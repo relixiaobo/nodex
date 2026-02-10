@@ -556,7 +556,9 @@ export const useNodeStore = create<NodeStore>()(
       const node = entities[nodeId];
       const oldOwnerId = node?.props._ownerId;
 
-      // Optimistic: remove from parent's children, update ownerId
+      const trashId = `${workspaceId}_TRASH`;
+
+      // Optimistic: remove from parent's children, add to trash, update ownerId
       set((state) => {
         if (oldOwnerId) {
           const parent = state.entities[oldOwnerId];
@@ -564,8 +566,13 @@ export const useNodeStore = create<NodeStore>()(
             parent.children = parent.children.filter((id) => id !== nodeId);
           }
         }
+        const trash = state.entities[trashId];
+        if (trash) {
+          if (!trash.children) trash.children = [];
+          trash.children.push(nodeId);
+        }
         if (state.entities[nodeId]) {
-          state.entities[nodeId].props._ownerId = `${workspaceId}_TRASH`;
+          state.entities[nodeId].props._ownerId = trashId;
         }
       });
 
@@ -576,9 +583,16 @@ export const useNodeStore = create<NodeStore>()(
       } catch {
         // Rollback
         set((state) => {
+          // Remove from trash
+          const trash = state.entities[trashId];
+          if (trash?.children) {
+            trash.children = trash.children.filter((id) => id !== nodeId);
+          }
+          // Restore owner
           if (state.entities[nodeId]) {
             state.entities[nodeId].props._ownerId = oldOwnerId;
           }
+          // Re-add to original parent
           if (oldOwnerId) {
             const parent = state.entities[oldOwnerId];
             if (parent) {

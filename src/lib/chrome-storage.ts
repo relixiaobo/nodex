@@ -6,18 +6,36 @@
  */
 import { createJSONStorage, type StateStorage } from 'zustand/middleware';
 
-const chromeStorage: StateStorage = {
-  getItem: async (name: string): Promise<string | null> => {
-    const result = await chrome.storage.local.get(name);
-    return (result[name] as string) ?? null;
-  },
-  setItem: async (name: string, value: string): Promise<void> => {
-    await chrome.storage.local.set({ [name]: value });
-  },
-  removeItem: async (name: string): Promise<void> => {
-    await chrome.storage.local.remove(name);
-  },
-};
+const hasChromeStorage =
+  typeof chrome !== 'undefined' &&
+  chrome.storage &&
+  chrome.storage.local;
+
+const chromeStorage: StateStorage = hasChromeStorage
+  ? {
+      getItem: async (name: string): Promise<string | null> => {
+        const result = await chrome.storage.local.get(name);
+        return (result[name] as string) ?? null;
+      },
+      setItem: async (name: string, value: string): Promise<void> => {
+        await chrome.storage.local.set({ [name]: value });
+      },
+      removeItem: async (name: string): Promise<void> => {
+        await chrome.storage.local.remove(name);
+      },
+    }
+  : {
+      // Fallback to localStorage for standalone dev/test
+      getItem: async (name: string): Promise<string | null> => {
+        return localStorage.getItem(name);
+      },
+      setItem: async (name: string, value: string): Promise<void> => {
+        localStorage.setItem(name, value);
+      },
+      removeItem: async (name: string): Promise<void> => {
+        localStorage.removeItem(name);
+      },
+    };
 
 /**
  * JSON replacer that converts Set instances to a tagged array format.

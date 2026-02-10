@@ -82,6 +82,15 @@
   pointer-events: none;
 }
 
+/* Indent guide line — hover fills button bg, inner line blends in.
+   Tana: 8px button, 1px ::after centered, hover shows full bg band. */
+.indent-line:hover {
+  background-color: var(--color-border);
+}
+.indent-line:hover > div {
+  background-color: var(--color-border);
+}
+
 /* cmdk command palette styles */
 [cmdk-group-heading] {
   padding: 0.25rem 0.5rem;

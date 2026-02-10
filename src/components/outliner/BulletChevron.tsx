@@ -27,6 +27,8 @@ interface BulletChevronProps {
  *   - All nodes get chevron on hover (including leaf nodes)
  *   - Collapsed/leaf: right-pointing arrow (›)
  *   - Expanded: down-pointing arrow (rotated 90°)
+ *   - Normal: white bg circle, light gray outline
+ *   - Hover: light gray bg circle fill
  *   - Click → toggle expand/collapse
  *   - Double-click → drill down (pushPanel)
  */
@@ -42,39 +44,46 @@ export function BulletChevron({
   const showOuterRing = hasChildren && !isExpanded;
 
   return (
-    <div className="flex shrink-0 items-center">
-      {/* Chevron area — left of bullet, shows on row hover only */}
+    <div className="flex shrink-0 items-center h-[21px]">
+      {/* Chevron area — left of bullet, shows on row hover only.
+           Tana: 15×15px circle button, position: absolute left: -21px from bullet.
+           We use inline flex with opacity toggle instead. */}
       <button
-        className="flex h-7 w-[15px] items-center justify-center"
+        className="flex h-[21px] w-[15px] items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
         onClick={onToggle}
         onDoubleClick={onDrillDown}
         onMouseDown={onChevronMouseDown}
         title={hasChildren && isExpanded ? 'Collapse' : 'Expand'}
       >
-        <svg
-          width="12"
-          height="12"
-          viewBox="0 0 12 12"
-          className={`text-muted-foreground opacity-0 group-hover:opacity-100 transition-all hover:text-foreground ${
-            hasChildren && isExpanded ? 'rotate-90' : ''
+        {/* Circular chevron button — Tana: white bg, 1px gray outline, hover fills gray */}
+        <div
+          className={`flex h-[15px] w-[15px] items-center justify-center rounded-full bg-background outline outline-1 outline-border/60 hover:bg-foreground/[0.04] transition-colors ${
+            hasChildren && isExpanded ? '[&>svg]:rotate-90' : ''
           }`}
         >
-          <path
-            d="M4 2L8 6L4 10"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
+          <svg
+            width="10"
+            height="10"
+            viewBox="0 0 12 12"
+            className="text-muted-foreground transition-transform"
+          >
+            <path
+              d="M4.5 2.5L8 6L4.5 9.5"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </div>
       </button>
       {/* Bullet area — right of chevron, always visible, click to zoom in.
            Hit area matches chevron height (h-7) for easy clicking;
            visual ring stays 15×15px. */}
       <span
         role="button"
-        className="flex h-7 w-[15px] items-center justify-center cursor-pointer group/bullet"
+        className="flex h-[21px] w-[15px] items-center justify-center cursor-pointer group/bullet"
         onClick={onBulletClick}
         title="Zoom in"
       >

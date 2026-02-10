@@ -10,8 +10,14 @@ import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 import { nanoid } from 'nanoid';
 import type { NodexNode } from '../types/index.js';
+import { WORKSPACE_CONTAINERS } from '../types/index.js';
 import * as nodeService from '../services/node-service.js';
 import { isSupabaseReady } from '../services/supabase.js';
+
+const CONTAINER_SUFFIXES = Object.values(WORKSPACE_CONTAINERS);
+function isWorkspaceContainer(nodeId: string): boolean {
+  return CONTAINER_SUFFIXES.some(suffix => nodeId.endsWith(`_${suffix}`));
+}
 
 interface NodeStore {
   /** Normalized entities map: { [nodeId]: NodexNode } */
@@ -356,6 +362,7 @@ export const useNodeStore = create<NodeStore>()(
       const parent = entities[parentId];
       const grandparentId = parent?.props._ownerId;
       if (!grandparentId) return; // Parent is top-level, can't outdent
+      if (isWorkspaceContainer(parentId)) return; // Parent is a container, can't outdent
 
       const grandparent = entities[grandparentId];
       if (!grandparent?.children) return;

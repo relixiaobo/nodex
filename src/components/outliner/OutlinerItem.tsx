@@ -6,6 +6,7 @@ import { useUIStore } from '../../stores/ui-store';
 import { useWorkspaceStore } from '../../stores/workspace-store';
 import { BulletChevron } from './BulletChevron';
 import { NodeEditor } from '../editor/NodeEditor';
+import { PendingChildEditor } from '../editor/PendingChildEditor';
 import {
   getFlattenedVisibleNodes,
   getPreviousVisibleNodeId,
@@ -70,13 +71,86 @@ export function OutlinerItem({ nodeId, depth, rootChildIds }: OutlinerItemProps)
     setFocusedNode(nodeId);
   }, [nodeId, setFocusedNode]);
 
+  const createChild = useNodeStore((s) => s.createChild);
+  const pendingNewChildOf = useUIStore((s) => s.pendingNewChildOf);
+  const setPendingNewChild = useUIStore((s) => s.setPendingNewChild);
+
+  // Flag to prevent blur→cancel race when chevron is clicked while pending editor is focused.
+  // mouseDown fires before blur, so we set the flag in onMouseDown and check it in the cancel handler.
+  const chevronClickRef = useRef(false);
+
+  const handleChevronMouseDown = useCallback(() => {
+    if (useUIStore.getState().pendingNewChildOf === nodeId) {
+      chevronClickRef.current = true;
+    }
+  }, [nodeId]);
+
   const handleToggle = useCallback(() => {
-    toggleExpanded(nodeId);
-  }, [nodeId, toggleExpanded]);
+    const pending = useUIStore.getState().pendingNewChildOf;
+    if (pending === nodeId) {
+      // Chevron click while pending child is active → cancel + collapse
+      setPendingNewChild(null);
+      setExpanded(nodeId, false);
+      chevronClickRef.current = false;
+      return;
+    }
+
+    const currentNode = useNodeStore.getState().entities[nodeId];
+    const currentHasChildren = (currentNode?.children ?? []).length > 0;
+    const currentlyExpanded = useUIStore.getState().expandedNodes.has(nodeId);
+
+    if (!currentHasChildren && !currentlyExpanded) {
+      // Leaf node chevron click: expand + show pending child editor (Tana behavior)
+      // No real node is created until the user types something.
+      setExpanded(nodeId, true);
+      setPendingNewChild(nodeId);
+    } else {
+      toggleExpanded(nodeId);
+    }
+  }, [nodeId, toggleExpanded, setExpanded, setPendingNewChild]);
 
   const handleDrillDown = useCallback(() => {
     pushPanel(nodeId);
   }, [nodeId, pushPanel]);
+
+  const handleBulletClick = useCallback(() => {
+    pushPanel(nodeId);
+  }, [nodeId, pushPanel]);
+
+  const handleIndentLineClick = useCallback(() => {
+    // Toggle expand/collapse all direct children (Tana indent guide line behavior)
+    const currentChildIds = useNodeStore.getState().entities[nodeId]?.children ?? [];
+    const expanded = useUIStore.getState().expandedNodes;
+    // Check if any child is expanded
+    const anyChildExpanded = currentChildIds.some((cid) => expanded.has(cid));
+    const next = new Set(expanded);
+    for (const cid of currentChildIds) {
+      if (anyChildExpanded) {
+        next.delete(cid);
+      } else {
+        next.add(cid);
+      }
+    }
+    useUIStore.setState({ expandedNodes: next });
+  }, [nodeId]);
+
+  // ─── Pending child handlers (leaf chevron click) ───
+
+  const handlePendingCommit = useCallback(
+    (name: string) => {
+      if (!wsId || !userId) return;
+      setPendingNewChild(null);
+      createChild(nodeId, wsId, userId, name);
+    },
+    [nodeId, wsId, userId, createChild, setPendingNewChild],
+  );
+
+  const handlePendingCancel = useCallback(() => {
+    // If blur was caused by clicking the chevron, let handleToggle handle it
+    if (chevronClickRef.current) return;
+    setPendingNewChild(null);
+    setExpanded(nodeId, false);
+  }, [nodeId, setPendingNewChild, setExpanded]);
 
   // ─── Keyboard shortcut handlers ───
 
@@ -263,6 +337,8 @@ export function OutlinerItem({ nodeId, depth, rootChildIds }: OutlinerItemProps)
           isExpanded={isExpanded}
           onToggle={handleToggle}
           onDrillDown={handleDrillDown}
+          onBulletClick={handleBulletClick}
+          onChevronMouseDown={handleChevronMouseDown}
         />
         {isFocused ? (
           <NodeEditor
@@ -280,7 +356,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds }: OutlinerItemProps)
           />
         ) : (
           <div
-            className="flex-1 cursor-text text-sm leading-7 min-w-0"
+            className="node-content flex-1 cursor-text text-sm leading-7 min-w-0"
             onClick={handleClick}
             dangerouslySetInnerHTML={{
               __html:
@@ -297,15 +373,48 @@ export function OutlinerItem({ nodeId, depth, rootChildIds }: OutlinerItemProps)
           style={{ marginLeft: depth * 24 + 20 }}
         />
       )}
-      {isExpanded &&
-        childIds.map((childId) => (
-          <OutlinerItem
-            key={childId}
-            nodeId={childId}
-            depth={depth + 1}
-            rootChildIds={rootChildIds}
-          />
-        ))}
+      {isExpanded && childIds.length > 0 && (
+        <div className="relative">
+          {/* Indent guide line — clickable button, toggles expand/collapse all children */}
+          <button
+            className="absolute top-0 bottom-0 w-4 flex justify-center cursor-pointer group/line"
+            style={{ left: depth * 24 + 15 }}
+            onClick={handleIndentLineClick}
+            title="Toggle children"
+          >
+            <div className="w-px h-full bg-border/50 group-hover/line:bg-foreground/30 transition-colors" />
+          </button>
+          {childIds.map((childId) => (
+            <OutlinerItem
+              key={childId}
+              nodeId={childId}
+              depth={depth + 1}
+              rootChildIds={rootChildIds}
+            />
+          ))}
+        </div>
+      )}
+      {/* Pending child: ephemeral editor shown when chevron is clicked on a leaf node */}
+      {isExpanded && !hasChildren && pendingNewChildOf === nodeId && (
+        <div className="relative">
+          <div
+            className="group flex min-h-7 items-start gap-0.5 rounded-sm py-0.5 bg-primary/5"
+            style={{ paddingLeft: (depth + 1) * 24 }}
+          >
+            <BulletChevron
+              hasChildren={false}
+              isExpanded={false}
+              onToggle={() => {}}
+              onDrillDown={() => {}}
+              onBulletClick={() => {}}
+            />
+            <PendingChildEditor
+              onCommit={handlePendingCommit}
+              onCancel={handlePendingCancel}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

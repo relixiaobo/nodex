@@ -66,6 +66,13 @@ function useTestBootstrap() {
       pushPanel(libraryId);
     }
 
+    // Expose stores on window for MCP/DevTools console testing
+    Object.assign(window, {
+      __nodeStore: useNodeStore,
+      __uiStore: useUIStore,
+      __wsStore: useWorkspaceStore,
+    });
+
     setReady(true);
   }, []);
 

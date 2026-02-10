@@ -41,6 +41,10 @@ interface UIStore {
   setDrag(nodeId: string | null): void;
   setDropTarget(nodeId: string | null, position: 'before' | 'after' | 'inside' | null): void;
 
+  // Pending new child (chevron click on leaf — ephemeral until user types)
+  pendingNewChildOf: string | null;
+  setPendingNewChild(parentId: string | null): void;
+
   // View mode
   viewMode: 'list' | 'table' | 'tiles' | 'cards';
   setViewMode(mode: 'list' | 'table' | 'tiles' | 'cards'): void;
@@ -101,6 +105,10 @@ export const useUIStore = create<UIStore>()(
       dropPosition: null,
       setDrag: (nodeId) => set({ dragNodeId: nodeId, dropTargetId: null, dropPosition: null }),
       setDropTarget: (nodeId, position) => set({ dropTargetId: nodeId, dropPosition: position }),
+
+      // Pending new child
+      pendingNewChildOf: null,
+      setPendingNewChild: (parentId) => set({ pendingNewChildOf: parentId }),
 
       // View mode
       viewMode: 'list',

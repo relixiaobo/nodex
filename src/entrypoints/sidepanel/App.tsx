@@ -8,6 +8,7 @@ import { PanelStack } from '../../components/panel/PanelStack';
 import { CommandPalette } from '../../components/search/CommandPalette';
 import { WORKSPACE_CONTAINERS, getContainerId } from '../../types/index.js';
 import type { NodexNode, WorkspaceContainerSuffix } from '../../types/index.js';
+import { resetSupabase } from '../../services/supabase.js';
 
 /**
  * Bootstrap seed container nodes for a workspace.
@@ -59,10 +60,14 @@ function useBootstrap() {
       // Try to initialize Supabase
       try {
         const { setupSupabase } = await import('../../lib/supabase');
-        setupSupabase();
+        const client = setupSupabase();
+        // Test actual connectivity with a lightweight query
+        const { error } = await client.from('nodes').select('id').limit(1);
+        if (error) throw error;
         supabaseReady = true;
       } catch {
-        // Supabase not configured — work in offline/demo mode
+        // Supabase not reachable or not configured — fall back to offline mode
+        resetSupabase();
       }
 
       // Bootstrap workspace

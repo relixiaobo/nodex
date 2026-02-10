@@ -29,7 +29,43 @@
   --font-mono: "JetBrains Mono", "Fira Code", monospace;
 }
 
-/* TipTap editor styles */
+/* Shared inline element styles — used by both TipTap editor (.tiptap)
+   and static node display (.node-content) to prevent visual jumping
+   when switching between edit and display modes. */
+.tiptap code,
+.node-content code {
+  background-color: var(--color-muted);
+  border-radius: 0.25rem;
+  padding: 0.125rem 0.25rem;
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+}
+
+.tiptap mark,
+.node-content mark {
+  background-color: #fef08a;
+  border-radius: 0.125rem;
+  padding: 0.0625rem 0;
+}
+
+.tiptap a,
+.node-content a {
+  color: var(--color-primary);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.tiptap strong,
+.node-content strong {
+  font-weight: 600;
+}
+
+.tiptap s,
+.node-content s {
+  text-decoration: line-through;
+}
+
+/* TipTap editor-only styles */
 .tiptap {
   outline: none;
 }
@@ -44,34 +80,6 @@
   float: left;
   height: 0;
   pointer-events: none;
-}
-
-.tiptap code {
-  background-color: var(--color-muted);
-  border-radius: 0.25rem;
-  padding: 0.125rem 0.25rem;
-  font-family: var(--font-mono);
-  font-size: 0.85em;
-}
-
-.tiptap mark {
-  background-color: #fef08a;
-  border-radius: 0.125rem;
-  padding: 0.0625rem 0;
-}
-
-.tiptap a {
-  color: var(--color-primary);
-  text-decoration: underline;
-  cursor: pointer;
-}
-
-.tiptap strong {
-  font-weight: 600;
-}
-
-.tiptap s {
-  text-decoration: line-through;
 }
 
 /* cmdk command palette styles */

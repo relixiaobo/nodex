@@ -158,9 +158,14 @@ export function NodeEditor({
     },
   });
 
-  // Auto-focus when mounted
+  // Auto-focus when mounted.
+  // Also reset savedRef: React Strict Mode double-invokes effects in dev,
+  // which triggers the cleanup save (harmlessly, since content is unchanged)
+  // but leaves savedRef.current = true. Resetting here ensures the real
+  // editing session can save correctly.
   useEffect(() => {
     if (editor && !editor.isDestroyed) {
+      savedRef.current = false;
       editor.commands.focus('end');
     }
   }, [editor]);

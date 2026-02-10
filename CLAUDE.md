@@ -149,6 +149,16 @@ ContentNode
 
 ## 代码约定
 
+### 点击区域标准 (Hit Area Standard)
+
+所有可交互的小元素（图标、按钮、小型点击目标）必须保证足够大的点击区域：
+
+- **最小点击区域**: 28px × 15px（与行高 h-7 对齐）
+- **实现方式**: 外层透明容器撑大点击区域，内层保持视觉尺寸不变
+- **示例**: BulletChevron 的 bullet 外层 `h-7 w-[15px]`（28×15 hit area），内层 `h-[15px] w-[15px]`（视觉尺寸）
+- **线性点击区域**: 垂直/水平线条类元素至少 `w-4`（16px）宽度
+- **参考组件**: `BulletChevron.tsx`（group/bullet 模式）、`OutlinerItem.tsx`（indent guide）
+
 ### TypeScript
 
 - 所有导入使用 `.js` 后缀（ESM 要求）
@@ -235,6 +245,59 @@ ContentNode
 | Service Worker 随时可能终止 | Zustand persist → chrome.storage |
 | MV3 CSP 限制 | 所有资源本地打包，无 CDN |
 | 与网页通信 | chrome.runtime.sendMessage + content script |
+
+## 测试与验证
+
+### MCP 工具分工
+
+| 工具集 | 用途 | 适用目标 |
+|--------|------|----------|
+| **`chrome-devtools` MCP** | JS 执行、a11y 快照、DOM 操作 | `http://localhost:5199` (standalone) |
+| **`claude-in-chrome` MCP** | 截图、缩放、视觉比较、元素交互 | 任意标签页 (含 Tana 参考) |
+
+**关键限制**：
+- `chrome-devtools` 只能连接 localhost，不能连接 chrome-extension:// 页面
+- `claude-in-chrome` 可以截图任何标签页，但 JS 执行受限于 Vite 模块隔离
+- 两个工具都无法模拟真实键盘事件（ProseMirror 忽略 `isTrusted: false`）
+- 截图前先调整页面为 1000x800 或更小
+- **Tana 操作限制**: 只允许操作 `just_for_claude` 工作区，禁止操作用户其他工作区（如 Xiaobo）
+
+### Standalone 测试环境
+
+```bash
+npm run dev:test   # 启动 http://localhost:5199/standalone/index.html
+```
+
+- `standalone/TestApp.tsx` 跳过 Supabase 初始化，纯离线模式
+- 种子数据 36 个节点（`src/entrypoints/test/seed-data.ts`）
+- **Store 全局访问**：`window.__nodeStore` / `window.__uiStore` / `window.__wsStore`
+
+### 自测流程 → `/self-test` Skill
+
+每次改完代码后，运行 `/self-test` 执行标准验证流程。Skill 定义在 `.claude/skills/self-test/SKILL.md`，包含：
+
+- **Phase 0**: 环境准备 (dev server + typecheck)
+- **Phase 1**: Store 操作验证 (CRUD + 树操作 + UI Store + 边界条件)
+- **Phase 2**: 视觉渲染验证 (截图 + Tana 对比 + 响应式)
+- **Phase 3**: 扩展构建 (`npx wxt build`)
+
+支持参数：`/self-test all|store|visual|build`
+
+### 已知易错点（Bug 档案）
+
+| # | 问题 | 文件 | 要点 |
+|---|------|------|------|
+| 1 | **handleBlur 竞态** | `OutlinerItem.tsx` | onBlur 须检查 `focusedNodeId === nodeId` 再清除 |
+| 2 | **trashNode children** | `node-store.ts` | 必须同时更新 `trash.children` 和 `node._ownerId` |
+| 3 | **Supabase 误触发** | `TestApp.tsx` | standalone 不调 `setupSupabase()`，靠 `isSupabaseReady()` guard |
+| 4 | **HMR 模块隔离** | `TestApp.tsx` | 用 `window.__nodeStore` 访问，不要用 `import()` |
+| 5 | **createSibling 父节点** | `node-store.ts` | 安全测试节点：`subtask_1a`（父 `task_1` 始终存在） |
+| 6 | **BulletChevron** | `BulletChevron.tsx` | Tana: bullet 始终可见，chevron 仅行 hover 时显示（所有节点含叶子），展开+不 hover 时 chevron 隐藏 |
+| 7 | **outdent 容器边界** | `node-store.ts` | 容器节点子节点 outdent 应为 no-op（`isWorkspaceContainer` guard） |
+| 8 | **chevron rotate 条件** | `BulletChevron.tsx` | 旋转条件必须是 `hasChildren && isExpanded`，不能只检查 `isExpanded` |
+| 9 | **bullet 点击区域** | `BulletChevron.tsx` | bullet `<span>` 和 chevron `<button>` 是独立元素，点击 bullet → pushPanel（zoom in），点击 chevron → toggleExpand |
+| 10 | **叶子节点 chevron 点击** | `OutlinerItem.tsx` | 叶子节点点击 chevron → expand + createChild（Tana 行为），需检查 children.length |
+| 11 | **indent guide line 可点击** | `OutlinerItem.tsx` | indent guide 是 `<button>`，点击 toggle 所有直接子节点的展开/折叠 |
 
 ## 参考文档
 

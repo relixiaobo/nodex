@@ -7,7 +7,7 @@ interface DragHandleProps {
 export function DragHandle({ onDragStart }: DragHandleProps) {
   return (
     <span
-      className="flex h-7 w-4 shrink-0 cursor-grab items-center justify-center opacity-0 group-hover:opacity-40 hover:!opacity-100 active:cursor-grabbing"
+      className="flex h-7 w-5 shrink-0 cursor-grab items-center justify-center opacity-0 group-hover:opacity-40 hover:!opacity-100 active:cursor-grabbing"
       draggable
       onDragStart={onDragStart}
     >

@@ -51,6 +51,7 @@ interface NodeStore {
     workspaceId: string,
     userId: string,
     name?: string,
+    position?: number,
   ): Promise<NodexNode>;
 
   /** Create a sibling node after the given nodeId */
@@ -58,6 +59,7 @@ interface NodeStore {
     nodeId: string,
     workspaceId: string,
     userId: string,
+    name?: string,
   ): Promise<NodexNode>;
 
   /** Update a node's name (optimistic) */
@@ -161,7 +163,7 @@ export const useNodeStore = create<NodeStore>()(
       }
     },
 
-    createChild: async (parentId, workspaceId, userId, name) => {
+    createChild: async (parentId, workspaceId, userId, name, position) => {
       const id = nanoid();
       const now = Date.now();
 
@@ -183,7 +185,11 @@ export const useNodeStore = create<NodeStore>()(
         const parent = state.entities[parentId];
         if (parent) {
           if (!parent.children) parent.children = [];
-          parent.children.push(id);
+          if (position !== undefined) {
+            parent.children.splice(position, 0, id);
+          } else {
+            parent.children.push(id);
+          }
         }
       });
 
@@ -214,7 +220,7 @@ export const useNodeStore = create<NodeStore>()(
       }
     },
 
-    createSibling: async (nodeId, workspaceId, userId) => {
+    createSibling: async (nodeId, workspaceId, userId, name) => {
       const { entities } = get();
       const node = entities[nodeId];
       const parentId = node?.props._ownerId;
@@ -231,7 +237,7 @@ export const useNodeStore = create<NodeStore>()(
       const optimisticNode: NodexNode = {
         id,
         workspaceId,
-        props: { created: now, name: '', _ownerId: parentId },
+        props: { created: now, name: name ?? '', _ownerId: parentId },
         children: [],
         version: 1,
         updatedAt: now,
@@ -254,7 +260,7 @@ export const useNodeStore = create<NodeStore>()(
 
       try {
         const newNode = await nodeService.createNode(
-          { id, workspaceId, props: { created: now, name: '', _ownerId: parentId } },
+          { id, workspaceId, props: { created: now, name: name ?? '', _ownerId: parentId } },
           userId,
         );
         await nodeService.addChild(parentId, id, userId, insertPosition);

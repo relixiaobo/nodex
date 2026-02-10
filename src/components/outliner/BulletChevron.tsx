@@ -4,7 +4,8 @@ interface BulletChevronProps {
   onToggle: () => void;
   onDrillDown: () => void;
   onBulletClick: () => void;
-  onChevronMouseDown?: () => void;
+  /** Dimmed style for trailing input placeholder bullets */
+  dimmed?: boolean;
 }
 
 /**
@@ -38,7 +39,7 @@ export function BulletChevron({
   onToggle,
   onDrillDown,
   onBulletClick,
-  onChevronMouseDown,
+  dimmed,
 }: BulletChevronProps) {
   // Collapsed with children: show dimmed background ring (Tana: bulletColor1Dimmed)
   const showOuterRing = hasChildren && !isExpanded;
@@ -52,7 +53,6 @@ export function BulletChevron({
         className="flex h-[21px] w-[15px] items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
         onClick={onToggle}
         onDoubleClick={onDrillDown}
-        onMouseDown={onChevronMouseDown}
         title={hasChildren && isExpanded ? 'Collapse' : 'Expand'}
       >
         {/* Circular chevron button — Tana: white bg, 1px gray outline, hover fills gray */}
@@ -92,7 +92,7 @@ export function BulletChevron({
             showOuterRing ? 'bg-foreground/10' : ''
           }`}
         >
-          <div className="h-[5px] w-[5px] rounded-full bg-foreground/50 transition-transform group-hover/bullet:scale-[1.375]" />
+          <div className={`h-[5px] w-[5px] rounded-full transition-transform group-hover/bullet:scale-[1.375] ${dimmed ? 'bg-foreground/15' : 'bg-foreground/50'}`} />
         </div>
       </span>
     </div>

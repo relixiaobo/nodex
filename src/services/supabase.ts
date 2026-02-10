@@ -24,6 +24,13 @@ export function getSupabase(): SupabaseClient {
 }
 
 /**
+ * 重置 Supabase 客户端（降级到离线模式）。
+ */
+export function resetSupabase(): void {
+  supabaseInstance = null;
+}
+
+/**
  * 检查 Supabase 是否已初始化。用于判断是否应尝试远程操作。
  */
 export function isSupabaseReady(): boolean {

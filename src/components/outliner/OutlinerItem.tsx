@@ -58,8 +58,13 @@ export function OutlinerItem({ nodeId, depth, rootChildIds }: OutlinerItemProps)
   // ─── Basic handlers ───
 
   const handleBlur = useCallback(() => {
-    setFocusedNode(null);
-  }, [setFocusedNode]);
+    // Only clear focus if this node is still the focused one.
+    // Prevents race condition: Enter creates sibling → setFocusedNode(newId) →
+    // old editor unmounts → onBlur fires → would wrongly reset to null.
+    if (useUIStore.getState().focusedNodeId === nodeId) {
+      setFocusedNode(null);
+    }
+  }, [nodeId, setFocusedNode]);
 
   const handleClick = useCallback(() => {
     setFocusedNode(nodeId);

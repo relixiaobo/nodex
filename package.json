@@ -10,6 +10,7 @@
     "build:firefox": "wxt build --browser firefox",
     "zip": "wxt zip",
     "zip:firefox": "wxt zip --browser firefox",
+    "dev:test": "vite --config vite.config.standalone.ts",
     "typecheck": "tsc --noEmit",
     "postinstall": "wxt prepare"
   },
@@ -32,6 +33,7 @@
     "@types/chrome": "^0.0.304",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^5.1.3",
     "@wxt-dev/module-react": "^1.1.2",
     "tailwindcss": "^4.0.0",
     "typescript": "^5.9.3",

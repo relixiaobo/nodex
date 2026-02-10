@@ -16,6 +16,7 @@ import { useEffect, useRef, useCallback } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import { Extension } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
+import Highlight from '@tiptap/extension-highlight';
 import Placeholder from '@tiptap/extension-placeholder';
 import { useNodeStore } from '../../stores/node-store';
 import { useWorkspaceStore } from '../../stores/workspace-store';
@@ -139,6 +140,7 @@ export function NodeEditor({
         codeBlock: false,
         horizontalRule: false,
       }),
+      Highlight,
       Placeholder.configure({
         placeholder: 'Type something...',
       }),
@@ -147,7 +149,7 @@ export function NodeEditor({
     content: wrapInP(initialContent),
     editorProps: {
       attributes: {
-        class: 'outline-none text-sm leading-7',
+        class: 'outline-none text-sm leading-[21px]',
       },
     },
     onBlur: ({ editor }) => {

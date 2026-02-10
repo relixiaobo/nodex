@@ -312,19 +312,17 @@ export function OutlinerItem({ nodeId, depth, rootChildIds }: OutlinerItemProps)
       {isDropTarget && dropPosition === 'before' && (
         <div
           className="h-0.5 bg-primary rounded-full"
-          style={{ marginLeft: depth * 24 + 20 }}
+          style={{ marginLeft: depth * 24 + 6 + 30 }}
         />
       )}
       <div
         ref={rowRef}
-        className={`group flex min-h-7 items-start gap-0.5 rounded-sm py-0.5 ${
-          isFocused
-            ? 'bg-primary/5'
-            : isDropTarget && dropPosition === 'inside'
-              ? 'bg-primary/10 ring-1 ring-primary/30'
-              : 'hover:bg-muted/50'
+        className={`group flex min-h-7 items-start gap-[7.5px] py-1 ${
+          isDropTarget && dropPosition === 'inside'
+            ? 'bg-primary/10 ring-1 ring-primary/30 rounded-sm'
+            : ''
         } ${isDragging ? 'opacity-40' : ''}`}
-        style={{ paddingLeft: depth * 24 }}
+        style={{ paddingLeft: depth * 24 + 6 }}
         draggable={!isFocused}
         onDragStart={handleDragStart}
         onDragOver={handleDragOver}
@@ -356,7 +354,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds }: OutlinerItemProps)
           />
         ) : (
           <div
-            className="node-content flex-1 cursor-text text-sm leading-7 min-w-0"
+            className="node-content flex-1 cursor-text text-sm leading-[21px] min-w-0"
             onClick={handleClick}
             dangerouslySetInnerHTML={{
               __html:
@@ -370,19 +368,20 @@ export function OutlinerItem({ nodeId, depth, rootChildIds }: OutlinerItemProps)
       {isDropTarget && dropPosition === 'after' && (
         <div
           className="h-0.5 bg-primary rounded-full"
-          style={{ marginLeft: depth * 24 + 20 }}
+          style={{ marginLeft: depth * 24 + 6 + 30 }}
         />
       )}
       {isExpanded && childIds.length > 0 && (
         <div className="relative">
-          {/* Indent guide line — clickable button, toggles expand/collapse all children */}
+          {/* Indent guide line — clickable 8px button (Tana: left 13.5px from parent).
+               Center aligns with parent bullet center. Hover fills bg = looks thicker. */}
           <button
-            className="absolute top-0 bottom-0 w-4 flex justify-center cursor-pointer group/line"
-            style={{ left: depth * 24 + 15 }}
+            className="indent-line absolute top-0 bottom-0 w-2 flex justify-center cursor-pointer rounded-sm transition-colors"
+            style={{ left: depth * 24 + 6 + 7 }}
             onClick={handleIndentLineClick}
             title="Toggle children"
           >
-            <div className="w-px h-full bg-border/50 group-hover/line:bg-foreground/30 transition-colors" />
+            <div className="w-px h-full bg-border/80" />
           </button>
           {childIds.map((childId) => (
             <OutlinerItem
@@ -398,8 +397,8 @@ export function OutlinerItem({ nodeId, depth, rootChildIds }: OutlinerItemProps)
       {isExpanded && !hasChildren && pendingNewChildOf === nodeId && (
         <div className="relative">
           <div
-            className="group flex min-h-7 items-start gap-0.5 rounded-sm py-0.5 bg-primary/5"
-            style={{ paddingLeft: (depth + 1) * 24 }}
+            className="group flex min-h-7 items-start gap-[7.5px] py-1"
+            style={{ paddingLeft: (depth + 1) * 24 + 6 }}
           >
             <BulletChevron
               hasChildren={false}

@@ -6,7 +6,7 @@ import { useUIStore } from '../../stores/ui-store';
 import { useWorkspaceStore } from '../../stores/workspace-store';
 import { BulletChevron } from './BulletChevron';
 import { NodeEditor } from '../editor/NodeEditor';
-import { PendingChildEditor } from '../editor/PendingChildEditor';
+import { TrailingInput } from '../editor/TrailingInput';
 import {
   getFlattenedVisibleNodes,
   getPreviousVisibleNodeId,
@@ -39,6 +39,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds }: OutlinerItemProps)
   const userId = useWorkspaceStore((s) => s.userId);
 
   const createSibling = useNodeStore((s) => s.createSibling);
+  const createChild = useNodeStore((s) => s.createChild);
   const indentNode = useNodeStore((s) => s.indentNode);
   const outdentNode = useNodeStore((s) => s.outdentNode);
   const moveNodeUp = useNodeStore((s) => s.moveNodeUp);
@@ -71,43 +72,18 @@ export function OutlinerItem({ nodeId, depth, rootChildIds }: OutlinerItemProps)
     setFocusedNode(nodeId);
   }, [nodeId, setFocusedNode]);
 
-  const createChild = useNodeStore((s) => s.createChild);
-  const pendingNewChildOf = useUIStore((s) => s.pendingNewChildOf);
-  const setPendingNewChild = useUIStore((s) => s.setPendingNewChild);
-
-  // Flag to prevent blur→cancel race when chevron is clicked while pending editor is focused.
-  // mouseDown fires before blur, so we set the flag in onMouseDown and check it in the cancel handler.
-  const chevronClickRef = useRef(false);
-
-  const handleChevronMouseDown = useCallback(() => {
-    if (useUIStore.getState().pendingNewChildOf === nodeId) {
-      chevronClickRef.current = true;
-    }
-  }, [nodeId]);
-
   const handleToggle = useCallback(() => {
-    const pending = useUIStore.getState().pendingNewChildOf;
-    if (pending === nodeId) {
-      // Chevron click while pending child is active → cancel + collapse
-      setPendingNewChild(null);
-      setExpanded(nodeId, false);
-      chevronClickRef.current = false;
-      return;
-    }
-
     const currentNode = useNodeStore.getState().entities[nodeId];
     const currentHasChildren = (currentNode?.children ?? []).length > 0;
     const currentlyExpanded = useUIStore.getState().expandedNodes.has(nodeId);
 
     if (!currentHasChildren && !currentlyExpanded) {
-      // Leaf node chevron click: expand + show pending child editor (Tana behavior)
-      // No real node is created until the user types something.
+      // Leaf node: expand to show trailing input (auto-focuses)
       setExpanded(nodeId, true);
-      setPendingNewChild(nodeId);
     } else {
       toggleExpanded(nodeId);
     }
-  }, [nodeId, toggleExpanded, setExpanded, setPendingNewChild]);
+  }, [nodeId, toggleExpanded, setExpanded]);
 
   const handleDrillDown = useCallback(() => {
     pushPanel(nodeId);
@@ -134,41 +110,50 @@ export function OutlinerItem({ nodeId, depth, rootChildIds }: OutlinerItemProps)
     useUIStore.setState({ expandedNodes: next });
   }, [nodeId]);
 
-  // ─── Pending child handlers (leaf chevron click) ───
-
-  const handlePendingCommit = useCallback(
-    (name: string) => {
-      if (!wsId || !userId) return;
-      setPendingNewChild(null);
-      createChild(nodeId, wsId, userId, name);
-    },
-    [nodeId, wsId, userId, createChild, setPendingNewChild],
-  );
-
-  const handlePendingCancel = useCallback(() => {
-    // If blur was caused by clicking the chevron, let handleToggle handle it
-    if (chevronClickRef.current) return;
-    setPendingNewChild(null);
-    setExpanded(nodeId, false);
-  }, [nodeId, setPendingNewChild, setExpanded]);
-
   // ─── Keyboard shortcut handlers ───
 
-  const handleEnter = useCallback(() => {
-    if (!wsId || !userId) return;
-    createSibling(nodeId, wsId, userId).then((newNode) => {
-      setFocusedNode(newNode.id);
-    });
-  }, [nodeId, wsId, userId, createSibling, setFocusedNode]);
+  const handleEnter = useCallback(
+    (afterContent?: string) => {
+      if (!wsId || !userId) return;
+
+      const currentlyExpanded = useUIStore.getState().expandedNodes.has(nodeId);
+      const currentHasChildren =
+        (useNodeStore.getState().entities[nodeId]?.children ?? []).length > 0;
+
+      if (afterContent !== undefined && currentlyExpanded && currentHasChildren) {
+        // Split with expanded children → afterContent becomes first child
+        createChild(nodeId, wsId, userId, afterContent, 0).then((newNode) => {
+          setFocusedNode(newNode.id);
+        });
+      } else {
+        // Create sibling (with split text or empty)
+        createSibling(nodeId, wsId, userId, afterContent).then((newNode) => {
+          setFocusedNode(newNode.id);
+        });
+      }
+    },
+    [nodeId, wsId, userId, createSibling, createChild, setFocusedNode],
+  );
 
   const handleIndent = useCallback(() => {
     if (!userId) return;
-    indentNode(nodeId, userId).then(() => {
-      const updatedNode = useNodeStore.getState().entities[nodeId];
-      if (updatedNode?.props._ownerId) {
-        setExpanded(updatedNode.props._ownerId, true);
-      }
-    });
+
+    // Pre-compute new parent (previous sibling) and expand it BEFORE moving.
+    // This prevents the node from being unmounted between state updates,
+    // which would cause blur → focus loss.
+    const currentNode = useNodeStore.getState().entities[nodeId];
+    const parentId = currentNode?.props._ownerId;
+    if (!parentId) return;
+
+    const parent = useNodeStore.getState().entities[parentId];
+    if (!parent?.children) return;
+
+    const index = parent.children.indexOf(nodeId);
+    if (index <= 0) return; // Can't indent first child
+
+    const newParentId = parent.children[index - 1];
+    setExpanded(newParentId, true);
+    indentNode(nodeId, userId);
   }, [nodeId, userId, indentNode, setExpanded]);
 
   const handleOutdent = useCallback(() => {
@@ -336,7 +321,6 @@ export function OutlinerItem({ nodeId, depth, rootChildIds }: OutlinerItemProps)
           onToggle={handleToggle}
           onDrillDown={handleDrillDown}
           onBulletClick={handleBulletClick}
-          onChevronMouseDown={handleChevronMouseDown}
         />
         {isFocused ? (
           <NodeEditor
@@ -371,18 +355,20 @@ export function OutlinerItem({ nodeId, depth, rootChildIds }: OutlinerItemProps)
           style={{ marginLeft: depth * 24 + 6 + 30 }}
         />
       )}
-      {isExpanded && childIds.length > 0 && (
+      {isExpanded && (
         <div className="relative">
           {/* Indent guide line — clickable 8px button (Tana: left 13.5px from parent).
                Center aligns with parent bullet center. Hover fills bg = looks thicker. */}
-          <button
-            className="indent-line absolute top-0 bottom-0 w-2 flex justify-center cursor-pointer rounded-sm transition-colors"
-            style={{ left: depth * 24 + 6 + 7 }}
-            onClick={handleIndentLineClick}
-            title="Toggle children"
-          >
-            <div className="w-px h-full bg-border/80" />
-          </button>
+          {childIds.length > 0 && (
+            <button
+              className="indent-line absolute top-0 bottom-0 w-2 flex justify-center cursor-pointer rounded-sm transition-colors"
+              style={{ left: depth * 24 + 6 + 7 }}
+              onClick={handleIndentLineClick}
+              title="Toggle children"
+            >
+              <div className="w-px h-full bg-border/80" />
+            </button>
+          )}
           {childIds.map((childId) => (
             <OutlinerItem
               key={childId}
@@ -391,27 +377,13 @@ export function OutlinerItem({ nodeId, depth, rootChildIds }: OutlinerItemProps)
               rootChildIds={rootChildIds}
             />
           ))}
-        </div>
-      )}
-      {/* Pending child: ephemeral editor shown when chevron is clicked on a leaf node */}
-      {isExpanded && !hasChildren && pendingNewChildOf === nodeId && (
-        <div className="relative">
-          <div
-            className="group flex min-h-7 items-start gap-[7.5px] py-1"
-            style={{ paddingLeft: (depth + 1) * 24 + 6 }}
-          >
-            <BulletChevron
-              hasChildren={false}
-              isExpanded={false}
-              onToggle={() => {}}
-              onDrillDown={() => {}}
-              onBulletClick={() => {}}
+          {childIds.length === 0 && (
+            <TrailingInput
+              parentId={nodeId}
+              depth={depth + 1}
+              autoFocus
             />
-            <PendingChildEditor
-              onCommit={handlePendingCommit}
-              onCancel={handlePendingCancel}
-            />
-          </div>
+          )}
         </div>
       )}
     </div>

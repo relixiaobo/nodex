@@ -18,6 +18,7 @@ import { Extension } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Highlight from '@tiptap/extension-highlight';
 import Placeholder from '@tiptap/extension-placeholder';
+import { DOMSerializer } from '@tiptap/pm/model';
 import { useNodeStore } from '../../stores/node-store';
 import { useWorkspaceStore } from '../../stores/workspace-store';
 
@@ -25,7 +26,7 @@ interface NodeEditorProps {
   nodeId: string;
   initialContent: string;
   onBlur: () => void;
-  onEnter: () => void;
+  onEnter: (afterContent?: string) => void;
   onIndent: () => void;
   onOutdent: () => void;
   onDelete: () => boolean; // returns true if node was deleted
@@ -74,10 +75,40 @@ export function NodeEditor({
       addKeyboardShortcuts() {
         return {
           Enter: ({ editor }) => {
-            // Save current content, then create sibling
-            const html = editor.getHTML();
-            callbacksRef.current.saveContent(html);
-            callbacksRef.current.onEnter();
+            const { from } = editor.state.selection;
+            const { doc, schema } = editor.state;
+            const docEnd = doc.content.size - 1;
+
+            if (from >= docEnd) {
+              // Cursor at end: save + create empty sibling
+              const html = editor.getHTML();
+              callbacksRef.current.saveContent(html);
+              callbacksRef.current.onEnter();
+            } else {
+              // Cursor in middle: split the node
+              const para = doc.firstChild!;
+              const paraOffset = from - 1; // position 1 = start of paragraph content
+              const afterFragment = para.content.cut(paraOffset);
+
+              // Serialize after-content to HTML
+              const serializer = DOMSerializer.fromSchema(schema);
+              const div = document.createElement('div');
+              div.appendChild(serializer.serializeFragment(afterFragment));
+              const afterHtml = div.innerHTML;
+
+              // Delete after-content from editor
+              editor.chain().command(({ tr }) => {
+                tr.delete(from, docEnd);
+                return true;
+              }).run();
+
+              // Save before-content
+              const beforeHtml = editor.getHTML();
+              callbacksRef.current.saveContent(beforeHtml);
+
+              // Create new node with after-content
+              callbacksRef.current.onEnter(afterHtml);
+            }
             return true;
           },
           Tab: () => {
@@ -92,6 +123,8 @@ export function NodeEditor({
             // Only intercept when editor is empty
             const isEmpty = editor.state.doc.textContent.length === 0;
             if (isEmpty) {
+              // Flush empty content to store so handleDelete sees name=''
+              callbacksRef.current.saveContent(editor.getHTML());
               const deleted = callbacksRef.current.onDelete();
               return deleted;
             }

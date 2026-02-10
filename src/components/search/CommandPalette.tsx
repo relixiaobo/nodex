@@ -1,0 +1,150 @@
+/**
+ * Cmd+K command palette for quick node search & navigation.
+ *
+ * Uses cmdk (https://cmdk.paco.me) for the combobox behavior.
+ * Searches across all cached nodes in the store.
+ */
+import { useEffect, useCallback, useMemo } from 'react';
+import { Command } from 'cmdk';
+import { Search, FileText, Library, Inbox, CalendarDays, Trash2 } from 'lucide-react';
+import { useUIStore } from '../../stores/ui-store';
+import { useNodeStore } from '../../stores/node-store';
+import { useWorkspaceStore } from '../../stores/workspace-store';
+import { WORKSPACE_CONTAINERS } from '../../types/index.js';
+
+export function CommandPalette() {
+  const searchOpen = useUIStore((s) => s.searchOpen);
+  const closeSearch = useUIStore((s) => s.closeSearch);
+  const searchQuery = useUIStore((s) => s.searchQuery);
+  const setSearchQuery = useUIStore((s) => s.setSearchQuery);
+  const pushPanel = useUIStore((s) => s.pushPanel);
+  const entities = useNodeStore((s) => s.entities);
+  const wsId = useWorkspaceStore((s) => s.currentWorkspaceId);
+
+  // Global Cmd+K shortcut
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        if (searchOpen) {
+          closeSearch();
+        } else {
+          useUIStore.getState().openSearch();
+        }
+      }
+    }
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [searchOpen, closeSearch]);
+
+  const handleSelect = useCallback(
+    (nodeId: string) => {
+      pushPanel(nodeId);
+      closeSearch();
+    },
+    [pushPanel, closeSearch],
+  );
+
+  // Filter nodes matching the search query
+  const results = useMemo(() => {
+    if (!searchQuery.trim()) return [];
+    const query = searchQuery.toLowerCase();
+    const matches: Array<{ id: string; name: string }> = [];
+
+    for (const [id, node] of Object.entries(entities)) {
+      // Skip system/container nodes unless explicitly searching
+      const name = node.props.name ?? '';
+      const plainText = name.replace(/<[^>]+>/g, '').toLowerCase();
+
+      if (plainText.includes(query)) {
+        matches.push({ id, name: plainText || 'Untitled' });
+        if (matches.length >= 20) break;
+      }
+    }
+
+    return matches;
+  }, [entities, searchQuery]);
+
+  // Container quick-access items
+  const containers = useMemo(() => {
+    if (!wsId) return [];
+    return [
+      { label: 'Library', suffix: WORKSPACE_CONTAINERS.LIBRARY, icon: Library },
+      { label: 'Inbox', suffix: WORKSPACE_CONTAINERS.INBOX, icon: Inbox },
+      { label: 'Journal', suffix: WORKSPACE_CONTAINERS.JOURNAL, icon: CalendarDays },
+      { label: 'Trash', suffix: WORKSPACE_CONTAINERS.TRASH, icon: Trash2 },
+    ].map((c) => ({ ...c, id: `${wsId}_${c.suffix}` }));
+  }, [wsId]);
+
+  if (!searchOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center pt-[15%]">
+      {/* Backdrop */}
+      <div
+        className="absolute inset-0 bg-black/20"
+        onClick={closeSearch}
+      />
+      {/* Dialog */}
+      <Command
+        className="relative w-full max-w-md rounded-lg border border-border bg-popover shadow-lg"
+        shouldFilter={false}
+      >
+        <div className="flex items-center gap-2 border-b border-border px-3">
+          <Search size={16} className="text-muted-foreground shrink-0" />
+          <Command.Input
+            value={searchQuery}
+            onValueChange={setSearchQuery}
+            placeholder="Search nodes..."
+            className="h-10 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+          />
+          <kbd className="hidden sm:inline-flex h-5 items-center rounded border border-border bg-muted px-1.5 text-[10px] font-medium text-muted-foreground">
+            Esc
+          </kbd>
+        </div>
+        <Command.List className="max-h-72 overflow-y-auto p-1">
+          <Command.Empty className="py-6 text-center text-sm text-muted-foreground">
+            No results found.
+          </Command.Empty>
+
+          {/* Quick navigation */}
+          {!searchQuery.trim() && (
+            <Command.Group heading="Navigate" className="px-1 py-1.5 text-xs font-medium text-muted-foreground">
+              {containers.map((c) => {
+                const Icon = c.icon;
+                return (
+                  <Command.Item
+                    key={c.id}
+                    value={c.id}
+                    onSelect={() => handleSelect(c.id)}
+                    className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm text-foreground aria-selected:bg-accent"
+                  >
+                    <Icon size={14} className="text-muted-foreground" />
+                    {c.label}
+                  </Command.Item>
+                );
+              })}
+            </Command.Group>
+          )}
+
+          {/* Search results */}
+          {searchQuery.trim() && results.length > 0 && (
+            <Command.Group heading="Nodes" className="px-1 py-1.5 text-xs font-medium text-muted-foreground">
+              {results.map((r) => (
+                <Command.Item
+                  key={r.id}
+                  value={r.id}
+                  onSelect={() => handleSelect(r.id)}
+                  className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm text-foreground aria-selected:bg-accent"
+                >
+                  <FileText size={14} className="text-muted-foreground shrink-0" />
+                  <span className="truncate">{r.name}</span>
+                </Command.Item>
+              ))}
+            </Command.Group>
+          )}
+        </Command.List>
+      </Command>
+    </div>
+  );
+}

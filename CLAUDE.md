@@ -105,6 +105,17 @@ docs/                      # 文档 (roadmap, testing, research)
 
 单表 `nodes` 存储所有类型。`doc_type` 列区分节点类型（22 种 + 1 Nodex 新增）。无 `doc_type` 的是普通内容节点（占 46.6%）。
 
+### 配置页面 = 系统标签模板（核心设计模式）
+
+Tana 的配置页面（字段配置、标签配置等）不是定制 UI，而是**标准 NodePanel 渲染被系统标签标记的节点**：
+
+- **attrDef** 被 `SYS_T02` (FIELD_DEFINITION) 标记 → 配置页 = SYS_T02 的模板字段
+- **tagDef** 被 `SYS_T01` (SUPERTAG) 标记 → 配置页 = SYS_T01 的模板字段
+
+配置页上的每个配置项（Field type 下拉、Options 列表、Toggle 开关等）都是系统标签模板字段的实例，通过不同渲染组件呈现：`TupleAsPicker`（下拉）、`ToggleButton`（开关）、标准 `OutlinerItem`（节点列表）。
+
+详见 `docs/research/tana-config-page-architecture.md`。
+
 ### 三大间接层（忠实保留 Tana）
 
 1. **Tuple** (`doc_type='tuple'`, 占 29.3%): 万能键值对。`children[0]` = 键 (SYS_A* 或 attrDefId)，`children[1:]` = 值。
@@ -281,6 +292,7 @@ npm run dev:test   # 启动 http://localhost:5199/standalone/index.html
 ## 参考文档
 
 - `docs/research/tana-data-model-specification.md` — 数据模型权威规格（设计决策的 source of truth）
+- `docs/research/tana-config-page-architecture.md` — 配置页面底层 node 结构（系统标签模板模式）
 - `.claude/plans/ancient-plotting-lemon.md` — 技术选型详细方案（含 Tana 逆向分析完整数据）
 - Tana 官方: https://tana.inc
 - Supabase 文档: https://supabase.com/docs

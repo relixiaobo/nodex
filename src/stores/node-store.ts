@@ -10,7 +10,8 @@ import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 import { nanoid } from 'nanoid';
 import type { NodexNode, DocType } from '../types/index.js';
-import { WORKSPACE_CONTAINERS, SYS_A, SYS_D } from '../types/index.js';
+import { WORKSPACE_CONTAINERS, SYS_A, SYS_D, SYS_T } from '../types/index.js';
+import { ATTRDEF_CONFIG_MAP } from '../lib/field-utils.js';
 import * as nodeService from '../services/node-service.js';
 import { isSupabaseReady } from '../services/supabase.js';
 
@@ -783,8 +784,31 @@ export const useNodeStore = create<NodeStore>()(
         for (const templateTupleId of tagDef.children) {
           const template = state.entities[templateTupleId];
           if (template?.props._docType !== 'tuple') continue;
-          const attrDefId = template.children?.[0];
-          if (!attrDefId || attrDefId.startsWith('SYS_')) continue;
+          const keyId = template.children?.[0];
+          if (!keyId) continue;
+
+          // System config field (SYS_A* or NDX_A* key from SYS_T02 template)
+          const configDef = ATTRDEF_CONFIG_MAP.get(keyId);
+          if (configDef) {
+            // Check if already has this config tuple (by key match)
+            const alreadyHas = n.children.some((cid) => {
+              const c = state.entities[cid];
+              return c?.props._docType === 'tuple' && c.children?.[0] === keyId;
+            });
+            if (alreadyHas) continue;
+
+            const instanceId = nanoid();
+            const instanceNode = makeNodeLocal(instanceId, nodeId, 'tuple', [keyId, configDef.defaultValue]);
+            instanceNode.props._sourceId = templateTupleId;
+            state.entities[instanceId] = instanceNode;
+            n.children.push(instanceId);
+            continue;
+          }
+
+          // User field (key is an attrDef node)
+          if (keyId.startsWith('SYS_') || keyId.startsWith('NDX_')) continue;
+          const attrDef = state.entities[keyId];
+          if (!attrDef || attrDef.props._docType !== 'attrDef') continue;
 
           // Check if field already instantiated (by _sourceId)
           const alreadyHasField = n.children.some((cid) => {
@@ -794,7 +818,7 @@ export const useNodeStore = create<NodeStore>()(
 
           // Create instance tuple
           const instanceId = nanoid();
-          const instanceNode = makeNodeLocal(instanceId, nodeId, 'tuple', [attrDefId]);
+          const instanceNode = makeNodeLocal(instanceId, nodeId, 'tuple', [keyId]);
           instanceNode.props._sourceId = templateTupleId;
           state.entities[instanceId] = instanceNode;
 
@@ -932,7 +956,12 @@ export const useNodeStore = create<NodeStore>()(
         }
       });
 
-      return attrDef;
+      // Apply SYS_T02 (Field Definition) tag — creates metanode + config tuples
+      if (get().entities[SYS_T.FIELD_DEFINITION]) {
+        await get().applyTag(attrDefId, SYS_T.FIELD_DEFINITION, workspaceId, userId);
+      }
+
+      return get().entities[attrDefId] ?? attrDef;
     },
 
     // ─── Field operations ───
@@ -1163,6 +1192,11 @@ export const useNodeStore = create<NodeStore>()(
         }
         state.entities[schemaId].children!.push(id);
       });
+
+      // Apply SYS_T02 (Field Definition) tag — creates metanode + config tuples
+      if (get().entities[SYS_T.FIELD_DEFINITION]) {
+        await get().applyTag(id, SYS_T.FIELD_DEFINITION, workspaceId, userId);
+      }
 
       return get().entities[id];
     },

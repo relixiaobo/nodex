@@ -65,6 +65,7 @@ export function seedTestData() {
     makeNode(searchesId, 'Searches', WS_ID, []),
     makeNode(trashId, 'Trash', WS_ID, []),
     makeNode(schemaId, 'Schema', WS_ID, [
+      'SYS_T02',
       'tagDef_task', 'tagDef_person',
       'attrDef_status', 'attrDef_priority', 'attrDef_due',
       'attrDef_email', 'attrDef_company',
@@ -144,10 +145,21 @@ export function seedTestData() {
     makeNode('j_3', 'Learned about TipTap keyboard shortcuts', 'journal_1', []),
   ];
 
-  // ─── Schema: TagDef + AttrDef nodes ───
+  // ─── Schema: SYS_T02 + TagDef + AttrDef nodes ───
 
-  // AttrDef: Status (options type)
-  const attrDefStatusNodes = [
+  // SYS_T02 (Field Definition) — system tag for attrDef config pages
+  const sysT02Nodes: NodexNode[] = [
+    makeNode('SYS_T02', 'Field Definition', schemaId, [
+      'sysT02_tpl_type', 'sysT02_tpl_autocollect', 'sysT02_tpl_required', 'sysT02_tpl_hide',
+    ], 'tagDef'),
+    makeNode('sysT02_tpl_type', '', 'SYS_T02', [SYS_A.TYPE_CHOICE], 'tuple'),
+    makeNode('sysT02_tpl_autocollect', '', 'SYS_T02', [SYS_A.AUTOCOLLECT_OPTIONS], 'tuple'),
+    makeNode('sysT02_tpl_required', '', 'SYS_T02', [SYS_A.NULLABLE], 'tuple'),
+    makeNode('sysT02_tpl_hide', '', 'SYS_T02', [SYS_A.HIDE_FIELD], 'tuple'),
+  ];
+
+  // AttrDef: Status (options type) — all config tuples + options
+  const attrDefStatusNodes: NodexNode[] = [
     makeNode('attrDef_status', 'Status', schemaId, [
       'attrDef_status_type', 'attrDef_status_autocollect',
       'attrDef_status_required', 'attrDef_status_hide',
@@ -163,7 +175,7 @@ export function seedTestData() {
   ];
 
   // AttrDef: Priority (options type)
-  const attrDefPriorityNodes = [
+  const attrDefPriorityNodes: NodexNode[] = [
     makeNode('attrDef_priority', 'Priority', schemaId, [
       'attrDef_priority_type', 'attrDef_priority_autocollect',
       'attrDef_priority_required', 'attrDef_priority_hide',
@@ -178,28 +190,85 @@ export function seedTestData() {
     makeNode('opt_low', 'Low', 'attrDef_priority'),
   ];
 
-  // AttrDef: Due (date type)
-  const attrDefDueNodes = [
-    makeNode('attrDef_due', 'Due', schemaId, ['attrDef_due_type', 'attrDef_due_required', 'attrDef_due_hide'], 'attrDef'),
+  // AttrDef: Due (date type) — all 4 config tuples
+  const attrDefDueNodes: NodexNode[] = [
+    makeNode('attrDef_due', 'Due', schemaId, [
+      'attrDef_due_type', 'attrDef_due_autocollect', 'attrDef_due_required', 'attrDef_due_hide',
+    ], 'attrDef'),
     makeNode('attrDef_due_type', '', 'attrDef_due', [SYS_A.TYPE_CHOICE, SYS_D.DATE], 'tuple'),
+    makeNode('attrDef_due_autocollect', '', 'attrDef_due', [SYS_A.AUTOCOLLECT_OPTIONS, SYS_V.YES], 'tuple'),
     makeNode('attrDef_due_required', '', 'attrDef_due', [SYS_A.NULLABLE, SYS_V.NO], 'tuple'),
     makeNode('attrDef_due_hide', '', 'attrDef_due', [SYS_A.HIDE_FIELD, SYS_V.NEVER], 'tuple'),
   ];
 
   // AttrDef: Email (email type)
-  const attrDefEmailNodes = [
-    makeNode('attrDef_email', 'Email', schemaId, ['attrDef_email_type', 'attrDef_email_required', 'attrDef_email_hide'], 'attrDef'),
+  const attrDefEmailNodes: NodexNode[] = [
+    makeNode('attrDef_email', 'Email', schemaId, [
+      'attrDef_email_type', 'attrDef_email_autocollect', 'attrDef_email_required', 'attrDef_email_hide',
+    ], 'attrDef'),
     makeNode('attrDef_email_type', '', 'attrDef_email', [SYS_A.TYPE_CHOICE, SYS_D.EMAIL], 'tuple'),
+    makeNode('attrDef_email_autocollect', '', 'attrDef_email', [SYS_A.AUTOCOLLECT_OPTIONS, SYS_V.YES], 'tuple'),
     makeNode('attrDef_email_required', '', 'attrDef_email', [SYS_A.NULLABLE, SYS_V.NO], 'tuple'),
     makeNode('attrDef_email_hide', '', 'attrDef_email', [SYS_A.HIDE_FIELD, SYS_V.NEVER], 'tuple'),
   ];
 
   // AttrDef: Company (plain type)
-  const attrDefCompanyNodes = [
-    makeNode('attrDef_company', 'Company', schemaId, ['attrDef_company_type', 'attrDef_company_required', 'attrDef_company_hide'], 'attrDef'),
+  const attrDefCompanyNodes: NodexNode[] = [
+    makeNode('attrDef_company', 'Company', schemaId, [
+      'attrDef_company_type', 'attrDef_company_autocollect', 'attrDef_company_required', 'attrDef_company_hide',
+    ], 'attrDef'),
     makeNode('attrDef_company_type', '', 'attrDef_company', [SYS_A.TYPE_CHOICE, SYS_D.PLAIN], 'tuple'),
+    makeNode('attrDef_company_autocollect', '', 'attrDef_company', [SYS_A.AUTOCOLLECT_OPTIONS, SYS_V.YES], 'tuple'),
     makeNode('attrDef_company_required', '', 'attrDef_company', [SYS_A.NULLABLE, SYS_V.NO], 'tuple'),
     makeNode('attrDef_company_hide', '', 'attrDef_company', [SYS_A.HIDE_FIELD, SYS_V.NEVER], 'tuple'),
+  ];
+
+  // Set _metaNodeId on attrDef nodes (tagged with SYS_T02)
+  attrDefStatusNodes[0].props._metaNodeId = 'meta_attrDef_status';
+  attrDefPriorityNodes[0].props._metaNodeId = 'meta_attrDef_priority';
+  attrDefDueNodes[0].props._metaNodeId = 'meta_attrDef_due';
+  attrDefEmailNodes[0].props._metaNodeId = 'meta_attrDef_email';
+  attrDefCompanyNodes[0].props._metaNodeId = 'meta_attrDef_company';
+
+  // Set _sourceId on config tuples → SYS_T02 templates
+  // Status (indices: [1]=type [2]=autocollect [3]=required [4]=hide)
+  attrDefStatusNodes[1].props._sourceId = 'sysT02_tpl_type';
+  attrDefStatusNodes[2].props._sourceId = 'sysT02_tpl_autocollect';
+  attrDefStatusNodes[3].props._sourceId = 'sysT02_tpl_required';
+  attrDefStatusNodes[4].props._sourceId = 'sysT02_tpl_hide';
+  // Priority
+  attrDefPriorityNodes[1].props._sourceId = 'sysT02_tpl_type';
+  attrDefPriorityNodes[2].props._sourceId = 'sysT02_tpl_autocollect';
+  attrDefPriorityNodes[3].props._sourceId = 'sysT02_tpl_required';
+  attrDefPriorityNodes[4].props._sourceId = 'sysT02_tpl_hide';
+  // Due (indices: [1]=type [2]=autocollect [3]=required [4]=hide)
+  attrDefDueNodes[1].props._sourceId = 'sysT02_tpl_type';
+  attrDefDueNodes[2].props._sourceId = 'sysT02_tpl_autocollect';
+  attrDefDueNodes[3].props._sourceId = 'sysT02_tpl_required';
+  attrDefDueNodes[4].props._sourceId = 'sysT02_tpl_hide';
+  // Email
+  attrDefEmailNodes[1].props._sourceId = 'sysT02_tpl_type';
+  attrDefEmailNodes[2].props._sourceId = 'sysT02_tpl_autocollect';
+  attrDefEmailNodes[3].props._sourceId = 'sysT02_tpl_required';
+  attrDefEmailNodes[4].props._sourceId = 'sysT02_tpl_hide';
+  // Company
+  attrDefCompanyNodes[1].props._sourceId = 'sysT02_tpl_type';
+  attrDefCompanyNodes[2].props._sourceId = 'sysT02_tpl_autocollect';
+  attrDefCompanyNodes[3].props._sourceId = 'sysT02_tpl_required';
+  attrDefCompanyNodes[4].props._sourceId = 'sysT02_tpl_hide';
+
+  // Metanodes for attrDefs (SYS_T02 tag application chain)
+  const attrDefMetanodes: NodexNode[] = [
+    makeNode('meta_attrDef_status', '', 'attrDef_status', ['meta_attrDef_status_tag'], 'metanode'),
+    makeNode('meta_attrDef_status_tag', '', 'meta_attrDef_status', [SYS_A.NODE_SUPERTAGS, 'SYS_T02'], 'tuple'),
+    makeNode('meta_attrDef_priority', '', 'attrDef_priority', ['meta_attrDef_priority_tag'], 'metanode'),
+    makeNode('meta_attrDef_priority_tag', '', 'meta_attrDef_priority', [SYS_A.NODE_SUPERTAGS, 'SYS_T02'], 'tuple'),
+    makeNode('meta_attrDef_due', '', 'attrDef_due', ['meta_attrDef_due_tag'], 'metanode'),
+    makeNode('meta_attrDef_due_tag', '', 'meta_attrDef_due', [SYS_A.NODE_SUPERTAGS, 'SYS_T02'], 'tuple'),
+    makeNode('meta_attrDef_email', '', 'attrDef_email', ['meta_attrDef_email_tag'], 'metanode'),
+    makeNode('meta_attrDef_email_tag', '', 'meta_attrDef_email', [SYS_A.NODE_SUPERTAGS, 'SYS_T02'], 'tuple'),
+    makeNode('meta_attrDef_company', '', 'attrDef_company', ['meta_attrDef_company_tag'], 'metanode'),
+    makeNode('meta_attrDef_company_tag', '', 'meta_attrDef_company', [SYS_A.NODE_SUPERTAGS, 'SYS_T02'], 'tuple'),
   ];
 
   // TagDef: Task — template Tuples reference attrDef IDs
@@ -239,11 +308,13 @@ export function seedTestData() {
   task1FieldNodes[2].props._sourceId = 'taskField_due';
 
   const schemaNodes = [
+    ...sysT02Nodes,
     ...attrDefStatusNodes,
     ...attrDefPriorityNodes,
     ...attrDefDueNodes,
     ...attrDefEmailNodes,
     ...attrDefCompanyNodes,
+    ...attrDefMetanodes,
     ...tagDefTaskNodes,
     ...tagDefPersonNodes,
     ...task1MetanodeNodes,

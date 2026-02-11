@@ -37,10 +37,13 @@ interface TrailingInputProps {
 
 export function TrailingInput({ parentId, depth, autoFocus }: TrailingInputProps) {
   const createChild = useNodeStore((s) => s.createChild);
+  const addUnnamedFieldToNode = useNodeStore((s) => s.addUnnamedFieldToNode);
   const wsId = useWorkspaceStore((s) => s.currentWorkspaceId);
   const userId = useWorkspaceStore((s) => s.userId);
   const setExpanded = useUIStore((s) => s.setExpanded);
   const setFocusedNode = useUIStore((s) => s.setFocusedNode);
+  const setEditingFieldName = useUIStore((s) => s.setEditingFieldName);
+  const setTriggerHint = useUIStore((s) => s.setTriggerHint);
 
   // Effective parent/depth — Tab/Shift+Tab change these without creating nodes
   const [effectiveParentId, setEffectiveParentId] = useState(parentId);
@@ -56,16 +59,16 @@ export function TrailingInput({ parentId, depth, autoFocus }: TrailingInputProps
   const [hasContent, setHasContent] = useState(false);
 
   const callbacksRef = useRef({
-    createChild, wsId, userId,
+    createChild, addUnnamedFieldToNode, wsId, userId,
     parentId, effectiveParentId, effectiveDepth,
     setEffectiveParentId, setEffectiveDepth,
-    setExpanded, setFocusedNode,
+    setExpanded, setFocusedNode, setEditingFieldName, setTriggerHint,
   });
   callbacksRef.current = {
-    createChild, wsId, userId,
+    createChild, addUnnamedFieldToNode, wsId, userId,
     parentId, effectiveParentId, effectiveDepth,
     setEffectiveParentId, setEffectiveDepth,
-    setExpanded, setFocusedNode,
+    setExpanded, setFocusedNode, setEditingFieldName, setTriggerHint,
   };
 
   const commitContent = useCallback((html: string, editor: Editor) => {
@@ -97,8 +100,17 @@ export function TrailingInput({ parentId, depth, autoFocus }: TrailingInputProps
             const text = editor.state.doc.textContent.trim();
             if (text.length > 0) {
               commitContent(editor.getHTML(), editor);
+            } else {
+              // Empty Enter → create empty child so user can keep creating nodes
+              const ref = callbacksRef.current;
+              if (!ref.wsId || !ref.userId) return true;
+              committingRef.current = true;
+              ref.createChild(ref.effectiveParentId, ref.wsId, ref.userId, '').then((newNode) => {
+                ref.setExpanded(ref.effectiveParentId, true);
+                ref.setFocusedNode(newNode.id, ref.effectiveParentId);
+                queueMicrotask(() => { committingRef.current = false; });
+              });
             }
-            // Empty Enter → no-op (stay in trailing input)
             return true;
           },
           Tab: () => {
@@ -183,18 +195,32 @@ export function TrailingInput({ parentId, depth, autoFocus }: TrailingInputProps
       const text = editor.state.doc.textContent;
       setHasContent(text.length > 0);
 
-      // Auto-commit on trigger chars (#, @, >) so that the real NodeEditor's
-      // extensions (HashTag, Reference, FieldTrigger) can handle them.
-      // TrailingInput doesn't have these extensions — creating a real node
-      // and focusing it transfers control to the full editor.
-      if (!committingRef.current && (text === '#' || text === '@' || text === '>')) {
-        const ref = callbacksRef.current;
-        if (!ref.wsId || !ref.userId) return;
+      if (committingRef.current) return;
+      const ref = callbacksRef.current;
+      if (!ref.wsId || !ref.userId) return;
 
+      // > field trigger: handle directly (no intermediate node needed)
+      if (text === '>') {
         committingRef.current = true;
         editor.commands.clearContent(false);
         setHasContent(false);
 
+        ref.addUnnamedFieldToNode(ref.effectiveParentId, ref.wsId, ref.userId).then(({ tupleId }) => {
+          ref.setEditingFieldName(tupleId);
+          queueMicrotask(() => { committingRef.current = false; });
+        });
+        return;
+      }
+
+      // # or @ trigger: create child node + set triggerHint so OutlinerItem
+      // opens the dropdown immediately (extensions need docChanged to fire,
+      // but mount doesn't count as docChanged)
+      if (text === '#' || text === '@') {
+        committingRef.current = true;
+        editor.commands.clearContent(false);
+        setHasContent(false);
+
+        ref.setTriggerHint(text as '#' | '@');
         ref.createChild(ref.effectiveParentId, ref.wsId, ref.userId, text).then((newNode) => {
           ref.setExpanded(ref.effectiveParentId, true);
           ref.setFocusedNode(newNode.id, ref.effectiveParentId);

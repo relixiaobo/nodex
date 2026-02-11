@@ -88,7 +88,7 @@ export function FieldRow({
             />
           ) : (
             <span
-              className="block text-[11px] leading-[22px] h-[22px] text-foreground truncate cursor-text"
+              className="block text-sm leading-[22px] h-[22px] text-foreground truncate cursor-text"
               onClick={handleNameClick}
               title={attrDefName}
             >

@@ -31,6 +31,7 @@ export function FieldNameInput({ tupleId, nodeId, attrDefId, currentName, onEnte
   const allFields = useWorkspaceFields();
   const renameAttrDef = useNodeStore((s) => s.renameAttrDef);
   const replaceFieldAttrDef = useNodeStore((s) => s.replaceFieldAttrDef);
+  const removeField = useNodeStore((s) => s.removeField);
   const wsId = useWorkspaceStore((s) => s.currentWorkspaceId);
   const userId = useWorkspaceStore((s) => s.userId);
   const setEditingFieldName = useUIStore((s) => s.setEditingFieldName);
@@ -146,6 +147,14 @@ export function FieldNameInput({ tupleId, nodeId, attrDefId, currentName, onEnte
         e.preventDefault();
         confirmedRef.current = true;
         setEditingFieldName(null);
+      } else if (e.key === 'Backspace') {
+        // Empty field name + Backspace → delete the entire field
+        if (value === '' && wsId && userId) {
+          e.preventDefault();
+          confirmedRef.current = true;
+          setEditingFieldName(null);
+          removeField(nodeId, tupleId, wsId, userId);
+        }
       } else if (e.key === 'ArrowDown') {
         e.preventDefault();
         setSelectedIndex((i) => Math.min(i + 1, suggestions.length - 1));
@@ -154,7 +163,7 @@ export function FieldNameInput({ tupleId, nodeId, attrDefId, currentName, onEnte
         setSelectedIndex((i) => Math.max(i - 1, 0));
       }
     },
-    [suggestions, selectedIndex, confirm, selectSuggestion, setEditingFieldName],
+    [suggestions, selectedIndex, confirm, selectSuggestion, setEditingFieldName, value, wsId, userId, nodeId, tupleId, removeField],
   );
 
   return (

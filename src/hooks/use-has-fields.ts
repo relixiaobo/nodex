@@ -4,6 +4,8 @@
  */
 import { useNodeStore } from '../stores/node-store';
 
+const ATTRDEF_CONFIG_KEYS = new Set(['SYS_A02', 'SYS_A01', 'SYS_A44', 'NDX_A01']);
+
 export function useHasFields(nodeId: string): boolean {
   return useNodeStore((state) => {
     const node = state.entities[nodeId];
@@ -15,9 +17,9 @@ export function useHasFields(nodeId: string): boolean {
       const child = state.entities[childId];
       if (child?.props._docType !== 'tuple' || !child.children?.length) continue;
       const keyId = child.children[0];
-      // attrDef nodes: typeChoice tuple [SYS_A02, SYS_D*] counts as a field
-      if (isAttrDef && keyId === 'SYS_A02') return true;
-      if (!keyId.startsWith('SYS_') && state.entities[keyId]?.props._docType === 'attrDef') {
+      // attrDef nodes: typeChoice + config tuples count as fields
+      if (isAttrDef && ATTRDEF_CONFIG_KEYS.has(keyId)) return true;
+      if (!keyId.startsWith('SYS_') && !keyId.startsWith('NDX_') && state.entities[keyId]?.props._docType === 'attrDef') {
         return true;
       }
     }

@@ -8,7 +8,7 @@ import { useNodeStore } from '../../stores/node-store';
 import { useUIStore } from '../../stores/ui-store';
 import { useWorkspaceStore } from '../../stores/workspace-store';
 import type { NodexNode, DocType } from '../../types/index.js';
-import { SYS_A, SYS_D } from '../../types/index.js';
+import { SYS_A, SYS_D, SYS_V } from '../../types/index.js';
 
 const WS_ID = 'ws_default';
 const USER_ID = 'user_default';
@@ -148,8 +148,15 @@ export function seedTestData() {
 
   // AttrDef: Status (options type)
   const attrDefStatusNodes = [
-    makeNode('attrDef_status', 'Status', schemaId, ['attrDef_status_type', 'opt_todo', 'opt_in_progress', 'opt_done'], 'attrDef'),
+    makeNode('attrDef_status', 'Status', schemaId, [
+      'attrDef_status_type', 'attrDef_status_autocollect',
+      'attrDef_status_required', 'attrDef_status_hide',
+      'opt_todo', 'opt_in_progress', 'opt_done',
+    ], 'attrDef'),
     makeNode('attrDef_status_type', '', 'attrDef_status', [SYS_A.TYPE_CHOICE, SYS_D.OPTIONS], 'tuple'),
+    makeNode('attrDef_status_autocollect', '', 'attrDef_status', [SYS_A.AUTOCOLLECT_OPTIONS, SYS_V.YES], 'tuple'),
+    makeNode('attrDef_status_required', '', 'attrDef_status', [SYS_A.NULLABLE, SYS_V.NO], 'tuple'),
+    makeNode('attrDef_status_hide', '', 'attrDef_status', [SYS_A.HIDE_FIELD, SYS_V.NEVER], 'tuple'),
     makeNode('opt_todo', 'To Do', 'attrDef_status'),
     makeNode('opt_in_progress', 'In Progress', 'attrDef_status'),
     makeNode('opt_done', 'Done', 'attrDef_status'),
@@ -157,8 +164,15 @@ export function seedTestData() {
 
   // AttrDef: Priority (options type)
   const attrDefPriorityNodes = [
-    makeNode('attrDef_priority', 'Priority', schemaId, ['attrDef_priority_type', 'opt_high', 'opt_medium', 'opt_low'], 'attrDef'),
+    makeNode('attrDef_priority', 'Priority', schemaId, [
+      'attrDef_priority_type', 'attrDef_priority_autocollect',
+      'attrDef_priority_required', 'attrDef_priority_hide',
+      'opt_high', 'opt_medium', 'opt_low',
+    ], 'attrDef'),
     makeNode('attrDef_priority_type', '', 'attrDef_priority', [SYS_A.TYPE_CHOICE, SYS_D.OPTIONS], 'tuple'),
+    makeNode('attrDef_priority_autocollect', '', 'attrDef_priority', [SYS_A.AUTOCOLLECT_OPTIONS, SYS_V.YES], 'tuple'),
+    makeNode('attrDef_priority_required', '', 'attrDef_priority', [SYS_A.NULLABLE, SYS_V.NO], 'tuple'),
+    makeNode('attrDef_priority_hide', '', 'attrDef_priority', [SYS_A.HIDE_FIELD, SYS_V.NEVER], 'tuple'),
     makeNode('opt_high', 'High', 'attrDef_priority'),
     makeNode('opt_medium', 'Medium', 'attrDef_priority'),
     makeNode('opt_low', 'Low', 'attrDef_priority'),
@@ -166,20 +180,26 @@ export function seedTestData() {
 
   // AttrDef: Due (date type)
   const attrDefDueNodes = [
-    makeNode('attrDef_due', 'Due', schemaId, ['attrDef_due_type'], 'attrDef'),
+    makeNode('attrDef_due', 'Due', schemaId, ['attrDef_due_type', 'attrDef_due_required', 'attrDef_due_hide'], 'attrDef'),
     makeNode('attrDef_due_type', '', 'attrDef_due', [SYS_A.TYPE_CHOICE, SYS_D.DATE], 'tuple'),
+    makeNode('attrDef_due_required', '', 'attrDef_due', [SYS_A.NULLABLE, SYS_V.NO], 'tuple'),
+    makeNode('attrDef_due_hide', '', 'attrDef_due', [SYS_A.HIDE_FIELD, SYS_V.NEVER], 'tuple'),
   ];
 
   // AttrDef: Email (email type)
   const attrDefEmailNodes = [
-    makeNode('attrDef_email', 'Email', schemaId, ['attrDef_email_type'], 'attrDef'),
+    makeNode('attrDef_email', 'Email', schemaId, ['attrDef_email_type', 'attrDef_email_required', 'attrDef_email_hide'], 'attrDef'),
     makeNode('attrDef_email_type', '', 'attrDef_email', [SYS_A.TYPE_CHOICE, SYS_D.EMAIL], 'tuple'),
+    makeNode('attrDef_email_required', '', 'attrDef_email', [SYS_A.NULLABLE, SYS_V.NO], 'tuple'),
+    makeNode('attrDef_email_hide', '', 'attrDef_email', [SYS_A.HIDE_FIELD, SYS_V.NEVER], 'tuple'),
   ];
 
   // AttrDef: Company (plain type)
   const attrDefCompanyNodes = [
-    makeNode('attrDef_company', 'Company', schemaId, ['attrDef_company_type'], 'attrDef'),
+    makeNode('attrDef_company', 'Company', schemaId, ['attrDef_company_type', 'attrDef_company_required', 'attrDef_company_hide'], 'attrDef'),
     makeNode('attrDef_company_type', '', 'attrDef_company', [SYS_A.TYPE_CHOICE, SYS_D.PLAIN], 'tuple'),
+    makeNode('attrDef_company_required', '', 'attrDef_company', [SYS_A.NULLABLE, SYS_V.NO], 'tuple'),
+    makeNode('attrDef_company_hide', '', 'attrDef_company', [SYS_A.HIDE_FIELD, SYS_V.NEVER], 'tuple'),
   ];
 
   // TagDef: Task — template Tuples reference attrDef IDs

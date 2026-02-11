@@ -19,6 +19,8 @@ import { getFieldTypeIcon } from '../../lib/field-utils.js';
 import { FieldValueOutliner } from './FieldValueOutliner';
 import { FieldNameInput } from './FieldNameInput';
 import { FieldTypePicker } from './FieldTypePicker';
+import { ConfigToggle } from './ConfigToggle';
+import { ConfigSelect } from './ConfigSelect';
 
 interface FieldRowProps {
   nodeId: string;
@@ -52,6 +54,9 @@ export function FieldRow({
   const clickOffsetXRef = useRef<number | undefined>(undefined);
 
   const isTypeChoice = dataType === '__type_choice__';
+  const isToggle = dataType === '__toggle__';
+  const isSelect = dataType === '__select__';
+  const isConfigField = isTypeChoice || isToggle || isSelect;
   const isEditing = editingFieldNameId === tupleId;
   const Icon = isTypeChoice ? Settings2 : getFieldTypeIcon(dataType);
 
@@ -73,10 +78,8 @@ export function FieldRow({
     <div className={`border-t ${isLastInGroup ? 'border-b' : ''} border-border/40 flex items-center min-h-[28px] py-1`} data-field-row>
       {/* Name column — fixed height container to prevent jump */}
       <div className="flex items-center gap-1 shrink-0 w-[130px] min-w-0 h-[22px]">
-        {isTypeChoice ? (
-          <span className="shrink-0 w-[15px] flex items-center justify-center text-muted-foreground/50">
-            <Icon size={12} />
-          </span>
+        {isConfigField ? (
+          <span className="shrink-0 w-[15px]" />
         ) : (
           <button
             className="shrink-0 w-[15px] flex items-center justify-center text-muted-foreground/50 hover:text-muted-foreground transition-colors"
@@ -87,7 +90,7 @@ export function FieldRow({
           </button>
         )}
         <div className="flex-1 min-w-0">
-          {isTypeChoice ? (
+          {isConfigField ? (
             <span
               className="block text-sm leading-[22px] h-[22px] text-muted-foreground truncate"
               title={attrDefName}
@@ -118,6 +121,10 @@ export function FieldRow({
       <div className="flex-1 min-w-0" data-field-value>
         {isTypeChoice ? (
           <FieldTypePicker attrDefId={nodeId} currentValue={valueName ?? ''} />
+        ) : isToggle ? (
+          <ConfigToggle tupleId={tupleId} fieldKey={attrDefId} currentValue={valueName} />
+        ) : isSelect ? (
+          <ConfigSelect tupleId={tupleId} fieldKey={attrDefId} currentValue={valueName} />
         ) : assocDataId ? (
           <FieldValueOutliner assocDataId={assocDataId} />
         ) : (

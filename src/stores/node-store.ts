@@ -174,6 +174,9 @@ interface NodeStore {
   /** Remove an option node from a field definition */
   removeFieldOption(attrDefId: string, optionId: string, userId: string): void;
 
+  /** Update a config Tuple's value (children[1]) */
+  setConfigValue(tupleId: string, newValue: string, userId: string): void;
+
   /** Replace a field's attrDef (swap placeholder → existing) and clean up orphan */
   replaceFieldAttrDef(
     nodeId: string,
@@ -1366,6 +1369,16 @@ export const useNodeStore = create<NodeStore>()(
           if (idx >= 0) attrDef.children.splice(idx, 1);
         }
         delete state.entities[optionId];
+      });
+    },
+
+    setConfigValue: (tupleId, newValue, userId) => {
+      set((state) => {
+        const tuple = state.entities[tupleId];
+        if (!tuple?.children || tuple.children.length < 1) return;
+        tuple.children[1] = newValue;
+        tuple.updatedAt = Date.now();
+        tuple.updatedBy = userId;
       });
     },
 

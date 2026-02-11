@@ -4,7 +4,7 @@
  * Verifies stores are mounted on window and seed data is loaded.
  * Run via chrome-devtools evaluate_script on localhost:5199.
  *
- * Expected: { ok: true, entities: 36+, workspace: 'ws_default' }
+ * Expected: { ok: true, entities: 68+, workspace: 'ws_default' }
  */
 (() => {
   const ns = window.__nodeStore;
@@ -14,7 +14,7 @@
   if (!ns || !ui || !ws) return { error: 'Stores not mounted on window' };
 
   const count = Object.keys(ns.getState().entities).length;
-  if (count < 30) return { error: `Only ${count} entities, expected 36+ (seed data missing?)` };
+  if (count < 60) return { error: `Only ${count} entities, expected 68+ (seed data missing?)` };
 
   return {
     ok: true,

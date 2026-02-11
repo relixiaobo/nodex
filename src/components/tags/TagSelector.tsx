@@ -1,0 +1,117 @@
+/**
+ * Tag selector dropdown — non-focusable list driven by editor # trigger.
+ *
+ * Keyboard navigation (Enter/Arrow/Escape/Cmd+Enter) is handled by
+ * the editor keymap and forwarded here via imperative ref methods.
+ * mouseDown.preventDefault() keeps editor focus when clicking items.
+ */
+import { useMemo, useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
+import { Hash, Plus } from 'lucide-react';
+import { useWorkspaceTags } from '../../hooks/use-workspace-tags';
+
+export interface TagDropdownHandle {
+  getItemCount(): number;
+  getSelectedItem(): { type: 'existing'; id: string } | { type: 'create'; name: string } | null;
+}
+
+interface TagSelectorProps {
+  open: boolean;
+  onSelect: (tagDefId: string) => void;
+  onCreateNew: (name: string) => void;
+  existingTagIds: string[];
+  /** Search query from editor (text after #) */
+  query: string;
+  /** Currently highlighted item index (managed by parent) */
+  selectedIndex: number;
+}
+
+export const TagSelector = forwardRef<TagDropdownHandle, TagSelectorProps>(
+  function TagSelector({ open, onSelect, onCreateNew, existingTagIds, query, selectedIndex }, ref) {
+    const allTags = useWorkspaceTags();
+    const listRef = useRef<HTMLDivElement>(null);
+
+    const filteredTags = useMemo(() => {
+      const available = allTags.filter((t) => !existingTagIds.includes(t.id));
+      if (!query) return available;
+      const q = query.toLowerCase();
+      return available.filter((t) => t.name.toLowerCase().includes(q));
+    }, [allTags, existingTagIds, query]);
+
+    const hasCreateOption = query.trim().length > 0;
+    const totalItems = filteredTags.length + (hasCreateOption ? 1 : 0);
+    const boundedIndex = totalItems > 0 ? Math.min(Math.max(0, selectedIndex), totalItems - 1) : -1;
+
+    // Scroll highlighted item into view
+    useEffect(() => {
+      if (!listRef.current || boundedIndex < 0) return;
+      const items = listRef.current.querySelectorAll('[data-tag-item]');
+      items[boundedIndex]?.scrollIntoView({ block: 'nearest' });
+    }, [boundedIndex]);
+
+    useImperativeHandle(
+      ref,
+      () => ({
+        getItemCount() {
+          return totalItems;
+        },
+        getSelectedItem() {
+          if (totalItems === 0 || boundedIndex < 0) return null;
+          if (boundedIndex < filteredTags.length) {
+            return { type: 'existing', id: filteredTags[boundedIndex].id };
+          }
+          if (hasCreateOption) {
+            return { type: 'create', name: query.trim() };
+          }
+          return null;
+        },
+      }),
+      [filteredTags, boundedIndex, totalItems, hasCreateOption, query],
+    );
+
+    if (!open) return null;
+
+    return (
+      <div
+        ref={listRef}
+        className="absolute left-0 z-50 mt-1 w-56 max-h-52 overflow-y-auto rounded-lg border border-border bg-popover shadow-lg py-1"
+        style={{ top: '100%' }}
+        onMouseDown={(e) => e.preventDefault()}
+      >
+        {filteredTags.length === 0 && !hasCreateOption && (
+          <div className="px-3 py-2 text-xs text-muted-foreground">No tags available</div>
+        )}
+        {filteredTags.map((tag, i) => (
+          <button
+            key={tag.id}
+            data-tag-item
+            className={`flex w-full items-center gap-1.5 px-3 py-1.5 text-xs text-foreground transition-colors text-left ${
+              i === boundedIndex ? 'bg-accent' : 'hover:bg-accent/50'
+            }`}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => onSelect(tag.id)}
+          >
+            <Hash size={12} className="text-muted-foreground shrink-0" />
+            {tag.name}
+          </button>
+        ))}
+        {hasCreateOption && (
+          <>
+            {filteredTags.length > 0 && <div className="my-0.5 h-px bg-border" />}
+            <button
+              data-tag-item
+              className={`flex w-full items-center gap-1.5 px-3 py-1.5 text-xs text-foreground transition-colors text-left ${
+                boundedIndex === filteredTags.length ? 'bg-accent' : 'hover:bg-accent/50'
+              }`}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => onCreateNew(query.trim())}
+            >
+              <Plus size={12} className="text-muted-foreground shrink-0" />
+              Create &ldquo;{query}&rdquo;
+              <span className="ml-auto text-[10px] text-muted-foreground shrink-0">⌘↵</span>
+            </button>
+          </>
+        )}
+      </div>
+    );
+  },
+);

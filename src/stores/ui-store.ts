@@ -44,6 +44,10 @@ interface UIStore {
   // View mode
   viewMode: 'list' | 'table' | 'tiles' | 'cards';
   setViewMode(mode: 'list' | 'table' | 'tiles' | 'cards'): void;
+
+  // Field name editing (transient, not persisted)
+  editingFieldNameId: string | null;
+  setEditingFieldName(tupleId: string | null): void;
 }
 
 export const useUIStore = create<UIStore>()(
@@ -105,6 +109,10 @@ export const useUIStore = create<UIStore>()(
       // View mode
       viewMode: 'list',
       setViewMode: (mode) => set({ viewMode: mode }),
+
+      // Field name editing
+      editingFieldNameId: null,
+      setEditingFieldName: (tupleId) => set({ editingFieldNameId: tupleId }),
     }),
     {
       name: 'nodex-ui',

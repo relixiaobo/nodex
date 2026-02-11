@@ -182,6 +182,25 @@ export function TrailingInput({ parentId, depth, autoFocus }: TrailingInputProps
     onUpdate: ({ editor }) => {
       const text = editor.state.doc.textContent;
       setHasContent(text.length > 0);
+
+      // Auto-commit on trigger chars (#, @, >) so that the real NodeEditor's
+      // extensions (HashTag, Reference, FieldTrigger) can handle them.
+      // TrailingInput doesn't have these extensions — creating a real node
+      // and focusing it transfers control to the full editor.
+      if (!committingRef.current && (text === '#' || text === '@' || text === '>')) {
+        const ref = callbacksRef.current;
+        if (!ref.wsId || !ref.userId) return;
+
+        committingRef.current = true;
+        editor.commands.clearContent(false);
+        setHasContent(false);
+
+        ref.createChild(ref.effectiveParentId, ref.wsId, ref.userId, text).then((newNode) => {
+          ref.setExpanded(ref.effectiveParentId, true);
+          ref.setFocusedNode(newNode.id, ref.effectiveParentId);
+          queueMicrotask(() => { committingRef.current = false; });
+        });
+      }
     },
     onBlur: ({ editor }) => {
       if (committingRef.current) return;

@@ -25,12 +25,29 @@ function computeFields(entities: Record<string, NodexNode>, nodeId: string): Fie
   const node = entities[nodeId];
   if (!node?.children) return [];
 
+  const isAttrDef = node.props._docType === 'attrDef';
+
   const fields: FieldEntry[] = [];
   for (const childId of node.children) {
     const child = entities[childId];
     if (child?.props._docType !== 'tuple' || !child.children?.length) continue;
 
     const keyId = child.children[0];
+
+    // For attrDef nodes: recognize the typeChoice tuple [SYS_A02, SYS_D*]
+    if (isAttrDef && keyId === 'SYS_A02') {
+      fields.push({
+        attrDefId: 'SYS_A02',
+        attrDefName: 'Field type',
+        tupleId: childId,
+        valueNodeId: child.children[1],
+        valueName: child.children[1],
+        dataType: '__type_choice__',
+        assocDataId: undefined,
+      });
+      continue;
+    }
+
     if (keyId.startsWith('SYS_')) continue;
 
     const attrDef = entities[keyId];

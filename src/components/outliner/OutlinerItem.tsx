@@ -294,9 +294,16 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     const flatList = getFlattenedVisibleNodes(rootChildIds, entities, expandedNodes, rootNodeId);
     const prev = getPreviousVisibleNode(nodeId, parentId, flatList);
 
-    // Reference: just remove from parent's children, don't trash the node
+    // Reference: just remove from parent's children, don't trash the node.
+    // Guard: also verify the node is actually in parentId's children. After indent,
+    // the closure's parentId may be stale (old parent) while _ownerId is already
+    // the new parent — this is NOT a reference, just a stale closure.
     const currentNode = useNodeStore.getState().entities[nodeId];
-    if (currentNode && currentNode.props._ownerId !== parentId) {
+    const parentChildren = useNodeStore.getState().entities[parentId]?.children ?? [];
+    const isReference = currentNode
+      && currentNode.props._ownerId !== parentId
+      && parentChildren.includes(nodeId);
+    if (isReference) {
       removeReference(parentId, nodeId, userId);
     } else {
       trashNode(nodeId, wsId, userId);

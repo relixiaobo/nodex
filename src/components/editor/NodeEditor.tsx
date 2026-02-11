@@ -12,7 +12,7 @@
  *   ArrowUp     → focus previous node
  *   ArrowDown   → focus next node
  */
-import { useEffect, useRef, useMemo, useCallback, type MutableRefObject } from 'react';
+import { useEffect, useLayoutEffect, useRef, useMemo, useCallback, type MutableRefObject } from 'react';
 import { useEditor, EditorContent, type Editor } from '@tiptap/react';
 import { Extension } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
@@ -374,12 +374,15 @@ export function NodeEditor({
     },
   });
 
-  // Auto-focus when mounted.
+  // Auto-focus when mounted — use useLayoutEffect so focus is set synchronously
+  // BEFORE paint. This prevents a gap where the editor is in the DOM but unfocused
+  // (e.g., after indent moves a node, old editor unmounts and new one mounts —
+  // if focus is deferred to useEffect, the user's next keypress goes to body).
   // Also reset savedRef: React Strict Mode double-invokes effects in dev,
   // which triggers the cleanup save (harmlessly, since content is unchanged)
   // but leaves savedRef.current = true. Resetting here ensures the real
   // editing session can save correctly.
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (editor && !editor.isDestroyed) {
       savedRef.current = false;
       editor.commands.focus('end');

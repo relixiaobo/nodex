@@ -269,35 +269,16 @@ npm run dev:test   # 启动 http://localhost:5199/standalone/index.html
 ```
 
 - `standalone/TestApp.tsx` 跳过 Supabase 初始化，纯离线模式
-- 种子数据 36 个节点（`src/entrypoints/test/seed-data.ts`）
+- 种子数据 68 个节点（`src/entrypoints/test/seed-data.ts`，含 Schema + TagDef + AttrDef）
 - **Store 全局访问**：`window.__nodeStore` / `window.__uiStore` / `window.__wsStore`
 
 ### 自测流程 → `/self-test` Skill
 
-每次改完代码后，运行 `/self-test` 执行标准验证流程。Skill 定义在 `.claude/skills/self-test/SKILL.md`，包含：
+每次改完代码后，运行 `/self-test` 执行标准验证流程。参数：`/self-test all|store|visual|build`
 
-- **Phase 0**: 环境准备 (dev server + typecheck)
-- **Phase 1**: Store 操作验证 (CRUD + 树操作 + UI Store + 边界条件)
-- **Phase 2**: 视觉渲染验证 (截图 + Tana 对比 + 响应式)
-- **Phase 3**: 扩展构建 (`npx wxt build`)
-
-支持参数：`/self-test all|store|visual|build`
-
-### 已知易错点（Bug 档案）
-
-| # | 问题 | 文件 | 要点 |
-|---|------|------|------|
-| 1 | **handleBlur 竞态** | `OutlinerItem.tsx` | onBlur 须检查 `focusedNodeId === nodeId` 再清除 |
-| 2 | **trashNode children** | `node-store.ts` | 必须同时更新 `trash.children` 和 `node._ownerId` |
-| 3 | **Supabase 误触发** | `TestApp.tsx` | standalone 不调 `setupSupabase()`，靠 `isSupabaseReady()` guard |
-| 4 | **HMR 模块隔离** | `TestApp.tsx` | 用 `window.__nodeStore` 访问，不要用 `import()` |
-| 5 | **createSibling 父节点** | `node-store.ts` | 安全测试节点：`subtask_1a`（父 `task_1` 始终存在） |
-| 6 | **BulletChevron** | `BulletChevron.tsx` | Tana: bullet 始终可见，chevron 仅行 hover 时显示（所有节点含叶子），展开+不 hover 时 chevron 隐藏 |
-| 7 | **outdent 容器边界** | `node-store.ts` | 容器节点子节点 outdent 应为 no-op（`isWorkspaceContainer` guard） |
-| 8 | **chevron rotate 条件** | `BulletChevron.tsx` | 旋转条件必须是 `hasChildren && isExpanded`，不能只检查 `isExpanded` |
-| 9 | **bullet 点击区域** | `BulletChevron.tsx` | bullet `<span>` 和 chevron `<button>` 是独立元素，点击 bullet → pushPanel（zoom in），点击 chevron → toggleExpand |
-| 10 | **叶子节点 chevron 点击** | `OutlinerItem.tsx` | 叶子节点点击 chevron → expand + createChild（Tana 行为），需检查 children.length |
-| 11 | **indent guide line 可点击** | `OutlinerItem.tsx` | indent guide 是 `<button>`，点击 toggle 所有直接子节点的展开/折叠 |
+- Skill 是通用自测规范（`.claude/skills/self-test/SKILL.md`）
+- 项目特定配置见 `TESTING.md`（脚本、seed data、已知 bug、检查点）
+- 测试脚本目录：`tests/scripts/`
 
 ## 参考文档
 

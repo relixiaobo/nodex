@@ -12,15 +12,16 @@
  *   ArrowUp     → focus previous node
  *   ArrowDown   → focus next node
  */
-import { useEffect, useRef, useCallback } from 'react';
-import { useEditor, EditorContent } from '@tiptap/react';
+import { useEffect, useRef, useCallback, type MutableRefObject } from 'react';
+import { useEditor, EditorContent, type Editor } from '@tiptap/react';
 import { Extension } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Highlight from '@tiptap/extension-highlight';
-import Placeholder from '@tiptap/extension-placeholder';
 import { DOMSerializer } from '@tiptap/pm/model';
 import { useNodeStore } from '../../stores/node-store';
 import { useWorkspaceStore } from '../../stores/workspace-store';
+import { HashTagExtension, type HashTagCallbacks } from './HashTagExtension';
+import { FieldTriggerExtension, type FieldTriggerCallbacks } from './FieldTriggerExtension';
 
 interface NodeEditorProps {
   nodeId: string;
@@ -34,6 +35,19 @@ interface NodeEditorProps {
   onArrowDown: () => void;
   onMoveUp: () => void;
   onMoveDown: () => void;
+  onHashTag?: (query: string, from: number, to: number) => void;
+  onHashTagDeactivate?: () => void;
+  /** Ref to get the editor instance (for deleting #query text from outside) */
+  editorRef?: MutableRefObject<Editor | null>;
+  // ─── HashTag dropdown keyboard forwarding ───
+  hashTagActive?: boolean;
+  onHashTagConfirm?: () => void;
+  onHashTagNavDown?: () => void;
+  onHashTagNavUp?: () => void;
+  onHashTagCreate?: () => void;
+  onHashTagClose?: () => void;
+  // ─── Field trigger (>) ───
+  onFieldTriggerFire?: () => void;
 }
 
 export function NodeEditor({
@@ -48,6 +62,16 @@ export function NodeEditor({
   onArrowDown,
   onMoveUp,
   onMoveDown,
+  onHashTag,
+  onHashTagDeactivate,
+  editorRef,
+  hashTagActive,
+  onHashTagConfirm,
+  onHashTagNavDown,
+  onHashTagNavUp,
+  onHashTagCreate,
+  onHashTagClose,
+  onFieldTriggerFire,
 }: NodeEditorProps) {
   const updateNodeName = useNodeStore((s) => s.updateNodeName);
   const userId = useWorkspaceStore((s) => s.userId);
@@ -66,8 +90,42 @@ export function NodeEditor({
   );
 
   // Store latest callbacks in refs so TipTap extension doesn't go stale
-  const callbacksRef = useRef({ onEnter, onIndent, onOutdent, onDelete, onArrowUp, onArrowDown, onMoveUp, onMoveDown, saveContent });
-  callbacksRef.current = { onEnter, onIndent, onOutdent, onDelete, onArrowUp, onArrowDown, onMoveUp, onMoveDown, saveContent };
+  const callbacksRef = useRef({
+    onEnter, onIndent, onOutdent, onDelete, onArrowUp, onArrowDown, onMoveUp, onMoveDown, saveContent,
+    hashTagActive: hashTagActive ?? false,
+    onHashTagConfirm: onHashTagConfirm ?? (() => {}),
+    onHashTagNavDown: onHashTagNavDown ?? (() => {}),
+    onHashTagNavUp: onHashTagNavUp ?? (() => {}),
+    onHashTagCreate: onHashTagCreate ?? (() => {}),
+    onHashTagClose: onHashTagClose ?? (() => {}),
+  });
+  callbacksRef.current = {
+    onEnter, onIndent, onOutdent, onDelete, onArrowUp, onArrowDown, onMoveUp, onMoveDown, saveContent,
+    hashTagActive: hashTagActive ?? false,
+    onHashTagConfirm: onHashTagConfirm ?? (() => {}),
+    onHashTagNavDown: onHashTagNavDown ?? (() => {}),
+    onHashTagNavUp: onHashTagNavUp ?? (() => {}),
+    onHashTagCreate: onHashTagCreate ?? (() => {}),
+    onHashTagClose: onHashTagClose ?? (() => {}),
+  };
+
+  // HashTag extension callbacks
+  const hashTagRef = useRef<HashTagCallbacks>({
+    onActivate: (query, from, to) => onHashTag?.(query, from, to),
+    onDeactivate: () => onHashTagDeactivate?.(),
+  });
+  hashTagRef.current = {
+    onActivate: (query, from, to) => onHashTag?.(query, from, to),
+    onDeactivate: () => onHashTagDeactivate?.(),
+  };
+
+  // FieldTrigger extension callbacks (fire-once, no query tracking)
+  const fieldTriggerRef = useRef<FieldTriggerCallbacks>({
+    onActivate: () => onFieldTriggerFire?.(),
+  });
+  fieldTriggerRef.current = {
+    onActivate: () => onFieldTriggerFire?.(),
+  };
 
   const outlinerKeymap = useRef(
     Extension.create({
@@ -75,6 +133,12 @@ export function NodeEditor({
       addKeyboardShortcuts() {
         return {
           Enter: ({ editor }) => {
+            // HashTag dropdown: confirm selection
+            if (callbacksRef.current.hashTagActive) {
+              callbacksRef.current.onHashTagConfirm();
+              return true;
+            }
+
             const { from } = editor.state.selection;
             const { doc, schema } = editor.state;
             const docEnd = doc.content.size - 1;
@@ -131,6 +195,11 @@ export function NodeEditor({
             return false; // Let TipTap handle normal backspace
           },
           ArrowUp: ({ editor }) => {
+            // HashTag dropdown: navigate up
+            if (callbacksRef.current.hashTagActive) {
+              callbacksRef.current.onHashTagNavUp();
+              return true;
+            }
             // Only intercept when cursor is at the start
             const { from } = editor.state.selection;
             if (from <= 1) {
@@ -140,11 +209,30 @@ export function NodeEditor({
             return false;
           },
           ArrowDown: ({ editor }) => {
+            // HashTag dropdown: navigate down
+            if (callbacksRef.current.hashTagActive) {
+              callbacksRef.current.onHashTagNavDown();
+              return true;
+            }
             // Only intercept when cursor is at the end
             const { to } = editor.state.selection;
             const endPos = editor.state.doc.content.size - 1;
             if (to >= endPos) {
               callbacksRef.current.onArrowDown();
+              return true;
+            }
+            return false;
+          },
+          Escape: () => {
+            if (callbacksRef.current.hashTagActive) {
+              callbacksRef.current.onHashTagClose();
+              return true;
+            }
+            return false;
+          },
+          'Mod-Enter': () => {
+            if (callbacksRef.current.hashTagActive) {
+              callbacksRef.current.onHashTagCreate();
               return true;
             }
             return false;
@@ -174,10 +262,9 @@ export function NodeEditor({
         horizontalRule: false,
       }),
       Highlight,
-      Placeholder.configure({
-        placeholder: 'Type something...',
-      }),
       outlinerKeymap,
+      HashTagExtension.configure({ callbacks: hashTagRef }),
+      FieldTriggerExtension.configure({ callbacks: fieldTriggerRef }),
     ],
     content: wrapInP(initialContent),
     editorProps: {
@@ -202,8 +289,12 @@ export function NodeEditor({
     if (editor && !editor.isDestroyed) {
       savedRef.current = false;
       editor.commands.focus('end');
+      if (editorRef) editorRef.current = editor;
     }
-  }, [editor]);
+    return () => {
+      if (editorRef) editorRef.current = null;
+    };
+  }, [editor, editorRef]);
 
   // Cleanup: save on unmount if not already saved
   useEffect(() => {
@@ -217,7 +308,7 @@ export function NodeEditor({
   if (!editor) return null;
 
   return (
-    <div className="flex-1 min-w-0">
+    <div className="editor-inline">
       <EditorContent editor={editor} />
     </div>
   );

@@ -53,6 +53,7 @@ export function TrailingInput({ parentId, depth, autoFocus }: TrailingInputProps
   }, [parentId, depth]);
 
   const committingRef = useRef(false);
+  const [hasContent, setHasContent] = useState(false);
 
   const callbacksRef = useRef({
     createChild, wsId, userId,
@@ -79,6 +80,7 @@ export function TrailingInput({ parentId, depth, autoFocus }: TrailingInputProps
 
     // Clear editor and keep focus for next item
     editor.commands.clearContent(false);
+    setHasContent(false);
     // Reset flag after microtask so blur doesn't double-commit
     queueMicrotask(() => {
       committingRef.current = false;
@@ -177,12 +179,17 @@ export function TrailingInput({ parentId, depth, autoFocus }: TrailingInputProps
         class: 'outline-none text-sm leading-[21px]',
       },
     },
+    onUpdate: ({ editor }) => {
+      const text = editor.state.doc.textContent;
+      setHasContent(text.length > 0);
+    },
     onBlur: ({ editor }) => {
       if (committingRef.current) return;
       const text = editor.state.doc.textContent.trim();
       if (text.length > 0) {
         commitContent(editor.getHTML(), editor);
       }
+      setHasContent(false);
       // Reset to original depth on blur
       const ref = callbacksRef.current;
       if (ref.effectiveParentId !== ref.parentId) {
@@ -203,7 +210,7 @@ export function TrailingInput({ parentId, depth, autoFocus }: TrailingInputProps
 
   return (
     <div
-      className="group flex min-h-7 items-start gap-[7.5px] py-1"
+      className="group/row flex min-h-7 items-start gap-[7.5px] py-1"
       style={{ paddingLeft: effectiveDepth * 24 + 6 }}
     >
       <BulletChevron
@@ -212,7 +219,7 @@ export function TrailingInput({ parentId, depth, autoFocus }: TrailingInputProps
         onToggle={() => {}}
         onDrillDown={() => {}}
         onBulletClick={() => {}}
-        dimmed
+        dimmed={!hasContent}
       />
       <div className="flex-1 min-w-0">
         <EditorContent editor={editor} />

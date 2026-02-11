@@ -50,7 +50,7 @@ export function BulletChevron({
            Tana: 15×15px circle button, position: absolute left: -21px from bullet.
            We use inline flex with opacity toggle instead. */}
       <button
-        className="flex h-[21px] w-[15px] items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+        className="flex h-[21px] w-[15px] items-center justify-center opacity-0 group-hover/row:opacity-100 transition-opacity"
         onClick={onToggle}
         onDoubleClick={onDrillDown}
         title={hasChildren && isExpanded ? 'Collapse' : 'Expand'}

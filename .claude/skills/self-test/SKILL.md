@@ -1,32 +1,42 @@
 ---
 name: self-test
-description: Run Nodex self-tests after code changes. Use this after modifying stores, components, hooks, or services to verify nothing is broken. Covers store operations, UI rendering, and extension build.
+description: Run automated self-tests after code changes. Validates store logic, visual rendering (with reference product comparison), and production build. Adapts to any project with a TESTING.md config file.
 ---
 
-# Nodex Self-Test Suite
+# Self-Test Suite
 
-每次代码改动后，执行本流程验证功能正确性。根据 `$ARGUMENTS` 决定测试范围：
+通用自测规范。每次代码改动后执行，验证功能正确性。
 
-- `all`（默认）: 运行全部测试
+根据 `$ARGUMENTS` 决定测试范围：
+
+- `all`（默认）: 运行全部阶段
 - `store`: 仅 Phase 0 + Phase 1
 - `visual`: 仅 Phase 2
 - `build`: 仅 Phase 0 + Phase 3
 
 ---
 
+## 前置条件
+
+1. **读取项目测试配置**: 读取项目根目录下的 `TESTING.md`，获取：
+   - Dev server 地址与启动命令
+   - 测试脚本路径与期望结果
+   - Seed data 速查表
+   - 安全测试节点列表
+   - 已知易错点
+   - 参考产品信息（用于视觉对比）
+
+2. 所有后续步骤中的具体参数（URL、脚本路径、期望值、节点 ID 等）都来自 `TESTING.md`。
+
+---
+
 ## Phase 0: 环境准备
 
 1. **确认 dev server 运行中**：
-```bash
-curl -s -o /dev/null -w "%{http_code}" http://localhost:5199/standalone/index.html
-```
-如果返回非 200，启动 dev server：
-```bash
-npm run dev:test
-```
-等待 server ready 后继续。
+   - 按 `TESTING.md` 中的地址发送 HTTP 请求检查可用性
+   - 如不可用，按配置的启动命令启动，等待 ready 后继续
 
-2. **TypeScript 类型检查**（快速拦截编译错误）：
+2. **TypeScript 类型检查**：
 ```bash
 npm run typecheck
 ```
@@ -34,143 +44,140 @@ npm run typecheck
 
 ---
 
-## Phase 1: Store 操作验证
+## Phase 1: Store / 逻辑验证
 
-通过 `chrome-devtools` MCP 的 `evaluate_script` 在 localhost:5199 页面执行。
+通过浏览器 DevTools 在测试页面执行脚本，验证数据层逻辑。
 
-**执行方式**：用 Read 工具读取脚本文件内容，然后传给 `evaluate_script` 执行。
+### 执行方式
 
-### 1.1 前置检查
+1. 用 Read 工具读取 `TESTING.md` 中指定的脚本文件内容
+2. 通过 `chrome-devtools` MCP 的 `evaluate_script` 在测试页面执行
+3. 检查返回值是否符合 `TESTING.md` 中的期望结果
 
-**脚本**: `scripts/preflight.js`
+### 脚本编写规范
 
-读取并执行该脚本。**期望**: `ok: true`, entities ≥ 36, workspace = `'ws_default'`。
+| 规则 | 说明 |
+|------|------|
+| **IIFE 封装** | 脚本必须是 `(() => { ... })()` 或 `(async () => { ... })()` 形式 |
+| **纯表达式** | 不要使用 `return` 在顶层，IIFE 返回值即为结果 |
+| **标准返回格式** | 返回 `{ allPassed: boolean, results: Array<{ test: string, pass: boolean, ... }> }` |
+| **单项检查格式** | 返回 `{ ok: boolean, ... }` |
+| **操作后清理** | 所有测试节点在操作后必须还原或删除，避免污染后续测试 |
+| **安全节点** | 只对 `TESTING.md` 中标记的安全测试节点做写操作 |
+| **Window 访问** | 通过 `window.__xxxStore` 访问 Zustand store（Vite HMR 安全） |
+| **无外部依赖** | 脚本不得 import 外部模块，所有逻辑 inline |
 
-如果失败，检查：
-- dev server 是否启动 (`npm run dev:test`)
-- 页面是否已加载完毕（等待几秒后重试）
-- 是否意外使用了 App 而非 TestApp
+### 结果判定
 
-### 1.2 CRUD + 树操作
-
-**脚本**: `scripts/store-crud.js`
-
-读取并执行。**期望**: `allPassed: true`，7 项全部 `pass: true`。
-
-测试项：
-| # | 操作 | 验证点 |
-|---|------|--------|
-| 1 | createSibling | entity 数量 +1 |
-| 2 | indent | _ownerId 变为前兄弟 `subtask_1a` |
-| 3 | outdent | _ownerId 恢复为 `task_1` |
-| 4 | moveDown + moveUp | children 顺序还原 |
-| 5 | trashNode | 入 trash.children 且出 parent.children |
-| 6 | createChild | 出现在 parent.children 且 name 正确 |
-| 7 | updateNodeName | props.name 更新后还原 |
-
-### 1.3 UI Store 操作
-
-**脚本**: `scripts/ui-store.js`
-
-读取并执行。**期望**: `allPassed: true`，11 项全部 `pass: true`。
-
-测试项：pushPanel, popPanel, replacePanel, expand, collapse, toggleExpand, setFocus, clearFocus, openSearch, closeSearch, toggleSidebar。
-
-### 1.4 边界条件
-
-**脚本**: `scripts/edge-cases.js`
-
-读取并执行。**期望**: `allPassed: true`，2 项全部 `pass: true`。
-
-测试项：indent 第一个子节点 (no-op)、outdent 顶层节点 (no-op)。
+- 每个脚本独立运行，独立判定 PASS/FAIL
+- 任一脚本 FAIL → 报告详细错误信息并建议修复方案
+- 前置检查失败 → 停止后续脚本执行
 
 ---
 
 ## Phase 2: 视觉渲染验证
 
-使用 `claude-in-chrome` MCP 工具进行截图和视觉检查。
+使用浏览器截图工具进行视觉检查。
 
-### 2.1 Nodex 截图
+### 2.1 截图检查
 
-1. 对 standalone 测试页截图（确保 tab 已打开 localhost:5199）
-2. 缩放到 bullet / chevron 区域，检查：
-   - Bullet 圆点可见性（叶节点始终显示圆点）
-   - Chevron 箭头行为（有子节点 + hover 时显示）
-   - 缩进层级（每层 24px 左边距）
-   - 文本对齐（bullet 与文本基线对齐）
+1. 对测试页面全页截图
+2. 缩放关键 UI 区域（按 `TESTING.md` 中定义的检查点），检查：
+   - 元素可见性与布局
+   - 间距和对齐
+   - 交互状态（hover/focus/active）
 
-### 2.2 与 Tana 对比（可选）
+### 2.2 与参考产品对比（可选）
 
-如果修改了 outliner 视觉样式：
-1. 截图 Tana (app.tana.inc) 的大纲区域
-2. 并排对比 bullet 大小、间距、字体
-3. 记录差异（可接受 vs 需要修复）
+当修改了核心 UI 样式时：
+
+1. 截图参考产品（`TESTING.md` 中定义的 URL 和区域）
+2. 并排对比相同功能区域
+3. 记录差异：
+   - **可接受差异**: 字体、品牌色、细节微调
+   - **需要修复**: 布局偏差、间距严重不一致、功能缺失
 
 ### 2.3 响应式检查
 
-1. 将页面调整为 350px 宽度（Side Panel 最小尺寸）
-2. 截图检查：布局是否溢出、文本是否截断
-3. 调整回 700px+，确认正常展示
+1. 调整到最小目标宽度（`TESTING.md` 定义）
+2. 检查布局溢出、文本截断
+3. 恢复到正常宽度，确认展示正常
+
+### 视觉检查注意事项
+
+| 要点 | 说明 |
+|------|------|
+| **截图前调整尺寸** | 先将页面调整到合适尺寸（如 1000×800），避免过大截图 |
+| **用 zoom 检查细节** | 小元素（图标、bullet、间距）用 zoom 放大区域查看 |
+| **console 错误检查** | 截图后检查浏览器 console，`error` 级别日志 = FAIL |
+| **不要手动模拟键盘** | ProseMirror 等编辑器忽略 `isTrusted: false` 的合成键盘事件 |
+| **MCP 工具分工** | `chrome-devtools` 用于 JS 执行 + snapshot; `claude-in-chrome` 用于截图 + zoom |
 
 ---
 
-## Phase 3: 扩展构建
+## Phase 3: 生产构建
+
+按 `TESTING.md` 配置的构建命令执行：
 
 ```bash
-npx wxt build 2>&1
+# 典型命令，具体见 TESTING.md
+npm run build 2>&1
 ```
 
-**期望**: 构建成功，无错误。输出中包含 `.output/chrome-mv3/`。
-
-如果构建失败，报告错误详情并立即修复。
+**期望**: 构建成功，无错误。
 
 ---
 
 ## 结果汇报格式
 
-测试完成后，输出汇总表格：
+测试完成后，输出汇总表格（行数按 TESTING.md 定义的实际脚本动态生成）：
 
 | Phase | Test | Result |
 |-------|------|--------|
 | 0 | TypeScript 类型检查 | PASS/FAIL |
-| 1.1 | Store 前置检查 | PASS/FAIL |
-| 1.2 | CRUD + 树操作 (7 tests) | PASS/FAIL |
-| 1.3 | UI Store 操作 (11 tests) | PASS/FAIL |
-| 1.4 | 边界条件 (2 tests) | PASS/FAIL |
+| 1.x | (各脚本名) | PASS/FAIL |
 | 2 | 视觉渲染 | PASS/FAIL/SKIP |
-| 3 | 扩展构建 | PASS/FAIL |
+| 3 | 生产构建 | PASS/FAIL |
 
-如果有 FAIL 项，详细列出失败原因和建议修复方案。
+如果有 FAIL 项，详细列出：
+1. 失败的具体断言或错误信息
+2. 可能的原因（参考 TESTING.md 中的已知易错点）
+3. 建议修复方案
 
 ---
 
-## 已知注意点
+## 通用易错点
 
-### 安全测试节点
-- `subtask_1a` — 父节点 `task_1` 始终存在，最安全的测试目标
-- `note_1a` — 父节点 `note_1` 存在
-- 不要用 `proj_1` 做 createSibling（其父是容器节点 `ws_default_LIBRARY`，操作后需要额外清理）
+### 浏览器 DevTools 操作
 
-### 常见失败原因
-1. **handleBlur 竞态**: Enter 创建新节点时 onBlur 清除了新设焦点 → 检查 `focusedNodeId === nodeId` guard
-2. **trashNode 未更新 children**: 节点移到 Trash 后检查 `trash.children` 是否包含该 ID
-3. **Supabase 误触发**: standalone 模式下 `isSupabaseReady()` 返回 true → store 操作被远程失败回滚
-4. **Vite HMR 模块隔离**: 热更新后 import() 拿到新实例 → 用 `window.__nodeStore` 访问
+| 问题 | 解决方案 |
+|------|----------|
+| `evaluate_script` 返回 undefined | 脚本未返回值，检查 IIFE 结尾是否缺少 `()` |
+| store 未挂载到 window | 测试页面加载完成前执行了脚本，等待后重试 |
+| HMR 后 store 实例变更 | 用 `window.__xxxStore` 访问，不要 `import()` 动态导入 |
+| 异步脚本超时 | `evaluate_script` 支持 async IIFE，但要确保 await 正确 |
+| 页面未连接 | 确认 `chrome-devtools` MCP 已选择正确的 page (`select_page`) |
 
-### Seed Data 速查
-```
-总数: 36 节点
-Library:  proj_1, task_1~3, subtask_1a~1b, subtask_2a~2c, note_1, note_1a~1c, note_2, idea_1~2, note_rich, rich_1~5
-Inbox:    inbox_1~3, inbox_3a~3b
-Journal:  journal_1, j_1~3
-Containers: ws_default_LIBRARY, ws_default_INBOX, ws_default_JOURNAL, ws_default_SEARCHES, ws_default_TRASH
-默认展开: proj_1, task_1, task_2, note_rich
-```
+### 截图与视觉检查
+
+| 问题 | 解决方案 |
+|------|----------|
+| 截图分辨率太高 | 先 `resize_page` 到合理尺寸 |
+| hover 状态无法截图 | 用 `hover` 动作触发后立即截图 |
+| 元素不在视口内 | 用 `scroll_to` 滚动到目标元素 |
+| 截图上看不清细节 | 用 `zoom` 放大指定区域检查 |
+
+### Zustand + React 稳定性
+
+| 问题 | 解决方案 |
+|------|----------|
+| 无限重渲染 | Selector 返回新对象/数组引用 → 用 `useShallow` 或 `JSON.stringify` + `useMemo` |
+| 状态不更新 | 检查 immer draft 操作是否正确 mutation |
+| persist 反序列化失败 | 检查 `createJSONStorage` 的 reviver/replacer |
 
 ### 新增测试指南
 
-当需要新增测试时：
-1. 在 `scripts/` 目录创建新的 `.js` 脚本，遵循现有模式（IIFE、返回 `{ allPassed, results }` 格式）
-2. 在 SKILL.md 中添加对应的 Phase/Step 描述
+1. 在 `TESTING.md` 指定的脚本目录创建新的 `.js` 脚本，遵循上述脚本编写规范
+2. 在 `TESTING.md` 中添加对应的 Phase/Step 描述和期望结果
 3. 更新结果汇报表格
 4. 所有测试节点在操作后必须清理或还原

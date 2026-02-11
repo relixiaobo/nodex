@@ -1,12 +1,18 @@
-import { useCallback, useRef, type DragEvent } from 'react';
+import { useCallback, useMemo, useRef, useState, type DragEvent } from 'react';
+import type { Editor } from '@tiptap/react';
 import { useNode } from '../../hooks/use-node';
 import { useChildren } from '../../hooks/use-children';
+import { useNodeTags } from '../../hooks/use-node-tags';
+import { useNodeFields, type FieldEntry } from '../../hooks/use-node-fields';
 import { useNodeStore } from '../../stores/node-store';
 import { useUIStore } from '../../stores/ui-store';
 import { useWorkspaceStore } from '../../stores/workspace-store';
 import { BulletChevron } from './BulletChevron';
 import { NodeEditor } from '../editor/NodeEditor';
 import { TrailingInput } from '../editor/TrailingInput';
+import { TagBar } from '../tags/TagBar';
+import { TagSelector, type TagDropdownHandle } from '../tags/TagSelector';
+import { FieldRow } from '../fields/FieldRow';
 import {
   getFlattenedVisibleNodes,
   getPreviousVisibleNodeId,
@@ -49,13 +55,60 @@ export function OutlinerItem({ nodeId, depth, rootChildIds }: OutlinerItemProps)
   const entities = useNodeStore((s) => s.entities);
 
   const rowRef = useRef<HTMLDivElement>(null);
+  const editorRef = useRef<Editor | null>(null);
+
+  // # trigger state
+  const [hashTagOpen, setHashTagOpen] = useState(false);
+  const [hashTagQuery, setHashTagQuery] = useState('');
+  const [hashTagSelectedIndex, setHashTagSelectedIndex] = useState(0);
+  const hashRangeRef = useRef<{ from: number; to: number }>({ from: 0, to: 0 });
+  const tagDropdownRef = useRef<TagDropdownHandle>(null);
+  const applyTag = useNodeStore((s) => s.applyTag);
+  const createTagDef = useNodeStore((s) => s.createTagDef);
+  const updateNodeName = useNodeStore((s) => s.updateNodeName);
+
+  // > trigger (fire-once: instantly creates field)
+  const addUnnamedFieldToNode = useNodeStore((s) => s.addUnnamedFieldToNode);
+  const setEditingFieldName = useUIStore((s) => s.setEditingFieldName);
 
   // Lazy-load children when expanded
   useChildren(isExpanded ? nodeId : null);
 
-  const childIds = node?.children ?? [];
-  const hasChildren = childIds.length > 0;
+  const tagIds = useNodeTags(nodeId);
+  const fields = useNodeFields(nodeId);
+
+  const allChildIds = node?.children ?? [];
+
+  // Build field lookup by tuple ID
+  const fieldMap = useMemo(() => {
+    const m = new Map<string, FieldEntry>();
+    for (const f of fields) m.set(f.tupleId, f);
+    return m;
+  }, [fields]);
+
+  // Classify each child: field tuple → 'field', regular node → 'content', else skip
+  const visibleChildren = useMemo(() => {
+    const result: { id: string; type: 'field' | 'content' }[] = [];
+    for (const cid of allChildIds) {
+      if (fieldMap.has(cid)) {
+        result.push({ id: cid, type: 'field' });
+      } else {
+        const dt = entities[cid]?.props._docType;
+        if (!dt) result.push({ id: cid, type: 'content' });
+        // else skip: metanode, associatedData, SYS tuple, tag tuple
+      }
+    }
+    return result;
+  }, [allChildIds, fieldMap, entities]);
+
+  const childIds = useMemo(
+    () => visibleChildren.filter((c) => c.type === 'content').map((c) => c.id),
+    [visibleChildren],
+  );
+  const hasChildren = visibleChildren.length > 0;
   const isFocused = focusedNodeId === nodeId;
+  const hasTags = tagIds.length > 0;
+  const hasFields = fields.length > 0;
 
   // ─── Basic handlers ───
 
@@ -163,7 +216,14 @@ export function OutlinerItem({ nodeId, depth, rootChildIds }: OutlinerItemProps)
 
   const handleDelete = useCallback((): boolean => {
     if (!wsId || !userId) return false;
-    if (node?.props.name && node.props.name.length > 0) return false;
+    // Read current name from store — the closure's `node` may be stale
+    // because saveContent() updates the store synchronously before this runs.
+    // Strip HTML tags before checking: TipTap may save empty paragraphs as
+    // '<br>' or '<br class="ProseMirror-trailingBreak">' which are non-empty
+    // strings but represent visually empty content.
+    const currentName = useNodeStore.getState().entities[nodeId]?.props.name ?? '';
+    const textOnly = currentName.replace(/<[^>]*>/g, '').trim();
+    if (textOnly.length > 0) return false;
 
     const flatList = getFlattenedVisibleNodes(rootChildIds, entities, expandedNodes);
     const prevId = getPreviousVisibleNodeId(nodeId, flatList);
@@ -171,7 +231,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds }: OutlinerItemProps)
     trashNode(nodeId, wsId, userId);
     setFocusedNode(prevId);
     return true;
-  }, [nodeId, node, wsId, userId, rootChildIds, entities, expandedNodes, trashNode, setFocusedNode]);
+  }, [nodeId, wsId, userId, rootChildIds, entities, expandedNodes, trashNode, setFocusedNode]);
 
   const handleArrowUp = useCallback(() => {
     const flatList = getFlattenedVisibleNodes(rootChildIds, entities, expandedNodes);
@@ -194,6 +254,111 @@ export function OutlinerItem({ nodeId, depth, rootChildIds }: OutlinerItemProps)
     if (!userId) return;
     moveNodeDown(nodeId, userId);
   }, [nodeId, userId, moveNodeDown]);
+
+  // ─── # trigger handlers ───
+
+  const handleHashTag = useCallback((query: string, from: number, to: number) => {
+    hashRangeRef.current = { from, to };
+    setHashTagQuery(query);
+    setHashTagSelectedIndex(0);
+    if (!hashTagOpen) setHashTagOpen(true);
+  }, [hashTagOpen]);
+
+  const handleHashTagDeactivate = useCallback(() => {
+    // Only close if it was truly deactivated (user deleted the #)
+    setHashTagOpen(false);
+    setHashTagQuery('');
+    setHashTagSelectedIndex(0);
+  }, []);
+
+  /** Delete #query text from editor, save corrected content, refocus */
+  const cleanupHashTagText = useCallback(() => {
+    const ed = editorRef.current;
+    if (ed && !ed.isDestroyed) {
+      const { from, to } = hashRangeRef.current;
+      ed.chain().deleteRange({ from, to }).run();
+      // Save corrected content (without #query)
+      const html = ed.getHTML();
+      const trimmed = html.trim();
+      const match = trimmed.match(/^<p>(.*)<\/p>$/s);
+      const cleanedName = (match && !match[1].includes('<p>')) ? match[1] : trimmed;
+      if (userId) updateNodeName(nodeId, cleanedName, userId);
+    }
+  }, [nodeId, userId, updateNodeName]);
+
+  const handleHashTagSelect = useCallback(
+    (tagDefId: string) => {
+      if (!wsId || !userId) return;
+      cleanupHashTagText();
+      applyTag(nodeId, tagDefId, wsId, userId);
+      setHashTagOpen(false);
+      setHashTagQuery('');
+      setHashTagSelectedIndex(0);
+    },
+    [nodeId, wsId, userId, applyTag, cleanupHashTagText],
+  );
+
+  const handleHashTagCreateNew = useCallback(
+    async (name: string) => {
+      if (!wsId || !userId) return;
+      cleanupHashTagText();
+      const tagDef = await createTagDef(name, wsId, userId);
+      applyTag(nodeId, tagDef.id, wsId, userId);
+      setHashTagOpen(false);
+      setHashTagQuery('');
+      setHashTagSelectedIndex(0);
+    },
+    [nodeId, wsId, userId, createTagDef, applyTag, cleanupHashTagText],
+  );
+
+  // Keyboard forwarding: confirm selected item in dropdown
+  const handleHashTagConfirm = useCallback(() => {
+    const item = tagDropdownRef.current?.getSelectedItem();
+    if (!item) return;
+    if (item.type === 'existing') {
+      handleHashTagSelect(item.id);
+    } else {
+      handleHashTagCreateNew(item.name);
+    }
+  }, [handleHashTagSelect, handleHashTagCreateNew]);
+
+  // Keyboard forwarding: navigate down in dropdown
+  const handleHashTagNavDown = useCallback(() => {
+    setHashTagSelectedIndex((i) => {
+      const count = tagDropdownRef.current?.getItemCount() ?? 0;
+      return count > 0 ? Math.min(i + 1, count - 1) : 0;
+    });
+  }, []);
+
+  // Keyboard forwarding: navigate up in dropdown
+  const handleHashTagNavUp = useCallback(() => {
+    setHashTagSelectedIndex((i) => Math.max(i - 1, 0));
+  }, []);
+
+  // Keyboard forwarding: Cmd+Enter → force create new tag
+  const handleHashTagForceCreate = useCallback(() => {
+    const query = hashTagQuery.trim();
+    if (query) {
+      handleHashTagCreateNew(query);
+    }
+  }, [hashTagQuery, handleHashTagCreateNew]);
+
+  // Keyboard forwarding: Escape → close dropdown
+  const handleHashTagClose = useCallback(() => {
+    setHashTagOpen(false);
+    setHashTagQuery('');
+    setHashTagSelectedIndex(0);
+  }, []);
+
+  // ─── > field trigger (fire-once: instantly creates unnamed field) ───
+
+  const handleFieldTriggerFire = useCallback(async () => {
+    const parentId = node?.props._ownerId;
+    if (!parentId || !wsId || !userId) return;
+    const { tupleId } = await addUnnamedFieldToNode(parentId, wsId, userId, nodeId);
+    trashNode(nodeId, wsId, userId);
+    setEditingFieldName(tupleId);
+  }, [nodeId, node?.props._ownerId, wsId, userId, addUnnamedFieldToNode, trashNode, setEditingFieldName]);
 
   // ─── Drag and drop handlers ───
 
@@ -302,7 +467,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds }: OutlinerItemProps)
       )}
       <div
         ref={rowRef}
-        className={`group flex min-h-7 items-start gap-[7.5px] py-1 ${
+        className={`group/row flex min-h-7 items-start gap-[7.5px] py-1 ${
           isDropTarget && dropPosition === 'inside'
             ? 'bg-primary/10 ring-1 ring-primary/30 rounded-sm'
             : ''
@@ -322,31 +487,63 @@ export function OutlinerItem({ nodeId, depth, rootChildIds }: OutlinerItemProps)
           onDrillDown={handleDrillDown}
           onBulletClick={handleBulletClick}
         />
-        {isFocused ? (
-          <NodeEditor
-            nodeId={nodeId}
-            initialContent={node.props.name ?? ''}
-            onBlur={handleBlur}
-            onEnter={handleEnter}
-            onIndent={handleIndent}
-            onOutdent={handleOutdent}
-            onDelete={handleDelete}
-            onArrowUp={handleArrowUp}
-            onArrowDown={handleArrowDown}
-            onMoveUp={handleMoveUp}
-            onMoveDown={handleMoveDown}
-          />
-        ) : (
+        <div className="flex-1 min-w-0 relative">
           <div
-            className="node-content flex-1 cursor-text text-sm leading-[21px] min-w-0"
-            onClick={handleClick}
-            dangerouslySetInnerHTML={{
-              __html:
-                node.props.name ||
-                '<span class="text-muted-foreground">Untitled</span>',
-            }}
-          />
-        )}
+            className={`text-sm leading-[21px] ${!isFocused ? 'cursor-text' : ''}`}
+            onClick={!isFocused ? handleClick : undefined}
+          >
+            {isFocused ? (
+              <NodeEditor
+                nodeId={nodeId}
+                initialContent={node.props.name ?? ''}
+                onBlur={handleBlur}
+                onEnter={handleEnter}
+                onIndent={handleIndent}
+                onOutdent={handleOutdent}
+                onDelete={handleDelete}
+                onArrowUp={handleArrowUp}
+                onArrowDown={handleArrowDown}
+                onMoveUp={handleMoveUp}
+                onMoveDown={handleMoveDown}
+                onHashTag={handleHashTag}
+                onHashTagDeactivate={handleHashTagDeactivate}
+                hashTagActive={hashTagOpen}
+                onHashTagConfirm={handleHashTagConfirm}
+                onHashTagNavDown={handleHashTagNavDown}
+                onHashTagNavUp={handleHashTagNavUp}
+                onHashTagCreate={handleHashTagForceCreate}
+                onHashTagClose={handleHashTagClose}
+                onFieldTriggerFire={handleFieldTriggerFire}
+                editorRef={editorRef}
+              />
+            ) : (
+              <span
+                className="node-content"
+                dangerouslySetInnerHTML={{
+                  __html:
+                    node.props.name ||
+                    '<span class="text-muted-foreground">Untitled</span>',
+                }}
+              />
+            )}
+            {hasTags && (
+              <span className="inline-flex align-baseline ml-1.5" onClick={(e) => e.stopPropagation()}>
+                <TagBar nodeId={nodeId} />
+              </span>
+            )}
+          </div>
+          {hashTagOpen && isFocused && (
+            <TagSelector
+              ref={tagDropdownRef}
+              open={hashTagOpen}
+              onSelect={handleHashTagSelect}
+              onCreateNew={handleHashTagCreateNew}
+              existingTagIds={tagIds}
+              query={hashTagQuery}
+              selectedIndex={hashTagSelectedIndex}
+            />
+          )}
+        </div>
       </div>
       {/* Drop indicator: after */}
       {isDropTarget && dropPosition === 'after' && (
@@ -359,25 +556,42 @@ export function OutlinerItem({ nodeId, depth, rootChildIds }: OutlinerItemProps)
         <div className="relative">
           {/* Indent guide line — clickable 8px button (Tana: left 13.5px from parent).
                Center aligns with parent bullet center. Hover fills bg = looks thicker. */}
-          {childIds.length > 0 && (
+          {hasChildren && (
             <button
               className="indent-line absolute top-0 bottom-0 w-2 flex justify-center cursor-pointer rounded-sm transition-colors"
-              style={{ left: depth * 24 + 6 + 7 }}
+              style={{ left: depth * 24 + 6 + 18.5 }}
               onClick={handleIndentLineClick}
               title="Toggle children"
             >
               <div className="w-px h-full bg-border/80" />
             </button>
           )}
-          {childIds.map((childId) => (
-            <OutlinerItem
-              key={childId}
-              nodeId={childId}
-              depth={depth + 1}
-              rootChildIds={rootChildIds}
-            />
-          ))}
-          {childIds.length === 0 && (
+          {/* Render children in natural order: fields as FieldRow, content as OutlinerItem */}
+          {visibleChildren.map(({ id, type }, i) =>
+            type === 'field' ? (
+              <div key={id} style={{ paddingLeft: (depth + 1) * 24 + 6 + 15 }}>
+                <FieldRow
+                  nodeId={nodeId}
+                  attrDefId={fieldMap.get(id)!.attrDefId}
+                  attrDefName={fieldMap.get(id)!.attrDefName}
+                  tupleId={id}
+                  valueNodeId={fieldMap.get(id)!.valueNodeId}
+                  valueName={fieldMap.get(id)!.valueName}
+                  dataType={fieldMap.get(id)!.dataType}
+                  assocDataId={fieldMap.get(id)!.assocDataId}
+                  isLastInGroup={i === visibleChildren.length - 1 || visibleChildren[i + 1].type !== 'field'}
+                />
+              </div>
+            ) : (
+              <OutlinerItem
+                key={id}
+                nodeId={id}
+                depth={depth + 1}
+                rootChildIds={rootChildIds}
+              />
+            ),
+          )}
+          {visibleChildren.length === 0 && (
             <TrailingInput
               parentId={nodeId}
               depth={depth + 1}

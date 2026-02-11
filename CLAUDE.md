@@ -96,7 +96,7 @@ src/
 supabase/
   migrations/
     001_create_nodes.sql   # DB Schema (单表 nodes + 辅助表)
-research/                  # 只读参考资料
+docs/                      # 文档 (roadmap, testing, research)
 ```
 
 ## 数据模型核心概念
@@ -204,7 +204,7 @@ ContentNode
 
 - Tana 导出的 `touchCounts`/`modifiedTs` 有两种格式：标准数组 `[1769, 0]` 和 JSON 字符串 `'{"0":1769}'`（紧凑稀疏格式）。`parseCompactArray()` 统一处理。
 - 工作区 ID 通过 `_ownerId` 链 + 容器后缀（`_SCHEMA`, `_TRASH` 等）反向推导。
-- `research/b8AyeCJNsefK@2026-01-30.json` 是 16MB 文件，不要直接用 Read 工具打开，用 Python/Bash 脚本处理。
+- `docs/research/b8AyeCJNsefK@2026-01-30.json` 是 16MB 文件，不要直接用 Read 工具打开，用 Python/Bash 脚本处理。
 
 ### 引用完整性
 
@@ -213,7 +213,7 @@ ContentNode
 
 ## 开发路线图
 
-详细路线图见 `ROADMAP.md`，以下为当前进度摘要：
+详细路线图见 `docs/ROADMAP.md`，以下为当前进度摘要：
 
 - [x] 数据模型 + 服务层 + 迁移验证
 - [x] WXT + React 19 + TipTap + Zustand 基础骨架
@@ -275,12 +275,12 @@ npm run dev:test   # 启动 http://localhost:5199/standalone/index.html
 每次改完代码后，运行 `/self-test` 执行标准验证流程。参数：`/self-test all|store|visual|build`
 
 - Skill 是通用自测规范（`.claude/skills/self-test/SKILL.md`）
-- 项目特定配置见 `TESTING.md`（脚本、seed data、已知 bug、检查点）
+- 项目特定配置见 `docs/TESTING.md`（脚本、seed data、已知 bug、检查点）
 - 测试脚本目录：`tests/scripts/`
 
 ## 参考文档
 
-- `research/tana-data-model-specification.md` — 数据模型权威规格（设计决策的 source of truth）
+- `docs/research/tana-data-model-specification.md` — 数据模型权威规格（设计决策的 source of truth）
 - `.claude/plans/ancient-plotting-lemon.md` — 技术选型详细方案（含 Tana 逆向分析完整数据）
 - Tana 官方: https://tana.inc
 - Supabase 文档: https://supabase.com/docs

@@ -14,10 +14,10 @@ interface UIStore {
   popPanel(): void;
   replacePanel(nodeId: string): void;
 
-  // Expand/collapse
+  // Expand/collapse (keys are compound: "parentId:nodeId" for per-instance state)
   expandedNodes: Set<string>;
-  toggleExpanded(nodeId: string): void;
-  setExpanded(nodeId: string, expanded: boolean): void;
+  toggleExpanded(expandKey: string): void;
+  setExpanded(expandKey: string, expanded: boolean): void;
 
   // Focus (parentId disambiguates reference nodes that appear in multiple places)
   focusedNodeId: string | null;
@@ -75,18 +75,18 @@ export const useUIStore = create<UIStore>()(
 
       // Expand/collapse
       expandedNodes: new Set<string>(),
-      toggleExpanded: (nodeId) =>
+      toggleExpanded: (expandKey) =>
         set((s) => {
           const next = new Set(s.expandedNodes);
-          if (next.has(nodeId)) next.delete(nodeId);
-          else next.add(nodeId);
+          if (next.has(expandKey)) next.delete(expandKey);
+          else next.add(expandKey);
           return { expandedNodes: next };
         }),
-      setExpanded: (nodeId, expanded) =>
+      setExpanded: (expandKey, expanded) =>
         set((s) => {
           const next = new Set(s.expandedNodes);
-          if (expanded) next.add(nodeId);
-          else next.delete(nodeId);
+          if (expanded) next.add(expandKey);
+          else next.delete(expandKey);
           return { expandedNodes: next };
         }),
 

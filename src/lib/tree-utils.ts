@@ -25,7 +25,7 @@ export function getFlattenedVisibleNodes(
 
       result.push({ nodeId: childId, depth, parentId: currentParentId });
 
-      if (expandedNodes.has(childId) && node.children && node.children.length > 0) {
+      if (expandedNodes.has(`${currentParentId}:${childId}`) && node.children && node.children.length > 0) {
         traverse(node.children, depth + 1, childId);
       }
     }

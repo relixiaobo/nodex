@@ -33,9 +33,11 @@ interface TrailingInputProps {
   parentId: string;
   depth: number;
   autoFocus?: boolean;
+  /** Compound expand key for the parent node (grandparentId:parentId) */
+  parentExpandKey: string;
 }
 
-export function TrailingInput({ parentId, depth, autoFocus }: TrailingInputProps) {
+export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey }: TrailingInputProps) {
   const createChild = useNodeStore((s) => s.createChild);
   const addUnnamedFieldToNode = useNodeStore((s) => s.addUnnamedFieldToNode);
   const wsId = useWorkspaceStore((s) => s.currentWorkspaceId);
@@ -49,25 +51,29 @@ export function TrailingInput({ parentId, depth, autoFocus }: TrailingInputProps
   const [effectiveParentId, setEffectiveParentId] = useState(parentId);
   const [effectiveDepth, setEffectiveDepth] = useState(depth);
 
+  // Track the expand key for the current effectiveParentId
+  const [effectiveParentEK, setEffectiveParentEK] = useState(parentExpandKey);
+
   // Reset when props change (parent re-renders, or node gets new children)
   useEffect(() => {
     setEffectiveParentId(parentId);
     setEffectiveDepth(depth);
-  }, [parentId, depth]);
+    setEffectiveParentEK(parentExpandKey);
+  }, [parentId, depth, parentExpandKey]);
 
   const committingRef = useRef(false);
   const [hasContent, setHasContent] = useState(false);
 
   const callbacksRef = useRef({
     createChild, addUnnamedFieldToNode, wsId, userId,
-    parentId, effectiveParentId, effectiveDepth,
-    setEffectiveParentId, setEffectiveDepth,
+    parentId, effectiveParentId, effectiveDepth, effectiveParentEK,
+    setEffectiveParentId, setEffectiveDepth, setEffectiveParentEK,
     setExpanded, setFocusedNode, setEditingFieldName, setTriggerHint,
   });
   callbacksRef.current = {
     createChild, addUnnamedFieldToNode, wsId, userId,
-    parentId, effectiveParentId, effectiveDepth,
-    setEffectiveParentId, setEffectiveDepth,
+    parentId, effectiveParentId, effectiveDepth, effectiveParentEK,
+    setEffectiveParentId, setEffectiveDepth, setEffectiveParentEK,
     setExpanded, setFocusedNode, setEditingFieldName, setTriggerHint,
   };
 
@@ -85,7 +91,7 @@ export function TrailingInput({ parentId, depth, autoFocus }: TrailingInputProps
     // Create child and focus it (TrailingInput may unmount if this was the
     // first child, so we can't rely on refocusing the editor here)
     ref.createChild(ref.effectiveParentId, ref.wsId, ref.userId, cleaned).then((newNode) => {
-      ref.setExpanded(ref.effectiveParentId, true);
+      ref.setExpanded(ref.effectiveParentEK, true);
       ref.setFocusedNode(newNode.id, ref.effectiveParentId);
       queueMicrotask(() => { committingRef.current = false; });
     });
@@ -106,7 +112,7 @@ export function TrailingInput({ parentId, depth, autoFocus }: TrailingInputProps
               if (!ref.wsId || !ref.userId) return true;
               committingRef.current = true;
               ref.createChild(ref.effectiveParentId, ref.wsId, ref.userId, '').then((newNode) => {
-                ref.setExpanded(ref.effectiveParentId, true);
+                ref.setExpanded(ref.effectiveParentEK, true);
                 ref.setFocusedNode(newNode.id, ref.effectiveParentId);
                 queueMicrotask(() => { committingRef.current = false; });
               });
@@ -121,7 +127,11 @@ export function TrailingInput({ parentId, depth, autoFocus }: TrailingInputProps
             if (siblings.length === 0) return true; // No siblings to indent under
 
             const lastSiblingId = siblings[siblings.length - 1];
-            ref.setExpanded(lastSiblingId, true);
+            // Expand the last sibling (compound key: effectiveParentId is its parent context)
+            const siblingEK = `${ref.effectiveParentId}:${lastSiblingId}`;
+            ref.setExpanded(siblingEK, true);
+            // Track: new effectiveParentId is lastSiblingId, its expand key is siblingEK
+            ref.setEffectiveParentEK(siblingEK);
             ref.setEffectiveParentId(lastSiblingId);
             ref.setEffectiveDepth(ref.effectiveDepth + 1);
             return true;
@@ -138,6 +148,9 @@ export function TrailingInput({ parentId, depth, autoFocus }: TrailingInputProps
             const grandparentId = currentParent?.props._ownerId;
             if (!grandparentId || isWorkspaceContainer(grandparentId)) return true;
 
+            // Compute expand key for grandparent (best-effort via _ownerId)
+            const ggpId = useNodeStore.getState().entities[grandparentId]?.props._ownerId ?? '';
+            ref.setEffectiveParentEK(`${ggpId}:${grandparentId}`);
             ref.setEffectiveParentId(grandparentId);
             ref.setEffectiveDepth(ref.effectiveDepth - 1);
             return true;
@@ -156,7 +169,7 @@ export function TrailingInput({ parentId, depth, autoFocus }: TrailingInputProps
             }
 
             // At original level: collapse parent → trailing input unmounts, focus parent
-            ref.setExpanded(ref.parentId, false);
+            ref.setExpanded(ref.effectiveParentEK, false);
             ref.setFocusedNode(ref.parentId);
             return true;
           },
@@ -222,7 +235,7 @@ export function TrailingInput({ parentId, depth, autoFocus }: TrailingInputProps
 
         ref.setTriggerHint(text as '#' | '@');
         ref.createChild(ref.effectiveParentId, ref.wsId, ref.userId, text).then((newNode) => {
-          ref.setExpanded(ref.effectiveParentId, true);
+          ref.setExpanded(ref.effectiveParentEK, true);
           ref.setFocusedNode(newNode.id, ref.effectiveParentId);
           queueMicrotask(() => { committingRef.current = false; });
         });

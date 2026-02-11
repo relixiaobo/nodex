@@ -79,7 +79,7 @@ export function FieldValueOutliner({ assocDataId }: FieldValueOutlinerProps) {
           />
         ),
       )}
-      <TrailingInput parentId={assocDataId} depth={0} />
+      <TrailingInput parentId={assocDataId} depth={0} parentExpandKey={`${entities[assocDataId]?.props._ownerId ?? ''}:${assocDataId}`} />
     </div>
   );
 }

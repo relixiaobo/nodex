@@ -165,6 +165,15 @@ interface NodeStore {
   /** Rename an attrDef node */
   renameAttrDef(attrDefId: string, newName: string, userId: string): Promise<void>;
 
+  /** Change the data type of a field definition */
+  changeFieldType(attrDefId: string, newType: string, userId: string): void;
+
+  /** Add an option node to an OPTIONS-type field definition */
+  addFieldOption(attrDefId: string, name: string, workspaceId: string, userId: string): string;
+
+  /** Remove an option node from a field definition */
+  removeFieldOption(attrDefId: string, optionId: string, userId: string): void;
+
   /** Replace a field's attrDef (swap placeholder → existing) and clean up orphan */
   replaceFieldAttrDef(
     nodeId: string,
@@ -1284,6 +1293,79 @@ export const useNodeStore = create<NodeStore>()(
         attrDef.props.name = newName;
         attrDef.updatedAt = Date.now();
         attrDef.updatedBy = userId;
+      });
+    },
+
+    changeFieldType: (attrDefId, newType, userId) => {
+      set((state) => {
+        const attrDef = state.entities[attrDefId];
+        if (!attrDef?.children) return;
+
+        // Find existing type Tuple [SYS_A02, SYS_D*]
+        for (const childId of attrDef.children) {
+          const child = state.entities[childId];
+          if (
+            child?.props._docType === 'tuple' &&
+            child.children?.[0] === SYS_A.TYPE_CHOICE
+          ) {
+            child.children[1] = newType;
+            child.updatedAt = Date.now();
+            child.updatedBy = userId;
+            return;
+          }
+        }
+
+        // No type tuple found — create one
+        const tupleId = nanoid();
+        const now = Date.now();
+        state.entities[tupleId] = {
+          id: tupleId,
+          workspaceId: attrDef.workspaceId,
+          props: { created: now, name: '', _ownerId: attrDefId, _docType: 'tuple' },
+          children: [SYS_A.TYPE_CHOICE, newType],
+          version: 1,
+          updatedAt: now,
+          createdBy: userId,
+          updatedBy: userId,
+        };
+        attrDef.children.push(tupleId);
+      });
+    },
+
+    addFieldOption: (attrDefId, name, workspaceId, userId) => {
+      const id = nanoid();
+      const now = Date.now();
+
+      set((state) => {
+        const attrDef = state.entities[attrDefId];
+        if (!attrDef) return;
+
+        state.entities[id] = {
+          id,
+          workspaceId,
+          props: { created: now, name, _ownerId: attrDefId },
+          children: [],
+          version: 1,
+          updatedAt: now,
+          createdBy: userId,
+          updatedBy: userId,
+        };
+
+        if (!attrDef.children) attrDef.children = [];
+        attrDef.children.push(id);
+      });
+
+      return id;
+    },
+
+    removeFieldOption: (attrDefId, optionId, _userId) => {
+      set((state) => {
+        const attrDef = state.entities[attrDefId];
+        if (attrDef?.children) {
+          const idx = attrDef.children.indexOf(optionId);
+          if (idx >= 0) attrDef.children.splice(idx, 1);
+        }
+        delete state.entities[optionId];
       });
     },
 

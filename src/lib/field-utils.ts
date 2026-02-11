@@ -67,6 +67,23 @@ export function resolveFieldOptions(
   });
 }
 
+/** Ordered list of field types for the type selector UI. */
+export const FIELD_TYPE_LIST: Array<{ value: string; label: string }> = [
+  { value: SYS_D.PLAIN, label: 'Plain' },
+  { value: SYS_D.OPTIONS, label: 'Options' },
+  { value: SYS_D.DATE, label: 'Date' },
+  { value: SYS_D.NUMBER, label: 'Number' },
+  { value: SYS_D.INTEGER, label: 'Integer' },
+  { value: SYS_D.CHECKBOX, label: 'Checkbox' },
+  { value: SYS_D.URL, label: 'URL' },
+  { value: SYS_D.EMAIL, label: 'Email' },
+];
+
+/** Get a human-readable label for a SYS_D data type constant. */
+export function getFieldTypeLabel(dataType: string): string {
+  return FIELD_TYPE_LIST.find((t) => t.value === dataType)?.label ?? 'Plain';
+}
+
 /** Check if a data type is "plain" (uses outliner for values). */
 export function isPlainFieldType(dataType: string): boolean {
   return dataType === SYS_D.PLAIN || !dataType;

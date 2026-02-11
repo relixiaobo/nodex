@@ -260,15 +260,22 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     const newParentId = parent.children[index - 1];
     setExpanded(newParentId, true);
     indentNode(nodeId, userId);
-  }, [nodeId, userId, parentId, indentNode, setExpanded]);
+    // Update focusedParentId so the node keeps focus under its new parent
+    setFocusedNode(nodeId, newParentId);
+  }, [nodeId, userId, parentId, indentNode, setExpanded, setFocusedNode]);
 
   const handleOutdent = useCallback(() => {
     if (!userId) return;
     // References cannot be outdented (would cause ownership conflicts)
     const currentNode = useNodeStore.getState().entities[nodeId];
     if (currentNode && currentNode.props._ownerId !== parentId) return;
+    // Compute grandparent before moving so we can update focusedParentId
+    const grandparentId = useNodeStore.getState().entities[parentId]?.props._ownerId;
     outdentNode(nodeId, userId);
-  }, [nodeId, userId, parentId, outdentNode]);
+    if (grandparentId) {
+      setFocusedNode(nodeId, grandparentId);
+    }
+  }, [nodeId, userId, parentId, outdentNode, setFocusedNode]);
 
   const handleDelete = useCallback((): boolean => {
     if (!wsId || !userId) return false;

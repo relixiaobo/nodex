@@ -159,6 +159,9 @@ interface NodeStore {
   /** Remove a reference from parent.children (node itself is NOT trashed) */
   removeReference(parentId: string, refNodeId: string, userId: string): void;
 
+  /** Remove a field from a node (tuple + associatedData, cleanup associationMap) */
+  removeField(nodeId: string, tupleId: string, workspaceId: string, userId: string): void;
+
   /** Rename an attrDef node */
   renameAttrDef(attrDefId: string, newName: string, userId: string): Promise<void>;
 
@@ -1232,6 +1235,46 @@ export const useNodeStore = create<NodeStore>()(
       });
 
       return { tupleId, attrDefId };
+    },
+
+    removeField: (nodeId, tupleId, workspaceId, userId) => {
+      set((state) => {
+        const node = state.entities[nodeId];
+        if (!node) return;
+
+        // Remove tuple from parent.children
+        if (node.children) {
+          const idx = node.children.indexOf(tupleId);
+          if (idx >= 0) node.children.splice(idx, 1);
+        }
+
+        // Remove associationMap entry and trash associatedData
+        const assocId = node.associationMap?.[tupleId];
+        if (node.associationMap) {
+          delete node.associationMap[tupleId];
+        }
+        if (assocId) {
+          const assoc = state.entities[assocId];
+          if (assoc) {
+            assoc.props._ownerId = `${workspaceId}_TRASH`;
+            const trash = state.entities[`${workspaceId}_TRASH`];
+            if (trash?.children) trash.children.push(assocId);
+          }
+        }
+
+        // Trash the tuple itself
+        const tuple = state.entities[tupleId];
+        if (tuple) {
+          tuple.props._ownerId = `${workspaceId}_TRASH`;
+          const trash = state.entities[`${workspaceId}_TRASH`];
+          if (trash?.children && !trash.children.includes(tupleId)) {
+            trash.children.push(tupleId);
+          }
+        }
+
+        node.updatedAt = Date.now();
+        node.updatedBy = userId;
+      });
     },
 
     renameAttrDef: async (attrDefId, newName, userId) => {

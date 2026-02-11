@@ -75,19 +75,19 @@ export function TrailingInput({ parentId, depth, autoFocus }: TrailingInputProps
     const cleaned = stripWrappingP(html);
     if (!cleaned || committingRef.current) return;
 
-    const { createChild: create, wsId: ws, userId: uid, effectiveParentId: pid } = callbacksRef.current;
-    if (!ws || !uid) return;
+    const ref = callbacksRef.current;
+    if (!ref.wsId || !ref.userId) return;
 
     committingRef.current = true;
-    create(pid, ws, uid, cleaned);
-
-    // Clear editor and keep focus for next item
     editor.commands.clearContent(false);
     setHasContent(false);
-    // Reset flag after microtask so blur doesn't double-commit
-    queueMicrotask(() => {
-      committingRef.current = false;
-      editor.commands.focus('start');
+
+    // Create child and focus it (TrailingInput may unmount if this was the
+    // first child, so we can't rely on refocusing the editor here)
+    ref.createChild(ref.effectiveParentId, ref.wsId, ref.userId, cleaned).then((newNode) => {
+      ref.setExpanded(ref.effectiveParentId, true);
+      ref.setFocusedNode(newNode.id, ref.effectiveParentId);
+      queueMicrotask(() => { committingRef.current = false; });
     });
   }, []);
 

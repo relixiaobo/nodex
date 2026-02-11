@@ -6,6 +6,8 @@ interface BulletChevronProps {
   onBulletClick: () => void;
   /** Dimmed style for trailing input placeholder bullets */
   dimmed?: boolean;
+  /** Reference node: show concentric circles (bullseye) bullet */
+  isReference?: boolean;
 }
 
 /**
@@ -20,6 +22,7 @@ interface BulletChevronProps {
  *   - All states: 5px inner dot (::after in Tana)
  *   - Collapsed with children: 15px outer circle with dimmed bg (bulletColor1Dimmed)
  *   - Leaf / expanded: transparent outer circle (only inner dot visible)
+ *   - Reference: concentric circles (outer ring border + inner dot), always visible
  *   - Click → zoom in (pushPanel)
  *   - Hover → scale up (1.375x in Tana)
  *   - Active → scale down (0.9x)
@@ -40,6 +43,7 @@ export function BulletChevron({
   onDrillDown,
   onBulletClick,
   dimmed,
+  isReference,
 }: BulletChevronProps) {
   // Collapsed with children: show dimmed background ring (Tana: bulletColor1Dimmed)
   const showOuterRing = hasChildren && !isExpanded;
@@ -87,13 +91,23 @@ export function BulletChevron({
         onClick={onBulletClick}
         title="Zoom in"
       >
-        <div
-          className={`flex h-[15px] w-[15px] items-center justify-center rounded-full transition-colors group-active/bullet:scale-90 ${
-            showOuterRing ? 'bg-foreground/10' : ''
-          }`}
-        >
-          <div className={`h-[5px] w-[5px] rounded-full transition-transform group-hover/bullet:scale-[1.375] ${dimmed ? 'bg-foreground/15' : 'bg-foreground/50'}`} />
-        </div>
+        {isReference ? (
+          /* Reference bullet: concentric circles (bullseye ◉)
+             Outer: 11px ring with 1.5px border, Inner: 5px solid dot.
+             Always visible regardless of expand/collapse state. */
+          <div className="flex h-[11px] w-[11px] items-center justify-center rounded-full border-[1.5px] border-foreground/30 transition-transform group-hover/bullet:scale-[1.375] group-active/bullet:scale-90">
+            <div className="h-[4px] w-[4px] rounded-full bg-foreground/50" />
+          </div>
+        ) : (
+          /* Standard bullet */
+          <div
+            className={`flex h-[15px] w-[15px] items-center justify-center rounded-full transition-colors group-active/bullet:scale-90 ${
+              showOuterRing ? 'bg-foreground/10' : ''
+            }`}
+          >
+            <div className={`h-[5px] w-[5px] rounded-full transition-transform group-hover/bullet:scale-[1.375] ${dimmed ? 'bg-foreground/15' : 'bg-foreground/50'}`} />
+          </div>
+        )}
       </span>
     </div>
   );

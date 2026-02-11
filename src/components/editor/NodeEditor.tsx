@@ -22,6 +22,8 @@ import { useNodeStore } from '../../stores/node-store';
 import { useWorkspaceStore } from '../../stores/workspace-store';
 import { HashTagExtension, type HashTagCallbacks } from './HashTagExtension';
 import { FieldTriggerExtension, type FieldTriggerCallbacks } from './FieldTriggerExtension';
+import { ReferenceExtension, type ReferenceCallbacks } from './ReferenceExtension';
+import { InlineRefNode } from './InlineRefNode';
 
 interface NodeEditorProps {
   nodeId: string;
@@ -48,6 +50,15 @@ interface NodeEditorProps {
   onHashTagClose?: () => void;
   // ─── Field trigger (>) ───
   onFieldTriggerFire?: () => void;
+  // ─── Reference trigger (@) ───
+  onReference?: (query: string, from: number, to: number) => void;
+  onReferenceDeactivate?: () => void;
+  referenceActive?: boolean;
+  onReferenceConfirm?: () => void;
+  onReferenceNavDown?: () => void;
+  onReferenceNavUp?: () => void;
+  onReferenceCreate?: () => void;
+  onReferenceClose?: () => void;
 }
 
 export function NodeEditor({
@@ -72,6 +83,14 @@ export function NodeEditor({
   onHashTagCreate,
   onHashTagClose,
   onFieldTriggerFire,
+  onReference,
+  onReferenceDeactivate,
+  referenceActive,
+  onReferenceConfirm,
+  onReferenceNavDown,
+  onReferenceNavUp,
+  onReferenceCreate,
+  onReferenceClose,
 }: NodeEditorProps) {
   const updateNodeName = useNodeStore((s) => s.updateNodeName);
   const userId = useWorkspaceStore((s) => s.userId);
@@ -98,6 +117,12 @@ export function NodeEditor({
     onHashTagNavUp: onHashTagNavUp ?? (() => {}),
     onHashTagCreate: onHashTagCreate ?? (() => {}),
     onHashTagClose: onHashTagClose ?? (() => {}),
+    referenceActive: referenceActive ?? false,
+    onReferenceConfirm: onReferenceConfirm ?? (() => {}),
+    onReferenceNavDown: onReferenceNavDown ?? (() => {}),
+    onReferenceNavUp: onReferenceNavUp ?? (() => {}),
+    onReferenceCreate: onReferenceCreate ?? (() => {}),
+    onReferenceClose: onReferenceClose ?? (() => {}),
   });
   callbacksRef.current = {
     onEnter, onIndent, onOutdent, onDelete, onArrowUp, onArrowDown, onMoveUp, onMoveDown, saveContent,
@@ -107,6 +132,12 @@ export function NodeEditor({
     onHashTagNavUp: onHashTagNavUp ?? (() => {}),
     onHashTagCreate: onHashTagCreate ?? (() => {}),
     onHashTagClose: onHashTagClose ?? (() => {}),
+    referenceActive: referenceActive ?? false,
+    onReferenceConfirm: onReferenceConfirm ?? (() => {}),
+    onReferenceNavDown: onReferenceNavDown ?? (() => {}),
+    onReferenceNavUp: onReferenceNavUp ?? (() => {}),
+    onReferenceCreate: onReferenceCreate ?? (() => {}),
+    onReferenceClose: onReferenceClose ?? (() => {}),
   };
 
   // HashTag extension callbacks
@@ -127,13 +158,27 @@ export function NodeEditor({
     onActivate: () => onFieldTriggerFire?.(),
   };
 
+  // Reference extension callbacks
+  const referenceRef = useRef<ReferenceCallbacks>({
+    onActivate: (query, from, to) => onReference?.(query, from, to),
+    onDeactivate: () => onReferenceDeactivate?.(),
+  });
+  referenceRef.current = {
+    onActivate: (query, from, to) => onReference?.(query, from, to),
+    onDeactivate: () => onReferenceDeactivate?.(),
+  };
+
   const outlinerKeymap = useRef(
     Extension.create({
       name: 'outlinerKeymap',
       addKeyboardShortcuts() {
         return {
           Enter: ({ editor }) => {
-            // HashTag dropdown: confirm selection
+            // Dropdown active: confirm selection
+            if (callbacksRef.current.referenceActive) {
+              callbacksRef.current.onReferenceConfirm();
+              return true;
+            }
             if (callbacksRef.current.hashTagActive) {
               callbacksRef.current.onHashTagConfirm();
               return true;
@@ -195,7 +240,11 @@ export function NodeEditor({
             return false; // Let TipTap handle normal backspace
           },
           ArrowUp: ({ editor }) => {
-            // HashTag dropdown: navigate up
+            // Dropdown navigation
+            if (callbacksRef.current.referenceActive) {
+              callbacksRef.current.onReferenceNavUp();
+              return true;
+            }
             if (callbacksRef.current.hashTagActive) {
               callbacksRef.current.onHashTagNavUp();
               return true;
@@ -209,7 +258,11 @@ export function NodeEditor({
             return false;
           },
           ArrowDown: ({ editor }) => {
-            // HashTag dropdown: navigate down
+            // Dropdown navigation
+            if (callbacksRef.current.referenceActive) {
+              callbacksRef.current.onReferenceNavDown();
+              return true;
+            }
             if (callbacksRef.current.hashTagActive) {
               callbacksRef.current.onHashTagNavDown();
               return true;
@@ -224,6 +277,10 @@ export function NodeEditor({
             return false;
           },
           Escape: () => {
+            if (callbacksRef.current.referenceActive) {
+              callbacksRef.current.onReferenceClose();
+              return true;
+            }
             if (callbacksRef.current.hashTagActive) {
               callbacksRef.current.onHashTagClose();
               return true;
@@ -231,6 +288,10 @@ export function NodeEditor({
             return false;
           },
           'Mod-Enter': () => {
+            if (callbacksRef.current.referenceActive) {
+              callbacksRef.current.onReferenceCreate();
+              return true;
+            }
             if (callbacksRef.current.hashTagActive) {
               callbacksRef.current.onHashTagCreate();
               return true;
@@ -262,9 +323,11 @@ export function NodeEditor({
         horizontalRule: false,
       }),
       Highlight,
+      InlineRefNode,
       outlinerKeymap,
       HashTagExtension.configure({ callbacks: hashTagRef }),
       FieldTriggerExtension.configure({ callbacks: fieldTriggerRef }),
+      ReferenceExtension.configure({ callbacks: referenceRef }),
     ],
     content: wrapInP(initialContent),
     editorProps: {

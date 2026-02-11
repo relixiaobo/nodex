@@ -12,6 +12,7 @@ import { NodeEditor } from '../editor/NodeEditor';
 import { TrailingInput } from '../editor/TrailingInput';
 import { TagBar } from '../tags/TagBar';
 import { TagSelector, type TagDropdownHandle } from '../tags/TagSelector';
+import { ReferenceSelector, type ReferenceDropdownHandle } from '../references/ReferenceSelector';
 import { FieldRow } from '../fields/FieldRow';
 import {
   getFlattenedVisibleNodes,
@@ -23,9 +24,10 @@ interface OutlinerItemProps {
   nodeId: string;
   depth: number;
   rootChildIds: string[];
+  parentId: string;
 }
 
-export function OutlinerItem({ nodeId, depth, rootChildIds }: OutlinerItemProps) {
+export function OutlinerItem({ nodeId, depth, rootChildIds, parentId }: OutlinerItemProps) {
   const node = useNode(nodeId);
   const isExpanded = useUIStore((s) => s.expandedNodes.has(nodeId));
   const focusedNodeId = useUIStore((s) => s.focusedNodeId);
@@ -66,6 +68,15 @@ export function OutlinerItem({ nodeId, depth, rootChildIds }: OutlinerItemProps)
   const applyTag = useNodeStore((s) => s.applyTag);
   const createTagDef = useNodeStore((s) => s.createTagDef);
   const updateNodeName = useNodeStore((s) => s.updateNodeName);
+  const addReference = useNodeStore((s) => s.addReference);
+  const removeReference = useNodeStore((s) => s.removeReference);
+
+  // @ trigger state (reference)
+  const [refOpen, setRefOpen] = useState(false);
+  const [refQuery, setRefQuery] = useState('');
+  const [refSelectedIndex, setRefSelectedIndex] = useState(0);
+  const refRangeRef = useRef<{ from: number; to: number }>({ from: 0, to: 0 });
+  const refDropdownRef = useRef<ReferenceDropdownHandle>(null);
 
   // > trigger (fire-once: instantly creates field)
   const addUnnamedFieldToNode = useNodeStore((s) => s.addUnnamedFieldToNode);
@@ -109,6 +120,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds }: OutlinerItemProps)
   const isFocused = focusedNodeId === nodeId;
   const hasTags = tagIds.length > 0;
   const hasFields = fields.length > 0;
+  const isReference = !!node && node.props._ownerId !== parentId;
 
   // ─── Basic handlers ───
 
@@ -121,9 +133,20 @@ export function OutlinerItem({ nodeId, depth, rootChildIds }: OutlinerItemProps)
     }
   }, [nodeId, setFocusedNode]);
 
-  const handleClick = useCallback(() => {
+  const handleContentClick = useCallback((e: React.MouseEvent) => {
+    // Intercept clicks on inline references (blue links in static display)
+    const target = e.target as HTMLElement;
+    const refEl = target.closest('[data-inlineref-node]') as HTMLElement;
+    if (refEl) {
+      e.stopPropagation();
+      const refId = refEl.getAttribute('data-inlineref-node');
+      if (refId) {
+        pushPanel(refId);
+        return;
+      }
+    }
     setFocusedNode(nodeId);
-  }, [nodeId, setFocusedNode]);
+  }, [nodeId, setFocusedNode, pushPanel]);
 
   const handleToggle = useCallback(() => {
     const currentNode = useNodeStore.getState().entities[nodeId];
@@ -190,15 +213,17 @@ export function OutlinerItem({ nodeId, depth, rootChildIds }: OutlinerItemProps)
 
   const handleIndent = useCallback(() => {
     if (!userId) return;
+    // References cannot be indented (would cause ownership conflicts)
+    const currentNode = useNodeStore.getState().entities[nodeId];
+    if (currentNode && currentNode.props._ownerId !== parentId) return;
 
     // Pre-compute new parent (previous sibling) and expand it BEFORE moving.
     // This prevents the node from being unmounted between state updates,
     // which would cause blur → focus loss.
-    const currentNode = useNodeStore.getState().entities[nodeId];
-    const parentId = currentNode?.props._ownerId;
-    if (!parentId) return;
+    const ownerId = currentNode?.props._ownerId;
+    if (!ownerId) return;
 
-    const parent = useNodeStore.getState().entities[parentId];
+    const parent = useNodeStore.getState().entities[ownerId];
     if (!parent?.children) return;
 
     const index = parent.children.indexOf(nodeId);
@@ -207,12 +232,15 @@ export function OutlinerItem({ nodeId, depth, rootChildIds }: OutlinerItemProps)
     const newParentId = parent.children[index - 1];
     setExpanded(newParentId, true);
     indentNode(nodeId, userId);
-  }, [nodeId, userId, indentNode, setExpanded]);
+  }, [nodeId, userId, parentId, indentNode, setExpanded]);
 
   const handleOutdent = useCallback(() => {
     if (!userId) return;
+    // References cannot be outdented (would cause ownership conflicts)
+    const currentNode = useNodeStore.getState().entities[nodeId];
+    if (currentNode && currentNode.props._ownerId !== parentId) return;
     outdentNode(nodeId, userId);
-  }, [nodeId, userId, outdentNode]);
+  }, [nodeId, userId, parentId, outdentNode]);
 
   const handleDelete = useCallback((): boolean => {
     if (!wsId || !userId) return false;
@@ -228,10 +256,16 @@ export function OutlinerItem({ nodeId, depth, rootChildIds }: OutlinerItemProps)
     const flatList = getFlattenedVisibleNodes(rootChildIds, entities, expandedNodes);
     const prevId = getPreviousVisibleNodeId(nodeId, flatList);
 
-    trashNode(nodeId, wsId, userId);
+    // Reference: just remove from parent's children, don't trash the node
+    const currentNode = useNodeStore.getState().entities[nodeId];
+    if (currentNode && currentNode.props._ownerId !== parentId) {
+      removeReference(parentId, nodeId, userId);
+    } else {
+      trashNode(nodeId, wsId, userId);
+    }
     setFocusedNode(prevId);
     return true;
-  }, [nodeId, wsId, userId, rootChildIds, entities, expandedNodes, trashNode, setFocusedNode]);
+  }, [nodeId, wsId, userId, parentId, rootChildIds, entities, expandedNodes, trashNode, removeReference, setFocusedNode]);
 
   const handleArrowUp = useCallback(() => {
     const flatList = getFlattenedVisibleNodes(rootChildIds, entities, expandedNodes);
@@ -360,6 +394,107 @@ export function OutlinerItem({ nodeId, depth, rootChildIds }: OutlinerItemProps)
     setEditingFieldName(tupleId);
   }, [nodeId, node?.props._ownerId, wsId, userId, addUnnamedFieldToNode, trashNode, setEditingFieldName]);
 
+  // ─── @ reference trigger handlers ───
+
+  const handleReference = useCallback((query: string, from: number, to: number) => {
+    refRangeRef.current = { from, to };
+    setRefQuery(query);
+    setRefSelectedIndex(0);
+    if (!refOpen) setRefOpen(true);
+  }, [refOpen]);
+
+  const handleReferenceDeactivate = useCallback(() => {
+    setRefOpen(false);
+    setRefQuery('');
+    setRefSelectedIndex(0);
+  }, []);
+
+  const handleReferenceSelect = useCallback(
+    (refNodeId: string) => {
+      if (!wsId || !userId) return;
+      const ed = editorRef.current;
+      if (!ed || ed.isDestroyed) return;
+
+      // Check if the entire editor content is just the @query (empty-node reference)
+      const fullText = ed.state.doc.textContent;
+      const { from, to } = refRangeRef.current;
+      // Text before the @ and after the query
+      const beforeAt = fullText.substring(0, from - 1);
+      const afterQuery = fullText.substring(to - 1);
+      const isEmptyAround = beforeAt.trim() === '' && afterQuery.trim() === '';
+
+      if (isEmptyAround) {
+        // Empty node @: trash this node, add reference at same position
+        const parent = entities[parentId];
+        const pos = parent?.children?.indexOf(nodeId) ?? -1;
+        trashNode(nodeId, wsId, userId);
+        addReference(parentId, refNodeId, userId, pos >= 0 ? pos : undefined);
+        setExpanded(parentId, true);
+        setFocusedNode(refNodeId);
+      } else {
+        // Mid-text @: insert inline reference
+        const refNode = entities[refNodeId];
+        const refName = (refNode?.props.name ?? '').replace(/<[^>]+>/g, '').trim() || 'Untitled';
+        ed.chain()
+          .deleteRange({ from, to })
+          .insertContentAt(from, {
+            type: 'inlineRef',
+            attrs: { nodeId: refNodeId, label: refName },
+          })
+          .run();
+      }
+
+      setRefOpen(false);
+      setRefQuery('');
+      setRefSelectedIndex(0);
+    },
+    [nodeId, parentId, wsId, userId, entities, trashNode, addReference, setExpanded, setFocusedNode],
+  );
+
+  const handleReferenceCreateNew = useCallback(
+    async (name: string) => {
+      if (!wsId || !userId) return;
+      const libraryId = `${wsId}_LIBRARY`;
+      const newNode = await useNodeStore.getState().createChild(libraryId, wsId, userId, name);
+      handleReferenceSelect(newNode.id);
+    },
+    [wsId, userId, handleReferenceSelect],
+  );
+
+  const handleReferenceConfirm = useCallback(() => {
+    const item = refDropdownRef.current?.getSelectedItem();
+    if (!item) return;
+    if (item.type === 'existing') {
+      handleReferenceSelect(item.id);
+    } else {
+      handleReferenceCreateNew(item.name);
+    }
+  }, [handleReferenceSelect, handleReferenceCreateNew]);
+
+  const handleReferenceNavDown = useCallback(() => {
+    setRefSelectedIndex((i) => {
+      const count = refDropdownRef.current?.getItemCount() ?? 0;
+      return count > 0 ? Math.min(i + 1, count - 1) : 0;
+    });
+  }, []);
+
+  const handleReferenceNavUp = useCallback(() => {
+    setRefSelectedIndex((i) => Math.max(i - 1, 0));
+  }, []);
+
+  const handleReferenceForceCreate = useCallback(() => {
+    const query = refQuery.trim();
+    if (query) {
+      handleReferenceCreateNew(query);
+    }
+  }, [refQuery, handleReferenceCreateNew]);
+
+  const handleReferenceClose = useCallback(() => {
+    setRefOpen(false);
+    setRefQuery('');
+    setRefSelectedIndex(0);
+  }, []);
+
   // ─── Drag and drop handlers ───
 
   const handleDragStart = useCallback(
@@ -486,11 +621,12 @@ export function OutlinerItem({ nodeId, depth, rootChildIds }: OutlinerItemProps)
           onToggle={handleToggle}
           onDrillDown={handleDrillDown}
           onBulletClick={handleBulletClick}
+          isReference={isReference}
         />
         <div className="flex-1 min-w-0 relative">
           <div
             className={`text-sm leading-[21px] ${!isFocused ? 'cursor-text' : ''}`}
-            onClick={!isFocused ? handleClick : undefined}
+            onClick={!isFocused ? handleContentClick : undefined}
           >
             {isFocused ? (
               <NodeEditor
@@ -515,6 +651,14 @@ export function OutlinerItem({ nodeId, depth, rootChildIds }: OutlinerItemProps)
                 onHashTagClose={handleHashTagClose}
                 onFieldTriggerFire={handleFieldTriggerFire}
                 editorRef={editorRef}
+                onReference={handleReference}
+                onReferenceDeactivate={handleReferenceDeactivate}
+                referenceActive={refOpen}
+                onReferenceConfirm={handleReferenceConfirm}
+                onReferenceNavDown={handleReferenceNavDown}
+                onReferenceNavUp={handleReferenceNavUp}
+                onReferenceCreate={handleReferenceForceCreate}
+                onReferenceClose={handleReferenceClose}
               />
             ) : (
               <span
@@ -541,6 +685,17 @@ export function OutlinerItem({ nodeId, depth, rootChildIds }: OutlinerItemProps)
               existingTagIds={tagIds}
               query={hashTagQuery}
               selectedIndex={hashTagSelectedIndex}
+            />
+          )}
+          {refOpen && isFocused && (
+            <ReferenceSelector
+              ref={refDropdownRef}
+              open={refOpen}
+              onSelect={handleReferenceSelect}
+              onCreateNew={handleReferenceCreateNew}
+              query={refQuery}
+              selectedIndex={refSelectedIndex}
+              currentNodeId={nodeId}
             />
           )}
         </div>
@@ -588,6 +743,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds }: OutlinerItemProps)
                 nodeId={id}
                 depth={depth + 1}
                 rootChildIds={rootChildIds}
+                parentId={nodeId}
               />
             ),
           )}

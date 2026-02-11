@@ -148,6 +148,14 @@ interface NodeStore {
     afterChildId?: string,
   ): Promise<{ tupleId: string; attrDefId: string }>;
 
+  // ─── Reference operations ───
+
+  /** Add a node as a reference child (no _ownerId change) */
+  addReference(parentId: string, refNodeId: string, userId: string, position?: number): void;
+
+  /** Remove a reference from parent.children (node itself is NOT trashed) */
+  removeReference(parentId: string, refNodeId: string, userId: string): void;
+
   /** Rename an attrDef node */
   renameAttrDef(attrDefId: string, newName: string, userId: string): Promise<void>;
 
@@ -1261,6 +1269,36 @@ export const useNodeStore = create<NodeStore>()(
             }
           }
           delete state.entities[oldAttrDefId];
+        }
+      });
+    },
+
+    // ─── Reference operations ───
+
+    addReference: (parentId, refNodeId, _userId, position) => {
+      set((state) => {
+        const parent = state.entities[parentId];
+        if (!parent) return;
+        if (!parent.children) parent.children = [];
+        // Prevent duplicate reference
+        if (parent.children.includes(refNodeId)) return;
+        if (position !== undefined && position >= 0 && position <= parent.children.length) {
+          parent.children.splice(position, 0, refNodeId);
+        } else {
+          parent.children.push(refNodeId);
+        }
+        parent.updatedAt = Date.now();
+      });
+    },
+
+    removeReference: (parentId, refNodeId, _userId) => {
+      set((state) => {
+        const parent = state.entities[parentId];
+        if (!parent?.children) return;
+        const idx = parent.children.indexOf(refNodeId);
+        if (idx >= 0) {
+          parent.children.splice(idx, 1);
+          parent.updatedAt = Date.now();
         }
       });
     },

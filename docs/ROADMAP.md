@@ -22,6 +22,8 @@
 - [x] 拖拽排序 (HTML5 DnD, before/after/inside)
 - [x] Supertags 基础 (#触发、应用标签、TagBadge 显示、TagSelector)
 - [x] Fields 基础 (>触发、字段名编辑+自动完成、交错渲染、字段值编辑器)
+- [x] References & @引用 MVP (@触发搜索、树引用+内联引用、引用bullet、删除引用)
+- [x] 交互打磨 (Enter创建子节点、indent/Backspace焦点、compound expand keys)
 
 ---
 
@@ -30,11 +32,12 @@
 > 没有这些，节点只是文本列表，无法成为知识图谱
 
 ### 1.1 References & @引用
-> **优先做**：Supertags 和 Fields 的高级功能依赖引用机制
+> MVP 已完成，以下为增强功能
 
-- [ ] `@` 触发搜索并引用节点（空节点/文本内均可）
-- [ ] 内联引用显示（灰色背景、可点击导航）
-- [ ] 引用节点显示（虚线圆点 bullet、编辑即更新原始节点）
+- [x] `@` 触发搜索并引用节点（空节点/文本内均可）
+- [x] 内联引用显示（蓝色链接、可点击导航）
+- [x] 引用节点显示（同心圆 bullet、编辑即更新原始节点）
+- [x] 引用独立展开/折叠状态（compound expand keys）
 - [ ] 反向链接 section（节点底部显示所有引用位置 + 面包屑路径）
 - [ ] 引用计数 badge
 - [ ] 合并节点（选中重复节点 → 合并 children/tags，更新所有引用）
@@ -215,7 +218,7 @@
 | Supertags 基础 | ✅ | 部分 | Phase 1.2 |
 | Supertags 高级 | ✅ | ❌ | Phase 1.2 |
 | Fields (9 种) | ✅ | 部分 | Phase 1.3 |
-| References | ✅ | ❌ | Phase 1.1 |
+| References | ✅ | MVP ✅ | Phase 1.1 |
 | 日期节点/日记 | ✅ | ❌ | Phase 1.4 |
 | Search Nodes | ✅ | ❌ | Phase 2.1 |
 | Table View | ✅ | ❌ | Phase 2.2 |

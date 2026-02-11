@@ -243,11 +243,11 @@ export function seedTestData() {
 
   store.setNodes(allNodes);
 
-  // Expand some nodes by default for testing
-  uiStore.setExpanded('proj_1', true);
-  uiStore.setExpanded('task_1', true);
-  uiStore.setExpanded('task_2', true);
-  uiStore.setExpanded('note_rich', true);
+  // Expand some nodes by default for testing (compound keys: parentId:nodeId)
+  uiStore.setExpanded(`${libraryId}:proj_1`, true);
+  uiStore.setExpanded(`proj_1:task_1`, true);
+  uiStore.setExpanded(`proj_1:task_2`, true);
+  uiStore.setExpanded(`${libraryId}:note_rich`, true);
 
   // Navigate to Library
   if (uiStore.panelStack.length === 0) {

@@ -25,7 +25,7 @@ export function OutlinerView({ rootNodeId }: OutlinerViewProps) {
           rootNodeId={rootNodeId}
         />
       ))}
-      <TrailingInput parentId={rootNodeId} depth={0} autoFocus={childIds.length === 0} />
+      <TrailingInput parentId={rootNodeId} depth={0} autoFocus={childIds.length === 0} parentExpandKey={`${node?.props._ownerId ?? ''}:${rootNodeId}`} />
     </div>
   );
 }

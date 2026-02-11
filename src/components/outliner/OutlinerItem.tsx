@@ -30,7 +30,8 @@ interface OutlinerItemProps {
 
 export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId }: OutlinerItemProps) {
   const node = useNode(nodeId);
-  const isExpanded = useUIStore((s) => s.expandedNodes.has(nodeId));
+  const expandKey = `${parentId}:${nodeId}`;
+  const isExpanded = useUIStore((s) => s.expandedNodes.has(`${parentId}:${nodeId}`));
   const focusedNodeId = useUIStore((s) => s.focusedNodeId);
   const focusedParentId = useUIStore((s) => s.focusedParentId);
   const setFocusedNode = useUIStore((s) => s.setFocusedNode);
@@ -177,17 +178,18 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   }, [nodeId, parentId, setFocusedNode, pushPanel]);
 
   const handleToggle = useCallback(() => {
+    const ek = `${parentId}:${nodeId}`;
     const currentNode = useNodeStore.getState().entities[nodeId];
     const currentHasChildren = (currentNode?.children ?? []).length > 0;
-    const currentlyExpanded = useUIStore.getState().expandedNodes.has(nodeId);
+    const currentlyExpanded = useUIStore.getState().expandedNodes.has(ek);
 
     if (!currentHasChildren && !currentlyExpanded) {
       // Leaf node: expand to show trailing input (auto-focuses)
-      setExpanded(nodeId, true);
+      setExpanded(ek, true);
     } else {
-      toggleExpanded(nodeId);
+      toggleExpanded(ek);
     }
-  }, [nodeId, toggleExpanded, setExpanded]);
+  }, [nodeId, parentId, toggleExpanded, setExpanded]);
 
   const handleDrillDown = useCallback(() => {
     pushPanel(nodeId);
@@ -201,14 +203,15 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     // Toggle expand/collapse all direct children (Tana indent guide line behavior)
     const currentChildIds = useNodeStore.getState().entities[nodeId]?.children ?? [];
     const expanded = useUIStore.getState().expandedNodes;
-    // Check if any child is expanded
-    const anyChildExpanded = currentChildIds.some((cid) => expanded.has(cid));
+    // Check if any child is expanded (compound key: nodeId is parent of children)
+    const anyChildExpanded = currentChildIds.some((cid) => expanded.has(`${nodeId}:${cid}`));
     const next = new Set(expanded);
     for (const cid of currentChildIds) {
+      const ck = `${nodeId}:${cid}`;
       if (anyChildExpanded) {
-        next.delete(cid);
+        next.delete(ck);
       } else {
-        next.add(cid);
+        next.add(ck);
       }
     }
     useUIStore.setState({ expandedNodes: next });
@@ -220,7 +223,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     (afterContent?: string) => {
       if (!wsId || !userId) return;
 
-      const currentlyExpanded = useUIStore.getState().expandedNodes.has(nodeId);
+      const currentlyExpanded = useUIStore.getState().expandedNodes.has(`${parentId}:${nodeId}`);
       const currentHasChildren =
         (useNodeStore.getState().entities[nodeId]?.children ?? []).length > 0;
 
@@ -258,7 +261,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     if (index <= 0) return; // Can't indent first child
 
     const newParentId = parent.children[index - 1];
-    setExpanded(newParentId, true);
+    setExpanded(`${ownerId}:${newParentId}`, true);
     indentNode(nodeId, userId);
     // Update focusedParentId so the node keeps focus under its new parent
     setFocusedNode(nodeId, newParentId);
@@ -467,7 +470,10 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
         const pos = parent?.children?.indexOf(nodeId) ?? -1;
         trashNode(nodeId, wsId, userId);
         addReference(parentId, refNodeId, userId, pos >= 0 ? pos : undefined);
-        setExpanded(parentId, true);
+        // Parent is already expanded (otherwise this item wouldn't render).
+        // Use best-effort grandparent lookup for the compound expand key.
+        const gpId = entities[parentId]?.props._ownerId;
+        if (gpId) setExpanded(`${gpId}:${parentId}`, true);
         setFocusedNode(refNodeId, parentId);
       } else {
         // Mid-text @: insert inline reference
@@ -581,32 +587,32 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
         return;
       }
 
-      const parentId = node?.props._ownerId;
-      if (!parentId) {
+      const dropParentId = node?.props._ownerId;
+      if (!dropParentId) {
         setDrag(null);
         return;
       }
 
-      const parent = entities[parentId];
-      const siblingIndex = parent?.children?.indexOf(nodeId) ?? 0;
+      const dropParent = entities[dropParentId];
+      const siblingIndex = dropParent?.children?.indexOf(nodeId) ?? 0;
 
       if (dropPosition === 'before') {
-        moveNodeTo(dragNodeId, parentId, siblingIndex, userId);
+        moveNodeTo(dragNodeId, dropParentId, siblingIndex, userId);
       } else if (dropPosition === 'after') {
         if (hasChildren && isExpanded) {
           // Drop as first child
           moveNodeTo(dragNodeId, nodeId, 0, userId);
         } else {
-          moveNodeTo(dragNodeId, parentId, siblingIndex + 1, userId);
+          moveNodeTo(dragNodeId, dropParentId, siblingIndex + 1, userId);
         }
       } else if (dropPosition === 'inside') {
         moveNodeTo(dragNodeId, nodeId, 0, userId);
-        setExpanded(nodeId, true);
+        setExpanded(`${parentId}:${nodeId}`, true);
       }
 
       setDrag(null);
     },
-    [dragNodeId, nodeId, userId, node, entities, dropPosition, hasChildren, isExpanded, moveNodeTo, setExpanded, setDrag],
+    [dragNodeId, nodeId, parentId, userId, node, entities, dropPosition, hasChildren, isExpanded, moveNodeTo, setExpanded, setDrag],
   );
 
   const handleDragEnd = useCallback(() => {
@@ -787,6 +793,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
               parentId={nodeId}
               depth={depth + 1}
               autoFocus
+              parentExpandKey={expandKey}
             />
           )}
         </div>

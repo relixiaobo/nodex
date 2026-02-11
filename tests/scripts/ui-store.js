@@ -29,16 +29,16 @@
   results.push({ test: 'replacePanel', pass: topAfter === 'note_2' });
   ui.getState().replacePanel(topBefore); // restore
 
-  // expand / collapse
-  ui.getState().setExpanded('note_2', true);
-  results.push({ test: 'expand', pass: ui.getState().expandedNodes.has('note_2') });
-  ui.getState().setExpanded('note_2', false);
-  results.push({ test: 'collapse', pass: !ui.getState().expandedNodes.has('note_2') });
+  // expand / collapse (compound keys: parentId:nodeId)
+  ui.getState().setExpanded('ws_default_LIBRARY:note_2', true);
+  results.push({ test: 'expand', pass: ui.getState().expandedNodes.has('ws_default_LIBRARY:note_2') });
+  ui.getState().setExpanded('ws_default_LIBRARY:note_2', false);
+  results.push({ test: 'collapse', pass: !ui.getState().expandedNodes.has('ws_default_LIBRARY:note_2') });
 
   // toggle expand
-  ui.getState().toggleExpanded('note_2');
-  results.push({ test: 'toggleExpand', pass: ui.getState().expandedNodes.has('note_2') });
-  ui.getState().toggleExpanded('note_2'); // restore
+  ui.getState().toggleExpanded('ws_default_LIBRARY:note_2');
+  results.push({ test: 'toggleExpand', pass: ui.getState().expandedNodes.has('ws_default_LIBRARY:note_2') });
+  ui.getState().toggleExpanded('ws_default_LIBRARY:note_2'); // restore
 
   // focus
   ui.getState().setFocusedNode('subtask_1a');

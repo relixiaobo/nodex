@@ -112,6 +112,7 @@ export function NodeEditor({
   // Store latest callbacks in refs so TipTap extension doesn't go stale
   const callbacksRef = useRef({
     onEnter, onIndent, onOutdent, onDelete, onArrowUp, onArrowDown, onMoveUp, onMoveDown, saveContent,
+    setNodeNameLocal, nodeId,
     hashTagActive: hashTagActive ?? false,
     onHashTagConfirm: onHashTagConfirm ?? (() => {}),
     onHashTagNavDown: onHashTagNavDown ?? (() => {}),
@@ -127,6 +128,7 @@ export function NodeEditor({
   });
   callbacksRef.current = {
     onEnter, onIndent, onOutdent, onDelete, onArrowUp, onArrowDown, onMoveUp, onMoveDown, saveContent,
+    setNodeNameLocal, nodeId,
     hashTagActive: hashTagActive ?? false,
     onHashTagConfirm: onHashTagConfirm ?? (() => {}),
     onHashTagNavDown: onHashTagNavDown ?? (() => {}),
@@ -233,7 +235,11 @@ export function NodeEditor({
             // Only intercept when editor is empty
             const isEmpty = editor.state.doc.textContent.length === 0;
             if (isEmpty) {
-              // Flush empty content to store so handleDelete sees name=''
+              // Explicitly flush empty name to store so handleDelete sees name=''
+              // (onUpdate's setNodeNameLocal may not have fired yet due to
+              // DOMObserver async timing)
+              const { setNodeNameLocal: setLocal, nodeId: nid } = callbacksRef.current;
+              setLocal(nid, '');
               callbacksRef.current.saveContent(editor.getHTML());
               const deleted = callbacksRef.current.onDelete();
               return deleted;

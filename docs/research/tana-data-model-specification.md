@@ -413,6 +413,23 @@ ContentNode
 | 选项来源 | SYS_A06 | supertag ref | Options from supertag 的来源标签 |
 | 反向引用 | SYS_A08 | attrDef ref | 反向关联字段 |
 
+### 6.5 字段配置页的底层结构（逆向分析）
+
+**核心发现**：AttrDef 的配置页面不是定制 UI，而是标准 NodePanel 渲染被 `SYS_T02` (FIELD_DEFINITION) 系统标签标记的 AttrDef 节点。
+
+AttrDef 的直接子节点仅有 1 个 Tuple（typeChoice），其余 16 项配置来自 SYS_T02 系统标签的模板字段：
+
+| 配置项 | 渲染组件 | Tuple Key | 说明 |
+|--------|---------|-----------|------|
+| Field type | TupleAsPicker | SYS_T06 ("Datatype") | 下拉选择 SYS_D* |
+| Pre-determined options | Outliner | SYS_T03 ("Options") | 选项节点列表 |
+| Hide field | TupleAsPicker | SYS_T61 | 下拉 Never/Always/WhenEmpty |
+| Auto-collect / Required / Auto-initialize | ToggleButton | — | 布尔开关 |
+
+typeChoice Tuple 的特殊性：`children[0]` 为 `SYS_T06`（非 SYS_A02），`_sourceId` 指向 `SYS_A02`。
+
+详细分析见 `docs/research/tana-config-page-architecture.md`。
+
 ---
 
 ## 第七部分：富文本编码规范

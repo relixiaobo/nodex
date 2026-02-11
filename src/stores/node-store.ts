@@ -62,7 +62,10 @@ interface NodeStore {
     name?: string,
   ): Promise<NodexNode>;
 
-  /** Update a node's name (optimistic) */
+  /** Update a node's name locally (no Supabase sync — for live typing updates) */
+  setNodeNameLocal(id: string, name: string): void;
+
+  /** Update a node's name (optimistic + Supabase sync) */
   updateNodeName(id: string, name: string, userId: string): Promise<void>;
 
   /** Indent node: make it a child of its previous sibling */
@@ -361,6 +364,14 @@ export const useNodeStore = create<NodeStore>()(
         });
         return optimisticNode;
       }
+    },
+
+    setNodeNameLocal: (id, name) => {
+      set((state) => {
+        if (state.entities[id]) {
+          state.entities[id].props.name = name;
+        }
+      });
     },
 
     updateNodeName: async (id, name, userId) => {

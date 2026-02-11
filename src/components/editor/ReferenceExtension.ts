@@ -33,6 +33,7 @@ export const ReferenceExtension = Extension.create<{ callbacks: { current: Refer
       new Plugin({
         key: referencePluginKey,
         view() {
+          let active = false;
           return {
             update(view, prevState) {
               // Skip spurious updates where doc/selection haven't changed
@@ -41,6 +42,11 @@ export const ReferenceExtension = Extension.create<{ callbacks: { current: Refer
                   view.state.selection.eq(prevState.selection)) {
                 return;
               }
+
+              // Only trigger on doc changes (user typed something),
+              // not on selection-only changes (focus, arrow keys).
+              // This prevents re-entering a node with existing @ from triggering.
+              const docChanged = !prevState || !view.state.doc.eq(prevState.doc);
 
               const { state } = view;
               const { from } = state.selection;
@@ -56,12 +62,14 @@ export const ReferenceExtension = Extension.create<{ callbacks: { current: Refer
 
               // Match @query at end — broader than # (supports CJK, punctuation)
               const match = textBefore.match(/@([^\s]*)$/);
-              if (match) {
+              if (match && (docChanged || active)) {
+                active = true;
                 const query = match[1];
                 const atStart = from - match[0].length;
                 callbacks.current.onActivate(query, atStart, from);
               } else {
-                callbacks.current.onDeactivate();
+                if (active) callbacks.current.onDeactivate();
+                active = false;
               }
             },
           };

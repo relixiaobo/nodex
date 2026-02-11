@@ -7,7 +7,7 @@
  *
  * Mirrors TagSelector.tsx pattern.
  */
-import { useMemo, useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
+import { useMemo, useEffect, useLayoutEffect, useRef, useState, forwardRef, useImperativeHandle } from 'react';
 import { AtSign, Plus } from 'lucide-react';
 import { useNodeSearch, type NodeSearchResult } from '../../hooks/use-node-search';
 import { useUIStore } from '../../stores/ui-store';
@@ -86,13 +86,44 @@ export const ReferenceSelector = forwardRef<ReferenceDropdownHandle, ReferenceSe
       [items, boundedIndex, totalItems, hasCreateOption, query],
     );
 
+    // Fixed positioning to escape overflow containers + auto-flip
+    const [dropStyle, setDropStyle] = useState<React.CSSProperties>({});
+    useLayoutEffect(() => {
+      if (!open || !listRef.current) return;
+      const anchor = listRef.current.parentElement;
+      if (!anchor) return;
+
+      const update = () => {
+        const rect = anchor.getBoundingClientRect();
+        const viewH = window.innerHeight;
+        const maxH = 240; // max-h-60
+        const gap = 4;
+        const spaceBelow = viewH - rect.bottom - gap;
+        const spaceAbove = rect.top - gap;
+
+        if (spaceBelow >= maxH || spaceBelow >= spaceAbove) {
+          setDropStyle({ position: 'fixed', top: rect.bottom + gap, left: rect.left });
+        } else {
+          setDropStyle({ position: 'fixed', bottom: viewH - rect.top + gap, left: rect.left });
+        }
+      };
+
+      update();
+      window.addEventListener('scroll', update, true);
+      window.addEventListener('resize', update);
+      return () => {
+        window.removeEventListener('scroll', update, true);
+        window.removeEventListener('resize', update);
+      };
+    }, [open]);
+
     if (!open) return null;
 
     return (
       <div
         ref={listRef}
-        className="absolute left-0 z-50 mt-1 w-64 max-h-60 overflow-y-auto rounded-lg border border-border bg-popover shadow-lg py-1"
-        style={{ top: '100%' }}
+        className="z-50 w-64 max-h-60 overflow-y-auto rounded-lg border border-border bg-popover shadow-lg py-1"
+        style={dropStyle}
         onMouseDown={(e) => e.preventDefault()}
       >
         {/* Section header */}

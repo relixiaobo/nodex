@@ -25,7 +25,9 @@ export const InlineRefNode = Node.create({
       label: {
         default: '',
         parseHTML: (element) => element.textContent ?? '',
-        renderHTML: () => ({}),
+        renderHTML: (attributes) => ({
+          'data-label': attributes.label,
+        }),
       },
     };
   },
@@ -35,13 +37,16 @@ export const InlineRefNode = Node.create({
   },
 
   renderHTML({ HTMLAttributes }) {
+    const label = HTMLAttributes['data-label'] || '';
+    // Remove data-label from DOM attributes — it's only used internally
+    const { 'data-label': _, ...rest } = HTMLAttributes;
     return [
       'span',
-      mergeAttributes(HTMLAttributes, {
+      mergeAttributes(rest, {
         'data-inlineref-node': HTMLAttributes['data-inlineref-node'],
         class: 'inline-ref',
       }),
-      HTMLAttributes.label || 'Untitled',
+      label,
     ];
   },
 });

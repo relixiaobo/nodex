@@ -93,6 +93,7 @@ export function NodeEditor({
   onReferenceClose,
 }: NodeEditorProps) {
   const updateNodeName = useNodeStore((s) => s.updateNodeName);
+  const setNodeNameLocal = useNodeStore((s) => s.setNodeNameLocal);
   const userId = useWorkspaceStore((s) => s.userId);
   const savedRef = useRef(false);
 
@@ -345,10 +346,20 @@ export function NodeEditor({
     },
   }), []);
 
+  // Live-update store on each keystroke so references/displays update in real-time.
+  // Uses setNodeNameLocal (no Supabase) — the final blur/save handles persistence.
+  const liveUpdateRef = useRef({ setNodeNameLocal, nodeId });
+  liveUpdateRef.current = { setNodeNameLocal, nodeId };
+
   const editor = useEditor({
     extensions,
     content: wrapInP(initialContent),
     editorProps,
+    onUpdate: ({ editor }) => {
+      const { setNodeNameLocal: setLocal, nodeId: nid } = liveUpdateRef.current;
+      const cleaned = stripWrappingP(editor.getHTML());
+      setLocal(nid, cleaned);
+    },
     onBlur: ({ editor }) => {
       if (!savedRef.current) {
         saveContent(editor.getHTML());

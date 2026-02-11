@@ -38,6 +38,10 @@ export const FieldTriggerExtension = Extension.create<{ callbacks: { current: Fi
                 return;
               }
 
+              // Only fire on doc changes (user typed >), not selection-only
+              const docChanged = !prevState || !view.state.doc.eq(prevState.doc);
+              if (!docChanged) return;
+
               const { state } = view;
               const { from } = state.selection;
 

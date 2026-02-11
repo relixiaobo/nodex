@@ -672,9 +672,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
               <span
                 className="node-content"
                 dangerouslySetInnerHTML={{
-                  __html:
-                    node.props.name ||
-                    '<span class="text-muted-foreground">Untitled</span>',
+                  __html: node.props.name || '&nbsp;',
                 }}
               />
             )}

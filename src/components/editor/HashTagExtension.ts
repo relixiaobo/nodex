@@ -30,6 +30,7 @@ export const HashTagExtension = Extension.create<{ callbacks: { current: HashTag
       new Plugin({
         key: hashTagPluginKey,
         view() {
+          let active = false;
           return {
             update(view, prevState) {
               // Skip spurious updates where doc/selection haven't changed
@@ -38,6 +39,11 @@ export const HashTagExtension = Extension.create<{ callbacks: { current: HashTag
                   view.state.selection.eq(prevState.selection)) {
                 return;
               }
+
+              // Only trigger on doc changes (user typed something),
+              // not on selection-only changes (focus, arrow keys).
+              // This prevents re-entering a node with existing # from triggering.
+              const docChanged = !prevState || !view.state.doc.eq(prevState.doc);
 
               const { state } = view;
               const { from } = state.selection;
@@ -53,12 +59,14 @@ export const HashTagExtension = Extension.create<{ callbacks: { current: HashTag
 
               // Look for # pattern at the end: #word
               const match = textBefore.match(/#(\w*)$/);
-              if (match) {
+              if (match && (docChanged || active)) {
+                active = true;
                 const query = match[1];
                 const hashStart = from - match[0].length;
                 callbacks.current.onActivate(query, hashStart, from);
               } else {
-                callbacks.current.onDeactivate();
+                if (active) callbacks.current.onDeactivate();
+                active = false;
               }
             },
           };

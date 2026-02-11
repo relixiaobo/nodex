@@ -788,14 +788,12 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
               />
             ),
           )}
-          {visibleChildren.length === 0 && (
-            <TrailingInput
-              parentId={nodeId}
-              depth={depth + 1}
-              autoFocus
-              parentExpandKey={expandKey}
-            />
-          )}
+          <TrailingInput
+            parentId={nodeId}
+            depth={depth + 1}
+            autoFocus={visibleChildren.length === 0}
+            parentExpandKey={expandKey}
+          />
         </div>
       )}
     </div>

@@ -88,11 +88,10 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey }: T
     editor.commands.clearContent(false);
     setHasContent(false);
 
-    // Create child and focus it (TrailingInput may unmount if this was the
-    // first child, so we can't rely on refocusing the editor here)
-    ref.createChild(ref.effectiveParentId, ref.wsId, ref.userId, cleaned).then((newNode) => {
+    // Create child — keep cursor in TrailingInput so the user can keep typing.
+    // (TrailingInput always renders at the bottom of expanded children.)
+    ref.createChild(ref.effectiveParentId, ref.wsId, ref.userId, cleaned).then(() => {
       ref.setExpanded(ref.effectiveParentEK, true);
-      ref.setFocusedNode(newNode.id, ref.effectiveParentId);
       queueMicrotask(() => { committingRef.current = false; });
     });
   }, []);
@@ -111,9 +110,8 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey }: T
               const ref = callbacksRef.current;
               if (!ref.wsId || !ref.userId) return true;
               committingRef.current = true;
-              ref.createChild(ref.effectiveParentId, ref.wsId, ref.userId, '').then((newNode) => {
+              ref.createChild(ref.effectiveParentId, ref.wsId, ref.userId, '').then(() => {
                 ref.setExpanded(ref.effectiveParentEK, true);
-                ref.setFocusedNode(newNode.id, ref.effectiveParentId);
                 queueMicrotask(() => { committingRef.current = false; });
               });
             }

@@ -740,16 +740,14 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
         <div className="relative">
           {/* Indent guide line — clickable 8px button (Tana: left 13.5px from parent).
                Center aligns with parent bullet center. Hover fills bg = looks thicker. */}
-          {hasChildren && (
-            <button
-              className="indent-line absolute top-0 bottom-0 w-2 flex justify-center cursor-pointer rounded-sm transition-colors"
-              style={{ left: depth * 24 + 6 + 18.5 }}
-              onClick={handleIndentLineClick}
-              title="Toggle children"
-            >
-              <div className="w-px h-full bg-border/80" />
-            </button>
-          )}
+          <button
+            className="indent-line absolute top-0 bottom-0 w-2 flex justify-center cursor-pointer rounded-sm transition-colors"
+            style={{ left: depth * 24 + 6 + 18.5 }}
+            onClick={handleIndentLineClick}
+            title="Toggle children"
+          >
+            <div className="w-px h-full bg-border/80" />
+          </button>
           {/* Render children in natural order: fields as FieldRow, content as OutlinerItem */}
           {visibleChildren.map(({ id, type }, i) =>
             type === 'field' ? (

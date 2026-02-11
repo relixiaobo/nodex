@@ -241,15 +241,6 @@ export function TrailingInput({ parentId, depth, autoFocus }: TrailingInputProps
         ref.setEffectiveParentId(ref.parentId);
         ref.setEffectiveDepth(depth);
       }
-      // If this was an autoFocus trailing input (leaf expand) and user blurred
-      // empty, collapse parent to avoid orphan blank trailing input
-      if (autoFocus && text.length === 0) {
-        const parent = useNodeStore.getState().entities[ref.parentId];
-        const realChildren = parent?.children ?? [];
-        if (realChildren.length === 0) {
-          ref.setExpanded(ref.parentId, false);
-        }
-      }
     },
   });
 

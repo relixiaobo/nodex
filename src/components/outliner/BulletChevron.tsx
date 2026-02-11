@@ -57,12 +57,12 @@ export function BulletChevron({
         className="flex h-[21px] w-[15px] items-center justify-center opacity-0 group-hover/row:opacity-100 transition-opacity"
         onClick={onToggle}
         onDoubleClick={onDrillDown}
-        title={hasChildren && isExpanded ? 'Collapse' : 'Expand'}
+        title={isExpanded ? 'Collapse' : 'Expand'}
       >
         {/* Circular chevron button — Tana: white bg, 1px gray outline, hover fills gray */}
         <div
           className={`flex h-[15px] w-[15px] items-center justify-center rounded-full bg-background outline outline-1 outline-border/60 hover:bg-foreground/[0.04] transition-colors ${
-            hasChildren && isExpanded ? '[&>svg]:rotate-90' : ''
+            isExpanded ? '[&>svg]:rotate-90' : ''
           }`}
         >
           <svg

@@ -49,6 +49,11 @@ interface UIStore {
   // Field name editing (transient, not persisted)
   editingFieldNameId: string | null;
   setEditingFieldName(tupleId: string | null): void;
+
+  // Trigger hint: set by TrailingInput when creating a node with trigger char (#/@)
+  // OutlinerItem reads & clears this to open the appropriate dropdown on mount
+  triggerHint: '#' | '@' | null;
+  setTriggerHint(hint: '#' | '@' | null): void;
 }
 
 export const useUIStore = create<UIStore>()(
@@ -118,6 +123,10 @@ export const useUIStore = create<UIStore>()(
       // Field name editing
       editingFieldNameId: null,
       setEditingFieldName: (tupleId) => set({ editingFieldNameId: tupleId }),
+
+      // Trigger hint
+      triggerHint: null,
+      setTriggerHint: (hint) => set({ triggerHint: hint }),
     }),
     {
       name: 'nodex-ui',

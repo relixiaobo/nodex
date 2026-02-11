@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState, type DragEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
 import type { Editor } from '@tiptap/react';
 import { useNode } from '../../hooks/use-node';
 import { useChildren } from '../../hooks/use-children';
@@ -124,6 +124,29 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   const hasTags = tagIds.length > 0;
   const hasFields = fields.length > 0;
   const isReference = !!node && node.props._ownerId !== parentId;
+
+  // When TrailingInput creates a node with # or @, it sets triggerHint so we
+  // can immediately open the dropdown (extensions don't fire on mount because
+  // there's no doc change). Read and clear the hint on focus.
+  useEffect(() => {
+    if (!isFocused) return;
+    const hint = useUIStore.getState().triggerHint;
+    if (!hint) return;
+    useUIStore.getState().setTriggerHint(null);
+
+    if (hint === '#') {
+      // The editor content is '#' — set range to cover it
+      setHashTagQuery('');
+      setHashTagSelectedIndex(0);
+      hashRangeRef.current = { from: 1, to: 2 }; // position of '#' in ProseMirror doc
+      setHashTagOpen(true);
+    } else if (hint === '@') {
+      setRefQuery('');
+      setRefSelectedIndex(0);
+      refRangeRef.current = { from: 1, to: 2 };
+      setRefOpen(true);
+    }
+  }, [isFocused]);
 
   // ─── Basic handlers ───
 

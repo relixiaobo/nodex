@@ -55,9 +55,9 @@ export function FieldRow({
     if (!wsId || !userId) return;
     // Create a normal content node after the current field tuple
     createSibling(tupleId, wsId, userId).then((newNode) => {
-      setFocusedNode(newNode.id);
+      setFocusedNode(newNode.id, nodeId);
     });
-  }, [tupleId, wsId, userId, createSibling, setFocusedNode]);
+  }, [tupleId, nodeId, wsId, userId, createSibling, setFocusedNode]);
 
   const handleNameClick = useCallback((e: React.MouseEvent<HTMLSpanElement>) => {
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();

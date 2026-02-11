@@ -16,8 +16,8 @@ import { ReferenceSelector, type ReferenceDropdownHandle } from '../references/R
 import { FieldRow } from '../fields/FieldRow';
 import {
   getFlattenedVisibleNodes,
-  getPreviousVisibleNodeId,
-  getNextVisibleNodeId,
+  getPreviousVisibleNode,
+  getNextVisibleNode,
 } from '../../lib/tree-utils';
 
 interface OutlinerItemProps {
@@ -25,12 +25,14 @@ interface OutlinerItemProps {
   depth: number;
   rootChildIds: string[];
   parentId: string;
+  rootNodeId: string;
 }
 
-export function OutlinerItem({ nodeId, depth, rootChildIds, parentId }: OutlinerItemProps) {
+export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId }: OutlinerItemProps) {
   const node = useNode(nodeId);
   const isExpanded = useUIStore((s) => s.expandedNodes.has(nodeId));
   const focusedNodeId = useUIStore((s) => s.focusedNodeId);
+  const focusedParentId = useUIStore((s) => s.focusedParentId);
   const setFocusedNode = useUIStore((s) => s.setFocusedNode);
   const toggleExpanded = useUIStore((s) => s.toggleExpanded);
   const setExpanded = useUIStore((s) => s.setExpanded);
@@ -117,7 +119,8 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId }: Outliner
     [visibleChildren],
   );
   const hasChildren = visibleChildren.length > 0;
-  const isFocused = focusedNodeId === nodeId;
+  const isFocused = focusedNodeId === nodeId &&
+    (focusedParentId === null || focusedParentId === parentId);
   const hasTags = tagIds.length > 0;
   const hasFields = fields.length > 0;
   const isReference = !!node && node.props._ownerId !== parentId;
@@ -128,10 +131,12 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId }: Outliner
     // Only clear focus if this node is still the focused one.
     // Prevents race condition: Enter creates sibling → setFocusedNode(newId) →
     // old editor unmounts → onBlur fires → would wrongly reset to null.
-    if (useUIStore.getState().focusedNodeId === nodeId) {
+    const state = useUIStore.getState();
+    if (state.focusedNodeId === nodeId &&
+        (state.focusedParentId === null || state.focusedParentId === parentId)) {
       setFocusedNode(null);
     }
-  }, [nodeId, setFocusedNode]);
+  }, [nodeId, parentId, setFocusedNode]);
 
   const handleContentClick = useCallback((e: React.MouseEvent) => {
     // Intercept clicks on inline references (blue links in static display)
@@ -145,8 +150,8 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId }: Outliner
         return;
       }
     }
-    setFocusedNode(nodeId);
-  }, [nodeId, setFocusedNode, pushPanel]);
+    setFocusedNode(nodeId, parentId);
+  }, [nodeId, parentId, setFocusedNode, pushPanel]);
 
   const handleToggle = useCallback(() => {
     const currentNode = useNodeStore.getState().entities[nodeId];
@@ -199,16 +204,16 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId }: Outliner
       if (afterContent !== undefined && currentlyExpanded && currentHasChildren) {
         // Split with expanded children → afterContent becomes first child
         createChild(nodeId, wsId, userId, afterContent, 0).then((newNode) => {
-          setFocusedNode(newNode.id);
+          setFocusedNode(newNode.id, nodeId);
         });
       } else {
         // Create sibling (with split text or empty)
         createSibling(nodeId, wsId, userId, afterContent).then((newNode) => {
-          setFocusedNode(newNode.id);
+          setFocusedNode(newNode.id, parentId);
         });
       }
     },
-    [nodeId, wsId, userId, createSibling, createChild, setFocusedNode],
+    [nodeId, parentId, wsId, userId, createSibling, createChild, setFocusedNode],
   );
 
   const handleIndent = useCallback(() => {
@@ -253,8 +258,8 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId }: Outliner
     const textOnly = currentName.replace(/<[^>]*>/g, '').trim();
     if (textOnly.length > 0) return false;
 
-    const flatList = getFlattenedVisibleNodes(rootChildIds, entities, expandedNodes);
-    const prevId = getPreviousVisibleNodeId(nodeId, flatList);
+    const flatList = getFlattenedVisibleNodes(rootChildIds, entities, expandedNodes, rootNodeId);
+    const prev = getPreviousVisibleNode(nodeId, parentId, flatList);
 
     // Reference: just remove from parent's children, don't trash the node
     const currentNode = useNodeStore.getState().entities[nodeId];
@@ -263,21 +268,25 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId }: Outliner
     } else {
       trashNode(nodeId, wsId, userId);
     }
-    setFocusedNode(prevId);
+    if (prev) {
+      setFocusedNode(prev.nodeId, prev.parentId);
+    } else {
+      setFocusedNode(null);
+    }
     return true;
-  }, [nodeId, wsId, userId, parentId, rootChildIds, entities, expandedNodes, trashNode, removeReference, setFocusedNode]);
+  }, [nodeId, wsId, userId, parentId, rootNodeId, rootChildIds, entities, expandedNodes, trashNode, removeReference, setFocusedNode]);
 
   const handleArrowUp = useCallback(() => {
-    const flatList = getFlattenedVisibleNodes(rootChildIds, entities, expandedNodes);
-    const prevId = getPreviousVisibleNodeId(nodeId, flatList);
-    if (prevId) setFocusedNode(prevId);
-  }, [nodeId, rootChildIds, entities, expandedNodes, setFocusedNode]);
+    const flatList = getFlattenedVisibleNodes(rootChildIds, entities, expandedNodes, rootNodeId);
+    const prev = getPreviousVisibleNode(nodeId, parentId, flatList);
+    if (prev) setFocusedNode(prev.nodeId, prev.parentId);
+  }, [nodeId, parentId, rootNodeId, rootChildIds, entities, expandedNodes, setFocusedNode]);
 
   const handleArrowDown = useCallback(() => {
-    const flatList = getFlattenedVisibleNodes(rootChildIds, entities, expandedNodes);
-    const nextId = getNextVisibleNodeId(nodeId, flatList);
-    if (nextId) setFocusedNode(nextId);
-  }, [nodeId, rootChildIds, entities, expandedNodes, setFocusedNode]);
+    const flatList = getFlattenedVisibleNodes(rootChildIds, entities, expandedNodes, rootNodeId);
+    const next = getNextVisibleNode(nodeId, parentId, flatList);
+    if (next) setFocusedNode(next.nodeId, next.parentId);
+  }, [nodeId, parentId, rootNodeId, rootChildIds, entities, expandedNodes, setFocusedNode]);
 
   const handleMoveUp = useCallback(() => {
     if (!userId) return;
@@ -429,7 +438,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId }: Outliner
         trashNode(nodeId, wsId, userId);
         addReference(parentId, refNodeId, userId, pos >= 0 ? pos : undefined);
         setExpanded(parentId, true);
-        setFocusedNode(refNodeId);
+        setFocusedNode(refNodeId, parentId);
       } else {
         // Mid-text @: insert inline reference
         const refNode = entities[refNodeId];
@@ -743,6 +752,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId }: Outliner
                 depth={depth + 1}
                 rootChildIds={rootChildIds}
                 parentId={nodeId}
+                rootNodeId={rootNodeId}
               />
             ),
           )}

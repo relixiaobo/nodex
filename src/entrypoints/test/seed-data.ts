@@ -75,7 +75,7 @@ export function seedTestData() {
 
   // Project with nested structure
   const projectNodes = [
-    makeNode('proj_1', 'My Project', libraryId, ['task_1', 'task_2', 'task_3']),
+    makeNode('proj_1', 'My Project', libraryId, ['task_1', 'task_2', 'task_3', 'note_1a']),
     {
       ...makeNode('task_1', 'Design the data model', 'proj_1', [
         'subtask_1a', 'subtask_1b',
@@ -117,13 +117,14 @@ export function seedTestData() {
       'note_rich',
       'Rich text formatting tests',
       libraryId,
-      ['rich_1', 'rich_2', 'rich_3', 'rich_4', 'rich_5'],
+      ['rich_1', 'rich_2', 'rich_3', 'rich_4', 'rich_5', 'rich_inline_ref'],
     ),
     makeNode('rich_1', '<strong>Bold text</strong> mixed with normal', 'note_rich', []),
     makeNode('rich_2', '<em>Italic text</em> and <strong><em>bold italic</em></strong>', 'note_rich', []),
     makeNode('rich_3', 'Inline <code>code snippet</code> in a sentence', 'note_rich', []),
     makeNode('rich_4', '<s>Strikethrough text</s> for done items', 'note_rich', []),
     makeNode('rich_5', 'Text with <mark>highlighted</mark> parts', 'note_rich', []),
+    makeNode('rich_inline_ref', 'Refer to <span data-inlineref-node="task_1">Design the data model</span> for details', 'note_rich', []),
   ];
 
   // ─── Inbox nodes ───

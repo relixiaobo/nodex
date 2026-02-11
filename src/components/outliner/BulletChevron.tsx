@@ -20,9 +20,9 @@ interface BulletChevronProps {
  *
  * Bullet (right, always visible):
  *   - All states: 5px inner dot (::after in Tana)
- *   - Collapsed with children: 15px outer circle with dimmed bg (bulletColor1Dimmed)
+ *   - Collapsed with children: 15px outer circle with light gray fill
  *   - Leaf / expanded: transparent outer circle (only inner dot visible)
- *   - Reference: concentric circles (outer ring border + inner dot), always visible
+ *   - Reference: 1px dashed border circle (+ light gray fill when has children)
  *   - Click → zoom in (pushPanel)
  *   - Hover → scale up (1.375x in Tana)
  *   - Active → scale down (0.9x)
@@ -84,30 +84,27 @@ export function BulletChevron({
       </button>
       {/* Bullet area — right of chevron, always visible, click to zoom in.
            Hit area matches chevron height (h-7) for easy clicking;
-           visual ring stays 15×15px. */}
+           visual ring stays 15×15px.
+
+           Tana bullet states (all 15×15px outer, 5px inner dot):
+           1. Leaf (no children):        transparent bg, no border
+           2. Has children (collapsed):  light gray bg fill, no border
+           3. Reference + children:      light gray bg fill, 1px dashed border
+           4. Reference + leaf:          transparent bg, 1px dashed border
+           Expanded nodes: same as leaf (transparent bg) */}
       <span
         role="button"
         className="flex h-[21px] w-[15px] items-center justify-center cursor-pointer group/bullet"
         onClick={onBulletClick}
         title="Zoom in"
       >
-        {isReference ? (
-          /* Reference bullet: concentric circles (bullseye ◉)
-             Outer: 11px ring with 1.5px border, Inner: 5px solid dot.
-             Always visible regardless of expand/collapse state. */
-          <div className="flex h-[11px] w-[11px] items-center justify-center rounded-full border-[1.5px] border-foreground/30 transition-transform group-hover/bullet:scale-[1.375] group-active/bullet:scale-90">
-            <div className="h-[4px] w-[4px] rounded-full bg-foreground/50" />
-          </div>
-        ) : (
-          /* Standard bullet */
-          <div
-            className={`flex h-[15px] w-[15px] items-center justify-center rounded-full transition-colors group-active/bullet:scale-90 ${
-              showOuterRing ? 'bg-foreground/10' : ''
-            }`}
-          >
-            <div className={`h-[5px] w-[5px] rounded-full transition-transform group-hover/bullet:scale-[1.375] ${dimmed ? 'bg-foreground/15' : 'bg-foreground/50'}`} />
-          </div>
-        )}
+        <div
+          className={`flex h-[15px] w-[15px] items-center justify-center rounded-full transition-colors group-active/bullet:scale-90 ${
+            isReference ? 'border border-dashed border-foreground/40' : ''
+          } ${showOuterRing || (isReference && hasChildren && !isExpanded) ? 'bg-foreground/[0.08]' : ''}`}
+        >
+          <div className={`h-[5px] w-[5px] rounded-full transition-transform group-hover/bullet:scale-[1.375] ${dimmed ? 'bg-foreground/15' : 'bg-foreground/50'}`} />
+        </div>
       </span>
     </div>
   );

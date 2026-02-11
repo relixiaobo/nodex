@@ -227,13 +227,13 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       const currentHasChildren =
         (useNodeStore.getState().entities[nodeId]?.children ?? []).length > 0;
 
-      if (afterContent !== undefined && currentlyExpanded && currentHasChildren) {
-        // Split with expanded children → afterContent becomes first child
-        createChild(nodeId, wsId, userId, afterContent, 0).then((newNode) => {
+      if (currentlyExpanded && currentHasChildren) {
+        // Expanded with children → new node becomes first child (position 0)
+        createChild(nodeId, wsId, userId, afterContent ?? '', 0).then((newNode) => {
           setFocusedNode(newNode.id, nodeId);
         });
       } else {
-        // Create sibling (with split text or empty)
+        // Collapsed or leaf → create sibling after this node
         createSibling(nodeId, wsId, userId, afterContent).then((newNode) => {
           setFocusedNode(newNode.id, parentId);
         });

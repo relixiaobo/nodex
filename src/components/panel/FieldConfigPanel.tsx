@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { ChevronLeft, Trash2, Plus, X } from 'lucide-react';
 import { useNode } from '../../hooks/use-node.js';
 import { useNodeStore } from '../../stores/node-store.js';
@@ -9,7 +9,6 @@ import {
   resolveDataType,
   resolveFieldOptions,
   getFieldTypeIcon,
-  getFieldTypeLabel,
   FIELD_TYPE_LIST,
 } from '../../lib/field-utils.js';
 
@@ -29,12 +28,14 @@ export function FieldConfigPanel({ nodeId }: FieldConfigPanelProps) {
       [nodeId],
     ),
   );
-  const optionIds = useNodeStore(
+  // JSON-serialize to stabilize array reference for Zustand selector
+  const optionIdsJson = useNodeStore(
     useCallback(
-      (s) => resolveFieldOptions(s.entities, nodeId),
+      (s) => JSON.stringify(resolveFieldOptions(s.entities, nodeId)),
       [nodeId],
     ),
   );
+  const optionIds: string[] = useMemo(() => JSON.parse(optionIdsJson), [optionIdsJson]);
 
   const isOptions = dataType === SYS_D.OPTIONS || dataType === SYS_D.OPTIONS_ALT;
 

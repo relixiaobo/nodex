@@ -3,7 +3,7 @@
  */
 import type { LucideIcon } from 'lucide-react';
 import { AlignLeft, Calendar, CheckSquare, Hash, Link, List, Mail } from 'lucide-react';
-import { SYS_A, SYS_D } from '../types/index.js';
+import { SYS_A, SYS_D, SYS_V } from '../types/index.js';
 import type { NodexNode } from '../types/index.js';
 
 /**
@@ -88,3 +88,46 @@ export function getFieldTypeLabel(dataType: string): string {
 export function isPlainFieldType(dataType: string): boolean {
   return dataType === SYS_D.PLAIN || !dataType;
 }
+
+// ─── AttrDef config field registry ───
+
+export interface ConfigFieldDef {
+  key: string;
+  name: string;
+  control: 'toggle' | 'select';
+  defaultValue: string;
+  appliesTo: string[] | '*';
+  description?: string;
+  options?: Array<{ value: string; label: string }>;
+}
+
+export const ATTRDEF_CONFIG_FIELDS: ConfigFieldDef[] = [
+  {
+    key: SYS_A.AUTOCOLLECT_OPTIONS,
+    name: 'Auto-collect values',
+    control: 'toggle',
+    defaultValue: SYS_V.YES,
+    appliesTo: [SYS_D.OPTIONS],
+    description: 'Include auto-collected values as options',
+  },
+  {
+    key: SYS_A.NULLABLE,
+    name: 'Required',
+    control: 'toggle',
+    defaultValue: SYS_V.NO,
+    appliesTo: '*',
+  },
+  {
+    key: SYS_A.HIDE_FIELD,
+    name: 'Hide field',
+    control: 'select',
+    defaultValue: SYS_V.NEVER,
+    appliesTo: '*',
+    description: 'Minimize field when part of a supertag',
+    options: [
+      { value: SYS_V.NEVER, label: 'Never' },
+      { value: SYS_V.ALWAYS, label: 'Always' },
+      { value: SYS_V.WHEN_EMPTY, label: 'When empty' },
+    ],
+  },
+];

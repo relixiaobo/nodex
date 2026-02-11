@@ -6,6 +6,8 @@ import { useHasFields } from '../../hooks/use-has-fields';
 import { useNodeStore } from '../../stores/node-store';
 import { useUIStore } from '../../stores/ui-store';
 import { useWorkspaceStore } from '../../stores/workspace-store';
+import { resolveDataType } from '../../lib/field-utils.js';
+import { SYS_D } from '../../types/index.js';
 import { NodePanelHeader } from './NodePanelHeader';
 import { OutlinerView } from '../outliner/OutlinerView';
 import { FieldList } from '../fields/FieldList';
@@ -23,6 +25,10 @@ export function NodePanel({ nodeId }: NodePanelProps) {
   const userId = useWorkspaceStore((s) => s.userId) ?? 'local';
 
   const isAttrDef = node?.props._docType === 'attrDef';
+  const isOptionsType = useNodeStore((s) => {
+    if (!isAttrDef) return false;
+    return resolveDataType(s.entities, nodeId) === SYS_D.OPTIONS;
+  });
 
   const handleDelete = useCallback(() => {
     useNodeStore.getState().trashNode(nodeId, wsId, userId);
@@ -36,6 +42,12 @@ export function NodePanel({ nodeId }: NodePanelProps) {
         {(tagIds.length > 0 || hasFields) && (
           <div className="mb-2 ml-4">
             <FieldList nodeId={nodeId} />
+          </div>
+        )}
+        {isAttrDef && isOptionsType && (
+          <div className="ml-4 mt-3 mb-1">
+            <span className="text-sm font-medium text-muted-foreground">Pre-determined options</span>
+            <p className="text-xs text-muted-foreground/60 mt-0.5">Each node above will become an option</p>
           </div>
         )}
         <OutlinerView rootNodeId={nodeId} />

@@ -8,7 +8,7 @@
  */
 import { useMemo } from 'react';
 import { useNodeStore } from '../stores/node-store';
-import { resolveDataType } from '../lib/field-utils.js';
+import { resolveDataType, ATTRDEF_CONFIG_FIELDS } from '../lib/field-utils.js';
 import type { NodexNode } from '../types/index.js';
 
 export interface FieldEntry {
@@ -48,7 +48,26 @@ function computeFields(entities: Record<string, NodexNode>, nodeId: string): Fie
       continue;
     }
 
-    if (keyId.startsWith('SYS_')) continue;
+    // For attrDef nodes: recognize config tuples (SYS_A01, SYS_A44, NDX_A01)
+    if (isAttrDef) {
+      const configDef = ATTRDEF_CONFIG_FIELDS.find(f => f.key === keyId);
+      if (configDef) {
+        const currentType = resolveDataType(entities, nodeId);
+        const applies = configDef.appliesTo === '*' || configDef.appliesTo.includes(currentType);
+        if (applies) {
+          fields.push({
+            attrDefId: keyId,
+            attrDefName: configDef.name,
+            tupleId: childId,
+            valueName: child.children[1],
+            dataType: `__${configDef.control}__`,
+          });
+        }
+        continue;
+      }
+    }
+
+    if (keyId.startsWith('SYS_') || keyId.startsWith('NDX_')) continue;
 
     const attrDef = entities[keyId];
     if (!attrDef || attrDef.props._docType !== 'attrDef') continue;

@@ -202,6 +202,10 @@ export const SYS_A = {
   PROMOTE_FOR: 'SYS_A251',
   /** 发言者 */
   SPEAKER: 'SYS_A252',
+
+  // ─── Nodex 自定义属性 ───
+  /** [Nodex] 隐藏字段条件 → SYS_V54(Never) / SYS_V52(Always) / SYS_V56(WhenEmpty) */
+  HIDE_FIELD: 'NDX_A01',
 } as const;
 
 export type SystemAttribute = typeof SYS_A[keyof typeof SYS_A];

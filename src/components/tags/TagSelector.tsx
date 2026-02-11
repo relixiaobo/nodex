@@ -5,7 +5,7 @@
  * the editor keymap and forwarded here via imperative ref methods.
  * mouseDown.preventDefault() keeps editor focus when clicking items.
  */
-import { useMemo, useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
+import { useMemo, useEffect, useLayoutEffect, useRef, useState, forwardRef, useImperativeHandle } from 'react';
 import { Hash, Plus } from 'lucide-react';
 import { useWorkspaceTags } from '../../hooks/use-workspace-tags';
 
@@ -68,13 +68,44 @@ export const TagSelector = forwardRef<TagDropdownHandle, TagSelectorProps>(
       [filteredTags, boundedIndex, totalItems, hasCreateOption, query],
     );
 
+    // Fixed positioning to escape overflow containers + auto-flip
+    const [dropStyle, setDropStyle] = useState<React.CSSProperties>({});
+    useLayoutEffect(() => {
+      if (!open || !listRef.current) return;
+      const anchor = listRef.current.parentElement;
+      if (!anchor) return;
+
+      const update = () => {
+        const rect = anchor.getBoundingClientRect();
+        const viewH = window.innerHeight;
+        const maxH = 208; // max-h-52
+        const gap = 4;
+        const spaceBelow = viewH - rect.bottom - gap;
+        const spaceAbove = rect.top - gap;
+
+        if (spaceBelow >= maxH || spaceBelow >= spaceAbove) {
+          setDropStyle({ position: 'fixed', top: rect.bottom + gap, left: rect.left });
+        } else {
+          setDropStyle({ position: 'fixed', bottom: viewH - rect.top + gap, left: rect.left });
+        }
+      };
+
+      update();
+      window.addEventListener('scroll', update, true);
+      window.addEventListener('resize', update);
+      return () => {
+        window.removeEventListener('scroll', update, true);
+        window.removeEventListener('resize', update);
+      };
+    }, [open]);
+
     if (!open) return null;
 
     return (
       <div
         ref={listRef}
-        className="absolute left-0 z-50 mt-1 w-56 max-h-52 overflow-y-auto rounded-lg border border-border bg-popover shadow-lg py-1"
-        style={{ top: '100%' }}
+        className="z-50 w-56 max-h-52 overflow-y-auto rounded-lg border border-border bg-popover shadow-lg py-1"
+        style={dropStyle}
         onMouseDown={(e) => e.preventDefault()}
       >
         {filteredTags.length === 0 && !hasCreateOption && (

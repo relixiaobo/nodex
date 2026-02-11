@@ -171,7 +171,7 @@ export function FieldNameInput({ tupleId, nodeId, attrDefId, currentName, onEnte
       <input
         ref={inputRef}
         type="text"
-        className="block w-full bg-transparent text-[11px] text-foreground outline-none border-0 py-0 px-0 m-0 h-[22px] leading-[22px]"
+        className="block w-full bg-transparent text-sm text-foreground outline-none border-0 py-0 px-0 m-0 h-[22px] leading-[22px]"
         placeholder="Field name..."
         value={value}
         onChange={(e) => {

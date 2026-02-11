@@ -12,7 +12,7 @@
  *   ArrowUp     → focus previous node
  *   ArrowDown   → focus next node
  */
-import { useEffect, useRef, useCallback, type MutableRefObject } from 'react';
+import { useEffect, useRef, useMemo, useCallback, type MutableRefObject } from 'react';
 import { useEditor, EditorContent, type Editor } from '@tiptap/react';
 import { Extension } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
@@ -311,24 +311,32 @@ export function NodeEditor({
     }),
   ).current;
 
+  // Memoize extensions to prevent useEditor from calling setOptions() on
+  // every re-render. Reconfiguring plugins disrupts ProseMirror's DOM
+  // observer, causing typed characters (like # or @) to not be detected
+  // by trigger plugins in newly created nodes.
+  // All callback refs are stable (useRef objects), so empty deps is correct.
+  const extensions = useMemo(() => [
+    StarterKit.configure({
+      bulletList: false,
+      orderedList: false,
+      listItem: false,
+      heading: false,
+      blockquote: false,
+      codeBlock: false,
+      horizontalRule: false,
+    }),
+    Highlight,
+    InlineRefNode,
+    outlinerKeymap,
+    HashTagExtension.configure({ callbacks: hashTagRef }),
+    FieldTriggerExtension.configure({ callbacks: fieldTriggerRef }),
+    ReferenceExtension.configure({ callbacks: referenceRef }),
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  ], []);
+
   const editor = useEditor({
-    extensions: [
-      StarterKit.configure({
-        bulletList: false,
-        orderedList: false,
-        listItem: false,
-        heading: false,
-        blockquote: false,
-        codeBlock: false,
-        horizontalRule: false,
-      }),
-      Highlight,
-      InlineRefNode,
-      outlinerKeymap,
-      HashTagExtension.configure({ callbacks: hashTagRef }),
-      FieldTriggerExtension.configure({ callbacks: fieldTriggerRef }),
-      ReferenceExtension.configure({ callbacks: referenceRef }),
-    ],
+    extensions,
     content: wrapInP(initialContent),
     editorProps: {
       attributes: {

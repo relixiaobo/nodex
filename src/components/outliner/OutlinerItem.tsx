@@ -296,14 +296,13 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId }: Outliner
     setHashTagQuery(query);
     setHashTagSelectedIndex(0);
     if (!hashTagOpen) setHashTagOpen(true);
-  }, [hashTagOpen]);
+  }, [hashTagOpen, nodeId]);
 
   const handleHashTagDeactivate = useCallback(() => {
-    // Only close if it was truly deactivated (user deleted the #)
     setHashTagOpen(false);
     setHashTagQuery('');
     setHashTagSelectedIndex(0);
-  }, []);
+  }, [nodeId]);
 
   /** Delete #query text from editor, save corrected content, refocus */
   const cleanupHashTagText = useCallback(() => {

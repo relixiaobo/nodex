@@ -34,7 +34,14 @@ export const ReferenceExtension = Extension.create<{ callbacks: { current: Refer
         key: referencePluginKey,
         view() {
           return {
-            update(view) {
+            update(view, prevState) {
+              // Skip spurious updates where doc/selection haven't changed
+              // (e.g., from TipTap setOptions or view.setProps during re-renders)
+              if (prevState && view.state.doc.eq(prevState.doc) &&
+                  view.state.selection.eq(prevState.selection)) {
+                return;
+              }
+
               const { state } = view;
               const { from } = state.selection;
 

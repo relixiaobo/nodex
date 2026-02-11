@@ -311,11 +311,15 @@ export function NodeEditor({
     }),
   ).current;
 
-  // Memoize extensions to prevent useEditor from calling setOptions() on
-  // every re-render. Reconfiguring plugins disrupts ProseMirror's DOM
-  // observer, causing typed characters (like # or @) to not be detected
-  // by trigger plugins in newly created nodes.
-  // All callback refs are stable (useRef objects), so empty deps is correct.
+  // Memoize ALL non-callback options to prevent TipTap's useEditor from
+  // calling editor.setOptions() on every re-render. setOptions() triggers
+  // view.updateState() which stops/restarts ProseMirror's DOMObserver,
+  // disrupting pending DOM mutations (typed characters like # or @).
+  //
+  // TipTap v3's compareOptions skips callbacks (onBlur etc.) and does
+  // element-by-element comparison for extensions, but uses strict reference
+  // comparison (===) for editorProps and other options. Without memoization,
+  // a new editorProps object each render triggers setOptions every time.
   const extensions = useMemo(() => [
     StarterKit.configure({
       bulletList: false,
@@ -335,14 +339,16 @@ export function NodeEditor({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   ], []);
 
+  const editorProps = useMemo(() => ({
+    attributes: {
+      class: 'outline-none text-sm leading-[21px]',
+    },
+  }), []);
+
   const editor = useEditor({
     extensions,
     content: wrapInP(initialContent),
-    editorProps: {
-      attributes: {
-        class: 'outline-none text-sm leading-[21px]',
-      },
-    },
+    editorProps,
     onBlur: ({ editor }) => {
       if (!savedRef.current) {
         saveContent(editor.getHTML());

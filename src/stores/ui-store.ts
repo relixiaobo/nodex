@@ -19,9 +19,10 @@ interface UIStore {
   toggleExpanded(nodeId: string): void;
   setExpanded(nodeId: string, expanded: boolean): void;
 
-  // Focus
+  // Focus (parentId disambiguates reference nodes that appear in multiple places)
   focusedNodeId: string | null;
-  setFocusedNode(nodeId: string | null): void;
+  focusedParentId: string | null;
+  setFocusedNode(nodeId: string | null, parentId?: string | null): void;
 
   // Sidebar
   sidebarOpen: boolean;
@@ -86,7 +87,11 @@ export const useUIStore = create<UIStore>()(
 
       // Focus
       focusedNodeId: null,
-      setFocusedNode: (nodeId) => set({ focusedNodeId: nodeId }),
+      focusedParentId: null,
+      setFocusedNode: (nodeId, parentId) => set({
+        focusedNodeId: nodeId,
+        focusedParentId: parentId ?? null,
+      }),
 
       // Sidebar
       sidebarOpen: true,

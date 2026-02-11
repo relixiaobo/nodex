@@ -21,7 +21,7 @@ export function FieldValueOutliner({ assocDataId }: FieldValueOutlinerProps) {
   return (
     <div className="min-h-[22px]">
       {childIds.map((id) => (
-        <OutlinerItem key={id} nodeId={id} depth={0} rootChildIds={childIds} parentId={assocDataId} />
+        <OutlinerItem key={id} nodeId={id} depth={0} rootChildIds={childIds} parentId={assocDataId} rootNodeId={assocDataId} />
       ))}
       <TrailingInput parentId={assocDataId} depth={0} />
     </div>

@@ -8,53 +8,61 @@ import type { NodexNode } from '../types/index.js';
 /**
  * Get the visible flattened list of node IDs for the outliner.
  * Only includes nodes whose ancestors are all expanded.
+ * Each item includes parentId for reference node disambiguation.
  */
 export function getFlattenedVisibleNodes(
   rootChildIds: string[],
   entities: Record<string, NodexNode>,
   expandedNodes: Set<string>,
-): Array<{ nodeId: string; depth: number }> {
-  const result: Array<{ nodeId: string; depth: number }> = [];
+  rootParentId: string = '',
+): Array<{ nodeId: string; depth: number; parentId: string }> {
+  const result: Array<{ nodeId: string; depth: number; parentId: string }> = [];
 
-  function traverse(childIds: string[], depth: number) {
+  function traverse(childIds: string[], depth: number, currentParentId: string) {
     for (const childId of childIds) {
       const node = entities[childId];
       if (!node) continue;
 
-      result.push({ nodeId: childId, depth });
+      result.push({ nodeId: childId, depth, parentId: currentParentId });
 
       if (expandedNodes.has(childId) && node.children && node.children.length > 0) {
-        traverse(node.children, depth + 1);
+        traverse(node.children, depth + 1, childId);
       }
     }
   }
 
-  traverse(rootChildIds, 0);
+  traverse(rootChildIds, 0, rootParentId);
   return result;
 }
 
 /**
  * Find the previous visible node in the flattened list.
+ * Uses parentId for disambiguation when a node appears in multiple places (references).
  */
-export function getPreviousVisibleNodeId(
+export function getPreviousVisibleNode(
   nodeId: string,
-  flatList: Array<{ nodeId: string; depth: number }>,
-): string | null {
-  const index = flatList.findIndex((item) => item.nodeId === nodeId);
+  parentId: string,
+  flatList: Array<{ nodeId: string; depth: number; parentId: string }>,
+): { nodeId: string; parentId: string } | null {
+  const index = flatList.findIndex((item) => item.nodeId === nodeId && item.parentId === parentId);
   if (index <= 0) return null;
-  return flatList[index - 1].nodeId;
+  const prev = flatList[index - 1];
+  return { nodeId: prev.nodeId, parentId: prev.parentId };
 }
 
 /**
  * Find the next visible node in the flattened list.
+ * Uses parentId for disambiguation when a node appears in multiple places (references).
  */
-export function getNextVisibleNodeId(
+export function getNextVisibleNode(
   nodeId: string,
-  flatList: Array<{ nodeId: string; depth: number }>,
-): string | null {
-  const index = flatList.findIndex((item) => item.nodeId === nodeId);
+  parentId: string,
+  flatList: Array<{ nodeId: string; depth: number; parentId: string }>,
+): { nodeId: string; parentId: string } | null {
+  const index = flatList.findIndex((item) => item.nodeId === nodeId && item.parentId === parentId);
   if (index < 0 || index >= flatList.length - 1) return null;
-  return flatList[index + 1].nodeId;
+  const next = flatList[index + 1];
+  return { nodeId: next.nodeId, parentId: next.parentId };
 }
 
 /**

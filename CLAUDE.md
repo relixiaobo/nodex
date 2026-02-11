@@ -213,23 +213,21 @@ ContentNode
 
 ## 开发路线图
 
-- [x] 数据模型设计 (TypeScript 类型 + PostgreSQL Schema)
-- [x] 核心服务层 (CRUD / 标签 / 字段 / 搜索 / 导入)
-- [x] 数据迁移验证 (41,753 节点 100% 转换成功)
-- [x] 技术选型 (WXT + React 19 + Tailwind 4 + TipTap + Zustand + shadcn/ui)
-- [x] 核心架构设计 (Per-Node Editor + 归一化 Zustand Store + Side Panel 直连 Supabase)
-- [x] WXT 项目初始化 + 基础骨架 (entrypoints, stores, components, hooks, build OK)
-- [x] TipTap 编辑器集成 (Per-Node Editor, 聚焦创建/失焦销毁, 富文本 bold/italic/code)
-- [x] 键盘导航 (Enter→创建兄弟, Tab→缩进, Shift+Tab→反缩进, ↑↓→焦点, Backspace→删除空节点)
-- [x] 离线/Demo 模式 (isSupabaseReady() guard, 本地种子容器节点, 全操作本地可用)
-- [x] Lucide 图标 + UI 优化 (sidebar/header 图标, search trigger)
-- [x] 搜索面板 Cmd+K (cmdk command palette, 节点搜索, 容器快速导航)
-- [x] 节点上下移动 (Ctrl/Cmd+Shift+↑/↓)
-- [x] 拖拽排序 (HTML5 DnD, before/after/inside 三区域判定, 视觉指示器)
-- [ ] 标签 + 字段 UI
-- [ ] AI 功能集成
-- [ ] 实时同步验证 (多标签)
-- [ ] 网页剪藏
+详细路线图见 `ROADMAP.md`，以下为当前进度摘要：
+
+- [x] 数据模型 + 服务层 + 迁移验证
+- [x] WXT + React 19 + TipTap + Zustand 基础骨架
+- [x] Outliner 核心 (编辑/键盘导航/拖拽/搜索面板)
+- [x] Supertags 基础 (#触发/应用/TagBadge/TagSelector)
+- [x] Fields 基础 (>触发/字段名编辑+自动完成/交错渲染/字段值编辑器)
+- [ ] **Phase 1.1**: References & @引用 ← 当前
+- [ ] **Phase 1.2**: Supertags 完善 (模板/继承/配置页)
+- [ ] **Phase 1.3**: Fields 全类型 (Date/Number/URL/Email/Checkbox)
+- [ ] **Phase 1.4**: Date 节点 & 日记
+- [ ] **Phase 2**: 视图 & 搜索 (Table/Cards/Calendar/Live Queries)
+- [ ] **Phase 3**: AI & 网页 (AI Chat/剪藏/网页辅助)
+- [ ] **Phase 4**: 同步 & 可靠性 (Supabase Realtime/离线/导入导出)
+- [ ] **Phase 5**: 高级功能 (Command Nodes/Publishing/API)
 
 ## Tana 产品技术栈（逆向分析结果）
 

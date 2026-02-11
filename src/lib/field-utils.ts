@@ -94,14 +94,26 @@ export function isPlainFieldType(dataType: string): boolean {
 export interface ConfigFieldDef {
   key: string;
   name: string;
-  control: 'toggle' | 'select';
+  control: 'type_choice' | 'toggle' | 'select';
   defaultValue: string;
   appliesTo: string[] | '*';
   description?: string;
   options?: Array<{ value: string; label: string }>;
 }
 
+/**
+ * Registry of config fields for attrDef nodes.
+ * Maps to SYS_T02 (FIELD_DEFINITION) template tuples.
+ * Order here matches template order in SYS_T02.
+ */
 export const ATTRDEF_CONFIG_FIELDS: ConfigFieldDef[] = [
+  {
+    key: SYS_A.TYPE_CHOICE,
+    name: 'Field type',
+    control: 'type_choice',
+    defaultValue: SYS_D.PLAIN,
+    appliesTo: '*',
+  },
   {
     key: SYS_A.AUTOCOLLECT_OPTIONS,
     name: 'Auto-collect values',
@@ -131,3 +143,8 @@ export const ATTRDEF_CONFIG_FIELDS: ConfigFieldDef[] = [
     ],
   },
 ];
+
+/** O(1) lookup by config field key (SYS_A* or NDX_A*). */
+export const ATTRDEF_CONFIG_MAP = new Map(
+  ATTRDEF_CONFIG_FIELDS.map(f => [f.key, f]),
+);

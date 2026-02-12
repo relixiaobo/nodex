@@ -852,11 +852,11 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
         </div>
         {/* Options picker dropdown: shown when clicking selected Options-field reference */}
         {optionsPickerOpen && allFieldOptions.length > 0 && (
-          <div className="absolute left-0 top-full z-50 mt-0.5 max-h-48 w-56 overflow-y-auto rounded-md border border-border bg-popover py-1 shadow-md">
+          <div className="absolute left-0 top-full z-50 mt-0.5 max-h-48 w-56 overflow-y-auto rounded-lg border border-border bg-popover p-1 shadow-md">
             {allFieldOptions.map((opt, i) => (
               <div
                 key={opt.id}
-                className={`flex cursor-pointer items-center gap-2 px-2 py-1 text-sm ${
+                className={`flex cursor-pointer items-center gap-2 rounded-md px-2 py-1 text-sm ${
                   opt.id === nodeId
                     ? 'bg-primary text-primary-foreground'
                     : i === optionsPickerIndex

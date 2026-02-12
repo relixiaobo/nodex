@@ -401,11 +401,11 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
       <div className="relative flex-1 min-w-0">
         <EditorContent editor={editor} />
         {optionsOpen && filteredOptions.length > 0 && (
-          <div className="absolute left-0 top-full z-50 mt-0.5 max-h-48 w-56 overflow-y-auto rounded-md border border-border bg-popover py-1 shadow-md">
+          <div className="absolute left-0 top-full z-50 mt-0.5 max-h-48 w-56 overflow-y-auto rounded-lg border border-border bg-popover p-1 shadow-md">
             {filteredOptions.map((opt, i) => (
               <div
                 key={opt.id}
-                className={`flex cursor-pointer items-center gap-2 px-2 py-1 text-sm ${i === optionsIndex ? 'bg-accent text-accent-foreground' : 'text-popover-foreground hover:bg-accent/50'}`}
+                className={`flex cursor-pointer items-center gap-2 rounded-md px-2 py-1 text-sm ${i === optionsIndex ? 'bg-accent text-accent-foreground' : 'text-popover-foreground hover:bg-accent/50'}`}
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => handleOptionClick(opt.id)}
               >

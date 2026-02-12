@@ -16,7 +16,7 @@
  * - Type icon: clickable → navigateTo to attrDef (regular), static (config)
  * - Field name: static label, click to edit (activates FieldNameInput)
  * - Config description: shown below name in name column
- * - Value area: FieldValueOutliner (plain + options), FieldValueEditor (typed)
+ * - Value area: FieldValueOutliner (all types), FieldValueEditor (checkbox only)
  */
 import { useCallback, useRef, useMemo } from 'react';
 import { Trash2 } from 'lucide-react';
@@ -24,7 +24,7 @@ import { useNodeStore } from '../../stores/node-store';
 import { useUIStore } from '../../stores/ui-store';
 import { useWorkspaceStore } from '../../stores/workspace-store';
 import { SYS_D } from '../../types/index.js';
-import { getFieldTypeIcon, isPlainFieldType, ATTRDEF_CONFIG_MAP, TAGDEF_CONFIG_MAP } from '../../lib/field-utils.js';
+import { getFieldTypeIcon, ATTRDEF_CONFIG_MAP, TAGDEF_CONFIG_MAP } from '../../lib/field-utils.js';
 import { FieldValueOutliner } from './FieldValueOutliner';
 import { FieldValueEditor } from './FieldValueEditor';
 import { FieldNameInput } from './FieldNameInput';
@@ -214,7 +214,13 @@ export function FieldRow({
       <div className="flex-1 min-w-0" data-field-value>
         {isOutliner ? (
           <ConfigOutliner nodeId={nodeId} />
-        ) : dataType === SYS_D.OPTIONS || dataType === SYS_D.OPTIONS_FROM_SUPERTAG || isPlainFieldType(dataType) ? (
+        ) : dataType === SYS_D.CHECKBOX ? (
+          <FieldValueEditor
+            dataType={dataType}
+            currentValue={valueName}
+            onChange={handleValueChange}
+          />
+        ) : (
           assocDataId ? (
             <FieldValueOutliner assocDataId={assocDataId} fieldDataType={dataType} attrDefId={attrDefId} />
           ) : (
@@ -223,12 +229,6 @@ export function FieldRow({
               <span className="text-sm leading-[21px] text-muted-foreground/40 select-none">Empty</span>
             </div>
           )
-        ) : (
-          <FieldValueEditor
-            dataType={dataType}
-            currentValue={valueName}
-            onChange={handleValueChange}
-          />
         )}
       </div>
     </div>

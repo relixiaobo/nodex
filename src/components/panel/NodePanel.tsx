@@ -59,17 +59,7 @@ export function NodePanel({ nodeId }: NodePanelProps) {
             <FieldList nodeId={nodeId} />
           </div>
         )}
-        {/* tagDef: show default content (template fields + regular nodes) */}
-        {isTagDef && (
-          <>
-            <div className="ml-4 px-2 mb-1">
-              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                Default content
-              </span>
-            </div>
-            <OutlinerView rootNodeId={nodeId} showTemplateTuples />
-          </>
-        )}
+        {/* tagDef: default content is now rendered as a FieldRow inside FieldList */}
         {/* Non-definition: OutlinerView handles field/content interleaved rendering */}
         {!isDefinitionNode && <OutlinerView rootNodeId={nodeId} />}
         {isDefinitionNode && (

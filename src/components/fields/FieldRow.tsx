@@ -116,7 +116,7 @@ export function FieldRow({
         {/* Name column — icon + name + description */}
         <div className="flex gap-1 @sm:shrink-0 @sm:w-[180px] min-w-0">
           {Icon ? (
-            <span className="shrink-0 w-[15px] flex items-start justify-center text-foreground-tertiary mt-[3px]">
+            <span className="shrink-0 w-[15px] flex items-start justify-center text-foreground-tertiary mt-1">
               <Icon size={12} />
             </span>
           ) : (
@@ -145,7 +145,7 @@ export function FieldRow({
             <ConfigSelect tupleId={tupleId} fieldKey={attrDefId} currentValue={valueName} />
           ) : (
             /* Toggle / tag_picker / color_picker — keep outer bullet wrapping */
-            <div className="flex min-h-7 items-center gap-[7.5px] py-1" style={{ paddingLeft: 6 }}>
+            <div className="flex min-h-7 items-center gap-2 py-1" style={{ paddingLeft: 6 }}>
               <BulletChevron hasChildren={false} isExpanded={false} onBulletClick={noop} />
               {isToggle ? (
                 <ConfigToggle tupleId={tupleId} fieldKey={attrDefId} currentValue={valueName} />
@@ -209,7 +209,7 @@ export function FieldRow({
         ) : assocDataId ? (
           <FieldValueOutliner assocDataId={assocDataId} fieldDataType={dataType} attrDefId={attrDefId} />
         ) : (
-          <div className="flex min-h-7 items-start gap-[7.5px] py-1" style={{ paddingLeft: 6 }}>
+          <div className="flex min-h-7 items-start gap-2 py-1" style={{ paddingLeft: 6 }}>
             <BulletChevron hasChildren={false} isExpanded={false} onBulletClick={noop} dimmed />
             <span className="text-sm leading-[21px] text-foreground-tertiary select-none">Empty</span>
           </div>

@@ -81,7 +81,7 @@ export function ChevronButton({
           width="10"
           height="10"
           viewBox="0 0 12 12"
-          className="text-muted-foreground transition-transform"
+          className="text-foreground-secondary transition-transform"
         >
           <path
             d="M4.5 2.5L8 6L4.5 9.5"

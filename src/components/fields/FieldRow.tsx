@@ -34,7 +34,10 @@ import { ConfigToggle } from './ConfigToggle';
 import { ConfigSelect } from './ConfigSelect';
 import { ConfigOutliner } from './ConfigOutliner';
 import { AutoCollectSection } from './AutoCollectSection';
+import { BulletChevron } from '../outliner/BulletChevron';
 import { ATTRDEF_OUTLINER_FIELDS } from '../../lib/field-utils.js';
+
+const noop = () => {};
 
 interface FieldRowProps {
   nodeId: string;
@@ -207,7 +210,10 @@ export function FieldRow({
           assocDataId ? (
             <FieldValueOutliner assocDataId={assocDataId} />
           ) : (
-            <span className="text-[11px] text-muted-foreground/50 leading-[22px]">Empty</span>
+            <div className="flex min-h-7 items-start gap-[7.5px] py-1" style={{ paddingLeft: 6 }}>
+              <BulletChevron hasChildren={false} isExpanded={false} onToggle={noop} onDrillDown={noop} onBulletClick={noop} dimmed />
+              <span className="text-sm leading-[21px] text-muted-foreground/40 select-none">Empty</span>
+            </div>
           )
         ) : (
           <FieldValueEditor

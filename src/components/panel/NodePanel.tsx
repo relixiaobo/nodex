@@ -18,7 +18,7 @@ export function NodePanel({ nodeId }: NodePanelProps) {
   const node = useNode(nodeId);
   const tagIds = useNodeTags(nodeId);
   const hasFields = useHasFields(nodeId);
-  const popPanel = useUIStore((s) => s.popPanel);
+  const goBack = useUIStore((s) => s.goBack);
   const wsId = useWorkspaceStore((s) => s.currentWorkspaceId) ?? '';
   const userId = useWorkspaceStore((s) => s.userId) ?? 'local';
 
@@ -26,8 +26,8 @@ export function NodePanel({ nodeId }: NodePanelProps) {
 
   const handleDelete = useCallback(() => {
     useNodeStore.getState().trashNode(nodeId, wsId, userId);
-    popPanel();
-  }, [nodeId, wsId, userId, popPanel]);
+    goBack();
+  }, [nodeId, wsId, userId, goBack]);
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">

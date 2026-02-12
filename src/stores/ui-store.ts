@@ -1,17 +1,25 @@
 /**
- * UI state store: panel stack, sidebar, expanded nodes, focus.
+ * UI state store: navigation history, sidebar, expanded nodes, focus.
  *
- * Persisted to chrome.storage.local (expandedNodes, panelStack, sidebar prefs).
+ * Persisted to chrome.storage.local (history, expandedNodes, sidebar prefs).
+ *
+ * Navigation uses a browser-like history model:
+ * - panelHistory: linear list of visited node IDs
+ * - panelIndex: current position pointer
+ * - navigateTo: truncate forward history + push
+ * - goBack/goForward: move pointer
  */
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { chromeLocalStorage } from '../lib/chrome-storage';
 
 interface UIStore {
-  // Panel stack (drill-down navigation)
-  panelStack: string[];
-  pushPanel(nodeId: string): void;
-  popPanel(): void;
+  // Browser-like navigation history
+  panelHistory: string[];
+  panelIndex: number;
+  navigateTo(nodeId: string): void;
+  goBack(): void;
+  goForward(): void;
   replacePanel(nodeId: string): void;
 
   // Expand/collapse (keys are compound: "parentId:nodeId" for per-instance state)
@@ -56,22 +64,43 @@ interface UIStore {
   setTriggerHint(hint: '#' | '@' | null): void;
 }
 
+/** Stable selector for the current (top) node ID. */
+export const selectCurrentNodeId = (s: UIStore): string | null =>
+  s.panelHistory[s.panelIndex] ?? null;
+
 export const useUIStore = create<UIStore>()(
   persist(
     (set) => ({
-      // Panel stack
-      panelStack: [],
-      pushPanel: (nodeId) =>
-        set((s) => ({ panelStack: [...s.panelStack, nodeId] })),
-      popPanel: () =>
-        set((s) => ({ panelStack: s.panelStack.slice(0, -1) })),
+      // Navigation history
+      panelHistory: [],
+      panelIndex: -1,
+      navigateTo: (nodeId) =>
+        set((s) => {
+          // Truncate forward history, skip duplicate of current page
+          const newHistory = s.panelHistory.slice(0, s.panelIndex + 1);
+          if (newHistory[newHistory.length - 1] === nodeId) return {};
+          newHistory.push(nodeId);
+          return { panelHistory: newHistory, panelIndex: newHistory.length - 1 };
+        }),
+      goBack: () =>
+        set((s) => {
+          if (s.panelIndex <= 0) return {};
+          return { panelIndex: s.panelIndex - 1 };
+        }),
+      goForward: () =>
+        set((s) => {
+          if (s.panelIndex >= s.panelHistory.length - 1) return {};
+          return { panelIndex: s.panelIndex + 1 };
+        }),
       replacePanel: (nodeId) =>
-        set((s) => ({
-          panelStack:
-            s.panelStack.length > 0
-              ? [...s.panelStack.slice(0, -1), nodeId]
-              : [nodeId],
-        })),
+        set((s) => {
+          if (s.panelHistory.length === 0) {
+            return { panelHistory: [nodeId], panelIndex: 0 };
+          }
+          const next = [...s.panelHistory];
+          next[s.panelIndex] = nodeId;
+          return { panelHistory: next };
+        }),
 
       // Expand/collapse
       expandedNodes: new Set<string>(),
@@ -130,13 +159,30 @@ export const useUIStore = create<UIStore>()(
     }),
     {
       name: 'nodex-ui',
+      version: 1,
       storage: chromeLocalStorage,
       partialize: (state) => ({
-        panelStack: state.panelStack,
+        panelHistory: state.panelHistory,
+        panelIndex: state.panelIndex,
         expandedNodes: state.expandedNodes,
         sidebarOpen: state.sidebarOpen,
         viewMode: state.viewMode,
       }),
+      // Migrate from old panelStack format to new history model
+      migrate: (persisted: unknown, version: number) => {
+        if (version === 0) {
+          const old = persisted as { panelStack?: string[] };
+          if (old.panelStack) {
+            return {
+              ...old,
+              panelHistory: old.panelStack,
+              panelIndex: old.panelStack.length - 1,
+              panelStack: undefined,
+            };
+          }
+        }
+        return persisted;
+      },
     },
   ),
 );

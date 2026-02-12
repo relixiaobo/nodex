@@ -356,7 +356,7 @@ export function seedTestData() {
   uiStore.setExpanded(`${libraryId}:note_rich`, true);
 
   // Navigate to Library
-  if (uiStore.panelStack.length === 0) {
-    uiStore.pushPanel(libraryId);
+  if (uiStore.panelHistory.length === 0) {
+    uiStore.navigateTo(libraryId);
   }
 }

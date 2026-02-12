@@ -13,7 +13,7 @@
  *        Description text
  * ──────────────────────────────────────
  *
- * - Type icon: clickable → pushPanel to attrDef (regular), static (config)
+ * - Type icon: clickable → navigateTo to attrDef (regular), static (config)
  * - Field name: static label, click to edit (activates FieldNameInput)
  * - Config description: shown below name in name column
  * - Value area: FieldValueOutliner (plain) or OptionsFieldValue (options dropdown)
@@ -53,7 +53,7 @@ export function FieldRow({
   assocDataId,
   isLastInGroup,
 }: FieldRowProps) {
-  const pushPanel = useUIStore((s) => s.pushPanel);
+  const navigateTo = useUIStore((s) => s.navigateTo);
   const editingFieldNameId = useUIStore((s) => s.editingFieldNameId);
   const setEditingFieldName = useUIStore((s) => s.setEditingFieldName);
   const setFocusedNode = useUIStore((s) => s.setFocusedNode);
@@ -134,7 +134,7 @@ export function FieldRow({
       <div className="flex items-center gap-1 shrink-0 w-[130px] min-w-0 h-[22px]">
         <button
           className="shrink-0 w-[15px] flex items-center justify-center text-muted-foreground/50 hover:text-muted-foreground transition-colors"
-          onClick={() => pushPanel(attrDefId)}
+          onClick={() => navigateTo(attrDefId)}
           title="Configure field"
         >
           {Icon && <Icon size={12} />}

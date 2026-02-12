@@ -37,7 +37,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   const setFocusedNode = useUIStore((s) => s.setFocusedNode);
   const toggleExpanded = useUIStore((s) => s.toggleExpanded);
   const setExpanded = useUIStore((s) => s.setExpanded);
-  const pushPanel = useUIStore((s) => s.pushPanel);
+  const navigateTo = useUIStore((s) => s.navigateTo);
   const expandedNodes = useUIStore((s) => s.expandedNodes);
 
   const dragNodeId = useUIStore((s) => s.dragNodeId);
@@ -170,12 +170,12 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       e.stopPropagation();
       const refId = refEl.getAttribute('data-inlineref-node');
       if (refId) {
-        pushPanel(refId);
+        navigateTo(refId);
         return;
       }
     }
     setFocusedNode(nodeId, parentId);
-  }, [nodeId, parentId, setFocusedNode, pushPanel]);
+  }, [nodeId, parentId, setFocusedNode, navigateTo]);
 
   const handleToggle = useCallback(() => {
     const ek = `${parentId}:${nodeId}`;
@@ -192,12 +192,12 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   }, [nodeId, parentId, toggleExpanded, setExpanded]);
 
   const handleDrillDown = useCallback(() => {
-    pushPanel(nodeId);
-  }, [nodeId, pushPanel]);
+    navigateTo(nodeId);
+  }, [nodeId, navigateTo]);
 
   const handleBulletClick = useCallback(() => {
-    pushPanel(nodeId);
-  }, [nodeId, pushPanel]);
+    navigateTo(nodeId);
+  }, [nodeId, navigateTo]);
 
   const handleIndentLineClick = useCallback(() => {
     // Toggle expand/collapse all direct children (Tana indent guide line behavior)

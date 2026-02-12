@@ -48,6 +48,7 @@ export function AutoCollectSection({ tupleId }: AutoCollectSectionProps) {
           onDrillDown={noop}
           onBulletClick={noop}
           dimmed
+          bulletOnly
         />
         <span className="text-sm leading-[21px] text-foreground-tertiary select-none">
           Empty
@@ -71,6 +72,7 @@ export function AutoCollectSection({ tupleId }: AutoCollectSectionProps) {
             onDrillDown={noop}
             onBulletClick={noop}
             isReference
+            bulletOnly
           />
           <span className="text-sm leading-[21px] text-foreground">
             {item.name}

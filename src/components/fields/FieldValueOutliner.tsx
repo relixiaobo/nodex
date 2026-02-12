@@ -70,7 +70,7 @@ export function FieldValueOutliner({ assocDataId, fieldDataType, attrDefId }: Fi
     <div className={`min-h-[22px]${firstIsField ? ' pt-1' : ''}${lastIsField ? ' pb-1' : ''}`}>
       {visibleChildren.map(({ id, type }, i) =>
         type === 'field' ? (
-          <div key={id} className="@container" style={{ paddingLeft: 6 + 22.5 }}>
+          <div key={id} className="@container" style={{ paddingLeft: 6 + 15 }}>
             <FieldRow
               nodeId={assocDataId}
               attrDefId={fieldMap.get(id)!.attrDefId}

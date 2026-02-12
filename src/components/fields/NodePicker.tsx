@@ -181,13 +181,11 @@ export function NodePicker({
         onClick={handleClick}
       >
         {open && isReference && selectedName ? (
-          /* Reference mode: chevron spacer outside, outline wraps bullet+text */
+          /* Reference mode: outline wraps bullet+text */
           <div
             className="flex min-h-7 items-start py-1"
             style={{ paddingLeft: 6 }}
           >
-            {/* Chevron spacer — same 15px as BulletChevron's chevron area */}
-            <span className="shrink-0 h-[21px] w-[15px]" />
             {/* Outline wraps reference bullet + text together (like Tana) */}
             <span className="inline-flex items-center gap-[7.5px] rounded-sm outline outline-1 outline-primary/50">
               {/* Reference bullet dot (no chevron) */}
@@ -223,6 +221,7 @@ export function NodePicker({
               onToggle={noop}
               onDrillDown={noop}
               onBulletClick={noop}
+              bulletOnly
               {...(selectedName
                 ? (isReference ? { isReference: true } : {})
                 : { dimmed: true })}

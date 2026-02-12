@@ -397,6 +397,7 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
         onDrillDown={() => {}}
         onBulletClick={() => {}}
         dimmed={!hasContent}
+        bulletOnly
       />
       <div className="relative flex-1 min-w-0">
         <EditorContent editor={editor} />

@@ -141,26 +141,27 @@ export function FieldRow({
             )}
           </div>
         </div>
-        {/* Value column — all controls wrapped with bullet for alignment */}
+        {/* Value column */}
         <div className="flex-1 min-w-0 min-h-[22px]" data-field-value>
-          {isAutoCollect ? (
+          {isTypeChoice ? (
+            <FieldTypePicker attrDefId={nodeId} currentValue={valueName ?? ''} />
+          ) : isAutoCollect ? (
             <AutoCollectSection tupleId={tupleId} />
           ) : isOutliner ? (
             <ConfigOutliner nodeId={nodeId} />
+          ) : isSelect ? (
+            <ConfigSelect tupleId={tupleId} fieldKey={attrDefId} currentValue={valueName} />
           ) : (
+            /* Toggle / tag_picker / color_picker — keep outer bullet wrapping */
             <div className="flex min-h-7 items-center gap-[7.5px] py-1" style={{ paddingLeft: 6 }}>
               <BulletChevron hasChildren={false} isExpanded={false} onToggle={noop} onDrillDown={noop} onBulletClick={noop} />
-              {isTypeChoice ? (
-                <FieldTypePicker attrDefId={nodeId} currentValue={valueName ?? ''} />
-              ) : isToggle ? (
+              {isToggle ? (
                 <ConfigToggle tupleId={tupleId} fieldKey={attrDefId} currentValue={valueName} />
               ) : isTagPicker ? (
                 <span className="text-xs text-muted-foreground/50 italic">Not set</span>
               ) : isColorPicker ? (
                 <span className="text-xs text-muted-foreground/50 italic">Default</span>
-              ) : (
-                <ConfigSelect tupleId={tupleId} fieldKey={attrDefId} currentValue={valueName} />
-              )}
+              ) : null}
             </div>
           )}
         </div>

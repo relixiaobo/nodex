@@ -27,7 +27,6 @@ import { SYS_D } from '../../types/index.js';
 import { getFieldTypeIcon, isPlainFieldType, ATTRDEF_CONFIG_MAP, TAGDEF_CONFIG_MAP } from '../../lib/field-utils.js';
 import { FieldValueOutliner } from './FieldValueOutliner';
 import { FieldValueEditor } from './FieldValueEditor';
-import { OptionsFieldValue } from './OptionsFieldValue';
 import { FieldNameInput } from './FieldNameInput';
 import { FieldTypePicker } from './FieldTypePicker';
 import { ConfigToggle } from './ConfigToggle';
@@ -186,13 +185,7 @@ export function FieldRow({
       </div>
       {/* Value column */}
       <div className="flex-1 min-w-0" data-field-value>
-        {dataType === SYS_D.OPTIONS || dataType === SYS_D.OPTIONS_FROM_SUPERTAG ? (
-          assocDataId ? (
-            <OptionsFieldValue nodeId={nodeId} attrDefId={attrDefId} assocDataId={assocDataId} />
-          ) : (
-            <span className="text-[11px] text-muted-foreground/50 leading-[22px]">Empty</span>
-          )
-        ) : isPlainFieldType(dataType) ? (
+        {isPlainFieldType(dataType) || dataType === SYS_D.OPTIONS || dataType === SYS_D.OPTIONS_FROM_SUPERTAG ? (
           assocDataId ? (
             <FieldValueOutliner assocDataId={assocDataId} />
           ) : (

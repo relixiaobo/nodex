@@ -25,7 +25,7 @@ interface FieldValueOutlinerProps {
   attrDefId?: string;
 }
 
-export function FieldValueOutliner({ assocDataId, fieldDataType }: FieldValueOutlinerProps) {
+export function FieldValueOutliner({ assocDataId, fieldDataType, attrDefId }: FieldValueOutlinerProps) {
   useChildren(assocDataId);
   const childIds = useNodeStore((s) => s.entities[assocDataId]?.children ?? []);
   const entities = useNodeStore((s) => s.entities);
@@ -93,7 +93,7 @@ export function FieldValueOutliner({ assocDataId, fieldDataType }: FieldValueOut
           />
         ),
       )}
-      <TrailingInput parentId={assocDataId} depth={0} parentExpandKey={`${entities[assocDataId]?.props._ownerId ?? ''}:${assocDataId}`} />
+      <TrailingInput parentId={assocDataId} depth={0} parentExpandKey={`${entities[assocDataId]?.props._ownerId ?? ''}:${assocDataId}`} fieldDataType={fieldDataType} attrDefId={attrDefId} />
     </div>
   );
 }

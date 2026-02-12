@@ -13,7 +13,7 @@
  * Tab/Shift+Tab do NOT create real nodes — they just change where the
  * next Enter will create a node (effective parent + visual depth).
  */
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useEditor, EditorContent, type Editor } from '@tiptap/react';
 import { Extension } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
@@ -21,8 +21,9 @@ import Placeholder from '@tiptap/extension-placeholder';
 import { useNodeStore } from '../../stores/node-store';
 import { useWorkspaceStore } from '../../stores/workspace-store';
 import { useUIStore } from '../../stores/ui-store';
-import { WORKSPACE_CONTAINERS } from '../../types';
+import { WORKSPACE_CONTAINERS, SYS_D } from '../../types';
 import { getLastVisibleNode } from '../../lib/tree-utils.js';
+import { useFieldOptions } from '../../hooks/use-field-options.js';
 import { BulletChevron } from '../outliner/BulletChevron';
 
 const CONTAINER_SUFFIXES = Object.values(WORKSPACE_CONTAINERS);
@@ -36,9 +37,13 @@ interface TrailingInputProps {
   autoFocus?: boolean;
   /** Compound expand key for the parent node (grandparentId:parentId) */
   parentExpandKey: string;
+  /** Field data type (e.g., SYS_D.OPTIONS) — enables option autocomplete */
+  fieldDataType?: string;
+  /** AttrDef ID — used to look up available options */
+  attrDefId?: string;
 }
 
-export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey }: TrailingInputProps) {
+export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fieldDataType, attrDefId }: TrailingInputProps) {
   const createChild = useNodeStore((s) => s.createChild);
   const addUnnamedFieldToNode = useNodeStore((s) => s.addUnnamedFieldToNode);
   const wsId = useWorkspaceStore((s) => s.currentWorkspaceId);
@@ -65,17 +70,37 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey }: T
   const committingRef = useRef(false);
   const [hasContent, setHasContent] = useState(false);
 
+  // Options autocomplete state
+  const isOptions = fieldDataType === SYS_D.OPTIONS || fieldDataType === SYS_D.OPTIONS_FROM_SUPERTAG;
+  const allOptions = useFieldOptions(isOptions ? (attrDefId ?? '') : '');
+  const addReference = useNodeStore((s) => s.addReference);
+
+  const [optionsOpen, setOptionsOpen] = useState(false);
+  const [optionsQuery, setOptionsQuery] = useState('');
+  const [optionsIndex, setOptionsIndex] = useState(0);
+
+  const filteredOptions = useMemo(() => {
+    if (!isOptions || !optionsOpen || allOptions.length === 0) return [];
+    if (!optionsQuery.trim()) return allOptions;
+    const q = optionsQuery.trim().toLowerCase();
+    return allOptions.filter(o => o.name.toLowerCase().includes(q));
+  }, [isOptions, optionsOpen, optionsQuery, allOptions]);
+
   const callbacksRef = useRef({
-    createChild, addUnnamedFieldToNode, wsId, userId,
+    createChild, addUnnamedFieldToNode, addReference, wsId, userId,
     parentId, effectiveParentId, effectiveDepth, effectiveParentEK,
     setEffectiveParentId, setEffectiveDepth, setEffectiveParentEK,
     setExpanded, setFocusedNode, setEditingFieldName, setTriggerHint,
+    isOptions, optionsOpen, filteredOptions, optionsIndex,
+    setOptionsOpen, setOptionsQuery, setOptionsIndex,
   });
   callbacksRef.current = {
-    createChild, addUnnamedFieldToNode, wsId, userId,
+    createChild, addUnnamedFieldToNode, addReference, wsId, userId,
     parentId, effectiveParentId, effectiveDepth, effectiveParentEK,
     setEffectiveParentId, setEffectiveDepth, setEffectiveParentEK,
     setExpanded, setFocusedNode, setEditingFieldName, setTriggerHint,
+    isOptions, optionsOpen, filteredOptions, optionsIndex,
+    setOptionsOpen, setOptionsQuery, setOptionsIndex,
   };
 
   const commitContent = useCallback((html: string, editor: Editor) => {
@@ -104,12 +129,27 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey }: T
       addKeyboardShortcuts() {
         return {
           Enter: ({ editor }) => {
+            const ref = callbacksRef.current;
+
+            // Options autocomplete: select highlighted option
+            if (ref.isOptions && ref.optionsOpen && ref.filteredOptions.length > 0) {
+              const selected = ref.filteredOptions[ref.optionsIndex];
+              if (selected && ref.userId) {
+                ref.addReference(ref.effectiveParentId, selected.id, ref.userId);
+                editor.commands.clearContent(false);
+                setHasContent(false);
+                ref.setOptionsOpen(false);
+                ref.setOptionsQuery('');
+                ref.setOptionsIndex(0);
+              }
+              return true;
+            }
+
             const text = editor.state.doc.textContent.trim();
             if (text.length > 0) {
               commitContent(editor.getHTML(), editor);
             } else {
               // Empty Enter → create empty child so user can keep creating nodes
-              const ref = callbacksRef.current;
               if (!ref.wsId || !ref.userId) return true;
               committingRef.current = true;
               ref.createChild(ref.effectiveParentId, ref.wsId, ref.userId, '').then((newNode) => {
@@ -180,7 +220,30 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey }: T
             }
             return true;
           },
+          ArrowDown: () => {
+            const ref = callbacksRef.current;
+            if (ref.isOptions && ref.optionsOpen && ref.filteredOptions.length > 0) {
+              ref.setOptionsIndex(Math.min(ref.optionsIndex + 1, ref.filteredOptions.length - 1));
+              return true;
+            }
+            return false;
+          },
+          ArrowUp: () => {
+            const ref = callbacksRef.current;
+            if (ref.isOptions && ref.optionsOpen && ref.filteredOptions.length > 0) {
+              ref.setOptionsIndex(Math.max(ref.optionsIndex - 1, 0));
+              return true;
+            }
+            return false;
+          },
           Escape: ({ editor }) => {
+            const ref = callbacksRef.current;
+            if (ref.isOptions && ref.optionsOpen) {
+              ref.setOptionsOpen(false);
+              ref.setOptionsQuery('');
+              ref.setOptionsIndex(0);
+              return true;
+            }
             editor.commands.blur();
             return true;
           },
@@ -224,6 +287,7 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey }: T
         committingRef.current = true;
         editor.commands.clearContent(false);
         setHasContent(false);
+        ref.setOptionsOpen(false);
 
         ref.addUnnamedFieldToNode(ref.effectiveParentId, ref.wsId, ref.userId).then(({ tupleId }) => {
           ref.setEditingFieldName(tupleId);
@@ -239,6 +303,7 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey }: T
         committingRef.current = true;
         editor.commands.clearContent(false);
         setHasContent(false);
+        ref.setOptionsOpen(false);
 
         ref.setTriggerHint(text as '#' | '@');
         ref.createChild(ref.effectiveParentId, ref.wsId, ref.userId, text).then((newNode) => {
@@ -246,6 +311,20 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey }: T
           ref.setFocusedNode(newNode.id, ref.effectiveParentId);
           queueMicrotask(() => { committingRef.current = false; });
         });
+        return;
+      }
+
+      // Options autocomplete: open dropdown when typing in an Options field
+      if (ref.isOptions) {
+        if (text.length > 0) {
+          ref.setOptionsOpen(true);
+          ref.setOptionsQuery(text);
+          ref.setOptionsIndex(0);
+        } else {
+          ref.setOptionsOpen(false);
+          ref.setOptionsQuery('');
+          ref.setOptionsIndex(0);
+        }
       }
     },
     onBlur: ({ editor }) => {
@@ -255,6 +334,10 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey }: T
         commitContent(editor.getHTML(), editor);
       }
       setHasContent(false);
+      // Close options dropdown
+      setOptionsOpen(false);
+      setOptionsQuery('');
+      setOptionsIndex(0);
       // Reset to original depth on blur
       const ref = callbacksRef.current;
       if (ref.effectiveParentId !== ref.parentId) {
@@ -273,6 +356,18 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey }: T
 
   if (!editor) return null;
 
+  // Handle option click from dropdown
+  const handleOptionClick = useCallback((optionId: string) => {
+    const ref = callbacksRef.current;
+    if (!ref.userId || !editor || editor.isDestroyed) return;
+    ref.addReference(ref.effectiveParentId, optionId, ref.userId);
+    editor.commands.clearContent(false);
+    setHasContent(false);
+    setOptionsOpen(false);
+    setOptionsQuery('');
+    setOptionsIndex(0);
+  }, [editor]);
+
   return (
     <div
       className="group/row flex min-h-7 items-start gap-[7.5px] py-1"
@@ -286,8 +381,23 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey }: T
         onBulletClick={() => {}}
         dimmed={!hasContent}
       />
-      <div className="flex-1 min-w-0">
+      <div className="relative flex-1 min-w-0">
         <EditorContent editor={editor} />
+        {optionsOpen && filteredOptions.length > 0 && (
+          <div className="absolute left-0 top-full z-50 mt-0.5 max-h-48 w-56 overflow-y-auto rounded-md border border-border bg-popover py-1 shadow-md">
+            {filteredOptions.map((opt, i) => (
+              <div
+                key={opt.id}
+                className={`flex cursor-pointer items-center gap-2 px-2 py-1 text-sm ${i === optionsIndex ? 'bg-accent text-accent-foreground' : 'text-popover-foreground hover:bg-accent/50'}`}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => handleOptionClick(opt.id)}
+              >
+                <span className="h-[5px] w-[5px] shrink-0 rounded-full bg-foreground/40" />
+                <span className="truncate">{opt.name}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

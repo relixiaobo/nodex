@@ -7,7 +7,7 @@ import { useNodeFields, type FieldEntry } from '../../hooks/use-node-fields';
 import { useNodeStore } from '../../stores/node-store';
 import { useUIStore } from '../../stores/ui-store';
 import { useWorkspaceStore } from '../../stores/workspace-store';
-import { BulletChevron } from './BulletChevron';
+import { BulletChevron, Bullet } from './BulletChevron';
 import { NodeEditor } from '../editor/NodeEditor';
 import { TrailingInput } from '../editor/TrailingInput';
 import { TagBar } from '../tags/TagBar';
@@ -693,10 +693,19 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
           onDrillDown={handleDrillDown}
           onBulletClick={handleBulletClick}
           isReference={isReference}
+          chevronOnly
         />
-        <div className="flex-1 min-w-0 relative">
+        {/* Bullet + text wrapper: always same structure, ring only when selected */}
+        <div className={`flex items-start gap-[7.5px] flex-1 min-w-0 ${isSelected ? 'ring-1 ring-primary/40 rounded-sm bg-primary/5 !w-fit !flex-none' : ''}`}>
+          <Bullet
+            hasChildren={hasChildren}
+            isExpanded={isExpanded}
+            onBulletClick={handleBulletClick}
+            isReference={isReference}
+          />
+          <div className="relative flex-1 min-w-0">
           <div
-            className={`text-sm leading-[21px] ${fieldDataType !== SYS_D.CHECKBOX && !isFocused ? (isReference ? 'cursor-default' : 'cursor-text') : ''} ${isSelected ? 'ring-1 ring-primary/40 rounded-sm bg-primary/5 px-1 -mx-1' : ''}`}
+            className={`text-sm leading-[21px] ${fieldDataType !== SYS_D.CHECKBOX && !isFocused ? (isReference ? 'cursor-default' : 'cursor-text') : ''}`}
             onClick={fieldDataType !== SYS_D.CHECKBOX && !isFocused ? handleContentClick : undefined}
             onDoubleClick={fieldDataType !== SYS_D.CHECKBOX && !isFocused && isReference ? handleContentDoubleClick : undefined}
           >
@@ -782,6 +791,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
             />
           )}
         </div>
+        </div>{/* close selection/contents wrapper */}
       </div>
       {/* Drop indicator: after */}
       {isDropTarget && dropPosition === 'after' && (

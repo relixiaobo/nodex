@@ -8,7 +8,7 @@
  */
 import { useMemo } from 'react';
 import { useNodeStore } from '../stores/node-store';
-import { resolveDataType, ATTRDEF_CONFIG_MAP } from '../lib/field-utils.js';
+import { resolveDataType, ATTRDEF_CONFIG_MAP, ATTRDEF_OUTLINER_FIELDS } from '../lib/field-utils.js';
 import type { NodexNode } from '../types/index.js';
 
 export interface FieldEntry {
@@ -73,6 +73,23 @@ function computeFields(entities: Record<string, NodexNode>, nodeId: string): Fie
       assocDataId,
     });
   }
+
+  // For attrDef: emit virtual entries for outliner-type config fields (no backing tuple)
+  if (isAttrDef) {
+    const currentType = resolveDataType(entities, nodeId);
+    for (const def of ATTRDEF_OUTLINER_FIELDS) {
+      const applies = def.appliesTo === '*' || def.appliesTo.includes(currentType);
+      if (applies) {
+        fields.push({
+          attrDefId: def.key,
+          attrDefName: def.name,
+          tupleId: `__virtual_${def.key}__`,
+          dataType: '__outliner__',
+        });
+      }
+    }
+  }
+
   return fields;
 }
 

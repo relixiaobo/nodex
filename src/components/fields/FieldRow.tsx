@@ -141,23 +141,20 @@ export function FieldRow({
     <div className={`border-t ${isLastInGroup ? 'border-b' : ''} border-border/40 flex items-center min-h-[28px] py-1`} data-field-row>
       {/* Name column — fixed height container to prevent jump */}
       <div className="flex items-center gap-1 shrink-0 w-[130px] min-w-0 h-[22px]">
-        {trashed ? (
-          <span
-            className="shrink-0 w-[15px] flex items-center justify-center text-destructive/50"
-            title={`Field "${attrDefName}" has been deleted`}
-          >
-            <Trash2 size={12} />
-          </span>
-        ) : (
-          <button
-            className="shrink-0 w-[15px] flex items-center justify-center text-muted-foreground/50 hover:text-muted-foreground transition-colors"
-            onClick={() => navigateTo(attrDefId)}
-            title="Configure field"
-          >
-            {Icon && <Icon size={12} />}
-          </button>
-        )}
-        <div className="flex-1 min-w-0">
+        <button
+          className="shrink-0 w-[15px] flex items-center justify-center text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+          onClick={trashed ? undefined : () => navigateTo(attrDefId)}
+          title={trashed ? undefined : 'Configure field'}
+          style={trashed ? { cursor: 'default' } : undefined}
+        >
+          {Icon && <Icon size={12} />}
+        </button>
+        <div className="flex-1 min-w-0 flex items-center gap-0.5">
+          {trashed && (
+            <span title={`Field "${attrDefName}" has been deleted`}>
+              <Trash2 size={12} className="shrink-0 text-destructive/50" />
+            </span>
+          )}
           {isEditing ? (
             <FieldNameInput
               tupleId={tupleId}

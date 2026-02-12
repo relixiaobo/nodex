@@ -141,22 +141,27 @@ export function FieldRow({
             )}
           </div>
         </div>
-        {/* Value column — pl-[6px] aligns controls with outliner bullets */}
-        <div className={`flex-1 min-w-0 ${isAutoCollect || isOutliner ? '' : 'flex items-center pl-[6px]'} min-h-[22px]`} data-field-value>
-          {isTypeChoice ? (
-            <FieldTypePicker attrDefId={nodeId} currentValue={valueName ?? ''} />
-          ) : isAutoCollect ? (
+        {/* Value column — all controls wrapped with bullet for alignment */}
+        <div className="flex-1 min-w-0 min-h-[22px]" data-field-value>
+          {isAutoCollect ? (
             <AutoCollectSection tupleId={tupleId} />
-          ) : isToggle ? (
-            <ConfigToggle tupleId={tupleId} fieldKey={attrDefId} currentValue={valueName} />
           ) : isOutliner ? (
             <ConfigOutliner nodeId={nodeId} />
-          ) : isTagPicker ? (
-            <span className="text-xs text-muted-foreground/50 italic">Not set</span>
-          ) : isColorPicker ? (
-            <span className="text-xs text-muted-foreground/50 italic">Default</span>
           ) : (
-            <ConfigSelect tupleId={tupleId} fieldKey={attrDefId} currentValue={valueName} />
+            <div className="flex min-h-7 items-center gap-[7.5px] py-1" style={{ paddingLeft: 6 }}>
+              <BulletChevron hasChildren={false} isExpanded={false} onToggle={noop} onDrillDown={noop} onBulletClick={noop} />
+              {isTypeChoice ? (
+                <FieldTypePicker attrDefId={nodeId} currentValue={valueName ?? ''} />
+              ) : isToggle ? (
+                <ConfigToggle tupleId={tupleId} fieldKey={attrDefId} currentValue={valueName} />
+              ) : isTagPicker ? (
+                <span className="text-xs text-muted-foreground/50 italic">Not set</span>
+              ) : isColorPicker ? (
+                <span className="text-xs text-muted-foreground/50 italic">Default</span>
+              ) : (
+                <ConfigSelect tupleId={tupleId} fieldKey={attrDefId} currentValue={valueName} />
+              )}
+            </div>
           )}
         </div>
       </div>

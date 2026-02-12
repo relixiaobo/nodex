@@ -3,7 +3,70 @@
  *
  * Works with the normalized NodexNode entities in the Zustand store.
  */
+import { WORKSPACE_CONTAINERS } from '../types/index.js';
 import type { NodexNode } from '../types/index.js';
+
+// ─── Workspace container detection ───
+
+const CONTAINER_SUFFIXES = Object.values(WORKSPACE_CONTAINERS);
+
+/** Check if a node ID is a workspace container (e.g., ws_default_LIBRARY). */
+export function isWorkspaceContainer(nodeId: string): boolean {
+  return CONTAINER_SUFFIXES.some(suffix => nodeId.endsWith(`_${suffix}`));
+}
+
+// ─── Ancestor chain for breadcrumb navigation ───
+
+export interface AncestorInfo {
+  id: string;
+  name: string;
+}
+
+/**
+ * Walk _ownerId chain from nodeId up to (but excluding) a workspace container.
+ * Returns ancestors ordered root-most → immediate parent (top to bottom).
+ * Excludes the current node itself and the workspace container.
+ */
+export function getAncestorChain(
+  nodeId: string,
+  entities: Record<string, NodexNode>,
+): { ancestors: AncestorInfo[]; rootContainerId: string | null } {
+  const chain: AncestorInfo[] = [];
+  let currentId = nodeId;
+  let rootContainerId: string | null = null;
+  const visited = new Set<string>();
+
+  while (true) {
+    const node = entities[currentId];
+    if (!node) break;
+
+    const parentId = node.props._ownerId;
+    if (!parentId || visited.has(parentId)) break;
+    visited.add(parentId);
+
+    // Stop at workspace container — record it but don't add to chain
+    if (isWorkspaceContainer(parentId)) {
+      rootContainerId = parentId;
+      break;
+    }
+
+    // Stop at workspace root (no _ownerId or is workspace node itself)
+    const parentNode = entities[parentId];
+    if (!parentNode || !parentNode.props._ownerId) {
+      rootContainerId = parentId;
+      break;
+    }
+
+    // Add parent to chain (will be reversed later)
+    const rawName = parentNode.props.name ?? '';
+    const displayName = rawName.replace(/<[^>]+>/g, '') || parentId;
+    chain.push({ id: parentId, name: displayName });
+
+    currentId = parentId;
+  }
+
+  return { ancestors: chain.reverse(), rootContainerId };
+}
 
 /**
  * Get the visible flattened list of node IDs for the outliner.

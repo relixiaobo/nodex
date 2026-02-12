@@ -28,6 +28,8 @@ import { FieldNameInput } from './FieldNameInput';
 import { FieldTypePicker } from './FieldTypePicker';
 import { ConfigToggle } from './ConfigToggle';
 import { ConfigSelect } from './ConfigSelect';
+import { ConfigOutliner } from './ConfigOutliner';
+import { ATTRDEF_OUTLINER_FIELDS } from '../../lib/field-utils.js';
 
 interface FieldRowProps {
   nodeId: string;
@@ -63,9 +65,12 @@ export function FieldRow({
   const isTypeChoice = dataType === '__type_choice__';
   const isToggle = dataType === '__toggle__';
   const isSelect = dataType === '__select__';
-  const isConfigField = isTypeChoice || isToggle || isSelect;
+  const isOutliner = dataType === '__outliner__';
+  const isConfigField = isTypeChoice || isToggle || isSelect || isOutliner;
   const isEditing = editingFieldNameId === tupleId;
-  const configDef = isConfigField ? ATTRDEF_CONFIG_MAP.get(attrDefId) : undefined;
+  const configDef = isConfigField
+    ? ATTRDEF_CONFIG_MAP.get(attrDefId) ?? ATTRDEF_OUTLINER_FIELDS.find(f => f.key === attrDefId)
+    : undefined;
   const Icon = configDef?.icon ?? (isConfigField ? undefined : getFieldTypeIcon(dataType));
 
   const handleEnterConfirm = useCallback(() => {
@@ -112,6 +117,8 @@ export function FieldRow({
             <FieldTypePicker attrDefId={nodeId} currentValue={valueName ?? ''} />
           ) : isToggle ? (
             <ConfigToggle tupleId={tupleId} fieldKey={attrDefId} currentValue={valueName} />
+          ) : isOutliner ? (
+            <ConfigOutliner nodeId={nodeId} />
           ) : (
             <ConfigSelect tupleId={tupleId} fieldKey={attrDefId} currentValue={valueName} />
           )}

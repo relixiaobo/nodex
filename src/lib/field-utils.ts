@@ -2,7 +2,7 @@
  * Shared field utilities: data type resolution and icon mapping.
  */
 import type { LucideIcon } from 'lucide-react';
-import { AlignLeft, Calendar, CheckSquare, ChevronDown, Hash, Link, List, Mail, Play, Asterisk, EyeOff, Settings2, Sparkles } from 'lucide-react';
+import { AlignLeft, Calendar, CheckSquare, ChevronDown, Hash, Link, List, ListTree, Mail, Play, Asterisk, EyeOff, Settings2, Sparkles } from 'lucide-react';
 import { SYS_A, SYS_D, SYS_V } from '../types/index.js';
 import type { NodexNode } from '../types/index.js';
 
@@ -99,7 +99,7 @@ export function isPlainFieldType(dataType: string): boolean {
 export interface ConfigFieldDef {
   key: string;
   name: string;
-  control: 'type_choice' | 'toggle' | 'select' | 'section_label';
+  control: 'type_choice' | 'toggle' | 'select' | 'outliner';
   defaultValue: string;
   appliesTo: string[] | '*';
   icon?: LucideIcon;
@@ -127,22 +127,15 @@ export const ATTRDEF_CONFIG_FIELDS: ConfigFieldDef[] = [
     defaultValue: SYS_D.PLAIN,
     appliesTo: '*',
   },
-  // section labels — rendered by NodePanel between FieldList and OutlinerView
+  // outliner fields — rendered as field rows with embedded outliner
   {
     key: 'NDX_SECTION_PRE_OPTIONS',
     name: 'Pre-determined options',
-    control: 'section_label',
+    control: 'outliner',
+    icon: ListTree,
     defaultValue: '',
     appliesTo: [SYS_D.OPTIONS],
-    description: 'Each node above will become an option',
-  },
-  {
-    key: 'NDX_SECTION_SOURCES',
-    name: 'Sources of options',
-    control: 'section_label',
-    defaultValue: '',
-    appliesTo: [SYS_D.OPTIONS],
-    description: 'List of references and search nodes, whose children will become options',
+    description: 'Each node included will become an option',
   },
   // tuple-based config fields
   {
@@ -189,13 +182,13 @@ export const ATTRDEF_CONFIG_FIELDS: ConfigFieldDef[] = [
   },
 ];
 
-/** O(1) lookup by config field key (SYS_A* or NDX_A*). Excludes section_label entries. */
+/** O(1) lookup by config field key (SYS_A* or NDX_A*). Excludes outliner entries (no backing tuple). */
 export const ATTRDEF_CONFIG_MAP = new Map(
   ATTRDEF_CONFIG_FIELDS
-    .filter(f => f.control !== 'section_label')
+    .filter(f => f.control !== 'outliner')
     .map(f => [f.key, f]),
 );
 
-/** Section label entries for NodePanel rendering. */
-export const ATTRDEF_SECTION_LABELS = ATTRDEF_CONFIG_FIELDS
-  .filter(f => f.control === 'section_label');
+/** Outliner-type config fields (virtual entries — no backing tuple). */
+export const ATTRDEF_OUTLINER_FIELDS = ATTRDEF_CONFIG_FIELDS
+  .filter(f => f.control === 'outliner');

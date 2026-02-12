@@ -182,7 +182,10 @@ export function FieldRow({
         >
           {Icon && <Icon size={12} />}
         </button>
-        <div className="flex-1 min-w-0 flex items-center gap-0.5">
+        <div
+          className={`flex-1 min-w-0 flex items-center gap-0.5${!trashed && !isEditing ? ' cursor-text' : ''}`}
+          onClick={!trashed && !isEditing ? handleNameClick : undefined}
+        >
           {trashed && (
             <span title={`Field "${attrDefName}" has been deleted`}>
               <Trash2 size={12} className="shrink-0 text-destructive/50" />
@@ -199,8 +202,7 @@ export function FieldRow({
             />
           ) : (
             <span
-              className="block text-sm leading-[22px] h-[22px] text-foreground truncate cursor-text"
-              onClick={handleNameClick}
+              className="block text-sm leading-[22px] h-[22px] text-foreground truncate"
               title={attrDefName}
             >
               {attrDefName}

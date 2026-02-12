@@ -80,15 +80,15 @@ export function NodePicker({
         const input = inputRef.current;
         if (input) {
           input.focus();
-          if (!isReference) {
-            // Non-reference: place cursor at end, like a normal node
+          if (!(isReference && selectedName)) {
+            // Non-reference or empty reference: place cursor at end
             const len = input.value.length;
             input.setSelectionRange(len, len);
           }
         }
       });
     }
-  }, [open, isReference]);
+  }, [open, isReference, selectedName]);
 
   // Close on click outside
   useEffect(() => {
@@ -154,12 +154,12 @@ export function NodePicker({
   const handleClick = useCallback(() => {
     if (!open) {
       setOpen(true);
-      if (isReference) {
-        // Reference mode: hidden input starts empty, visible box shows selectedName
+      if (isReference && selectedName) {
+        // Reference mode with value: hidden input starts empty, visible box shows selectedName
         setInputValue('');
         setTextSelected(true);
       } else {
-        // Non-reference: input pre-filled with current value, text selected
+        // Non-reference or empty reference: input with cursor, like a normal node
         setInputValue(selectedName ?? '');
         setTextSelected(false);
       }
@@ -173,10 +173,10 @@ export function NodePicker({
         className="cursor-pointer group/picker"
         onClick={handleClick}
       >
-        {open && isReference ? (
-          /* Reference mode: bordered box wrapping bullet + text, like Tana node selection */
+        {open && isReference && selectedName ? (
+          /* Reference mode: outline box wrapping bullet + text (no layout shift) */
           <div className="relative py-1" style={{ paddingLeft: 6 }}>
-            <div className="inline-flex min-h-7 items-start gap-[7.5px] rounded border border-primary/50 px-1">
+            <div className="inline-flex min-h-7 items-start gap-[7.5px] rounded outline outline-1 outline-primary/50">
               <BulletChevron
                 hasChildren={false}
                 isExpanded={false}
@@ -186,7 +186,7 @@ export function NodePicker({
                 isReference
               />
               <span className="text-sm leading-[21px] text-foreground">
-                {textSelected ? (selectedName ?? '') : inputValue}
+                {textSelected ? selectedName : inputValue}
               </span>
             </div>
             {/* Hidden input for keyboard capture */}

@@ -194,7 +194,7 @@ export const ATTRDEF_CONFIG_FIELDS: ConfigFieldDef[] = [
     icon: Sparkles,
     defaultValue: SYS_V.YES,
     appliesTo: [SYS_D.OPTIONS],
-    description: 'Include auto-collected values as options',
+    description: 'Values created from field input',
   },
   {
     key: SYS_A.AUTO_INITIALIZE,

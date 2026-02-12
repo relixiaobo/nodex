@@ -393,11 +393,8 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
       <BulletChevron
         hasChildren={false}
         isExpanded={false}
-        onToggle={() => {}}
-        onDrillDown={() => {}}
         onBulletClick={() => {}}
         dimmed={!hasContent}
-        bulletOnly
       />
       <div className="relative flex-1 min-w-0">
         <EditorContent editor={editor} />

@@ -7,7 +7,7 @@ import { useNodeFields, type FieldEntry } from '../../hooks/use-node-fields';
 import { useNodeStore } from '../../stores/node-store';
 import { useUIStore } from '../../stores/ui-store';
 import { useWorkspaceStore } from '../../stores/workspace-store';
-import { BulletChevron } from './BulletChevron';
+import { BulletChevron, ChevronButton } from './BulletChevron';
 import { NodeEditor } from '../editor/NodeEditor';
 import { TrailingInput } from '../editor/TrailingInput';
 import { TagBar } from '../tags/TagBar';
@@ -745,13 +745,17 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
         onDrop={handleDrop}
         onDragEnd={handleDragEnd}
       >
-        {/* BulletChevron + text wrapper: ring wraps both when selected */}
+        {/* Chevron: 15px zone, visible on row hover only */}
+        <ChevronButton
+          isExpanded={isExpanded}
+          onToggle={handleToggle}
+          onDrillDown={handleDrillDown}
+        />
+        {/* Selection ring wraps bullet + text (not chevron) */}
         <div className={`flex items-start gap-[7.5px] flex-1 min-w-0 relative ${isSelected ? 'ring-1 ring-primary/40 rounded-sm bg-primary/5 !w-fit !flex-none' : ''}`}>
           <BulletChevron
             hasChildren={hasChildren}
             isExpanded={isExpanded}
-            onToggle={handleToggle}
-            onDrillDown={handleDrillDown}
             onBulletClick={handleBulletClick}
             isReference={isReference}
           />
@@ -882,11 +886,12 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       )}
       {isExpanded && (
         <div className="relative">
-          {/* Indent guide line — clickable 8px button (Tana: left 13.5px from parent).
-               Center aligns with parent bullet center. Hover fills bg = looks thicker. */}
+          {/* Indent guide line — clickable 8px button centered on parent bullet.
+               Parent bullet center = depth*24 + 6 + 15 + 7.5 = depth*24 + 28.5.
+               w-2 (8px) button: left + 4 = center → left = depth*24 + 24.5. */}
           <button
             className="indent-line absolute top-0 bottom-0 w-2 flex justify-center cursor-pointer rounded-sm transition-colors"
-            style={{ left: depth * 24 + 6 + 3.5 }}
+            style={{ left: depth * 24 + 24.5 }}
             onClick={handleIndentLineClick}
             title="Toggle children"
           >

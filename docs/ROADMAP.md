@@ -45,12 +45,24 @@
 
 ### 1.2 Supertags 完善
 
-- [ ] 移除标签（hover tag chip → X 按钮）
-- [ ] 标签模板自动填充字段（应用标签时自动添加模板定义的字段）
-- [ ] 标签配置页（点击标签定义节点 → 配置字段/默认值/可选字段，复用 SYS_T01 标签链路）
+- [x] 移除标签（hover × + 清理模板字段 + associatedData）
+- [x] 标签模板自动填充字段（applyTag 实例化模板 tuple + _sourceId 追踪）
+- [x] 标签配置页（SYS_T01 渲染 + FieldList config + OutlinerView default content）
+- [x] createTagDef 自动 applyTag(SYS_T01)
+- [x] TagBadge 右键菜单（Remove / Configure tag）
+- [x] Schema 面包屑导航
+- [x] Delete tag 按钮 + 级联清理（trashNode 遍历所有引用节点）
+- [x] Delete field 级联清理（trashNode 移除所有引用该 attrDef 的 tuple）
 - [ ] Show as Checkbox（标签开启 checkbox 行为，Done 状态双向映射）
 - [ ] Default Child Supertag（被打标签的节点，新增子节点自动继承指定标签）
+- [ ] Color picker（真实色板 swatches）
+- [ ] Pinned fields（置顶显示 + filter 优先）
+- [ ] Optional fields（建议按钮 + 自动降级）
+- [ ] applyTag 复制 default content 中的普通节点
+- [ ] Convert to supertag（普通节点快捷转 tagDef）
+- [ ] 批量标签操作（多选 add/remove）
 - [ ] 标签继承/Extend（子标签继承父标签模板字段）
+- [ ] Title expression（${field name} 动态标题）
 - [ ] 标签页（点击 supertag → 显示所有打该标签的节点列表/表格）
 
 ### 1.3 Fields 全类型

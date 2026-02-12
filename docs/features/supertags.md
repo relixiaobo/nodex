@@ -59,12 +59,21 @@
 - 创建 metanode + SYS_A13 tag binding + 3 个 config tuple（checkbox/childtag/color）
 - tagDef 的 `_ownerId` 始终为 `{workspaceId}_SCHEMA`
 
+### 删除标签级联清理
+
+- trashNode(tagDefId) 时自动级联：
+  - 遍历所有节点，移除 SYS_A13 绑定 tuple
+  - 移除模板来源的字段 tuple（`_sourceId` 匹配）+ associatedData
+  - tagDef 本身移到 Trash
+- Tana 行为：被删 tag 在节点上显示废纸篓图标（Nodex 当前直接清除引用）
+
 ### Show as Checkbox — 未实现
 
 - tagDef 配置中开启 "Show as Checkbox" → SYS_A55 = SYS_V03
 - 被该标签标记的节点在 bullet 位置显示 checkbox
 - 勾选 checkbox → 设置节点 `props._done = true`
 - 取消勾选 → `props._done = false`
+- **Done state mapping**（Tana 高级）: checkbox 状态可双向映射到特定字段值
 
 ### Default Child Supertag — 未实现
 
@@ -77,12 +86,52 @@
 - tagDef 可以"继承"另一个 tagDef（Tana "Building blocks" 功能）
 - 子标签包含父标签的所有模板字段 + 自己的额外字段
 - 应用子标签 = 同时应用父标签的所有字段
+- **继承约束**: 继承来的内容不可移动/删除，但可添加字段和修改默认值
+
+### Convert to Supertag — 未实现
+
+- 选中普通节点 → Cmd+K → "Convert to supertag"
+- 子字段和子节点自动转为模板项
+- 节点变为 tagDef，移入 Schema
+
+### 批量标签操作 — 未实现
+
+- 多选节点后同时 add/remove tag
+- 批量应用时每个节点走标准 applyTag 流程
+
+### Pinned Fields — 未实现
+
+- 在 supertag 配置中标记字段为 pinned
+- Pinned 字段：置顶显示在节点实例顶部（带 border）+ filter toolbar 优先展示
+- 多标签节点中，pinned 字段跨所有标签统一显示
+
+### Optional Fields — 未实现
+
+- 在 supertag 配置中标记为 optional 的字段
+- 不随 applyTag 自动添加，以建议按钮呈现
+- 同一字段在不同节点添加两次 → 自动转为 optional
+- 右键模板字段 → "Make optional" 降级
 
 ### 标签页 — 未实现
 
 - 点击 supertag → 除了配置页，还可以查看"所有打该标签的节点"
 - 本质上是一个预设搜索（`#tagName` 作为 query）
 - 支持 Table / List / Cards 视图切换（依赖 Phase 2 视图系统）
+
+### Title Expression — 未实现
+
+- tagDef "Advanced options" 中配置 "Build title from fields"
+- 格式: `${field name}` 自动组合标题
+- 支持: 固定文本、`${name}`、截断 `${field|30…}`、可选 `${field|?}`、系统变量 `${cdate}` / `${mdate}`
+
+### 模板实例分离 — 未实现
+
+- 编辑模板实例后与模板脱钩，后续模板修改不反映到已编辑实例
+- Hard delete (Cmd+Shift+Backspace) 可从模板刷新
+
+### Merge Tags — 未实现
+
+- 合并重复标签定义，所有引用指向合并后的 tagDef
 
 ## 与 Tana 配置页的差异分析
 
@@ -124,6 +173,8 @@
 | 2026-02-12 | removeTag 同时清理模板来源的字段 tuple | 与 Tana 一致（移除标签不保留模板字段数据） |
 | 2026-02-12 | 配置页分 FieldList (config) + OutlinerView (default content) | 配置项用特殊控件，模板内容用标准 outliner |
 | 2026-02-12 | Default content 支持字段 tuple 和普通内容节点混合 | 与 Tana 一致（template 不仅有 field） |
+| 2026-02-12 | trashNode(tagDef) 级联清理所有引用节点 | 删除标签后，已打标签的节点自动移除标签和模板字段 |
+| 2026-02-12 | 对比 Tana 官方文档补全遗漏功能清单 | 记录 Pinned/Optional/Convert/Batch/TitleExpr 等 |
 
 ## 当前状态
 
@@ -138,14 +189,21 @@
 - [x] 标签配置页（SYS_T01 渲染 + FieldList + OutlinerView）
 - [x] createTagDef 自动 applyTag(SYS_T01)
 - [x] Schema 面包屑导航
-- [x] Delete tag 按钮
+- [x] Delete tag 按钮 + 级联清理
+- [x] Delete attrDef 级联清理（移除所有引用该字段的 tuple）
 - [ ] applyTag 复制 default content 中的普通节点
-- [ ] Show as Checkbox
+- [ ] Show as Checkbox + Done state mapping
 - [ ] Default Child Supertag（真实 tag_picker）
 - [ ] Color picker（真实色板）
+- [ ] Pinned fields
+- [ ] Optional fields
 - [ ] 标签继承 / Extend
+- [ ] Convert to supertag
+- [ ] 批量标签操作
 - [ ] 标签页（搜索 + 视图）
-- [ ] Optional fields 区域
+- [ ] Title expression
+- [ ] 模板实例分离
+- [ ] Merge tags
 - [ ] "New field" / "Insert existing field" 按钮
 
 ## 与 Tana 的已知差异
@@ -155,3 +213,6 @@
 - Tana 支持 tag 内嵌 description（在标签名下方显示），Nodex 暂不支持
 - Tana 的"标签页"是完整的 Search Node + View 组合，Nodex 需等 Phase 2
 - Tana applyTag 会复制 default content 中的普通节点到目标节点，Nodex 当前只复制 field tuples
+- Tana 删除 tag 后节点显示 trash icon，Nodex 直接清除引用
+- Tana 有 Pinned/Optional fields 两级机制，Nodex 当前所有模板字段平等
+- Tana 支持 "Convert to supertag" 快捷转换，Nodex 暂不支持

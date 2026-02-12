@@ -99,7 +99,7 @@ export function isPlainFieldType(dataType: string): boolean {
 export interface ConfigFieldDef {
   key: string;
   name: string;
-  control: 'type_choice' | 'toggle' | 'select' | 'outliner';
+  control: 'type_choice' | 'toggle' | 'select' | 'outliner' | 'tag_picker' | 'color_picker';
   defaultValue: string;
   appliesTo: string[] | '*';
   icon?: LucideIcon;
@@ -192,3 +192,46 @@ export const ATTRDEF_CONFIG_MAP = new Map(
 /** Outliner-type config fields (virtual entries — no backing tuple). */
 export const ATTRDEF_OUTLINER_FIELDS = ATTRDEF_CONFIG_FIELDS
   .filter(f => f.control === 'outliner');
+
+// ─── TagDef (SYS_T01) config field registry ───
+
+/**
+ * Registry of config fields for tagDef nodes.
+ * Maps to SYS_T01 (SUPERTAG) template tuples.
+ * Mirrors ATTRDEF_CONFIG_FIELDS pattern.
+ */
+export const TAGDEF_CONFIG_FIELDS: ConfigFieldDef[] = [
+  {
+    key: SYS_A.SHOW_CHECKBOX,   // SYS_A55
+    name: 'Show as checkbox',
+    control: 'toggle',
+    icon: CheckSquare,
+    defaultValue: SYS_V.NO,
+    appliesTo: '*',
+    description: 'Show done/not done checkbox on tagged nodes',
+  },
+  {
+    key: SYS_A.CHILD_SUPERTAG,  // SYS_A14
+    name: 'Default child supertag',
+    control: 'tag_picker',
+    icon: ChevronDown,
+    defaultValue: '',
+    appliesTo: '*',
+    description: 'Auto-apply this tag to new children',
+  },
+  {
+    key: SYS_A.COLOR,           // SYS_A11
+    name: 'Color',
+    control: 'color_picker',
+    icon: undefined,
+    defaultValue: '',
+    appliesTo: '*',
+  },
+];
+
+/** O(1) lookup by config field key (SYS_A*). Excludes outliner entries. */
+export const TAGDEF_CONFIG_MAP = new Map(
+  TAGDEF_CONFIG_FIELDS
+    .filter(f => f.control !== 'outliner')
+    .map(f => [f.key, f]),
+);

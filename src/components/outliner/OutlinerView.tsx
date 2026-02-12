@@ -9,9 +9,11 @@ import { TrailingInput } from '../editor/TrailingInput';
 
 interface OutlinerViewProps {
   rootNodeId: string;
+  /** When true, show tuple children whose key is an attrDef (tagDef template fields). */
+  showTemplateTuples?: boolean;
 }
 
-export function OutlinerView({ rootNodeId }: OutlinerViewProps) {
+export function OutlinerView({ rootNodeId, showTemplateTuples }: OutlinerViewProps) {
   const node = useNode(rootNodeId);
   useChildren(rootNodeId);
 
@@ -30,7 +32,10 @@ export function OutlinerView({ rootNodeId }: OutlinerViewProps) {
   const visibleChildren = useMemo(() => {
     const result: { id: string; type: 'field' | 'content' }[] = [];
     for (const cid of allChildIds) {
-      if (fieldMap.has(cid)) {
+      const fieldEntry = fieldMap.get(cid);
+      if (fieldEntry) {
+        // When showTemplateTuples: skip config fields (handled by FieldList above)
+        if (showTemplateTuples && fieldEntry.dataType.startsWith('__')) continue;
         result.push({ id: cid, type: 'field' });
       } else {
         const dt = entities[cid]?.props._docType;
@@ -38,7 +43,7 @@ export function OutlinerView({ rootNodeId }: OutlinerViewProps) {
       }
     }
     return result;
-  }, [allChildIds, fieldMap, entities]);
+  }, [allChildIds, fieldMap, entities, showTemplateTuples]);
 
   // Content-only IDs for keyboard navigation (rootChildIds)
   const contentChildIds = useMemo(

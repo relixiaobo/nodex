@@ -20,6 +20,8 @@ export function NodePanel({ nodeId }: NodePanelProps) {
   const userId = useWorkspaceStore((s) => s.userId) ?? 'local';
 
   const isAttrDef = node?.props._docType === 'attrDef';
+  const isTagDef = node?.props._docType === 'tagDef';
+  const isDefinitionNode = isAttrDef || isTagDef;
 
   // IntersectionObserver: detect when title scrolls out of view
   const [titleVisible, setTitleVisible] = useState(true);
@@ -52,13 +54,24 @@ export function NodePanel({ nodeId }: NodePanelProps) {
       <NodePanelHeader nodeId={nodeId} showCurrentName={!titleVisible} />
       <div ref={scrollRef} className="flex-1 overflow-y-auto">
         <PanelTitle nodeId={nodeId} onTitleRef={handleTitleRef} />
-        {isAttrDef && (
+        {isDefinitionNode && (
           <div className="mb-2 ml-4 px-2">
             <FieldList nodeId={nodeId} />
           </div>
         )}
-        {/* Non-attrDef: OutlinerView handles field/content interleaved rendering */}
-        {!isAttrDef && <OutlinerView rootNodeId={nodeId} />}
+        {/* tagDef: show template fields (user-defined field tuples) */}
+        {isTagDef && (
+          <>
+            <div className="ml-4 px-2 mb-1">
+              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                Template fields
+              </span>
+            </div>
+            <OutlinerView rootNodeId={nodeId} showTemplateTuples />
+          </>
+        )}
+        {/* Non-definition: OutlinerView handles field/content interleaved rendering */}
+        {!isDefinitionNode && <OutlinerView rootNodeId={nodeId} />}
         {isAttrDef && (
           <div className="mt-4 ml-4 px-2 pb-4">
             <button

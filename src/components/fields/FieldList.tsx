@@ -1,7 +1,12 @@
 /**
  * Field list for a tagged node — renders field rows below node content.
+ *
+ * For definition nodes (attrDef/tagDef), only renders config-type fields
+ * (dataType starts with __). Template field entries are shown in OutlinerView.
  */
+import { useMemo } from 'react';
 import { useNodeFields } from '../../hooks/use-node-fields';
+import { useNodeStore } from '../../stores/node-store';
 import { FieldRow } from './FieldRow';
 
 interface FieldListProps {
@@ -9,7 +14,19 @@ interface FieldListProps {
 }
 
 export function FieldList({ nodeId }: FieldListProps) {
-  const fields = useNodeFields(nodeId);
+  const allFields = useNodeFields(nodeId);
+  const isDefinitionNode = useNodeStore(
+    (s) => {
+      const dt = s.entities[nodeId]?.props._docType;
+      return dt === 'attrDef' || dt === 'tagDef';
+    },
+  );
+
+  // For definition nodes, only show config fields (dataType starts with __)
+  const fields = useMemo(
+    () => isDefinitionNode ? allFields.filter(f => f.dataType.startsWith('__')) : allFields,
+    [allFields, isDefinitionNode],
+  );
 
   if (fields.length === 0) return null;
 

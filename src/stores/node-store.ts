@@ -11,7 +11,7 @@ import { immer } from 'zustand/middleware/immer';
 import { nanoid } from 'nanoid';
 import type { NodexNode, DocType } from '../types/index.js';
 import { WORKSPACE_CONTAINERS, SYS_A, SYS_D, SYS_T } from '../types/index.js';
-import { ATTRDEF_CONFIG_MAP } from '../lib/field-utils.js';
+import { ATTRDEF_CONFIG_MAP, TAGDEF_CONFIG_MAP } from '../lib/field-utils.js';
 import * as nodeService from '../services/node-service.js';
 import { isSupabaseReady } from '../services/supabase.js';
 
@@ -787,8 +787,8 @@ export const useNodeStore = create<NodeStore>()(
           const keyId = template.children?.[0];
           if (!keyId) continue;
 
-          // System config field (SYS_A* or NDX_A* key from SYS_T02 template)
-          const configDef = ATTRDEF_CONFIG_MAP.get(keyId);
+          // System config field (SYS_A* or NDX_A* key from SYS_T02/SYS_T01 template)
+          const configDef = ATTRDEF_CONFIG_MAP.get(keyId) ?? TAGDEF_CONFIG_MAP.get(keyId);
           if (configDef) {
             // Check if already has this config tuple (by key match)
             const alreadyHas = n.children.some((cid) => {
@@ -843,7 +843,7 @@ export const useNodeStore = create<NodeStore>()(
         const metanode = state.entities[node.props._metaNodeId];
         if (!metanode?.children) return;
 
-        // Find and remove the SYS_A13 tuple
+        // 1. Remove SYS_A13 tuple from metanode
         const idx = metanode.children.findIndex((cid) => {
           const t = state.entities[cid];
           return t?.props._docType === 'tuple' &&
@@ -851,7 +851,35 @@ export const useNodeStore = create<NodeStore>()(
             t.children?.[1] === tagDefId;
         });
         if (idx >= 0) {
+          const tupleId = metanode.children[idx];
           metanode.children.splice(idx, 1);
+          delete state.entities[tupleId];
+        }
+
+        // 2. Remove template-sourced field tuples from node.children
+        const tagDef = state.entities[tagDefId];
+        if (!tagDef?.children || !node.children) return;
+
+        const templateTupleIds = new Set(tagDef.children);
+        const toRemove: string[] = [];
+
+        for (const cid of node.children) {
+          const child = state.entities[cid];
+          if (child?.props._sourceId && templateTupleIds.has(child.props._sourceId)) {
+            toRemove.push(cid);
+            // Clean up associatedData
+            const assocId = node.associationMap?.[cid];
+            if (assocId) {
+              delete state.entities[assocId];
+              delete node.associationMap![cid];
+            }
+            delete state.entities[cid];
+          }
+        }
+
+        if (toRemove.length > 0) {
+          const removeSet = new Set(toRemove);
+          node.children = node.children.filter(cid => !removeSet.has(cid));
         }
       });
     },
@@ -892,7 +920,12 @@ export const useNodeStore = create<NodeStore>()(
         schema.children.push(id);
       });
 
-      return tagDef;
+      // Apply SYS_T01 (Supertag) tag — creates metanode + config tuples
+      if (get().entities[SYS_T.SUPERTAG]) {
+        await get().applyTag(id, SYS_T.SUPERTAG, workspaceId, userId);
+      }
+
+      return get().entities[id] ?? tagDef;
     },
 
     createAttrDef: async (name, tagDefId, dataType, workspaceId, userId) => {

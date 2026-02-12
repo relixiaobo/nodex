@@ -8,7 +8,7 @@
  */
 import { useMemo } from 'react';
 import { useNodeStore } from '../stores/node-store';
-import { resolveDataType, ATTRDEF_CONFIG_MAP, ATTRDEF_OUTLINER_FIELDS } from '../lib/field-utils.js';
+import { resolveDataType, ATTRDEF_CONFIG_MAP, ATTRDEF_OUTLINER_FIELDS, TAGDEF_CONFIG_MAP } from '../lib/field-utils.js';
 import type { NodexNode } from '../types/index.js';
 
 export interface FieldEntry {
@@ -26,6 +26,7 @@ function computeFields(entities: Record<string, NodexNode>, nodeId: string): Fie
   if (!node?.children) return [];
 
   const isAttrDef = node.props._docType === 'attrDef';
+  const isTagDef = node.props._docType === 'tagDef';
 
   const fields: FieldEntry[] = [];
   for (const childId of node.children) {
@@ -35,7 +36,6 @@ function computeFields(entities: Record<string, NodexNode>, nodeId: string): Fie
     const keyId = child.children[0];
 
     // For attrDef nodes: recognize config tuples via ATTRDEF_CONFIG_MAP
-    // (SYS_A02 type choice, SYS_A01 nullable, SYS_A44 autocollect, NDX_A01 hide)
     if (isAttrDef) {
       const configDef = ATTRDEF_CONFIG_MAP.get(keyId);
       if (configDef) {
@@ -50,6 +50,21 @@ function computeFields(entities: Record<string, NodexNode>, nodeId: string): Fie
             dataType: `__${configDef.control}__`,
           });
         }
+        continue;
+      }
+    }
+
+    // For tagDef nodes: recognize config tuples via TAGDEF_CONFIG_MAP
+    if (isTagDef) {
+      const configDef = TAGDEF_CONFIG_MAP.get(keyId);
+      if (configDef) {
+        fields.push({
+          attrDefId: keyId,
+          attrDefName: configDef.name,
+          tupleId: childId,
+          valueName: child.children[1],
+          dataType: `__${configDef.control}__`,
+        });
         continue;
       }
     }

@@ -5,6 +5,7 @@
 import { useCallback } from 'react';
 import { useNodeTags } from '../../hooks/use-node-tags';
 import { useNodeStore } from '../../stores/node-store';
+import { useUIStore } from '../../stores/ui-store';
 import { useWorkspaceStore } from '../../stores/workspace-store';
 import { TagBadge } from './TagBadge';
 
@@ -15,6 +16,7 @@ interface TagBarProps {
 export function TagBar({ nodeId }: TagBarProps) {
   const tagIds = useNodeTags(nodeId);
   const removeTag = useNodeStore((s) => s.removeTag);
+  const navigateTo = useUIStore((s) => s.navigateTo);
   const userId = useWorkspaceStore((s) => s.userId);
 
   const handleRemove = useCallback(
@@ -34,6 +36,7 @@ export function TagBar({ nodeId }: TagBarProps) {
           key={tagId}
           tagDefId={tagId}
           onRemove={() => handleRemove(tagId)}
+          onNavigate={() => navigateTo(tagId)}
         />
       ))}
     </span>

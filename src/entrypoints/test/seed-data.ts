@@ -8,7 +8,7 @@ import { useNodeStore } from '../../stores/node-store';
 import { useUIStore } from '../../stores/ui-store';
 import { useWorkspaceStore } from '../../stores/workspace-store';
 import type { NodexNode, DocType } from '../../types/index.js';
-import { SYS_A, SYS_D, SYS_V } from '../../types/index.js';
+import { SYS_A, SYS_D, SYS_T, SYS_V } from '../../types/index.js';
 
 const WS_ID = 'ws_default';
 const USER_ID = 'user_default';
@@ -65,7 +65,7 @@ export function seedTestData() {
     makeNode(searchesId, 'Searches', WS_ID, []),
     makeNode(trashId, 'Trash', WS_ID, []),
     makeNode(schemaId, 'Schema', WS_ID, [
-      'SYS_T02',
+      'SYS_T01', 'SYS_T02',
       'tagDef_task', 'tagDef_person',
       'attrDef_status', 'attrDef_priority', 'attrDef_due',
       'attrDef_email', 'attrDef_company',
@@ -145,7 +145,17 @@ export function seedTestData() {
     makeNode('j_3', 'Learned about TipTap keyboard shortcuts', 'journal_1', []),
   ];
 
-  // ─── Schema: SYS_T02 + TagDef + AttrDef nodes ───
+  // ─── Schema: SYS_T01 + SYS_T02 + TagDef + AttrDef nodes ───
+
+  // SYS_T01 (Supertag) — system tag for tagDef config pages
+  const sysT01Nodes: NodexNode[] = [
+    makeNode('SYS_T01', 'Supertag', schemaId, [
+      'sysT01_tpl_checkbox', 'sysT01_tpl_childtag', 'sysT01_tpl_color',
+    ], 'tagDef'),
+    makeNode('sysT01_tpl_checkbox', '', 'SYS_T01', [SYS_A.SHOW_CHECKBOX], 'tuple'),
+    makeNode('sysT01_tpl_childtag', '', 'SYS_T01', [SYS_A.CHILD_SUPERTAG], 'tuple'),
+    makeNode('sysT01_tpl_color', '', 'SYS_T01', [SYS_A.COLOR], 'tuple'),
+  ];
 
   // SYS_T02 (Field Definition) — system tag for attrDef config pages
   const sysT02Nodes: NodexNode[] = [
@@ -286,19 +296,57 @@ export function seedTestData() {
     makeNode('meta_attrDef_company_tag', '', 'meta_attrDef_company', [SYS_A.NODE_SUPERTAGS, 'SYS_T02'], 'tuple'),
   ];
 
-  // TagDef: Task — template Tuples reference attrDef IDs
+  // TagDef: Task — template Tuples reference attrDef IDs (tagged with SYS_T01)
   const tagDefTaskNodes = [
-    makeNode('tagDef_task', 'Task', schemaId, ['taskField_status', 'taskField_priority', 'taskField_due'], 'tagDef'),
+    makeNode('tagDef_task', 'Task', schemaId, [
+      'tagDef_task_cfg_checkbox', 'tagDef_task_cfg_childtag', 'tagDef_task_cfg_color',
+      'taskField_status', 'taskField_priority', 'taskField_due',
+    ], 'tagDef'),
     makeNode('taskField_status', '', 'tagDef_task', ['attrDef_status'], 'tuple'),
     makeNode('taskField_priority', '', 'tagDef_task', ['attrDef_priority'], 'tuple'),
     makeNode('taskField_due', '', 'tagDef_task', ['attrDef_due'], 'tuple'),
   ];
 
-  // TagDef: Person
+  // TagDef: Person (tagged with SYS_T01)
   const tagDefPersonNodes = [
-    makeNode('tagDef_person', 'Person', schemaId, ['personField_email', 'personField_company'], 'tagDef'),
+    makeNode('tagDef_person', 'Person', schemaId, [
+      'tagDef_person_cfg_checkbox', 'tagDef_person_cfg_childtag', 'tagDef_person_cfg_color',
+      'personField_email', 'personField_company',
+    ], 'tagDef'),
     makeNode('personField_email', '', 'tagDef_person', ['attrDef_email'], 'tuple'),
     makeNode('personField_company', '', 'tagDef_person', ['attrDef_company'], 'tuple'),
+  ];
+
+  // Set _metaNodeId on tagDef nodes (tagged with SYS_T01)
+  tagDefTaskNodes[0].props._metaNodeId = 'meta_tagDef_task';
+  tagDefPersonNodes[0].props._metaNodeId = 'meta_tagDef_person';
+
+  // Config tuples for tagDef_task (SYS_T01 template instances)
+  const tagDefTaskConfigNodes: NodexNode[] = [
+    makeNode('tagDef_task_cfg_checkbox', '', 'tagDef_task', [SYS_A.SHOW_CHECKBOX, SYS_V.NO], 'tuple'),
+    makeNode('tagDef_task_cfg_childtag', '', 'tagDef_task', [SYS_A.CHILD_SUPERTAG], 'tuple'),
+    makeNode('tagDef_task_cfg_color', '', 'tagDef_task', [SYS_A.COLOR], 'tuple'),
+  ];
+  tagDefTaskConfigNodes[0].props._sourceId = 'sysT01_tpl_checkbox';
+  tagDefTaskConfigNodes[1].props._sourceId = 'sysT01_tpl_childtag';
+  tagDefTaskConfigNodes[2].props._sourceId = 'sysT01_tpl_color';
+
+  // Config tuples for tagDef_person (SYS_T01 template instances)
+  const tagDefPersonConfigNodes: NodexNode[] = [
+    makeNode('tagDef_person_cfg_checkbox', '', 'tagDef_person', [SYS_A.SHOW_CHECKBOX, SYS_V.NO], 'tuple'),
+    makeNode('tagDef_person_cfg_childtag', '', 'tagDef_person', [SYS_A.CHILD_SUPERTAG], 'tuple'),
+    makeNode('tagDef_person_cfg_color', '', 'tagDef_person', [SYS_A.COLOR], 'tuple'),
+  ];
+  tagDefPersonConfigNodes[0].props._sourceId = 'sysT01_tpl_checkbox';
+  tagDefPersonConfigNodes[1].props._sourceId = 'sysT01_tpl_childtag';
+  tagDefPersonConfigNodes[2].props._sourceId = 'sysT01_tpl_color';
+
+  // Metanodes for tagDefs (SYS_T01 tag application chain)
+  const tagDefMetanodes: NodexNode[] = [
+    makeNode('meta_tagDef_task', '', 'tagDef_task', ['meta_tagDef_task_tag'], 'metanode'),
+    makeNode('meta_tagDef_task_tag', '', 'meta_tagDef_task', [SYS_A.NODE_SUPERTAGS, SYS_T.SUPERTAG], 'tuple'),
+    makeNode('meta_tagDef_person', '', 'tagDef_person', ['meta_tagDef_person_tag'], 'metanode'),
+    makeNode('meta_tagDef_person_tag', '', 'meta_tagDef_person', [SYS_A.NODE_SUPERTAGS, SYS_T.SUPERTAG], 'tuple'),
   ];
 
   // ─── Pre-tag task_1 with "Task" tag (demo fields on startup) ───
@@ -323,6 +371,7 @@ export function seedTestData() {
   task1FieldNodes[2].props._sourceId = 'taskField_due';
 
   const schemaNodes = [
+    ...sysT01Nodes,
     ...sysT02Nodes,
     ...attrDefStatusNodes,
     ...attrDefPriorityNodes,
@@ -331,7 +380,10 @@ export function seedTestData() {
     ...attrDefCompanyNodes,
     ...attrDefMetanodes,
     ...tagDefTaskNodes,
+    ...tagDefTaskConfigNodes,
     ...tagDefPersonNodes,
+    ...tagDefPersonConfigNodes,
+    ...tagDefMetanodes,
     ...task1MetanodeNodes,
     ...task1FieldNodes,
   ];

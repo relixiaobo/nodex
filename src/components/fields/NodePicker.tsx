@@ -174,21 +174,25 @@ export function NodePicker({
         onClick={handleClick}
       >
         {open && isReference && selectedName ? (
-          /* Reference mode: outline box wrapping bullet + text (no layout shift) */
-          <div className="relative py-1" style={{ paddingLeft: 6 }}>
-            <div className="inline-flex min-h-7 items-start gap-[7.5px] rounded outline outline-1 outline-primary/50">
-              <BulletChevron
-                hasChildren={false}
-                isExpanded={false}
-                onToggle={noop}
-                onDrillDown={noop}
-                onBulletClick={noop}
-                isReference
-              />
-              <span className="text-sm leading-[21px] text-foreground">
+          /* Reference mode: chevron spacer outside, outline wraps bullet+text */
+          <div
+            className="flex min-h-7 items-start py-1"
+            style={{ paddingLeft: 6 }}
+          >
+            {/* Chevron spacer — same 15px as BulletChevron's chevron area */}
+            <span className="shrink-0 h-[21px] w-[15px]" />
+            {/* Outline wraps reference bullet + text together (like Tana) */}
+            <span className="inline-flex items-center gap-[7.5px] rounded-sm outline outline-1 outline-primary/50">
+              {/* Reference bullet dot (no chevron) */}
+              <span className="flex shrink-0 h-[21px] w-[15px] items-center justify-center">
+                <span className="flex h-[15px] w-[15px] items-center justify-center rounded-full border border-dashed border-foreground/40">
+                  <span className="block h-[5px] w-[5px] rounded-full bg-foreground/50" />
+                </span>
+              </span>
+              <span className="text-sm leading-[21px] text-foreground pr-1">
                 {textSelected ? selectedName : inputValue}
               </span>
-            </div>
+            </span>
             {/* Hidden input for keyboard capture */}
             <input
               ref={inputRef}

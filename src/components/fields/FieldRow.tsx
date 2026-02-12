@@ -16,7 +16,7 @@
  * - Type icon: clickable → navigateTo to attrDef (regular), static (config)
  * - Field name: static label, click to edit (activates FieldNameInput)
  * - Config description: shown below name in name column
- * - Value area: FieldValueOutliner (plain), OptionsPicker (options), FieldValueEditor (typed)
+ * - Value area: FieldValueOutliner (plain + options), FieldValueEditor (typed)
  */
 import { useCallback, useRef, useMemo } from 'react';
 import { Trash2 } from 'lucide-react';
@@ -27,7 +27,6 @@ import { SYS_D } from '../../types/index.js';
 import { getFieldTypeIcon, isPlainFieldType, ATTRDEF_CONFIG_MAP, TAGDEF_CONFIG_MAP } from '../../lib/field-utils.js';
 import { FieldValueOutliner } from './FieldValueOutliner';
 import { FieldValueEditor } from './FieldValueEditor';
-import { OptionsPicker } from './OptionsPicker';
 import { FieldNameInput } from './FieldNameInput';
 import { FieldTypePicker } from './FieldTypePicker';
 import { ConfigToggle } from './ConfigToggle';
@@ -215,11 +214,9 @@ export function FieldRow({
       <div className="flex-1 min-w-0" data-field-value>
         {isOutliner ? (
           <ConfigOutliner nodeId={nodeId} />
-        ) : dataType === SYS_D.OPTIONS || dataType === SYS_D.OPTIONS_FROM_SUPERTAG ? (
-          <OptionsPicker nodeId={nodeId} attrDefId={attrDefId} assocDataId={assocDataId} />
-        ) : isPlainFieldType(dataType) ? (
+        ) : dataType === SYS_D.OPTIONS || dataType === SYS_D.OPTIONS_FROM_SUPERTAG || isPlainFieldType(dataType) ? (
           assocDataId ? (
-            <FieldValueOutliner assocDataId={assocDataId} />
+            <FieldValueOutliner assocDataId={assocDataId} fieldDataType={dataType} attrDefId={attrDefId} />
           ) : (
             <div className="flex min-h-7 items-start gap-[7.5px] py-1" style={{ paddingLeft: 6 }}>
               <BulletChevron hasChildren={false} isExpanded={false} onToggle={noop} onDrillDown={noop} onBulletClick={noop} dimmed />

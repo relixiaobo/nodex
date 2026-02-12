@@ -16,6 +16,9 @@
 ### 树引用（Reference Node）
 
 - Bullet 显示为同心圆（双圈），区别于普通实心圆点
+- **单击 = 选中**（蓝色 ring 高亮，cursor-default），不进入编辑
+- **双击 = 编辑**（创建 TipTap 编辑器，编辑原始节点 `props.name`）
+- 选中状态与编辑状态互斥（`selectedNodeId` vs `focusedNodeId`）
 - 编辑引用节点的文本 = 编辑原始节点的 `props.name`（双向同步）
 - 展开引用节点显示原始节点的 children（实时）
 - 引用节点有独立的展开/折叠状态（compound key: `parentId:nodeId`）
@@ -53,6 +56,7 @@
 | 2026-02-01 | 引用节点使用 compound expand key `parentId:nodeId` | 同一节点在不同位置引用时需要独立展开状态 |
 | 2026-02-01 | 编辑引用 = 编辑原始节点 | 与 Tana 行为一致 |
 | 2026-02-03 | 内联引用用 TipTap inline node extension | ProseMirror 原生支持 inline node 渲染 |
+| 2026-02-12 | Reference 节点单击选中、双击编辑 | 区分选中（框选预览）和编辑（修改原始节点）两种交互意图 |
 
 ## 当前状态
 
@@ -62,6 +66,7 @@
 - [x] 内联引用显示（蓝色链接、可点击导航）
 - [x] 引用独立展开/折叠状态
 - [x] 删除引用不删除原始节点
+- [x] 引用节点单击选中（ring 高亮）、双击编辑
 - [ ] 反向链接 section
 - [ ] 引用计数 badge
 - [ ] 合并节点

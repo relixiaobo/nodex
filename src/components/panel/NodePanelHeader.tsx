@@ -1,57 +1,20 @@
-import { PanelLeft, ChevronLeft, Search } from 'lucide-react';
-import { useNode } from '../../hooks/use-node';
-import { useUIStore } from '../../stores/ui-store';
-import { TagBar } from '../tags/TagBar';
+/**
+ * Node panel header — thin wrapper around Breadcrumb.
+ *
+ * Fixed at top of NodePanel. Title and TagBar have moved to PanelTitle
+ * in the scrollable content area.
+ */
+import { Breadcrumb } from './Breadcrumb';
 
 interface NodePanelHeaderProps {
   nodeId: string;
+  showCurrentName?: boolean;
 }
 
-export function NodePanelHeader({ nodeId }: NodePanelHeaderProps) {
-  const node = useNode(nodeId);
-  const panelIndex = useUIStore((s) => s.panelIndex);
-  const goBack = useUIStore((s) => s.goBack);
-  const toggleSidebar = useUIStore((s) => s.toggleSidebar);
-  const openSearch = useUIStore((s) => s.openSearch);
-  const canGoBack = panelIndex > 0;
-
-  // Extract display name — strip HTML tags for header
-  const rawName = node?.props.name || '';
-  const displayName = rawName.replace(/<[^>]+>/g, '') || nodeId.split('_').pop() || nodeId;
-
+export function NodePanelHeader({ nodeId, showCurrentName }: NodePanelHeaderProps) {
   return (
     <div className="shrink-0 border-b border-border">
-      <div className="flex h-10 items-center gap-1 px-2">
-        <button
-          onClick={toggleSidebar}
-          className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
-          title="Toggle sidebar"
-        >
-          <PanelLeft size={16} strokeWidth={1.75} />
-        </button>
-        {canGoBack && (
-          <button
-            onClick={goBack}
-            className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
-            title="Go back"
-          >
-            <ChevronLeft size={16} strokeWidth={1.75} />
-          </button>
-        )}
-        <span className="flex-1 truncate text-sm font-medium px-1">
-          {displayName}
-        </span>
-        <button
-          onClick={openSearch}
-          className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
-          title="Search (Cmd+K)"
-        >
-          <Search size={16} strokeWidth={1.75} />
-        </button>
-      </div>
-      <div className="group px-3 pb-1">
-        <TagBar nodeId={nodeId} />
-      </div>
+      <Breadcrumb nodeId={nodeId} showCurrentName={showCurrentName} />
     </div>
   );
 }

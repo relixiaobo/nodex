@@ -46,8 +46,8 @@ function useTestBootstrap() {
   const wsId = useWorkspaceStore((s) => s.currentWorkspaceId);
   const setWorkspace = useWorkspaceStore((s) => s.setWorkspace);
   const setUser = useWorkspaceStore((s) => s.setUser);
-  const panelStack = useUIStore((s) => s.panelStack);
-  const pushPanel = useUIStore((s) => s.pushPanel);
+  const panelHistory = useUIStore((s) => s.panelHistory);
+  const navigateTo = useUIStore((s) => s.navigateTo);
 
   useEffect(() => {
     // NO Supabase initialization — purely offline
@@ -61,9 +61,9 @@ function useTestBootstrap() {
     seedWorkspaceContainers(currentWsId, 'user_default');
     seedTestData();
 
-    if (panelStack.length === 0) {
+    if (panelHistory.length === 0) {
       const libraryId = getContainerId(currentWsId, WORKSPACE_CONTAINERS.LIBRARY);
-      pushPanel(libraryId);
+      navigateTo(libraryId);
     }
 
     // Expose stores on window for MCP/DevTools console testing

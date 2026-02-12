@@ -242,7 +242,7 @@ export function NodePicker({
                 className={
                   selectedName
                     ? 'text-sm leading-[21px] text-foreground'
-                    : 'text-sm leading-[21px] text-muted-foreground/40 select-none group-hover/picker:text-muted-foreground/60 transition-colors'
+                    : 'text-sm leading-[21px] text-foreground-tertiary select-none group-hover/picker:text-foreground-secondary transition-colors'
                 }
               >
                 {selectedName ?? placeholder}

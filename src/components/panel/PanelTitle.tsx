@@ -86,7 +86,7 @@ export function PanelTitle({ nodeId, onTitleRef }: PanelTitleProps) {
     <div className="px-4 pt-3 pb-1">
       <div className="flex items-start gap-2">
         {FieldIcon && (
-          <span className="shrink-0 mt-1.5 text-muted-foreground/50">
+          <span className="shrink-0 mt-1.5 text-foreground-tertiary">
             <FieldIcon size={16} />
           </span>
         )}
@@ -101,7 +101,7 @@ export function PanelTitle({ nodeId, onTitleRef }: PanelTitleProps) {
           onBlur={handleBlur}
           onKeyDown={editing ? handleKeyDown : undefined}
           dangerouslySetInnerHTML={editing ? undefined : {
-            __html: displayName || '<span class="text-muted-foreground/40">Untitled</span>',
+            __html: displayName || '<span class="text-foreground-tertiary">Untitled</span>',
           }}
         />
       </div>

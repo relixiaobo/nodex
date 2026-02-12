@@ -116,7 +116,7 @@ export function FieldRow({
         {/* Name column — icon + name + description */}
         <div className="flex gap-1 @sm:shrink-0 @sm:w-[180px] min-w-0">
           {Icon ? (
-            <span className="shrink-0 w-[15px] flex items-start justify-center text-muted-foreground/40 mt-[3px]">
+            <span className="shrink-0 w-[15px] flex items-start justify-center text-foreground-tertiary mt-[3px]">
               <Icon size={12} />
             </span>
           ) : (
@@ -127,7 +127,7 @@ export function FieldRow({
               {configNameDisplay}
             </span>
             {configDef?.description && (
-              <span className="block text-xs leading-tight text-muted-foreground/50 mt-0.5">
+              <span className="block text-xs leading-tight text-foreground-tertiary mt-0.5">
                 {configDef.description}
               </span>
             )}
@@ -150,9 +150,9 @@ export function FieldRow({
               {isToggle ? (
                 <ConfigToggle tupleId={tupleId} fieldKey={attrDefId} currentValue={valueName} />
               ) : isTagPicker ? (
-                <span className="text-xs text-muted-foreground/50 italic">Not set</span>
+                <span className="text-xs text-foreground-tertiary italic">Not set</span>
               ) : isColorPicker ? (
-                <span className="text-xs text-muted-foreground/50 italic">Default</span>
+                <span className="text-xs text-foreground-tertiary italic">Default</span>
               ) : null}
             </div>
           )}
@@ -167,7 +167,7 @@ export function FieldRow({
       {/* Name column — aligned to first line of value */}
       <div className="flex items-center gap-1 @sm:shrink-0 @sm:w-[130px] min-w-0 h-7 py-1">
         <button
-          className="shrink-0 w-[15px] flex items-center justify-center text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+          className="shrink-0 w-[15px] flex items-center justify-center text-foreground-tertiary hover:text-foreground-secondary transition-colors"
           onClick={trashed || isVirtual ? undefined : () => navigateTo(attrDefId)}
           title={trashed || isVirtual ? undefined : 'Configure field'}
           style={trashed || isVirtual ? { cursor: 'default' } : undefined}
@@ -211,7 +211,7 @@ export function FieldRow({
         ) : (
           <div className="flex min-h-7 items-start gap-[7.5px] py-1" style={{ paddingLeft: 6 }}>
             <BulletChevron hasChildren={false} isExpanded={false} onToggle={noop} onDrillDown={noop} onBulletClick={noop} dimmed />
-            <span className="text-sm leading-[21px] text-muted-foreground/40 select-none">Empty</span>
+            <span className="text-sm leading-[21px] text-foreground-tertiary select-none">Empty</span>
           </div>
         )}
       </div>

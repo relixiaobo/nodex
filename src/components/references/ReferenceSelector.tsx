@@ -129,12 +129,12 @@ export const ReferenceSelector = forwardRef<ReferenceDropdownHandle, ReferenceSe
       >
         {/* Section header */}
         {!query.trim() && recentNodes.length > 0 && (
-          <div className="px-3 py-1 text-[10px] font-medium text-muted-foreground/60 uppercase tracking-wider">
+          <div className="px-3 py-1 text-[10px] font-medium text-foreground-secondary uppercase tracking-wider">
             Recently opened
           </div>
         )}
         {query.trim() && items.length > 0 && (
-          <div className="px-3 py-1 text-[10px] font-medium text-muted-foreground/60 uppercase tracking-wider">
+          <div className="px-3 py-1 text-[10px] font-medium text-foreground-secondary uppercase tracking-wider">
             Nodes
           </div>
         )}
@@ -158,7 +158,7 @@ export const ReferenceSelector = forwardRef<ReferenceDropdownHandle, ReferenceSe
               <span className="text-xs text-foreground truncate">{item.name}</span>
             </div>
             {item.breadcrumb && (
-              <span className="text-[10px] text-muted-foreground/60 truncate ml-[18px]">
+              <span className="text-[10px] text-foreground-secondary truncate ml-[18px]">
                 {item.breadcrumb}
               </span>
             )}

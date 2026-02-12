@@ -1,6 +1,6 @@
 # Feature: Fields 全类型
 
-> Phase 1.3 | 基础已完成，全类型扩展待实现
+> Phase 1.3 | 全类型值编辑器已实现
 
 ## 行为规格
 
@@ -41,44 +41,43 @@
 - 支持添加子节点、编辑、拖拽等所有大纲操作
 - 这是默认类型，不选择其他类型时就是 Plain
 
-### Options 类型 — 未实现
+### Options 类型 — 已实现
 
-- 值区域渲染为下拉选择器（NodePicker）
-- 选项来源：
-  1. Pre-determined options（attrDef 配置的固定选项列表）
-  2. Auto-collected（历史使用过的值）
-  3. Options from Supertag（特定标签的节点）
-- 选中选项后，Tuple.children[1] = selectedNodeId
-- 支持多选（值为多个子节点）
+- 值区域渲染为 `OptionsFieldValue` 下拉选择器
+- 选项来源：Pre-determined options（attrDef 配置的固定选项列表）
+- 选中选项后以 ReferenceNode（蓝色链接）样式显示
+- 无选中值时显示 "Select..." placeholder
+- 待扩展：Auto-collected / Options from Supertag
 
-### Date 类型 — 未实现
+### Date 类型 — 已实现
 
-- 值区域渲染为日期选择器
-- 选择日期后链接到对应日节点（年/月/日层级）
-- 支持自然语言输入（@today / @next Monday）
-- 日期节点自动创建（如果不存在）
+- 值区域渲染为 `FieldValueEditor` click-to-edit 日期输入
+- 点击 "Empty" 显示 `<input type="date">`，选择后自动保存并关闭
+- 值存储为 ISO 日期字符串（YYYY-MM-DD）
+- 待扩展：链接到日节点、自然语言输入
 
-### Number 类型 — 未实现
+### Number 类型 — 已实现
 
-- 值区域渲染为数字输入框
-- 支持 min/max 校验（来自 attrDef 配置）
-- 无效输入时显示红色边框 + 错误提示
+- 值区域渲染为 `FieldValueEditor` click-to-edit 数字输入
+- INTEGER 类型 step=1, NUMBER 类型 step=any
+- Enter 确认、Escape 取消、blur 自动保存
+- 待扩展：min/max 校验
 
-### URL 类型 — 未实现
+### URL 类型 — 已实现
 
-- 值区域渲染为 URL 输入框
-- 输入完成后显示为可点击链接
-- 链接在新标签页打开
+- 值区域渲染为 `FieldValueEditor` click-to-edit URL 输入
+- 有值时显示为蓝色带下划线的链接样式
+- 待扩展：点击链接在新标签页打开
 
-### Email 类型 — 未实现
+### Email 类型 — 已实现
 
-- 值区域渲染为 Email 输入框
-- 输入完成后显示为 `mailto:` 可点击链接
+- 值区域渲染为 `FieldValueEditor` click-to-edit Email 输入
+- 待扩展：显示为 `mailto:` 可点击链接
 
-### Checkbox 类型 — 未实现
+### Checkbox 类型 — 已实现
 
-- 值区域渲染为复选框（check/uncheck）
-- 数据模型：Tuple.children[1] = SYS_V03 (Yes) 或 SYS_V04 (No)
+- 值区域渲染为内联复选框（直接 toggle，无 click-to-edit）
+- 数据模型：值节点 name = SYS_V03 (Yes) 或 SYS_V04 (No)
 - 注意区分：这是字段值的 checkbox，与 Supertag 的 "Show as Checkbox" 是不同功能
 
 ### Tana User 类型 — 未实现
@@ -146,18 +145,10 @@
 | 2026-02-06 | 所有类型通用配置 + 特定配置分离 | ATTRDEF_CONFIG_MAP 用 appliesTo 控制可见性 |
 | 2026-02-06 | Options/Checkbox 使用 SYS_V03/V04 布尔值 | 与 Tana 数据模型一致 |
 | 2026-02-06 | Unified NodePicker 设计模式 | Options、Config Select 等统一为"从列表选节点"组件 |
-
-## 决策记录
-
-| 日期 | 决策 | 原因 |
-|------|------|------|
-| 2026-02-08 | 字段和内容交错渲染（非分离） | 保持 children 原始顺序，与 Tana 一致 |
-| 2026-02-08 | addUnnamedFieldToNode 需要 applyTag(SYS_T02) | 确保新字段有完整配置项 |
-| 2026-02-06 | 所有类型通用配置 + 特定配置分离 | ATTRDEF_CONFIG_MAP 用 appliesTo 控制可见性 |
-| 2026-02-06 | Options/Checkbox 使用 SYS_V03/V04 布尔值 | 与 Tana 数据模型一致 |
-| 2026-02-06 | Unified NodePicker 设计模式 | Options、Config Select 等统一为"从列表选节点"组件 |
 | 2026-02-12 | trashNode(attrDef) 级联清理所有引用 | 删除字段后，所有使用该字段的节点自动移除字段 tuple |
 | 2026-02-12 | 对比 Tana 官方文档补全遗漏（Hide 5 种模式、Auto-init 6 种策略等） | 确保功能清单完整 |
+| 2026-02-12 | FieldRow 按 dataType 分发到 3 种渲染器 | Options→OptionsFieldValue, Plain→FieldValueOutliner, 其余→FieldValueEditor |
+| 2026-02-12 | FieldValueEditor 移除 Options 分支 | Options 由 OptionsFieldValue 独立处理（支持 ReferenceNode 显示） |
 
 ## 当前状态
 
@@ -168,14 +159,15 @@
 - [x] AttrDef 配置页（Field type / Required / Hide / Auto-collect / Auto-initialize）
 - [x] 新字段自动应用 SYS_T02 标签
 - [x] Delete field 按钮 + 级联清理
-- [ ] Options 下拉选择
+- [x] Options 下拉选择（OptionsFieldValue + ReferenceNode）
+- [x] Date 日期选择器（click-to-edit date input）
+- [x] Number 数字输入（click-to-edit, Integer/Number）
+- [x] URL 链接输入（click-to-edit, 蓝色链接样式）
+- [x] Email 邮箱输入（click-to-edit）
+- [x] Checkbox 复选框（inline toggle, SYS_V03/V04）
+- [x] FieldRow 按 dataType 分发渲染器
 - [ ] Options from Supertag（独立类型）
-- [ ] Date 日期选择器
-- [ ] Number 数字输入
-- [ ] URL 链接输入
-- [ ] Email 邮箱输入
 - [ ] Tana User 类型
-- [ ] Checkbox 复选框
 - [ ] 字段隐藏规则运行时（5 种模式）
 - [ ] Required 字段视觉提示
 - [ ] Auto-initialize（6 种策略）

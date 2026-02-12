@@ -141,8 +141,8 @@ export function FieldRow({
             )}
           </div>
         </div>
-        {/* Value column — just the control */}
-        <div className={`flex-1 min-w-0 ${isAutoCollect ? '' : 'flex items-center'} min-h-[22px]`} data-field-value>
+        {/* Value column — pl-[6px] aligns controls with outliner bullets */}
+        <div className={`flex-1 min-w-0 ${isAutoCollect || isOutliner ? '' : 'flex items-center pl-[6px]'} min-h-[22px]`} data-field-value>
           {isTypeChoice ? (
             <FieldTypePicker attrDefId={nodeId} currentValue={valueName ?? ''} />
           ) : isAutoCollect ? (

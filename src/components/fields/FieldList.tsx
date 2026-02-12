@@ -43,6 +43,7 @@ export function FieldList({ nodeId }: FieldListProps) {
           valueName={f.valueName}
           dataType={f.dataType}
           assocDataId={f.assocDataId}
+          trashed={f.trashed}
         />
       ))}
       <div className="border-b border-border/40" />

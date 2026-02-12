@@ -81,7 +81,7 @@ export function Breadcrumb({ nodeId, showCurrentName }: BreadcrumbProps) {
         className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md hover:bg-muted hover:text-foreground"
         title="Toggle sidebar"
       >
-        <PanelLeft size={15} strokeWidth={1.75} />
+        <PanelLeft size={16} strokeWidth={1.75} />
       </button>
 
       {/* ← button: navigate to parent (hidden at root view) */}
@@ -91,7 +91,7 @@ export function Breadcrumb({ nodeId, showCurrentName }: BreadcrumbProps) {
           className="flex h-7 w-6 shrink-0 items-center justify-center rounded-md hover:bg-muted hover:text-foreground"
           title="Go to parent"
         >
-          <ChevronLeft size={15} strokeWidth={1.75} />
+          <ChevronLeft size={16} strokeWidth={1.75} />
         </button>
       )}
 
@@ -155,7 +155,7 @@ export function Breadcrumb({ nodeId, showCurrentName }: BreadcrumbProps) {
         className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md hover:bg-muted hover:text-foreground"
         title="Search (Cmd+K)"
       >
-        <Search size={15} strokeWidth={1.75} />
+        <Search size={16} strokeWidth={1.75} />
       </button>
     </div>
   );

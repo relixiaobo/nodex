@@ -2,7 +2,7 @@
  * Shared field utilities: data type resolution and icon mapping.
  */
 import type { LucideIcon } from 'lucide-react';
-import { AlignLeft, Calendar, CheckSquare, Hash, Link, List, Mail } from 'lucide-react';
+import { AlignLeft, Calendar, CheckSquare, ChevronDown, Hash, Link, List, Mail, Play, Asterisk, EyeOff, Settings2, Sparkles } from 'lucide-react';
 import { SYS_A, SYS_D, SYS_V } from '../types/index.js';
 import type { NodexNode } from '../types/index.js';
 
@@ -102,6 +102,7 @@ export interface ConfigFieldDef {
   control: 'type_choice' | 'toggle' | 'select' | 'section_label';
   defaultValue: string;
   appliesTo: string[] | '*';
+  icon?: LucideIcon;
   description?: string;
   options?: Array<{ value: string; label: string }>;
 }
@@ -122,6 +123,7 @@ export const ATTRDEF_CONFIG_FIELDS: ConfigFieldDef[] = [
     key: SYS_A.TYPE_CHOICE,
     name: 'Field type',
     control: 'type_choice',
+    icon: Settings2,
     defaultValue: SYS_D.PLAIN,
     appliesTo: '*',
   },
@@ -147,6 +149,7 @@ export const ATTRDEF_CONFIG_FIELDS: ConfigFieldDef[] = [
     key: SYS_A.AUTOCOLLECT_OPTIONS,
     name: 'Auto-collect values',
     control: 'toggle',
+    icon: Sparkles,
     defaultValue: SYS_V.YES,
     appliesTo: [SYS_D.OPTIONS],
     description: 'Include auto-collected values as options',
@@ -155,6 +158,7 @@ export const ATTRDEF_CONFIG_FIELDS: ConfigFieldDef[] = [
     key: SYS_A.AUTO_INITIALIZE,
     name: 'Auto-initialize',
     control: 'toggle',
+    icon: Play,
     defaultValue: SYS_V.NO,
     appliesTo: '*',
     description: 'to value from ancestor with this field',
@@ -163,6 +167,7 @@ export const ATTRDEF_CONFIG_FIELDS: ConfigFieldDef[] = [
     key: SYS_A.NULLABLE,
     name: 'Required',
     control: 'toggle',
+    icon: Asterisk,
     defaultValue: SYS_V.NO,
     appliesTo: '*',
   },
@@ -170,6 +175,7 @@ export const ATTRDEF_CONFIG_FIELDS: ConfigFieldDef[] = [
     key: SYS_A.HIDE_FIELD,
     name: 'Hide field',
     control: 'select',
+    icon: EyeOff,
     defaultValue: SYS_V.NEVER,
     appliesTo: '*',
     description: 'Minimize field when part of a supertag',

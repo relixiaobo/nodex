@@ -61,8 +61,13 @@ export function ConfigOutliner({ nodeId }: ConfigOutlinerProps) {
     [visibleChildren],
   );
 
+  // Prevent border stacking: when nested FieldRows are first/last, add padding
+  // so their border-t/border-b doesn't visually coincide with the parent FieldRow's borders
+  const firstIsField = visibleChildren.length > 0 && visibleChildren[0].type === 'field';
+  const lastIsField = visibleChildren.length > 0 && visibleChildren[visibleChildren.length - 1].type === 'field';
+
   return (
-    <div className="min-h-[22px]">
+    <div className={`min-h-[22px]${firstIsField ? ' pt-1' : ''}${lastIsField ? ' pb-1' : ''}`}>
       {visibleChildren.map(({ id, type }, i) =>
         type === 'field' ? (
           <div key={id} className="@container" style={{ paddingLeft: 6 + 15 }}>

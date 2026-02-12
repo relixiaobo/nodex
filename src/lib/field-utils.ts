@@ -2,7 +2,7 @@
  * Shared field utilities: data type resolution and icon mapping.
  */
 import type { LucideIcon } from 'lucide-react';
-import { AlignLeft, Calendar, CheckSquare, ChevronDown, Hash, Link, List, ListTree, Mail, Play, Asterisk, EyeOff, Settings2, Sparkles } from 'lucide-react';
+import { AlignLeft, Calendar, CheckSquare, ChevronDown, FileText, Hash, Link, List, ListTree, Mail, Play, Asterisk, EyeOff, Settings2, Sparkles } from 'lucide-react';
 import { SYS_A, SYS_D, SYS_V } from '../types/index.js';
 import type { NodexNode } from '../types/index.js';
 
@@ -276,6 +276,15 @@ export const TAGDEF_CONFIG_FIELDS: ConfigFieldDef[] = [
     defaultValue: '',
     appliesTo: '*',
   },
+  // outliner field — rendered as field row with embedded outliner (template children)
+  {
+    key: 'NDX_SECTION_DEFAULT_CONTENT',
+    name: 'Default content',
+    control: 'outliner',
+    icon: FileText,
+    defaultValue: '',
+    appliesTo: '*',
+  },
 ];
 
 /** O(1) lookup by config field key (SYS_A*). Excludes outliner entries. */
@@ -284,3 +293,7 @@ export const TAGDEF_CONFIG_MAP = new Map(
     .filter(f => f.control !== 'outliner')
     .map(f => [f.key, f]),
 );
+
+/** Outliner-type config fields for tagDef (virtual entries — no backing tuple). */
+export const TAGDEF_OUTLINER_FIELDS = TAGDEF_CONFIG_FIELDS
+  .filter(f => f.control === 'outliner');

@@ -35,7 +35,7 @@ import { ConfigSelect } from './ConfigSelect';
 import { ConfigOutliner } from './ConfigOutliner';
 import { AutoCollectSection } from './AutoCollectSection';
 import { BulletChevron } from '../outliner/BulletChevron';
-import { ATTRDEF_OUTLINER_FIELDS } from '../../lib/field-utils.js';
+import { ATTRDEF_OUTLINER_FIELDS, TAGDEF_OUTLINER_FIELDS } from '../../lib/field-utils.js';
 
 const noop = () => {};
 
@@ -88,7 +88,7 @@ export function FieldRow({
   const isConfigField = isTypeChoice || isToggle || isSelect || isOutliner || isAutoCollect || isTagPicker || isColorPicker;
   const isEditing = editingFieldNameId === tupleId;
   const configDef = isConfigField
-    ? ATTRDEF_CONFIG_MAP.get(attrDefId) ?? TAGDEF_CONFIG_MAP.get(attrDefId) ?? ATTRDEF_OUTLINER_FIELDS.find(f => f.key === attrDefId)
+    ? ATTRDEF_CONFIG_MAP.get(attrDefId) ?? TAGDEF_CONFIG_MAP.get(attrDefId) ?? ATTRDEF_OUTLINER_FIELDS.find(f => f.key === attrDefId) ?? TAGDEF_OUTLINER_FIELDS.find(f => f.key === attrDefId)
     : undefined;
   const Icon = configDef?.icon ?? (isConfigField ? undefined : getFieldTypeIcon(dataType));
 

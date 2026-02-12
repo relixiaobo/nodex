@@ -2,7 +2,7 @@
 
 基于 Tana 完整功能分析的开发路线图。按优先级分阶段，逐步迭代。
 
-> 最后更新: 2026-02-11
+> 最后更新: 2026-02-12
 
 ---
 
@@ -24,6 +24,7 @@
 - [x] Fields 基础 (>触发、字段名编辑+自动完成、交错渲染、字段值编辑器)
 - [x] References & @引用 MVP (@触发搜索、树引用+内联引用、引用bullet、删除引用)
 - [x] 交互打磨 (Enter创建子节点、indent/Backspace焦点、compound expand keys)
+- [x] AttrDef 字段配置页 (SYS_T02标签链路、Field type/Required/Hide field/Auto-collect/Auto-initialize)
 
 ---
 
@@ -46,7 +47,7 @@
 
 - [ ] 移除标签（hover tag chip → X 按钮）
 - [ ] 标签模板自动填充字段（应用标签时自动添加模板定义的字段）
-- [ ] 标签配置页（点击标签定义节点 → 配置字段/默认值/可选字段）
+- [ ] 标签配置页（点击标签定义节点 → 配置字段/默认值/可选字段，复用 SYS_T01 标签链路）
 - [ ] Show as Checkbox（标签开启 checkbox 行为，Done 状态双向映射）
 - [ ] Default Child Supertag（被打标签的节点，新增子节点自动继承指定标签）
 - [ ] 标签继承/Extend（子标签继承父标签模板字段）
@@ -61,9 +62,14 @@
 - [ ] URL 链接输入
 - [ ] Email 邮箱输入
 - [ ] Checkbox 布尔切换
-- [ ] 字段隐藏规则（Never / When empty / When not empty / Always）
-- [ ] Required 字段标记（空值时视觉警告）
+- [ ] 字段隐藏规则运行时（FieldRow 根据 Hide field 配置 + 值状态动态显隐）
+- [ ] Required 字段运行时（空值时视觉警告）
+- [ ] Number 字段 Min/Max 配置（attrDef config 新增 Minimum/Maximum value）
+- [ ] Options from Supertag picker（attrDef config 新增 Supertag 选择器）
 - [ ] 系统字段（Created time / Modified time / Owner）
+- [ ] AttrDef "Used in" 计算字段（显示使用该字段的所有 supertag）
+- [ ] AttrDef "Make discoverable" 开关（字段在全局可被搜索到）
+- [ ] AttrDef "Actions" / "Advanced" section（Commands、Page size、Semantic function）
 
 ### 1.4 Date 节点 & 日记
 
@@ -151,6 +157,15 @@
 - [ ] AI 命令节点（Ask AI / Transcribe / Generate Image）
 - [ ] 提示模板变量（${fieldname} / ${sys:context}）
 - [ ] 批量处理（长上下文拆分）
+
+### 3.5 AI 字段增强（AttrDef Config 扩展）
+
+> Tana attrDef 配置页中的 AI 相关项，当前已跳过
+
+- [ ] Audio-enabled field（语音输入字段）
+- [ ] AI instructions（字段级 AI 提示）
+- [ ] Autofill（AI 自动填充）
+- [ ] AI-enhanced field（AI 增强字段）
 
 ---
 

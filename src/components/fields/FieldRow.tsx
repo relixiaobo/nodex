@@ -131,7 +131,7 @@ export function FieldRow({
             <span className="block text-sm font-medium leading-[22px] text-foreground">
               {configNameDisplay}
             </span>
-            {configDef?.description && !isAutoCollect && (
+            {configDef?.description && (
               <span className="block text-xs leading-tight text-muted-foreground/50 mt-0.5">
                 {configDef.description}
               </span>
@@ -143,7 +143,7 @@ export function FieldRow({
           {isTypeChoice ? (
             <FieldTypePicker attrDefId={nodeId} currentValue={valueName ?? ''} />
           ) : isAutoCollect ? (
-            <AutoCollectSection tupleId={tupleId} currentValue={valueName} />
+            <AutoCollectSection tupleId={tupleId} />
           ) : isToggle ? (
             <ConfigToggle tupleId={tupleId} fieldKey={attrDefId} currentValue={valueName} />
           ) : isOutliner ? (

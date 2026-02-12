@@ -59,7 +59,7 @@ export function seedTestData() {
   const schemaId = `${WS_ID}_SCHEMA`;
 
   const containers = [
-    makeNode(libraryId, 'Library', WS_ID, ['proj_1', 'note_1', 'note_2', 'note_rich']),
+    makeNode(libraryId, 'Library', WS_ID, ['proj_1', 'person_1', 'note_1', 'note_2', 'note_rich']),
     makeNode(inboxId, 'Inbox', WS_ID, ['inbox_1', 'inbox_2', 'inbox_3']),
     makeNode(journalId, 'Journal', WS_ID, ['journal_1']),
     makeNode(searchesId, 'Searches', WS_ID, []),
@@ -69,6 +69,7 @@ export function seedTestData() {
       'tagDef_task', 'tagDef_person',
       'attrDef_status', 'attrDef_priority', 'attrDef_due',
       'attrDef_email', 'attrDef_company',
+      'attrDef_age', 'attrDef_website', 'attrDef_done',
     ]),
   ];
 
@@ -80,7 +81,7 @@ export function seedTestData() {
     {
       ...makeNode('task_1', 'Design the data model', 'proj_1', [
         'subtask_1a', 'subtask_1b',
-        'task1_fld_status', 'task1_fld_priority', 'task1_fld_due',
+        'task1_fld_status', 'task1_fld_priority', 'task1_fld_due', 'task1_fld_done',
       ]),
       props: {
         ...makeNode('task_1', 'Design the data model', 'proj_1').props,
@@ -90,6 +91,7 @@ export function seedTestData() {
         task1_fld_status: 'task1_assoc_status',
         task1_fld_priority: 'task1_assoc_priority',
         task1_fld_due: 'task1_assoc_due',
+        task1_fld_done: 'task1_assoc_done',
       },
     },
     makeNode('subtask_1a', 'Define node types and properties', 'task_1', []),
@@ -110,6 +112,25 @@ export function seedTestData() {
     makeNode('note_2', 'Quick ideas', libraryId, ['idea_1', 'idea_2']),
     makeNode('idea_1', 'Try using virtual scrolling for large lists', 'note_2', []),
     makeNode('idea_2', 'Add dark mode support', 'note_2', []),
+  ];
+
+  // Person node tagged with Person tag (exercises Email, Company, Age, Website fields)
+  const personNodes = [
+    {
+      ...makeNode('person_1', 'Alice Johnson', libraryId, [
+        'person1_fld_email', 'person1_fld_company', 'person1_fld_age', 'person1_fld_website',
+      ]),
+      props: {
+        ...makeNode('person_1', 'Alice Johnson', libraryId).props,
+        _metaNodeId: 'meta_person_1',
+      },
+      associationMap: {
+        person1_fld_email: 'person1_assoc_email',
+        person1_fld_company: 'person1_assoc_company',
+        person1_fld_age: 'person1_assoc_age',
+        person1_fld_website: 'person1_assoc_website',
+      },
+    },
   ];
 
   // Rich text test node
@@ -243,12 +264,54 @@ export function seedTestData() {
     makeNode('attrDef_company_hide', '', 'attrDef_company', [SYS_A.HIDE_FIELD, SYS_V.NEVER], 'tuple'),
   ];
 
+  // AttrDef: Age (number type)
+  const attrDefAgeNodes: NodexNode[] = [
+    makeNode('attrDef_age', 'Age', schemaId, [
+      'attrDef_age_type', 'attrDef_age_autocollect', 'attrDef_age_autoinit',
+      'attrDef_age_required', 'attrDef_age_hide',
+    ], 'attrDef'),
+    makeNode('attrDef_age_type', '', 'attrDef_age', [SYS_A.TYPE_CHOICE, SYS_D.NUMBER], 'tuple'),
+    makeNode('attrDef_age_autocollect', '', 'attrDef_age', [SYS_A.AUTOCOLLECT_OPTIONS, SYS_V.YES], 'tuple'),
+    makeNode('attrDef_age_autoinit', '', 'attrDef_age', [SYS_A.AUTO_INITIALIZE, SYS_V.NO], 'tuple'),
+    makeNode('attrDef_age_required', '', 'attrDef_age', [SYS_A.NULLABLE, SYS_V.NO], 'tuple'),
+    makeNode('attrDef_age_hide', '', 'attrDef_age', [SYS_A.HIDE_FIELD, SYS_V.NEVER], 'tuple'),
+  ];
+
+  // AttrDef: Website (URL type)
+  const attrDefWebsiteNodes: NodexNode[] = [
+    makeNode('attrDef_website', 'Website', schemaId, [
+      'attrDef_website_type', 'attrDef_website_autocollect', 'attrDef_website_autoinit',
+      'attrDef_website_required', 'attrDef_website_hide',
+    ], 'attrDef'),
+    makeNode('attrDef_website_type', '', 'attrDef_website', [SYS_A.TYPE_CHOICE, SYS_D.URL], 'tuple'),
+    makeNode('attrDef_website_autocollect', '', 'attrDef_website', [SYS_A.AUTOCOLLECT_OPTIONS, SYS_V.YES], 'tuple'),
+    makeNode('attrDef_website_autoinit', '', 'attrDef_website', [SYS_A.AUTO_INITIALIZE, SYS_V.NO], 'tuple'),
+    makeNode('attrDef_website_required', '', 'attrDef_website', [SYS_A.NULLABLE, SYS_V.NO], 'tuple'),
+    makeNode('attrDef_website_hide', '', 'attrDef_website', [SYS_A.HIDE_FIELD, SYS_V.NEVER], 'tuple'),
+  ];
+
+  // AttrDef: Done (checkbox type)
+  const attrDefDoneNodes: NodexNode[] = [
+    makeNode('attrDef_done', 'Done', schemaId, [
+      'attrDef_done_type', 'attrDef_done_autocollect', 'attrDef_done_autoinit',
+      'attrDef_done_required', 'attrDef_done_hide',
+    ], 'attrDef'),
+    makeNode('attrDef_done_type', '', 'attrDef_done', [SYS_A.TYPE_CHOICE, SYS_D.CHECKBOX], 'tuple'),
+    makeNode('attrDef_done_autocollect', '', 'attrDef_done', [SYS_A.AUTOCOLLECT_OPTIONS, SYS_V.YES], 'tuple'),
+    makeNode('attrDef_done_autoinit', '', 'attrDef_done', [SYS_A.AUTO_INITIALIZE, SYS_V.NO], 'tuple'),
+    makeNode('attrDef_done_required', '', 'attrDef_done', [SYS_A.NULLABLE, SYS_V.NO], 'tuple'),
+    makeNode('attrDef_done_hide', '', 'attrDef_done', [SYS_A.HIDE_FIELD, SYS_V.NEVER], 'tuple'),
+  ];
+
   // Set _metaNodeId on attrDef nodes (tagged with SYS_T02)
   attrDefStatusNodes[0].props._metaNodeId = 'meta_attrDef_status';
   attrDefPriorityNodes[0].props._metaNodeId = 'meta_attrDef_priority';
   attrDefDueNodes[0].props._metaNodeId = 'meta_attrDef_due';
   attrDefEmailNodes[0].props._metaNodeId = 'meta_attrDef_email';
   attrDefCompanyNodes[0].props._metaNodeId = 'meta_attrDef_company';
+  attrDefAgeNodes[0].props._metaNodeId = 'meta_attrDef_age';
+  attrDefWebsiteNodes[0].props._metaNodeId = 'meta_attrDef_website';
+  attrDefDoneNodes[0].props._metaNodeId = 'meta_attrDef_done';
 
   // Set _sourceId on config tuples → SYS_T02 templates
   // Status (indices: [1]=type [2]=autocollect [3]=autoinit [4]=required [5]=hide)
@@ -281,6 +344,24 @@ export function seedTestData() {
   attrDefCompanyNodes[3].props._sourceId = 'sysT02_tpl_autoinit';
   attrDefCompanyNodes[4].props._sourceId = 'sysT02_tpl_required';
   attrDefCompanyNodes[5].props._sourceId = 'sysT02_tpl_hide';
+  // Age
+  attrDefAgeNodes[1].props._sourceId = 'sysT02_tpl_type';
+  attrDefAgeNodes[2].props._sourceId = 'sysT02_tpl_autocollect';
+  attrDefAgeNodes[3].props._sourceId = 'sysT02_tpl_autoinit';
+  attrDefAgeNodes[4].props._sourceId = 'sysT02_tpl_required';
+  attrDefAgeNodes[5].props._sourceId = 'sysT02_tpl_hide';
+  // Website
+  attrDefWebsiteNodes[1].props._sourceId = 'sysT02_tpl_type';
+  attrDefWebsiteNodes[2].props._sourceId = 'sysT02_tpl_autocollect';
+  attrDefWebsiteNodes[3].props._sourceId = 'sysT02_tpl_autoinit';
+  attrDefWebsiteNodes[4].props._sourceId = 'sysT02_tpl_required';
+  attrDefWebsiteNodes[5].props._sourceId = 'sysT02_tpl_hide';
+  // Done
+  attrDefDoneNodes[1].props._sourceId = 'sysT02_tpl_type';
+  attrDefDoneNodes[2].props._sourceId = 'sysT02_tpl_autocollect';
+  attrDefDoneNodes[3].props._sourceId = 'sysT02_tpl_autoinit';
+  attrDefDoneNodes[4].props._sourceId = 'sysT02_tpl_required';
+  attrDefDoneNodes[5].props._sourceId = 'sysT02_tpl_hide';
 
   // Metanodes for attrDefs (SYS_T02 tag application chain)
   const attrDefMetanodes: NodexNode[] = [
@@ -294,18 +375,25 @@ export function seedTestData() {
     makeNode('meta_attrDef_email_tag', '', 'meta_attrDef_email', [SYS_A.NODE_SUPERTAGS, 'SYS_T02'], 'tuple'),
     makeNode('meta_attrDef_company', '', 'attrDef_company', ['meta_attrDef_company_tag'], 'metanode'),
     makeNode('meta_attrDef_company_tag', '', 'meta_attrDef_company', [SYS_A.NODE_SUPERTAGS, 'SYS_T02'], 'tuple'),
+    makeNode('meta_attrDef_age', '', 'attrDef_age', ['meta_attrDef_age_tag'], 'metanode'),
+    makeNode('meta_attrDef_age_tag', '', 'meta_attrDef_age', [SYS_A.NODE_SUPERTAGS, 'SYS_T02'], 'tuple'),
+    makeNode('meta_attrDef_website', '', 'attrDef_website', ['meta_attrDef_website_tag'], 'metanode'),
+    makeNode('meta_attrDef_website_tag', '', 'meta_attrDef_website', [SYS_A.NODE_SUPERTAGS, 'SYS_T02'], 'tuple'),
+    makeNode('meta_attrDef_done', '', 'attrDef_done', ['meta_attrDef_done_tag'], 'metanode'),
+    makeNode('meta_attrDef_done_tag', '', 'meta_attrDef_done', [SYS_A.NODE_SUPERTAGS, 'SYS_T02'], 'tuple'),
   ];
 
   // TagDef: Task — template Tuples reference attrDef IDs + regular content nodes (tagged with SYS_T01)
   const tagDefTaskNodes = [
     makeNode('tagDef_task', 'Task', schemaId, [
       'tagDef_task_cfg_checkbox', 'tagDef_task_cfg_childtag', 'tagDef_task_cfg_color',
-      'taskField_status', 'taskField_priority', 'taskField_due',
+      'taskField_status', 'taskField_priority', 'taskField_due', 'taskField_done',
       'taskTpl_default_note',
     ], 'tagDef'),
     makeNode('taskField_status', '', 'tagDef_task', ['attrDef_status'], 'tuple'),
     makeNode('taskField_priority', '', 'tagDef_task', ['attrDef_priority'], 'tuple'),
     makeNode('taskField_due', '', 'tagDef_task', ['attrDef_due'], 'tuple'),
+    makeNode('taskField_done', '', 'tagDef_task', ['attrDef_done'], 'tuple'),
     makeNode('taskTpl_default_note', 'Notes', 'tagDef_task'),  // regular content node in template
   ];
 
@@ -313,10 +401,12 @@ export function seedTestData() {
   const tagDefPersonNodes = [
     makeNode('tagDef_person', 'Person', schemaId, [
       'tagDef_person_cfg_checkbox', 'tagDef_person_cfg_childtag', 'tagDef_person_cfg_color',
-      'personField_email', 'personField_company',
+      'personField_email', 'personField_company', 'personField_age', 'personField_website',
     ], 'tagDef'),
     makeNode('personField_email', '', 'tagDef_person', ['attrDef_email'], 'tuple'),
     makeNode('personField_company', '', 'tagDef_person', ['attrDef_company'], 'tuple'),
+    makeNode('personField_age', '', 'tagDef_person', ['attrDef_age'], 'tuple'),
+    makeNode('personField_website', '', 'tagDef_person', ['attrDef_website'], 'tuple'),
   ];
 
   // Set _metaNodeId on tagDef nodes (tagged with SYS_T01)
@@ -363,14 +453,40 @@ export function seedTestData() {
     makeNode('task1_fld_status', '', 'task_1', ['attrDef_status'], 'tuple'),
     makeNode('task1_fld_priority', '', 'task_1', ['attrDef_priority'], 'tuple'),
     makeNode('task1_fld_due', '', 'task_1', ['attrDef_due'], 'tuple'),
+    makeNode('task1_fld_done', '', 'task_1', ['attrDef_done'], 'tuple'),
     makeNode('task1_assoc_status', '', 'task_1', [], 'associatedData'),
     makeNode('task1_assoc_priority', '', 'task_1', [], 'associatedData'),
     makeNode('task1_assoc_due', '', 'task_1', [], 'associatedData'),
+    makeNode('task1_assoc_done', '', 'task_1', [], 'associatedData'),
   ];
   // Set _sourceId on field instance tuples (link to template)
   task1FieldNodes[0].props._sourceId = 'taskField_status';
   task1FieldNodes[1].props._sourceId = 'taskField_priority';
   task1FieldNodes[2].props._sourceId = 'taskField_due';
+  task1FieldNodes[3].props._sourceId = 'taskField_done';
+
+  // ─── Pre-tag person_1 with "Person" tag (demo all typed fields) ───
+
+  // Metanode for person_1
+  const person1MetanodeNodes: NodexNode[] = [
+    makeNode('meta_person_1', '', 'person_1', ['meta_person_1_tag'], 'metanode'),
+    makeNode('meta_person_1_tag', '', 'meta_person_1', [SYS_A.NODE_SUPERTAGS, 'tagDef_person'], 'tuple'),
+  ];
+  // Field instance tuples + associatedData for person_1
+  const person1FieldNodes: NodexNode[] = [
+    makeNode('person1_fld_email', '', 'person_1', ['attrDef_email'], 'tuple'),
+    makeNode('person1_fld_company', '', 'person_1', ['attrDef_company'], 'tuple'),
+    makeNode('person1_fld_age', '', 'person_1', ['attrDef_age'], 'tuple'),
+    makeNode('person1_fld_website', '', 'person_1', ['attrDef_website'], 'tuple'),
+    makeNode('person1_assoc_email', '', 'person_1', [], 'associatedData'),
+    makeNode('person1_assoc_company', '', 'person_1', [], 'associatedData'),
+    makeNode('person1_assoc_age', '', 'person_1', [], 'associatedData'),
+    makeNode('person1_assoc_website', '', 'person_1', [], 'associatedData'),
+  ];
+  person1FieldNodes[0].props._sourceId = 'personField_email';
+  person1FieldNodes[1].props._sourceId = 'personField_company';
+  person1FieldNodes[2].props._sourceId = 'personField_age';
+  person1FieldNodes[3].props._sourceId = 'personField_website';
 
   const schemaNodes = [
     ...sysT01Nodes,
@@ -380,6 +496,9 @@ export function seedTestData() {
     ...attrDefDueNodes,
     ...attrDefEmailNodes,
     ...attrDefCompanyNodes,
+    ...attrDefAgeNodes,
+    ...attrDefWebsiteNodes,
+    ...attrDefDoneNodes,
     ...attrDefMetanodes,
     ...tagDefTaskNodes,
     ...tagDefTaskConfigNodes,
@@ -388,12 +507,15 @@ export function seedTestData() {
     ...tagDefMetanodes,
     ...task1MetanodeNodes,
     ...task1FieldNodes,
+    ...person1MetanodeNodes,
+    ...person1FieldNodes,
   ];
 
   // ─── Set all nodes ───
   const allNodes = [
     ...containers,
     ...projectNodes,
+    ...personNodes,
     ...noteNodes,
     ...richTextNodes,
     ...inboxNodes,

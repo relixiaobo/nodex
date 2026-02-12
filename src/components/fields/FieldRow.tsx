@@ -23,8 +23,11 @@ import { Trash2 } from 'lucide-react';
 import { useNodeStore } from '../../stores/node-store';
 import { useUIStore } from '../../stores/ui-store';
 import { useWorkspaceStore } from '../../stores/workspace-store';
-import { getFieldTypeIcon, ATTRDEF_CONFIG_MAP, TAGDEF_CONFIG_MAP } from '../../lib/field-utils.js';
+import { SYS_D } from '../../types/index.js';
+import { getFieldTypeIcon, isPlainFieldType, ATTRDEF_CONFIG_MAP, TAGDEF_CONFIG_MAP } from '../../lib/field-utils.js';
 import { FieldValueOutliner } from './FieldValueOutliner';
+import { FieldValueEditor } from './FieldValueEditor';
+import { OptionsFieldValue } from './OptionsFieldValue';
 import { FieldNameInput } from './FieldNameInput';
 import { FieldTypePicker } from './FieldTypePicker';
 import { ConfigToggle } from './ConfigToggle';
@@ -61,9 +64,15 @@ export function FieldRow({
   const setEditingFieldName = useUIStore((s) => s.setEditingFieldName);
   const setFocusedNode = useUIStore((s) => s.setFocusedNode);
   const createSibling = useNodeStore((s) => s.createSibling);
+  const setFieldValue = useNodeStore((s) => s.setFieldValue);
   const wsId = useWorkspaceStore((s) => s.currentWorkspaceId);
   const userId = useWorkspaceStore((s) => s.userId);
   const clickOffsetXRef = useRef<number | undefined>(undefined);
+
+  const handleValueChange = useCallback((value: string) => {
+    if (!wsId || !userId) return;
+    setFieldValue(nodeId, attrDefId, value, wsId, userId);
+  }, [nodeId, attrDefId, wsId, userId, setFieldValue]);
 
   const isTypeChoice = dataType === '__type_choice__';
   const isToggle = dataType === '__toggle__';
@@ -177,10 +186,24 @@ export function FieldRow({
       </div>
       {/* Value column */}
       <div className="flex-1 min-w-0" data-field-value>
-        {assocDataId ? (
-          <FieldValueOutliner assocDataId={assocDataId} />
+        {dataType === SYS_D.OPTIONS || dataType === SYS_D.OPTIONS_FROM_SUPERTAG ? (
+          assocDataId ? (
+            <OptionsFieldValue nodeId={nodeId} attrDefId={attrDefId} assocDataId={assocDataId} />
+          ) : (
+            <span className="text-[11px] text-muted-foreground/50 leading-[22px]">Empty</span>
+          )
+        ) : isPlainFieldType(dataType) ? (
+          assocDataId ? (
+            <FieldValueOutliner assocDataId={assocDataId} />
+          ) : (
+            <span className="text-[11px] text-muted-foreground/50 leading-[22px]">Empty</span>
+          )
         ) : (
-          <span className="text-[11px] text-muted-foreground/50 leading-[22px]">Empty</span>
+          <FieldValueEditor
+            dataType={dataType}
+            currentValue={valueName}
+            onChange={handleValueChange}
+          />
         )}
       </div>
     </div>

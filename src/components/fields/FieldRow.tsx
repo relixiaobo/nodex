@@ -85,9 +85,10 @@ export function FieldRow({
   const isAutoCollect = dataType === '__autocollect__';
   const isTagPicker = dataType === '__tag_picker__';
   const isColorPicker = dataType === '__color_picker__';
-  const isConfigField = isTypeChoice || isToggle || isSelect || isOutliner || isAutoCollect || isTagPicker || isColorPicker;
+  const isConfigField = isTypeChoice || isToggle || isSelect || isAutoCollect || isTagPicker || isColorPicker;
+  const isVirtual = tupleId.startsWith('__virtual_');
   const isEditing = editingFieldNameId === tupleId;
-  const configDef = isConfigField
+  const configDef = (isConfigField || isVirtual)
     ? ATTRDEF_CONFIG_MAP.get(attrDefId) ?? TAGDEF_CONFIG_MAP.get(attrDefId) ?? ATTRDEF_OUTLINER_FIELDS.find(f => f.key === attrDefId) ?? TAGDEF_OUTLINER_FIELDS.find(f => f.key === attrDefId)
     : undefined;
   const Icon = configDef?.icon ?? (isConfigField ? undefined : getFieldTypeIcon(dataType));
@@ -176,15 +177,15 @@ export function FieldRow({
       <div className="flex items-center gap-1 @sm:shrink-0 @sm:w-[130px] min-w-0 h-7 py-1">
         <button
           className="shrink-0 w-[15px] flex items-center justify-center text-muted-foreground/50 hover:text-muted-foreground transition-colors"
-          onClick={trashed ? undefined : () => navigateTo(attrDefId)}
-          title={trashed ? undefined : 'Configure field'}
-          style={trashed ? { cursor: 'default' } : undefined}
+          onClick={trashed || isVirtual ? undefined : () => navigateTo(attrDefId)}
+          title={trashed || isVirtual ? undefined : 'Configure field'}
+          style={trashed || isVirtual ? { cursor: 'default' } : undefined}
         >
           {Icon && <Icon size={12} />}
         </button>
         <div
-          className={`flex-1 min-w-0 flex items-center gap-0.5${!trashed && !isEditing ? ' cursor-text' : ''}`}
-          onClick={!trashed && !isEditing ? handleNameClick : undefined}
+          className={`flex-1 min-w-0 flex items-center gap-0.5${!trashed && !isVirtual && !isEditing ? ' cursor-text' : ''}`}
+          onClick={!trashed && !isVirtual && !isEditing ? handleNameClick : undefined}
         >
           {trashed && (
             <span title={`Field "${attrDefName}" has been deleted`}>
@@ -212,7 +213,9 @@ export function FieldRow({
       </div>
       {/* Value column */}
       <div className="flex-1 min-w-0" data-field-value>
-        {dataType === SYS_D.OPTIONS || dataType === SYS_D.OPTIONS_FROM_SUPERTAG ? (
+        {isOutliner ? (
+          <ConfigOutliner nodeId={nodeId} />
+        ) : dataType === SYS_D.OPTIONS || dataType === SYS_D.OPTIONS_FROM_SUPERTAG ? (
           <OptionsPicker nodeId={nodeId} attrDefId={attrDefId} assocDataId={assocDataId} />
         ) : isPlainFieldType(dataType) ? (
           assocDataId ? (

@@ -1,10 +1,10 @@
 /**
- * Generic combobox component: bullet + click-to-edit + filtered dropdown.
+ * Generic combobox component: bullet + inline-edit + filtered dropdown.
  *
  * Used by OptionsPicker, FieldTypePicker, and ConfigSelect.
  *
- * Click on value → dropdown opens below, current value stays visible.
- * Dropdown has search input at top + bullet-styled option rows.
+ * Click on value → value becomes editable input (pre-filled, selected),
+ * dropdown appears below. Typing filters options. Backspace clears.
  * ArrowUp/Down navigate, Enter selects, Escape closes, click outside closes.
  *
  * Self-contained bullet layout (pl-6 + BulletChevron + gap-7.5px).
@@ -40,6 +40,8 @@ export function NodePicker({
 }: NodePickerProps) {
   const [open, setOpen] = useState(false);
   const [inputValue, setInputValue] = useState('');
+  // Whether the input text is in "selected" state (all text highlighted, next keystroke replaces)
+  const [textSelected, setTextSelected] = useState(false);
   const [hoverIndex, setHoverIndex] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -49,11 +51,12 @@ export function NodePicker({
     return options.find((o) => o.id === selectedId)?.name;
   }, [options, selectedId]);
 
+  // When textSelected, show all options (user hasn't typed yet); otherwise filter
   const filteredOptions = useMemo(() => {
-    if (!inputValue.trim()) return options;
+    if (textSelected || !inputValue.trim()) return options;
     const query = inputValue.trim().toLowerCase();
     return options.filter((opt) => opt.name.toLowerCase().includes(query));
-  }, [options, inputValue]);
+  }, [options, inputValue, textSelected]);
 
   // Reset hover index when filtered options change
   useEffect(() => {
@@ -63,13 +66,20 @@ export function NodePicker({
   const closeDropdown = useCallback(() => {
     setOpen(false);
     setInputValue('');
+    setTextSelected(false);
     setHoverIndex(0);
   }, []);
 
-  // Auto-focus search input when dropdown opens
+  // Auto-focus and select input when dropdown opens
   useEffect(() => {
     if (open) {
-      requestAnimationFrame(() => inputRef.current?.focus());
+      requestAnimationFrame(() => {
+        const input = inputRef.current;
+        if (input) {
+          input.focus();
+          input.select();
+        }
+      });
     }
   }, [open]);
 
@@ -124,17 +134,26 @@ export function NodePicker({
     [filteredOptions, hoverIndex, inputValue, allowCreate, handleSelect, handleCreate, closeDropdown],
   );
 
+  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setInputValue(e.target.value);
+    setTextSelected(false);
+  }, []);
+
   const handleClick = useCallback(() => {
     if (!open) {
       setOpen(true);
-      setInputValue('');
+      setInputValue(selectedName ?? '');
+      setTextSelected(true);
     }
-  }, [open]);
+  }, [open, selectedName]);
 
   return (
     <div ref={containerRef} className="relative min-h-[22px]">
-      {/* Value display — always visible, click to toggle dropdown */}
-      <div className="cursor-pointer group/picker" onClick={handleClick}>
+      {/* Value row — static display or inline editable input */}
+      <div
+        className={`cursor-pointer group/picker ${open ? '' : ''}`}
+        onClick={handleClick}
+      >
         <div
           className="flex min-h-7 items-start gap-[7.5px] py-1"
           style={{ paddingLeft: 6 }}
@@ -145,17 +164,33 @@ export function NodePicker({
             onToggle={noop}
             onDrillDown={noop}
             onBulletClick={noop}
-            {...(selectedName ? (isReference ? { isReference: true } : {}) : { dimmed: true })}
+            {...(open
+              ? (isReference ? { isReference: true } : {})
+              : selectedName
+                ? (isReference ? { isReference: true } : {})
+                : { dimmed: true })}
           />
-          <span
-            className={
-              selectedName
-                ? 'text-sm leading-[21px] text-foreground'
-                : 'text-sm leading-[21px] text-muted-foreground/40 select-none group-hover/picker:text-muted-foreground/60 transition-colors'
-            }
-          >
-            {selectedName ?? placeholder}
-          </span>
+          {open ? (
+            <input
+              ref={inputRef}
+              type="text"
+              value={inputValue}
+              onChange={handleInputChange}
+              onKeyDown={handleKeyDown}
+              className="flex-1 min-w-0 bg-transparent text-sm leading-[21px] text-foreground outline-none
+                border-b border-primary/40 -mb-px"
+            />
+          ) : (
+            <span
+              className={
+                selectedName
+                  ? 'text-sm leading-[21px] text-foreground'
+                  : 'text-sm leading-[21px] text-muted-foreground/40 select-none group-hover/picker:text-muted-foreground/60 transition-colors'
+              }
+            >
+              {selectedName ?? placeholder}
+            </span>
+          )}
         </div>
       </div>
 
@@ -165,47 +200,29 @@ export function NodePicker({
           className="absolute left-6 top-full z-50 mt-0.5 w-48 max-h-52 overflow-y-auto rounded-lg border border-border bg-popover shadow-lg"
           onMouseDown={(e) => e.preventDefault()}
         >
-          {/* Search input */}
-          <div className="sticky top-0 bg-popover p-1.5 border-b border-border/40">
-            <input
-              ref={inputRef}
-              type="text"
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder={allowCreate ? 'Search or create...' : 'Search...'}
-              className="w-full bg-transparent text-xs leading-5 text-foreground outline-none placeholder:text-muted-foreground/40"
-            />
-          </div>
-
           {/* Option list — bullet + text per item */}
           {filteredOptions.length > 0 ? (
             <div className="py-0.5">
-              {filteredOptions.map((opt, i) => {
-                const isSelected = opt.id === selectedId;
-                return (
-                  <button
-                    key={opt.id}
-                    className={`flex w-full items-center gap-[7.5px] pl-1.5 pr-3 min-h-7 text-left transition-colors ${
-                      i === hoverIndex ? 'bg-accent' : 'hover:bg-accent/50'
-                    }`}
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => handleSelect(opt.id)}
-                    onMouseEnter={() => setHoverIndex(i)}
-                  >
-                    {/* Bullet dot — matches outliner node style */}
-                    <span className="flex shrink-0 w-[15px] h-[15px] items-center justify-center">
-                      <span className={`block h-[5px] w-[5px] rounded-full ${isSelected ? 'bg-primary' : 'bg-foreground/50'}`} />
-                    </span>
-                    <span className={`text-sm leading-[21px] ${isSelected ? 'text-primary font-medium' : 'text-foreground'}`}>
-                      {opt.name}
-                    </span>
-                  </button>
-                );
-              })}
+              {filteredOptions.map((opt, i) => (
+                <button
+                  key={opt.id}
+                  className={`flex w-full items-center gap-[7.5px] pl-1.5 pr-3 min-h-7 text-left transition-colors ${
+                    i === hoverIndex ? 'bg-accent' : 'hover:bg-accent/50'
+                  }`}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => handleSelect(opt.id)}
+                  onMouseEnter={() => setHoverIndex(i)}
+                >
+                  <span className="flex shrink-0 w-[15px] h-[15px] items-center justify-center">
+                    <span className="block h-[5px] w-[5px] rounded-full bg-foreground/50" />
+                  </span>
+                  <span className="text-sm leading-[21px] text-foreground">
+                    {opt.name}
+                  </span>
+                </button>
+              ))}
             </div>
           ) : allowCreate && inputValue.trim() ? (
-            /* No matches — show create hint */
             <div className="py-0.5">
               <button
                 className="flex w-full items-center gap-[7.5px] pl-1.5 pr-3 min-h-7 text-left bg-accent text-foreground"

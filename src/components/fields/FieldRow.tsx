@@ -1,13 +1,21 @@
 /**
  * Single field row: two-column layout with separator line.
  *
+ * Regular fields:
  * ──────────────────────────────────────
  * [icon] [editable name   ] • value node
  *                            • value node 2
  * ──────────────────────────────────────
  *
- * - Type icon: clickable → pushPanel to attrDef
+ * Config fields (attrDef):
+ * ──────────────────────────────────────
+ * [icon] Field name           [control]
+ *        Description text
+ * ──────────────────────────────────────
+ *
+ * - Type icon: clickable → pushPanel to attrDef (regular), static (config)
  * - Field name: static label, click to edit (activates FieldNameInput)
+ * - Config description: shown below name in name column
  * - Value area: FieldValueOutliner (plain) or OptionsFieldValue (options dropdown)
  */
 import { useCallback, useRef } from 'react';
@@ -74,36 +82,58 @@ export function FieldRow({
     setEditingFieldName(tupleId);
   }, [tupleId, setEditingFieldName]);
 
-  return (
-    <div className={`border-t ${isLastInGroup ? 'border-b' : ''} border-border/40 flex items-center min-h-[28px] py-1`} data-field-row>
-      {/* Name column — fixed height container to prevent jump */}
-      <div className="flex items-center gap-1 shrink-0 w-[130px] min-w-0 h-[22px]">
-        {isConfigField ? (
-          Icon ? (
-            <span className="shrink-0 w-[15px] flex items-center justify-center text-muted-foreground/40">
+  // Config fields: name+description on left, control on right (items-start for multi-line)
+  if (isConfigField) {
+    return (
+      <div className={`border-t ${isLastInGroup ? 'border-b' : ''} border-border/40 flex items-start min-h-[28px] py-1.5`} data-field-row>
+        {/* Name column — icon + name + description */}
+        <div className="flex gap-1 shrink-0 w-[180px] min-w-0">
+          {Icon ? (
+            <span className="shrink-0 w-[15px] flex items-center justify-center text-muted-foreground/40 mt-[3px]">
               <Icon size={12} />
             </span>
           ) : (
             <span className="shrink-0 w-[15px]" />
-          )
-        ) : (
-          <button
-            className="shrink-0 w-[15px] flex items-center justify-center text-muted-foreground/50 hover:text-muted-foreground transition-colors"
-            onClick={() => pushPanel(attrDefId)}
-            title="Configure field"
-          >
-            {Icon && <Icon size={12} />}
-          </button>
-        )}
-        <div className="flex-1 min-w-0">
-          {isConfigField ? (
-            <span
-              className="block text-sm leading-[22px] h-[22px] text-muted-foreground truncate"
-              title={attrDefName}
-            >
+          )}
+          <div className="flex-1 min-w-0">
+            <span className="block text-sm font-medium leading-[22px] text-foreground">
               {attrDefName}
             </span>
-          ) : isEditing ? (
+            {configDef?.description && (
+              <span className="block text-xs leading-tight text-muted-foreground/50 mt-0.5">
+                {configDef.description}
+              </span>
+            )}
+          </div>
+        </div>
+        {/* Value column — just the control */}
+        <div className="flex-1 min-w-0 flex items-center min-h-[22px]" data-field-value>
+          {isTypeChoice ? (
+            <FieldTypePicker attrDefId={nodeId} currentValue={valueName ?? ''} />
+          ) : isToggle ? (
+            <ConfigToggle tupleId={tupleId} fieldKey={attrDefId} currentValue={valueName} />
+          ) : (
+            <ConfigSelect tupleId={tupleId} fieldKey={attrDefId} currentValue={valueName} />
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // Regular fields: icon + editable name on left, value outliner on right
+  return (
+    <div className={`border-t ${isLastInGroup ? 'border-b' : ''} border-border/40 flex items-center min-h-[28px] py-1`} data-field-row>
+      {/* Name column — fixed height container to prevent jump */}
+      <div className="flex items-center gap-1 shrink-0 w-[130px] min-w-0 h-[22px]">
+        <button
+          className="shrink-0 w-[15px] flex items-center justify-center text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+          onClick={() => pushPanel(attrDefId)}
+          title="Configure field"
+        >
+          {Icon && <Icon size={12} />}
+        </button>
+        <div className="flex-1 min-w-0">
+          {isEditing ? (
             <FieldNameInput
               tupleId={tupleId}
               nodeId={nodeId}
@@ -125,13 +155,7 @@ export function FieldRow({
       </div>
       {/* Value column */}
       <div className="flex-1 min-w-0" data-field-value>
-        {isTypeChoice ? (
-          <FieldTypePicker attrDefId={nodeId} currentValue={valueName ?? ''} />
-        ) : isToggle ? (
-          <ConfigToggle tupleId={tupleId} fieldKey={attrDefId} currentValue={valueName} />
-        ) : isSelect ? (
-          <ConfigSelect tupleId={tupleId} fieldKey={attrDefId} currentValue={valueName} />
-        ) : assocDataId ? (
+        {assocDataId ? (
           <FieldValueOutliner assocDataId={assocDataId} />
         ) : (
           <span className="text-[11px] text-muted-foreground/50 leading-[22px]">Empty</span>

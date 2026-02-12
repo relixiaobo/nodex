@@ -3,6 +3,8 @@
  *
  * Options come from the ATTRDEF_CONFIG_FIELDS registry.
  * onChange updates the Tuple value via setConfigValue.
+ *
+ * Description is rendered by FieldRow (name column), not here.
  */
 import { useCallback } from 'react';
 import { useNodeStore } from '../../stores/node-store';
@@ -27,21 +29,16 @@ export function ConfigSelect({ tupleId, fieldKey, currentValue }: ConfigSelectPr
   }, [tupleId, setConfigValue, userId]);
 
   return (
-    <div className="flex flex-col gap-0.5">
-      <select
-        value={currentValue ?? configDef?.defaultValue ?? ''}
-        onChange={handleChange}
-        className="h-[22px] text-sm bg-transparent border border-border/40 rounded px-1.5 text-foreground cursor-pointer outline-none hover:border-border/80 transition-colors"
-      >
-        {options.map((opt) => (
-          <option key={opt.value} value={opt.value}>
-            {opt.label}
-          </option>
-        ))}
-      </select>
-      {configDef?.description && (
-        <span className="text-xs text-muted-foreground/60">{configDef.description}</span>
-      )}
-    </div>
+    <select
+      value={currentValue ?? configDef?.defaultValue ?? ''}
+      onChange={handleChange}
+      className="h-[22px] text-sm bg-transparent border border-border/40 rounded px-1.5 text-foreground cursor-pointer outline-none hover:border-border/80 transition-colors"
+    >
+      {options.map((opt) => (
+        <option key={opt.value} value={opt.value}>
+          {opt.label}
+        </option>
+      ))}
+    </select>
   );
 }

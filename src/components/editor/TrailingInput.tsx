@@ -135,12 +135,16 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
             if (ref.isOptions && ref.optionsOpen && ref.filteredOptions.length > 0) {
               const selected = ref.filteredOptions[ref.optionsIndex];
               if (selected && ref.userId) {
+                committingRef.current = true;
                 ref.addReference(ref.effectiveParentId, selected.id, ref.userId);
                 editor.commands.clearContent(false);
                 setHasContent(false);
                 ref.setOptionsOpen(false);
                 ref.setOptionsQuery('');
                 ref.setOptionsIndex(0);
+                // Blur so the TrailingInput doesn't look like an empty node
+                editor.commands.blur();
+                queueMicrotask(() => { committingRef.current = false; });
               }
               return true;
             }
@@ -327,6 +331,15 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
         }
       }
     },
+    onFocus: () => {
+      // Options: show all options immediately on focus (even with empty input)
+      const ref = callbacksRef.current;
+      if (ref.isOptions) {
+        setOptionsOpen(true);
+        setOptionsQuery('');
+        setOptionsIndex(0);
+      }
+    },
     onBlur: ({ editor }) => {
       if (committingRef.current) return;
       const text = editor.state.doc.textContent.trim();
@@ -360,12 +373,16 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
   const handleOptionClick = useCallback((optionId: string) => {
     const ref = callbacksRef.current;
     if (!ref.userId || !editor || editor.isDestroyed) return;
+    committingRef.current = true;
     ref.addReference(ref.effectiveParentId, optionId, ref.userId);
     editor.commands.clearContent(false);
     setHasContent(false);
     setOptionsOpen(false);
     setOptionsQuery('');
     setOptionsIndex(0);
+    // Blur so the TrailingInput doesn't look like an empty node
+    editor.commands.blur();
+    queueMicrotask(() => { committingRef.current = false; });
   }, [editor]);
 
   return (

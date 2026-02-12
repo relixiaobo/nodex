@@ -204,6 +204,7 @@
 - [x] Email 邮箱输入（click-to-edit）
 - [x] Checkbox 复选框（inline toggle, SYS_V03/V04）
 - [x] FieldRow 统一值渲染器（所有类型 → FieldValueOutliner，含 Checkbox）
+- [x] Options 自动补全（TrailingInput 集成，输入时下拉匹配预置/auto-collected 选项，Enter 添加引用）
 - [ ] Options from Supertag（独立类型）
 - [ ] Tana User 类型
 - [ ] 字段隐藏规则运行时（5 种模式）
@@ -219,7 +220,7 @@
 
 ## 与 Tana 的已知差异
 
-- Tana 的 Options 值区域本质是 outliner（可自由输入、嵌套、`>` 转字段），预置选项只是一种输入方式。Nodex 当前用独立 combobox 渲染，不支持自由输入和树操作
+- ~~Tana 的 Options 值区域本质是 outliner~~ **已解决**：统一值渲染器完成后，Options 值区域 = FieldValueOutliner，支持自由输入、嵌套、`>` 转字段。TrailingInput 集成自动补全，输入时匹配预置/auto-collected 选项
 - Tana 的 Options 支持更丰富的 UI（彩色 pill、多列选择器），Nodex 已实现 combobox 但尚无 pill 样式
 - Tana 字段隐藏有 5 种模式（Never/When empty/When not empty/When default/Always），我们需全部实现
 - Tana Auto-initialize 有 6 种策略，适用于多种字段类型

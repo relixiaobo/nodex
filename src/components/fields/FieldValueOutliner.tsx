@@ -1,10 +1,13 @@
 /**
- * Mini outliner for plain-type field values.
+ * Mini outliner for field values (all types that store values as nodes).
  *
  * Uses AssociatedData node as the root. Its children are value nodes
  * rendered with full OutlinerItem capabilities (Enter, Tab, children, etc.).
  * Field tuples are rendered as FieldRow (same as OutlinerItem).
  * Shows a TrailingInput when empty or at the end.
+ *
+ * Used for Plain and Options field types. fieldDataType and attrDefId are
+ * passed through for future type-specific rendering (e.g., option autocomplete).
  */
 import { useMemo } from 'react';
 import { useNodeStore } from '../../stores/node-store';
@@ -16,11 +19,13 @@ import { FieldRow } from './FieldRow';
 
 interface FieldValueOutlinerProps {
   assocDataId: string;
-  /** Hide the TrailingInput at the bottom (used by Options fields which provide their own picker) */
-  hideTrailing?: boolean;
+  /** Field data type (e.g., SYS_D.OPTIONS) — for future type-specific value rendering */
+  fieldDataType?: string;
+  /** AttrDef ID — for future option autocomplete */
+  attrDefId?: string;
 }
 
-export function FieldValueOutliner({ assocDataId, hideTrailing }: FieldValueOutlinerProps) {
+export function FieldValueOutliner({ assocDataId }: FieldValueOutlinerProps) {
   useChildren(assocDataId);
   const childIds = useNodeStore((s) => s.entities[assocDataId]?.children ?? []);
   const entities = useNodeStore((s) => s.entities);
@@ -87,9 +92,7 @@ export function FieldValueOutliner({ assocDataId, hideTrailing }: FieldValueOutl
           />
         ),
       )}
-      {!hideTrailing && (
-        <TrailingInput parentId={assocDataId} depth={0} parentExpandKey={`${entities[assocDataId]?.props._ownerId ?? ''}:${assocDataId}`} />
-      )}
+      <TrailingInput parentId={assocDataId} depth={0} parentExpandKey={`${entities[assocDataId]?.props._ownerId ?? ''}:${assocDataId}`} />
     </div>
   );
 }

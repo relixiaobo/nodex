@@ -18,7 +18,29 @@
 - 字段行布局：`[icon] [字段名 130px] [字段值区域]`
 - 字段名可编辑（点击进入编辑模式，自动完成已有 attrDef 名）
 - 字段名为空时自动聚焦到字段名编辑器
-- 字段值区域根据数据类型渲染不同的编辑器
+
+### 字段值统一模型（设计原则）
+
+**所有字段类型的值区域本质上都是 outliner**。数据模型层面，值永远是 `assocData.children[]` —— 一组节点。dataType 只决定值节点的**输入方式**和**显示格式**，不改变值区域的底层结构。
+
+统一行为（所有类型共享）：
+- 值区域 = `FieldValueOutliner`（mini outliner）
+- 支持多个值节点（assocData.children 可以有多项）
+- 支持嵌套子节点
+- 支持 `>` 转 field tuple（创建嵌套字段）
+- TrailingInput 添加新值
+- 完整的树操作（Enter/Tab/Shift+Tab）
+
+类型特有行为（由 dataType 控制）：
+- **Plain**（默认）：标准文本编辑
+- **Options**：文本编辑 + 可从预置选项中选取（值 = 节点引用）
+- **Date**：日期选择器
+- **Number/Integer**：数字输入
+- **URL**：URL 输入 + 链接样式显示
+- **Email**：邮箱输入
+- **Checkbox**：复选框 toggle
+
+> **当前实现差距**：目前按 dataType 分发到 3 种独立渲染器（FieldValueOutliner / OptionsPicker / FieldValueEditor），尚未统一。重构方向见决策记录 2026-02-12 "统一值渲染器"。
 
 ### 字段配置页（AttrDef Config）
 
@@ -163,6 +185,7 @@
 | 2026-02-12 | FieldValueEditor 移除 Options 分支 | Options 由 OptionsFieldValue 独立处理（支持 ReferenceNode 显示） |
 | 2026-02-12 | OptionsPicker 改为 combobox 模式 | 支持输入搜索 + 新建选项，与 Tana 交互一致 |
 | 2026-02-12 | Auto-collect: 原节点在 field value，引用在 autocollect Tuple | 分离 pre-determined 与 auto-collected，Tuple children[2+] 存引用 |
+| 2026-02-12 | **统一值渲染器**：所有字段类型值区域 = FieldValueOutliner | 数据模型层面值永远是 assocData.children[]，dataType 只决定值节点的输入方式和显示格式，不改变底层结构。替代当前 3 渲染器分发 |
 
 ## 当前状态
 
@@ -195,6 +218,7 @@
 
 ## 与 Tana 的已知差异
 
+- Tana 的 Options 值区域本质是 outliner（可自由输入、嵌套、`>` 转字段），预置选项只是一种输入方式。Nodex 当前用独立 combobox 渲染，不支持自由输入和树操作
 - Tana 的 Options 支持更丰富的 UI（彩色 pill、多列选择器），Nodex 已实现 combobox 但尚无 pill 样式
 - Tana 字段隐藏有 5 种模式（Never/When empty/When not empty/When default/Always），我们需全部实现
 - Tana Auto-initialize 有 6 种策略，适用于多种字段类型

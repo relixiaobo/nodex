@@ -1,12 +1,13 @@
 /**
- * Generic combobox component: bullet + inline-edit + filtered dropdown.
+ * Generic combobox component: bullet + click-to-edit + filtered dropdown.
  *
  * Used by OptionsPicker, FieldTypePicker, and ConfigSelect.
  *
- * Click on value → value becomes editable input (pre-filled, selected),
- * dropdown appears below. Typing filters options. Backspace clears.
- * ArrowUp/Down navigate, Enter selects, Escape closes, click outside closes.
+ * Two editing modes based on isReference:
+ * - Non-reference (config fields): click → plain input with cursor, like editing a normal node
+ * - Reference (Options): click → bordered box "selected" state, typing replaces/filters
  *
+ * ArrowUp/Down navigate, Enter selects, Escape closes, click outside closes.
  * Self-contained bullet layout (pl-6 + BulletChevron + gap-7.5px).
  */
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
@@ -70,18 +71,22 @@ export function NodePicker({
     setHoverIndex(0);
   }, []);
 
-  // Auto-focus and select input when dropdown opens
+  // Auto-focus input when dropdown opens
   useEffect(() => {
     if (open) {
       requestAnimationFrame(() => {
         const input = inputRef.current;
         if (input) {
           input.focus();
-          input.select();
+          if (!isReference) {
+            // Non-reference: place cursor at end, like a normal node
+            const len = input.value.length;
+            input.setSelectionRange(len, len);
+          }
         }
       });
     }
-  }, [open]);
+  }, [open, isReference]);
 
   // Close on click outside
   useEffect(() => {
@@ -129,9 +134,14 @@ export function NodePicker({
       } else if (e.key === 'Escape') {
         e.preventDefault();
         closeDropdown();
+      } else if (e.key === 'Backspace' && isReference && textSelected) {
+        // Reference mode: backspace in selected state clears the value text
+        e.preventDefault();
+        setInputValue('');
+        setTextSelected(false);
       }
     },
-    [filteredOptions, hoverIndex, inputValue, allowCreate, handleSelect, handleCreate, closeDropdown],
+    [filteredOptions, hoverIndex, inputValue, allowCreate, isReference, textSelected, handleSelect, handleCreate, closeDropdown],
   );
 
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -142,56 +152,95 @@ export function NodePicker({
   const handleClick = useCallback(() => {
     if (!open) {
       setOpen(true);
-      setInputValue(selectedName ?? '');
-      setTextSelected(true);
+      if (isReference) {
+        // Reference mode: hidden input starts empty, visible box shows selectedName
+        setInputValue('');
+        setTextSelected(true);
+      } else {
+        // Non-reference: input pre-filled with current value, text selected
+        setInputValue(selectedName ?? '');
+        setTextSelected(false);
+      }
     }
-  }, [open, selectedName]);
+  }, [open, selectedName, isReference]);
 
   return (
     <div ref={containerRef} className="relative min-h-[22px]">
-      {/* Value row — static display or inline editable input */}
+      {/* Value row — click to open dropdown */}
       <div
-        className={`cursor-pointer group/picker ${open ? '' : ''}`}
+        className="cursor-pointer group/picker"
         onClick={handleClick}
       >
-        <div
-          className="flex min-h-7 items-start gap-[7.5px] py-1"
-          style={{ paddingLeft: 6 }}
-        >
-          <BulletChevron
-            hasChildren={false}
-            isExpanded={false}
-            onToggle={noop}
-            onDrillDown={noop}
-            onBulletClick={noop}
-            {...(open
-              ? (isReference ? { isReference: true } : {})
-              : selectedName
+        {open && isReference ? (
+          /* Reference mode: bordered box with value text, hidden input captures keyboard */
+          <div
+            className="flex min-h-7 items-start gap-[7.5px] py-1"
+            style={{ paddingLeft: 6 }}
+          >
+            <BulletChevron
+              hasChildren={false}
+              isExpanded={false}
+              onToggle={noop}
+              onDrillDown={noop}
+              onBulletClick={noop}
+              isReference
+            />
+            <div className="relative flex items-center min-h-[21px]">
+              {/* Visible bordered box showing current value or typed text */}
+              <span className="inline-flex items-center rounded border border-primary/50 px-1 text-sm leading-[21px] text-foreground min-w-[2ch]">
+                {textSelected ? (selectedName ?? '') : inputValue}
+              </span>
+              {/* Hidden input for keyboard capture */}
+              <input
+                ref={inputRef}
+                type="text"
+                value={inputValue}
+                onChange={handleInputChange}
+                onKeyDown={handleKeyDown}
+                className="absolute inset-0 w-full opacity-0"
+                aria-hidden
+              />
+            </div>
+          </div>
+        ) : (
+          /* Non-reference mode or closed state */
+          <div
+            className="flex min-h-7 items-start gap-[7.5px] py-1"
+            style={{ paddingLeft: 6 }}
+          >
+            <BulletChevron
+              hasChildren={false}
+              isExpanded={false}
+              onToggle={noop}
+              onDrillDown={noop}
+              onBulletClick={noop}
+              {...(selectedName
                 ? (isReference ? { isReference: true } : {})
                 : { dimmed: true })}
-          />
-          {open ? (
-            <input
-              ref={inputRef}
-              type="text"
-              value={inputValue}
-              onChange={handleInputChange}
-              onKeyDown={handleKeyDown}
-              className="flex-1 min-w-0 bg-transparent text-sm leading-[21px] text-foreground outline-none
-                border-b border-primary/40 -mb-px"
             />
-          ) : (
-            <span
-              className={
-                selectedName
-                  ? 'text-sm leading-[21px] text-foreground'
-                  : 'text-sm leading-[21px] text-muted-foreground/40 select-none group-hover/picker:text-muted-foreground/60 transition-colors'
-              }
-            >
-              {selectedName ?? placeholder}
-            </span>
-          )}
-        </div>
+            {open ? (
+              /* Non-reference editing: plain input with cursor, like a normal node */
+              <input
+                ref={inputRef}
+                type="text"
+                value={inputValue}
+                onChange={handleInputChange}
+                onKeyDown={handleKeyDown}
+                className="flex-1 min-w-0 bg-transparent text-sm leading-[21px] text-foreground outline-none"
+              />
+            ) : (
+              <span
+                className={
+                  selectedName
+                    ? 'text-sm leading-[21px] text-foreground'
+                    : 'text-sm leading-[21px] text-muted-foreground/40 select-none group-hover/picker:text-muted-foreground/60 transition-colors'
+                }
+              >
+                {selectedName ?? placeholder}
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Dropdown — shown below the value */}

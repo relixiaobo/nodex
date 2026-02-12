@@ -65,7 +65,7 @@ export function ConfigOutliner({ nodeId }: ConfigOutlinerProps) {
     <div className="min-h-[22px]">
       {visibleChildren.map(({ id, type }, i) =>
         type === 'field' ? (
-          <div key={id} style={{ paddingLeft: 15 }}>
+          <div key={id} className="@container" style={{ paddingLeft: 6 + 15 }}>
             <FieldRow
               nodeId={nodeId}
               attrDefId={fieldMap.get(id)!.attrDefId}

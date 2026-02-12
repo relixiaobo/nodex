@@ -57,7 +57,7 @@ export function FieldValueOutliner({ assocDataId, hideTrailing }: FieldValueOutl
     <div className="min-h-[22px]">
       {visibleChildren.map(({ id, type }, i) =>
         type === 'field' ? (
-          <div key={id} style={{ paddingLeft: 15 }}>
+          <div key={id} className="@container" style={{ paddingLeft: 6 + 15 }}>
             <FieldRow
               nodeId={assocDataId}
               attrDefId={fieldMap.get(id)!.attrDefId}

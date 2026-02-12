@@ -10,17 +10,17 @@ import { getAncestorChain, type AncestorInfo } from '../lib/tree-utils';
 
 interface AncestorResult {
   ancestors: AncestorInfo[];
-  rootContainerId: string | null;
+  workspaceRootId: string | null;
 }
 
-const EMPTY: AncestorResult = { ancestors: [], rootContainerId: null };
+const EMPTY: AncestorResult = { ancestors: [], workspaceRootId: null };
 const EMPTY_JSON = JSON.stringify(EMPTY);
 
 export function useAncestors(nodeId: string | null): AncestorResult {
   const json = useNodeStore((state) => {
     if (!nodeId) return EMPTY_JSON;
     const result = getAncestorChain(nodeId, state.entities);
-    if (result.ancestors.length === 0 && !result.rootContainerId) return EMPTY_JSON;
+    if (result.ancestors.length === 0 && !result.workspaceRootId) return EMPTY_JSON;
     return JSON.stringify(result);
   });
 

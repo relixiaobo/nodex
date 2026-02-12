@@ -29,17 +29,18 @@ export interface AncestorInfo {
 }
 
 /**
- * Walk _ownerId chain from nodeId up to (but excluding) a workspace container.
+ * Walk _ownerId chain from nodeId up to (but excluding) the workspace root.
  * Returns ancestors ordered root-most → immediate parent (top to bottom).
- * Excludes the current node itself and the workspace container.
+ * Containers are included as normal ancestors. The workspace root is recorded
+ * separately as `workspaceRootId`.
  */
 export function getAncestorChain(
   nodeId: string,
   entities: Record<string, NodexNode>,
-): { ancestors: AncestorInfo[]; rootContainerId: string | null } {
+): { ancestors: AncestorInfo[]; workspaceRootId: string | null } {
   const chain: AncestorInfo[] = [];
   let currentId = nodeId;
-  let rootContainerId: string | null = null;
+  let workspaceRootId: string | null = null;
   const visited = new Set<string>();
 
   while (true) {
@@ -52,24 +53,14 @@ export function getAncestorChain(
 
     // Stop at workspace root — record it but don't add to chain
     if (isWorkspaceRoot(parentId, entities)) {
-      rootContainerId = parentId;
+      workspaceRootId = parentId;
       break;
     }
 
-    // Stop at workspace container — record it but don't add to chain
-    if (isWorkspaceContainer(parentId)) {
-      rootContainerId = parentId;
-      break;
-    }
-
-    // Stop at nodes with no parent (orphans or unknown roots)
     const parentNode = entities[parentId];
-    if (!parentNode || !parentNode.props._ownerId) {
-      rootContainerId = parentId;
-      break;
-    }
+    if (!parentNode) break;
 
-    // Add parent to chain (will be reversed later)
+    // Add parent to chain (will be reversed later) — containers included
     const rawName = parentNode.props.name ?? '';
     const displayName = rawName.replace(/<[^>]+>/g, '') || parentId;
     chain.push({ id: parentId, name: displayName });
@@ -77,7 +68,7 @@ export function getAncestorChain(
     currentId = parentId;
   }
 
-  return { ancestors: chain.reverse(), rootContainerId };
+  return { ancestors: chain.reverse(), workspaceRootId };
 }
 
 /**

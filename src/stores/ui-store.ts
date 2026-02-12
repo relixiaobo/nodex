@@ -62,6 +62,12 @@ interface UIStore {
   // OutlinerItem reads & clears this to open the appropriate dropdown on mount
   triggerHint: '#' | '@' | null;
   setTriggerHint(hint: '#' | '@' | null): void;
+
+  // Navigation undo/redo (session-only, not persisted)
+  navUndoStack: Array<{ panelHistory: string[]; panelIndex: number }>;
+  navRedoStack: Array<{ panelHistory: string[]; panelIndex: number }>;
+  navUndo(): void;
+  navRedo(): void;
 }
 
 /** Stable selector for the current (top) node ID. */
@@ -79,18 +85,35 @@ export const useUIStore = create<UIStore>()(
           // Truncate forward history, skip duplicate of current page
           const newHistory = s.panelHistory.slice(0, s.panelIndex + 1);
           if (newHistory[newHistory.length - 1] === nodeId) return {};
+          // Push undo snapshot before modifying
+          const snapshot = { panelHistory: [...s.panelHistory], panelIndex: s.panelIndex };
           newHistory.push(nodeId);
-          return { panelHistory: newHistory, panelIndex: newHistory.length - 1 };
+          return {
+            panelHistory: newHistory,
+            panelIndex: newHistory.length - 1,
+            navUndoStack: [...s.navUndoStack, snapshot],
+            navRedoStack: [],
+          };
         }),
       goBack: () =>
         set((s) => {
           if (s.panelIndex <= 0) return {};
-          return { panelIndex: s.panelIndex - 1 };
+          const snapshot = { panelHistory: [...s.panelHistory], panelIndex: s.panelIndex };
+          return {
+            panelIndex: s.panelIndex - 1,
+            navUndoStack: [...s.navUndoStack, snapshot],
+            navRedoStack: [],
+          };
         }),
       goForward: () =>
         set((s) => {
           if (s.panelIndex >= s.panelHistory.length - 1) return {};
-          return { panelIndex: s.panelIndex + 1 };
+          const snapshot = { panelHistory: [...s.panelHistory], panelIndex: s.panelIndex };
+          return {
+            panelIndex: s.panelIndex + 1,
+            navUndoStack: [...s.navUndoStack, snapshot],
+            navRedoStack: [],
+          };
         }),
       replacePanel: (nodeId) =>
         set((s) => {
@@ -156,6 +179,34 @@ export const useUIStore = create<UIStore>()(
       // Trigger hint
       triggerHint: null,
       setTriggerHint: (hint) => set({ triggerHint: hint }),
+
+      // Navigation undo/redo (session-only)
+      navUndoStack: [],
+      navRedoStack: [],
+      navUndo: () =>
+        set((s) => {
+          if (s.navUndoStack.length === 0) return {};
+          const prev = s.navUndoStack[s.navUndoStack.length - 1];
+          const currentSnapshot = { panelHistory: [...s.panelHistory], panelIndex: s.panelIndex };
+          return {
+            panelHistory: prev.panelHistory,
+            panelIndex: prev.panelIndex,
+            navUndoStack: s.navUndoStack.slice(0, -1),
+            navRedoStack: [...s.navRedoStack, currentSnapshot],
+          };
+        }),
+      navRedo: () =>
+        set((s) => {
+          if (s.navRedoStack.length === 0) return {};
+          const next = s.navRedoStack[s.navRedoStack.length - 1];
+          const currentSnapshot = { panelHistory: [...s.panelHistory], panelIndex: s.panelIndex };
+          return {
+            panelHistory: next.panelHistory,
+            panelIndex: next.panelIndex,
+            navUndoStack: [...s.navUndoStack, currentSnapshot],
+            navRedoStack: s.navRedoStack.slice(0, -1),
+          };
+        }),
     }),
     {
       name: 'nodex-ui',

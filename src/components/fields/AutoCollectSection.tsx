@@ -37,9 +37,22 @@ export function AutoCollectSection({ tupleId }: AutoCollectSectionProps) {
 
   if (collectedValues.length === 0) {
     return (
-      <span className="text-xs text-muted-foreground/40 leading-[22px] select-none italic">
-        Empty
-      </span>
+      <div
+        className="flex min-h-7 items-start gap-[7.5px] py-0.5"
+        style={{ paddingLeft: 6 }}
+      >
+        <BulletChevron
+          hasChildren={false}
+          isExpanded={false}
+          onToggle={noop}
+          onDrillDown={noop}
+          onBulletClick={noop}
+          dimmed
+        />
+        <span className="text-sm leading-[21px] text-muted-foreground/40 select-none">
+          Empty
+        </span>
+      </div>
     );
   }
 

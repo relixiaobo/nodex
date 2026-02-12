@@ -134,7 +134,7 @@ export function TagBadge({ tagDefId, onRemove, onNavigate }: TagBadgeProps) {
               setMenu(null);
             }}
             onConfigure={() => {
-              // TODO: open tag configuration
+              onNavigate?.();
               setMenu(null);
             }}
           />,

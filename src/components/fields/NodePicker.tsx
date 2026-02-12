@@ -3,15 +3,9 @@
  *
  * Used by OptionsPicker, FieldTypePicker, and ConfigSelect.
  *
- * Display mode:
- *   - Has value: bullet (reference style when isReference) + selected name
- *   - Empty: dimmed bullet + placeholder text
- *
- * Editing mode (click to enter):
- *   - Bullet + input (auto-focus) + filtered dropdown
- *   - ArrowUp/Down navigate, Enter selects, Escape closes
- *   - allowCreate + no match → "Create ..." button
- *   - Click outside → close
+ * Click on value → dropdown opens below, current value stays visible.
+ * Dropdown has search input at top + bullet-styled option rows.
+ * ArrowUp/Down navigate, Enter selects, Escape closes, click outside closes.
  *
  * Self-contained bullet layout (pl-6 + BulletChevron + gap-7.5px).
  */
@@ -44,7 +38,7 @@ export function NodePicker({
   placeholder = 'Select...',
   isReference = false,
 }: NodePickerProps) {
-  const [editing, setEditing] = useState(false);
+  const [open, setOpen] = useState(false);
   const [inputValue, setInputValue] = useState('');
   const [hoverIndex, setHoverIndex] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -66,45 +60,45 @@ export function NodePicker({
     setHoverIndex(0);
   }, [filteredOptions.length]);
 
-  const closeEditor = useCallback(() => {
-    setEditing(false);
+  const closeDropdown = useCallback(() => {
+    setOpen(false);
     setInputValue('');
     setHoverIndex(0);
   }, []);
 
-  // Auto-focus input when entering editing mode
+  // Auto-focus search input when dropdown opens
   useEffect(() => {
-    if (editing) {
+    if (open) {
       requestAnimationFrame(() => inputRef.current?.focus());
     }
-  }, [editing]);
+  }, [open]);
 
   // Close on click outside
   useEffect(() => {
-    if (!editing) return;
+    if (!open) return;
     const handler = (e: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        closeEditor();
+        closeDropdown();
       }
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
-  }, [editing, closeEditor]);
+  }, [open, closeDropdown]);
 
   const handleSelect = useCallback(
     (optionId: string) => {
       onSelect(optionId);
-      closeEditor();
+      closeDropdown();
     },
-    [onSelect, closeEditor],
+    [onSelect, closeDropdown],
   );
 
   const handleCreate = useCallback(
     (name: string) => {
       onCreate?.(name);
-      closeEditor();
+      closeDropdown();
     },
-    [onCreate, closeEditor],
+    [onCreate, closeDropdown],
   );
 
   const handleKeyDown = useCallback(
@@ -124,110 +118,109 @@ export function NodePicker({
         }
       } else if (e.key === 'Escape') {
         e.preventDefault();
-        closeEditor();
+        closeDropdown();
       }
     },
-    [filteredOptions, hoverIndex, inputValue, allowCreate, handleSelect, handleCreate, closeEditor],
+    [filteredOptions, hoverIndex, inputValue, allowCreate, handleSelect, handleCreate, closeDropdown],
   );
 
   const handleClick = useCallback(() => {
-    if (!editing) {
-      setEditing(true);
+    if (!open) {
+      setOpen(true);
       setInputValue('');
     }
-  }, [editing]);
+  }, [open]);
 
   return (
     <div ref={containerRef} className="relative min-h-[22px]">
-      {editing ? (
-        /* Editing mode: bullet + input + dropdown */
-        <div>
-          <div
-            className="flex min-h-7 items-start gap-[7.5px] py-1"
-            style={{ paddingLeft: 6 }}
+      {/* Value display — always visible, click to toggle dropdown */}
+      <div className="cursor-pointer group/picker" onClick={handleClick}>
+        <div
+          className="flex min-h-7 items-start gap-[7.5px] py-1"
+          style={{ paddingLeft: 6 }}
+        >
+          <BulletChevron
+            hasChildren={false}
+            isExpanded={false}
+            onToggle={noop}
+            onDrillDown={noop}
+            onBulletClick={noop}
+            {...(selectedName ? (isReference ? { isReference: true } : {}) : { dimmed: true })}
+          />
+          <span
+            className={
+              selectedName
+                ? 'text-sm leading-[21px] text-foreground'
+                : 'text-sm leading-[21px] text-muted-foreground/40 select-none group-hover/picker:text-muted-foreground/60 transition-colors'
+            }
           >
-            <BulletChevron
-              hasChildren={false}
-              isExpanded={false}
-              onToggle={noop}
-              onDrillDown={noop}
-              onBulletClick={noop}
-            />
+            {selectedName ?? placeholder}
+          </span>
+        </div>
+      </div>
+
+      {/* Dropdown — shown below the value */}
+      {open && (
+        <div
+          className="absolute left-6 top-full z-50 mt-0.5 w-48 max-h-52 overflow-y-auto rounded-lg border border-border bg-popover shadow-lg"
+          onMouseDown={(e) => e.preventDefault()}
+        >
+          {/* Search input */}
+          <div className="sticky top-0 bg-popover p-1.5 border-b border-border/40">
             <input
               ref={inputRef}
               type="text"
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder={allowCreate ? 'Type to search or create...' : 'Type to search...'}
-              className="flex-1 min-w-0 bg-transparent text-sm leading-[21px] text-foreground outline-none placeholder:text-muted-foreground/40"
+              placeholder={allowCreate ? 'Search or create...' : 'Search...'}
+              className="w-full bg-transparent text-xs leading-5 text-foreground outline-none placeholder:text-muted-foreground/40"
             />
           </div>
 
-          {/* Dropdown */}
+          {/* Option list — bullet + text per item */}
           {filteredOptions.length > 0 ? (
-            <div
-              className="absolute left-6 top-full z-50 mt-0.5 w-48 max-h-40 overflow-y-auto rounded-lg border border-border bg-popover shadow-lg py-1"
-              onMouseDown={(e) => e.preventDefault()}
-            >
-              {filteredOptions.map((opt, i) => (
-                <button
-                  key={opt.id}
-                  className={`flex w-full items-center gap-1.5 px-3 py-1.5 text-xs text-left transition-colors ${
-                    i === hoverIndex ? 'bg-accent' : 'hover:bg-accent/50'
-                  } ${opt.id === selectedId ? 'text-primary font-medium' : 'text-foreground'}`}
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => handleSelect(opt.id)}
-                  onMouseEnter={() => setHoverIndex(i)}
-                >
-                  {opt.id === selectedId && (
-                    <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
-                  )}
-                  {opt.name}
-                </button>
-              ))}
+            <div className="py-0.5">
+              {filteredOptions.map((opt, i) => {
+                const isSelected = opt.id === selectedId;
+                return (
+                  <button
+                    key={opt.id}
+                    className={`flex w-full items-center gap-[7.5px] pl-1.5 pr-3 min-h-7 text-left transition-colors ${
+                      i === hoverIndex ? 'bg-accent' : 'hover:bg-accent/50'
+                    }`}
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => handleSelect(opt.id)}
+                    onMouseEnter={() => setHoverIndex(i)}
+                  >
+                    {/* Bullet dot — matches outliner node style */}
+                    <span className="flex shrink-0 w-[15px] h-[15px] items-center justify-center">
+                      <span className={`block h-[5px] w-[5px] rounded-full ${isSelected ? 'bg-primary' : 'bg-foreground/50'}`} />
+                    </span>
+                    <span className={`text-sm leading-[21px] ${isSelected ? 'text-primary font-medium' : 'text-foreground'}`}>
+                      {opt.name}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           ) : allowCreate && inputValue.trim() ? (
             /* No matches — show create hint */
-            <div
-              className="absolute left-6 top-full z-50 mt-0.5 w-48 rounded-lg border border-border bg-popover shadow-lg py-1"
-              onMouseDown={(e) => e.preventDefault()}
-            >
+            <div className="py-0.5">
               <button
-                className="flex w-full items-center gap-1.5 px-3 py-1.5 text-xs text-left bg-accent text-foreground"
+                className="flex w-full items-center gap-[7.5px] pl-1.5 pr-3 min-h-7 text-left bg-accent text-foreground"
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => handleCreate(inputValue.trim())}
               >
-                Create "<span className="font-medium">{inputValue.trim()}</span>"
+                <span className="flex shrink-0 w-[15px] h-[15px] items-center justify-center">
+                  <span className="block h-[5px] w-[5px] rounded-full bg-foreground/50" />
+                </span>
+                <span className="text-sm leading-[21px]">
+                  Create "<span className="font-medium">{inputValue.trim()}</span>"
+                </span>
               </button>
             </div>
           ) : null}
-        </div>
-      ) : (
-        /* Display mode — click to enter editing */
-        <div className="cursor-pointer group/picker" onClick={handleClick}>
-          <div
-            className="flex min-h-7 items-start gap-[7.5px] py-1"
-            style={{ paddingLeft: 6 }}
-          >
-            <BulletChevron
-              hasChildren={false}
-              isExpanded={false}
-              onToggle={noop}
-              onDrillDown={noop}
-              onBulletClick={noop}
-              {...(selectedName ? (isReference ? { isReference: true } : {}) : { dimmed: true })}
-            />
-            <span
-              className={
-                selectedName
-                  ? 'text-sm leading-[21px] text-foreground'
-                  : 'text-sm leading-[21px] text-muted-foreground/40 select-none group-hover/picker:text-muted-foreground/60 transition-colors'
-              }
-            >
-              {selectedName ?? placeholder}
-            </span>
-          </div>
         </div>
       )}
     </div>

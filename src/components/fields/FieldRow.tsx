@@ -124,7 +124,7 @@ export function FieldRow({
         {/* Name column — icon + name + description */}
         <div className="flex gap-1 @sm:shrink-0 @sm:w-[180px] min-w-0">
           {Icon ? (
-            <span className="shrink-0 w-[15px] flex items-center justify-center text-muted-foreground/40 mt-[3px]">
+            <span className="shrink-0 w-[15px] flex items-start justify-center text-muted-foreground/40 mt-[3px]">
               <Icon size={12} />
             </span>
           ) : (

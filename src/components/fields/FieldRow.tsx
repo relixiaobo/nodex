@@ -112,7 +112,7 @@ export function FieldRow({
   // Config fields: name+description on left, control on right (items-start for multi-line)
   if (isConfigField) {
     return (
-      <div className={`border-t ${isLastInGroup ? 'border-b' : ''} border-border/40 flex flex-col @sm:flex-row @sm:items-start min-h-[28px] py-1.5`} data-field-row>
+      <div className={`border-t ${isLastInGroup ? 'border-b' : ''} border-border-subtle flex flex-col @sm:flex-row @sm:items-start min-h-[28px] py-1.5`} data-field-row>
         {/* Name column — icon + name + description */}
         <div className="flex gap-1 @sm:shrink-0 @sm:w-[180px] min-w-0">
           {Icon ? (
@@ -163,7 +163,7 @@ export function FieldRow({
 
   // Regular fields: icon + editable name on left, value outliner on right
   return (
-    <div className={`border-t ${isLastInGroup ? 'border-b' : ''} border-border/40 flex flex-col @sm:flex-row @sm:items-start min-h-[28px]`} data-field-row>
+    <div className={`border-t ${isLastInGroup ? 'border-b' : ''} border-border-subtle flex flex-col @sm:flex-row @sm:items-start min-h-[28px]`} data-field-row>
       {/* Name column — aligned to first line of value */}
       <div className="flex items-center gap-1 @sm:shrink-0 @sm:w-[130px] min-w-0 h-7 py-1">
         <button
@@ -180,7 +180,7 @@ export function FieldRow({
         >
           {trashed && (
             <span title={`Field "${attrDefName}" has been deleted`}>
-              <Trash2 size={12} className="shrink-0 text-destructive/50" />
+              <Trash2 size={12} className="shrink-0 text-foreground-tertiary" />
             </span>
           )}
           {isEditing ? (

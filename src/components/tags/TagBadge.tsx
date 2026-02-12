@@ -90,12 +90,12 @@ export function TagBadge({ tagDefId, onRemove, onNavigate }: TagBadgeProps) {
   if (isTrashed) {
     return (
       <span
-        className="inline-flex items-center text-xs shrink-0 rounded bg-destructive/10 text-destructive/70 py-0.5 px-1.5 gap-1"
+        className="inline-flex items-center text-xs shrink-0 rounded bg-destructive/10 text-destructive py-0.5 px-1.5 gap-1"
         title={`Tag "${tagName}" has been deleted`}
       >
         <span className="text-[11px] leading-none">#</span>
         <span>{tagName}</span>
-        <AlertTriangle size={11} className="text-amber-500" />
+        <AlertTriangle size={11} className="text-warning" />
         <Trash2 size={11} />
       </span>
     );

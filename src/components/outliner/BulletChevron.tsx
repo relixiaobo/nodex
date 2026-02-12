@@ -73,7 +73,7 @@ export function BulletChevron({
       title={isExpanded ? 'Collapse' : 'Expand'}
     >
       <div
-        className={`flex h-[15px] w-[15px] items-center justify-center rounded-full bg-background outline outline-1 outline-border/60 hover:bg-foreground/[0.04] transition-colors ${
+        className={`flex h-[15px] w-[15px] items-center justify-center rounded-full bg-background outline outline-1 outline-border-emphasis hover:bg-foreground/[0.04] transition-colors ${
           isExpanded ? '[&>svg]:rotate-90' : ''
         }`}
       >

@@ -42,7 +42,7 @@ export function SidebarNav() {
             onClick={() => handleClick(item.suffix)}
             className={`flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors ${
               isActive
-                ? 'bg-primary/10 text-primary font-medium'
+                ? 'bg-primary-muted text-primary font-medium'
                 : 'text-muted-foreground hover:bg-muted hover:text-foreground'
             }`}
           >

@@ -515,10 +515,14 @@ Chrome Side Panel 宽度范围：300px ~ 700px+。
 - 组件内 `text-muted-foreground/40`/`/50`/`/60` 不透明度 hack 迁移至 `text-foreground-tertiary`/`text-foreground-secondary`
 - 新增 `--color-primary-muted: rgba(139,92,246,0.08)`
 
-### Phase 3: 剩余组件迁移
-- `border-border/40`/`/50`/`/60` → 语义边框 token
-- `bg-muted-foreground/25`（ConfigToggle off 态）→ 语义 token
-- 其余散落的不透明度 hack 清理
+### Phase 3: 剩余组件迁移 ✅
+- `border-border/40`/`/50`/`/60`/`/80` → `border-border-subtle`/`border-border`/`border-border-emphasis`
+- `bg-muted-foreground/25`（ConfigToggle off 态）→ `bg-foreground/[0.15]`
+- `bg-green-500`（ConfigToggle on 态）→ `bg-success`
+- `text-amber-500` → `text-warning`
+- `outline-border/60` → `outline-border-emphasis`
+- `text-destructive/50`/`/70`/`/80` → 语义 token
+- `bg-primary/10`（SidebarNav）→ `bg-primary-muted`
 
 ### Phase 4: Dark Mode
 - 实现 `[data-theme="dark"]` 覆盖

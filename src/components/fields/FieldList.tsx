@@ -46,7 +46,7 @@ export function FieldList({ nodeId }: FieldListProps) {
           trashed={f.trashed}
         />
       ))}
-      <div className="border-b border-border/40" />
+      <div className="border-b border-border-subtle" />
     </div>
   );
 }

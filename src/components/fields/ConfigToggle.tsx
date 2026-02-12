@@ -36,7 +36,7 @@ export function ConfigToggle({ tupleId, currentValue }: ConfigToggleProps) {
       className={`
         relative inline-flex h-[18px] w-8 shrink-0 cursor-pointer rounded-full
         transition-colors duration-200 ease-in-out
-        ${isOn ? 'bg-green-500' : 'bg-muted-foreground/25'}
+        ${isOn ? 'bg-success' : 'bg-foreground/[0.15]'}
       `}
     >
       <span

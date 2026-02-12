@@ -54,13 +54,15 @@
 | `--primary-hover` | `#7C3AED` | 主色 hover（加深） |
 | `--primary-muted` | `rgba(139,92,246,0.08)` | 主色背景（选中行、badge） |
 | `--primary-foreground` | `#FFFFFF` | 主色上的文本 |
-| `--accent` | `#0D9488` | 辅助色（深青，白底对比度 ≥ 4.5:1） |
+| `--accent` | `#0D9488` | 辅助色（深青，白底对比度 ≥ 4.5:1）† |
 | `--accent-hover` | `#0F766E` | 辅助色 hover |
 | `--accent-muted` | `rgba(13,148,136,0.08)` | 辅助色背景 |
 | `--destructive` | `#E11D48` | 危险 |
 | `--destructive-muted` | `rgba(225,29,72,0.06)` | 危险背景 |
 | `--warning` | `#D97706` | 警告 |
 | `--success` | `#0D9488` | 成功（复用 accent） |
+
+> **† accent Token 实现说明**：`--accent` 在设计规格中为 teal `#0D9488`，但 shadcn/ui 组件（CommandPalette、ContextMenu、Dropdown）使用 `bg-accent` 作为**中性 hover 背景**。CSS 中 `--color-accent` 保持 `#f1f5f9`（shadcn 默认），teal 通过 `--color-success` (`#0D9488`) 使用。
 
 #### Dark Mode
 
@@ -90,7 +92,7 @@
 
 ### Tag 色板（10 色）
 
-Tag badge 使用固定 10 色调色板，通过 hash 分配。每色提供 `bg`（12% 不透明度）+ `text` 两个值：
+Tag badge 使用固定 10 色调色板，通过 hash 分配。每色提供 `bg`（Light 8% / Dark 15% 不透明度）+ `text` 两个值：
 
 | 序号 | 名称 | Dark text | Dark bg | Light text | Light bg |
 |------|------|-----------|---------|------------|----------|
@@ -498,23 +500,32 @@ Chrome Side Panel 宽度范围：300px ~ 700px+。
 
 ## 迁移路径
 
-当前 Nodex 使用旧色板（indigo #6366f1 + slate grays）。迁移分阶段进行：
+迁移分阶段进行：
 
-### Phase 1: Token 重命名（无视觉变化）
-- 将现有 CSS 变量映射到新命名规范（`--color-background` → 保留，新增 `--color-surface` 等层级）
-- 引入 `foreground-secondary`、`foreground-tertiary` 替代硬编码 `foreground/XX`
+### Phase 1: Token 体系升级 ✅
+- 主色迁移至荧光紫 `#8B5CF6`
+- 新增 `surface`/`surface-raised`/`surface-overlay` 背景层级
+- 新增 `foreground-secondary`/`foreground-tertiary` 语义前景 token
+- 新增 `border-subtle`/`border-emphasis` 边框层级
 
-### Phase 2: Dark Mode 基础
+### Phase 2: Light Mode 对齐 + 语义 Token 迁移 ✅
+- 基础 token 值对齐 Light Mode 规格（background `#FAFAFA`、foreground `#0F0F12`、border `rgba(0,0,0,0.08)` 等）
+- `muted-foreground` 对齐 `foreground-secondary`（`#6B6B80`）
+- Tag 色板 bg opacity `0.12` → `0.08`，slot 6 从 red → rose
+- 组件内 `text-muted-foreground/40`/`/50`/`/60` 不透明度 hack 迁移至 `text-foreground-tertiary`/`text-foreground-secondary`
+- 新增 `--color-primary-muted: rgba(139,92,246,0.08)`
+
+### Phase 3: 剩余组件迁移
+- `border-border/40`/`/50`/`/60` → 语义边框 token
+- `bg-muted-foreground/25`（ConfigToggle off 态）→ 语义 token
+- 其余散落的不透明度 hack 清理
+
+### Phase 4: Dark Mode
 - 实现 `[data-theme="dark"]` 覆盖
 - 新增主题切换 UI（设置 → 外观）
-- 所有组件测试 dark mode 兼容
+- Tag 色板切换为 Dark 列值
 
-### Phase 3: 色彩迁移
-- 主色从 `#6366f1` → `#7C6BF4`（微调，非剧变）
-- 引入辅助色 `accent` (#2DD4A8)
-- Tag 色板更新为双模式版本
-
-### Phase 4: 玻璃材质
+### Phase 5: 玻璃材质
 - Popover/Dropdown 添加 `backdrop-filter`
 - Command Palette 添加玻璃效果
 - 性能测试确认 Side Panel 内无卡顿

@@ -49,7 +49,7 @@ export function AutoCollectSection({ tupleId }: AutoCollectSectionProps) {
           onBulletClick={noop}
           dimmed
         />
-        <span className="text-sm leading-[21px] text-muted-foreground/40 select-none">
+        <span className="text-sm leading-[21px] text-foreground-tertiary select-none">
           Empty
         </span>
       </div>

@@ -8,16 +8,16 @@ import { useNodeStore } from '../../stores/node-store';
  * Each tagDefId hashes to a consistent color.
  */
 const TAG_COLORS = [
-  { bg: 'rgba(139,92,246,0.12)', text: '#8B5CF6' },    // violet (primary)
-  { bg: 'rgba(236,72,153,0.12)', text: '#db2777' },    // pink
-  { bg: 'rgba(147,51,234,0.12)', text: '#9333EA' },    // purple
-  { bg: 'rgba(6,182,212,0.12)', text: '#0891b2' },     // cyan
-  { bg: 'rgba(16,185,129,0.12)', text: '#059669' },    // emerald
-  { bg: 'rgba(245,158,11,0.12)', text: '#d97706' },    // amber
-  { bg: 'rgba(239,68,68,0.12)', text: '#dc2626' },     // red
-  { bg: 'rgba(59,130,246,0.12)', text: '#2563eb' },    // blue
-  { bg: 'rgba(20,184,166,0.12)', text: '#0d9488' },    // teal
-  { bg: 'rgba(249,115,22,0.12)', text: '#ea580c' },    // orange
+  { bg: 'rgba(139,92,246,0.08)', text: '#8B5CF6' },    // 0: violet
+  { bg: 'rgba(236,72,153,0.08)', text: '#DB2777' },    // 1: pink
+  { bg: 'rgba(147,51,234,0.08)', text: '#9333EA' },    // 2: purple
+  { bg: 'rgba(6,182,212,0.08)',  text: '#0891B2' },    // 3: cyan
+  { bg: 'rgba(16,185,129,0.08)', text: '#059669' },    // 4: emerald
+  { bg: 'rgba(245,158,11,0.08)', text: '#D97706' },    // 5: amber
+  { bg: 'rgba(225,29,72,0.08)',  text: '#E11D48' },    // 6: rose
+  { bg: 'rgba(59,130,246,0.08)', text: '#2563EB' },    // 7: blue
+  { bg: 'rgba(20,184,166,0.08)', text: '#0D9488' },    // 8: teal
+  { bg: 'rgba(249,115,22,0.08)', text: '#EA580C' },    // 9: orange
 ];
 
 function getTagColor(tagDefId: string) {

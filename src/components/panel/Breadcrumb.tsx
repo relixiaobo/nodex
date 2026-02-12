@@ -112,7 +112,7 @@ export function Breadcrumb({ nodeId, showCurrentName }: BreadcrumbProps) {
           {/* Ellipsis for folded ancestors */}
           {needsFolding && (
             <>
-              <ChevronRight size={10} className="shrink-0 text-muted-foreground/40" />
+              <ChevronRight size={10} className="shrink-0 text-foreground-tertiary" />
               <button
                 onClick={() => setExpanded(true)}
                 className="flex h-7 shrink-0 items-center justify-center rounded-md px-1 hover:bg-muted hover:text-foreground"
@@ -126,7 +126,7 @@ export function Breadcrumb({ nodeId, showCurrentName }: BreadcrumbProps) {
           {/* Visible ancestors */}
           {visibleAncestors.map((ancestor) => (
             <span key={ancestor.id} className="flex items-center shrink-0 min-w-0">
-              <ChevronRight size={10} className="shrink-0 text-muted-foreground/40 mx-0.5" />
+              <ChevronRight size={10} className="shrink-0 text-foreground-tertiary mx-0.5" />
               <button
                 onClick={() => navigateTo(ancestor.id)}
                 className="truncate max-w-[120px] rounded px-0.5 hover:bg-muted hover:text-foreground"
@@ -138,8 +138,8 @@ export function Breadcrumb({ nodeId, showCurrentName }: BreadcrumbProps) {
 
           {/* Conditional current node name (when title scrolled out of view) */}
           {showCurrentName && (
-            <span className="flex items-center shrink min-w-0 text-foreground/60">
-              <ChevronRight size={10} className="shrink-0 text-muted-foreground/40 mx-0.5" />
+            <span className="flex items-center shrink min-w-0 text-foreground-secondary">
+              <ChevronRight size={10} className="shrink-0 text-foreground-tertiary mx-0.5" />
               <BreadcrumbCurrentName nodeId={nodeId} />
             </span>
           )}

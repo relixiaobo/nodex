@@ -16,7 +16,7 @@
  * - Type icon: clickable → navigateTo to attrDef (regular), static (config)
  * - Field name: static label, click to edit (activates FieldNameInput)
  * - Config description: shown below name in name column
- * - Value area: FieldValueOutliner (plain) or OptionsFieldValue (options dropdown)
+ * - Value area: FieldValueOutliner (plain), OptionsPicker (options), FieldValueEditor (typed)
  */
 import { useCallback, useRef } from 'react';
 import { Trash2 } from 'lucide-react';

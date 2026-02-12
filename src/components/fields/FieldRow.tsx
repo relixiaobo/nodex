@@ -165,9 +165,9 @@ export function FieldRow({
 
   // Regular fields: icon + editable name on left, value outliner on right
   return (
-    <div className={`border-t ${isLastInGroup ? 'border-b' : ''} border-border/40 flex items-center min-h-[28px] py-1`} data-field-row>
-      {/* Name column — fixed height container to prevent jump */}
-      <div className="flex items-center gap-1 shrink-0 w-[130px] min-w-0 h-[22px]">
+    <div className={`border-t ${isLastInGroup ? 'border-b' : ''} border-border/40 flex items-start min-h-[28px]`} data-field-row>
+      {/* Name column — aligned to first line of value */}
+      <div className="flex items-center gap-1 shrink-0 w-[130px] min-w-0 h-7 py-1">
         <button
           className="shrink-0 w-[15px] flex items-center justify-center text-muted-foreground/50 hover:text-muted-foreground transition-colors"
           onClick={trashed ? undefined : () => navigateTo(attrDefId)}

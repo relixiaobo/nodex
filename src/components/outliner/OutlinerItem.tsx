@@ -752,7 +752,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
           onDrillDown={handleDrillDown}
         />
         {/* Selection ring wraps bullet + text (not chevron) */}
-        <div className={`flex items-start gap-[7.5px] flex-1 min-w-0 relative ${isSelected ? 'ring-1 ring-primary/40 rounded-sm bg-primary/5 !w-fit !flex-none' : ''}`}>
+        <div className={`flex items-start gap-2 flex-1 min-w-0 relative ${isSelected ? 'ring-1 ring-primary/40 rounded-sm bg-primary/5 !w-fit !flex-none' : ''}`}>
           <BulletChevron
             hasChildren={hasChildren}
             isExpanded={isExpanded}
@@ -886,12 +886,12 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       )}
       {isExpanded && (
         <div className="relative">
-          {/* Indent guide line — clickable 8px button centered on parent bullet.
+          {/* Indent guide line — clickable 16px button centered on parent bullet.
                Parent bullet center = depth*24 + 6 + 15 + 7.5 = depth*24 + 28.5.
-               w-2 (8px) button: left + 4 = center → left = depth*24 + 24.5. */}
+               w-4 (16px) button: left + 8 = center → left = depth*24 + 20.5. */}
           <button
-            className="indent-line absolute top-0 bottom-0 w-2 flex justify-center cursor-pointer rounded-sm transition-colors"
-            style={{ left: depth * 24 + 24.5 }}
+            className="indent-line absolute top-0 bottom-0 w-4 flex justify-center cursor-pointer rounded-sm transition-colors"
+            style={{ left: depth * 24 + 20.5 }}
             onClick={handleIndentLineClick}
             title="Toggle children"
           >

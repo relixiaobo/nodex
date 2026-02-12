@@ -38,7 +38,7 @@ export function AutoCollectSection({ tupleId }: AutoCollectSectionProps) {
   if (collectedValues.length === 0) {
     return (
       <div
-        className="flex min-h-7 items-start gap-[7.5px] py-0.5"
+        className="flex min-h-7 items-start gap-2 py-0.5"
         style={{ paddingLeft: 6 }}
       >
         <BulletChevron
@@ -59,7 +59,7 @@ export function AutoCollectSection({ tupleId }: AutoCollectSectionProps) {
       {collectedValues.map((item) => (
         <div
           key={item.id}
-          className="flex min-h-7 items-start gap-[7.5px] py-0.5"
+          className="flex min-h-7 items-start gap-2 py-0.5"
           style={{ paddingLeft: 6 }}
         >
           <BulletChevron

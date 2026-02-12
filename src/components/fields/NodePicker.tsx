@@ -187,7 +187,7 @@ export function NodePicker({
             style={{ paddingLeft: 6 }}
           >
             {/* Outline wraps reference bullet + text together (like Tana) */}
-            <span className="inline-flex items-center gap-[7.5px] rounded-sm outline outline-1 outline-primary/50">
+            <span className="inline-flex items-center gap-2 rounded-sm outline outline-1 outline-primary/50">
               {/* Reference bullet dot (no chevron) */}
               <span className="flex shrink-0 h-[21px] w-[15px] items-center justify-center">
                 <span className="flex h-[15px] w-[15px] items-center justify-center rounded-full border border-dashed border-foreground/40">
@@ -212,7 +212,7 @@ export function NodePicker({
         ) : (
           /* Non-reference mode or closed state */
           <div
-            className="flex min-h-7 items-start gap-[7.5px] py-1"
+            className="flex min-h-7 items-start gap-2 py-1"
             style={{ paddingLeft: 6 }}
           >
             <BulletChevron
@@ -260,7 +260,7 @@ export function NodePicker({
               {filteredOptions.map((opt, i) => (
                 <button
                   key={opt.id}
-                  className={`flex w-full items-center gap-[7.5px] pl-1.5 pr-3 min-h-7 text-left transition-colors ${
+                  className={`flex w-full items-center gap-2 pl-1.5 pr-3 min-h-7 text-left transition-colors ${
                     i === hoverIndex ? 'bg-accent' : 'hover:bg-accent/50'
                   }`}
                   onMouseDown={(e) => e.preventDefault()}
@@ -279,7 +279,7 @@ export function NodePicker({
           ) : allowCreate && inputValue.trim() ? (
             <div className="py-0.5">
               <button
-                className="flex w-full items-center gap-[7.5px] pl-1.5 pr-3 min-h-7 text-left bg-accent text-foreground"
+                className="flex w-full items-center gap-2 pl-1.5 pr-3 min-h-7 text-left bg-accent text-foreground"
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => handleCreate(inputValue.trim())}
               >

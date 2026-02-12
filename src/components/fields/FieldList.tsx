@@ -31,7 +31,7 @@ export function FieldList({ nodeId }: FieldListProps) {
   if (fields.length === 0) return null;
 
   return (
-    <div className="mt-0.5 ml-1">
+    <div className="@container mt-0.5 ml-1">
       {fields.map((f) => (
         <FieldRow
           key={f.tupleId}

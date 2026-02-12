@@ -771,7 +771,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
           {/* Render children in natural order: fields as FieldRow, content as OutlinerItem */}
           {visibleChildren.map(({ id, type }, i) =>
             type === 'field' ? (
-              <div key={id} style={{ paddingLeft: (depth + 1) * 24 + 6 + 15 }}>
+              <div key={id} className="@container" style={{ paddingLeft: (depth + 1) * 24 + 6 + 15 }}>
                 <FieldRow
                   nodeId={nodeId}
                   attrDefId={fieldMap.get(id)!.attrDefId}

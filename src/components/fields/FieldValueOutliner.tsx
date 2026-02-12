@@ -25,7 +25,7 @@ interface FieldValueOutlinerProps {
   attrDefId?: string;
 }
 
-export function FieldValueOutliner({ assocDataId }: FieldValueOutlinerProps) {
+export function FieldValueOutliner({ assocDataId, fieldDataType }: FieldValueOutlinerProps) {
   useChildren(assocDataId);
   const childIds = useNodeStore((s) => s.entities[assocDataId]?.children ?? []);
   const entities = useNodeStore((s) => s.entities);
@@ -89,6 +89,7 @@ export function FieldValueOutliner({ assocDataId }: FieldValueOutlinerProps) {
             rootChildIds={contentChildIds}
             parentId={assocDataId}
             rootNodeId={assocDataId}
+            fieldDataType={fieldDataType}
           />
         ),
       )}

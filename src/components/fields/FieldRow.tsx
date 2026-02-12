@@ -16,17 +16,15 @@
  * - Type icon: clickable → navigateTo to attrDef (regular), static (config)
  * - Field name: static label, click to edit (activates FieldNameInput)
  * - Config description: shown below name in name column
- * - Value area: FieldValueOutliner (all types), FieldValueEditor (checkbox only)
+ * - Value area: FieldValueOutliner (all types including checkbox)
  */
 import { useCallback, useRef, useMemo } from 'react';
 import { Trash2 } from 'lucide-react';
 import { useNodeStore } from '../../stores/node-store';
 import { useUIStore } from '../../stores/ui-store';
 import { useWorkspaceStore } from '../../stores/workspace-store';
-import { SYS_D } from '../../types/index.js';
 import { getFieldTypeIcon, ATTRDEF_CONFIG_MAP, TAGDEF_CONFIG_MAP } from '../../lib/field-utils.js';
 import { FieldValueOutliner } from './FieldValueOutliner';
-import { FieldValueEditor } from './FieldValueEditor';
 import { FieldNameInput } from './FieldNameInput';
 import { FieldTypePicker } from './FieldTypePicker';
 import { ConfigToggle } from './ConfigToggle';
@@ -67,15 +65,9 @@ export function FieldRow({
   const setEditingFieldName = useUIStore((s) => s.setEditingFieldName);
   const setFocusedNode = useUIStore((s) => s.setFocusedNode);
   const createSibling = useNodeStore((s) => s.createSibling);
-  const setFieldValue = useNodeStore((s) => s.setFieldValue);
   const wsId = useWorkspaceStore((s) => s.currentWorkspaceId);
   const userId = useWorkspaceStore((s) => s.userId);
   const clickOffsetXRef = useRef<number | undefined>(undefined);
-
-  const handleValueChange = useCallback((value: string) => {
-    if (!wsId || !userId) return;
-    setFieldValue(nodeId, attrDefId, value, wsId, userId);
-  }, [nodeId, attrDefId, wsId, userId, setFieldValue]);
 
   const isTypeChoice = dataType === '__type_choice__';
   const isToggle = dataType === '__toggle__';
@@ -214,21 +206,13 @@ export function FieldRow({
       <div className="flex-1 min-w-0" data-field-value>
         {isOutliner ? (
           <ConfigOutliner nodeId={nodeId} />
-        ) : dataType === SYS_D.CHECKBOX ? (
-          <FieldValueEditor
-            dataType={dataType}
-            currentValue={valueName}
-            onChange={handleValueChange}
-          />
+        ) : assocDataId ? (
+          <FieldValueOutliner assocDataId={assocDataId} fieldDataType={dataType} attrDefId={attrDefId} />
         ) : (
-          assocDataId ? (
-            <FieldValueOutliner assocDataId={assocDataId} fieldDataType={dataType} attrDefId={attrDefId} />
-          ) : (
-            <div className="flex min-h-7 items-start gap-[7.5px] py-1" style={{ paddingLeft: 6 }}>
-              <BulletChevron hasChildren={false} isExpanded={false} onToggle={noop} onDrillDown={noop} onBulletClick={noop} dimmed />
-              <span className="text-sm leading-[21px] text-muted-foreground/40 select-none">Empty</span>
-            </div>
-          )
+          <div className="flex min-h-7 items-start gap-[7.5px] py-1" style={{ paddingLeft: 6 }}>
+            <BulletChevron hasChildren={false} isExpanded={false} onToggle={noop} onDrillDown={noop} onBulletClick={noop} dimmed />
+            <span className="text-sm leading-[21px] text-muted-foreground/40 select-none">Empty</span>
+          </div>
         )}
       </div>
     </div>

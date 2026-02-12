@@ -1,22 +1,17 @@
 /**
  * Polymorphic field value editor — switches UI by data type.
- * Tana-style: click-to-edit text for most types, minimal chrome.
- *
- * All types render with a bullet (BulletChevron) for alignment with
- * sibling field values and regular outliner nodes.
- * Checkbox: the checkbox replaces the bullet position.
+ * All types render with a BulletChevron for visual alignment with
+ * OptionsPicker and FieldValueOutliner.
  *
  * Handles: Date, Number, Integer, URL, Email, Checkbox.
  * Options are handled by OptionsPicker; Plain by FieldValueOutliner.
  */
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { SYS_D, SYS_V } from '../../types/index.js';
 import { BulletChevron } from '../outliner/BulletChevron';
 
 const INPUT_CLASS =
   'flex-1 min-w-0 bg-transparent text-sm leading-[21px] text-foreground outline-none placeholder:text-muted-foreground/40';
-
-const noop = () => {};
 
 interface FieldValueEditorProps {
   dataType: string;
@@ -24,9 +19,12 @@ interface FieldValueEditorProps {
   onChange: (value: string) => void;
 }
 
+const noop = () => {};
+
 export function FieldValueEditor({ dataType, currentValue, onChange }: FieldValueEditorProps) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(currentValue ?? '');
+  const dateRef = useRef<HTMLInputElement>(null);
 
   const commitAndClose = useCallback(() => {
     setEditing(false);
@@ -37,57 +35,47 @@ export function FieldValueEditor({ dataType, currentValue, onChange }: FieldValu
 
   const hasValue = !!currentValue;
 
-  // Checkbox type — checkbox replaces the bullet position
+  // ── Checkbox ──
   if (dataType === SYS_D.CHECKBOX) {
     return (
       <div
         className="flex min-h-7 items-start gap-[7.5px] py-1"
         style={{ paddingLeft: 6 }}
       >
-        {/* Checkbox in the bullet position (same 15px width) */}
-        <span className="flex h-[15px] w-[15px] items-center justify-center mt-[3px]">
-          <input
-            type="checkbox"
-            checked={currentValue === SYS_V.YES}
-            onChange={(e) => onChange(e.target.checked ? SYS_V.YES : SYS_V.NO)}
-            className="h-3.5 w-3.5 rounded border-border/50 accent-primary cursor-pointer"
-          />
-        </span>
+        <BulletChevron
+          hasChildren={false}
+          isExpanded={false}
+          onToggle={noop}
+          onDrillDown={noop}
+          onBulletClick={noop}
+        />
+        <input
+          type="checkbox"
+          checked={currentValue === SYS_V.YES}
+          onChange={(e) => onChange(e.target.checked ? SYS_V.YES : SYS_V.NO)}
+          className="mt-[3px] h-3.5 w-3.5 rounded border-border/50 accent-primary cursor-pointer"
+        />
       </div>
     );
   }
 
-  // Date type — click-to-reveal date input
+  // ── Date ──
   if (dataType === SYS_D.DATE) {
-    if (editing) {
-      return (
-        <div
-          className="flex min-h-7 items-start gap-[7.5px] py-1"
-          style={{ paddingLeft: 6 }}
-        >
-          <BulletChevron
-            hasChildren={false}
-            isExpanded={false}
-            onToggle={noop}
-            onDrillDown={noop}
-            onBulletClick={noop}
-          />
-          <input
-            autoFocus
-            type="date"
-            value={currentValue ?? ''}
-            onChange={(e) => { onChange(e.target.value); setEditing(false); }}
-            onBlur={() => setEditing(false)}
-            className={INPUT_CLASS}
-          />
-        </div>
-      );
-    }
+    const handleDateClick = () => {
+      // Trigger the hidden date input's picker
+      dateRef.current?.showPicker?.();
+      dateRef.current?.click();
+    };
+    const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      onChange(e.target.value);
+    };
+    const formattedDate = currentValue ? formatDate(currentValue) : '';
+
     return (
       <div
         className="flex min-h-7 items-start gap-[7.5px] py-1 cursor-pointer"
         style={{ paddingLeft: 6 }}
-        onClick={() => setEditing(true)}
+        onClick={handleDateClick}
       >
         <BulletChevron
           hasChildren={false}
@@ -97,14 +85,29 @@ export function FieldValueEditor({ dataType, currentValue, onChange }: FieldValu
           onBulletClick={noop}
           dimmed={!hasValue}
         />
-        <span className={`text-sm leading-[21px] ${hasValue ? 'text-foreground' : 'text-muted-foreground/40 select-none'}`}>
-          {currentValue || 'Add date'}
-        </span>
+        {hasValue ? (
+          <span className="text-sm leading-[21px] text-foreground">
+            {formattedDate}
+          </span>
+        ) : (
+          <span className="text-sm leading-[21px] text-muted-foreground/40 select-none">
+            Add date
+          </span>
+        )}
+        {/* Hidden date input for native picker */}
+        <input
+          ref={dateRef}
+          type="date"
+          value={currentValue ?? ''}
+          onChange={handleDateChange}
+          className="sr-only"
+          tabIndex={-1}
+        />
       </div>
     );
   }
 
-  // Number / Integer types
+  // ── Number / Integer ──
   if (dataType === SYS_D.NUMBER || dataType === SYS_D.INTEGER) {
     if (editing) {
       return (
@@ -128,7 +131,7 @@ export function FieldValueEditor({ dataType, currentValue, onChange }: FieldValu
             onBlur={commitAndClose}
             onKeyDown={(e) => { if (e.key === 'Enter') commitAndClose(); if (e.key === 'Escape') setEditing(false); }}
             placeholder="0"
-            className={`${INPUT_CLASS} w-20`}
+            className={INPUT_CLASS}
           />
         </div>
       );
@@ -147,14 +150,16 @@ export function FieldValueEditor({ dataType, currentValue, onChange }: FieldValu
           onBulletClick={noop}
           dimmed={!hasValue}
         />
-        <span className={`text-sm leading-[21px] ${hasValue ? 'text-foreground' : 'text-muted-foreground/40 select-none'}`}>
-          {currentValue || 'Empty'}
-        </span>
+        {hasValue ? (
+          <span className="text-sm leading-[21px] text-foreground">{currentValue}</span>
+        ) : (
+          <span className="text-sm leading-[21px] text-muted-foreground/40 select-none">Empty</span>
+        )}
       </div>
     );
   }
 
-  // URL type
+  // ── URL ──
   if (dataType === SYS_D.URL) {
     if (editing) {
       return (
@@ -177,7 +182,7 @@ export function FieldValueEditor({ dataType, currentValue, onChange }: FieldValu
             onBlur={commitAndClose}
             onKeyDown={(e) => { if (e.key === 'Enter') commitAndClose(); if (e.key === 'Escape') setEditing(false); }}
             placeholder="https://..."
-            className={`${INPUT_CLASS} flex-1`}
+            className={INPUT_CLASS}
           />
         </div>
       );
@@ -196,14 +201,16 @@ export function FieldValueEditor({ dataType, currentValue, onChange }: FieldValu
           onBulletClick={noop}
           dimmed={!hasValue}
         />
-        <span className={`text-sm leading-[21px] ${hasValue ? 'text-primary/70 underline decoration-primary/20 hover:decoration-primary/50' : 'text-muted-foreground/40 select-none'}`}>
-          {currentValue || 'Empty'}
-        </span>
+        {hasValue ? (
+          <span className="text-sm leading-[21px] text-primary/70 underline decoration-primary/20">{currentValue}</span>
+        ) : (
+          <span className="text-sm leading-[21px] text-muted-foreground/40 select-none">Empty</span>
+        )}
       </div>
     );
   }
 
-  // Email type
+  // ── Email ──
   if (dataType === SYS_D.EMAIL) {
     if (editing) {
       return (
@@ -226,7 +233,7 @@ export function FieldValueEditor({ dataType, currentValue, onChange }: FieldValu
             onBlur={commitAndClose}
             onKeyDown={(e) => { if (e.key === 'Enter') commitAndClose(); if (e.key === 'Escape') setEditing(false); }}
             placeholder="email@example.com"
-            className={`${INPUT_CLASS} flex-1`}
+            className={INPUT_CLASS}
           />
         </div>
       );
@@ -245,14 +252,16 @@ export function FieldValueEditor({ dataType, currentValue, onChange }: FieldValu
           onBulletClick={noop}
           dimmed={!hasValue}
         />
-        <span className={`text-sm leading-[21px] ${hasValue ? 'text-foreground' : 'text-muted-foreground/40 select-none'}`}>
-          {currentValue || 'Empty'}
-        </span>
+        {hasValue ? (
+          <span className="text-sm leading-[21px] text-foreground">{currentValue}</span>
+        ) : (
+          <span className="text-sm leading-[21px] text-muted-foreground/40 select-none">Empty</span>
+        )}
       </div>
     );
   }
 
-  // Default: Plain text (click-to-edit)
+  // ── Default: Plain text (click-to-edit) ──
   if (editing) {
     return (
       <div
@@ -274,7 +283,7 @@ export function FieldValueEditor({ dataType, currentValue, onChange }: FieldValu
           onBlur={commitAndClose}
           onKeyDown={(e) => { if (e.key === 'Enter') commitAndClose(); if (e.key === 'Escape') setEditing(false); }}
           placeholder="Empty"
-          className={`${INPUT_CLASS} flex-1`}
+          className={INPUT_CLASS}
         />
       </div>
     );
@@ -294,9 +303,25 @@ export function FieldValueEditor({ dataType, currentValue, onChange }: FieldValu
         onBulletClick={noop}
         dimmed={!hasValue}
       />
-      <span className={`text-sm leading-[21px] ${hasValue ? 'text-foreground' : 'text-muted-foreground/40 select-none'}`}>
-        {currentValue || 'Empty'}
-      </span>
+      {hasValue ? (
+        <span className="text-sm leading-[21px] text-foreground">{currentValue}</span>
+      ) : (
+        <span className="text-sm leading-[21px] text-muted-foreground/40 select-none">Empty</span>
+      )}
     </div>
   );
+}
+
+/** Format ISO date string as human-readable (e.g. "Tue, Feb 24") */
+function formatDate(isoDate: string): string {
+  try {
+    const date = new Date(isoDate + 'T00:00:00');
+    return date.toLocaleDateString('en-US', {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+    });
+  } catch {
+    return isoDate;
+  }
 }

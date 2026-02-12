@@ -138,10 +138,13 @@ export function NodePicker({
         e.preventDefault();
         closeDropdown();
       } else if (e.key === 'Backspace' && isReference && textSelected) {
-        // Reference mode: backspace in selected state clears the value
+        // Reference mode: backspace clears value and transitions to empty input state
         e.preventDefault();
         onClear?.();
-        closeDropdown();
+        setInputValue('');
+        setTextSelected(false);
+        setHoverIndex(0);
+        // Keep open — component re-renders to empty input with cursor
       }
     },
     [filteredOptions, hoverIndex, inputValue, allowCreate, isReference, textSelected, onClear, handleSelect, handleCreate, closeDropdown],

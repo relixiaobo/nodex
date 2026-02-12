@@ -8,7 +8,7 @@
  */
 import { useMemo } from 'react';
 import { useNodeStore } from '../stores/node-store';
-import { resolveDataType, ATTRDEF_CONFIG_MAP, ATTRDEF_OUTLINER_FIELDS, TAGDEF_CONFIG_MAP } from '../lib/field-utils.js';
+import { resolveDataType, ATTRDEF_CONFIG_MAP, ATTRDEF_CONFIG_FIELDS, ATTRDEF_OUTLINER_FIELDS, TAGDEF_CONFIG_MAP } from '../lib/field-utils.js';
 import type { NodexNode } from '../types/index.js';
 
 export interface FieldEntry {
@@ -107,6 +107,9 @@ function computeFields(entities: Record<string, NodexNode>, nodeId: string): Fie
         });
       }
     }
+    // Sort config fields by canonical order defined in ATTRDEF_CONFIG_FIELDS
+    const orderMap = new Map(ATTRDEF_CONFIG_FIELDS.map((f, i) => [f.key, i]));
+    fields.sort((a, b) => (orderMap.get(a.attrDefId) ?? Infinity) - (orderMap.get(b.attrDefId) ?? Infinity));
   }
 
   return fields;

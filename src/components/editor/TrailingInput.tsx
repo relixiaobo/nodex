@@ -168,9 +168,13 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey }: T
               return true;
             }
 
-            // At original level: collapse parent → trailing input unmounts, focus parent
-            ref.setExpanded(ref.effectiveParentEK, false);
-            ref.setFocusedNode(ref.parentId);
+            // Focus the last child of the parent (the node right above this TrailingInput)
+            const parent = useNodeStore.getState().entities[ref.effectiveParentId];
+            const children = parent?.children ?? [];
+            if (children.length > 0) {
+              const lastChildId = children[children.length - 1];
+              ref.setFocusedNode(lastChildId, ref.effectiveParentId);
+            }
             return true;
           },
           Escape: ({ editor }) => {

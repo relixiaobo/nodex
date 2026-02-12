@@ -66,7 +66,7 @@ export function NodePanel({ nodeId }: NodePanelProps) {
           <div className="mt-4 ml-4 px-2 pb-4">
             <button
               onClick={handleDelete}
-              className="flex items-center gap-2 text-sm text-destructive hover:text-destructive/80"
+              className="flex items-center gap-2 text-sm text-foreground-secondary hover:text-destructive transition-colors"
             >
               <Trash2 size={14} />
               <span>{isAttrDef ? 'Delete field' : 'Delete tag'}</span>

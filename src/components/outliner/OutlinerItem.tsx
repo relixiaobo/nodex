@@ -775,7 +775,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
                 onChange={(e) => {
                   if (userId) updateNodeName(nodeId, e.target.checked ? SYS_V.YES : SYS_V.NO, userId);
                 }}
-                className="mt-[3px] h-3.5 w-3.5 rounded border-border/50 accent-primary cursor-pointer"
+                className="mt-[3px] h-3.5 w-3.5 rounded border-border accent-primary cursor-pointer"
               />
             ) : isFocused ? (
               <NodeEditor
@@ -812,7 +812,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
             ) : fieldDataType === SYS_D.DATE && node.props.name ? (
               <span className="node-content">{formatFieldDate(node.props.name)}</span>
             ) : fieldDataType === SYS_D.URL && node.props.name ? (
-              <span className="node-content text-primary/70 underline decoration-primary/20">{node.props.name}</span>
+              <span className="node-content text-primary underline decoration-primary/20">{node.props.name}</span>
             ) : (
               <span
                 className="node-content"
@@ -897,7 +897,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
             onClick={handleIndentLineClick}
             title="Toggle children"
           >
-            <div className="w-px h-full bg-border/80" />
+            <div className="w-px h-full bg-border" />
           </button>
           {/* Render children in natural order: fields as FieldRow, content as OutlinerItem */}
           {visibleChildren.map(({ id, type }, i) =>

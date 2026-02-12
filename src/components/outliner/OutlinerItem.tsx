@@ -14,6 +14,7 @@ import { TagBar } from '../tags/TagBar';
 import { TagSelector, type TagDropdownHandle } from '../tags/TagSelector';
 import { ReferenceSelector, type ReferenceDropdownHandle } from '../references/ReferenceSelector';
 import { FieldRow } from '../fields/FieldRow';
+import { SYS_D, SYS_V } from '../../types/index.js';
 import {
   getFlattenedVisibleNodes,
   getPreviousVisibleNode,
@@ -26,9 +27,11 @@ interface OutlinerItemProps {
   rootChildIds: string[];
   parentId: string;
   rootNodeId: string;
+  /** When set, controls how the value node is rendered (e.g. checkbox toggle). Only applies to direct field value nodes. */
+  fieldDataType?: string;
 }
 
-export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId }: OutlinerItemProps) {
+export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId, fieldDataType }: OutlinerItemProps) {
   const node = useNode(nodeId);
   const expandKey = `${parentId}:${nodeId}`;
   const isExpanded = useUIStore((s) => s.expandedNodes.has(`${parentId}:${nodeId}`));
@@ -676,10 +679,19 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
         />
         <div className="flex-1 min-w-0 relative">
           <div
-            className={`text-sm leading-[21px] ${!isFocused ? 'cursor-text' : ''}`}
-            onClick={!isFocused ? handleContentClick : undefined}
+            className={`text-sm leading-[21px] ${fieldDataType !== SYS_D.CHECKBOX && !isFocused ? 'cursor-text' : ''}`}
+            onClick={fieldDataType !== SYS_D.CHECKBOX && !isFocused ? handleContentClick : undefined}
           >
-            {isFocused ? (
+            {fieldDataType === SYS_D.CHECKBOX ? (
+              <input
+                type="checkbox"
+                checked={node.props.name === SYS_V.YES}
+                onChange={(e) => {
+                  if (userId) updateNodeName(nodeId, e.target.checked ? SYS_V.YES : SYS_V.NO, userId);
+                }}
+                className="mt-[3px] h-3.5 w-3.5 rounded border-border/50 accent-primary cursor-pointer"
+              />
+            ) : isFocused ? (
               <NodeEditor
                 nodeId={nodeId}
                 initialContent={node.props.name ?? ''}

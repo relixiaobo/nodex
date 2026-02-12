@@ -1,7 +1,7 @@
 /**
  * Phase 1.3 — UI Store Operations
  *
- * Tests: pushPanel, popPanel, replacePanel, expand, collapse,
+ * Tests: navigateTo, goBack, replacePanel, expand, collapse,
  *        toggleExpanded, setFocusedNode, openSearch, closeSearch,
  *        toggleSidebar.
  * All state is restored after each test.
@@ -12,22 +12,30 @@
 (() => {
   const ui = window.__uiStore;
   const results = [];
-  const stackBefore = ui.getState().panelStack.length;
+  const historyBefore = ui.getState().panelHistory.length;
+  const indexBefore = ui.getState().panelIndex;
 
-  // pushPanel
-  ui.getState().pushPanel('inbox_3');
-  results.push({ test: 'pushPanel', pass: ui.getState().panelStack.length === stackBefore + 1 });
+  // navigateTo (replaces pushPanel)
+  ui.getState().navigateTo('inbox_3');
+  const s1 = ui.getState();
+  results.push({ test: 'navigateTo', pass: s1.panelHistory[s1.panelIndex] === 'inbox_3' });
 
-  // popPanel
-  ui.getState().popPanel();
-  results.push({ test: 'popPanel', pass: ui.getState().panelStack.length === stackBefore });
+  // goBack (replaces popPanel)
+  ui.getState().goBack();
+  const s2 = ui.getState();
+  results.push({ test: 'goBack', pass: s2.panelIndex === s1.panelIndex - 1 });
+
+  // goForward
+  ui.getState().goForward();
+  const s3 = ui.getState();
+  results.push({ test: 'goForward', pass: s3.panelHistory[s3.panelIndex] === 'inbox_3' });
 
   // replacePanel
-  const topBefore = ui.getState().panelStack[ui.getState().panelStack.length - 1];
+  const currentBefore = ui.getState().panelHistory[ui.getState().panelIndex];
   ui.getState().replacePanel('note_2');
-  const topAfter = ui.getState().panelStack[ui.getState().panelStack.length - 1];
-  results.push({ test: 'replacePanel', pass: topAfter === 'note_2' });
-  ui.getState().replacePanel(topBefore); // restore
+  const currentAfter = ui.getState().panelHistory[ui.getState().panelIndex];
+  results.push({ test: 'replacePanel', pass: currentAfter === 'note_2' });
+  ui.getState().replacePanel(currentBefore); // restore
 
   // expand / collapse (compound keys: parentId:nodeId)
   ui.getState().setExpanded('ws_default_LIBRARY:note_2', true);

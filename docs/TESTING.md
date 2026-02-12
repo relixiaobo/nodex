@@ -58,9 +58,9 @@
 
 **脚本**: `tests/scripts/ui-store.js`
 
-**期望**: `{ allPassed: true }`，11 项全部 `pass: true`。
+**期望**: `{ allPassed: true }`，12 项全部 `pass: true`。
 
-测试项：pushPanel, popPanel, replacePanel, expand, collapse, toggleExpand, setFocus, clearFocus, openSearch, closeSearch, toggleSidebar。
+测试项：navigateTo, goBack, goForward, replacePanel, expand, collapse, toggleExpand, setFocus, clearFocus, openSearch, closeSearch, toggleSidebar。
 
 ### 1.4 边界条件
 

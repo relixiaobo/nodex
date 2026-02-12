@@ -20,6 +20,6 @@
     ok: true,
     entities: count,
     workspace: ws.getState().currentWorkspaceId,
-    panelStack: ui.getState().panelStack,
+    panelHistory: ui.getState().panelHistory,
   };
 })()

@@ -1,8 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Trash2 } from 'lucide-react';
 import { useNode } from '../../hooks/use-node';
-import { useNodeTags } from '../../hooks/use-node-tags';
-import { useHasFields } from '../../hooks/use-has-fields';
 import { useNodeStore } from '../../stores/node-store';
 import { useUIStore } from '../../stores/ui-store';
 import { useWorkspaceStore } from '../../stores/workspace-store';
@@ -17,8 +15,6 @@ interface NodePanelProps {
 
 export function NodePanel({ nodeId }: NodePanelProps) {
   const node = useNode(nodeId);
-  const tagIds = useNodeTags(nodeId);
-  const hasFields = useHasFields(nodeId);
   const goBack = useUIStore((s) => s.goBack);
   const wsId = useWorkspaceStore((s) => s.currentWorkspaceId) ?? '';
   const userId = useWorkspaceStore((s) => s.userId) ?? 'local';
@@ -56,12 +52,12 @@ export function NodePanel({ nodeId }: NodePanelProps) {
       <NodePanelHeader nodeId={nodeId} showCurrentName={!titleVisible} />
       <div ref={scrollRef} className="flex-1 overflow-y-auto">
         <PanelTitle nodeId={nodeId} onTitleRef={handleTitleRef} />
-        {(tagIds.length > 0 || hasFields) && (
+        {isAttrDef && (
           <div className="mb-2 ml-4 px-2">
             <FieldList nodeId={nodeId} />
           </div>
         )}
-        {/* attrDef: outliner children rendered by ConfigOutliner inside FieldList */}
+        {/* Non-attrDef: OutlinerView handles field/content interleaved rendering */}
         {!isAttrDef && <OutlinerView rootNodeId={nodeId} />}
         {isAttrDef && (
           <div className="mt-4 ml-4 px-2 pb-4">

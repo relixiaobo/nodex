@@ -1280,6 +1280,11 @@ export const useNodeStore = create<NodeStore>()(
         node.updatedBy = userId;
       });
 
+      // Apply SYS_T02 (Field Definition) tag — creates config tuples
+      if (get().entities[SYS_T.FIELD_DEFINITION]) {
+        await get().applyTag(attrDefId, SYS_T.FIELD_DEFINITION, workspaceId, userId);
+      }
+
       return { tupleId, attrDefId };
     },
 

@@ -93,6 +93,7 @@ export function FieldValueOutliner({ assocDataId, fieldDataType, attrDefId }: Fi
             parentId={assocDataId}
             rootNodeId={assocDataId}
             fieldDataType={fieldDataType}
+            attrDefId={attrDefId}
           />
         ),
       )}

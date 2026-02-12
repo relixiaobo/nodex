@@ -15,6 +15,7 @@ import { TagSelector, type TagDropdownHandle } from '../tags/TagSelector';
 import { ReferenceSelector, type ReferenceDropdownHandle } from '../references/ReferenceSelector';
 import { FieldRow } from '../fields/FieldRow';
 import { SYS_D, SYS_V } from '../../types/index.js';
+import { useFieldOptions } from '../../hooks/use-field-options.js';
 import {
   getFlattenedVisibleNodes,
   getPreviousVisibleNode,
@@ -29,9 +30,11 @@ interface OutlinerItemProps {
   rootNodeId: string;
   /** When set, controls how the value node is rendered (e.g. checkbox toggle). Only applies to direct field value nodes. */
   fieldDataType?: string;
+  /** AttrDef ID — for Options field dropdown when clicking selected value */
+  attrDefId?: string;
 }
 
-export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId, fieldDataType }: OutlinerItemProps) {
+export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId, fieldDataType, attrDefId }: OutlinerItemProps) {
   const node = useNode(nodeId);
   const expandKey = `${parentId}:${nodeId}`;
   const isExpanded = useUIStore((s) => s.expandedNodes.has(`${parentId}:${nodeId}`));
@@ -133,6 +136,62 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   const isReference = !!node && node.props._ownerId !== parentId;
   const isSelected = selectedNodeId === nodeId &&
     (selectedParentId === null || selectedParentId === parentId);
+
+  // Options field dropdown (for changing selected option value)
+  const isOptionsField = fieldDataType === SYS_D.OPTIONS || fieldDataType === SYS_D.OPTIONS_FROM_SUPERTAG;
+  const [optionsPickerOpen, setOptionsPickerOpen] = useState(false);
+  const [optionsPickerIndex, setOptionsPickerIndex] = useState(0);
+  const allFieldOptions = useFieldOptions(isOptionsField && attrDefId ? attrDefId : '');
+
+  // Open options picker when Options-field reference is selected
+  useEffect(() => {
+    if (isSelected && isReference && isOptionsField) {
+      setOptionsPickerOpen(true);
+      // Highlight the currently selected option
+      const idx = allFieldOptions.findIndex((o) => o.id === nodeId);
+      setOptionsPickerIndex(idx >= 0 ? idx : 0);
+    } else {
+      setOptionsPickerOpen(false);
+    }
+  }, [isSelected, isReference, isOptionsField, allFieldOptions, nodeId]);
+
+  // Keyboard handler for selected reference nodes
+  useEffect(() => {
+    if (!isSelected || !isReference) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Backspace' || e.key === 'Delete') {
+        e.preventDefault();
+        if (userId) removeReference(parentId, nodeId, userId);
+        setSelectedNode(null);
+        return;
+      }
+      if (optionsPickerOpen && allFieldOptions.length > 0) {
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          setOptionsPickerIndex((i) => Math.min(i + 1, allFieldOptions.length - 1));
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          setOptionsPickerIndex((i) => Math.max(i - 1, 0));
+        } else if (e.key === 'Enter') {
+          e.preventDefault();
+          const opt = allFieldOptions[optionsPickerIndex];
+          if (opt && userId) {
+            removeReference(parentId, nodeId, userId);
+            addReference(parentId, opt.id, userId);
+          }
+          setSelectedNode(null);
+        } else if (e.key === 'Escape') {
+          e.preventDefault();
+          setSelectedNode(null);
+        }
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        setSelectedNode(null);
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isSelected, isReference, optionsPickerOpen, allFieldOptions, optionsPickerIndex, parentId, nodeId, userId, removeReference, addReference, setSelectedNode]);
 
   // When TrailingInput creates a node with # or @, it sets triggerHint so we
   // can immediately open the dropdown (extensions don't fire on mount because
@@ -696,7 +755,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
           chevronOnly
         />
         {/* Bullet + text wrapper: always same structure, ring only when selected */}
-        <div className={`flex items-start gap-[7.5px] flex-1 min-w-0 ${isSelected ? 'ring-1 ring-primary/40 rounded-sm bg-primary/5 !w-fit !flex-none' : ''}`}>
+        <div className={`flex items-start gap-[7.5px] flex-1 min-w-0 relative ${isSelected ? 'ring-1 ring-primary/40 rounded-sm bg-primary/5 !w-fit !flex-none' : ''}`}>
           <Bullet
             hasChildren={hasChildren}
             isExpanded={isExpanded}
@@ -791,6 +850,34 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
             />
           )}
         </div>
+        {/* Options picker dropdown: shown when clicking selected Options-field reference */}
+        {optionsPickerOpen && allFieldOptions.length > 0 && (
+          <div className="absolute left-0 top-full z-50 mt-0.5 max-h-48 w-56 overflow-y-auto rounded-md border border-border bg-popover py-1 shadow-md">
+            {allFieldOptions.map((opt, i) => (
+              <div
+                key={opt.id}
+                className={`flex cursor-pointer items-center gap-2 px-2 py-1 text-sm ${
+                  opt.id === nodeId
+                    ? 'bg-primary text-primary-foreground'
+                    : i === optionsPickerIndex
+                      ? 'bg-accent text-accent-foreground'
+                      : 'text-popover-foreground hover:bg-accent/50'
+                }`}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => {
+                  if (userId && opt.id !== nodeId) {
+                    removeReference(parentId, nodeId, userId);
+                    addReference(parentId, opt.id, userId);
+                  }
+                  setSelectedNode(null);
+                }}
+              >
+                <span className="h-[5px] w-[5px] shrink-0 rounded-full bg-foreground/40" />
+                <span className="truncate">{opt.name}</span>
+              </div>
+            ))}
+          </div>
+        )}
         </div>{/* close selection/contents wrapper */}
       </div>
       {/* Drop indicator: after */}

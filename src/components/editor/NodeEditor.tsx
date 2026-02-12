@@ -232,8 +232,8 @@ export function NodeEditor({
             return true;
           },
           Backspace: ({ editor }) => {
-            // Only intercept when editor is empty
-            const isEmpty = editor.state.doc.textContent.length === 0;
+            // Intercept when editor is visually empty (trim catches \n from <br>)
+            const isEmpty = editor.state.doc.textContent.trim().length === 0;
             if (isEmpty) {
               // Explicitly flush empty name to store so handleDelete sees name=''
               // (onUpdate's setNodeNameLocal may not have fired yet due to

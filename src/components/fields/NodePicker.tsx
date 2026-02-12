@@ -22,6 +22,7 @@ interface NodePickerProps {
   options: NodePickerOption[];
   selectedId?: string;
   onSelect: (id: string) => void;
+  onClear?: () => void;
   allowCreate?: boolean;
   onCreate?: (name: string) => void;
   placeholder?: string;
@@ -34,6 +35,7 @@ export function NodePicker({
   options,
   selectedId,
   onSelect,
+  onClear,
   allowCreate = false,
   onCreate,
   placeholder = 'Select...',
@@ -135,13 +137,13 @@ export function NodePicker({
         e.preventDefault();
         closeDropdown();
       } else if (e.key === 'Backspace' && isReference && textSelected) {
-        // Reference mode: backspace in selected state clears the value text
+        // Reference mode: backspace in selected state clears the value
         e.preventDefault();
-        setInputValue('');
-        setTextSelected(false);
+        onClear?.();
+        closeDropdown();
       }
     },
-    [filteredOptions, hoverIndex, inputValue, allowCreate, isReference, textSelected, handleSelect, handleCreate, closeDropdown],
+    [filteredOptions, hoverIndex, inputValue, allowCreate, isReference, textSelected, onClear, handleSelect, handleCreate, closeDropdown],
   );
 
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -172,35 +174,31 @@ export function NodePicker({
         onClick={handleClick}
       >
         {open && isReference ? (
-          /* Reference mode: bordered box with value text, hidden input captures keyboard */
-          <div
-            className="flex min-h-7 items-start gap-[7.5px] py-1"
-            style={{ paddingLeft: 6 }}
-          >
-            <BulletChevron
-              hasChildren={false}
-              isExpanded={false}
-              onToggle={noop}
-              onDrillDown={noop}
-              onBulletClick={noop}
-              isReference
-            />
-            <div className="relative flex items-center min-h-[21px]">
-              {/* Visible bordered box showing current value or typed text */}
-              <span className="inline-flex items-center rounded border border-primary/50 px-1 text-sm leading-[21px] text-foreground min-w-[2ch]">
+          /* Reference mode: bordered box wrapping bullet + text, like Tana node selection */
+          <div className="relative py-1" style={{ paddingLeft: 6 }}>
+            <div className="inline-flex min-h-7 items-start gap-[7.5px] rounded border border-primary/50 px-1">
+              <BulletChevron
+                hasChildren={false}
+                isExpanded={false}
+                onToggle={noop}
+                onDrillDown={noop}
+                onBulletClick={noop}
+                isReference
+              />
+              <span className="text-sm leading-[21px] text-foreground">
                 {textSelected ? (selectedName ?? '') : inputValue}
               </span>
-              {/* Hidden input for keyboard capture */}
-              <input
-                ref={inputRef}
-                type="text"
-                value={inputValue}
-                onChange={handleInputChange}
-                onKeyDown={handleKeyDown}
-                className="absolute inset-0 w-full opacity-0"
-                aria-hidden
-              />
             </div>
+            {/* Hidden input for keyboard capture */}
+            <input
+              ref={inputRef}
+              type="text"
+              value={inputValue}
+              onChange={handleInputChange}
+              onKeyDown={handleKeyDown}
+              className="sr-only"
+              aria-hidden
+            />
           </div>
         ) : (
           /* Non-reference mode or closed state */

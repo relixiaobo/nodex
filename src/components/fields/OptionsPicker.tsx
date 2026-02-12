@@ -51,11 +51,20 @@ export function OptionsPicker({ nodeId, attrDefId, assocDataId }: OptionsPickerP
     [nodeId, attrDefId, userId, workspaceId, autoCollectOption],
   );
 
+  const handleClear = useCallback(() => {
+    if (!assocDataId) return;
+    useNodeStore.setState((state) => {
+      const assoc = state.entities[assocDataId];
+      if (assoc) assoc.children = [];
+    });
+  }, [assocDataId]);
+
   return (
     <NodePicker
       options={options}
       selectedId={selectedId}
       onSelect={handleSelect}
+      onClear={handleClear}
       allowCreate
       onCreate={handleCreate}
       placeholder="Select option"

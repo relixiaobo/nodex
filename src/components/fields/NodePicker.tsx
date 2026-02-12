@@ -54,12 +54,13 @@ export function NodePicker({
     return options.find((o) => o.id === selectedId)?.name;
   }, [options, selectedId]);
 
-  // When textSelected, show all options (user hasn't typed yet); otherwise filter
+  // Show all options when: textSelected (reference just opened), empty input,
+  // or input matches selectedName exactly (non-reference just opened, not yet typed)
   const filteredOptions = useMemo(() => {
-    if (textSelected || !inputValue.trim()) return options;
+    if (textSelected || !inputValue.trim() || inputValue === selectedName) return options;
     const query = inputValue.trim().toLowerCase();
     return options.filter((opt) => opt.name.toLowerCase().includes(query));
-  }, [options, inputValue, textSelected]);
+  }, [options, inputValue, textSelected, selectedName]);
 
   // Reset hover index when filtered options change
   useEffect(() => {
@@ -154,6 +155,9 @@ export function NodePicker({
   const handleClick = useCallback(() => {
     if (!open) {
       setOpen(true);
+      // Pre-select the currently selected item in the dropdown
+      const idx = selectedId ? options.findIndex((o) => o.id === selectedId) : -1;
+      setHoverIndex(idx >= 0 ? idx : 0);
       if (isReference && selectedName) {
         // Reference mode with value: hidden input starts empty, visible box shows selectedName
         setInputValue('');
@@ -164,7 +168,7 @@ export function NodePicker({
         setTextSelected(false);
       }
     }
-  }, [open, selectedName, isReference]);
+  }, [open, selectedId, selectedName, isReference, options]);
 
   return (
     <div ref={containerRef} className="relative min-h-[22px]">

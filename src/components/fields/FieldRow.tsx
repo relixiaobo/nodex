@@ -11,11 +11,10 @@
  * - Value area: FieldValueOutliner (plain) or OptionsFieldValue (options dropdown)
  */
 import { useCallback, useRef } from 'react';
-import { Settings2 } from 'lucide-react';
 import { useNodeStore } from '../../stores/node-store';
 import { useUIStore } from '../../stores/ui-store';
 import { useWorkspaceStore } from '../../stores/workspace-store';
-import { getFieldTypeIcon } from '../../lib/field-utils.js';
+import { getFieldTypeIcon, ATTRDEF_CONFIG_MAP } from '../../lib/field-utils.js';
 import { FieldValueOutliner } from './FieldValueOutliner';
 import { FieldNameInput } from './FieldNameInput';
 import { FieldTypePicker } from './FieldTypePicker';
@@ -58,7 +57,8 @@ export function FieldRow({
   const isSelect = dataType === '__select__';
   const isConfigField = isTypeChoice || isToggle || isSelect;
   const isEditing = editingFieldNameId === tupleId;
-  const Icon = isTypeChoice ? Settings2 : getFieldTypeIcon(dataType);
+  const configDef = isConfigField ? ATTRDEF_CONFIG_MAP.get(attrDefId) : undefined;
+  const Icon = configDef?.icon ?? (isConfigField ? undefined : getFieldTypeIcon(dataType));
 
   const handleEnterConfirm = useCallback(() => {
     if (!wsId || !userId) return;
@@ -79,14 +79,20 @@ export function FieldRow({
       {/* Name column — fixed height container to prevent jump */}
       <div className="flex items-center gap-1 shrink-0 w-[130px] min-w-0 h-[22px]">
         {isConfigField ? (
-          <span className="shrink-0 w-[15px]" />
+          Icon ? (
+            <span className="shrink-0 w-[15px] flex items-center justify-center text-muted-foreground/40">
+              <Icon size={12} />
+            </span>
+          ) : (
+            <span className="shrink-0 w-[15px]" />
+          )
         ) : (
           <button
             className="shrink-0 w-[15px] flex items-center justify-center text-muted-foreground/50 hover:text-muted-foreground transition-colors"
             onClick={() => pushPanel(attrDefId)}
             title="Configure field"
           >
-            <Icon size={12} />
+            {Icon && <Icon size={12} />}
           </button>
         )}
         <div className="flex-1 min-w-0">

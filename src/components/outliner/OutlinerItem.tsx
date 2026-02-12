@@ -893,7 +893,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
                Center aligns with parent bullet center. Hover fills bg = looks thicker. */}
           <button
             className="indent-line absolute top-0 bottom-0 w-2 flex justify-center cursor-pointer rounded-sm transition-colors"
-            style={{ left: depth * 24 + 6 + 18.5 }}
+            style={{ left: depth * 24 + 6 + 26 }}
             onClick={handleIndentLineClick}
             title="Toggle children"
           >
@@ -902,7 +902,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
           {/* Render children in natural order: fields as FieldRow, content as OutlinerItem */}
           {visibleChildren.map(({ id, type }, i) =>
             type === 'field' ? (
-              <div key={id} className="@container" style={{ paddingLeft: (depth + 1) * 24 + 6 + 15 }}>
+              <div key={id} className="@container" style={{ paddingLeft: (depth + 1) * 24 + 6 + 22.5 }}>
                 <FieldRow
                   nodeId={nodeId}
                   attrDefId={fieldMap.get(id)!.attrDefId}

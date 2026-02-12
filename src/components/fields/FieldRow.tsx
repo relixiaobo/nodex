@@ -18,7 +18,7 @@
  * - Config description: shown below name in name column
  * - Value area: FieldValueOutliner (plain), OptionsPicker (options), FieldValueEditor (typed)
  */
-import { useCallback, useRef } from 'react';
+import { useCallback, useRef, useMemo } from 'react';
 import { Trash2 } from 'lucide-react';
 import { useNodeStore } from '../../stores/node-store';
 import { useUIStore } from '../../stores/ui-store';
@@ -33,6 +33,7 @@ import { FieldTypePicker } from './FieldTypePicker';
 import { ConfigToggle } from './ConfigToggle';
 import { ConfigSelect } from './ConfigSelect';
 import { ConfigOutliner } from './ConfigOutliner';
+import { AutoCollectSection } from './AutoCollectSection';
 import { ATTRDEF_OUTLINER_FIELDS } from '../../lib/field-utils.js';
 
 interface FieldRowProps {
@@ -78,14 +79,26 @@ export function FieldRow({
   const isToggle = dataType === '__toggle__';
   const isSelect = dataType === '__select__';
   const isOutliner = dataType === '__outliner__';
+  const isAutoCollect = dataType === '__autocollect__';
   const isTagPicker = dataType === '__tag_picker__';
   const isColorPicker = dataType === '__color_picker__';
-  const isConfigField = isTypeChoice || isToggle || isSelect || isOutliner || isTagPicker || isColorPicker;
+  const isConfigField = isTypeChoice || isToggle || isSelect || isOutliner || isAutoCollect || isTagPicker || isColorPicker;
   const isEditing = editingFieldNameId === tupleId;
   const configDef = isConfigField
     ? ATTRDEF_CONFIG_MAP.get(attrDefId) ?? TAGDEF_CONFIG_MAP.get(attrDefId) ?? ATTRDEF_OUTLINER_FIELDS.find(f => f.key === attrDefId)
     : undefined;
   const Icon = configDef?.icon ?? (isConfigField ? undefined : getFieldTypeIcon(dataType));
+
+  // Count auto-collected values for the name column "(N)"
+  const autoCollectCount = useNodeStore((s) => {
+    if (!isAutoCollect) return 0;
+    const tuple = s.entities[tupleId];
+    return Math.max(0, (tuple?.children?.length ?? 0) - 2);
+  });
+  const configNameDisplay = useMemo(() => {
+    if (isAutoCollect && autoCollectCount > 0) return `${attrDefName} (${autoCollectCount})`;
+    return attrDefName;
+  }, [isAutoCollect, autoCollectCount, attrDefName]);
 
   const handleEnterConfirm = useCallback(() => {
     if (!wsId || !userId) return;
@@ -116,9 +129,9 @@ export function FieldRow({
           )}
           <div className="flex-1 min-w-0">
             <span className="block text-sm font-medium leading-[22px] text-foreground">
-              {attrDefName}
+              {configNameDisplay}
             </span>
-            {configDef?.description && (
+            {configDef?.description && !isAutoCollect && (
               <span className="block text-xs leading-tight text-muted-foreground/50 mt-0.5">
                 {configDef.description}
               </span>
@@ -126,9 +139,11 @@ export function FieldRow({
           </div>
         </div>
         {/* Value column — just the control */}
-        <div className="flex-1 min-w-0 flex items-center min-h-[22px]" data-field-value>
+        <div className={`flex-1 min-w-0 ${isAutoCollect ? '' : 'flex items-center'} min-h-[22px]`} data-field-value>
           {isTypeChoice ? (
             <FieldTypePicker attrDefId={nodeId} currentValue={valueName ?? ''} />
+          ) : isAutoCollect ? (
+            <AutoCollectSection tupleId={tupleId} currentValue={valueName} />
           ) : isToggle ? (
             <ConfigToggle tupleId={tupleId} fieldKey={attrDefId} currentValue={valueName} />
           ) : isOutliner ? (

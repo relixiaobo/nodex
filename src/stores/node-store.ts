@@ -11,7 +11,7 @@ import { immer } from 'zustand/middleware/immer';
 import { nanoid } from 'nanoid';
 import type { NodexNode, DocType } from '../types/index.js';
 import { WORKSPACE_CONTAINERS, SYS_A, SYS_D, SYS_T } from '../types/index.js';
-import { ATTRDEF_CONFIG_MAP, TAGDEF_CONFIG_MAP } from '../lib/field-utils.js';
+import { ATTRDEF_CONFIG_MAP, TAGDEF_CONFIG_MAP, findAutoCollectTupleId } from '../lib/field-utils.js';
 import * as nodeService from '../services/node-service.js';
 import { isSupabaseReady } from '../services/supabase.js';
 
@@ -171,6 +171,9 @@ interface NodeStore {
 
   /** Add an option node to an OPTIONS-type field definition */
   addFieldOption(attrDefId: string, name: string, workspaceId: string, userId: string): string;
+
+  /** Create a new option from field value, set as value, and auto-collect in attrDef */
+  autoCollectOption(nodeId: string, attrDefId: string, name: string, workspaceId: string, userId: string): string;
 
   /** Remove an option node from a field definition */
   removeFieldOption(attrDefId: string, optionId: string, userId: string): void;
@@ -1433,6 +1436,54 @@ export const useNodeStore = create<NodeStore>()(
       });
 
       return id;
+    },
+
+    autoCollectOption: (nodeId, attrDefId, name, workspaceId, userId) => {
+      const valueId = nanoid();
+      const now = Date.now();
+
+      set((state) => {
+        // 1. Create the value node (original lives in field value)
+        state.entities[valueId] = {
+          id: valueId,
+          workspaceId,
+          props: { created: now, name },
+          children: [],
+          version: 1,
+          updatedAt: now,
+          createdBy: userId,
+          updatedBy: userId,
+        };
+
+        // 2. Set as field value (inline setOptionsFieldValue logic)
+        const node = state.entities[nodeId];
+        if (node?.children && node.associationMap) {
+          for (const cid of node.children) {
+            const child = state.entities[cid];
+            if (child?.props._docType === 'tuple' && child.children?.[0] === attrDefId) {
+              const assocId = node.associationMap[cid];
+              const assoc = assocId ? state.entities[assocId] : undefined;
+              if (assoc) {
+                assoc.children = [valueId];
+                assoc.updatedAt = now;
+                assoc.updatedBy = userId;
+              }
+              break;
+            }
+          }
+        }
+
+        // 3. Add reference to autocollect Tuple (children[2+])
+        const acTupleId = findAutoCollectTupleId(state.entities, attrDefId);
+        if (acTupleId) {
+          const acTuple = state.entities[acTupleId];
+          if (acTuple?.children) {
+            acTuple.children.push(valueId);
+          }
+        }
+      });
+
+      return valueId;
     },
 
     removeFieldOption: (attrDefId, optionId, _userId) => {

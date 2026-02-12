@@ -69,6 +69,55 @@ export function resolveFieldOptions(
 }
 
 /**
+ * Resolve auto-collected option node IDs for an OPTIONS-type attrDef.
+ * Auto-collected values are stored as children[2+] of the autocollect Tuple
+ * (children[0] = SYS_A44 key, children[1] = toggle value, children[2+] = collected IDs).
+ * Returns IDs only when the toggle is ON (SYS_V.YES).
+ */
+export function resolveAutoCollectedOptions(
+  entities: Record<string, NodexNode>,
+  attrDefId: string,
+): string[] {
+  const attrDef = entities[attrDefId];
+  if (!attrDef?.children) return [];
+
+  for (const cid of attrDef.children) {
+    const child = entities[cid];
+    if (
+      child?.props._docType === 'tuple' &&
+      child.children?.[0] === SYS_A.AUTOCOLLECT_OPTIONS
+    ) {
+      const isEnabled = child.children[1] === SYS_V.YES;
+      if (!isEnabled || child.children.length <= 2) return [];
+      return child.children.slice(2);
+    }
+  }
+  return [];
+}
+
+/**
+ * Find the autocollect Tuple ID for an attrDef.
+ */
+export function findAutoCollectTupleId(
+  entities: Record<string, NodexNode>,
+  attrDefId: string,
+): string | null {
+  const attrDef = entities[attrDefId];
+  if (!attrDef?.children) return null;
+
+  for (const cid of attrDef.children) {
+    const child = entities[cid];
+    if (
+      child?.props._docType === 'tuple' &&
+      child.children?.[0] === SYS_A.AUTOCOLLECT_OPTIONS
+    ) {
+      return cid;
+    }
+  }
+  return null;
+}
+
+/**
  * Ordered list of field types for the type selector UI.
  * Matches Tana's dropdown order exactly (no Integer — Tana only shows Number).
  */
@@ -99,7 +148,7 @@ export function isPlainFieldType(dataType: string): boolean {
 export interface ConfigFieldDef {
   key: string;
   name: string;
-  control: 'type_choice' | 'toggle' | 'select' | 'outliner' | 'tag_picker' | 'color_picker';
+  control: 'type_choice' | 'toggle' | 'select' | 'outliner' | 'autocollect' | 'tag_picker' | 'color_picker';
   defaultValue: string;
   appliesTo: string[] | '*';
   icon?: LucideIcon;
@@ -141,7 +190,7 @@ export const ATTRDEF_CONFIG_FIELDS: ConfigFieldDef[] = [
   {
     key: SYS_A.AUTOCOLLECT_OPTIONS,
     name: 'Auto-collect values',
-    control: 'toggle',
+    control: 'autocollect',
     icon: Sparkles,
     defaultValue: SYS_V.YES,
     appliesTo: [SYS_D.OPTIONS],

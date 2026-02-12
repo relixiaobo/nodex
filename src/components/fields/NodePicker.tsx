@@ -218,10 +218,7 @@ export function NodePicker({
             <BulletChevron
               hasChildren={false}
               isExpanded={false}
-              onToggle={noop}
-              onDrillDown={noop}
               onBulletClick={noop}
-              bulletOnly
               {...(selectedName
                 ? (isReference ? { isReference: true } : {})
                 : { dimmed: true })}

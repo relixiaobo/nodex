@@ -51,8 +51,15 @@
   - 下拉列表实时匹配；已选项带 primary 高亮点
   - Enter 选择高亮项，或在无匹配时创建新选项节点
   - Escape / click outside → 关闭不改变
-- **新建选项**：输入不匹配文字 + Enter → `addFieldOption` 创建节点 → 自动选中；新选项自动收录到 attrDef 的 Pre-determined options 列表
-- 待扩展：Auto-collected / Options from Supertag
+- **新建选项（Auto-collect）**：输入不匹配文字 + Enter → `autoCollectOption` 创建值节点：
+  - **原节点留在 field value**（assocData.children），不是 attrDef 的直接子节点
+  - **引用存入 autocollect Tuple**：attrDef 的 autocollect Tuple (`[SYS_A44, toggle, ...ids]`) children[2+] 存放引用
+  - 下次选择同字段时，auto-collected 值与 pre-determined 选项合并显示在下拉中
+- **Auto-collect 配置页**：attrDef 配置页显示 Auto-collect values 区段：
+  - Toggle（ON/OFF）控制是否将 auto-collected 值作为可选项
+  - 名称列显示 "(N)" 计数
+  - Toggle 下方显示 auto-collected 值列表（reference bullet 样式）
+- 待扩展：Options from Supertag
 
 ### Date 类型 — 已实现
 
@@ -155,6 +162,7 @@
 | 2026-02-12 | FieldRow 按 dataType 分发到 3 种渲染器 | Options→OptionsFieldValue, Plain→FieldValueOutliner, 其余→FieldValueEditor |
 | 2026-02-12 | FieldValueEditor 移除 Options 分支 | Options 由 OptionsFieldValue 独立处理（支持 ReferenceNode 显示） |
 | 2026-02-12 | OptionsPicker 改为 combobox 模式 | 支持输入搜索 + 新建选项，与 Tana 交互一致 |
+| 2026-02-12 | Auto-collect: 原节点在 field value，引用在 autocollect Tuple | 分离 pre-determined 与 auto-collected，Tuple children[2+] 存引用 |
 
 ## 当前状态
 
@@ -165,7 +173,7 @@
 - [x] AttrDef 配置页（Field type / Required / Hide / Auto-collect / Auto-initialize）
 - [x] 新字段自动应用 SYS_T02 标签
 - [x] Delete field 按钮 + 级联清理
-- [x] Options combobox（OptionsPicker: 搜索 + 选择 + 新建选项）
+- [x] Options combobox（OptionsPicker: 搜索 + 选择 + 新建选项 + Auto-collect）
 - [x] Date 日期选择器（click-to-edit date input）
 - [x] Number 数字输入（click-to-edit, Integer/Number）
 - [x] URL 链接输入（click-to-edit, 蓝色链接样式）

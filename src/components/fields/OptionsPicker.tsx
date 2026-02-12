@@ -37,7 +37,7 @@ export function OptionsPicker({ nodeId, attrDefId, assocDataId }: OptionsPickerP
 
   const options = useFieldOptions(attrDefId);
   const setOptionsFieldValue = useNodeStore((s) => s.setOptionsFieldValue);
-  const addFieldOption = useNodeStore((s) => s.addFieldOption);
+  const autoCollectOption = useNodeStore((s) => s.autoCollectOption);
   const userId = useWorkspaceStore((s) => s.userId);
   const workspaceId = useWorkspaceStore((s) => s.currentWorkspaceId);
 
@@ -114,11 +114,11 @@ export function OptionsPicker({ nodeId, attrDefId, assocDataId }: OptionsPickerP
   const handleCreate = useCallback(
     (name: string) => {
       if (!userId || !workspaceId) return;
-      const newId = addFieldOption(attrDefId, name, workspaceId, userId);
-      setOptionsFieldValue(nodeId, attrDefId, newId, userId);
+      // Auto-collect: creates value node, sets as field value, adds to autocollect tuple
+      autoCollectOption(nodeId, attrDefId, name, workspaceId, userId);
       closeEditor();
     },
-    [nodeId, attrDefId, userId, workspaceId, addFieldOption, setOptionsFieldValue, closeEditor],
+    [nodeId, attrDefId, userId, workspaceId, autoCollectOption, closeEditor],
   );
 
   const handleKeyDown = useCallback(

@@ -59,12 +59,12 @@ export function NodePanel({ nodeId }: NodePanelProps) {
             <FieldList nodeId={nodeId} />
           </div>
         )}
-        {/* tagDef: show template fields (user-defined field tuples) */}
+        {/* tagDef: show default content (template fields + regular nodes) */}
         {isTagDef && (
           <>
             <div className="ml-4 px-2 mb-1">
               <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                Template fields
+                Default content
               </span>
             </div>
             <OutlinerView rootNodeId={nodeId} showTemplateTuples />
@@ -72,14 +72,14 @@ export function NodePanel({ nodeId }: NodePanelProps) {
         )}
         {/* Non-definition: OutlinerView handles field/content interleaved rendering */}
         {!isDefinitionNode && <OutlinerView rootNodeId={nodeId} />}
-        {isAttrDef && (
+        {isDefinitionNode && (
           <div className="mt-4 ml-4 px-2 pb-4">
             <button
               onClick={handleDelete}
               className="flex items-center gap-2 text-sm text-destructive hover:text-destructive/80"
             >
               <Trash2 size={14} />
-              <span>Delete field</span>
+              <span>{isAttrDef ? 'Delete field' : 'Delete tag'}</span>
             </button>
           </div>
         )}

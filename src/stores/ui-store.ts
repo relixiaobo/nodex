@@ -32,6 +32,11 @@ interface UIStore {
   focusedParentId: string | null;
   setFocusedNode(nodeId: string | null, parentId?: string | null): void;
 
+  // Selection (reference nodes: single click = select, double click = edit/focus)
+  selectedNodeId: string | null;
+  selectedParentId: string | null;
+  setSelectedNode(nodeId: string | null, parentId?: string | null): void;
+
   // Sidebar
   sidebarOpen: boolean;
   toggleSidebar(): void;
@@ -148,6 +153,20 @@ export const useUIStore = create<UIStore>()(
       setFocusedNode: (nodeId, parentId) => set({
         focusedNodeId: nodeId,
         focusedParentId: parentId ?? null,
+        // Clear selection when entering edit mode
+        selectedNodeId: null,
+        selectedParentId: null,
+      }),
+
+      // Selection
+      selectedNodeId: null,
+      selectedParentId: null,
+      setSelectedNode: (nodeId, parentId) => set({
+        selectedNodeId: nodeId,
+        selectedParentId: parentId ?? null,
+        // Clear focus when selecting (exit edit mode)
+        focusedNodeId: null,
+        focusedParentId: null,
       }),
 
       // Sidebar

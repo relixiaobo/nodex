@@ -16,9 +16,11 @@ import { FieldRow } from './FieldRow';
 
 interface FieldValueOutlinerProps {
   assocDataId: string;
+  /** Hide the TrailingInput at the bottom (used by Options fields which provide their own picker) */
+  hideTrailing?: boolean;
 }
 
-export function FieldValueOutliner({ assocDataId }: FieldValueOutlinerProps) {
+export function FieldValueOutliner({ assocDataId, hideTrailing }: FieldValueOutlinerProps) {
   useChildren(assocDataId);
   const childIds = useNodeStore((s) => s.entities[assocDataId]?.children ?? []);
   const entities = useNodeStore((s) => s.entities);
@@ -80,7 +82,9 @@ export function FieldValueOutliner({ assocDataId }: FieldValueOutlinerProps) {
           />
         ),
       )}
-      <TrailingInput parentId={assocDataId} depth={0} parentExpandKey={`${entities[assocDataId]?.props._ownerId ?? ''}:${assocDataId}`} />
+      {!hideTrailing && (
+        <TrailingInput parentId={assocDataId} depth={0} parentExpandKey={`${entities[assocDataId]?.props._ownerId ?? ''}:${assocDataId}`} />
+      )}
     </div>
   );
 }

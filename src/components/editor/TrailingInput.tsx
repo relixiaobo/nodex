@@ -22,6 +22,7 @@ import { useNodeStore } from '../../stores/node-store';
 import { useWorkspaceStore } from '../../stores/workspace-store';
 import { useUIStore } from '../../stores/ui-store';
 import { WORKSPACE_CONTAINERS } from '../../types';
+import { getLastVisibleNode } from '../../lib/tree-utils.js';
 import { BulletChevron } from '../outliner/BulletChevron';
 
 const CONTAINER_SUFFIXES = Object.values(WORKSPACE_CONTAINERS);
@@ -168,12 +169,14 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey }: T
               return true;
             }
 
-            // Focus the last child of the parent (the node right above this TrailingInput)
-            const parent = useNodeStore.getState().entities[ref.effectiveParentId];
-            const children = parent?.children ?? [];
-            if (children.length > 0) {
-              const lastChildId = children[children.length - 1];
-              ref.setFocusedNode(lastChildId, ref.effectiveParentId);
+            // Focus the last visible node above this TrailingInput.
+            // Walks from parent's last visible child down through expanded
+            // descendants to find the deepest visible node.
+            const entities = useNodeStore.getState().entities;
+            const expanded = useUIStore.getState().expandedNodes;
+            const target = getLastVisibleNode(ref.effectiveParentId, entities, expanded);
+            if (target) {
+              ref.setFocusedNode(target.nodeId, target.parentId);
             }
             return true;
           },

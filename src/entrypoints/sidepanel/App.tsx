@@ -3,6 +3,7 @@ import { useWorkspaceStore } from '../../stores/workspace-store';
 import { useUIStore } from '../../stores/ui-store';
 import { useNodeStore } from '../../stores/node-store';
 import { useRealtimeNodes } from '../../hooks/use-realtime';
+import { useNavUndoKeyboard } from '../../hooks/use-nav-undo-keyboard';
 import { Sidebar } from '../../components/sidebar/Sidebar';
 import { PanelStack } from '../../components/panel/PanelStack';
 import { CommandPalette } from '../../components/search/CommandPalette';
@@ -132,6 +133,9 @@ export function App() {
 
   // Realtime subscription
   useRealtimeNodes(wsId);
+
+  // Global Cmd+Z / Cmd+Shift+Z for navigation undo/redo
+  useNavUndoKeyboard();
 
   if (!ready) {
     return (

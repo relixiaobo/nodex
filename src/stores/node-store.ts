@@ -676,6 +676,7 @@ export const useNodeStore = create<NodeStore>()(
       const { entities } = get();
       const node = entities[nodeId];
       const oldOwnerId = node?.props._ownerId;
+      const docType = node?.props._docType;
 
       const trashId = `${workspaceId}_TRASH`;
 
@@ -694,6 +695,82 @@ export const useNodeStore = create<NodeStore>()(
         }
         if (state.entities[nodeId]) {
           state.entities[nodeId].props._ownerId = trashId;
+        }
+
+        // ── Cascade cleanup for definition nodes ──
+
+        if (docType === 'tagDef') {
+          // Remove this tag from all nodes that have it applied
+          const templateTupleIds = new Set(state.entities[nodeId]?.children ?? []);
+          for (const eid of Object.keys(state.entities)) {
+            const e = state.entities[eid];
+            if (!e?.props._metaNodeId) continue;
+            const meta = state.entities[e.props._metaNodeId];
+            if (!meta?.children) continue;
+
+            // Find SYS_A13 tuple pointing to this tagDef
+            const tagIdx = meta.children.findIndex((cid) => {
+              const t = state.entities[cid];
+              return t?.props._docType === 'tuple' &&
+                t.children?.[0] === SYS_A.NODE_SUPERTAGS &&
+                t.children?.[1] === nodeId;
+            });
+            if (tagIdx < 0) continue;
+
+            // Remove SYS_A13 tuple from metanode
+            const tupleId = meta.children[tagIdx];
+            meta.children.splice(tagIdx, 1);
+            delete state.entities[tupleId];
+
+            // Remove template-sourced field tuples from content node
+            if (e.children) {
+              const toRemove: string[] = [];
+              for (const cid of e.children) {
+                const child = state.entities[cid];
+                if (child?.props._sourceId && templateTupleIds.has(child.props._sourceId)) {
+                  toRemove.push(cid);
+                  const assocId = e.associationMap?.[cid];
+                  if (assocId) {
+                    delete state.entities[assocId];
+                    delete e.associationMap![cid];
+                  }
+                  delete state.entities[cid];
+                }
+              }
+              if (toRemove.length > 0) {
+                const removeSet = new Set(toRemove);
+                e.children = e.children.filter(cid => !removeSet.has(cid));
+              }
+            }
+          }
+        }
+
+        if (docType === 'attrDef') {
+          // Remove all field tuples that reference this attrDef
+          for (const eid of Object.keys(state.entities)) {
+            const e = state.entities[eid];
+            if (!e?.children) continue;
+            // Skip non-content nodes (tuples, metanodes, etc.)
+            if (e.props._docType && e.props._docType !== 'tagDef') continue;
+
+            const toRemove: string[] = [];
+            for (const cid of e.children) {
+              const child = state.entities[cid];
+              if (child?.props._docType === 'tuple' && child.children?.[0] === nodeId) {
+                toRemove.push(cid);
+                const assocId = e.associationMap?.[cid];
+                if (assocId) {
+                  delete state.entities[assocId];
+                  delete e.associationMap![cid];
+                }
+                delete state.entities[cid];
+              }
+            }
+            if (toRemove.length > 0) {
+              const removeSet = new Set(toRemove);
+              e.children = e.children.filter(cid => !removeSet.has(cid));
+            }
+          }
         }
       });
 

@@ -7,7 +7,7 @@ import { useNodeFields, type FieldEntry } from '../../hooks/use-node-fields';
 import { useNodeStore } from '../../stores/node-store';
 import { useUIStore } from '../../stores/ui-store';
 import { useWorkspaceStore } from '../../stores/workspace-store';
-import { BulletChevron, Bullet } from './BulletChevron';
+import { BulletChevron } from './BulletChevron';
 import { NodeEditor } from '../editor/NodeEditor';
 import { TrailingInput } from '../editor/TrailingInput';
 import { TagBar } from '../tags/TagBar';
@@ -727,12 +727,12 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       {isDropTarget && dropPosition === 'before' && (
         <div
           className="h-0.5 bg-primary rounded-full"
-          style={{ marginLeft: depth * 24 + 6 + 30 }}
+          style={{ marginLeft: depth * 24 + 6 + 15 }}
         />
       )}
       <div
         ref={rowRef}
-        className={`group/row flex min-h-7 items-start gap-[7.5px] py-1 ${
+        className={`group/row flex min-h-7 items-start py-1 ${
           isDropTarget && dropPosition === 'inside'
             ? 'bg-primary/10 ring-1 ring-primary/30 rounded-sm'
             : ''
@@ -745,20 +745,13 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
         onDrop={handleDrop}
         onDragEnd={handleDragEnd}
       >
-        <BulletChevron
-          hasChildren={hasChildren}
-          isExpanded={isExpanded}
-          onToggle={handleToggle}
-          onDrillDown={handleDrillDown}
-          onBulletClick={handleBulletClick}
-          isReference={isReference}
-          chevronOnly
-        />
-        {/* Bullet + text wrapper: always same structure, ring only when selected */}
+        {/* BulletChevron + text wrapper: ring wraps both when selected */}
         <div className={`flex items-start gap-[7.5px] flex-1 min-w-0 relative ${isSelected ? 'ring-1 ring-primary/40 rounded-sm bg-primary/5 !w-fit !flex-none' : ''}`}>
-          <Bullet
+          <BulletChevron
             hasChildren={hasChildren}
             isExpanded={isExpanded}
+            onToggle={handleToggle}
+            onDrillDown={handleDrillDown}
             onBulletClick={handleBulletClick}
             isReference={isReference}
           />
@@ -884,7 +877,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       {isDropTarget && dropPosition === 'after' && (
         <div
           className="h-0.5 bg-primary rounded-full"
-          style={{ marginLeft: depth * 24 + 6 + 30 }}
+          style={{ marginLeft: depth * 24 + 6 + 15 }}
         />
       )}
       {isExpanded && (
@@ -893,7 +886,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
                Center aligns with parent bullet center. Hover fills bg = looks thicker. */}
           <button
             className="indent-line absolute top-0 bottom-0 w-2 flex justify-center cursor-pointer rounded-sm transition-colors"
-            style={{ left: depth * 24 + 6 + 26 }}
+            style={{ left: depth * 24 + 6 + 3.5 }}
             onClick={handleIndentLineClick}
             title="Toggle children"
           >
@@ -902,7 +895,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
           {/* Render children in natural order: fields as FieldRow, content as OutlinerItem */}
           {visibleChildren.map(({ id, type }, i) =>
             type === 'field' ? (
-              <div key={id} className="@container" style={{ paddingLeft: (depth + 1) * 24 + 6 + 22.5 }}>
+              <div key={id} className="@container" style={{ paddingLeft: (depth + 1) * 24 + 6 + 15 }}>
                 <FieldRow
                   nodeId={nodeId}
                   attrDefId={fieldMap.get(id)!.attrDefId}

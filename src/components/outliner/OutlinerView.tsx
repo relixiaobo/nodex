@@ -55,7 +55,7 @@ export function OutlinerView({ rootNodeId, showTemplateTuples }: OutlinerViewPro
     <div className="flex flex-col" role="tree">
       {visibleChildren.map(({ id, type }, i) =>
         type === 'field' ? (
-          <div key={id} className="@container" style={{ paddingLeft: 6 + 22.5 }}>
+          <div key={id} className="@container" style={{ paddingLeft: 6 + 15 }}>
             <FieldRow
               nodeId={rootNodeId}
               attrDefId={fieldMap.get(id)!.attrDefId}

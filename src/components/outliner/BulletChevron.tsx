@@ -8,52 +8,24 @@ interface BulletChevronProps {
   dimmed?: boolean;
   /** Reference node: show concentric circles (bullseye) bullet */
   isReference?: boolean;
-  /** When true, only render the chevron (bullet rendered separately via <Bullet />) */
-  chevronOnly?: boolean;
-}
-
-interface BulletProps {
-  hasChildren: boolean;
-  isExpanded: boolean;
-  onBulletClick: () => void;
-  dimmed?: boolean;
-  isReference?: boolean;
-}
-
-/**
- * Standalone Bullet component — used when selection ring needs to wrap
- * bullet + text separately from chevron.
- */
-export function Bullet({ hasChildren, isExpanded, onBulletClick, dimmed, isReference }: BulletProps) {
-  const showOuterRing = hasChildren && !isExpanded;
-  return (
-    <span
-      role="button"
-      className="flex h-[21px] w-[15px] items-center justify-center cursor-pointer group/bullet shrink-0"
-      onClick={onBulletClick}
-      title="Zoom in"
-    >
-      <div
-        className={`flex h-[15px] w-[15px] items-center justify-center rounded-full transition-colors group-active/bullet:scale-90 ${
-          isReference ? 'border border-dashed border-foreground/40' : ''
-        } ${showOuterRing || (isReference && hasChildren && !isExpanded) ? 'bg-foreground/[0.08]' : ''}`}
-      >
-        <div className={`h-[5px] w-[5px] rounded-full transition-transform group-hover/bullet:scale-[1.375] ${dimmed ? 'bg-foreground/15' : 'bg-foreground/50'}`} />
-      </div>
-    </span>
-  );
+  /** When true, only render bullet (no chevron overlay). Use for decorative/static bullets. */
+  bulletOnly?: boolean;
 }
 
 /**
  * Tana-faithful BulletChevron component.
  *
- * Layout (matches Tana DOM):
- *   [ChevronArea 15px] [BulletArea 15px]
+ * Bullet and chevron share the SAME 15px zone (overlay layout):
+ *   - Bullet is always visible (normal flow)
+ *   - Chevron appears on row hover, overlaying the bullet (absolute positioned)
  *
- * Chevron and Bullet are TWO INDEPENDENT side-by-side areas.
+ * This ensures the component fits within the 24px indent step:
+ *   [BulletChevron 15px] [gap 7.5px] [text]
+ *   Total pre-text: 22.5px < 24px indent step → no overlap with child chevrons.
  *
- * When `chevronOnly` is true, only the chevron is rendered (for selection
- * ring layouts where bullet needs to be inside a separate wrapper).
+ * When `bulletOnly` is true, the chevron overlay is not rendered. Use this for
+ * decorative bullets in FieldRow, AutoCollectSection, etc. that are nested inside
+ * a group/row container but should not show expand/collapse controls.
  */
 export function BulletChevron({
   hasChildren,
@@ -63,53 +35,59 @@ export function BulletChevron({
   onBulletClick,
   dimmed,
   isReference,
-  chevronOnly,
+  bulletOnly,
 }: BulletChevronProps) {
-  const chevron = (
-    <button
-      className="flex shrink-0 h-[21px] w-[15px] items-center justify-center opacity-0 group-hover/row:opacity-100 transition-opacity"
-      onClick={onToggle}
-      onDoubleClick={onDrillDown}
-      title={isExpanded ? 'Collapse' : 'Expand'}
-    >
-      <div
-        className={`flex h-[15px] w-[15px] items-center justify-center rounded-full bg-background outline outline-1 outline-border-emphasis hover:bg-foreground/[0.04] transition-colors ${
-          isExpanded ? '[&>svg]:rotate-90' : ''
-        }`}
-      >
-        <svg
-          width="10"
-          height="10"
-          viewBox="0 0 12 12"
-          className="text-muted-foreground transition-transform"
-        >
-          <path
-            d="M4.5 2.5L8 6L4.5 9.5"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      </div>
-    </button>
-  );
-
-  if (chevronOnly) {
-    return chevron;
-  }
+  const showOuterRing = hasChildren && !isExpanded;
 
   return (
-    <div className="flex shrink-0 items-center h-[21px]">
-      {chevron}
-      <Bullet
-        hasChildren={hasChildren}
-        isExpanded={isExpanded}
-        onBulletClick={onBulletClick}
-        dimmed={dimmed}
-        isReference={isReference}
-      />
+    <div className="relative flex shrink-0 items-center h-[21px] w-[15px]">
+      {/* Bullet: always visible */}
+      <span
+        role="button"
+        className="flex h-[21px] w-[15px] items-center justify-center cursor-pointer group/bullet shrink-0"
+        onClick={onBulletClick}
+        title="Zoom in"
+      >
+        <div
+          className={`flex h-[15px] w-[15px] items-center justify-center rounded-full transition-colors group-active/bullet:scale-90 ${
+            isReference ? 'border border-dashed border-foreground/40' : ''
+          } ${showOuterRing || (isReference && hasChildren && !isExpanded) ? 'bg-foreground/[0.08]' : ''}`}
+        >
+          <div className={`h-[5px] w-[5px] rounded-full transition-transform group-hover/bullet:scale-[1.375] ${dimmed ? 'bg-foreground/15' : 'bg-foreground/50'}`} />
+        </div>
+      </span>
+
+      {/* Chevron: overlays bullet on row hover (hidden for decorative/static bullets) */}
+      {!bulletOnly && (
+        <button
+          className="absolute inset-0 flex items-center justify-center opacity-0 group-hover/row:opacity-100 pointer-events-none group-hover/row:pointer-events-auto z-10 transition-opacity"
+          onClick={(e) => { e.stopPropagation(); onToggle(); }}
+          onDoubleClick={(e) => { e.stopPropagation(); onDrillDown(); }}
+          title={isExpanded ? 'Collapse' : 'Expand'}
+        >
+          <div
+            className={`flex h-[15px] w-[15px] items-center justify-center rounded-full bg-background outline outline-1 outline-border-emphasis hover:bg-foreground/[0.04] transition-colors ${
+              isExpanded ? '[&>svg]:rotate-90' : ''
+            }`}
+          >
+            <svg
+              width="10"
+              height="10"
+              viewBox="0 0 12 12"
+              className="text-muted-foreground transition-transform"
+            >
+              <path
+                d="M4.5 2.5L8 6L4.5 9.5"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </div>
+        </button>
+      )}
     </div>
   );
 }

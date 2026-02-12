@@ -146,7 +146,7 @@ export function FieldRow({
           ) : (
             /* Toggle / tag_picker / color_picker — keep outer bullet wrapping */
             <div className="flex min-h-7 items-center gap-[7.5px] py-1" style={{ paddingLeft: 6 }}>
-              <BulletChevron hasChildren={false} isExpanded={false} onToggle={noop} onDrillDown={noop} onBulletClick={noop} />
+              <BulletChevron hasChildren={false} isExpanded={false} onToggle={noop} onDrillDown={noop} onBulletClick={noop} bulletOnly />
               {isToggle ? (
                 <ConfigToggle tupleId={tupleId} fieldKey={attrDefId} currentValue={valueName} />
               ) : isTagPicker ? (
@@ -210,7 +210,7 @@ export function FieldRow({
           <FieldValueOutliner assocDataId={assocDataId} fieldDataType={dataType} attrDefId={attrDefId} />
         ) : (
           <div className="flex min-h-7 items-start gap-[7.5px] py-1" style={{ paddingLeft: 6 }}>
-            <BulletChevron hasChildren={false} isExpanded={false} onToggle={noop} onDrillDown={noop} onBulletClick={noop} dimmed />
+            <BulletChevron hasChildren={false} isExpanded={false} onToggle={noop} onDrillDown={noop} onBulletClick={noop} dimmed bulletOnly />
             <span className="text-sm leading-[21px] text-foreground-tertiary select-none">Empty</span>
           </div>
         )}

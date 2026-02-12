@@ -1,15 +1,17 @@
 /**
- * Dropdown select for attrDef config fields (Hide field).
+ * Config select picker — thin wrapper around NodePicker.
  *
- * Options come from the ATTRDEF_CONFIG_FIELDS registry.
- * onChange updates the Tuple value via setConfigValue.
+ * Maps config field options (from ATTRDEF_CONFIG_FIELDS) to
+ * NodePicker and calls setConfigValue on selection.
  *
- * Description is rendered by FieldRow (name column), not here.
+ * - allowCreate: false (fixed option list)
+ * - isReference: false (normal bullet)
  */
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useNodeStore } from '../../stores/node-store';
 import { useWorkspaceStore } from '../../stores/workspace-store';
 import { ATTRDEF_CONFIG_FIELDS } from '../../lib/field-utils.js';
+import { NodePicker } from './NodePicker';
 
 interface ConfigSelectProps {
   tupleId: string;
@@ -21,24 +23,25 @@ export function ConfigSelect({ tupleId, fieldKey, currentValue }: ConfigSelectPr
   const setConfigValue = useNodeStore((s) => s.setConfigValue);
   const userId = useWorkspaceStore((s) => s.userId) ?? 'local';
 
-  const configDef = ATTRDEF_CONFIG_FIELDS.find(f => f.key === fieldKey);
-  const options = configDef?.options ?? [];
+  const configDef = ATTRDEF_CONFIG_FIELDS.find((f) => f.key === fieldKey);
+  const pickerOptions = useMemo(
+    () => (configDef?.options ?? []).map((opt) => ({ id: opt.value, name: opt.label })),
+    [configDef?.options],
+  );
 
-  const handleChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
-    setConfigValue(tupleId, e.target.value, userId);
-  }, [tupleId, setConfigValue, userId]);
+  const handleSelect = useCallback(
+    (id: string) => {
+      setConfigValue(tupleId, id, userId);
+    },
+    [tupleId, setConfigValue, userId],
+  );
 
   return (
-    <select
-      value={currentValue ?? configDef?.defaultValue ?? ''}
-      onChange={handleChange}
-      className="h-[22px] text-sm bg-transparent border border-border/40 rounded px-1.5 text-foreground cursor-pointer outline-none hover:border-border/80 transition-colors"
-    >
-      {options.map((opt) => (
-        <option key={opt.value} value={opt.value}>
-          {opt.label}
-        </option>
-      ))}
-    </select>
+    <NodePicker
+      options={pickerOptions}
+      selectedId={currentValue ?? configDef?.defaultValue}
+      onSelect={handleSelect}
+      placeholder="Select"
+    />
   );
 }

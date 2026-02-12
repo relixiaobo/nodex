@@ -2,7 +2,8 @@
 @source "../../src";
 
 @theme {
-  --color-primary: #6366f1;
+  --color-primary: #8B5CF6;
+  --color-primary-hover: #7C3AED;
   --color-primary-foreground: #ffffff;
   --color-secondary: #f1f5f9;
   --color-secondary-foreground: #0f172a;
@@ -14,17 +15,28 @@
   --color-destructive-foreground: #ffffff;
   --color-border: #e2e8f0;
   --color-input: #e2e8f0;
-  --color-ring: #6366f1;
+  --color-ring: #8B5CF6;
   --color-background: #ffffff;
   --color-foreground: #0f172a;
   --color-card: #ffffff;
   --color-card-foreground: #0f172a;
   --color-popover: #ffffff;
   --color-popover-foreground: #0f172a;
+  --color-surface: #FFFFFF;
+  --color-surface-raised: #FFFFFF;
+  --color-surface-overlay: #FFFFFF;
+  --color-foreground-secondary: #6B6B80;
+  --color-foreground-tertiary: #A0A0B0;
+  --color-border-subtle: rgba(0,0,0,0.04);
+  --color-border-emphasis: rgba(0,0,0,0.15);
+  --color-warning: #D97706;
+  --color-success: #0D9488;
+  --radius-xs: 0.125rem;
   --radius-sm: 0.25rem;
-  --radius-default: 0.5rem;
   --radius-md: 0.375rem;
   --radius-lg: 0.5rem;
+  --radius-xl: 0.75rem;
+  --radius-2xl: 1rem;
   --font-sans: "Inter", system-ui, -apple-system, sans-serif;
   --font-mono: "JetBrains Mono", "Fira Code", monospace;
 }

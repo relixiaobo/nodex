@@ -8,9 +8,9 @@ import { useNodeStore } from '../../stores/node-store';
  * Each tagDefId hashes to a consistent color.
  */
 const TAG_COLORS = [
-  { bg: 'rgba(99,102,241,0.12)', text: '#6366f1' },   // indigo
+  { bg: 'rgba(139,92,246,0.12)', text: '#8B5CF6' },    // violet (primary)
   { bg: 'rgba(236,72,153,0.12)', text: '#db2777' },    // pink
-  { bg: 'rgba(139,92,246,0.12)', text: '#7c3aed' },    // violet
+  { bg: 'rgba(147,51,234,0.12)', text: '#9333EA' },    // purple
   { bg: 'rgba(6,182,212,0.12)', text: '#0891b2' },     // cyan
   { bg: 'rgba(16,185,129,0.12)', text: '#059669' },    // emerald
   { bg: 'rgba(245,158,11,0.12)', text: '#d97706' },    // amber

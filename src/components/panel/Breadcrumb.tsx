@@ -12,7 +12,7 @@
  * [...] expands in-place (no navigation). Resets when nodeId changes.
  */
 import { useState, useEffect, useCallback } from 'react';
-import { PanelLeft, ChevronLeft, ChevronRight, Search, Library, Inbox, CalendarDays, Trash2, MoreHorizontal } from 'lucide-react';
+import { PanelLeft, ChevronLeft, ChevronRight, Search, Library, Inbox, CalendarDays, Trash2, MoreHorizontal, Hash } from 'lucide-react';
 import { useUIStore } from '../../stores/ui-store';
 import { useNodeStore } from '../../stores/node-store';
 import { useAncestors } from '../../hooks/use-ancestors';
@@ -30,6 +30,7 @@ const CONTAINER_INFO: Record<string, { icon: typeof Library; label: string }> = 
   [WORKSPACE_CONTAINERS.JOURNAL]: { icon: CalendarDays, label: 'Journal' },
   [WORKSPACE_CONTAINERS.SEARCHES]: { icon: Search, label: 'Searches' },
   [WORKSPACE_CONTAINERS.TRASH]: { icon: Trash2, label: 'Trash' },
+  [WORKSPACE_CONTAINERS.SCHEMA]: { icon: Hash, label: 'Schema' },
 };
 
 function getContainerInfo(containerId: string | null) {

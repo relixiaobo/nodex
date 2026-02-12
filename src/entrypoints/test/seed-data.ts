@@ -296,15 +296,17 @@ export function seedTestData() {
     makeNode('meta_attrDef_company_tag', '', 'meta_attrDef_company', [SYS_A.NODE_SUPERTAGS, 'SYS_T02'], 'tuple'),
   ];
 
-  // TagDef: Task — template Tuples reference attrDef IDs (tagged with SYS_T01)
+  // TagDef: Task — template Tuples reference attrDef IDs + regular content nodes (tagged with SYS_T01)
   const tagDefTaskNodes = [
     makeNode('tagDef_task', 'Task', schemaId, [
       'tagDef_task_cfg_checkbox', 'tagDef_task_cfg_childtag', 'tagDef_task_cfg_color',
       'taskField_status', 'taskField_priority', 'taskField_due',
+      'taskTpl_default_note',
     ], 'tagDef'),
     makeNode('taskField_status', '', 'tagDef_task', ['attrDef_status'], 'tuple'),
     makeNode('taskField_priority', '', 'tagDef_task', ['attrDef_priority'], 'tuple'),
     makeNode('taskField_due', '', 'tagDef_task', ['attrDef_due'], 'tuple'),
+    makeNode('taskTpl_default_note', 'Notes', 'tagDef_task'),  // regular content node in template
   ];
 
   // TagDef: Person (tagged with SYS_T01)

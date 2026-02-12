@@ -723,6 +723,10 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
                 onReferenceCreate={handleReferenceForceCreate}
                 onReferenceClose={handleReferenceClose}
               />
+            ) : fieldDataType === SYS_D.DATE && node.props.name ? (
+              <span className="node-content">{formatFieldDate(node.props.name)}</span>
+            ) : fieldDataType === SYS_D.URL && node.props.name ? (
+              <span className="node-content text-primary/70 underline decoration-primary/20">{node.props.name}</span>
             ) : (
               <span
                 className="node-content"
@@ -820,4 +824,18 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       )}
     </div>
   );
+}
+
+/** Format ISO date string as human-readable (e.g. "Tue, Feb 24") */
+function formatFieldDate(isoDate: string): string {
+  try {
+    const date = new Date(isoDate + 'T00:00:00');
+    return date.toLocaleDateString('en-US', {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+    });
+  } catch {
+    return isoDate;
+  }
 }

@@ -19,6 +19,8 @@ export interface FieldEntry {
   valueName?: string;
   dataType: string;
   assocDataId?: string;
+  /** True when the attrDef has been trashed (moved to Trash container) */
+  trashed?: boolean;
 }
 
 function computeFields(entities: Record<string, NodexNode>, nodeId: string): FieldEntry[] {
@@ -77,6 +79,7 @@ function computeFields(entities: Record<string, NodexNode>, nodeId: string): Fie
     const valueNodeId = child.children[1];
     const valueNode = valueNodeId ? entities[valueNodeId] : undefined;
     const assocDataId = node.associationMap?.[childId];
+    const trashed = attrDef.props._ownerId?.endsWith('_TRASH') ?? false;
 
     fields.push({
       attrDefId: keyId,
@@ -86,6 +89,7 @@ function computeFields(entities: Record<string, NodexNode>, nodeId: string): Fie
       valueName: valueNode?.props.name,
       dataType: resolveDataType(entities, keyId),
       assocDataId,
+      trashed,
     });
   }
 

@@ -66,6 +66,7 @@ export function OutlinerView({ rootNodeId, showTemplateTuples }: OutlinerViewPro
               dataType={fieldMap.get(id)!.dataType}
               assocDataId={fieldMap.get(id)!.assocDataId}
               isLastInGroup={i === visibleChildren.length - 1 || visibleChildren[i + 1].type !== 'field'}
+              trashed={fieldMap.get(id)!.trashed}
             />
           </div>
         ) : (

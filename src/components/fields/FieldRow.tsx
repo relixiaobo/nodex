@@ -19,6 +19,7 @@
  * - Value area: FieldValueOutliner (plain) or OptionsFieldValue (options dropdown)
  */
 import { useCallback, useRef } from 'react';
+import { Trash2 } from 'lucide-react';
 import { useNodeStore } from '../../stores/node-store';
 import { useUIStore } from '../../stores/ui-store';
 import { useWorkspaceStore } from '../../stores/workspace-store';
@@ -41,6 +42,7 @@ interface FieldRowProps {
   dataType: string;
   assocDataId?: string;
   isLastInGroup?: boolean;
+  trashed?: boolean;
 }
 
 export function FieldRow({
@@ -52,6 +54,7 @@ export function FieldRow({
   dataType,
   assocDataId,
   isLastInGroup,
+  trashed,
 }: FieldRowProps) {
   const navigateTo = useUIStore((s) => s.navigateTo);
   const editingFieldNameId = useUIStore((s) => s.editingFieldNameId);
@@ -138,13 +141,22 @@ export function FieldRow({
     <div className={`border-t ${isLastInGroup ? 'border-b' : ''} border-border/40 flex items-center min-h-[28px] py-1`} data-field-row>
       {/* Name column — fixed height container to prevent jump */}
       <div className="flex items-center gap-1 shrink-0 w-[130px] min-w-0 h-[22px]">
-        <button
-          className="shrink-0 w-[15px] flex items-center justify-center text-muted-foreground/50 hover:text-muted-foreground transition-colors"
-          onClick={() => navigateTo(attrDefId)}
-          title="Configure field"
-        >
-          {Icon && <Icon size={12} />}
-        </button>
+        {trashed ? (
+          <span
+            className="shrink-0 w-[15px] flex items-center justify-center text-destructive/50"
+            title={`Field "${attrDefName}" has been deleted`}
+          >
+            <Trash2 size={12} />
+          </span>
+        ) : (
+          <button
+            className="shrink-0 w-[15px] flex items-center justify-center text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+            onClick={() => navigateTo(attrDefId)}
+            title="Configure field"
+          >
+            {Icon && <Icon size={12} />}
+          </button>
+        )}
         <div className="flex-1 min-w-0">
           {isEditing ? (
             <FieldNameInput

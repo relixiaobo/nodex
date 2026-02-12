@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef, forwardRef } from 'react';
-import { X, XCircle, Hash, Settings } from 'lucide-react';
+import { X, XCircle, Hash, Settings, Trash2, AlertTriangle } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { useNodeStore } from '../../stores/node-store';
 
@@ -37,6 +37,7 @@ interface TagBadgeProps {
 
 export function TagBadge({ tagDefId, onRemove, onNavigate }: TagBadgeProps) {
   const tagName = useNodeStore((s) => s.entities[tagDefId]?.props.name ?? 'Untitled');
+  const isTrashed = useNodeStore((s) => s.entities[tagDefId]?.props._ownerId?.endsWith('_TRASH') ?? false);
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const color = getTagColor(tagDefId);
@@ -84,6 +85,21 @@ export function TagBadge({ tagDefId, onRemove, onNavigate }: TagBadgeProps) {
     },
     [onNavigate],
   );
+
+  // Trashed tagDef: show warning style instead of normal badge
+  if (isTrashed) {
+    return (
+      <span
+        className="inline-flex items-center text-xs shrink-0 rounded bg-destructive/10 text-destructive/70 py-0.5 px-1.5 gap-1"
+        title={`Tag "${tagName}" has been deleted`}
+      >
+        <span className="text-[11px] leading-none">#</span>
+        <span>{tagName}</span>
+        <AlertTriangle size={11} className="text-amber-500" />
+        <Trash2 size={11} />
+      </span>
+    );
+  }
 
   return (
     <>

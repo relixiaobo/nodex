@@ -38,6 +38,9 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   const focusedNodeId = useUIStore((s) => s.focusedNodeId);
   const focusedParentId = useUIStore((s) => s.focusedParentId);
   const setFocusedNode = useUIStore((s) => s.setFocusedNode);
+  const selectedNodeId = useUIStore((s) => s.selectedNodeId);
+  const selectedParentId = useUIStore((s) => s.selectedParentId);
+  const setSelectedNode = useUIStore((s) => s.setSelectedNode);
   const toggleExpanded = useUIStore((s) => s.toggleExpanded);
   const setExpanded = useUIStore((s) => s.setExpanded);
   const navigateTo = useUIStore((s) => s.navigateTo);
@@ -128,6 +131,8 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   const hasTags = tagIds.length > 0;
   const hasFields = fields.length > 0;
   const isReference = !!node && node.props._ownerId !== parentId;
+  const isSelected = selectedNodeId === nodeId &&
+    (selectedParentId === null || selectedParentId === parentId);
 
   // When TrailingInput creates a node with # or @, it sets triggerHint so we
   // can immediately open the dropdown (extensions don't fire on mount because
@@ -177,8 +182,20 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
         return;
       }
     }
-    setFocusedNode(nodeId, parentId);
-  }, [nodeId, parentId, setFocusedNode, navigateTo]);
+    // Reference nodes: single click = select (frame), double click = edit
+    if (isReference) {
+      setSelectedNode(nodeId, parentId);
+    } else {
+      setFocusedNode(nodeId, parentId);
+    }
+  }, [nodeId, parentId, isReference, setFocusedNode, setSelectedNode, navigateTo]);
+
+  const handleContentDoubleClick = useCallback(() => {
+    // Double click on reference node → enter edit mode
+    if (isReference) {
+      setFocusedNode(nodeId, parentId);
+    }
+  }, [nodeId, parentId, isReference, setFocusedNode]);
 
   const handleToggle = useCallback(() => {
     const ek = `${parentId}:${nodeId}`;
@@ -679,8 +696,9 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
         />
         <div className="flex-1 min-w-0 relative">
           <div
-            className={`text-sm leading-[21px] ${fieldDataType !== SYS_D.CHECKBOX && !isFocused ? 'cursor-text' : ''}`}
+            className={`text-sm leading-[21px] ${fieldDataType !== SYS_D.CHECKBOX && !isFocused ? (isReference ? 'cursor-default' : 'cursor-text') : ''} ${isSelected ? 'ring-1 ring-primary/40 rounded-sm bg-primary/5 px-1 -mx-1' : ''}`}
             onClick={fieldDataType !== SYS_D.CHECKBOX && !isFocused ? handleContentClick : undefined}
+            onDoubleClick={fieldDataType !== SYS_D.CHECKBOX && !isFocused && isReference ? handleContentDoubleClick : undefined}
           >
             {fieldDataType === SYS_D.CHECKBOX ? (
               <input

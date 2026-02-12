@@ -9,11 +9,11 @@ interface NodePanelHeaderProps {
 
 export function NodePanelHeader({ nodeId }: NodePanelHeaderProps) {
   const node = useNode(nodeId);
-  const panelStack = useUIStore((s) => s.panelStack);
-  const popPanel = useUIStore((s) => s.popPanel);
+  const panelIndex = useUIStore((s) => s.panelIndex);
+  const goBack = useUIStore((s) => s.goBack);
   const toggleSidebar = useUIStore((s) => s.toggleSidebar);
   const openSearch = useUIStore((s) => s.openSearch);
-  const canGoBack = panelStack.length > 1;
+  const canGoBack = panelIndex > 0;
 
   // Extract display name — strip HTML tags for header
   const rawName = node?.props.name || '';
@@ -31,7 +31,7 @@ export function NodePanelHeader({ nodeId }: NodePanelHeaderProps) {
         </button>
         {canGoBack && (
           <button
-            onClick={popPanel}
+            onClick={goBack}
             className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
             title="Go back"
           >

@@ -32,17 +32,18 @@ export const ReferenceSelector = forwardRef<ReferenceDropdownHandle, ReferenceSe
     const searchResults = useNodeSearch(query, currentNodeId);
     const listRef = useRef<HTMLDivElement>(null);
 
-    // When query is empty, show recently opened nodes from panelStack
-    const panelStack = useUIStore((s) => s.panelStack);
+    // When query is empty, show recently opened nodes from navigation history
+    const panelHistory = useUIStore((s) => s.panelHistory);
+    const panelIndex = useUIStore((s) => s.panelIndex);
     const entities = useNodeStore((s) => s.entities);
 
     const recentNodes = useMemo(() => {
       if (query.trim()) return [];
       const seen = new Set<string>();
       const results: NodeSearchResult[] = [];
-      // Walk panelStack in reverse for most recently visited
-      for (let i = panelStack.length - 1; i >= 0 && results.length < 5; i--) {
-        const id = panelStack[i];
+      // Walk history backwards from current position for most recently visited
+      for (let i = panelIndex; i >= 0 && results.length < 5; i--) {
+        const id = panelHistory[i];
         if (id === currentNodeId || seen.has(id)) continue;
         seen.add(id);
         const node = entities[id];
@@ -52,7 +53,7 @@ export const ReferenceSelector = forwardRef<ReferenceDropdownHandle, ReferenceSe
         results.push({ id, name, breadcrumb: '' });
       }
       return results;
-    }, [query, panelStack, entities, currentNodeId]);
+    }, [query, panelHistory, panelIndex, entities, currentNodeId]);
 
     const items = query.trim() ? searchResults : recentNodes;
     const hasCreateOption = !!(query.trim() && onCreateNew);

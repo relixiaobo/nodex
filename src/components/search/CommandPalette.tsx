@@ -17,7 +17,7 @@ export function CommandPalette() {
   const closeSearch = useUIStore((s) => s.closeSearch);
   const searchQuery = useUIStore((s) => s.searchQuery);
   const setSearchQuery = useUIStore((s) => s.setSearchQuery);
-  const pushPanel = useUIStore((s) => s.pushPanel);
+  const navigateTo = useUIStore((s) => s.navigateTo);
   const entities = useNodeStore((s) => s.entities);
   const wsId = useWorkspaceStore((s) => s.currentWorkspaceId);
 
@@ -39,10 +39,10 @@ export function CommandPalette() {
 
   const handleSelect = useCallback(
     (nodeId: string) => {
-      pushPanel(nodeId);
+      navigateTo(nodeId);
       closeSearch();
     },
-    [pushPanel, closeSearch],
+    [navigateTo, closeSearch],
   );
 
   // Filter nodes matching the search query

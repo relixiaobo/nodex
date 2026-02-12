@@ -20,14 +20,13 @@ const NAV_ITEMS: NavItem[] = [
 
 export function SidebarNav() {
   const wsId = useWorkspaceStore((s) => s.currentWorkspaceId);
-  const replacePanel = useUIStore((s) => s.replacePanel);
-  const panelStack = useUIStore((s) => s.panelStack);
-  const currentNodeId = panelStack[panelStack.length - 1] ?? null;
+  const navigateTo = useUIStore((s) => s.navigateTo);
+  const currentNodeId = useUIStore((s) => s.panelHistory[s.panelIndex] ?? null);
 
   function handleClick(suffix: WorkspaceContainerSuffix) {
     if (!wsId) return;
     const containerId = `${wsId}_${suffix}`;
-    replacePanel(containerId);
+    navigateTo(containerId);
   }
 
   return (

@@ -1,9 +1,8 @@
-import { useUIStore } from '../../stores/ui-store';
+import { useUIStore, selectCurrentNodeId } from '../../stores/ui-store';
 import { NodePanel } from './NodePanel';
 
 export function PanelStack() {
-  const panelStack = useUIStore((s) => s.panelStack);
-  const topNodeId = panelStack[panelStack.length - 1] ?? null;
+  const topNodeId = useUIStore(selectCurrentNodeId);
 
   if (!topNodeId) {
     return (

@@ -23,6 +23,24 @@
 
 ---
 
+## Phase 0.5: 渲染安全检查
+
+每次 UI 改动后，在运行 Phase 1 之前执行渲染安全检查，确保页面没有白屏：
+
+1. 确认 `http://localhost:5199/standalone/index.html` 返回 200
+2. 通过 `chrome-devtools` evaluate_script 执行：
+```js
+() => ({
+  hasTree: document.querySelector('[role="tree"]') !== null,
+  hasPanel: document.querySelector('[class*="flex-1"]') !== null,
+  errorCount: document.querySelectorAll('.error-boundary, [data-error]').length
+})
+```
+3. **期望**: `{ hasTree: true, hasPanel: true, errorCount: 0 }`
+4. 如果 `hasTree: false` → **FAIL**，页面白屏，立即报告并建议 `git stash` 回退
+
+---
+
 ## Phase 1: 测试脚本
 
 脚本目录: `tests/scripts/`

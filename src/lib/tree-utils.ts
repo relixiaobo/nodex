@@ -129,6 +129,52 @@ export function getNextVisibleNode(
 }
 
 /**
+ * Find the last visible node before a TrailingInput position.
+ *
+ * Starting from the parent's last visible content child, walks down
+ * expanded descendants to find the deepest visible leaf. This is the
+ * node that should receive focus on Backspace in TrailingInput.
+ *
+ * Returns null if the parent has no visible content children.
+ */
+export function getLastVisibleNode(
+  parentId: string,
+  entities: Record<string, NodexNode>,
+  expandedNodes: Set<string>,
+): { nodeId: string; parentId: string } | null {
+  const parent = entities[parentId];
+  if (!parent?.children?.length) return null;
+
+  // Filter for visible content nodes (no docType = regular content)
+  const visibleChildren = parent.children.filter(
+    (cid) => !entities[cid]?.props._docType,
+  );
+  if (visibleChildren.length === 0) return null;
+
+  // Start from the last visible child and walk down
+  let currentId = visibleChildren[visibleChildren.length - 1];
+  let currentParentId = parentId;
+
+  while (true) {
+    const expandKey = `${currentParentId}:${currentId}`;
+    if (!expandedNodes.has(expandKey)) break;
+
+    const node = entities[currentId];
+    if (!node?.children?.length) break;
+
+    const childVisible = node.children.filter(
+      (cid) => !entities[cid]?.props._docType,
+    );
+    if (childVisible.length === 0) break;
+
+    currentParentId = currentId;
+    currentId = childVisible[childVisible.length - 1];
+  }
+
+  return { nodeId: currentId, parentId: currentParentId };
+}
+
+/**
  * Find the parent node ID by looking up _ownerId.
  */
 export function getParentId(

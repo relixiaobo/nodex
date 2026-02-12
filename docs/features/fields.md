@@ -40,7 +40,7 @@
 - **Email**：邮箱输入
 - **Checkbox**：复选框 toggle
 
-> **当前实现差距**：目前按 dataType 分发到 3 种独立渲染器（FieldValueOutliner / OptionsPicker / FieldValueEditor），尚未统一。重构方向见决策记录 2026-02-12 "统一值渲染器"。
+> **已完成统一**：所有字段类型（含 Checkbox）的值区域统一通过 FieldValueOutliner 渲染。OutlinerItem 通过 `fieldDataType` prop 控制特殊渲染（如 Checkbox → toggle）。FieldValueEditor 已成为死代码。
 
 ### 字段配置页（AttrDef Config）
 
@@ -186,6 +186,7 @@
 | 2026-02-12 | OptionsPicker 改为 combobox 模式 | 支持输入搜索 + 新建选项，与 Tana 交互一致 |
 | 2026-02-12 | Auto-collect: 原节点在 field value，引用在 autocollect Tuple | 分离 pre-determined 与 auto-collected，Tuple children[2+] 存引用 |
 | 2026-02-12 | **统一值渲染器**：所有字段类型值区域 = FieldValueOutliner | 数据模型层面值永远是 assocData.children[]，dataType 只决定值节点的输入方式和显示格式，不改变底层结构。替代当前 3 渲染器分发 |
+| 2026-02-12 | Checkbox 统一：OutlinerItem 支持 fieldDataType prop | Checkbox 值节点渲染为 toggle 而非编辑器，FieldValueEditor 变为死代码 |
 
 ## 当前状态
 
@@ -202,7 +203,7 @@
 - [x] URL 链接输入（click-to-edit, 蓝色链接样式）
 - [x] Email 邮箱输入（click-to-edit）
 - [x] Checkbox 复选框（inline toggle, SYS_V03/V04）
-- [x] FieldRow 按 dataType 分发渲染器
+- [x] FieldRow 统一值渲染器（所有类型 → FieldValueOutliner，含 Checkbox）
 - [ ] Options from Supertag（独立类型）
 - [ ] Tana User 类型
 - [ ] 字段隐藏规则运行时（5 种模式）

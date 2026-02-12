@@ -197,6 +197,8 @@ ContentNode
 - **示例**: BulletChevron 的 bullet 外层 `h-7 w-[15px]`（28×15 hit area），内层 `h-[15px] w-[15px]`（视觉尺寸）
 - **线性点击区域**: 垂直/水平线条类元素至少 `w-4`（16px）宽度
 - **参考组件**: `BulletChevron.tsx`（group/bullet 模式）、`OutlinerItem.tsx`（indent guide）
+- **文本交互区域**: click handler 绑定在占满空间的 `flex-1` 容器上，不是 `truncate` 的文本 span 上。文本右侧空白区域也要响应点击
+- **icon 对齐规则**: icon + 多行文本（name + description）布局时，icon 用 `items-start`（对齐首行），不要用 `items-center`（会跟多行内容居中）
 
 ### TypeScript
 

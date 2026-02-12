@@ -204,8 +204,10 @@ export const SYS_A = {
   SPEAKER: 'SYS_A252',
 
   // ─── Nodex 自定义属性 ───
-  /** [Nodex] 隐藏字段条件 → SYS_V54(Never) / SYS_V52(Always) / SYS_V56(WhenEmpty) */
+  /** [Nodex] 隐藏字段条件 → SYS_V54(Never) / SYS_V52(Always) / SYS_V56(WhenEmpty) / SYS_V57(WhenNotEmpty) / NDX_V01(WhenDefault) */
   HIDE_FIELD: 'NDX_A01',
+  /** [Nodex] 自动初始化 → SYS_V03(Yes) / SYS_V04(No) — 从祖先节点继承同名字段值 */
+  AUTO_INITIALIZE: 'NDX_A02',
 } as const;
 
 export type SystemAttribute = typeof SYS_A[keyof typeof SYS_A];
@@ -307,6 +309,10 @@ export const SYS_V = {
   // ─── 其他 ───
   /** Tana 聊天机器人 */
   TANA: 'SYS_V86',
+
+  // ─── Nodex 自定义枚举值 ───
+  /** [Nodex] 值为默认值时 — Hide field 条件选项 */
+  WHEN_VALUE_IS_DEFAULT: 'NDX_V01',
 } as const;
 
 export type SystemEnumValue = typeof SYS_V[keyof typeof SYS_V];

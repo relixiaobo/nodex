@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import { Trash2 } from 'lucide-react';
 import { useNode } from '../../hooks/use-node';
 import { useNodeTags } from '../../hooks/use-node-tags';
@@ -6,8 +6,7 @@ import { useHasFields } from '../../hooks/use-has-fields';
 import { useNodeStore } from '../../stores/node-store';
 import { useUIStore } from '../../stores/ui-store';
 import { useWorkspaceStore } from '../../stores/workspace-store';
-import { resolveDataType } from '../../lib/field-utils.js';
-import { SYS_D } from '../../types/index.js';
+import { resolveDataType, ATTRDEF_SECTION_LABELS } from '../../lib/field-utils.js';
 import { NodePanelHeader } from './NodePanelHeader';
 import { OutlinerView } from '../outliner/OutlinerView';
 import { FieldList } from '../fields/FieldList';
@@ -25,10 +24,20 @@ export function NodePanel({ nodeId }: NodePanelProps) {
   const userId = useWorkspaceStore((s) => s.userId) ?? 'local';
 
   const isAttrDef = node?.props._docType === 'attrDef';
-  const isOptionsType = useNodeStore((s) => {
-    if (!isAttrDef) return false;
-    return resolveDataType(s.entities, nodeId) === SYS_D.OPTIONS;
-  });
+
+  // Resolve current data type (primitive string — stable reference)
+  const currentDataType = useNodeStore((s) =>
+    isAttrDef ? resolveDataType(s.entities, nodeId) : '',
+  );
+
+  // Derive visible section labels (filter on static array — no new objects)
+  const sectionLabels = useMemo(() => {
+    if (!isAttrDef) return [];
+    return ATTRDEF_SECTION_LABELS.filter((f) => {
+      if (f.appliesTo === '*') return true;
+      return f.appliesTo.includes(currentDataType);
+    });
+  }, [isAttrDef, currentDataType]);
 
   const handleDelete = useCallback(() => {
     useNodeStore.getState().trashNode(nodeId, wsId, userId);
@@ -44,12 +53,14 @@ export function NodePanel({ nodeId }: NodePanelProps) {
             <FieldList nodeId={nodeId} />
           </div>
         )}
-        {isAttrDef && isOptionsType && (
-          <div className="ml-4 mt-3 mb-1">
-            <span className="text-sm font-medium text-muted-foreground">Pre-determined options</span>
-            <p className="text-xs text-muted-foreground/60 mt-0.5">Each node above will become an option</p>
+        {sectionLabels.map((label) => (
+          <div key={label.key} className="ml-4 mt-3 mb-1">
+            <span className="text-sm font-medium text-muted-foreground">{label.name}</span>
+            {label.description && (
+              <p className="text-xs text-muted-foreground/60 mt-0.5">{label.description}</p>
+            )}
           </div>
-        )}
+        ))}
         <OutlinerView rootNodeId={nodeId} />
         {isAttrDef && (
           <div className="mt-4 ml-4 pb-4">

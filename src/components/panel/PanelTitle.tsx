@@ -1,0 +1,113 @@
+/**
+ * Large editable title for the NodePanel scrollable content area.
+ *
+ * Renders node name in `text-lg font-semibold`.
+ * Click to enter edit mode (contentEditable), blur/Enter to save.
+ * For attrDef nodes, shows field type icon before title.
+ * TagBar rendered below the title.
+ */
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useNode } from '../../hooks/use-node';
+import { useNodeStore } from '../../stores/node-store';
+import { useWorkspaceStore } from '../../stores/workspace-store';
+import { resolveDataType, getFieldTypeIcon } from '../../lib/field-utils.js';
+import { TagBar } from '../tags/TagBar';
+
+interface PanelTitleProps {
+  nodeId: string;
+  onTitleRef?: (el: HTMLElement | null) => void;
+}
+
+export function PanelTitle({ nodeId, onTitleRef }: PanelTitleProps) {
+  const node = useNode(nodeId);
+  const updateNodeName = useNodeStore((s) => s.updateNodeName);
+  const userId = useWorkspaceStore((s) => s.userId) ?? 'local';
+
+  const isAttrDef = node?.props._docType === 'attrDef';
+  const dataType = useNodeStore((s) =>
+    isAttrDef ? resolveDataType(s.entities, nodeId) : '',
+  );
+  const FieldIcon = isAttrDef ? getFieldTypeIcon(dataType) : null;
+
+  const rawName = node?.props.name ?? '';
+  const displayName = rawName.replace(/<[^>]+>/g, '') || '';
+
+  const [editing, setEditing] = useState(false);
+  const titleRef = useRef<HTMLHeadingElement>(null);
+
+  // Sync ref callback for IntersectionObserver
+  const setRef = useCallback(
+    (el: HTMLHeadingElement | null) => {
+      (titleRef as React.MutableRefObject<HTMLHeadingElement | null>).current = el;
+      onTitleRef?.(el);
+    },
+    [onTitleRef],
+  );
+
+  // When entering edit mode, set content and focus
+  useEffect(() => {
+    if (editing && titleRef.current) {
+      titleRef.current.textContent = displayName;
+      // Place cursor at end
+      const range = document.createRange();
+      const sel = window.getSelection();
+      range.selectNodeContents(titleRef.current);
+      range.collapse(false);
+      sel?.removeAllRanges();
+      sel?.addRange(range);
+    }
+  }, [editing, displayName]);
+
+  const handleBlur = useCallback(() => {
+    if (!titleRef.current) return;
+    const newName = titleRef.current.textContent?.trim() ?? '';
+    if (newName !== displayName) {
+      updateNodeName(nodeId, newName, userId);
+    }
+    setEditing(false);
+  }, [nodeId, displayName, userId, updateNodeName]);
+
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        titleRef.current?.blur();
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        // Restore original content and blur
+        if (titleRef.current) titleRef.current.textContent = displayName;
+        setEditing(false);
+      }
+    },
+    [displayName],
+  );
+
+  return (
+    <div className="px-4 pt-3 pb-1">
+      <div className="flex items-start gap-2">
+        {FieldIcon && (
+          <span className="shrink-0 mt-1.5 text-muted-foreground/50">
+            <FieldIcon size={16} />
+          </span>
+        )}
+        <h1
+          ref={setRef}
+          contentEditable={editing}
+          suppressContentEditableWarning
+          className="text-lg font-semibold leading-7 outline-none min-h-7 flex-1 cursor-text"
+          onClick={() => {
+            if (!editing) setEditing(true);
+          }}
+          onBlur={handleBlur}
+          onKeyDown={editing ? handleKeyDown : undefined}
+          dangerouslySetInnerHTML={editing ? undefined : {
+            __html: displayName || '<span class="text-muted-foreground/40">Untitled</span>',
+          }}
+        />
+      </div>
+      <div className="mt-0.5">
+        <TagBar nodeId={nodeId} />
+      </div>
+    </div>
+  );
+}

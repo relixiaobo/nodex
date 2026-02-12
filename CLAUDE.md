@@ -301,6 +301,9 @@ npm run dev:test   # 启动 http://localhost:5199/standalone/index.html
 
 ## 参考文档
 
+### 设计系统
+- `docs/design-system.md` — UI 视觉标准（色彩/排版/间距/圆角/交互状态/组件模式）
+
 ### 特性规格（行为定义）
 - `docs/features/references.md` — References & @引用
 - `docs/features/supertags.md` — Supertags 系统

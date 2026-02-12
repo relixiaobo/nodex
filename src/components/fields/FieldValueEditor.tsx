@@ -3,7 +3,7 @@
  * Tana-style: click-to-edit text for most types, minimal chrome.
  *
  * Handles: Date, Number, Integer, URL, Email, Checkbox.
- * Options are handled by OptionsFieldValue; Plain by FieldValueOutliner.
+ * Options are handled by OptionsPicker; Plain by FieldValueOutliner.
  */
 import { useState, useCallback } from 'react';
 import { SYS_D, SYS_V } from '../../types/index.js';

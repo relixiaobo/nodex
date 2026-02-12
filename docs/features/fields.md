@@ -43,10 +43,15 @@
 
 ### Options 类型 — 已实现
 
-- 值区域渲染为 `OptionsFieldValue` 下拉选择器
+- 值区域渲染为 `OptionsPicker` combobox（输入 + 下拉选择 + 新建）
 - 选项来源：Pre-determined options（attrDef 配置的固定选项列表）
-- 选中选项后以 ReferenceNode（蓝色链接）样式显示
-- 无选中值时显示 "Select..." placeholder
+- **Display 模式**：选中选项以 reference bullet（dotted）+ name 显示；无值时 dimmed bullet + "Select option"
+- **Editing 模式**（点击进入）：
+  - 输入框自动聚焦，可输入文字过滤已有选项
+  - 下拉列表实时匹配；已选项带 primary 高亮点
+  - Enter 选择高亮项，或在无匹配时创建新选项节点
+  - Escape / click outside → 关闭不改变
+- **新建选项**：输入不匹配文字 + Enter → `addFieldOption` 创建节点 → 自动选中；新选项自动收录到 attrDef 的 Pre-determined options 列表
 - 待扩展：Auto-collected / Options from Supertag
 
 ### Date 类型 — 已实现
@@ -149,6 +154,7 @@
 | 2026-02-12 | 对比 Tana 官方文档补全遗漏（Hide 5 种模式、Auto-init 6 种策略等） | 确保功能清单完整 |
 | 2026-02-12 | FieldRow 按 dataType 分发到 3 种渲染器 | Options→OptionsFieldValue, Plain→FieldValueOutliner, 其余→FieldValueEditor |
 | 2026-02-12 | FieldValueEditor 移除 Options 分支 | Options 由 OptionsFieldValue 独立处理（支持 ReferenceNode 显示） |
+| 2026-02-12 | OptionsPicker 改为 combobox 模式 | 支持输入搜索 + 新建选项，与 Tana 交互一致 |
 
 ## 当前状态
 
@@ -159,7 +165,7 @@
 - [x] AttrDef 配置页（Field type / Required / Hide / Auto-collect / Auto-initialize）
 - [x] 新字段自动应用 SYS_T02 标签
 - [x] Delete field 按钮 + 级联清理
-- [x] Options 下拉选择（OptionsFieldValue + ReferenceNode）
+- [x] Options combobox（OptionsPicker: 搜索 + 选择 + 新建选项）
 - [x] Date 日期选择器（click-to-edit date input）
 - [x] Number 数字输入（click-to-edit, Integer/Number）
 - [x] URL 链接输入（click-to-edit, 蓝色链接样式）
@@ -181,7 +187,7 @@
 
 ## 与 Tana 的已知差异
 
-- Tana 的 Options 支持更丰富的 UI（彩色 pill、多列选择器），Nodex 先做基础下拉
+- Tana 的 Options 支持更丰富的 UI（彩色 pill、多列选择器），Nodex 已实现 combobox 但尚无 pill 样式
 - Tana 字段隐藏有 5 种模式（Never/When empty/When not empty/When default/Always），我们需全部实现
 - Tana Auto-initialize 有 6 种策略，适用于多种字段类型
 - Tana 的 "Used in" 计算字段显示所有使用该字段的 supertag，Nodex 延后

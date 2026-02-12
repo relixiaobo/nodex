@@ -150,10 +150,12 @@ export function seedTestData() {
   // SYS_T02 (Field Definition) — system tag for attrDef config pages
   const sysT02Nodes: NodexNode[] = [
     makeNode('SYS_T02', 'Field Definition', schemaId, [
-      'sysT02_tpl_type', 'sysT02_tpl_autocollect', 'sysT02_tpl_required', 'sysT02_tpl_hide',
+      'sysT02_tpl_type', 'sysT02_tpl_autocollect', 'sysT02_tpl_autoinit',
+      'sysT02_tpl_required', 'sysT02_tpl_hide',
     ], 'tagDef'),
     makeNode('sysT02_tpl_type', '', 'SYS_T02', [SYS_A.TYPE_CHOICE], 'tuple'),
     makeNode('sysT02_tpl_autocollect', '', 'SYS_T02', [SYS_A.AUTOCOLLECT_OPTIONS], 'tuple'),
+    makeNode('sysT02_tpl_autoinit', '', 'SYS_T02', [SYS_A.AUTO_INITIALIZE], 'tuple'),
     makeNode('sysT02_tpl_required', '', 'SYS_T02', [SYS_A.NULLABLE], 'tuple'),
     makeNode('sysT02_tpl_hide', '', 'SYS_T02', [SYS_A.HIDE_FIELD], 'tuple'),
   ];
@@ -161,12 +163,13 @@ export function seedTestData() {
   // AttrDef: Status (options type) — all config tuples + options
   const attrDefStatusNodes: NodexNode[] = [
     makeNode('attrDef_status', 'Status', schemaId, [
-      'attrDef_status_type', 'attrDef_status_autocollect',
+      'attrDef_status_type', 'attrDef_status_autocollect', 'attrDef_status_autoinit',
       'attrDef_status_required', 'attrDef_status_hide',
       'opt_todo', 'opt_in_progress', 'opt_done',
     ], 'attrDef'),
     makeNode('attrDef_status_type', '', 'attrDef_status', [SYS_A.TYPE_CHOICE, SYS_D.OPTIONS], 'tuple'),
     makeNode('attrDef_status_autocollect', '', 'attrDef_status', [SYS_A.AUTOCOLLECT_OPTIONS, SYS_V.YES], 'tuple'),
+    makeNode('attrDef_status_autoinit', '', 'attrDef_status', [SYS_A.AUTO_INITIALIZE, SYS_V.NO], 'tuple'),
     makeNode('attrDef_status_required', '', 'attrDef_status', [SYS_A.NULLABLE, SYS_V.NO], 'tuple'),
     makeNode('attrDef_status_hide', '', 'attrDef_status', [SYS_A.HIDE_FIELD, SYS_V.NEVER], 'tuple'),
     makeNode('opt_todo', 'To Do', 'attrDef_status'),
@@ -177,12 +180,13 @@ export function seedTestData() {
   // AttrDef: Priority (options type)
   const attrDefPriorityNodes: NodexNode[] = [
     makeNode('attrDef_priority', 'Priority', schemaId, [
-      'attrDef_priority_type', 'attrDef_priority_autocollect',
+      'attrDef_priority_type', 'attrDef_priority_autocollect', 'attrDef_priority_autoinit',
       'attrDef_priority_required', 'attrDef_priority_hide',
       'opt_high', 'opt_medium', 'opt_low',
     ], 'attrDef'),
     makeNode('attrDef_priority_type', '', 'attrDef_priority', [SYS_A.TYPE_CHOICE, SYS_D.OPTIONS], 'tuple'),
     makeNode('attrDef_priority_autocollect', '', 'attrDef_priority', [SYS_A.AUTOCOLLECT_OPTIONS, SYS_V.YES], 'tuple'),
+    makeNode('attrDef_priority_autoinit', '', 'attrDef_priority', [SYS_A.AUTO_INITIALIZE, SYS_V.NO], 'tuple'),
     makeNode('attrDef_priority_required', '', 'attrDef_priority', [SYS_A.NULLABLE, SYS_V.NO], 'tuple'),
     makeNode('attrDef_priority_hide', '', 'attrDef_priority', [SYS_A.HIDE_FIELD, SYS_V.NEVER], 'tuple'),
     makeNode('opt_high', 'High', 'attrDef_priority'),
@@ -193,10 +197,12 @@ export function seedTestData() {
   // AttrDef: Due (date type) — all 4 config tuples
   const attrDefDueNodes: NodexNode[] = [
     makeNode('attrDef_due', 'Due', schemaId, [
-      'attrDef_due_type', 'attrDef_due_autocollect', 'attrDef_due_required', 'attrDef_due_hide',
+      'attrDef_due_type', 'attrDef_due_autocollect', 'attrDef_due_autoinit',
+      'attrDef_due_required', 'attrDef_due_hide',
     ], 'attrDef'),
     makeNode('attrDef_due_type', '', 'attrDef_due', [SYS_A.TYPE_CHOICE, SYS_D.DATE], 'tuple'),
     makeNode('attrDef_due_autocollect', '', 'attrDef_due', [SYS_A.AUTOCOLLECT_OPTIONS, SYS_V.YES], 'tuple'),
+    makeNode('attrDef_due_autoinit', '', 'attrDef_due', [SYS_A.AUTO_INITIALIZE, SYS_V.NO], 'tuple'),
     makeNode('attrDef_due_required', '', 'attrDef_due', [SYS_A.NULLABLE, SYS_V.NO], 'tuple'),
     makeNode('attrDef_due_hide', '', 'attrDef_due', [SYS_A.HIDE_FIELD, SYS_V.NEVER], 'tuple'),
   ];
@@ -204,10 +210,12 @@ export function seedTestData() {
   // AttrDef: Email (email type)
   const attrDefEmailNodes: NodexNode[] = [
     makeNode('attrDef_email', 'Email', schemaId, [
-      'attrDef_email_type', 'attrDef_email_autocollect', 'attrDef_email_required', 'attrDef_email_hide',
+      'attrDef_email_type', 'attrDef_email_autocollect', 'attrDef_email_autoinit',
+      'attrDef_email_required', 'attrDef_email_hide',
     ], 'attrDef'),
     makeNode('attrDef_email_type', '', 'attrDef_email', [SYS_A.TYPE_CHOICE, SYS_D.EMAIL], 'tuple'),
     makeNode('attrDef_email_autocollect', '', 'attrDef_email', [SYS_A.AUTOCOLLECT_OPTIONS, SYS_V.YES], 'tuple'),
+    makeNode('attrDef_email_autoinit', '', 'attrDef_email', [SYS_A.AUTO_INITIALIZE, SYS_V.NO], 'tuple'),
     makeNode('attrDef_email_required', '', 'attrDef_email', [SYS_A.NULLABLE, SYS_V.NO], 'tuple'),
     makeNode('attrDef_email_hide', '', 'attrDef_email', [SYS_A.HIDE_FIELD, SYS_V.NEVER], 'tuple'),
   ];
@@ -215,10 +223,12 @@ export function seedTestData() {
   // AttrDef: Company (plain type)
   const attrDefCompanyNodes: NodexNode[] = [
     makeNode('attrDef_company', 'Company', schemaId, [
-      'attrDef_company_type', 'attrDef_company_autocollect', 'attrDef_company_required', 'attrDef_company_hide',
+      'attrDef_company_type', 'attrDef_company_autocollect', 'attrDef_company_autoinit',
+      'attrDef_company_required', 'attrDef_company_hide',
     ], 'attrDef'),
     makeNode('attrDef_company_type', '', 'attrDef_company', [SYS_A.TYPE_CHOICE, SYS_D.PLAIN], 'tuple'),
     makeNode('attrDef_company_autocollect', '', 'attrDef_company', [SYS_A.AUTOCOLLECT_OPTIONS, SYS_V.YES], 'tuple'),
+    makeNode('attrDef_company_autoinit', '', 'attrDef_company', [SYS_A.AUTO_INITIALIZE, SYS_V.NO], 'tuple'),
     makeNode('attrDef_company_required', '', 'attrDef_company', [SYS_A.NULLABLE, SYS_V.NO], 'tuple'),
     makeNode('attrDef_company_hide', '', 'attrDef_company', [SYS_A.HIDE_FIELD, SYS_V.NEVER], 'tuple'),
   ];
@@ -231,31 +241,36 @@ export function seedTestData() {
   attrDefCompanyNodes[0].props._metaNodeId = 'meta_attrDef_company';
 
   // Set _sourceId on config tuples → SYS_T02 templates
-  // Status (indices: [1]=type [2]=autocollect [3]=required [4]=hide)
+  // Status (indices: [1]=type [2]=autocollect [3]=autoinit [4]=required [5]=hide)
   attrDefStatusNodes[1].props._sourceId = 'sysT02_tpl_type';
   attrDefStatusNodes[2].props._sourceId = 'sysT02_tpl_autocollect';
-  attrDefStatusNodes[3].props._sourceId = 'sysT02_tpl_required';
-  attrDefStatusNodes[4].props._sourceId = 'sysT02_tpl_hide';
+  attrDefStatusNodes[3].props._sourceId = 'sysT02_tpl_autoinit';
+  attrDefStatusNodes[4].props._sourceId = 'sysT02_tpl_required';
+  attrDefStatusNodes[5].props._sourceId = 'sysT02_tpl_hide';
   // Priority
   attrDefPriorityNodes[1].props._sourceId = 'sysT02_tpl_type';
   attrDefPriorityNodes[2].props._sourceId = 'sysT02_tpl_autocollect';
-  attrDefPriorityNodes[3].props._sourceId = 'sysT02_tpl_required';
-  attrDefPriorityNodes[4].props._sourceId = 'sysT02_tpl_hide';
-  // Due (indices: [1]=type [2]=autocollect [3]=required [4]=hide)
+  attrDefPriorityNodes[3].props._sourceId = 'sysT02_tpl_autoinit';
+  attrDefPriorityNodes[4].props._sourceId = 'sysT02_tpl_required';
+  attrDefPriorityNodes[5].props._sourceId = 'sysT02_tpl_hide';
+  // Due (indices: [1]=type [2]=autocollect [3]=autoinit [4]=required [5]=hide)
   attrDefDueNodes[1].props._sourceId = 'sysT02_tpl_type';
   attrDefDueNodes[2].props._sourceId = 'sysT02_tpl_autocollect';
-  attrDefDueNodes[3].props._sourceId = 'sysT02_tpl_required';
-  attrDefDueNodes[4].props._sourceId = 'sysT02_tpl_hide';
+  attrDefDueNodes[3].props._sourceId = 'sysT02_tpl_autoinit';
+  attrDefDueNodes[4].props._sourceId = 'sysT02_tpl_required';
+  attrDefDueNodes[5].props._sourceId = 'sysT02_tpl_hide';
   // Email
   attrDefEmailNodes[1].props._sourceId = 'sysT02_tpl_type';
   attrDefEmailNodes[2].props._sourceId = 'sysT02_tpl_autocollect';
-  attrDefEmailNodes[3].props._sourceId = 'sysT02_tpl_required';
-  attrDefEmailNodes[4].props._sourceId = 'sysT02_tpl_hide';
+  attrDefEmailNodes[3].props._sourceId = 'sysT02_tpl_autoinit';
+  attrDefEmailNodes[4].props._sourceId = 'sysT02_tpl_required';
+  attrDefEmailNodes[5].props._sourceId = 'sysT02_tpl_hide';
   // Company
   attrDefCompanyNodes[1].props._sourceId = 'sysT02_tpl_type';
   attrDefCompanyNodes[2].props._sourceId = 'sysT02_tpl_autocollect';
-  attrDefCompanyNodes[3].props._sourceId = 'sysT02_tpl_required';
-  attrDefCompanyNodes[4].props._sourceId = 'sysT02_tpl_hide';
+  attrDefCompanyNodes[3].props._sourceId = 'sysT02_tpl_autoinit';
+  attrDefCompanyNodes[4].props._sourceId = 'sysT02_tpl_required';
+  attrDefCompanyNodes[5].props._sourceId = 'sysT02_tpl_hide';
 
   // Metanodes for attrDefs (SYS_T02 tag application chain)
   const attrDefMetanodes: NodexNode[] = [

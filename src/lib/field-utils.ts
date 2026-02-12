@@ -37,6 +37,7 @@ export function getFieldTypeIcon(dataType: string): LucideIcon {
     case SYS_D.CHECKBOX:
       return CheckSquare;
     case SYS_D.OPTIONS:
+    case SYS_D.OPTIONS_FROM_SUPERTAG:
       return List;
     case SYS_D.NUMBER:
     case SYS_D.INTEGER:
@@ -67,20 +68,24 @@ export function resolveFieldOptions(
   });
 }
 
-/** Ordered list of field types for the type selector UI. */
+/**
+ * Ordered list of field types for the type selector UI.
+ * Matches Tana's dropdown order exactly (no Integer — Tana only shows Number).
+ */
 export const FIELD_TYPE_LIST: Array<{ value: string; label: string }> = [
   { value: SYS_D.PLAIN, label: 'Plain' },
   { value: SYS_D.OPTIONS, label: 'Options' },
+  { value: SYS_D.OPTIONS_FROM_SUPERTAG, label: 'Options from supertag' },
   { value: SYS_D.DATE, label: 'Date' },
   { value: SYS_D.NUMBER, label: 'Number' },
-  { value: SYS_D.INTEGER, label: 'Integer' },
-  { value: SYS_D.CHECKBOX, label: 'Checkbox' },
   { value: SYS_D.URL, label: 'URL' },
   { value: SYS_D.EMAIL, label: 'Email' },
+  { value: SYS_D.CHECKBOX, label: 'Checkbox' },
 ];
 
 /** Get a human-readable label for a SYS_D data type constant. */
 export function getFieldTypeLabel(dataType: string): string {
+  if (dataType === SYS_D.INTEGER) return 'Number'; // INTEGER maps to Number in UI
   return FIELD_TYPE_LIST.find((t) => t.value === dataType)?.label ?? 'Plain';
 }
 
@@ -94,7 +99,7 @@ export function isPlainFieldType(dataType: string): boolean {
 export interface ConfigFieldDef {
   key: string;
   name: string;
-  control: 'type_choice' | 'toggle' | 'select';
+  control: 'type_choice' | 'toggle' | 'select' | 'section_label';
   defaultValue: string;
   appliesTo: string[] | '*';
   description?: string;
@@ -104,7 +109,13 @@ export interface ConfigFieldDef {
 /**
  * Registry of config fields for attrDef nodes.
  * Maps to SYS_T02 (FIELD_DEFINITION) template tuples.
- * Order here matches template order in SYS_T02.
+ * Order matches Tana's config page layout.
+ *
+ * control types:
+ * - type_choice: Field type dropdown picker
+ * - toggle: Boolean switch (Yes/No)
+ * - select: Dropdown with predefined options
+ * - section_label: Label + description rendered between FieldList and OutlinerView (no tuple)
  */
 export const ATTRDEF_CONFIG_FIELDS: ConfigFieldDef[] = [
   {
@@ -114,6 +125,24 @@ export const ATTRDEF_CONFIG_FIELDS: ConfigFieldDef[] = [
     defaultValue: SYS_D.PLAIN,
     appliesTo: '*',
   },
+  // section labels — rendered by NodePanel between FieldList and OutlinerView
+  {
+    key: 'NDX_SECTION_PRE_OPTIONS',
+    name: 'Pre-determined options',
+    control: 'section_label',
+    defaultValue: '',
+    appliesTo: [SYS_D.OPTIONS],
+    description: 'Each node above will become an option',
+  },
+  {
+    key: 'NDX_SECTION_SOURCES',
+    name: 'Sources of options',
+    control: 'section_label',
+    defaultValue: '',
+    appliesTo: [SYS_D.OPTIONS],
+    description: 'List of references and search nodes, whose children will become options',
+  },
+  // tuple-based config fields
   {
     key: SYS_A.AUTOCOLLECT_OPTIONS,
     name: 'Auto-collect values',
@@ -121,6 +150,14 @@ export const ATTRDEF_CONFIG_FIELDS: ConfigFieldDef[] = [
     defaultValue: SYS_V.YES,
     appliesTo: [SYS_D.OPTIONS],
     description: 'Include auto-collected values as options',
+  },
+  {
+    key: SYS_A.AUTO_INITIALIZE,
+    name: 'Auto-initialize',
+    control: 'toggle',
+    defaultValue: SYS_V.NO,
+    appliesTo: '*',
+    description: 'to value from ancestor with this field',
   },
   {
     key: SYS_A.NULLABLE,
@@ -138,13 +175,21 @@ export const ATTRDEF_CONFIG_FIELDS: ConfigFieldDef[] = [
     description: 'Minimize field when part of a supertag',
     options: [
       { value: SYS_V.NEVER, label: 'Never' },
-      { value: SYS_V.ALWAYS, label: 'Always' },
       { value: SYS_V.WHEN_EMPTY, label: 'When empty' },
+      { value: SYS_V.WHEN_NOT_EMPTY, label: 'When not empty' },
+      { value: SYS_V.WHEN_VALUE_IS_DEFAULT, label: 'When value is default' },
+      { value: SYS_V.ALWAYS, label: 'Always' },
     ],
   },
 ];
 
-/** O(1) lookup by config field key (SYS_A* or NDX_A*). */
+/** O(1) lookup by config field key (SYS_A* or NDX_A*). Excludes section_label entries. */
 export const ATTRDEF_CONFIG_MAP = new Map(
-  ATTRDEF_CONFIG_FIELDS.map(f => [f.key, f]),
+  ATTRDEF_CONFIG_FIELDS
+    .filter(f => f.control !== 'section_label')
+    .map(f => [f.key, f]),
 );
+
+/** Section label entries for NodePanel rendering. */
+export const ATTRDEF_SECTION_LABELS = ATTRDEF_CONFIG_FIELDS
+  .filter(f => f.control === 'section_label');

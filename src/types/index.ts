@@ -9,7 +9,7 @@ export type {
   UpdateNodeInput,
 } from './node.js';
 
-export { WORKSPACE_CONTAINERS, getContainerId } from './node.js';
+export { WORKSPACE_CONTAINERS, getContainerId, isWorkspaceRoot } from './node.js';
 
 export {
   SYS_ROOT,

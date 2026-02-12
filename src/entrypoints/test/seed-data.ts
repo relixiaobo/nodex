@@ -50,7 +50,7 @@ export function seedTestData() {
   wsStore.setWorkspace(WS_ID);
   wsStore.setUser(USER_ID);
 
-  // ─── Container nodes ───
+  // ─── Workspace root node ───
   const libraryId = `${WS_ID}_LIBRARY`;
   const inboxId = `${WS_ID}_INBOX`;
   const journalId = `${WS_ID}_JOURNAL`;
@@ -58,6 +58,18 @@ export function seedTestData() {
   const trashId = `${WS_ID}_TRASH`;
   const schemaId = `${WS_ID}_SCHEMA`;
 
+  const wsRoot: NodexNode = {
+    id: WS_ID,
+    workspaceId: WS_ID,
+    props: { created: Date.now(), name: 'My Workspace' },
+    children: [libraryId, inboxId, journalId, searchesId, trashId, schemaId],
+    version: 1,
+    updatedAt: Date.now(),
+    createdBy: USER_ID,
+    updatedBy: USER_ID,
+  };
+
+  // ─── Container nodes ───
   const containers = [
     makeNode(libraryId, 'Library', WS_ID, ['proj_1', 'person_1', 'note_1', 'note_2', 'note_rich']),
     makeNode(inboxId, 'Inbox', WS_ID, ['inbox_1', 'inbox_2', 'inbox_3']),
@@ -513,6 +525,7 @@ export function seedTestData() {
 
   // ─── Set all nodes ───
   const allNodes = [
+    wsRoot,
     ...containers,
     ...projectNodes,
     ...personNodes,

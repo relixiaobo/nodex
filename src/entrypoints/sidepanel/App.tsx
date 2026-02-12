@@ -11,10 +11,10 @@ import type { NodexNode, WorkspaceContainerSuffix } from '../../types/index.js';
 import { resetSupabase } from '../../services/supabase.js';
 
 /**
- * Bootstrap seed container nodes for a workspace.
+ * Bootstrap workspace root node and container nodes.
  * Called when no Supabase data is available (offline/demo mode).
  */
-function seedWorkspaceContainers(wsId: string, userId: string) {
+function seedWorkspace(wsId: string, userId: string) {
   const store = useNodeStore.getState();
   const now = Date.now();
 
@@ -26,6 +26,23 @@ function seedWorkspaceContainers(wsId: string, userId: string) {
     { suffix: WORKSPACE_CONTAINERS.TRASH, name: 'Trash' },
   ];
 
+  const containerIds = containers.map(({ suffix }) => getContainerId(wsId, suffix));
+
+  // Create workspace root node (id === wsId)
+  if (!store.entities[wsId]) {
+    store.setNode({
+      id: wsId,
+      workspaceId: wsId,
+      props: { created: now, name: 'My Workspace' },
+      children: containerIds,
+      version: 1,
+      updatedAt: now,
+      createdBy: userId,
+      updatedBy: userId,
+    });
+  }
+
+  // Create container nodes
   for (const { suffix, name } of containers) {
     const id = getContainerId(wsId, suffix);
     if (!store.entities[id]) {
@@ -79,8 +96,8 @@ function useBootstrap() {
         setUser('user_default');
       }
 
-      // Seed local container nodes (for offline/demo mode)
-      seedWorkspaceContainers(
+      // Seed workspace root + container nodes (for offline/demo mode)
+      seedWorkspace(
         currentWsId,
         currentUserId ?? 'user_default',
       );

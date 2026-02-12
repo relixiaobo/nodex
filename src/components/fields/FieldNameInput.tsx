@@ -182,7 +182,7 @@ export function FieldNameInput({ tupleId, nodeId, attrDefId, currentName, onEnte
         onKeyDown={handleKeyDown}
       />
       {suggestions.length > 0 && (
-        <div className="absolute left-0 top-full z-50 mt-0.5 w-[180px] bg-popover border border-border rounded-md shadow-md py-0.5 text-xs">
+        <div className="absolute left-0 top-full z-50 mt-0.5 w-[180px] bg-popover border border-border rounded-lg shadow-lg py-0.5 text-xs">
           {suggestions.map((s, i) => (
             <button
               key={s.id}

@@ -46,7 +46,7 @@ export function SidebarNav() {
                 : 'text-muted-foreground hover:bg-muted hover:text-foreground'
             }`}
           >
-            <Icon size={16} strokeWidth={1.75} />
+            <Icon size={14} strokeWidth={1.75} />
             <span>{item.label}</span>
           </button>
         );

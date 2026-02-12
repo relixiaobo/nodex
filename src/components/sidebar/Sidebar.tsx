@@ -20,7 +20,7 @@ export function Sidebar() {
           onClick={openSearch}
           className="flex w-full items-center gap-2 rounded-md border border-border bg-background px-2 py-1 text-xs text-muted-foreground hover:bg-muted transition-colors"
         >
-          <Search size={12} />
+          <Search size={14} />
           <span className="flex-1 text-left">Search...</span>
           <kbd className="rounded border border-border bg-muted px-1 text-[10px] font-medium">
             {navigator.platform?.includes('Mac') ? '\u2318' : 'Ctrl+'}K

@@ -1,14 +1,18 @@
 import { Search } from 'lucide-react';
 import { useUIStore } from '../../stores/ui-store';
+import { useNodeStore } from '../../stores/node-store';
+import { useWorkspaceStore } from '../../stores/workspace-store';
 import { SidebarNav } from './SidebarNav';
 
 export function Sidebar() {
   const openSearch = useUIStore((s) => s.openSearch);
+  const wsId = useWorkspaceStore((s) => s.currentWorkspaceId);
+  const wsName = useNodeStore((s) => s.entities[wsId ?? '']?.props.name);
 
   return (
     <aside className="flex h-full w-56 shrink-0 flex-col border-r border-border bg-muted/30">
       <div className="flex h-10 items-center justify-between px-3">
-        <span className="text-sm font-semibold">Nodex</span>
+        <span className="text-sm font-semibold">{wsName || 'Nodex'}</span>
       </div>
       {/* Quick search trigger */}
       <div className="px-2 pb-1">

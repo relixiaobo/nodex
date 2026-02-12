@@ -19,6 +19,10 @@ const CONTAINER_SUFFIXES = Object.values(WORKSPACE_CONTAINERS);
 function isWorkspaceContainer(nodeId: string): boolean {
   return CONTAINER_SUFFIXES.some(suffix => nodeId.endsWith(`_${suffix}`));
 }
+function isWorkspaceRoot(nodeId: string, entities: Record<string, NodexNode>): boolean {
+  const node = entities[nodeId];
+  return !!node && node.id === node.workspaceId && !node.props._ownerId;
+}
 
 interface NodeStore {
   /** Normalized entities map: { [nodeId]: NodexNode } */
@@ -480,6 +484,7 @@ export const useNodeStore = create<NodeStore>()(
       const grandparentId = parent?.props._ownerId;
       if (!grandparentId) return; // Parent is top-level, can't outdent
       if (isWorkspaceContainer(parentId)) return; // Parent is a container, can't outdent
+      if (isWorkspaceRoot(parentId, entities)) return; // Parent is workspace root, can't outdent
 
       const grandparent = entities[grandparentId];
       if (!grandparent?.children) return;
@@ -918,6 +923,14 @@ export const useNodeStore = create<NodeStore>()(
             createdBy: userId,
             updatedBy: userId,
           };
+          // Add SCHEMA to workspace root's children
+          const wsRoot = state.entities[workspaceId];
+          if (wsRoot) {
+            if (!wsRoot.children) wsRoot.children = [];
+            if (!wsRoot.children.includes(schemaId)) {
+              wsRoot.children.push(schemaId);
+            }
+          }
         }
         state.entities[id] = tagDef;
         const schema = state.entities[schemaId];
@@ -1227,6 +1240,14 @@ export const useNodeStore = create<NodeStore>()(
             createdBy: userId,
             updatedBy: userId,
           };
+          // Add SCHEMA to workspace root's children
+          const wsRoot = state.entities[workspaceId];
+          if (wsRoot) {
+            if (!wsRoot.children) wsRoot.children = [];
+            if (!wsRoot.children.includes(schemaId)) {
+              wsRoot.children.push(schemaId);
+            }
+          }
         }
         state.entities[schemaId].children!.push(id);
       });

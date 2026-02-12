@@ -248,6 +248,14 @@ export function getContainerId(workspaceId: string, suffix: WorkspaceContainerSu
   return `${workspaceId}_${suffix}`;
 }
 
+/**
+ * 判断一个节点是否是 workspace root 节点。
+ * workspace root 的 ID 等于 workspaceId 本身。
+ */
+export function isWorkspaceRoot(nodeId: string, workspaceId: string): boolean {
+  return nodeId === workspaceId;
+}
+
 // ============================================================
 // 编辑者信息
 // ============================================================

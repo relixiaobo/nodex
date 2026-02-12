@@ -6,13 +6,19 @@
 import { WORKSPACE_CONTAINERS } from '../types/index.js';
 import type { NodexNode } from '../types/index.js';
 
-// ─── Workspace container detection ───
+// ─── Workspace container / root detection ───
 
 const CONTAINER_SUFFIXES = Object.values(WORKSPACE_CONTAINERS);
 
 /** Check if a node ID is a workspace container (e.g., ws_default_LIBRARY). */
 export function isWorkspaceContainer(nodeId: string): boolean {
   return CONTAINER_SUFFIXES.some(suffix => nodeId.endsWith(`_${suffix}`));
+}
+
+/** Check if a node is a workspace root (id === workspaceId). */
+export function isWorkspaceRoot(nodeId: string, entities: Record<string, NodexNode>): boolean {
+  const node = entities[nodeId];
+  return !!node && node.id === node.workspaceId && !node.props._ownerId;
 }
 
 // ─── Ancestor chain for breadcrumb navigation ───
@@ -44,13 +50,19 @@ export function getAncestorChain(
     if (!parentId || visited.has(parentId)) break;
     visited.add(parentId);
 
+    // Stop at workspace root — record it but don't add to chain
+    if (isWorkspaceRoot(parentId, entities)) {
+      rootContainerId = parentId;
+      break;
+    }
+
     // Stop at workspace container — record it but don't add to chain
     if (isWorkspaceContainer(parentId)) {
       rootContainerId = parentId;
       break;
     }
 
-    // Stop at workspace root (no _ownerId or is workspace node itself)
+    // Stop at nodes with no parent (orphans or unknown roots)
     const parentNode = entities[parentId];
     if (!parentNode || !parentNode.props._ownerId) {
       rootContainerId = parentId;

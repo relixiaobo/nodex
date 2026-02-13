@@ -608,17 +608,33 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       const isEmptyAround = beforeAt.trim() === '' && afterQuery.trim() === '';
 
       if (isEmptyAround) {
-        // Empty node @: trash this node, create temp node in conversion mode
-        // Temp node has inline ref content — user sees reference bullet + cursor at end.
-        // Typing adds text → keeps as normal node; blur without typing → reverts to reference.
         const parent = entities[parentId];
-        const pos = parent?.children?.indexOf(nodeId) ?? -1;
-        trashNode(nodeId, wsId, userId);
-        const tempNodeId = startRefConversion(refNodeId, parentId, pos >= 0 ? pos : 0, wsId, userId);
-        setPendingRefConversion({ tempNodeId, refNodeId, parentId });
-        const gpId = entities[parentId]?.props._ownerId;
-        if (gpId) setExpanded(`${gpId}:${parentId}`, true);
-        setTimeout(() => setFocusedNode(tempNodeId, parentId), 0);
+        const alreadyChild = parent?.children?.includes(refNodeId) ?? false;
+
+        if (alreadyChild) {
+          // Target is already a child (owned or reference) — can't create duplicate reference.
+          // Tana behavior: insert inline ref instead, keeping this as a regular content node.
+          const refNode = entities[refNodeId];
+          const refName = (refNode?.props.name ?? '').replace(/<[^>]+>/g, '').trim() || 'Untitled';
+          ed.chain()
+            .deleteRange({ from, to })
+            .insertContentAt(from, {
+              type: 'inlineRef',
+              attrs: { nodeId: refNodeId, label: refName },
+            })
+            .run();
+        } else {
+          // Empty node @: trash this node, create temp node in conversion mode
+          // Temp node has inline ref content — user sees reference bullet + cursor at end.
+          // Typing adds text → keeps as normal node; blur without typing → reverts to reference.
+          const pos = parent?.children?.indexOf(nodeId) ?? -1;
+          trashNode(nodeId, wsId, userId);
+          const tempNodeId = startRefConversion(refNodeId, parentId, pos >= 0 ? pos : 0, wsId, userId);
+          setPendingRefConversion({ tempNodeId, refNodeId, parentId });
+          const gpId = entities[parentId]?.props._ownerId;
+          if (gpId) setExpanded(`${gpId}:${parentId}`, true);
+          setTimeout(() => setFocusedNode(tempNodeId, parentId), 0);
+        }
       } else {
         // Mid-text @: insert inline reference
         const refNode = entities[refNodeId];

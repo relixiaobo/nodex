@@ -1548,7 +1548,12 @@ export const useNodeStore = create<NodeStore>()(
         if (!parent?.children) return;
         const pos = parent.children.indexOf(tempNodeId);
         if (pos >= 0) {
-          parent.children[pos] = refNodeId;
+          // Safety: don't create duplicate if refNodeId is already in children
+          if (parent.children.includes(refNodeId)) {
+            parent.children.splice(pos, 1);
+          } else {
+            parent.children[pos] = refNodeId;
+          }
         }
         delete state.entities[tempNodeId];
       });

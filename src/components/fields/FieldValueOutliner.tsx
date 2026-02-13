@@ -16,6 +16,7 @@ import { useNodeFields, type FieldEntry } from '../../hooks/use-node-fields';
 import { OutlinerItem } from '../outliner/OutlinerItem';
 import { TrailingInput } from '../editor/TrailingInput';
 import { FieldRow } from './FieldRow';
+import { BulletChevron } from '../outliner/BulletChevron';
 import { SYS_D, SYS_V } from '../../types';
 import { useWorkspaceStore } from '../../stores/workspace-store';
 
@@ -72,15 +73,18 @@ export function FieldValueOutliner({ assocDataId, fieldDataType, attrDefId, onNa
     const valueNode = valueNodeId ? entities[valueNodeId] : undefined;
     const checked = valueNode?.props.name === SYS_V.YES;
 
+    // paddingLeft: 6(base) + 15(chevron space) + 4(gap-1) = 25
+    // Then BulletChevron (15px) + gap-2 (8px) + checkbox → bullet aligns with sibling fields
     return (
-      <div className="flex min-h-7 items-center" style={{ paddingLeft: 6 }}>
+      <div className="flex min-h-7 items-start gap-2 py-1" style={{ paddingLeft: 25 }}>
+        <BulletChevron hasChildren={false} isExpanded={false} onBulletClick={() => {}} />
         <input
           type="checkbox"
           checked={checked}
           onChange={() => {
             if (wsId && userId) toggleCheckboxField(assocDataId, wsId, userId);
           }}
-          className="h-3.5 w-3.5 rounded border-border accent-primary cursor-pointer"
+          className="mt-[3px] h-3.5 w-3.5 rounded border-border accent-primary cursor-pointer"
         />
       </div>
     );

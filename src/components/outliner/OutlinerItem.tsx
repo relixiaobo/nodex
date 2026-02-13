@@ -25,7 +25,7 @@ import {
 
 /** Field types that accept only a single value node. Enter navigates out instead of creating siblings. */
 const SINGLE_VALUE_FIELD_TYPES: Set<string> = new Set([
-  SYS_D.DATE, SYS_D.NUMBER, SYS_D.INTEGER, SYS_D.URL, SYS_D.EMAIL,
+  SYS_D.NUMBER, SYS_D.INTEGER, SYS_D.URL, SYS_D.EMAIL,
 ]);
 
 interface OutlinerItemProps {
@@ -908,12 +908,6 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
                 }}
                 className="mt-[3px] h-3.5 w-3.5 rounded border-border accent-primary cursor-pointer"
               />
-            ) : fieldDataType === SYS_D.DATE && isFocused ? (
-              <DatePickerInput
-                value={node.props.name ?? ''}
-                onChange={(v) => { if (userId) updateNodeName(nodeId, v, userId); }}
-                onBlur={handleBlur}
-              />
             ) : isFocused ? (
               <NodeEditor
                 nodeId={nodeId}
@@ -950,11 +944,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
             ) : (
               <span
                 className="node-content"
-                dangerouslySetInnerHTML={{
-                  __html: fieldDataType === SYS_D.DATE && node.props.name
-                    ? formatDateDisplay(node.props.name)
-                    : (node.props.name || '&nbsp;'),
-                }}
+                dangerouslySetInnerHTML={{ __html: node.props.name || '&nbsp;' }}
               />
             )}
             {hasTags && (
@@ -1099,51 +1089,6 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       )}
     </div>
   );
-}
-
-/** Native date picker input for Date field values. Auto-opens picker on mount. */
-function DatePickerInput({ value, onChange, onBlur }: {
-  value: string;
-  onChange: (v: string) => void;
-  onBlur: () => void;
-}) {
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    const input = inputRef.current;
-    if (!input) return;
-    input.focus();
-    try { input.showPicker(); } catch { /* showPicker not supported in all contexts */ }
-  }, []);
-
-  return (
-    <input
-      ref={inputRef}
-      type="date"
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      onBlur={onBlur}
-      onKeyDown={(e) => {
-        if (e.key === 'Escape') {
-          e.preventDefault();
-          inputRef.current?.blur();
-        }
-      }}
-      className="bg-transparent outline-none text-sm leading-[21px] w-full"
-    />
-  );
-}
-
-/** Format ISO date (YYYY-MM-DD) for display in Date field values. */
-function formatDateDisplay(dateStr: string): string {
-  try {
-    const [y, m, d] = dateStr.split('-').map(Number);
-    if (!y || !m || !d) return dateStr;
-    const date = new Date(y, m - 1, d);
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-  } catch {
-    return dateStr;
-  }
 }
 
 function getTextOffsetFromPoint(container: HTMLElement, clientX: number, clientY: number): number | null {

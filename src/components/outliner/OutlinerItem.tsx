@@ -14,6 +14,7 @@ import { TagBar } from '../tags/TagBar';
 import { TagSelector, type TagDropdownHandle } from '../tags/TagSelector';
 import { ReferenceSelector, type ReferenceDropdownHandle } from '../references/ReferenceSelector';
 import { FieldRow } from '../fields/FieldRow';
+import { FieldInlineEditor, INLINE_FIELD_TYPES, formatFieldDate, validateFieldValue, ValidationWarning } from '../fields/FieldInlineEditor';
 import { SYS_D, SYS_V } from '../../types/index.js';
 import { useFieldOptions } from '../../hooks/use-field-options.js';
 import {
@@ -145,6 +146,9 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   const isPendingConversion = useUIStore((s) => s.pendingRefConversion?.tempNodeId === nodeId);
   const isSelected = selectedNodeId === nodeId &&
     (selectedParentId === null || selectedParentId === parentId);
+
+  // Inline field types (Date/Number/URL/Email) use FieldInlineEditor instead of NodeEditor
+  const isInlineField = !!fieldDataType && INLINE_FIELD_TYPES.has(fieldDataType);
 
   // Options field dropdown (for changing selected option value)
   const isOptionsField = fieldDataType === SYS_D.OPTIONS || fieldDataType === SYS_D.OPTIONS_FROM_SUPERTAG;
@@ -897,6 +901,13 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
                 }}
                 className="mt-[3px] h-3.5 w-3.5 rounded border-border accent-primary cursor-pointer"
               />
+            ) : isFocused && isInlineField ? (
+              <FieldInlineEditor
+                value={node.props.name ?? ''}
+                fieldDataType={fieldDataType!}
+                onSave={(v) => { if (userId) updateNodeName(nodeId, v, userId); }}
+                onBlur={handleBlur}
+              />
             ) : isFocused ? (
               <NodeEditor
                 nodeId={nodeId}
@@ -933,7 +944,42 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
             ) : fieldDataType === SYS_D.DATE && node.props.name ? (
               <span className="node-content">{formatFieldDate(node.props.name)}</span>
             ) : fieldDataType === SYS_D.URL && node.props.name ? (
-              <span className="node-content text-primary underline decoration-primary/20">{node.props.name}</span>
+              <>
+                <a
+                  href={node.props.name.includes('://') ? node.props.name : `https://${node.props.name}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="node-content text-primary underline decoration-primary/20"
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {node.props.name}
+                </a>
+                {validateFieldValue(SYS_D.URL, node.props.name) && (
+                  <ValidationWarning message={validateFieldValue(SYS_D.URL, node.props.name)!} />
+                )}
+              </>
+            ) : fieldDataType === SYS_D.EMAIL && node.props.name ? (
+              <>
+                <a
+                  href={`mailto:${node.props.name}`}
+                  className="node-content text-primary underline decoration-primary/20"
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {node.props.name}
+                </a>
+                {validateFieldValue(SYS_D.EMAIL, node.props.name) && (
+                  <ValidationWarning message={validateFieldValue(SYS_D.EMAIL, node.props.name)!} />
+                )}
+              </>
+            ) : isInlineField && node.props.name ? (
+              <>
+                <span className="node-content">{node.props.name}</span>
+                {validateFieldValue(fieldDataType!, node.props.name) && (
+                  <ValidationWarning message={validateFieldValue(fieldDataType!, node.props.name)!} />
+                )}
+              </>
             ) : (
               <span
                 className="node-content"
@@ -1126,16 +1172,3 @@ function getTextOffsetFromPoint(container: HTMLElement, clientX: number, clientY
   }
 }
 
-/** Format ISO date string as human-readable (e.g. "Tue, Feb 24") */
-function formatFieldDate(isoDate: string): string {
-  try {
-    const date = new Date(isoDate + 'T00:00:00');
-    return date.toLocaleDateString('en-US', {
-      weekday: 'short',
-      month: 'short',
-      day: 'numeric',
-    });
-  } catch {
-    return isoDate;
-  }
-}

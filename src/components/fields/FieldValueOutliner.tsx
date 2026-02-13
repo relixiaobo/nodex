@@ -17,13 +17,8 @@ import { OutlinerItem } from '../outliner/OutlinerItem';
 import { TrailingInput } from '../editor/TrailingInput';
 import { FieldRow } from './FieldRow';
 import { BulletChevron } from '../outliner/BulletChevron';
-import { FieldInlineEditor } from './FieldInlineEditor';
 import { SYS_D, SYS_V } from '../../types';
 import { useWorkspaceStore } from '../../stores/workspace-store';
-
-const INLINE_FIELD_TYPES: Set<string> = new Set([
-  SYS_D.DATE, SYS_D.NUMBER, SYS_D.INTEGER, SYS_D.URL, SYS_D.EMAIL,
-]);
 
 interface FieldValueOutlinerProps {
   assocDataId: string;
@@ -90,25 +85,6 @@ export function FieldValueOutliner({ assocDataId, fieldDataType, attrDefId, onNa
             if (wsId && userId) toggleCheckboxField(assocDataId, wsId, userId);
           }}
           className="mt-[3px] h-3.5 w-3.5 rounded border-border accent-primary cursor-pointer"
-        />
-      </div>
-    );
-  }
-
-  // --- INLINE FIELD early return (Date/Number/Integer/URL/Email) ---
-  const setInlineFieldValue = useNodeStore((s) => s.setInlineFieldValue);
-  if (fieldDataType && INLINE_FIELD_TYPES.has(fieldDataType)) {
-    const valueNodeId = contentChildIds[0];
-    const value = valueNodeId ? entities[valueNodeId]?.props.name : undefined;
-    return (
-      <div className="flex min-h-7 items-start gap-2 py-1" style={{ paddingLeft: 25 }}>
-        <BulletChevron hasChildren={false} isExpanded={false} onBulletClick={() => {}} />
-        <FieldInlineEditor
-          fieldDataType={fieldDataType}
-          value={value}
-          onSave={(v) => {
-            if (wsId && userId) setInlineFieldValue(assocDataId, v, wsId, userId);
-          }}
         />
       </div>
     );

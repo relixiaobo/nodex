@@ -9,9 +9,8 @@
  * Used for Plain and Options field types. fieldDataType and attrDefId are
  * passed through for future type-specific rendering (e.g., option autocomplete).
  */
-import { useMemo, useRef, useCallback } from 'react';
+import { useMemo, useState, useCallback } from 'react';
 import { useNodeStore } from '../../stores/node-store';
-import { useUIStore } from '../../stores/ui-store';
 import { useChildren } from '../../hooks/use-children';
 import { useNodeFields, type FieldEntry } from '../../hooks/use-node-fields';
 import { OutlinerItem } from '../outliner/OutlinerItem';
@@ -20,6 +19,7 @@ import { FieldRow } from './FieldRow';
 import { BulletChevron } from '../outliner/BulletChevron';
 import { SYS_D, SYS_V } from '../../types';
 import { useWorkspaceStore } from '../../stores/workspace-store';
+import { DatePicker, formatDateDisplay } from './DatePicker.js';
 
 interface FieldValueOutlinerProps {
   assocDataId: string;
@@ -70,7 +70,6 @@ export function FieldValueOutliner({ assocDataId, fieldDataType, attrDefId, onNa
   const toggleCheckboxField = useNodeStore((s) => s.toggleCheckboxField);
   const createChild = useNodeStore((s) => s.createChild);
   const updateNodeName = useNodeStore((s) => s.updateNodeName);
-  const setFocusedNode = useUIStore((s) => s.setFocusedNode);
   const isCheckbox = fieldDataType === SYS_D.CHECKBOX;
   if (isCheckbox) {
     const valueNodeId = contentChildIds[0];
@@ -101,20 +100,22 @@ export function FieldValueOutliner({ assocDataId, fieldDataType, attrDefId, onNa
     const currentValue = valueNode?.props.name ?? '';
 
     return (
-      <div className="flex min-h-7 items-start gap-2 py-1" style={{ paddingLeft: 25 }}>
-        <BulletChevron hasChildren={false} isExpanded={false} onBulletClick={() => {}} dimmed={!currentValue} />
-        <DatePickerDisplay
-          value={currentValue}
-          onSelect={(v) => {
-            if (!wsId || !userId) return;
-            if (valueNodeId) {
-              updateNodeName(valueNodeId, v, userId);
-            } else {
-              createChild(assocDataId, wsId, userId, v);
-            }
-          }}
-        />
-      </div>
+      <DatePickerField
+        value={currentValue}
+        onSelect={(v) => {
+          if (!wsId || !userId) return;
+          if (v === '') {
+            // Clear: if value node exists, set name to empty
+            if (valueNodeId) updateNodeName(valueNodeId, '', userId);
+            return;
+          }
+          if (valueNodeId) {
+            updateNodeName(valueNodeId, v, userId);
+          } else {
+            createChild(assocDataId, wsId, userId, v);
+          }
+        }}
+      />
     );
   }
 
@@ -164,41 +165,29 @@ export function FieldValueOutliner({ assocDataId, fieldDataType, attrDefId, onNa
   );
 }
 
-/** Click-to-pick date display. Hidden native input provides the date picker overlay. */
-function DatePickerDisplay({ value, onSelect }: { value: string; onSelect: (v: string) => void }) {
-  const inputRef = useRef<HTMLInputElement>(null);
+/** Click-to-pick date field with custom DatePicker popover. */
+function DatePickerField({ value, onSelect }: { value: string; onSelect: (v: string) => void }) {
+  const [open, setOpen] = useState(false);
 
   const handleClick = useCallback(() => {
-    const input = inputRef.current;
-    if (!input) return;
-    try { input.showPicker(); } catch { /* fallback: input gets focus, user can type */ }
+    setOpen((prev) => !prev);
   }, []);
 
   return (
-    <div className="flex-1 min-w-0 flex items-center cursor-pointer relative" onClick={handleClick}>
-      <span className={`text-sm leading-[21px] select-none ${value ? '' : 'text-foreground-tertiary'}`}>
-        {value ? formatDateDisplay(value) : 'Empty'}
-      </span>
-      <input
-        ref={inputRef}
-        type="date"
-        value={value}
-        onChange={(e) => onSelect(e.target.value)}
-        className="absolute w-px h-px opacity-0 pointer-events-none"
-        tabIndex={-1}
-      />
+    <div className="relative flex min-h-7 items-start gap-2 py-1" style={{ paddingLeft: 25 }}>
+      <BulletChevron hasChildren={false} isExpanded={false} onBulletClick={() => {}} dimmed={!value} />
+      <div className="flex-1 min-w-0 flex items-center cursor-pointer" onClick={handleClick}>
+        <span className={`text-sm leading-[21px] select-none ${value ? '' : 'text-foreground-tertiary'}`}>
+          {value ? formatDateDisplay(value) : 'Empty'}
+        </span>
+      </div>
+      {open && (
+        <DatePicker
+          value={value}
+          onSelect={onSelect}
+          onClose={() => setOpen(false)}
+        />
+      )}
     </div>
   );
-}
-
-/** Format ISO date (YYYY-MM-DD) for display: "Mar 15, 2025" */
-function formatDateDisplay(dateStr: string): string {
-  try {
-    const [y, m, d] = dateStr.split('-').map(Number);
-    if (!y || !m || !d) return dateStr;
-    const date = new Date(y, m - 1, d);
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-  } catch {
-    return dateStr;
-  }
 }

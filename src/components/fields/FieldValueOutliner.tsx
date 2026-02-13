@@ -9,7 +9,7 @@
  * Used for Plain and Options field types. fieldDataType and attrDefId are
  * passed through for future type-specific rendering (e.g., option autocomplete).
  */
-import { useMemo } from 'react';
+import { useMemo, useRef, useCallback } from 'react';
 import { useNodeStore } from '../../stores/node-store';
 import { useUIStore } from '../../stores/ui-store';
 import { useChildren } from '../../hooks/use-children';
@@ -69,6 +69,7 @@ export function FieldValueOutliner({ assocDataId, fieldDataType, attrDefId, onNa
   const userId = useWorkspaceStore((s) => s.userId);
   const toggleCheckboxField = useNodeStore((s) => s.toggleCheckboxField);
   const createChild = useNodeStore((s) => s.createChild);
+  const updateNodeName = useNodeStore((s) => s.updateNodeName);
   const setFocusedNode = useUIStore((s) => s.setFocusedNode);
   const isCheckbox = fieldDataType === SYS_D.CHECKBOX;
   if (isCheckbox) {
@@ -93,22 +94,26 @@ export function FieldValueOutliner({ assocDataId, fieldDataType, attrDefId, onNa
     );
   }
 
-  // --- DATE empty state: click to create node + open picker ---
-  if (fieldDataType === SYS_D.DATE && contentChildIds.length === 0) {
+  // --- DATE: click-to-pick, similar to Options pattern ---
+  if (fieldDataType === SYS_D.DATE) {
+    const valueNodeId = contentChildIds[0];
+    const valueNode = valueNodeId ? entities[valueNodeId] : undefined;
+    const currentValue = valueNode?.props.name ?? '';
+
     return (
-      <div
-        className="flex min-h-7 items-start gap-2 py-1 cursor-pointer"
-        style={{ paddingLeft: 25 }}
-        onClick={() => {
-          if (wsId && userId) {
-            createChild(assocDataId, wsId, userId, '').then((newNode) => {
-              setFocusedNode(newNode.id, assocDataId);
-            });
-          }
-        }}
-      >
-        <BulletChevron hasChildren={false} isExpanded={false} onBulletClick={() => {}} dimmed />
-        <span className="text-sm leading-[21px] text-foreground-tertiary select-none">Empty</span>
+      <div className="flex min-h-7 items-start gap-2 py-1" style={{ paddingLeft: 25 }}>
+        <BulletChevron hasChildren={false} isExpanded={false} onBulletClick={() => {}} dimmed={!currentValue} />
+        <DatePickerDisplay
+          value={currentValue}
+          onSelect={(v) => {
+            if (!wsId || !userId) return;
+            if (valueNodeId) {
+              updateNodeName(valueNodeId, v, userId);
+            } else {
+              createChild(assocDataId, wsId, userId, v);
+            }
+          }}
+        />
       </div>
     );
   }
@@ -157,4 +162,43 @@ export function FieldValueOutliner({ assocDataId, fieldDataType, attrDefId, onNa
       )}
     </div>
   );
+}
+
+/** Click-to-pick date display. Hidden native input provides the date picker overlay. */
+function DatePickerDisplay({ value, onSelect }: { value: string; onSelect: (v: string) => void }) {
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const handleClick = useCallback(() => {
+    const input = inputRef.current;
+    if (!input) return;
+    try { input.showPicker(); } catch { /* fallback: input gets focus, user can type */ }
+  }, []);
+
+  return (
+    <div className="flex-1 min-w-0 flex items-center cursor-pointer relative" onClick={handleClick}>
+      <span className={`text-sm leading-[21px] select-none ${value ? '' : 'text-foreground-tertiary'}`}>
+        {value ? formatDateDisplay(value) : 'Empty'}
+      </span>
+      <input
+        ref={inputRef}
+        type="date"
+        value={value}
+        onChange={(e) => onSelect(e.target.value)}
+        className="absolute w-px h-px opacity-0 pointer-events-none"
+        tabIndex={-1}
+      />
+    </div>
+  );
+}
+
+/** Format ISO date (YYYY-MM-DD) for display: "Mar 15, 2025" */
+function formatDateDisplay(dateStr: string): string {
+  try {
+    const [y, m, d] = dateStr.split('-').map(Number);
+    if (!y || !m || !d) return dateStr;
+    const date = new Date(y, m - 1, d);
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  } catch {
+    return dateStr;
+  }
 }

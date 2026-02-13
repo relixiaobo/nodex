@@ -1226,11 +1226,11 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
               />
             );
           })}
-          {visibleChildren.length === 0 && (
+          {(visibleChildren.length === 0 || visibleChildren[visibleChildren.length - 1]?.type === 'field') && (
             <TrailingInput
               parentId={nodeId}
               depth={depth + 1}
-              autoFocus
+              autoFocus={visibleChildren.length === 0}
               parentExpandKey={expandKey}
             />
           )}

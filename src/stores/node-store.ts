@@ -157,6 +157,12 @@ interface NodeStore {
   /** Remove a reference from parent.children (node itself is NOT trashed) */
   removeReference(parentId: string, refNodeId: string, userId: string): void;
 
+  /** Start ref→inline conversion: create temp node with inline-ref content, return tempNodeId */
+  startRefConversion(refNodeId: string, parentId: string, position: number, workspaceId: string, userId: string): string;
+
+  /** Revert conversion: replace temp node with reference in parent.children */
+  revertRefConversion(tempNodeId: string, refNodeId: string, parentId: string): void;
+
   /** Remove a field from a node (tuple + associatedData, cleanup associationMap) */
   removeField(nodeId: string, tupleId: string, workspaceId: string, userId: string): void;
 
@@ -1504,6 +1510,47 @@ export const useNodeStore = create<NodeStore>()(
           parent.children.splice(idx, 1);
           parent.updatedAt = Date.now();
         }
+      });
+    },
+
+    startRefConversion: (refNodeId, parentId, position, workspaceId, userId) => {
+      const tempId = nanoid();
+      const now = Date.now();
+      set((state) => {
+        const refNode = state.entities[refNodeId];
+        const rawName = refNode?.props.name ?? '';
+        const refName = rawName.replace(/<[^>]+>/g, '').trim() || 'Untitled';
+        const inlineRefHTML = `<span data-inlineref-node="${refNodeId}">${refName}</span>`;
+
+        state.entities[tempId] = {
+          id: tempId,
+          workspaceId,
+          props: { created: now, name: inlineRefHTML, _ownerId: parentId },
+          children: [],
+          version: 1,
+          updatedAt: now,
+          createdBy: userId,
+          updatedBy: userId,
+        };
+
+        const parent = state.entities[parentId];
+        if (parent?.children) {
+          const insertPos = Math.min(Math.max(position, 0), parent.children.length);
+          parent.children.splice(insertPos, 0, tempId);
+        }
+      });
+      return tempId;
+    },
+
+    revertRefConversion: (tempNodeId, refNodeId, parentId) => {
+      set((state) => {
+        const parent = state.entities[parentId];
+        if (!parent?.children) return;
+        const pos = parent.children.indexOf(tempNodeId);
+        if (pos >= 0) {
+          parent.children[pos] = refNodeId;
+        }
+        delete state.entities[tempNodeId];
       });
     },
   })),

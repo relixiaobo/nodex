@@ -1354,8 +1354,10 @@ export const useNodeStore = create<NodeStore>()(
       set((state) => {
         const attrDef = state.entities[attrDefId];
         if (!attrDef?.children) return;
+        const now = Date.now();
 
         // Find existing type Tuple [SYS_A02, SYS_D*]
+        let found = false;
         for (const childId of attrDef.children) {
           const child = state.entities[childId];
           if (
@@ -1363,26 +1365,54 @@ export const useNodeStore = create<NodeStore>()(
             child.children?.[0] === SYS_A.TYPE_CHOICE
           ) {
             child.children[1] = newType;
-            child.updatedAt = Date.now();
+            child.updatedAt = now;
             child.updatedBy = userId;
-            return;
+            found = true;
+            break;
           }
         }
 
-        // No type tuple found — create one
-        const tupleId = nanoid();
-        const now = Date.now();
-        state.entities[tupleId] = {
-          id: tupleId,
-          workspaceId: attrDef.workspaceId,
-          props: { created: now, name: '', _ownerId: attrDefId, _docType: 'tuple' },
-          children: [SYS_A.TYPE_CHOICE, newType],
-          version: 1,
-          updatedAt: now,
-          createdBy: userId,
-          updatedBy: userId,
-        };
-        attrDef.children.push(tupleId);
+        if (!found) {
+          // No type tuple found — create one
+          const tupleId = nanoid();
+          state.entities[tupleId] = {
+            id: tupleId,
+            workspaceId: attrDef.workspaceId,
+            props: { created: now, name: '', _ownerId: attrDefId, _docType: 'tuple' },
+            children: [SYS_A.TYPE_CHOICE, newType],
+            version: 1,
+            updatedAt: now,
+            createdBy: userId,
+            updatedBy: userId,
+          };
+          attrDef.children.push(tupleId);
+        }
+
+        // Auto-create missing config tuples required by the new type
+        const existingKeys = new Set<string>();
+        for (const childId of attrDef.children) {
+          const child = state.entities[childId];
+          if (child?.props._docType === 'tuple' && child.children?.[0]) {
+            existingKeys.add(child.children[0]);
+          }
+        }
+        for (const [key, def] of ATTRDEF_CONFIG_MAP) {
+          if (existingKeys.has(key)) continue;
+          const applies = def.appliesTo === '*' || def.appliesTo.includes(newType);
+          if (!applies) continue;
+          const tid = nanoid();
+          state.entities[tid] = {
+            id: tid,
+            workspaceId: attrDef.workspaceId,
+            props: { created: now, name: '', _ownerId: attrDefId, _docType: 'tuple' },
+            children: [key, def.defaultValue],
+            version: 1,
+            updatedAt: now,
+            createdBy: userId,
+            updatedBy: userId,
+          };
+          attrDef.children.push(tid);
+        }
       });
     },
 
@@ -1429,10 +1459,11 @@ export const useNodeStore = create<NodeStore>()(
     addFieldOption: (attrDefId, name, workspaceId, userId) => {
       const id = nanoid();
       const now = Date.now();
+      let created = false;
 
       set((state) => {
         const attrDef = state.entities[attrDefId];
-        if (!attrDef) return;
+        if (!attrDef || attrDef.props._docType !== 'attrDef') return;
 
         state.entities[id] = {
           id,
@@ -1447,9 +1478,10 @@ export const useNodeStore = create<NodeStore>()(
 
         if (!attrDef.children) attrDef.children = [];
         attrDef.children.push(id);
+        created = true;
       });
 
-      return id;
+      return created ? id : '';
     },
 
     autoCollectOption: (nodeId, attrDefId, name, workspaceId, userId) => {
@@ -1503,10 +1535,10 @@ export const useNodeStore = create<NodeStore>()(
     removeFieldOption: (attrDefId, optionId, _userId) => {
       set((state) => {
         const attrDef = state.entities[attrDefId];
-        if (attrDef?.children) {
-          const idx = attrDef.children.indexOf(optionId);
-          if (idx >= 0) attrDef.children.splice(idx, 1);
-        }
+        if (!attrDef || attrDef.props._docType !== 'attrDef' || !attrDef.children) return;
+        const idx = attrDef.children.indexOf(optionId);
+        if (idx < 0) return;
+        attrDef.children.splice(idx, 1);
         delete state.entities[optionId];
       });
     },
@@ -1514,7 +1546,7 @@ export const useNodeStore = create<NodeStore>()(
     setConfigValue: (tupleId, newValue, userId) => {
       set((state) => {
         const tuple = state.entities[tupleId];
-        if (!tuple?.children || tuple.children.length < 1) return;
+        if (!tuple || tuple.props._docType !== 'tuple' || !tuple.children || tuple.children.length < 1) return;
         tuple.children[1] = newValue;
         tuple.updatedAt = Date.now();
         tuple.updatedBy = userId;
@@ -1525,7 +1557,15 @@ export const useNodeStore = create<NodeStore>()(
       set((state) => {
         const node = state.entities[nodeId];
         const tuple = state.entities[tupleId];
-        if (!node || !tuple?.children) return;
+        if (
+          !node ||
+          !node.children?.includes(tupleId) ||
+          !tuple ||
+          tuple.props._docType !== 'tuple' ||
+          tuple.props._ownerId !== nodeId ||
+          !tuple.children ||
+          tuple.children[0] !== oldAttrDefId
+        ) return;
 
         // Guard: don't replace if parent already has a field with newAttrDefId
         const alreadyHas = node.children?.some((cid) => {
@@ -1540,9 +1580,12 @@ export const useNodeStore = create<NodeStore>()(
         tuple.updatedAt = Date.now();
         tuple.updatedBy = userId;
 
-        // Clean up orphaned placeholder attrDef
+        // Clean up orphaned placeholder attrDef (owned by this tuple only).
         const oldAttrDef = state.entities[oldAttrDefId];
-        if (oldAttrDef) {
+        if (
+          oldAttrDef?.props._docType === 'attrDef' &&
+          oldAttrDef.props._ownerId === tupleId
+        ) {
           // Delete type tuple children
           if (oldAttrDef.children) {
             for (const cid of oldAttrDef.children) {

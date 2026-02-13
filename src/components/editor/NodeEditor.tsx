@@ -18,6 +18,7 @@ import { Extension } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Highlight from '@tiptap/extension-highlight';
 import { DOMSerializer } from '@tiptap/pm/model';
+import { TextSelection } from '@tiptap/pm/state';
 import { useNodeStore } from '../../stores/node-store';
 import { useUIStore } from '../../stores/ui-store';
 import { useWorkspaceStore } from '../../stores/workspace-store';
@@ -393,11 +394,15 @@ export function NodeEditor({
       // If the user clicked on text to focus this node, position cursor at
       // the click point using a pre-computed text offset. The offset was
       // calculated from the static (non-editable) content via caretRangeFromPoint
-      // in handleContentClick — this avoids layout timing issues with rAF.
-      // ProseMirror position = textOffset + 1 (offset 1 = paragraph start).
+      // in handleContentClick.
       //
-      // React Strict Mode re-invokes this effect: the first run reads from the
-      // store and caches in clickInfoRef; the second run reads from the ref.
+      // Key: set PM state selection BEFORE focus. When view.focus() fires the
+      // browser 'focus' event, ProseMirror's handler calls selectionToDOM()
+      // which writes the PM selection (our desired position) to the DOM.
+      // This eliminates race conditions with async browser focus handling.
+      //
+      // React Strict Mode: first run reads from store + caches in clickInfoRef;
+      // second run reads from the ref (store was already cleared).
       const storeInfo = useUIStore.getState().focusClickCoords;
       if (storeInfo) {
         clickInfoRef.current = storeInfo;
@@ -408,16 +413,14 @@ export function NodeEditor({
       if (info) {
         const maxPos = editor.state.doc.content.size - 1;
         const pmPos = Math.max(1, Math.min(info.textOffset + 1, maxPos));
-        // Focus first, then defer setTextSelection to next frame.
-        // TipTap's focus() triggers async browser focus handling that can
-        // reset the DOM selection. By deferring, we set the selection AFTER
-        // the browser finishes focus processing, so it sticks.
-        editor.commands.focus('end');
-        requestAnimationFrame(() => {
-          if (!editor.isDestroyed) {
-            editor.commands.setTextSelection(pmPos);
-          }
-        });
+        // 1. Set PM selection (updates state + DOM selection, no focus)
+        const tr = editor.state.tr.setSelection(
+          TextSelection.create(editor.state.doc, pmPos),
+        );
+        editor.view.dispatch(tr);
+        // 2. Focus DOM element — PM's focus handler calls selectionToDOM()
+        //    which writes pmPos to DOM, so browser sees correct position.
+        editor.view.focus();
       } else {
         editor.commands.focus('end');
       }

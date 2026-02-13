@@ -22,6 +22,7 @@ import { useUIStore } from '../../stores/ui-store';
 import { useNodeStore } from '../../stores/node-store';
 import { useWorkspaceStore } from '../../stores/workspace-store';
 import { useAncestors } from '../../hooks/use-ancestors';
+import { getNavigableParentId } from '../../lib/tree-utils';
 
 interface BreadcrumbProps {
   nodeId: string;
@@ -36,8 +37,8 @@ export function Breadcrumb({ nodeId, showCurrentName }: BreadcrumbProps) {
   const { ancestors, workspaceRootId } = useAncestors(nodeId);
   const isRootView = !!workspaceRootId && nodeId === workspaceRootId;
 
-  // Get parent ID for ← button (navigate to parent)
-  const parentId = useNodeStore((s) => s.entities[nodeId]?.props._ownerId ?? null);
+  // Get parent ID for ← button (navigate to first non-structural parent)
+  const parentId = useNodeStore((s) => getNavigableParentId(nodeId, s.entities));
 
   // Workspace name for avatar
   const wsId = useWorkspaceStore((s) => s.currentWorkspaceId);

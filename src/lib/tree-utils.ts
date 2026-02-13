@@ -259,6 +259,21 @@ export function getPreviousSiblingId(
 }
 
 /**
+ * Check if HTML content is only a single inline reference (no additional text).
+ * Empty content also returns true (treat as revertable).
+ */
+export function isOnlyInlineRef(html: string): boolean {
+  if (!html?.trim()) return true;
+  const div = document.createElement('div');
+  div.innerHTML = html.trim();
+  const inlineRefs = div.querySelectorAll('[data-inlineref-node]');
+  if (inlineRefs.length !== 1) return false;
+  const allText = div.textContent?.trim() ?? '';
+  const refText = inlineRefs[0].textContent?.trim() ?? '';
+  return allText === refText;
+}
+
+/**
  * Find the index of a node within its parent's children array.
  */
 export function getNodeIndex(

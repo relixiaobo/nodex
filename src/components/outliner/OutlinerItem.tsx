@@ -20,6 +20,7 @@ import {
   getFlattenedVisibleNodes,
   getPreviousVisibleNode,
   getNextVisibleNode,
+  isOnlyInlineRef,
 } from '../../lib/tree-utils';
 
 interface OutlinerItemProps {
@@ -82,6 +83,9 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   const updateNodeName = useNodeStore((s) => s.updateNodeName);
   const addReference = useNodeStore((s) => s.addReference);
   const removeReference = useNodeStore((s) => s.removeReference);
+  const startRefConversion = useNodeStore((s) => s.startRefConversion);
+  const revertRefConversion = useNodeStore((s) => s.revertRefConversion);
+  const setPendingRefConversion = useUIStore((s) => s.setPendingRefConversion);
 
   // @ trigger state (reference)
   const [refOpen, setRefOpen] = useState(false);
@@ -165,6 +169,19 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
         setSelectedNode(null);
         return;
       }
+      if (e.key === 'ArrowRight' && !optionsPickerOpen) {
+        e.preventDefault();
+        if (!wsId || !userId) return;
+        const parent = entities[parentId];
+        const pos = parent?.children?.indexOf(nodeId) ?? -1;
+        if (pos < 0) return;
+        removeReference(parentId, nodeId, userId);
+        const tempNodeId = startRefConversion(nodeId, parentId, pos, wsId, userId);
+        setPendingRefConversion({ tempNodeId, refNodeId: nodeId, parentId });
+        setSelectedNode(null);
+        setTimeout(() => setFocusedNode(tempNodeId, parentId), 0);
+        return;
+      }
       if (optionsPickerOpen && allFieldOptions.length > 0) {
         if (e.key === 'ArrowDown') {
           e.preventDefault();
@@ -191,7 +208,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isSelected, isReference, optionsPickerOpen, allFieldOptions, optionsPickerIndex, parentId, nodeId, userId, removeReference, addReference, setSelectedNode]);
+  }, [isSelected, isReference, optionsPickerOpen, allFieldOptions, optionsPickerIndex, parentId, nodeId, userId, wsId, entities, removeReference, addReference, setSelectedNode, startRefConversion, setPendingRefConversion, setFocusedNode]);
 
   // When TrailingInput creates a node with # or @, it sets triggerHint so we
   // can immediately open the dropdown (extensions don't fire on mount because
@@ -219,6 +236,17 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   // ─── Basic handlers ───
 
   const handleBlur = useCallback(() => {
+    // Check pending ref conversion: if this is a temp node, decide revert or keep
+    const pending = useUIStore.getState().pendingRefConversion;
+    if (pending && pending.tempNodeId === nodeId) {
+      const tempNode = useNodeStore.getState().entities[nodeId];
+      const content = tempNode?.props.name ?? '';
+      if (isOnlyInlineRef(content)) {
+        revertRefConversion(pending.tempNodeId, pending.refNodeId, pending.parentId);
+      }
+      useUIStore.getState().setPendingRefConversion(null);
+    }
+
     // Only clear focus if this node is still the focused one.
     // Prevents race condition: Enter creates sibling → setFocusedNode(newId) →
     // old editor unmounts → onBlur fires → would wrongly reset to null.
@@ -227,7 +255,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
         (state.focusedParentId === null || state.focusedParentId === parentId)) {
       setFocusedNode(null);
     }
-  }, [nodeId, parentId, setFocusedNode]);
+  }, [nodeId, parentId, setFocusedNode, revertRefConversion]);
 
   const handleContentClick = useCallback((e: React.MouseEvent) => {
     // Intercept clicks on inline references (blue links in static display)
@@ -551,16 +579,16 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       const isEmptyAround = beforeAt.trim() === '' && afterQuery.trim() === '';
 
       if (isEmptyAround) {
-        // Empty node @: trash this node, add reference at same position
+        // Empty node @: trash this node, create temp node in conversion mode
         const parent = entities[parentId];
         const pos = parent?.children?.indexOf(nodeId) ?? -1;
         trashNode(nodeId, wsId, userId);
-        addReference(parentId, refNodeId, userId, pos >= 0 ? pos : undefined);
+        const tempNodeId = startRefConversion(refNodeId, parentId, pos >= 0 ? pos : 0, wsId, userId);
+        setPendingRefConversion({ tempNodeId, refNodeId, parentId });
         // Parent is already expanded (otherwise this item wouldn't render).
-        // Use best-effort grandparent lookup for the compound expand key.
         const gpId = entities[parentId]?.props._ownerId;
         if (gpId) setExpanded(`${gpId}:${parentId}`, true);
-        setFocusedNode(refNodeId, parentId);
+        setTimeout(() => setFocusedNode(tempNodeId, parentId), 0);
       } else {
         // Mid-text @: insert inline reference
         const refNode = entities[refNodeId];
@@ -578,7 +606,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       setRefQuery('');
       setRefSelectedIndex(0);
     },
-    [nodeId, parentId, wsId, userId, entities, trashNode, addReference, setExpanded, setFocusedNode],
+    [nodeId, parentId, wsId, userId, entities, trashNode, addReference, setExpanded, setFocusedNode, startRefConversion, setPendingRefConversion],
   );
 
   const handleReferenceCreateNew = useCallback(

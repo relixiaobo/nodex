@@ -68,6 +68,14 @@ interface UIStore {
   triggerHint: '#' | '@' | null;
   setTriggerHint(hint: '#' | '@' | null): void;
 
+  // Pending reference ↔ inline reference conversion (session-only)
+  pendingRefConversion: {
+    tempNodeId: string;
+    refNodeId: string;
+    parentId: string;
+  } | null;
+  setPendingRefConversion(info: { tempNodeId: string; refNodeId: string; parentId: string } | null): void;
+
   // Navigation undo/redo (session-only, not persisted)
   navUndoStack: Array<{ panelHistory: string[]; panelIndex: number }>;
   navRedoStack: Array<{ panelHistory: string[]; panelIndex: number }>;
@@ -198,6 +206,10 @@ export const useUIStore = create<UIStore>()(
       // Trigger hint
       triggerHint: null,
       setTriggerHint: (hint) => set({ triggerHint: hint }),
+
+      // Pending reference conversion (session-only)
+      pendingRefConversion: null,
+      setPendingRefConversion: (info) => set({ pendingRefConversion: info }),
 
       // Navigation undo/redo (session-only)
       navUndoStack: [],

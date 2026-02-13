@@ -50,6 +50,20 @@ export function resolveRequired(entities: Record<string, NodexNode>, attrDefId: 
   return resolveAttrDefConfig(entities, attrDefId, SYS_A.NULLABLE) === SYS_V.YES;
 }
 
+/** Resolve minimum value for Number/Integer fields. Returns number or undefined. */
+export function resolveMinValue(entities: Record<string, NodexNode>, attrDefId: string): number | undefined {
+  const v = resolveAttrDefConfig(entities, attrDefId, SYS_A.MIN_VALUE);
+  if (v && !isNaN(Number(v))) return Number(v);
+  return undefined;
+}
+
+/** Resolve maximum value for Number/Integer fields. Returns number or undefined. */
+export function resolveMaxValue(entities: Record<string, NodexNode>, attrDefId: string): number | undefined {
+  const v = resolveAttrDefConfig(entities, attrDefId, SYS_A.MAX_VALUE);
+  if (v && !isNaN(Number(v))) return Number(v);
+  return undefined;
+}
+
 /**
  * Map a SYS_D data type constant to a lucide icon component.
  */
@@ -171,7 +185,7 @@ export function isPlainFieldType(dataType: string): boolean {
 export interface ConfigFieldDef {
   key: string;
   name: string;
-  control: 'type_choice' | 'toggle' | 'select' | 'outliner' | 'autocollect' | 'tag_picker' | 'color_picker';
+  control: 'type_choice' | 'toggle' | 'select' | 'outliner' | 'autocollect' | 'tag_picker' | 'color_picker' | 'number_input';
   defaultValue: string;
   appliesTo: string[] | '*';
   icon?: LucideIcon;
@@ -251,6 +265,24 @@ export const ATTRDEF_CONFIG_FIELDS: ConfigFieldDef[] = [
       { value: SYS_V.WHEN_VALUE_IS_DEFAULT, label: 'When value is default' },
       { value: SYS_V.ALWAYS, label: 'Always' },
     ],
+  },
+  {
+    key: SYS_A.MIN_VALUE,
+    name: 'Minimum value',
+    control: 'number_input',
+    icon: Hash,
+    defaultValue: '',
+    appliesTo: [SYS_D.NUMBER, SYS_D.INTEGER],
+    description: 'Warn when value is below this number',
+  },
+  {
+    key: SYS_A.MAX_VALUE,
+    name: 'Maximum value',
+    control: 'number_input',
+    icon: Hash,
+    defaultValue: '',
+    appliesTo: [SYS_D.NUMBER, SYS_D.INTEGER],
+    description: 'Warn when value exceeds this number',
   },
 ];
 

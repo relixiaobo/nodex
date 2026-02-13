@@ -87,8 +87,11 @@ export const ReferenceSelector = forwardRef<ReferenceDropdownHandle, ReferenceSe
       [items, boundedIndex, totalItems, hasCreateOption, query],
     );
 
-    // Fixed positioning to escape overflow containers + auto-flip
-    const [dropStyle, setDropStyle] = useState<React.CSSProperties>({});
+    // Fixed positioning to escape overflow containers + auto-flip.
+    // Start offscreen so the dropdown doesn't inflate the anchor rect on first render.
+    const [dropStyle, setDropStyle] = useState<React.CSSProperties>({
+      position: 'fixed', top: -9999, left: -9999,
+    });
     useLayoutEffect(() => {
       if (!open || !listRef.current) return;
       const anchor = listRef.current.parentElement;

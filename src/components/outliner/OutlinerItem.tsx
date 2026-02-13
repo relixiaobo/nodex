@@ -1060,7 +1060,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
               {hiddenRevealableFields.filter(f => !revealedFieldIds.has(f.id)).map(f => (
                 <button
                   key={f.id}
-                  className="flex items-center gap-0.5 h-7 rounded-md px-0.5 text-xs text-foreground-tertiary hover:text-foreground-secondary hover:bg-foreground/5 transition-colors cursor-pointer"
+                  className="flex items-center gap-0.5 h-7 rounded-md pl-0.5 pr-1.5 text-xs text-foreground-tertiary hover:text-foreground-secondary hover:bg-foreground/5 transition-colors cursor-pointer"
                   onClick={() => setRevealedFieldIds(prev => new Set(prev).add(f.id))}
                   title={`Show ${f.name}`}
                 >

@@ -102,27 +102,39 @@
 
 ### Number 类型 — 已实现
 
-- 值区域渲染为 `FieldValueEditor` click-to-edit 数字输入
-- INTEGER 类型 step=1, NUMBER 类型 step=any
-- Enter 确认、Escape 取消、blur 自动保存
-- 待扩展：min/max 校验
+- 值区域渲染为 FieldValueOutliner（统一值渲染器），值节点 = 普通文本
+- INTEGER 和 NUMBER 共用同一 UI，差异仅在验证层
+- **值验证**：非数字输入 → warning icon（"Value should be a number"）
+- **Min/Max 范围验证**：attrDef 配置页可设 Minimum/Maximum value（NDX_A03/A04），超出范围显示 warning（"Value should be ≥ N" / "≤ N"）
+- 验证为非阻塞式，仅视觉提示（warning icon + tooltip），不阻止输入
 
 ### URL 类型 — 已实现
 
-- 值区域渲染为 `FieldValueEditor` click-to-edit URL 输入
-- 有值时显示为蓝色带下划线的链接样式
-- 待扩展：点击链接在新标签页打开
+- 值区域渲染为 FieldValueOutliner（统一值渲染器），值节点 = 普通文本
+- **值验证**：不含 `://` → warning icon（"Value should be a URL"）
+- 待扩展：蓝色链接样式、点击在新标签页打开
 
 ### Email 类型 — 已实现
 
-- 值区域渲染为 `FieldValueEditor` click-to-edit Email 输入
-- 待扩展：显示为 `mailto:` 可点击链接
+- 值区域渲染为 FieldValueOutliner（统一值渲染器），值节点 = 普通文本
+- **值验证**：不含 `@` → warning icon（"Value should be an email address"）
+- 待扩展：`mailto:` 可点击链接样式
 
 ### Checkbox 类型 — 已实现
 
 - 值区域渲染为内联复选框（直接 toggle，无 click-to-edit）
 - 数据模型：值节点 name = SYS_V03 (Yes) 或 SYS_V04 (No)
 - 注意区分：这是字段值的 checkbox，与 Supertag 的 "Show as Checkbox" 是不同功能
+
+### 值验证 — 已实现（Number/URL/Email）
+
+- **非阻塞式验证**：不阻止输入，仅在 FieldRow 右侧显示 warning icon（橙色 `CircleAlert`）+ tooltip
+- 验证逻辑在 `field-validation.tsx`：
+  - **Number/Integer**：非数字 → "Value should be a number"；超 min/max → "Value should be ≥ N" / "≤ N"
+  - **URL**：不含 `://` → "Value should be a URL"
+  - **Email**：不含 `@` → "Value should be an email address"
+- FieldRow selector 读取 assocData 首个内容子节点的 `props.name`，调用 `validateFieldValue()`
+- Min/Max 通过 `resolveMinValue()` / `resolveMaxValue()` 从 attrDef 的 NDX_A03/A04 Tuple 读取
 
 ### Tana User 类型 — 未实现
 
@@ -200,8 +212,8 @@
 | 2026-02-06 | Unified NodePicker 设计模式 | Options、Config Select 等统一为"从列表选节点"组件 |
 | 2026-02-12 | trashNode(attrDef) 级联清理所有引用 | 删除字段后，所有使用该字段的节点自动移除字段 tuple |
 | 2026-02-12 | 对比 Tana 官方文档补全遗漏（Hide 5 种模式、Auto-init 6 种策略等） | 确保功能清单完整 |
-| 2026-02-12 | FieldRow 按 dataType 分发到 3 种渲染器 | Options→OptionsFieldValue, Plain→FieldValueOutliner, 其余→FieldValueEditor |
-| 2026-02-12 | FieldValueEditor 移除 Options 分支 | Options 由 OptionsFieldValue 独立处理（支持 ReferenceNode 显示） |
+| 2026-02-12 | ~~FieldRow 按 dataType 分发到 3 种渲染器~~ 已废弃 | 被统一值渲染器替代 |
+| 2026-02-12 | ~~FieldValueEditor 移除 Options 分支~~ 已废弃 | FieldValueEditor 整体废弃 |
 | 2026-02-12 | OptionsPicker 改为 combobox 模式 | 支持输入搜索 + 新建选项，与 Tana 交互一致 |
 | 2026-02-12 | Auto-collect: 原节点在 field value，引用在 autocollect Tuple | 分离 pre-determined 与 auto-collected，Tuple children[2+] 存引用 |
 | 2026-02-12 | **统一值渲染器**：所有字段类型值区域 = FieldValueOutliner | 数据模型层面值永远是 assocData.children[]，dataType 只决定值节点的输入方式和显示格式，不改变底层结构。替代当前 3 渲染器分发 |
@@ -234,6 +246,7 @@
 - [ ] Auto-initialize（6 种策略）
 - [ ] Pinned fields
 - [x] Number Min/Max 配置（ConfigNumberInput + 范围验证 warning）
+- [x] 值验证（Number/URL/Email 格式 + Number min/max 范围，非阻塞 warning icon）
 - [ ] Page size 配置
 - [ ] Merge fields
 - [ ] 系统字段（Created time / Modified time / Owner）

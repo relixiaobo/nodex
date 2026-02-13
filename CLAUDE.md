@@ -124,7 +124,8 @@ src/
 supabase/
   migrations/
     001_create_nodes.sql   # DB Schema (单表 nodes + 辅助表)
-docs/                      # 文档 (roadmap, testing, research)
+docs/                      # 文档 (roadmap, testing, research, features)
+.github/ISSUE_TEMPLATE/    # GitHub Issue 模板
 ```
 
 ## 数据模型核心概念
@@ -252,9 +253,14 @@ ContentNode
 - 导入的 41,753 节点中，children 缺失引用 267 条（0.06%）—— 属于预期范围（跨工作区引用等）。
 - `_metaNodeId` 引用 100% 完整。
 
-## 开发路线图
+## 开发路线图与 Bug 跟踪
 
-详细路线图和进度跟踪见 `docs/ROADMAP.md`。各特性的行为规格见 `docs/features/`。
+- 路线图和进度跟踪见 `docs/ROADMAP.md`
+- 特性行为规格见 `docs/features/`
+- **Bug 跟踪用 GitHub Issues**（`gh issue create/view/close`）
+  - Issue 模板：`.github/ISSUE_TEMPLATE/bug.md`
+  - 复杂 bug 在 issue body 记录根因、方案迭代表格、相关 commit
+  - 每轮修复后 `gh issue comment` 追加进展
 
 ## Chrome Side Panel 约束
 
@@ -312,6 +318,9 @@ npm run dev:test   # 启动 http://localhost:5199/standalone/index.html
 ### 逆向研究（Tana 分析）
 - `docs/research/tana-data-model-specification.md` — 数据模型权威规格
 - `docs/research/tana-config-page-architecture.md` — 配置页面 node 结构
+
+### 项目
+- GitHub: https://github.com/relixiaobo/nodex
 
 ### 外部文档
 - Tana 官方: https://tana.inc

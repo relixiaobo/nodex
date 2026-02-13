@@ -126,39 +126,39 @@ export const ReferenceSelector = forwardRef<ReferenceDropdownHandle, ReferenceSe
     return (
       <div
         ref={listRef}
-        className="z-50 w-64 max-h-60 overflow-y-auto rounded-lg border border-border bg-popover shadow-lg py-1"
+        className="z-50 w-64 max-h-60 overflow-y-auto rounded-lg border border-border bg-popover shadow-lg p-1"
         style={dropStyle}
         onMouseDown={(e) => e.preventDefault()}
       >
         {/* Section header */}
         {!query.trim() && recentNodes.length > 0 && (
-          <div className="px-3 py-1 text-[10px] font-medium text-foreground-secondary uppercase tracking-wider">
+          <div className="px-2 py-1 text-[10px] font-medium text-foreground-secondary uppercase tracking-wider">
             Recently opened
           </div>
         )}
         {query.trim() && items.length > 0 && (
-          <div className="px-3 py-1 text-[10px] font-medium text-foreground-secondary uppercase tracking-wider">
+          <div className="px-2 py-1 text-[10px] font-medium text-foreground-secondary uppercase tracking-wider">
             Nodes
           </div>
         )}
 
         {items.length === 0 && !hasCreateOption && (
-          <div className="px-3 py-2 text-xs text-muted-foreground">No matches</div>
+          <div className="px-2 py-2 text-sm text-foreground-secondary">No matches</div>
         )}
 
         {items.map((item, i) => (
           <button
             key={item.id}
             data-ref-item
-            className={`flex w-full flex-col items-start px-3 py-1.5 text-left transition-colors ${
-              i === boundedIndex ? 'bg-accent' : 'hover:bg-accent/50'
+            className={`flex w-full flex-col items-start rounded-md px-2 py-1 text-left transition-colors ${
+              i === boundedIndex ? 'bg-accent' : 'hover:bg-foreground/5'
             }`}
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => onSelect(item.id)}
           >
             <div className="flex w-full items-center gap-1.5">
-              <AtSign size={12} className="text-muted-foreground shrink-0" />
-              <span className="text-xs text-foreground truncate">{item.name}</span>
+              <AtSign size={14} className="text-foreground-secondary shrink-0" />
+              <span className="text-sm text-foreground truncate">{item.name}</span>
             </div>
             {item.breadcrumb && (
               <span className="text-[10px] text-foreground-secondary truncate ml-[18px]">
@@ -173,15 +173,15 @@ export const ReferenceSelector = forwardRef<ReferenceDropdownHandle, ReferenceSe
             {items.length > 0 && <div className="my-0.5 h-px bg-border" />}
             <button
               data-ref-item
-              className={`flex w-full items-center gap-1.5 px-3 py-1.5 text-xs text-foreground transition-colors text-left ${
-                boundedIndex === items.length ? 'bg-accent' : 'hover:bg-accent/50'
+              className={`flex w-full items-center gap-1.5 rounded-md px-2 py-1 text-sm text-foreground transition-colors text-left ${
+                boundedIndex === items.length ? 'bg-accent' : 'hover:bg-foreground/5'
               }`}
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => onCreateNew?.(query.trim())}
             >
-              <Plus size={12} className="text-muted-foreground shrink-0" />
+              <Plus size={14} className="text-foreground-secondary shrink-0" />
               Create &ldquo;{query}&rdquo;
-              <span className="ml-auto text-[10px] text-muted-foreground shrink-0">⌘↵</span>
+              <span className="ml-auto text-[10px] text-foreground-tertiary shrink-0">⌘↵</span>
             </button>
           </>
         )}

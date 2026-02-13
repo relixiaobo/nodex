@@ -75,24 +75,24 @@ export function Breadcrumb({ nodeId, showCurrentName }: BreadcrumbProps) {
     : [];
 
   return (
-    <div className="flex h-8 items-center gap-0.5 px-1.5 text-xs text-muted-foreground overflow-hidden">
+    <div className="flex h-11 items-center gap-0.5 px-3 text-xs text-foreground-secondary overflow-hidden">
       {/* Sidebar toggle */}
       <button
         onClick={toggleSidebar}
-        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md hover:bg-muted hover:text-foreground"
+        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md hover:bg-foreground/5 hover:text-foreground"
         title="Toggle sidebar"
       >
-        <PanelLeft size={16} strokeWidth={1.75} />
+        <PanelLeft size={16} strokeWidth={1.5} />
       </button>
 
       {/* ← button: navigate to parent (hidden at root view) */}
       {canGoUp && (
         <button
           onClick={handleGoUp}
-          className="flex h-7 w-6 shrink-0 items-center justify-center rounded-md hover:bg-muted hover:text-foreground"
+          className="flex h-7 w-6 shrink-0 items-center justify-center rounded-md hover:bg-foreground/5 hover:text-foreground"
           title="Go to parent"
         >
-          <ChevronLeft size={16} strokeWidth={1.75} />
+          <ChevronLeft size={16} strokeWidth={1.5} />
         </button>
       )}
 
@@ -116,7 +116,7 @@ export function Breadcrumb({ nodeId, showCurrentName }: BreadcrumbProps) {
               <ChevronRight size={10} className="shrink-0 text-foreground-tertiary" />
               <button
                 onClick={() => setExpanded(true)}
-                className="flex h-7 shrink-0 items-center justify-center rounded-md px-1 hover:bg-muted hover:text-foreground"
+                className="flex h-7 shrink-0 items-center justify-center rounded-md px-1 hover:bg-foreground/5 hover:text-foreground"
                 title={hiddenAncestors.map(a => a.name).join(' › ')}
               >
                 <MoreHorizontal size={14} />
@@ -130,7 +130,7 @@ export function Breadcrumb({ nodeId, showCurrentName }: BreadcrumbProps) {
               <ChevronRight size={10} className="shrink-0 text-foreground-tertiary mx-0.5" />
               <button
                 onClick={() => navigateTo(ancestor.id)}
-                className="truncate max-w-[120px] rounded px-0.5 hover:bg-muted hover:text-foreground"
+                className="truncate max-w-[120px] rounded px-0.5 hover:bg-foreground/5 hover:text-foreground"
               >
                 {ancestor.name}
               </button>
@@ -153,10 +153,10 @@ export function Breadcrumb({ nodeId, showCurrentName }: BreadcrumbProps) {
       {/* Search button */}
       <button
         onClick={openSearch}
-        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md hover:bg-muted hover:text-foreground"
+        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md hover:bg-foreground/5 hover:text-foreground"
         title="Search (Cmd+K)"
       >
-        <Search size={16} strokeWidth={1.75} />
+        <Search size={16} strokeWidth={1.5} />
       </button>
     </div>
   );

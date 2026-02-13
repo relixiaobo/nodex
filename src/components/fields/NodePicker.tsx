@@ -251,17 +251,17 @@ export function NodePicker({
       {/* Dropdown — shown below the value */}
       {open && (
         <div
-          className="absolute left-6 top-full z-50 mt-0.5 w-48 max-h-52 overflow-y-auto rounded-lg border border-border bg-popover shadow-lg"
+          className="absolute left-6 top-full z-50 mt-0.5 w-48 max-h-52 overflow-y-auto rounded-lg border border-border bg-popover shadow-lg p-1"
           onMouseDown={(e) => e.preventDefault()}
         >
           {/* Option list — bullet + text per item */}
           {filteredOptions.length > 0 ? (
-            <div className="py-0.5">
+            <div>
               {filteredOptions.map((opt, i) => (
                 <button
                   key={opt.id}
-                  className={`flex w-full items-center gap-2 pl-1.5 pr-3 min-h-7 text-left transition-colors ${
-                    i === hoverIndex ? 'bg-accent' : 'hover:bg-accent/50'
+                  className={`flex w-full items-center gap-2 rounded-md px-2 py-1 min-h-7 text-left transition-colors ${
+                    i === hoverIndex ? 'bg-accent' : 'hover:bg-foreground/5'
                   }`}
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => handleSelect(opt.id)}
@@ -277,9 +277,9 @@ export function NodePicker({
               ))}
             </div>
           ) : allowCreate && inputValue.trim() ? (
-            <div className="py-0.5">
+            <div>
               <button
-                className="flex w-full items-center gap-2 pl-1.5 pr-3 min-h-7 text-left bg-accent text-foreground"
+                className="flex w-full items-center gap-2 rounded-md px-2 py-1 min-h-7 text-left bg-accent text-foreground"
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => handleCreate(inputValue.trim())}
               >

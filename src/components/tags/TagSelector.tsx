@@ -107,24 +107,24 @@ export const TagSelector = forwardRef<TagDropdownHandle, TagSelectorProps>(
     return (
       <div
         ref={listRef}
-        className="z-50 w-56 max-h-52 overflow-y-auto rounded-lg border border-border bg-popover shadow-lg py-1"
+        className="z-50 w-56 max-h-52 overflow-y-auto rounded-lg border border-border bg-popover shadow-lg p-1"
         style={dropStyle}
         onMouseDown={(e) => e.preventDefault()}
       >
         {filteredTags.length === 0 && !hasCreateOption && (
-          <div className="px-3 py-2 text-xs text-muted-foreground">No tags available</div>
+          <div className="px-2 py-2 text-sm text-foreground-secondary">No tags available</div>
         )}
         {filteredTags.map((tag, i) => (
           <button
             key={tag.id}
             data-tag-item
-            className={`flex w-full items-center gap-1.5 px-3 py-1.5 text-xs text-foreground transition-colors text-left ${
-              i === boundedIndex ? 'bg-accent' : 'hover:bg-accent/50'
+            className={`flex w-full items-center gap-1.5 rounded-md px-2 py-1 text-sm text-foreground transition-colors text-left ${
+              i === boundedIndex ? 'bg-accent' : 'hover:bg-foreground/5'
             }`}
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => onSelect(tag.id)}
           >
-            <Hash size={12} className="text-muted-foreground shrink-0" />
+            <Hash size={14} className="text-foreground-secondary shrink-0" />
             {tag.name}
           </button>
         ))}
@@ -133,15 +133,15 @@ export const TagSelector = forwardRef<TagDropdownHandle, TagSelectorProps>(
             {filteredTags.length > 0 && <div className="my-0.5 h-px bg-border" />}
             <button
               data-tag-item
-              className={`flex w-full items-center gap-1.5 px-3 py-1.5 text-xs text-foreground transition-colors text-left ${
-                boundedIndex === filteredTags.length ? 'bg-accent' : 'hover:bg-accent/50'
+              className={`flex w-full items-center gap-1.5 rounded-md px-2 py-1 text-sm text-foreground transition-colors text-left ${
+                boundedIndex === filteredTags.length ? 'bg-accent' : 'hover:bg-foreground/5'
               }`}
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => onCreateNew(query.trim())}
             >
-              <Plus size={12} className="text-muted-foreground shrink-0" />
+              <Plus size={14} className="text-foreground-secondary shrink-0" />
               Create &ldquo;{query}&rdquo;
-              <span className="ml-auto text-[10px] text-muted-foreground shrink-0">⌘↵</span>
+              <span className="ml-auto text-[10px] text-foreground-tertiary shrink-0">⌘↵</span>
             </button>
           </>
         )}

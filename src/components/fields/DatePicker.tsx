@@ -166,11 +166,25 @@ function build24from12(hours12: string, minutes: string, period: 'AM' | 'PM'): s
   return `${String(h).padStart(2, '0')}:${String(isNaN(m) ? 0 : m).padStart(2, '0')}`;
 }
 
-/** Short display for date input fields: "Feb 20, 2026" */
+/** Format for editable date input fields: "2026/02/20" */
 function formatInputDate(dateStr: string): string {
-  const [y, m, d] = dateStr.split('-').map(Number);
-  if (!y || !m || !d) return dateStr;
-  return `${SHORT_MONTH_NAMES[m - 1]} ${d}, ${y}`;
+  // dateStr is YYYY-MM-DD, convert to YYYY/MM/DD for display/editing
+  return dateStr.replace(/-/g, '/');
+}
+
+/** Parse user-typed date "2026/02/20" or "2026/2/5" back to YYYY-MM-DD */
+function parseInputDate(input: string): string | null {
+  const trimmed = input.trim().replace(/-/g, '/');
+  const parts = trimmed.split('/');
+  if (parts.length !== 3) return null;
+  const y = parseInt(parts[0], 10);
+  const m = parseInt(parts[1], 10);
+  const d = parseInt(parts[2], 10);
+  if (isNaN(y) || isNaN(m) || isNaN(d)) return null;
+  if (y < 1900 || y > 2100 || m < 1 || m > 12 || d < 1 || d > 31) return null;
+  const maxD = getDaysInMonth(y, m - 1);
+  if (d > maxD) return null;
+  return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 }
 
 /** Format 24h time to display: "9:00 AM" */
@@ -351,6 +365,7 @@ export function DatePicker({ value, onSelect, onClose }: DatePickerProps) {
           active={!includeEnd || editingEnd === 'start'}
           showRing={includeEnd}
           onClick={() => setEditingEnd('start')}
+          onDateChange={(d) => { setSelectedDate(d); const ym = dateStrToYM(d); setViewYear(ym.year); setViewMonth(ym.month); }}
           onTimeChange={includeTime ? setSelectedTime : undefined}
         />
         {/* End date input (only when range active) */}
@@ -362,6 +377,7 @@ export function DatePicker({ value, onSelect, onClose }: DatePickerProps) {
             active={editingEnd === 'end'}
             showRing
             onClick={() => setEditingEnd('end')}
+            onDateChange={(d) => { setEndDate(d); const ym = dateStrToYM(d); setViewYear(ym.year); setViewMonth(ym.month); }}
             onTimeChange={includeTime ? setEndTime : undefined}
           />
         )}
@@ -413,6 +429,7 @@ function DateInputField({
   active,
   showRing,
   onClick,
+  onDateChange,
   onTimeChange,
 }: {
   dateStr: string;
@@ -421,23 +438,63 @@ function DateInputField({
   active: boolean;
   showRing: boolean;
   onClick: () => void;
+  onDateChange?: (dateStr: string) => void;
   onTimeChange?: (v: string) => void;
 }) {
+  const [editing, setEditing] = useState(false);
+  const [editValue, setEditValue] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const startEditing = useCallback(() => {
+    onClick();
+    if (dateStr && onDateChange) {
+      setEditing(true);
+      setEditValue(formatInputDate(dateStr));
+      requestAnimationFrame(() => inputRef.current?.select());
+    }
+  }, [dateStr, onClick, onDateChange]);
+
+  const commitEdit = useCallback(() => {
+    setEditing(false);
+    const parsed = parseInputDate(editValue);
+    if (parsed && parsed !== dateStr) {
+      onDateChange?.(parsed);
+    }
+  }, [editValue, dateStr, onDateChange]);
+
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') { e.preventDefault(); commitEdit(); }
+    else if (e.key === 'Escape') { e.preventDefault(); setEditing(false); }
+  }, [commitEdit]);
+
   return (
     <div
-      className={`flex w-full items-center rounded-md border text-sm cursor-pointer transition-colors ${
+      className={`flex w-full items-center rounded-md border text-sm transition-colors ${
         active && showRing
           ? 'border-primary bg-primary/5'
           : active && !showRing
             ? 'border-border bg-transparent'
             : 'border-border bg-transparent hover:border-foreground/20'
       }`}
-      onClick={onClick}
+      onClick={!editing ? startEditing : onClick}
     >
-      {/* Date part */}
-      <span className={`flex-1 px-2.5 py-1.5 ${dateStr ? 'text-foreground' : 'text-foreground-tertiary'}`}>
-        {dateStr ? formatInputDate(dateStr) : placeholder}
-      </span>
+      {/* Date part — editable input */}
+      {editing ? (
+        <input
+          ref={inputRef}
+          type="text"
+          value={editValue}
+          onChange={(e) => setEditValue(e.target.value)}
+          onBlur={commitEdit}
+          onKeyDown={handleKeyDown}
+          className="flex-1 min-w-0 px-2.5 py-1.5 bg-transparent text-sm text-foreground outline-none"
+          onClick={(e) => e.stopPropagation()}
+        />
+      ) : (
+        <span className={`flex-1 px-2.5 py-1.5 cursor-pointer ${dateStr ? 'text-foreground' : 'text-foreground-tertiary'}`}>
+          {dateStr ? formatInputDate(dateStr) : placeholder}
+        </span>
+      )}
       {/* Time part — separated by | divider */}
       {timeStr && onTimeChange ? (
         <>
@@ -614,29 +671,16 @@ function CalendarGrid({
   hoveredDate,
   onHover,
 }: CalendarGridProps) {
-  const [pickerMode, setPickerMode] = useState<'calendar' | 'year' | 'month'>('calendar');
   const weeks = useMemo(() => generateCalendarDays(viewYear, viewMonth), [viewYear, viewMonth]);
 
   const prevMonth = () => {
-    if (pickerMode === 'year') {
-      onViewChange(viewYear - 12, viewMonth);
-    } else if (pickerMode === 'month') {
-      onViewChange(viewYear - 1, viewMonth);
-    } else {
-      if (viewMonth === 0) onViewChange(viewYear - 1, 11);
-      else onViewChange(viewYear, viewMonth - 1);
-    }
+    if (viewMonth === 0) onViewChange(viewYear - 1, 11);
+    else onViewChange(viewYear, viewMonth - 1);
   };
 
   const nextMonth = () => {
-    if (pickerMode === 'year') {
-      onViewChange(viewYear + 12, viewMonth);
-    } else if (pickerMode === 'month') {
-      onViewChange(viewYear + 1, viewMonth);
-    } else {
-      if (viewMonth === 11) onViewChange(viewYear + 1, 0);
-      else onViewChange(viewYear, viewMonth + 1);
-    }
+    if (viewMonth === 11) onViewChange(viewYear + 1, 0);
+    else onViewChange(viewYear, viewMonth + 1);
   };
 
   // Compute effective range for highlighting (with hover preview)
@@ -650,79 +694,14 @@ function CalendarGrid({
     return dateStr > effectiveStart && dateStr < effectiveEnd;
   }, [effectiveStart, effectiveEnd]);
 
-  // Year picker
-  if (pickerMode === 'year') {
-    const startYear = viewYear - 5;
-    const years = Array.from({ length: 12 }, (_, i) => startYear + i);
-    return (
-      <div>
-        <div className="flex items-center justify-between mb-2">
-          <button className="text-foreground-tertiary hover:text-foreground-secondary transition-colors w-6 h-6 flex items-center justify-center" onClick={prevMonth}>
-            <ChevronLeft size={14} />
-          </button>
-          <span className="text-sm font-medium text-foreground-secondary">{startYear} – {startYear + 11}</span>
-          <button className="text-foreground-tertiary hover:text-foreground-secondary transition-colors w-6 h-6 flex items-center justify-center" onClick={nextMonth}>
-            <ChevronRight size={14} />
-          </button>
-        </div>
-        <div className="grid grid-cols-3 gap-1">
-          {years.map((y) => (
-            <button
-              key={y}
-              className={`h-8 rounded-md text-sm transition-colors cursor-pointer ${
-                y === viewYear ? 'bg-primary text-primary-foreground font-medium' : 'hover:bg-foreground/5 text-foreground'
-              }`}
-              onClick={() => { onViewChange(y, viewMonth); setPickerMode('calendar'); }}
-            >
-              {y}
-            </button>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  // Month picker
-  if (pickerMode === 'month') {
-    return (
-      <div>
-        <div className="flex items-center justify-between mb-2">
-          <button className="text-foreground-tertiary hover:text-foreground-secondary transition-colors w-6 h-6 flex items-center justify-center" onClick={prevMonth}>
-            <ChevronLeft size={14} />
-          </button>
-          <span className="text-sm font-medium text-foreground-secondary">{viewYear}</span>
-          <button className="text-foreground-tertiary hover:text-foreground-secondary transition-colors w-6 h-6 flex items-center justify-center" onClick={nextMonth}>
-            <ChevronRight size={14} />
-          </button>
-        </div>
-        <div className="grid grid-cols-3 gap-1">
-          {SHORT_MONTH_NAMES.map((name, i) => (
-            <button
-              key={i}
-              className={`h-8 rounded-md text-sm transition-colors cursor-pointer ${
-                i === viewMonth ? 'bg-primary text-primary-foreground font-medium' : 'hover:bg-foreground/5 text-foreground'
-              }`}
-              onClick={() => { onViewChange(viewYear, i); setPickerMode('calendar'); }}
-            >
-              {name}
-            </button>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
   // Calendar grid — 7 columns, no week numbers
   return (
     <div>
-      {/* Month/Year navigation + Today — Notion style: "Month Year" left, "Today < >" right */}
+      {/* Month/Year status label + Today + arrows */}
       <div className="flex items-center justify-between mb-2">
-        <button
-          className="text-sm font-medium text-foreground hover:text-foreground-secondary transition-colors cursor-pointer"
-          onClick={() => setPickerMode('month')}
-        >
+        <span className="text-sm font-medium text-foreground">
           {MONTH_NAMES[viewMonth]} {viewYear}
-        </button>
+        </span>
         <div className="flex items-center gap-1">
           <button
             className="rounded-md px-1.5 py-0.5 text-xs text-foreground-secondary hover:bg-foreground/5 transition-colors cursor-pointer"

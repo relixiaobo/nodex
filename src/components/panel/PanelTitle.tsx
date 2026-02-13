@@ -94,7 +94,7 @@ export function PanelTitle({ nodeId, onTitleRef }: PanelTitleProps) {
           ref={setRef}
           contentEditable={editing}
           suppressContentEditableWarning
-          className="text-lg font-semibold leading-7 outline-none min-h-7 flex-1 cursor-text"
+          className="text-lg font-semibold leading-6 outline-none min-h-7 flex-1 cursor-text"
           onClick={() => {
             if (!editing) setEditing(true);
           }}

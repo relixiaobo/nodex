@@ -13,7 +13,7 @@ interface NodePanelHeaderProps {
 
 export function NodePanelHeader({ nodeId, showCurrentName }: NodePanelHeaderProps) {
   return (
-    <div className="shrink-0 border-b border-border">
+    <div className="shrink-0 border-b border-border-subtle">
       <Breadcrumb nodeId={nodeId} showCurrentName={showCurrentName} />
     </div>
   );

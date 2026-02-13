@@ -91,25 +91,25 @@ export function CommandPalette() {
         shouldFilter={false}
       >
         <div className="flex items-center gap-2 border-b border-border px-3">
-          <Search size={16} className="text-muted-foreground shrink-0" />
+          <Search size={16} className="text-foreground-secondary shrink-0" />
           <Command.Input
             value={searchQuery}
             onValueChange={setSearchQuery}
             placeholder="Search nodes..."
-            className="h-10 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+            className="h-10 flex-1 bg-transparent text-sm outline-none placeholder:text-foreground-tertiary"
           />
-          <kbd className="hidden sm:inline-flex h-5 items-center rounded border border-border bg-muted px-1.5 text-[10px] font-medium text-muted-foreground">
+          <kbd className="hidden sm:inline-flex h-5 items-center rounded border border-border bg-background px-1.5 text-[10px] font-medium text-foreground-tertiary">
             Esc
           </kbd>
         </div>
         <Command.List className="max-h-72 overflow-y-auto p-1">
-          <Command.Empty className="py-6 text-center text-sm text-muted-foreground">
+          <Command.Empty className="py-6 text-center text-sm text-foreground-secondary">
             No results found.
           </Command.Empty>
 
           {/* Quick navigation */}
           {!searchQuery.trim() && (
-            <Command.Group heading="Navigate" className="px-1 py-1.5 text-xs font-medium text-muted-foreground">
+            <Command.Group heading="Navigate" className="px-1 py-1.5 text-xs font-medium text-foreground-secondary">
               {containers.map((c) => {
                 const Icon = c.icon;
                 return (
@@ -119,7 +119,7 @@ export function CommandPalette() {
                     onSelect={() => handleSelect(c.id)}
                     className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm text-foreground aria-selected:bg-accent"
                   >
-                    <Icon size={14} className="text-muted-foreground" />
+                    <Icon size={14} className="text-foreground-secondary" />
                     {c.label}
                   </Command.Item>
                 );
@@ -129,7 +129,7 @@ export function CommandPalette() {
 
           {/* Search results */}
           {searchQuery.trim() && results.length > 0 && (
-            <Command.Group heading="Nodes" className="px-1 py-1.5 text-xs font-medium text-muted-foreground">
+            <Command.Group heading="Nodes" className="px-1 py-1.5 text-xs font-medium text-foreground-secondary">
               {results.map((r) => (
                 <Command.Item
                   key={r.id}
@@ -137,7 +137,7 @@ export function CommandPalette() {
                   onSelect={() => handleSelect(r.id)}
                   className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm text-foreground aria-selected:bg-accent"
                 >
-                  <FileText size={14} className="text-muted-foreground shrink-0" />
+                  <FileText size={14} className="text-foreground-secondary shrink-0" />
                   <span className="truncate">{r.name}</span>
                 </Command.Item>
               ))}

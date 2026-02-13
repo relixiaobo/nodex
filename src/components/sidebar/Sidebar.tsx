@@ -10,7 +10,7 @@ export function Sidebar() {
   const wsName = useNodeStore((s) => s.entities[wsId ?? '']?.props.name);
 
   return (
-    <aside className="flex h-full w-56 shrink-0 flex-col border-r border-border bg-muted/30">
+    <aside className="flex h-full w-56 shrink-0 flex-col border-r border-border bg-surface">
       <div className="flex h-10 items-center justify-between px-3">
         <span className="text-sm font-semibold">{wsName || 'Nodex'}</span>
       </div>
@@ -18,7 +18,7 @@ export function Sidebar() {
       <div className="px-2 pb-1">
         <button
           onClick={openSearch}
-          className="flex w-full items-center gap-2 rounded-md border border-border bg-background px-2 py-1 text-xs text-muted-foreground hover:bg-muted transition-colors"
+          className="flex w-full items-center gap-2 rounded-md border border-border bg-background px-2 py-1 text-xs text-foreground-secondary hover:bg-foreground/5 transition-colors"
         >
           <Search size={14} />
           <span className="flex-1 text-left">Search...</span>

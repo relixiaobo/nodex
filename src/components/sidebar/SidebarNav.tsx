@@ -43,10 +43,10 @@ export function SidebarNav() {
             className={`flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors ${
               isActive
                 ? 'bg-primary-muted text-primary font-medium'
-                : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                : 'text-foreground-secondary font-medium hover:bg-foreground/5 hover:text-foreground'
             }`}
           >
-            <Icon size={14} strokeWidth={1.75} />
+            <Icon size={14} />
             <span>{item.label}</span>
           </button>
         );

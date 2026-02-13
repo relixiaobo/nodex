@@ -4,86 +4,135 @@
 
 ## 概述
 
-Chrome Side Panel 的核心场景：用户浏览网页时，将内容剪藏为 Nodex 节点。剪藏结果是一个普通节点，通过 Supertag + Field 携带来源元数据。
+Chrome Side Panel 的核心场景：用户浏览网页时，将内容剪藏为 Nodex 节点。剪藏结果是一个普通节点，通过 Supertag + Field 携带来源元数据，并支持 Read Later（正文大纲化）。
 
 ## 核心设计决策
 
 ### 来源 URL 用 Supertag 字段，不用节点属性
 
-**背景**：早期设计在 `NodexNode` 上预留了 `sourceUrl` 顶层属性和 DB `source_url` 列。但这违反了"一切皆节点"的数据模型原则。
+**背景**：早期设计在 `NodexNode` 上预留了 `sourceUrl` 顶层属性和 DB `source_url` 列。但这不属于通用节点属性语义。
 
-**决策**：剪藏 = 创建节点 + 打标签 `#Web Clip`，来源 URL 作为标签的字段值存储。
+**决策**：剪藏 = 创建节点 + 打标签 `#web_clip`，来源 URL 作为标签字段 `Source URL` 存储。
 
 **理由**：
-- `sourceUrl` 不是每个节点的通用属性（不像 `name`/`description`），只有剪藏节点才有
-- 用 Supertag + Field 完全复用现有体系（渲染、编辑、验证、搜索、配置页全免费）
-- 不需要在 DB 加专栏，不需要特殊 UI 组件
-- 未来可在 `#Web Clip` 标签上自由扩展更多元数据字段
+- `sourceUrl` 只对剪藏节点有意义，不是所有节点的通用属性
+- 用 Supertag + Field 可完全复用现有体系（渲染、编辑、验证、搜索、配置页）
+- 后续新增剪藏元数据时，不需要改 Node 顶层 Schema
 
-**对比 `description`**：`description` 是 Tana 原始设计的节点属性（`SYS_A22`），每个节点都可以有，所以作为 `props.description` 是合理的。`sourceUrl` 不属于这个级别。
+**兼容策略**：`NodexNode.sourceUrl` 和 DB `source_url` 先保留，避免一次性迁移风险；V1 剪藏逻辑不再写入，后续单独清理。
 
-**待办**：实现时删除 `NodexNode.sourceUrl` 属性和 DB `source_url` 列（当前无代码使用，仅预留）。
+### 标签体系：`#web_clip` 作为基类，子类型继承
+
+**目标模型**：
+- `#web_clip`：承载剪藏通用字段（如 Source URL）
+- `#article` / `#video` / `#tweet` ...：作为子类型标签，`extend #web_clip`
+
+**现阶段过渡方案（Extend 尚未实现）**：
+- V1 剪藏时同时打两个标签：`#web_clip + #article|#video|#tweet...`
+- 等 Supertag Extend 落地后，收敛为只打子类型标签
+
+### 去重策略：不去重
+
+- 每次剪藏都新建节点
+- 相同 URL 的多次剪藏视为独立记录
+
+### 快照策略：成功不存原始快照，失败样本入池
+
+- 正常剪藏成功：不存完整原始 HTML 快照
+- 解析失败/质量过低：统一记录失败样本，用于后续提取优化
 
 ## 数据模型
 
-### `#Web Clip` Supertag（系统标签）
+### `#web_clip` Supertag（基类标签）
 
 ```
 tagDef_webclip
-  props: { name: 'Web Clip', _docType: 'tagDef' }
+  props: { name: 'web_clip', _docType: 'tagDef' }
   children:
-    - tuple [SYS_A13, tagDef_webclip]     ← 标签绑定（自身）
-    - tuple [attrDef_source_url]           ← 模板字段：Source URL
-    - tuple [attrDef_clip_date]            ← 模板字段：Clip Date（可选）
+    - tuple [SYS_A13, tagDef_webclip]      ← 标签绑定（自身）
+    - tuple [attrDef_source_url]            ← 模板字段：Source URL（必填）
 ```
 
-### 字段定义
+### 子类型标签（继承目标）
+
+```
+tagDef_article    extends #web_clip
+tagDef_video      extends #web_clip
+tagDef_tweet      extends #web_clip
+...
+```
+
+> V1：Extend 未实现，剪藏时通过双标签模拟继承效果。
+
+### 字段定义（V1 极简）
 
 | 字段 | attrDef | 数据类型 | 说明 |
 |------|---------|----------|------|
 | Source URL | `attrDef_source_url` | `SYS_D.URL` | 原始网页地址，必填 |
-| Clip Date | `attrDef_clip_date` | `SYS_D.DATE` | 剪藏时间，auto-initialize = current date |
-| Description | — | `props.description` | 页面摘要，节点自身属性（非字段） |
+| Author | `attrDef_author` | `SYS_D.PLAIN` | 作者（可选） |
+| Published At | `attrDef_published_at` | `SYS_D.DATE` | 发布时间（可选） |
 
-### 剪藏后的节点结构
+### 剪藏后的节点结构（V1）
 
 ```
 clip_node
   props: { name: '页面标题', description: '页面摘要（可选）' }
   _metaNodeId → metanode
     children:
-      - tuple [SYS_A13, tagDef_webclip]    ← 标记为 Web Clip
+      - tuple [SYS_A13, tagDef_webclip]
+      - tuple [SYS_A13, tagDef_article]     ← 示例：按页面类型自动选择
   children:
-    - tuple [attrDef_source_url]           ← Source URL 字段
-    - '剪藏的内容节点...'                    ← 正文内容
-  associationMap:
-    { sourceUrlTupleId: assocData_url }    ← URL 值
+    - tuple [attrDef_source_url]            ← Source URL 字段
+    - tuple [attrDef_author]                ← 可选
+    - tuple [attrDef_published_at]          ← 可选
+    - '剪藏正文内容节点...'                  ← Read Later 大纲
 ```
 
-## 剪藏流程（草案）
+## 剪藏流程（V1 草案）
 
 1. 用户在网页上触发剪藏（Side Panel 按钮 / 右键菜单 / 快捷键）
 2. Content Script 提取页面信息（标题、URL、选中文本/全文）
-3. 发送到 Side Panel（via `chrome.runtime.sendMessage`）
-4. Side Panel 创建节点：
+3. Content Script 发送消息到 Background（`chrome.runtime.sendMessage`）
+4. Background 统一编排创建节点：
    - `name` = 页面标题
-   - `description` = 页面摘要（可选，取 meta description 或 AI 生成）
-   - `applyTag(tagDef_webclip)` → 自动创建 Source URL 字段
-   - 设置 Source URL 字段值 = 当前页面 URL
-   - 正文内容作为子节点
-5. 节点出现在 Inbox 或当前位置
+   - `description` = 页面摘要（可选）
+   - 自动判别类型并打标签：`#web_clip + #article|#video|#tweet...`
+   - `applyTag(tagDef_webclip)` 后设置 `Source URL` 字段值
+   - 设置 `Author` / `Published At`（可选）
+   - 正文内容转为子节点
+5. Background 通知 Side Panel 刷新并定位新节点
+6. 节点默认出现在 Inbox（或用户配置的目标位置）
+
+## 失败样本池（解析优化）
+
+记录条件：
+- 正文提取失败
+- 或提取结果质量低（例如正文为空、过短、噪声过高）
+
+建议记录字段：
+- `url`
+- `title`
+- `errorCode`
+- `parserName`
+- `parserVersion`
+- `capturedAt`
+- `sampleHtml`（可选，截断片段）
 
 ## 待定事项
 
-- 剪藏内容格式：纯文本 / HTML → 多节点树 / Markdown 转换
+- 正文解析实现：`defuddle` / `Readability` / fallback 组合
 - 剪藏模式：全页 / 选中文本 / 简化阅读模式
-- AI 摘要：自动生成 `description`（需 AI Chat 能力）
-- 去重：相同 URL 再次剪藏时合并还是新建
+- 正文落地格式：纯文本块 / HTML 清洗后分块 / Markdown 转换
+- AI 摘要：是否自动写入 `description`
 - 离线队列：无网络时暂存，上线后同步
+- Extend 实现后的迁移策略（双标签 -> 继承）
 
 ## 决策记录
 
 | 日期 | 决策 | 原因 |
 |------|------|------|
-| 2026-02-13 | 来源 URL 用 Supertag 字段，不用 `NodexNode.sourceUrl` | 遵循"一切皆节点"，复用 Field 体系，避免 DB 专栏 |
-| 2026-02-13 | 实现时删除 `sourceUrl` 属性和 `source_url` 列 | 当前无使用，预留设计已被更好方案替代 |
+| 2026-02-13 | 来源 URL 用 Supertag 字段，不用 `NodexNode.sourceUrl` | 遵循"一切皆节点"，复用 Field 体系 |
+| 2026-02-13 | `#web_clip` 作为基类标签，子类型标签继承它 | 语义清晰，便于扩展不同网页类型 |
+| 2026-02-13 | V1 采用双标签方案（`#web_clip + 子类型`） | 当前 Extend 尚未实现，需要可落地过渡方案 |
+| 2026-02-13 | 不做 URL 去重，每次剪藏新建节点 | 保持用户行为可预期，降低实现复杂度 |
+| 2026-02-13 | 成功不存完整原始快照；失败样本统一记录 | 降低存储成本，并为提取优化保留诊断数据 |

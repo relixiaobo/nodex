@@ -1,6 +1,6 @@
 # Nodex Roadmap
 
-> 最后更新: 2026-02-13
+> 最后更新: 2026-02-14
 
 ## 已完成
 
@@ -22,17 +22,21 @@
 - References 增强 — 反向链接、引用计数、合并节点
 - Supertags 完善 — Checkbox, Default Child, Color, 继承等
 - Fields 全类型 — Options, Date, Number, URL, Email, Checkbox 等
-- Date 节点 & 日记 — 年/月/周/日层级、Today 入口
+- Date 节点 & 日记 — 年/周/日层级、Today 入口
+- 节点选中基础 — Escape 退出编辑→选中、选中导航
+- Slash Command Menu — `/` 斜杠命令菜单
+- Floating Toolbar — 选中文本浮动格式工具栏
 
-### Phase 2: 视图 & 搜索
+### Phase 2: 搜索 & 操作增强
+- 节点多选 & 批量操作 — Cmd+Click、Shift+Click、批量删除/缩进
+- 撤销与重做 — 节点操作撤销栈、三层优先级统一
 - Search Nodes / Live Queries
+
+### Phase 3: 视图 & AI & 网页
 - Table View — 表格视图
 - Filter / Group / Sort 工具栏
 - Cards View — 卡片视图
-- Calendar View — 日历视图
-- List & Tabs View
-
-### Phase 3: AI & 网页
+- Calendar View — 日历视图（依赖日期节点）
 - AI Chat — Side Panel 内 AI 对话
 - 网页剪藏
 - 网页 AI 辅助
@@ -40,6 +44,7 @@
 - AI 字段增强 — AttrDef Config 扩展
 
 ### Phase 4: 同步 & 可靠性
+- 用户认证 — Google 登录（上线前必需）
 - Supabase 实时同步
 - 离线模式增强
 - 导入/导出
@@ -54,7 +59,9 @@
 
 | 文档 | 内容 |
 |------|------|
+| `docs/features/data-model.md` | **数据模型权威参考**（节点结构、三大间接层、DB 映射） |
 | `docs/features/*.md` | 特性行为规格（实现时的权威参考） |
+| `docs/supabase-setup.md` | Supabase 部署配置指南（环境变量、RLS、Auth、Realtime） |
 | `docs/issues.md` | Bug 跟踪 + 功能工作项 |
 | `docs/research/` | Tana 逆向分析 |
 | `docs/design-system.md` | UI 视觉标准 |

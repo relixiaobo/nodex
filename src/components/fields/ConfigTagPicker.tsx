@@ -4,7 +4,7 @@
  * Maps workspace tags to NodePicker and calls setConfigValue on selection.
  * Used by both attrDef (SOURCE_SUPERTAG) and tagDef (CHILD_SUPERTAG) config fields.
  */
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useNodeStore } from '../../stores/node-store';
 import { useWorkspaceStore } from '../../stores/workspace-store';
 import { useWorkspaceTags } from '../../hooks/use-workspace-tags';
@@ -17,7 +17,8 @@ interface ConfigTagPickerProps {
 }
 
 export function ConfigTagPicker({ tupleId, fieldKey, currentValue }: ConfigTagPickerProps) {
-  const tags = useWorkspaceTags();
+  const rawTags = useWorkspaceTags();
+  const tags = useMemo(() => rawTags.map((t) => ({ ...t, isTagDef: true as const })), [rawTags]);
   const setConfigValue = useNodeStore((s) => s.setConfigValue);
   const userId = useWorkspaceStore((s) => s.userId) ?? 'local';
 

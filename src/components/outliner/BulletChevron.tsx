@@ -6,6 +6,8 @@ interface BulletChevronProps {
   dimmed?: boolean;
   /** Reference node: show concentric circles (bullseye) bullet */
   isReference?: boolean;
+  /** TagDef color: renders colored circle with white # instead of plain dot */
+  tagDefColor?: string;
 }
 
 /**
@@ -24,8 +26,28 @@ export function BulletChevron({
   onBulletClick,
   dimmed,
   isReference,
+  tagDefColor,
 }: BulletChevronProps) {
   const showOuterRing = hasChildren && !isExpanded;
+
+  // TagDef bullet: colored circle with white #
+  if (tagDefColor) {
+    return (
+      <span
+        role="button"
+        className="flex shrink-0 h-[21px] w-[15px] items-center justify-center cursor-pointer group/bullet"
+        onClick={onBulletClick}
+        title="Zoom in"
+      >
+        <div
+          className="flex h-[13px] w-[13px] items-center justify-center rounded-full transition-transform group-hover/bullet:scale-110 group-active/bullet:scale-90"
+          style={{ backgroundColor: tagDefColor }}
+        >
+          <span className="text-[9px] font-bold leading-none text-white select-none">#</span>
+        </div>
+      </span>
+    );
+  }
 
   return (
     <span

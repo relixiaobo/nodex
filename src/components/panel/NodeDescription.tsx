@@ -106,7 +106,7 @@ export function NodeDescription({ nodeId }: NodeDescriptionProps) {
       ref={editing ? descRef : undefined}
       contentEditable={editing}
       suppressContentEditableWarning
-      className={`text-xs leading-tight text-foreground-tertiary mt-1 cursor-text ${editing ? 'outline-none min-h-4' : ''}`}
+      className={`text-xs leading-[15px] min-h-[15px] text-foreground-tertiary mt-1 cursor-text ${editing ? 'outline-none' : ''}`}
       onMouseDown={!editing ? handleMouseDown : undefined}
       onBlur={editing ? handleBlur : undefined}
       onKeyDown={editing ? handleKeyDown : undefined}

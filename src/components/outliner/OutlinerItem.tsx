@@ -169,6 +169,16 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     [visibleChildren, fieldMap],
   );
   const [revealedFieldIds, setRevealedFieldIds] = useState<Set<string>>(() => new Set());
+  // If the last visible child is a field, keep a trailing blank input after fields.
+  // This allows direct typing a new content node without first creating it manually.
+  const lastRenderableChild = useMemo(() => {
+    for (let i = visibleChildren.length - 1; i >= 0; i--) {
+      const child = visibleChildren[i];
+      if (!child.hidden || revealedFieldIds.has(child.id)) return child;
+    }
+    return null;
+  }, [visibleChildren, revealedFieldIds]);
+  const shouldShowTrailingInput = !lastRenderableChild || lastRenderableChild.type === 'field';
   const isFocused = focusedNodeId === nodeId &&
     (focusedParentId === null || focusedParentId === parentId);
   const hasTags = tagIds.length > 0;
@@ -530,13 +540,31 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
 
       if (currentlyExpanded && currentHasChildren) {
         // Expanded with children → new node becomes first child (position 0)
-        createChild(nodeId, wsId, userId, afterContent ?? '', 0).then((newNode) => {
-          setFocusedNode(newNode.id, nodeId);
+        const beforeIds = new Set(useNodeStore.getState().entities[nodeId]?.children ?? []);
+        const createPromise = createChild(nodeId, wsId, userId, afterContent ?? '', 0);
+
+        const optimisticIds = useNodeStore.getState().entities[nodeId]?.children ?? [];
+        const optimisticNewId = optimisticIds.find((cid) => !beforeIds.has(cid));
+        if (optimisticNewId) setFocusedNode(optimisticNewId, nodeId);
+
+        createPromise.then((newNode) => {
+          if (useNodeStore.getState().entities[newNode.id]) {
+            setFocusedNode(newNode.id, nodeId);
+          }
         });
       } else {
         // Collapsed or leaf → create sibling after this node
-        createSibling(nodeId, wsId, userId, afterContent).then((newNode) => {
-          setFocusedNode(newNode.id, parentId);
+        const beforeIds = new Set(useNodeStore.getState().entities[parentId]?.children ?? []);
+        const createPromise = createSibling(nodeId, wsId, userId, afterContent);
+
+        const optimisticIds = useNodeStore.getState().entities[parentId]?.children ?? [];
+        const optimisticNewId = optimisticIds.find((cid) => !beforeIds.has(cid));
+        if (optimisticNewId) setFocusedNode(optimisticNewId, parentId);
+
+        createPromise.then((newNode) => {
+          if (useNodeStore.getState().entities[newNode.id]) {
+            setFocusedNode(newNode.id, parentId);
+          }
         });
       }
     },
@@ -1074,7 +1102,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
               ref={editingDescription ? descriptionRef : undefined}
               contentEditable={editingDescription}
               suppressContentEditableWarning
-              className={`text-xs leading-tight text-foreground-tertiary cursor-text ${editingDescription ? 'outline-none min-h-4' : ''}`}
+              className={`text-xs leading-[15px] min-h-[15px] text-foreground-tertiary cursor-text ${editingDescription ? 'outline-none' : ''}`}
               onMouseDown={!editingDescription ? handleDescriptionMouseDown : undefined}
               onBlur={editingDescription ? handleDescriptionBlur : undefined}
               onKeyDown={editingDescription ? handleDescriptionKeyDown : undefined}
@@ -1226,11 +1254,11 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
               />
             );
           })}
-          {visibleChildren.length === 0 && (
+          {shouldShowTrailingInput && (
             <TrailingInput
               parentId={nodeId}
               depth={depth + 1}
-              autoFocus
+              autoFocus={!lastRenderableChild}
               parentExpandKey={expandKey}
             />
           )}
@@ -1279,4 +1307,3 @@ function getTextOffsetFromPoint(container: HTMLElement, clientX: number, clientY
     return null;
   }
 }
-

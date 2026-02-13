@@ -313,7 +313,7 @@ export const useNodeStore = create<NodeStore>()(
           { id, workspaceId, props: { created: now, name: name ?? '', _ownerId: parentId } },
           userId,
         );
-        await nodeService.addChild(parentId, id, userId);
+        await nodeService.addChild(parentId, id, userId, position);
 
         set((state) => {
           state.entities[node.id] = node;

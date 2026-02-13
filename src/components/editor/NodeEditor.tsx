@@ -336,6 +336,10 @@ export function NodeEditor({
             callbacksRef.current.onDescriptionEdit();
             return true;
           },
+          'Ctrl-i': () => {
+            callbacksRef.current.onDescriptionEdit();
+            return true;
+          },
         };
       },
     }),

@@ -109,13 +109,27 @@
    has a rendering bug where the native caret is invisible inside inline marks
    (<code>, <mark>) when the contenteditable element has display:inline. */
 .editor-inline,
-.editor-inline > div,
-.editor-inline .tiptap p {
+.editor-inline > div {
   display: inline;
 }
 
 .editor-inline .tiptap {
   display: inline-block;
+  caret-color: currentColor;
+}
+
+/* Keep paragraph inline with tags while avoiding empty-node double-height.
+   ProseMirror uses <br class="ProseMirror-trailingBreak"> for empty lines; when
+   paragraph is inline this <br> introduces an extra visual line in our row layout. */
+.editor-inline .tiptap p {
+  display: inline-block;
+  margin: 0;
+  min-width: 1px;
+  vertical-align: top;
+}
+
+.editor-inline .tiptap p > br.ProseMirror-trailingBreak:only-child {
+  display: none;
 }
 
 /* Override placeholder float for inline mode —

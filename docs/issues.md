@@ -3,7 +3,7 @@
 - [x] node reference 在原节点编辑的时候，没有实时更新，需要等我焦点离开原节点才会更新
 - [x] 新建 node 之后，如果不输入文本，node 就会显示暗文本"untitled"，不需要显示暗文本，保持节点的空白状态即可
 - [x] 带有行内引用的节点，在点击变成编辑模式之后，行内引用会变成 "Untitled"
-- [ ] Field 每个类型的配置项是不同的，现在可能有些配置项对于某些type是多余或者不合适的，需要检查
+- [x] Field 每个类型的配置项是不同的，现在可能有些配置项对于某些type是多余或者不合适的，需要检查（已验证：appliesTo 分类正确，无多余配置项；缺失的 Number Min/Max、Options from Supertag picker、Auto-initialize 6 策略已在 ROADMAP 中跟踪）
 - [x] 当 options type 的 field node 的 value 本质上也是 outliner，跟 plain 格式的一样，只是这个值可以从 预置选项中选取而已，所以也应该在其中输入任何值，包括 输入 > 将这个 value 的 node 转换为 field node
 - [x] supertag 总是 Schema node 的 child node，但是 field node 并不属于 Schema node，而是在哪个node 下面创建的，就属于哪个 node
 - [x] 检查所有的 outliner 部分的逻辑是否一致，我看到 plain field node value 操作有些跟 在普通节点中的操作有些小差异

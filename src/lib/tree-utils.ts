@@ -21,6 +21,16 @@ export function isWorkspaceRoot(nodeId: string, entities: Record<string, NodexNo
   return !!node && node.id === node.workspaceId && !node.props._ownerId;
 }
 
+// ─── Structural node detection ───
+
+/** Structural doc types that are not meaningful navigation targets. */
+const STRUCTURAL_DOC_TYPES = new Set(['tuple', 'metanode', 'associatedData']);
+
+/** Check if a node is a structural node (tuple/metanode/associatedData). */
+function isStructuralNode(node: NodexNode): boolean {
+  return !!node.props._docType && STRUCTURAL_DOC_TYPES.has(node.props._docType);
+}
+
 // ─── Ancestor chain for breadcrumb navigation ───
 
 export interface AncestorInfo {
@@ -33,6 +43,9 @@ export interface AncestorInfo {
  * Returns ancestors ordered root-most → immediate parent (top to bottom).
  * Containers are included as normal ancestors. The workspace root is recorded
  * separately as `workspaceRootId`.
+ *
+ * Structural nodes (tuple, metanode, associatedData) are skipped — they are
+ * not meaningful navigation targets.
  */
 export function getAncestorChain(
   nodeId: string,
@@ -60,6 +73,12 @@ export function getAncestorChain(
     const parentNode = entities[parentId];
     if (!parentNode) break;
 
+    // Skip structural nodes (tuple/metanode/associatedData) — continue walking up
+    if (isStructuralNode(parentNode)) {
+      currentId = parentId;
+      continue;
+    }
+
     // Add parent to chain (will be reversed later) — containers included
     const rawName = parentNode.props.name ?? '';
     const displayName = rawName.replace(/<[^>]+>/g, '') || parentId;
@@ -69,6 +88,38 @@ export function getAncestorChain(
   }
 
   return { ancestors: chain.reverse(), workspaceRootId };
+}
+
+/**
+ * Find the first navigable (non-structural) parent of a node.
+ * Skips tuple, metanode, and associatedData nodes.
+ */
+export function getNavigableParentId(
+  nodeId: string,
+  entities: Record<string, NodexNode>,
+): string | null {
+  let currentId = nodeId;
+  const visited = new Set<string>();
+
+  while (true) {
+    const node = entities[currentId];
+    if (!node) return null;
+
+    const parentId = node.props._ownerId;
+    if (!parentId || visited.has(parentId)) return null;
+    visited.add(parentId);
+
+    const parentNode = entities[parentId];
+    if (!parentNode) return null;
+
+    // Skip structural nodes
+    if (isStructuralNode(parentNode)) {
+      currentId = parentId;
+      continue;
+    }
+
+    return parentId;
+  }
 }
 
 /**

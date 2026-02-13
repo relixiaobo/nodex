@@ -602,6 +602,8 @@ function InlineTimeInput({ value, onChange }: { value: string; onChange: (v: str
   const [hours, setHours] = useState(parsed.hours12);
   const [minutes, setMinutes] = useState(parsed.minutes);
   const [period, setPeriod] = useState<'AM' | 'PM'>(parsed.period);
+  const hoursRef = useRef<HTMLInputElement>(null);
+  const minutesRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const p = parse24to12(value);
@@ -611,84 +613,134 @@ function InlineTimeInput({ value, onChange }: { value: string; onChange: (v: str
   }, [value]);
 
   const commit = useCallback((h: string, m: string, p: 'AM' | 'PM') => {
-    if (h === '--' || m === '--') return;
-    onChange(build24from12(h, m, p));
+    const hNum = parseInt(h, 10);
+    const mNum = parseInt(m, 10);
+    if (isNaN(hNum) || isNaN(mNum)) return;
+    onChange(build24from12(String(hNum).padStart(2, '0'), String(mNum).padStart(2, '0'), p));
   }, [onChange]);
 
-  const handleHoursChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const raw = e.target.value.replace(/\D/g, '');
-    if (raw.length > 2) return;
-    const num = parseInt(raw, 10);
-    if (raw && (num < 1 || num > 12)) return;
-    const val = raw || '--';
-    setHours(val);
-    if (raw.length === 2 && !isNaN(num)) commit(val.padStart(2, '0'), minutes === '--' ? '00' : minutes, period);
-  }, [minutes, period, commit]);
+  // Block all non-digit input via onKeyDown; manage value ourselves
+  const makeKeyHandler = useCallback((
+    field: 'hours' | 'minutes',
+    val: string,
+    setVal: (v: string) => void,
+    max: number,
+    min: number,
+  ) => (e: React.KeyboardEvent<HTMLInputElement>) => {
+    // Allow navigation keys
+    if (['Tab', 'ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) return;
 
-  const handleMinutesChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const raw = e.target.value.replace(/\D/g, '');
-    if (raw.length > 2) return;
-    const num = parseInt(raw, 10);
-    if (raw && num > 59) return;
-    const val = raw || '--';
-    setMinutes(val);
-    if (raw.length === 2 && !isNaN(num)) commit(hours === '--' ? '12' : hours, val.padStart(2, '0'), period);
-  }, [hours, period, commit]);
+    e.preventDefault(); // block all other default input
+
+    if (e.key === 'Backspace') {
+      if (val.length > 0) {
+        const next = val.slice(0, -1);
+        setVal(next);
+      }
+      return;
+    }
+
+    if (!/^\d$/.test(e.key)) return; // only digits allowed
+
+    // Build candidate value
+    const candidate = val.length >= 2 ? e.key : val + e.key; // replace if already 2 digits
+    const num = parseInt(candidate, 10);
+
+    // Validate range
+    if (num > max) return; // reject out-of-range
+    if (candidate.length === 2 && num < min) return; // reject completed value below min
+
+    setVal(candidate);
+
+    // Auto-commit and advance when 2 digits entered
+    if (candidate.length === 2) {
+      const padded = candidate.padStart(2, '0');
+      if (field === 'hours') {
+        commit(padded, minutes.length === 2 ? minutes : '00', period);
+        // Auto-advance to minutes
+        requestAnimationFrame(() => { minutesRef.current?.focus(); minutesRef.current?.select(); });
+      } else {
+        commit(hours.length === 2 ? hours : '12', padded, period);
+      }
+    }
+  }, [hours, minutes, period, commit]);
+
+  const handleHoursKey = useMemo(
+    () => makeKeyHandler('hours', hours, setHours, 12, 1),
+    [makeKeyHandler, hours],
+  );
+  const handleMinutesKey = useMemo(
+    () => makeKeyHandler('minutes', minutes, setMinutes, 59, 0),
+    [makeKeyHandler, minutes],
+  );
 
   const handleHoursBlur = useCallback(() => {
-    if (hours !== '--' && hours.length === 1) {
+    if (hours.length === 1) {
       const padded = hours.padStart(2, '0');
-      setHours(padded);
-      commit(padded, minutes === '--' ? '00' : minutes, period);
+      const num = parseInt(padded, 10);
+      if (num >= 1 && num <= 12) {
+        setHours(padded);
+        commit(padded, minutes.length === 2 ? minutes : '00', period);
+      } else {
+        setHours('12'); // fallback
+        commit('12', minutes.length === 2 ? minutes : '00', period);
+      }
+    } else if (hours.length === 0) {
+      // Restore to parsed default
+      setHours(parsed.hours12);
     }
-  }, [hours, minutes, period, commit]);
+  }, [hours, minutes, period, parsed.hours12, commit]);
 
   const handleMinutesBlur = useCallback(() => {
-    if (minutes !== '--' && minutes.length === 1) {
+    if (minutes.length === 1) {
       const padded = minutes.padStart(2, '0');
       setMinutes(padded);
-      commit(hours === '--' ? '12' : hours, padded, period);
+      commit(hours.length === 2 ? hours : '12', padded, period);
+    } else if (minutes.length === 0) {
+      setMinutes(parsed.minutes);
     }
-  }, [hours, minutes, period, commit]);
+  }, [hours, minutes, period, parsed.minutes, commit]);
 
   const togglePeriod = useCallback(() => {
     const newPeriod = period === 'AM' ? 'PM' : 'AM';
     setPeriod(newPeriod);
-    if (hours !== '--' && minutes !== '--') {
-      commit(hours, minutes, newPeriod);
-    }
+    const h = hours.length === 2 ? hours : '12';
+    const m = minutes.length === 2 ? minutes : '00';
+    commit(h, m, newPeriod);
   }, [hours, minutes, period, commit]);
 
-  const handleHoursFocus = useCallback((e: React.FocusEvent<HTMLInputElement>) => {
-    if (hours === '--') setHours('');
+  const handleFocus = useCallback((e: React.FocusEvent<HTMLInputElement>) => {
     e.target.select();
-  }, [hours]);
+  }, []);
 
-  const handleMinutesFocus = useCallback((e: React.FocusEvent<HTMLInputElement>) => {
-    if (minutes === '--') setMinutes('');
-    e.target.select();
-  }, [minutes]);
+  // Display: show value or placeholder
+  const hoursDisplay = hours || '--';
+  const minutesDisplay = minutes || '--';
 
   return (
     <span className="inline-flex items-center text-sm text-foreground">
       <input
+        ref={hoursRef}
         type="text"
-        value={hours}
-        onChange={handleHoursChange}
-        onFocus={handleHoursFocus}
+        inputMode="numeric"
+        value={hoursDisplay}
+        onChange={() => {}} // controlled via onKeyDown
+        onKeyDown={handleHoursKey}
+        onFocus={handleFocus}
         onBlur={handleHoursBlur}
-        className="w-[18px] text-right bg-transparent outline-none text-sm"
-        maxLength={2}
+        className={`w-[18px] text-right bg-transparent outline-none text-sm ${hours ? '' : 'text-foreground-tertiary'}`}
       />
       <span className="text-foreground-tertiary">:</span>
       <input
+        ref={minutesRef}
         type="text"
-        value={minutes}
-        onChange={handleMinutesChange}
-        onFocus={handleMinutesFocus}
+        inputMode="numeric"
+        value={minutesDisplay}
+        onChange={() => {}} // controlled via onKeyDown
+        onKeyDown={handleMinutesKey}
+        onFocus={handleFocus}
         onBlur={handleMinutesBlur}
-        className="w-[18px] bg-transparent outline-none text-sm"
-        maxLength={2}
+        className={`w-[18px] bg-transparent outline-none text-sm ${minutes ? '' : 'text-foreground-tertiary'}`}
       />
       <button
         className="w-[26px] text-xs font-medium text-foreground-secondary hover:text-foreground transition-colors cursor-pointer text-center"

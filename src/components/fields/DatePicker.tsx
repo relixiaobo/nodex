@@ -314,6 +314,7 @@ export function DatePicker({ value, onSelect, onClose }: DatePickerProps) {
       // Turn ON
       setIncludeEnd(true);
       setEndDate(selectedDate || today);
+      if (includeTime && !endTime) setEndTime('09:00');
       setEditingEnd('end');
     } else {
       // Turn OFF
@@ -323,7 +324,7 @@ export function DatePicker({ value, onSelect, onClose }: DatePickerProps) {
       setEditingEnd('start');
       setHoveredDate('');
     }
-  }, [includeEnd, selectedDate, today]);
+  }, [includeEnd, includeTime, endTime, selectedDate, today]);
 
   // Toggle include time
   const toggleTime = useCallback(() => {
@@ -500,7 +501,7 @@ function DateInputField({
         <>
           <span className="text-border-emphasis select-none">|</span>
           <span
-            className="px-2 py-1.5"
+            className="pl-1.5 pr-1 py-1.5"
             onClick={(e) => e.stopPropagation()}
           >
             <InlineTimeInput value={timeStr} onChange={onTimeChange} />
@@ -586,30 +587,28 @@ function InlineTimeInput({ value, onChange }: { value: string; onChange: (v: str
   }, [minutes]);
 
   return (
-    <span className="inline-flex items-center gap-0.5 text-sm">
-      <span className="inline-flex items-center rounded-md border border-border px-1 py-px bg-transparent">
-        <input
-          type="text"
-          value={hours}
-          onChange={handleHoursChange}
-          onFocus={handleHoursFocus}
-          onBlur={handleHoursBlur}
-          className="w-4 text-center bg-transparent outline-none text-xs text-foreground"
-          maxLength={2}
-        />
-        <span className="text-foreground-tertiary text-xs">:</span>
-        <input
-          type="text"
-          value={minutes}
-          onChange={handleMinutesChange}
-          onFocus={handleMinutesFocus}
-          onBlur={handleMinutesBlur}
-          className="w-4 text-center bg-transparent outline-none text-xs text-foreground"
-          maxLength={2}
-        />
-      </span>
+    <span className="inline-flex items-center text-sm text-foreground">
+      <input
+        type="text"
+        value={hours}
+        onChange={handleHoursChange}
+        onFocus={handleHoursFocus}
+        onBlur={handleHoursBlur}
+        className="w-[18px] text-right bg-transparent outline-none text-sm"
+        maxLength={2}
+      />
+      <span className="text-foreground-tertiary">:</span>
+      <input
+        type="text"
+        value={minutes}
+        onChange={handleMinutesChange}
+        onFocus={handleMinutesFocus}
+        onBlur={handleMinutesBlur}
+        className="w-[18px] bg-transparent outline-none text-sm"
+        maxLength={2}
+      />
       <button
-        className="text-xs font-medium text-foreground-secondary hover:text-foreground transition-colors cursor-pointer px-0.5"
+        className="w-[26px] text-xs font-medium text-foreground-secondary hover:text-foreground transition-colors cursor-pointer text-center"
         onClick={(e) => { e.stopPropagation(); togglePeriod(); }}
       >
         {period}

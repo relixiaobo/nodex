@@ -19,6 +19,7 @@ import StarterKit from '@tiptap/starter-kit';
 import Highlight from '@tiptap/extension-highlight';
 import { DOMSerializer } from '@tiptap/pm/model';
 import { useNodeStore } from '../../stores/node-store';
+import { useUIStore } from '../../stores/ui-store';
 import { useWorkspaceStore } from '../../stores/workspace-store';
 import { HashTagExtension, type HashTagCallbacks } from './HashTagExtension';
 import { FieldTriggerExtension, type FieldTriggerCallbacks } from './FieldTriggerExtension';
@@ -385,7 +386,22 @@ export function NodeEditor({
   useLayoutEffect(() => {
     if (editor && !editor.isDestroyed) {
       savedRef.current = false;
-      editor.commands.focus('end');
+
+      // If the user clicked on text to focus this node, position cursor at the
+      // click point rather than defaulting to the end. Uses ProseMirror's
+      // posAtCoords to map screen coordinates → document position.
+      const coords = useUIStore.getState().focusClickCoords;
+      if (coords) {
+        useUIStore.getState().setFocusClickCoords(null);
+        editor.commands.focus();
+        const pos = editor.view.posAtCoords({ left: coords.x, top: coords.y });
+        if (pos) {
+          editor.commands.setTextSelection(pos.pos);
+        }
+      } else {
+        editor.commands.focus('end');
+      }
+
       if (editorRef) editorRef.current = editor;
     }
     return () => {

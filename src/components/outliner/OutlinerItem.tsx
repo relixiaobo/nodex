@@ -304,6 +304,8 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     if (isReference) {
       setSelectedNode(nodeId, parentId);
     } else {
+      // Store click coordinates so NodeEditor can position cursor at click point
+      useUIStore.getState().setFocusClickCoords({ x: e.clientX, y: e.clientY });
       setFocusedNode(nodeId, parentId);
     }
   }, [nodeId, parentId, isReference, setFocusedNode, setSelectedNode, navigateTo]);

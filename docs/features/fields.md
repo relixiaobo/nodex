@@ -133,13 +133,19 @@
 
 - 根据 attrDef "Hide field" 配置 + 当前值状态：
   - **Never**: 始终显示（默认）
-  - **When empty**: 值为空时隐藏，hover 节点子树区域时以 50% 透明度淡入
-  - **When not empty**: 有值时隐藏，hover 时同样淡入
+  - **When empty**: 值为空时隐藏
+  - **When not empty**: 有值时隐藏
   - **When value is default**: 待实现（需要 auto-initialize default 值概念）
-  - **Always**: 始终隐藏，即使 hover 也不显示
+  - **Always**: 始终隐藏
 - 实现方式：`resolveHideField()` 读取 attrDef 的 `NDX_A01` 配置 Tuple
 - 空值判定：assocData 无内容子节点 = 空（通过 `isEmpty` 字段传递）
-- **click-to-reveal（Tana 风格 pill）**：隐藏字段显示为紧凑的 `+ FieldName` pill 按钮行，点击临时展开为完整 FieldRow，离开节点后恢复隐藏（transient React state）
+- **click-to-reveal（Tana 风格 pill）**：
+  - 所有隐藏字段（含 Always）显示为紧凑的 `+ FieldName` pill 按钮行
+  - pill `+` icon 与同级 BulletChevron 精确对齐（15px 居中容器）
+  - pill 之间 `gap-x-3`(12px)，pill 内 `gap-0.5`(2px)，近邻性原则分组
+  - hover 仅文字颜色 `tertiary → secondary`，无背景色
+  - 点击临时展开为完整 FieldRow，离开节点后恢复隐藏（transient React state）
+  - OutlinerItem（内联）和 OutlinerView（zoom-in）两处一致
 
 ### Required 字段 — 已实现
 
@@ -201,6 +207,7 @@
 | 2026-02-12 | **统一值渲染器**：所有字段类型值区域 = FieldValueOutliner | 数据模型层面值永远是 assocData.children[]，dataType 只决定值节点的输入方式和显示格式，不改变底层结构。替代当前 3 渲染器分发 |
 | 2026-02-12 | Checkbox 统一：OutlinerItem 支持 fieldDataType prop | Checkbox 值节点渲染为 toggle 而非编辑器，FieldValueEditor 变为死代码 |
 | 2026-02-13 | DatePicker 重写为 Notion 风格 | 自定义日历 + masked input + Toggle 控制范围/时间 + 即时保存，替代浏览器原生 date input |
+| 2026-02-13 | 隐藏字段改为 pill click-to-reveal（替代 hover-to-reveal） | Tana 风格：`+ FieldName` 紧凑按钮，点击临时显示。所有隐藏模式（含 Always）都出现 pill |
 
 ## 当前状态
 
@@ -221,7 +228,7 @@
 - [x] Options 自动补全（TrailingInput 集成，输入时下拉匹配预置/auto-collected 选项，Enter 添加引用）
 - [ ] Options from Supertag（独立类型）
 - [ ] Tana User 类型
-- [x] 字段隐藏规则运行时（4/5 种模式：Never/When empty/When not empty/Always + hover-to-reveal）
+- [x] 字段隐藏规则运行时（4/5 种模式：Never/When empty/When not empty/Always + pill click-to-reveal）
 - [x] Required 字段视觉提示（红色 * 号）
 - [ ] Auto-initialize（6 种策略）
 - [ ] Pinned fields

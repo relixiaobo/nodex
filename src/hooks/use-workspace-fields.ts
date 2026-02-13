@@ -6,7 +6,7 @@
  */
 import { useMemo } from 'react';
 import { useNodeStore } from '../stores/node-store';
-import { resolveDataType } from '../lib/field-utils.js';
+import { resolveDataType, SYSTEM_FIELD_ENTRIES } from '../lib/field-utils.js';
 
 const EMPTY = '[]';
 
@@ -22,8 +22,10 @@ export function useWorkspaceFields(): Array<{ id: string; name: string; dataType
         });
       }
     }
-    if (fields.length === 0) return EMPTY;
     fields.sort((a, b) => a.name.localeCompare(b.name));
+    // Append system fields after user-defined fields
+    fields.push(...SYSTEM_FIELD_ENTRIES);
+    if (fields.length === 0) return EMPTY;
     return JSON.stringify(fields);
   });
 

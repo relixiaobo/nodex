@@ -23,7 +23,7 @@ import { Trash2 } from 'lucide-react';
 import { useNodeStore } from '../../stores/node-store';
 import { useUIStore } from '../../stores/ui-store';
 import { useWorkspaceStore } from '../../stores/workspace-store';
-import { getFieldTypeIcon, ATTRDEF_CONFIG_MAP, TAGDEF_CONFIG_MAP, resolveMinValue, resolveMaxValue } from '../../lib/field-utils.js';
+import { getFieldTypeIcon, ATTRDEF_CONFIG_MAP, TAGDEF_CONFIG_MAP, resolveMinValue, resolveMaxValue, SYSTEM_FIELD_MAP } from '../../lib/field-utils.js';
 import { FieldValueOutliner } from './FieldValueOutliner';
 import { FieldNameInput } from './FieldNameInput';
 import { FieldTypePicker } from './FieldTypePicker';
@@ -62,6 +62,7 @@ export function FieldRow({
   attrDefId,
   attrDefName,
   tupleId,
+  valueNodeId,
   valueName,
   dataType,
   assocDataId,
@@ -80,6 +81,7 @@ export function FieldRow({
   const userId = useWorkspaceStore((s) => s.userId);
   const clickOffsetXRef = useRef<number | undefined>(undefined);
 
+  const isSystemField = dataType === '__system_date__' || dataType === '__system_text__' || dataType === '__system_node__';
   const isTypeChoice = dataType === '__type_choice__';
   const isToggle = dataType === '__toggle__';
   const isSelect = dataType === '__select__';
@@ -138,6 +140,42 @@ export function FieldRow({
     clickOffsetXRef.current = e.clientX - rect.left;
     setEditingFieldName(tupleId);
   }, [tupleId, setEditingFieldName]);
+
+  // System fields: read-only, auto-derived from node metadata
+  if (isSystemField) {
+    const sysFieldDef = SYSTEM_FIELD_MAP.get(attrDefId);
+    const SysIcon = sysFieldDef?.icon;
+    const displayText = valueName || '—';
+    return (
+      <div className={`border-t ${isLastInGroup ? 'border-b' : ''} border-border-subtle flex flex-col @sm:flex-row @sm:items-start min-h-[28px]`} data-field-row>
+        {/* Name column */}
+        <div className="flex items-center gap-1 @sm:shrink-0 @sm:w-[130px] min-w-0 h-7 py-1">
+          <span className="shrink-0 w-[15px] flex items-center justify-center text-foreground-tertiary">
+            {SysIcon && <SysIcon size={12} />}
+          </span>
+          <span className="block text-sm leading-[22px] h-[22px] text-foreground-tertiary truncate" title={attrDefName}>
+            {attrDefName}
+          </span>
+        </div>
+        {/* Value column */}
+        <div className="flex flex-1 min-w-0 items-center min-h-7 py-1" data-field-value>
+          {dataType === '__system_node__' && valueNodeId ? (
+            <button
+              className="text-sm leading-[22px] text-foreground-tertiary hover:text-foreground-secondary cursor-pointer truncate"
+              onClick={() => navigateTo(valueNodeId)}
+              title={`Navigate to ${displayText}`}
+            >
+              {displayText}
+            </button>
+          ) : (
+            <span className="text-sm leading-[22px] text-foreground-tertiary truncate">
+              {displayText}
+            </span>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   // Config fields: name+description on left, control on right (items-start for multi-line)
   if (isConfigField) {

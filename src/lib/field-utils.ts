@@ -2,7 +2,7 @@
  * Shared field utilities: data type resolution and icon mapping.
  */
 import type { LucideIcon } from 'lucide-react';
-import { AlignLeft, Calendar, CheckSquare, ChevronDown, FileText, Hash, Link, List, ListTree, Mail, Play, Asterisk, EyeOff, Settings2, Sparkles } from 'lucide-react';
+import { AlignLeft, Building2, Calendar, CalendarCheck, CalendarClock, CalendarPlus, CheckSquare, ChevronDown, FileText, Hash, Link, List, ListTree, Mail, Play, Asterisk, EyeOff, Settings2, SquareUser, Sparkles, Tag, UserPen } from 'lucide-react';
 import { SYS_A, SYS_D, SYS_V } from '../types/index.js';
 import type { NodexNode } from '../types/index.js';
 
@@ -352,3 +352,103 @@ export const TAGDEF_CONFIG_MAP = new Map(
 /** Outliner-type config fields for tagDef (virtual entries — no backing tuple). */
 export const TAGDEF_OUTLINER_FIELDS = TAGDEF_CONFIG_FIELDS
   .filter(f => f.control === 'outliner');
+
+// ─── System Fields (read-only, auto-derived from node metadata) ───
+
+export interface SystemFieldDef {
+  key: string;
+  name: string;
+  source: string;
+  dataType: '__system_date__' | '__system_text__' | '__system_node__';
+  icon: LucideIcon;
+}
+
+/** 8 system fields available for Nodex. Key = NDX_SYS_* stored in tuple children[0]. */
+export const SYSTEM_FIELDS: SystemFieldDef[] = [
+  { key: 'NDX_SYS_DESCRIPTION', name: 'Node description', source: 'props.description', dataType: '__system_text__', icon: FileText },
+  { key: 'NDX_SYS_CREATED', name: 'Created time', source: 'props.created', dataType: '__system_date__', icon: CalendarPlus },
+  { key: 'NDX_SYS_LAST_EDITED', name: 'Last edited time', source: 'updatedAt', dataType: '__system_date__', icon: CalendarClock },
+  { key: 'NDX_SYS_LAST_EDITED_BY', name: 'Last edited by', source: 'updatedBy', dataType: '__system_text__', icon: UserPen },
+  { key: 'NDX_SYS_OWNER', name: 'Owner node', source: 'props._ownerId', dataType: '__system_node__', icon: SquareUser },
+  { key: 'NDX_SYS_TAGS', name: 'Tags', source: 'metanode', dataType: '__system_text__', icon: Tag },
+  { key: 'NDX_SYS_WORKSPACE', name: 'Workspace', source: 'workspaceId', dataType: '__system_text__', icon: Building2 },
+  { key: 'NDX_SYS_DONE_TIME', name: 'Done time', source: 'props._done', dataType: '__system_date__', icon: CalendarCheck },
+];
+
+/** O(1) lookup by system field key. */
+export const SYSTEM_FIELD_MAP = new Map(SYSTEM_FIELDS.map(f => [f.key, f]));
+
+/** Entries shaped for useWorkspaceFields autocomplete list. */
+export const SYSTEM_FIELD_ENTRIES: Array<{ id: string; name: string; dataType: string }> =
+  SYSTEM_FIELDS.map(f => ({ id: f.key, name: f.name, dataType: f.dataType }));
+
+const systemDateFormatter = new Intl.DateTimeFormat('en', {
+  month: 'short',
+  day: 'numeric',
+  year: 'numeric',
+  hour: 'numeric',
+  minute: '2-digit',
+  hour12: true,
+});
+
+/** Format a millisecond timestamp to human-readable date string. */
+export function formatTimestamp(ms: number | undefined): string {
+  if (!ms) return '';
+  return systemDateFormatter.format(new Date(ms));
+}
+
+/**
+ * Resolve the display value for a system field on a given node.
+ * Returns { text, refNodeId? } where refNodeId is set for __system_node__ types.
+ */
+export function resolveSystemFieldValue(
+  entities: Record<string, NodexNode>,
+  nodeId: string,
+  sysDef: SystemFieldDef,
+): { text: string; refNodeId?: string } {
+  const node = entities[nodeId];
+  if (!node) return { text: '' };
+
+  switch (sysDef.source) {
+    case 'props.description':
+      return { text: node.props.description ?? '' };
+    case 'props.created':
+      return { text: formatTimestamp(node.props.created) };
+    case 'updatedAt':
+      return { text: formatTimestamp(node.updatedAt) };
+    case 'updatedBy':
+      return { text: node.updatedBy ?? '' };
+    case 'props._ownerId': {
+      const ownerId = node.props._ownerId;
+      if (!ownerId) return { text: '' };
+      const ownerNode = entities[ownerId];
+      return { text: ownerNode?.props.name ?? ownerId, refNodeId: ownerId };
+    }
+    case 'metanode': {
+      const metaId = node.props._metaNodeId;
+      if (!metaId) return { text: '' };
+      const meta = entities[metaId];
+      if (!meta?.children) return { text: '' };
+      const tagNames: string[] = [];
+      for (const cid of meta.children) {
+        const tuple = entities[cid];
+        if (tuple?.props._docType === 'tuple' && tuple.children?.[0] === SYS_A.NODE_SUPERTAGS && tuple.children[1]) {
+          const tagDef = entities[tuple.children[1]];
+          if (tagDef?.props.name) tagNames.push(tagDef.props.name);
+        }
+      }
+      return { text: tagNames.join(', ') };
+    }
+    case 'workspaceId': {
+      const wsId = node.workspaceId;
+      const wsNode = entities[wsId];
+      return { text: wsNode?.props.name ?? wsId };
+    }
+    case 'props._done': {
+      const done = node.props._done;
+      return { text: done ? formatTimestamp(done) : '' };
+    }
+    default:
+      return { text: '' };
+  }
+}

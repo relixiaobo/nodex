@@ -140,6 +140,8 @@ export function FieldValueOutliner({ assocDataId, fieldDataType, attrDefId, onNa
               assocDataId={fieldMap.get(id)!.assocDataId}
               isLastInGroup={i === visibleChildren.length - 1 || visibleChildren[i + 1].type !== 'field'}
               trashed={fieldMap.get(id)!.trashed}
+              isRequired={fieldMap.get(id)!.isRequired}
+              isEmpty={fieldMap.get(id)!.isEmpty}
             />
           </div>
         ) : (

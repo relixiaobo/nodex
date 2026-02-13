@@ -123,11 +123,28 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   }, [fields]);
 
   // Classify each child: field tuple → 'field', regular node → 'content', else skip
+  // Also evaluate hide-field rules for field entries
   const visibleChildren = useMemo(() => {
-    const result: { id: string; type: 'field' | 'content' }[] = [];
+    const result: { id: string; type: 'field' | 'content'; hidden?: boolean }[] = [];
     for (const cid of allChildIds) {
       if (fieldMap.has(cid)) {
-        result.push({ id: cid, type: 'field' });
+        const f = fieldMap.get(cid)!;
+        // Evaluate hide-field condition
+        let hidden = false;
+        switch (f.hideMode) {
+          case SYS_V.ALWAYS:
+            hidden = true;
+            break;
+          case SYS_V.WHEN_EMPTY:
+            hidden = !!f.isEmpty;
+            break;
+          case SYS_V.WHEN_NOT_EMPTY:
+            hidden = !f.isEmpty;
+            break;
+          // WHEN_VALUE_IS_DEFAULT: needs "default" concept — skip for now
+          // NEVER: default, not hidden
+        }
+        result.push({ id: cid, type: 'field', hidden });
       } else {
         const dt = entities[cid]?.props._docType;
         if (!dt) result.push({ id: cid, type: 'content' });
@@ -141,7 +158,14 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     () => visibleChildren.filter((c) => c.type === 'content').map((c) => c.id),
     [visibleChildren],
   );
-  const hasChildren = visibleChildren.length > 0;
+  // For hasChildren: count non-hidden items (hidden-always fields don't count toward expand chevron)
+  const hasChildren = visibleChildren.some((c) => !c.hidden);
+  // Track whether any fields are conditionally hidden (for hover-to-reveal)
+  const hasHiddenFields = useMemo(
+    () => visibleChildren.some((c) => c.hidden && fieldMap.get(c.id)?.hideMode !== SYS_V.ALWAYS),
+    [visibleChildren, fieldMap],
+  );
+  const [childrenHovered, setChildrenHovered] = useState(false);
   const isFocused = focusedNodeId === nodeId &&
     (focusedParentId === null || focusedParentId === parentId);
   const hasTags = tagIds.length > 0;
@@ -1014,7 +1038,11 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
         />
       )}
       {isExpanded && (
-        <div className="relative">
+        <div
+          className="relative"
+          onMouseEnter={hasHiddenFields ? () => setChildrenHovered(true) : undefined}
+          onMouseLeave={hasHiddenFields ? () => setChildrenHovered(false) : undefined}
+        >
           {/* Indent guide line — 16px click area LEFT of bullet center.
                Parent bullet center = depth*28 + 32.5.
                Button right edge at depth*28+33 (1px gap to child ChevronButton at depth*28+34).
@@ -1029,9 +1057,13 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
             <div className="indent-line-inner w-px h-full bg-border rounded-full" />
           </button>
           {/* Render children in natural order: fields as FieldRow, content as OutlinerItem */}
-          {visibleChildren.map(({ id, type }, i) =>
-            type === 'field' ? (
-              <div key={id} className="@container" style={{ paddingLeft: (depth + 1) * 28 + 6 + 15 + 4 }}>
+          {visibleChildren.map(({ id, type, hidden }, i) => {
+            // ALWAYS-hidden fields: never render
+            if (hidden && fieldMap.get(id)?.hideMode === SYS_V.ALWAYS) return null;
+            // Conditionally hidden fields: render only on hover, dimmed
+            if (hidden && !childrenHovered) return null;
+            return type === 'field' ? (
+              <div key={id} className={`@container${hidden ? ' opacity-50 transition-opacity' : ''}`} style={{ paddingLeft: (depth + 1) * 28 + 6 + 15 + 4 }}>
                 <FieldRow
                   nodeId={nodeId}
                   attrDefId={fieldMap.get(id)!.attrDefId}
@@ -1043,6 +1075,8 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
                   assocDataId={fieldMap.get(id)!.assocDataId}
                   isLastInGroup={i === visibleChildren.length - 1 || visibleChildren[i + 1].type !== 'field'}
                   trashed={fieldMap.get(id)!.trashed}
+                  isRequired={fieldMap.get(id)!.isRequired}
+                  isEmpty={fieldMap.get(id)!.isEmpty}
                   onNavigateOut={(direction) => {
                     if (direction === 'up') {
                       // Escape up → focus this parent node
@@ -1051,7 +1085,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
                       // Escape down → focus next content child after this field, or parent's next
                       let found = false;
                       for (let j = i + 1; j < visibleChildren.length; j++) {
-                        if (visibleChildren[j].type === 'content') {
+                        if (visibleChildren[j].type === 'content' && !visibleChildren[j].hidden) {
                           setFocusedNode(visibleChildren[j].id, nodeId);
                           found = true;
                           break;
@@ -1075,8 +1109,8 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
                 parentId={nodeId}
                 rootNodeId={rootNodeId}
               />
-            ),
-          )}
+            );
+          })}
           {visibleChildren.length === 0 && (
             <TrailingInput
               parentId={nodeId}

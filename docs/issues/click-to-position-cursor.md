@@ -46,19 +46,23 @@ mousedown on B → focusout on A → [layout shift] → click on B
 | 4 | 先 dispatch(tr) 设 PM selection 再 view.focus() | 完全破坏光标插入 |
 | 5 | useState initializer + editor.commands.focus(pmPos) | 首次有效，切换节点时格式化文本失败 |
 | 6 | mousedown 捕获 textOffset（在 blur 之前） | 改善但未完全修复 |
+| 7 | focusClickCoords 增加 nodeId+parentId 标识 | 防止跨节点数据污染，待人工验证 |
 
-## 当前实现（方案 5+6 组合）
+## 当前实现（方案 5+6+7 组合）
 
-- `OutlinerItem.onMouseDown` → `caretRangeFromPoint` → 计算 textOffset → 存入 `ui-store.focusClickCoords`
+- `OutlinerItem.onMouseDown` → `getTextOffsetFromPoint()`（`caretPositionFromPoint` 标准 API + `caretRangeFromPoint` webkit 回退）→ 计算 textOffset → 存入 `ui-store.focusClickCoords`（含 `nodeId`+`parentId` 标识）
 - `OutlinerItem.onClick` → `setFocusedNode(nodeId, parentId)`
-- `NodeEditor` mount → `useState(() => readFocusClickCoords())` → `editor.commands.focus(pmPos)`
+- `NodeEditor` mount → `useRef` 读取匹配的 `focusClickCoords`（仅当 `nodeId`+`parentId` 匹配时消费）→ `useLayoutEffect` 中 `focus('end')` + `setTextSelection(pmPos)` → 清除 store
 
-## 可能的后续方向
+### 方案 7 解决的问题
 
-1. **TipTap `autofocus` 选项**: 将 pmPos 传入 `useEditor({ autofocus: pmPos })`，让 TipTap 内部处理 focus + selection，减少手动干预
-2. **mousedown 中直接记录 Range 对象**: 不转换为 textOffset，而是保存 DOM Range，click 后用 Range 信息在编辑器中定位
-3. **延迟 blur 处理**: 在 handleBlur 中用 `requestAnimationFrame` 延迟 `setFocusedNode(null)`，让 click 事件先执行完再触发布局变化
-4. **完全不同的架构**: 不在 blur 时卸载编辑器，改为隐藏/禁用，避免高度变化引起的布局偏移
+之前 `focusClickCoords` 只存 `{ textOffset }`，无身份标识。当用户快速点击不同节点时，节点 A 的 mousedown 存储的 textOffset 可能被节点 B 的 NodeEditor 错误消费（因为 React 重渲染时序导致 A 和 B 的 mount/unmount 交织）。增加 `nodeId`+`parentId` 后，每个 NodeEditor 只消费属于自己的数据。
+
+## 如果仍未完全修复的后续方向
+
+1. **延迟 blur 处理**: 在 handleBlur 中用 `requestAnimationFrame` 延迟 `setFocusedNode(null)`，让 click 事件先执行完再触发布局变化。这能从根本上消除 layout shift 问题
+2. **完全不同的架构**: 不在 blur 时卸载编辑器，改为隐藏/禁用，避免高度变化引起的布局偏移
+3. **TipTap `autofocus` 选项**: 将 pmPos 传入 `useEditor({ autofocus: pmPos })`，让 TipTap 内部处理 focus + selection
 
 ## 相关文件
 
@@ -76,3 +80,5 @@ mousedown on B → focusout on A → [layout shift] → click on B
 - `05c4164` fix: 系统性修复点击光标定位 — dispatch+focus 消除竞态
 - `a77c82b` fix: 简化点击光标定位 — useState + TipTap focus(pos)
 - `2b43dc0` fix: mousedown 捕获 textOffset 避免 blur 导致的布局偏移
+- `71bf78c` fix: 编辑器切换时格式化文本光标定位 — 分离 focus 和 selection
+- `7277ccf` fix: focusClickCoords 增加 nodeId+parentId 标识，防止跨节点数据污染

@@ -208,6 +208,10 @@ export const SYS_A = {
   HIDE_FIELD: 'NDX_A01',
   /** [Nodex] 自动初始化 → SYS_V03(Yes) / SYS_V04(No) — 从祖先节点继承同名字段值 */
   AUTO_INITIALIZE: 'NDX_A02',
+  /** [Nodex] Number/Integer 最小值 → Tuple value = 数字字符串 */
+  MIN_VALUE: 'NDX_A03',
+  /** [Nodex] Number/Integer 最大值 → Tuple value = 数字字符串 */
+  MAX_VALUE: 'NDX_A04',
 } as const;
 
 export type SystemAttribute = typeof SYS_A[keyof typeof SYS_A];

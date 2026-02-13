@@ -277,13 +277,15 @@ export function seedTestData() {
   const attrDefAgeNodes: NodexNode[] = [
     makeNode('attrDef_age', 'Age', 'personField_age', [
       'attrDef_age_type', 'attrDef_age_autocollect', 'attrDef_age_autoinit',
-      'attrDef_age_required', 'attrDef_age_hide',
+      'attrDef_age_required', 'attrDef_age_hide', 'attrDef_age_min', 'attrDef_age_max',
     ], 'attrDef'),
     makeNode('attrDef_age_type', '', 'attrDef_age', [SYS_A.TYPE_CHOICE, SYS_D.NUMBER], 'tuple'),
     makeNode('attrDef_age_autocollect', '', 'attrDef_age', [SYS_A.AUTOCOLLECT_OPTIONS, SYS_V.YES], 'tuple'),
     makeNode('attrDef_age_autoinit', '', 'attrDef_age', [SYS_A.AUTO_INITIALIZE, SYS_V.NO], 'tuple'),
     makeNode('attrDef_age_required', '', 'attrDef_age', [SYS_A.NULLABLE, SYS_V.NO], 'tuple'),
     makeNode('attrDef_age_hide', '', 'attrDef_age', [SYS_A.HIDE_FIELD, SYS_V.NEVER], 'tuple'),
+    makeNode('attrDef_age_min', '', 'attrDef_age', [SYS_A.MIN_VALUE, '0'], 'tuple'),
+    makeNode('attrDef_age_max', '', 'attrDef_age', [SYS_A.MAX_VALUE, '150'], 'tuple'),
   ];
 
   // AttrDef: Website (URL type)

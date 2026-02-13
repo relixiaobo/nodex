@@ -23,12 +23,13 @@ import { Trash2 } from 'lucide-react';
 import { useNodeStore } from '../../stores/node-store';
 import { useUIStore } from '../../stores/ui-store';
 import { useWorkspaceStore } from '../../stores/workspace-store';
-import { getFieldTypeIcon, ATTRDEF_CONFIG_MAP, TAGDEF_CONFIG_MAP } from '../../lib/field-utils.js';
+import { getFieldTypeIcon, ATTRDEF_CONFIG_MAP, TAGDEF_CONFIG_MAP, resolveMinValue, resolveMaxValue } from '../../lib/field-utils.js';
 import { FieldValueOutliner } from './FieldValueOutliner';
 import { FieldNameInput } from './FieldNameInput';
 import { FieldTypePicker } from './FieldTypePicker';
 import { ConfigToggle } from './ConfigToggle';
 import { ConfigSelect } from './ConfigSelect';
+import { ConfigNumberInput } from './ConfigNumberInput';
 import { ConfigOutliner } from './ConfigOutliner';
 import { AutoCollectSection } from './AutoCollectSection';
 import { BulletChevron } from '../outliner/BulletChevron';
@@ -86,7 +87,8 @@ export function FieldRow({
   const isAutoCollect = dataType === '__autocollect__';
   const isTagPicker = dataType === '__tag_picker__';
   const isColorPicker = dataType === '__color_picker__';
-  const isConfigField = isTypeChoice || isToggle || isSelect || isAutoCollect || isTagPicker || isColorPicker;
+  const isNumberInput = dataType === '__number_input__';
+  const isConfigField = isTypeChoice || isToggle || isSelect || isAutoCollect || isTagPicker || isColorPicker || isNumberInput;
   const isVirtual = tupleId.startsWith('__virtual_');
   const isEditing = editingFieldNameId === tupleId;
   const configDef = (isConfigField || isVirtual)
@@ -99,11 +101,14 @@ export function FieldRow({
     if (!assocDataId || !VALIDATED_FIELD_TYPES.has(dataType)) return null;
     const assoc = s.entities[assocDataId];
     if (!assoc?.children) return null;
+    // Resolve min/max for number fields
+    const min = resolveMinValue(s.entities, attrDefId);
+    const max = resolveMaxValue(s.entities, attrDefId);
     // Find first content child (no _docType)
     for (const cid of assoc.children) {
       const child = s.entities[cid];
       if (child && !child.props._docType && child.props.name) {
-        return validateFieldValue(dataType, child.props.name);
+        return validateFieldValue(dataType, child.props.name, { min, max });
       }
     }
     return null;
@@ -168,6 +173,8 @@ export function FieldRow({
             <ConfigOutliner nodeId={nodeId} />
           ) : isSelect ? (
             <ConfigSelect tupleId={tupleId} fieldKey={attrDefId} currentValue={valueName} />
+          ) : isNumberInput ? (
+            <ConfigNumberInput tupleId={tupleId} fieldKey={attrDefId} currentValue={valueName} />
           ) : (
             /* Toggle / tag_picker / color_picker — keep outer bullet wrapping */
             <div className="flex min-h-7 items-center gap-2 py-1" style={{ paddingLeft: 6 }}>

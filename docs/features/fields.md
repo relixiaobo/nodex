@@ -1,6 +1,6 @@
 # Feature: Fields 全类型
 
-> Phase 1.3 | 全类型值编辑器已实现
+> Phase 1.3 | 全类型值编辑器已实现 | [GitHub Issue #21](https://github.com/relixiaobo/nodex/issues/21)
 
 ## 行为规格
 

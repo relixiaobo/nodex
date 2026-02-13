@@ -1056,7 +1056,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
           </button>
           {/* Hidden field pills: compact clickable chips to temporarily reveal hidden fields */}
           {hiddenRevealableFields.length > 0 && hiddenRevealableFields.some(f => !revealedFieldIds.has(f.id)) && (
-            <div className="flex flex-wrap gap-x-1 min-h-7 items-center" style={{ paddingLeft: (depth + 1) * 28 + 6 + 15 + 4 }}>
+            <div className="flex flex-wrap gap-x-3 min-h-7 items-center" style={{ paddingLeft: (depth + 1) * 28 + 6 + 15 + 4 }}>
               {hiddenRevealableFields.filter(f => !revealedFieldIds.has(f.id)).map(f => (
                 <button
                   key={f.id}

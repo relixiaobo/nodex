@@ -16,12 +16,15 @@ import { ReferenceSelector, type ReferenceDropdownHandle } from '../references/R
 import { FieldRow } from '../fields/FieldRow';
 import { SYS_D, SYS_V } from '../../types/index.js';
 import { useFieldOptions } from '../../hooks/use-field-options.js';
+import { getTagColor } from '../../lib/tag-colors.js';
 import {
   getFlattenedVisibleNodes,
   getPreviousVisibleNode,
   getNextVisibleNode,
   isOnlyInlineRef,
 } from '../../lib/tree-utils';
+import { resolveDropMove } from '../../lib/drag-drop';
+import { resolveSelectedReferenceShortcut } from '../../lib/selected-reference-shortcuts';
 
 /** Field types that accept only a single value node. Enter navigates out instead of creating siblings. */
 const SINGLE_VALUE_FIELD_TYPES: Set<string> = new Set([
@@ -184,6 +187,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   const hasTags = tagIds.length > 0;
   const hasFields = fields.length > 0;
   const isReference = !!node && node.props._ownerId !== parentId;
+  const isTagDef = node?.props._docType === 'tagDef';
   const isPendingConversion = useUIStore((s) => s.pendingRefConversion?.tempNodeId === nodeId);
   const isSelected = selectedNodeId === nodeId &&
     (selectedParentId === null || selectedParentId === parentId);
@@ -297,13 +301,17 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   useEffect(() => {
     if (!isSelected || !isReference) return;
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Backspace' || e.key === 'Delete') {
+      const action = resolveSelectedReferenceShortcut(e, optionsPickerOpen);
+      if (!action) return;
+
+      if (action === 'delete') {
         e.preventDefault();
         if (userId) removeReference(parentId, nodeId, userId);
         setSelectedNode(null);
         return;
       }
-      if (e.key === 'ArrowRight' && !optionsPickerOpen) {
+
+      if (action === 'convert_arrow_right' || action === 'convert_printable') {
         e.preventDefault();
         if (!wsId || !userId) return;
         const parent = entities[parentId];
@@ -311,48 +319,41 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
         if (pos < 0) return;
         removeReference(parentId, nodeId, userId);
         const tempNodeId = startRefConversion(nodeId, parentId, pos, wsId, userId);
-        setPendingRefConversion({ tempNodeId, refNodeId: nodeId, parentId });
-        setSelectedNode(null);
-        setTimeout(() => setFocusedNode(tempNodeId, parentId), 0);
-        return;
-      }
-      // Printable character on selected reference → enter conversion mode with char appended
-      if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey && !optionsPickerOpen) {
-        e.preventDefault();
-        if (!wsId || !userId) return;
-        const parent = entities[parentId];
-        const pos = parent?.children?.indexOf(nodeId) ?? -1;
-        if (pos < 0) return;
-        removeReference(parentId, nodeId, userId);
-        const tempNodeId = startRefConversion(nodeId, parentId, pos, wsId, userId);
-        // Append typed character after inline ref
-        const tempName = useNodeStore.getState().entities[tempNodeId]?.props.name ?? '';
-        useNodeStore.getState().setNodeNameLocal(tempNodeId, tempName + e.key);
-        setPendingRefConversion({ tempNodeId, refNodeId: nodeId, parentId });
-        setSelectedNode(null);
-        setTimeout(() => setFocusedNode(tempNodeId, parentId), 0);
-        return;
-      }
-      if (optionsPickerOpen && allFieldOptions.length > 0) {
-        if (e.key === 'ArrowDown') {
-          e.preventDefault();
-          setOptionsPickerIndex((i) => Math.min(i + 1, allFieldOptions.length - 1));
-        } else if (e.key === 'ArrowUp') {
-          e.preventDefault();
-          setOptionsPickerIndex((i) => Math.max(i - 1, 0));
-        } else if (e.key === 'Enter') {
-          e.preventDefault();
-          const opt = allFieldOptions[optionsPickerIndex];
-          if (opt && userId) {
-            removeReference(parentId, nodeId, userId);
-            addReference(parentId, opt.id, userId);
-          }
-          setSelectedNode(null);
-        } else if (e.key === 'Escape') {
-          e.preventDefault();
-          setSelectedNode(null);
+        if (action === 'convert_printable') {
+          // Append typed character after inline ref.
+          const tempName = useNodeStore.getState().entities[tempNodeId]?.props.name ?? '';
+          useNodeStore.getState().setNodeNameLocal(tempNodeId, tempName + e.key);
         }
-      } else if (e.key === 'Escape') {
+        setPendingRefConversion({ tempNodeId, refNodeId: nodeId, parentId });
+        setSelectedNode(null);
+        setTimeout(() => setFocusedNode(tempNodeId, parentId), 0);
+        return;
+      }
+
+      if (action === 'options_down' && allFieldOptions.length > 0) {
+        e.preventDefault();
+        setOptionsPickerIndex((i) => Math.min(i + 1, allFieldOptions.length - 1));
+        return;
+      }
+
+      if (action === 'options_up' && allFieldOptions.length > 0) {
+        e.preventDefault();
+        setOptionsPickerIndex((i) => Math.max(i - 1, 0));
+        return;
+      }
+
+      if (action === 'options_confirm' && allFieldOptions.length > 0) {
+        e.preventDefault();
+        const opt = allFieldOptions[optionsPickerIndex];
+        if (opt && userId) {
+          removeReference(parentId, nodeId, userId);
+          addReference(parentId, opt.id, userId);
+        }
+        setSelectedNode(null);
+        return;
+      }
+
+      if (action === 'escape') {
         e.preventDefault();
         setSelectedNode(null);
       }
@@ -957,18 +958,22 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       const dropParent = entities[dropParentId];
       const siblingIndex = dropParent?.children?.indexOf(nodeId) ?? 0;
 
-      if (dropPosition === 'before') {
-        moveNodeTo(dragNodeId, dropParentId, siblingIndex, userId);
-      } else if (dropPosition === 'after') {
-        if (hasChildren && isExpanded) {
-          // Drop as first child
-          moveNodeTo(dragNodeId, nodeId, 0, userId);
-        } else {
-          moveNodeTo(dragNodeId, dropParentId, siblingIndex + 1, userId);
+      const decision = resolveDropMove({
+        dragNodeId,
+        targetNodeId: nodeId,
+        targetParentId: dropParentId,
+        targetParentKey: `${parentId}:${nodeId}`,
+        siblingIndex,
+        dropPosition,
+        targetHasChildren: hasChildren,
+        targetIsExpanded: isExpanded,
+      });
+
+      if (decision) {
+        moveNodeTo(dragNodeId, decision.newParentId, decision.position, userId);
+        if (decision.expandKey) {
+          setExpanded(decision.expandKey, true);
         }
-      } else if (dropPosition === 'inside') {
-        moveNodeTo(dragNodeId, nodeId, 0, userId);
-        setExpanded(`${parentId}:${nodeId}`, true);
       }
 
       setDrag(null);
@@ -1033,6 +1038,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
             isExpanded={isExpanded}
             onBulletClick={handleBulletClick}
             isReference={isReference || isPendingConversion}
+            tagDefColor={isTagDef ? getTagColor(nodeId).text : undefined}
           />
           <div className={`relative flex-1 min-w-0 ${isPendingConversion ? 'ref-converting' : ''}`}>
           <div

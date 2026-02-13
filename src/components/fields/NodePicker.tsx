@@ -12,10 +12,13 @@
  */
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { BulletChevron } from '../outliner/BulletChevron';
+import { getTagColor } from '../../lib/tag-colors.js';
 
 export interface NodePickerOption {
   id: string;
   name: string;
+  /** When true, renders colored # bullet instead of plain dot */
+  isTagDef?: boolean;
 }
 
 interface NodePickerProps {
@@ -49,10 +52,13 @@ export function NodePicker({
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const selectedName = useMemo(() => {
+  const selectedOption = useMemo(() => {
     if (!selectedId) return undefined;
-    return options.find((o) => o.id === selectedId)?.name;
+    return options.find((o) => o.id === selectedId);
   }, [options, selectedId]);
+
+  const selectedName = selectedOption?.name;
+  const selectedTagDefColor = selectedOption?.isTagDef ? getTagColor(selectedOption.id).text : undefined;
 
   // Show all options when: textSelected (reference just opened), empty input,
   // or input matches selectedName exactly (non-reference just opened, not yet typed)
@@ -188,11 +194,20 @@ export function NodePicker({
           >
             {/* Outline wraps reference bullet + text together (like Tana) */}
             <span className="inline-flex items-center gap-2 rounded-sm outline outline-1 outline-primary/50">
-              {/* Reference bullet dot (no chevron) */}
+              {/* Reference bullet dot (no chevron) — tagDef shows colored # */}
               <span className="flex shrink-0 h-[21px] w-[15px] items-center justify-center">
-                <span className="flex h-[15px] w-[15px] items-center justify-center rounded-full border border-dashed border-foreground/40">
-                  <span className="block h-[5px] w-[5px] rounded-full bg-foreground/50" />
-                </span>
+                {selectedTagDefColor ? (
+                  <span
+                    className="flex h-[13px] w-[13px] items-center justify-center rounded-full"
+                    style={{ backgroundColor: selectedTagDefColor }}
+                  >
+                    <span className="text-[9px] font-bold leading-none text-white select-none">#</span>
+                  </span>
+                ) : (
+                  <span className="flex h-[15px] w-[15px] items-center justify-center rounded-full border border-dashed border-foreground/40">
+                    <span className="block h-[5px] w-[5px] rounded-full bg-foreground/50" />
+                  </span>
+                )}
               </span>
               <span className="text-sm leading-[21px] text-foreground pr-1">
                 {textSelected ? selectedName : inputValue}
@@ -222,6 +237,7 @@ export function NodePicker({
               {...(selectedName
                 ? (isReference ? { isReference: true } : {})
                 : { dimmed: true })}
+              tagDefColor={selectedTagDefColor}
             />
             {open ? (
               /* Non-reference editing: plain input with cursor, like a normal node */
@@ -268,7 +284,16 @@ export function NodePicker({
                   onMouseEnter={() => setHoverIndex(i)}
                 >
                   <span className="flex shrink-0 w-[15px] h-[15px] items-center justify-center">
-                    <span className="block h-[5px] w-[5px] rounded-full bg-foreground/50" />
+                    {opt.isTagDef ? (
+                      <span
+                        className="flex h-[13px] w-[13px] items-center justify-center rounded-full"
+                        style={{ backgroundColor: getTagColor(opt.id).text }}
+                      >
+                        <span className="text-[9px] font-bold leading-none text-white select-none">#</span>
+                      </span>
+                    ) : (
+                      <span className="block h-[5px] w-[5px] rounded-full bg-foreground/50" />
+                    )}
                   </span>
                   <span className="text-sm leading-[21px] text-foreground">
                     {opt.name}

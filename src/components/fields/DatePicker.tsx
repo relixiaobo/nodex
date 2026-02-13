@@ -448,10 +448,13 @@ function DateInputField({
 
   const startEditing = useCallback(() => {
     onClick();
-    if (dateStr && onDateChange) {
+    if (onDateChange) {
       setEditing(true);
-      setEditValue(formatInputDate(dateStr));
-      requestAnimationFrame(() => inputRef.current?.select());
+      setEditValue(dateStr ? formatInputDate(dateStr) : '');
+      requestAnimationFrame(() => {
+        const input = inputRef.current;
+        if (input) dateStr ? input.select() : input.focus();
+      });
     }
   }, [dateStr, onClick, onDateChange]);
 

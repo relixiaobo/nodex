@@ -295,22 +295,14 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   // then use post-shift coordinates, hitting the wrong text position.
   const handleContentMouseDown = useCallback((e: React.MouseEvent) => {
     if (isReference || fieldDataType === SYS_D.CHECKBOX) return;
-    // Compute text offset from click on STATIC content (visible, laid out).
-    let textOffset: number | null = null;
-    try {
-      const range = document.caretRangeFromPoint(e.clientX, e.clientY);
-      if (range) {
-        const container = e.currentTarget as HTMLElement;
-        if (container.contains(range.startContainer)) {
-          const preRange = document.createRange();
-          preRange.setStart(container, 0);
-          preRange.setEnd(range.startContainer, range.startOffset);
-          textOffset = preRange.toString().length;
-        }
-      }
-    } catch { /* ignore */ }
-    useUIStore.getState().setFocusClickCoords(textOffset !== null ? { textOffset } : null);
-  }, [isReference, fieldDataType]);
+    const container = e.currentTarget as HTMLElement;
+    const textOffset = getTextOffsetFromPoint(container, e.clientX, e.clientY);
+    useUIStore.getState().setFocusClickCoords(
+      textOffset !== null
+        ? { nodeId, parentId, textOffset }
+        : null,
+    );
+  }, [isReference, fieldDataType, nodeId, parentId]);
 
   const handleContentClick = useCallback((e: React.MouseEvent) => {
     // Intercept clicks on inline references (blue links in static display)
@@ -888,6 +880,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
             ) : isFocused ? (
               <NodeEditor
                 nodeId={nodeId}
+                parentId={parentId}
                 initialContent={node.props.name ?? ''}
                 onBlur={handleBlur}
                 onEnter={handleEnter}
@@ -1071,6 +1064,46 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       )}
     </div>
   );
+}
+
+function getTextOffsetFromPoint(container: HTMLElement, clientX: number, clientY: number): number | null {
+  const doc = container.ownerDocument;
+  const docWithCaret = doc as Document & {
+    caretPositionFromPoint?: (x: number, y: number) => CaretPosition | null;
+    caretRangeFromPoint?: (x: number, y: number) => Range | null;
+  };
+
+  let startContainer: Node | null = null;
+  let startOffset = 0;
+
+  try {
+    const pos = docWithCaret.caretPositionFromPoint?.(clientX, clientY);
+    if (pos) {
+      startContainer = pos.offsetNode;
+      startOffset = pos.offset;
+    } else {
+      const range = docWithCaret.caretRangeFromPoint?.(clientX, clientY);
+      if (range) {
+        startContainer = range.startContainer;
+        startOffset = range.startOffset;
+      }
+    }
+  } catch {
+    return null;
+  }
+
+  if (!startContainer || !container.contains(startContainer)) {
+    return null;
+  }
+
+  try {
+    const preRange = doc.createRange();
+    preRange.setStart(container, 0);
+    preRange.setEnd(startContainer, startOffset);
+    return preRange.toString().length;
+  } catch {
+    return null;
+  }
 }
 
 /** Format ISO date string as human-readable (e.g. "Tue, Feb 24") */

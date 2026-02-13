@@ -81,11 +81,11 @@ export function OutlinerView({ rootNodeId, showTemplateTuples }: OutlinerViewPro
     <div className="flex flex-col pr-4" role="tree">
       {/* Hidden field pills: compact clickable chips to temporarily reveal hidden fields */}
       {hiddenRevealableFields.length > 0 && hiddenRevealableFields.some(f => !revealedFieldIds.has(f.id)) && (
-        <div className="flex flex-wrap gap-x-2 gap-y-0.5 min-h-6 items-center" style={{ paddingLeft: 6 + 15 + 4 }}>
+        <div className="flex flex-wrap gap-x-1 min-h-7 items-center" style={{ paddingLeft: 6 + 15 + 4 }}>
           {hiddenRevealableFields.filter(f => !revealedFieldIds.has(f.id)).map(f => (
             <button
               key={f.id}
-              className="flex items-center gap-0.5 text-xs text-foreground-tertiary hover:text-foreground-secondary cursor-pointer"
+              className="flex items-center gap-0.5 h-7 rounded-md px-0.5 text-xs text-foreground-tertiary hover:text-foreground-secondary hover:bg-foreground/5 transition-colors cursor-pointer"
               onClick={() => setRevealedFieldIds(prev => new Set(prev).add(f.id))}
               title={`Show ${f.name}`}
             >

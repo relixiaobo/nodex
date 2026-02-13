@@ -398,21 +398,20 @@ export function NodeEditor({
     if (editor && !editor.isDestroyed) {
       savedRef.current = false;
 
+      // Always focus first (at 'end', which works reliably) to ensure
+      // the editor receives browser focus. Then adjust cursor position.
+      // This two-step approach avoids a race: focus(pmPos) sets selection
+      // THEN focuses, but the browser's async focus handling can override
+      // the DOM selection for formatted text (bold/code/highlight marks).
+      // By focusing first, the contenteditable is stable when we set selection.
+      editor.commands.focus('end');
+
       if (initialClickOffset !== null) {
-        // User clicked on text — position cursor at the click point.
-        // textOffset was computed from static content via caretRangeFromPoint.
-        // PM position = textOffset + 1 (position 1 = start of paragraph content).
-        // TipTap's focus(number) internally calls setTextSelection + view.focus,
-        // keeping PM state and DOM selection in sync via the official API.
         try {
           const maxPos = editor.state.doc.content.size - 1;
           const pmPos = Math.max(1, Math.min(initialClickOffset + 1, maxPos));
-          editor.commands.focus(pmPos);
-        } catch {
-          editor.commands.focus('end');
-        }
-      } else {
-        editor.commands.focus('end');
+          editor.commands.setTextSelection(pmPos);
+        } catch { /* fallback: cursor stays at end */ }
       }
 
       if (editorRef) editorRef.current = editor;

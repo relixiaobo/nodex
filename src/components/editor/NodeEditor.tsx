@@ -12,13 +12,12 @@
  *   ArrowUp     → focus previous node
  *   ArrowDown   → focus next node
  */
-import { useEffect, useLayoutEffect, useRef, useMemo, useCallback, type MutableRefObject } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback, type MutableRefObject } from 'react';
 import { useEditor, EditorContent, type Editor } from '@tiptap/react';
 import { Extension } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Highlight from '@tiptap/extension-highlight';
 import { DOMSerializer } from '@tiptap/pm/model';
-import { TextSelection } from '@tiptap/pm/state';
 import { useNodeStore } from '../../stores/node-store';
 import { useUIStore } from '../../stores/ui-store';
 import { useWorkspaceStore } from '../../stores/workspace-store';
@@ -98,9 +97,17 @@ export function NodeEditor({
   const setNodeNameLocal = useNodeStore((s) => s.setNodeNameLocal);
   const userId = useWorkspaceStore((s) => s.userId);
   const savedRef = useRef(false);
-  // Cache click info across React Strict Mode double-invocations.
-  // First invocation reads from store + saves here; second invocation reads from ref.
-  const clickInfoRef = useRef<{ textOffset: number } | null>(null);
+
+  // Consume click position once per component instance via useState initializer.
+  // useState initializer runs exactly once even in React Strict Mode — no ref hack needed.
+  const [initialClickOffset] = useState<number | null>(() => {
+    const info = useUIStore.getState().focusClickCoords;
+    if (info) {
+      useUIStore.getState().setFocusClickCoords(null);
+      return info.textOffset;
+    }
+    return null;
+  });
 
   const saveContent = useCallback(
     (html: string) => {
@@ -391,36 +398,19 @@ export function NodeEditor({
     if (editor && !editor.isDestroyed) {
       savedRef.current = false;
 
-      // If the user clicked on text to focus this node, position cursor at
-      // the click point using a pre-computed text offset. The offset was
-      // calculated from the static (non-editable) content via caretRangeFromPoint
-      // in handleContentClick.
-      //
-      // Key: set PM state selection BEFORE focus. When view.focus() fires the
-      // browser 'focus' event, ProseMirror's handler calls selectionToDOM()
-      // which writes the PM selection (our desired position) to the DOM.
-      // This eliminates race conditions with async browser focus handling.
-      //
-      // React Strict Mode: first run reads from store + caches in clickInfoRef;
-      // second run reads from the ref (store was already cleared).
-      const storeInfo = useUIStore.getState().focusClickCoords;
-      if (storeInfo) {
-        clickInfoRef.current = storeInfo;
-        useUIStore.getState().setFocusClickCoords(null);
-      }
-
-      const info = clickInfoRef.current;
-      if (info) {
-        const maxPos = editor.state.doc.content.size - 1;
-        const pmPos = Math.max(1, Math.min(info.textOffset + 1, maxPos));
-        // 1. Set PM selection (updates state + DOM selection, no focus)
-        const tr = editor.state.tr.setSelection(
-          TextSelection.create(editor.state.doc, pmPos),
-        );
-        editor.view.dispatch(tr);
-        // 2. Focus DOM element — PM's focus handler calls selectionToDOM()
-        //    which writes pmPos to DOM, so browser sees correct position.
-        editor.view.focus();
+      if (initialClickOffset !== null) {
+        // User clicked on text — position cursor at the click point.
+        // textOffset was computed from static content via caretRangeFromPoint.
+        // PM position = textOffset + 1 (position 1 = start of paragraph content).
+        // TipTap's focus(number) internally calls setTextSelection + view.focus,
+        // keeping PM state and DOM selection in sync via the official API.
+        try {
+          const maxPos = editor.state.doc.content.size - 1;
+          const pmPos = Math.max(1, Math.min(initialClickOffset + 1, maxPos));
+          editor.commands.focus(pmPos);
+        } catch {
+          editor.commands.focus('end');
+        }
       } else {
         editor.commands.focus('end');
       }
@@ -430,7 +420,7 @@ export function NodeEditor({
     return () => {
       if (editorRef) editorRef.current = null;
     };
-  }, [editor, editorRef]);
+  }, [editor, editorRef, initialClickOffset]);
 
   // Cleanup: save on unmount if not already saved
   useEffect(() => {

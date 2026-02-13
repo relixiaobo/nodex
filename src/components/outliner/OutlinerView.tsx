@@ -52,7 +52,7 @@ export function OutlinerView({ rootNodeId, showTemplateTuples }: OutlinerViewPro
   );
 
   return (
-    <div className="flex flex-col" role="tree">
+    <div className="flex flex-col pr-4" role="tree">
       {visibleChildren.map(({ id, type }, i) =>
         type === 'field' ? (
           <div key={id} className="@container" style={{ paddingLeft: 6 + 15 + 4 }}>

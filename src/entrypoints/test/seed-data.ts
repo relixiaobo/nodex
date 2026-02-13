@@ -79,9 +79,6 @@ export function seedTestData() {
     makeNode(schemaId, 'Schema', WS_ID, [
       'SYS_T01', 'SYS_T02',
       'tagDef_task', 'tagDef_person',
-      'attrDef_status', 'attrDef_priority', 'attrDef_due',
-      'attrDef_email', 'attrDef_company',
-      'attrDef_age', 'attrDef_website', 'attrDef_done',
     ]),
   ];
 
@@ -205,7 +202,7 @@ export function seedTestData() {
 
   // AttrDef: Status (options type) — all config tuples + options
   const attrDefStatusNodes: NodexNode[] = [
-    makeNode('attrDef_status', 'Status', schemaId, [
+    makeNode('attrDef_status', 'Status', 'taskField_status', [
       'attrDef_status_type', 'attrDef_status_autocollect', 'attrDef_status_autoinit',
       'attrDef_status_required', 'attrDef_status_hide',
       'opt_todo', 'opt_in_progress', 'opt_done',
@@ -222,7 +219,7 @@ export function seedTestData() {
 
   // AttrDef: Priority (options type)
   const attrDefPriorityNodes: NodexNode[] = [
-    makeNode('attrDef_priority', 'Priority', schemaId, [
+    makeNode('attrDef_priority', 'Priority', 'taskField_priority', [
       'attrDef_priority_type', 'attrDef_priority_autocollect', 'attrDef_priority_autoinit',
       'attrDef_priority_required', 'attrDef_priority_hide',
       'opt_high', 'opt_medium', 'opt_low',
@@ -239,7 +236,7 @@ export function seedTestData() {
 
   // AttrDef: Due (date type) — all 4 config tuples
   const attrDefDueNodes: NodexNode[] = [
-    makeNode('attrDef_due', 'Due', schemaId, [
+    makeNode('attrDef_due', 'Due', 'taskField_due', [
       'attrDef_due_type', 'attrDef_due_autocollect', 'attrDef_due_autoinit',
       'attrDef_due_required', 'attrDef_due_hide',
     ], 'attrDef'),
@@ -252,7 +249,7 @@ export function seedTestData() {
 
   // AttrDef: Email (email type)
   const attrDefEmailNodes: NodexNode[] = [
-    makeNode('attrDef_email', 'Email', schemaId, [
+    makeNode('attrDef_email', 'Email', 'personField_email', [
       'attrDef_email_type', 'attrDef_email_autocollect', 'attrDef_email_autoinit',
       'attrDef_email_required', 'attrDef_email_hide',
     ], 'attrDef'),
@@ -265,7 +262,7 @@ export function seedTestData() {
 
   // AttrDef: Company (plain type)
   const attrDefCompanyNodes: NodexNode[] = [
-    makeNode('attrDef_company', 'Company', schemaId, [
+    makeNode('attrDef_company', 'Company', 'personField_company', [
       'attrDef_company_type', 'attrDef_company_autocollect', 'attrDef_company_autoinit',
       'attrDef_company_required', 'attrDef_company_hide',
     ], 'attrDef'),
@@ -278,7 +275,7 @@ export function seedTestData() {
 
   // AttrDef: Age (number type)
   const attrDefAgeNodes: NodexNode[] = [
-    makeNode('attrDef_age', 'Age', schemaId, [
+    makeNode('attrDef_age', 'Age', 'personField_age', [
       'attrDef_age_type', 'attrDef_age_autocollect', 'attrDef_age_autoinit',
       'attrDef_age_required', 'attrDef_age_hide',
     ], 'attrDef'),
@@ -291,7 +288,7 @@ export function seedTestData() {
 
   // AttrDef: Website (URL type)
   const attrDefWebsiteNodes: NodexNode[] = [
-    makeNode('attrDef_website', 'Website', schemaId, [
+    makeNode('attrDef_website', 'Website', 'personField_website', [
       'attrDef_website_type', 'attrDef_website_autocollect', 'attrDef_website_autoinit',
       'attrDef_website_required', 'attrDef_website_hide',
     ], 'attrDef'),
@@ -304,7 +301,7 @@ export function seedTestData() {
 
   // AttrDef: Done (checkbox type)
   const attrDefDoneNodes: NodexNode[] = [
-    makeNode('attrDef_done', 'Done', schemaId, [
+    makeNode('attrDef_done', 'Done', 'taskField_done', [
       'attrDef_done_type', 'attrDef_done_autocollect', 'attrDef_done_autoinit',
       'attrDef_done_required', 'attrDef_done_hide',
     ], 'attrDef'),

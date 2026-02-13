@@ -4,5 +4,13 @@
 - [x] 新建 node 之后，如果不输入文本，node 就会显示暗文本"untitled"，不需要显示暗文本，保持节点的空白状态即可
 - [x] 带有行内引用的节点，在点击变成编辑模式之后，行内引用会变成 "Untitled"
 - [ ] Field 每个类型的配置项是不同的，现在可能有些配置项对于某些type是多余或者不合适的，需要检查
-- [ ] 当 options type 的 field node 的 value 本质上也是 outliner，跟 plain 格式的一样，只是这个值可以从 预置选项中选取而已，所以也应该在其中输入任何值，包括 输入 > 将这个 value 的 node 转换为 field node
-- [ ] 所有的节点的根节点是什么？
+- [x] 当 options type 的 field node 的 value 本质上也是 outliner，跟 plain 格式的一样，只是这个值可以从 预置选项中选取而已，所以也应该在其中输入任何值，包括 输入 > 将这个 value 的 node 转换为 field node
+- [x] supertag 总是 Schema node 的 child node，但是 field node 并不属于 Schema node，而是在哪个node 下面创建的，就属于哪个 node
+- [ ] 检查所有的 outliner 部分的逻辑是否一致，我看到 plain field node value 操作有些跟 在普通节点中的操作有些小差异
+- [ ] 选中 reference node，之后，按方向键右键，可以将光标移动到这个 选中框 外面（后面），然后输入文本，就会将 reference node 转换为一个普通 node ，原本referenc部分变成 inline reference，注意，这个转换不是马上转换，而是需要输入文本之后才会转换；如果用户又删除了所有的输入文本，那么又会将这个 inline reference ，转换为原本的 reference node 状态，整个转换过程是可逆的；
+- [ ] 通过 @ 或者其他方式产生了一个 reference node 之后，光标的位置位于 reference node 的尾部，用户可以继续输入文本，就会转换成 inline reference
+- [ ] #tag 总是跟在所在node的文本的末尾，检查其是否 与所在行的文本是居中对齐的
+- [ ] 如果 node 中文本过长，在焦点从这个node转移的时候，其文本的布局会发生改变，宽度变窄
+- [ ] 在包含 inline code 的node中，如果将光标移动到 inline code 里面，光标会消失
+- [ ] 节点多选/单选
+- [ ] undo / redo (cmd+z / cmd+shift+z)

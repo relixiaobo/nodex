@@ -141,13 +141,6 @@ interface NodeStore {
     userId: string,
   ): Promise<void>;
 
-  /** Create a standalone AttrDef (not tied to a tag) with default plain type */
-  createStandaloneAttrDef(
-    name: string,
-    workspaceId: string,
-    userId: string,
-  ): Promise<NodexNode>;
-
   /** Create an unnamed field on a node (for `>` trigger: instant creation) */
   addUnnamedFieldToNode(
     nodeId: string,
@@ -951,12 +944,11 @@ export const useNodeStore = create<NodeStore>()(
       const typeTupleId = nanoid();
       const templateTupleId = nanoid();
       const now = Date.now();
-      const schemaId = `${workspaceId}_SCHEMA`;
 
       const attrDef: NodexNode = {
         id: attrDefId,
         workspaceId,
-        props: { created: now, name, _ownerId: schemaId, _docType: 'attrDef' },
+        props: { created: now, name, _ownerId: templateTupleId, _docType: 'attrDef' },
         children: [typeTupleId],
         version: 1,
         updatedAt: now,
@@ -979,13 +971,6 @@ export const useNodeStore = create<NodeStore>()(
           createdBy: userId,
           updatedBy: userId,
         };
-
-        // Add attrDef to SCHEMA container
-        const schema = state.entities[schemaId];
-        if (schema) {
-          if (!schema.children) schema.children = [];
-          schema.children.push(attrDefId);
-        }
 
         // Template tuple in tagDef: [attrDefId]
         state.entities[templateTupleId] = {
@@ -1195,88 +1180,22 @@ export const useNodeStore = create<NodeStore>()(
       });
     },
 
-    createStandaloneAttrDef: async (name, workspaceId, userId) => {
-      const id = nanoid();
-      const typeTupleId = nanoid();
-      const now = Date.now();
-      const schemaId = `${workspaceId}_SCHEMA`;
-
-      const attrDef: NodexNode = {
-        id,
-        workspaceId,
-        props: { created: now, name, _ownerId: schemaId, _docType: 'attrDef' },
-        children: [typeTupleId],
-        version: 1,
-        updatedAt: now,
-        createdBy: userId,
-        updatedBy: userId,
-      };
-
-      set((state) => {
-        // Create attrDef
-        state.entities[id] = attrDef;
-
-        // Create type tuple [SYS_A02, SYS_D06] (default plain)
-        state.entities[typeTupleId] = {
-          id: typeTupleId,
-          workspaceId,
-          props: { created: now, name: '', _ownerId: id, _docType: 'tuple' },
-          children: [SYS_A.TYPE_CHOICE, SYS_D.PLAIN],
-          version: 1,
-          updatedAt: now,
-          createdBy: userId,
-          updatedBy: userId,
-        };
-
-        // Add to SCHEMA container
-        if (!state.entities[schemaId]) {
-          state.entities[schemaId] = {
-            id: schemaId,
-            workspaceId,
-            props: { created: now, name: 'Schema', _ownerId: workspaceId },
-            children: [],
-            version: 1,
-            updatedAt: now,
-            createdBy: userId,
-            updatedBy: userId,
-          };
-          // Add SCHEMA to workspace root's children
-          const wsRoot = state.entities[workspaceId];
-          if (wsRoot) {
-            if (!wsRoot.children) wsRoot.children = [];
-            if (!wsRoot.children.includes(schemaId)) {
-              wsRoot.children.push(schemaId);
-            }
-          }
-        }
-        state.entities[schemaId].children!.push(id);
-      });
-
-      // Apply SYS_T02 (Field Definition) tag — creates metanode + config tuples
-      if (get().entities[SYS_T.FIELD_DEFINITION]) {
-        await get().applyTag(id, SYS_T.FIELD_DEFINITION, workspaceId, userId);
-      }
-
-      return get().entities[id];
-    },
-
     addUnnamedFieldToNode: async (nodeId, workspaceId, userId, afterChildId?) => {
       const attrDefId = nanoid();
       const typeTupleId = nanoid();
       const tupleId = nanoid();
       const assocId = nanoid();
       const now = Date.now();
-      const schemaId = `${workspaceId}_SCHEMA`;
 
       set((state) => {
         const node = state.entities[nodeId];
         if (!node) return;
 
-        // 1. Create empty-name attrDef in SCHEMA
+        // 1. Create empty-name attrDef (owned by its field tuple)
         state.entities[attrDefId] = {
           id: attrDefId,
           workspaceId,
-          props: { created: now, name: '', _ownerId: schemaId, _docType: 'attrDef' },
+          props: { created: now, name: '', _ownerId: tupleId, _docType: 'attrDef' },
           children: [typeTupleId],
           version: 1,
           updatedAt: now,
@@ -1293,9 +1212,6 @@ export const useNodeStore = create<NodeStore>()(
           createdBy: userId,
           updatedBy: userId,
         };
-        if (state.entities[schemaId]) {
-          state.entities[schemaId].children!.push(attrDefId);
-        }
 
         // 2. Create field tuple [attrDefId] on node
         state.entities[tupleId] = {
@@ -1550,13 +1466,6 @@ export const useNodeStore = create<NodeStore>()(
         // Clean up orphaned placeholder attrDef
         const oldAttrDef = state.entities[oldAttrDefId];
         if (oldAttrDef) {
-          // Remove from SCHEMA container
-          const schemaId = `${workspaceId}_SCHEMA`;
-          const schema = state.entities[schemaId];
-          if (schema?.children) {
-            const idx = schema.children.indexOf(oldAttrDefId);
-            if (idx >= 0) schema.children.splice(idx, 1);
-          }
           // Delete type tuple children
           if (oldAttrDef.children) {
             for (const cid of oldAttrDef.children) {

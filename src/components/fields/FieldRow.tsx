@@ -32,6 +32,7 @@ import { ConfigSelect } from './ConfigSelect';
 import { ConfigOutliner } from './ConfigOutliner';
 import { AutoCollectSection } from './AutoCollectSection';
 import { BulletChevron } from '../outliner/BulletChevron';
+import { VALIDATED_FIELD_TYPES, validateFieldValue, ValidationWarning } from './field-validation';
 import { ATTRDEF_OUTLINER_FIELDS, TAGDEF_OUTLINER_FIELDS } from '../../lib/field-utils.js';
 
 const noop = () => {};
@@ -86,6 +87,21 @@ export function FieldRow({
     ? ATTRDEF_CONFIG_MAP.get(attrDefId) ?? TAGDEF_CONFIG_MAP.get(attrDefId) ?? ATTRDEF_OUTLINER_FIELDS.find(f => f.key === attrDefId) ?? TAGDEF_OUTLINER_FIELDS.find(f => f.key === attrDefId)
     : undefined;
   const Icon = configDef?.icon ?? (isConfigField ? undefined : getFieldTypeIcon(dataType));
+
+  // Validation: read first content child of assocData to check value
+  const validationWarning = useNodeStore((s) => {
+    if (!assocDataId || !VALIDATED_FIELD_TYPES.has(dataType)) return null;
+    const assoc = s.entities[assocDataId];
+    if (!assoc?.children) return null;
+    // Find first content child (no _docType)
+    for (const cid of assoc.children) {
+      const child = s.entities[cid];
+      if (child && !child.props._docType && child.props.name) {
+        return validateFieldValue(dataType, child.props.name);
+      }
+    }
+    return null;
+  });
 
   // Count auto-collected values for the name column "(N)"
   const autoCollectCount = useNodeStore((s) => {
@@ -206,15 +222,22 @@ export function FieldRow({
         </div>
       </div>
       {/* Value column */}
-      <div className="flex-1 min-w-0" data-field-value>
-        {isOutliner ? (
-          <ConfigOutliner nodeId={nodeId} />
-        ) : assocDataId ? (
-          <FieldValueOutliner assocDataId={assocDataId} fieldDataType={dataType} attrDefId={attrDefId} onNavigateOut={onNavigateOut} />
-        ) : (
-          <div className="flex min-h-7 items-start gap-2 py-1" style={{ paddingLeft: 6 }}>
-            <BulletChevron hasChildren={false} isExpanded={false} onBulletClick={noop} dimmed />
-            <span className="text-sm leading-[21px] text-foreground-tertiary select-none">Empty</span>
+      <div className="flex flex-1 min-w-0 items-start" data-field-value>
+        <div className="flex-1 min-w-0">
+          {isOutliner ? (
+            <ConfigOutliner nodeId={nodeId} />
+          ) : assocDataId ? (
+            <FieldValueOutliner assocDataId={assocDataId} fieldDataType={dataType} attrDefId={attrDefId} onNavigateOut={onNavigateOut} />
+          ) : (
+            <div className="flex min-h-7 items-start gap-2 py-1" style={{ paddingLeft: 6 }}>
+              <BulletChevron hasChildren={false} isExpanded={false} onBulletClick={noop} dimmed />
+              <span className="text-sm leading-[21px] text-foreground-tertiary select-none">Empty</span>
+            </div>
+          )}
+        </div>
+        {validationWarning && (
+          <div className="flex items-center h-7 pr-1">
+            <ValidationWarning message={validationWarning} />
           </div>
         )}
       </div>

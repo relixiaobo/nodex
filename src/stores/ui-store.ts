@@ -68,6 +68,10 @@ interface UIStore {
   triggerHint: '#' | '@' | null;
   setTriggerHint(hint: '#' | '@' | null): void;
 
+  // Click coordinates for cursor positioning (consumed once by NodeEditor on mount)
+  focusClickCoords: { x: number; y: number } | null;
+  setFocusClickCoords(coords: { x: number; y: number } | null): void;
+
   // Pending reference ↔ inline reference conversion (session-only)
   pendingRefConversion: {
     tempNodeId: string;
@@ -206,6 +210,10 @@ export const useUIStore = create<UIStore>()(
       // Trigger hint
       triggerHint: null,
       setTriggerHint: (hint) => set({ triggerHint: hint }),
+
+      // Click coordinates for cursor positioning
+      focusClickCoords: null,
+      setFocusClickCoords: (coords) => set({ focusClickCoords: coords }),
 
       // Pending reference conversion (session-only)
       pendingRefConversion: null,

@@ -423,14 +423,26 @@ export function DatePicker({ value, onSelect, onClose }: DatePickerProps) {
 
 // ─── DateInputField ──────────────────────────────────────────────
 
-/** Format raw digits into YYYY/MM/DD template. */
-function formatDigitsToMask(digits: string): string {
-  let result = '';
-  for (let i = 0; i < digits.length; i++) {
-    if (i === 4 || i === 6) result += '/';
-    result += digits[i];
+/** Build per-character display array: always 10 chars, typed vs template. */
+function buildDisplayChars(digits: string): { char: string; typed: boolean }[] {
+  const TEMPLATE = 'YYYY/MM/DD';
+  const chars: { char: string; typed: boolean }[] = [];
+  let di = 0;
+  for (let ti = 0; ti < TEMPLATE.length; ti++) {
+    if (TEMPLATE[ti] === '/') {
+      // Separator: typed when its preceding digit group is complete
+      const threshold = ti === 4 ? 4 : 6;
+      chars.push({ char: '/', typed: digits.length >= threshold });
+    } else {
+      if (di < digits.length) {
+        chars.push({ char: digits[di], typed: true });
+        di++;
+      } else {
+        chars.push({ char: TEMPLATE[ti], typed: false });
+      }
+    }
   }
-  return result;
+  return chars;
 }
 
 /** Convert raw digits (up to 8) to YYYY-MM-DD date string, or null if invalid/incomplete. */
@@ -513,9 +525,10 @@ function DateInputField({
     }
   }, [allSelected, digits, commitEdit]);
 
-  // Build masked display
-  const masked = formatDigitsToMask(digits);
-  const templateRemaining = 'YYYY/MM/DD'.slice(masked.length);
+  // Build per-character display (always 10 chars — zero layout shift)
+  const displayChars = useMemo(() => buildDisplayChars(digits), [digits]);
+  const cursorIdx = allSelected ? -1 : displayChars.findIndex(c => !c.typed);
+  const fullText = displayChars.map(c => c.char).join('');
 
   return (
     <div
@@ -542,16 +555,22 @@ function DateInputField({
             onBlur={commitEdit}
             readOnly
           />
-          {/* Visual masked display */}
-          <span className="text-sm select-none whitespace-pre">
+          {/* Visual masked display — always 10 chars, no layout shift */}
+          <span className="text-sm select-none">
             {allSelected ? (
-              <span className="bg-primary/20 text-foreground rounded-sm">{masked}</span>
+              <span className="bg-primary/20 text-foreground rounded-sm">{fullText}</span>
             ) : (
-              <>
-                <span className="text-foreground">{masked}</span>
-                <span className="inline-block w-[1.5px] h-[14px] bg-foreground align-middle animate-pulse" />
-                <span className="text-foreground-tertiary">{templateRemaining}</span>
-              </>
+              displayChars.map((c, i) => (
+                <span
+                  key={i}
+                  className={`${c.typed ? 'text-foreground' : 'text-foreground-tertiary'}${i === cursorIdx ? ' relative' : ''}`}
+                >
+                  {i === cursorIdx && (
+                    <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[1.5px] h-[14px] bg-foreground animate-pulse pointer-events-none" />
+                  )}
+                  {c.char}
+                </span>
+              ))
             )}
           </span>
         </div>

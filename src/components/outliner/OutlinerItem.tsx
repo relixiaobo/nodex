@@ -711,7 +711,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     return (
       <div
         className="text-xs text-muted-foreground"
-        style={{ paddingLeft: depth * 24 }}
+        style={{ paddingLeft: depth * 28 }}
       >
         Loading...
       </div>
@@ -727,17 +727,17 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       {isDropTarget && dropPosition === 'before' && (
         <div
           className="h-0.5 bg-primary rounded-full"
-          style={{ marginLeft: depth * 24 + 6 + 15 }}
+          style={{ marginLeft: depth * 28 + 6 + 15 + 4 }}
         />
       )}
       <div
         ref={rowRef}
-        className={`group/row flex min-h-7 items-start py-1 ${
+        className={`group/row flex gap-1 min-h-7 items-start py-1 ${
           isDropTarget && dropPosition === 'inside'
             ? 'bg-primary/10 ring-1 ring-primary/30 rounded-sm'
             : ''
         } ${isDragging ? 'opacity-40' : ''}`}
-        style={{ paddingLeft: depth * 24 + 6 }}
+        style={{ paddingLeft: depth * 28 + 6 }}
         draggable={!isFocused}
         onDragStart={handleDragStart}
         onDragOver={handleDragOver}
@@ -881,19 +881,19 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       {isDropTarget && dropPosition === 'after' && (
         <div
           className="h-0.5 bg-primary rounded-full"
-          style={{ marginLeft: depth * 24 + 6 + 15 }}
+          style={{ marginLeft: depth * 28 + 6 + 15 + 4 }}
         />
       )}
       {isExpanded && (
         <div className="relative">
           {/* Indent guide line — 16px click area LEFT of bullet center.
-               Parent bullet center = depth*24 + 28.5.
-               Button right edge at depth*24+29 (1px gap to child ChevronButton at depth*24+30).
-               Visual line at right edge via justify-end, centered at ~28.5.
+               Parent bullet center = depth*28 + 32.5.
+               Button right edge at depth*28+33 (1px gap to child ChevronButton at depth*28+34).
+               Visual line at right edge via justify-end, centered at ~32.5.
                No overlap with child chevron/bullet hover zones. */}
           <button
             className="indent-line absolute top-0 bottom-0 z-10 flex justify-end cursor-pointer"
-            style={{ left: depth * 24 + 13, width: 16 }}
+            style={{ left: depth * 28 + 17, width: 16 }}
             onClick={handleIndentLineClick}
             title="Toggle children"
           >
@@ -902,7 +902,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
           {/* Render children in natural order: fields as FieldRow, content as OutlinerItem */}
           {visibleChildren.map(({ id, type }, i) =>
             type === 'field' ? (
-              <div key={id} className="@container" style={{ paddingLeft: (depth + 1) * 24 + 6 + 15 }}>
+              <div key={id} className="@container" style={{ paddingLeft: (depth + 1) * 28 + 6 + 15 + 4 }}>
                 <FieldRow
                   nodeId={nodeId}
                   attrDefId={fieldMap.get(id)!.attrDefId}

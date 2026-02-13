@@ -141,23 +141,42 @@ export function FieldRow({
     setEditingFieldName(tupleId);
   }, [tupleId, setEditingFieldName]);
 
-  // System fields: read-only, auto-derived from node metadata
+  // System fields: read-only value, but name area supports click → FieldNameInput (for Enter/Backspace/navigation)
   if (isSystemField) {
     const sysFieldDef = SYSTEM_FIELD_MAP.get(attrDefId);
     const SysIcon = sysFieldDef?.icon;
     const displayText = valueName || '—';
     return (
       <div className={`border-t ${isLastInGroup ? 'border-b' : ''} border-border-subtle flex flex-col @sm:flex-row @sm:items-start min-h-[28px]`} data-field-row>
-        {/* Name column */}
+        {/* Name column — clickable to enter editing (Enter → create sibling, Backspace → delete) */}
         <div className="flex items-center gap-1 @sm:shrink-0 @sm:w-[130px] min-w-0 h-7 py-1">
           <span className="shrink-0 w-[15px] flex items-center justify-center text-foreground-tertiary">
             {SysIcon && <SysIcon size={12} />}
           </span>
-          <span className="block text-sm leading-[22px] h-[22px] text-foreground-tertiary truncate" title={attrDefName}>
-            {attrDefName}
-          </span>
+          <div
+            className={`flex-1 min-w-0 flex items-center${!isEditing ? ' cursor-text' : ''}`}
+            onClick={!isEditing ? handleNameClick : undefined}
+          >
+            {isEditing ? (
+              <FieldNameInput
+                tupleId={tupleId}
+                nodeId={nodeId}
+                attrDefId={attrDefId}
+                currentName={attrDefName}
+                onEnterConfirm={handleEnterConfirm}
+                clickOffsetX={clickOffsetXRef.current}
+              />
+            ) : (
+              <span
+                className="block text-sm leading-[22px] h-[22px] text-foreground-tertiary truncate"
+                title={attrDefName}
+              >
+                {attrDefName}
+              </span>
+            )}
+          </div>
         </div>
-        {/* Value column */}
+        {/* Value column — read-only */}
         <div className="flex flex-1 min-w-0 items-center min-h-7 py-1" data-field-value>
           {dataType === '__system_node__' && valueNodeId ? (
             <button

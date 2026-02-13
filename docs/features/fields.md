@@ -21,9 +21,11 @@
 - 字段名为空时自动聚焦到字段名编辑器
 - 若父节点最后一个可见子项是 field，仍显示一个空白 `TrailingInput` 行，允许直接继续输入普通子节点
 
-### 字段值统一模型（设计原则）
+### 字段值统一模型（目标与现状）
 
-**所有字段类型的值区域本质上都是 outliner**。数据模型层面，值永远是 `assocData.children[]` —— 一组节点。dataType 只决定值节点的**输入方式**和**显示格式**，不改变值区域的底层结构。
+**目标规格（未来）**：所有字段类型的值区域本质上都是 outliner，数据模型层面统一为 `assocData.children[]`（值是一组节点）。dataType 只决定值节点的**输入方式**和**显示格式**，不改变底层结构。
+
+**当前实现（2026-02）**：渲染层已统一为 `FieldValueOutliner`；数据层仍有历史兼容路径（部分读写仍使用 tuple 的 `children[1]`），尚未完全迁移到“仅 assocData.children[]”。
 
 统一行为（所有类型共享）：
 - 值区域 = `FieldValueOutliner`（mini outliner）
@@ -42,14 +44,14 @@
 - **Email**：邮箱输入
 - **Checkbox**：复选框 toggle
 
-> **已完成统一**：所有字段类型（含 Checkbox）的值区域统一通过 FieldValueOutliner 渲染。OutlinerItem 通过 `fieldDataType` prop 控制特殊渲染（如 Checkbox → toggle）。FieldValueEditor 已成为死代码。
+> **状态**：值区域渲染统一已完成（含 Checkbox）；数据存储统一仍在收敛中。`FieldValueEditor` 已不在主渲染路径中使用。
 
 ### 字段配置页（AttrDef Config）
 
 - 点击字段名 → navigateTo attrDef 节点（进入配置页）
 - 配置页是标准 NodePanel 渲染被 SYS_T02 (FIELD_DEFINITION) 标记的节点
 - 配置项（所有类型通用）：
-  - **Field type**: 下拉选择数据类型（Plain / Options / Date / Number / URL / Email / Checkbox）
+  - **Field type**: 下拉选择数据类型（Plain / Options / Options from Supertag / Date / Number / URL / Email / Checkbox）
   - **Required**: 开关，空值时视觉警告
   - **Hide field**: 下拉选择（Never / When empty / Always）
 - 配置项（特定类型）：
@@ -61,13 +63,13 @@
 
 ### Plain 类型（默认）
 
-- 值区域渲染为标准 OutlinerView（子节点列表）
+- 值区域渲染为 `FieldValueOutliner`（统一值渲染器）
 - 支持添加子节点、编辑、拖拽等所有大纲操作
 - 这是默认类型，不选择其他类型时就是 Plain
 
 ### Options 类型 — 已实现
 
-- 值区域渲染为 `OptionsPicker` combobox（输入 + 下拉选择 + 新建）
+- 值区域渲染为 `FieldValueOutliner`（统一值渲染器）
 - 选项来源：Pre-determined options（attrDef 配置的固定选项列表）
 - **Display 模式**：选中选项以 reference bullet（dotted）+ name 显示；无值时 dimmed bullet + "Select option"
 - **Editing 模式**（点击进入）：
@@ -83,7 +85,14 @@
   - Toggle（ON/OFF）控制是否将 auto-collected 值作为可选项
   - 名称列显示 "(N)" 计数
   - Toggle 下方显示 auto-collected 值列表（reference bullet 样式）
-- 待扩展：Options from Supertag
+### Options from Supertag 类型 — 已实现
+
+- 独立字段类型 `SYS_D05`，选项来源 = 所有被某 supertag 标记的节点
+- attrDef 配置页显示 "Supertag" picker（`ConfigTagPicker`，复用 `NodePicker` + `useWorkspaceTags`）
+- 选择一个 tagDef 后，`useFieldOptions` 通过 `resolveSourceSupertag` → `resolveTaggedNodes` 查找所有被该 tag 标记的内容节点
+- TrailingInput / OutlinerItem 共用 `isOptionsField` 逻辑（SYS_D05 与 SYS_D12 合并处理），下拉列表自动展示 tagged nodes
+- 配置数据存储：attrDef children 中的 Tuple `[SYS_A06, tagDefId]`
+- 选择选项后通过 `addReference` 添加引用（复用 Options 现有机制）
 
 ### Date 类型 — 已实现（Notion 风格）
 
@@ -99,7 +108,7 @@
   - 纯 `onKeyDown` 拦截：只接受数字，小时 1-12，分钟 0-59，2 位自动跳到下一段
 - **即时保存**：点击日期/修改时间立即 `onSelect()`，无 OK 按钮
 - **清除**：底部 "Clear" 按钮
-- 值存储格式：`YYYY-MM-DD`（单日期）/ `YYYY-MM-DD → YYYY-MM-DD`（范围）/ 含时间 `YYYY-MM-DD HH:mm`
+- 值存储格式：`YYYY-MM-DD`（单日期）/ `YYYY-MM-DDTHH:MM`（单日期+时间）/ `YYYY-MM-DD/YYYY-MM-DD`（范围）/ `YYYY-MM-DDTHH:MM/YYYY-MM-DDTHH:MM`（范围+时间）
 - 待扩展：链接到日节点、自然语言输入
 
 ### Number 类型 — 已实现
@@ -205,13 +214,15 @@
 - Filter/Sort/Group 工具栏优先展示 pinned 字段
 - 多标签节点中跨所有标签统一显示
 
-### 删除字段级联清理
+### 删除字段：当前行为与目标行为
 
-- trashNode(attrDefId) 时自动级联：
-  - 遍历所有节点（含 tagDef 模板），移除引用该 attrDef 的字段 tuple
-  - 清理对应 associatedData + associationMap
-  - attrDef 本身移到 Trash
-- Tana 行为：被删字段在节点上显示废纸篓图标（Nodex 当前直接清除引用）
+- **当前行为（已实现）**：
+  - `trashNode(attrDefId)` 仅将 attrDef 移到 Trash，不做全局级联清理
+  - 既有字段 tuple 引用会保留，UI 以 trashed 状态显示（废纸篓/警示语义）
+- **目标行为（未来）**：
+  - 删除 attrDef 时自动级联清理所有引用（含模板中的字段 tuple）
+  - 同步清理对应 `associatedData` + `associationMap`
+- Tana 行为：删除字段后通常保留可见的“字段已删除”状态提示
 
 ### Merge Fields — 未实现
 
@@ -231,13 +242,13 @@
 | 2026-02-06 | 所有类型通用配置 + 特定配置分离 | ATTRDEF_CONFIG_MAP 用 appliesTo 控制可见性 |
 | 2026-02-06 | Options/Checkbox 使用 SYS_V03/V04 布尔值 | 与 Tana 数据模型一致 |
 | 2026-02-06 | Unified NodePicker 设计模式 | Options、Config Select 等统一为"从列表选节点"组件 |
-| 2026-02-12 | trashNode(attrDef) 级联清理所有引用 | 删除字段后，所有使用该字段的节点自动移除字段 tuple |
+| 2026-02-12 | 目标：trashNode(attrDef) 级联清理所有引用（尚未实现） | 避免残留字段引用，减少文档噪音 |
 | 2026-02-12 | 对比 Tana 官方文档补全遗漏（Hide 5 种模式、Auto-init 6 种策略等） | 确保功能清单完整 |
 | 2026-02-12 | ~~FieldRow 按 dataType 分发到 3 种渲染器~~ 已废弃 | 被统一值渲染器替代 |
 | 2026-02-12 | ~~FieldValueEditor 移除 Options 分支~~ 已废弃 | FieldValueEditor 整体废弃 |
 | 2026-02-12 | OptionsPicker 改为 combobox 模式 | 支持输入搜索 + 新建选项，与 Tana 交互一致 |
 | 2026-02-12 | Auto-collect: 原节点在 field value，引用在 autocollect Tuple | 分离 pre-determined 与 auto-collected，Tuple children[2+] 存引用 |
-| 2026-02-12 | **统一值渲染器**：所有字段类型值区域 = FieldValueOutliner | 数据模型层面值永远是 assocData.children[]，dataType 只决定值节点的输入方式和显示格式，不改变底层结构。替代当前 3 渲染器分发 |
+| 2026-02-12 | **统一值渲染器**：所有字段类型值区域 = FieldValueOutliner | 渲染层统一已完成；数据层仍保留 tuple children[1] 的兼容读写，后续继续收敛到 assocData.children[] |
 | 2026-02-12 | Checkbox 统一：OutlinerItem 支持 fieldDataType prop | Checkbox 值节点渲染为 toggle 而非编辑器，FieldValueEditor 变为死代码 |
 | 2026-02-13 | DatePicker 重写为 Notion 风格 | 自定义日历 + masked input + Toggle 控制范围/时间 + 即时保存，替代浏览器原生 date input |
 | 2026-02-13 | 隐藏字段改为 pill click-to-reveal（替代 hover-to-reveal） | Tana 风格：`+ FieldName` 紧凑按钮，点击临时显示。所有隐藏模式（含 Always）都出现 pill |
@@ -245,25 +256,26 @@
 | 2026-02-13 | Number Min/Max 配置 + 范围验证 | NDX_A03/A04 存储，ConfigNumberInput 编辑，validateFieldValue 支持 ≥ min / ≤ max 警告 |
 | 2026-02-14 | FieldNameInput 的 Enter 语义固定为「确认并创建下方节点」 | 避免字段自动完成误替换（如 Done → Done time），保证输入流连续性 |
 | 2026-02-14 | 父节点末尾为 field 时仍渲染 TrailingInput | 支持在字段块后直接输入普通内容，符合 outliner 连续输入习惯 |
+| 2026-02-14 | Options from Supertag: ConfigTagPicker 复用 NodePicker + useWorkspaceTags | 无新 UI 模式，tag picker 同时服务 attrDef(SYS_A06) 和 tagDef(SYS_A14) |
 
 ## 当前状态
 
 - [x] `>` 触发字段创建
 - [x] 字段名编辑 + 自动完成
 - [x] 字段/内容交错渲染
-- [x] 字段值编辑器（Plain 类型 = OutlinerView）
+- [x] 字段值编辑器（Plain 类型 = FieldValueOutliner）
 - [x] AttrDef 配置页（Field type / Required / Hide / Auto-collect / Auto-initialize）
 - [x] 新字段自动应用 SYS_T02 标签
-- [x] Delete field 按钮 + 级联清理
-- [x] Options combobox（OptionsPicker: 搜索 + 选择 + 新建选项 + Auto-collect）
+- [ ] Delete field 级联清理（当前仅移入 Trash，不级联）
+- [x] Options combobox 交互（搜索 + 选择 + 新建选项 + Auto-collect）
 - [x] Date 日期选择器（Notion 风格：自定义日历 + masked input + 范围/时间 Toggle + 即时保存）
 - [x] Number 数字输入（click-to-edit, Integer/Number）
-- [x] URL 链接输入（click-to-edit, 蓝色链接样式）
+- [x] URL 输入 + 格式验证（蓝色链接样式待实现）
 - [x] Email 邮箱输入（click-to-edit）
 - [x] Checkbox 复选框（inline toggle, SYS_V03/V04）
 - [x] FieldRow 统一值渲染器（所有类型 → FieldValueOutliner，含 Checkbox）
 - [x] Options 自动补全（TrailingInput 集成，输入时下拉匹配预置/auto-collected 选项，Enter 添加引用）
-- [ ] Options from Supertag（独立类型）
+- [x] Options from Supertag（ConfigTagPicker + resolveSourceSupertag + resolveTaggedNodes）
 - [ ] Tana User 类型
 - [x] 字段隐藏规则运行时（4/5 种模式：Never/When empty/When not empty/Always + pill click-to-reveal）
 - [x] Required 字段视觉提示（红色 * 号）
@@ -284,7 +296,7 @@
 - ~~Tana 字段隐藏有 5 种模式~~ **基本完成**：已实现 4/5 种（Never/When empty/When not empty/Always），"When value is default" 需要 default 值概念后续补充
 - Tana Auto-initialize 有 6 种策略，适用于多种字段类型
 - Tana 的 "Used in" 计算字段显示所有使用该字段的 supertag，Nodex 延后
-- Tana 删除字段后节点显示 trash icon，Nodex 直接清除引用
+- Tana 删除字段后节点显示 trash icon；Nodex 当前也保留引用并显示 trashed 状态（尚未实现级联清理）
 - Tana 有 Pinned fields 机制（置顶 + filter 优先），Nodex 暂不支持
 - Tana 有 Audio-enabled / AI-enhanced / AI instructions 字段功能，属 Tana 特有，Nodex 跳过
 - Tana 系统字段 12 种，Nodex 实现 8 种（延后：Edited by / Number of references / Date from calendar node / Number of nodes with this tag）

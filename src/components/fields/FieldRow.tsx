@@ -32,6 +32,7 @@ import { ConfigSelect } from './ConfigSelect';
 import { ConfigNumberInput } from './ConfigNumberInput';
 import { ConfigOutliner } from './ConfigOutliner';
 import { AutoCollectSection } from './AutoCollectSection';
+import { ConfigTagPicker } from './ConfigTagPicker';
 import { BulletChevron } from '../outliner/BulletChevron';
 import { VALIDATED_FIELD_TYPES, validateFieldValue, ValidationWarning } from './field-validation';
 import { ATTRDEF_OUTLINER_FIELDS, TAGDEF_OUTLINER_FIELDS } from '../../lib/field-utils.js';
@@ -251,16 +252,16 @@ export function FieldRow({
             <ConfigOutliner nodeId={nodeId} />
           ) : isSelect ? (
             <ConfigSelect tupleId={tupleId} fieldKey={attrDefId} currentValue={valueName} />
+          ) : isTagPicker ? (
+            <ConfigTagPicker tupleId={tupleId} fieldKey={attrDefId} currentValue={valueName} />
           ) : (
-            /* Toggle / number_input / tag_picker / color_picker — bullet + inline control */
+            /* Toggle / number_input / color_picker — bullet + inline control */
             <div className="flex min-h-7 items-center gap-2 py-1" style={{ paddingLeft: 6 }}>
               <BulletChevron hasChildren={false} isExpanded={false} onBulletClick={noop} />
               {isToggle ? (
                 <ConfigToggle tupleId={tupleId} fieldKey={attrDefId} currentValue={valueName} />
               ) : isNumberInput ? (
                 <ConfigNumberInput tupleId={tupleId} fieldKey={attrDefId} currentValue={valueName} />
-              ) : isTagPicker ? (
-                <span className="text-xs text-foreground-tertiary italic">Not set</span>
               ) : isColorPicker ? (
                 <span className="text-xs text-foreground-tertiary italic">Default</span>
               ) : null}

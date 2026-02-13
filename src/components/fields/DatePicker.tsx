@@ -58,16 +58,21 @@ function generateCalendarDays(year: number, month: number): DayCell[][] {
     });
   }
 
-  const nextMonth = month === 11 ? 0 : month + 1;
-  const nextYear = month === 11 ? year + 1 : year;
-  const remaining = 7 - (cells.length % 7);
-  if (remaining < 7) {
-    for (let d = 1; d <= remaining; d++) {
-      cells.push({
-        day: d, month: nextMonth, year: nextYear, isCurrentMonth: false,
-        dateStr: `${nextYear}-${String(nextMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`,
-      });
+  // Always pad to 6 rows (42 cells) like Notion — show more overflow from next month
+  while (cells.length < 42) {
+    const prev = cells[cells.length - 1];
+    let nm = prev.month;
+    let ny = prev.year;
+    let nd = prev.day + 1;
+    const maxD = getDaysInMonth(ny, nm);
+    if (nd > maxD) {
+      nd = 1;
+      if (nm === 11) { nm = 0; ny += 1; } else { nm += 1; }
     }
+    cells.push({
+      day: nd, month: nm, year: ny, isCurrentMonth: false,
+      dateStr: `${ny}-${String(nm + 1).padStart(2, '0')}-${String(nd).padStart(2, '0')}`,
+    });
   }
 
   const weeks: DayCell[][] = [];
@@ -269,7 +274,13 @@ export function DatePicker({ value, onSelect, onClose }: DatePickerProps) {
       setEndDate(e);
       setHoveredDate('');
     }
-  }, [includeEnd, editingEnd, selectedDate, endDate]);
+    // Auto-jump calendar when clicking an overflow (non-current-month) date
+    const { year: cy, month: cm } = dateStrToYM(dateStr);
+    if (cy !== viewYear || cm !== viewMonth) {
+      setViewYear(cy);
+      setViewMonth(cm);
+    }
+  }, [includeEnd, editingEnd, selectedDate, endDate, viewYear, viewMonth]);
 
   // Today button
   const handleToday = useCallback(() => {
@@ -413,26 +424,33 @@ function DateInputField({
   onTimeChange?: (v: string) => void;
 }) {
   return (
-    <button
-      className={`flex w-full items-center justify-between rounded-md border px-2.5 py-1.5 text-sm cursor-pointer transition-colors ${
+    <div
+      className={`flex w-full items-center rounded-md border text-sm cursor-pointer transition-colors ${
         active && showRing
-          ? 'border-primary ring-1 ring-primary/50 bg-transparent'
-          : 'border-border bg-transparent hover:border-foreground/20'
+          ? 'border-primary bg-primary/5'
+          : active && !showRing
+            ? 'border-border bg-transparent'
+            : 'border-border bg-transparent hover:border-foreground/20'
       }`}
       onClick={onClick}
     >
-      <span className={dateStr ? 'text-foreground' : 'text-foreground-tertiary'}>
+      {/* Date part */}
+      <span className={`flex-1 px-2.5 py-1.5 ${dateStr ? 'text-foreground' : 'text-foreground-tertiary'}`}>
         {dateStr ? formatInputDate(dateStr) : placeholder}
       </span>
+      {/* Time part — separated by | divider */}
       {timeStr && onTimeChange ? (
-        <span
-          className="text-foreground-secondary"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <InlineTimeInput value={timeStr} onChange={onTimeChange} />
-        </span>
+        <>
+          <span className="text-foreground-tertiary/40">|</span>
+          <span
+            className="px-2 py-1.5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <InlineTimeInput value={timeStr} onChange={onTimeChange} />
+          </span>
+        </>
       ) : null}
-    </button>
+    </div>
   );
 }
 
@@ -697,22 +715,14 @@ function CalendarGrid({
   // Calendar grid — 7 columns, no week numbers
   return (
     <div>
-      {/* Month/Year navigation + Today */}
+      {/* Month/Year navigation + Today — Notion style: "Month Year" left, "Today < >" right */}
       <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-1">
-          <button
-            className="rounded-md px-1.5 py-0.5 bg-foreground/5 text-xs font-medium hover:bg-foreground/10 transition-colors cursor-pointer"
-            onClick={() => setPickerMode('month')}
-          >
-            {MONTH_NAMES[viewMonth]}
-          </button>
-          <button
-            className="rounded-md px-1.5 py-0.5 bg-foreground/5 text-xs font-medium hover:bg-foreground/10 transition-colors cursor-pointer"
-            onClick={() => setPickerMode('year')}
-          >
-            {viewYear}
-          </button>
-        </div>
+        <button
+          className="text-sm font-medium text-foreground hover:text-foreground-secondary transition-colors cursor-pointer"
+          onClick={() => setPickerMode('month')}
+        >
+          {MONTH_NAMES[viewMonth]} {viewYear}
+        </button>
         <div className="flex items-center gap-1">
           <button
             className="rounded-md px-1.5 py-0.5 text-xs text-foreground-secondary hover:bg-foreground/5 transition-colors cursor-pointer"
@@ -741,37 +751,64 @@ function CalendarGrid({
       {/* Weeks — 7 columns, no week numbers */}
       {weeks.map((week, wi) => (
         <div key={wi} className="grid grid-cols-7 gap-0">
-          {week.map((cell) => {
+          {week.map((cell, ci) => {
             const isToday = cell.dateStr === today;
             const isSelected = cell.dateStr === selectedDate;
-            const isEnd = cell.dateStr === effectiveEnd && !!effectiveStart;
-            const isStart = cell.dateStr === effectiveStart && !!effectiveEnd;
+            const hasRange = !!effectiveStart && !!effectiveEnd && effectiveStart !== effectiveEnd;
+            const isEnd = cell.dateStr === effectiveEnd && hasRange;
+            const isStart = cell.dateStr === effectiveStart && hasRange;
             const inRange = isInRange(cell.dateStr);
+            // Non-current month dates: not clickable in single mode (like Notion)
+            const isOverflow = !cell.isCurrentMonth;
+            const isRangeActive = !!rangeStart;
+            const disabled = isOverflow && !isRangeActive && !inRange;
 
-            // Notion style: selected = filled blue rounded-md
-            let cls = 'aspect-square h-7 mx-auto flex items-center justify-center rounded-md text-sm cursor-pointer transition-colors';
+            // Full-width cells for continuous range band
+            let cls = 'h-7 flex items-center justify-center text-sm transition-colors';
 
-            if (isSelected || isStart || isEnd) {
-              cls += ' bg-primary text-primary-foreground font-medium';
-            } else if (isToday) {
-              cls += ' ring-1 ring-primary/30 font-medium';
+            if (isStart && isEnd) {
+              // Same day range: fully rounded
+              cls += ' bg-primary text-primary-foreground font-medium rounded-md';
+            } else if (isStart) {
+              // Range start: filled blue, rounded left only (right connects to range)
+              cls += ' bg-primary text-primary-foreground font-medium rounded-l-md';
+            } else if (isEnd) {
+              // Range end: filled blue, rounded right only
+              cls += ' bg-primary text-primary-foreground font-medium rounded-r-md';
+            } else if (isSelected) {
+              // Single selected: fully rounded
+              cls += ' bg-primary text-primary-foreground font-medium rounded-md';
             } else if (inRange) {
+              // Range middle: no rounding for continuous band
               cls += ' bg-primary-muted';
+              // Round edges at row boundaries for clean look
+              if (ci === 0) cls += ' rounded-l-md';
+              if (ci === 6) cls += ' rounded-r-md';
+            } else if (isToday) {
+              cls += ' ring-1 ring-primary/30 font-medium rounded-md';
             } else {
-              cls += ' hover:bg-foreground/5';
+              cls += ' rounded-md';
+              if (!disabled) cls += ' hover:bg-foreground/5';
             }
 
-            if (!cell.isCurrentMonth && !isSelected && !isStart && !isEnd) {
-              cls += ' text-foreground-tertiary';
+            if (disabled) {
+              cls += ' text-foreground-tertiary/40 cursor-default';
+            } else if (isOverflow && !isSelected && !isStart && !isEnd && !inRange) {
+              cls += ' text-foreground-tertiary cursor-pointer';
+            } else if (!isSelected && !isStart && !isEnd) {
+              cls += ' cursor-pointer';
+            } else {
+              cls += ' cursor-pointer';
             }
 
             return (
               <button
                 key={cell.dateStr}
                 className={cls}
-                onClick={() => onSelectDate(cell.dateStr)}
-                onMouseEnter={() => onHover?.(cell.dateStr)}
+                onClick={() => !disabled && onSelectDate(cell.dateStr)}
+                onMouseEnter={() => !disabled && onHover?.(cell.dateStr)}
                 onMouseLeave={() => onHover?.('')}
+                disabled={disabled}
               >
                 {cell.day}
               </button>

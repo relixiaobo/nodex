@@ -125,14 +125,15 @@
   text-decoration: underline;
 }
 
-/* Ref conversion shimmer: color breathes between foreground and primary */
+/* Ref conversion shimmer: color breathes between foreground and primary.
+   Peak at 35% → return takes 65% of cycle for a gentle fade back. */
 @keyframes ref-conversion-shimmer {
   0%, 100% { color: var(--color-foreground); }
-  50% { color: var(--color-primary); }
+  35% { color: var(--color-primary); }
 }
 
 .ref-converting .tiptap [data-inlineref-node] {
-  animation: ref-conversion-shimmer 2.5s ease infinite;
+  animation: ref-conversion-shimmer 2.5s ease-in-out infinite;
 }
 
 /* Indent guide line — hover thickens line subtly, no background fill.

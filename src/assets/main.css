@@ -52,6 +52,7 @@
   padding: 0.125rem 0.25rem;
   font-family: var(--font-mono);
   font-size: 0.85em;
+  line-height: inherit;
 }
 
 .tiptap mark,
@@ -76,6 +77,13 @@
 .tiptap s,
 .node-content s {
   text-decoration: line-through;
+}
+
+/* Static node display: match editor-inline layout so text doesn't reflow on blur.
+   TipTap wraps text in <p> which defaults to display:block; force inline. */
+.node-content p {
+  display: inline;
+  margin: 0;
 }
 
 /* TipTap editor-only styles */

@@ -45,8 +45,9 @@ export const ReferenceExtension = Extension.create<{ callbacks: { current: Refer
 
               // Only trigger on doc changes (user typed something),
               // not on selection-only changes (focus, arrow keys).
-              // This prevents re-entering a node with existing @ from triggering.
-              const docChanged = !prevState || !view.state.doc.eq(prevState.doc);
+              // !prevState = initial mount → treat as no change (prevents
+              // triggering on focus when text already contains @).
+              const docChanged = !!prevState && !view.state.doc.eq(prevState.doc);
 
               const { state } = view;
               const { from } = state.selection;

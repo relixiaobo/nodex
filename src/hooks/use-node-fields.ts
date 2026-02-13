@@ -8,7 +8,7 @@
  */
 import { useMemo } from 'react';
 import { useNodeStore } from '../stores/node-store';
-import { resolveDataType, resolveHideField, resolveRequired, ATTRDEF_CONFIG_MAP, ATTRDEF_CONFIG_FIELDS, ATTRDEF_OUTLINER_FIELDS, TAGDEF_CONFIG_MAP, TAGDEF_CONFIG_FIELDS, TAGDEF_OUTLINER_FIELDS } from '../lib/field-utils.js';
+import { resolveDataType, resolveHideField, resolveRequired, ATTRDEF_CONFIG_MAP, ATTRDEF_CONFIG_FIELDS, ATTRDEF_OUTLINER_FIELDS, TAGDEF_CONFIG_MAP, TAGDEF_CONFIG_FIELDS, TAGDEF_OUTLINER_FIELDS, SYSTEM_FIELD_MAP, resolveSystemFieldValue } from '../lib/field-utils.js';
 import type { NodexNode } from '../types/index.js';
 
 export interface FieldEntry {
@@ -75,6 +75,21 @@ function computeFields(entities: Record<string, NodexNode>, nodeId: string): Fie
         });
         continue;
       }
+    }
+
+    // System fields (NDX_SYS_*): read-only, auto-derived from node metadata
+    const sysDef = SYSTEM_FIELD_MAP.get(keyId);
+    if (sysDef) {
+      const resolved = resolveSystemFieldValue(entities, nodeId, sysDef);
+      fields.push({
+        attrDefId: keyId,
+        attrDefName: sysDef.name,
+        tupleId: childId,
+        valueName: resolved.text,
+        valueNodeId: resolved.refNodeId,
+        dataType: sysDef.dataType,
+      });
+      continue;
     }
 
     if (keyId.startsWith('SYS_') || keyId.startsWith('NDX_')) continue;

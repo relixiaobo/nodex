@@ -136,6 +136,25 @@
 - FieldRow selector 读取 assocData 首个内容子节点的 `props.name`，调用 `validateFieldValue()`
 - Min/Max 通过 `resolveMinValue()` / `resolveMaxValue()` 从 attrDef 的 NDX_A03/A04 Tuple 读取
 
+### 系统字段 (System Fields) — 已实现（8/12）
+
+- 只读字段，值从节点元数据自动派生，不可编辑
+- 用户通过 `>` 添加字段时，在 field name 输入关键词可看到系统字段选项
+- 系统字段 key 以 `NDX_SYS_` 前缀存储在 tuple children[0]
+- 选中后 tuple 无 value children，值由 `resolveSystemFieldValue()` 实时计算
+- **已实现 8 种**：
+  1. **Node description** — `props.description`
+  2. **Created time** — `props.created`，Intl.DateTimeFormat 格式化
+  3. **Last edited time** — `updatedAt`
+  4. **Last edited by** — `updatedBy`
+  5. **Owner node** — `props._ownerId` → 解析节点名，可点击跳转
+  6. **Tags** — metanode chain → SYS_A13 tuples → tagDef names，逗号分隔
+  7. **Workspace** — `workspaceId` → 解析工作区名
+  8. **Done time** — `props._done`，无值显示 "—"
+- **延后 4 种**：Edited by（需多用户）、Number of references（需全量扫描）、Date from calendar node（需祖先遍历）、Number of nodes with this tag（需全量扫描）
+- FieldRow 渲染：全文字 `text-foreground-tertiary`，名称列带专属图标，值列纯文本或可点击节点引用
+- 不可重复添加同一系统字段（replaceFieldAttrDef 的 duplicate guard 自然生效）
+
 ### Tana User 类型 — 未实现
 
 - 字段值为 workspace 用户（@ mention 选择）
@@ -220,6 +239,7 @@
 | 2026-02-12 | Checkbox 统一：OutlinerItem 支持 fieldDataType prop | Checkbox 值节点渲染为 toggle 而非编辑器，FieldValueEditor 变为死代码 |
 | 2026-02-13 | DatePicker 重写为 Notion 风格 | 自定义日历 + masked input + Toggle 控制范围/时间 + 即时保存，替代浏览器原生 date input |
 | 2026-02-13 | 隐藏字段改为 pill click-to-reveal（替代 hover-to-reveal） | Tana 风格：`+ FieldName` 紧凑按钮，点击临时显示。所有隐藏模式（含 Always）都出现 pill |
+| 2026-02-13 | 系统字段 key 用 NDX_SYS_* 前缀，不创建 attrDef 节点 | 系统字段无需配置/模板，值实时派生。8/12 优先实现，4 个依赖全量扫描/多用户的延后 |
 | 2026-02-13 | Number Min/Max 配置 + 范围验证 | NDX_A03/A04 存储，ConfigNumberInput 编辑，validateFieldValue 支持 ≥ min / ≤ max 警告 |
 
 ## 当前状态
@@ -249,7 +269,7 @@
 - [x] 值验证（Number/URL/Email 格式 + Number min/max 范围，非阻塞 warning icon）
 - [ ] Page size 配置
 - [ ] Merge fields
-- [ ] 系统字段（Created time / Modified time / Owner）
+- [x] 系统字段（8/12：Description / Created / Last edited / Last edited by / Owner / Tags / Workspace / Done time）
 - [ ] "Used in" 统计
 - [ ] Semantic functions
 
@@ -263,3 +283,4 @@
 - Tana 删除字段后节点显示 trash icon，Nodex 直接清除引用
 - Tana 有 Pinned fields 机制（置顶 + filter 优先），Nodex 暂不支持
 - Tana 有 Audio-enabled / AI-enhanced / AI instructions 字段功能，属 Tana 特有，Nodex 跳过
+- Tana 系统字段 12 种，Nodex 实现 8 种（延后：Edited by / Number of references / Date from calendar node / Number of nodes with this tag）

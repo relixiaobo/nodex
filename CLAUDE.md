@@ -256,12 +256,14 @@ ContentNode
 
 ## 开发路线图与 Bug 跟踪
 
-- 路线图和进度跟踪见 `docs/ROADMAP.md`
+- 路线图见 `docs/ROADMAP.md`
 - 特性行为规格见 `docs/features/`
-- **Bug 跟踪用 GitHub Issues**（`gh issue create/view/close`）
-  - Issue 模板：`.github/ISSUE_TEMPLATE/bug.md`
-  - 复杂 bug 在 issue body 记录根因、方案迭代表格、相关 commit
-  - 每轮修复后 `gh issue comment` 追加进展
+- **Bug 跟踪和功能工作项见 `docs/issues.md`**（纯文本，方便多 agent 协作）
+  - Open bugs 有详细描述（现象、已尝试方案、根因分析、相关代码）
+  - Closed bugs 列表（编号 + 标题 + 关闭日期）
+  - Feature roadmap 汇总表（编号 + 功能 + Phase + 状态）
+  - 新增 bug 时递增编号，记录在 Open Bugs 段
+  - 修复后移动到 Closed Bugs 表格
 
 ## Chrome Side Panel 约束
 

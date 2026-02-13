@@ -1,7 +1,5 @@
 # Nodex Roadmap
 
-基于 Tana 完整功能分析的开发路线图。详细进度跟踪在 [GitHub Milestones](https://github.com/relixiaobo/nodex/milestones)。
-
 > 最后更新: 2026-02-13
 
 ## 已完成
@@ -20,19 +18,43 @@
 
 ## Milestones
 
-| Milestone | 说明 | Issues |
-|-----------|------|--------|
-| [Phase 1: 数据基础](https://github.com/relixiaobo/nodex/milestone/1) | References 增强, Supertags 完善, Fields 全类型, Date & 日记 | #19 #20 #21 #22 |
-| [Phase 2: 视图 & 搜索](https://github.com/relixiaobo/nodex/milestone/2) | Search Nodes, Table/Cards/Calendar/List View, Filter/Group/Sort | #23-#28 |
-| [Phase 3: AI & 网页](https://github.com/relixiaobo/nodex/milestone/3) | AI Chat, 网页剪藏, AI Command Nodes, AI 字段增强 | #29-#33 |
-| [Phase 4: 同步 & 可靠性](https://github.com/relixiaobo/nodex/milestone/4) | Supabase Realtime, 离线模式, 导入/导出 | #34-#36 |
-| [Phase 5: 高级功能](https://github.com/relixiaobo/nodex/milestone/5) | Command Nodes, Title Expressions, Publishing, Input API | #37-#40 |
+### Phase 1: 数据基础
+- References 增强 — 反向链接、引用计数、合并节点
+- Supertags 完善 — Checkbox, Default Child, Color, 继承等
+- Fields 全类型 — Options, Date, Number, URL, Email, Checkbox 等
+- Date 节点 & 日记 — 年/月/周/日层级、Today 入口
+
+### Phase 2: 视图 & 搜索
+- Search Nodes / Live Queries
+- Table View — 表格视图
+- Filter / Group / Sort 工具栏
+- Cards View — 卡片视图
+- Calendar View — 日历视图
+- List & Tabs View
+
+### Phase 3: AI & 网页
+- AI Chat — Side Panel 内 AI 对话
+- 网页剪藏
+- 网页 AI 辅助
+- AI Command Nodes
+- AI 字段增强 — AttrDef Config 扩展
+
+### Phase 4: 同步 & 可靠性
+- Supabase 实时同步
+- 离线模式增强
+- 导入/导出
+
+### Phase 5: 高级功能
+- Command Nodes — 自动化
+- Title Expressions — 动态标题模板
+- Publishing — 节点发布为公开网页
+- Input API — REST API 接入
 
 ## 文档索引
 
 | 文档 | 内容 |
 |------|------|
 | `docs/features/*.md` | 特性行为规格（实现时的权威参考） |
+| `docs/issues.md` | Bug 跟踪 + 功能工作项 |
 | `docs/research/` | Tana 逆向分析 |
 | `docs/design-system.md` | UI 视觉标准 |
-| [GitHub Issues](https://github.com/relixiaobo/nodex/issues) | Bug 跟踪 + 功能工作项 |

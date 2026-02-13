@@ -1,13 +1,16 @@
 # Issues
 
-> 纯文本 issue 跟踪，方便多 agent 协作。格式：`[状态] #ID 标题`
+> 纯文本 issue 跟踪，方便多 agent 协作。
+> Bug 格式：详细描述（现象、已尝试方案、根因分析、相关代码）。
+> Feature 格式：待办清单 + 相关文档。
+
+---
 
 ## Open Bugs
 
 ### #42 Field name 按 Enter 创建的节点层级错误 + 无焦点
 
-**状态**: open
-**发现**: 2026-02-13
+**状态**: open | **发现**: 2026-02-13
 **相关**: system fields 实现过程中发现，但影响所有 field 类型
 
 **现象**:
@@ -37,23 +40,26 @@
 
 ### #41 Node Description 编辑：高度跳动 + Ctrl+I 快捷键不生效
 
-**状态**: open
-**发现**: 2026-02-13
+**状态**: open | **发现**: 2026-02-13
 
 **Bug 1: 点击 description 进入编辑时高度跳动**
-- 静态显示：`text-xs leading-tight`（12px font, 15px line-height）
-- 编辑态：增加了 `min-h-4`（16px），比文本行高多 1px
-- 可能修复：移除 `min-h-4`，统一 `leading-[15px]`
+- 现象：点击 description 文本进入 contentEditable 编辑模式时，div 高度产生变化，导致下方节点向下位移
+- 根因：静态显示 `text-xs leading-tight`（12px font, 15px line-height），编辑态增加了 `min-h-4`（16px），多 1px
+- 可能修复：移除 `min-h-4`，统一 `leading-[15px]`；或始终保持 contentEditable 样式，仅用 readOnly 控制
 
 **Bug 2: Ctrl+I (Mod-i) 快捷键不触发 Add Description**
+- 现象：NodeEditor 中按 Cmd+I / Ctrl+I 不会打开 description 编辑
 - 已尝试：StarterKit 禁用 italic + `Mod-i` keymap → 不生效
-- 可能根因：Mac 上 `Mod-i` = `Cmd+I`，用户可能按的是 `Ctrl+I`
-- 下一步：添加 console.log 确认回调是否被调用
+- 可能根因：
+  1. Mac 上 `Mod-i` = `Cmd+I`，用户可能按的是物理 `Ctrl+I`，需同时绑定 `Ctrl-i`
+  2. 即使 StarterKit italic 已禁用，其他扩展/浏览器默认行为可能拦截
+  3. focus/blur 竞态：`setEditingDescription(true)` → useEffect focus → NodeEditor blur → unmount
+- 下一步：在 `handleDescriptionEdit` 中 console.log 确认回调是否被调用
 
 **相关代码**:
-- `src/components/editor/NodeEditor.tsx`
-- `src/components/outliner/OutlinerItem.tsx`
-- `src/components/panel/NodeDescription.tsx`
+- `src/components/editor/NodeEditor.tsx` — `Mod-i` keymap + ItalicNoShortcut
+- `src/components/outliner/OutlinerItem.tsx` — description 显示/编辑逻辑
+- `src/components/panel/NodeDescription.tsx` — PanelTitle description
 
 **相关 commit**: 361d4a8, 8222558
 
@@ -80,33 +86,288 @@
 | 4 | node reference 在原节点编辑时没有实时更新 | 2026-02-13 |
 | 3 | 后续进入包含 # 或 @ 的节点不应触发选择框 | 2026-02-13 |
 | 2 | field node 的 value 中不能将普通节点转换为 field node | 2026-02-13 |
-| 1 | 点击未聚焦节点的格式化文本时光标定位不准 | 2026-02-13 |
+| 1 | 点击未聚焦节点的格式化文本时光标定位不准（9 轮迭代） | 2026-02-13 |
 
-## Feature Roadmap
+---
 
-> 功能规划见 `docs/ROADMAP.md`，每个功能的详细行为规格见 `docs/features/*.md`
+## Open Features
 
-| # | 功能 | Phase | 状态 |
-|---|------|-------|------|
-| 19 | References 增强 — 反向链接、引用计数、合并节点 | 1 | open |
-| 20 | Supertags 完善 — Checkbox, Default Child, Color, 继承等 | 1 | open |
-| 21 | Fields 全类型 — Options, Date, Number, URL, Email, Checkbox 等 | 1 | open |
-| 22 | Date 节点 & 日记 | 1 | open |
-| 23 | Search Nodes / Live Queries | 2 | open |
-| 24 | Table View | 2 | open |
-| 25 | Filter / Group / Sort 工具栏 | 2 | open |
-| 26 | Cards View | 2 | open |
-| 27 | Calendar View | 2 | open |
-| 28 | List & Tabs View | 2 | open |
-| 29 | AI Chat | 3 | open |
-| 30 | 网页剪藏 | 3 | open |
-| 31 | 网页 AI 辅助 | 3 | open |
-| 32 | AI Command Nodes | 3 | open |
-| 33 | AI 字段增强 | 3 | open |
-| 34 | Supabase 实时同步 | 4 | open |
-| 35 | 离线模式增强 | 4 | open |
-| 36 | 导入/导出 | 4 | open |
-| 37 | Command Nodes — 自动化 | 5 | open |
-| 38 | Title Expressions — 动态标题模板 | 5 | open |
-| 39 | Publishing — 节点发布为公开网页 | 5 | open |
-| 40 | Input API — REST API 接入 | 5 | open |
+### #19 References 增强 — 反向链接、引用计数、合并节点
+
+**Phase**: 1 | **前置**: MVP 已完成（@触发搜索、树引用+内联引用、引用 bullet、删除引用）
+
+**待办**:
+- [ ] 反向链接 section（节点底部显示所有引用位置 + 面包屑路径）
+- [ ] 引用计数 badge
+- [ ] 合并节点（选中重复节点 → 合并 children/tags，更新所有引用）
+
+**文档**: `docs/features/references.md`
+
+---
+
+### #20 Supertags 完善 — Checkbox, Default Child, Color, 继承等
+
+**Phase**: 1 | **前置**: 基础已完成（#触发、标签应用/移除、配置页、模板字段、TagBadge 右键菜单）
+
+**待办**:
+- [ ] Show as Checkbox（标签开启 checkbox 行为，Done 状态双向映射）
+- [ ] Default Child Supertag（新增子节点自动继承指定标签）
+- [ ] Color picker（真实色板 swatches）
+- [ ] Pinned fields（置顶显示 + filter 优先）
+- [ ] Optional fields（建议按钮 + 自动降级）
+- [ ] applyTag 复制 default content 中的普通节点
+- [ ] Convert to supertag（普通节点快捷转 tagDef）
+- [ ] 批量标签操作（多选 add/remove）
+- [ ] 标签继承/Extend（子标签继承父标签模板字段）
+- [ ] Title expression（${field name} 动态标题）
+- [ ] 标签页（点击 supertag → 显示所有打该标签的节点列表/表格）
+
+**文档**: `docs/features/supertags.md`
+
+---
+
+### #21 Fields 全类型 — Options, Date, Number, URL, Email, Checkbox 等
+
+**Phase**: 1 | **前置**: 基础已完成（>触发、字段名编辑+自动完成、交错渲染、字段值编辑器、配置页）
+
+**待办**:
+- [x] Options 下拉选择（预设选项 + 自动收集）
+- [ ] Options from Supertag（特定标签的节点作为选项源）
+- [x] Date 日期选择器（Notion 风格：自定义日历 + masked input + 范围/时间）
+- [x] Number 数字输入（min/max 校验）
+- [x] URL 链接输入
+- [x] Email 邮箱输入
+- [x] Checkbox 布尔切换
+- [x] 字段隐藏规则运行时（4/5 种模式 + pill click-to-reveal）
+- [x] Required 字段运行时（空值时红色 * 号）
+- [x] Number 字段 Min/Max 配置
+- [x] 值验证（Number/URL/Email 格式 + Number min/max 范围）
+- [x] 系统字段（8/12 种：Description/Created/LastEdited/Owner/Tags/Workspace/Done）
+- [ ] AttrDef "Used in" 计算字段
+- [ ] Auto-initialize（6 种策略）
+- [ ] Pinned fields
+- [ ] Merge fields
+
+**文档**: `docs/features/fields.md`
+
+---
+
+### #22 Date 节点 & 日记 — 年/月/周/日层级、Today 入口、自然语言解析
+
+**Phase**: 1
+
+**待办**:
+- [ ] 年/月/周/日节点层级（自动生成）
+- [ ] Today 快捷入口（侧栏按钮 + 快捷键 Ctrl+Shift+D）
+- [ ] 自然语言日期解析（@today / @next Monday / @November）
+- [ ] 日记模板（#day supertag 配置）
+- [ ] 日期字段链接到日节点
+
+---
+
+### #23 Search Nodes / Live Queries
+
+**Phase**: 2
+
+**待办**:
+- [ ] `?` 触发创建搜索节点（放大镜图标）
+- [ ] 基础搜索操作符（#tag / field 值 / 文本 / 日期）
+- [ ] 搜索结果实时更新（展开时执行）
+- [ ] AND / OR / NOT 逻辑组合
+- [ ] 关键词操作符（TODO / DONE / OVERDUE / CREATED LAST X DAYS）
+- [ ] 搜索结果配合视图展示
+
+---
+
+### #24 Table View — 表格视图
+
+**Phase**: 2
+
+**待办**:
+- [ ] 表格视图（行=节点，列=字段）
+- [ ] 列宽调整、列拖拽排序
+- [ ] 列计算（Sum / Avg / Median / Min / Max / Count）
+- [ ] 单元格内直接编辑字段值
+
+---
+
+### #25 Filter / Group / Sort 工具栏
+
+**Phase**: 2
+
+**待办**:
+- [ ] 通用视图工具栏（适用于所有视图）
+- [ ] 按字段值过滤
+- [ ] 按字段值分组（Outline / Cards / List 视图）
+- [ ] 多级排序（升序/降序、堆叠排序条件）
+
+---
+
+### #26 Cards View — 卡片视图
+
+**Phase**: 2
+
+**待办**:
+- [ ] 卡片视图
+- [ ] 卡片间拖拽更新字段值
+- [ ] Banner 图片显示
+
+---
+
+### #27 Calendar View — 日历视图
+
+**Phase**: 2
+
+**待办**:
+- [ ] 日历视图（按日期字段排列节点）
+- [ ] 日/周/月粒度切换
+- [ ] 拖拽未排期节点到日历添加日期
+
+---
+
+### #28 List & Tabs View
+
+**Phase**: 2
+
+**待办**:
+- [ ] List 视图（左侧列表 + 右侧详情双面板）
+- [ ] Tabs 视图（顶部 tab 切换内容）
+
+---
+
+### #29 AI Chat — Side Panel 内 AI 对话
+
+**Phase**: 3
+
+**待办**:
+- [ ] Side Panel 内 AI 对话界面
+- [ ] `@` 引用工作区节点作为上下文
+- [ ] 多模型切换（OpenAI / Anthropic / Google）
+- [ ] AI 回复应用 supertag
+- [ ] 对话分支（Alt+click）
+
+---
+
+### #30 网页剪藏
+
+**Phase**: 3
+
+**待办**:
+- [ ] Content Script 提取页面标题/URL/选中文本
+- [ ] 一键保存到 Inbox / Today / 指定节点
+- [ ] 自动打标签（根据内容类型）
+- [ ] 保留源 URL 引用
+
+**文档**: `docs/features/web-clipping.md`
+
+---
+
+### #31 网页 AI 辅助
+
+**Phase**: 3
+
+**待办**:
+- [ ] 选中网页文本 → 发送给 AI 提问/摘要
+- [ ] 基于当前网页内容生成笔记
+- [ ] 网页内容与已有笔记关联
+
+---
+
+### #32 AI Command Nodes
+
+**Phase**: 3
+
+**待办**:
+- [ ] AI 命令节点（Ask AI / Transcribe / Generate Image）
+- [ ] 提示模板变量（${fieldname} / ${sys:context}）
+- [ ] 批量处理（长上下文拆分）
+
+---
+
+### #33 AI 字段增强 — AttrDef Config 扩展
+
+**Phase**: 3
+
+**待办**:
+- [ ] Audio-enabled field（语音输入字段）
+- [ ] AI instructions（字段级 AI 提示）
+- [ ] Autofill（AI 自动填充）
+- [ ] AI-enhanced field（AI 增强字段）
+
+---
+
+### #34 Supabase 实时同步
+
+**Phase**: 4
+
+**待办**:
+- [ ] 乐观更新 + Realtime 推送
+- [ ] 冲突解决策略（last-write-wins + version check）
+- [ ] 多标签页同步验证
+
+---
+
+### #35 离线模式增强
+
+**Phase**: 4
+
+**待办**:
+- [ ] chrome.storage 缓存队列
+- [ ] 断线检测 + 重连 + 队列化更新回放
+- [ ] 离线编辑 → 上线后自动同步
+
+---
+
+### #36 导入/导出
+
+**Phase**: 4
+
+**待办**:
+- [ ] Tana JSON 导入（服务层已完成，需 UI）
+- [ ] Markdown 导出
+- [ ] Tana Paste 格式支持
+
+---
+
+### #37 Command Nodes — 自动化
+
+**Phase**: 5
+
+**待办**:
+- [ ] 命令节点（顺序执行子命令）
+- [ ] 可用命令：添加标签 / 设字段 / 移动节点 / 插入日期
+- [ ] 事件触发（标签添加/移除、子节点添加/移除、checkbox 切换）
+
+---
+
+### #38 Title Expressions — 动态标题模板
+
+**Phase**: 5
+
+**待办**:
+- [ ] ${field name} 动态标题模板
+- [ ] 条件显示 ${field|?}、截断 ${field|30...}
+- [ ] 系统变量 ${cdate} / ${mdate} / ${sys:owner}
+
+---
+
+### #39 Publishing — 节点发布为公开网页
+
+**Phase**: 5
+
+**待办**:
+- [ ] 节点发布为公开网页链接
+- [ ] Article View（静态阅读页）
+- [ ] Tana View（交互式，可展开/折叠）
+- [ ] 密码保护
+
+---
+
+### #40 Input API — REST API 接入
+
+**Phase**: 5
+
+**待办**:
+- [ ] REST API 接入节点数据
+- [ ] 支持创建节点 / 应用标签 / 设字段
+- [ ] Email-to-Nodex（通过 API 桥接）

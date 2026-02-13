@@ -182,6 +182,23 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
         setTimeout(() => setFocusedNode(tempNodeId, parentId), 0);
         return;
       }
+      // Printable character on selected reference → enter conversion mode with char appended
+      if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey && !optionsPickerOpen) {
+        e.preventDefault();
+        if (!wsId || !userId) return;
+        const parent = entities[parentId];
+        const pos = parent?.children?.indexOf(nodeId) ?? -1;
+        if (pos < 0) return;
+        removeReference(parentId, nodeId, userId);
+        const tempNodeId = startRefConversion(nodeId, parentId, pos, wsId, userId);
+        // Append typed character after inline ref
+        const tempName = useNodeStore.getState().entities[tempNodeId]?.props.name ?? '';
+        useNodeStore.getState().setNodeNameLocal(tempNodeId, tempName + e.key);
+        setPendingRefConversion({ tempNodeId, refNodeId: nodeId, parentId });
+        setSelectedNode(null);
+        setTimeout(() => setFocusedNode(tempNodeId, parentId), 0);
+        return;
+      }
       if (optionsPickerOpen && allFieldOptions.length > 0) {
         if (e.key === 'ArrowDown') {
           e.preventDefault();
@@ -579,16 +596,16 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       const isEmptyAround = beforeAt.trim() === '' && afterQuery.trim() === '';
 
       if (isEmptyAround) {
-        // Empty node @: trash this node, create temp node in conversion mode
+        // Empty node @: trash this node, add reference at same position, select it
         const parent = entities[parentId];
         const pos = parent?.children?.indexOf(nodeId) ?? -1;
         trashNode(nodeId, wsId, userId);
-        const tempNodeId = startRefConversion(refNodeId, parentId, pos >= 0 ? pos : 0, wsId, userId);
-        setPendingRefConversion({ tempNodeId, refNodeId, parentId });
+        addReference(parentId, refNodeId, userId, pos >= 0 ? pos : undefined);
         // Parent is already expanded (otherwise this item wouldn't render).
         const gpId = entities[parentId]?.props._ownerId;
         if (gpId) setExpanded(`${gpId}:${parentId}`, true);
-        setTimeout(() => setFocusedNode(tempNodeId, parentId), 0);
+        // Select (not focus) so user can ArrowRight or type to convert
+        setTimeout(() => setSelectedNode(refNodeId, parentId), 0);
       } else {
         // Mid-text @: insert inline reference
         const refNode = entities[refNodeId];
@@ -606,7 +623,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       setRefQuery('');
       setRefSelectedIndex(0);
     },
-    [nodeId, parentId, wsId, userId, entities, trashNode, addReference, setExpanded, setFocusedNode, startRefConversion, setPendingRefConversion],
+    [nodeId, parentId, wsId, userId, entities, trashNode, addReference, setExpanded, setFocusedNode, setSelectedNode],
   );
 
   const handleReferenceCreateNew = useCallback(

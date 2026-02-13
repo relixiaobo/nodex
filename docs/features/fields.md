@@ -139,7 +139,7 @@
   - **Always**: 始终隐藏，即使 hover 也不显示
 - 实现方式：`resolveHideField()` 读取 attrDef 的 `NDX_A01` 配置 Tuple
 - 空值判定：assocData 无内容子节点 = 空（通过 `isEmpty` 字段传递）
-- hover-to-reveal：children container 的 mouseEnter/mouseLeave + React state
+- **click-to-reveal（Tana 风格 pill）**：隐藏字段显示为紧凑的 `+ FieldName` pill 按钮行，点击临时展开为完整 FieldRow，离开节点后恢复隐藏（transient React state）
 
 ### Required 字段 — 已实现
 

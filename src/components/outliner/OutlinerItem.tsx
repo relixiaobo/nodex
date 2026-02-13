@@ -886,12 +886,14 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       )}
       {isExpanded && (
         <div className="relative">
-          {/* Indent guide line — clickable 16px button centered on parent bullet.
-               Parent bullet center = depth*24 + 6 + 15 + 7.5 = depth*24 + 28.5.
-               w-4 (16px) button: left + 8 = center → left = depth*24 + 20.5. */}
+          {/* Indent guide line — 16px click area LEFT of bullet center.
+               Parent bullet center = depth*24 + 28.5.
+               Button right edge at depth*24+29 (1px gap to child ChevronButton at depth*24+30).
+               Visual line at right edge via justify-end, centered at ~28.5.
+               No overlap with child chevron/bullet hover zones. */}
           <button
-            className="indent-line absolute top-0 bottom-0 w-4 z-10 flex justify-center cursor-pointer"
-            style={{ left: depth * 24 + 20.5 }}
+            className="indent-line absolute top-0 bottom-0 z-10 flex justify-end cursor-pointer"
+            style={{ left: depth * 24 + 13, width: 16 }}
             onClick={handleIndentLineClick}
             title="Toggle children"
           >

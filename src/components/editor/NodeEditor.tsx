@@ -12,7 +12,7 @@
  *   ArrowUp     → focus previous node
  *   ArrowDown   → focus next node
  */
-import { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback, type MutableRefObject } from 'react';
+import { useEffect, useLayoutEffect, useRef, useMemo, useCallback, type MutableRefObject } from 'react';
 import { useEditor, EditorContent, type Editor } from '@tiptap/react';
 import { Extension } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
@@ -28,6 +28,7 @@ import { InlineRefNode } from './InlineRefNode';
 
 interface NodeEditorProps {
   nodeId: string;
+  parentId: string;
   initialContent: string;
   onBlur: () => void;
   onEnter: (afterContent?: string) => void;
@@ -64,6 +65,7 @@ interface NodeEditorProps {
 
 export function NodeEditor({
   nodeId,
+  parentId,
   initialContent,
   onBlur,
   onEnter,
@@ -98,16 +100,15 @@ export function NodeEditor({
   const userId = useWorkspaceStore((s) => s.userId);
   const savedRef = useRef(false);
 
-  // Consume click position once per component instance via useState initializer.
-  // useState initializer runs exactly once even in React Strict Mode — no ref hack needed.
-  const [initialClickOffset] = useState<number | null>(() => {
+  // Snapshot click position for THIS node without side effects during render.
+  // Clearing the shared hint happens in useLayoutEffect.
+  const initialClickOffsetRef = useRef<number | null>(null);
+  if (initialClickOffsetRef.current === null) {
     const info = useUIStore.getState().focusClickCoords;
-    if (info) {
-      useUIStore.getState().setFocusClickCoords(null);
-      return info.textOffset;
+    if (info && info.nodeId === nodeId && info.parentId === parentId) {
+      initialClickOffsetRef.current = info.textOffset;
     }
-    return null;
-  });
+  }
 
   const saveContent = useCallback(
     (html: string) => {
@@ -406,6 +407,7 @@ export function NodeEditor({
       // By focusing first, the contenteditable is stable when we set selection.
       editor.commands.focus('end');
 
+      const initialClickOffset = initialClickOffsetRef.current;
       if (initialClickOffset !== null) {
         try {
           const maxPos = editor.state.doc.content.size - 1;
@@ -414,12 +416,17 @@ export function NodeEditor({
         } catch { /* fallback: cursor stays at end */ }
       }
 
+      const clickInfo = useUIStore.getState().focusClickCoords;
+      if (clickInfo && clickInfo.nodeId === nodeId && clickInfo.parentId === parentId) {
+        useUIStore.getState().setFocusClickCoords(null);
+      }
+
       if (editorRef) editorRef.current = editor;
     }
     return () => {
       if (editorRef) editorRef.current = null;
     };
-  }, [editor, editorRef, initialClickOffset]);
+  }, [editor, editorRef, nodeId, parentId]);
 
   // Cleanup: save on unmount if not already saved
   useEffect(() => {

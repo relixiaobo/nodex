@@ -7,24 +7,47 @@ import { SYS_A, SYS_D, SYS_V } from '../types/index.js';
 import type { NodexNode } from '../types/index.js';
 
 /**
- * Resolve the data type of an attrDef by walking its children
- * for a Tuple [SYS_A02, SYS_D*].
+ * Resolve a config value from an attrDef by walking its children
+ * for a Tuple [configKey, value].
  */
-export function resolveDataType(entities: Record<string, NodexNode>, attrDefId: string): string {
+function resolveAttrDefConfig(entities: Record<string, NodexNode>, attrDefId: string, configKey: string): string | undefined {
   const attrDef = entities[attrDefId];
-  if (!attrDef?.children) return SYS_D.PLAIN;
+  if (!attrDef?.children) return undefined;
 
   for (const childId of attrDef.children) {
     const child = entities[childId];
     if (
       child?.props._docType === 'tuple' &&
-      child.children?.[0] === SYS_A.TYPE_CHOICE &&
+      child.children?.[0] === configKey &&
       child.children.length >= 2
     ) {
       return child.children[1];
     }
   }
-  return SYS_D.PLAIN;
+  return undefined;
+}
+
+/**
+ * Resolve the data type of an attrDef by walking its children
+ * for a Tuple [SYS_A02, SYS_D*].
+ */
+export function resolveDataType(entities: Record<string, NodexNode>, attrDefId: string): string {
+  return resolveAttrDefConfig(entities, attrDefId, SYS_A.TYPE_CHOICE) ?? SYS_D.PLAIN;
+}
+
+/**
+ * Resolve the hide-field condition from an attrDef.
+ * Returns the SYS_V constant (NEVER, WHEN_EMPTY, WHEN_NOT_EMPTY, WHEN_VALUE_IS_DEFAULT, ALWAYS).
+ */
+export function resolveHideField(entities: Record<string, NodexNode>, attrDefId: string): string {
+  return resolveAttrDefConfig(entities, attrDefId, SYS_A.HIDE_FIELD) ?? SYS_V.NEVER;
+}
+
+/**
+ * Resolve whether an attrDef field is marked as required.
+ */
+export function resolveRequired(entities: Record<string, NodexNode>, attrDefId: string): boolean {
+  return resolveAttrDefConfig(entities, attrDefId, SYS_A.NULLABLE) === SYS_V.YES;
 }
 
 /**

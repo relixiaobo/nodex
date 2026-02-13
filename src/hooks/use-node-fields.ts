@@ -8,7 +8,7 @@
  */
 import { useMemo } from 'react';
 import { useNodeStore } from '../stores/node-store';
-import { resolveDataType, ATTRDEF_CONFIG_MAP, ATTRDEF_CONFIG_FIELDS, ATTRDEF_OUTLINER_FIELDS, TAGDEF_CONFIG_MAP, TAGDEF_CONFIG_FIELDS, TAGDEF_OUTLINER_FIELDS } from '../lib/field-utils.js';
+import { resolveDataType, resolveHideField, resolveRequired, ATTRDEF_CONFIG_MAP, ATTRDEF_CONFIG_FIELDS, ATTRDEF_OUTLINER_FIELDS, TAGDEF_CONFIG_MAP, TAGDEF_CONFIG_FIELDS, TAGDEF_OUTLINER_FIELDS } from '../lib/field-utils.js';
 import type { NodexNode } from '../types/index.js';
 
 export interface FieldEntry {
@@ -21,6 +21,12 @@ export interface FieldEntry {
   assocDataId?: string;
   /** True when the attrDef has been trashed (moved to Trash container) */
   trashed?: boolean;
+  /** Hide-field condition from attrDef config (SYS_V.NEVER by default) */
+  hideMode?: string;
+  /** True when the field has no meaningful value (for hide-when-empty evaluation) */
+  isEmpty?: boolean;
+  /** True when the attrDef config marks this field as required */
+  isRequired?: boolean;
 }
 
 function computeFields(entities: Record<string, NodexNode>, nodeId: string): FieldEntry[] {
@@ -81,6 +87,13 @@ function computeFields(entities: Record<string, NodexNode>, nodeId: string): Fie
     const assocDataId = node.associationMap?.[childId];
     const trashed = attrDef.props._ownerId?.endsWith('_TRASH') ?? false;
 
+    // Determine if the field value is empty: no value node AND no content children in assocData
+    const assocNode = assocDataId ? entities[assocDataId] : undefined;
+    const hasContent = !!valueNodeId || (assocNode?.children?.some(cid => {
+      const c = entities[cid];
+      return c && !c.props._docType;
+    }) ?? false);
+
     fields.push({
       attrDefId: keyId,
       attrDefName: attrDef.props.name ?? 'Untitled',
@@ -90,6 +103,9 @@ function computeFields(entities: Record<string, NodexNode>, nodeId: string): Fie
       dataType: resolveDataType(entities, keyId),
       assocDataId,
       trashed,
+      hideMode: resolveHideField(entities, keyId),
+      isEmpty: !hasContent,
+      isRequired: resolveRequired(entities, keyId),
     });
   }
 

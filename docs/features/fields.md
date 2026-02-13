@@ -83,11 +83,21 @@
   - Toggle 下方显示 auto-collected 值列表（reference bullet 样式）
 - 待扩展：Options from Supertag
 
-### Date 类型 — 已实现
+### Date 类型 — 已实现（Notion 风格）
 
-- 值区域渲染为 `FieldValueEditor` click-to-edit 日期输入
-- 点击 "Empty" 显示 `<input type="date">`，选择后自动保存并关闭
-- 值存储为 ISO 日期字符串（YYYY-MM-DD）
+- 值区域渲染为 `DatePickerField`（click-to-pick，类似 Options 交互）
+- **自定义日历组件**（`DatePicker.tsx`），参考 Notion 设计：
+  - 顶部日期输入框：masked input（YYYY/MM/DD 模板，逐位填充，`/` 自动补全）
+  - 7 列日历网格（无周数），6 行固定高度
+  - 月/年标题可点击进入年/月选择器网格（Notion 无此功能，我们的优势）
+  - "Today" 快捷按钮
+  - 选中日期 = 填充蓝色 `rounded-md` 方块
+- **范围选择**：Toggle "End date" 开启第二个输入框，点击切换编辑端
+- **时间输入**：Toggle "Include time" 开启，12 小时制 + AM/PM，输入框内联显示
+  - 纯 `onKeyDown` 拦截：只接受数字，小时 1-12，分钟 0-59，2 位自动跳到下一段
+- **即时保存**：点击日期/修改时间立即 `onSelect()`，无 OK 按钮
+- **清除**：底部 "Clear" 按钮
+- 值存储格式：`YYYY-MM-DD`（单日期）/ `YYYY-MM-DD → YYYY-MM-DD`（范围）/ 含时间 `YYYY-MM-DD HH:mm`
 - 待扩展：链接到日节点、自然语言输入
 
 ### Number 类型 — 已实现
@@ -187,6 +197,7 @@
 | 2026-02-12 | Auto-collect: 原节点在 field value，引用在 autocollect Tuple | 分离 pre-determined 与 auto-collected，Tuple children[2+] 存引用 |
 | 2026-02-12 | **统一值渲染器**：所有字段类型值区域 = FieldValueOutliner | 数据模型层面值永远是 assocData.children[]，dataType 只决定值节点的输入方式和显示格式，不改变底层结构。替代当前 3 渲染器分发 |
 | 2026-02-12 | Checkbox 统一：OutlinerItem 支持 fieldDataType prop | Checkbox 值节点渲染为 toggle 而非编辑器，FieldValueEditor 变为死代码 |
+| 2026-02-13 | DatePicker 重写为 Notion 风格 | 自定义日历 + masked input + Toggle 控制范围/时间 + 即时保存，替代浏览器原生 date input |
 
 ## 当前状态
 
@@ -198,7 +209,7 @@
 - [x] 新字段自动应用 SYS_T02 标签
 - [x] Delete field 按钮 + 级联清理
 - [x] Options combobox（OptionsPicker: 搜索 + 选择 + 新建选项 + Auto-collect）
-- [x] Date 日期选择器（click-to-edit date input）
+- [x] Date 日期选择器（Notion 风格：自定义日历 + masked input + 范围/时间 Toggle + 即时保存）
 - [x] Number 数字输入（click-to-edit, Integer/Number）
 - [x] URL 链接输入（click-to-edit, 蓝色链接样式）
 - [x] Email 邮箱输入（click-to-edit）

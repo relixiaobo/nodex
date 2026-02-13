@@ -48,6 +48,10 @@ interface FieldRowProps {
   assocDataId?: string;
   isLastInGroup?: boolean;
   trashed?: boolean;
+  /** When true AND isEmpty, show red asterisk on field name */
+  isRequired?: boolean;
+  /** Field has no value (for required visual hint) */
+  isEmpty?: boolean;
   /** Called when arrow navigation escapes field value boundaries */
   onNavigateOut?: (direction: 'up' | 'down') => void;
 }
@@ -62,6 +66,8 @@ export function FieldRow({
   assocDataId,
   isLastInGroup,
   trashed,
+  isRequired,
+  isEmpty,
   onNavigateOut,
 }: FieldRowProps) {
   const navigateTo = useUIStore((s) => s.navigateTo);
@@ -217,6 +223,7 @@ export function FieldRow({
               title={attrDefName}
             >
               {attrDefName}
+              {isRequired && isEmpty && <span className="text-destructive ml-0.5">*</span>}
             </span>
           )}
         </div>

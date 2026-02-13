@@ -61,6 +61,8 @@ interface NodeEditorProps {
   onReferenceNavUp?: () => void;
   onReferenceCreate?: () => void;
   onReferenceClose?: () => void;
+  // ─── Description editing ───
+  onDescriptionEdit?: () => void;
 }
 
 export function NodeEditor({
@@ -94,6 +96,7 @@ export function NodeEditor({
   onReferenceNavUp,
   onReferenceCreate,
   onReferenceClose,
+  onDescriptionEdit,
 }: NodeEditorProps) {
   const updateNodeName = useNodeStore((s) => s.updateNodeName);
   const setNodeNameLocal = useNodeStore((s) => s.setNodeNameLocal);
@@ -138,6 +141,7 @@ export function NodeEditor({
     onReferenceNavUp: onReferenceNavUp ?? (() => {}),
     onReferenceCreate: onReferenceCreate ?? (() => {}),
     onReferenceClose: onReferenceClose ?? (() => {}),
+    onDescriptionEdit: onDescriptionEdit ?? (() => {}),
   });
   callbacksRef.current = {
     onEnter, onIndent, onOutdent, onDelete, onArrowUp, onArrowDown, onMoveUp, onMoveDown, saveContent,
@@ -154,6 +158,7 @@ export function NodeEditor({
     onReferenceNavUp: onReferenceNavUp ?? (() => {}),
     onReferenceCreate: onReferenceCreate ?? (() => {}),
     onReferenceClose: onReferenceClose ?? (() => {}),
+    onDescriptionEdit: onDescriptionEdit ?? (() => {}),
   };
 
   // HashTag extension callbacks
@@ -324,6 +329,10 @@ export function NodeEditor({
           },
           'Mod-Shift-ArrowDown': () => {
             callbacksRef.current.onMoveDown();
+            return true;
+          },
+          'Mod-i': () => {
+            callbacksRef.current.onDescriptionEdit();
             return true;
           },
         };

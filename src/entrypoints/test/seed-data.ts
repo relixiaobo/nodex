@@ -86,7 +86,13 @@ export function seedTestData() {
 
   // Project with nested structure
   const projectNodes = [
-    makeNode('proj_1', 'My Project', libraryId, ['task_1', 'task_2', 'task_3', 'note_1a']),
+    {
+      ...makeNode('proj_1', 'My Project', libraryId, ['task_1', 'task_2', 'task_3', 'note_1a']),
+      props: {
+        ...makeNode('proj_1', 'My Project', libraryId).props,
+        description: 'A sample project to demonstrate outliner features',
+      },
+    },
     {
       ...makeNode('task_1', 'Design the data model', 'proj_1', [
         'subtask_1a', 'subtask_1b',
@@ -419,6 +425,9 @@ export function seedTestData() {
     makeNode('personField_age', '', 'tagDef_person', ['attrDef_age'], 'tuple'),
     makeNode('personField_website', '', 'tagDef_person', ['attrDef_website'], 'tuple'),
   ];
+
+  // Set description on tagDef nodes
+  tagDefPersonNodes[0].props.description = 'Tag for tracking people and their contact info';
 
   // Set _metaNodeId on tagDef nodes (tagged with SYS_T01)
   tagDefTaskNodes[0].props._metaNodeId = 'meta_tagDef_task';

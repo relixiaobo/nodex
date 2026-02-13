@@ -129,21 +129,24 @@
 - 字段值为 workspace 用户（@ mention 选择）
 - 提示选择工作区成员
 
-### 字段隐藏规则 — 未实现
+### 字段隐藏规则 — 已实现（4/5 种模式）
 
 - 根据 attrDef "Hide field" 配置 + 当前值状态：
-  - **Never**: 始终显示
-  - **When empty**: 值为空时隐藏（hover 区域时短暂显示）
-  - **When not empty**: 有值时隐藏
-  - **When value is default**: 值等于默认值时隐藏
-  - **Always**: 始终隐藏（仅在配置页可见）
-- 注意: Tana 有 5 种模式，我们之前只记了 3 种
+  - **Never**: 始终显示（默认）
+  - **When empty**: 值为空时隐藏，hover 节点子树区域时以 50% 透明度淡入
+  - **When not empty**: 有值时隐藏，hover 时同样淡入
+  - **When value is default**: 待实现（需要 auto-initialize default 值概念）
+  - **Always**: 始终隐藏，即使 hover 也不显示
+- 实现方式：`resolveHideField()` 读取 attrDef 的 `NDX_A01` 配置 Tuple
+- 空值判定：assocData 无内容子节点 = 空（通过 `isEmpty` 字段传递）
+- hover-to-reveal：children container 的 mouseEnter/mouseLeave + React state
 
-### Required 字段 — 未实现
+### Required 字段 — 已实现
 
-- attrDef "Required" = true 时：
-  - 字段值为空 → 字段名显示红色星号 `*`
+- attrDef "Required" (`SYS_A01` = `SYS_V03`) 时：
+  - 字段值为空 → 字段名后显示红色 `*` 星号
   - 不阻止操作，只是视觉提示
+  - 通过 `resolveRequired()` 读取配置，`isRequired` + `isEmpty` 传递给 FieldRow
 
 ### Auto-initialize 规则 — 未实现
 
@@ -218,8 +221,8 @@
 - [x] Options 自动补全（TrailingInput 集成，输入时下拉匹配预置/auto-collected 选项，Enter 添加引用）
 - [ ] Options from Supertag（独立类型）
 - [ ] Tana User 类型
-- [ ] 字段隐藏规则运行时（5 种模式）
-- [ ] Required 字段视觉提示
+- [x] 字段隐藏规则运行时（4/5 种模式：Never/When empty/When not empty/Always + hover-to-reveal）
+- [x] Required 字段视觉提示（红色 * 号）
 - [ ] Auto-initialize（6 种策略）
 - [ ] Pinned fields
 - [ ] Number Min/Max 配置
@@ -233,7 +236,7 @@
 
 - ~~Tana 的 Options 值区域本质是 outliner~~ **已解决**：统一值渲染器完成后，Options 值区域 = FieldValueOutliner，支持自由输入、嵌套、`>` 转字段。TrailingInput 集成自动补全，输入时匹配预置/auto-collected 选项
 - Tana 的 Options 支持更丰富的 UI（彩色 pill、多列选择器），Nodex 已实现 combobox 但尚无 pill 样式
-- Tana 字段隐藏有 5 种模式（Never/When empty/When not empty/When default/Always），我们需全部实现
+- ~~Tana 字段隐藏有 5 种模式~~ **基本完成**：已实现 4/5 种（Never/When empty/When not empty/Always），"When value is default" 需要 default 值概念后续补充
 - Tana Auto-initialize 有 6 种策略，适用于多种字段类型
 - Tana 的 "Used in" 计算字段显示所有使用该字段的 supertag，Nodex 延后
 - Tana 删除字段后节点显示 trash icon，Nodex 直接清除引用

@@ -423,6 +423,23 @@ export function DatePicker({ value, onSelect, onClose }: DatePickerProps) {
 
 // ─── DateInputField ──────────────────────────────────────────────
 
+/** Format raw digits into YYYY/MM/DD template. */
+function formatDigitsToMask(digits: string): string {
+  let result = '';
+  for (let i = 0; i < digits.length; i++) {
+    if (i === 4 || i === 6) result += '/';
+    result += digits[i];
+  }
+  return result;
+}
+
+/** Convert raw digits (up to 8) to YYYY-MM-DD date string, or null if invalid/incomplete. */
+function digitsToDateStr(digits: string): string | null {
+  if (digits.length !== 8) return null;
+  const formatted = `${digits.slice(0, 4)}/${digits.slice(4, 6)}/${digits.slice(6, 8)}`;
+  return parseInputDate(formatted);
+}
+
 function DateInputField({
   dateStr,
   timeStr,
@@ -443,33 +460,62 @@ function DateInputField({
   onTimeChange?: (v: string) => void;
 }) {
   const [editing, setEditing] = useState(false);
-  const [editValue, setEditValue] = useState('');
+  const [digits, setDigits] = useState('');
+  const [allSelected, setAllSelected] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const startEditing = useCallback(() => {
     onClick();
     if (onDateChange) {
       setEditing(true);
-      setEditValue(dateStr ? formatInputDate(dateStr) : '');
-      requestAnimationFrame(() => {
-        const input = inputRef.current;
-        if (input) dateStr ? input.select() : input.focus();
-      });
+      if (dateStr) {
+        setDigits(dateStr.replace(/\D/g, '')); // "2026-03-15" → "20260315"
+        setAllSelected(true);
+      } else {
+        setDigits('');
+        setAllSelected(false);
+      }
+      requestAnimationFrame(() => inputRef.current?.focus());
     }
   }, [dateStr, onClick, onDateChange]);
 
   const commitEdit = useCallback(() => {
     setEditing(false);
-    const parsed = parseInputDate(editValue);
+    const parsed = digitsToDateStr(digits);
     if (parsed && parsed !== dateStr) {
       onDateChange?.(parsed);
     }
-  }, [editValue, dateStr, onDateChange]);
+  }, [digits, dateStr, onDateChange]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') { e.preventDefault(); commitEdit(); }
-    else if (e.key === 'Escape') { e.preventDefault(); setEditing(false); }
-  }, [commitEdit]);
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      commitEdit();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      setEditing(false);
+    } else if (e.key === 'Backspace') {
+      e.preventDefault();
+      if (allSelected) {
+        setDigits('');
+        setAllSelected(false);
+      } else {
+        setDigits(d => d.slice(0, -1));
+      }
+    } else if (/^\d$/.test(e.key)) {
+      e.preventDefault();
+      if (allSelected) {
+        setDigits(e.key);
+        setAllSelected(false);
+      } else if (digits.length < 8) {
+        setDigits(d => d + e.key);
+      }
+    }
+  }, [allSelected, digits, commitEdit]);
+
+  // Build masked display
+  const masked = formatDigitsToMask(digits);
+  const templateRemaining = 'YYYY/MM/DD'.slice(masked.length);
 
   return (
     <div
@@ -482,19 +528,33 @@ function DateInputField({
       }`}
       onClick={!editing ? startEditing : onClick}
     >
-      {/* Date part — editable input */}
+      {/* Date part — masked input */}
       {editing ? (
-        <input
-          ref={inputRef}
-          type="text"
-          value={editValue}
-          onChange={(e) => setEditValue(e.target.value)}
-          onBlur={commitEdit}
-          onKeyDown={handleKeyDown}
-          placeholder="YYYY/MM/DD"
-          className="flex-1 min-w-0 px-2.5 py-1.5 bg-transparent text-sm text-foreground outline-none placeholder:text-foreground-tertiary"
-          onClick={(e) => e.stopPropagation()}
-        />
+        <div
+          className="relative flex-1 min-w-0 px-2.5 py-1.5 cursor-text"
+          onClick={(e) => { e.stopPropagation(); inputRef.current?.focus(); }}
+        >
+          {/* Hidden input for keyboard capture */}
+          <input
+            ref={inputRef}
+            className="absolute w-0 h-0 overflow-hidden opacity-0"
+            onKeyDown={handleKeyDown}
+            onBlur={commitEdit}
+            readOnly
+          />
+          {/* Visual masked display */}
+          <span className="text-sm select-none whitespace-pre">
+            {allSelected ? (
+              <span className="bg-primary/20 text-foreground rounded-sm">{masked}</span>
+            ) : (
+              <>
+                <span className="text-foreground">{masked}</span>
+                <span className="inline-block w-[1.5px] h-[14px] bg-foreground align-middle animate-pulse" />
+                <span className="text-foreground-tertiary">{templateRemaining}</span>
+              </>
+            )}
+          </span>
+        </div>
       ) : (
         <span className={`flex-1 px-2.5 py-1.5 cursor-pointer ${dateStr ? 'text-foreground' : 'text-foreground-tertiary'}`}>
           {dateStr ? formatInputDate(dateStr) : placeholder}

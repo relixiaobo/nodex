@@ -125,9 +125,10 @@
   text-decoration: underline;
 }
 
-/* Indent guide line — hover thickens line subtly, no background fill. */
+/* Indent guide line — hover thickens line subtly, no background fill.
+   Default 1px → hover 3px: 3× visible change, still thinner than 5px bullet dot. */
 .indent-line:hover > .indent-line-inner {
-  width: 2px;
+  width: 3px;
 }
 
 /* cmdk command palette styles */

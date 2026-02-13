@@ -47,6 +47,8 @@ interface FieldRowProps {
   assocDataId?: string;
   isLastInGroup?: boolean;
   trashed?: boolean;
+  /** Called when arrow navigation escapes field value boundaries */
+  onNavigateOut?: (direction: 'up' | 'down') => void;
 }
 
 export function FieldRow({
@@ -59,6 +61,7 @@ export function FieldRow({
   assocDataId,
   isLastInGroup,
   trashed,
+  onNavigateOut,
 }: FieldRowProps) {
   const navigateTo = useUIStore((s) => s.navigateTo);
   const editingFieldNameId = useUIStore((s) => s.editingFieldNameId);
@@ -207,7 +210,7 @@ export function FieldRow({
         {isOutliner ? (
           <ConfigOutliner nodeId={nodeId} />
         ) : assocDataId ? (
-          <FieldValueOutliner assocDataId={assocDataId} fieldDataType={dataType} attrDefId={attrDefId} />
+          <FieldValueOutliner assocDataId={assocDataId} fieldDataType={dataType} attrDefId={attrDefId} onNavigateOut={onNavigateOut} />
         ) : (
           <div className="flex min-h-7 items-start gap-2 py-1" style={{ paddingLeft: 6 }}>
             <BulletChevron hasChildren={false} isExpanded={false} onBulletClick={noop} dimmed />

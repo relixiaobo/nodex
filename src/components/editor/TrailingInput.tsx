@@ -41,9 +41,11 @@ interface TrailingInputProps {
   fieldDataType?: string;
   /** AttrDef ID — used to look up available options */
   attrDefId?: string;
+  /** Called when arrow navigation reaches a boundary (e.g. escaping field values) */
+  onNavigateOut?: (direction: 'up' | 'down') => void;
 }
 
-export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fieldDataType, attrDefId }: TrailingInputProps) {
+export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fieldDataType, attrDefId, onNavigateOut }: TrailingInputProps) {
   const createChild = useNodeStore((s) => s.createChild);
   const addUnnamedFieldToNode = useNodeStore((s) => s.addUnnamedFieldToNode);
   const wsId = useWorkspaceStore((s) => s.currentWorkspaceId);
@@ -93,6 +95,7 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
     setExpanded, setFocusedNode, setEditingFieldName, setTriggerHint,
     isOptions, optionsOpen, filteredOptions, optionsIndex,
     setOptionsOpen, setOptionsQuery, setOptionsIndex,
+    onNavigateOut,
   });
   callbacksRef.current = {
     createChild, addUnnamedFieldToNode, addReference, wsId, userId,
@@ -101,6 +104,7 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
     setExpanded, setFocusedNode, setEditingFieldName, setTriggerHint,
     isOptions, optionsOpen, filteredOptions, optionsIndex,
     setOptionsOpen, setOptionsQuery, setOptionsIndex,
+    onNavigateOut,
   };
 
   const commitContent = useCallback((html: string, editor: Editor) => {
@@ -230,12 +234,30 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
               ref.setOptionsIndex(Math.min(ref.optionsIndex + 1, ref.filteredOptions.length - 1));
               return true;
             }
+            // At the bottom — escape to parent context
+            if (ref.onNavigateOut) {
+              ref.onNavigateOut('down');
+              return true;
+            }
             return false;
           },
           ArrowUp: () => {
             const ref = callbacksRef.current;
             if (ref.isOptions && ref.optionsOpen && ref.filteredOptions.length > 0) {
               ref.setOptionsIndex(Math.max(ref.optionsIndex - 1, 0));
+              return true;
+            }
+            // Try to focus last visible node above this TrailingInput
+            const entities = useNodeStore.getState().entities;
+            const expanded = useUIStore.getState().expandedNodes;
+            const target = getLastVisibleNode(ref.effectiveParentId, entities, expanded);
+            if (target) {
+              ref.setFocusedNode(target.nodeId, target.parentId);
+              return true;
+            }
+            // No nodes above — escape to parent context
+            if (ref.onNavigateOut) {
+              ref.onNavigateOut('up');
               return true;
             }
             return false;

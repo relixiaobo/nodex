@@ -97,6 +97,9 @@ export function NodeEditor({
   const setNodeNameLocal = useNodeStore((s) => s.setNodeNameLocal);
   const userId = useWorkspaceStore((s) => s.userId);
   const savedRef = useRef(false);
+  // Cache click info across React Strict Mode double-invocations.
+  // First invocation reads from store + saves here; second invocation reads from ref.
+  const clickInfoRef = useRef<{ textOffset: number } | null>(null);
 
   const saveContent = useCallback(
     (html: string) => {
@@ -392,9 +395,17 @@ export function NodeEditor({
       // calculated from the static (non-editable) content via caretRangeFromPoint
       // in handleContentClick — this avoids layout timing issues with rAF.
       // ProseMirror position = textOffset + 1 (offset 1 = paragraph start).
-      const info = useUIStore.getState().focusClickCoords;
-      if (info) {
+      //
+      // React Strict Mode re-invokes this effect: the first run reads from the
+      // store and caches in clickInfoRef; the second run reads from the ref.
+      const storeInfo = useUIStore.getState().focusClickCoords;
+      if (storeInfo) {
+        clickInfoRef.current = storeInfo;
         useUIStore.getState().setFocusClickCoords(null);
+      }
+
+      const info = clickInfoRef.current;
+      if (info) {
         const maxPos = editor.state.doc.content.size - 1;
         const pmPos = Math.max(1, Math.min(info.textOffset + 1, maxPos));
         editor.commands.focus();

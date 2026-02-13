@@ -1064,7 +1064,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
                   onClick={() => setRevealedFieldIds(prev => new Set(prev).add(f.id))}
                   title={`Show ${f.name}`}
                 >
-                  <span className="text-[11px] leading-none">+</span>
+                  <span className="w-[15px] flex items-center justify-center text-[11px] leading-none shrink-0">+</span>
                   <span>{f.name}</span>
                 </button>
               ))}

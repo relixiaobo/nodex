@@ -10,7 +10,7 @@ import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 import { nanoid } from 'nanoid';
 import type { NodexNode, DocType } from '../types/index.js';
-import { WORKSPACE_CONTAINERS, SYS_A, SYS_D, SYS_T } from '../types/index.js';
+import { WORKSPACE_CONTAINERS, SYS_A, SYS_D, SYS_T, SYS_V } from '../types/index.js';
 import { ATTRDEF_CONFIG_MAP, TAGDEF_CONFIG_MAP, findAutoCollectTupleId } from '../lib/field-utils.js';
 import * as nodeService from '../services/node-service.js';
 import { isSupabaseReady } from '../services/supabase.js';
@@ -177,6 +177,9 @@ interface NodeStore {
 
   /** Create a new option from field value, set as value, and auto-collect in attrDef */
   autoCollectOption(nodeId: string, attrDefId: string, name: string, workspaceId: string, userId: string): string;
+
+  /** Toggle a checkbox field value. Creates value node if needed. */
+  toggleCheckboxField(assocDataId: string, workspaceId: string, userId: string): void;
 
   /** Remove an option node from a field definition */
   removeFieldOption(attrDefId: string, optionId: string, userId: string): void;
@@ -1352,6 +1355,46 @@ export const useNodeStore = create<NodeStore>()(
           updatedBy: userId,
         };
         attrDef.children.push(tupleId);
+      });
+    },
+
+    toggleCheckboxField: (assocDataId, workspaceId, userId) => {
+      set((state) => {
+        const assoc = state.entities[assocDataId];
+        if (!assoc) return;
+        const now = Date.now();
+
+        // Find existing value node (first content child — no _docType)
+        const existingId = assoc.children?.find(
+          (cid) => {
+            const e = state.entities[cid];
+            return e && !e.props._docType;
+          },
+        );
+
+        if (existingId) {
+          const valNode = state.entities[existingId];
+          if (valNode) {
+            valNode.props.name = valNode.props.name === SYS_V.YES ? SYS_V.NO : SYS_V.YES;
+            valNode.updatedAt = now;
+            valNode.updatedBy = userId;
+          }
+        } else {
+          // Create new value node (default: YES since user is clicking to turn ON)
+          const id = nanoid();
+          state.entities[id] = {
+            id,
+            workspaceId,
+            props: { created: now, name: SYS_V.YES, _ownerId: assocDataId },
+            children: [],
+            version: 1,
+            updatedAt: now,
+            createdBy: userId,
+            updatedBy: userId,
+          };
+          if (!assoc.children) assoc.children = [];
+          assoc.children.push(id);
+        }
       });
     },
 

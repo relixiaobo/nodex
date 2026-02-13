@@ -16,7 +16,8 @@ import { useNodeFields, type FieldEntry } from '../../hooks/use-node-fields';
 import { OutlinerItem } from '../outliner/OutlinerItem';
 import { TrailingInput } from '../editor/TrailingInput';
 import { FieldRow } from './FieldRow';
-import { SYS_D } from '../../types';
+import { SYS_D, SYS_V } from '../../types';
+import { useWorkspaceStore } from '../../stores/workspace-store';
 
 interface FieldValueOutlinerProps {
   assocDataId: string;
@@ -60,6 +61,30 @@ export function FieldValueOutliner({ assocDataId, fieldDataType, attrDefId, onNa
     () => visibleChildren.filter((c) => c.type === 'content').map((c) => c.id),
     [visibleChildren],
   );
+
+  // --- CHECKBOX early return ---
+  const wsId = useWorkspaceStore((s) => s.currentWorkspaceId);
+  const userId = useWorkspaceStore((s) => s.userId);
+  const toggleCheckboxField = useNodeStore((s) => s.toggleCheckboxField);
+  const isCheckbox = fieldDataType === SYS_D.CHECKBOX;
+  if (isCheckbox) {
+    const valueNodeId = contentChildIds[0];
+    const valueNode = valueNodeId ? entities[valueNodeId] : undefined;
+    const checked = valueNode?.props.name === SYS_V.YES;
+
+    return (
+      <div className="flex min-h-7 items-center" style={{ paddingLeft: 6 }}>
+        <input
+          type="checkbox"
+          checked={checked}
+          onChange={() => {
+            if (wsId && userId) toggleCheckboxField(assocDataId, wsId, userId);
+          }}
+          className="h-3.5 w-3.5 rounded border-border accent-primary cursor-pointer"
+        />
+      </div>
+    );
+  }
 
   const isOptionsType = fieldDataType === SYS_D.OPTIONS || fieldDataType === SYS_D.OPTIONS_FROM_SUPERTAG;
 

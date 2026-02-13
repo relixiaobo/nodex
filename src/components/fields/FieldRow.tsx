@@ -76,7 +76,7 @@ export function FieldRow({
   const editingFieldNameId = useUIStore((s) => s.editingFieldNameId);
   const setEditingFieldName = useUIStore((s) => s.setEditingFieldName);
   const setFocusedNode = useUIStore((s) => s.setFocusedNode);
-  const createSibling = useNodeStore((s) => s.createSibling);
+  const createChild = useNodeStore((s) => s.createChild);
   const removeField = useNodeStore((s) => s.removeField);
   const wsId = useWorkspaceStore((s) => s.currentWorkspaceId);
   const userId = useWorkspaceStore((s) => s.userId);
@@ -130,11 +130,14 @@ export function FieldRow({
 
   const handleEnterConfirm = useCallback(() => {
     if (!wsId || !userId) return;
-    // Create a normal content node after the current field tuple
-    createSibling(tupleId, wsId, userId).then((newNode) => {
+    // Create a content node in nodeId's children, right after the field tuple
+    const parent = useNodeStore.getState().entities[nodeId];
+    const tupleIdx = parent?.children?.indexOf(tupleId) ?? -1;
+    const position = tupleIdx >= 0 ? tupleIdx + 1 : undefined;
+    createChild(nodeId, wsId, userId, '', position).then((newNode) => {
       setFocusedNode(newNode.id, nodeId);
     });
-  }, [tupleId, nodeId, wsId, userId, createSibling, setFocusedNode]);
+  }, [tupleId, nodeId, wsId, userId, createChild, setFocusedNode]);
 
   const handleNameClick = useCallback((e: React.MouseEvent<HTMLSpanElement>) => {
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();

@@ -160,12 +160,14 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   );
   // For hasChildren: count non-hidden items (hidden-always fields don't count toward expand chevron)
   const hasChildren = visibleChildren.some((c) => !c.hidden);
-  // Track whether any fields are conditionally hidden (for hover-to-reveal)
-  const hasHiddenFields = useMemo(
-    () => visibleChildren.some((c) => c.hidden && fieldMap.get(c.id)?.hideMode !== SYS_V.ALWAYS),
+  // Hidden-but-revealable fields: shown as compact pills, click to temporarily reveal
+  const hiddenRevealableFields = useMemo(
+    () => visibleChildren
+      .filter((c) => c.hidden && fieldMap.get(c.id)?.hideMode !== SYS_V.ALWAYS)
+      .map((c) => ({ id: c.id, name: fieldMap.get(c.id)!.attrDefName })),
     [visibleChildren, fieldMap],
   );
-  const [childrenHovered, setChildrenHovered] = useState(false);
+  const [revealedFieldIds, setRevealedFieldIds] = useState<Set<string>>(() => new Set());
   const isFocused = focusedNodeId === nodeId &&
     (focusedParentId === null || focusedParentId === parentId);
   const hasTags = tagIds.length > 0;
@@ -1038,11 +1040,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
         />
       )}
       {isExpanded && (
-        <div
-          className="relative"
-          onMouseEnter={hasHiddenFields ? () => setChildrenHovered(true) : undefined}
-          onMouseLeave={hasHiddenFields ? () => setChildrenHovered(false) : undefined}
-        >
+        <div className="relative">
           {/* Indent guide line — 16px click area LEFT of bullet center.
                Parent bullet center = depth*28 + 32.5.
                Button right edge at depth*28+33 (1px gap to child ChevronButton at depth*28+34).
@@ -1056,14 +1054,30 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
           >
             <div className="indent-line-inner w-px h-full bg-border rounded-full" />
           </button>
+          {/* Hidden field pills: compact clickable chips to temporarily reveal hidden fields */}
+          {hiddenRevealableFields.length > 0 && hiddenRevealableFields.some(f => !revealedFieldIds.has(f.id)) && (
+            <div className="flex flex-wrap gap-x-2 gap-y-0.5 min-h-6 items-center" style={{ paddingLeft: (depth + 1) * 28 + 6 + 15 + 4 }}>
+              {hiddenRevealableFields.filter(f => !revealedFieldIds.has(f.id)).map(f => (
+                <button
+                  key={f.id}
+                  className="flex items-center gap-0.5 text-xs text-foreground-tertiary hover:text-foreground-secondary cursor-pointer"
+                  onClick={() => setRevealedFieldIds(prev => new Set(prev).add(f.id))}
+                  title={`Show ${f.name}`}
+                >
+                  <span className="text-[11px] leading-none">+</span>
+                  <span>{f.name}</span>
+                </button>
+              ))}
+            </div>
+          )}
           {/* Render children in natural order: fields as FieldRow, content as OutlinerItem */}
           {visibleChildren.map(({ id, type, hidden }, i) => {
             // ALWAYS-hidden fields: never render
             if (hidden && fieldMap.get(id)?.hideMode === SYS_V.ALWAYS) return null;
-            // Conditionally hidden fields: render only on hover, dimmed
-            if (hidden && !childrenHovered) return null;
+            // Conditionally hidden fields: skip unless manually revealed via pill click
+            if (hidden && !revealedFieldIds.has(id)) return null;
             return type === 'field' ? (
-              <div key={id} className={`@container${hidden ? ' opacity-50 transition-opacity' : ''}`} style={{ paddingLeft: (depth + 1) * 28 + 6 + 15 + 4 }}>
+              <div key={id} className="@container" style={{ paddingLeft: (depth + 1) * 28 + 6 + 15 + 4 }}>
                 <FieldRow
                   nodeId={nodeId}
                   attrDefId={fieldMap.get(id)!.attrDefId}

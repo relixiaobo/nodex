@@ -11,6 +11,7 @@
  */
 import { useMemo } from 'react';
 import { useNodeStore } from '../../stores/node-store';
+import { useUIStore } from '../../stores/ui-store';
 import { useChildren } from '../../hooks/use-children';
 import { useNodeFields, type FieldEntry } from '../../hooks/use-node-fields';
 import { OutlinerItem } from '../outliner/OutlinerItem';
@@ -63,10 +64,12 @@ export function FieldValueOutliner({ assocDataId, fieldDataType, attrDefId, onNa
     [visibleChildren],
   );
 
-  // --- CHECKBOX early return ---
+  // --- Special control early returns (Checkbox, Date) ---
   const wsId = useWorkspaceStore((s) => s.currentWorkspaceId);
   const userId = useWorkspaceStore((s) => s.userId);
   const toggleCheckboxField = useNodeStore((s) => s.toggleCheckboxField);
+  const createChild = useNodeStore((s) => s.createChild);
+  const setFocusedNode = useUIStore((s) => s.setFocusedNode);
   const isCheckbox = fieldDataType === SYS_D.CHECKBOX;
   if (isCheckbox) {
     const valueNodeId = contentChildIds[0];
@@ -86,6 +89,26 @@ export function FieldValueOutliner({ assocDataId, fieldDataType, attrDefId, onNa
           }}
           className="mt-[3px] h-3.5 w-3.5 rounded border-border accent-primary cursor-pointer"
         />
+      </div>
+    );
+  }
+
+  // --- DATE empty state: click to create node + open picker ---
+  if (fieldDataType === SYS_D.DATE && contentChildIds.length === 0) {
+    return (
+      <div
+        className="flex min-h-7 items-start gap-2 py-1 cursor-pointer"
+        style={{ paddingLeft: 25 }}
+        onClick={() => {
+          if (wsId && userId) {
+            createChild(assocDataId, wsId, userId, '').then((newNode) => {
+              setFocusedNode(newNode.id, assocDataId);
+            });
+          }
+        }}
+      >
+        <BulletChevron hasChildren={false} isExpanded={false} onBulletClick={() => {}} dimmed />
+        <span className="text-sm leading-[21px] text-foreground-tertiary select-none">Empty</span>
       </div>
     );
   }

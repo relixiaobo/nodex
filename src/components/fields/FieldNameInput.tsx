@@ -134,12 +134,11 @@ export function FieldNameInput({ tupleId, nodeId, attrDefId, currentName, onEnte
     (e: KeyboardEvent) => {
       if (e.key === 'Enter') {
         e.preventDefault();
-        if (suggestions.length > 0 && selectedIndex < suggestions.length) {
-          selectSuggestion(suggestions[selectedIndex].id);
-        } else {
-          confirm();
-          onEnterConfirm?.();
-        }
+        // Enter on field name always means:
+        // confirm name (reuse exact-match attrDef if needed) + create content node below.
+        // Suggestion selection remains available via click.
+        confirm();
+        onEnterConfirm?.();
       } else if (e.key === 'Tab') {
         e.preventDefault();
         confirm({ focusValue: true });
@@ -163,7 +162,7 @@ export function FieldNameInput({ tupleId, nodeId, attrDefId, currentName, onEnte
         setSelectedIndex((i) => Math.max(i - 1, 0));
       }
     },
-    [suggestions, selectedIndex, confirm, selectSuggestion, setEditingFieldName, value, wsId, userId, nodeId, tupleId, removeField],
+    [confirm, onEnterConfirm, setEditingFieldName, value, wsId, userId, nodeId, tupleId, removeField],
   );
 
   return (

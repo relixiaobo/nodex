@@ -130,12 +130,33 @@ export function FieldRow({
 
   const handleEnterConfirm = useCallback(() => {
     if (!wsId || !userId) return;
-    // Create a content node in nodeId's children, right after the field tuple
-    const parent = useNodeStore.getState().entities[nodeId];
+    const state = useNodeStore.getState();
+    const entities = state.entities;
+
+    // Prefer visual parent (nodeId), fallback to actual container holding tupleId.
+    // This guards against stale props/callers while still avoiding tuple._ownerId reliance.
+    let insertParentId = nodeId;
+    if (!entities[nodeId]?.children?.includes(tupleId)) {
+      const fallbackParent = Object.values(entities).find((n) => n.children?.includes(tupleId));
+      if (fallbackParent) insertParentId = fallbackParent.id;
+    }
+
+    const parent = entities[insertParentId];
+    const beforeIds = new Set(parent?.children ?? []);
     const tupleIdx = parent?.children?.indexOf(tupleId) ?? -1;
     const position = tupleIdx >= 0 ? tupleIdx + 1 : undefined;
-    createChild(nodeId, wsId, userId, '', position).then((newNode) => {
-      setFocusedNode(newNode.id, nodeId);
+
+    const createPromise = createChild(insertParentId, wsId, userId, '', position);
+
+    // createChild applies optimistic insert synchronously; focus immediately for snappy UX.
+    const optimisticParent = useNodeStore.getState().entities[insertParentId];
+    const optimisticNewId = optimisticParent?.children?.find((cid) => !beforeIds.has(cid));
+    if (optimisticNewId) setFocusedNode(optimisticNewId, insertParentId);
+
+    createPromise.then((newNode) => {
+      if (useNodeStore.getState().entities[newNode.id]) {
+        setFocusedNode(newNode.id, insertParentId);
+      }
     });
   }, [tupleId, nodeId, wsId, userId, createChild, setFocusedNode]);
 

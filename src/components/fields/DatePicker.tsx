@@ -409,7 +409,7 @@ export function DatePicker({ value, onSelect, onClose }: DatePickerProps) {
       {selectedDate && (
         <div className="mt-2 pt-2 border-t border-border">
           <button
-            className="text-xs text-foreground-tertiary hover:text-destructive transition-colors cursor-pointer"
+            className="text-sm text-foreground-secondary hover:text-destructive transition-colors cursor-pointer h-7 flex items-center"
             onClick={handleClearDate}
           >
             Clear
@@ -498,7 +498,7 @@ function DateInputField({
       {/* Time part — separated by | divider */}
       {timeStr && onTimeChange ? (
         <>
-          <span className="text-foreground-tertiary/40">|</span>
+          <span className="text-border-emphasis select-none">|</span>
           <span
             className="px-2 py-1.5"
             onClick={(e) => e.stopPropagation()}
@@ -587,7 +587,7 @@ function InlineTimeInput({ value, onChange }: { value: string; onChange: (v: str
 
   return (
     <span className="inline-flex items-center gap-0.5 text-sm">
-      <span className="inline-flex items-center rounded border border-border px-1 py-px bg-transparent">
+      <span className="inline-flex items-center rounded-md border border-border px-1 py-px bg-transparent">
         <input
           type="text"
           value={hours}
@@ -609,7 +609,7 @@ function InlineTimeInput({ value, onChange }: { value: string; onChange: (v: str
         />
       </span>
       <button
-        className="text-[10px] font-medium text-foreground-secondary hover:text-foreground transition-colors cursor-pointer px-0.5"
+        className="text-xs font-medium text-foreground-secondary hover:text-foreground transition-colors cursor-pointer px-0.5"
         onClick={(e) => { e.stopPropagation(); togglePeriod(); }}
       >
         {period}
@@ -704,16 +704,16 @@ function CalendarGrid({
         </span>
         <div className="flex items-center gap-1">
           <button
-            className="rounded-md px-1.5 py-0.5 text-xs text-foreground-secondary hover:bg-foreground/5 transition-colors cursor-pointer"
+            className="rounded-md px-1.5 h-7 text-xs text-foreground-secondary hover:bg-foreground/5 transition-colors cursor-pointer"
             onClick={onToday}
           >
             Today
           </button>
-          <button className="text-foreground-tertiary hover:text-foreground-secondary transition-colors w-6 h-6 flex items-center justify-center" onClick={prevMonth}>
-            <ChevronLeft size={14} />
+          <button className="text-foreground-tertiary hover:text-foreground-secondary transition-colors w-7 h-7 flex items-center justify-center rounded-md cursor-pointer" onClick={prevMonth}>
+            <ChevronLeft size={16} />
           </button>
-          <button className="text-foreground-tertiary hover:text-foreground-secondary transition-colors w-6 h-6 flex items-center justify-center" onClick={nextMonth}>
-            <ChevronRight size={14} />
+          <button className="text-foreground-tertiary hover:text-foreground-secondary transition-colors w-7 h-7 flex items-center justify-center rounded-md cursor-pointer" onClick={nextMonth}>
+            <ChevronRight size={16} />
           </button>
         </div>
       </div>
@@ -721,7 +721,7 @@ function CalendarGrid({
       {/* Day headers — 7 columns */}
       <div className="grid grid-cols-7 gap-0 mb-0.5">
         {DAY_HEADERS.map((d, i) => (
-          <div key={i} className="text-center text-[10px] text-foreground-tertiary">
+          <div key={i} className="text-center text-xs text-foreground-tertiary">
             {d}
           </div>
         ))}
@@ -771,7 +771,7 @@ function CalendarGrid({
             }
 
             if (disabled) {
-              cls += ' text-foreground-tertiary/40 cursor-default';
+              cls += ' text-foreground-tertiary opacity-50 cursor-not-allowed';
             } else if (isOverflow && !isSelected && !isStart && !isEnd && !inRange) {
               cls += ' text-foreground-tertiary cursor-pointer';
             } else if (!isSelected && !isStart && !isEnd) {

@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useNode } from '../../hooks/use-node';
 import { useChildren } from '../../hooks/use-children';
 import { useNodeFields, type FieldEntry } from '../../hooks/use-node-fields';
@@ -6,6 +6,7 @@ import { useNodeStore } from '../../stores/node-store';
 import { OutlinerItem } from './OutlinerItem';
 import { FieldRow } from '../fields/FieldRow';
 import { TrailingInput } from '../editor/TrailingInput';
+import { SYS_V } from '../../types/index.js';
 
 interface OutlinerViewProps {
   rootNodeId: string;
@@ -29,14 +30,30 @@ export function OutlinerView({ rootNodeId, showTemplateTuples }: OutlinerViewPro
   }, [fields]);
 
   // Classify each child: field tuple → 'field', regular node → 'content', else skip
+  // Also evaluate hide-field rules for field entries
   const visibleChildren = useMemo(() => {
-    const result: { id: string; type: 'field' | 'content' }[] = [];
+    const result: { id: string; type: 'field' | 'content'; hidden?: boolean }[] = [];
     for (const cid of allChildIds) {
       const fieldEntry = fieldMap.get(cid);
       if (fieldEntry) {
         // When showTemplateTuples: skip config fields (handled by FieldList above)
         if (showTemplateTuples && fieldEntry.dataType.startsWith('__')) continue;
-        result.push({ id: cid, type: 'field' });
+        // Evaluate hide-field condition
+        let hidden = false;
+        switch (fieldEntry.hideMode) {
+          case SYS_V.ALWAYS:
+            hidden = true;
+            break;
+          case SYS_V.WHEN_EMPTY:
+            hidden = !!fieldEntry.isEmpty;
+            break;
+          case SYS_V.WHEN_NOT_EMPTY:
+            hidden = !fieldEntry.isEmpty;
+            break;
+          // WHEN_VALUE_IS_DEFAULT: needs "default" concept — skip for now
+          // NEVER: default, not hidden
+        }
+        result.push({ id: cid, type: 'field', hidden });
       } else {
         const dt = entities[cid]?.props._docType;
         if (!dt) result.push({ id: cid, type: 'content' });
@@ -51,10 +68,37 @@ export function OutlinerView({ rootNodeId, showTemplateTuples }: OutlinerViewPro
     [visibleChildren],
   );
 
+  // All hidden fields (including ALWAYS): shown as compact pills, click to temporarily reveal
+  const hiddenRevealableFields = useMemo(
+    () => visibleChildren
+      .filter((c) => c.hidden)
+      .map((c) => ({ id: c.id, name: fieldMap.get(c.id)!.attrDefName })),
+    [visibleChildren, fieldMap],
+  );
+  const [revealedFieldIds, setRevealedFieldIds] = useState<Set<string>>(() => new Set());
+
   return (
     <div className="flex flex-col pr-4" role="tree">
-      {visibleChildren.map(({ id, type }, i) =>
-        type === 'field' ? (
+      {/* Hidden field pills: compact clickable chips to temporarily reveal hidden fields */}
+      {hiddenRevealableFields.length > 0 && hiddenRevealableFields.some(f => !revealedFieldIds.has(f.id)) && (
+        <div className="flex flex-wrap gap-x-2 gap-y-0.5 min-h-6 items-center" style={{ paddingLeft: 6 + 15 + 4 }}>
+          {hiddenRevealableFields.filter(f => !revealedFieldIds.has(f.id)).map(f => (
+            <button
+              key={f.id}
+              className="flex items-center gap-0.5 text-xs text-foreground-tertiary hover:text-foreground-secondary cursor-pointer"
+              onClick={() => setRevealedFieldIds(prev => new Set(prev).add(f.id))}
+              title={`Show ${f.name}`}
+            >
+              <span className="text-[11px] leading-none">+</span>
+              <span>{f.name}</span>
+            </button>
+          ))}
+        </div>
+      )}
+      {visibleChildren.map(({ id, type, hidden }, i) => {
+        // Hidden fields: skip unless manually revealed via pill click
+        if (hidden && !revealedFieldIds.has(id)) return null;
+        return type === 'field' ? (
           <div key={id} className="@container" style={{ paddingLeft: 6 + 15 + 4 }}>
             <FieldRow
               nodeId={rootNodeId}
@@ -67,6 +111,8 @@ export function OutlinerView({ rootNodeId, showTemplateTuples }: OutlinerViewPro
               assocDataId={fieldMap.get(id)!.assocDataId}
               isLastInGroup={i === visibleChildren.length - 1 || visibleChildren[i + 1].type !== 'field'}
               trashed={fieldMap.get(id)!.trashed}
+              isRequired={fieldMap.get(id)!.isRequired}
+              isEmpty={fieldMap.get(id)!.isEmpty}
             />
           </div>
         ) : (
@@ -78,8 +124,8 @@ export function OutlinerView({ rootNodeId, showTemplateTuples }: OutlinerViewPro
             parentId={rootNodeId}
             rootNodeId={rootNodeId}
           />
-        ),
-      )}
+        );
+      })}
       <TrailingInput parentId={rootNodeId} depth={0} autoFocus={visibleChildren.length === 0} parentExpandKey={`${node?.props._ownerId ?? ''}:${rootNodeId}`} />
     </div>
   );

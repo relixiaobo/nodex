@@ -160,10 +160,10 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   );
   // For hasChildren: count non-hidden items (hidden-always fields don't count toward expand chevron)
   const hasChildren = visibleChildren.some((c) => !c.hidden);
-  // Hidden-but-revealable fields: shown as compact pills, click to temporarily reveal
+  // All hidden fields (including ALWAYS): shown as compact pills, click to temporarily reveal
   const hiddenRevealableFields = useMemo(
     () => visibleChildren
-      .filter((c) => c.hidden && fieldMap.get(c.id)?.hideMode !== SYS_V.ALWAYS)
+      .filter((c) => c.hidden)
       .map((c) => ({ id: c.id, name: fieldMap.get(c.id)!.attrDefName })),
     [visibleChildren, fieldMap],
   );
@@ -1072,9 +1072,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
           )}
           {/* Render children in natural order: fields as FieldRow, content as OutlinerItem */}
           {visibleChildren.map(({ id, type, hidden }, i) => {
-            // ALWAYS-hidden fields: never render
-            if (hidden && fieldMap.get(id)?.hideMode === SYS_V.ALWAYS) return null;
-            // Conditionally hidden fields: skip unless manually revealed via pill click
+            // Hidden fields: skip unless manually revealed via pill click
             if (hidden && !revealedFieldIds.has(id)) return null;
             return type === 'field' ? (
               <div key={id} className="@container" style={{ paddingLeft: (depth + 1) * 28 + 6 + 15 + 4 }}>

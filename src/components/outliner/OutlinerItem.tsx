@@ -319,6 +319,8 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
             preRange.setEnd(range.startContainer, range.startOffset);
             textOffset = preRange.toString().length;
           }
+        } else {
+          // caretRangeFromPoint returned null (element may be out of viewport)
         }
       } catch { /* ignore */ }
       useUIStore.getState().setFocusClickCoords(textOffset !== null ? { textOffset } : null);

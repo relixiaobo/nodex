@@ -33,9 +33,12 @@ interface OutlinerItemProps {
   fieldDataType?: string;
   /** AttrDef ID — for Options field dropdown when clicking selected value */
   attrDefId?: string;
+  /** Called when arrow navigation reaches a boundary (first/last node in scope).
+   *  Allows field-value OutlinerItems to escape to the parent outliner context. */
+  onNavigateOut?: (direction: 'up' | 'down') => void;
 }
 
-export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId, fieldDataType, attrDefId }: OutlinerItemProps) {
+export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId, fieldDataType, attrDefId, onNavigateOut }: OutlinerItemProps) {
   const node = useNode(nodeId);
   const expandKey = `${parentId}:${nodeId}`;
   const isExpanded = useUIStore((s) => s.expandedNodes.has(`${parentId}:${nodeId}`));
@@ -444,14 +447,22 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   const handleArrowUp = useCallback(() => {
     const flatList = getFlattenedVisibleNodes(rootChildIds, entities, expandedNodes, rootNodeId);
     const prev = getPreviousVisibleNode(nodeId, parentId, flatList);
-    if (prev) setFocusedNode(prev.nodeId, prev.parentId);
-  }, [nodeId, parentId, rootNodeId, rootChildIds, entities, expandedNodes, setFocusedNode]);
+    if (prev) {
+      setFocusedNode(prev.nodeId, prev.parentId);
+    } else if (onNavigateOut) {
+      onNavigateOut('up');
+    }
+  }, [nodeId, parentId, rootNodeId, rootChildIds, entities, expandedNodes, setFocusedNode, onNavigateOut]);
 
   const handleArrowDown = useCallback(() => {
     const flatList = getFlattenedVisibleNodes(rootChildIds, entities, expandedNodes, rootNodeId);
     const next = getNextVisibleNode(nodeId, parentId, flatList);
-    if (next) setFocusedNode(next.nodeId, next.parentId);
-  }, [nodeId, parentId, rootNodeId, rootChildIds, entities, expandedNodes, setFocusedNode]);
+    if (next) {
+      setFocusedNode(next.nodeId, next.parentId);
+    } else if (onNavigateOut) {
+      onNavigateOut('down');
+    }
+  }, [nodeId, parentId, rootNodeId, rootChildIds, entities, expandedNodes, setFocusedNode, onNavigateOut]);
 
   const handleMoveUp = useCallback(() => {
     if (!userId) return;
@@ -961,6 +972,27 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
                   assocDataId={fieldMap.get(id)!.assocDataId}
                   isLastInGroup={i === visibleChildren.length - 1 || visibleChildren[i + 1].type !== 'field'}
                   trashed={fieldMap.get(id)!.trashed}
+                  onNavigateOut={(direction) => {
+                    if (direction === 'up') {
+                      // Escape up → focus this parent node
+                      setFocusedNode(nodeId, parentId);
+                    } else {
+                      // Escape down → focus next content child after this field, or parent's next
+                      let found = false;
+                      for (let j = i + 1; j < visibleChildren.length; j++) {
+                        if (visibleChildren[j].type === 'content') {
+                          setFocusedNode(visibleChildren[j].id, nodeId);
+                          found = true;
+                          break;
+                        }
+                      }
+                      if (!found) {
+                        const fl = getFlattenedVisibleNodes(rootChildIds, useNodeStore.getState().entities, useUIStore.getState().expandedNodes, rootNodeId);
+                        const nx = getNextVisibleNode(nodeId, parentId, fl);
+                        if (nx) setFocusedNode(nx.nodeId, nx.parentId);
+                      }
+                    }
+                  }}
                 />
               </div>
             ) : (

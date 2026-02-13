@@ -24,9 +24,11 @@ interface FieldValueOutlinerProps {
   fieldDataType?: string;
   /** AttrDef ID — for future option autocomplete */
   attrDefId?: string;
+  /** Called when arrow navigation escapes field value boundaries */
+  onNavigateOut?: (direction: 'up' | 'down') => void;
 }
 
-export function FieldValueOutliner({ assocDataId, fieldDataType, attrDefId }: FieldValueOutlinerProps) {
+export function FieldValueOutliner({ assocDataId, fieldDataType, attrDefId, onNavigateOut }: FieldValueOutlinerProps) {
   useChildren(assocDataId);
   const childIds = useNodeStore((s) => s.entities[assocDataId]?.children ?? []);
   const entities = useNodeStore((s) => s.entities);
@@ -94,12 +96,13 @@ export function FieldValueOutliner({ assocDataId, fieldDataType, attrDefId }: Fi
             rootNodeId={assocDataId}
             fieldDataType={fieldDataType}
             attrDefId={attrDefId}
+            onNavigateOut={onNavigateOut}
           />
         ),
       )}
       {/* Options fields: hide TrailingInput once a value is selected (user clicks existing value to change) */}
       {!(isOptionsType && contentChildIds.length > 0) && (
-        <TrailingInput parentId={assocDataId} depth={0} parentExpandKey={`${entities[assocDataId]?.props._ownerId ?? ''}:${assocDataId}`} fieldDataType={fieldDataType} attrDefId={attrDefId} />
+        <TrailingInput parentId={assocDataId} depth={0} parentExpandKey={`${entities[assocDataId]?.props._ownerId ?? ''}:${assocDataId}`} fieldDataType={fieldDataType} attrDefId={attrDefId} onNavigateOut={onNavigateOut} />
       )}
     </div>
   );

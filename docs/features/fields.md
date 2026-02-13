@@ -208,6 +208,7 @@
 | 2026-02-12 | Checkbox 统一：OutlinerItem 支持 fieldDataType prop | Checkbox 值节点渲染为 toggle 而非编辑器，FieldValueEditor 变为死代码 |
 | 2026-02-13 | DatePicker 重写为 Notion 风格 | 自定义日历 + masked input + Toggle 控制范围/时间 + 即时保存，替代浏览器原生 date input |
 | 2026-02-13 | 隐藏字段改为 pill click-to-reveal（替代 hover-to-reveal） | Tana 风格：`+ FieldName` 紧凑按钮，点击临时显示。所有隐藏模式（含 Always）都出现 pill |
+| 2026-02-13 | Number Min/Max 配置 + 范围验证 | NDX_A03/A04 存储，ConfigNumberInput 编辑，validateFieldValue 支持 ≥ min / ≤ max 警告 |
 
 ## 当前状态
 
@@ -232,7 +233,7 @@
 - [x] Required 字段视觉提示（红色 * 号）
 - [ ] Auto-initialize（6 种策略）
 - [ ] Pinned fields
-- [ ] Number Min/Max 配置
+- [x] Number Min/Max 配置（ConfigNumberInput + 范围验证 warning）
 - [ ] Page size 配置
 - [ ] Merge fields
 - [ ] 系统字段（Created time / Modified time / Owner）

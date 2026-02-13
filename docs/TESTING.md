@@ -2,6 +2,12 @@
 
 本文件为 `/self-test` Skill 提供项目特定的测试参数。Skill 本身是通用自测规范，此文件定义 Nodex 的具体配置。
 
+## 测试职责边界（重要）
+
+1. 本文档用于 **Agent 可执行** 的验证：脚本、构建、可自动化检查点。
+2. 人工验收不是全量回归，只处理“Agent 无法可靠验证”或“核心高风险路径”。
+3. 人工验收清单统一维护在 `docs/MANUAL-TEST-CHECKLIST.md`，不要在本文重复维护第二份版本。
+
 ---
 
 ## 环境配置
@@ -41,15 +47,21 @@
 
 ---
 
-## Phase 1: 测试脚本
+## Phase 1: Vitest 自动化套件（主回归）
 
-脚本目录: `tests/scripts/`
+目录: `tests/vitest/`
+
+执行命令：
+
+```bash
+npm run test:run
+```
 
 ### 1.1 前置检查
 
-**脚本**: `tests/scripts/preflight.js`
+**测试文件**: `tests/vitest/preflight.test.ts`
 
-**期望**: `{ ok: true, entities: 68+, workspace: 'ws_default' }`
+**期望**: 种子数据加载成功（60+ 节点），workspace = `ws_default`，默认 panel = `ws_default_LIBRARY`
 
 如果失败，检查：
 - dev server 是否启动 (`npm run dev:test`)
@@ -58,9 +70,9 @@
 
 ### 1.2 CRUD + 树操作
 
-**脚本**: `tests/scripts/store-crud.js`
+**测试文件**: `tests/vitest/store-crud.test.ts`
 
-**期望**: `{ allPassed: true }`，7 项全部 `pass: true`。
+**覆盖点**:
 
 | # | 操作 | 验证点 |
 |---|------|--------|
@@ -71,22 +83,19 @@
 | 5 | trashNode | 入 trash.children 且出 parent.children |
 | 6 | createChild | 出现在 parent.children 且 name 正确 |
 | 7 | updateNodeName | props.name 更新后还原 |
+| 8 | graph invariants | `children` / `_ownerId` / associationMap 一致性 |
 
 ### 1.3 UI Store 操作
 
-**脚本**: `tests/scripts/ui-store.js`
+**测试文件**: `tests/vitest/ui-store.test.ts`
 
-**期望**: `{ allPassed: true }`，12 项全部 `pass: true`。
-
-测试项：navigateTo, goBack, goForward, replacePanel, expand, collapse, toggleExpand, setFocus, clearFocus, openSearch, closeSearch, toggleSidebar。
+**覆盖点**: navigateTo, goBack, goForward, replacePanel, expand, collapse, toggleExpand, setFocus, clearFocus, openSearch, closeSearch, toggleSidebar
 
 ### 1.4 边界条件
 
-**脚本**: `tests/scripts/edge-cases.js`
+**测试文件**: `tests/vitest/edge-cases.test.ts`
 
-**期望**: `{ allPassed: true }`，2 项全部 `pass: true`。
-
-测试项：indent 第一个子节点 (no-op)、outdent 顶层节点 (no-op)。
+**覆盖点**: indent 第一个子节点 (no-op)、outdent 顶层节点 (no-op)
 
 ---
 
@@ -129,9 +138,9 @@
 | Phase | Test | Result |
 |-------|------|--------|
 | 0 | TypeScript 类型检查 | PASS/FAIL |
-| 1.1 | Store 前置检查 | PASS/FAIL |
-| 1.2 | CRUD + 树操作 (7 tests) | PASS/FAIL |
-| 1.3 | UI Store 操作 (11 tests) | PASS/FAIL |
+| 1.1 | Preflight | PASS/FAIL |
+| 1.2 | CRUD + 树操作 + 不变量 | PASS/FAIL |
+| 1.3 | UI Store 操作 | PASS/FAIL |
 | 1.4 | 边界条件 (2 tests) | PASS/FAIL |
 | 2 | 视觉渲染 | PASS/FAIL/SKIP |
 | 3 | 扩展构建 | PASS/FAIL |
@@ -188,36 +197,9 @@ Pre-tagged: task_1 → #Task (meta_task_1, field tuples, associatedData)
 
 ---
 
-## 人工测试清单
+## 人工验收入口
 
-以下交互涉及真实键盘事件、ProseMirror 编辑器行为，无法通过 MCP 自动化测试（`isTrusted: false` 的合成事件被 ProseMirror 忽略）。
-
-### 键盘快捷键
-
-| 操作 | 预期行为 |
-|------|----------|
-| **Enter** | 在当前节点下方创建新兄弟节点，焦点移到新节点 |
-| **Tab** | 当前节点缩进（变成上方兄弟的子节点） |
-| **Shift+Tab** | 当前节点反缩进（提升到父节点的兄弟） |
-| **↑ / ↓** | 焦点在相邻节点间移动 |
-| **Backspace (空节点)** | 删除当前空节点，焦点移到上方节点 |
-| **Cmd/Ctrl+Shift+↑/↓** | 当前节点上/下移 |
-| **Cmd/Ctrl+B/I/E** | 加粗 / 斜体 / inline code |
-
-### 拖拽排序
-
-| 操作 | 预期行为 |
-|------|----------|
-| 拖到节点上方 | 蓝色指示线，释放后移到目标前 |
-| 拖到节点下方 | 蓝色指示线，释放后移到目标后 |
-| 拖到节点中间 | 高亮目标，释放后成为子节点 |
-
-### 搜索面板 + 面板导航 + Chevron
-
-| 操作 | 预期行为 |
-|------|----------|
-| **Cmd/Ctrl+K** | 搜索面板弹出，输入关键词实时过滤 |
-| 点击 bullet | push panel（zoom in） |
-| 点击返回箭头 | pop panel |
-| hover 有子节点 | Chevron 箭头出现 |
-| 点击 chevron | 展开/折叠子节点 |
+- 人工验收请使用：`docs/MANUAL-TEST-CHECKLIST.md`
+- 写入原则：
+  - 仅写入 Agent 无法可靠自动验证的项
+  - 或核心高风险且必须由你最终确认的项

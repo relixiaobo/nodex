@@ -17,7 +17,9 @@
 - 字段和内容节点在 children 中**交错显示**（保持原始顺序，不分离）
 - 字段行布局：`[icon] [字段名 130px] [字段值区域]`
 - 字段名可编辑（点击进入编辑模式，自动完成已有 attrDef 名）
+- 字段名编辑态按 `Enter`：始终「确认字段名」并在该字段下方创建普通内容节点（不再将 Enter 用作建议项切换）
 - 字段名为空时自动聚焦到字段名编辑器
+- 若父节点最后一个可见子项是 field，仍显示一个空白 `TrailingInput` 行，允许直接继续输入普通子节点
 
 ### 字段值统一模型（设计原则）
 
@@ -241,6 +243,8 @@
 | 2026-02-13 | 隐藏字段改为 pill click-to-reveal（替代 hover-to-reveal） | Tana 风格：`+ FieldName` 紧凑按钮，点击临时显示。所有隐藏模式（含 Always）都出现 pill |
 | 2026-02-13 | 系统字段 key 用 NDX_SYS_* 前缀，不创建 attrDef 节点 | 系统字段无需配置/模板，值实时派生。8/12 优先实现，4 个依赖全量扫描/多用户的延后 |
 | 2026-02-13 | Number Min/Max 配置 + 范围验证 | NDX_A03/A04 存储，ConfigNumberInput 编辑，validateFieldValue 支持 ≥ min / ≤ max 警告 |
+| 2026-02-14 | FieldNameInput 的 Enter 语义固定为「确认并创建下方节点」 | 避免字段自动完成误替换（如 Done → Done time），保证输入流连续性 |
+| 2026-02-14 | 父节点末尾为 field 时仍渲染 TrailingInput | 支持在字段块后直接输入普通内容，符合 outliner 连续输入习惯 |
 
 ## 当前状态
 

@@ -8,60 +8,7 @@
 
 ## Open Bugs
 
-### #42 Field name 按 Enter 创建的节点层级错误 + 无焦点
-
-**状态**: open | **发现**: 2026-02-13
-**相关**: system fields 实现过程中发现，但影响所有 field 类型
-
-**现象**:
-1. 在任意 field name 中按 Enter，新节点应出现在该 field 下方（作为同级 child）
-2. 实际：新节点出现在错误的层级（更高层），且高度异常偏大
-3. 光标没有聚焦到新创建的节点
-
-**已尝试**:
-
-| 轮次 | 方案 | 结果 |
-|------|------|------|
-| 1 | `createSibling(tupleId)` | 节点层级错误——tuple._ownerId 不一定匹配视觉父节点 |
-| 2 | 改为 `createChild(nodeId, position)` | 仍有问题，待排查 |
-
-**根因分析**:
-- `createSibling` 依赖 `tuple._ownerId` 定位父节点，导入数据中 `_ownerId` 可能不匹配视觉父节点
-- 已改为 `createChild(nodeId, position)` 但问题仍在，需进一步排查：
-  - `nodeId` 是否是正确的视觉父节点（FieldRow 接收的 nodeId 来自哪里）
-  - `createChild` 后 `setFocusedNode` 的 parentId 是否正确
-  - 新节点高度异常可能是 FieldList/TagBar 渲染在空节点上导致
-
-**相关代码**:
-- `src/components/fields/FieldRow.tsx` — `handleEnterConfirm`
-- `src/stores/node-store.ts` — `createChild`, `createSibling`
-
----
-
-### #41 Node Description 编辑：高度跳动 + Ctrl+I 快捷键不生效
-
-**状态**: open | **发现**: 2026-02-13
-
-**Bug 1: 点击 description 进入编辑时高度跳动**
-- 现象：点击 description 文本进入 contentEditable 编辑模式时，div 高度产生变化，导致下方节点向下位移
-- 根因：静态显示 `text-xs leading-tight`（12px font, 15px line-height），编辑态增加了 `min-h-4`（16px），多 1px
-- 可能修复：移除 `min-h-4`，统一 `leading-[15px]`；或始终保持 contentEditable 样式，仅用 readOnly 控制
-
-**Bug 2: Ctrl+I (Mod-i) 快捷键不触发 Add Description**
-- 现象：NodeEditor 中按 Cmd+I / Ctrl+I 不会打开 description 编辑
-- 已尝试：StarterKit 禁用 italic + `Mod-i` keymap → 不生效
-- 可能根因：
-  1. Mac 上 `Mod-i` = `Cmd+I`，用户可能按的是物理 `Ctrl+I`，需同时绑定 `Ctrl-i`
-  2. 即使 StarterKit italic 已禁用，其他扩展/浏览器默认行为可能拦截
-  3. focus/blur 竞态：`setEditingDescription(true)` → useEffect focus → NodeEditor blur → unmount
-- 下一步：在 `handleDescriptionEdit` 中 console.log 确认回调是否被调用
-
-**相关代码**:
-- `src/components/editor/NodeEditor.tsx` — `Mod-i` keymap + ItalicNoShortcut
-- `src/components/outliner/OutlinerItem.tsx` — description 显示/编辑逻辑
-- `src/components/panel/NodeDescription.tsx` — PanelTitle description
-
-**相关 commit**: 361d4a8, 8222558
+暂无
 
 ---
 
@@ -69,6 +16,9 @@
 
 | # | 标题 | 关闭日期 |
 |---|------|----------|
+| 43 | Field name 末尾 Enter 不应切换建议字段；父节点末尾为 field 时需保留空白输入行 | 2026-02-14 |
+| 42 | Field name 按 Enter 创建的节点层级错误 + 无焦点 | 2026-02-14 |
+| 41 | Node Description 编辑：高度跳动 + Ctrl+I 快捷键不生效 | 2026-02-14 |
 | 18 | 无 child node 的节点展开后 backspace 应删除空子节点并收起 | 2026-02-13 |
 | 17 | 在子节点中 @ 创建对兄弟节点的 reference 时出错 | 2026-02-13 |
 | 16 | 聚焦末尾含 # 或 @ 的 node 时不应触发菜单 | 2026-02-13 |
@@ -152,16 +102,18 @@
 
 ---
 
-### #22 Date 节点 & 日记 — 年/月/周/日层级、Today 入口、自然语言解析
+### #22 Date 节点 & 日记 — 年/周/日层级、Today 入口、自然语言解析
 
 **Phase**: 1
 
 **待办**:
-- [ ] 年/月/周/日节点层级（自动生成）
+- [ ] 年/周/日节点层级（自动生成，无月层级）
 - [ ] Today 快捷入口（侧栏按钮 + 快捷键 Ctrl+Shift+D）
-- [ ] 自然语言日期解析（@today / @next Monday / @November）
 - [ ] 日记模板（#day supertag 配置）
-- [ ] 日期字段链接到日节点
+- [ ] 自然语言日期解析（@today / @next Monday / @November）— 延后
+- [ ] 日期字段链接到日节点 — 延后
+
+**文档**: `docs/features/date-nodes.md`
 
 ---
 
@@ -177,6 +129,8 @@
 - [ ] 关键词操作符（TODO / DONE / OVERDUE / CREATED LAST X DAYS）
 - [ ] 搜索结果配合视图展示
 
+**文档**: `docs/features/search.md`
+
 ---
 
 ### #24 Table View — 表格视图
@@ -188,6 +142,8 @@
 - [ ] 列宽调整、列拖拽排序
 - [ ] 列计算（Sum / Avg / Median / Min / Max / Count）
 - [ ] 单元格内直接编辑字段值
+
+**文档**: `docs/features/views.md`
 
 ---
 
@@ -201,6 +157,8 @@
 - [ ] 按字段值分组（Outline / Cards / List 视图）
 - [ ] 多级排序（升序/降序、堆叠排序条件）
 
+**文档**: `docs/features/views.md`
+
 ---
 
 ### #26 Cards View — 卡片视图
@@ -211,6 +169,8 @@
 - [ ] 卡片视图
 - [ ] 卡片间拖拽更新字段值
 - [ ] Banner 图片显示
+
+**文档**: `docs/features/views.md`
 
 ---
 
@@ -223,6 +183,8 @@
 - [ ] 日/周/月粒度切换
 - [ ] 拖拽未排期节点到日历添加日期
 
+**文档**: `docs/features/views.md`
+
 ---
 
 ### #28 List & Tabs View
@@ -232,6 +194,8 @@
 **待办**:
 - [ ] List 视图（左侧列表 + 右侧详情双面板）
 - [ ] Tabs 视图（顶部 tab 切换内容）
+
+**文档**: `docs/features/views.md`
 
 ---
 
@@ -371,3 +335,78 @@
 - [ ] REST API 接入节点数据
 - [ ] 支持创建节点 / 应用标签 / 设字段
 - [ ] Email-to-Nodex（通过 API 桥接）
+
+---
+
+### #44 节点选中 — 多选、批量操作
+
+**Phase**: 1-2
+
+**待办**:
+- [ ] Escape 退出编辑 → 选中状态（Phase 1）
+- [ ] 选中模式下 ↑/↓ 导航、Enter 回到编辑（Phase 1）
+- [ ] Cmd+Click 多选（Phase 2）
+- [ ] Shift+Click 范围选中（Phase 2）
+- [ ] Shift+Arrow 扩展选区（Phase 2）
+- [ ] 批量删除 / 缩进 / 反缩进（Phase 2）
+- [ ] 鼠标拖拽框选（Phase 2，低优先）
+
+**文档**: `docs/features/node-selection.md`
+
+---
+
+### #45 撤销与重做 — 节点操作撤销
+
+**Phase**: 2
+
+**待办**:
+- [x] 文本编辑撤销（TipTap 内置）
+- [x] 导航撤销（navUndoStack）
+- [ ] 创建/删除节点撤销
+- [ ] 缩进/反缩进/移动撤销
+- [ ] 拖拽排序撤销
+- [ ] Cmd+Z 三层优先级统一（文本 → 节点操作 → 导航）
+- [ ] 焦点恢复
+- [ ] 标签/字段操作撤销
+- [ ] 批量操作撤销
+
+**文档**: `docs/features/undo-redo.md`
+
+---
+
+### #47 Slash Command Menu — `/` 斜杠命令菜单
+
+**Phase**: 1
+
+**待办**:
+- [ ] 空节点输入 `/` 触发命令菜单（TipTap Suggestion 扩展）
+- [ ] 菜单项：Search node / Field / Reference / Heading / Checkbox
+- [ ] 菜单项可搜索过滤（输入关键词缩小列表）
+- [ ] 选中菜单项后执行对应操作（等同于 `?` `>` `@` 等触发符）
+- [ ] "More commands" 入口 → 打开 CommandPalette (Cmd+K)
+
+---
+
+### #48 Floating Toolbar — 选中文本浮动格式工具栏
+
+**Phase**: 1
+
+**待办**:
+- [ ] TipTap BubbleMenu 集成（选中文本时浮现）
+- [ ] 格式按钮：Bold / Italic / Underline / Strikethrough / Code / Highlight / Heading
+- [ ] 清除格式按钮
+- [ ] @ Reference 按钮（选中文本转内联引用）
+- [ ] # Tag 按钮（为当前节点添加标签）
+
+---
+
+### #46 用户认证 — Google 登录
+
+**Phase**: 4（上线前必需）
+
+**待办**:
+- [ ] Supabase Auth 集成 Google OAuth
+- [ ] 登录/注册 UI（Side Panel 内）
+- [ ] 用户会话管理（token 刷新、登出）
+- [ ] 未登录状态拦截（引导到登录页）
+- [ ] 用户数据隔离（RLS 基于 auth.uid()）

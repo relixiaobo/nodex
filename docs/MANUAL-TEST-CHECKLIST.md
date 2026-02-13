@@ -1,57 +1,287 @@
-# Nodex Manual Test Checklist
+# Nodex 人工测试用例清单（Use Case）
 
-Items that require human verification (browser interaction limitations prevent automated testing).
+> 最后更新：2026-02-14  
+> 目的：提供给多 Agent 协作时统一执行的人工验收标准。  
+> 原则：只保留“当前版本已实现或高风险回归”的验证项，移除过时/未落地功能的误导性检查。
 
-## BulletChevron Layout & Hover Behavior (vs Tana)
+## 0. 使用说明
 
-Chevron and Bullet are TWO INDEPENDENT side-by-side areas: `[Chevron 15px] [Bullet 15px]`
+1. 执行顺序：先跑 `P0`（必测），再按变更范围补跑 `P1`。
+2. 结果记录：每条用例结尾都有 `执行结果`，请填写 `PASS / FAIL / BLOCKED`。
+3. 缺陷记录：若失败，记录「复现步骤 + 实际结果 + 期望结果 + 截图/录屏」。
 
-- [ ] **Layout**: Chevron area is to the LEFT of bullet, they don't overlap
-- [ ] **Leaf node hover**: Hover over a leaf node - chevron `>` appears in LEFT area, bullet stays visible in RIGHT area
-- [ ] **Parent node (collapsed) hover**: Hover over a collapsed parent - chevron `>` appears, bullet stays visible
-- [ ] **Parent node (expanded) hover**: Hover over an expanded parent - chevron `v` (rotated) appears, bullet stays visible
-- [ ] **Mouse away from expanded node**: Move mouse away - chevron disappears, bullet remains, children still shown
-- [ ] **Mouse away from leaf node**: Move mouse away - chevron disappears, bullet returns
-- [ ] **Click chevron on leaf**: Click the chevron on a leaf node - should expand + create empty child with editor focused
-- [ ] **Click chevron on parent (collapsed)**: Click chevron - should expand and show children
-- [ ] **Click chevron on parent (expanded)**: Click chevron - should collapse and hide children
-- [ ] **Double-click chevron**: Double-click on a parent node - should drill-down (push panel)
+### 0.1 准入规则（何时允许写入本清单）
 
-## Bullet Size/Style & Click Behavior
+1. 该清单只收录「必须由你验证」的项目，不做全量回归。
+2. 仅在以下场景新增用例：
+   - Agent 无法可靠自动验证（真实键盘事件、真实拖拽手感、关键视觉细节）
+   - 核心路径且失败代价高（数据破坏、主流程中断）
+3. 普通功能或可自动化验证项，不应写入本清单。
 
-- [ ] **Leaf node bullet**: 5px inner dot, no outer ring (transparent background)
-- [ ] **Parent node bullet (collapsed)**: 5px inner dot + 15px outer ring (dimmed background, `bg-foreground/10`)
-- [ ] **Parent node bullet (expanded)**: 5px inner dot, no outer ring (transparent background, same as leaf)
-- [ ] **Bullet click → zoom in**: Click any bullet - should push panel (drill-down to that node)
-- [ ] **Bullet hover**: Hover over bullet - inner dot scales up slightly
-- [ ] **Bullet active**: Press down on bullet - scales down slightly (0.9x)
+---
 
-## Indent Guide Line (Clickable)
+## 1. 全局前提条件
 
-- [ ] **Expanded node has guide line**: Vertical 1px line under expanded node, aligns with parent bullet center
-- [ ] **Guide line spans all children**: Line extends from first child to last child
-- [ ] **Nested guide lines**: Multiple levels of nesting each show their own guide line
-- [ ] **Collapsed node has no guide line**: Guide line disappears when node is collapsed
-- [ ] **Click guide line (expand-all)**: Click indent line when no children expanded - expands all direct children
-- [ ] **Click guide line (collapse-all)**: Click indent line when any child expanded - collapses all direct children
-- [ ] **Guide line hover**: Hover over guide line - line color becomes darker
+1. 已启动测试环境（见 `docs/TESTING.md`）：
+   - `npm run dev:test`
+   - `http://localhost:5199/standalone/index.html` 可访问
+2. 当前页面已完成初始加载，左侧可见 Sidebar，主区可见 Outliner。
+3. 使用测试 seed 数据（默认 `ws_default`）。
+4. 浏览器缩放比例为 100%，避免视觉误判。
 
-## Keyboard Navigation (ProseMirror cannot be tested with synthetic events)
+---
 
-- [ ] **Enter**: Creates a sibling node below current
-- [ ] **Tab**: Indents node (becomes child of previous sibling)
-- [ ] **Shift+Tab**: Outdents node (moves to grandparent level)
-- [ ] **Backspace on empty node**: Deletes the empty node, focuses previous
-- [ ] **Arrow Up/Down**: Moves focus between visible nodes
-- [ ] **Cmd+Shift+Up/Down**: Reorders node up/down within siblings
+## 2. P0 冒烟用例（每次提交必测）
 
-## Edge Case: Container Outdent Guard
+### UC-P0-001：容器导航可用（Sidebar + 面板切换）
+- 前提条件：
+  1. 应用已加载。
+- 操作步骤：
+  1. 在 Sidebar 依次点击 `Library`、`Inbox`、`Journal`、`Trash`。
+  2. 观察主面板内容与高亮导航项。
+- 预期结果：
+  1. 主面板切换到对应容器节点。
+  2. 当前容器按钮高亮正确。
+- 执行结果：`[ ] PASS  [ ] FAIL  [ ] BLOCKED`
 
-- [ ] **Outdent at container level**: Try Shift+Tab on a top-level node in Library - should be no-op (node stays in Library)
+### UC-P0-002：基础编辑与节点创建（Enter / Backspace）
+- 前提条件：
+  1. 在 `Library` 找到任意普通节点并进入编辑态。
+- 操作步骤：
+  1. 输入文本并按 `Enter`。
+  2. 在新节点保持为空，按 `Backspace`。
+- 预期结果：
+  1. `Enter` 后创建同级新节点，焦点移动到新节点。
+  2. 空节点 `Backspace` 删除当前节点，焦点回到上一个可见节点。
+- 执行结果：`[ ] PASS  [ ] FAIL  [ ] BLOCKED`
 
-## Drag and Drop
+### UC-P0-003：层级操作（Tab / Shift+Tab）与容器边界保护
+- 前提条件：
+  1. 同一父节点下至少有两个兄弟节点。
+- 操作步骤：
+  1. 选中第二个兄弟节点按 `Tab`。
+  2. 对该节点按 `Shift+Tab`。
+  3. 对 `Library` 顶层节点按 `Shift+Tab`。
+- 预期结果：
+  1. `Tab` 后节点缩进到上一兄弟节点下。
+  2. `Shift+Tab` 后节点反缩进回原层级。
+  3. 顶层节点反缩进为 no-op（不越过容器层级）。
+- 执行结果：`[ ] PASS  [ ] FAIL  [ ] BLOCKED`
 
-- [ ] **Drag before**: Drag a node above another - drop indicator line appears above
-- [ ] **Drag after**: Drag below - drop indicator line appears below
-- [ ] **Drag inside**: Drag into middle of node - node highlights, becomes child
-- [ ] **Cross-level drag**: Drag from one nesting level to another
+### UC-P0-004：可见节点导航（↑ / ↓ / Cmd+Shift+↑↓）
+- 前提条件：
+  1. 当前视图中至少 3 个可见节点。
+- 操作步骤：
+  1. 在中间节点按 `ArrowUp`、`ArrowDown`。
+  2. 对同一节点按 `Cmd/Ctrl+Shift+ArrowUp` 和 `Cmd/Ctrl+Shift+ArrowDown`。
+- 预期结果：
+  1. `ArrowUp/Down` 在可见节点间稳定移动焦点。
+  2. `Cmd/Ctrl+Shift+ArrowUp/Down` 调整同级顺序，且无焦点丢失。
+- 执行结果：`[ ] PASS  [ ] FAIL  [ ] BLOCKED`
+
+### UC-P0-005：Chevron / Bullet / 缩进线交互
+- 前提条件：
+  1. 准备一个有子节点的父节点和一个叶子节点。
+- 操作步骤：
+  1. Hover 叶子节点与父节点，观察 Chevron 显示。
+  2. 点击 Chevron 执行展开/折叠。
+  3. 点击 Bullet 执行 drill-down。
+  4. 点击缩进线（guide line）执行子树展开/折叠切换。
+- 预期结果：
+  1. Chevron 区和 Bullet 区是独立可交互区域。
+  2. 展开/折叠状态正确，子节点显示与隐藏正确。
+  3. Bullet 点击后 push panel 进入节点。
+  4. 缩进线点击可切换“直接子节点的批量展开/折叠”。
+- 执行结果：`[ ] PASS  [ ] FAIL  [ ] BLOCKED`
+
+### UC-P0-006：拖拽排序（before / after / inside）
+- 前提条件：
+  1. 至少有 3 个可拖拽节点。
+- 操作步骤：
+  1. 拖拽节点到目标节点上方（before）。
+  2. 拖拽节点到目标节点下方（after）。
+  3. 拖拽节点到目标节点中间（inside）。
+- 预期结果：
+  1. 三种落点都能出现正确视觉提示。
+  2. 释放后树结构与落点语义一致。
+  3. 不出现节点丢失、重复或错误父子关系。
+- 执行结果：`[ ] PASS  [ ] FAIL  [ ] BLOCKED`
+
+### UC-P0-007：`@` 引用（树引用 + 行内引用）
+- 前提条件：
+  1. 当前工作区存在可被引用节点。
+- 操作步骤：
+  1. 在空节点输入 `@` 并选择目标节点。
+  2. 在普通文本中间输入 `@` 并选择目标节点。
+  3. 单击树引用节点，再双击树引用节点。
+- 预期结果：
+  1. 空节点 `@` 创建树引用（引用 bullet 样式）。
+  2. 文本中 `@` 创建行内引用 chip。
+  3. 树引用单击为选中态，双击进入编辑态。
+- 执行结果：`[ ] PASS  [ ] FAIL  [ ] BLOCKED`
+
+### UC-P0-008：引用一致性（删除引用不删原节点）
+- 前提条件：
+  1. 已创建树引用节点。
+- 操作步骤：
+  1. 删除该树引用节点。
+  2. 导航到原始节点确认内容。
+- 预期结果：
+  1. 只删除引用关系。
+  2. 原始节点及其子树保留不变。
+- 执行结果：`[ ] PASS  [ ] FAIL  [ ] BLOCKED`
+
+### UC-P0-009：`#` 标签应用与移除（含模板字段清理）
+- 前提条件：
+  1. 工作区已有至少一个 tagDef。
+- 操作步骤：
+  1. 在节点中输入 `#` 应用已有标签。
+  2. 观察 TagBadge 和模板字段是否出现。
+  3. 通过 TagBadge 的移除操作删除标签。
+- 预期结果：
+  1. 标签应用后显示 TagBadge。
+  2. 模板字段按标签配置注入。
+  3. 移除标签后，来源于该模板的字段与关联数据被清理。
+- 执行结果：`[ ] PASS  [ ] FAIL  [ ] BLOCKED`
+
+### UC-P0-010：`>` 字段创建与连续输入
+- 前提条件：
+  1. 在普通节点中操作。
+- 操作步骤：
+  1. 输入 `>` 创建字段，填写字段名。
+  2. 在字段名输入框按 `Enter`。
+  3. 若最后一项是字段，继续在字段块后输入普通内容。
+- 预期结果：
+  1. 字段创建成功，字段与内容交错渲染。
+  2. 字段名 `Enter` 语义为“确认字段名并在下方创建普通节点”。
+  3. 即使最后一项是字段，仍有可输入的 TrailingInput 行。
+- 执行结果：`[ ] PASS  [ ] FAIL  [ ] BLOCKED`
+
+### UC-P0-011：字段值验证（Number / URL / Email）
+- 前提条件：
+  1. 有 Number、URL、Email 类型字段。
+- 操作步骤：
+  1. 分别输入非法值（例如 Number 输入文本、URL 不含 `://`、Email 不含 `@`）。
+  2. 再改为合法值。
+- 预期结果：
+  1. 非法值时出现 warning 图标和提示文案。
+  2. 验证为非阻塞，不中断输入。
+  3. 改为合法值后 warning 消失。
+- 执行结果：`[ ] PASS  [ ] FAIL  [ ] BLOCKED`
+
+### UC-P0-012：Cmd/Ctrl+K 搜索面板与导航
+- 前提条件：
+  1. 工作区存在可检索节点。
+- 操作步骤：
+  1. 按 `Cmd/Ctrl+K` 打开面板。
+  2. 输入关键词并选择结果节点。
+  3. 再次 `Cmd/Ctrl+K` + `Esc` 关闭面板。
+- 预期结果：
+  1. 搜索面板可打开/关闭。
+  2. 关键词能筛出节点并导航成功。
+  3. 关闭后不残留遮罩和焦点异常。
+- 执行结果：`[ ] PASS  [ ] FAIL  [ ] BLOCKED`
+
+---
+
+## 3. P1 回归用例（按改动范围执行）
+
+### UC-P1-001：Options 字段（搜索、选择、新建）
+- 前提条件：
+  1. 有 `Options` 类型字段并配置预设选项。
+- 操作步骤：
+  1. 打开字段值选择器，输入关键词过滤选项。
+  2. 选择已有选项。
+  3. 输入不存在选项并确认新建。
+- 预期结果：
+  1. 过滤结果与输入一致。
+  2. 可正确写入选中值。
+  3. 新建值可再次被检索和选择（含 auto-collect 场景）。
+- 执行结果：`[ ] PASS  [ ] FAIL  [ ] BLOCKED`
+
+### UC-P1-002：Date 字段（单日期 / 范围 / 时间 / 清除）
+- 前提条件：
+  1. 有 `Date` 类型字段。
+- 操作步骤：
+  1. 选择单日期。
+  2. 开启 `End date` 选择范围。
+  3. 开启 `Include time` 输入时间。
+  4. 点击 `Clear`。
+- 预期结果：
+  1. 日期点击后即时保存。
+  2. 范围模式可同时维护起止日期。
+  3. 时间输入合法且格式稳定。
+  4. 清除后字段回到空状态。
+- 执行结果：`[ ] PASS  [ ] FAIL  [ ] BLOCKED`
+
+### UC-P1-003：隐藏字段 pill 与临时展开
+- 前提条件：
+  1. 字段 Hide 规则配置为 `Always`/`When empty`/`When not empty`。
+- 操作步骤：
+  1. 让字段进入“应隐藏”的状态。
+  2. 点击 `+ FieldName` pill。
+  3. 切换焦点到其他节点后返回。
+- 预期结果：
+  1. 隐藏字段显示为紧凑 pill，不直接渲染完整 FieldRow。
+  2. 点击 pill 可临时展开字段。
+  3. 离开节点后恢复隐藏状态。
+- 执行结果：`[ ] PASS  [ ] FAIL  [ ] BLOCKED`
+
+### UC-P1-004：系统字段只读展示（抽样）
+- 前提条件：
+  1. 节点可访问系统字段（如 Created time、Owner node、Tags）。
+- 操作步骤：
+  1. 添加 2~3 个系统字段到节点。
+  2. 尝试直接编辑系统字段值区域。
+  3. 对可导航字段（如 Owner node）执行点击跳转。
+- 预期结果：
+  1. 系统字段值来自实时派生，非手工输入。
+  2. 值区域不进入可编辑文本态。
+  3. 可导航字段点击可跳转。
+- 执行结果：`[ ] PASS  [ ] FAIL  [ ] BLOCKED`
+
+### UC-P1-005：TagBadge 导航与右键菜单
+- 前提条件：
+  1. 节点已存在 TagBadge。
+- 操作步骤：
+  1. 左键点击 TagBadge 名称。
+  2. 右键打开菜单，执行 `Configure tag`。
+  3. 若存在 `Remove tag`，执行一次。
+- 预期结果：
+  1. 左键与 `Configure tag` 都可导航到 tagDef 配置页。
+  2. `Remove tag` 行为与主界面移除一致。
+  3. 右键菜单可正常关闭，不残留。
+- 执行结果：`[ ] PASS  [ ] FAIL  [ ] BLOCKED`
+
+### UC-P1-006：导航撤销/重做（非编辑态）
+- 前提条件：
+  1. 已进行至少 3 次 `navigateTo`（如容器切换、bullet drill-down）。
+- 操作步骤：
+  1. 在非编辑态按 `Cmd/Ctrl+Z`。
+  2. 按 `Cmd/Ctrl+Shift+Z`。
+- 预期结果：
+  1. `Cmd/Ctrl+Z` 执行导航撤销（回到上一个 panel 快照）。
+  2. `Cmd/Ctrl+Shift+Z` 执行导航重做。
+  3. 编辑器聚焦态下不应误触发导航撤销（由 TipTap 接管文本撤销）。
+- 执行结果：`[ ] PASS  [ ] FAIL  [ ] BLOCKED`
+
+---
+
+## 4. 暂不纳入人工验收（当前版本未实现或未闭环）
+
+1. 节点多选与批量操作（`Cmd+Click`、`Shift+Click`、框选、批量删除/缩进）。
+2. `Escape` 退出编辑并进入选中模式（当前仅关闭 `#/@` 下拉菜单）。
+3. Date 节点日记体系（Today 入口、年/周/日自动创建）。
+4. References 增强：Backlinks 区块、引用计数、合并节点。
+5. Search Node / Live Query UI（`?` 触发、过滤器构建、结果视图）。
+6. Views（Table / Cards / Calendar / List / Tabs）。
+7. 节点操作级撤销栈（创建/删除/移动的可撤销命令）。
+8. 网页剪藏（Phase 3）。
+
+---
+
+## 5. 执行批次记录模板
+
+| 批次 | 执行人 | 分支/提交 | 用例范围 | 通过 | 失败 | 阻塞 | 备注 |
+|---|---|---|---|---:|---:|---:|---|
+| Batch-YYYYMMDD-01 |  |  | P0/P1(填写ID) |  |  |  |  |

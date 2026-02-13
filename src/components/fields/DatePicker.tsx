@@ -491,7 +491,8 @@ function DateInputField({
           onChange={(e) => setEditValue(e.target.value)}
           onBlur={commitEdit}
           onKeyDown={handleKeyDown}
-          className="flex-1 min-w-0 px-2.5 py-1.5 bg-transparent text-sm text-foreground outline-none"
+          placeholder="YYYY/MM/DD"
+          className="flex-1 min-w-0 px-2.5 py-1.5 bg-transparent text-sm text-foreground outline-none placeholder:text-foreground-tertiary"
           onClick={(e) => e.stopPropagation()}
         />
       ) : (

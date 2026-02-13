@@ -138,6 +138,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   const hasTags = tagIds.length > 0;
   const hasFields = fields.length > 0;
   const isReference = !!node && node.props._ownerId !== parentId;
+  const isPendingConversion = useUIStore((s) => s.pendingRefConversion?.tempNodeId === nodeId);
   const isSelected = selectedNodeId === nodeId &&
     (selectedParentId === null || selectedParentId === parentId);
 
@@ -596,16 +597,17 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       const isEmptyAround = beforeAt.trim() === '' && afterQuery.trim() === '';
 
       if (isEmptyAround) {
-        // Empty node @: trash this node, add reference at same position, select it
+        // Empty node @: trash this node, create temp node in conversion mode
+        // Temp node has inline ref content — user sees reference bullet + cursor at end.
+        // Typing adds text → keeps as normal node; blur without typing → reverts to reference.
         const parent = entities[parentId];
         const pos = parent?.children?.indexOf(nodeId) ?? -1;
         trashNode(nodeId, wsId, userId);
-        addReference(parentId, refNodeId, userId, pos >= 0 ? pos : undefined);
-        // Parent is already expanded (otherwise this item wouldn't render).
+        const tempNodeId = startRefConversion(refNodeId, parentId, pos >= 0 ? pos : 0, wsId, userId);
+        setPendingRefConversion({ tempNodeId, refNodeId, parentId });
         const gpId = entities[parentId]?.props._ownerId;
         if (gpId) setExpanded(`${gpId}:${parentId}`, true);
-        // Select (not focus) so user can ArrowRight or type to convert
-        setTimeout(() => setSelectedNode(refNodeId, parentId), 0);
+        setTimeout(() => setFocusedNode(tempNodeId, parentId), 0);
       } else {
         // Mid-text @: insert inline reference
         const refNode = entities[refNodeId];
@@ -623,7 +625,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       setRefQuery('');
       setRefSelectedIndex(0);
     },
-    [nodeId, parentId, wsId, userId, entities, trashNode, addReference, setExpanded, setFocusedNode, setSelectedNode],
+    [nodeId, parentId, wsId, userId, entities, trashNode, addReference, setExpanded, setFocusedNode, startRefConversion, setPendingRefConversion],
   );
 
   const handleReferenceCreateNew = useCallback(
@@ -802,7 +804,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
             hasChildren={hasChildren}
             isExpanded={isExpanded}
             onBulletClick={handleBulletClick}
-            isReference={isReference}
+            isReference={isReference || isPendingConversion}
           />
           <div className="relative flex-1 min-w-0">
           <div

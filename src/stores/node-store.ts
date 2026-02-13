@@ -181,6 +181,9 @@ interface NodeStore {
   /** Toggle a checkbox field value. Creates value node if needed. */
   toggleCheckboxField(assocDataId: string, workspaceId: string, userId: string): void;
 
+  /** Set a single-value inline field (Date/Number/URL/Email). Creates value node if needed. */
+  setInlineFieldValue(assocDataId: string, value: string, workspaceId: string, userId: string): void;
+
   /** Remove an option node from a field definition */
   removeFieldOption(attrDefId: string, optionId: string, userId: string): void;
 
@@ -1386,6 +1389,46 @@ export const useNodeStore = create<NodeStore>()(
             id,
             workspaceId,
             props: { created: now, name: SYS_V.YES, _ownerId: assocDataId },
+            children: [],
+            version: 1,
+            updatedAt: now,
+            createdBy: userId,
+            updatedBy: userId,
+          };
+          if (!assoc.children) assoc.children = [];
+          assoc.children.push(id);
+        }
+      });
+    },
+
+    setInlineFieldValue: (assocDataId, value, workspaceId, userId) => {
+      set((state) => {
+        const assoc = state.entities[assocDataId];
+        if (!assoc) return;
+        const now = Date.now();
+
+        // Find existing value node (first content child — no _docType)
+        const existingId = assoc.children?.find(
+          (cid) => {
+            const e = state.entities[cid];
+            return e && !e.props._docType;
+          },
+        );
+
+        if (existingId) {
+          const valNode = state.entities[existingId];
+          if (valNode) {
+            valNode.props.name = value;
+            valNode.updatedAt = now;
+            valNode.updatedBy = userId;
+          }
+        } else {
+          // Create new value node
+          const id = nanoid();
+          state.entities[id] = {
+            id,
+            workspaceId,
+            props: { created: now, name: value, _ownerId: assocDataId },
             children: [],
             version: 1,
             updatedAt: now,

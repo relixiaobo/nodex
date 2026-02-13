@@ -125,16 +125,14 @@
   text-decoration: underline;
 }
 
-/* Ref conversion shimmer: gentle breathing pulse between foreground and primary.
-   Uses oklch color space for perceptually uniform transitions.
-   Peaks at ~60% toward primary — subtle, not jarring. */
+/* Ref conversion shimmer: color breathes between foreground and primary */
 @keyframes ref-conversion-shimmer {
   0%, 100% { color: var(--color-foreground); }
-  50% { color: color-mix(in oklch, var(--color-primary) 60%, var(--color-foreground)); }
+  50% { color: var(--color-primary); }
 }
 
 .ref-converting .tiptap [data-inlineref-node] {
-  animation: ref-conversion-shimmer 3s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
+  animation: ref-conversion-shimmer 2.5s ease infinite;
 }
 
 /* Indent guide line — hover thickens line subtly, no background fill.

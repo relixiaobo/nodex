@@ -31,6 +31,10 @@ export const HashTagExtension = Extension.create<{ callbacks: { current: HashTag
         key: hashTagPluginKey,
         view() {
           let active = false;
+          // Guard: only allow triggering after the user has made at least one
+          // real edit (doc change) since mount. This prevents false activation
+          // when focusing a node whose text already contains #.
+          let hasUserEdited = false;
           return {
             update(view, prevState) {
               // Skip spurious updates where doc/selection haven't changed
@@ -40,11 +44,8 @@ export const HashTagExtension = Extension.create<{ callbacks: { current: HashTag
                 return;
               }
 
-              // Only trigger on doc changes (user typed something),
-              // not on selection-only changes (focus, arrow keys).
-              // !prevState = initial mount → treat as no change (prevents
-              // triggering on focus when text already contains #).
               const docChanged = !!prevState && !view.state.doc.eq(prevState.doc);
+              if (docChanged) hasUserEdited = true;
 
               const { state } = view;
               const { from } = state.selection;
@@ -60,7 +61,7 @@ export const HashTagExtension = Extension.create<{ callbacks: { current: HashTag
 
               // Look for # pattern at the end: #word
               const match = textBefore.match(/#(\w*)$/);
-              if (match && (docChanged || active)) {
+              if (match && hasUserEdited && (docChanged || active)) {
                 active = true;
                 const query = match[1];
                 const hashStart = from - match[0].length;

@@ -104,12 +104,18 @@
 }
 
 /* Inline editor mode: tags follow right after text.
-   All wrappers become inline; ProseMirror p stays inline so text flows. */
+   Outer wrappers + <p> become inline so text flows alongside tag badges.
+   .tiptap (contenteditable) uses inline-block — NOT inline — because Chrome
+   has a rendering bug where the native caret is invisible inside inline marks
+   (<code>, <mark>) when the contenteditable element has display:inline. */
 .editor-inline,
 .editor-inline > div,
-.editor-inline .tiptap,
 .editor-inline .tiptap p {
   display: inline;
+}
+
+.editor-inline .tiptap {
+  display: inline-block;
 }
 
 /* Override placeholder float for inline mode —

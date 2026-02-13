@@ -257,6 +257,16 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   // ─── Basic handlers ───
 
   const handleBlur = useCallback(() => {
+    // Reset any open dropdown state so it doesn't persist across focus cycles.
+    // Without this, clicking away while dropdown is open → re-focusing the same
+    // node would show the dropdown again (hashTagOpen/refOpen were never reset).
+    setHashTagOpen(false);
+    setHashTagQuery('');
+    setHashTagSelectedIndex(0);
+    setRefOpen(false);
+    setRefQuery('');
+    setRefSelectedIndex(0);
+
     // Check pending ref conversion: if this is a temp node, decide revert or keep
     const pending = useUIStore.getState().pendingRefConversion;
     if (pending && pending.tempNodeId === nodeId) {

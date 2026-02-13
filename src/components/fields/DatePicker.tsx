@@ -362,7 +362,7 @@ export function DatePicker({ value, onSelect, onClose }: DatePickerProps) {
         <DateInputField
           dateStr={selectedDate}
           timeStr={includeTime ? selectedTime : ''}
-          placeholder="Pick a date"
+          placeholder="YYYY/MM/DD"
           active={!includeEnd || editingEnd === 'start'}
           showRing={includeEnd}
           onClick={() => setEditingEnd('start')}
@@ -374,7 +374,7 @@ export function DatePicker({ value, onSelect, onClose }: DatePickerProps) {
           <DateInputField
             dateStr={endDate}
             timeStr={includeTime ? endTime : ''}
-            placeholder="Pick end date"
+            placeholder="YYYY/MM/DD"
             active={editingEnd === 'end'}
             showRing
             onClick={() => setEditingEnd('end')}

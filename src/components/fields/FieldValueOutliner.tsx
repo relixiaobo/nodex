@@ -90,8 +90,6 @@ export function FieldValueOutliner({ assocDataId, fieldDataType, attrDefId, onNa
     );
   }
 
-  const isOptionsType = fieldDataType === SYS_D.OPTIONS || fieldDataType === SYS_D.OPTIONS_FROM_SUPERTAG;
-
   // Prevent border stacking: when nested FieldRows are first/last, add padding
   // so their border-t/border-b doesn't visually coincide with the parent FieldRow's borders
   const firstIsField = visibleChildren.length > 0 && visibleChildren[0].type === 'field';
@@ -129,8 +127,9 @@ export function FieldValueOutliner({ assocDataId, fieldDataType, attrDefId, onNa
           />
         ),
       )}
-      {/* Options fields: hide TrailingInput once a value is selected (user clicks existing value to change) */}
-      {!(isOptionsType && contentChildIds.length > 0) && (
+      {/* Show TrailingInput only when no content children yet (matches OutlinerItem pattern).
+          Users add more values via Enter in existing value nodes. */}
+      {contentChildIds.length === 0 && (
         <TrailingInput parentId={assocDataId} depth={0} parentExpandKey={`${entities[assocDataId]?.props._ownerId ?? ''}:${assocDataId}`} fieldDataType={fieldDataType} attrDefId={attrDefId} onNavigateOut={onNavigateOut} />
       )}
     </div>

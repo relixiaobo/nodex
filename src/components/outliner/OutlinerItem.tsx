@@ -23,6 +23,11 @@ import {
   isOnlyInlineRef,
 } from '../../lib/tree-utils';
 
+/** Field types that accept only a single value node. Enter navigates out instead of creating siblings. */
+const SINGLE_VALUE_FIELD_TYPES: Set<string> = new Set([
+  SYS_D.DATE, SYS_D.NUMBER, SYS_D.INTEGER, SYS_D.URL, SYS_D.EMAIL,
+]);
+
 interface OutlinerItemProps {
   nodeId: string;
   depth: number;
@@ -399,6 +404,12 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     (afterContent?: string) => {
       if (!wsId || !userId) return;
 
+      // Single-value field types: Enter navigates out instead of creating sibling
+      if (fieldDataType && SINGLE_VALUE_FIELD_TYPES.has(fieldDataType)) {
+        if (onNavigateOut) onNavigateOut('down');
+        return;
+      }
+
       const currentlyExpanded = useUIStore.getState().expandedNodes.has(`${parentId}:${nodeId}`);
       const currentHasChildren =
         (useNodeStore.getState().entities[nodeId]?.children ?? []).length > 0;
@@ -415,7 +426,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
         });
       }
     },
-    [nodeId, parentId, wsId, userId, createSibling, createChild, setFocusedNode],
+    [nodeId, parentId, wsId, userId, fieldDataType, onNavigateOut, createSibling, createChild, setFocusedNode],
   );
 
   const handleIndent = useCallback(() => {

@@ -90,7 +90,7 @@ export function TagBadge({ tagDefId, onRemove, onNavigate }: TagBadgeProps) {
   if (isTrashed) {
     return (
       <span
-        className="inline-flex items-center text-xs shrink-0 rounded bg-destructive/10 text-destructive py-0.5 px-1.5 gap-1"
+        className="inline-flex items-center text-xs font-medium leading-5 shrink-0 rounded bg-destructive/10 text-destructive px-1.5 gap-1"
         title={`Tag "${tagName}" has been deleted`}
       >
         <span className="text-[11px] leading-none">#</span>
@@ -104,7 +104,7 @@ export function TagBadge({ tagDefId, onRemove, onNavigate }: TagBadgeProps) {
   return (
     <>
       <span
-        className="group/tag inline-flex items-center text-xs shrink-0 cursor-default"
+        className="group/tag inline-flex items-center text-xs font-medium leading-5 shrink-0 cursor-default"
         style={{ '--tag-bg': color.bg, color: color.text } as React.CSSProperties}
         onContextMenu={handleContextMenu}
       >
@@ -129,7 +129,7 @@ export function TagBadge({ tagDefId, onRemove, onNavigate }: TagBadgeProps) {
         </span>
         {/* Tag name area: colored bg always, rounded-r by default → rounded on hover */}
         <span
-          className="py-0.5 px-1.5 rounded-r bg-[var(--tag-bg)] transition-all group-hover/tag:rounded hover:bg-black/[0.06] cursor-pointer"
+          className="px-1.5 rounded-r bg-[var(--tag-bg)] transition-all group-hover/tag:rounded hover:bg-black/[0.06] cursor-pointer"
           onClick={onNavigate ? handleNameClick : undefined}
         >
           {tagName}

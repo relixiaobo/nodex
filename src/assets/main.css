@@ -125,6 +125,16 @@
   text-decoration: underline;
 }
 
+/* Ref conversion shimmer: color flows between foreground and primary */
+@keyframes ref-conversion-shimmer {
+  0%, 100% { color: var(--color-foreground); }
+  50% { color: var(--color-primary); }
+}
+
+.ref-converting .tiptap [data-inlineref-node] {
+  animation: ref-conversion-shimmer 2s ease-in-out infinite;
+}
+
 /* Indent guide line — hover thickens line subtly, no background fill.
    Default 1px → hover 3px: 3× visible change, still thinner than 5px bullet dot.
    Button positioned LEFT of bullet center (justify-end) to avoid

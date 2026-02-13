@@ -36,6 +36,45 @@ export function resolveDataType(entities: Record<string, NodexNode>, attrDefId: 
 }
 
 /**
+ * Resolve the source supertag ID for an OPTIONS_FROM_SUPERTAG attrDef.
+ * Reads the Tuple [SYS_A06, tagDefId] from attrDef children.
+ */
+export function resolveSourceSupertag(
+  entities: Record<string, NodexNode>, attrDefId: string
+): string | undefined {
+  return resolveAttrDefConfig(entities, attrDefId, SYS_A.SOURCE_SUPERTAG);
+}
+
+/**
+ * Find all content nodes tagged with a given tagDefId.
+ * Walks every entity → metanode → tuples looking for [SYS_A13, tagDefId].
+ */
+export function resolveTaggedNodes(
+  entities: Record<string, NodexNode>, tagDefId: string
+): string[] {
+  const result: string[] = [];
+  for (const [id, node] of Object.entries(entities)) {
+    if (node.props._docType) continue;
+    const metaId = node.props._metaNodeId;
+    if (!metaId) continue;
+    const meta = entities[metaId];
+    if (!meta?.children) continue;
+    for (const cid of meta.children) {
+      const tuple = entities[cid];
+      if (
+        tuple?.props._docType === 'tuple' &&
+        tuple.children?.[0] === SYS_A.NODE_SUPERTAGS &&
+        tuple.children[1] === tagDefId
+      ) {
+        result.push(id);
+        break;
+      }
+    }
+  }
+  return result;
+}
+
+/**
  * Resolve the hide-field condition from an attrDef.
  * Returns the SYS_V constant (NEVER, WHEN_EMPTY, WHEN_NOT_EMPTY, WHEN_VALUE_IS_DEFAULT, ALWAYS).
  */
@@ -222,6 +261,15 @@ export const ATTRDEF_CONFIG_FIELDS: ConfigFieldDef[] = [
     defaultValue: '',
     appliesTo: [SYS_D.OPTIONS],
     description: 'Each node included will become an option',
+  },
+  {
+    key: SYS_A.SOURCE_SUPERTAG,
+    name: 'Supertag',
+    control: 'tag_picker',
+    icon: Tag,
+    defaultValue: '',
+    appliesTo: [SYS_D.OPTIONS_FROM_SUPERTAG],
+    description: 'Nodes tagged with this supertag become options',
   },
   // tuple-based config fields
   {

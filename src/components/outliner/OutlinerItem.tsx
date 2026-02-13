@@ -890,12 +890,12 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
                Parent bullet center = depth*24 + 6 + 15 + 7.5 = depth*24 + 28.5.
                w-4 (16px) button: left + 8 = center → left = depth*24 + 20.5. */}
           <button
-            className="indent-line absolute top-0 bottom-0 w-4 flex justify-center cursor-pointer rounded-sm transition-colors"
+            className="indent-line absolute top-0 bottom-0 w-4 z-10 flex justify-center cursor-pointer"
             style={{ left: depth * 24 + 20.5 }}
             onClick={handleIndentLineClick}
             title="Toggle children"
           >
-            <div className="w-px h-full bg-border" />
+            <div className="indent-line-inner w-px h-full bg-border rounded-full" />
           </button>
           {/* Render children in natural order: fields as FieldRow, content as OutlinerItem */}
           {visibleChildren.map(({ id, type }, i) =>

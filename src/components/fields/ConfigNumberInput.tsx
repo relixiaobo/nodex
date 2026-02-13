@@ -52,7 +52,7 @@ export function ConfigNumberInput({ tupleId, currentValue }: ConfigNumberInputPr
       onBlur={commit}
       onKeyDown={handleKeyDown}
       placeholder="—"
-      className="h-7 w-20 rounded-md border border-border bg-transparent px-2 text-sm text-foreground placeholder:text-foreground-tertiary focus:outline-none focus:ring-2 focus:ring-primary/40"
+      className="flex-1 min-w-0 bg-transparent text-sm leading-[21px] text-foreground placeholder:text-foreground-tertiary outline-none"
     />
   );
 }

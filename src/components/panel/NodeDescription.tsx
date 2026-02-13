@@ -2,7 +2,8 @@
  * Editable description line for PanelTitle.
  *
  * Displays below TagBar as gray small text.
- * Click to edit (contentEditable), blur/Enter to save, Escape to cancel.
+ * MouseDown to edit (contentEditable), blur/Enter to save, Escape to cancel.
+ * Cursor placed at click position via caretPositionFromPoint.
  * When empty and not editing, renders nothing.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -22,19 +23,58 @@ export function NodeDescription({ nodeId }: NodeDescriptionProps) {
   const description = node?.props.description ?? '';
   const [editing, setEditing] = useState(false);
   const descRef = useRef<HTMLDivElement>(null);
+  const clickCoordsRef = useRef<{ x: number; y: number } | null>(null);
 
   useEffect(() => {
     if (editing && descRef.current) {
-      descRef.current.textContent = description;
-      descRef.current.focus();
+      const el = descRef.current;
+      el.textContent = description;
+      el.focus();
+
+      const coords = clickCoordsRef.current;
+      clickCoordsRef.current = null;
+
+      if (coords && description) {
+        const doc = el.ownerDocument;
+        const caretDoc = doc as Document & {
+          caretPositionFromPoint?: (x: number, y: number) => CaretPosition | null;
+          caretRangeFromPoint?: (x: number, y: number) => Range | null;
+        };
+        try {
+          const pos = caretDoc.caretPositionFromPoint?.(coords.x, coords.y);
+          if (pos && el.contains(pos.offsetNode)) {
+            const range = doc.createRange();
+            range.setStart(pos.offsetNode, pos.offset);
+            range.collapse(true);
+            const sel = window.getSelection();
+            sel?.removeAllRanges();
+            sel?.addRange(range);
+            return;
+          }
+          const range = caretDoc.caretRangeFromPoint?.(coords.x, coords.y);
+          if (range && el.contains(range.startContainer)) {
+            const sel = window.getSelection();
+            sel?.removeAllRanges();
+            sel?.addRange(range);
+            return;
+          }
+        } catch { /* fallback to cursor at end */ }
+      }
+
       const range = document.createRange();
       const sel = window.getSelection();
-      range.selectNodeContents(descRef.current);
+      range.selectNodeContents(el);
       range.collapse(false);
       sel?.removeAllRanges();
       sel?.addRange(range);
     }
   }, [editing, description]);
+
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    clickCoordsRef.current = { x: e.clientX, y: e.clientY };
+    setEditing(true);
+  }, []);
 
   const handleBlur = useCallback(() => {
     if (!descRef.current) return;
@@ -66,8 +106,8 @@ export function NodeDescription({ nodeId }: NodeDescriptionProps) {
       ref={editing ? descRef : undefined}
       contentEditable={editing}
       suppressContentEditableWarning
-      className={`text-xs leading-tight text-foreground-tertiary mt-1 ${editing ? 'outline-none cursor-text' : 'cursor-pointer'}`}
-      onClick={!editing ? () => setEditing(true) : undefined}
+      className={`text-xs leading-tight text-foreground-tertiary mt-1 cursor-text ${editing ? 'outline-none min-h-4' : ''}`}
+      onMouseDown={!editing ? handleMouseDown : undefined}
       onBlur={editing ? handleBlur : undefined}
       onKeyDown={editing ? handleKeyDown : undefined}
     >

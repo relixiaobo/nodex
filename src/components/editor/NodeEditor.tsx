@@ -17,6 +17,7 @@ import { useEditor, EditorContent, type Editor } from '@tiptap/react';
 import { Extension } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Highlight from '@tiptap/extension-highlight';
+import Italic from '@tiptap/extension-italic';
 import { DOMSerializer } from '@tiptap/pm/model';
 import { useNodeStore } from '../../stores/node-store';
 import { useUIStore } from '../../stores/ui-store';
@@ -349,8 +350,16 @@ export function NodeEditor({
   // element-by-element comparison for extensions, but uses strict reference
   // comparison (===) for editorProps and other options. Without memoization,
   // a new editorProps object each render triggers setOptions every time.
+  // Italic mark without keyboard shortcuts — Mod-i is reassigned to description editing.
+  // StarterKit's built-in Italic extension is disabled to prevent its Mod-i binding
+  // from intercepting our custom keymap.
+  const ItalicNoShortcut = useMemo(() => Italic.extend({
+    addKeyboardShortcuts() { return {}; },
+  }), []);
+
   const extensions = useMemo(() => [
     StarterKit.configure({
+      italic: false,
       bulletList: false,
       orderedList: false,
       listItem: false,
@@ -359,6 +368,7 @@ export function NodeEditor({
       codeBlock: false,
       horizontalRule: false,
     }),
+    ItalicNoShortcut,
     Highlight,
     InlineRefNode,
     outlinerKeymap,
@@ -366,7 +376,7 @@ export function NodeEditor({
     FieldTriggerExtension.configure({ callbacks: fieldTriggerRef }),
     ReferenceExtension.configure({ callbacks: referenceRef }),
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  ], []);
+  ], [ItalicNoShortcut]);
 
   const editorProps = useMemo(() => ({
     attributes: {

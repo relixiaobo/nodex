@@ -189,7 +189,12 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   const descriptionRef = useRef<HTMLDivElement>(null);
   const description = node?.props.description ?? '';
 
-  const handleDescriptionClick = useCallback(() => {
+  // Pending click coordinates for description cursor placement
+  const descClickCoordsRef = useRef<{ x: number; y: number } | null>(null);
+
+  const handleDescriptionMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault(); // Prevent native focus churn
+    descClickCoordsRef.current = { x: e.clientX, y: e.clientY };
     setEditingDescription(true);
   }, []);
 
@@ -216,12 +221,45 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   // Focus description contentEditable when entering edit mode
   useEffect(() => {
     if (editingDescription && descriptionRef.current) {
-      descriptionRef.current.textContent = description;
-      descriptionRef.current.focus();
-      // Place cursor at end
+      const el = descriptionRef.current;
+      el.textContent = description;
+      el.focus();
+
+      const coords = descClickCoordsRef.current;
+      descClickCoordsRef.current = null;
+
+      if (coords && description) {
+        // Place cursor at click position
+        const doc = el.ownerDocument;
+        const caretDoc = doc as Document & {
+          caretPositionFromPoint?: (x: number, y: number) => CaretPosition | null;
+          caretRangeFromPoint?: (x: number, y: number) => Range | null;
+        };
+        try {
+          const pos = caretDoc.caretPositionFromPoint?.(coords.x, coords.y);
+          if (pos && el.contains(pos.offsetNode)) {
+            const range = doc.createRange();
+            range.setStart(pos.offsetNode, pos.offset);
+            range.collapse(true);
+            const sel = window.getSelection();
+            sel?.removeAllRanges();
+            sel?.addRange(range);
+            return;
+          }
+          const range = caretDoc.caretRangeFromPoint?.(coords.x, coords.y);
+          if (range && el.contains(range.startContainer)) {
+            const sel = window.getSelection();
+            sel?.removeAllRanges();
+            sel?.addRange(range);
+            return;
+          }
+        } catch { /* fallback to cursor at end */ }
+      }
+
+      // Default: cursor at end
       const range = document.createRange();
       const sel = window.getSelection();
-      range.selectNodeContents(descriptionRef.current);
+      range.selectNodeContents(el);
       range.collapse(false);
       sel?.removeAllRanges();
       sel?.addRange(range);
@@ -229,6 +267,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   }, [editingDescription, description]);
 
   const handleDescriptionEdit = useCallback(() => {
+    descClickCoordsRef.current = null; // No click coords → cursor at end
     setEditingDescription(true);
   }, []);
 
@@ -1035,8 +1074,8 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
               ref={editingDescription ? descriptionRef : undefined}
               contentEditable={editingDescription}
               suppressContentEditableWarning
-              className={`text-xs leading-tight text-foreground-tertiary ${editingDescription ? 'outline-none cursor-text' : 'cursor-pointer'}`}
-              onClick={!editingDescription ? handleDescriptionClick : undefined}
+              className={`text-xs leading-tight text-foreground-tertiary cursor-text ${editingDescription ? 'outline-none min-h-4' : ''}`}
+              onMouseDown={!editingDescription ? handleDescriptionMouseDown : undefined}
               onBlur={editingDescription ? handleDescriptionBlur : undefined}
               onKeyDown={editingDescription ? handleDescriptionKeyDown : undefined}
             >

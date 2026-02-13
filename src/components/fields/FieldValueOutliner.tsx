@@ -174,12 +174,14 @@ function DatePickerField({ value, onSelect }: { value: string; onSelect: (v: str
   }, []);
 
   return (
-    <div className="relative flex min-h-7 items-start gap-2 py-1" style={{ paddingLeft: 25 }}>
-      <BulletChevron hasChildren={false} isExpanded={false} onBulletClick={() => {}} dimmed={!value} />
-      <div className="flex-1 min-w-0 flex items-center cursor-pointer" onClick={handleClick}>
-        <span className={`text-sm leading-[21px] select-none ${value ? '' : 'text-foreground-tertiary'}`}>
-          {value ? formatDateDisplay(value) : 'Empty'}
-        </span>
+    <div className="relative">
+      <div className="flex min-h-7 items-start gap-2 py-1" style={{ paddingLeft: 25 }}>
+        <BulletChevron hasChildren={false} isExpanded={false} onBulletClick={() => {}} dimmed={!value} />
+        <div className="flex-1 min-w-0 flex items-center cursor-pointer" onClick={handleClick}>
+          <span className={`text-sm leading-[21px] select-none ${value ? '' : 'text-foreground-tertiary'}`}>
+            {value ? formatDateDisplay(value) : 'Empty'}
+          </span>
+        </div>
       </div>
       {open && (
         <DatePicker

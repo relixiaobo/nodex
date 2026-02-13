@@ -74,6 +74,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
 
   const rowRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<Editor | null>(null);
+  const blurClearRafRef = useRef<number | null>(null);
 
   // # trigger state
   const [hashTagOpen, setHashTagOpen] = useState(false);
@@ -256,6 +257,14 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
 
   // ─── Basic handlers ───
 
+  useEffect(() => {
+    return () => {
+      if (blurClearRafRef.current !== null) {
+        cancelAnimationFrame(blurClearRafRef.current);
+      }
+    };
+  }, []);
+
   const handleBlur = useCallback(() => {
     // Reset any open dropdown state so it doesn't persist across focus cycles.
     // Without this, clicking away while dropdown is open → re-focusing the same
@@ -278,23 +287,34 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       useUIStore.getState().setPendingRefConversion(null);
     }
 
-    // Only clear focus if this node is still the focused one.
-    // Prevents race condition: Enter creates sibling → setFocusedNode(newId) →
-    // old editor unmounts → onBlur fires → would wrongly reset to null.
-    const state = useUIStore.getState();
-    if (state.focusedNodeId === nodeId &&
-        (state.focusedParentId === null || state.focusedParentId === parentId)) {
-      setFocusedNode(null);
+    if (blurClearRafRef.current !== null) {
+      cancelAnimationFrame(blurClearRafRef.current);
     }
+    // Delay clearing focus by one frame so click handlers on the next node run
+    // before the previous editor unmounts, preventing click-time layout shift.
+    blurClearRafRef.current = requestAnimationFrame(() => {
+      blurClearRafRef.current = null;
+      // Only clear focus if this node is still the focused one.
+      // Prevents race condition: Enter creates sibling → setFocusedNode(newId) →
+      // old editor unmounts → onBlur fires → would wrongly reset to null.
+      const state = useUIStore.getState();
+      if (state.focusedNodeId === nodeId &&
+          (state.focusedParentId === null || state.focusedParentId === parentId)) {
+        setFocusedNode(null);
+      }
+    });
   }, [nodeId, parentId, setFocusedNode, revertRefConversion]);
 
-  // Capture text offset on mousedown BEFORE blur can trigger a layout shift.
-  // Event order: mousedown → focusout (blur) → click.
-  // If another node's editor is focused, the blur unmounts it (changing height),
-  // shifting subsequent nodes. caretRangeFromPoint in the click handler would
-  // then use post-shift coordinates, hitting the wrong text position.
+  // Enter edit mode on mousedown to avoid relying on click after blur.
+  // Event order when switching nodes is mousedown → blur/focusout → click; if
+  // we wait for click, the first click can be consumed by focus transitions.
+  // Capturing textOffset here keeps one-click cursor placement stable.
   const handleContentMouseDown = useCallback((e: React.MouseEvent) => {
-    if (isReference || fieldDataType === SYS_D.CHECKBOX) return;
+    if (fieldDataType === SYS_D.CHECKBOX) return;
+    const target = e.target as HTMLElement;
+    const refEl = target.closest('[data-inlineref-node]') as HTMLElement | null;
+    if (refEl || isReference) return;
+
     const container = e.currentTarget as HTMLElement;
     const textOffset = getTextOffsetFromPoint(container, e.clientX, e.clientY);
     useUIStore.getState().setFocusClickCoords(
@@ -302,7 +322,10 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
         ? { nodeId, parentId, textOffset }
         : null,
     );
-  }, [isReference, fieldDataType, nodeId, parentId]);
+    // Prevent native selection/focus churn on the static HTML layer.
+    e.preventDefault();
+    setFocusedNode(nodeId, parentId);
+  }, [isReference, fieldDataType, nodeId, parentId, setFocusedNode]);
 
   const handleContentClick = useCallback((e: React.MouseEvent) => {
     // Intercept clicks on inline references (blue links in static display)
@@ -320,11 +343,8 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     // Reference nodes: single click = select (frame), double click = edit
     if (isReference) {
       setSelectedNode(nodeId, parentId);
-    } else {
-      // textOffset was already captured in mousedown (before blur layout shift)
-      setFocusedNode(nodeId, parentId);
     }
-  }, [nodeId, parentId, isReference, setFocusedNode, setSelectedNode, navigateTo]);
+  }, [nodeId, parentId, isReference, setSelectedNode, navigateTo]);
 
   const handleContentDoubleClick = useCallback(() => {
     // Double click on reference node → enter edit mode

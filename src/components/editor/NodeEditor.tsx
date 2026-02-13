@@ -408,8 +408,16 @@ export function NodeEditor({
       if (info) {
         const maxPos = editor.state.doc.content.size - 1;
         const pmPos = Math.max(1, Math.min(info.textOffset + 1, maxPos));
-        editor.commands.focus();
-        editor.commands.setTextSelection(pmPos);
+        // Focus first, then defer setTextSelection to next frame.
+        // TipTap's focus() triggers async browser focus handling that can
+        // reset the DOM selection. By deferring, we set the selection AFTER
+        // the browser finishes focus processing, so it sticks.
+        editor.commands.focus('end');
+        requestAnimationFrame(() => {
+          if (!editor.isDestroyed) {
+            editor.commands.setTextSelection(pmPos);
+          }
+        });
       } else {
         editor.commands.focus('end');
       }

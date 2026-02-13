@@ -1,25 +1,16 @@
 # Issue: 点击未聚焦节点的格式化文本时光标定位不准
 
-> 状态: 未解决 | 优先级: 中 | 影响范围: 编辑体验
+> 状态: **已解决** | 优先级: 中 | 影响范围: 编辑体验
 
 ## 目标
 
 点击任意未聚焦节点的文本（包括加粗、代码、高亮、删除线等格式化文本），光标应精确定位到点击位置，而非跳到末尾。**一次点击即可**，不需要二次点击。
 
-## 当前表现
-
-| 场景 | 表现 |
-|------|------|
-| 刷新后首次点击任意节点文本 | 光标正确定位 ✓ |
-| 已聚焦节点 A → 点击节点 B 的**纯文本** | 大部分情况正确 |
-| 已聚焦节点 A → 点击节点 B 的**格式化文本** | 光标跳到末尾，需再点一次 ✗ |
-| 节点 B 已聚焦 → 点击 B 内格式化文本 | 正确（ProseMirror 原生处理）✓ |
-
 ## 根因分析
 
 核心问题是**节点切换时的 blur → layout shift → caretRangeFromPoint 失准**。
 
-### 事件时序
+### 原始事件时序（问题根源）
 
 ```
 mousedown on B → focusout on A → [layout shift] → click on B
@@ -36,7 +27,34 @@ mousedown on B → focusout on A → [layout shift] → click on B
 - 纯文本在小偏移下仍能命中同一字符，格式化文本（`<code>`/`<strong>` 等）边界精确，小偏移就可能命中容器外或空白区域
 - `container.contains(range.startContainer)` 检查失败 → textOffset 为 null → fallback 到 `focus('end')`
 
-## 已尝试的方案
+## 解决方案（经 9 轮迭代）
+
+最终方案由三个互补修复组成：
+
+### 1. mousedown 中完成 focus 切换（消除 blur 布局偏移）
+
+```
+mousedown B → e.preventDefault() + textOffset 捕获 + setFocusedNode(B)
+           → blur A 触发时 focusedNodeId=B≠A → guard 失败 → no-op
+```
+
+- `handleContentMouseDown` 调用 `e.preventDefault()` 阻止浏览器原生 focus 行为
+- 直接在 mousedown 中调用 `setFocusedNode(nodeId, parentId)`，不再依赖 click
+- 布局偏移从根本上消除：focus 在 mousedown 同步切换，blur 的 guard 条件检测到 focusedNodeId 已变更
+
+### 2. rAF 延迟 blur 清除（安全网）
+
+`handleBlur` 中 `setFocusedNode(null)` 通过 `requestAnimationFrame` 延迟一帧：
+- 即使 mousedown 的 `setFocusedNode` 未及时执行，rAF 也确保 blur 在下一帧执行
+- 此时新节点的 focus 已设置，guard 条件自然失败
+
+### 3. focusClickCoords 标识匹配（防止跨节点污染）
+
+`focusClickCoords` 包含 `{ nodeId, parentId, textOffset }`：
+- NodeEditor mount 时仅消费 nodeId+parentId 匹配的数据
+- 防止快速点击不同节点时，旧数据被新编辑器错误消费
+
+## 已尝试的方案（历史记录）
 
 | # | 方案 | 结果 |
 |---|------|------|
@@ -46,30 +64,16 @@ mousedown on B → focusout on A → [layout shift] → click on B
 | 4 | 先 dispatch(tr) 设 PM selection 再 view.focus() | 完全破坏光标插入 |
 | 5 | useState initializer + editor.commands.focus(pmPos) | 首次有效，切换节点时格式化文本失败 |
 | 6 | mousedown 捕获 textOffset（在 blur 之前） | 改善但未完全修复 |
-| 7 | focusClickCoords 增加 nodeId+parentId 标识 | 防止跨节点数据污染，待人工验证 |
-
-## 当前实现（方案 5+6+7 组合）
-
-- `OutlinerItem.onMouseDown` → `getTextOffsetFromPoint()`（`caretPositionFromPoint` 标准 API + `caretRangeFromPoint` webkit 回退）→ 计算 textOffset → 存入 `ui-store.focusClickCoords`（含 `nodeId`+`parentId` 标识）
-- `OutlinerItem.onClick` → `setFocusedNode(nodeId, parentId)`
-- `NodeEditor` mount → `useRef` 读取匹配的 `focusClickCoords`（仅当 `nodeId`+`parentId` 匹配时消费）→ `useLayoutEffect` 中 `focus('end')` + `setTextSelection(pmPos)` → 清除 store
-
-### 方案 7 解决的问题
-
-之前 `focusClickCoords` 只存 `{ textOffset }`，无身份标识。当用户快速点击不同节点时，节点 A 的 mousedown 存储的 textOffset 可能被节点 B 的 NodeEditor 错误消费（因为 React 重渲染时序导致 A 和 B 的 mount/unmount 交织）。增加 `nodeId`+`parentId` 后，每个 NodeEditor 只消费属于自己的数据。
-
-## 如果仍未完全修复的后续方向
-
-1. **延迟 blur 处理**: 在 handleBlur 中用 `requestAnimationFrame` 延迟 `setFocusedNode(null)`，让 click 事件先执行完再触发布局变化。这能从根本上消除 layout shift 问题
-2. **完全不同的架构**: 不在 blur 时卸载编辑器，改为隐藏/禁用，避免高度变化引起的布局偏移
-3. **TipTap `autofocus` 选项**: 将 pmPos 传入 `useEditor({ autofocus: pmPos })`，让 TipTap 内部处理 focus + selection
+| 7 | focusClickCoords 增加 nodeId+parentId 标识 | 防止跨节点数据污染 |
+| 8 | rAF 延迟 blur + click fallback textOffset | 进一步改善 |
+| 9 | **mousedown 中 preventDefault + setFocusedNode** | **完全修复** ✓ |
 
 ## 相关文件
 
 | 文件 | 职责 |
 |------|------|
 | `src/components/editor/NodeEditor.tsx` | 编辑器挂载、光标定位 |
-| `src/components/outliner/OutlinerItem.tsx` | click/mousedown 处理、textOffset 计算 |
+| `src/components/outliner/OutlinerItem.tsx` | mousedown focus 切换、textOffset 计算、rAF blur |
 | `src/stores/ui-store.ts` | `focusClickCoords` 状态 |
 
 ## 相关 commit
@@ -82,3 +86,4 @@ mousedown on B → focusout on A → [layout shift] → click on B
 - `2b43dc0` fix: mousedown 捕获 textOffset 避免 blur 导致的布局偏移
 - `71bf78c` fix: 编辑器切换时格式化文本光标定位 — 分离 focus 和 selection
 - `7277ccf` fix: focusClickCoords 增加 nodeId+parentId 标识，防止跨节点数据污染
+- `208323a` fix: 点击光标定位 — mousedown 中完成 focus 切换，消除 blur 布局偏移

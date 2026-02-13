@@ -806,7 +806,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
             onBulletClick={handleBulletClick}
             isReference={isReference || isPendingConversion}
           />
-          <div className="relative flex-1 min-w-0">
+          <div className={`relative flex-1 min-w-0 ${isPendingConversion ? 'ref-converting' : ''}`}>
           <div
             className={`text-sm leading-[21px] ${fieldDataType !== SYS_D.CHECKBOX && !isFocused ? (isReference ? 'cursor-default' : 'cursor-text') : ''}`}
             onClick={fieldDataType !== SYS_D.CHECKBOX && !isFocused ? handleContentClick : undefined}

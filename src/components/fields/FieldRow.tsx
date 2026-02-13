@@ -77,6 +77,7 @@ export function FieldRow({
   const setEditingFieldName = useUIStore((s) => s.setEditingFieldName);
   const setFocusedNode = useUIStore((s) => s.setFocusedNode);
   const createSibling = useNodeStore((s) => s.createSibling);
+  const removeField = useNodeStore((s) => s.removeField);
   const wsId = useWorkspaceStore((s) => s.currentWorkspaceId);
   const userId = useWorkspaceStore((s) => s.userId);
   const clickOffsetXRef = useRef<number | undefined>(undefined);
@@ -141,40 +142,36 @@ export function FieldRow({
     setEditingFieldName(tupleId);
   }, [tupleId, setEditingFieldName]);
 
-  // System fields: read-only value, but name area supports click → FieldNameInput (for Enter/Backspace/navigation)
+  // System fields: read-only name (Enter → create sibling, Backspace → delete field)
   if (isSystemField) {
     const sysFieldDef = SYSTEM_FIELD_MAP.get(attrDefId);
     const SysIcon = sysFieldDef?.icon;
     const displayText = valueName || '—';
     return (
       <div className={`border-t ${isLastInGroup ? 'border-b' : ''} border-border-subtle flex flex-col @sm:flex-row @sm:items-start min-h-[28px]`} data-field-row>
-        {/* Name column — clickable to enter editing (Enter → create sibling, Backspace → delete) */}
+        {/* Name column — focusable but not editable */}
         <div className="flex items-center gap-1 @sm:shrink-0 @sm:w-[130px] min-w-0 h-7 py-1">
           <span className="shrink-0 w-[15px] flex items-center justify-center text-foreground-tertiary">
             {SysIcon && <SysIcon size={12} />}
           </span>
-          <div
-            className={`flex-1 min-w-0 flex items-center${!isEditing ? ' cursor-text' : ''}`}
-            onClick={!isEditing ? handleNameClick : undefined}
+          <span
+            className="block text-sm leading-[22px] h-[22px] text-foreground-tertiary truncate cursor-default outline-none focus:ring-1 focus:ring-ring rounded-sm"
+            tabIndex={0}
+            title={attrDefName}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                handleEnterConfirm();
+              } else if (e.key === 'Backspace') {
+                e.preventDefault();
+                if (wsId && userId) removeField(nodeId, tupleId, wsId, userId);
+              } else if (e.key === 'Escape') {
+                (e.target as HTMLElement).blur();
+              }
+            }}
           >
-            {isEditing ? (
-              <FieldNameInput
-                tupleId={tupleId}
-                nodeId={nodeId}
-                attrDefId={attrDefId}
-                currentName={attrDefName}
-                onEnterConfirm={handleEnterConfirm}
-                clickOffsetX={clickOffsetXRef.current}
-              />
-            ) : (
-              <span
-                className="block text-sm leading-[22px] h-[22px] text-foreground-tertiary truncate"
-                title={attrDefName}
-              >
-                {attrDefName}
-              </span>
-            )}
-          </div>
+            {attrDefName}
+          </span>
         </div>
         {/* Value column — read-only */}
         <div className="flex flex-1 min-w-0 items-center min-h-7 py-1" data-field-value>

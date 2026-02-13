@@ -271,7 +271,7 @@ export function DatePicker({ value, onSelect, onClose }: DatePickerProps) {
   return (
     <div
       ref={containerRef}
-      className="absolute left-0 top-full z-50 mt-1 w-[280px] rounded-lg border border-border bg-popover shadow-lg p-3"
+      className="absolute right-0 top-full z-50 mt-1 w-[280px] rounded-lg border border-border bg-popover shadow-lg p-3"
       onMouseDown={(e) => e.stopPropagation()}
     >
       {/* Close button */}

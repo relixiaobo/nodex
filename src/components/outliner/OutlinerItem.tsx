@@ -893,7 +893,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
               />
             )}
             {hasTags && (
-              <span className="inline-flex align-baseline ml-1.5" onClick={(e) => e.stopPropagation()}>
+              <span className="inline-flex align-[0.125em] ml-1.5" onClick={(e) => e.stopPropagation()}>
                 <TagBar nodeId={nodeId} />
               </span>
             )}

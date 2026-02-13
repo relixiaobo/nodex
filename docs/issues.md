@@ -6,11 +6,12 @@
 - [ ] Field 每个类型的配置项是不同的，现在可能有些配置项对于某些type是多余或者不合适的，需要检查
 - [x] 当 options type 的 field node 的 value 本质上也是 outliner，跟 plain 格式的一样，只是这个值可以从 预置选项中选取而已，所以也应该在其中输入任何值，包括 输入 > 将这个 value 的 node 转换为 field node
 - [x] supertag 总是 Schema node 的 child node，但是 field node 并不属于 Schema node，而是在哪个node 下面创建的，就属于哪个 node
-- [ ] 检查所有的 outliner 部分的逻辑是否一致，我看到 plain field node value 操作有些跟 在普通节点中的操作有些小差异
-- [ ] 选中 reference node，之后，按方向键右键，可以将光标移动到这个 选中框 外面（后面），然后输入文本，就会将 reference node 转换为一个普通 node ，原本referenc部分变成 inline reference，注意，这个转换不是马上转换，而是需要输入文本之后才会转换；如果用户又删除了所有的输入文本，那么又会将这个 inline reference ，转换为原本的 reference node 状态，整个转换过程是可逆的；
-- [ ] 通过 @ 或者其他方式产生了一个 reference node 之后，光标的位置位于 reference node 的尾部，用户可以继续输入文本，就会转换成 inline reference
-- [ ] #tag 总是跟在所在node的文本的末尾，检查其是否 与所在行的文本是居中对齐的
-- [ ] 如果 node 中文本过长，在焦点从这个node转移的时候，其文本的布局会发生改变，宽度变窄
-- [ ] 在包含 inline code 的node中，如果将光标移动到 inline code 里面，光标会消失
-- [ ] 节点多选/单选
-- [ ] undo / redo (cmd+z / cmd+shift+z)
+- [x] 检查所有的 outliner 部分的逻辑是否一致，我看到 plain field node value 操作有些跟 在普通节点中的操作有些小差异
+- [x] 选中 reference node，之后，按方向键右键，可以将光标移动到这个 选中框 外面（后面），然后输入文本，就会将 reference node 转换为一个普通 node ，原本referenc部分变成 inline reference，注意，这个转换不是马上转换，而是需要输入文本之后才会转换；如果用户又删除了所有的输入文本，那么又会将这个 inline reference ，转换为原本的 reference node 状态，整个转换过程是可逆的；
+- [x] 通过 @ 或者其他方式产生了一个 reference node 之后，光标的位置位于 reference node 的尾部，用户可以继续输入文本，就会转换成 inline reference
+- [x] #tag 总是跟在所在node的文本的末尾，检查其是否 与所在行的文本是居中对齐的，我在如图的引用节点中，看到 tag 好像没有与所在行文本居中对齐
+- [x] 如果 node 中文本过长，在焦点从这个node转移的时候，其文本的布局会发生改变，宽度变窄
+- [x] 在包含 inline code 的node中，如果将光标移动到 inline code 里面，光标会消失
+- [x] 只有键盘输入 # 或 @ 会触发菜单，如果一个 node 末尾本身就是 # 或者 @，下次聚焦这个 node 的时候不要触发菜单
+- [x] 在 node A 下面有一个 子节点 node B，此时，如果我在 node A 的空白子节点中通过 @ 来直接创建 node B 的 reference node，此时就会出错（tana 也不允许这样的操作，tana 的做法是不允许创建 reference node，而是直接将其转换为另一个新的 inline reference 的 node，并且 tana 也不允许同一个 node 下面出现完全相同的 reference node）
+- [x] 无 child node 的 node A点击 chevron，会展开，并看到一个空白的 child node ，此时光标也会在这个空白节点中，如果此时 按 backspace，应该删除这个空白的 child node，并且将 node A变成收起状态

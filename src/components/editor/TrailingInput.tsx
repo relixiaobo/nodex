@@ -217,10 +217,21 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
               return true;
             }
 
+            // If parent has no real children (only TrailingInput showing),
+            // collapse the parent and focus it
+            const entities = useNodeStore.getState().entities;
+            const parent = entities[ref.effectiveParentId];
+            if ((parent?.children ?? []).length === 0) {
+              const expandKey = ref.effectiveParentEK;
+              if (expandKey) ref.setExpanded(expandKey, false);
+              const gpId = parent?.props._ownerId;
+              if (gpId) ref.setFocusedNode(ref.effectiveParentId, gpId);
+              return true;
+            }
+
             // Focus the last visible node above this TrailingInput.
             // Walks from parent's last visible child down through expanded
             // descendants to find the deepest visible node.
-            const entities = useNodeStore.getState().entities;
             const expanded = useUIStore.getState().expandedNodes;
             const target = getLastVisibleNode(ref.effectiveParentId, entities, expanded);
             if (target) {

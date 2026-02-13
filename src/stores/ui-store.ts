@@ -68,9 +68,9 @@ interface UIStore {
   triggerHint: '#' | '@' | null;
   setTriggerHint(hint: '#' | '@' | null): void;
 
-  // Click coordinates for cursor positioning (consumed once by NodeEditor on mount)
-  focusClickCoords: { x: number; y: number } | null;
-  setFocusClickCoords(coords: { x: number; y: number } | null): void;
+  // Text offset for cursor positioning (consumed once by NodeEditor on mount)
+  focusClickCoords: { textOffset: number } | null;
+  setFocusClickCoords(coords: { textOffset: number } | null): void;
 
   // Pending reference ↔ inline reference conversion (session-only)
   pendingRefConversion: {

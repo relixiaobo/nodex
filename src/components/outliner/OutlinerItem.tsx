@@ -304,8 +304,24 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     if (isReference) {
       setSelectedNode(nodeId, parentId);
     } else {
-      // Store click coordinates so NodeEditor can position cursor at click point
-      useUIStore.getState().setFocusClickCoords({ x: e.clientX, y: e.clientY });
+      // Compute text offset from click on STATIC content (visible, laid out).
+      // caretRangeFromPoint works reliably here because the element is rendered.
+      // We store textOffset (not screen coords) so NodeEditor can map it to a
+      // ProseMirror position synchronously — avoids rAF timing issues with marks.
+      let textOffset: number | null = null;
+      try {
+        const range = document.caretRangeFromPoint(e.clientX, e.clientY);
+        if (range) {
+          const container = e.currentTarget as HTMLElement;
+          if (container.contains(range.startContainer)) {
+            const preRange = document.createRange();
+            preRange.setStart(container, 0);
+            preRange.setEnd(range.startContainer, range.startOffset);
+            textOffset = preRange.toString().length;
+          }
+        }
+      } catch { /* ignore */ }
+      useUIStore.getState().setFocusClickCoords(textOffset !== null ? { textOffset } : null);
       setFocusedNode(nodeId, parentId);
     }
   }, [nodeId, parentId, isReference, setFocusedNode, setSelectedNode, navigateTo]);

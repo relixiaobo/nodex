@@ -387,23 +387,20 @@ export function NodeEditor({
     if (editor && !editor.isDestroyed) {
       savedRef.current = false;
 
-      // Always focus immediately to prevent unfocused gap between renders.
-      editor.commands.focus('end');
-
-      // If the user clicked on text to focus this node, adjust cursor to the
-      // click point. posAtCoords uses caretRangeFromPoint which requires the
-      // element to be laid out, so defer to requestAnimationFrame (runs after
-      // layout is computed but before paint).
-      const coords = useUIStore.getState().focusClickCoords;
-      if (coords) {
+      // If the user clicked on text to focus this node, position cursor at
+      // the click point using a pre-computed text offset. The offset was
+      // calculated from the static (non-editable) content via caretRangeFromPoint
+      // in handleContentClick — this avoids layout timing issues with rAF.
+      // ProseMirror position = textOffset + 1 (offset 1 = paragraph start).
+      const info = useUIStore.getState().focusClickCoords;
+      if (info) {
         useUIStore.getState().setFocusClickCoords(null);
-        requestAnimationFrame(() => {
-          if (editor.isDestroyed) return;
-          const pos = editor.view.posAtCoords({ left: coords.x, top: coords.y });
-          if (pos) {
-            editor.commands.setTextSelection(pos.pos);
-          }
-        });
+        const maxPos = editor.state.doc.content.size - 1;
+        const pmPos = Math.max(1, Math.min(info.textOffset + 1, maxPos));
+        editor.commands.focus();
+        editor.commands.setTextSelection(pmPos);
+      } else {
+        editor.commands.focus('end');
       }
 
       if (editorRef) editorRef.current = editor;

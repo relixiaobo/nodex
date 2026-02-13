@@ -943,43 +943,28 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
               />
             ) : fieldDataType === SYS_D.DATE && node.props.name ? (
               <span className="node-content">{formatFieldDate(node.props.name)}</span>
-            ) : fieldDataType === SYS_D.URL && node.props.name ? (
-              <>
-                <a
-                  href={node.props.name.includes('://') ? node.props.name : `https://${node.props.name}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="node-content text-primary underline decoration-primary/20"
-                  onMouseDown={(e) => e.stopPropagation()}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  {node.props.name}
-                </a>
-                {validateFieldValue(SYS_D.URL, node.props.name) && (
-                  <ValidationWarning message={validateFieldValue(SYS_D.URL, node.props.name)!} />
-                )}
-              </>
-            ) : fieldDataType === SYS_D.EMAIL && node.props.name ? (
-              <>
-                <a
-                  href={`mailto:${node.props.name}`}
-                  className="node-content text-primary underline decoration-primary/20"
-                  onMouseDown={(e) => e.stopPropagation()}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  {node.props.name}
-                </a>
-                {validateFieldValue(SYS_D.EMAIL, node.props.name) && (
-                  <ValidationWarning message={validateFieldValue(SYS_D.EMAIL, node.props.name)!} />
-                )}
-              </>
+            ) : fieldDataType === SYS_D.URL && node.props.name && !validateFieldValue(SYS_D.URL, node.props.name) ? (
+              <a
+                href={node.props.name.includes('://') ? node.props.name : `https://${node.props.name}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="node-content text-primary underline decoration-primary/20"
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={(e) => e.stopPropagation()}
+              >
+                {node.props.name}
+              </a>
+            ) : fieldDataType === SYS_D.EMAIL && node.props.name && !validateFieldValue(SYS_D.EMAIL, node.props.name) ? (
+              <a
+                href={`mailto:${node.props.name}`}
+                className="node-content text-primary underline decoration-primary/20"
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={(e) => e.stopPropagation()}
+              >
+                {node.props.name}
+              </a>
             ) : isInlineField && node.props.name ? (
-              <>
-                <span className="node-content">{node.props.name}</span>
-                {validateFieldValue(fieldDataType!, node.props.name) && (
-                  <ValidationWarning message={validateFieldValue(fieldDataType!, node.props.name)!} />
-                )}
-              </>
+              <span className="node-content">{node.props.name}</span>
             ) : (
               <span
                 className="node-content"
@@ -992,6 +977,9 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
               <span className="inline-flex align-[0.125em] ml-1.5" onClick={(e) => e.stopPropagation()}>
                 <TagBar nodeId={nodeId} />
               </span>
+            )}
+            {!isFocused && isInlineField && node.props.name && validateFieldValue(fieldDataType!, node.props.name) && (
+              <ValidationWarning message={validateFieldValue(fieldDataType!, node.props.name)!} />
             )}
           </div>
           {hashTagOpen && isFocused && (

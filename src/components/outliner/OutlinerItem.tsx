@@ -90,6 +90,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   const applyTag = useNodeStore((s) => s.applyTag);
   const createTagDef = useNodeStore((s) => s.createTagDef);
   const updateNodeName = useNodeStore((s) => s.updateNodeName);
+  const updateNodeDescription = useNodeStore((s) => s.updateNodeDescription);
   const addReference = useNodeStore((s) => s.addReference);
   const removeReference = useNodeStore((s) => s.removeReference);
   const startRefConversion = useNodeStore((s) => s.startRefConversion);
@@ -182,6 +183,54 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   const [optionsPickerOpen, setOptionsPickerOpen] = useState(false);
   const [optionsPickerIndex, setOptionsPickerIndex] = useState(0);
   const allFieldOptions = useFieldOptions(isOptionsField && attrDefId ? attrDefId : '');
+
+  // Description editing state
+  const [editingDescription, setEditingDescription] = useState(false);
+  const descriptionRef = useRef<HTMLDivElement>(null);
+  const description = node?.props.description ?? '';
+
+  const handleDescriptionClick = useCallback(() => {
+    setEditingDescription(true);
+  }, []);
+
+  const handleDescriptionBlur = useCallback(() => {
+    if (!descriptionRef.current) return;
+    const newDesc = descriptionRef.current.textContent?.trim() ?? '';
+    if (newDesc !== description && userId) {
+      updateNodeDescription(nodeId, newDesc, userId);
+    }
+    setEditingDescription(false);
+  }, [nodeId, description, userId, updateNodeDescription]);
+
+  const handleDescriptionKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      descriptionRef.current?.blur();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      if (descriptionRef.current) descriptionRef.current.textContent = description;
+      setEditingDescription(false);
+    }
+  }, [description]);
+
+  // Focus description contentEditable when entering edit mode
+  useEffect(() => {
+    if (editingDescription && descriptionRef.current) {
+      descriptionRef.current.textContent = description;
+      descriptionRef.current.focus();
+      // Place cursor at end
+      const range = document.createRange();
+      const sel = window.getSelection();
+      range.selectNodeContents(descriptionRef.current);
+      range.collapse(false);
+      sel?.removeAllRanges();
+      sel?.addRange(range);
+    }
+  }, [editingDescription, description]);
+
+  const handleDescriptionEdit = useCallback(() => {
+    setEditingDescription(true);
+  }, []);
 
   // Open options picker when Options-field reference is selected
   useEffect(() => {
@@ -966,6 +1015,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
                 onReferenceNavUp={handleReferenceNavUp}
                 onReferenceCreate={handleReferenceForceCreate}
                 onReferenceClose={handleReferenceClose}
+                onDescriptionEdit={handleDescriptionEdit}
               />
             ) : (
               <span
@@ -979,6 +1029,20 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
               </span>
             )}
           </div>
+          {/* Description: gray text below name */}
+          {(description || editingDescription) && (
+            <div
+              ref={editingDescription ? descriptionRef : undefined}
+              contentEditable={editingDescription}
+              suppressContentEditableWarning
+              className={`text-xs leading-tight text-foreground-tertiary ${editingDescription ? 'outline-none cursor-text' : 'cursor-pointer'}`}
+              onClick={!editingDescription ? handleDescriptionClick : undefined}
+              onBlur={editingDescription ? handleDescriptionBlur : undefined}
+              onKeyDown={editingDescription ? handleDescriptionKeyDown : undefined}
+            >
+              {!editingDescription && description}
+            </div>
+          )}
           {hashTagOpen && isFocused && (
             <TagSelector
               ref={tagDropdownRef}

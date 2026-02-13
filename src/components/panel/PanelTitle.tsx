@@ -12,6 +12,7 @@ import { useNodeStore } from '../../stores/node-store';
 import { useWorkspaceStore } from '../../stores/workspace-store';
 import { resolveDataType, getFieldTypeIcon } from '../../lib/field-utils.js';
 import { TagBar } from '../tags/TagBar';
+import { NodeDescription } from './NodeDescription';
 
 interface PanelTitleProps {
   nodeId: string;
@@ -108,6 +109,7 @@ export function PanelTitle({ nodeId, onTitleRef }: PanelTitleProps) {
       <div className="mt-0.5">
         <TagBar nodeId={nodeId} />
       </div>
+      <NodeDescription nodeId={nodeId} />
     </div>
   );
 }

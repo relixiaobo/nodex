@@ -1,23 +1,149 @@
 /**
- * Click-to-edit inline editor for Date / Number / URL / Email field values.
+ * Inline editor for Date / Number / URL / Email field value nodes.
  *
- * Display mode: formatted text (clickable links for URL/Email, formatted dates).
- * Edit mode: plain text <input> (or type="date" for Date).
- * Validation: non-blocking visual warning icon with tooltip.
+ * Used inside OutlinerItem as a replacement for NodeEditor (ProseMirror)
+ * when the node is a field value of these types. Renders a borderless
+ * <input> that matches the node text style (text-sm leading-[21px]).
+ *
+ * Date: hidden <input type="date">, opens native picker immediately.
+ * Number/URL/Email: plain <input type="text">.
+ *
+ * Validation is non-blocking: saves any value, shows warning icon.
  */
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useRef, useEffect, useCallback } from 'react';
 import { CircleAlert } from 'lucide-react';
 import { SYS_D } from '../../types/index.js';
 
+/** Set of field data types that use inline editing instead of ProseMirror */
+export const INLINE_FIELD_TYPES: Set<string> = new Set([
+  SYS_D.DATE, SYS_D.NUMBER, SYS_D.INTEGER, SYS_D.URL, SYS_D.EMAIL,
+]);
+
 interface FieldInlineEditorProps {
+  /** Current node name (the raw value) */
+  value: string;
   fieldDataType: string;
-  value?: string;
+  /** Called on save — same as NodeEditor's updateNodeName */
   onSave: (value: string) => void;
+  /** Called when editing ends (like NodeEditor onBlur) */
+  onBlur: () => void;
 }
 
-// ─── Validation helpers ───
+export function FieldInlineEditor({ value, fieldDataType, onSave, onBlur }: FieldInlineEditorProps) {
+  if (fieldDataType === SYS_D.DATE) {
+    return <DateInput value={value} onSave={onSave} onBlur={onBlur} />;
+  }
+  return <TextInput value={value} onSave={onSave} onBlur={onBlur} />;
+}
 
-function validateValue(fieldDataType: string, value: string): string | null {
+// ─── Date input: opens native picker immediately ───
+
+function DateInput({ value, onSave, onBlur }: { value: string; onSave: (v: string) => void; onBlur: () => void }) {
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    // Open the native date picker immediately
+    try { el.showPicker(); } catch { el.focus(); }
+  }, []);
+
+  const handleChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const v = e.target.value;
+      if (v !== value) onSave(v);
+      // Close after selection
+      onBlur();
+    },
+    [value, onSave, onBlur],
+  );
+
+  // If user dismisses picker without selecting, blur out
+  const handleBlurEvent = useCallback(() => {
+    onBlur();
+  }, [onBlur]);
+
+  return (
+    <input
+      ref={inputRef}
+      type="date"
+      defaultValue={toDateInputValue(value)}
+      onChange={handleChange}
+      onBlur={handleBlurEvent}
+      className="min-w-0 flex-1 bg-transparent text-sm leading-[21px] outline-none"
+    />
+  );
+}
+
+// ─── Text input (Number / URL / Email) ───
+
+function TextInput({ value, onSave, onBlur }: { value: string; onSave: (v: string) => void; onBlur: () => void }) {
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, []);
+
+  const handleBlurEvent = useCallback(() => {
+    const trimmed = inputRef.current?.value.trim() ?? '';
+    if (trimmed !== value) onSave(trimmed);
+    onBlur();
+  }, [value, onSave, onBlur]);
+
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        const trimmed = inputRef.current?.value.trim() ?? '';
+        if (trimmed !== value) onSave(trimmed);
+        onBlur();
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        onBlur();
+      }
+    },
+    [value, onSave, onBlur],
+  );
+
+  return (
+    <input
+      ref={inputRef}
+      type="text"
+      defaultValue={value}
+      onBlur={handleBlurEvent}
+      onKeyDown={handleKeyDown}
+      className="min-w-0 flex-1 bg-transparent text-sm leading-[21px] outline-none"
+    />
+  );
+}
+
+// ─── Display helpers (used by OutlinerItem for non-focused rendering) ───
+
+export function formatFieldDate(isoDate: string): string {
+  try {
+    const date = new Date(isoDate + 'T00:00:00');
+    return date.toLocaleDateString('en-US', {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+    });
+  } catch {
+    return isoDate;
+  }
+}
+
+function toDateInputValue(value?: string): string {
+  if (!value) return '';
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  const d = new Date(value + 'T00:00:00');
+  if (isNaN(d.getTime())) return '';
+  return d.toISOString().split('T')[0];
+}
+
+export function validateFieldValue(fieldDataType: string, value: string): string | null {
   if (!value) return null;
   switch (fieldDataType) {
     case SYS_D.NUMBER:
@@ -32,185 +158,10 @@ function validateValue(fieldDataType: string, value: string): string | null {
   }
 }
 
-// ─── Date formatting ───
-
-function formatFieldDate(value: string): string {
-  // Try parsing ISO date (YYYY-MM-DD) or other formats
-  const d = new Date(value);
-  if (isNaN(d.getTime())) return value;
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-}
-
-function toDateInputValue(value?: string): string {
-  if (!value) return '';
-  // If already YYYY-MM-DD, return as-is
-  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
-  const d = new Date(value);
-  if (isNaN(d.getTime())) return '';
-  return d.toISOString().split('T')[0];
-}
-
-export function FieldInlineEditor({ fieldDataType, value, onSave }: FieldInlineEditorProps) {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(value ?? '');
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  // Sync draft when value changes externally
-  useEffect(() => {
-    if (!editing) setDraft(value ?? '');
-  }, [value, editing]);
-
-  // Auto-focus on edit start
-  useEffect(() => {
-    if (editing && inputRef.current) {
-      inputRef.current.focus();
-      if (fieldDataType !== SYS_D.DATE) {
-        inputRef.current.select();
-      }
-    }
-  }, [editing, fieldDataType]);
-
-  const save = useCallback(() => {
-    const trimmed = draft.trim();
-    setEditing(false);
-    if (trimmed !== (value ?? '')) {
-      onSave(trimmed);
-    }
-  }, [draft, value, onSave]);
-
-  const cancel = useCallback(() => {
-    setDraft(value ?? '');
-    setEditing(false);
-  }, [value]);
-
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        save();
-      } else if (e.key === 'Escape') {
-        e.preventDefault();
-        cancel();
-      }
-    },
-    [save, cancel],
-  );
-
-  // ─── Edit mode ───
-  if (editing) {
-    const isDate = fieldDataType === SYS_D.DATE;
-    return (
-      <input
-        ref={inputRef}
-        type={isDate ? 'date' : 'text'}
-        value={isDate ? toDateInputValue(draft) : draft}
-        onChange={(e) => setDraft(e.target.value)}
-        onBlur={save}
-        onKeyDown={handleKeyDown}
-        className="h-6 w-full min-w-0 rounded border border-border bg-background px-1.5 text-sm outline-none focus:border-primary"
-      />
-    );
-  }
-
-  // ─── Display mode ───
-  const isEmpty = !value;
-  const warning = value ? validateValue(fieldDataType, value) : null;
-
-  if (isEmpty) {
-    return (
-      <span
-        className="flex-1 cursor-text text-sm text-muted-foreground/50 select-none"
-        onClick={() => setEditing(true)}
-      >
-        Empty
-      </span>
-    );
-  }
-
-  // URL: clickable blue link
-  if (fieldDataType === SYS_D.URL) {
-    const href = value!.includes('://') ? value! : `https://${value!}`;
-    return (
-      <span className="flex min-w-0 items-center gap-1">
-        <a
-          href={href}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="truncate text-sm text-primary underline hover:text-primary/80"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {value}
-        </a>
-        <span
-          className="cursor-text text-sm text-transparent hover:text-muted-foreground/50 select-none px-1"
-          onClick={() => setEditing(true)}
-          title="Edit"
-        >
-          ✎
-        </span>
-        {warning && <ValidationWarning message={warning} />}
-      </span>
-    );
-  }
-
-  // Email: clickable mailto link
-  if (fieldDataType === SYS_D.EMAIL) {
-    return (
-      <span className="flex min-w-0 items-center gap-1">
-        <a
-          href={`mailto:${value}`}
-          className="truncate text-sm text-primary underline hover:text-primary/80"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {value}
-        </a>
-        <span
-          className="cursor-text text-sm text-transparent hover:text-muted-foreground/50 select-none px-1"
-          onClick={() => setEditing(true)}
-          title="Edit"
-        >
-          ✎
-        </span>
-        {warning && <ValidationWarning message={warning} />}
-      </span>
-    );
-  }
-
-  // Date: formatted display
-  if (fieldDataType === SYS_D.DATE) {
-    return (
-      <span className="flex min-w-0 items-center gap-1">
-        <span
-          className="cursor-text truncate text-sm"
-          onClick={() => setEditing(true)}
-        >
-          {formatFieldDate(value!)}
-        </span>
-        {warning && <ValidationWarning message={warning} />}
-      </span>
-    );
-  }
-
-  // Number / Integer: plain text
+export function ValidationWarning({ message }: { message: string }) {
   return (
-    <span className="flex min-w-0 items-center gap-1">
-      <span
-        className="cursor-text truncate text-sm"
-        onClick={() => setEditing(true)}
-      >
-        {value}
-      </span>
-      {warning && <ValidationWarning message={warning} />}
-    </span>
-  );
-}
-
-// ─── Validation warning icon ───
-
-function ValidationWarning({ message }: { message: string }) {
-  return (
-    <span className="shrink-0 cursor-default" title={message}>
-      <CircleAlert className="h-3.5 w-3.5 text-amber-500" />
+    <span className="inline-flex shrink-0 cursor-default ml-1" title={message}>
+      <CircleAlert className="h-3.5 w-3.5 text-warning" />
     </span>
   );
 }

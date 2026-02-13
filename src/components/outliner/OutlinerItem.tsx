@@ -288,12 +288,37 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     }
   }, [nodeId, parentId, setFocusedNode, revertRefConversion]);
 
+  // Capture text offset on mousedown BEFORE blur can trigger a layout shift.
+  // Event order: mousedown → focusout (blur) → click.
+  // If another node's editor is focused, the blur unmounts it (changing height),
+  // shifting subsequent nodes. caretRangeFromPoint in the click handler would
+  // then use post-shift coordinates, hitting the wrong text position.
+  const handleContentMouseDown = useCallback((e: React.MouseEvent) => {
+    if (isReference || fieldDataType === SYS_D.CHECKBOX) return;
+    // Compute text offset from click on STATIC content (visible, laid out).
+    let textOffset: number | null = null;
+    try {
+      const range = document.caretRangeFromPoint(e.clientX, e.clientY);
+      if (range) {
+        const container = e.currentTarget as HTMLElement;
+        if (container.contains(range.startContainer)) {
+          const preRange = document.createRange();
+          preRange.setStart(container, 0);
+          preRange.setEnd(range.startContainer, range.startOffset);
+          textOffset = preRange.toString().length;
+        }
+      }
+    } catch { /* ignore */ }
+    useUIStore.getState().setFocusClickCoords(textOffset !== null ? { textOffset } : null);
+  }, [isReference, fieldDataType]);
+
   const handleContentClick = useCallback((e: React.MouseEvent) => {
     // Intercept clicks on inline references (blue links in static display)
     const target = e.target as HTMLElement;
     const refEl = target.closest('[data-inlineref-node]') as HTMLElement;
     if (refEl) {
       e.stopPropagation();
+      useUIStore.getState().setFocusClickCoords(null);
       const refId = refEl.getAttribute('data-inlineref-node');
       if (refId) {
         navigateTo(refId);
@@ -304,26 +329,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     if (isReference) {
       setSelectedNode(nodeId, parentId);
     } else {
-      // Compute text offset from click on STATIC content (visible, laid out).
-      // caretRangeFromPoint works reliably here because the element is rendered.
-      // We store textOffset (not screen coords) so NodeEditor can map it to a
-      // ProseMirror position synchronously — avoids rAF timing issues with marks.
-      let textOffset: number | null = null;
-      try {
-        const range = document.caretRangeFromPoint(e.clientX, e.clientY);
-        if (range) {
-          const container = e.currentTarget as HTMLElement;
-          if (container.contains(range.startContainer)) {
-            const preRange = document.createRange();
-            preRange.setStart(container, 0);
-            preRange.setEnd(range.startContainer, range.startOffset);
-            textOffset = preRange.toString().length;
-          }
-        } else {
-          // caretRangeFromPoint returned null (element may be out of viewport)
-        }
-      } catch { /* ignore */ }
-      useUIStore.getState().setFocusClickCoords(textOffset !== null ? { textOffset } : null);
+      // textOffset was already captured in mousedown (before blur layout shift)
       setFocusedNode(nodeId, parentId);
     }
   }, [nodeId, parentId, isReference, setFocusedNode, setSelectedNode, navigateTo]);
@@ -866,6 +872,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
           <div className={`relative flex-1 min-w-0 ${isPendingConversion ? 'ref-converting' : ''}`}>
           <div
             className={`text-sm leading-[21px] ${fieldDataType !== SYS_D.CHECKBOX && !isFocused ? (isReference ? 'cursor-default' : 'cursor-text') : ''}`}
+            onMouseDown={fieldDataType !== SYS_D.CHECKBOX && !isFocused ? handleContentMouseDown : undefined}
             onClick={fieldDataType !== SYS_D.CHECKBOX && !isFocused ? handleContentClick : undefined}
             onDoubleClick={fieldDataType !== SYS_D.CHECKBOX && !isFocused && isReference ? handleContentDoubleClick : undefined}
           >

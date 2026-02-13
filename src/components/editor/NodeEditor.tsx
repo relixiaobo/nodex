@@ -387,19 +387,23 @@ export function NodeEditor({
     if (editor && !editor.isDestroyed) {
       savedRef.current = false;
 
-      // If the user clicked on text to focus this node, position cursor at the
-      // click point rather than defaulting to the end. Uses ProseMirror's
-      // posAtCoords to map screen coordinates → document position.
+      // Always focus immediately to prevent unfocused gap between renders.
+      editor.commands.focus('end');
+
+      // If the user clicked on text to focus this node, adjust cursor to the
+      // click point. posAtCoords uses caretRangeFromPoint which requires the
+      // element to be laid out, so defer to requestAnimationFrame (runs after
+      // layout is computed but before paint).
       const coords = useUIStore.getState().focusClickCoords;
       if (coords) {
         useUIStore.getState().setFocusClickCoords(null);
-        editor.commands.focus();
-        const pos = editor.view.posAtCoords({ left: coords.x, top: coords.y });
-        if (pos) {
-          editor.commands.setTextSelection(pos.pos);
-        }
-      } else {
-        editor.commands.focus('end');
+        requestAnimationFrame(() => {
+          if (editor.isDestroyed) return;
+          const pos = editor.view.posAtCoords({ left: coords.x, top: coords.y });
+          if (pos) {
+            editor.commands.setTextSelection(pos.pos);
+          }
+        });
       }
 
       if (editorRef) editorRef.current = editor;

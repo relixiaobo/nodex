@@ -1,10 +1,17 @@
 # Feature: 网页剪藏
 
-> Phase 3 | 未实现 | 设计阶段
+> Phase 3 | 部分实现 | 提取链路已验证，落库阶段暂缓（等待 Supertag Extend）
 
 ## 概述
 
 Chrome Side Panel 的核心场景：用户浏览网页时，将内容剪藏为 Nodex 节点。剪藏结果是一个普通节点，通过 Supertag + Field 携带来源元数据，并支持 Read Later（正文大纲化）。
+
+## 当前实现状态（2026-02-14）
+
+- ✅ Side Panel -> Background -> Content Script 消息链路已打通
+- ✅ Content Script 已切换为 `defuddle` 提取，且不再保留 `innerText` fallback
+- ✅ `Capture Tab` 当前行为为：复制 `defuddle` 返回的原始 `content` 到剪贴板（用于验证提取质量）
+- ⏸️ 节点落库（创建节点、打 `#web_clip`、写 `Source URL`）暂缓，等待 Supertag Extend 落地后继续
 
 ## 前因后果（决策演进）
 
@@ -111,6 +118,8 @@ clip_node
 5. Background 通知 Side Panel 刷新并定位新节点
 6. 节点默认出现在 Inbox（或用户配置的目标位置）
 
+> 说明：当前代码实现仅用于提取质量验证，输出目标是剪贴板；上述“创建节点 + 打标签 + 写字段”流程尚未接入。
+
 ## 失败样本池（解析优化）
 
 记录条件：
@@ -128,9 +137,9 @@ clip_node
 
 ## 待定事项
 
-- 正文解析实现：`defuddle` / `Readability` / fallback 组合
+- 正文提取优化：`defuddle` 参数调优、站点特化提取规则、失败样本池策略
 - 剪藏模式：全页 / 选中文本 / 简化阅读模式
-- 正文落地格式：纯文本块 / HTML 清洗后分块 / Markdown 转换
+- 正文落地格式：原始 HTML 分块 / 结构化段落分块（目标为 outliner/node）
 - AI 摘要：是否自动写入 `description`
 - 离线队列：无网络时暂存，上线后同步
 - Extend 实现后的迁移策略（双标签 -> 继承）
@@ -145,3 +154,6 @@ clip_node
 | 2026-02-13 | V1 采用双标签方案（`#web_clip + 子类型`） | 当前 Extend 尚未实现，需要可落地过渡方案 |
 | 2026-02-13 | 不做 URL 去重，每次剪藏新建节点 | 保持用户行为可预期，降低实现复杂度 |
 | 2026-02-13 | 成功不存完整原始快照；失败样本统一记录 | 降低存储成本，并为提取优化保留诊断数据 |
+| 2026-02-14 | 提取器统一为 `defuddle`，不再保留 `innerText` fallback | 避免双路径行为差异，先聚焦提取质量基线 |
+| 2026-02-14 | 当前验收路径为“复制 `defuddle` 原始 content 到剪贴板” | 在落库前先观察真实提取结果，减少后续返工 |
+| 2026-02-14 | 网页剪藏落库阶段暂缓，等待 Supertag Extend 完成 | 避免在双标签过渡方案上过早固化实现 |

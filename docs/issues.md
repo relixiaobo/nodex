@@ -14,8 +14,8 @@
 
 ## Closed Bugs
 
-| # | 标题 | 关闭人 | 关闭日期 |
-|---|------|--------|----------|
+| # | 标题 | 关闭人 | 关闭日期 | 备注 |
+|---|------|--------|----------|------|
 | 54 | Schema 空子节点 Backspace 无法删除 | claude-main | 02-15 | 回退到 TipTap，raw contentEditable 已废弃 |
 | 53 | `#tag` 选中后触发词文本残留 | claude-main | 02-15 | 回退到 TipTap，raw contentEditable 已废弃 |
 | 52 | `@` reference 下拉菜单导航/确认失败 | claude-main | 02-15 | 回退到 TipTap，raw contentEditable 已废弃 |

@@ -1036,10 +1036,17 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
           onToggle={handleToggle}
           onDrillDown={handleDrillDown}
         />
-        {/* Selection ring wraps bullet/checkbox + text (not chevron) */}
+        {/* Selection ring wraps bullet + checkbox + text (not chevron) */}
         <div className={`flex items-start gap-2 flex-1 min-w-0 relative ${isSelected ? 'ring-1 ring-primary/40 rounded-sm bg-primary/5 !w-fit !flex-none' : ''}`}>
-          {showCheckbox ? (
-            <div className="w-[15px] h-7 flex items-center justify-center shrink-0">
+          <BulletChevron
+            hasChildren={hasChildren}
+            isExpanded={isExpanded}
+            onBulletClick={handleBulletClick}
+            isReference={isReference || isPendingConversion}
+            tagDefColor={isTagDef ? getTagColor(nodeId).text : undefined}
+          />
+          {showCheckbox && (
+            <div className="h-7 flex items-center shrink-0">
               <input
                 type="checkbox"
                 checked={isDone}
@@ -1047,14 +1054,6 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
                 className="h-3.5 w-3.5 rounded border-border accent-primary cursor-pointer"
               />
             </div>
-          ) : (
-            <BulletChevron
-              hasChildren={hasChildren}
-              isExpanded={isExpanded}
-              onBulletClick={handleBulletClick}
-              isReference={isReference || isPendingConversion}
-              tagDefColor={isTagDef ? getTagColor(nodeId).text : undefined}
-            />
           )}
           <div className={`relative flex-1 min-w-0 ${isPendingConversion ? 'ref-converting' : ''} ${isDone ? 'line-through text-foreground/50' : ''}`}>
           <div

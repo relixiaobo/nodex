@@ -6,6 +6,14 @@ import type { NodexNode } from '../../../src/types/index.js';
  */
 export function collectNodeGraphErrors(entities: Record<string, NodexNode>): string[] {
   const errors: string[] = [];
+  const tupleValueRefs = new Set<string>();
+
+  for (const node of Object.values(entities)) {
+    if (node.props._docType !== 'tuple') continue;
+    for (const childId of node.children?.slice(1) ?? []) {
+      tupleValueRefs.add(childId);
+    }
+  }
 
   for (const [nodeId, node] of Object.entries(entities)) {
     const ownerId = node.props._ownerId;
@@ -21,7 +29,7 @@ export function collectNodeGraphErrors(entities: Record<string, NodexNode>): str
       const owner = entities[ownerId];
       if (!owner) {
         errors.push(`owner missing: node=${nodeId} owner=${ownerId}`);
-      } else if (!owner.children?.includes(nodeId)) {
+      } else if (!owner.children?.includes(nodeId) && !tupleValueRefs.has(nodeId)) {
         errors.push(`owner-child mismatch: node=${nodeId} owner=${ownerId}`);
       }
     }

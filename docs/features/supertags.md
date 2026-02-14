@@ -59,20 +59,21 @@
 - 创建 metanode + SYS_A13 tag binding + 3 个 config tuple（checkbox/childtag/color）
 - tagDef 的 `_ownerId` 始终为 `{workspaceId}_SCHEMA`
 
-### 删除标签级联清理
+### 删除标签级联清理 — 目标规格（未实现）
 
-- trashNode(tagDefId) 时自动级联：
+- 目标行为（未来）：
+  - trashNode(tagDefId) 时自动级联
   - 遍历所有节点，移除 SYS_A13 绑定 tuple
   - 移除模板来源的字段 tuple（`_sourceId` 匹配）+ associatedData
   - tagDef 本身移到 Trash
-- Tana 行为：被删 tag 在节点上显示废纸篓图标（Nodex 当前直接清除引用）
+- 当前行为（2026-02）：`trashNode` 仅将 tagDef 移入 Trash，不自动清理现有引用链路
 
 ### Show as Checkbox — 未实现
 
 - tagDef 配置中开启 "Show as Checkbox" → SYS_A55 = SYS_V03
 - 被该标签标记的节点在 bullet 位置显示 checkbox
-- 勾选 checkbox → 设置节点 `props._done = true`
-- 取消勾选 → `props._done = false`
+- 勾选 checkbox → 设置节点 `props._done = Date.now()`（毫秒时间戳）
+- 取消勾选 → 清空节点 `props._done`
 - **Done state mapping**（Tana 高级）: checkbox 状态可双向映射到特定字段值
 
 ### Default Child Supertag — 未实现
@@ -168,12 +169,12 @@
 | 日期 | 决策 | 原因 |
 |------|------|------|
 | 2026-01-28 | 标签配置页复用 NodePanel（非定制 UI） | 与 Tana 一致，系统标签模板模式 |
-| 2026-02-05 | tagDef typeChoice key 是 SYS_T06 不是 SYS_A02 | 逆向验证结果 |
+| 2026-02-05 | AttrDef typeChoice key 使用 SYS_A02 | 与当前实现和系统常量一致 |
 | 2026-02-06 | 标签模板字段通过 _sourceId 追踪来源 | 区分"模板自动添加"和"手动添加"的字段 |
 | 2026-02-12 | removeTag 同时清理模板来源的字段 tuple | 与 Tana 一致（移除标签不保留模板字段数据） |
 | 2026-02-12 | 配置页分 FieldList (config) + OutlinerView (default content) | 配置项用特殊控件，模板内容用标准 outliner |
 | 2026-02-12 | Default content 支持字段 tuple 和普通内容节点混合 | 与 Tana 一致（template 不仅有 field） |
-| 2026-02-12 | trashNode(tagDef) 级联清理所有引用节点 | 删除标签后，已打标签的节点自动移除标签和模板字段 |
+| 2026-02-12 | trashNode(tagDef) 级联清理所有引用节点（目标规格） | 作为未来目标行为，避免遗留悬挂引用 |
 | 2026-02-12 | 对比 Tana 官方文档补全遗漏功能清单 | 记录 Pinned/Optional/Convert/Batch/TitleExpr 等 |
 
 ## 当前状态
@@ -189,8 +190,9 @@
 - [x] 标签配置页（SYS_T01 渲染 + FieldList + OutlinerView）
 - [x] createTagDef 自动 applyTag(SYS_T01)
 - [x] Schema 面包屑导航
-- [x] Delete tag 按钮 + 级联清理
-- [x] Delete attrDef 级联清理（移除所有引用该字段的 tuple）
+- [x] Delete tag / Delete field 按钮（当前行为为 trashNode）
+- [ ] trashNode(tagDef) 级联清理（移除所有标签绑定与模板来源字段）
+- [ ] trashNode(attrDef) 级联清理（移除所有引用该字段的 tuple）
 - [ ] applyTag 复制 default content 中的普通节点
 - [ ] Show as Checkbox + Done state mapping
 - [ ] Default Child Supertag（真实 tag_picker）

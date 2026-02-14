@@ -92,6 +92,11 @@ PR / main push 会执行以下检查：
 npm run test:run
 ```
 
+说明：
+
+1. `tests/scripts/*.js`（DevTools evaluate_script 方案）已退役，不再作为回归入口。
+2. 自动化回归统一以 `tests/vitest/` 为唯一权威。
+
 ### 1.1 前置检查
 
 **测试文件**: `tests/vitest/preflight.test.ts`

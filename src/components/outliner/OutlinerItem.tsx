@@ -23,6 +23,7 @@ import {
   getNextVisibleNode,
   isOnlyInlineRef,
 } from '../../lib/tree-utils';
+import { resolveDropHoverPosition } from '../../lib/drag-drop-position';
 import { resolveDropMove } from '../../lib/drag-drop';
 import { resolveSelectedReferenceShortcut } from '../../lib/selected-reference-shortcuts';
 
@@ -921,16 +922,11 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       const rect = rowRef.current?.getBoundingClientRect();
       if (!rect) return;
 
-      const y = e.clientY - rect.top;
-      const third = rect.height / 3;
-
-      if (y < third) {
-        setDropTarget(nodeId, 'before');
-      } else if (y > third * 2) {
-        setDropTarget(nodeId, 'after');
-      } else {
-        setDropTarget(nodeId, 'inside');
-      }
+      const position = resolveDropHoverPosition({
+        offsetY: e.clientY - rect.top,
+        rowHeight: rect.height,
+      });
+      setDropTarget(nodeId, position);
     },
     [nodeId, dragNodeId, setDropTarget],
   );

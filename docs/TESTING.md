@@ -303,6 +303,15 @@ npm run test:run
 2. `ArrowUp/Down` 的 dropdown vs boundary 导航决策
 3. `Escape` 与 `Mod+Enter` 的 reference/hashTag 分支决策
 
+### 1.23 拖拽 hover 落点分区纯函数
+
+**测试文件**: `tests/vitest/drag-drop-position.test.ts`
+
+**覆盖点**:
+
+1. 目标行上中下三等分到 `before/inside/after` 的分区语义
+2. 非法高度（`<=0`）下的安全回退（`inside`）
+
 ---
 
 ## Phase 2: 视觉检查点
@@ -366,6 +375,7 @@ npm run test:run
 | 1.20 | TrailingInput onUpdate 决策纯函数 | PASS/FAIL |
 | 1.21 | TrailingInput 键盘导航决策纯函数 | PASS/FAIL |
 | 1.22 | NodeEditor 键盘决策纯函数 | PASS/FAIL |
+| 1.23 | 拖拽 hover 落点分区纯函数 | PASS/FAIL |
 | 2 | 视觉渲染 | PASS/FAIL/SKIP |
 | 3 | 扩展构建 | PASS/FAIL |
 

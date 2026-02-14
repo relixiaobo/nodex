@@ -107,6 +107,7 @@
 - `src/components/editor/TrailingInput.tsx`
 - `src/lib/editor-html.ts`
 - `src/lib/node-editor-shortcuts.ts`
+- `src/lib/drag-drop-position.ts`
 - `src/lib/trailing-input-actions.ts`
 - `src/lib/trailing-input-navigation.ts`
 - `src/lib/tree-utils.ts`

@@ -33,7 +33,8 @@
 - 中 1/3 => `inside`
 - 下 1/3 => `after`
 
-> 该判定后的“实际落点决策”已提炼为纯函数 `resolveDropMove()`，便于 Vitest 覆盖与回归锁定。
+> 判定逻辑已提炼为纯函数 `resolveDropHoverPosition()`；  
+> 判定后的“实际落点决策”提炼为 `resolveDropMove()`，便于 Vitest 覆盖与回归锁定。
 
 ## 放置规则
 
@@ -85,9 +86,11 @@
 ## 相关实现文件
 
 - `src/components/outliner/OutlinerItem.tsx`
+- `src/lib/drag-drop-position.ts`
 - `src/lib/drag-drop.ts`
 - `src/stores/ui-store.ts`
 - `src/stores/node-store.ts`
+- `tests/vitest/drag-drop-position.test.ts`
 - `tests/vitest/drag-drop-utils.test.ts`
 - `tests/vitest/node-store-move-node-to.test.ts`
 - `tests/vitest/ui-store-drag-state.test.ts`

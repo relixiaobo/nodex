@@ -8,7 +8,32 @@
 
 ## Open Bugs
 
-暂无
+### #49 Cmd+Enter 在编辑器内无法切换 Checkbox 状态
+
+**现象**: 在节点编辑器中按 Cmd+Enter 期望触发 checkbox 三态循环（无→未完成→已完成→无），但实际不生效（可能插入换行或无响应）。点击 checkbox 本身可以正常 toggle。
+
+**预期**: Cmd+Enter 在编辑器聚焦状态下应切换 checkbox 状态，与点击 checkbox 行为一致（仅操作方式不同）。
+
+**已尝试方案**:
+
+| # | 方案 | 结果 |
+|---|------|------|
+| 1 | `resolveNodeEditorForceCreateIntent` 返回 `toggle_done`，outlinerKeymap 调用 `onToggleDone` | 未生效 |
+| 2 | StarterKit `hardBreak: false` 禁用 Mod-Enter → `<br>` 拦截 | 未生效 |
+
+**相关代码**:
+- `src/components/editor/NodeEditor.tsx` — `outlinerKeymap` 的 `KEY_EDITOR_DROPDOWN_FORCE_CREATE` handler（L362-378）
+- `src/lib/node-editor-shortcuts.ts` — `resolveNodeEditorForceCreateIntent` 返回 `'toggle_done'`
+- `src/components/outliner/OutlinerItem.tsx` — `handleCycleCheckbox` → `cycleNodeCheckbox`
+- `src/stores/node-store.ts` — `cycleNodeCheckbox` action
+
+**可能根因**: Mod-Enter 在 TipTap 中可能被更早的 keymap（如 StarterKit 其他扩展）或浏览器默认行为拦截，导致 outlinerKeymap handler 未执行。需进一步排查 ProseMirror keymap 优先级链。
+
+**调试方向**:
+1. 在 `KEY_EDITOR_DROPDOWN_FORCE_CREATE` handler 入口加 `console.log` 确认是否被调用
+2. 检查 TipTap keymap 注册顺序（extensions 数组中 StarterKit vs outlinerKeymap）
+3. 检查 `Mod-Enter` 在 Mac 上是否被系统快捷键拦截（系统偏好设置）
+4. 验证 `getPrimaryShortcutKey('editor.dropdown_force_create', 'Mod-Enter')` 返回值是否正确
 
 ---
 

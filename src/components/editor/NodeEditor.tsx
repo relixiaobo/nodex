@@ -351,9 +351,11 @@ export function NodeEditor({
     if (refMatch && (state.hasUserEdited || state.referenceActive)) {
       state.referenceActive = true;
       const query = refMatch[1];
+      console.log('[DBG-trigger] @ref active, query=', query, 'hasUserEdited=', state.hasUserEdited);
       callbacksRef.current.onReference(query, caret - refMatch[0].length, caret);
     } else if (state.referenceActive) {
       state.referenceActive = false;
+      console.log('[DBG-trigger] @ref DEACTIVATED, text=', JSON.stringify(text), 'caret=', caret);
       callbacksRef.current.onReferenceDeactivate();
     }
 
@@ -406,6 +408,14 @@ export function NodeEditor({
       const intent = resolveNodeEditorEnterIntent({
         referenceActive: triggerStateRef.current.referenceActive,
         hashTagActive: triggerStateRef.current.hashActive,
+      });
+
+      console.log('[DBG-Enter]', {
+        intent,
+        triggerRef: triggerStateRef.current.referenceActive,
+        triggerHash: triggerStateRef.current.hashActive,
+        callbackRef: callbacksRef.current.referenceActive,
+        callbackHash: callbacksRef.current.hashTagActive,
       });
 
       if (intent === 'reference_confirm') {
@@ -475,7 +485,9 @@ export function NodeEditor({
           return;
         }
       }
-      const isEmpty = !(root?.textContent ?? '').replace(/\u200B/g, '').trim().length;
+      const rawText = root?.textContent ?? '';
+      const isEmpty = !rawText.replace(/\u200B/g, '').trim().length;
+      console.log('[DBG-Backspace]', { caret, hasSelection, isEmpty, rawText: JSON.stringify(rawText), rawLen: rawText.length });
       if (isEmpty) {
         callbacksRef.current.setNodeNameLocal(callbacksRef.current.nodeId, '');
         saveContent(readHtml());
@@ -518,6 +530,12 @@ export function NodeEditor({
         referenceActive: triggerStateRef.current.referenceActive,
         hashTagActive: triggerStateRef.current.hashActive,
         isAtBoundary: (caret ?? totalLen) >= totalLen,
+      });
+      console.log('[DBG-ArrowDown]', {
+        intent,
+        triggerRef: triggerStateRef.current.referenceActive,
+        triggerHash: triggerStateRef.current.hashActive,
+        caret, totalLen,
       });
       if (intent === 'reference_nav') {
         e.preventDefault();

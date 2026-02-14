@@ -95,6 +95,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   const [hashTagQuery, setHashTagQuery] = useState('');
   const [hashTagSelectedIndex, setHashTagSelectedIndex] = useState(0);
   const hashRangeRef = useRef<{ from: number; to: number }>({ from: 0, to: 0 });
+  const prevHashQueryRef = useRef('');
   const tagDropdownRef = useRef<TagDropdownHandle>(null);
   const applyTag = useNodeStore((s) => s.applyTag);
   const createTagDef = useNodeStore((s) => s.createTagDef);
@@ -111,6 +112,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   const [refQuery, setRefQuery] = useState('');
   const [refSelectedIndex, setRefSelectedIndex] = useState(0);
   const refRangeRef = useRef<{ from: number; to: number }>({ from: 0, to: 0 });
+  const prevRefQueryRef = useRef('');
   const refDropdownRef = useRef<ReferenceDropdownHandle>(null);
 
   // > trigger (fire-once: instantly creates field)
@@ -394,11 +396,13 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       // The editor content is '#' — set range to cover it
       setHashTagQuery('');
       setHashTagSelectedIndex(0);
+      prevHashQueryRef.current = '';
       hashRangeRef.current = { from: 0, to: 1 };
       setHashTagOpen(true);
     } else if (hint === '@') {
       setRefQuery('');
       setRefSelectedIndex(0);
+      prevRefQueryRef.current = '';
       refRangeRef.current = { from: 0, to: 1 };
       setRefOpen(true);
     }
@@ -421,9 +425,11 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     setHashTagOpen(false);
     setHashTagQuery('');
     setHashTagSelectedIndex(0);
+    prevHashQueryRef.current = '';
     setRefOpen(false);
     setRefQuery('');
     setRefSelectedIndex(0);
+    prevRefQueryRef.current = '';
 
     // Check pending ref conversion: if this is a temp node, decide revert or keep
     const pending = useUIStore.getState().pendingRefConversion;
@@ -653,13 +659,9 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
 
   const handleDelete = useCallback((): boolean => {
     if (!wsId || !userId) return false;
-    // Read current name from store — the closure's `node` may be stale
-    // because saveContent() updates the store synchronously before this runs.
-    // Strip HTML tags before checking: TipTap may save empty paragraphs as
-    // '<br>' or '<br class="ProseMirror-trailingBreak">' which are non-empty
-    // strings but represent visually empty content.
     const currentName = useNodeStore.getState().entities[nodeId]?.props.name ?? '';
-    const textOnly = currentName.replace(/<[^>]*>/g, '').trim();
+    const textOnly = currentName.replace(/<[^>]*>/g, '').replace(/\u200B/g, '').trim();
+    console.log('[DBG-handleDelete]', { nodeId, parentId, currentName: JSON.stringify(currentName), textOnly: JSON.stringify(textOnly), textOnlyLen: textOnly.length });
     if (textOnly.length > 0) return false;
 
     const flatList = getFlattenedVisibleNodes(rootChildIds, entities, expandedNodes, rootNodeId);
@@ -781,7 +783,12 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   const handleHashTag = useCallback((query: string, from: number, to: number) => {
     hashRangeRef.current = { from, to };
     setHashTagQuery(query);
-    setHashTagSelectedIndex(0);
+    // Only reset selection when query actually changes (evaluateTriggers fires on
+    // every keyUp, which would clobber arrow-key index changes otherwise).
+    if (query !== prevHashQueryRef.current) {
+      prevHashQueryRef.current = query;
+      setHashTagSelectedIndex(0);
+    }
     if (!hashTagOpen) setHashTagOpen(true);
   }, [hashTagOpen, nodeId]);
 
@@ -789,6 +796,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     setHashTagOpen(false);
     setHashTagQuery('');
     setHashTagSelectedIndex(0);
+    prevHashQueryRef.current = '';
   }, [nodeId]);
 
   /** Delete #query text from editor, save corrected content, refocus.
@@ -814,11 +822,15 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       ?? (hashRangeRef.current.from < hashRangeRef.current.to
         ? hashRangeRef.current
         : null);
+    console.log('[DBG-hashCleanup]', { text: JSON.stringify(text), caret, range, hashRangeRef: hashRangeRef.current });
     if (range) {
       ed.deleteTextRange(range);
     }
+    const afterText = ed.getText();
+    const afterHtml = ed.getHTML();
+    console.log('[DBG-hashCleanup-after]', { afterText: JSON.stringify(afterText), afterHtml: JSON.stringify(afterHtml) });
 
-    if (userId) updateNodeName(nodeId, ed.getHTML(), userId);
+    if (userId) updateNodeName(nodeId, afterHtml, userId);
   }, [nodeId, userId, updateNodeName]);
 
   const handleHashTagSelect = useCallback(
@@ -829,6 +841,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       setHashTagOpen(false);
       setHashTagQuery('');
       setHashTagSelectedIndex(0);
+      prevHashQueryRef.current = '';
     },
     [nodeId, wsId, userId, applyTag, cleanupHashTagText],
   );
@@ -842,6 +855,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       setHashTagOpen(false);
       setHashTagQuery('');
       setHashTagSelectedIndex(0);
+      prevHashQueryRef.current = '';
     },
     [nodeId, wsId, userId, createTagDef, applyTag, cleanupHashTagText],
   );
@@ -849,6 +863,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   // Keyboard forwarding: confirm selected item in dropdown
   const handleHashTagConfirm = useCallback(() => {
     const item = tagDropdownRef.current?.getSelectedItem();
+    console.log('[DBG-hashConfirm]', { item, tagDropdownRef: !!tagDropdownRef.current, itemCount: tagDropdownRef.current?.getItemCount() });
     if (!item) return;
     if (item.type === 'existing') {
       handleHashTagSelect(item.id);
@@ -883,6 +898,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     setHashTagOpen(false);
     setHashTagQuery('');
     setHashTagSelectedIndex(0);
+    prevHashQueryRef.current = '';
   }, []);
 
   // ─── > field trigger (fire-once: instantly creates unnamed field) ───
@@ -900,7 +916,12 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   const handleReference = useCallback((query: string, from: number, to: number) => {
     refRangeRef.current = { from, to };
     setRefQuery(query);
-    setRefSelectedIndex(0);
+    // Only reset selection when query actually changes (evaluateTriggers fires on
+    // every keyUp, which would clobber arrow-key index changes otherwise).
+    if (query !== prevRefQueryRef.current) {
+      prevRefQueryRef.current = query;
+      setRefSelectedIndex(0);
+    }
     if (!refOpen) setRefOpen(true);
   }, [refOpen]);
 
@@ -908,6 +929,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     setRefOpen(false);
     setRefQuery('');
     setRefSelectedIndex(0);
+    prevRefQueryRef.current = '';
   }, []);
 
   const handleReferenceSelect = useCallback(
@@ -964,6 +986,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       setRefOpen(false);
       setRefQuery('');
       setRefSelectedIndex(0);
+      prevRefQueryRef.current = '';
     },
     [
       nodeId,
@@ -993,6 +1016,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
 
   const handleReferenceConfirm = useCallback(() => {
     const item = refDropdownRef.current?.getSelectedItem();
+    console.log('[DBG-refConfirm]', { item, refDropdownRef: !!refDropdownRef.current, itemCount: refDropdownRef.current?.getItemCount() });
     if (!item) return;
     if (item.type === 'existing') {
       handleReferenceSelect(item.id);
@@ -1023,6 +1047,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     setRefOpen(false);
     setRefQuery('');
     setRefSelectedIndex(0);
+    prevRefQueryRef.current = '';
   }, []);
 
   // ─── Drag and drop handlers ───

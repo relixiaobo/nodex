@@ -9,7 +9,7 @@
  * |---------------|-------------|---------------------------------|
  * | `undefined`   | No checkbox | Normal text, no checkbox shown  |
  * | `0`           | Undone      | Empty checkbox, normal text     |
- * | `> 0` (ts)    | Done        | Green check, strikethrough text |
+ * | `> 0` (ts)    | Done        | Green check, dimmed text        |
  *
  * `_done = 0` is a sentinel: epoch-zero is never a valid completion time,
  * so it safely encodes "has checkbox, not yet done".

@@ -87,9 +87,42 @@ interface UIStore {
   navRedo(): void;
 }
 
+export interface PersistedUIStoreState {
+  panelHistory: string[];
+  panelIndex: number;
+  expandedNodes: Set<string>;
+  sidebarOpen: boolean;
+  viewMode: 'list' | 'table' | 'tiles' | 'cards';
+}
+
 /** Stable selector for the current (top) node ID. */
 export const selectCurrentNodeId = (s: UIStore): string | null =>
   s.panelHistory[s.panelIndex] ?? null;
+
+export function partializeUIStore(state: UIStore): PersistedUIStoreState {
+  return {
+    panelHistory: state.panelHistory,
+    panelIndex: state.panelIndex,
+    expandedNodes: state.expandedNodes,
+    sidebarOpen: state.sidebarOpen,
+    viewMode: state.viewMode,
+  };
+}
+
+export function migrateUIStoreState(persisted: unknown, version: number): unknown {
+  if (version === 0) {
+    const old = persisted as { panelStack?: string[] };
+    if (old.panelStack) {
+      return {
+        ...old,
+        panelHistory: old.panelStack,
+        panelIndex: old.panelStack.length - 1,
+        panelStack: undefined,
+      };
+    }
+  }
+  return persisted;
+}
 
 export const useUIStore = create<UIStore>()(
   persist(
@@ -251,28 +284,9 @@ export const useUIStore = create<UIStore>()(
       name: 'nodex-ui',
       version: 1,
       storage: chromeLocalStorage,
-      partialize: (state) => ({
-        panelHistory: state.panelHistory,
-        panelIndex: state.panelIndex,
-        expandedNodes: state.expandedNodes,
-        sidebarOpen: state.sidebarOpen,
-        viewMode: state.viewMode,
-      }),
+      partialize: partializeUIStore,
       // Migrate from old panelStack format to new history model
-      migrate: (persisted: unknown, version: number) => {
-        if (version === 0) {
-          const old = persisted as { panelStack?: string[] };
-          if (old.panelStack) {
-            return {
-              ...old,
-              panelHistory: old.panelStack,
-              panelIndex: old.panelStack.length - 1,
-              panelStack: undefined,
-            };
-          }
-        }
-        return persisted;
-      },
+      migrate: migrateUIStoreState,
     },
   ),
 );

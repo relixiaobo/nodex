@@ -324,6 +324,15 @@ npm run test:run
 2. 返回值必须来自 `TAG_COLORS` 调色板
 3. 多个 tagDefId 的分布不应退化为单一颜色
 
+### 1.25 UI Store 当前面板选择器
+
+**测试文件**: `tests/vitest/ui-store-selector.test.ts`
+
+**覆盖点**:
+
+1. panelIndex 越界时返回 `null`
+2. panelIndex 命中时返回当前 panel nodeId
+
 ---
 
 ## Phase 2: 视觉检查点
@@ -389,6 +398,7 @@ npm run test:run
 | 1.22 | NodeEditor 键盘决策纯函数 | PASS/FAIL |
 | 1.23 | 拖拽 hover 落点分区纯函数 | PASS/FAIL |
 | 1.24 | Tag 颜色映射稳定性 | PASS/FAIL |
+| 1.25 | UI Store 当前面板选择器 | PASS/FAIL |
 | 2 | 视觉渲染 | PASS/FAIL/SKIP |
 | 3 | 扩展构建 | PASS/FAIL |
 

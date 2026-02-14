@@ -425,19 +425,37 @@ npm run test:run
 3. 空 undo/redo 栈下 `navUndo/navRedo` no-op
 4. 空历史下 `replacePanel` 的初始化行为
 
-### 1.32 Checkbox 可见性与 Done 状态
+### 1.32 Checkbox 三态模型与 Done 状态
 
 **测试文件**: `tests/vitest/checkbox-utils.test.ts`
 
 **覆盖点**:
 
+shouldNodeShowCheckbox（7 cases）:
 1. 无标签节点 → showCheckbox=false
 2. 有标签但 SYS_A55=NO → showCheckbox=false
-3. 有标签且 SYS_A55=YES → showCheckbox=true
-4. 无标签但 _done 有值 → showCheckbox=true（手动 Cmd+Enter 场景）
-5. 标签 SYS_A55=YES + _done 有值 → 双 true
-6. 不存在的节点 → 安全回退
-7. `toggleNodeDone` store action 的 toggle 语义
+3. 有标签且 SYS_A55=YES → showCheckbox=true, isDone=false
+4. 标签 SYS_A55=YES + `_done>0` → showCheckbox=true, isDone=true
+5. `_done=0`（手动 undone）→ showCheckbox=true, isDone=false
+6. `_done>0`（手动 done）→ showCheckbox=true, isDone=true
+7. 不存在的节点 → 安全回退
+
+resolveCheckboxClick（4 cases）:
+8. undone→done（manual）: 返回 timestamp
+9. done→undone=0（manual）: 保留 checkbox
+10. undone→done（tag-driven）: 返回 timestamp
+11. done→undefined（tag-driven）: tag 保持 checkbox
+
+resolveCmdEnterCycle（5 cases）:
+12. manual: No→Undone(0)
+13. manual: Undone→Done(timestamp)
+14. manual: Done→No(undefined)
+15. tag-driven: undone→done
+16. tag-driven: done→undone(undefined)
+
+Store integration（2 cases）:
+17. `toggleNodeDone` click toggle undone↔done
+18. `cycleNodeCheckbox` 3-state cycle for manual nodes
 
 ### 1.33 Workspace Store 认证状态与持久化
 

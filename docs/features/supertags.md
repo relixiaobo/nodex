@@ -70,14 +70,36 @@
 
 ### Show as Checkbox — 已实现
 
-- tagDef 配置中开启 "Show as Checkbox" → SYS_A55 = SYS_V03
-- 被该标签标记的节点在 bullet 位置显示 checkbox（替换 BulletChevron）
-- 勾选 checkbox → 设置节点 `props._done = Date.now()`（毫秒时间戳）
-- 取消勾选 → 清空节点 `props._done`
-- Done 视觉状态：文本 strikethrough + dimmed（`line-through text-foreground/50`）
-- 编辑器内 Cmd+Enter 可 toggle done 状态（无需点击 checkbox）
-- 无标签但 `_done` 有值时也显示 checkbox（手动 Cmd+Enter 场景）
-- **Done state mapping**（Tana 高级，未实现）: checkbox 状态可双向映射到特定字段值
+**三态模型**（`_done` 编码）:
+
+| `_done` 值 | 状态 | 视觉 |
+|------------|------|------|
+| `undefined` | 无 checkbox | 正常文本，不显示 checkbox |
+| `0` | Undone | 空 checkbox，正常文本 |
+| `> 0` (timestamp) | Done | 绿色勾选，strikethrough + dimmed 文本 |
+
+`_done = 0` 是哨兵值：epoch-zero 不是合法完成时间，安全表达"有 checkbox 但未完成"。
+
+**可见性规则**:
+- tagDef 配置中 SYS_A55 = SYS_V03 → 被该标签标记的节点自动显示 checkbox（tag-driven）
+- `_done !== undefined` → 显示 checkbox（manual，通过 Cmd+Enter 添加）
+
+**布局**: checkbox 位于 bullet 和文本之间（`[chevron][bullet][checkbox][text]`），不替换 bullet
+
+**Click 行为**（点击 checkbox）:
+- 仅 toggle undone ↔ done，永远不移除 checkbox
+- Tag-driven: done → `_done=undefined`（tag 保持 checkbox 可见），undone → `_done=Date.now()`
+- Manual: done → `_done=0`（保留 checkbox），undone → `_done=Date.now()`
+
+**Cmd+Enter 行为**:
+- Manual 节点: 三态循环 No → Undone → Done → No（`undefined → 0 → timestamp → undefined`）
+- Tag-driven 节点: 二态 toggle undone ↔ done（tag 始终保持 checkbox 可见）
+
+**Done 视觉**: `line-through text-foreground/50`（strikethrough + dimmed）
+
+**未实现**:
+- Done state mapping（checkbox ↔ Options 字段双向映射）
+- 批量操作（需多选功能）
 
 ### Default Child Supertag — 未实现
 

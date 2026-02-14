@@ -222,40 +222,41 @@ export function NodeEditor({
     }
   }
 
-  const callbacksRef = useRef({
-    onEnter,
-    onBackspaceAtStart: onBackspaceAtStart ?? (() => false),
-    onIndent,
-    onOutdent,
-    onDelete,
-    onArrowUp,
-    onArrowDown,
-    onMoveUp,
-    onMoveDown,
-    setNodeNameLocal,
-    nodeId,
-    hashTagActive: hashTagActive ?? false,
-    onHashTagConfirm: onHashTagConfirm ?? (() => {}),
-    onHashTagNavDown: onHashTagNavDown ?? (() => {}),
-    onHashTagNavUp: onHashTagNavUp ?? (() => {}),
-    onHashTagCreate: onHashTagCreate ?? (() => {}),
-    onHashTagClose: onHashTagClose ?? (() => {}),
-    referenceActive: referenceActive ?? false,
-    onReferenceConfirm: onReferenceConfirm ?? (() => {}),
-    onReferenceNavDown: onReferenceNavDown ?? (() => {}),
-    onReferenceNavUp: onReferenceNavUp ?? (() => {}),
-    onReferenceCreate: onReferenceCreate ?? (() => {}),
-    onReferenceClose: onReferenceClose ?? (() => {}),
-    onDescriptionEdit: onDescriptionEdit ?? (() => {}),
-    onToggleDone: onToggleDone ?? (() => {}),
-    onInlineReferenceClick: onInlineReferenceClick ?? (() => {}),
-    onFieldTriggerFire: onFieldTriggerFire ?? (() => {}),
-    onHashTag: onHashTag ?? (() => {}),
-    onHashTagDeactivate: onHashTagDeactivate ?? (() => {}),
-    onReference: onReference ?? (() => {}),
-    onReferenceDeactivate: onReferenceDeactivate ?? (() => {}),
-  });
-
+  // Mutable ref updated every render — avoids stale closures in event handlers.
+  const noop = (() => {}) as () => void;
+  const callbacksRef = useRef<{
+    onEnter: typeof onEnter;
+    onBackspaceAtStart: NonNullable<typeof onBackspaceAtStart>;
+    onIndent: typeof onIndent;
+    onOutdent: typeof onOutdent;
+    onDelete: typeof onDelete;
+    onArrowUp: typeof onArrowUp;
+    onArrowDown: typeof onArrowDown;
+    onMoveUp: typeof onMoveUp;
+    onMoveDown: typeof onMoveDown;
+    setNodeNameLocal: typeof setNodeNameLocal;
+    nodeId: string;
+    hashTagActive: boolean;
+    onHashTagConfirm: () => void;
+    onHashTagNavDown: () => void;
+    onHashTagNavUp: () => void;
+    onHashTagCreate: () => void;
+    onHashTagClose: () => void;
+    referenceActive: boolean;
+    onReferenceConfirm: () => void;
+    onReferenceNavDown: () => void;
+    onReferenceNavUp: () => void;
+    onReferenceCreate: () => void;
+    onReferenceClose: () => void;
+    onDescriptionEdit: () => void;
+    onToggleDone: () => void;
+    onInlineReferenceClick: (refNodeId: string) => void;
+    onFieldTriggerFire: () => void;
+    onHashTag: (query: string, from: number, to: number) => void;
+    onHashTagDeactivate: () => void;
+    onReference: (query: string, from: number, to: number) => void;
+    onReferenceDeactivate: () => void;
+  }>(null!);
   callbacksRef.current = {
     onEnter,
     onBackspaceAtStart: onBackspaceAtStart ?? (() => false),
@@ -269,25 +270,25 @@ export function NodeEditor({
     setNodeNameLocal,
     nodeId,
     hashTagActive: hashTagActive ?? false,
-    onHashTagConfirm: onHashTagConfirm ?? (() => {}),
-    onHashTagNavDown: onHashTagNavDown ?? (() => {}),
-    onHashTagNavUp: onHashTagNavUp ?? (() => {}),
-    onHashTagCreate: onHashTagCreate ?? (() => {}),
-    onHashTagClose: onHashTagClose ?? (() => {}),
+    onHashTagConfirm: onHashTagConfirm ?? noop,
+    onHashTagNavDown: onHashTagNavDown ?? noop,
+    onHashTagNavUp: onHashTagNavUp ?? noop,
+    onHashTagCreate: onHashTagCreate ?? noop,
+    onHashTagClose: onHashTagClose ?? noop,
     referenceActive: referenceActive ?? false,
-    onReferenceConfirm: onReferenceConfirm ?? (() => {}),
-    onReferenceNavDown: onReferenceNavDown ?? (() => {}),
-    onReferenceNavUp: onReferenceNavUp ?? (() => {}),
-    onReferenceCreate: onReferenceCreate ?? (() => {}),
-    onReferenceClose: onReferenceClose ?? (() => {}),
-    onDescriptionEdit: onDescriptionEdit ?? (() => {}),
-    onToggleDone: onToggleDone ?? (() => {}),
-    onInlineReferenceClick: onInlineReferenceClick ?? (() => {}),
-    onFieldTriggerFire: onFieldTriggerFire ?? (() => {}),
-    onHashTag: onHashTag ?? (() => {}),
-    onHashTagDeactivate: onHashTagDeactivate ?? (() => {}),
-    onReference: onReference ?? (() => {}),
-    onReferenceDeactivate: onReferenceDeactivate ?? (() => {}),
+    onReferenceConfirm: onReferenceConfirm ?? noop,
+    onReferenceNavDown: onReferenceNavDown ?? noop,
+    onReferenceNavUp: onReferenceNavUp ?? noop,
+    onReferenceCreate: onReferenceCreate ?? noop,
+    onReferenceClose: onReferenceClose ?? noop,
+    onDescriptionEdit: onDescriptionEdit ?? noop,
+    onToggleDone: onToggleDone ?? noop,
+    onInlineReferenceClick: onInlineReferenceClick ?? noop,
+    onFieldTriggerFire: onFieldTriggerFire ?? noop,
+    onHashTag: onHashTag ?? noop,
+    onHashTagDeactivate: onHashTagDeactivate ?? noop,
+    onReference: onReference ?? noop,
+    onReferenceDeactivate: onReferenceDeactivate ?? noop,
   };
 
   const triggerStateRef = useRef({
@@ -384,7 +385,10 @@ export function NodeEditor({
   }, []);
 
   const handleKeyDown = useCallback((e: ReactKeyboardEvent<HTMLDivElement>) => {
-    if (composingRef.current || e.nativeEvent.isComposing || e.key === 'Process') return;
+    // Use only the event-level isComposing flag — composingRef.current can be
+    // stale-true (macOS triggers compositionStart on first keystroke in fresh
+    // contentEditable; Enter before compositionEnd would be wrongly blocked).
+    if (e.nativeEvent.isComposing || e.key === 'Process') return;
 
     if (matchesShortcutEvent(e.nativeEvent, KEY_EDITOR_DROPDOWN_FORCE_CREATE)) {
       e.preventDefault();
@@ -740,7 +744,7 @@ export function NodeEditor({
     <div className="editor-inline">
       <div
         ref={rootRef}
-        className="tiptap outline-none text-sm leading-[21px] min-w-[1px]"
+        className="outline-none text-sm leading-[21px] min-w-[1px]"
         contentEditable
         suppressContentEditableWarning
         onKeyDown={handleKeyDown}

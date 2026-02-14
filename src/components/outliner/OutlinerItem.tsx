@@ -27,6 +27,7 @@ import { resolveDropHoverPosition } from '../../lib/drag-drop-position';
 import { resolveDropMove } from '../../lib/drag-drop';
 import { resolveSelectedReferenceShortcut } from '../../lib/selected-reference-shortcuts';
 import type { NodeEditorHandle } from '../editor/editor-handle';
+import { findHashTriggerRange } from '../../lib/trigger-cleanup.js';
 
 /** Field types that accept only a single value node. Enter navigates out instead of creating siblings. */
 const SINGLE_VALUE_FIELD_TYPES: Set<string> = new Set([
@@ -790,60 +791,32 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     setHashTagSelectedIndex(0);
   }, [nodeId]);
 
-  /** Delete #query text from editor, save corrected content, refocus */
+  /** Delete #query text from editor, save corrected content, refocus.
+   *
+   * Single-transaction approach: read text+caret once, regex-find the trigger
+   * token, compute {from,to}, write back atomically. No stale-ref fallbacks.
+   */
   const cleanupHashTagText = useCallback(() => {
     const ed = editorRef.current;
-    if (ed) {
-      let { from, to } = hashRangeRef.current;
-      const beforeText = ed.getText();
-      const caret = ed.getCaretOffset() ?? beforeText.length;
-      const beforeCaret = beforeText.slice(0, caret);
-      const activeMatch = beforeCaret.match(/#([^\s#@]*)$/u);
-      if (activeMatch) {
-        from = caret - activeMatch[0].length;
-        to = caret;
-      } else if (from < 0 || to > beforeText.length || from >= to || beforeText.slice(from, to).indexOf('#') !== 0) {
-        const token = `#${hashTagQuery}`;
-        const fallback = token.length > 1 ? beforeText.lastIndexOf(token) : beforeText.lastIndexOf('#');
-        if (fallback >= 0) {
-          from = fallback;
-          to = fallback + (token.length || 1);
-        }
+    if (!ed) {
+      // No editor handle (edge case: unmounted) — strip from stored name
+      if (userId) {
+        const currentName = useNodeStore.getState().entities[nodeId]?.props.name ?? '';
+        const fallbackText = htmlToPlainText(currentName).replace(/#([^\s#@]*)$/u, '');
+        updateNodeName(nodeId, fallbackText, userId);
       }
-      if (from < 0 || to > beforeText.length || from >= to || beforeText.slice(from, to).indexOf('#') !== 0) {
-        const regex = /#([^\s#@]*)/gu;
-        let lastMatch: RegExpMatchArray | null = null;
-        for (const match of beforeText.matchAll(regex)) {
-          lastMatch = match;
-        }
-        if (lastMatch && typeof lastMatch.index === 'number') {
-          from = lastMatch.index;
-          to = lastMatch.index + lastMatch[0].length;
-        }
-      }
-      if (from >= 0 && to > from && to <= beforeText.length) {
-        ed.deleteTextRange({ from, to });
-      }
-      const afterText = ed.getText();
-      if (afterText === beforeText) {
-        if (from >= 0 && to > from && to <= beforeText.length) {
-          const forcedText = beforeText.slice(0, from) + beforeText.slice(to);
-          ed.setPlainText(forcedText, from);
-        } else {
-          const hashPos = beforeText.lastIndexOf('#');
-          if (hashPos >= 0) {
-            const forcedText = beforeText.slice(0, hashPos) + beforeText.slice(hashPos + 1);
-            ed.setPlainText(forcedText, hashPos);
-          }
-        }
-      }
-      if (userId) updateNodeName(nodeId, ed.getHTML(), userId);
-    } else if (userId) {
-      const currentName = useNodeStore.getState().entities[nodeId]?.props.name ?? '';
-      const fallbackText = htmlToPlainText(currentName).replace(/#([^\s#@]*)$/u, '');
-      updateNodeName(nodeId, fallbackText, userId);
+      return;
     }
-  }, [hashTagQuery, nodeId, userId, updateNodeName]);
+
+    const text = ed.getText();
+    const caret = ed.getCaretOffset() ?? text.length;
+    const range = findHashTriggerRange(text, caret);
+    if (range) {
+      ed.deleteTextRange(range);
+    }
+
+    if (userId) updateNodeName(nodeId, ed.getHTML(), userId);
+  }, [nodeId, userId, updateNodeName]);
 
   const handleHashTagSelect = useCallback(
     (tagDefId: string) => {

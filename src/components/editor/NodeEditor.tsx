@@ -427,6 +427,7 @@ export function NodeEditor({
       blockquote: false,
       codeBlock: false,
       horizontalRule: false,
+      hardBreak: false, // Nodes are single-line; also frees Mod-Enter for checkbox toggle
     }),
     ItalicNoShortcut,
     Highlight,

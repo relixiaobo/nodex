@@ -18,8 +18,8 @@ export interface NodeSearchResult {
 
 /** System doc types to skip in search results */
 const SKIP_DOC_TYPES = new Set([
-  'tuple', 'metanode', 'associatedData', 'tagDefinition',
-  'attributeDefinition', 'workspace', 'user',
+  'tuple', 'metanode', 'associatedData', 'tagDef',
+  'attrDef', 'workspace', 'user',
 ]);
 
 export function useNodeSearch(query: string, excludeId?: string): NodeSearchResult[] {

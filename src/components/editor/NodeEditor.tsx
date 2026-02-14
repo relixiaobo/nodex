@@ -369,8 +369,8 @@ export function NodeEditor({
 
   const runForceCreateShortcut = useCallback(() => {
     const intent = resolveNodeEditorForceCreateIntent(
-      callbacksRef.current.referenceActive,
-      callbacksRef.current.hashTagActive,
+      triggerStateRef.current.referenceActive,
+      triggerStateRef.current.hashActive,
     );
     if (intent === 'reference_create') {
       callbacksRef.current.onReferenceCreate();
@@ -399,9 +399,13 @@ export function NodeEditor({
     if (matchesShortcutEvent(e.nativeEvent, KEY_EDITOR_ENTER)) {
       e.preventDefault();
 
+      // Read trigger state from mutable ref (updated synchronously in
+      // evaluateTriggers) rather than callbacksRef (updated via React prop
+      // after render). This avoids a one-render-cycle lag where the prop is
+      // still false when the user presses Enter immediately after typing @/#.
       const intent = resolveNodeEditorEnterIntent({
-        referenceActive: callbacksRef.current.referenceActive,
-        hashTagActive: callbacksRef.current.hashTagActive,
+        referenceActive: triggerStateRef.current.referenceActive,
+        hashTagActive: triggerStateRef.current.hashActive,
       });
 
       if (intent === 'reference_confirm') {
@@ -471,7 +475,7 @@ export function NodeEditor({
           return;
         }
       }
-      const isEmpty = !(root?.textContent ?? '').trim().length;
+      const isEmpty = !(root?.textContent ?? '').replace(/\u200B/g, '').trim().length;
       if (isEmpty) {
         callbacksRef.current.setNodeNameLocal(callbacksRef.current.nodeId, '');
         saveContent(readHtml());
@@ -485,8 +489,8 @@ export function NodeEditor({
       const root = rootRef.current;
       const caret = root ? getCaretOffset(root) : null;
       const intent = resolveNodeEditorArrowIntent({
-        referenceActive: callbacksRef.current.referenceActive,
-        hashTagActive: callbacksRef.current.hashTagActive,
+        referenceActive: triggerStateRef.current.referenceActive,
+        hashTagActive: triggerStateRef.current.hashActive,
         isAtBoundary: (caret ?? 0) <= 0,
       });
       if (intent === 'reference_nav') {
@@ -511,8 +515,8 @@ export function NodeEditor({
       const totalLen = (root?.textContent ?? '').length;
       const caret = root ? getCaretOffset(root) : null;
       const intent = resolveNodeEditorArrowIntent({
-        referenceActive: callbacksRef.current.referenceActive,
-        hashTagActive: callbacksRef.current.hashTagActive,
+        referenceActive: triggerStateRef.current.referenceActive,
+        hashTagActive: triggerStateRef.current.hashActive,
         isAtBoundary: (caret ?? totalLen) >= totalLen,
       });
       if (intent === 'reference_nav') {
@@ -534,8 +538,8 @@ export function NodeEditor({
 
     if (matchesShortcutEvent(e.nativeEvent, KEY_EDITOR_ESCAPE)) {
       const intent = resolveNodeEditorEscapeIntent(
-        callbacksRef.current.referenceActive,
-        callbacksRef.current.hashTagActive,
+        triggerStateRef.current.referenceActive,
+        triggerStateRef.current.hashActive,
       );
       if (intent === 'reference_close') {
         e.preventDefault();

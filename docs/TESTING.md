@@ -457,29 +457,7 @@ Store integration（2 cases）:
 17. `toggleNodeDone` click toggle undone↔done
 18. `cycleNodeCheckbox` 3-state cycle for manual nodes
 
-### 1.33 触发词清理（Trigger Cleanup）
-
-**测试文件**: `tests/vitest/trigger-cleanup.test.ts`
-
-**覆盖点**:
-
-findHashTriggerRange（8 cases）:
-1. `#query` 在 caret 位置命中（主路径）
-2. 裸 `#` 空 query 命中
-3. 文本中间的 `#query` 在 caret 处命中
-4. 无 `#` 时返回 null
-5. 紧邻文字的 `#` 仍然匹配（`hello#world`）
-6. caret 已离开触发位置 → fallback 找最后一个 `#token`
-7. 多个 `#` token → fallback 选最后一个
-8. `@` 与 `#` 混合场景
-
-findRefTriggerRange（4 cases）:
-9. `@query` 在 caret 位置命中
-10. 裸 `@` 命中
-11. 无 `@` 返回 null
-12. caret 离开 → fallback
-
-### 1.34 Editor isEmpty / handleDelete 零宽空格 + Hash Cleanup Safety
+### 1.33 Editor isEmpty / handleDelete 零宽空格 + Hash Cleanup Safety
 
 **测试文件**: `tests/vitest/editor-isEmpty.test.ts`
 
@@ -501,7 +479,7 @@ hash trigger cleanup safety（2 cases, Bug #53 回归）:
 9. DOM cleanup 失败后检测残留 `#` 触发词
 10. DOM cleanup 成功后无残留
 
-### 1.35 节点搜索 SKIP_DOC_TYPES 过滤
+### 1.34 节点搜索 SKIP_DOC_TYPES 过滤
 
 **测试文件**: `tests/vitest/node-search-filter.test.ts`
 
@@ -512,7 +490,7 @@ hash trigger cleanup safety（2 cases, Bug #53 回归）:
 3. `tuple` / `metanode` 节点被过滤
 4. 普通内容节点正常返回
 
-### 1.36 Workspace Store 认证状态与持久化（原 1.33）
+### 1.35 Workspace Store 认证状态与持久化
 
 **测试文件**: `tests/vitest/workspace-store.test.ts`
 
@@ -595,10 +573,9 @@ hash trigger cleanup safety（2 cases, Bug #53 回归）:
 | 1.30 | Supabase Service 生命周期 | PASS/FAIL |
 | 1.31 | UI Store 历史边界保护 | PASS/FAIL |
 | 1.32 | Checkbox 可见性与 Done 状态 | PASS/FAIL |
-| 1.33 | 触发词清理（Trigger Cleanup） | PASS/FAIL |
-| 1.34 | Editor isEmpty 零宽空格 | PASS/FAIL |
-| 1.35 | 节点搜索 SKIP_DOC_TYPES 过滤 | PASS/FAIL |
-| 1.36 | Workspace Store 认证状态与持久化 | PASS/FAIL |
+| 1.33 | Editor isEmpty 零宽空格 | PASS/FAIL |
+| 1.34 | 节点搜索 SKIP_DOC_TYPES 过滤 | PASS/FAIL |
+| 1.35 | Workspace Store 认证状态与持久化 | PASS/FAIL |
 | 2 | 视觉渲染 | PASS/FAIL/SKIP |
 | 3 | 扩展构建 | PASS/FAIL |
 

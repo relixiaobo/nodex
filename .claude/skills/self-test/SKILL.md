@@ -38,22 +38,28 @@ npm run typecheck
 
 ## Phase 1: Vitest 自动化回归（主流程）
 
-1. 执行：
+1. 先执行测试同步守卫：
+
+```bash
+npm run check:test-sync
+```
+
+2. 再执行：
 
 ```bash
 npm run test:run
 ```
 
-2. 结果要求：
+3. 结果要求：
 - 所有测试文件 PASS
 - 无 flaky 重跑依赖
 
-3. 执行规范：
+4. 执行规范：
 - 优先新增/维护 `tests/vitest/` 下的测试
 - store、lib、纯函数逻辑必须优先由 Vitest 覆盖
 - 不再以 DevTools 页面脚本作为主回归手段
 
-4. 失败处理：
+5. 失败处理：
 - 报告失败测试文件、测试名、断言差异
 - 给出最小修复建议
 - 修复后必须重新执行 Phase 1
@@ -114,3 +120,9 @@ npm run build
 3. 每个缺陷修复至少补一个回归 case（issue-driven）
 4. 若新增了重要套件，更新 `docs/TESTING.md` 的 Phase 1 清单
 5. 仅当无法自动化时，把人工项写入 `docs/MANUAL-TEST-CHECKLIST.md`
+
+## 强制同步规则（新增）
+
+1. 改动 `src/` 代码后，必须同步改动 `tests/vitest/*.test.ts`（新增或更新均可）。
+2. 改动 `tests/vitest/` 后，必须同步更新 `docs/TESTING.md` 的覆盖映射。
+3. 执行 `npm run check:test-sync`，若失败必须先修复再继续。

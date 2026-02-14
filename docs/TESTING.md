@@ -10,6 +10,18 @@
 
 ---
 
+## 一键验证
+
+统一命令：
+
+```bash
+npm run verify
+```
+
+执行顺序：`typecheck` → `check:test-sync` → `test:run` → `build`
+
+---
+
 ## CI 门禁
 
 GitHub Actions 工作流：`.github/workflows/ci.yml`
@@ -18,8 +30,18 @@ PR / main push 会执行以下检查：
 
 1. `npm ci`
 2. `npm run typecheck`
-3. `npm run test:run`
-4. `npm run build`
+3. `npm run check:test-sync`
+4. `npm run test:run`
+5. `npm run build`
+
+### Test Sync Gate（新增）
+
+命令：`npm run check:test-sync`
+
+规则：
+
+1. 若改动了 `src/`，必须同时改动 `tests/vitest/*.test.ts`
+2. 若改动了 `tests/vitest/`，必须同时更新 `docs/TESTING.md`
 
 ---
 

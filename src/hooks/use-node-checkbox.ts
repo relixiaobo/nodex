@@ -16,8 +16,9 @@ export function useNodeCheckbox(nodeId: string): CheckboxState {
     const node = s.entities[nodeId];
     if (!node) return '';
 
-    // Collect relevant data: _done, metanode children, and tagDef config tuples
-    const parts: string[] = [node.props._done ? '1' : '0'];
+    // Collect relevant data: _done (3 states), metanode children, tagDef config tuples
+    // Must distinguish undefined / 0 / >0 for the three-state checkbox model
+    const parts: string[] = [String(node.props._done ?? 'x')];
 
     const metaId = node.props._metaNodeId;
     if (metaId) {

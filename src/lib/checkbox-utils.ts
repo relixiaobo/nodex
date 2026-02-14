@@ -1,9 +1,30 @@
 /**
- * Pure functions for checkbox visibility and done-state derivation.
+ * Pure functions for checkbox visibility, done-state, and state transitions.
  *
- * A node shows a checkbox when:
- * 1. Any of its supertags has SYS_A55 (SHOW_CHECKBOX) = SYS_V03 (YES), OR
- * 2. The node's _done prop is set (manual toggle via Cmd+Enter).
+ * ## Three-state model
+ *
+ * Each node has one of three checkbox states:
+ *
+ * | `_done` value | State       | Visual                          |
+ * |---------------|-------------|---------------------------------|
+ * | `undefined`   | No checkbox | Normal text, no checkbox shown  |
+ * | `0`           | Undone      | Empty checkbox, normal text     |
+ * | `> 0` (ts)    | Done        | Green check, strikethrough text |
+ *
+ * `_done = 0` is a sentinel: epoch-zero is never a valid completion time,
+ * so it safely encodes "has checkbox, not yet done".
+ *
+ * ## Visibility rules
+ *
+ * A checkbox is visible when:
+ * 1. Any supertag has SYS_A55 = YES (tag-driven, always visible), OR
+ * 2. `_done !== undefined` (manual, added via Cmd+Enter)
+ *
+ * ## Interactions
+ *
+ * - **Click checkbox**: toggles between undone ↔ done (never removes checkbox)
+ * - **Cmd+Enter** (manual nodes): cycles No → Undone → Done → No
+ * - **Cmd+Enter** (tag-driven nodes): toggles undone ↔ done (tag keeps checkbox)
  */
 import type { NodexNode } from '../types/node.js';
 import { SYS_A, SYS_V } from '../types/index.js';
@@ -14,9 +35,7 @@ export interface CheckboxState {
 }
 
 /**
- * Determine whether a node should display a checkbox and its done state.
- *
- * Walk: node → metanode → tuples[SYS_A13, tagDefId] → tagDef.children → tuples[SYS_A55, SYS_V03]
+ * Determine checkbox visibility and done state for a node.
  */
 export function shouldNodeShowCheckbox(
   nodeId: string,
@@ -25,37 +44,94 @@ export function shouldNodeShowCheckbox(
   const node = entities[nodeId];
   if (!node) return { showCheckbox: false, isDone: false };
 
-  const isDone = !!node.props._done;
+  const isDone = node.props._done !== undefined && node.props._done > 0;
 
-  // Check supertags for SYS_A55 = YES
-  const metaNodeId = node.props._metaNodeId;
-  if (metaNodeId) {
-    const meta = entities[metaNodeId];
-    if (meta?.children) {
-      for (const tupleId of meta.children) {
-        const tuple = entities[tupleId];
-        if (!tuple?.children || tuple.children.length < 2) continue;
-        if (tuple.children[0] !== SYS_A.NODE_SUPERTAGS) continue;
-
-        // tuple.children[1] = tagDefId
-        const tagDefId = tuple.children[1];
-        if (hasShowCheckbox(tagDefId, entities)) {
-          return { showCheckbox: true, isDone };
-        }
-      }
-    }
+  // Tag-driven: any supertag has SYS_A55 = YES
+  if (hasTagShowCheckbox(nodeId, entities)) {
+    return { showCheckbox: true, isDone };
   }
 
-  // No tag has SYS_A55=YES, but _done is set → show checkbox (manual toggle)
-  if (isDone) return { showCheckbox: true, isDone: true };
+  // Manual: _done !== undefined (includes _done = 0 for undone)
+  if (node.props._done !== undefined) {
+    return { showCheckbox: true, isDone };
+  }
 
   return { showCheckbox: false, isDone: false };
 }
 
 /**
- * Check if a tagDef has a config tuple [SYS_A55, SYS_V03] in its children.
+ * Check if any of the node's supertags has SYS_A55 = YES.
  */
-function hasShowCheckbox(
+export function hasTagShowCheckbox(
+  nodeId: string,
+  entities: Record<string, NodexNode>,
+): boolean {
+  const node = entities[nodeId];
+  if (!node) return false;
+
+  const metaNodeId = node.props._metaNodeId;
+  if (!metaNodeId) return false;
+
+  const meta = entities[metaNodeId];
+  if (!meta?.children) return false;
+
+  for (const tupleId of meta.children) {
+    const tuple = entities[tupleId];
+    if (!tuple?.children || tuple.children.length < 2) continue;
+    if (tuple.children[0] !== SYS_A.NODE_SUPERTAGS) continue;
+
+    const tagDefId = tuple.children[1];
+    if (tagDefHasShowCheckbox(tagDefId, entities)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Resolve next `_done` value when clicking the checkbox.
+ *
+ * Click only toggles between undone ↔ done. It never removes the checkbox.
+ *
+ * - Tag-driven: done → `undefined` (tag keeps checkbox visible), undone → `Date.now()`
+ * - Manual: done → `0` (keep checkbox, undone), undone → `Date.now()`
+ */
+export function resolveCheckboxClick(
+  currentDone: number | undefined,
+  hasTag: boolean,
+): number | undefined {
+  if (currentDone !== undefined && currentDone > 0) {
+    // Was done → undone
+    return hasTag ? undefined : 0;
+  }
+  // Was undone → done
+  return Date.now();
+}
+
+/**
+ * Resolve next `_done` value for Cmd+Enter.
+ *
+ * - Tag-driven: 2-state toggle (undone ↔ done), checkbox always visible from tag
+ * - Manual: 3-state cycle (No → Undone → Done → No)
+ */
+export function resolveCmdEnterCycle(
+  currentDone: number | undefined,
+  hasTag: boolean,
+): number | undefined {
+  if (hasTag) {
+    // Tag-driven: 2-state toggle
+    return (currentDone !== undefined && currentDone > 0) ? undefined : Date.now();
+  }
+  // Manual: 3-state cycle
+  if (currentDone === undefined) return 0;           // No → Undone
+  if (currentDone === 0) return Date.now();           // Undone → Done
+  return undefined;                                   // Done → No
+}
+
+// ─── Internal helpers ───
+
+function tagDefHasShowCheckbox(
   tagDefId: string,
   entities: Record<string, NodexNode>,
 ): boolean {

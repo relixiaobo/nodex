@@ -12,6 +12,7 @@ import { nanoid } from 'nanoid';
 import type { NodexNode, DocType } from '../types/index.js';
 import { WORKSPACE_CONTAINERS, SYS_A, SYS_D, SYS_T, SYS_V } from '../types/index.js';
 import { ATTRDEF_CONFIG_MAP, TAGDEF_CONFIG_MAP, findAutoCollectTupleId } from '../lib/field-utils.js';
+import { resolveCheckboxClick, resolveCmdEnterCycle, hasTagShowCheckbox } from '../lib/checkbox-utils.js';
 import * as nodeService from '../services/node-service.js';
 import { isSupabaseReady } from '../services/supabase.js';
 
@@ -76,8 +77,11 @@ interface NodeStore {
   /** Update a node's description (optimistic + Supabase sync) */
   updateNodeDescription(id: string, description: string, userId: string): Promise<void>;
 
-  /** Toggle node's _done state (optimistic + Supabase sync) */
+  /** Toggle node's done state via checkbox click (undone ↔ done, never removes checkbox) */
   toggleNodeDone(nodeId: string, userId: string): Promise<void>;
+
+  /** Cycle checkbox via Cmd+Enter: manual 3-state (No→Undone→Done→No), tag-driven 2-state */
+  cycleNodeCheckbox(nodeId: string, userId: string): Promise<void>;
 
   /** Indent node: make it a child of its previous sibling */
   indentNode(nodeId: string, userId: string): Promise<void>;
@@ -458,9 +462,9 @@ export const useNodeStore = create<NodeStore>()(
     toggleNodeDone: async (nodeId, userId) => {
       const { entities } = get();
       const oldDone = entities[nodeId]?.props._done;
-      const newDone = oldDone ? undefined : Date.now();
+      const hasTag = hasTagShowCheckbox(nodeId, entities);
+      const newDone = resolveCheckboxClick(oldDone, hasTag);
 
-      // Optimistic
       set((state) => {
         if (state.entities[nodeId]) {
           state.entities[nodeId].props._done = newDone;
@@ -472,7 +476,31 @@ export const useNodeStore = create<NodeStore>()(
       try {
         await nodeService.updateNode(nodeId, { props: { _done: newDone } }, userId);
       } catch {
-        // Rollback
+        set((state) => {
+          if (state.entities[nodeId]) {
+            state.entities[nodeId].props._done = oldDone;
+          }
+        });
+      }
+    },
+
+    cycleNodeCheckbox: async (nodeId, userId) => {
+      const { entities } = get();
+      const oldDone = entities[nodeId]?.props._done;
+      const hasTag = hasTagShowCheckbox(nodeId, entities);
+      const newDone = resolveCmdEnterCycle(oldDone, hasTag);
+
+      set((state) => {
+        if (state.entities[nodeId]) {
+          state.entities[nodeId].props._done = newDone;
+        }
+      });
+
+      if (!isSupabaseReady()) return;
+
+      try {
+        await nodeService.updateNode(nodeId, { props: { _done: newDone } }, userId);
+      } catch {
         set((state) => {
           if (state.entities[nodeId]) {
             state.entities[nodeId].props._done = oldDone;

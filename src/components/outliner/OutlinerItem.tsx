@@ -81,6 +81,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   const moveNodeTo = useNodeStore((s) => s.moveNodeTo);
   const trashNode = useNodeStore((s) => s.trashNode);
   const toggleNodeDone = useNodeStore((s) => s.toggleNodeDone);
+  const cycleNodeCheckbox = useNodeStore((s) => s.cycleNodeCheckbox);
   const entities = useNodeStore((s) => s.entities);
 
   const rowRef = useRef<HTMLDivElement>(null);
@@ -204,9 +205,15 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   // Checkbox state (supertag SYS_A55 or manual _done)
   const { showCheckbox, isDone } = useNodeCheckbox(nodeId);
 
+  // Click on checkbox: toggles undone ↔ done (never removes checkbox)
   const handleCheckboxToggle = useCallback(() => {
     if (userId) toggleNodeDone(nodeId, userId);
   }, [nodeId, userId, toggleNodeDone]);
+
+  // Cmd+Enter: 3-state cycle for manual, 2-state for tag-driven
+  const handleCycleCheckbox = useCallback(() => {
+    if (userId) cycleNodeCheckbox(nodeId, userId);
+  }, [nodeId, userId, cycleNodeCheckbox]);
 
   // Description editing state
   const [editingDescription, setEditingDescription] = useState(false);
@@ -1104,7 +1111,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
                 onReferenceCreate={handleReferenceForceCreate}
                 onReferenceClose={handleReferenceClose}
                 onDescriptionEdit={handleDescriptionEdit}
-                onToggleDone={handleCheckboxToggle}
+                onToggleDone={handleCycleCheckbox}
               />
             ) : (
               <span

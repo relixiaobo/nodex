@@ -479,17 +479,27 @@ findRefTriggerRange（4 cases）:
 11. 无 `@` 返回 null
 12. caret 离开 → fallback
 
-### 1.34 Editor isEmpty 与零宽空格
+### 1.34 Editor isEmpty / handleDelete 零宽空格 + Hash Cleanup Safety
 
 **测试文件**: `tests/vitest/editor-isEmpty.test.ts`
 
 **覆盖点**:
 
+editor isEmpty（7 cases）:
 1. 纯 `\u200B`（零宽空格）视为空（Bug #54 回归）
 2. 多个 `\u200B` 视为空
 3. `\u200B` + 空白符混合视为空
 4. `\u200B` + 实际文本视为非空
 5. 空字符串与纯空白符边界
+
+handleDelete isEmpty（6 cases, Bug #54 回归）:
+6. HTML name 仅含 `\u200B` → 允许删除
+7. 空 HTML / HTML 标签包裹 `\u200B` → 允许删除
+8. 真实文本 / `\u200B` + 真实文本 → 阻止删除
+
+hash trigger cleanup safety（2 cases, Bug #53 回归）:
+9. DOM cleanup 失败后检测残留 `#` 触发词
+10. DOM cleanup 成功后无残留
 
 ### 1.35 节点搜索 SKIP_DOC_TYPES 过滤
 

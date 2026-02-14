@@ -10,6 +10,7 @@ import { CommandPalette } from '../../components/search/CommandPalette';
 import { WORKSPACE_CONTAINERS, getContainerId } from '../../types/index.js';
 import type { NodexNode, WorkspaceContainerSuffix } from '../../types/index.js';
 import { resetSupabase } from '../../services/supabase.js';
+import { findUnexpectedShortcutConflicts } from '../../lib/shortcut-registry.js';
 
 /**
  * Bootstrap workspace root node and container nodes.
@@ -130,6 +131,14 @@ export function App() {
   const sidebarOpen = useUIStore((s) => s.sidebarOpen);
   const wsId = useWorkspaceStore((s) => s.currentWorkspaceId);
   const ready = useBootstrap();
+
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    const conflicts = findUnexpectedShortcutConflicts();
+    if (conflicts.length > 0) {
+      console.warn('[shortcut-registry] unexpected conflicts detected', conflicts);
+    }
+  }, []);
 
   // Realtime subscription
   useRealtimeNodes(wsId);

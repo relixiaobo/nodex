@@ -10,6 +10,19 @@
 
 ---
 
+## CI 门禁
+
+GitHub Actions 工作流：`.github/workflows/ci.yml`
+
+PR / main push 会执行以下检查：
+
+1. `npm ci`
+2. `npm run typecheck`
+3. `npm run test:run`
+4. `npm run build`
+
+---
+
 ## 环境配置
 
 | 配置项 | 值 |
@@ -97,6 +110,199 @@ npm run test:run
 
 **覆盖点**: indent 第一个子节点 (no-op)、outdent 顶层节点 (no-op)
 
+### 1.5 树工具函数
+
+**测试文件**: `tests/vitest/tree-utils.test.ts`
+
+**覆盖点**:
+
+1. workspace 容器/root 检测
+2. ancestor chain + structural 节点跳过
+3. 可见节点 flatten 与上下导航（含 reference 场景 parentId 消歧）
+4. last visible node / sibling / index helpers
+5. inline reference HTML 纯度判断
+
+### 1.6 字段值验证
+
+**测试文件**: `tests/vitest/field-validation.test.ts`
+
+**覆盖点**:
+
+1. Number/Integer 数值校验 + min/max 边界
+2. URL/Email 格式校验
+3. 非验证类型返回 null
+
+### 1.7 标签与引用状态流
+
+**测试文件**: `tests/vitest/node-store-tags-refs.test.ts`
+
+**覆盖点**:
+
+1. applyTag/removeTag（模板字段实例化与清理）
+2. add/remove reference 去重与删除
+3. reference ↔ inline conversion 临时节点替换链路
+
+### 1.8 字段状态流（Node Store）
+
+**测试文件**: `tests/vitest/node-store-fields.test.ts`
+
+**覆盖点**:
+
+1. `setFieldValue` 对已有字段值节点的创建/复用/更新
+2. 缺失字段时自动创建 tuple + value + associatedData
+3. `addFieldToNode` 去重与 `setOptionsFieldValue` 单选写入
+4. `removeField` 清理 associationMap 并将 tuple/associatedData 移入 Trash
+5. `toggleCheckboxField` 的 `YES/NO` 切换链路
+6. `addUnnamedFieldToNode` 的原地插入（`afterChildId`）与 attrDef 初始化
+7. `autoCollectOption` 的值回填与 autocollect tuple 引用追加
+8. `removeFieldOption` 从 attrDef children 移除并删除 option 节点
+9. `replaceFieldAttrDef` 的占位 attrDef 置换与重复字段保护
+10. `changeFieldType` / `setConfigValue` 配置 tuple 原地更新
+
+### 1.9 Schema / Supertag 构建链路
+
+**测试文件**: `tests/vitest/node-store-schema.test.ts`
+
+**覆盖点**:
+
+1. `createTagDef` 自动归属 SCHEMA + 自动应用 `SYS_T01`
+2. `createAttrDef` 的 template tuple/type tuple/`SYS_T02` 配置链路
+3. 新建 `attrDef` 在后续 `applyTag` 中被正确实例化到内容节点
+
+### 1.10 Guard Rails（错误输入防护）
+
+**测试文件**: `tests/vitest/node-store-guard-rails.test.ts`
+
+**覆盖点**:
+
+1. `setConfigValue` 对非 tuple ID 的保护（防止误写）
+2. `addFieldOption` 仅允许 `attrDef` 目标，非法目标返回空 ID
+3. `removeFieldOption` 仅删除目标 attrDef 挂载的 option，避免误删
+4. `replaceFieldAttrDef` 的 owner/oldAttrDef 一致性保护
+
+### 1.11 Trash 语义（TagDef / AttrDef）
+
+**测试文件**: `tests/vitest/node-store-trash-semantics.test.ts`
+
+**覆盖点**:
+
+1. `trashNode(tagDef)` 不级联清理既有标签绑定与模板实例字段
+2. `trashNode(attrDef)` 保留已实例化字段引用，同时模板 tuple key 解绑
+3. `tagDef` 已入 Trash 后，`removeTag` 仍可清理模板来源字段
+
+### 1.12 拖拽落点语义（纯函数）
+
+**测试文件**: `tests/vitest/drag-drop-utils.test.ts`
+
+**覆盖点**:
+
+1. `before / after / inside` 三态落点决策
+2. `after + expanded children` 解释为“放入第一个子节点”
+3. 无效拖拽上下文（空 drag/self）返回 no-op
+
+### 1.13 moveNodeTo 结构安全
+
+**测试文件**: `tests/vitest/node-store-move-node-to.test.ts`
+
+**覆盖点**:
+
+1. 防自环、防后代放置
+2. 同父移动时索引修正（remove 后 insert 位置偏移）
+3. 跨父节点移动的 children/owner 一致性
+
+### 1.14 Drag UI Store 状态机
+
+**测试文件**: `tests/vitest/ui-store-drag-state.test.ts`
+
+**覆盖点**:
+
+1. `setDrag` 会重置历史 `dropTarget/dropPosition`
+2. `setDropTarget` 与 `setDrag(null)` 的状态收敛
+
+### 1.15 导航撤销与焦点语义（UI Store）
+
+**测试文件**: `tests/vitest/ui-store-undo-focus.test.ts`
+
+**覆盖点**:
+
+1. `navUndo/navRedo` 历史回放与“新导航清空 redo”
+2. `focusedNode` 与 `selectedNode` 的互斥关系
+3. `parentId` 消歧值的归一化（未传时为 `null`）
+
+### 1.16 快捷键注册表一致性
+
+**测试文件**: `tests/vitest/shortcut-registry.test.ts`
+
+**覆盖点**:
+
+1. registry ID 唯一性
+2. `findShortcutConflicts` 的规范化冲突检测（含伪键忽略）
+3. `getShortcutsByScope` 的作用域过滤
+4. 当前已知冲突快照（`selected_ref.options_cancel` vs `selected_ref.clear_selection` 条件互斥场景）
+5. `findUnexpectedShortcutConflicts` 白名单过滤后的异常冲突探测
+
+### 1.17 全局导航快捷键拦截保护
+
+**测试文件**: `tests/vitest/nav-undo-keyboard.test.ts`
+
+**覆盖点**:
+
+1. contentEditable / input / textarea 焦点下不拦截
+2. 非编辑焦点与空 activeElement 下允许触发全局导航撤销/重做逻辑
+
+### 1.18 Selected Reference 快捷键解析
+
+**测试文件**: `tests/vitest/selected-reference-shortcuts.test.ts`
+
+**覆盖点**:
+
+1. `delete / convert_arrow_right / convert_printable` 分支解析
+2. options 打开时的 `ArrowUp/Down/Enter/Escape` 解析
+3. options 关闭时 `Escape` 的 clear-selection 语义
+
+### 1.19 编辑器 HTML 归一化工具
+
+**测试文件**: `tests/vitest/editor-html.test.ts`
+
+**覆盖点**:
+
+1. `stripWrappingP` 对单层 `<p>` 包裹的去壳与 trim
+2. 嵌套 `<p>` 结构保持原样（防误裁剪）
+3. `wrapInP` 对纯文本与空字符串的包裹语义
+4. 已有 `<p>` 内容的稳定透传
+
+### 1.20 TrailingInput onUpdate 决策纯函数
+
+**测试文件**: `tests/vitest/trailing-input-actions.test.ts`
+
+**覆盖点**:
+
+1. `>` 触发 `create_field`
+2. `#/@` 触发 `create_trigger_node`
+3. Options 字段下的 open/close dropdown 决策
+4. 普通文本（非 Options）返回 no-op
+
+### 1.21 TrailingInput 键盘导航决策纯函数
+
+**测试文件**: `tests/vitest/trailing-input-navigation.test.ts`
+
+**覆盖点**:
+
+1. `Backspace` 空输入下的优先级决策（reset/collapse/focus/noop）
+2. `ArrowDown` 在 options 与 navigate-out 场景下的分支决策
+3. `ArrowUp` 在 options/focus-last-visible/navigate-out 场景下的分支决策
+4. `Escape` 的 close-options vs blur-editor 决策
+
+### 1.22 NodeEditor 键盘决策纯函数
+
+**测试文件**: `tests/vitest/node-editor-shortcuts.test.ts`
+
+**覆盖点**:
+
+1. `Enter` 在 reference/hashTag dropdown 下的优先级决策
+2. `ArrowUp/Down` 的 dropdown vs boundary 导航决策
+3. `Escape` 与 `Mod+Enter` 的 reference/hashTag 分支决策
+
 ---
 
 ## Phase 2: 视觉检查点
@@ -142,6 +348,24 @@ npm run test:run
 | 1.2 | CRUD + 树操作 + 不变量 | PASS/FAIL |
 | 1.3 | UI Store 操作 | PASS/FAIL |
 | 1.4 | 边界条件 (2 tests) | PASS/FAIL |
+| 1.5 | tree-utils 纯函数 | PASS/FAIL |
+| 1.6 | 字段值验证 | PASS/FAIL |
+| 1.7 | 标签与引用状态流 | PASS/FAIL |
+| 1.8 | 字段状态流（Node Store） | PASS/FAIL |
+| 1.9 | Schema / Supertag 构建链路 | PASS/FAIL |
+| 1.10 | Guard Rails（错误输入防护） | PASS/FAIL |
+| 1.11 | Trash 语义（TagDef / AttrDef） | PASS/FAIL |
+| 1.12 | 拖拽落点语义（纯函数） | PASS/FAIL |
+| 1.13 | moveNodeTo 结构安全 | PASS/FAIL |
+| 1.14 | Drag UI Store 状态机 | PASS/FAIL |
+| 1.15 | 导航撤销与焦点语义（UI Store） | PASS/FAIL |
+| 1.16 | 快捷键注册表一致性 | PASS/FAIL |
+| 1.17 | 全局导航快捷键拦截保护 | PASS/FAIL |
+| 1.18 | Selected Reference 快捷键解析 | PASS/FAIL |
+| 1.19 | 编辑器 HTML 归一化工具 | PASS/FAIL |
+| 1.20 | TrailingInput onUpdate 决策纯函数 | PASS/FAIL |
+| 1.21 | TrailingInput 键盘导航决策纯函数 | PASS/FAIL |
+| 1.22 | NodeEditor 键盘决策纯函数 | PASS/FAIL |
 | 2 | 视觉渲染 | PASS/FAIL/SKIP |
 | 3 | 扩展构建 | PASS/FAIL |
 

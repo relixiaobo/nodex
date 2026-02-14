@@ -22,10 +22,33 @@ import { DOMSerializer } from '@tiptap/pm/model';
 import { useNodeStore } from '../../stores/node-store';
 import { useUIStore } from '../../stores/ui-store';
 import { useWorkspaceStore } from '../../stores/workspace-store';
+import { getPrimaryShortcutKey, getShortcutKeys } from '../../lib/shortcut-registry';
+import { stripWrappingP, wrapInP } from '../../lib/editor-html.js';
+import {
+  resolveNodeEditorArrowIntent,
+  resolveNodeEditorEnterIntent,
+  resolveNodeEditorEscapeIntent,
+  resolveNodeEditorForceCreateIntent,
+} from '../../lib/node-editor-shortcuts.js';
 import { HashTagExtension, type HashTagCallbacks } from './HashTagExtension';
 import { FieldTriggerExtension, type FieldTriggerCallbacks } from './FieldTriggerExtension';
 import { ReferenceExtension, type ReferenceCallbacks } from './ReferenceExtension';
 import { InlineRefNode } from './InlineRefNode';
+
+const KEY_EDITOR_ENTER = getPrimaryShortcutKey('editor.enter', 'Enter');
+const KEY_EDITOR_INDENT = getPrimaryShortcutKey('editor.indent', 'Tab');
+const KEY_EDITOR_OUTDENT = getPrimaryShortcutKey('editor.outdent', 'Shift-Tab');
+const KEY_EDITOR_BACKSPACE = getPrimaryShortcutKey('editor.backspace_empty', 'Backspace');
+const KEY_EDITOR_ARROW_UP = getPrimaryShortcutKey('editor.arrow_up', 'ArrowUp');
+const KEY_EDITOR_ARROW_DOWN = getPrimaryShortcutKey('editor.arrow_down', 'ArrowDown');
+const KEY_EDITOR_ESCAPE = getPrimaryShortcutKey('editor.escape', 'Escape');
+const KEY_EDITOR_DROPDOWN_FORCE_CREATE = getPrimaryShortcutKey('editor.dropdown_force_create', 'Mod-Enter');
+const KEY_EDITOR_MOVE_UP = getPrimaryShortcutKey('editor.move_up', 'Mod-Shift-ArrowUp');
+const KEY_EDITOR_MOVE_DOWN = getPrimaryShortcutKey('editor.move_down', 'Mod-Shift-ArrowDown');
+const [KEY_EDITOR_EDIT_DESC_PRIMARY, KEY_EDITOR_EDIT_DESC_SECONDARY] = getShortcutKeys(
+  'editor.edit_description',
+  ['Mod-i', 'Ctrl-i'],
+);
 
 interface NodeEditorProps {
   nodeId: string;
@@ -195,13 +218,17 @@ export function NodeEditor({
       name: 'outlinerKeymap',
       addKeyboardShortcuts() {
         return {
-          Enter: ({ editor }) => {
+          [KEY_EDITOR_ENTER]: ({ editor }) => {
+            const intent = resolveNodeEditorEnterIntent({
+              referenceActive: callbacksRef.current.referenceActive,
+              hashTagActive: callbacksRef.current.hashTagActive,
+            });
             // Dropdown active: confirm selection
-            if (callbacksRef.current.referenceActive) {
+            if (intent === 'reference_confirm') {
               callbacksRef.current.onReferenceConfirm();
               return true;
             }
-            if (callbacksRef.current.hashTagActive) {
+            if (intent === 'hashtag_confirm') {
               callbacksRef.current.onHashTagConfirm();
               return true;
             }
@@ -242,15 +269,15 @@ export function NodeEditor({
             }
             return true;
           },
-          Tab: () => {
+          [KEY_EDITOR_INDENT]: () => {
             callbacksRef.current.onIndent();
             return true;
           },
-          'Shift-Tab': () => {
+          [KEY_EDITOR_OUTDENT]: () => {
             callbacksRef.current.onOutdent();
             return true;
           },
-          Backspace: ({ editor }) => {
+          [KEY_EDITOR_BACKSPACE]: ({ editor }) => {
             // Intercept when editor is visually empty (trim catches \n from <br>)
             const isEmpty = editor.state.doc.textContent.trim().length === 0;
             if (isEmpty) {
@@ -265,81 +292,103 @@ export function NodeEditor({
             }
             return false; // Let TipTap handle normal backspace
           },
-          ArrowUp: ({ editor }) => {
+          [KEY_EDITOR_ARROW_UP]: ({ editor }) => {
+            const { from } = editor.state.selection;
+            const intent = resolveNodeEditorArrowIntent({
+              referenceActive: callbacksRef.current.referenceActive,
+              hashTagActive: callbacksRef.current.hashTagActive,
+              isAtBoundary: from <= 1,
+            });
             // Dropdown navigation
-            if (callbacksRef.current.referenceActive) {
+            if (intent === 'reference_nav') {
               callbacksRef.current.onReferenceNavUp();
               return true;
             }
-            if (callbacksRef.current.hashTagActive) {
+            if (intent === 'hashtag_nav') {
               callbacksRef.current.onHashTagNavUp();
               return true;
             }
             // Only intercept when cursor is at the start
-            const { from } = editor.state.selection;
-            if (from <= 1) {
+            if (intent === 'navigate_outliner') {
               callbacksRef.current.onArrowUp();
               return true;
             }
             return false;
           },
-          ArrowDown: ({ editor }) => {
+          [KEY_EDITOR_ARROW_DOWN]: ({ editor }) => {
+            const { to } = editor.state.selection;
+            const endPos = editor.state.doc.content.size - 1;
+            const intent = resolveNodeEditorArrowIntent({
+              referenceActive: callbacksRef.current.referenceActive,
+              hashTagActive: callbacksRef.current.hashTagActive,
+              isAtBoundary: to >= endPos,
+            });
             // Dropdown navigation
-            if (callbacksRef.current.referenceActive) {
+            if (intent === 'reference_nav') {
               callbacksRef.current.onReferenceNavDown();
               return true;
             }
-            if (callbacksRef.current.hashTagActive) {
+            if (intent === 'hashtag_nav') {
               callbacksRef.current.onHashTagNavDown();
               return true;
             }
             // Only intercept when cursor is at the end
-            const { to } = editor.state.selection;
-            const endPos = editor.state.doc.content.size - 1;
-            if (to >= endPos) {
+            if (intent === 'navigate_outliner') {
               callbacksRef.current.onArrowDown();
               return true;
             }
             return false;
           },
-          Escape: () => {
-            if (callbacksRef.current.referenceActive) {
+          [KEY_EDITOR_ESCAPE]: () => {
+            const intent = resolveNodeEditorEscapeIntent(
+              callbacksRef.current.referenceActive,
+              callbacksRef.current.hashTagActive,
+            );
+            if (intent === 'reference_close') {
               callbacksRef.current.onReferenceClose();
               return true;
             }
-            if (callbacksRef.current.hashTagActive) {
+            if (intent === 'hashtag_close') {
               callbacksRef.current.onHashTagClose();
               return true;
             }
             return false;
           },
-          'Mod-Enter': () => {
-            if (callbacksRef.current.referenceActive) {
+          [KEY_EDITOR_DROPDOWN_FORCE_CREATE]: () => {
+            const intent = resolveNodeEditorForceCreateIntent(
+              callbacksRef.current.referenceActive,
+              callbacksRef.current.hashTagActive,
+            );
+            if (intent === 'reference_create') {
               callbacksRef.current.onReferenceCreate();
               return true;
             }
-            if (callbacksRef.current.hashTagActive) {
+            if (intent === 'hashtag_create') {
               callbacksRef.current.onHashTagCreate();
               return true;
             }
             return false;
           },
-          'Mod-Shift-ArrowUp': () => {
+          [KEY_EDITOR_MOVE_UP]: () => {
             callbacksRef.current.onMoveUp();
             return true;
           },
-          'Mod-Shift-ArrowDown': () => {
+          [KEY_EDITOR_MOVE_DOWN]: () => {
             callbacksRef.current.onMoveDown();
             return true;
           },
-          'Mod-i': () => {
+          [KEY_EDITOR_EDIT_DESC_PRIMARY]: () => {
             callbacksRef.current.onDescriptionEdit();
             return true;
           },
-          'Ctrl-i': () => {
-            callbacksRef.current.onDescriptionEdit();
-            return true;
-          },
+          ...(KEY_EDITOR_EDIT_DESC_SECONDARY
+            ? {
+                [KEY_EDITOR_EDIT_DESC_SECONDARY]: () => {
+                  callbacksRef.current.onDescriptionEdit();
+                  return true;
+                },
+              }
+            : {}),
         };
       },
     }),
@@ -467,20 +516,4 @@ export function NodeEditor({
       <EditorContent editor={editor} />
     </div>
   );
-}
-
-function stripWrappingP(html: string): string {
-  const trimmed = html.trim();
-  const match = trimmed.match(/^<p>(.*)<\/p>$/s);
-  if (match && !match[1].includes('<p>')) {
-    return match[1];
-  }
-  return trimmed;
-}
-
-function wrapInP(content: string): string {
-  if (!content) return '<p></p>';
-  const trimmed = content.trim();
-  if (trimmed.startsWith('<p>')) return trimmed;
-  return `<p>${trimmed}</p>`;
 }

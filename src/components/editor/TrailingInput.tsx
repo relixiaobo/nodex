@@ -23,6 +23,15 @@ import { useWorkspaceStore } from '../../stores/workspace-store';
 import { useUIStore } from '../../stores/ui-store';
 import { WORKSPACE_CONTAINERS, SYS_D } from '../../types';
 import { getLastVisibleNode } from '../../lib/tree-utils.js';
+import { getPrimaryShortcutKey } from '../../lib/shortcut-registry';
+import { stripWrappingP } from '../../lib/editor-html.js';
+import { resolveTrailingUpdateAction } from '../../lib/trailing-input-actions.js';
+import {
+  resolveTrailingArrowDownIntent,
+  resolveTrailingArrowUpIntent,
+  resolveTrailingBackspaceIntent,
+  resolveTrailingEscapeIntent,
+} from '../../lib/trailing-input-navigation.js';
 import { useFieldOptions } from '../../hooks/use-field-options.js';
 import { BulletChevron } from '../outliner/BulletChevron';
 
@@ -30,6 +39,14 @@ const CONTAINER_SUFFIXES = Object.values(WORKSPACE_CONTAINERS);
 function isWorkspaceContainer(nodeId: string): boolean {
   return CONTAINER_SUFFIXES.some(suffix => nodeId.endsWith(`_${suffix}`));
 }
+
+const KEY_TRAILING_ENTER = getPrimaryShortcutKey('trailing.enter', 'Enter');
+const KEY_TRAILING_INDENT = getPrimaryShortcutKey('trailing.indent_depth', 'Tab');
+const KEY_TRAILING_OUTDENT = getPrimaryShortcutKey('trailing.outdent_depth', 'Shift-Tab');
+const KEY_TRAILING_BACKSPACE = getPrimaryShortcutKey('trailing.backspace', 'Backspace');
+const KEY_TRAILING_ARROW_DOWN = getPrimaryShortcutKey('trailing.arrow_down', 'ArrowDown');
+const KEY_TRAILING_ARROW_UP = getPrimaryShortcutKey('trailing.arrow_up', 'ArrowUp');
+const KEY_TRAILING_ESCAPE = getPrimaryShortcutKey('trailing.escape', 'Escape');
 
 interface TrailingInputProps {
   parentId: string;
@@ -132,7 +149,7 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
       name: 'trailingInputKeymap',
       addKeyboardShortcuts() {
         return {
-          Enter: ({ editor }) => {
+          [KEY_TRAILING_ENTER]: ({ editor }) => {
             const ref = callbacksRef.current;
 
             // Options autocomplete: select highlighted option
@@ -168,7 +185,7 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
             }
             return true;
           },
-          Tab: () => {
+          [KEY_TRAILING_INDENT]: () => {
             // Indent: move effective parent to last child of current parent
             const ref = callbacksRef.current;
             const parent = useNodeStore.getState().entities[ref.effectiveParentId];
@@ -185,7 +202,7 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
             ref.setEffectiveDepth(ref.effectiveDepth + 1);
             return true;
           },
-          'Shift-Tab': () => {
+          [KEY_TRAILING_OUTDENT]: () => {
             // Outdent: move effective parent up one level
             const ref = callbacksRef.current;
 
@@ -204,14 +221,24 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
             ref.setEffectiveDepth(ref.effectiveDepth - 1);
             return true;
           },
-          Backspace: ({ editor }) => {
-            const isEmpty = editor.state.doc.textContent.length === 0;
-            if (!isEmpty) return false; // Let TipTap handle normal backspace
-
+          [KEY_TRAILING_BACKSPACE]: ({ editor }) => {
             const ref = callbacksRef.current;
+            const isEditorEmpty = editor.state.doc.textContent.length === 0;
+            const entities = useNodeStore.getState().entities;
+            const expanded = useUIStore.getState().expandedNodes;
+            const parent = entities[ref.effectiveParentId];
+            const target = getLastVisibleNode(ref.effectiveParentId, entities, expanded);
+            const intent = resolveTrailingBackspaceIntent({
+              isEditorEmpty,
+              depthShifted: ref.effectiveParentId !== ref.parentId,
+              parentChildCount: (parent?.children ?? []).length,
+              hasLastVisibleTarget: !!target,
+            });
+
+            if (intent === 'allow_default') return false; // Let TipTap handle normal backspace
 
             // If depth was shifted via Tab/Shift+Tab, undo the shift first
-            if (ref.effectiveParentId !== ref.parentId) {
+            if (intent === 'reset_depth_shift') {
               ref.setEffectiveParentId(ref.parentId);
               ref.setEffectiveDepth(depth);
               return true;
@@ -219,9 +246,7 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
 
             // If parent has no real children (only TrailingInput showing),
             // collapse the parent and focus it
-            const entities = useNodeStore.getState().entities;
-            const parent = entities[ref.effectiveParentId];
-            if ((parent?.children ?? []).length === 0) {
+            if (intent === 'collapse_parent') {
               const expandKey = ref.effectiveParentEK;
               if (expandKey) ref.setExpanded(expandKey, false);
               const gpId = parent?.props._ownerId;
@@ -232,50 +257,60 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
             // Focus the last visible node above this TrailingInput.
             // Walks from parent's last visible child down through expanded
             // descendants to find the deepest visible node.
-            const expanded = useUIStore.getState().expandedNodes;
-            const target = getLastVisibleNode(ref.effectiveParentId, entities, expanded);
-            if (target) {
+            if (intent === 'focus_last_visible' && target) {
               ref.setFocusedNode(target.nodeId, target.parentId);
             }
             return true;
           },
-          ArrowDown: () => {
+          [KEY_TRAILING_ARROW_DOWN]: () => {
             const ref = callbacksRef.current;
-            if (ref.isOptions && ref.optionsOpen && ref.filteredOptions.length > 0) {
+            const intent = resolveTrailingArrowDownIntent({
+              optionsOpen: ref.isOptions && ref.optionsOpen,
+              optionCount: ref.filteredOptions.length,
+              hasNavigateOut: !!ref.onNavigateOut,
+            });
+            if (intent === 'options_down') {
               ref.setOptionsIndex(Math.min(ref.optionsIndex + 1, ref.filteredOptions.length - 1));
               return true;
             }
             // At the bottom — escape to parent context
-            if (ref.onNavigateOut) {
+            if (intent === 'navigate_out_down' && ref.onNavigateOut) {
               ref.onNavigateOut('down');
               return true;
             }
             return false;
           },
-          ArrowUp: () => {
+          [KEY_TRAILING_ARROW_UP]: () => {
             const ref = callbacksRef.current;
-            if (ref.isOptions && ref.optionsOpen && ref.filteredOptions.length > 0) {
+            const entities = useNodeStore.getState().entities;
+            const expanded = useUIStore.getState().expandedNodes;
+            const target = getLastVisibleNode(ref.effectiveParentId, entities, expanded);
+            const intent = resolveTrailingArrowUpIntent({
+              optionsOpen: ref.isOptions && ref.optionsOpen,
+              optionCount: ref.filteredOptions.length,
+              hasLastVisibleTarget: !!target,
+              hasNavigateOut: !!ref.onNavigateOut,
+            });
+            if (intent === 'options_up') {
               ref.setOptionsIndex(Math.max(ref.optionsIndex - 1, 0));
               return true;
             }
             // Try to focus last visible node above this TrailingInput
-            const entities = useNodeStore.getState().entities;
-            const expanded = useUIStore.getState().expandedNodes;
-            const target = getLastVisibleNode(ref.effectiveParentId, entities, expanded);
-            if (target) {
+            if (intent === 'focus_last_visible' && target) {
               ref.setFocusedNode(target.nodeId, target.parentId);
               return true;
             }
             // No nodes above — escape to parent context
-            if (ref.onNavigateOut) {
+            if (intent === 'navigate_out_up' && ref.onNavigateOut) {
               ref.onNavigateOut('up');
               return true;
             }
             return false;
           },
-          Escape: ({ editor }) => {
+          [KEY_TRAILING_ESCAPE]: ({ editor }) => {
             const ref = callbacksRef.current;
-            if (ref.isOptions && ref.optionsOpen) {
+            const intent = resolveTrailingEscapeIntent(ref.isOptions && ref.optionsOpen);
+            if (intent === 'close_options') {
               ref.setOptionsOpen(false);
               ref.setOptionsQuery('');
               ref.setOptionsIndex(0);
@@ -319,8 +354,13 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
       const ref = callbacksRef.current;
       if (!ref.wsId || !ref.userId) return;
 
+      const action = resolveTrailingUpdateAction({
+        text,
+        isOptionsField: ref.isOptions,
+      });
+
       // > field trigger: handle directly (no intermediate node needed)
-      if (text === '>') {
+      if (action.type === 'create_field') {
         committingRef.current = true;
         editor.commands.clearContent(false);
         setHasContent(false);
@@ -336,14 +376,14 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
       // # or @ trigger: create child node + set triggerHint so OutlinerItem
       // opens the dropdown immediately (extensions need docChanged to fire,
       // but mount doesn't count as docChanged)
-      if (text === '#' || text === '@') {
+      if (action.type === 'create_trigger_node') {
         committingRef.current = true;
         editor.commands.clearContent(false);
         setHasContent(false);
         ref.setOptionsOpen(false);
 
-        ref.setTriggerHint(text as '#' | '@');
-        ref.createChild(ref.effectiveParentId, ref.wsId, ref.userId, text).then((newNode) => {
+        ref.setTriggerHint(action.trigger);
+        ref.createChild(ref.effectiveParentId, ref.wsId, ref.userId, action.trigger).then((newNode) => {
           ref.setExpanded(ref.effectiveParentEK, true);
           ref.setFocusedNode(newNode.id, ref.effectiveParentId);
           queueMicrotask(() => { committingRef.current = false; });
@@ -351,17 +391,17 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
         return;
       }
 
-      // Options autocomplete: open dropdown when typing in an Options field
-      if (ref.isOptions) {
-        if (text.length > 0) {
-          ref.setOptionsOpen(true);
-          ref.setOptionsQuery(text);
-          ref.setOptionsIndex(0);
-        } else {
-          ref.setOptionsOpen(false);
-          ref.setOptionsQuery('');
-          ref.setOptionsIndex(0);
-        }
+      if (action.type === 'open_options') {
+        ref.setOptionsOpen(true);
+        ref.setOptionsQuery(action.query);
+        ref.setOptionsIndex(0);
+        return;
+      }
+
+      if (action.type === 'close_options') {
+        ref.setOptionsOpen(false);
+        ref.setOptionsQuery('');
+        ref.setOptionsIndex(0);
       }
     },
     onFocus: () => {
@@ -449,13 +489,4 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
       </div>
     </div>
   );
-}
-
-function stripWrappingP(html: string): string {
-  const trimmed = html.trim();
-  const match = trimmed.match(/^<p>(.*)<\/p>$/s);
-  if (match && !match[1].includes('<p>')) {
-    return match[1];
-  }
-  return trimmed;
 }

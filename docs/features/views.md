@@ -61,7 +61,7 @@ ContentNode._metaNodeId → Metanode
 |------|-----|------|
 | `SYS_A.VIEWS` | `SYS_A16` | 视图配置 Tuple key |
 | `SYS_A.COLUMN_DEFS` | `SYS_A17` | 列定义 Tuple key |
-| `SYS_A.FILTER` | `SYS_A18` | 过滤表达式 |
+| `SYS_A.FILTER_EXPRESSIONS` | `SYS_A18` | 过滤表达式 |
 | `SYS_A.SORT_ORDER` | `SYS_A19` | 排序方向 |
 | `SYS_A.SORT_FIELD` | `SYS_A20` | 排序字段 |
 | `SYS_A.BANNER_IMAGE` | `SYS_A25` | 横幅图片（Cards） |
@@ -435,14 +435,14 @@ ViewContainer 负责：
 | Filter / Sort / Group | 通用数据管道 |
 | Calendar 视图 | 依赖日期节点 |
 | List 视图 | 双面板，窄屏受限 |
-| Tabs / Side Menu | 场景窄 / 与 Side Panel 重叠 |，窄屏适配困难
+| Tabs / Side Menu | 场景窄 / 与 Side Panel 重叠，窄屏适配困难 |
 
 ## 与 Tana 的已知差异
 
 | 差异 | Tana | Nodex 决策 |
 |------|------|-----------|
 | Side Panel 宽度 | 桌面应用全屏 | Table 需横向滚动（固定名称列）；Cards 自适应列数 |
-| 视图数量 | 7 种（Outline/Table/Cards/Calendar/List/Tabs/Side Menu） | Phase 2 实现 3 种（Outline/Table/Cards），Calendar 延后 |
+| 视图数量 | 7 种（Outline/Table/Cards/Calendar/List/Tabs/Side Menu） | 目标阶段优先实现 3 种（Outline/Table/Cards）；当前仅 Outline |
 | Side Menu 视图 | 侧边栏菜单导航 | 不实现（与 Side Panel 侧栏功能重叠） |
 | Tabs 视图 | flow/wrap inline 文本块布局 | 延后（使用场景窄） |
 | List 视图 | 双面板（左列表 + 右详情） | 延后（窄屏空间不足，降级后与 Outline 重叠） |
@@ -458,5 +458,5 @@ ViewContainer 负责：
 | 2026-02-14 | 不实现 Side Menu 视图 | Chrome Side Panel 本身就是侧栏，Side Menu 视图功能重叠 |
 | 2026-02-14 | Calendar 依赖日期节点 | 需要先完成 #22 Date 节点才能确定日历定位字段 |
 | 2026-02-14 | 合并 5 种视图 + Filter/Group/Sort 为一份文档 | 它们是同一个系统的不同维度，分开文档会导致重复描述数据模型 |
-| 2026-02-14 | Phase 2 聚焦 Outline + Table + Cards | 截图分析后确认：Table 在窄屏可用（横向滚动），Cards 2列适配良好；Calendar/List/Tabs 在 300-700px 宽度下体验受限 |
+| 2026-02-14 | 目标阶段聚焦 Outline + Table + Cards | 截图分析后确认：Table 在窄屏可用（横向滚动），Cards 2列适配良好；Calendar/List/Tabs 在 300-700px 宽度下体验受限 |
 | 2026-02-14 | Tabs 视图确认为 flow/wrap 文本块布局 | 截图确认非传统 tab 切换，而是 inline 文本块排列，使用场景窄 |

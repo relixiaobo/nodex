@@ -111,6 +111,13 @@ describe('shortcut-registry', () => {
     const shifted = new KeyboardEvent('keydown', { key: 'z', metaKey: true, shiftKey: true });
     expect(matchesShortcutEvent(shifted, 'Mod-Shift-z')).toBe(true);
     expect(matchesShortcutEvent(shifted, 'Mod-z')).toBe(false);
+
+    const modEnterMeta = new KeyboardEvent('keydown', { key: 'Enter', metaKey: true });
+    expect(matchesShortcutEvent(modEnterMeta, 'Mod-Enter')).toBe(true);
+    expect(matchesShortcutEvent(modEnterMeta, 'Enter')).toBe(false);
+
+    const modEnterCtrl = new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true });
+    expect(matchesShortcutEvent(modEnterCtrl, 'Mod-Enter')).toBe(true);
   });
 
   it('supports plus-separated bindings and token aliases', () => {

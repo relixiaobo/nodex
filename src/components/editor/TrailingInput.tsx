@@ -1,30 +1,21 @@
 /**
  * Trailing input: phantom empty editor for creating new nodes.
- *
- * - Click → focus, cursor appears
- * - Type + Enter → create child of effective parent, clear input, keep focus
- * - Enter empty → no-op
- * - Tab → indent (move effective parent to last sibling's child level)
- * - Shift+Tab → outdent (move effective parent up one level)
- * - Escape → blur
- * - Blur with content → create child (preserve user's work)
- * - Blur empty → no-op
- *
- * Tab/Shift+Tab do NOT create real nodes — they just change where the
- * next Enter will create a node (effective parent + visual depth).
+ * TipTap-free implementation (single-line input).
  */
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { useEditor, EditorContent, type Editor } from '@tiptap/react';
-import { Extension } from '@tiptap/react';
-import StarterKit from '@tiptap/starter-kit';
-import Placeholder from '@tiptap/extension-placeholder';
+import {
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  useMemo,
+  type KeyboardEvent as ReactKeyboardEvent,
+} from 'react';
 import { useNodeStore } from '../../stores/node-store';
 import { useWorkspaceStore } from '../../stores/workspace-store';
 import { useUIStore } from '../../stores/ui-store';
 import { WORKSPACE_CONTAINERS, SYS_D } from '../../types';
 import { getLastVisibleNode } from '../../lib/tree-utils.js';
-import { getPrimaryShortcutKey } from '../../lib/shortcut-registry';
-import { stripWrappingP } from '../../lib/editor-html.js';
+import { getPrimaryShortcutKey, matchesShortcutEvent } from '../../lib/shortcut-registry';
 import { resolveTrailingUpdateAction } from '../../lib/trailing-input-actions.js';
 import {
   resolveTrailingArrowDownIntent,
@@ -41,6 +32,7 @@ function isWorkspaceContainer(nodeId: string): boolean {
 }
 
 const KEY_TRAILING_ENTER = getPrimaryShortcutKey('trailing.enter', 'Enter');
+const KEY_TRAILING_FORCE_ENTER = 'Mod-Enter';
 const KEY_TRAILING_INDENT = getPrimaryShortcutKey('trailing.indent_depth', 'Tab');
 const KEY_TRAILING_OUTDENT = getPrimaryShortcutKey('trailing.outdent_depth', 'Shift-Tab');
 const KEY_TRAILING_BACKSPACE = getPrimaryShortcutKey('trailing.backspace', 'Backspace');
@@ -52,19 +44,17 @@ interface TrailingInputProps {
   parentId: string;
   depth: number;
   autoFocus?: boolean;
-  /** Compound expand key for the parent node (grandparentId:parentId) */
   parentExpandKey: string;
-  /** Field data type (e.g., SYS_D.OPTIONS) — enables option autocomplete */
   fieldDataType?: string;
-  /** AttrDef ID — used to look up available options */
   attrDefId?: string;
-  /** Called when arrow navigation reaches a boundary (e.g. escaping field values) */
   onNavigateOut?: (direction: 'up' | 'down') => void;
 }
 
 export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fieldDataType, attrDefId, onNavigateOut }: TrailingInputProps) {
   const createChild = useNodeStore((s) => s.createChild);
+  const cycleNodeCheckbox = useNodeStore((s) => s.cycleNodeCheckbox);
   const addUnnamedFieldToNode = useNodeStore((s) => s.addUnnamedFieldToNode);
+  const addReference = useNodeStore((s) => s.addReference);
   const wsId = useWorkspaceStore((s) => s.currentWorkspaceId);
   const userId = useWorkspaceStore((s) => s.userId);
   const setExpanded = useUIStore((s) => s.setExpanded);
@@ -72,27 +62,24 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
   const setEditingFieldName = useUIStore((s) => s.setEditingFieldName);
   const setTriggerHint = useUIStore((s) => s.setTriggerHint);
 
-  // Effective parent/depth — Tab/Shift+Tab change these without creating nodes
   const [effectiveParentId, setEffectiveParentId] = useState(parentId);
   const [effectiveDepth, setEffectiveDepth] = useState(depth);
-
-  // Track the expand key for the current effectiveParentId
   const [effectiveParentEK, setEffectiveParentEK] = useState(parentExpandKey);
 
-  // Reset when props change (parent re-renders, or node gets new children)
   useEffect(() => {
     setEffectiveParentId(parentId);
     setEffectiveDepth(depth);
     setEffectiveParentEK(parentExpandKey);
   }, [parentId, depth, parentExpandKey]);
 
-  const committingRef = useRef(false);
+  const [value, setValue] = useState('');
   const [hasContent, setHasContent] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const committingRef = useRef(false);
+  const composingRef = useRef(false);
 
-  // Options autocomplete state
   const isOptions = fieldDataType === SYS_D.OPTIONS || fieldDataType === SYS_D.OPTIONS_FROM_SUPERTAG;
   const allOptions = useFieldOptions(isOptions ? (attrDefId ?? '') : '');
-  const addReference = useNodeStore((s) => s.addReference);
 
   const [optionsOpen, setOptionsOpen] = useState(false);
   const [optionsQuery, setOptionsQuery] = useState('');
@@ -105,358 +92,341 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
     return allOptions.filter(o => o.name.toLowerCase().includes(q));
   }, [isOptions, optionsOpen, optionsQuery, allOptions]);
 
-  const callbacksRef = useRef({
-    createChild, addUnnamedFieldToNode, addReference, wsId, userId,
-    parentId, effectiveParentId, effectiveDepth, effectiveParentEK,
-    setEffectiveParentId, setEffectiveDepth, setEffectiveParentEK,
-    setExpanded, setFocusedNode, setEditingFieldName, setTriggerHint,
-    isOptions, optionsOpen, filteredOptions, optionsIndex,
-    setOptionsOpen, setOptionsQuery, setOptionsIndex,
-    onNavigateOut,
-  });
-  callbacksRef.current = {
-    createChild, addUnnamedFieldToNode, addReference, wsId, userId,
-    parentId, effectiveParentId, effectiveDepth, effectiveParentEK,
-    setEffectiveParentId, setEffectiveDepth, setEffectiveParentEK,
-    setExpanded, setFocusedNode, setEditingFieldName, setTriggerHint,
-    isOptions, optionsOpen, filteredOptions, optionsIndex,
-    setOptionsOpen, setOptionsQuery, setOptionsIndex,
-    onNavigateOut,
-  };
-
-  const commitContent = useCallback((html: string, editor: Editor) => {
-    const cleaned = stripWrappingP(html);
-    if (!cleaned || committingRef.current) return;
-
-    const ref = callbacksRef.current;
-    if (!ref.wsId || !ref.userId) return;
+  const commitText = useCallback((text: string, toggleCheckbox = false) => {
+    if (committingRef.current) return;
+    if (!wsId || !userId) return;
 
     committingRef.current = true;
-    editor.commands.clearContent(false);
+    setValue('');
     setHasContent(false);
 
-    // Create child and focus it (TrailingInput unmounts once there are children,
-    // so we focus the new node to keep the cursor visible)
-    ref.createChild(ref.effectiveParentId, ref.wsId, ref.userId, cleaned).then((newNode) => {
-      ref.setExpanded(ref.effectiveParentEK, true);
-      ref.setFocusedNode(newNode.id, ref.effectiveParentId);
+    createChild(effectiveParentId, wsId, userId, text).then((newNode) => {
+      if (toggleCheckbox) {
+        void cycleNodeCheckbox(newNode.id, userId);
+      }
+      setExpanded(effectiveParentEK, true);
+      setFocusedNode(newNode.id, effectiveParentId);
       queueMicrotask(() => { committingRef.current = false; });
     });
-  }, []);
+  }, [createChild, cycleNodeCheckbox, effectiveParentEK, effectiveParentId, setExpanded, setFocusedNode, userId, wsId]);
 
-  const keymap = useRef(
-    Extension.create({
-      name: 'trailingInputKeymap',
-      addKeyboardShortcuts() {
-        return {
-          [KEY_TRAILING_ENTER]: ({ editor }) => {
-            const ref = callbacksRef.current;
+  const createEmptyNode = useCallback((toggleCheckbox = false) => {
+    if (committingRef.current) return;
+    if (!wsId || !userId) return;
 
-            // Options autocomplete: select highlighted option
-            if (ref.isOptions && ref.optionsOpen && ref.filteredOptions.length > 0) {
-              const selected = ref.filteredOptions[ref.optionsIndex];
-              if (selected && ref.userId) {
-                committingRef.current = true;
-                ref.addReference(ref.effectiveParentId, selected.id, ref.userId);
-                editor.commands.clearContent(false);
-                setHasContent(false);
-                ref.setOptionsOpen(false);
-                ref.setOptionsQuery('');
-                ref.setOptionsIndex(0);
-                // Blur so the TrailingInput doesn't look like an empty node
-                editor.commands.blur();
-                queueMicrotask(() => { committingRef.current = false; });
-              }
-              return true;
-            }
-
-            const text = editor.state.doc.textContent.trim();
-            if (text.length > 0) {
-              commitContent(editor.getHTML(), editor);
-            } else {
-              // Empty Enter → create empty child so user can keep creating nodes
-              if (!ref.wsId || !ref.userId) return true;
-              committingRef.current = true;
-              ref.createChild(ref.effectiveParentId, ref.wsId, ref.userId, '').then((newNode) => {
-                ref.setExpanded(ref.effectiveParentEK, true);
-                ref.setFocusedNode(newNode.id, ref.effectiveParentId);
-                queueMicrotask(() => { committingRef.current = false; });
-              });
-            }
-            return true;
-          },
-          [KEY_TRAILING_INDENT]: () => {
-            // Indent: move effective parent to last child of current parent
-            const ref = callbacksRef.current;
-            const parent = useNodeStore.getState().entities[ref.effectiveParentId];
-            const siblings = parent?.children ?? [];
-            if (siblings.length === 0) return true; // No siblings to indent under
-
-            const lastSiblingId = siblings[siblings.length - 1];
-            // Expand the last sibling (compound key: effectiveParentId is its parent context)
-            const siblingEK = `${ref.effectiveParentId}:${lastSiblingId}`;
-            ref.setExpanded(siblingEK, true);
-            // Track: new effectiveParentId is lastSiblingId, its expand key is siblingEK
-            ref.setEffectiveParentEK(siblingEK);
-            ref.setEffectiveParentId(lastSiblingId);
-            ref.setEffectiveDepth(ref.effectiveDepth + 1);
-            return true;
-          },
-          [KEY_TRAILING_OUTDENT]: () => {
-            // Outdent: move effective parent up one level
-            const ref = callbacksRef.current;
-
-            // Can't go above workspace containers or depth 0
-            if (ref.effectiveDepth <= 0) return true;
-            if (isWorkspaceContainer(ref.effectiveParentId)) return true;
-
-            const currentParent = useNodeStore.getState().entities[ref.effectiveParentId];
-            const grandparentId = currentParent?.props._ownerId;
-            if (!grandparentId || isWorkspaceContainer(grandparentId)) return true;
-
-            // Compute expand key for grandparent (best-effort via _ownerId)
-            const ggpId = useNodeStore.getState().entities[grandparentId]?.props._ownerId ?? '';
-            ref.setEffectiveParentEK(`${ggpId}:${grandparentId}`);
-            ref.setEffectiveParentId(grandparentId);
-            ref.setEffectiveDepth(ref.effectiveDepth - 1);
-            return true;
-          },
-          [KEY_TRAILING_BACKSPACE]: ({ editor }) => {
-            const ref = callbacksRef.current;
-            const isEditorEmpty = editor.state.doc.textContent.length === 0;
-            const entities = useNodeStore.getState().entities;
-            const expanded = useUIStore.getState().expandedNodes;
-            const parent = entities[ref.effectiveParentId];
-            const target = getLastVisibleNode(ref.effectiveParentId, entities, expanded);
-            const intent = resolveTrailingBackspaceIntent({
-              isEditorEmpty,
-              depthShifted: ref.effectiveParentId !== ref.parentId,
-              parentChildCount: (parent?.children ?? []).length,
-              hasLastVisibleTarget: !!target,
-            });
-
-            if (intent === 'allow_default') return false; // Let TipTap handle normal backspace
-
-            // If depth was shifted via Tab/Shift+Tab, undo the shift first
-            if (intent === 'reset_depth_shift') {
-              ref.setEffectiveParentId(ref.parentId);
-              ref.setEffectiveDepth(depth);
-              return true;
-            }
-
-            // If parent has no real children (only TrailingInput showing),
-            // collapse the parent and focus it
-            if (intent === 'collapse_parent') {
-              const expandKey = ref.effectiveParentEK;
-              if (expandKey) ref.setExpanded(expandKey, false);
-              const gpId = parent?.props._ownerId;
-              if (gpId) ref.setFocusedNode(ref.effectiveParentId, gpId);
-              return true;
-            }
-
-            // Focus the last visible node above this TrailingInput.
-            // Walks from parent's last visible child down through expanded
-            // descendants to find the deepest visible node.
-            if (intent === 'focus_last_visible' && target) {
-              ref.setFocusedNode(target.nodeId, target.parentId);
-            }
-            return true;
-          },
-          [KEY_TRAILING_ARROW_DOWN]: () => {
-            const ref = callbacksRef.current;
-            const intent = resolveTrailingArrowDownIntent({
-              optionsOpen: ref.isOptions && ref.optionsOpen,
-              optionCount: ref.filteredOptions.length,
-              hasNavigateOut: !!ref.onNavigateOut,
-            });
-            if (intent === 'options_down') {
-              ref.setOptionsIndex(Math.min(ref.optionsIndex + 1, ref.filteredOptions.length - 1));
-              return true;
-            }
-            // At the bottom — escape to parent context
-            if (intent === 'navigate_out_down' && ref.onNavigateOut) {
-              ref.onNavigateOut('down');
-              return true;
-            }
-            return false;
-          },
-          [KEY_TRAILING_ARROW_UP]: () => {
-            const ref = callbacksRef.current;
-            const entities = useNodeStore.getState().entities;
-            const expanded = useUIStore.getState().expandedNodes;
-            const target = getLastVisibleNode(ref.effectiveParentId, entities, expanded);
-            const intent = resolveTrailingArrowUpIntent({
-              optionsOpen: ref.isOptions && ref.optionsOpen,
-              optionCount: ref.filteredOptions.length,
-              hasLastVisibleTarget: !!target,
-              hasNavigateOut: !!ref.onNavigateOut,
-            });
-            if (intent === 'options_up') {
-              ref.setOptionsIndex(Math.max(ref.optionsIndex - 1, 0));
-              return true;
-            }
-            // Try to focus last visible node above this TrailingInput
-            if (intent === 'focus_last_visible' && target) {
-              ref.setFocusedNode(target.nodeId, target.parentId);
-              return true;
-            }
-            // No nodes above — escape to parent context
-            if (intent === 'navigate_out_up' && ref.onNavigateOut) {
-              ref.onNavigateOut('up');
-              return true;
-            }
-            return false;
-          },
-          [KEY_TRAILING_ESCAPE]: ({ editor }) => {
-            const ref = callbacksRef.current;
-            const intent = resolveTrailingEscapeIntent(ref.isOptions && ref.optionsOpen);
-            if (intent === 'close_options') {
-              ref.setOptionsOpen(false);
-              ref.setOptionsQuery('');
-              ref.setOptionsIndex(0);
-              return true;
-            }
-            editor.commands.blur();
-            return true;
-          },
-        };
-      },
-    }),
-  ).current;
-
-  const editor = useEditor({
-    extensions: [
-      StarterKit.configure({
-        bulletList: false,
-        orderedList: false,
-        listItem: false,
-        heading: false,
-        blockquote: false,
-        codeBlock: false,
-        horizontalRule: false,
-      }),
-      Placeholder.configure({
-        placeholder: '',
-      }),
-      keymap,
-    ],
-    content: '<p></p>',
-    editorProps: {
-      attributes: {
-        class: 'outline-none text-sm leading-[21px]',
-      },
-    },
-    onUpdate: ({ editor }) => {
-      const text = editor.state.doc.textContent;
-      setHasContent(text.length > 0);
-
-      if (committingRef.current) return;
-      const ref = callbacksRef.current;
-      if (!ref.wsId || !ref.userId) return;
-
-      const action = resolveTrailingUpdateAction({
-        text,
-        isOptionsField: ref.isOptions,
-      });
-
-      // > field trigger: handle directly (no intermediate node needed)
-      if (action.type === 'create_field') {
-        committingRef.current = true;
-        editor.commands.clearContent(false);
-        setHasContent(false);
-        ref.setOptionsOpen(false);
-
-        ref.addUnnamedFieldToNode(ref.effectiveParentId, ref.wsId, ref.userId).then(({ tupleId }) => {
-          ref.setEditingFieldName(tupleId);
-          queueMicrotask(() => { committingRef.current = false; });
-        });
-        return;
-      }
-
-      // # or @ trigger: create child node + set triggerHint so OutlinerItem
-      // opens the dropdown immediately (extensions need docChanged to fire,
-      // but mount doesn't count as docChanged)
-      if (action.type === 'create_trigger_node') {
-        committingRef.current = true;
-        editor.commands.clearContent(false);
-        setHasContent(false);
-        ref.setOptionsOpen(false);
-
-        ref.setTriggerHint(action.trigger);
-        ref.createChild(ref.effectiveParentId, ref.wsId, ref.userId, action.trigger).then((newNode) => {
-          ref.setExpanded(ref.effectiveParentEK, true);
-          ref.setFocusedNode(newNode.id, ref.effectiveParentId);
-          queueMicrotask(() => { committingRef.current = false; });
-        });
-        return;
-      }
-
-      if (action.type === 'open_options') {
-        ref.setOptionsOpen(true);
-        ref.setOptionsQuery(action.query);
-        ref.setOptionsIndex(0);
-        return;
-      }
-
-      if (action.type === 'close_options') {
-        ref.setOptionsOpen(false);
-        ref.setOptionsQuery('');
-        ref.setOptionsIndex(0);
-      }
-    },
-    onFocus: () => {
-      // Options: show all options immediately on focus (even with empty input)
-      const ref = callbacksRef.current;
-      if (ref.isOptions) {
-        setOptionsOpen(true);
-        setOptionsQuery('');
-        setOptionsIndex(0);
-      }
-    },
-    onBlur: ({ editor }) => {
-      if (committingRef.current) return;
-      const text = editor.state.doc.textContent.trim();
-      if (text.length > 0) {
-        commitContent(editor.getHTML(), editor);
-      }
-      setHasContent(false);
-      // Close options dropdown
-      setOptionsOpen(false);
-      setOptionsQuery('');
-      setOptionsIndex(0);
-      // Reset to original depth on blur
-      const ref = callbacksRef.current;
-      if (ref.effectiveParentId !== ref.parentId) {
-        ref.setEffectiveParentId(ref.parentId);
-        ref.setEffectiveDepth(depth);
-      }
-    },
-  });
-
-  // Auto-focus when mounting with autoFocus (leaf node expansion)
-  useEffect(() => {
-    if (autoFocus && editor && !editor.isDestroyed) {
-      editor.commands.focus('start');
-    }
-  }, [autoFocus, editor]);
-
-  if (!editor) return null;
-
-  // Handle option click from dropdown
-  const handleOptionClick = useCallback((optionId: string) => {
-    const ref = callbacksRef.current;
-    if (!ref.userId || !editor || editor.isDestroyed) return;
     committingRef.current = true;
-    ref.addReference(ref.effectiveParentId, optionId, ref.userId);
-    editor.commands.clearContent(false);
+    createChild(effectiveParentId, wsId, userId, '').then((newNode) => {
+      if (toggleCheckbox) {
+        void cycleNodeCheckbox(newNode.id, userId);
+      }
+      setExpanded(effectiveParentEK, true);
+      setFocusedNode(newNode.id, effectiveParentId);
+      queueMicrotask(() => { committingRef.current = false; });
+    });
+  }, [createChild, cycleNodeCheckbox, effectiveParentEK, effectiveParentId, setExpanded, setFocusedNode, userId, wsId]);
+
+  const confirmOptionSelection = useCallback(() => {
+    const selected = filteredOptions[optionsIndex];
+    if (!selected || !userId) return;
+
+    committingRef.current = true;
+    addReference(effectiveParentId, selected.id, userId);
+    setValue('');
     setHasContent(false);
     setOptionsOpen(false);
     setOptionsQuery('');
     setOptionsIndex(0);
-    // Blur so the TrailingInput doesn't look like an empty node
-    editor.commands.blur();
+    inputRef.current?.blur();
     queueMicrotask(() => { committingRef.current = false; });
-  }, [editor]);
+  }, [addReference, effectiveParentId, filteredOptions, optionsIndex, userId]);
+
+  const handleEnter = useCallback((toggleCheckbox = false) => {
+    if (isOptions && optionsOpen && filteredOptions.length > 0) {
+      confirmOptionSelection();
+      return;
+    }
+
+    if (value.trim().length > 0) {
+      commitText(value, toggleCheckbox);
+      return;
+    }
+
+    createEmptyNode(toggleCheckbox);
+  }, [confirmOptionSelection, createEmptyNode, filteredOptions.length, isOptions, optionsOpen, value, commitText]);
+
+  const handleInputValue = useCallback((nextValue: string) => {
+    setValue(nextValue);
+    setHasContent(nextValue.length > 0);
+
+    if (committingRef.current) return;
+    if (!wsId || !userId) return;
+
+    const action = resolveTrailingUpdateAction({ text: nextValue, isOptionsField: isOptions });
+
+    if (action.type === 'create_field') {
+      committingRef.current = true;
+      setValue('');
+      setHasContent(false);
+      setOptionsOpen(false);
+
+      addUnnamedFieldToNode(effectiveParentId, wsId, userId).then(({ tupleId }) => {
+        setEditingFieldName(tupleId);
+        queueMicrotask(() => { committingRef.current = false; });
+      });
+      return;
+    }
+
+    if (action.type === 'create_trigger_node') {
+      committingRef.current = true;
+      setValue('');
+      setHasContent(false);
+      setOptionsOpen(false);
+
+      setTriggerHint(action.trigger);
+      createChild(effectiveParentId, wsId, userId, action.trigger).then((newNode) => {
+        setExpanded(effectiveParentEK, true);
+        setFocusedNode(newNode.id, effectiveParentId);
+        queueMicrotask(() => { committingRef.current = false; });
+      });
+      return;
+    }
+
+    if (action.type === 'open_options') {
+      setOptionsOpen(true);
+      setOptionsQuery(action.query);
+      setOptionsIndex(0);
+      return;
+    }
+
+    if (action.type === 'close_options') {
+      setOptionsOpen(false);
+      setOptionsQuery('');
+      setOptionsIndex(0);
+    }
+  }, [
+    addUnnamedFieldToNode,
+    createChild,
+    effectiveParentEK,
+    effectiveParentId,
+    isOptions,
+    setEditingFieldName,
+    setExpanded,
+    setFocusedNode,
+    setTriggerHint,
+    userId,
+    wsId,
+  ]);
+
+  const handleKeyDown = useCallback((e: ReactKeyboardEvent<HTMLInputElement>) => {
+    if (composingRef.current || e.nativeEvent.isComposing || e.key === 'Process') return;
+
+    if (matchesShortcutEvent(e.nativeEvent, KEY_TRAILING_FORCE_ENTER)) {
+      e.preventDefault();
+      handleEnter(true);
+      return;
+    }
+
+    if (matchesShortcutEvent(e.nativeEvent, KEY_TRAILING_ENTER)) {
+      e.preventDefault();
+      handleEnter(false);
+      return;
+    }
+
+    if (matchesShortcutEvent(e.nativeEvent, KEY_TRAILING_INDENT)) {
+      e.preventDefault();
+      const parent = useNodeStore.getState().entities[effectiveParentId];
+      const siblings = parent?.children ?? [];
+      if (siblings.length === 0) return;
+
+      const lastSiblingId = siblings[siblings.length - 1];
+      const siblingEK = `${effectiveParentId}:${lastSiblingId}`;
+      setExpanded(siblingEK, true);
+      setEffectiveParentEK(siblingEK);
+      setEffectiveParentId(lastSiblingId);
+      setEffectiveDepth((d) => d + 1);
+      return;
+    }
+
+    if (matchesShortcutEvent(e.nativeEvent, KEY_TRAILING_OUTDENT)) {
+      e.preventDefault();
+      if (effectiveDepth <= 0) return;
+      if (isWorkspaceContainer(effectiveParentId)) return;
+
+      const currentParent = useNodeStore.getState().entities[effectiveParentId];
+      const grandparentId = currentParent?.props._ownerId;
+      if (!grandparentId || isWorkspaceContainer(grandparentId)) return;
+
+      const ggpId = useNodeStore.getState().entities[grandparentId]?.props._ownerId ?? '';
+      setEffectiveParentEK(`${ggpId}:${grandparentId}`);
+      setEffectiveParentId(grandparentId);
+      setEffectiveDepth((d) => d - 1);
+      return;
+    }
+
+    if (matchesShortcutEvent(e.nativeEvent, KEY_TRAILING_BACKSPACE)) {
+      const entities = useNodeStore.getState().entities;
+      const expanded = useUIStore.getState().expandedNodes;
+      const parent = entities[effectiveParentId];
+      const target = getLastVisibleNode(effectiveParentId, entities, expanded);
+      const intent = resolveTrailingBackspaceIntent({
+        isEditorEmpty: value.length === 0,
+        depthShifted: effectiveParentId !== parentId,
+        parentChildCount: (parent?.children ?? []).length,
+        hasLastVisibleTarget: !!target,
+      });
+
+      if (intent === 'allow_default') return;
+      e.preventDefault();
+
+      if (intent === 'reset_depth_shift') {
+        setEffectiveParentId(parentId);
+        setEffectiveDepth(depth);
+        return;
+      }
+
+      if (intent === 'collapse_parent') {
+        if (effectiveParentEK) setExpanded(effectiveParentEK, false);
+        const gpId = parent?.props._ownerId;
+        if (gpId) setFocusedNode(effectiveParentId, gpId);
+        return;
+      }
+
+      if (intent === 'focus_last_visible' && target) {
+        setFocusedNode(target.nodeId, target.parentId);
+      }
+      return;
+    }
+
+    if (matchesShortcutEvent(e.nativeEvent, KEY_TRAILING_ARROW_DOWN)) {
+      const intent = resolveTrailingArrowDownIntent({
+        optionsOpen: isOptions && optionsOpen,
+        optionCount: filteredOptions.length,
+        hasNavigateOut: !!onNavigateOut,
+      });
+
+      if (intent === 'options_down') {
+        e.preventDefault();
+        setOptionsIndex((i) => Math.min(i + 1, filteredOptions.length - 1));
+        return;
+      }
+
+      if (intent === 'navigate_out_down' && onNavigateOut) {
+        e.preventDefault();
+        onNavigateOut('down');
+      }
+      return;
+    }
+
+    if (matchesShortcutEvent(e.nativeEvent, KEY_TRAILING_ARROW_UP)) {
+      const entities = useNodeStore.getState().entities;
+      const expanded = useUIStore.getState().expandedNodes;
+      const target = getLastVisibleNode(effectiveParentId, entities, expanded);
+      const intent = resolveTrailingArrowUpIntent({
+        optionsOpen: isOptions && optionsOpen,
+        optionCount: filteredOptions.length,
+        hasLastVisibleTarget: !!target,
+        hasNavigateOut: !!onNavigateOut,
+      });
+
+      if (intent === 'options_up') {
+        e.preventDefault();
+        setOptionsIndex((i) => Math.max(i - 1, 0));
+        return;
+      }
+
+      if (intent === 'focus_last_visible' && target) {
+        e.preventDefault();
+        setFocusedNode(target.nodeId, target.parentId);
+        return;
+      }
+
+      if (intent === 'navigate_out_up' && onNavigateOut) {
+        e.preventDefault();
+        onNavigateOut('up');
+      }
+      return;
+    }
+
+    if (matchesShortcutEvent(e.nativeEvent, KEY_TRAILING_ESCAPE)) {
+      e.preventDefault();
+      const intent = resolveTrailingEscapeIntent(isOptions && optionsOpen);
+      if (intent === 'close_options') {
+        setOptionsOpen(false);
+        setOptionsQuery('');
+        setOptionsIndex(0);
+        return;
+      }
+      inputRef.current?.blur();
+    }
+  }, [
+    depth,
+    effectiveDepth,
+    effectiveParentEK,
+    effectiveParentId,
+    filteredOptions.length,
+    handleEnter,
+    isOptions,
+    onNavigateOut,
+    optionsOpen,
+    parentId,
+    setExpanded,
+    setFocusedNode,
+    value.length,
+  ]);
+
+  const handleBlur = useCallback(() => {
+    if (committingRef.current) return;
+    const text = value.trim();
+    if (text.length > 0) {
+      commitText(value);
+    }
+
+    setHasContent(false);
+    setOptionsOpen(false);
+    setOptionsQuery('');
+    setOptionsIndex(0);
+
+    if (effectiveParentId !== parentId) {
+      setEffectiveParentId(parentId);
+      setEffectiveDepth(depth);
+    }
+  }, [commitText, depth, effectiveParentId, parentId, value]);
+
+  const handleFocus = useCallback(() => {
+    if (isOptions) {
+      setOptionsOpen(true);
+      setOptionsQuery(value);
+      setOptionsIndex(0);
+    }
+  }, [isOptions, value]);
+
+  const handleOptionClick = useCallback((optionId: string) => {
+    if (!userId) return;
+    committingRef.current = true;
+    addReference(effectiveParentId, optionId, userId);
+    setValue('');
+    setHasContent(false);
+    setOptionsOpen(false);
+    setOptionsQuery('');
+    setOptionsIndex(0);
+    inputRef.current?.blur();
+    queueMicrotask(() => { committingRef.current = false; });
+  }, [addReference, effectiveParentId, userId]);
+
+  const handleCompositionStart = useCallback(() => {
+    composingRef.current = true;
+  }, []);
+
+  const handleCompositionEnd = useCallback(() => {
+    composingRef.current = false;
+  }, []);
+
+  useEffect(() => {
+    if (autoFocus) {
+      inputRef.current?.focus();
+      inputRef.current?.setSelectionRange(value.length, value.length);
+    }
+  }, [autoFocus, value.length]);
 
   return (
     <div
@@ -470,7 +440,18 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
         dimmed={!hasContent}
       />
       <div className="relative flex-1 min-w-0">
-        <EditorContent editor={editor} />
+        <input
+          ref={inputRef}
+          type="text"
+          value={value}
+          onChange={(e) => handleInputValue(e.target.value)}
+          onKeyDown={handleKeyDown}
+          onCompositionStart={handleCompositionStart}
+          onCompositionEnd={handleCompositionEnd}
+          onFocus={handleFocus}
+          onBlur={handleBlur}
+          className="block w-full h-[21px] appearance-none bg-transparent p-0 m-0 border-0 outline-none text-sm leading-[21px] align-top font-sans"
+        />
         {optionsOpen && filteredOptions.length > 0 && (
           <div className="absolute left-0 top-full z-50 mt-0.5 max-h-48 w-56 overflow-y-auto rounded-lg border border-border bg-popover p-1 shadow-lg">
             {filteredOptions.map((opt, i) => (

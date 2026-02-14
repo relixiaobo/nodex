@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
-import type { Editor } from '@tiptap/react';
 import { useNode } from '../../hooks/use-node';
 import { useChildren } from '../../hooks/use-children';
 import { useNodeTags } from '../../hooks/use-node-tags';
@@ -27,6 +26,7 @@ import {
 import { resolveDropHoverPosition } from '../../lib/drag-drop-position';
 import { resolveDropMove } from '../../lib/drag-drop';
 import { resolveSelectedReferenceShortcut } from '../../lib/selected-reference-shortcuts';
+import type { NodeEditorHandle } from '../editor/editor-handle';
 
 /** Field types that accept only a single value node. Enter navigates out instead of creating siblings. */
 const SINGLE_VALUE_FIELD_TYPES: Set<string> = new Set([
@@ -55,6 +55,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   const focusedNodeId = useUIStore((s) => s.focusedNodeId);
   const focusedParentId = useUIStore((s) => s.focusedParentId);
   const setFocusedNode = useUIStore((s) => s.setFocusedNode);
+  const setFocusClickCoords = useUIStore((s) => s.setFocusClickCoords);
   const selectedNodeId = useUIStore((s) => s.selectedNodeId);
   const selectedParentId = useUIStore((s) => s.selectedParentId);
   const setSelectedNode = useUIStore((s) => s.setSelectedNode);
@@ -85,7 +86,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   const entities = useNodeStore((s) => s.entities);
 
   const rowRef = useRef<HTMLDivElement>(null);
-  const editorRef = useRef<Editor | null>(null);
+  const editorRef = useRef<NodeEditorHandle | null>(null);
   const blurClearRafRef = useRef<number | null>(null);
 
   // # trigger state
@@ -392,12 +393,12 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       // The editor content is '#' — set range to cover it
       setHashTagQuery('');
       setHashTagSelectedIndex(0);
-      hashRangeRef.current = { from: 1, to: 2 }; // position of '#' in ProseMirror doc
+      hashRangeRef.current = { from: 0, to: 1 };
       setHashTagOpen(true);
     } else if (hint === '@') {
       setRefQuery('');
       setRefSelectedIndex(0);
-      refRangeRef.current = { from: 1, to: 2 };
+      refRangeRef.current = { from: 0, to: 1 };
       setRefOpen(true);
     }
   }, [isFocused]);
@@ -555,38 +556,60 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       const currentlyExpanded = useUIStore.getState().expandedNodes.has(`${parentId}:${nodeId}`);
       const currentHasChildren =
         (useNodeStore.getState().entities[nodeId]?.children ?? []).length > 0;
+      const isSplit = afterContent !== undefined;
 
-      if (currentlyExpanded && currentHasChildren) {
-        // Expanded with children → new node becomes first child (position 0)
+      const focusNewNodeStart = (newNodeId: string, newParentId: string) => {
+        setFocusClickCoords({ nodeId: newNodeId, parentId: newParentId, textOffset: 0 });
+        setFocusedNode(newNodeId, newParentId);
+      };
+
+      // Split semantics:
+      // - no children -> sibling
+      // - has children -> first child (regardless of expanded state)
+      if ((isSplit && currentHasChildren) || (!isSplit && currentlyExpanded && currentHasChildren)) {
+        // Child insertion -> new node becomes first child (position 0)
+        setExpanded(`${parentId}:${nodeId}`, true);
         const beforeIds = new Set(useNodeStore.getState().entities[nodeId]?.children ?? []);
         const createPromise = createChild(nodeId, wsId, userId, afterContent ?? '', 0);
 
         const optimisticIds = useNodeStore.getState().entities[nodeId]?.children ?? [];
         const optimisticNewId = optimisticIds.find((cid) => !beforeIds.has(cid));
-        if (optimisticNewId) setFocusedNode(optimisticNewId, nodeId);
+        if (optimisticNewId) focusNewNodeStart(optimisticNewId, nodeId);
 
         createPromise.then((newNode) => {
           if (useNodeStore.getState().entities[newNode.id]) {
-            setFocusedNode(newNode.id, nodeId);
+            focusNewNodeStart(newNode.id, nodeId);
           }
         });
       } else {
-        // Collapsed or leaf → create sibling after this node
+        // Sibling insertion after this node
         const beforeIds = new Set(useNodeStore.getState().entities[parentId]?.children ?? []);
         const createPromise = createSibling(nodeId, wsId, userId, afterContent);
 
         const optimisticIds = useNodeStore.getState().entities[parentId]?.children ?? [];
         const optimisticNewId = optimisticIds.find((cid) => !beforeIds.has(cid));
-        if (optimisticNewId) setFocusedNode(optimisticNewId, parentId);
+        if (optimisticNewId) focusNewNodeStart(optimisticNewId, parentId);
 
         createPromise.then((newNode) => {
           if (useNodeStore.getState().entities[newNode.id]) {
-            setFocusedNode(newNode.id, parentId);
+            focusNewNodeStart(newNode.id, parentId);
           }
         });
       }
     },
-    [nodeId, parentId, wsId, userId, fieldDataType, onNavigateOut, createSibling, createChild, setFocusedNode],
+    [
+      nodeId,
+      parentId,
+      wsId,
+      userId,
+      fieldDataType,
+      onNavigateOut,
+      createSibling,
+      createChild,
+      setExpanded,
+      setFocusedNode,
+      setFocusClickCoords,
+    ],
   );
 
   const handleIndent = useCallback(() => {
@@ -663,6 +686,65 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     return true;
   }, [nodeId, wsId, userId, parentId, rootNodeId, rootChildIds, entities, expandedNodes, trashNode, removeReference, setFocusedNode]);
 
+  const handleBackspaceAtStart = useCallback((): boolean => {
+    if (!wsId || !userId) return false;
+    const state = useNodeStore.getState();
+    const current = state.entities[nodeId];
+    const parent = state.entities[parentId];
+    if (!current || !parent?.children) return false;
+
+    // Only merge normal owned content nodes.
+    if (current.props._ownerId !== parentId || current.props._docType) return false;
+
+    const index = parent.children.indexOf(nodeId);
+    if (index <= 0) return false;
+
+    const prevId = parent.children[index - 1];
+    const prevNode = state.entities[prevId];
+    if (!prevNode || prevNode.props._docType) return false;
+
+    const currentName = current.props.name ?? '';
+    const currentText = htmlToPlainText(currentName).trim();
+    if (!currentText) return false;
+
+    const prevName = prevNode.props.name ?? '';
+    const prevTextLen = htmlToPlainText(prevName).length;
+
+    void updateNodeName(prevId, `${prevName}${currentName}`, userId);
+
+    const childrenToMove = [...(current.children ?? [])];
+    if (childrenToMove.length > 0) {
+      setExpanded(`${parentId}:${prevId}`, true);
+      const prevChildCount = prevNode.children?.length ?? 0;
+      for (let i = 0; i < childrenToMove.length; i++) {
+        void moveNodeTo(childrenToMove[i], prevId, prevChildCount + i, userId);
+      }
+    }
+
+    void trashNode(nodeId, wsId, userId);
+    const boundary = { nodeId: prevId, parentId, textOffset: prevTextLen };
+    setFocusClickCoords(boundary);
+    setFocusedNode(prevId, parentId);
+    requestAnimationFrame(() => {
+      const state = useUIStore.getState();
+      if (state.focusedNodeId === prevId && state.focusedParentId === parentId) {
+        state.setFocusClickCoords(boundary);
+      }
+    });
+    return true;
+  }, [
+    moveNodeTo,
+    nodeId,
+    parentId,
+    setExpanded,
+    setFocusClickCoords,
+    setFocusedNode,
+    trashNode,
+    updateNodeName,
+    userId,
+    wsId,
+  ]);
+
   const handleArrowUp = useCallback(() => {
     const flatList = getFlattenedVisibleNodes(rootChildIds, entities, expandedNodes, rootNodeId);
     const prev = getPreviousVisibleNode(nodeId, parentId, flatList);
@@ -711,17 +793,57 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   /** Delete #query text from editor, save corrected content, refocus */
   const cleanupHashTagText = useCallback(() => {
     const ed = editorRef.current;
-    if (ed && !ed.isDestroyed) {
-      const { from, to } = hashRangeRef.current;
-      ed.chain().deleteRange({ from, to }).run();
-      // Save corrected content (without #query)
-      const html = ed.getHTML();
-      const trimmed = html.trim();
-      const match = trimmed.match(/^<p>(.*)<\/p>$/s);
-      const cleanedName = (match && !match[1].includes('<p>')) ? match[1] : trimmed;
-      if (userId) updateNodeName(nodeId, cleanedName, userId);
+    if (ed) {
+      let { from, to } = hashRangeRef.current;
+      const beforeText = ed.getText();
+      const caret = ed.getCaretOffset() ?? beforeText.length;
+      const beforeCaret = beforeText.slice(0, caret);
+      const activeMatch = beforeCaret.match(/#([^\s#@]*)$/u);
+      if (activeMatch) {
+        from = caret - activeMatch[0].length;
+        to = caret;
+      } else if (from < 0 || to > beforeText.length || from >= to || beforeText.slice(from, to).indexOf('#') !== 0) {
+        const token = `#${hashTagQuery}`;
+        const fallback = token.length > 1 ? beforeText.lastIndexOf(token) : beforeText.lastIndexOf('#');
+        if (fallback >= 0) {
+          from = fallback;
+          to = fallback + (token.length || 1);
+        }
+      }
+      if (from < 0 || to > beforeText.length || from >= to || beforeText.slice(from, to).indexOf('#') !== 0) {
+        const regex = /#([^\s#@]*)/gu;
+        let lastMatch: RegExpMatchArray | null = null;
+        for (const match of beforeText.matchAll(regex)) {
+          lastMatch = match;
+        }
+        if (lastMatch && typeof lastMatch.index === 'number') {
+          from = lastMatch.index;
+          to = lastMatch.index + lastMatch[0].length;
+        }
+      }
+      if (from >= 0 && to > from && to <= beforeText.length) {
+        ed.deleteTextRange({ from, to });
+      }
+      const afterText = ed.getText();
+      if (afterText === beforeText) {
+        if (from >= 0 && to > from && to <= beforeText.length) {
+          const forcedText = beforeText.slice(0, from) + beforeText.slice(to);
+          ed.setPlainText(forcedText, from);
+        } else {
+          const hashPos = beforeText.lastIndexOf('#');
+          if (hashPos >= 0) {
+            const forcedText = beforeText.slice(0, hashPos) + beforeText.slice(hashPos + 1);
+            ed.setPlainText(forcedText, hashPos);
+          }
+        }
+      }
+      if (userId) updateNodeName(nodeId, ed.getHTML(), userId);
+    } else if (userId) {
+      const currentName = useNodeStore.getState().entities[nodeId]?.props.name ?? '';
+      const fallbackText = htmlToPlainText(currentName).replace(/#([^\s#@]*)$/u, '');
+      updateNodeName(nodeId, fallbackText, userId);
     }
-  }, [nodeId, userId, updateNodeName]);
+  }, [hashTagQuery, nodeId, userId, updateNodeName]);
 
   const handleHashTagSelect = useCallback(
     (tagDefId: string) => {
@@ -816,14 +938,22 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     (refNodeId: string) => {
       if (!wsId || !userId) return;
       const ed = editorRef.current;
-      if (!ed || ed.isDestroyed) return;
+      if (!ed) return;
 
       // Check if the entire editor content is just the @query (empty-node reference)
-      const fullText = ed.state.doc.textContent;
-      const { from, to } = refRangeRef.current;
+      const fullText = ed.getText();
+      let { from, to } = refRangeRef.current;
+      if (from < 0 || to > fullText.length || from >= to || fullText.slice(from, to).indexOf('@') !== 0) {
+        const token = `@${refQuery}`;
+        const fallback = fullText.lastIndexOf(token || '@');
+        if (fallback >= 0) {
+          from = fallback;
+          to = fallback + (token.length || 1);
+        }
+      }
       // Text before the @ and after the query
-      const beforeAt = fullText.substring(0, from - 1);
-      const afterQuery = fullText.substring(to - 1);
+      const beforeAt = fullText.substring(0, from);
+      const afterQuery = fullText.substring(to);
       const isEmptyAround = beforeAt.trim() === '' && afterQuery.trim() === '';
 
       if (isEmptyAround) {
@@ -835,13 +965,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
           // Tana behavior: insert inline ref instead, keeping this as a regular content node.
           const refNode = entities[refNodeId];
           const refName = (refNode?.props.name ?? '').replace(/<[^>]+>/g, '').trim() || 'Untitled';
-          ed.chain()
-            .deleteRange({ from, to })
-            .insertContentAt(from, {
-              type: 'inlineRef',
-              attrs: { nodeId: refNodeId, label: refName },
-            })
-            .run();
+          ed.replaceTextRangeWithInlineRef({ from, to }, refNodeId, refName);
         } else {
           // Empty node @: trash this node, create temp node in conversion mode
           // Temp node has inline ref content — user sees reference bullet + cursor at end.
@@ -858,20 +982,27 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
         // Mid-text @: insert inline reference
         const refNode = entities[refNodeId];
         const refName = (refNode?.props.name ?? '').replace(/<[^>]+>/g, '').trim() || 'Untitled';
-        ed.chain()
-          .deleteRange({ from, to })
-          .insertContentAt(from, {
-            type: 'inlineRef',
-            attrs: { nodeId: refNodeId, label: refName },
-          })
-          .run();
+        ed.replaceTextRangeWithInlineRef({ from, to }, refNodeId, refName);
       }
 
       setRefOpen(false);
       setRefQuery('');
       setRefSelectedIndex(0);
     },
-    [nodeId, parentId, wsId, userId, entities, trashNode, addReference, setExpanded, setFocusedNode, startRefConversion, setPendingRefConversion],
+    [
+      nodeId,
+      parentId,
+      wsId,
+      userId,
+      entities,
+      trashNode,
+      addReference,
+      setExpanded,
+      setFocusedNode,
+      startRefConversion,
+      setPendingRefConversion,
+      refQuery,
+    ],
   );
 
   const handleReferenceCreateNew = useCallback(
@@ -1085,6 +1216,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
                 initialContent={node.props.name ?? ''}
                 onBlur={handleBlur}
                 onEnter={handleEnter}
+                onBackspaceAtStart={handleBackspaceAtStart}
                 onIndent={handleIndent}
                 onOutdent={handleOutdent}
                 onDelete={handleDelete}
@@ -1112,6 +1244,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
                 onReferenceClose={handleReferenceClose}
                 onDescriptionEdit={handleDescriptionEdit}
                 onToggleDone={handleCycleCheckbox}
+                onInlineReferenceClick={navigateTo}
               />
             ) : (
               <span
@@ -1324,7 +1457,7 @@ function getTextOffsetFromPoint(container: HTMLElement, clientX: number, clientY
   }
 
   if (!startContainer || !container.contains(startContainer)) {
-    return null;
+    return getApproxTextOffsetFromPoint(container, clientX, clientY);
   }
 
   try {
@@ -1333,6 +1466,67 @@ function getTextOffsetFromPoint(container: HTMLElement, clientX: number, clientY
     preRange.setEnd(startContainer, startOffset);
     return preRange.toString().length;
   } catch {
+    return getApproxTextOffsetFromPoint(container, clientX, clientY);
+  }
+}
+
+function getApproxTextOffsetFromPoint(container: HTMLElement, clientX: number, clientY: number): number {
+  const textLength = (container.textContent ?? '').length;
+  if (textLength <= 0) return 0;
+  let bestOffset = textLength;
+  let bestDist = Number.POSITIVE_INFINITY;
+  for (let i = 0; i <= textLength; i++) {
+    const rect = getCaretRectAtOffset(container, i);
+    if (!rect) continue;
+    const dx = clientX < rect.left ? rect.left - clientX : (clientX > rect.right ? clientX - rect.right : 0);
+    const dy = clientY < rect.top ? rect.top - clientY : (clientY > rect.bottom ? clientY - rect.bottom : 0);
+    const dist = dy * 1000 + dx;
+    if (dist < bestDist) {
+      bestDist = dist;
+      bestOffset = i;
+    }
+  }
+  return bestOffset;
+}
+
+function getCaretRectAtOffset(container: HTMLElement, offset: number): DOMRect | null {
+  const doc = container.ownerDocument;
+  const pos = resolvePositionByTextOffset(container, offset);
+  if (!pos) return null;
+  try {
+    const range = doc.createRange();
+    range.setStart(pos.node, pos.offset);
+    range.collapse(true);
+    const rect = range.getClientRects()[0] ?? range.getBoundingClientRect();
+    if (rect && Number.isFinite(rect.left) && Number.isFinite(rect.top)) {
+      return rect;
+    }
+  } catch {
     return null;
   }
+  return null;
+}
+
+function resolvePositionByTextOffset(root: HTMLElement, offset: number): { node: Node; offset: number } | null {
+  const target = Math.max(0, offset);
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  let remaining = target;
+  let current = walker.nextNode();
+  while (current) {
+    const textNode = current as Text;
+    const len = textNode.nodeValue?.length ?? 0;
+    if (remaining <= len) {
+      return { node: textNode, offset: remaining };
+    }
+    remaining -= len;
+    current = walker.nextNode();
+  }
+  return { node: root, offset: root.childNodes.length };
+}
+
+function htmlToPlainText(html: string): string {
+  if (!html) return '';
+  const div = document.createElement('div');
+  div.innerHTML = html;
+  return (div.textContent ?? '').replace(/\u200B/g, '');
 }

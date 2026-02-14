@@ -1,39 +1,25 @@
 /**
- * Per-node TipTap editor.
- *
- * Created only when a node is focused. On blur, extracts HTML content
- * and saves back to the store, then the instance is destroyed.
- *
- * Keyboard shortcuts (handled via TipTap keymap, propagated to outliner):
- *   Enter       → save + create sibling
- *   Tab         → indent node
- *   Shift+Tab   → outdent node
- *   Backspace   → delete node (when empty)
- *   ArrowUp     → focus previous node
- *   ArrowDown   → focus next node
+ * Lightweight per-node contentEditable editor (TipTap-free).
  */
-import { useEffect, useLayoutEffect, useRef, useMemo, useCallback, type MutableRefObject } from 'react';
-import { useEditor, EditorContent, type Editor } from '@tiptap/react';
-import { Extension } from '@tiptap/react';
-import StarterKit from '@tiptap/starter-kit';
-import Highlight from '@tiptap/extension-highlight';
-import Italic from '@tiptap/extension-italic';
-import { DOMSerializer } from '@tiptap/pm/model';
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useCallback,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type MutableRefObject,
+} from 'react';
 import { useNodeStore } from '../../stores/node-store';
 import { useUIStore } from '../../stores/ui-store';
 import { useWorkspaceStore } from '../../stores/workspace-store';
-import { getPrimaryShortcutKey, getShortcutKeys } from '../../lib/shortcut-registry';
-import { stripWrappingP, wrapInP } from '../../lib/editor-html.js';
+import { getPrimaryShortcutKey, getShortcutKeys, matchesShortcutEvent } from '../../lib/shortcut-registry';
 import {
   resolveNodeEditorArrowIntent,
   resolveNodeEditorEnterIntent,
   resolveNodeEditorEscapeIntent,
   resolveNodeEditorForceCreateIntent,
 } from '../../lib/node-editor-shortcuts.js';
-import { HashTagExtension, type HashTagCallbacks } from './HashTagExtension';
-import { FieldTriggerExtension, type FieldTriggerCallbacks } from './FieldTriggerExtension';
-import { ReferenceExtension, type ReferenceCallbacks } from './ReferenceExtension';
-import { InlineRefNode } from './InlineRefNode';
+import type { NodeEditorHandle, TextRange } from './editor-handle';
 
 const KEY_EDITOR_ENTER = getPrimaryShortcutKey('editor.enter', 'Enter');
 const KEY_EDITOR_INDENT = getPrimaryShortcutKey('editor.indent', 'Tab');
@@ -56,27 +42,24 @@ interface NodeEditorProps {
   initialContent: string;
   onBlur: () => void;
   onEnter: (afterContent?: string) => void;
+  onBackspaceAtStart?: () => boolean;
   onIndent: () => void;
   onOutdent: () => void;
-  onDelete: () => boolean; // returns true if node was deleted
+  onDelete: () => boolean;
   onArrowUp: () => void;
   onArrowDown: () => void;
   onMoveUp: () => void;
   onMoveDown: () => void;
   onHashTag?: (query: string, from: number, to: number) => void;
   onHashTagDeactivate?: () => void;
-  /** Ref to get the editor instance (for deleting #query text from outside) */
-  editorRef?: MutableRefObject<Editor | null>;
-  // ─── HashTag dropdown keyboard forwarding ───
+  editorRef?: MutableRefObject<NodeEditorHandle | null>;
   hashTagActive?: boolean;
   onHashTagConfirm?: () => void;
   onHashTagNavDown?: () => void;
   onHashTagNavUp?: () => void;
   onHashTagCreate?: () => void;
   onHashTagClose?: () => void;
-  // ─── Field trigger (>) ───
   onFieldTriggerFire?: () => void;
-  // ─── Reference trigger (@) ───
   onReference?: (query: string, from: number, to: number) => void;
   onReferenceDeactivate?: () => void;
   referenceActive?: boolean;
@@ -85,10 +68,103 @@ interface NodeEditorProps {
   onReferenceNavUp?: () => void;
   onReferenceCreate?: () => void;
   onReferenceClose?: () => void;
-  // ─── Description editing ───
   onDescriptionEdit?: () => void;
-  // ─── Checkbox toggle (Cmd+Enter when no dropdown) ───
   onToggleDone?: () => void;
+  onInlineReferenceClick?: (refNodeId: string) => void;
+}
+
+function normalizeEditorHtml(html: string): string {
+  const trimmed = html.trim();
+  if (!trimmed) return '';
+  const div = document.createElement('div');
+  div.innerHTML = trimmed;
+  const hasInlineRef = !!div.querySelector('[data-inlineref-node]');
+  const text = (div.textContent ?? '').replace(/\u200B/g, '').trim();
+  if (!hasInlineRef && text.length === 0) return '';
+  return trimmed;
+}
+
+function getSelectionRangeWithin(root: HTMLElement): Range | null {
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0) return null;
+  const range = sel.getRangeAt(0);
+  if (!root.contains(range.startContainer) || !root.contains(range.endContainer)) return null;
+  return range;
+}
+
+function getCaretOffset(root: HTMLElement): number | null {
+  const range = getSelectionRangeWithin(root);
+  if (!range) return null;
+  const pre = range.cloneRange();
+  pre.selectNodeContents(root);
+  pre.setEnd(range.startContainer, range.startOffset);
+  return pre.toString().length;
+}
+
+function resolvePositionByTextOffset(root: HTMLElement, offset: number): { node: Node; offset: number } {
+  const target = Math.max(0, offset);
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  let remaining = target;
+  let current = walker.nextNode();
+
+  while (current) {
+    const textNode = current as Text;
+    const len = textNode.nodeValue?.length ?? 0;
+    if (remaining <= len) {
+      return { node: textNode, offset: remaining };
+    }
+    remaining -= len;
+    current = walker.nextNode();
+  }
+
+  return { node: root, offset: root.childNodes.length };
+}
+
+function setCaretByTextOffset(root: HTMLElement, offset: number): void {
+  const pos = resolvePositionByTextOffset(root, offset);
+  const range = document.createRange();
+  range.setStart(pos.node, pos.offset);
+  range.collapse(true);
+  const sel = window.getSelection();
+  sel?.removeAllRanges();
+  sel?.addRange(range);
+}
+
+function createRangeFromTextOffsets(root: HTMLElement, range: TextRange): Range | null {
+  const textLength = (root.textContent ?? '').length;
+  const from = Math.max(0, Math.min(range.from, textLength));
+  const to = Math.max(from, Math.min(range.to, textLength));
+
+  const startPos = resolvePositionByTextOffset(root, from);
+  const endPos = resolvePositionByTextOffset(root, to);
+
+  const domRange = document.createRange();
+  try {
+    domRange.setStart(startPos.node, startPos.offset);
+    domRange.setEnd(endPos.node, endPos.offset);
+  } catch {
+    return null;
+  }
+  return domRange;
+}
+
+function insertInlineRefAtRange(range: Range, nodeId: string, label: string): HTMLSpanElement {
+  const span = document.createElement('span');
+  span.setAttribute('data-inlineref-node', nodeId);
+  span.className = 'inline-ref';
+  span.contentEditable = 'false';
+  span.textContent = label;
+  range.insertNode(span);
+  return span;
+}
+
+function escapeHtml(text: string): string {
+  return text
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
 }
 
 export function NodeEditor({
@@ -97,6 +173,7 @@ export function NodeEditor({
   initialContent,
   onBlur,
   onEnter,
+  onBackspaceAtStart,
   onIndent,
   onOutdent,
   onDelete,
@@ -124,14 +201,19 @@ export function NodeEditor({
   onReferenceClose,
   onDescriptionEdit,
   onToggleDone,
+  onInlineReferenceClick,
 }: NodeEditorProps) {
   const updateNodeName = useNodeStore((s) => s.updateNodeName);
   const setNodeNameLocal = useNodeStore((s) => s.setNodeNameLocal);
   const userId = useWorkspaceStore((s) => s.userId);
-  const savedRef = useRef(false);
+  const focusClickCoords = useUIStore((s) => s.focusClickCoords);
+  const setFocusClickCoords = useUIStore((s) => s.setFocusClickCoords);
 
-  // Snapshot click position for THIS node without side effects during render.
-  // Clearing the shared hint happens in useLayoutEffect.
+  const savedRef = useRef(false);
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const latestHtmlRef = useRef<string>(normalizeEditorHtml(initialContent));
+  const composingRef = useRef(false);
+
   const initialClickOffsetRef = useRef<number | null>(null);
   if (initialClickOffsetRef.current === null) {
     const info = useUIStore.getState().focusClickCoords;
@@ -140,388 +222,536 @@ export function NodeEditor({
     }
   }
 
+  const callbacksRef = useRef({
+    onEnter,
+    onBackspaceAtStart: onBackspaceAtStart ?? (() => false),
+    onIndent,
+    onOutdent,
+    onDelete,
+    onArrowUp,
+    onArrowDown,
+    onMoveUp,
+    onMoveDown,
+    setNodeNameLocal,
+    nodeId,
+    hashTagActive: hashTagActive ?? false,
+    onHashTagConfirm: onHashTagConfirm ?? (() => {}),
+    onHashTagNavDown: onHashTagNavDown ?? (() => {}),
+    onHashTagNavUp: onHashTagNavUp ?? (() => {}),
+    onHashTagCreate: onHashTagCreate ?? (() => {}),
+    onHashTagClose: onHashTagClose ?? (() => {}),
+    referenceActive: referenceActive ?? false,
+    onReferenceConfirm: onReferenceConfirm ?? (() => {}),
+    onReferenceNavDown: onReferenceNavDown ?? (() => {}),
+    onReferenceNavUp: onReferenceNavUp ?? (() => {}),
+    onReferenceCreate: onReferenceCreate ?? (() => {}),
+    onReferenceClose: onReferenceClose ?? (() => {}),
+    onDescriptionEdit: onDescriptionEdit ?? (() => {}),
+    onToggleDone: onToggleDone ?? (() => {}),
+    onInlineReferenceClick: onInlineReferenceClick ?? (() => {}),
+    onFieldTriggerFire: onFieldTriggerFire ?? (() => {}),
+    onHashTag: onHashTag ?? (() => {}),
+    onHashTagDeactivate: onHashTagDeactivate ?? (() => {}),
+    onReference: onReference ?? (() => {}),
+    onReferenceDeactivate: onReferenceDeactivate ?? (() => {}),
+  });
+
+  callbacksRef.current = {
+    onEnter,
+    onBackspaceAtStart: onBackspaceAtStart ?? (() => false),
+    onIndent,
+    onOutdent,
+    onDelete,
+    onArrowUp,
+    onArrowDown,
+    onMoveUp,
+    onMoveDown,
+    setNodeNameLocal,
+    nodeId,
+    hashTagActive: hashTagActive ?? false,
+    onHashTagConfirm: onHashTagConfirm ?? (() => {}),
+    onHashTagNavDown: onHashTagNavDown ?? (() => {}),
+    onHashTagNavUp: onHashTagNavUp ?? (() => {}),
+    onHashTagCreate: onHashTagCreate ?? (() => {}),
+    onHashTagClose: onHashTagClose ?? (() => {}),
+    referenceActive: referenceActive ?? false,
+    onReferenceConfirm: onReferenceConfirm ?? (() => {}),
+    onReferenceNavDown: onReferenceNavDown ?? (() => {}),
+    onReferenceNavUp: onReferenceNavUp ?? (() => {}),
+    onReferenceCreate: onReferenceCreate ?? (() => {}),
+    onReferenceClose: onReferenceClose ?? (() => {}),
+    onDescriptionEdit: onDescriptionEdit ?? (() => {}),
+    onToggleDone: onToggleDone ?? (() => {}),
+    onInlineReferenceClick: onInlineReferenceClick ?? (() => {}),
+    onFieldTriggerFire: onFieldTriggerFire ?? (() => {}),
+    onHashTag: onHashTag ?? (() => {}),
+    onHashTagDeactivate: onHashTagDeactivate ?? (() => {}),
+    onReference: onReference ?? (() => {}),
+    onReferenceDeactivate: onReferenceDeactivate ?? (() => {}),
+  };
+
+  const triggerStateRef = useRef({
+    hashActive: false,
+    referenceActive: false,
+    fieldFired: false,
+    hasUserEdited: false,
+  });
+
+  const readHtml = useCallback((): string => {
+    const root = rootRef.current;
+    if (!root) return latestHtmlRef.current;
+    const cleaned = normalizeEditorHtml(root.innerHTML);
+    latestHtmlRef.current = cleaned;
+    return cleaned;
+  }, []);
+
+  const syncLocalName = useCallback(() => {
+    const root = rootRef.current;
+    if (!root) return;
+    const cleaned = normalizeEditorHtml(root.innerHTML);
+    latestHtmlRef.current = cleaned;
+    callbacksRef.current.setNodeNameLocal(callbacksRef.current.nodeId, cleaned);
+  }, []);
+
   const saveContent = useCallback(
     (html: string) => {
       if (savedRef.current) return;
       savedRef.current = true;
-      const cleaned = stripWrappingP(html);
+      const cleaned = normalizeEditorHtml(html);
       if (cleaned !== initialContent && userId) {
         updateNodeName(nodeId, cleaned, userId);
       }
     },
-    [nodeId, initialContent, userId, updateNodeName],
+    [initialContent, nodeId, updateNodeName, userId],
   );
 
-  // Store latest callbacks in refs so TipTap extension doesn't go stale
-  const callbacksRef = useRef({
-    onEnter, onIndent, onOutdent, onDelete, onArrowUp, onArrowDown, onMoveUp, onMoveDown, saveContent,
-    setNodeNameLocal, nodeId,
-    hashTagActive: hashTagActive ?? false,
-    onHashTagConfirm: onHashTagConfirm ?? (() => {}),
-    onHashTagNavDown: onHashTagNavDown ?? (() => {}),
-    onHashTagNavUp: onHashTagNavUp ?? (() => {}),
-    onHashTagCreate: onHashTagCreate ?? (() => {}),
-    onHashTagClose: onHashTagClose ?? (() => {}),
-    referenceActive: referenceActive ?? false,
-    onReferenceConfirm: onReferenceConfirm ?? (() => {}),
-    onReferenceNavDown: onReferenceNavDown ?? (() => {}),
-    onReferenceNavUp: onReferenceNavUp ?? (() => {}),
-    onReferenceCreate: onReferenceCreate ?? (() => {}),
-    onReferenceClose: onReferenceClose ?? (() => {}),
-    onDescriptionEdit: onDescriptionEdit ?? (() => {}),
-    onToggleDone: onToggleDone ?? (() => {}),
-  });
-  callbacksRef.current = {
-    onEnter, onIndent, onOutdent, onDelete, onArrowUp, onArrowDown, onMoveUp, onMoveDown, saveContent,
-    setNodeNameLocal, nodeId,
-    hashTagActive: hashTagActive ?? false,
-    onHashTagConfirm: onHashTagConfirm ?? (() => {}),
-    onHashTagNavDown: onHashTagNavDown ?? (() => {}),
-    onHashTagNavUp: onHashTagNavUp ?? (() => {}),
-    onHashTagCreate: onHashTagCreate ?? (() => {}),
-    onHashTagClose: onHashTagClose ?? (() => {}),
-    referenceActive: referenceActive ?? false,
-    onReferenceConfirm: onReferenceConfirm ?? (() => {}),
-    onReferenceNavDown: onReferenceNavDown ?? (() => {}),
-    onReferenceNavUp: onReferenceNavUp ?? (() => {}),
-    onReferenceCreate: onReferenceCreate ?? (() => {}),
-    onReferenceClose: onReferenceClose ?? (() => {}),
-    onDescriptionEdit: onDescriptionEdit ?? (() => {}),
-    onToggleDone: onToggleDone ?? (() => {}),
-  };
+  const evaluateTriggers = useCallback(() => {
+    const root = rootRef.current;
+    if (!root) return;
 
-  // HashTag extension callbacks
-  const hashTagRef = useRef<HashTagCallbacks>({
-    onActivate: (query, from, to) => onHashTag?.(query, from, to),
-    onDeactivate: () => onHashTagDeactivate?.(),
-  });
-  hashTagRef.current = {
-    onActivate: (query, from, to) => onHashTag?.(query, from, to),
-    onDeactivate: () => onHashTagDeactivate?.(),
-  };
+    const text = root.textContent ?? '';
+    const caret = getCaretOffset(root);
+    if (caret === null) return;
 
-  // FieldTrigger extension callbacks (fire-once, no query tracking)
-  const fieldTriggerRef = useRef<FieldTriggerCallbacks>({
-    onActivate: () => onFieldTriggerFire?.(),
-  });
-  fieldTriggerRef.current = {
-    onActivate: () => onFieldTriggerFire?.(),
-  };
+    const state = triggerStateRef.current;
+    const textBefore = text.slice(0, caret);
 
-  // Reference extension callbacks
-  const referenceRef = useRef<ReferenceCallbacks>({
-    onActivate: (query, from, to) => onReference?.(query, from, to),
-    onDeactivate: () => onReferenceDeactivate?.(),
-  });
-  referenceRef.current = {
-    onActivate: (query, from, to) => onReference?.(query, from, to),
-    onDeactivate: () => onReferenceDeactivate?.(),
-  };
-
-  const outlinerKeymap = useRef(
-    Extension.create({
-      name: 'outlinerKeymap',
-      addKeyboardShortcuts() {
-        return {
-          [KEY_EDITOR_ENTER]: ({ editor }) => {
-            const intent = resolveNodeEditorEnterIntent({
-              referenceActive: callbacksRef.current.referenceActive,
-              hashTagActive: callbacksRef.current.hashTagActive,
-            });
-            // Dropdown active: confirm selection
-            if (intent === 'reference_confirm') {
-              callbacksRef.current.onReferenceConfirm();
-              return true;
-            }
-            if (intent === 'hashtag_confirm') {
-              callbacksRef.current.onHashTagConfirm();
-              return true;
-            }
-
-            const { from } = editor.state.selection;
-            const { doc, schema } = editor.state;
-            const docEnd = doc.content.size - 1;
-
-            if (from >= docEnd) {
-              // Cursor at end: save + create empty sibling
-              const html = editor.getHTML();
-              callbacksRef.current.saveContent(html);
-              callbacksRef.current.onEnter();
-            } else {
-              // Cursor in middle: split the node
-              const para = doc.firstChild!;
-              const paraOffset = from - 1; // position 1 = start of paragraph content
-              const afterFragment = para.content.cut(paraOffset);
-
-              // Serialize after-content to HTML
-              const serializer = DOMSerializer.fromSchema(schema);
-              const div = document.createElement('div');
-              div.appendChild(serializer.serializeFragment(afterFragment));
-              const afterHtml = div.innerHTML;
-
-              // Delete after-content from editor
-              editor.chain().command(({ tr }) => {
-                tr.delete(from, docEnd);
-                return true;
-              }).run();
-
-              // Save before-content
-              const beforeHtml = editor.getHTML();
-              callbacksRef.current.saveContent(beforeHtml);
-
-              // Create new node with after-content
-              callbacksRef.current.onEnter(afterHtml);
-            }
-            return true;
-          },
-          [KEY_EDITOR_INDENT]: () => {
-            callbacksRef.current.onIndent();
-            return true;
-          },
-          [KEY_EDITOR_OUTDENT]: () => {
-            callbacksRef.current.onOutdent();
-            return true;
-          },
-          [KEY_EDITOR_BACKSPACE]: ({ editor }) => {
-            // Intercept when editor is visually empty (trim catches \n from <br>)
-            const isEmpty = editor.state.doc.textContent.trim().length === 0;
-            if (isEmpty) {
-              // Explicitly flush empty name to store so handleDelete sees name=''
-              // (onUpdate's setNodeNameLocal may not have fired yet due to
-              // DOMObserver async timing)
-              const { setNodeNameLocal: setLocal, nodeId: nid } = callbacksRef.current;
-              setLocal(nid, '');
-              callbacksRef.current.saveContent(editor.getHTML());
-              const deleted = callbacksRef.current.onDelete();
-              return deleted;
-            }
-            return false; // Let TipTap handle normal backspace
-          },
-          [KEY_EDITOR_ARROW_UP]: ({ editor }) => {
-            const { from } = editor.state.selection;
-            const intent = resolveNodeEditorArrowIntent({
-              referenceActive: callbacksRef.current.referenceActive,
-              hashTagActive: callbacksRef.current.hashTagActive,
-              isAtBoundary: from <= 1,
-            });
-            // Dropdown navigation
-            if (intent === 'reference_nav') {
-              callbacksRef.current.onReferenceNavUp();
-              return true;
-            }
-            if (intent === 'hashtag_nav') {
-              callbacksRef.current.onHashTagNavUp();
-              return true;
-            }
-            // Only intercept when cursor is at the start
-            if (intent === 'navigate_outliner') {
-              callbacksRef.current.onArrowUp();
-              return true;
-            }
-            return false;
-          },
-          [KEY_EDITOR_ARROW_DOWN]: ({ editor }) => {
-            const { to } = editor.state.selection;
-            const endPos = editor.state.doc.content.size - 1;
-            const intent = resolveNodeEditorArrowIntent({
-              referenceActive: callbacksRef.current.referenceActive,
-              hashTagActive: callbacksRef.current.hashTagActive,
-              isAtBoundary: to >= endPos,
-            });
-            // Dropdown navigation
-            if (intent === 'reference_nav') {
-              callbacksRef.current.onReferenceNavDown();
-              return true;
-            }
-            if (intent === 'hashtag_nav') {
-              callbacksRef.current.onHashTagNavDown();
-              return true;
-            }
-            // Only intercept when cursor is at the end
-            if (intent === 'navigate_outliner') {
-              callbacksRef.current.onArrowDown();
-              return true;
-            }
-            return false;
-          },
-          [KEY_EDITOR_ESCAPE]: () => {
-            const intent = resolveNodeEditorEscapeIntent(
-              callbacksRef.current.referenceActive,
-              callbacksRef.current.hashTagActive,
-            );
-            if (intent === 'reference_close') {
-              callbacksRef.current.onReferenceClose();
-              return true;
-            }
-            if (intent === 'hashtag_close') {
-              callbacksRef.current.onHashTagClose();
-              return true;
-            }
-            return false;
-          },
-          [KEY_EDITOR_DROPDOWN_FORCE_CREATE]: () => {
-            const intent = resolveNodeEditorForceCreateIntent(
-              callbacksRef.current.referenceActive,
-              callbacksRef.current.hashTagActive,
-            );
-            if (intent === 'reference_create') {
-              callbacksRef.current.onReferenceCreate();
-              return true;
-            }
-            if (intent === 'hashtag_create') {
-              callbacksRef.current.onHashTagCreate();
-              return true;
-            }
-            // No dropdown active: toggle done state
-            callbacksRef.current.onToggleDone();
-            return true;
-          },
-          [KEY_EDITOR_MOVE_UP]: () => {
-            callbacksRef.current.onMoveUp();
-            return true;
-          },
-          [KEY_EDITOR_MOVE_DOWN]: () => {
-            callbacksRef.current.onMoveDown();
-            return true;
-          },
-          [KEY_EDITOR_EDIT_DESC_PRIMARY]: () => {
-            callbacksRef.current.onDescriptionEdit();
-            return true;
-          },
-          ...(KEY_EDITOR_EDIT_DESC_SECONDARY
-            ? {
-                [KEY_EDITOR_EDIT_DESC_SECONDARY]: () => {
-                  callbacksRef.current.onDescriptionEdit();
-                  return true;
-                },
-              }
-            : {}),
-        };
-      },
-    }),
-  ).current;
-
-  // Memoize ALL non-callback options to prevent TipTap's useEditor from
-  // calling editor.setOptions() on every re-render. setOptions() triggers
-  // view.updateState() which stops/restarts ProseMirror's DOMObserver,
-  // disrupting pending DOM mutations (typed characters like # or @).
-  //
-  // TipTap v3's compareOptions skips callbacks (onBlur etc.) and does
-  // element-by-element comparison for extensions, but uses strict reference
-  // comparison (===) for editorProps and other options. Without memoization,
-  // a new editorProps object each render triggers setOptions every time.
-  // Italic mark without keyboard shortcuts — Mod-i is reassigned to description editing.
-  // StarterKit's built-in Italic extension is disabled to prevent its Mod-i binding
-  // from intercepting our custom keymap.
-  const ItalicNoShortcut = useMemo(() => Italic.extend({
-    addKeyboardShortcuts() { return {}; },
-  }), []);
-
-  const extensions = useMemo(() => [
-    StarterKit.configure({
-      italic: false,
-      bulletList: false,
-      orderedList: false,
-      listItem: false,
-      heading: false,
-      blockquote: false,
-      codeBlock: false,
-      horizontalRule: false,
-      hardBreak: false, // Nodes are single-line; also frees Mod-Enter for checkbox toggle
-    }),
-    ItalicNoShortcut,
-    Highlight,
-    InlineRefNode,
-    outlinerKeymap,
-    HashTagExtension.configure({ callbacks: hashTagRef }),
-    FieldTriggerExtension.configure({ callbacks: fieldTriggerRef }),
-    ReferenceExtension.configure({ callbacks: referenceRef }),
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  ], [ItalicNoShortcut]);
-
-  const editorProps = useMemo(() => ({
-    attributes: {
-      class: 'outline-none text-sm leading-[21px]',
-    },
-  }), []);
-
-  // Live-update store on each keystroke so references/displays update in real-time.
-  // Uses setNodeNameLocal (no Supabase) — the final blur/save handles persistence.
-  const liveUpdateRef = useRef({ setNodeNameLocal, nodeId });
-  liveUpdateRef.current = { setNodeNameLocal, nodeId };
-
-  const editor = useEditor({
-    extensions,
-    content: wrapInP(initialContent),
-    editorProps,
-    onUpdate: ({ editor }) => {
-      const { setNodeNameLocal: setLocal, nodeId: nid } = liveUpdateRef.current;
-      const cleaned = stripWrappingP(editor.getHTML());
-      setLocal(nid, cleaned);
-    },
-    onBlur: ({ editor }) => {
-      if (!savedRef.current) {
-        saveContent(editor.getHTML());
-      }
-      onBlur();
-    },
-  });
-
-  // Auto-focus when mounted — use useLayoutEffect so focus is set synchronously
-  // BEFORE paint. This prevents a gap where the editor is in the DOM but unfocused
-  // (e.g., after indent moves a node, old editor unmounts and new one mounts —
-  // if focus is deferred to useEffect, the user's next keypress goes to body).
-  // Also reset savedRef: React Strict Mode double-invokes effects in dev,
-  // which triggers the cleanup save (harmlessly, since content is unchanged)
-  // but leaves savedRef.current = true. Resetting here ensures the real
-  // editing session can save correctly.
-  useLayoutEffect(() => {
-    if (editor && !editor.isDestroyed) {
-      savedRef.current = false;
-
-      // Always focus first (at 'end', which works reliably) to ensure
-      // the editor receives browser focus. Then adjust cursor position.
-      // This two-step approach avoids a race: focus(pmPos) sets selection
-      // THEN focuses, but the browser's async focus handling can override
-      // the DOM selection for formatted text (bold/code/highlight marks).
-      // By focusing first, the contenteditable is stable when we set selection.
-      editor.commands.focus('end');
-
-      const initialClickOffset = initialClickOffsetRef.current;
-      if (initialClickOffset !== null) {
-        try {
-          const maxPos = editor.state.doc.content.size - 1;
-          const pmPos = Math.max(1, Math.min(initialClickOffset + 1, maxPos));
-          editor.commands.setTextSelection(pmPos);
-        } catch { /* fallback: cursor stays at end */ }
-      }
-
-      const clickInfo = useUIStore.getState().focusClickCoords;
-      if (clickInfo && clickInfo.nodeId === nodeId && clickInfo.parentId === parentId) {
-        useUIStore.getState().setFocusClickCoords(null);
-      }
-
-      if (editorRef) editorRef.current = editor;
+    const hashMatch = textBefore.match(/#([^\s#@]*)$/u);
+    if (hashMatch && (state.hasUserEdited || state.hashActive)) {
+      state.hashActive = true;
+      const query = hashMatch[1];
+      callbacksRef.current.onHashTag(query, caret - hashMatch[0].length, caret);
+    } else if (state.hashActive) {
+      state.hashActive = false;
+      callbacksRef.current.onHashTagDeactivate();
     }
+
+    const refMatch = textBefore.match(/@([^\s]*)$/);
+    if (refMatch && (state.hasUserEdited || state.referenceActive)) {
+      state.referenceActive = true;
+      const query = refMatch[1];
+      callbacksRef.current.onReference(query, caret - refMatch[0].length, caret);
+    } else if (state.referenceActive) {
+      state.referenceActive = false;
+      callbacksRef.current.onReferenceDeactivate();
+    }
+
+    if (state.hasUserEdited && text === '>' && caret === 1) {
+      if (!state.fieldFired) {
+        state.fieldFired = true;
+        callbacksRef.current.onFieldTriggerFire();
+      }
+    } else {
+      state.fieldFired = false;
+    }
+  }, []);
+
+  const runForceCreateShortcut = useCallback(() => {
+    const intent = resolveNodeEditorForceCreateIntent(
+      callbacksRef.current.referenceActive,
+      callbacksRef.current.hashTagActive,
+    );
+    if (intent === 'reference_create') {
+      callbacksRef.current.onReferenceCreate();
+      return true;
+    }
+    if (intent === 'hashtag_create') {
+      callbacksRef.current.onHashTagCreate();
+      return true;
+    }
+    callbacksRef.current.onToggleDone();
+    return true;
+  }, []);
+
+  const handleKeyDown = useCallback((e: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (composingRef.current || e.nativeEvent.isComposing || e.key === 'Process') return;
+
+    if (matchesShortcutEvent(e.nativeEvent, KEY_EDITOR_DROPDOWN_FORCE_CREATE)) {
+      e.preventDefault();
+      runForceCreateShortcut();
+      return;
+    }
+
+    if (matchesShortcutEvent(e.nativeEvent, KEY_EDITOR_ENTER)) {
+      e.preventDefault();
+
+      const intent = resolveNodeEditorEnterIntent({
+        referenceActive: callbacksRef.current.referenceActive,
+        hashTagActive: callbacksRef.current.hashTagActive,
+      });
+
+      if (intent === 'reference_confirm') {
+        callbacksRef.current.onReferenceConfirm();
+        return;
+      }
+      if (intent === 'hashtag_confirm') {
+        callbacksRef.current.onHashTagConfirm();
+        return;
+      }
+
+      const root = rootRef.current;
+      if (!root) {
+        callbacksRef.current.onEnter();
+        return;
+      }
+
+      const totalLen = (root.textContent ?? '').length;
+      const caret = getCaretOffset(root) ?? totalLen;
+
+      if (caret >= totalLen) {
+        saveContent(readHtml());
+        callbacksRef.current.onEnter();
+        return;
+      }
+
+      const range = createRangeFromTextOffsets(root, { from: caret, to: totalLen });
+      if (!range) {
+        saveContent(readHtml());
+        callbacksRef.current.onEnter();
+        return;
+      }
+
+      const fragment = range.cloneContents();
+      const tmp = document.createElement('div');
+      tmp.appendChild(fragment);
+      const afterHtml = normalizeEditorHtml(tmp.innerHTML);
+
+      range.deleteContents();
+      const beforeHtml = readHtml();
+      saveContent(beforeHtml);
+      callbacksRef.current.onEnter(afterHtml);
+      return;
+    }
+
+    if (matchesShortcutEvent(e.nativeEvent, KEY_EDITOR_INDENT)) {
+      e.preventDefault();
+      callbacksRef.current.onIndent();
+      return;
+    }
+
+    if (matchesShortcutEvent(e.nativeEvent, KEY_EDITOR_OUTDENT)) {
+      e.preventDefault();
+      callbacksRef.current.onOutdent();
+      return;
+    }
+
+    if (matchesShortcutEvent(e.nativeEvent, KEY_EDITOR_BACKSPACE)) {
+      const root = rootRef.current;
+      const selRange = root ? getSelectionRangeWithin(root) : null;
+      const hasSelection = !!selRange && !selRange.collapsed;
+      const caret = root ? getCaretOffset(root) : null;
+      if (!hasSelection && (caret ?? 0) <= 0) {
+        const merged = callbacksRef.current.onBackspaceAtStart();
+        if (merged) {
+          e.preventDefault();
+          return;
+        }
+      }
+      const isEmpty = !(root?.textContent ?? '').trim().length;
+      if (isEmpty) {
+        callbacksRef.current.setNodeNameLocal(callbacksRef.current.nodeId, '');
+        saveContent(readHtml());
+        const deleted = callbacksRef.current.onDelete();
+        if (deleted) e.preventDefault();
+      }
+      return;
+    }
+
+    if (matchesShortcutEvent(e.nativeEvent, KEY_EDITOR_ARROW_UP)) {
+      const root = rootRef.current;
+      const caret = root ? getCaretOffset(root) : null;
+      const intent = resolveNodeEditorArrowIntent({
+        referenceActive: callbacksRef.current.referenceActive,
+        hashTagActive: callbacksRef.current.hashTagActive,
+        isAtBoundary: (caret ?? 0) <= 0,
+      });
+      if (intent === 'reference_nav') {
+        e.preventDefault();
+        callbacksRef.current.onReferenceNavUp();
+        return;
+      }
+      if (intent === 'hashtag_nav') {
+        e.preventDefault();
+        callbacksRef.current.onHashTagNavUp();
+        return;
+      }
+      if (intent === 'navigate_outliner') {
+        e.preventDefault();
+        callbacksRef.current.onArrowUp();
+      }
+      return;
+    }
+
+    if (matchesShortcutEvent(e.nativeEvent, KEY_EDITOR_ARROW_DOWN)) {
+      const root = rootRef.current;
+      const totalLen = (root?.textContent ?? '').length;
+      const caret = root ? getCaretOffset(root) : null;
+      const intent = resolveNodeEditorArrowIntent({
+        referenceActive: callbacksRef.current.referenceActive,
+        hashTagActive: callbacksRef.current.hashTagActive,
+        isAtBoundary: (caret ?? totalLen) >= totalLen,
+      });
+      if (intent === 'reference_nav') {
+        e.preventDefault();
+        callbacksRef.current.onReferenceNavDown();
+        return;
+      }
+      if (intent === 'hashtag_nav') {
+        e.preventDefault();
+        callbacksRef.current.onHashTagNavDown();
+        return;
+      }
+      if (intent === 'navigate_outliner') {
+        e.preventDefault();
+        callbacksRef.current.onArrowDown();
+      }
+      return;
+    }
+
+    if (matchesShortcutEvent(e.nativeEvent, KEY_EDITOR_ESCAPE)) {
+      const intent = resolveNodeEditorEscapeIntent(
+        callbacksRef.current.referenceActive,
+        callbacksRef.current.hashTagActive,
+      );
+      if (intent === 'reference_close') {
+        e.preventDefault();
+        callbacksRef.current.onReferenceClose();
+        return;
+      }
+      if (intent === 'hashtag_close') {
+        e.preventDefault();
+        callbacksRef.current.onHashTagClose();
+      }
+      return;
+    }
+
+    if (matchesShortcutEvent(e.nativeEvent, KEY_EDITOR_MOVE_UP)) {
+      e.preventDefault();
+      callbacksRef.current.onMoveUp();
+      return;
+    }
+
+    if (matchesShortcutEvent(e.nativeEvent, KEY_EDITOR_MOVE_DOWN)) {
+      e.preventDefault();
+      callbacksRef.current.onMoveDown();
+      return;
+    }
+
+    if (
+      matchesShortcutEvent(e.nativeEvent, KEY_EDITOR_EDIT_DESC_PRIMARY)
+      || (KEY_EDITOR_EDIT_DESC_SECONDARY && matchesShortcutEvent(e.nativeEvent, KEY_EDITOR_EDIT_DESC_SECONDARY))
+    ) {
+      e.preventDefault();
+      callbacksRef.current.onDescriptionEdit();
+    }
+  }, [readHtml, runForceCreateShortcut, saveContent]);
+
+  const handleInput = useCallback((e: React.FormEvent<HTMLDivElement>) => {
+    const inputEvent = e.nativeEvent as InputEvent;
+    if (composingRef.current || inputEvent.isComposing) return;
+    savedRef.current = false;
+    triggerStateRef.current.hasUserEdited = true;
+    syncLocalName();
+    evaluateTriggers();
+  }, [evaluateTriggers, syncLocalName]);
+
+  const handleCompositionStart = useCallback(() => {
+    composingRef.current = true;
+  }, []);
+
+  const handleCompositionEnd = useCallback(() => {
+    composingRef.current = false;
+    savedRef.current = false;
+    triggerStateRef.current.hasUserEdited = true;
+    syncLocalName();
+    evaluateTriggers();
+  }, [evaluateTriggers, syncLocalName]);
+
+  const handleMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLElement;
+    const refEl = target.closest('[data-inlineref-node]') as HTMLElement | null;
+    if (!refEl) return;
+    const refId = refEl.getAttribute('data-inlineref-node');
+    if (!refId) return;
+    e.preventDefault();
+    e.stopPropagation();
+    callbacksRef.current.onInlineReferenceClick(refId);
+  }, []);
+
+  const handleBlur = useCallback(() => {
+    if (!savedRef.current) {
+      saveContent(readHtml());
+    }
+    onBlur();
+  }, [onBlur, readHtml, saveContent]);
+
+  useLayoutEffect(() => {
+    const root = rootRef.current;
+    if (!root) return;
+
+    savedRef.current = false;
+    triggerStateRef.current = {
+      hashActive: false,
+      referenceActive: false,
+      fieldFired: false,
+      hasUserEdited: false,
+    };
+
+    root.innerHTML = initialContent || '';
+    latestHtmlRef.current = normalizeEditorHtml(root.innerHTML);
+    root.focus();
+
+    const initialClickOffset = initialClickOffsetRef.current;
+    if (initialClickOffset !== null) {
+      setCaretByTextOffset(root, initialClickOffset);
+      initialClickOffsetRef.current = null;
+    } else {
+      setCaretByTextOffset(root, (root.textContent ?? '').length);
+    }
+
+    const clickInfo = useUIStore.getState().focusClickCoords;
+    if (clickInfo && clickInfo.nodeId === nodeId && clickInfo.parentId === parentId) {
+      useUIStore.getState().setFocusClickCoords(null);
+    }
+
+    if (editorRef) {
+      editorRef.current = {
+        getText: () => root.textContent ?? '',
+        getHTML: () => normalizeEditorHtml(root.innerHTML),
+        getCaretOffset: () => getCaretOffset(root),
+        setPlainText: (text, caretOffset) => {
+          root.focus();
+          root.textContent = text;
+          const offset = caretOffset ?? text.length;
+          setCaretByTextOffset(root, offset);
+          triggerStateRef.current.hasUserEdited = true;
+          syncLocalName();
+          evaluateTriggers();
+        },
+        deleteTextRange: (range) => {
+          root.focus();
+          const before = normalizeEditorHtml(root.innerHTML);
+          const domRange = createRangeFromTextOffsets(root, range);
+          if (domRange) {
+            domRange.deleteContents();
+          } else {
+            const fullText = root.textContent ?? '';
+            const from = Math.max(0, Math.min(range.from, fullText.length));
+            const to = Math.max(from, Math.min(range.to, fullText.length));
+            root.textContent = fullText.slice(0, from) + fullText.slice(to);
+          }
+          if (normalizeEditorHtml(root.innerHTML) === before) {
+            const fullText = root.textContent ?? '';
+            const from = Math.max(0, Math.min(range.from, fullText.length));
+            const to = Math.max(from, Math.min(range.to, fullText.length));
+            root.textContent = fullText.slice(0, from) + fullText.slice(to);
+          }
+          const collapsedAt = range.from;
+          setCaretByTextOffset(root, collapsedAt);
+          triggerStateRef.current.hasUserEdited = true;
+          syncLocalName();
+          evaluateTriggers();
+        },
+        replaceTextRangeWithInlineRef: (range, refNodeId, label) => {
+          root.focus();
+          const domRange = createRangeFromTextOffsets(root, range);
+          let span: HTMLSpanElement | null = null;
+          if (domRange) {
+            domRange.deleteContents();
+            span = insertInlineRefAtRange(domRange, refNodeId, label);
+          } else {
+            const fullText = root.textContent ?? '';
+            const from = Math.max(0, Math.min(range.from, fullText.length));
+            const to = Math.max(from, Math.min(range.to, fullText.length));
+            root.innerHTML =
+              `${escapeHtml(fullText.slice(0, from))}`
+              + `<span data-inlineref-node="${refNodeId}" data-inline-temp="1" class="inline-ref" contenteditable="false">${escapeHtml(label)}</span>`
+              + `${escapeHtml(fullText.slice(to))}`;
+            span = root.querySelector('[data-inline-temp=\"1\"]') as HTMLSpanElement | null;
+            if (span) span.removeAttribute('data-inline-temp');
+          }
+          if (!span) return;
+          const after = document.createRange();
+          after.setStartAfter(span);
+          after.collapse(true);
+          const sel = window.getSelection();
+          sel?.removeAllRanges();
+          sel?.addRange(after);
+          triggerStateRef.current.hasUserEdited = true;
+          syncLocalName();
+          evaluateTriggers();
+        },
+        focusToEnd: () => {
+          root.focus();
+          setCaretByTextOffset(root, (root.textContent ?? '').length);
+        },
+      };
+    }
+
     return () => {
       if (editorRef) editorRef.current = null;
     };
-  }, [editor, editorRef, nodeId, parentId]);
+  }, [editorRef, evaluateTriggers, nodeId, parentId, syncLocalName]);
 
-  // Cleanup: save on unmount if not already saved
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root || !focusClickCoords) return;
+    if (focusClickCoords.nodeId !== nodeId || focusClickCoords.parentId !== parentId) return;
+    root.focus();
+    setCaretByTextOffset(root, focusClickCoords.textOffset);
+    setFocusClickCoords(null);
+  }, [focusClickCoords, nodeId, parentId, setFocusClickCoords]);
+
+  const handleKeyUp = useCallback((e: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (composingRef.current || e.nativeEvent.isComposing || e.key === 'Process') return;
+    evaluateTriggers();
+  }, [evaluateTriggers]);
+
   useEffect(() => {
     return () => {
-      if (editor && !editor.isDestroyed && !savedRef.current) {
-        saveContent(editor.getHTML());
+      if (!savedRef.current) {
+        saveContent(readHtml());
       }
+      if (editorRef) editorRef.current = null;
     };
-  }, [editor, saveContent]);
-
-  if (!editor) return null;
+  }, [editorRef, readHtml, saveContent]);
 
   return (
     <div className="editor-inline">
-      <EditorContent editor={editor} />
+      <div
+        ref={rootRef}
+        className="tiptap outline-none text-sm leading-[21px] min-w-[1px]"
+        contentEditable
+        suppressContentEditableWarning
+        onKeyDown={handleKeyDown}
+        onInput={handleInput}
+        onCompositionStart={handleCompositionStart}
+        onCompositionEnd={handleCompositionEnd}
+        onMouseDown={handleMouseDown}
+        onKeyUp={handleKeyUp}
+        onMouseUp={evaluateTriggers}
+        onBlur={handleBlur}
+      />
     </div>
   );
 }

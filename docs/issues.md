@@ -16,6 +16,9 @@
 
 | # | 标题 | 关闭人 | 关闭日期 |
 |---|------|--------|----------|
+| 54 | Schema 空子节点 Backspace 无法删除（\u200B 零宽空格导致 isEmpty 判断错误） | claude-main | 02-14 |
+| 53 | `#tag` 选中后触发词文本残留（Enter 路径因 React prop 延迟未触发 confirm） | claude-main | 02-14 |
+| 52 | `@` reference 下拉菜单 Enter/点击无法选中项（triggerState 与 callbacksRef 延迟不同步） | claude-main | 02-14 |
 | 51 | 新建节点首次输入后需按两次 Enter 才创建下一节点 | claude-main | 02-14 |
 | 50 | `#query` 选中 tag 后触发词未清理（如 `#per` 残留） | claude-main | 02-14 |
 | 43 | Field name 末尾 Enter 不应切换建议字段；父节点末尾为 field 时需保留空白输入行 | claude-main | 02-14 |

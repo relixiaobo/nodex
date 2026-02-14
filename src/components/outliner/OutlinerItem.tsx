@@ -810,7 +810,10 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
 
     const text = ed.getText();
     const caret = ed.getCaretOffset() ?? text.length;
-    const range = findHashTriggerRange(text, caret);
+    const range = findHashTriggerRange(text, caret)
+      ?? (hashRangeRef.current.from < hashRangeRef.current.to
+        ? hashRangeRef.current
+        : null);
     if (range) {
       ed.deleteTextRange(range);
     }

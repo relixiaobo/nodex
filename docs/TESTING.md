@@ -479,7 +479,30 @@ findRefTriggerRange（4 cases）:
 11. 无 `@` 返回 null
 12. caret 离开 → fallback
 
-### 1.34 Workspace Store 认证状态与持久化（原 1.33）
+### 1.34 Editor isEmpty 与零宽空格
+
+**测试文件**: `tests/vitest/editor-isEmpty.test.ts`
+
+**覆盖点**:
+
+1. 纯 `\u200B`（零宽空格）视为空（Bug #54 回归）
+2. 多个 `\u200B` 视为空
+3. `\u200B` + 空白符混合视为空
+4. `\u200B` + 实际文本视为非空
+5. 空字符串与纯空白符边界
+
+### 1.35 节点搜索 SKIP_DOC_TYPES 过滤
+
+**测试文件**: `tests/vitest/node-search-filter.test.ts`
+
+**覆盖点**:
+
+1. `tagDef` 节点被过滤（不出现在搜索结果中）
+2. `attrDef` 节点被过滤
+3. `tuple` / `metanode` 节点被过滤
+4. 普通内容节点正常返回
+
+### 1.36 Workspace Store 认证状态与持久化（原 1.33）
 
 **测试文件**: `tests/vitest/workspace-store.test.ts`
 
@@ -563,7 +586,9 @@ findRefTriggerRange（4 cases）:
 | 1.31 | UI Store 历史边界保护 | PASS/FAIL |
 | 1.32 | Checkbox 可见性与 Done 状态 | PASS/FAIL |
 | 1.33 | 触发词清理（Trigger Cleanup） | PASS/FAIL |
-| 1.34 | Workspace Store 认证状态与持久化 | PASS/FAIL |
+| 1.34 | Editor isEmpty 零宽空格 | PASS/FAIL |
+| 1.35 | 节点搜索 SKIP_DOC_TYPES 过滤 | PASS/FAIL |
+| 1.36 | Workspace Store 认证状态与持久化 | PASS/FAIL |
 | 2 | 视觉渲染 | PASS/FAIL/SKIP |
 | 3 | 扩展构建 | PASS/FAIL |
 

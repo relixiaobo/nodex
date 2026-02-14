@@ -42,10 +42,10 @@
   --font-mono: "JetBrains Mono", "Fira Code", monospace;
 }
 
-/* Shared inline element styles — used by both the contentEditable editor (.node-editor)
+/* Shared inline element styles — used by both TipTap editor (.tiptap)
    and static node display (.node-content) to prevent visual jumping
    when switching between edit and display modes. */
-.node-editor code,
+.tiptap code,
 .node-content code {
   background-color: var(--color-muted);
   border-radius: 0.25rem;
@@ -55,47 +55,57 @@
   line-height: inherit;
 }
 
-.node-editor mark,
+.tiptap mark,
 .node-content mark {
   background-color: #fef08a;
   border-radius: 0.125rem;
   padding: 0.0625rem 0;
 }
 
-.node-editor a,
+.tiptap a,
 .node-content a {
   color: var(--color-primary);
   text-decoration: underline;
   cursor: pointer;
 }
 
-.node-editor strong,
+.tiptap strong,
 .node-content strong {
   font-weight: 600;
 }
 
-.node-editor s,
+.tiptap s,
 .node-content s {
   text-decoration: line-through;
 }
 
-/* Static node display: force <p> inline so text doesn't reflow on blur. */
+/* Static node display: match editor-inline layout so text doesn't reflow on blur.
+   TipTap wraps text in <p> which defaults to display:block; force inline. */
 .node-content p {
   display: inline;
   margin: 0;
 }
 
-/* contentEditable editor-only styles */
-.node-editor {
+/* TipTap editor-only styles */
+.tiptap {
   outline: none;
 }
 
-/* Legacy ProseMirror paragraph rules removed — raw contentEditable
-   does not produce <p> or .is-editor-empty elements. */
+.tiptap p {
+  margin: 0;
+}
+
+.tiptap p.is-editor-empty:first-child::before {
+  color: var(--color-foreground-tertiary);
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
 
 /* Inline editor mode: tags follow right after text.
-   Outer wrappers become inline so text flows alongside tag badges.
-   .node-editor (contenteditable) uses inline-block — NOT inline — because Chrome
+   Outer wrappers + <p> become inline so text flows alongside tag badges.
+   .tiptap (contenteditable) uses inline-block — NOT inline — because Chrome
    has a rendering bug where the native caret is invisible inside inline marks
    (<code>, <mark>) when the contenteditable element has display:inline. */
 .editor-inline,
@@ -103,15 +113,34 @@
   display: inline;
 }
 
-.editor-inline .node-editor {
+.editor-inline .tiptap {
   display: inline-block;
   caret-color: currentColor;
 }
 
-/* Legacy ProseMirror paragraph/trailingBreak/placeholder rules removed. */
+/* Keep paragraph inline with tags while avoiding empty-node double-height.
+   ProseMirror uses <br class="ProseMirror-trailingBreak"> for empty lines; when
+   paragraph is inline this <br> introduces an extra visual line in our row layout. */
+.editor-inline .tiptap p {
+  display: inline-block;
+  margin: 0;
+  min-width: 1px;
+  vertical-align: top;
+}
+
+.editor-inline .tiptap p > br.ProseMirror-trailingBreak:only-child {
+  display: none;
+}
+
+/* Override placeholder float for inline mode —
+   regular inline content so it takes horizontal space. */
+.editor-inline .tiptap p.is-editor-empty:first-child::before {
+  float: none;
+  height: auto;
+}
 
 /* Inline references — clickable blue node links (Tana: data-inlineref-node) */
-.node-editor [data-inlineref-node],
+.tiptap [data-inlineref-node],
 .node-content [data-inlineref-node] {
   color: var(--color-primary);
   cursor: pointer;
@@ -119,7 +148,7 @@
   padding: 0 0.0625rem;
 }
 
-.node-editor [data-inlineref-node]:hover,
+.tiptap [data-inlineref-node]:hover,
 .node-content [data-inlineref-node]:hover {
   text-decoration: underline;
 }
@@ -131,7 +160,7 @@
   35% { color: var(--color-primary); }
 }
 
-.ref-converting .node-editor [data-inlineref-node] {
+.ref-converting .tiptap [data-inlineref-node] {
   animation: ref-conversion-shimmer 2.5s ease-in-out infinite;
 }
 

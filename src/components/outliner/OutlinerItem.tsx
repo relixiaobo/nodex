@@ -1046,14 +1046,14 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
             tagDefColor={isTagDef ? getTagColor(nodeId).text : undefined}
           />
           {showCheckbox && (
-            <div className="h-7 flex items-center shrink-0">
+            <span className="flex shrink-0 h-[21px] w-[15px] items-center justify-center">
               <input
                 type="checkbox"
                 checked={isDone}
                 onChange={handleCheckboxToggle}
                 className="h-3.5 w-3.5 rounded border-border accent-primary cursor-pointer"
               />
-            </div>
+            </span>
           )}
           <div className={`relative flex-1 min-w-0 ${isPendingConversion ? 'ref-converting' : ''} ${isDone ? 'line-through text-foreground/50' : ''}`}>
           <div

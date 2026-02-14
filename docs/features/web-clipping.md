@@ -6,6 +6,14 @@
 
 Chrome Side Panel 的核心场景：用户浏览网页时，将内容剪藏为 Nodex 节点。剪藏结果是一个普通节点，通过 Supertag + Field 携带来源元数据，并支持 Read Later（正文大纲化）。
 
+## 前因后果（决策演进）
+
+1. 初版想法：在 `NodexNode` 顶层增加 `sourceUrl`，并在数据库使用 `source_url` 列，快速打通剪藏能力。
+2. 讨论后发现：`sourceUrl` 不是通用节点属性，更接近“剪藏类型的结构化元数据”，放顶层会弱化 Supertag/Field 的统一性。
+3. 因此调整为：URL 等元数据通过 `#web_clip` 的字段承载，剪藏结果仍是普通内容节点。
+4. 随着类型讨论深入（`#article/#video/#tweet`），进一步收敛为：`#web_clip` 作为基类语义，子类型标签继承它。
+5. 受当前实现约束：Supertag Extend 尚未落地，V1 先采用“双标签”过渡，保证可交付。
+
 ## 核心设计决策
 
 ### 来源 URL 用 Supertag 字段，不用节点属性
@@ -21,10 +29,10 @@ Chrome Side Panel 的核心场景：用户浏览网页时，将内容剪藏为 N
 
 **兼容策略**：`NodexNode.sourceUrl` 和 DB `source_url` 先保留，避免一次性迁移风险；V1 剪藏逻辑不再写入，后续单独清理。
 
-### 标签体系：`#web_clip` 作为基类，子类型继承
+### 标签体系：`#web_clip` 作为系统预置 Base Type（目标）
 
 **目标模型**：
-- `#web_clip`：承载剪藏通用字段（如 Source URL）
+- `#web_clip`：系统预置 base type，承载剪藏通用字段（如 Source URL）
 - `#article` / `#video` / `#tweet` ...：作为子类型标签，`extend #web_clip`
 
 **现阶段过渡方案（Extend 尚未实现）**：
@@ -132,6 +140,7 @@ clip_node
 | 日期 | 决策 | 原因 |
 |------|------|------|
 | 2026-02-13 | 来源 URL 用 Supertag 字段，不用 `NodexNode.sourceUrl` | 遵循"一切皆节点"，复用 Field 体系 |
+| 2026-02-14 | `#web_clip` 定位为系统预置 base type（目标） | 与 Tana Base type 思路一致，便于子类型扩展 |
 | 2026-02-13 | `#web_clip` 作为基类标签，子类型标签继承它 | 语义清晰，便于扩展不同网页类型 |
 | 2026-02-13 | V1 采用双标签方案（`#web_clip + 子类型`） | 当前 Extend 尚未实现，需要可落地过渡方案 |
 | 2026-02-13 | 不做 URL 去重，每次剪藏新建节点 | 保持用户行为可预期，降低实现复杂度 |

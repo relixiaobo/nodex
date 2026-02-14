@@ -59,9 +59,13 @@
 
 | 文档 | 内容 |
 |------|------|
+| `docs/README.md` | 文档总入口（阅读顺序 + 目录职责） |
 | `docs/features/data-model.md` | **数据模型权威参考**（节点结构、三大间接层、DB 映射） |
 | `docs/features/*.md` | 特性行为规格（实现时的权威参考） |
+| `docs/features/README.md` | Features 子目录索引（按能力分组） |
 | `docs/supabase-setup.md` | Supabase 部署配置指南（环境变量、RLS、Auth、Realtime） |
+| `docs/INFRASTRUCTURE-PLAN.md` | 1000 用户阶段上线与迁移方案 |
 | `docs/issues.md` | Bug 跟踪 + 功能工作项 |
 | `docs/research/` | Tana 逆向分析 |
+| `docs/research/README.md` | Research 子目录索引（推荐阅读顺序） |
 | `docs/design-system.md` | UI 视觉标准 |

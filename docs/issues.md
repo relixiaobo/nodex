@@ -85,7 +85,7 @@
 **Phase**: 1 | **前置**: 基础已完成（#触发、标签应用/移除、配置页、模板字段、TagBadge 右键菜单）
 
 **待办**:
-- [x] Show as Checkbox（标签开启 checkbox 行为 + Cmd+Enter toggle + done visual）— 2026-02-14
+- [x] Show as Checkbox（标签开启 checkbox + 点击 toggle + done dimming）— 2026-02-14（⚠️ Cmd+Enter 不工作，见 #49）
 - [ ] Done state mapping（checkbox ↔ Options 字段值双向映射）
 - [ ] Default Child Supertag（新增子节点自动继承指定标签）
 - [ ] Color picker（真实色板 swatches）
@@ -240,13 +240,17 @@
 
 ### #30 网页剪藏
 
-**Phase**: 3
+**Phase**: 3 | **前置**: 消息通道脚手架已完成
 
 **待办**:
-- [ ] Content Script 提取页面标题/URL/选中文本
-- [ ] 一键保存到 Inbox / Today / 指定节点
-- [ ] 自动打标签（根据内容类型）
-- [ ] 保留源 URL 引用
+- [x] 消息类型定义（`src/lib/webclip-messaging.ts`）— 2026-02-14
+- [x] Content Script 提取页面标题/URL/选中文本（`src/entrypoints/content/index.ts`）— 2026-02-14
+- [x] Background Service Worker 中转（`src/entrypoints/background/index.ts`）— 2026-02-14
+- [x] Sidebar 剪藏按钮触发（`src/components/sidebar/Sidebar.tsx`）— 2026-02-14
+- [ ] 将捕获数据保存为节点（Inbox / Today / 指定位置）
+- [ ] 自动打 `#web_clip` 标签 + 子类型标签
+- [ ] Source URL 字段写入
+- [ ] 剪藏结果 Toast 反馈
 
 **文档**: `docs/features/web-clipping.md`
 

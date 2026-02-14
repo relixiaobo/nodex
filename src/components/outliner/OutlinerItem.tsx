@@ -1062,7 +1062,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
               />
             </span>
           )}
-          <div className={`relative flex-1 min-w-0 ${isPendingConversion ? 'ref-converting' : ''} ${isDone ? 'line-through text-foreground/50' : ''}`}>
+          <div className={`relative flex-1 min-w-0 ${isPendingConversion ? 'ref-converting' : ''} ${isDone ? 'text-foreground/50' : ''}`}>
           <div
             className={`text-sm leading-[21px] ${fieldDataType !== SYS_D.CHECKBOX && !isFocused ? (isReference ? 'cursor-default' : 'cursor-text') : ''}`}
             onMouseDown={fieldDataType !== SYS_D.CHECKBOX && !isFocused ? handleContentMouseDown : undefined}

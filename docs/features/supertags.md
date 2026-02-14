@@ -76,7 +76,7 @@
 |------------|------|------|
 | `undefined` | 无 checkbox | 正常文本，不显示 checkbox |
 | `0` | Undone | 空 checkbox，正常文本 |
-| `> 0` (timestamp) | Done | 绿色勾选，strikethrough + dimmed 文本 |
+| `> 0` (timestamp) | Done | 绿色勾选，dimmed 文本（无删除线） |
 
 `_done = 0` 是哨兵值：epoch-zero 不是合法完成时间，安全表达"有 checkbox 但未完成"。
 
@@ -95,7 +95,7 @@
 - Manual 节点: 三态循环 No → Undone → Done → No（`undefined → 0 → timestamp → undefined`）
 - Tag-driven 节点: 二态 toggle undone ↔ done（tag 始终保持 checkbox 可见）
 
-**Done 视觉**: `line-through text-foreground/50`（strikethrough + dimmed）
+**Done 视觉**: `text-foreground/50`（dimmed，无删除线）
 
 **未实现**:
 - Done state mapping（checkbox ↔ Options 字段双向映射）

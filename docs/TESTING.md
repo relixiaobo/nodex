@@ -241,6 +241,7 @@ npm run test:run
 3. `getShortcutsByScope` 的作用域过滤
 4. 当前已知冲突快照（`selected_ref.options_cancel` vs `selected_ref.clear_selection` 条件互斥场景）
 5. `findUnexpectedShortcutConflicts` 白名单过滤后的异常冲突探测
+6. `matchesShortcutEvent` 对 `Ctrl+Shift+Z`（`+` 分隔）与 `command/option` 别名兼容
 
 ### 1.17 全局导航快捷键拦截保护
 

@@ -112,4 +112,15 @@ describe('shortcut-registry', () => {
     expect(matchesShortcutEvent(shifted, 'Mod-Shift-z')).toBe(true);
     expect(matchesShortcutEvent(shifted, 'Mod-z')).toBe(false);
   });
+
+  it('supports plus-separated bindings and token aliases', () => {
+    const ctrlShift = new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, shiftKey: true });
+    expect(matchesShortcutEvent(ctrlShift, 'Ctrl+Shift+z')).toBe(true);
+
+    const commandI = new KeyboardEvent('keydown', { key: 'i', metaKey: true });
+    expect(matchesShortcutEvent(commandI, 'Command-i')).toBe(true);
+
+    const optionK = new KeyboardEvent('keydown', { key: 'k', altKey: true });
+    expect(matchesShortcutEvent(optionK, 'Option-k')).toBe(true);
+  });
 });

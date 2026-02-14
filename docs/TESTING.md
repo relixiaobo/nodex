@@ -387,6 +387,17 @@ npm run test:run
 2. `initSupabase` 调用 `createClient` 且 `isSupabaseReady` 变为 `true`
 3. `resetSupabase` 后恢复未初始化状态
 
+### 1.31 UI Store 历史边界保护
+
+**测试文件**: `tests/vitest/ui-store-history-guards.test.ts`
+
+**覆盖点**:
+
+1. `navigateTo` 命中当前页面时 no-op（不新增历史/undo）
+2. `goBack/goForward` 在边界位置 no-op
+3. 空 undo/redo 栈下 `navUndo/navRedo` no-op
+4. 空历史下 `replacePanel` 的初始化行为
+
 ---
 
 ## Phase 2: 视觉检查点
@@ -458,6 +469,7 @@ npm run test:run
 | 1.28 | Field Utils 解析与映射 | PASS/FAIL |
 | 1.29 | Chrome Storage 适配层 | PASS/FAIL |
 | 1.30 | Supabase Service 生命周期 | PASS/FAIL |
+| 1.31 | UI Store 历史边界保护 | PASS/FAIL |
 | 2 | 视觉渲染 | PASS/FAIL/SKIP |
 | 3 | 扩展构建 | PASS/FAIL |
 

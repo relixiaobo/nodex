@@ -12,6 +12,11 @@ describe('drag drop hover position resolver', () => {
     expect(resolveDropHoverPosition({ offsetY: 29, rowHeight: 30 })).toBe('after');
   });
 
+  it('treats exact 1/3 and 2/3 boundaries as inside', () => {
+    expect(resolveDropHoverPosition({ offsetY: 10, rowHeight: 30 })).toBe('inside');
+    expect(resolveDropHoverPosition({ offsetY: 20, rowHeight: 30 })).toBe('inside');
+  });
+
   it('falls back to inside for invalid row height', () => {
     expect(resolveDropHoverPosition({ offsetY: 0, rowHeight: 0 })).toBe('inside');
     expect(resolveDropHoverPosition({ offsetY: 3, rowHeight: -1 })).toBe('inside');

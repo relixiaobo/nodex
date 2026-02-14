@@ -367,6 +367,16 @@ npm run test:run
 4. metanode + supertag tuple 的 tagged node 解析
 5. field type label/icon/plain 判定映射
 
+### 1.29 Chrome Storage 适配层
+
+**测试文件**: `tests/vitest/chrome-storage.test.ts`
+
+**覆盖点**:
+
+1. `Set` 的 JSON 序列化与反序列化恢复
+2. missing key 返回 `null`
+3. `removeItem` 删除语义
+
 ---
 
 ## Phase 2: 视觉检查点
@@ -436,6 +446,7 @@ npm run test:run
 | 1.26 | UI Store 持久化与迁移辅助函数 | PASS/FAIL |
 | 1.27 | 图结构不变量 helper 自检 | PASS/FAIL |
 | 1.28 | Field Utils 解析与映射 | PASS/FAIL |
+| 1.29 | Chrome Storage 适配层 | PASS/FAIL |
 | 2 | 视觉渲染 | PASS/FAIL/SKIP |
 | 3 | 扩展构建 | PASS/FAIL |
 

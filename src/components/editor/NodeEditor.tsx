@@ -744,7 +744,7 @@ export function NodeEditor({
     <div className="editor-inline">
       <div
         ref={rootRef}
-        className="outline-none text-sm leading-[21px] min-w-[1px]"
+        className="node-editor outline-none text-sm leading-[21px] min-w-[1px]"
         contentEditable
         suppressContentEditableWarning
         onKeyDown={handleKeyDown}

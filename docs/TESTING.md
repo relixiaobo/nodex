@@ -313,6 +313,7 @@ npm run test:run
 
 1. 目标行上中下三等分到 `before/inside/after` 的分区语义
 2. 非法高度（`<=0`）下的安全回退（`inside`）
+3. 临界值 `1/3` 与 `2/3` 命中中间区（`inside`）
 
 ### 1.24 Tag 颜色映射稳定性
 

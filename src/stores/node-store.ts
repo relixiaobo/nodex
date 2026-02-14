@@ -76,6 +76,9 @@ interface NodeStore {
   /** Update a node's description (optimistic + Supabase sync) */
   updateNodeDescription(id: string, description: string, userId: string): Promise<void>;
 
+  /** Toggle node's _done state (optimistic + Supabase sync) */
+  toggleNodeDone(nodeId: string, userId: string): Promise<void>;
+
   /** Indent node: make it a child of its previous sibling */
   indentNode(nodeId: string, userId: string): Promise<void>;
 
@@ -447,6 +450,32 @@ export const useNodeStore = create<NodeStore>()(
         set((state) => {
           if (state.entities[id]) {
             state.entities[id].props.description = oldDesc;
+          }
+        });
+      }
+    },
+
+    toggleNodeDone: async (nodeId, userId) => {
+      const { entities } = get();
+      const oldDone = entities[nodeId]?.props._done;
+      const newDone = oldDone ? undefined : Date.now();
+
+      // Optimistic
+      set((state) => {
+        if (state.entities[nodeId]) {
+          state.entities[nodeId].props._done = newDone;
+        }
+      });
+
+      if (!isSupabaseReady()) return;
+
+      try {
+        await nodeService.updateNode(nodeId, { props: { _done: newDone } }, userId);
+      } catch {
+        // Rollback
+        set((state) => {
+          if (state.entities[nodeId]) {
+            state.entities[nodeId].props._done = oldDone;
           }
         });
       }

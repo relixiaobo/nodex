@@ -53,6 +53,6 @@ describe('node editor shortcut resolver', () => {
 
     expect(resolveNodeEditorForceCreateIntent(true, false)).toBe('reference_create');
     expect(resolveNodeEditorForceCreateIntent(false, true)).toBe('hashtag_create');
-    expect(resolveNodeEditorForceCreateIntent(false, false)).toBe('allow_default');
+    expect(resolveNodeEditorForceCreateIntent(false, false)).toBe('toggle_done');
   });
 });

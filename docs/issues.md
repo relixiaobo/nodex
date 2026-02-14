@@ -60,7 +60,8 @@
 **Phase**: 1 | **前置**: 基础已完成（#触发、标签应用/移除、配置页、模板字段、TagBadge 右键菜单）
 
 **待办**:
-- [ ] Show as Checkbox（标签开启 checkbox 行为，Done 状态双向映射）
+- [x] Show as Checkbox（标签开启 checkbox 行为 + Cmd+Enter toggle + done visual）— 2026-02-14
+- [ ] Done state mapping（checkbox ↔ Options 字段值双向映射）
 - [ ] Default Child Supertag（新增子节点自动继承指定标签）
 - [ ] Color picker（真实色板 swatches）
 - [ ] Pinned fields（置顶显示 + filter 优先）

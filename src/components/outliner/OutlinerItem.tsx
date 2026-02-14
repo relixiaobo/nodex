@@ -17,6 +17,7 @@ import { FieldRow } from '../fields/FieldRow';
 import { SYS_D, SYS_V } from '../../types/index.js';
 import { useFieldOptions } from '../../hooks/use-field-options.js';
 import { getTagColor } from '../../lib/tag-colors.js';
+import { useNodeCheckbox } from '../../hooks/use-node-checkbox.js';
 import {
   getFlattenedVisibleNodes,
   getPreviousVisibleNode,
@@ -79,6 +80,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   const moveNodeDown = useNodeStore((s) => s.moveNodeDown);
   const moveNodeTo = useNodeStore((s) => s.moveNodeTo);
   const trashNode = useNodeStore((s) => s.trashNode);
+  const toggleNodeDone = useNodeStore((s) => s.toggleNodeDone);
   const entities = useNodeStore((s) => s.entities);
 
   const rowRef = useRef<HTMLDivElement>(null);
@@ -198,6 +200,13 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   const [optionsPickerOpen, setOptionsPickerOpen] = useState(false);
   const [optionsPickerIndex, setOptionsPickerIndex] = useState(0);
   const allFieldOptions = useFieldOptions(isOptionsField && attrDefId ? attrDefId : '');
+
+  // Checkbox state (supertag SYS_A55 or manual _done)
+  const { showCheckbox, isDone } = useNodeCheckbox(nodeId);
+
+  const handleCheckboxToggle = useCallback(() => {
+    if (userId) toggleNodeDone(nodeId, userId);
+  }, [nodeId, userId, toggleNodeDone]);
 
   // Description editing state
   const [editingDescription, setEditingDescription] = useState(false);
@@ -1027,16 +1036,27 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
           onToggle={handleToggle}
           onDrillDown={handleDrillDown}
         />
-        {/* Selection ring wraps bullet + text (not chevron) */}
+        {/* Selection ring wraps bullet/checkbox + text (not chevron) */}
         <div className={`flex items-start gap-2 flex-1 min-w-0 relative ${isSelected ? 'ring-1 ring-primary/40 rounded-sm bg-primary/5 !w-fit !flex-none' : ''}`}>
-          <BulletChevron
-            hasChildren={hasChildren}
-            isExpanded={isExpanded}
-            onBulletClick={handleBulletClick}
-            isReference={isReference || isPendingConversion}
-            tagDefColor={isTagDef ? getTagColor(nodeId).text : undefined}
-          />
-          <div className={`relative flex-1 min-w-0 ${isPendingConversion ? 'ref-converting' : ''}`}>
+          {showCheckbox ? (
+            <div className="w-[15px] h-7 flex items-center justify-center shrink-0">
+              <input
+                type="checkbox"
+                checked={isDone}
+                onChange={handleCheckboxToggle}
+                className="h-3.5 w-3.5 rounded border-border accent-primary cursor-pointer"
+              />
+            </div>
+          ) : (
+            <BulletChevron
+              hasChildren={hasChildren}
+              isExpanded={isExpanded}
+              onBulletClick={handleBulletClick}
+              isReference={isReference || isPendingConversion}
+              tagDefColor={isTagDef ? getTagColor(nodeId).text : undefined}
+            />
+          )}
+          <div className={`relative flex-1 min-w-0 ${isPendingConversion ? 'ref-converting' : ''} ${isDone ? 'line-through text-foreground/50' : ''}`}>
           <div
             className={`text-sm leading-[21px] ${fieldDataType !== SYS_D.CHECKBOX && !isFocused ? (isReference ? 'cursor-default' : 'cursor-text') : ''}`}
             onMouseDown={fieldDataType !== SYS_D.CHECKBOX && !isFocused ? handleContentMouseDown : undefined}
@@ -1085,6 +1105,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
                 onReferenceCreate={handleReferenceForceCreate}
                 onReferenceClose={handleReferenceClose}
                 onDescriptionEdit={handleDescriptionEdit}
+                onToggleDone={handleCheckboxToggle}
               />
             ) : (
               <span

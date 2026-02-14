@@ -68,13 +68,16 @@
   - tagDef 本身移到 Trash
 - 当前行为（2026-02）：`trashNode` 仅将 tagDef 移入 Trash，不自动清理现有引用链路
 
-### Show as Checkbox — 未实现
+### Show as Checkbox — 已实现
 
 - tagDef 配置中开启 "Show as Checkbox" → SYS_A55 = SYS_V03
-- 被该标签标记的节点在 bullet 位置显示 checkbox
+- 被该标签标记的节点在 bullet 位置显示 checkbox（替换 BulletChevron）
 - 勾选 checkbox → 设置节点 `props._done = Date.now()`（毫秒时间戳）
 - 取消勾选 → 清空节点 `props._done`
-- **Done state mapping**（Tana 高级）: checkbox 状态可双向映射到特定字段值
+- Done 视觉状态：文本 strikethrough + dimmed（`line-through text-foreground/50`）
+- 编辑器内 Cmd+Enter 可 toggle done 状态（无需点击 checkbox）
+- 无标签但 `_done` 有值时也显示 checkbox（手动 Cmd+Enter 场景）
+- **Done state mapping**（Tana 高级，未实现）: checkbox 状态可双向映射到特定字段值
 
 ### Default Child Supertag — 未实现
 
@@ -143,7 +146,7 @@
 | Tana 功能 | Nodex 对应 |
 |-----------|-----------|
 | 标签名（可编辑）| PanelTitle |
-| Show checkbox toggle | FieldList config row (SYS_A55) |
+| Show checkbox toggle | FieldList config row (SYS_A55) + 运行时 checkbox 渲染 + Cmd+Enter toggle |
 | Default content 区域（字段 + 普通节点）| OutlinerView with showTemplateTuples |
 | Schema 面包屑 | Breadcrumb SCHEMA container |
 | Delete 按钮 | "Delete tag" button |
@@ -194,7 +197,8 @@
 - [ ] trashNode(tagDef) 级联清理（移除所有标签绑定与模板来源字段）
 - [ ] trashNode(attrDef) 级联清理（移除所有引用该字段的 tuple）
 - [ ] applyTag 复制 default content 中的普通节点
-- [ ] Show as Checkbox + Done state mapping
+- [x] Show as Checkbox（toggle + done visual + Cmd+Enter）
+- [ ] Done state mapping（checkbox ↔ Options 字段双向映射）
 - [ ] Default Child Supertag（真实 tag_picker）
 - [ ] Color picker（真实色板）
 - [ ] Pinned fields

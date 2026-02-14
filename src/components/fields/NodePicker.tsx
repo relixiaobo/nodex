@@ -267,7 +267,7 @@ export function NodePicker({
       {/* Dropdown — shown below the value */}
       {open && (
         <div
-          className="absolute left-6 top-full z-50 mt-0.5 w-48 max-h-52 overflow-y-auto rounded-lg border border-border bg-popover shadow-lg p-1"
+          className="absolute left-6 top-full z-50 mt-0.5 w-56 max-h-52 overflow-y-auto rounded-lg border border-border bg-popover shadow-lg p-1"
           onMouseDown={(e) => e.preventDefault()}
         >
           {/* Option list — bullet + text per item */}
@@ -276,14 +276,14 @@ export function NodePicker({
               {filteredOptions.map((opt, i) => (
                 <button
                   key={opt.id}
-                  className={`flex w-full items-center gap-2 rounded-md px-2 py-1 min-h-7 text-left transition-colors ${
+                  className={`flex w-full items-start gap-2 rounded-md px-2 py-1 min-h-7 text-left transition-colors ${
                     i === hoverIndex ? 'bg-accent' : 'hover:bg-foreground/5'
                   }`}
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => handleSelect(opt.id)}
                   onMouseEnter={() => setHoverIndex(i)}
                 >
-                  <span className="flex shrink-0 w-[15px] h-[15px] items-center justify-center">
+                  <span className="flex shrink-0 w-[15px] h-[21px] items-center justify-center">
                     {opt.isTagDef ? (
                       <span
                         className="flex h-[13px] w-[13px] items-center justify-center rounded-full"
@@ -304,11 +304,11 @@ export function NodePicker({
           ) : allowCreate && inputValue.trim() ? (
             <div>
               <button
-                className="flex w-full items-center gap-2 rounded-md px-2 py-1 min-h-7 text-left bg-accent text-foreground"
+                className="flex w-full items-start gap-2 rounded-md px-2 py-1 min-h-7 text-left bg-accent text-foreground"
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => handleCreate(inputValue.trim())}
               >
-                <span className="flex shrink-0 w-[15px] h-[15px] items-center justify-center">
+                <span className="flex shrink-0 w-[15px] h-[21px] items-center justify-center">
                   <span className="block h-[5px] w-[5px] rounded-full bg-foreground/50" />
                 </span>
                 <span className="text-sm leading-[21px]">

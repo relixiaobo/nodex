@@ -47,6 +47,7 @@
 
 - 默认：`moveNodeTo(dragNodeId, dropParentId, siblingIndex + 1)`。
 - 特殊：若目标节点有子节点且当前已展开，`after` 会解释为“放入其内部第一个子节点”（更接近大纲使用习惯）。
+- 若目标有子节点但当前未展开，则仍按同级 `after` 处理（不隐式进入子层级）。
 
 ### inside
 

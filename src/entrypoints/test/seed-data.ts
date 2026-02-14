@@ -435,7 +435,7 @@ export function seedTestData() {
 
   // Config tuples for tagDef_task (SYS_T01 template instances)
   const tagDefTaskConfigNodes: NodexNode[] = [
-    makeNode('tagDef_task_cfg_checkbox', '', 'tagDef_task', [SYS_A.SHOW_CHECKBOX, SYS_V.NO], 'tuple'),
+    makeNode('tagDef_task_cfg_checkbox', '', 'tagDef_task', [SYS_A.SHOW_CHECKBOX, SYS_V.YES], 'tuple'),
     makeNode('tagDef_task_cfg_childtag', '', 'tagDef_task', [SYS_A.CHILD_SUPERTAG], 'tuple'),
     makeNode('tagDef_task_cfg_color', '', 'tagDef_task', [SYS_A.COLOR], 'tuple'),
   ];

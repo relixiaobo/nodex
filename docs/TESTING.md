@@ -425,7 +425,21 @@ npm run test:run
 3. 空 undo/redo 栈下 `navUndo/navRedo` no-op
 4. 空历史下 `replacePanel` 的初始化行为
 
-### 1.32 Workspace Store 认证状态与持久化
+### 1.32 Checkbox 可见性与 Done 状态
+
+**测试文件**: `tests/vitest/checkbox-utils.test.ts`
+
+**覆盖点**:
+
+1. 无标签节点 → showCheckbox=false
+2. 有标签但 SYS_A55=NO → showCheckbox=false
+3. 有标签且 SYS_A55=YES → showCheckbox=true
+4. 无标签但 _done 有值 → showCheckbox=true（手动 Cmd+Enter 场景）
+5. 标签 SYS_A55=YES + _done 有值 → 双 true
+6. 不存在的节点 → 安全回退
+7. `toggleNodeDone` store action 的 toggle 语义
+
+### 1.33 Workspace Store 认证状态与持久化
 
 **测试文件**: `tests/vitest/workspace-store.test.ts`
 
@@ -507,7 +521,8 @@ npm run test:run
 | 1.29 | Chrome Storage 适配层 | PASS/FAIL |
 | 1.30 | Supabase Service 生命周期 | PASS/FAIL |
 | 1.31 | UI Store 历史边界保护 | PASS/FAIL |
-| 1.32 | Workspace Store 认证状态与持久化 | PASS/FAIL |
+| 1.32 | Checkbox 可见性与 Done 状态 | PASS/FAIL |
+| 1.33 | Workspace Store 认证状态与持久化 | PASS/FAIL |
 | 2 | 视觉渲染 | PASS/FAIL/SKIP |
 | 3 | 扩展构建 | PASS/FAIL |
 
@@ -539,7 +554,7 @@ Containers: ws_default_LIBRARY, ws_default_INBOX, ws_default_JOURNAL,
             ws_default_SEARCHES, ws_default_TRASH, ws_default_SCHEMA
 Schema:     tagDef_task, tagDef_person,
             attrDef_status/priority/due/email/company + type tuples + option nodes
-Pre-tagged: task_1 → #Task (meta_task_1, field tuples, associatedData)
+Pre-tagged: task_1 → #Task (meta_task_1, field tuples, associatedData, checkbox=YES)
 
 默认展开: proj_1, task_1, task_2, note_rich
 ```

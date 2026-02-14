@@ -87,6 +87,8 @@ interface NodeEditorProps {
   onReferenceClose?: () => void;
   // ─── Description editing ───
   onDescriptionEdit?: () => void;
+  // ─── Checkbox toggle (Cmd+Enter when no dropdown) ───
+  onToggleDone?: () => void;
 }
 
 export function NodeEditor({
@@ -121,6 +123,7 @@ export function NodeEditor({
   onReferenceCreate,
   onReferenceClose,
   onDescriptionEdit,
+  onToggleDone,
 }: NodeEditorProps) {
   const updateNodeName = useNodeStore((s) => s.updateNodeName);
   const setNodeNameLocal = useNodeStore((s) => s.setNodeNameLocal);
@@ -166,6 +169,7 @@ export function NodeEditor({
     onReferenceCreate: onReferenceCreate ?? (() => {}),
     onReferenceClose: onReferenceClose ?? (() => {}),
     onDescriptionEdit: onDescriptionEdit ?? (() => {}),
+    onToggleDone: onToggleDone ?? (() => {}),
   });
   callbacksRef.current = {
     onEnter, onIndent, onOutdent, onDelete, onArrowUp, onArrowDown, onMoveUp, onMoveDown, saveContent,
@@ -183,6 +187,7 @@ export function NodeEditor({
     onReferenceCreate: onReferenceCreate ?? (() => {}),
     onReferenceClose: onReferenceClose ?? (() => {}),
     onDescriptionEdit: onDescriptionEdit ?? (() => {}),
+    onToggleDone: onToggleDone ?? (() => {}),
   };
 
   // HashTag extension callbacks
@@ -367,7 +372,9 @@ export function NodeEditor({
               callbacksRef.current.onHashTagCreate();
               return true;
             }
-            return false;
+            // No dropdown active: toggle done state
+            callbacksRef.current.onToggleDone();
+            return true;
           },
           [KEY_EDITOR_MOVE_UP]: () => {
             callbacksRef.current.onMoveUp();

@@ -56,7 +56,7 @@ export function resolveNodeEditorEscapeIntent(
 export type NodeEditorForceCreateIntent =
   | 'reference_create'
   | 'hashtag_create'
-  | 'allow_default';
+  | 'toggle_done';
 
 export function resolveNodeEditorForceCreateIntent(
   referenceActive: boolean,
@@ -64,5 +64,5 @@ export function resolveNodeEditorForceCreateIntent(
 ): NodeEditorForceCreateIntent {
   if (referenceActive) return 'reference_create';
   if (hashTagActive) return 'hashtag_create';
-  return 'allow_default';
+  return 'toggle_done';
 }

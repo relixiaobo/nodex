@@ -135,10 +135,12 @@
 - [x] Content Script 提取 — 2026-02-14
 - [x] Background 中转 — 2026-02-14
 - [x] Sidebar 剪藏按钮 — 2026-02-14
-- [ ] 将捕获数据保存为节点
-- [ ] 自动打 `#web_clip` 标签
-- [ ] Source URL 字段写入
-- [ ] 剪藏结果 Toast 反馈
+- [x] 提取器切换为 `defuddle`（不保留 `innerText` fallback）— 2026-02-14
+- [x] `Capture Tab` 复制 `defuddle` 原始 `content` 到剪贴板（临时验收路径）— 2026-02-14
+- [ ] （等待 Supertag Extend）将捕获数据保存为节点
+- [ ] （等待 Supertag Extend）自动打 `#web_clip` 标签
+- [ ] （等待 Supertag Extend）Source URL 字段写入
+- [ ] （等待 Supertag Extend）剪藏结果 Toast 反馈
 
 #### #44 节点选中
 

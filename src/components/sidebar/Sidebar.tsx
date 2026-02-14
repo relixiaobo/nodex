@@ -20,9 +20,17 @@ export function Sidebar() {
     typeof chrome !== 'undefined' &&
     !!chrome.runtime &&
     !!chrome.runtime.sendMessage;
+  const canUseClipboard =
+    typeof navigator !== 'undefined' &&
+    !!navigator.clipboard &&
+    typeof navigator.clipboard.writeText === 'function';
 
   async function handleCaptureTab() {
     if (!canUseRuntime || captureLoading) return;
+    if (!canUseClipboard) {
+      setCaptureStatus('Capture failed: Clipboard API unavailable');
+      return;
+    }
 
     setCaptureLoading(true);
     setCaptureStatus('Capturing current tab...');
@@ -37,8 +45,8 @@ export function Sidebar() {
         return;
       }
 
-      const snippet = response.payload.pageText.replace(/\s+/g, ' ').slice(0, 100);
-      setCaptureStatus(`Captured: ${response.payload.title} (${snippet}${response.payload.pageText.length > 100 ? '...' : ''})`);
+      await navigator.clipboard.writeText(response.payload.pageText);
+      setCaptureStatus(`Copied raw content: ${response.payload.title}`);
     } catch (err) {
       setCaptureStatus(`Capture failed: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
@@ -68,10 +76,10 @@ export function Sidebar() {
       <div className="px-2 pb-2">
         <button
           onClick={handleCaptureTab}
-          disabled={!canUseRuntime || captureLoading}
+          disabled={!canUseRuntime || !canUseClipboard || captureLoading}
           className="flex w-full items-center justify-center rounded-md border border-border bg-background px-2 py-1 text-xs text-foreground-secondary hover:bg-foreground/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {captureLoading ? 'Capturing...' : 'Capture Tab (Preview)'}
+          {captureLoading ? 'Capturing...' : 'Capture Tab -> Clipboard'}
         </button>
         {captureStatus && (
           <p className="mt-1 line-clamp-2 text-[11px] text-foreground-tertiary">

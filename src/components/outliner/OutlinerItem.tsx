@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
+import type { Editor } from '@tiptap/react';
 import { useNode } from '../../hooks/use-node';
 import { useChildren } from '../../hooks/use-children';
 import { useNodeTags } from '../../hooks/use-node-tags';
@@ -26,8 +27,6 @@ import {
 import { resolveDropHoverPosition } from '../../lib/drag-drop-position';
 import { resolveDropMove } from '../../lib/drag-drop';
 import { resolveSelectedReferenceShortcut } from '../../lib/selected-reference-shortcuts';
-import type { NodeEditorHandle } from '../editor/editor-handle';
-import { findHashTriggerRange } from '../../lib/trigger-cleanup.js';
 
 /** Field types that accept only a single value node. Enter navigates out instead of creating siblings. */
 const SINGLE_VALUE_FIELD_TYPES: Set<string> = new Set([
@@ -56,7 +55,6 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   const focusedNodeId = useUIStore((s) => s.focusedNodeId);
   const focusedParentId = useUIStore((s) => s.focusedParentId);
   const setFocusedNode = useUIStore((s) => s.setFocusedNode);
-  const setFocusClickCoords = useUIStore((s) => s.setFocusClickCoords);
   const selectedNodeId = useUIStore((s) => s.selectedNodeId);
   const selectedParentId = useUIStore((s) => s.selectedParentId);
   const setSelectedNode = useUIStore((s) => s.setSelectedNode);
@@ -87,7 +85,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   const entities = useNodeStore((s) => s.entities);
 
   const rowRef = useRef<HTMLDivElement>(null);
-  const editorRef = useRef<NodeEditorHandle | null>(null);
+  const editorRef = useRef<Editor | null>(null);
   const blurClearRafRef = useRef<number | null>(null);
 
   // # trigger state
@@ -95,7 +93,6 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   const [hashTagQuery, setHashTagQuery] = useState('');
   const [hashTagSelectedIndex, setHashTagSelectedIndex] = useState(0);
   const hashRangeRef = useRef<{ from: number; to: number }>({ from: 0, to: 0 });
-  const prevHashQueryRef = useRef('');
   const tagDropdownRef = useRef<TagDropdownHandle>(null);
   const applyTag = useNodeStore((s) => s.applyTag);
   const createTagDef = useNodeStore((s) => s.createTagDef);
@@ -112,7 +109,6 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   const [refQuery, setRefQuery] = useState('');
   const [refSelectedIndex, setRefSelectedIndex] = useState(0);
   const refRangeRef = useRef<{ from: number; to: number }>({ from: 0, to: 0 });
-  const prevRefQueryRef = useRef('');
   const refDropdownRef = useRef<ReferenceDropdownHandle>(null);
 
   // > trigger (fire-once: instantly creates field)
@@ -396,14 +392,12 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       // The editor content is '#' — set range to cover it
       setHashTagQuery('');
       setHashTagSelectedIndex(0);
-      prevHashQueryRef.current = '';
-      hashRangeRef.current = { from: 0, to: 1 };
+      hashRangeRef.current = { from: 1, to: 2 }; // position of '#' in ProseMirror doc
       setHashTagOpen(true);
     } else if (hint === '@') {
       setRefQuery('');
       setRefSelectedIndex(0);
-      prevRefQueryRef.current = '';
-      refRangeRef.current = { from: 0, to: 1 };
+      refRangeRef.current = { from: 1, to: 2 };
       setRefOpen(true);
     }
   }, [isFocused]);
@@ -425,11 +419,9 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     setHashTagOpen(false);
     setHashTagQuery('');
     setHashTagSelectedIndex(0);
-    prevHashQueryRef.current = '';
     setRefOpen(false);
     setRefQuery('');
     setRefSelectedIndex(0);
-    prevRefQueryRef.current = '';
 
     // Check pending ref conversion: if this is a temp node, decide revert or keep
     const pending = useUIStore.getState().pendingRefConversion;
@@ -563,60 +555,38 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       const currentlyExpanded = useUIStore.getState().expandedNodes.has(`${parentId}:${nodeId}`);
       const currentHasChildren =
         (useNodeStore.getState().entities[nodeId]?.children ?? []).length > 0;
-      const isSplit = afterContent !== undefined;
 
-      const focusNewNodeStart = (newNodeId: string, newParentId: string) => {
-        setFocusClickCoords({ nodeId: newNodeId, parentId: newParentId, textOffset: 0 });
-        setFocusedNode(newNodeId, newParentId);
-      };
-
-      // Split semantics:
-      // - no children -> sibling
-      // - has children -> first child (regardless of expanded state)
-      if ((isSplit && currentHasChildren) || (!isSplit && currentlyExpanded && currentHasChildren)) {
-        // Child insertion -> new node becomes first child (position 0)
-        setExpanded(`${parentId}:${nodeId}`, true);
+      if (currentlyExpanded && currentHasChildren) {
+        // Expanded with children → new node becomes first child (position 0)
         const beforeIds = new Set(useNodeStore.getState().entities[nodeId]?.children ?? []);
         const createPromise = createChild(nodeId, wsId, userId, afterContent ?? '', 0);
 
         const optimisticIds = useNodeStore.getState().entities[nodeId]?.children ?? [];
         const optimisticNewId = optimisticIds.find((cid) => !beforeIds.has(cid));
-        if (optimisticNewId) focusNewNodeStart(optimisticNewId, nodeId);
+        if (optimisticNewId) setFocusedNode(optimisticNewId, nodeId);
 
         createPromise.then((newNode) => {
           if (useNodeStore.getState().entities[newNode.id]) {
-            focusNewNodeStart(newNode.id, nodeId);
+            setFocusedNode(newNode.id, nodeId);
           }
         });
       } else {
-        // Sibling insertion after this node
+        // Collapsed or leaf → create sibling after this node
         const beforeIds = new Set(useNodeStore.getState().entities[parentId]?.children ?? []);
         const createPromise = createSibling(nodeId, wsId, userId, afterContent);
 
         const optimisticIds = useNodeStore.getState().entities[parentId]?.children ?? [];
         const optimisticNewId = optimisticIds.find((cid) => !beforeIds.has(cid));
-        if (optimisticNewId) focusNewNodeStart(optimisticNewId, parentId);
+        if (optimisticNewId) setFocusedNode(optimisticNewId, parentId);
 
         createPromise.then((newNode) => {
           if (useNodeStore.getState().entities[newNode.id]) {
-            focusNewNodeStart(newNode.id, parentId);
+            setFocusedNode(newNode.id, parentId);
           }
         });
       }
     },
-    [
-      nodeId,
-      parentId,
-      wsId,
-      userId,
-      fieldDataType,
-      onNavigateOut,
-      createSibling,
-      createChild,
-      setExpanded,
-      setFocusedNode,
-      setFocusClickCoords,
-    ],
+    [nodeId, parentId, wsId, userId, fieldDataType, onNavigateOut, createSibling, createChild, setFocusedNode],
   );
 
   const handleIndent = useCallback(() => {
@@ -659,8 +629,13 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
 
   const handleDelete = useCallback((): boolean => {
     if (!wsId || !userId) return false;
+    // Read current name from store — the closure's `node` may be stale
+    // because saveContent() updates the store synchronously before this runs.
+    // Strip HTML tags before checking: TipTap may save empty paragraphs as
+    // '<br>' or '<br class="ProseMirror-trailingBreak">' which are non-empty
+    // strings but represent visually empty content.
     const currentName = useNodeStore.getState().entities[nodeId]?.props.name ?? '';
-    const textOnly = currentName.replace(/<[^>]*>/g, '').replace(/\u200B/g, '').trim();
+    const textOnly = currentName.replace(/<[^>]*>/g, '').trim();
     if (textOnly.length > 0) return false;
 
     const flatList = getFlattenedVisibleNodes(rootChildIds, entities, expandedNodes, rootNodeId);
@@ -687,65 +662,6 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     }
     return true;
   }, [nodeId, wsId, userId, parentId, rootNodeId, rootChildIds, entities, expandedNodes, trashNode, removeReference, setFocusedNode]);
-
-  const handleBackspaceAtStart = useCallback((): boolean => {
-    if (!wsId || !userId) return false;
-    const state = useNodeStore.getState();
-    const current = state.entities[nodeId];
-    const parent = state.entities[parentId];
-    if (!current || !parent?.children) return false;
-
-    // Only merge normal owned content nodes.
-    if (current.props._ownerId !== parentId || current.props._docType) return false;
-
-    const index = parent.children.indexOf(nodeId);
-    if (index <= 0) return false;
-
-    const prevId = parent.children[index - 1];
-    const prevNode = state.entities[prevId];
-    if (!prevNode || prevNode.props._docType) return false;
-
-    const currentName = current.props.name ?? '';
-    const currentText = htmlToPlainText(currentName).trim();
-    if (!currentText) return false;
-
-    const prevName = prevNode.props.name ?? '';
-    const prevTextLen = htmlToPlainText(prevName).length;
-
-    void updateNodeName(prevId, `${prevName}${currentName}`, userId);
-
-    const childrenToMove = [...(current.children ?? [])];
-    if (childrenToMove.length > 0) {
-      setExpanded(`${parentId}:${prevId}`, true);
-      const prevChildCount = prevNode.children?.length ?? 0;
-      for (let i = 0; i < childrenToMove.length; i++) {
-        void moveNodeTo(childrenToMove[i], prevId, prevChildCount + i, userId);
-      }
-    }
-
-    void trashNode(nodeId, wsId, userId);
-    const boundary = { nodeId: prevId, parentId, textOffset: prevTextLen };
-    setFocusClickCoords(boundary);
-    setFocusedNode(prevId, parentId);
-    requestAnimationFrame(() => {
-      const state = useUIStore.getState();
-      if (state.focusedNodeId === prevId && state.focusedParentId === parentId) {
-        state.setFocusClickCoords(boundary);
-      }
-    });
-    return true;
-  }, [
-    moveNodeTo,
-    nodeId,
-    parentId,
-    setExpanded,
-    setFocusClickCoords,
-    setFocusedNode,
-    trashNode,
-    updateNodeName,
-    userId,
-    wsId,
-  ]);
 
   const handleArrowUp = useCallback(() => {
     const flatList = getFlattenedVisibleNodes(rootChildIds, entities, expandedNodes, rootNodeId);
@@ -782,12 +698,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   const handleHashTag = useCallback((query: string, from: number, to: number) => {
     hashRangeRef.current = { from, to };
     setHashTagQuery(query);
-    // Only reset selection when query actually changes (evaluateTriggers fires on
-    // every keyUp, which would clobber arrow-key index changes otherwise).
-    if (query !== prevHashQueryRef.current) {
-      prevHashQueryRef.current = query;
-      setHashTagSelectedIndex(0);
-    }
+    setHashTagSelectedIndex(0);
     if (!hashTagOpen) setHashTagOpen(true);
   }, [hashTagOpen, nodeId]);
 
@@ -795,46 +706,20 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     setHashTagOpen(false);
     setHashTagQuery('');
     setHashTagSelectedIndex(0);
-    prevHashQueryRef.current = '';
   }, [nodeId]);
 
-  /** Delete #query text from editor, save corrected content, refocus.
-   *
-   * Single-transaction approach: read text+caret once, regex-find the trigger
-   * token, compute {from,to}, write back atomically. No stale-ref fallbacks.
-   */
+  /** Delete #query text from editor, save corrected content, refocus */
   const cleanupHashTagText = useCallback(() => {
     const ed = editorRef.current;
-    if (!ed) {
-      // No editor handle (edge case: unmounted) — strip from stored name
-      if (userId) {
-        const currentName = useNodeStore.getState().entities[nodeId]?.props.name ?? '';
-        const fallbackText = htmlToPlainText(currentName).replace(/#([^\s#@]*)$/u, '');
-        updateNodeName(nodeId, fallbackText, userId);
-      }
-      return;
-    }
-
-    const text = ed.getText();
-    const caret = ed.getCaretOffset() ?? text.length;
-    const range = findHashTriggerRange(text, caret)
-      ?? (hashRangeRef.current.from < hashRangeRef.current.to
-        ? hashRangeRef.current
-        : null);
-    if (range) {
-      ed.deleteTextRange(range);
-    }
-    const afterHtml = ed.getHTML();
-
-    // Safety: if deleteTextRange failed to remove the # trigger, strip it from HTML
-    const afterText = ed.getText();
-    const stillHasHash = afterText.match(/#([^\s#@]*)$/u);
-    if (stillHasHash) {
-      const cleaned = afterText.replace(/#([^\s#@]*)$/u, '');
-      ed.setPlainText(cleaned, cleaned.length);
-      if (userId) updateNodeName(nodeId, ed.getHTML(), userId);
-    } else {
-      if (userId) updateNodeName(nodeId, afterHtml, userId);
+    if (ed && !ed.isDestroyed) {
+      const { from, to } = hashRangeRef.current;
+      ed.chain().deleteRange({ from, to }).run();
+      // Save corrected content (without #query)
+      const html = ed.getHTML();
+      const trimmed = html.trim();
+      const match = trimmed.match(/^<p>(.*)<\/p>$/s);
+      const cleanedName = (match && !match[1].includes('<p>')) ? match[1] : trimmed;
+      if (userId) updateNodeName(nodeId, cleanedName, userId);
     }
   }, [nodeId, userId, updateNodeName]);
 
@@ -846,7 +731,6 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       setHashTagOpen(false);
       setHashTagQuery('');
       setHashTagSelectedIndex(0);
-      prevHashQueryRef.current = '';
     },
     [nodeId, wsId, userId, applyTag, cleanupHashTagText],
   );
@@ -860,7 +744,6 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       setHashTagOpen(false);
       setHashTagQuery('');
       setHashTagSelectedIndex(0);
-      prevHashQueryRef.current = '';
     },
     [nodeId, wsId, userId, createTagDef, applyTag, cleanupHashTagText],
   );
@@ -878,10 +761,10 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
 
   // Keyboard forwarding: navigate down in dropdown
   const handleHashTagNavDown = useCallback(() => {
-    // Read item count outside updater to avoid stale-ref issues inside
-    // React 19 state updater functions.
-    const count = tagDropdownRef.current?.getItemCount() ?? 0;
-    setHashTagSelectedIndex((i) => count > 0 ? Math.min(i + 1, count - 1) : i);
+    setHashTagSelectedIndex((i) => {
+      const count = tagDropdownRef.current?.getItemCount() ?? 0;
+      return count > 0 ? Math.min(i + 1, count - 1) : 0;
+    });
   }, []);
 
   // Keyboard forwarding: navigate up in dropdown
@@ -902,7 +785,6 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     setHashTagOpen(false);
     setHashTagQuery('');
     setHashTagSelectedIndex(0);
-    prevHashQueryRef.current = '';
   }, []);
 
   // ─── > field trigger (fire-once: instantly creates unnamed field) ───
@@ -920,12 +802,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   const handleReference = useCallback((query: string, from: number, to: number) => {
     refRangeRef.current = { from, to };
     setRefQuery(query);
-    // Only reset selection when query actually changes (evaluateTriggers fires on
-    // every keyUp, which would clobber arrow-key index changes otherwise).
-    if (query !== prevRefQueryRef.current) {
-      prevRefQueryRef.current = query;
-      setRefSelectedIndex(0);
-    }
+    setRefSelectedIndex(0);
     if (!refOpen) setRefOpen(true);
   }, [refOpen]);
 
@@ -933,37 +810,20 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     setRefOpen(false);
     setRefQuery('');
     setRefSelectedIndex(0);
-    prevRefQueryRef.current = '';
   }, []);
 
   const handleReferenceSelect = useCallback(
     (refNodeId: string) => {
-      // Always close dropdown — even if insertion logic fails.
-      const closeDropdown = () => {
-        setRefOpen(false);
-        setRefQuery('');
-        setRefSelectedIndex(0);
-        prevRefQueryRef.current = '';
-      };
-
-      if (!wsId || !userId) { closeDropdown(); return; }
+      if (!wsId || !userId) return;
       const ed = editorRef.current;
-      if (!ed) { closeDropdown(); return; }
+      if (!ed || ed.isDestroyed) return;
 
       // Check if the entire editor content is just the @query (empty-node reference)
-      const fullText = ed.getText();
-      let { from, to } = refRangeRef.current;
-      if (from < 0 || to > fullText.length || from >= to || fullText.slice(from, to).indexOf('@') !== 0) {
-        const token = `@${refQuery}`;
-        const fallback = fullText.lastIndexOf(token || '@');
-        if (fallback >= 0) {
-          from = fallback;
-          to = fallback + (token.length || 1);
-        }
-      }
+      const fullText = ed.state.doc.textContent;
+      const { from, to } = refRangeRef.current;
       // Text before the @ and after the query
-      const beforeAt = fullText.substring(0, from);
-      const afterQuery = fullText.substring(to);
+      const beforeAt = fullText.substring(0, from - 1);
+      const afterQuery = fullText.substring(to - 1);
       const isEmptyAround = beforeAt.trim() === '' && afterQuery.trim() === '';
 
       if (isEmptyAround) {
@@ -975,7 +835,13 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
           // Tana behavior: insert inline ref instead, keeping this as a regular content node.
           const refNode = entities[refNodeId];
           const refName = (refNode?.props.name ?? '').replace(/<[^>]+>/g, '').trim() || 'Untitled';
-          ed.replaceTextRangeWithInlineRef({ from, to }, refNodeId, refName);
+          ed.chain()
+            .deleteRange({ from, to })
+            .insertContentAt(from, {
+              type: 'inlineRef',
+              attrs: { nodeId: refNodeId, label: refName },
+            })
+            .run();
         } else {
           // Empty node @: trash this node, create temp node in conversion mode
           // Temp node has inline ref content — user sees reference bullet + cursor at end.
@@ -992,25 +858,20 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
         // Mid-text @: insert inline reference
         const refNode = entities[refNodeId];
         const refName = (refNode?.props.name ?? '').replace(/<[^>]+>/g, '').trim() || 'Untitled';
-        ed.replaceTextRangeWithInlineRef({ from, to }, refNodeId, refName);
+        ed.chain()
+          .deleteRange({ from, to })
+          .insertContentAt(from, {
+            type: 'inlineRef',
+            attrs: { nodeId: refNodeId, label: refName },
+          })
+          .run();
       }
 
-      closeDropdown();
+      setRefOpen(false);
+      setRefQuery('');
+      setRefSelectedIndex(0);
     },
-    [
-      nodeId,
-      parentId,
-      wsId,
-      userId,
-      entities,
-      trashNode,
-      addReference,
-      setExpanded,
-      setFocusedNode,
-      startRefConversion,
-      setPendingRefConversion,
-      refQuery,
-    ],
+    [nodeId, parentId, wsId, userId, entities, trashNode, addReference, setExpanded, setFocusedNode, startRefConversion, setPendingRefConversion],
   );
 
   const handleReferenceCreateNew = useCallback(
@@ -1034,10 +895,10 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   }, [handleReferenceSelect, handleReferenceCreateNew]);
 
   const handleReferenceNavDown = useCallback(() => {
-    // Read item count outside updater to avoid stale-ref issues inside
-    // React 19 state updater functions.
-    const count = refDropdownRef.current?.getItemCount() ?? 0;
-    setRefSelectedIndex((i) => count > 0 ? Math.min(i + 1, count - 1) : i);
+    setRefSelectedIndex((i) => {
+      const count = refDropdownRef.current?.getItemCount() ?? 0;
+      return count > 0 ? Math.min(i + 1, count - 1) : 0;
+    });
   }, []);
 
   const handleReferenceNavUp = useCallback(() => {
@@ -1055,7 +916,6 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     setRefOpen(false);
     setRefQuery('');
     setRefSelectedIndex(0);
-    prevRefQueryRef.current = '';
   }, []);
 
   // ─── Drag and drop handlers ───
@@ -1225,7 +1085,6 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
                 initialContent={node.props.name ?? ''}
                 onBlur={handleBlur}
                 onEnter={handleEnter}
-                onBackspaceAtStart={handleBackspaceAtStart}
                 onIndent={handleIndent}
                 onOutdent={handleOutdent}
                 onDelete={handleDelete}
@@ -1253,7 +1112,6 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
                 onReferenceClose={handleReferenceClose}
                 onDescriptionEdit={handleDescriptionEdit}
                 onToggleDone={handleCycleCheckbox}
-                onInlineReferenceClick={navigateTo}
               />
             ) : (
               <span
@@ -1466,7 +1324,7 @@ function getTextOffsetFromPoint(container: HTMLElement, clientX: number, clientY
   }
 
   if (!startContainer || !container.contains(startContainer)) {
-    return getApproxTextOffsetFromPoint(container, clientX, clientY);
+    return null;
   }
 
   try {
@@ -1475,67 +1333,6 @@ function getTextOffsetFromPoint(container: HTMLElement, clientX: number, clientY
     preRange.setEnd(startContainer, startOffset);
     return preRange.toString().length;
   } catch {
-    return getApproxTextOffsetFromPoint(container, clientX, clientY);
-  }
-}
-
-function getApproxTextOffsetFromPoint(container: HTMLElement, clientX: number, clientY: number): number {
-  const textLength = (container.textContent ?? '').length;
-  if (textLength <= 0) return 0;
-  let bestOffset = textLength;
-  let bestDist = Number.POSITIVE_INFINITY;
-  for (let i = 0; i <= textLength; i++) {
-    const rect = getCaretRectAtOffset(container, i);
-    if (!rect) continue;
-    const dx = clientX < rect.left ? rect.left - clientX : (clientX > rect.right ? clientX - rect.right : 0);
-    const dy = clientY < rect.top ? rect.top - clientY : (clientY > rect.bottom ? clientY - rect.bottom : 0);
-    const dist = dy * 1000 + dx;
-    if (dist < bestDist) {
-      bestDist = dist;
-      bestOffset = i;
-    }
-  }
-  return bestOffset;
-}
-
-function getCaretRectAtOffset(container: HTMLElement, offset: number): DOMRect | null {
-  const doc = container.ownerDocument;
-  const pos = resolvePositionByTextOffset(container, offset);
-  if (!pos) return null;
-  try {
-    const range = doc.createRange();
-    range.setStart(pos.node, pos.offset);
-    range.collapse(true);
-    const rect = range.getClientRects()[0] ?? range.getBoundingClientRect();
-    if (rect && Number.isFinite(rect.left) && Number.isFinite(rect.top)) {
-      return rect;
-    }
-  } catch {
     return null;
   }
-  return null;
-}
-
-function resolvePositionByTextOffset(root: HTMLElement, offset: number): { node: Node; offset: number } | null {
-  const target = Math.max(0, offset);
-  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
-  let remaining = target;
-  let current = walker.nextNode();
-  while (current) {
-    const textNode = current as Text;
-    const len = textNode.nodeValue?.length ?? 0;
-    if (remaining <= len) {
-      return { node: textNode, offset: remaining };
-    }
-    remaining -= len;
-    current = walker.nextNode();
-  }
-  return { node: root, offset: root.childNodes.length };
-}
-
-function htmlToPlainText(html: string): string {
-  if (!html) return '';
-  const div = document.createElement('div');
-  div.innerHTML = html;
-  return (div.textContent ?? '').replace(/\u200B/g, '');
 }

@@ -16,11 +16,11 @@
 
 | # | 标题 | 关闭人 | 关闭日期 |
 |---|------|--------|----------|
-| 54 | Schema 空子节点 Backspace 无法删除（handleDelete \u200B 处理） | claude-agent | 02-14 |
-| 53 | `#tag` 选中后触发词文本残留（cleanupHashTagText safety fallback） | claude-agent | 02-14 |
-| 52 | `@` reference 下拉菜单导航/确认失败（nav count + dropdown close） | claude-agent | 02-14 |
-| 51 | 新建节点首次输入后需按两次 Enter 才创建下一节点 | claude-main | 02-14 |
-| 50 | `#query` 选中 tag 后触发词未清理（如 `#per` 残留） | claude-main | 02-14 |
+| 54 | Schema 空子节点 Backspace 无法删除 | claude-main | 02-15 | 回退到 TipTap，raw contentEditable 已废弃 |
+| 53 | `#tag` 选中后触发词文本残留 | claude-main | 02-15 | 回退到 TipTap，raw contentEditable 已废弃 |
+| 52 | `@` reference 下拉菜单导航/确认失败 | claude-main | 02-15 | 回退到 TipTap，raw contentEditable 已废弃 |
+| 51 | 新建节点首次输入后需按两次 Enter 才创建下一节点 | claude-main | 02-15 | 回退到 TipTap，raw contentEditable 已废弃 |
+| 50 | `#query` 选中 tag 后触发词未清理 | claude-main | 02-15 | 回退到 TipTap，raw contentEditable 已废弃 |
 | 43 | Field name 末尾 Enter 不应切换建议字段；父节点末尾为 field 时需保留空白输入行 | claude-main | 02-14 |
 | 42 | Field name 按 Enter 创建的节点层级错误 + 无焦点 | claude-main | 02-14 |
 | 41 | Node Description 编辑：高度跳动 + Ctrl+I 快捷键不生效 | claude-main | 02-14 |

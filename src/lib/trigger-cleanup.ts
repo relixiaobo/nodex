@@ -1,4 +1,5 @@
-import type { TextRange } from '../components/editor/editor-handle.js';
+/** A text range with from/to offsets. */
+export interface TextRange { from: number; to: number; }
 
 /**
  * Find the range of a #trigger token in editor text, suitable for deletion.

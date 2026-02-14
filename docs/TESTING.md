@@ -333,6 +333,16 @@ npm run test:run
 1. panelIndex 越界时返回 `null`
 2. panelIndex 命中时返回当前 panel nodeId
 
+### 1.26 UI Store 持久化与迁移辅助函数
+
+**测试文件**: `tests/vitest/ui-store-persist.test.ts`
+
+**覆盖点**:
+
+1. `partializeUIStore` 仅保留持久化白名单字段
+2. `migrateUIStoreState` 将 v0 `panelStack` 迁移为 `panelHistory/panelIndex`
+3. 无需迁移场景下保持原对象语义
+
 ---
 
 ## Phase 2: 视觉检查点
@@ -399,6 +409,7 @@ npm run test:run
 | 1.23 | 拖拽 hover 落点分区纯函数 | PASS/FAIL |
 | 1.24 | Tag 颜色映射稳定性 | PASS/FAIL |
 | 1.25 | UI Store 当前面板选择器 | PASS/FAIL |
+| 1.26 | UI Store 持久化与迁移辅助函数 | PASS/FAIL |
 | 2 | 视觉渲染 | PASS/FAIL/SKIP |
 | 3 | 扩展构建 | PASS/FAIL |
 

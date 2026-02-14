@@ -343,6 +343,17 @@ npm run test:run
 2. `migrateUIStoreState` 将 v0 `panelStack` 迁移为 `panelHistory/panelIndex`
 3. 无需迁移场景下保持原对象语义
 
+### 1.27 图结构不变量 helper 自检
+
+**测试文件**: `tests/vitest/invariants-helper.test.ts`
+
+**覆盖点**:
+
+1. 有效最小图返回空错误列表
+2. owner 缺失 / owner-child 不一致 / child 重复 ID 报错
+3. tuple value 引用节点不触发 owner-child mismatch 误报
+4. associationMap key/value 缺失报错
+
 ---
 
 ## Phase 2: 视觉检查点
@@ -410,6 +421,7 @@ npm run test:run
 | 1.24 | Tag 颜色映射稳定性 | PASS/FAIL |
 | 1.25 | UI Store 当前面板选择器 | PASS/FAIL |
 | 1.26 | UI Store 持久化与迁移辅助函数 | PASS/FAIL |
+| 1.27 | 图结构不变量 helper 自检 | PASS/FAIL |
 | 2 | 视觉渲染 | PASS/FAIL/SKIP |
 | 3 | 扩展构建 | PASS/FAIL |
 

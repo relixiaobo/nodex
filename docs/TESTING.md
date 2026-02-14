@@ -313,6 +313,16 @@ npm run test:run
 1. 目标行上中下三等分到 `before/inside/after` 的分区语义
 2. 非法高度（`<=0`）下的安全回退（`inside`）
 
+### 1.24 Tag 颜色映射稳定性
+
+**测试文件**: `tests/vitest/tag-colors.test.ts`
+
+**覆盖点**:
+
+1. 相同 tagDefId 的颜色映射确定性
+2. 返回值必须来自 `TAG_COLORS` 调色板
+3. 多个 tagDefId 的分布不应退化为单一颜色
+
 ---
 
 ## Phase 2: 视觉检查点
@@ -377,6 +387,7 @@ npm run test:run
 | 1.21 | TrailingInput 键盘导航决策纯函数 | PASS/FAIL |
 | 1.22 | NodeEditor 键盘决策纯函数 | PASS/FAIL |
 | 1.23 | 拖拽 hover 落点分区纯函数 | PASS/FAIL |
+| 1.24 | Tag 颜色映射稳定性 | PASS/FAIL |
 | 2 | 视觉渲染 | PASS/FAIL/SKIP |
 | 3 | 扩展构建 | PASS/FAIL |
 

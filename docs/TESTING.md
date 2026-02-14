@@ -198,7 +198,8 @@ npm run test:run
 
 1. `before / after / inside` 三态落点决策
 2. `after + expanded children` 解释为“放入第一个子节点”
-3. 无效拖拽上下文（空 drag/self）返回 no-op
+3. 无效拖拽上下文（空 drag/self/无 parent/空 dropPosition）返回 no-op
+4. `after + hasChildren 但未展开` 仍保持同级插入
 
 ### 1.13 moveNodeTo 结构安全
 

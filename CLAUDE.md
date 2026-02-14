@@ -85,6 +85,15 @@ gh pr create --title "feat: <summary>" --body "..."
 - 谁后合并谁处理冲突
 - `docs/issues.md` 只追加不修改已有条目，减少冲突
 
+### Dev Server 端口
+
+多个 clone 可同时启动 dev server，通过 `PORT` 环境变量区分：
+
+| 工作区 | 命令 | 地址 |
+|--------|------|------|
+| nodex/（主） | `npm run dev:test` | `http://localhost:5199` |
+| nodex-codex/（Agent） | `PORT=5200 npm run dev:test` | `http://localhost:5200` |
+
 ### 协调机制
 
 - 任务分配和进度跟踪通过 `docs/issues.md` 的 Open Features 段

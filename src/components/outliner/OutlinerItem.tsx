@@ -661,7 +661,6 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     if (!wsId || !userId) return false;
     const currentName = useNodeStore.getState().entities[nodeId]?.props.name ?? '';
     const textOnly = currentName.replace(/<[^>]*>/g, '').replace(/\u200B/g, '').trim();
-    console.log('[DBG-handleDelete]', { nodeId, parentId, currentName: JSON.stringify(currentName), textOnly: JSON.stringify(textOnly), textOnlyLen: textOnly.length });
     if (textOnly.length > 0) return false;
 
     const flatList = getFlattenedVisibleNodes(rootChildIds, entities, expandedNodes, rootNodeId);
@@ -822,15 +821,21 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       ?? (hashRangeRef.current.from < hashRangeRef.current.to
         ? hashRangeRef.current
         : null);
-    console.log('[DBG-hashCleanup]', { text: JSON.stringify(text), caret, range, hashRangeRef: hashRangeRef.current });
     if (range) {
       ed.deleteTextRange(range);
     }
-    const afterText = ed.getText();
     const afterHtml = ed.getHTML();
-    console.log('[DBG-hashCleanup-after]', { afterText: JSON.stringify(afterText), afterHtml: JSON.stringify(afterHtml) });
 
-    if (userId) updateNodeName(nodeId, afterHtml, userId);
+    // Safety: if deleteTextRange failed to remove the # trigger, strip it from HTML
+    const afterText = ed.getText();
+    const stillHasHash = afterText.match(/#([^\s#@]*)$/u);
+    if (stillHasHash) {
+      const cleaned = afterText.replace(/#([^\s#@]*)$/u, '');
+      ed.setPlainText(cleaned, cleaned.length);
+      if (userId) updateNodeName(nodeId, ed.getHTML(), userId);
+    } else {
+      if (userId) updateNodeName(nodeId, afterHtml, userId);
+    }
   }, [nodeId, userId, updateNodeName]);
 
   const handleHashTagSelect = useCallback(
@@ -863,7 +868,6 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   // Keyboard forwarding: confirm selected item in dropdown
   const handleHashTagConfirm = useCallback(() => {
     const item = tagDropdownRef.current?.getSelectedItem();
-    console.log('[DBG-hashConfirm]', { item, tagDropdownRef: !!tagDropdownRef.current, itemCount: tagDropdownRef.current?.getItemCount() });
     if (!item) return;
     if (item.type === 'existing') {
       handleHashTagSelect(item.id);
@@ -874,10 +878,10 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
 
   // Keyboard forwarding: navigate down in dropdown
   const handleHashTagNavDown = useCallback(() => {
-    setHashTagSelectedIndex((i) => {
-      const count = tagDropdownRef.current?.getItemCount() ?? 0;
-      return count > 0 ? Math.min(i + 1, count - 1) : 0;
-    });
+    // Read item count outside updater to avoid stale-ref issues inside
+    // React 19 state updater functions.
+    const count = tagDropdownRef.current?.getItemCount() ?? 0;
+    setHashTagSelectedIndex((i) => count > 0 ? Math.min(i + 1, count - 1) : i);
   }, []);
 
   // Keyboard forwarding: navigate up in dropdown
@@ -934,9 +938,17 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
 
   const handleReferenceSelect = useCallback(
     (refNodeId: string) => {
-      if (!wsId || !userId) return;
+      // Always close dropdown — even if insertion logic fails.
+      const closeDropdown = () => {
+        setRefOpen(false);
+        setRefQuery('');
+        setRefSelectedIndex(0);
+        prevRefQueryRef.current = '';
+      };
+
+      if (!wsId || !userId) { closeDropdown(); return; }
       const ed = editorRef.current;
-      if (!ed) return;
+      if (!ed) { closeDropdown(); return; }
 
       // Check if the entire editor content is just the @query (empty-node reference)
       const fullText = ed.getText();
@@ -983,10 +995,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
         ed.replaceTextRangeWithInlineRef({ from, to }, refNodeId, refName);
       }
 
-      setRefOpen(false);
-      setRefQuery('');
-      setRefSelectedIndex(0);
-      prevRefQueryRef.current = '';
+      closeDropdown();
     },
     [
       nodeId,
@@ -1016,7 +1025,6 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
 
   const handleReferenceConfirm = useCallback(() => {
     const item = refDropdownRef.current?.getSelectedItem();
-    console.log('[DBG-refConfirm]', { item, refDropdownRef: !!refDropdownRef.current, itemCount: refDropdownRef.current?.getItemCount() });
     if (!item) return;
     if (item.type === 'existing') {
       handleReferenceSelect(item.id);
@@ -1026,10 +1034,10 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   }, [handleReferenceSelect, handleReferenceCreateNew]);
 
   const handleReferenceNavDown = useCallback(() => {
-    setRefSelectedIndex((i) => {
-      const count = refDropdownRef.current?.getItemCount() ?? 0;
-      return count > 0 ? Math.min(i + 1, count - 1) : 0;
-    });
+    // Read item count outside updater to avoid stale-ref issues inside
+    // React 19 state updater functions.
+    const count = refDropdownRef.current?.getItemCount() ?? 0;
+    setRefSelectedIndex((i) => count > 0 ? Math.min(i + 1, count - 1) : i);
   }, []);
 
   const handleReferenceNavUp = useCallback(() => {

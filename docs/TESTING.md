@@ -355,6 +355,18 @@ npm run test:run
 3. tuple value 引用节点不触发 owner-child mismatch 误报
 4. associationMap key/value 缺失报错
 
+### 1.28 Field Utils 解析与映射
+
+**测试文件**: `tests/vitest/field-utils.test.ts`
+
+**覆盖点**:
+
+1. attrDef 配置 tuple 解析（dataType/sourceTag/hide/required/min/max）及默认值
+2. 非法 min/max 数值回退为 `undefined`
+3. options 与 autocollect 节点解析（含开关关闭场景）
+4. metanode + supertag tuple 的 tagged node 解析
+5. field type label/icon/plain 判定映射
+
 ---
 
 ## Phase 2: 视觉检查点
@@ -423,6 +435,7 @@ npm run test:run
 | 1.25 | UI Store 当前面板选择器 | PASS/FAIL |
 | 1.26 | UI Store 持久化与迁移辅助函数 | PASS/FAIL |
 | 1.27 | 图结构不变量 helper 自检 | PASS/FAIL |
+| 1.28 | Field Utils 解析与映射 | PASS/FAIL |
 | 2 | 视觉渲染 | PASS/FAIL/SKIP |
 | 3 | 扩展构建 | PASS/FAIL |
 

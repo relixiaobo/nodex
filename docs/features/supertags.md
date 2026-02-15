@@ -56,7 +56,7 @@
 ### createTagDef 自动配置
 
 - 新建 tagDef 后自动调用 `applyTag(id, SYS_T01)`
-- 创建 metanode + SYS_A13 tag binding + 3 个 config tuple（checkbox/childtag/color）
+- 创建 metanode + SYS_A13 tag binding + 4 个 config tuple（checkbox/childtag/color/extends）
 - tagDef 的 `_ownerId` 始终为 `{workspaceId}_SCHEMA`
 
 ### 删除标签级联清理 — 目标规格（未实现）
@@ -107,12 +107,110 @@
 - 当被该标签标记的节点创建子节点时，子节点自动应用指定的标签
 - 例如：`#Project` 设 Default Child = `#Task` → Project 下新建子节点自动变成 Task
 
-### 标签继承 / Extend — 未实现
+### 标签继承 / Extend — Phase 1 已实现
 
-- tagDef 可以"继承"另一个 tagDef（Tana "Building blocks" 功能）
-- 子标签包含父标签的所有模板字段 + 自己的额外字段
-- 应用子标签 = 同时应用父标签的所有字段
-- **继承约束**: 继承来的内容不可移动/删除，但可添加字段和修改默认值
+> Extend 是 Web Clipping (#30) 的前置依赖：`#web_clip` 需要 `#article`/`#video`/`#tweet` extend 它。
+> 以下行为规格基于 2026-02-15 对 Tana 官方文档的交叉验证。
+
+**核心概念**: 子标签（child tag）"extends" 父标签（parent tag），继承父标签的 **全部模板内容**（字段 + 普通节点），并可添加自己的额外内容。
+
+**Phase 1 已实现（2026-02-15）**:
+- 数据模型：`NDX_A05` (EXTENDS) 属性绑定，存储在 tagDef metanode 中作为 `Tuple [NDX_A05, parentTagDefId]`
+- `applyTag(childTag)` 沿 Extend 链收集所有祖先字段模板，依次实例化到目标节点
+- 字段按 attrDef ID 去重（同一 attrDef 跨继承链只实例化一次）
+- `removeTag(childTag)` 清理继承链上所有模板来源的字段
+- 配置页上 "Extends" 显示为 tag_picker 控件（与 Default child supertag 同类型）
+- 支持多级继承（grandparent → parent → child）和循环引用防护
+- Seed data 包含 `#Dev Task` extends `#Task` 的测试示例
+
+**Phase 1.1 已实现（2026-02-15）— 配置页颜色继承**:
+- 子标签配置页的 "Default content" 区域合并显示继承模板 + 自有模板
+- 每个模板项（字段/节点）的图标和 bullet 颜色标识所属 tagDef
+- 继承自父标签的项 → 父标签颜色，子标签自有的项 → 子标签颜色
+- 无 Extend 关系时不显示颜色（保持原有灰色样式）
+- 颜色来自 `getTagColor(tagDefId)` 的确定性哈希
+
+**Phase 2 待实现**:
+- 父标签模板变更后自动传播到所有子标签实例（无需手动同步）
+- 配置页中继承字段标记为"来自 #parent_tag"（锁定/不可编辑）
+- 多态搜索：搜索父标签时自动返回所有子标签的实例
+
+**继承范围**:
+- 继承的不仅是字段（field tuples），还包括父标签 default content 中的**普通节点**（Phase 2）
+- 父标签模板变更后自动传播到所有子标签实例（Phase 2）
+- 支持多重继承（一个标签可以 extend 多个父标签）— 数据模型支持，UI 待完善
+
+**继承约束**:
+- 继承来的内容（字段和节点）不可移动、不可删除（Phase 2 UI）
+- 但可以**覆写默认值**（如修改字段的默认选项）
+- 子标签可以在继承内容之外添加自己的字段和节点
+
+**字段身份规则**:
+- 字段按 **attrDef 节点 ID** 识别身份，不按名称
+- 父子标签中同一个 attrDef ID 的字段 → 去重，只实例化一次（祖先优先）
+- 不同 attrDef ID 但同名的字段 → 两个都显示
+
+**多态搜索**（Phase 2）:
+- 搜索父标签时，自动返回所有子标签的实例
+- 例如：搜索 `#web_clip` 会返回 `#article`、`#video`、`#tweet` 的所有节点
+
+**Tana 使用模式参考**:
+- `#todo` → `#dev task` / `#design task` / `#bug`
+- `#meeting` → `#onboarding` / `#followup`
+- `#person` → `#candidate` / `#employee`
+- `#web_clip` → `#article` / `#video` / `#tweet`（Nodex 目标）
+
+**数据模型**:
+```
+tagDef_article
+  metanode.children:
+    - tuple [SYS_A13, SYS_T01]           ← 被 SUPERTAG 系统标签标记
+    - tuple [NDX_A05, tagDef_webclip]     ← Extend 绑定（Nodex 自定义属性）
+  children:
+    - tuple [NDX_A05, tagDef_webclip]     ← config tuple (tag_picker 控件)
+    - (inherited from tagDef_webclip)      ← 运行时展开，不物理复制
+    - tuple [attrDef_article_type]         ← 子标签自有字段
+```
+
+**applyTag 行为**:
+- `applyTag(nodeId, tagDef_article)` 执行：
+  1. `getExtendsChain()` 沿 Extend 链收集所有祖先标签 ID（ancestor-first 顺序）
+  2. 依次实例化 grandparent → parent → child 的所有字段 tuple
+  3. 按 attrDef ID 去重（祖先先到先得）
+  4. 在 Metanode 中只绑定子标签（`SYS_A13 → tagDef_article`）
+
+**配置页展示**（Phase 1.1 已实现）:
+- 子标签配置页中，继承模板项通过**颜色**区分所属（父标签颜色 vs 子标签颜色）
+- 继承字段不可拖拽排序，不显示删除按钮（Phase 2 UI 锁定）
+
+### Base Type — 参考（暂不实现）
+
+> Tana 的 Building Blocks 区域包含 Base Type 和 Extend 两个功能。Base Type 主要服务于 AI，
+> 帮助 AI 识别对象语义类型（不论用户给标签取什么名字）。Nodex 的 AI 不一定需要此机制，仅作参考记录。
+
+**Tana Base Type 列表**（13 种，对应 SYS_T98–SYS_T125）:
+
+| Base Type | 语义 |
+|-----------|------|
+| Meeting | 会议 |
+| Task | 任务 |
+| Project | 项目 |
+| Person | 人物 |
+| Organization | 组织 |
+| Product | 产品 |
+| Location | 地点 |
+| Event | 事件 |
+| Creative Work | 创意作品 |
+| Concept | 概念 |
+| Metric | 指标 |
+| Tool | 工具 |
+| Custom Type | 自定义（兜底） |
+
+**作用**: 纯 AI 辅助——Tana AI 根据 Base Type 理解对象语义。例如 `#collaborator` 设 Base Type = Person，AI 就知道这是一个人。
+
+**数据模型**: 通过 Metanode Tuple `[SYS_A_BASE_TYPE, SYS_T98..SYS_T125]` 绑定。
+
+**Nodex 决策**: 暂不实现。如果未来 Nodex AI 需要对象语义识别，可按需引入。Extend 功能不依赖 Base Type。
 
 ### Convert to Supertag — 未实现
 
@@ -179,7 +277,7 @@
 |-----------|------|--------|
 | **Color picker** (色板选择) | 当前 placeholder "Default"，需实现真实色板 swatches | P2 |
 | **"Add description"** 字段 | 标签描述文本，显示在标签名下方 | P3 |
-| **Building blocks** 折叠面板 | Tag 继承 / Extend 功能 | P3 |
+| **Building blocks** 折叠面板 | Tag 继承 / Extend Phase 2（传播 + 继承标记 UI） | P2 |
 | **Optional fields** 独立区域 | 与 Default content 分离的可选字段区 | P3 |
 | **"New field" / "Insert existing field" 按钮** | Default content 区域底部的快捷操作 | P2 |
 | **"Used N times"** 统计 | 底部使用次数展示 | P3 |
@@ -187,7 +285,7 @@
 | **Voice chat** 面板 | Nodex 不需要（Tana 特有） | — |
 | **Advanced options** 折叠面板 | 包含 build title, shortcuts 等高级配置 | P3 |
 | **折叠面板 UI 结构** | Tana 用折叠卡片组织配置区，Nodex 当前是扁平列表 | P3 |
-| **applyTag 复制普通内容节点** | 当前 applyTag 只复制 field tuples，不复制 default content 中的普通节点 | P2 |
+| **applyTag 深度克隆内容节点** | 当前 shallow clone（顶层），Tana 递归克隆含子节点 | P3 |
 
 ## 决策记录
 
@@ -201,6 +299,15 @@
 | 2026-02-12 | Default content 支持字段 tuple 和普通内容节点混合 | 与 Tana 一致（template 不仅有 field） |
 | 2026-02-12 | trashNode(tagDef) 级联清理所有引用节点（目标规格） | 作为未来目标行为，避免遗留悬挂引用 |
 | 2026-02-12 | 对比 Tana 官方文档补全遗漏功能清单 | 记录 Pinned/Optional/Convert/Batch/TitleExpr 等 |
+| 2026-02-15 | Extend 继承范围 = 全部模板内容（字段 + 普通节点） | Tana 官方文档验证：template objects 整体继承 |
+| 2026-02-15 | 字段身份按 attrDef ID 匹配，非名称 | 同 ID → 合并，不同 ID 同名 → 两个都显示 |
+| 2026-02-15 | 父标签模板变更自动传播到子标签实例 | Tana 文档明确说明 auto-propagation |
+| 2026-02-15 | Extend 提升为 P1（原 P3） | 阻塞 #30 Web Clipping（`#web_clip` → `#article` 等） |
+| 2026-02-15 | Base Type 暂不实现，仅记录参考 | 主要服务 AI 语义识别，Nodex AI 不一定需要 |
+| 2026-02-15 | Extend Phase 1 使用 NDX_A05（非 SYS_A*） | Tana 的 Extend 机制未被逆向确认，使用 Nodex 自有命名空间 |
+| 2026-02-15 | Extend 绑定存储在 metanode 和 config tuple 双写 | metanode 用于 `getExtendsChain()` 遍历，config tuple 用于配置页 tag_picker 渲染 |
+| 2026-02-15 | 字段去重按 attrDef ID，祖先优先 | 同一 attrDef 跨继承链只实例化一次，`_sourceId` 指向最早祖先的模板 |
+| 2026-02-15 | 配置页继承项通过 owning tagDef 颜色区分 | OOP 继承视觉：父标签项 = 父色，子标签项 = 子色，无 extend 时无色 |
 
 ## 当前状态
 
@@ -218,14 +325,16 @@
 - [x] Delete tag / Delete field 按钮（当前行为为 trashNode）
 - [ ] trashNode(tagDef) 级联清理（移除所有标签绑定与模板来源字段）
 - [ ] trashNode(attrDef) 级联清理（移除所有引用该字段的 tuple）
-- [ ] applyTag 复制 default content 中的普通节点
+- [x] applyTag 克隆 default content 中的普通节点（shallow clone, `_sourceId` 追踪来源）
 - [x] Show as Checkbox（toggle + done visual + Cmd+Enter）
 - [ ] Done state mapping（checkbox ↔ Options 字段双向映射）
 - [ ] Default Child Supertag（真实 tag_picker）
 - [ ] Color picker（真实色板）
 - [ ] Pinned fields
 - [ ] Optional fields
-- [ ] 标签继承 / Extend
+- [x] 标签继承 / Extend Phase 1（applyTag/removeTag 字段继承 + config UI）
+- [x] Extend Phase 1.1 — 配置页颜色继承（owning tagDef 颜色标识模板项归属）
+- [ ] Extend Phase 2（父变更传播 + 配置页继承项锁定 + 多态搜索）
 - [ ] Convert to supertag
 - [ ] 批量标签操作
 - [ ] 标签页（搜索 + 视图）
@@ -240,7 +349,9 @@
 - Tana TagBadge 有自定义颜色，Nodex 用 ID 哈希确定色系
 - Tana 支持 tag 内嵌 description（在标签名下方显示），Nodex 暂不支持
 - Tana 的"标签页"是完整的 Search Node + View 组合，Nodex 需等 Phase 2
-- Tana applyTag 会复制 default content 中的普通节点到目标节点，Nodex 当前只复制 field tuples
+- Tana applyTag 深度克隆 default content（含子节点），Nodex 当前为 shallow clone（仅顶层节点，子节点不递归）
 - Tana 删除 tag 后节点显示 trash icon，Nodex 直接清除引用
 - Tana 有 Pinned/Optional fields 两级机制，Nodex 当前所有模板字段平等
 - Tana 支持 "Convert to supertag" 快捷转换，Nodex 暂不支持
+- Tana Extend 支持多重继承 + 自动传播父标签变更，Nodex Phase 1 支持继承链字段实例化但不支持自动传播
+- Tana Base Type（13 种语义类型）服务于 AI，Nodex 暂不需要

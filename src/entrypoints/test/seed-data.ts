@@ -78,7 +78,7 @@ export function seedTestData() {
     makeNode(trashId, 'Trash', WS_ID, []),
     makeNode(schemaId, 'Schema', WS_ID, [
       'SYS_T01', 'SYS_T02',
-      'tagDef_task', 'tagDef_person',
+      'tagDef_task', 'tagDef_person', 'tagDef_dev_task',
     ]),
   ];
 
@@ -186,11 +186,12 @@ export function seedTestData() {
   // SYS_T01 (Supertag) — system tag for tagDef config pages
   const sysT01Nodes: NodexNode[] = [
     makeNode('SYS_T01', 'Supertag', schemaId, [
-      'sysT01_tpl_checkbox', 'sysT01_tpl_childtag', 'sysT01_tpl_color',
+      'sysT01_tpl_checkbox', 'sysT01_tpl_childtag', 'sysT01_tpl_color', 'sysT01_tpl_extends',
     ], 'tagDef'),
     makeNode('sysT01_tpl_checkbox', '', 'SYS_T01', [SYS_A.SHOW_CHECKBOX], 'tuple'),
     makeNode('sysT01_tpl_childtag', '', 'SYS_T01', [SYS_A.CHILD_SUPERTAG], 'tuple'),
     makeNode('sysT01_tpl_color', '', 'SYS_T01', [SYS_A.COLOR], 'tuple'),
+    makeNode('sysT01_tpl_extends', '', 'SYS_T01', [SYS_A.EXTENDS], 'tuple'),
   ];
 
   // SYS_T02 (Field Definition) — system tag for attrDef config pages
@@ -404,6 +405,7 @@ export function seedTestData() {
   const tagDefTaskNodes = [
     makeNode('tagDef_task', 'Task', schemaId, [
       'tagDef_task_cfg_checkbox', 'tagDef_task_cfg_childtag', 'tagDef_task_cfg_color',
+      'tagDef_task_cfg_extends',
       'taskField_status', 'taskField_priority', 'taskField_due', 'taskField_done',
       'taskTpl_default_note',
     ], 'tagDef'),
@@ -418,6 +420,7 @@ export function seedTestData() {
   const tagDefPersonNodes = [
     makeNode('tagDef_person', 'Person', schemaId, [
       'tagDef_person_cfg_checkbox', 'tagDef_person_cfg_childtag', 'tagDef_person_cfg_color',
+      'tagDef_person_cfg_extends',
       'personField_email', 'personField_company', 'personField_age', 'personField_website',
     ], 'tagDef'),
     makeNode('personField_email', '', 'tagDef_person', ['attrDef_email'], 'tuple'),
@@ -426,8 +429,65 @@ export function seedTestData() {
     makeNode('personField_website', '', 'tagDef_person', ['attrDef_website'], 'tuple'),
   ];
 
+  // AttrDef: Branch (plain type) — for dev_task tag
+  const attrDefBranchNodes: NodexNode[] = [
+    makeNode('attrDef_branch', 'Branch', 'devTaskField_branch', [
+      'attrDef_branch_type', 'attrDef_branch_autocollect', 'attrDef_branch_autoinit',
+      'attrDef_branch_required', 'attrDef_branch_hide',
+    ], 'attrDef'),
+    makeNode('attrDef_branch_type', '', 'attrDef_branch', [SYS_A.TYPE_CHOICE, SYS_D.PLAIN], 'tuple'),
+    makeNode('attrDef_branch_autocollect', '', 'attrDef_branch', [SYS_A.AUTOCOLLECT_OPTIONS, SYS_V.YES], 'tuple'),
+    makeNode('attrDef_branch_autoinit', '', 'attrDef_branch', [SYS_A.AUTO_INITIALIZE, SYS_V.NO], 'tuple'),
+    makeNode('attrDef_branch_required', '', 'attrDef_branch', [SYS_A.NULLABLE, SYS_V.NO], 'tuple'),
+    makeNode('attrDef_branch_hide', '', 'attrDef_branch', [SYS_A.HIDE_FIELD, SYS_V.NEVER], 'tuple'),
+  ];
+  attrDefBranchNodes[0].props._metaNodeId = 'meta_attrDef_branch';
+  attrDefBranchNodes[1].props._sourceId = 'sysT02_tpl_type';
+  attrDefBranchNodes[2].props._sourceId = 'sysT02_tpl_autocollect';
+  attrDefBranchNodes[3].props._sourceId = 'sysT02_tpl_autoinit';
+  attrDefBranchNodes[4].props._sourceId = 'sysT02_tpl_required';
+  attrDefBranchNodes[5].props._sourceId = 'sysT02_tpl_hide';
+
+  const attrDefBranchMetanodes: NodexNode[] = [
+    makeNode('meta_attrDef_branch', '', 'attrDef_branch', ['meta_attrDef_branch_tag'], 'metanode'),
+    makeNode('meta_attrDef_branch_tag', '', 'meta_attrDef_branch', [SYS_A.NODE_SUPERTAGS, 'SYS_T02'], 'tuple'),
+  ];
+
+  // TagDef: Dev Task — extends Task (inherits Status/Priority/Due/Done, adds Branch)
+  const tagDefDevTaskNodes = [
+    makeNode('tagDef_dev_task', 'Dev Task', schemaId, [
+      'tagDef_dev_task_cfg_checkbox', 'tagDef_dev_task_cfg_childtag',
+      'tagDef_dev_task_cfg_color', 'tagDef_dev_task_cfg_extends',
+      'devTaskField_branch',
+    ], 'tagDef'),
+    makeNode('devTaskField_branch', '', 'tagDef_dev_task', ['attrDef_branch'], 'tuple'),
+  ];
+  tagDefDevTaskNodes[0].props._metaNodeId = 'meta_tagDef_dev_task';
+
+  // Config tuples for tagDef_dev_task (SYS_T01 template instances)
+  const tagDefDevTaskConfigNodes: NodexNode[] = [
+    makeNode('tagDef_dev_task_cfg_checkbox', '', 'tagDef_dev_task', [SYS_A.SHOW_CHECKBOX, SYS_V.YES], 'tuple'),
+    makeNode('tagDef_dev_task_cfg_childtag', '', 'tagDef_dev_task', [SYS_A.CHILD_SUPERTAG], 'tuple'),
+    makeNode('tagDef_dev_task_cfg_color', '', 'tagDef_dev_task', [SYS_A.COLOR], 'tuple'),
+    makeNode('tagDef_dev_task_cfg_extends', '', 'tagDef_dev_task', [SYS_A.EXTENDS, 'tagDef_task'], 'tuple'),
+  ];
+  tagDefDevTaskConfigNodes[0].props._sourceId = 'sysT01_tpl_checkbox';
+  tagDefDevTaskConfigNodes[1].props._sourceId = 'sysT01_tpl_childtag';
+  tagDefDevTaskConfigNodes[2].props._sourceId = 'sysT01_tpl_color';
+  tagDefDevTaskConfigNodes[3].props._sourceId = 'sysT01_tpl_extends';
+
+  // Metanode for tagDef_dev_task (SYS_T01 tag + NDX_A05 extends binding)
+  const tagDefDevTaskMetanodes: NodexNode[] = [
+    makeNode('meta_tagDef_dev_task', '', 'tagDef_dev_task', [
+      'meta_tagDef_dev_task_tag', 'meta_tagDef_dev_task_extends',
+    ], 'metanode'),
+    makeNode('meta_tagDef_dev_task_tag', '', 'meta_tagDef_dev_task', [SYS_A.NODE_SUPERTAGS, SYS_T.SUPERTAG], 'tuple'),
+    makeNode('meta_tagDef_dev_task_extends', '', 'meta_tagDef_dev_task', [SYS_A.EXTENDS, 'tagDef_task'], 'tuple'),
+  ];
+
   // Set description on tagDef nodes
   tagDefPersonNodes[0].props.description = 'Tag for tracking people and their contact info';
+  tagDefDevTaskNodes[0].props.description = 'Dev task extending Task with a Branch field';
 
   // Set _metaNodeId on tagDef nodes (tagged with SYS_T01)
   tagDefTaskNodes[0].props._metaNodeId = 'meta_tagDef_task';
@@ -438,20 +498,24 @@ export function seedTestData() {
     makeNode('tagDef_task_cfg_checkbox', '', 'tagDef_task', [SYS_A.SHOW_CHECKBOX, SYS_V.YES], 'tuple'),
     makeNode('tagDef_task_cfg_childtag', '', 'tagDef_task', [SYS_A.CHILD_SUPERTAG], 'tuple'),
     makeNode('tagDef_task_cfg_color', '', 'tagDef_task', [SYS_A.COLOR], 'tuple'),
+    makeNode('tagDef_task_cfg_extends', '', 'tagDef_task', [SYS_A.EXTENDS], 'tuple'),
   ];
   tagDefTaskConfigNodes[0].props._sourceId = 'sysT01_tpl_checkbox';
   tagDefTaskConfigNodes[1].props._sourceId = 'sysT01_tpl_childtag';
   tagDefTaskConfigNodes[2].props._sourceId = 'sysT01_tpl_color';
+  tagDefTaskConfigNodes[3].props._sourceId = 'sysT01_tpl_extends';
 
   // Config tuples for tagDef_person (SYS_T01 template instances)
   const tagDefPersonConfigNodes: NodexNode[] = [
     makeNode('tagDef_person_cfg_checkbox', '', 'tagDef_person', [SYS_A.SHOW_CHECKBOX, SYS_V.NO], 'tuple'),
     makeNode('tagDef_person_cfg_childtag', '', 'tagDef_person', [SYS_A.CHILD_SUPERTAG], 'tuple'),
     makeNode('tagDef_person_cfg_color', '', 'tagDef_person', [SYS_A.COLOR], 'tuple'),
+    makeNode('tagDef_person_cfg_extends', '', 'tagDef_person', [SYS_A.EXTENDS], 'tuple'),
   ];
   tagDefPersonConfigNodes[0].props._sourceId = 'sysT01_tpl_checkbox';
   tagDefPersonConfigNodes[1].props._sourceId = 'sysT01_tpl_childtag';
   tagDefPersonConfigNodes[2].props._sourceId = 'sysT01_tpl_color';
+  tagDefPersonConfigNodes[3].props._sourceId = 'sysT01_tpl_extends';
 
   // Metanodes for tagDefs (SYS_T01 tag application chain)
   const tagDefMetanodes: NodexNode[] = [
@@ -519,12 +583,17 @@ export function seedTestData() {
     ...attrDefAgeNodes,
     ...attrDefWebsiteNodes,
     ...attrDefDoneNodes,
+    ...attrDefBranchNodes,
     ...attrDefMetanodes,
+    ...attrDefBranchMetanodes,
     ...tagDefTaskNodes,
     ...tagDefTaskConfigNodes,
     ...tagDefPersonNodes,
     ...tagDefPersonConfigNodes,
+    ...tagDefDevTaskNodes,
+    ...tagDefDevTaskConfigNodes,
     ...tagDefMetanodes,
+    ...tagDefDevTaskMetanodes,
     ...task1MetanodeNodes,
     ...task1FieldNodes,
     ...person1MetanodeNodes,

@@ -196,7 +196,23 @@ npm run test:run
 2. `createAttrDef` 的 template tuple/type tuple/`SYS_T02` 配置链路
 3. 新建 `attrDef` 在后续 `applyTag` 中被正确实例化到内容节点
 
-### 1.10 Guard Rails（错误输入防护）
+### 1.10 Supertag Extend（继承）
+
+**测试文件**: `tests/vitest/node-store-extend.test.ts`
+
+**覆盖点**:
+
+1. `getExtendsChain` 无继承时返回空数组
+2. `getExtendsChain` 单级继承返回父 tagDef
+3. `getExtendsChain` 多级继承按 ancestor-first 顺序
+4. `getExtendsChain` 循环引用安全（不死循环，排除自身）
+5. `applyTag` 子标签同时实例化父标签和自有字段
+6. `applyTag` 跨继承链按 attrDef ID 去重
+7. `applyTag` 直接应用父标签仍正常工作
+8. `removeTag` 清理继承链上所有模板来源的字段
+9. `removeTag` 正确移除 metanode 中的 tag binding
+
+### 1.11 Guard Rails（错误输入防护）
 
 **测试文件**: `tests/vitest/node-store-guard-rails.test.ts`
 
@@ -207,7 +223,7 @@ npm run test:run
 3. `removeFieldOption` 仅删除目标 attrDef 挂载的 option，避免误删
 4. `replaceFieldAttrDef` 的 owner/oldAttrDef 一致性保护
 
-### 1.11 Trash 语义（TagDef / AttrDef）
+### 1.12 Trash 语义（TagDef / AttrDef）
 
 **测试文件**: `tests/vitest/node-store-trash-semantics.test.ts`
 
@@ -217,7 +233,7 @@ npm run test:run
 2. `trashNode(attrDef)` 保留已实例化字段引用，同时模板 tuple key 解绑
 3. `tagDef` 已入 Trash 后，`removeTag` 仍可清理模板来源字段
 
-### 1.12 拖拽落点语义（纯函数）
+### 1.13 拖拽落点语义（纯函数）
 
 **测试文件**: `tests/vitest/drag-drop-utils.test.ts`
 
@@ -228,7 +244,7 @@ npm run test:run
 3. 无效拖拽上下文（空 drag/self/无 parent/空 dropPosition）返回 no-op
 4. `after + hasChildren 但未展开` 仍保持同级插入
 
-### 1.13 moveNodeTo 结构安全
+### 1.14 moveNodeTo 结构安全
 
 **测试文件**: `tests/vitest/node-store-move-node-to.test.ts`
 
@@ -238,7 +254,7 @@ npm run test:run
 2. 同父移动时索引修正（remove 后 insert 位置偏移）
 3. 跨父节点移动的 children/owner 一致性
 
-### 1.14 Drag UI Store 状态机
+### 1.15 Drag UI Store 状态机
 
 **测试文件**: `tests/vitest/ui-store-drag-state.test.ts`
 
@@ -247,7 +263,7 @@ npm run test:run
 1. `setDrag` 会重置历史 `dropTarget/dropPosition`
 2. `setDropTarget` 与 `setDrag(null)` 的状态收敛
 
-### 1.15 导航撤销与焦点语义（UI Store）
+### 1.16 导航撤销与焦点语义（UI Store）
 
 **测试文件**: `tests/vitest/ui-store-undo-focus.test.ts`
 
@@ -257,7 +273,7 @@ npm run test:run
 2. `focusedNode` 与 `selectedNode` 的互斥关系
 3. `parentId` 消歧值的归一化（未传时为 `null`）
 
-### 1.16 快捷键注册表一致性
+### 1.17 快捷键注册表一致性
 
 **测试文件**: `tests/vitest/shortcut-registry.test.ts`
 
@@ -270,7 +286,7 @@ npm run test:run
 5. `findUnexpectedShortcutConflicts` 白名单过滤后的异常冲突探测
 6. `matchesShortcutEvent` 对 `Ctrl+Shift+Z`（`+` 分隔）与 `command/option` 别名兼容
 
-### 1.17 全局导航快捷键拦截保护
+### 1.18 全局导航快捷键拦截保护
 
 **测试文件**: `tests/vitest/nav-undo-keyboard.test.ts`
 
@@ -279,7 +295,7 @@ npm run test:run
 1. contentEditable / input / textarea 焦点下不拦截
 2. 非编辑焦点与空 activeElement 下允许触发全局导航撤销/重做逻辑
 
-### 1.18 Selected Reference 快捷键解析
+### 1.19 Selected Reference 快捷键解析
 
 **测试文件**: `tests/vitest/selected-reference-shortcuts.test.ts`
 
@@ -289,7 +305,7 @@ npm run test:run
 2. options 打开时的 `ArrowUp/Down/Enter/Escape` 解析
 3. options 关闭时 `Escape` 的 clear-selection 语义
 
-### 1.19 编辑器 HTML 归一化工具
+### 1.20 编辑器 HTML 归一化工具
 
 **测试文件**: `tests/vitest/editor-html.test.ts`
 
@@ -300,7 +316,7 @@ npm run test:run
 3. `wrapInP` 对纯文本与空字符串的包裹语义
 4. 已有 `<p>` 内容的稳定透传
 
-### 1.20 TrailingInput onUpdate 决策纯函数
+### 1.21 TrailingInput onUpdate 决策纯函数
 
 **测试文件**: `tests/vitest/trailing-input-actions.test.ts`
 
@@ -311,7 +327,7 @@ npm run test:run
 3. Options 字段下的 open/close dropdown 决策
 4. 普通文本（非 Options）返回 no-op
 
-### 1.21 TrailingInput 键盘导航决策纯函数
+### 1.22 TrailingInput 键盘导航决策纯函数
 
 **测试文件**: `tests/vitest/trailing-input-navigation.test.ts`
 
@@ -322,7 +338,7 @@ npm run test:run
 3. `ArrowUp` 在 options/focus-last-visible/navigate-out 场景下的分支决策
 4. `Escape` 的 close-options vs blur-editor 决策
 
-### 1.22 NodeEditor 键盘决策纯函数
+### 1.23 NodeEditor 键盘决策纯函数
 
 **测试文件**: `tests/vitest/node-editor-shortcuts.test.ts`
 
@@ -332,7 +348,7 @@ npm run test:run
 2. `ArrowUp/Down` 的 dropdown vs boundary 导航决策
 3. `Escape` 与 `Mod+Enter` 的 reference/hashTag 分支决策
 
-### 1.23 拖拽 hover 落点分区纯函数
+### 1.24 拖拽 hover 落点分区纯函数
 
 **测试文件**: `tests/vitest/drag-drop-position.test.ts`
 
@@ -342,7 +358,7 @@ npm run test:run
 2. 非法高度（`<=0`）下的安全回退（`inside`）
 3. 临界值 `1/3` 与 `2/3` 命中中间区（`inside`）
 
-### 1.24 Tag 颜色映射稳定性
+### 1.25 Tag 颜色映射稳定性
 
 **测试文件**: `tests/vitest/tag-colors.test.ts`
 
@@ -352,7 +368,7 @@ npm run test:run
 2. 返回值必须来自 `TAG_COLORS` 调色板
 3. 多个 tagDefId 的分布不应退化为单一颜色
 
-### 1.25 UI Store 当前面板选择器
+### 1.26 UI Store 当前面板选择器
 
 **测试文件**: `tests/vitest/ui-store-selector.test.ts`
 
@@ -361,7 +377,7 @@ npm run test:run
 1. panelIndex 越界时返回 `null`
 2. panelIndex 命中时返回当前 panel nodeId
 
-### 1.26 UI Store 持久化与迁移辅助函数
+### 1.27 UI Store 持久化与迁移辅助函数
 
 **测试文件**: `tests/vitest/ui-store-persist.test.ts`
 
@@ -371,7 +387,7 @@ npm run test:run
 2. `migrateUIStoreState` 将 v0 `panelStack` 迁移为 `panelHistory/panelIndex`
 3. 无需迁移场景下保持原对象语义
 
-### 1.27 图结构不变量 helper 自检
+### 1.28 图结构不变量 helper 自检
 
 **测试文件**: `tests/vitest/invariants-helper.test.ts`
 
@@ -382,7 +398,7 @@ npm run test:run
 3. tuple value 引用节点不触发 owner-child mismatch 误报
 4. associationMap key/value 缺失报错
 
-### 1.28 Field Utils 解析与映射
+### 1.29 Field Utils 解析与映射
 
 **测试文件**: `tests/vitest/field-utils.test.ts`
 
@@ -394,7 +410,7 @@ npm run test:run
 4. metanode + supertag tuple 的 tagged node 解析
 5. field type label/icon/plain 判定映射
 
-### 1.29 Chrome Storage 适配层
+### 1.30 Chrome Storage 适配层
 
 **测试文件**: `tests/vitest/chrome-storage.test.ts`
 
@@ -404,7 +420,7 @@ npm run test:run
 2. missing key 返回 `null`
 3. `removeItem` 删除语义
 
-### 1.30 Supabase Service 生命周期
+### 1.31 Supabase Service 生命周期
 
 **测试文件**: `tests/vitest/supabase-service.test.ts`
 
@@ -414,7 +430,7 @@ npm run test:run
 2. `initSupabase` 调用 `createClient` 且 `isSupabaseReady` 变为 `true`
 3. `resetSupabase` 后恢复未初始化状态
 
-### 1.31 UI Store 历史边界保护
+### 1.32 UI Store 历史边界保护
 
 **测试文件**: `tests/vitest/ui-store-history-guards.test.ts`
 
@@ -425,7 +441,7 @@ npm run test:run
 3. 空 undo/redo 栈下 `navUndo/navRedo` no-op
 4. 空历史下 `replacePanel` 的初始化行为
 
-### 1.32 Checkbox 三态模型与 Done 状态
+### 1.33 Checkbox 三态模型与 Done 状态
 
 **测试文件**: `tests/vitest/checkbox-utils.test.ts`
 
@@ -457,7 +473,7 @@ Store integration（2 cases）:
 17. `toggleNodeDone` click toggle undone↔done
 18. `cycleNodeCheckbox` 3-state cycle for manual nodes
 
-### 1.33 Editor isEmpty / handleDelete 零宽空格 + Hash Cleanup Safety
+### 1.34 Editor isEmpty / handleDelete 零宽空格 + Hash Cleanup Safety
 
 **测试文件**: `tests/vitest/editor-isEmpty.test.ts`
 
@@ -479,7 +495,7 @@ hash trigger cleanup safety（2 cases, Bug #53 回归）:
 9. DOM cleanup 失败后检测残留 `#` 触发词
 10. DOM cleanup 成功后无残留
 
-### 1.34 节点搜索 SKIP_DOC_TYPES 过滤
+### 1.35 节点搜索 SKIP_DOC_TYPES 过滤
 
 **测试文件**: `tests/vitest/node-search-filter.test.ts`
 
@@ -490,7 +506,7 @@ hash trigger cleanup safety（2 cases, Bug #53 回归）:
 3. `tuple` / `metanode` 节点被过滤
 4. 普通内容节点正常返回
 
-### 1.35 Workspace Store 认证状态与持久化
+### 1.36 Workspace Store 认证状态与持久化
 
 **测试文件**: `tests/vitest/workspace-store.test.ts`
 
@@ -550,32 +566,33 @@ hash trigger cleanup safety（2 cases, Bug #53 回归）:
 | 1.7 | 标签与引用状态流 | PASS/FAIL |
 | 1.8 | 字段状态流（Node Store） | PASS/FAIL |
 | 1.9 | Schema / Supertag 构建链路 | PASS/FAIL |
-| 1.10 | Guard Rails（错误输入防护） | PASS/FAIL |
-| 1.11 | Trash 语义（TagDef / AttrDef） | PASS/FAIL |
-| 1.12 | 拖拽落点语义（纯函数） | PASS/FAIL |
-| 1.13 | moveNodeTo 结构安全 | PASS/FAIL |
-| 1.14 | Drag UI Store 状态机 | PASS/FAIL |
-| 1.15 | 导航撤销与焦点语义（UI Store） | PASS/FAIL |
-| 1.16 | 快捷键注册表一致性 | PASS/FAIL |
-| 1.17 | 全局导航快捷键拦截保护 | PASS/FAIL |
-| 1.18 | Selected Reference 快捷键解析 | PASS/FAIL |
-| 1.19 | 编辑器 HTML 归一化工具 | PASS/FAIL |
-| 1.20 | TrailingInput onUpdate 决策纯函数 | PASS/FAIL |
-| 1.21 | TrailingInput 键盘导航决策纯函数 | PASS/FAIL |
-| 1.22 | NodeEditor 键盘决策纯函数 | PASS/FAIL |
-| 1.23 | 拖拽 hover 落点分区纯函数 | PASS/FAIL |
-| 1.24 | Tag 颜色映射稳定性 | PASS/FAIL |
-| 1.25 | UI Store 当前面板选择器 | PASS/FAIL |
-| 1.26 | UI Store 持久化与迁移辅助函数 | PASS/FAIL |
-| 1.27 | 图结构不变量 helper 自检 | PASS/FAIL |
-| 1.28 | Field Utils 解析与映射 | PASS/FAIL |
-| 1.29 | Chrome Storage 适配层 | PASS/FAIL |
-| 1.30 | Supabase Service 生命周期 | PASS/FAIL |
-| 1.31 | UI Store 历史边界保护 | PASS/FAIL |
-| 1.32 | Checkbox 可见性与 Done 状态 | PASS/FAIL |
-| 1.33 | Editor isEmpty 零宽空格 | PASS/FAIL |
-| 1.34 | 节点搜索 SKIP_DOC_TYPES 过滤 | PASS/FAIL |
-| 1.35 | Workspace Store 认证状态与持久化 | PASS/FAIL |
+| 1.10 | Supertag Extend（继承） | PASS/FAIL |
+| 1.11 | Guard Rails（错误输入防护） | PASS/FAIL |
+| 1.12 | Trash 语义（TagDef / AttrDef） | PASS/FAIL |
+| 1.13 | 拖拽落点语义（纯函数） | PASS/FAIL |
+| 1.14 | moveNodeTo 结构安全 | PASS/FAIL |
+| 1.15 | Drag UI Store 状态机 | PASS/FAIL |
+| 1.16 | 导航撤销与焦点语义（UI Store） | PASS/FAIL |
+| 1.17 | 快捷键注册表一致性 | PASS/FAIL |
+| 1.18 | 全局导航快捷键拦截保护 | PASS/FAIL |
+| 1.19 | Selected Reference 快捷键解析 | PASS/FAIL |
+| 1.20 | 编辑器 HTML 归一化工具 | PASS/FAIL |
+| 1.21 | TrailingInput onUpdate 决策纯函数 | PASS/FAIL |
+| 1.22 | TrailingInput 键盘导航决策纯函数 | PASS/FAIL |
+| 1.23 | NodeEditor 键盘决策纯函数 | PASS/FAIL |
+| 1.24 | 拖拽 hover 落点分区纯函数 | PASS/FAIL |
+| 1.25 | Tag 颜色映射稳定性 | PASS/FAIL |
+| 1.26 | UI Store 当前面板选择器 | PASS/FAIL |
+| 1.27 | UI Store 持久化与迁移辅助函数 | PASS/FAIL |
+| 1.28 | 图结构不变量 helper 自检 | PASS/FAIL |
+| 1.29 | Field Utils 解析与映射 | PASS/FAIL |
+| 1.30 | Chrome Storage 适配层 | PASS/FAIL |
+| 1.31 | Supabase Service 生命周期 | PASS/FAIL |
+| 1.32 | UI Store 历史边界保护 | PASS/FAIL |
+| 1.33 | Checkbox 可见性与 Done 状态 | PASS/FAIL |
+| 1.34 | Editor isEmpty 零宽空格 | PASS/FAIL |
+| 1.35 | 节点搜索 SKIP_DOC_TYPES 过滤 | PASS/FAIL |
+| 1.36 | Workspace Store 认证状态与持久化 | PASS/FAIL |
 | 2 | 视觉渲染 | PASS/FAIL/SKIP |
 | 3 | 扩展构建 | PASS/FAIL |
 

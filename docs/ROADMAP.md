@@ -1,5 +1,9 @@
-# Nodex Roadmap
+# Nodex Roadmap (DEPRECATED)
 
+> **⚠️ 此文件已废弃。** 进度跟踪已迁移到 [GitHub Issues](https://github.com/relixiaobo/nodex/issues) + [Nodex Board](https://github.com/users/relixiaobo/projects/1)。
+>
+> 以下内容保留为历史归档，不再更新。
+>
 > 最后更新: 2026-02-14
 
 ## 已完成

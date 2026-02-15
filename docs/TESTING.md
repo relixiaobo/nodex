@@ -323,7 +323,7 @@ npm run test:run
 **覆盖点**:
 
 1. `>` 触发 `create_field`
-2. `#/@` 触发 `create_trigger_node`
+2. `#/@/` 触发 `create_trigger_node`（`/` 为 slash command 触发）
 3. Options 字段下的 open/close dropdown 决策
 4. 普通文本（非 Options）返回 no-op
 
@@ -344,9 +344,10 @@ npm run test:run
 
 **覆盖点**:
 
-1. `Enter` 在 reference/hashTag dropdown 下的优先级决策
-2. `ArrowUp/Down` 的 dropdown vs boundary 导航决策
-3. `Escape` 与 `Mod+Enter` 的 reference/hashTag 分支决策
+1. `Enter` 在 reference/hashTag/slash dropdown 下的优先级决策
+2. `ArrowUp/Down` 的 dropdown（含 slash）vs boundary 导航决策
+3. `Escape` 与 `Mod+Enter` 的 reference/hashTag/slash 分支决策
+4. slash active 时 `Mod+Enter` 返回 `noop`（不切换 checkbox）
 
 ### 1.24 拖拽 hover 落点分区纯函数
 
@@ -516,6 +517,18 @@ hash trigger cleanup safety（2 cases, Bug #53 回归）:
 2. `setWorkspace + setUser` 后状态一致，且写入 `nodex-workspace` 持久化键
 3. `logout` 清空用户与工作区上下文，并恢复未登录状态
 
+### 1.37 Slash Command 注册与导航
+
+**测试文件**: `tests/vitest/slash-commands.test.ts`
+
+**覆盖点**:
+
+1. `filterSlashCommands` 按命令名和关键词过滤
+2. 空 query 返回全量基线命令列表（10 项）
+3. `getFirstEnabledSlashIndex` 跳过禁用项返回首个可用索引
+4. `getNextEnabledSlashIndex` 仅在 enabled 项间上下移动，边界 clamp
+5. 全部禁用时返回 `-1`
+
 ---
 
 ## Phase 2: 视觉检查点
@@ -593,6 +606,7 @@ hash trigger cleanup safety（2 cases, Bug #53 回归）:
 | 1.34 | Editor isEmpty 零宽空格 | PASS/FAIL |
 | 1.35 | 节点搜索 SKIP_DOC_TYPES 过滤 | PASS/FAIL |
 | 1.36 | Workspace Store 认证状态与持久化 | PASS/FAIL |
+| 1.37 | Slash Command 注册与导航 | PASS/FAIL |
 | 2 | 视觉渲染 | PASS/FAIL/SKIP |
 | 3 | 扩展构建 | PASS/FAIL |
 

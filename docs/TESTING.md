@@ -538,40 +538,55 @@ hash trigger cleanup safety（2 cases, Bug #53 回归）:
 
 **覆盖点**:
 
-纯函数（14 cases）:
-1. `getDoneStateMappings` 无标签 → 空
-2. `getDoneStateMappings` 有标签但无 NDX_A06 → 空
-3. `getDoneStateMappings` 有 Task 标签 + NDX_A06 → 返回映射（checked only）
-4. `getDoneStateMappings` 含 uncheckedOptionId 配置
-5. `getDoneStateMappings` 沿 Extend 链继承
-6. `getDoneStateMappings` 不存在节点 → 空
-7. `resolveForwardDoneMapping` isDone=true → checkedOptionId
-8. `resolveForwardDoneMapping` isDone=false + unchecked → uncheckedOptionId
-9. `resolveForwardDoneMapping` isDone=false 无 unchecked → 空
-10. `resolveForwardDoneMapping` 无映射 → 空
-11. `resolveReverseDoneMapping` checkedOption → newDone=true
-12. `resolveReverseDoneMapping` uncheckedOption → newDone=false
-13. `resolveReverseDoneMapping` 无关 option → null
-14. `resolveReverseDoneMapping` attrDefId 不匹配 → null
+纯函数 — getDoneStateMappings（8 cases）:
+1. 无标签 → 空
+2. 有标签但无映射配置 → 空
+3. 新格式 (toggle+NDX_A07/A08) → 返回映射 (checked only)
+4. 含 uncheckedOptionIds 配置
+5. 多个 checked option IDs
+6. 多个 unchecked option IDs
+7. Toggle OFF → 空
+8. 沿 Extend 链继承
+9. 不存在节点 → 空
+
+纯函数 — 旧格式向后兼容（3 cases）:
+10. 旧格式 (NDX_A06 children>=3) 正常解析
+11. 旧格式含 uncheckedOptionId
+12. 旧格式 Extend 链继承
+
+纯函数 — resolveForwardDoneMapping（5 cases）:
+13. isDone=true → 第一个 checkedOptionId
+14. isDone=true + 多 checked → 仍取第一个
+15. isDone=false + unchecked → 第一个 uncheckedOptionId
+16. isDone=false 无 unchecked → 空
+17. 无映射 → 空
+
+纯函数 — resolveReverseDoneMapping（7 cases）:
+18. checkedOption → newDone=true
+19. 多 checked 中任一匹配 → newDone=true
+20. uncheckedOption → newDone=false
+21. 多 unchecked 中任一匹配 → newDone=false
+22. 无关 option → null
+23. attrDefId 不匹配 → null
+24. 无 unchecked + non-checked option → null
 
 Store 集成 — setOptionsFieldValue（3 cases）:
-15. `setOptionsFieldValue`（opt_done）→ checkbox 自动勾选
-16. `setOptionsFieldValue`（opt_todo）→ checkbox 自动取消
-17. `setOptionsFieldValue`（opt_in_progress）→ checkbox 不变
+25. `setOptionsFieldValue`（opt_done）→ checkbox 自动勾选
+26. `setOptionsFieldValue`（opt_todo）→ checkbox 自动取消
+27. `setOptionsFieldValue`（opt_in_progress）→ checkbox 不变
 
 Store 集成 — selectFieldOption / UI 路径（4 cases）:
-18. `selectFieldOption` via assocDataId（opt_done）→ checkbox 自动勾选
-19. `selectFieldOption` via assocDataId（opt_todo）→ checkbox 自动取消
-20. `selectFieldOption` via assocDataId（opt_in_progress）→ checkbox 不变
-21. `selectFieldOption` old→new option swap（children 替换正确）
+28. `selectFieldOption` via assocDataId（opt_done）→ checkbox 自动勾选
+29. `selectFieldOption` via assocDataId（opt_todo）→ checkbox 自动取消
+30. `selectFieldOption` via assocDataId（opt_in_progress）→ checkbox 不变
+31. `selectFieldOption` old→new option swap（children 替换正确）
 
 Store 集成 — forward mapping（2 cases）:
-22. `toggleNodeDone`（undone→done）→ Status 设为 opt_done
-23. `toggleNodeDone`（done→undone）→ Status 设为 opt_todo
+32. `toggleNodeDone`（undone→done）→ Status 设为 opt_done
+33. `toggleNodeDone`（done→undone）→ Status 设为 opt_todo
 
-Store 集成 — 安全性（2 cases）:
-24. 原子 set() 无循环：forward + reverse 独立操作
-25. `resolveReverseDoneMapping` 无 unchecked + non-checked option → null
+Store 集成 — 安全性（1 case）:
+34. 原子 set() 无循环：forward + reverse 独立操作
 
 ### 1.39 Web Clip 落库服务
 

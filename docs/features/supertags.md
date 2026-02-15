@@ -56,7 +56,7 @@
 ### createTagDef 自动配置
 
 - 新建 tagDef 后自动调用 `applyTag(id, SYS_T01)`
-- 创建 metanode + SYS_A13 tag binding + 4 个 config tuple（checkbox/childtag/color/extends）
+- 创建 metanode + SYS_A13 tag binding + 7 个 config tuple（checkbox/childtag/color/extends/done_mapping/done_map_checked/done_map_unchecked）
 - tagDef 的 `_ownerId` 始终为 `{workspaceId}_SCHEMA`
 
 ### 删除标签级联清理 — 目标规格（未实现）
@@ -100,29 +100,44 @@
 **未实现**:
 - 批量操作（需多选功能）
 
-### Done State Mapping — 已实现
+### Done State Mapping — 已实现（多值模型）
 
-**数据模型**: TagDef 上新增 config tuple `Tuple [NDX_A06, attrDefId, checkedOptionId, uncheckedOptionId?]`
+**数据模型**（三类 tuple）:
 
-- `NDX_A06` = `SYS_A.DONE_STATE_MAPPING`
-- `attrDefId` = Options 类型字段 ID（如 `attrDef_status`）
-- `checkedOptionId` = checkbox 勾选时对应的 option（如 `opt_done`）
-- `uncheckedOptionId` = checkbox 取消时对应的 option（如 `opt_todo`），可选
+```
+tagDef.children:
+  Tuple [NDX_A06, SYS_V.YES]                              ← 开关（visibleWhen: Show checkbox = YES）
+  Tuple [NDX_A07, attrDefId, optionId]                     ← checked 映射（可多个）
+  Tuple [NDX_A08, attrDefId, optionId]                     ← unchecked 映射（可多个）
+```
+
+- `NDX_A06` = `SYS_A.DONE_STATE_MAPPING` — 独立 toggle（YES/NO）
+- `NDX_A07` = `SYS_A.DONE_MAP_CHECKED` — 每个 tuple = 一个 checked 映射
+- `NDX_A08` = `SYS_A.DONE_MAP_UNCHECKED` — 每个 tuple = 一个 unchecked 映射
+- 同一 key 可有**多个** tuple → 多值（如 Status→Done 和 Status→Cancelled 都映射为 checked）
+- 按 attrDefId 分组为 `DoneStateMapping { checkedOptionIds[], uncheckedOptionIds[] }`
+- 条件可见性: NDX_A06 仅在 SYS_A55=YES 时可见，NDX_A07/NDX_A08 仅在 NDX_A06=YES 时可见
+
+**向后兼容**: 旧格式 `[NDX_A06, attrDefId, checkedOptionId, uncheckedOptionId?]`（children.length >= 3）仍可读取。
 
 **正向映射**（checkbox → Options field）:
 - `toggleNodeDone` / `cycleNodeCheckbox` 计算 newDone 后，调用 `resolveForwardDoneMapping` 获取要更新的字段
+- isDone=true → 每个 mapping 的 `checkedOptionIds[0]`（取第一个）
+- isDone=false → 每个 mapping 的 `uncheckedOptionIds[0]`
 - 在同一个 `set()` 调用内同时更新 `_done` 和 AssociatedData.children
 
 **反向映射**（Options field → checkbox）:
 - `setOptionsFieldValue` / `autoCollectOption` 设置 option 值后，调用 `resolveReverseDoneMapping`
 - `selectFieldOption`（UI 路径，从 assocDataId 反查内容节点和 attrDefId）— 用于 OutlinerItem inline picker 和 TrailingInput option 选择
+- newOptionId ∈ 任一 mapping 的 `checkedOptionIds` → `{ newDone: true }`
+- newOptionId ∈ 任一 mapping 的 `uncheckedOptionIds` → `{ newDone: false }`
 - 在同一个 `set()` 调用内更新 `_done`
 
 **无限循环防护**: 正向和反向都在各自的 `set()` 内完成，不会互相触发 store action。
 
 **继承支持**: Done state mapping 沿 Extend 链继承（子标签自动继承父标签的映射配置）。
 
-**Seed data**: `tagDef_task` 预配置 `NDX_A06 → [attrDef_status, opt_done, opt_todo]`
+**Seed data**: `tagDef_task` 预配置 toggle=YES + `NDX_A07 → [attrDef_status, opt_done]` + `NDX_A08 → [attrDef_status, opt_todo]`
 
 ### Default Child Supertag — 未实现
 
@@ -335,6 +350,9 @@ tagDef_article
 | 2026-02-16 | 正向/反向映射在同一 set() 中原子完成 | 避免无限循环，无需额外防护标志 |
 | 2026-02-16 | Done state mapping 沿 Extend 链继承 | 子标签自动继承父标签的映射配置 |
 | 2026-02-16 | 新增 `selectFieldOption` store action 用于 UI 路径反向映射 | UI 使用 `addReference` 而非 `setOptionsFieldValue`，需独立路径从 assocDataId 反查 |
+| 2026-02-16 | Done State Mapping 升级为多值模型（NDX_A06 toggle + NDX_A07/A08 multi-tuple） | 支持多个 checked/unchecked option，匹配 Tana 实际行为 |
+| 2026-02-16 | NDX_A06 改为 toggle，NDX_A07/A08 新增用于 checked/unchecked 映射 | 保持旧格式向后兼容（children.length >= 3 自动识别） |
+| 2026-02-16 | ConfigFieldDef 新增 visibleWhen 条件可见性 | Done state mapping toggle 仅在 Show checkbox=YES 时可见 |
 
 ## 当前状态
 

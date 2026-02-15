@@ -230,6 +230,8 @@ export interface ConfigFieldDef {
   icon?: LucideIcon;
   description?: string;
   options?: Array<{ value: string; label: string }>;
+  /** Conditional visibility: only show when another config field has a specific value */
+  visibleWhen?: { dependsOn: string; value: string };
 }
 
 /**
@@ -391,11 +393,32 @@ export const TAGDEF_CONFIG_FIELDS: ConfigFieldDef[] = [
   {
     key: SYS_A.DONE_STATE_MAPPING,  // NDX_A06
     name: 'Done state mapping',
+    control: 'toggle',
+    icon: CheckSquare,
+    defaultValue: SYS_V.NO,
+    appliesTo: '*',
+    description: 'Map checkbox done state to Options field values',
+    visibleWhen: { dependsOn: SYS_A.SHOW_CHECKBOX, value: SYS_V.YES },
+  },
+  {
+    key: SYS_A.DONE_MAP_CHECKED,   // NDX_A07
+    name: 'Map checked to',
     control: 'tag_picker',       // TODO: implement dedicated picker UI
     icon: CheckSquare,
     defaultValue: '',
     appliesTo: '*',
-    description: 'Map checkbox done state to an Options field value',
+    description: 'Field+option pairs that mean "done"',
+    visibleWhen: { dependsOn: SYS_A.DONE_STATE_MAPPING, value: SYS_V.YES },
+  },
+  {
+    key: SYS_A.DONE_MAP_UNCHECKED, // NDX_A08
+    name: 'Map unchecked to',
+    control: 'tag_picker',       // TODO: implement dedicated picker UI
+    icon: CheckSquare,
+    defaultValue: '',
+    appliesTo: '*',
+    description: 'Field+option pairs that mean "not done"',
+    visibleWhen: { dependsOn: SYS_A.DONE_STATE_MAPPING, value: SYS_V.YES },
   },
   // outliner field — rendered as field row with embedded outliner (template children)
   {

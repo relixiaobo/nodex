@@ -135,14 +135,134 @@ export function resolveCmdEnterCycle(
 export interface DoneStateMapping {
   tagDefId: string;
   attrDefId: string;
-  checkedOptionId: string;
-  uncheckedOptionId?: string;
+  checkedOptionIds: string[];
+  uncheckedOptionIds: string[];
+}
+
+/**
+ * Check if a tagDef has the Done State Mapping toggle enabled (NDX_A06 = YES).
+ * Returns true if toggle is ON, false if OFF or absent.
+ * Also returns true for legacy format where NDX_A06 tuple has >= 3 children (old model).
+ */
+function hasDoneMappingEnabled(
+  tagDefId: string,
+  entities: Record<string, NodexNode>,
+): boolean {
+  const td = entities[tagDefId];
+  if (!td?.children) return false;
+
+  for (const childId of td.children) {
+    const child = entities[childId];
+    if (!child?.children || child.children.length < 2) continue;
+    if (child.props._docType !== 'tuple') continue;
+    if (child.children[0] !== SYS_A.DONE_STATE_MAPPING) continue;
+
+    // New format: [NDX_A06, SYS_V.YES/NO]
+    if (child.children.length === 2) {
+      return child.children[1] === SYS_V.YES;
+    }
+    // Legacy format: [NDX_A06, attrDefId, checkedOptionId, ...] → treat as enabled
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Collect legacy NDX_A06 mappings from a single tagDef (old format: children.length >= 3).
+ */
+function collectLegacyMappings(
+  tdId: string,
+  entities: Record<string, NodexNode>,
+): DoneStateMapping[] {
+  const td = entities[tdId];
+  if (!td?.children) return [];
+
+  const result: DoneStateMapping[] = [];
+  for (const childId of td.children) {
+    const child = entities[childId];
+    if (!child?.children || child.children.length < 3) continue;
+    if (child.props._docType !== 'tuple') continue;
+    if (child.children[0] !== SYS_A.DONE_STATE_MAPPING) continue;
+
+    result.push({
+      tagDefId: tdId,
+      attrDefId: child.children[1],
+      checkedOptionIds: [child.children[2]],
+      uncheckedOptionIds: child.children[3] ? [child.children[3]] : [],
+    });
+  }
+  return result;
+}
+
+/**
+ * Collect new-format NDX_A07/NDX_A08 mappings from a single tagDef.
+ * Groups by attrDefId into one DoneStateMapping per field.
+ */
+function collectNewMappings(
+  tdId: string,
+  entities: Record<string, NodexNode>,
+): DoneStateMapping[] {
+  const td = entities[tdId];
+  if (!td?.children) return [];
+
+  // Group by attrDefId
+  const byAttrDef = new Map<string, { checked: string[]; unchecked: string[] }>();
+
+  for (const childId of td.children) {
+    const child = entities[childId];
+    if (!child?.children || child.children.length < 3) continue;
+    if (child.props._docType !== 'tuple') continue;
+
+    const key = child.children[0];
+    if (key !== SYS_A.DONE_MAP_CHECKED && key !== SYS_A.DONE_MAP_UNCHECKED) continue;
+
+    const attrDefId = child.children[1];
+    const optionId = child.children[2];
+
+    if (!byAttrDef.has(attrDefId)) {
+      byAttrDef.set(attrDefId, { checked: [], unchecked: [] });
+    }
+    const entry = byAttrDef.get(attrDefId)!;
+    if (key === SYS_A.DONE_MAP_CHECKED) {
+      entry.checked.push(optionId);
+    } else {
+      entry.unchecked.push(optionId);
+    }
+  }
+
+  const result: DoneStateMapping[] = [];
+  for (const [attrDefId, { checked, unchecked }] of byAttrDef) {
+    result.push({
+      tagDefId: tdId,
+      attrDefId,
+      checkedOptionIds: checked,
+      uncheckedOptionIds: unchecked,
+    });
+  }
+  return result;
+}
+
+/**
+ * Detect whether a tagDef uses legacy (NDX_A06 with >= 3 children) or new format.
+ */
+function isLegacyFormat(tdId: string, entities: Record<string, NodexNode>): boolean {
+  const td = entities[tdId];
+  if (!td?.children) return false;
+
+  for (const childId of td.children) {
+    const child = entities[childId];
+    if (!child?.children || child.children.length < 3) continue;
+    if (child.props._docType !== 'tuple') continue;
+    if (child.children[0] === SYS_A.DONE_STATE_MAPPING) return true;
+  }
+  return false;
 }
 
 /**
  * Get all done-state mapping configs from a node's supertags (including Extend chain).
  *
- * Path: node → metanode → SYS_A13 tuples → tagDefId → tagDef.children → NDX_A06 tuple
+ * New format: NDX_A06 toggle + NDX_A07/NDX_A08 multi-value tuples.
+ * Legacy format: NDX_A06 tuple with [key, attrDefId, checkedOptionId, uncheckedOptionId?].
  * Also walks the Extend chain for each tag.
  */
 export function getDoneStateMappings(
@@ -171,21 +291,13 @@ export function getDoneStateMappings(
     const allTagDefs = [...chain, tagDefId];
 
     for (const tdId of allTagDefs) {
-      const td = entities[tdId];
-      if (!td?.children) continue;
+      // Check if the toggle is enabled (for new format) or has legacy mapping
+      if (!hasDoneMappingEnabled(tdId, entities)) continue;
 
-      for (const childId of td.children) {
-        const child = entities[childId];
-        if (!child?.children || child.children.length < 3) continue;
-        if (child.props._docType !== 'tuple') continue;
-        if (child.children[0] !== SYS_A.DONE_STATE_MAPPING) continue;
-
-        result.push({
-          tagDefId: tdId,
-          attrDefId: child.children[1],
-          checkedOptionId: child.children[2],
-          uncheckedOptionId: child.children[3],
-        });
+      if (isLegacyFormat(tdId, entities)) {
+        result.push(...collectLegacyMappings(tdId, entities));
+      } else {
+        result.push(...collectNewMappings(tdId, entities));
       }
     }
   }
@@ -196,8 +308,9 @@ export function getDoneStateMappings(
 /**
  * Forward mapping: checkbox state changed → which field values to update.
  *
- * When isDone=true, returns the checkedOptionId for each mapping.
- * When isDone=false, returns the uncheckedOptionId (if configured).
+ * When isDone=true, returns the first checkedOptionId for each mapping.
+ * When isDone=false, returns the first uncheckedOptionId (if configured).
+ * Skips mappings where the relevant array is empty.
  */
 export function resolveForwardDoneMapping(
   nodeId: string,
@@ -209,9 +322,13 @@ export function resolveForwardDoneMapping(
 
   for (const m of mappings) {
     if (isDone) {
-      result.push({ attrDefId: m.attrDefId, optionNodeId: m.checkedOptionId });
-    } else if (m.uncheckedOptionId) {
-      result.push({ attrDefId: m.attrDefId, optionNodeId: m.uncheckedOptionId });
+      if (m.checkedOptionIds.length > 0) {
+        result.push({ attrDefId: m.attrDefId, optionNodeId: m.checkedOptionIds[0] });
+      }
+    } else {
+      if (m.uncheckedOptionIds.length > 0) {
+        result.push({ attrDefId: m.attrDefId, optionNodeId: m.uncheckedOptionIds[0] });
+      }
     }
   }
 
@@ -221,8 +338,8 @@ export function resolveForwardDoneMapping(
 /**
  * Reverse mapping: Options field value changed → should checkbox change?
  *
- * Returns { newDone: true } if the new option matches checkedOptionId,
- * { newDone: false } if it matches uncheckedOptionId,
+ * Returns { newDone: true } if the new option matches ANY checkedOptionId,
+ * { newDone: false } if it matches ANY uncheckedOptionId,
  * or null if no mapping applies.
  */
 export function resolveReverseDoneMapping(
@@ -235,8 +352,8 @@ export function resolveReverseDoneMapping(
 
   for (const m of mappings) {
     if (m.attrDefId !== attrDefId) continue;
-    if (newOptionId === m.checkedOptionId) return { newDone: true };
-    if (m.uncheckedOptionId && newOptionId === m.uncheckedOptionId) return { newDone: false };
+    if (m.checkedOptionIds.includes(newOptionId)) return { newDone: true };
+    if (m.uncheckedOptionIds.includes(newOptionId)) return { newDone: false };
   }
 
   return null;

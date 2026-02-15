@@ -214,8 +214,12 @@ export const SYS_A = {
   MAX_VALUE: 'NDX_A04',
   /** [Nodex] Extend parent tagDef → Tuple [NDX_A05, parentTagDefId] */
   EXTENDS: 'NDX_A05',
-  /** [Nodex] Done state mapping → Tuple [NDX_A06, attrDefId, checkedOptionId, uncheckedOptionId?] */
+  /** [Nodex] Done state mapping toggle → Tuple [NDX_A06, SYS_V03(YES)/SYS_V04(NO)] */
   DONE_STATE_MAPPING: 'NDX_A06',
+  /** [Nodex] Done map checked → Tuple [NDX_A07, attrDefId, optionId] (one per mapping) */
+  DONE_MAP_CHECKED: 'NDX_A07',
+  /** [Nodex] Done map unchecked → Tuple [NDX_A08, attrDefId, optionId] (one per mapping) */
+  DONE_MAP_UNCHECKED: 'NDX_A08',
 } as const;
 
 export type SystemAttribute = typeof SYS_A[keyof typeof SYS_A];

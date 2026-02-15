@@ -8,7 +8,7 @@
  */
 import { useMemo } from 'react';
 import { useNodeStore } from '../stores/node-store';
-import { resolveDataType, resolveHideField, resolveRequired, ATTRDEF_CONFIG_MAP, ATTRDEF_CONFIG_FIELDS, ATTRDEF_OUTLINER_FIELDS, TAGDEF_CONFIG_MAP, TAGDEF_CONFIG_FIELDS, TAGDEF_OUTLINER_FIELDS, SYSTEM_FIELD_MAP, resolveSystemFieldValue } from '../lib/field-utils.js';
+import { resolveDataType, resolveHideField, resolveRequired, ATTRDEF_CONFIG_MAP, ATTRDEF_CONFIG_FIELDS, ATTRDEF_OUTLINER_FIELDS, TAGDEF_CONFIG_MAP, TAGDEF_CONFIG_FIELDS, TAGDEF_OUTLINER_FIELDS, SYSTEM_FIELD_MAP, resolveSystemFieldValue, type ConfigFieldDef } from '../lib/field-utils.js';
 import type { NodexNode } from '../types/index.js';
 
 export interface FieldEntry {
@@ -27,6 +27,24 @@ export interface FieldEntry {
   isEmpty?: boolean;
   /** True when the attrDef config marks this field as required */
   isRequired?: boolean;
+}
+
+/** Check if a visibleWhen condition is satisfied by looking at sibling config tuples. */
+function isVisibleWhenSatisfied(
+  condition: NonNullable<ConfigFieldDef['visibleWhen']>,
+  node: NodexNode,
+  entities: Record<string, NodexNode>,
+): boolean {
+  if (!node.children) return false;
+  for (const cid of node.children) {
+    const sibling = entities[cid];
+    if (!sibling?.children || sibling.children.length < 2) continue;
+    if (sibling.props._docType !== 'tuple') continue;
+    if (sibling.children[0] === condition.dependsOn && sibling.children[1] === condition.value) {
+      return true;
+    }
+  }
+  return false;
 }
 
 function computeFields(entities: Record<string, NodexNode>, nodeId: string): FieldEntry[] {
@@ -66,6 +84,10 @@ function computeFields(entities: Record<string, NodexNode>, nodeId: string): Fie
     if (isTagDef) {
       const configDef = TAGDEF_CONFIG_MAP.get(keyId);
       if (configDef) {
+        // Check visibleWhen condition
+        if (configDef.visibleWhen && !isVisibleWhenSatisfied(configDef.visibleWhen, node, entities)) {
+          continue;
+        }
         fields.push({
           attrDefId: keyId,
           attrDefName: configDef.name,

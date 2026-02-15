@@ -187,13 +187,15 @@ export function seedTestData() {
   const sysT01Nodes: NodexNode[] = [
     makeNode('SYS_T01', 'Supertag', schemaId, [
       'sysT01_tpl_checkbox', 'sysT01_tpl_childtag', 'sysT01_tpl_color', 'sysT01_tpl_extends',
-      'sysT01_tpl_done_mapping',
+      'sysT01_tpl_done_mapping', 'sysT01_tpl_done_map_checked', 'sysT01_tpl_done_map_unchecked',
     ], 'tagDef'),
     makeNode('sysT01_tpl_checkbox', '', 'SYS_T01', [SYS_A.SHOW_CHECKBOX], 'tuple'),
     makeNode('sysT01_tpl_childtag', '', 'SYS_T01', [SYS_A.CHILD_SUPERTAG], 'tuple'),
     makeNode('sysT01_tpl_color', '', 'SYS_T01', [SYS_A.COLOR], 'tuple'),
     makeNode('sysT01_tpl_extends', '', 'SYS_T01', [SYS_A.EXTENDS], 'tuple'),
     makeNode('sysT01_tpl_done_mapping', '', 'SYS_T01', [SYS_A.DONE_STATE_MAPPING], 'tuple'),
+    makeNode('sysT01_tpl_done_map_checked', '', 'SYS_T01', [SYS_A.DONE_MAP_CHECKED], 'tuple'),
+    makeNode('sysT01_tpl_done_map_unchecked', '', 'SYS_T01', [SYS_A.DONE_MAP_UNCHECKED], 'tuple'),
   ];
 
   // SYS_T02 (Field Definition) — system tag for attrDef config pages
@@ -408,6 +410,7 @@ export function seedTestData() {
     makeNode('tagDef_task', 'Task', schemaId, [
       'tagDef_task_cfg_checkbox', 'tagDef_task_cfg_childtag', 'tagDef_task_cfg_color',
       'tagDef_task_cfg_extends', 'tagDef_task_cfg_done_mapping',
+      'tagDef_task_cfg_done_checked_1', 'tagDef_task_cfg_done_unchecked_1',
       'taskField_status', 'taskField_priority', 'taskField_due', 'taskField_done',
       'taskTpl_default_note',
     ], 'tagDef'),
@@ -577,13 +580,17 @@ export function seedTestData() {
     makeNode('tagDef_task_cfg_childtag', '', 'tagDef_task', [SYS_A.CHILD_SUPERTAG], 'tuple'),
     makeNode('tagDef_task_cfg_color', '', 'tagDef_task', [SYS_A.COLOR], 'tuple'),
     makeNode('tagDef_task_cfg_extends', '', 'tagDef_task', [SYS_A.EXTENDS], 'tuple'),
-    makeNode('tagDef_task_cfg_done_mapping', '', 'tagDef_task', [SYS_A.DONE_STATE_MAPPING, 'attrDef_status', 'opt_done', 'opt_todo'], 'tuple'),
+    makeNode('tagDef_task_cfg_done_mapping', '', 'tagDef_task', [SYS_A.DONE_STATE_MAPPING, SYS_V.YES], 'tuple'),
+    makeNode('tagDef_task_cfg_done_checked_1', '', 'tagDef_task', [SYS_A.DONE_MAP_CHECKED, 'attrDef_status', 'opt_done'], 'tuple'),
+    makeNode('tagDef_task_cfg_done_unchecked_1', '', 'tagDef_task', [SYS_A.DONE_MAP_UNCHECKED, 'attrDef_status', 'opt_todo'], 'tuple'),
   ];
   tagDefTaskConfigNodes[0].props._sourceId = 'sysT01_tpl_checkbox';
   tagDefTaskConfigNodes[1].props._sourceId = 'sysT01_tpl_childtag';
   tagDefTaskConfigNodes[2].props._sourceId = 'sysT01_tpl_color';
   tagDefTaskConfigNodes[3].props._sourceId = 'sysT01_tpl_extends';
   tagDefTaskConfigNodes[4].props._sourceId = 'sysT01_tpl_done_mapping';
+  tagDefTaskConfigNodes[5].props._sourceId = 'sysT01_tpl_done_map_checked';
+  tagDefTaskConfigNodes[6].props._sourceId = 'sysT01_tpl_done_map_unchecked';
 
   // Config tuples for tagDef_person (SYS_T01 template instances)
   const tagDefPersonConfigNodes: NodexNode[] = [

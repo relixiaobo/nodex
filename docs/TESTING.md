@@ -192,7 +192,7 @@ npm run test:run
 
 **覆盖点**:
 
-1. `createTagDef` 自动归属 SCHEMA + 自动应用 `SYS_T01`
+1. `createTagDef` 自动归属 SCHEMA + 自动应用 `SYS_T01`（5 个直接 config tuple + NDX_A07/A08 嵌套验证）
 2. `createAttrDef` 的 template tuple/type tuple/`SYS_T02` 配置链路
 3. 新建 `attrDef` 在后续 `applyTag` 中被正确实例化到内容节点
 
@@ -541,7 +541,7 @@ hash trigger cleanup safety（2 cases, Bug #53 回归）:
 纯函数 — getDoneStateMappings（8 cases）:
 1. 无标签 → 空
 2. 有标签但无映射配置 → 空
-3. 新格式 (toggle+NDX_A07/A08) → 返回映射 (checked only)
+3. 新格式 (toggle+嵌套 NDX_A07/A08) → 返回映射 (checked only)
 4. 含 uncheckedOptionIds 配置
 5. 多个 checked option IDs
 6. 多个 unchecked option IDs
@@ -553,6 +553,11 @@ hash trigger cleanup safety（2 cases, Bug #53 回归）:
 10. 旧格式 (NDX_A06 children>=3) 正常解析
 11. 旧格式含 uncheckedOptionId
 12. 旧格式 Extend 链继承
+
+嵌套结构验证（3 cases）:
+35. 嵌套 NDX_A07/A08 在 NDX_A06 toggle 子节点中正确读取
+36. toggle OFF 时嵌套子节点存在但不返回映射
+37. 嵌套结构 Extend 链继承
 
 纯函数 — resolveForwardDoneMapping（5 cases）:
 13. isDone=true → 第一个 checkedOptionId

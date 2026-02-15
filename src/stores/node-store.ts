@@ -983,6 +983,26 @@ export const useNodeStore = create<NodeStore>()(
               instanceNode.props._sourceId = templateChildId;
               state.entities[instanceId] = instanceNode;
               n.children.push(instanceId);
+
+              // Recursive: instantiate nested config template children (e.g. NDX_A07/A08 under NDX_A06)
+              if (template.children && template.children.length > 1) {
+                for (let i = 1; i < template.children.length; i++) {
+                  const nestedTemplateId = template.children[i];
+                  const nestedTemplate = state.entities[nestedTemplateId];
+                  if (!nestedTemplate?.children?.length) continue;
+                  if (nestedTemplate.props._docType !== 'tuple') continue;
+                  const nestedKeyId = nestedTemplate.children[0];
+                  const nestedConfigDef = ATTRDEF_CONFIG_MAP.get(nestedKeyId) ?? TAGDEF_CONFIG_MAP.get(nestedKeyId);
+                  if (!nestedConfigDef) continue;
+
+                  const nestedInstanceId = nanoid();
+                  const nestedInstance = makeNodeLocal(nestedInstanceId, instanceId, 'tuple', [nestedKeyId, nestedConfigDef.defaultValue]);
+                  nestedInstance.props._sourceId = nestedTemplateId;
+                  state.entities[nestedInstanceId] = nestedInstance;
+                  if (!instanceNode.children) instanceNode.children = [];
+                  instanceNode.children.push(nestedInstanceId);
+                }
+              }
               continue;
             }
 
@@ -1066,6 +1086,14 @@ export const useNodeStore = create<NodeStore>()(
             if (assocId) {
               delete state.entities[assocId];
               delete node.associationMap![cid];
+            }
+            // Clean up nested children (e.g. NDX_A07/A08 under NDX_A06 instance)
+            if (child.children) {
+              for (const nestedId of child.children) {
+                if (state.entities[nestedId]?.props._ownerId === cid) {
+                  delete state.entities[nestedId];
+                }
+              }
             }
             delete state.entities[cid];
           }

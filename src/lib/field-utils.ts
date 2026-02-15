@@ -408,7 +408,6 @@ export const TAGDEF_CONFIG_FIELDS: ConfigFieldDef[] = [
     defaultValue: '',
     appliesTo: '*',
     description: 'Field+option pairs that mean "done"',
-    visibleWhen: { dependsOn: SYS_A.DONE_STATE_MAPPING, value: SYS_V.YES },
   },
   {
     key: SYS_A.DONE_MAP_UNCHECKED, // NDX_A08
@@ -418,7 +417,6 @@ export const TAGDEF_CONFIG_FIELDS: ConfigFieldDef[] = [
     defaultValue: '',
     appliesTo: '*',
     description: 'Field+option pairs that mean "not done"',
-    visibleWhen: { dependsOn: SYS_A.DONE_STATE_MAPPING, value: SYS_V.YES },
   },
   // outliner field — rendered as field row with embedded outliner (template children)
   {

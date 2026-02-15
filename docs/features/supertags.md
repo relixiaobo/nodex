@@ -56,7 +56,8 @@
 ### createTagDef 自动配置
 
 - 新建 tagDef 后自动调用 `applyTag(id, SYS_T01)`
-- 创建 metanode + SYS_A13 tag binding + 7 个 config tuple（checkbox/childtag/color/extends/done_mapping/done_map_checked/done_map_unchecked）
+- 创建 metanode + SYS_A13 tag binding + 5 个直接 config tuple（checkbox/childtag/color/extends/done_mapping）
+- NDX_A07/A08 嵌套在 NDX_A06 实例的 children 中（递归模板实例化）
 - tagDef 的 `_ownerId` 始终为 `{workspaceId}_SCHEMA`
 
 ### 删除标签级联清理 — 目标规格（未实现）
@@ -100,23 +101,27 @@
 **未实现**:
 - 批量操作（需多选功能）
 
-### Done State Mapping — 已实现（多值模型）
+### Done State Mapping — 已实现（嵌套多值模型）
 
-**数据模型**（三类 tuple）:
+**数据模型**（嵌套 tuple 树）:
 
 ```
 tagDef.children:
-  Tuple [NDX_A06, SYS_V.YES]                              ← 开关（visibleWhen: Show checkbox = YES）
-  Tuple [NDX_A07, attrDefId, optionId]                     ← checked 映射（可多个）
-  Tuple [NDX_A08, attrDefId, optionId]                     ← unchecked 映射（可多个）
+  Tuple_A [NDX_A06, SYS_V.YES]                            ← 开关（visibleWhen: Show checkbox = YES）
+    Tuple_A.children (嵌套):
+      Tuple [NDX_A07, attrDefId, optionId]                 ← checked 映射（可多个）
+      Tuple [NDX_A08, attrDefId, optionId]                 ← unchecked 映射（可多个）
 ```
 
-- `NDX_A06` = `SYS_A.DONE_STATE_MAPPING` — 独立 toggle（YES/NO）
+- `NDX_A06` = `SYS_A.DONE_STATE_MAPPING` — 独立 toggle（YES/NO），NDX_A07/A08 作为其**嵌套子节点**
 - `NDX_A07` = `SYS_A.DONE_MAP_CHECKED` — 每个 tuple = 一个 checked 映射
 - `NDX_A08` = `SYS_A.DONE_MAP_UNCHECKED` — 每个 tuple = 一个 unchecked 映射
+- NDX_A06 tuple 的 `children` = `[NDX_A06, SYS_V.YES, nestedCheckedId, nestedUncheckedId, ...]`（前两个是 key+value，后续是嵌套子节点 ID）
+- NDX_A07/A08 的 `_ownerId` = NDX_A06 实例 ID（嵌套归属）
 - 同一 key 可有**多个** tuple → 多值（如 Status→Done 和 Status→Cancelled 都映射为 checked）
 - 按 attrDefId 分组为 `DoneStateMapping { checkedOptionIds[], uncheckedOptionIds[] }`
-- 条件可见性: NDX_A06 仅在 SYS_A55=YES 时可见，NDX_A07/NDX_A08 仅在 NDX_A06=YES 时可见
+- 条件可见性: NDX_A06 仅在 SYS_A55=YES 时可见；NDX_A07/A08 嵌套可见性由树结构决定（toggle ON 时展开）
+- 配置页缩进渲染: NDX_A07/A08 相对 NDX_A06 缩进 28px（depth=1）
 
 **向后兼容**: 旧格式 `[NDX_A06, attrDefId, checkedOptionId, uncheckedOptionId?]`（children.length >= 3）仍可读取。
 
@@ -353,6 +358,10 @@ tagDef_article
 | 2026-02-16 | Done State Mapping 升级为多值模型（NDX_A06 toggle + NDX_A07/A08 multi-tuple） | 支持多个 checked/unchecked option，匹配 Tana 实际行为 |
 | 2026-02-16 | NDX_A06 改为 toggle，NDX_A07/A08 新增用于 checked/unchecked 映射 | 保持旧格式向后兼容（children.length >= 3 自动识别） |
 | 2026-02-16 | ConfigFieldDef 新增 visibleWhen 条件可见性 | Done state mapping toggle 仅在 Show checkbox=YES 时可见 |
+| 2026-02-16 | NDX_A07/A08 从扁平同级重构为 NDX_A06 的嵌套子节点 | 遵循"一切皆节点"原则，嵌套关系由节点树决定而非渲染层 visibleWhen 元数据 |
+| 2026-02-16 | applyTag 递归实例化嵌套 config template | SYS_T01 模板中 NDX_A07/A08 作为 NDX_A06 的嵌套模板，applyTag 自动递归创建对应实例 |
+| 2026-02-16 | removeTag 级联清理嵌套 config 子节点 | 删除 NDX_A06 实例时同时清理其 NDX_A07/A08 嵌套子节点，防止孤儿实体 |
+| 2026-02-16 | FieldEntry 新增 depth 属性支持配置页缩进渲染 | NDX_A06 depth=0，NDX_A07/A08 depth=1，FieldList 通过 paddingLeft 渲染层级 |
 
 ## 当前状态
 

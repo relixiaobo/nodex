@@ -157,8 +157,9 @@ function hasDoneMappingEnabled(
     if (child.props._docType !== 'tuple') continue;
     if (child.children[0] !== SYS_A.DONE_STATE_MAPPING) continue;
 
-    // New format: [NDX_A06, SYS_V.YES/NO]
-    if (child.children.length === 2) {
+    // New format: children[1] is SYS_V.YES or SYS_V.NO (toggle value)
+    // May also have nested children[2+] for NDX_A07/A08 tuples
+    if (child.children[1] === SYS_V.YES || child.children[1] === SYS_V.NO) {
       return child.children[1] === SYS_V.YES;
     }
     // Legacy format: [NDX_A06, attrDefId, checkedOptionId, ...] → treat as enabled
@@ -196,6 +197,7 @@ function collectLegacyMappings(
 
 /**
  * Collect new-format NDX_A07/NDX_A08 mappings from a single tagDef.
+ * NDX_A07/A08 tuples are nested children of the NDX_A06 toggle tuple.
  * Groups by attrDefId into one DoneStateMapping per field.
  */
 function collectNewMappings(
@@ -205,19 +207,30 @@ function collectNewMappings(
   const td = entities[tdId];
   if (!td?.children) return [];
 
-  // Group by attrDefId
-  const byAttrDef = new Map<string, { checked: string[]; unchecked: string[] }>();
-
+  // Find the NDX_A06 toggle tuple
+  let toggleTuple: NodexNode | undefined;
   for (const childId of td.children) {
     const child = entities[childId];
-    if (!child?.children || child.children.length < 3) continue;
-    if (child.props._docType !== 'tuple') continue;
+    if (child?.props._docType === 'tuple' && child.children?.[0] === SYS_A.DONE_STATE_MAPPING) {
+      toggleTuple = child;
+      break;
+    }
+  }
+  if (!toggleTuple?.children) return [];
 
-    const key = child.children[0];
+  // Group by attrDefId — scan nested children of the toggle tuple
+  const byAttrDef = new Map<string, { checked: string[]; unchecked: string[] }>();
+
+  for (const nestedId of toggleTuple.children) {
+    const nested = entities[nestedId];
+    if (!nested?.children || nested.children.length < 3) continue;
+    if (nested.props._docType !== 'tuple') continue;
+
+    const key = nested.children[0];
     if (key !== SYS_A.DONE_MAP_CHECKED && key !== SYS_A.DONE_MAP_UNCHECKED) continue;
 
-    const attrDefId = child.children[1];
-    const optionId = child.children[2];
+    const attrDefId = nested.children[1];
+    const optionId = nested.children[2];
 
     if (!byAttrDef.has(attrDefId)) {
       byAttrDef.set(attrDefId, { checked: [], unchecked: [] });
@@ -253,7 +266,10 @@ function isLegacyFormat(tdId: string, entities: Record<string, NodexNode>): bool
     const child = entities[childId];
     if (!child?.children || child.children.length < 3) continue;
     if (child.props._docType !== 'tuple') continue;
-    if (child.children[0] === SYS_A.DONE_STATE_MAPPING) return true;
+    if (child.children[0] !== SYS_A.DONE_STATE_MAPPING) continue;
+    // New nested format has SYS_V.YES/NO as children[1]; legacy has attrDefId
+    if (child.children[1] === SYS_V.YES || child.children[1] === SYS_V.NO) return false;
+    return true;
   }
   return false;
 }

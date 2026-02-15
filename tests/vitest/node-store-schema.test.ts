@@ -39,11 +39,12 @@ describe('node-store schema flows', () => {
     });
     expect(hasSupertagBinding).toBe(true);
 
+    // Direct config tuples: 5 (NDX_A07/A08 are now nested under NDX_A06)
     const configTupleIds = (tagDef?.children ?? []).filter((cid) => {
       const child = state.entities[cid];
       return child?.props._docType === 'tuple' && (child.props._sourceId ?? '').startsWith('sysT01_tpl_');
     });
-    expect(configTupleIds.length).toBe(7);
+    expect(configTupleIds.length).toBe(5);
 
     const configKeys = new Set(configTupleIds.map((cid) => state.entities[cid].children?.[0]));
     expect(configKeys.has(SYS_A.SHOW_CHECKBOX)).toBe(true);
@@ -51,8 +52,26 @@ describe('node-store schema flows', () => {
     expect(configKeys.has(SYS_A.COLOR)).toBe(true);
     expect(configKeys.has(SYS_A.EXTENDS)).toBe(true);
     expect(configKeys.has(SYS_A.DONE_STATE_MAPPING)).toBe(true);
-    expect(configKeys.has(SYS_A.DONE_MAP_CHECKED)).toBe(true);
-    expect(configKeys.has(SYS_A.DONE_MAP_UNCHECKED)).toBe(true);
+
+    // NDX_A07/A08 should be nested children of the NDX_A06 instance
+    const doneMappingTupleId = configTupleIds.find(
+      (cid) => state.entities[cid].children?.[0] === SYS_A.DONE_STATE_MAPPING,
+    );
+    expect(doneMappingTupleId).toBeTruthy();
+    if (doneMappingTupleId) {
+      const doneMappingTuple = state.entities[doneMappingTupleId];
+      // children: [NDX_A06, defaultValue, nestedChecked, nestedUnchecked]
+      expect(doneMappingTuple.children!.length).toBeGreaterThanOrEqual(4);
+      const nestedKeys = doneMappingTuple.children!.slice(2).map(
+        (nid) => state.entities[nid]?.children?.[0],
+      );
+      expect(nestedKeys).toContain(SYS_A.DONE_MAP_CHECKED);
+      expect(nestedKeys).toContain(SYS_A.DONE_MAP_UNCHECKED);
+      // Nested instances should have _ownerId = parent instance
+      for (const nid of doneMappingTuple.children!.slice(2)) {
+        expect(state.entities[nid]?.props._ownerId).toBe(doneMappingTupleId);
+      }
+    }
 
     expect(collectNodeGraphErrors(useNodeStore.getState().entities)).toEqual([]);
   });

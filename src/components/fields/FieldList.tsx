@@ -33,18 +33,19 @@ export function FieldList({ nodeId }: FieldListProps) {
   return (
     <div className="@container mt-0.5 ml-1">
       {fields.map((f) => (
-        <FieldRow
-          key={f.tupleId}
-          nodeId={nodeId}
-          attrDefId={f.attrDefId}
-          attrDefName={f.attrDefName}
-          tupleId={f.tupleId}
-          valueNodeId={f.valueNodeId}
-          valueName={f.valueName}
-          dataType={f.dataType}
-          assocDataId={f.assocDataId}
-          trashed={f.trashed}
-        />
+        <div key={f.tupleId} style={f.depth ? { paddingLeft: f.depth * 28 } : undefined}>
+          <FieldRow
+            nodeId={nodeId}
+            attrDefId={f.attrDefId}
+            attrDefName={f.attrDefName}
+            tupleId={f.tupleId}
+            valueNodeId={f.valueNodeId}
+            valueName={f.valueName}
+            dataType={f.dataType}
+            assocDataId={f.assocDataId}
+            trashed={f.trashed}
+          />
+        </div>
       ))}
       <div className="border-b border-border-subtle" />
     </div>

@@ -10,6 +10,7 @@ import { useMemo } from 'react';
 import { useNodeStore } from '../stores/node-store';
 import { resolveDataType, resolveHideField, resolveRequired, ATTRDEF_CONFIG_MAP, ATTRDEF_CONFIG_FIELDS, ATTRDEF_OUTLINER_FIELDS, TAGDEF_CONFIG_MAP, TAGDEF_CONFIG_FIELDS, TAGDEF_OUTLINER_FIELDS, SYSTEM_FIELD_MAP, resolveSystemFieldValue, type ConfigFieldDef } from '../lib/field-utils.js';
 import type { NodexNode } from '../types/index.js';
+import { SYS_V } from '../types/index.js';
 
 export interface FieldEntry {
   attrDefId: string;
@@ -27,6 +28,8 @@ export interface FieldEntry {
   isEmpty?: boolean;
   /** True when the attrDef config marks this field as required */
   isRequired?: boolean;
+  /** Nesting depth for config fields (0 = top level). */
+  depth?: number;
 }
 
 /** Check if a visibleWhen condition is satisfied by looking at sibling config tuples. */
@@ -84,7 +87,7 @@ function computeFields(entities: Record<string, NodexNode>, nodeId: string): Fie
     if (isTagDef) {
       const configDef = TAGDEF_CONFIG_MAP.get(keyId);
       if (configDef) {
-        // Check visibleWhen condition
+        // Check visibleWhen condition (e.g. NDX_A06 depends on SYS_A55)
         if (configDef.visibleWhen && !isVisibleWhenSatisfied(configDef.visibleWhen, node, entities)) {
           continue;
         }
@@ -94,7 +97,27 @@ function computeFields(entities: Record<string, NodexNode>, nodeId: string): Fie
           tupleId: childId,
           valueName: child.children[1],
           dataType: `__${configDef.control}__`,
+          depth: 0,
         });
+
+        // Recursive: emit nested config children when toggle is ON
+        if (child.children[1] === SYS_V.YES && child.children.length > 2) {
+          for (const nestedId of child.children) {
+            const nested = entities[nestedId];
+            if (!nested?.children?.length || nested.props._docType !== 'tuple') continue;
+            const nestedKeyId = nested.children[0];
+            const nestedConfigDef = TAGDEF_CONFIG_MAP.get(nestedKeyId);
+            if (!nestedConfigDef) continue;
+            fields.push({
+              attrDefId: nestedKeyId,
+              attrDefName: nestedConfigDef.name,
+              tupleId: nestedId,
+              valueName: nested.children[1],
+              dataType: `__${nestedConfigDef.control}__`,
+              depth: 1,
+            });
+          }
+        }
         continue;
       }
     }

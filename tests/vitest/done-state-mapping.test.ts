@@ -35,9 +35,10 @@ function makeNode(id: string, overrides: Partial<NodexNode> = {}): NodexNode {
 }
 
 /**
- * Build a full entity graph with new multi-value format:
+ * Build a full entity graph with new nested format:
  * - node n1 tagged with tagDef1
- * - tagDef1 has SYS_A55=YES (checkbox) + NDX_A06 toggle + NDX_A07/NDX_A08 mapping tuples
+ * - tagDef1 has SYS_A55=YES (checkbox) + NDX_A06 toggle tuple
+ *   - NDX_A06 toggle tuple has nested NDX_A07/NDX_A08 mapping tuples as children
  * - attrDef_status with options opt_done / opt_todo / opt_in_progress
  * - n1 has field tuple for attrDef_status + associatedData
  */
@@ -65,14 +66,11 @@ function buildDoneStateMappingEntities(opts?: {
     children: [SYS_A.TYPE_CHOICE, 'SYS_D12'],
   });
 
-  // TagDef with done-state mapping (new format)
+  // TagDef with done-state mapping (nested format)
+  // NDX_A07/A08 are children of the NDX_A06 toggle tuple, NOT direct children of tagDef
   const tagDefChildren: string[] = ['cfg_cb', 'tpl_status'];
   if (!opts?.skipMapping) {
     tagDefChildren.push('cfg_done_toggle');
-    const checkedIds = opts?.checkedOptionIds ?? ['opt_done'];
-    const uncheckedIds = opts?.uncheckedOptionIds ?? [];
-    checkedIds.forEach((_, i) => tagDefChildren.push(`cfg_done_checked_${i}`));
-    uncheckedIds.forEach((_, i) => tagDefChildren.push(`cfg_done_unchecked_${i}`));
   }
 
   entities['tagDef1'] = makeNode('tagDef1', {
@@ -89,24 +87,29 @@ function buildDoneStateMappingEntities(opts?: {
   });
 
   if (!opts?.skipMapping) {
-    // Toggle tuple
+    // Build toggle tuple children: [key, value, ...nestedMappingIds]
+    const toggleChildren: string[] = [SYS_A.DONE_STATE_MAPPING, opts?.toggleOff ? SYS_V.NO : SYS_V.YES];
+    const checkedIds = opts?.checkedOptionIds ?? ['opt_done'];
+    const uncheckedIds = opts?.uncheckedOptionIds ?? [];
+    checkedIds.forEach((_, i) => toggleChildren.push(`cfg_done_checked_${i}`));
+    uncheckedIds.forEach((_, i) => toggleChildren.push(`cfg_done_unchecked_${i}`));
+
+    // Toggle tuple with nested mapping children
     entities['cfg_done_toggle'] = makeNode('cfg_done_toggle', {
       props: { created: 1, _docType: 'tuple' as DocType },
-      children: [SYS_A.DONE_STATE_MAPPING, opts?.toggleOff ? SYS_V.NO : SYS_V.YES],
+      children: toggleChildren,
     });
-    // Checked mapping tuples
-    const checkedIds = opts?.checkedOptionIds ?? ['opt_done'];
+    // Checked mapping tuples (nested under toggle)
     checkedIds.forEach((optId, i) => {
       entities[`cfg_done_checked_${i}`] = makeNode(`cfg_done_checked_${i}`, {
-        props: { created: 1, _docType: 'tuple' as DocType },
+        props: { created: 1, _docType: 'tuple' as DocType, _ownerId: 'cfg_done_toggle' },
         children: [SYS_A.DONE_MAP_CHECKED, 'attrDef_status', optId],
       });
     });
-    // Unchecked mapping tuples
-    const uncheckedIds = opts?.uncheckedOptionIds ?? [];
+    // Unchecked mapping tuples (nested under toggle)
     uncheckedIds.forEach((optId, i) => {
       entities[`cfg_done_unchecked_${i}`] = makeNode(`cfg_done_unchecked_${i}`, {
-        props: { created: 1, _docType: 'tuple' as DocType },
+        props: { created: 1, _docType: 'tuple' as DocType, _ownerId: 'cfg_done_toggle' },
         children: [SYS_A.DONE_MAP_UNCHECKED, 'attrDef_status', optId],
       });
     });
@@ -547,6 +550,42 @@ describe('Store: selectFieldOption → checkbox update (UI path)', () => {
     const state = useNodeStore.getState().entities;
     expect(state['assoc_status'].children).toEqual(['opt_done']);
     expect(state['assoc_status'].children).not.toContain('opt_todo');
+  });
+});
+
+describe('Nested structure: collectNewMappings scans toggle children', () => {
+  it('toggle ON → collectNewMappings finds NDX_A07/A08 in toggle.children', () => {
+    const entities = buildDoneStateMappingEntities({ uncheckedOptionIds: ['opt_todo'] });
+    const mappings = getDoneStateMappings('n1', entities);
+    expect(mappings).toHaveLength(1);
+    expect(mappings[0].checkedOptionIds).toEqual(['opt_done']);
+    expect(mappings[0].uncheckedOptionIds).toEqual(['opt_todo']);
+  });
+
+  it('toggle OFF → nested children exist but mappings not returned', () => {
+    const entities = buildDoneStateMappingEntities({ toggleOff: true, uncheckedOptionIds: ['opt_todo'] });
+    // Toggle is OFF so hasDoneMappingEnabled returns false
+    expect(getDoneStateMappings('n1', entities)).toEqual([]);
+  });
+
+  it('nested structure inherits via Extend chain', () => {
+    const entities = buildDoneStateMappingEntities({ uncheckedOptionIds: ['opt_todo'] });
+    // Create child tag that extends tagDef1
+    entities['childTag'] = makeNode('childTag', {
+      props: { created: 1, _docType: 'tagDef' as DocType },
+      children: ['childTag_extends'],
+    });
+    entities['childTag_extends'] = makeNode('childTag_extends', {
+      props: { created: 1, _docType: 'tuple' as DocType },
+      children: [SYS_A.EXTENDS, 'tagDef1'],
+    });
+    entities['tuple_tag'].children = [SYS_A.NODE_SUPERTAGS, 'childTag'];
+
+    const mappings = getDoneStateMappings('n1', entities);
+    expect(mappings).toHaveLength(1);
+    expect(mappings[0].tagDefId).toBe('tagDef1');
+    expect(mappings[0].checkedOptionIds).toEqual(['opt_done']);
+    expect(mappings[0].uncheckedOptionIds).toEqual(['opt_todo']);
   });
 });
 

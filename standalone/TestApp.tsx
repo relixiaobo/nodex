@@ -41,6 +41,19 @@ function seedWorkspaceContainers(wsId: string, userId: string) {
   }
 }
 
+/** Map port → agent identity for visual differentiation */
+const AGENT_BY_PORT: Record<string, { name: string; color: string }> = {
+  '5199': { name: 'nodex', color: '#6366f1' },       // indigo
+  '5200': { name: 'nodex-codex', color: '#f59e0b' },  // amber
+  '5201': { name: 'nodex-cc', color: '#10b981' },     // emerald
+  '5202': { name: 'nodex-cc-2', color: '#ef4444' },   // red
+};
+
+function getAgentInfo() {
+  const port = window.location.port;
+  return AGENT_BY_PORT[port] ?? { name: `port:${port}`, color: '#6b7280' };
+}
+
 function useTestBootstrap() {
   const [ready, setReady] = useState(false);
   const wsId = useWorkspaceStore((s) => s.currentWorkspaceId);
@@ -73,6 +86,10 @@ function useTestBootstrap() {
       __wsStore: useWorkspaceStore,
     });
 
+    // Set tab title to agent name for easy identification
+    const agent = getAgentInfo();
+    document.title = `Nodex [${agent.name}]`;
+
     setReady(true);
   }, []);
 
@@ -91,11 +108,32 @@ export function TestApp() {
     );
   }
 
+  const agent = getAgentInfo();
+
   return (
     <div className="flex h-screen w-full overflow-hidden bg-background text-foreground">
       {sidebarOpen && <Sidebar />}
       <PanelStack />
       <CommandPalette />
+      {/* Agent badge — fixed top-right corner */}
+      <div
+        style={{
+          position: 'fixed',
+          top: 6,
+          right: 6,
+          backgroundColor: agent.color,
+          color: '#fff',
+          fontSize: 11,
+          fontWeight: 600,
+          padding: '2px 8px',
+          borderRadius: 4,
+          zIndex: 9999,
+          opacity: 0.85,
+          pointerEvents: 'none',
+        }}
+      >
+        {agent.name}
+      </div>
     </div>
   );
 }

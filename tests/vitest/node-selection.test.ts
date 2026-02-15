@@ -161,7 +161,7 @@ describe('node selection (Phase 1)', () => {
       expect(useUIStore.getState().focusedNodeId).toBeNull();
     });
 
-    it('simulates ↑/↓ navigation in selection mode', () => {
+    it('simulates ↑/↓ in selection mode → exits selection, enters edit on adjacent node', () => {
       const entities = useNodeStore.getState().entities;
       const expandedNodes = new Set<string>();
       const inboxChildren = entities.ws_default_INBOX?.children ?? [];
@@ -174,17 +174,24 @@ describe('node selection (Phase 1)', () => {
       useUIStore.getState().setSelectedNode(first.nodeId, first.parentId);
       expect(useUIStore.getState().selectedNodeId).toBe(first.nodeId);
 
-      // Arrow down → select next
+      // Arrow down → exit selection, enter edit on next node
       const next = getNextVisibleNode(first.nodeId, first.parentId, flatList);
       expect(next).not.toBeNull();
+      // Simulate: setFocusedNode (not setSelectedNode) — clears selection, enters edit
+      useUIStore.getState().setFocusedNode(next!.nodeId, next!.parentId);
+      expect(useUIStore.getState().focusedNodeId).toBe(next!.nodeId);
+      expect(useUIStore.getState().selectedNodeId).toBeNull(); // selection cleared
+
+      // Re-select next node via Escape
       useUIStore.getState().setSelectedNode(next!.nodeId, next!.parentId);
       expect(useUIStore.getState().selectedNodeId).toBe(next!.nodeId);
 
-      // Arrow up → back to first
+      // Arrow up → exit selection, enter edit on previous (first) node
       const prev = getPreviousVisibleNode(next!.nodeId, next!.parentId, flatList);
       expect(prev).not.toBeNull();
-      useUIStore.getState().setSelectedNode(prev!.nodeId, prev!.parentId);
-      expect(useUIStore.getState().selectedNodeId).toBe(first.nodeId);
+      useUIStore.getState().setFocusedNode(prev!.nodeId, prev!.parentId);
+      expect(useUIStore.getState().focusedNodeId).toBe(first.nodeId);
+      expect(useUIStore.getState().selectedNodeId).toBeNull(); // selection cleared
     });
   });
 });

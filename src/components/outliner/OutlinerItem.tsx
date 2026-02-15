@@ -404,18 +404,20 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       }
 
       // ── General selection actions (all nodes) ──
+      // ↑/↓ in selection mode: EXIT selection, ENTER EDIT on adjacent node
+      // (Tana/Atomia behavior — arrows don't move selection ring)
       if (e.key === 'ArrowUp') {
         e.preventDefault();
         const flatList = getFlattenedVisibleNodes(rootChildIds, entities, expandedNodes, rootNodeId);
         const prev = getPreviousVisibleNode(nodeId, parentId, flatList);
-        if (prev) setSelectedNode(prev.nodeId, prev.parentId);
+        if (prev) setFocusedNode(prev.nodeId, prev.parentId);
         return;
       }
       if (e.key === 'ArrowDown') {
         e.preventDefault();
         const flatList = getFlattenedVisibleNodes(rootChildIds, entities, expandedNodes, rootNodeId);
         const next = getNextVisibleNode(nodeId, parentId, flatList);
-        if (next) setSelectedNode(next.nodeId, next.parentId);
+        if (next) setFocusedNode(next.nodeId, next.parentId);
         return;
       }
       if (e.key === 'Enter') {

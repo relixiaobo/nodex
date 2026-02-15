@@ -63,10 +63,10 @@ interface UIStore {
   editingFieldNameId: string | null;
   setEditingFieldName(tupleId: string | null): void;
 
-  // Trigger hint: set by TrailingInput when creating a node with trigger char (#/@)
+  // Trigger hint: set by TrailingInput when creating a node with trigger char (#/@/)
   // OutlinerItem reads & clears this to open the appropriate dropdown on mount
-  triggerHint: '#' | '@' | null;
-  setTriggerHint(hint: '#' | '@' | null): void;
+  triggerHint: '#' | '@' | '/' | null;
+  setTriggerHint(hint: '#' | '@' | '/' | null): void;
 
   // Text offset for cursor positioning (consumed by matching NodeEditor on mount)
   focusClickCoords: { nodeId: string; parentId: string | null; textOffset: number } | null;

@@ -101,7 +101,7 @@ npm run test:run
 
 **测试文件**: `tests/vitest/preflight.test.ts`
 
-**期望**: 种子数据加载成功（60+ 节点），workspace = `ws_default`，默认 panel = `ws_default_LIBRARY`
+**期望**: 种子数据加载成功（80+ 节点），workspace = `ws_default`，默认 panel = `ws_default_LIBRARY`
 
 如果失败，检查：
 - dev server 是否启动 (`npm run dev:test`)
@@ -523,11 +523,45 @@ hash trigger cleanup safety（2 cases, Bug #53 回归）:
 
 **覆盖点**:
 
-1. `filterSlashCommands` 按命令名和关键词过滤
-2. 空 query 返回全量基线命令列表（10 项）
-3. `getFirstEnabledSlashIndex` 跳过禁用项返回首个可用索引
+1. `filterSlashCommands` 按命令名和关键词过滤（含 `clip_page`）
+2. 空 query 返回全量基线命令列表（11 项）
+3. `getFirstEnabledSlashIndex` 跳过禁用项返回首个可用索引（`clip_page`）
 4. `getNextEnabledSlashIndex` 仅在 enabled 项间上下移动，边界 clamp
 5. 全部禁用时返回 `-1`
+
+### 1.38 Web Clip 落库服务
+
+**测试文件**: `tests/vitest/webclip-service.test.ts`
+
+**覆盖点**:
+
+findTagDefByName（4 cases）:
+1. 按名称查找已有 tagDef（大小写不敏感）
+2. 不同大小写匹配
+3. 不存在的 tagDef 返回 undefined
+4. 不存在的 schema 返回 undefined
+
+findTemplateAttrDef（3 cases）:
+5. 在 tagDef 模板中查找 attrDef
+6. 不存在的字段名返回 undefined
+7. 不存在的 tagDef 返回 undefined
+
+saveWebClip（8 cases）:
+8. 在 Inbox 创建节点（默认 parentId，title + ownerId 正确）
+9. 在自定义 parentId 下创建节点（非 Inbox）
+10. 自动打 `#web_clip` 标签（复用已有 tagDef）
+11. 写入 Source URL 字段值
+12. 设置 description（如有）
+13. description 为空时不写入
+14. 首次剪藏时自动创建 tagDef
+15. 重复剪藏复用同一 tagDef
+
+applyWebClipToNode（5 cases）:
+16. 就地改名为页面标题
+17. 就地打 `#web_clip` 标签
+18. 就地写入 Source URL 字段值
+19. 就地设置 description
+20. 不改变节点 ownership（留在原父节点）
 
 ---
 
@@ -607,6 +641,7 @@ hash trigger cleanup safety（2 cases, Bug #53 回归）:
 | 1.35 | 节点搜索 SKIP_DOC_TYPES 过滤 | PASS/FAIL |
 | 1.36 | Workspace Store 认证状态与持久化 | PASS/FAIL |
 | 1.37 | Slash Command 注册与导航 | PASS/FAIL |
+| 1.38 | Web Clip 落库服务 | PASS/FAIL |
 | 2 | 视觉渲染 | PASS/FAIL/SKIP |
 | 3 | 扩展构建 | PASS/FAIL |
 
@@ -627,18 +662,19 @@ hash trigger cleanup safety（2 cases, Bug #53 回归）:
 ## Seed Data 速查
 
 ```
-总数: 68 节点
+总数: ~85 节点
 
 Library:    proj_1, task_1~3, subtask_1a~1b, subtask_2a~2c,
             note_1, note_1a~1c, note_2, idea_1~2,
             note_rich, rich_1~5
-Inbox:      inbox_1~3, inbox_3a~3b
+Inbox:      inbox_1~3, inbox_3a~3b, webclip_1
 Journal:    journal_1, j_1~3
 Containers: ws_default_LIBRARY, ws_default_INBOX, ws_default_JOURNAL,
             ws_default_SEARCHES, ws_default_TRASH, ws_default_SCHEMA
-Schema:     tagDef_task, tagDef_person,
-            attrDef_status/priority/due/email/company + type tuples + option nodes
+Schema:     tagDef_task, tagDef_person, tagDef_dev_task, tagDef_web_clip,
+            attrDef_status/priority/due/email/company/source_url + type tuples + option nodes
 Pre-tagged: task_1 → #Task (meta_task_1, field tuples, associatedData, checkbox=YES)
+            webclip_1 → #web_clip (Source URL = https://medium.com/example-article)
 
 默认展开: proj_1, task_1, task_2, note_rich
 ```

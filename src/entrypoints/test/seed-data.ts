@@ -72,13 +72,13 @@ export function seedTestData() {
   // ─── Container nodes ───
   const containers = [
     makeNode(libraryId, 'Library', WS_ID, ['proj_1', 'person_1', 'note_1', 'note_2', 'note_rich']),
-    makeNode(inboxId, 'Inbox', WS_ID, ['inbox_1', 'inbox_2', 'inbox_3']),
+    makeNode(inboxId, 'Inbox', WS_ID, ['inbox_1', 'inbox_2', 'inbox_3', 'webclip_1']),
     makeNode(journalId, 'Journal', WS_ID, ['journal_1']),
     makeNode(searchesId, 'Searches', WS_ID, []),
     makeNode(trashId, 'Trash', WS_ID, []),
     makeNode(schemaId, 'Schema', WS_ID, [
       'SYS_T01', 'SYS_T02',
-      'tagDef_task', 'tagDef_person', 'tagDef_dev_task',
+      'tagDef_task', 'tagDef_person', 'tagDef_dev_task', 'tagDef_web_clip',
     ]),
   ];
 
@@ -485,6 +485,82 @@ export function seedTestData() {
     makeNode('meta_tagDef_dev_task_extends', '', 'meta_tagDef_dev_task', [SYS_A.EXTENDS, 'tagDef_task'], 'tuple'),
   ];
 
+  // ─── TagDef: web_clip (for web clipping) ───
+
+  // AttrDef: Source URL (URL type)
+  const attrDefSourceUrlNodes: NodexNode[] = [
+    makeNode('attrDef_source_url', 'Source URL', 'webClipField_source_url', [
+      'attrDef_source_url_type', 'attrDef_source_url_autocollect', 'attrDef_source_url_autoinit',
+      'attrDef_source_url_required', 'attrDef_source_url_hide',
+    ], 'attrDef'),
+    makeNode('attrDef_source_url_type', '', 'attrDef_source_url', [SYS_A.TYPE_CHOICE, SYS_D.URL], 'tuple'),
+    makeNode('attrDef_source_url_autocollect', '', 'attrDef_source_url', [SYS_A.AUTOCOLLECT_OPTIONS, SYS_V.YES], 'tuple'),
+    makeNode('attrDef_source_url_autoinit', '', 'attrDef_source_url', [SYS_A.AUTO_INITIALIZE, SYS_V.NO], 'tuple'),
+    makeNode('attrDef_source_url_required', '', 'attrDef_source_url', [SYS_A.NULLABLE, SYS_V.NO], 'tuple'),
+    makeNode('attrDef_source_url_hide', '', 'attrDef_source_url', [SYS_A.HIDE_FIELD, SYS_V.NEVER], 'tuple'),
+  ];
+  attrDefSourceUrlNodes[0].props._metaNodeId = 'meta_attrDef_source_url';
+  attrDefSourceUrlNodes[1].props._sourceId = 'sysT02_tpl_type';
+  attrDefSourceUrlNodes[2].props._sourceId = 'sysT02_tpl_autocollect';
+  attrDefSourceUrlNodes[3].props._sourceId = 'sysT02_tpl_autoinit';
+  attrDefSourceUrlNodes[4].props._sourceId = 'sysT02_tpl_required';
+  attrDefSourceUrlNodes[5].props._sourceId = 'sysT02_tpl_hide';
+
+  const attrDefSourceUrlMetanodes: NodexNode[] = [
+    makeNode('meta_attrDef_source_url', '', 'attrDef_source_url', ['meta_attrDef_source_url_tag'], 'metanode'),
+    makeNode('meta_attrDef_source_url_tag', '', 'meta_attrDef_source_url', [SYS_A.NODE_SUPERTAGS, 'SYS_T02'], 'tuple'),
+  ];
+
+  // TagDef: web_clip
+  const tagDefWebClipNodes = [
+    makeNode('tagDef_web_clip', 'web_clip', schemaId, [
+      'tagDef_web_clip_cfg_checkbox', 'tagDef_web_clip_cfg_childtag',
+      'tagDef_web_clip_cfg_color', 'tagDef_web_clip_cfg_extends',
+      'webClipField_source_url',
+    ], 'tagDef'),
+    makeNode('webClipField_source_url', '', 'tagDef_web_clip', ['attrDef_source_url'], 'tuple'),
+  ];
+  tagDefWebClipNodes[0].props._metaNodeId = 'meta_tagDef_web_clip';
+
+  const tagDefWebClipConfigNodes: NodexNode[] = [
+    makeNode('tagDef_web_clip_cfg_checkbox', '', 'tagDef_web_clip', [SYS_A.SHOW_CHECKBOX, SYS_V.NO], 'tuple'),
+    makeNode('tagDef_web_clip_cfg_childtag', '', 'tagDef_web_clip', [SYS_A.CHILD_SUPERTAG], 'tuple'),
+    makeNode('tagDef_web_clip_cfg_color', '', 'tagDef_web_clip', [SYS_A.COLOR], 'tuple'),
+    makeNode('tagDef_web_clip_cfg_extends', '', 'tagDef_web_clip', [SYS_A.EXTENDS], 'tuple'),
+  ];
+  tagDefWebClipConfigNodes[0].props._sourceId = 'sysT01_tpl_checkbox';
+  tagDefWebClipConfigNodes[1].props._sourceId = 'sysT01_tpl_childtag';
+  tagDefWebClipConfigNodes[2].props._sourceId = 'sysT01_tpl_color';
+  tagDefWebClipConfigNodes[3].props._sourceId = 'sysT01_tpl_extends';
+
+  const tagDefWebClipMetanodes: NodexNode[] = [
+    makeNode('meta_tagDef_web_clip', '', 'tagDef_web_clip', ['meta_tagDef_web_clip_tag'], 'metanode'),
+    makeNode('meta_tagDef_web_clip_tag', '', 'meta_tagDef_web_clip', [SYS_A.NODE_SUPERTAGS, SYS_T.SUPERTAG], 'tuple'),
+  ];
+
+  // ─── Sample web clip node (pre-tagged) ───
+  const webclip1Nodes: NodexNode[] = [
+    {
+      ...makeNode('webclip_1', 'Example Article — Medium', inboxId, [
+        'webclip1_fld_source_url',
+      ]),
+      props: {
+        ...makeNode('webclip_1', 'Example Article — Medium', inboxId).props,
+        description: 'A sample web clip to demonstrate the clipping feature',
+        _metaNodeId: 'meta_webclip_1',
+      },
+      associationMap: {
+        webclip1_fld_source_url: 'webclip1_assoc_source_url',
+      },
+    },
+    makeNode('meta_webclip_1', '', 'webclip_1', ['meta_webclip_1_tag'], 'metanode'),
+    makeNode('meta_webclip_1_tag', '', 'meta_webclip_1', [SYS_A.NODE_SUPERTAGS, 'tagDef_web_clip'], 'tuple'),
+    makeNode('webclip1_fld_source_url', '', 'webclip_1', ['attrDef_source_url', 'webclip1_val_url'], 'tuple'),
+    makeNode('webclip1_val_url', 'https://medium.com/example-article', 'webclip1_assoc_source_url'),
+    makeNode('webclip1_assoc_source_url', '', 'webclip_1', ['webclip1_val_url'], 'associatedData'),
+  ];
+  webclip1Nodes[3].props._sourceId = 'webClipField_source_url';
+
   // Set description on tagDef nodes
   tagDefPersonNodes[0].props.description = 'Tag for tracking people and their contact info';
   tagDefDevTaskNodes[0].props.description = 'Dev task extending Task with a Branch field';
@@ -594,6 +670,12 @@ export function seedTestData() {
     ...tagDefDevTaskConfigNodes,
     ...tagDefMetanodes,
     ...tagDefDevTaskMetanodes,
+    ...attrDefSourceUrlNodes,
+    ...attrDefSourceUrlMetanodes,
+    ...tagDefWebClipNodes,
+    ...tagDefWebClipConfigNodes,
+    ...tagDefWebClipMetanodes,
+    ...webclip1Nodes,
     ...task1MetanodeNodes,
     ...task1FieldNodes,
     ...person1MetanodeNodes,

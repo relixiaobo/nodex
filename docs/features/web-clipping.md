@@ -1,17 +1,22 @@
 # Feature: 网页剪藏
 
-> Phase 3 | 部分实现 | 提取链路已验证，落库阶段暂缓（等待 Supertag Extend）
+> Phase 3 | V1 落库完成 | 提取→落库→导航 全链路可用
 
 ## 概述
 
 Chrome Side Panel 的核心场景：用户浏览网页时，将内容剪藏为 Nodex 节点。剪藏结果是一个普通节点，通过 Supertag + Field 携带来源元数据，并支持 Read Later（正文大纲化）。
 
-## 当前实现状态（2026-02-14）
+## 当前实现状态（2026-02-15）
 
 - ✅ Side Panel -> Background -> Content Script 消息链路已打通
-- ✅ Content Script 已切换为 `defuddle` 提取，且不再保留 `innerText` fallback
-- ✅ `Capture Tab` 当前行为为：复制 `defuddle` 返回的原始 `content` 到剪贴板（用于验证提取质量）
-- ⏸️ 节点落库（创建节点、打 `#web_clip`、写 `Source URL`）暂缓，等待 Supertag Extend 落地后继续
+- ✅ Content Script 已切换为 `defuddle` 提取，提取 title/url/content/author/published/description/siteName
+- ✅ `/clip` 斜杠命令完成全链路：提取 → 将**当前节点**就地转为 clip 节点（改名 + 打标签 + 写字段），不切换页面
+- ✅ `saveWebClip()` 支持自定义 `parentId` 参数（默认 Inbox）
+- ✅ `#web_clip` tagDef + `Source URL` attrDef 首次剪藏时 find-or-create（惰性创建）
+- ✅ 页面 description（如有）写入节点 description
+- ✅ 种子数据包含 `#web_clip` tagDef + 示例剪藏节点
+- ✅ Vitest 测试覆盖 `findTagDefByName`/`findTemplateAttrDef`/`saveWebClip`（15 cases）
+- ✅ Sidebar "Clip Page" 按钮已移除，入口迁移至 slash command
 
 ## 前因后果（决策演进）
 
@@ -36,15 +41,15 @@ Chrome Side Panel 的核心场景：用户浏览网页时，将内容剪藏为 N
 
 **兼容策略**：`NodexNode.sourceUrl` 和 DB `source_url` 先保留，避免一次性迁移风险；V1 剪藏逻辑不再写入，后续单独清理。
 
-### 标签体系：`#web_clip` 作为系统预置 Base Type（目标）
+### 标签体系：`#web_clip` 单标签（V1）
 
-**目标模型**：
+**V1 设计**：
+- 仅打 `#web_clip` 单标签，不做子类型 auto-detect
+- Supertag Extend 已就绪，但无子类型标签需求时不引入
+
+**目标模型（V2+）**：
 - `#web_clip`：系统预置 base type，承载剪藏通用字段（如 Source URL）
 - `#article` / `#video` / `#tweet` ...：作为子类型标签，`extend #web_clip`
-
-**现阶段过渡方案（Extend 尚未实现）**：
-- V1 剪藏时同时打两个标签：`#web_clip + #article|#video|#tweet...`
-- 等 Supertag Extend 落地后，收敛为只打子类型标签
 
 ### 去重策略：不去重
 
@@ -77,7 +82,7 @@ tagDef_tweet      extends #web_clip
 ...
 ```
 
-> V1：Extend 未实现，剪藏时通过双标签模拟继承效果。
+> V1：仅使用 `#web_clip` 单标签。子类型标签留 V2。
 
 ### 字段定义（V1 极简）
 
@@ -94,31 +99,23 @@ clip_node
   props: { name: '页面标题', description: '页面摘要（可选）' }
   _metaNodeId → metanode
     children:
-      - tuple [SYS_A13, tagDef_webclip]
-      - tuple [SYS_A13, tagDef_article]     ← 示例：按页面类型自动选择
+      - tuple [SYS_A13, tagDef_web_clip]
   children:
-    - tuple [attrDef_source_url]            ← Source URL 字段
-    - tuple [attrDef_author]                ← 可选
-    - tuple [attrDef_published_at]          ← 可选
-    - '剪藏正文内容节点...'                  ← Read Later 大纲
+    - tuple [attrDef_source_url, valueNode]  ← Source URL 字段（含值）
+    - (V2: 正文内容子节点)
 ```
 
-## 剪藏流程（V1 草案）
+## 剪藏流程（V1 实现）
 
-1. 用户在网页上触发剪藏（Side Panel 按钮 / 右键菜单 / 快捷键）
-2. Content Script 提取页面信息（标题、URL、选中文本/全文）
-3. Content Script 发送消息到 Background（`chrome.runtime.sendMessage`）
-4. Background 统一编排创建节点：
-   - `name` = 页面标题
-   - `description` = 页面摘要（可选）
-   - 自动判别类型并打标签：`#web_clip + #article|#video|#tweet...`
-   - `applyTag(tagDef_webclip)` 后设置 `Source URL` 字段值
-   - 设置 `Author` / `Published At`（可选）
-   - 正文内容转为子节点
-5. Background 通知 Side Panel 刷新并定位新节点
-6. 节点默认出现在 Inbox（或用户配置的目标位置）
-
-> 说明：当前代码实现仅用于提取质量验证，输出目标是剪贴板；上述“创建节点 + 打标签 + 写字段”流程尚未接入。
+1. 用户在编辑器中输入 `/clip`，从 slash command 菜单选择 "Clip Page"
+2. Side Panel → Background → Content Script 消息链路提取页面元数据
+3. `applyWebClipToNode()` 就地转换当前节点：
+   - Find-or-create `#web_clip` tagDef + `Source URL` attrDef
+   - `updateNodeName(nodeId, title)` 将当前节点改名为页面标题
+   - `applyTag(tagDef_web_clip)` 打标签（创建 metanode + 实例化模板字段）
+   - `setFieldValue(sourceUrlAttrDefId, url)` 写 Source URL 值
+   - 如有 description，`updateNodeDescription()` 写入
+4. 保持当前页面状态不变（不导航、不创建新节点）
 
 ## 失败样本池（解析优化）
 
@@ -137,12 +134,14 @@ clip_node
 
 ## 待定事项
 
+- 正文 → 子节点（V2）：提取正文内容转为 outliner 子节点树
+- 子类型标签（V2）：`#article`/`#video`/`#tweet` extend `#web_clip`，auto-detect
+- Author/Published At 字段（V2）：payload 已提取 author/published，待加字段
 - 正文提取优化：`defuddle` 参数调优、站点特化提取规则、失败样本池策略
 - 剪藏模式：全页 / 选中文本 / 简化阅读模式
-- 正文落地格式：原始 HTML 分块 / 结构化段落分块（目标为 outliner/node）
 - AI 摘要：是否自动写入 `description`
 - 离线队列：无网络时暂存，上线后同步
-- Extend 实现后的迁移策略（双标签 -> 继承）
+- Toast 组件升级：当前复用 sidebar status 文本，后续引入 sonner 等 toast 库
 
 ## 决策记录
 
@@ -157,3 +156,9 @@ clip_node
 | 2026-02-14 | 提取器统一为 `defuddle`，不再保留 `innerText` fallback | 避免双路径行为差异，先聚焦提取质量基线 |
 | 2026-02-14 | 当前验收路径为“复制 `defuddle` 原始 content 到剪贴板” | 在落库前先观察真实提取结果，减少后续返工 |
 | 2026-02-14 | 网页剪藏落库阶段暂缓，等待 Supertag Extend 完成 | 避免在双标签过渡方案上过早固化实现 |
+| 2026-02-15 | V1 落库：单标签 `#web_clip` + `Source URL` 字段，惰性创建 tagDef | Extend 已就绪但无子类型需求，单标签最简可用 |
+| 2026-02-15 | 编排逻辑抽取为 `webclip-service.ts`（纯函数 + store 接口） | 可测试、可复用，不依赖 Chrome API |
+| 2026-02-15 | 内容暂不转子节点，仅保存 title+URL+description | V1 最小交付，正文子节点留 V2 |
+| 2026-02-15 | 入口从 Sidebar 按钮迁移到 `/clip` slash command | 减少 Sidebar 按钮堆积，就地操作更自然 |
+| 2026-02-15 | `/clip` 就地转换当前节点（改名+打标签+写字段），不创建新节点 | 最简交互：当前节点即 clip 节点 |
+| 2026-02-15 | `saveWebClip` 新增可选 `parentId` 参数（默认 Inbox） | 支持 slash command 从任意节点触发剪藏 |

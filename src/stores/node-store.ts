@@ -1084,14 +1084,28 @@ export const useNodeStore = create<NodeStore>()(
     createAttrDef: async (name, tagDefId, dataType, workspaceId, userId) => {
       const attrDefId = nanoid();
       const typeTupleId = nanoid();
+      const autoInitTupleId = nanoid();
+      const requiredTupleId = nanoid();
+      const hideTupleId = nanoid();
       const templateTupleId = nanoid();
       const now = Date.now();
+
+      const makeTuple = (id: string, children: string[]): NodexNode => ({
+        id,
+        workspaceId,
+        props: { created: now, name: '', _ownerId: attrDefId, _docType: 'tuple' as const },
+        children,
+        version: 1,
+        updatedAt: now,
+        createdBy: userId,
+        updatedBy: userId,
+      });
 
       const attrDef: NodexNode = {
         id: attrDefId,
         workspaceId,
         props: { created: now, name, _ownerId: templateTupleId, _docType: 'attrDef' },
-        children: [typeTupleId],
+        children: [typeTupleId, autoInitTupleId, requiredTupleId, hideTupleId],
         version: 1,
         updatedAt: now,
         createdBy: userId,
@@ -1102,17 +1116,11 @@ export const useNodeStore = create<NodeStore>()(
         // AttrDef node
         state.entities[attrDefId] = attrDef;
 
-        // Type tuple: [SYS_A02, dataType]
-        state.entities[typeTupleId] = {
-          id: typeTupleId,
-          workspaceId,
-          props: { created: now, name: '', _ownerId: attrDefId, _docType: 'tuple' },
-          children: [SYS_A.TYPE_CHOICE, dataType],
-          version: 1,
-          updatedAt: now,
-          createdBy: userId,
-          updatedBy: userId,
-        };
+        // Config tuples with default values
+        state.entities[typeTupleId] = makeTuple(typeTupleId, [SYS_A.TYPE_CHOICE, dataType]);
+        state.entities[autoInitTupleId] = makeTuple(autoInitTupleId, [SYS_A.AUTO_INITIALIZE, SYS_V.NO]);
+        state.entities[requiredTupleId] = makeTuple(requiredTupleId, [SYS_A.NULLABLE, SYS_V.NO]);
+        state.entities[hideTupleId] = makeTuple(hideTupleId, [SYS_A.HIDE_FIELD, SYS_V.NEVER]);
 
         // Template tuple in tagDef: [attrDefId]
         state.entities[templateTupleId] = {
@@ -1173,10 +1181,11 @@ export const useNodeStore = create<NodeStore>()(
           } else {
             // Create new value node
             valueNodeId = nanoid();
+            const assocId = node.associationMap?.[tupleId];
             state.entities[valueNodeId] = {
               id: valueNodeId,
               workspaceId,
-              props: { created: now, name: valueText, _ownerId: nodeId },
+              props: { created: now, name: valueText, _ownerId: assocId ?? nodeId },
               children: [],
               version: 1,
               updatedAt: now,
@@ -1185,6 +1194,15 @@ export const useNodeStore = create<NodeStore>()(
             };
             if (!tuple.children) tuple.children = [attrDefId];
             tuple.children[1] = valueNodeId;
+
+            // Also add to associatedData.children so FieldValueOutliner renders it
+            const assoc = assocId ? state.entities[assocId] : undefined;
+            if (assoc) {
+              if (!assoc.children) assoc.children = [];
+              if (!assoc.children.includes(valueNodeId)) {
+                assoc.children.push(valueNodeId);
+              }
+            }
           }
         } else {
           // Create new field tuple + value node + associatedData
@@ -1195,7 +1213,7 @@ export const useNodeStore = create<NodeStore>()(
           state.entities[valueNodeId] = {
             id: valueNodeId,
             workspaceId,
-            props: { created: now, name: valueText, _ownerId: nodeId },
+            props: { created: now, name: valueText, _ownerId: assocId },
             children: [],
             version: 1,
             updatedAt: now,
@@ -1218,7 +1236,7 @@ export const useNodeStore = create<NodeStore>()(
             id: assocId,
             workspaceId,
             props: { created: now, name: '', _ownerId: nodeId, _docType: 'associatedData' },
-            children: [],
+            children: [valueNodeId],
             version: 1,
             updatedAt: now,
             createdBy: userId,

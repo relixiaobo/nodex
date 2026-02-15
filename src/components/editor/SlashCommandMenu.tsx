@@ -8,6 +8,7 @@ import {
   ListChecks,
   Mic,
   MoreHorizontal,
+  Scissors,
   Search,
   SquareCheck,
   type LucideIcon,
@@ -20,6 +21,7 @@ import {
 
 const ICON_MAP: Record<SlashCommandId, LucideIcon> = {
   paste: ClipboardPaste,
+  clip_page: Scissors,
   search_node: Search,
   field: ChevronRight,
   reference: AtSign,

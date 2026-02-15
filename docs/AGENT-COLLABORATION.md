@@ -155,140 +155,71 @@
 
 每次完成"实现/修复/更新"后，Agent 应按此清单同步文档：
 
-| 变更类型 | 需要更新的文档 |
-|---------|--------------|
-| Bug 修复 | `docs/issues.md`（关闭）+ `docs/issues/<N>.md`（如有） |
+| 变更类型 | 需要更新 |
+|---------|---------|
+| Bug 修复 | `gh issue close <N>` 或 PR 中 `fixes #N` |
 | 行为变更 | `docs/features/*.md`（对应特性） |
 | 新增测试 | `docs/TESTING.md`（覆盖映射） |
 | 需要人工验收 | `docs/MANUAL-TEST-CHECKLIST.md` |
-| Feature 进度 | `docs/ROADMAP.md` + `docs/issues.md`（Feature 行） |
+| Feature 进度 | GitHub Issue 勾选子任务 checkbox |
 | UI 视觉变更 | `docs/design-system.md` |
 
 ---
 
-## 3. Issue 跟踪
+## 3. Issue 跟踪（GitHub Issues）
 
-### 3.1 索引表格式（docs/issues.md）
+所有 Bug 和 Feature 统一在 [GitHub Issues](https://github.com/relixiaobo/nodex/issues) 跟踪。
 
-索引表 = 轻量一行一条，方便快速扫描和多 Agent 追加。
+看板地址：[Nodex Board](https://github.com/users/relixiaobo/projects/1)
 
-```markdown
-## Open
+> `docs/issues.md` 和 `docs/ROADMAP.md` 已废弃，不再维护。
 
-| # | 标题 | 状态 | 负责人 | 优先级 | 创建 |
-|---|------|------|--------|--------|------|
-| 49 | Cmd+Enter 无法切换 Checkbox | 📋 待认领 | — | P1 | 02-14 |
-| 50 | 某新功能 | 🔧 进行中 | codex-a | P2 | 02-15 |
+### 3.1 Labels 约定
 
-## Closed
+| Label | 用途 |
+|-------|------|
+| `bug` | Bug |
+| `enhancement` | 新功能 |
+| `P1` / `P2` / `P3` | 优先级 |
+| `agent:nodex-codex` / `agent:nodex-cc` | Agent 认领标记 |
+| `blocked` | 被其他任务阻塞 |
+| `needs-review` | 等待 review/merge |
 
-| # | 标题 | 关闭人 | 关闭日期 |
-|---|------|--------|----------|
-| 43 | Field name 末尾 Enter 不应切换建议字段 | claude-main | 02-14 |
+### 3.2 Agent 操作规则
+
+```bash
+# 新建 issue
+gh issue create --title "..." --label "bug,P1" --milestone "Phase 1: 数据基础"
+
+# 认领 issue（添加 agent label）
+gh issue edit <N> --add-label "agent:nodex-codex"
+
+# 完成后关闭（或 PR 中用 fixes #N 自动关闭）
+gh issue close <N>
+
+# 卡住时：在 issue 中留 comment 说明进展，移除自己的 agent label
+gh issue edit <N> --remove-label "agent:nodex-codex" --add-label "blocked"
+gh issue comment <N> --body "卡住了，原因：... 建议下一步：..."
 ```
 
-### 3.2 状态枚举
+### 3.3 交接协议
 
-| 状态 | 含义 | 谁可以设 |
-|------|------|---------|
-| 📋 待认领 | 新建，没人在做 | 任何人创建 issue 时 |
-| 🔧 进行中 | 有人正在处理 | 认领的 Agent |
-| 🔁 交接 | 当前 Agent 卡住，需要另一个接手 | 卡住的 Agent |
-| ✅ 已关闭 | 已修复/已实现 | 修复的 Agent |
+当一个 Agent 卡住时：
 
-### 3.3 操作规则
+**交出方**：
+1. 在 GitHub Issue 中留详细 comment（已尝试方案、排除的方向、建议下一步）
+2. 移除自己的 `agent:*` label，添加 `blocked` label
+3. Commit + push 当前进度到自己的分支
 
-- **新建**: 追加到 Open 表末尾（只追加，不修改已有行）
-- **认领**: 将状态改为 `🔧 进行中`，填自己的身份
-- **卡住**: 将状态改为 `🔁 交接`，清空负责人，在详情文件写交接备注
-- **关闭**: 移到 Closed 表，在详情文件标注解决方案
-
-### 3.4 详情文件（docs/issues/\<number\>.md）
-
-仅在以下情况创建详情文件：
-- Bug 需要多轮调查（记录尝试过的方案）
-- 需要交接给另一个 Agent
-- 功能实现涉及多步决策
-
-简单 bug（一次修复、无需上下文）不需要详情文件。
-
-模板：
-
-```markdown
-# #<number> <标题>
-
-**状态**: 🔁 交接 / 🔧 进行中 / ✅ 已关闭
-**负责人**: <agent-id> / —（待认领）
-**优先级**: P1 / P2 / P3
-**关联**: ref #20 / fixes #49
-
----
-
-## 问题描述
-
-<现象、复现步骤、预期 vs 实际>
-
-## 已尝试方案
-
-| # | 方案 | 结果 | 操作人 |
-|---|------|------|--------|
-| 1 | ... | 未生效 — <原因> | claude-main |
-| 2 | ... | 部分生效 — <残留问题> | claude-main |
-
-## 相关代码
-
-- `src/path/file.ts` L100-120 — <说明>
-- `src/path/other.ts` — <说明>
-
-## 相关 commit
-
-- `abc1234` <commit message>
-- `def5678` <commit message>
-
-## 交接备注
-
-> 下一个接手的 Agent 从这里开始读
-
-- **当前判断**: <对根因的最新理解>
-- **排除的方向**: <已证明不是原因的假设>
-- **建议下一步**: <具体可执行的调试动作>
-- **风险提示**: <可能的副作用或注意事项>
-```
-
----
-
-## 4. 交接协议
-
-当一个 Agent 无法解决问题时：
-
-### 交出方（卡住的 Agent）
-
-1. 创建或更新 `docs/issues/<number>.md`，填写完整的调查上下文
-2. `issues.md` 索引表状态改为 `🔁 交接`，清空负责人
-3. Commit + push 到自己的分支（或 main）
-4. 告知用户："#49 我卡住了，已记录交接备注，可以交给其他 Agent"
-
-### 接收方（新 Agent）
-
+**接收方**：
 1. `git pull` 获取最新代码
-2. 读 `docs/issues/<number>.md` 了解完整上下文
-3. 索引表状态改为 `🔧 进行中`，填自己的身份
-4. 在详情文件的"已尝试方案"表格中继续追加
-5. 解决后关闭，或继续交接
+2. 读 Issue 的 comment 了解完整上下文
+3. 添加自己的 `agent:*` label，移除 `blocked`
+4. 在 Issue 中追加 comment 记录新的尝试
 
-### 关键原则
-
-- **不要重复已失败的方案** — 先读完交接备注再动手
-- **追加而非覆盖** — 在详情文件中追加新方案，保留前人的记录
+**关键原则**：
+- **不要重复已失败的方案** — 先读完 Issue comments 再动手
 - **交接备注要具体** — "可能是 keymap 问题"不够，要写"在 L362 加 console.log 确认 handler 是否被调用"
-
----
-
-## 5. Feature 工作项
-
-Feature 级别的跟踪使用 `docs/issues.md` 的 Open Features 段。
-
-Feature 内的子任务如果需要交接，同样创建 `docs/issues/<number>.md`。
 
 ---
 

@@ -1,8 +1,8 @@
-# Issues
+# Issues (DEPRECATED)
 
-> 索引表 + 独立详情文件。协作规范见 `docs/AGENT-COLLABORATION.md`。
-> - Bug/Feature 一行一条，详情放 `docs/issues/<number>.md`
-> - 简单 bug 无需详情文件，索引表一行描述即可
+> **⚠️ 此文件已废弃。** Issue 跟踪已迁移到 [GitHub Issues](https://github.com/relixiaobo/nodex/issues)，看板见 [Nodex Board](https://github.com/users/relixiaobo/projects/1)。
+>
+> 以下内容保留为历史归档，不再更新。
 
 ---
 

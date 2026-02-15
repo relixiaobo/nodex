@@ -388,6 +388,15 @@ export const TAGDEF_CONFIG_FIELDS: ConfigFieldDef[] = [
     appliesTo: '*',
     description: 'Inherit fields and content from another tag',
   },
+  {
+    key: SYS_A.DONE_STATE_MAPPING,  // NDX_A06
+    name: 'Done state mapping',
+    control: 'tag_picker',       // TODO: implement dedicated picker UI
+    icon: CheckSquare,
+    defaultValue: '',
+    appliesTo: '*',
+    description: 'Map checkbox done state to an Options field value',
+  },
   // outliner field — rendered as field row with embedded outliner (template children)
   {
     key: 'NDX_SECTION_DEFAULT_CONTENT',

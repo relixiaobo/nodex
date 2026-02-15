@@ -532,7 +532,38 @@ hash trigger cleanup safety（2 cases, Bug #53 回归）:
 4. `getNextEnabledSlashIndex` 仅在 enabled 项间上下移动，边界 clamp
 5. 全部禁用时返回 `-1`
 
-### 1.38 Web Clip 落库服务
+### 1.38 Done State Mapping（checkbox ↔ Options 联动）
+
+**测试文件**: `tests/vitest/done-state-mapping.test.ts`
+
+**覆盖点**:
+
+纯函数（14 cases）:
+1. `getDoneStateMappings` 无标签 → 空
+2. `getDoneStateMappings` 有标签但无 NDX_A06 → 空
+3. `getDoneStateMappings` 有 Task 标签 + NDX_A06 → 返回映射（checked only）
+4. `getDoneStateMappings` 含 uncheckedOptionId 配置
+5. `getDoneStateMappings` 沿 Extend 链继承
+6. `getDoneStateMappings` 不存在节点 → 空
+7. `resolveForwardDoneMapping` isDone=true → checkedOptionId
+8. `resolveForwardDoneMapping` isDone=false + unchecked → uncheckedOptionId
+9. `resolveForwardDoneMapping` isDone=false 无 unchecked → 空
+10. `resolveForwardDoneMapping` 无映射 → 空
+11. `resolveReverseDoneMapping` checkedOption → newDone=true
+12. `resolveReverseDoneMapping` uncheckedOption → newDone=false
+13. `resolveReverseDoneMapping` 无关 option → null
+14. `resolveReverseDoneMapping` attrDefId 不匹配 → null
+
+Store 集成（7 cases）:
+15. `toggleNodeDone`（undone→done）→ Status 设为 opt_done
+16. `toggleNodeDone`（done→undone）→ Status 设为 opt_todo
+17. `setOptionsFieldValue`（opt_done）→ checkbox 自动勾选
+18. `setOptionsFieldValue`（opt_todo）→ checkbox 自动取消
+19. `setOptionsFieldValue`（opt_in_progress）→ checkbox 不变
+20. 原子 set() 无循环：forward + reverse 独立操作
+21. `resolveReverseDoneMapping` 无 unchecked + non-checked option → null
+
+### 1.39 Web Clip 落库服务
 
 **测试文件**: `tests/vitest/webclip-service.test.ts`
 
@@ -682,7 +713,8 @@ applyWebClipToNode（5 cases）:
 | 1.35 | 节点搜索 SKIP_DOC_TYPES 过滤 | PASS/FAIL |
 | 1.36 | Workspace Store 认证状态与持久化 | PASS/FAIL |
 | 1.37 | Slash Command 注册与导航 | PASS/FAIL |
-| 1.38 | Web Clip 落库服务 | PASS/FAIL |
+| 1.38 | Done State Mapping | PASS/FAIL |
+| 1.39 | Web Clip 落库服务 | PASS/FAIL |
 | 2 | 视觉渲染 | PASS/FAIL/SKIP |
 | 3 | 扩展构建 | PASS/FAIL |
 

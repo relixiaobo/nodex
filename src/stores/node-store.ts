@@ -12,7 +12,7 @@ import { nanoid } from 'nanoid';
 import type { NodexNode, DocType } from '../types/index.js';
 import { WORKSPACE_CONTAINERS, SYS_A, SYS_D, SYS_T, SYS_V } from '../types/index.js';
 import { ATTRDEF_CONFIG_MAP, TAGDEF_CONFIG_MAP, findAutoCollectTupleId, getExtendsChain } from '../lib/field-utils.js';
-import { resolveCheckboxClick, resolveCmdEnterCycle, hasTagShowCheckbox } from '../lib/checkbox-utils.js';
+import { resolveCheckboxClick, resolveCmdEnterCycle, hasTagShowCheckbox, resolveForwardDoneMapping, resolveReverseDoneMapping } from '../lib/checkbox-utils.js';
 import * as nodeService from '../services/node-service.js';
 import { isSupabaseReady } from '../services/supabase.js';
 
@@ -23,6 +23,33 @@ function isWorkspaceContainer(nodeId: string): boolean {
 function isWorkspaceRoot(nodeId: string, entities: Record<string, NodexNode>): boolean {
   const node = entities[nodeId];
   return !!node && node.id === node.workspaceId && !node.props._ownerId;
+}
+
+/**
+ * Apply an option value to a field's AssociatedData in-place (for immer state).
+ * Used by done-state mapping to update Options fields atomically within a set().
+ */
+function applyFieldValueInPlace(
+  state: { entities: Record<string, NodexNode> },
+  nodeId: string,
+  attrDefId: string,
+  optionNodeId: string,
+): void {
+  const node = state.entities[nodeId];
+  if (!node?.children || !node.associationMap) return;
+
+  for (const cid of node.children) {
+    const child = state.entities[cid];
+    if (child?.props._docType === 'tuple' && child.children?.[0] === attrDefId) {
+      const assocId = node.associationMap[cid];
+      const assoc = assocId ? state.entities[assocId] : undefined;
+      if (assoc) {
+        assoc.children = [optionNodeId];
+        assoc.updatedAt = Date.now();
+      }
+      return;
+    }
+  }
 }
 
 interface NodeStore {
@@ -464,10 +491,18 @@ export const useNodeStore = create<NodeStore>()(
       const oldDone = entities[nodeId]?.props._done;
       const hasTag = hasTagShowCheckbox(nodeId, entities);
       const newDone = resolveCheckboxClick(oldDone, hasTag);
+      const isDone = newDone !== undefined && newDone > 0;
+
+      // Forward done-state mapping: checkbox → Options field
+      const fieldUpdates = resolveForwardDoneMapping(nodeId, isDone, entities);
 
       set((state) => {
         if (state.entities[nodeId]) {
           state.entities[nodeId].props._done = newDone;
+        }
+        // Apply field value changes in the same atomic set()
+        for (const { attrDefId, optionNodeId } of fieldUpdates) {
+          applyFieldValueInPlace(state, nodeId, attrDefId, optionNodeId);
         }
       });
 
@@ -489,10 +524,18 @@ export const useNodeStore = create<NodeStore>()(
       const oldDone = entities[nodeId]?.props._done;
       const hasTag = hasTagShowCheckbox(nodeId, entities);
       const newDone = resolveCmdEnterCycle(oldDone, hasTag);
+      const isDone = newDone !== undefined && newDone > 0;
+
+      // Forward done-state mapping: checkbox → Options field
+      const fieldUpdates = resolveForwardDoneMapping(nodeId, isDone, entities);
 
       set((state) => {
         if (state.entities[nodeId]) {
           state.entities[nodeId].props._done = newDone;
+        }
+        // Apply field value changes in the same atomic set()
+        for (const { attrDefId, optionNodeId } of fieldUpdates) {
+          applyFieldValueInPlace(state, nodeId, attrDefId, optionNodeId);
         }
       });
 
@@ -1251,6 +1294,10 @@ export const useNodeStore = create<NodeStore>()(
     },
 
     setOptionsFieldValue: (nodeId, attrDefId, optionNodeId, userId) => {
+      // Pre-compute reverse done-state mapping before set() to read clean state
+      const { entities } = get();
+      const reverseResult = resolveReverseDoneMapping(nodeId, attrDefId, optionNodeId, entities);
+
       set((state) => {
         const node = state.entities[nodeId];
         if (!node?.children || !node.associationMap) return;
@@ -1268,6 +1315,11 @@ export const useNodeStore = create<NodeStore>()(
             assoc.children = [optionNodeId];
             assoc.updatedAt = Date.now();
             assoc.updatedBy = userId;
+
+            // Reverse done-state mapping: Options field → checkbox
+            if (reverseResult && state.entities[nodeId]) {
+              state.entities[nodeId].props._done = reverseResult.newDone ? Date.now() : undefined;
+            }
             return;
           }
         }
@@ -1611,6 +1663,10 @@ export const useNodeStore = create<NodeStore>()(
       const valueId = nanoid();
       const now = Date.now();
 
+      // Pre-compute reverse done-state mapping (new auto-collected option)
+      const { entities } = get();
+      const reverseResult = resolveReverseDoneMapping(nodeId, attrDefId, valueId, entities);
+
       set((state) => {
         // 1. Create the value node (original lives in field value)
         state.entities[valueId] = {
@@ -1649,6 +1705,11 @@ export const useNodeStore = create<NodeStore>()(
           if (acTuple?.children) {
             acTuple.children.push(valueId);
           }
+        }
+
+        // 4. Reverse done-state mapping: Options field → checkbox
+        if (reverseResult && state.entities[nodeId]) {
+          state.entities[nodeId].props._done = reverseResult.newDone ? Date.now() : undefined;
         }
       });
 

@@ -33,7 +33,6 @@ export {
   setFieldValue,
   setFieldTextValue,
   clearFieldValue,
-  handleDoneStateChange,
 } from './field-service.js';
 
 export type { FieldValueEntry, FieldValueMap } from './field-service.js';

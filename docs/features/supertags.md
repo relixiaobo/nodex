@@ -98,8 +98,30 @@
 **Done 视觉**: `text-foreground/50`（dimmed，无删除线）
 
 **未实现**:
-- Done state mapping（checkbox ↔ Options 字段双向映射）
 - 批量操作（需多选功能）
+
+### Done State Mapping — 已实现
+
+**数据模型**: TagDef 上新增 config tuple `Tuple [NDX_A06, attrDefId, checkedOptionId, uncheckedOptionId?]`
+
+- `NDX_A06` = `SYS_A.DONE_STATE_MAPPING`
+- `attrDefId` = Options 类型字段 ID（如 `attrDef_status`）
+- `checkedOptionId` = checkbox 勾选时对应的 option（如 `opt_done`）
+- `uncheckedOptionId` = checkbox 取消时对应的 option（如 `opt_todo`），可选
+
+**正向映射**（checkbox → Options field）:
+- `toggleNodeDone` / `cycleNodeCheckbox` 计算 newDone 后，调用 `resolveForwardDoneMapping` 获取要更新的字段
+- 在同一个 `set()` 调用内同时更新 `_done` 和 AssociatedData.children
+
+**反向映射**（Options field → checkbox）:
+- `setOptionsFieldValue` / `autoCollectOption` 设置 option 值后，调用 `resolveReverseDoneMapping`
+- 在同一个 `set()` 调用内更新 `_done`
+
+**无限循环防护**: 正向和反向都在各自的 `set()` 内完成，不会互相触发 store action。
+
+**继承支持**: Done state mapping 沿 Extend 链继承（子标签自动继承父标签的映射配置）。
+
+**Seed data**: `tagDef_task` 预配置 `NDX_A06 → [attrDef_status, opt_done, opt_todo]`
 
 ### Default Child Supertag — 未实现
 
@@ -308,6 +330,9 @@ tagDef_article
 | 2026-02-15 | Extend 绑定存储在 metanode 和 config tuple 双写 | metanode 用于 `getExtendsChain()` 遍历，config tuple 用于配置页 tag_picker 渲染 |
 | 2026-02-15 | 字段去重按 attrDef ID，祖先优先 | 同一 attrDef 跨继承链只实例化一次，`_sourceId` 指向最早祖先的模板 |
 | 2026-02-15 | 配置页继承项通过 owning tagDef 颜色区分 | OOP 继承视觉：父标签项 = 父色，子标签项 = 子色，无 extend 时无色 |
+| 2026-02-16 | Done state mapping 使用 NDX_A06 Tuple 存储在 tagDef.children | 遵循现有 config tuple 模式，与 SYS_T01 模板一致 |
+| 2026-02-16 | 正向/反向映射在同一 set() 中原子完成 | 避免无限循环，无需额外防护标志 |
+| 2026-02-16 | Done state mapping 沿 Extend 链继承 | 子标签自动继承父标签的映射配置 |
 
 ## 当前状态
 
@@ -327,7 +352,7 @@ tagDef_article
 - [ ] trashNode(attrDef) 级联清理（移除所有引用该字段的 tuple）
 - [x] applyTag 克隆 default content 中的普通节点（shallow clone, `_sourceId` 追踪来源）
 - [x] Show as Checkbox（toggle + done visual + Cmd+Enter）
-- [ ] Done state mapping（checkbox ↔ Options 字段双向映射）
+- [x] Done state mapping（checkbox ↔ Options 字段双向映射, NDX_A06）
 - [ ] Default Child Supertag（真实 tag_picker）
 - [ ] Color picker（真实色板）
 - [ ] Pinned fields

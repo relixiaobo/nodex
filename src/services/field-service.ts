@@ -270,37 +270,6 @@ export async function clearFieldValue(
 }
 
 // ============================================================
-// Done State Mapping
-// ============================================================
-
-/**
- * 处理 Done State Mapping。
- *
- * 当 checkbox 状态变化时，自动更新关联的 Options 字段值。
- * 反之亦然（Options 字段值变为 "Done" 时自动勾选 checkbox）。
- *
- * 需要查找 TagDef 中的 Done State Mapping 配置。
- */
-export async function handleDoneStateChange(
-  nodeId: string,
-  isDone: boolean,
-  userId: string,
-): Promise<void> {
-  const node = await getNode(nodeId);
-  if (!node) return;
-
-  // 更新 _done 时间戳
-  await updateNode(
-    nodeId,
-    { props: { _done: isDone ? Date.now() : undefined } },
-    userId,
-  );
-
-  // TODO: 查找关联标签的 Done State Mapping 配置，
-  // 自动更新对应 Options 字段值
-}
-
-// ============================================================
 // 内部辅助函数
 // ============================================================
 

@@ -43,13 +43,14 @@ describe('node-store schema flows', () => {
       const child = state.entities[cid];
       return child?.props._docType === 'tuple' && (child.props._sourceId ?? '').startsWith('sysT01_tpl_');
     });
-    expect(configTupleIds.length).toBe(4);
+    expect(configTupleIds.length).toBe(5);
 
     const configKeys = new Set(configTupleIds.map((cid) => state.entities[cid].children?.[0]));
     expect(configKeys.has(SYS_A.SHOW_CHECKBOX)).toBe(true);
     expect(configKeys.has(SYS_A.CHILD_SUPERTAG)).toBe(true);
     expect(configKeys.has(SYS_A.COLOR)).toBe(true);
     expect(configKeys.has(SYS_A.EXTENDS)).toBe(true);
+    expect(configKeys.has(SYS_A.DONE_STATE_MAPPING)).toBe(true);
 
     expect(collectNodeGraphErrors(useNodeStore.getState().entities)).toEqual([]);
   });

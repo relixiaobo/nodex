@@ -214,6 +214,8 @@ export const SYS_A = {
   MAX_VALUE: 'NDX_A04',
   /** [Nodex] Extend parent tagDef → Tuple [NDX_A05, parentTagDefId] */
   EXTENDS: 'NDX_A05',
+  /** [Nodex] Done state mapping → Tuple [NDX_A06, attrDefId, checkedOptionId, uncheckedOptionId?] */
+  DONE_STATE_MAPPING: 'NDX_A06',
 } as const;
 
 export type SystemAttribute = typeof SYS_A[keyof typeof SYS_A];

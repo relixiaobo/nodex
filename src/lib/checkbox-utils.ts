@@ -28,6 +28,7 @@
  */
 import type { NodexNode } from '../types/node.js';
 import { SYS_A, SYS_V } from '../types/index.js';
+import { getExtendsChain } from './field-utils.js';
 
 export interface CheckboxState {
   showCheckbox: boolean;
@@ -127,6 +128,118 @@ export function resolveCmdEnterCycle(
   if (currentDone === undefined) return 0;           // No → Undone
   if (currentDone === 0) return Date.now();           // Undone → Done
   return undefined;                                   // Done → No
+}
+
+// ─── Done State Mapping ───
+
+export interface DoneStateMapping {
+  tagDefId: string;
+  attrDefId: string;
+  checkedOptionId: string;
+  uncheckedOptionId?: string;
+}
+
+/**
+ * Get all done-state mapping configs from a node's supertags (including Extend chain).
+ *
+ * Path: node → metanode → SYS_A13 tuples → tagDefId → tagDef.children → NDX_A06 tuple
+ * Also walks the Extend chain for each tag.
+ */
+export function getDoneStateMappings(
+  nodeId: string,
+  entities: Record<string, NodexNode>,
+): DoneStateMapping[] {
+  const node = entities[nodeId];
+  if (!node) return [];
+
+  const metaNodeId = node.props._metaNodeId;
+  if (!metaNodeId) return [];
+
+  const meta = entities[metaNodeId];
+  if (!meta?.children) return [];
+
+  const result: DoneStateMapping[] = [];
+
+  for (const tupleId of meta.children) {
+    const tuple = entities[tupleId];
+    if (!tuple?.children || tuple.children.length < 2) continue;
+    if (tuple.children[0] !== SYS_A.NODE_SUPERTAGS) continue;
+
+    const tagDefId = tuple.children[1];
+    // Collect mappings from this tag and its entire Extend chain
+    const chain = getExtendsChain(entities, tagDefId);
+    const allTagDefs = [...chain, tagDefId];
+
+    for (const tdId of allTagDefs) {
+      const td = entities[tdId];
+      if (!td?.children) continue;
+
+      for (const childId of td.children) {
+        const child = entities[childId];
+        if (!child?.children || child.children.length < 3) continue;
+        if (child.props._docType !== 'tuple') continue;
+        if (child.children[0] !== SYS_A.DONE_STATE_MAPPING) continue;
+
+        result.push({
+          tagDefId: tdId,
+          attrDefId: child.children[1],
+          checkedOptionId: child.children[2],
+          uncheckedOptionId: child.children[3],
+        });
+      }
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Forward mapping: checkbox state changed → which field values to update.
+ *
+ * When isDone=true, returns the checkedOptionId for each mapping.
+ * When isDone=false, returns the uncheckedOptionId (if configured).
+ */
+export function resolveForwardDoneMapping(
+  nodeId: string,
+  isDone: boolean,
+  entities: Record<string, NodexNode>,
+): Array<{ attrDefId: string; optionNodeId: string }> {
+  const mappings = getDoneStateMappings(nodeId, entities);
+  const result: Array<{ attrDefId: string; optionNodeId: string }> = [];
+
+  for (const m of mappings) {
+    if (isDone) {
+      result.push({ attrDefId: m.attrDefId, optionNodeId: m.checkedOptionId });
+    } else if (m.uncheckedOptionId) {
+      result.push({ attrDefId: m.attrDefId, optionNodeId: m.uncheckedOptionId });
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Reverse mapping: Options field value changed → should checkbox change?
+ *
+ * Returns { newDone: true } if the new option matches checkedOptionId,
+ * { newDone: false } if it matches uncheckedOptionId,
+ * or null if no mapping applies.
+ */
+export function resolveReverseDoneMapping(
+  nodeId: string,
+  attrDefId: string,
+  newOptionId: string,
+  entities: Record<string, NodexNode>,
+): { newDone: boolean } | null {
+  const mappings = getDoneStateMappings(nodeId, entities);
+
+  for (const m of mappings) {
+    if (m.attrDefId !== attrDefId) continue;
+    if (newOptionId === m.checkedOptionId) return { newDone: true };
+    if (m.uncheckedOptionId && newOptionId === m.uncheckedOptionId) return { newDone: false };
+  }
+
+  return null;
 }
 
 // ─── Internal helpers ───

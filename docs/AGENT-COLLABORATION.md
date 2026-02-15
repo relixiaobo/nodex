@@ -21,16 +21,17 @@
 | **nodex** | Claude Code (主会话) | Review PR、合并到 main、协调任务 | 小修复、紧急改动 | `main` 或临时分支 | `5199` | 主 clone |
 | **nodex-codex** | Codex | 功能开发、提交 PR | Bug 修复 | `codex/<feature>` | `5200` | 独立 clone |
 | **nodex-cc** | Claude Code (独立会话) | 功能开发、提交 PR | Bug 修复 | `cc/<feature>` | `5201` | 独立 clone |
+| **nodex-cc-2** | Claude Code (独立会话) | 功能开发、提交 PR | Bug 修复 | `cc2/<feature>` | `5202` | 独立 clone |
 
 ### Agent 自我识别
 
-三个 Agent 共享同一套 `CLAUDE.md` 和 `AGENT-COLLABORATION.md`。每个 Agent 通过以下方式确认自己的身份：
+所有 Agent 共享同一套 `CLAUDE.md` 和 `AGENT-COLLABORATION.md`。每个 Agent 通过以下方式确认自己的身份：
 
-| 识别依据 | nodex | nodex-codex | nodex-cc |
-|---------|-----------|-------------|----------|
-| Clone 路径 | `nodex`（主 clone） | `nodex-codex` | `nodex-cc` |
-| Dev Server 端口 | `5199` | `5200` | `5201` |
-| Git 分支 | `main` | `codex/*` | `cc/*` |
+| 识别依据 | nodex | nodex-codex | nodex-cc | nodex-cc-2 |
+|---------|-----------|-------------|----------|------------|
+| Clone 路径 | `nodex`（主 clone） | `nodex-codex` | `nodex-cc` | `nodex-cc-2` |
+| Dev Server 端口 | `5199` | `5200` | `5201` | `5202` |
+| Git 分支 | `main` | `codex/*` | `cc/*` | `cc2/*` |
 
 ### 端口分配规则
 
@@ -196,7 +197,7 @@ Dev Agent 空闲时**主动从 GitHub Issues 认领任务**，无需等待用户
 | `bug` | Bug |
 | `enhancement` | 新功能 |
 | `P1` / `P2` / `P3` | 优先级 |
-| `agent:nodex-codex` / `agent:nodex-cc` | Agent 认领标记 |
+| `agent:nodex-codex` / `agent:nodex-cc` / `agent:nodex-cc-2` | Agent 认领标记 |
 | `blocked` | 被其他任务阻塞 |
 | `needs-review` | 等待 review/merge（PR 和 Issue 都可用） |
 

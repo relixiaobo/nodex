@@ -20,6 +20,7 @@ Chrome Side Panel 云端知识管理工具，忠实复刻 Tana 核心功能。
 其他 Agent：
 - **nodex**（主 clone）：Review PR、合并到 main
 - **nodex-cc**（独立 clone）：功能开发，分支 `cc/<feature>`，端口 `5201`
+- **nodex-cc-2**（独立 clone）：功能开发，分支 `cc2/<feature>`，端口 `5202`
 
 ## Session 启动协议
 

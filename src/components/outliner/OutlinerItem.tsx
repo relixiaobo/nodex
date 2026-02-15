@@ -1373,7 +1373,14 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   const isDragging = dragNodeId === nodeId;
 
   return (
-    <div role="treeitem" aria-expanded={isExpanded} className={isSelected && !isFocused ? 'bg-selection rounded-md ring-1 ring-selection-ring' : ''}>
+    <div role="treeitem" aria-expanded={isExpanded} className="relative">
+      {/* Selection overlay: starts at bullet column, covers row + children */}
+      {isSelected && !isFocused && (
+        <div
+          className="absolute top-0 bottom-0 right-0 bg-selection rounded-md ring-1 ring-selection-ring pointer-events-none z-0"
+          style={{ left: depth * 28 + 6 + 15 + 4 }}
+        />
+      )}
       {/* Drop indicator: before */}
       {isDropTarget && dropPosition === 'before' && (
         <div
@@ -1383,7 +1390,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       )}
       <div
         ref={rowRef}
-        className={`group/row flex gap-1 min-h-7 items-start py-1 ${
+        className={`group/row flex gap-1 min-h-7 items-start py-1 relative z-[1] ${
           isDropTarget && dropPosition === 'inside'
             ? 'bg-primary/10 ring-1 ring-primary/30 rounded-sm'
             : ''
@@ -1578,7 +1585,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
         />
       )}
       {isExpanded && (
-        <div className="relative">
+        <div className="relative z-[1]">
           {/* Indent guide line — 16px click area LEFT of bullet center.
                Parent bullet center = depth*28 + 32.5.
                Button right edge at depth*28+33 (1px gap to child ChevronButton at depth*28+34).

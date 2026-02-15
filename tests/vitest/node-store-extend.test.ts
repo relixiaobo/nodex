@@ -42,44 +42,27 @@ describe('Supertag Extend (Inheritance)', () => {
 
     it('returns ancestors in ancestor-first order for multi-level extends', () => {
       // Create a grandchild tagDef that extends dev_task
-      const state = getState();
+      // getExtendsChain reads from tagDef.children (config tuples), not metanode
       const now = Date.now();
 
-      // grandchild tagDef
-      const grandchildMeta: NodexNode = {
-        id: 'meta_tagDef_grand',
+      const grandExtendsTuple: NodexNode = {
+        id: 'grand_cfg_extends',
         workspaceId: 'ws_default',
-        props: { created: now, name: '', _ownerId: 'tagDef_grand', _docType: 'metanode' as DocType },
-        children: ['meta_tagDef_grand_tag', 'meta_tagDef_grand_extends'],
-        version: 1, updatedAt: now, createdBy: 'user_default', updatedBy: 'user_default',
-      };
-      const grandchildMetaTag: NodexNode = {
-        id: 'meta_tagDef_grand_tag',
-        workspaceId: 'ws_default',
-        props: { created: now, name: '', _ownerId: 'meta_tagDef_grand', _docType: 'tuple' as DocType },
-        children: [SYS_A.NODE_SUPERTAGS, SYS_T.SUPERTAG],
-        version: 1, updatedAt: now, createdBy: 'user_default', updatedBy: 'user_default',
-      };
-      const grandchildMetaExtends: NodexNode = {
-        id: 'meta_tagDef_grand_extends',
-        workspaceId: 'ws_default',
-        props: { created: now, name: '', _ownerId: 'meta_tagDef_grand', _docType: 'tuple' as DocType },
+        props: { created: now, name: '', _ownerId: 'tagDef_grand', _docType: 'tuple' as DocType },
         children: [SYS_A.EXTENDS, 'tagDef_dev_task'],
         version: 1, updatedAt: now, createdBy: 'user_default', updatedBy: 'user_default',
       };
       const grandchildTagDef: NodexNode = {
         id: 'tagDef_grand',
         workspaceId: 'ws_default',
-        props: { created: now, name: 'Grand Task', _ownerId: 'ws_default_SCHEMA', _docType: 'tagDef' as DocType, _metaNodeId: 'meta_tagDef_grand' },
-        children: [],
+        props: { created: now, name: 'Grand Task', _ownerId: 'ws_default_SCHEMA', _docType: 'tagDef' as DocType },
+        children: ['grand_cfg_extends'],
         version: 1, updatedAt: now, createdBy: 'user_default', updatedBy: 'user_default',
       };
 
       useNodeStore.setState((s) => {
         s.entities['tagDef_grand'] = grandchildTagDef;
-        s.entities['meta_tagDef_grand'] = grandchildMeta;
-        s.entities['meta_tagDef_grand_tag'] = grandchildMetaTag;
-        s.entities['meta_tagDef_grand_extends'] = grandchildMetaExtends;
+        s.entities['grand_cfg_extends'] = grandExtendsTuple;
       });
 
       const chain = getExtendsChain(useNodeStore.getState().entities, 'tagDef_grand');
@@ -89,23 +72,21 @@ describe('Supertag Extend (Inheritance)', () => {
 
     it('handles circular references without infinite loop', () => {
       // Make tagDef_task extend tagDef_dev_task (circular: task ↔ dev_task)
-      const state = getState();
-      const meta = state.entities['meta_tagDef_task'];
-
+      // getExtendsChain reads from tagDef.children (config tuples)
       const now = Date.now();
       const circularTuple: NodexNode = {
-        id: 'meta_tagDef_task_extends_circular',
+        id: 'tagDef_task_cfg_extends_circular',
         workspaceId: 'ws_default',
-        props: { created: now, name: '', _ownerId: 'meta_tagDef_task', _docType: 'tuple' as DocType },
+        props: { created: now, name: '', _ownerId: 'tagDef_task', _docType: 'tuple' as DocType },
         children: [SYS_A.EXTENDS, 'tagDef_dev_task'],
         version: 1, updatedAt: now, createdBy: 'user_default', updatedBy: 'user_default',
       };
 
       useNodeStore.setState((s) => {
-        s.entities['meta_tagDef_task_extends_circular'] = circularTuple;
-        s.entities['meta_tagDef_task'].children = [
-          ...(s.entities['meta_tagDef_task'].children ?? []),
-          'meta_tagDef_task_extends_circular',
+        s.entities['tagDef_task_cfg_extends_circular'] = circularTuple;
+        s.entities['tagDef_task'].children = [
+          ...(s.entities['tagDef_task'].children ?? []),
+          'tagDef_task_cfg_extends_circular',
         ];
       });
 

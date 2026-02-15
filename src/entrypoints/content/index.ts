@@ -25,6 +25,10 @@ function captureCurrentPage(): WebClipCapturePayload {
     selectionText,
     pageText,
     capturedAt: Date.now(),
+    author: extracted.author ?? undefined,
+    published: extracted.published ?? undefined,
+    description: extracted.description ?? undefined,
+    siteName: extracted.site ?? undefined,
   };
 }
 

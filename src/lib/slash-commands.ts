@@ -1,5 +1,6 @@
 export type SlashCommandId =
   | 'paste'
+  | 'clip_page'
   | 'search_node'
   | 'field'
   | 'reference'
@@ -30,6 +31,12 @@ export const SLASH_COMMANDS_BASELINE: readonly SlashCommandDefinition[] = [
     keywords: ['paste', 'clipboard'],
     enabled: false,
     disabledHint: SLASH_DISABLED_HINT_DEFAULT,
+  },
+  {
+    id: 'clip_page',
+    name: 'Clip Page',
+    keywords: ['clip', 'web', 'capture', 'page'],
+    enabled: true,
   },
   {
     id: 'search_node',

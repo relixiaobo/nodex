@@ -18,6 +18,12 @@ import { FieldRow } from '../fields/FieldRow';
 import { SYS_D, SYS_V } from '../../types/index.js';
 import { useFieldOptions } from '../../hooks/use-field-options.js';
 import { getTagColor } from '../../lib/tag-colors.js';
+import { applyWebClipToNode } from '../../lib/webclip-service.js';
+import { wrapInP } from '../../lib/editor-html.js';
+import {
+  WEBCLIP_CAPTURE_ACTIVE_TAB,
+  type WebClipCaptureResponse,
+} from '../../lib/webclip-messaging.js';
 import { useNodeCheckbox } from '../../hooks/use-node-checkbox.js';
 import {
   getFlattenedVisibleNodes,
@@ -977,7 +983,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     setSlashSelectedIndex(-1);
   }, []);
 
-  const executeSlashCommand = useCallback((commandId: SlashCommandId) => {
+  const executeSlashCommand = useCallback(async (commandId: SlashCommandId) => {
     if (commandId === 'field') {
       replaceSlashTriggerText('>');
       closeSlashMenu();
@@ -1001,8 +1007,44 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       replaceSlashTriggerText('');
       handleCycleCheckbox();
       closeSlashMenu();
+      return;
     }
-  }, [replaceSlashTriggerText, closeSlashMenu, openSearch, handleCycleCheckbox]);
+
+    if (commandId === 'clip_page') {
+      replaceSlashTriggerText('');
+      closeSlashMenu();
+
+      const canUseRuntime =
+        typeof chrome !== 'undefined' &&
+        !!chrome.runtime &&
+        !!chrome.runtime.sendMessage;
+
+      if (!canUseRuntime || !wsId || !userId) return;
+
+      try {
+        const response = await chrome.runtime.sendMessage({
+          type: WEBCLIP_CAPTURE_ACTIVE_TAB,
+        }) as WebClipCaptureResponse;
+
+        if (!response?.ok) {
+          console.error('Clip failed:', response?.error ?? 'unknown error');
+          return;
+        }
+
+        const store = useNodeStore.getState();
+        await applyWebClipToNode(nodeId, response.payload, store, wsId, userId);
+
+        // Sync editor content with the new title so it's visible immediately
+        // (without this, the editor still shows empty until focus moves away)
+        const ed = editorRef.current;
+        if (ed && !ed.isDestroyed && response.payload.title) {
+          ed.commands.setContent(wrapInP(response.payload.title));
+        }
+      } catch (err) {
+        console.error('Clip failed:', err instanceof Error ? err.message : String(err));
+      }
+    }
+  }, [replaceSlashTriggerText, closeSlashMenu, openSearch, handleCycleCheckbox, wsId, userId, nodeId]);
 
   const handleSlashCommand = useCallback((query: string, from: number, to: number) => {
     slashRangeRef.current = { from, to };

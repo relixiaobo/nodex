@@ -38,7 +38,8 @@ describe('node-store field operations', () => {
     if (!firstValueId) return;
 
     expect(useNodeStore.getState().entities[firstValueId]?.props.name).toBe('2026-02-13');
-    expect(useNodeStore.getState().entities[firstValueId]?.props._ownerId).toBe('task_1');
+    // Value node's _ownerId should be the associatedData (parent in FieldValueOutliner)
+    expect(useNodeStore.getState().entities[firstValueId]?.props._ownerId).toBe('task1_assoc_due');
 
     await useNodeStore.getState().setFieldValue(
       'task_1',

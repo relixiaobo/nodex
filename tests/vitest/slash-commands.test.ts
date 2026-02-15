@@ -9,12 +9,14 @@ describe('slash command helpers', () => {
   it('filters by command name and keywords', () => {
     expect(filterSlashCommands('field').map((c) => c.id)).toEqual(['field']);
     expect(filterSlashCommands('mention').map((c) => c.id)).toEqual(['reference']);
+    expect(filterSlashCommands('clip').map((c) => c.id)).toContain('clip_page');
+    expect(filterSlashCommands('capture').map((c) => c.id)).toEqual(['clip_page']);
     expect(filterSlashCommands('')).toHaveLength(SLASH_COMMANDS_BASELINE.length);
   });
 
   it('returns first enabled index', () => {
     const filtered = filterSlashCommands('');
-    expect(getFirstEnabledSlashIndex(filtered)).toBe(filtered.findIndex((c) => c.id === 'field'));
+    expect(getFirstEnabledSlashIndex(filtered)).toBe(filtered.findIndex((c) => c.id === 'clip_page'));
   });
 
   it('moves selection only across enabled items', () => {
@@ -23,14 +25,16 @@ describe('slash command helpers', () => {
     const second = getNextEnabledSlashIndex(filtered, first, 'down');
     const third = getNextEnabledSlashIndex(filtered, second, 'down');
     const fourth = getNextEnabledSlashIndex(filtered, third, 'down');
+    const fifth = getNextEnabledSlashIndex(filtered, fourth, 'down');
 
-    expect(filtered[first]?.id).toBe('field');
-    expect(filtered[second]?.id).toBe('reference');
-    expect(filtered[third]?.id).toBe('checkbox');
-    expect(filtered[fourth]?.id).toBe('more_commands');
+    expect(filtered[first]?.id).toBe('clip_page');
+    expect(filtered[second]?.id).toBe('field');
+    expect(filtered[third]?.id).toBe('reference');
+    expect(filtered[fourth]?.id).toBe('checkbox');
+    expect(filtered[fifth]?.id).toBe('more_commands');
 
     // Clamp to boundaries.
-    expect(getNextEnabledSlashIndex(filtered, fourth, 'down')).toBe(fourth);
+    expect(getNextEnabledSlashIndex(filtered, fifth, 'down')).toBe(fifth);
     expect(getNextEnabledSlashIndex(filtered, first, 'up')).toBe(first);
   });
 

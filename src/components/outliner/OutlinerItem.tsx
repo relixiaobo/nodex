@@ -236,6 +236,11 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     if (userId) toggleNodeDone(nodeId, userId);
   }, [nodeId, userId, toggleNodeDone]);
 
+  // Escape in editor (no dropdown) → select current node
+  const handleEscapeSelect = useCallback(() => {
+    setSelectedNode(nodeId, parentId);
+  }, [nodeId, parentId, setSelectedNode]);
+
   // Cmd+Enter: 3-state cycle for manual, 2-state for tag-driven
   const handleCycleCheckbox = useCallback(() => {
     if (userId) cycleNodeCheckbox(nodeId, userId);
@@ -340,70 +345,92 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     }
   }, [isSelected, isReference, isOptionsField, allFieldOptions, nodeId]);
 
-  // Keyboard handler for selected reference nodes
+  // Keyboard handler for selected nodes (all types: reference + normal)
   useEffect(() => {
-    if (!isSelected || !isReference) return;
+    if (!isSelected) return;
     const handleKeyDown = (e: KeyboardEvent) => {
-      const action = resolveSelectedReferenceShortcut(e, optionsPickerOpen);
-      if (!action) return;
+      // ── Reference-specific actions (conversion, options picker) ──
+      if (isReference) {
+        const action = resolveSelectedReferenceShortcut(e, optionsPickerOpen);
+        if (action) {
+          e.preventDefault();
 
-      if (action === 'delete') {
-        e.preventDefault();
-        if (userId) removeReference(parentId, nodeId, userId);
-        setSelectedNode(null);
-        return;
-      }
+          if (action === 'delete') {
+            if (userId) removeReference(parentId, nodeId, userId);
+            setSelectedNode(null);
+            return;
+          }
 
-      if (action === 'convert_arrow_right' || action === 'convert_printable') {
-        e.preventDefault();
-        if (!wsId || !userId) return;
-        const parent = entities[parentId];
-        const pos = parent?.children?.indexOf(nodeId) ?? -1;
-        if (pos < 0) return;
-        removeReference(parentId, nodeId, userId);
-        const tempNodeId = startRefConversion(nodeId, parentId, pos, wsId, userId);
-        if (action === 'convert_printable') {
-          // Append typed character after inline ref.
-          const tempName = useNodeStore.getState().entities[tempNodeId]?.props.name ?? '';
-          useNodeStore.getState().setNodeNameLocal(tempNodeId, tempName + e.key);
+          if (action === 'convert_arrow_right' || action === 'convert_printable') {
+            if (!wsId || !userId) return;
+            const parent = entities[parentId];
+            const pos = parent?.children?.indexOf(nodeId) ?? -1;
+            if (pos < 0) return;
+            removeReference(parentId, nodeId, userId);
+            const tempNodeId = startRefConversion(nodeId, parentId, pos, wsId, userId);
+            if (action === 'convert_printable') {
+              const tempName = useNodeStore.getState().entities[tempNodeId]?.props.name ?? '';
+              useNodeStore.getState().setNodeNameLocal(tempNodeId, tempName + e.key);
+            }
+            setPendingRefConversion({ tempNodeId, refNodeId: nodeId, parentId });
+            setSelectedNode(null);
+            setTimeout(() => setFocusedNode(tempNodeId, parentId), 0);
+            return;
+          }
+
+          if (action === 'options_down' && allFieldOptions.length > 0) {
+            setOptionsPickerIndex((i) => Math.min(i + 1, allFieldOptions.length - 1));
+            return;
+          }
+          if (action === 'options_up' && allFieldOptions.length > 0) {
+            setOptionsPickerIndex((i) => Math.max(i - 1, 0));
+            return;
+          }
+          if (action === 'options_confirm' && allFieldOptions.length > 0) {
+            const opt = allFieldOptions[optionsPickerIndex];
+            if (opt && userId) {
+              removeReference(parentId, nodeId, userId);
+              addReference(parentId, opt.id, userId);
+            }
+            setSelectedNode(null);
+            return;
+          }
+
+          if (action === 'escape') {
+            setSelectedNode(null);
+            return;
+          }
         }
-        setPendingRefConversion({ tempNodeId, refNodeId: nodeId, parentId });
-        setSelectedNode(null);
-        setTimeout(() => setFocusedNode(tempNodeId, parentId), 0);
-        return;
       }
 
-      if (action === 'options_down' && allFieldOptions.length > 0) {
+      // ── General selection actions (all nodes) ──
+      if (e.key === 'ArrowUp') {
         e.preventDefault();
-        setOptionsPickerIndex((i) => Math.min(i + 1, allFieldOptions.length - 1));
+        const flatList = getFlattenedVisibleNodes(rootChildIds, entities, expandedNodes, rootNodeId);
+        const prev = getPreviousVisibleNode(nodeId, parentId, flatList);
+        if (prev) setSelectedNode(prev.nodeId, prev.parentId);
         return;
       }
-
-      if (action === 'options_up' && allFieldOptions.length > 0) {
+      if (e.key === 'ArrowDown') {
         e.preventDefault();
-        setOptionsPickerIndex((i) => Math.max(i - 1, 0));
+        const flatList = getFlattenedVisibleNodes(rootChildIds, entities, expandedNodes, rootNodeId);
+        const next = getNextVisibleNode(nodeId, parentId, flatList);
+        if (next) setSelectedNode(next.nodeId, next.parentId);
         return;
       }
-
-      if (action === 'options_confirm' && allFieldOptions.length > 0) {
+      if (e.key === 'Enter') {
         e.preventDefault();
-        const opt = allFieldOptions[optionsPickerIndex];
-        if (opt && userId) {
-          removeReference(parentId, nodeId, userId);
-          addReference(parentId, opt.id, userId);
-        }
-        setSelectedNode(null);
+        setFocusedNode(nodeId, parentId);
         return;
       }
-
-      if (action === 'escape') {
+      if (e.key === 'Escape') {
         e.preventDefault();
         setSelectedNode(null);
       }
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isSelected, isReference, optionsPickerOpen, allFieldOptions, optionsPickerIndex, parentId, nodeId, userId, wsId, entities, removeReference, addReference, setSelectedNode, startRefConversion, setPendingRefConversion, setFocusedNode]);
+  }, [isSelected, isReference, optionsPickerOpen, allFieldOptions, optionsPickerIndex, parentId, nodeId, userId, wsId, rootNodeId, rootChildIds, entities, expandedNodes, removeReference, addReference, setSelectedNode, startRefConversion, setPendingRefConversion, setFocusedNode]);
 
   // When TrailingInput creates a node with #/@/, it sets triggerHint so we
   // can immediately open the dropdown (extensions don't fire on mount because
@@ -1281,6 +1308,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
                 onSlashClose={closeSlashMenu}
                 onDescriptionEdit={handleDescriptionEdit}
                 onToggleDone={handleCycleCheckbox}
+                onEscapeSelect={handleEscapeSelect}
               />
             ) : (
               <span

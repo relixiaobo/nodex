@@ -98,6 +98,8 @@ interface NodeEditorProps {
   onDescriptionEdit?: () => void;
   // ─── Checkbox toggle (Cmd+Enter when no dropdown) ───
   onToggleDone?: () => void;
+  // ─── Escape → select current node (no dropdown open) ───
+  onEscapeSelect?: () => void;
 }
 
 export function NodeEditor({
@@ -140,6 +142,7 @@ export function NodeEditor({
   onSlashClose,
   onDescriptionEdit,
   onToggleDone,
+  onEscapeSelect,
 }: NodeEditorProps) {
   const updateNodeName = useNodeStore((s) => s.updateNodeName);
   const setNodeNameLocal = useNodeStore((s) => s.setNodeNameLocal);
@@ -191,6 +194,7 @@ export function NodeEditor({
     onSlashClose: onSlashClose ?? (() => {}),
     onDescriptionEdit: onDescriptionEdit ?? (() => {}),
     onToggleDone: onToggleDone ?? (() => {}),
+    onEscapeSelect: onEscapeSelect ?? (() => {}),
   });
   callbacksRef.current = {
     onEnter, onIndent, onOutdent, onDelete, onArrowUp, onArrowDown, onMoveUp, onMoveDown, saveContent,
@@ -214,6 +218,7 @@ export function NodeEditor({
     onSlashClose: onSlashClose ?? (() => {}),
     onDescriptionEdit: onDescriptionEdit ?? (() => {}),
     onToggleDone: onToggleDone ?? (() => {}),
+    onEscapeSelect: onEscapeSelect ?? (() => {}),
   };
 
   // HashTag extension callbacks
@@ -411,6 +416,10 @@ export function NodeEditor({
             }
             if (intent === 'slash_close') {
               callbacksRef.current.onSlashClose();
+              return true;
+            }
+            if (intent === 'select_current') {
+              callbacksRef.current.onEscapeSelect();
               return true;
             }
             return false;

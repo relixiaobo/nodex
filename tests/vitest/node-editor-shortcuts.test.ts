@@ -80,7 +80,7 @@ describe('node editor shortcut resolver', () => {
     expect(resolveNodeEditorEscapeIntent(true, false, true)).toBe('reference_close');
     expect(resolveNodeEditorEscapeIntent(false, true, true)).toBe('hashtag_close');
     expect(resolveNodeEditorEscapeIntent(false, false, true)).toBe('slash_close');
-    expect(resolveNodeEditorEscapeIntent(false, false, false)).toBe('allow_default');
+    expect(resolveNodeEditorEscapeIntent(false, false, false)).toBe('select_current');
 
     expect(resolveNodeEditorForceCreateIntent(true, false, true)).toBe('reference_create');
     expect(resolveNodeEditorForceCreateIntent(false, true, true)).toBe('hashtag_create');

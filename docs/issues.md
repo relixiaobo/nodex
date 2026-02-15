@@ -155,8 +155,8 @@
 
 #### #44 节点选中
 
-- [ ] Escape 退出编辑 → 选中状态（Phase 1）
-- [ ] 选中模式下 ↑/↓ 导航、Enter 回到编辑（Phase 1）
+- [x] Escape 退出编辑 → 选中状态（Phase 1）— 2026-02-15
+- [x] 选中模式下 ↑/↓ 导航、Enter 回到编辑、Escape 取消选中（Phase 1）— 2026-02-15
 - [ ] Cmd+Click 多选（Phase 2）
 - [ ] Shift+Click 范围选中（Phase 2）
 - [ ] Shift+Arrow 扩展选区（Phase 2）

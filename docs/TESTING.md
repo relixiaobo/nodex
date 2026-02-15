@@ -565,6 +565,34 @@ applyWebClipToNode（5 cases）:
 
 ---
 
+### 节点选中 (Phase 1)
+
+**测试文件**: `tests/vitest/node-selection.test.ts`
+
+**覆盖点**:
+
+resolveNodeEditorEscapeIntent（4 cases）:
+1. 无下拉菜单时返回 `select_current`
+2. Reference 下拉打开时返回 `reference_close`
+3. HashTag 下拉打开时返回 `hashtag_close`
+4. Slash 下拉打开时返回 `slash_close`
+
+Focus/Selection 互斥（3 cases）:
+5. setFocusedNode 清除 selection
+6. setSelectedNode 清除 focus
+7. setSelectedNode(null) 清除选中但不设 focus
+
+Selection 导航（3 cases）:
+8. ↑ 导航到前一个可见节点
+9. ↓ 导航到后一个可见节点
+10. 边界处返回 null（首节点无前一个，末节点无后一个）
+
+状态转换（4 cases）:
+11. Escape → Select（编辑中 → 选中当前节点）
+12. Enter → Edit（选中 → 重新进入编辑）
+13. Escape → Deselect（选中 → 取消选中）
+14. ↑/↓ 导航选中框移动
+
 ## Phase 2: 视觉检查点
 
 ### Outliner 核心

@@ -134,13 +134,14 @@
 - [x] 消息类型定义 — 2026-02-14
 - [x] Content Script 提取 — 2026-02-14
 - [x] Background 中转 — 2026-02-14
-- [x] Sidebar 剪藏按钮 — 2026-02-14
+- [x] Sidebar 剪藏按钮 — 2026-02-14（已移除，迁移至 slash command）
 - [x] 提取器切换为 `defuddle`（不保留 `innerText` fallback）— 2026-02-14
 - [x] `Capture Tab` 复制 `defuddle` 原始 `content` 到剪贴板（临时验收路径）— 2026-02-14
-- [ ] （等待 Supertag Extend）将捕获数据保存为节点
-- [ ] （等待 Supertag Extend）自动打 `#web_clip` 标签
-- [ ] （等待 Supertag Extend）Source URL 字段写入
-- [ ] （等待 Supertag Extend）剪藏结果 Toast 反馈
+- [x] 将捕获数据保存为 Inbox 节点 — 2026-02-15
+- [x] 自动打 `#web_clip` 标签（find-or-create） — 2026-02-15
+- [x] Source URL 字段写入 — 2026-02-15
+- [x] 剪藏结果反馈 + 导航到新节点 — 2026-02-15
+- [x] `/clip` slash command 入口（就地转换当前节点，不切换页面）— 2026-02-15
 
 #### #44 节点选中
 
@@ -164,7 +165,8 @@
 #### #47 Slash Command Menu
 
 - [ ] 空节点输入 `/` 触发命令菜单（交互基线对齐 2026-02-15 评审截图）
-- [ ] 菜单项顺序固定：Paste / Search node / Field / Reference / Image / file / Heading / Checkbox / Checklist / Start live transcription / More commands
+- [ ] 菜单项顺序固定：Paste / Clip Page / Search node / Field / Reference / Image / file / Heading / Checkbox / Checklist / Start live transcription / More commands
+- [x] Clip Page（`/clip`）— 就地将当前节点转为网页剪藏 — 2026-02-15
 - [ ] 已实现命令可点击执行：Field（等价 `>`）/ Reference（等价 `@`）/ Checkbox（等价 `Cmd+Enter`）/ More commands（打开 Cmd+K）
 - [ ] 未实现命令保留在对应位置，灰色禁用（不可点击）：Paste / Search node / Image / file / Heading / Checklist / Start live transcription
 

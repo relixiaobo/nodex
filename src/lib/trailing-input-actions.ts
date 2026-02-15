@@ -1,7 +1,7 @@
 export type TrailingUpdateAction =
   | { type: 'none' }
   | { type: 'create_field' }
-  | { type: 'create_trigger_node'; trigger: '#' | '@' }
+  | { type: 'create_trigger_node'; trigger: '#' | '@' | '/' }
   | { type: 'open_options'; query: string }
   | { type: 'close_options' };
 
@@ -19,7 +19,9 @@ export function resolveTrailingUpdateAction(
   const { text, isOptionsField } = params;
 
   if (text === '>') return { type: 'create_field' };
-  if (text === '#' || text === '@') return { type: 'create_trigger_node', trigger: text };
+  if (text === '#' || text === '@' || text === '/') {
+    return { type: 'create_trigger_node', trigger: text };
+  }
 
   if (isOptionsField) {
     if (text.length > 0) return { type: 'open_options', query: text };

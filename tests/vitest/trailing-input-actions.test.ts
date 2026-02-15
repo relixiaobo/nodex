@@ -7,7 +7,7 @@ describe('trailing input update action resolver', () => {
     });
   });
 
-  it('maps "#" and "@" to trigger-node actions', () => {
+  it('maps "#", "@", "/" to trigger-node actions', () => {
     expect(resolveTrailingUpdateAction({ text: '#', isOptionsField: false })).toEqual({
       type: 'create_trigger_node',
       trigger: '#',
@@ -15,6 +15,10 @@ describe('trailing input update action resolver', () => {
     expect(resolveTrailingUpdateAction({ text: '@', isOptionsField: false })).toEqual({
       type: 'create_trigger_node',
       trigger: '@',
+    });
+    expect(resolveTrailingUpdateAction({ text: '/', isOptionsField: false })).toEqual({
+      type: 'create_trigger_node',
+      trigger: '/',
     });
   });
 

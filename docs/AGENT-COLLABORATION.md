@@ -55,30 +55,37 @@
    - **nodex**: `gh pr list --label needs-review` — 是否有待审 PR
    - **dev agent**: 检查自己认领的 GitHub Issue 状态，或寻找可认领的任务
 
-### 2.2 任务认领（dev agent 自助）
+### 2.2 接到任务后的强制标记（不可跳过）
 
-Dev Agent 空闲时**主动从 GitHub Issues 认领任务**，无需等待用户分配：
+任务来源通常是用户在聊天中指定（如"做 #47 节点选中"）。无论任务怎么来的，Dev Agent 写第一行代码之前**必须**执行以下标记：
 
-1. `gh issue list --state open --label "enhancement" --no-assignee` 查看未认领任务
-2. 优先选择：**当前 Milestone 内 > P1 > P2 > P3**
-3. 认领 = 添加自己的 `agent:*` label + 在 Issue 留 comment 说明计划和预计修改的文件
-4. 如果任务涉及热点文件，先检查是否有其他 Agent 的 open PR 正在修改同一文件
+```bash
+# 1. 标记 Issue（替换 <N> 和自己的 agent 名称）
+gh issue edit <N> --add-label "agent:nodex-cc"
+gh issue comment <N> --body "开始开发。预计修改文件：node-store.ts, OutlinerItem.tsx"
 
-**用户仍可随时指定任务**，指定任务优先于自助认领。
-
-### 2.3 开发 Agent 工作流（nodex-codex / nodex-cc）
-
-```
-认领任务 → 创建分支 → 立即开 Draft PR → 开发 → 自检 → 标记 Ready → 等待 review
+# 2. 创建分支 + Draft PR
+git checkout -b cc/<feature> origin/main
+gh pr create --draft --title "[WIP] feat: ..." --body "ref #<N>"
 ```
 
-1. 从 `main` 创建功能分支（`codex/<feature>` 或 `cc/<feature>`）
-2. **立即创建 Draft PR**（即使还没写代码），标题带 `[WIP]`
-   - 好处：让工作进度对所有人可见，其他 Agent 可看到修改中的文件
-   - `gh pr create --draft --title "[WIP] feat: ..." --body "ref #N"`
-3. 在 Issue comment 中**声明将修改的热点文件**（见 §5 文件锁）
-4. 开发过程中定期 push，保持 Draft PR 可见
-5. 完成后：
+**为什么不可跳过**：
+- 其他 Agent 通过 Issue label 和 Draft PR 判断全局状态
+- 不标记 = 对其他人不可见 = 可能产生文件冲突
+- nodex（review agent）通过 `gh issue list --label "agent:*"` 查看各 agent 工作状态
+
+**如果用户没给 Issue 编号**：先搜索对应 issue（`gh issue list --state open`），找到后标记；没有则创建新 issue 再标记。
+
+### 2.3 开发 Agent 工作流（nodex-codex / nodex-cc / nodex-cc-2）
+
+```
+接到任务 → 标记 Issue + Draft PR（§2.2）→ 开发 → 自检 → 标记 Ready → 等待 review
+```
+
+1. §2.2 的标记步骤已包含创建分支和 Draft PR
+2. 在 Issue comment 中**声明将修改的热点文件**（见 §5 文件锁）
+3. 开发过程中定期 push，保持 Draft PR 可见
+4. 完成后：
    - 按 PR template checklist 逐项自检
    - 将 PR 从 Draft 转为 Ready：`gh pr ready`
    - 添加 `needs-review` label：`gh pr edit --add-label "needs-review"`

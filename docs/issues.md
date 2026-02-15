@@ -163,9 +163,10 @@
 
 #### #47 Slash Command Menu
 
-- [ ] 空节点输入 `/` 触发命令菜单
-- [ ] 菜单项：Search node / Field / Reference / Heading / Checkbox
-- [ ] 选中菜单项后执行对应操作
+- [ ] 空节点输入 `/` 触发命令菜单（交互基线对齐 2026-02-15 评审截图）
+- [ ] 菜单项顺序固定：Paste / Search node / Field / Reference / Image / file / Heading / Checkbox / Checklist / Start live transcription / More commands
+- [ ] 已实现命令可点击执行：Field（等价 `>`）/ Reference（等价 `@`）/ Checkbox（等价 `Cmd+Enter`）/ More commands（打开 Cmd+K）
+- [ ] 未实现命令保留在对应位置，灰色禁用（不可点击）：Paste / Search node / Image / file / Heading / Checklist / Start live transcription
 
 #### #48 Floating Toolbar
 

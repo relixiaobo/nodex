@@ -33,6 +33,7 @@ import {
 import { HashTagExtension, type HashTagCallbacks } from './HashTagExtension';
 import { FieldTriggerExtension, type FieldTriggerCallbacks } from './FieldTriggerExtension';
 import { ReferenceExtension, type ReferenceCallbacks } from './ReferenceExtension';
+import { SlashCommandExtension, type SlashCommandCallbacks } from './SlashCommandExtension';
 import { InlineRefNode } from './InlineRefNode';
 
 const KEY_EDITOR_ENTER = getPrimaryShortcutKey('editor.enter', 'Enter');
@@ -85,6 +86,14 @@ interface NodeEditorProps {
   onReferenceNavUp?: () => void;
   onReferenceCreate?: () => void;
   onReferenceClose?: () => void;
+  // ─── Slash trigger (/) ───
+  onSlashCommand?: (query: string, from: number, to: number) => void;
+  onSlashCommandDeactivate?: () => void;
+  slashActive?: boolean;
+  onSlashConfirm?: () => void;
+  onSlashNavDown?: () => void;
+  onSlashNavUp?: () => void;
+  onSlashClose?: () => void;
   // ─── Description editing ───
   onDescriptionEdit?: () => void;
   // ─── Checkbox toggle (Cmd+Enter when no dropdown) ───
@@ -122,6 +131,13 @@ export function NodeEditor({
   onReferenceNavUp,
   onReferenceCreate,
   onReferenceClose,
+  onSlashCommand,
+  onSlashCommandDeactivate,
+  slashActive,
+  onSlashConfirm,
+  onSlashNavDown,
+  onSlashNavUp,
+  onSlashClose,
   onDescriptionEdit,
   onToggleDone,
 }: NodeEditorProps) {
@@ -168,6 +184,11 @@ export function NodeEditor({
     onReferenceNavUp: onReferenceNavUp ?? (() => {}),
     onReferenceCreate: onReferenceCreate ?? (() => {}),
     onReferenceClose: onReferenceClose ?? (() => {}),
+    slashActive: slashActive ?? false,
+    onSlashConfirm: onSlashConfirm ?? (() => {}),
+    onSlashNavDown: onSlashNavDown ?? (() => {}),
+    onSlashNavUp: onSlashNavUp ?? (() => {}),
+    onSlashClose: onSlashClose ?? (() => {}),
     onDescriptionEdit: onDescriptionEdit ?? (() => {}),
     onToggleDone: onToggleDone ?? (() => {}),
   });
@@ -186,6 +207,11 @@ export function NodeEditor({
     onReferenceNavUp: onReferenceNavUp ?? (() => {}),
     onReferenceCreate: onReferenceCreate ?? (() => {}),
     onReferenceClose: onReferenceClose ?? (() => {}),
+    slashActive: slashActive ?? false,
+    onSlashConfirm: onSlashConfirm ?? (() => {}),
+    onSlashNavDown: onSlashNavDown ?? (() => {}),
+    onSlashNavUp: onSlashNavUp ?? (() => {}),
+    onSlashClose: onSlashClose ?? (() => {}),
     onDescriptionEdit: onDescriptionEdit ?? (() => {}),
     onToggleDone: onToggleDone ?? (() => {}),
   };
@@ -218,6 +244,16 @@ export function NodeEditor({
     onDeactivate: () => onReferenceDeactivate?.(),
   };
 
+  // Slash command extension callbacks
+  const slashRef = useRef<SlashCommandCallbacks>({
+    onActivate: (query, from, to) => onSlashCommand?.(query, from, to),
+    onDeactivate: () => onSlashCommandDeactivate?.(),
+  });
+  slashRef.current = {
+    onActivate: (query, from, to) => onSlashCommand?.(query, from, to),
+    onDeactivate: () => onSlashCommandDeactivate?.(),
+  };
+
   const outlinerKeymap = useRef(
     Extension.create({
       name: 'outlinerKeymap',
@@ -227,6 +263,7 @@ export function NodeEditor({
             const intent = resolveNodeEditorEnterIntent({
               referenceActive: callbacksRef.current.referenceActive,
               hashTagActive: callbacksRef.current.hashTagActive,
+              slashActive: callbacksRef.current.slashActive,
             });
             // Dropdown active: confirm selection
             if (intent === 'reference_confirm') {
@@ -235,6 +272,10 @@ export function NodeEditor({
             }
             if (intent === 'hashtag_confirm') {
               callbacksRef.current.onHashTagConfirm();
+              return true;
+            }
+            if (intent === 'slash_confirm') {
+              callbacksRef.current.onSlashConfirm();
               return true;
             }
 
@@ -302,6 +343,7 @@ export function NodeEditor({
             const intent = resolveNodeEditorArrowIntent({
               referenceActive: callbacksRef.current.referenceActive,
               hashTagActive: callbacksRef.current.hashTagActive,
+              slashActive: callbacksRef.current.slashActive,
               isAtBoundary: from <= 1,
             });
             // Dropdown navigation
@@ -311,6 +353,10 @@ export function NodeEditor({
             }
             if (intent === 'hashtag_nav') {
               callbacksRef.current.onHashTagNavUp();
+              return true;
+            }
+            if (intent === 'slash_nav') {
+              callbacksRef.current.onSlashNavUp();
               return true;
             }
             // Only intercept when cursor is at the start
@@ -326,6 +372,7 @@ export function NodeEditor({
             const intent = resolveNodeEditorArrowIntent({
               referenceActive: callbacksRef.current.referenceActive,
               hashTagActive: callbacksRef.current.hashTagActive,
+              slashActive: callbacksRef.current.slashActive,
               isAtBoundary: to >= endPos,
             });
             // Dropdown navigation
@@ -335,6 +382,10 @@ export function NodeEditor({
             }
             if (intent === 'hashtag_nav') {
               callbacksRef.current.onHashTagNavDown();
+              return true;
+            }
+            if (intent === 'slash_nav') {
+              callbacksRef.current.onSlashNavDown();
               return true;
             }
             // Only intercept when cursor is at the end
@@ -348,6 +399,7 @@ export function NodeEditor({
             const intent = resolveNodeEditorEscapeIntent(
               callbacksRef.current.referenceActive,
               callbacksRef.current.hashTagActive,
+              callbacksRef.current.slashActive,
             );
             if (intent === 'reference_close') {
               callbacksRef.current.onReferenceClose();
@@ -357,12 +409,17 @@ export function NodeEditor({
               callbacksRef.current.onHashTagClose();
               return true;
             }
+            if (intent === 'slash_close') {
+              callbacksRef.current.onSlashClose();
+              return true;
+            }
             return false;
           },
           [KEY_EDITOR_DROPDOWN_FORCE_CREATE]: () => {
             const intent = resolveNodeEditorForceCreateIntent(
               callbacksRef.current.referenceActive,
               callbacksRef.current.hashTagActive,
+              callbacksRef.current.slashActive,
             );
             if (intent === 'reference_create') {
               callbacksRef.current.onReferenceCreate();
@@ -370,6 +427,9 @@ export function NodeEditor({
             }
             if (intent === 'hashtag_create') {
               callbacksRef.current.onHashTagCreate();
+              return true;
+            }
+            if (intent === 'noop') {
               return true;
             }
             // No dropdown active: toggle done state
@@ -436,6 +496,7 @@ export function NodeEditor({
     HashTagExtension.configure({ callbacks: hashTagRef }),
     FieldTriggerExtension.configure({ callbacks: fieldTriggerRef }),
     ReferenceExtension.configure({ callbacks: referenceRef }),
+    SlashCommandExtension.configure({ callbacks: slashRef }),
   // eslint-disable-next-line react-hooks/exhaustive-deps
   ], [ItalicNoShortcut]);
 

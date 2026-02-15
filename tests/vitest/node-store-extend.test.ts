@@ -182,9 +182,36 @@ describe('Supertag Extend (Inheritance)', () => {
       expect(statusFields.length).toBe(1);
     });
 
-    it('applying parent tag directly still works normally', async () => {
+    it('clones default content nodes from parent tag template', async () => {
+      const nodeId = 'note_2';
+      // tagDef_task has a regular content child 'taskTpl_default_note' ("Notes")
+      await getState().applyTag(nodeId, 'tagDef_dev_task', 'ws_default', 'user_default');
+
+      const node = getState().entities[nodeId];
+      // Find cloned content node (by _sourceId pointing to template)
+      const clonedNotes = (node.children ?? []).filter((cid) => {
+        const c = getState().entities[cid];
+        return c?.props._sourceId === 'taskTpl_default_note';
+      });
+      expect(clonedNotes.length).toBe(1);
+
+      const clone = getState().entities[clonedNotes[0]];
+      expect(clone.props.name).toBe('Notes');
+      expect(clone.props._ownerId).toBe(nodeId);
+      // Should NOT have a docType (regular content node)
+      expect(clone.props._docType).toBeUndefined();
+    });
+
+    it('applying parent tag directly clones its default content', async () => {
       const nodeId = 'note_2';
       await getState().applyTag(nodeId, 'tagDef_task', 'ws_default', 'user_default');
+
+      const node = getState().entities[nodeId];
+      const clonedNotes = (node.children ?? []).filter((cid) => {
+        const c = getState().entities[cid];
+        return c?.props._sourceId === 'taskTpl_default_note';
+      });
+      expect(clonedNotes.length).toBe(1);
 
       const statusFields = findFieldTupleIds(nodeId, 'attrDef_status');
       const priorityFields = findFieldTupleIds(nodeId, 'attrDef_priority');
@@ -206,9 +233,13 @@ describe('Supertag Extend (Inheritance)', () => {
 
       await getState().applyTag(nodeId, tagDefId, 'ws_default', 'user_default');
 
-      // Verify fields are there
+      // Verify fields + content clones are there
       expect(findFieldTupleIds(nodeId, 'attrDef_status').length).toBe(1);
       expect(findFieldTupleIds(nodeId, 'attrDef_branch').length).toBe(1);
+      const notesClone = (getState().entities[nodeId].children ?? []).find((cid) =>
+        getState().entities[cid]?.props._sourceId === 'taskTpl_default_note',
+      );
+      expect(notesClone).toBeTruthy();
 
       await getState().removeTag(nodeId, tagDefId, 'user_default');
 
@@ -218,6 +249,12 @@ describe('Supertag Extend (Inheritance)', () => {
       expect(findFieldTupleIds(nodeId, 'attrDef_due').length).toBe(0);
       expect(findFieldTupleIds(nodeId, 'attrDef_done').length).toBe(0);
       expect(findFieldTupleIds(nodeId, 'attrDef_branch').length).toBe(0);
+
+      // Cloned content nodes should also be removed
+      const notesCloneAfter = (getState().entities[nodeId].children ?? []).find((cid) =>
+        getState().entities[cid]?.props._sourceId === 'taskTpl_default_note',
+      );
+      expect(notesCloneAfter).toBeUndefined();
 
       // Original children preserved
       const node = getState().entities[nodeId];

@@ -886,9 +886,36 @@ export const useNodeStore = create<NodeStore>()(
         const seenAttrDefs = new Set<string>();
 
         for (const td of tagDefsToInstantiate) {
-          for (const templateTupleId of td.children!) {
-            const template = state.entities[templateTupleId];
-            if (template?.props._docType !== 'tuple') continue;
+          for (const templateChildId of td.children!) {
+            const template = state.entities[templateChildId];
+            if (!template) continue;
+
+            // ── Regular content node (default content) ──
+            if (!template.props._docType || template.props._docType !== 'tuple') {
+              // Check if already cloned (by _sourceId)
+              const alreadyCloned = n.children.some((cid) => {
+                return state.entities[cid]?.props._sourceId === templateChildId;
+              });
+              if (alreadyCloned) continue;
+
+              // Clone template content node (shallow — children not deep-cloned)
+              const cloneId = nanoid();
+              const clone: NodexNode = {
+                id: cloneId,
+                workspaceId,
+                props: { created: now, name: template.props.name ?? '', _ownerId: nodeId, _sourceId: templateChildId },
+                children: [],
+                version: 1,
+                updatedAt: now,
+                createdBy: userId,
+                updatedBy: userId,
+              };
+              state.entities[cloneId] = clone;
+              n.children.push(cloneId);
+              continue;
+            }
+
+            // ── Tuple children ──
             const keyId = template.children?.[0];
             if (!keyId) continue;
 
@@ -904,7 +931,7 @@ export const useNodeStore = create<NodeStore>()(
 
               const instanceId = nanoid();
               const instanceNode = makeNodeLocal(instanceId, nodeId, 'tuple', [keyId, configDef.defaultValue]);
-              instanceNode.props._sourceId = templateTupleId;
+              instanceNode.props._sourceId = templateChildId;
               state.entities[instanceId] = instanceNode;
               n.children.push(instanceId);
               continue;
@@ -929,7 +956,7 @@ export const useNodeStore = create<NodeStore>()(
             // Create instance tuple
             const instanceId = nanoid();
             const instanceNode = makeNodeLocal(instanceId, nodeId, 'tuple', [keyId]);
-            instanceNode.props._sourceId = templateTupleId;
+            instanceNode.props._sourceId = templateChildId;
             state.entities[instanceId] = instanceNode;
 
             // Create associatedData

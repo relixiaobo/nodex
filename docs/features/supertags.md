@@ -127,7 +127,6 @@
 - 父标签模板变更后自动传播到所有子标签实例（无需手动同步）
 - 配置页中继承字段标记为"来自 #parent_tag"（灰色/锁定样式）
 - 多态搜索：搜索父标签时自动返回所有子标签的实例
-- applyTag 复制 default content 中的普通节点
 
 **继承范围**:
 - 继承的不仅是字段（field tuples），还包括父标签 default content 中的**普通节点**（Phase 2）
@@ -279,7 +278,7 @@ tagDef_article
 | **Voice chat** 面板 | Nodex 不需要（Tana 特有） | — |
 | **Advanced options** 折叠面板 | 包含 build title, shortcuts 等高级配置 | P3 |
 | **折叠面板 UI 结构** | Tana 用折叠卡片组织配置区，Nodex 当前是扁平列表 | P3 |
-| **applyTag 复制普通内容节点** | 当前 applyTag 只复制 field tuples，不复制 default content 中的普通节点 | P2 |
+| **applyTag 深度克隆内容节点** | 当前 shallow clone（顶层），Tana 递归克隆含子节点 | P3 |
 
 ## 决策记录
 
@@ -318,7 +317,7 @@ tagDef_article
 - [x] Delete tag / Delete field 按钮（当前行为为 trashNode）
 - [ ] trashNode(tagDef) 级联清理（移除所有标签绑定与模板来源字段）
 - [ ] trashNode(attrDef) 级联清理（移除所有引用该字段的 tuple）
-- [ ] applyTag 复制 default content 中的普通节点
+- [x] applyTag 克隆 default content 中的普通节点（shallow clone, `_sourceId` 追踪来源）
 - [x] Show as Checkbox（toggle + done visual + Cmd+Enter）
 - [ ] Done state mapping（checkbox ↔ Options 字段双向映射）
 - [ ] Default Child Supertag（真实 tag_picker）
@@ -341,7 +340,7 @@ tagDef_article
 - Tana TagBadge 有自定义颜色，Nodex 用 ID 哈希确定色系
 - Tana 支持 tag 内嵌 description（在标签名下方显示），Nodex 暂不支持
 - Tana 的"标签页"是完整的 Search Node + View 组合，Nodex 需等 Phase 2
-- Tana applyTag 会复制 default content 中的普通节点到目标节点，Nodex 当前只复制 field tuples
+- Tana applyTag 深度克隆 default content（含子节点），Nodex 当前为 shallow clone（仅顶层节点，子节点不递归）
 - Tana 删除 tag 后节点显示 trash icon，Nodex 直接清除引用
 - Tana 有 Pinned/Optional fields 两级机制，Nodex 当前所有模板字段平等
 - Tana 支持 "Convert to supertag" 快捷转换，Nodex 暂不支持

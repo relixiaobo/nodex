@@ -28,9 +28,13 @@ interface UIStore {
   setExpanded(expandKey: string, expanded: boolean): void;
 
   // Focus (parentId disambiguates reference nodes that appear in multiple places)
+  // setFocusedNode also sets selection to the focused node (click-time selection pattern)
+  // so that Escape only needs to clearFocus() and selection survives.
   focusedNodeId: string | null;
   focusedParentId: string | null;
   setFocusedNode(nodeId: string | null, parentId?: string | null): void;
+  /** Clear focus only, preserving selection. Used by Escape to transition edit→selected. */
+  clearFocus(): void;
 
   // Selection (reference nodes: single click = select, double click = edit/focus)
   selectedNodeId: string | null;
@@ -205,14 +209,34 @@ export const useUIStore = create<UIStore>()(
       // Focus
       focusedNodeId: null,
       focusedParentId: null,
-      setFocusedNode: (nodeId, parentId) => set({
-        focusedNodeId: nodeId,
-        focusedParentId: parentId ?? null,
-        // Clear all selection when entering edit mode
-        selectedNodeId: null,
-        selectedParentId: null,
-        selectedNodeIds: new Set(),
-        selectionAnchorId: null,
+      setFocusedNode: (nodeId, parentId) => {
+        if (nodeId) {
+          // Entering edit mode: set focus AND selection to this node.
+          // Selection is set at click-time so Escape only needs clearFocus()
+          // and the node stays in selectedNodeIds → ring shows.
+          set({
+            focusedNodeId: nodeId,
+            focusedParentId: parentId ?? null,
+            selectedNodeId: nodeId,
+            selectedParentId: parentId ?? null,
+            selectedNodeIds: new Set([nodeId]),
+            selectionAnchorId: nodeId,
+          });
+        } else {
+          // Clearing focus (blur/navigation away): also clear all selection
+          set({
+            focusedNodeId: null,
+            focusedParentId: null,
+            selectedNodeId: null,
+            selectedParentId: null,
+            selectedNodeIds: new Set(),
+            selectionAnchorId: null,
+          });
+        }
+      },
+      clearFocus: () => set({
+        focusedNodeId: null,
+        focusedParentId: null,
       }),
 
       // Selection (single)

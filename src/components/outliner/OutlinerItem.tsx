@@ -85,6 +85,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   const selectionAnchorId = useUIStore((s) => s.selectionAnchorId);
   const setSelectedNodes = useUIStore((s) => s.setSelectedNodes);
   const clearSelection = useUIStore((s) => s.clearSelection);
+  const clearFocus = useUIStore((s) => s.clearFocus);
   const toggleExpanded = useUIStore((s) => s.toggleExpanded);
   const setExpanded = useUIStore((s) => s.setExpanded);
   const navigateTo = useUIStore((s) => s.navigateTo);
@@ -288,15 +289,15 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     setSelectedNodes(range, anchor);
   }, [nodeId, parentId, rootChildIds, rootNodeId, setSelectedNode, setSelectedNodes]);
 
-  // Escape in editor (no dropdown) → select current node
+  // Escape in editor (no dropdown) → clear focus, keep selection (set at click time)
   const handleEscapeSelect = useCallback(() => {
-    setSelectedNode(nodeId, parentId);
-  }, [nodeId, parentId, setSelectedNode]);
+    clearFocus();
+  }, [clearFocus]);
 
-  // Shift+↑/↓ in editor → enter selection mode (current node as anchor)
+  // Shift+↑/↓ in editor → enter selection mode (selection already set at click time)
   const handleShiftArrow = useCallback((_direction: 'up' | 'down') => {
-    setSelectedNode(nodeId, parentId);
-  }, [nodeId, parentId, setSelectedNode]);
+    clearFocus();
+  }, [clearFocus]);
 
   // Description editing state
   const [editingDescription, setEditingDescription] = useState(false);
@@ -406,6 +407,12 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   useEffect(() => {
     if (!isSelected || isFocused) return;
     const handleKeyDown = (e: KeyboardEvent) => {
+      // If TipTap/ProseMirror already handled this key (e.g. Escape in editor
+      // called clearFocus() synchronously before this handler runs), skip it.
+      // Without this, the same Escape event that transitions edit→selected
+      // would also immediately clear the selection.
+      if (e.defaultPrevented) return;
+
       const uiState = useUIStore.getState();
 
       // For multi-select, only the anchor node processes keyboard events
@@ -1397,8 +1404,9 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
           onToggle={handleToggle}
           onDrillDown={handleDrillDown}
         />
-        {/* Selection ring wraps bullet + checkbox + text (not chevron) */}
-        <div className={`flex items-start gap-2 flex-1 min-w-0 relative ${isSelected ? 'ring-1 ring-primary/40 rounded-sm bg-primary/5 !w-fit !flex-none' : ''}`}>
+        {/* Selection ring wraps bullet + checkbox + text (not chevron).
+            Only show when selected AND not editing (isFocused). */}
+        <div className={`flex items-start gap-2 flex-1 min-w-0 relative ${isSelected && !isFocused ? 'ring-1 ring-primary/40 rounded-sm bg-primary/5 !w-fit !flex-none' : ''}`}>
           <BulletChevron
             hasChildren={hasChildren}
             isExpanded={isExpanded}

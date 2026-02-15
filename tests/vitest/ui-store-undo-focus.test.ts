@@ -42,16 +42,57 @@ describe('ui-store undo/redo + focus/selection semantics', () => {
     expect(useUIStore.getState().focusedNodeId).toBeNull();
     expect(useUIStore.getState().focusedParentId).toBeNull();
 
+    // setFocusedNode now sets selection alongside focus (click-time selection pattern)
     ui.setFocusedNode('subtask_1a', 'task_1');
     expect(useUIStore.getState().focusedNodeId).toBe('subtask_1a');
     expect(useUIStore.getState().focusedParentId).toBe('task_1');
-    expect(useUIStore.getState().selectedNodeId).toBeNull();
-    expect(useUIStore.getState().selectedParentId).toBeNull();
+    expect(useUIStore.getState().selectedNodeId).toBe('subtask_1a');
+    expect(useUIStore.getState().selectedParentId).toBe('task_1');
 
     // ParentId omitted => normalized to null.
     ui.setSelectedNode('note_2');
     expect(useUIStore.getState().selectedNodeId).toBe('note_2');
     expect(useUIStore.getState().selectedParentId).toBeNull();
     expect(useUIStore.getState().focusedNodeId).toBeNull();
+  });
+
+  it('clearFocus preserves selection for Escape edit→selected transition', () => {
+    const ui = useUIStore.getState();
+
+    // Simulate click-to-edit: setFocusedNode sets both focus AND selection
+    ui.setFocusedNode('task_1', 'proj_1');
+    expect(useUIStore.getState().focusedNodeId).toBe('task_1');
+    expect(useUIStore.getState().selectedNodeId).toBe('task_1');
+    expect(useUIStore.getState().selectedNodeIds.has('task_1')).toBe(true);
+    expect(useUIStore.getState().selectionAnchorId).toBe('task_1');
+
+    // Simulate Escape: clearFocus only clears focus, selection survives
+    ui.clearFocus();
+    expect(useUIStore.getState().focusedNodeId).toBeNull();
+    expect(useUIStore.getState().focusedParentId).toBeNull();
+    // Selection preserved!
+    expect(useUIStore.getState().selectedNodeId).toBe('task_1');
+    expect(useUIStore.getState().selectedParentId).toBe('proj_1');
+    expect(useUIStore.getState().selectedNodeIds.has('task_1')).toBe(true);
+    expect(useUIStore.getState().selectionAnchorId).toBe('task_1');
+
+    // Second Escape: clearSelection clears everything
+    ui.clearSelection();
+    expect(useUIStore.getState().selectedNodeId).toBeNull();
+    expect(useUIStore.getState().selectedNodeIds.size).toBe(0);
+    expect(useUIStore.getState().selectionAnchorId).toBeNull();
+  });
+
+  it('setFocusedNode(null) clears both focus and selection (blur to empty space)', () => {
+    const ui = useUIStore.getState();
+
+    ui.setFocusedNode('task_1', 'proj_1');
+    expect(useUIStore.getState().selectedNodeIds.has('task_1')).toBe(true);
+
+    // Blur handler calls setFocusedNode(null) → clears everything
+    ui.setFocusedNode(null);
+    expect(useUIStore.getState().focusedNodeId).toBeNull();
+    expect(useUIStore.getState().selectedNodeId).toBeNull();
+    expect(useUIStore.getState().selectedNodeIds.size).toBe(0);
   });
 });

@@ -115,6 +115,7 @@
 
 **反向映射**（Options field → checkbox）:
 - `setOptionsFieldValue` / `autoCollectOption` 设置 option 值后，调用 `resolveReverseDoneMapping`
+- `selectFieldOption`（UI 路径，从 assocDataId 反查内容节点和 attrDefId）— 用于 OutlinerItem inline picker 和 TrailingInput option 选择
 - 在同一个 `set()` 调用内更新 `_done`
 
 **无限循环防护**: 正向和反向都在各自的 `set()` 内完成，不会互相触发 store action。
@@ -333,6 +334,7 @@ tagDef_article
 | 2026-02-16 | Done state mapping 使用 NDX_A06 Tuple 存储在 tagDef.children | 遵循现有 config tuple 模式，与 SYS_T01 模板一致 |
 | 2026-02-16 | 正向/反向映射在同一 set() 中原子完成 | 避免无限循环，无需额外防护标志 |
 | 2026-02-16 | Done state mapping 沿 Extend 链继承 | 子标签自动继承父标签的映射配置 |
+| 2026-02-16 | 新增 `selectFieldOption` store action 用于 UI 路径反向映射 | UI 使用 `addReference` 而非 `setOptionsFieldValue`，需独立路径从 assocDataId 反查 |
 
 ## 当前状态
 

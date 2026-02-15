@@ -554,14 +554,24 @@ hash trigger cleanup safety（2 cases, Bug #53 回归）:
 13. `resolveReverseDoneMapping` 无关 option → null
 14. `resolveReverseDoneMapping` attrDefId 不匹配 → null
 
-Store 集成（7 cases）:
-15. `toggleNodeDone`（undone→done）→ Status 设为 opt_done
-16. `toggleNodeDone`（done→undone）→ Status 设为 opt_todo
-17. `setOptionsFieldValue`（opt_done）→ checkbox 自动勾选
-18. `setOptionsFieldValue`（opt_todo）→ checkbox 自动取消
-19. `setOptionsFieldValue`（opt_in_progress）→ checkbox 不变
-20. 原子 set() 无循环：forward + reverse 独立操作
-21. `resolveReverseDoneMapping` 无 unchecked + non-checked option → null
+Store 集成 — setOptionsFieldValue（3 cases）:
+15. `setOptionsFieldValue`（opt_done）→ checkbox 自动勾选
+16. `setOptionsFieldValue`（opt_todo）→ checkbox 自动取消
+17. `setOptionsFieldValue`（opt_in_progress）→ checkbox 不变
+
+Store 集成 — selectFieldOption / UI 路径（4 cases）:
+18. `selectFieldOption` via assocDataId（opt_done）→ checkbox 自动勾选
+19. `selectFieldOption` via assocDataId（opt_todo）→ checkbox 自动取消
+20. `selectFieldOption` via assocDataId（opt_in_progress）→ checkbox 不变
+21. `selectFieldOption` old→new option swap（children 替换正确）
+
+Store 集成 — forward mapping（2 cases）:
+22. `toggleNodeDone`（undone→done）→ Status 设为 opt_done
+23. `toggleNodeDone`（done→undone）→ Status 设为 opt_todo
+
+Store 集成 — 安全性（2 cases）:
+24. 原子 set() 无循环：forward + reverse 独立操作
+25. `resolveReverseDoneMapping` 无 unchecked + non-checked option → null
 
 ### 1.39 Web Clip 落库服务
 

@@ -167,6 +167,12 @@ interface NodeStore {
   /** Set an OPTIONS-type field to a specific option node */
   setOptionsFieldValue(nodeId: string, attrDefId: string, optionNodeId: string, userId: string): void;
 
+  /**
+   * Select an option for a field via assocData reference (used by UI pickers).
+   * Replaces old reference with new one and applies reverse done-state mapping.
+   */
+  selectFieldOption(assocDataId: string, optionNodeId: string, oldOptionNodeId: string | undefined, userId: string): void;
+
   /** Clear a field value (set to empty) */
   clearFieldValue(nodeId: string, attrDefId: string, userId: string): Promise<void>;
 
@@ -1322,6 +1328,55 @@ export const useNodeStore = create<NodeStore>()(
             }
             return;
           }
+        }
+      });
+    },
+
+    selectFieldOption: (assocDataId, optionNodeId, oldOptionNodeId, userId) => {
+      // Pre-compute reverse done-state mapping before set()
+      const { entities } = get();
+      const assoc = entities[assocDataId];
+      const contentNodeId = assoc?.props._ownerId;
+      let reverseResult: { newDone: boolean } | null = null;
+      if (contentNodeId) {
+        // Find attrDefId from the content node's associationMap
+        const contentNode = entities[contentNodeId];
+        if (contentNode?.associationMap) {
+          for (const [tupleId, aId] of Object.entries(contentNode.associationMap)) {
+            if (aId === assocDataId) {
+              const tuple = entities[tupleId];
+              if (tuple?.children?.[0]) {
+                reverseResult = resolveReverseDoneMapping(
+                  contentNodeId, tuple.children[0], optionNodeId, entities,
+                );
+              }
+              break;
+            }
+          }
+        }
+      }
+
+      set((state) => {
+        const a = state.entities[assocDataId];
+        if (!a) return;
+
+        // Remove old reference if present
+        if (oldOptionNodeId && a.children) {
+          const idx = a.children.indexOf(oldOptionNodeId);
+          if (idx >= 0) a.children.splice(idx, 1);
+        }
+
+        // Add new reference (prevent duplicate)
+        if (!a.children) a.children = [];
+        if (!a.children.includes(optionNodeId)) {
+          a.children.push(optionNodeId);
+        }
+        a.updatedAt = Date.now();
+        a.updatedBy = userId;
+
+        // Reverse done-state mapping
+        if (reverseResult && contentNodeId && state.entities[contentNodeId]) {
+          state.entities[contentNodeId].props._done = reverseResult.newDone ? Date.now() : undefined;
         }
       });
     },

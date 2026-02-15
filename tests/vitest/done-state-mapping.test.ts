@@ -310,6 +310,62 @@ describe('Store: setOptionsFieldValue → checkbox update', () => {
   });
 });
 
+describe('Store: selectFieldOption → checkbox update (UI path)', () => {
+  beforeEach(() => {
+    useNodeStore.setState({ entities: {}, loading: new Set() });
+  });
+
+  it('selecting checkedOptionId via assocData auto-checks checkbox', () => {
+    const entities = buildDoneStateMappingEntities({ uncheckedOptionId: 'opt_todo' });
+    entities['n1'].props._done = undefined;
+    useNodeStore.setState({ entities });
+
+    // selectFieldOption works with assocDataId (what the UI has), not nodeId
+    useNodeStore.getState().selectFieldOption('assoc_status', 'opt_done', undefined, USER);
+
+    const state = useNodeStore.getState().entities;
+    expect(state['n1'].props._done).toBeGreaterThan(0);
+    expect(state['assoc_status'].children).toEqual(['opt_done']);
+  });
+
+  it('selecting uncheckedOptionId via assocData auto-unchecks checkbox', () => {
+    const entities = buildDoneStateMappingEntities({ uncheckedOptionId: 'opt_todo' });
+    entities['n1'].props._done = Date.now();
+    entities['assoc_status'].children = ['opt_done'];
+    useNodeStore.setState({ entities });
+
+    useNodeStore.getState().selectFieldOption('assoc_status', 'opt_todo', 'opt_done', USER);
+
+    const state = useNodeStore.getState().entities;
+    expect(state['n1'].props._done).toBeUndefined();
+    expect(state['assoc_status'].children).toEqual(['opt_todo']);
+  });
+
+  it('selecting unrelated option does not change checkbox', () => {
+    const entities = buildDoneStateMappingEntities({ uncheckedOptionId: 'opt_todo' });
+    entities['n1'].props._done = undefined;
+    useNodeStore.setState({ entities });
+
+    useNodeStore.getState().selectFieldOption('assoc_status', 'opt_in_progress', undefined, USER);
+
+    const state = useNodeStore.getState().entities;
+    expect(state['n1'].props._done).toBeUndefined();
+    expect(state['assoc_status'].children).toEqual(['opt_in_progress']);
+  });
+
+  it('replaces old option with new one (swap)', () => {
+    const entities = buildDoneStateMappingEntities({ uncheckedOptionId: 'opt_todo' });
+    entities['assoc_status'].children = ['opt_todo'];
+    useNodeStore.setState({ entities });
+
+    useNodeStore.getState().selectFieldOption('assoc_status', 'opt_done', 'opt_todo', USER);
+
+    const state = useNodeStore.getState().entities;
+    expect(state['assoc_status'].children).toEqual(['opt_done']);
+    expect(state['assoc_status'].children).not.toContain('opt_todo');
+  });
+});
+
 describe('No infinite loop: atomic set() verification', () => {
   it('forward and reverse operate in separate set() calls, no recursion', () => {
     // This test verifies the architecture: forward mapping is in toggleNodeDone/cycleNodeCheckbox,

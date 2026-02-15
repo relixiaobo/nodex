@@ -212,6 +212,8 @@ export const SYS_A = {
   MIN_VALUE: 'NDX_A03',
   /** [Nodex] Number/Integer 最大值 → Tuple value = 数字字符串 */
   MAX_VALUE: 'NDX_A04',
+  /** [Nodex] Extend parent tagDef → Tuple [NDX_A05, parentTagDefId] */
+  EXTENDS: 'NDX_A05',
 } as const;
 
 export type SystemAttribute = typeof SYS_A[keyof typeof SYS_A];

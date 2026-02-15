@@ -273,29 +273,21 @@ async function shouldShowCheckbox(tagDef: NodexNode): Promise<boolean> {
   return false;
 }
 
-/** 获取 TagDef 的继承标签 ID 列表 */
+/** 获取 TagDef 的继承标签 ID 列表 (via NDX_A05 EXTENDS config tuples in tagDef.children) */
 async function getExtendsTagIds(tagDef: NodexNode): Promise<string[]> {
-  // Tana 中 extends 关系通过 TagDef Metanode 中的特定 Tuple 存储
-  // 具体 SYS_A* 键需要从数据中确认
-  // 暂时返回空数组，后续根据实际数据完善
-  if (!tagDef.props._metaNodeId) return [];
+  if (!tagDef.children?.length) return [];
 
-  const metanode = await getNode(tagDef.props._metaNodeId);
-  if (!metanode || !metanode.children) return [];
-
-  // 查找 extends 相关的 Tuple（具体键 ID 需确认）
-  const tuples = await getNodes(metanode.children);
+  // Read from tagDef.children (config tuples) — same source as getExtendsChain()
+  const tuples = await getNodes(tagDef.children);
   const extendsIds: string[] = [];
 
   for (const tuple of tuples) {
     if (
       tuple.props._docType === 'tuple' &&
-      tuple.children &&
-      tuple.children[0] === SYS_A.NODE_SUPERTAGS &&
-      tuple.children.length >= 2
+      tuple.children?.[0] === SYS_A.EXTENDS &&
+      tuple.children.length >= 2 &&
+      tuple.children[1] // skip empty extends
     ) {
-      // TagDef 的 SYS_A13 Tuple 中的值即为继承的父标签
-      // 但这与"节点应用标签"是同一个机制（标签本身也是节点，也可以有标签）
       extendsIds.push(tuple.children[1]);
     }
   }

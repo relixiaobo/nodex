@@ -379,6 +379,15 @@ export const TAGDEF_CONFIG_FIELDS: ConfigFieldDef[] = [
     defaultValue: '',
     appliesTo: '*',
   },
+  {
+    key: SYS_A.EXTENDS,           // NDX_A05
+    name: 'Extends',
+    control: 'tag_picker',
+    icon: ListTree,
+    defaultValue: '',
+    appliesTo: '*',
+    description: 'Inherit fields and content from another tag',
+  },
   // outliner field — rendered as field row with embedded outliner (template children)
   {
     key: 'NDX_SECTION_DEFAULT_CONTENT',
@@ -400,6 +409,49 @@ export const TAGDEF_CONFIG_MAP = new Map(
 /** Outliner-type config fields for tagDef (virtual entries — no backing tuple). */
 export const TAGDEF_OUTLINER_FIELDS = TAGDEF_CONFIG_FIELDS
   .filter(f => f.control === 'outliner');
+
+// ─── Extend chain resolution (synchronous, for immer context) ───
+
+/**
+ * Walk the Extend chain for a tagDef and return ancestor tagDef IDs
+ * in ancestor-first order (grandparent before parent). Does not include self.
+ * Handles circular references via visited set.
+ *
+ * Reads from tagDef.children (config tuple) — this is the source of truth
+ * that ConfigTagPicker edits via setConfigValue. Previously read from metanode,
+ * which caused the bug where changing Extends tag_picker didn't update Default content.
+ */
+export function getExtendsChain(
+  entities: Record<string, NodexNode>,
+  tagDefId: string,
+): string[] {
+  const chain: string[] = [];
+  const visited = new Set<string>();
+
+  function walk(id: string) {
+    if (visited.has(id)) return; // circular guard
+    visited.add(id);
+    const tagDef = entities[id];
+    if (!tagDef?.children) return;
+
+    for (const cid of tagDef.children) {
+      const tuple = entities[cid];
+      if (
+        tuple?.props._docType === 'tuple' &&
+        tuple.children?.[0] === SYS_A.EXTENDS &&
+        tuple.children.length >= 2
+      ) {
+        const parentId = tuple.children[1];
+        if (parentId === tagDefId) continue; // exclude self (circular)
+        if (!parentId || !entities[parentId]) continue; // skip empty/invalid
+        walk(parentId); // recurse ancestors first
+        if (!chain.includes(parentId)) chain.push(parentId);
+      }
+    }
+  }
+  walk(tagDefId);
+  return chain;
+}
 
 // ─── System Fields (read-only, auto-derived from node metadata) ───
 

@@ -16,11 +16,25 @@
 
 ### 当前 Agent 清单
 
-| Agent ID | 工具 | 职责 | 分支前缀 | Dev Server 端口 | Clone 路径 |
-|----------|------|------|---------|----------------|-----------|
-| **claude-cc** | Claude Code (主会话) | Review、合并 PR、协调任务、主线开发 | `main` 或临时分支 | `5199` | 主 clone |
-| **nodex-codex** | Codex | 独立功能开发，提交 PR | `codex/<feature>` | `5200` | 独立 clone |
-| **nodex-cc** | Claude Code (独立会话) | 独立功能开发，提交 PR | `cc/<feature>` | `5201` | 独立 clone |
+| Agent ID | 工具 | 主要职责 | 次要职责 | 分支前缀 | Dev Server 端口 | Clone 路径 |
+|----------|------|---------|---------|---------|----------------|-----------|
+| **nodex** | Claude Code (主会话) | Review PR、合并到 main、协调任务 | 小修复、紧急改动 | `main` 或临时分支 | `5199` | 主 clone |
+| **nodex-codex** | Codex | 功能开发、提交 PR | Bug 修复 | `codex/<feature>` | `5200` | 独立 clone |
+| **nodex-cc** | Claude Code (独立会话) | 功能开发、提交 PR | Bug 修复 | `cc/<feature>` | `5201` | 独立 clone |
+
+### Agent 自我识别
+
+三个 Agent 共享同一套 `CLAUDE.md` 和 `AGENT-COLLABORATION.md`。每个 Agent 通过以下方式确认自己的身份：
+
+| 识别依据 | nodex | nodex-codex | nodex-cc |
+|---------|-----------|-------------|----------|
+| Clone 路径 | `nodex`（主 clone） | `nodex-codex` | `nodex-cc` |
+| Dev Server 端口 | `5199` | `5200` | `5201` |
+| Git 分支 | `main` | `codex/*` | `cc/*` |
+
+**识别后的行为差异**：
+- **nodex**: 收到 PR 后 review 代码质量、测试覆盖、文档同步，确认无误后合并。可以做小修复但不主动认领大功能
+- **nodex-codex / nodex-cc**: 从 `docs/issues.md` 认领任务或接收用户分配的功能，在独立分支开发，完成后提 PR 并等待 review
 
 ### 端口分配规则
 
@@ -37,7 +51,7 @@
    - 完成后提交 PR 到 `main`
    - PR 中说明改动范围、测试结果、涉及的热点文件
 
-2. **主会话 Agent**（claude-cc）:
+2. **主会话 Agent**（nodex）:
    - Review PR、提出修改意见或直接合并
    - 处理 Agent 间的任务分配和冲突协调
    - 也可直接在 main 上做小修复或紧急改动

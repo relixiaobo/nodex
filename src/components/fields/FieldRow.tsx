@@ -56,6 +56,8 @@ interface FieldRowProps {
   isEmpty?: boolean;
   /** Called when arrow navigation escapes field value boundaries */
   onNavigateOut?: (direction: 'up' | 'down') => void;
+  /** Owner tag color: tints the field icon and bullet in this color (inherited template items) */
+  ownerTagColor?: string;
 }
 
 export function FieldRow({
@@ -72,6 +74,7 @@ export function FieldRow({
   isRequired,
   isEmpty,
   onNavigateOut,
+  ownerTagColor,
 }: FieldRowProps) {
   const navigateTo = useUIStore((s) => s.navigateTo);
   const editingFieldNameId = useUIStore((s) => s.editingFieldNameId);
@@ -278,10 +281,10 @@ export function FieldRow({
       {/* Name column — aligned to first line of value */}
       <div className="flex items-center gap-1 @sm:shrink-0 @sm:w-[130px] min-w-0 h-7 py-1">
         <button
-          className="shrink-0 w-[15px] flex items-center justify-center text-foreground-tertiary hover:text-foreground-secondary transition-colors"
+          className={`shrink-0 w-[15px] flex items-center justify-center transition-colors ${ownerTagColor ? '' : 'text-foreground-tertiary hover:text-foreground-secondary'}`}
           onClick={trashed || isVirtual ? undefined : () => navigateTo(attrDefId)}
           title={trashed || isVirtual ? undefined : 'Configure field'}
-          style={trashed || isVirtual ? { cursor: 'default' } : undefined}
+          style={trashed || isVirtual ? { cursor: 'default' } : ownerTagColor ? { color: ownerTagColor } : undefined}
         >
           {Icon && <Icon size={12} />}
         </button>
@@ -323,7 +326,7 @@ export function FieldRow({
             <FieldValueOutliner assocDataId={assocDataId} fieldDataType={dataType} attrDefId={attrDefId} onNavigateOut={onNavigateOut} />
           ) : (
             <div className="flex min-h-7 items-start gap-2 py-1" style={{ paddingLeft: 6 }}>
-              <BulletChevron hasChildren={false} isExpanded={false} onBulletClick={noop} dimmed />
+              <BulletChevron hasChildren={false} isExpanded={false} onBulletClick={noop} dimmed bulletColor={ownerTagColor} />
               <span className="text-sm leading-[21px] text-foreground-tertiary select-none">Empty</span>
             </div>
           )}

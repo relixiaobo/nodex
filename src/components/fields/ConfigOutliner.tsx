@@ -5,13 +5,18 @@
  * - For attrDef: plain content nodes (pre-determined options) → OutlinerItem
  * - For tagDef: field tuples (template fields) → FieldRow + plain content → OutlinerItem
  *
+ * For tagDef with Extend (inheritance): merges inherited template items from
+ * ancestor tagDefs. Each item's bullet/icon is tinted with its owning tagDef's color.
+ *
  * Skips config tuples (SYS_A* keys) which are handled by FieldList.
  * Same mixed field/content pattern as FieldValueOutliner.
  */
-import { useMemo } from 'react';
+import { useMemo, useEffect } from 'react';
 import { useChildren } from '../../hooks/use-children';
 import { useNodeStore } from '../../stores/node-store';
 import { useNodeFields, type FieldEntry } from '../../hooks/use-node-fields';
+import { resolveDataType, getExtendsChain } from '../../lib/field-utils.js';
+import { getTagColor } from '../../lib/tag-colors.js';
 import { OutlinerItem } from '../outliner/OutlinerItem';
 import { TrailingInput } from '../editor/TrailingInput';
 import { FieldRow } from './FieldRow';
@@ -20,17 +25,42 @@ interface ConfigOutlinerProps {
   nodeId: string;
 }
 
+interface MergedItem {
+  id: string;
+  type: 'field' | 'content';
+  ownerTagDefId: string;
+  /** For fields: resolved FieldEntry data */
+  fieldEntry?: FieldEntry;
+}
+
 export function ConfigOutliner({ nodeId }: ConfigOutlinerProps) {
   useChildren(nodeId);
 
-  const allChildIds = useNodeStore((s) => s.entities[nodeId]?.children ?? []);
   const entities = useNodeStore((s) => s.entities);
+  const fetchChildren = useNodeStore((s) => s.fetchChildren);
   const ownerId = useNodeStore((s) => s.entities[nodeId]?.props._ownerId ?? '');
+  const isTagDef = useNodeStore((s) => s.entities[nodeId]?.props._docType === 'tagDef');
 
-  // Detect fields on this node (includes config + template fields)
+  // For tagDef: get Extend chain (ancestor tagDef IDs)
+  const extendsChain = useMemo(
+    () => (isTagDef ? getExtendsChain(entities, nodeId) : []),
+    [isTagDef, entities, nodeId],
+  );
+
+  // Ensure ancestor tagDef children are loaded
+  useEffect(() => {
+    for (const ancestorId of extendsChain) {
+      const ancestor = entities[ancestorId];
+      if (ancestor?.children?.some((cid) => !entities[cid])) {
+        fetchChildren(ancestorId);
+      }
+    }
+  }, [extendsChain, entities, fetchChildren]);
+
+  // Detect fields on THIS node (includes config + template fields)
   const fields = useNodeFields(nodeId);
 
-  // Build fieldMap for non-config fields only (template field tuples)
+  // Build fieldMap for non-config fields only (template field tuples on current node)
   const fieldMap = useMemo(() => {
     const m = new Map<string, FieldEntry>();
     for (const f of fields) {
@@ -41,47 +71,107 @@ export function ConfigOutliner({ nodeId }: ConfigOutlinerProps) {
     return m;
   }, [fields]);
 
-  // Classify children as field (FieldRow) or content (OutlinerItem)
-  const visibleChildren = useMemo(() => {
-    const result: { id: string; type: 'field' | 'content' }[] = [];
+  // Build merged items: [inherited from ancestors..., own items]
+  const mergedItems = useMemo(() => {
+    const items: MergedItem[] = [];
+
+    // 1. Inherited items from ancestor tagDefs (in ancestor-first order)
+    for (const ancestorId of extendsChain) {
+      const ancestor = entities[ancestorId];
+      if (!ancestor?.children) continue;
+
+      for (const cid of ancestor.children) {
+        const child = entities[cid];
+        if (!child) continue;
+
+        // Field tuples: _docType=tuple with attrDef key
+        if (child.props._docType === 'tuple' && child.children?.length) {
+          const keyId = child.children[0];
+          // Skip config tuples (SYS_A*, NDX_A*)
+          if (keyId.startsWith('SYS_') || keyId.startsWith('NDX_')) continue;
+
+          const attrDef = entities[keyId];
+          if (!attrDef || attrDef.props._docType !== 'attrDef') continue;
+
+          items.push({
+            id: cid,
+            type: 'field',
+            ownerTagDefId: ancestorId,
+            fieldEntry: {
+              attrDefId: keyId,
+              attrDefName: attrDef.props.name ?? 'Untitled',
+              tupleId: cid,
+              dataType: resolveDataType(entities, keyId),
+            },
+          });
+        } else if (!child.props._docType) {
+          // Content node (regular template content)
+          items.push({
+            id: cid,
+            type: 'content',
+            ownerTagDefId: ancestorId,
+          });
+        }
+      }
+    }
+
+    // 2. Own items from current tagDef
+    const node = entities[nodeId];
+    const allChildIds = node?.children ?? [];
     for (const cid of allChildIds) {
       if (fieldMap.has(cid)) {
-        result.push({ id: cid, type: 'field' });
+        items.push({
+          id: cid,
+          type: 'field',
+          ownerTagDefId: nodeId,
+          fieldEntry: fieldMap.get(cid)!,
+        });
       } else {
         const dt = entities[cid]?.props._docType;
-        if (!dt) result.push({ id: cid, type: 'content' });
+        if (!dt) {
+          items.push({
+            id: cid,
+            type: 'content',
+            ownerTagDefId: nodeId,
+          });
+        }
         // else skip: config tuples, metanode, associatedData, etc.
       }
     }
-    return result;
-  }, [allChildIds, fieldMap, entities]);
 
+    return items;
+  }, [entities, extendsChain, nodeId, fieldMap]);
+
+  // Collect content child IDs (for OutlinerItem rootChildIds — own items only)
   const contentChildIds = useMemo(
-    () => visibleChildren.filter((c) => c.type === 'content').map((c) => c.id),
-    [visibleChildren],
+    () => mergedItems.filter((c) => c.type === 'content' && c.ownerTagDefId === nodeId).map((c) => c.id),
+    [mergedItems, nodeId],
   );
 
   // Prevent border stacking: when nested FieldRows are first/last, add padding
-  // so their border-t/border-b doesn't visually coincide with the parent FieldRow's borders
-  const firstIsField = visibleChildren.length > 0 && visibleChildren[0].type === 'field';
-  const lastIsField = visibleChildren.length > 0 && visibleChildren[visibleChildren.length - 1].type === 'field';
+  const firstIsField = mergedItems.length > 0 && mergedItems[0].type === 'field';
+  const lastIsField = mergedItems.length > 0 && mergedItems[mergedItems.length - 1].type === 'field';
 
   return (
     <div className={`min-h-[22px]${firstIsField ? ' pt-1' : ''}${lastIsField ? ' pb-1' : ''}`}>
-      {visibleChildren.map(({ id, type }, i) =>
-        type === 'field' ? (
+      {mergedItems.map(({ id, type, ownerTagDefId, fieldEntry }, i) => {
+        // Color from owning tagDef (only for tagDef config pages with extends)
+        const ownerColor = extendsChain.length > 0 ? getTagColor(ownerTagDefId).text : undefined;
+
+        return type === 'field' && fieldEntry ? (
           <div key={id} className="@container" style={{ paddingLeft: 6 + 15 + 4 }}>
             <FieldRow
-              nodeId={nodeId}
-              attrDefId={fieldMap.get(id)!.attrDefId}
-              attrDefName={fieldMap.get(id)!.attrDefName}
+              nodeId={ownerTagDefId}
+              attrDefId={fieldEntry.attrDefId}
+              attrDefName={fieldEntry.attrDefName}
               tupleId={id}
-              valueNodeId={fieldMap.get(id)!.valueNodeId}
-              valueName={fieldMap.get(id)!.valueName}
-              dataType={fieldMap.get(id)!.dataType}
-              assocDataId={fieldMap.get(id)!.assocDataId}
-              isLastInGroup={i === visibleChildren.length - 1 || visibleChildren[i + 1].type !== 'field'}
-              trashed={fieldMap.get(id)!.trashed}
+              valueNodeId={fieldEntry.valueNodeId}
+              valueName={fieldEntry.valueName}
+              dataType={fieldEntry.dataType}
+              assocDataId={fieldEntry.assocDataId}
+              isLastInGroup={i === mergedItems.length - 1 || mergedItems[i + 1].type !== 'field'}
+              trashed={fieldEntry.trashed}
+              ownerTagColor={ownerColor}
             />
           </div>
         ) : (
@@ -90,11 +180,12 @@ export function ConfigOutliner({ nodeId }: ConfigOutlinerProps) {
             nodeId={id}
             depth={0}
             rootChildIds={contentChildIds}
-            parentId={nodeId}
+            parentId={ownerTagDefId}
             rootNodeId={nodeId}
+            bulletColor={ownerColor}
           />
-        ),
-      )}
+        );
+      })}
       <TrailingInput
         parentId={nodeId}
         depth={0}

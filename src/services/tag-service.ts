@@ -273,21 +273,20 @@ async function shouldShowCheckbox(tagDef: NodexNode): Promise<boolean> {
   return false;
 }
 
-/** 获取 TagDef 的继承标签 ID 列表 (via NDX_A05 EXTENDS tuples in metanode) */
+/** 获取 TagDef 的继承标签 ID 列表 (via NDX_A05 EXTENDS config tuples in tagDef.children) */
 async function getExtendsTagIds(tagDef: NodexNode): Promise<string[]> {
-  if (!tagDef.props._metaNodeId) return [];
+  if (!tagDef.children?.length) return [];
 
-  const metanode = await getNode(tagDef.props._metaNodeId);
-  if (!metanode?.children) return [];
-
-  const tuples = await getNodes(metanode.children);
+  // Read from tagDef.children (config tuples) — same source as getExtendsChain()
+  const tuples = await getNodes(tagDef.children);
   const extendsIds: string[] = [];
 
   for (const tuple of tuples) {
     if (
       tuple.props._docType === 'tuple' &&
       tuple.children?.[0] === SYS_A.EXTENDS &&
-      tuple.children.length >= 2
+      tuple.children.length >= 2 &&
+      tuple.children[1] // skip empty extends
     ) {
       extendsIds.push(tuple.children[1]);
     }

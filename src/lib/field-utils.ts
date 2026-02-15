@@ -416,6 +416,10 @@ export const TAGDEF_OUTLINER_FIELDS = TAGDEF_CONFIG_FIELDS
  * Walk the Extend chain for a tagDef and return ancestor tagDef IDs
  * in ancestor-first order (grandparent before parent). Does not include self.
  * Handles circular references via visited set.
+ *
+ * Reads from tagDef.children (config tuple) — this is the source of truth
+ * that ConfigTagPicker edits via setConfigValue. Previously read from metanode,
+ * which caused the bug where changing Extends tag_picker didn't update Default content.
  */
 export function getExtendsChain(
   entities: Record<string, NodexNode>,
@@ -428,11 +432,9 @@ export function getExtendsChain(
     if (visited.has(id)) return; // circular guard
     visited.add(id);
     const tagDef = entities[id];
-    if (!tagDef?.props._metaNodeId) return;
-    const meta = entities[tagDef.props._metaNodeId];
-    if (!meta?.children) return;
+    if (!tagDef?.children) return;
 
-    for (const cid of meta.children) {
+    for (const cid of tagDef.children) {
       const tuple = entities[cid];
       if (
         tuple?.props._docType === 'tuple' &&
@@ -441,6 +443,7 @@ export function getExtendsChain(
       ) {
         const parentId = tuple.children[1];
         if (parentId === tagDefId) continue; // exclude self (circular)
+        if (!parentId || !entities[parentId]) continue; // skip empty/invalid
         walk(parentId); // recurse ancestors first
         if (!chain.includes(parentId)) chain.push(parentId);
       }

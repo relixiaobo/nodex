@@ -98,7 +98,7 @@ export function SlashCommandMenu({ open, commands, selectedIndex, onSelect }: Sl
             type="button"
             aria-disabled={isDisabled}
             title={isDisabled ? command.disabledHint ?? SLASH_DISABLED_HINT_DEFAULT : undefined}
-            className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm ${
+            className={`flex w-full items-center gap-2 rounded-md px-2 py-1 text-left text-sm ${
               isDisabled
                 ? 'cursor-not-allowed text-foreground-tertiary opacity-50'
                 : isActive
@@ -111,10 +111,10 @@ export function SlashCommandMenu({ open, commands, selectedIndex, onSelect }: Sl
               onSelect(command.id);
             }}
           >
-            <Icon size={14} className="shrink-0 text-foreground-secondary" />
+            <Icon size={16} className="shrink-0 text-foreground-secondary" />
             <span className="truncate">{command.name}</span>
             {command.shortcutHint && (
-              <span className="ml-auto shrink-0 text-[11px] text-foreground-tertiary">
+              <span className="ml-auto shrink-0 text-xs text-foreground-tertiary">
                 {command.shortcutHint}
               </span>
             )}

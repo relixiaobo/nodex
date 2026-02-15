@@ -7,6 +7,10 @@ export interface WebClipCapturePayload {
   selectionText: string;
   pageText: string;
   capturedAt: number;
+  author?: string;
+  published?: string;
+  description?: string;
+  siteName?: string;
 }
 
 export type WebClipCaptureResponse =

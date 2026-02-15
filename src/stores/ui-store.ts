@@ -72,6 +72,10 @@ interface UIStore {
   focusClickCoords: { nodeId: string; parentId: string | null; textOffset: number } | null;
   setFocusClickCoords(coords: { nodeId: string; parentId: string | null; textOffset: number } | null): void;
 
+  // Pending input character: set by selection mode keydown, consumed by NodeEditor on mount
+  pendingInputChar: string | null;
+  setPendingInputChar(char: string | null): void;
+
   // Pending reference ↔ inline reference conversion (session-only)
   pendingRefConversion: {
     tempNodeId: string;
@@ -247,6 +251,10 @@ export const useUIStore = create<UIStore>()(
       // Click coordinates for cursor positioning
       focusClickCoords: null,
       setFocusClickCoords: (coords) => set({ focusClickCoords: coords }),
+
+      // Pending input character (session-only, consumed by NodeEditor on mount)
+      pendingInputChar: null,
+      setPendingInputChar: (char) => set({ pendingInputChar: char }),
 
       // Pending reference conversion (session-only)
       pendingRefConversion: null,

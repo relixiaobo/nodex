@@ -563,6 +563,22 @@ applyWebClipToNode（5 cases）:
 19. 就地设置 description
 20. 不改变节点 ownership（留在原父节点）
 
+### 1.39 Selection Mode 键盘决策纯函数
+
+**测试文件**: `tests/vitest/selection-keyboard.test.ts`
+
+**覆盖点**:
+
+1. `ArrowUp` → `navigate_up`（退出选中，编辑上一节点，光标在末尾）
+2. `ArrowDown` → `navigate_down`（退出选中，编辑下一节点，光标在开头）
+3. `Enter` → `enter_edit`（编辑选中节点，光标在末尾）
+4. `Escape` → `clear_selection`（清除所有选中）
+5. 可打印字符 → `type_char`（编辑选中节点 + 追加字符）
+6. `Shift+Arrow` → `null`（Phase 2 扩展选区，暂不处理）
+7. `Cmd/Ctrl/Alt+key` → `null`（修饰键组合不处理）
+8. 特殊键（Tab/F1/Shift/Control）→ `null`
+9. `Enter` + 修饰键 → `null`（仅无修饰键 Enter 触发编辑）
+
 ---
 
 ## Phase 2: 视觉检查点

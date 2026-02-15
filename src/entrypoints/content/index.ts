@@ -1,25 +1,23 @@
+import Defuddle from 'defuddle';
 import {
   WEBCLIP_CAPTURE_PAGE,
   type WebClipCapturePayload,
   type WebClipCaptureResponse,
 } from '../../lib/webclip-messaging.js';
 
-const MAX_CAPTURE_TEXT_CHARS = 50_000;
-
-function normalizeText(input: string): string {
-  return input
-    .replace(/\u00A0/g, ' ')
-    .replace(/[ \t]+\n/g, '\n')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim();
-}
-
 function captureCurrentPage(): WebClipCapturePayload {
-  const title = document.title?.trim() || location.hostname;
   const url = location.href;
-  const selectionText = normalizeText(window.getSelection()?.toString() ?? '');
-  const rawPageText = document.body?.innerText ?? '';
-  const pageText = normalizeText(rawPageText).slice(0, MAX_CAPTURE_TEXT_CHARS);
+  const selectionText = window.getSelection()?.toString() ?? '';
+  const extracted = new Defuddle(document, {
+    url,
+    markdown: false,
+    separateMarkdown: false,
+  }).parse();
+  const title = extracted.title?.trim() || document.title?.trim() || location.hostname;
+  const pageText = extracted.content ?? '';
+  if (!pageText) {
+    throw new Error('Defuddle returned empty content');
+  }
 
   return {
     url,

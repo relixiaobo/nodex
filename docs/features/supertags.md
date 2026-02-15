@@ -109,10 +109,89 @@
 
 ### 标签继承 / Extend — 未实现
 
-- tagDef 可以"继承"另一个 tagDef（Tana "Building blocks" 功能）
-- 子标签包含父标签的所有模板字段 + 自己的额外字段
-- 应用子标签 = 同时应用父标签的所有字段
-- **继承约束**: 继承来的内容不可移动/删除，但可添加字段和修改默认值
+> Extend 是 Web Clipping (#30) 的前置依赖：`#web_clip` 需要 `#article`/`#video`/`#tweet` extend 它。
+> 以下行为规格基于 2026-02-15 对 Tana 官方文档的交叉验证。
+
+**核心概念**: 子标签（child tag）"extends" 父标签（parent tag），继承父标签的 **全部模板内容**（字段 + 普通节点），并可添加自己的额外内容。
+
+**继承范围**:
+- 继承的不仅是字段（field tuples），还包括父标签 default content 中的**普通节点**
+- 父标签模板变更后自动传播到所有子标签实例（无需手动同步）
+- 支持多重继承（一个标签可以 extend 多个父标签）
+
+**继承约束**:
+- 继承来的内容（字段和节点）不可移动、不可删除
+- 但可以**覆写默认值**（如修改字段的默认选项）
+- 子标签可以在继承内容之外添加自己的字段和节点
+
+**字段身份规则**:
+- 字段按 **attrDef 节点 ID** 识别身份，不按名称
+- 父子标签中同一个 attrDef ID 的字段 → 合并显示为一个
+- 不同 attrDef ID 但同名的字段 → 两个都显示
+- 这意味着 Extend 复制的是 `_sourceId` 引用，不是名称匹配
+
+**多态搜索**:
+- 搜索父标签时，自动返回所有子标签的实例
+- 例如：搜索 `#web_clip` 会返回 `#article`、`#video`、`#tweet` 的所有节点
+
+**Tana 使用模式参考**:
+- `#todo` → `#dev task` / `#design task` / `#bug`
+- `#meeting` → `#onboarding` / `#followup`
+- `#person` → `#candidate` / `#employee`
+- `#web_clip` → `#article` / `#video` / `#tweet`（Nodex 目标）
+
+**数据模型设计（草案）**:
+```
+tagDef_article
+  metanode.children:
+    - tuple [SYS_A13, SYS_T01]           ← 被 SUPERTAG 系统标签标记
+    - tuple [SYS_A_EXTENDS, tagDef_webclip]  ← Extend 绑定（新增系统属性）
+  children:
+    - (inherited from tagDef_webclip)      ← 运行时展开，不物理复制
+    - tuple [attrDef_article_type]         ← 子标签自有字段
+```
+
+**applyTag 行为扩展**:
+- `applyTag(nodeId, tagDef_article)` 需要：
+  1. 沿 Extend 链收集所有祖先标签的模板内容
+  2. 依次实例化父→子的所有字段 tuple（`_sourceId` 指向各自模板）
+  3. 依次复制父→子的所有普通内容节点
+  4. 在 Metanode 中只绑定子标签（`SYS_A13 → tagDef_article`）
+
+**配置页展示**:
+- 子标签配置页中，继承内容标记为"来自 #parent_tag"（灰色/锁定样式）
+- 继承字段不可拖拽排序，不显示删除按钮
+
+**实现优先级**: P1（阻塞 #30 Web Clipping）
+
+### Base Type — 参考（暂不实现）
+
+> Tana 的 Building Blocks 区域包含 Base Type 和 Extend 两个功能。Base Type 主要服务于 AI，
+> 帮助 AI 识别对象语义类型（不论用户给标签取什么名字）。Nodex 的 AI 不一定需要此机制，仅作参考记录。
+
+**Tana Base Type 列表**（13 种，对应 SYS_T98–SYS_T125）:
+
+| Base Type | 语义 |
+|-----------|------|
+| Meeting | 会议 |
+| Task | 任务 |
+| Project | 项目 |
+| Person | 人物 |
+| Organization | 组织 |
+| Product | 产品 |
+| Location | 地点 |
+| Event | 事件 |
+| Creative Work | 创意作品 |
+| Concept | 概念 |
+| Metric | 指标 |
+| Tool | 工具 |
+| Custom Type | 自定义（兜底） |
+
+**作用**: 纯 AI 辅助——Tana AI 根据 Base Type 理解对象语义。例如 `#collaborator` 设 Base Type = Person，AI 就知道这是一个人。
+
+**数据模型**: 通过 Metanode Tuple `[SYS_A_BASE_TYPE, SYS_T98..SYS_T125]` 绑定。
+
+**Nodex 决策**: 暂不实现。如果未来 Nodex AI 需要对象语义识别，可按需引入。Extend 功能不依赖 Base Type。
 
 ### Convert to Supertag — 未实现
 
@@ -179,7 +258,7 @@
 |-----------|------|--------|
 | **Color picker** (色板选择) | 当前 placeholder "Default"，需实现真实色板 swatches | P2 |
 | **"Add description"** 字段 | 标签描述文本，显示在标签名下方 | P3 |
-| **Building blocks** 折叠面板 | Tag 继承 / Extend 功能 | P3 |
+| **Building blocks** 折叠面板 | Tag 继承 / Extend 功能（阻塞 #30 Web Clipping） | P1 |
 | **Optional fields** 独立区域 | 与 Default content 分离的可选字段区 | P3 |
 | **"New field" / "Insert existing field" 按钮** | Default content 区域底部的快捷操作 | P2 |
 | **"Used N times"** 统计 | 底部使用次数展示 | P3 |
@@ -201,6 +280,11 @@
 | 2026-02-12 | Default content 支持字段 tuple 和普通内容节点混合 | 与 Tana 一致（template 不仅有 field） |
 | 2026-02-12 | trashNode(tagDef) 级联清理所有引用节点（目标规格） | 作为未来目标行为，避免遗留悬挂引用 |
 | 2026-02-12 | 对比 Tana 官方文档补全遗漏功能清单 | 记录 Pinned/Optional/Convert/Batch/TitleExpr 等 |
+| 2026-02-15 | Extend 继承范围 = 全部模板内容（字段 + 普通节点） | Tana 官方文档验证：template objects 整体继承 |
+| 2026-02-15 | 字段身份按 attrDef ID 匹配，非名称 | 同 ID → 合并，不同 ID 同名 → 两个都显示 |
+| 2026-02-15 | 父标签模板变更自动传播到子标签实例 | Tana 文档明确说明 auto-propagation |
+| 2026-02-15 | Extend 提升为 P1（原 P3） | 阻塞 #30 Web Clipping（`#web_clip` → `#article` 等） |
+| 2026-02-15 | Base Type 暂不实现，仅记录参考 | 主要服务 AI 语义识别，Nodex AI 不一定需要 |
 
 ## 当前状态
 
@@ -225,7 +309,7 @@
 - [ ] Color picker（真实色板）
 - [ ] Pinned fields
 - [ ] Optional fields
-- [ ] 标签继承 / Extend
+- [ ] 标签继承 / Extend（P1，阻塞 #30）
 - [ ] Convert to supertag
 - [ ] 批量标签操作
 - [ ] 标签页（搜索 + 视图）
@@ -244,3 +328,5 @@
 - Tana 删除 tag 后节点显示 trash icon，Nodex 直接清除引用
 - Tana 有 Pinned/Optional fields 两级机制，Nodex 当前所有模板字段平等
 - Tana 支持 "Convert to supertag" 快捷转换，Nodex 暂不支持
+- Tana Extend 支持多重继承 + 自动传播父标签变更，Nodex 尚未实现
+- Tana Base Type（13 种语义类型）服务于 AI，Nodex 暂不需要

@@ -46,9 +46,11 @@ interface OutlinerItemProps {
   /** Called when arrow navigation reaches a boundary (first/last node in scope).
    *  Allows field-value OutlinerItems to escape to the parent outliner context. */
   onNavigateOut?: (direction: 'up' | 'down') => void;
+  /** Owner tag color: tints the bullet dot in this color (template items in config page) */
+  bulletColor?: string;
 }
 
-export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId, fieldDataType, attrDefId, onNavigateOut }: OutlinerItemProps) {
+export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId, fieldDataType, attrDefId, onNavigateOut, bulletColor }: OutlinerItemProps) {
   const node = useNode(nodeId);
   const expandKey = `${parentId}:${nodeId}`;
   const isExpanded = useUIStore((s) => s.expandedNodes.has(`${parentId}:${nodeId}`));
@@ -1051,6 +1053,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
             onBulletClick={handleBulletClick}
             isReference={isReference || isPendingConversion}
             tagDefColor={isTagDef ? getTagColor(nodeId).text : undefined}
+            bulletColor={bulletColor}
           />
           {showCheckbox && (
             <span className="flex shrink-0 h-[21px] w-[15px] items-center justify-center">

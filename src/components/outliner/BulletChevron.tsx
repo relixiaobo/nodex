@@ -8,6 +8,8 @@ interface BulletChevronProps {
   isReference?: boolean;
   /** TagDef color: renders colored circle with white # instead of plain dot */
   tagDefColor?: string;
+  /** Owner tag color: tints the regular bullet dot in this color (template items) */
+  bulletColor?: string;
 }
 
 /**
@@ -27,6 +29,7 @@ export function BulletChevron({
   dimmed,
   isReference,
   tagDefColor,
+  bulletColor,
 }: BulletChevronProps) {
   const showOuterRing = hasChildren && !isExpanded;
 
@@ -61,7 +64,10 @@ export function BulletChevron({
           isReference ? 'border border-dashed border-foreground/40' : ''
         } ${showOuterRing ? 'bg-foreground/[0.08]' : ''}`}
       >
-        <div className={`h-[5px] w-[5px] rounded-full transition-transform group-hover/bullet:scale-[1.375] ${dimmed ? 'bg-foreground/15' : 'bg-foreground/50'}`} />
+        <div
+          className={`h-[5px] w-[5px] rounded-full transition-transform group-hover/bullet:scale-[1.375] ${!bulletColor ? (dimmed ? 'bg-foreground/15' : 'bg-foreground/50') : ''}`}
+          style={bulletColor ? { backgroundColor: bulletColor } : undefined}
+        />
       </div>
     </span>
   );

@@ -11,7 +11,7 @@ import { immer } from 'zustand/middleware/immer';
 import { nanoid } from 'nanoid';
 import type { NodexNode, DocType } from '../types/index.js';
 import { WORKSPACE_CONTAINERS, SYS_A, SYS_D, SYS_T, SYS_V } from '../types/index.js';
-import { ATTRDEF_CONFIG_MAP, TAGDEF_CONFIG_MAP, findAutoCollectTupleId } from '../lib/field-utils.js';
+import { ATTRDEF_CONFIG_MAP, TAGDEF_CONFIG_MAP, findAutoCollectTupleId, getExtendsChain } from '../lib/field-utils.js';
 import { resolveCheckboxClick, resolveCmdEnterCycle, hasTagShowCheckbox } from '../lib/checkbox-utils.js';
 import * as nodeService from '../services/node-service.js';
 import { isSupabaseReady } from '../services/supabase.js';
@@ -871,61 +871,75 @@ export const useNodeStore = create<NodeStore>()(
         if (!metanode.children) metanode.children = [];
         metanode.children.push(tagTupleId);
 
-        // 4. Instantiate field templates from tagDef
-        const tagDef = state.entities[tagDefId];
-        if (!tagDef?.children) return;
+        // 4. Build inheritance chain (ancestors first, then self)
+        const extendsChain = getExtendsChain(state.entities, tagDefId);
+        const tagDefsToInstantiate = [...extendsChain, tagDefId]
+          .map(id => state.entities[id])
+          .filter((t): t is NodexNode => !!t && !!t.children);
+
+        if (tagDefsToInstantiate.length === 0) return;
 
         if (!n.children) n.children = [];
         if (!n.associationMap) n.associationMap = {};
 
-        for (const templateTupleId of tagDef.children) {
-          const template = state.entities[templateTupleId];
-          if (template?.props._docType !== 'tuple') continue;
-          const keyId = template.children?.[0];
-          if (!keyId) continue;
+        // Track seen attrDefs to dedup across inheritance chain
+        const seenAttrDefs = new Set<string>();
 
-          // System config field (SYS_A* or NDX_A* key from SYS_T02/SYS_T01 template)
-          const configDef = ATTRDEF_CONFIG_MAP.get(keyId) ?? TAGDEF_CONFIG_MAP.get(keyId);
-          if (configDef) {
-            // Check if already has this config tuple (by key match)
-            const alreadyHas = n.children.some((cid) => {
+        for (const td of tagDefsToInstantiate) {
+          for (const templateTupleId of td.children!) {
+            const template = state.entities[templateTupleId];
+            if (template?.props._docType !== 'tuple') continue;
+            const keyId = template.children?.[0];
+            if (!keyId) continue;
+
+            // System config field (SYS_A* or NDX_A* key from SYS_T02/SYS_T01 template)
+            const configDef = ATTRDEF_CONFIG_MAP.get(keyId) ?? TAGDEF_CONFIG_MAP.get(keyId);
+            if (configDef) {
+              // Check if already has this config tuple (by key match)
+              const alreadyHas = n.children.some((cid) => {
+                const c = state.entities[cid];
+                return c?.props._docType === 'tuple' && c.children?.[0] === keyId;
+              });
+              if (alreadyHas) continue;
+
+              const instanceId = nanoid();
+              const instanceNode = makeNodeLocal(instanceId, nodeId, 'tuple', [keyId, configDef.defaultValue]);
+              instanceNode.props._sourceId = templateTupleId;
+              state.entities[instanceId] = instanceNode;
+              n.children.push(instanceId);
+              continue;
+            }
+
+            // User field (key is an attrDef node)
+            if (keyId.startsWith('SYS_') || keyId.startsWith('NDX_')) continue;
+            const attrDef = state.entities[keyId];
+            if (!attrDef || attrDef.props._docType !== 'attrDef') continue;
+
+            // Dedup by attrDef ID across inheritance chain
+            if (seenAttrDefs.has(keyId)) continue;
+            seenAttrDefs.add(keyId);
+
+            // Check if field already instantiated (by attrDef key match)
+            const alreadyHasField = n.children.some((cid) => {
               const c = state.entities[cid];
               return c?.props._docType === 'tuple' && c.children?.[0] === keyId;
             });
-            if (alreadyHas) continue;
+            if (alreadyHasField) continue;
 
+            // Create instance tuple
             const instanceId = nanoid();
-            const instanceNode = makeNodeLocal(instanceId, nodeId, 'tuple', [keyId, configDef.defaultValue]);
+            const instanceNode = makeNodeLocal(instanceId, nodeId, 'tuple', [keyId]);
             instanceNode.props._sourceId = templateTupleId;
             state.entities[instanceId] = instanceNode;
+
+            // Create associatedData
+            const assocId = nanoid();
+            state.entities[assocId] = makeNodeLocal(assocId, nodeId, 'associatedData');
+
+            // Wire up
             n.children.push(instanceId);
-            continue;
+            n.associationMap[instanceId] = assocId;
           }
-
-          // User field (key is an attrDef node)
-          if (keyId.startsWith('SYS_') || keyId.startsWith('NDX_')) continue;
-          const attrDef = state.entities[keyId];
-          if (!attrDef || attrDef.props._docType !== 'attrDef') continue;
-
-          // Check if field already instantiated (by _sourceId)
-          const alreadyHasField = n.children.some((cid) => {
-            return state.entities[cid]?.props._sourceId === templateTupleId;
-          });
-          if (alreadyHasField) continue;
-
-          // Create instance tuple
-          const instanceId = nanoid();
-          const instanceNode = makeNodeLocal(instanceId, nodeId, 'tuple', [keyId]);
-          instanceNode.props._sourceId = templateTupleId;
-          state.entities[instanceId] = instanceNode;
-
-          // Create associatedData
-          const assocId = nanoid();
-          state.entities[assocId] = makeNodeLocal(assocId, nodeId, 'associatedData');
-
-          // Wire up
-          n.children.push(instanceId);
-          n.associationMap[instanceId] = assocId;
         }
       });
 
@@ -954,10 +968,17 @@ export const useNodeStore = create<NodeStore>()(
         }
 
         // 2. Remove template-sourced field tuples from node.children
-        const tagDef = state.entities[tagDefId];
-        if (!tagDef?.children || !node.children) return;
-
-        const templateTupleIds = new Set(tagDef.children);
+        //    Include fields from the full Extend chain (self + all ancestors)
+        const chain = getExtendsChain(state.entities, tagDefId);
+        const allTagDefs = [...chain, tagDefId];
+        const templateTupleIds = new Set<string>();
+        for (const tdId of allTagDefs) {
+          const td = state.entities[tdId];
+          if (td?.children) {
+            for (const cid of td.children) templateTupleIds.add(cid);
+          }
+        }
+        if (templateTupleIds.size === 0 || !node.children) return;
         const toRemove: string[] = [];
 
         for (const cid of node.children) {

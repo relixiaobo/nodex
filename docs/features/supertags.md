@@ -123,9 +123,16 @@
 - 支持多级继承（grandparent → parent → child）和循环引用防护
 - Seed data 包含 `#Dev Task` extends `#Task` 的测试示例
 
+**Phase 1.1 已实现（2026-02-15）— 配置页颜色继承**:
+- 子标签配置页的 "Default content" 区域合并显示继承模板 + 自有模板
+- 每个模板项（字段/节点）的图标和 bullet 颜色标识所属 tagDef
+- 继承自父标签的项 → 父标签颜色，子标签自有的项 → 子标签颜色
+- 无 Extend 关系时不显示颜色（保持原有灰色样式）
+- 颜色来自 `getTagColor(tagDefId)` 的确定性哈希
+
 **Phase 2 待实现**:
 - 父标签模板变更后自动传播到所有子标签实例（无需手动同步）
-- 配置页中继承字段标记为"来自 #parent_tag"（灰色/锁定样式）
+- 配置页中继承字段标记为"来自 #parent_tag"（锁定/不可编辑）
 - 多态搜索：搜索父标签时自动返回所有子标签的实例
 
 **继承范围**:
@@ -172,9 +179,9 @@ tagDef_article
   3. 按 attrDef ID 去重（祖先先到先得）
   4. 在 Metanode 中只绑定子标签（`SYS_A13 → tagDef_article`）
 
-**配置页展示**（Phase 2）:
-- 子标签配置页中，继承内容标记为"来自 #parent_tag"（灰色/锁定样式）
-- 继承字段不可拖拽排序，不显示删除按钮
+**配置页展示**（Phase 1.1 已实现）:
+- 子标签配置页中，继承模板项通过**颜色**区分所属（父标签颜色 vs 子标签颜色）
+- 继承字段不可拖拽排序，不显示删除按钮（Phase 2 UI 锁定）
 
 ### Base Type — 参考（暂不实现）
 
@@ -300,6 +307,7 @@ tagDef_article
 | 2026-02-15 | Extend Phase 1 使用 NDX_A05（非 SYS_A*） | Tana 的 Extend 机制未被逆向确认，使用 Nodex 自有命名空间 |
 | 2026-02-15 | Extend 绑定存储在 metanode 和 config tuple 双写 | metanode 用于 `getExtendsChain()` 遍历，config tuple 用于配置页 tag_picker 渲染 |
 | 2026-02-15 | 字段去重按 attrDef ID，祖先优先 | 同一 attrDef 跨继承链只实例化一次，`_sourceId` 指向最早祖先的模板 |
+| 2026-02-15 | 配置页继承项通过 owning tagDef 颜色区分 | OOP 继承视觉：父标签项 = 父色，子标签项 = 子色，无 extend 时无色 |
 
 ## 当前状态
 
@@ -325,7 +333,8 @@ tagDef_article
 - [ ] Pinned fields
 - [ ] Optional fields
 - [x] 标签继承 / Extend Phase 1（applyTag/removeTag 字段继承 + config UI）
-- [ ] Extend Phase 2（父变更传播 + 配置页继承标记 + 多态搜索）
+- [x] Extend Phase 1.1 — 配置页颜色继承（owning tagDef 颜色标识模板项归属）
+- [ ] Extend Phase 2（父变更传播 + 配置页继承项锁定 + 多态搜索）
 - [ ] Convert to supertag
 - [ ] 批量标签操作
 - [ ] 标签页（搜索 + 视图）

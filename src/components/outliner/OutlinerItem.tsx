@@ -9,6 +9,7 @@ import { useUIStore } from '../../stores/ui-store';
 import { useWorkspaceStore } from '../../stores/workspace-store';
 import { BulletChevron, ChevronButton } from './BulletChevron';
 import { NodeEditor } from '../editor/NodeEditor';
+import { SlashCommandMenu } from '../editor/SlashCommandMenu';
 import { TrailingInput } from '../editor/TrailingInput';
 import { TagBar } from '../tags/TagBar';
 import { TagSelector, type TagDropdownHandle } from '../tags/TagSelector';
@@ -27,6 +28,12 @@ import {
 import { resolveDropHoverPosition } from '../../lib/drag-drop-position';
 import { resolveDropMove } from '../../lib/drag-drop';
 import { resolveSelectedReferenceShortcut } from '../../lib/selected-reference-shortcuts';
+import {
+  filterSlashCommands,
+  getFirstEnabledSlashIndex,
+  getNextEnabledSlashIndex,
+  type SlashCommandId,
+} from '../../lib/slash-commands';
 
 /** Field types that accept only a single value node. Enter navigates out instead of creating siblings. */
 const SINGLE_VALUE_FIELD_TYPES: Set<string> = new Set([
@@ -63,6 +70,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   const toggleExpanded = useUIStore((s) => s.toggleExpanded);
   const setExpanded = useUIStore((s) => s.setExpanded);
   const navigateTo = useUIStore((s) => s.navigateTo);
+  const openSearch = useUIStore((s) => s.openSearch);
   const expandedNodes = useUIStore((s) => s.expandedNodes);
 
   const dragNodeId = useUIStore((s) => s.dragNodeId);
@@ -113,6 +121,12 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   const refRangeRef = useRef<{ from: number; to: number }>({ from: 0, to: 0 });
   const refDropdownRef = useRef<ReferenceDropdownHandle>(null);
 
+  // / trigger state (slash command)
+  const [slashOpen, setSlashOpen] = useState(false);
+  const [slashQuery, setSlashQuery] = useState('');
+  const [slashSelectedIndex, setSlashSelectedIndex] = useState(-1);
+  const slashRangeRef = useRef<{ from: number; to: number }>({ from: 0, to: 0 });
+
   // > trigger (fire-once: instantly creates field)
   const addUnnamedFieldToNode = useNodeStore((s) => s.addUnnamedFieldToNode);
   const setEditingFieldName = useUIStore((s) => s.setEditingFieldName);
@@ -122,6 +136,10 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
 
   const tagIds = useNodeTags(nodeId);
   const fields = useNodeFields(nodeId);
+  const filteredSlashCommands = useMemo(
+    () => filterSlashCommands(slashQuery),
+    [slashQuery],
+  );
 
   const allChildIds = node?.children ?? [];
 
@@ -381,7 +399,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [isSelected, isReference, optionsPickerOpen, allFieldOptions, optionsPickerIndex, parentId, nodeId, userId, wsId, entities, removeReference, addReference, setSelectedNode, startRefConversion, setPendingRefConversion, setFocusedNode]);
 
-  // When TrailingInput creates a node with # or @, it sets triggerHint so we
+  // When TrailingInput creates a node with #/@/, it sets triggerHint so we
   // can immediately open the dropdown (extensions don't fire on mount because
   // there's no doc change). Read and clear the hint on focus.
   useEffect(() => {
@@ -401,8 +419,25 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       setRefSelectedIndex(0);
       refRangeRef.current = { from: 1, to: 2 };
       setRefOpen(true);
+    } else if (hint === '/') {
+      setSlashQuery('');
+      slashRangeRef.current = { from: 1, to: 2 };
+      setSlashOpen(true);
     }
   }, [isFocused]);
+
+  useEffect(() => {
+    if (!slashOpen) return;
+    if (filteredSlashCommands.length === 0) {
+      if (slashSelectedIndex !== -1) setSlashSelectedIndex(-1);
+      return;
+    }
+
+    const current = filteredSlashCommands[slashSelectedIndex];
+    if (slashSelectedIndex >= 0 && current?.enabled) return;
+
+    setSlashSelectedIndex(getFirstEnabledSlashIndex(filteredSlashCommands));
+  }, [slashOpen, filteredSlashCommands, slashSelectedIndex]);
 
   // ─── Basic handlers ───
 
@@ -424,6 +459,9 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     setRefOpen(false);
     setRefQuery('');
     setRefSelectedIndex(0);
+    setSlashOpen(false);
+    setSlashQuery('');
+    setSlashSelectedIndex(-1);
 
     // Check pending ref conversion: if this is a temp node, decide revert or keep
     const pending = useUIStore.getState().pendingRefConversion;
@@ -920,6 +958,85 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     setRefSelectedIndex(0);
   }, []);
 
+  // ─── / slash command handlers ───
+
+  const replaceSlashTriggerText = useCallback((replacement = '') => {
+    const ed = editorRef.current;
+    if (!ed || ed.isDestroyed) return;
+    const { from, to } = slashRangeRef.current;
+    const chain = ed.chain().deleteRange({ from, to });
+    if (replacement) {
+      chain.insertContentAt(from, replacement);
+    }
+    chain.run();
+  }, []);
+
+  const closeSlashMenu = useCallback(() => {
+    setSlashOpen(false);
+    setSlashQuery('');
+    setSlashSelectedIndex(-1);
+  }, []);
+
+  const executeSlashCommand = useCallback((commandId: SlashCommandId) => {
+    if (commandId === 'field') {
+      replaceSlashTriggerText('>');
+      closeSlashMenu();
+      return;
+    }
+
+    if (commandId === 'reference') {
+      replaceSlashTriggerText('@');
+      closeSlashMenu();
+      return;
+    }
+
+    if (commandId === 'more_commands') {
+      replaceSlashTriggerText('');
+      closeSlashMenu();
+      openSearch();
+      return;
+    }
+
+    if (commandId === 'checkbox') {
+      replaceSlashTriggerText('');
+      handleCycleCheckbox();
+      closeSlashMenu();
+    }
+  }, [replaceSlashTriggerText, closeSlashMenu, openSearch, handleCycleCheckbox]);
+
+  const handleSlashCommand = useCallback((query: string, from: number, to: number) => {
+    slashRangeRef.current = { from, to };
+    setSlashQuery(query);
+    setSlashOpen(true);
+
+    // Slash command has its own menu; close other trigger dropdowns.
+    setHashTagOpen(false);
+    setHashTagQuery('');
+    setHashTagSelectedIndex(0);
+    setRefOpen(false);
+    setRefQuery('');
+    setRefSelectedIndex(0);
+  }, []);
+
+  const handleSlashDeactivate = useCallback(() => {
+    closeSlashMenu();
+  }, [closeSlashMenu]);
+
+  const handleSlashConfirm = useCallback(() => {
+    if (slashSelectedIndex < 0) return;
+    const selected = filteredSlashCommands[slashSelectedIndex];
+    if (!selected || !selected.enabled) return;
+    executeSlashCommand(selected.id);
+  }, [slashSelectedIndex, filteredSlashCommands, executeSlashCommand]);
+
+  const handleSlashNavDown = useCallback(() => {
+    setSlashSelectedIndex((i) => getNextEnabledSlashIndex(filteredSlashCommands, i, 'down'));
+  }, [filteredSlashCommands]);
+
+  const handleSlashNavUp = useCallback(() => {
+    setSlashSelectedIndex((i) => getNextEnabledSlashIndex(filteredSlashCommands, i, 'up'));
+  }, [filteredSlashCommands]);
+
   // ─── Drag and drop handlers ───
 
   const handleDragStart = useCallback(
@@ -1113,6 +1230,13 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
                 onReferenceNavUp={handleReferenceNavUp}
                 onReferenceCreate={handleReferenceForceCreate}
                 onReferenceClose={handleReferenceClose}
+                onSlashCommand={handleSlashCommand}
+                onSlashCommandDeactivate={handleSlashDeactivate}
+                slashActive={slashOpen}
+                onSlashConfirm={handleSlashConfirm}
+                onSlashNavDown={handleSlashNavDown}
+                onSlashNavUp={handleSlashNavUp}
+                onSlashClose={closeSlashMenu}
                 onDescriptionEdit={handleDescriptionEdit}
                 onToggleDone={handleCycleCheckbox}
               />
@@ -1162,6 +1286,14 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
               query={refQuery}
               selectedIndex={refSelectedIndex}
               currentNodeId={nodeId}
+            />
+          )}
+          {slashOpen && isFocused && (
+            <SlashCommandMenu
+              open={slashOpen}
+              commands={filteredSlashCommands}
+              selectedIndex={slashSelectedIndex}
+              onSelect={executeSlashCommand}
             />
           )}
         </div>

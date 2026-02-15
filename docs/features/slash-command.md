@@ -1,144 +1,134 @@
 # Feature: Slash Command Menu
 
-> Phase 1 | 未实现
+> Phase 1 | 规格更新于 2026-02-15（以评审截图为 UI/功能基线）
 
 ## 概述
 
-Slash Command 是输入 `/` 后弹出的命令菜单，提供快速插入内容、转换节点类型等操作。这是 Nodex 特有功能（Tana 使用 Cmd+K 命令面板而非 `/` 触发），与 Notion / Coda 的 slash command 模式对齐。
+Slash Command 是在编辑器内输入 `/` 后出现的命令菜单，用于快速执行节点内操作。  
+本功能与 Cmd+K 共存：
 
-与已有的触发符体系对称：
+- `/`：当前节点上下文命令（就地操作）
+- `Cmd+K`：全局搜索与导航
 
-| 触发符 | 功能 | 状态 |
-|--------|------|------|
-| `#` | 应用标签 | ✅ |
-| `@` | 插入引用 | ✅ |
-| `>` | 添加字段 | ✅ |
-| `?` | 创建搜索节点 | 📋 已规划 |
-| `/` | **命令菜单** | 📋 本文档 |
+本次规格统一为“**先完整呈现菜单信息架构，再逐项点亮功能**”：
+
+- 菜单项顺序固定，和评审截图一致
+- 已实现能力可点击执行
+- 未实现能力保留在对应位置，灰色禁用
 
 ## 当前实现状态
 
 | 层次 | 状态 |
 |------|------|
-| TipTap 触发扩展模式 | ✅ 已有 `#`/`@`/`>` 的成熟模式可复用 |
+| TipTap 触发扩展模式（可复用 `#/@/>`） | ✅ |
 | SlashCommandExtension | ❌ |
-| 命令菜单 UI | ❌ |
-| 命令定义与注册 | ❌ |
+| Slash 菜单 UI | ❌ |
+| 命令注册（含 enabled/disabled） | ❌ |
 
 ## 行为规格
 
-### 触发与显示
+### 触发与关闭
 
-1. 用户在编辑器中输入 `/` → 弹出命令菜单
-2. 菜单出现在光标下方，向下展开（与 `#`/`@` 下拉一致）
-3. 继续输入文字 → 实时过滤命令列表（模糊匹配命令名）
-4. 无匹配时显示 "No results"
-5. 空格或光标离开 → 关闭菜单
+1. 在编辑器中输入 `/`，打开 Slash 菜单
+2. 菜单跟随光标下方展开（与 `#` / `@` 下拉一致）
+3. 持续输入，按关键词过滤命令
+4. 无匹配时显示 `No results`
+5. 以下情况关闭菜单：
+   - 光标离开当前触发上下文
+   - 删除 `/`（Backspace）
+   - 按 `Escape`
 
 ### 键盘导航
 
 | 按键 | 行为 |
 |------|------|
-| `↑` / `↓` | 在命令列表中移动高亮 |
-| `Enter` | 执行高亮命令 |
-| `Escape` | 关闭菜单，保留已输入文字 |
-| 继续输入 | 过滤命令列表 |
-| `Backspace` 删除 `/` | 关闭菜单 |
+| `↑` / `↓` | 在可用项之间移动高亮 |
+| `Enter` | 执行高亮命令（仅可用项） |
+| `Escape` | 关闭菜单，保留已输入文本 |
+| 继续输入 | 实时过滤 |
 
-### 命令列表
+说明：禁用项不参与确认执行；键盘导航应跳过禁用项。
 
-#### Phase 1 命令
+## 命令列表（基线顺序）
 
-| 命令 | 图标 | 说明 | 执行行为 |
-|------|------|------|----------|
-| **Heading** | `Heading` | 转为标题样式 | 当前节点 name 添加 `<strong>` 包裹（Tana 标题 = 加粗节点） |
-| **Code block** | `Code` | 转为代码块 | 当前节点转为 `_docType: 'codeblock'` |
-| **Horizontal rule** | `Minus` | 插入分隔线 | 在当前节点后插入分隔线节点 |
-| **Date** | `Calendar` | 插入日期引用 | 插入 `<span data-inlineref-date>` |
-| **Search node** | `Search` | 创建搜索节点 | 等价于 `?` 触发（`_docType: 'search'`） |
-| **Reference** | `AtSign` | 插入节点引用 | 等价于 `@` 触发 |
-| **Tag** | `Hash` | 应用标签 | 等价于 `#` 触发 |
-| **Field** | `ChevronRight` | 添加字段 | 等价于 `>` 触发 |
+> 下表顺序必须与 UI 一致，不按分类重排。
 
-#### 延后命令
+| 顺序 | 命令 | 快捷提示 | 状态 | 行为 |
+|------|------|----------|------|------|
+| 1 | Paste | `⌘V` | 🟡 禁用 | 占位，灰色不可点击 |
+| 2 | Search node | — | 🟡 禁用 | 占位，灰色不可点击（待 Search Node UI） |
+| 3 | Field | `>` | ✅ 可用 | 等价 `>` 触发（新增字段） |
+| 4 | Reference | `@` | ✅ 可用 | 等价 `@` 触发（引用节点） |
+| 5 | Image / file | — | 🟡 禁用 | 占位，灰色不可点击 |
+| 6 | Heading | `!` | 🟡 禁用 | 占位，灰色不可点击 |
+| 7 | Checkbox | `⌘↩` | ✅ 可用 | 等价 `Cmd+Enter`（为节点启用/切换 checkbox 状态） |
+| 8 | Checklist | — | 🟡 禁用 | 占位，灰色不可点击 |
+| 9 | Start live transcription | — | 🟡 禁用 | 占位，灰色不可点击 |
+| 10 | More commands | `⌘K` | ✅ 可用 | 打开 Cmd+K CommandPalette |
 
-| 命令 | 依赖 |
-|------|------|
-| Image | 图片上传（Phase 3） |
-| Table view | 视图系统（Phase 3） |
-| AI Chat | AI 功能（Phase 3） |
-| Web clip | 网页剪藏（Phase 3） |
+## 菜单 UI（结构）
 
-### 菜单 UI
-
-```
-┌──────────────────────────────┐
-│ 🔍 Filter commands...       │  ← 输入的 `/` 后文字作为过滤词
-├──────────────────────────────┤
-│ INSERT                       │  ← 分类标题（灰色小字）
-│  ⊙ Reference    @mention     │
-│  # Tag          #supertag    │
-│  > Field        add field    │
-│  🔍 Search node              │
-│  📅 Date                     │
-├──────────────────────────────┤
-│ CONVERT                      │
-│  B  Heading                  │
-│  <> Code block               │
-│  ── Horizontal rule          │
-└──────────────────────────────┘
+```text
+┌─────────────────────────────────────────┐
+│ Paste                              ⌘V  │
+│ Search node                            │
+│ Field                               >  │
+│ Reference                           @  │
+│ Image / file                           │
+│ Heading                             !  │
+│ Checkbox                          ⌘↩   │
+│ Checklist                              │
+│ Start live transcription               │
+│ More commands                      ⌘K  │
+└─────────────────────────────────────────┘
 ```
 
-- 分类：INSERT（插入内容） / CONVERT（转换类型）
-- 每项：图标 + 命令名 + 可选描述（灰色）
-- 高亮项：`bg-accent` 背景
-- 最大高度：8 项可见，超出滚动
-- 宽度：240px（与 `#`/`@` 下拉一致）
+视觉规则：
+
+- 菜单宽度对齐现有下拉（约 240px）
+- 可用项：正常前景色 + hover/highlight
+- 禁用项：灰色（如 `text-foreground-tertiary` + `opacity-50`），`cursor-not-allowed`
+- 禁用项不可点击，需带 `aria-disabled="true"`
 
 ## 实现考量
 
-### 复用现有扩展模式
+### 复用现有触发扩展模式
 
-已有三个 TipTap 触发扩展（`HashTagExtension`、`ReferenceExtension`、`FieldTriggerExtension`）提供了成熟的模式：
+可直接复用 `HashTagExtension` / `ReferenceExtension` / `FieldTriggerExtension` 的结构：
 
-```
+```text
 SlashCommandExtension.ts
-  ├── ProseMirror Plugin 监听文档变化
-  ├── 检测光标前 /query 模式
-  ├── onActivate(query, from, to) 回调
-  └── NodeEditor 管理下拉状态
+  ├── ProseMirror Plugin 监听 doc/selection 变化
+  ├── 匹配光标前 /query
+  ├── onActivate(query, from, to)
+  └── onDeactivate()
 ```
 
-与 `#`/`@` 不同的是：
-- `/` 在行内**任意位置**触发（不限于行首）
-- 匹配正则：`/[^\s/]*$`（`/` 后跟非空白非 `/`）
-- 执行命令后**删除 `/` 及过滤文字**（replace from-to 范围）
+建议匹配规则：
 
-### 命令注册
+- `/` 在行内任意位置触发
+- 仅匹配“光标前最后一个 `/query` 片段”
+- 执行命令前，先删除该触发片段（`/query`）
 
-```typescript
+### 命令注册建议
+
+```ts
 interface SlashCommand {
   id: string;
-  name: string;          // 显示名
-  keywords: string[];    // 搜索别名（如 "hr" → Horizontal rule）
-  icon: LucideIcon;
-  category: 'insert' | 'convert';
-  execute: (editor: Editor, nodeId: string, parentId: string) => void;
+  name: string;
+  shortcutHint?: string;
+  keywords: string[];
+  enabled: boolean;
+  run: () => void;
 }
 ```
 
-命令列表定义在独立文件中（如 `slash-commands.ts`），方便扩展。
+`enabled=false` 的命令也参与渲染（保持布局稳定），但不执行。
 
-### 与 Cmd+K 的关系
+命令实现约束：
 
-| 特性 | `/` Slash Command | `Cmd+K` CommandPalette |
-|------|-------------------|------------------------|
-| 触发方式 | 编辑器内输入 | 全局快捷键 |
-| 作用范围 | 当前编辑中的节点 | 全局搜索 + 导航 |
-| 命令类型 | 节点内操作（插入/转换） | 全局操作（搜索/导航/切换） |
-| 位置 | 光标下方内联 | 屏幕中央弹窗 |
-
-两者互补，不冲突。
+- 与编辑器已有能力重复的 Slash 命令必须复用现有逻辑，不单独开发一套新流程
+- `Checkbox` 命令复用 `Cmd+Enter` 同一逻辑（节点 checkbox 三态/二态切换规则保持一致）
 
 ## 实现范围
 
@@ -146,34 +136,25 @@ interface SlashCommand {
 
 | 功能 | 优先级 |
 |------|--------|
-| SlashCommandExtension（TipTap 扩展） | 高 |
-| 命令菜单 UI（过滤 + 键盘导航） | 高 |
-| 基础命令（Reference/Tag/Field/Search 快捷入口） | 高 |
-| Heading / Code block 转换 | 中 |
-| Date 插入 | 中 |
-| Horizontal rule | 低 |
+| SlashCommandExtension | 高 |
+| Slash 菜单 UI（顺序与样式对齐基线） | 高 |
+| 可用命令：Field / Reference / Checkbox / More commands | 高 |
+| 禁用占位命令渲染（其余 6 项） | 高 |
 
-### 延后
+### 后续点亮（非本次）
 
-| 功能 | 原因 |
+| 命令 | 依赖 |
 |------|------|
-| Image / Table / AI 相关命令 | 依赖 Phase 3 功能 |
-| 自定义命令（用户定义 slash command） | Phase 5 |
-| 命令分组折叠 | 命令数量少时不需要 |
-
-## 与 Tana 的已知差异
-
-| 差异 | Tana | Nodex 决策 |
-|------|------|-----------|
-| 命令触发 | Cmd+K 全局命令面板 | `/` 编辑器内命令 + Cmd+K 全局搜索，两者共存 |
-| 触发位置 | 无 `/` 触发 | 行内任意位置输入 `/` |
-| 设计参考 | — | 对齐 Notion / Coda 的 slash command 交互模式 |
+| Search node | Search Node UI（`docs/features/search.md`） |
+| Heading / Checklist | 对应样式与交互规则 |
+| Image / file | 上传与存储流程 |
+| Paste | 剪贴板内容类型与插入策略 |
+| Start live transcription | 语音转写能力 |
 
 ## 决策记录
 
 | 日期 | 决策 | 原因 |
 |------|------|------|
-| 2026-02-14 | `/` 作为命令触发符 | 与 Notion/Coda 一致的用户心智模型；与 #/@/>/?  形成完整触发符体系 |
-| 2026-02-14 | 独立于 Cmd+K，不合并 | 两者作用域不同：`/` = 节点内操作，Cmd+K = 全局导航 |
-| 2026-02-14 | Phase 1 只做基础命令 | 覆盖高频操作，高级命令随对应功能实现后逐步添加 |
-| 2026-02-14 | 复用 TipTap 触发扩展模式 | 已有 #/@/> 三个成熟实现，架构一致性 |
+| 2026-02-15 | Slash 菜单以评审截图为基线 | 先统一产品预期，减少实现偏差 |
+| 2026-02-15 | 未实现命令先灰置禁用而非移除 | 保持信息架构稳定，便于逐项点亮 |
+| 2026-02-15 | `/` 与 `Cmd+K` 分工并存 | 局部编辑命令与全局导航职责不同 |

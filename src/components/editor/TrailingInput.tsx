@@ -373,7 +373,7 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
         return;
       }
 
-      // # or @ trigger: create child node + set triggerHint so OutlinerItem
+      // #/@/ trigger: create child node + set triggerHint so OutlinerItem
       // opens the dropdown immediately (extensions need docChanged to fire,
       // but mount doesn't count as docChanged)
       if (action.type === 'create_trigger_node') {

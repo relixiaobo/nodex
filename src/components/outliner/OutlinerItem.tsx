@@ -1373,7 +1373,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   const isDragging = dragNodeId === nodeId;
 
   return (
-    <div role="treeitem" aria-expanded={isExpanded}>
+    <div role="treeitem" aria-expanded={isExpanded} className={isSelected && !isFocused ? 'bg-selection rounded-md ring-1 ring-selection-ring' : ''}>
       {/* Drop indicator: before */}
       {isDropTarget && dropPosition === 'before' && (
         <div
@@ -1404,9 +1404,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
           onToggle={handleToggle}
           onDrillDown={handleDrillDown}
         />
-        {/* Selection ring wraps bullet + checkbox + text (not chevron).
-            Only show when selected AND not editing (isFocused). */}
-        <div className={`flex items-start gap-2 flex-1 min-w-0 relative ${isSelected && !isFocused ? 'ring-1 ring-primary/40 rounded-sm bg-primary/5 !w-fit !flex-none' : ''}`}>
+        <div className="flex items-start gap-2 flex-1 min-w-0 relative">
           <BulletChevron
             hasChildren={hasChildren}
             isExpanded={isExpanded}

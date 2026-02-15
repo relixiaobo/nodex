@@ -31,17 +31,33 @@ Chrome Side Panel 云端知识管理工具，忠实复刻 Tana 核心功能。
 3. 检查自己认领的 GitHub Issue 状态，或从 `gh issue list --state open --label "enhancement"` 寻找可认领的任务
 4. 如果用户指定了任务，优先执行用户指定的任务
 
+## 接到任务后的强制第一步（不可跳过）
+
+无论用户怎么给你任务，写第一行代码之前**必须**执行：
+
+```bash
+# 1. 标记 Issue（替换 <N>）
+gh issue edit <N> --add-label "agent:nodex-codex"
+gh issue comment <N> --body "开始开发。预计修改文件：..."
+
+# 2. 创建分支 + Draft PR
+git checkout -b codex/<feature> origin/main
+gh pr create --draft --title "[WIP] feat: ..." --body "ref #<N>"
+```
+
+如果用户没给 Issue 编号，先 `gh issue list --state open` 找到对应 issue，没有则创建新 issue。
+
+**为什么不可跳过**：其他 Agent 通过 Issue label 和 Draft PR 判断全局状态。不标记 = 不可见 = 文件冲突风险。
+
 ## 开发工作流
 
 ```
-认领任务 → 创建分支 → 立即开 Draft PR → 开发 → 自检 → 标记 Ready → 等待 review
+接到任务 → 标记 Issue + Draft PR（上一步）→ 开发 → 自检 → 标记 Ready → 等待 review
 ```
 
-1. 从 `main` 创建功能分支：`codex/<feature>`
-2. **立即创建 Draft PR**：`gh pr create --draft --title "[WIP] feat: ..." --body "ref #N"`
-3. 在 Issue comment 中声明将修改的热点文件（`🔒 Working on: node-store.ts, ...`）
-4. 开发过程中定期 push，保持 Draft PR 可见
-5. 完成后：
+1. 在 Issue comment 中声明将修改的热点文件（`🔒 Working on: node-store.ts, ...`）
+2. 开发过程中定期 push，保持 Draft PR 可见
+3. 完成后：
    - 按 `.github/pull_request_template.md` checklist 逐项自检
    - `gh pr ready` 转为 Ready
    - `gh pr edit --add-label "needs-review"` 触发 review

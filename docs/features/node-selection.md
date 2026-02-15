@@ -27,8 +27,11 @@
 | 选中模式 ↑/↓ 导航 + Enter 回编辑 | ✅ 已实现 (Phase 1) |
 | 选中模式可打印字符输入 | ✅ 已实现 (Phase 1) |
 | Shift+↑/↓ 从编辑进入选中 | ✅ 已实现 (Phase 1) |
-| 多选（Cmd+Click / Shift+Click） | ❌ 未实现 |
-| 拖动选择（Drag Select） | ❌ 未实现 |
+| Cmd+Click 多选（含子树合并吸收） | ✅ 已实现 (Phase 2) |
+| Shift+Click 范围选中 | ✅ 已实现 (Phase 2) |
+| Shift+Arrow 扩展选区 | ✅ 已实现 (Phase 2) |
+| 拖动选择（Drag Select） | ✅ 已实现 (Phase 2) |
+| Cmd+A 全选 | ✅ 已实现 (Phase 2) |
 | 批量操作 | ❌ 未实现 |
 | 双层选中高亮（子树遮罩 + 行高亮） | ❌ 未实现 |
 
@@ -402,3 +405,4 @@ contenteditable 元素会捕获鼠标事件，导致父容器上的 React onMous
 | 2026-02-15 | ↑/↓ 光标位置约定（↑末尾/↓开头） | 符合从上/下方进入节点的直觉 |
 | 2026-02-15 | Phase 拆为 3 期（基础→多选拖选→批量操作视觉） | 渐进交付，Phase 1 可独立使用 |
 | 2026-02-16 | Phase 1 实现：Escape→选中、↑↓导航、Enter/字符输入、Shift+Arrow 入选 | 统一选中键盘处理，合并引用节点与通用选择逻辑 |
+| 2026-02-16 | Phase 2 实现：Cmd+Click多选、Shift+Click范围选、Shift+Arrow扩展、拖选、Cmd+A | 多选仅anchor节点处理键盘；拖选使用document级别监听；extent从bounds+anchor动态推导无需额外状态 |

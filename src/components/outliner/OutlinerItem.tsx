@@ -36,6 +36,13 @@ import { resolveDropMove } from '../../lib/drag-drop';
 import { resolveSelectedReferenceShortcut } from '../../lib/selected-reference-shortcuts';
 import { resolveSelectionKeyboardAction } from '../../lib/selection-keyboard';
 import {
+  toggleNodeInSelection,
+  computeRangeSelection,
+  filterToRootLevel,
+  getFirstSelectedInOrder,
+  getSelectionBounds,
+} from '../../lib/selection-utils';
+import {
   filterSlashCommands,
   getFirstEnabledSlashIndex,
   getNextEnabledSlashIndex,
@@ -74,6 +81,10 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   const selectedNodeId = useUIStore((s) => s.selectedNodeId);
   const selectedParentId = useUIStore((s) => s.selectedParentId);
   const setSelectedNode = useUIStore((s) => s.setSelectedNode);
+  const selectedNodeIds = useUIStore((s) => s.selectedNodeIds);
+  const selectionAnchorId = useUIStore((s) => s.selectionAnchorId);
+  const setSelectedNodes = useUIStore((s) => s.setSelectedNodes);
+  const clearSelection = useUIStore((s) => s.clearSelection);
   const toggleExpanded = useUIStore((s) => s.toggleExpanded);
   const setExpanded = useUIStore((s) => s.setExpanded);
   const navigateTo = useUIStore((s) => s.navigateTo);
@@ -220,8 +231,13 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   const isReference = !!node && node.props._ownerId !== parentId;
   const isTagDef = node?.props._docType === 'tagDef';
   const isPendingConversion = useUIStore((s) => s.pendingRefConversion?.tempNodeId === nodeId);
-  const isSelected = selectedNodeId === nodeId &&
-    (selectedParentId === null || selectedParentId === parentId);
+  // Multi-select: check the set. For single-select with parent disambiguation (reference nodes),
+  // also check selectedParentId to support the same node appearing in multiple places.
+  const isSelected = selectedNodeIds.has(nodeId) && (
+    selectedNodeIds.size > 1 ||
+    selectedParentId === null ||
+    selectedParentId === parentId
+  );
 
   // Options field dropdown (for changing selected option value)
   const isOptionsField = fieldDataType === SYS_D.OPTIONS || fieldDataType === SYS_D.OPTIONS_FROM_SUPERTAG;
@@ -241,6 +257,36 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   const handleCycleCheckbox = useCallback(() => {
     if (userId) cycleNodeCheckbox(nodeId, userId);
   }, [nodeId, userId, cycleNodeCheckbox]);
+
+  // Cmd+Click: toggle node in multi-selection
+  const handleCmdClick = useCallback(() => {
+    const state = useUIStore.getState();
+    const storeEntities = useNodeStore.getState().entities;
+    const newSelection = toggleNodeInSelection(nodeId, state.selectedNodeIds, storeEntities);
+    // If anchor was deselected, pick another selected node
+    let newAnchor = state.selectionAnchorId;
+    if (newAnchor && !newSelection.has(newAnchor)) {
+      newAnchor = newSelection.size > 0 ? [...newSelection][0] : null;
+    }
+    if (!newAnchor && newSelection.has(nodeId)) {
+      newAnchor = nodeId;
+    }
+    setSelectedNodes(newSelection, newAnchor);
+  }, [nodeId, setSelectedNodes]);
+
+  // Shift+Click: range select from anchor to this node
+  const handleShiftClick = useCallback(() => {
+    const state = useUIStore.getState();
+    const anchor = state.selectionAnchorId;
+    if (!anchor) {
+      setSelectedNode(nodeId, parentId);
+      return;
+    }
+    const storeEntities = useNodeStore.getState().entities;
+    const flatList = getFlattenedVisibleNodes(rootChildIds, storeEntities, state.expandedNodes, rootNodeId);
+    const range = computeRangeSelection(anchor, nodeId, flatList, storeEntities);
+    setSelectedNodes(range, anchor);
+  }, [nodeId, parentId, rootChildIds, rootNodeId, setSelectedNode, setSelectedNodes]);
 
   // Escape in editor (no dropdown) → select current node
   const handleEscapeSelect = useCallback(() => {
@@ -353,20 +399,28 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
 
   // Unified keyboard handler for selected nodes (both reference and non-reference).
   // Reference-specific actions (delete ref, convert to inline) are checked first;
-  // general selection actions (↑/↓ navigate, Enter edit, printable char, Esc clear)
-  // handle the rest.
+  // general selection actions (↑/↓ navigate, Shift+↑/↓ extend, Enter edit, Cmd+A,
+  // printable char, Esc clear) handle the rest.
+  // For multi-select, only the anchor node handles keyboard events to avoid duplicates.
   const setPendingInputChar = useUIStore((s) => s.setPendingInputChar);
   useEffect(() => {
     if (!isSelected || isFocused) return;
     const handleKeyDown = (e: KeyboardEvent) => {
-      // 1. Reference-specific actions (only for reference nodes)
-      if (isReference) {
+      const uiState = useUIStore.getState();
+
+      // For multi-select, only the anchor node processes keyboard events
+      if (uiState.selectedNodeIds.size > 1 && nodeId !== uiState.selectionAnchorId) {
+        return;
+      }
+
+      // 1. Reference-specific actions (only for single-selected reference nodes)
+      if (isReference && uiState.selectedNodeIds.size <= 1) {
         const refAction = resolveSelectedReferenceShortcut(e, optionsPickerOpen);
         if (refAction) {
           if (refAction === 'delete') {
             e.preventDefault();
             if (userId) removeReference(parentId, nodeId, userId);
-            setSelectedNode(null);
+            clearSelection();
             return;
           }
           if (refAction === 'convert_arrow_right' || refAction === 'convert_printable') {
@@ -382,7 +436,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
               useNodeStore.getState().setNodeNameLocal(tempNodeId, tempName + e.key);
             }
             setPendingRefConversion({ tempNodeId, refNodeId: nodeId, parentId });
-            setSelectedNode(null);
+            clearSelection();
             setTimeout(() => setFocusedNode(tempNodeId, parentId), 0);
             return;
           }
@@ -403,34 +457,94 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
               removeReference(parentId, nodeId, userId);
               addReference(parentId, opt.id, userId);
             }
-            setSelectedNode(null);
+            clearSelection();
             return;
           }
           if (refAction === 'escape') {
             e.preventDefault();
-            setSelectedNode(null);
+            clearSelection();
             return;
           }
           return; // Reference handler consumed the event
         }
       }
 
-      // 2. General selection mode actions (all node types)
+      // 2. General selection mode actions (all node types, including multi-select)
       const selAction = resolveSelectionKeyboardAction(e);
       if (!selAction) return;
 
       e.preventDefault();
 
       if (selAction === 'clear_selection') {
-        setSelectedNode(null);
+        clearSelection();
         return;
       }
 
+      if (selAction === 'select_all') {
+        // Select all top-level content children of root
+        const storeEntities = useNodeStore.getState().entities;
+        const rootNode = storeEntities[rootNodeId];
+        const topLevelIds = (rootNode?.children ?? []).filter(
+          (cid) => !storeEntities[cid]?.props._docType,
+        );
+        if (topLevelIds.length > 0) {
+          setSelectedNodes(new Set(topLevelIds), topLevelIds[0]);
+        }
+        return;
+      }
+
+      if (selAction === 'extend_up' || selAction === 'extend_down') {
+        const storeEntities = useNodeStore.getState().entities;
+        const latestUi = useUIStore.getState();
+        const flatList = getFlattenedVisibleNodes(rootChildIds, storeEntities, latestUi.expandedNodes, rootNodeId);
+
+        const bounds = getSelectionBounds(latestUi.selectedNodeIds, flatList);
+        const anchor = latestUi.selectionAnchorId;
+        if (!bounds || !anchor) return;
+
+        const anchorIdx = flatList.findIndex((n) => n.nodeId === anchor);
+        const firstIdx = flatList.findIndex((n) => n.nodeId === bounds.first.nodeId);
+        const lastIdx = flatList.findIndex((n) => n.nodeId === bounds.last.nodeId);
+        if (anchorIdx < 0) return;
+
+        // Determine current extent: the end of the range that is NOT the anchor
+        let extentIdx: number;
+        if (anchorIdx <= firstIdx) {
+          extentIdx = lastIdx;
+        } else if (anchorIdx >= lastIdx) {
+          extentIdx = firstIdx;
+        } else {
+          extentIdx = selAction === 'extend_down' ? lastIdx : firstIdx;
+        }
+
+        // Move extent by one
+        const newExtentIdx = selAction === 'extend_up'
+          ? Math.max(0, extentIdx - 1)
+          : Math.min(flatList.length - 1, extentIdx + 1);
+
+        // Compute new range from anchor to new extent
+        const start = Math.min(anchorIdx, newExtentIdx);
+        const end = Math.max(anchorIdx, newExtentIdx);
+        const rangeIds = new Set<string>();
+        for (let i = start; i <= end; i++) {
+          rangeIds.add(flatList[i].nodeId);
+        }
+        const filtered = filterToRootLevel(rangeIds, storeEntities);
+        setSelectedNodes(filtered, anchor);
+        return;
+      }
+
+      // For navigate/enter/type: use fresh state for multi-select bounds
+      const storeEntities = useNodeStore.getState().entities;
+      const latestUi = useUIStore.getState();
+      const flatList = getFlattenedVisibleNodes(rootChildIds, storeEntities, latestUi.expandedNodes, rootNodeId);
+
       if (selAction === 'navigate_up') {
-        const flatList = getFlattenedVisibleNodes(rootChildIds, entities, expandedNodes, rootNodeId);
-        const prev = getPreviousVisibleNode(nodeId, parentId, flatList);
+        const bounds = getSelectionBounds(latestUi.selectedNodeIds, flatList);
+        if (!bounds) return;
+        const prev = getPreviousVisibleNode(bounds.first.nodeId, bounds.first.parentId, flatList);
         if (prev) {
-          setSelectedNode(null);
+          clearSelection();
           // ↑ → cursor at text end (no click coords = default end position)
           useUIStore.getState().setFocusClickCoords(null);
           setFocusedNode(prev.nodeId, prev.parentId);
@@ -439,10 +553,11 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       }
 
       if (selAction === 'navigate_down') {
-        const flatList = getFlattenedVisibleNodes(rootChildIds, entities, expandedNodes, rootNodeId);
-        const next = getNextVisibleNode(nodeId, parentId, flatList);
+        const bounds = getSelectionBounds(latestUi.selectedNodeIds, flatList);
+        if (!bounds) return;
+        const next = getNextVisibleNode(bounds.last.nodeId, bounds.last.parentId, flatList);
         if (next) {
-          setSelectedNode(null);
+          clearSelection();
           // ↓ → cursor at text start (textOffset 0)
           useUIStore.getState().setFocusClickCoords({ nodeId: next.nodeId, parentId: next.parentId, textOffset: 0 });
           setFocusedNode(next.nodeId, next.parentId);
@@ -450,24 +565,21 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
         return;
       }
 
-      if (selAction === 'enter_edit') {
-        setSelectedNode(null);
+      if (selAction === 'enter_edit' || selAction === 'type_char') {
+        const first = getFirstSelectedInOrder(latestUi.selectedNodeIds, flatList);
+        if (!first) return;
+        if (selAction === 'type_char') {
+          setPendingInputChar(e.key);
+        }
+        clearSelection();
         useUIStore.getState().setFocusClickCoords(null);
-        setFocusedNode(nodeId, parentId);
-        return;
-      }
-
-      if (selAction === 'type_char') {
-        setPendingInputChar(e.key);
-        setSelectedNode(null);
-        useUIStore.getState().setFocusClickCoords(null);
-        setFocusedNode(nodeId, parentId);
+        setFocusedNode(first.nodeId, first.parentId);
         return;
       }
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isSelected, isFocused, isReference, optionsPickerOpen, allFieldOptions, optionsPickerIndex, parentId, nodeId, userId, wsId, rootNodeId, rootChildIds, entities, expandedNodes, removeReference, addReference, setSelectedNode, setFocusedNode, startRefConversion, setPendingRefConversion, setPendingInputChar]);
+  }, [isSelected, isFocused, isReference, optionsPickerOpen, allFieldOptions, optionsPickerIndex, parentId, nodeId, userId, wsId, rootNodeId, rootChildIds, entities, expandedNodes, selectedNodeIds, selectionAnchorId, removeReference, addReference, setSelectedNode, setSelectedNodes, clearSelection, setFocusedNode, startRefConversion, setPendingRefConversion, setPendingInputChar]);
 
   // When TrailingInput creates a node with #/@/, it sets triggerHint so we
   // can immediately open the dropdown (extensions don't fire on mount because
@@ -570,7 +682,21 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     if (fieldDataType === SYS_D.CHECKBOX) return;
     const target = e.target as HTMLElement;
     const refEl = target.closest('[data-inlineref-node]') as HTMLElement | null;
-    if (refEl || isReference) return;
+    if (refEl) return;
+
+    // Multi-select modifiers: Cmd+Click / Shift+Click (both reference and non-reference)
+    if (e.metaKey || e.ctrlKey) {
+      e.preventDefault();
+      handleCmdClick();
+      return;
+    }
+    if (e.shiftKey) {
+      e.preventDefault();
+      handleShiftClick();
+      return;
+    }
+
+    if (isReference) return;
 
     const container = e.currentTarget as HTMLElement;
     const textOffset = getTextOffsetFromPoint(container, e.clientX, e.clientY);
@@ -582,7 +708,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     // Prevent native selection/focus churn on the static HTML layer.
     e.preventDefault();
     setFocusedNode(nodeId, parentId);
-  }, [isReference, fieldDataType, nodeId, parentId, setFocusedNode]);
+  }, [isReference, fieldDataType, nodeId, parentId, setFocusedNode, handleCmdClick, handleShiftClick]);
 
   const handleContentClick = useCallback((e: React.MouseEvent) => {
     // Intercept clicks on inline references (blue links in static display)
@@ -598,7 +724,8 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       }
     }
     // Reference nodes: single click = select (frame), double click = edit
-    if (isReference) {
+    // Cmd+Click and Shift+Click are handled in handleContentMouseDown
+    if (isReference && !e.metaKey && !e.ctrlKey && !e.shiftKey) {
       setSelectedNode(nodeId, parentId);
     }
   }, [nodeId, parentId, isReference, setSelectedNode, navigateTo]);
@@ -1255,6 +1382,8 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
             : ''
         } ${isDragging ? 'opacity-40' : ''}`}
         style={{ paddingLeft: depth * 28 + 6 }}
+        data-node-id={nodeId}
+        data-parent-id={parentId}
         draggable={!isFocused}
         onDragStart={handleDragStart}
         onDragOver={handleDragOver}

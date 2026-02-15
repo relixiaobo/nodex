@@ -574,10 +574,26 @@ applyWebClipToNode（5 cases）:
 3. `Enter` → `enter_edit`（编辑选中节点，光标在末尾）
 4. `Escape` → `clear_selection`（清除所有选中）
 5. 可打印字符 → `type_char`（编辑选中节点 + 追加字符）
-6. `Shift+Arrow` → `null`（Phase 2 扩展选区，暂不处理）
-7. `Cmd/Ctrl/Alt+key` → `null`（修饰键组合不处理）
-8. 特殊键（Tab/F1/Shift/Control）→ `null`
-9. `Enter` + 修饰键 → `null`（仅无修饰键 Enter 触发编辑）
+6. `Shift+↑` → `extend_up`（从锚点向上扩展选区）
+7. `Shift+↓` → `extend_down`（从锚点向下扩展选区）
+8. `Cmd+A` / `Ctrl+A` → `select_all`（选中所有顶层节点）
+9. `Cmd/Ctrl+非a` / `Alt+key` → `null`（其他修饰键组合不处理）
+10. 特殊键（Tab/F1/Shift/Control）→ `null`
+11. `Enter` + 修饰键 → `null`（仅无修饰键 Enter 触发编辑）
+
+### 1.40 Multi-Select 纯函数工具库
+
+**测试文件**: `tests/vitest/selection-utils.test.ts`
+
+**覆盖点**:
+
+1. `isNodeOrAncestorSelected` — 空选区/自身/父/祖父/兄弟/未知节点
+2. `hasSelectedAncestor` — 空选区/仅自身/父选中/根节点
+3. `toggleNodeInSelection` — 新增/移除/忽略后代/吸收后代/嵌套吸收
+4. `computeRangeSelection` — 正向/反向/单节点/全范围/缺失锚点回退
+5. `filterToRootLevel` — 过滤子节点/全保留/空集/深嵌套链
+6. `getFirstSelectedInOrder` — 多选首项/空选区/单选
+7. `getSelectionBounds` — 首尾边界/单选/空选区/非连续选区
 
 ---
 

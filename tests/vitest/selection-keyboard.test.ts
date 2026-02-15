@@ -39,14 +39,25 @@ describe('resolveSelectionKeyboardAction', () => {
     expect(resolveSelectionKeyboardAction(keyEvent('A', { shiftKey: true }))).toBe('type_char');
   });
 
-  it('returns null for Shift+Arrow (reserved for Phase 2 extend)', () => {
-    expect(resolveSelectionKeyboardAction(keyEvent('ArrowUp', { shiftKey: true }))).toBeNull();
-    expect(resolveSelectionKeyboardAction(keyEvent('ArrowDown', { shiftKey: true }))).toBeNull();
+  it('returns extend_up for Shift+ArrowUp', () => {
+    expect(resolveSelectionKeyboardAction(keyEvent('ArrowUp', { shiftKey: true }))).toBe('extend_up');
   });
 
-  it('returns null for Cmd/Ctrl+key', () => {
-    expect(resolveSelectionKeyboardAction(keyEvent('a', { metaKey: true }))).toBeNull();
-    expect(resolveSelectionKeyboardAction(keyEvent('a', { ctrlKey: true }))).toBeNull();
+  it('returns extend_down for Shift+ArrowDown', () => {
+    expect(resolveSelectionKeyboardAction(keyEvent('ArrowDown', { shiftKey: true }))).toBe('extend_down');
+  });
+
+  it('returns select_all for Cmd+A', () => {
+    expect(resolveSelectionKeyboardAction(keyEvent('a', { metaKey: true }))).toBe('select_all');
+  });
+
+  it('returns select_all for Ctrl+A', () => {
+    expect(resolveSelectionKeyboardAction(keyEvent('a', { ctrlKey: true }))).toBe('select_all');
+  });
+
+  it('returns null for Cmd/Ctrl+key (non-a)', () => {
+    expect(resolveSelectionKeyboardAction(keyEvent('b', { metaKey: true }))).toBeNull();
+    expect(resolveSelectionKeyboardAction(keyEvent('c', { ctrlKey: true }))).toBeNull();
   });
 
   it('returns null for Alt+key', () => {

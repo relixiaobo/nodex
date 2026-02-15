@@ -37,6 +37,12 @@ interface UIStore {
   selectedParentId: string | null;
   setSelectedNode(nodeId: string | null, parentId?: string | null): void;
 
+  // Multi-selection (root-level node IDs only; ancestors cover descendants)
+  selectedNodeIds: Set<string>;
+  selectionAnchorId: string | null;
+  setSelectedNodes(nodeIds: Set<string>, anchorId?: string | null): void;
+  clearSelection(): void;
+
   // Sidebar
   sidebarOpen: boolean;
   toggleSidebar(): void;
@@ -202,20 +208,44 @@ export const useUIStore = create<UIStore>()(
       setFocusedNode: (nodeId, parentId) => set({
         focusedNodeId: nodeId,
         focusedParentId: parentId ?? null,
-        // Clear selection when entering edit mode
+        // Clear all selection when entering edit mode
         selectedNodeId: null,
         selectedParentId: null,
+        selectedNodeIds: new Set(),
+        selectionAnchorId: null,
       }),
 
-      // Selection
+      // Selection (single)
       selectedNodeId: null,
       selectedParentId: null,
       setSelectedNode: (nodeId, parentId) => set({
         selectedNodeId: nodeId,
         selectedParentId: parentId ?? null,
+        selectedNodeIds: nodeId ? new Set([nodeId]) : new Set(),
+        selectionAnchorId: nodeId,
         // Clear focus when selecting (exit edit mode)
         focusedNodeId: null,
         focusedParentId: null,
+      }),
+
+      // Multi-selection
+      selectedNodeIds: new Set<string>(),
+      selectionAnchorId: null,
+      setSelectedNodes: (nodeIds, anchorId) => set({
+        selectedNodeIds: nodeIds,
+        selectionAnchorId: anchorId ?? null,
+        // Sync single-select fields (for backward compat with reference node logic)
+        selectedNodeId: nodeIds.size === 1 ? [...nodeIds][0] : null,
+        selectedParentId: null,
+        // Clear focus
+        focusedNodeId: null,
+        focusedParentId: null,
+      }),
+      clearSelection: () => set({
+        selectedNodeId: null,
+        selectedParentId: null,
+        selectedNodeIds: new Set(),
+        selectionAnchorId: null,
       }),
 
       // Sidebar

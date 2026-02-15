@@ -10,12 +10,17 @@
 
 | # | 标题 | 状态 | 负责人 | 优先级 | 创建 | 详情 |
 |---|------|------|--------|--------|------|------|
+| 59 | 网页正文内容抓取与保存（剪藏 V2） | 📋 待认领 | — | P2 | 02-15 | — |
 | 49 | Cmd+Enter 在编辑器内无法切换 Checkbox 状态 | 📋 待认领 | — | P1 | 02-14 | [详情](issues/49.md) |
 
 ## Closed Bugs
 
 | # | 标题 | 关闭人 | 关闭日期 | 备注 |
 |---|------|--------|----------|------|
+| 58 | 字段值节点 `_ownerId` 指向内容节点导致 reference 样式渲染 | nodex-cc | 02-15 | `_ownerId` 改为指向 `assocDataId` |
+| 57 | `createAttrDef` 仅创建 TYPE_CHOICE tuple，配置页不完整 | nodex-cc | 02-15 | 补齐 Auto-initialize / Required / Hide field 配置 |
+| 56 | Source URL 字段值未写入 `assocData.children`，UI 无法渲染 | nodex-cc | 02-15 | `setFieldValue` 同时写入 tuple 和 assocData |
+| 55 | `/clip` 后节点标题空白，需移开焦点才显示 | nodex-cc | 02-15 | clip 完成后 `editor.setContent()` 主动同步 |
 | 54 | Schema 空子节点 Backspace 无法删除 | claude-main | 02-15 | 回退到 TipTap，raw contentEditable 已废弃 |
 | 53 | `#tag` 选中后触发词文本残留 | claude-main | 02-15 | 回退到 TipTap，raw contentEditable 已废弃 |
 | 52 | `@` reference 下拉菜单导航/确认失败 | claude-main | 02-15 | 回退到 TipTap，raw contentEditable 已废弃 |
@@ -142,6 +147,11 @@
 - [x] Source URL 字段写入 — 2026-02-15
 - [x] 剪藏结果反馈 + 导航到新节点 — 2026-02-15
 - [x] `/clip` slash command 入口（就地转换当前节点，不切换页面）— 2026-02-15
+- [x] Bug fix: `/clip` 后编辑器立即同步标题（#55）— 2026-02-15
+- [x] Bug fix: Source URL 值写入 assocData.children（#56）— 2026-02-15
+- [x] Bug fix: `createAttrDef` 完整配置 tuples（#57）— 2026-02-15
+- [x] Bug fix: 字段值 `_ownerId` 指向 assocDataId（#58）— 2026-02-15
+- [ ] 网页正文内容抓取与保存（#59）：提取 `defuddle` content → 转为 outliner 子节点树
 
 #### #44 节点选中
 

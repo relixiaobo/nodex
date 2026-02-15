@@ -11,11 +11,15 @@ Chrome Side Panel 的核心场景：用户浏览网页时，将内容剪藏为 N
 - ✅ Side Panel -> Background -> Content Script 消息链路已打通
 - ✅ Content Script 已切换为 `defuddle` 提取，提取 title/url/content/author/published/description/siteName
 - ✅ `/clip` 斜杠命令完成全链路：提取 → 将**当前节点**就地转为 clip 节点（改名 + 打标签 + 写字段），不切换页面
+- ✅ `/clip` 后编辑器立即同步页面标题（`editor.setContent()`），无需移开焦点
 - ✅ `saveWebClip()` 支持自定义 `parentId` 参数（默认 Inbox）
 - ✅ `#web_clip` tagDef + `Source URL` attrDef 首次剪藏时 find-or-create（惰性创建）
+- ✅ `setFieldValue` 同时写入 `tuple.children[1]` 和 `assocData.children`，UI 正确渲染
+- ✅ 字段值节点 `_ownerId` 指向 `assocDataId`（非内容节点），避免 reference 误判
+- ✅ `createAttrDef` 创建完整配置 tuples（Field type / Auto-initialize / Required / Hide field）
 - ✅ 页面 description（如有）写入节点 description
 - ✅ 种子数据包含 `#web_clip` tagDef + 示例剪藏节点
-- ✅ Vitest 测试覆盖 `findTagDefByName`/`findTemplateAttrDef`/`saveWebClip`（15 cases）
+- ✅ Vitest 测试覆盖 `findTagDefByName`/`findTemplateAttrDef`/`saveWebClip`/`applyWebClipToNode`（20 cases）
 - ✅ Sidebar "Clip Page" 按钮已移除，入口迁移至 slash command
 
 ## 前因后果（决策演进）
@@ -162,3 +166,6 @@ clip_node
 | 2026-02-15 | 入口从 Sidebar 按钮迁移到 `/clip` slash command | 减少 Sidebar 按钮堆积，就地操作更自然 |
 | 2026-02-15 | `/clip` 就地转换当前节点（改名+打标签+写字段），不创建新节点 | 最简交互：当前节点即 clip 节点 |
 | 2026-02-15 | `saveWebClip` 新增可选 `parentId` 参数（默认 Inbox） | 支持 slash command 从任意节点触发剪藏 |
+| 2026-02-15 | `setFieldValue` 同时写入 `tuple.children` 和 `assocData.children` | `FieldValueOutliner` 从 assocData.children 读取值节点，两处必须同步 |
+| 2026-02-15 | 字段值节点 `_ownerId` 指向 `assocDataId`（非内容节点） | 避免 `OutlinerItem.isReference` 误判为 reference 样式 |
+| 2026-02-15 | `createAttrDef` 创建完整 4 个配置 tuples | 确保字段配置页显示所有配置项（Field type / Auto-init / Required / Hide） |

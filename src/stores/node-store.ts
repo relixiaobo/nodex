@@ -1824,9 +1824,23 @@ export const useNodeStore = create<NodeStore>()(
       set((state) => {
         const tuple = state.entities[tupleId];
         if (!tuple || tuple.props._docType !== 'tuple' || !tuple.children || tuple.children.length < 1) return;
+        const now = Date.now();
         tuple.children[1] = newValue;
-        tuple.updatedAt = Date.now();
+        tuple.updatedAt = now;
         tuple.updatedBy = userId;
+
+        // Also update AssociatedData (unified model)
+        const parentId = tuple.props._ownerId;
+        const parent = parentId ? state.entities[parentId] : undefined;
+        const assocId = parent?.associationMap?.[tupleId];
+        if (assocId) {
+          const assoc = state.entities[assocId];
+          if (assoc) {
+            assoc.children = [newValue];
+            assoc.updatedAt = now;
+            assoc.updatedBy = userId;
+          }
+        }
       });
     },
 

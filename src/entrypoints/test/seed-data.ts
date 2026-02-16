@@ -101,7 +101,7 @@ export function seedTestData() {
     makeNode(schemaId, 'Schema', WS_ID, [
       // System value nodes
       SYS_V.YES, SYS_V.NO,
-      SYS_D.PLAIN, SYS_D.OPTIONS, SYS_D.OPTIONS_FROM_SUPERTAG, SYS_D.DATE, SYS_D.NUMBER, SYS_D.URL, SYS_D.EMAIL, SYS_D.CHECKBOX,
+      SYS_D.PLAIN, SYS_D.OPTIONS, SYS_D.OPTIONS_FROM_SUPERTAG, SYS_D.DATE, SYS_D.NUMBER, SYS_D.URL, SYS_D.EMAIL, SYS_D.CHECKBOX, SYS_D.BOOLEAN,
       SYS_V.NEVER, SYS_V.WHEN_EMPTY, SYS_V.WHEN_NOT_EMPTY, SYS_V.WHEN_VALUE_IS_DEFAULT, SYS_V.ALWAYS,
       // System attrDef nodes
       SYS_A.COLOR, SYS_A.EXTENDS, SYS_A.SHOW_CHECKBOX,
@@ -232,6 +232,7 @@ export function seedTestData() {
     makeNode(SYS_D.URL, 'URL', schemaId),
     makeNode(SYS_D.EMAIL, 'Email', schemaId),
     makeNode(SYS_D.CHECKBOX, 'Checkbox', schemaId),
+    makeNode(SYS_D.BOOLEAN, 'Boolean', schemaId),
     // Hide field enum
     makeNode(SYS_V.NEVER, 'Never', schemaId),
     makeNode(SYS_V.WHEN_EMPTY, 'When empty', schemaId),
@@ -263,13 +264,13 @@ export function seedTestData() {
   // SYS_A55 Show as checkbox — OPTIONS type [Yes/No]
   const sysAttrDefCheckbox: NodexNode[] = [
     makeNode(SYS_A.SHOW_CHECKBOX, 'Show as checkbox', schemaId, [`${SYS_A.SHOW_CHECKBOX}_type`, SYS_V.YES, SYS_V.NO], 'attrDef'),
-    makeNode(`${SYS_A.SHOW_CHECKBOX}_type`, '', SYS_A.SHOW_CHECKBOX, [SYS_A.TYPE_CHOICE, SYS_D.OPTIONS], 'tuple'),
+    makeNode(`${SYS_A.SHOW_CHECKBOX}_type`, '', SYS_A.SHOW_CHECKBOX, [SYS_A.TYPE_CHOICE, SYS_D.BOOLEAN], 'tuple'),
   ];
 
   // NDX_A06 Done state mapping — OPTIONS type [Yes/No]
   const sysAttrDefDoneMapping: NodexNode[] = [
     makeNode(SYS_A.DONE_STATE_MAPPING, 'Done state mapping', schemaId, [`${SYS_A.DONE_STATE_MAPPING}_type`, SYS_V.YES, SYS_V.NO], 'attrDef'),
-    makeNode(`${SYS_A.DONE_STATE_MAPPING}_type`, '', SYS_A.DONE_STATE_MAPPING, [SYS_A.TYPE_CHOICE, SYS_D.OPTIONS], 'tuple'),
+    makeNode(`${SYS_A.DONE_STATE_MAPPING}_type`, '', SYS_A.DONE_STATE_MAPPING, [SYS_A.TYPE_CHOICE, SYS_D.BOOLEAN], 'tuple'),
   ];
 
   // NDX_A07 Map checked to — PLAIN type (entries in AssociatedData)
@@ -312,19 +313,19 @@ export function seedTestData() {
   // SYS_A44 Auto-collect values — OPTIONS type [Yes/No]
   const sysAttrDefAutocollect: NodexNode[] = [
     makeNode(SYS_A.AUTOCOLLECT_OPTIONS, 'Auto-collect values', schemaId, [`${SYS_A.AUTOCOLLECT_OPTIONS}_type`, SYS_V.YES, SYS_V.NO], 'attrDef'),
-    makeNode(`${SYS_A.AUTOCOLLECT_OPTIONS}_type`, '', SYS_A.AUTOCOLLECT_OPTIONS, [SYS_A.TYPE_CHOICE, SYS_D.OPTIONS], 'tuple'),
+    makeNode(`${SYS_A.AUTOCOLLECT_OPTIONS}_type`, '', SYS_A.AUTOCOLLECT_OPTIONS, [SYS_A.TYPE_CHOICE, SYS_D.BOOLEAN], 'tuple'),
   ];
 
   // NDX_A02 Auto-initialize — OPTIONS type [Yes/No]
   const sysAttrDefAutoInit: NodexNode[] = [
     makeNode(SYS_A.AUTO_INITIALIZE, 'Auto-initialize', schemaId, [`${SYS_A.AUTO_INITIALIZE}_type`, SYS_V.YES, SYS_V.NO], 'attrDef'),
-    makeNode(`${SYS_A.AUTO_INITIALIZE}_type`, '', SYS_A.AUTO_INITIALIZE, [SYS_A.TYPE_CHOICE, SYS_D.OPTIONS], 'tuple'),
+    makeNode(`${SYS_A.AUTO_INITIALIZE}_type`, '', SYS_A.AUTO_INITIALIZE, [SYS_A.TYPE_CHOICE, SYS_D.BOOLEAN], 'tuple'),
   ];
 
   // SYS_A01 Required — OPTIONS type [Yes/No]
   const sysAttrDefRequired: NodexNode[] = [
     makeNode(SYS_A.NULLABLE, 'Required', schemaId, [`${SYS_A.NULLABLE}_type`, SYS_V.YES, SYS_V.NO], 'attrDef'),
-    makeNode(`${SYS_A.NULLABLE}_type`, '', SYS_A.NULLABLE, [SYS_A.TYPE_CHOICE, SYS_D.OPTIONS], 'tuple'),
+    makeNode(`${SYS_A.NULLABLE}_type`, '', SYS_A.NULLABLE, [SYS_A.TYPE_CHOICE, SYS_D.BOOLEAN], 'tuple'),
   ];
 
   // NDX_A01 Hide field — OPTIONS type [hide enum values]

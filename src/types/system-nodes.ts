@@ -257,6 +257,8 @@ export const SYS_D = {
   OPTIONS: 'SYS_D12',
   /** 选项（别名） */
   OPTIONS_ALT: 'SYS_D13',
+  /** 布尔值 (Yes/No toggle) — Nodex 扩展 */
+  BOOLEAN: 'NDX_D01',
 } as const;
 
 export type SystemDataType = typeof SYS_D[keyof typeof SYS_D];

@@ -120,6 +120,8 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   const rowRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<Editor | null>(null);
   const blurClearRafRef = useRef<number | null>(null);
+  /** Pending focus from mousedown: deferred to mouseup so drag-select can cancel it. */
+  const pendingFocusRef = useRef<{ nodeId: string; parentId: string; x: number; y: number } | null>(null);
 
   // # trigger state
   const [hashTagOpen, setHashTagOpen] = useState(false);
@@ -823,17 +825,42 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
 
     if (isReference) return;
 
-    const container = e.currentTarget as HTMLElement;
-    const textOffset = getTextOffsetFromPoint(container, e.clientX, e.clientY);
-    useUIStore.getState().setFocusClickCoords(
-      textOffset !== null
-        ? { nodeId, parentId, textOffset }
-        : null,
-    );
+    // Defer focus to mouseup so drag-select can take over if the user drags.
+    // Without this, setFocusedNode mounts TipTap immediately on mousedown,
+    // which captures subsequent mouse events and prevents drag-select.
+    pendingFocusRef.current = { nodeId, parentId, x: e.clientX, y: e.clientY };
     // Prevent native selection/focus churn on the static HTML layer.
     e.preventDefault();
-    setFocusedNode(nodeId, parentId);
-  }, [isReference, fieldDataType, nodeId, parentId, setFocusedNode, handleCmdClick, handleShiftClick]);
+  }, [isReference, fieldDataType, nodeId, parentId, handleCmdClick, handleShiftClick]);
+
+  // Document-level mouseup to complete deferred focus from handleContentMouseDown.
+  // Must be document-level because the user may release the mouse outside the content div.
+  useEffect(() => {
+    const handleDocMouseUp = () => {
+      const pending = pendingFocusRef.current;
+      pendingFocusRef.current = null;
+      if (!pending) return;
+
+      // If drag-select already activated (selection has multiple nodes), don't enter edit mode
+      const uiState = useUIStore.getState();
+      if (uiState.selectedNodeIds.size > 1) return;
+      // If another node got selected during drag, don't enter edit mode on this one
+      if (uiState.selectedNodeIds.size === 1 && !uiState.selectedNodeIds.has(pending.nodeId)) return;
+
+      // Find the content container for text offset calculation
+      const row = rowRef.current;
+      const container = row?.querySelector('.text-sm') as HTMLElement | null;
+      const textOffset = container ? getTextOffsetFromPoint(container, pending.x, pending.y) : null;
+      useUIStore.getState().setFocusClickCoords(
+        textOffset !== null
+          ? { nodeId: pending.nodeId, parentId: pending.parentId, textOffset }
+          : null,
+      );
+      setFocusedNode(pending.nodeId, pending.parentId);
+    };
+    document.addEventListener('mouseup', handleDocMouseUp);
+    return () => document.removeEventListener('mouseup', handleDocMouseUp);
+  }, [setFocusedNode]);
 
   const handleContentClick = useCallback((e: React.MouseEvent) => {
     // Intercept clicks on inline references (blue links in static display)

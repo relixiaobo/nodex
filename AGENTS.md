@@ -134,6 +134,19 @@ npm run build            # 生产构建
 - **AssociatedData**（`doc_type='associatedData'`）：通过 `associationMap` 映射，提供字段值索引
 - 完整数据模型见 `CLAUDE.md` 的"数据模型核心概念"段
 
+### "一切皆节点"设计守则（实现时必须遵守）
+
+> **判断标准**：这个信息该存为节点/Tuple，还是 JSON/字符串/UI 状态？**答案永远是前者。**
+
+1. **视图配置 = ViewDef 节点 + Tuple**，不是 JSON blob
+2. **Filter/Sort/Group = ViewDef 的持久化 Tuple**，不是 React state / Zustand 临时状态
+3. **搜索条件 = Tuple 树**，不是 DSL 字符串
+4. **日期字段值 = 日节点引用**，不是字符串 `"2026-02-16"`
+5. **剪藏元数据 = Supertag 字段**，不加 NodexNode 顶层属性
+6. **AI 命令 = Command Node**，prompt/参数/输出全部是节点/字段/children
+
+详细设计见 `docs/features/data-model.md` § 设计守则。
+
 ## 不适用于你的内容
 
 `CLAUDE.md` 中以下段落为 Claude Code 特有：

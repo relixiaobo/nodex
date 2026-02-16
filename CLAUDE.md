@@ -229,6 +229,21 @@ ContentNode
 
 经数据验证修正：AssociationMap 的 KEY 主要是普通内容子节点（88.1%），不限于字段 Tuple。它是 children → associatedData 的**通用映射机制**。
 
+### "一切皆节点"设计守则（实现时必须遵守）
+
+> **核心判断标准**：这个信息该存为节点/Tuple，还是 JSON/字符串/UI 状态？**答案永远是前者。**
+
+实现 P2/P3 功能时，以下 6 条守则不可违背：
+
+1. **视图配置 = ViewDef 节点 + Tuple**，不是 JSON blob。视图可通过 supertag 模板继承
+2. **Filter/Sort/Group = ViewDef 的持久化 Tuple**，不是 React state 或 Zustand 临时状态。视图切换时自动保存/恢复
+3. **搜索条件 = Tuple 树**，不是 DSL 字符串 `"#task AND status:TODO"`。Query Builder 直接渲染 Tuple 节点树
+4. **日期字段值 = 日节点引用**，不是字符串 `"2026-02-16"`。日期是一等公民（可挂 children/tag/field）
+5. **剪藏元数据 = Supertag 字段**，不是节点属性。所有新增元数据走 attrDef，不加 NodexNode 顶层属性
+6. **AI 命令 = Command Node**，prompt/参数/输出全部是节点/字段/children，不建独立配置系统
+
+详细设计见 `docs/features/data-model.md` § 设计守则。
+
 ## 数据库设计要点
 
 - **单表 `nodes`**: 所有 Tana props 平铺为 PostgreSQL 列（snake_case）

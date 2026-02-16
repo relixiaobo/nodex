@@ -28,12 +28,35 @@ _(空)_
 | Agent | 当前任务 | 分支 | 修改中的文件 |
 |-------|---------|------|-------------|
 | nodex-cc | 节点选中 UI 设计系统合规检查 (#52) | — | — |
-| nodex-cc-2 | — | — | — |
+| nodex-cc-2 | Supertags + Fields 增强（#20+#21 批次） | _(待创建)_ | node-store.ts, field-utils.ts, tag-colors.ts |
 | nodex-codex | — | — | — |
 
 ---
 
 ## 进行中
+
+### Supertags + Fields 增强批次（#20 + #21）
+
+- **Owner**: nodex-cc-2
+- **Branch**: _(待创建，cc2/supertags-fields-enhance)_
+- **Files**: node-store.ts, field-utils.ts, tag-colors.ts, system-nodes.ts, FieldValueOutliner 相关
+- **Spec**: `docs/features/supertags.md` + `docs/features/fields.md`
+- **Progress**:
+  - [ ] **Default Child Supertag** — SYS_A14 config 字段实现
+    - tagDef 配置页已有 placeholder（`control: 'tag_picker'`），需接通 tag picker 选择 + 存储
+    - `createNode` 时检查父节点标签的 SYS_A14 配置，自动 `applyTag` 到新节点
+  - [ ] **Color Picker** — 新增 Color 数据类型 + Swatch UI
+    - 当前状态：`control: 'color_picker'` 已注册但无渲染组件；颜色来自 `getTagColor()` 确定性哈希
+    - 需要：新增 `NDX_D*` Color 数据类型（不复用 Options）+ 色板 Swatch 选择器组件
+    - 色板应与 `TAG_COLORS`（tag-colors.ts，10 色）对齐，用户选择后存入 SYS_A11 Tuple value
+    - `getTagColor()` 改为优先读 SYS_A11 配置值，fallback 到哈希
+    - TagBadge / BulletChevron / NodePicker 三处颜色源统一
+  - [ ] **Options from Supertag** — SYS_D05 字段类型
+    - attrDef 配置页 Field type 下拉新增 "Options from supertag" 选项
+    - 新增 SYS_A06 (SOURCE_SUPERTAG) 配置 → tag picker 选择来源标签
+    - OptionsPicker 查询逻辑改造：从"预定义 Options 列表"扩展到"搜索所有打了指定标签的节点"
+- **迭代日志**:
+  - [2026-02-16 nodex] 创建任务。承接 PR #54 的 config field 上下文，三个子项可按顺序独立提交。
 
 ### 节点选中 UI 设计系统合规检查 (#52)
 
@@ -73,8 +96,8 @@ _(空)_
 - [x] Done state mapping — checkbox ↔ Options 字段值双向映射 ✓ PR #54
 - [x] 统一 config field 架构（系统配置字段与用户字段共享数据模型） ✓ PR #54
 - [x] BOOLEAN 数据类型 + toggle switch ✓ PR #54
-- [ ] Default Child Supertag（新增子节点自动继承指定标签）
-- [ ] Color picker（真实色板 swatches，目前只有继承）
+- [ ] Default Child Supertag（新增子节点自动继承指定标签）→ **进行中 nodex-cc-2**
+- [ ] Color picker（真实色板 swatches，目前只有继承）→ **进行中 nodex-cc-2**
 - [ ] Pinned fields（置顶显示 + filter 优先）
 - [ ] Optional fields（建议按钮 + 自动降级）
 - [ ] Convert to supertag（普通节点快捷转 tagDef）
@@ -87,7 +110,7 @@ _(空)_
 > 基础已完成（>触发、字段名编辑+自动完成、交错渲染、字段值编辑器、配置页）
 > 已完成子项：Options 下拉、Date 选择器、Number/URL/Email 输入、Checkbox、字段隐藏规则、Required 字段、Number Min/Max、值验证、系统字段(8/12)
 
-- [ ] Options from Supertag（特定标签的节点作为选项源）
+- [ ] Options from Supertag（特定标签的节点作为选项源）→ **进行中 nodex-cc-2**
 - [ ] AttrDef "Used in" 计算字段
 - [ ] Auto-initialize（6 种策略）
 - [ ] Pinned fields

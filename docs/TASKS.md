@@ -27,13 +27,30 @@ _(空)_
 
 | Agent | 当前任务 | 分支 | 修改中的文件 |
 |-------|---------|------|-------------|
-| nodex-cc | — | — | — |
+| nodex-cc | 节点选中 UI 设计系统合规检查 (#52) | — | — |
 | nodex-cc-2 | Checkbox-Options 联动 | _(未 push)_ | _(待声明)_ |
 | nodex-codex | — | — | — |
 
 ---
 
 ## 进行中
+
+### 节点选中 UI 设计系统合规检查 (#52)
+
+- **Owner**: nodex-cc
+- **Branch**: _(待创建)_
+- **Files**: OutlinerItem.tsx, main.css, design-system.md
+- **Spec**: `docs/design-system.md` + `docs/features/node-selection.md`
+- **Progress**:
+  - [ ] 选中高亮颜色/透明度是否使用设计系统色值
+  - [ ] 双层高亮视觉层次合理性
+  - [ ] 多选 focus ring / selection ring 规范
+  - [ ] 拖选框边框/填充色
+  - [ ] hover/selected/focused 三态视觉区分
+  - [ ] 间距/圆角与现有组件一致性
+  - [ ] 不符合项直接修复，更新 design-system.md
+- **迭代日志**:
+  - [2026-02-16 nodex] 创建任务。Phase 1-3 合并后 UI 尚未对照设计系统验证。
 
 ### Checkbox-Options 联动 (#20 子任务)
 

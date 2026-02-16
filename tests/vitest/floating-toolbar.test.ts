@@ -91,6 +91,9 @@ describe('FloatingToolbar render-loop guard', () => {
   let container: HTMLDivElement;
   let root: Root;
   let editor: FakeEditor;
+  const latestShouldShow = () => bubbleMenuPropHistory.at(-1)!.shouldShow as (
+    args: { editor: Editor; from: number; to: number }
+  ) => boolean;
 
   beforeEach(async () => {
     bubbleMenuPropHistory.length = 0;
@@ -151,29 +154,28 @@ describe('FloatingToolbar render-loop guard', () => {
   });
 
   it('shows toolbar only after pointer selection ends (mouseup)', () => {
-    const shouldShow = bubbleMenuPropHistory.at(-1)!.shouldShow as (
-      args: { editor: Editor; from: number; to: number }
-    ) => boolean;
     const selection = { editor: editor as unknown as Editor, from: 1, to: 4 };
 
-    expect(shouldShow(selection)).toBe(true);
+    const beforePointerDown = latestShouldShow();
+    expect(beforePointerDown(selection)).toBe(true);
 
     flushSync(() => {
       editor.view.dom.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0 }));
       editor.emit('selectionUpdate');
     });
-    expect(shouldShow(selection)).toBe(false);
+    const whileSelecting = latestShouldShow();
+    expect(whileSelecting).not.toBe(beforePointerDown);
+    expect(whileSelecting(selection)).toBe(false);
 
     flushSync(() => {
       document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, button: 0 }));
     });
-    expect(shouldShow(selection)).toBe(true);
+    const afterPointerUp = latestShouldShow();
+    expect(afterPointerUp).not.toBe(whileSelecting);
+    expect(afterPointerUp(selection)).toBe(true);
   });
 
   it('restores toolbar visibility after double-click selection', () => {
-    const shouldShow = bubbleMenuPropHistory.at(-1)!.shouldShow as (
-      args: { editor: Editor; from: number; to: number }
-    ) => boolean;
     const selection = { editor: editor as unknown as Editor, from: 2, to: 8 };
 
     flushSync(() => {
@@ -183,11 +185,11 @@ describe('FloatingToolbar render-loop guard', () => {
       editor.emit('selectionUpdate');
     });
 
-    expect(shouldShow(selection)).toBe(false);
+    expect(latestShouldShow()(selection)).toBe(false);
 
     flushSync(() => {
       document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, button: 0 }));
     });
-    expect(shouldShow(selection)).toBe(true);
+    expect(latestShouldShow()(selection)).toBe(true);
   });
 });

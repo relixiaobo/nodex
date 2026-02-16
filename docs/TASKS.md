@@ -19,7 +19,7 @@
 
 用户随手记录，agent 启动时处理（归类到待办或进行中，处理完从此处删除）。
 
-_(空)_
+- **Ctrl+I 切换 Description 未生效**：按第二次 Ctrl+I 应关闭 description 并将光标返回 name editor。当前实现（`handleDescriptionKeyDown` 中 blur + `requestAnimationFrame` focus）未生效，需排查焦点管理流程。相关文件：`OutlinerItem.tsx:347`（handleDescriptionKeyDown）、`NodeEditor.tsx`（editorRef focus）。已有 3 个 commit 在 main 上（d32e106, d78043c, cb5eb53），需要在此基础上修复。
 
 ---
 

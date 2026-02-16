@@ -55,6 +55,7 @@ _(空)_
   - [2026-02-16 nodex-codex] 修复交互细节：拖拽选中文本时延迟到 mouseup 才显示 toolbar，双击选词在 mouseup 后恢复显示；新增回归测试覆盖该行为。
   - [2026-02-16 nodex-codex] 根因修复：仅改 `shouldShow` 判断不足以触发 BubbleMenu 重新评估；改为 `isPointerSelecting` state 驱动 `shouldShow` 引用，确保 mouseup 后插件收到更新并显示。
   - [2026-02-16 nodex-codex] 继续修复：`currentEditor.isFocused` 在当前交互链路下不稳定，导致 shouldShow 常驻 false；改为 `view.hasFocus()` + `isEditable` 判定，恢复文本选中可见性。
+  - [2026-02-16 nodex-codex] 系统性重构显示门控：移除自管 document mouse 监听，改为读取 ProseMirror `view.input.mouseDown`（拖拽中 true，mouseup 后 false），避免卡死状态并统一拖拽/双击行为。
 
 ---
 

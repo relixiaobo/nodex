@@ -50,7 +50,7 @@
 .tiptap code,
 .node-content code {
   background-color: var(--color-muted);
-  border-radius: 0.25rem;
+  border-radius: 0.125rem;
   padding: 0.125rem 0.25rem;
   font-family: var(--font-mono);
   font-size: 0.85em;
@@ -59,9 +59,16 @@
 
 .tiptap mark,
 .node-content mark {
-  background-color: #fef08a;
+  background-color: rgba(250, 204, 21, 0.4);
   border-radius: 0.125rem;
   padding: 0.0625rem 0;
+}
+
+@media (prefers-color-scheme: dark) {
+  .tiptap mark,
+  .node-content mark {
+    background-color: rgba(251, 191, 36, 0.2);
+  }
 }
 
 .tiptap a,
@@ -79,6 +86,7 @@
 .tiptap s,
 .node-content s {
   text-decoration: line-through;
+  opacity: 0.5;
 }
 
 .tiptap [data-heading-mark],

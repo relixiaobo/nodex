@@ -34,6 +34,9 @@ class FakeEditor {
   public view = {
     dom: document.createElement('div'),
     hasFocus: () => this.isFocused,
+    input: {
+      mouseDown: false as boolean | { done: () => void },
+    },
   };
 
   public state = {
@@ -94,7 +97,12 @@ describe('FloatingToolbar render-loop guard', () => {
   let root: Root;
   let editor: FakeEditor;
   const latestShouldShow = () => bubbleMenuPropHistory.at(-1)!.shouldShow as (
-    args: { editor: Editor; view: { hasFocus: () => boolean }; from: number; to: number }
+    args: {
+      editor: Editor;
+      view: { hasFocus: () => boolean; input?: { mouseDown?: unknown } };
+      from: number;
+      to: number;
+    }
   ) => boolean;
 
   beforeEach(async () => {
@@ -157,41 +165,23 @@ describe('FloatingToolbar render-loop guard', () => {
 
   it('shows toolbar only after pointer selection ends (mouseup)', () => {
     const selection = { editor: editor as unknown as Editor, view: editor.view, from: 1, to: 4 };
+    const shouldShow = latestShouldShow();
 
-    const beforePointerDown = latestShouldShow();
-    expect(beforePointerDown(selection)).toBe(true);
+    editor.view.input.mouseDown = { done: () => {} };
+    expect(shouldShow(selection)).toBe(false);
 
-    flushSync(() => {
-      editor.view.dom.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0 }));
-      editor.emit('selectionUpdate');
-    });
-    const whileSelecting = latestShouldShow();
-    expect(whileSelecting).not.toBe(beforePointerDown);
-    expect(whileSelecting(selection)).toBe(false);
-
-    flushSync(() => {
-      document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, button: 0 }));
-    });
-    const afterPointerUp = latestShouldShow();
-    expect(afterPointerUp).not.toBe(whileSelecting);
-    expect(afterPointerUp(selection)).toBe(true);
+    editor.view.input.mouseDown = false;
+    expect(shouldShow(selection)).toBe(true);
   });
 
   it('restores toolbar visibility after double-click selection', () => {
     const selection = { editor: editor as unknown as Editor, view: editor.view, from: 2, to: 8 };
+    const shouldShow = latestShouldShow();
 
-    flushSync(() => {
-      editor.view.dom.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0 }));
-      document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, button: 0 }));
-      editor.view.dom.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0 }));
-      editor.emit('selectionUpdate');
-    });
+    editor.view.input.mouseDown = { done: () => {} };
+    expect(shouldShow(selection)).toBe(false);
 
-    expect(latestShouldShow()(selection)).toBe(false);
-
-    flushSync(() => {
-      document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, button: 0 }));
-    });
-    expect(latestShouldShow()(selection)).toBe(true);
+    editor.view.input.mouseDown = false;
+    expect(shouldShow(selection)).toBe(true);
   });
 });

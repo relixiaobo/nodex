@@ -92,10 +92,10 @@ export function PanelTitle({ nodeId, onTitleRef }: PanelTitleProps) {
 
   return (
     <div className="px-4 pt-3 pb-1">
-      <div className="flex items-start gap-2">
+      <div className="flex items-center gap-2">
         {isTagDef && tagDefColor && (
           <span
-            className="shrink-0 mt-0.5 flex h-7 w-7 items-center justify-center rounded-full"
+            className="shrink-0 flex h-7 w-7 items-center justify-center rounded-full"
             style={{ backgroundColor: tagDefColor.bg }}
           >
             <span className="text-sm font-bold select-none" style={{ color: tagDefColor.text }}>#</span>

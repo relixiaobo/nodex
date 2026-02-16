@@ -42,13 +42,13 @@ _(空)_
 - **Files**: OutlinerItem.tsx, main.css, design-system.md
 - **Spec**: `docs/design-system.md` + `docs/features/node-selection.md`
 - **Progress**:
-  - [ ] 选中高亮颜色/透明度是否使用设计系统色值
-  - [ ] 双层高亮视觉层次合理性
-  - [ ] 多选 focus ring / selection ring 规范
-  - [ ] 拖选框边框/填充色
-  - [ ] hover/selected/focused 三态视觉区分
-  - [ ] 间距/圆角与现有组件一致性
-  - [ ] 不符合项直接修复，更新 design-system.md
+  - [x] 选中高亮颜色/透明度是否使用设计系统色值 — blue→primary purple 已修复
+  - [x] 双层高亮视觉层次合理性 — 10%/18% 双层清晰，已补充到 design-system.md
+  - [x] 多选 focus ring / selection ring 规范 — 双层高亮替代 ring，已文档化
+  - [x] 拖选框边框/填充色 — N/A（实现为锚点→悬停范围高亮，无矩形拖选框）
+  - [x] hover/selected/focused 三态视觉区分 — hover=icon显隐, selected=双层紫, focused=编辑器激活
+  - [x] 间距/圆角与现有组件一致性 — rounded-md→rounded-sm(4px) 已修复
+  - [x] 不符合项直接修复，更新 design-system.md — 已补充节点选中双层高亮规范
 - **迭代日志**:
   - [2026-02-16 nodex] 创建任务。Phase 1-3 合并后 UI 尚未对照设计系统验证。
   - [2026-02-16 nodex-cc] 开始审查。发现 3 个不合规项：(1) 选中色用 blue #3B82F6 而非 primary #8B5CF6；(2) 选中高亮圆角 rounded-md(6px) 应为 rounded-sm(4px)；(3) design-system.md 缺少双层选中高亮规范。

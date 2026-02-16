@@ -1,16 +1,19 @@
 /**
  * Derive field entries for a content node from the local store.
- * Walks node.children to find field Tuples (non-SYS_ attrDefId keys),
+ * Walks node.children to find field Tuples (attrDefId keys),
  * resolves names, values, and data types.
+ *
+ * Unified model: both system config fields (SYS_A*, NDX_A*) and user fields
+ * share the same data path — key is an attrDef entity ID, value in AssociatedData.
  *
  * Uses JSON.stringify as the Zustand selector return (primitive = stable reference)
  * to avoid React 19 infinite re-render loops with useSyncExternalStore.
  */
 import { useMemo } from 'react';
 import { useNodeStore } from '../stores/node-store';
-import { resolveDataType, resolveHideField, resolveRequired, ATTRDEF_CONFIG_MAP, ATTRDEF_CONFIG_FIELDS, ATTRDEF_OUTLINER_FIELDS, TAGDEF_CONFIG_MAP, TAGDEF_CONFIG_FIELDS, TAGDEF_OUTLINER_FIELDS, SYSTEM_FIELD_MAP, resolveSystemFieldValue, type ConfigFieldDef } from '../lib/field-utils.js';
+import { resolveDataType, resolveHideField, resolveRequired, resolveConfigValue, isSystemConfigField, ATTRDEF_CONFIG_MAP, ATTRDEF_CONFIG_FIELDS, ATTRDEF_OUTLINER_FIELDS, TAGDEF_CONFIG_MAP, TAGDEF_CONFIG_FIELDS, TAGDEF_OUTLINER_FIELDS, SYSTEM_FIELD_MAP, resolveSystemFieldValue, type ConfigFieldDef } from '../lib/field-utils.js';
 import type { NodexNode } from '../types/index.js';
-import { SYS_A, SYS_V } from '../types/index.js';
+import { SYS_A } from '../types/index.js';
 
 export interface FieldEntry {
   attrDefId: string;
@@ -28,26 +31,20 @@ export interface FieldEntry {
   isEmpty?: boolean;
   /** True when the attrDef config marks this field as required */
   isRequired?: boolean;
-  /** Nesting depth for config fields (0 = top level). */
-  depth?: number;
+  /** True when this is a system config field (SYS_A*, NDX_A*) — read-only name, not deletable */
+  isSystemConfig?: boolean;
+  /** Config field metadata key for looking up icon/description in FieldRow */
+  configKey?: string;
 }
 
-/** Check if a visibleWhen condition is satisfied by looking at sibling config tuples. */
+/** Check if a visibleWhen condition is satisfied by looking at sibling config values. */
 function isVisibleWhenSatisfied(
   condition: NonNullable<ConfigFieldDef['visibleWhen']>,
   node: NodexNode,
   entities: Record<string, NodexNode>,
 ): boolean {
-  if (!node.children) return false;
-  for (const cid of node.children) {
-    const sibling = entities[cid];
-    if (!sibling?.children || sibling.children.length < 2) continue;
-    if (sibling.props._docType !== 'tuple') continue;
-    if (sibling.children[0] === condition.dependsOn && sibling.children[1] === condition.value) {
-      return true;
-    }
-  }
-  return false;
+  const val = resolveConfigValue(entities, node, condition.dependsOn);
+  return val === condition.value;
 }
 
 function computeFields(entities: Record<string, NodexNode>, nodeId: string): FieldEntry[] {
@@ -64,71 +61,6 @@ function computeFields(entities: Record<string, NodexNode>, nodeId: string): Fie
 
     const keyId = child.children[0];
 
-    // For attrDef nodes: recognize config tuples via ATTRDEF_CONFIG_MAP
-    if (isAttrDef) {
-      const configDef = ATTRDEF_CONFIG_MAP.get(keyId);
-      if (configDef) {
-        const currentType = resolveDataType(entities, nodeId);
-        const applies = configDef.appliesTo === '*' || configDef.appliesTo.includes(currentType);
-        if (applies) {
-          fields.push({
-            attrDefId: keyId,
-            attrDefName: configDef.name,
-            tupleId: childId,
-            valueName: child.children[1],
-            dataType: `__${configDef.control}__`,
-          });
-        }
-        continue;
-      }
-    }
-
-    // For tagDef nodes: recognize config tuples via TAGDEF_CONFIG_MAP
-    if (isTagDef) {
-      const configDef = TAGDEF_CONFIG_MAP.get(keyId);
-      if (configDef) {
-        // Check visibleWhen condition (e.g. NDX_A06 depends on SYS_A55)
-        if (configDef.visibleWhen && !isVisibleWhenSatisfied(configDef.visibleWhen, node, entities)) {
-          continue;
-        }
-        fields.push({
-          attrDefId: keyId,
-          attrDefName: configDef.name,
-          tupleId: childId,
-          valueName: child.children[1],
-          dataType: `__${configDef.control}__`,
-          depth: 0,
-        });
-
-        // Aggregate: emit one entry per mapping key (NDX_A07 / NDX_A08) when toggle is ON
-        if (child.children[1] === SYS_V.YES && child.children.length > 2) {
-          const checkedDef = TAGDEF_CONFIG_MAP.get(SYS_A.DONE_MAP_CHECKED);
-          if (checkedDef) {
-            fields.push({
-              attrDefId: SYS_A.DONE_MAP_CHECKED,
-              attrDefName: checkedDef.name,
-              tupleId: childId,  // NDX_A06 toggle tuple ID
-              valueName: '',
-              dataType: `__${checkedDef.control}__`,
-              depth: 1,
-            });
-          }
-          const uncheckedDef = TAGDEF_CONFIG_MAP.get(SYS_A.DONE_MAP_UNCHECKED);
-          if (uncheckedDef) {
-            fields.push({
-              attrDefId: SYS_A.DONE_MAP_UNCHECKED,
-              attrDefName: uncheckedDef.name,
-              tupleId: childId,  // NDX_A06 toggle tuple ID
-              valueName: '',
-              dataType: `__${uncheckedDef.control}__`,
-              depth: 1,
-            });
-          }
-        }
-        continue;
-      }
-    }
-
     // System fields (NDX_SYS_*): read-only, auto-derived from node metadata
     const sysDef = SYSTEM_FIELD_MAP.get(keyId);
     if (sysDef) {
@@ -144,22 +76,43 @@ function computeFields(entities: Record<string, NodexNode>, nodeId: string): Fie
       continue;
     }
 
-    if (keyId.startsWith('SYS_') || keyId.startsWith('NDX_')) continue;
-
+    // All attrDefs (user and system): unified path
     const attrDef = entities[keyId];
     if (!attrDef || attrDef.props._docType !== 'attrDef') continue;
+
+    const isSysConfig = isSystemConfigField(keyId);
+
+    // System config fields: check visibleWhen + appliesTo conditions
+    if (isSysConfig) {
+      const configDef = ATTRDEF_CONFIG_MAP.get(keyId) ?? TAGDEF_CONFIG_MAP.get(keyId);
+      if (configDef) {
+        // Check visibleWhen condition
+        if (configDef.visibleWhen && !isVisibleWhenSatisfied(configDef.visibleWhen, node, entities)) {
+          continue;
+        }
+        // Check appliesTo (for attrDef config pages, some fields only apply to certain data types)
+        if (isAttrDef && configDef.appliesTo !== '*') {
+          const currentType = resolveDataType(entities, nodeId);
+          if (!configDef.appliesTo.includes(currentType)) continue;
+        }
+      }
+    }
 
     const valueNodeId = child.children[1];
     const valueNode = valueNodeId ? entities[valueNodeId] : undefined;
     const assocDataId = node.associationMap?.[childId];
-    const trashed = attrDef.props._ownerId?.endsWith('_TRASH') ?? false;
+    const trashed = !isSysConfig && (attrDef.props._ownerId?.endsWith('_TRASH') ?? false);
 
-    // Determine if the field value is empty: no value node AND no content children in assocData
+    // Determine if the field value is empty
     const assocNode = assocDataId ? entities[assocDataId] : undefined;
     const hasContent = !!valueNodeId || (assocNode?.children?.some(cid => {
       const c = entities[cid];
       return c && !c.props._docType;
     }) ?? false);
+
+    // For system config fields with done_map_entries control, use special data type
+    const configDef = isSysConfig ? (ATTRDEF_CONFIG_MAP.get(keyId) ?? TAGDEF_CONFIG_MAP.get(keyId)) : undefined;
+    const isDoneMapEntries = configDef?.control === 'done_map_entries';
 
     fields.push({
       attrDefId: keyId,
@@ -167,12 +120,14 @@ function computeFields(entities: Record<string, NodexNode>, nodeId: string): Fie
       tupleId: childId,
       valueNodeId,
       valueName: valueNode?.props.name,
-      dataType: resolveDataType(entities, keyId),
+      dataType: isDoneMapEntries ? '__done_map_entries__' : resolveDataType(entities, keyId),
       assocDataId,
       trashed,
-      hideMode: resolveHideField(entities, keyId),
+      hideMode: isSysConfig ? undefined : resolveHideField(entities, keyId),
       isEmpty: !hasContent,
-      isRequired: resolveRequired(entities, keyId),
+      isRequired: isSysConfig ? undefined : resolveRequired(entities, keyId),
+      isSystemConfig: isSysConfig || undefined,
+      configKey: isSysConfig ? keyId : undefined,
     });
   }
 
@@ -187,6 +142,8 @@ function computeFields(entities: Record<string, NodexNode>, nodeId: string): Fie
           attrDefName: def.name,
           tupleId: `__virtual_${def.key}__`,
           dataType: '__outliner__',
+          isSystemConfig: true,
+          configKey: def.key,
         });
       }
     }
@@ -203,6 +160,8 @@ function computeFields(entities: Record<string, NodexNode>, nodeId: string): Fie
         attrDefName: def.name,
         tupleId: `__virtual_${def.key}__`,
         dataType: '__outliner__',
+        isSystemConfig: true,
+        configKey: def.key,
       });
     }
     // Sort config fields by canonical order defined in TAGDEF_CONFIG_FIELDS

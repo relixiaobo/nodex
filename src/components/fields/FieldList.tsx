@@ -24,7 +24,7 @@ export function FieldList({ nodeId }: FieldListProps) {
 
   // For definition nodes, only show config fields (dataType starts with __)
   const fields = useMemo(
-    () => isDefinitionNode ? allFields.filter(f => f.dataType.startsWith('__')) : allFields,
+    () => isDefinitionNode ? allFields.filter(f => f.isSystemConfig) : allFields,
     [allFields, isDefinitionNode],
   );
 
@@ -33,7 +33,7 @@ export function FieldList({ nodeId }: FieldListProps) {
   return (
     <div className="@container mt-0.5 ml-1">
       {fields.map((f) => (
-        <div key={f.tupleId} style={f.depth ? { paddingLeft: f.depth * 28 } : undefined}>
+        <div key={f.tupleId}>
           <FieldRow
             nodeId={nodeId}
             attrDefId={f.attrDefId}
@@ -44,6 +44,11 @@ export function FieldList({ nodeId }: FieldListProps) {
             dataType={f.dataType}
             assocDataId={f.assocDataId}
             trashed={f.trashed}
+            hideMode={f.hideMode}
+            isEmpty={f.isEmpty}
+            isRequired={f.isRequired}
+            isSystemConfig={f.isSystemConfig}
+            configKey={f.configKey}
           />
         </div>
       ))}

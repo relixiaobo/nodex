@@ -11,7 +11,7 @@ import { immer } from 'zustand/middleware/immer';
 import { nanoid } from 'nanoid';
 import type { NodexNode, DocType } from '../types/index.js';
 import { WORKSPACE_CONTAINERS, SYS_A, SYS_D, SYS_T, SYS_V } from '../types/index.js';
-import { ATTRDEF_CONFIG_MAP, TAGDEF_CONFIG_MAP, findAutoCollectTupleId, getExtendsChain } from '../lib/field-utils.js';
+import { ATTRDEF_CONFIG_MAP, findAutoCollectTupleId, getExtendsChain } from '../lib/field-utils.js';
 import { resolveCheckboxClick, resolveCmdEnterCycle, hasTagShowCheckbox, resolveForwardDoneMapping, resolveReverseDoneMapping } from '../lib/checkbox-utils.js';
 import * as nodeService from '../services/node-service.js';
 import { isSupabaseReady } from '../services/supabase.js';
@@ -976,50 +976,11 @@ export const useNodeStore = create<NodeStore>()(
               continue;
             }
 
-            // ── Tuple children ──
+            // ── Tuple children: unified path for all attrDef fields ──
             const keyId = template.children?.[0];
             if (!keyId) continue;
 
-            // System config field (SYS_A* or NDX_A* key from SYS_T02/SYS_T01 template)
-            const configDef = ATTRDEF_CONFIG_MAP.get(keyId) ?? TAGDEF_CONFIG_MAP.get(keyId);
-            if (configDef) {
-              // Check if already has this config tuple (by key match)
-              const alreadyHas = n.children.some((cid) => {
-                const c = state.entities[cid];
-                return c?.props._docType === 'tuple' && c.children?.[0] === keyId;
-              });
-              if (alreadyHas) continue;
-
-              const instanceId = nanoid();
-              const instanceNode = makeNodeLocal(instanceId, nodeId, 'tuple', [keyId, configDef.defaultValue]);
-              instanceNode.props._sourceId = templateChildId;
-              state.entities[instanceId] = instanceNode;
-              n.children.push(instanceId);
-
-              // Recursive: instantiate nested config template children (e.g. NDX_A07/A08 under NDX_A06)
-              if (template.children && template.children.length > 1) {
-                for (let i = 1; i < template.children.length; i++) {
-                  const nestedTemplateId = template.children[i];
-                  const nestedTemplate = state.entities[nestedTemplateId];
-                  if (!nestedTemplate?.children?.length) continue;
-                  if (nestedTemplate.props._docType !== 'tuple') continue;
-                  const nestedKeyId = nestedTemplate.children[0];
-                  const nestedConfigDef = ATTRDEF_CONFIG_MAP.get(nestedKeyId) ?? TAGDEF_CONFIG_MAP.get(nestedKeyId);
-                  if (!nestedConfigDef) continue;
-
-                  const nestedInstanceId = nanoid();
-                  const nestedInstance = makeNodeLocal(nestedInstanceId, instanceId, 'tuple', [nestedKeyId, nestedConfigDef.defaultValue]);
-                  nestedInstance.props._sourceId = nestedTemplateId;
-                  state.entities[nestedInstanceId] = nestedInstance;
-                  if (!instanceNode.children) instanceNode.children = [];
-                  instanceNode.children.push(nestedInstanceId);
-                }
-              }
-              continue;
-            }
-
-            // User field (key is an attrDef node)
-            if (keyId.startsWith('SYS_') || keyId.startsWith('NDX_')) continue;
+            // Key must reference a real attrDef entity (system or user)
             const attrDef = state.entities[keyId];
             if (!attrDef || attrDef.props._docType !== 'attrDef') continue;
 
@@ -1034,15 +995,21 @@ export const useNodeStore = create<NodeStore>()(
             });
             if (alreadyHasField) continue;
 
+            // Default value from template (children[1] if present)
+            const defaultValueId = template.children?.[1];
+
             // Create instance tuple
             const instanceId = nanoid();
-            const instanceNode = makeNodeLocal(instanceId, nodeId, 'tuple', [keyId]);
+            const tupleChildren = defaultValueId ? [keyId, defaultValueId] : [keyId];
+            const instanceNode = makeNodeLocal(instanceId, nodeId, 'tuple', tupleChildren);
             instanceNode.props._sourceId = templateChildId;
             state.entities[instanceId] = instanceNode;
 
-            // Create associatedData
+            // Create associatedData (unified for all field types)
             const assocId = nanoid();
-            state.entities[assocId] = makeNodeLocal(assocId, nodeId, 'associatedData');
+            const assocNode = makeNodeLocal(assocId, nodeId, 'associatedData');
+            if (defaultValueId) assocNode.children = [defaultValueId];
+            state.entities[assocId] = assocNode;
 
             // Wire up
             n.children.push(instanceId);
@@ -1575,6 +1542,10 @@ export const useNodeStore = create<NodeStore>()(
         const node = state.entities[nodeId];
         if (!node) return;
 
+        // Guard: system config fields cannot be deleted
+        const fieldKey = state.entities[tupleId]?.children?.[0];
+        if (fieldKey && (fieldKey.startsWith('SYS_') || fieldKey.startsWith('NDX_'))) return;
+
         // Remove tuple from parent.children
         if (node.children) {
           const idx = node.children.indexOf(tupleId);
@@ -1643,7 +1614,7 @@ export const useNodeStore = create<NodeStore>()(
         }
 
         if (!found) {
-          // No type tuple found — create one
+          // No type tuple found — create one (with AssociatedData)
           const tupleId = nanoid();
           state.entities[tupleId] = {
             id: tupleId,
@@ -1655,6 +1626,19 @@ export const useNodeStore = create<NodeStore>()(
             createdBy: userId,
             updatedBy: userId,
           };
+          const assocId = nanoid();
+          state.entities[assocId] = {
+            id: assocId,
+            workspaceId: attrDef.workspaceId,
+            props: { created: now, name: '', _ownerId: attrDefId, _docType: 'associatedData' },
+            children: [newType],
+            version: 1,
+            updatedAt: now,
+            createdBy: userId,
+            updatedBy: userId,
+          };
+          if (!attrDef.associationMap) attrDef.associationMap = {};
+          attrDef.associationMap[tupleId] = assocId;
           attrDef.children.push(tupleId);
         }
 
@@ -1681,6 +1665,20 @@ export const useNodeStore = create<NodeStore>()(
             createdBy: userId,
             updatedBy: userId,
           };
+          // Create AssociatedData for the config tuple
+          const aId = nanoid();
+          state.entities[aId] = {
+            id: aId,
+            workspaceId: attrDef.workspaceId,
+            props: { created: now, name: '', _ownerId: attrDefId, _docType: 'associatedData' },
+            children: def.defaultValue ? [def.defaultValue] : [],
+            version: 1,
+            updatedAt: now,
+            createdBy: userId,
+            updatedBy: userId,
+          };
+          if (!attrDef.associationMap) attrDef.associationMap = {};
+          attrDef.associationMap[tid] = aId;
           attrDef.children.push(tid);
         }
       });

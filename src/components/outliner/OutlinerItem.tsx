@@ -1321,6 +1321,32 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       return;
     }
 
+    if (commandId === 'heading') {
+      replaceSlashTriggerText('');
+      const ed = editorRef.current;
+      if (ed && !ed.isDestroyed) {
+        const { from, to } = ed.state.selection;
+        const docEnd = ed.state.doc.content.size - 1;
+
+        if (from !== to) {
+          ed.chain().focus().toggleHeadingMark().run();
+        } else if (docEnd > 1) {
+          const cursorPos = Math.max(1, Math.min(from, docEnd));
+          ed
+            .chain()
+            .focus()
+            .setTextSelection({ from: 1, to: docEnd })
+            .toggleHeadingMark()
+            .setTextSelection(cursorPos)
+            .run();
+        } else {
+          ed.chain().focus().toggleHeadingMark().run();
+        }
+      }
+      closeSlashMenu();
+      return;
+    }
+
     if (commandId === 'more_commands') {
       replaceSlashTriggerText('');
       closeSlashMenu();

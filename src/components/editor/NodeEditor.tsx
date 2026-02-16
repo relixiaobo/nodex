@@ -18,6 +18,7 @@ import { Extension } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Highlight from '@tiptap/extension-highlight';
 import Italic from '@tiptap/extension-italic';
+import Link from '@tiptap/extension-link';
 import { DOMSerializer } from '@tiptap/pm/model';
 import { useNodeStore } from '../../stores/node-store';
 import { useUIStore } from '../../stores/ui-store';
@@ -35,6 +36,8 @@ import { FieldTriggerExtension, type FieldTriggerCallbacks } from './FieldTrigge
 import { ReferenceExtension, type ReferenceCallbacks } from './ReferenceExtension';
 import { SlashCommandExtension, type SlashCommandCallbacks } from './SlashCommandExtension';
 import { InlineRefNode } from './InlineRefNode';
+import { HeadingMark } from './HeadingMark.js';
+import { FloatingToolbar } from './FloatingToolbar.js';
 
 const KEY_EDITOR_ENTER = getPrimaryShortcutKey('editor.enter', 'Enter');
 const KEY_EDITOR_INDENT = getPrimaryShortcutKey('editor.indent', 'Tab');
@@ -517,6 +520,11 @@ export function NodeEditor({
     addKeyboardShortcuts() { return {}; },
   }), []);
 
+  const LinkNoOpenOnClick = useMemo(
+    () => Link.configure({ openOnClick: false, linkOnPaste: true, defaultProtocol: 'https' }),
+    [],
+  );
+
   const extensions = useMemo(() => [
     StarterKit.configure({
       italic: false,
@@ -530,7 +538,9 @@ export function NodeEditor({
       hardBreak: false, // Nodes are single-line; also frees Mod-Enter for checkbox toggle
     }),
     ItalicNoShortcut,
+    LinkNoOpenOnClick,
     Highlight,
+    HeadingMark,
     InlineRefNode,
     outlinerKeymap,
     HashTagExtension.configure({ callbacks: hashTagRef }),
@@ -538,7 +548,7 @@ export function NodeEditor({
     ReferenceExtension.configure({ callbacks: referenceRef }),
     SlashCommandExtension.configure({ callbacks: slashRef }),
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  ], [ItalicNoShortcut]);
+  ], [ItalicNoShortcut, LinkNoOpenOnClick]);
 
   const editorProps = useMemo(() => ({
     attributes: {
@@ -629,6 +639,7 @@ export function NodeEditor({
 
   return (
     <div className="editor-inline">
+      <FloatingToolbar editor={editor} />
       <EditorContent editor={editor} />
     </div>
   );

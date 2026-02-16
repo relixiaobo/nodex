@@ -71,8 +71,7 @@ export const SLASH_COMMANDS_BASELINE: readonly SlashCommandDefinition[] = [
     name: 'Heading',
     shortcutHint: '!',
     keywords: ['heading', 'title', 'h1', '!'],
-    enabled: false,
-    disabledHint: SLASH_DISABLED_HINT_DEFAULT,
+    enabled: true,
   },
   {
     id: 'checkbox',

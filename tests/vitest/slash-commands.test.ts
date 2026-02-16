@@ -26,16 +26,23 @@ describe('slash command helpers', () => {
     const third = getNextEnabledSlashIndex(filtered, second, 'down');
     const fourth = getNextEnabledSlashIndex(filtered, third, 'down');
     const fifth = getNextEnabledSlashIndex(filtered, fourth, 'down');
+    const sixth = getNextEnabledSlashIndex(filtered, fifth, 'down');
 
     expect(filtered[first]?.id).toBe('clip_page');
     expect(filtered[second]?.id).toBe('field');
     expect(filtered[third]?.id).toBe('reference');
-    expect(filtered[fourth]?.id).toBe('checkbox');
-    expect(filtered[fifth]?.id).toBe('more_commands');
+    expect(filtered[fourth]?.id).toBe('heading');
+    expect(filtered[fifth]?.id).toBe('checkbox');
+    expect(filtered[sixth]?.id).toBe('more_commands');
 
     // Clamp to boundaries.
-    expect(getNextEnabledSlashIndex(filtered, fifth, 'down')).toBe(fifth);
+    expect(getNextEnabledSlashIndex(filtered, sixth, 'down')).toBe(sixth);
     expect(getNextEnabledSlashIndex(filtered, first, 'up')).toBe(first);
+  });
+
+  it('enables heading command', () => {
+    const heading = SLASH_COMMANDS_BASELINE.find((command) => command.id === 'heading');
+    expect(heading?.enabled).toBe(true);
   });
 
   it('returns -1 when no enabled commands are present', () => {

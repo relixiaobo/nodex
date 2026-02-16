@@ -578,8 +578,13 @@ applyWebClipToNode（5 cases）:
 7. `Shift+↓` → `extend_down`（从锚点向下扩展选区）
 8. `Cmd+A` / `Ctrl+A` → `select_all`（选中所有顶层节点）
 9. `Cmd/Ctrl+非a` / `Alt+key` → `null`（其他修饰键组合不处理）
-10. 特殊键（Tab/F1/Shift/Control）→ `null`
-11. `Enter` + 修饰键 → `null`（仅无修饰键 Enter 触发编辑）
+10. 特殊键（F1/Shift/Control）→ `null`
+11. `Enter` + 非批量修饰键（Shift/Alt）→ `null`
+12. `Backspace` / `Delete` → `batch_delete`（批量删除选中节点）
+13. `Tab` → `batch_indent`（批量缩进）
+14. `Shift+Tab` → `batch_outdent`（批量取消缩进）
+15. `Cmd+Shift+D` → `batch_duplicate`（批量复制，含大小写兼容）
+16. `Cmd+Enter` / `Ctrl+Enter` → `batch_checkbox`（批量 checkbox 切换）
 
 ### 1.40 Multi-Select 纯函数工具库
 
@@ -593,7 +598,8 @@ applyWebClipToNode（5 cases）:
 4. `computeRangeSelection` — 正向/反向/单节点/全范围/缺失锚点回退
 5. `filterToRootLevel` — 过滤子节点/全保留/空集/深嵌套链
 6. `getFirstSelectedInOrder` — 多选首项/空选区/单选
-7. `getSelectionBounds` — 首尾边界/单选/空选区/非连续选区
+7. `getSelectedIdsInOrder` — 可见顺序排列/空选区/过滤/忽略不在 flatList 中的 ID
+8. `getSelectionBounds` — 首尾边界/单选/空选区/非连续选区
 
 ---
 

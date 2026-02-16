@@ -65,15 +65,43 @@ describe('resolveSelectionKeyboardAction', () => {
   });
 
   it('returns null for unhandled special keys', () => {
-    expect(resolveSelectionKeyboardAction(keyEvent('Tab'))).toBeNull();
     expect(resolveSelectionKeyboardAction(keyEvent('F1'))).toBeNull();
     expect(resolveSelectionKeyboardAction(keyEvent('Shift'))).toBeNull();
     expect(resolveSelectionKeyboardAction(keyEvent('Control'))).toBeNull();
   });
 
-  it('returns null for Enter with modifiers', () => {
-    expect(resolveSelectionKeyboardAction(keyEvent('Enter', { metaKey: true }))).toBeNull();
+  it('returns null for Enter with non-batch modifiers', () => {
     expect(resolveSelectionKeyboardAction(keyEvent('Enter', { shiftKey: true }))).toBeNull();
+    expect(resolveSelectionKeyboardAction(keyEvent('Enter', { altKey: true }))).toBeNull();
+  });
+
+  // ─── Phase 3: Batch actions ───
+
+  it('returns batch_delete for Backspace', () => {
+    expect(resolveSelectionKeyboardAction(keyEvent('Backspace'))).toBe('batch_delete');
+  });
+
+  it('returns batch_delete for Delete', () => {
+    expect(resolveSelectionKeyboardAction(keyEvent('Delete'))).toBe('batch_delete');
+  });
+
+  it('returns batch_indent for Tab', () => {
+    expect(resolveSelectionKeyboardAction(keyEvent('Tab'))).toBe('batch_indent');
+  });
+
+  it('returns batch_outdent for Shift+Tab', () => {
+    expect(resolveSelectionKeyboardAction(keyEvent('Tab', { shiftKey: true }))).toBe('batch_outdent');
+  });
+
+  it('returns batch_duplicate for Cmd+Shift+D', () => {
+    expect(resolveSelectionKeyboardAction(keyEvent('d', { metaKey: true, shiftKey: true }))).toBe('batch_duplicate');
+    expect(resolveSelectionKeyboardAction(keyEvent('D', { metaKey: true, shiftKey: true }))).toBe('batch_duplicate');
+    expect(resolveSelectionKeyboardAction(keyEvent('d', { ctrlKey: true, shiftKey: true }))).toBe('batch_duplicate');
+  });
+
+  it('returns batch_checkbox for Cmd+Enter', () => {
+    expect(resolveSelectionKeyboardAction(keyEvent('Enter', { metaKey: true }))).toBe('batch_checkbox');
+    expect(resolveSelectionKeyboardAction(keyEvent('Enter', { ctrlKey: true }))).toBe('batch_checkbox');
   });
 
   it('returns null for Arrow with Cmd modifier', () => {

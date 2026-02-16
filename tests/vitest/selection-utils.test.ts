@@ -6,6 +6,7 @@ import {
   computeRangeSelection,
   filterToRootLevel,
   getFirstSelectedInOrder,
+  getSelectedIdsInOrder,
   getSelectionBounds,
   getEffectiveSelectionBounds,
 } from '../../src/lib/selection-utils.js';
@@ -233,6 +234,34 @@ describe('getFirstSelectedInOrder', () => {
   it('returns the only selected node', () => {
     const result = getFirstSelectedInOrder(new Set(['C']), flatList);
     expect(result).toEqual({ nodeId: 'C', parentId: 'root' });
+  });
+});
+
+// ─── getSelectedIdsInOrder ───
+
+describe('getSelectedIdsInOrder', () => {
+  const flatList = [
+    { nodeId: 'A', parentId: 'root' },
+    { nodeId: 'A1', parentId: 'A' },
+    { nodeId: 'A2', parentId: 'A' },
+    { nodeId: 'B', parentId: 'root' },
+    { nodeId: 'C', parentId: 'root' },
+  ];
+
+  it('returns selected IDs in visible order', () => {
+    expect(getSelectedIdsInOrder(new Set(['C', 'A']), flatList)).toEqual(['A', 'C']);
+  });
+
+  it('returns empty array for empty selection', () => {
+    expect(getSelectedIdsInOrder(new Set(), flatList)).toEqual([]);
+  });
+
+  it('filters to only IDs in selectedIds set', () => {
+    expect(getSelectedIdsInOrder(new Set(['B']), flatList)).toEqual(['B']);
+  });
+
+  it('ignores selected IDs not in flatList', () => {
+    expect(getSelectedIdsInOrder(new Set(['X', 'A']), flatList)).toEqual(['A']);
   });
 });
 

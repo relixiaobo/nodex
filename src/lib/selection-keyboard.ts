@@ -4,6 +4,7 @@
  * Returns the action to take, or null if the event is not handled.
  * Phase 1: single-selection basics (navigate, enter edit, type char, clear).
  * Phase 2: extend selection (Shift+Arrow), Cmd+A select all.
+ * Phase 3: batch operations (delete, indent, outdent, duplicate, checkbox).
  */
 
 export type SelectionKeyboardAction =
@@ -14,7 +15,12 @@ export type SelectionKeyboardAction =
   | 'enter_edit'       // Enter → edit first selected node (cursor at end)
   | 'type_char'        // printable char → edit first selected + append char
   | 'clear_selection'  // Escape → clear all selection
-  | 'select_all';      // Cmd+A → select all top-level nodes
+  | 'select_all'       // Cmd+A → select all top-level nodes
+  | 'batch_delete'     // Backspace/Delete → trash all selected nodes
+  | 'batch_indent'     // Tab → indent all selected nodes
+  | 'batch_outdent'    // Shift+Tab → outdent all selected nodes
+  | 'batch_duplicate'  // Cmd+Shift+D → duplicate all selected nodes
+  | 'batch_checkbox';  // Cmd+Enter → toggle checkbox on all selected nodes
 
 export function resolveSelectionKeyboardAction(
   e: KeyboardEvent,
@@ -32,6 +38,16 @@ export function resolveSelectionKeyboardAction(
     return 'select_all';
   }
 
+  // Cmd+Enter / Ctrl+Enter: batch checkbox toggle
+  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && !e.shiftKey && !e.altKey) {
+    return 'batch_checkbox';
+  }
+
+  // Cmd+Shift+D / Ctrl+Shift+D: batch duplicate
+  if ((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === 'd' || e.key === 'D') && !e.altKey) {
+    return 'batch_duplicate';
+  }
+
   if (e.key === 'ArrowUp' && !e.shiftKey && !e.metaKey && !e.ctrlKey && !e.altKey) {
     return 'navigate_up';
   }
@@ -46,6 +62,21 @@ export function resolveSelectionKeyboardAction(
 
   if (e.key === 'Escape') {
     return 'clear_selection';
+  }
+
+  // Backspace / Delete: batch delete
+  if ((e.key === 'Backspace' || e.key === 'Delete') && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey) {
+    return 'batch_delete';
+  }
+
+  // Shift+Tab: batch outdent (must come before Tab check)
+  if (e.key === 'Tab' && e.shiftKey && !e.metaKey && !e.ctrlKey && !e.altKey) {
+    return 'batch_outdent';
+  }
+
+  // Tab: batch indent
+  if (e.key === 'Tab' && !e.shiftKey && !e.metaKey && !e.ctrlKey && !e.altKey) {
+    return 'batch_indent';
   }
 
   // Printable character: single char, no modifier keys (except Shift for uppercase)

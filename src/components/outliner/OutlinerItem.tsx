@@ -42,6 +42,7 @@ import {
   getFirstSelectedInOrder,
   getSelectionBounds,
   getEffectiveSelectionBounds,
+  getSelectedIdsInOrder,
 } from '../../lib/selection-utils';
 import {
   filterSlashCommands,
@@ -514,6 +515,107 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
         if (topLevelIds.length > 0) {
           setSelectedNodes(new Set(topLevelIds), topLevelIds[0]);
         }
+        return;
+      }
+
+      // ─── Batch operations (Phase 3) ───
+
+      if (selAction === 'batch_delete') {
+        if (!wsId || !userId) return;
+        const latestUi = useUIStore.getState();
+        const storeEntities = useNodeStore.getState().entities;
+        const flatList = getFlattenedVisibleNodes(rootChildIds, storeEntities, latestUi.expandedNodes, rootNodeId);
+        const bounds = getSelectionBounds(latestUi.selectedNodeIds, flatList);
+        const prev = bounds ? getPreviousVisibleNode(bounds.first.nodeId, bounds.first.parentId, flatList) : null;
+        const orderedIds = getSelectedIdsInOrder(latestUi.selectedNodeIds, flatList);
+        // Bottom-up: avoid index shift when deleting upper nodes first
+        for (let i = orderedIds.length - 1; i >= 0; i--) {
+          trashNode(orderedIds[i], wsId, userId);
+        }
+        clearSelection();
+        if (prev) {
+          setFocusedNode(prev.nodeId, prev.parentId);
+        }
+        return;
+      }
+
+      if (selAction === 'batch_indent') {
+        if (!userId) return;
+        const latestUi = useUIStore.getState();
+        const storeEntities = useNodeStore.getState().entities;
+        const flatList = getFlattenedVisibleNodes(rootChildIds, storeEntities, latestUi.expandedNodes, rootNodeId);
+        const orderedIds = getSelectedIdsInOrder(latestUi.selectedNodeIds, flatList);
+        // Top-down: upper nodes indent first so lower ones follow into the same parent
+        for (const id of orderedIds) {
+          const currentEntities = useNodeStore.getState().entities;
+          const currentNode = currentEntities[id];
+          if (!currentNode) continue;
+          const ownerId = currentNode.props._ownerId;
+          if (!ownerId) continue;
+          const parent = currentEntities[ownerId];
+          if (!parent?.children) continue;
+          const index = parent.children.indexOf(id);
+          if (index <= 0) continue;
+          const newParentId = parent.children[index - 1];
+          setExpanded(`${ownerId}:${newParentId}`, true);
+          indentNode(id, userId);
+        }
+        clearSelection();
+        return;
+      }
+
+      if (selAction === 'batch_outdent') {
+        if (!userId) return;
+        const latestUi = useUIStore.getState();
+        const storeEntities = useNodeStore.getState().entities;
+        const flatList = getFlattenedVisibleNodes(rootChildIds, storeEntities, latestUi.expandedNodes, rootNodeId);
+        const orderedIds = getSelectedIdsInOrder(latestUi.selectedNodeIds, flatList);
+        // Bottom-up: lower nodes outdent first to avoid parent relationship issues
+        for (let i = orderedIds.length - 1; i >= 0; i--) {
+          outdentNode(orderedIds[i], userId);
+        }
+        clearSelection();
+        return;
+      }
+
+      if (selAction === 'batch_duplicate') {
+        if (!wsId || !userId) return;
+        const latestUi = useUIStore.getState();
+        const storeEntities = useNodeStore.getState().entities;
+        const flatList = getFlattenedVisibleNodes(rootChildIds, storeEntities, latestUi.expandedNodes, rootNodeId);
+        const orderedIds = getSelectedIdsInOrder(latestUi.selectedNodeIds, flatList);
+        // Bottom-up: insert positions stay correct when lower nodes duplicate first
+        for (let i = orderedIds.length - 1; i >= 0; i--) {
+          const currentEntities = useNodeStore.getState().entities;
+          const name = currentEntities[orderedIds[i]]?.props.name ?? '';
+          createSibling(orderedIds[i], wsId, userId, name);
+        }
+        clearSelection();
+        return;
+      }
+
+      if (selAction === 'batch_checkbox') {
+        if (!userId) return;
+        const storeEntities = useNodeStore.getState().entities;
+        const latestUi = useUIStore.getState();
+        const ids = [...latestUi.selectedNodeIds];
+        // Determine target: any undone → make all done; all done → make all undone
+        const allDone = ids.every((id) => {
+          const d = storeEntities[id]?.props._done;
+          return d !== undefined && d > 0;
+        });
+        for (const id of ids) {
+          const d = storeEntities[id]?.props._done;
+          const isDone = d !== undefined && d > 0;
+          if (allDone) {
+            // All done → toggle each to undone
+            toggleNodeDone(id, userId);
+          } else if (!isDone) {
+            // Some undone → toggle only the undone ones to done
+            toggleNodeDone(id, userId);
+          }
+        }
+        // Keep selection (don't clear)
         return;
       }
 
@@ -1397,10 +1499,10 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
 
   return (
     <div role="treeitem" aria-expanded={isExpanded} className="relative">
-      {/* Selection overlay: starts at bullet column, covers row + children */}
+      {/* Selection subtree mask: light blue covering row + expanded children */}
       {isSelected && !isFocused && (
         <div
-          className="absolute top-0 bottom-0 right-0 bg-selection rounded-md ring-1 ring-selection-ring pointer-events-none z-0"
+          className="absolute top-0 bottom-0 right-0 bg-selection rounded-md pointer-events-none z-0"
           style={{ left: depth * 28 + 6 + 15 + 4 }}
         />
       )}
@@ -1428,6 +1530,13 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
         onDrop={handleDrop}
         onDragEnd={handleDragEnd}
       >
+        {/* Selection row highlight: deeper blue on directly selected row only */}
+        {isSelected && !isFocused && (
+          <div
+            className="absolute top-0 bottom-0 right-0 bg-selection-row rounded-md pointer-events-none"
+            style={{ left: 15 + 4 }}
+          />
+        )}
         {/* Chevron: 15px zone, visible on row hover only */}
         <ChevronButton
           isExpanded={isExpanded}

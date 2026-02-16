@@ -190,6 +190,19 @@ export function getEffectiveSelectionBounds(
 }
 
 /**
+ * Return the selected node IDs in visible (flat-list) order.
+ * Used by batch operations to iterate in correct traversal direction.
+ */
+export function getSelectedIdsInOrder(
+  selectedIds: Set<string>,
+  flatList: Array<{ nodeId: string; parentId: string }>,
+): string[] {
+  return flatList
+    .filter((item) => selectedIds.has(item.nodeId))
+    .map((item) => item.nodeId);
+}
+
+/**
  * Get the topmost and bottommost selected nodes in visible order.
  * Used for ↑/↓ navigation from multi-select.
  */

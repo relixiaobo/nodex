@@ -32,8 +32,11 @@
 | Shift+Arrow 扩展选区 | ✅ 已实现 (Phase 2) |
 | 拖动选择（Drag Select） | ✅ 已实现 (Phase 2) |
 | Cmd+A 全选 | ✅ 已实现 (Phase 2) |
-| 批量操作 | ❌ 未实现 |
-| 双层选中高亮（子树遮罩 + 行高亮） | ❌ 未实现 |
+| 批量删除 (Backspace/Delete) | ✅ 已实现 (Phase 3) |
+| 批量缩进 (Tab) / 取消缩进 (Shift+Tab) | ✅ 已实现 (Phase 3) |
+| 批量复制 (Cmd+Shift+D) | ✅ 已实现 (Phase 3) |
+| 批量 Checkbox 切换 (Cmd+Enter) | ✅ 已实现 (Phase 3) |
+| 双层选中高亮（子树遮罩 + 行高亮） | ✅ 已实现 (Phase 3) |
 
 ## 数据模型
 
@@ -406,3 +409,4 @@ contenteditable 元素会捕获鼠标事件，导致父容器上的 React onMous
 | 2026-02-15 | Phase 拆为 3 期（基础→多选拖选→批量操作视觉） | 渐进交付，Phase 1 可独立使用 |
 | 2026-02-16 | Phase 1 实现：Escape→选中、↑↓导航、Enter/字符输入、Shift+Arrow 入选 | 统一选中键盘处理，合并引用节点与通用选择逻辑 |
 | 2026-02-16 | Phase 2 实现：Cmd+Click多选、Shift+Click范围选、Shift+Arrow扩展、拖选、Cmd+A | 多选仅anchor节点处理键盘；拖选使用document级别监听；extent从bounds+anchor动态推导无需额外状态 |
+| 2026-02-16 | Phase 3 实现：批量操作（delete/indent/outdent/duplicate/checkbox）+ 双层高亮 | 复用已有单节点 store 方法循环调用，无需新 store API；双层高亮=子树遮罩(10%)+行高亮(18%)替代 ring |

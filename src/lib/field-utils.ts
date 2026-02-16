@@ -496,8 +496,8 @@ export const TAGDEF_OUTLINER_FIELDS = TAGDEF_CONFIG_FIELDS
  * Handles circular references via visited set.
  *
  * Reads from tagDef.children (config tuple) — this is the source of truth
- * that ConfigTagPicker edits via setConfigValue. Previously read from metanode,
- * which caused the bug where changing Extends tag_picker didn't update Default content.
+ * that the config field UI edits via setConfigValue. Previously read from metanode,
+ * which caused the bug where changing Extends didn't update Default content.
  */
 export function getExtendsChain(
   entities: Record<string, NodexNode>,

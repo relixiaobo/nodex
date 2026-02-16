@@ -7,8 +7,6 @@ interface FloatingToolbarProps {
   editor: Editor;
 }
 
-const POINTER_SELECTION_STALE_MS = 1500;
-
 function normalizeLinkHref(rawHref: string): string {
   const value = rawHref.trim();
   if (!value) return '';
@@ -51,20 +49,40 @@ export function FloatingToolbar({ editor }: FloatingToolbarProps) {
   const [renderTick, setRenderTick] = useState(0);
   const [editingLink, setEditingLink] = useState(false);
   const [linkDraft, setLinkDraft] = useState('');
+  const [isPointerSelecting, setIsPointerSelecting] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-  const pointerSelectingSinceRef = useRef<number | null>(null);
 
   useEffect(() => {
     const rerender = () => setRenderTick((value) => value + 1);
+    const handleMouseDown = (event: MouseEvent) => {
+      if (event.button !== 0) return;
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (!editor.view.dom.contains(target)) return;
+      setIsPointerSelecting(true);
+    };
+    const handleMouseUp = () => {
+      setIsPointerSelecting(false);
+    };
+    const handleWindowBlur = () => {
+      setIsPointerSelecting(false);
+    };
+
     // Only listen to selectionUpdate and blur — NOT transaction.
     // BubbleMenu dispatches transactions internally (updateOptions meta),
     // so listening to 'transaction' creates an infinite render loop:
     // render → new shouldShow/options refs → BubbleMenu dispatches tx → rerender → repeat.
     editor.on('selectionUpdate', rerender);
     editor.on('blur', rerender);
+    document.addEventListener('mousedown', handleMouseDown, true);
+    document.addEventListener('mouseup', handleMouseUp, true);
+    window.addEventListener('blur', handleWindowBlur);
     return () => {
       editor.off('selectionUpdate', rerender);
       editor.off('blur', rerender);
+      document.removeEventListener('mousedown', handleMouseDown, true);
+      document.removeEventListener('mouseup', handleMouseUp, true);
+      window.removeEventListener('blur', handleWindowBlur);
     };
   }, [editor]);
 
@@ -138,26 +156,15 @@ export function FloatingToolbar({ editor }: FloatingToolbarProps) {
       to,
     }: {
       editor: Editor;
-      view: { hasFocus: () => boolean; input?: { mouseDown?: unknown } };
+      view: { hasFocus: () => boolean };
       from: number;
       to: number;
     }) => {
-      // Use ProseMirror's internal mouseDown state to delay menu appearance
-      // until pointer selection ends (mouseup), including double-click flows.
-      if (view.input?.mouseDown) {
-        const now = Date.now();
-        if (pointerSelectingSinceRef.current === null) {
-          pointerSelectingSinceRef.current = now;
-        }
-        if (now - pointerSelectingSinceRef.current < POINTER_SELECTION_STALE_MS) {
-          return false;
-        }
-      } else {
-        pointerSelectingSinceRef.current = null;
-      }
+      // Delay menu during pointer selection gesture; show right after mouseup.
+      if (isPointerSelecting) return false;
       return currentEditor.isEditable && view.hasFocus() && from !== to;
     },
-    [],
+    [isPointerSelecting],
   );
 
   const bubbleMenuOptions = useMemo(() => ({

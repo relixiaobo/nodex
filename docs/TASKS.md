@@ -29,7 +29,7 @@ _(空)_
 |-------|---------|------|-------------|
 | nodex-cc | — | — | — |
 | nodex-cc-2 | — | — | — |
-| nodex-codex | Ctrl+I Description 切换修复 | main（直接在 main 修） | OutlinerItem.tsx, NodeEditor.tsx |
+| nodex-codex | — | — | — |
 
 ---
 
@@ -38,7 +38,7 @@ _(空)_
 ### Ctrl+I Description 切换修复
 
 - **Owner**: nodex-codex
-- **Branch**: main（小修复，直接在 main 上改）
+- **Branch**: codex/fix-ctrl-i-description-toggle
 - **Files**: `src/components/outliner/OutlinerItem.tsx`, `src/components/editor/NodeEditor.tsx`
 - **期望行为**:
   1. 聚焦一个节点，按 Ctrl+I → 打开 description 编辑（如无 description 则显示空 contentEditable）
@@ -55,6 +55,7 @@ _(空)_
   - 可能需要用 `console.log` 确认事件流
 - **迭代日志**:
   - [2026-02-16 nodex] 创建任务。已有 3 个 commit（d32e106 Cmd+I italic 分离, d78043c toggle, cb5eb53 Ctrl+I in description）。用户测试未生效，交 codex 排查。
+  - [2026-02-16 nodex-codex] 切换到独立分支 `codex/fix-ctrl-i-description-toggle`，开始修复并走 Draft PR 流程以避免并行冲突。
 
 ---
 

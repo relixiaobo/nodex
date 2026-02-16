@@ -1833,34 +1833,75 @@ export const useNodeStore = create<NodeStore>()(
     addDoneMappingEntry: (toggleTupleId, mappingKey, attrDefId, optionId, userId) => {
       set((state) => {
         const toggle = state.entities[toggleTupleId];
-        if (!toggle || toggle.props._docType !== 'tuple' || !toggle.children) return;
+        if (!toggle || toggle.props._docType !== 'tuple') return;
+
+        // Find parent → associationMap → AssociatedData (unified model)
+        const parentId = toggle.props._ownerId;
+        const parent = parentId ? state.entities[parentId] : undefined;
+        const assocId = parent?.associationMap?.[toggleTupleId];
+        const assoc = assocId ? state.entities[assocId] : undefined;
+
+        const now = Date.now();
         const entryId = nanoid();
         state.entities[entryId] = {
           id: entryId,
-          props: { created: Date.now(), _docType: 'tuple' as DocType, _ownerId: toggleTupleId },
+          props: { created: now, _docType: 'tuple' as DocType, _ownerId: assocId ?? toggleTupleId },
           children: [mappingKey, attrDefId, optionId],
           workspaceId: toggle.workspaceId,
           version: 1,
-          updatedAt: Date.now(),
+          updatedAt: now,
           createdBy: userId,
           updatedBy: userId,
         };
-        toggle.children.push(entryId);
-        toggle.updatedAt = Date.now();
-        toggle.updatedBy = userId;
+
+        if (assoc) {
+          // Unified: add to AssociatedData
+          if (!assoc.children) assoc.children = [];
+          assoc.children.push(entryId);
+          assoc.updatedAt = now;
+          assoc.updatedBy = userId;
+        } else {
+          // Fallback: add to toggle tuple children (legacy)
+          if (!toggle.children) toggle.children = [];
+          toggle.children.push(entryId);
+          toggle.updatedAt = now;
+          toggle.updatedBy = userId;
+        }
       });
     },
 
     removeDoneMappingEntry: (toggleTupleId, entryTupleId, userId) => {
       set((state) => {
         const toggle = state.entities[toggleTupleId];
-        if (!toggle?.children) return;
-        const idx = toggle.children.indexOf(entryTupleId);
-        if (idx >= 0) {
-          toggle.children.splice(idx, 1);
-          toggle.updatedAt = Date.now();
-          toggle.updatedBy = userId;
+        if (!toggle) return;
+
+        const now = Date.now();
+
+        // Try unified model first: remove from AssociatedData
+        const parentId = toggle.props._ownerId;
+        const parent = parentId ? state.entities[parentId] : undefined;
+        const assocId = parent?.associationMap?.[toggleTupleId];
+        const assoc = assocId ? state.entities[assocId] : undefined;
+
+        if (assoc?.children) {
+          const idx = assoc.children.indexOf(entryTupleId);
+          if (idx >= 0) {
+            assoc.children.splice(idx, 1);
+            assoc.updatedAt = now;
+            assoc.updatedBy = userId;
+          }
         }
+
+        // Fallback: remove from toggle tuple children (legacy)
+        if (toggle.children) {
+          const idx = toggle.children.indexOf(entryTupleId);
+          if (idx >= 0) {
+            toggle.children.splice(idx, 1);
+            toggle.updatedAt = now;
+            toggle.updatedBy = userId;
+          }
+        }
+
         delete state.entities[entryTupleId];
       });
     },

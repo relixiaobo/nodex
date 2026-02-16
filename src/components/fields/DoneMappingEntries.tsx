@@ -4,8 +4,8 @@
  * Shows existing field+option pairs as "FieldName: OptionValue" entries with delete button.
  * Provides a two-step picker (select field → select option) to add new entries.
  *
- * Data model: each entry is a tuple [NDX_A07|NDX_A08, attrDefId, optionId]
- * nested under the NDX_A06 toggle tuple.
+ * Data model (unified): entries are tuples [NDX_A07|NDX_A08, attrDefId, optionId]
+ * stored as children of the AssociatedData node for the NDX_A07/A08 field tuple.
  *
  * Uses JSON.stringify as Zustand selector return to avoid React 19 infinite loop.
  */
@@ -21,9 +21,9 @@ const noop = () => {};
 const EMPTY = '[]';
 
 interface DoneMappingEntriesProps {
-  /** NDX_A06 toggle tuple ID (parent of mapping entry tuples) */
+  /** NDX_A07/A08 field tuple ID on the tagDef */
   toggleTupleId: string;
-  /** NDX_A07 (checked) or NDX_A08 (unchecked) */
+  /** NDX_A07 (checked) or NDX_A08 (unchecked) attrDef key */
   mappingKey: string;
 }
 
@@ -40,32 +40,66 @@ export function DoneMappingEntries({ toggleTupleId, mappingKey }: DoneMappingEnt
   const addDoneMappingEntry = useNodeStore((s) => s.addDoneMappingEntry);
   const removeDoneMappingEntry = useNodeStore((s) => s.removeDoneMappingEntry);
 
-  // Two-step picker state: null = not picking, 'field' = selecting field, 'option' = selecting option
+  // Two-step picker state
   const [pickerStep, setPickerStep] = useState<null | 'field' | 'option'>(null);
   const [selectedFieldId, setSelectedFieldId] = useState<string | null>(null);
 
-  // Read existing entries from store (JSON.stringify for stable reference)
+  // Read existing entries from AssociatedData (unified model)
+  // Fallback: also check toggle tuple's direct children (legacy nested model)
   const entriesJson = useNodeStore((s) => {
-    const toggle = s.entities[toggleTupleId];
-    if (!toggle?.children) return EMPTY;
     const result: MappingEntry[] = [];
-    for (const cid of toggle.children) {
-      const child = s.entities[cid];
-      if (!child?.children || child.props._docType !== 'tuple') continue;
-      if (child.children[0] !== mappingKey) continue;
-      const attrDefId = child.children[1];
-      const optionId = child.children[2];
-      if (!attrDefId || !optionId) continue;
-      const attrDef = s.entities[attrDefId];
-      const option = s.entities[optionId];
-      result.push({
-        entryTupleId: cid,
-        attrDefId,
-        attrDefName: attrDef?.props.name ?? 'Unknown field',
-        optionId,
-        optionName: option?.props.name ?? 'Unknown option',
-      });
+
+    // Unified model: find parent (tagDef) → associationMap → AssociatedData
+    // Walk entities to find which node has this tuple as a child
+    const tuple = s.entities[toggleTupleId];
+    if (!tuple) return EMPTY;
+
+    const parentId = tuple.props._ownerId;
+    const parent = parentId ? s.entities[parentId] : undefined;
+    const assocId = parent?.associationMap?.[toggleTupleId];
+    const assoc = assocId ? s.entities[assocId] : undefined;
+
+    if (assoc?.children) {
+      for (const cid of assoc.children) {
+        const child = s.entities[cid];
+        if (!child?.children || child.props._docType !== 'tuple') continue;
+        if (child.children[0] !== mappingKey) continue;
+        const attrDefId = child.children[1];
+        const optionId = child.children[2];
+        if (!attrDefId || !optionId) continue;
+        const attrDef = s.entities[attrDefId];
+        const option = s.entities[optionId];
+        result.push({
+          entryTupleId: cid,
+          attrDefId,
+          attrDefName: attrDef?.props.name ?? 'Unknown field',
+          optionId,
+          optionName: option?.props.name ?? 'Unknown option',
+        });
+      }
     }
+
+    // Fallback: legacy model where entries are direct children of toggle tuple
+    if (result.length === 0 && tuple.children) {
+      for (const cid of tuple.children) {
+        const child = s.entities[cid];
+        if (!child?.children || child.props._docType !== 'tuple') continue;
+        if (child.children[0] !== mappingKey) continue;
+        const attrDefId = child.children[1];
+        const optionId = child.children[2];
+        if (!attrDefId || !optionId) continue;
+        const attrDef = s.entities[attrDefId];
+        const option = s.entities[optionId];
+        result.push({
+          entryTupleId: cid,
+          attrDefId,
+          attrDefName: attrDef?.props.name ?? 'Unknown field',
+          optionId,
+          optionName: option?.props.name ?? 'Unknown option',
+        });
+      }
+    }
+
     if (result.length === 0) return EMPTY;
     return JSON.stringify(result);
   });
@@ -81,7 +115,7 @@ export function DoneMappingEntries({ toggleTupleId, mappingKey }: DoneMappingEnt
     [allFields],
   );
 
-  // Options for step 2 picker (JSON.stringify for stable reference)
+  // Options for step 2 picker
   const optionOptionsJson = useNodeStore((s) => {
     if (!selectedFieldId) return EMPTY;
     const attrDef = s.entities[selectedFieldId];

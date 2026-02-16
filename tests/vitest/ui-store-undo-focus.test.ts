@@ -83,6 +83,23 @@ describe('ui-store undo/redo + focus/selection semantics', () => {
     expect(useUIStore.getState().selectionAnchorId).toBeNull();
   });
 
+  it('setFocusedNode collapses multi-select to single node (intentional design)', () => {
+    const ui = useUIStore.getState();
+
+    // Set up multi-select: 3 nodes selected
+    ui.setSelectedNodes(new Set(['task_1', 'task_2', 'task_3']), 'task_1');
+    expect(useUIStore.getState().selectedNodeIds.size).toBe(3);
+
+    // setFocusedNode enters edit mode → collapses to single node
+    ui.setFocusedNode('task_2', 'proj_1');
+    expect(useUIStore.getState().focusedNodeId).toBe('task_2');
+    expect(useUIStore.getState().selectedNodeIds.size).toBe(1);
+    expect(useUIStore.getState().selectedNodeIds.has('task_2')).toBe(true);
+    // Other selections discarded
+    expect(useUIStore.getState().selectedNodeIds.has('task_1')).toBe(false);
+    expect(useUIStore.getState().selectedNodeIds.has('task_3')).toBe(false);
+  });
+
   it('setFocusedNode(null) clears both focus and selection (blur to empty space)', () => {
     const ui = useUIStore.getState();
 

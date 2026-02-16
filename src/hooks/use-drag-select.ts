@@ -138,6 +138,9 @@ export function useDragSelect({ containerRef, rootChildIds, rootNodeId }: UseDra
     const { rootChildIds: rcIds, rootNodeId: rnId } = contextRef.current;
     const flatList = getFlattenedVisibleNodes(rcIds, storeEntities, uiState.expandedNodes, rnId);
 
+    // Validate hover node belongs to this outliner context (not a different panel)
+    if (!flatList.some((item) => item.nodeId === hoverNode.nodeId)) return;
+
     const range = computeRangeSelection(
       state.startNodeId!,
       hoverNode.nodeId,

@@ -211,9 +211,12 @@ export const useUIStore = create<UIStore>()(
       focusedParentId: null,
       setFocusedNode: (nodeId, parentId) => {
         if (nodeId) {
-          // Entering edit mode: set focus AND selection to this node.
+          // Entering edit mode: set focus AND collapse multi-select to this single node.
+          // This is intentional — clicking a node (or pressing Enter from selection) means
+          // the user is now editing ONE node, so multi-select is discarded. Callers that
+          // need to preserve multi-select state should use clearFocus() instead.
           // Selection is set at click-time so Escape only needs clearFocus()
-          // and the node stays in selectedNodeIds → ring shows.
+          // and the node stays in selectedNodeIds → highlight shows.
           set({
             focusedNodeId: nodeId,
             focusedParentId: parentId ?? null,

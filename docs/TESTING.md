@@ -269,9 +269,12 @@ npm run test:run
 
 **覆盖点**:
 
-1. `navUndo/navRedo` 历史回放与“新导航清空 redo”
+1. `navUndo/navRedo` 历史回放与"新导航清空 redo"
 2. `focusedNode` 与 `selectedNode` 的互斥关系
 3. `parentId` 消歧值的归一化（未传时为 `null`）
+4. `clearFocus` 保留 selection（Escape 编辑→选中过渡）
+5. `setFocusedNode(null)` 清空 focus + selection（blur 到空白区域）
+6. `setFocusedNode` 多选时收窄为单选（设计意图：进入编辑=放弃多选）
 
 ### 1.17 快捷键注册表一致性
 

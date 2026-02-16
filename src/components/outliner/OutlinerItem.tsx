@@ -83,8 +83,10 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   const selectedNodeId = useUIStore((s) => s.selectedNodeId);
   const selectedParentId = useUIStore((s) => s.selectedParentId);
   const setSelectedNode = useUIStore((s) => s.setSelectedNode);
-  const selectedNodeIds = useUIStore((s) => s.selectedNodeIds);
-  const selectionAnchorId = useUIStore((s) => s.selectionAnchorId);
+  // Derive booleans from Set to avoid Zustand infinite re-render (Set creates new reference each time)
+  const isInSelectedSet = useUIStore((s) => s.selectedNodeIds.has(nodeId));
+  const isMultiSelected = useUIStore((s) => s.selectedNodeIds.size > 1);
+  const isSelectionAnchor = useUIStore((s) => s.selectionAnchorId === nodeId);
   const setSelectedNodes = useUIStore((s) => s.setSelectedNodes);
   const clearSelection = useUIStore((s) => s.clearSelection);
   const clearFocus = useUIStore((s) => s.clearFocus);
@@ -234,10 +236,10 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   const isReference = !!node && node.props._ownerId !== parentId;
   const isTagDef = node?.props._docType === 'tagDef';
   const isPendingConversion = useUIStore((s) => s.pendingRefConversion?.tempNodeId === nodeId);
-  // Multi-select: check the set. For single-select with parent disambiguation (reference nodes),
+  // Multi-select: check derived boolean. For single-select with parent disambiguation (reference nodes),
   // also check selectedParentId to support the same node appearing in multiple places.
-  const isSelected = selectedNodeIds.has(nodeId) && (
-    selectedNodeIds.size > 1 ||
+  const isSelected = isInSelectedSet && (
+    isMultiSelected ||
     selectedParentId === null ||
     selectedParentId === parentId
   );
@@ -431,7 +433,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       const uiState = useUIStore.getState();
 
       // For multi-select, only the anchor node processes keyboard events
-      if (uiState.selectedNodeIds.size > 1 && nodeId !== uiState.selectionAnchorId) {
+      if (uiState.selectedNodeIds.size > 1 && !isSelectionAnchor) {
         return;
       }
 
@@ -699,7 +701,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isSelected, isFocused, isReference, optionsPickerOpen, allFieldOptions, optionsPickerIndex, parentId, nodeId, userId, wsId, rootNodeId, rootChildIds, entities, expandedNodes, selectedNodeIds, selectionAnchorId, removeReference, addReference, setSelectedNode, setSelectedNodes, clearSelection, setFocusedNode, startRefConversion, setPendingRefConversion, setPendingInputChar]);
+  }, [isSelected, isFocused, isReference, isSelectionAnchor, optionsPickerOpen, allFieldOptions, optionsPickerIndex, parentId, nodeId, userId, wsId, rootNodeId, rootChildIds, entities, expandedNodes, removeReference, addReference, setSelectedNode, setSelectedNodes, clearSelection, setFocusedNode, startRefConversion, setPendingRefConversion, setPendingInputChar]);
 
   // When TrailingInput creates a node with #/@/, it sets triggerHint so we
   // can immediately open the dropdown (extensions don't fire on mount because

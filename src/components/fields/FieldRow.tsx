@@ -80,7 +80,8 @@ export function FieldRow({
   const editingFieldNameId = useUIStore((s) => s.editingFieldNameId);
   const setEditingFieldName = useUIStore((s) => s.setEditingFieldName);
   const setFocusedNode = useUIStore((s) => s.setFocusedNode);
-  const selectedNodeIds = useUIStore((s) => s.selectedNodeIds);
+  // Derive boolean from Set to avoid Zustand infinite re-render (Set creates new reference each time)
+  const isTupleInSelectedSet = useUIStore((s) => s.selectedNodeIds.has(tupleId));
   const focusedNodeId = useUIStore((s) => s.focusedNodeId);
   const clearSelection = useUIStore((s) => s.clearSelection);
   const createChild = useNodeStore((s) => s.createChild);
@@ -101,7 +102,7 @@ export function FieldRow({
   const isConfigField = isTypeChoice || isToggle || isSelect || isAutoCollect || isTagPicker || isColorPicker || isNumberInput;
   const isVirtual = tupleId.startsWith('__virtual_');
   const isEditing = editingFieldNameId === tupleId;
-  const isFieldSelected = selectedNodeIds.has(tupleId) && !focusedNodeId && !isEditing;
+  const isFieldSelected = isTupleInSelectedSet && !focusedNodeId && !isEditing;
   const configDef = (isConfigField || isVirtual)
     ? ATTRDEF_CONFIG_MAP.get(attrDefId) ?? TAGDEF_CONFIG_MAP.get(attrDefId) ?? ATTRDEF_OUTLINER_FIELDS.find(f => f.key === attrDefId) ?? TAGDEF_OUTLINER_FIELDS.find(f => f.key === attrDefId)
     : undefined;

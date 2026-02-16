@@ -88,24 +88,50 @@ gh pr create --draft --title "[WIP] feat: ..." --body "ref: <任务名>"
 
 1. §2.2 的标记步骤已包含创建分支和 Draft PR
 2. 在 `docs/TASKS.md` 的任务条目 Files 字段**声明将修改的热点文件**（见 §5 文件锁）
-3. 开发过程中定期 push，保持 Draft PR 可见
+3. 开发过程中定期 push **到自己的分支**，保持 Draft PR 可见
 4. 完成后：
    - 按 PR template checklist 逐项自检
    - 将 PR 从 Draft 转为 Ready：`gh pr ready`
    - **不需要通知用户或 nodex**，nodex 通过 `gh pr list` 发现待审 PR
 
+#### ⛔ 禁止直接 push main（硬性规则）
+
+Dev Agent（nodex-codex / nodex-cc / nodex-cc-2）**绝对不能**直接向 `main` 分支 push commit。违反此规则等同于绕过 code review，可能导致：
+- 未经审查的代码进入主干，引入 bug 或架构问题
+- 其他 Agent 的工作被意外覆盖
+- 无法追溯变更的审批链路
+
+**唯一的合入路径**：`feature branch` → `PR` → `nodex review` → `merge to main`
+
+**唯一例外**：nodex（review agent）自身可在 main 上做小修复和紧急改动。
+
+#### PR 状态管理
+
+| 状态 | 含义 | nodex 行为 |
+|------|------|-----------|
+| **Draft** | 开发中，尚未完成 | **忽略**，不 review |
+| **Ready** | 开发完成，等待 review | review → comment/merge |
+
+- Dev Agent 开发中必须保持 PR 为 **Draft** 状态
+- 开发完成、自检通过后，用 `gh pr ready` 转为 Ready
+- nodex 只关注 Ready 状态的 PR：`gh pr list --state open` 后过滤 Draft
+
 ### 2.4 Review Agent 工作流（nodex）
 
 ```
-检查 open PR → Review PR → 留 comment / 合并 → 后续修正
+检查 Ready PR → Review PR → 留 comment / 合并 → 后续修正
 ```
 
-1. Session 开始时检查：`gh pr list --state open`
-2. Review 内容：代码质量、测试覆盖、文档同步、设计系统合规
-3. **Review 意见直接写在 PR comment 中**（不通过用户转达）
+1. Session 开始时检查 Ready 状态的 PR：
+   ```bash
+   gh pr list --state open  # 查看所有 open PR，跳过 Draft 状态的
+   ```
+2. **只 review Ready 状态的 PR**，Draft PR 代表开发中，不做 review
+3. Review 内容：代码质量、测试覆盖、文档同步、设计系统合规、**是否有不当的 entities 全量订阅等性能问题**
+4. **Review 意见直接写在 PR comment 中**（不通过用户转达）
    - 需要修改：在 PR 留 comment，dev agent 下次 session 会看到
    - 可以合并：直接合并，做必要的后续修正（如设计系统微调）
-4. 也可直接在 main 上做小修复或紧急改动
+5. 也可直接在 main 上做小修复或紧急改动
 
 ### 2.5 常量/类型协调
 

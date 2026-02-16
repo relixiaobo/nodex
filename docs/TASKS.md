@@ -53,6 +53,7 @@ _(空)_
   - [2026-02-16 nodex-codex] 确认代码中修复逻辑已在主干（去掉 transaction 监听 + 稳定 BubbleMenu props），补充 `floating-toolbar.test.ts` 回归测试并完成全量验证。
   - [2026-02-16 nodex-codex] 创建并更新 PR #57，状态已转 Ready for review。
   - [2026-02-16 nodex-codex] 修复交互细节：拖拽选中文本时延迟到 mouseup 才显示 toolbar，双击选词在 mouseup 后恢复显示；新增回归测试覆盖该行为。
+  - [2026-02-16 nodex-codex] 根因修复：仅改 `shouldShow` 判断不足以触发 BubbleMenu 重新评估；改为 `isPointerSelecting` state 驱动 `shouldShow` 引用，确保 mouseup 后插件收到更新并显示。
 
 ---
 

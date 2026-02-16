@@ -49,15 +49,13 @@ export function FloatingToolbar({ editor }: FloatingToolbarProps) {
   const [renderTick, setRenderTick] = useState(0);
   const [editingLink, setEditingLink] = useState(false);
   const [linkDraft, setLinkDraft] = useState('');
+  const [isPointerSelecting, setIsPointerSelecting] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-  const isPointerSelectingRef = useRef(false);
 
   useEffect(() => {
     const rerender = () => setRenderTick((value) => value + 1);
     const setPointerSelecting = (next: boolean) => {
-      if (isPointerSelectingRef.current === next) return;
-      isPointerSelectingRef.current = next;
-      rerender();
+      setIsPointerSelecting((previous) => (previous === next ? previous : next));
     };
     const handleMouseDown = (event: MouseEvent) => {
       if (event.button !== 0) return;
@@ -157,10 +155,10 @@ export function FloatingToolbar({ editor }: FloatingToolbarProps) {
     ({ editor: currentEditor, from, to }: { editor: Editor; from: number; to: number }) => {
       // Delay toolbar display until pointer selection finishes (mouse up),
       // so drag-select and double-click don't flash the menu mid-gesture.
-      if (isPointerSelectingRef.current) return false;
+      if (isPointerSelecting) return false;
       return currentEditor.isFocused && from !== to;
     },
-    [],
+    [isPointerSelecting],
   );
 
   const bubbleMenuOptions = useMemo(() => ({

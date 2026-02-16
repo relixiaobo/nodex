@@ -676,9 +676,12 @@ applyWebClipToNode（5 cases）:
 3. `toggleNodeInSelection` — 新增/移除/忽略后代/吸收后代/嵌套吸收
 4. `computeRangeSelection` — 正向/反向/单节点/全范围/缺失锚点回退
 5. `filterToRootLevel` — 过滤子节点/全保留/空集/深嵌套链
-6. `getFirstSelectedInOrder` — 多选首项/空选区/单选
-7. `getSelectedIdsInOrder` — 可见顺序排列/空选区/过滤/忽略不在 flatList 中的 ID
-8. `getSelectionBounds` — 首尾边界/单选/空选区/非连续选区
+6. `filterToRootLevel` with flatList — 显示层级过滤/reference 节点不被错误过滤/display parent 选中时过滤
+7. `getFirstSelectedInOrder` — 多选首项/空选区/单选
+8. `getSelectedIdsInOrder` — 可见顺序排列/空选区/过滤/忽略不在 flatList 中的 ID
+9. `getSelectionBounds` — 首尾边界/单选/空选区/非连续选区
+10. `getEffectiveSelectionBounds` with reference — 显示层级 reference 节点隐式选中
+11. `computeRangeSelection` with reference — 跨 reference 范围选择/不振荡
 
 ---
 

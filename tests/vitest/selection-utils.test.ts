@@ -350,4 +350,118 @@ describe('getEffectiveSelectionBounds', () => {
     const result = getEffectiveSelectionBounds(new Set(['A', 'C']), collapsedList, entities);
     expect(result).toEqual({ firstIdx: 0, lastIdx: 2 }); // A(0) through C(2)
   });
+
+  it('includes reference node descendants via display hierarchy', () => {
+    // Reference node R appears under B in display, but _ownerId points to A.
+    // If B is selected, R (displayed under B) should be counted as implicitly selected.
+    const refEntities: Record<string, NodexNode> = {
+      ...entities,
+      R: makeNode('R', 'A', []), // _ownerId = A (original owner)
+    };
+    // In the display tree, R appears under B (as a reference)
+    const refFlatList = [
+      { nodeId: 'A', parentId: 'root' },
+      { nodeId: 'A1', parentId: 'A' },
+      { nodeId: 'A2', parentId: 'A' },
+      { nodeId: 'B', parentId: 'root' },
+      { nodeId: 'R', parentId: 'B' },  // R displayed under B
+      { nodeId: 'B1', parentId: 'B' },
+      { nodeId: 'C', parentId: 'root' },
+    ];
+    // B selected → R (display child of B) should be included in effective bounds
+    const result = getEffectiveSelectionBounds(new Set(['B']), refFlatList, refEntities);
+    expect(result).toEqual({ firstIdx: 3, lastIdx: 5 }); // B(3) through B1(5), including R(4)
+  });
+});
+
+// ─── Reference node selection tests ───
+
+describe('filterToRootLevel with flatList (display hierarchy)', () => {
+  const entities = makeEntities();
+
+  it('filters using display hierarchy when flatList provided', () => {
+    // A1 is displayed under A in flatList, so selecting {A, A1} → keeps only A
+    const flatList = [
+      { nodeId: 'A', parentId: 'root' },
+      { nodeId: 'A1', parentId: 'A' },
+      { nodeId: 'A2', parentId: 'A' },
+      { nodeId: 'B', parentId: 'root' },
+    ];
+    const result = filterToRootLevel(new Set(['A', 'A1', 'A2', 'B']), entities, flatList);
+    expect(result).toEqual(new Set(['A', 'B']));
+  });
+
+  it('does NOT incorrectly filter reference nodes via _ownerId', () => {
+    // Reference node R: _ownerId = A (original owner), but displayed under B
+    const refEntities: Record<string, NodexNode> = {
+      ...entities,
+      R: makeNode('R', 'A', []), // _ownerId points to A
+    };
+    const flatList = [
+      { nodeId: 'A', parentId: 'root' },
+      { nodeId: 'B', parentId: 'root' },
+      { nodeId: 'R', parentId: 'B' },  // displayed under B
+      { nodeId: 'C', parentId: 'root' },
+    ];
+    // Select A and R: without flatList, _ownerId chain would see R→A→root,
+    // incorrectly filtering R as covered by A. With flatList, R's display parent is B,
+    // so R is NOT covered by A.
+    const result = filterToRootLevel(new Set(['A', 'R']), refEntities, flatList);
+    expect(result).toEqual(new Set(['A', 'R'])); // Both kept
+  });
+
+  it('reference node filtered when its display parent IS selected', () => {
+    const refEntities: Record<string, NodexNode> = {
+      ...entities,
+      R: makeNode('R', 'A', []),
+    };
+    const flatList = [
+      { nodeId: 'A', parentId: 'root' },
+      { nodeId: 'B', parentId: 'root' },
+      { nodeId: 'R', parentId: 'B' },
+      { nodeId: 'C', parentId: 'root' },
+    ];
+    // Select B and R: R's display parent is B, so R is filtered out
+    const result = filterToRootLevel(new Set(['B', 'R']), refEntities, flatList);
+    expect(result).toEqual(new Set(['B']));
+  });
+});
+
+describe('computeRangeSelection with reference nodes', () => {
+  it('range across reference node includes it correctly', () => {
+    const refEntities: Record<string, NodexNode> = {
+      ...makeEntities(),
+      R: makeNode('R', 'A', []), // _ownerId = A, displayed under root
+    };
+    // Flat list: A, R (ref displayed at root level), B
+    const flatList = [
+      { nodeId: 'A', parentId: 'root' },
+      { nodeId: 'R', parentId: 'root' },  // reference at root level
+      { nodeId: 'B', parentId: 'root' },
+    ];
+    // Range from A to B should include R
+    const result = computeRangeSelection('A', 'B', flatList, refEntities);
+    expect(result).toEqual(new Set(['A', 'R', 'B']));
+  });
+
+  it('range does not oscillate: reference node not wrongly removed', () => {
+    // This is the core bug scenario: selecting A → extending to include R
+    // R's _ownerId = A, so old filterToRootLevel would see R as covered by A.
+    // With flatList-based filtering, R at root display level stays.
+    const refEntities: Record<string, NodexNode> = {
+      ...makeEntities(),
+      R: makeNode('R', 'A', []),
+    };
+    const flatList = [
+      { nodeId: 'A', parentId: 'root' },
+      { nodeId: 'A1', parentId: 'A' },
+      { nodeId: 'A2', parentId: 'A' },
+      { nodeId: 'R', parentId: 'root' },  // ref at root level
+      { nodeId: 'B', parentId: 'root' },
+    ];
+    // Range from A to R
+    const result = computeRangeSelection('A', 'R', flatList, refEntities);
+    // A covers A1/A2 (display children), R is at root → both A and R in result
+    expect(result).toEqual(new Set(['A', 'R']));
+  });
 });

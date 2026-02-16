@@ -36,7 +36,7 @@
 | 批量缩进 (Tab) / 取消缩进 (Shift+Tab) | ✅ 已实现 (Phase 3) |
 | 批量复制 (Cmd+Shift+D) | ✅ 已实现 (Phase 3) |
 | 批量 Checkbox 切换 (Cmd+Enter) | ✅ 已实现 (Phase 3) |
-| 双层选中高亮（子树遮罩 + 行高亮） | ✅ 已实现 (Phase 3) |
+| 独立行高亮（Tana-style per-row） | ✅ 已实现 (Phase 3 → refined) |
 
 ## 数据模型
 
@@ -142,11 +142,14 @@ selectionAnchorId: string | null;   // 范围选中 / Shift+Arrow 的锚点
 
 ### 2.1 普通点击
 
-1. 如果刚结束拖选操作，忽略这次点击（防止 mouseup 干扰）
-2. 如果存在多选（≥2 节点），先清除多选
-3. 将点击节点设为唯一选中项
-4. **点击文本区域**：进入编辑模式，光标位置由浏览器根据点击坐标自然放置
-5. **点击非文本区域**（左侧 padding、bullet 区域）：进入编辑模式，光标放在文本末尾
+1. **mousedown 阶段**：记录文本偏移量（光标位置），但**不进入编辑模式**。这允许后续拖动触发 drag-select
+2. **click 阶段**：如果刚结束拖选操作（`justDragged` 标志），忽略这次点击
+3. 如果存在多选（≥2 节点），先清除多选
+4. 将点击节点设为唯一选中项
+5. **点击文本区域**：进入编辑模式，光标位置由 mousedown 记录的偏移量恢复
+6. **点击非文本区域**（左侧 padding、bullet 区域）：进入编辑模式，光标放在文本末尾
+
+> 延迟焦点设计：mousedown 不挂载 TipTap 编辑器，避免编辑器捕获后续 mousemove 事件导致 drag-select 失效。
 
 ### 2.2 Cmd+Click（多选切换）
 
@@ -175,32 +178,58 @@ selectionAnchorId: string | null;   // 范围选中 / Shift+Arrow 的锚点
 
 ### 启动条件
 
-- 左键按下，无 Cmd/Shift/Ctrl 修饰键
-- 鼠标垂直移动超过 **5px** 阈值
+- 左键按下（`button === 0`），无 Cmd/Shift/Ctrl/Alt 修饰键
+- 点击位置必须在容器内、在某个节点行上
+- 不在 button/input/`[role="button"]` 等交互元素上
+- 鼠标垂直移动超过 **5px** 阈值后激活
 
-### 文本区域 vs 非文本区域
+### 文本区域智能判断
 
-- **从文本区域开始拖动**：只有当鼠标移动到**另一个**节点行时才激活拖选。在同一节点内拖动视为浏览器原生文本选择
-- **从非文本区域开始拖动**：超过 5px 阈值即激活拖选
+从文本区域（`.editor-inline`、`.node-content`、`[contenteditable]`）开始拖动时，有三种分支：
 
-> 设计意图：在编辑器上拖动大概率是选择文字，只有跨节点才说明意图是选择整行节点。
+1. **仍在同一节点的文本区域上** → 让浏览器原生文本选择工作（不激活拖选）
+2. **仍在同一节点但移到非文本区域**（padding 等） → 激活拖选
+3. **移到不同节点** → 激活拖选
+
+从非文本区域开始拖动时，超过 5px 阈值即激活拖选。
+
+> 设计意图：在文字上拖动大概率是选择文字，移到其他节点或 padding 才说明意图是多选。
 
 ### 拖选过程
 
-1. 清除浏览器文本选区
-2. 起始节点被选中并设为锚点
-3. 退出编辑模式，进入选中模式
+1. 清除浏览器文本选区（`window.getSelection()?.removeAllRanges()`）
+2. 容器添加 `select-none` CSS 类防止文本选择伪影
+3. 起始节点被选中并设为锚点（`setSelectedNodes` 清除 focusedNodeId）
 4. 鼠标移动过程中，实时更新选区：选中从锚点到当前悬停节点之间的所有可见节点
-5. 添加 `select-none` 样式防止文本选择伪影
+5. 安全检查：`mousemove` 中检测 `me.buttons !== 1`（左键已释放但 mouseup 未触发），自动 cleanup
 
 ### 拖选结束
 
 - 释放鼠标后，选区保持
-- 抑制随后的 mouseup 点击事件（下一个事件循环重置），避免点击干扰刚完成的选区
+- 设置共享标志 `dragState.justDragged = true`
+- 通过 `setTimeout(0)` 在下一个微任务中重置为 `false`
+- OutlinerItem 的 `handleContentClick` 检查此标志，跳过点击处理
 
-### 实现要点
+### 实现架构
 
-- 必须使用 **document 级别**的 mousemove/mouseup 监听。原因：contenteditable 元素会捕获鼠标事件，导致父容器上的 React onMouseMove 不可靠触发
+```
+mousedown (document, capture)
+  → 记录 startY、startNodeId、startedOnText
+  → 注册 mousemove + mouseup 到 document（动态监听器）
+
+mousemove (document, 动态)
+  → 阈值检查 (5px)
+  → 文本区域智能判断
+  → 激活后：select-none + setSelectedNodes + 实时范围更新
+
+mouseup (document, 动态)
+  → justDragged 标志 + setTimeout(0) 重置
+  → cleanup（移除动态监听器、恢复样式）
+```
+
+- 使用**动态** document 级监听器（mousedown 时注册，mouseup 时移除），而非永久监听
+- `justDragged` 是模块级共享状态，OutlinerItem 通过 `import { dragState }` 访问
+- 不依赖 React 事件系统，避免 contenteditable 事件捕获问题
 
 ---
 
@@ -260,34 +289,31 @@ selectionAnchorId: string | null;   // 范围选中 / Shift+Arrow 的锚点
 
 ## 六、选中态视觉呈现
 
-### 6.1 普通节点 — 双层高亮
+### 6.1 普通节点 — 子树遮罩 + 独立行高亮（Tana-style）
 
-1. **子树遮罩层**：浅蓝色半透明背景，覆盖被选中节点的**整个子树区域**（节点行 + 所有展开的子节点），圆角。层级在内容下方，不影响交互
-2. **当前节点行高亮**：较深的蓝色背景，仅覆盖被选中的根节点行（bullet + 文本区域）
+两层叠加实现 Tana 风格的选中视觉：
+
+1. **子树遮罩**：`--selection` (`rgba(139,92,246,0.08)`)，无边框，仅展开时显示，覆盖整个子树区域，子节点作为连续整体，`rounded-b-sm`（底部圆角）
+2. **直接行高亮**：`--selection-row` (`#E8E0FA` 不透明) + `border border-primary/[0.15]`，仅覆盖直接选中的行，不透明色避免与子树遮罩叠加，边框营造荧光感
+
+> 行高亮有 1px 垂直内缩 (`top: 1; bottom: 1`)，相邻直接选中行之间有 2px 可见间隙。
+> 子树遮罩有 1px 底部内缩 (`bottom: 1`)，与下一兄弟节点保持一致的 2px 间隙。
 
 **视觉效果**：
-- 单选一个有子节点的父节点：用户看到整个子树区域被浅蓝色包裹，父节点行更深蓝
-- 多选多个节点：每个根选中节点各自一块子树遮罩，互相独立
-- 被隐式选中的子节点：不显示独立高亮，被父节点的浅蓝遮罩覆盖
+- 单选展开的父节点：子树区域被浅紫色连续遮罩覆盖，父节点行颜色更深（不透明 `#E8E0FA`）
+- 多选多个节点：每个选中节点各自独立行高亮，相邻行之间有 2px 间隙
+- 子节点不单独高亮，由子树遮罩统一覆盖，颜色更浅，形成一个连续整体
 
 ### 6.2 引用节点
 
-- 不使用全行遮罩
-- 使用**紧凑蓝色边框**包裹文本内容
-- 边框宽度收缩到实际文本宽度（不撑满整行）
+- 使用与普通节点相同的子树边框 + 行高亮方案
+- Reference 节点选区使用显示层级（display hierarchy）而非 `_ownerId` 链判断
+- 修复：Shift+Arrow 跨 reference 节点扩展选区不再振荡
 
-### 6.3 暗色模式
+### 6.3 暗色模式（待实现）
 
-- 子树遮罩：深蓝半透明（20% 不透明度）
-- 节点行高亮：深蓝半透明（40% 不透明度）
-
-### 6.4 当前实现（过渡方案）
-
-- Selection ring 包裹 `BulletChevron` + 文本内容区域
-- 不包裹 ChevronButton（展开/折叠按钮）
-- 样式：`ring-1 ring-primary/40 rounded-sm bg-primary/5`
-- 多选时每个选中节点独立显示 ring
-- 后续迁移到双层高亮方案
+- 子树遮罩：primary 20% 不透明度
+- 节点行高亮：primary 40% 不透明度
 
 ---
 
@@ -301,7 +327,7 @@ selectionAnchorId: string | null;   // 范围选中 / Shift+Arrow 的锚点
 | **→（选中态，单个引用被选中）** | 无特殊行为 | 将节点引用转换为内联引用 |
 | **Backspace（光标在开头，有文字）** | 与上一节点合并文本 | 导航到上一节点（不合并，引用不支持文本合并） |
 | **Backspace（空内容）** | 删除节点 | 删除引用节点 |
-| **高亮样式** | 全行浅蓝遮罩 + 深蓝行高亮 | 紧凑蓝色边框（宽度收缩到文本） |
+| **高亮样式** | 独立行高亮（per-row） | 独立行高亮（同普通节点） |
 
 ---
 
@@ -357,7 +383,9 @@ Shift+Click / 拖动选择需要计算两个节点之间的可见节点列表。
 
 ### 拖动选择的 document 级监听
 
-contenteditable 元素会捕获鼠标事件，导致父容器上的 React onMouseMove 不可靠触发。拖选必须在 document 级别注册 mousemove/mouseup 监听器。
+contenteditable 元素会捕获鼠标事件，导致父容器上的 React onMouseMove 不可靠触发。拖选使用**动态** document 级监听器（mousedown 时注册，mouseup 时移除）。
+
+关键设计：焦点入口从 mousedown 延迟到 click。mousedown 阶段仅记录文本偏移量，不挂载 TipTap 编辑器——这避免编辑器捕获后续 mousemove 事件。拖选完成后通过共享 `dragState.justDragged` 标志抑制 click 处理，防止干扰选区。
 
 ---
 
@@ -391,7 +419,7 @@ contenteditable 元素会捕获鼠标事件，导致父容器上的 React onMous
 | Tab / Shift+Tab 批量缩进 | 缩进从上往下，取消缩进从下往上 |
 | Cmd+Shift+D 批量复制 | 从下往上遍历 |
 | Cmd+Enter 批量 Checkbox | 顺序无关 |
-| 双层选中高亮 | 子树遮罩 + 行高亮替代当前 ring |
+| 独立行高亮 | Tana-style per-row highlight（ancestorSelected prop 传递） |
 
 ---
 
@@ -410,3 +438,7 @@ contenteditable 元素会捕获鼠标事件，导致父容器上的 React onMous
 | 2026-02-16 | Phase 1 实现：Escape→选中、↑↓导航、Enter/字符输入、Shift+Arrow 入选 | 统一选中键盘处理，合并引用节点与通用选择逻辑 |
 | 2026-02-16 | Phase 2 实现：Cmd+Click多选、Shift+Click范围选、Shift+Arrow扩展、拖选、Cmd+A | 多选仅anchor节点处理键盘；拖选使用document级别监听；extent从bounds+anchor动态推导无需额外状态 |
 | 2026-02-16 | Phase 3 实现：批量操作（delete/indent/outdent/duplicate/checkbox）+ 双层高亮 | 复用已有单节点 store 方法循环调用，无需新 store API；双层高亮=子树遮罩(10%)+行高亮(18%)替代 ring |
+| 2026-02-16 | 修复 reference 选区振荡 + Tana-style 子树遮罩 + 行高亮 | filterToRootLevel/getEffectiveSelectionBounds 改用 display hierarchy（flatList parentId）而非 _ownerId；子树遮罩(8%) 覆盖子节点为连续整体 + 直接行(不透明)，1px 内缩产生行间隙 |
+| 2026-02-16 | 子树遮罩无边框 | 用户反馈移除子树遮罩的 border primary/12%，仅保留 bg-selection 填充 |
+| 2026-02-16 | 拖选重构：mousedown→click 延迟焦点 + justDragged 模式 | 参考外部实现重写 useDragSelect：动态 document 监听器、文本区域三分支判断、click-based 焦点入口、共享 dragState.justDragged 抑制拖选后的点击 |
+| 2026-02-16 | 子树遮罩 bottom:1 一致间隙 | 展开节点的子树遮罩与非展开节点的行高亮保持一致的 2px 间隙 |

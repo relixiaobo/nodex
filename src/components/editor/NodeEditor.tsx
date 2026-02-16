@@ -17,7 +17,6 @@ import { useEditor, EditorContent, type Editor } from '@tiptap/react';
 import { Extension } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Highlight from '@tiptap/extension-highlight';
-import Italic from '@tiptap/extension-italic';
 import Link from '@tiptap/extension-link';
 import { DOMSerializer } from '@tiptap/pm/model';
 import { useNodeStore } from '../../stores/node-store';
@@ -51,7 +50,7 @@ const KEY_EDITOR_MOVE_UP = getPrimaryShortcutKey('editor.move_up', 'Mod-Shift-Ar
 const KEY_EDITOR_MOVE_DOWN = getPrimaryShortcutKey('editor.move_down', 'Mod-Shift-ArrowDown');
 const [KEY_EDITOR_EDIT_DESC_PRIMARY, KEY_EDITOR_EDIT_DESC_SECONDARY] = getShortcutKeys(
   'editor.edit_description',
-  ['Mod-i', 'Ctrl-i'],
+  ['Ctrl-i'],
 );
 
 interface NodeEditorProps {
@@ -513,12 +512,9 @@ export function NodeEditor({
   // element-by-element comparison for extensions, but uses strict reference
   // comparison (===) for editorProps and other options. Without memoization,
   // a new editorProps object each render triggers setOptions every time.
-  // Italic mark without keyboard shortcuts — Mod-i is reassigned to description editing.
-  // StarterKit's built-in Italic extension is disabled to prevent its Mod-i binding
-  // from intercepting our custom keymap.
-  const ItalicNoShortcut = useMemo(() => Italic.extend({
-    addKeyboardShortcuts() { return {}; },
-  }), []);
+  // Italic uses Mod-i (Cmd+I on Mac, Ctrl+I on Windows) — the standard shortcut.
+  // Description editing uses Ctrl-i (specifically the Ctrl key on Mac), which doesn't
+  // conflict with Mod-i on Mac because Mod = Cmd there.
 
   const LinkNoOpenOnClick = useMemo(
     () => Link.configure({ openOnClick: false, linkOnPaste: true, defaultProtocol: 'https' }),
@@ -527,7 +523,6 @@ export function NodeEditor({
 
   const extensions = useMemo(() => [
     StarterKit.configure({
-      italic: false,
       bulletList: false,
       orderedList: false,
       listItem: false,
@@ -537,7 +532,6 @@ export function NodeEditor({
       horizontalRule: false,
       hardBreak: false, // Nodes are single-line; also frees Mod-Enter for checkbox toggle
     }),
-    ItalicNoShortcut,
     LinkNoOpenOnClick,
     Highlight,
     HeadingMark,
@@ -547,8 +541,7 @@ export function NodeEditor({
     FieldTriggerExtension.configure({ callbacks: fieldTriggerRef }),
     ReferenceExtension.configure({ callbacks: referenceRef }),
     SlashCommandExtension.configure({ callbacks: slashRef }),
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  ], [ItalicNoShortcut, LinkNoOpenOnClick]);
+  ], [LinkNoOpenOnClick]);
 
   const editorProps = useMemo(() => ({
     attributes: {

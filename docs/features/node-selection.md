@@ -262,18 +262,17 @@ selectionAnchorId: string | null;   // 范围选中 / Shift+Arrow 的锚点
 
 ### 6.1 普通节点 — 子树边框 + 独立行高亮（Tana-style）
 
-三层叠加实现 Tana 风格的选中视觉：
+两层叠加实现 Tana 风格的选中视觉：
 
-1. **子树边框**：`--selection` (`rgba(139,92,246,0.06)`) + `border border-primary/[0.12]`，仅展开时显示，覆盖整个子树区域
+1. **子树遮罩**：`--selection` (`rgba(139,92,246,0.10)`) + `border border-primary/[0.12]`，仅展开时显示，覆盖整个子树区域，子节点作为连续整体
 2. **直接行高亮**：`--selection-row` (`rgba(139,92,246,0.18)`)，仅覆盖直接选中的行
-3. **子节点行高亮**：`--selection-child` (`rgba(139,92,246,0.10)`)，被祖先隐式选中的子行，左对齐到选中祖先
 
-> 行高亮有 1px 垂直内缩 (`top: 1; bottom: 1`)，相邻行产生可见间隙（匹配 Tana）。
+> 行高亮有 1px 垂直内缩 (`top: 1; bottom: 1`)，相邻直接选中行之间有可见间隙。
 
 **视觉效果**：
-- 单选展开的父节点：子树区域被浅紫色边框包裹，父节点行更深，子节点行更浅且左对齐到父级
-- 多选多个节点：每个选中节点各自独立高亮，相邻行之间有 2px 间隙
-- 子节点行高亮的左边缘与选中祖先对齐，不随自身缩进加深
+- 单选展开的父节点：子树区域被浅紫色连续遮罩 + 边框包裹，父节点行颜色更深
+- 多选多个节点：每个选中节点各自独立行高亮，相邻行之间有 2px 间隙
+- 子节点不单独高亮，由子树遮罩统一覆盖，颜色更浅，形成一个连续整体
 
 ### 6.2 引用节点
 
@@ -407,4 +406,4 @@ contenteditable 元素会捕获鼠标事件，导致父容器上的 React onMous
 | 2026-02-16 | Phase 1 实现：Escape→选中、↑↓导航、Enter/字符输入、Shift+Arrow 入选 | 统一选中键盘处理，合并引用节点与通用选择逻辑 |
 | 2026-02-16 | Phase 2 实现：Cmd+Click多选、Shift+Click范围选、Shift+Arrow扩展、拖选、Cmd+A | 多选仅anchor节点处理键盘；拖选使用document级别监听；extent从bounds+anchor动态推导无需额外状态 |
 | 2026-02-16 | Phase 3 实现：批量操作（delete/indent/outdent/duplicate/checkbox）+ 双层高亮 | 复用已有单节点 store 方法循环调用，无需新 store API；双层高亮=子树遮罩(10%)+行高亮(18%)替代 ring |
-| 2026-02-16 | 修复 reference 选区振荡 + Tana-style 子树边框 + 行高亮 | filterToRootLevel/getEffectiveSelectionBounds 改用 display hierarchy（flatList parentId）而非 _ownerId；子树边框(6%+border) + 直接行(18%) + 子节点行(10%，左对齐祖先)，1px 内缩产生行间隙 |
+| 2026-02-16 | 修复 reference 选区振荡 + Tana-style 子树遮罩 + 行高亮 | filterToRootLevel/getEffectiveSelectionBounds 改用 display hierarchy（flatList parentId）而非 _ownerId；子树遮罩(10%+border) 覆盖子节点为连续整体 + 直接行(18%)，1px 内缩产生行间隙 |

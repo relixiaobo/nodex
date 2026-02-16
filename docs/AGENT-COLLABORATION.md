@@ -10,7 +10,7 @@
 | 角色 | 说明 |
 |------|------|
 | **用户** | 最终决策者：优先级调整、方向纠偏、合并/拒绝 |
-| **Agent** | 各自在独立 clone + 独立分支工作，通过 GitHub 异步协调 |
+| **Agent** | 各自在独立 clone + 独立分支工作，通过 `docs/TASKS.md` + Git PR 异步协调 |
 
 每个 Agent 工作时在 commit 和文档中使用自己的身份标识，方便追溯。
 
@@ -87,7 +87,7 @@ gh pr create --draft --title "[WIP] feat: ..." --body "ref: <任务名>"
 ```
 
 1. §2.2 的标记步骤已包含创建分支和 Draft PR
-2. 在 Issue comment 中**声明将修改的热点文件**（见 §5 文件锁）
+2. 在 `docs/TASKS.md` 的任务条目 Files 字段**声明将修改的热点文件**（见 §5 文件锁）
 3. 开发过程中定期 push，保持 Draft PR 可见
 4. 完成后：
    - 按 PR template checklist 逐项自检
@@ -123,14 +123,14 @@ gh pr create --draft --title "[WIP] feat: ..." --body "ref: <任务名>"
 |------|------|---------|-----------|---------|
 | **治理** | `CLAUDE.md` | 高 | 共有 | 仅用户批准后修改 |
 | **治理** | `docs/AGENT-COLLABORATION.md` | 低 | 共有 | 仅用户批准后修改 |
+| **任务** | `docs/TASKS.md` | 中 | 共有 | Agent 状态各改自己的行；进行中各改自己的任务 |
+| **经验** | `docs/LESSONS.md` | 低 | 共有 | 追加式，遇到新经验时追加到对应段落 |
 | **规格** | `docs/features/*.md` | 低 | 按文件独占 | 改功能时同步更新对应文件 |
 | **测试** | `docs/TESTING.md` | 中 | 共有 | 只追加自己的 section |
 | **测试** | `docs/MANUAL-TEST-CHECKLIST.md` | 低 | 共有 | 只追加 |
 | **设计** | `docs/design-system.md` | 低 | 共有 | 涉及视觉变更时更新 |
 | **研究** | `docs/research/*.md` | 无 | 只读 | 原则上不修改（参考资料） |
 | **代码** | `src/**` | 高 | 按文件独占 | 同一时间只有一个 Agent 改同一文件 |
-
-> `docs/issues.md` 和 `docs/ROADMAP.md` 已废弃，不再维护。
 
 ### 3.2 详细规则
 
@@ -208,7 +208,7 @@ gh pr create --draft --title "[WIP] feat: ..." --body "ref: <任务名>"
 |------|------|--------|
 | **收件箱** | 用户随手记录 bug/想法 | 用户写入，agent 归类后删除 |
 | **Agent 状态** | 谁在做什么、改哪些文件 | Dev agent 开工时更新 |
-| **进行中** | 活跃任务详情（owner/branch/files/progress/notes） | Dev agent 持续更新 |
+| **进行中** | 活跃任务详情（owner/branch/files/progress/迭代日志） | Dev agent 持续更新 |
 | **待办** | 按优先级排列的任务列表（P2 > P3） | nodex 或用户调整优先级 |
 | **已完成** | 完成记录 | nodex merge 时移入 |
 
@@ -216,8 +216,8 @@ gh pr create --draft --title "[WIP] feat: ..." --body "ref: <任务名>"
 
 ```bash
 # 开工：编辑 docs/TASKS.md（更新 Agent 状态 + 移动任务到「进行中」）
-# 进展：更新 Progress checklist + Notes
-# 卡住：在 Notes 中写明原因、已尝试方案、建议下一步，Owner 改为 —
+# 进展：更新 Progress checklist + 追加迭代日志
+# 卡住：在迭代日志中写明原因、已尝试方案、建议下一步，Owner 改为 —
 # 完成：nodex merge PR 时移到「已完成」
 ```
 
@@ -226,18 +226,18 @@ gh pr create --draft --title "[WIP] feat: ..." --body "ref: <任务名>"
 当一个 Agent 卡住时：
 
 **交出方**：
-1. 在 `docs/TASKS.md` 对应任务的 Notes 中写详细交接备注（已尝试方案、排除的方向、建议下一步）
+1. 在 `docs/TASKS.md` 对应任务的迭代日志中写详细交接备注（已尝试方案、排除的方向、建议下一步）
 2. Owner 改为 `—`，Agent 状态表清空自己的行
 3. Commit + push 当前进度到自己的分支
 
 **接收方**：
 1. `git pull` 获取最新代码
-2. 读 TASKS.md 对应任务的 Notes 了解完整上下文
+2. 读 TASKS.md 对应任务的迭代日志了解完整上下文
 3. 更新 Owner 为自己，更新 Agent 状态表
-4. 在 Notes 中追加新的尝试记录
+4. 在迭代日志中追加新的尝试记录
 
 **关键原则**：
-- **不要重复已失败的方案** — 先读完 Notes 再动手
+- **不要重复已失败的方案** — 先读完迭代日志再动手
 - **交接备注要具体** — "可能是 keymap 问题"不够，要写"在 L362 加 console.log 确认 handler 是否被调用"
 
 ---

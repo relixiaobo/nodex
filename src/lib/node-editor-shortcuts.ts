@@ -49,7 +49,7 @@ export type NodeEditorEscapeIntent =
   | 'reference_close'
   | 'hashtag_close'
   | 'slash_close'
-  | 'allow_default';
+  | 'select_current';
 
 export function resolveNodeEditorEscapeIntent(
   referenceActive: boolean,
@@ -59,7 +59,7 @@ export function resolveNodeEditorEscapeIntent(
   if (referenceActive) return 'reference_close';
   if (hashTagActive) return 'hashtag_close';
   if (slashActive) return 'slash_close';
-  return 'allow_default';
+  return 'select_current';
 }
 
 export type NodeEditorForceCreateIntent =

@@ -98,6 +98,10 @@ interface NodeEditorProps {
   onDescriptionEdit?: () => void;
   // ─── Checkbox toggle (Cmd+Enter when no dropdown) ───
   onToggleDone?: () => void;
+  // ─── Selection mode transitions ───
+  onEscapeSelect?: () => void;
+  onShiftArrow?: (direction: 'up' | 'down') => void;
+  onSelectAll?: () => void;
 }
 
 export function NodeEditor({
@@ -140,6 +144,9 @@ export function NodeEditor({
   onSlashClose,
   onDescriptionEdit,
   onToggleDone,
+  onEscapeSelect,
+  onShiftArrow,
+  onSelectAll,
 }: NodeEditorProps) {
   const updateNodeName = useNodeStore((s) => s.updateNodeName);
   const setNodeNameLocal = useNodeStore((s) => s.setNodeNameLocal);
@@ -191,6 +198,9 @@ export function NodeEditor({
     onSlashClose: onSlashClose ?? (() => {}),
     onDescriptionEdit: onDescriptionEdit ?? (() => {}),
     onToggleDone: onToggleDone ?? (() => {}),
+    onEscapeSelect: onEscapeSelect ?? (() => {}),
+    onShiftArrow: onShiftArrow ?? (() => {}),
+    onSelectAll: onSelectAll ?? (() => {}),
   });
   callbacksRef.current = {
     onEnter, onIndent, onOutdent, onDelete, onArrowUp, onArrowDown, onMoveUp, onMoveDown, saveContent,
@@ -214,6 +224,9 @@ export function NodeEditor({
     onSlashClose: onSlashClose ?? (() => {}),
     onDescriptionEdit: onDescriptionEdit ?? (() => {}),
     onToggleDone: onToggleDone ?? (() => {}),
+    onEscapeSelect: onEscapeSelect ?? (() => {}),
+    onShiftArrow: onShiftArrow ?? (() => {}),
+    onSelectAll: onSelectAll ?? (() => {}),
   };
 
   // HashTag extension callbacks
@@ -395,7 +408,7 @@ export function NodeEditor({
             }
             return false;
           },
-          [KEY_EDITOR_ESCAPE]: () => {
+          [KEY_EDITOR_ESCAPE]: ({ editor }) => {
             const intent = resolveNodeEditorEscapeIntent(
               callbacksRef.current.referenceActive,
               callbacksRef.current.hashTagActive,
@@ -413,7 +426,34 @@ export function NodeEditor({
               callbacksRef.current.onSlashClose();
               return true;
             }
+            if (intent === 'select_current') {
+              callbacksRef.current.saveContent(editor.getHTML());
+              callbacksRef.current.onEscapeSelect();
+              return true;
+            }
             return false;
+          },
+          'Shift-ArrowUp': ({ editor }) => {
+            callbacksRef.current.saveContent(editor.getHTML());
+            callbacksRef.current.onShiftArrow('up');
+            return true;
+          },
+          'Shift-ArrowDown': ({ editor }) => {
+            callbacksRef.current.saveContent(editor.getHTML());
+            callbacksRef.current.onShiftArrow('down');
+            return true;
+          },
+          'Mod-a': ({ editor }) => {
+            // Double Cmd+A: first press selects all text (ProseMirror default),
+            // second press (all text already selected) escalates to select all nodes.
+            const { from, to } = editor.state.selection;
+            const docEnd = editor.state.doc.content.size - 1;
+            if (from <= 1 && to >= docEnd) {
+              callbacksRef.current.saveContent(editor.getHTML());
+              callbacksRef.current.onSelectAll();
+              return true;
+            }
+            return false; // Let ProseMirror select all text
           },
           [KEY_EDITOR_DROPDOWN_FORCE_CREATE]: () => {
             const intent = resolveNodeEditorForceCreateIntent(
@@ -560,6 +600,13 @@ export function NodeEditor({
       const clickInfo = useUIStore.getState().focusClickCoords;
       if (clickInfo && clickInfo.nodeId === nodeId && clickInfo.parentId === parentId) {
         useUIStore.getState().setFocusClickCoords(null);
+      }
+
+      // Consume pending input character from selection mode (typed char → edit + append)
+      const pendingChar = useUIStore.getState().pendingInputChar;
+      if (pendingChar) {
+        useUIStore.getState().setPendingInputChar(null);
+        editor.commands.insertContent(pendingChar);
       }
 
       if (editorRef) editorRef.current = editor;

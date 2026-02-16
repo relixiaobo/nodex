@@ -269,9 +269,12 @@ npm run test:run
 
 **覆盖点**:
 
-1. `navUndo/navRedo` 历史回放与“新导航清空 redo”
+1. `navUndo/navRedo` 历史回放与"新导航清空 redo"
 2. `focusedNode` 与 `selectedNode` 的互斥关系
 3. `parentId` 消歧值的归一化（未传时为 `null`）
+4. `clearFocus` 保留 selection（Escape 编辑→选中过渡）
+5. `setFocusedNode(null)` 清空 focus + selection（blur 到空白区域）
+6. `setFocusedNode` 多选时收窄为单选（设计意图：进入编辑=放弃多选）
 
 ### 1.17 快捷键注册表一致性
 
@@ -562,6 +565,44 @@ applyWebClipToNode（5 cases）:
 18. 就地写入 Source URL 字段值
 19. 就地设置 description
 20. 不改变节点 ownership（留在原父节点）
+
+### 1.39 Selection Mode 键盘决策纯函数
+
+**测试文件**: `tests/vitest/selection-keyboard.test.ts`
+
+**覆盖点**:
+
+1. `ArrowUp` → `navigate_up`（退出选中，编辑上一节点，光标在末尾）
+2. `ArrowDown` → `navigate_down`（退出选中，编辑下一节点，光标在开头）
+3. `Enter` → `enter_edit`（编辑选中节点，光标在末尾）
+4. `Escape` → `clear_selection`（清除所有选中）
+5. 可打印字符 → `type_char`（编辑选中节点 + 追加字符）
+6. `Shift+↑` → `extend_up`（从锚点向上扩展选区）
+7. `Shift+↓` → `extend_down`（从锚点向下扩展选区）
+8. `Cmd+A` / `Ctrl+A` → `select_all`（选中所有顶层节点）
+9. `Cmd/Ctrl+非a` / `Alt+key` → `null`（其他修饰键组合不处理）
+10. 特殊键（F1/Shift/Control）→ `null`
+11. `Enter` + 非批量修饰键（Shift/Alt）→ `null`
+12. `Backspace` / `Delete` → `batch_delete`（批量删除选中节点）
+13. `Tab` → `batch_indent`（批量缩进）
+14. `Shift+Tab` → `batch_outdent`（批量取消缩进）
+15. `Cmd+Shift+D` → `batch_duplicate`（批量复制，含大小写兼容）
+16. `Cmd+Enter` / `Ctrl+Enter` → `batch_checkbox`（批量 checkbox 切换）
+
+### 1.40 Multi-Select 纯函数工具库
+
+**测试文件**: `tests/vitest/selection-utils.test.ts`
+
+**覆盖点**:
+
+1. `isNodeOrAncestorSelected` — 空选区/自身/父/祖父/兄弟/未知节点
+2. `hasSelectedAncestor` — 空选区/仅自身/父选中/根节点
+3. `toggleNodeInSelection` — 新增/移除/忽略后代/吸收后代/嵌套吸收
+4. `computeRangeSelection` — 正向/反向/单节点/全范围/缺失锚点回退
+5. `filterToRootLevel` — 过滤子节点/全保留/空集/深嵌套链
+6. `getFirstSelectedInOrder` — 多选首项/空选区/单选
+7. `getSelectedIdsInOrder` — 可见顺序排列/空选区/过滤/忽略不在 flatList 中的 ID
+8. `getSelectionBounds` — 首尾边界/单选/空选区/非连续选区
 
 ---
 

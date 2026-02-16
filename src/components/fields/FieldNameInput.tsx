@@ -35,6 +35,7 @@ export function FieldNameInput({ tupleId, nodeId, attrDefId, currentName, onEnte
   const wsId = useWorkspaceStore((s) => s.currentWorkspaceId);
   const userId = useWorkspaceStore((s) => s.userId);
   const setEditingFieldName = useUIStore((s) => s.setEditingFieldName);
+  const setSelectedNode = useUIStore((s) => s.setSelectedNode);
 
   // Filter suggestions: exclude current attrDefId, match by typed text
   const suggestions = value.trim()
@@ -146,6 +147,8 @@ export function FieldNameInput({ tupleId, nodeId, attrDefId, currentName, onEnte
         e.preventDefault();
         confirmedRef.current = true;
         setEditingFieldName(null);
+        // Select the field tuple (same pattern as content node Escape→selected)
+        setSelectedNode(tupleId, nodeId);
       } else if (e.key === 'Backspace') {
         // Empty field name + Backspace → delete the entire field
         if (value === '' && wsId && userId) {

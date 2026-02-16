@@ -28,14 +28,24 @@ interface UIStore {
   setExpanded(expandKey: string, expanded: boolean): void;
 
   // Focus (parentId disambiguates reference nodes that appear in multiple places)
+  // setFocusedNode also sets selection to the focused node (click-time selection pattern)
+  // so that Escape only needs to clearFocus() and selection survives.
   focusedNodeId: string | null;
   focusedParentId: string | null;
   setFocusedNode(nodeId: string | null, parentId?: string | null): void;
+  /** Clear focus only, preserving selection. Used by Escape to transition edit→selected. */
+  clearFocus(): void;
 
   // Selection (reference nodes: single click = select, double click = edit/focus)
   selectedNodeId: string | null;
   selectedParentId: string | null;
   setSelectedNode(nodeId: string | null, parentId?: string | null): void;
+
+  // Multi-selection (root-level node IDs only; ancestors cover descendants)
+  selectedNodeIds: Set<string>;
+  selectionAnchorId: string | null;
+  setSelectedNodes(nodeIds: Set<string>, anchorId?: string | null): void;
+  clearSelection(): void;
 
   // Sidebar
   sidebarOpen: boolean;
@@ -71,6 +81,10 @@ interface UIStore {
   // Text offset for cursor positioning (consumed by matching NodeEditor on mount)
   focusClickCoords: { nodeId: string; parentId: string | null; textOffset: number } | null;
   setFocusClickCoords(coords: { nodeId: string; parentId: string | null; textOffset: number } | null): void;
+
+  // Pending input character: set by selection mode keydown, consumed by NodeEditor on mount
+  pendingInputChar: string | null;
+  setPendingInputChar(char: string | null): void;
 
   // Pending reference ↔ inline reference conversion (session-only)
   pendingRefConversion: {
@@ -195,23 +209,70 @@ export const useUIStore = create<UIStore>()(
       // Focus
       focusedNodeId: null,
       focusedParentId: null,
-      setFocusedNode: (nodeId, parentId) => set({
-        focusedNodeId: nodeId,
-        focusedParentId: parentId ?? null,
-        // Clear selection when entering edit mode
-        selectedNodeId: null,
-        selectedParentId: null,
+      setFocusedNode: (nodeId, parentId) => {
+        if (nodeId) {
+          // Entering edit mode: set focus AND collapse multi-select to this single node.
+          // This is intentional — clicking a node (or pressing Enter from selection) means
+          // the user is now editing ONE node, so multi-select is discarded. Callers that
+          // need to preserve multi-select state should use clearFocus() instead.
+          // Selection is set at click-time so Escape only needs clearFocus()
+          // and the node stays in selectedNodeIds → highlight shows.
+          set({
+            focusedNodeId: nodeId,
+            focusedParentId: parentId ?? null,
+            selectedNodeId: nodeId,
+            selectedParentId: parentId ?? null,
+            selectedNodeIds: new Set([nodeId]),
+            selectionAnchorId: nodeId,
+          });
+        } else {
+          // Clearing focus (blur/navigation away): also clear all selection
+          set({
+            focusedNodeId: null,
+            focusedParentId: null,
+            selectedNodeId: null,
+            selectedParentId: null,
+            selectedNodeIds: new Set(),
+            selectionAnchorId: null,
+          });
+        }
+      },
+      clearFocus: () => set({
+        focusedNodeId: null,
+        focusedParentId: null,
       }),
 
-      // Selection
+      // Selection (single)
       selectedNodeId: null,
       selectedParentId: null,
       setSelectedNode: (nodeId, parentId) => set({
         selectedNodeId: nodeId,
         selectedParentId: parentId ?? null,
+        selectedNodeIds: nodeId ? new Set([nodeId]) : new Set(),
+        selectionAnchorId: nodeId,
         // Clear focus when selecting (exit edit mode)
         focusedNodeId: null,
         focusedParentId: null,
+      }),
+
+      // Multi-selection
+      selectedNodeIds: new Set<string>(),
+      selectionAnchorId: null,
+      setSelectedNodes: (nodeIds, anchorId) => set({
+        selectedNodeIds: nodeIds,
+        selectionAnchorId: anchorId ?? null,
+        // Sync single-select fields (for backward compat with reference node logic)
+        selectedNodeId: nodeIds.size === 1 ? [...nodeIds][0] : null,
+        selectedParentId: null,
+        // Clear focus
+        focusedNodeId: null,
+        focusedParentId: null,
+      }),
+      clearSelection: () => set({
+        selectedNodeId: null,
+        selectedParentId: null,
+        selectedNodeIds: new Set(),
+        selectionAnchorId: null,
       }),
 
       // Sidebar
@@ -247,6 +308,10 @@ export const useUIStore = create<UIStore>()(
       // Click coordinates for cursor positioning
       focusClickCoords: null,
       setFocusClickCoords: (coords) => set({ focusClickCoords: coords }),
+
+      // Pending input character (session-only, consumed by NodeEditor on mount)
+      pendingInputChar: null,
+      setPendingInputChar: (char) => set({ pendingInputChar: char }),
 
       // Pending reference conversion (session-only)
       pendingRefConversion: null,

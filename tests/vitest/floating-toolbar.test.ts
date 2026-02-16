@@ -184,4 +184,23 @@ describe('FloatingToolbar render-loop guard', () => {
     editor.view.input.mouseDown = false;
     expect(shouldShow(selection)).toBe(true);
   });
+
+  it('recovers when ProseMirror mouseDown flag gets stuck', () => {
+    const selection = { editor: editor as unknown as Editor, view: editor.view, from: 3, to: 9 };
+    const shouldShow = latestShouldShow();
+    const nowSpy = vi.spyOn(Date, 'now');
+
+    try {
+      editor.view.input.mouseDown = { done: () => {} };
+
+      nowSpy.mockReturnValue(1000);
+      expect(shouldShow(selection)).toBe(false);
+
+      // Failsafe: stale pointer state should no longer block toolbar forever.
+      nowSpy.mockReturnValue(3000);
+      expect(shouldShow(selection)).toBe(true);
+    } finally {
+      nowSpy.mockRestore();
+    }
+  });
 });

@@ -53,22 +53,27 @@ export function ColorSwatchPicker({ assocDataId }: ColorSwatchPickerProps) {
   );
 
   return (
-    <div className="flex min-h-7 items-center gap-2 py-1" style={{ paddingLeft: 25 }}>
+    <div className="flex min-h-7 items-center gap-2 py-1.5" style={{ paddingLeft: 25 }}>
       <BulletChevron hasChildren={false} isExpanded={false} onBulletClick={() => {}} />
-      <div className="flex flex-wrap gap-1.5">
-        {SWATCH_OPTIONS.map((swatch) => (
-          <button
-            key={swatch.key}
-            onClick={() => handleSelect(swatch.key)}
-            className={`h-5 w-5 rounded-full border-2 transition-transform hover:scale-110 active:scale-90 ${
-              swatch.key === selectedKey
-                ? 'border-foreground/60 ring-1 ring-foreground/20'
-                : 'border-transparent'
-            }`}
-            style={{ backgroundColor: swatch.color.text }}
-            title={swatch.name}
-          />
-        ))}
+      <div className="flex flex-wrap gap-2">
+        {SWATCH_OPTIONS.map((swatch) => {
+          const isSelected = swatch.key === selectedKey;
+          // Tana-style: selected swatch has a same-color ring with white gap
+          return (
+            <button
+              key={swatch.key}
+              onClick={() => handleSelect(swatch.key)}
+              className="h-6 w-6 rounded-full transition-transform hover:scale-110 active:scale-90"
+              style={{
+                backgroundColor: swatch.color.text,
+                boxShadow: isSelected
+                  ? `0 0 0 2px var(--background, #fff), 0 0 0 4px ${swatch.color.text}`
+                  : undefined,
+              }}
+              title={swatch.name}
+            />
+          );
+        })}
       </div>
     </div>
   );

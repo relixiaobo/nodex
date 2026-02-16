@@ -17,6 +17,7 @@
 - Selector 返回新对象/数组 → 无限重渲染。用 `JSON.stringify` + `useMemo` 或 `useShallow`
 - Zustand v5 persist: 无顶层 `serialize`/`deserialize`，用 `createJSONStorage({ reviver, replacer })`
 - Vite HMR 后 store 实例变更 → 必须用 `window.__nodeStore` 访问，不要 `import()`
+- **禁止 `useNodeStore((s) => s.entities)` 全量订阅**：entities 是全局节点表，任何节点变化都会触发重渲染。在列表中大量出现的组件（TagBadge、NodePicker 选项等）尤其致命。正确做法：将 `resolveTagColor` 等计算放入 selector 内部，返回原始值或常量引用，例如 `useNodeStore((s) => resolveTagColor(s.entities, tagDefId))`
 
 ### contenteditable 切换焦点（9 轮迭代的教训）
 
@@ -131,3 +132,29 @@
 ### justify-end 不对称定位技巧
 
 Click area 需偏向一侧、visual 需在另一侧时：`justify-end` + 固定宽度 + absolute → 点击区域在左侧，视觉线在右边缘。
+
+---
+
+## 协作纪律（血泪教训）
+
+### 禁止直接 push main
+
+- Dev Agent（nodex-codex / nodex-cc / nodex-cc-2）**绝对不能**直接向 main push commit
+- 曾发生过 cc-2 直接 push 6 个 commit 到 main，绕过 code review，导致性能问题（entities 全量订阅）和 TASKS.md 被自行标记完成
+- **唯一合入路径**：feature branch → PR → nodex review → merge
+- 唯一例外：nodex 自身的小修复和紧急改动
+
+### PR 状态管理
+
+- **Draft** = 开发中，nodex 忽略不 review
+- **Ready** = 开发完成，等待 review
+- Dev Agent 开发中保持 Draft；完成自检后 `gh pr ready` 转 Ready
+- 不要跳过 Draft 直接创建 Ready PR（除非改动极小且已充分自测）
+
+### Review 检查要点（给 nodex 的提醒）
+
+- 代码质量：架构合理性、命名一致性
+- 性能：是否有 `useNodeStore((s) => s.entities)` 等全量订阅
+- 测试：新功能是否有 Vitest 覆盖
+- 文档：`docs/features/*.md` 和 `docs/TESTING.md` 是否同步更新
+- 数据模型：`system-nodes.ts` 常量是否有 ID 冲突

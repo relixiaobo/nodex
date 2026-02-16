@@ -58,7 +58,7 @@ gh pr create --draft --title "[WIP] feat: ..." --body "ref: <任务名>"
 接到任务 → 标记 Issue + Draft PR（上一步）→ 开发 → 自检 → 标记 Ready → 等待 review
 ```
 
-1. 在 Issue comment 中声明将修改的热点文件（`🔒 Working on: node-store.ts, ...`）
+1. 在 `docs/TASKS.md` 的任务条目 Files 字段声明将修改的热点文件
 2. 开发过程中定期 push，保持 Draft PR 可见
 3. 完成后：
    - 按 `.github/pull_request_template.md` checklist 逐项自检
@@ -78,17 +78,17 @@ npm run build            # 生产构建
 
 1. 改动 `src/` 下代码 → 必须同步新增或更新 `tests/vitest/*.test.ts`
 2. 改动 `tests/vitest/` → 必须同步更新 `docs/TESTING.md` 的覆盖映射
-3. Commit message 关联 Issue：修复 bug 用 `fixes #N`，功能进展用 `ref #N`
 
 ## 交付后文档同步
 
 | 变更类型 | 需要更新 |
 |---------|---------|
-| Bug 修复 | PR 中 `fixes #N` 自动关闭 Issue |
+| Bug 修复 | `docs/TASKS.md` 勾选子任务或移到「已完成」 |
 | 行为变更 | `docs/features/*.md`（对应特性的行为规格） |
 | 新增测试 | `docs/TESTING.md`（覆盖映射） |
-| Feature 进度 | GitHub Issue 勾选子任务 checkbox |
+| Feature 进度 | `docs/TASKS.md` 更新 Progress checklist + 迭代日志 |
 | UI 视觉变更 | `docs/design-system.md` |
+| 踩坑经验 | `docs/LESSONS.md`（通用教训追加到对应段落） |
 
 ## 技术栈
 
@@ -124,8 +124,8 @@ npm run build            # 生产构建
 
 - **单一事实来源**：`docs/TASKS.md`（一次 `Read` 获取全局状态）
 - 开工时更新 TASKS.md（Agent 状态 + 进行中条目）
-- 进展更新 Progress checklist + Notes
-- 卡住时在 Notes 写交接备注，Owner 改为 `—`
+- 进展更新 Progress checklist + 追加迭代日志
+- 卡住时在迭代日志写交接备注，Owner 改为 `—`
 
 ## 数据模型核心（快速参考）
 

@@ -46,7 +46,7 @@
   2. **FieldList**: 系统配置字段（来自 SYS_T01 模板，`isSystemConfig=true`）
      - Show as checkbox (toggle) — SYS_A55
      - Default child supertag (tag_picker, 当前 placeholder) — SYS_A14
-     - Color (color_picker, 当前 placeholder) — SYS_A11
+     - Color (color_swatch, 10 色圆点选择器) — SYS_A11
      - Extends (tag_picker) — NDX_A05
      - Done state mapping (toggle + nested entries) — NDX_A06/A07/A08
   3. **"Default content" 标签 + ConfigOutliner**: tagDef.children 中的用户模板内容
@@ -163,11 +163,14 @@ tagDef.children:
 
 **Seed data**: `tagDef_task` 预配置 toggle=YES + `NDX_A07 → [attrDef_status, opt_done]` + `NDX_A08 → [attrDef_status, opt_todo]`
 
-### Default Child Supertag — 未实现
+### Default Child Supertag — 已实现
 
-- tagDef 配置中设置 SYS_A14 = 另一个 tagDefId
-- 当被该标签标记的节点创建子节点时，子节点自动应用指定的标签
+- tagDef 配置中设置 SYS_A14 = 另一个 tagDefId（通过 tag_picker 控件选择）
+- 当被该标签标记的节点创建子节点（`createChild`/`createSibling`）时，子节点自动应用指定的标签
 - 例如：`#Project` 设 Default Child = `#Task` → Project 下新建子节点自动变成 Task
+- 多标签场景：父节点有多个标签各自配了不同的 default child → 全部应用到新子节点
+- 无标签/无 SYS_A14 配置 → 不触发自动标签（安全降级）
+- 实现：`resolveChildSupertags(entities, parentId)` 遍历父节点所有标签的 SYS_A14 配置，`createChild`/`createSibling` 在 optimistic set 后 fire-and-forget 调用 `applyTag`
 
 ### 标签继承 / Extend — Phase 1 已实现
 
@@ -190,7 +193,7 @@ tagDef.children:
 - 每个模板项（字段/节点）的图标和 bullet 颜色标识所属 tagDef
 - 继承自父标签的项 → 父标签颜色，子标签自有的项 → 子标签颜色
 - 无 Extend 关系时不显示颜色（保持原有灰色样式）
-- 颜色来自 `getTagColor(tagDefId)` 的确定性哈希
+- 颜色来自 `resolveTagColor(entities, tagDefId)`: SYS_A11 配置 → 命名色; 无配置 → 确定性哈希 fallback
 
 **Phase 2 待实现**:
 - 父标签模板变更后自动传播到所有子标签实例（无需手动同步）
@@ -337,7 +340,7 @@ tagDef_article
 
 | Tana 功能 | 说明 | 优先级 |
 |-----------|------|--------|
-| **Color Swatch Selector** (预置色板) | 预置 10 色 swatch（含 1 个灰色），不开放自由取色。新增 `NDX_D*` Color 数据类型（不复用 Options）。`getTagColor()` 优先读 SYS_A11 配置值，fallback 到哈希。灰色用于 SYS_T* 系统预置标签。 → **进行中 nodex-cc-2** | P2 |
+| ~~**Color Swatch Selector**~~ ✅ | 已实现：10 色 swatch（含灰色）+ `NDX_D02` COLOR 数据类型 + `resolveTagColor` 优先级（SYS_T*→gray, SYS_A11→命名色, fallback→hash）+ ColorSwatchPicker 组件 | ✅ |
 | **"Add description"** 字段 | 标签描述文本，显示在标签名下方 | P3 |
 | **Building blocks** 折叠面板 | Tag 继承 / Extend Phase 2（传播 + 继承标记 UI） | P2 |
 | **Optional fields** 独立区域 | 与 Default content 分离的可选字段区 | P3 |
@@ -393,6 +396,11 @@ tagDef_article
 | 2026-02-16 | Color Swatch 预置 10 色（含灰色），不开放自由取色 | 设计系统一致性 + 避免用户选择不协调颜色；灰色保留给系统预置 supertag（SYS_T*） |
 | 2026-02-16 | Color 使用新增 NDX_D* 数据类型，不复用 Options | Color 是固定色板索引，非用户可编辑选项列表，语义不同 |
 | 2026-02-16 | getTagColor() 优先级：SYS_A11 配置值 → 确定性哈希 fallback | 向后兼容：未配置颜色的标签保持现有哈希行为 |
+| 2026-02-16 | Default Child Supertag 在 optimistic set 后 fire-and-forget 调用 applyTag | UI 立即显示标签，不阻塞 createChild 返回 |
+| 2026-02-16 | resolveChildSupertags 遍历父节点所有标签读取 SYS_A14 | 多标签场景各自独立的 default child 全部应用，结果去重 |
+| 2026-02-16 | Color Swatch 实现为 ColorSwatchPicker 组件 | 10 个圆点，click 选择/toggle 清除，存储命名色 key (e.g. "violet") |
+| 2026-02-16 | 所有颜色消费者统一切换到 resolveTagColor | TagBadge/OutlinerItem/NodePicker/ConfigOutliner 四处统一，需要 entities 参数 |
+| 2026-02-16 | NDX_D02 (COLOR) 注册为新数据类型 | FieldValueOutliner 新增 COLOR 分支渲染 ColorSwatchPicker |
 
 ## 当前状态
 
@@ -413,8 +421,8 @@ tagDef_article
 - [x] applyTag 克隆 default content 中的普通节点（shallow clone, `_sourceId` 追踪来源）
 - [x] Show as Checkbox（toggle + done visual + Cmd+Enter）
 - [x] Done state mapping（checkbox ↔ Options 字段双向映射, NDX_A06）
-- [ ] Default Child Supertag（真实 tag_picker）
-- [ ] Color picker（真实色板）
+- [x] Default Child Supertag（tag_picker 配置 + createChild/createSibling 自动应用）
+- [x] Color Swatch Selector（10 色预置色板 + ColorSwatchPicker + resolveTagColor）
 - [ ] Pinned fields
 - [ ] Optional fields
 - [x] 标签继承 / Extend Phase 1（applyTag/removeTag 字段继承 + config UI）

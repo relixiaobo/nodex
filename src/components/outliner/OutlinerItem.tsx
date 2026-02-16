@@ -17,7 +17,7 @@ import { ReferenceSelector, type ReferenceDropdownHandle } from '../references/R
 import { FieldRow } from '../fields/FieldRow';
 import { SYS_D, SYS_V } from '../../types/index.js';
 import { useFieldOptions } from '../../hooks/use-field-options.js';
-import { getTagColor } from '../../lib/tag-colors.js';
+import { resolveTagColor } from '../../lib/tag-colors.js';
 import { applyWebClipToNode } from '../../lib/webclip-service.js';
 import { wrapInP } from '../../lib/editor-html.js';
 import {
@@ -1580,7 +1580,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
             isExpanded={isExpanded}
             onBulletClick={handleBulletClick}
             isReference={isReference || isPendingConversion}
-            tagDefColor={isTagDef ? getTagColor(nodeId).text : undefined}
+            tagDefColor={isTagDef ? resolveTagColor(entities, nodeId).text : undefined}
             bulletColor={bulletColor}
           />
           {showCheckbox && (

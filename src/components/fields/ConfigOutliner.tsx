@@ -16,7 +16,7 @@ import { useChildren } from '../../hooks/use-children';
 import { useNodeStore } from '../../stores/node-store';
 import { useNodeFields, type FieldEntry } from '../../hooks/use-node-fields';
 import { resolveDataType, getExtendsChain } from '../../lib/field-utils.js';
-import { getTagColor } from '../../lib/tag-colors.js';
+import { resolveTagColor } from '../../lib/tag-colors.js';
 import { OutlinerItem } from '../outliner/OutlinerItem';
 import { TrailingInput } from '../editor/TrailingInput';
 import { FieldRow } from './FieldRow';
@@ -156,7 +156,7 @@ export function ConfigOutliner({ nodeId }: ConfigOutlinerProps) {
     <div className={`min-h-[22px]${firstIsField ? ' pt-1' : ''}${lastIsField ? ' pb-1' : ''}`}>
       {mergedItems.map(({ id, type, ownerTagDefId, fieldEntry }, i) => {
         // Color from owning tagDef (only for tagDef config pages with extends)
-        const ownerColor = extendsChain.length > 0 ? getTagColor(ownerTagDefId).text : undefined;
+        const ownerColor = extendsChain.length > 0 ? resolveTagColor(entities, ownerTagDefId).text : undefined;
 
         return type === 'field' && fieldEntry ? (
           <div key={id} className="@container" style={{ paddingLeft: 6 + 15 + 4 }}>

@@ -101,7 +101,7 @@ export function seedTestData() {
     makeNode(schemaId, 'Schema', WS_ID, [
       // System value nodes
       SYS_V.YES, SYS_V.NO,
-      SYS_D.PLAIN, SYS_D.OPTIONS, SYS_D.OPTIONS_FROM_SUPERTAG, SYS_D.DATE, SYS_D.NUMBER, SYS_D.URL, SYS_D.EMAIL, SYS_D.CHECKBOX, SYS_D.BOOLEAN,
+      SYS_D.PLAIN, SYS_D.OPTIONS, SYS_D.OPTIONS_FROM_SUPERTAG, SYS_D.DATE, SYS_D.NUMBER, SYS_D.URL, SYS_D.EMAIL, SYS_D.CHECKBOX, SYS_D.BOOLEAN, SYS_D.COLOR,
       SYS_V.NEVER, SYS_V.WHEN_EMPTY, SYS_V.WHEN_NOT_EMPTY, SYS_V.WHEN_VALUE_IS_DEFAULT, SYS_V.ALWAYS,
       // System attrDef nodes
       SYS_A.COLOR, SYS_A.EXTENDS, SYS_A.SHOW_CHECKBOX,
@@ -233,6 +233,7 @@ export function seedTestData() {
     makeNode(SYS_D.EMAIL, 'Email', schemaId),
     makeNode(SYS_D.CHECKBOX, 'Checkbox', schemaId),
     makeNode(SYS_D.BOOLEAN, 'Boolean', schemaId),
+    makeNode(SYS_D.COLOR, 'Color', schemaId),
     // Hide field enum
     makeNode(SYS_V.NEVER, 'Never', schemaId),
     makeNode(SYS_V.WHEN_EMPTY, 'When empty', schemaId),
@@ -248,10 +249,10 @@ export function seedTestData() {
 
   // --- TagDef config attrDefs (SYS_T01 template fields) ---
 
-  // SYS_A11 Color — OPTIONS type (color picker values not yet implemented, placeholder)
+  // SYS_A11 Color — COLOR type (swatch picker)
   const sysAttrDefColor: NodexNode[] = [
     makeNode(SYS_A.COLOR, 'Color', schemaId, [`${SYS_A.COLOR}_type`], 'attrDef'),
-    makeNode(`${SYS_A.COLOR}_type`, '', SYS_A.COLOR, [SYS_A.TYPE_CHOICE, SYS_D.OPTIONS], 'tuple'),
+    makeNode(`${SYS_A.COLOR}_type`, '', SYS_A.COLOR, [SYS_A.TYPE_CHOICE, SYS_D.COLOR], 'tuple'),
   ];
 
   // NDX_A05 Extends — OPTIONS_FROM_SUPERTAG type, source = SYS_T01

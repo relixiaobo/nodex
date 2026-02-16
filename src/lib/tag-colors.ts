@@ -4,8 +4,16 @@
  *
  * Shared between TagBadge, BulletChevron, and NodePicker.
  */
+import { SYS_A } from '../types/index.js';
+import type { NodexNode } from '../types/index.js';
+import { resolveConfigValue } from './field-utils.js';
 
-export const TAG_COLORS = [
+export interface TagColor {
+  bg: string;
+  text: string;
+}
+
+export const TAG_COLORS: TagColor[] = [
   { bg: 'rgba(139,92,246,0.08)', text: '#8B5CF6' },    // 0: violet
   { bg: 'rgba(236,72,153,0.08)', text: '#DB2777' },    // 1: pink
   { bg: 'rgba(147,51,234,0.08)', text: '#9333EA' },    // 2: purple
@@ -18,10 +26,79 @@ export const TAG_COLORS = [
   { bg: 'rgba(249,115,22,0.08)', text: '#EA580C' },    // 9: orange
 ];
 
-export function getTagColor(tagDefId: string): { bg: string; text: string } {
+/** Gray color for system tags (SYS_T*) and user-selectable gray swatch. */
+export const TAG_COLOR_GRAY: TagColor = {
+  bg: 'rgba(115,115,115,0.08)',
+  text: '#737373',
+};
+
+/**
+ * Named color map: config value string → TagColor.
+ * Stored in SYS_A11 config via AssociatedData.
+ */
+export const TAG_COLOR_MAP: Record<string, TagColor> = {
+  violet: TAG_COLORS[0],
+  pink: TAG_COLORS[1],
+  cyan: TAG_COLORS[3],
+  emerald: TAG_COLORS[4],
+  amber: TAG_COLORS[5],
+  rose: TAG_COLORS[6],
+  blue: TAG_COLORS[7],
+  teal: TAG_COLORS[8],
+  orange: TAG_COLORS[9],
+  gray: TAG_COLOR_GRAY,
+};
+
+/**
+ * 10 swatch options for the color picker UI.
+ * Order matches the visual layout (warm → cool → neutral).
+ */
+export const SWATCH_OPTIONS: Array<{ key: string; color: TagColor; name: string }> = [
+  { key: 'rose', color: TAG_COLOR_MAP.rose, name: 'Rose' },
+  { key: 'pink', color: TAG_COLOR_MAP.pink, name: 'Pink' },
+  { key: 'orange', color: TAG_COLOR_MAP.orange, name: 'Orange' },
+  { key: 'amber', color: TAG_COLOR_MAP.amber, name: 'Amber' },
+  { key: 'emerald', color: TAG_COLOR_MAP.emerald, name: 'Emerald' },
+  { key: 'teal', color: TAG_COLOR_MAP.teal, name: 'Teal' },
+  { key: 'cyan', color: TAG_COLOR_MAP.cyan, name: 'Cyan' },
+  { key: 'blue', color: TAG_COLOR_MAP.blue, name: 'Blue' },
+  { key: 'violet', color: TAG_COLOR_MAP.violet, name: 'Violet' },
+  { key: 'gray', color: TAG_COLOR_MAP.gray, name: 'Gray' },
+];
+
+/**
+ * Hash-based color fallback. Always returns a color from the 10-color palette.
+ */
+export function getTagColor(tagDefId: string): TagColor {
   let hash = 0;
   for (let i = 0; i < tagDefId.length; i++) {
     hash = ((hash << 5) - hash + tagDefId.charCodeAt(i)) | 0;
   }
   return TAG_COLORS[Math.abs(hash) % TAG_COLORS.length];
+}
+
+/**
+ * Resolve tag color with config priority:
+ * 1. System tags (SYS_T*) → always gray
+ * 2. SYS_A11 config value → named color from TAG_COLOR_MAP
+ * 3. Fallback → deterministic hash
+ */
+export function resolveTagColor(
+  entities: Record<string, NodexNode>,
+  tagDefId: string,
+): TagColor {
+  // System tags always gray
+  if (tagDefId.startsWith('SYS_T')) return TAG_COLOR_GRAY;
+
+  // Check SYS_A11 config
+  const tagDef = entities[tagDefId];
+  if (tagDef) {
+    const colorKey = resolveConfigValue(entities, tagDef, SYS_A.COLOR);
+    if (colorKey && TAG_COLOR_MAP[colorKey]) {
+      return TAG_COLOR_MAP[colorKey];
+    }
+  }
+
+  // Fallback to hash
+  return getTagColor(tagDefId);
 }

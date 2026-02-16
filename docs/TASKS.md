@@ -63,23 +63,23 @@ _(空)_
 - **Files**: node-store.ts, field-utils.ts, tag-colors.ts, system-nodes.ts, FieldValueOutliner 相关
 - **Spec**: `docs/features/supertags.md` + `docs/features/fields.md`
 - **Progress**:
-  - [ ] **Default Child Supertag** — SYS_A14 config 字段实现
-    - tagDef 配置页已有 placeholder（`control: 'tag_picker'`），需接通 tag picker 选择 + 存储
-    - `createNode` 时检查父节点标签的 SYS_A14 配置，自动 `applyTag` 到新节点
-  - [ ] **Color Swatch Selector** — 预置 10 色色板 + Swatch UI
-    - 当前状态：`control: 'color_picker'` 已注册但无渲染组件；颜色来自 `getTagColor()` 确定性哈希
-    - **设计约束**：预置 10 色（含 1 个灰色），不开放自由取色。色值对齐设计系统
-    - 灰色用途：系统预置 supertag（SYS_T*）统一显示为灰色
-    - 需要：新增 `NDX_D*` Color 数据类型（不复用 Options）+ 色板 Swatch 选择器组件（10 个圆点/方块）
-    - 用户选择后存入 SYS_A11 Tuple value（值 = 色板索引或色值标识）
-    - `getTagColor()` 改为：有 SYS_A11 配置 → 用配置值；无配置 → fallback 到哈希
-    - TagBadge / BulletChevron / NodePicker 三处颜色源统一
+  - [x] **Default Child Supertag** — SYS_A14 运行时行为已实现 ✓
+    - tagDef 配置页 tag_picker 已在 PR #54 完成
+    - `createChild`/`createSibling` 自动读取父节点标签的 SYS_A14，fire-and-forget `applyTag`
+    - `resolveChildSupertags()` 辅助函数在 `field-utils.ts`，10 个 Vitest 用例覆盖
+  - [x] **Color Swatch Selector** — 预置 10 色色板 + Swatch UI ✓
+    - `NDX_D02` COLOR 数据类型 + `ColorSwatchPicker` 组件（10 个彩色圆点）
+    - `resolveTagColor(entities, tagDefId)`: SYS_T* → gray; SYS_A11 config → 命名色; fallback → hash
+    - TagBadge / OutlinerItem / NodePicker / ConfigOutliner 四处统一使用 `resolveTagColor`
+    - 12 个 Vitest 用例覆盖
   - [ ] **Options from Supertag** — SYS_D05 字段类型
     - attrDef 配置页 Field type 下拉新增 "Options from supertag" 选项
     - 新增 SYS_A06 (SOURCE_SUPERTAG) 配置 → tag picker 选择来源标签
     - OptionsPicker 查询逻辑改造：从"预定义 Options 列表"扩展到"搜索所有打了指定标签的节点"
 - **迭代日志**:
   - [2026-02-16 nodex] 创建任务。承接 PR #54 的 config field 上下文，三个子项可按顺序独立提交。
+  - [2026-02-16 nodex-cc-2] Default Child Supertag 运行时行为完成。`resolveChildSupertags` + `createChild`/`createSibling` 自动 applyTag，10 个 Vitest 用例。
+  - [2026-02-16 nodex-cc-2] Color Swatch Selector 完成。`NDX_D02` 数据类型 + `ColorSwatchPicker` 组件 + `resolveTagColor` 替换全部 `getTagColor` 调用 + 12 个 Vitest 用例。
 
 ---
 
@@ -102,8 +102,8 @@ _(空)_
 - [x] Done state mapping — checkbox ↔ Options 字段值双向映射 ✓ PR #54
 - [x] 统一 config field 架构（系统配置字段与用户字段共享数据模型） ✓ PR #54
 - [x] BOOLEAN 数据类型 + toggle switch ✓ PR #54
-- [ ] Default Child Supertag（新增子节点自动继承指定标签）→ **进行中 nodex-cc-2**
-- [ ] Color picker（真实色板 swatches，目前只有继承）→ **进行中 nodex-cc-2**
+- [x] Default Child Supertag（新增子节点自动继承指定标签）✓ nodex-cc-2
+- [x] Color Swatch Selector（10 色预置色板 + ColorSwatchPicker + resolveTagColor）✓ nodex-cc-2
 - [ ] Pinned fields（置顶显示 + filter 优先）
 - [ ] Optional fields（建议按钮 + 自动降级）
 - [ ] Convert to supertag（普通节点快捷转 tagDef）

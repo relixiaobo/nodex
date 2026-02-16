@@ -12,7 +12,8 @@
  */
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { BulletChevron } from '../outliner/BulletChevron';
-import { getTagColor } from '../../lib/tag-colors.js';
+import { resolveTagColor } from '../../lib/tag-colors.js';
+import { useNodeStore } from '../../stores/node-store';
 
 export interface NodePickerOption {
   id: string;
@@ -44,6 +45,7 @@ export function NodePicker({
   placeholder = 'Select...',
   isReference = false,
 }: NodePickerProps) {
+  const entities = useNodeStore((s) => s.entities);
   const [open, setOpen] = useState(false);
   const [inputValue, setInputValue] = useState('');
   // Whether the input text is in "selected" state (all text highlighted, next keystroke replaces)
@@ -58,7 +60,7 @@ export function NodePicker({
   }, [options, selectedId]);
 
   const selectedName = selectedOption?.name;
-  const selectedTagDefColor = selectedOption?.isTagDef ? getTagColor(selectedOption.id).text : undefined;
+  const selectedTagDefColor = selectedOption?.isTagDef ? resolveTagColor(entities, selectedOption.id).text : undefined;
 
   // Show all options when: textSelected (reference just opened), empty input,
   // or input matches selectedName exactly (non-reference just opened, not yet typed)
@@ -287,7 +289,7 @@ export function NodePicker({
                     {opt.isTagDef ? (
                       <span
                         className="flex h-[13px] w-[13px] items-center justify-center rounded-full"
-                        style={{ backgroundColor: getTagColor(opt.id).text }}
+                        style={{ backgroundColor: resolveTagColor(entities, opt.id).text }}
                       >
                         <span className="text-[9px] font-bold leading-none text-white select-none">#</span>
                       </span>

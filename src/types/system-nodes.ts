@@ -259,6 +259,8 @@ export const SYS_D = {
   OPTIONS_ALT: 'SYS_D13',
   /** 布尔值 (Yes/No toggle) — Nodex 扩展 */
   BOOLEAN: 'NDX_D01',
+  /** 颜色 (Color swatch picker) — Nodex 扩展 */
+  COLOR: 'NDX_D02',
 } as const;
 
 export type SystemDataType = typeof SYS_D[keyof typeof SYS_D];

@@ -71,11 +71,9 @@ interface OutlinerItemProps {
   onNavigateOut?: (direction: 'up' | 'down') => void;
   /** Owner tag color: tints the bullet dot in this color (template items in config page) */
   bulletColor?: string;
-  /** Depth of the selecting ancestor — used for left-aligning child highlights with parent */
-  ancestorSelectedDepth?: number;
 }
 
-export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId, fieldDataType, attrDefId, onNavigateOut, bulletColor, ancestorSelectedDepth }: OutlinerItemProps) {
+export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId, fieldDataType, attrDefId, onNavigateOut, bulletColor }: OutlinerItemProps) {
   const node = useNode(nodeId);
   const expandKey = `${parentId}:${nodeId}`;
   const isExpanded = useUIStore((s) => s.expandedNodes.has(`${parentId}:${nodeId}`));
@@ -246,12 +244,8 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     selectedParentId === parentId
   );
 
-  // Per-row highlight: shown when directly selected OR covered by a selected ancestor
-  const showHighlight = (isSelected || ancestorSelectedDepth != null) && !isFocused;
-  // Left alignment: child highlights align with the selecting ancestor's position
-  const highlightLeft = (ancestorSelectedDepth != null && !isSelected)
-    ? ancestorSelectedDepth * 28 + 6 + 15 + 4
-    : depth * 28 + 6 + 15 + 4;
+  // Per-row highlight: only for directly selected nodes (children use subtree mask)
+  const showRowHighlight = isSelected && !isFocused;
 
   // Options field dropdown (for changing selected option value)
   const isOptionsField = fieldDataType === SYS_D.OPTIONS || fieldDataType === SYS_D.OPTIONS_FROM_SUPERTAG;
@@ -1529,11 +1523,11 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
         onDrop={handleDrop}
         onDragEnd={handleDragEnd}
       >
-        {/* Per-row selection highlight: deeper for directly selected, lighter for implicitly selected children */}
-        {showHighlight && (
+        {/* Per-row selection highlight: only directly selected rows */}
+        {showRowHighlight && (
           <div
-            className={`absolute right-0 ${isSelected ? 'bg-selection-row' : 'bg-selection-child'} rounded-sm pointer-events-none`}
-            style={{ left: highlightLeft, top: 1, bottom: 1 }}
+            className="absolute right-0 bg-selection-row rounded-sm pointer-events-none"
+            style={{ left: depth * 28 + 6 + 15 + 4, top: 1, bottom: 1 }}
           />
         )}
         {/* Chevron: 15px zone, visible on row hover only */}
@@ -1797,7 +1791,6 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
                 rootChildIds={rootChildIds}
                 parentId={nodeId}
                 rootNodeId={rootNodeId}
-                ancestorSelectedDepth={isSelected ? depth : ancestorSelectedDepth}
               />
             );
           })}

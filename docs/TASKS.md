@@ -6,7 +6,6 @@
 > - 用户随手记录到「收件箱」，agent 启动时处理（归类到待办或直接处理）
 > - Dev agent 接到任务后，第一步编辑此文件（更新 Agent 状态 + 移动/创建任务到「进行中」）
 > - 任务完成后，nodex merge PR 时移动到「已完成」
-> - 原 GitHub Issue 编号保留为 `(GH#N)` 标注，方便追溯历史
 >
 > **迭代日志规则**：
 > - 每个「进行中」任务带 `迭代日志` 字段（追加式，不删改历史条目）
@@ -36,7 +35,7 @@ _(空)_
 
 ## 进行中
 
-### Checkbox-Options 联动 (GH#20 子任务)
+### Checkbox-Options 联动 (#20 子任务)
 
 - **Owner**: nodex-cc-2
 - **Branch**: _(未 push)_
@@ -45,7 +44,7 @@ _(空)_
 - **Progress**:
   - [ ] Done state mapping — checkbox ↔ Options 字段值双向映射
 - **迭代日志**:
-  - [2026-02-16 nodex-cc-2] 开始 Done state mapping。checkbox 勾选时自动设置 Options 字段值，反之亦然。属于 Supertags 完善 (GH#20) 的子任务。
+  - [2026-02-16 nodex-cc-2] 开始 Done state mapping。checkbox 勾选时自动设置 Options 字段值，反之亦然。属于 Supertags 完善 (#20) 的子任务。
 
 ---
 
@@ -53,7 +52,7 @@ _(空)_
 
 ### P2
 
-#### References 增强 (GH#19)
+#### References 增强 (#19)
 > MVP 已完成（@触发搜索、树引用+内联引用、引用 bullet、删除引用）
 
 - [ ] 反向链接 section（节点底部显示所有引用位置 + 面包屑路径）
@@ -61,7 +60,7 @@ _(空)_
 - [ ] 合并节点（选中重复节点 → 合并 children/tags，更新所有引用）
 - **Spec**: `docs/features/references.md`
 
-#### Supertags 完善 (GH#20)
+#### Supertags 完善 (#20)
 > 基础已完成（#触发、标签应用/移除、配置页、模板字段、TagBadge 右键菜单）
 > 已完成子项：Show as Checkbox、标签继承/Extend Phase 1、applyTag 复制 default content、Color 继承
 
@@ -76,7 +75,7 @@ _(空)_
 - [ ] 标签页（点击 supertag → 显示所有打该标签的节点列表/表格）
 - **Spec**: `docs/features/supertags.md`
 
-#### Fields 全类型 (GH#21)
+#### Fields 全类型 (#21)
 > 基础已完成（>触发、字段名编辑+自动完成、交错渲染、字段值编辑器、配置页）
 > 已完成子项：Options 下拉、Date 选择器、Number/URL/Email 输入、Checkbox、字段隐藏规则、Required 字段、Number Min/Max、值验证、系统字段(8/12)
 
@@ -87,7 +86,7 @@ _(空)_
 - [ ] Merge fields
 - **Spec**: `docs/features/fields.md`
 
-#### Date 节点 & 日记 (GH#22)
+#### Date 节点 & 日记 (#22)
 
 - [ ] 年/月/周/日节点层级（自动生成）
 - [ ] Today 快捷入口（侧栏按钮 + 快捷键 Ctrl+Shift+D）
@@ -95,7 +94,7 @@ _(空)_
 - [ ] 日记模板（#day supertag 配置）
 - [ ] 日期字段链接到日节点
 
-#### 网页剪藏 (GH#30)
+#### 网页剪藏 (#30)
 > 已完成：消息类型定义、Content Script 提取（defuddle）、Background 中转、Sidebar 剪藏按钮、Capture Tab 复制到剪贴板
 
 - [ ] 将捕获数据保存为节点（Supertag Extend 已就绪）
@@ -106,7 +105,7 @@ _(空)_
 - [ ] 保留源 URL 引用
 - **Spec**: `docs/features/web-clipping.md`
 
-#### 撤销与重做 (GH#44)
+#### 撤销与重做 (#44)
 > 已完成：文本编辑撤销（TipTap 内置）、导航撤销（navUndoStack）
 
 - [ ] 创建/删除节点撤销
@@ -116,7 +115,7 @@ _(空)_
 - [ ] 标签/字段操作撤销
 - **Spec**: `docs/features/undo-redo.md`
 
-#### 节点选中 — 后续增强 (GH#47)
+#### 节点选中 — 后续增强 (#47)
 > Phase 1-3 已合并（PR #51）。以下为未覆盖的后续项：
 
 - [ ] Cmd+Shift+D 批量复制
@@ -125,7 +124,7 @@ _(空)_
 
 ### P3
 
-#### Search Nodes / Live Queries (GH#23)
+#### Search Nodes / Live Queries (#23)
 
 - [ ] `?` 触发创建搜索节点（放大镜图标）
 - [ ] 基础搜索操作符（#tag / field 值 / 文本 / 日期）
@@ -134,38 +133,38 @@ _(空)_
 - [ ] 关键词操作符（TODO / DONE / OVERDUE / CREATED LAST X DAYS）
 - [ ] 搜索结果配合视图展示
 
-#### Table View (GH#24)
+#### Table View (#24)
 
 - [ ] 表格视图（行=节点，列=字段）
 - [ ] 列宽调整、列拖拽排序
 - [ ] 列计算（Sum / Avg / Median / Min / Max / Count）
 - [ ] 单元格内直接编辑字段值
 
-#### Filter / Group / Sort 工具栏 (GH#25)
+#### Filter / Group / Sort 工具栏 (#25)
 
 - [ ] 通用视图工具栏（适用于所有视图）
 - [ ] 按字段值过滤
 - [ ] 按字段值分组（Outline / Cards / List 视图）
 - [ ] 多级排序（升序/降序、堆叠排序条件）
 
-#### Cards View (GH#26)
+#### Cards View (#26)
 
 - [ ] 卡片视图
 - [ ] 卡片间拖拽更新字段值
 - [ ] Banner 图片显示
 
-#### Calendar View (GH#27)
+#### Calendar View (#27)
 
 - [ ] 日历视图（按日期字段排列节点）
 - [ ] 日/周/月粒度切换
 - [ ] 拖拽未排期节点到日历添加日期
 
-#### List & Tabs View (GH#28)
+#### List & Tabs View (#28)
 
 - [ ] List 视图（左侧列表 + 右侧详情双面板）
 - [ ] Tabs 视图（顶部 tab 切换内容）
 
-#### 用户认证 — Google 登录 (GH#45)
+#### 用户认证 — Google 登录 (#45)
 > 上线前必需
 
 - [ ] Supabase Auth 配置
@@ -173,7 +172,7 @@ _(空)_
 - [ ] 登录/登出 UI
 - [ ] 工作区绑定
 
-#### Floating Toolbar (GH#46)
+#### Floating Toolbar (#46)
 
 - [ ] TipTap BubbleMenu 集成
 - [ ] 格式按钮（Bold / Italic / Code / Highlight / Strikethrough）
@@ -181,12 +180,12 @@ _(空)_
 - [ ] # Tag 按钮
 - **Spec**: `docs/features/floating-toolbar.md`
 
-#### Slash Command — 后续命令点亮 (GH#48)
+#### Slash Command — 后续命令点亮 (#48)
 > 基线已合并（PR #42）。已完成：SlashCommandExtension + 菜单 UI + Field / Reference / Checkbox / More commands
 
 - [ ] Heading（加粗节点样式）
 - [ ] Paste（剪贴板内容类型判断）
-- [ ] Search node（依赖 Search Node UI GH#23）
+- [ ] Search node（依赖 Search Node UI #23）
 - [ ] Image / file（依赖上传与存储）
 - [ ] Checklist（批量 checkbox）
 - [ ] Start live transcription（语音转写）
@@ -198,19 +197,19 @@ _(空)_
 
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
-| 2026-02-16 | 节点选中 Phase 1-3 — 单选/多选/批量操作/双层高亮 (GH#47) | nodex-cc | #51 |
-| 2026-02-15 | Cmd+Enter 编辑器内切换 Checkbox (GH#43) | — | — |
+| 2026-02-16 | 节点选中 Phase 1-3 — 单选/多选/批量操作/双层高亮 (#47) | nodex-cc | #51 |
+| 2026-02-15 | Cmd+Enter 编辑器内切换 Checkbox (#43) | — | — |
 | 2026-02-14 | Web Clipping 修复 — title sync, field value rendering, attrDef config | nodex-codex | #49 |
-| 2026-02-14 | Node Description 编辑：高度跳动 + Ctrl+I 快捷键 (GH#41) | — | — |
-| 2026-02-13 | 无 child 节点展开后 backspace 删除空子节点并收起 (GH#18) | — | — |
-| 2026-02-13 | @ 创建 reference 对兄弟节点出错 (GH#17) | — | — |
-| 2026-02-13 | 聚焦末尾含 # 或 @ 的 node 时不应触发菜单 (GH#16) | — | — |
-| 2026-02-13 | 光标移动到 inline code 内部时光标消失 (GH#15) | — | — |
-| 2026-02-13 | 长文本 node 失焦时文本布局宽度变窄 (GH#14) | — | — |
-| 2026-02-13 | #tag 与所在行文本垂直居中对齐 (GH#13) | — | — |
-| 2026-02-13 | @ 创建 reference 后光标继续输入应转为 inline reference (GH#12) | — | — |
+| 2026-02-14 | Node Description 编辑：高度跳动 + Ctrl+I 快捷键 (#41) | — | — |
+| 2026-02-13 | 无 child 节点展开后 backspace 删除空子节点并收起 (#18) | — | — |
+| 2026-02-13 | @ 创建 reference 对兄弟节点出错 (#17) | — | — |
+| 2026-02-13 | 聚焦末尾含 # 或 @ 的 node 时不应触发菜单 (#16) | — | — |
+| 2026-02-13 | 光标移动到 inline code 内部时光标消失 (#15) | — | — |
+| 2026-02-13 | 长文本 node 失焦时文本布局宽度变窄 (#14) | — | — |
+| 2026-02-13 | #tag 与所在行文本垂直居中对齐 (#13) | — | — |
+| 2026-02-13 | @ 创建 reference 后光标继续输入应转为 inline reference (#12) | — | — |
 
 ### 已关闭的远期/非开发任务
 
-以下 issue 在 GH#29-40 范围内已关闭，属远期规划或非当前迭代范围：
-AI Chat (GH#29)、AI 网页辅助 (GH#31)、AI Command Nodes (GH#32)、AI 字段增强 (GH#33)、Supabase 实时同步 (GH#34)、离线模式增强 (GH#35)、导入/导出 (GH#36)、Command Nodes (GH#37)、Title Expressions (GH#38)、Publishing (GH#39)、Input API (GH#40)。
+以下 issue 在 #29-40 范围内已关闭，属远期规划或非当前迭代范围：
+AI Chat (#29)、AI 网页辅助 (#31)、AI Command Nodes (#32)、AI 字段增强 (#33)、Supabase 实时同步 (#34)、离线模式增强 (#35)、导入/导出 (#36)、Command Nodes (#37)、Title Expressions (#38)、Publishing (#39)、Input API (#40)。

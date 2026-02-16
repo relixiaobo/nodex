@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import type { Editor } from '@tiptap/react';
 import { BubbleMenu } from '@tiptap/react/menus';
 import { Bold, Check, Code2, Heading, Highlighter, Italic, Link2, Strikethrough, Unlink, X } from 'lucide-react';
@@ -32,10 +32,10 @@ function ToolbarButton({ title, active = false, onClick, children }: ToolbarButt
     <button
       type="button"
       title={title}
-      className={`flex h-7 w-7 items-center justify-center rounded-md ${
+      className={`flex h-7 w-7 items-center justify-center rounded-md transition-colors duration-150 ${
         active
-          ? 'bg-accent text-foreground'
-          : 'text-foreground-secondary hover:bg-accent hover:text-foreground'
+          ? 'bg-foreground/8 text-foreground'
+          : 'text-foreground-secondary hover:bg-foreground/5 hover:text-foreground'
       }`}
       onMouseDown={(event) => event.preventDefault()}
       onClick={onClick}
@@ -53,12 +53,14 @@ export function FloatingToolbar({ editor }: FloatingToolbarProps) {
 
   useEffect(() => {
     const rerender = () => setRenderTick((value) => value + 1);
+    // Only listen to selectionUpdate and blur — NOT transaction.
+    // BubbleMenu dispatches transactions internally (updateOptions meta),
+    // so listening to 'transaction' creates an infinite render loop:
+    // render → new shouldShow/options refs → BubbleMenu dispatches tx → rerender → repeat.
     editor.on('selectionUpdate', rerender);
-    editor.on('transaction', rerender);
     editor.on('blur', rerender);
     return () => {
       editor.off('selectionUpdate', rerender);
-      editor.off('transaction', rerender);
       editor.off('blur', rerender);
     };
   }, [editor]);
@@ -122,19 +124,30 @@ export function FloatingToolbar({ editor }: FloatingToolbarProps) {
     }
   };
 
+  // Memoize BubbleMenu props to prevent infinite render loops.
+  // BubbleMenu's useEffect dispatches transactions when these references change,
+  // which would re-trigger our selectionUpdate listener → setState → re-render.
+  const shouldShow = useCallback(
+    ({ editor: currentEditor, from, to }: { editor: Editor; from: number; to: number }) =>
+      currentEditor.isFocused && from !== to,
+    [],
+  );
+
+  const bubbleMenuOptions = useMemo(() => ({
+    placement: 'top' as const,
+    strategy: 'fixed' as const,
+    offset: 8,
+  }), []);
+
   return (
     <BubbleMenu
       editor={editor}
       updateDelay={0}
-      shouldShow={({ editor: currentEditor, from, to }) => currentEditor.isFocused && from !== to}
-      options={{
-        placement: 'top',
-        strategy: 'fixed',
-        offset: 8,
-      }}
+      shouldShow={shouldShow}
+      options={bubbleMenuOptions}
     >
       <div
-        className="flex items-center gap-0.5 rounded-lg border border-border bg-popover p-1 shadow-md"
+        className="flex items-center gap-0.5 rounded-lg border border-border bg-popover p-1 shadow-lg"
         onMouseDown={(event) => event.preventDefault()}
       >
         {editingLink ? (
@@ -146,12 +159,12 @@ export function FloatingToolbar({ editor }: FloatingToolbarProps) {
               onChange={(event) => setLinkDraft(event.target.value)}
               onKeyDown={handleLinkInputKeyDown}
               placeholder="https://example.com"
-              className="h-7 w-56 rounded-md border border-border bg-background px-2 text-xs text-foreground outline-none focus:ring-1 focus:ring-ring"
+              className="h-7 w-56 rounded-md border border-border bg-background px-2 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/40"
             />
             <button
               type="button"
               title="Apply link"
-              className="flex h-7 w-7 items-center justify-center rounded-md text-foreground-secondary hover:bg-accent hover:text-foreground"
+              className="flex h-7 w-7 items-center justify-center rounded-md text-foreground-secondary transition-colors duration-150 hover:bg-foreground/5 hover:text-foreground"
               onMouseDown={(event) => event.preventDefault()}
               onClick={applyLink}
             >
@@ -160,7 +173,7 @@ export function FloatingToolbar({ editor }: FloatingToolbarProps) {
             <button
               type="button"
               title="Cancel"
-              className="flex h-7 w-7 items-center justify-center rounded-md text-foreground-secondary hover:bg-accent hover:text-foreground"
+              className="flex h-7 w-7 items-center justify-center rounded-md text-foreground-secondary transition-colors duration-150 hover:bg-foreground/5 hover:text-foreground"
               onMouseDown={(event) => event.preventDefault()}
               onClick={() => setEditingLink(false)}
             >
@@ -170,7 +183,7 @@ export function FloatingToolbar({ editor }: FloatingToolbarProps) {
               <button
                 type="button"
                 title="Remove link"
-                className="flex h-7 w-7 items-center justify-center rounded-md text-foreground-secondary hover:bg-accent hover:text-foreground"
+                className="flex h-7 w-7 items-center justify-center rounded-md text-foreground-secondary transition-colors duration-150 hover:bg-foreground/5 hover:text-foreground"
                 onMouseDown={(event) => event.preventDefault()}
                 onClick={removeLink}
               >

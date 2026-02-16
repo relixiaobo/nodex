@@ -171,6 +171,13 @@ _(空)_
 - [x] TipTap BubbleMenu 集成 ✓ PR #55
 - [x] 格式按钮（Bold / Italic / Code / Highlight / Strikethrough / Heading） ✓ PR #55
 - [x] Link 编辑弹窗 ✓ PR #55
+- [ ] **BUG: BubbleMenu 无限渲染循环 — 选中文字后浮动工具栏不出现**
+  - 根因：`FloatingToolbar.tsx` 中 `editor.on('transaction', rerender)` 与 BubbleMenu 内部 `updateOptions` transaction 形成无限循环，触发数百次 "Maximum update depth exceeded" 错误，导致 BubbleMenu 组件静默崩溃
+  - 修复方案（已验证可行，未提交）：
+    1. 移除 `transaction` 事件监听（只保留 `selectionUpdate` + `blur`）
+    2. `useCallback` 包裹 `shouldShow`，`useMemo` 包裹 `options` — 防止引用变化触发 BubbleMenu useEffect
+  - 同时需合入的设计系统合规修复（已改好）：`shadow-lg`、`focus:ring-2 ring-primary/40`、`hover:bg-foreground/5`、inline mark 样式（`<s>` opacity、`<code>` border-radius、`<mark>` dark mode）
+  - 涉及文件：`src/components/editor/FloatingToolbar.tsx`、`src/assets/main.css`
 - [ ] @ Reference 按钮
 - [ ] # Tag 按钮
 - **Spec**: `docs/features/floating-toolbar.md`

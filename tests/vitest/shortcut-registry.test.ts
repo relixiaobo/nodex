@@ -124,6 +124,9 @@ describe('shortcut-registry', () => {
     const ctrlShift = new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, shiftKey: true });
     expect(matchesShortcutEvent(ctrlShift, 'Ctrl+Shift+z')).toBe(true);
 
+    const ctrlUpperI = new KeyboardEvent('keydown', { key: 'I', ctrlKey: true });
+    expect(matchesShortcutEvent(ctrlUpperI, 'Ctrl-i')).toBe(true);
+
     const commandI = new KeyboardEvent('keydown', { key: 'i', metaKey: true });
     expect(matchesShortcutEvent(commandI, 'Command-i')).toBe(true);
 

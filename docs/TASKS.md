@@ -35,27 +35,7 @@ _(空)_
 
 ## 进行中
 
-### Ctrl+I Description 切换修复
-
-- **Owner**: nodex-codex
-- **Branch**: codex/fix-ctrl-i-description-toggle
-- **Files**: `src/components/outliner/OutlinerItem.tsx`, `src/components/editor/NodeEditor.tsx`
-- **期望行为**:
-  1. 聚焦一个节点，按 Ctrl+I → 打开 description 编辑（如无 description 则显示空 contentEditable）
-  2. 在 description 编辑中再按 Ctrl+I → 保存 description、关闭编辑、**光标返回 name editor 之前的位置**
-  3. 如果 description 为空则不保存（即取消添加）
-- **当前状态（未生效）**:
-  - `handleDescriptionEdit`（~line 406）已改为 toggle（`!prev`）— commit d78043c
-  - `handleDescriptionKeyDown`（~line 347）已添加 Ctrl+I 分支，调用 `descriptionRef.current?.blur()` + `requestAnimationFrame(() => editorRef.current?.commands.focus('end'))` — commit cb5eb53
-  - **问题**：用户测试报告按第二次 Ctrl+I 无反应，description 未关闭，光标未返回
-- **排查方向**:
-  - 确认 `handleDescriptionKeyDown` 是否正确绑定到 description 的 contentEditable（onKeyDown prop）
-  - 确认 `e.ctrlKey` 在 Mac 上的行为（Mac 上物理 Ctrl 键 → `e.ctrlKey=true`，Cmd 键 → `e.metaKey=true`）
-  - 确认 blur 后 `handleDescriptionBlur` 是否被触发、`setEditingDescription(false)` 是否执行
-  - 可能需要用 `console.log` 确认事件流
-- **迭代日志**:
-  - [2026-02-16 nodex] 创建任务。已有 3 个 commit（d32e106 Cmd+I italic 分离, d78043c toggle, cb5eb53 Ctrl+I in description）。用户测试未生效，交 codex 排查。
-  - [2026-02-16 nodex-codex] 切换到独立分支 `codex/fix-ctrl-i-description-toggle`，开始修复并走 Draft PR 流程以避免并行冲突。
+_(空)_
 
 ---
 
@@ -212,6 +192,7 @@ _(空)_
 
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
+| 2026-02-16 | Ctrl+I Description 切换修复 — registry 匹配 + 光标位置恢复 | nodex-codex | #56 |
 | 2026-02-16 | Supertags + Fields 增强批次 — Default Child Supertag + Color Swatch + Options from Supertag (#20+#21) | nodex-cc-2 | main |
 | 2026-02-16 | 文本格式化 — Floating Toolbar + Heading Mark + Link 编辑 (#46+#48) | nodex-codex | #55 |
 | 2026-02-16 | 节点选中 UI 设计系统合规检查 + reference 修复 + drag-select 重构 (#52) | nodex-cc | #53 |

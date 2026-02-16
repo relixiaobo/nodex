@@ -51,6 +51,7 @@ _(空)_
 - **迭代日志**:
   - [2026-02-16 nodex-codex] 认领任务，更新 TASKS，准备创建分支与 Draft PR。
   - [2026-02-16 nodex-codex] 确认代码中修复逻辑已在主干（去掉 transaction 监听 + 稳定 BubbleMenu props），补充 `floating-toolbar.test.ts` 回归测试并完成全量验证。
+  - [2026-02-16 nodex-codex] 创建并更新 PR #57，状态已转 Ready for review。
 
 ---
 

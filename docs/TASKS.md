@@ -7,6 +7,12 @@
 > - Dev agent 接到任务后，第一步编辑此文件（更新 Agent 状态 + 移动/创建任务到「进行中」）
 > - 任务完成后，nodex merge PR 时移动到「已完成」
 > - 原 GitHub Issue 编号保留为 `(GH#N)` 标注，方便追溯历史
+>
+> **迭代日志规则**：
+> - 每个「进行中」任务带 `迭代日志` 字段（追加式，不删改历史条目）
+> - 格式：`[日期 agent-id] 摘要`
+> - 记录：尝试了什么、为什么失败、最终选择了什么方案、关键代码位置
+> - 通用经验教训（非任务特定的）沉淀到 `docs/LESSONS.md`
 
 ---
 
@@ -42,7 +48,9 @@ _(空)_
   - [ ] 选中模式 Enter 回编辑（光标在文本末尾）
   - [ ] 选中模式可打印字符输入（聚焦首个选中节点，字符追加到末尾）
   - [ ] Shift+↑/↓ 从编辑进入选中
-- **Notes**: 基于 Tana 双模式选择范式（编辑模式 ↔ 选中模式）。Phase 1 只做单选，Phase 2/3 在后续任务中。
+- **迭代日志**:
+  - [2026-02-15 nodex-cc] 基于 Tana 双模式选择范式（编辑模式 ↔ 选中模式）开始 Phase 1。选中状态存 ui-store selectedNodeIds Set。Escape 退出编辑和 ↑/↓ 导航基本完成。
+  - [2026-02-16 nodex-cc] 修复 ↑/↓ 导航问题：选中模式下按 ↑/↓ 应退出选中并进入相邻节点编辑。
 
 ### Checkbox-Options 联动 (GH#20 子任务)
 
@@ -52,7 +60,8 @@ _(空)_
 - **Spec**: `docs/features/supertags.md`
 - **Progress**:
   - [ ] Done state mapping — checkbox ↔ Options 字段值双向映射
-- **Notes**: 属于 Supertags 完善 (GH#20) 的子任务。checkbox 勾选时自动设置 Options 字段值，反之亦然。
+- **迭代日志**:
+  - [2026-02-16 nodex-cc-2] 开始 Done state mapping。checkbox 勾选时自动设置 Options 字段值，反之亦然。属于 Supertags 完善 (GH#20) 的子任务。
 
 ---
 

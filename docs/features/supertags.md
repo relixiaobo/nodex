@@ -337,7 +337,7 @@ tagDef_article
 
 | Tana 功能 | 说明 | 优先级 |
 |-----------|------|--------|
-| **Color picker** (色板选择) | 当前 placeholder "Default"，需实现真实色板 swatches | P2 |
+| **Color Swatch Selector** (预置色板) | 预置 10 色 swatch（含 1 个灰色），不开放自由取色。新增 `NDX_D*` Color 数据类型（不复用 Options）。`getTagColor()` 优先读 SYS_A11 配置值，fallback 到哈希。灰色用于 SYS_T* 系统预置标签。 → **进行中 nodex-cc-2** | P2 |
 | **"Add description"** 字段 | 标签描述文本，显示在标签名下方 | P3 |
 | **Building blocks** 折叠面板 | Tag 继承 / Extend Phase 2（传播 + 继承标记 UI） | P2 |
 | **Optional fields** 独立区域 | 与 Default content 分离的可选字段区 | P3 |
@@ -390,6 +390,9 @@ tagDef_article
 | 2026-02-16 | removeField 增加系统配置保护 | tuple key 为 SYS_*/NDX_* 前缀时跳过删除，防止用户误删系统配置字段 |
 | 2026-02-16 | ConfigOutliner 使用 isSystemConfig 标志 | 不再用 dataType 前缀判断，改用 FieldEntry.isSystemConfig 语义标志区分系统配置与用户模板 |
 | 2026-02-16 | DoneMappingEntries 读取 AssociatedData | 统一模型下映射条目从 AssociatedData.children 读取，不再直接读 tuple.children |
+| 2026-02-16 | Color Swatch 预置 10 色（含灰色），不开放自由取色 | 设计系统一致性 + 避免用户选择不协调颜色；灰色保留给系统预置 supertag（SYS_T*） |
+| 2026-02-16 | Color 使用新增 NDX_D* 数据类型，不复用 Options | Color 是固定色板索引，非用户可编辑选项列表，语义不同 |
+| 2026-02-16 | getTagColor() 优先级：SYS_A11 配置值 → 确定性哈希 fallback | 向后兼容：未配置颜色的标签保持现有哈希行为 |
 
 ## 当前状态
 

@@ -45,11 +45,13 @@ _(空)_
   - [ ] **Default Child Supertag** — SYS_A14 config 字段实现
     - tagDef 配置页已有 placeholder（`control: 'tag_picker'`），需接通 tag picker 选择 + 存储
     - `createNode` 时检查父节点标签的 SYS_A14 配置，自动 `applyTag` 到新节点
-  - [ ] **Color Picker** — 新增 Color 数据类型 + Swatch UI
+  - [ ] **Color Swatch Selector** — 预置 10 色色板 + Swatch UI
     - 当前状态：`control: 'color_picker'` 已注册但无渲染组件；颜色来自 `getTagColor()` 确定性哈希
-    - 需要：新增 `NDX_D*` Color 数据类型（不复用 Options）+ 色板 Swatch 选择器组件
-    - 色板应与 `TAG_COLORS`（tag-colors.ts，10 色）对齐，用户选择后存入 SYS_A11 Tuple value
-    - `getTagColor()` 改为优先读 SYS_A11 配置值，fallback 到哈希
+    - **设计约束**：预置 10 色（含 1 个灰色），不开放自由取色。色值对齐设计系统
+    - 灰色用途：系统预置 supertag（SYS_T*）统一显示为灰色
+    - 需要：新增 `NDX_D*` Color 数据类型（不复用 Options）+ 色板 Swatch 选择器组件（10 个圆点/方块）
+    - 用户选择后存入 SYS_A11 Tuple value（值 = 色板索引或色值标识）
+    - `getTagColor()` 改为：有 SYS_A11 配置 → 用配置值；无配置 → fallback 到哈希
     - TagBadge / BulletChevron / NodePicker 三处颜色源统一
   - [ ] **Options from Supertag** — SYS_D05 字段类型
     - attrDef 配置页 Field type 下拉新增 "Options from supertag" 选项

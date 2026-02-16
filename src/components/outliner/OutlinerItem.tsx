@@ -121,7 +121,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   const editorRef = useRef<Editor | null>(null);
   const blurClearRafRef = useRef<number | null>(null);
   /** Pending focus from mousedown: deferred to mouseup so drag-select can cancel it. */
-  const pendingFocusRef = useRef<{ nodeId: string; parentId: string; x: number; y: number } | null>(null);
+  const pendingFocusRef = useRef<{ nid: string; pid: string; x: number; y: number } | null>(null);
 
   // # trigger state
   const [hashTagOpen, setHashTagOpen] = useState(false);
@@ -758,6 +758,15 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     };
   }, []);
 
+  // Document-level mouseup: clear pendingFocusRef if the content-level mouseup
+  // wasn't reached (e.g., user released mouse outside the text area).
+  useEffect(() => {
+    const clearPending = () => { pendingFocusRef.current = null; };
+    // Use capture=false so it fires after the content-level React handler
+    document.addEventListener('mouseup', clearPending);
+    return () => document.removeEventListener('mouseup', clearPending);
+  }, []);
+
   const handleBlur = useCallback(() => {
     // Reset any open dropdown state so it doesn't persist across focus cycles.
     // Without this, clicking away while dropdown is open → re-focusing the same
@@ -805,6 +814,9 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   // Event order when switching nodes is mousedown → blur/focusout → click; if
   // we wait for click, the first click can be consumed by focus transitions.
   // Capturing textOffset here keeps one-click cursor placement stable.
+  // Defer focus to mouseup so drag-select can take over if the user drags.
+  // Without this, setFocusedNode on mousedown mounts TipTap immediately,
+  // which captures subsequent mouse events and prevents drag-select.
   const handleContentMouseDown = useCallback((e: React.MouseEvent) => {
     if (fieldDataType === SYS_D.CHECKBOX) return;
     const target = e.target as HTMLElement;
@@ -825,41 +837,29 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
 
     if (isReference) return;
 
-    // Defer focus to mouseup so drag-select can take over if the user drags.
-    // Without this, setFocusedNode mounts TipTap immediately on mousedown,
-    // which captures subsequent mouse events and prevents drag-select.
-    pendingFocusRef.current = { nodeId, parentId, x: e.clientX, y: e.clientY };
+    // Record intent; completed on mouseup if no drag-select activates.
+    pendingFocusRef.current = { nid: nodeId, pid: parentId, x: e.clientX, y: e.clientY };
     // Prevent native selection/focus churn on the static HTML layer.
     e.preventDefault();
   }, [isReference, fieldDataType, nodeId, parentId, handleCmdClick, handleShiftClick]);
 
-  // Document-level mouseup to complete deferred focus from handleContentMouseDown.
-  // Must be document-level because the user may release the mouse outside the content div.
-  useEffect(() => {
-    const handleDocMouseUp = () => {
-      const pending = pendingFocusRef.current;
-      pendingFocusRef.current = null;
-      if (!pending) return;
+  const handleContentMouseUp = useCallback((e: React.MouseEvent) => {
+    const pending = pendingFocusRef.current;
+    pendingFocusRef.current = null;
+    if (!pending) return;
 
-      // If drag-select already activated (selection has multiple nodes), don't enter edit mode
-      const uiState = useUIStore.getState();
-      if (uiState.selectedNodeIds.size > 1) return;
-      // If another node got selected during drag, don't enter edit mode on this one
-      if (uiState.selectedNodeIds.size === 1 && !uiState.selectedNodeIds.has(pending.nodeId)) return;
+    // If drag-select activated, don't enter edit mode
+    const uiState = useUIStore.getState();
+    if (uiState.selectedNodeIds.size > 1) return;
 
-      // Find the content container for text offset calculation
-      const row = rowRef.current;
-      const container = row?.querySelector('.text-sm') as HTMLElement | null;
-      const textOffset = container ? getTextOffsetFromPoint(container, pending.x, pending.y) : null;
-      useUIStore.getState().setFocusClickCoords(
-        textOffset !== null
-          ? { nodeId: pending.nodeId, parentId: pending.parentId, textOffset }
-          : null,
-      );
-      setFocusedNode(pending.nodeId, pending.parentId);
-    };
-    document.addEventListener('mouseup', handleDocMouseUp);
-    return () => document.removeEventListener('mouseup', handleDocMouseUp);
+    const container = e.currentTarget as HTMLElement;
+    const textOffset = getTextOffsetFromPoint(container, pending.x, pending.y);
+    useUIStore.getState().setFocusClickCoords(
+      textOffset !== null
+        ? { nodeId: pending.nid, parentId: pending.pid, textOffset }
+        : null,
+    );
+    setFocusedNode(pending.nid, pending.pid);
   }, [setFocusedNode]);
 
   const handleContentClick = useCallback((e: React.MouseEvent) => {
@@ -1579,6 +1579,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
           <div
             className={`text-sm leading-[21px] ${fieldDataType !== SYS_D.CHECKBOX && !isFocused ? (isReference ? 'cursor-default' : 'cursor-text') : ''}`}
             onMouseDown={fieldDataType !== SYS_D.CHECKBOX && !isFocused ? handleContentMouseDown : undefined}
+            onMouseUp={fieldDataType !== SYS_D.CHECKBOX && !isFocused ? handleContentMouseUp : undefined}
             onClick={fieldDataType !== SYS_D.CHECKBOX && !isFocused ? handleContentClick : undefined}
             onDoubleClick={fieldDataType !== SYS_D.CHECKBOX && !isFocused && isReference ? handleContentDoubleClick : undefined}
           >

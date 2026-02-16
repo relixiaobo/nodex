@@ -596,24 +596,12 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
 
       if (selAction === 'batch_checkbox') {
         if (!userId) return;
-        const storeEntities = useNodeStore.getState().entities;
         const latestUi = useUIStore.getState();
         const ids = [...latestUi.selectedNodeIds];
-        // Determine target: any undone → make all done; all done → make all undone
-        const allDone = ids.every((id) => {
-          const d = storeEntities[id]?.props._done;
-          return d !== undefined && d > 0;
-        });
+        // 3-state cycle per node: No → Undone → Done → No (manual)
+        //                         Undone → Done → Undone (tag-driven)
         for (const id of ids) {
-          const d = storeEntities[id]?.props._done;
-          const isDone = d !== undefined && d > 0;
-          if (allDone) {
-            // All done → toggle each to undone
-            toggleNodeDone(id, userId);
-          } else if (!isDone) {
-            // Some undone → toggle only the undone ones to done
-            toggleNodeDone(id, userId);
-          }
+          cycleNodeCheckbox(id, userId);
         }
         // Keep selection (don't clear)
         return;
@@ -1534,7 +1522,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
         {isSelected && !isFocused && (
           <div
             className="absolute top-0 bottom-0 right-0 bg-selection-row rounded-md pointer-events-none"
-            style={{ left: 15 + 4 }}
+            style={{ left: depth * 28 + 6 + 15 + 4 }}
           />
         )}
         {/* Chevron: 15px zone, visible on row hover only */}

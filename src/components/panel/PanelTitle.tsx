@@ -11,6 +11,7 @@ import { useNode } from '../../hooks/use-node';
 import { useNodeStore } from '../../stores/node-store';
 import { useWorkspaceStore } from '../../stores/workspace-store';
 import { resolveDataType, getFieldTypeIcon } from '../../lib/field-utils.js';
+import { resolveTagColor } from '../../lib/tag-colors.js';
 import { TagBar } from '../tags/TagBar';
 import { NodeDescription } from './NodeDescription';
 
@@ -25,10 +26,16 @@ export function PanelTitle({ nodeId, onTitleRef }: PanelTitleProps) {
   const userId = useWorkspaceStore((s) => s.userId) ?? 'local';
 
   const isAttrDef = node?.props._docType === 'attrDef';
+  const isTagDef = node?.props._docType === 'tagDef';
   const dataType = useNodeStore((s) =>
     isAttrDef ? resolveDataType(s.entities, nodeId) : '',
   );
   const FieldIcon = isAttrDef ? getFieldTypeIcon(dataType) : null;
+
+  // TagDef: colored # badge reflecting configured SYS_A11 color
+  const tagDefColor = useNodeStore((s) =>
+    isTagDef ? resolveTagColor(s.entities, nodeId) : null,
+  );
 
   const rawName = node?.props.name ?? '';
   const displayName = rawName.replace(/<[^>]+>/g, '') || '';
@@ -86,6 +93,14 @@ export function PanelTitle({ nodeId, onTitleRef }: PanelTitleProps) {
   return (
     <div className="px-4 pt-3 pb-1">
       <div className="flex items-start gap-2">
+        {isTagDef && tagDefColor && (
+          <span
+            className="shrink-0 mt-0.5 flex h-7 w-7 items-center justify-center rounded-full"
+            style={{ backgroundColor: tagDefColor.bg }}
+          >
+            <span className="text-sm font-bold select-none" style={{ color: tagDefColor.text }}>#</span>
+          </span>
+        )}
         {FieldIcon && (
           <span className="shrink-0 mt-1.5 text-foreground-tertiary">
             <FieldIcon size={16} />

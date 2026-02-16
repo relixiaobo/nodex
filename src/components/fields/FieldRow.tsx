@@ -181,7 +181,9 @@ export function FieldRow({
       if (e.defaultPrevented) return;
       if (e.key === 'Escape') {
         e.preventDefault();
+        // Second Escape: re-enter field name editing so cursor returns
         clearSelection();
+        setEditingFieldName(tupleId);
       } else if (e.key === 'Enter') {
         e.preventDefault();
         clearSelection();

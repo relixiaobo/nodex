@@ -483,7 +483,10 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       e.preventDefault();
 
       if (selAction === 'clear_selection') {
+        // Second Escape: re-enter edit mode on the same node so the cursor
+        // returns to its original position (matching Tana behavior).
         clearSelection();
+        setFocusedNode(nodeId, parentId);
         return;
       }
 

@@ -404,8 +404,10 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   }, [editingDescription, description]);
 
   const handleDescriptionEdit = useCallback(() => {
-    descClickCoordsRef.current = null; // No click coords → cursor at end
-    setEditingDescription(true);
+    setEditingDescription((prev) => {
+      if (!prev) descClickCoordsRef.current = null; // No click coords → cursor at end
+      return !prev;
+    });
   }, []);
 
   // Open options picker when Options-field reference is selected

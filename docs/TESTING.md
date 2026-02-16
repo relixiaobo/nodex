@@ -179,12 +179,13 @@ npm run test:run
 2. 缺失字段时自动创建 tuple + value + associatedData
 3. `addFieldToNode` 去重与 `setOptionsFieldValue` 单选写入
 4. `removeField` 清理 associationMap 并将 tuple/associatedData 移入 Trash
-5. `toggleCheckboxField` 的 `YES/NO` 切换链路
-6. `addUnnamedFieldToNode` 的原地插入（`afterChildId`）与 attrDef 初始化
-7. `autoCollectOption` 的值回填与 autocollect tuple 引用追加
-8. `removeFieldOption` 从 attrDef children 移除并删除 option 节点
-9. `replaceFieldAttrDef` 的占位 attrDef 置换与重复字段保护
-10. `changeFieldType` / `setConfigValue` 配置 tuple 原地更新
+5. `removeField` 系统配置保护：tuple key 为 SYS_*/NDX_* 前缀时跳过删除（防误删 config field）
+6. `toggleCheckboxField` 的 `YES/NO` 切换链路
+7. `addUnnamedFieldToNode` 的原地插入（`afterChildId`）与 attrDef 初始化
+8. `autoCollectOption` 的值回填与 autocollect tuple 引用追加
+9. `removeFieldOption` 从 attrDef children 移除并删除 option 节点
+10. `replaceFieldAttrDef` 的占位 attrDef 置换与重复字段保护
+11. `changeFieldType` / `setConfigValue` 配置 tuple 原地更新
 
 ### 1.9 Schema / Supertag 构建链路
 
@@ -192,9 +193,11 @@ npm run test:run
 
 **覆盖点**:
 
-1. `createTagDef` 自动归属 SCHEMA + 自动应用 `SYS_T01`（5 个直接 config tuple + NDX_A07/A08 嵌套验证）
-2. `createAttrDef` 的 template tuple/type tuple/`SYS_T02` 配置链路
-3. 新建 `attrDef` 在后续 `applyTag` 中被正确实例化到内容节点
+1. `createTagDef` 自动归属 SCHEMA + 自动应用 `SYS_T01`（7 个 config tuple：checkbox/childtag/color/extends/done_mapping/checked/unchecked）
+2. **统一配置字段架构验证**: 所有 config tuple 通过 associationMap 关联 AssociatedData（与用户字段同结构）
+3. Config tuple key 为真实 attrDef 实体节点（`attrDef_show_checkbox` 等），非裸 SYS_A* ID
+4. `createAttrDef` 的 template tuple/type tuple/`SYS_T02` 配置链路（含 AssociatedData 默认值）
+5. 新建 `attrDef` 在后续 `applyTag` 中被正确实例化到内容节点（含 associationMap 验证）
 
 ### 1.10 Supertag Extend（继承）
 
@@ -222,6 +225,8 @@ npm run test:run
 2. `addFieldOption` 仅允许 `attrDef` 目标，非法目标返回空 ID
 3. `removeFieldOption` 仅删除目标 attrDef 挂载的 option，避免误删
 4. `replaceFieldAttrDef` 的 owner/oldAttrDef 一致性保护
+
+**注意**: `removeField` 的系统配置字段保护（SYS_*/NDX_* key guard）在 1.8 node-store-fields 中覆盖。
 
 ### 1.12 Trash 语义（TagDef / AttrDef）
 
@@ -532,9 +537,11 @@ hash trigger cleanup safety（2 cases, Bug #53 回归）:
 4. `getNextEnabledSlashIndex` 仅在 enabled 项间上下移动，边界 clamp
 5. 全部禁用时返回 `-1`
 
-### 1.38 Done State Mapping（checkbox ↔ Options 联动）
+### 1.38 Done State Mapping（checkbox ↔ Options 联动，统一字段模型）
 
 **测试文件**: `tests/vitest/done-state-mapping.test.ts`
+
+**说明**: DoneMappingEntries 从 AssociatedData 读取映射数据（统一配置字段架构）。DoneMappingEntries selectors 使用 JSON.stringify 防止 React 19 无限循环。
 
 **覆盖点**:
 

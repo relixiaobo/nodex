@@ -1496,14 +1496,14 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       {isSelected && !isFocused && isExpanded && (
         <div
           className="absolute top-0 bottom-0 right-0 bg-selection rounded-sm border border-primary/[0.12] pointer-events-none z-0"
-          style={{ left: depth * 28 + 6 + 15 + 4 }}
+          style={{ left: depth * 28 + 6 + 15 }}
         />
       )}
       {/* Drop indicator: before */}
       {isDropTarget && dropPosition === 'before' && (
         <div
           className="h-0.5 bg-primary rounded-full"
-          style={{ marginLeft: depth * 28 + 6 + 15 + 4 }}
+          style={{ marginLeft: depth * 28 + 6 + 15 }}
         />
       )}
       <div
@@ -1527,7 +1527,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
         {showRowHighlight && (
           <div
             className="absolute right-0 bg-selection-row rounded-sm pointer-events-none"
-            style={{ left: depth * 28 + 6 + 15 + 4, top: 1, bottom: 1 }}
+            style={{ left: depth * 28 + 6 + 15, top: 1, bottom: 1 }}
           />
         )}
         {/* Chevron: 15px zone, visible on row hover only */}

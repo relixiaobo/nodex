@@ -30,6 +30,9 @@ class FakeEditor {
   private readonly listeners = new Map<string, Set<Listener>>();
 
   public isFocused = true;
+  public view = {
+    dom: document.createElement('div'),
+  };
 
   public state = {
     selection: {
@@ -92,6 +95,10 @@ describe('FloatingToolbar render-loop guard', () => {
   beforeEach(async () => {
     bubbleMenuPropHistory.length = 0;
     editor = new FakeEditor();
+    const editorTextNode = document.createElement('span');
+    editorTextNode.textContent = 'sample text';
+    editor.view.dom.appendChild(editorTextNode);
+    document.body.appendChild(editor.view.dom);
     container = document.createElement('div');
     document.body.appendChild(container);
     root = createRoot(container);
@@ -109,6 +116,7 @@ describe('FloatingToolbar render-loop guard', () => {
     flushSync(() => {
       root.unmount();
     });
+    editor.view.dom.remove();
     container.remove();
   });
 
@@ -140,5 +148,46 @@ describe('FloatingToolbar render-loop guard', () => {
     });
 
     expect(bubbleMenuPropHistory.length).toBe(before);
+  });
+
+  it('shows toolbar only after pointer selection ends (mouseup)', () => {
+    const shouldShow = bubbleMenuPropHistory.at(-1)!.shouldShow as (
+      args: { editor: Editor; from: number; to: number }
+    ) => boolean;
+    const selection = { editor: editor as unknown as Editor, from: 1, to: 4 };
+
+    expect(shouldShow(selection)).toBe(true);
+
+    flushSync(() => {
+      editor.view.dom.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0 }));
+      editor.emit('selectionUpdate');
+    });
+    expect(shouldShow(selection)).toBe(false);
+
+    flushSync(() => {
+      document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, button: 0 }));
+    });
+    expect(shouldShow(selection)).toBe(true);
+  });
+
+  it('restores toolbar visibility after double-click selection', () => {
+    const shouldShow = bubbleMenuPropHistory.at(-1)!.shouldShow as (
+      args: { editor: Editor; from: number; to: number }
+    ) => boolean;
+    const selection = { editor: editor as unknown as Editor, from: 2, to: 8 };
+
+    flushSync(() => {
+      editor.view.dom.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0 }));
+      document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, button: 0 }));
+      editor.view.dom.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0 }));
+      editor.emit('selectionUpdate');
+    });
+
+    expect(shouldShow(selection)).toBe(false);
+
+    flushSync(() => {
+      document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, button: 0 }));
+    });
+    expect(shouldShow(selection)).toBe(true);
   });
 });

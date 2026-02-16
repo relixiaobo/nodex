@@ -50,18 +50,44 @@ export function FloatingToolbar({ editor }: FloatingToolbarProps) {
   const [editingLink, setEditingLink] = useState(false);
   const [linkDraft, setLinkDraft] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
+  const isPointerSelectingRef = useRef(false);
 
   useEffect(() => {
     const rerender = () => setRenderTick((value) => value + 1);
+    const setPointerSelecting = (next: boolean) => {
+      if (isPointerSelectingRef.current === next) return;
+      isPointerSelectingRef.current = next;
+      rerender();
+    };
+    const handleMouseDown = (event: MouseEvent) => {
+      if (event.button !== 0) return;
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (!editor.view.dom.contains(target)) return;
+      setPointerSelecting(true);
+    };
+    const handleMouseUp = () => {
+      setPointerSelecting(false);
+    };
+    const handleWindowBlur = () => {
+      setPointerSelecting(false);
+    };
+
     // Only listen to selectionUpdate and blur — NOT transaction.
     // BubbleMenu dispatches transactions internally (updateOptions meta),
     // so listening to 'transaction' creates an infinite render loop:
     // render → new shouldShow/options refs → BubbleMenu dispatches tx → rerender → repeat.
     editor.on('selectionUpdate', rerender);
     editor.on('blur', rerender);
+    document.addEventListener('mousedown', handleMouseDown, true);
+    document.addEventListener('mouseup', handleMouseUp, true);
+    window.addEventListener('blur', handleWindowBlur);
     return () => {
       editor.off('selectionUpdate', rerender);
       editor.off('blur', rerender);
+      document.removeEventListener('mousedown', handleMouseDown, true);
+      document.removeEventListener('mouseup', handleMouseUp, true);
+      window.removeEventListener('blur', handleWindowBlur);
     };
   }, [editor]);
 
@@ -128,8 +154,12 @@ export function FloatingToolbar({ editor }: FloatingToolbarProps) {
   // BubbleMenu's useEffect dispatches transactions when these references change,
   // which would re-trigger our selectionUpdate listener → setState → re-render.
   const shouldShow = useCallback(
-    ({ editor: currentEditor, from, to }: { editor: Editor; from: number; to: number }) =>
-      currentEditor.isFocused && from !== to,
+    ({ editor: currentEditor, from, to }: { editor: Editor; from: number; to: number }) => {
+      // Delay toolbar display until pointer selection finishes (mouse up),
+      // so drag-select and double-click don't flash the menu mid-gesture.
+      if (isPointerSelectingRef.current) return false;
+      return currentEditor.isFocused && from !== to;
+    },
     [],
   );
 

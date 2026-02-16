@@ -152,11 +152,21 @@ export function FloatingToolbar({ editor }: FloatingToolbarProps) {
   // BubbleMenu's useEffect dispatches transactions when these references change,
   // which would re-trigger our selectionUpdate listener → setState → re-render.
   const shouldShow = useCallback(
-    ({ editor: currentEditor, from, to }: { editor: Editor; from: number; to: number }) => {
+    ({
+      editor: currentEditor,
+      view,
+      from,
+      to,
+    }: {
+      editor: Editor;
+      view: { hasFocus: () => boolean };
+      from: number;
+      to: number;
+    }) => {
       // Delay toolbar display until pointer selection finishes (mouse up),
       // so drag-select and double-click don't flash the menu mid-gesture.
       if (isPointerSelecting) return false;
-      return currentEditor.isFocused && from !== to;
+      return currentEditor.isEditable && view.hasFocus() && from !== to;
     },
     [isPointerSelecting],
   );

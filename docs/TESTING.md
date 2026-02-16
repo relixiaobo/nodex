@@ -553,6 +553,16 @@ hash trigger cleanup safety（2 cases, Bug #53 回归）:
 1. `toggleHeadingMark` 对选中文本正确写入 `data-heading-mark="true"`
 2. 对同一区间再次 toggle 会移除 heading mark（幂等反向）
 
+### 1.43 Floating Toolbar 循环渲染防回归
+
+**测试文件**: `tests/vitest/floating-toolbar.test.ts`
+
+**覆盖点**:
+
+1. `FloatingToolbar` 仅监听 `selectionUpdate` / `blur`，不监听 `transaction`
+2. `BubbleMenu` 的 `shouldShow` / `options` 在 selection 导致的重渲染后保持同一引用
+3. 触发 `transaction` 事件不会导致 toolbar 额外重渲染（防止无限循环回归）
+
 ### 1.38 Done State Mapping（checkbox ↔ Options 联动，统一字段模型）
 
 **测试文件**: `tests/vitest/done-state-mapping.test.ts`
@@ -803,6 +813,7 @@ createSibling 自动标签（2 cases）:
 | 1.39 | Web Clip 落库服务 | PASS/FAIL |
 | 1.41 | Heading Mark 扩展 | PASS/FAIL |
 | 1.42 | Default Child Supertag (SYS_A14) | PASS/FAIL |
+| 1.43 | Floating Toolbar 循环渲染防回归 | PASS/FAIL |
 | 2 | 视觉渲染 | PASS/FAIL/SKIP |
 | 3 | 扩展构建 | PASS/FAIL |
 

@@ -352,6 +352,14 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       e.preventDefault();
       if (descriptionRef.current) descriptionRef.current.textContent = description;
       setEditingDescription(false);
+    } else if (e.key === 'i' && e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) {
+      // Ctrl+I toggle: save description and return focus to name editor
+      e.preventDefault();
+      descriptionRef.current?.blur(); // triggers handleDescriptionBlur → save + close
+      // Re-focus TipTap editor after React re-render
+      requestAnimationFrame(() => {
+        editorRef.current?.commands.focus('end');
+      });
     }
   }, [description]);
 

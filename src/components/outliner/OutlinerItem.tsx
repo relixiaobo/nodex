@@ -1526,7 +1526,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
         {/* Per-row selection highlight: only directly selected rows */}
         {showRowHighlight && (
           <div
-            className="absolute right-0 bg-selection-row rounded-sm pointer-events-none"
+            className="absolute right-0 bg-selection-row rounded-sm border border-primary/[0.15] pointer-events-none"
             style={{ left: depth * 28 + 6 + 15, top: 1, bottom: 1 }}
           />
         )}

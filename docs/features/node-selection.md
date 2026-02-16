@@ -264,8 +264,8 @@ selectionAnchorId: string | null;   // 范围选中 / Shift+Arrow 的锚点
 
 两层叠加实现 Tana 风格的选中视觉：
 
-1. **子树遮罩**：`--selection` (`rgba(139,92,246,0.10)`) + `border border-primary/[0.12]`，仅展开时显示，覆盖整个子树区域，子节点作为连续整体
-2. **直接行高亮**：`--selection-row` (`rgba(139,92,246,0.18)`)，仅覆盖直接选中的行
+1. **子树遮罩**：`--selection` (`rgba(139,92,246,0.08)`) + `border border-primary/[0.12]`，仅展开时显示，覆盖整个子树区域，子节点作为连续整体
+2. **直接行高亮**：`--selection-row` (`#E8E0FA` 不透明) + `border border-primary/[0.15]`，仅覆盖直接选中的行，不透明色避免与子树遮罩叠加，边框营造荧光感
 
 > 行高亮有 1px 垂直内缩 (`top: 1; bottom: 1`)，相邻直接选中行之间有可见间隙。
 

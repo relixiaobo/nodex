@@ -38,6 +38,7 @@
 | `docs/features/floating-toolbar.md` | 文本选区浮动工具栏 |
 | `docs/features/web-clipping.md` | 网页剪藏能力与数据写入策略 |
 | `docs/features/ai-chat-agent-gateway.md` | AI Chat / Agent 网关、双模式密钥与上下文分层 |
+| `docs/features/command-nodes.md` | Command Nodes（AI 命令节点）设计方向 |
 
 ## 5. 使用建议
 

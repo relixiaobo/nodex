@@ -337,6 +337,17 @@ ViewDef Metanode:
 - 适用于 Outline / Cards / List 视图
 - Table 视图中分组表现为行间分隔符
 
+**数据模型**：
+
+Group 配置作为 Tuple 存储在 ViewDef 的 Metanode 中（与 Filter/Sort 对称）：
+
+```
+ViewDef Metanode:
+  └── Tuple [NDX_A_GROUP_FIELD, fieldDefId]   ← 分组字段
+```
+
+> 注：`NDX_A_GROUP_FIELD` 系统常量待分配。Tana 导出数据中未发现 Group 专用 SYS_A 常量，推测 Tana 使用客户端状态或未导出的属性。Nodex 自定义此常量以保持 Tuple 存储一致性。
+
 ### Sort（排序）
 
 按字段值排序节点。
@@ -371,6 +382,21 @@ SearchNode Metanode:
 ```
 
 这意味着搜索节点 + Table 视图 = 类似 Notion Database 的体验。详见 `docs/features/search.md`。
+
+## 设计原则
+
+> **Filter/Sort/Group 是持久化节点数据，不是临时 UI 状态。**
+
+实现时的硬约束：
+
+1. **不要**把 Filter/Sort/Group 存为 React state 或 Zustand 临时状态。它们必须是 ViewDef 关联的 Tuple 节点，随 ViewDef 一起持久化
+2. 视图切换时，新视图的 Filter/Sort/Group 从新 ViewDef 的 Tuple 加载，旧视图的配置自然保留在旧 ViewDef 上
+3. 搜索节点的 Filter 与普通节点的 Filter 共享同一数据模型（都是 Tuple），不需要两套实现
+4. ViewDef 可通过 supertag 模板继承 — tagDef 模板中的 `[SYS_A16, viewDefId]` Tuple 在标签应用时实例化，实例 ViewDef 的 Filter/Sort/Group Tuple 继承模板的默认配置
+
+详见 `docs/features/data-model.md` § 设计守则 1-2。
+
+---
 
 ## 实现考量
 
@@ -458,5 +484,8 @@ ViewContainer 负责：
 | 2026-02-14 | 不实现 Side Menu 视图 | Chrome Side Panel 本身就是侧栏，Side Menu 视图功能重叠 |
 | 2026-02-14 | Calendar 依赖日期节点 | 需要先完成 #22 Date 节点才能确定日历定位字段 |
 | 2026-02-14 | 合并 5 种视图 + Filter/Group/Sort 为一份文档 | 它们是同一个系统的不同维度，分开文档会导致重复描述数据模型 |
+| 2026-02-16 | Filter/Sort/Group 必须是 ViewDef 的 Tuple，不是 UI 状态 | "一切皆节点"守则；确保视图切换自动保存/恢复配置 |
+| 2026-02-16 | Group By 使用 `NDX_A_GROUP_FIELD` Tuple 存储 | 与 Filter(SYS_A18)/Sort(SYS_A19+20) 对称；Tana 无导出对应常量 |
+| 2026-02-16 | 视图配置可通过 supertag 模板继承 | tagDef 模板中定义默认视图 → 应用标签时实例化 |
 | 2026-02-14 | 目标阶段聚焦 Outline + Table + Cards | 截图分析后确认：Table 在窄屏可用（横向滚动），Cards 2列适配良好；Calendar/List/Tabs 在 300-700px 宽度下体验受限 |
 | 2026-02-14 | Tabs 视图确认为 flow/wrap 文本块布局 | 截图确认非传统 tab 切换，而是 inline 文本块排列，使用场景窄 |

@@ -29,7 +29,7 @@ _(空)_
 |-------|---------|------|-------------|
 | nodex-cc | — | — | — |
 | nodex-cc-2 | Supertags + Fields 增强（#20+#21 批次） | _(待创建)_ | node-store.ts, field-utils.ts, tag-colors.ts |
-| nodex-codex | 文本格式化补齐（#46+#48 Heading） | _(待创建，codex/text-formatting)_ | NodeEditor.tsx, FloatingToolbar.tsx(新), main.css |
+| nodex-codex | — | — | — |
 
 ---
 
@@ -59,31 +59,6 @@ _(空)_
     - OptionsPicker 查询逻辑改造：从"预定义 Options 列表"扩展到"搜索所有打了指定标签的节点"
 - **迭代日志**:
   - [2026-02-16 nodex] 创建任务。承接 PR #54 的 config field 上下文，三个子项可按顺序独立提交。
-
-### 文本格式化补齐（#46 Floating Toolbar + #48 Heading）
-
-- **Owner**: nodex-codex
-- **Branch**: _(待创建，codex/text-formatting)_
-- **Files**: NodeEditor.tsx, FloatingToolbar.tsx(新), SlashCommandMenu.tsx, slash-commands.ts, main.css
-- **Spec**: `docs/features/floating-toolbar.md` + `docs/features/slash-command.md`
-- **核心认知**：Heading 是一种**文本格式 mark**（跟 Bold/Italic/Highlight/Strikethrough 同级），不是结构性 HTML 标题。实现为 TipTap mark extension。
-- **Progress**:
-  - [ ] **Heading mark 实现** — TipTap mark extension（加粗+加大显示）
-    - 当前状态：StarterKit 中 `heading: false` 已禁用。Slash command 菜单已有 `heading` 占位（`enabled: false`）
-    - 实现：新增自定义 mark（非 StarterKit heading），渲染为视觉上加粗/加大的文本
-    - 点亮 slash command `/heading`（从禁用改为可用）
-  - [ ] **Floating Toolbar 组件** — TipTap BubbleMenu 选中文本后浮动工具栏
-    - 安装 `@tiptap/extension-bubble-menu`
-    - FloatingToolbar 组件：6 格式按钮（B / I / S / Code / H / Link）+ toggle 状态
-    - 集成到 NodeEditor 作为子组件
-    - 视觉样式：`bg-popover` + `border` + `shadow-md` + `rounded-lg`，按钮 `h-7 w-7`
-  - [ ] **Link 编辑弹窗** — 点击链接按钮原地展开 URL 输入
-    - 选区无链接：展开 URL 输入框 → Enter 确认
-    - 选区有链接：预填 URL + 修改 + 移除链接按钮
-  - [ ] **Slash command `/heading` 点亮** — 从禁用改为可用
-    - 执行行为：为当前选中文本或整行 toggle heading mark
-- **迭代日志**:
-  - [2026-02-16 nodex] 创建任务。Heading 是文本格式 mark（与 Bold 同级），不是结构性标题。Floating Toolbar 和 Slash Heading 是同一领域（文本格式化），合并为一个任务。
 
 ---
 
@@ -213,11 +188,12 @@ _(空)_
 - [ ] 登录/登出 UI
 - [ ] 工作区绑定
 
-#### Floating Toolbar (#46) → **进行中 nodex-codex**
+#### Floating Toolbar (#46)
+> Phase 1 已完成（PR #55）：BubbleMenu + 7 格式按钮 + Link 原地编辑 + Heading mark
 
-- [ ] TipTap BubbleMenu 集成
-- [ ] 格式按钮（Bold / Italic / Code / Highlight / Strikethrough / Heading）
-- [ ] Link 编辑弹窗
+- [x] TipTap BubbleMenu 集成 ✓ PR #55
+- [x] 格式按钮（Bold / Italic / Code / Highlight / Strikethrough / Heading） ✓ PR #55
+- [x] Link 编辑弹窗 ✓ PR #55
 - [ ] @ Reference 按钮
 - [ ] # Tag 按钮
 - **Spec**: `docs/features/floating-toolbar.md`
@@ -225,7 +201,7 @@ _(空)_
 #### Slash Command — 后续命令点亮 (#48)
 > 基线已合并（PR #42）。已完成：SlashCommandExtension + 菜单 UI + Field / Reference / Checkbox / More commands
 
-- [ ] Heading（文本格式 mark）→ **进行中 nodex-codex**
+- [x] Heading（文本格式 mark） ✓ PR #55
 - [ ] Paste（剪贴板内容类型判断）
 - [ ] Search node（依赖 Search Node UI #23）
 - [ ] Image / file（依赖上传与存储）
@@ -239,6 +215,7 @@ _(空)_
 
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
+| 2026-02-16 | 文本格式化 — Floating Toolbar + Heading Mark + Link 编辑 (#46+#48) | nodex-codex | #55 |
 | 2026-02-16 | 节点选中 UI 设计系统合规检查 + reference 修复 + drag-select 重构 (#52) | nodex-cc | #53 |
 | 2026-02-16 | 统一 config field 架构 + Done state mapping + BOOLEAN 类型 (#20) | nodex-cc-2 | #54 |
 | 2026-02-16 | 节点选中 Phase 1-3 — 单选/多选/批量操作/双层高亮 (#47) | nodex-cc | #51 |

@@ -534,8 +534,18 @@ hash trigger cleanup safety（2 cases, Bug #53 回归）:
 1. `filterSlashCommands` 按命令名和关键词过滤（含 `clip_page`）
 2. 空 query 返回全量基线命令列表（11 项）
 3. `getFirstEnabledSlashIndex` 跳过禁用项返回首个可用索引（`clip_page`）
-4. `getNextEnabledSlashIndex` 仅在 enabled 项间上下移动，边界 clamp
-5. 全部禁用时返回 `-1`
+4. `getNextEnabledSlashIndex` 仅在 enabled 项间上下移动（含 `heading`），边界 clamp
+5. `heading` 命令处于 enabled 状态
+6. 全部禁用时返回 `-1`
+
+### 1.41 Heading Mark 扩展
+
+**测试文件**: `tests/vitest/heading-mark.test.ts`
+
+**覆盖点**:
+
+1. `toggleHeadingMark` 对选中文本正确写入 `data-heading-mark="true"`
+2. 对同一区间再次 toggle 会移除 heading mark（幂等反向）
 
 ### 1.38 Done State Mapping（checkbox ↔ Options 联动，统一字段模型）
 
@@ -763,6 +773,7 @@ applyWebClipToNode（5 cases）:
 | 1.37 | Slash Command 注册与导航 | PASS/FAIL |
 | 1.38 | Done State Mapping | PASS/FAIL |
 | 1.39 | Web Clip 落库服务 | PASS/FAIL |
+| 1.41 | Heading Mark 扩展 | PASS/FAIL |
 | 2 | 视觉渲染 | PASS/FAIL/SKIP |
 | 3 | 扩展构建 | PASS/FAIL |
 

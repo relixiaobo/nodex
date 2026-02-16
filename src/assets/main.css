@@ -81,6 +81,13 @@
   text-decoration: line-through;
 }
 
+.tiptap [data-heading-mark],
+.node-content [data-heading-mark] {
+  font-size: 1.125em;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
 /* Static node display: match editor-inline layout so text doesn't reflow on blur.
    TipTap wraps text in <p> which defaults to display:block; force inline. */
 .node-content p {

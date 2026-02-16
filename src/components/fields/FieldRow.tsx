@@ -18,7 +18,7 @@
  * - Config description: shown below name in name column
  * - Value area: FieldValueOutliner (all types including checkbox)
  */
-import { useCallback, useRef, useMemo } from 'react';
+import { useCallback, useRef, useMemo, useEffect } from 'react';
 import { Trash2 } from 'lucide-react';
 import { useNodeStore } from '../../stores/node-store';
 import { useUIStore } from '../../stores/ui-store';
@@ -80,6 +80,10 @@ export function FieldRow({
   const editingFieldNameId = useUIStore((s) => s.editingFieldNameId);
   const setEditingFieldName = useUIStore((s) => s.setEditingFieldName);
   const setFocusedNode = useUIStore((s) => s.setFocusedNode);
+  // Derive boolean from Set to avoid Zustand infinite re-render (Set creates new reference each time)
+  const isTupleInSelectedSet = useUIStore((s) => s.selectedNodeIds.has(tupleId));
+  const focusedNodeId = useUIStore((s) => s.focusedNodeId);
+  const clearSelection = useUIStore((s) => s.clearSelection);
   const createChild = useNodeStore((s) => s.createChild);
   const removeField = useNodeStore((s) => s.removeField);
   const wsId = useWorkspaceStore((s) => s.currentWorkspaceId);
@@ -98,6 +102,7 @@ export function FieldRow({
   const isConfigField = isTypeChoice || isToggle || isSelect || isAutoCollect || isTagPicker || isColorPicker || isNumberInput;
   const isVirtual = tupleId.startsWith('__virtual_');
   const isEditing = editingFieldNameId === tupleId;
+  const isFieldSelected = isTupleInSelectedSet && !focusedNodeId && !isEditing;
   const configDef = (isConfigField || isVirtual)
     ? ATTRDEF_CONFIG_MAP.get(attrDefId) ?? TAGDEF_CONFIG_MAP.get(attrDefId) ?? ATTRDEF_OUTLINER_FIELDS.find(f => f.key === attrDefId) ?? TAGDEF_OUTLINER_FIELDS.find(f => f.key === attrDefId)
     : undefined;
@@ -169,6 +174,26 @@ export function FieldRow({
     clickOffsetXRef.current = e.clientX - rect.left;
     setEditingFieldName(tupleId);
   }, [tupleId, setEditingFieldName]);
+
+  // Keyboard handler for field-selected state: Escape clears, Enter re-edits
+  useEffect(() => {
+    if (!isFieldSelected) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.defaultPrevented) return;
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        // Second Escape: re-enter field name editing so cursor returns
+        clearSelection();
+        setEditingFieldName(tupleId);
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        clearSelection();
+        setEditingFieldName(tupleId);
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isFieldSelected, tupleId, clearSelection, setEditingFieldName]);
 
   // System fields: read-only name (Enter → create sibling, Backspace → delete field)
   if (isSystemField) {
@@ -277,7 +302,10 @@ export function FieldRow({
 
   // Regular fields: icon + editable name on left, value outliner on right
   return (
-    <div className={`border-t ${isLastInGroup ? 'border-b' : ''} border-border-subtle flex flex-col @sm:flex-row @sm:items-start min-h-[28px]`} data-field-row>
+    <div className={`relative border-t ${isLastInGroup ? 'border-b' : ''} border-border-subtle flex flex-col @sm:flex-row @sm:items-start min-h-[28px]`} data-field-row>
+      {isFieldSelected && (
+        <div className="absolute inset-0 bg-selection rounded-sm ring-1 ring-selection-ring pointer-events-none z-0" />
+      )}
       {/* Name column — aligned to first line of value */}
       <div className="flex items-center gap-1 @sm:shrink-0 @sm:w-[130px] min-w-0 h-7 py-1">
         <button

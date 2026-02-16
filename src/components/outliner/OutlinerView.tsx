@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useNode } from '../../hooks/use-node';
 import { useChildren } from '../../hooks/use-children';
 import { useNodeFields, type FieldEntry } from '../../hooks/use-node-fields';
@@ -7,6 +7,7 @@ import { OutlinerItem } from './OutlinerItem';
 import { FieldRow } from '../fields/FieldRow';
 import { TrailingInput } from '../editor/TrailingInput';
 import { SYS_V } from '../../types/index.js';
+import { useDragSelect } from '../../hooks/use-drag-select.js';
 
 interface OutlinerViewProps {
   rootNodeId: string;
@@ -77,8 +78,12 @@ export function OutlinerView({ rootNodeId, showTemplateTuples }: OutlinerViewPro
   );
   const [revealedFieldIds, setRevealedFieldIds] = useState<Set<string>>(() => new Set());
 
+  // Drag select: document-level mouse tracking for multi-node selection
+  const containerRef = useRef<HTMLDivElement>(null);
+  useDragSelect({ containerRef, rootChildIds: contentChildIds, rootNodeId });
+
   return (
-    <div className="flex flex-col pr-4" role="tree">
+    <div ref={containerRef} className="flex flex-col pr-4" role="tree">
       {/* Hidden field pills: compact clickable chips to temporarily reveal hidden fields */}
       {hiddenRevealableFields.length > 0 && hiddenRevealableFields.some(f => !revealedFieldIds.has(f.id)) && (
         <div className="flex flex-wrap gap-x-3 min-h-7 items-center" style={{ paddingLeft: 6 + 15 + 4 }}>

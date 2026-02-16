@@ -14,10 +14,9 @@ interface TagBadgeProps {
 export function TagBadge({ tagDefId, onRemove, onNavigate }: TagBadgeProps) {
   const tagName = useNodeStore((s) => s.entities[tagDefId]?.props.name ?? 'Untitled');
   const isTrashed = useNodeStore((s) => s.entities[tagDefId]?.props._ownerId?.endsWith('_TRASH') ?? false);
-  const entities = useNodeStore((s) => s.entities);
+  const color = useNodeStore((s) => resolveTagColor(s.entities, tagDefId));
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
-  const color = resolveTagColor(entities, tagDefId);
 
   // Close context menu on outside click or Escape
   useEffect(() => {

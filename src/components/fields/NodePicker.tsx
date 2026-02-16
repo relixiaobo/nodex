@@ -10,10 +10,23 @@
  * ArrowUp/Down navigate, Enter selects, Escape closes, click outside closes.
  * Self-contained bullet layout (pl-6 + BulletChevron + gap-7.5px).
  */
-import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo, memo } from 'react';
 import { BulletChevron } from '../outliner/BulletChevron';
 import { resolveTagColor } from '../../lib/tag-colors.js';
 import { useNodeStore } from '../../stores/node-store';
+
+/** Memoized colored # bullet — subscribes only to the specific tagDef's color config. */
+const TagDefBullet = memo(function TagDefBullet({ tagDefId }: { tagDefId: string }) {
+  const color = useNodeStore((s) => resolveTagColor(s.entities, tagDefId).text);
+  return (
+    <span
+      className="flex h-[13px] w-[13px] items-center justify-center rounded-full"
+      style={{ backgroundColor: color }}
+    >
+      <span className="text-[9px] font-bold leading-none text-white select-none">#</span>
+    </span>
+  );
+});
 
 export interface NodePickerOption {
   id: string;
@@ -45,7 +58,6 @@ export function NodePicker({
   placeholder = 'Select...',
   isReference = false,
 }: NodePickerProps) {
-  const entities = useNodeStore((s) => s.entities);
   const [open, setOpen] = useState(false);
   const [inputValue, setInputValue] = useState('');
   // Whether the input text is in "selected" state (all text highlighted, next keystroke replaces)
@@ -60,7 +72,9 @@ export function NodePicker({
   }, [options, selectedId]);
 
   const selectedName = selectedOption?.name;
-  const selectedTagDefColor = selectedOption?.isTagDef ? resolveTagColor(entities, selectedOption.id).text : undefined;
+  const selectedTagDefColor = useNodeStore((s) =>
+    selectedOption?.isTagDef ? resolveTagColor(s.entities, selectedOption.id).text : undefined,
+  );
 
   // Show all options when: textSelected (reference just opened), empty input,
   // or input matches selectedName exactly (non-reference just opened, not yet typed)
@@ -287,12 +301,7 @@ export function NodePicker({
                 >
                   <span className="flex shrink-0 w-[15px] h-[21px] items-center justify-center">
                     {opt.isTagDef ? (
-                      <span
-                        className="flex h-[13px] w-[13px] items-center justify-center rounded-full"
-                        style={{ backgroundColor: resolveTagColor(entities, opt.id).text }}
-                      >
-                        <span className="text-[9px] font-bold leading-none text-white select-none">#</span>
-                      </span>
+                      <TagDefBullet tagDefId={opt.id} />
                     ) : (
                       <span className="block h-[5px] w-[5px] rounded-full bg-foreground/50" />
                     )}

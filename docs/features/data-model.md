@@ -679,6 +679,124 @@ window.__wsStore     // 工作区 store
 
 ---
 
+## 设计守则：一切皆节点的实践指南
+
+> 以下 6 条守则覆盖近期（P2/P3）和远期功能的关键设计决策。
+> 每条守则的核心问题是：**这个信息该存为节点/Tuple，还是存为 JSON/字符串/UI 状态？答案永远是前者。**
+
+### 守则 1：视图配置 = 节点 + Tuple，不是 JSON
+
+ViewDef 已经是节点（`doc_type: 'viewDef'`），视图配置已通过 `Tuple [SYS_A16, viewDefId]` 存在 Metanode 上。实现时必须遵守：
+
+- **不要**用 JSON blob 存储视图配置（列定义、过滤器、排序规则）
+- **要**让 ViewDef.children 包含列定义 Tuple，Filter/Sort/Group 配置也是 Tuple
+- **视图模板继承**：tagDef 模板可包含 `SYS_A16` Tuple → 应用标签时实例化 → 节点自动获得预配置视图
+
+这意味着视图配置可以被搜索、被引用、被模板化。一个 supertag 可以定义"所有打了 #project 标签的节点默认用 Table 视图"。
+
+详见 `docs/features/views.md`。
+
+### 守则 2：Filter/Sort/Group = ViewDef 的持久化 Tuple，不是临时 UI 状态
+
+三个工具栏操作的配置**必须**存为 ViewDef 关联的 Tuple，而非 React state 或 Zustand 临时状态：
+
+| 操作 | 存储方式 | Tuple Key |
+|------|----------|-----------|
+| Filter | `Tuple [SYS_A18, filterTupleId]` → filterTuple.children = `[fieldDefId, operator, value]` | `SYS_A.FILTER_EXPRESSIONS` |
+| Sort | `Tuple [SYS_A19, direction]` + `Tuple [SYS_A20, fieldDefId]`（多组 = 多级排序） | `SYS_A.SORT_ORDER` + `SYS_A.SORT_FIELD` |
+| Group | `Tuple [NDX_A_GROUP_FIELD, fieldDefId]`（待定义系统常量） | 待分配 |
+
+**关键效果**：
+- 视图切换时，Filter/Sort/Group 自动保存和恢复（跟随 ViewDef 节点）
+- 搜索节点的过滤条件 = 搜索表达式 Tuple 的一部分，不需要额外机制
+- 可以通过 supertag 模板定义"默认过滤/排序规则"
+
+详见 `docs/features/views.md` § Filter / Group / Sort。
+
+### 守则 3：搜索条件 = Tuple 树，不是 DSL 字符串
+
+搜索表达式已设计为 Tuple 树结构：`Tuple [SYS_A15, tagDefId, filterTupleId]`，过滤条件是嵌套 Tuple。**不要**把搜索条件序列化为 DSL 字符串（如 `"#task AND status:TODO"`）。
+
+Tuple 树 vs DSL 字符串的优势：
+
+| 维度 | Tuple 树 | DSL 字符串 |
+|------|----------|-----------|
+| 编辑 | 展开子节点直接编辑 | 需要解析器 + 语法高亮 |
+| 引用 | 条件可被其他搜索引用 | 不可能 |
+| 模板化 | 通过 supertag 模板预定义搜索条件 | 需要额外的模板语言 |
+| 可视化 | Query Builder 直接渲染 Tuple 树 | 需要 DSL → AST → UI 往返转换 |
+| 组合 | AND/OR/NOT = 嵌套 Tuple 父子关系 | 需要解析优先级和括号 |
+
+实现 Query Builder 时，每个条件就是一个 Tuple 节点，逻辑组合通过 Tuple 嵌套表达。
+
+详见 `docs/features/search.md`。
+
+### 守则 4：日期值 = 日节点引用，不是日期字符串
+
+**核心原则**：日期类型字段的值应该是对日节点（`journalPart`）的**引用**，而不是字符串 `"2026-02-16"`。
+
+这让日期成为一等公民：
+- 日期可以挂 children（当天的笔记）
+- 日期可以打 tag（`#day` 标签 + 自定义日记模板）
+- 日期可以加 field（天气、心情等）
+- 点击日期字段值 → navigateTo 日节点
+- Today = navigateTo 今天的日节点
+
+**Tana 的验证**：内联日期引用 `<span data-inlineref-date='{"dateTimeString":"2026-01-26","timezone":"..."}'></span>` 和 Metanode 中的 `[SYS_A169, dateRef]` 都证实日期在 Tana 中是节点引用，不是字符串。
+
+**实现顺序**：先完成日节点层级（year/week/day），再让日期字段值引用日节点。这是 #22 的核心设计约束。
+
+详见 `docs/features/date-nodes.md`。
+
+### 守则 5：剪藏元数据 = Supertag 字段，不是节点属性
+
+已决策：来源 URL 通过 `#web_clip` 的 `Source URL` 字段存储，不用 `NodexNode.sourceUrl` 属性。所有未来新增的剪藏元数据同理：
+
+| 元数据 | 存储方式 | 阶段 |
+|--------|----------|------|
+| Source URL | `Source URL` attrDef（`SYS_D.URL`） | V1 ✅ |
+| Author | `Author` attrDef（`SYS_D.PLAIN`） | V2 |
+| Published At | `Published At` attrDef（`SYS_D.DATE`） | V2 |
+| Site Name | `Site Name` attrDef（`SYS_D.PLAIN`） | V2 |
+| Favicon | `Favicon` attrDef（`SYS_D.URL`） | V2 |
+| Excerpt | `Excerpt` attrDef（`SYS_D.PLAIN`） | V2 |
+
+**待清理**：`NodexNode.sourceUrl` 属性和 DB `source_url` 列已废弃（V1 不再写入），应在后续清理迭代中移除。
+
+**用户可定制**：因为元数据全部是 supertag 字段，用户可以为 `#web_clip` 添加自定义字段（如 "Rating"、"Category"），无需代码变更。
+
+详见 `docs/features/web-clipping.md`。
+
+### 守则 6：Command Nodes = Prompt 模板节点，不是硬编码配置
+
+远期 AI 功能（#32）应遵循"一切皆节点"路线：
+
+```
+CommandNode (doc_type: 'command')
+  ├── props.name: "Summarize"            ← 命令名称
+  ├── props.description: "生成摘要"       ← 命令描述
+  ├── _metaNodeId → Metanode
+  │     └── Tuple [SYS_A160, promptNode] ← AI 指令（prompt 模板）
+  ├── children:
+  │     ├── Tuple [inputAttrDefId, ...]  ← 输入参数（字段定义）
+  │     ├── Tuple [outputAttrDefId, ...] ← 输出配置
+  │     └── 执行结果子节点...            ← 每次执行的结果
+  └── associationMap: { ... }
+```
+
+**关键效果**：
+- Prompt 模板 = 节点内容（可编辑、可引用、可搜索）
+- 输入参数 = 字段 Tuple（复用 Field 体系的渲染和验证）
+- 输出 = children（AI 生成的内容自然成为子节点）
+- 执行历史 = children 列表（时间线式追溯）
+- 命令可被 supertag 模板化（"所有 #meeting 节点自动生成会议纪要"）
+
+这个方向保证 AI 功能不需要独立的配置系统，全部复用现有的节点/字段/标签基础设施。
+
+详见 `docs/features/command-nodes.md`。
+
+---
+
 ## 决策记录
 
 | 日期 | 决策 | 原因 |
@@ -692,3 +810,7 @@ window.__wsStore     // 工作区 store
 | — | 当前前端标签移除会清理模板实例字段 | 与当前 `node-store.removeTag` 行为保持一致 |
 | — | 系统字段用 `NDX_SYS_*` 前缀 | 与 SYS_A* 区分；系统字段不是 Tuple，是客户端派生值 |
 | — | 配置页 = 系统标签模板渲染 | 与 Tana 一致；避免为每种配置创建专门 UI |
+| 2026-02-16 | 新增"设计守则"章节（6 条） | 确保 P2/P3 实现不偏离"一切皆节点"原则 |
+| 2026-02-16 | 日期值 = 日节点引用（非字符串） | 让日期成为可挂 children/tag/field 的一等公民 |
+| 2026-02-16 | Command Nodes = prompt 模板节点 | 远期 AI 功能复用现有节点/字段/标签基础设施 |
+| 2026-02-16 | sourceUrl 属性标记为废弃待清理 | V1 已改用 #web_clip 字段，属性和 DB 列冗余 |

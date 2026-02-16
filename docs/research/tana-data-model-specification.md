@@ -805,6 +805,17 @@ TagDef 的字段模板 Tuple 在标签应用时被实例化到内容节点，通
 ### 15.8 Firebase 实时同步
 基于 Firebase Realtime Database 的乐观并发事务模型，支持多用户实时协作。
 
+### 15.9 Nodex 设计守则（交叉引用）
+
+基于本文档的数据模型分析，Nodex 在 `docs/features/data-model.md` 中确立了 6 条"一切皆节点"设计守则，覆盖：
+
+1. 视图配置 = ViewDef 节点 + Tuple（§10）
+2. Filter/Sort/Group = ViewDef 的持久化 Tuple（§10.2 + §4）
+3. 搜索条件 = Tuple 树，不是 DSL 字符串（§8.2 + §4）
+4. 日期值 = 日节点引用，不是字符串（§9.2）
+5. 剪藏元数据 = Supertag 字段，不是节点属性（§5 + §6）
+6. Command Nodes = Prompt 模板节点（§2.2 `command` docType）
+
 ---
 
 ## 第十六部分：统计概览

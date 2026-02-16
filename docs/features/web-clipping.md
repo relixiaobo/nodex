@@ -136,16 +136,38 @@ clip_node
 - `capturedAt`
 - `sampleHtml`（可选，截断片段）
 
+## 设计原则
+
+> **所有剪藏元数据 = Supertag 字段，不是节点属性。**
+
+V1 已确立此原则（Source URL = attrDef 字段）。V2 新增的元数据**必须**继续走字段路线：
+
+| 元数据 | attrDef | 数据类型 | 阶段 |
+|--------|---------|----------|------|
+| Source URL | `attrDef_source_url` | `SYS_D.URL` | V1 ✅ |
+| Author | `attrDef_author` | `SYS_D.PLAIN` | V2 |
+| Published At | `attrDef_published_at` | `SYS_D.DATE` | V2 |
+| Site Name | `attrDef_site_name` | `SYS_D.PLAIN` | V2 |
+| Favicon | `attrDef_favicon` | `SYS_D.URL` | V2 |
+| Excerpt | `attrDef_excerpt` | `SYS_D.PLAIN` | V2 |
+
+**用户可定制**：因为元数据全部是 supertag 字段，用户可以为 `#web_clip` 添加自定义字段（如 "Rating"、"Category"），无需代码变更。
+
+**待清理**：`NodexNode.sourceUrl` 属性和 DB `source_url` 列已废弃（V1 不再写入）。应在后续清理迭代中移除，避免新代码误用。
+
+详见 `docs/features/data-model.md` § 设计守则 5。
+
 ## 待定事项
 
 - 正文 → 子节点（V2）：提取正文内容转为 outliner 子节点树
 - 子类型标签（V2）：`#article`/`#video`/`#tweet` extend `#web_clip`，auto-detect
-- Author/Published At 字段（V2）：payload 已提取 author/published，待加字段
+- Author/Published At/SiteName/Favicon 字段（V2）：payload 已提取，待创建 attrDef 并加入 tagDef 模板
 - 正文提取优化：`defuddle` 参数调优、站点特化提取规则、失败样本池策略
 - 剪藏模式：全页 / 选中文本 / 简化阅读模式
 - AI 摘要：是否自动写入 `description`
 - 离线队列：无网络时暂存，上线后同步
 - Toast 组件升级：当前复用 sidebar status 文本，后续引入 sonner 等 toast 库
+- **清理 `sourceUrl` 废弃代码**：移除 `NodexNode.sourceUrl` 属性、DB `source_url` 列、`nodeToRow`/`rowToNode` 中的映射
 
 ## 决策记录
 

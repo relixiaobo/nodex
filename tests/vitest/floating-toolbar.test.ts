@@ -30,8 +30,10 @@ class FakeEditor {
   private readonly listeners = new Map<string, Set<Listener>>();
 
   public isFocused = true;
+  public isEditable = true;
   public view = {
     dom: document.createElement('div'),
+    hasFocus: () => this.isFocused,
   };
 
   public state = {
@@ -92,7 +94,7 @@ describe('FloatingToolbar render-loop guard', () => {
   let root: Root;
   let editor: FakeEditor;
   const latestShouldShow = () => bubbleMenuPropHistory.at(-1)!.shouldShow as (
-    args: { editor: Editor; from: number; to: number }
+    args: { editor: Editor; view: { hasFocus: () => boolean }; from: number; to: number }
   ) => boolean;
 
   beforeEach(async () => {
@@ -154,7 +156,7 @@ describe('FloatingToolbar render-loop guard', () => {
   });
 
   it('shows toolbar only after pointer selection ends (mouseup)', () => {
-    const selection = { editor: editor as unknown as Editor, from: 1, to: 4 };
+    const selection = { editor: editor as unknown as Editor, view: editor.view, from: 1, to: 4 };
 
     const beforePointerDown = latestShouldShow();
     expect(beforePointerDown(selection)).toBe(true);
@@ -176,7 +178,7 @@ describe('FloatingToolbar render-loop guard', () => {
   });
 
   it('restores toolbar visibility after double-click selection', () => {
-    const selection = { editor: editor as unknown as Editor, from: 2, to: 8 };
+    const selection = { editor: editor as unknown as Editor, view: editor.view, from: 2, to: 8 };
 
     flushSync(() => {
       editor.view.dom.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0 }));

@@ -293,6 +293,7 @@ npm run test:run
 4. 当前已知冲突快照（`selected_ref.options_cancel` vs `selected_ref.clear_selection` 条件互斥场景）
 5. `findUnexpectedShortcutConflicts` 白名单过滤后的异常冲突探测
 6. `matchesShortcutEvent` 对 `Ctrl+Shift+Z`（`+` 分隔）与 `command/option` 别名兼容
+7. `matchesShortcutEvent` 对字母键大小写归一化（`Ctrl+I` 事件键值为 `I` 时仍匹配 `Ctrl-i`）
 
 ### 1.18 全局导航快捷键拦截保护
 

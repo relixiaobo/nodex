@@ -564,7 +564,7 @@ hash trigger cleanup safety（2 cases, Bug #53 回归）:
 3. 触发 `transaction` 事件不会导致 toolbar 额外重渲染（防止无限循环回归）
 4. 鼠标拖拽选择期间（`mousedown` 到 `mouseup`）`shouldShow=false`，避免中途闪现
 5. `mouseup` 后恢复可见；双击选词场景在第二次 `mouseup` 后可显示 toolbar
-6. `view.input.mouseDown` 异常残留时不会永久阻塞显示（stale failsafe）
+6. `mouseup` 后即使没有新的 `selectionUpdate` 事件，菜单也能恢复显示（防卡住）
 
 ### 1.38 Done State Mapping（checkbox ↔ Options 联动，统一字段模型）
 

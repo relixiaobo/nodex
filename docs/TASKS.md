@@ -29,7 +29,7 @@ _(空)_
 |-------|---------|------|-------------|
 | nodex-cc | — | — | — |
 | nodex-cc-2 | Supertags + Fields 增强（#20+#21 批次） | _(待创建)_ | node-store.ts, field-utils.ts, tag-colors.ts |
-| nodex-codex | 文本格式化补齐（#46+#48 Heading） | codex/text-formatting | NodeEditor.tsx, FloatingToolbar.tsx(新), SlashCommandMenu.tsx, slash-commands.ts, main.css |
+| nodex-codex | 文本格式化补齐（#46+#48 Heading） | codex/text-formatting | NodeEditor.tsx, FloatingToolbar.tsx(新), HeadingMark.ts(新), OutlinerItem.tsx, slash-commands.ts, main.css |
 
 ---
 
@@ -64,27 +64,28 @@ _(空)_
 
 - **Owner**: nodex-codex
 - **Branch**: `codex/text-formatting`
-- **Files**: NodeEditor.tsx, FloatingToolbar.tsx(新), SlashCommandMenu.tsx, slash-commands.ts, main.css
+- **Files**: NodeEditor.tsx, FloatingToolbar.tsx(新), HeadingMark.ts(新), OutlinerItem.tsx, slash-commands.ts, main.css
 - **Spec**: `docs/features/floating-toolbar.md` + `docs/features/slash-command.md`
 - **核心认知**：Heading 是一种**文本格式 mark**（跟 Bold/Italic/Highlight/Strikethrough 同级），不是结构性 HTML 标题。实现为 TipTap mark extension。
 - **Progress**:
-  - [ ] **Heading mark 实现** — TipTap mark extension（加粗+加大显示）
+  - [x] **Heading mark 实现** — TipTap mark extension（加粗+加大显示）
     - 当前状态：StarterKit 中 `heading: false` 已禁用。Slash command 菜单已有 `heading` 占位（`enabled: false`）
     - 实现：新增自定义 mark（非 StarterKit heading），渲染为视觉上加粗/加大的文本
     - 点亮 slash command `/heading`（从禁用改为可用）
-  - [ ] **Floating Toolbar 组件** — TipTap BubbleMenu 选中文本后浮动工具栏
+  - [x] **Floating Toolbar 组件** — TipTap BubbleMenu 选中文本后浮动工具栏
     - 安装 `@tiptap/extension-bubble-menu`
-    - FloatingToolbar 组件：6 格式按钮（B / I / S / Code / H / Link）+ toggle 状态
+    - FloatingToolbar 组件：7 格式按钮（B / I / S / Code / H / T / Link）+ toggle 状态
     - 集成到 NodeEditor 作为子组件
     - 视觉样式：`bg-popover` + `border` + `shadow-md` + `rounded-lg`，按钮 `h-7 w-7`
-  - [ ] **Link 编辑弹窗** — 点击链接按钮原地展开 URL 输入
+  - [x] **Link 编辑弹窗** — 点击链接按钮原地展开 URL 输入
     - 选区无链接：展开 URL 输入框 → Enter 确认
     - 选区有链接：预填 URL + 修改 + 移除链接按钮
-  - [ ] **Slash command `/heading` 点亮** — 从禁用改为可用
+  - [x] **Slash command `/heading` 点亮** — 从禁用改为可用
     - 执行行为：为当前选中文本或整行 toggle heading mark
 - **迭代日志**:
   - [2026-02-16 nodex] 创建任务。Heading 是文本格式 mark（与 Bold 同级），不是结构性标题。Floating Toolbar 和 Slash Heading 是同一领域（文本格式化），合并为一个任务。
   - [2026-02-16 nodex-codex] 接手任务并开始实现。先完成任务认领流程：更新 TASKS、创建分支 `codex/text-formatting`、提交 docs claim commit、创建 Draft PR。
+  - [2026-02-16 nodex-codex] 已完成实现：新增 `HeadingMark` 扩展 + `FloatingToolbar`（BubbleMenu 插件、7 个格式按钮、Link 原地编辑），在 `OutlinerItem` 点亮 `/heading` 并支持“无选区时整行 toggle”；同步更新 `slash-commands` 测试与 `heading-mark` 单测，更新 feature/testing 文档映射。
 
 ---
 

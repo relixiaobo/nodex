@@ -65,7 +65,7 @@ export function ConfigOutliner({ nodeId }: ConfigOutlinerProps) {
     const m = new Map<string, FieldEntry>();
     for (const f of fields) {
       // Skip config fields — those are rendered by FieldList
-      if (f.dataType.startsWith('__')) continue;
+      if (f.isSystemConfig) continue;
       m.set(f.tupleId, f);
     }
     return m;

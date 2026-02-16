@@ -114,9 +114,9 @@ export const SHORTCUT_REGISTRY: ShortcutDefinition[] = [
   {
     id: 'editor.edit_description',
     scope: 'node_editor',
-    keys: ['Mod-i', 'Ctrl-i'],
+    keys: ['Ctrl-i'],
     when: 'NodeEditor focused',
-    action: 'Enter description editing mode',
+    action: 'Enter description editing mode (Ctrl+I on Mac, not Cmd+I which is italic)',
     source: 'src/components/editor/NodeEditor.tsx',
   },
 

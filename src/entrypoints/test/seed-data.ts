@@ -3,6 +3,10 @@
  *
  * Creates a realistic outliner tree with various node types
  * to exercise all outliner interactions.
+ *
+ * Unified config field architecture: config tuples use the same data model
+ * as regular fields (Tuple + AssociatedData). System attrDef nodes (SYS_A, NDX_A)
+ * are created as real attrDef entities, enabling a single rendering path.
  */
 import { useNodeStore } from '../../stores/node-store';
 import { useUIStore } from '../../stores/ui-store';
@@ -36,6 +40,24 @@ function makeNode(
     createdBy: USER_ID,
     updatedBy: USER_ID,
   };
+}
+
+/**
+ * Create a config tuple + AssociatedData pair.
+ * Returns [tuple, assoc] nodes and a mapping entry { tupleId: assocId }.
+ */
+function makeConfigEntry(
+  tupleId: string,
+  owner: string,
+  key: string,
+  value: string | undefined,
+  sourceId?: string,
+): { nodes: NodexNode[]; map: Record<string, string> } {
+  const assocId = `${tupleId}_assoc`;
+  const tuple = makeNode(tupleId, '', owner, [key], 'tuple');
+  if (sourceId) tuple.props._sourceId = sourceId;
+  const assoc = makeNode(assocId, '', owner, value ? [value] : [], 'associatedData');
+  return { nodes: [tuple, assoc], map: { [tupleId]: assocId } };
 }
 
 export function seedTestData() {
@@ -77,6 +99,18 @@ export function seedTestData() {
     makeNode(searchesId, 'Searches', WS_ID, []),
     makeNode(trashId, 'Trash', WS_ID, []),
     makeNode(schemaId, 'Schema', WS_ID, [
+      // System value nodes
+      SYS_V.YES, SYS_V.NO,
+      SYS_D.PLAIN, SYS_D.OPTIONS, SYS_D.OPTIONS_FROM_SUPERTAG, SYS_D.DATE, SYS_D.NUMBER, SYS_D.URL, SYS_D.EMAIL, SYS_D.CHECKBOX, SYS_D.BOOLEAN,
+      SYS_V.NEVER, SYS_V.WHEN_EMPTY, SYS_V.WHEN_NOT_EMPTY, SYS_V.WHEN_VALUE_IS_DEFAULT, SYS_V.ALWAYS,
+      // System attrDef nodes
+      SYS_A.COLOR, SYS_A.EXTENDS, SYS_A.SHOW_CHECKBOX,
+      SYS_A.DONE_STATE_MAPPING, SYS_A.DONE_MAP_CHECKED, SYS_A.DONE_MAP_UNCHECKED,
+      SYS_A.CHILD_SUPERTAG,
+      SYS_A.TYPE_CHOICE, SYS_A.SOURCE_SUPERTAG, SYS_A.AUTOCOLLECT_OPTIONS,
+      SYS_A.AUTO_INITIALIZE, SYS_A.NULLABLE, SYS_A.HIDE_FIELD,
+      SYS_A.MIN_VALUE, SYS_A.MAX_VALUE,
+      // System tag templates + user tagDefs
       'SYS_T01', 'SYS_T02',
       'tagDef_task', 'tagDef_person', 'tagDef_dev_task', 'tagDef_web_clip',
     ]),
@@ -129,7 +163,7 @@ export function seedTestData() {
     makeNode('idea_2', 'Add dark mode support', 'note_2', []),
   ];
 
-  // Person node tagged with Person tag (exercises Email, Company, Age, Website fields)
+  // Person node tagged with Person tag
   const personNodes = [
     {
       ...makeNode('person_1', 'Alice Johnson', libraryId, [
@@ -181,205 +215,339 @@ export function seedTestData() {
     makeNode('j_3', 'Learned about TipTap keyboard shortcuts', 'journal_1', []),
   ];
 
-  // ─── Schema: SYS_T01 + SYS_T02 + TagDef + AttrDef nodes ───
+  // ═══════════════════════════════════════════════════════════════
+  // System value nodes — shared enumerations used by system attrDefs
+  // ═══════════════════════════════════════════════════════════════
 
+  const systemValueNodes: NodexNode[] = [
+    // Boolean enum
+    makeNode(SYS_V.YES, 'Yes', schemaId),
+    makeNode(SYS_V.NO, 'No', schemaId),
+    // Data type enum
+    makeNode(SYS_D.PLAIN, 'Plain', schemaId),
+    makeNode(SYS_D.OPTIONS, 'Options', schemaId),
+    makeNode(SYS_D.OPTIONS_FROM_SUPERTAG, 'Options from supertag', schemaId),
+    makeNode(SYS_D.DATE, 'Date', schemaId),
+    makeNode(SYS_D.NUMBER, 'Number', schemaId),
+    makeNode(SYS_D.URL, 'URL', schemaId),
+    makeNode(SYS_D.EMAIL, 'Email', schemaId),
+    makeNode(SYS_D.CHECKBOX, 'Checkbox', schemaId),
+    makeNode(SYS_D.BOOLEAN, 'Boolean', schemaId),
+    // Hide field enum
+    makeNode(SYS_V.NEVER, 'Never', schemaId),
+    makeNode(SYS_V.WHEN_EMPTY, 'When empty', schemaId),
+    makeNode(SYS_V.WHEN_NOT_EMPTY, 'When not empty', schemaId),
+    makeNode(SYS_V.WHEN_VALUE_IS_DEFAULT, 'When value is default', schemaId),
+    makeNode(SYS_V.ALWAYS, 'Always', schemaId),
+  ];
+
+  // ═══════════════════════════════════════════════════════════════
+  // System attrDef nodes — config fields for tagDef (SYS_T01) and attrDef (SYS_T02)
+  // Each has: _docType='attrDef', children=[type_tuple, ...options], type_tuple=[SYS_A02, dataType]
+  // ═══════════════════════════════════════════════════════════════
+
+  // --- TagDef config attrDefs (SYS_T01 template fields) ---
+
+  // SYS_A11 Color — OPTIONS type (color picker values not yet implemented, placeholder)
+  const sysAttrDefColor: NodexNode[] = [
+    makeNode(SYS_A.COLOR, 'Color', schemaId, [`${SYS_A.COLOR}_type`], 'attrDef'),
+    makeNode(`${SYS_A.COLOR}_type`, '', SYS_A.COLOR, [SYS_A.TYPE_CHOICE, SYS_D.OPTIONS], 'tuple'),
+  ];
+
+  // NDX_A05 Extends — OPTIONS_FROM_SUPERTAG type, source = SYS_T01
+  const sysAttrDefExtends: NodexNode[] = [
+    makeNode(SYS_A.EXTENDS, 'Extend from', schemaId, [`${SYS_A.EXTENDS}_type`, `${SYS_A.EXTENDS}_source`], 'attrDef'),
+    makeNode(`${SYS_A.EXTENDS}_type`, '', SYS_A.EXTENDS, [SYS_A.TYPE_CHOICE, SYS_D.OPTIONS_FROM_SUPERTAG], 'tuple'),
+    makeNode(`${SYS_A.EXTENDS}_source`, '', SYS_A.EXTENDS, [SYS_A.SOURCE_SUPERTAG, SYS_T.SUPERTAG], 'tuple'),
+  ];
+
+  // SYS_A55 Show as checkbox — OPTIONS type [Yes/No]
+  const sysAttrDefCheckbox: NodexNode[] = [
+    makeNode(SYS_A.SHOW_CHECKBOX, 'Show as checkbox', schemaId, [`${SYS_A.SHOW_CHECKBOX}_type`, SYS_V.YES, SYS_V.NO], 'attrDef'),
+    makeNode(`${SYS_A.SHOW_CHECKBOX}_type`, '', SYS_A.SHOW_CHECKBOX, [SYS_A.TYPE_CHOICE, SYS_D.BOOLEAN], 'tuple'),
+  ];
+
+  // NDX_A06 Done state mapping — OPTIONS type [Yes/No]
+  const sysAttrDefDoneMapping: NodexNode[] = [
+    makeNode(SYS_A.DONE_STATE_MAPPING, 'Done state mapping', schemaId, [`${SYS_A.DONE_STATE_MAPPING}_type`, SYS_V.YES, SYS_V.NO], 'attrDef'),
+    makeNode(`${SYS_A.DONE_STATE_MAPPING}_type`, '', SYS_A.DONE_STATE_MAPPING, [SYS_A.TYPE_CHOICE, SYS_D.BOOLEAN], 'tuple'),
+  ];
+
+  // NDX_A07 Map checked to — PLAIN type (entries in AssociatedData)
+  const sysAttrDefDoneChecked: NodexNode[] = [
+    makeNode(SYS_A.DONE_MAP_CHECKED, 'Map checked to', schemaId, [`${SYS_A.DONE_MAP_CHECKED}_type`], 'attrDef'),
+    makeNode(`${SYS_A.DONE_MAP_CHECKED}_type`, '', SYS_A.DONE_MAP_CHECKED, [SYS_A.TYPE_CHOICE, SYS_D.PLAIN], 'tuple'),
+  ];
+
+  // NDX_A08 Map unchecked to — PLAIN type (entries in AssociatedData)
+  const sysAttrDefDoneUnchecked: NodexNode[] = [
+    makeNode(SYS_A.DONE_MAP_UNCHECKED, 'Map unchecked to', schemaId, [`${SYS_A.DONE_MAP_UNCHECKED}_type`], 'attrDef'),
+    makeNode(`${SYS_A.DONE_MAP_UNCHECKED}_type`, '', SYS_A.DONE_MAP_UNCHECKED, [SYS_A.TYPE_CHOICE, SYS_D.PLAIN], 'tuple'),
+  ];
+
+  // SYS_A14 Default child supertag — OPTIONS_FROM_SUPERTAG type, source = SYS_T01
+  const sysAttrDefChildTag: NodexNode[] = [
+    makeNode(SYS_A.CHILD_SUPERTAG, 'Default child supertag', schemaId, [`${SYS_A.CHILD_SUPERTAG}_type`, `${SYS_A.CHILD_SUPERTAG}_source`], 'attrDef'),
+    makeNode(`${SYS_A.CHILD_SUPERTAG}_type`, '', SYS_A.CHILD_SUPERTAG, [SYS_A.TYPE_CHOICE, SYS_D.OPTIONS_FROM_SUPERTAG], 'tuple'),
+    makeNode(`${SYS_A.CHILD_SUPERTAG}_source`, '', SYS_A.CHILD_SUPERTAG, [SYS_A.SOURCE_SUPERTAG, SYS_T.SUPERTAG], 'tuple'),
+  ];
+
+  // --- AttrDef config attrDefs (SYS_T02 template fields) ---
+
+  // SYS_A02 Field type — OPTIONS type [data type enums]
+  const sysAttrDefFieldType: NodexNode[] = [
+    makeNode(SYS_A.TYPE_CHOICE, 'Field type', schemaId, [
+      `${SYS_A.TYPE_CHOICE}_type`,
+      SYS_D.PLAIN, SYS_D.OPTIONS, SYS_D.OPTIONS_FROM_SUPERTAG, SYS_D.DATE, SYS_D.NUMBER, SYS_D.URL, SYS_D.EMAIL, SYS_D.CHECKBOX,
+    ], 'attrDef'),
+    makeNode(`${SYS_A.TYPE_CHOICE}_type`, '', SYS_A.TYPE_CHOICE, [SYS_A.TYPE_CHOICE, SYS_D.OPTIONS], 'tuple'),
+  ];
+
+  // SYS_A06 Source supertag — OPTIONS_FROM_SUPERTAG type, source = SYS_T01
+  const sysAttrDefSourceTag: NodexNode[] = [
+    makeNode(SYS_A.SOURCE_SUPERTAG, 'Source supertag', schemaId, [`${SYS_A.SOURCE_SUPERTAG}_type`, `${SYS_A.SOURCE_SUPERTAG}_source`], 'attrDef'),
+    makeNode(`${SYS_A.SOURCE_SUPERTAG}_type`, '', SYS_A.SOURCE_SUPERTAG, [SYS_A.TYPE_CHOICE, SYS_D.OPTIONS_FROM_SUPERTAG], 'tuple'),
+    makeNode(`${SYS_A.SOURCE_SUPERTAG}_source`, '', SYS_A.SOURCE_SUPERTAG, [SYS_A.SOURCE_SUPERTAG, SYS_T.SUPERTAG], 'tuple'),
+  ];
+
+  // SYS_A44 Auto-collect values — OPTIONS type [Yes/No]
+  const sysAttrDefAutocollect: NodexNode[] = [
+    makeNode(SYS_A.AUTOCOLLECT_OPTIONS, 'Auto-collect values', schemaId, [`${SYS_A.AUTOCOLLECT_OPTIONS}_type`, SYS_V.YES, SYS_V.NO], 'attrDef'),
+    makeNode(`${SYS_A.AUTOCOLLECT_OPTIONS}_type`, '', SYS_A.AUTOCOLLECT_OPTIONS, [SYS_A.TYPE_CHOICE, SYS_D.BOOLEAN], 'tuple'),
+  ];
+
+  // NDX_A02 Auto-initialize — OPTIONS type [Yes/No]
+  const sysAttrDefAutoInit: NodexNode[] = [
+    makeNode(SYS_A.AUTO_INITIALIZE, 'Auto-initialize', schemaId, [`${SYS_A.AUTO_INITIALIZE}_type`, SYS_V.YES, SYS_V.NO], 'attrDef'),
+    makeNode(`${SYS_A.AUTO_INITIALIZE}_type`, '', SYS_A.AUTO_INITIALIZE, [SYS_A.TYPE_CHOICE, SYS_D.BOOLEAN], 'tuple'),
+  ];
+
+  // SYS_A01 Required — OPTIONS type [Yes/No]
+  const sysAttrDefRequired: NodexNode[] = [
+    makeNode(SYS_A.NULLABLE, 'Required', schemaId, [`${SYS_A.NULLABLE}_type`, SYS_V.YES, SYS_V.NO], 'attrDef'),
+    makeNode(`${SYS_A.NULLABLE}_type`, '', SYS_A.NULLABLE, [SYS_A.TYPE_CHOICE, SYS_D.BOOLEAN], 'tuple'),
+  ];
+
+  // NDX_A01 Hide field — OPTIONS type [hide enum values]
+  const sysAttrDefHideField: NodexNode[] = [
+    makeNode(SYS_A.HIDE_FIELD, 'Hide field', schemaId, [
+      `${SYS_A.HIDE_FIELD}_type`,
+      SYS_V.NEVER, SYS_V.WHEN_EMPTY, SYS_V.WHEN_NOT_EMPTY, SYS_V.WHEN_VALUE_IS_DEFAULT, SYS_V.ALWAYS,
+    ], 'attrDef'),
+    makeNode(`${SYS_A.HIDE_FIELD}_type`, '', SYS_A.HIDE_FIELD, [SYS_A.TYPE_CHOICE, SYS_D.OPTIONS], 'tuple'),
+  ];
+
+  // NDX_A03 Minimum value — NUMBER type
+  const sysAttrDefMinValue: NodexNode[] = [
+    makeNode(SYS_A.MIN_VALUE, 'Minimum value', schemaId, [`${SYS_A.MIN_VALUE}_type`], 'attrDef'),
+    makeNode(`${SYS_A.MIN_VALUE}_type`, '', SYS_A.MIN_VALUE, [SYS_A.TYPE_CHOICE, SYS_D.NUMBER], 'tuple'),
+  ];
+
+  // NDX_A04 Maximum value — NUMBER type
+  const sysAttrDefMaxValue: NodexNode[] = [
+    makeNode(SYS_A.MAX_VALUE, 'Maximum value', schemaId, [`${SYS_A.MAX_VALUE}_type`], 'attrDef'),
+    makeNode(`${SYS_A.MAX_VALUE}_type`, '', SYS_A.MAX_VALUE, [SYS_A.TYPE_CHOICE, SYS_D.NUMBER], 'tuple'),
+  ];
+
+  const systemAttrDefNodes: NodexNode[] = [
+    ...sysAttrDefColor, ...sysAttrDefExtends, ...sysAttrDefCheckbox,
+    ...sysAttrDefDoneMapping, ...sysAttrDefDoneChecked, ...sysAttrDefDoneUnchecked,
+    ...sysAttrDefChildTag,
+    ...sysAttrDefFieldType, ...sysAttrDefSourceTag, ...sysAttrDefAutocollect,
+    ...sysAttrDefAutoInit, ...sysAttrDefRequired, ...sysAttrDefHideField,
+    ...sysAttrDefMinValue, ...sysAttrDefMaxValue,
+  ];
+
+  // ═══════════════════════════════════════════════════════════════
   // SYS_T01 (Supertag) — system tag for tagDef config pages
+  // Template tuples reference system attrDef IDs as keys
+  // ═══════════════════════════════════════════════════════════════
+
   const sysT01Nodes: NodexNode[] = [
     makeNode('SYS_T01', 'Supertag', schemaId, [
-      'sysT01_tpl_checkbox', 'sysT01_tpl_childtag', 'sysT01_tpl_color', 'sysT01_tpl_extends',
+      'sysT01_tpl_color', 'sysT01_tpl_extends', 'sysT01_tpl_checkbox',
+      'sysT01_tpl_done_mapping', 'sysT01_tpl_done_map_checked', 'sysT01_tpl_done_map_unchecked',
+      'sysT01_tpl_childtag',
     ], 'tagDef'),
-    makeNode('sysT01_tpl_checkbox', '', 'SYS_T01', [SYS_A.SHOW_CHECKBOX], 'tuple'),
-    makeNode('sysT01_tpl_childtag', '', 'SYS_T01', [SYS_A.CHILD_SUPERTAG], 'tuple'),
     makeNode('sysT01_tpl_color', '', 'SYS_T01', [SYS_A.COLOR], 'tuple'),
     makeNode('sysT01_tpl_extends', '', 'SYS_T01', [SYS_A.EXTENDS], 'tuple'),
+    makeNode('sysT01_tpl_checkbox', '', 'SYS_T01', [SYS_A.SHOW_CHECKBOX, SYS_V.NO], 'tuple'),
+    makeNode('sysT01_tpl_done_mapping', '', 'SYS_T01', [SYS_A.DONE_STATE_MAPPING, SYS_V.NO], 'tuple'),
+    makeNode('sysT01_tpl_done_map_checked', '', 'SYS_T01', [SYS_A.DONE_MAP_CHECKED], 'tuple'),
+    makeNode('sysT01_tpl_done_map_unchecked', '', 'SYS_T01', [SYS_A.DONE_MAP_UNCHECKED], 'tuple'),
+    makeNode('sysT01_tpl_childtag', '', 'SYS_T01', [SYS_A.CHILD_SUPERTAG], 'tuple'),
   ];
 
   // SYS_T02 (Field Definition) — system tag for attrDef config pages
   const sysT02Nodes: NodexNode[] = [
     makeNode('SYS_T02', 'Field Definition', schemaId, [
-      'sysT02_tpl_type', 'sysT02_tpl_autocollect', 'sysT02_tpl_autoinit',
-      'sysT02_tpl_required', 'sysT02_tpl_hide',
+      'sysT02_tpl_type', 'sysT02_tpl_source_supertag', 'sysT02_tpl_autocollect',
+      'sysT02_tpl_autoinit', 'sysT02_tpl_required', 'sysT02_tpl_hide',
+      'sysT02_tpl_min', 'sysT02_tpl_max',
     ], 'tagDef'),
-    makeNode('sysT02_tpl_type', '', 'SYS_T02', [SYS_A.TYPE_CHOICE], 'tuple'),
-    makeNode('sysT02_tpl_autocollect', '', 'SYS_T02', [SYS_A.AUTOCOLLECT_OPTIONS], 'tuple'),
-    makeNode('sysT02_tpl_autoinit', '', 'SYS_T02', [SYS_A.AUTO_INITIALIZE], 'tuple'),
-    makeNode('sysT02_tpl_required', '', 'SYS_T02', [SYS_A.NULLABLE], 'tuple'),
-    makeNode('sysT02_tpl_hide', '', 'SYS_T02', [SYS_A.HIDE_FIELD], 'tuple'),
+    makeNode('sysT02_tpl_type', '', 'SYS_T02', [SYS_A.TYPE_CHOICE, SYS_D.PLAIN], 'tuple'),
+    makeNode('sysT02_tpl_source_supertag', '', 'SYS_T02', [SYS_A.SOURCE_SUPERTAG], 'tuple'),
+    makeNode('sysT02_tpl_autocollect', '', 'SYS_T02', [SYS_A.AUTOCOLLECT_OPTIONS, SYS_V.YES], 'tuple'),
+    makeNode('sysT02_tpl_autoinit', '', 'SYS_T02', [SYS_A.AUTO_INITIALIZE, SYS_V.NO], 'tuple'),
+    makeNode('sysT02_tpl_required', '', 'SYS_T02', [SYS_A.NULLABLE, SYS_V.NO], 'tuple'),
+    makeNode('sysT02_tpl_hide', '', 'SYS_T02', [SYS_A.HIDE_FIELD, SYS_V.NEVER], 'tuple'),
+    makeNode('sysT02_tpl_min', '', 'SYS_T02', [SYS_A.MIN_VALUE], 'tuple'),
+    makeNode('sysT02_tpl_max', '', 'SYS_T02', [SYS_A.MAX_VALUE], 'tuple'),
   ];
 
-  // AttrDef: Status (options type) — all config tuples + options
+  // ═══════════════════════════════════════════════════════════════
+  // User AttrDef nodes — each with unified config tuples + AssociatedData
+  // ═══════════════════════════════════════════════════════════════
+
+  // Helper: create standard attrDef config tuples for SYS_T02 template
+  function makeAttrDefConfigTuples(prefix: string, owner: string, dataType: string, extra?: { min?: string; max?: string }) {
+    // For number min/max: create content nodes to hold the value (not raw strings)
+    const minValueNodeId = extra?.min !== undefined ? `${prefix}_min_val` : undefined;
+    const maxValueNodeId = extra?.max !== undefined ? `${prefix}_max_val` : undefined;
+    const extraNodes: NodexNode[] = [];
+    if (minValueNodeId && extra?.min !== undefined) {
+      extraNodes.push(makeNode(minValueNodeId, extra.min, `${prefix}_min_assoc`));
+    }
+    if (maxValueNodeId && extra?.max !== undefined) {
+      extraNodes.push(makeNode(maxValueNodeId, extra.max, `${prefix}_max_assoc`));
+    }
+
+    const entries = [
+      makeConfigEntry(`${prefix}_type`, owner, SYS_A.TYPE_CHOICE, dataType, 'sysT02_tpl_type'),
+      makeConfigEntry(`${prefix}_source_supertag`, owner, SYS_A.SOURCE_SUPERTAG, undefined, 'sysT02_tpl_source_supertag'),
+      makeConfigEntry(`${prefix}_autocollect`, owner, SYS_A.AUTOCOLLECT_OPTIONS, SYS_V.YES, 'sysT02_tpl_autocollect'),
+      makeConfigEntry(`${prefix}_autoinit`, owner, SYS_A.AUTO_INITIALIZE, SYS_V.NO, 'sysT02_tpl_autoinit'),
+      makeConfigEntry(`${prefix}_required`, owner, SYS_A.NULLABLE, SYS_V.NO, 'sysT02_tpl_required'),
+      makeConfigEntry(`${prefix}_hide`, owner, SYS_A.HIDE_FIELD, SYS_V.NEVER, 'sysT02_tpl_hide'),
+      makeConfigEntry(`${prefix}_min`, owner, SYS_A.MIN_VALUE, minValueNodeId, 'sysT02_tpl_min'),
+      makeConfigEntry(`${prefix}_max`, owner, SYS_A.MAX_VALUE, maxValueNodeId, 'sysT02_tpl_max'),
+    ];
+    const nodes = [...entries.flatMap(e => e.nodes), ...extraNodes];
+    const map: Record<string, string> = {};
+    for (const e of entries) Object.assign(map, e.map);
+    const childIds = entries.map(e => Object.keys(e.map)[0]);
+    return { nodes, map, childIds };
+  }
+
+  // AttrDef: Status (OPTIONS)
+  const statusCfg = makeAttrDefConfigTuples('attrDef_status', 'attrDef_status', SYS_D.OPTIONS);
   const attrDefStatusNodes: NodexNode[] = [
-    makeNode('attrDef_status', 'Status', 'taskField_status', [
-      'attrDef_status_type', 'attrDef_status_autocollect', 'attrDef_status_autoinit',
-      'attrDef_status_required', 'attrDef_status_hide',
-      'opt_todo', 'opt_in_progress', 'opt_done',
-    ], 'attrDef'),
-    makeNode('attrDef_status_type', '', 'attrDef_status', [SYS_A.TYPE_CHOICE, SYS_D.OPTIONS], 'tuple'),
-    makeNode('attrDef_status_autocollect', '', 'attrDef_status', [SYS_A.AUTOCOLLECT_OPTIONS, SYS_V.YES], 'tuple'),
-    makeNode('attrDef_status_autoinit', '', 'attrDef_status', [SYS_A.AUTO_INITIALIZE, SYS_V.NO], 'tuple'),
-    makeNode('attrDef_status_required', '', 'attrDef_status', [SYS_A.NULLABLE, SYS_V.NO], 'tuple'),
-    makeNode('attrDef_status_hide', '', 'attrDef_status', [SYS_A.HIDE_FIELD, SYS_V.NEVER], 'tuple'),
+    {
+      ...makeNode('attrDef_status', 'Status', 'taskField_status', [
+        ...statusCfg.childIds, 'opt_todo', 'opt_in_progress', 'opt_done',
+      ], 'attrDef'),
+      props: { ...makeNode('attrDef_status', '', '').props, _docType: 'attrDef' as DocType, name: 'Status', _ownerId: 'taskField_status', _metaNodeId: 'meta_attrDef_status' },
+      associationMap: statusCfg.map,
+    },
+    ...statusCfg.nodes,
     makeNode('opt_todo', 'To Do', 'attrDef_status'),
     makeNode('opt_in_progress', 'In Progress', 'attrDef_status'),
     makeNode('opt_done', 'Done', 'attrDef_status'),
   ];
 
-  // AttrDef: Priority (options type)
+  // AttrDef: Priority (OPTIONS)
+  const priorityCfg = makeAttrDefConfigTuples('attrDef_priority', 'attrDef_priority', SYS_D.OPTIONS);
   const attrDefPriorityNodes: NodexNode[] = [
-    makeNode('attrDef_priority', 'Priority', 'taskField_priority', [
-      'attrDef_priority_type', 'attrDef_priority_autocollect', 'attrDef_priority_autoinit',
-      'attrDef_priority_required', 'attrDef_priority_hide',
-      'opt_high', 'opt_medium', 'opt_low',
-    ], 'attrDef'),
-    makeNode('attrDef_priority_type', '', 'attrDef_priority', [SYS_A.TYPE_CHOICE, SYS_D.OPTIONS], 'tuple'),
-    makeNode('attrDef_priority_autocollect', '', 'attrDef_priority', [SYS_A.AUTOCOLLECT_OPTIONS, SYS_V.YES], 'tuple'),
-    makeNode('attrDef_priority_autoinit', '', 'attrDef_priority', [SYS_A.AUTO_INITIALIZE, SYS_V.NO], 'tuple'),
-    makeNode('attrDef_priority_required', '', 'attrDef_priority', [SYS_A.NULLABLE, SYS_V.NO], 'tuple'),
-    makeNode('attrDef_priority_hide', '', 'attrDef_priority', [SYS_A.HIDE_FIELD, SYS_V.NEVER], 'tuple'),
+    {
+      ...makeNode('attrDef_priority', 'Priority', 'taskField_priority', [
+        ...priorityCfg.childIds, 'opt_high', 'opt_medium', 'opt_low',
+      ], 'attrDef'),
+      props: { ...makeNode('attrDef_priority', '', '').props, _docType: 'attrDef' as DocType, name: 'Priority', _ownerId: 'taskField_priority', _metaNodeId: 'meta_attrDef_priority' },
+      associationMap: priorityCfg.map,
+    },
+    ...priorityCfg.nodes,
     makeNode('opt_high', 'High', 'attrDef_priority'),
     makeNode('opt_medium', 'Medium', 'attrDef_priority'),
     makeNode('opt_low', 'Low', 'attrDef_priority'),
   ];
 
-  // AttrDef: Due (date type) — all 4 config tuples
+  // AttrDef: Due (DATE)
+  const dueCfg = makeAttrDefConfigTuples('attrDef_due', 'attrDef_due', SYS_D.DATE);
   const attrDefDueNodes: NodexNode[] = [
-    makeNode('attrDef_due', 'Due', 'taskField_due', [
-      'attrDef_due_type', 'attrDef_due_autocollect', 'attrDef_due_autoinit',
-      'attrDef_due_required', 'attrDef_due_hide',
-    ], 'attrDef'),
-    makeNode('attrDef_due_type', '', 'attrDef_due', [SYS_A.TYPE_CHOICE, SYS_D.DATE], 'tuple'),
-    makeNode('attrDef_due_autocollect', '', 'attrDef_due', [SYS_A.AUTOCOLLECT_OPTIONS, SYS_V.YES], 'tuple'),
-    makeNode('attrDef_due_autoinit', '', 'attrDef_due', [SYS_A.AUTO_INITIALIZE, SYS_V.NO], 'tuple'),
-    makeNode('attrDef_due_required', '', 'attrDef_due', [SYS_A.NULLABLE, SYS_V.NO], 'tuple'),
-    makeNode('attrDef_due_hide', '', 'attrDef_due', [SYS_A.HIDE_FIELD, SYS_V.NEVER], 'tuple'),
+    {
+      ...makeNode('attrDef_due', 'Due', 'taskField_due', dueCfg.childIds, 'attrDef'),
+      props: { ...makeNode('attrDef_due', '', '').props, _docType: 'attrDef' as DocType, name: 'Due', _ownerId: 'taskField_due', _metaNodeId: 'meta_attrDef_due' },
+      associationMap: dueCfg.map,
+    },
+    ...dueCfg.nodes,
   ];
 
-  // AttrDef: Email (email type)
+  // AttrDef: Email (EMAIL)
+  const emailCfg = makeAttrDefConfigTuples('attrDef_email', 'attrDef_email', SYS_D.EMAIL);
   const attrDefEmailNodes: NodexNode[] = [
-    makeNode('attrDef_email', 'Email', 'personField_email', [
-      'attrDef_email_type', 'attrDef_email_autocollect', 'attrDef_email_autoinit',
-      'attrDef_email_required', 'attrDef_email_hide',
-    ], 'attrDef'),
-    makeNode('attrDef_email_type', '', 'attrDef_email', [SYS_A.TYPE_CHOICE, SYS_D.EMAIL], 'tuple'),
-    makeNode('attrDef_email_autocollect', '', 'attrDef_email', [SYS_A.AUTOCOLLECT_OPTIONS, SYS_V.YES], 'tuple'),
-    makeNode('attrDef_email_autoinit', '', 'attrDef_email', [SYS_A.AUTO_INITIALIZE, SYS_V.NO], 'tuple'),
-    makeNode('attrDef_email_required', '', 'attrDef_email', [SYS_A.NULLABLE, SYS_V.NO], 'tuple'),
-    makeNode('attrDef_email_hide', '', 'attrDef_email', [SYS_A.HIDE_FIELD, SYS_V.NEVER], 'tuple'),
+    {
+      ...makeNode('attrDef_email', 'Email', 'personField_email', emailCfg.childIds, 'attrDef'),
+      props: { ...makeNode('attrDef_email', '', '').props, _docType: 'attrDef' as DocType, name: 'Email', _ownerId: 'personField_email', _metaNodeId: 'meta_attrDef_email' },
+      associationMap: emailCfg.map,
+    },
+    ...emailCfg.nodes,
   ];
 
-  // AttrDef: Company (plain type)
+  // AttrDef: Company (PLAIN)
+  const companyCfg = makeAttrDefConfigTuples('attrDef_company', 'attrDef_company', SYS_D.PLAIN);
   const attrDefCompanyNodes: NodexNode[] = [
-    makeNode('attrDef_company', 'Company', 'personField_company', [
-      'attrDef_company_type', 'attrDef_company_autocollect', 'attrDef_company_autoinit',
-      'attrDef_company_required', 'attrDef_company_hide',
-    ], 'attrDef'),
-    makeNode('attrDef_company_type', '', 'attrDef_company', [SYS_A.TYPE_CHOICE, SYS_D.PLAIN], 'tuple'),
-    makeNode('attrDef_company_autocollect', '', 'attrDef_company', [SYS_A.AUTOCOLLECT_OPTIONS, SYS_V.YES], 'tuple'),
-    makeNode('attrDef_company_autoinit', '', 'attrDef_company', [SYS_A.AUTO_INITIALIZE, SYS_V.NO], 'tuple'),
-    makeNode('attrDef_company_required', '', 'attrDef_company', [SYS_A.NULLABLE, SYS_V.NO], 'tuple'),
-    makeNode('attrDef_company_hide', '', 'attrDef_company', [SYS_A.HIDE_FIELD, SYS_V.NEVER], 'tuple'),
+    {
+      ...makeNode('attrDef_company', 'Company', 'personField_company', companyCfg.childIds, 'attrDef'),
+      props: { ...makeNode('attrDef_company', '', '').props, _docType: 'attrDef' as DocType, name: 'Company', _ownerId: 'personField_company', _metaNodeId: 'meta_attrDef_company' },
+      associationMap: companyCfg.map,
+    },
+    ...companyCfg.nodes,
   ];
 
-  // AttrDef: Age (number type)
+  // AttrDef: Age (NUMBER)
+  const ageCfg = makeAttrDefConfigTuples('attrDef_age', 'attrDef_age', SYS_D.NUMBER, { min: '0', max: '150' });
   const attrDefAgeNodes: NodexNode[] = [
-    makeNode('attrDef_age', 'Age', 'personField_age', [
-      'attrDef_age_type', 'attrDef_age_autocollect', 'attrDef_age_autoinit',
-      'attrDef_age_required', 'attrDef_age_hide', 'attrDef_age_min', 'attrDef_age_max',
-    ], 'attrDef'),
-    makeNode('attrDef_age_type', '', 'attrDef_age', [SYS_A.TYPE_CHOICE, SYS_D.NUMBER], 'tuple'),
-    makeNode('attrDef_age_autocollect', '', 'attrDef_age', [SYS_A.AUTOCOLLECT_OPTIONS, SYS_V.YES], 'tuple'),
-    makeNode('attrDef_age_autoinit', '', 'attrDef_age', [SYS_A.AUTO_INITIALIZE, SYS_V.NO], 'tuple'),
-    makeNode('attrDef_age_required', '', 'attrDef_age', [SYS_A.NULLABLE, SYS_V.NO], 'tuple'),
-    makeNode('attrDef_age_hide', '', 'attrDef_age', [SYS_A.HIDE_FIELD, SYS_V.NEVER], 'tuple'),
-    makeNode('attrDef_age_min', '', 'attrDef_age', [SYS_A.MIN_VALUE, '0'], 'tuple'),
-    makeNode('attrDef_age_max', '', 'attrDef_age', [SYS_A.MAX_VALUE, '150'], 'tuple'),
+    {
+      ...makeNode('attrDef_age', 'Age', 'personField_age', ageCfg.childIds, 'attrDef'),
+      props: { ...makeNode('attrDef_age', '', '').props, _docType: 'attrDef' as DocType, name: 'Age', _ownerId: 'personField_age', _metaNodeId: 'meta_attrDef_age' },
+      associationMap: ageCfg.map,
+    },
+    ...ageCfg.nodes,
   ];
 
-  // AttrDef: Website (URL type)
+  // AttrDef: Website (URL)
+  const websiteCfg = makeAttrDefConfigTuples('attrDef_website', 'attrDef_website', SYS_D.URL);
   const attrDefWebsiteNodes: NodexNode[] = [
-    makeNode('attrDef_website', 'Website', 'personField_website', [
-      'attrDef_website_type', 'attrDef_website_autocollect', 'attrDef_website_autoinit',
-      'attrDef_website_required', 'attrDef_website_hide',
-    ], 'attrDef'),
-    makeNode('attrDef_website_type', '', 'attrDef_website', [SYS_A.TYPE_CHOICE, SYS_D.URL], 'tuple'),
-    makeNode('attrDef_website_autocollect', '', 'attrDef_website', [SYS_A.AUTOCOLLECT_OPTIONS, SYS_V.YES], 'tuple'),
-    makeNode('attrDef_website_autoinit', '', 'attrDef_website', [SYS_A.AUTO_INITIALIZE, SYS_V.NO], 'tuple'),
-    makeNode('attrDef_website_required', '', 'attrDef_website', [SYS_A.NULLABLE, SYS_V.NO], 'tuple'),
-    makeNode('attrDef_website_hide', '', 'attrDef_website', [SYS_A.HIDE_FIELD, SYS_V.NEVER], 'tuple'),
+    {
+      ...makeNode('attrDef_website', 'Website', 'personField_website', websiteCfg.childIds, 'attrDef'),
+      props: { ...makeNode('attrDef_website', '', '').props, _docType: 'attrDef' as DocType, name: 'Website', _ownerId: 'personField_website', _metaNodeId: 'meta_attrDef_website' },
+      associationMap: websiteCfg.map,
+    },
+    ...websiteCfg.nodes,
   ];
 
-  // AttrDef: Done (checkbox type)
+  // AttrDef: Done (CHECKBOX)
+  const doneCfg = makeAttrDefConfigTuples('attrDef_done', 'attrDef_done', SYS_D.CHECKBOX);
   const attrDefDoneNodes: NodexNode[] = [
-    makeNode('attrDef_done', 'Done', 'taskField_done', [
-      'attrDef_done_type', 'attrDef_done_autocollect', 'attrDef_done_autoinit',
-      'attrDef_done_required', 'attrDef_done_hide',
-    ], 'attrDef'),
-    makeNode('attrDef_done_type', '', 'attrDef_done', [SYS_A.TYPE_CHOICE, SYS_D.CHECKBOX], 'tuple'),
-    makeNode('attrDef_done_autocollect', '', 'attrDef_done', [SYS_A.AUTOCOLLECT_OPTIONS, SYS_V.YES], 'tuple'),
-    makeNode('attrDef_done_autoinit', '', 'attrDef_done', [SYS_A.AUTO_INITIALIZE, SYS_V.NO], 'tuple'),
-    makeNode('attrDef_done_required', '', 'attrDef_done', [SYS_A.NULLABLE, SYS_V.NO], 'tuple'),
-    makeNode('attrDef_done_hide', '', 'attrDef_done', [SYS_A.HIDE_FIELD, SYS_V.NEVER], 'tuple'),
+    {
+      ...makeNode('attrDef_done', 'Done', 'taskField_done', doneCfg.childIds, 'attrDef'),
+      props: { ...makeNode('attrDef_done', '', '').props, _docType: 'attrDef' as DocType, name: 'Done', _ownerId: 'taskField_done', _metaNodeId: 'meta_attrDef_done' },
+      associationMap: doneCfg.map,
+    },
+    ...doneCfg.nodes,
   ];
 
-  // Set _metaNodeId on attrDef nodes (tagged with SYS_T02)
-  attrDefStatusNodes[0].props._metaNodeId = 'meta_attrDef_status';
-  attrDefPriorityNodes[0].props._metaNodeId = 'meta_attrDef_priority';
-  attrDefDueNodes[0].props._metaNodeId = 'meta_attrDef_due';
-  attrDefEmailNodes[0].props._metaNodeId = 'meta_attrDef_email';
-  attrDefCompanyNodes[0].props._metaNodeId = 'meta_attrDef_company';
-  attrDefAgeNodes[0].props._metaNodeId = 'meta_attrDef_age';
-  attrDefWebsiteNodes[0].props._metaNodeId = 'meta_attrDef_website';
-  attrDefDoneNodes[0].props._metaNodeId = 'meta_attrDef_done';
+  // AttrDef: Branch (PLAIN) — for dev_task tag
+  const branchCfg = makeAttrDefConfigTuples('attrDef_branch', 'attrDef_branch', SYS_D.PLAIN);
+  const attrDefBranchNodes: NodexNode[] = [
+    {
+      ...makeNode('attrDef_branch', 'Branch', 'devTaskField_branch', branchCfg.childIds, 'attrDef'),
+      props: { ...makeNode('attrDef_branch', '', '').props, _docType: 'attrDef' as DocType, name: 'Branch', _ownerId: 'devTaskField_branch', _metaNodeId: 'meta_attrDef_branch' },
+      associationMap: branchCfg.map,
+    },
+    ...branchCfg.nodes,
+  ];
 
-  // Set _sourceId on config tuples → SYS_T02 templates
-  // Status (indices: [1]=type [2]=autocollect [3]=autoinit [4]=required [5]=hide)
-  attrDefStatusNodes[1].props._sourceId = 'sysT02_tpl_type';
-  attrDefStatusNodes[2].props._sourceId = 'sysT02_tpl_autocollect';
-  attrDefStatusNodes[3].props._sourceId = 'sysT02_tpl_autoinit';
-  attrDefStatusNodes[4].props._sourceId = 'sysT02_tpl_required';
-  attrDefStatusNodes[5].props._sourceId = 'sysT02_tpl_hide';
-  // Priority
-  attrDefPriorityNodes[1].props._sourceId = 'sysT02_tpl_type';
-  attrDefPriorityNodes[2].props._sourceId = 'sysT02_tpl_autocollect';
-  attrDefPriorityNodes[3].props._sourceId = 'sysT02_tpl_autoinit';
-  attrDefPriorityNodes[4].props._sourceId = 'sysT02_tpl_required';
-  attrDefPriorityNodes[5].props._sourceId = 'sysT02_tpl_hide';
-  // Due (indices: [1]=type [2]=autocollect [3]=autoinit [4]=required [5]=hide)
-  attrDefDueNodes[1].props._sourceId = 'sysT02_tpl_type';
-  attrDefDueNodes[2].props._sourceId = 'sysT02_tpl_autocollect';
-  attrDefDueNodes[3].props._sourceId = 'sysT02_tpl_autoinit';
-  attrDefDueNodes[4].props._sourceId = 'sysT02_tpl_required';
-  attrDefDueNodes[5].props._sourceId = 'sysT02_tpl_hide';
-  // Email
-  attrDefEmailNodes[1].props._sourceId = 'sysT02_tpl_type';
-  attrDefEmailNodes[2].props._sourceId = 'sysT02_tpl_autocollect';
-  attrDefEmailNodes[3].props._sourceId = 'sysT02_tpl_autoinit';
-  attrDefEmailNodes[4].props._sourceId = 'sysT02_tpl_required';
-  attrDefEmailNodes[5].props._sourceId = 'sysT02_tpl_hide';
-  // Company
-  attrDefCompanyNodes[1].props._sourceId = 'sysT02_tpl_type';
-  attrDefCompanyNodes[2].props._sourceId = 'sysT02_tpl_autocollect';
-  attrDefCompanyNodes[3].props._sourceId = 'sysT02_tpl_autoinit';
-  attrDefCompanyNodes[4].props._sourceId = 'sysT02_tpl_required';
-  attrDefCompanyNodes[5].props._sourceId = 'sysT02_tpl_hide';
-  // Age
-  attrDefAgeNodes[1].props._sourceId = 'sysT02_tpl_type';
-  attrDefAgeNodes[2].props._sourceId = 'sysT02_tpl_autocollect';
-  attrDefAgeNodes[3].props._sourceId = 'sysT02_tpl_autoinit';
-  attrDefAgeNodes[4].props._sourceId = 'sysT02_tpl_required';
-  attrDefAgeNodes[5].props._sourceId = 'sysT02_tpl_hide';
-  // Website
-  attrDefWebsiteNodes[1].props._sourceId = 'sysT02_tpl_type';
-  attrDefWebsiteNodes[2].props._sourceId = 'sysT02_tpl_autocollect';
-  attrDefWebsiteNodes[3].props._sourceId = 'sysT02_tpl_autoinit';
-  attrDefWebsiteNodes[4].props._sourceId = 'sysT02_tpl_required';
-  attrDefWebsiteNodes[5].props._sourceId = 'sysT02_tpl_hide';
-  // Done
-  attrDefDoneNodes[1].props._sourceId = 'sysT02_tpl_type';
-  attrDefDoneNodes[2].props._sourceId = 'sysT02_tpl_autocollect';
-  attrDefDoneNodes[3].props._sourceId = 'sysT02_tpl_autoinit';
-  attrDefDoneNodes[4].props._sourceId = 'sysT02_tpl_required';
-  attrDefDoneNodes[5].props._sourceId = 'sysT02_tpl_hide';
+  // AttrDef: Source URL (URL) — for web_clip tag
+  const sourceUrlCfg = makeAttrDefConfigTuples('attrDef_source_url', 'attrDef_source_url', SYS_D.URL);
+  const attrDefSourceUrlNodes: NodexNode[] = [
+    {
+      ...makeNode('attrDef_source_url', 'Source URL', 'webClipField_source_url', sourceUrlCfg.childIds, 'attrDef'),
+      props: { ...makeNode('attrDef_source_url', '', '').props, _docType: 'attrDef' as DocType, name: 'Source URL', _ownerId: 'webClipField_source_url', _metaNodeId: 'meta_attrDef_source_url' },
+      associationMap: sourceUrlCfg.map,
+    },
+    ...sourceUrlCfg.nodes,
+  ];
 
   // Metanodes for attrDefs (SYS_T02 tag application chain)
   const attrDefMetanodes: NodexNode[] = [
@@ -399,199 +567,145 @@ export function seedTestData() {
     makeNode('meta_attrDef_website_tag', '', 'meta_attrDef_website', [SYS_A.NODE_SUPERTAGS, 'SYS_T02'], 'tuple'),
     makeNode('meta_attrDef_done', '', 'attrDef_done', ['meta_attrDef_done_tag'], 'metanode'),
     makeNode('meta_attrDef_done_tag', '', 'meta_attrDef_done', [SYS_A.NODE_SUPERTAGS, 'SYS_T02'], 'tuple'),
+    makeNode('meta_attrDef_branch', '', 'attrDef_branch', ['meta_attrDef_branch_tag'], 'metanode'),
+    makeNode('meta_attrDef_branch_tag', '', 'meta_attrDef_branch', [SYS_A.NODE_SUPERTAGS, 'SYS_T02'], 'tuple'),
+    makeNode('meta_attrDef_source_url', '', 'attrDef_source_url', ['meta_attrDef_source_url_tag'], 'metanode'),
+    makeNode('meta_attrDef_source_url_tag', '', 'meta_attrDef_source_url', [SYS_A.NODE_SUPERTAGS, 'SYS_T02'], 'tuple'),
   ];
 
-  // TagDef: Task — template Tuples reference attrDef IDs + regular content nodes (tagged with SYS_T01)
-  const tagDefTaskNodes = [
-    makeNode('tagDef_task', 'Task', schemaId, [
-      'tagDef_task_cfg_checkbox', 'tagDef_task_cfg_childtag', 'tagDef_task_cfg_color',
-      'tagDef_task_cfg_extends',
-      'taskField_status', 'taskField_priority', 'taskField_due', 'taskField_done',
-      'taskTpl_default_note',
-    ], 'tagDef'),
+  // ═══════════════════════════════════════════════════════════════
+  // TagDef nodes — config tuples use unified model (AssociatedData)
+  // ═══════════════════════════════════════════════════════════════
+
+  // Helper: create tagDef config tuples from SYS_T01 template
+  function makeTagDefConfigTuples(prefix: string, owner: string, opts: {
+    checkbox?: string; extends?: string; doneMapping?: string;
+    doneCheckedEntries?: NodexNode[]; doneUncheckedEntries?: NodexNode[];
+  }) {
+    const entries = [
+      makeConfigEntry(`${prefix}_cfg_color`, owner, SYS_A.COLOR, undefined, 'sysT01_tpl_color'),
+      makeConfigEntry(`${prefix}_cfg_extends`, owner, SYS_A.EXTENDS, opts.extends, 'sysT01_tpl_extends'),
+      makeConfigEntry(`${prefix}_cfg_checkbox`, owner, SYS_A.SHOW_CHECKBOX, opts.checkbox ?? SYS_V.NO, 'sysT01_tpl_checkbox'),
+      makeConfigEntry(`${prefix}_cfg_done_mapping`, owner, SYS_A.DONE_STATE_MAPPING, opts.doneMapping ?? SYS_V.NO, 'sysT01_tpl_done_mapping'),
+      makeConfigEntry(`${prefix}_cfg_done_checked`, owner, SYS_A.DONE_MAP_CHECKED, undefined, 'sysT01_tpl_done_map_checked'),
+      makeConfigEntry(`${prefix}_cfg_done_unchecked`, owner, SYS_A.DONE_MAP_UNCHECKED, undefined, 'sysT01_tpl_done_map_unchecked'),
+      makeConfigEntry(`${prefix}_cfg_childtag`, owner, SYS_A.CHILD_SUPERTAG, undefined, 'sysT01_tpl_childtag'),
+    ];
+    const nodes = entries.flatMap(e => e.nodes);
+    const map: Record<string, string> = {};
+    for (const e of entries) Object.assign(map, e.map);
+    const childIds = entries.map(e => Object.keys(e.map)[0]);
+
+    // Add done mapping entries to AssociatedData if provided
+    if (opts.doneCheckedEntries?.length) {
+      const assocId = `${prefix}_cfg_done_checked_assoc`;
+      const assoc = nodes.find(n => n.id === assocId);
+      if (assoc) {
+        assoc.children = opts.doneCheckedEntries.map(e => e.id);
+        nodes.push(...opts.doneCheckedEntries);
+      }
+    }
+    if (opts.doneUncheckedEntries?.length) {
+      const assocId = `${prefix}_cfg_done_unchecked_assoc`;
+      const assoc = nodes.find(n => n.id === assocId);
+      if (assoc) {
+        assoc.children = opts.doneUncheckedEntries.map(e => e.id);
+        nodes.push(...opts.doneUncheckedEntries);
+      }
+    }
+
+    return { nodes, map, childIds };
+  }
+
+  // TagDef: Task (with done state mapping)
+  const taskCfg = makeTagDefConfigTuples('tagDef_task', 'tagDef_task', {
+    checkbox: SYS_V.YES,
+    doneMapping: SYS_V.YES,
+    doneCheckedEntries: [
+      makeNode('tagDef_task_dm_checked_1', '', 'tagDef_task_cfg_done_checked_assoc',
+        [SYS_A.DONE_MAP_CHECKED, 'attrDef_status', 'opt_done'], 'tuple'),
+    ],
+    doneUncheckedEntries: [
+      makeNode('tagDef_task_dm_unchecked_1', '', 'tagDef_task_cfg_done_unchecked_assoc',
+        [SYS_A.DONE_MAP_UNCHECKED, 'attrDef_status', 'opt_todo'], 'tuple'),
+    ],
+  });
+  const tagDefTaskNodes: NodexNode[] = [
+    {
+      ...makeNode('tagDef_task', 'Task', schemaId, [
+        ...taskCfg.childIds,
+        'taskField_status', 'taskField_priority', 'taskField_due', 'taskField_done',
+        'taskTpl_default_note',
+      ], 'tagDef'),
+      props: { ...makeNode('tagDef_task', '', '').props, _docType: 'tagDef' as DocType, name: 'Task', _ownerId: schemaId, _metaNodeId: 'meta_tagDef_task' },
+      associationMap: taskCfg.map,
+    },
+    ...taskCfg.nodes,
     makeNode('taskField_status', '', 'tagDef_task', ['attrDef_status'], 'tuple'),
     makeNode('taskField_priority', '', 'tagDef_task', ['attrDef_priority'], 'tuple'),
     makeNode('taskField_due', '', 'tagDef_task', ['attrDef_due'], 'tuple'),
     makeNode('taskField_done', '', 'tagDef_task', ['attrDef_done'], 'tuple'),
-    makeNode('taskTpl_default_note', 'Notes', 'tagDef_task'),  // regular content node in template
+    makeNode('taskTpl_default_note', 'Notes', 'tagDef_task'),
   ];
 
-  // TagDef: Person (tagged with SYS_T01)
-  const tagDefPersonNodes = [
-    makeNode('tagDef_person', 'Person', schemaId, [
-      'tagDef_person_cfg_checkbox', 'tagDef_person_cfg_childtag', 'tagDef_person_cfg_color',
-      'tagDef_person_cfg_extends',
-      'personField_email', 'personField_company', 'personField_age', 'personField_website',
-    ], 'tagDef'),
+  // TagDef: Person
+  const personCfg = makeTagDefConfigTuples('tagDef_person', 'tagDef_person', {});
+  const tagDefPersonNodes: NodexNode[] = [
+    {
+      ...makeNode('tagDef_person', 'Person', schemaId, [
+        ...personCfg.childIds,
+        'personField_email', 'personField_company', 'personField_age', 'personField_website',
+      ], 'tagDef'),
+      props: {
+        ...makeNode('tagDef_person', '', '').props, _docType: 'tagDef' as DocType,
+        name: 'Person', _ownerId: schemaId, _metaNodeId: 'meta_tagDef_person',
+        description: 'Tag for tracking people and their contact info',
+      },
+      associationMap: personCfg.map,
+    },
+    ...personCfg.nodes,
     makeNode('personField_email', '', 'tagDef_person', ['attrDef_email'], 'tuple'),
     makeNode('personField_company', '', 'tagDef_person', ['attrDef_company'], 'tuple'),
     makeNode('personField_age', '', 'tagDef_person', ['attrDef_age'], 'tuple'),
     makeNode('personField_website', '', 'tagDef_person', ['attrDef_website'], 'tuple'),
   ];
 
-  // AttrDef: Branch (plain type) — for dev_task tag
-  const attrDefBranchNodes: NodexNode[] = [
-    makeNode('attrDef_branch', 'Branch', 'devTaskField_branch', [
-      'attrDef_branch_type', 'attrDef_branch_autocollect', 'attrDef_branch_autoinit',
-      'attrDef_branch_required', 'attrDef_branch_hide',
-    ], 'attrDef'),
-    makeNode('attrDef_branch_type', '', 'attrDef_branch', [SYS_A.TYPE_CHOICE, SYS_D.PLAIN], 'tuple'),
-    makeNode('attrDef_branch_autocollect', '', 'attrDef_branch', [SYS_A.AUTOCOLLECT_OPTIONS, SYS_V.YES], 'tuple'),
-    makeNode('attrDef_branch_autoinit', '', 'attrDef_branch', [SYS_A.AUTO_INITIALIZE, SYS_V.NO], 'tuple'),
-    makeNode('attrDef_branch_required', '', 'attrDef_branch', [SYS_A.NULLABLE, SYS_V.NO], 'tuple'),
-    makeNode('attrDef_branch_hide', '', 'attrDef_branch', [SYS_A.HIDE_FIELD, SYS_V.NEVER], 'tuple'),
-  ];
-  attrDefBranchNodes[0].props._metaNodeId = 'meta_attrDef_branch';
-  attrDefBranchNodes[1].props._sourceId = 'sysT02_tpl_type';
-  attrDefBranchNodes[2].props._sourceId = 'sysT02_tpl_autocollect';
-  attrDefBranchNodes[3].props._sourceId = 'sysT02_tpl_autoinit';
-  attrDefBranchNodes[4].props._sourceId = 'sysT02_tpl_required';
-  attrDefBranchNodes[5].props._sourceId = 'sysT02_tpl_hide';
-
-  const attrDefBranchMetanodes: NodexNode[] = [
-    makeNode('meta_attrDef_branch', '', 'attrDef_branch', ['meta_attrDef_branch_tag'], 'metanode'),
-    makeNode('meta_attrDef_branch_tag', '', 'meta_attrDef_branch', [SYS_A.NODE_SUPERTAGS, 'SYS_T02'], 'tuple'),
-  ];
-
-  // TagDef: Dev Task — extends Task (inherits Status/Priority/Due/Done, adds Branch)
-  const tagDefDevTaskNodes = [
-    makeNode('tagDef_dev_task', 'Dev Task', schemaId, [
-      'tagDef_dev_task_cfg_checkbox', 'tagDef_dev_task_cfg_childtag',
-      'tagDef_dev_task_cfg_color', 'tagDef_dev_task_cfg_extends',
-      'devTaskField_branch',
-    ], 'tagDef'),
+  // TagDef: Dev Task — extends Task
+  const devTaskCfg = makeTagDefConfigTuples('tagDef_dev_task', 'tagDef_dev_task', {
+    checkbox: SYS_V.YES,
+    extends: 'tagDef_task',
+  });
+  const tagDefDevTaskNodes: NodexNode[] = [
+    {
+      ...makeNode('tagDef_dev_task', 'Dev Task', schemaId, [
+        ...devTaskCfg.childIds,
+        'devTaskField_branch',
+      ], 'tagDef'),
+      props: {
+        ...makeNode('tagDef_dev_task', '', '').props, _docType: 'tagDef' as DocType,
+        name: 'Dev Task', _ownerId: schemaId, _metaNodeId: 'meta_tagDef_dev_task',
+        description: 'Dev task extending Task with a Branch field',
+      },
+      associationMap: devTaskCfg.map,
+    },
+    ...devTaskCfg.nodes,
     makeNode('devTaskField_branch', '', 'tagDef_dev_task', ['attrDef_branch'], 'tuple'),
-  ];
-  tagDefDevTaskNodes[0].props._metaNodeId = 'meta_tagDef_dev_task';
-
-  // Config tuples for tagDef_dev_task (SYS_T01 template instances)
-  const tagDefDevTaskConfigNodes: NodexNode[] = [
-    makeNode('tagDef_dev_task_cfg_checkbox', '', 'tagDef_dev_task', [SYS_A.SHOW_CHECKBOX, SYS_V.YES], 'tuple'),
-    makeNode('tagDef_dev_task_cfg_childtag', '', 'tagDef_dev_task', [SYS_A.CHILD_SUPERTAG], 'tuple'),
-    makeNode('tagDef_dev_task_cfg_color', '', 'tagDef_dev_task', [SYS_A.COLOR], 'tuple'),
-    makeNode('tagDef_dev_task_cfg_extends', '', 'tagDef_dev_task', [SYS_A.EXTENDS, 'tagDef_task'], 'tuple'),
-  ];
-  tagDefDevTaskConfigNodes[0].props._sourceId = 'sysT01_tpl_checkbox';
-  tagDefDevTaskConfigNodes[1].props._sourceId = 'sysT01_tpl_childtag';
-  tagDefDevTaskConfigNodes[2].props._sourceId = 'sysT01_tpl_color';
-  tagDefDevTaskConfigNodes[3].props._sourceId = 'sysT01_tpl_extends';
-
-  // Metanode for tagDef_dev_task (SYS_T01 tag + NDX_A05 extends binding)
-  const tagDefDevTaskMetanodes: NodexNode[] = [
-    makeNode('meta_tagDef_dev_task', '', 'tagDef_dev_task', [
-      'meta_tagDef_dev_task_tag', 'meta_tagDef_dev_task_extends',
-    ], 'metanode'),
-    makeNode('meta_tagDef_dev_task_tag', '', 'meta_tagDef_dev_task', [SYS_A.NODE_SUPERTAGS, SYS_T.SUPERTAG], 'tuple'),
-    makeNode('meta_tagDef_dev_task_extends', '', 'meta_tagDef_dev_task', [SYS_A.EXTENDS, 'tagDef_task'], 'tuple'),
-  ];
-
-  // ─── TagDef: web_clip (for web clipping) ───
-
-  // AttrDef: Source URL (URL type)
-  const attrDefSourceUrlNodes: NodexNode[] = [
-    makeNode('attrDef_source_url', 'Source URL', 'webClipField_source_url', [
-      'attrDef_source_url_type', 'attrDef_source_url_autocollect', 'attrDef_source_url_autoinit',
-      'attrDef_source_url_required', 'attrDef_source_url_hide',
-    ], 'attrDef'),
-    makeNode('attrDef_source_url_type', '', 'attrDef_source_url', [SYS_A.TYPE_CHOICE, SYS_D.URL], 'tuple'),
-    makeNode('attrDef_source_url_autocollect', '', 'attrDef_source_url', [SYS_A.AUTOCOLLECT_OPTIONS, SYS_V.YES], 'tuple'),
-    makeNode('attrDef_source_url_autoinit', '', 'attrDef_source_url', [SYS_A.AUTO_INITIALIZE, SYS_V.NO], 'tuple'),
-    makeNode('attrDef_source_url_required', '', 'attrDef_source_url', [SYS_A.NULLABLE, SYS_V.NO], 'tuple'),
-    makeNode('attrDef_source_url_hide', '', 'attrDef_source_url', [SYS_A.HIDE_FIELD, SYS_V.NEVER], 'tuple'),
-  ];
-  attrDefSourceUrlNodes[0].props._metaNodeId = 'meta_attrDef_source_url';
-  attrDefSourceUrlNodes[1].props._sourceId = 'sysT02_tpl_type';
-  attrDefSourceUrlNodes[2].props._sourceId = 'sysT02_tpl_autocollect';
-  attrDefSourceUrlNodes[3].props._sourceId = 'sysT02_tpl_autoinit';
-  attrDefSourceUrlNodes[4].props._sourceId = 'sysT02_tpl_required';
-  attrDefSourceUrlNodes[5].props._sourceId = 'sysT02_tpl_hide';
-
-  const attrDefSourceUrlMetanodes: NodexNode[] = [
-    makeNode('meta_attrDef_source_url', '', 'attrDef_source_url', ['meta_attrDef_source_url_tag'], 'metanode'),
-    makeNode('meta_attrDef_source_url_tag', '', 'meta_attrDef_source_url', [SYS_A.NODE_SUPERTAGS, 'SYS_T02'], 'tuple'),
   ];
 
   // TagDef: web_clip
-  const tagDefWebClipNodes = [
-    makeNode('tagDef_web_clip', 'web_clip', schemaId, [
-      'tagDef_web_clip_cfg_checkbox', 'tagDef_web_clip_cfg_childtag',
-      'tagDef_web_clip_cfg_color', 'tagDef_web_clip_cfg_extends',
-      'webClipField_source_url',
-    ], 'tagDef'),
+  const webClipCfg = makeTagDefConfigTuples('tagDef_web_clip', 'tagDef_web_clip', {});
+  const tagDefWebClipNodes: NodexNode[] = [
+    {
+      ...makeNode('tagDef_web_clip', 'web_clip', schemaId, [
+        ...webClipCfg.childIds,
+        'webClipField_source_url',
+      ], 'tagDef'),
+      props: { ...makeNode('tagDef_web_clip', '', '').props, _docType: 'tagDef' as DocType, name: 'web_clip', _ownerId: schemaId, _metaNodeId: 'meta_tagDef_web_clip' },
+      associationMap: webClipCfg.map,
+    },
+    ...webClipCfg.nodes,
     makeNode('webClipField_source_url', '', 'tagDef_web_clip', ['attrDef_source_url'], 'tuple'),
   ];
-  tagDefWebClipNodes[0].props._metaNodeId = 'meta_tagDef_web_clip';
-
-  const tagDefWebClipConfigNodes: NodexNode[] = [
-    makeNode('tagDef_web_clip_cfg_checkbox', '', 'tagDef_web_clip', [SYS_A.SHOW_CHECKBOX, SYS_V.NO], 'tuple'),
-    makeNode('tagDef_web_clip_cfg_childtag', '', 'tagDef_web_clip', [SYS_A.CHILD_SUPERTAG], 'tuple'),
-    makeNode('tagDef_web_clip_cfg_color', '', 'tagDef_web_clip', [SYS_A.COLOR], 'tuple'),
-    makeNode('tagDef_web_clip_cfg_extends', '', 'tagDef_web_clip', [SYS_A.EXTENDS], 'tuple'),
-  ];
-  tagDefWebClipConfigNodes[0].props._sourceId = 'sysT01_tpl_checkbox';
-  tagDefWebClipConfigNodes[1].props._sourceId = 'sysT01_tpl_childtag';
-  tagDefWebClipConfigNodes[2].props._sourceId = 'sysT01_tpl_color';
-  tagDefWebClipConfigNodes[3].props._sourceId = 'sysT01_tpl_extends';
-
-  const tagDefWebClipMetanodes: NodexNode[] = [
-    makeNode('meta_tagDef_web_clip', '', 'tagDef_web_clip', ['meta_tagDef_web_clip_tag'], 'metanode'),
-    makeNode('meta_tagDef_web_clip_tag', '', 'meta_tagDef_web_clip', [SYS_A.NODE_SUPERTAGS, SYS_T.SUPERTAG], 'tuple'),
-  ];
-
-  // ─── Sample web clip node (pre-tagged) ───
-  const webclip1Nodes: NodexNode[] = [
-    {
-      ...makeNode('webclip_1', 'Example Article — Medium', inboxId, [
-        'webclip1_fld_source_url',
-      ]),
-      props: {
-        ...makeNode('webclip_1', 'Example Article — Medium', inboxId).props,
-        description: 'A sample web clip to demonstrate the clipping feature',
-        _metaNodeId: 'meta_webclip_1',
-      },
-      associationMap: {
-        webclip1_fld_source_url: 'webclip1_assoc_source_url',
-      },
-    },
-    makeNode('meta_webclip_1', '', 'webclip_1', ['meta_webclip_1_tag'], 'metanode'),
-    makeNode('meta_webclip_1_tag', '', 'meta_webclip_1', [SYS_A.NODE_SUPERTAGS, 'tagDef_web_clip'], 'tuple'),
-    makeNode('webclip1_fld_source_url', '', 'webclip_1', ['attrDef_source_url', 'webclip1_val_url'], 'tuple'),
-    makeNode('webclip1_val_url', 'https://medium.com/example-article', 'webclip1_assoc_source_url'),
-    makeNode('webclip1_assoc_source_url', '', 'webclip_1', ['webclip1_val_url'], 'associatedData'),
-  ];
-  webclip1Nodes[3].props._sourceId = 'webClipField_source_url';
-
-  // Set description on tagDef nodes
-  tagDefPersonNodes[0].props.description = 'Tag for tracking people and their contact info';
-  tagDefDevTaskNodes[0].props.description = 'Dev task extending Task with a Branch field';
-
-  // Set _metaNodeId on tagDef nodes (tagged with SYS_T01)
-  tagDefTaskNodes[0].props._metaNodeId = 'meta_tagDef_task';
-  tagDefPersonNodes[0].props._metaNodeId = 'meta_tagDef_person';
-
-  // Config tuples for tagDef_task (SYS_T01 template instances)
-  const tagDefTaskConfigNodes: NodexNode[] = [
-    makeNode('tagDef_task_cfg_checkbox', '', 'tagDef_task', [SYS_A.SHOW_CHECKBOX, SYS_V.YES], 'tuple'),
-    makeNode('tagDef_task_cfg_childtag', '', 'tagDef_task', [SYS_A.CHILD_SUPERTAG], 'tuple'),
-    makeNode('tagDef_task_cfg_color', '', 'tagDef_task', [SYS_A.COLOR], 'tuple'),
-    makeNode('tagDef_task_cfg_extends', '', 'tagDef_task', [SYS_A.EXTENDS], 'tuple'),
-  ];
-  tagDefTaskConfigNodes[0].props._sourceId = 'sysT01_tpl_checkbox';
-  tagDefTaskConfigNodes[1].props._sourceId = 'sysT01_tpl_childtag';
-  tagDefTaskConfigNodes[2].props._sourceId = 'sysT01_tpl_color';
-  tagDefTaskConfigNodes[3].props._sourceId = 'sysT01_tpl_extends';
-
-  // Config tuples for tagDef_person (SYS_T01 template instances)
-  const tagDefPersonConfigNodes: NodexNode[] = [
-    makeNode('tagDef_person_cfg_checkbox', '', 'tagDef_person', [SYS_A.SHOW_CHECKBOX, SYS_V.NO], 'tuple'),
-    makeNode('tagDef_person_cfg_childtag', '', 'tagDef_person', [SYS_A.CHILD_SUPERTAG], 'tuple'),
-    makeNode('tagDef_person_cfg_color', '', 'tagDef_person', [SYS_A.COLOR], 'tuple'),
-    makeNode('tagDef_person_cfg_extends', '', 'tagDef_person', [SYS_A.EXTENDS], 'tuple'),
-  ];
-  tagDefPersonConfigNodes[0].props._sourceId = 'sysT01_tpl_checkbox';
-  tagDefPersonConfigNodes[1].props._sourceId = 'sysT01_tpl_childtag';
-  tagDefPersonConfigNodes[2].props._sourceId = 'sysT01_tpl_color';
-  tagDefPersonConfigNodes[3].props._sourceId = 'sysT01_tpl_extends';
 
   // Metanodes for tagDefs (SYS_T01 tag application chain)
   const tagDefMetanodes: NodexNode[] = [
@@ -599,16 +713,17 @@ export function seedTestData() {
     makeNode('meta_tagDef_task_tag', '', 'meta_tagDef_task', [SYS_A.NODE_SUPERTAGS, SYS_T.SUPERTAG], 'tuple'),
     makeNode('meta_tagDef_person', '', 'tagDef_person', ['meta_tagDef_person_tag'], 'metanode'),
     makeNode('meta_tagDef_person_tag', '', 'meta_tagDef_person', [SYS_A.NODE_SUPERTAGS, SYS_T.SUPERTAG], 'tuple'),
+    makeNode('meta_tagDef_dev_task', '', 'tagDef_dev_task', ['meta_tagDef_dev_task_tag'], 'metanode'),
+    makeNode('meta_tagDef_dev_task_tag', '', 'meta_tagDef_dev_task', [SYS_A.NODE_SUPERTAGS, SYS_T.SUPERTAG], 'tuple'),
+    makeNode('meta_tagDef_web_clip', '', 'tagDef_web_clip', ['meta_tagDef_web_clip_tag'], 'metanode'),
+    makeNode('meta_tagDef_web_clip_tag', '', 'meta_tagDef_web_clip', [SYS_A.NODE_SUPERTAGS, SYS_T.SUPERTAG], 'tuple'),
   ];
 
   // ─── Pre-tag task_1 with "Task" tag (demo fields on startup) ───
-
-  // Metanode for task_1
   const task1MetanodeNodes: NodexNode[] = [
     makeNode('meta_task_1', '', 'task_1', ['meta_task_1_tag'], 'metanode'),
     makeNode('meta_task_1_tag', '', 'meta_task_1', [SYS_A.NODE_SUPERTAGS, 'tagDef_task'], 'tuple'),
   ];
-  // Field instance tuples + associatedData for task_1
   const task1FieldNodes: NodexNode[] = [
     makeNode('task1_fld_status', '', 'task_1', ['attrDef_status'], 'tuple'),
     makeNode('task1_fld_priority', '', 'task_1', ['attrDef_priority'], 'tuple'),
@@ -619,20 +734,16 @@ export function seedTestData() {
     makeNode('task1_assoc_due', '', 'task_1', [], 'associatedData'),
     makeNode('task1_assoc_done', '', 'task_1', [], 'associatedData'),
   ];
-  // Set _sourceId on field instance tuples (link to template)
   task1FieldNodes[0].props._sourceId = 'taskField_status';
   task1FieldNodes[1].props._sourceId = 'taskField_priority';
   task1FieldNodes[2].props._sourceId = 'taskField_due';
   task1FieldNodes[3].props._sourceId = 'taskField_done';
 
-  // ─── Pre-tag person_1 with "Person" tag (demo all typed fields) ───
-
-  // Metanode for person_1
+  // ─── Pre-tag person_1 with "Person" tag ───
   const person1MetanodeNodes: NodexNode[] = [
     makeNode('meta_person_1', '', 'person_1', ['meta_person_1_tag'], 'metanode'),
     makeNode('meta_person_1_tag', '', 'meta_person_1', [SYS_A.NODE_SUPERTAGS, 'tagDef_person'], 'tuple'),
   ];
-  // Field instance tuples + associatedData for person_1
   const person1FieldNodes: NodexNode[] = [
     makeNode('person1_fld_email', '', 'person_1', ['attrDef_email'], 'tuple'),
     makeNode('person1_fld_company', '', 'person_1', ['attrDef_company'], 'tuple'),
@@ -648,39 +759,24 @@ export function seedTestData() {
   person1FieldNodes[2].props._sourceId = 'personField_age';
   person1FieldNodes[3].props._sourceId = 'personField_website';
 
-  const schemaNodes = [
-    ...sysT01Nodes,
-    ...sysT02Nodes,
-    ...attrDefStatusNodes,
-    ...attrDefPriorityNodes,
-    ...attrDefDueNodes,
-    ...attrDefEmailNodes,
-    ...attrDefCompanyNodes,
-    ...attrDefAgeNodes,
-    ...attrDefWebsiteNodes,
-    ...attrDefDoneNodes,
-    ...attrDefBranchNodes,
-    ...attrDefMetanodes,
-    ...attrDefBranchMetanodes,
-    ...tagDefTaskNodes,
-    ...tagDefTaskConfigNodes,
-    ...tagDefPersonNodes,
-    ...tagDefPersonConfigNodes,
-    ...tagDefDevTaskNodes,
-    ...tagDefDevTaskConfigNodes,
-    ...tagDefMetanodes,
-    ...tagDefDevTaskMetanodes,
-    ...attrDefSourceUrlNodes,
-    ...attrDefSourceUrlMetanodes,
-    ...tagDefWebClipNodes,
-    ...tagDefWebClipConfigNodes,
-    ...tagDefWebClipMetanodes,
-    ...webclip1Nodes,
-    ...task1MetanodeNodes,
-    ...task1FieldNodes,
-    ...person1MetanodeNodes,
-    ...person1FieldNodes,
+  // ─── Sample web clip node (pre-tagged) ───
+  const webclip1Nodes: NodexNode[] = [
+    {
+      ...makeNode('webclip_1', 'Example Article — Medium', inboxId, ['webclip1_fld_source_url']),
+      props: {
+        ...makeNode('webclip_1', 'Example Article — Medium', inboxId).props,
+        description: 'A sample web clip to demonstrate the clipping feature',
+        _metaNodeId: 'meta_webclip_1',
+      },
+      associationMap: { webclip1_fld_source_url: 'webclip1_assoc_source_url' },
+    },
+    makeNode('meta_webclip_1', '', 'webclip_1', ['meta_webclip_1_tag'], 'metanode'),
+    makeNode('meta_webclip_1_tag', '', 'meta_webclip_1', [SYS_A.NODE_SUPERTAGS, 'tagDef_web_clip'], 'tuple'),
+    makeNode('webclip1_fld_source_url', '', 'webclip_1', ['attrDef_source_url', 'webclip1_val_url'], 'tuple'),
+    makeNode('webclip1_val_url', 'https://medium.com/example-article', 'webclip1_assoc_source_url'),
+    makeNode('webclip1_assoc_source_url', '', 'webclip_1', ['webclip1_val_url'], 'associatedData'),
   ];
+  webclip1Nodes[3].props._sourceId = 'webClipField_source_url';
 
   // ─── Set all nodes ───
   const allNodes = [
@@ -692,7 +788,35 @@ export function seedTestData() {
     ...richTextNodes,
     ...inboxNodes,
     ...journalNodes,
-    ...schemaNodes,
+    // System
+    ...systemValueNodes,
+    ...systemAttrDefNodes,
+    ...sysT01Nodes,
+    ...sysT02Nodes,
+    // User attrDefs
+    ...attrDefStatusNodes,
+    ...attrDefPriorityNodes,
+    ...attrDefDueNodes,
+    ...attrDefEmailNodes,
+    ...attrDefCompanyNodes,
+    ...attrDefAgeNodes,
+    ...attrDefWebsiteNodes,
+    ...attrDefDoneNodes,
+    ...attrDefBranchNodes,
+    ...attrDefSourceUrlNodes,
+    ...attrDefMetanodes,
+    // TagDefs
+    ...tagDefTaskNodes,
+    ...tagDefPersonNodes,
+    ...tagDefDevTaskNodes,
+    ...tagDefWebClipNodes,
+    ...tagDefMetanodes,
+    // Pre-tagged instances
+    ...webclip1Nodes,
+    ...task1MetanodeNodes,
+    ...task1FieldNodes,
+    ...person1MetanodeNodes,
+    ...person1FieldNodes,
   ];
 
   store.setNodes(allNodes);

@@ -2,7 +2,7 @@
  * Shared field utilities: data type resolution and icon mapping.
  */
 import type { LucideIcon } from 'lucide-react';
-import { AlignLeft, Building2, Calendar, CalendarCheck, CalendarClock, CalendarPlus, CheckSquare, ChevronDown, FileText, Hash, Link, List, ListTree, Mail, Play, Asterisk, EyeOff, Settings2, SquareUser, Sparkles, Tag, UserPen } from 'lucide-react';
+import { AlignLeft, Building2, Calendar, CalendarCheck, CalendarClock, CalendarPlus, CheckSquare, ChevronDown, FileText, Hash, Link, List, ListTree, Mail, Play, Asterisk, EyeOff, Settings2, SquareUser, Sparkles, Tag, ToggleLeft, UserPen } from 'lucide-react';
 import { SYS_A, SYS_D, SYS_V } from '../types/index.js';
 import type { NodexNode } from '../types/index.js';
 
@@ -28,11 +28,47 @@ function resolveAttrDefConfig(entities: Record<string, NodexNode>, attrDefId: st
 }
 
 /**
+ * Resolve a config/field value from a node by walking its children for a Tuple [configKey, ...].
+ * Reads from AssociatedData first (unified model), falls back to children[1] (legacy/internal tuples).
+ */
+export function resolveConfigValue(
+  entities: Record<string, NodexNode>,
+  node: NodexNode,
+  configKey: string,
+): string | undefined {
+  if (!node.children) return undefined;
+  for (const childId of node.children) {
+    const child = entities[childId];
+    if (child?.props._docType === 'tuple' && child.children?.[0] === configKey) {
+      // Unified model: read from AssociatedData
+      const assocId = node.associationMap?.[childId];
+      if (assocId) {
+        const assoc = entities[assocId];
+        if (assoc?.children?.length) return assoc.children[0];
+      }
+      // Legacy/internal: read from children[1]
+      if (child.children.length >= 2) return child.children[1];
+      return undefined;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Check whether a node ID is a system config attrDef (SYS_A* or NDX_A*).
+ */
+export function isSystemConfigField(keyId: string): boolean {
+  return keyId.startsWith('SYS_') || keyId.startsWith('NDX_');
+}
+
+/**
  * Resolve the data type of an attrDef by walking its children
  * for a Tuple [SYS_A02, SYS_D*].
  */
 export function resolveDataType(entities: Record<string, NodexNode>, attrDefId: string): string {
-  return resolveAttrDefConfig(entities, attrDefId, SYS_A.TYPE_CHOICE) ?? SYS_D.PLAIN;
+  const attrDef = entities[attrDefId];
+  if (!attrDef) return SYS_D.PLAIN;
+  return resolveConfigValue(entities, attrDef, SYS_A.TYPE_CHOICE) ?? SYS_D.PLAIN;
 }
 
 /**
@@ -42,7 +78,9 @@ export function resolveDataType(entities: Record<string, NodexNode>, attrDefId: 
 export function resolveSourceSupertag(
   entities: Record<string, NodexNode>, attrDefId: string
 ): string | undefined {
-  return resolveAttrDefConfig(entities, attrDefId, SYS_A.SOURCE_SUPERTAG);
+  const attrDef = entities[attrDefId];
+  if (!attrDef) return undefined;
+  return resolveConfigValue(entities, attrDef, SYS_A.SOURCE_SUPERTAG);
 }
 
 /**
@@ -79,26 +117,34 @@ export function resolveTaggedNodes(
  * Returns the SYS_V constant (NEVER, WHEN_EMPTY, WHEN_NOT_EMPTY, WHEN_VALUE_IS_DEFAULT, ALWAYS).
  */
 export function resolveHideField(entities: Record<string, NodexNode>, attrDefId: string): string {
-  return resolveAttrDefConfig(entities, attrDefId, SYS_A.HIDE_FIELD) ?? SYS_V.NEVER;
+  const attrDef = entities[attrDefId];
+  if (!attrDef) return SYS_V.NEVER;
+  return resolveConfigValue(entities, attrDef, SYS_A.HIDE_FIELD) ?? SYS_V.NEVER;
 }
 
 /**
  * Resolve whether an attrDef field is marked as required.
  */
 export function resolveRequired(entities: Record<string, NodexNode>, attrDefId: string): boolean {
-  return resolveAttrDefConfig(entities, attrDefId, SYS_A.NULLABLE) === SYS_V.YES;
+  const attrDef = entities[attrDefId];
+  if (!attrDef) return false;
+  return resolveConfigValue(entities, attrDef, SYS_A.NULLABLE) === SYS_V.YES;
 }
 
 /** Resolve minimum value for Number/Integer fields. Returns number or undefined. */
 export function resolveMinValue(entities: Record<string, NodexNode>, attrDefId: string): number | undefined {
-  const v = resolveAttrDefConfig(entities, attrDefId, SYS_A.MIN_VALUE);
+  const attrDef = entities[attrDefId];
+  if (!attrDef) return undefined;
+  const v = resolveConfigValue(entities, attrDef, SYS_A.MIN_VALUE);
   if (v && !isNaN(Number(v))) return Number(v);
   return undefined;
 }
 
 /** Resolve maximum value for Number/Integer fields. Returns number or undefined. */
 export function resolveMaxValue(entities: Record<string, NodexNode>, attrDefId: string): number | undefined {
-  const v = resolveAttrDefConfig(entities, attrDefId, SYS_A.MAX_VALUE);
+  const attrDef = entities[attrDefId];
+  if (!attrDef) return undefined;
+  const v = resolveConfigValue(entities, attrDef, SYS_A.MAX_VALUE);
   if (v && !isNaN(Number(v))) return Number(v);
   return undefined;
 }
@@ -122,6 +168,8 @@ export function getFieldTypeIcon(dataType: string): LucideIcon {
       return Link;
     case SYS_D.EMAIL:
       return Mail;
+    case SYS_D.BOOLEAN:
+      return ToggleLeft;
     default:
       return AlignLeft;
   }
@@ -224,12 +272,14 @@ export function isPlainFieldType(dataType: string): boolean {
 export interface ConfigFieldDef {
   key: string;
   name: string;
-  control: 'type_choice' | 'toggle' | 'select' | 'outliner' | 'autocollect' | 'tag_picker' | 'color_picker' | 'number_input';
+  control: 'type_choice' | 'toggle' | 'select' | 'outliner' | 'autocollect' | 'tag_picker' | 'color_picker' | 'number_input' | 'done_map_entries';
   defaultValue: string;
   appliesTo: string[] | '*';
   icon?: LucideIcon;
   description?: string;
   options?: Array<{ value: string; label: string }>;
+  /** Conditional visibility: only show when another config field has a specific value */
+  visibleWhen?: { dependsOn: string; value: string };
 }
 
 /**
@@ -354,24 +404,6 @@ export const ATTRDEF_OUTLINER_FIELDS = ATTRDEF_CONFIG_FIELDS
  */
 export const TAGDEF_CONFIG_FIELDS: ConfigFieldDef[] = [
   {
-    key: SYS_A.SHOW_CHECKBOX,   // SYS_A55
-    name: 'Show as checkbox',
-    control: 'toggle',
-    icon: CheckSquare,
-    defaultValue: SYS_V.NO,
-    appliesTo: '*',
-    description: 'Show done/not done checkbox on tagged nodes',
-  },
-  {
-    key: SYS_A.CHILD_SUPERTAG,  // SYS_A14
-    name: 'Default child supertag',
-    control: 'tag_picker',
-    icon: ChevronDown,
-    defaultValue: '',
-    appliesTo: '*',
-    description: 'Auto-apply this tag to new children',
-  },
-  {
     key: SYS_A.COLOR,           // SYS_A11
     name: 'Color',
     control: 'color_picker',
@@ -381,12 +413,51 @@ export const TAGDEF_CONFIG_FIELDS: ConfigFieldDef[] = [
   },
   {
     key: SYS_A.EXTENDS,           // NDX_A05
-    name: 'Extends',
+    name: 'Extend from',
     control: 'tag_picker',
     icon: ListTree,
     defaultValue: '',
     appliesTo: '*',
     description: 'Inherit fields and content from another tag',
+  },
+  {
+    key: SYS_A.SHOW_CHECKBOX,   // SYS_A55
+    name: 'Show as checkbox',
+    control: 'toggle',
+    icon: CheckSquare,
+    defaultValue: SYS_V.NO,
+    appliesTo: '*',
+    description: 'Show done/not done checkbox on tagged nodes',
+  },
+  {
+    key: SYS_A.DONE_STATE_MAPPING,  // NDX_A06
+    name: 'Done state mapping',
+    control: 'toggle',
+    icon: CheckSquare,
+    defaultValue: SYS_V.NO,
+    appliesTo: '*',
+    description: 'Map checkbox done state to Options field values',
+    visibleWhen: { dependsOn: SYS_A.SHOW_CHECKBOX, value: SYS_V.YES },
+  },
+  {
+    key: SYS_A.DONE_MAP_CHECKED,   // NDX_A07
+    name: 'Map checked to',
+    control: 'done_map_entries',
+    icon: CheckSquare,
+    defaultValue: '',
+    appliesTo: '*',
+    description: 'Field+option pairs that mean "done"',
+    visibleWhen: { dependsOn: SYS_A.DONE_STATE_MAPPING, value: SYS_V.YES },
+  },
+  {
+    key: SYS_A.DONE_MAP_UNCHECKED, // NDX_A08
+    name: 'Map unchecked to',
+    control: 'done_map_entries',
+    icon: CheckSquare,
+    defaultValue: '',
+    appliesTo: '*',
+    description: 'Field+option pairs that mean "not done"',
+    visibleWhen: { dependsOn: SYS_A.DONE_STATE_MAPPING, value: SYS_V.YES },
   },
   // outliner field — rendered as field row with embedded outliner (template children)
   {
@@ -396,6 +467,15 @@ export const TAGDEF_CONFIG_FIELDS: ConfigFieldDef[] = [
     icon: FileText,
     defaultValue: '',
     appliesTo: '*',
+  },
+  {
+    key: SYS_A.CHILD_SUPERTAG,  // SYS_A14
+    name: 'Default child supertag',
+    control: 'tag_picker',
+    icon: ChevronDown,
+    defaultValue: '',
+    appliesTo: '*',
+    description: 'Auto-apply this tag to new children',
   },
 ];
 
@@ -418,8 +498,8 @@ export const TAGDEF_OUTLINER_FIELDS = TAGDEF_CONFIG_FIELDS
  * Handles circular references via visited set.
  *
  * Reads from tagDef.children (config tuple) — this is the source of truth
- * that ConfigTagPicker edits via setConfigValue. Previously read from metanode,
- * which caused the bug where changing Extends tag_picker didn't update Default content.
+ * that the config field UI edits via setConfigValue. Previously read from metanode,
+ * which caused the bug where changing Extends didn't update Default content.
  */
 export function getExtendsChain(
   entities: Record<string, NodexNode>,
@@ -432,22 +512,15 @@ export function getExtendsChain(
     if (visited.has(id)) return; // circular guard
     visited.add(id);
     const tagDef = entities[id];
-    if (!tagDef?.children) return;
+    if (!tagDef) return;
 
-    for (const cid of tagDef.children) {
-      const tuple = entities[cid];
-      if (
-        tuple?.props._docType === 'tuple' &&
-        tuple.children?.[0] === SYS_A.EXTENDS &&
-        tuple.children.length >= 2
-      ) {
-        const parentId = tuple.children[1];
-        if (parentId === tagDefId) continue; // exclude self (circular)
-        if (!parentId || !entities[parentId]) continue; // skip empty/invalid
-        walk(parentId); // recurse ancestors first
-        if (!chain.includes(parentId)) chain.push(parentId);
-      }
-    }
+    const parentId = resolveConfigValue(entities, tagDef, SYS_A.EXTENDS);
+    if (!parentId) return;
+    if (parentId === tagDefId) return; // exclude self (circular)
+    if (!entities[parentId]) return; // skip invalid
+
+    walk(parentId); // recurse ancestors first
+    if (!chain.includes(parentId)) chain.push(parentId);
   }
   walk(tagDefId);
   return chain;

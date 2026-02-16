@@ -179,12 +179,13 @@ npm run test:run
 2. 缺失字段时自动创建 tuple + value + associatedData
 3. `addFieldToNode` 去重与 `setOptionsFieldValue` 单选写入
 4. `removeField` 清理 associationMap 并将 tuple/associatedData 移入 Trash
-5. `toggleCheckboxField` 的 `YES/NO` 切换链路
-6. `addUnnamedFieldToNode` 的原地插入（`afterChildId`）与 attrDef 初始化
-7. `autoCollectOption` 的值回填与 autocollect tuple 引用追加
-8. `removeFieldOption` 从 attrDef children 移除并删除 option 节点
-9. `replaceFieldAttrDef` 的占位 attrDef 置换与重复字段保护
-10. `changeFieldType` / `setConfigValue` 配置 tuple 原地更新
+5. `removeField` 系统配置保护：tuple key 为 SYS_*/NDX_* 前缀时跳过删除（防误删 config field）
+6. `toggleCheckboxField` 的 `YES/NO` 切换链路
+7. `addUnnamedFieldToNode` 的原地插入（`afterChildId`）与 attrDef 初始化
+8. `autoCollectOption` 的值回填与 autocollect tuple 引用追加
+9. `removeFieldOption` 从 attrDef children 移除并删除 option 节点
+10. `replaceFieldAttrDef` 的占位 attrDef 置换与重复字段保护
+11. `changeFieldType` / `setConfigValue` 配置 tuple 原地更新
 
 ### 1.9 Schema / Supertag 构建链路
 
@@ -192,9 +193,11 @@ npm run test:run
 
 **覆盖点**:
 
-1. `createTagDef` 自动归属 SCHEMA + 自动应用 `SYS_T01`
-2. `createAttrDef` 的 template tuple/type tuple/`SYS_T02` 配置链路
-3. 新建 `attrDef` 在后续 `applyTag` 中被正确实例化到内容节点
+1. `createTagDef` 自动归属 SCHEMA + 自动应用 `SYS_T01`（7 个 config tuple：checkbox/childtag/color/extends/done_mapping/checked/unchecked）
+2. **统一配置字段架构验证**: 所有 config tuple 通过 associationMap 关联 AssociatedData（与用户字段同结构）
+3. Config tuple key 为真实 attrDef 实体节点（`attrDef_show_checkbox` 等），非裸 SYS_A* ID
+4. `createAttrDef` 的 template tuple/type tuple/`SYS_T02` 配置链路（含 AssociatedData 默认值）
+5. 新建 `attrDef` 在后续 `applyTag` 中被正确实例化到内容节点（含 associationMap 验证）
 
 ### 1.10 Supertag Extend（继承）
 
@@ -222,6 +225,8 @@ npm run test:run
 2. `addFieldOption` 仅允许 `attrDef` 目标，非法目标返回空 ID
 3. `removeFieldOption` 仅删除目标 attrDef 挂载的 option，避免误删
 4. `replaceFieldAttrDef` 的 owner/oldAttrDef 一致性保护
+
+**注意**: `removeField` 的系统配置字段保护（SYS_*/NDX_* key guard）在 1.8 node-store-fields 中覆盖。
 
 ### 1.12 Trash 语义（TagDef / AttrDef）
 
@@ -532,7 +537,78 @@ hash trigger cleanup safety（2 cases, Bug #53 回归）:
 4. `getNextEnabledSlashIndex` 仅在 enabled 项间上下移动，边界 clamp
 5. 全部禁用时返回 `-1`
 
-### 1.38 Web Clip 落库服务
+### 1.38 Done State Mapping（checkbox ↔ Options 联动，统一字段模型）
+
+**测试文件**: `tests/vitest/done-state-mapping.test.ts`
+
+**说明**: DoneMappingEntries 从 AssociatedData 读取映射数据（统一配置字段架构）。DoneMappingEntries selectors 使用 JSON.stringify 防止 React 19 无限循环。
+
+**覆盖点**:
+
+纯函数 — getDoneStateMappings（8 cases）:
+1. 无标签 → 空
+2. 有标签但无映射配置 → 空
+3. 新格式 (toggle+嵌套 NDX_A07/A08) → 返回映射 (checked only)
+4. 含 uncheckedOptionIds 配置
+5. 多个 checked option IDs
+6. 多个 unchecked option IDs
+7. Toggle OFF → 空
+8. 沿 Extend 链继承
+9. 不存在节点 → 空
+
+纯函数 — 旧格式向后兼容（3 cases）:
+10. 旧格式 (NDX_A06 children>=3) 正常解析
+11. 旧格式含 uncheckedOptionId
+12. 旧格式 Extend 链继承
+
+嵌套结构验证（3 cases）:
+35. 嵌套 NDX_A07/A08 在 NDX_A06 toggle 子节点中正确读取
+36. toggle OFF 时嵌套子节点存在但不返回映射
+37. 嵌套结构 Extend 链继承
+
+纯函数 — resolveForwardDoneMapping（5 cases）:
+13. isDone=true → 第一个 checkedOptionId
+14. isDone=true + 多 checked → 仍取第一个
+15. isDone=false + unchecked → 第一个 uncheckedOptionId
+16. isDone=false 无 unchecked → 空
+17. 无映射 → 空
+
+纯函数 — resolveReverseDoneMapping（7 cases）:
+18. checkedOption → newDone=true
+19. 多 checked 中任一匹配 → newDone=true
+20. uncheckedOption → newDone=false
+21. 多 unchecked 中任一匹配 → newDone=false
+22. 无关 option → null
+23. attrDefId 不匹配 → null
+24. 无 unchecked + non-checked option → null
+
+Store 集成 — setOptionsFieldValue（3 cases）:
+25. `setOptionsFieldValue`（opt_done）→ checkbox 自动勾选
+26. `setOptionsFieldValue`（opt_todo）→ checkbox 自动取消
+27. `setOptionsFieldValue`（opt_in_progress）→ checkbox 不变
+
+Store 集成 — selectFieldOption / UI 路径（4 cases）:
+28. `selectFieldOption` via assocDataId（opt_done）→ checkbox 自动勾选
+29. `selectFieldOption` via assocDataId（opt_todo）→ checkbox 自动取消
+30. `selectFieldOption` via assocDataId（opt_in_progress）→ checkbox 不变
+31. `selectFieldOption` old→new option swap（children 替换正确）
+
+Store 集成 — forward mapping（2 cases）:
+32. `toggleNodeDone`（undone→done）→ Status 设为 opt_done
+33. `toggleNodeDone`（done→undone）→ Status 设为 opt_todo
+
+Store 集成 — 安全性（1 case）:
+34. 原子 set() 无循环：forward + reverse 独立操作
+
+Store 集成 — addDoneMappingEntry（2 cases）:
+38. 创建 mapping entry tuple，追加到 toggle children
+39. 新条目被 getDoneStateMappings 正确读取
+
+Store 集成 — removeDoneMappingEntry（2 cases）:
+40. 从 toggle children 中移除并删除 entity
+41. 移除后 getDoneStateMappings 结果为空
+
+### 1.39 Web Clip 落库服务
 
 **测试文件**: `tests/vitest/webclip-service.test.ts`
 
@@ -682,7 +758,8 @@ applyWebClipToNode（5 cases）:
 | 1.35 | 节点搜索 SKIP_DOC_TYPES 过滤 | PASS/FAIL |
 | 1.36 | Workspace Store 认证状态与持久化 | PASS/FAIL |
 | 1.37 | Slash Command 注册与导航 | PASS/FAIL |
-| 1.38 | Web Clip 落库服务 | PASS/FAIL |
+| 1.38 | Done State Mapping | PASS/FAIL |
+| 1.39 | Web Clip 落库服务 | PASS/FAIL |
 | 2 | 视觉渲染 | PASS/FAIL/SKIP |
 | 3 | 扩展构建 | PASS/FAIL |
 

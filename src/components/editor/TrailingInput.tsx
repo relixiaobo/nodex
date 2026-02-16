@@ -93,6 +93,7 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
   const isOptions = fieldDataType === SYS_D.OPTIONS || fieldDataType === SYS_D.OPTIONS_FROM_SUPERTAG;
   const allOptions = useFieldOptions(isOptions ? (attrDefId ?? '') : '');
   const addReference = useNodeStore((s) => s.addReference);
+  const selectFieldOption = useNodeStore((s) => s.selectFieldOption);
 
   const [optionsOpen, setOptionsOpen] = useState(false);
   const [optionsQuery, setOptionsQuery] = useState('');
@@ -106,7 +107,7 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
   }, [isOptions, optionsOpen, optionsQuery, allOptions]);
 
   const callbacksRef = useRef({
-    createChild, addUnnamedFieldToNode, addReference, wsId, userId,
+    createChild, addUnnamedFieldToNode, addReference, selectFieldOption, wsId, userId,
     parentId, effectiveParentId, effectiveDepth, effectiveParentEK,
     setEffectiveParentId, setEffectiveDepth, setEffectiveParentEK,
     setExpanded, setFocusedNode, setEditingFieldName, setTriggerHint,
@@ -115,7 +116,7 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
     onNavigateOut,
   });
   callbacksRef.current = {
-    createChild, addUnnamedFieldToNode, addReference, wsId, userId,
+    createChild, addUnnamedFieldToNode, addReference, selectFieldOption, wsId, userId,
     parentId, effectiveParentId, effectiveDepth, effectiveParentEK,
     setEffectiveParentId, setEffectiveDepth, setEffectiveParentEK,
     setExpanded, setFocusedNode, setEditingFieldName, setTriggerHint,
@@ -157,7 +158,7 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
               const selected = ref.filteredOptions[ref.optionsIndex];
               if (selected && ref.userId) {
                 committingRef.current = true;
-                ref.addReference(ref.effectiveParentId, selected.id, ref.userId);
+                ref.selectFieldOption(ref.effectiveParentId, selected.id, undefined, ref.userId);
                 editor.commands.clearContent(false);
                 setHasContent(false);
                 ref.setOptionsOpen(false);
@@ -447,7 +448,7 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
     const ref = callbacksRef.current;
     if (!ref.userId || !editor || editor.isDestroyed) return;
     committingRef.current = true;
-    ref.addReference(ref.effectiveParentId, optionId, ref.userId);
+    ref.selectFieldOption(ref.effectiveParentId, optionId, undefined, ref.userId);
     editor.commands.clearContent(false);
     setHasContent(false);
     setOptionsOpen(false);

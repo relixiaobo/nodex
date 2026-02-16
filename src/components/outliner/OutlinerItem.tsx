@@ -133,6 +133,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   const updateNodeDescription = useNodeStore((s) => s.updateNodeDescription);
   const addReference = useNodeStore((s) => s.addReference);
   const removeReference = useNodeStore((s) => s.removeReference);
+  const selectFieldOption = useNodeStore((s) => s.selectFieldOption);
   const startRefConversion = useNodeStore((s) => s.startRefConversion);
   const revertRefConversion = useNodeStore((s) => s.revertRefConversion);
   const setPendingRefConversion = useUIStore((s) => s.setPendingRefConversion);
@@ -478,8 +479,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
             e.preventDefault();
             const opt = allFieldOptions[optionsPickerIndex];
             if (opt && userId) {
-              removeReference(parentId, nodeId, userId);
-              addReference(parentId, opt.id, userId);
+              selectFieldOption(parentId, opt.id, nodeId, userId);
             }
             clearSelection();
             return;
@@ -701,7 +701,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isSelected, isFocused, isReference, isSelectionAnchor, optionsPickerOpen, allFieldOptions, optionsPickerIndex, parentId, nodeId, userId, wsId, rootNodeId, rootChildIds, entities, expandedNodes, removeReference, addReference, setSelectedNode, setSelectedNodes, clearSelection, setFocusedNode, startRefConversion, setPendingRefConversion, setPendingInputChar]);
+  }, [isSelected, isFocused, isReference, isSelectionAnchor, optionsPickerOpen, allFieldOptions, optionsPickerIndex, parentId, nodeId, userId, wsId, rootNodeId, rootChildIds, entities, expandedNodes, removeReference, addReference, selectFieldOption, setSelectedNode, setSelectedNodes, clearSelection, setFocusedNode, startRefConversion, setPendingRefConversion, setPendingInputChar]);
 
   // When TrailingInput creates a node with #/@/, it sets triggerHint so we
   // can immediately open the dropdown (extensions don't fire on mount because
@@ -1686,8 +1686,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => {
                   if (userId && opt.id !== nodeId) {
-                    removeReference(parentId, nodeId, userId);
-                    addReference(parentId, opt.id, userId);
+                    selectFieldOption(parentId, opt.id, nodeId, userId);
                   }
                   setSelectedNode(null);
                 }}

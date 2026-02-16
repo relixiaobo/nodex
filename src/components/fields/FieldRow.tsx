@@ -1,24 +1,18 @@
 /**
  * Single field row: two-column layout with separator line.
  *
- * Regular fields:
- * ──────────────────────────────────────
- * [icon] [editable name   ] • value node
- *                            • value node 2
- * ──────────────────────────────────────
+ * Three rendering paths:
  *
- * Config fields (attrDef):
- * ──────────────────────────────────────
- * [icon] Field name           [control]
- *        Description text
- * ──────────────────────────────────────
+ * 1. System metadata fields (__system_*__): read-only name + value, not editable
+ * 2. System config fields (isSystemConfig): read-only name + description, unified value via FieldValueOutliner
+ * 3. Regular fields: editable name, FieldValueOutliner
  *
- * - Type icon: clickable → navigateTo to attrDef (regular), static (config)
- * - Field name: static label, click to edit (activates FieldNameInput)
- * - Config description: shown below name in name column
- * - Value area: FieldValueOutliner (all types including checkbox)
+ * ──────────────────────────────────────
+ * [icon] [field name    ] • value node
+ *        [description]     • value node 2
+ * ──────────────────────────────────────
  */
-import { useCallback, useRef, useMemo, useEffect } from 'react';
+import { useCallback, useRef, useEffect } from 'react';
 import { Trash2 } from 'lucide-react';
 import { useNodeStore } from '../../stores/node-store';
 import { useUIStore } from '../../stores/ui-store';
@@ -26,16 +20,12 @@ import { useWorkspaceStore } from '../../stores/workspace-store';
 import { getFieldTypeIcon, ATTRDEF_CONFIG_MAP, TAGDEF_CONFIG_MAP, resolveMinValue, resolveMaxValue, SYSTEM_FIELD_MAP } from '../../lib/field-utils.js';
 import { FieldValueOutliner } from './FieldValueOutliner';
 import { FieldNameInput } from './FieldNameInput';
-import { FieldTypePicker } from './FieldTypePicker';
-import { ConfigToggle } from './ConfigToggle';
-import { ConfigSelect } from './ConfigSelect';
-import { ConfigNumberInput } from './ConfigNumberInput';
 import { ConfigOutliner } from './ConfigOutliner';
 import { AutoCollectSection } from './AutoCollectSection';
-import { ConfigTagPicker } from './ConfigTagPicker';
 import { BulletChevron } from '../outliner/BulletChevron';
 import { VALIDATED_FIELD_TYPES, validateFieldValue, ValidationWarning } from './field-validation';
 import { ATTRDEF_OUTLINER_FIELDS, TAGDEF_OUTLINER_FIELDS } from '../../lib/field-utils.js';
+import { SYS_A } from '../../types/index.js';
 
 const noop = () => {};
 
@@ -58,6 +48,12 @@ interface FieldRowProps {
   onNavigateOut?: (direction: 'up' | 'down') => void;
   /** Owner tag color: tints the field icon and bullet in this color (inherited template items) */
   ownerTagColor?: string;
+  /** Hide-field condition from attrDef config (SYS_V.NEVER by default) */
+  hideMode?: string;
+  /** True when this is a system config field — read-only name, not deletable */
+  isSystemConfig?: boolean;
+  /** Config field metadata key for looking up icon/description */
+  configKey?: string;
 }
 
 export function FieldRow({
@@ -75,6 +71,8 @@ export function FieldRow({
   isEmpty,
   onNavigateOut,
   ownerTagColor,
+  isSystemConfig,
+  configKey,
 }: FieldRowProps) {
   const navigateTo = useUIStore((s) => s.navigateTo);
   const editingFieldNameId = useUIStore((s) => s.editingFieldNameId);
@@ -91,32 +89,24 @@ export function FieldRow({
   const clickOffsetXRef = useRef<number | undefined>(undefined);
 
   const isSystemField = dataType === '__system_date__' || dataType === '__system_text__' || dataType === '__system_node__';
-  const isTypeChoice = dataType === '__type_choice__';
-  const isToggle = dataType === '__toggle__';
-  const isSelect = dataType === '__select__';
   const isOutliner = dataType === '__outliner__';
-  const isAutoCollect = dataType === '__autocollect__';
-  const isTagPicker = dataType === '__tag_picker__';
-  const isColorPicker = dataType === '__color_picker__';
-  const isNumberInput = dataType === '__number_input__';
-  const isConfigField = isTypeChoice || isToggle || isSelect || isAutoCollect || isTagPicker || isColorPicker || isNumberInput;
   const isVirtual = tupleId.startsWith('__virtual_');
   const isEditing = editingFieldNameId === tupleId;
   const isFieldSelected = isTupleInSelectedSet && !focusedNodeId && !isEditing;
-  const configDef = (isConfigField || isVirtual)
-    ? ATTRDEF_CONFIG_MAP.get(attrDefId) ?? TAGDEF_CONFIG_MAP.get(attrDefId) ?? ATTRDEF_OUTLINER_FIELDS.find(f => f.key === attrDefId) ?? TAGDEF_OUTLINER_FIELDS.find(f => f.key === attrDefId)
+
+  // Config metadata for system config fields (icon, description)
+  const configDef = configKey
+    ? ATTRDEF_CONFIG_MAP.get(configKey) ?? TAGDEF_CONFIG_MAP.get(configKey) ?? ATTRDEF_OUTLINER_FIELDS.find(f => f.key === configKey) ?? TAGDEF_OUTLINER_FIELDS.find(f => f.key === configKey)
     : undefined;
-  const Icon = configDef?.icon ?? (isConfigField ? undefined : getFieldTypeIcon(dataType));
+  const Icon = getFieldTypeIcon(dataType);
 
   // Validation: read first content child of assocData to check value
   const validationWarning = useNodeStore((s) => {
     if (!assocDataId || !VALIDATED_FIELD_TYPES.has(dataType)) return null;
     const assoc = s.entities[assocDataId];
     if (!assoc?.children) return null;
-    // Resolve min/max for number fields
     const min = resolveMinValue(s.entities, attrDefId);
     const max = resolveMaxValue(s.entities, attrDefId);
-    // Find first content child (no _docType)
     for (const cid of assoc.children) {
       const child = s.entities[cid];
       if (child && !child.props._docType && child.props.name) {
@@ -126,24 +116,19 @@ export function FieldRow({
     return null;
   });
 
-  // Count auto-collected values for the name column "(N)"
+  // Auto-collect count for SYS_A44 name display
+  const isAutoCollect = configKey === SYS_A.AUTOCOLLECT_OPTIONS;
   const autoCollectCount = useNodeStore((s) => {
     if (!isAutoCollect) return 0;
     const tuple = s.entities[tupleId];
     return Math.max(0, (tuple?.children?.length ?? 0) - 2);
   });
-  const configNameDisplay = useMemo(() => {
-    if (isAutoCollect && autoCollectCount > 0) return `${attrDefName} (${autoCollectCount})`;
-    return attrDefName;
-  }, [isAutoCollect, autoCollectCount, attrDefName]);
 
   const handleEnterConfirm = useCallback(() => {
     if (!wsId || !userId) return;
     const state = useNodeStore.getState();
     const entities = state.entities;
 
-    // Prefer visual parent (nodeId), fallback to actual container holding tupleId.
-    // This guards against stale props/callers while still avoiding tuple._ownerId reliance.
     let insertParentId = nodeId;
     if (!entities[nodeId]?.children?.includes(tupleId)) {
       const fallbackParent = Object.values(entities).find((n) => n.children?.includes(tupleId));
@@ -157,7 +142,6 @@ export function FieldRow({
 
     const createPromise = createChild(insertParentId, wsId, userId, '', position);
 
-    // createChild applies optimistic insert synchronously; focus immediately for snappy UX.
     const optimisticParent = useNodeStore.getState().entities[insertParentId];
     const optimisticNewId = optimisticParent?.children?.find((cid) => !beforeIds.has(cid));
     if (optimisticNewId) setFocusedNode(optimisticNewId, insertParentId);
@@ -195,14 +179,13 @@ export function FieldRow({
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [isFieldSelected, tupleId, clearSelection, setEditingFieldName]);
 
-  // System fields: read-only name (Enter → create sibling, Backspace → delete field)
+  // ─── Path 1: System metadata fields (NDX_SYS_*) — read-only ───
   if (isSystemField) {
     const sysFieldDef = SYSTEM_FIELD_MAP.get(attrDefId);
     const SysIcon = sysFieldDef?.icon;
     const displayText = valueName || '—';
     return (
       <div className={`border-t ${isLastInGroup ? 'border-b' : ''} border-border-subtle flex flex-col @sm:flex-row @sm:items-start min-h-[28px]`} data-field-row>
-        {/* Name column — focusable but not editable */}
         <div className="flex items-center gap-1 @sm:shrink-0 @sm:w-[130px] min-w-0 h-7 py-1">
           <span className="shrink-0 w-[15px] flex items-center justify-center text-foreground-tertiary">
             {SysIcon && <SysIcon size={12} />}
@@ -226,7 +209,6 @@ export function FieldRow({
             {attrDefName}
           </span>
         </div>
-        {/* Value column — read-only */}
         <div className="flex flex-1 min-w-0 items-center min-h-7 py-1" data-field-value>
           {dataType === '__system_node__' && valueNodeId ? (
             <button
@@ -246,8 +228,12 @@ export function FieldRow({
     );
   }
 
-  // Config fields: name+description on left, control on right (items-start for multi-line)
-  if (isConfigField) {
+  // ─── Path 2: System config fields — read-only name + description, unified value ───
+  if (isSystemConfig) {
+    const displayName = isAutoCollect && autoCollectCount > 0
+      ? `${attrDefName} (${autoCollectCount})`
+      : attrDefName;
+
     return (
       <div className={`border-t ${isLastInGroup ? 'border-b' : ''} border-border-subtle flex flex-col @sm:flex-row @sm:items-start min-h-[28px] py-1.5`} data-field-row>
         {/* Name column — icon + name + description */}
@@ -261,7 +247,7 @@ export function FieldRow({
           )}
           <div className="flex-1 min-w-0">
             <span className="block text-sm font-medium leading-[22px] text-foreground">
-              {configNameDisplay}
+              {displayName}
             </span>
             {configDef?.description && (
               <span className="block text-xs leading-tight text-foreground-tertiary mt-0.5">
@@ -270,29 +256,28 @@ export function FieldRow({
             )}
           </div>
         </div>
-        {/* Value column */}
+        {/* Value column — unified rendering */}
         <div className="flex-1 min-w-0 min-h-[22px]" data-field-value>
-          {isTypeChoice ? (
-            <FieldTypePicker attrDefId={nodeId} currentValue={valueName ?? ''} />
-          ) : isAutoCollect ? (
-            <AutoCollectSection tupleId={tupleId} />
-          ) : isOutliner ? (
+          {isOutliner ? (
             <ConfigOutliner nodeId={nodeId} />
-          ) : isSelect ? (
-            <ConfigSelect tupleId={tupleId} fieldKey={attrDefId} currentValue={valueName} />
-          ) : isTagPicker ? (
-            <ConfigTagPicker tupleId={tupleId} fieldKey={attrDefId} currentValue={valueName} />
+          ) : isAutoCollect ? (
+            <>
+              {assocDataId ? (
+                <FieldValueOutliner assocDataId={assocDataId} fieldDataType={dataType} attrDefId={attrDefId} />
+              ) : (
+                <div className="flex min-h-7 items-center gap-2 py-1" style={{ paddingLeft: 6 }}>
+                  <BulletChevron hasChildren={false} isExpanded={false} onBulletClick={noop} dimmed />
+                  <span className="text-sm leading-[21px] text-foreground-tertiary select-none">Empty</span>
+                </div>
+              )}
+              <AutoCollectSection tupleId={tupleId} />
+            </>
+          ) : assocDataId ? (
+            <FieldValueOutliner assocDataId={assocDataId} fieldDataType={dataType} attrDefId={attrDefId} />
           ) : (
-            /* Toggle / number_input / color_picker — bullet + inline control */
             <div className="flex min-h-7 items-center gap-2 py-1" style={{ paddingLeft: 6 }}>
-              <BulletChevron hasChildren={false} isExpanded={false} onBulletClick={noop} />
-              {isToggle ? (
-                <ConfigToggle tupleId={tupleId} fieldKey={attrDefId} currentValue={valueName} />
-              ) : isNumberInput ? (
-                <ConfigNumberInput tupleId={tupleId} fieldKey={attrDefId} currentValue={valueName} />
-              ) : isColorPicker ? (
-                <span className="text-xs text-foreground-tertiary italic">Default</span>
-              ) : null}
+              <BulletChevron hasChildren={false} isExpanded={false} onBulletClick={noop} dimmed />
+              <span className="text-sm leading-[21px] text-foreground-tertiary select-none">Empty</span>
             </div>
           )}
         </div>
@@ -300,7 +285,7 @@ export function FieldRow({
     );
   }
 
-  // Regular fields: icon + editable name on left, value outliner on right
+  // ─── Path 3: Regular fields — editable name, FieldValueOutliner ───
   return (
     <div className={`relative border-t ${isLastInGroup ? 'border-b' : ''} border-border-subtle flex flex-col @sm:flex-row @sm:items-start min-h-[28px]`} data-field-row>
       {isFieldSelected && (

@@ -28,7 +28,7 @@ _(空)_
 | Agent | 当前任务 | 分支 | 修改中的文件 |
 |-------|---------|------|-------------|
 | nodex-cc | 节点选中 UI 设计系统合规检查 (#52) | — | — |
-| nodex-cc-2 | Checkbox-Options 联动 | _(未 push)_ | _(待声明)_ |
+| nodex-cc-2 | — | — | — |
 | nodex-codex | — | — | — |
 
 ---
@@ -52,17 +52,6 @@ _(空)_
 - **迭代日志**:
   - [2026-02-16 nodex] 创建任务。Phase 1-3 合并后 UI 尚未对照设计系统验证。
 
-### Checkbox-Options 联动 (#20 子任务)
-
-- **Owner**: nodex-cc-2
-- **Branch**: _(未 push)_
-- **Files**: _(待声明)_
-- **Spec**: `docs/features/supertags.md`
-- **Progress**:
-  - [ ] Done state mapping — checkbox ↔ Options 字段值双向映射
-- **迭代日志**:
-  - [2026-02-16 nodex-cc-2] 开始 Done state mapping。checkbox 勾选时自动设置 Options 字段值，反之亦然。属于 Supertags 完善 (#20) 的子任务。
-
 ---
 
 ## 待办
@@ -81,7 +70,9 @@ _(空)_
 > 基础已完成（#触发、标签应用/移除、配置页、模板字段、TagBadge 右键菜单）
 > 已完成子项：Show as Checkbox、标签继承/Extend Phase 1、applyTag 复制 default content、Color 继承
 
-- [ ] Done state mapping — checkbox ↔ Options 字段值双向映射 ← **nodex-cc-2 进行中**
+- [x] Done state mapping — checkbox ↔ Options 字段值双向映射 ✓ PR #54
+- [x] 统一 config field 架构（系统配置字段与用户字段共享数据模型） ✓ PR #54
+- [x] BOOLEAN 数据类型 + toggle switch ✓ PR #54
 - [ ] Default Child Supertag（新增子节点自动继承指定标签）
 - [ ] Color picker（真实色板 swatches，目前只有继承）
 - [ ] Pinned fields（置顶显示 + filter 优先）
@@ -214,6 +205,7 @@ _(空)_
 
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
+| 2026-02-16 | 统一 config field 架构 + Done state mapping + BOOLEAN 类型 (#20) | nodex-cc-2 | #54 |
 | 2026-02-16 | 节点选中 Phase 1-3 — 单选/多选/批量操作/双层高亮 (#47) | nodex-cc | #51 |
 | 2026-02-15 | Cmd+Enter 编辑器内切换 Checkbox (#43) | — | — |
 | 2026-02-14 | Web Clipping 修复 — title sync, field value rendering, attrDef config | nodex-codex | #49 |

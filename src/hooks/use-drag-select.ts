@@ -1,16 +1,18 @@
 /**
  * Document-level drag select hook for multi-node selection.
  *
- * Handles mousedown → mousemove → mouseup on the outliner container.
- * Uses document-level listeners because contenteditable captures mouse events.
+ * Architecture (matches reference implementation):
+ *   mousedown (document capture) → record start + register document listeners
+ *   mousemove (document, dynamic) → threshold + text-area logic → activate
+ *   mouseup   (document, dynamic) → cleanup + justDragged flag
  *
- * Behavior:
- * - Left click with no modifiers starts tracking
- * - 5px vertical threshold before activating drag select
- * - Text area start: only activates when mouse crosses to a DIFFERENT node
- * - Non-text area start: activates after 5px threshold
- * - During drag: computes range selection from anchor to hover node
- * - After drag: suppresses the next click event
+ * Text area start special handling:
+ *   - Still on same node, still on text → let browser text selection work
+ *   - Still on same node, moved to non-text (padding) → enter drag-select
+ *   - Moved to different node → enter drag-select
+ *
+ * After drag: dragState.justDragged = true (reset via setTimeout(0))
+ *   → OutlinerItem checks this to suppress the click that follows mouseup.
  */
 import { useCallback, useEffect, useRef } from 'react';
 import { useUIStore } from '../stores/ui-store.js';
@@ -19,6 +21,12 @@ import { getFlattenedVisibleNodes } from '../lib/tree-utils.js';
 import { computeRangeSelection } from '../lib/selection-utils.js';
 
 const DRAG_THRESHOLD_PX = 5;
+
+/**
+ * Shared drag state — OutlinerItem checks justDragged to suppress click
+ * after drag-select completes (mouseup fires click in the same event loop).
+ */
+export const dragState = { justDragged: false };
 
 interface UseDragSelectOptions {
   containerRef: React.RefObject<HTMLElement | null>;
@@ -39,39 +47,44 @@ function getNodeFromPoint(x: number, y: number): { nodeId: string; parentId: str
 }
 
 /** Check if an element is inside a text-editable area (editor or content span). */
-function isTextArea(target: EventTarget | null): boolean {
-  if (!target || !(target instanceof HTMLElement)) return false;
-  // Inside an active editor
-  if (target.closest('.editor-inline')) return true;
-  // Inside node content (static rendered text)
-  if (target.closest('.node-content')) return true;
-  // Contenteditable
-  if (target.closest('[contenteditable]')) return true;
+function isTextArea(el: EventTarget | null): boolean {
+  if (!el || !(el instanceof HTMLElement)) return false;
+  if (el.closest('.editor-inline')) return true;
+  if (el.closest('.node-content')) return true;
+  if (el.closest('[contenteditable]')) return true;
   return false;
 }
 
 export function useDragSelect({ containerRef, rootChildIds, rootNodeId }: UseDragSelectOptions) {
-  const stateRef = useRef<{
-    active: boolean;
-    startX: number;
-    startY: number;
-    startNodeId: string | null;
-    startParentId: string | null;
-    startedInTextArea: boolean;
-    suppressNextClick: boolean;
-  }>({
-    active: false,
-    startX: 0,
-    startY: 0,
-    startNodeId: null,
-    startParentId: null,
-    startedInTextArea: false,
-    suppressNextClick: false,
-  });
-
-  // Keep rootChildIds and rootNodeId fresh for the document-level handlers
   const contextRef = useRef({ rootChildIds, rootNodeId });
   contextRef.current = { rootChildIds, rootNodeId };
+
+  const stateRef = useRef({
+    isDragging: false,
+    startY: 0,
+    startNodeId: null as string | null,
+    startedOnText: false,
+  });
+
+  // Track dynamic listeners for cleanup
+  const listenersRef = useRef<{
+    move: ((e: MouseEvent) => void) | null;
+    up: (() => void) | null;
+  }>({ move: null, up: null });
+
+  const cleanup = useCallback(() => {
+    stateRef.current.isDragging = false;
+    stateRef.current.startNodeId = null;
+    containerRef.current?.classList.remove('select-none');
+    if (listenersRef.current.move) {
+      document.removeEventListener('mousemove', listenersRef.current.move);
+      listenersRef.current.move = null;
+    }
+    if (listenersRef.current.up) {
+      document.removeEventListener('mouseup', listenersRef.current.up);
+      listenersRef.current.up = null;
+    }
+  }, [containerRef]);
 
   const handleMouseDown = useCallback((e: MouseEvent) => {
     // Only left button, no modifiers (Cmd/Shift have their own handlers)
@@ -83,106 +96,100 @@ export function useDragSelect({ containerRef, rootChildIds, rootNodeId }: UseDra
 
     // Don't start drag select on buttons, inputs, or interactive elements
     const target = e.target as HTMLElement;
-    if (target.closest('button, input, [role="button"], .editor-inline')) return;
+    if (target.closest('button, input, [role="button"]')) return;
 
     const nodeInfo = getNodeFromPoint(e.clientX, e.clientY);
     if (!nodeInfo) return;
 
-    stateRef.current = {
-      active: false,
-      startX: e.clientX,
-      startY: e.clientY,
-      startNodeId: nodeInfo.nodeId,
-      startParentId: nodeInfo.parentId,
-      startedInTextArea: isTextArea(e.target),
-      suppressNextClick: false,
-    };
-  }, [containerRef]);
-
-  const handleMouseMove = useCallback((e: MouseEvent) => {
+    // Record start state
     const state = stateRef.current;
-    if (!state.startNodeId) return;
+    state.startY = e.clientY;
+    state.startNodeId = nodeInfo.nodeId;
+    state.startedOnText = isTextArea(e.target);
+    state.isDragging = false;
 
-    const dy = Math.abs(e.clientY - state.startY);
+    // Register dynamic document listeners for this drag session
+    const onDocMouseMove = (me: MouseEvent) => {
+      // Safety: if left button released (missed mouseup), cleanup
+      if (me.buttons !== 1) { cleanup(); return; }
 
-    if (!state.active) {
-      // Check threshold
-      if (dy < DRAG_THRESHOLD_PX) return;
+      const s = stateRef.current;
+      if (!s.startNodeId) return;
 
-      // Text area: also require crossing to a different node
-      if (state.startedInTextArea) {
-        const hoverNode = getNodeFromPoint(e.clientX, e.clientY);
-        if (!hoverNode || hoverNode.nodeId === state.startNodeId) return;
+      const dy = Math.abs(me.clientY - s.startY);
+
+      if (!s.isDragging) {
+        if (dy < DRAG_THRESHOLD_PX) return;
+
+        // Started on text + still on same node?
+        if (s.startedOnText) {
+          const hoverNode = getNodeFromPoint(me.clientX, me.clientY);
+          if (hoverNode && hoverNode.nodeId === s.startNodeId) {
+            // Still on same node: check if cursor is still on text area
+            const hoverEl = document.elementFromPoint(me.clientX, me.clientY);
+            if (isTextArea(hoverEl)) return; // Let browser handle text selection
+            // Moved to non-text area (padding etc.) → fall through to activate
+          }
+          // Different node or non-text area → activate drag-select
+        }
+
+        // Activate drag-select
+        s.isDragging = true;
+        window.getSelection()?.removeAllRanges();
+        containerRef.current?.classList.add('select-none');
+
+        // Select start node as anchor + clear focus (unmount any editor).
+        // setSelectedNodes clears focusedNodeId/focusedParentId.
+        const setSelectedNodes = useUIStore.getState().setSelectedNodes;
+        setSelectedNodes(new Set([s.startNodeId]), s.startNodeId);
       }
 
-      // Activate drag select
-      state.active = true;
+      // During active drag: prevent text selection + update range
+      me.preventDefault();
 
-      // Clear browser text selection
-      window.getSelection()?.removeAllRanges();
+      const hoverNode = getNodeFromPoint(me.clientX, me.clientY);
+      if (!hoverNode) return;
 
-      // Set starting node as anchor and selected
-      const setSelectedNodes = useUIStore.getState().setSelectedNodes;
-      setSelectedNodes(new Set([state.startNodeId]), state.startNodeId);
+      const uiState = useUIStore.getState();
+      const storeEntities = useNodeStore.getState().entities;
+      const { rootChildIds: rcIds, rootNodeId: rnId } = contextRef.current;
+      const flatList = getFlattenedVisibleNodes(rcIds, storeEntities, uiState.expandedNodes, rnId);
 
-      // Add select-none to prevent text selection artifacts
-      containerRef.current?.classList.add('select-none');
-    }
+      // Validate hover node belongs to this outliner context
+      if (!flatList.some((item) => item.nodeId === hoverNode.nodeId)) return;
 
-    // During active drag: update selection based on hover node
-    const hoverNode = getNodeFromPoint(e.clientX, e.clientY);
-    if (!hoverNode) return;
+      const range = computeRangeSelection(
+        s.startNodeId!,
+        hoverNode.nodeId,
+        flatList,
+        storeEntities,
+      );
+      useUIStore.getState().setSelectedNodes(range, s.startNodeId);
+    };
 
-    const uiState = useUIStore.getState();
-    const storeEntities = useNodeStore.getState().entities;
-    const { rootChildIds: rcIds, rootNodeId: rnId } = contextRef.current;
-    const flatList = getFlattenedVisibleNodes(rcIds, storeEntities, uiState.expandedNodes, rnId);
+    const onDocMouseUp = () => {
+      if (stateRef.current.isDragging) {
+        // Flag to suppress the click event that follows mouseup.
+        // setTimeout(0) resets after the click handler runs (same event loop).
+        dragState.justDragged = true;
+        setTimeout(() => { dragState.justDragged = false; }, 0);
+      }
+      cleanup();
+    };
 
-    // Validate hover node belongs to this outliner context (not a different panel)
-    if (!flatList.some((item) => item.nodeId === hoverNode.nodeId)) return;
+    // Store refs for cleanup and register
+    listenersRef.current.move = onDocMouseMove;
+    listenersRef.current.up = onDocMouseUp;
+    document.addEventListener('mousemove', onDocMouseMove);
+    document.addEventListener('mouseup', onDocMouseUp);
+  }, [containerRef, cleanup]);
 
-    const range = computeRangeSelection(
-      state.startNodeId!,
-      hoverNode.nodeId,
-      flatList,
-      storeEntities,
-    );
-    useUIStore.getState().setSelectedNodes(range, state.startNodeId);
-  }, [containerRef]);
-
-  const handleMouseUp = useCallback(() => {
-    const state = stateRef.current;
-    if (state.active) {
-      state.suppressNextClick = true;
-      containerRef.current?.classList.remove('select-none');
-    }
-
-    // Reset start tracking (keep suppressNextClick for the click handler)
-    state.active = false;
-    state.startNodeId = null;
-    state.startParentId = null;
-  }, [containerRef]);
-
-  const handleClick = useCallback((e: MouseEvent) => {
-    if (stateRef.current.suppressNextClick) {
-      stateRef.current.suppressNextClick = false;
-      e.stopPropagation();
-      e.preventDefault();
-    }
-  }, []);
-
+  // Register mousedown on document (capture phase) and cleanup on unmount
   useEffect(() => {
     document.addEventListener('mousedown', handleMouseDown, true);
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
-    document.addEventListener('click', handleClick, true);
-
     return () => {
       document.removeEventListener('mousedown', handleMouseDown, true);
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-      document.removeEventListener('click', handleClick, true);
-      containerRef.current?.classList.remove('select-none');
+      cleanup();
     };
-  }, [handleMouseDown, handleMouseMove, handleMouseUp, handleClick, containerRef]);
+  }, [handleMouseDown, cleanup]);
 }

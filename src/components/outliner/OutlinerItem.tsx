@@ -1520,7 +1520,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
         {showRowHighlight && (
           <div
             className="absolute right-0 bg-selection-row rounded-sm border border-primary/[0.15] pointer-events-none"
-            style={{ left: depth * 28 + 6 + 15, top: 1, bottom: isExpanded ? 0 : 1 }}
+            style={{ left: depth * 28 + 6 + 15, top: 1, bottom: 1 }}
           />
         )}
         {/* Chevron: 15px zone, visible on row hover only */}
@@ -1708,8 +1708,8 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
           {/* Selection subtree mask: children area, connects to parent row above */}
           {isSelected && !isFocused && (
             <div
-              className="absolute top-0 bottom-0 right-0 bg-selection rounded-b-sm rounded-t-none pointer-events-none z-0"
-              style={{ left: depth * 28 + 6 + 15 }}
+              className="absolute bottom-0 right-0 bg-selection rounded-b-sm rounded-t-none pointer-events-none z-0"
+              style={{ left: depth * 28 + 6 + 15, top: -1 }}
             />
           )}
           {/* Indent guide line — 16px click area LEFT of bullet center.

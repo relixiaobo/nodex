@@ -28,7 +28,7 @@
  */
 import type { NodexNode } from '../types/node.js';
 import { SYS_A, SYS_V } from '../types/index.js';
-import { getExtendsChain } from './field-utils.js';
+import { getExtendsChain, resolveConfigValue } from './field-utils.js';
 
 export interface CheckboxState {
   showCheckbox: boolean;
@@ -149,23 +149,12 @@ function hasDoneMappingEnabled(
   entities: Record<string, NodexNode>,
 ): boolean {
   const td = entities[tagDefId];
-  if (!td?.children) return false;
-
-  for (const childId of td.children) {
-    const child = entities[childId];
-    if (!child?.children || child.children.length < 2) continue;
-    if (child.props._docType !== 'tuple') continue;
-    if (child.children[0] !== SYS_A.DONE_STATE_MAPPING) continue;
-
-    // New format: children[1] is SYS_V.YES or SYS_V.NO (toggle value)
-    // May also have nested children[2+] for NDX_A07/A08 tuples
-    if (child.children[1] === SYS_V.YES || child.children[1] === SYS_V.NO) {
-      return child.children[1] === SYS_V.YES;
-    }
-    // Legacy format: [NDX_A06, attrDefId, checkedOptionId, ...] → treat as enabled
-    return true;
-  }
-  return false;
+  if (!td) return false;
+  const val = resolveConfigValue(entities, td, SYS_A.DONE_STATE_MAPPING);
+  if (val === SYS_V.YES) return true;
+  if (val === SYS_V.NO || val === undefined) return false;
+  // Legacy format: value is an attrDefId (not SYS_V*) → treat as enabled
+  return true;
 }
 
 /**
@@ -207,31 +196,12 @@ function collectNewMappings(
   const td = entities[tdId];
   if (!td?.children) return [];
 
-  // Find the NDX_A06 toggle tuple
-  let toggleTuple: NodexNode | undefined;
-  for (const childId of td.children) {
-    const child = entities[childId];
-    if (child?.props._docType === 'tuple' && child.children?.[0] === SYS_A.DONE_STATE_MAPPING) {
-      toggleTuple = child;
-      break;
-    }
-  }
-  if (!toggleTuple?.children) return [];
-
-  // Group by attrDefId — scan nested children of the toggle tuple
+  // Collect mapping entries from two sources:
+  // 1. Nested children of NDX_A06 toggle tuple (legacy nested format)
+  // 2. AssociatedData of NDX_A07/NDX_A08 field tuples (unified format)
   const byAttrDef = new Map<string, { checked: string[]; unchecked: string[] }>();
 
-  for (const nestedId of toggleTuple.children) {
-    const nested = entities[nestedId];
-    if (!nested?.children || nested.children.length < 3) continue;
-    if (nested.props._docType !== 'tuple') continue;
-
-    const key = nested.children[0];
-    if (key !== SYS_A.DONE_MAP_CHECKED && key !== SYS_A.DONE_MAP_UNCHECKED) continue;
-
-    const attrDefId = nested.children[1];
-    const optionId = nested.children[2];
-
+  function addEntry(key: string, attrDefId: string, optionId: string) {
     if (!byAttrDef.has(attrDefId)) {
       byAttrDef.set(attrDefId, { checked: [], unchecked: [] });
     }
@@ -240,6 +210,41 @@ function collectNewMappings(
       entry.checked.push(optionId);
     } else {
       entry.unchecked.push(optionId);
+    }
+  }
+
+  for (const childId of td.children) {
+    const child = entities[childId];
+    if (!child?.children || child.props._docType !== 'tuple') continue;
+    const childKey = child.children[0];
+
+    // Source 1: NDX_A06 toggle tuple with nested children (children[2+] are entry IDs)
+    if (childKey === SYS_A.DONE_STATE_MAPPING) {
+      for (const nestedId of child.children) {
+        const nested = entities[nestedId];
+        if (!nested?.children || nested.children.length < 3) continue;
+        if (nested.props._docType !== 'tuple') continue;
+        const nKey = nested.children[0];
+        if (nKey !== SYS_A.DONE_MAP_CHECKED && nKey !== SYS_A.DONE_MAP_UNCHECKED) continue;
+        addEntry(nKey, nested.children[1], nested.children[2]);
+      }
+      continue;
+    }
+
+    // Source 2: NDX_A07/A08 field tuples — entries in AssociatedData (unified format)
+    if (childKey === SYS_A.DONE_MAP_CHECKED || childKey === SYS_A.DONE_MAP_UNCHECKED) {
+      const assocId = td.associationMap?.[childId];
+      if (assocId) {
+        const assoc = entities[assocId];
+        if (assoc?.children) {
+          for (const entryId of assoc.children) {
+            const entry = entities[entryId];
+            if (entry?.children && entry.children.length >= 3 && entry.props._docType === 'tuple') {
+              addEntry(childKey, entry.children[1], entry.children[2]);
+            }
+          }
+        }
+      }
     }
   }
 
@@ -382,14 +387,6 @@ function tagDefHasShowCheckbox(
   entities: Record<string, NodexNode>,
 ): boolean {
   const tagDef = entities[tagDefId];
-  if (!tagDef?.children) return false;
-
-  for (const childId of tagDef.children) {
-    const child = entities[childId];
-    if (!child?.children || child.children.length < 2) continue;
-    if (child.children[0] === SYS_A.SHOW_CHECKBOX && child.children[1] === SYS_V.YES) {
-      return true;
-    }
-  }
-  return false;
+  if (!tagDef) return false;
+  return resolveConfigValue(entities, tagDef, SYS_A.SHOW_CHECKBOX) === SYS_V.YES;
 }

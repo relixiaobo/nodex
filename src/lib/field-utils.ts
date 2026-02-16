@@ -28,11 +28,47 @@ function resolveAttrDefConfig(entities: Record<string, NodexNode>, attrDefId: st
 }
 
 /**
+ * Resolve a config/field value from a node by walking its children for a Tuple [configKey, ...].
+ * Reads from AssociatedData first (unified model), falls back to children[1] (legacy/internal tuples).
+ */
+export function resolveConfigValue(
+  entities: Record<string, NodexNode>,
+  node: NodexNode,
+  configKey: string,
+): string | undefined {
+  if (!node.children) return undefined;
+  for (const childId of node.children) {
+    const child = entities[childId];
+    if (child?.props._docType === 'tuple' && child.children?.[0] === configKey) {
+      // Unified model: read from AssociatedData
+      const assocId = node.associationMap?.[childId];
+      if (assocId) {
+        const assoc = entities[assocId];
+        if (assoc?.children?.length) return assoc.children[0];
+      }
+      // Legacy/internal: read from children[1]
+      if (child.children.length >= 2) return child.children[1];
+      return undefined;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Check whether a node ID is a system config attrDef (SYS_A* or NDX_A*).
+ */
+export function isSystemConfigField(keyId: string): boolean {
+  return keyId.startsWith('SYS_') || keyId.startsWith('NDX_');
+}
+
+/**
  * Resolve the data type of an attrDef by walking its children
  * for a Tuple [SYS_A02, SYS_D*].
  */
 export function resolveDataType(entities: Record<string, NodexNode>, attrDefId: string): string {
-  return resolveAttrDefConfig(entities, attrDefId, SYS_A.TYPE_CHOICE) ?? SYS_D.PLAIN;
+  const attrDef = entities[attrDefId];
+  if (!attrDef) return SYS_D.PLAIN;
+  return resolveConfigValue(entities, attrDef, SYS_A.TYPE_CHOICE) ?? SYS_D.PLAIN;
 }
 
 /**
@@ -42,7 +78,9 @@ export function resolveDataType(entities: Record<string, NodexNode>, attrDefId: 
 export function resolveSourceSupertag(
   entities: Record<string, NodexNode>, attrDefId: string
 ): string | undefined {
-  return resolveAttrDefConfig(entities, attrDefId, SYS_A.SOURCE_SUPERTAG);
+  const attrDef = entities[attrDefId];
+  if (!attrDef) return undefined;
+  return resolveConfigValue(entities, attrDef, SYS_A.SOURCE_SUPERTAG);
 }
 
 /**
@@ -79,26 +117,34 @@ export function resolveTaggedNodes(
  * Returns the SYS_V constant (NEVER, WHEN_EMPTY, WHEN_NOT_EMPTY, WHEN_VALUE_IS_DEFAULT, ALWAYS).
  */
 export function resolveHideField(entities: Record<string, NodexNode>, attrDefId: string): string {
-  return resolveAttrDefConfig(entities, attrDefId, SYS_A.HIDE_FIELD) ?? SYS_V.NEVER;
+  const attrDef = entities[attrDefId];
+  if (!attrDef) return SYS_V.NEVER;
+  return resolveConfigValue(entities, attrDef, SYS_A.HIDE_FIELD) ?? SYS_V.NEVER;
 }
 
 /**
  * Resolve whether an attrDef field is marked as required.
  */
 export function resolveRequired(entities: Record<string, NodexNode>, attrDefId: string): boolean {
-  return resolveAttrDefConfig(entities, attrDefId, SYS_A.NULLABLE) === SYS_V.YES;
+  const attrDef = entities[attrDefId];
+  if (!attrDef) return false;
+  return resolveConfigValue(entities, attrDef, SYS_A.NULLABLE) === SYS_V.YES;
 }
 
 /** Resolve minimum value for Number/Integer fields. Returns number or undefined. */
 export function resolveMinValue(entities: Record<string, NodexNode>, attrDefId: string): number | undefined {
-  const v = resolveAttrDefConfig(entities, attrDefId, SYS_A.MIN_VALUE);
+  const attrDef = entities[attrDefId];
+  if (!attrDef) return undefined;
+  const v = resolveConfigValue(entities, attrDef, SYS_A.MIN_VALUE);
   if (v && !isNaN(Number(v))) return Number(v);
   return undefined;
 }
 
 /** Resolve maximum value for Number/Integer fields. Returns number or undefined. */
 export function resolveMaxValue(entities: Record<string, NodexNode>, attrDefId: string): number | undefined {
-  const v = resolveAttrDefConfig(entities, attrDefId, SYS_A.MAX_VALUE);
+  const attrDef = entities[attrDefId];
+  if (!attrDef) return undefined;
+  const v = resolveConfigValue(entities, attrDef, SYS_A.MAX_VALUE);
   if (v && !isNaN(Number(v))) return Number(v);
   return undefined;
 }
@@ -399,6 +445,7 @@ export const TAGDEF_CONFIG_FIELDS: ConfigFieldDef[] = [
     defaultValue: '',
     appliesTo: '*',
     description: 'Field+option pairs that mean "done"',
+    visibleWhen: { dependsOn: SYS_A.DONE_STATE_MAPPING, value: SYS_V.YES },
   },
   {
     key: SYS_A.DONE_MAP_UNCHECKED, // NDX_A08
@@ -408,6 +455,7 @@ export const TAGDEF_CONFIG_FIELDS: ConfigFieldDef[] = [
     defaultValue: '',
     appliesTo: '*',
     description: 'Field+option pairs that mean "not done"',
+    visibleWhen: { dependsOn: SYS_A.DONE_STATE_MAPPING, value: SYS_V.YES },
   },
   // outliner field — rendered as field row with embedded outliner (template children)
   {
@@ -462,22 +510,15 @@ export function getExtendsChain(
     if (visited.has(id)) return; // circular guard
     visited.add(id);
     const tagDef = entities[id];
-    if (!tagDef?.children) return;
+    if (!tagDef) return;
 
-    for (const cid of tagDef.children) {
-      const tuple = entities[cid];
-      if (
-        tuple?.props._docType === 'tuple' &&
-        tuple.children?.[0] === SYS_A.EXTENDS &&
-        tuple.children.length >= 2
-      ) {
-        const parentId = tuple.children[1];
-        if (parentId === tagDefId) continue; // exclude self (circular)
-        if (!parentId || !entities[parentId]) continue; // skip empty/invalid
-        walk(parentId); // recurse ancestors first
-        if (!chain.includes(parentId)) chain.push(parentId);
-      }
-    }
+    const parentId = resolveConfigValue(entities, tagDef, SYS_A.EXTENDS);
+    if (!parentId) return;
+    if (parentId === tagDefId) return; // exclude self (circular)
+    if (!entities[parentId]) return; // skip invalid
+
+    walk(parentId); // recurse ancestors first
+    if (!chain.includes(parentId)) chain.push(parentId);
   }
   walk(tagDefId);
   return chain;

@@ -1,0 +1,233 @@
+# Task Board
+
+> 所有任务的单一事实来源。Agent 通过 `Read docs/TASKS.md` 获取全局状态。
+>
+> **维护规则**：
+> - 用户随手记录到「收件箱」，agent 启动时处理（归类到待办或直接处理）
+> - Dev agent 接到任务后，第一步编辑此文件（更新 Agent 状态 + 移动/创建任务到「进行中」）
+> - 任务完成后，nodex merge PR 时移动到「已完成」
+> - 原 GitHub Issue 编号保留为 `(GH#N)` 标注，方便追溯历史
+
+---
+
+## 收件箱
+
+用户随手记录，agent 启动时处理（归类到待办或进行中，处理完从此处删除）。
+
+_(空)_
+
+---
+
+## Agent 状态
+
+| Agent | 当前任务 | 分支 | 修改中的文件 |
+|-------|---------|------|-------------|
+| nodex-cc | 节点选中 Phase 1 | `cc/node-selection-phase1` | OutlinerItem.tsx, ui-store.ts |
+| nodex-cc-2 | Checkbox-Options 联动 | _(未 push)_ | _(待声明)_ |
+| nodex-codex | — | — | — |
+
+---
+
+## 进行中
+
+### 节点选中 — Phase 1 (GH#47)
+
+- **Owner**: nodex-cc
+- **Branch**: `cc/node-selection-phase1`
+- **Files**: OutlinerItem.tsx, ui-store.ts, node-store.ts
+- **Spec**: `docs/features/node-selection.md`
+- **Progress**:
+  - [x] Escape 退出编辑 → 选中模式
+  - [x] 选中模式 ↑/↓ 导航
+  - [ ] 选中模式 Enter 回编辑（光标在文本末尾）
+  - [ ] 选中模式可打印字符输入（聚焦首个选中节点，字符追加到末尾）
+  - [ ] Shift+↑/↓ 从编辑进入选中
+- **Notes**: 基于 Tana 双模式选择范式（编辑模式 ↔ 选中模式）。Phase 1 只做单选，Phase 2/3 在后续任务中。
+
+### Checkbox-Options 联动 (GH#20 子任务)
+
+- **Owner**: nodex-cc-2
+- **Branch**: _(未 push)_
+- **Files**: _(待声明)_
+- **Spec**: `docs/features/supertags.md`
+- **Progress**:
+  - [ ] Done state mapping — checkbox ↔ Options 字段值双向映射
+- **Notes**: 属于 Supertags 完善 (GH#20) 的子任务。checkbox 勾选时自动设置 Options 字段值，反之亦然。
+
+---
+
+## 待办
+
+### P2
+
+#### References 增强 (GH#19)
+> MVP 已完成（@触发搜索、树引用+内联引用、引用 bullet、删除引用）
+
+- [ ] 反向链接 section（节点底部显示所有引用位置 + 面包屑路径）
+- [ ] 引用计数 badge
+- [ ] 合并节点（选中重复节点 → 合并 children/tags，更新所有引用）
+- **Spec**: `docs/features/references.md`
+
+#### Supertags 完善 (GH#20)
+> 基础已完成（#触发、标签应用/移除、配置页、模板字段、TagBadge 右键菜单）
+> 已完成子项：Show as Checkbox、标签继承/Extend Phase 1、applyTag 复制 default content、Color 继承
+
+- [ ] Done state mapping — checkbox ↔ Options 字段值双向映射 ← **nodex-cc-2 进行中**
+- [ ] Default Child Supertag（新增子节点自动继承指定标签）
+- [ ] Color picker（真实色板 swatches，目前只有继承）
+- [ ] Pinned fields（置顶显示 + filter 优先）
+- [ ] Optional fields（建议按钮 + 自动降级）
+- [ ] Convert to supertag（普通节点快捷转 tagDef）
+- [ ] 批量标签操作（多选 add/remove）
+- [ ] Title expression（`${field name}` 动态标题）
+- [ ] 标签页（点击 supertag → 显示所有打该标签的节点列表/表格）
+- **Spec**: `docs/features/supertags.md`
+
+#### Fields 全类型 (GH#21)
+> 基础已完成（>触发、字段名编辑+自动完成、交错渲染、字段值编辑器、配置页）
+> 已完成子项：Options 下拉、Date 选择器、Number/URL/Email 输入、Checkbox、字段隐藏规则、Required 字段、Number Min/Max、值验证、系统字段(8/12)
+
+- [ ] Options from Supertag（特定标签的节点作为选项源）
+- [ ] AttrDef "Used in" 计算字段
+- [ ] Auto-initialize（6 种策略）
+- [ ] Pinned fields
+- [ ] Merge fields
+- **Spec**: `docs/features/fields.md`
+
+#### Date 节点 & 日记 (GH#22)
+
+- [ ] 年/月/周/日节点层级（自动生成）
+- [ ] Today 快捷入口（侧栏按钮 + 快捷键 Ctrl+Shift+D）
+- [ ] 自然语言日期解析（@today / @next Monday / @November）
+- [ ] 日记模板（#day supertag 配置）
+- [ ] 日期字段链接到日节点
+
+#### 网页剪藏 (GH#30)
+> 已完成：消息类型定义、Content Script 提取（defuddle）、Background 中转、Sidebar 剪藏按钮、Capture Tab 复制到剪贴板
+
+- [ ] 将捕获数据保存为节点（Supertag Extend 已就绪）
+- [ ] 自动打 web_clip 标签
+- [ ] Source URL 字段写入
+- [ ] 剪藏结果 Toast 反馈
+- [ ] 一键保存到 Inbox / Today / 指定节点
+- [ ] 保留源 URL 引用
+- **Spec**: `docs/features/web-clipping.md`
+
+#### 撤销与重做 (GH#44)
+> 已完成：文本编辑撤销（TipTap 内置）、导航撤销（navUndoStack）
+
+- [ ] 创建/删除节点撤销
+- [ ] 缩进/反缩进/移动撤销
+- [ ] 拖拽排序撤销
+- [ ] Cmd+Z 三层优先级统一
+- [ ] 标签/字段操作撤销
+- **Spec**: `docs/features/undo-redo.md`
+
+#### 节点选中 — Phase 2 & 3 (GH#47)
+> Phase 1 由 nodex-cc 进行中（见上方）
+
+**Phase 2 — 多选 + 拖选**:
+- [ ] Cmd+Click 多选（含子树合并吸收规则）
+- [ ] Shift+Click 范围选中（锚点到目标之间可见节点，根级过滤）
+- [ ] Shift+Arrow 扩展选区（从锚点持续扩展）
+- [ ] 拖动选择（文本/非文本区域区分启动，5px 阈值，document 级监听）
+- [ ] Cmd+A 全选（编辑模式=选文字，选中模式=选所有顶层节点）
+
+**Phase 3 — 批量操作 + 视觉升级**:
+- [ ] Backspace/Delete 批量删除（从下往上遍历）
+- [ ] Tab / Shift+Tab 批量缩进（缩进从上往下，反缩进从下往上）
+- [ ] Cmd+Shift+D 批量复制（从下往上遍历）
+- [ ] Cmd+Enter 批量切换 Checkbox
+- [ ] 双层选中高亮（子树遮罩 + 行高亮替代当前 ring）
+- **Spec**: `docs/features/node-selection.md`
+
+### P3
+
+#### Search Nodes / Live Queries (GH#23)
+
+- [ ] `?` 触发创建搜索节点（放大镜图标）
+- [ ] 基础搜索操作符（#tag / field 值 / 文本 / 日期）
+- [ ] 搜索结果实时更新（展开时执行）
+- [ ] AND / OR / NOT 逻辑组合
+- [ ] 关键词操作符（TODO / DONE / OVERDUE / CREATED LAST X DAYS）
+- [ ] 搜索结果配合视图展示
+
+#### Table View (GH#24)
+
+- [ ] 表格视图（行=节点，列=字段）
+- [ ] 列宽调整、列拖拽排序
+- [ ] 列计算（Sum / Avg / Median / Min / Max / Count）
+- [ ] 单元格内直接编辑字段值
+
+#### Filter / Group / Sort 工具栏 (GH#25)
+
+- [ ] 通用视图工具栏（适用于所有视图）
+- [ ] 按字段值过滤
+- [ ] 按字段值分组（Outline / Cards / List 视图）
+- [ ] 多级排序（升序/降序、堆叠排序条件）
+
+#### Cards View (GH#26)
+
+- [ ] 卡片视图
+- [ ] 卡片间拖拽更新字段值
+- [ ] Banner 图片显示
+
+#### Calendar View (GH#27)
+
+- [ ] 日历视图（按日期字段排列节点）
+- [ ] 日/周/月粒度切换
+- [ ] 拖拽未排期节点到日历添加日期
+
+#### List & Tabs View (GH#28)
+
+- [ ] List 视图（左侧列表 + 右侧详情双面板）
+- [ ] Tabs 视图（顶部 tab 切换内容）
+
+#### 用户认证 — Google 登录 (GH#45)
+> 上线前必需
+
+- [ ] Supabase Auth 配置
+- [ ] Google OAuth provider 设置
+- [ ] 登录/登出 UI
+- [ ] 工作区绑定
+
+#### Floating Toolbar (GH#46)
+
+- [ ] TipTap BubbleMenu 集成
+- [ ] 格式按钮（Bold / Italic / Code / Highlight / Strikethrough）
+- [ ] @ Reference 按钮
+- [ ] # Tag 按钮
+- **Spec**: `docs/features/floating-toolbar.md`
+
+#### Slash Command — 后续命令点亮 (GH#48)
+> 基线已合并（PR #42）。已完成：SlashCommandExtension + 菜单 UI + Field / Reference / Checkbox / More commands
+
+- [ ] Heading（加粗节点样式）
+- [ ] Paste（剪贴板内容类型判断）
+- [ ] Search node（依赖 Search Node UI GH#23）
+- [ ] Image / file（依赖上传与存储）
+- [ ] Checklist（批量 checkbox）
+- [ ] Start live transcription（语音转写）
+- **Spec**: `docs/features/slash-command.md`
+
+---
+
+## 已完成
+
+| 日期 | 任务 | Agent | PR |
+|------|------|-------|-----|
+| 2026-02-15 | Cmd+Enter 编辑器内切换 Checkbox (GH#43) | — | — |
+| 2026-02-14 | Web Clipping 修复 — title sync, field value rendering, attrDef config | nodex-codex | #49 |
+| 2026-02-14 | Node Description 编辑：高度跳动 + Ctrl+I 快捷键 (GH#41) | — | — |
+| 2026-02-13 | 无 child 节点展开后 backspace 删除空子节点并收起 (GH#18) | — | — |
+| 2026-02-13 | @ 创建 reference 对兄弟节点出错 (GH#17) | — | — |
+| 2026-02-13 | 聚焦末尾含 # 或 @ 的 node 时不应触发菜单 (GH#16) | — | — |
+| 2026-02-13 | 光标移动到 inline code 内部时光标消失 (GH#15) | — | — |
+| 2026-02-13 | 长文本 node 失焦时文本布局宽度变窄 (GH#14) | — | — |
+| 2026-02-13 | #tag 与所在行文本垂直居中对齐 (GH#13) | — | — |
+| 2026-02-13 | @ 创建 reference 后光标继续输入应转为 inline reference (GH#12) | — | — |
+
+### 已关闭的远期/非开发任务
+
+以下 issue 在 GH#29-40 范围内已关闭，属远期规划或非当前迭代范围：
+AI Chat (GH#29)、AI 网页辅助 (GH#31)、AI Command Nodes (GH#32)、AI 字段增强 (GH#33)、Supabase 实时同步 (GH#34)、离线模式增强 (GH#35)、导入/导出 (GH#36)、Command Nodes (GH#37)、Title Expressions (GH#38)、Publishing (GH#39)、Input API (GH#40)。

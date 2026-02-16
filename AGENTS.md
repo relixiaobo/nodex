@@ -36,18 +36,20 @@ Chrome Side Panel 云端知识管理工具，忠实复刻 Tana 核心功能。
 无论用户怎么给你任务，写第一行代码之前**必须**执行：
 
 ```bash
-# 1. 标记 Issue（替换 <N>）
-gh issue edit <N> --add-label "agent:nodex-codex"
-gh issue comment <N> --body "开始开发。预计修改文件：..."
+# 1. 编辑 docs/TASKS.md：
+#    - 更新「Agent 状态」表（填入当前任务、分支、修改中的文件）
+#    - 将任务移到「进行中」或新建条目（含 Owner、Branch、Files、Progress）
 
-# 2. 创建分支 + Draft PR
+# 2. 创建分支 + commit TASKS.md 变更 + Draft PR
 git checkout -b codex/<feature> origin/main
-gh pr create --draft --title "[WIP] feat: ..." --body "ref #<N>"
+git add docs/TASKS.md && git commit -m "docs: claim task — <任务名>"
+git push -u origin codex/<feature>
+gh pr create --draft --title "[WIP] feat: ..." --body "ref: <任务名>"
 ```
 
-如果用户没给 Issue 编号，先 `gh issue list --state open` 找到对应 issue，没有则创建新 issue。
+如果用户没明确任务名，先 `Read docs/TASKS.md` 查看待办列表，与用户确认。
 
-**为什么不可跳过**：其他 Agent 通过 Issue label 和 Draft PR 判断全局状态。不标记 = 不可见 = 文件冲突风险。
+**为什么不可跳过**：其他 Agent 通过 `Read docs/TASKS.md` 判断全局状态。不更新 = 不可见 = 文件冲突风险。
 
 ## 开发工作流
 
@@ -117,12 +119,12 @@ npm run build            # 生产构建
 
 修改前检查：`gh pr list --state open` 确认没有其他 Agent 正在改同一文件。
 
-## Issue 跟踪
+## 任务跟踪
 
-- GitHub Issues：https://github.com/relixiaobo/nodex/issues
-- 看板：https://github.com/users/relixiaobo/projects/1
-- 认领：`gh issue edit <N> --add-label "agent:nodex-codex"` + 留 comment 说明计划
-- 卡住时：`gh issue edit <N> --remove-label "agent:nodex-codex" --add-label "blocked"` + 留详细 comment
+- **单一事实来源**：`docs/TASKS.md`（一次 `Read` 获取全局状态）
+- 开工时更新 TASKS.md（Agent 状态 + 进行中条目）
+- 进展更新 Progress checklist + Notes
+- 卡住时在 Notes 写交接备注，Owner 改为 `—`
 
 ## 数据模型核心（快速参考）
 

@@ -29,7 +29,7 @@ _(空)_
 |-------|---------|------|-------------|
 | nodex-cc | — | — | — |
 | nodex-cc-2 | Supertags + Fields 增强（#20+#21 批次） | _(待创建)_ | node-store.ts, field-utils.ts, tag-colors.ts |
-| nodex-codex | 文本格式化补齐（#46+#48 Heading） | _(待创建，codex/text-formatting)_ | NodeEditor.tsx, FloatingToolbar.tsx(新), main.css |
+| nodex-codex | 文本格式化补齐（#46+#48 Heading） | codex/text-formatting | NodeEditor.tsx, FloatingToolbar.tsx(新), SlashCommandMenu.tsx, slash-commands.ts, main.css |
 
 ---
 
@@ -63,7 +63,7 @@ _(空)_
 ### 文本格式化补齐（#46 Floating Toolbar + #48 Heading）
 
 - **Owner**: nodex-codex
-- **Branch**: _(待创建，codex/text-formatting)_
+- **Branch**: `codex/text-formatting`
 - **Files**: NodeEditor.tsx, FloatingToolbar.tsx(新), SlashCommandMenu.tsx, slash-commands.ts, main.css
 - **Spec**: `docs/features/floating-toolbar.md` + `docs/features/slash-command.md`
 - **核心认知**：Heading 是一种**文本格式 mark**（跟 Bold/Italic/Highlight/Strikethrough 同级），不是结构性 HTML 标题。实现为 TipTap mark extension。
@@ -84,6 +84,7 @@ _(空)_
     - 执行行为：为当前选中文本或整行 toggle heading mark
 - **迭代日志**:
   - [2026-02-16 nodex] 创建任务。Heading 是文本格式 mark（与 Bold 同级），不是结构性标题。Floating Toolbar 和 Slash Heading 是同一领域（文本格式化），合并为一个任务。
+  - [2026-02-16 nodex-codex] 接手任务并开始实现。先完成任务认领流程：更新 TASKS、创建分支 `codex/text-formatting`、提交 docs claim commit、创建 Draft PR。
 
 ---
 

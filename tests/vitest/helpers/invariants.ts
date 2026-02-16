@@ -37,8 +37,9 @@ export function collectNodeGraphErrors(entities: Record<string, NodexNode>): str
     const children = node.children ?? [];
     const seen = new Set<string>();
 
-    // tuple children are key/value payloads; they are not guaranteed to be node IDs.
-    const shouldValidateChildIds = docType !== 'tuple';
+    // tuple children are key/value payloads; associatedData children can be
+    // raw strings (e.g., color config "emerald"). Neither is guaranteed to be node IDs.
+    const shouldValidateChildIds = docType !== 'tuple' && docType !== 'associatedData';
     for (const childId of children) {
       if (shouldValidateChildIds && !entities[childId]) {
         errors.push(`child missing: parent=${nodeId} child=${childId}`);

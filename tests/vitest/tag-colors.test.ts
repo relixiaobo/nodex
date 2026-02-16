@@ -51,9 +51,14 @@ describe('resolveTagColor', () => {
 
   it('falls back to hash when no SYS_A11 config', () => {
     const entities = useNodeStore.getState().entities;
-    // tagDef_task has no color configured (value undefined in seed)
-    const color = resolveTagColor(entities, 'tagDef_task');
-    expect(color).toEqual(getTagColor('tagDef_task'));
+    // tagDef_dev_task has no color configured (value undefined in seed)
+    const color = resolveTagColor(entities, 'tagDef_dev_task');
+    expect(color).toEqual(getTagColor('tagDef_dev_task'));
+  });
+
+  it('reads pre-configured emerald for tagDef_task from seed', () => {
+    const entities = useNodeStore.getState().entities;
+    expect(resolveTagColor(entities, 'tagDef_task')).toEqual(TAG_COLOR_MAP.emerald);
   });
 
   it('reads configured SYS_A11 color value', () => {

@@ -580,11 +580,11 @@ export function seedTestData() {
 
   // Helper: create tagDef config tuples from SYS_T01 template
   function makeTagDefConfigTuples(prefix: string, owner: string, opts: {
-    checkbox?: string; extends?: string; doneMapping?: string;
+    color?: string; checkbox?: string; extends?: string; doneMapping?: string;
     doneCheckedEntries?: NodexNode[]; doneUncheckedEntries?: NodexNode[];
   }) {
     const entries = [
-      makeConfigEntry(`${prefix}_cfg_color`, owner, SYS_A.COLOR, undefined, 'sysT01_tpl_color'),
+      makeConfigEntry(`${prefix}_cfg_color`, owner, SYS_A.COLOR, opts.color, 'sysT01_tpl_color'),
       makeConfigEntry(`${prefix}_cfg_extends`, owner, SYS_A.EXTENDS, opts.extends, 'sysT01_tpl_extends'),
       makeConfigEntry(`${prefix}_cfg_checkbox`, owner, SYS_A.SHOW_CHECKBOX, opts.checkbox ?? SYS_V.NO, 'sysT01_tpl_checkbox'),
       makeConfigEntry(`${prefix}_cfg_done_mapping`, owner, SYS_A.DONE_STATE_MAPPING, opts.doneMapping ?? SYS_V.NO, 'sysT01_tpl_done_mapping'),
@@ -620,6 +620,7 @@ export function seedTestData() {
 
   // TagDef: Task (with done state mapping)
   const taskCfg = makeTagDefConfigTuples('tagDef_task', 'tagDef_task', {
+    color: 'emerald',
     checkbox: SYS_V.YES,
     doneMapping: SYS_V.YES,
     doneCheckedEntries: [

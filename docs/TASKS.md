@@ -27,7 +27,7 @@ _(空)_
 
 | Agent | 当前任务 | 分支 | 修改中的文件 |
 |-------|---------|------|-------------|
-| nodex-cc | 节点选中 UI 设计系统合规检查 (#52) | — | — |
+| nodex-cc | — | — | — |
 | nodex-cc-2 | Supertags + Fields 增强（#20+#21 批次） | _(待创建)_ | node-store.ts, field-utils.ts, tag-colors.ts |
 | nodex-codex | 文本格式化补齐（#46+#48 Heading） | _(待创建，codex/text-formatting)_ | NodeEditor.tsx, FloatingToolbar.tsx(新), main.css |
 
@@ -84,23 +84,6 @@ _(空)_
     - 执行行为：为当前选中文本或整行 toggle heading mark
 - **迭代日志**:
   - [2026-02-16 nodex] 创建任务。Heading 是文本格式 mark（与 Bold 同级），不是结构性标题。Floating Toolbar 和 Slash Heading 是同一领域（文本格式化），合并为一个任务。
-
-### 节点选中 UI 设计系统合规检查 (#52)
-
-- **Owner**: nodex-cc
-- **Branch**: _(待创建)_
-- **Files**: OutlinerItem.tsx, main.css, design-system.md
-- **Spec**: `docs/design-system.md` + `docs/features/node-selection.md`
-- **Progress**:
-  - [ ] 选中高亮颜色/透明度是否使用设计系统色值
-  - [ ] 双层高亮视觉层次合理性
-  - [ ] 多选 focus ring / selection ring 规范
-  - [ ] 拖选框边框/填充色
-  - [ ] hover/selected/focused 三态视觉区分
-  - [ ] 间距/圆角与现有组件一致性
-  - [ ] 不符合项直接修复，更新 design-system.md
-- **迭代日志**:
-  - [2026-02-16 nodex] 创建任务。Phase 1-3 合并后 UI 尚未对照设计系统验证。
 
 ---
 
@@ -256,6 +239,7 @@ _(空)_
 
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
+| 2026-02-16 | 节点选中 UI 设计系统合规检查 + reference 修复 + drag-select 重构 (#52) | nodex-cc | #53 |
 | 2026-02-16 | 统一 config field 架构 + Done state mapping + BOOLEAN 类型 (#20) | nodex-cc-2 | #54 |
 | 2026-02-16 | 节点选中 Phase 1-3 — 单选/多选/批量操作/双层高亮 (#47) | nodex-cc | #51 |
 | 2026-02-15 | Cmd+Enter 编辑器内切换 Checkbox (#43) | — | — |

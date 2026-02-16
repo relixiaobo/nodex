@@ -289,7 +289,7 @@ export function FieldRow({
   return (
     <div className={`relative border-t ${isLastInGroup ? 'border-b' : ''} border-border-subtle flex flex-col @sm:flex-row @sm:items-start min-h-[28px]`} data-field-row>
       {isFieldSelected && (
-        <div className="absolute inset-0 bg-selection rounded-sm ring-1 ring-selection-ring pointer-events-none z-0" />
+        <div className="absolute inset-0 bg-selection-row rounded-sm pointer-events-none z-0" />
       )}
       {/* Name column — aligned to first line of value */}
       <div className="flex items-center gap-1 @sm:shrink-0 @sm:w-[130px] min-w-0 h-7 py-1">

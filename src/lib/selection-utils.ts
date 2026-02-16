@@ -133,17 +133,57 @@ export function computeRangeSelection(
     rangeIds.add(flatList[i].nodeId);
   }
 
-  return filterToRootLevel(rangeIds, entities);
+  return filterToRootLevel(rangeIds, entities, flatList);
+}
+
+/**
+ * Check if a node has a display-tree ancestor in the given set.
+ * Walks up the flatList parentId chain (visual hierarchy) instead of _ownerId.
+ * This correctly handles reference nodes whose _ownerId differs from their
+ * display parent.
+ */
+function hasDisplayAncestorInSet(
+  nodeId: string,
+  nodeIds: Set<string>,
+  displayParent: Map<string, string>,
+): boolean {
+  let current = displayParent.get(nodeId);
+  const visited = new Set<string>();
+  while (current) {
+    if (visited.has(current)) return false;
+    visited.add(current);
+    if (nodeIds.has(current)) return true;
+    current = displayParent.get(current);
+  }
+  return false;
 }
 
 /**
  * Filter a set of node IDs to only root-level: remove any node whose ancestor
  * is also in the set. This enforces "select parent = select all descendants".
+ *
+ * When flatList is provided, uses display-tree hierarchy (parentId from flatList)
+ * instead of _ownerId. This fixes reference nodes whose _ownerId points to
+ * their original owner rather than the display context parent.
  */
 export function filterToRootLevel(
   nodeIds: Set<string>,
   entities: Record<string, NodexNode>,
+  flatList?: Array<{ nodeId: string; parentId: string }>,
 ): Set<string> {
+  if (flatList) {
+    const displayParent = new Map<string, string>();
+    for (const item of flatList) {
+      displayParent.set(item.nodeId, item.parentId);
+    }
+    const result = new Set<string>();
+    for (const id of nodeIds) {
+      if (!hasDisplayAncestorInSet(id, nodeIds, displayParent)) {
+        result.add(id);
+      }
+    }
+    return result;
+  }
   const result = new Set<string>();
   for (const id of nodeIds) {
     if (!hasSelectedAncestor(id, nodeIds, entities)) {
@@ -167,20 +207,51 @@ export function getFirstSelectedInOrder(
 }
 
 /**
+ * Check if a node is selected or has a display-ancestor that is selected.
+ * Uses flatList parentId chain (display hierarchy) to correctly handle
+ * reference nodes.
+ */
+function isNodeOrDisplayAncestorSelected(
+  nodeId: string,
+  selectedIds: Set<string>,
+  displayParent: Map<string, string>,
+): boolean {
+  if (selectedIds.has(nodeId)) return true;
+  let current = displayParent.get(nodeId);
+  const visited = new Set<string>();
+  while (current) {
+    if (visited.has(current)) return false;
+    visited.add(current);
+    if (selectedIds.has(current)) return true;
+    current = displayParent.get(current);
+  }
+  return false;
+}
+
+/**
  * Get effective selection bounds including implicitly selected descendants.
  * When a parent is selected, all its visible descendants count toward the bounds.
  * Returns flat-list indices (not node references) for use in extend operations.
+ *
+ * Uses display hierarchy (flatList parentId) instead of _ownerId to correctly
+ * handle reference nodes.
  */
 export function getEffectiveSelectionBounds(
   selectedIds: Set<string>,
   flatList: Array<{ nodeId: string; parentId: string }>,
   entities: Record<string, NodexNode>,
 ): { firstIdx: number; lastIdx: number } | null {
+  // Build display parent map from flatList
+  const displayParent = new Map<string, string>();
+  for (const item of flatList) {
+    displayParent.set(item.nodeId, item.parentId);
+  }
+
   let firstIdx = -1;
   let lastIdx = -1;
 
   for (let i = 0; i < flatList.length; i++) {
-    if (isNodeOrAncestorSelected(flatList[i].nodeId, selectedIds, entities)) {
+    if (isNodeOrDisplayAncestorSelected(flatList[i].nodeId, selectedIds, displayParent)) {
       if (firstIdx < 0) firstIdx = i;
       lastIdx = i;
     }

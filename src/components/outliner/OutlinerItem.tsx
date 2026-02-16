@@ -50,6 +50,7 @@ import {
   getNextEnabledSlashIndex,
   type SlashCommandId,
 } from '../../lib/slash-commands';
+import { dragState } from '../../hooks/use-drag-select';
 
 /** Field types that accept only a single value node. Enter navigates out instead of creating siblings. */
 const SINGLE_VALUE_FIELD_TYPES: Set<string> = new Set([
@@ -244,6 +245,9 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     selectedParentId === null ||
     selectedParentId === parentId
   );
+
+  // Per-row highlight: only for directly selected nodes (children use subtree mask)
+  const showRowHighlight = isSelected && !isFocused;
 
   // Options field dropdown (for changing selected option value)
   const isOptionsField = fieldDataType === SYS_D.OPTIONS || fieldDataType === SYS_D.OPTIONS_FROM_SUPERTAG;
@@ -651,7 +655,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
         for (let i = start; i <= end; i++) {
           rangeIds.add(flatList[i].nodeId);
         }
-        const filtered = filterToRootLevel(rangeIds, storeEntities);
+        const filtered = filterToRootLevel(rangeIds, storeEntities, flatList);
         setSelectedNodes(filtered, anchor);
         return;
       }
@@ -796,10 +800,9 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     });
   }, [nodeId, parentId, setFocusedNode, revertRefConversion]);
 
-  // Enter edit mode on mousedown to avoid relying on click after blur.
-  // Event order when switching nodes is mousedown → blur/focusout → click; if
-  // we wait for click, the first click can be consumed by focus transitions.
-  // Capturing textOffset here keeps one-click cursor placement stable.
+  // mousedown: record text offset for cursor placement, but DON'T enter edit
+  // mode. Edit mode is deferred to click so drag-select can take over if the
+  // user drags (mounting TipTap on mousedown captures subsequent mouse events).
   const handleContentMouseDown = useCallback((e: React.MouseEvent) => {
     if (fieldDataType === SYS_D.CHECKBOX) return;
     const target = e.target as HTMLElement;
@@ -820,6 +823,8 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
 
     if (isReference) return;
 
+    // Record text offset now (mousedown position = click position for simple clicks).
+    // Will be consumed by NodeEditor when it mounts (after setFocusedNode in click).
     const container = e.currentTarget as HTMLElement;
     const textOffset = getTextOffsetFromPoint(container, e.clientX, e.clientY);
     useUIStore.getState().setFocusClickCoords(
@@ -829,10 +834,12 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     );
     // Prevent native selection/focus churn on the static HTML layer.
     e.preventDefault();
-    setFocusedNode(nodeId, parentId);
-  }, [isReference, fieldDataType, nodeId, parentId, setFocusedNode, handleCmdClick, handleShiftClick]);
+  }, [isReference, fieldDataType, nodeId, parentId, handleCmdClick, handleShiftClick]);
 
   const handleContentClick = useCallback((e: React.MouseEvent) => {
+    // Drag-select just ended → suppress this click
+    if (dragState.justDragged) return;
+
     // Intercept clicks on inline references (blue links in static display)
     const target = e.target as HTMLElement;
     const refEl = target.closest('[data-inlineref-node]') as HTMLElement;
@@ -849,8 +856,13 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     // Cmd+Click and Shift+Click are handled in handleContentMouseDown
     if (isReference && !e.metaKey && !e.ctrlKey && !e.shiftKey) {
       setSelectedNode(nodeId, parentId);
+      return;
     }
-  }, [nodeId, parentId, isReference, setSelectedNode, navigateTo]);
+    // Non-reference: enter edit mode (text offset already recorded in mousedown)
+    if (!isReference) {
+      setFocusedNode(nodeId, parentId);
+    }
+  }, [nodeId, parentId, isReference, setSelectedNode, setFocusedNode, navigateTo]);
 
   const handleContentDoubleClick = useCallback(() => {
     // Double click on reference node → enter edit mode
@@ -1489,18 +1501,11 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
 
   return (
     <div role="treeitem" aria-expanded={isExpanded} className="relative">
-      {/* Selection subtree mask: light blue covering row + expanded children */}
-      {isSelected && !isFocused && (
-        <div
-          className="absolute top-0 bottom-0 right-0 bg-selection rounded-md pointer-events-none z-0"
-          style={{ left: depth * 28 + 6 + 15 + 4 }}
-        />
-      )}
       {/* Drop indicator: before */}
       {isDropTarget && dropPosition === 'before' && (
         <div
           className="h-0.5 bg-primary rounded-full"
-          style={{ marginLeft: depth * 28 + 6 + 15 + 4 }}
+          style={{ marginLeft: depth * 28 + 6 + 15 }}
         />
       )}
       <div
@@ -1520,11 +1525,11 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
         onDrop={handleDrop}
         onDragEnd={handleDragEnd}
       >
-        {/* Selection row highlight: deeper blue on directly selected row only */}
-        {isSelected && !isFocused && (
+        {/* Per-row selection highlight: only directly selected rows */}
+        {showRowHighlight && (
           <div
-            className="absolute top-0 bottom-0 right-0 bg-selection-row rounded-md pointer-events-none"
-            style={{ left: depth * 28 + 6 + 15 + 4 }}
+            className="absolute right-0 bg-selection-row rounded-sm border border-primary/[0.15] pointer-events-none"
+            style={{ left: depth * 28 + 6 + 15, top: 1, bottom: 1 }}
           />
         )}
         {/* Chevron: 15px zone, visible on row hover only */}
@@ -1708,6 +1713,13 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       )}
       {isExpanded && (
         <div className="relative z-[1]">
+          {/* Selection subtree mask: children area, connects to parent row above */}
+          {isSelected && !isFocused && (
+            <div
+              className="absolute right-0 bg-selection rounded-b-sm rounded-t-none pointer-events-none z-0"
+              style={{ left: depth * 28 + 6 + 15, top: -1, bottom: 1 }}
+            />
+          )}
           {/* Indent guide line — 16px click area LEFT of bullet center.
                Parent bullet center = depth*28 + 32.5.
                Button right edge at depth*28+33 (1px gap to child ChevronButton at depth*28+34).

@@ -59,11 +59,29 @@ gh pr create --draft --title "[WIP] feat: ..." --body "ref: <任务名>"
 ```
 
 1. 在 `docs/TASKS.md` 的任务条目 Files 字段声明将修改的热点文件
-2. 开发过程中定期 push，保持 Draft PR 可见
+2. 开发过程中定期 push **到自己的分支**，保持 Draft PR 可见
 3. 完成后：
    - 按 `.github/pull_request_template.md` checklist 逐项自检
    - `gh pr ready` 转为 Ready
    - **不需要通知用户或 nodex**，nodex 通过 `gh pr list` 发现待审 PR
+
+### ⛔ 禁止直接 push main（硬性规则）
+
+**绝对不能**直接向 `main` 分支 push commit。违反此规则等同于绕过 code review，可能导致未经审查的代码进入主干、覆盖其他 Agent 的工作。
+
+- **唯一的合入路径**：`feature branch` → `PR` → `nodex review` → `merge to main`
+- 唯一例外：nodex（review agent）自身可在 main 上做小修复
+
+### PR 状态管理
+
+| 状态 | 含义 | nodex 行为 |
+|------|------|-----------|
+| **Draft** | 开发中，尚未完成 | **忽略**，不 review |
+| **Ready** | 开发完成，等待 review | review → comment/merge |
+
+- 开发中保持 PR 为 **Draft** 状态
+- 完成自检后用 `gh pr ready` 转为 Ready
+- 不要自行 merge PR 或标记 TASKS.md 任务为已完成（由 nodex merge 时处理）
 
 ## 提交前自检顺序
 
@@ -108,6 +126,7 @@ npm run build            # 生产构建
 - 系统常量从 `src/types/index.js` 导入（`SYS_A`, `SYS_D`, `SYS_V`, `SYS_T`）
 - 不要过度工程化：只做被要求的改动，不要顺手重构周边代码
 - 特性行为的权威来源：`docs/features/*.md`，其次 `docs/research/`
+- **禁止 `useNodeStore((s) => s.entities)` 全量订阅**：entities 是全局节点表，任何节点变化都会触发该组件重渲染。正确做法：将计算放入 selector 内部返回原始值，例如 `useNodeStore((s) => resolveTagColor(s.entities, tagDefId))`
 
 ## 高风险文件（修改前必须确认无冲突）
 

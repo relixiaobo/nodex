@@ -71,9 +71,11 @@ interface OutlinerItemProps {
   onNavigateOut?: (direction: 'up' | 'down') => void;
   /** Owner tag color: tints the bullet dot in this color (template items in config page) */
   bulletColor?: string;
+  /** When true, a selected ancestor covers this node — show per-row highlight */
+  ancestorSelected?: boolean;
 }
 
-export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId, fieldDataType, attrDefId, onNavigateOut, bulletColor }: OutlinerItemProps) {
+export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId, fieldDataType, attrDefId, onNavigateOut, bulletColor, ancestorSelected }: OutlinerItemProps) {
   const node = useNode(nodeId);
   const expandKey = `${parentId}:${nodeId}`;
   const isExpanded = useUIStore((s) => s.expandedNodes.has(`${parentId}:${nodeId}`));
@@ -243,6 +245,9 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     selectedParentId === null ||
     selectedParentId === parentId
   );
+
+  // Per-row highlight: shown when directly selected OR covered by a selected ancestor
+  const showHighlight = (isSelected || !!ancestorSelected) && !isFocused;
 
   // Options field dropdown (for changing selected option value)
   const isOptionsField = fieldDataType === SYS_D.OPTIONS || fieldDataType === SYS_D.OPTIONS_FROM_SUPERTAG;
@@ -651,7 +656,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
         for (let i = start; i <= end; i++) {
           rangeIds.add(flatList[i].nodeId);
         }
-        const filtered = filterToRootLevel(rangeIds, storeEntities);
+        const filtered = filterToRootLevel(rangeIds, storeEntities, flatList);
         setSelectedNodes(filtered, anchor);
         return;
       }
@@ -1489,13 +1494,6 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
 
   return (
     <div role="treeitem" aria-expanded={isExpanded} className="relative">
-      {/* Selection subtree mask: primary-tinted covering row + expanded children */}
-      {isSelected && !isFocused && (
-        <div
-          className="absolute top-0 bottom-0 right-0 bg-selection rounded-sm pointer-events-none z-0"
-          style={{ left: depth * 28 + 6 + 15 + 4 }}
-        />
-      )}
       {/* Drop indicator: before */}
       {isDropTarget && dropPosition === 'before' && (
         <div
@@ -1520,10 +1518,10 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
         onDrop={handleDrop}
         onDragEnd={handleDragEnd}
       >
-        {/* Selection row highlight: deeper primary on directly selected row only */}
-        {isSelected && !isFocused && (
+        {/* Per-row selection highlight: shown for directly selected + implicitly selected (ancestor covers) */}
+        {showHighlight && (
           <div
-            className="absolute top-0 bottom-0 right-0 bg-selection-row rounded-sm pointer-events-none"
+            className="absolute inset-y-0 right-0 bg-selection-row rounded-sm pointer-events-none"
             style={{ left: depth * 28 + 6 + 15 + 4 }}
           />
         )}
@@ -1788,6 +1786,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
                 rootChildIds={rootChildIds}
                 parentId={nodeId}
                 rootNodeId={rootNodeId}
+                ancestorSelected={isSelected || ancestorSelected}
               />
             );
           })}

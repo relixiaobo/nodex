@@ -36,7 +36,7 @@
 | 批量缩进 (Tab) / 取消缩进 (Shift+Tab) | ✅ 已实现 (Phase 3) |
 | 批量复制 (Cmd+Shift+D) | ✅ 已实现 (Phase 3) |
 | 批量 Checkbox 切换 (Cmd+Enter) | ✅ 已实现 (Phase 3) |
-| 双层选中高亮（子树遮罩 + 行高亮） | ✅ 已实现 (Phase 3) |
+| 独立行高亮（Tana-style per-row） | ✅ 已实现 (Phase 3 → refined) |
 
 ## 数据模型
 
@@ -260,22 +260,25 @@ selectionAnchorId: string | null;   // 范围选中 / Shift+Arrow 的锚点
 
 ## 六、选中态视觉呈现
 
-### 6.1 普通节点 — 双层高亮
+### 6.1 普通节点 — 独立行高亮（Tana-style）
 
-1. **子树遮罩层**：`--selection` (`rgba(139,92,246,0.10)`)，覆盖被选中节点的**整个子树区域**（节点行 + 所有展开的子节点），`rounded-sm`。层级在内容下方，不影响交互
-2. **当前节点行高亮**：`--selection-row` (`rgba(139,92,246,0.18)`)，仅覆盖被选中的根节点行（bullet + 文本区域），`rounded-sm`
+每个被选中或被隐式选中（祖先选中）的节点各自显示独立的行高亮条：
 
-> 颜色基于设计系统 primary (`#8B5CF6`)，不透明度 10%/18% 形成视觉层次。
+- **行高亮**：`--selection-row` (`rgba(139,92,246,0.12)`)，覆盖单个节点行（bullet + 文本区域），`rounded-sm`
+- 通过 `ancestorSelected` prop 向子节点传递选中状态
+
+> 颜色基于设计系统 primary (`#8B5CF6`)，12% 不透明度。每行独立高亮时密度较高，因此不透明度比之前更低。
 
 **视觉效果**：
-- 单选一个有子节点的父节点：用户看到整个子树区域被浅紫色包裹，父节点行更深
-- 多选多个节点：每个根选中节点各自一块子树遮罩，互相独立
-- 被隐式选中的子节点：不显示独立高亮，被父节点的浅色遮罩覆盖
+- 单选一个有子节点的父节点：父节点和每个展开子节点各自显示独立紫色高亮条
+- 多选多个节点：每个选中节点及其展开子节点都有独立高亮条
+- 被隐式选中的子节点：显示与直接选中相同的独立高亮条
 
 ### 6.2 引用节点
 
-- 使用与普通节点相同的双层高亮方案（`--selection` + `--selection-row`）
-- 不再使用紧凑边框包裹（已统一为双层高亮）
+- 使用与普通节点相同的独立行高亮方案（`--selection-row`）
+- Reference 节点选区使用显示层级（display hierarchy）而非 `_ownerId` 链判断
+- 修复：Shift+Arrow 跨 reference 节点扩展选区不再振荡
 
 ### 6.3 暗色模式（待实现）
 
@@ -294,7 +297,7 @@ selectionAnchorId: string | null;   // 范围选中 / Shift+Arrow 的锚点
 | **→（选中态，单个引用被选中）** | 无特殊行为 | 将节点引用转换为内联引用 |
 | **Backspace（光标在开头，有文字）** | 与上一节点合并文本 | 导航到上一节点（不合并，引用不支持文本合并） |
 | **Backspace（空内容）** | 删除节点 | 删除引用节点 |
-| **高亮样式** | 双层高亮（子树遮罩 + 行高亮） | 双层高亮（同普通节点） |
+| **高亮样式** | 独立行高亮（per-row） | 独立行高亮（同普通节点） |
 
 ---
 
@@ -384,7 +387,7 @@ contenteditable 元素会捕获鼠标事件，导致父容器上的 React onMous
 | Tab / Shift+Tab 批量缩进 | 缩进从上往下，取消缩进从下往上 |
 | Cmd+Shift+D 批量复制 | 从下往上遍历 |
 | Cmd+Enter 批量 Checkbox | 顺序无关 |
-| 双层选中高亮 | 子树遮罩 + 行高亮替代当前 ring |
+| 独立行高亮 | Tana-style per-row highlight（ancestorSelected prop 传递） |
 
 ---
 
@@ -403,3 +406,4 @@ contenteditable 元素会捕获鼠标事件，导致父容器上的 React onMous
 | 2026-02-16 | Phase 1 实现：Escape→选中、↑↓导航、Enter/字符输入、Shift+Arrow 入选 | 统一选中键盘处理，合并引用节点与通用选择逻辑 |
 | 2026-02-16 | Phase 2 实现：Cmd+Click多选、Shift+Click范围选、Shift+Arrow扩展、拖选、Cmd+A | 多选仅anchor节点处理键盘；拖选使用document级别监听；extent从bounds+anchor动态推导无需额外状态 |
 | 2026-02-16 | Phase 3 实现：批量操作（delete/indent/outdent/duplicate/checkbox）+ 双层高亮 | 复用已有单节点 store 方法循环调用，无需新 store API；双层高亮=子树遮罩(10%)+行高亮(18%)替代 ring |
+| 2026-02-16 | 修复 reference 选区振荡 + 双层→独立行高亮 | filterToRootLevel/getEffectiveSelectionBounds 改用 display hierarchy（flatList parentId）而非 _ownerId；删除子树遮罩层，每行独立 12% 高亮，通过 ancestorSelected prop 传递 |

@@ -27,7 +27,7 @@ _(空)_
 
 | Agent | 当前任务 | 分支 | 修改中的文件 |
 |-------|---------|------|-------------|
-| nodex-cc | 节点选中 UI 设计系统合规检查 (#52) | — | — |
+| nodex-cc | 节点选中 UI 设计系统合规检查 (#52) | cc/design-system-check | OutlinerItem.tsx, main.css, design-system.md, node-selection.md |
 | nodex-cc-2 | Checkbox-Options 联动 | _(未 push)_ | _(待声明)_ |
 | nodex-codex | — | — | — |
 
@@ -38,7 +38,7 @@ _(空)_
 ### 节点选中 UI 设计系统合规检查 (#52)
 
 - **Owner**: nodex-cc
-- **Branch**: _(待创建)_
+- **Branch**: cc/design-system-check
 - **Files**: OutlinerItem.tsx, main.css, design-system.md
 - **Spec**: `docs/design-system.md` + `docs/features/node-selection.md`
 - **Progress**:
@@ -51,6 +51,7 @@ _(空)_
   - [ ] 不符合项直接修复，更新 design-system.md
 - **迭代日志**:
   - [2026-02-16 nodex] 创建任务。Phase 1-3 合并后 UI 尚未对照设计系统验证。
+  - [2026-02-16 nodex-cc] 开始审查。发现 3 个不合规项：(1) 选中色用 blue #3B82F6 而非 primary #8B5CF6；(2) 选中高亮圆角 rounded-md(6px) 应为 rounded-sm(4px)；(3) design-system.md 缺少双层选中高亮规范。
 
 ### Checkbox-Options 联动 (#20 子任务)
 

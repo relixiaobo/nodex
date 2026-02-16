@@ -6,6 +6,8 @@
  *
  * Data model: each entry is a tuple [NDX_A07|NDX_A08, attrDefId, optionId]
  * nested under the NDX_A06 toggle tuple.
+ *
+ * Uses JSON.stringify as Zustand selector return to avoid React 19 infinite loop.
  */
 import { useState, useCallback, useMemo } from 'react';
 import { X } from 'lucide-react';
@@ -16,6 +18,7 @@ import { NodePicker, type NodePickerOption } from './NodePicker';
 import { BulletChevron } from '../outliner/BulletChevron';
 
 const noop = () => {};
+const EMPTY = '[]';
 
 interface DoneMappingEntriesProps {
   /** NDX_A06 toggle tuple ID (parent of mapping entry tuples) */
@@ -41,10 +44,10 @@ export function DoneMappingEntries({ toggleTupleId, mappingKey }: DoneMappingEnt
   const [pickerStep, setPickerStep] = useState<null | 'field' | 'option'>(null);
   const [selectedFieldId, setSelectedFieldId] = useState<string | null>(null);
 
-  // Read existing entries from store
-  const entries = useNodeStore((s): MappingEntry[] => {
+  // Read existing entries from store (JSON.stringify for stable reference)
+  const entriesJson = useNodeStore((s) => {
     const toggle = s.entities[toggleTupleId];
-    if (!toggle?.children) return [];
+    if (!toggle?.children) return EMPTY;
     const result: MappingEntry[] = [];
     for (const cid of toggle.children) {
       const child = s.entities[cid];
@@ -63,8 +66,13 @@ export function DoneMappingEntries({ toggleTupleId, mappingKey }: DoneMappingEnt
         optionName: option?.props.name ?? 'Unknown option',
       });
     }
-    return result;
+    if (result.length === 0) return EMPTY;
+    return JSON.stringify(result);
   });
+  const entries: MappingEntry[] = useMemo(
+    () => (entriesJson === EMPTY ? [] : JSON.parse(entriesJson)),
+    [entriesJson],
+  );
 
   // Workspace fields for step 1 picker
   const allFields = useWorkspaceFields();
@@ -73,16 +81,22 @@ export function DoneMappingEntries({ toggleTupleId, mappingKey }: DoneMappingEnt
     [allFields],
   );
 
-  // Options for step 2 picker (children of selected field that are content nodes = option nodes)
-  const optionOptions: NodePickerOption[] = useNodeStore((s): NodePickerOption[] => {
-    if (!selectedFieldId) return [];
+  // Options for step 2 picker (JSON.stringify for stable reference)
+  const optionOptionsJson = useNodeStore((s) => {
+    if (!selectedFieldId) return EMPTY;
     const attrDef = s.entities[selectedFieldId];
-    if (!attrDef?.children) return [];
-    return attrDef.children
+    if (!attrDef?.children) return EMPTY;
+    const opts = attrDef.children
       .map(cid => s.entities[cid])
       .filter(n => n && !n.props._docType)
       .map(n => ({ id: n!.id, name: n!.props.name ?? 'Untitled' }));
+    if (opts.length === 0) return EMPTY;
+    return JSON.stringify(opts);
   });
+  const optionOptions: NodePickerOption[] = useMemo(
+    () => (optionOptionsJson === EMPTY ? [] : JSON.parse(optionOptionsJson)),
+    [optionOptionsJson],
+  );
 
   const handleDelete = useCallback(
     (entryTupleId: string) => {

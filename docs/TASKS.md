@@ -19,7 +19,7 @@
 
 用户随手记录，agent 启动时处理（归类到待办或进行中，处理完从此处删除）。
 
-- **Ctrl+I 切换 Description 未生效**：按第二次 Ctrl+I 应关闭 description 并将光标返回 name editor。当前实现（`handleDescriptionKeyDown` 中 blur + `requestAnimationFrame` focus）未生效，需排查焦点管理流程。相关文件：`OutlinerItem.tsx:347`（handleDescriptionKeyDown）、`NodeEditor.tsx`（editorRef focus）。已有 3 个 commit 在 main 上（d32e106, d78043c, cb5eb53），需要在此基础上修复。
+_(空)_
 
 ---
 
@@ -29,11 +29,32 @@
 |-------|---------|------|-------------|
 | nodex-cc | — | — | — |
 | nodex-cc-2 | Supertags + Fields 增强（#20+#21 批次） | _(待创建)_ | node-store.ts, field-utils.ts, tag-colors.ts |
-| nodex-codex | — | — | — |
+| nodex-codex | Ctrl+I Description 切换修复 | main（直接在 main 修） | OutlinerItem.tsx, NodeEditor.tsx |
 
 ---
 
 ## 进行中
+
+### Ctrl+I Description 切换修复
+
+- **Owner**: nodex-codex
+- **Branch**: main（小修复，直接在 main 上改）
+- **Files**: `src/components/outliner/OutlinerItem.tsx`, `src/components/editor/NodeEditor.tsx`
+- **期望行为**:
+  1. 聚焦一个节点，按 Ctrl+I → 打开 description 编辑（如无 description 则显示空 contentEditable）
+  2. 在 description 编辑中再按 Ctrl+I → 保存 description、关闭编辑、**光标返回 name editor 之前的位置**
+  3. 如果 description 为空则不保存（即取消添加）
+- **当前状态（未生效）**:
+  - `handleDescriptionEdit`（~line 406）已改为 toggle（`!prev`）— commit d78043c
+  - `handleDescriptionKeyDown`（~line 347）已添加 Ctrl+I 分支，调用 `descriptionRef.current?.blur()` + `requestAnimationFrame(() => editorRef.current?.commands.focus('end'))` — commit cb5eb53
+  - **问题**：用户测试报告按第二次 Ctrl+I 无反应，description 未关闭，光标未返回
+- **排查方向**:
+  - 确认 `handleDescriptionKeyDown` 是否正确绑定到 description 的 contentEditable（onKeyDown prop）
+  - 确认 `e.ctrlKey` 在 Mac 上的行为（Mac 上物理 Ctrl 键 → `e.ctrlKey=true`，Cmd 键 → `e.metaKey=true`）
+  - 确认 blur 后 `handleDescriptionBlur` 是否被触发、`setEditingDescription(false)` 是否执行
+  - 可能需要用 `console.log` 确认事件流
+- **迭代日志**:
+  - [2026-02-16 nodex] 创建任务。已有 3 个 commit（d32e106 Cmd+I italic 分离, d78043c toggle, cb5eb53 Ctrl+I in description）。用户测试未生效，交 codex 排查。
 
 ### Supertags + Fields 增强批次（#20 + #21）
 

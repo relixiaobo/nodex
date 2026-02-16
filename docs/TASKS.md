@@ -56,6 +56,7 @@ _(空)_
   - [2026-02-16 nodex-codex] 根因修复：仅改 `shouldShow` 判断不足以触发 BubbleMenu 重新评估；改为 `isPointerSelecting` state 驱动 `shouldShow` 引用，确保 mouseup 后插件收到更新并显示。
   - [2026-02-16 nodex-codex] 继续修复：`currentEditor.isFocused` 在当前交互链路下不稳定，导致 shouldShow 常驻 false；改为 `view.hasFocus()` + `isEditable` 判定，恢复文本选中可见性。
   - [2026-02-16 nodex-codex] 系统性重构显示门控：移除自管 document mouse 监听，改为读取 ProseMirror `view.input.mouseDown`（拖拽中 true，mouseup 后 false），避免卡死状态并统一拖拽/双击行为。
+  - [2026-02-16 nodex-codex] 增加 failsafe：若 `view.input.mouseDown` 异常残留超过阈值（1.5s），自动解除阻塞，避免多次触发后菜单永久不出现。
 
 ---
 

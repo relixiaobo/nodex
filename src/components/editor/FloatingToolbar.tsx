@@ -7,6 +7,8 @@ interface FloatingToolbarProps {
   editor: Editor;
 }
 
+const POINTER_SELECTION_STALE_MS = 1500;
+
 function normalizeLinkHref(rawHref: string): string {
   const value = rawHref.trim();
   if (!value) return '';
@@ -50,6 +52,7 @@ export function FloatingToolbar({ editor }: FloatingToolbarProps) {
   const [editingLink, setEditingLink] = useState(false);
   const [linkDraft, setLinkDraft] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
+  const pointerSelectingSinceRef = useRef<number | null>(null);
 
   useEffect(() => {
     const rerender = () => setRenderTick((value) => value + 1);
@@ -141,7 +144,17 @@ export function FloatingToolbar({ editor }: FloatingToolbarProps) {
     }) => {
       // Use ProseMirror's internal mouseDown state to delay menu appearance
       // until pointer selection ends (mouseup), including double-click flows.
-      if (view.input?.mouseDown) return false;
+      if (view.input?.mouseDown) {
+        const now = Date.now();
+        if (pointerSelectingSinceRef.current === null) {
+          pointerSelectingSinceRef.current = now;
+        }
+        if (now - pointerSelectingSinceRef.current < POINTER_SELECTION_STALE_MS) {
+          return false;
+        }
+      } else {
+        pointerSelectingSinceRef.current = null;
+      }
       return currentEditor.isEditable && view.hasFocus() && from !== to;
     },
     [],

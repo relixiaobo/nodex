@@ -50,12 +50,14 @@ import {
   getNextEnabledSlashIndex,
   type SlashCommandId,
 } from '../../lib/slash-commands';
+import { getShortcutKeys, matchesShortcutEvent } from '../../lib/shortcut-registry.js';
 import { dragState } from '../../hooks/use-drag-select';
 
 /** Field types that accept only a single value node. Enter navigates out instead of creating siblings. */
 const SINGLE_VALUE_FIELD_TYPES: Set<string> = new Set([
   SYS_D.NUMBER, SYS_D.INTEGER, SYS_D.URL, SYS_D.EMAIL,
 ]);
+const DESCRIPTION_SHORTCUT_KEYS = getShortcutKeys('editor.edit_description', ['Ctrl-i']);
 
 interface OutlinerItemProps {
   nodeId: string;
@@ -328,21 +330,39 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
 
   // Pending click coordinates for description cursor placement
   const descClickCoordsRef = useRef<{ x: number; y: number } | null>(null);
+  const descriptionReturnOffsetRef = useRef<number | null>(null);
 
-  const handleDescriptionMouseDown = useCallback((e: React.MouseEvent) => {
-    e.preventDefault(); // Prevent native focus churn
-    descClickCoordsRef.current = { x: e.clientX, y: e.clientY };
-    setEditingDescription(true);
+  const captureNameEditorOffset = useCallback(() => {
+    const editor = editorRef.current;
+    if (!editor || editor.isDestroyed) {
+      descriptionReturnOffsetRef.current = null;
+      return;
+    }
+    const { from } = editor.state.selection;
+    const maxPos = editor.state.doc.content.size - 1;
+    const clampedPos = Math.max(1, Math.min(from, maxPos));
+    descriptionReturnOffsetRef.current = clampedPos - 1;
   }, []);
 
-  const handleDescriptionBlur = useCallback(() => {
+  const commitDescriptionDraft = useCallback(() => {
     if (!descriptionRef.current) return;
     const newDesc = descriptionRef.current.textContent?.trim() ?? '';
     if (newDesc !== description && userId) {
       updateNodeDescription(nodeId, newDesc, userId);
     }
-    setEditingDescription(false);
   }, [nodeId, description, userId, updateNodeDescription]);
+
+  const handleDescriptionMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault(); // Prevent native focus churn
+    captureNameEditorOffset();
+    descClickCoordsRef.current = { x: e.clientX, y: e.clientY };
+    setEditingDescription(true);
+  }, [captureNameEditorOffset]);
+
+  const handleDescriptionBlur = useCallback(() => {
+    commitDescriptionDraft();
+    setEditingDescription(false);
+  }, [commitDescriptionDraft]);
 
   const handleDescriptionKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
@@ -352,16 +372,23 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       e.preventDefault();
       if (descriptionRef.current) descriptionRef.current.textContent = description;
       setEditingDescription(false);
-    } else if (e.key === 'i' && e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) {
+    } else if (DESCRIPTION_SHORTCUT_KEYS.some((binding) => matchesShortcutEvent(e.nativeEvent, binding))) {
       // Ctrl+I toggle: save description and return focus to name editor
       e.preventDefault();
-      descriptionRef.current?.blur(); // triggers handleDescriptionBlur → save + close
-      // Re-focus TipTap editor after React re-render
+      commitDescriptionDraft();
+      setEditingDescription(false);
+      const textOffset = descriptionReturnOffsetRef.current;
+      if (textOffset !== null) {
+        useUIStore.getState().setFocusClickCoords({ nodeId, parentId, textOffset });
+      } else {
+        useUIStore.getState().setFocusClickCoords(null);
+      }
+      // Re-enter node editor after React re-render.
       requestAnimationFrame(() => {
-        editorRef.current?.commands.focus('end');
+        setFocusedNode(nodeId, parentId);
       });
     }
-  }, [description]);
+  }, [description, commitDescriptionDraft, nodeId, parentId, setFocusedNode]);
 
   // Focus description contentEditable when entering edit mode
   useEffect(() => {
@@ -413,10 +440,13 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
 
   const handleDescriptionEdit = useCallback(() => {
     setEditingDescription((prev) => {
-      if (!prev) descClickCoordsRef.current = null; // No click coords → cursor at end
+      if (!prev) {
+        captureNameEditorOffset();
+        descClickCoordsRef.current = null; // No click coords → cursor at end
+      }
       return !prev;
     });
-  }, []);
+  }, [captureNameEditorOffset]);
 
   // Open options picker when Options-field reference is selected
   useEffect(() => {

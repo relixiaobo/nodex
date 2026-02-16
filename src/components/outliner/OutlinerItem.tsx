@@ -41,6 +41,7 @@ import {
   filterToRootLevel,
   getFirstSelectedInOrder,
   getSelectionBounds,
+  getEffectiveSelectionBounds,
 } from '../../lib/selection-utils';
 import {
   filterSlashCommands,
@@ -299,6 +300,19 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     clearFocus();
   }, [clearFocus]);
 
+  // Cmd+A (double-press) in editor → select all top-level nodes
+  const handleSelectAll = useCallback(() => {
+    clearFocus();
+    const storeEntities = useNodeStore.getState().entities;
+    const rootNode = storeEntities[rootNodeId];
+    const topLevelIds = (rootNode?.children ?? []).filter(
+      (cid) => !storeEntities[cid]?.props._docType,
+    );
+    if (topLevelIds.length > 0) {
+      setSelectedNodes(new Set(topLevelIds), topLevelIds[0]);
+    }
+  }, [rootNodeId, clearFocus, setSelectedNodes]);
+
   // Description editing state
   const [editingDescription, setEditingDescription] = useState(false);
   const descriptionRef = useRef<HTMLDivElement>(null);
@@ -508,14 +522,20 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
         const latestUi = useUIStore.getState();
         const flatList = getFlattenedVisibleNodes(rootChildIds, storeEntities, latestUi.expandedNodes, rootNodeId);
 
-        const bounds = getSelectionBounds(latestUi.selectedNodeIds, flatList);
         const anchor = latestUi.selectionAnchorId;
-        if (!bounds || !anchor) return;
+        if (!anchor) return;
 
         const anchorIdx = flatList.findIndex((n) => n.nodeId === anchor);
-        const firstIdx = flatList.findIndex((n) => n.nodeId === bounds.first.nodeId);
-        const lastIdx = flatList.findIndex((n) => n.nodeId === bounds.last.nodeId);
         if (anchorIdx < 0) return;
+
+        // Use effective bounds that include implicitly selected descendants.
+        // Without this, selecting a parent with expanded children would get
+        // stuck: filterToRootLevel removes children, so bounds.last = parent,
+        // and the extent can never move past the children.
+        const effectiveBounds = getEffectiveSelectionBounds(latestUi.selectedNodeIds, flatList, storeEntities);
+        if (!effectiveBounds) return;
+
+        const { firstIdx, lastIdx } = effectiveBounds;
 
         // Determine current extent: the end of the range that is NOT the anchor
         let extentIdx: number;
@@ -1492,6 +1512,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
                 onToggleDone={handleCycleCheckbox}
                 onEscapeSelect={handleEscapeSelect}
                 onShiftArrow={handleShiftArrow}
+                onSelectAll={handleSelectAll}
               />
             ) : (
               <span

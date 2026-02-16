@@ -167,6 +167,29 @@ export function getFirstSelectedInOrder(
 }
 
 /**
+ * Get effective selection bounds including implicitly selected descendants.
+ * When a parent is selected, all its visible descendants count toward the bounds.
+ * Returns flat-list indices (not node references) for use in extend operations.
+ */
+export function getEffectiveSelectionBounds(
+  selectedIds: Set<string>,
+  flatList: Array<{ nodeId: string; parentId: string }>,
+  entities: Record<string, NodexNode>,
+): { firstIdx: number; lastIdx: number } | null {
+  let firstIdx = -1;
+  let lastIdx = -1;
+
+  for (let i = 0; i < flatList.length; i++) {
+    if (isNodeOrAncestorSelected(flatList[i].nodeId, selectedIds, entities)) {
+      if (firstIdx < 0) firstIdx = i;
+      lastIdx = i;
+    }
+  }
+
+  return firstIdx >= 0 ? { firstIdx, lastIdx } : null;
+}
+
+/**
  * Get the topmost and bottommost selected nodes in visible order.
  * Used for ↑/↓ navigation from multi-select.
  */

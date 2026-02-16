@@ -7,6 +7,7 @@ import {
   filterToRootLevel,
   getFirstSelectedInOrder,
   getSelectionBounds,
+  getEffectiveSelectionBounds,
 } from '../../src/lib/selection-utils.js';
 
 /** Helper to create a minimal NodexNode. */
@@ -272,5 +273,52 @@ describe('getSelectionBounds', () => {
       first: { nodeId: 'A', parentId: 'root' },
       last: { nodeId: 'D', parentId: 'root' },
     });
+  });
+});
+
+// ─── getEffectiveSelectionBounds ───
+
+describe('getEffectiveSelectionBounds', () => {
+  const entities = makeEntities();
+  // Flat list: A, A1, A2, B, B1, C (all expanded)
+  const flatList = [
+    { nodeId: 'A', parentId: 'root' },
+    { nodeId: 'A1', parentId: 'A' },
+    { nodeId: 'A2', parentId: 'A' },
+    { nodeId: 'B', parentId: 'root' },
+    { nodeId: 'B1', parentId: 'B' },
+    { nodeId: 'C', parentId: 'root' },
+  ];
+
+  it('returns null for empty selection', () => {
+    expect(getEffectiveSelectionBounds(new Set(), flatList, entities)).toBeNull();
+  });
+
+  it('includes implicitly selected descendants of a parent', () => {
+    // Only A is in selectedNodeIds, but A1 and A2 are descendants
+    const result = getEffectiveSelectionBounds(new Set(['A']), flatList, entities);
+    expect(result).toEqual({ firstIdx: 0, lastIdx: 2 }); // A(0) through A2(2)
+  });
+
+  it('returns exact index for leaf node selection', () => {
+    const result = getEffectiveSelectionBounds(new Set(['C']), flatList, entities);
+    expect(result).toEqual({ firstIdx: 5, lastIdx: 5 }); // C is at index 5
+  });
+
+  it('spans across multiple selected parents with descendants', () => {
+    // A and B selected → covers A, A1, A2, B, B1
+    const result = getEffectiveSelectionBounds(new Set(['A', 'B']), flatList, entities);
+    expect(result).toEqual({ firstIdx: 0, lastIdx: 4 }); // A(0) through B1(4)
+  });
+
+  it('matches getSelectionBounds when no children are expanded', () => {
+    // Collapsed flat list: only A, B, C (no children visible)
+    const collapsedList = [
+      { nodeId: 'A', parentId: 'root' },
+      { nodeId: 'B', parentId: 'root' },
+      { nodeId: 'C', parentId: 'root' },
+    ];
+    const result = getEffectiveSelectionBounds(new Set(['A', 'C']), collapsedList, entities);
+    expect(result).toEqual({ firstIdx: 0, lastIdx: 2 }); // A(0) through C(2)
   });
 });

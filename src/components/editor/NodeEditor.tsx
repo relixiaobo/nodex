@@ -101,6 +101,7 @@ interface NodeEditorProps {
   // ─── Selection mode transitions ───
   onEscapeSelect?: () => void;
   onShiftArrow?: (direction: 'up' | 'down') => void;
+  onSelectAll?: () => void;
 }
 
 export function NodeEditor({
@@ -145,6 +146,7 @@ export function NodeEditor({
   onToggleDone,
   onEscapeSelect,
   onShiftArrow,
+  onSelectAll,
 }: NodeEditorProps) {
   const updateNodeName = useNodeStore((s) => s.updateNodeName);
   const setNodeNameLocal = useNodeStore((s) => s.setNodeNameLocal);
@@ -198,6 +200,7 @@ export function NodeEditor({
     onToggleDone: onToggleDone ?? (() => {}),
     onEscapeSelect: onEscapeSelect ?? (() => {}),
     onShiftArrow: onShiftArrow ?? (() => {}),
+    onSelectAll: onSelectAll ?? (() => {}),
   });
   callbacksRef.current = {
     onEnter, onIndent, onOutdent, onDelete, onArrowUp, onArrowDown, onMoveUp, onMoveDown, saveContent,
@@ -223,6 +226,7 @@ export function NodeEditor({
     onToggleDone: onToggleDone ?? (() => {}),
     onEscapeSelect: onEscapeSelect ?? (() => {}),
     onShiftArrow: onShiftArrow ?? (() => {}),
+    onSelectAll: onSelectAll ?? (() => {}),
   };
 
   // HashTag extension callbacks
@@ -438,6 +442,18 @@ export function NodeEditor({
             callbacksRef.current.saveContent(editor.getHTML());
             callbacksRef.current.onShiftArrow('down');
             return true;
+          },
+          'Mod-a': ({ editor }) => {
+            // Double Cmd+A: first press selects all text (ProseMirror default),
+            // second press (all text already selected) escalates to select all nodes.
+            const { from, to } = editor.state.selection;
+            const docEnd = editor.state.doc.content.size - 1;
+            if (from <= 1 && to >= docEnd) {
+              callbacksRef.current.saveContent(editor.getHTML());
+              callbacksRef.current.onSelectAll();
+              return true;
+            }
+            return false; // Let ProseMirror select all text
           },
           [KEY_EDITOR_DROPDOWN_FORCE_CREATE]: () => {
             const intent = resolveNodeEditorForceCreateIntent(

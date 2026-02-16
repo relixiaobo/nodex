@@ -1519,7 +1519,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
         {/* Per-row selection highlight: only directly selected rows */}
         {showRowHighlight && (
           <div
-            className={`absolute right-0 bg-selection-row border border-primary/[0.15] pointer-events-none ${isExpanded ? 'rounded-t-sm rounded-b-none border-b-0' : 'rounded-sm'}`}
+            className={`absolute right-0 bg-selection-row border border-primary/[0.15] pointer-events-none ${isExpanded ? 'rounded-t-sm rounded-b-none' : 'rounded-sm'}`}
             style={{ left: depth * 28 + 6 + 15, top: 1, bottom: isExpanded ? 0 : 1 }}
           />
         )}
@@ -1708,7 +1708,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
           {/* Selection subtree mask: children area, connects to parent row above */}
           {isSelected && !isFocused && (
             <div
-              className="absolute top-0 bottom-0 right-0 bg-selection rounded-b-sm rounded-t-none border border-primary/[0.15] border-t-0 pointer-events-none z-0"
+              className="absolute top-0 bottom-0 right-0 bg-selection rounded-b-sm rounded-t-none pointer-events-none z-0"
               style={{ left: depth * 28 + 6 + 15 }}
             />
           )}

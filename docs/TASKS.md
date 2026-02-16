@@ -29,13 +29,26 @@ _(空)_
 |-------|---------|------|-------------|
 | nodex-cc | — | — | — |
 | nodex-cc-2 | — | — | — |
-| nodex-codex | — | — | — |
+| nodex-codex | Floating Toolbar BUG（无限渲染循环）修复 | codex/fix-floating-toolbar-render-loop | docs/TASKS.md, FloatingToolbar.tsx, main.css |
 
 ---
 
 ## 进行中
 
-_(空)_
+### Floating Toolbar BUG 修复（无限渲染循环）
+
+- **Owner**: nodex-codex
+- **Branch**: `codex/fix-floating-toolbar-render-loop`
+- **Files**: `docs/TASKS.md`, `src/components/editor/FloatingToolbar.tsx`, `src/assets/main.css`
+- **目标**:
+  1. 修复 BubbleMenu 交易循环导致的 `Maximum update depth exceeded`，恢复选中文字后的浮动工具栏显示
+  2. 保持已验证的设计系统样式修复一起落地（toolbar 阴影/hover/focus、inline mark 样式）
+- **Progress**:
+  - [ ] 移除 `editor.on('transaction', ...)` 监听，保留必要事件
+  - [ ] 稳定 `shouldShow` / `options` 引用（`useCallback` + `useMemo`）
+  - [ ] 合入 `FloatingToolbar.tsx` + `main.css` 修复并完成回归
+- **迭代日志**:
+  - [2026-02-16 nodex-codex] 认领任务，更新 TASKS，准备创建分支与 Draft PR。
 
 ---
 
@@ -171,7 +184,7 @@ _(空)_
 - [x] TipTap BubbleMenu 集成 ✓ PR #55
 - [x] 格式按钮（Bold / Italic / Code / Highlight / Strikethrough / Heading） ✓ PR #55
 - [x] Link 编辑弹窗 ✓ PR #55
-- [ ] **BUG: BubbleMenu 无限渲染循环 — 选中文字后浮动工具栏不出现**
+- [ ] **BUG: BubbleMenu 无限渲染循环 — 选中文字后浮动工具栏不出现**（进行中：`nodex-codex`，分支 `codex/fix-floating-toolbar-render-loop`）
   - 根因：`FloatingToolbar.tsx` 中 `editor.on('transaction', rerender)` 与 BubbleMenu 内部 `updateOptions` transaction 形成无限循环，触发数百次 "Maximum update depth exceeded" 错误，导致 BubbleMenu 组件静默崩溃
   - 修复方案（已验证可行，未提交）：
     1. 移除 `transaction` 事件监听（只保留 `selectionUpdate` + `blur`）

@@ -490,6 +490,43 @@ export const TAGDEF_CONFIG_MAP = new Map(
 export const TAGDEF_OUTLINER_FIELDS = TAGDEF_CONFIG_FIELDS
   .filter(f => f.control === 'outliner');
 
+/**
+ * Resolve default child supertag IDs for a parent node.
+ * Walks the parent's tags (metanode → SYS_A13 tuples) and reads SYS_A14 from each tagDef.
+ * Returns deduplicated tagDef IDs that should be auto-applied to new children.
+ */
+export function resolveChildSupertags(
+  entities: Record<string, NodexNode>,
+  parentId: string,
+): string[] {
+  const parent = entities[parentId];
+  if (!parent) return [];
+
+  const metaId = parent.props._metaNodeId;
+  if (!metaId) return [];
+  const meta = entities[metaId];
+  if (!meta?.children) return [];
+
+  const result: string[] = [];
+  for (const cid of meta.children) {
+    const tuple = entities[cid];
+    if (
+      tuple?.props._docType === 'tuple' &&
+      tuple.children?.[0] === SYS_A.NODE_SUPERTAGS &&
+      tuple.children[1]
+    ) {
+      const tagDefId = tuple.children[1];
+      const tagDef = entities[tagDefId];
+      if (!tagDef) continue;
+      const childTagId = resolveConfigValue(entities, tagDef, SYS_A.CHILD_SUPERTAG);
+      if (childTagId && entities[childTagId] && !result.includes(childTagId)) {
+        result.push(childTagId);
+      }
+    }
+  }
+  return result;
+}
+
 // ─── Extend chain resolution (synchronous, for immer context) ───
 
 /**

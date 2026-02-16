@@ -367,15 +367,20 @@ npm run test:run
 2. 非法高度（`<=0`）下的安全回退（`inside`）
 3. 临界值 `1/3` 与 `2/3` 命中中间区（`inside`）
 
-### 1.25 Tag 颜色映射稳定性
+### 1.25 Tag 颜色映射 + Color Swatch Selector
 
 **测试文件**: `tests/vitest/tag-colors.test.ts`
 
 **覆盖点**:
 
-1. 相同 tagDefId 的颜色映射确定性
+1. `getTagColor` 确定性哈希：相同 ID → 相同颜色
 2. 返回值必须来自 `TAG_COLORS` 调色板
 3. 多个 tagDefId 的分布不应退化为单一颜色
+4. `resolveTagColor` 优先级：SYS_T* → gray; SYS_A11 config → 命名色; fallback → hash
+5. `resolveTagColor` 配置写入后读取 SYS_A11 值
+6. `resolveTagColor` 未知色名 → fallback to hash
+7. `SWATCH_OPTIONS` 10 项 + 键映射完整性
+8. SYS_A11 attrDef 使用 `NDX_D02` (COLOR) 数据类型
 
 ### 1.26 UI Store 当前面板选择器
 
@@ -652,6 +657,28 @@ applyWebClipToNode（5 cases）:
 19. 就地设置 description
 20. 不改变节点 ownership（留在原父节点）
 
+### 1.41 Default Child Supertag (SYS_A14)
+
+**测试文件**: `tests/vitest/child-supertag.test.ts`
+
+**覆盖点**:
+
+resolveChildSupertags 纯函数（4 cases）:
+1. 无标签父节点 → 空
+2. 有标签但无 SYS_A14 → 空
+3. SYS_A14 已配置 → 返回 child tag ID
+4. 不存在的父节点 → 空
+
+createChild 自动标签（4 cases）:
+5. 父有 SYS_A14 → 新子节点自动标签
+6. 父无 SYS_A14 → 无自动标签
+7. 父无标签 → 无自动标签
+8. 多标签各有 SYS_A14 → 全部应用
+
+createSibling 自动标签（2 cases）:
+9. 兄弟父有 SYS_A14 → 新兄弟自动标签
+10. 兄弟父无 SYS_A14 → 无自动标签
+
 ### 1.39 Selection Mode 键盘决策纯函数
 
 **测试文件**: `tests/vitest/selection-keyboard.test.ts`
@@ -774,6 +801,7 @@ applyWebClipToNode（5 cases）:
 | 1.38 | Done State Mapping | PASS/FAIL |
 | 1.39 | Web Clip 落库服务 | PASS/FAIL |
 | 1.41 | Heading Mark 扩展 | PASS/FAIL |
+| 1.42 | Default Child Supertag (SYS_A14) | PASS/FAIL |
 | 2 | 视觉渲染 | PASS/FAIL/SKIP |
 | 3 | 扩展构建 | PASS/FAIL |
 

@@ -11,7 +11,7 @@ import { immer } from 'zustand/middleware/immer';
 import { nanoid } from 'nanoid';
 import type { NodexNode, DocType } from '../types/index.js';
 import { WORKSPACE_CONTAINERS, SYS_A, SYS_D, SYS_T, SYS_V } from '../types/index.js';
-import { ATTRDEF_CONFIG_MAP, findAutoCollectTupleId, getExtendsChain } from '../lib/field-utils.js';
+import { ATTRDEF_CONFIG_MAP, findAutoCollectTupleId, getExtendsChain, isSystemConfigField, resolveChildSupertags } from '../lib/field-utils.js';
 import { resolveCheckboxClick, resolveCmdEnterCycle, hasTagShowCheckbox, resolveForwardDoneMapping, resolveReverseDoneMapping } from '../lib/checkbox-utils.js';
 import * as nodeService from '../services/node-service.js';
 import { isSupabaseReady } from '../services/supabase.js';
@@ -357,6 +357,12 @@ export const useNodeStore = create<NodeStore>()(
         }
       });
 
+      // Auto-apply default child supertags from parent's tags
+      const childTags = resolveChildSupertags(get().entities, parentId);
+      for (const tagId of childTags) {
+        get().applyTag(id, tagId, workspaceId, userId);
+      }
+
       // Persist to Supabase (skip if not connected)
       if (!isSupabaseReady()) return optimisticNode;
 
@@ -418,6 +424,12 @@ export const useNodeStore = create<NodeStore>()(
           p.children.splice(insertPosition, 0, id);
         }
       });
+
+      // Auto-apply default child supertags from parent's tags
+      const childTags = resolveChildSupertags(get().entities, parentId);
+      for (const tagId of childTags) {
+        get().applyTag(id, tagId, workspaceId, userId);
+      }
 
       // Persist (skip if not connected)
       if (!isSupabaseReady()) return optimisticNode;
@@ -983,6 +995,10 @@ export const useNodeStore = create<NodeStore>()(
             // Key must reference a real attrDef entity (system or user)
             const attrDef = state.entities[keyId];
             if (!attrDef || attrDef.props._docType !== 'attrDef') continue;
+
+            // Skip system config fields (Color, Extends, Show checkbox, etc.)
+            // when applying to content nodes — these belong on tagDef config pages only
+            if (!n.props._docType && isSystemConfigField(keyId)) continue;
 
             // Dedup by attrDef ID across inheritance chain
             if (seenAttrDefs.has(keyId)) continue;

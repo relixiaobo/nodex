@@ -20,6 +20,7 @@ import { FieldRow } from './FieldRow';
 import { NodePicker, type NodePickerOption } from './NodePicker';
 import { BulletChevron } from '../outliner/BulletChevron';
 import { SYS_D, SYS_V } from '../../types';
+import { ColorSwatchPicker } from './ColorSwatchPicker';
 import { useWorkspaceStore } from '../../stores/workspace-store';
 import { DatePicker, formatDateDisplay } from './DatePicker.js';
 
@@ -118,6 +119,11 @@ export function FieldValueOutliner({ assocDataId, fieldDataType, attrDefId, onNa
         <span className="text-sm leading-[21px] text-foreground select-none">{label}</span>
       </div>
     );
+  }
+
+  // --- COLOR: swatch selector ---
+  if (fieldDataType === SYS_D.COLOR) {
+    return <ColorSwatchPicker assocDataId={assocDataId} />;
   }
 
   // --- OPTIONS_FROM_SUPERTAG: single-select supertag picker ---

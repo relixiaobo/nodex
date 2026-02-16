@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useRef, forwardRef } from 'react';
 import { X, XCircle, Hash, Settings, Trash2, AlertTriangle } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { useNodeStore } from '../../stores/node-store';
-import { getTagColor } from '../../lib/tag-colors.js';
+import { resolveTagColor } from '../../lib/tag-colors.js';
 
 interface TagBadgeProps {
   tagDefId: string;
@@ -14,9 +14,10 @@ interface TagBadgeProps {
 export function TagBadge({ tagDefId, onRemove, onNavigate }: TagBadgeProps) {
   const tagName = useNodeStore((s) => s.entities[tagDefId]?.props.name ?? 'Untitled');
   const isTrashed = useNodeStore((s) => s.entities[tagDefId]?.props._ownerId?.endsWith('_TRASH') ?? false);
+  const entities = useNodeStore((s) => s.entities);
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
-  const color = getTagColor(tagDefId);
+  const color = resolveTagColor(entities, tagDefId);
 
   // Close context menu on outside click or Escape
   useEffect(() => {

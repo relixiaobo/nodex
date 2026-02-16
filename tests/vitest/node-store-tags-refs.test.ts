@@ -117,6 +117,33 @@ describe('node-store tag + reference flows', () => {
     expect(useNodeStore.getState().entities[manualAssocId]).toBeTruthy();
   });
 
+  it('applyTag on content node does NOT instantiate system config fields (Color, Extends, etc.)', async () => {
+    const nodeId = 'note_2';
+    const tagDefId = 'tagDef_person';
+
+    await useNodeStore.getState().applyTag(nodeId, tagDefId, 'ws_default', 'user_default');
+
+    const node = useNodeStore.getState().entities[nodeId];
+    const entities = useNodeStore.getState().entities;
+
+    // Collect all tuple keys on the content node
+    const tupleKeys = (node.children ?? [])
+      .map(cid => entities[cid])
+      .filter(c => c?.props._docType === 'tuple')
+      .map(c => c.children?.[0])
+      .filter(Boolean) as string[];
+
+    // System config fields should NOT be present on content nodes
+    const systemKeys = tupleKeys.filter(k => k.startsWith('SYS_') || k.startsWith('NDX_'));
+    expect(systemKeys).toEqual([]);
+
+    // User fields should be present
+    expect(tupleKeys).toContain('attrDef_email');
+    expect(tupleKeys).toContain('attrDef_company');
+    expect(tupleKeys).toContain('attrDef_age');
+    expect(tupleKeys).toContain('attrDef_website');
+  });
+
   it('addReference/removeReference/startRefConversion/revertRefConversion keep parent children stable', () => {
     const parentId = 'note_2';
     const refNodeId = 'task_1';

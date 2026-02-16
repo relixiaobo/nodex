@@ -8,6 +8,7 @@ import { NodePanelHeader } from './NodePanelHeader';
 import { PanelTitle } from './PanelTitle';
 import { OutlinerView } from '../outliner/OutlinerView';
 import { FieldList } from '../fields/FieldList';
+import { resolveTagColor } from '../../lib/tag-colors.js';
 
 interface NodePanelProps {
   nodeId: string;
@@ -22,6 +23,11 @@ export function NodePanel({ nodeId }: NodePanelProps) {
   const isAttrDef = node?.props._docType === 'attrDef';
   const isTagDef = node?.props._docType === 'tagDef';
   const isDefinitionNode = isAttrDef || isTagDef;
+
+  // TagDef: colored gradient at top reflecting configured color
+  const tagDefColor = useNodeStore((s) =>
+    isTagDef ? resolveTagColor(s.entities, nodeId) : null,
+  );
 
   // IntersectionObserver: detect when title scrolls out of view
   const [titleVisible, setTitleVisible] = useState(true);
@@ -53,6 +59,14 @@ export function NodePanel({ nodeId }: NodePanelProps) {
     <div className="flex flex-1 flex-col overflow-hidden">
       <NodePanelHeader nodeId={nodeId} showCurrentName={!titleVisible} />
       <div ref={scrollRef} className="flex-1 overflow-y-auto">
+        {isTagDef && tagDefColor && (
+          <div
+            className="h-28 -mb-28 pointer-events-none"
+            style={{
+              background: `linear-gradient(to bottom, ${tagDefColor.text}20, transparent)`,
+            }}
+          />
+        )}
         <PanelTitle nodeId={nodeId} onTitleRef={handleTitleRef} />
         {isDefinitionNode && (
           <div className="mb-2 ml-4 px-2">

@@ -98,7 +98,7 @@ export function FieldRow({
   const configDef = configKey
     ? ATTRDEF_CONFIG_MAP.get(configKey) ?? TAGDEF_CONFIG_MAP.get(configKey) ?? ATTRDEF_OUTLINER_FIELDS.find(f => f.key === configKey) ?? TAGDEF_OUTLINER_FIELDS.find(f => f.key === configKey)
     : undefined;
-  const Icon = configDef?.icon ?? (isSystemConfig ? undefined : getFieldTypeIcon(dataType));
+  const Icon = getFieldTypeIcon(dataType);
 
   // Validation: read first content child of assocData to check value
   const validationWarning = useNodeStore((s) => {

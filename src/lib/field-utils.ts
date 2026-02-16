@@ -2,7 +2,7 @@
  * Shared field utilities: data type resolution and icon mapping.
  */
 import type { LucideIcon } from 'lucide-react';
-import { AlignLeft, Building2, Calendar, CalendarCheck, CalendarClock, CalendarPlus, CheckSquare, ChevronDown, FileText, Hash, Link, List, ListTree, Mail, Play, Asterisk, EyeOff, Settings2, SquareUser, Sparkles, Tag, UserPen } from 'lucide-react';
+import { AlignLeft, Building2, Calendar, CalendarCheck, CalendarClock, CalendarPlus, CheckSquare, ChevronDown, FileText, Hash, Link, List, ListTree, Mail, Play, Asterisk, EyeOff, Settings2, SquareUser, Sparkles, Tag, ToggleLeft, UserPen } from 'lucide-react';
 import { SYS_A, SYS_D, SYS_V } from '../types/index.js';
 import type { NodexNode } from '../types/index.js';
 
@@ -168,6 +168,8 @@ export function getFieldTypeIcon(dataType: string): LucideIcon {
       return Link;
     case SYS_D.EMAIL:
       return Mail;
+    case SYS_D.BOOLEAN:
+      return ToggleLeft;
     default:
       return AlignLeft;
   }

@@ -11,8 +11,8 @@ import { immer } from 'zustand/middleware/immer';
 import { nanoid } from 'nanoid';
 import type { NodexNode, DocType } from '../types/index.js';
 import { WORKSPACE_CONTAINERS, SYS_A, SYS_D, SYS_T, SYS_V } from '../types/index.js';
-import { ATTRDEF_CONFIG_MAP, TAGDEF_CONFIG_MAP, findAutoCollectTupleId, getExtendsChain } from '../lib/field-utils.js';
-import { resolveCheckboxClick, resolveCmdEnterCycle, hasTagShowCheckbox } from '../lib/checkbox-utils.js';
+import { ATTRDEF_CONFIG_MAP, findAutoCollectTupleId, getExtendsChain } from '../lib/field-utils.js';
+import { resolveCheckboxClick, resolveCmdEnterCycle, hasTagShowCheckbox, resolveForwardDoneMapping, resolveReverseDoneMapping } from '../lib/checkbox-utils.js';
 import * as nodeService from '../services/node-service.js';
 import { isSupabaseReady } from '../services/supabase.js';
 
@@ -23,6 +23,33 @@ function isWorkspaceContainer(nodeId: string): boolean {
 function isWorkspaceRoot(nodeId: string, entities: Record<string, NodexNode>): boolean {
   const node = entities[nodeId];
   return !!node && node.id === node.workspaceId && !node.props._ownerId;
+}
+
+/**
+ * Apply an option value to a field's AssociatedData in-place (for immer state).
+ * Used by done-state mapping to update Options fields atomically within a set().
+ */
+function applyFieldValueInPlace(
+  state: { entities: Record<string, NodexNode> },
+  nodeId: string,
+  attrDefId: string,
+  optionNodeId: string,
+): void {
+  const node = state.entities[nodeId];
+  if (!node?.children || !node.associationMap) return;
+
+  for (const cid of node.children) {
+    const child = state.entities[cid];
+    if (child?.props._docType === 'tuple' && child.children?.[0] === attrDefId) {
+      const assocId = node.associationMap[cid];
+      const assoc = assocId ? state.entities[assocId] : undefined;
+      if (assoc) {
+        assoc.children = [optionNodeId];
+        assoc.updatedAt = Date.now();
+      }
+      return;
+    }
+  }
 }
 
 interface NodeStore {
@@ -140,6 +167,12 @@ interface NodeStore {
   /** Set an OPTIONS-type field to a specific option node */
   setOptionsFieldValue(nodeId: string, attrDefId: string, optionNodeId: string, userId: string): void;
 
+  /**
+   * Select an option for a field via assocData reference (used by UI pickers).
+   * Replaces old reference with new one and applies reverse done-state mapping.
+   */
+  selectFieldOption(assocDataId: string, optionNodeId: string, oldOptionNodeId: string | undefined, userId: string): void;
+
   /** Clear a field value (set to empty) */
   clearFieldValue(nodeId: string, attrDefId: string, userId: string): Promise<void>;
 
@@ -196,6 +229,18 @@ interface NodeStore {
 
   /** Update a config Tuple's value (children[1]) */
   setConfigValue(tupleId: string, newValue: string, userId: string): void;
+
+  /** Add a done-mapping entry tuple as a child of the NDX_A06 toggle tuple */
+  addDoneMappingEntry(
+    toggleTupleId: string,
+    mappingKey: string,
+    attrDefId: string,
+    optionId: string,
+    userId: string,
+  ): void;
+
+  /** Remove a done-mapping entry tuple from the NDX_A06 toggle tuple */
+  removeDoneMappingEntry(toggleTupleId: string, entryTupleId: string, userId: string): void;
 
   /** Replace a field's attrDef (swap placeholder → existing) and clean up orphan */
   replaceFieldAttrDef(
@@ -464,10 +509,18 @@ export const useNodeStore = create<NodeStore>()(
       const oldDone = entities[nodeId]?.props._done;
       const hasTag = hasTagShowCheckbox(nodeId, entities);
       const newDone = resolveCheckboxClick(oldDone, hasTag);
+      const isDone = newDone !== undefined && newDone > 0;
+
+      // Forward done-state mapping: checkbox → Options field
+      const fieldUpdates = resolveForwardDoneMapping(nodeId, isDone, entities);
 
       set((state) => {
         if (state.entities[nodeId]) {
           state.entities[nodeId].props._done = newDone;
+        }
+        // Apply field value changes in the same atomic set()
+        for (const { attrDefId, optionNodeId } of fieldUpdates) {
+          applyFieldValueInPlace(state, nodeId, attrDefId, optionNodeId);
         }
       });
 
@@ -489,10 +542,18 @@ export const useNodeStore = create<NodeStore>()(
       const oldDone = entities[nodeId]?.props._done;
       const hasTag = hasTagShowCheckbox(nodeId, entities);
       const newDone = resolveCmdEnterCycle(oldDone, hasTag);
+      const isDone = newDone !== undefined && newDone > 0;
+
+      // Forward done-state mapping: checkbox → Options field
+      const fieldUpdates = resolveForwardDoneMapping(nodeId, isDone, entities);
 
       set((state) => {
         if (state.entities[nodeId]) {
           state.entities[nodeId].props._done = newDone;
+        }
+        // Apply field value changes in the same atomic set()
+        for (const { attrDefId, optionNodeId } of fieldUpdates) {
+          applyFieldValueInPlace(state, nodeId, attrDefId, optionNodeId);
         }
       });
 
@@ -915,30 +976,11 @@ export const useNodeStore = create<NodeStore>()(
               continue;
             }
 
-            // ── Tuple children ──
+            // ── Tuple children: unified path for all attrDef fields ──
             const keyId = template.children?.[0];
             if (!keyId) continue;
 
-            // System config field (SYS_A* or NDX_A* key from SYS_T02/SYS_T01 template)
-            const configDef = ATTRDEF_CONFIG_MAP.get(keyId) ?? TAGDEF_CONFIG_MAP.get(keyId);
-            if (configDef) {
-              // Check if already has this config tuple (by key match)
-              const alreadyHas = n.children.some((cid) => {
-                const c = state.entities[cid];
-                return c?.props._docType === 'tuple' && c.children?.[0] === keyId;
-              });
-              if (alreadyHas) continue;
-
-              const instanceId = nanoid();
-              const instanceNode = makeNodeLocal(instanceId, nodeId, 'tuple', [keyId, configDef.defaultValue]);
-              instanceNode.props._sourceId = templateChildId;
-              state.entities[instanceId] = instanceNode;
-              n.children.push(instanceId);
-              continue;
-            }
-
-            // User field (key is an attrDef node)
-            if (keyId.startsWith('SYS_') || keyId.startsWith('NDX_')) continue;
+            // Key must reference a real attrDef entity (system or user)
             const attrDef = state.entities[keyId];
             if (!attrDef || attrDef.props._docType !== 'attrDef') continue;
 
@@ -953,15 +995,21 @@ export const useNodeStore = create<NodeStore>()(
             });
             if (alreadyHasField) continue;
 
+            // Default value from template (children[1] if present)
+            const defaultValueId = template.children?.[1];
+
             // Create instance tuple
             const instanceId = nanoid();
-            const instanceNode = makeNodeLocal(instanceId, nodeId, 'tuple', [keyId]);
+            const tupleChildren = defaultValueId ? [keyId, defaultValueId] : [keyId];
+            const instanceNode = makeNodeLocal(instanceId, nodeId, 'tuple', tupleChildren);
             instanceNode.props._sourceId = templateChildId;
             state.entities[instanceId] = instanceNode;
 
-            // Create associatedData
+            // Create associatedData (unified for all field types)
             const assocId = nanoid();
-            state.entities[assocId] = makeNodeLocal(assocId, nodeId, 'associatedData');
+            const assocNode = makeNodeLocal(assocId, nodeId, 'associatedData');
+            if (defaultValueId) assocNode.children = [defaultValueId];
+            state.entities[assocId] = assocNode;
 
             // Wire up
             n.children.push(instanceId);
@@ -1017,6 +1065,14 @@ export const useNodeStore = create<NodeStore>()(
             if (assocId) {
               delete state.entities[assocId];
               delete node.associationMap![cid];
+            }
+            // Clean up nested children (e.g. NDX_A07/A08 under NDX_A06 instance)
+            if (child.children) {
+              for (const nestedId of child.children) {
+                if (state.entities[nestedId]?.props._ownerId === cid) {
+                  delete state.entities[nestedId];
+                }
+              }
             }
             delete state.entities[cid];
           }
@@ -1251,6 +1307,10 @@ export const useNodeStore = create<NodeStore>()(
     },
 
     setOptionsFieldValue: (nodeId, attrDefId, optionNodeId, userId) => {
+      // Pre-compute reverse done-state mapping before set() to read clean state
+      const { entities } = get();
+      const reverseResult = resolveReverseDoneMapping(nodeId, attrDefId, optionNodeId, entities);
+
       set((state) => {
         const node = state.entities[nodeId];
         if (!node?.children || !node.associationMap) return;
@@ -1268,8 +1328,62 @@ export const useNodeStore = create<NodeStore>()(
             assoc.children = [optionNodeId];
             assoc.updatedAt = Date.now();
             assoc.updatedBy = userId;
+
+            // Reverse done-state mapping: Options field → checkbox
+            if (reverseResult && state.entities[nodeId]) {
+              state.entities[nodeId].props._done = reverseResult.newDone ? Date.now() : undefined;
+            }
             return;
           }
+        }
+      });
+    },
+
+    selectFieldOption: (assocDataId, optionNodeId, oldOptionNodeId, userId) => {
+      // Pre-compute reverse done-state mapping before set()
+      const { entities } = get();
+      const assoc = entities[assocDataId];
+      const contentNodeId = assoc?.props._ownerId;
+      let reverseResult: { newDone: boolean } | null = null;
+      if (contentNodeId) {
+        // Find attrDefId from the content node's associationMap
+        const contentNode = entities[contentNodeId];
+        if (contentNode?.associationMap) {
+          for (const [tupleId, aId] of Object.entries(contentNode.associationMap)) {
+            if (aId === assocDataId) {
+              const tuple = entities[tupleId];
+              if (tuple?.children?.[0]) {
+                reverseResult = resolveReverseDoneMapping(
+                  contentNodeId, tuple.children[0], optionNodeId, entities,
+                );
+              }
+              break;
+            }
+          }
+        }
+      }
+
+      set((state) => {
+        const a = state.entities[assocDataId];
+        if (!a) return;
+
+        // Remove old reference if present
+        if (oldOptionNodeId && a.children) {
+          const idx = a.children.indexOf(oldOptionNodeId);
+          if (idx >= 0) a.children.splice(idx, 1);
+        }
+
+        // Add new reference (prevent duplicate)
+        if (!a.children) a.children = [];
+        if (!a.children.includes(optionNodeId)) {
+          a.children.push(optionNodeId);
+        }
+        a.updatedAt = Date.now();
+        a.updatedBy = userId;
+
+        // Reverse done-state mapping
+        if (reverseResult && contentNodeId && state.entities[contentNodeId]) {
+          state.entities[contentNodeId].props._done = reverseResult.newDone ? Date.now() : undefined;
         }
       });
     },
@@ -1428,6 +1542,10 @@ export const useNodeStore = create<NodeStore>()(
         const node = state.entities[nodeId];
         if (!node) return;
 
+        // Guard: system config fields cannot be deleted
+        const fieldKey = state.entities[tupleId]?.children?.[0];
+        if (fieldKey && (fieldKey.startsWith('SYS_') || fieldKey.startsWith('NDX_'))) return;
+
         // Remove tuple from parent.children
         if (node.children) {
           const idx = node.children.indexOf(tupleId);
@@ -1496,7 +1614,7 @@ export const useNodeStore = create<NodeStore>()(
         }
 
         if (!found) {
-          // No type tuple found — create one
+          // No type tuple found — create one (with AssociatedData)
           const tupleId = nanoid();
           state.entities[tupleId] = {
             id: tupleId,
@@ -1508,6 +1626,19 @@ export const useNodeStore = create<NodeStore>()(
             createdBy: userId,
             updatedBy: userId,
           };
+          const assocId = nanoid();
+          state.entities[assocId] = {
+            id: assocId,
+            workspaceId: attrDef.workspaceId,
+            props: { created: now, name: '', _ownerId: attrDefId, _docType: 'associatedData' },
+            children: [newType],
+            version: 1,
+            updatedAt: now,
+            createdBy: userId,
+            updatedBy: userId,
+          };
+          if (!attrDef.associationMap) attrDef.associationMap = {};
+          attrDef.associationMap[tupleId] = assocId;
           attrDef.children.push(tupleId);
         }
 
@@ -1534,6 +1665,20 @@ export const useNodeStore = create<NodeStore>()(
             createdBy: userId,
             updatedBy: userId,
           };
+          // Create AssociatedData for the config tuple
+          const aId = nanoid();
+          state.entities[aId] = {
+            id: aId,
+            workspaceId: attrDef.workspaceId,
+            props: { created: now, name: '', _ownerId: attrDefId, _docType: 'associatedData' },
+            children: def.defaultValue ? [def.defaultValue] : [],
+            version: 1,
+            updatedAt: now,
+            createdBy: userId,
+            updatedBy: userId,
+          };
+          if (!attrDef.associationMap) attrDef.associationMap = {};
+          attrDef.associationMap[tid] = aId;
           attrDef.children.push(tid);
         }
       });
@@ -1611,6 +1756,10 @@ export const useNodeStore = create<NodeStore>()(
       const valueId = nanoid();
       const now = Date.now();
 
+      // Pre-compute reverse done-state mapping (new auto-collected option)
+      const { entities } = get();
+      const reverseResult = resolveReverseDoneMapping(nodeId, attrDefId, valueId, entities);
+
       set((state) => {
         // 1. Create the value node (original lives in field value)
         state.entities[valueId] = {
@@ -1650,6 +1799,11 @@ export const useNodeStore = create<NodeStore>()(
             acTuple.children.push(valueId);
           }
         }
+
+        // 4. Reverse done-state mapping: Options field → checkbox
+        if (reverseResult && state.entities[nodeId]) {
+          state.entities[nodeId].props._done = reverseResult.newDone ? Date.now() : undefined;
+        }
       });
 
       return valueId;
@@ -1670,9 +1824,99 @@ export const useNodeStore = create<NodeStore>()(
       set((state) => {
         const tuple = state.entities[tupleId];
         if (!tuple || tuple.props._docType !== 'tuple' || !tuple.children || tuple.children.length < 1) return;
+        const now = Date.now();
         tuple.children[1] = newValue;
-        tuple.updatedAt = Date.now();
+        tuple.updatedAt = now;
         tuple.updatedBy = userId;
+
+        // Also update AssociatedData (unified model)
+        const parentId = tuple.props._ownerId;
+        const parent = parentId ? state.entities[parentId] : undefined;
+        const assocId = parent?.associationMap?.[tupleId];
+        if (assocId) {
+          const assoc = state.entities[assocId];
+          if (assoc) {
+            assoc.children = [newValue];
+            assoc.updatedAt = now;
+            assoc.updatedBy = userId;
+          }
+        }
+      });
+    },
+
+    addDoneMappingEntry: (toggleTupleId, mappingKey, attrDefId, optionId, userId) => {
+      set((state) => {
+        const toggle = state.entities[toggleTupleId];
+        if (!toggle || toggle.props._docType !== 'tuple') return;
+
+        // Find parent → associationMap → AssociatedData (unified model)
+        const parentId = toggle.props._ownerId;
+        const parent = parentId ? state.entities[parentId] : undefined;
+        const assocId = parent?.associationMap?.[toggleTupleId];
+        const assoc = assocId ? state.entities[assocId] : undefined;
+
+        const now = Date.now();
+        const entryId = nanoid();
+        state.entities[entryId] = {
+          id: entryId,
+          props: { created: now, _docType: 'tuple' as DocType, _ownerId: assocId ?? toggleTupleId },
+          children: [mappingKey, attrDefId, optionId],
+          workspaceId: toggle.workspaceId,
+          version: 1,
+          updatedAt: now,
+          createdBy: userId,
+          updatedBy: userId,
+        };
+
+        if (assoc) {
+          // Unified: add to AssociatedData
+          if (!assoc.children) assoc.children = [];
+          assoc.children.push(entryId);
+          assoc.updatedAt = now;
+          assoc.updatedBy = userId;
+        } else {
+          // Fallback: add to toggle tuple children (legacy)
+          if (!toggle.children) toggle.children = [];
+          toggle.children.push(entryId);
+          toggle.updatedAt = now;
+          toggle.updatedBy = userId;
+        }
+      });
+    },
+
+    removeDoneMappingEntry: (toggleTupleId, entryTupleId, userId) => {
+      set((state) => {
+        const toggle = state.entities[toggleTupleId];
+        if (!toggle) return;
+
+        const now = Date.now();
+
+        // Try unified model first: remove from AssociatedData
+        const parentId = toggle.props._ownerId;
+        const parent = parentId ? state.entities[parentId] : undefined;
+        const assocId = parent?.associationMap?.[toggleTupleId];
+        const assoc = assocId ? state.entities[assocId] : undefined;
+
+        if (assoc?.children) {
+          const idx = assoc.children.indexOf(entryTupleId);
+          if (idx >= 0) {
+            assoc.children.splice(idx, 1);
+            assoc.updatedAt = now;
+            assoc.updatedBy = userId;
+          }
+        }
+
+        // Fallback: remove from toggle tuple children (legacy)
+        if (toggle.children) {
+          const idx = toggle.children.indexOf(entryTupleId);
+          if (idx >= 0) {
+            toggle.children.splice(idx, 1);
+            toggle.updatedAt = now;
+            toggle.updatedBy = userId;
+          }
+        }
+
+        delete state.entities[entryTupleId];
       });
     },
 

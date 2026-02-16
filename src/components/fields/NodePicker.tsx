@@ -1,7 +1,7 @@
 /**
  * Generic combobox component: bullet + click-to-edit + filtered dropdown.
  *
- * Used by OptionsPicker, FieldTypePicker, and ConfigSelect.
+ * Used by OptionsPicker and FieldValueOutliner.
  *
  * Two editing modes based on isReference:
  * - Non-reference (config fields): click → plain input with cursor, like editing a normal node

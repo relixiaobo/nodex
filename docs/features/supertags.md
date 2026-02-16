@@ -43,20 +43,38 @@
 - 面包屑显示 `[#] Schema` 作为根容器
 - **页面结构**：
   1. **PanelTitle**: 标签名（可编辑）+ TagBar（`#Supertag` badge）
-  2. **FieldList**: 系统配置项（来自 SYS_T01 模板）
+  2. **FieldList**: 系统配置字段（来自 SYS_T01 模板，`isSystemConfig=true`）
      - Show as checkbox (toggle) — SYS_A55
      - Default child supertag (tag_picker, 当前 placeholder) — SYS_A14
      - Color (color_picker, 当前 placeholder) — SYS_A11
-  3. **"Default content" 标签 + OutlinerView**: tagDef.children 中的用户内容
+     - Extends (tag_picker) — NDX_A05
+     - Done state mapping (toggle + nested entries) — NDX_A06/A07/A08
+  3. **"Default content" 标签 + ConfigOutliner**: tagDef.children 中的用户模板内容
      - 模板字段 tuple（key 为 attrDefId）→ 渲染为 FieldRow
      - 普通内容节点（无 docType）→ 渲染为 OutlinerItem
      - 支持 TrailingInput 在模板中新建内容
+     - ConfigOutliner 根据 `f.isSystemConfig` 标志区分系统配置项和用户模板内容（不再用 dataType 前缀）
   4. **Delete tag** 按钮
+
+#### 统一配置字段架构（2026-02-16 重构）
+
+配置字段（SYS_A*/NDX_A* key 的 tuple）与用户字段现在使用**完全相同的数据结构**：
+
+- **Key**: 真实 attrDef 实体节点（如 `attrDef_show_checkbox`），不再使用 SYS_A* 裸 ID 作为 tuple key
+- **Value**: 存储在 AssociatedData 中，通过 associationMap 索引（与用户字段完全一致）
+- **applyTag 统一路径**: 创建 config 和 user 字段 tuple 时都生成 AssociatedData
+- **渲染统一**: `FieldValueOutliner` 处理所有字段类型（OPTIONS picker、plain outliner 等），不再有专用 config 组件
+- **系统保护**: `removeField` 通过检查 tuple key 是否为 `SYS_*` 或 `NDX_*` 前缀来保护系统配置字段不被删除
+- **已删除的专用组件**（5 个）: `ConfigTagPicker`、`ConfigSelect`、`ConfigNumberInput`、`FieldTypePicker`、`ConfigToggle`
+- **DoneMappingEntries** 从 AssociatedData 读取映射数据（统一模型）
 
 ### createTagDef 自动配置
 
 - 新建 tagDef 后自动调用 `applyTag(id, SYS_T01)`
-- 创建 metanode + SYS_A13 tag binding + 4 个 config tuple（checkbox/childtag/color/extends）
+- 创建 metanode + SYS_A13 tag binding + 5 个直接 config tuple（checkbox/childtag/color/extends/done_mapping）
+- 每个 config tuple 同时创建 AssociatedData + associationMap 条目（统一字段架构）
+- Config tuple 的 key 是真实 attrDef 实体节点（如 `attrDef_show_checkbox`），value 存储在 AssociatedData.children 中
+- NDX_A07/A08 嵌套在 NDX_A06 实例的 children 中（递归模板实例化）
 - tagDef 的 `_ownerId` 始终为 `{workspaceId}_SCHEMA`
 
 ### 删除标签级联清理 — 目标规格（未实现）
@@ -98,8 +116,52 @@
 **Done 视觉**: `text-foreground/50`（dimmed，无删除线）
 
 **未实现**:
-- Done state mapping（checkbox ↔ Options 字段双向映射）
 - 批量操作（需多选功能）
+
+### Done State Mapping — 已实现（嵌套多值模型）
+
+**数据模型**（嵌套 tuple 树）:
+
+```
+tagDef.children:
+  Tuple_A [NDX_A06, SYS_V.YES]                            ← 开关（visibleWhen: Show checkbox = YES）
+    Tuple_A.children (嵌套):
+      Tuple [NDX_A07, attrDefId, optionId]                 ← checked 映射（可多个）
+      Tuple [NDX_A08, attrDefId, optionId]                 ← unchecked 映射（可多个）
+```
+
+- `NDX_A06` = `SYS_A.DONE_STATE_MAPPING` — 独立 toggle（YES/NO），NDX_A07/A08 作为其**嵌套子节点**
+- `NDX_A07` = `SYS_A.DONE_MAP_CHECKED` — 每个 tuple = 一个 checked 映射
+- `NDX_A08` = `SYS_A.DONE_MAP_UNCHECKED` — 每个 tuple = 一个 unchecked 映射
+- NDX_A06 tuple 的 `children` = `[NDX_A06, SYS_V.YES, nestedCheckedId, nestedUncheckedId, ...]`（前两个是 key+value，后续是嵌套子节点 ID）
+- NDX_A07/A08 的 `_ownerId` = NDX_A06 实例 ID（嵌套归属）
+- 同一 key 可有**多个** tuple → 多值（如 Status→Done 和 Status→Cancelled 都映射为 checked）
+- 按 attrDefId 分组为 `DoneStateMapping { checkedOptionIds[], uncheckedOptionIds[] }`
+- 条件可见性: NDX_A06 仅在 SYS_A55=YES 时可见；NDX_A07/A08 嵌套可见性由树结构决定（toggle ON 时展开）
+- 配置页缩进渲染: NDX_A07/A08 相对 NDX_A06 缩进 28px（depth=1）
+- **UI 控件**: "Map checked to" / "Map unchecked to" 使用 `DoneMappingEntries` 组件（普通字段值输入），显示已有条目列表（"FieldName: OptionValue" + 删除按钮）+ 两步 picker（先选字段，再选 option）添加新条目
+- **配置项排序**: Color → Extends → Show checkbox → Done mapping → Map checked → Map unchecked → Default content → Default child supertag
+
+**向后兼容**: 旧格式 `[NDX_A06, attrDefId, checkedOptionId, uncheckedOptionId?]`（children.length >= 3）仍可读取。
+
+**正向映射**（checkbox → Options field）:
+- `toggleNodeDone` / `cycleNodeCheckbox` 计算 newDone 后，调用 `resolveForwardDoneMapping` 获取要更新的字段
+- isDone=true → 每个 mapping 的 `checkedOptionIds[0]`（取第一个）
+- isDone=false → 每个 mapping 的 `uncheckedOptionIds[0]`
+- 在同一个 `set()` 调用内同时更新 `_done` 和 AssociatedData.children
+
+**反向映射**（Options field → checkbox）:
+- `setOptionsFieldValue` / `autoCollectOption` 设置 option 值后，调用 `resolveReverseDoneMapping`
+- `selectFieldOption`（UI 路径，从 assocDataId 反查内容节点和 attrDefId）— 用于 OutlinerItem inline picker 和 TrailingInput option 选择
+- newOptionId ∈ 任一 mapping 的 `checkedOptionIds` → `{ newDone: true }`
+- newOptionId ∈ 任一 mapping 的 `uncheckedOptionIds` → `{ newDone: false }`
+- 在同一个 `set()` 调用内更新 `_done`
+
+**无限循环防护**: 正向和反向都在各自的 `set()` 内完成，不会互相触发 store action。
+
+**继承支持**: Done state mapping 沿 Extend 链继承（子标签自动继承父标签的映射配置）。
+
+**Seed data**: `tagDef_task` 预配置 toggle=YES + `NDX_A07 → [attrDef_status, opt_done]` + `NDX_A08 → [attrDef_status, opt_todo]`
 
 ### Default Child Supertag — 未实现
 
@@ -295,7 +357,7 @@ tagDef_article
 | 2026-02-05 | AttrDef typeChoice key 使用 SYS_A02 | 与当前实现和系统常量一致 |
 | 2026-02-06 | 标签模板字段通过 _sourceId 追踪来源 | 区分"模板自动添加"和"手动添加"的字段 |
 | 2026-02-12 | removeTag 同时清理模板来源的字段 tuple | 与 Tana 一致（移除标签不保留模板字段数据） |
-| 2026-02-12 | 配置页分 FieldList (config) + OutlinerView (default content) | 配置项用特殊控件，模板内容用标准 outliner |
+| 2026-02-12 | 配置页分 FieldList (config) + ConfigOutliner (default content) | 配置项用 FieldList 渲染，模板内容用 ConfigOutliner |
 | 2026-02-12 | Default content 支持字段 tuple 和普通内容节点混合 | 与 Tana 一致（template 不仅有 field） |
 | 2026-02-12 | trashNode(tagDef) 级联清理所有引用节点（目标规格） | 作为未来目标行为，避免遗留悬挂引用 |
 | 2026-02-12 | 对比 Tana 官方文档补全遗漏功能清单 | 记录 Pinned/Optional/Convert/Batch/TitleExpr 等 |
@@ -308,6 +370,26 @@ tagDef_article
 | 2026-02-15 | Extend 绑定存储在 metanode 和 config tuple 双写 | metanode 用于 `getExtendsChain()` 遍历，config tuple 用于配置页 tag_picker 渲染 |
 | 2026-02-15 | 字段去重按 attrDef ID，祖先优先 | 同一 attrDef 跨继承链只实例化一次，`_sourceId` 指向最早祖先的模板 |
 | 2026-02-15 | 配置页继承项通过 owning tagDef 颜色区分 | OOP 继承视觉：父标签项 = 父色，子标签项 = 子色，无 extend 时无色 |
+| 2026-02-16 | Done state mapping 使用 NDX_A06 Tuple 存储在 tagDef.children | 遵循现有 config tuple 模式，与 SYS_T01 模板一致 |
+| 2026-02-16 | 正向/反向映射在同一 set() 中原子完成 | 避免无限循环，无需额外防护标志 |
+| 2026-02-16 | Done state mapping 沿 Extend 链继承 | 子标签自动继承父标签的映射配置 |
+| 2026-02-16 | 新增 `selectFieldOption` store action 用于 UI 路径反向映射 | UI 使用 `addReference` 而非 `setOptionsFieldValue`，需独立路径从 assocDataId 反查 |
+| 2026-02-16 | Done State Mapping 升级为多值模型（NDX_A06 toggle + NDX_A07/A08 multi-tuple） | 支持多个 checked/unchecked option，匹配 Tana 实际行为 |
+| 2026-02-16 | NDX_A06 改为 toggle，NDX_A07/A08 新增用于 checked/unchecked 映射 | 保持旧格式向后兼容（children.length >= 3 自动识别） |
+| 2026-02-16 | ConfigFieldDef 新增 visibleWhen 条件可见性 | Done state mapping toggle 仅在 Show checkbox=YES 时可见 |
+| 2026-02-16 | NDX_A07/A08 从扁平同级重构为 NDX_A06 的嵌套子节点 | 遵循"一切皆节点"原则，嵌套关系由节点树决定而非渲染层 visibleWhen 元数据 |
+| 2026-02-16 | applyTag 递归实例化嵌套 config template | SYS_T01 模板中 NDX_A07/A08 作为 NDX_A06 的嵌套模板，applyTag 自动递归创建对应实例 |
+| 2026-02-16 | removeTag 级联清理嵌套 config 子节点 | 删除 NDX_A06 实例时同时清理其 NDX_A07/A08 嵌套子节点，防止孤儿实体 |
+| 2026-02-16 | FieldEntry 新增 depth 属性支持配置页缩进渲染 | NDX_A06 depth=0，NDX_A07/A08 depth=1，FieldList 通过 paddingLeft 渲染层级 |
+| 2026-02-16 | NDX_A07/A08 控件从 tag_picker 改为 done_map_entries | "Map checked/unchecked to" 使用普通字段值输入（两步 picker: 选字段 → 选 option），匹配 Tana 行为 |
+| 2026-02-16 | TagDef 配置项重排序 | Color → Extends → Show checkbox → Done mapping → Map checked/unchecked → Default content → Default child supertag |
+| 2026-02-16 | use-node-fields 聚合 NDX_A07/A08 为两个 FieldEntry | 不再逐个嵌套 child 发射，而是聚合为 "Map checked to" + "Map unchecked to" 两个条目，组件内部扫描 toggle children |
+| 2026-02-16 | 统一配置字段架构（issue #20 重构） | Config fields 使用真实 attrDef 实体节点作为 key，values 存储在 AssociatedData 中（与用户字段完全统一） |
+| 2026-02-16 | 删除 5 个专用 config 组件 | ConfigTagPicker/ConfigSelect/ConfigNumberInput/FieldTypePicker/ConfigToggle → FieldValueOutliner 统一渲染 |
+| 2026-02-16 | applyTag 统一创建 AssociatedData | config 和 user field tuple 共享同一代码路径创建 AssociatedData + associationMap |
+| 2026-02-16 | removeField 增加系统配置保护 | tuple key 为 SYS_*/NDX_* 前缀时跳过删除，防止用户误删系统配置字段 |
+| 2026-02-16 | ConfigOutliner 使用 isSystemConfig 标志 | 不再用 dataType 前缀判断，改用 FieldEntry.isSystemConfig 语义标志区分系统配置与用户模板 |
+| 2026-02-16 | DoneMappingEntries 读取 AssociatedData | 统一模型下映射条目从 AssociatedData.children 读取，不再直接读 tuple.children |
 
 ## 当前状态
 
@@ -327,7 +409,7 @@ tagDef_article
 - [ ] trashNode(attrDef) 级联清理（移除所有引用该字段的 tuple）
 - [x] applyTag 克隆 default content 中的普通节点（shallow clone, `_sourceId` 追踪来源）
 - [x] Show as Checkbox（toggle + done visual + Cmd+Enter）
-- [ ] Done state mapping（checkbox ↔ Options 字段双向映射）
+- [x] Done state mapping（checkbox ↔ Options 字段双向映射, NDX_A06）
 - [ ] Default Child Supertag（真实 tag_picker）
 - [ ] Color picker（真实色板）
 - [ ] Pinned fields
@@ -345,7 +427,8 @@ tagDef_article
 
 ## 与 Tana 的已知差异
 
-- Tana 配置页用折叠卡片（Building blocks / Content template / AI / Advanced），Nodex 用扁平列表
+- Tana 配置页用折叠卡片（Building blocks / Content template / AI / Advanced），Nodex 用扁平 FieldList + ConfigOutliner
+- Tana 配置字段可能使用专用 UI 控件，Nodex 统一使用 FieldValueOutliner 渲染所有字段类型（config 和 user 共享同一套渲染管线）
 - Tana TagBadge 有自定义颜色，Nodex 用 ID 哈希确定色系
 - Tana 支持 tag 内嵌 description（在标签名下方显示），Nodex 暂不支持
 - Tana 的"标签页"是完整的 Search Node + View 组合，Nodex 需等 Phase 2

@@ -256,7 +256,7 @@ export function seedTestData() {
 
   // NDX_A05 Extends — OPTIONS_FROM_SUPERTAG type, source = SYS_T01
   const sysAttrDefExtends: NodexNode[] = [
-    makeNode(SYS_A.EXTENDS, 'Extends', schemaId, [`${SYS_A.EXTENDS}_type`, `${SYS_A.EXTENDS}_source`], 'attrDef'),
+    makeNode(SYS_A.EXTENDS, 'Extend from', schemaId, [`${SYS_A.EXTENDS}_type`, `${SYS_A.EXTENDS}_source`], 'attrDef'),
     makeNode(`${SYS_A.EXTENDS}_type`, '', SYS_A.EXTENDS, [SYS_A.TYPE_CHOICE, SYS_D.OPTIONS_FROM_SUPERTAG], 'tuple'),
     makeNode(`${SYS_A.EXTENDS}_source`, '', SYS_A.EXTENDS, [SYS_A.SOURCE_SUPERTAG, SYS_T.SUPERTAG], 'tuple'),
   ];

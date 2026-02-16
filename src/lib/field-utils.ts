@@ -413,7 +413,7 @@ export const TAGDEF_CONFIG_FIELDS: ConfigFieldDef[] = [
   },
   {
     key: SYS_A.EXTENDS,           // NDX_A05
-    name: 'Extends',
+    name: 'Extend from',
     control: 'tag_picker',
     icon: ListTree,
     defaultValue: '',

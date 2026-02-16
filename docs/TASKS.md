@@ -28,7 +28,7 @@ _(空)_
 | Agent | 当前任务 | 分支 | 修改中的文件 |
 |-------|---------|------|-------------|
 | nodex-cc | — | — | — |
-| nodex-cc-2 | Supertags + Fields 增强（#20+#21 批次） | _(待创建)_ | node-store.ts, field-utils.ts, tag-colors.ts |
+| nodex-cc-2 | — | — | — |
 | nodex-codex | Ctrl+I Description 切换修复 | main（直接在 main 修） | OutlinerItem.tsx, NodeEditor.tsx |
 
 ---
@@ -55,31 +55,6 @@ _(空)_
   - 可能需要用 `console.log` 确认事件流
 - **迭代日志**:
   - [2026-02-16 nodex] 创建任务。已有 3 个 commit（d32e106 Cmd+I italic 分离, d78043c toggle, cb5eb53 Ctrl+I in description）。用户测试未生效，交 codex 排查。
-
-### Supertags + Fields 增强批次（#20 + #21）
-
-- **Owner**: nodex-cc-2
-- **Branch**: _(待创建，cc2/supertags-fields-enhance)_
-- **Files**: node-store.ts, field-utils.ts, tag-colors.ts, system-nodes.ts, FieldValueOutliner 相关
-- **Spec**: `docs/features/supertags.md` + `docs/features/fields.md`
-- **Progress**:
-  - [x] **Default Child Supertag** — SYS_A14 运行时行为已实现 ✓
-    - tagDef 配置页 tag_picker 已在 PR #54 完成
-    - `createChild`/`createSibling` 自动读取父节点标签的 SYS_A14，fire-and-forget `applyTag`
-    - `resolveChildSupertags()` 辅助函数在 `field-utils.ts`，10 个 Vitest 用例覆盖
-  - [x] **Color Swatch Selector** — 预置 10 色色板 + Swatch UI ✓
-    - `NDX_D02` COLOR 数据类型 + `ColorSwatchPicker` 组件（10 个彩色圆点）
-    - `resolveTagColor(entities, tagDefId)`: SYS_T* → gray; SYS_A11 config → 命名色; fallback → hash
-    - TagBadge / OutlinerItem / NodePicker / ConfigOutliner 四处统一使用 `resolveTagColor`
-    - 12 个 Vitest 用例覆盖
-  - [ ] **Options from Supertag** — SYS_D05 字段类型
-    - attrDef 配置页 Field type 下拉新增 "Options from supertag" 选项
-    - 新增 SYS_A06 (SOURCE_SUPERTAG) 配置 → tag picker 选择来源标签
-    - OptionsPicker 查询逻辑改造：从"预定义 Options 列表"扩展到"搜索所有打了指定标签的节点"
-- **迭代日志**:
-  - [2026-02-16 nodex] 创建任务。承接 PR #54 的 config field 上下文，三个子项可按顺序独立提交。
-  - [2026-02-16 nodex-cc-2] Default Child Supertag 运行时行为完成。`resolveChildSupertags` + `createChild`/`createSibling` 自动 applyTag，10 个 Vitest 用例。
-  - [2026-02-16 nodex-cc-2] Color Swatch Selector 完成。`NDX_D02` 数据类型 + `ColorSwatchPicker` 组件 + `resolveTagColor` 替换全部 `getTagColor` 调用 + 12 个 Vitest 用例。
 
 ---
 
@@ -116,7 +91,7 @@ _(空)_
 > 基础已完成（>触发、字段名编辑+自动完成、交错渲染、字段值编辑器、配置页）
 > 已完成子项：Options 下拉、Date 选择器、Number/URL/Email 输入、Checkbox、字段隐藏规则、Required 字段、Number Min/Max、值验证、系统字段(8/12)
 
-- [ ] Options from Supertag（特定标签的节点作为选项源）→ **进行中 nodex-cc-2**
+- [x] Options from Supertag（特定标签的节点作为选项源）✓ PR #54 + nodex-cc-2
 - [ ] AttrDef "Used in" 计算字段
 - [ ] Auto-initialize（6 种策略）
 - [ ] Pinned fields
@@ -236,6 +211,7 @@ _(空)_
 
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
+| 2026-02-16 | Supertags + Fields 增强批次 — Default Child Supertag + Color Swatch + Options from Supertag (#20+#21) | nodex-cc-2 | main |
 | 2026-02-16 | 文本格式化 — Floating Toolbar + Heading Mark + Link 编辑 (#46+#48) | nodex-codex | #55 |
 | 2026-02-16 | 节点选中 UI 设计系统合规检查 + reference 修复 + drag-select 重构 (#52) | nodex-cc | #53 |
 | 2026-02-16 | 统一 config field 架构 + Done state mapping + BOOLEAN 类型 (#20) | nodex-cc-2 | #54 |

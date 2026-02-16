@@ -30,13 +30,11 @@ export function ColorSwatchPicker({ assocDataId }: ColorSwatchPickerProps) {
     return undefined;
   });
 
-  // Read current color value from AssociatedData children[0] → node name
+  // Read current color key directly from AssociatedData children[0].
+  // Color values are stored as raw strings ("emerald", "violet"), not node references.
   const selectedKey = useNodeStore((s) => {
     const assoc = s.entities[assocDataId];
-    const valueId = assoc?.children?.[0];
-    if (!valueId) return undefined;
-    const valueNode = s.entities[valueId];
-    return valueNode?.props.name || undefined;
+    return assoc?.children?.[0] || undefined;
   });
 
   const handleSelect = useCallback(

@@ -94,6 +94,7 @@ export function FieldValueOutliner({ assocDataId, fieldDataType, attrDefId, onNa
 
     return (
       <div className="flex min-h-7 items-center gap-2 py-1" style={{ paddingLeft: 6 }}>
+        <BulletChevron hasChildren={false} isExpanded={false} onBulletClick={() => {}} />
         <button
           onClick={() => {
             if (!userId) return;

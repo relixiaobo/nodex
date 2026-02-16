@@ -29,7 +29,7 @@ _(空)_
 |-------|---------|------|-------------|
 | nodex-cc | — | — | — |
 | nodex-cc-2 | — | — | — |
-| nodex-codex | Floating Toolbar BUG（无限渲染循环）修复 | codex/fix-floating-toolbar-render-loop | docs/TASKS.md, FloatingToolbar.tsx, main.css |
+| nodex-codex | Floating Toolbar BUG（无限渲染循环）修复 | codex/fix-floating-toolbar-render-loop | docs/TASKS.md, tests/vitest/floating-toolbar.test.ts, docs/TESTING.md |
 
 ---
 
@@ -39,16 +39,18 @@ _(空)_
 
 - **Owner**: nodex-codex
 - **Branch**: `codex/fix-floating-toolbar-render-loop`
-- **Files**: `docs/TASKS.md`, `src/components/editor/FloatingToolbar.tsx`, `src/assets/main.css`
+- **Files**: `docs/TASKS.md`, `tests/vitest/floating-toolbar.test.ts`, `docs/TESTING.md`
 - **目标**:
   1. 修复 BubbleMenu 交易循环导致的 `Maximum update depth exceeded`，恢复选中文字后的浮动工具栏显示
   2. 保持已验证的设计系统样式修复一起落地（toolbar 阴影/hover/focus、inline mark 样式）
 - **Progress**:
-  - [ ] 移除 `editor.on('transaction', ...)` 监听，保留必要事件
-  - [ ] 稳定 `shouldShow` / `options` 引用（`useCallback` + `useMemo`）
-  - [ ] 合入 `FloatingToolbar.tsx` + `main.css` 修复并完成回归
+  - [x] 确认 `FloatingToolbar.tsx` 已移除 `editor.on('transaction', ...)` 监听，仅保留 `selectionUpdate` + `blur`
+  - [x] 确认 `shouldShow` / `options` 已稳定引用（`useCallback` + `useMemo`）
+  - [x] 新增回归测试 `tests/vitest/floating-toolbar.test.ts`，覆盖循环渲染防回归
+  - [x] 更新 `docs/TESTING.md` 覆盖映射并通过 `typecheck/check:test-sync/test:run/build`
 - **迭代日志**:
   - [2026-02-16 nodex-codex] 认领任务，更新 TASKS，准备创建分支与 Draft PR。
+  - [2026-02-16 nodex-codex] 确认代码中修复逻辑已在主干（去掉 transaction 监听 + 稳定 BubbleMenu props），补充 `floating-toolbar.test.ts` 回归测试并完成全量验证。
 
 ---
 

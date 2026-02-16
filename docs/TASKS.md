@@ -28,29 +28,13 @@ _(空)_
 
 | Agent | 当前任务 | 分支 | 修改中的文件 |
 |-------|---------|------|-------------|
-| nodex-cc | 节点选中 Phase 1 | `cc/node-selection-phase1` | OutlinerItem.tsx, ui-store.ts |
+| nodex-cc | — | — | — |
 | nodex-cc-2 | Checkbox-Options 联动 | _(未 push)_ | _(待声明)_ |
 | nodex-codex | — | — | — |
 
 ---
 
 ## 进行中
-
-### 节点选中 — Phase 1 (GH#47)
-
-- **Owner**: nodex-cc
-- **Branch**: `cc/node-selection-phase1`
-- **Files**: OutlinerItem.tsx, ui-store.ts, node-store.ts
-- **Spec**: `docs/features/node-selection.md`
-- **Progress**:
-  - [x] Escape 退出编辑 → 选中模式
-  - [x] 选中模式 ↑/↓ 导航
-  - [ ] 选中模式 Enter 回编辑（光标在文本末尾）
-  - [ ] 选中模式可打印字符输入（聚焦首个选中节点，字符追加到末尾）
-  - [ ] Shift+↑/↓ 从编辑进入选中
-- **迭代日志**:
-  - [2026-02-15 nodex-cc] 基于 Tana 双模式选择范式（编辑模式 ↔ 选中模式）开始 Phase 1。选中状态存 ui-store selectedNodeIds Set。Escape 退出编辑和 ↑/↓ 导航基本完成。
-  - [2026-02-16 nodex-cc] 修复 ↑/↓ 导航问题：选中模式下按 ↑/↓ 应退出选中并进入相邻节点编辑。
 
 ### Checkbox-Options 联动 (GH#20 子任务)
 
@@ -132,22 +116,11 @@ _(空)_
 - [ ] 标签/字段操作撤销
 - **Spec**: `docs/features/undo-redo.md`
 
-#### 节点选中 — Phase 2 & 3 (GH#47)
-> Phase 1 由 nodex-cc 进行中（见上方）
+#### 节点选中 — 后续增强 (GH#47)
+> Phase 1-3 已合并（PR #51）。以下为未覆盖的后续项：
 
-**Phase 2 — 多选 + 拖选**:
-- [ ] Cmd+Click 多选（含子树合并吸收规则）
-- [ ] Shift+Click 范围选中（锚点到目标之间可见节点，根级过滤）
-- [ ] Shift+Arrow 扩展选区（从锚点持续扩展）
-- [ ] 拖动选择（文本/非文本区域区分启动，5px 阈值，document 级监听）
-- [ ] Cmd+A 全选（编辑模式=选文字，选中模式=选所有顶层节点）
-
-**Phase 3 — 批量操作 + 视觉升级**:
-- [ ] Backspace/Delete 批量删除（从下往上遍历）
-- [ ] Tab / Shift+Tab 批量缩进（缩进从上往下，反缩进从下往上）
-- [ ] Cmd+Shift+D 批量复制（从下往上遍历）
-- [ ] Cmd+Enter 批量切换 Checkbox
-- [ ] 双层选中高亮（子树遮罩 + 行高亮替代当前 ring）
+- [ ] Cmd+Shift+D 批量复制
+- [ ] 拖动选择优化（跨面板边界防护）
 - **Spec**: `docs/features/node-selection.md`
 
 ### P3
@@ -225,6 +198,7 @@ _(空)_
 
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
+| 2026-02-16 | 节点选中 Phase 1-3 — 单选/多选/批量操作/双层高亮 (GH#47) | nodex-cc | #51 |
 | 2026-02-15 | Cmd+Enter 编辑器内切换 Checkbox (GH#43) | — | — |
 | 2026-02-14 | Web Clipping 修复 — title sync, field value rendering, attrDef config | nodex-codex | #49 |
 | 2026-02-14 | Node Description 编辑：高度跳动 + Ctrl+I 快捷键 (GH#41) | — | — |

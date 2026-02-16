@@ -27,9 +27,10 @@ Chrome Side Panel 云端知识管理工具，忠实复刻 Tana 核心功能。
 每次新 session 开始时，**必须**按以下顺序执行：
 
 1. `git pull origin main`，rebase 自己的分支
-2. `gh pr list --author @me` — 检查是否有 review comment 需要处理
-3. 检查自己认领的 GitHub Issue 状态，或从 `gh issue list --state open --label "enhancement"` 寻找可认领的任务
-4. 如果用户指定了任务，优先执行用户指定的任务
+2. `Read docs/LESSONS.md` — 了解项目经验教训和陷阱（避免重复踩坑）
+3. `Read docs/TASKS.md` — 了解全局状态、收件箱、自己的进行中任务
+4. `gh pr list --author @me` — 检查是否有 review comment 需要处理
+5. 如果用户指定了任务，优先执行用户指定的任务
 
 ## 接到任务后的强制第一步（不可跳过）
 

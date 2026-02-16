@@ -50,8 +50,9 @@
 
 1. **识别自己**：通过 clone 路径 / 端口 / 分支确认身份
 2. **同步代码**：`git pull origin main`（dev agent 额外 rebase 自己的分支）
-3. **检查自己的 open PR**：`gh pr list --author @me` — 是否有 review comment 需要处理
-4. **检查待办**：
+3. **读取共享知识**：`Read docs/LESSONS.md` — 了解项目经验教训和陷阱
+4. **检查自己的 open PR**：`gh pr list --author @me` — 是否有 review comment 需要处理
+5. **检查待办**：
    - **所有 Agent**: `Read docs/TASKS.md` — 了解全局状态、收件箱、自己的进行中任务
    - **nodex**: 额外 `gh pr list --label needs-review` — 是否有待审 PR
 
@@ -189,8 +190,9 @@ gh pr create --draft --title "[WIP] feat: ..." --body "ref: <任务名>"
 | 行为变更 | `docs/features/*.md`（对应特性） |
 | 新增测试 | `docs/TESTING.md`（覆盖映射） |
 | 需要人工验收 | `docs/MANUAL-TEST-CHECKLIST.md` |
-| Feature 进度 | `docs/TASKS.md` 更新 Progress checklist |
+| Feature 进度 | `docs/TASKS.md` 更新 Progress checklist + 迭代日志 |
 | UI 视觉变更 | `docs/design-system.md` |
+| 踩坑经验 | `docs/LESSONS.md`（通用教训追加到对应段落） |
 
 ---
 

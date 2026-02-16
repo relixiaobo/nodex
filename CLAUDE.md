@@ -307,9 +307,9 @@ ContentNode
 ## 任务跟踪与文档
 
 - **任务跟踪**: `docs/TASKS.md`（单一事实来源，一次 Read 获取全局状态）
+- **共享经验**: `docs/LESSONS.md`（所有 Agent 共用的陷阱、设计模式、方法论）
 - 特性行为规格见 `docs/features/`
 - 多 Agent 协作规范见 `docs/AGENT-COLLABORATION.md`
-- 原 [GitHub Issues](https://github.com/relixiaobo/nodex/issues) 保留为历史存档
 
 ## Chrome Side Panel 约束
 

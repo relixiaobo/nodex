@@ -1708,8 +1708,8 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
           {/* Selection subtree mask: children area, connects to parent row above */}
           {isSelected && !isFocused && (
             <div
-              className="absolute bottom-0 right-0 bg-selection rounded-b-sm rounded-t-none pointer-events-none z-0"
-              style={{ left: depth * 28 + 6 + 15, top: -1 }}
+              className="absolute right-0 bg-selection rounded-b-sm rounded-t-none pointer-events-none z-0"
+              style={{ left: depth * 28 + 6 + 15, top: -1, bottom: 1 }}
             />
           )}
           {/* Indent guide line — 16px click area LEFT of bullet center.

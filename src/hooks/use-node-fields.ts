@@ -110,17 +110,13 @@ function computeFields(entities: Record<string, NodexNode>, nodeId: string): Fie
       return c && !c.props._docType;
     }) ?? false);
 
-    // For system config fields with done_map_entries control, use special data type
-    const configDef = isSysConfig ? (ATTRDEF_CONFIG_MAP.get(keyId) ?? TAGDEF_CONFIG_MAP.get(keyId)) : undefined;
-    const isDoneMapEntries = configDef?.control === 'done_map_entries';
-
     fields.push({
       attrDefId: keyId,
       attrDefName: attrDef.props.name ?? 'Untitled',
       tupleId: childId,
       valueNodeId,
       valueName: valueNode?.props.name,
-      dataType: isDoneMapEntries ? '__done_map_entries__' : resolveDataType(entities, keyId),
+      dataType: resolveDataType(entities, keyId),
       assocDataId,
       trashed,
       hideMode: isSysConfig ? undefined : resolveHideField(entities, keyId),

@@ -23,7 +23,6 @@ import { FieldNameInput } from './FieldNameInput';
 import { ConfigOutliner } from './ConfigOutliner';
 import { AutoCollectSection } from './AutoCollectSection';
 import { BulletChevron } from '../outliner/BulletChevron';
-import { DoneMappingEntries } from './DoneMappingEntries';
 import { VALIDATED_FIELD_TYPES, validateFieldValue, ValidationWarning } from './field-validation';
 import { ATTRDEF_OUTLINER_FIELDS, TAGDEF_OUTLINER_FIELDS } from '../../lib/field-utils.js';
 import { SYS_A } from '../../types/index.js';
@@ -91,7 +90,6 @@ export function FieldRow({
 
   const isSystemField = dataType === '__system_date__' || dataType === '__system_text__' || dataType === '__system_node__';
   const isOutliner = dataType === '__outliner__';
-  const isDoneMapEntries = dataType === '__done_map_entries__';
   const isVirtual = tupleId.startsWith('__virtual_');
   const isEditing = editingFieldNameId === tupleId;
   const isFieldSelected = isTupleInSelectedSet && !focusedNodeId && !isEditing;
@@ -262,8 +260,6 @@ export function FieldRow({
         <div className="flex-1 min-w-0 min-h-[22px]" data-field-value>
           {isOutliner ? (
             <ConfigOutliner nodeId={nodeId} />
-          ) : isDoneMapEntries ? (
-            <DoneMappingEntries toggleTupleId={tupleId} mappingKey={attrDefId} />
           ) : isAutoCollect ? (
             <>
               {assocDataId ? (

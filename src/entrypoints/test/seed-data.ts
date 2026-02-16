@@ -99,6 +99,18 @@ export function seedTestData() {
     makeNode(searchesId, 'Searches', WS_ID, []),
     makeNode(trashId, 'Trash', WS_ID, []),
     makeNode(schemaId, 'Schema', WS_ID, [
+      // System value nodes
+      SYS_V.YES, SYS_V.NO,
+      SYS_D.PLAIN, SYS_D.OPTIONS, SYS_D.OPTIONS_FROM_SUPERTAG, SYS_D.DATE, SYS_D.NUMBER, SYS_D.URL, SYS_D.EMAIL, SYS_D.CHECKBOX,
+      SYS_V.NEVER, SYS_V.WHEN_EMPTY, SYS_V.WHEN_NOT_EMPTY, SYS_V.WHEN_VALUE_IS_DEFAULT, SYS_V.ALWAYS,
+      // System attrDef nodes
+      SYS_A.COLOR, SYS_A.EXTENDS, SYS_A.SHOW_CHECKBOX,
+      SYS_A.DONE_STATE_MAPPING, SYS_A.DONE_MAP_CHECKED, SYS_A.DONE_MAP_UNCHECKED,
+      SYS_A.CHILD_SUPERTAG,
+      SYS_A.TYPE_CHOICE, SYS_A.SOURCE_SUPERTAG, SYS_A.AUTOCOLLECT_OPTIONS,
+      SYS_A.AUTO_INITIALIZE, SYS_A.NULLABLE, SYS_A.HIDE_FIELD,
+      SYS_A.MIN_VALUE, SYS_A.MAX_VALUE,
+      // System tag templates + user tagDefs
       'SYS_T01', 'SYS_T02',
       'tagDef_task', 'tagDef_person', 'tagDef_dev_task', 'tagDef_web_clip',
     ]),
@@ -358,8 +370,8 @@ export function seedTestData() {
     ], 'tagDef'),
     makeNode('sysT01_tpl_color', '', 'SYS_T01', [SYS_A.COLOR], 'tuple'),
     makeNode('sysT01_tpl_extends', '', 'SYS_T01', [SYS_A.EXTENDS], 'tuple'),
-    makeNode('sysT01_tpl_checkbox', '', 'SYS_T01', [SYS_A.SHOW_CHECKBOX], 'tuple'),
-    makeNode('sysT01_tpl_done_mapping', '', 'SYS_T01', [SYS_A.DONE_STATE_MAPPING], 'tuple'),
+    makeNode('sysT01_tpl_checkbox', '', 'SYS_T01', [SYS_A.SHOW_CHECKBOX, SYS_V.NO], 'tuple'),
+    makeNode('sysT01_tpl_done_mapping', '', 'SYS_T01', [SYS_A.DONE_STATE_MAPPING, SYS_V.NO], 'tuple'),
     makeNode('sysT01_tpl_done_map_checked', '', 'SYS_T01', [SYS_A.DONE_MAP_CHECKED], 'tuple'),
     makeNode('sysT01_tpl_done_map_unchecked', '', 'SYS_T01', [SYS_A.DONE_MAP_UNCHECKED], 'tuple'),
     makeNode('sysT01_tpl_childtag', '', 'SYS_T01', [SYS_A.CHILD_SUPERTAG], 'tuple'),
@@ -372,12 +384,12 @@ export function seedTestData() {
       'sysT02_tpl_autoinit', 'sysT02_tpl_required', 'sysT02_tpl_hide',
       'sysT02_tpl_min', 'sysT02_tpl_max',
     ], 'tagDef'),
-    makeNode('sysT02_tpl_type', '', 'SYS_T02', [SYS_A.TYPE_CHOICE], 'tuple'),
+    makeNode('sysT02_tpl_type', '', 'SYS_T02', [SYS_A.TYPE_CHOICE, SYS_D.PLAIN], 'tuple'),
     makeNode('sysT02_tpl_source_supertag', '', 'SYS_T02', [SYS_A.SOURCE_SUPERTAG], 'tuple'),
-    makeNode('sysT02_tpl_autocollect', '', 'SYS_T02', [SYS_A.AUTOCOLLECT_OPTIONS], 'tuple'),
-    makeNode('sysT02_tpl_autoinit', '', 'SYS_T02', [SYS_A.AUTO_INITIALIZE], 'tuple'),
-    makeNode('sysT02_tpl_required', '', 'SYS_T02', [SYS_A.NULLABLE], 'tuple'),
-    makeNode('sysT02_tpl_hide', '', 'SYS_T02', [SYS_A.HIDE_FIELD], 'tuple'),
+    makeNode('sysT02_tpl_autocollect', '', 'SYS_T02', [SYS_A.AUTOCOLLECT_OPTIONS, SYS_V.YES], 'tuple'),
+    makeNode('sysT02_tpl_autoinit', '', 'SYS_T02', [SYS_A.AUTO_INITIALIZE, SYS_V.NO], 'tuple'),
+    makeNode('sysT02_tpl_required', '', 'SYS_T02', [SYS_A.NULLABLE, SYS_V.NO], 'tuple'),
+    makeNode('sysT02_tpl_hide', '', 'SYS_T02', [SYS_A.HIDE_FIELD, SYS_V.NEVER], 'tuple'),
     makeNode('sysT02_tpl_min', '', 'SYS_T02', [SYS_A.MIN_VALUE], 'tuple'),
     makeNode('sysT02_tpl_max', '', 'SYS_T02', [SYS_A.MAX_VALUE], 'tuple'),
   ];
@@ -388,6 +400,17 @@ export function seedTestData() {
 
   // Helper: create standard attrDef config tuples for SYS_T02 template
   function makeAttrDefConfigTuples(prefix: string, owner: string, dataType: string, extra?: { min?: string; max?: string }) {
+    // For number min/max: create content nodes to hold the value (not raw strings)
+    const minValueNodeId = extra?.min !== undefined ? `${prefix}_min_val` : undefined;
+    const maxValueNodeId = extra?.max !== undefined ? `${prefix}_max_val` : undefined;
+    const extraNodes: NodexNode[] = [];
+    if (minValueNodeId && extra?.min !== undefined) {
+      extraNodes.push(makeNode(minValueNodeId, extra.min, `${prefix}_min_assoc`));
+    }
+    if (maxValueNodeId && extra?.max !== undefined) {
+      extraNodes.push(makeNode(maxValueNodeId, extra.max, `${prefix}_max_assoc`));
+    }
+
     const entries = [
       makeConfigEntry(`${prefix}_type`, owner, SYS_A.TYPE_CHOICE, dataType, 'sysT02_tpl_type'),
       makeConfigEntry(`${prefix}_source_supertag`, owner, SYS_A.SOURCE_SUPERTAG, undefined, 'sysT02_tpl_source_supertag'),
@@ -395,10 +418,10 @@ export function seedTestData() {
       makeConfigEntry(`${prefix}_autoinit`, owner, SYS_A.AUTO_INITIALIZE, SYS_V.NO, 'sysT02_tpl_autoinit'),
       makeConfigEntry(`${prefix}_required`, owner, SYS_A.NULLABLE, SYS_V.NO, 'sysT02_tpl_required'),
       makeConfigEntry(`${prefix}_hide`, owner, SYS_A.HIDE_FIELD, SYS_V.NEVER, 'sysT02_tpl_hide'),
-      makeConfigEntry(`${prefix}_min`, owner, SYS_A.MIN_VALUE, extra?.min, 'sysT02_tpl_min'),
-      makeConfigEntry(`${prefix}_max`, owner, SYS_A.MAX_VALUE, extra?.max, 'sysT02_tpl_max'),
+      makeConfigEntry(`${prefix}_min`, owner, SYS_A.MIN_VALUE, minValueNodeId, 'sysT02_tpl_min'),
+      makeConfigEntry(`${prefix}_max`, owner, SYS_A.MAX_VALUE, maxValueNodeId, 'sysT02_tpl_max'),
     ];
-    const nodes = entries.flatMap(e => e.nodes);
+    const nodes = [...entries.flatMap(e => e.nodes), ...extraNodes];
     const map: Record<string, string> = {};
     for (const e of entries) Object.assign(map, e.map);
     const childIds = entries.map(e => Object.keys(e.map)[0]);

@@ -39,12 +39,12 @@ describe('node-store schema flows', () => {
     });
     expect(hasSupertagBinding).toBe(true);
 
-    // Direct config tuples: 5 (NDX_A07/A08 are now nested under NDX_A06)
+    // Config tuples: 7 top-level (all SYS_T01 template fields are top-level in unified model)
     const configTupleIds = (tagDef?.children ?? []).filter((cid) => {
       const child = state.entities[cid];
       return child?.props._docType === 'tuple' && (child.props._sourceId ?? '').startsWith('sysT01_tpl_');
     });
-    expect(configTupleIds.length).toBe(5);
+    expect(configTupleIds.length).toBe(7);
 
     const configKeys = new Set(configTupleIds.map((cid) => state.entities[cid].children?.[0]));
     expect(configKeys.has(SYS_A.SHOW_CHECKBOX)).toBe(true);
@@ -52,24 +52,15 @@ describe('node-store schema flows', () => {
     expect(configKeys.has(SYS_A.COLOR)).toBe(true);
     expect(configKeys.has(SYS_A.EXTENDS)).toBe(true);
     expect(configKeys.has(SYS_A.DONE_STATE_MAPPING)).toBe(true);
+    expect(configKeys.has(SYS_A.DONE_MAP_CHECKED)).toBe(true);
+    expect(configKeys.has(SYS_A.DONE_MAP_UNCHECKED)).toBe(true);
 
-    // NDX_A07/A08 should be nested children of the NDX_A06 instance
-    const doneMappingTupleId = configTupleIds.find(
-      (cid) => state.entities[cid].children?.[0] === SYS_A.DONE_STATE_MAPPING,
-    );
-    expect(doneMappingTupleId).toBeTruthy();
-    if (doneMappingTupleId) {
-      const doneMappingTuple = state.entities[doneMappingTupleId];
-      // children: [NDX_A06, defaultValue, nestedChecked, nestedUnchecked]
-      expect(doneMappingTuple.children!.length).toBeGreaterThanOrEqual(4);
-      const nestedKeys = doneMappingTuple.children!.slice(2).map(
-        (nid) => state.entities[nid]?.children?.[0],
-      );
-      expect(nestedKeys).toContain(SYS_A.DONE_MAP_CHECKED);
-      expect(nestedKeys).toContain(SYS_A.DONE_MAP_UNCHECKED);
-      // Nested instances should have _ownerId = parent instance
-      for (const nid of doneMappingTuple.children!.slice(2)) {
-        expect(state.entities[nid]?.props._ownerId).toBe(doneMappingTupleId);
+    // All config tuples should have AssociatedData via parent associationMap
+    for (const cid of configTupleIds) {
+      const assocId = tagDef!.associationMap?.[cid];
+      expect(assocId).toBeTruthy();
+      if (assocId) {
+        expect(state.entities[assocId]?.props._docType).toBe('associatedData');
       }
     }
 
@@ -126,10 +117,19 @@ describe('node-store schema flows', () => {
     expect(hideTupleId).toBeTruthy();
     if (!autoCollectTupleId || !autoInitTupleId || !requiredTupleId || !hideTupleId) return;
 
+    // Default values in both children[1] and AssociatedData
     expect(state.entities[autoCollectTupleId].children?.[1]).toBe(SYS_V.YES);
     expect(state.entities[autoInitTupleId].children?.[1]).toBe(SYS_V.NO);
     expect(state.entities[requiredTupleId].children?.[1]).toBe(SYS_V.NO);
     expect(state.entities[hideTupleId].children?.[1]).toBe(SYS_V.NEVER);
+
+    // AssociatedData should also have the default values
+    const createdAttrDef = state.entities[created.id];
+    const autoCollectAssoc = createdAttrDef?.associationMap?.[autoCollectTupleId];
+    expect(autoCollectAssoc).toBeTruthy();
+    if (autoCollectAssoc) {
+      expect(state.entities[autoCollectAssoc]?.children?.[0]).toBe(SYS_V.YES);
+    }
 
     expect(collectNodeGraphErrors(useNodeStore.getState().entities)).toEqual([]);
   });

@@ -1492,13 +1492,6 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
 
   return (
     <div role="treeitem" aria-expanded={isExpanded} className="relative">
-      {/* Selection subtree mask: light bg + border framing row + expanded children */}
-      {isSelected && !isFocused && isExpanded && (
-        <div
-          className="absolute top-0 bottom-0 right-0 bg-selection rounded-sm border border-primary/[0.12] pointer-events-none z-0"
-          style={{ left: depth * 28 + 6 + 15 }}
-        />
-      )}
       {/* Drop indicator: before */}
       {isDropTarget && dropPosition === 'before' && (
         <div
@@ -1526,8 +1519,8 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
         {/* Per-row selection highlight: only directly selected rows */}
         {showRowHighlight && (
           <div
-            className={`absolute right-0 bg-selection-row rounded-sm border border-primary/[0.15] pointer-events-none ${isExpanded ? 'border-b-0 rounded-b-none' : ''}`}
-            style={{ left: depth * 28 + 6 + 15, top: 1, bottom: isExpanded ? 0 : 1 }}
+            className="absolute right-0 bg-selection-row rounded-sm border border-primary/[0.15] pointer-events-none"
+            style={{ left: depth * 28 + 6 + 15, top: 1, bottom: 1 }}
           />
         )}
         {/* Chevron: 15px zone, visible on row hover only */}
@@ -1712,6 +1705,13 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       )}
       {isExpanded && (
         <div className="relative z-[1]">
+          {/* Selection subtree mask: covers only children area (separate box from parent row) */}
+          {isSelected && !isFocused && (
+            <div
+              className="absolute top-0 bottom-0 right-0 bg-selection rounded-sm border border-primary/[0.12] pointer-events-none z-0"
+              style={{ left: depth * 28 + 6 + 15 }}
+            />
+          )}
           {/* Indent guide line — 16px click area LEFT of bullet center.
                Parent bullet center = depth*28 + 32.5.
                Button right edge at depth*28+33 (1px gap to child ChevronButton at depth*28+34).

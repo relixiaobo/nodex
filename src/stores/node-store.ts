@@ -230,6 +230,18 @@ interface NodeStore {
   /** Update a config Tuple's value (children[1]) */
   setConfigValue(tupleId: string, newValue: string, userId: string): void;
 
+  /** Add a done-mapping entry tuple as a child of the NDX_A06 toggle tuple */
+  addDoneMappingEntry(
+    toggleTupleId: string,
+    mappingKey: string,
+    attrDefId: string,
+    optionId: string,
+    userId: string,
+  ): void;
+
+  /** Remove a done-mapping entry tuple from the NDX_A06 toggle tuple */
+  removeDoneMappingEntry(toggleTupleId: string, entryTupleId: string, userId: string): void;
+
   /** Replace a field's attrDef (swap placeholder → existing) and clean up orphan */
   replaceFieldAttrDef(
     nodeId: string,
@@ -1817,6 +1829,41 @@ export const useNodeStore = create<NodeStore>()(
         tuple.children[1] = newValue;
         tuple.updatedAt = Date.now();
         tuple.updatedBy = userId;
+      });
+    },
+
+    addDoneMappingEntry: (toggleTupleId, mappingKey, attrDefId, optionId, userId) => {
+      set((state) => {
+        const toggle = state.entities[toggleTupleId];
+        if (!toggle || toggle.props._docType !== 'tuple' || !toggle.children) return;
+        const entryId = nanoid();
+        state.entities[entryId] = {
+          id: entryId,
+          props: { created: Date.now(), _docType: 'tuple' as DocType, _ownerId: toggleTupleId },
+          children: [mappingKey, attrDefId, optionId],
+          workspaceId: toggle.workspaceId,
+          version: 1,
+          updatedAt: Date.now(),
+          createdBy: userId,
+          updatedBy: userId,
+        };
+        toggle.children.push(entryId);
+        toggle.updatedAt = Date.now();
+        toggle.updatedBy = userId;
+      });
+    },
+
+    removeDoneMappingEntry: (toggleTupleId, entryTupleId, userId) => {
+      set((state) => {
+        const toggle = state.entities[toggleTupleId];
+        if (!toggle?.children) return;
+        const idx = toggle.children.indexOf(entryTupleId);
+        if (idx >= 0) {
+          toggle.children.splice(idx, 1);
+          toggle.updatedAt = Date.now();
+          toggle.updatedBy = userId;
+        }
+        delete state.entities[entryTupleId];
       });
     },
 

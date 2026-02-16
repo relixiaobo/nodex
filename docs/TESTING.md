@@ -593,6 +593,14 @@ Store 集成 — forward mapping（2 cases）:
 Store 集成 — 安全性（1 case）:
 34. 原子 set() 无循环：forward + reverse 独立操作
 
+Store 集成 — addDoneMappingEntry（2 cases）:
+38. 创建 mapping entry tuple，追加到 toggle children
+39. 新条目被 getDoneStateMappings 正确读取
+
+Store 集成 — removeDoneMappingEntry（2 cases）:
+40. 从 toggle children 中移除并删除 entity
+41. 移除后 getDoneStateMappings 结果为空
+
 ### 1.39 Web Clip 落库服务
 
 **测试文件**: `tests/vitest/webclip-service.test.ts`

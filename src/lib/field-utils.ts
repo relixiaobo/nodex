@@ -224,7 +224,7 @@ export function isPlainFieldType(dataType: string): boolean {
 export interface ConfigFieldDef {
   key: string;
   name: string;
-  control: 'type_choice' | 'toggle' | 'select' | 'outliner' | 'autocollect' | 'tag_picker' | 'color_picker' | 'number_input';
+  control: 'type_choice' | 'toggle' | 'select' | 'outliner' | 'autocollect' | 'tag_picker' | 'color_picker' | 'number_input' | 'done_map_entries';
   defaultValue: string;
   appliesTo: string[] | '*';
   icon?: LucideIcon;
@@ -356,24 +356,6 @@ export const ATTRDEF_OUTLINER_FIELDS = ATTRDEF_CONFIG_FIELDS
  */
 export const TAGDEF_CONFIG_FIELDS: ConfigFieldDef[] = [
   {
-    key: SYS_A.SHOW_CHECKBOX,   // SYS_A55
-    name: 'Show as checkbox',
-    control: 'toggle',
-    icon: CheckSquare,
-    defaultValue: SYS_V.NO,
-    appliesTo: '*',
-    description: 'Show done/not done checkbox on tagged nodes',
-  },
-  {
-    key: SYS_A.CHILD_SUPERTAG,  // SYS_A14
-    name: 'Default child supertag',
-    control: 'tag_picker',
-    icon: ChevronDown,
-    defaultValue: '',
-    appliesTo: '*',
-    description: 'Auto-apply this tag to new children',
-  },
-  {
     key: SYS_A.COLOR,           // SYS_A11
     name: 'Color',
     control: 'color_picker',
@@ -391,6 +373,15 @@ export const TAGDEF_CONFIG_FIELDS: ConfigFieldDef[] = [
     description: 'Inherit fields and content from another tag',
   },
   {
+    key: SYS_A.SHOW_CHECKBOX,   // SYS_A55
+    name: 'Show as checkbox',
+    control: 'toggle',
+    icon: CheckSquare,
+    defaultValue: SYS_V.NO,
+    appliesTo: '*',
+    description: 'Show done/not done checkbox on tagged nodes',
+  },
+  {
     key: SYS_A.DONE_STATE_MAPPING,  // NDX_A06
     name: 'Done state mapping',
     control: 'toggle',
@@ -403,7 +394,7 @@ export const TAGDEF_CONFIG_FIELDS: ConfigFieldDef[] = [
   {
     key: SYS_A.DONE_MAP_CHECKED,   // NDX_A07
     name: 'Map checked to',
-    control: 'tag_picker',       // TODO: implement dedicated picker UI
+    control: 'done_map_entries',
     icon: CheckSquare,
     defaultValue: '',
     appliesTo: '*',
@@ -412,7 +403,7 @@ export const TAGDEF_CONFIG_FIELDS: ConfigFieldDef[] = [
   {
     key: SYS_A.DONE_MAP_UNCHECKED, // NDX_A08
     name: 'Map unchecked to',
-    control: 'tag_picker',       // TODO: implement dedicated picker UI
+    control: 'done_map_entries',
     icon: CheckSquare,
     defaultValue: '',
     appliesTo: '*',
@@ -426,6 +417,15 @@ export const TAGDEF_CONFIG_FIELDS: ConfigFieldDef[] = [
     icon: FileText,
     defaultValue: '',
     appliesTo: '*',
+  },
+  {
+    key: SYS_A.CHILD_SUPERTAG,  // SYS_A14
+    name: 'Default child supertag',
+    control: 'tag_picker',
+    icon: ChevronDown,
+    defaultValue: '',
+    appliesTo: '*',
+    description: 'Auto-apply this tag to new children',
   },
 ];
 

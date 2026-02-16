@@ -611,3 +611,92 @@ describe('No infinite loop: atomic set() verification', () => {
     expect(s2['assoc_status'].children).toEqual(['opt_todo']);
   });
 });
+
+// ─── Store actions: addDoneMappingEntry / removeDoneMappingEntry ───
+
+describe('Store: addDoneMappingEntry', () => {
+  beforeEach(() => {
+    useNodeStore.setState({ entities: {}, loading: new Set() });
+  });
+
+  it('creates a mapping entry tuple and appends to toggle children', () => {
+    const entities = buildDoneStateMappingEntities();
+    useNodeStore.setState({ entities });
+
+    const toggleBefore = useNodeStore.getState().entities['cfg_done_toggle'];
+    const childrenBefore = toggleBefore.children!.length;
+
+    useNodeStore.getState().addDoneMappingEntry(
+      'cfg_done_toggle',
+      SYS_A.DONE_MAP_CHECKED,
+      'attrDef_status',
+      'opt_cancelled',
+      USER,
+    );
+
+    const state = useNodeStore.getState().entities;
+    const toggle = state['cfg_done_toggle'];
+    expect(toggle.children!.length).toBe(childrenBefore + 1);
+
+    const newEntryId = toggle.children![toggle.children!.length - 1];
+    const newEntry = state[newEntryId];
+    expect(newEntry).toBeDefined();
+    expect(newEntry.props._docType).toBe('tuple');
+    expect(newEntry.props._ownerId).toBe('cfg_done_toggle');
+    expect(newEntry.children).toEqual([SYS_A.DONE_MAP_CHECKED, 'attrDef_status', 'opt_cancelled']);
+  });
+
+  it('new entry is picked up by getDoneStateMappings', () => {
+    const entities = buildDoneStateMappingEntities();
+    useNodeStore.setState({ entities });
+
+    useNodeStore.getState().addDoneMappingEntry(
+      'cfg_done_toggle',
+      SYS_A.DONE_MAP_UNCHECKED,
+      'attrDef_status',
+      'opt_todo',
+      USER,
+    );
+
+    const mappings = getDoneStateMappings('n1', useNodeStore.getState().entities);
+    expect(mappings).toHaveLength(1);
+    expect(mappings[0].uncheckedOptionIds).toContain('opt_todo');
+  });
+});
+
+describe('Store: removeDoneMappingEntry', () => {
+  beforeEach(() => {
+    useNodeStore.setState({ entities: {}, loading: new Set() });
+  });
+
+  it('removes entry from toggle children and deletes entity', () => {
+    const entities = buildDoneStateMappingEntities();
+    useNodeStore.setState({ entities });
+
+    const toggleBefore = useNodeStore.getState().entities['cfg_done_toggle'];
+    const childrenBefore = toggleBefore.children!.length;
+
+    useNodeStore.getState().removeDoneMappingEntry('cfg_done_toggle', 'cfg_done_checked_0', USER);
+
+    const state = useNodeStore.getState().entities;
+    const toggle = state['cfg_done_toggle'];
+    expect(toggle.children!.length).toBe(childrenBefore - 1);
+    expect(toggle.children).not.toContain('cfg_done_checked_0');
+    expect(state['cfg_done_checked_0']).toBeUndefined();
+  });
+
+  it('removal is reflected in getDoneStateMappings', () => {
+    const entities = buildDoneStateMappingEntities();
+    useNodeStore.setState({ entities });
+
+    // Before: has checked mapping
+    const before = getDoneStateMappings('n1', useNodeStore.getState().entities);
+    expect(before[0].checkedOptionIds).toEqual(['opt_done']);
+
+    useNodeStore.getState().removeDoneMappingEntry('cfg_done_toggle', 'cfg_done_checked_0', USER);
+
+    // After: toggle still ON but no mapping tuples left → empty result
+    const after = getDoneStateMappings('n1', useNodeStore.getState().entities);
+    expect(after).toHaveLength(0);
+  });
+});

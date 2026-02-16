@@ -10,7 +10,7 @@ import { useMemo } from 'react';
 import { useNodeStore } from '../stores/node-store';
 import { resolveDataType, resolveHideField, resolveRequired, ATTRDEF_CONFIG_MAP, ATTRDEF_CONFIG_FIELDS, ATTRDEF_OUTLINER_FIELDS, TAGDEF_CONFIG_MAP, TAGDEF_CONFIG_FIELDS, TAGDEF_OUTLINER_FIELDS, SYSTEM_FIELD_MAP, resolveSystemFieldValue, type ConfigFieldDef } from '../lib/field-utils.js';
 import type { NodexNode } from '../types/index.js';
-import { SYS_V } from '../types/index.js';
+import { SYS_A, SYS_V } from '../types/index.js';
 
 export interface FieldEntry {
   attrDefId: string;
@@ -100,20 +100,27 @@ function computeFields(entities: Record<string, NodexNode>, nodeId: string): Fie
           depth: 0,
         });
 
-        // Recursive: emit nested config children when toggle is ON
+        // Aggregate: emit one entry per mapping key (NDX_A07 / NDX_A08) when toggle is ON
         if (child.children[1] === SYS_V.YES && child.children.length > 2) {
-          for (const nestedId of child.children) {
-            const nested = entities[nestedId];
-            if (!nested?.children?.length || nested.props._docType !== 'tuple') continue;
-            const nestedKeyId = nested.children[0];
-            const nestedConfigDef = TAGDEF_CONFIG_MAP.get(nestedKeyId);
-            if (!nestedConfigDef) continue;
+          const checkedDef = TAGDEF_CONFIG_MAP.get(SYS_A.DONE_MAP_CHECKED);
+          if (checkedDef) {
             fields.push({
-              attrDefId: nestedKeyId,
-              attrDefName: nestedConfigDef.name,
-              tupleId: nestedId,
-              valueName: nested.children[1],
-              dataType: `__${nestedConfigDef.control}__`,
+              attrDefId: SYS_A.DONE_MAP_CHECKED,
+              attrDefName: checkedDef.name,
+              tupleId: childId,  // NDX_A06 toggle tuple ID
+              valueName: '',
+              dataType: `__${checkedDef.control}__`,
+              depth: 1,
+            });
+          }
+          const uncheckedDef = TAGDEF_CONFIG_MAP.get(SYS_A.DONE_MAP_UNCHECKED);
+          if (uncheckedDef) {
+            fields.push({
+              attrDefId: SYS_A.DONE_MAP_UNCHECKED,
+              attrDefName: uncheckedDef.name,
+              tupleId: childId,  // NDX_A06 toggle tuple ID
+              valueName: '',
+              dataType: `__${uncheckedDef.control}__`,
               depth: 1,
             });
           }

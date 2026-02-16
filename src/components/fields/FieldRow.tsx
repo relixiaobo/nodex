@@ -34,6 +34,7 @@ import { ConfigOutliner } from './ConfigOutliner';
 import { AutoCollectSection } from './AutoCollectSection';
 import { ConfigTagPicker } from './ConfigTagPicker';
 import { BulletChevron } from '../outliner/BulletChevron';
+import { DoneMappingEntries } from './DoneMappingEntries';
 import { VALIDATED_FIELD_TYPES, validateFieldValue, ValidationWarning } from './field-validation';
 import { ATTRDEF_OUTLINER_FIELDS, TAGDEF_OUTLINER_FIELDS } from '../../lib/field-utils.js';
 
@@ -99,7 +100,8 @@ export function FieldRow({
   const isTagPicker = dataType === '__tag_picker__';
   const isColorPicker = dataType === '__color_picker__';
   const isNumberInput = dataType === '__number_input__';
-  const isConfigField = isTypeChoice || isToggle || isSelect || isAutoCollect || isTagPicker || isColorPicker || isNumberInput;
+  const isDoneMapEntries = dataType === '__done_map_entries__';
+  const isConfigField = isTypeChoice || isToggle || isSelect || isAutoCollect || isTagPicker || isColorPicker || isNumberInput || isDoneMapEntries;
   const isVirtual = tupleId.startsWith('__virtual_');
   const isEditing = editingFieldNameId === tupleId;
   const isFieldSelected = isTupleInSelectedSet && !focusedNodeId && !isEditing;
@@ -280,6 +282,8 @@ export function FieldRow({
             <ConfigOutliner nodeId={nodeId} />
           ) : isSelect ? (
             <ConfigSelect tupleId={tupleId} fieldKey={attrDefId} currentValue={valueName} />
+          ) : isDoneMapEntries ? (
+            <DoneMappingEntries toggleTupleId={tupleId} mappingKey={attrDefId} />
           ) : isTagPicker ? (
             <ConfigTagPicker tupleId={tupleId} fieldKey={attrDefId} currentValue={valueName} />
           ) : (

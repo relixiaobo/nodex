@@ -1489,10 +1489,10 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
 
   return (
     <div role="treeitem" aria-expanded={isExpanded} className="relative">
-      {/* Selection subtree mask: light blue covering row + expanded children */}
+      {/* Selection subtree mask: primary-tinted covering row + expanded children */}
       {isSelected && !isFocused && (
         <div
-          className="absolute top-0 bottom-0 right-0 bg-selection rounded-md pointer-events-none z-0"
+          className="absolute top-0 bottom-0 right-0 bg-selection rounded-sm pointer-events-none z-0"
           style={{ left: depth * 28 + 6 + 15 + 4 }}
         />
       )}
@@ -1520,10 +1520,10 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
         onDrop={handleDrop}
         onDragEnd={handleDragEnd}
       >
-        {/* Selection row highlight: deeper blue on directly selected row only */}
+        {/* Selection row highlight: deeper primary on directly selected row only */}
         {isSelected && !isFocused && (
           <div
-            className="absolute top-0 bottom-0 right-0 bg-selection-row rounded-md pointer-events-none"
+            className="absolute top-0 bottom-0 right-0 bg-selection-row rounded-sm pointer-events-none"
             style={{ left: depth * 28 + 6 + 15 + 4 }}
           />
         )}

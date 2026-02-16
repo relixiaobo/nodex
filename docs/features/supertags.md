@@ -1,6 +1,6 @@
 # Feature: Supertags
 
-> Phase 1.2 | 配置页基础已实现，高级功能待完善 | [GitHub Issue #20](https://github.com/relixiaobo/nodex/issues/20)
+> Phase 1.2 | 配置页基础已实现，高级功能待完善 | TASKS.md #20
 
 ## 行为规格
 

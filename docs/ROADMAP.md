@@ -1,6 +1,6 @@
 # Nodex Roadmap (DEPRECATED)
 
-> **⚠️ 此文件已废弃。** 进度跟踪已迁移到 [GitHub Issues](https://github.com/relixiaobo/nodex/issues) + [Nodex Board](https://github.com/users/relixiaobo/projects/1)。
+> **⚠️ 此文件已废弃。** 进度跟踪已迁移到 `docs/TASKS.md`。
 >
 > 以下内容保留为历史归档，不再更新。
 >

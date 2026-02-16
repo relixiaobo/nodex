@@ -55,7 +55,7 @@ gh pr create --draft --title "[WIP] feat: ..." --body "ref: <任务名>"
 ## 开发工作流
 
 ```
-接到任务 → 标记 Issue + Draft PR（上一步）→ 开发 → 自检 → 标记 Ready → 等待 review
+接到任务 → 更新 TASKS.md + Draft PR（上一步）→ 开发 → 自检 → 标记 Ready → 等待 review
 ```
 
 1. 在 `docs/TASKS.md` 的任务条目 Files 字段声明将修改的热点文件
@@ -63,8 +63,7 @@ gh pr create --draft --title "[WIP] feat: ..." --body "ref: <任务名>"
 3. 完成后：
    - 按 `.github/pull_request_template.md` checklist 逐项自检
    - `gh pr ready` 转为 Ready
-   - `gh pr edit --add-label "needs-review"` 触发 review
-   - **不需要通知用户或 nodex**，label 驱动 review
+   - **不需要通知用户或 nodex**，nodex 通过 `gh pr list` 发现待审 PR
 
 ## 提交前自检顺序
 

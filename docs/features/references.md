@@ -1,6 +1,6 @@
 # Feature: References & @引用
 
-> Phase 1.1 | MVP 已完成，增强功能待实现 | [GitHub Issue #19](https://github.com/relixiaobo/nodex/issues/19)
+> Phase 1.1 | MVP 已完成，增强功能待实现 | TASKS.md #19
 
 ## 行为规格
 

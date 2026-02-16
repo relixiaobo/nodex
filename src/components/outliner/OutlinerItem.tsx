@@ -71,11 +71,11 @@ interface OutlinerItemProps {
   onNavigateOut?: (direction: 'up' | 'down') => void;
   /** Owner tag color: tints the bullet dot in this color (template items in config page) */
   bulletColor?: string;
-  /** When true, a selected ancestor covers this node — show per-row highlight */
-  ancestorSelected?: boolean;
+  /** Depth of the selecting ancestor — used for left-aligning child highlights with parent */
+  ancestorSelectedDepth?: number;
 }
 
-export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId, fieldDataType, attrDefId, onNavigateOut, bulletColor, ancestorSelected }: OutlinerItemProps) {
+export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId, fieldDataType, attrDefId, onNavigateOut, bulletColor, ancestorSelectedDepth }: OutlinerItemProps) {
   const node = useNode(nodeId);
   const expandKey = `${parentId}:${nodeId}`;
   const isExpanded = useUIStore((s) => s.expandedNodes.has(`${parentId}:${nodeId}`));
@@ -247,7 +247,11 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   );
 
   // Per-row highlight: shown when directly selected OR covered by a selected ancestor
-  const showHighlight = (isSelected || !!ancestorSelected) && !isFocused;
+  const showHighlight = (isSelected || ancestorSelectedDepth != null) && !isFocused;
+  // Left alignment: child highlights align with the selecting ancestor's position
+  const highlightLeft = (ancestorSelectedDepth != null && !isSelected)
+    ? ancestorSelectedDepth * 28 + 6 + 15 + 4
+    : depth * 28 + 6 + 15 + 4;
 
   // Options field dropdown (for changing selected option value)
   const isOptionsField = fieldDataType === SYS_D.OPTIONS || fieldDataType === SYS_D.OPTIONS_FROM_SUPERTAG;
@@ -1494,6 +1498,13 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
 
   return (
     <div role="treeitem" aria-expanded={isExpanded} className="relative">
+      {/* Selection subtree mask: light bg + border framing row + expanded children */}
+      {isSelected && !isFocused && isExpanded && (
+        <div
+          className="absolute top-0 bottom-0 right-0 bg-selection rounded-sm border border-primary/[0.12] pointer-events-none z-0"
+          style={{ left: depth * 28 + 6 + 15 + 4 }}
+        />
+      )}
       {/* Drop indicator: before */}
       {isDropTarget && dropPosition === 'before' && (
         <div
@@ -1518,11 +1529,11 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
         onDrop={handleDrop}
         onDragEnd={handleDragEnd}
       >
-        {/* Per-row selection highlight: shown for directly selected + implicitly selected (ancestor covers) */}
+        {/* Per-row selection highlight: deeper for directly selected, lighter for implicitly selected children */}
         {showHighlight && (
           <div
-            className="absolute inset-y-0 right-0 bg-selection-row rounded-sm pointer-events-none"
-            style={{ left: depth * 28 + 6 + 15 + 4 }}
+            className={`absolute right-0 ${isSelected ? 'bg-selection-row' : 'bg-selection-child'} rounded-sm pointer-events-none`}
+            style={{ left: highlightLeft, top: 1, bottom: 1 }}
           />
         )}
         {/* Chevron: 15px zone, visible on row hover only */}
@@ -1786,7 +1797,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
                 rootChildIds={rootChildIds}
                 parentId={nodeId}
                 rootNodeId={rootNodeId}
-                ancestorSelected={isSelected || ancestorSelected}
+                ancestorSelectedDepth={isSelected ? depth : ancestorSelectedDepth}
               />
             );
           })}

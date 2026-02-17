@@ -169,7 +169,10 @@ describe('node-store tag + reference flows', () => {
     );
     const tempNode = useNodeStore.getState().entities[tempId];
     expect(tempNode.props._ownerId).toBe(parentId);
-    expect(tempNode.props.name).toContain(`data-inlineref-node="${refNodeId}"`);
+    expect(tempNode.props.name).toBe('\uFFFC');
+    expect(tempNode.props._inlineRefs).toEqual([
+      expect.objectContaining({ offset: 0, targetNodeId: refNodeId }),
+    ]);
     expect(useNodeStore.getState().entities[parentId].children?.[1]).toBe(tempId);
 
     useNodeStore.getState().revertRefConversion(tempId, refNodeId, parentId);

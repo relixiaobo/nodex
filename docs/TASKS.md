@@ -29,7 +29,7 @@ _(空)_
 |-------|---------|------|-------------|
 | nodex-cc | 用户认证 — Google 登录 (#45) | cc/google-auth | `src/lib/auth.ts`, `src/components/auth/*`, `workspace-store.ts` |
 | nodex-cc-2 | 性能基线测量 | cc2/perf-baseline | `docs/research/performance-baseline.md` |
-| nodex-codex | Editor 迁移: TipTap → ProseMirror | codex/editor-migration | `src/components/editor/*`, `src/lib/editor-marks.ts`, `src/lib/pm-doc-utils.ts` |
+| nodex-codex | Editor 迁移: TipTap → ProseMirror | codex/editor-migration | `src/types/node.ts`, `src/services/node-service.ts`, `src/stores/node-store.ts`, `src/lib/editor-marks.ts`, `src/lib/pm-doc-utils.ts`, `src/services/search-service.ts`, `src/lib/tree-utils.ts`, `src/services/tana-import.ts`, `src/entrypoints/test/seed-data.ts`, `supabase/migrations/*`, `tests/vitest/*`, `docs/features/data-model.md` |
 
 ---
 
@@ -46,8 +46,10 @@ _(空)_
 3. Phase 3: FloatingToolbar + TrailingInput 迁移
 4. Phase 4: 切换 + 清理旧代码 + 删除 TipTap 依赖
 
-- **Files**: `src/components/editor/*`, `src/lib/editor-marks.ts`, `src/lib/pm-doc-utils.ts`, `src/types/node.ts`
-- **迭代日志**: _(开始后追加)_
+- **Files**: `src/types/node.ts`, `src/services/node-service.ts`, `src/stores/node-store.ts`, `src/lib/editor-marks.ts`, `src/lib/pm-doc-utils.ts`, `src/services/search-service.ts`, `src/lib/tree-utils.ts`, `src/services/tana-import.ts`, `src/entrypoints/test/seed-data.ts`, `supabase/migrations/*`, `tests/vitest/*`, `docs/features/data-model.md`
+- **迭代日志**:
+  - [2026-02-17 nodex-codex] 启动实施：先落地 Phase 1 数据层与转换基础设施（类型/DB 映射/store 新接口 + marks 工具与测试），随后再切编辑器 UI 层。
+  - [2026-02-17 nodex-codex] 已完成 Phase 1 首批实现：`NodeProps._marks/_inlineRefs`、`nodes.marks/inline_refs` 迁移、`setNodeContentLocal/updateNodeContent`、`htmlToMarks/marksToHtml`、`marksToDoc/docToMarks`、`tana-import` 转换、seed 切换；验证通过 `typecheck`、`check:test-sync`、`test:run`、`build`。
 
 ### 性能基线测量
 > **Owner: nodex-cc-2** | Branch: `cc2/perf-baseline` | Priority: P2

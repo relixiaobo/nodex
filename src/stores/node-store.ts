@@ -9,7 +9,7 @@
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 import { nanoid } from 'nanoid';
-import type { NodexNode, DocType } from '../types/index.js';
+import type { NodexNode, DocType, TextMark, InlineRefEntry } from '../types/index.js';
 import { WORKSPACE_CONTAINERS, SYS_A, SYS_D, SYS_T, SYS_V } from '../types/index.js';
 import { ATTRDEF_CONFIG_MAP, findAutoCollectTupleId, getExtendsChain, isSystemConfigField, resolveChildSupertags } from '../lib/field-utils.js';
 import { resolveCheckboxClick, resolveCmdEnterCycle, hasTagShowCheckbox, resolveForwardDoneMapping, resolveReverseDoneMapping } from '../lib/checkbox-utils.js';
@@ -100,6 +100,18 @@ interface NodeStore {
 
   /** Update a node's name (optimistic + Supabase sync) */
   updateNodeName(id: string, name: string, userId: string): Promise<void>;
+
+  /** Update text+marks+inlineRefs locally (no Supabase sync — for live typing updates) */
+  setNodeContentLocal(id: string, name: string, marks: TextMark[], inlineRefs: InlineRefEntry[]): void;
+
+  /** Update text+marks+inlineRefs (optimistic + Supabase sync) */
+  updateNodeContent(
+    id: string,
+    name: string,
+    marks: TextMark[],
+    inlineRefs: InlineRefEntry[],
+    userId: string,
+  ): Promise<void>;
 
   /** Update a node's description (optimistic + Supabase sync) */
   updateNodeDescription(id: string, description: string, userId: string): Promise<void>;
@@ -458,37 +470,66 @@ export const useNodeStore = create<NodeStore>()(
       }
     },
 
-    setNodeNameLocal: (id, name) => {
+    setNodeContentLocal: (id, name, marks, inlineRefs) => {
       set((state) => {
         if (state.entities[id]) {
           state.entities[id].props.name = name;
+          state.entities[id].props._marks = marks.length > 0 ? marks : undefined;
+          state.entities[id].props._inlineRefs = inlineRefs.length > 0 ? inlineRefs : undefined;
         }
       });
     },
 
-    updateNodeName: async (id, name, userId) => {
+    updateNodeContent: async (id, name, marks, inlineRefs, userId) => {
       const { entities } = get();
       const oldName = entities[id]?.props.name;
+      const oldMarks = entities[id]?.props._marks;
+      const oldInlineRefs = entities[id]?.props._inlineRefs;
 
       // Optimistic
       set((state) => {
         if (state.entities[id]) {
           state.entities[id].props.name = name;
+          state.entities[id].props._marks = marks.length > 0 ? marks : undefined;
+          state.entities[id].props._inlineRefs = inlineRefs.length > 0 ? inlineRefs : undefined;
         }
       });
 
       if (!isSupabaseReady()) return;
 
       try {
-        await nodeService.updateNode(id, { props: { name } }, userId);
+        await nodeService.updateNode(id, { props: { name, _marks: marks, _inlineRefs: inlineRefs } }, userId);
       } catch {
         // Rollback
         set((state) => {
           if (state.entities[id]) {
             state.entities[id].props.name = oldName;
+            state.entities[id].props._marks = oldMarks;
+            state.entities[id].props._inlineRefs = oldInlineRefs;
           }
         });
       }
+    },
+
+    setNodeNameLocal: (id, name) => {
+      const node = get().entities[id];
+      get().setNodeContentLocal(
+        id,
+        name,
+        node?.props._marks ?? [],
+        node?.props._inlineRefs ?? [],
+      );
+    },
+
+    updateNodeName: async (id, name, userId) => {
+      const node = get().entities[id];
+      await get().updateNodeContent(
+        id,
+        name,
+        node?.props._marks ?? [],
+        node?.props._inlineRefs ?? [],
+        userId,
+      );
     },
 
     updateNodeDescription: async (id, description, userId) => {
@@ -2015,14 +2056,17 @@ export const useNodeStore = create<NodeStore>()(
       const now = Date.now();
       set((state) => {
         const refNode = state.entities[refNodeId];
-        const rawName = refNode?.props.name ?? '';
-        const refName = rawName.replace(/<[^>]+>/g, '').trim() || 'Untitled';
-        const inlineRefHTML = `<span data-inlineref-node="${refNodeId}">${refName}</span>`;
+        const refName = (refNode?.props.name ?? '').replace(/<[^>]+>/g, '').trim() || 'Untitled';
 
         state.entities[tempId] = {
           id: tempId,
           workspaceId,
-          props: { created: now, name: inlineRefHTML, _ownerId: parentId },
+          props: {
+            created: now,
+            name: '\uFFFC',
+            _inlineRefs: [{ offset: 0, targetNodeId: refNodeId, displayName: refName }],
+            _ownerId: parentId,
+          },
           children: [],
           version: 1,
           updatedAt: now,

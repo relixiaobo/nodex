@@ -11,7 +11,7 @@
 import { useNodeStore } from '../../stores/node-store';
 import { useUIStore } from '../../stores/ui-store';
 import { useWorkspaceStore } from '../../stores/workspace-store';
-import type { NodexNode, DocType } from '../../types/index.js';
+import type { NodexNode, DocType, TextMark, InlineRefEntry } from '../../types/index.js';
 import { SYS_A, SYS_D, SYS_T, SYS_V } from '../../types/index.js';
 
 const WS_ID = 'ws_default';
@@ -23,6 +23,7 @@ function makeNode(
   parentId: string,
   children: string[] = [],
   docType?: DocType,
+  content?: { marks?: TextMark[]; inlineRefs?: InlineRefEntry[] },
 ): NodexNode {
   const now = Date.now();
   return {
@@ -31,6 +32,8 @@ function makeNode(
     props: {
       created: now,
       name,
+      ...(content?.marks && content.marks.length > 0 ? { _marks: content.marks } : {}),
+      ...(content?.inlineRefs && content.inlineRefs.length > 0 ? { _inlineRefs: content.inlineRefs } : {}),
       _ownerId: parentId,
       ...(docType ? { _docType: docType } : {}),
     },
@@ -190,12 +193,28 @@ export function seedTestData() {
       libraryId,
       ['rich_1', 'rich_2', 'rich_3', 'rich_4', 'rich_5', 'rich_inline_ref'],
     ),
-    makeNode('rich_1', '<strong>Bold text</strong> mixed with normal', 'note_rich', []),
-    makeNode('rich_2', '<em>Italic text</em> and <strong><em>bold italic</em></strong>', 'note_rich', []),
-    makeNode('rich_3', 'Inline <code>code snippet</code> in a sentence', 'note_rich', []),
-    makeNode('rich_4', '<s>Strikethrough text</s> for done items', 'note_rich', []),
-    makeNode('rich_5', 'Text with <mark>highlighted</mark> parts', 'note_rich', []),
-    makeNode('rich_inline_ref', 'Refer to <span data-inlineref-node="task_1">Design the data model</span> for details', 'note_rich', []),
+    makeNode('rich_1', 'Bold text mixed with normal', 'note_rich', [], undefined, {
+      marks: [{ start: 0, end: 9, type: 'bold' }],
+    }),
+    makeNode('rich_2', 'Italic text and bold italic', 'note_rich', [], undefined, {
+      marks: [
+        { start: 0, end: 11, type: 'italic' },
+        { start: 16, end: 27, type: 'bold' },
+        { start: 16, end: 27, type: 'italic' },
+      ],
+    }),
+    makeNode('rich_3', 'Inline code snippet in a sentence', 'note_rich', [], undefined, {
+      marks: [{ start: 7, end: 19, type: 'code' }],
+    }),
+    makeNode('rich_4', 'Strikethrough text for done items', 'note_rich', [], undefined, {
+      marks: [{ start: 0, end: 17, type: 'strike' }],
+    }),
+    makeNode('rich_5', 'Text with highlighted parts', 'note_rich', [], undefined, {
+      marks: [{ start: 10, end: 21, type: 'highlight' }],
+    }),
+    makeNode('rich_inline_ref', 'Refer to \uFFFC for details', 'note_rich', [], undefined, {
+      inlineRefs: [{ offset: 9, targetNodeId: 'task_1', displayName: 'Design the data model' }],
+    }),
   ];
 
   // ─── Inbox nodes ───

@@ -47,6 +47,7 @@
  */
 import type { NodexNode, DocType, ViewMode } from '../types/index.js';
 import { createNodes } from './node-service.js';
+import { htmlToMarks } from '../lib/editor-marks.js';
 
 // ============================================================
 // Tana 导出格式类型定义
@@ -299,6 +300,7 @@ function tanaDocToNodexNode(
   _now: number,
 ): NodexNode {
   const workspaceId = wsMap.get(doc.id) ?? 'unknown';
+  const parsedName = htmlToMarks(doc.props.name ?? '');
 
   const touchCounts = parseCompactArray(doc.touchCounts);
   const modifiedTs = parseCompactArray(doc.modifiedTs);
@@ -315,7 +317,9 @@ function tanaDocToNodexNode(
     workspaceId,
     props: {
       created: doc.props.created,
-      name: doc.props.name,
+      name: parsedName.text,
+      ...(parsedName.marks.length > 0 ? { _marks: parsedName.marks } : {}),
+      ...(parsedName.inlineRefs.length > 0 ? { _inlineRefs: parsedName.inlineRefs } : {}),
       description: doc.props.description,
       _docType: doc.props._docType as DocType | undefined,
       _ownerId: doc.props._ownerId,

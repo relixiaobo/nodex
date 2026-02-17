@@ -8,7 +8,13 @@
  */
 import { nanoid } from 'nanoid';
 import { getSupabase } from './supabase.js';
-import type { NodexNode, CreateNodeInput, UpdateNodeInput } from '../types/index.js';
+import type {
+  NodexNode,
+  CreateNodeInput,
+  UpdateNodeInput,
+  TextMark,
+  InlineRefEntry,
+} from '../types/index.js';
 
 // ============================================================
 // 数据库行类型（snake_case 列名）
@@ -20,6 +26,8 @@ export interface NodeRow {
   workspace_id: string;
   created: number;
   name: string;
+  marks?: TextMark[] | null;
+  inline_refs?: InlineRefEntry[] | null;
   description: string | null;
   doc_type: string | null;
   owner_id: string | null;
@@ -57,6 +65,8 @@ export function rowToNode(row: NodeRow): NodexNode {
     props: {
       created: row.created,
       name: row.name || undefined,
+      _marks: row.marks && row.marks.length > 0 ? row.marks : undefined,
+      _inlineRefs: row.inline_refs && row.inline_refs.length > 0 ? row.inline_refs : undefined,
       description: row.description || undefined,
       _docType: (row.doc_type as NodexNode['props']['_docType']) || undefined,
       _ownerId: row.owner_id || undefined,
@@ -91,6 +101,8 @@ function nodeToRow(node: NodexNode): NodeRow {
     workspace_id: node.workspaceId,
     created: node.props.created,
     name: node.props.name ?? '',
+    marks: node.props._marks ?? [],
+    inline_refs: node.props._inlineRefs ?? [],
     description: node.props.description ?? null,
     doc_type: node.props._docType ?? null,
     owner_id: node.props._ownerId ?? null,
@@ -207,6 +219,8 @@ export async function updateNode(
   if (changes.props !== undefined) {
     const p = changes.props;
     if (p.name !== undefined) updates.name = p.name ?? '';
+    if (p._marks !== undefined) updates.marks = p._marks ?? [];
+    if (p._inlineRefs !== undefined) updates.inline_refs = p._inlineRefs ?? [];
     if (p.description !== undefined) updates.description = p.description ?? null;
     if (p._docType !== undefined) updates.doc_type = p._docType ?? null;
     if (p._ownerId !== undefined) updates.owner_id = p._ownerId ?? null;

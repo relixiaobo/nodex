@@ -116,6 +116,8 @@ describe('tree-utils', () => {
 
   it('validates inline-ref-only HTML correctly', () => {
     expect(isOnlyInlineRef('')).toBe(true);
+    expect(isOnlyInlineRef('\uFFFC', [{ offset: 0 }])).toBe(true);
+    expect(isOnlyInlineRef('x\uFFFC', [{ offset: 1 }])).toBe(false);
     expect(isOnlyInlineRef('<span data-inlineref-node="x">X</span>')).toBe(true);
     expect(isOnlyInlineRef('<p><span data-inlineref-node="x">X</span></p>')).toBe(true);
     expect(isOnlyInlineRef('<span data-inlineref-node="x">X</span> tail')).toBe(false);
@@ -124,4 +126,3 @@ describe('tree-utils', () => {
     ).toBe(false);
   });
 });
-

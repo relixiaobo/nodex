@@ -27,7 +27,7 @@ _(空)_
 
 | Agent | 当前任务 | 分支 | 修改中的文件 |
 |-------|---------|------|-------------|
-| nodex-cc | — | — | — |
+| nodex-cc | 用户认证 — Google 登录 (#45) | cc/google-auth | `src/lib/auth.ts`, `src/components/auth/*`, `workspace-store.ts` |
 | nodex-cc-2 | — | — | — |
 | nodex-codex | Editor 迁移: TipTap → ProseMirror | codex/editor-migration | `src/components/editor/*`, `src/lib/editor-marks.ts`, `src/lib/pm-doc-utils.ts` |
 
@@ -184,12 +184,19 @@ _(空)_
 - **Spec**: `docs/features/views.md`
 
 #### 用户认证 — Google 登录 (#45)
-> 上线前必需
+> **Owner: nodex-cc** | 上线前必需
+> **Spec**: `docs/features/auth-and-environments.md`
 
-- [ ] Supabase Auth 配置
-- [ ] Google OAuth provider 设置
-- [ ] 登录/登出 UI
-- [ ] 工作区绑定
+- [ ] 环境配置：固定 Dev Extension ID + `.env` / `.env.production` 双套
+- [ ] Supabase Auth 配置（启用 Google Provider，添加 redirect URIs）
+- [ ] Google Cloud Console OAuth Client ID 创建（Dev + Prod 各一个）
+- [ ] `src/lib/auth.ts` — chrome.identity + Supabase Auth 流程封装
+- [ ] `workspace-store.ts` 扩展 — signInWithGoogle / onAuthStateChange / signOut
+- [ ] `src/components/auth/LoginScreen.tsx` — 登录页 UI
+- [ ] `src/components/auth/UserMenu.tsx` — 用户头像 + 登出菜单
+- [ ] App.tsx 路由守卫（未登录 → LoginScreen）
+- [ ] wxt.config.ts 新增 `identity` 权限
+- [ ] 工作区绑定（登录后自动关联 workspaceId）
 
 #### Floating Toolbar (#46)
 > Phase 1 已完成（PR #55）：BubbleMenu + 7 格式按钮 + Link 原地编辑 + Heading mark

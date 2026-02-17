@@ -160,33 +160,16 @@ describe('FloatingToolbar render-loop guard', () => {
     expect(bubbleMenuPropHistory.length).toBe(before);
   });
 
-  it('shows toolbar only after pointer selection ends (mouseup)', () => {
-    const selection = { editor: editor as unknown as Editor, view: editor.view, from: 1, to: 4 };
-    const beforePointerDown = latestShouldShow();
-    expect(beforePointerDown(selection)).toBe(true);
+  it('shows toolbar whenever selection is non-empty', () => {
+    const shouldShow = latestShouldShow();
+    const nonEmptySelection = { editor: editor as unknown as Editor, view: editor.view, from: 1, to: 4 };
+    const emptySelection = { editor: editor as unknown as Editor, view: editor.view, from: 3, to: 3 };
 
-    flushSync(() => {
-      editor.view.dom.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0 }));
-      document.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, buttons: 1 }));
-      editor.emit('selectionUpdate');
-    });
-
-    const whileSelecting = latestShouldShow();
-    expect(whileSelecting).not.toBe(beforePointerDown);
-    expect(whileSelecting(selection)).toBe(false);
-
-    // Critical regression guard: mouseup should restore visibility even
-    // without a new selectionUpdate event.
-    flushSync(() => {
-      document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, button: 0 }));
-    });
-
-    const afterPointerUp = latestShouldShow();
-    expect(afterPointerUp).not.toBe(whileSelecting);
-    expect(afterPointerUp(selection)).toBe(true);
+    expect(shouldShow(nonEmptySelection)).toBe(true);
+    expect(shouldShow(emptySelection)).toBe(false);
   });
 
-  it('keeps toolbar available on double-click word selection (no drag)', () => {
+  it('shows toolbar for both click and double-click selections', () => {
     const selection = { editor: editor as unknown as Editor, view: editor.view, from: 2, to: 8 };
     flushSync(() => {
       editor.view.dom.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0 }));
@@ -195,7 +178,13 @@ describe('FloatingToolbar render-loop guard', () => {
       editor.emit('selectionUpdate');
     });
 
-    // Double-click selection should not be blocked waiting for a third click.
     expect(latestShouldShow()(selection)).toBe(true);
+  });
+
+  it('hides toolbar when editor is not focused', () => {
+    const selection = { editor: editor as unknown as Editor, view: editor.view, from: 1, to: 4 };
+    editor.isFocused = false;
+
+    expect(latestShouldShow()(selection)).toBe(false);
   });
 });

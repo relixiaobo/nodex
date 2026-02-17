@@ -1231,13 +1231,45 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
 
   const handleMoveUp = useCallback(() => {
     if (!userId) return;
-    moveNodeUp(nodeId, userId);
-  }, [nodeId, userId, moveNodeUp]);
+    const ed = editorRef.current;
+    const textOffset = isEditorViewAlive(ed)
+      ? Math.max(0, ed.state.selection.from - 1)
+      : getNodeTextLengthById(nodeId, useNodeStore.getState().entities);
+
+    useUIStore.getState().setFocusClickCoords({ nodeId, parentId, textOffset });
+    void moveNodeUp(nodeId, userId);
+
+    requestAnimationFrame(() => {
+      const currentEditor = editorRef.current;
+      if (!isEditorViewAlive(currentEditor)) return;
+      const maxPos = Math.max(1, currentEditor.state.doc.content.size - 1);
+      const pmPos = Math.max(1, Math.min(textOffset + 1, maxPos));
+      setEditorSelection(currentEditor, pmPos, pmPos);
+      currentEditor.focus();
+      useUIStore.getState().setFocusClickCoords(null);
+    });
+  }, [nodeId, parentId, userId, moveNodeUp]);
 
   const handleMoveDown = useCallback(() => {
     if (!userId) return;
-    moveNodeDown(nodeId, userId);
-  }, [nodeId, userId, moveNodeDown]);
+    const ed = editorRef.current;
+    const textOffset = isEditorViewAlive(ed)
+      ? Math.max(0, ed.state.selection.from - 1)
+      : getNodeTextLengthById(nodeId, useNodeStore.getState().entities);
+
+    useUIStore.getState().setFocusClickCoords({ nodeId, parentId, textOffset });
+    void moveNodeDown(nodeId, userId);
+
+    requestAnimationFrame(() => {
+      const currentEditor = editorRef.current;
+      if (!isEditorViewAlive(currentEditor)) return;
+      const maxPos = Math.max(1, currentEditor.state.doc.content.size - 1);
+      const pmPos = Math.max(1, Math.min(textOffset + 1, maxPos));
+      setEditorSelection(currentEditor, pmPos, pmPos);
+      currentEditor.focus();
+      useUIStore.getState().setFocusClickCoords(null);
+    });
+  }, [nodeId, parentId, userId, moveNodeDown]);
 
   // ─── # trigger handlers ───
 

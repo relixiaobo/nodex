@@ -146,6 +146,18 @@ interface NodeStore {
     userId: string,
   ): Promise<void>;
 
+  /**
+   * Move a field tuple between parents, keeping associationMap + associatedData ownership in sync.
+   * Used by field-row Tab/Shift+Tab indentation.
+   */
+  moveFieldTuple(
+    currentParentId: string,
+    tupleId: string,
+    newParentId: string,
+    userId: string,
+    position?: number,
+  ): Promise<void>;
+
   /** Move node to trash */
   trashNode(nodeId: string, workspaceId: string, userId: string): Promise<void>;
 
@@ -912,6 +924,125 @@ export const useNodeStore = create<NodeStore>()(
           }
           if (state.entities[nodeId]) {
             state.entities[nodeId].props._ownerId = oldParentId;
+          }
+        });
+      }
+    },
+
+    moveFieldTuple: async (currentParentId, tupleId, newParentId, userId, position) => {
+      const snapshot = (() => {
+        const entities = get().entities;
+        const currentParent = entities[currentParentId];
+        const targetParent = entities[newParentId];
+        const tuple = entities[tupleId];
+        if (!currentParent || !targetParent || !tuple) return null;
+        const assocId = currentParent.associationMap?.[tupleId];
+        const assoc = assocId ? entities[assocId] : undefined;
+        return {
+          currentParentChildren: [...(currentParent.children ?? [])],
+          currentParentAssociation: { ...(currentParent.associationMap ?? {}) },
+          targetParentChildren: [...(targetParent.children ?? [])],
+          targetParentAssociation: { ...(targetParent.associationMap ?? {}) },
+          tupleOwnerId: tuple.props._ownerId,
+          assocId,
+          assocOwnerId: assoc?.props._ownerId,
+        };
+      })();
+      if (!snapshot) return;
+
+      set((state) => {
+        const currentParent = state.entities[currentParentId];
+        const targetParent = state.entities[newParentId];
+        const tuple = state.entities[tupleId];
+        if (!currentParent || !targetParent || !tuple) return;
+
+        const assocId = currentParent.associationMap?.[tupleId];
+
+        if (currentParent.children) {
+          currentParent.children = currentParent.children.filter((id) => id !== tupleId);
+        }
+        if (currentParent.associationMap) {
+          delete currentParent.associationMap[tupleId];
+        }
+
+        if (!targetParent.children) targetParent.children = [];
+        const insertAt = position !== undefined
+          ? Math.max(0, Math.min(position, targetParent.children.length))
+          : targetParent.children.length;
+        targetParent.children.splice(insertAt, 0, tupleId);
+
+        if (assocId) {
+          if (!targetParent.associationMap) targetParent.associationMap = {};
+          targetParent.associationMap[tupleId] = assocId;
+        }
+
+        tuple.props._ownerId = newParentId;
+        if (assocId && state.entities[assocId]) {
+          state.entities[assocId].props._ownerId = newParentId;
+          state.entities[assocId].updatedAt = Date.now();
+          state.entities[assocId].updatedBy = userId;
+        }
+
+        currentParent.updatedAt = Date.now();
+        currentParent.updatedBy = userId;
+        targetParent.updatedAt = Date.now();
+        targetParent.updatedBy = userId;
+        tuple.updatedAt = Date.now();
+        tuple.updatedBy = userId;
+      });
+
+      if (!isSupabaseReady()) return;
+
+      try {
+        const entities = get().entities;
+        const currentParent = entities[currentParentId];
+        const targetParent = entities[newParentId];
+        const tuple = entities[tupleId];
+        if (!currentParent || !targetParent || !tuple) return;
+
+        await nodeService.updateNode(
+          currentParentId,
+          {
+            children: currentParent.children ?? [],
+            associationMap: currentParent.associationMap ?? {},
+          },
+          userId,
+        );
+        await nodeService.updateNode(
+          newParentId,
+          {
+            children: targetParent.children ?? [],
+            associationMap: targetParent.associationMap ?? {},
+          },
+          userId,
+        );
+        await nodeService.updateNode(
+          tupleId,
+          { props: { _ownerId: newParentId } },
+          userId,
+        );
+        if (snapshot.assocId) {
+          await nodeService.updateNode(
+            snapshot.assocId,
+            { props: { _ownerId: newParentId } },
+            userId,
+          );
+        }
+      } catch {
+        set((state) => {
+          const currentParent = state.entities[currentParentId];
+          const targetParent = state.entities[newParentId];
+          const tuple = state.entities[tupleId];
+          if (!currentParent || !targetParent || !tuple) return;
+
+          currentParent.children = [...snapshot.currentParentChildren];
+          currentParent.associationMap = { ...snapshot.currentParentAssociation };
+          targetParent.children = [...snapshot.targetParentChildren];
+          targetParent.associationMap = { ...snapshot.targetParentAssociation };
+          tuple.props._ownerId = snapshot.tupleOwnerId;
+
+          if (snapshot.assocId && state.entities[snapshot.assocId]) {
+            state.entities[snapshot.assocId].props._ownerId = snapshot.assocOwnerId;
           }
         });
       }

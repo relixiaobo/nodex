@@ -29,7 +29,7 @@ _(空)_
 |-------|---------|------|-------------|
 | nodex-cc | 用户认证 — Google 登录 (#45) | cc/google-auth | `src/lib/auth.ts`, `src/components/auth/*`, `workspace-store.ts` |
 | nodex-cc-2 | 性能基线测量 | cc2/perf-baseline | `docs/research/performance-baseline.md` |
-| nodex-codex | Editor 迁移: TipTap → ProseMirror | codex/editor-migration | `src/components/outliner/OutlinerItem.tsx`, `src/components/editor/FloatingToolbar.tsx`, `src/components/editor/RichTextEditor.tsx`, `src/components/editor/SlashCommandMenu.tsx`, `src/components/tags/TagSelector.tsx`, `src/components/references/ReferenceSelector.tsx`, `tests/vitest/floating-toolbar.test.ts`, `docs/EDITOR-MIGRATION-ACCEPTANCE.md`, `docs/TASKS.md` |
+| nodex-codex | Editor 迁移: TipTap → ProseMirror | codex/editor-migration | `src/components/outliner/OutlinerItem.tsx`, `src/components/fields/FieldRow.tsx`, `src/stores/node-store.ts`, `src/components/editor/FloatingToolbar.tsx`, `src/components/editor/RichTextEditor.tsx`, `src/components/editor/SlashCommandMenu.tsx`, `src/components/tags/TagSelector.tsx`, `src/components/references/ReferenceSelector.tsx`, `tests/vitest/floating-toolbar.test.ts`, `tests/vitest/node-store-fields.test.ts`, `docs/EDITOR-MIGRATION-ACCEPTANCE.md`, `docs/TASKS.md` |
 
 ---
 
@@ -67,6 +67,7 @@ _(空)_
   - [2026-02-17 nodex-codex] 第七轮修复（继续处理剩余两项）：`Cmd+Shift+ArrowUp/Down` 移动时记录并恢复当前字符偏移，确保节点移动后光标位置不跳变；`use-nav-undo-keyboard` 增加 `focusedNodeId` 守卫，编辑态不再抢占 `Cmd+Z`，修复格式变更撤销链路。验证通过 `typecheck`、`test:run`、`build`（339/339）。
   - [2026-02-18 nodex-codex] 根据手测反馈继续修复 Arrow 导航：内容节点上下键遇到 field 行时改为进入对应 `field name`；边界场景新增聚焦灰色“系统空白输入位”（TrailingInput）兜底，避免光标消失。验证通过 `typecheck`、`test:run`、`build`。
   - [2026-02-18 nodex-codex] 继续修复 field/TrailingInput 导航闭环：`FieldNameInput` 支持无候选时 `ArrowUp/Down` 行间导航；`field name` 支持 `Tab/Shift+Tab` 直接缩进/反缩进；`FieldRow` 统一 sibling 导航并支持进入 content/trailing；`OutlinerView` 与 `OutlinerItem` 补齐 TrailingInput `onNavigateOut`，修复灰色空白位上下不可进出。验证通过 `typecheck`、`test:run`、`build`。
+  - [2026-02-18 nodex-codex] 收敛灰色空白位与 field 缩进语义：`OutlinerItem` 改为基于“已渲染 sibling 行”处理 Arrow 导航，确保普通节点可稳定进入 TrailingInput；`FieldRow` 的 `Tab/Shift+Tab` 改为 `moveFieldTuple`（下方 field → 上方 field value），并修正反缩进插入点到父 field 后方；补充 `node-store-fields.test.ts` 覆盖字段 tuple 迁移与 associationMap 所有权同步。验证通过 `typecheck`、`test:run`、`build`、`check:test-sync`（340/340）。
 
 ### 性能基线测量
 > **Owner: nodex-cc-2** | Branch: `cc2/perf-baseline` | Priority: P2

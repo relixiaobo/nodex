@@ -3,11 +3,13 @@ import { useNode } from '../../hooks/use-node';
 import { useChildren } from '../../hooks/use-children';
 import { useNodeFields, type FieldEntry } from '../../hooks/use-node-fields';
 import { useNodeStore } from '../../stores/node-store';
+import { useUIStore } from '../../stores/ui-store';
 import { OutlinerItem } from './OutlinerItem';
 import { FieldRow } from '../fields/FieldRow';
 import { TrailingInput } from '../editor/TrailingInput';
 import { SYS_V } from '../../types/index.js';
 import { useDragSelect } from '../../hooks/use-drag-select.js';
+import { getLastVisibleNode } from '../../lib/tree-utils.js';
 
 interface OutlinerViewProps {
   rootNodeId: string;
@@ -21,6 +23,10 @@ export function OutlinerView({ rootNodeId, showTemplateTuples }: OutlinerViewPro
 
   const allChildIds = node?.children ?? [];
   const entities = useNodeStore((s) => s.entities);
+  const expandedNodes = useUIStore((s) => s.expandedNodes);
+  const setFocusedNode = useUIStore((s) => s.setFocusedNode);
+  const clearFocus = useUIStore((s) => s.clearFocus);
+  const setEditingFieldName = useUIStore((s) => s.setEditingFieldName);
   const fields = useNodeFields(rootNodeId);
 
   // Build field lookup by tuple ID (same pattern as OutlinerItem)
@@ -118,6 +124,44 @@ export function OutlinerView({ rootNodeId, showTemplateTuples }: OutlinerViewPro
               trashed={fieldMap.get(id)!.trashed}
               isRequired={fieldMap.get(id)!.isRequired}
               isEmpty={fieldMap.get(id)!.isEmpty}
+              onNavigateOut={(direction) => {
+                if (direction === 'up') {
+                  for (let j = i - 1; j >= 0; j--) {
+                    const prev = visibleChildren[j];
+                    if (prev.hidden) continue;
+                    if (prev.type === 'field') {
+                      clearFocus();
+                      setEditingFieldName(prev.id);
+                      return;
+                    }
+                    useUIStore.getState().setFocusClickCoords({
+                      nodeId: prev.id,
+                      parentId: rootNodeId,
+                      textOffset: (useNodeStore.getState().entities[prev.id]?.props.name ?? '').length,
+                    });
+                    setFocusedNode(prev.id, rootNodeId);
+                    return;
+                  }
+                  return;
+                }
+
+                for (let j = i + 1; j < visibleChildren.length; j++) {
+                  const next = visibleChildren[j];
+                  if (next.hidden) continue;
+                  if (next.type === 'field') {
+                    clearFocus();
+                    setEditingFieldName(next.id);
+                    return;
+                  }
+                  useUIStore.getState().setFocusClickCoords({
+                    nodeId: next.id,
+                    parentId: rootNodeId,
+                    textOffset: 0,
+                  });
+                  setFocusedNode(next.id, rootNodeId);
+                  return;
+                }
+              }}
             />
           </div>
         ) : (
@@ -131,7 +175,23 @@ export function OutlinerView({ rootNodeId, showTemplateTuples }: OutlinerViewPro
           />
         );
       })}
-      <TrailingInput parentId={rootNodeId} depth={0} autoFocus={visibleChildren.length === 0} parentExpandKey={`${node?.props._ownerId ?? ''}:${rootNodeId}`} />
+      <TrailingInput
+        parentId={rootNodeId}
+        depth={0}
+        autoFocus={visibleChildren.length === 0}
+        parentExpandKey={`${node?.props._ownerId ?? ''}:${rootNodeId}`}
+        onNavigateOut={(direction) => {
+          if (direction !== 'up') return;
+          const target = getLastVisibleNode(rootNodeId, useNodeStore.getState().entities, expandedNodes);
+          if (!target) return;
+          useUIStore.getState().setFocusClickCoords({
+            nodeId: target.nodeId,
+            parentId: target.parentId,
+            textOffset: (useNodeStore.getState().entities[target.nodeId]?.props.name ?? '').length,
+          });
+          setFocusedNode(target.nodeId, target.parentId);
+        }}
+      />
     </div>
   );
 }

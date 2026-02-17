@@ -2045,9 +2045,13 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
                   isEmpty={fieldMap.get(id)!.isEmpty}
                   onNavigateOut={(direction) => {
                     if (direction === 'up') {
-                      // Escape up from field value → edit this field name.
-                      clearFocus();
-                      setEditingFieldName(id);
+                      // Escape up from first field/value block → focus parent content node.
+                      useUIStore.getState().setFocusClickCoords({
+                        nodeId,
+                        parentId,
+                        textOffset: (useNodeStore.getState().entities[nodeId]?.props.name ?? '').length,
+                      });
+                      setFocusedNode(nodeId, parentId);
                     } else {
                       // Escape down → focus next sibling item in this parent.
                       let found = false;
@@ -2107,6 +2111,31 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
               depth={depth + 1}
               autoFocus={!lastRenderableChild}
               parentExpandKey={expandKey}
+              onNavigateOut={(direction) => {
+                if (direction === 'up') {
+                  useUIStore.getState().setFocusClickCoords({
+                    nodeId,
+                    parentId,
+                    textOffset: (useNodeStore.getState().entities[nodeId]?.props.name ?? '').length,
+                  });
+                  setFocusedNode(nodeId, parentId);
+                  return;
+                }
+                const fl = getFlattenedVisibleNodes(
+                  rootChildIds,
+                  useNodeStore.getState().entities,
+                  useUIStore.getState().expandedNodes,
+                  rootNodeId,
+                );
+                const nx = getNextVisibleNode(nodeId, parentId, fl);
+                if (!nx) return;
+                useUIStore.getState().setFocusClickCoords({
+                  nodeId: nx.nodeId,
+                  parentId: nx.parentId,
+                  textOffset: 0,
+                });
+                setFocusedNode(nx.nodeId, nx.parentId);
+              }}
             />
           )}
         </div>

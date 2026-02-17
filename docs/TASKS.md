@@ -29,40 +29,13 @@ _(空)_
 |-------|---------|------|-------------|
 | nodex-cc | — | — | — |
 | nodex-cc-2 | — | — | — |
-| nodex-codex | Floating Toolbar BUG（无限渲染循环）修复 | codex/fix-floating-toolbar-render-loop | docs/TASKS.md, src/components/editor/FloatingToolbar.tsx, tests/vitest/floating-toolbar.test.ts, docs/TESTING.md, docs/features/floating-toolbar.md |
+| nodex-codex | — | — | — |
 
 ---
 
 ## 进行中
 
-### Floating Toolbar BUG 修复（无限渲染循环）
-
-- **Owner**: nodex-codex
-- **Branch**: `codex/fix-floating-toolbar-render-loop`
-- **Files**: `docs/TASKS.md`, `src/components/editor/FloatingToolbar.tsx`, `tests/vitest/floating-toolbar.test.ts`, `docs/TESTING.md`, `docs/features/floating-toolbar.md`
-- **目标**:
-  1. 修复 Floating Toolbar 显示不稳定（拖拽/双击多次后不出现）问题，恢复“选中文本即出现”
-  2. 保持已验证的设计系统样式修复一起落地（toolbar 阴影/hover/focus、inline mark 样式）
-- **Progress**:
-  - [x] `FloatingToolbar.tsx` 从 BubbleMenu 迁移到自管理 `createPortal + fixed` 浮层
-  - [x] 显示判定统一为 `TextSelection && from !== to && view.hasFocus() && editor.isEditable`
-  - [x] 鼠标交互改为 `mousedown` 隐藏、`mouseup` 后重算选区再显示（拖拽/双击统一链路）
-  - [x] 重写 `tests/vitest/floating-toolbar.test.ts`，覆盖拖拽、双击、非文本选区、失焦隐藏
-  - [x] 用户手测确认“反复触发仍稳定显示”
-- **迭代日志**:
-  - [2026-02-16 nodex-codex] 认领任务，更新 TASKS，准备创建分支与 Draft PR。
-  - [2026-02-16 nodex-codex] 确认代码中修复逻辑已在主干（去掉 transaction 监听 + 稳定 BubbleMenu props），补充 `floating-toolbar.test.ts` 回归测试并完成全量验证。
-  - [2026-02-16 nodex-codex] 创建并更新 PR #57，状态已转 Ready for review。
-  - [2026-02-16 nodex-codex] 修复交互细节：拖拽选中文本时延迟到 mouseup 才显示 toolbar，双击选词在 mouseup 后恢复显示；新增回归测试覆盖该行为。
-  - [2026-02-16 nodex-codex] 根因修复：仅改 `shouldShow` 判断不足以触发 BubbleMenu 重新评估；改为 `isPointerSelecting` state 驱动 `shouldShow` 引用，确保 mouseup 后插件收到更新并显示。
-  - [2026-02-16 nodex-codex] 继续修复：`currentEditor.isFocused` 在当前交互链路下不稳定，导致 shouldShow 常驻 false；改为 `view.hasFocus()` + `isEditable` 判定，恢复文本选中可见性。
-  - [2026-02-16 nodex-codex] 系统性重构显示门控：移除自管 document mouse 监听，改为读取 ProseMirror `view.input.mouseDown`（拖拽中 true，mouseup 后 false），避免卡死状态并统一拖拽/双击行为。
-  - [2026-02-16 nodex-codex] 增加 failsafe：若 `view.input.mouseDown` 异常残留超过阈值（1.5s），自动解除阻塞，避免多次触发后菜单永久不出现。
-  - [2026-02-16 nodex-codex] 根因复盘后改回显式 pointer 状态机：`mousedown` 进入 selecting、`mouseup` 立即退出并触发 BubbleMenu 重新评估；覆盖“第二次双击已选中但要第三次才显示”场景。
-  - [2026-02-16 nodex-codex] 进一步收敛为“仅拖拽隐藏”：只有 `mousedown+mousemove` 才置 selecting，双击（无拖拽）不进入隐藏态，修复双击需三次的问题。
-  - [2026-02-16 nodex-codex] 按用户反馈回归最小正确模型：移除手势门控逻辑，统一为“非空选区即显示”，保证点击/双击一致性。
-  - [2026-02-17 nodex-codex] 参考外部稳定实现后做根因重构：彻底移除 BubbleMenu，改为组件内 selection/focus/mouseup 驱动 + `view.coordsAtPos` 定位 + portal 渲染；同步重写回归测试。
-  - [2026-02-17 nodex-codex] 用户手测通过：反复触发（点击/双击/拖拽）后菜单显示稳定，验收通过。
+_(空)_
 
 ---
 
@@ -107,12 +80,14 @@ _(空)_
 - **Spec**: `docs/features/fields.md`
 
 #### Date 节点 & 日记 (#22)
+> **Owner: nodex-codex** | 执行顺序 ①（"一切皆节点"系列首项，后续 Search/Views 依赖日期节点）
 
 - [ ] 年/月/周/日节点层级（自动生成）
 - [ ] Today 快捷入口（侧栏按钮 + 快捷键 Ctrl+Shift+D）
 - [ ] 自然语言日期解析（@today / @next Monday / @November）
 - [ ] 日记模板（#day supertag 配置）
 - [ ] 日期字段链接到日节点
+- **Spec**: `docs/features/date-nodes.md`
 
 #### 网页剪藏 (#30)
 > 已完成：消息类型定义、Content Script 提取（defuddle）、Background 中转、Sidebar 剪藏按钮、Capture Tab 复制到剪贴板
@@ -145,6 +120,7 @@ _(空)_
 ### P3
 
 #### Search Nodes / Live Queries (#23)
+> **Owner: nodex-codex** | 执行顺序 ②（搜索条件 = Tuple 树，依赖 #22 的日期节点做日期操作符）
 
 - [ ] `?` 触发创建搜索节点（放大镜图标）
 - [ ] 基础搜索操作符（#tag / field 值 / 文本 / 日期）
@@ -152,37 +128,48 @@ _(空)_
 - [ ] AND / OR / NOT 逻辑组合
 - [ ] 关键词操作符（TODO / DONE / OVERDUE / CREATED LAST X DAYS）
 - [ ] 搜索结果配合视图展示
+- **Spec**: `docs/features/search.md`
 
 #### Table View (#24)
+> **Owner: nodex-codex** | 执行顺序 ④（依赖 #25 的 Filter/Sort/Group 基础设施）
 
 - [ ] 表格视图（行=节点，列=字段）
 - [ ] 列宽调整、列拖拽排序
 - [ ] 列计算（Sum / Avg / Median / Min / Max / Count）
 - [ ] 单元格内直接编辑字段值
+- **Spec**: `docs/features/views.md`
 
 #### Filter / Group / Sort 工具栏 (#25)
+> **Owner: nodex-codex** | 执行顺序 ③（视图基础设施，Filter/Sort/Group = ViewDef 的 Tuple，所有视图共用）
 
 - [ ] 通用视图工具栏（适用于所有视图）
 - [ ] 按字段值过滤
 - [ ] 按字段值分组（Outline / Cards / List 视图）
 - [ ] 多级排序（升序/降序、堆叠排序条件）
+- **Spec**: `docs/features/views.md`
 
 #### Cards View (#26)
+> **Owner: nodex-codex** | 执行顺序 ⑤（依赖 #25 的 Filter/Sort/Group 基础设施）
 
 - [ ] 卡片视图
 - [ ] 卡片间拖拽更新字段值
 - [ ] Banner 图片显示
+- **Spec**: `docs/features/views.md`
 
 #### Calendar View (#27)
+> **Owner: nodex-codex** | 执行顺序 ⑥（依赖 #22 的日期节点 + #25 的视图基础设施）
 
 - [ ] 日历视图（按日期字段排列节点）
 - [ ] 日/周/月粒度切换
 - [ ] 拖拽未排期节点到日历添加日期
+- **Spec**: `docs/features/views.md`
 
 #### List & Tabs View (#28)
+> **Owner: nodex-codex** | 执行顺序 ⑦（依赖 #25 的视图基础设施）
 
 - [ ] List 视图（左侧列表 + 右侧详情双面板）
 - [ ] Tabs 视图（顶部 tab 切换内容）
+- **Spec**: `docs/features/views.md`
 
 #### 用户认证 — Google 登录 (#45)
 > 上线前必需
@@ -198,15 +185,9 @@ _(空)_
 - [x] TipTap BubbleMenu 集成 ✓ PR #55
 - [x] 格式按钮（Bold / Italic / Code / Highlight / Strikethrough / Heading） ✓ PR #55
 - [x] Link 编辑弹窗 ✓ PR #55
-- [ ] **BUG: BubbleMenu 无限渲染循环 — 选中文字后浮动工具栏不出现**（进行中：`nodex-codex`，分支 `codex/fix-floating-toolbar-render-loop`）
-  - 根因：BubbleMenu 插件内部 transaction/updateOptions 与外部显示门控逻辑相互反馈，导致在拖拽/双击高频链路中出现状态竞争（菜单偶发不显示或多次触发后失效）
-  - 当前修复：
-    1. 移除 BubbleMenu 运行时依赖，改为 `FloatingToolbar` 自管理显示状态
-    2. 显示条件统一为 `TextSelection + 非空选区 + focus + editable`
-    3. 鼠标链路统一为 `mousedown` 隐藏，`mouseup` 后重算选区并显示
-    4. 通过 `createPortal(..., document.body)` + `fixed` 定位，避免节点局部布局影响浮层可见性
-  - 回归测试：`tests/vitest/floating-toolbar.test.ts`（覆盖拖拽/双击/非文本选区/blur）
-  - 涉及文件：`src/components/editor/FloatingToolbar.tsx`、`tests/vitest/floating-toolbar.test.ts`
+- [x] **BUG: BubbleMenu 无限渲染循环 — 选中文字后浮动工具栏不出现** ✓ PR #57
+  - 根因：BubbleMenu 插件内部 transaction/updateOptions 与外部显示门控逻辑互相反馈
+  - 已修复：移除 BubbleMenu，改为自管理 Portal 浮层（selection/focus/mouseup 驱动 + `coordsAtPos` 定位）
 - [ ] @ Reference 按钮
 - [ ] # Tag 按钮
 - **Spec**: `docs/features/floating-toolbar.md`
@@ -228,6 +209,7 @@ _(空)_
 
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
+| 2026-02-17 | Floating Toolbar BUG 修复 — 移除 BubbleMenu，改为自管理 Portal 浮层 | nodex-codex | #57 |
 | 2026-02-16 | Ctrl+I Description 切换修复 — registry 匹配 + 光标位置恢复 | nodex-codex | #56 |
 | 2026-02-16 | Supertags + Fields 增强批次 — Default Child Supertag + Color Swatch + Options from Supertag (#20+#21) | nodex-cc-2 | main |
 | 2026-02-16 | 文本格式化 — Floating Toolbar + Heading Mark + Link 编辑 (#46+#48) | nodex-codex | #55 |

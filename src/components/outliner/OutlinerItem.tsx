@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
-import type { EditorView } from '@tiptap/pm/view';
+import type { EditorView } from 'prosemirror-view';
 import { useNode } from '../../hooks/use-node';
 import { useChildren } from '../../hooks/use-children';
 import { useNodeTags } from '../../hooks/use-node-tags';

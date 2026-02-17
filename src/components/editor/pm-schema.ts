@@ -1,4 +1,4 @@
-import { Schema } from '@tiptap/pm/model';
+import { Schema } from 'prosemirror-model';
 
 export const pmSchema = new Schema({
   nodes: {

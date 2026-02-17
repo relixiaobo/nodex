@@ -1,14 +1,38 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import type { Editor } from '@tiptap/react';
-import { toggleMark } from '@tiptap/pm/commands';
-import { TextSelection } from '@tiptap/pm/state';
-import type { EditorView } from '@tiptap/pm/view';
+import { toggleMark } from 'prosemirror-commands';
+import { TextSelection } from 'prosemirror-state';
+import type { EditorView } from 'prosemirror-view';
 import { Bold, Check, Code2, Heading, Highlighter, Italic, Link2, Strikethrough, Unlink, X } from 'lucide-react';
 import { pmSchema } from './pm-schema.js';
 
+interface TiptapLikeChain {
+  focus: () => TiptapLikeChain;
+  extendMarkRange: (_mark: string) => TiptapLikeChain;
+  setLink: (_attrs: { href: string }) => TiptapLikeChain;
+  unsetLink: () => TiptapLikeChain;
+  toggleBold: () => TiptapLikeChain;
+  toggleItalic: () => TiptapLikeChain;
+  toggleStrike: () => TiptapLikeChain;
+  toggleCode: () => TiptapLikeChain;
+  toggleHighlight: () => TiptapLikeChain;
+  toggleHeadingMark: () => TiptapLikeChain;
+  run: () => boolean;
+}
+
+interface TiptapLikeEditor {
+  state: { selection: { from: number; to: number; empty?: boolean; constructor?: { name?: string } } };
+  isEditable: boolean;
+  view: EditorView;
+  on: (_event: string, _callback: () => void) => void;
+  off: (_event: string, _callback: () => void) => void;
+  getAttributes: (_mark: string) => { href?: string };
+  isActive: (_mark: string) => boolean;
+  chain: () => TiptapLikeChain;
+}
+
 interface FloatingToolbarProps {
-  editor?: Editor;
+  editor?: TiptapLikeEditor;
   view?: EditorView | null;
   tick?: number;
 }

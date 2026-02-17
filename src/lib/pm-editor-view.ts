@@ -1,6 +1,6 @@
-import { toggleMark } from '@tiptap/pm/commands';
-import { TextSelection } from '@tiptap/pm/state';
-import type { EditorView } from '@tiptap/pm/view';
+import { toggleMark } from 'prosemirror-commands';
+import { TextSelection } from 'prosemirror-state';
+import type { EditorView } from 'prosemirror-view';
 import { marksToDoc } from './pm-doc-utils.js';
 import { pmSchema } from '../components/editor/pm-schema.js';
 

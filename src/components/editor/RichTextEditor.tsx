@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type MutableRefObject } from 'react';
-import { EditorState, TextSelection } from '@tiptap/pm/state';
-import type { Plugin } from '@tiptap/pm/state';
-import { EditorView } from '@tiptap/pm/view';
-import { keymap } from '@tiptap/pm/keymap';
-import { baseKeymap, toggleMark } from '@tiptap/pm/commands';
-import { history, redo, undo } from '@tiptap/pm/history';
+import { EditorState, TextSelection, type Plugin } from 'prosemirror-state';
+import { EditorView } from 'prosemirror-view';
+import { keymap } from 'prosemirror-keymap';
+import { baseKeymap, toggleMark } from 'prosemirror-commands';
+import { history, redo, undo } from 'prosemirror-history';
 import { useNodeStore } from '../../stores/node-store.js';
 import { useWorkspaceStore } from '../../stores/workspace-store.js';
 import { useUIStore } from '../../stores/ui-store.js';

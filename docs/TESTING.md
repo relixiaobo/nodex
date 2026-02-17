@@ -559,12 +559,12 @@ hash trigger cleanup safety（2 cases, Bug #53 回归）:
 
 **覆盖点**:
 
-1. `FloatingToolbar` 仅监听 `selectionUpdate` / `blur`，不监听 `transaction`
-2. `BubbleMenu` 的 `shouldShow` / `options` 在 selection 导致的重渲染后保持同一引用
-3. 触发 `transaction` 事件不会导致 toolbar 额外重渲染（防止无限循环回归）
-4. 非空选区（`from !== to`）时显示，空选区时隐藏
-5. 单击选中与双击选词两种路径行为一致：选中后即可显示
-6. 失焦（`view.hasFocus() = false`）时隐藏
+1. `FloatingToolbar` 监听 `selectionUpdate` / `transaction` / `focus` / `blur`，并在组件卸载时正确清理
+2. 非空 `TextSelection` 且编辑器聚焦时显示
+3. 空选区或 `NodeSelection` 时隐藏
+4. 鼠标拖拽选区期间保持隐藏，`mouseup` 后再显示
+5. 双击选词路径在第二次点击 `mouseup` 后即可显示（不需要额外点击）
+6. 失焦（blur）立即隐藏
 
 ### 1.38 Done State Mapping（checkbox ↔ Options 联动，统一字段模型）
 

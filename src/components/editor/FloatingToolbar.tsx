@@ -1,11 +1,23 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import type { Editor } from '@tiptap/react';
-import { BubbleMenu } from '@tiptap/react/menus';
+import { TextSelection } from '@tiptap/pm/state';
 import { Bold, Check, Code2, Heading, Highlighter, Italic, Link2, Strikethrough, Unlink, X } from 'lucide-react';
 
 interface FloatingToolbarProps {
   editor: Editor;
 }
+
+interface ToolbarPosition {
+  show: boolean;
+  top: number;
+  left: number;
+}
+
+const TOOLBAR_TOP_OFFSET = 40;
+const TOOLBAR_VIEWPORT_PADDING = 8;
+const TOOLBAR_DEFAULT_WIDTH = 232;
+const TOOLBAR_LINK_WIDTH = 360;
 
 function normalizeLinkHref(rawHref: string): string {
   const value = rawHref.trim();
@@ -45,26 +57,123 @@ function ToolbarButton({ title, active = false, onClick, children }: ToolbarButt
   );
 }
 
+function isTextSelectionRange(selection: { from: number; to: number; constructor?: { name?: string } }) {
+  const constructorName = selection.constructor?.name;
+  const isText = selection instanceof TextSelection || constructorName === 'TextSelection';
+  return isText && selection.from !== selection.to;
+}
+
+function clampToolbarPosition(rawTop: number, rawLeft: number, toolbarWidth: number) {
+  if (typeof document === 'undefined') {
+    return { top: rawTop, left: rawLeft };
+  }
+
+  const viewportWidth = document.documentElement.clientWidth;
+  const minLeft = TOOLBAR_VIEWPORT_PADDING + toolbarWidth / 2;
+  const maxLeft = viewportWidth - TOOLBAR_VIEWPORT_PADDING - toolbarWidth / 2;
+  const left = viewportWidth > 0 ? Math.max(minLeft, Math.min(rawLeft, maxLeft)) : rawLeft;
+  const top = Math.max(TOOLBAR_VIEWPORT_PADDING, rawTop);
+
+  return { top, left };
+}
+
 export function FloatingToolbar({ editor }: FloatingToolbarProps) {
   const [renderTick, setRenderTick] = useState(0);
+  const [toolbarPosition, setToolbarPosition] = useState<ToolbarPosition>({ show: false, top: 0, left: 0 });
   const [editingLink, setEditingLink] = useState(false);
   const [linkDraft, setLinkDraft] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
+  const pointerSelectingRef = useRef(false);
+
+  const hideToolbar = useCallback(() => {
+    setToolbarPosition((prev) => (prev.show ? { ...prev, show: false } : prev));
+  }, []);
+
+  const updateToolbarFromSelection = useCallback(() => {
+    const selection = editor.state.selection;
+    const hasTextSelection = isTextSelectionRange(selection);
+    const shouldShow = editor.isEditable && editor.view.hasFocus() && hasTextSelection && !pointerSelectingRef.current;
+
+    if (!shouldShow) {
+      hideToolbar();
+      return false;
+    }
+
+    try {
+      const start = editor.view.coordsAtPos(selection.from);
+      const end = editor.view.coordsAtPos(selection.to);
+      const top = Math.min(start.top, end.top) - TOOLBAR_TOP_OFFSET;
+      const left = (start.left + end.left) / 2;
+
+      setToolbarPosition((prev) => {
+        if (prev.show && prev.top === top && prev.left === left) {
+          return prev;
+        }
+        return { show: true, top, left };
+      });
+
+      return true;
+    } catch {
+      hideToolbar();
+      return false;
+    }
+  }, [editor, hideToolbar]);
 
   useEffect(() => {
-    const rerender = () => setRenderTick((value) => value + 1);
-
-    // Only listen to selectionUpdate and blur — NOT transaction.
-    // BubbleMenu dispatches transactions internally (updateOptions meta),
-    // so listening to 'transaction' creates an infinite render loop:
-    // render → new shouldShow/options refs → BubbleMenu dispatches tx → rerender → repeat.
-    editor.on('selectionUpdate', rerender);
-    editor.on('blur', rerender);
-    return () => {
-      editor.off('selectionUpdate', rerender);
-      editor.off('blur', rerender);
+    const syncToolbar = () => {
+      updateToolbarFromSelection();
+      setRenderTick((value) => value + 1);
     };
-  }, [editor]);
+    const handleBlur = () => {
+      pointerSelectingRef.current = false;
+      setEditingLink(false);
+      hideToolbar();
+      setRenderTick((value) => value + 1);
+    };
+
+    editor.on('selectionUpdate', syncToolbar);
+    editor.on('transaction', syncToolbar);
+    editor.on('focus', syncToolbar);
+    editor.on('blur', handleBlur);
+
+    syncToolbar();
+
+    return () => {
+      editor.off('selectionUpdate', syncToolbar);
+      editor.off('transaction', syncToolbar);
+      editor.off('focus', syncToolbar);
+      editor.off('blur', handleBlur);
+    };
+  }, [editor, hideToolbar, updateToolbarFromSelection]);
+
+  useEffect(() => {
+    const handleMouseDown = (event: MouseEvent) => {
+      if (event.button !== 0) return;
+      pointerSelectingRef.current = true;
+      hideToolbar();
+    };
+    const handleMouseUp = () => {
+      if (!pointerSelectingRef.current) return;
+      pointerSelectingRef.current = false;
+      requestAnimationFrame(() => {
+        updateToolbarFromSelection();
+        setRenderTick((value) => value + 1);
+      });
+    };
+    const handleWindowBlur = () => {
+      pointerSelectingRef.current = false;
+    };
+
+    editor.view.dom.addEventListener('mousedown', handleMouseDown);
+    document.addEventListener('mouseup', handleMouseUp, true);
+    window.addEventListener('blur', handleWindowBlur);
+
+    return () => {
+      editor.view.dom.removeEventListener('mousedown', handleMouseDown);
+      document.removeEventListener('mouseup', handleMouseUp, true);
+      window.removeEventListener('blur', handleWindowBlur);
+    };
+  }, [editor, hideToolbar, updateToolbarFromSelection]);
 
   useEffect(() => {
     if (!editingLink) return;
@@ -76,10 +185,10 @@ export function FloatingToolbar({ editor }: FloatingToolbarProps) {
 
   useEffect(() => {
     if (!editingLink) return;
-    if (editor.state.selection.empty) {
+    if (!toolbarPosition.show || editor.state.selection.empty) {
       setEditingLink(false);
     }
-  }, [editor, editingLink, renderTick]);
+  }, [editor, editingLink, toolbarPosition.show, renderTick]);
 
   const state = useMemo(() => {
     const href = editor.getAttributes('link').href;
@@ -106,11 +215,15 @@ export function FloatingToolbar({ editor }: FloatingToolbarProps) {
 
     editor.chain().focus().extendMarkRange('link').setLink({ href: normalizedHref }).run();
     setEditingLink(false);
+    updateToolbarFromSelection();
+    setRenderTick((value) => value + 1);
   };
 
   const removeLink = () => {
     editor.chain().focus().extendMarkRange('link').unsetLink().run();
     setEditingLink(false);
+    updateToolbarFromSelection();
+    setRenderTick((value) => value + 1);
   };
 
   const handleLinkInputKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
@@ -125,43 +238,33 @@ export function FloatingToolbar({ editor }: FloatingToolbarProps) {
     }
   };
 
-  // Memoize BubbleMenu props to prevent infinite render loops.
-  // BubbleMenu's useEffect dispatches transactions when these references change,
-  // which would re-trigger our selectionUpdate listener → setState → re-render.
-  const shouldShow = useCallback(
-    ({
-      editor: currentEditor,
-      view,
-      from,
-      to,
-    }: {
-      editor: Editor;
-      view: { hasFocus: () => boolean };
-      from: number;
-      to: number;
-    }) => {
-      // Keep behavior simple and stable: show whenever text is selected.
-      return currentEditor.isEditable && view.hasFocus() && from !== to;
-    },
-    [],
-  );
+  const toolbarPositionStyle = useMemo(() => {
+    const toolbarWidth = editingLink ? TOOLBAR_LINK_WIDTH : TOOLBAR_DEFAULT_WIDTH;
+    const { top, left } = clampToolbarPosition(toolbarPosition.top, toolbarPosition.left, toolbarWidth);
+    return { top: `${top}px`, left: `${left}px` };
+  }, [editingLink, toolbarPosition.left, toolbarPosition.top]);
 
-  const bubbleMenuOptions = useMemo(() => ({
-    placement: 'top' as const,
-    strategy: 'fixed' as const,
-    offset: 8,
-  }), []);
+  if (!toolbarPosition.show || typeof document === 'undefined') {
+    return null;
+  }
 
-  return (
-    <BubbleMenu
-      editor={editor}
-      updateDelay={0}
-      shouldShow={shouldShow}
-      options={bubbleMenuOptions}
+  return createPortal(
+    <div
+      data-testid="floating-toolbar"
+      className="fixed z-50 flex items-center gap-0.5 rounded-lg border border-border bg-popover p-1 shadow-lg"
+      style={{
+        top: toolbarPositionStyle.top,
+        left: toolbarPositionStyle.left,
+        transform: 'translateX(-50%)',
+      }}
+      onMouseDown={(event) => event.preventDefault()}
     >
       <div
-        className="flex items-center gap-0.5 rounded-lg border border-border bg-popover p-1 shadow-lg"
-        onMouseDown={(event) => event.preventDefault()}
+        className="flex items-center gap-0.5"
+        onMouseDown={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+        }}
       >
         {editingLink ? (
           <div className="flex items-center gap-1">
@@ -206,22 +309,64 @@ export function FloatingToolbar({ editor }: FloatingToolbarProps) {
           </div>
         ) : (
           <>
-            <ToolbarButton title="Bold" active={state.isBold} onClick={() => editor.chain().focus().toggleBold().run()}>
+            <ToolbarButton
+              title="Bold"
+              active={state.isBold}
+              onClick={() => {
+                editor.chain().focus().toggleBold().run();
+                setRenderTick((value) => value + 1);
+              }}
+            >
               <Bold size={14} />
             </ToolbarButton>
-            <ToolbarButton title="Italic" active={state.isItalic} onClick={() => editor.chain().focus().toggleItalic().run()}>
+            <ToolbarButton
+              title="Italic"
+              active={state.isItalic}
+              onClick={() => {
+                editor.chain().focus().toggleItalic().run();
+                setRenderTick((value) => value + 1);
+              }}
+            >
               <Italic size={14} />
             </ToolbarButton>
-            <ToolbarButton title="Strikethrough" active={state.isStrike} onClick={() => editor.chain().focus().toggleStrike().run()}>
+            <ToolbarButton
+              title="Strikethrough"
+              active={state.isStrike}
+              onClick={() => {
+                editor.chain().focus().toggleStrike().run();
+                setRenderTick((value) => value + 1);
+              }}
+            >
               <Strikethrough size={14} />
             </ToolbarButton>
-            <ToolbarButton title="Code" active={state.isCode} onClick={() => editor.chain().focus().toggleCode().run()}>
+            <ToolbarButton
+              title="Code"
+              active={state.isCode}
+              onClick={() => {
+                editor.chain().focus().toggleCode().run();
+                setRenderTick((value) => value + 1);
+              }}
+            >
               <Code2 size={14} />
             </ToolbarButton>
-            <ToolbarButton title="Highlight" active={state.isHighlight} onClick={() => editor.chain().focus().toggleHighlight().run()}>
+            <ToolbarButton
+              title="Highlight"
+              active={state.isHighlight}
+              onClick={() => {
+                editor.chain().focus().toggleHighlight().run();
+                setRenderTick((value) => value + 1);
+              }}
+            >
               <Highlighter size={14} />
             </ToolbarButton>
-            <ToolbarButton title="Heading" active={state.isHeading} onClick={() => editor.chain().focus().toggleHeadingMark().run()}>
+            <ToolbarButton
+              title="Heading"
+              active={state.isHeading}
+              onClick={() => {
+                editor.chain().focus().toggleHeadingMark().run();
+                setRenderTick((value) => value + 1);
+              }}
+            >
               <Heading size={14} />
             </ToolbarButton>
             <ToolbarButton title="Link" active={state.isLink} onClick={openLinkEditor}>
@@ -230,6 +375,7 @@ export function FloatingToolbar({ editor }: FloatingToolbarProps) {
           </>
         )}
       </div>
-    </BubbleMenu>
+    </div>,
+    document.body,
   );
 }

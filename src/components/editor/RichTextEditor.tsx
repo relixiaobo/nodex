@@ -180,7 +180,12 @@ export function RichTextEditor(props: RichTextEditorProps) {
       const pendingChar = useUIStore.getState().pendingInputChar;
       if (pendingChar) {
         useUIStore.getState().setPendingInputChar(null);
-        view.dispatch(view.state.tr.insertText(pendingChar));
+        const insertFrom = view.state.selection.from;
+        const tr = view.state.tr.insertText(pendingChar);
+        const maxPos = tr.doc.content.size - 1;
+        const nextPos = Math.max(1, Math.min(insertFrom + pendingChar.length, maxPos));
+        tr.setSelection(TextSelection.create(tr.doc, nextPos));
+        view.dispatch(tr);
         setToolbarTick((value) => value + 1);
       }
 

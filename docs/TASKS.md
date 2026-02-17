@@ -29,7 +29,7 @@ _(空)_
 |-------|---------|------|-------------|
 | nodex-cc | 用户认证 — Google 登录 (#45) | cc/google-auth | `src/lib/auth.ts`, `src/components/auth/*`, `workspace-store.ts` |
 | nodex-cc-2 | 性能基线测量 | cc2/perf-baseline | `docs/research/performance-baseline.md` |
-| nodex-codex | Editor 迁移: TipTap → ProseMirror | codex/editor-migration | `src/types/node.ts`, `src/services/node-service.ts`, `src/stores/node-store.ts`, `src/lib/editor-marks.ts`, `src/lib/pm-doc-utils.ts`, `src/services/search-service.ts`, `src/lib/tree-utils.ts`, `src/services/tana-import.ts`, `src/entrypoints/test/seed-data.ts`, `supabase/migrations/*`, `tests/vitest/*`, `docs/features/data-model.md` |
+| nodex-codex | Editor 迁移: TipTap → ProseMirror | codex/editor-migration | `src/components/editor/FloatingToolbar.tsx`, `src/components/editor/RichTextEditor.tsx`, `src/components/editor/SlashCommandMenu.tsx`, `src/components/tags/TagSelector.tsx`, `src/components/references/ReferenceSelector.tsx`, `tests/vitest/floating-toolbar.test.ts`, `docs/EDITOR-MIGRATION-ACCEPTANCE.md`, `docs/TASKS.md` |
 
 ---
 
@@ -51,6 +51,15 @@ _(空)_
   - [2026-02-17 nodex-codex] 启动实施：先落地 Phase 1 数据层与转换基础设施（类型/DB 映射/store 新接口 + marks 工具与测试），随后再切编辑器 UI 层。
   - [2026-02-17 nodex-codex] 已完成 Phase 1 首批实现：`NodeProps._marks/_inlineRefs`、`nodes.marks/inline_refs` 迁移、`setNodeContentLocal/updateNodeContent`、`htmlToMarks/marksToHtml`、`marksToDoc/docToMarks`、`tana-import` 转换、seed 切换；验证通过 `typecheck`、`check:test-sync`、`test:run`、`build`。
   - [2026-02-17 nodex-codex] 继续实施（过渡到 Phase 2 前的运行时对齐）：`NodeEditor` 改为通过 `htmlToMarks` 回写 `text+marks+inlineRefs`，`OutlinerItem` 改为基于 `marksToHtml` 展示并在 split/create 时传递富文本 payload，`createChild/createSibling` 支持携带 marks/inlineRefs；全量验证通过。
+  - [2026-02-17 nodex-codex] 推进 Phase 2：新增 `RichTextEditor`（直接 PM EditorView + keymap/history + 触发器正则检测 + 外部值同步 + 纯文本粘贴），`OutlinerItem` 切换到 PM `EditorView` 引用并改用事务工具操作（替代 TipTap chain API），新增 `pm-editor-view` 工具与测试，补充 `.ProseMirror` 样式映射；全量验证通过。
+  - [2026-02-17 nodex-codex] 推进 Phase 3：`FloatingToolbar` 改为同时支持 TipTap/PM 双通路并在 `RichTextEditor` 接入（`view + tick`），`TrailingInput` 从 TipTap `useEditor` 迁移到直接 PM `EditorView`（保留原有 Enter/Tab/Backspace/Arrow/Escape 与 trigger/options 语义）；全量验证通过。
+  - [2026-02-17 nodex-codex] 推进 Phase 4：移除 TipTap 依赖与遗留文件（`NodeEditor`、旧 extension、`editor-html`、对应测试），源码全部切换为直接 `prosemirror-*` 包导入，`FloatingToolbar` 测试改为 PM 兼容类型，`docs/TESTING.md` 同步删除已废弃测试映射；验证通过 `typecheck`、`check:test-sync`、`test:run`、`build`。
+  - [2026-02-17 nodex-codex] 验收文档对齐：`docs/EDITOR-MIGRATION-ACCEPTANCE.md` 已勾选自动可验证项（Phase 4 清理、依赖替换、代码引用清理、全量回归），并将 bundle size 项标记为 `[-]`（当前缺少迁移前同口径基线对比）。
+  - [2026-02-17 nodex-codex] 自动/代码核验层复核：再次执行 `typecheck`、`check:test-sync`、`test:run`、`build`，并基于单测 + 代码映射补充勾选 Phase 1 的可自动验证条目（1.1、1.2部分、1.3部分、1.4部分、1.5-1.10）。
+  - [2026-02-17 nodex-codex] 修复手工用例阻断问题（首次点击节点不出 caret）：根因是 `RichTextEditor` 在 `useLayoutEffect` 聚焦，但 `EditorView` 在 `useEffect` 才创建，首挂载未触发聚焦；改为在 `EditorView` 创建后 `requestAnimationFrame` 执行焦点/光标/pendingInput 同步，并在卸载取消 RAF；验证通过 `typecheck`、`check:test-sync`、`test:run`。
+  - [2026-02-17 nodex-codex] 根据手测备注修复交互偏差：`OutlinerItem` 为 `ArrowUp` / 空节点 `Backspace` / 选择模式 `type_char` 明确写入光标定位（上移到上一节点末尾、输入字符追加到末尾），引用节点双击编辑支持按双击位置落光标；同时为空节点 `Backspace` 增加有子节点保护（不再删除整棵子树）。验证通过 `typecheck`、`check:test-sync`、`test:run`。
+  - [2026-02-17 nodex-codex] 修复浮动工具栏右边界定位偏差：`FloatingToolbar` 改用 `selection.to - 1` 的字符坐标计算终点，并以 `end.right` 参与中心点计算，避免行尾选区中心误落到下一行起点；验证通过 `typecheck`、`floating-toolbar.test.ts`。
+  - [2026-02-17 nodex-codex] 第二轮手测备注修复：`FloatingToolbar` 改为跟随选区“结束侧字符”定位；`#/@/Slash` 下拉改为 `onMouseDown` 即选择（修复鼠标点击不生效）并统一不透明背景（修复穿透观感）；Slash 触发规则收敛为“仅空白节点 `/` 触发”；补充 `floating-toolbar.test.ts` 定位断言。验证通过 `typecheck` + `test:run`（全量 338/338）。
 
 ### 性能基线测量
 > **Owner: nodex-cc-2** | Branch: `cc2/perf-baseline` | Priority: P2
@@ -248,6 +257,15 @@ _(空)_
 - [ ] Checklist（批量 checkbox）
 - [ ] Start live transcription（语音转写）
 - **Spec**: `docs/features/slash-command.md`
+
+#### Editor 粘贴增强（结构化粘贴）
+> 来源：Editor 迁移验收备注（Phase 2.9），本轮先保持当前纯文本粘贴行为
+
+- [ ] 多行纯文本粘贴：按行拆分为多个节点（而不是单节点空格拼接）
+- [ ] Markdown 列表粘贴：根据缩进/列表层级重建节点树
+- [ ] 富文本粘贴：保留基础结构语义（段落/列表/强调）并映射到 `text + marks + inlineRefs`
+- [ ] 与撤销/重做集成：一次粘贴可完整撤销
+- **Spec**: `docs/features/editor-migration.md`（待补充“结构化粘贴”小节）
 
 ---
 

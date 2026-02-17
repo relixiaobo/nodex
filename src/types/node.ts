@@ -72,6 +72,27 @@ export type ViewMode =
 // ============================================================
 
 /**
+ * 文本格式标记。
+ * 偏移区间遵循 [start, end)（start 包含，end 不包含）。
+ */
+export interface TextMark {
+  start: number;
+  end: number;
+  type: 'bold' | 'italic' | 'strike' | 'code' | 'highlight' | 'headingMark' | 'link';
+  attrs?: Record<string, string>;
+}
+
+/**
+ * 行内引用条目。
+ * offset 指向 props.name 中的 '\uFFFC' 位置。
+ */
+export interface InlineRefEntry {
+  offset: number;
+  targetNodeId: string;
+  displayName?: string;
+}
+
+/**
  * 节点属性接口。
  * 忠实复制 Tana Node 的 props 结构。
  */
@@ -79,12 +100,15 @@ export interface NodeProps {
   /** 创建时间戳（毫秒，JavaScript epoch）—— 所有节点必有 */
   created: number;
 
-  /** 节点名称/内容。支持 HTML 富文本编码。
-   *  富文本格式：<strong>, <code>, <mark>, <em>, <strike>, <a href>
-   *  内联引用：<span data-inlineref-node="nodeId"></span>
-   *  内联日期：<span data-inlineref-date='{"dateTimeString":"...","timezone":"..."}'></span>
-   *  Wiki 引用：[[节点名^nodeId]] */
+  /** 节点名称/内容（纯文本）。
+   *  行内引用占位符使用 '\uFFFC'。 */
   name?: string;
+
+  /** 稀疏文本格式标记（bold/italic/strike/code/highlight/heading/link） */
+  _marks?: TextMark[];
+
+  /** 行内引用映射（offset 与 name 中 '\uFFFC' 对齐） */
+  _inlineRefs?: InlineRefEntry[];
 
   /** 节点描述。辅助文本，UI 显示为灰色小字 */
   description?: string;

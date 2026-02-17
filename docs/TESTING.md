@@ -131,6 +131,15 @@ npm run test:run
 
 **覆盖点**: navigateTo, goBack, goForward, replacePanel, expand, collapse, toggleExpand, setFocus, clearFocus, openSearch, closeSearch, toggleSidebar
 
+### 1.3.1 内容模型联动（Node Store）
+
+**测试文件**: `tests/vitest/node-store-content.test.ts`
+
+**覆盖点**:
+
+1. `setNodeContentLocal` 同步写入 `name + _marks + _inlineRefs`
+2. `updateNodeName` 路径保留已有 `_marks/_inlineRefs`（兼容旧调用）
+
 ### 1.4 边界条件
 
 **测试文件**: `tests/vitest/edge-cases.test.ts`
@@ -147,7 +156,23 @@ npm run test:run
 2. ancestor chain + structural 节点跳过
 3. 可见节点 flatten 与上下导航（含 reference 场景 parentId 消歧）
 4. last visible node / sibling / index helpers
-5. inline reference HTML 纯度判断
+5. inline reference 纯度判断（兼容 legacy HTML + 新模型 `\uFFFC + _inlineRefs`）
+
+### 1.5.1 富文本 marks / ProseMirror 基础设施
+
+**测试文件**:
+- `tests/vitest/editor-marks.test.ts`
+- `tests/vitest/pm-schema.test.ts`
+- `tests/vitest/pm-doc-utils.test.ts`
+
+**覆盖点**:
+
+1. `htmlToMarks`：HTML → `text + marks + inlineRefs`
+2. `marksToHtml`：`text + marks + inlineRefs` → HTML
+3. `mergeAdjacentMarks`：同类 mark 合并
+4. `pmSchema`：单段落 + `inlineReference` atom + 7 marks 注册
+5. `marksToDoc` / `docToMarks`：PM 文档往返
+6. `splitMarks` / `combineMarks`：拆分与偏移合并
 
 ### 1.6 字段值验证
 
@@ -167,7 +192,7 @@ npm run test:run
 
 1. applyTag/removeTag（模板字段实例化与清理）
 2. add/remove reference 去重与删除
-3. reference ↔ inline conversion 临时节点替换链路
+3. reference ↔ inline conversion 临时节点替换链路（临时节点内容为 `\uFFFC + _inlineRefs`）
 
 ### 1.8 字段状态流（Node Store）
 

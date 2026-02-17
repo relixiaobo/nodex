@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type MutableRefObject } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react';
 import { EditorState, TextSelection, type Plugin } from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
 import { keymap } from 'prosemirror-keymap';
@@ -111,6 +111,7 @@ export function RichTextEditor(props: RichTextEditorProps) {
   const [toolbarTick, setToolbarTick] = useState(0);
   const mountRef = useRef<HTMLDivElement | null>(null);
   const viewRef = useRef<EditorView | null>(null);
+  const focusRafRef = useRef<number | null>(null);
   const savedRef = useRef(false);
   const isExternalSyncRef = useRef(false);
   const triggerStateRef = useRef<TriggerRuntimeState>({
@@ -153,6 +154,41 @@ export function RichTextEditor(props: RichTextEditorProps) {
       );
     }
   }, [updateNodeContent, userId]);
+
+  const syncInitialFocus = useCallback((view: EditorView) => {
+    if (focusRafRef.current !== null) {
+      cancelAnimationFrame(focusRafRef.current);
+    }
+    focusRafRef.current = requestAnimationFrame(() => {
+      focusRafRef.current = null;
+      if (viewRef.current !== view) return;
+
+      savedRef.current = false;
+      view.focus();
+
+      const clickInfo = useUIStore.getState().focusClickCoords;
+      if (clickInfo && clickInfo.nodeId === propsRef.current.nodeId && clickInfo.parentId === propsRef.current.parentId) {
+        const maxPos = view.state.doc.content.size - 1;
+        const pmPos = Math.max(1, Math.min(clickInfo.textOffset + 1, maxPos));
+        const tr = view.state.tr.setSelection(TextSelection.create(view.state.doc, pmPos));
+        tr.setMeta('addToHistory', false);
+        view.dispatch(tr);
+        useUIStore.getState().setFocusClickCoords(null);
+        setToolbarTick((value) => value + 1);
+      }
+
+      const pendingChar = useUIStore.getState().pendingInputChar;
+      if (pendingChar) {
+        useUIStore.getState().setPendingInputChar(null);
+        view.dispatch(view.state.tr.insertText(pendingChar));
+        setToolbarTick((value) => value + 1);
+      }
+
+      if (propsRef.current.editorRef) {
+        propsRef.current.editorRef.current = view;
+      }
+    });
+  }, []);
 
   const runTriggerDetection = useCallback((view: EditorView, docChanged: boolean) => {
     const stateRef = triggerStateRef.current;
@@ -496,8 +532,13 @@ export function RichTextEditor(props: RichTextEditorProps) {
 
     viewRef.current = view;
     if (propsRef.current.editorRef) propsRef.current.editorRef.current = view;
+    syncInitialFocus(view);
 
     return () => {
+      if (focusRafRef.current !== null) {
+        cancelAnimationFrame(focusRafRef.current);
+        focusRafRef.current = null;
+      }
       saveContent();
       if (propsRef.current.editorRef?.current === view) {
         propsRef.current.editorRef.current = null;
@@ -505,7 +546,7 @@ export function RichTextEditor(props: RichTextEditorProps) {
       view.destroy();
       viewRef.current = null;
     };
-  }, [plugins, runTriggerDetection, saveContent, setNodeContentLocal]);
+  }, [plugins, runTriggerDetection, saveContent, setNodeContentLocal, syncInitialFocus]);
 
   useEffect(() => {
     const view = viewRef.current;
@@ -541,40 +582,6 @@ export function RichTextEditor(props: RichTextEditorProps) {
       isExternalSyncRef.current = false;
     }
   }, [props.initialInlineRefs, props.initialMarks, props.initialText]);
-
-  useLayoutEffect(() => {
-    const view = viewRef.current;
-    if (!view) return;
-
-    savedRef.current = false;
-    view.focus();
-
-    const clickInfo = useUIStore.getState().focusClickCoords;
-    if (clickInfo && clickInfo.nodeId === props.nodeId && clickInfo.parentId === props.parentId) {
-      const maxPos = view.state.doc.content.size - 1;
-      const pmPos = Math.max(1, Math.min(clickInfo.textOffset + 1, maxPos));
-      const tr = view.state.tr.setSelection(TextSelection.create(view.state.doc, pmPos));
-      tr.setMeta('addToHistory', false);
-      view.dispatch(tr);
-      useUIStore.getState().setFocusClickCoords(null);
-      setToolbarTick((value) => value + 1);
-    }
-
-    const pendingChar = useUIStore.getState().pendingInputChar;
-    if (pendingChar) {
-      useUIStore.getState().setPendingInputChar(null);
-      view.dispatch(view.state.tr.insertText(pendingChar));
-      setToolbarTick((value) => value + 1);
-    }
-
-    if (props.editorRef) props.editorRef.current = view;
-
-    return () => {
-      if (props.editorRef?.current === view) {
-        props.editorRef.current = null;
-      }
-    };
-  }, [props.editorRef, props.nodeId, props.parentId]);
 
   return (
     <div className="editor-inline">

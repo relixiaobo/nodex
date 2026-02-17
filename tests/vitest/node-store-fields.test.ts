@@ -123,6 +123,43 @@ describe('node-store field operations', () => {
     expect(collectNodeGraphErrors(useNodeStore.getState().entities)).toEqual([]);
   });
 
+  it('moveFieldTuple nests a field under previous field value and keeps associations aligned', async () => {
+    await useNodeStore.getState().addFieldToNode('note_2', 'attrDef_status', 'ws_default', 'user_default');
+    await useNodeStore.getState().addFieldToNode('note_2', 'attrDef_priority', 'ws_default', 'user_default');
+
+    const statusTupleId = findFieldTupleId('note_2', 'attrDef_status');
+    const priorityTupleId = findFieldTupleId('note_2', 'attrDef_priority');
+    expect(statusTupleId).toBeTruthy();
+    expect(priorityTupleId).toBeTruthy();
+    if (!statusTupleId || !priorityTupleId) return;
+
+    const before = useNodeStore.getState();
+    const statusAssocId = before.entities.note_2.associationMap?.[statusTupleId];
+    const priorityAssocId = before.entities.note_2.associationMap?.[priorityTupleId];
+    expect(statusAssocId).toBeTruthy();
+    expect(priorityAssocId).toBeTruthy();
+    if (!statusAssocId || !priorityAssocId) return;
+
+    await useNodeStore.getState().moveFieldTuple(
+      'note_2',
+      priorityTupleId,
+      statusAssocId,
+      'user_default',
+    );
+
+    const state = useNodeStore.getState();
+    expect(state.entities.note_2.children ?? []).toContain(statusTupleId);
+    expect(state.entities.note_2.children ?? []).not.toContain(priorityTupleId);
+    expect(state.entities.note_2.associationMap?.[priorityTupleId]).toBeUndefined();
+
+    expect(state.entities[statusAssocId].children ?? []).toContain(priorityTupleId);
+    expect(state.entities[statusAssocId].associationMap?.[priorityTupleId]).toBe(priorityAssocId);
+    expect(state.entities[priorityTupleId]?.props._ownerId).toBe(statusAssocId);
+    expect(state.entities[priorityAssocId]?.props._ownerId).toBe(statusAssocId);
+
+    expect(collectNodeGraphErrors(state.entities)).toEqual([]);
+  });
+
   it('removeField moves tuple and associatedData to trash and cleans associationMap', async () => {
     await useNodeStore.getState().addFieldToNode('note_2', 'attrDef_priority', 'ws_default', 'user_default');
     const tupleId = findFieldTupleId('note_2', 'attrDef_priority');

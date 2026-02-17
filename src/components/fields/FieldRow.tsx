@@ -97,8 +97,7 @@ export function FieldRow({
   const focusedNodeId = useUIStore((s) => s.focusedNodeId);
   const clearSelection = useUIStore((s) => s.clearSelection);
   const createChild = useNodeStore((s) => s.createChild);
-  const indentNode = useNodeStore((s) => s.indentNode);
-  const outdentNode = useNodeStore((s) => s.outdentNode);
+  const moveFieldTuple = useNodeStore((s) => s.moveFieldTuple);
   const removeField = useNodeStore((s) => s.removeField);
   const entities = useNodeStore((s) => s.entities);
   const siblingFields = useNodeFields(nodeId);
@@ -194,13 +193,44 @@ export function FieldRow({
 
   const handleIndentField = useCallback(() => {
     if (!userId) return;
-    indentNode(tupleId, userId);
-  }, [tupleId, userId, indentNode]);
+    const index = renderableSiblings.findIndex((item) => item.type === 'field' && item.id === tupleId);
+    if (index <= 0) return;
+
+    const prev = renderableSiblings[index - 1];
+    if (!prev) return;
+
+    if (prev.type === 'field') {
+      const prevAssocId = useNodeStore.getState().entities[nodeId]?.associationMap?.[prev.id];
+      if (!prevAssocId) return;
+      void moveFieldTuple(nodeId, tupleId, prevAssocId, userId);
+      return;
+    }
+
+    if (prev.type === 'content') {
+      void moveFieldTuple(nodeId, tupleId, prev.id, userId);
+    }
+  }, [tupleId, userId, renderableSiblings, nodeId, moveFieldTuple]);
 
   const handleOutdentField = useCallback(() => {
     if (!userId) return;
-    outdentNode(tupleId, userId);
-  }, [tupleId, userId, outdentNode]);
+    const currentParent = useNodeStore.getState().entities[nodeId];
+    const grandparentId = currentParent?.props._ownerId;
+    if (!grandparentId) return;
+    const grandparent = useNodeStore.getState().entities[grandparentId];
+    if (!grandparent?.children) return;
+    const ownerTupleId = Object.entries(grandparent.associationMap ?? {}).find(
+      ([, assocId]) => assocId === nodeId,
+    )?.[0];
+    let insertAt = grandparent.children.length;
+    if (ownerTupleId) {
+      const ownerTupleIndex = grandparent.children.indexOf(ownerTupleId);
+      if (ownerTupleIndex >= 0) insertAt = ownerTupleIndex + 1;
+    } else {
+      const parentIndex = grandparent.children.indexOf(nodeId);
+      if (parentIndex >= 0) insertAt = parentIndex + 1;
+    }
+    void moveFieldTuple(nodeId, tupleId, grandparentId, userId, insertAt);
+  }, [tupleId, userId, nodeId, moveFieldTuple]);
 
   const handleEnterConfirm = useCallback(() => {
     if (!wsId || !userId) return;
@@ -271,7 +301,14 @@ export function FieldRow({
     const SysIcon = sysFieldDef?.icon;
     const displayText = valueName || '—';
     return (
-      <div className={`border-t ${isLastInGroup ? 'border-b' : ''} border-border-subtle flex flex-col @sm:flex-row @sm:items-start min-h-[28px]`} data-field-row>
+      <div
+        className={`border-t ${isLastInGroup ? 'border-b' : ''} border-border-subtle flex flex-col @sm:flex-row @sm:items-start min-h-[28px]`}
+        data-field-row
+        data-field-row-id={tupleId}
+        data-node-id={tupleId}
+        data-parent-id={nodeId}
+        data-row-kind="field"
+      >
         <div className="flex items-center gap-1 @sm:shrink-0 @sm:w-[130px] min-w-0 h-7 py-1">
           <span className="shrink-0 w-[15px] flex items-center justify-center text-foreground-tertiary">
             {SysIcon && <SysIcon size={12} />}
@@ -333,7 +370,14 @@ export function FieldRow({
       : attrDefName;
 
     return (
-      <div className={`border-t ${isLastInGroup ? 'border-b' : ''} border-border-subtle flex flex-col @sm:flex-row @sm:items-start min-h-[28px] py-1.5`} data-field-row>
+      <div
+        className={`border-t ${isLastInGroup ? 'border-b' : ''} border-border-subtle flex flex-col @sm:flex-row @sm:items-start min-h-[28px] py-1.5`}
+        data-field-row
+        data-field-row-id={tupleId}
+        data-node-id={tupleId}
+        data-parent-id={nodeId}
+        data-row-kind="field"
+      >
         {/* Name column — icon + name + description */}
         <div className="flex gap-1 @sm:shrink-0 @sm:w-[180px] min-w-0">
           {Icon ? (
@@ -395,7 +439,14 @@ export function FieldRow({
 
   // ─── Path 3: Regular fields — editable name, FieldValueOutliner ───
   return (
-    <div className={`relative border-t ${isLastInGroup ? 'border-b' : ''} border-border-subtle flex flex-col @sm:flex-row @sm:items-start min-h-[28px]`} data-field-row>
+    <div
+      className={`relative border-t ${isLastInGroup ? 'border-b' : ''} border-border-subtle flex flex-col @sm:flex-row @sm:items-start min-h-[28px]`}
+      data-field-row
+      data-field-row-id={tupleId}
+      data-node-id={tupleId}
+      data-parent-id={nodeId}
+      data-row-kind="field"
+    >
       {isFieldSelected && (
         <div className="absolute inset-0 bg-selection-row rounded-sm pointer-events-none z-0" />
       )}

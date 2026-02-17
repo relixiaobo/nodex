@@ -102,6 +102,24 @@ function focusTrailingInputForParent(parentId: string): boolean {
   return false;
 }
 
+function getAdjacentVisibleRow(
+  parentId: string,
+  nodeId: string,
+  direction: 'up' | 'down',
+): HTMLElement | null {
+  const rows = Array.from(
+    document.querySelectorAll<HTMLElement>(`[data-parent-id="${parentId}"][data-node-id]`),
+  );
+  if (rows.length === 0) return null;
+
+  const currentIndex = rows.findIndex((row) => row.dataset.nodeId === nodeId);
+  if (currentIndex < 0) return null;
+
+  const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+  if (targetIndex < 0 || targetIndex >= rows.length) return null;
+  return rows[targetIndex] ?? null;
+}
+
 export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId, fieldDataType, attrDefId, onNavigateOut, bulletColor }: OutlinerItemProps) {
   const node = useNode(nodeId);
   const expandKey = `${parentId}:${nodeId}`;
@@ -1235,12 +1253,12 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   }, [nodeId, wsId, userId, parentId, rootNodeId, rootChildIds, entities, expandedNodes, trashNode, removeReference, setFocusedNode, hasChildren]);
 
   const handleArrowUp = useCallback(() => {
-    const siblingIndex = renderableSiblings.findIndex((item) => item.type === 'content' && item.id === nodeId);
-    if (siblingIndex > 0) {
-      const prevSibling = renderableSiblings[siblingIndex - 1];
-      if (prevSibling?.type === 'field') {
+    const prevVisibleRow = getAdjacentVisibleRow(parentId, nodeId, 'up');
+    if (prevVisibleRow?.dataset.rowKind === 'field') {
+      const prevFieldId = prevVisibleRow.dataset.nodeId;
+      if (prevFieldId) {
         clearFocus();
-        setEditingFieldName(prevSibling.id);
+        setEditingFieldName(prevFieldId);
         return;
       }
     }
@@ -1258,17 +1276,23 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     } else if (onNavigateOut) {
       onNavigateOut('up');
     }
-  }, [nodeId, parentId, rootNodeId, rootChildIds, entities, expandedNodes, setFocusedNode, onNavigateOut, renderableSiblings, clearFocus, setEditingFieldName]);
+  }, [nodeId, parentId, rootNodeId, rootChildIds, entities, expandedNodes, setFocusedNode, onNavigateOut, clearFocus, setEditingFieldName]);
 
   const handleArrowDown = useCallback(() => {
-    const siblingIndex = renderableSiblings.findIndex((item) => item.type === 'content' && item.id === nodeId);
-    if (siblingIndex >= 0 && siblingIndex < renderableSiblings.length - 1) {
-      const nextSibling = renderableSiblings[siblingIndex + 1];
-      if (nextSibling?.type === 'field') {
+    const nextVisibleRow = getAdjacentVisibleRow(parentId, nodeId, 'down');
+    if (nextVisibleRow?.dataset.rowKind === 'field') {
+      const nextFieldId = nextVisibleRow.dataset.nodeId;
+      if (nextFieldId) {
         clearFocus();
-        setEditingFieldName(nextSibling.id);
+        setEditingFieldName(nextFieldId);
         return;
       }
+    }
+
+    // Virtual-row priority: if there is no next rendered row under the same parent,
+    // go to trailing input before jumping outside parent scope.
+    if (!nextVisibleRow && focusTrailingInputForParent(parentId)) {
+      return;
     }
 
     const flatList = getFlattenedVisibleNodes(rootChildIds, entities, expandedNodes, rootNodeId);
@@ -1283,7 +1307,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     } else if (onNavigateOut) {
       onNavigateOut('down');
     }
-  }, [nodeId, parentId, rootNodeId, rootChildIds, entities, expandedNodes, setFocusedNode, onNavigateOut, renderableSiblings, clearFocus, setEditingFieldName]);
+  }, [nodeId, parentId, rootNodeId, rootChildIds, entities, expandedNodes, setFocusedNode, onNavigateOut, clearFocus, setEditingFieldName]);
 
   const handleMoveUp = useCallback(() => {
     if (!userId) return;
@@ -1789,6 +1813,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
         style={{ paddingLeft: depth * 28 + 6 }}
         data-node-id={nodeId}
         data-parent-id={parentId}
+        data-row-kind="content"
         draggable={!isFocused}
         onMouseDownCapture={isFocused ? handleFocusedRowMouseDownCapture : undefined}
         onDragStart={handleDragStart}

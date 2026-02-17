@@ -3,6 +3,7 @@
 > **目标读者**: 负责实现迁移的 Dev Agent
 > **核心目标**: 去掉 TipTap 封装层，直接使用 ProseMirror API；引入文本+marks 分离的数据模型
 > **UI 约束**: 所有 UI 组件（FloatingToolbar、TagSelector、ReferenceSelector、SlashCommandMenu 等）保持现有视觉和交互不变
+> **执行范围**: 一次性切换数据模型（`props.name` 纯文本 + `props._marks` + `props._inlineRefs`），并在同一任务内完成数据层与编辑器层改造
 
 ---
 
@@ -64,7 +65,7 @@ OutlinerItem
 - marks 数组数据模型 → 消除 HTML 解析/归一化
 - 统一 `dispatchTransaction` → 4 个独立触发器合并为一处
 - `propsRef` 模式统一 → 与当前 `callbacksRef` 类似但更简洁
-- 双栈 undo → PM history 处理文字，UndoStore 处理结构
+- 预留双栈 undo 扩展位 → 本次先用 PM history，后续再接 UndoStore 结构操作栈
 
 ---
 
@@ -113,13 +114,13 @@ node.props._inlineRefs = [{ offset: 9, targetNodeId: 'abc', displayName: 'Ref' }
 
 **需要同步修改的文件**:
 - `src/types/node.ts` — NodeProps 新增字段
-- `src/stores/node-store.ts` — `setNodeNameLocal` 改为同时更新 name/marks/inlineRefs
+- `src/stores/node-store.ts` — 新增或升级本地/远端写接口以同时更新 name/marks/inlineRefs（如 `setNodeContentLocal` / `updateNodeContent`）
 - `src/services/node-service.ts` — 读写映射
 - `src/entrypoints/test/seed-data.ts` — 种子数据改用 marks 格式
 - `src/services/tana-import.ts` — 导入时 HTML → marks 转换
 - `supabase/migrations/` — 新增列
 
-### HTML ↔ Marks 转换函数
+### HTML ↔ Marks 转换函数（仅导入链路）
 
 需要新建 `src/lib/editor-marks.ts`：
 
@@ -160,7 +161,8 @@ export function mergeAdjacentMarks(marks: TextMark[]): TextMark[] {
 }
 ```
 
-这两个函数是迁移的**基础设施**，必须先实现并充分测试。
+这两个函数用于**导入/脚本迁移**，必须先实现并充分测试。  
+运行时编辑链路不再走 `HTML ↔ marks`，而是直接读写 `text + marks + inlineRefs`。
 
 ### 关键测试用例
 
@@ -298,9 +300,15 @@ interface RichTextEditorProps {
   // 与当前 NodeEditorProps 完全一致（保持 API 兼容）
   nodeId: string;
   parentId: string;
-  initialContent: string;  // HTML 字符串（阶段 A 不改存储格式）
+  initialText: string;
+  initialMarks: TextMark[];
+  initialInlineRefs: InlineRefEntry[];
   onBlur: () => void;
-  onEnter: (afterContent?: string) => void;
+  onEnter: (after?: {
+    text: string;
+    marks: TextMark[];
+    inlineRefs: InlineRefEntry[];
+  }) => void;
   onIndent: () => void;
   onOutdent: () => void;
   onDelete: () => boolean;
@@ -314,9 +322,9 @@ interface RichTextEditorProps {
 
 // ⚠️ 重要区分：以下值不是 props，是组件内部状态/store 派生值
 // - savedRef: useRef<boolean>(false) — 组件内部标志位，防止重复保存
-// - saveContent: useCallback — 组件内部函数，调用 updateNodeName 持久化到 Supabase
-// - setNodeNameLocal: 从 useNodeStore 取得的 store action（本地乐观更新，不涉及网络）
-// - updateNodeName: 从 useNodeStore 取得的 store action（写入 Supabase）
+// - saveContent: useCallback — 组件内部函数，调用 updateNodeContent 持久化到 Supabase
+// - setNodeContentLocal: 从 useNodeStore 取得的 store action（本地乐观更新，不涉及网络）
+// - updateNodeContent: 从 useNodeStore 取得的 store action（写入 Supabase）
 // - userId: 从 useWorkspaceStore 取得
 ```
 
@@ -330,36 +338,51 @@ export function RichTextEditor(props: RichTextEditorProps) {
   propsRef.current = props;  // 每次 render 更新 ref
 
   // ── 组件内部状态（不是 props，但 PM 闭包需要读取）──
-  const updateNodeName = useNodeStore((s) => s.updateNodeName);
-  const setNodeNameLocal = useNodeStore((s) => s.setNodeNameLocal);
+  const updateNodeContent = useNodeStore((s) => s.updateNodeContent);
+  const setNodeContentLocal = useNodeStore((s) => s.setNodeContentLocal);
   const userId = useWorkspaceStore((s) => s.userId);
   const savedRef = useRef(false);  // 防止重复保存
 
   // 将 store 派生值也存入 ref，供 PM 闭包读取
-  const storeRef = useRef({ updateNodeName, setNodeNameLocal, userId });
-  storeRef.current = { updateNodeName, setNodeNameLocal, userId };
+  const storeRef = useRef({ updateNodeContent, setNodeContentLocal, userId });
+  storeRef.current = { updateNodeContent, setNodeContentLocal, userId };
 
-  // saveContent：组件内部函数，调用 updateNodeName 持久化到 Supabase
-  const saveContent = useCallback((html: string) => {
+  // saveContent：组件内部函数，调用 updateNodeContent 持久化到 Supabase
+  const saveContent = useCallback((payload: {
+    text: string;
+    marks: TextMark[];
+    inlineRefs: InlineRefEntry[];
+  }) => {
     if (savedRef.current) return;
     savedRef.current = true;
-    const cleaned = stripWrappingP(html);  // 阶段 A 仍用 HTML；阶段 B 后直接取 text
-    if (cleaned !== props.initialContent && storeRef.current.userId) {
-      storeRef.current.updateNodeName(props.nodeId, cleaned, storeRef.current.userId);
+    const changed = payload.text !== props.initialText
+      || JSON.stringify(payload.marks) !== JSON.stringify(props.initialMarks)
+      || JSON.stringify(payload.inlineRefs) !== JSON.stringify(props.initialInlineRefs);
+    if (changed && storeRef.current.userId) {
+      storeRef.current.updateNodeContent(
+        props.nodeId,
+        payload.text,
+        payload.marks,
+        payload.inlineRefs,
+        storeRef.current.userId,
+      );
     }
-  }, [props.nodeId, props.initialContent]);
+  }, [props.nodeId, props.initialText, props.initialMarks, props.initialInlineRefs]);
 
   // 阻止外部同步时触发 onChange
   const isExternalUpdate = useRef(false);
-  // 阻止 PM undo 时进入 undoStore 循环（阶段 B）
+  // 阻止 PM undo 时进入结构化 undoStore 循环（后续任务）
   const isPMUndoRedo = useRef(false);
   // > field trigger fire-once 状态（等价于当前 FieldTriggerExtension 的 `let fired`）
   const fieldFiredRef = useRef(false);
 
   useEffect(() => {
-    // ── 1. 解析初始内容 ──
-    const { text, marks, inlineRefs } = htmlToMarks(propsRef.current.initialContent);
-    const doc = marksToDoc(text, marks, inlineRefs);
+    // ── 1. 构建初始文档 ──
+    const doc = marksToDoc(
+      propsRef.current.initialText,
+      propsRef.current.initialMarks,
+      propsRef.current.initialInlineRefs,
+    );
 
     // ── 2. 创建 EditorState ──
     const state = EditorState.create({
@@ -389,8 +412,12 @@ export function RichTextEditor(props: RichTextEditorProps) {
         // ── 通知父组件内容变化（live update）──
         if (tr.docChanged && !isExternalUpdate.current) {
           const result = docToMarks(newState.doc);
-          const html = marksToHtml(result.text, result.marks, result.inlineRefs);
-          storeRef.current.setNodeNameLocal(propsRef.current.nodeId, html);
+          storeRef.current.setNodeContentLocal(
+            propsRef.current.nodeId,
+            result.text,
+            result.marks,
+            result.inlineRefs,
+          );
         }
 
         // ── 浮动工具栏同步（通过 event 或 state 驱动）──
@@ -403,8 +430,7 @@ export function RichTextEditor(props: RichTextEditorProps) {
         blur(view, event) {
           if (!savedRef.current) {
             const result = docToMarks(view.state.doc);
-            const html = marksToHtml(result.text, result.marks, result.inlineRefs);
-            saveContent(html);  // 注意：saveContent 通过闭包捕获，但它是 useCallback 且依赖稳定
+            saveContent(result);
           }
           propsRef.current.onBlur();
           return false;  // 不阻止默认行为
@@ -427,8 +453,7 @@ export function RichTextEditor(props: RichTextEditorProps) {
       // 卸载前保存（如果 blur 没有触发保存）
       if (!savedRef.current) {
         const result = docToMarks(view.state.doc);
-        const html = marksToHtml(result.text, result.marks, result.inlineRefs);
-        saveContent(html);
+        saveContent(result);
       }
       view.destroy();
     };
@@ -448,11 +473,11 @@ const propsRef = useRef(props);
 propsRef.current = props;  // 每次 render 更新
 
 // 2. storeRef：存储从 Zustand store 取得的 action/值
-//    - setNodeNameLocal: 本地乐观更新（不涉及网络）
-//    - updateNodeName: 持久化到 Supabase
+//    - setNodeContentLocal: 本地乐观更新（不涉及网络）
+//    - updateNodeContent: 持久化到 Supabase
 //    - userId: 当前用户 ID
-const storeRef = useRef({ updateNodeName, setNodeNameLocal, userId });
-storeRef.current = { updateNodeName, setNodeNameLocal, userId };
+const storeRef = useRef({ updateNodeContent, setNodeContentLocal, userId });
+storeRef.current = { updateNodeContent, setNodeContentLocal, userId };
 
 // 3. savedRef：防重复保存标志（组件内部状态）
 const savedRef = useRef(false);
@@ -482,7 +507,7 @@ function customKeymap(
 
 **为什么比当前 callbacksRef 更好**: 当前 NodeEditor 维护了 `callbacksRef`（30+ 字段，混合了 props 回调和 store 值）加 4 个独立 trigger ref（`hashTagRef`/`referenceRef`/`slashRef`/`fieldTriggerRef`），每个 render 都要更新所有 ref。新方案用 `propsRef` 存 props、`storeRef` 存 store 值、`savedRef` 存内部标志，职责清晰。
 
-**⚠️ 不要把 `savedRef`/`saveContent`/`setNodeNameLocal` 放进 propsRef**: 这些不是外部 props，而是组件内部状态或 store 派生值。混在 props 里会导致类型混乱和逻辑不清。
+**⚠️ 不要把 `savedRef`/`saveContent`/`setNodeContentLocal` 放进 propsRef**: 这些不是外部 props，而是组件内部状态或 store 派生值。混在 props 里会导致类型混乱和逻辑不清。
 
 ---
 
@@ -794,7 +819,7 @@ export function createNodeEditorKeymap(
     // ── Undo/Redo ──
     'Mod-z': (state, dispatch) => {
       const didUndo = undo(state, dispatch);
-      // 阶段 B: if (!didUndo) undoStore.undo();
+      // 后续结构化 UndoStore: if (!didUndo) undoStore.undo();
       return true;  // 始终拦截，不让浏览器处理
     },
     'Mod-y': (state, dispatch) => {
@@ -836,7 +861,7 @@ export function createNodeEditorKeymap(
       const stripped = textContent.replace(/\u200B/g, '').trim();
       const isEmpty = stripped.length === 0;
       if (isEmpty) {
-        storeRef.current.setNodeNameLocal(propsRef.current.nodeId, '');
+        storeRef.current.setNodeContentLocal(propsRef.current.nodeId, '', [], []);
         flushSave(view!, storeRef, savedRef, propsRef);
         return propsRef.current.onDelete();
       }
@@ -1134,7 +1159,7 @@ setSelectionTick(t => t + 1);
 
 ## 10. 撤销/重做双栈架构
 
-### 阶段 A（本次迁移）：仅 PM History
+### 本次迁移范围：仅 PM History
 
 本次迁移使用 ProseMirror 内置的 `history()` 插件处理文字级 undo/redo。暂不实现结构化 UndoStore。
 
@@ -1145,7 +1170,7 @@ import { history, undo, redo } from 'prosemirror-history';
 history({ depth: 100 })
 ```
 
-### 阶段 B（后续任务）：结构化 UndoStore
+### 后续增强任务：结构化 UndoStore
 
 新建 `src/stores/undo-store.ts`，参考架构提供了完整设计：
 
@@ -1166,7 +1191,7 @@ interface UndoEntry {
 // Promise chain 串行执行，防止快速连按并发
 ```
 
-**阶段 B 不在本次迁移范围内**，但 PM keymap 中的 `Mod-z` handler 应预留扩展点。
+**结构化 UndoStore 不在本次迁移范围内**，但 PM keymap 中的 `Mod-z` handler 应预留扩展点。
 
 ---
 
@@ -1203,7 +1228,11 @@ function handleEnterSplit(
         schema.node('paragraph', null, para.content.cut(paraOffset).content)
       ])
     );
-    const afterHtml = marksToHtml(afterResult.text, afterResult.marks, afterResult.inlineRefs);
+    const afterPayload = {
+      text: afterResult.text,
+      marks: afterResult.marks,
+      inlineRefs: afterResult.inlineRefs,
+    };
 
     // 从编辑器中删除 after 部分
     const tr = view.state.tr.delete(from, doc.content.size - 1);
@@ -1213,7 +1242,7 @@ function handleEnterSplit(
     flushSave(view, storeRef, savedRef, propsRef);
 
     // 创建新节点，传入 after 内容
-    p.onEnter(afterHtml);
+    p.onEnter(afterPayload);
   }
 }
 
@@ -1229,9 +1258,17 @@ function flushSave(
   if (savedRef.current) return;
   savedRef.current = true;
   const result = docToMarks(view.state.doc);
-  const html = marksToHtml(result.text, result.marks, result.inlineRefs);
-  if (html !== propsRef.current.initialContent && storeRef.current.userId) {
-    storeRef.current.updateNodeName(propsRef.current.nodeId, html, storeRef.current.userId);
+  const changed = result.text !== propsRef.current.initialText
+    || JSON.stringify(result.marks) !== JSON.stringify(propsRef.current.initialMarks)
+    || JSON.stringify(result.inlineRefs) !== JSON.stringify(propsRef.current.initialInlineRefs);
+  if (changed && storeRef.current.userId) {
+    storeRef.current.updateNodeContent(
+      propsRef.current.nodeId,
+      result.text,
+      result.marks,
+      result.inlineRefs,
+      storeRef.current.userId,
+    );
   }
 }
 ```
@@ -1243,30 +1280,35 @@ function flushSave(
 当 store 中的值被外部修改（如 undo/redo、远端同步）时，需要更新 PM 编辑器：
 
 ```typescript
-// 当 initialContent prop 变化时（通过 propsRef 检测）
+// 当 initialText/initialMarks/initialInlineRefs 变化时
 useEffect(() => {
   const view = viewRef.current;
-  if (!view || !propsRef.current.initialContent) return;
+  if (!view) return;
 
   const currentResult = docToMarks(view.state.doc);
-  const currentHtml = marksToHtml(currentResult.text, currentResult.marks, currentResult.inlineRefs);
-
-  if (currentHtml === propsRef.current.initialContent) return;  // 已是最新
+  const alreadySynced =
+    currentResult.text === propsRef.current.initialText
+    && JSON.stringify(currentResult.marks) === JSON.stringify(propsRef.current.initialMarks)
+    && JSON.stringify(currentResult.inlineRefs) === JSON.stringify(propsRef.current.initialInlineRefs);
+  if (alreadySynced) return;
 
   isExternalUpdate.current = true;
   try {
-    const { text, marks, inlineRefs } = htmlToMarks(propsRef.current.initialContent);
-    const newDoc = marksToDoc(text, marks, inlineRefs);
+    const newDoc = marksToDoc(
+      propsRef.current.initialText,
+      propsRef.current.initialMarks,
+      propsRef.current.initialInlineRefs,
+    );
     const tr = view.state.tr.replaceWith(0, view.state.doc.content.size, newDoc.content);
     tr.setMeta('addToHistory', false);  // 不计入 undo
     view.dispatch(tr);
   } finally {
     isExternalUpdate.current = false;
   }
-}, [/* 监听 initialContent 变化的适当依赖 */]);
+}, [/* 监听 initialText/initialMarks/initialInlineRefs 变化的适当依赖 */]);
 ```
 
-**`isExternalUpdate` 的重要性**: 防止外部同步 → dispatchTransaction → setNodeNameLocal → 又触发同步的循环。
+**`isExternalUpdate` 的重要性**: 防止外部同步 → dispatchTransaction → setNodeContentLocal → 又触发同步的循环。
 
 ---
 
@@ -1341,11 +1383,20 @@ function placeholderPlugin(text: string) {
 
 | 文件 | 变更内容 |
 |------|---------|
+| `src/types/node.ts` | NodeProps 新增 `_marks`、`_inlineRefs`；新增 `TextMark`、`InlineRefEntry` 类型 |
+| `src/services/node-service.ts` | `rowToNode`/`nodeToRow` 映射 `marks`、`inline_refs` 列 |
+| `src/stores/node-store.ts` | 新增或升级 `setNodeContentLocal` / `updateNodeContent`（或等价接口）以同步 text+marks+inlineRefs |
+| `src/services/search-service.ts` | inline backlinks 查询改为基于 `inline_refs`（不再依赖 `name LIKE data-inlineref-node`） |
+| `src/lib/tree-utils.ts` | `isOnlyInlineRef` 改为读取 `_inlineRefs` + `name`（纯文本）语义，不再解析 HTML |
+| `src/entrypoints/test/seed-data.ts` | 种子数据从 HTML 文本切换到 text+marks+inlineRefs |
+| `src/services/tana-import.ts` | 导入链路新增 `htmlToMarks` 转换并写入三字段 |
 | `src/components/editor/FloatingToolbar.tsx` | props 从 TipTap `Editor` 改为 PM `EditorView`；替换所有 TipTap API 调用 |
 | `src/components/editor/TrailingInput.tsx` | 从 TipTap useEditor 迁移到直接 PM EditorView |
 | `src/components/outliner/OutlinerItem.tsx` | 导入 `RichTextEditor` 替代 `NodeEditor`；`editorRef` 类型从 `Editor` 改为 `EditorView` |
-| `src/types/node.ts` | 新增 `TextMark` 和 `InlineRefEntry` 类型定义（为阶段 B 准备，阶段 A 仅定义类型） |
+| `src/components/panel/PanelTitle.tsx` 等读取节点标题的组件 | 去除对 HTML strip 的隐式依赖，统一走纯文本显示逻辑 |
+| `src/assets/main.css` | `.tiptap` 相关样式迁移到 `.ProseMirror`，保留 `.node-content` 静态渲染一致性 |
 | `package.json` | 新增 PM 直接依赖，标记 TipTap 待删除 |
+| `docs/features/data-model.md` | 同步更新 `props.name` 与 `marks/inline_refs` 的权威定义 |
 
 ### 删除文件（最后清理阶段）
 
@@ -1365,15 +1416,18 @@ function placeholderPlugin(text: string) {
 
 ## 15. 分阶段实施计划
 
+> 注意：虽然分 Phase 交付，但属于**同一任务**，最终一次性切换到 `text + marks + inlineRefs`，不保留 HTML 运行时路径。
+
 ### Phase 1: 基础设施（无 UI 变更）
 
-**目标**: 实现所有转换函数，充分测试
+**目标**: 打通新数据模型的类型、存储、转换基础设施
 
 **交付物**:
 1. `src/lib/editor-marks.ts` — 类型定义 + `htmlToMarks` + `marksToHtml` + `mergeAdjacentMarks`
 2. `src/lib/pm-doc-utils.ts` — `marksToDoc` + `docToMarks` + `splitMarks` + `combineMarks`
 3. `src/components/editor/pm-schema.ts` — ProseMirror Schema
-4. 完整测试套件（往返一致性、edge case）
+4. `src/types/node.ts` / `src/services/node-service.ts` / `supabase/migrations/*` 完成三字段持久化
+5. 完整测试套件（往返一致性、edge case）
 
 **验证方式**: `npm run typecheck && npm run test:run`
 
@@ -1387,7 +1441,8 @@ function placeholderPlugin(text: string) {
 1. `src/components/editor/pm-keymap.ts` — 键盘快捷键
 2. `src/components/editor/pm-trigger-detect.ts` — 触发器检测
 3. `src/components/editor/RichTextEditor.tsx` — 新编辑器（不含 FloatingToolbar）
-4. 在 OutlinerItem 中用 feature flag 切换 `NodeEditor` / `RichTextEditor`
+4. `OutlinerItem`/`PanelTitle`/相关视图统一改为三字段读写
+5. 可选：开发期短暂使用 feature flag；不作为最终交付
 
 **验证方式**: `npm run dev:test` → standalone 模式下可编辑、创建、拆分、导航
 
@@ -1399,6 +1454,7 @@ function placeholderPlugin(text: string) {
 1. `FloatingToolbar.tsx` 改用 PM API
 2. `TrailingInput.tsx` 改用 PM API
 3. 所有触发器（#/@//>）在新编辑器中工作
+4. 落地交互决策：`Backspace 空+有子` 不删除（摇晃反馈），`TrailingInput 空 Enter` 创建空节点
 
 **验证方式**: 完整功能测试（格式化、链接编辑、触发器、新建节点）
 
@@ -1407,7 +1463,7 @@ function placeholderPlugin(text: string) {
 **目标**: 移除 TipTap，清理代码
 
 **步骤**:
-1. 移除 feature flag，默认使用 RichTextEditor
+1. 若引入过 feature flag，移除并默认使用 RichTextEditor
 2. 删除旧文件（NodeEditor.tsx、4 个 Extension、InlineRefNode.ts、HeadingMark.ts、editor-html.ts）
 3. 移除 TipTap 依赖：`npm remove @tiptap/react @tiptap/starter-kit @tiptap/pm @tiptap/extension-highlight @tiptap/extension-link @tiptap/extension-placeholder @tiptap/extension-bubble-menu`
 4. 更新所有测试
@@ -1424,7 +1480,7 @@ function placeholderPlugin(text: string) {
 | **PM keymap 闭包过期** | keymap 在创建时固定闭包 | 用 `propsRef.current` 始终读最新值 |
 | **Zustand 闭包过期** | useCallback 捕获了初始 store 状态 | 在回调内调用 `store.getState()` 而非用闭包值 |
 | **外部值同步循环** | 更新 PM → 触发 onChange → 又更新 PM | `isExternalUpdate` ref 标志跳过 onChange |
-| **PM undo 触发 undoStore** | PM undo 改变文本 → onChange → push 到 undoStore | `isPMUndoRedo` ref 标志阻止 push（阶段 B） |
+| **PM undo 触发 undoStore** | PM undo 改变文本 → onChange → push 到 undoStore | `isPMUndoRedo` ref 标志阻止 push（后续结构化 undo） |
 | **PM focus 竞态** | React setState + PM focus 需要一帧 | `requestAnimationFrame` 延迟 focus + 光标设置 |
 | **macOS Shift+字母大写** | `Cmd+Shift+D` 时 `e.key` 是 `'D'` 不是 `'d'` | 总是用 `e.key.toLowerCase()` 比较 |
 | **工具栏按钮抢焦点** | `onClick` 导致 PM 失焦 | 用 `onMouseDown` + `e.preventDefault()` |
@@ -1436,7 +1492,7 @@ function placeholderPlugin(text: string) {
 | **触发器挂载误触发** | 节点内容已含 # 但不应打开下拉 | `hasUserEdited` flag，仅 docChanged 后允许触发 |
 | **Immer 冻结 Map** | `getState().nodes` 被冻结 | `new Map(nodes)` 复制后再修改 |
 | **零宽字符** | 浏览器在空 contentEditable 中插入 `\u200B` | 检查 isEmpty 时 strip `\u200B` |
-| **快速连按 Cmd+Z** | 并发读同一栈条目导致重复 undo | Promise chain 串行执行队列（阶段 B） |
+| **快速连按 Cmd+Z** | 并发读同一栈条目导致重复 undo | Promise chain 串行执行队列（后续结构化 undo） |
 
 ### ProseMirror CSS 全局样式（必须保留）
 

@@ -562,9 +562,9 @@ hash trigger cleanup safety（2 cases, Bug #53 回归）:
 1. `FloatingToolbar` 仅监听 `selectionUpdate` / `blur`，不监听 `transaction`
 2. `BubbleMenu` 的 `shouldShow` / `options` 在 selection 导致的重渲染后保持同一引用
 3. 触发 `transaction` 事件不会导致 toolbar 额外重渲染（防止无限循环回归）
-4. 鼠标拖拽选择期间（`mousedown` 到 `mouseup`）`shouldShow=false`，避免中途闪现
-5. `mouseup` 后恢复可见；双击选词场景在第二次 `mouseup` 后可显示 toolbar
-6. `mouseup` 后即使没有新的 `selectionUpdate` 事件，菜单也能恢复显示（防卡住）
+4. 仅在真实拖拽（`mousedown` + `mousemove`）期间 `shouldShow=false`，避免中途闪现
+5. `mouseup` 后恢复可见；即使没有新的 `selectionUpdate` 事件也能恢复（防卡住）
+6. 双击选词（无拖拽）不会被错误阻塞，选中后即可显示 toolbar（无需第三次点击）
 
 ### 1.38 Done State Mapping（checkbox ↔ Options 联动，统一字段模型）
 

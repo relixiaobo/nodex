@@ -167,6 +167,7 @@ describe('FloatingToolbar render-loop guard', () => {
 
     flushSync(() => {
       editor.view.dom.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0 }));
+      document.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, buttons: 1 }));
       editor.emit('selectionUpdate');
     });
 
@@ -185,7 +186,7 @@ describe('FloatingToolbar render-loop guard', () => {
     expect(afterPointerUp(selection)).toBe(true);
   });
 
-  it('restores toolbar visibility after double-click selection', () => {
+  it('keeps toolbar available on double-click word selection (no drag)', () => {
     const selection = { editor: editor as unknown as Editor, view: editor.view, from: 2, to: 8 };
     flushSync(() => {
       editor.view.dom.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0 }));
@@ -194,11 +195,7 @@ describe('FloatingToolbar render-loop guard', () => {
       editor.emit('selectionUpdate');
     });
 
-    expect(latestShouldShow()(selection)).toBe(false);
-
-    flushSync(() => {
-      document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, button: 0 }));
-    });
+    // Double-click selection should not be blocked waiting for a third click.
     expect(latestShouldShow()(selection)).toBe(true);
   });
 });

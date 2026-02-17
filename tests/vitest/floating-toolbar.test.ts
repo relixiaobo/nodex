@@ -2,44 +2,35 @@ import React from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { flushSync } from 'react-dom';
 import type { Editor } from '@tiptap/react';
-
-const { bubbleMenuPropHistory } = vi.hoisted(() => ({
-  bubbleMenuPropHistory: [] as Array<{ shouldShow: unknown; options: unknown }>,
-}));
-
-vi.mock('@tiptap/react/menus', () => ({
-  BubbleMenu: ({
-    children,
-    shouldShow,
-    options,
-  }: {
-    children: React.ReactNode;
-    shouldShow: unknown;
-    options: unknown;
-  }) => {
-    bubbleMenuPropHistory.push({ shouldShow, options });
-    return React.createElement('div', { 'data-testid': 'bubble-menu' }, children);
-  },
-}));
-
 import { FloatingToolbar } from '../../src/components/editor/FloatingToolbar.js';
 
 type Listener = () => void;
+type SelectionKind = 'TextSelection' | 'NodeSelection';
+
+function createSelection(from: number, to: number, kind: SelectionKind) {
+  return {
+    from,
+    to,
+    empty: from === to,
+    constructor: { name: kind },
+  };
+}
 
 class FakeEditor {
   private readonly listeners = new Map<string, Set<Listener>>();
 
   public isFocused = true;
   public isEditable = true;
+  public state = {
+    selection: createSelection(1, 1, 'TextSelection'),
+  };
   public view = {
     dom: document.createElement('div'),
     hasFocus: () => this.isFocused,
-  };
-
-  public state = {
-    selection: {
-      empty: false,
-    },
+    coordsAtPos: (pos: number) => ({
+      top: 200,
+      left: pos * 10,
+    }),
   };
 
   on(event: string, callback: Listener) {
@@ -61,6 +52,10 @@ class FakeEditor {
 
   listenerCount(event: string) {
     return this.listeners.get(event)?.size ?? 0;
+  }
+
+  setSelection(from: number, to: number, kind: SelectionKind = 'TextSelection') {
+    this.state.selection = createSelection(from, to, kind);
   }
 
   getAttributes(_mark: string) {
@@ -89,25 +84,22 @@ class FakeEditor {
   }
 }
 
-describe('FloatingToolbar render-loop guard', () => {
+describe('FloatingToolbar selection behavior', () => {
   let container: HTMLDivElement;
   let root: Root;
   let editor: FakeEditor;
-  const latestShouldShow = () => bubbleMenuPropHistory.at(-1)!.shouldShow as (
-    args: {
-      editor: Editor;
-      view: { hasFocus: () => boolean };
-      from: number;
-      to: number;
-    }
-  ) => boolean;
+  let originalRaf: typeof requestAnimationFrame;
 
-  beforeEach(async () => {
-    bubbleMenuPropHistory.length = 0;
+  const getToolbar = () => document.querySelector('[data-testid="floating-toolbar"]');
+
+  beforeEach(() => {
+    originalRaf = window.requestAnimationFrame;
+    window.requestAnimationFrame = (callback: FrameRequestCallback) => {
+      callback(0);
+      return 1;
+    };
+
     editor = new FakeEditor();
-    const editorTextNode = document.createElement('span');
-    editorTextNode.textContent = 'sample text';
-    editor.view.dom.appendChild(editorTextNode);
     document.body.appendChild(editor.view.dom);
     container = document.createElement('div');
     document.body.appendChild(container);
@@ -126,65 +118,97 @@ describe('FloatingToolbar render-loop guard', () => {
     flushSync(() => {
       root.unmount();
     });
+    window.requestAnimationFrame = originalRaf;
     editor.view.dom.remove();
     container.remove();
   });
 
-  it('listens to selectionUpdate/blur only (not transaction)', () => {
+  it('subscribes to selection/focus/blur/transaction events', () => {
     expect(editor.listenerCount('selectionUpdate')).toBe(1);
+    expect(editor.listenerCount('transaction')).toBe(1);
+    expect(editor.listenerCount('focus')).toBe(1);
     expect(editor.listenerCount('blur')).toBe(1);
-    expect(editor.listenerCount('transaction')).toBe(0);
   });
 
-  it('keeps BubbleMenu shouldShow/options refs stable across rerenders', () => {
-    const firstRender = bubbleMenuPropHistory.at(-1);
-    expect(firstRender).toBeDefined();
+  it('shows toolbar for focused non-empty text selection', () => {
+    editor.setSelection(2, 8, 'TextSelection');
 
     flushSync(() => {
       editor.emit('selectionUpdate');
     });
 
-    const secondRender = bubbleMenuPropHistory.at(-1);
-    expect(secondRender).toBeDefined();
-    expect(secondRender!.shouldShow).toBe(firstRender!.shouldShow);
-    expect(secondRender!.options).toBe(firstRender!.options);
+    expect(getToolbar()).not.toBeNull();
   });
 
-  it('ignores transaction events from BubbleMenu updates', () => {
-    const before = bubbleMenuPropHistory.length;
-
+  it('hides toolbar for empty or non-text selection', () => {
+    editor.setSelection(2, 8, 'TextSelection');
     flushSync(() => {
-      editor.emit('transaction');
+      editor.emit('selectionUpdate');
     });
+    expect(getToolbar()).not.toBeNull();
 
-    expect(bubbleMenuPropHistory.length).toBe(before);
+    editor.setSelection(4, 4, 'TextSelection');
+    flushSync(() => {
+      editor.emit('selectionUpdate');
+    });
+    expect(getToolbar()).toBeNull();
+
+    editor.setSelection(2, 8, 'NodeSelection');
+    flushSync(() => {
+      editor.emit('selectionUpdate');
+    });
+    expect(getToolbar()).toBeNull();
   });
 
-  it('shows toolbar whenever selection is non-empty', () => {
-    const shouldShow = latestShouldShow();
-    const nonEmptySelection = { editor: editor as unknown as Editor, view: editor.view, from: 1, to: 4 };
-    const emptySelection = { editor: editor as unknown as Editor, view: editor.view, from: 3, to: 3 };
+  it('shows only after mouseup while dragging selection', () => {
+    editor.setSelection(2, 8, 'TextSelection');
 
-    expect(shouldShow(nonEmptySelection)).toBe(true);
-    expect(shouldShow(emptySelection)).toBe(false);
-  });
-
-  it('shows toolbar for both click and double-click selections', () => {
-    const selection = { editor: editor as unknown as Editor, view: editor.view, from: 2, to: 8 };
     flushSync(() => {
       editor.view.dom.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0 }));
+      editor.emit('selectionUpdate');
+    });
+    expect(getToolbar()).toBeNull();
+
+    flushSync(() => {
       document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, button: 0 }));
-      editor.view.dom.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0 }));
-      editor.emit('selectionUpdate');
     });
-
-    expect(latestShouldShow()(selection)).toBe(true);
+    expect(getToolbar()).not.toBeNull();
   });
 
-  it('hides toolbar when editor is not focused', () => {
-    const selection = { editor: editor as unknown as Editor, view: editor.view, from: 1, to: 4 };
-    editor.isFocused = false;
+  it('shows on second click mouseup for double-click word selection path', () => {
+    editor.setSelection(4, 4, 'TextSelection');
 
-    expect(latestShouldShow()(selection)).toBe(false);
+    flushSync(() => {
+      editor.view.dom.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0, detail: 1 }));
+      document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, button: 0, detail: 1 }));
+      editor.emit('selectionUpdate');
+    });
+    expect(getToolbar()).toBeNull();
+
+    editor.setSelection(4, 9, 'TextSelection');
+    flushSync(() => {
+      editor.view.dom.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0, detail: 2 }));
+      editor.emit('selectionUpdate');
+    });
+    expect(getToolbar()).toBeNull();
+
+    flushSync(() => {
+      document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, button: 0, detail: 2 }));
+    });
+    expect(getToolbar()).not.toBeNull();
+  });
+
+  it('hides toolbar when editor blurs', () => {
+    editor.setSelection(2, 8, 'TextSelection');
+    flushSync(() => {
+      editor.emit('selectionUpdate');
+    });
+    expect(getToolbar()).not.toBeNull();
+
+    editor.isFocused = false;
+    flushSync(() => {
+      editor.emit('blur');
+    });
+    expect(getToolbar()).toBeNull();
   });
 });

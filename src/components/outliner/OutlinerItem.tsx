@@ -86,6 +86,10 @@ interface OutlinerItemProps {
   bulletColor?: string;
 }
 
+function getNodeTextLengthById(nodeId: string, entities: Record<string, { props?: { name?: string } }>): number {
+  return (entities[nodeId]?.props?.name ?? '').length;
+}
+
 export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId, fieldDataType, attrDefId, onNavigateOut, bulletColor }: OutlinerItemProps) {
   const node = useNode(nodeId);
   const expandKey = `${parentId}:${nodeId}`;
@@ -721,8 +725,13 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
         const prev = getPreviousVisibleNode(bounds.first.nodeId, bounds.first.parentId, flatList);
         if (prev) {
           clearSelection();
-          // ↑ → cursor at text end (no click coords = default end position)
-          useUIStore.getState().setFocusClickCoords(null);
+          // ↑ → cursor at text end
+          const currentEntities = useNodeStore.getState().entities;
+          useUIStore.getState().setFocusClickCoords({
+            nodeId: prev.nodeId,
+            parentId: prev.parentId,
+            textOffset: getNodeTextLengthById(prev.nodeId, currentEntities),
+          });
           setFocusedNode(prev.nodeId, prev.parentId);
         }
         return;
@@ -744,11 +753,18 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       if (selAction === 'enter_edit' || selAction === 'type_char') {
         const first = getFirstSelectedInOrder(latestUi.selectedNodeIds, flatList);
         if (!first) return;
+        const currentEntities = useNodeStore.getState().entities;
+        const editAtEnd = getNodeTextLengthById(first.nodeId, currentEntities);
         if (selAction === 'type_char') {
           setPendingInputChar(e.key);
         }
         clearSelection();
-        useUIStore.getState().setFocusClickCoords(null);
+        // typing in selected mode should append at end of the first selected node
+        useUIStore.getState().setFocusClickCoords({
+          nodeId: first.nodeId,
+          parentId: first.parentId,
+          textOffset: editAtEnd,
+        });
         setFocusedNode(first.nodeId, first.parentId);
         return;
       }
@@ -914,9 +930,16 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     }
   }, [nodeId, parentId, isReference, setSelectedNode, setFocusedNode, navigateTo]);
 
-  const handleContentDoubleClick = useCallback(() => {
+  const handleContentDoubleClick = useCallback((e: React.MouseEvent) => {
     // Double click on reference node → enter edit mode
     if (isReference) {
+      const container = e.currentTarget as HTMLElement;
+      const textOffset = getTextOffsetFromPoint(container, e.clientX, e.clientY);
+      useUIStore.getState().setFocusClickCoords(
+        textOffset !== null
+          ? { nodeId, parentId, textOffset }
+          : null,
+      );
       setFocusedNode(nodeId, parentId);
     }
   }, [nodeId, parentId, isReference, setFocusedNode]);
@@ -1073,6 +1096,8 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     const currentName = useNodeStore.getState().entities[nodeId]?.props.name ?? '';
     const textOnly = currentName.replace(/<[^>]*>/g, '').trim();
     if (textOnly.length > 0) return false;
+    // Prevent deleting a whole subtree when Backspace is pressed on an empty parent.
+    if (hasChildren) return true;
 
     const flatList = getFlattenedVisibleNodes(rootChildIds, entities, expandedNodes, rootNodeId);
     const prev = getPreviousVisibleNode(nodeId, parentId, flatList);
@@ -1092,17 +1117,29 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       trashNode(nodeId, wsId, userId);
     }
     if (prev) {
+      const currentEntities = useNodeStore.getState().entities;
+      useUIStore.getState().setFocusClickCoords({
+        nodeId: prev.nodeId,
+        parentId: prev.parentId,
+        textOffset: getNodeTextLengthById(prev.nodeId, currentEntities),
+      });
       setFocusedNode(prev.nodeId, prev.parentId);
     } else {
       setFocusedNode(null);
     }
     return true;
-  }, [nodeId, wsId, userId, parentId, rootNodeId, rootChildIds, entities, expandedNodes, trashNode, removeReference, setFocusedNode]);
+  }, [nodeId, wsId, userId, parentId, rootNodeId, rootChildIds, entities, expandedNodes, trashNode, removeReference, setFocusedNode, hasChildren]);
 
   const handleArrowUp = useCallback(() => {
     const flatList = getFlattenedVisibleNodes(rootChildIds, entities, expandedNodes, rootNodeId);
     const prev = getPreviousVisibleNode(nodeId, parentId, flatList);
     if (prev) {
+      const currentEntities = useNodeStore.getState().entities;
+      useUIStore.getState().setFocusClickCoords({
+        nodeId: prev.nodeId,
+        parentId: prev.parentId,
+        textOffset: getNodeTextLengthById(prev.nodeId, currentEntities),
+      });
       setFocusedNode(prev.nodeId, prev.parentId);
     } else if (onNavigateOut) {
       onNavigateOut('up');

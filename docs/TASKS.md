@@ -29,13 +29,40 @@ _(空)_
 |-------|---------|------|-------------|
 | nodex-cc | — | — | — |
 | nodex-cc-2 | — | — | — |
-| nodex-codex | — | — | — |
+| nodex-codex | Floating Toolbar BUG（无限渲染循环）修复 | codex/fix-floating-toolbar-render-loop | docs/TASKS.md, src/components/editor/FloatingToolbar.tsx, tests/vitest/floating-toolbar.test.ts, docs/TESTING.md, docs/features/floating-toolbar.md |
 
 ---
 
 ## 进行中
 
-_(空)_
+### Floating Toolbar BUG 修复（无限渲染循环）
+
+- **Owner**: nodex-codex
+- **Branch**: `codex/fix-floating-toolbar-render-loop`
+- **Files**: `docs/TASKS.md`, `src/components/editor/FloatingToolbar.tsx`, `tests/vitest/floating-toolbar.test.ts`, `docs/TESTING.md`, `docs/features/floating-toolbar.md`
+- **目标**:
+  1. 修复 Floating Toolbar 显示不稳定（拖拽/双击多次后不出现）问题，恢复“选中文本即出现”
+  2. 保持已验证的设计系统样式修复一起落地（toolbar 阴影/hover/focus、inline mark 样式）
+- **Progress**:
+  - [x] `FloatingToolbar.tsx` 从 BubbleMenu 迁移到自管理 `createPortal + fixed` 浮层
+  - [x] 显示判定统一为 `TextSelection && from !== to && view.hasFocus() && editor.isEditable`
+  - [x] 鼠标交互改为 `mousedown` 隐藏、`mouseup` 后重算选区再显示（拖拽/双击统一链路）
+  - [x] 重写 `tests/vitest/floating-toolbar.test.ts`，覆盖拖拽、双击、非文本选区、失焦隐藏
+  - [x] 用户手测确认“反复触发仍稳定显示”
+- **迭代日志**:
+  - [2026-02-16 nodex-codex] 认领任务，更新 TASKS，准备创建分支与 Draft PR。
+  - [2026-02-16 nodex-codex] 确认代码中修复逻辑已在主干（去掉 transaction 监听 + 稳定 BubbleMenu props），补充 `floating-toolbar.test.ts` 回归测试并完成全量验证。
+  - [2026-02-16 nodex-codex] 创建并更新 PR #57，状态已转 Ready for review。
+  - [2026-02-16 nodex-codex] 修复交互细节：拖拽选中文本时延迟到 mouseup 才显示 toolbar，双击选词在 mouseup 后恢复显示；新增回归测试覆盖该行为。
+  - [2026-02-16 nodex-codex] 根因修复：仅改 `shouldShow` 判断不足以触发 BubbleMenu 重新评估；改为 `isPointerSelecting` state 驱动 `shouldShow` 引用，确保 mouseup 后插件收到更新并显示。
+  - [2026-02-16 nodex-codex] 继续修复：`currentEditor.isFocused` 在当前交互链路下不稳定，导致 shouldShow 常驻 false；改为 `view.hasFocus()` + `isEditable` 判定，恢复文本选中可见性。
+  - [2026-02-16 nodex-codex] 系统性重构显示门控：移除自管 document mouse 监听，改为读取 ProseMirror `view.input.mouseDown`（拖拽中 true，mouseup 后 false），避免卡死状态并统一拖拽/双击行为。
+  - [2026-02-16 nodex-codex] 增加 failsafe：若 `view.input.mouseDown` 异常残留超过阈值（1.5s），自动解除阻塞，避免多次触发后菜单永久不出现。
+  - [2026-02-16 nodex-codex] 根因复盘后改回显式 pointer 状态机：`mousedown` 进入 selecting、`mouseup` 立即退出并触发 BubbleMenu 重新评估；覆盖“第二次双击已选中但要第三次才显示”场景。
+  - [2026-02-16 nodex-codex] 进一步收敛为“仅拖拽隐藏”：只有 `mousedown+mousemove` 才置 selecting，双击（无拖拽）不进入隐藏态，修复双击需三次的问题。
+  - [2026-02-16 nodex-codex] 按用户反馈回归最小正确模型：移除手势门控逻辑，统一为“非空选区即显示”，保证点击/双击一致性。
+  - [2026-02-17 nodex-codex] 参考外部稳定实现后做根因重构：彻底移除 BubbleMenu，改为组件内 selection/focus/mouseup 驱动 + `view.coordsAtPos` 定位 + portal 渲染；同步重写回归测试。
+  - [2026-02-17 nodex-codex] 用户手测通过：反复触发（点击/双击/拖拽）后菜单显示稳定，验收通过。
 
 ---
 
@@ -171,13 +198,15 @@ _(空)_
 - [x] TipTap BubbleMenu 集成 ✓ PR #55
 - [x] 格式按钮（Bold / Italic / Code / Highlight / Strikethrough / Heading） ✓ PR #55
 - [x] Link 编辑弹窗 ✓ PR #55
-- [ ] **BUG: BubbleMenu 无限渲染循环 — 选中文字后浮动工具栏不出现**
-  - 根因：`FloatingToolbar.tsx` 中 `editor.on('transaction', rerender)` 与 BubbleMenu 内部 `updateOptions` transaction 形成无限循环，触发数百次 "Maximum update depth exceeded" 错误，导致 BubbleMenu 组件静默崩溃
-  - 修复方案（已验证可行，未提交）：
-    1. 移除 `transaction` 事件监听（只保留 `selectionUpdate` + `blur`）
-    2. `useCallback` 包裹 `shouldShow`，`useMemo` 包裹 `options` — 防止引用变化触发 BubbleMenu useEffect
-  - 同时需合入的设计系统合规修复（已改好）：`shadow-lg`、`focus:ring-2 ring-primary/40`、`hover:bg-foreground/5`、inline mark 样式（`<s>` opacity、`<code>` border-radius、`<mark>` dark mode）
-  - 涉及文件：`src/components/editor/FloatingToolbar.tsx`、`src/assets/main.css`
+- [ ] **BUG: BubbleMenu 无限渲染循环 — 选中文字后浮动工具栏不出现**（进行中：`nodex-codex`，分支 `codex/fix-floating-toolbar-render-loop`）
+  - 根因：BubbleMenu 插件内部 transaction/updateOptions 与外部显示门控逻辑相互反馈，导致在拖拽/双击高频链路中出现状态竞争（菜单偶发不显示或多次触发后失效）
+  - 当前修复：
+    1. 移除 BubbleMenu 运行时依赖，改为 `FloatingToolbar` 自管理显示状态
+    2. 显示条件统一为 `TextSelection + 非空选区 + focus + editable`
+    3. 鼠标链路统一为 `mousedown` 隐藏，`mouseup` 后重算选区并显示
+    4. 通过 `createPortal(..., document.body)` + `fixed` 定位，避免节点局部布局影响浮层可见性
+  - 回归测试：`tests/vitest/floating-toolbar.test.ts`（覆盖拖拽/双击/非文本选区/blur）
+  - 涉及文件：`src/components/editor/FloatingToolbar.tsx`、`tests/vitest/floating-toolbar.test.ts`
 - [ ] @ Reference 按钮
 - [ ] # Tag 按钮
 - **Spec**: `docs/features/floating-toolbar.md`

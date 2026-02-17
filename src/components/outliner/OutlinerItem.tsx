@@ -899,12 +899,44 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       const rect = container.getBoundingClientRect();
       return e.clientX <= rect.left + 2 ? 0 : textLength;
     })();
+    const textRightEdge = getRenderedTextRightEdge(container);
+    const textLength = getNodeTextLengthById(nodeId, useNodeStore.getState().entities);
+    const resolvedOffset = textRightEdge !== null && e.clientX > textRightEdge + 1
+      ? textLength
+      : fallbackOffset;
     useUIStore.getState().setFocusClickCoords(
-      { nodeId, parentId, textOffset: fallbackOffset },
+      { nodeId, parentId, textOffset: resolvedOffset },
     );
     // Prevent native selection/focus churn on the static HTML layer.
     e.preventDefault();
   }, [isReference, fieldDataType, nodeId, parentId, handleCmdClick, handleShiftClick]);
+
+  // While editing, clicking the large blank area to the right of inline editor
+  // should keep caret at end instead of blurring/re-entering at offset 0.
+  const handleFocusedContentMouseDown = useCallback((e: React.MouseEvent) => {
+    if (fieldDataType === SYS_D.CHECKBOX) return;
+    if (e.button !== 0) return;
+    if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+
+    const target = e.target as HTMLElement;
+    if (target.closest('.ProseMirror') || target.closest('[data-inlineref-node]')) {
+      return;
+    }
+
+    const container = e.currentTarget as HTMLElement;
+    const textRightEdge = getRenderedTextRightEdge(container);
+    if (textRightEdge === null || e.clientX <= textRightEdge + 1) {
+      return;
+    }
+
+    const ed = editorRef.current;
+    if (!isEditorViewAlive(ed)) return;
+
+    e.preventDefault();
+    const endPos = Math.max(1, ed.state.doc.content.size - 1);
+    setEditorSelection(ed, endPos, endPos);
+    ed.focus();
+  }, [fieldDataType]);
 
   const handleContentClick = useCallback((e: React.MouseEvent) => {
     // Drag-select just ended → suppress this click
@@ -1674,7 +1706,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
           <div className={`relative flex-1 min-w-0 ${isPendingConversion ? 'ref-converting' : ''} ${isDone ? 'text-foreground/50' : ''}`}>
           <div
             className={`text-sm leading-[21px] ${fieldDataType !== SYS_D.CHECKBOX && !isFocused ? (isReference ? 'cursor-default' : 'cursor-text') : ''}`}
-            onMouseDown={fieldDataType !== SYS_D.CHECKBOX && !isFocused ? handleContentMouseDown : undefined}
+            onMouseDown={fieldDataType !== SYS_D.CHECKBOX ? (isFocused ? handleFocusedContentMouseDown : handleContentMouseDown) : undefined}
             onClick={fieldDataType !== SYS_D.CHECKBOX && !isFocused ? handleContentClick : undefined}
             onDoubleClick={fieldDataType !== SYS_D.CHECKBOX && !isFocused && isReference ? handleContentDoubleClick : undefined}
           >
@@ -1967,6 +1999,19 @@ function getTextOffsetFromPoint(container: HTMLElement, clientX: number, clientY
     preRange.setStart(container, 0);
     preRange.setEnd(startContainer, startOffset);
     return preRange.toString().length;
+  } catch {
+    return null;
+  }
+}
+
+function getRenderedTextRightEdge(container: HTMLElement): number | null {
+  const doc = container.ownerDocument;
+  try {
+    const range = doc.createRange();
+    range.selectNodeContents(container);
+    const rects = Array.from(range.getClientRects());
+    if (rects.length === 0) return null;
+    return rects.reduce((maxRight, rect) => Math.max(maxRight, rect.right), -Infinity);
   } catch {
     return null;
   }

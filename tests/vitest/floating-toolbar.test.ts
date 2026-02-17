@@ -1,7 +1,6 @@
 import React from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { flushSync } from 'react-dom';
-import type { Editor } from '@tiptap/react';
 import { FloatingToolbar } from '../../src/components/editor/FloatingToolbar.js';
 
 type Listener = () => void;
@@ -108,7 +107,7 @@ describe('FloatingToolbar selection behavior', () => {
     flushSync(() => {
       root.render(
         React.createElement(FloatingToolbar, {
-          editor: editor as unknown as Editor,
+          editor: editor,
         }),
       );
     });

@@ -353,17 +353,6 @@ npm run test:run
 2. options 打开时的 `ArrowUp/Down/Enter/Escape` 解析
 3. options 关闭时 `Escape` 的 clear-selection 语义
 
-### 1.20 编辑器 HTML 归一化工具
-
-**测试文件**: `tests/vitest/editor-html.test.ts`
-
-**覆盖点**:
-
-1. `stripWrappingP` 对单层 `<p>` 包裹的去壳与 trim
-2. 嵌套 `<p>` 结构保持原样（防误裁剪）
-3. `wrapInP` 对纯文本与空字符串的包裹语义
-4. 已有 `<p>` 内容的稳定透传
-
 ### 1.21 TrailingInput onUpdate 决策纯函数
 
 **测试文件**: `tests/vitest/trailing-input-actions.test.ts`
@@ -583,15 +572,6 @@ hash trigger cleanup safety（2 cases, Bug #53 回归）:
 5. `heading` 命令处于 enabled 状态
 6. 全部禁用时返回 `-1`
 
-### 1.41 Heading Mark 扩展
-
-**测试文件**: `tests/vitest/heading-mark.test.ts`
-
-**覆盖点**:
-
-1. `toggleHeadingMark` 对选中文本正确写入 `data-heading-mark="true"`
-2. 对同一区间再次 toggle 会移除 heading mark（幂等反向）
-
 ### 1.43 Floating Toolbar 循环渲染防回归
 
 **测试文件**: `tests/vitest/floating-toolbar.test.ts`
@@ -710,7 +690,7 @@ applyWebClipToNode（5 cases）:
 19. 就地设置 description
 20. 不改变节点 ownership（留在原父节点）
 
-### 1.41 Default Child Supertag (SYS_A14)
+### 1.42 Default Child Supertag (SYS_A14)
 
 **测试文件**: `tests/vitest/child-supertag.test.ts`
 
@@ -833,7 +813,6 @@ createSibling 自动标签（2 cases）:
 | 1.17 | 快捷键注册表一致性 | PASS/FAIL |
 | 1.18 | 全局导航快捷键拦截保护 | PASS/FAIL |
 | 1.19 | Selected Reference 快捷键解析 | PASS/FAIL |
-| 1.20 | 编辑器 HTML 归一化工具 | PASS/FAIL |
 | 1.21 | TrailingInput onUpdate 决策纯函数 | PASS/FAIL |
 | 1.22 | TrailingInput 键盘导航决策纯函数 | PASS/FAIL |
 | 1.23 | NodeEditor 键盘决策纯函数 | PASS/FAIL |
@@ -853,7 +832,6 @@ createSibling 自动标签（2 cases）:
 | 1.37 | Slash Command 注册与导航 | PASS/FAIL |
 | 1.38 | Done State Mapping | PASS/FAIL |
 | 1.39 | Web Clip 落库服务 | PASS/FAIL |
-| 1.41 | Heading Mark 扩展 | PASS/FAIL |
 | 1.42 | Default Child Supertag (SYS_A14) | PASS/FAIL |
 | 1.43 | Floating Toolbar 循环渲染防回归 | PASS/FAIL |
 | 1.44 | PM EditorView 操作工具 | PASS/FAIL |

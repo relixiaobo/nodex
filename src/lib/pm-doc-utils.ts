@@ -1,7 +1,7 @@
 import type { InlineRefEntry, TextMark } from '../types/index.js';
 import { mergeAdjacentMarks } from './editor-marks.js';
 import { pmSchema } from '../components/editor/pm-schema.js';
-import { Node as PMNode } from '@tiptap/pm/model';
+import { Node as PMNode } from 'prosemirror-model';
 
 const INLINE_REF_CHAR = '\uFFFC';
 
@@ -187,4 +187,3 @@ export function combineMarks(
 
   return mergeAdjacentMarks([...firstMarks.map(cloneMark), ...shiftedSecond]);
 }
-

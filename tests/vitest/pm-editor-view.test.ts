@@ -1,5 +1,5 @@
-import { EditorState } from '@tiptap/pm/state';
-import { EditorView } from '@tiptap/pm/view';
+import { EditorState } from 'prosemirror-state';
+import { EditorView } from 'prosemirror-view';
 import { pmSchema } from '../../src/components/editor/pm-schema.js';
 import { docToMarks, marksToDoc } from '../../src/lib/pm-doc-utils.js';
 import {

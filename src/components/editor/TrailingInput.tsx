@@ -11,11 +11,10 @@
  * - Blur empty → no-op
  */
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { EditorState, TextSelection } from '@tiptap/pm/state';
-import { keymap } from '@tiptap/pm/keymap';
-import { baseKeymap } from '@tiptap/pm/commands';
-import type { Plugin } from '@tiptap/pm/state';
-import { EditorView } from '@tiptap/pm/view';
+import { EditorState, TextSelection, type Plugin } from 'prosemirror-state';
+import { keymap } from 'prosemirror-keymap';
+import { baseKeymap } from 'prosemirror-commands';
+import { EditorView } from 'prosemirror-view';
 import { useNodeStore } from '../../stores/node-store';
 import { useWorkspaceStore } from '../../stores/workspace-store';
 import { useUIStore } from '../../stores/ui-store';

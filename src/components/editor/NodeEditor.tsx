@@ -22,8 +22,10 @@ import { DOMSerializer } from '@tiptap/pm/model';
 import { useNodeStore } from '../../stores/node-store';
 import { useUIStore } from '../../stores/ui-store';
 import { useWorkspaceStore } from '../../stores/workspace-store';
+import type { InlineRefEntry, TextMark } from '../../types/index.js';
 import { getPrimaryShortcutKey, getShortcutKeys } from '../../lib/shortcut-registry';
-import { stripWrappingP, wrapInP } from '../../lib/editor-html.js';
+import { wrapInP } from '../../lib/editor-html.js';
+import { htmlToMarks, marksToHtml } from '../../lib/editor-marks.js';
 import {
   resolveNodeEditorArrowIntent,
   resolveNodeEditorEnterIntent,
@@ -56,9 +58,11 @@ const [KEY_EDITOR_EDIT_DESC_PRIMARY, KEY_EDITOR_EDIT_DESC_SECONDARY] = getShortc
 interface NodeEditorProps {
   nodeId: string;
   parentId: string;
-  initialContent: string;
+  initialText: string;
+  initialMarks: TextMark[];
+  initialInlineRefs: InlineRefEntry[];
   onBlur: () => void;
-  onEnter: (afterContent?: string) => void;
+  onEnter: (afterContent?: EditorContentPayload) => void;
   onIndent: () => void;
   onOutdent: () => void;
   onDelete: () => boolean; // returns true if node was deleted
@@ -106,10 +110,18 @@ interface NodeEditorProps {
   onSelectAll?: () => void;
 }
 
+export interface EditorContentPayload {
+  text: string;
+  marks: TextMark[];
+  inlineRefs: InlineRefEntry[];
+}
+
 export function NodeEditor({
   nodeId,
   parentId,
-  initialContent,
+  initialText,
+  initialMarks,
+  initialInlineRefs,
   onBlur,
   onEnter,
   onIndent,
@@ -150,8 +162,8 @@ export function NodeEditor({
   onShiftArrow,
   onSelectAll,
 }: NodeEditorProps) {
-  const updateNodeName = useNodeStore((s) => s.updateNodeName);
-  const setNodeNameLocal = useNodeStore((s) => s.setNodeNameLocal);
+  const updateNodeContent = useNodeStore((s) => s.updateNodeContent);
+  const setNodeContentLocal = useNodeStore((s) => s.setNodeContentLocal);
   const userId = useWorkspaceStore((s) => s.userId);
   const savedRef = useRef(false);
 
@@ -169,18 +181,21 @@ export function NodeEditor({
     (html: string) => {
       if (savedRef.current) return;
       savedRef.current = true;
-      const cleaned = stripWrappingP(html);
-      if (cleaned !== initialContent && userId) {
-        updateNodeName(nodeId, cleaned, userId);
+      const parsed = htmlToMarks(html);
+      const changed = parsed.text !== initialText
+        || JSON.stringify(parsed.marks) !== JSON.stringify(initialMarks)
+        || JSON.stringify(parsed.inlineRefs) !== JSON.stringify(initialInlineRefs);
+      if (changed && userId) {
+        updateNodeContent(nodeId, parsed.text, parsed.marks, parsed.inlineRefs, userId);
       }
     },
-    [nodeId, initialContent, userId, updateNodeName],
+    [nodeId, initialText, initialMarks, initialInlineRefs, userId, updateNodeContent],
   );
 
   // Store latest callbacks in refs so TipTap extension doesn't go stale
   const callbacksRef = useRef({
     onEnter, onIndent, onOutdent, onDelete, onArrowUp, onArrowDown, onMoveUp, onMoveDown, saveContent,
-    setNodeNameLocal, nodeId,
+    setNodeContentLocal, nodeId,
     hashTagActive: hashTagActive ?? false,
     onHashTagConfirm: onHashTagConfirm ?? (() => {}),
     onHashTagNavDown: onHashTagNavDown ?? (() => {}),
@@ -206,7 +221,7 @@ export function NodeEditor({
   });
   callbacksRef.current = {
     onEnter, onIndent, onOutdent, onDelete, onArrowUp, onArrowDown, onMoveUp, onMoveDown, saveContent,
-    setNodeNameLocal, nodeId,
+    setNodeContentLocal, nodeId,
     hashTagActive: hashTagActive ?? false,
     onHashTagConfirm: onHashTagConfirm ?? (() => {}),
     onHashTagNavDown: onHashTagNavDown ?? (() => {}),
@@ -313,7 +328,7 @@ export function NodeEditor({
               const serializer = DOMSerializer.fromSchema(schema);
               const div = document.createElement('div');
               div.appendChild(serializer.serializeFragment(afterFragment));
-              const afterHtml = div.innerHTML;
+              const afterPayload = htmlToMarks(div.innerHTML);
 
               // Delete after-content from editor
               editor.chain().command(({ tr }) => {
@@ -326,7 +341,7 @@ export function NodeEditor({
               callbacksRef.current.saveContent(beforeHtml);
 
               // Create new node with after-content
-              callbacksRef.current.onEnter(afterHtml);
+              callbacksRef.current.onEnter(afterPayload);
             }
             return true;
           },
@@ -343,10 +358,10 @@ export function NodeEditor({
             const isEmpty = editor.state.doc.textContent.trim().length === 0;
             if (isEmpty) {
               // Explicitly flush empty name to store so handleDelete sees name=''
-              // (onUpdate's setNodeNameLocal may not have fired yet due to
+              // (onUpdate's setNodeContentLocal may not have fired yet due to
               // DOMObserver async timing)
-              const { setNodeNameLocal: setLocal, nodeId: nid } = callbacksRef.current;
-              setLocal(nid, '');
+              const { setNodeContentLocal: setLocal, nodeId: nid } = callbacksRef.current;
+              setLocal(nid, '', [], []);
               callbacksRef.current.saveContent(editor.getHTML());
               const deleted = callbacksRef.current.onDelete();
               return deleted;
@@ -550,18 +565,18 @@ export function NodeEditor({
   }), []);
 
   // Live-update store on each keystroke so references/displays update in real-time.
-  // Uses setNodeNameLocal (no Supabase) — the final blur/save handles persistence.
-  const liveUpdateRef = useRef({ setNodeNameLocal, nodeId });
-  liveUpdateRef.current = { setNodeNameLocal, nodeId };
+  // Uses setNodeContentLocal (no Supabase) — the final blur/save handles persistence.
+  const liveUpdateRef = useRef({ setNodeContentLocal, nodeId });
+  liveUpdateRef.current = { setNodeContentLocal, nodeId };
 
   const editor = useEditor({
     extensions,
-    content: wrapInP(initialContent),
+    content: wrapInP(marksToHtml(initialText, initialMarks, initialInlineRefs)),
     editorProps,
     onUpdate: ({ editor }) => {
-      const { setNodeNameLocal: setLocal, nodeId: nid } = liveUpdateRef.current;
-      const cleaned = stripWrappingP(editor.getHTML());
-      setLocal(nid, cleaned);
+      const { setNodeContentLocal: setLocal, nodeId: nid } = liveUpdateRef.current;
+      const parsed = htmlToMarks(editor.getHTML());
+      setLocal(nid, parsed.text, parsed.marks, parsed.inlineRefs);
     },
     onBlur: ({ editor }) => {
       if (!savedRef.current) {

@@ -50,6 +50,7 @@ _(空)_
 - **迭代日志**:
   - [2026-02-17 nodex-codex] 启动实施：先落地 Phase 1 数据层与转换基础设施（类型/DB 映射/store 新接口 + marks 工具与测试），随后再切编辑器 UI 层。
   - [2026-02-17 nodex-codex] 已完成 Phase 1 首批实现：`NodeProps._marks/_inlineRefs`、`nodes.marks/inline_refs` 迁移、`setNodeContentLocal/updateNodeContent`、`htmlToMarks/marksToHtml`、`marksToDoc/docToMarks`、`tana-import` 转换、seed 切换；验证通过 `typecheck`、`check:test-sync`、`test:run`、`build`。
+  - [2026-02-17 nodex-codex] 继续实施（过渡到 Phase 2 前的运行时对齐）：`NodeEditor` 改为通过 `htmlToMarks` 回写 `text+marks+inlineRefs`，`OutlinerItem` 改为基于 `marksToHtml` 展示并在 split/create 时传递富文本 payload，`createChild/createSibling` 支持携带 marks/inlineRefs；全量验证通过。
 
 ### 性能基线测量
 > **Owner: nodex-cc-2** | Branch: `cc2/perf-baseline` | Priority: P2

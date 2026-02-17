@@ -9,6 +9,7 @@ import { useUIStore } from '../../stores/ui-store';
 import { useWorkspaceStore } from '../../stores/workspace-store';
 import { BulletChevron, ChevronButton } from './BulletChevron';
 import { NodeEditor } from '../editor/NodeEditor';
+import type { EditorContentPayload } from '../editor/NodeEditor';
 import { SlashCommandMenu } from '../editor/SlashCommandMenu';
 import { TrailingInput } from '../editor/TrailingInput';
 import { TagBar } from '../tags/TagBar';
@@ -20,6 +21,7 @@ import { useFieldOptions } from '../../hooks/use-field-options.js';
 import { resolveTagColor } from '../../lib/tag-colors.js';
 import { applyWebClipToNode } from '../../lib/webclip-service.js';
 import { wrapInP } from '../../lib/editor-html.js';
+import { htmlToMarks, marksToHtml } from '../../lib/editor-marks.js';
 import {
   WEBCLIP_CAPTURE_ACTIVE_TAB,
   type WebClipCaptureResponse,
@@ -133,6 +135,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   const applyTag = useNodeStore((s) => s.applyTag);
   const createTagDef = useNodeStore((s) => s.createTagDef);
   const updateNodeName = useNodeStore((s) => s.updateNodeName);
+  const updateNodeContent = useNodeStore((s) => s.updateNodeContent);
   const updateNodeDescription = useNodeStore((s) => s.updateNodeDescription);
   const addReference = useNodeStore((s) => s.addReference);
   const removeReference = useNodeStore((s) => s.removeReference);
@@ -816,7 +819,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     if (pending && pending.tempNodeId === nodeId) {
       const tempNode = useNodeStore.getState().entities[nodeId];
       const content = tempNode?.props.name ?? '';
-      if (isOnlyInlineRef(content)) {
+      if (isOnlyInlineRef(content, tempNode?.props._inlineRefs)) {
         revertRefConversion(pending.tempNodeId, pending.refNodeId, pending.parentId);
       }
       useUIStore.getState().setPendingRefConversion(null);
@@ -954,7 +957,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   // ─── Keyboard shortcut handlers ───
 
   const handleEnter = useCallback(
-    (afterContent?: string) => {
+    (afterContent?: EditorContentPayload) => {
       if (!wsId || !userId) return;
 
       // Single-value field types: Enter navigates out instead of creating sibling
@@ -970,7 +973,15 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       if (currentlyExpanded && currentHasChildren) {
         // Expanded with children → new node becomes first child (position 0)
         const beforeIds = new Set(useNodeStore.getState().entities[nodeId]?.children ?? []);
-        const createPromise = createChild(nodeId, wsId, userId, afterContent ?? '', 0);
+        const createPromise = createChild(
+          nodeId,
+          wsId,
+          userId,
+          afterContent?.text ?? '',
+          0,
+          afterContent?.marks,
+          afterContent?.inlineRefs,
+        );
 
         const optimisticIds = useNodeStore.getState().entities[nodeId]?.children ?? [];
         const optimisticNewId = optimisticIds.find((cid) => !beforeIds.has(cid));
@@ -984,7 +995,14 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       } else {
         // Collapsed or leaf → create sibling after this node
         const beforeIds = new Set(useNodeStore.getState().entities[parentId]?.children ?? []);
-        const createPromise = createSibling(nodeId, wsId, userId, afterContent);
+        const createPromise = createSibling(
+          nodeId,
+          wsId,
+          userId,
+          afterContent?.text,
+          afterContent?.marks,
+          afterContent?.inlineRefs,
+        );
 
         const optimisticIds = useNodeStore.getState().entities[parentId]?.children ?? [];
         const optimisticNewId = optimisticIds.find((cid) => !beforeIds.has(cid));
@@ -1125,14 +1143,11 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     if (ed && !ed.isDestroyed) {
       const { from, to } = hashRangeRef.current;
       ed.chain().deleteRange({ from, to }).run();
-      // Save corrected content (without #query)
-      const html = ed.getHTML();
-      const trimmed = html.trim();
-      const match = trimmed.match(/^<p>(.*)<\/p>$/s);
-      const cleanedName = (match && !match[1].includes('<p>')) ? match[1] : trimmed;
-      if (userId) updateNodeName(nodeId, cleanedName, userId);
+      // Save corrected content (without #query) using text+marks model
+      const parsed = htmlToMarks(ed.getHTML());
+      if (userId) updateNodeContent(nodeId, parsed.text, parsed.marks, parsed.inlineRefs, userId);
     }
-  }, [nodeId, userId, updateNodeName]);
+  }, [nodeId, userId, updateNodeContent]);
 
   const handleHashTagSelect = useCallback(
     (tagDefId: string) => {
@@ -1564,6 +1579,10 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
 
   const isDropTarget = dropTargetId === nodeId;
   const isDragging = dragNodeId === nodeId;
+  const nodeText = node.props.name ?? '';
+  const nodeMarks = node.props._marks ?? [];
+  const nodeInlineRefs = node.props._inlineRefs ?? [];
+  const nodeContentHtml = marksToHtml(nodeText, nodeMarks, nodeInlineRefs);
 
   return (
     <div role="treeitem" aria-expanded={isExpanded} className="relative">
@@ -1643,7 +1662,9 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
               <NodeEditor
                 nodeId={nodeId}
                 parentId={parentId}
-                initialContent={node.props.name ?? ''}
+                initialText={nodeText}
+                initialMarks={nodeMarks}
+                initialInlineRefs={nodeInlineRefs}
                 onBlur={handleBlur}
                 onEnter={handleEnter}
                 onIndent={handleIndent}
@@ -1687,7 +1708,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
             ) : (
               <span
                 className="node-content"
-                dangerouslySetInnerHTML={{ __html: node.props.name || '&nbsp;' }}
+                dangerouslySetInnerHTML={{ __html: nodeContentHtml || '&nbsp;' }}
               />
             )}
             {hasTags && (

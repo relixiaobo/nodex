@@ -764,6 +764,16 @@ createSibling 自动标签（2 cases）:
 2. 最后一项为 field 时显示 TrailingInput
 3. 最后一项为 content 时隐藏 TrailingInput
 
+### 1.46 FieldValueOutliner TrailingInput 显示规则
+
+**测试文件**: `tests/vitest/field-value-outliner.test.ts`
+
+**覆盖点**:
+
+1. 空 FieldValueOutliner 显示 TrailingInput
+2. 最后一项为 field 时显示 TrailingInput
+3. 最后一项为 content 时隐藏 TrailingInput
+
 ---
 
 ## Phase 2: 视觉检查点
@@ -847,6 +857,7 @@ createSibling 自动标签（2 cases）:
 | 1.43 | Floating Toolbar 循环渲染防回归 | PASS/FAIL |
 | 1.44 | PM EditorView 操作工具 | PASS/FAIL |
 | 1.45 | ConfigOutliner TrailingInput 显示规则 | PASS/FAIL |
+| 1.46 | FieldValueOutliner TrailingInput 显示规则 | PASS/FAIL |
 | 2 | 视觉渲染 | PASS/FAIL/SKIP |
 | 3 | 扩展构建 | PASS/FAIL |
 

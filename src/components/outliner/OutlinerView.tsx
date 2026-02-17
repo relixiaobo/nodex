@@ -9,7 +9,6 @@ import { FieldRow } from '../fields/FieldRow';
 import { TrailingInput } from '../editor/TrailingInput';
 import { SYS_V } from '../../types/index.js';
 import { useDragSelect } from '../../hooks/use-drag-select.js';
-import { getLastVisibleNode } from '../../lib/tree-utils.js';
 
 interface OutlinerViewProps {
   rootNodeId: string;
@@ -23,7 +22,6 @@ export function OutlinerView({ rootNodeId, showTemplateTuples }: OutlinerViewPro
 
   const allChildIds = node?.children ?? [];
   const entities = useNodeStore((s) => s.entities);
-  const expandedNodes = useUIStore((s) => s.expandedNodes);
   const setFocusedNode = useUIStore((s) => s.setFocusedNode);
   const clearFocus = useUIStore((s) => s.clearFocus);
   const setEditingFieldName = useUIStore((s) => s.setEditingFieldName);
@@ -89,7 +87,12 @@ export function OutlinerView({ rootNodeId, showTemplateTuples }: OutlinerViewPro
   useDragSelect({ containerRef, rootChildIds: contentChildIds, rootNodeId });
 
   return (
-    <div ref={containerRef} className="flex flex-col pr-4" role="tree">
+    <div
+      ref={containerRef}
+      className="flex flex-col pr-4"
+      role="tree"
+      data-row-scope-parent-id={rootNodeId}
+    >
       {/* Hidden field pills: compact clickable chips to temporarily reveal hidden fields */}
       {hiddenRevealableFields.length > 0 && hiddenRevealableFields.some(f => !revealedFieldIds.has(f.id)) && (
         <div className="flex flex-wrap gap-x-3 min-h-7 items-center" style={{ paddingLeft: 6 + 15 + 4 }}>
@@ -182,14 +185,22 @@ export function OutlinerView({ rootNodeId, showTemplateTuples }: OutlinerViewPro
         parentExpandKey={`${node?.props._ownerId ?? ''}:${rootNodeId}`}
         onNavigateOut={(direction) => {
           if (direction !== 'up') return;
-          const target = getLastVisibleNode(rootNodeId, useNodeStore.getState().entities, expandedNodes);
-          if (!target) return;
-          useUIStore.getState().setFocusClickCoords({
-            nodeId: target.nodeId,
-            parentId: target.parentId,
-            textOffset: (useNodeStore.getState().entities[target.nodeId]?.props.name ?? '').length,
-          });
-          setFocusedNode(target.nodeId, target.parentId);
+          for (let j = visibleChildren.length - 1; j >= 0; j--) {
+            const last = visibleChildren[j];
+            if (last.hidden && !revealedFieldIds.has(last.id)) continue;
+            if (last.type === 'field') {
+              clearFocus();
+              setEditingFieldName(last.id);
+              return;
+            }
+            useUIStore.getState().setFocusClickCoords({
+              nodeId: last.id,
+              parentId: rootNodeId,
+              textOffset: (useNodeStore.getState().entities[last.id]?.props.name ?? '').length,
+            });
+            setFocusedNode(last.id, rootNodeId);
+            return;
+          }
         }}
       />
     </div>

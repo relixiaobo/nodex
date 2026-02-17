@@ -51,21 +51,55 @@ export function FloatingToolbar({ editor }: FloatingToolbarProps) {
   const [linkDraft, setLinkDraft] = useState('');
   const [isPointerSelecting, setIsPointerSelecting] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const isPointerSelectingRef = useRef(false);
+  const pointerDownInEditorRef = useRef(false);
+  const pointerMovedRef = useRef(false);
 
   useEffect(() => {
-    const rerender = () => setRenderTick((value) => value + 1);
+    const setPointerSelecting = (next: boolean) => {
+      if (isPointerSelectingRef.current === next) return;
+      isPointerSelectingRef.current = next;
+      setIsPointerSelecting(next);
+    };
+    const resetPointerTracking = () => {
+      pointerDownInEditorRef.current = false;
+      pointerMovedRef.current = false;
+      setPointerSelecting(false);
+    };
+    const rerender = () => {
+      if (!pointerDownInEditorRef.current && isPointerSelectingRef.current) {
+        setPointerSelecting(false);
+      }
+      setRenderTick((value) => value + 1);
+    };
     const handleMouseDown = (event: MouseEvent) => {
       if (event.button !== 0) return;
       const target = event.target;
-      if (!(target instanceof Node)) return;
-      if (!editor.view.dom.contains(target)) return;
-      setIsPointerSelecting(true);
+      if (!(target instanceof Node) || !editor.view.dom.contains(target)) {
+        resetPointerTracking();
+        return;
+      }
+      pointerDownInEditorRef.current = true;
+      pointerMovedRef.current = false;
+    };
+    const handleMouseMove = (event: MouseEvent) => {
+      if (!pointerDownInEditorRef.current) return;
+      // If the primary button is no longer pressed, recover immediately.
+      if ((event.buttons & 1) === 0) {
+        resetPointerTracking();
+        return;
+      }
+      // Only treat as pointer selection after actual drag movement.
+      if (!pointerMovedRef.current) {
+        pointerMovedRef.current = true;
+        setPointerSelecting(true);
+      }
     };
     const handleMouseUp = () => {
-      setIsPointerSelecting(false);
+      resetPointerTracking();
     };
     const handleWindowBlur = () => {
-      setIsPointerSelecting(false);
+      resetPointerTracking();
     };
 
     // Only listen to selectionUpdate and blur — NOT transaction.
@@ -75,12 +109,14 @@ export function FloatingToolbar({ editor }: FloatingToolbarProps) {
     editor.on('selectionUpdate', rerender);
     editor.on('blur', rerender);
     document.addEventListener('mousedown', handleMouseDown, true);
+    document.addEventListener('mousemove', handleMouseMove, true);
     document.addEventListener('mouseup', handleMouseUp, true);
     window.addEventListener('blur', handleWindowBlur);
     return () => {
       editor.off('selectionUpdate', rerender);
       editor.off('blur', rerender);
       document.removeEventListener('mousedown', handleMouseDown, true);
+      document.removeEventListener('mousemove', handleMouseMove, true);
       document.removeEventListener('mouseup', handleMouseUp, true);
       window.removeEventListener('blur', handleWindowBlur);
     };

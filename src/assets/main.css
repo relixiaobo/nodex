@@ -48,6 +48,7 @@
    and static node display (.node-content) to prevent visual jumping
    when switching between edit and display modes. */
 .tiptap code,
+.ProseMirror code,
 .node-content code {
   background-color: var(--color-muted);
   border-radius: 0.125rem;
@@ -58,6 +59,7 @@
 }
 
 .tiptap mark,
+.ProseMirror mark,
 .node-content mark {
   background-color: rgba(250, 204, 21, 0.4);
   border-radius: 0.125rem;
@@ -66,12 +68,14 @@
 
 @media (prefers-color-scheme: dark) {
   .tiptap mark,
+  .ProseMirror mark,
   .node-content mark {
     background-color: rgba(251, 191, 36, 0.2);
   }
 }
 
 .tiptap a,
+.ProseMirror a,
 .node-content a {
   color: var(--color-primary);
   text-decoration: underline;
@@ -79,17 +83,20 @@
 }
 
 .tiptap strong,
+.ProseMirror strong,
 .node-content strong {
   font-weight: 600;
 }
 
 .tiptap s,
+.ProseMirror s,
 .node-content s {
   text-decoration: line-through;
   opacity: 0.5;
 }
 
 .tiptap [data-heading-mark],
+.ProseMirror [data-heading-mark],
 .node-content [data-heading-mark] {
   font-size: 1.125em;
   font-weight: 700;
@@ -108,7 +115,15 @@
   outline: none;
 }
 
+.ProseMirror {
+  outline: none;
+}
+
 .tiptap p {
+  margin: 0;
+}
+
+.ProseMirror p {
   margin: 0;
 }
 
@@ -135,6 +150,11 @@
   caret-color: currentColor;
 }
 
+.editor-inline .ProseMirror {
+  display: inline-block;
+  caret-color: currentColor;
+}
+
 /* Keep paragraph inline with tags while avoiding empty-node double-height.
    ProseMirror uses <br class="ProseMirror-trailingBreak"> for empty lines; when
    paragraph is inline this <br> introduces an extra visual line in our row layout. */
@@ -145,7 +165,18 @@
   vertical-align: top;
 }
 
+.editor-inline .ProseMirror p {
+  display: inline-block;
+  margin: 0;
+  min-width: 1px;
+  vertical-align: top;
+}
+
 .editor-inline .tiptap p > br.ProseMirror-trailingBreak:only-child {
+  display: none;
+}
+
+.editor-inline .ProseMirror p > br.ProseMirror-trailingBreak:only-child {
   display: none;
 }
 
@@ -158,6 +189,7 @@
 
 /* Inline references — clickable blue node links (Tana: data-inlineref-node) */
 .tiptap [data-inlineref-node],
+.ProseMirror [data-inlineref-node],
 .node-content [data-inlineref-node] {
   color: var(--color-primary);
   cursor: pointer;
@@ -166,6 +198,7 @@
 }
 
 .tiptap [data-inlineref-node]:hover,
+.ProseMirror [data-inlineref-node]:hover,
 .node-content [data-inlineref-node]:hover {
   text-decoration: underline;
 }
@@ -178,6 +211,10 @@
 }
 
 .ref-converting .tiptap [data-inlineref-node] {
+  animation: ref-conversion-shimmer 2.5s ease-in-out infinite;
+}
+
+.ref-converting .ProseMirror [data-inlineref-node] {
   animation: ref-conversion-shimmer 2.5s ease-in-out infinite;
 }
 

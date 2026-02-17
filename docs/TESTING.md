@@ -553,6 +553,19 @@ hash trigger cleanup safety（2 cases, Bug #53 回归）:
 1. `toggleHeadingMark` 对选中文本正确写入 `data-heading-mark="true"`
 2. 对同一区间再次 toggle 会移除 heading mark（幂等反向）
 
+### 1.43 Floating Toolbar 循环渲染防回归
+
+**测试文件**: `tests/vitest/floating-toolbar.test.ts`
+
+**覆盖点**:
+
+1. `FloatingToolbar` 监听 `selectionUpdate` / `transaction` / `focus` / `blur`，并在组件卸载时正确清理
+2. 非空 `TextSelection` 且编辑器聚焦时显示
+3. 空选区或 `NodeSelection` 时隐藏
+4. 鼠标拖拽选区期间保持隐藏，`mouseup` 后再显示
+5. 双击选词路径在第二次点击 `mouseup` 后即可显示（不需要额外点击）
+6. 失焦（blur）立即隐藏
+
 ### 1.38 Done State Mapping（checkbox ↔ Options 联动，统一字段模型）
 
 **测试文件**: `tests/vitest/done-state-mapping.test.ts`
@@ -803,6 +816,7 @@ createSibling 自动标签（2 cases）:
 | 1.39 | Web Clip 落库服务 | PASS/FAIL |
 | 1.41 | Heading Mark 扩展 | PASS/FAIL |
 | 1.42 | Default Child Supertag (SYS_A14) | PASS/FAIL |
+| 1.43 | Floating Toolbar 循环渲染防回归 | PASS/FAIL |
 | 2 | 视觉渲染 | PASS/FAIL/SKIP |
 | 3 | 扩展构建 | PASS/FAIL |
 

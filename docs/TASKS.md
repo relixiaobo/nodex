@@ -48,7 +48,7 @@ _(空)_
   - [x] 显示判定统一为 `TextSelection && from !== to && view.hasFocus() && editor.isEditable`
   - [x] 鼠标交互改为 `mousedown` 隐藏、`mouseup` 后重算选区再显示（拖拽/双击统一链路）
   - [x] 重写 `tests/vitest/floating-toolbar.test.ts`，覆盖拖拽、双击、非文本选区、失焦隐藏
-  - [ ] 用户手测确认“反复触发仍稳定显示”
+  - [x] 用户手测确认“反复触发仍稳定显示”
 - **迭代日志**:
   - [2026-02-16 nodex-codex] 认领任务，更新 TASKS，准备创建分支与 Draft PR。
   - [2026-02-16 nodex-codex] 确认代码中修复逻辑已在主干（去掉 transaction 监听 + 稳定 BubbleMenu props），补充 `floating-toolbar.test.ts` 回归测试并完成全量验证。
@@ -62,6 +62,7 @@ _(空)_
   - [2026-02-16 nodex-codex] 进一步收敛为“仅拖拽隐藏”：只有 `mousedown+mousemove` 才置 selecting，双击（无拖拽）不进入隐藏态，修复双击需三次的问题。
   - [2026-02-16 nodex-codex] 按用户反馈回归最小正确模型：移除手势门控逻辑，统一为“非空选区即显示”，保证点击/双击一致性。
   - [2026-02-17 nodex-codex] 参考外部稳定实现后做根因重构：彻底移除 BubbleMenu，改为组件内 selection/focus/mouseup 驱动 + `view.coordsAtPos` 定位 + portal 渲染；同步重写回归测试。
+  - [2026-02-17 nodex-codex] 用户手测通过：反复触发（点击/双击/拖拽）后菜单显示稳定，验收通过。
 
 ---
 

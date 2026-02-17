@@ -23,6 +23,8 @@ npm run build              # 构建成功
 
 ## Phase 1: 基础设施验收
 
+> 说明：`htmlToMarks` / `marksToHtml` 仅用于导入与迁移脚本；运行时编辑链路以 `text + marks + inlineRefs` 为准。
+
 ### 1.1 类型定义
 
 - [ ] `TextMark` 接口定义正确，包含 `start`, `end`, `type`, `attrs?` 字段
@@ -81,7 +83,7 @@ npm run build              # 构建成功
 - [ ] headingMark
 - [ ] 内联引用
 - [ ] marks + 引用混合
-- [ ] 现有种子数据中的所有 `props.name`（遍历 seed-data.ts 中 68 个节点的 name 字段）
+- [ ] 导入样例 HTML fixtures（覆盖多层嵌套、引用与链接混合场景）
 
 ### 1.5 mergeAdjacentMarks
 
@@ -119,6 +121,14 @@ npm run build              # 构建成功
 - [ ] 内联引用 → inlineReference atom 节点
 - [ ] 完整往返：`docToMarks(marksToDoc(text, marks, refs))` 结果与输入一致
 
+### 1.10 数据层一次性切换（同任务内）
+
+- [ ] `src/types/node.ts` 已新增 `NodeProps._marks`、`NodeProps._inlineRefs`
+- [ ] `supabase/migrations/*` 已新增 `nodes.marks`、`nodes.inline_refs` 列
+- [ ] `rowToNode` / `nodeToRow` 已映射 `marks`、`inline_refs`
+- [ ] `setNodeContentLocal` / `updateNodeContent`（或等价接口）可同时读写 text+marks+inlineRefs
+- [ ] 种子数据与导入链路已写入新三字段，不再依赖 HTML 作为运行时主存储
+
 ---
 
 ## Phase 2: RichTextEditor 核心验收
@@ -146,12 +156,13 @@ npm run build              # 构建成功
 - [ ] ArrowDown 到达节点 → 光标在开头
 - [ ] 新建空节点 → 光标在开头
 - [ ] 选择模式按字符键进入编辑 → 字符被插入（pendingInputChar 消费正确）
+- [ ] 引用节点单击仅选中（不进编辑）；双击才进入编辑模式
 
 ### 2.4 内容同步（live update）
 
-- [ ] 每次按键后，`node.props.name` 在 store 中实时更新（通过 `setNodeNameLocal`）
+- [ ] 每次按键后，`node.props.name`、`node.props._marks`、`node.props._inlineRefs` 在 store 中实时更新（通过 `setNodeContentLocal` 或等价 action）
 - [ ] 其他引用此节点的 UI 实时反映变化
-- [ ] blur 时调用 `updateNodeName` 持久化到 Supabase
+- [ ] blur 时调用 `updateNodeContent`（或等价 action）持久化到 Supabase
 - [ ] 内容未变化时 blur 不触发 Supabase 写入（savedRef 逻辑）
 
 ### 2.5 基础键盘快捷键
@@ -164,7 +175,7 @@ npm run build              # 构建成功
 | **Enter（行中带引用）** | 光标在引用前按 Enter → 引用跟随到新节点 | [ ] |
 | **Backspace（空节点）** | 空节点按 Backspace → 节点删除，焦点到上一节点（注意：需正确处理浏览器插入的零宽字符 `\u200B`） | [ ] |
 | **Backspace（非空）** | 正常删除字符（PM 默认行为） | [ ] |
-| **Backspace（空节点有子节点）** | 不应删除（当前行为是摇晃反馈） | [ ] |
+| **Backspace（空节点有子节点）** | 不应删除；显示摇晃反馈，防止误删整棵子树 | [ ] |
 | **Tab** | 按 Tab → 节点缩进（变为前一兄弟的子节点） | [ ] |
 | **Shift+Tab** | 按 Shift+Tab → 节点反缩进 | [ ] |
 | **ArrowUp（行首）** | 光标在行首按 ↑ → 焦点到上一可见节点 | [ ] |
@@ -270,7 +281,7 @@ npm run build              # 构建成功
 
 - [ ] 点击父节点底部空白区域 → TrailingInput 出现（光标闪烁）
 - [ ] 输入文本 + Enter → 创建子节点，内容正确
-- [ ] 空输入 Enter → 无操作
+- [ ] 空输入 Enter → 仍创建空子节点（保持连续输入流）
 - [ ] Tab → 缩进深度增加（视觉偏移，不创建节点）
 - [ ] Shift+Tab → 缩进深度减少
 - [ ] Escape → blur，TrailingInput 消失
@@ -437,5 +448,6 @@ npm run build              # 构建成功
 
 - [ ] 新种子数据在新编辑器中正确显示（纯文本、格式化、引用）
 - [ ] 编辑后保存的内容可以被再次正确加载（往返一致性）
-- [ ] 内联引用的 `data-inlineref-node` 属性值不丢失
+- [ ] 内联引用的 `_inlineRefs[].targetNodeId` 不丢失，offset 与 `\uFFFC` 位置一致
+- [ ] `search-service.getInlineBacklinks()` 基于 `inline_refs` 查询仍返回正确结果
 - [ ] Tana 导入流程更新后，导入的节点在新编辑器中正确显示

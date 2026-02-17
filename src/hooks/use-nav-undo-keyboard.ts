@@ -12,7 +12,9 @@ import { getShortcutKeys, matchesShortcutEvent } from '../lib/shortcut-registry'
 
 export type NavUndoAction = 'undo' | 'redo' | null;
 
-export function shouldHandleNavUndo(activeElement: Element | null): boolean {
+export function shouldHandleNavUndo(activeElement: Element | null, focusedNodeId: string | null): boolean {
+  // In editor mode, always let ProseMirror own undo/redo handling.
+  if (focusedNodeId) return false;
   if (activeElement instanceof HTMLElement && activeElement.isContentEditable) return false;
   if (activeElement instanceof HTMLInputElement || activeElement instanceof HTMLTextAreaElement) return false;
   return true;
@@ -39,8 +41,8 @@ export function useNavUndoKeyboard() {
       const action = resolveNavUndoAction(e, undoBindings, redoBindings);
       if (!action) return;
 
-      // Don't intercept inside contentEditable (TipTap editors)
-      if (!shouldHandleNavUndo(document.activeElement)) return;
+      // Don't intercept while editing (or inside text inputs/contentEditable).
+      if (!shouldHandleNavUndo(document.activeElement, useUIStore.getState().focusedNodeId)) return;
 
       e.preventDefault();
 

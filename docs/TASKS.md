@@ -59,6 +59,7 @@ _(空)_
   - [2026-02-16 nodex-codex] 增加 failsafe：若 `view.input.mouseDown` 异常残留超过阈值（1.5s），自动解除阻塞，避免多次触发后菜单永久不出现。
   - [2026-02-16 nodex-codex] 根因复盘后改回显式 pointer 状态机：`mousedown` 进入 selecting、`mouseup` 立即退出并触发 BubbleMenu 重新评估；覆盖“第二次双击已选中但要第三次才显示”场景。
   - [2026-02-16 nodex-codex] 进一步收敛为“仅拖拽隐藏”：只有 `mousedown+mousemove` 才置 selecting，双击（无拖拽）不进入隐藏态，修复双击需三次的问题。
+  - [2026-02-16 nodex-codex] 按用户反馈回归最小正确模型：移除手势门控逻辑，统一为“非空选区即显示”，保证点击/双击一致性。
 
 ---
 

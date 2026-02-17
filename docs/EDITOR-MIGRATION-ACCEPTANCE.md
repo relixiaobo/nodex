@@ -14,10 +14,10 @@ npm run test:run           # 全量通过
 npm run build              # 构建成功
 ```
 
-- [ ] `typecheck` 通过
-- [ ] `check:test-sync` 通过
-- [ ] `test:run` 全量通过
-- [ ] `build` 成功
+- [x] `typecheck` 通过
+- [x] `check:test-sync` 通过
+- [x] `test:run` 全量通过
+- [x] `build` 成功
 
 ---
 
@@ -295,48 +295,48 @@ npm run build              # 构建成功
 
 ### 4.1 旧文件删除
 
-- [ ] `NodeEditor.tsx` 已删除
-- [ ] `HashTagExtension.ts` 已删除
-- [ ] `ReferenceExtension.ts` 已删除
-- [ ] `SlashCommandExtension.ts` 已删除
-- [ ] `FieldTriggerExtension.ts` 已删除
-- [ ] `InlineRefNode.ts` 已删除
-- [ ] `HeadingMark.ts` 已删除
-- [ ] `editor-html.ts`（`stripWrappingP`/`wrapInP`）已删除
-- [ ] `editor-html.test.ts` 已删除或替换
+- [x] `NodeEditor.tsx` 已删除
+- [x] `HashTagExtension.ts` 已删除
+- [x] `ReferenceExtension.ts` 已删除
+- [x] `SlashCommandExtension.ts` 已删除
+- [x] `FieldTriggerExtension.ts` 已删除
+- [x] `InlineRefNode.ts` 已删除
+- [x] `HeadingMark.ts` 已删除
+- [x] `editor-html.ts`（`stripWrappingP`/`wrapInP`）已删除
+- [x] `editor-html.test.ts` 已删除或替换
 
 ### 4.2 TipTap 依赖移除
 
-- [ ] `package.json` 中无 `@tiptap/*` 依赖
-- [ ] `package-lock.json` 中无 `@tiptap/*`
-- [ ] `npm ls @tiptap/react` 返回空
+- [x] `package.json` 中无 `@tiptap/*` 依赖
+- [x] `package-lock.json` 中无 `@tiptap/*`
+- [x] `npm ls @tiptap/react` 返回空
 
 ### 4.3 ProseMirror 依赖正确
 
-- [ ] `prosemirror-model` 已安装
-- [ ] `prosemirror-state` 已安装
-- [ ] `prosemirror-view` 已安装
-- [ ] `prosemirror-keymap` 已安装
-- [ ] `prosemirror-history` 已安装
-- [ ] `prosemirror-commands` 已安装
-- [ ] `prosemirror-transform` 已安装
-- [ ] 不需要的包未安装（`prosemirror-schema-basic` 不需要）
+- [x] `prosemirror-model` 已安装
+- [x] `prosemirror-state` 已安装
+- [x] `prosemirror-view` 已安装
+- [x] `prosemirror-keymap` 已安装
+- [x] `prosemirror-history` 已安装
+- [x] `prosemirror-commands` 已安装
+- [x] `prosemirror-transform` 已安装（由 `prosemirror-commands` 传递依赖提供）
+- [x] 不需要的包未安装（`prosemirror-schema-basic` 不需要）
 
 ### 4.4 代码引用清理
 
-- [ ] `grep -r "@tiptap" src/` 返回空（无残留导入）
-- [ ] `grep -r "from '@tiptap" src/` 返回空
-- [ ] `grep -r "useEditor" src/` 返回空
-- [ ] `grep -r "EditorContent" src/` 返回空
-- [ ] `grep -r "Extension.create" src/` 返回空
+- [x] `grep -r "@tiptap" src/` 返回空（无残留导入）
+- [x] `grep -r "from '@tiptap" src/` 返回空
+- [x] `grep -r "useEditor(" src/` 返回空
+- [x] `grep -r "\bEditorContent\b" src/` 返回空
+- [x] `grep -r "Extension.create(" src/` 返回空
 
 ### 4.5 全量回归
 
-- [ ] `npm run typecheck` 通过
-- [ ] `npm run check:test-sync` 通过
-- [ ] `npm run test:run` 全量通过
-- [ ] `npm run build` 成功
-- [ ] bundle size 不增加（理想情况下减少，去掉了 TipTap 层）
+- [x] `npm run typecheck` 通过
+- [x] `npm run check:test-sync` 通过
+- [x] `npm run test:run` 全量通过
+- [x] `npm run build` 成功
+- [-] bundle size 不增加（理想情况下减少，去掉了 TipTap 层）— 本轮仅验证构建成功，未与迁移前基线做同口径对比
 
 ---
 

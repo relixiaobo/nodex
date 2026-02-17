@@ -90,6 +90,18 @@ function getNodeTextLengthById(nodeId: string, entities: Record<string, { props?
   return (entities[nodeId]?.props?.name ?? '').length;
 }
 
+function focusTrailingInputForParent(parentId: string): boolean {
+  const roots = document.querySelectorAll<HTMLElement>('[data-trailing-parent-id]');
+  for (const root of roots) {
+    if (root.dataset.trailingParentId !== parentId) continue;
+    const editor = root.querySelector<HTMLElement>('.ProseMirror');
+    if (!editor) continue;
+    editor.focus();
+    return true;
+  }
+  return false;
+}
+
 export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId, fieldDataType, attrDefId, onNavigateOut, bulletColor }: OutlinerItemProps) {
   const node = useNode(nodeId);
   const expandKey = `${parentId}:${nodeId}`;
@@ -178,12 +190,31 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
 
   const tagIds = useNodeTags(nodeId);
   const fields = useNodeFields(nodeId);
+  const parentFields = useNodeFields(parentId);
   const filteredSlashCommands = useMemo(
     () => filterSlashCommands(slashQuery),
     [slashQuery],
   );
 
   const allChildIds = node?.children ?? [];
+  const parentFieldTupleIds = useMemo(
+    () => new Set(parentFields.map((f) => f.tupleId)),
+    [parentFields],
+  );
+  const renderableSiblings = useMemo(() => {
+    const parentChildren = entities[parentId]?.children ?? [];
+    const result: Array<{ id: string; type: 'field' | 'content' }> = [];
+    for (const cid of parentChildren) {
+      if (parentFieldTupleIds.has(cid)) {
+        result.push({ id: cid, type: 'field' });
+        continue;
+      }
+      if (!entities[cid]?.props._docType) {
+        result.push({ id: cid, type: 'content' });
+      }
+    }
+    return result;
+  }, [entities, parentId, parentFieldTupleIds]);
 
   // Build field lookup by tuple ID
   const fieldMap = useMemo(() => {
@@ -1204,6 +1235,16 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   }, [nodeId, wsId, userId, parentId, rootNodeId, rootChildIds, entities, expandedNodes, trashNode, removeReference, setFocusedNode, hasChildren]);
 
   const handleArrowUp = useCallback(() => {
+    const siblingIndex = renderableSiblings.findIndex((item) => item.type === 'content' && item.id === nodeId);
+    if (siblingIndex > 0) {
+      const prevSibling = renderableSiblings[siblingIndex - 1];
+      if (prevSibling?.type === 'field') {
+        clearFocus();
+        setEditingFieldName(prevSibling.id);
+        return;
+      }
+    }
+
     const flatList = getFlattenedVisibleNodes(rootChildIds, entities, expandedNodes, rootNodeId);
     const prev = getPreviousVisibleNode(nodeId, parentId, flatList);
     if (prev) {
@@ -1217,17 +1258,32 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     } else if (onNavigateOut) {
       onNavigateOut('up');
     }
-  }, [nodeId, parentId, rootNodeId, rootChildIds, entities, expandedNodes, setFocusedNode, onNavigateOut]);
+  }, [nodeId, parentId, rootNodeId, rootChildIds, entities, expandedNodes, setFocusedNode, onNavigateOut, renderableSiblings, clearFocus, setEditingFieldName]);
 
   const handleArrowDown = useCallback(() => {
+    const siblingIndex = renderableSiblings.findIndex((item) => item.type === 'content' && item.id === nodeId);
+    if (siblingIndex >= 0 && siblingIndex < renderableSiblings.length - 1) {
+      const nextSibling = renderableSiblings[siblingIndex + 1];
+      if (nextSibling?.type === 'field') {
+        clearFocus();
+        setEditingFieldName(nextSibling.id);
+        return;
+      }
+    }
+
     const flatList = getFlattenedVisibleNodes(rootChildIds, entities, expandedNodes, rootNodeId);
     const next = getNextVisibleNode(nodeId, parentId, flatList);
     if (next) {
       setFocusedNode(next.nodeId, next.parentId);
+      return;
+    }
+
+    if (focusTrailingInputForParent(parentId)) {
+      return;
     } else if (onNavigateOut) {
       onNavigateOut('down');
     }
-  }, [nodeId, parentId, rootNodeId, rootChildIds, entities, expandedNodes, setFocusedNode, onNavigateOut]);
+  }, [nodeId, parentId, rootNodeId, rootChildIds, entities, expandedNodes, setFocusedNode, onNavigateOut, renderableSiblings, clearFocus, setEditingFieldName]);
 
   const handleMoveUp = useCallback(() => {
     if (!userId) return;
@@ -1989,22 +2045,46 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
                   isEmpty={fieldMap.get(id)!.isEmpty}
                   onNavigateOut={(direction) => {
                     if (direction === 'up') {
-                      // Escape up → focus this parent node
-                      setFocusedNode(nodeId, parentId);
+                      // Escape up from field value → edit this field name.
+                      clearFocus();
+                      setEditingFieldName(id);
                     } else {
-                      // Escape down → focus next content child after this field, or parent's next
+                      // Escape down → focus next sibling item in this parent.
                       let found = false;
                       for (let j = i + 1; j < visibleChildren.length; j++) {
-                        if (visibleChildren[j].type === 'content' && !visibleChildren[j].hidden) {
-                          setFocusedNode(visibleChildren[j].id, nodeId);
+                        const nextItem = visibleChildren[j];
+                        if (nextItem.hidden) continue;
+                        if (nextItem.type === 'field') {
+                          clearFocus();
+                          setEditingFieldName(nextItem.id);
+                          found = true;
+                          break;
+                        }
+                        if (nextItem.type === 'content') {
+                          useUIStore.getState().setFocusClickCoords({
+                            nodeId: nextItem.id,
+                            parentId: nodeId,
+                            textOffset: 0,
+                          });
+                          setFocusedNode(nextItem.id, nodeId);
                           found = true;
                           break;
                         }
                       }
                       if (!found) {
+                        if (focusTrailingInputForParent(nodeId)) {
+                          return;
+                        }
                         const fl = getFlattenedVisibleNodes(rootChildIds, useNodeStore.getState().entities, useUIStore.getState().expandedNodes, rootNodeId);
                         const nx = getNextVisibleNode(nodeId, parentId, fl);
-                        if (nx) setFocusedNode(nx.nodeId, nx.parentId);
+                        if (nx) {
+                          useUIStore.getState().setFocusClickCoords({
+                            nodeId: nx.nodeId,
+                            parentId: nx.parentId,
+                            textOffset: 0,
+                          });
+                          setFocusedNode(nx.nodeId, nx.parentId);
+                        }
                       }
                     }
                   }}

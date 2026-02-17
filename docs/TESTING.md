@@ -225,6 +225,7 @@ npm run test:run
 9. `removeFieldOption` 从 attrDef children 移除并删除 option 节点
 10. `replaceFieldAttrDef` 的占位 attrDef 置换与重复字段保护
 11. `changeFieldType` / `setConfigValue` 配置 tuple 原地更新
+12. `moveFieldTuple` 跨父节点迁移 tuple 时同步 `associationMap` 与 `_ownerId`
 
 ### 1.9 Schema / Supertag 构建链路
 
@@ -753,6 +754,16 @@ createSibling 自动标签（2 cases）:
 10. `getEffectiveSelectionBounds` with reference — 显示层级 reference 节点隐式选中
 11. `computeRangeSelection` with reference — 跨 reference 范围选择/不振荡
 
+### 1.45 ConfigOutliner TrailingInput 显示规则
+
+**测试文件**: `tests/vitest/config-outliner.test.ts`
+
+**覆盖点**:
+
+1. 空 ConfigOutliner 显示 TrailingInput
+2. 最后一项为 field 时显示 TrailingInput
+3. 最后一项为 content 时隐藏 TrailingInput
+
 ---
 
 ## Phase 2: 视觉检查点
@@ -835,6 +846,7 @@ createSibling 自动标签（2 cases）:
 | 1.42 | Default Child Supertag (SYS_A14) | PASS/FAIL |
 | 1.43 | Floating Toolbar 循环渲染防回归 | PASS/FAIL |
 | 1.44 | PM EditorView 操作工具 | PASS/FAIL |
+| 1.45 | ConfigOutliner TrailingInput 显示规则 | PASS/FAIL |
 | 2 | 视觉渲染 | PASS/FAIL/SKIP |
 | 3 | 扩展构建 | PASS/FAIL |
 

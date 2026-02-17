@@ -220,8 +220,17 @@ export function RichTextEditor(props: RichTextEditorProps) {
       stateRef.referenceActive = false;
     }
 
-    const slashMatch = textBefore.match(/(?:^|\s)\/([^\s/]*)$/);
-    if (slashMatch && stateRef.hasUserEdited && (docChanged || stateRef.slashActive)) {
+    const afterCursorText = $from.parent.textBetween(
+      $from.parentOffset,
+      $from.parent.content.size,
+      undefined,
+      '\ufffc',
+    );
+    // Product rule: slash menu only triggers when the current node is effectively empty
+    // except for the "/query" text itself.
+    const slashMatch = textBefore.match(/^\s*\/([^\s/]*)$/);
+    const slashOnlyInEmptyNode = !!slashMatch && afterCursorText.trim() === '';
+    if (slashOnlyInEmptyNode && stateRef.hasUserEdited && (docChanged || stateRef.slashActive)) {
       stateRef.slashActive = true;
       const query = slashMatch[1];
       const slashStart = from - (query.length + 1);

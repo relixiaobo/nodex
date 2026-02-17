@@ -126,7 +126,7 @@ export const ReferenceSelector = forwardRef<ReferenceDropdownHandle, ReferenceSe
     return (
       <div
         ref={listRef}
-        className="z-50 w-64 max-h-60 overflow-y-auto rounded-lg border border-border bg-popover shadow-lg p-1"
+        className="z-50 w-64 max-h-60 overflow-y-auto rounded-lg border border-border bg-popover/100 shadow-lg p-1"
         style={dropStyle}
         onMouseDown={(e) => e.preventDefault()}
       >
@@ -153,8 +153,11 @@ export const ReferenceSelector = forwardRef<ReferenceDropdownHandle, ReferenceSe
             className={`flex w-full flex-col items-start rounded-md px-2 py-1 text-left transition-colors ${
               i === boundedIndex ? 'bg-accent' : 'hover:bg-foreground/5'
             }`}
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={() => onSelect(item.id)}
+            onMouseDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onSelect(item.id);
+            }}
           >
             <div className="flex w-full items-center gap-1.5">
               <AtSign size={14} className="text-foreground-secondary shrink-0" />
@@ -176,8 +179,11 @@ export const ReferenceSelector = forwardRef<ReferenceDropdownHandle, ReferenceSe
               className={`flex w-full items-center gap-1.5 rounded-md px-2 py-1 text-sm text-foreground transition-colors text-left ${
                 boundedIndex === items.length ? 'bg-accent' : 'hover:bg-foreground/5'
               }`}
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => onCreateNew?.(query.trim())}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onCreateNew?.(query.trim());
+              }}
             >
               <Plus size={14} className="text-foreground-secondary shrink-0" />
               Create &ldquo;{query}&rdquo;

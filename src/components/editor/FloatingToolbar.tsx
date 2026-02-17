@@ -216,14 +216,20 @@ export function FloatingToolbar({ editor, view, tick = 0 }: FloatingToolbarProps
     }
 
     try {
-      const start = activeView.coordsAtPos(selection.from);
-      // `coordsAtPos(selection.to)` can snap to next line start when the
-      // selection ends at line boundary. Use the last selected char box for a
-      // stable horizontal center near line endings.
-      const endPos = Math.max(selection.from, selection.to - 1);
-      const end = activeView.coordsAtPos(endPos);
-      const top = Math.min(start.top, end.top) - TOOLBAR_TOP_OFFSET;
-      const left = (start.left + end.right) / 2;
+      const anchor = ('anchor' in selection ? selection.anchor : selection.from);
+      const head = ('head' in selection ? selection.head : selection.to);
+      const forward = head >= anchor;
+      const selectionFrom = selection.from;
+      const selectionTo = selection.to;
+      // Follow the selection focus edge (mouse-up position / double-click edge),
+      // not the geometric center of a possibly multi-line range.
+      const focusPos = forward
+        ? Math.max(selectionFrom, selectionTo - 1)
+        : selectionFrom;
+      const focusRect = activeView.coordsAtPos(focusPos);
+      const top = focusRect.top - TOOLBAR_TOP_OFFSET;
+      const right = Number.isFinite(focusRect.right) ? focusRect.right : focusRect.left;
+      const left = (focusRect.left + right) / 2;
 
       setToolbarPosition((prev) => {
         if (prev.show && prev.top === top && prev.left === left) {

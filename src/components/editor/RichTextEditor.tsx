@@ -538,26 +538,24 @@ export function RichTextEditor(props: RichTextEditorProps) {
         mousedown: (view, event) => {
           const mouseEvent = event as MouseEvent;
           if (mouseEvent.button !== 0) return false;
+          if (mouseEvent.altKey || mouseEvent.ctrlKey || mouseEvent.metaKey || mouseEvent.shiftKey) return false;
+          if (mouseEvent.detail !== 1) return false;
 
-          const paragraph = view.dom.querySelector('p');
-          if (!paragraph) return false;
+          const endPos = Math.max(1, view.state.doc.content.size - 1);
+          let endRect: ReturnType<EditorView['coordsAtPos']>;
+          try {
+            endRect = view.coordsAtPos(endPos);
+          } catch {
+            return false;
+          }
 
-          const paragraphRect = paragraph.getBoundingClientRect();
-          const withinLineY = mouseEvent.clientY >= paragraphRect.top && mouseEvent.clientY <= paragraphRect.bottom;
-          if (!withinLineY) return false;
-
-          const range = view.dom.ownerDocument.createRange();
-          range.selectNodeContents(paragraph);
-          const rects = Array.from(range.getClientRects());
-          const lastRect = rects[rects.length - 1];
-          if (!lastRect) return false;
-
-          // Clicking to the right of the rendered last glyph should keep caret at line end.
-          if (mouseEvent.clientX <= lastRect.right + 1) return false;
+          const lineTop = Math.min(endRect.top, endRect.bottom);
+          const lineBottom = Math.max(endRect.top, endRect.bottom);
+          if (mouseEvent.clientY < lineTop - 1 || mouseEvent.clientY > lineBottom + 1) return false;
+          if (mouseEvent.clientX < endRect.left - 1) return false;
 
           requestAnimationFrame(() => {
             if (viewRef.current !== view) return;
-            const endPos = Math.max(1, view.state.doc.content.size - 1);
             const tr = view.state.tr.setSelection(TextSelection.create(view.state.doc, endPos));
             tr.setMeta('addToHistory', false);
             view.dispatch(tr);

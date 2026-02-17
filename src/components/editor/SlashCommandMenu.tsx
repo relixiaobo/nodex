@@ -1,4 +1,5 @@
 import { useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
+import { createPortal } from 'react-dom';
 import {
   AtSign,
   ChevronRight,
@@ -41,6 +42,7 @@ interface SlashCommandMenuProps {
 }
 
 export function SlashCommandMenu({ open, commands, selectedIndex, onSelect }: SlashCommandMenuProps) {
+  const anchorRef = useRef<HTMLSpanElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const [dropStyle, setDropStyle] = useState<CSSProperties>({
     position: 'fixed',
@@ -49,9 +51,8 @@ export function SlashCommandMenu({ open, commands, selectedIndex, onSelect }: Sl
   });
 
   useLayoutEffect(() => {
-    if (!open || !listRef.current) return;
-    const anchor = listRef.current.parentElement;
-    if (!anchor) return;
+    if (!open || !anchorRef.current) return;
+    const anchor = anchorRef.current;
 
     const update = () => {
       const rect = anchor.getBoundingClientRect();
@@ -79,10 +80,10 @@ export function SlashCommandMenu({ open, commands, selectedIndex, onSelect }: Sl
 
   if (!open) return null;
 
-  return (
+  const menu = (
     <div
       ref={listRef}
-      className="z-50 w-60 max-h-80 overflow-y-auto rounded-lg border border-border bg-popover/100 p-1 shadow-lg"
+      className="z-[1000] w-60 max-h-80 overflow-y-auto rounded-lg border border-border bg-popover/100 p-1 shadow-lg"
       style={dropStyle}
       onMouseDown={(e) => e.preventDefault()}
     >
@@ -125,5 +126,12 @@ export function SlashCommandMenu({ open, commands, selectedIndex, onSelect }: Sl
         );
       })}
     </div>
+  );
+
+  return (
+    <>
+      <span ref={anchorRef} className="pointer-events-none absolute left-0 top-0 h-0 w-0" />
+      {typeof document === 'undefined' ? menu : createPortal(menu, document.body)}
+    </>
   );
 }

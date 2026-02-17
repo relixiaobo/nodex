@@ -8,6 +8,7 @@
  * Mirrors TagSelector.tsx pattern.
  */
 import { useMemo, useEffect, useLayoutEffect, useRef, useState, forwardRef, useImperativeHandle } from 'react';
+import { createPortal } from 'react-dom';
 import { AtSign, Plus } from 'lucide-react';
 import { useNodeSearch, type NodeSearchResult } from '../../hooks/use-node-search';
 import { useUIStore } from '../../stores/ui-store';
@@ -29,6 +30,7 @@ interface ReferenceSelectorProps {
 
 export const ReferenceSelector = forwardRef<ReferenceDropdownHandle, ReferenceSelectorProps>(
   function ReferenceSelector({ open, onSelect, onCreateNew, query, selectedIndex, currentNodeId }, ref) {
+    const anchorRef = useRef<HTMLSpanElement>(null);
     const searchResults = useNodeSearch(query, currentNodeId);
     const listRef = useRef<HTMLDivElement>(null);
 
@@ -93,9 +95,8 @@ export const ReferenceSelector = forwardRef<ReferenceDropdownHandle, ReferenceSe
       position: 'fixed', top: -9999, left: -9999,
     });
     useLayoutEffect(() => {
-      if (!open || !listRef.current) return;
-      const anchor = listRef.current.parentElement;
-      if (!anchor) return;
+      if (!open || !anchorRef.current) return;
+      const anchor = anchorRef.current;
 
       const update = () => {
         const rect = anchor.getBoundingClientRect();
@@ -123,10 +124,10 @@ export const ReferenceSelector = forwardRef<ReferenceDropdownHandle, ReferenceSe
 
     if (!open) return null;
 
-    return (
+    const menu = (
       <div
         ref={listRef}
-        className="z-50 w-64 max-h-60 overflow-y-auto rounded-lg border border-border bg-popover/100 shadow-lg p-1"
+        className="z-[1000] w-64 max-h-60 overflow-y-auto rounded-lg border border-border bg-popover/100 shadow-lg p-1"
         style={dropStyle}
         onMouseDown={(e) => e.preventDefault()}
       >
@@ -192,6 +193,13 @@ export const ReferenceSelector = forwardRef<ReferenceDropdownHandle, ReferenceSe
           </>
         )}
       </div>
+    );
+
+    return (
+      <>
+        <span ref={anchorRef} className="pointer-events-none absolute left-0 top-0 h-0 w-0" />
+        {typeof document === 'undefined' ? menu : createPortal(menu, document.body)}
+      </>
     );
   },
 );

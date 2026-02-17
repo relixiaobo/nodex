@@ -65,6 +65,7 @@ _(空)_
   - [2026-02-17 nodex-codex] 第五轮修复（针对“行尾空白识别区太小”）：`OutlinerItem` 新增编辑态空白区点击拦截（直接将光标置于行尾，避免 blur/re-focus 导致跳到开头）；非编辑态 `mousedown` 也按“点击在文本右侧则落尾”强制解析。验证通过 `typecheck`、`check:test-sync`、`test:run`、`build`。
   - [2026-02-17 nodex-codex] 第六轮修复（针对“仍有大片空白点击漏判”）：新增行级 `onMouseDownCapture` 兜底，在编辑态点击整行右侧空白时统一强制光标置于行尾，并排除按钮/输入/链接/indent-line 等交互元素，避免误拦截。验证通过 `typecheck`、`check:test-sync`、`test:run`、`build`。
   - [2026-02-17 nodex-codex] 第七轮修复（继续处理剩余两项）：`Cmd+Shift+ArrowUp/Down` 移动时记录并恢复当前字符偏移，确保节点移动后光标位置不跳变；`use-nav-undo-keyboard` 增加 `focusedNodeId` 守卫，编辑态不再抢占 `Cmd+Z`，修复格式变更撤销链路。验证通过 `typecheck`、`test:run`、`build`（339/339）。
+  - [2026-02-18 nodex-codex] 根据手测反馈继续修复 Arrow 导航：内容节点上下键遇到 field 行时改为进入对应 `field name`；边界场景新增聚焦灰色“系统空白输入位”（TrailingInput）兜底，避免光标消失。验证通过 `typecheck`、`test:run`、`build`。
 
 ### 性能基线测量
 > **Owner: nodex-cc-2** | Branch: `cc2/perf-baseline` | Priority: P2

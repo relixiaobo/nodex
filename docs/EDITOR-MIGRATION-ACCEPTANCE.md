@@ -27,16 +27,16 @@ npm run build              # 构建成功
 
 ### 1.1 类型定义
 
-- [ ] `TextMark` 接口定义正确，包含 `start`, `end`, `type`, `attrs?` 字段
-- [ ] `TextMark.type` 联合类型覆盖全部 7 种: `bold | italic | strike | code | highlight | headingMark | link`
-- [ ] `InlineRefEntry` 接口定义正确，包含 `offset`, `targetNodeId`, `displayName?` 字段
+- [x] `TextMark` 接口定义正确，包含 `start`, `end`, `type`, `attrs?` 字段
+- [x] `TextMark.type` 联合类型覆盖全部 7 种: `bold | italic | strike | code | highlight | headingMark | link`
+- [x] `InlineRefEntry` 接口定义正确，包含 `offset`, `targetNodeId`, `displayName?` 字段
 
 ### 1.2 htmlToMarks — HTML 解析为 marks 模型
 
 纯文本：
-- [ ] `htmlToMarks('')` → `{ text: '', marks: [], inlineRefs: [] }`
+- [x] `htmlToMarks('')` → `{ text: '', marks: [], inlineRefs: [] }`
 - [ ] `htmlToMarks('Hello world')` → `{ text: 'Hello world', marks: [], inlineRefs: [] }`
-- [ ] `htmlToMarks('a &amp; b')` → text 正确解码 HTML 实体为 `a & b`
+- [x] `htmlToMarks('a &amp; b')` → text 正确解码 HTML 实体为 `a & b`
 
 基础 marks：
 - [ ] `<strong>Bold</strong>` → `[{ start: 0, end: 4, type: 'bold' }]`
@@ -49,28 +49,28 @@ npm run build              # 构建成功
 
 嵌套 marks：
 - [ ] `<strong><em>BI</em></strong>` → 两条 mark（bold + italic），range 相同
-- [ ] `<a href="..."><strong>bold link</strong></a>` → bold + link 两条
+- [x] `<a href="..."><strong>bold link</strong></a>` → bold + link 两条
 
 部分重叠：
 - [ ] `<strong>AB</strong>CD` → bold 只覆盖 AB 部分
 
 内联引用：
 - [ ] `<span data-inlineref-node="abc">Name</span>` → text 中为 `\uFFFC`，inlineRefs 有一条 entry
-- [ ] 引用前后有文本：`See <span data-inlineref-node="abc">Ref</span> here` → text = `See \uFFFC here`，offset = 4
+- [x] 引用前后有文本：`See <span data-inlineref-node="abc">Ref</span> here` → text = `See \uFFFC here`，offset = 4
 - [ ] 多个引用：两个 `<span data-inlineref-node>` → inlineRefs 有两条 entry，offset 分别正确
 
 混合场景：
-- [ ] marks + 内联引用同时存在：`<strong>Bold</strong> <span data-inlineref-node="x">R</span>` → marks 和 inlineRefs 都正确
+- [x] marks + 内联引用同时存在：`<strong>Bold</strong> <span data-inlineref-node="x">R</span>` → marks 和 inlineRefs 都正确
 
 ### 1.3 marksToHtml — marks 模型还原为 HTML
 
-- [ ] 空内容 → `''`
+- [x] 空内容 → `''`
 - [ ] 纯文本 → 原样输出（无多余标签）
-- [ ] 单 mark → 正确的 HTML 标签包裹
+- [x] 单 mark → 正确的 HTML 标签包裹
 - [ ] 嵌套 marks → 标签正确嵌套（不交叉）
 - [ ] link mark → `<a href="...">` 输出
 - [ ] headingMark → `<span data-heading-mark="true">`
-- [ ] 内联引用 → `<span data-inlineref-node="..." class="inline-ref">displayName</span>`
+- [x] 内联引用 → `<span data-inlineref-node="..." class="inline-ref">displayName</span>`
 
 ### 1.4 往返一致性（最关键）
 
@@ -82,52 +82,52 @@ npm run build              # 构建成功
 - [ ] link
 - [ ] headingMark
 - [ ] 内联引用
-- [ ] marks + 引用混合
+- [x] marks + 引用混合
 - [ ] 导入样例 HTML fixtures（覆盖多层嵌套、引用与链接混合场景）
 
 ### 1.5 mergeAdjacentMarks
 
-- [ ] `[{0,3,bold}, {3,6,bold}]` → 合并为 `[{0,6,bold}]`
+- [x] `[{0,3,bold}, {3,6,bold}]` → 合并为 `[{0,6,bold}]`
 - [ ] `[{0,3,bold}, {3,6,italic}]` → 不合并（类型不同）
 - [ ] `[{0,3,bold}, {4,6,bold}]` → 不合并（不相邻）
 - [ ] link marks 的 attrs 不同时不合并
 
 ### 1.6 splitMarks
 
-- [ ] 在 splitPos=3 处拆分 `[{0,6,bold}]` → before `[{0,3,bold}]`, after `[{0,3,bold}]`
+- [x] 在 splitPos=3 处拆分 `[{0,6,bold}]` → before `[{0,3,bold}]`, after `[{0,3,bold}]`
 - [ ] mark 完全在拆分点之前 → 只出现在 before
 - [ ] mark 完全在拆分点之后 → 只出现在 after，offset 已归零
 - [ ] mark 跨越拆分点 → 两边都有，边界正确
 
 ### 1.7 combineMarks
 
-- [ ] 合并后 second 的 marks offset 正确偏移了 firstTextLength
-- [ ] 相邻同类型 marks 被 merge
+- [x] 合并后 second 的 marks offset 正确偏移了 firstTextLength
+- [x] 相邻同类型 marks 被 merge
 
 ### 1.8 ProseMirror Schema
 
-- [ ] Schema 创建不报错
-- [ ] `doc` 只允许一个 `paragraph` 子节点
-- [ ] `paragraph` 允许 `inline*`（text + inlineReference）
-- [ ] `inlineReference` 是 atom、inline
-- [ ] 全部 7 种 marks 注册正确
-- [ ] `link.inclusive === false`
+- [x] Schema 创建不报错
+- [x] `doc` 只允许一个 `paragraph` 子节点
+- [x] `paragraph` 允许 `inline*`（text + inlineReference）
+- [x] `inlineReference` 是 atom、inline
+- [x] 全部 7 种 marks 注册正确
+- [x] `link.inclusive === false`
 
 ### 1.9 marksToDoc / docToMarks
 
-- [ ] 空内容 → 空段落文档
-- [ ] 纯文本 → 单 text 节点
-- [ ] 带 marks 的文本 → text 节点携带正确的 PM marks
-- [ ] 内联引用 → inlineReference atom 节点
-- [ ] 完整往返：`docToMarks(marksToDoc(text, marks, refs))` 结果与输入一致
+- [x] 空内容 → 空段落文档
+- [x] 纯文本 → 单 text 节点
+- [x] 带 marks 的文本 → text 节点携带正确的 PM marks
+- [x] 内联引用 → inlineReference atom 节点
+- [x] 完整往返：`docToMarks(marksToDoc(text, marks, refs))` 结果与输入一致
 
 ### 1.10 数据层一次性切换（同任务内）
 
-- [ ] `src/types/node.ts` 已新增 `NodeProps._marks`、`NodeProps._inlineRefs`
-- [ ] `supabase/migrations/*` 已新增 `nodes.marks`、`nodes.inline_refs` 列
-- [ ] `rowToNode` / `nodeToRow` 已映射 `marks`、`inline_refs`
-- [ ] `setNodeContentLocal` / `updateNodeContent`（或等价接口）可同时读写 text+marks+inlineRefs
-- [ ] 种子数据与导入链路已写入新三字段，不再依赖 HTML 作为运行时主存储
+- [x] `src/types/node.ts` 已新增 `NodeProps._marks`、`NodeProps._inlineRefs`
+- [x] `supabase/migrations/*` 已新增 `nodes.marks`、`nodes.inline_refs` 列
+- [x] `rowToNode` / `nodeToRow` 已映射 `marks`、`inline_refs`
+- [x] `setNodeContentLocal` / `updateNodeContent`（或等价接口）可同时读写 text+marks+inlineRefs
+- [x] 种子数据与导入链路已写入新三字段，不再依赖 HTML 作为运行时主存储
 
 ---
 

@@ -63,6 +63,7 @@ _(空)_
   - [2026-02-17 nodex-codex] 第三轮手测反馈修复：为菜单打开行提升 z-index（修复跨行穿模与点击命中问题）；`handleContentMouseDown` 增加点击偏移兜底；`RichTextEditor` 增加“行尾右侧空白点击强制落尾”逻辑，处理光标从末尾跳回开头。验证通过 `typecheck`、`check:test-sync`、`test:run`、`build`。
   - [2026-02-17 nodex-codex] 第四轮修复（针对“仅 Enter 新建节点出现穿模/无法点击”）：`#/@/Slash` 菜单改为 `createPortal(..., document.body)`，脱离节点树 stacking context；`RichTextEditor` 行尾空白点击判定改为 PM `coordsAtPos(endPos)`（替代 DOM range），避免行尾点击误回到开头。验证通过 `typecheck`、`check:test-sync`、`test:run`、`build`。
   - [2026-02-17 nodex-codex] 第五轮修复（针对“行尾空白识别区太小”）：`OutlinerItem` 新增编辑态空白区点击拦截（直接将光标置于行尾，避免 blur/re-focus 导致跳到开头）；非编辑态 `mousedown` 也按“点击在文本右侧则落尾”强制解析。验证通过 `typecheck`、`check:test-sync`、`test:run`、`build`。
+  - [2026-02-17 nodex-codex] 第六轮修复（针对“仍有大片空白点击漏判”）：新增行级 `onMouseDownCapture` 兜底，在编辑态点击整行右侧空白时统一强制光标置于行尾，并排除按钮/输入/链接/indent-line 等交互元素，避免误拦截。验证通过 `typecheck`、`check:test-sync`、`test:run`、`build`。
 
 ### 性能基线测量
 > **Owner: nodex-cc-2** | Branch: `cc2/perf-baseline` | Priority: P2

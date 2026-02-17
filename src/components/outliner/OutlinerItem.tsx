@@ -135,6 +135,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   const entities = useNodeStore((s) => s.entities);
 
   const rowRef = useRef<HTMLDivElement>(null);
+  const contentAreaRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<EditorView | null>(null);
   const blurClearRafRef = useRef<number | null>(null);
 
@@ -938,6 +939,42 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     ed.focus();
   }, [fieldDataType]);
 
+  // Fallback for large row blank area clicks: keep caret at end while focused.
+  const handleFocusedRowMouseDownCapture = useCallback((e: React.MouseEvent) => {
+    if (!isFocused) return;
+    if (fieldDataType === SYS_D.CHECKBOX) return;
+    if (e.button !== 0) return;
+    if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+
+    const target = e.target as HTMLElement;
+    if (
+      target.closest('.ProseMirror') ||
+      target.closest('[data-inlineref-node]') ||
+      target.closest('button') ||
+      target.closest('input') ||
+      target.closest('a') ||
+      target.closest('.indent-line')
+    ) {
+      return;
+    }
+
+    const contentArea = contentAreaRef.current;
+    if (!contentArea) return;
+
+    const textRightEdge = getRenderedTextRightEdge(contentArea);
+    if (textRightEdge === null || e.clientX <= textRightEdge + 1) {
+      return;
+    }
+
+    const ed = editorRef.current;
+    if (!isEditorViewAlive(ed)) return;
+
+    e.preventDefault();
+    const endPos = Math.max(1, ed.state.doc.content.size - 1);
+    setEditorSelection(ed, endPos, endPos);
+    ed.focus();
+  }, [isFocused, fieldDataType]);
+
   const handleContentClick = useCallback((e: React.MouseEvent) => {
     // Drag-select just ended → suppress this click
     if (dragState.justDragged) return;
@@ -1665,6 +1702,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
         data-node-id={nodeId}
         data-parent-id={parentId}
         draggable={!isFocused}
+        onMouseDownCapture={isFocused ? handleFocusedRowMouseDownCapture : undefined}
         onDragStart={handleDragStart}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
@@ -1705,6 +1743,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
           )}
           <div className={`relative flex-1 min-w-0 ${isPendingConversion ? 'ref-converting' : ''} ${isDone ? 'text-foreground/50' : ''}`}>
           <div
+            ref={contentAreaRef}
             className={`text-sm leading-[21px] ${fieldDataType !== SYS_D.CHECKBOX && !isFocused ? (isReference ? 'cursor-default' : 'cursor-text') : ''}`}
             onMouseDown={fieldDataType !== SYS_D.CHECKBOX ? (isFocused ? handleFocusedContentMouseDown : handleContentMouseDown) : undefined}
             onClick={fieldDataType !== SYS_D.CHECKBOX && !isFocused ? handleContentClick : undefined}

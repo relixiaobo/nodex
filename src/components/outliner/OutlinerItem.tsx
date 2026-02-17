@@ -893,10 +893,14 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     // Will be consumed by RichTextEditor when it mounts (after setFocusedNode in click).
     const container = e.currentTarget as HTMLElement;
     const textOffset = getTextOffsetFromPoint(container, e.clientX, e.clientY);
+    const fallbackOffset = (() => {
+      const textLength = getNodeTextLengthById(nodeId, useNodeStore.getState().entities);
+      if (textOffset !== null) return textOffset;
+      const rect = container.getBoundingClientRect();
+      return e.clientX <= rect.left + 2 ? 0 : textLength;
+    })();
     useUIStore.getState().setFocusClickCoords(
-      textOffset !== null
-        ? { nodeId, parentId, textOffset }
-        : null,
+      { nodeId, parentId, textOffset: fallbackOffset },
     );
     // Prevent native selection/focus churn on the static HTML layer.
     e.preventDefault();
@@ -1607,6 +1611,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   const nodeMarks = node.props._marks ?? [];
   const nodeInlineRefs = node.props._inlineRefs ?? [];
   const nodeContentHtml = marksToHtml(nodeText, nodeMarks, nodeInlineRefs);
+  const hasOverlayOpen = isFocused && (hashTagOpen || refOpen || slashOpen || optionsPickerOpen);
 
   return (
     <div role="treeitem" aria-expanded={isExpanded} className="relative">
@@ -1619,11 +1624,11 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       )}
       <div
         ref={rowRef}
-        className={`group/row flex gap-1 min-h-7 items-start py-1 relative z-[1] ${
+        className={`group/row flex gap-1 min-h-7 items-start py-1 relative ${
           isDropTarget && dropPosition === 'inside'
             ? 'bg-primary/10 ring-1 ring-primary/30 rounded-sm'
             : ''
-        } ${isDragging ? 'opacity-40' : ''}`}
+        } ${isDragging ? 'opacity-40' : ''} ${hasOverlayOpen ? 'z-[80]' : 'z-[1]'}`}
         style={{ paddingLeft: depth * 28 + 6 }}
         data-node-id={nodeId}
         data-parent-id={parentId}

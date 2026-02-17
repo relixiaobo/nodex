@@ -29,7 +29,7 @@ _(空)_
 |-------|---------|------|-------------|
 | nodex-cc | 用户认证 — Google 登录 (#45) | cc/google-auth | `src/lib/auth.ts`, `src/components/auth/*`, `workspace-store.ts` |
 | nodex-cc-2 | 性能基线测量 | cc2/perf-baseline | `docs/research/performance-baseline.md` |
-| nodex-codex | Editor 迁移: TipTap → ProseMirror | codex/editor-migration | `src/components/editor/FloatingToolbar.tsx`, `src/components/editor/RichTextEditor.tsx`, `src/components/editor/SlashCommandMenu.tsx`, `src/components/tags/TagSelector.tsx`, `src/components/references/ReferenceSelector.tsx`, `tests/vitest/floating-toolbar.test.ts`, `docs/EDITOR-MIGRATION-ACCEPTANCE.md`, `docs/TASKS.md` |
+| nodex-codex | Editor 迁移: TipTap → ProseMirror | codex/editor-migration | `src/components/outliner/OutlinerItem.tsx`, `src/components/editor/FloatingToolbar.tsx`, `src/components/editor/RichTextEditor.tsx`, `src/components/editor/SlashCommandMenu.tsx`, `src/components/tags/TagSelector.tsx`, `src/components/references/ReferenceSelector.tsx`, `tests/vitest/floating-toolbar.test.ts`, `docs/EDITOR-MIGRATION-ACCEPTANCE.md`, `docs/TASKS.md` |
 
 ---
 
@@ -60,6 +60,7 @@ _(空)_
   - [2026-02-17 nodex-codex] 根据手测备注修复交互偏差：`OutlinerItem` 为 `ArrowUp` / 空节点 `Backspace` / 选择模式 `type_char` 明确写入光标定位（上移到上一节点末尾、输入字符追加到末尾），引用节点双击编辑支持按双击位置落光标；同时为空节点 `Backspace` 增加有子节点保护（不再删除整棵子树）。验证通过 `typecheck`、`check:test-sync`、`test:run`。
   - [2026-02-17 nodex-codex] 修复浮动工具栏右边界定位偏差：`FloatingToolbar` 改用 `selection.to - 1` 的字符坐标计算终点，并以 `end.right` 参与中心点计算，避免行尾选区中心误落到下一行起点；验证通过 `typecheck`、`floating-toolbar.test.ts`。
   - [2026-02-17 nodex-codex] 第二轮手测备注修复：`FloatingToolbar` 改为跟随选区“结束侧字符”定位；`#/@/Slash` 下拉改为 `onMouseDown` 即选择（修复鼠标点击不生效）并统一不透明背景（修复穿透观感）；Slash 触发规则收敛为“仅空白节点 `/` 触发”；补充 `floating-toolbar.test.ts` 定位断言。验证通过 `typecheck` + `test:run`（全量 338/338）。
+  - [2026-02-17 nodex-codex] 第三轮手测反馈修复：为菜单打开行提升 z-index（修复跨行穿模与点击命中问题）；`handleContentMouseDown` 增加点击偏移兜底；`RichTextEditor` 增加“行尾右侧空白点击强制落尾”逻辑，处理光标从末尾跳回开头。验证通过 `typecheck`、`check:test-sync`、`test:run`、`build`。
 
 ### 性能基线测量
 > **Owner: nodex-cc-2** | Branch: `cc2/perf-baseline` | Priority: P2

@@ -85,6 +85,8 @@ interface NodeStore {
     userId: string,
     name?: string,
     position?: number,
+    marks?: TextMark[],
+    inlineRefs?: InlineRefEntry[],
   ): Promise<NodexNode>;
 
   /** Create a sibling node after the given nodeId */
@@ -93,6 +95,8 @@ interface NodeStore {
     workspaceId: string,
     userId: string,
     name?: string,
+    marks?: TextMark[],
+    inlineRefs?: InlineRefEntry[],
   ): Promise<NodexNode>;
 
   /** Update a node's name locally (no Supabase sync — for live typing updates) */
@@ -339,7 +343,7 @@ export const useNodeStore = create<NodeStore>()(
       }
     },
 
-    createChild: async (parentId, workspaceId, userId, name, position) => {
+    createChild: async (parentId, workspaceId, userId, name, position, marks, inlineRefs) => {
       const id = nanoid();
       const now = Date.now();
 
@@ -347,7 +351,13 @@ export const useNodeStore = create<NodeStore>()(
       const optimisticNode: NodexNode = {
         id,
         workspaceId,
-        props: { created: now, name: name ?? '', _ownerId: parentId },
+        props: {
+          created: now,
+          name: name ?? '',
+          ...(marks && marks.length > 0 ? { _marks: marks } : {}),
+          ...(inlineRefs && inlineRefs.length > 0 ? { _inlineRefs: inlineRefs } : {}),
+          _ownerId: parentId,
+        },
         children: [],
         version: 1,
         updatedAt: now,
@@ -380,7 +390,17 @@ export const useNodeStore = create<NodeStore>()(
 
       try {
         const node = await nodeService.createNode(
-          { id, workspaceId, props: { created: now, name: name ?? '', _ownerId: parentId } },
+          {
+            id,
+            workspaceId,
+            props: {
+              created: now,
+              name: name ?? '',
+              ...(marks && marks.length > 0 ? { _marks: marks } : {}),
+              ...(inlineRefs && inlineRefs.length > 0 ? { _inlineRefs: inlineRefs } : {}),
+              _ownerId: parentId,
+            },
+          },
           userId,
         );
         await nodeService.addChild(parentId, id, userId, position);
@@ -402,7 +422,7 @@ export const useNodeStore = create<NodeStore>()(
       }
     },
 
-    createSibling: async (nodeId, workspaceId, userId, name) => {
+    createSibling: async (nodeId, workspaceId, userId, name, marks, inlineRefs) => {
       const { entities } = get();
       const node = entities[nodeId];
       const parentId = node?.props._ownerId;
@@ -419,7 +439,13 @@ export const useNodeStore = create<NodeStore>()(
       const optimisticNode: NodexNode = {
         id,
         workspaceId,
-        props: { created: now, name: name ?? '', _ownerId: parentId },
+        props: {
+          created: now,
+          name: name ?? '',
+          ...(marks && marks.length > 0 ? { _marks: marks } : {}),
+          ...(inlineRefs && inlineRefs.length > 0 ? { _inlineRefs: inlineRefs } : {}),
+          _ownerId: parentId,
+        },
         children: [],
         version: 1,
         updatedAt: now,
@@ -448,7 +474,17 @@ export const useNodeStore = create<NodeStore>()(
 
       try {
         const newNode = await nodeService.createNode(
-          { id, workspaceId, props: { created: now, name: name ?? '', _ownerId: parentId } },
+          {
+            id,
+            workspaceId,
+            props: {
+              created: now,
+              name: name ?? '',
+              ...(marks && marks.length > 0 ? { _marks: marks } : {}),
+              ...(inlineRefs && inlineRefs.length > 0 ? { _inlineRefs: inlineRefs } : {}),
+              _ownerId: parentId,
+            },
+          },
           userId,
         );
         await nodeService.addChild(parentId, id, userId, insertPosition);

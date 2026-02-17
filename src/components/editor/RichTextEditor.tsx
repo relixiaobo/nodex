@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, type MutableRefObject } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type MutableRefObject } from 'react';
 import { EditorState, TextSelection } from '@tiptap/pm/state';
 import type { Plugin } from '@tiptap/pm/state';
 import { EditorView } from '@tiptap/pm/view';
@@ -18,6 +18,7 @@ import {
 import type { InlineRefEntry, TextMark } from '../../types/index.js';
 import { docToMarks, marksToDoc } from '../../lib/pm-doc-utils.js';
 import { pmSchema } from './pm-schema.js';
+import { FloatingToolbar } from './FloatingToolbar.js';
 
 const KEY_EDITOR_DROPDOWN_FORCE_CREATE = getPrimaryShortcutKey('editor.dropdown_force_create', 'Mod-Enter');
 const KEY_EDITOR_MOVE_UP = getPrimaryShortcutKey('editor.move_up', 'Mod-Shift-ArrowUp');
@@ -108,6 +109,7 @@ function contentEquals(
 }
 
 export function RichTextEditor(props: RichTextEditorProps) {
+  const [toolbarTick, setToolbarTick] = useState(0);
   const mountRef = useRef<HTMLDivElement | null>(null);
   const viewRef = useRef<EditorView | null>(null);
   const savedRef = useRef(false);
@@ -464,6 +466,7 @@ export function RichTextEditor(props: RichTextEditorProps) {
       dispatchTransaction: (tr) => {
         const newState = view.state.apply(tr);
         view.updateState(newState);
+        setToolbarTick((value) => value + 1);
 
         if (tr.docChanged && !isExternalSyncRef.current) {
           const parsed = docToMarks(newState.doc);
@@ -484,6 +487,7 @@ export function RichTextEditor(props: RichTextEditorProps) {
       },
       handleDOMEvents: {
         blur: () => {
+          setToolbarTick((value) => value + 1);
           saveContent();
           propsRef.current.onBlur();
           return false;
@@ -533,6 +537,7 @@ export function RichTextEditor(props: RichTextEditorProps) {
       tr = tr.setMeta('addToHistory', false);
       tr = tr.setSelection(TextSelection.create(tr.doc, nextFrom, nextTo));
       view.dispatch(tr);
+      setToolbarTick((value) => value + 1);
     } finally {
       isExternalSyncRef.current = false;
     }
@@ -553,12 +558,14 @@ export function RichTextEditor(props: RichTextEditorProps) {
       tr.setMeta('addToHistory', false);
       view.dispatch(tr);
       useUIStore.getState().setFocusClickCoords(null);
+      setToolbarTick((value) => value + 1);
     }
 
     const pendingChar = useUIStore.getState().pendingInputChar;
     if (pendingChar) {
       useUIStore.getState().setPendingInputChar(null);
       view.dispatch(view.state.tr.insertText(pendingChar));
+      setToolbarTick((value) => value + 1);
     }
 
     if (props.editorRef) props.editorRef.current = view;
@@ -572,6 +579,7 @@ export function RichTextEditor(props: RichTextEditorProps) {
 
   return (
     <div className="editor-inline">
+      <FloatingToolbar view={viewRef.current} tick={toolbarTick} />
       <div ref={mountRef} className="outline-none text-sm leading-[21px]" />
     </div>
   );

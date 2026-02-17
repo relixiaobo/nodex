@@ -29,13 +29,25 @@ _(空)_
 |-------|---------|------|-------------|
 | nodex-cc | — | — | — |
 | nodex-cc-2 | — | — | — |
-| nodex-codex | — | — | — |
+| nodex-codex | Editor 迁移: TipTap → ProseMirror | codex/editor-migration | `src/components/editor/*`, `src/lib/editor-marks.ts`, `src/lib/pm-doc-utils.ts` |
 
 ---
 
 ## 进行中
 
-_(空)_
+### Editor 迁移：TipTap → 直接 ProseMirror
+> **Owner: nodex-codex** | Branch: `codex/editor-migration` | Priority: P1
+> **Spec**: `docs/features/editor-migration.md` | **验收**: `docs/EDITOR-MIGRATION-ACCEPTANCE.md`
+
+去掉 TipTap 封装层，直接使用 ProseMirror API；引入 text+marks 分离的数据模型。
+分 4 个 Phase 实施（详见 spec）：
+1. Phase 1: 基础设施（marks 转换 + PM Schema + 测试）
+2. Phase 2: RichTextEditor 核心组件
+3. Phase 3: FloatingToolbar + TrailingInput 迁移
+4. Phase 4: 切换 + 清理旧代码 + 删除 TipTap 依赖
+
+- **Files**: `src/components/editor/*`, `src/lib/editor-marks.ts`, `src/lib/pm-doc-utils.ts`, `src/types/node.ts`
+- **迭代日志**: _(开始后追加)_
 
 ---
 
@@ -80,7 +92,7 @@ _(空)_
 - **Spec**: `docs/features/fields.md`
 
 #### Date 节点 & 日记 (#22)
-> **Owner: nodex-codex** | 执行顺序 ①（"一切皆节点"系列首项，后续 Search/Views 依赖日期节点）
+> 执行顺序 ①（"一切皆节点"系列首项，后续 Search/Views 依赖日期节点）
 
 - [ ] 年/月/周/日节点层级（自动生成）
 - [ ] Today 快捷入口（侧栏按钮 + 快捷键 Ctrl+Shift+D）
@@ -120,7 +132,7 @@ _(空)_
 ### P3
 
 #### Search Nodes / Live Queries (#23)
-> **Owner: nodex-codex** | 执行顺序 ②（搜索条件 = Tuple 树，依赖 #22 的日期节点做日期操作符）
+> 执行顺序 ②（搜索条件 = Tuple 树，依赖 #22 的日期节点做日期操作符）
 
 - [ ] `?` 触发创建搜索节点（放大镜图标）
 - [ ] 基础搜索操作符（#tag / field 值 / 文本 / 日期）
@@ -131,7 +143,7 @@ _(空)_
 - **Spec**: `docs/features/search.md`
 
 #### Table View (#24)
-> **Owner: nodex-codex** | 执行顺序 ④（依赖 #25 的 Filter/Sort/Group 基础设施）
+> 执行顺序 ④（依赖 #25 的 Filter/Sort/Group 基础设施）
 
 - [ ] 表格视图（行=节点，列=字段）
 - [ ] 列宽调整、列拖拽排序
@@ -140,7 +152,7 @@ _(空)_
 - **Spec**: `docs/features/views.md`
 
 #### Filter / Group / Sort 工具栏 (#25)
-> **Owner: nodex-codex** | 执行顺序 ③（视图基础设施，Filter/Sort/Group = ViewDef 的 Tuple，所有视图共用）
+> 执行顺序 ③（视图基础设施，Filter/Sort/Group = ViewDef 的 Tuple，所有视图共用）
 
 - [ ] 通用视图工具栏（适用于所有视图）
 - [ ] 按字段值过滤
@@ -149,7 +161,7 @@ _(空)_
 - **Spec**: `docs/features/views.md`
 
 #### Cards View (#26)
-> **Owner: nodex-codex** | 执行顺序 ⑤（依赖 #25 的 Filter/Sort/Group 基础设施）
+> 执行顺序 ⑤（依赖 #25 的 Filter/Sort/Group 基础设施）
 
 - [ ] 卡片视图
 - [ ] 卡片间拖拽更新字段值
@@ -157,7 +169,7 @@ _(空)_
 - **Spec**: `docs/features/views.md`
 
 #### Calendar View (#27)
-> **Owner: nodex-codex** | 执行顺序 ⑥（依赖 #22 的日期节点 + #25 的视图基础设施）
+> 执行顺序 ⑥（依赖 #22 的日期节点 + #25 的视图基础设施）
 
 - [ ] 日历视图（按日期字段排列节点）
 - [ ] 日/周/月粒度切换
@@ -165,7 +177,7 @@ _(空)_
 - **Spec**: `docs/features/views.md`
 
 #### List & Tabs View (#28)
-> **Owner: nodex-codex** | 执行顺序 ⑦（依赖 #25 的视图基础设施）
+> 执行顺序 ⑦（依赖 #25 的视图基础设施）
 
 - [ ] List 视图（左侧列表 + 右侧详情双面板）
 - [ ] Tabs 视图（顶部 tab 切换内容）

@@ -174,6 +174,20 @@ npm run test:run
 5. `marksToDoc` / `docToMarks`：PM 文档往返
 6. `splitMarks` / `combineMarks`：拆分与偏移合并
 
+### 1.5.2 ProseMirror EditorView 操作工具
+
+**测试文件**:
+- `tests/vitest/pm-editor-view.test.ts`
+
+**覆盖点**:
+
+1. `deleteEditorRange`：删除范围并回到起始光标
+2. `replaceEditorRangeWithText`：范围替换文本
+3. `replaceEditorRangeWithInlineRef`：范围替换为 `inlineReference` atom
+4. `toggleHeadingMark`：选区 heading mark 切换
+5. `setEditorPlainTextContent`：整段内容替换为纯文本
+6. `isEditorViewAlive`：EditorView 生命周期判断
+
 ### 1.6 字段值验证
 
 **测试文件**: `tests/vitest/field-validation.test.ts`
@@ -842,6 +856,7 @@ createSibling 自动标签（2 cases）:
 | 1.41 | Heading Mark 扩展 | PASS/FAIL |
 | 1.42 | Default Child Supertag (SYS_A14) | PASS/FAIL |
 | 1.43 | Floating Toolbar 循环渲染防回归 | PASS/FAIL |
+| 1.44 | PM EditorView 操作工具 | PASS/FAIL |
 | 2 | 视觉渲染 | PASS/FAIL/SKIP |
 | 3 | 扩展构建 | PASS/FAIL |
 

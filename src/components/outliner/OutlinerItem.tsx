@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
-import type { Editor } from '@tiptap/react';
+import type { EditorView } from '@tiptap/pm/view';
 import { useNode } from '../../hooks/use-node';
 import { useChildren } from '../../hooks/use-children';
 import { useNodeTags } from '../../hooks/use-node-tags';
@@ -8,8 +8,7 @@ import { useNodeStore } from '../../stores/node-store';
 import { useUIStore } from '../../stores/ui-store';
 import { useWorkspaceStore } from '../../stores/workspace-store';
 import { BulletChevron, ChevronButton } from './BulletChevron';
-import { NodeEditor } from '../editor/NodeEditor';
-import type { EditorContentPayload } from '../editor/NodeEditor';
+import { RichTextEditor, type EditorContentPayload } from '../editor/RichTextEditor';
 import { SlashCommandMenu } from '../editor/SlashCommandMenu';
 import { TrailingInput } from '../editor/TrailingInput';
 import { TagBar } from '../tags/TagBar';
@@ -20,8 +19,8 @@ import { SYS_D, SYS_V } from '../../types/index.js';
 import { useFieldOptions } from '../../hooks/use-field-options.js';
 import { resolveTagColor } from '../../lib/tag-colors.js';
 import { applyWebClipToNode } from '../../lib/webclip-service.js';
-import { wrapInP } from '../../lib/editor-html.js';
-import { htmlToMarks, marksToHtml } from '../../lib/editor-marks.js';
+import { marksToHtml } from '../../lib/editor-marks.js';
+import { docToMarks } from '../../lib/pm-doc-utils.js';
 import {
   WEBCLIP_CAPTURE_ACTIVE_TAB,
   type WebClipCaptureResponse,
@@ -53,6 +52,15 @@ import {
   type SlashCommandId,
 } from '../../lib/slash-commands';
 import { getShortcutKeys, matchesShortcutEvent } from '../../lib/shortcut-registry.js';
+import {
+  deleteEditorRange,
+  isEditorViewAlive,
+  replaceEditorRangeWithInlineRef,
+  replaceEditorRangeWithText,
+  setEditorPlainTextContent,
+  setEditorSelection,
+  toggleHeadingMark,
+} from '../../lib/pm-editor-view.js';
 import { dragState } from '../../hooks/use-drag-select';
 
 /** Field types that accept only a single value node. Enter navigates out instead of creating siblings. */
@@ -123,7 +131,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   const entities = useNodeStore((s) => s.entities);
 
   const rowRef = useRef<HTMLDivElement>(null);
-  const editorRef = useRef<Editor | null>(null);
+  const editorRef = useRef<EditorView | null>(null);
   const blurClearRafRef = useRef<number | null>(null);
 
   // # trigger state
@@ -137,7 +145,6 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   const updateNodeName = useNodeStore((s) => s.updateNodeName);
   const updateNodeContent = useNodeStore((s) => s.updateNodeContent);
   const updateNodeDescription = useNodeStore((s) => s.updateNodeDescription);
-  const addReference = useNodeStore((s) => s.addReference);
   const removeReference = useNodeStore((s) => s.removeReference);
   const selectFieldOption = useNodeStore((s) => s.selectFieldOption);
   const startRefConversion = useNodeStore((s) => s.startRefConversion);
@@ -748,7 +755,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isSelected, isFocused, isReference, isSelectionAnchor, optionsPickerOpen, allFieldOptions, optionsPickerIndex, parentId, nodeId, userId, wsId, rootNodeId, rootChildIds, entities, expandedNodes, removeReference, addReference, selectFieldOption, setSelectedNode, setSelectedNodes, clearSelection, setFocusedNode, startRefConversion, setPendingRefConversion, setPendingInputChar]);
+  }, [isSelected, isFocused, isReference, isSelectionAnchor, optionsPickerOpen, allFieldOptions, optionsPickerIndex, parentId, nodeId, userId, wsId, rootNodeId, rootChildIds, entities, expandedNodes, removeReference, selectFieldOption, setSelectedNode, setSelectedNodes, clearSelection, setFocusedNode, startRefConversion, setPendingRefConversion, setPendingInputChar]);
 
   // When TrailingInput creates a node with #/@/, it sets triggerHint so we
   // can immediately open the dropdown (extensions don't fire on mount because
@@ -867,7 +874,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     if (isReference) return;
 
     // Record text offset now (mousedown position = click position for simple clicks).
-    // Will be consumed by NodeEditor when it mounts (after setFocusedNode in click).
+    // Will be consumed by RichTextEditor when it mounts (after setFocusedNode in click).
     const container = e.currentTarget as HTMLElement;
     const textOffset = getTextOffsetFromPoint(container, e.clientX, e.clientY);
     useUIStore.getState().setFocusClickCoords(
@@ -1140,13 +1147,13 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   /** Delete #query text from editor, save corrected content, refocus */
   const cleanupHashTagText = useCallback(() => {
     const ed = editorRef.current;
-    if (ed && !ed.isDestroyed) {
-      const { from, to } = hashRangeRef.current;
-      ed.chain().deleteRange({ from, to }).run();
-      // Save corrected content (without #query) using text+marks model
-      const parsed = htmlToMarks(ed.getHTML());
-      if (userId) updateNodeContent(nodeId, parsed.text, parsed.marks, parsed.inlineRefs, userId);
-    }
+    if (!isEditorViewAlive(ed)) return;
+
+    const { from, to } = hashRangeRef.current;
+    deleteEditorRange(ed, from, to);
+
+    const parsed = docToMarks(ed.state.doc);
+    if (userId) updateNodeContent(nodeId, parsed.text, parsed.marks, parsed.inlineRefs, userId);
   }, [nodeId, userId, updateNodeContent]);
 
   const handleHashTagSelect = useCallback(
@@ -1242,7 +1249,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     (refNodeId: string) => {
       if (!wsId || !userId) return;
       const ed = editorRef.current;
-      if (!ed || ed.isDestroyed) return;
+      if (!isEditorViewAlive(ed)) return;
 
       // Check if the entire editor content is just the @query (empty-node reference)
       const fullText = ed.state.doc.textContent;
@@ -1260,14 +1267,8 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
           // Target is already a child (owned or reference) — can't create duplicate reference.
           // Tana behavior: insert inline ref instead, keeping this as a regular content node.
           const refNode = entities[refNodeId];
-          const refName = (refNode?.props.name ?? '').replace(/<[^>]+>/g, '').trim() || 'Untitled';
-          ed.chain()
-            .deleteRange({ from, to })
-            .insertContentAt(from, {
-              type: 'inlineRef',
-              attrs: { nodeId: refNodeId, label: refName },
-            })
-            .run();
+          const refName = (refNode?.props.name ?? '').trim() || 'Untitled';
+          replaceEditorRangeWithInlineRef(ed, from, to, refNodeId, refName);
         } else {
           // Empty node @: trash this node, create temp node in conversion mode
           // Temp node has inline ref content — user sees reference bullet + cursor at end.
@@ -1283,21 +1284,15 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       } else {
         // Mid-text @: insert inline reference
         const refNode = entities[refNodeId];
-        const refName = (refNode?.props.name ?? '').replace(/<[^>]+>/g, '').trim() || 'Untitled';
-        ed.chain()
-          .deleteRange({ from, to })
-          .insertContentAt(from, {
-            type: 'inlineRef',
-            attrs: { nodeId: refNodeId, label: refName },
-          })
-          .run();
+        const refName = (refNode?.props.name ?? '').trim() || 'Untitled';
+        replaceEditorRangeWithInlineRef(ed, from, to, refNodeId, refName);
       }
 
       setRefOpen(false);
       setRefQuery('');
       setRefSelectedIndex(0);
     },
-    [nodeId, parentId, wsId, userId, entities, trashNode, addReference, setExpanded, setFocusedNode, startRefConversion, setPendingRefConversion],
+    [nodeId, parentId, wsId, userId, entities, trashNode, setExpanded, setFocusedNode, startRefConversion, setPendingRefConversion],
   );
 
   const handleReferenceCreateNew = useCallback(
@@ -1348,13 +1343,9 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
 
   const replaceSlashTriggerText = useCallback((replacement = '') => {
     const ed = editorRef.current;
-    if (!ed || ed.isDestroyed) return;
+    if (!isEditorViewAlive(ed)) return;
     const { from, to } = slashRangeRef.current;
-    const chain = ed.chain().deleteRange({ from, to });
-    if (replacement) {
-      chain.insertContentAt(from, replacement);
-    }
-    chain.run();
+    replaceEditorRangeWithText(ed, from, to, replacement);
   }, []);
 
   const closeSlashMenu = useCallback(() => {
@@ -1379,23 +1370,19 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     if (commandId === 'heading') {
       replaceSlashTriggerText('');
       const ed = editorRef.current;
-      if (ed && !ed.isDestroyed) {
+      if (isEditorViewAlive(ed)) {
         const { from, to } = ed.state.selection;
         const docEnd = ed.state.doc.content.size - 1;
 
         if (from !== to) {
-          ed.chain().focus().toggleHeadingMark().run();
+          toggleHeadingMark(ed);
         } else if (docEnd > 1) {
           const cursorPos = Math.max(1, Math.min(from, docEnd));
-          ed
-            .chain()
-            .focus()
-            .setTextSelection({ from: 1, to: docEnd })
-            .toggleHeadingMark()
-            .setTextSelection(cursorPos)
-            .run();
+          setEditorSelection(ed, 1, docEnd);
+          toggleHeadingMark(ed);
+          setEditorSelection(ed, cursorPos, cursorPos);
         } else {
-          ed.chain().focus().toggleHeadingMark().run();
+          toggleHeadingMark(ed);
         }
       }
       closeSlashMenu();
@@ -1443,8 +1430,8 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
         // Sync editor content with the new title so it's visible immediately
         // (without this, the editor still shows empty until focus moves away)
         const ed = editorRef.current;
-        if (ed && !ed.isDestroyed && response.payload.title) {
-          ed.commands.setContent(wrapInP(response.payload.title));
+        if (isEditorViewAlive(ed) && response.payload.title) {
+          setEditorPlainTextContent(ed, response.payload.title);
         }
       } catch (err) {
         console.error('Clip failed:', err instanceof Error ? err.message : String(err));
@@ -1659,7 +1646,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
                 className="mt-[3px] h-3.5 w-3.5 rounded border-border accent-primary cursor-pointer"
               />
             ) : isFocused ? (
-              <NodeEditor
+              <RichTextEditor
                 nodeId={nodeId}
                 parentId={parentId}
                 initialText={nodeText}

@@ -3,7 +3,13 @@ import { Schema } from '@tiptap/pm/model';
 export const pmSchema = new Schema({
   nodes: {
     doc: { content: 'paragraph' },
-    paragraph: { content: 'inline*' },
+    paragraph: {
+      content: 'inline*',
+      parseDOM: [{ tag: 'p' }],
+      toDOM() {
+        return ['p', 0];
+      },
+    },
     text: { group: 'inline' },
     inlineReference: {
       group: 'inline',
@@ -85,4 +91,3 @@ export const pmSchema = new Schema({
     },
   },
 });
-

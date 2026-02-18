@@ -162,25 +162,37 @@ export function RichTextEditor(props: RichTextEditorProps) {
 
     savedRef.current = false;
 
-    // --- Immediate: lightweight DOM focus only ---
-    // Give the contenteditable element DOM focus so that keystrokes arriving
-    // before the rAF callback are captured by the editor rather than lost.
-    // We intentionally use view.dom.focus() instead of view.focus() because
-    // ProseMirror's view.focus() also calls selectionToDOM() which forces a
-    // synchronous selection update — doing that in useLayoutEffect (before
-    // browser paint) disrupts CJK IME initialisation on the new editor.
-    if (!view.hasFocus()) {
-      view.dom.focus();
-    }
-
     if (propsRef.current.editorRef) {
       propsRef.current.editorRef.current = view;
     }
 
-    // --- Deferred: PM-level selection & pending input processing ---
-    // Wait one animation frame so the browser has time to settle DOM layout
-    // and IME state before we dispatch PM transactions (selection placement,
-    // click-coord restoration, pending input char insertion).
+    const clickInfo = useUIStore.getState().focusClickCoords;
+    const hasClickCoords = clickInfo && clickInfo.nodeId === propsRef.current.nodeId && clickInfo.parentId === propsRef.current.parentId;
+
+    const pendingInput = useUIStore.getState().pendingInputChar;
+    const hasPendingInput = pendingInput && pendingInput.nodeId === propsRef.current.nodeId && pendingInput.parentId === propsRef.current.parentId;
+
+    if (!hasClickCoords && !hasPendingInput) {
+      // --- Fast path: Enter-created editor (no click coords, no pending input) ---
+      // Focus immediately and return.  A single view.focus() call in
+      // useLayoutEffect is safe for IME — the old dual-shot design
+      // (immediate + rAF) was the source of IME disruption because the
+      // rAF callback could dispatch PM transactions while IME was composing.
+      // With a single immediate focus and NO follow-up rAF, IME initializes
+      // cleanly on the next keystroke.
+      view.focus();
+      return;
+    }
+
+    // --- Deferred path: click-created editor (needs cursor placement) ---
+    // Give the contenteditable DOM focus immediately so keystrokes arriving
+    // before rAF are captured.  We use view.dom.focus() (not view.focus())
+    // to avoid selectionToDOM() which would place the cursor at position 0
+    // before we can restore the click-based offset.
+    if (!view.hasFocus()) {
+      view.dom.focus();
+    }
+
     if (focusRafRef.current !== null) {
       cancelAnimationFrame(focusRafRef.current);
     }
@@ -188,21 +200,18 @@ export function RichTextEditor(props: RichTextEditorProps) {
       focusRafRef.current = null;
       if (viewRef.current !== view) return;
 
-      // Ensure PM-level focus (selectionToDOM) now that the browser has
-      // painted and IME state is stable.
+      // Full PM focus (including selectionToDOM) now that browser has painted.
       if (!view.hasFocus()) {
         view.focus();
       }
       if (!view.hasFocus()) return;
 
-      // Restore click-based cursor position if the editor was opened by
-      // clicking on static text in OutlinerItem.
-      const clickInfo = useUIStore.getState().focusClickCoords;
-      if (clickInfo && clickInfo.nodeId === propsRef.current.nodeId && clickInfo.parentId === propsRef.current.parentId) {
-        // Skip if user is already composing (they started typing before rAF).
+      // Restore click-based cursor position.
+      const ci = useUIStore.getState().focusClickCoords;
+      if (ci && ci.nodeId === propsRef.current.nodeId && ci.parentId === propsRef.current.parentId) {
         if (!view.composing) {
           const maxPos = view.state.doc.content.size - 1;
-          const pmPos = Math.max(1, Math.min(clickInfo.textOffset + 1, maxPos));
+          const pmPos = Math.max(1, Math.min(ci.textOffset + 1, maxPos));
           const tr = view.state.tr.setSelection(TextSelection.create(view.state.doc, pmPos));
           tr.setMeta('addToHistory', false);
           view.dispatch(tr);
@@ -211,17 +220,15 @@ export function RichTextEditor(props: RichTextEditorProps) {
         useUIStore.getState().setFocusClickCoords(null);
       }
 
-      // Insert any pending character that was captured while the editor was
-      // mounting (e.g. selection-mode type-to-edit).
-      const pendingInput = useUIStore.getState().pendingInputChar;
-      if (pendingInput && pendingInput.nodeId === propsRef.current.nodeId && pendingInput.parentId === propsRef.current.parentId) {
+      // Insert pending character (selection-mode type-to-edit).
+      const pi = useUIStore.getState().pendingInputChar;
+      if (pi && pi.nodeId === propsRef.current.nodeId && pi.parentId === propsRef.current.parentId) {
         useUIStore.getState().setPendingInputChar(null);
-        // Skip if user is already composing (IME started before rAF).
         if (!view.composing) {
           const insertFrom = view.state.selection.from;
-          const tr = view.state.tr.insertText(pendingInput.char);
+          const tr = view.state.tr.insertText(pi.char);
           const maxPos = tr.doc.content.size - 1;
-          const nextPos = Math.max(1, Math.min(insertFrom + pendingInput.char.length, maxPos));
+          const nextPos = Math.max(1, Math.min(insertFrom + pi.char.length, maxPos));
           tr.setSelection(TextSelection.create(tr.doc, nextPos));
           view.dispatch(tr);
           setToolbarTick((value) => value + 1);

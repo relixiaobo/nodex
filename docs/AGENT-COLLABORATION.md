@@ -35,8 +35,8 @@
 
 ### 端口分配规则
 
-- **主 clone**: `http://localhost:5199`（默认，CLAUDE.md 中已配置）
-- **Agent clone**: 通过 `PORT=<port> npm run dev:test` 启动，避免端口冲突
+- **主仓库 (nodex)**: `http://localhost:5199`（默认，CLAUDE.md 中已配置）
+- **Agent worktree**: 通过 `PORT=<port> npm run dev:test` 启动，避免端口冲突
 - 端口范围 `5199-5210`，每个 Agent 固定一个端口
 - MCP 工具（chrome-devtools）连接对应端口的 standalone 测试环境
 
@@ -254,7 +254,7 @@ Dev Agent（nodex-codex / nodex-cc / nodex-cc-2）**绝对不能**直接向 `mai
 3. Commit + push 当前进度到自己的分支
 
 **接收方**：
-1. `git pull` 获取最新代码
+1. `git fetch origin` 获取最新代码
 2. 读 TASKS.md 对应任务的迭代日志了解完整上下文
 3. 更新 Owner 为自己，更新 Agent 状态表
 4. 在迭代日志中追加新的尝试记录

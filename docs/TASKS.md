@@ -29,59 +29,11 @@ _(空)_
 |-------|---------|------|-------------|
 | nodex-cc | 用户认证 — Google 登录 (#45) | cc/google-auth | `src/lib/auth.ts`, `src/components/auth/*`, `workspace-store.ts` |
 | nodex-cc-2 | 性能基线测量 | cc2/perf-baseline | `docs/research/performance-baseline.md` |
-| nodex-codex | Editor 迁移: TipTap → ProseMirror | codex/editor-migration | `src/components/outliner/OutlinerItem.tsx`, `src/components/outliner/OutlinerView.tsx`, `src/components/fields/FieldRow.tsx`, `src/components/fields/ConfigOutliner.tsx`, `src/components/fields/FieldValueOutliner.tsx`, `src/components/editor/TrailingInput.tsx`, `src/lib/trailing-input-navigation.ts`, `src/lib/selection-keyboard.ts`, `src/lib/selected-reference-shortcuts.ts`, `src/lib/ime-keyboard.ts`, `src/stores/ui-store.ts`, `src/stores/node-store.ts`, `src/components/editor/FloatingToolbar.tsx`, `src/components/editor/RichTextEditor.tsx`, `src/components/editor/SlashCommandMenu.tsx`, `src/components/tags/TagSelector.tsx`, `src/components/references/ReferenceSelector.tsx`, `tests/vitest/floating-toolbar.test.ts`, `tests/vitest/node-store-fields.test.ts`, `tests/vitest/config-outliner.test.ts`, `tests/vitest/field-value-outliner.test.ts`, `tests/vitest/trailing-input-navigation.test.ts`, `tests/vitest/selection-keyboard.test.ts`, `tests/vitest/selected-reference-shortcuts.test.ts`, `docs/EDITOR-MIGRATION-ACCEPTANCE.md`, `docs/TESTING.md`, `docs/TASKS.md`, `docs/issues/editor-ime-enter-empty-node.md`, `docs/issues/editor-tail-click-first-open.md` |
+| nodex-codex | _(idle)_ | — | — |
 
 ---
 
 ## 进行中
-
-### Editor 迁移：TipTap → 直接 ProseMirror
-> **Owner: nodex-codex** | Branch: `codex/editor-migration` | Priority: P1
-> **Spec**: `docs/features/editor-migration.md` | **验收**: `docs/EDITOR-MIGRATION-ACCEPTANCE.md`
-
-去掉 TipTap 封装层，直接使用 ProseMirror API；引入 text+marks 分离的数据模型。
-分 4 个 Phase 实施（详见 spec）：
-1. Phase 1: 基础设施（marks 转换 + PM Schema + 测试）
-2. Phase 2: RichTextEditor 核心组件
-3. Phase 3: FloatingToolbar + TrailingInput 迁移
-4. Phase 4: 切换 + 清理旧代码 + 删除 TipTap 依赖
-
-- **Files**: `src/types/node.ts`, `src/services/node-service.ts`, `src/stores/node-store.ts`, `src/lib/editor-marks.ts`, `src/lib/pm-doc-utils.ts`, `src/services/search-service.ts`, `src/lib/tree-utils.ts`, `src/services/tana-import.ts`, `src/entrypoints/test/seed-data.ts`, `supabase/migrations/*`, `tests/vitest/*`, `docs/features/data-model.md`
-- **迭代日志**:
-  - [2026-02-17 nodex-codex] 启动实施：先落地 Phase 1 数据层与转换基础设施（类型/DB 映射/store 新接口 + marks 工具与测试），随后再切编辑器 UI 层。
-  - [2026-02-17 nodex-codex] 已完成 Phase 1 首批实现：`NodeProps._marks/_inlineRefs`、`nodes.marks/inline_refs` 迁移、`setNodeContentLocal/updateNodeContent`、`htmlToMarks/marksToHtml`、`marksToDoc/docToMarks`、`tana-import` 转换、seed 切换；验证通过 `typecheck`、`check:test-sync`、`test:run`、`build`。
-  - [2026-02-17 nodex-codex] 继续实施（过渡到 Phase 2 前的运行时对齐）：`NodeEditor` 改为通过 `htmlToMarks` 回写 `text+marks+inlineRefs`，`OutlinerItem` 改为基于 `marksToHtml` 展示并在 split/create 时传递富文本 payload，`createChild/createSibling` 支持携带 marks/inlineRefs；全量验证通过。
-  - [2026-02-17 nodex-codex] 推进 Phase 2：新增 `RichTextEditor`（直接 PM EditorView + keymap/history + 触发器正则检测 + 外部值同步 + 纯文本粘贴），`OutlinerItem` 切换到 PM `EditorView` 引用并改用事务工具操作（替代 TipTap chain API），新增 `pm-editor-view` 工具与测试，补充 `.ProseMirror` 样式映射；全量验证通过。
-  - [2026-02-17 nodex-codex] 推进 Phase 3：`FloatingToolbar` 改为同时支持 TipTap/PM 双通路并在 `RichTextEditor` 接入（`view + tick`），`TrailingInput` 从 TipTap `useEditor` 迁移到直接 PM `EditorView`（保留原有 Enter/Tab/Backspace/Arrow/Escape 与 trigger/options 语义）；全量验证通过。
-  - [2026-02-17 nodex-codex] 推进 Phase 4：移除 TipTap 依赖与遗留文件（`NodeEditor`、旧 extension、`editor-html`、对应测试），源码全部切换为直接 `prosemirror-*` 包导入，`FloatingToolbar` 测试改为 PM 兼容类型，`docs/TESTING.md` 同步删除已废弃测试映射；验证通过 `typecheck`、`check:test-sync`、`test:run`、`build`。
-  - [2026-02-17 nodex-codex] 验收文档对齐：`docs/EDITOR-MIGRATION-ACCEPTANCE.md` 已勾选自动可验证项（Phase 4 清理、依赖替换、代码引用清理、全量回归），并将 bundle size 项标记为 `[-]`（当前缺少迁移前同口径基线对比）。
-  - [2026-02-17 nodex-codex] 自动/代码核验层复核：再次执行 `typecheck`、`check:test-sync`、`test:run`、`build`，并基于单测 + 代码映射补充勾选 Phase 1 的可自动验证条目（1.1、1.2部分、1.3部分、1.4部分、1.5-1.10）。
-  - [2026-02-17 nodex-codex] 修复手工用例阻断问题（首次点击节点不出 caret）：根因是 `RichTextEditor` 在 `useLayoutEffect` 聚焦，但 `EditorView` 在 `useEffect` 才创建，首挂载未触发聚焦；改为在 `EditorView` 创建后 `requestAnimationFrame` 执行焦点/光标/pendingInput 同步，并在卸载取消 RAF；验证通过 `typecheck`、`check:test-sync`、`test:run`。
-  - [2026-02-17 nodex-codex] 根据手测备注修复交互偏差：`OutlinerItem` 为 `ArrowUp` / 空节点 `Backspace` / 选择模式 `type_char` 明确写入光标定位（上移到上一节点末尾、输入字符追加到末尾），引用节点双击编辑支持按双击位置落光标；同时为空节点 `Backspace` 增加有子节点保护（不再删除整棵子树）。验证通过 `typecheck`、`check:test-sync`、`test:run`。
-  - [2026-02-17 nodex-codex] 修复浮动工具栏右边界定位偏差：`FloatingToolbar` 改用 `selection.to - 1` 的字符坐标计算终点，并以 `end.right` 参与中心点计算，避免行尾选区中心误落到下一行起点；验证通过 `typecheck`、`floating-toolbar.test.ts`。
-  - [2026-02-17 nodex-codex] 第二轮手测备注修复：`FloatingToolbar` 改为跟随选区“结束侧字符”定位；`#/@/Slash` 下拉改为 `onMouseDown` 即选择（修复鼠标点击不生效）并统一不透明背景（修复穿透观感）；Slash 触发规则收敛为“仅空白节点 `/` 触发”；补充 `floating-toolbar.test.ts` 定位断言。验证通过 `typecheck` + `test:run`（全量 338/338）。
-  - [2026-02-17 nodex-codex] 第三轮手测反馈修复：为菜单打开行提升 z-index（修复跨行穿模与点击命中问题）；`handleContentMouseDown` 增加点击偏移兜底；`RichTextEditor` 增加“行尾右侧空白点击强制落尾”逻辑，处理光标从末尾跳回开头。验证通过 `typecheck`、`check:test-sync`、`test:run`、`build`。
-  - [2026-02-17 nodex-codex] 第四轮修复（针对“仅 Enter 新建节点出现穿模/无法点击”）：`#/@/Slash` 菜单改为 `createPortal(..., document.body)`，脱离节点树 stacking context；`RichTextEditor` 行尾空白点击判定改为 PM `coordsAtPos(endPos)`（替代 DOM range），避免行尾点击误回到开头。验证通过 `typecheck`、`check:test-sync`、`test:run`、`build`。
-  - [2026-02-17 nodex-codex] 第五轮修复（针对“行尾空白识别区太小”）：`OutlinerItem` 新增编辑态空白区点击拦截（直接将光标置于行尾，避免 blur/re-focus 导致跳到开头）；非编辑态 `mousedown` 也按“点击在文本右侧则落尾”强制解析。验证通过 `typecheck`、`check:test-sync`、`test:run`、`build`。
-  - [2026-02-17 nodex-codex] 第六轮修复（针对“仍有大片空白点击漏判”）：新增行级 `onMouseDownCapture` 兜底，在编辑态点击整行右侧空白时统一强制光标置于行尾，并排除按钮/输入/链接/indent-line 等交互元素，避免误拦截。验证通过 `typecheck`、`check:test-sync`、`test:run`、`build`。
-  - [2026-02-17 nodex-codex] 第七轮修复（继续处理剩余两项）：`Cmd+Shift+ArrowUp/Down` 移动时记录并恢复当前字符偏移，确保节点移动后光标位置不跳变；`use-nav-undo-keyboard` 增加 `focusedNodeId` 守卫，编辑态不再抢占 `Cmd+Z`，修复格式变更撤销链路。验证通过 `typecheck`、`test:run`、`build`（339/339）。
-  - [2026-02-18 nodex-codex] 根据手测反馈继续修复 Arrow 导航：内容节点上下键遇到 field 行时改为进入对应 `field name`；边界场景新增聚焦灰色“系统空白输入位”（TrailingInput）兜底，避免光标消失。验证通过 `typecheck`、`test:run`、`build`。
-  - [2026-02-18 nodex-codex] 继续修复 field/TrailingInput 导航闭环：`FieldNameInput` 支持无候选时 `ArrowUp/Down` 行间导航；`field name` 支持 `Tab/Shift+Tab` 直接缩进/反缩进；`FieldRow` 统一 sibling 导航并支持进入 content/trailing；`OutlinerView` 与 `OutlinerItem` 补齐 TrailingInput `onNavigateOut`，修复灰色空白位上下不可进出。验证通过 `typecheck`、`test:run`、`build`。
-  - [2026-02-18 nodex-codex] 收敛灰色空白位与 field 缩进语义：`OutlinerItem` 改为基于“已渲染 sibling 行”处理 Arrow 导航，确保普通节点可稳定进入 TrailingInput；`FieldRow` 的 `Tab/Shift+Tab` 改为 `moveFieldTuple`（下方 field → 上方 field value），并修正反缩进插入点到父 field 后方；补充 `node-store-fields.test.ts` 覆盖字段 tuple 迁移与 associationMap 所有权同步。验证通过 `typecheck`、`test:run`、`build`、`check:test-sync`（340/340）。
-  - [2026-02-18 nodex-codex] 调整 ConfigOutliner 灰色空白位显示规则：从“始终显示”改为“仅空列表或末行为 field 时显示”；末行为普通 content 时隐藏，符合手测预期。新增 `config-outliner.test.ts` 覆盖 3 条显示规则，并同步 `docs/TESTING.md` 覆盖映射。验证通过 `typecheck`、`test:run`、`build`、`check:test-sync`。
-  - [2026-02-18 nodex-codex] 根据手测继续修复上下导航与 FieldValueOutliner 一致性：`OutlinerItem` sibling 导航改为过滤隐藏 field 后的可渲染集合，避免普通 node 跳过 trailing；`TrailingInput` 在 child outliner 的 `ArrowUp` 改为回到“最后一条渲染行”（field 则进入 field name）；`OutlinerView` root trailing 同步该规则；`FieldValueOutliner` trailing 显示规则对齐 nodepanel（空/末行=field 显示，末行=content 隐藏）并新增单测 `field-value-outliner.test.ts`。验证通过 `typecheck`、`test:run`、`build`、`check:test-sync`。
-  - [2026-02-18 nodex-codex] 按最新手测反馈修复剩余 3 个交互偏差：`TrailingInput ArrowUp` 改为 `onNavigateOut` 优先（避免跳到父 content 起始），`OutlinerItem ArrowDown` 在展开态优先进入“子作用域首行/灰色 trailing”，并在 Trailing 提交创建后写入 `focusClickCoords`（光标落新节点末尾，避免下一次 Enter 在行首 split）。同步更新 `trailing-input-navigation.test.ts` 断言；验证通过 `typecheck`、`test:run`（346/346）、`build`、`check:test-sync`。
-  - [2026-02-18 nodex-codex] 按“Trailing 一次 Enter 等同普通 node”再修：新增 `resolveTrailingEnterIntent`，将 trailing Enter 分为 `options_confirm` / `create_content_and_continue` / `create_empty`；有文本时一次 Enter 连续创建“内容节点 + 下一空节点”并聚焦空节点，支持持续连写。同步补充 `trailing-input-navigation.test.ts` 对 Enter 决策覆盖，并更新 `docs/TESTING.md` 覆盖点。
-  - [2026-02-18 nodex-codex] 新增手测回归项：修复中文输入法（IME）组合输入被中断问题，重点排查 `RichTextEditor` 在 composition 期间的键盘桥接与外部同步时序。
-  - [2026-02-18 nodex-codex] 完成 IME 保护修复：新增 `ime-keyboard` 统一识别（`isComposing` / `Process` / `keyCode=229`）；`selection-keyboard` 与 `selected-reference-shortcuts` 在组合输入期间不再触发 `type_char/convert_printable`；`RichTextEditor/TrailingInput` 在 composition 期间跳过结构快捷键并在 `compositionend` 后恢复同步，避免拼音首字母被误插入。验证通过 `typecheck`、`test:run`（349/349）、`build`、`check:test-sync`。
-  - [2026-02-18 nodex-codex] 针对你最新复测继续修复 IME 漏网路径：`pendingInputChar` 升级为“定向 payload（char+nodeId+parentId）”，仅目标编辑器消费，避免残留字符串到 Enter 新建节点；`OutlinerItem` 选中态键盘新增全局 `focusedNodeId` 守卫；`type_char` 与 reference `convert_printable` 改为“字母键不强制 preventDefault/不手动注入”，reference 字母输入直接进入编辑（不再走 inline 转换），并通过 `beforeinput/compositionstart` 清理 pending，避免拼音首字母污染。验证通过 `typecheck`、`test:run`（349/349）、`build`、`check:test-sync`。
-  - [2026-02-18 nodex-codex] 继续修复“仅 Enter 新建空节点触发 IME 异常”：`OutlinerItem.handleEnter` 的 createChild/createSibling 回调改为“仅必要时回补焦点”，若用户已切到其他编辑器或当前目标已在焦点则不再二次 `setFocusedNode`，避免输入法组合态被异步回调抢焦点打断。验证通过 `typecheck`、`test:run`（349/349）、`build`、`check:test-sync`。
-  - [2026-02-18 nodex-codex] 继续做根因级兜底：`OutlinerItem` 选中态 document keydown 新增 `activeElement` 可编辑守卫（任何 contenteditable/input 焦点时不抢键）；`RichTextEditor.syncInitialFocus` 改为“立即聚焦 + rAF 非抢占回补”，并在回补阶段避免从其他可编辑目标偷焦点，降低 Enter 新建后一帧焦点竞态导致的 IME 组合中断。验证通过 `typecheck`、`test:run`（349/349）、`build`、`check:test-sync`。
-  - [2026-02-18 nodex-codex] 继续修复 Enter 新建节点 IME 时序与点击回归：`RichTextEditor` 的 EditorView 挂载从 `useEffect` 提前到 `useLayoutEffect`，缩短 Enter 后首字符输入窗口期；`OutlinerItem` 的行尾空白点击判定改为文本节点/inline-ref 精确右边界计算（不再用容器整体 rect），并在右侧空白且误判 offset=0 时强制落尾，修复“首次点击行尾空白光标到开头”的回归。验证通过 `typecheck`、`test:run`（349/349）、`build`、`check:test-sync`。
-  - [2026-02-18 nodex-codex] 按用户要求先详细记录 Enter+IME 阻断问题：新增 `docs/issues/editor-ime-enter-empty-node.md`（含稳定复现路径、边界确认、期望/实际、已尝试清单与下一步建议），作为独立跟踪文档。
-  - [2026-02-18 nodex-codex] 优先修复“首次点击 node 行尾空白落到开头”回归：`handleContentMouseDown` 优先使用静态 `.node-content` 的真实右边界判定右侧空白（`getStaticNodeContentRightEdge`），仅在缺失时回退到文本 rect 推导，降低首击命中容器空白时 offset=0 的误判。
-  - [2026-02-18 nodex-codex] 针对“首次点击行尾空白仍落开头”再加兜底：当点击位置在内容容器右侧 1/3 区域且解析 offset 仍为 0 时，强制视为落尾（`textOffset=textLength`），修复由浏览器 caret-from-point 在静态 HTML 上返回 0 的尾部误判。
-  - [2026-02-18 nodex-codex] 用户反馈上述“首次点击行尾空白”问题仍未修复，按要求转为交接问题：新增 `docs/issues/editor-tail-click-first-open.md`（复现/实际/预期/已尝试/建议排查），交由下一位 agent 接手处理。
 
 ### 性能基线测量
 > **Owner: nodex-cc-2** | Branch: `cc2/perf-baseline` | Priority: P2
@@ -110,6 +62,21 @@ _(空)_
 ---
 
 ## 待办
+
+### P1
+
+#### Editor Bug: Enter 新建空节点后 CJK IME 组合输入异常
+> 详见 `docs/issues/editor-ime-enter-empty-node.md`
+
+- 根因：ProseMirror focus 后多条路径延迟调用 `selectionToDOM()`，重置 Chrome IME 上下文
+- 已尝试 9 种外部修复方案均无法完全覆盖所有 `selectionToDOM` 路径
+- 可行方案：fork `prosemirror-view` 添加 composing 守卫 / 保活 EditorView 避免重建
+
+#### Editor Bug: 首次点击节点行尾空白光标落到开头
+> 详见 `docs/issues/editor-tail-click-first-open.md`
+
+- 仅首次点击（节点从静态 HTML 切换到 ProseMirror 编辑态）时复现
+- 可能与 `caretPositionFromPoint` 在静态 DOM 上的行为有关
 
 ### P2
 
@@ -295,6 +262,7 @@ _(空)_
 
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
+| 2026-02-18 | Editor 迁移 TipTap → ProseMirror（Phase 1-4 + text+marks 数据模型 + 交互修复 30+ 轮）| nodex-codex | #58 |
 | 2026-02-17 | Floating Toolbar BUG 修复 — 移除 BubbleMenu，改为自管理 Portal 浮层 | nodex-codex | #57 |
 | 2026-02-16 | Ctrl+I Description 切换修复 — registry 匹配 + 光标位置恢复 | nodex-codex | #56 |
 | 2026-02-16 | Supertags + Fields 增强批次 — Default Child Supertag + Color Swatch + Options from Supertag (#20+#21) | nodex-cc-2 | main |

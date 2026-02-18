@@ -157,14 +157,11 @@ export function RichTextEditor(props: RichTextEditorProps) {
     }
   }, [updateNodeContent, userId]);
 
-  // Ref flag: when the PM EditorView is first created in useLayoutEffect,
-  // we set this to the view instance so the follow-up useEffect can pick it
-  // up and apply focus AFTER the browser has painted.  Focusing after paint
-  // is critical for CJK IME: the browser needs the contenteditable element
-  // to be rendered on screen before it can initialise the input method
-  // context.  Focusing before paint (in useLayoutEffect) causes the first
-  // keystroke to bypass IME and arrive as raw text.
-  const pendingFocusViewRef = useRef<EditorView | null>(null);
+  // Flag: set to true right before dom.focus() for Enter-created editors.
+  // The handleDOMEvents.focus interceptor reads this to suppress PM's
+  // built-in focus handler (which schedules selectionToDOM after 20ms,
+  // disrupting CJK IME on the first keystroke).
+  const isEnterCreatedRef = useRef(false);
 
   const syncInitialFocus = useCallback((view: EditorView) => {
     if (viewRef.current !== view) return;
@@ -182,12 +179,12 @@ export function RichTextEditor(props: RichTextEditorProps) {
     const hasPendingInput = pendingInput && pendingInput.nodeId === propsRef.current.nodeId && pendingInput.parentId === propsRef.current.parentId;
 
     if (!hasClickCoords && !hasPendingInput) {
-      // --- Deferred focus path: Enter-created editor ---
-      // Signal the useEffect to focus this view after the browser paints.
-      // The browser needs the contenteditable to be rendered before it can
-      // initialise the IME input context.  Focusing in useLayoutEffect
-      // (before paint) causes the first CJK keystroke to bypass IME.
-      pendingFocusViewRef.current = view;
+      // --- Enter-created editor ---
+      // Set the flag so handleDOMEvents.focus intercepts PM's focus handler
+      // and suppresses the setTimeout→selectionToDOM(view, 20ms) that
+      // disrupts CJK IME when the user types within that window.
+      isEnterCreatedRef.current = true;
+      view.dom.focus();
       return;
     }
 
@@ -597,6 +594,31 @@ export function RichTextEditor(props: RichTextEditorProps) {
         return true;
       },
       handleDOMEvents: {
+        focus: (view) => {
+          if (!isEnterCreatedRef.current) return false;
+          isEnterCreatedRef.current = false;
+          // Replicate PM's focus handler (prosemirror-view input.ts:780-791)
+          // but SKIP the setTimeout→selectionToDOM that disrupts CJK IME.
+          // When Enter creates a new editor and the user types immediately,
+          // PM's 20ms-delayed selectionToDOM fires mid-composition, calling
+          // Selection.collapse() which resets Chrome's IME input context.
+          //
+          // Setting lastFocus=0 also prevents DOMObserver.flush() from
+          // calling selectionToDOM for the "browser reset selection to
+          // document start" heuristic (domobserver.ts:219-230).
+          const internal = view as Record<string, any>;
+          internal.input.lastFocus = 0;
+          if (!internal.focused) {
+            internal.domObserver.stop();
+            view.dom.classList.add('ProseMirror-focused');
+            internal.domObserver.start();
+            internal.focused = true;
+          }
+          // Record current DOM selection so DOMObserver.flush() won't see
+          // a "new" selection and trigger selectionToDOM.
+          internal.domObserver.setCurSelection();
+          return true; // skip PM's built-in focus handler
+        },
         keydown: (_view, event) => {
           const keyboardEvent = event as KeyboardEvent;
           if (isImeComposingEvent(keyboardEvent)) {
@@ -686,19 +708,6 @@ export function RichTextEditor(props: RichTextEditorProps) {
       viewRef.current = null;
     };
   }, [plugins, runTriggerDetection, saveContent, setNodeContentLocal, syncInitialFocus]);
-
-  // Post-paint focus for Enter-created editors.
-  // useEffect runs after the browser has painted, so the contenteditable
-  // element is fully rendered and the browser can initialise the IME input
-  // context before we set focus.  This prevents the first CJK keystroke
-  // from bypassing IME and arriving as raw text.
-  useEffect(() => {
-    const view = pendingFocusViewRef.current;
-    if (!view) return;
-    pendingFocusViewRef.current = null;
-    if (viewRef.current !== view) return;
-    view.focus();
-  });
 
   useEffect(() => {
     const view = viewRef.current;

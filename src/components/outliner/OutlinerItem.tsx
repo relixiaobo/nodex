@@ -545,6 +545,15 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       // would also immediately clear the selection.
       if (e.defaultPrevented) return;
 
+      const active = document.activeElement;
+      if (
+        active instanceof HTMLInputElement ||
+        active instanceof HTMLTextAreaElement ||
+        (active instanceof HTMLElement && active.isContentEditable)
+      ) {
+        return;
+      }
+
       const uiState = useUIStore.getState();
       if (uiState.focusedNodeId) return;
 

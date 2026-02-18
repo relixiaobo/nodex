@@ -158,15 +158,24 @@ export function RichTextEditor(props: RichTextEditorProps) {
   }, [updateNodeContent, userId]);
 
   const syncInitialFocus = useCallback((view: EditorView) => {
-    if (focusRafRef.current !== null) {
-      cancelAnimationFrame(focusRafRef.current);
-    }
-    focusRafRef.current = requestAnimationFrame(() => {
-      focusRafRef.current = null;
+    const applyFocusState = (allowStealFocus: boolean) => {
       if (viewRef.current !== view) return;
 
       savedRef.current = false;
-      view.focus();
+
+      const active = document.activeElement;
+      const activeIsEditable = (
+        active instanceof HTMLInputElement ||
+        active instanceof HTMLTextAreaElement ||
+        (active instanceof HTMLElement && active.isContentEditable)
+      );
+      const activeInsideCurrent = !!(active instanceof Node && view.dom.contains(active));
+
+      if (!view.hasFocus() && (allowStealFocus || !activeIsEditable || activeInsideCurrent)) {
+        view.focus();
+      }
+
+      if (!view.hasFocus()) return;
 
       const clickInfo = useUIStore.getState().focusClickCoords;
       if (clickInfo && clickInfo.nodeId === propsRef.current.nodeId && clickInfo.parentId === propsRef.current.parentId) {
@@ -194,6 +203,18 @@ export function RichTextEditor(props: RichTextEditorProps) {
       if (propsRef.current.editorRef) {
         propsRef.current.editorRef.current = view;
       }
+    };
+
+    // Try immediately so rapid typing after Enter-create lands in the new editor.
+    applyFocusState(true);
+
+    if (focusRafRef.current !== null) {
+      cancelAnimationFrame(focusRafRef.current);
+    }
+    focusRafRef.current = requestAnimationFrame(() => {
+      focusRafRef.current = null;
+      // One-frame fallback, but avoid stealing focus from other active editors.
+      applyFocusState(false);
     });
   }, []);
 

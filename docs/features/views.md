@@ -45,12 +45,11 @@ Tana 导出数据中有 53 个 viewDef 节点。
 
 ### 视图配置存储（SYS_A16）
 
-视图通过 Metanode Tuple 关联到节点：
+视图通过 meta Tuple 关联到节点：
 
 ```
-ContentNode._metaNodeId → Metanode
-  Metanode.children:
-    └── Tuple [SYS_A16, viewDefId]   ← 视图配置
+ContentNode.meta:
+  └── Tuple [SYS_A16, viewDefId]   ← 视图配置
 ```
 
 一个节点可以有多个 `SYS_A16` Tuple（多个可切换的视图）。
@@ -307,7 +306,7 @@ ContentNode._metaNodeId → Metanode
 **数据模型**：
 
 ```
-ViewDef Metanode:
+ViewDef meta:
   └── Tuple [SYS_A18, filterTupleId]
         └── filterTuple.children: [fieldDefId, operatorValue, filterValue]
 ```
@@ -339,10 +338,10 @@ ViewDef Metanode:
 
 **数据模型**：
 
-Group 配置作为 Tuple 存储在 ViewDef 的 Metanode 中（与 Filter/Sort 对称）：
+Group 配置作为 Tuple 存储在 ViewDef 的 meta 中（与 Filter/Sort 对称）：
 
 ```
-ViewDef Metanode:
+ViewDef meta:
   └── Tuple [NDX_A_GROUP_FIELD, fieldDefId]   ← 分组字段
 ```
 
@@ -361,7 +360,7 @@ ViewDef Metanode:
 **数据模型**：
 
 ```
-ViewDef Metanode:
+ViewDef meta:
   ├── Tuple [SYS_A19, sortDirection]   ← 升序/降序
   └── Tuple [SYS_A20, fieldDefId]      ← 排序字段
 ```
@@ -375,7 +374,7 @@ ViewDef Metanode:
 搜索节点（`doc_type: 'search'`）的结果可以用任意视图展示：
 
 ```
-SearchNode Metanode:
+SearchNode meta:
   ├── Tuple [SYS_A15, tagDefId]       ← 搜索表达式
   ├── Tuple [SYS_A16, viewDefId]      ← 结果视图
   └── Tuple [SYS_A14, defaultTagId]   ← 新建结果时的默认标签
@@ -480,7 +479,7 @@ ViewContainer 负责：
 |------|------|------|
 | 2026-02-14 | Table 优先实现 | 最高用户价值；搜索节点 + Table = 类 Notion Database |
 | 2026-02-14 | Filter/Sort 独立于视图类型 | 避免每个视图重复实现；统一数据管道 |
-| 2026-02-14 | ViewDef 存储在 Metanode Tuple 中 | 与 Tana 数据模型一致 |
+| 2026-02-14 | ViewDef 存储在 meta Tuple 中 | 与 Tana 数据模型一致（Metanode 已简化为 meta 数组） |
 | 2026-02-14 | 不实现 Side Menu 视图 | Chrome Side Panel 本身就是侧栏，Side Menu 视图功能重叠 |
 | 2026-02-14 | Calendar 依赖日期节点 | 需要先完成 #22 Date 节点才能确定日历定位字段 |
 | 2026-02-14 | 合并 5 种视图 + Filter/Group/Sort 为一份文档 | 它们是同一个系统的不同维度，分开文档会导致重复描述数据模型 |

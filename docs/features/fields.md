@@ -10,7 +10,7 @@
 - 弹出字段名搜索面板（自动完成已有 attrDef）
 - 选择已有字段或创建新字段名
 - 创建后在节点 children 中插入 field Tuple：`[attrDefId, valueNodeId?]`
-- 同时创建 associatedData 并建立 associationMap 映射
+- 字段 Tuple 的值直接存储在 children[1:] 中
 
 ### 字段渲染
 
@@ -23,13 +23,13 @@
 
 ### 字段值统一模型（目标与现状）
 
-**目标规格（未来）**：所有字段类型的值区域本质上都是 outliner，数据模型层面统一为 `assocData.children[]`（值是一组节点）。dataType 只决定值节点的**输入方式**和**显示格式**，不改变底层结构。
+**目标规格**：所有字段类型的值区域本质上都是 outliner，数据模型层面统一为 `Tuple.children[1:]`（值是一组节点）。dataType 只决定值节点的**输入方式**和**显示格式**，不改变底层结构。
 
-**当前实现（2026-02）**：渲染层已统一为 `FieldValueOutliner`；数据层仍有历史兼容路径（部分读写仍使用 tuple 的 `children[1]`），尚未完全迁移到“仅 assocData.children[]”。
+**当前实现（2026-02）**：渲染层已统一为 `FieldValueOutliner`；数据层已简化为 Tuple.children[1:] 直接存值（消除了 AssociatedData 间接层）。
 
 统一行为（所有类型共享）：
 - 值区域 = `FieldValueOutliner`（mini outliner）
-- 支持多个值节点（assocData.children 可以有多项）
+- 支持多个值节点（Tuple.children[1:] 可以有多项）
 - 支持嵌套子节点
 - 支持 `>` 转 field tuple（创建嵌套字段）
 - TrailingInput 添加新值
@@ -44,7 +44,7 @@
 - **Email**：邮箱输入
 - **Checkbox**：复选框 toggle
 
-> **状态**：值区域渲染统一已完成（含 Checkbox）；数据存储统一仍在收敛中。`FieldValueEditor` 已不在主渲染路径中使用。
+> **状态**：值区域渲染统一已完成（含 Checkbox）；数据存储已简化为 Tuple.children 直接存值。`FieldValueEditor` 已不在主渲染路径中使用。
 
 ### 字段配置页（AttrDef Config）
 
@@ -78,7 +78,7 @@
   - Enter 选择高亮项，或在无匹配时创建新选项节点
   - Escape / click outside → 关闭不改变
 - **新建选项（Auto-collect）**：输入不匹配文字 + Enter → `autoCollectOption` 创建值节点：
-  - **原节点留在 field value**（assocData.children），不是 attrDef 的直接子节点
+  - **原节点留在 field value**（Tuple.children[1:]），不是 attrDef 的直接子节点
   - **引用存入 autocollect Tuple**：attrDef 的 autocollect Tuple (`[SYS_A44, toggle, ...ids]`) children[2+] 存放引用
   - 下次选择同字段时，auto-collected 值与 pre-determined 选项合并显示在下拉中
 - **Auto-collect 配置页**：attrDef 配置页显示 Auto-collect values 区段：
@@ -144,7 +144,7 @@
   - **Number/Integer**：非数字 → "Value should be a number"；超 min/max → "Value should be ≥ N" / "≤ N"
   - **URL**：不含 `://` → "Value should be a URL"
   - **Email**：不含 `@` → "Value should be an email address"
-- FieldRow selector 读取 assocData 首个内容子节点的 `props.name`，调用 `validateFieldValue()`
+- FieldRow selector 读取 Tuple.children[1] 对应值节点的 `props.name`，调用 `validateFieldValue()`
 - Min/Max 通过 `resolveMinValue()` / `resolveMaxValue()` 从 attrDef 的 NDX_A03/A04 Tuple 读取
 
 ### 系统字段 (System Fields) — 已实现（8/12）
@@ -159,7 +159,7 @@
   3. **Last edited time** — `updatedAt`
   4. **Last edited by** — `updatedBy`
   5. **Owner node** — `props._ownerId` → 解析节点名，可点击跳转
-  6. **Tags** — metanode chain → SYS_A13 tuples → tagDef names，逗号分隔
+  6. **Tags** — meta → SYS_A13 tuples → tagDef names，逗号分隔
   7. **Workspace** — `workspaceId` → 解析工作区名
   8. **Done time** — `props._done`，无值显示 "—"
 - **延后 4 种**：Edited by（需多用户）、Number of references（需全量扫描）、Date from calendar node（需祖先遍历）、Number of nodes with this tag（需全量扫描）
@@ -180,7 +180,7 @@
   - **When value is default**: 待实现（需要 auto-initialize default 值概念）
   - **Always**: 始终隐藏
 - 实现方式：`resolveHideField()` 读取 attrDef 的 `NDX_A01` 配置 Tuple
-- 空值判定：assocData 无内容子节点 = 空（通过 `isEmpty` 字段传递）
+- 空值判定：Tuple.children 长度 ≤ 1（仅有 key 无值）= 空（通过 `isEmpty` 字段传递）
 - **click-to-reveal（Tana 风格 pill）**：
   - 所有隐藏字段（含 Always）显示为紧凑的 `+ FieldName` pill 按钮行
   - pill `+` icon 与同级 BulletChevron 精确对齐（15px 居中容器）
@@ -221,7 +221,7 @@
   - 既有字段 tuple 引用会保留，UI 以 trashed 状态显示（废纸篓/警示语义）
 - **目标行为（未来）**：
   - 删除 attrDef 时自动级联清理所有引用（含模板中的字段 tuple）
-  - 同步清理对应 `associatedData` + `associationMap`
+  - 清理对应的字段 Tuple
 - Tana 行为：删除字段后通常保留可见的“字段已删除”状态提示
 
 ### Merge Fields — 未实现
@@ -248,7 +248,7 @@
 | 2026-02-12 | ~~FieldValueEditor 移除 Options 分支~~ 已废弃 | FieldValueEditor 整体废弃 |
 | 2026-02-12 | OptionsPicker 改为 combobox 模式 | 支持输入搜索 + 新建选项，与 Tana 交互一致 |
 | 2026-02-12 | Auto-collect: 原节点在 field value，引用在 autocollect Tuple | 分离 pre-determined 与 auto-collected，Tuple children[2+] 存引用 |
-| 2026-02-12 | **统一值渲染器**：所有字段类型值区域 = FieldValueOutliner | 渲染层统一已完成；数据层仍保留 tuple children[1] 的兼容读写，后续继续收敛到 assocData.children[] |
+| 2026-02-12 | **统一值渲染器**：所有字段类型值区域 = FieldValueOutliner | 渲染层统一已完成；数据层已简化为 Tuple.children[1:] 直接存值 |
 | 2026-02-12 | Checkbox 统一：OutlinerItem 支持 fieldDataType prop | Checkbox 值节点渲染为 toggle 而非编辑器，FieldValueEditor 变为死代码 |
 | 2026-02-13 | DatePicker 重写为 Notion 风格 | 自定义日历 + masked input + Toggle 控制范围/时间 + 即时保存，替代浏览器原生 date input |
 | 2026-02-13 | 隐藏字段改为 pill click-to-reveal（替代 hover-to-reveal） | Tana 风格：`+ FieldName` 紧凑按钮，点击临时显示。所有隐藏模式（含 Always）都出现 pill |

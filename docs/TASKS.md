@@ -59,6 +59,27 @@ _(空)_
 - **Files**: `docs/research/performance-baseline.md`
 - **迭代日志**: _(开始后追加)_
 
+### 数据模型简化：消除 Metanode + AssociatedData
+> **Owner: TBD** | Branch: `TBD` | Priority: P0
+> **计划文档**: `.claude/plans/hashed-dancing-avalanche.md`
+
+简化三层间接为一层（只保留 Tuple），消除 Metanode 和 AssociatedData。
+
+- [ ] Phase 0: 添加 meta 列 + 类型 + helper
+- [ ] Phase 1a: 读路径迁移（meta 优先，fallback _metaNodeId）
+- [ ] Phase 1b: 写路径迁移（不再创建 Metanode）
+- [ ] Phase 1c: 种子数据 + 测试迁移
+- [ ] Phase 2a: 字段读路径迁移（Tuple.children 直接读值）
+- [ ] Phase 2b: 字段写路径迁移（不再创建 AssociatedData）
+- [ ] Phase 2c: UI 组件迁移（FieldValueOutliner）
+- [ ] Phase 2d: 种子数据 + 测试迁移
+- [ ] Phase 3: 类型清理 + 数据库清理 + 视图重写 + 文档最终更新
+
+- **Files**: node-store.ts, node.ts, seed-data.ts, tag-service.ts, field-service.ts,
+  search-service.ts, checkbox-utils.ts, field-utils.ts, use-node-fields.ts,
+  FieldValueOutliner.tsx, node-service.ts, meta-utils.ts (new)
+- **迭代日志**: _(开始后追加)_
+
 ---
 
 ## 待办

@@ -6,7 +6,7 @@ Chrome Side Panel 云端知识管理工具，忠实复刻 Tana 核心功能。
 
 Nodex 让用户在浏览网页时，通过 Chrome Side Panel 记录和组织信息，与历史笔记协同阅读，并提供 AI 辅助功能（聊天、网页操作等）。
 
-**核心设计原则**：忠实复制 Tana 的 "Everything is a Node" 数据模型，包括 Tuple、Metanode、AssociatedData 间接层，不做简化。
+**核心设计原则**：基于 Tana 的 "Everything is a Node" 数据模型，保留 Tuple 核心抽象，简化掉 Firebase 时代的 Metanode 和 AssociatedData 间接层。
 
 ## 沟通约定
 
@@ -168,8 +168,8 @@ src/
   services/                # 数据服务层 (不变)
     supabase.ts            # 客户端单例
     node-service.ts        # CRUD + 树操作 + 批量 + rowToNode/NodeRow
-    tag-service.ts         # 标签应用 (Metanode+Tuple)
-    field-service.ts       # 字段值 (Tuple+AssociationMap)
+    tag-service.ts         # 标签应用 (meta+Tuple)
+    field-service.ts       # 字段值 (Tuple.children 直接存值)
     search-service.ts      # 搜索 + 反向引用
     tana-import.ts         # Tana JSON 导入
     index.ts               # 统一导出
@@ -198,38 +198,36 @@ Tana 的配置页面（字段配置、标签配置等）不是定制 UI，而是
 
 详见 `docs/research/tana-config-page-architecture.md`。
 
-### 三大间接层（忠实保留 Tana）
+### 间接层（简化后只保留 Tuple）
 
-1. **Tuple** (`doc_type='tuple'`, 占 29.3%): 万能键值对。`children[0]` = 键 (SYS_A* 或 attrDefId)，`children[1:]` = 值。
-2. **Metanode** (`doc_type='metanode'`, 占 13.5%): 元信息代理。通过 `_metaNodeId` 链接到内容节点，`children` 全部是 Tuple。
-3. **AssociatedData** (`doc_type='associatedData'`, 占 6.3%): 通过 `associationMap` 映射，提供字段值索引。
+1. **Tuple** (`doc_type='tuple'`, 占 29.3%): 万能键值对。`children[0]` = 键 (SYS_A* 或 attrDefId)，`children[1:]` = 值（字段值直接存这里）。
+2. **node.meta** (`TEXT[]` 列): 元信息 Tuple ID 列表，替代原来的 Metanode 间接层。`meta = [tagTupleId, checkboxTupleId, ...]`
+3. ~~Metanode~~ / ~~AssociatedData~~: 已废弃，被 `meta` 列和 Tuple.children 直接值存储替代。
 
-### 标签应用链路 (六步)
+### 标签应用链路 (四步)
 
 ```
-ContentNode._metaNodeId → Metanode
-  Metanode.children → Tuple [SYS_A13, tagDefId]   ← 标签绑定
-  Metanode.children → Tuple [SYS_A55, SYS_V03]    ← checkbox 配置
-ContentNode.children → Tuple [attrDefId, valueNodeId]  ← 字段实例 (_sourceId → 模板)
-ContentNode.associationMap → { tupleId: associatedDataId }
+ContentNode.meta → [TagTuple.id, CbTuple.id]
+  TagTuple.children: [SYS_A13, tagDefId]   ← 标签绑定
+  CbTuple.children: [SYS_A55, SYS_V03]     ← checkbox 配置
+ContentNode.children → Tuple [attrDefId, valueNodeId1, valueNodeId2, ...]  ← 字段实例（值直接存 children）
 ```
 
-### 字段值存储 (三层)
+### 字段值存储 (两层)
 
 ```
 ContentNode
   ├── children: [..., fieldTupleId, ...]
-  ├── associationMap: { fieldTupleId: associatedDataId }
-  └── Tuple (children: [attrDefId, valueNodeId])
+  └── FieldTuple.children: [attrDefId, valueNodeId1, valueNodeId2, ...]
 ```
 
 ### 工作区容器命名
 
 容器节点 ID = `{workspaceId}_{SUFFIX}`，后缀见 `WORKSPACE_CONTAINERS` 常量。
 
-### AssociationMap 语义
+### AssociationMap 语义（已废弃）
 
-经数据验证修正：AssociationMap 的 KEY 主要是普通内容子节点（88.1%），不限于字段 Tuple。它是 children → associatedData 的**通用映射机制**。
+~~经数据验证修正：AssociationMap 的 KEY 主要是普通内容子节点（88.1%），不限于字段 Tuple。~~ AssociationMap 已废弃。字段值直接存储在 Tuple.children[1:] 中。
 
 ### "一切皆节点"设计守则（实现时必须遵守）
 
@@ -250,7 +248,7 @@ ContentNode
 
 - **单表 `nodes`**: 所有 Tana props 平铺为 PostgreSQL 列（snake_case）
 - **`children TEXT[]`**: 有序子节点列表，GIN 索引
-- **`association_map JSONB`**: 字段值索引映射，GIN 索引
+- **`meta TEXT[]`**: 元信息 Tuple ID 列表，GIN 索引
 - **乐观锁**: `version` 列，每次更新 +1，updateNode 先读后写验证
 - **RLS**: 基于 `workspace_members` 表的工作区级别行级安全
 - **Realtime**: `nodes` 表已加入 `supabase_realtime` publication
@@ -283,7 +281,7 @@ ContentNode
 | `workspaceId` | `workspace_id` |
 | `props._docType` | `doc_type` |
 | `props._ownerId` | `owner_id` |
-| `props._metaNodeId` | `meta_node_id` |
+| `meta` | `meta` |
 | `props._sourceId` | `source_id` |
 | `props._flags` | `flags` |
 | `props._done` | `done` |
@@ -319,7 +317,7 @@ ContentNode
 ### 引用完整性
 
 - 导入的 41,753 节点中，children 缺失引用 267 条（0.06%）—— 属于预期范围（跨工作区引用等）。
-- `_metaNodeId` 引用 100% 完整。
+- `meta` 数组引用完整性由 invariants helper 验证。
 
 ## 任务跟踪与文档
 
@@ -383,7 +381,7 @@ npm run dev:test   # 启动 http://localhost:5199/standalone/index.html
 
 - 优先把可测试规则从组件中下沉到 `src/lib/` 或 `src/stores/`，用 Vitest 覆盖
 - 每次修复 bug，补一个对应 Vitest 回归用例
-- 优先验证树结构不变量（`children` / `_ownerId` / `trash` / `associationMap` 一致性）
+- 优先验证树结构不变量（`children` / `_ownerId` / `trash` / `meta` 一致性）
 - 仅保留最小量浏览器自动化用于 Vitest 无法可靠覆盖的真实交互链路
 
 ## 参考文档

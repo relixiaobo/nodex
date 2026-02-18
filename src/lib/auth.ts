@@ -1,8 +1,11 @@
 /**
  * Google OAuth + Supabase Auth flow for Chrome Extension.
  *
- * Uses chrome.identity.launchWebAuthFlow to handle the OAuth redirect
- * without opening a new browser tab.
+ * Uses chrome.identity.launchWebAuthFlow with Supabase's PKCE OAuth flow.
+ * The flow: Extension → Supabase /authorize → Google → Supabase callback → Extension
+ *
+ * This avoids needing to register chromiumapp.org in Google Cloud Console,
+ * because Google's redirect goes to Supabase's callback URL (already registered).
  */
 import { getSupabase } from '../services/supabase.js';
 
@@ -19,14 +22,13 @@ export interface AuthUser {
  *
  * Requires:
  *  - Supabase Google provider enabled (Dashboard → Auth → Providers)
- *  - Google OAuth Client ID configured in Supabase
+ *  - Google OAuth Web Application Client ID + Secret configured in Supabase
  *  - `https://<extension-id>.chromiumapp.org/` added to Supabase redirect URLs
  *  - `identity` permission in manifest
  */
 export async function signInWithGoogle(): Promise<AuthUser> {
   const supabase = getSupabase();
-  const extensionId = chrome.runtime.id;
-  const redirectTo = `https://${extensionId}.chromiumapp.org/`;
+  const redirectTo = `https://${chrome.runtime.id}.chromiumapp.org/`;
 
   // Get OAuth URL from Supabase (PKCE flow, don't redirect the browser)
   const { data, error } = await supabase.auth.signInWithOAuth({
@@ -57,9 +59,22 @@ export async function signInWithGoogle(): Promise<AuthUser> {
     );
   });
 
+  // Extract the PKCE authorization code from the callback URL
+  // Supabase redirects back with: https://<ext-id>.chromiumapp.org/?code=AUTH_CODE
+  const url = new URL(callbackUrl);
+  const authCode = url.searchParams.get('code');
+
+  if (!authCode) {
+    throw new Error(
+      'No authorization code found in callback URL. Got: ' +
+        callbackUrl.substring(0, 100),
+    );
+  }
+
   // Exchange PKCE authorization code for Supabase session
+  // (Supabase retrieves the stored code_verifier internally)
   const { data: sessionData, error: sessionError } =
-    await supabase.auth.exchangeCodeForSession(callbackUrl);
+    await supabase.auth.exchangeCodeForSession(authCode);
 
   if (sessionError || !sessionData.user) {
     throw new Error(sessionError?.message ?? 'Failed to exchange code for session');

@@ -9,7 +9,9 @@ let supabaseInstance: SupabaseClient | null = null;
  * 初始化 Supabase 客户端。在应用启动时调用一次。
  */
 export function initSupabase(url: string, anonKey: string): SupabaseClient {
-  supabaseInstance = createClient(url, anonKey);
+  supabaseInstance = createClient(url, anonKey, {
+    auth: { flowType: 'pkce' },
+  });
   return supabaseInstance;
 }
 

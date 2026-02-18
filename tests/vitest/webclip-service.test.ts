@@ -119,11 +119,10 @@ describe('webclip-service', () => {
 
       const entities = useNodeStore.getState().entities;
       const clip = entities[clipId];
-      const metanode = clip?.props._metaNodeId ? entities[clip.props._metaNodeId] : undefined;
-      expect(metanode).toBeDefined();
+      expect(clip?.meta?.length).toBeGreaterThan(0);
 
-      // Check SYS_A13 tag tuple referencing tagDef_web_clip
-      const tagTuple = metanode!.children?.find((cid) => {
+      // Check SYS_A13 tag tuple referencing tagDef_web_clip in node.meta
+      const tagTuple = clip!.meta?.find((cid) => {
         const t = entities[cid];
         return t?.props._docType === 'tuple' &&
           t.children?.[0] === SYS_A.NODE_SUPERTAGS &&
@@ -255,10 +254,9 @@ describe('webclip-service', () => {
 
       const entities = useNodeStore.getState().entities;
       const node = entities.idea_1;
-      const metanode = node.props._metaNodeId ? entities[node.props._metaNodeId] : undefined;
-      expect(metanode).toBeDefined();
+      expect(node.meta?.length).toBeGreaterThan(0);
 
-      const tagTuple = metanode!.children?.find((cid) => {
+      const tagTuple = node.meta?.find((cid) => {
         const t = entities[cid];
         return t?.props._docType === 'tuple' &&
           t.children?.[0] === SYS_A.NODE_SUPERTAGS &&

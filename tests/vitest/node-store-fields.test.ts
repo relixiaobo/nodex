@@ -233,7 +233,7 @@ describe('node-store field operations', () => {
     expect(attrDef?.props._docType).toBe('attrDef');
     expect(attrDef?.props.name).toBe('');
     expect(attrDef?.props._ownerId).toBe(tupleId);
-    expect(attrDef?.props._metaNodeId).toBeTruthy();
+    expect(attrDef?.meta?.length).toBeGreaterThan(0);
 
     const hasPlainTypeTuple = (attrDef?.children ?? []).some((cid) => {
       const child = state.entities[cid];

@@ -29,19 +29,16 @@ import type { NodexNode } from '../types/index.js';
 /**
  * 从搜索节点提取搜索配置。
  *
- * 搜索配置存储在 SearchNode 的 Metanode Tuple 中。
+ * 搜索配置存储在 SearchNode 的 meta Tuple 中。
  */
 export async function getSearchConfig(
   searchNodeId: string,
 ): Promise<SearchConfig | null> {
   const searchNode = await getNode(searchNodeId);
   if (!searchNode || searchNode.props._docType !== 'search') return null;
-  if (!searchNode.props._metaNodeId) return null;
+  if (!searchNode.meta || searchNode.meta.length === 0) return null;
 
-  const metanode = await getNode(searchNode.props._metaNodeId);
-  if (!metanode || !metanode.children) return null;
-
-  const tuples = await getNodes(metanode.children);
+  const tuples = await getNodes(searchNode.meta);
   const config: SearchConfig = {
     targetTagId: null,
     filters: [],
@@ -109,8 +106,8 @@ export async function executeSearch(
  *
  * 核心逻辑：
  * 1. 获取目标标签的完整标签树（含子标签，支持多态搜索）
- * 2. 查找所有 Metanode 中有 [SYS_A13, 匹配标签] 的节点
- * 3. 应用过滤条件
+ * 2. 查找所有 tag Tuple [SYS_A13, tagDefId]，通过 _ownerId 直接找到内容节点
+ * 3. 验证标签匹配
  */
 async function executeSearchConfig(
   config: SearchConfig,
@@ -122,8 +119,7 @@ async function executeSearchConfig(
   // Step 1: 获取标签树（多态搜索）
   const tagTreeIds = await getTagTree(config.targetTagId);
 
-  // Step 2: 查找所有 Metanode 中包含目标标签的 Tuple
-  // 先找到 children 包含 SYS_A13 的 Tuple 节点
+  // Step 2: 查找所有 tag Tuple [SYS_A13, ...] 的 _ownerId（直接指向内容节点）
   const { data: tagTuples, error: tupleError } = await supabase
     .from('nodes')
     .select('owner_id')
@@ -132,36 +128,20 @@ async function executeSearchConfig(
 
   if (tupleError) throw new Error(`Search failed: ${tupleError.message}`);
 
-  // 过滤出 children[1] 在标签树中的 Tuple
-  const metanodeIds = new Set<string>();
+  // 收集内容节点 ID（tag tuple._ownerId 直接是内容节点）
+  const contentNodeIds = new Set<string>();
   for (const tuple of (tagTuples ?? [])) {
     if (tuple.owner_id) {
-      metanodeIds.add(tuple.owner_id);
+      contentNodeIds.add(tuple.owner_id);
     }
   }
 
-  if (metanodeIds.size === 0) return [];
+  if (contentNodeIds.size === 0) return [];
 
-  // Step 3: 从 Metanode 找到内容节点
-  // Metanode._ownerId → ContentNode.id
-  const { data: metanodes, error: metaError } = await supabase
-    .from('nodes')
-    .select('owner_id')
-    .eq('doc_type', 'metanode')
-    .in('id', [...metanodeIds]);
+  // Step 3: 获取内容节点
+  const nodes = await getNodes([...contentNodeIds]);
 
-  if (metaError) throw new Error(`Search failed: ${metaError.message}`);
-
-  const contentNodeIds = (metanodes ?? [])
-    .map(m => m.owner_id)
-    .filter((id): id is string => id !== null);
-
-  if (contentNodeIds.length === 0) return [];
-
-  // Step 4: 获取内容节点
-  const nodes = await getNodes(contentNodeIds);
-
-  // Step 5: 验证标签匹配（精确验证，因为 Step 2 是粗过滤）
+  // Step 4: 验证标签匹配（精确验证，因为 Step 2 是粗过滤）
   const matchedNodes: NodexNode[] = [];
   for (const node of nodes) {
     const nodeTags = await getNodeTags(node.id);
@@ -177,33 +157,30 @@ async function executeSearchConfig(
  * 获取标签的完整继承树（含自身和所有子标签）。
  *
  * 用于多态搜索：搜索 #source 时返回 #article, #tweet, #video 等子标签的实例。
+ * 检查 tagDef.children 中的 NDX_A05 Extends 配置 Tuple。
  */
 async function getTagTree(tagDefId: string): Promise<string[]> {
   const result = [tagDefId];
   const supabase = getSupabase();
 
-  // 查找所有 docType='tagDef' 的节点，检查其 Metanode 中是否有
-  // Tuple [SYS_A13, tagDefId]（表示继承关系）
+  // 查找所有 docType='tagDef' 的节点
   const { data: allTagDefs, error } = await supabase
     .from('nodes')
-    .select('id, meta_node_id')
+    .select('id, children')
     .eq('doc_type', 'tagDef');
 
   if (error || !allTagDefs) return result;
 
   for (const tagDef of allTagDefs) {
-    if (!tagDef.meta_node_id || tagDef.id === tagDefId) continue;
+    if (tagDef.id === tagDefId || !tagDef.children?.length) continue;
 
-    // 检查此标签是否继承自目标标签
-    const metanode = await getNode(tagDef.meta_node_id);
-    if (!metanode || !metanode.children) continue;
-
-    const tuples = await getNodes(metanode.children);
+    // 检查此标签是否继承自目标标签（通过 children 中的 NDX_A05 Extends Tuple）
+    const tuples = await getNodes(tagDef.children);
     for (const tuple of tuples) {
       if (
         tuple.props._docType === 'tuple' &&
         tuple.children &&
-        tuple.children[0] === SYS_A.NODE_SUPERTAGS &&
+        tuple.children[0] === SYS_A.EXTENDS &&
         tuple.children[1] === tagDefId
       ) {
         // 此标签继承自目标标签

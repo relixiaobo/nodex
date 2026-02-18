@@ -19,17 +19,21 @@ export function collectNodeGraphErrors(entities: Record<string, NodexNode>): str
     const ownerId = node.props._ownerId;
     const docType = node.props._docType;
 
-    // metanode/associatedData are linked via _metaNodeId/associationMap, not parent.children
-    const shouldBeInOwnerChildren =
+    // associatedData are linked via associationMap, not parent.children
+    // meta tuples are linked via owner.meta, not owner.children
+    const shouldBeInOwnerChildrenOrMeta =
       ownerId &&
-      docType !== 'metanode' &&
       docType !== 'associatedData';
 
-    if (shouldBeInOwnerChildren) {
+    if (shouldBeInOwnerChildrenOrMeta) {
       const owner = entities[ownerId];
       if (!owner) {
         errors.push(`owner missing: node=${nodeId} owner=${ownerId}`);
-      } else if (!owner.children?.includes(nodeId) && !tupleValueRefs.has(nodeId)) {
+      } else if (
+        !owner.children?.includes(nodeId) &&
+        !owner.meta?.includes(nodeId) &&
+        !tupleValueRefs.has(nodeId)
+      ) {
         errors.push(`owner-child mismatch: node=${nodeId} owner=${ownerId}`);
       }
     }

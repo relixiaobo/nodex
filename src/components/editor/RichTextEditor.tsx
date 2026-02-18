@@ -158,61 +158,75 @@ export function RichTextEditor(props: RichTextEditorProps) {
   }, [updateNodeContent, userId]);
 
   const syncInitialFocus = useCallback((view: EditorView) => {
-    const applyFocusState = () => {
-      if (viewRef.current !== view) return;
+    if (viewRef.current !== view) return;
 
-      savedRef.current = false;
+    savedRef.current = false;
 
-      // Always focus the new editor – this callback is only invoked once when
-      // the view mounts for a node that *should* receive focus.  The old
-      // "immediate + rAF fallback" dual-shot design called view.focus() in
-      // useLayoutEffect (before paint) which disrupted IME composition state
-      // on CJK input methods.  Deferring to rAF gives the browser one frame
-      // to settle focus/IME state while remaining imperceptible to the user.
-      if (!view.hasFocus()) {
-        view.focus();
-      }
+    // --- Immediate: lightweight DOM focus only ---
+    // Give the contenteditable element DOM focus so that keystrokes arriving
+    // before the rAF callback are captured by the editor rather than lost.
+    // We intentionally use view.dom.focus() instead of view.focus() because
+    // ProseMirror's view.focus() also calls selectionToDOM() which forces a
+    // synchronous selection update — doing that in useLayoutEffect (before
+    // browser paint) disrupts CJK IME initialisation on the new editor.
+    if (!view.hasFocus()) {
+      view.dom.focus();
+    }
 
-      if (!view.hasFocus()) return;
+    if (propsRef.current.editorRef) {
+      propsRef.current.editorRef.current = view;
+    }
 
-      const clickInfo = useUIStore.getState().focusClickCoords;
-      if (clickInfo && clickInfo.nodeId === propsRef.current.nodeId && clickInfo.parentId === propsRef.current.parentId) {
-        const maxPos = view.state.doc.content.size - 1;
-        const pmPos = Math.max(1, Math.min(clickInfo.textOffset + 1, maxPos));
-        const tr = view.state.tr.setSelection(TextSelection.create(view.state.doc, pmPos));
-        tr.setMeta('addToHistory', false);
-        view.dispatch(tr);
-        useUIStore.getState().setFocusClickCoords(null);
-        setToolbarTick((value) => value + 1);
-      }
-
-      const pendingInput = useUIStore.getState().pendingInputChar;
-      if (pendingInput && pendingInput.nodeId === propsRef.current.nodeId && pendingInput.parentId === propsRef.current.parentId) {
-        useUIStore.getState().setPendingInputChar(null);
-        const insertFrom = view.state.selection.from;
-        const tr = view.state.tr.insertText(pendingInput.char);
-        const maxPos = tr.doc.content.size - 1;
-        const nextPos = Math.max(1, Math.min(insertFrom + pendingInput.char.length, maxPos));
-        tr.setSelection(TextSelection.create(tr.doc, nextPos));
-        view.dispatch(tr);
-        setToolbarTick((value) => value + 1);
-      }
-
-      if (propsRef.current.editorRef) {
-        propsRef.current.editorRef.current = view;
-      }
-    };
-
-    // Defer focus to requestAnimationFrame so the browser has one frame to
-    // settle DOM layout and IME state.  This fixes CJK IME composition being
-    // disrupted when Enter creates a new empty node (the old code called
-    // view.focus() synchronously in useLayoutEffect before paint).
+    // --- Deferred: PM-level selection & pending input processing ---
+    // Wait one animation frame so the browser has time to settle DOM layout
+    // and IME state before we dispatch PM transactions (selection placement,
+    // click-coord restoration, pending input char insertion).
     if (focusRafRef.current !== null) {
       cancelAnimationFrame(focusRafRef.current);
     }
     focusRafRef.current = requestAnimationFrame(() => {
       focusRafRef.current = null;
-      applyFocusState();
+      if (viewRef.current !== view) return;
+
+      // Ensure PM-level focus (selectionToDOM) now that the browser has
+      // painted and IME state is stable.
+      if (!view.hasFocus()) {
+        view.focus();
+      }
+      if (!view.hasFocus()) return;
+
+      // Restore click-based cursor position if the editor was opened by
+      // clicking on static text in OutlinerItem.
+      const clickInfo = useUIStore.getState().focusClickCoords;
+      if (clickInfo && clickInfo.nodeId === propsRef.current.nodeId && clickInfo.parentId === propsRef.current.parentId) {
+        // Skip if user is already composing (they started typing before rAF).
+        if (!view.composing) {
+          const maxPos = view.state.doc.content.size - 1;
+          const pmPos = Math.max(1, Math.min(clickInfo.textOffset + 1, maxPos));
+          const tr = view.state.tr.setSelection(TextSelection.create(view.state.doc, pmPos));
+          tr.setMeta('addToHistory', false);
+          view.dispatch(tr);
+          setToolbarTick((value) => value + 1);
+        }
+        useUIStore.getState().setFocusClickCoords(null);
+      }
+
+      // Insert any pending character that was captured while the editor was
+      // mounting (e.g. selection-mode type-to-edit).
+      const pendingInput = useUIStore.getState().pendingInputChar;
+      if (pendingInput && pendingInput.nodeId === propsRef.current.nodeId && pendingInput.parentId === propsRef.current.parentId) {
+        useUIStore.getState().setPendingInputChar(null);
+        // Skip if user is already composing (IME started before rAF).
+        if (!view.composing) {
+          const insertFrom = view.state.selection.from;
+          const tr = view.state.tr.insertText(pendingInput.char);
+          const maxPos = tr.doc.content.size - 1;
+          const nextPos = Math.max(1, Math.min(insertFrom + pendingInput.char.length, maxPos));
+          tr.setSelection(TextSelection.create(tr.doc, nextPos));
+          view.dispatch(tr);
+          setToolbarTick((value) => value + 1);
+        }
+      }
     });
   }, []);
 

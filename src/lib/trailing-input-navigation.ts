@@ -67,8 +67,8 @@ export function resolveTrailingArrowUpIntent(
 ): TrailingArrowUpIntent {
   const { optionsOpen, optionCount, hasLastVisibleTarget, hasNavigateOut } = params;
   if (optionsOpen && optionCount > 0) return 'options_up';
-  if (hasLastVisibleTarget) return 'focus_last_visible';
   if (hasNavigateOut) return 'navigate_out_up';
+  if (hasLastVisibleTarget) return 'focus_last_visible';
   return 'allow_default';
 }
 

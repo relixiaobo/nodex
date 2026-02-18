@@ -29,11 +29,27 @@ _(空)_
 |-------|---------|------|-------------|
 | nodex-cc | 用户认证 — Google 登录 (#45) | cc/google-auth | `src/lib/auth.ts`, `src/components/auth/*`, `workspace-store.ts` |
 | nodex-cc-2 | 性能基线测量 | cc2/perf-baseline | `docs/research/performance-baseline.md` |
-| nodex-codex | Editor 迁移: TipTap → ProseMirror | codex/editor-migration | `src/components/editor/*`, `src/lib/editor-marks.ts`, `src/lib/pm-doc-utils.ts` |
+| nodex-codex | “一切皆节点”重构文档系统 Review | codex/everything-as-nodes-review | `docs/features/data-model.md`, `docs/features/date-nodes.md`, `docs/features/search.md`, `docs/features/views.md`, `docs/TASKS.md` |
 
 ---
 
 ## 进行中
+
+### “一切皆节点”重构：文档/计划系统 Review
+> **Owner: nodex-codex** | Branch: `codex/everything-as-nodes-review` | Priority: P1
+> **Scope**: `docs/features/data-model.md`, `docs/features/date-nodes.md`, `docs/features/search.md`, `docs/features/views.md`, `CLAUDE.md`
+> **产出**: `docs/research/everything-as-nodes-review.md`
+
+对“`一切皆节点`”相关文档、计划与约束做系统性合理性审查，确保后续 #22/#23/#25/#24/#26/#27/#28 的执行顺序与数据模型一致。
+
+- **Review 关注点**：
+  1. 数据模型闭环：Node / Tuple / Metanode / AssociatedData / ViewDef 的职责边界是否一致
+  2. 执行顺序合理性：Date Nodes → Search → View Infra → 各视图是否存在前置缺口
+  3. 可实现性风险：是否有“文档正确但工程上不可落地”的描述
+  4. 术语一致性：同一概念是否在不同文档中出现冲突定义
+- **Files**: `docs/features/data-model.md`, `docs/features/date-nodes.md`, `docs/features/search.md`, `docs/features/views.md`, `docs/TASKS.md`, `docs/research/everything-as-nodes-review.md`
+- **迭代日志**:
+  - [2026-02-18 nodex-codex] 创建专用分支并认领任务，开始汇总“一切皆节点”相关文档，准备输出系统 review 结论与修订建议。
 
 ### Editor 迁移：TipTap → 直接 ProseMirror
 > **Owner: nodex-codex** | Branch: `codex/editor-migration` | Priority: P1

@@ -67,8 +67,8 @@ export function resolveTrailingArrowUpIntent(
 ): TrailingArrowUpIntent {
   const { optionsOpen, optionCount, hasLastVisibleTarget, hasNavigateOut } = params;
   if (optionsOpen && optionCount > 0) return 'options_up';
-  if (hasLastVisibleTarget) return 'focus_last_visible';
   if (hasNavigateOut) return 'navigate_out_up';
+  if (hasLastVisibleTarget) return 'focus_last_visible';
   return 'allow_default';
 }
 
@@ -76,4 +76,24 @@ export type TrailingEscapeIntent = 'close_options' | 'blur_editor';
 
 export function resolveTrailingEscapeIntent(optionsOpen: boolean): TrailingEscapeIntent {
   return optionsOpen ? 'close_options' : 'blur_editor';
+}
+
+export type TrailingEnterIntent =
+  | 'options_confirm'
+  | 'create_content_and_continue'
+  | 'create_empty';
+
+interface ResolveTrailingEnterIntentParams {
+  optionsOpen: boolean;
+  optionCount: number;
+  hasText: boolean;
+}
+
+export function resolveTrailingEnterIntent(
+  params: ResolveTrailingEnterIntentParams,
+): TrailingEnterIntent {
+  const { optionsOpen, optionCount, hasText } = params;
+  if (optionsOpen && optionCount > 0) return 'options_confirm';
+  if (hasText) return 'create_content_and_continue';
+  return 'create_empty';
 }

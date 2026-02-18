@@ -18,10 +18,23 @@ interface FieldNameInputProps {
   attrDefId: string;
   currentName: string;
   onEnterConfirm?: () => void;
+  onNavigateRow?: (direction: 'up' | 'down') => void;
+  onIndentRow?: () => void;
+  onOutdentRow?: () => void;
   clickOffsetX?: number;
 }
 
-export function FieldNameInput({ tupleId, nodeId, attrDefId, currentName, onEnterConfirm, clickOffsetX }: FieldNameInputProps) {
+export function FieldNameInput({
+  tupleId,
+  nodeId,
+  attrDefId,
+  currentName,
+  onEnterConfirm,
+  onNavigateRow,
+  onIndentRow,
+  onOutdentRow,
+  clickOffsetX,
+}: FieldNameInputProps) {
   const [value, setValue] = useState(currentName === 'Untitled' ? '' : currentName);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -142,7 +155,11 @@ export function FieldNameInput({ tupleId, nodeId, attrDefId, currentName, onEnte
         onEnterConfirm?.();
       } else if (e.key === 'Tab') {
         e.preventDefault();
-        confirm({ focusValue: true });
+        if (e.shiftKey) {
+          void confirm().then(() => onOutdentRow?.());
+        } else {
+          void confirm().then(() => onIndentRow?.());
+        }
       } else if (e.key === 'Escape') {
         e.preventDefault();
         confirmedRef.current = true;
@@ -159,13 +176,35 @@ export function FieldNameInput({ tupleId, nodeId, attrDefId, currentName, onEnte
         }
       } else if (e.key === 'ArrowDown') {
         e.preventDefault();
-        setSelectedIndex((i) => Math.min(i + 1, suggestions.length - 1));
+        if (suggestions.length > 0) {
+          setSelectedIndex((i) => Math.min(i + 1, suggestions.length - 1));
+        } else if (onNavigateRow) {
+          void confirm().then(() => onNavigateRow('down'));
+        }
       } else if (e.key === 'ArrowUp') {
         e.preventDefault();
-        setSelectedIndex((i) => Math.max(i - 1, 0));
+        if (suggestions.length > 0) {
+          setSelectedIndex((i) => Math.max(i - 1, 0));
+        } else if (onNavigateRow) {
+          void confirm().then(() => onNavigateRow('up'));
+        }
       }
     },
-    [confirm, onEnterConfirm, setEditingFieldName, value, wsId, userId, nodeId, tupleId, removeField],
+    [
+      confirm,
+      onEnterConfirm,
+      onNavigateRow,
+      onIndentRow,
+      onOutdentRow,
+      suggestions.length,
+      setEditingFieldName,
+      value,
+      wsId,
+      userId,
+      nodeId,
+      tupleId,
+      removeField,
+    ],
   );
 
   return (

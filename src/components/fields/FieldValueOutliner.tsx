@@ -23,6 +23,7 @@ import { SYS_D, SYS_V } from '../../types';
 import { ColorSwatchPicker } from './ColorSwatchPicker';
 import { useWorkspaceStore } from '../../stores/workspace-store';
 import { DatePicker, formatDateDisplay } from './DatePicker.js';
+import { useUIStore } from '../../stores/ui-store.js';
 
 interface FieldValueOutlinerProps {
   assocDataId: string;
@@ -32,6 +33,13 @@ interface FieldValueOutlinerProps {
   attrDefId?: string;
   /** Called when arrow navigation escapes field value boundaries */
   onNavigateOut?: (direction: 'up' | 'down') => void;
+}
+
+export function shouldShowFieldValueTrailingInput(
+  items: Array<{ type: 'field' | 'content' }>,
+): boolean {
+  if (items.length === 0) return true;
+  return items[items.length - 1]?.type === 'field';
 }
 
 export function FieldValueOutliner({ assocDataId, fieldDataType, attrDefId, onNavigateOut }: FieldValueOutlinerProps) {
@@ -74,6 +82,9 @@ export function FieldValueOutliner({ assocDataId, fieldDataType, attrDefId, onNa
   const setConfigValue = useNodeStore((s) => s.setConfigValue);
   const createChild = useNodeStore((s) => s.createChild);
   const updateNodeName = useNodeStore((s) => s.updateNodeName);
+  const setFocusedNode = useUIStore((s) => s.setFocusedNode);
+  const clearFocus = useUIStore((s) => s.clearFocus);
+  const setEditingFieldName = useUIStore((s) => s.setEditingFieldName);
 
   // --- BOOLEAN: Yes/No toggle switch ---
   // Reads value from AssociatedData children[0] (reference to SYS_V.YES or SYS_V.NO)
@@ -186,9 +197,36 @@ export function FieldValueOutliner({ assocDataId, fieldDataType, attrDefId, onNa
   // so their border-t/border-b doesn't visually coincide with the parent FieldRow's borders
   const firstIsField = visibleChildren.length > 0 && visibleChildren[0].type === 'field';
   const lastIsField = visibleChildren.length > 0 && visibleChildren[visibleChildren.length - 1].type === 'field';
+  const showTrailingInput = shouldShowFieldValueTrailingInput(visibleChildren);
+
+  const handleTrailingNavigateOut = useCallback((direction: 'up' | 'down') => {
+    if (direction === 'up') {
+      const last = visibleChildren[visibleChildren.length - 1];
+      if (!last) {
+        onNavigateOut?.('up');
+        return;
+      }
+      if (last.type === 'field') {
+        clearFocus();
+        setEditingFieldName(last.id);
+        return;
+      }
+      useUIStore.getState().setFocusClickCoords({
+        nodeId: last.id,
+        parentId: assocDataId,
+        textOffset: (useNodeStore.getState().entities[last.id]?.props.name ?? '').length,
+      });
+      setFocusedNode(last.id, assocDataId);
+      return;
+    }
+    onNavigateOut?.('down');
+  }, [visibleChildren, onNavigateOut, clearFocus, setEditingFieldName, assocDataId, setFocusedNode]);
 
   return (
-    <div className={`min-h-[22px]${firstIsField ? ' pt-1' : ''}${lastIsField ? ' pb-1' : ''}`}>
+    <div
+      className={`min-h-[22px]${firstIsField ? ' pt-1' : ''}${lastIsField ? ' pb-1' : ''}`}
+      data-row-scope-parent-id={assocDataId}
+    >
       {visibleChildren.map(({ id, type }, i) =>
         type === 'field' ? (
           <div key={id} className="@container" style={{ paddingLeft: 6 + 15 + 4 }}>
@@ -221,10 +259,15 @@ export function FieldValueOutliner({ assocDataId, fieldDataType, attrDefId, onNa
           />
         ),
       )}
-      {/* Show TrailingInput only when no content children yet (matches OutlinerItem pattern).
-          Users add more values via Enter in existing value nodes. */}
-      {contentChildIds.length === 0 && (
-        <TrailingInput parentId={assocDataId} depth={0} parentExpandKey={`${entities[assocDataId]?.props._ownerId ?? ''}:${assocDataId}`} fieldDataType={fieldDataType} attrDefId={attrDefId} onNavigateOut={onNavigateOut} />
+      {showTrailingInput && (
+        <TrailingInput
+          parentId={assocDataId}
+          depth={0}
+          parentExpandKey={`${entities[assocDataId]?.props._ownerId ?? ''}:${assocDataId}`}
+          fieldDataType={fieldDataType}
+          attrDefId={attrDefId}
+          onNavigateOut={handleTrailingNavigateOut}
+        />
       )}
     </div>
   );

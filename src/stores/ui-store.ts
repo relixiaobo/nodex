@@ -78,13 +78,13 @@ interface UIStore {
   triggerHint: '#' | '@' | '/' | null;
   setTriggerHint(hint: '#' | '@' | '/' | null): void;
 
-  // Text offset for cursor positioning (consumed by matching NodeEditor on mount)
+  // Text offset for cursor positioning (consumed by matching RichTextEditor on mount)
   focusClickCoords: { nodeId: string; parentId: string | null; textOffset: number } | null;
   setFocusClickCoords(coords: { nodeId: string; parentId: string | null; textOffset: number } | null): void;
 
-  // Pending input character: set by selection mode keydown, consumed by NodeEditor on mount
-  pendingInputChar: string | null;
-  setPendingInputChar(char: string | null): void;
+  // Pending input character: set by selection mode keydown, consumed by target RichTextEditor on mount
+  pendingInputChar: { char: string; nodeId: string; parentId: string | null } | null;
+  setPendingInputChar(payload: { char: string; nodeId: string; parentId: string | null } | null): void;
 
   // Pending reference ↔ inline reference conversion (session-only)
   pendingRefConversion: {
@@ -309,9 +309,9 @@ export const useUIStore = create<UIStore>()(
       focusClickCoords: null,
       setFocusClickCoords: (coords) => set({ focusClickCoords: coords }),
 
-      // Pending input character (session-only, consumed by NodeEditor on mount)
+      // Pending input character (session-only, consumed by target RichTextEditor on mount)
       pendingInputChar: null,
-      setPendingInputChar: (char) => set({ pendingInputChar: char }),
+      setPendingInputChar: (payload) => set({ pendingInputChar: payload }),
 
       // Pending reference conversion (session-only)
       pendingRefConversion: null,

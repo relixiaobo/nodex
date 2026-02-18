@@ -33,6 +33,13 @@ interface MergedItem {
   fieldEntry?: FieldEntry;
 }
 
+export function shouldShowConfigTrailingInput(
+  items: Array<{ type: 'field' | 'content' }>,
+): boolean {
+  if (items.length === 0) return true;
+  return items[items.length - 1]?.type === 'field';
+}
+
 export function ConfigOutliner({ nodeId }: ConfigOutlinerProps) {
   useChildren(nodeId);
 
@@ -151,6 +158,7 @@ export function ConfigOutliner({ nodeId }: ConfigOutlinerProps) {
   // Prevent border stacking: when nested FieldRows are first/last, add padding
   const firstIsField = mergedItems.length > 0 && mergedItems[0].type === 'field';
   const lastIsField = mergedItems.length > 0 && mergedItems[mergedItems.length - 1].type === 'field';
+  const showTrailingInput = shouldShowConfigTrailingInput(mergedItems);
 
   return (
     <div className={`min-h-[22px]${firstIsField ? ' pt-1' : ''}${lastIsField ? ' pb-1' : ''}`}>
@@ -186,11 +194,13 @@ export function ConfigOutliner({ nodeId }: ConfigOutlinerProps) {
           />
         );
       })}
-      <TrailingInput
-        parentId={nodeId}
-        depth={0}
-        parentExpandKey={`${ownerId}:${nodeId}`}
-      />
+      {showTrailingInput && (
+        <TrailingInput
+          parentId={nodeId}
+          depth={0}
+          parentExpandKey={`${ownerId}:${nodeId}`}
+        />
+      )}
     </div>
   );
 }

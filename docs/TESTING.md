@@ -131,6 +131,15 @@ npm run test:run
 
 **覆盖点**: navigateTo, goBack, goForward, replacePanel, expand, collapse, toggleExpand, setFocus, clearFocus, openSearch, closeSearch, toggleSidebar
 
+### 1.3.1 内容模型联动（Node Store）
+
+**测试文件**: `tests/vitest/node-store-content.test.ts`
+
+**覆盖点**:
+
+1. `setNodeContentLocal` 同步写入 `name + _marks + _inlineRefs`
+2. `updateNodeName` 路径保留已有 `_marks/_inlineRefs`（兼容旧调用）
+
 ### 1.4 边界条件
 
 **测试文件**: `tests/vitest/edge-cases.test.ts`
@@ -147,7 +156,37 @@ npm run test:run
 2. ancestor chain + structural 节点跳过
 3. 可见节点 flatten 与上下导航（含 reference 场景 parentId 消歧）
 4. last visible node / sibling / index helpers
-5. inline reference HTML 纯度判断
+5. inline reference 纯度判断（兼容 legacy HTML + 新模型 `\uFFFC + _inlineRefs`）
+
+### 1.5.1 富文本 marks / ProseMirror 基础设施
+
+**测试文件**:
+- `tests/vitest/editor-marks.test.ts`
+- `tests/vitest/pm-schema.test.ts`
+- `tests/vitest/pm-doc-utils.test.ts`
+
+**覆盖点**:
+
+1. `htmlToMarks`：HTML → `text + marks + inlineRefs`
+2. `marksToHtml`：`text + marks + inlineRefs` → HTML
+3. `mergeAdjacentMarks`：同类 mark 合并
+4. `pmSchema`：单段落 + `inlineReference` atom + 7 marks 注册
+5. `marksToDoc` / `docToMarks`：PM 文档往返
+6. `splitMarks` / `combineMarks`：拆分与偏移合并
+
+### 1.5.2 ProseMirror EditorView 操作工具
+
+**测试文件**:
+- `tests/vitest/pm-editor-view.test.ts`
+
+**覆盖点**:
+
+1. `deleteEditorRange`：删除范围并回到起始光标
+2. `replaceEditorRangeWithText`：范围替换文本
+3. `replaceEditorRangeWithInlineRef`：范围替换为 `inlineReference` atom
+4. `toggleHeadingMark`：选区 heading mark 切换
+5. `setEditorPlainTextContent`：整段内容替换为纯文本
+6. `isEditorViewAlive`：EditorView 生命周期判断
 
 ### 1.6 字段值验证
 
@@ -167,7 +206,7 @@ npm run test:run
 
 1. applyTag/removeTag（模板字段实例化与清理）
 2. add/remove reference 去重与删除
-3. reference ↔ inline conversion 临时节点替换链路
+3. reference ↔ inline conversion 临时节点替换链路（临时节点内容为 `\uFFFC + _inlineRefs`）
 
 ### 1.8 字段状态流（Node Store）
 
@@ -186,6 +225,7 @@ npm run test:run
 9. `removeFieldOption` 从 attrDef children 移除并删除 option 节点
 10. `replaceFieldAttrDef` 的占位 attrDef 置换与重复字段保护
 11. `changeFieldType` / `setConfigValue` 配置 tuple 原地更新
+12. `moveFieldTuple` 跨父节点迁移 tuple 时同步 `associationMap` 与 `_ownerId`
 
 ### 1.9 Schema / Supertag 构建链路
 
@@ -313,17 +353,7 @@ npm run test:run
 1. `delete / convert_arrow_right / convert_printable` 分支解析
 2. options 打开时的 `ArrowUp/Down/Enter/Escape` 解析
 3. options 关闭时 `Escape` 的 clear-selection 语义
-
-### 1.20 编辑器 HTML 归一化工具
-
-**测试文件**: `tests/vitest/editor-html.test.ts`
-
-**覆盖点**:
-
-1. `stripWrappingP` 对单层 `<p>` 包裹的去壳与 trim
-2. 嵌套 `<p>` 结构保持原样（防误裁剪）
-3. `wrapInP` 对纯文本与空字符串的包裹语义
-4. 已有 `<p>` 内容的稳定透传
+4. IME 组合输入事件（`isComposing` / `Process` / `keyCode=229`）不触发 reference 选中态快捷键
 
 ### 1.21 TrailingInput onUpdate 决策纯函数
 
@@ -346,6 +376,7 @@ npm run test:run
 2. `ArrowDown` 在 options 与 navigate-out 场景下的分支决策
 3. `ArrowUp` 在 options/focus-last-visible/navigate-out 场景下的分支决策
 4. `Escape` 的 close-options vs blur-editor 决策
+5. `Enter` 的 options-confirm / create-content-and-continue / create-empty 决策
 
 ### 1.23 NodeEditor 键盘决策纯函数
 
@@ -544,15 +575,6 @@ hash trigger cleanup safety（2 cases, Bug #53 回归）:
 5. `heading` 命令处于 enabled 状态
 6. 全部禁用时返回 `-1`
 
-### 1.41 Heading Mark 扩展
-
-**测试文件**: `tests/vitest/heading-mark.test.ts`
-
-**覆盖点**:
-
-1. `toggleHeadingMark` 对选中文本正确写入 `data-heading-mark="true"`
-2. 对同一区间再次 toggle 会移除 heading mark（幂等反向）
-
 ### 1.43 Floating Toolbar 循环渲染防回归
 
 **测试文件**: `tests/vitest/floating-toolbar.test.ts`
@@ -671,7 +693,7 @@ applyWebClipToNode（5 cases）:
 19. 就地设置 description
 20. 不改变节点 ownership（留在原父节点）
 
-### 1.41 Default Child Supertag (SYS_A14)
+### 1.42 Default Child Supertag (SYS_A14)
 
 **测试文件**: `tests/vitest/child-supertag.test.ts`
 
@@ -715,6 +737,7 @@ createSibling 自动标签（2 cases）:
 14. `Shift+Tab` → `batch_outdent`（批量取消缩进）
 15. `Cmd+Shift+D` → `batch_duplicate`（批量复制，含大小写兼容）
 16. `Cmd+Enter` / `Ctrl+Enter` → `batch_checkbox`（批量 checkbox 切换）
+17. IME 组合输入事件（`isComposing` / `Process` / `keyCode=229`）返回 `null`，避免误触发 `type_char`
 
 ### 1.40 Multi-Select 纯函数工具库
 
@@ -733,6 +756,26 @@ createSibling 自动标签（2 cases）:
 9. `getSelectionBounds` — 首尾边界/单选/空选区/非连续选区
 10. `getEffectiveSelectionBounds` with reference — 显示层级 reference 节点隐式选中
 11. `computeRangeSelection` with reference — 跨 reference 范围选择/不振荡
+
+### 1.45 ConfigOutliner TrailingInput 显示规则
+
+**测试文件**: `tests/vitest/config-outliner.test.ts`
+
+**覆盖点**:
+
+1. 空 ConfigOutliner 显示 TrailingInput
+2. 最后一项为 field 时显示 TrailingInput
+3. 最后一项为 content 时隐藏 TrailingInput
+
+### 1.46 FieldValueOutliner TrailingInput 显示规则
+
+**测试文件**: `tests/vitest/field-value-outliner.test.ts`
+
+**覆盖点**:
+
+1. 空 FieldValueOutliner 显示 TrailingInput
+2. 最后一项为 field 时显示 TrailingInput
+3. 最后一项为 content 时隐藏 TrailingInput
 
 ---
 
@@ -794,7 +837,6 @@ createSibling 自动标签（2 cases）:
 | 1.17 | 快捷键注册表一致性 | PASS/FAIL |
 | 1.18 | 全局导航快捷键拦截保护 | PASS/FAIL |
 | 1.19 | Selected Reference 快捷键解析 | PASS/FAIL |
-| 1.20 | 编辑器 HTML 归一化工具 | PASS/FAIL |
 | 1.21 | TrailingInput onUpdate 决策纯函数 | PASS/FAIL |
 | 1.22 | TrailingInput 键盘导航决策纯函数 | PASS/FAIL |
 | 1.23 | NodeEditor 键盘决策纯函数 | PASS/FAIL |
@@ -814,9 +856,11 @@ createSibling 自动标签（2 cases）:
 | 1.37 | Slash Command 注册与导航 | PASS/FAIL |
 | 1.38 | Done State Mapping | PASS/FAIL |
 | 1.39 | Web Clip 落库服务 | PASS/FAIL |
-| 1.41 | Heading Mark 扩展 | PASS/FAIL |
 | 1.42 | Default Child Supertag (SYS_A14) | PASS/FAIL |
 | 1.43 | Floating Toolbar 循环渲染防回归 | PASS/FAIL |
+| 1.44 | PM EditorView 操作工具 | PASS/FAIL |
+| 1.45 | ConfigOutliner TrailingInput 显示规则 | PASS/FAIL |
+| 1.46 | FieldValueOutliner TrailingInput 显示规则 | PASS/FAIL |
 | 2 | 视觉渲染 | PASS/FAIL/SKIP |
 | 3 | 扩展构建 | PASS/FAIL |
 

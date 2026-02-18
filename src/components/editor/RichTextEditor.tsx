@@ -179,13 +179,13 @@ export function RichTextEditor(props: RichTextEditorProps) {
         setToolbarTick((value) => value + 1);
       }
 
-      const pendingChar = useUIStore.getState().pendingInputChar;
-      if (pendingChar) {
+      const pendingInput = useUIStore.getState().pendingInputChar;
+      if (pendingInput && pendingInput.nodeId === propsRef.current.nodeId && pendingInput.parentId === propsRef.current.parentId) {
         useUIStore.getState().setPendingInputChar(null);
         const insertFrom = view.state.selection.from;
-        const tr = view.state.tr.insertText(pendingChar);
+        const tr = view.state.tr.insertText(pendingInput.char);
         const maxPos = tr.doc.content.size - 1;
-        const nextPos = Math.max(1, Math.min(insertFrom + pendingChar.length, maxPos));
+        const nextPos = Math.max(1, Math.min(insertFrom + pendingInput.char.length, maxPos));
         tr.setSelection(TextSelection.create(tr.doc, nextPos));
         view.dispatch(tr);
         setToolbarTick((value) => value + 1);
@@ -554,11 +554,26 @@ export function RichTextEditor(props: RichTextEditorProps) {
           const keyboardEvent = event as KeyboardEvent;
           if (isImeComposingEvent(keyboardEvent)) {
             isComposingRef.current = true;
+            const pendingInput = useUIStore.getState().pendingInputChar;
+            if (pendingInput && pendingInput.nodeId === propsRef.current.nodeId && pendingInput.parentId === propsRef.current.parentId) {
+              useUIStore.getState().setPendingInputChar(null);
+            }
+          }
+          return false;
+        },
+        beforeinput: () => {
+          const pendingInput = useUIStore.getState().pendingInputChar;
+          if (pendingInput && pendingInput.nodeId === propsRef.current.nodeId && pendingInput.parentId === propsRef.current.parentId) {
+            useUIStore.getState().setPendingInputChar(null);
           }
           return false;
         },
         compositionstart: () => {
           isComposingRef.current = true;
+          const pendingInput = useUIStore.getState().pendingInputChar;
+          if (pendingInput && pendingInput.nodeId === propsRef.current.nodeId && pendingInput.parentId === propsRef.current.parentId) {
+            useUIStore.getState().setPendingInputChar(null);
+          }
           return false;
         },
         compositionend: (view) => {

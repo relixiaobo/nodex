@@ -11,7 +11,7 @@
 - 可选择已有标签或创建新标签（输入不存在的名称 → 新建 tagDef）
 - 选择标签后：
   - 节点名称右侧出现彩色 TagBadge（`#TagName`，pill 样式）
-  - 底层创建 Metanode → Tuple[SYS_A13, tagDefId] 链路
+  - 底层创建 Tuple[SYS_A13, tagDefId] 并加入 node.meta
   - 标签模板定义的字段自动添加到节点 children 中（通过 applyTag）
   - 每个字段 tuple 的 `_sourceId` 指向 tagDef 中的模板 tuple
 - 一个节点可以有多个标签（多个 TagBadge 依次排列）
@@ -20,10 +20,8 @@
 
 - Hover TagBadge 时 `#` 变为 `×` 关闭按钮
 - 点击 `×` 移除标签：
-  - 删除 Metanode 中对应的 SYS_A13 Tuple
+  - 从 node.meta 中移除对应的 SYS_A13 Tuple ID，并删除该 Tuple
   - **同时清理**由该标签模板创建的字段 tuple（通过 `_sourceId` 匹配模板 tuple）
-  - 清理对应的 associatedData 和 associationMap 条目
-- Metanode 本身保留（可能有其他标签绑定）
 
 ### TagBadge 显示与交互
 
@@ -61,19 +59,19 @@
 配置字段（SYS_A*/NDX_A* key 的 tuple）与用户字段现在使用**完全相同的数据结构**：
 
 - **Key**: 真实 attrDef 实体节点（如 `attrDef_show_checkbox`），不再使用 SYS_A* 裸 ID 作为 tuple key
-- **Value**: 存储在 AssociatedData 中，通过 associationMap 索引（与用户字段完全一致）
-- **applyTag 统一路径**: 创建 config 和 user 字段 tuple 时都生成 AssociatedData
+- **Value**: 存储在 Tuple.children[1:] 中（与用户字段完全一致）
+- **applyTag 统一路径**: 创建 config 和 user 字段 tuple 时值直接存 children
 - **渲染统一**: `FieldValueOutliner` 处理所有字段类型（OPTIONS picker、plain outliner 等），不再有专用 config 组件
 - **系统保护**: `removeField` 通过检查 tuple key 是否为 `SYS_*` 或 `NDX_*` 前缀来保护系统配置字段不被删除
 - **已删除的专用组件**（5 个）: `ConfigTagPicker`、`ConfigSelect`、`ConfigNumberInput`、`FieldTypePicker`、`ConfigToggle`
-- **DoneMappingEntries** 从 AssociatedData 读取映射数据（统一模型）
+- **DoneMappingEntries** 从 Tuple.children 读取映射数据（统一模型）
 
 ### createTagDef 自动配置
 
 - 新建 tagDef 后自动调用 `applyTag(id, SYS_T01)`
-- 创建 metanode + SYS_A13 tag binding + 5 个直接 config tuple（checkbox/childtag/color/extends/done_mapping）
-- 每个 config tuple 同时创建 AssociatedData + associationMap 条目（统一字段架构）
-- Config tuple 的 key 是真实 attrDef 实体节点（如 `attrDef_show_checkbox`），value 存储在 AssociatedData.children 中
+- 创建 SYS_A13 tag binding 加入 meta + 5 个直接 config tuple（checkbox/childtag/color/extends/done_mapping）
+- 每个 config tuple 的值直接存储在 children 中（统一字段架构）
+- Config tuple 的 key 是真实 attrDef 实体节点（如 `attrDef_show_checkbox`），value 存储在 Tuple.children[1:] 中
 - NDX_A07/A08 嵌套在 NDX_A06 实例的 children 中（递归模板实例化）
 - tagDef 的 `_ownerId` 始终为 `{workspaceId}_SCHEMA`
 
@@ -82,7 +80,7 @@
 - 目标行为（未来）：
   - trashNode(tagDefId) 时自动级联
   - 遍历所有节点，移除 SYS_A13 绑定 tuple
-  - 移除模板来源的字段 tuple（`_sourceId` 匹配）+ associatedData
+  - 移除模板来源的字段 tuple（`_sourceId` 匹配）
   - tagDef 本身移到 Trash
 - 当前行为（2026-02）：`trashNode` 仅将 tagDef 移入 Trash，不自动清理现有引用链路
 
@@ -148,11 +146,11 @@ tagDef.children:
 - `toggleNodeDone` / `cycleNodeCheckbox` 计算 newDone 后，调用 `resolveForwardDoneMapping` 获取要更新的字段
 - isDone=true → 每个 mapping 的 `checkedOptionIds[0]`（取第一个）
 - isDone=false → 每个 mapping 的 `uncheckedOptionIds[0]`
-- 在同一个 `set()` 调用内同时更新 `_done` 和 AssociatedData.children
+- 在同一个 `set()` 调用内同时更新 `_done` 和 Tuple.children 中的 option 值
 
 **反向映射**（Options field → checkbox）:
 - `setOptionsFieldValue` / `autoCollectOption` 设置 option 值后，调用 `resolveReverseDoneMapping`
-- `selectFieldOption`（UI 路径，从 assocDataId 反查内容节点和 attrDefId）— 用于 OutlinerItem inline picker 和 TrailingInput option 选择
+- `selectFieldOption`（UI 路径，从 tupleId 反查内容节点和 attrDefId）— 用于 OutlinerItem inline picker 和 TrailingInput option 选择
 - newOptionId ∈ 任一 mapping 的 `checkedOptionIds` → `{ newDone: true }`
 - newOptionId ∈ 任一 mapping 的 `uncheckedOptionIds` → `{ newDone: false }`
 - 在同一个 `set()` 调用内更新 `_done`
@@ -180,7 +178,7 @@ tagDef.children:
 **核心概念**: 子标签（child tag）"extends" 父标签（parent tag），继承父标签的 **全部模板内容**（字段 + 普通节点），并可添加自己的额外内容。
 
 **Phase 1 已实现（2026-02-15）**:
-- 数据模型：`NDX_A05` (EXTENDS) 属性绑定，存储在 tagDef metanode 中作为 `Tuple [NDX_A05, parentTagDefId]`
+- 数据模型：`NDX_A05` (EXTENDS) 属性绑定，存储在 tagDef meta 中作为 `Tuple [NDX_A05, parentTagDefId]`
 - `applyTag(childTag)` 沿 Extend 链收集所有祖先字段模板，依次实例化到目标节点
 - 字段按 attrDef ID 去重（同一 attrDef 跨继承链只实例化一次）
 - `removeTag(childTag)` 清理继承链上所有模板来源的字段
@@ -228,7 +226,7 @@ tagDef.children:
 **数据模型**:
 ```
 tagDef_article
-  metanode.children:
+  meta:
     - tuple [SYS_A13, SYS_T01]           ← 被 SUPERTAG 系统标签标记
     - tuple [NDX_A05, tagDef_webclip]     ← Extend 绑定（Nodex 自定义属性）
   children:
@@ -242,7 +240,7 @@ tagDef_article
   1. `getExtendsChain()` 沿 Extend 链收集所有祖先标签 ID（ancestor-first 顺序）
   2. 依次实例化 grandparent → parent → child 的所有字段 tuple
   3. 按 attrDef ID 去重（祖先先到先得）
-  4. 在 Metanode 中只绑定子标签（`SYS_A13 → tagDef_article`）
+  4. 在 meta 中只绑定子标签（`SYS_A13 → tagDef_article`）
 
 **配置页展示**（Phase 1.1 已实现）:
 - 子标签配置页中，继承模板项通过**颜色**区分所属（父标签颜色 vs 子标签颜色）
@@ -273,7 +271,7 @@ tagDef_article
 
 **作用**: 纯 AI 辅助——Tana AI 根据 Base Type 理解对象语义。例如 `#collaborator` 设 Base Type = Person，AI 就知道这是一个人。
 
-**数据模型**: 通过 Metanode Tuple `[SYS_A_BASE_TYPE, SYS_T98..SYS_T125]` 绑定。
+**数据模型**: 通过 meta Tuple `[SYS_A_BASE_TYPE, SYS_T98..SYS_T125]` 绑定。
 
 **Nodex 决策**: 暂不实现。如果未来 Nodex AI 需要对象语义识别，可按需引入。Extend 功能不依赖 Base Type。
 
@@ -370,7 +368,7 @@ tagDef_article
 | 2026-02-15 | Extend 提升为 P1（原 P3） | 阻塞 #30 Web Clipping（`#web_clip` → `#article` 等） |
 | 2026-02-15 | Base Type 暂不实现，仅记录参考 | 主要服务 AI 语义识别，Nodex AI 不一定需要 |
 | 2026-02-15 | Extend Phase 1 使用 NDX_A05（非 SYS_A*） | Tana 的 Extend 机制未被逆向确认，使用 Nodex 自有命名空间 |
-| 2026-02-15 | Extend 绑定存储在 metanode 和 config tuple 双写 | metanode 用于 `getExtendsChain()` 遍历，config tuple 用于配置页 tag_picker 渲染 |
+| 2026-02-15 | Extend 绑定存储在 meta 和 config tuple 双写 | meta 用于 `getExtendsChain()` 遍历，config tuple 用于配置页 tag_picker 渲染 |
 | 2026-02-15 | 字段去重按 attrDef ID，祖先优先 | 同一 attrDef 跨继承链只实例化一次，`_sourceId` 指向最早祖先的模板 |
 | 2026-02-15 | 配置页继承项通过 owning tagDef 颜色区分 | OOP 继承视觉：父标签项 = 父色，子标签项 = 子色，无 extend 时无色 |
 | 2026-02-16 | Done state mapping 使用 NDX_A06 Tuple 存储在 tagDef.children | 遵循现有 config tuple 模式，与 SYS_T01 模板一致 |
@@ -387,12 +385,12 @@ tagDef_article
 | 2026-02-16 | NDX_A07/A08 控件从 tag_picker 改为 done_map_entries | "Map checked/unchecked to" 使用普通字段值输入（两步 picker: 选字段 → 选 option），匹配 Tana 行为 |
 | 2026-02-16 | TagDef 配置项重排序 | Color → Extends → Show checkbox → Done mapping → Map checked/unchecked → Default content → Default child supertag |
 | 2026-02-16 | use-node-fields 聚合 NDX_A07/A08 为两个 FieldEntry | 不再逐个嵌套 child 发射，而是聚合为 "Map checked to" + "Map unchecked to" 两个条目，组件内部扫描 toggle children |
-| 2026-02-16 | 统一配置字段架构（issue #20 重构） | Config fields 使用真实 attrDef 实体节点作为 key，values 存储在 AssociatedData 中（与用户字段完全统一） |
+| 2026-02-16 | 统一配置字段架构（issue #20 重构） | Config fields 使用真实 attrDef 实体节点作为 key，values 存储在 Tuple.children 中（与用户字段完全统一） |
 | 2026-02-16 | 删除 5 个专用 config 组件 | ConfigTagPicker/ConfigSelect/ConfigNumberInput/FieldTypePicker/ConfigToggle → FieldValueOutliner 统一渲染 |
-| 2026-02-16 | applyTag 统一创建 AssociatedData | config 和 user field tuple 共享同一代码路径创建 AssociatedData + associationMap |
+| 2026-02-16 | ~~applyTag 统一创建 AssociatedData~~ 已简化 | config 和 user field tuple 值直接存 Tuple.children，无需 AssociatedData |
 | 2026-02-16 | removeField 增加系统配置保护 | tuple key 为 SYS_*/NDX_* 前缀时跳过删除，防止用户误删系统配置字段 |
 | 2026-02-16 | ConfigOutliner 使用 isSystemConfig 标志 | 不再用 dataType 前缀判断，改用 FieldEntry.isSystemConfig 语义标志区分系统配置与用户模板 |
-| 2026-02-16 | DoneMappingEntries 读取 AssociatedData | 统一模型下映射条目从 AssociatedData.children 读取，不再直接读 tuple.children |
+| 2026-02-16 | DoneMappingEntries 读取 Tuple.children | 统一模型下映射条目直接从 Tuple.children 读取 |
 | 2026-02-16 | Color Swatch 预置 10 色（含灰色），不开放自由取色 | 设计系统一致性 + 避免用户选择不协调颜色；灰色保留给系统预置 supertag（SYS_T*） |
 | 2026-02-16 | Color 使用新增 NDX_D* 数据类型，不复用 Options | Color 是固定色板索引，非用户可编辑选项列表，语义不同 |
 | 2026-02-16 | getTagColor() 优先级：SYS_A11 配置值 → 确定性哈希 fallback | 向后兼容：未配置颜色的标签保持现有哈希行为 |
@@ -401,11 +399,13 @@ tagDef_article
 | 2026-02-16 | Color Swatch 实现为 ColorSwatchPicker 组件 | 10 个圆点，click 选择/toggle 清除，存储命名色 key (e.g. "violet") |
 | 2026-02-16 | 所有颜色消费者统一切换到 resolveTagColor | TagBadge/OutlinerItem/NodePicker/ConfigOutliner 四处统一，需要 entities 参数 |
 | 2026-02-16 | NDX_D02 (COLOR) 注册为新数据类型 | FieldValueOutliner 新增 COLOR 分支渲染 ColorSwatchPicker |
+| 2026-02-18 | 消除 Metanode 间接层，用 node.meta TEXT[] 替代 | PostgreSQL 原生数组替代 Firebase 容器节点 |
+| 2026-02-18 | 消除 AssociatedData，值直接存 Tuple.children[1:] | Tuple 本身就是列表，无需额外容器 |
 
 ## 当前状态
 
 - [x] `#` 触发 TagSelector
-- [x] 应用标签（Metanode + SYS_A13 Tuple 链路）
+- [x] 应用标签（node.meta + SYS_A13 Tuple 链路）
 - [x] TagBadge 显示 + 彩色哈希
 - [x] TagBadge 点击导航到 tagDef
 - [x] TagBadge 右键菜单（Remove / Configure tag）

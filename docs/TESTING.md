@@ -207,6 +207,7 @@ npm run test:run
 1. applyTag/removeTag（模板字段实例化与清理）
 2. add/remove reference 去重与删除
 3. reference ↔ inline conversion 临时节点替换链路（临时节点内容为 `\uFFFC + _inlineRefs`）
+4. **数据模型变更**: applyTag 写入 node.meta 而非 Metanode.children
 
 ### 1.8 字段状态流（Node Store）
 
@@ -215,9 +216,9 @@ npm run test:run
 **覆盖点**:
 
 1. `setFieldValue` 对已有字段值节点的创建/复用/更新
-2. 缺失字段时自动创建 tuple + value + associatedData
+2. 缺失字段时自动创建 tuple + value（值直接存 Tuple.children）
 3. `addFieldToNode` 去重与 `setOptionsFieldValue` 单选写入
-4. `removeField` 清理 associationMap 并将 tuple/associatedData 移入 Trash
+4. `removeField` 将 tuple 移入 Trash
 5. `removeField` 系统配置保护：tuple key 为 SYS_*/NDX_* 前缀时跳过删除（防误删 config field）
 6. `toggleCheckboxField` 的 `YES/NO` 切换链路
 7. `addUnnamedFieldToNode` 的原地插入（`afterChildId`）与 attrDef 初始化
@@ -225,7 +226,7 @@ npm run test:run
 9. `removeFieldOption` 从 attrDef children 移除并删除 option 节点
 10. `replaceFieldAttrDef` 的占位 attrDef 置换与重复字段保护
 11. `changeFieldType` / `setConfigValue` 配置 tuple 原地更新
-12. `moveFieldTuple` 跨父节点迁移 tuple 时同步 `associationMap` 与 `_ownerId`
+12. `moveFieldTuple` 跨父节点迁移 tuple 时同步 `_ownerId`
 
 ### 1.9 Schema / Supertag 构建链路
 
@@ -234,10 +235,10 @@ npm run test:run
 **覆盖点**:
 
 1. `createTagDef` 自动归属 SCHEMA + 自动应用 `SYS_T01`（7 个 config tuple：checkbox/childtag/color/extends/done_mapping/checked/unchecked）
-2. **统一配置字段架构验证**: 所有 config tuple 通过 associationMap 关联 AssociatedData（与用户字段同结构）
+2. **统一配置字段架构验证**: 所有 config tuple 值直接存 Tuple.children（与用户字段同结构）
 3. Config tuple key 为真实 attrDef 实体节点（`attrDef_show_checkbox` 等），非裸 SYS_A* ID
-4. `createAttrDef` 的 template tuple/type tuple/`SYS_T02` 配置链路（含 AssociatedData 默认值）
-5. 新建 `attrDef` 在后续 `applyTag` 中被正确实例化到内容节点（含 associationMap 验证）
+4. `createAttrDef` 的 template tuple/type tuple/`SYS_T02` 配置链路
+5. 新建 `attrDef` 在后续 `applyTag` 中被正确实例化到内容节点
 
 ### 1.10 Supertag Extend（继承）
 
@@ -442,7 +443,7 @@ npm run test:run
 1. 有效最小图返回空错误列表
 2. owner 缺失 / owner-child 不一致 / child 重复 ID 报错
 3. tuple value 引用节点不触发 owner-child mismatch 误报
-4. associationMap key/value 缺失报错
+4. meta 数组中的 ID 都指向存在的 tuple 节点
 
 ### 1.29 Field Utils 解析与映射
 
@@ -549,7 +550,7 @@ hash trigger cleanup safety（2 cases, Bug #53 回归）:
 
 1. `tagDef` 节点被过滤（不出现在搜索结果中）
 2. `attrDef` 节点被过滤
-3. `tuple` / `metanode` 节点被过滤
+3. `tuple` 节点被过滤（metanode docType 已废弃）
 4. 普通内容节点正常返回
 
 ### 1.36 Workspace Store 认证状态与持久化
@@ -575,6 +576,21 @@ hash trigger cleanup safety（2 cases, Bug #53 回归）:
 5. `heading` 命令处于 enabled 状态
 6. 全部禁用时返回 `-1`
 
+### 1.47 Meta-Utils 工具函数
+
+**测试文件**: `tests/vitest/meta-utils.test.ts`
+
+**覆盖点**:
+1. `getMetaTuples` 正确返回 meta 数组中的 tuple 节点
+2. `getMetaTuples` 跳过不存在的 ID
+3. `getMetaTuples` 空 meta 返回空数组
+4. `findMetaTuple` 按 children[0] key 查找（如 SYS_A13）
+5. `findMetaTuple` 未找到返回 undefined
+6. `addMetaTupleId` 追加新 ID
+7. `addMetaTupleId` 去重（已存在的 ID 不重复添加）
+8. `removeMetaTupleId` 移除存在的 ID
+9. `removeMetaTupleId` 对不存在的 ID 返回原数组
+
 ### 1.43 Floating Toolbar 循环渲染防回归
 
 **测试文件**: `tests/vitest/floating-toolbar.test.ts`
@@ -592,7 +608,7 @@ hash trigger cleanup safety（2 cases, Bug #53 回归）:
 
 **测试文件**: `tests/vitest/done-state-mapping.test.ts`
 
-**说明**: DoneMappingEntries 从 AssociatedData 读取映射数据（统一配置字段架构）。DoneMappingEntries selectors 使用 JSON.stringify 防止 React 19 无限循环。
+**说明**: DoneMappingEntries 从 Tuple.children 读取映射数据（统一配置字段架构）。DoneMappingEntries selectors 使用 JSON.stringify 防止 React 19 无限循环。
 
 **覆盖点**:
 
@@ -861,6 +877,7 @@ createSibling 自动标签（2 cases）:
 | 1.44 | PM EditorView 操作工具 | PASS/FAIL |
 | 1.45 | ConfigOutliner TrailingInput 显示规则 | PASS/FAIL |
 | 1.46 | FieldValueOutliner TrailingInput 显示规则 | PASS/FAIL |
+| 1.47 | Meta-Utils 工具函数 | PASS/FAIL |
 | 2 | 视觉渲染 | PASS/FAIL/SKIP |
 | 3 | 扩展构建 | PASS/FAIL |
 
@@ -892,7 +909,7 @@ Containers: ws_default_LIBRARY, ws_default_INBOX, ws_default_JOURNAL,
             ws_default_SEARCHES, ws_default_TRASH, ws_default_SCHEMA
 Schema:     tagDef_task, tagDef_person, tagDef_dev_task, tagDef_web_clip,
             attrDef_status/priority/due/email/company/source_url + type tuples + option nodes
-Pre-tagged: task_1 → #Task (meta_task_1, field tuples, associatedData, checkbox=YES)
+Pre-tagged: task_1 → #Task (meta: [tag_tuple, cb_tuple], field tuples in children, checkbox=YES)
             webclip_1 → #web_clip (Source URL = https://medium.com/example-article)
 
 默认展开: proj_1, task_1, task_2, note_rich
@@ -911,7 +928,7 @@ Pre-tagged: task_1 → #Task (meta_task_1, field tuples, associatedData, checkbo
 | 5 | **createSibling 父节点** | `node-store.ts` | 安全测试节点：`subtask_1a`（父 `task_1` 始终存在） |
 | 6 | **BulletChevron** | `BulletChevron.tsx` | Tana: bullet 始终可见，chevron 仅 hover/expanded 时显示 |
 | 7 | **Zustand selector 无限循环** | hooks/*.ts | React 19 + Zustand v5: selector 返回新引用 → `useShallow` 或 JSON.stringify |
-| 8 | **内部结构节点泄漏** | `OutlinerItem.tsx` | 必须过滤 `tuple/metanode/associatedData` 类型子节点 |
+| 8 | **内部结构节点泄漏** | `OutlinerItem.tsx` | 必须过滤 `tuple` 类型子节点（metanode/associatedData 已废弃） |
 | 9 | **outdent 容器边界** | `node-store.ts` | 父节点是容器时 outdent 应为 no-op |
 | 10 | **BulletChevron rotate** | `BulletChevron.tsx` | 旋转条件必须 `hasChildren && isExpanded` |
 

@@ -27,7 +27,7 @@ _(空)_
 
 | Agent | 当前任务 | 分支 | 修改中的文件 |
 |-------|---------|------|-------------|
-| nodex-cc | 用户认证 — Google 登录 (#45) | cc/google-auth | `src/lib/auth.ts`, `src/components/auth/*`, `workspace-store.ts` |
+| nodex-cc | 数据模型简化：消除 Metanode + AssociatedData | cc/simplify-data-model | `node-store.ts`, `node.ts`, `seed-data.ts`, `tag-service.ts`, `meta-utils.ts` (new) |
 | nodex-cc-2 | 性能基线测量 | cc2/perf-baseline | `docs/research/performance-baseline.md` |
 | nodex-codex | _(idle)_ | — | — |
 
@@ -230,7 +230,7 @@ _(空)_
 - **Spec**: `docs/features/views.md`
 
 #### 用户认证 — Google 登录 (#45)
-> **Owner: nodex-cc** | 上线前必需
+> 上线前必需（已延迟，等数据模型简化完成后再启动）
 > **Spec**: `docs/features/auth-and-environments.md`
 
 - [ ] 环境配置：固定 Dev Extension ID + `.env` / `.env.production` 双套

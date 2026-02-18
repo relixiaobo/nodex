@@ -79,6 +79,7 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
   const userId = useWorkspaceStore((s) => s.userId);
   const setExpanded = useUIStore((s) => s.setExpanded);
   const setFocusedNode = useUIStore((s) => s.setFocusedNode);
+  const setFocusClickCoords = useUIStore((s) => s.setFocusClickCoords);
   const setEditingFieldName = useUIStore((s) => s.setEditingFieldName);
   const setTriggerHint = useUIStore((s) => s.setTriggerHint);
 
@@ -122,7 +123,7 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
     createChild, addUnnamedFieldToNode, addReference, selectFieldOption, wsId, userId,
     parentId, effectiveParentId, effectiveDepth, effectiveParentEK,
     setEffectiveParentId, setEffectiveDepth, setEffectiveParentEK,
-    setExpanded, setFocusedNode, setEditingFieldName, setTriggerHint,
+    setExpanded, setFocusedNode, setFocusClickCoords, setEditingFieldName, setTriggerHint,
     isOptions, optionsOpen, filteredOptions, optionsIndex,
     setOptionsOpen, setOptionsQuery, setOptionsIndex,
     onNavigateOut,
@@ -131,7 +132,7 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
     createChild, addUnnamedFieldToNode, addReference, selectFieldOption, wsId, userId,
     parentId, effectiveParentId, effectiveDepth, effectiveParentEK,
     setEffectiveParentId, setEffectiveDepth, setEffectiveParentEK,
-    setExpanded, setFocusedNode, setEditingFieldName, setTriggerHint,
+    setExpanded, setFocusedNode, setFocusClickCoords, setEditingFieldName, setTriggerHint,
     isOptions, optionsOpen, filteredOptions, optionsIndex,
     setOptionsOpen, setOptionsQuery, setOptionsIndex,
     onNavigateOut,
@@ -151,6 +152,11 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
     // so we focus the new node to keep the cursor visible)
     ref.createChild(ref.effectiveParentId, ref.wsId, ref.userId, rawText).then((newNode) => {
       ref.setExpanded(ref.effectiveParentEK, true);
+      ref.setFocusClickCoords({
+        nodeId: newNode.id,
+        parentId: ref.effectiveParentId,
+        textOffset: rawText.length,
+      });
       ref.setFocusedNode(newNode.id, ref.effectiveParentId);
       queueMicrotask(() => { committingRef.current = false; });
     });
@@ -190,6 +196,11 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
             committingRef.current = true;
             ref.createChild(ref.effectiveParentId, ref.wsId, ref.userId, '').then((newNode) => {
               ref.setExpanded(ref.effectiveParentEK, true);
+              ref.setFocusClickCoords({
+                nodeId: newNode.id,
+                parentId: ref.effectiveParentId,
+                textOffset: 0,
+              });
               ref.setFocusedNode(newNode.id, ref.effectiveParentId);
               queueMicrotask(() => { committingRef.current = false; });
             });

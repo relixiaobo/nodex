@@ -295,6 +295,13 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     }
     return null;
   }, [visibleChildren, revealedFieldIds]);
+  const firstRenderableChild = useMemo(() => {
+    for (let i = 0; i < visibleChildren.length; i++) {
+      const child = visibleChildren[i];
+      if (!child.hidden || revealedFieldIds.has(child.id)) return child;
+    }
+    return null;
+  }, [visibleChildren, revealedFieldIds]);
   const shouldShowTrailingInput = !lastRenderableChild || lastRenderableChild.type === 'field';
   const isFocused = focusedNodeId === nodeId &&
     (focusedParentId === null || focusedParentId === parentId);
@@ -1278,6 +1285,23 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   }, [nodeId, parentId, rootNodeId, rootChildIds, entities, expandedNodes, setFocusedNode, onNavigateOut, renderableSiblings, clearFocus, setEditingFieldName]);
 
   const handleArrowDown = useCallback(() => {
+    // When expanded, ArrowDown first enters this node's child scope
+    // (field rows/content rows/trailing row) before leaving to siblings.
+    if (isExpanded) {
+      if (firstRenderableChild) {
+        if (firstRenderableChild.type === 'field') {
+          clearFocus();
+          setEditingFieldName(firstRenderableChild.id);
+          return;
+        }
+        setFocusedNode(firstRenderableChild.id, nodeId);
+        return;
+      }
+      if (shouldShowTrailingInput && focusTrailingInputForParent(nodeId)) {
+        return;
+      }
+    }
+
     const siblingIndex = renderableSiblings.findIndex((item) => item.type === 'content' && item.id === nodeId);
     if (siblingIndex >= 0 && siblingIndex < renderableSiblings.length - 1) {
       const nextSibling = renderableSiblings[siblingIndex + 1];
@@ -1306,7 +1330,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     } else if (onNavigateOut) {
       onNavigateOut('down');
     }
-  }, [nodeId, parentId, rootNodeId, rootChildIds, entities, expandedNodes, setFocusedNode, onNavigateOut, renderableSiblings, clearFocus, setEditingFieldName]);
+  }, [nodeId, parentId, rootNodeId, rootChildIds, entities, expandedNodes, isExpanded, shouldShowTrailingInput, firstRenderableChild, setFocusedNode, onNavigateOut, renderableSiblings, clearFocus, setEditingFieldName]);
 
   const handleMoveUp = useCallback(() => {
     if (!userId) return;

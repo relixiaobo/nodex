@@ -96,7 +96,7 @@ describe('trailing input navigation resolver', () => {
         hasLastVisibleTarget: true,
         hasNavigateOut: true,
       }),
-    ).toBe('focus_last_visible');
+    ).toBe('navigate_out_up');
 
     expect(
       resolveTrailingArrowUpIntent({

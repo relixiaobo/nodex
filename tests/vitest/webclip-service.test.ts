@@ -153,11 +153,8 @@ describe('webclip-service', () => {
       expect(valueNodeId).toBeDefined();
       expect(entities[valueNodeId!]?.props.name).toBe('https://example.com/test');
 
-      // Check value node is also in associatedData.children (for FieldValueOutliner rendering)
-      const assocId = clip!.associationMap?.[urlTuple!];
-      expect(assocId).toBeDefined();
-      const assoc = entities[assocId!];
-      expect(assoc?.children).toContain(valueNodeId);
+      // Value is stored directly in tuple.children[1]
+      expect(tuple?.children?.[1]).toBe(valueNodeId);
     });
 
     it('sets description when available', async () => {
@@ -283,11 +280,8 @@ describe('webclip-service', () => {
       const valueNodeId = tuple?.children?.[1];
       expect(entities[valueNodeId!]?.props.name).toBe('https://example.com/clipped');
 
-      // Check value node is also in associatedData.children
-      const assocId = node.associationMap?.[urlTuple!];
-      expect(assocId).toBeDefined();
-      const assoc = entities[assocId!];
-      expect(assoc?.children).toContain(valueNodeId);
+      // Value is stored directly in tuple.children[1]
+      expect(tuple?.children?.[1]).toBe(valueNodeId);
     });
 
     it('sets description on existing node', async () => {

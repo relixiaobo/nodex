@@ -4,8 +4,8 @@
  * Creates a realistic outliner tree with various node types
  * to exercise all outliner interactions.
  *
- * Unified config field architecture: config tuples use the same data model
- * as regular fields (Tuple + AssociatedData). System attrDef nodes (SYS_A, NDX_A)
+ * Config tuples store values directly in Tuple.children[1:].
+ * System attrDef nodes (SYS_A, NDX_A)
  * are created as real attrDef entities, enabling a single rendering path.
  */
 import { useNodeStore } from '../../stores/node-store';
@@ -46,8 +46,8 @@ function makeNode(
 }
 
 /**
- * Create a config tuple + AssociatedData pair.
- * Returns [tuple, assoc] nodes and a mapping entry { tupleId: assocId }.
+ * Create a config tuple with value stored directly in children[1].
+ * Returns tuple node and its childId (for parent's children array).
  */
 function makeConfigEntry(
   tupleId: string,
@@ -55,12 +55,11 @@ function makeConfigEntry(
   key: string,
   value: string | undefined,
   sourceId?: string,
-): { nodes: NodexNode[]; map: Record<string, string> } {
-  const assocId = `${tupleId}_assoc`;
-  const tuple = makeNode(tupleId, '', owner, [key], 'tuple');
+): { nodes: NodexNode[]; childId: string } {
+  const tupleChildren = value !== undefined ? [key, value] : [key];
+  const tuple = makeNode(tupleId, '', owner, tupleChildren, 'tuple');
   if (sourceId) tuple.props._sourceId = sourceId;
-  const assoc = makeNode(assocId, '', owner, value ? [value] : [], 'associatedData');
-  return { nodes: [tuple, assoc], map: { [tupleId]: assocId } };
+  return { nodes: [tuple], childId: tupleId };
 }
 
 export function seedTestData() {
@@ -139,12 +138,6 @@ export function seedTestData() {
         ...makeNode('task_1', 'Design the data model', 'proj_1').props,
       },
       meta: ['meta_task_1_tag'],
-      associationMap: {
-        task1_fld_status: 'task1_assoc_status',
-        task1_fld_priority: 'task1_assoc_priority',
-        task1_fld_due: 'task1_assoc_due',
-        task1_fld_done: 'task1_assoc_done',
-      },
     },
     makeNode('subtask_1a', 'Define node types and properties', 'task_1', []),
     makeNode('subtask_1b', 'Create database migration', 'task_1', []),
@@ -176,12 +169,6 @@ export function seedTestData() {
         ...makeNode('person_1', 'Alice Johnson', libraryId).props,
       },
       meta: ['meta_person_1_tag'],
-      associationMap: {
-        person1_fld_email: 'person1_assoc_email',
-        person1_fld_company: 'person1_assoc_company',
-        person1_fld_age: 'person1_assoc_age',
-        person1_fld_website: 'person1_assoc_website',
-      },
     },
   ];
 
@@ -293,13 +280,13 @@ export function seedTestData() {
     makeNode(`${SYS_A.DONE_STATE_MAPPING}_type`, '', SYS_A.DONE_STATE_MAPPING, [SYS_A.TYPE_CHOICE, SYS_D.BOOLEAN], 'tuple'),
   ];
 
-  // NDX_A07 Map checked to — PLAIN type (entries in AssociatedData)
+  // NDX_A07 Map checked to — PLAIN type (entries in Tuple.children[1:])
   const sysAttrDefDoneChecked: NodexNode[] = [
     makeNode(SYS_A.DONE_MAP_CHECKED, 'Map checked to', schemaId, [`${SYS_A.DONE_MAP_CHECKED}_type`], 'attrDef'),
     makeNode(`${SYS_A.DONE_MAP_CHECKED}_type`, '', SYS_A.DONE_MAP_CHECKED, [SYS_A.TYPE_CHOICE, SYS_D.PLAIN], 'tuple'),
   ];
 
-  // NDX_A08 Map unchecked to — PLAIN type (entries in AssociatedData)
+  // NDX_A08 Map unchecked to — PLAIN type (entries in Tuple.children[1:])
   const sysAttrDefDoneUnchecked: NodexNode[] = [
     makeNode(SYS_A.DONE_MAP_UNCHECKED, 'Map unchecked to', schemaId, [`${SYS_A.DONE_MAP_UNCHECKED}_type`], 'attrDef'),
     makeNode(`${SYS_A.DONE_MAP_UNCHECKED}_type`, '', SYS_A.DONE_MAP_UNCHECKED, [SYS_A.TYPE_CHOICE, SYS_D.PLAIN], 'tuple'),
@@ -416,7 +403,7 @@ export function seedTestData() {
   ];
 
   // ═══════════════════════════════════════════════════════════════
-  // User AttrDef nodes — each with unified config tuples + AssociatedData
+  // User AttrDef nodes — each with config tuples (values in children[1:])
   // ═══════════════════════════════════════════════════════════════
 
   // Helper: create standard attrDef config tuples for SYS_T02 template
@@ -426,10 +413,10 @@ export function seedTestData() {
     const maxValueNodeId = extra?.max !== undefined ? `${prefix}_max_val` : undefined;
     const extraNodes: NodexNode[] = [];
     if (minValueNodeId && extra?.min !== undefined) {
-      extraNodes.push(makeNode(minValueNodeId, extra.min, `${prefix}_min_assoc`));
+      extraNodes.push(makeNode(minValueNodeId, extra.min, `${prefix}_min`));
     }
     if (maxValueNodeId && extra?.max !== undefined) {
-      extraNodes.push(makeNode(maxValueNodeId, extra.max, `${prefix}_max_assoc`));
+      extraNodes.push(makeNode(maxValueNodeId, extra.max, `${prefix}_max`));
     }
 
     const entries = [
@@ -443,10 +430,8 @@ export function seedTestData() {
       makeConfigEntry(`${prefix}_max`, owner, SYS_A.MAX_VALUE, maxValueNodeId, 'sysT02_tpl_max'),
     ];
     const nodes = [...entries.flatMap(e => e.nodes), ...extraNodes];
-    const map: Record<string, string> = {};
-    for (const e of entries) Object.assign(map, e.map);
-    const childIds = entries.map(e => Object.keys(e.map)[0]);
-    return { nodes, map, childIds };
+    const childIds = entries.map(e => e.childId);
+    return { nodes, childIds };
   }
 
   // AttrDef: Status (OPTIONS)
@@ -458,7 +443,6 @@ export function seedTestData() {
       ], 'attrDef'),
       props: { ...makeNode('attrDef_status', '', '').props, _docType: 'attrDef' as DocType, name: 'Status', _ownerId: 'taskField_status' },
       meta: ['meta_attrDef_status_tag'],
-      associationMap: statusCfg.map,
     },
     ...statusCfg.nodes,
     makeNode('opt_todo', 'To Do', 'attrDef_status'),
@@ -475,7 +459,6 @@ export function seedTestData() {
       ], 'attrDef'),
       props: { ...makeNode('attrDef_priority', '', '').props, _docType: 'attrDef' as DocType, name: 'Priority', _ownerId: 'taskField_priority' },
       meta: ['meta_attrDef_priority_tag'],
-      associationMap: priorityCfg.map,
     },
     ...priorityCfg.nodes,
     makeNode('opt_high', 'High', 'attrDef_priority'),
@@ -490,7 +473,6 @@ export function seedTestData() {
       ...makeNode('attrDef_due', 'Due', 'taskField_due', dueCfg.childIds, 'attrDef'),
       props: { ...makeNode('attrDef_due', '', '').props, _docType: 'attrDef' as DocType, name: 'Due', _ownerId: 'taskField_due' },
       meta: ['meta_attrDef_due_tag'],
-      associationMap: dueCfg.map,
     },
     ...dueCfg.nodes,
   ];
@@ -502,7 +484,6 @@ export function seedTestData() {
       ...makeNode('attrDef_email', 'Email', 'personField_email', emailCfg.childIds, 'attrDef'),
       props: { ...makeNode('attrDef_email', '', '').props, _docType: 'attrDef' as DocType, name: 'Email', _ownerId: 'personField_email' },
       meta: ['meta_attrDef_email_tag'],
-      associationMap: emailCfg.map,
     },
     ...emailCfg.nodes,
   ];
@@ -514,7 +495,6 @@ export function seedTestData() {
       ...makeNode('attrDef_company', 'Company', 'personField_company', companyCfg.childIds, 'attrDef'),
       props: { ...makeNode('attrDef_company', '', '').props, _docType: 'attrDef' as DocType, name: 'Company', _ownerId: 'personField_company' },
       meta: ['meta_attrDef_company_tag'],
-      associationMap: companyCfg.map,
     },
     ...companyCfg.nodes,
   ];
@@ -526,7 +506,6 @@ export function seedTestData() {
       ...makeNode('attrDef_age', 'Age', 'personField_age', ageCfg.childIds, 'attrDef'),
       props: { ...makeNode('attrDef_age', '', '').props, _docType: 'attrDef' as DocType, name: 'Age', _ownerId: 'personField_age' },
       meta: ['meta_attrDef_age_tag'],
-      associationMap: ageCfg.map,
     },
     ...ageCfg.nodes,
   ];
@@ -538,7 +517,6 @@ export function seedTestData() {
       ...makeNode('attrDef_website', 'Website', 'personField_website', websiteCfg.childIds, 'attrDef'),
       props: { ...makeNode('attrDef_website', '', '').props, _docType: 'attrDef' as DocType, name: 'Website', _ownerId: 'personField_website' },
       meta: ['meta_attrDef_website_tag'],
-      associationMap: websiteCfg.map,
     },
     ...websiteCfg.nodes,
   ];
@@ -550,7 +528,6 @@ export function seedTestData() {
       ...makeNode('attrDef_done', 'Done', 'taskField_done', doneCfg.childIds, 'attrDef'),
       props: { ...makeNode('attrDef_done', '', '').props, _docType: 'attrDef' as DocType, name: 'Done', _ownerId: 'taskField_done' },
       meta: ['meta_attrDef_done_tag'],
-      associationMap: doneCfg.map,
     },
     ...doneCfg.nodes,
   ];
@@ -562,7 +539,6 @@ export function seedTestData() {
       ...makeNode('attrDef_branch', 'Branch', 'devTaskField_branch', branchCfg.childIds, 'attrDef'),
       props: { ...makeNode('attrDef_branch', '', '').props, _docType: 'attrDef' as DocType, name: 'Branch', _ownerId: 'devTaskField_branch' },
       meta: ['meta_attrDef_branch_tag'],
-      associationMap: branchCfg.map,
     },
     ...branchCfg.nodes,
   ];
@@ -574,7 +550,6 @@ export function seedTestData() {
       ...makeNode('attrDef_source_url', 'Source URL', 'webClipField_source_url', sourceUrlCfg.childIds, 'attrDef'),
       props: { ...makeNode('attrDef_source_url', '', '').props, _docType: 'attrDef' as DocType, name: 'Source URL', _ownerId: 'webClipField_source_url' },
       meta: ['meta_attrDef_source_url_tag'],
-      associationMap: sourceUrlCfg.map,
     },
     ...sourceUrlCfg.nodes,
   ];
@@ -594,7 +569,7 @@ export function seedTestData() {
   ];
 
   // ═══════════════════════════════════════════════════════════════
-  // TagDef nodes — config tuples use unified model (AssociatedData)
+  // TagDef nodes — config tuples use direct value model (Tuple.children[1:])
   // ═══════════════════════════════════════════════════════════════
 
   // Helper: create tagDef config tuples from SYS_T01 template
@@ -612,29 +587,27 @@ export function seedTestData() {
       makeConfigEntry(`${prefix}_cfg_childtag`, owner, SYS_A.CHILD_SUPERTAG, undefined, 'sysT01_tpl_childtag'),
     ];
     const nodes = entries.flatMap(e => e.nodes);
-    const map: Record<string, string> = {};
-    for (const e of entries) Object.assign(map, e.map);
-    const childIds = entries.map(e => Object.keys(e.map)[0]);
+    const childIds = entries.map(e => e.childId);
 
-    // Add done mapping entries to AssociatedData if provided
+    // Add done mapping entries directly to tuple's children (after the key)
     if (opts.doneCheckedEntries?.length) {
-      const assocId = `${prefix}_cfg_done_checked_assoc`;
-      const assoc = nodes.find(n => n.id === assocId);
-      if (assoc) {
-        assoc.children = opts.doneCheckedEntries.map(e => e.id);
+      const tupleId = `${prefix}_cfg_done_checked`;
+      const tuple = nodes.find(n => n.id === tupleId);
+      if (tuple) {
+        tuple.children = [...(tuple.children ?? []), ...opts.doneCheckedEntries.map(e => e.id)];
         nodes.push(...opts.doneCheckedEntries);
       }
     }
     if (opts.doneUncheckedEntries?.length) {
-      const assocId = `${prefix}_cfg_done_unchecked_assoc`;
-      const assoc = nodes.find(n => n.id === assocId);
-      if (assoc) {
-        assoc.children = opts.doneUncheckedEntries.map(e => e.id);
+      const tupleId = `${prefix}_cfg_done_unchecked`;
+      const tuple = nodes.find(n => n.id === tupleId);
+      if (tuple) {
+        tuple.children = [...(tuple.children ?? []), ...opts.doneUncheckedEntries.map(e => e.id)];
         nodes.push(...opts.doneUncheckedEntries);
       }
     }
 
-    return { nodes, map, childIds };
+    return { nodes, childIds };
   }
 
   // TagDef: Task (with done state mapping)
@@ -643,11 +616,11 @@ export function seedTestData() {
     checkbox: SYS_V.YES,
     doneMapping: SYS_V.YES,
     doneCheckedEntries: [
-      makeNode('tagDef_task_dm_checked_1', '', 'tagDef_task_cfg_done_checked_assoc',
+      makeNode('tagDef_task_dm_checked_1', '', 'tagDef_task_cfg_done_checked',
         [SYS_A.DONE_MAP_CHECKED, 'attrDef_status', 'opt_done'], 'tuple'),
     ],
     doneUncheckedEntries: [
-      makeNode('tagDef_task_dm_unchecked_1', '', 'tagDef_task_cfg_done_unchecked_assoc',
+      makeNode('tagDef_task_dm_unchecked_1', '', 'tagDef_task_cfg_done_unchecked',
         [SYS_A.DONE_MAP_UNCHECKED, 'attrDef_status', 'opt_todo'], 'tuple'),
     ],
   });
@@ -660,7 +633,6 @@ export function seedTestData() {
       ], 'tagDef'),
       props: { ...makeNode('tagDef_task', '', '').props, _docType: 'tagDef' as DocType, name: 'Task', _ownerId: schemaId },
       meta: ['meta_tagDef_task_tag'],
-      associationMap: taskCfg.map,
     },
     ...taskCfg.nodes,
     makeNode('taskField_status', '', 'tagDef_task', ['attrDef_status'], 'tuple'),
@@ -684,7 +656,6 @@ export function seedTestData() {
         description: 'Tag for tracking people and their contact info',
       },
       meta: ['meta_tagDef_person_tag'],
-      associationMap: personCfg.map,
     },
     ...personCfg.nodes,
     makeNode('personField_email', '', 'tagDef_person', ['attrDef_email'], 'tuple'),
@@ -710,7 +681,6 @@ export function seedTestData() {
         description: 'Dev task extending Task with a Branch field',
       },
       meta: ['meta_tagDef_dev_task_tag'],
-      associationMap: devTaskCfg.map,
     },
     ...devTaskCfg.nodes,
     makeNode('devTaskField_branch', '', 'tagDef_dev_task', ['attrDef_branch'], 'tuple'),
@@ -726,7 +696,6 @@ export function seedTestData() {
       ], 'tagDef'),
       props: { ...makeNode('tagDef_web_clip', '', '').props, _docType: 'tagDef' as DocType, name: 'web_clip', _ownerId: schemaId },
       meta: ['meta_tagDef_web_clip_tag'],
-      associationMap: webClipCfg.map,
     },
     ...webClipCfg.nodes,
     makeNode('webClipField_source_url', '', 'tagDef_web_clip', ['attrDef_source_url'], 'tuple'),
@@ -749,10 +718,6 @@ export function seedTestData() {
     makeNode('task1_fld_priority', '', 'task_1', ['attrDef_priority'], 'tuple'),
     makeNode('task1_fld_due', '', 'task_1', ['attrDef_due'], 'tuple'),
     makeNode('task1_fld_done', '', 'task_1', ['attrDef_done'], 'tuple'),
-    makeNode('task1_assoc_status', '', 'task_1', [], 'associatedData'),
-    makeNode('task1_assoc_priority', '', 'task_1', [], 'associatedData'),
-    makeNode('task1_assoc_due', '', 'task_1', [], 'associatedData'),
-    makeNode('task1_assoc_done', '', 'task_1', [], 'associatedData'),
   ];
   task1FieldNodes[0].props._sourceId = 'taskField_status';
   task1FieldNodes[1].props._sourceId = 'taskField_priority';
@@ -768,10 +733,6 @@ export function seedTestData() {
     makeNode('person1_fld_company', '', 'person_1', ['attrDef_company'], 'tuple'),
     makeNode('person1_fld_age', '', 'person_1', ['attrDef_age'], 'tuple'),
     makeNode('person1_fld_website', '', 'person_1', ['attrDef_website'], 'tuple'),
-    makeNode('person1_assoc_email', '', 'person_1', [], 'associatedData'),
-    makeNode('person1_assoc_company', '', 'person_1', [], 'associatedData'),
-    makeNode('person1_assoc_age', '', 'person_1', [], 'associatedData'),
-    makeNode('person1_assoc_website', '', 'person_1', [], 'associatedData'),
   ];
   person1FieldNodes[0].props._sourceId = 'personField_email';
   person1FieldNodes[1].props._sourceId = 'personField_company';
@@ -787,12 +748,10 @@ export function seedTestData() {
         description: 'A sample web clip to demonstrate the clipping feature',
       },
       meta: ['meta_webclip_1_tag'],
-      associationMap: { webclip1_fld_source_url: 'webclip1_assoc_source_url' },
     },
     makeNode('meta_webclip_1_tag', '', 'webclip_1', [SYS_A.NODE_SUPERTAGS, 'tagDef_web_clip'], 'tuple'),
     makeNode('webclip1_fld_source_url', '', 'webclip_1', ['attrDef_source_url', 'webclip1_val_url'], 'tuple'),
-    makeNode('webclip1_val_url', 'https://medium.com/example-article', 'webclip1_assoc_source_url'),
-    makeNode('webclip1_assoc_source_url', '', 'webclip_1', ['webclip1_val_url'], 'associatedData'),
+    makeNode('webclip1_val_url', 'https://medium.com/example-article', 'webclip1_fld_source_url'),
   ];
   webclip1Nodes[2].props._sourceId = 'webClipField_source_url';
 

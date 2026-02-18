@@ -127,10 +127,6 @@ describe('Supertag Extend (Inheritance)', () => {
       const branchFields = findFieldTupleIds(nodeId, 'attrDef_branch');
       expect(branchFields.length).toBe(1);
 
-      // Each field should have associatedData
-      for (const fid of [...statusFields, ...priorityFields, ...dueFields, ...doneFields, ...branchFields]) {
-        expect(node.associationMap?.[fid]).toBeTruthy();
-      }
     });
 
     it('deduplicates fields by attrDef ID across inheritance chain', async () => {

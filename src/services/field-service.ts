@@ -61,8 +61,6 @@ export async function getFieldValues(
       tupleNode: child,
       valueNodeId,
       valueNode: valueNode ?? undefined,
-      // associatedData（如果存在）
-      associatedDataId: node.associationMap?.[child.id],
     };
   }
 
@@ -180,33 +178,9 @@ export async function setFieldValue(
       userId,
     );
 
-    // 创建 AssociatedData 节点
-    const associatedData = await createNode(
-      {
-        workspaceId: node.workspaceId,
-        props: {
-          _docType: 'associatedData',
-          _ownerId: nodeId,
-        },
-      },
-      userId,
-    );
-
     // 更新内容节点
     const newChildren = [...(node.children ?? []), tuple.id];
-    const newAssociationMap = {
-      ...(node.associationMap ?? {}),
-      [tuple.id]: associatedData.id,
-    };
-
-    await updateNode(
-      nodeId,
-      {
-        children: newChildren,
-        associationMap: newAssociationMap,
-      },
-      userId,
-    );
+    await updateNode(nodeId, { children: newChildren }, userId);
   }
 }
 
@@ -308,8 +282,6 @@ export interface FieldValueEntry {
   valueNodeId: string;
   /** 值节点（如果已加载） */
   valueNode?: NodexNode;
-  /** AssociatedData 节点 ID */
-  associatedDataId?: string;
 }
 
 /** 字段值映射 { attrDefId → FieldValueEntry } */

@@ -192,7 +192,7 @@ function collectNewMappings(
 
   // Collect mapping entries from two sources:
   // 1. Nested children of NDX_A06 toggle tuple (legacy nested format)
-  // 2. AssociatedData of NDX_A07/NDX_A08 field tuples (unified format)
+  // 2. NDX_A07/NDX_A08 field tuples — entries in tuple.children[1:]
   const byAttrDef = new Map<string, { checked: string[]; unchecked: string[] }>();
 
   function addEntry(key: string, attrDefId: string, optionId: string) {
@@ -225,18 +225,13 @@ function collectNewMappings(
       continue;
     }
 
-    // Source 2: NDX_A07/A08 field tuples — entries in AssociatedData (unified format)
+    // Source 2: NDX_A07/A08 field tuples — entries in tuple.children[1:]
     if (childKey === SYS_A.DONE_MAP_CHECKED || childKey === SYS_A.DONE_MAP_UNCHECKED) {
-      const assocId = td.associationMap?.[childId];
-      if (assocId) {
-        const assoc = entities[assocId];
-        if (assoc?.children) {
-          for (const entryId of assoc.children) {
-            const entry = entities[entryId];
-            if (entry?.children && entry.children.length >= 3 && entry.props._docType === 'tuple') {
-              addEntry(childKey, entry.children[1], entry.children[2]);
-            }
-          }
+      for (let i = 1; i < child.children.length; i++) {
+        const entryId = child.children[i];
+        const entry = entities[entryId];
+        if (entry?.children && entry.children.length >= 3 && entry.props._docType === 'tuple') {
+          addEntry(childKey, entry.children[1], entry.children[2]);
         }
       }
     }

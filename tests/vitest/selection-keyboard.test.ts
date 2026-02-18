@@ -64,6 +64,12 @@ describe('resolveSelectionKeyboardAction', () => {
     expect(resolveSelectionKeyboardAction(keyEvent('a', { altKey: true }))).toBeNull();
   });
 
+  it('returns null during IME composition events', () => {
+    expect(resolveSelectionKeyboardAction(keyEvent('n', { isComposing: true }))).toBeNull();
+    expect(resolveSelectionKeyboardAction(keyEvent('Process'))).toBeNull();
+    expect(resolveSelectionKeyboardAction(keyEvent('n', { keyCode: 229 }))).toBeNull();
+  });
+
   it('returns null for unhandled special keys', () => {
     expect(resolveSelectionKeyboardAction(keyEvent('F1'))).toBeNull();
     expect(resolveSelectionKeyboardAction(keyEvent('Shift'))).toBeNull();

@@ -39,4 +39,16 @@ describe('selected reference shortcut resolver', () => {
       resolveSelectedReferenceShortcut(new KeyboardEvent('keydown', { key: 'Escape' }), false),
     ).toBe('escape');
   });
+
+  it('ignores IME composition key events', () => {
+    expect(
+      resolveSelectedReferenceShortcut(new KeyboardEvent('keydown', { key: 'a', isComposing: true }), false),
+    ).toBeNull();
+    expect(
+      resolveSelectedReferenceShortcut(new KeyboardEvent('keydown', { key: 'Process' }), false),
+    ).toBeNull();
+    expect(
+      resolveSelectedReferenceShortcut(new KeyboardEvent('keydown', { key: 'a', keyCode: 229 }), false),
+    ).toBeNull();
+  });
 });

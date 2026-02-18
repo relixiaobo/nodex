@@ -21,6 +21,7 @@ import { useUIStore } from '../../stores/ui-store';
 import { WORKSPACE_CONTAINERS, SYS_D } from '../../types';
 import { getLastVisibleNode } from '../../lib/tree-utils.js';
 import { getPrimaryShortcutKey } from '../../lib/shortcut-registry';
+import { isImeComposingEvent } from '../../lib/ime-keyboard.js';
 import { resolveTrailingUpdateAction } from '../../lib/trailing-input-actions.js';
 import {
   resolveTrailingEnterIntent,
@@ -99,6 +100,7 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
   }, [parentId, depth, parentExpandKey]);
 
   const committingRef = useRef(false);
+  const isComposingRef = useRef(false);
   const [hasContent, setHasContent] = useState(false);
   const mountRef = useRef<HTMLDivElement | null>(null);
   const viewRef = useRef<EditorView | null>(null);
@@ -164,10 +166,13 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
   }, []);
 
   const plugins = useMemo<Plugin[]>(() => {
+    const isComposing = (view: EditorView | null | undefined): boolean =>
+      !!view && (view.composing || isComposingRef.current);
+
     return [
       keymap({
         [KEY_TRAILING_ENTER]: (_state, _dispatch, view) => {
-          if (!view) return false;
+          if (!view || isComposing(view)) return false;
           const ref = callbacksRef.current;
           const rawText = getEditorText(view);
           const intent = resolveTrailingEnterIntent({
@@ -235,7 +240,8 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
           });
           return true;
         },
-        [KEY_TRAILING_INDENT]: () => {
+        [KEY_TRAILING_INDENT]: (_state, _dispatch, view) => {
+          if (isComposing(view)) return false;
           // Indent: move effective parent to last child of current parent
           const ref = callbacksRef.current;
           const parent = useNodeStore.getState().entities[ref.effectiveParentId];
@@ -252,7 +258,8 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
           ref.setEffectiveDepth(ref.effectiveDepth + 1);
           return true;
         },
-        [KEY_TRAILING_OUTDENT]: () => {
+        [KEY_TRAILING_OUTDENT]: (_state, _dispatch, view) => {
+          if (isComposing(view)) return false;
           // Outdent: move effective parent up one level
           const ref = callbacksRef.current;
 
@@ -272,7 +279,7 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
           return true;
         },
         [KEY_TRAILING_BACKSPACE]: (_state, _dispatch, view) => {
-          if (!view) return false;
+          if (!view || isComposing(view)) return false;
           const ref = callbacksRef.current;
           const isEditorEmpty = getEditorText(view).length === 0;
           const entities = useNodeStore.getState().entities;
@@ -311,7 +318,8 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
           }
           return true;
         },
-        [KEY_TRAILING_ARROW_DOWN]: () => {
+        [KEY_TRAILING_ARROW_DOWN]: (_state, _dispatch, view) => {
+          if (isComposing(view)) return false;
           const ref = callbacksRef.current;
           const intent = resolveTrailingArrowDownIntent({
             optionsOpen: ref.isOptions && ref.optionsOpen,
@@ -329,7 +337,8 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
           }
           return false;
         },
-        [KEY_TRAILING_ARROW_UP]: () => {
+        [KEY_TRAILING_ARROW_UP]: (_state, _dispatch, view) => {
+          if (isComposing(view)) return false;
           const ref = callbacksRef.current;
           const entities = useNodeStore.getState().entities;
           const expanded = useUIStore.getState().expandedNodes;
@@ -357,7 +366,7 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
           return false;
         },
         [KEY_TRAILING_ESCAPE]: (_state, _dispatch, view) => {
-          if (!view) return false;
+          if (!view || isComposing(view)) return false;
           const ref = callbacksRef.current;
           const intent = resolveTrailingEscapeIntent(ref.isOptions && ref.optionsOpen);
           if (intent === 'close_options') {
@@ -447,6 +456,21 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
         }
       },
       handleDOMEvents: {
+        keydown: (_view, event) => {
+          const keyboardEvent = event as KeyboardEvent;
+          if (isImeComposingEvent(keyboardEvent)) {
+            isComposingRef.current = true;
+          }
+          return false;
+        },
+        compositionstart: () => {
+          isComposingRef.current = true;
+          return false;
+        },
+        compositionend: () => {
+          isComposingRef.current = false;
+          return false;
+        },
         focus: () => {
           // Options: show all options immediately on focus (even with empty input)
           const ref = callbacksRef.current;
@@ -458,6 +482,7 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
           return false;
         },
         blur: () => {
+          isComposingRef.current = false;
           if (committingRef.current) return false;
 
           const activeView = viewRef.current;

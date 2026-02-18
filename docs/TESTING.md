@@ -353,6 +353,7 @@ npm run test:run
 1. `delete / convert_arrow_right / convert_printable` 分支解析
 2. options 打开时的 `ArrowUp/Down/Enter/Escape` 解析
 3. options 关闭时 `Escape` 的 clear-selection 语义
+4. IME 组合输入事件（`isComposing` / `Process` / `keyCode=229`）不触发 reference 选中态快捷键
 
 ### 1.21 TrailingInput onUpdate 决策纯函数
 
@@ -736,6 +737,7 @@ createSibling 自动标签（2 cases）:
 14. `Shift+Tab` → `batch_outdent`（批量取消缩进）
 15. `Cmd+Shift+D` → `batch_duplicate`（批量复制，含大小写兼容）
 16. `Cmd+Enter` / `Ctrl+Enter` → `batch_checkbox`（批量 checkbox 切换）
+17. IME 组合输入事件（`isComposing` / `Process` / `keyCode=229`）返回 `null`，避免误触发 `type_char`
 
 ### 1.40 Multi-Select 纯函数工具库
 

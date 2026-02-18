@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type MutableRefObject } from 'react';
 import { EditorState, TextSelection, type Plugin } from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
 import { keymap } from 'prosemirror-keymap';
@@ -524,7 +524,7 @@ export function RichTextEditor(props: RichTextEditorProps) {
     ];
   }, [saveContent, setNodeContentLocal]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!mountRef.current) return;
 
     triggerStateRef.current = {

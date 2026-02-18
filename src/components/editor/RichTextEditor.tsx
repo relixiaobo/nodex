@@ -598,14 +598,19 @@ export function RichTextEditor(props: RichTextEditorProps) {
           if (!isEnterCreatedRef.current) return false;
           isEnterCreatedRef.current = false;
           // Replicate PM's focus handler (prosemirror-view input.ts:780-791)
-          // but SKIP the setTimeout→selectionToDOM that disrupts CJK IME.
-          // When Enter creates a new editor and the user types immediately,
-          // PM's 20ms-delayed selectionToDOM fires mid-composition, calling
-          // Selection.collapse() which resets Chrome's IME input context.
+          // but suppress ALL paths that call selectionToDOM, which disrupts
+          // CJK IME when the user types immediately after Enter.
           //
-          // Setting lastFocus=0 also prevents DOMObserver.flush() from
-          // calling selectionToDOM for the "browser reset selection to
-          // document start" heuristic (domobserver.ts:219-230).
+          // Three selectionToDOM paths exist after focus:
+          // 1. PM focus handler's setTimeout(selectionToDOM, 20) — suppressed
+          //    by returning true from this handler.
+          // 2. DOMObserver.flush "browser reset to doc start" heuristic
+          //    (domobserver.ts:219-230) — suppressed by setting lastFocus=0.
+          // 3. domObserver.stop() schedules an anonymous setTimeout(flush, 20)
+          //    for any pending construction mutations (domobserver.ts:111).
+          //    That delayed flush can call handleDOMChange → updateState →
+          //    selectionToDOM mid-composition. Suppressed by clearing the
+          //    mutation queue after stop/start.
           const internal = view as Record<string, any>;
           internal.input.lastFocus = 0;
           if (!internal.focused) {
@@ -613,6 +618,12 @@ export function RichTextEditor(props: RichTextEditorProps) {
             view.dom.classList.add('ProseMirror-focused');
             internal.domObserver.start();
             internal.focused = true;
+            // Clear mutation queue so the uncancelable 20ms flush scheduled
+            // by domObserver.stop() becomes a no-op. Without this, the flush
+            // processes EditorView construction mutations, triggers
+            // handleDOMChange → updateState → selectionToDOM, and disrupts
+            // CJK composition on the second keystroke.
+            internal.domObserver.queue.length = 0;
           }
           // Record current DOM selection so DOMObserver.flush() won't see
           // a "new" selection and trigger selectionToDOM.

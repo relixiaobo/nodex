@@ -375,6 +375,7 @@ npm run test:run
 2. `ArrowDown` 在 options 与 navigate-out 场景下的分支决策
 3. `ArrowUp` 在 options/focus-last-visible/navigate-out 场景下的分支决策
 4. `Escape` 的 close-options vs blur-editor 决策
+5. `Enter` 的 options-confirm / create-content-and-continue / create-empty 决策
 
 ### 1.23 NodeEditor 键盘决策纯函数
 

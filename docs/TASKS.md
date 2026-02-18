@@ -71,6 +71,7 @@ _(空)_
   - [2026-02-18 nodex-codex] 调整 ConfigOutliner 灰色空白位显示规则：从“始终显示”改为“仅空列表或末行为 field 时显示”；末行为普通 content 时隐藏，符合手测预期。新增 `config-outliner.test.ts` 覆盖 3 条显示规则，并同步 `docs/TESTING.md` 覆盖映射。验证通过 `typecheck`、`test:run`、`build`、`check:test-sync`。
   - [2026-02-18 nodex-codex] 根据手测继续修复上下导航与 FieldValueOutliner 一致性：`OutlinerItem` sibling 导航改为过滤隐藏 field 后的可渲染集合，避免普通 node 跳过 trailing；`TrailingInput` 在 child outliner 的 `ArrowUp` 改为回到“最后一条渲染行”（field 则进入 field name）；`OutlinerView` root trailing 同步该规则；`FieldValueOutliner` trailing 显示规则对齐 nodepanel（空/末行=field 显示，末行=content 隐藏）并新增单测 `field-value-outliner.test.ts`。验证通过 `typecheck`、`test:run`、`build`、`check:test-sync`。
   - [2026-02-18 nodex-codex] 按最新手测反馈修复剩余 3 个交互偏差：`TrailingInput ArrowUp` 改为 `onNavigateOut` 优先（避免跳到父 content 起始），`OutlinerItem ArrowDown` 在展开态优先进入“子作用域首行/灰色 trailing”，并在 Trailing 提交创建后写入 `focusClickCoords`（光标落新节点末尾，避免下一次 Enter 在行首 split）。同步更新 `trailing-input-navigation.test.ts` 断言；验证通过 `typecheck`、`test:run`（346/346）、`build`、`check:test-sync`。
+  - [2026-02-18 nodex-codex] 按“Trailing 一次 Enter 等同普通 node”再修：新增 `resolveTrailingEnterIntent`，将 trailing Enter 分为 `options_confirm` / `create_content_and_continue` / `create_empty`；有文本时一次 Enter 连续创建“内容节点 + 下一空节点”并聚焦空节点，支持持续连写。同步补充 `trailing-input-navigation.test.ts` 对 Enter 决策覆盖，并更新 `docs/TESTING.md` 覆盖点。
 
 ### 性能基线测量
 > **Owner: nodex-cc-2** | Branch: `cc2/perf-baseline` | Priority: P2

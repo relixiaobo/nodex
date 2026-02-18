@@ -993,7 +993,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       const rect = container.getBoundingClientRect();
       return e.clientX <= rect.left + 2 ? 0 : textLength;
     })();
-    const textRightEdge = getRenderedTextRightEdge(container);
+    const textRightEdge = getStaticNodeContentRightEdge(container) ?? getRenderedTextRightEdge(container);
     const textLength = getNodeTextLengthById(nodeId, useNodeStore.getState().entities);
     const rect = container.getBoundingClientRect();
     const forceEndWhenRightBlank = textOffset === 0 && textLength > 0 && e.clientX > rect.left + 24;
@@ -1022,7 +1022,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     }
 
     const container = e.currentTarget as HTMLElement;
-    const textRightEdge = getRenderedTextRightEdge(container);
+    const textRightEdge = getStaticNodeContentRightEdge(container) ?? getRenderedTextRightEdge(container);
     if (textRightEdge === null || e.clientX <= textRightEdge + 1) {
       return;
     }
@@ -2344,4 +2344,12 @@ function getRenderedTextRightEdge(container: HTMLElement): number | null {
   } catch {
     return null;
   }
+}
+
+function getStaticNodeContentRightEdge(container: HTMLElement): number | null {
+  const contentEl = container.querySelector<HTMLElement>('.node-content');
+  if (!contentEl) return null;
+  const rect = contentEl.getBoundingClientRect();
+  if (rect.width <= 0 && rect.height <= 0) return null;
+  return rect.right;
 }

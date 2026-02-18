@@ -57,7 +57,7 @@ Chrome Extension 环境下的 Google OAuth 登录 + Supabase Auth 集成。
 
 ### 数据模型简化：消除 Metanode + AssociatedData
 > **Owner: nodex-cc** | Branch: `cc/simplify-data-model` | Priority: P0
-> **计划文档**: `.claude/plans/simplify-data-model-eliminate-metanode-assocdata.md`
+> **计划文档**: `docs/plans/simplify-data-model-eliminate-metanode-assocdata.md`
 
 简化三层间接为一层（只保留 Tuple），消除 Metanode 和 AssociatedData。
 

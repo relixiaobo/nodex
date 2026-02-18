@@ -559,9 +559,24 @@ hash trigger cleanup safety（2 cases, Bug #53 回归）:
 
 **覆盖点**:
 
-1. 默认状态为未登录（`currentWorkspaceId/userId = null`，`isAuthenticated = false`）
+1. 默认状态为未登录（`currentWorkspaceId/userId = null`，`isAuthenticated = false`，`authUser = null`）
 2. `setWorkspace + setUser` 后状态一致，且写入 `nodex-workspace` 持久化键
-3. `logout` 清空用户与工作区上下文，并恢复未登录状态
+3. `logout` 清空用户与工作区上下文，并恢复未登录状态（含 `authUser`）
+4. `authUser` 不被持久化到 storage（通过 `partialize` 排除）
+5. `signInWithGoogle` 成功后 `userId / isAuthenticated / authUser` 正确写入
+
+### 1.48 Auth 工具函数（Google OAuth + Supabase）
+
+**测试文件**: `tests/vitest/auth.test.ts`
+
+**覆盖点**:
+
+1. `AuthUser` 类型包含 `id / email / avatarUrl / name` 字段
+2. `AuthUser` 允许可选字段缺失（仅 `id` 必填）
+3. `getCurrentUser` 在 Supabase 未初始化或返回错误时返回 `null`
+4. `signOut / signInWithGoogle / getCurrentUser / onAuthStateChange` 全部导出
+
+**注**：`signInWithGoogle` 需要 `chrome.identity.launchWebAuthFlow`，无法在 Vitest 中端到端测试，手工验收见 `docs/MANUAL-TEST-CHECKLIST.md`
 
 ### 1.37 Slash Command 注册与导航
 

@@ -993,7 +993,12 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       const rect = container.getBoundingClientRect();
       return e.clientX <= rect.left + 2 ? 0 : textLength;
     })();
-    const textRightEdge = getStaticNodeContentRightEdge(container) ?? getRenderedTextRightEdge(container);
+    // Use getRenderedTextRightEdge which walks actual text node Ranges for an
+    // accurate right edge.  The old getStaticNodeContentRightEdge queried the
+    // .node-content <span>'s bounding rect which could report the container
+    // width rather than the text width, causing first-click tail detection to
+    // fail (cursor placed at offset 0 instead of end).
+    const textRightEdge = getRenderedTextRightEdge(container);
     const textLength = getNodeTextLengthById(nodeId, useNodeStore.getState().entities);
     const rect = container.getBoundingClientRect();
     const forceEndWhenRightBlank = textOffset === 0 && textLength > 0 && e.clientX > rect.left + 24;
@@ -1026,7 +1031,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     }
 
     const container = e.currentTarget as HTMLElement;
-    const textRightEdge = getStaticNodeContentRightEdge(container) ?? getRenderedTextRightEdge(container);
+    const textRightEdge = getRenderedTextRightEdge(container);
     if (textRightEdge === null || e.clientX <= textRightEdge + 1) {
       return;
     }
@@ -2350,10 +2355,3 @@ function getRenderedTextRightEdge(container: HTMLElement): number | null {
   }
 }
 
-function getStaticNodeContentRightEdge(container: HTMLElement): number | null {
-  const contentEl = container.querySelector<HTMLElement>('.node-content');
-  if (!contentEl) return null;
-  const rect = contentEl.getBoundingClientRect();
-  if (rect.width <= 0 && rect.height <= 0) return null;
-  return rect.right;
-}

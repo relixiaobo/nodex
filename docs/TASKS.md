@@ -50,6 +50,7 @@ _(空)_
 - **Files**: `docs/features/data-model.md`, `docs/features/date-nodes.md`, `docs/features/search.md`, `docs/features/views.md`, `docs/TASKS.md`, `docs/research/everything-as-nodes-review.md`
 - **迭代日志**:
   - [2026-02-18 nodex-codex] 创建专用分支并认领任务，开始汇总“一切皆节点”相关文档，准备输出系统 review 结论与修订建议。
+  - [2026-02-18 nodex-codex] 完成首轮系统 review，输出 `docs/research/everything-as-nodes-review.md`：识别 3 个 P0（日期层级冲突、日期值模型不一致、Search 实现状态偏差）与 3 个 P1/P2 协调项，建议先对齐文档契约再进入实现。
 
 ### Editor 迁移：TipTap → 直接 ProseMirror
 > **Owner: nodex-codex** | Branch: `codex/editor-migration` | Priority: P1

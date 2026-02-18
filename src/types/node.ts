@@ -192,12 +192,14 @@ export interface NodexNode {
    *    children[0] = 键 (SYS_A* 系统属性 ID 或 attrDef 字段定义 ID)
    *    children[1:] = 值 (节点 ID 或 SYS_V* 枚举值 ID)
    *
-   *  对于 Metanode (docType='metanode'):
-   *    children = [tupleId1, tupleId2, ...] 全部是 Tuple 子节点
-   *
    *  对于普通内容节点:
    *    children = [childId1, childId2, ...] 混合内容子节点和字段 Tuple */
   children?: string[];
+
+  /** 元信息 Tuple ID 列表。替代原来的 Metanode 间接层。
+   *  每个元素是一个 Tuple 节点的 ID，这些 Tuple 的 _ownerId = 本节点 ID。
+   *  常见的 meta Tuple 键：SYS_A13(标签)、SYS_A55(checkbox)、SYS_A16(视图)、SYS_A12(锁定) */
+  meta?: string[];
 
   /** 字段值关联映射。key=子节点ID（字段 Tuple）, value=associatedData 节点 ID。
    *  提供字段值的快速索引查找。
@@ -308,6 +310,7 @@ export type CreateNodeInput = {
   workspaceId: string;
   props: Partial<NodeProps> & { _docType?: DocType; _ownerId?: string };
   children?: string[];
+  meta?: string[];
 };
 
 /**

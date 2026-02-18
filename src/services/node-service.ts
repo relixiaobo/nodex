@@ -42,6 +42,7 @@ export interface NodeRow {
   edit_mode: boolean | null;
   search_context_node: string | null;
   children: string[];
+  meta: string[];
   association_map: Record<string, string>;
   touch_counts: number[];
   modified_ts: number[];
@@ -82,6 +83,7 @@ export function rowToNode(row: NodeRow): NodexNode {
       searchContextNode: row.search_context_node || undefined,
     },
     children: row.children.length > 0 ? row.children : undefined,
+    meta: row.meta.length > 0 ? row.meta : undefined,
     associationMap: Object.keys(row.association_map).length > 0 ? row.association_map : undefined,
     touchCounts: row.touch_counts.length > 0 ? row.touch_counts : undefined,
     modifiedTs: row.modified_ts.length > 0 ? row.modified_ts : undefined,
@@ -117,6 +119,7 @@ function nodeToRow(node: NodexNode): NodeRow {
     edit_mode: node.props._editMode ?? null,
     search_context_node: node.props.searchContextNode ?? null,
     children: node.children ?? [],
+    meta: node.meta ?? [],
     association_map: node.associationMap ?? {},
     touch_counts: node.touchCounts ?? [],
     modified_ts: node.modifiedTs ?? [],
@@ -150,6 +153,7 @@ export async function createNode(
       created: input.props.created ?? now,
     },
     children: input.children,
+    meta: input.meta,
     version: 1,
     updatedAt: now,
     createdBy: userId,
@@ -237,6 +241,7 @@ export async function updateNode(
   }
 
   if (changes.children !== undefined) updates.children = changes.children ?? [];
+  if (changes.meta !== undefined) updates.meta = changes.meta ?? [];
   if (changes.associationMap !== undefined) updates.association_map = changes.associationMap ?? {};
   if (changes.touchCounts !== undefined) updates.touch_counts = changes.touchCounts ?? [];
   if (changes.modifiedTs !== undefined) updates.modified_ts = changes.modifiedTs ?? [];

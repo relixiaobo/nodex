@@ -90,8 +90,8 @@ function useBootstrap(): BootstrapResult {
       try {
         const { setupSupabase } = await import('../../lib/supabase');
         const client = setupSupabase();
-        // Test actual connectivity with a lightweight query
-        const { error } = await client.from('nodes').select('id').limit(1);
+        // Test connectivity via auth endpoint (doesn't require any table to exist)
+        const { error } = await client.auth.getSession();
         if (error) throw error;
         supabaseReady = true;
       } catch {

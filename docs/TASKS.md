@@ -28,35 +28,31 @@ _(空)_
 | Agent | 当前任务 | 分支 | 修改中的文件 |
 |-------|---------|------|-------------|
 | nodex-cc | 数据模型简化：消除 Metanode + AssociatedData | cc/simplify-data-model | `node-store.ts`, `node.ts`, `seed-data.ts`, `tag-service.ts`, `meta-utils.ts` (new) |
-| nodex-cc-2 | 性能基线测量 | cc2/perf-baseline | `docs/research/performance-baseline.md` |
+| nodex-cc-2 | 用户认证 — Google 登录 (#45) | cc2/google-auth | `src/lib/auth.ts`, `src/components/auth/*`, `workspace-store.ts` |
 | nodex-codex | _(idle)_ | — | — |
 
 ---
 
 ## 进行中
 
-### 性能基线测量
-> **Owner: nodex-cc-2** | Branch: `cc2/perf-baseline` | Priority: P2
-> **产出**: `docs/research/performance-baseline.md`
+### 用户认证 — Google 登录 (#45)
+> **Owner: nodex-cc-2** | Branch: `cc2/google-auth` | Priority: P2
+> **Spec**: `docs/features/auth-and-environments.md`
 
-在编辑器迁移**之前**建立性能基准，迁移完成后可量化对比。
+Chrome Extension 环境下的 Google OAuth 登录 + Supabase Auth 集成。
 
-**测量项目**：
-1. **Bundle 分析**：总包体积、TipTap 相关包占比、tree-shaking 后实际大小
-2. **启动性能**：Side Panel 打开到可交互的时间（First Contentful Paint + Time to Interactive）
-3. **编辑器性能**：聚焦/失焦延迟、输入响应延迟（Input Latency）、长文本节点渲染帧率
-4. **大纲渲染**：种子数据 68 节点全展开渲染时间、滚动帧率
-5. **内存**：空闲态 / 编辑态 / 多节点展开态的 JS Heap 占用
+- [ ] 环境配置：固定 Dev Extension ID + `.env` / `.env.production` 双套
+- [ ] Supabase Auth 配置（启用 Google Provider，添加 redirect URIs）
+- [ ] Google Cloud Console OAuth Client ID 创建（Dev + Prod 各一个）
+- [ ] `src/lib/auth.ts` — chrome.identity + Supabase Auth 流程封装
+- [ ] `workspace-store.ts` 扩展 — signInWithGoogle / onAuthStateChange / signOut
+- [ ] `src/components/auth/LoginScreen.tsx` — 登录页 UI
+- [ ] `src/components/auth/UserMenu.tsx` — 用户头像 + 登出菜单
+- [ ] App.tsx 路由守卫（未登录 → LoginScreen）
+- [ ] wxt.config.ts 新增 `identity` 权限
+- [ ] 工作区绑定（登录后自动关联 workspaceId）
 
-**测量方法**：
-- `npm run build` + bundle analyzer（如 `rollup-plugin-visualizer`）
-- Chrome DevTools Performance 面板手动录制
-- `window.performance` API 脚本化采集
-- 结果记录到 `docs/research/performance-baseline.md`，含截图和数值
-
-**注意**：此任务为纯研究，不修改 `src/` 下的代码。如需添加测量脚本，放在 `scripts/` 或 `docs/research/` 中。
-
-- **Files**: `docs/research/performance-baseline.md`
+- **Files**: `src/lib/auth.ts` (new), `src/components/auth/*` (new), `workspace-store.ts`, `App.tsx`, `wxt.config.ts`
 - **迭代日志**: _(开始后追加)_
 
 ### 数据模型简化：消除 Metanode + AssociatedData
@@ -229,20 +225,9 @@ _(空)_
 - [ ] Tabs 视图（顶部 tab 切换内容）
 - **Spec**: `docs/features/views.md`
 
-#### 用户认证 — Google 登录 (#45)
-> 上线前必需（已延迟，等数据模型简化完成后再启动）
-> **Spec**: `docs/features/auth-and-environments.md`
-
-- [ ] 环境配置：固定 Dev Extension ID + `.env` / `.env.production` 双套
-- [ ] Supabase Auth 配置（启用 Google Provider，添加 redirect URIs）
-- [ ] Google Cloud Console OAuth Client ID 创建（Dev + Prod 各一个）
-- [ ] `src/lib/auth.ts` — chrome.identity + Supabase Auth 流程封装
-- [ ] `workspace-store.ts` 扩展 — signInWithGoogle / onAuthStateChange / signOut
-- [ ] `src/components/auth/LoginScreen.tsx` — 登录页 UI
-- [ ] `src/components/auth/UserMenu.tsx` — 用户头像 + 登出菜单
-- [ ] App.tsx 路由守卫（未登录 → LoginScreen）
-- [ ] wxt.config.ts 新增 `identity` 权限
-- [ ] 工作区绑定（登录后自动关联 workspaceId）
+#### 性能基线测量
+> 已延迟：等数据模型简化完成后再测量（原始目的"编辑器迁移对比"已过期，重构后重新建立基线更有意义）
+> **产出**: `docs/research/performance-baseline.md`
 
 #### Floating Toolbar (#46)
 > Phase 1 已完成（PR #55）：BubbleMenu + 7 格式按钮 + Link 原地编辑 + Heading mark

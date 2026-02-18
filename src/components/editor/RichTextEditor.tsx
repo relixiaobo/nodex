@@ -8,6 +8,7 @@ import { useNodeStore } from '../../stores/node-store.js';
 import { useWorkspaceStore } from '../../stores/workspace-store.js';
 import { useUIStore } from '../../stores/ui-store.js';
 import { getPrimaryShortcutKey, getShortcutKeys } from '../../lib/shortcut-registry.js';
+import { isImeComposingEvent } from '../../lib/ime-keyboard.js';
 import {
   resolveNodeEditorArrowIntent,
   resolveNodeEditorEnterIntent,
@@ -114,6 +115,7 @@ export function RichTextEditor(props: RichTextEditorProps) {
   const focusRafRef = useRef<number | null>(null);
   const savedRef = useRef(false);
   const isExternalSyncRef = useRef(false);
+  const isComposingRef = useRef(false);
   const triggerStateRef = useRef<TriggerRuntimeState>({
     hasUserEdited: false,
     hashActive: false,
@@ -256,6 +258,9 @@ export function RichTextEditor(props: RichTextEditorProps) {
   }, []);
 
   const plugins = useMemo<Plugin[]>(() => {
+    const isComposing = (view: EditorView | null | undefined): boolean =>
+      !!view && (view.composing || isComposingRef.current);
+
     const handleEnter = (view: EditorView) => {
       const intent = resolveNodeEditorEnterIntent({
         referenceActive: propsRef.current.referenceActive ?? false,
@@ -394,41 +399,49 @@ export function RichTextEditor(props: RichTextEditorProps) {
       history({ depth: 100 }),
       keymap({
         Enter: (_state, _dispatch, view) => {
-          if (!view) return false;
+          if (!view || isComposing(view)) return false;
           return handleEnter(view);
         },
-        Tab: () => {
+        Tab: (_state, _dispatch, view) => {
+          if (isComposing(view)) return false;
           propsRef.current.onIndent();
           return true;
         },
-        'Shift-Tab': () => {
+        'Shift-Tab': (_state, _dispatch, view) => {
+          if (isComposing(view)) return false;
           propsRef.current.onOutdent();
           return true;
         },
         Backspace: (_state, _dispatch, view) => {
-          if (!view) return false;
+          if (!view || isComposing(view)) return false;
           return handleBackspace(view);
         },
         ArrowUp: (_state, _dispatch, view) => {
-          if (!view) return false;
+          if (!view || isComposing(view)) return false;
           return handleArrowUp(view);
         },
         ArrowDown: (_state, _dispatch, view) => {
-          if (!view) return false;
+          if (!view || isComposing(view)) return false;
           return handleArrowDown(view);
         },
-        Escape: () => handleEscape(),
-        'Shift-ArrowUp': () => {
+        Escape: (_state, _dispatch, view) => {
+          if (isComposing(view)) return false;
+          return handleEscape();
+        },
+        'Shift-ArrowUp': (_state, _dispatch, view) => {
+          if (isComposing(view)) return false;
           saveContent();
           propsRef.current.onShiftArrow?.('up');
           return true;
         },
-        'Shift-ArrowDown': () => {
+        'Shift-ArrowDown': (_state, _dispatch, view) => {
+          if (isComposing(view)) return false;
           saveContent();
           propsRef.current.onShiftArrow?.('down');
           return true;
         },
-        'Mod-a': (state) => {
+        'Mod-a': (state, _dispatch, view) => {
+          if (isComposing(view)) return false;
           const { from, to } = state.selection;
           const docEnd = state.doc.content.size - 1;
           if (from <= 1 && to >= docEnd) {
@@ -438,7 +451,8 @@ export function RichTextEditor(props: RichTextEditorProps) {
           }
           return false;
         },
-        [KEY_EDITOR_DROPDOWN_FORCE_CREATE]: () => {
+        [KEY_EDITOR_DROPDOWN_FORCE_CREATE]: (_state, _dispatch, view) => {
+          if (isComposing(view)) return false;
           const intent = resolveNodeEditorForceCreateIntent(
             propsRef.current.referenceActive ?? false,
             propsRef.current.hashTagActive ?? false,
@@ -516,13 +530,14 @@ export function RichTextEditor(props: RichTextEditorProps) {
         const newState = view.state.apply(tr);
         view.updateState(newState);
         setToolbarTick((value) => value + 1);
+        const isComposing = isComposingRef.current || view.composing;
 
-        if (tr.docChanged && !isExternalSyncRef.current) {
+        if (tr.docChanged && !isExternalSyncRef.current && !isComposing) {
           const parsed = docToMarks(newState.doc);
           setNodeContentLocal(propsRef.current.nodeId, parsed.text, parsed.marks, parsed.inlineRefs);
         }
 
-        if (!isExternalSyncRef.current) {
+        if (!isExternalSyncRef.current && !isComposing) {
           runTriggerDetection(view, tr.docChanged);
         }
       },
@@ -535,6 +550,24 @@ export function RichTextEditor(props: RichTextEditorProps) {
         return true;
       },
       handleDOMEvents: {
+        keydown: (_view, event) => {
+          const keyboardEvent = event as KeyboardEvent;
+          if (isImeComposingEvent(keyboardEvent)) {
+            isComposingRef.current = true;
+          }
+          return false;
+        },
+        compositionstart: () => {
+          isComposingRef.current = true;
+          return false;
+        },
+        compositionend: (view) => {
+          isComposingRef.current = false;
+          const parsed = docToMarks(view.state.doc);
+          setNodeContentLocal(propsRef.current.nodeId, parsed.text, parsed.marks, parsed.inlineRefs);
+          runTriggerDetection(view, true);
+          return false;
+        },
         mousedown: (view, event) => {
           const mouseEvent = event as MouseEvent;
           if (mouseEvent.button !== 0) return false;
@@ -565,6 +598,7 @@ export function RichTextEditor(props: RichTextEditorProps) {
           return false;
         },
         blur: () => {
+          isComposingRef.current = false;
           setToolbarTick((value) => value + 1);
           saveContent();
           propsRef.current.onBlur();
@@ -594,6 +628,7 @@ export function RichTextEditor(props: RichTextEditorProps) {
   useEffect(() => {
     const view = viewRef.current;
     if (!view) return;
+    if (isComposingRef.current || view.composing) return;
 
     const current = docToMarks(view.state.doc);
     if (contentEquals(

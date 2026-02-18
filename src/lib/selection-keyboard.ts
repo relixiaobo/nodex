@@ -7,6 +7,8 @@
  * Phase 3: batch operations (delete, indent, outdent, duplicate, checkbox).
  */
 
+import { isImeComposingEvent } from './ime-keyboard.js';
+
 export type SelectionKeyboardAction =
   | 'navigate_up'      // ↑ → exit selection, edit prev node (cursor at end)
   | 'navigate_down'    // ↓ → exit selection, edit next node (cursor at start)
@@ -25,6 +27,10 @@ export type SelectionKeyboardAction =
 export function resolveSelectionKeyboardAction(
   e: KeyboardEvent,
 ): SelectionKeyboardAction | null {
+  if (isImeComposingEvent(e)) {
+    return null;
+  }
+
   // Shift+Arrow: extend selection
   if (e.shiftKey && e.key === 'ArrowUp' && !e.metaKey && !e.ctrlKey && !e.altKey) {
     return 'extend_up';

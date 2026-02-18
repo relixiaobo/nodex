@@ -157,6 +157,15 @@ export function RichTextEditor(props: RichTextEditorProps) {
     }
   }, [updateNodeContent, userId]);
 
+  // Ref flag: when the PM EditorView is first created in useLayoutEffect,
+  // we set this to the view instance so the follow-up useEffect can pick it
+  // up and apply focus AFTER the browser has painted.  Focusing after paint
+  // is critical for CJK IME: the browser needs the contenteditable element
+  // to be rendered on screen before it can initialise the input method
+  // context.  Focusing before paint (in useLayoutEffect) causes the first
+  // keystroke to bypass IME and arrive as raw text.
+  const pendingFocusViewRef = useRef<EditorView | null>(null);
+
   const syncInitialFocus = useCallback((view: EditorView) => {
     if (viewRef.current !== view) return;
 
@@ -173,18 +182,16 @@ export function RichTextEditor(props: RichTextEditorProps) {
     const hasPendingInput = pendingInput && pendingInput.nodeId === propsRef.current.nodeId && pendingInput.parentId === propsRef.current.parentId;
 
     if (!hasClickCoords && !hasPendingInput) {
-      // --- Fast path: Enter-created editor (no click coords, no pending input) ---
-      // Focus immediately and return.  A single view.focus() call in
-      // useLayoutEffect is safe for IME — the old dual-shot design
-      // (immediate + rAF) was the source of IME disruption because the
-      // rAF callback could dispatch PM transactions while IME was composing.
-      // With a single immediate focus and NO follow-up rAF, IME initializes
-      // cleanly on the next keystroke.
-      view.focus();
+      // --- Deferred focus path: Enter-created editor ---
+      // Signal the useEffect to focus this view after the browser paints.
+      // The browser needs the contenteditable to be rendered before it can
+      // initialise the IME input context.  Focusing in useLayoutEffect
+      // (before paint) causes the first CJK keystroke to bypass IME.
+      pendingFocusViewRef.current = view;
       return;
     }
 
-    // --- Deferred path: click-created editor (needs cursor placement) ---
+    // --- Click-created editor (needs cursor placement) ---
     // Give the contenteditable DOM focus immediately so keystrokes arriving
     // before rAF are captured.  We use view.dom.focus() (not view.focus())
     // to avoid selectionToDOM() which would place the cursor at position 0
@@ -679,6 +686,19 @@ export function RichTextEditor(props: RichTextEditorProps) {
       viewRef.current = null;
     };
   }, [plugins, runTriggerDetection, saveContent, setNodeContentLocal, syncInitialFocus]);
+
+  // Post-paint focus for Enter-created editors.
+  // useEffect runs after the browser has painted, so the contenteditable
+  // element is fully rendered and the browser can initialise the IME input
+  // context before we set focus.  This prevents the first CJK keystroke
+  // from bypassing IME and arriving as raw text.
+  useEffect(() => {
+    const view = pendingFocusViewRef.current;
+    if (!view) return;
+    pendingFocusViewRef.current = null;
+    if (viewRef.current !== view) return;
+    view.focus();
+  });
 
   useEffect(() => {
     const view = viewRef.current;

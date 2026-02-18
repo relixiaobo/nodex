@@ -40,7 +40,7 @@ function makeNode(id: string, overrides: Partial<NodexNode> = {}): NodexNode {
  * - tagDef1 has SYS_A55=YES (checkbox) + NDX_A06 toggle tuple
  *   - NDX_A06 toggle tuple has nested NDX_A07/NDX_A08 mapping tuples as children
  * - attrDef_status with options opt_done / opt_todo / opt_in_progress
- * - n1 has field tuple for attrDef_status + associatedData
+ * - n1 has field tuple for attrDef_status (values stored in tuple.children[1:])
  */
 function buildDoneStateMappingEntities(opts?: {
   checkedOptionIds?: string[];
@@ -119,7 +119,6 @@ function buildDoneStateMappingEntities(opts?: {
   entities['n1'] = makeNode('n1', {
     meta: ['tuple_tag'],
     children: ['fld_status'],
-    associationMap: { fld_status: 'assoc_status' },
   });
   entities['tuple_tag'] = makeNode('tuple_tag', {
     props: { created: 1, _docType: 'tuple' as DocType },
@@ -128,10 +127,6 @@ function buildDoneStateMappingEntities(opts?: {
   entities['fld_status'] = makeNode('fld_status', {
     props: { created: 1, _docType: 'tuple' as DocType, _ownerId: 'n1' },
     children: ['attrDef_status'],
-  });
-  entities['assoc_status'] = makeNode('assoc_status', {
-    props: { created: 1, _docType: 'associatedData' as DocType, _ownerId: 'n1' },
-    children: [],
   });
 
   return entities;
@@ -181,7 +176,6 @@ function buildLegacyEntities(opts?: {
   entities['n1'] = makeNode('n1', {
     meta: ['tuple_tag'],
     children: ['fld_status'],
-    associationMap: { fld_status: 'assoc_status' },
   });
   entities['tuple_tag'] = makeNode('tuple_tag', {
     props: { created: 1, _docType: 'tuple' as DocType },
@@ -190,10 +184,6 @@ function buildLegacyEntities(opts?: {
   entities['fld_status'] = makeNode('fld_status', {
     props: { created: 1, _docType: 'tuple' as DocType, _ownerId: 'n1' },
     children: ['attrDef_status'],
-  });
-  entities['assoc_status'] = makeNode('assoc_status', {
-    props: { created: 1, _docType: 'associatedData' as DocType, _ownerId: 'n1' },
-    children: [],
   });
 
   return entities;
@@ -424,8 +414,8 @@ describe('Store: toggleNodeDone → field update', () => {
     const state = useNodeStore.getState().entities;
     // Checkbox should now be done
     expect(state['n1'].props._done).toBeGreaterThan(0);
-    // Status field should be set to opt_done
-    expect(state['assoc_status'].children).toEqual(['opt_done']);
+    // Status field should be set to opt_done (stored in tuple.children[1])
+    expect(state['fld_status'].children?.[1]).toBe('opt_done');
   });
 
   it('toggleNodeDone sets Options field to uncheckedOptionId when undone', async () => {
@@ -439,8 +429,8 @@ describe('Store: toggleNodeDone → field update', () => {
     const state = useNodeStore.getState().entities;
     // Checkbox should now be undone (tag-driven → _done=undefined)
     expect(state['n1'].props._done).toBeUndefined();
-    // Status field should be set to opt_todo
-    expect(state['assoc_status'].children).toEqual(['opt_todo']);
+    // Status field should be set to opt_todo (stored in tuple.children[1])
+    expect(state['fld_status'].children?.[1]).toBe('opt_todo');
   });
 });
 
@@ -459,7 +449,7 @@ describe('Store: setOptionsFieldValue → checkbox update', () => {
 
     const state = useNodeStore.getState().entities;
     expect(state['n1'].props._done).toBeGreaterThan(0);
-    expect(state['assoc_status'].children).toEqual(['opt_done']);
+    expect(state['fld_status'].children?.[1]).toBe('opt_done');
   });
 
   it('setting uncheckedOptionId auto-unchecks the checkbox', () => {
@@ -472,7 +462,7 @@ describe('Store: setOptionsFieldValue → checkbox update', () => {
 
     const state = useNodeStore.getState().entities;
     expect(state['n1'].props._done).toBeUndefined();
-    expect(state['assoc_status'].children).toEqual(['opt_todo']);
+    expect(state['fld_status'].children?.[1]).toBe('opt_todo');
   });
 
   it('setting unrelated option does not change checkbox', () => {
@@ -485,7 +475,7 @@ describe('Store: setOptionsFieldValue → checkbox update', () => {
 
     const state = useNodeStore.getState().entities;
     expect(state['n1'].props._done).toBeUndefined();
-    expect(state['assoc_status'].children).toEqual(['opt_in_progress']);
+    expect(state['fld_status'].children?.[1]).toBe('opt_in_progress');
   });
 });
 
@@ -494,30 +484,30 @@ describe('Store: selectFieldOption → checkbox update (UI path)', () => {
     useNodeStore.setState({ entities: {}, loading: new Set() });
   });
 
-  it('selecting checkedOptionId via assocData auto-checks checkbox', () => {
+  it('selecting checkedOptionId via tuple auto-checks checkbox', () => {
     const entities = buildDoneStateMappingEntities({ uncheckedOptionIds: ['opt_todo'] });
     entities['n1'].props._done = undefined;
     useNodeStore.setState({ entities });
 
-    // selectFieldOption works with assocDataId (what the UI has), not nodeId
-    useNodeStore.getState().selectFieldOption('assoc_status', 'opt_done', undefined, USER);
+    // selectFieldOption works with tupleId (what the UI has)
+    useNodeStore.getState().selectFieldOption('fld_status', 'opt_done', undefined, USER);
 
     const state = useNodeStore.getState().entities;
     expect(state['n1'].props._done).toBeGreaterThan(0);
-    expect(state['assoc_status'].children).toEqual(['opt_done']);
+    expect(state['fld_status'].children?.[1]).toBe('opt_done');
   });
 
-  it('selecting uncheckedOptionId via assocData auto-unchecks checkbox', () => {
+  it('selecting uncheckedOptionId via tuple auto-unchecks checkbox', () => {
     const entities = buildDoneStateMappingEntities({ uncheckedOptionIds: ['opt_todo'] });
     entities['n1'].props._done = Date.now();
-    entities['assoc_status'].children = ['opt_done'];
+    entities['fld_status'].children = ['attrDef_status', 'opt_done'];
     useNodeStore.setState({ entities });
 
-    useNodeStore.getState().selectFieldOption('assoc_status', 'opt_todo', 'opt_done', USER);
+    useNodeStore.getState().selectFieldOption('fld_status', 'opt_todo', 'opt_done', USER);
 
     const state = useNodeStore.getState().entities;
     expect(state['n1'].props._done).toBeUndefined();
-    expect(state['assoc_status'].children).toEqual(['opt_todo']);
+    expect(state['fld_status'].children?.[1]).toBe('opt_todo');
   });
 
   it('selecting unrelated option does not change checkbox', () => {
@@ -525,23 +515,23 @@ describe('Store: selectFieldOption → checkbox update (UI path)', () => {
     entities['n1'].props._done = undefined;
     useNodeStore.setState({ entities });
 
-    useNodeStore.getState().selectFieldOption('assoc_status', 'opt_in_progress', undefined, USER);
+    useNodeStore.getState().selectFieldOption('fld_status', 'opt_in_progress', undefined, USER);
 
     const state = useNodeStore.getState().entities;
     expect(state['n1'].props._done).toBeUndefined();
-    expect(state['assoc_status'].children).toEqual(['opt_in_progress']);
+    expect(state['fld_status'].children?.[1]).toBe('opt_in_progress');
   });
 
   it('replaces old option with new one (swap)', () => {
     const entities = buildDoneStateMappingEntities({ uncheckedOptionIds: ['opt_todo'] });
-    entities['assoc_status'].children = ['opt_todo'];
+    entities['fld_status'].children = ['attrDef_status', 'opt_todo'];
     useNodeStore.setState({ entities });
 
-    useNodeStore.getState().selectFieldOption('assoc_status', 'opt_done', 'opt_todo', USER);
+    useNodeStore.getState().selectFieldOption('fld_status', 'opt_done', 'opt_todo', USER);
 
     const state = useNodeStore.getState().entities;
-    expect(state['assoc_status'].children).toEqual(['opt_done']);
-    expect(state['assoc_status'].children).not.toContain('opt_todo');
+    expect(state['fld_status'].children?.[1]).toBe('opt_done');
+    expect(state['fld_status'].children).not.toContain('opt_todo');
   });
 });
 
@@ -594,13 +584,13 @@ describe('No infinite loop: atomic set() verification', () => {
     useNodeStore.getState().toggleNodeDone('n1', USER);
     const s1 = useNodeStore.getState().entities;
     expect(s1['n1'].props._done).toBeGreaterThan(0);
-    expect(s1['assoc_status'].children).toEqual(['opt_done']);
+    expect(s1['fld_status'].children?.[1]).toBe('opt_done');
 
     // Reverse: set option → should set checkbox, but NOT re-trigger toggleNodeDone
     useNodeStore.getState().setOptionsFieldValue('n1', 'attrDef_status', 'opt_todo', USER);
     const s2 = useNodeStore.getState().entities;
     expect(s2['n1'].props._done).toBeUndefined();
-    expect(s2['assoc_status'].children).toEqual(['opt_todo']);
+    expect(s2['fld_status'].children?.[1]).toBe('opt_todo');
   });
 });
 

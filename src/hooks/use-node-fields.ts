@@ -4,7 +4,7 @@
  * resolves names, values, and data types.
  *
  * Unified model: both system config fields (SYS_A*, NDX_A*) and user fields
- * share the same data path — key is an attrDef entity ID, value in AssociatedData.
+ * share the same data path — key is an attrDef entity ID, value in Tuple.children[1:].
  *
  * Uses JSON.stringify as the Zustand selector return (primitive = stable reference)
  * to avoid React 19 infinite re-render loops with useSyncExternalStore.
@@ -22,6 +22,7 @@ export interface FieldEntry {
   valueNodeId?: string;
   valueName?: string;
   dataType: string;
+  /** @deprecated Will be removed in Phase 2c. Use tupleId + tuple.children[1:] instead. */
   assocDataId?: string;
   /** True when the attrDef has been trashed (moved to Trash container) */
   trashed?: boolean;
@@ -100,15 +101,11 @@ function computeFields(entities: Record<string, NodexNode>, nodeId: string): Fie
 
     const valueNodeId = child.children[1];
     const valueNode = valueNodeId ? entities[valueNodeId] : undefined;
-    const assocDataId = node.associationMap?.[childId];
+    const assocDataId = node.associationMap?.[childId]; // deprecated — Phase 2c will remove
     const trashed = !isSysConfig && (attrDef.props._ownerId?.endsWith('_TRASH') ?? false);
 
-    // Determine if the field value is empty
-    const assocNode = assocDataId ? entities[assocDataId] : undefined;
-    const hasContent = !!valueNodeId || (assocNode?.children?.some(cid => {
-      const c = entities[cid];
-      return c && !c.props._docType;
-    }) ?? false);
+    // Determine if the field value is empty: check tuple.children[1:]
+    const hasContent = child.children.length > 1;
 
     fields.push({
       attrDefId: keyId,

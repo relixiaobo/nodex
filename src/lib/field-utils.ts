@@ -29,7 +29,7 @@ function resolveAttrDefConfig(entities: Record<string, NodexNode>, attrDefId: st
 
 /**
  * Resolve a config/field value from a node by walking its children for a Tuple [configKey, ...].
- * Reads from AssociatedData first (unified model), falls back to children[1] (legacy/internal tuples).
+ * Reads directly from Tuple.children[1].
  */
 export function resolveConfigValue(
   entities: Record<string, NodexNode>,
@@ -40,13 +40,6 @@ export function resolveConfigValue(
   for (const childId of node.children) {
     const child = entities[childId];
     if (child?.props._docType === 'tuple' && child.children?.[0] === configKey) {
-      // Unified model: read from AssociatedData
-      const assocId = node.associationMap?.[childId];
-      if (assocId) {
-        const assoc = entities[assocId];
-        if (assoc?.children?.length) return assoc.children[0];
-      }
-      // Legacy/internal: read from children[1]
       if (child.children.length >= 2) return child.children[1];
       return undefined;
     }

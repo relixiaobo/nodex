@@ -28,7 +28,6 @@ describe('node-store trash semantics', () => {
 
     // Pre-seeded template field tuple on task_1 should remain.
     expect(state.entities.task_1.children ?? []).toContain('task1_fld_status');
-    expect(state.entities.task_1.associationMap?.task1_fld_status).toBe('task1_assoc_status');
     expect(state.entities.task1_fld_status.props._sourceId).toBe('taskField_status');
 
     expect(collectNodeGraphErrors(useNodeStore.getState().entities)).toEqual([]);

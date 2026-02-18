@@ -1,4 +1,4 @@
-import { SYS_A, SYS_V } from '../../src/types/index.js';
+import { SYS_A } from '../../src/types/index.js';
 import { useNodeStore } from '../../src/stores/node-store.js';
 import { resolveChildSupertags } from '../../src/lib/field-utils.js';
 import { resetAndSeed } from './helpers/test-state.js';
@@ -16,30 +16,26 @@ function hasTag(nodeId: string, tagDefId: string): boolean {
   });
 }
 
-/** Set the SYS_A14 (CHILD_SUPERTAG) config value on a tagDef's AssociatedData. */
+/** Set the SYS_A14 (CHILD_SUPERTAG) config value on a tagDef's config tuple. */
 function setChildSupertag(tagDefId: string, childTagDefId: string) {
   const state = useNodeStore.getState();
   const tagDef = state.entities[tagDefId];
   if (!tagDef?.children) throw new Error(`tagDef ${tagDefId} not found`);
 
-  // Find the SYS_A14 config tuple
+  // Find the SYS_A14 config tuple and write value into children[1]
   for (const cid of tagDef.children) {
     const child = state.entities[cid];
     if (
       child?.props._docType === 'tuple' &&
       child.children?.[0] === SYS_A.CHILD_SUPERTAG
     ) {
-      // Write value into its AssociatedData
-      const assocId = tagDef.associationMap?.[cid];
-      if (assocId) {
-        useNodeStore.setState((prev) => {
-          const assoc = prev.entities[assocId];
-          if (assoc) {
-            assoc.children = [childTagDefId];
-          }
-        });
-        return;
-      }
+      useNodeStore.setState((prev) => {
+        const tuple = prev.entities[cid];
+        if (tuple) {
+          tuple.children = [SYS_A.CHILD_SUPERTAG, childTagDefId];
+        }
+      });
+      return;
     }
   }
   throw new Error(`SYS_A14 config tuple not found on ${tagDefId}`);

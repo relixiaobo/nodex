@@ -43,10 +43,6 @@ describe('node-store tag + reference flows', () => {
     });
     expect(templatedFieldTupleIds.length).toBe(expectedTemplateSources.length);
 
-    for (const tupleId of templatedFieldTupleIds) {
-      expect(nodeAfterApply.associationMap?.[tupleId]).toBeTruthy();
-    }
-
     await useNodeStore.getState().removeTag(nodeId, tagDefId, 'user_default');
 
     const nodeAfterRemove = useNodeStore.getState().entities[nodeId];
@@ -79,9 +75,6 @@ describe('node-store tag + reference flows', () => {
     const manualTupleId = findFieldTupleId(nodeId, 'attrDef_company');
     expect(manualTupleId).toBeTruthy();
     if (!manualTupleId) return;
-    const manualAssocId = useNodeStore.getState().entities[nodeId].associationMap?.[manualTupleId];
-    expect(manualAssocId).toBeTruthy();
-    if (!manualAssocId) return;
 
     await useNodeStore.getState().applyTag(nodeId, tagDefId, 'ws_default', 'user_default');
     await useNodeStore.getState().applyTag(nodeId, tagDefId, 'ws_default', 'user_default');
@@ -108,8 +101,8 @@ describe('node-store tag + reference flows', () => {
 
     const nodeAfterRemove = useNodeStore.getState().entities[nodeId];
     expect(nodeAfterRemove.children ?? []).toContain(manualTupleId);
-    expect(nodeAfterRemove.associationMap?.[manualTupleId]).toBe(manualAssocId);
-    expect(useNodeStore.getState().entities[manualAssocId]).toBeTruthy();
+    // Manual field tuple should still exist as a valid entity
+    expect(useNodeStore.getState().entities[manualTupleId]).toBeTruthy();
   });
 
   it('applyTag on content node does NOT instantiate system config fields (Color, Extends, etc.)', async () => {

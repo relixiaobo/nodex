@@ -27,7 +27,7 @@ _(空)_
 
 | Agent | 当前任务 | 分支 | 修改中的文件 |
 |-------|---------|------|-------------|
-| nodex-cc | 数据模型简化：消除 Metanode + AssociatedData | cc/simplify-data-model | `node-store.ts`, `node.ts`, `seed-data.ts`, `tag-service.ts`, `meta-utils.ts` (new) |
+| nodex-cc | 数据模型简化：消除 Metanode + AssociatedData | cc/simplify-data-model | `node-store.ts`, `node.ts`, `seed-data.ts`, `tag-service.ts`, `field-service.ts`, `checkbox-utils.ts`, `field-utils.ts`, `node-service.ts`, `meta-utils.ts` (new) |
 | nodex-cc-2 | 用户认证 — Google 登录 (#45) | cc2/google-auth | `src/lib/auth.ts`, `src/components/auth/*`, `workspace-store.ts` |
 | nodex-codex | _(idle)_ | — | — |
 

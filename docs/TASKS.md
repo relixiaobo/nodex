@@ -60,8 +60,8 @@ _(空)_
 - **迭代日志**: _(开始后追加)_
 
 ### 数据模型简化：消除 Metanode + AssociatedData
-> **Owner: TBD** | Branch: `TBD` | Priority: P0
-> **计划文档**: `.claude/plans/hashed-dancing-avalanche.md`
+> **Owner: nodex-cc** | Branch: `cc/simplify-data-model` | Priority: P0
+> **计划文档**: `.claude/plans/simplify-data-model-eliminate-metanode-assocdata.md`
 
 简化三层间接为一层（只保留 Tuple），消除 Metanode 和 AssociatedData。
 

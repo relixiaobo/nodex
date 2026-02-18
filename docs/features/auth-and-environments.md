@@ -1,7 +1,7 @@
 # 用户认证 & 环境策略
 
 > **目标读者**: 开发者 + 产品（用户）
-> **当前阶段**: 未上线，仅开发环境
+> **当前阶段**: 代码已实现（PR #cc2/google-auth），等待外部服务配置
 
 ---
 
@@ -194,3 +194,7 @@ if (isAuthenticated)  → 显示正常 App（当前的 Sidebar + PanelStack）
 | 2026-02-17 | 当前只搭 Dev + Production，不建 Preview | 产品未上线，无内测用户 |
 | 2026-02-17 | 一个 Supabase 项目，Dev/Prod 用不同环境变量 | 简化管理，后续可拆分 |
 | 2026-02-17 | 两个 Google OAuth Client ID（Dev/Prod） | Chrome Extension ID 不同，redirect URI 不同 |
+| 2026-02-18 | 使用 Supabase PKCE OAuth 流程（`skipBrowserRedirect: true` + `exchangeCodeForSession`） | 比 implicit flow 更安全，Supabase v2 推荐 |
+| 2026-02-18 | Supabase 不可用时降级为 offline 模式（不强制登录） | 保留 dev 无 `.env` 时的可用性 |
+| 2026-02-18 | `authUser` 不持久化到 chrome.storage，每次从 Supabase getUser 重新水化 | token 由 Supabase 内部 localStorage 管理，避免双重存储 |
+| 2026-02-18 | `partialize` 只持久化 `currentWorkspaceId / userId / isAuthenticated` | 最小持久化原则 |

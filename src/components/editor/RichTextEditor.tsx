@@ -158,20 +158,18 @@ export function RichTextEditor(props: RichTextEditorProps) {
   }, [updateNodeContent, userId]);
 
   const syncInitialFocus = useCallback((view: EditorView) => {
-    const applyFocusState = (allowStealFocus: boolean) => {
+    const applyFocusState = () => {
       if (viewRef.current !== view) return;
 
       savedRef.current = false;
 
-      const active = document.activeElement;
-      const activeIsEditable = (
-        active instanceof HTMLInputElement ||
-        active instanceof HTMLTextAreaElement ||
-        (active instanceof HTMLElement && active.isContentEditable)
-      );
-      const activeInsideCurrent = !!(active instanceof Node && view.dom.contains(active));
-
-      if (!view.hasFocus() && (allowStealFocus || !activeIsEditable || activeInsideCurrent)) {
+      // Always focus the new editor – this callback is only invoked once when
+      // the view mounts for a node that *should* receive focus.  The old
+      // "immediate + rAF fallback" dual-shot design called view.focus() in
+      // useLayoutEffect (before paint) which disrupted IME composition state
+      // on CJK input methods.  Deferring to rAF gives the browser one frame
+      // to settle focus/IME state while remaining imperceptible to the user.
+      if (!view.hasFocus()) {
         view.focus();
       }
 
@@ -205,16 +203,16 @@ export function RichTextEditor(props: RichTextEditorProps) {
       }
     };
 
-    // Try immediately so rapid typing after Enter-create lands in the new editor.
-    applyFocusState(true);
-
+    // Defer focus to requestAnimationFrame so the browser has one frame to
+    // settle DOM layout and IME state.  This fixes CJK IME composition being
+    // disrupted when Enter creates a new empty node (the old code called
+    // view.focus() synchronously in useLayoutEffect before paint).
     if (focusRafRef.current !== null) {
       cancelAnimationFrame(focusRafRef.current);
     }
     focusRafRef.current = requestAnimationFrame(() => {
       focusRafRef.current = null;
-      // One-frame fallback, but avoid stealing focus from other active editors.
-      applyFocusState(false);
+      applyFocusState();
     });
   }, []);
 

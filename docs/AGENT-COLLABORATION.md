@@ -49,10 +49,18 @@
 每次新 session 开始时，Agent **必须**按以下顺序执行：
 
 1. **识别自己**：通过 worktree 路径 / 端口 / 分支确认身份
-2. **同步代码**：`git fetch origin`（一次 fetch，所有 worktree 共享。dev agent 额外 rebase 自己的分支）
-3. **读取共享知识**：`Read docs/LESSONS.md` — 了解项目经验教训和陷阱
-4. **检查自己的 open PR**：`gh pr list --author @me` — 是否有 review comment 需要处理
-5. **检查待办**：
+2. **同步代码**：
+   ```bash
+   git stash --include-untracked   # 暂存本地未提交改动（防止脏文件遮盖上游更新）
+   git fetch origin
+   git merge origin/main           # 或 rebase 自己的分支
+   git stash pop                   # 恢复暂存（如有冲突会提示，需手动解决）
+   ```
+   > ⚠️ **为什么必须 stash**：git worktree 共享 `.git`，`git pull/merge` 只更新 committed history，**不会覆盖工作区的未提交修改**。如果其他 Agent 远程更新了共享文档（TASKS.md、CLAUDE.md、docs/*.md），本地的旧版脏文件会遮盖新内容，导致读到过时信息。
+3. **验证工作区干净**：`git status` 确认无意外的未提交文件（特别是共享文档）
+4. **读取共享知识**：`Read docs/LESSONS.md` — 了解项目经验教训和陷阱
+5. **检查自己的 open PR**：`gh pr list --author @me` — 是否有 review comment 需要处理
+6. **检查待办**：
    - **所有 Agent**: `Read docs/TASKS.md` — 了解全局状态、收件箱、自己的进行中任务
    - **nodex**: 额外 `gh pr list --state open` — 是否有待审 PR
 
@@ -157,7 +165,19 @@ Dev Agent（nodex-codex / nodex-cc / nodex-cc-2）**绝对不能**直接向 `mai
 | **研究** | `docs/research/*.md` | 无 | 只读 | 原则上不修改（参考资料） |
 | **代码** | `src/**` | 高 | 按文件独占 | 同一时间只有一个 Agent 改同一文件 |
 
-### 3.2 详细规则
+### 3.2 共享文档编辑硬规则
+
+> ⚠️ **对共享文档的修改必须立即 commit**（同一操作中，不允许留在工作区未提交）。
+>
+> **共享文档**：`docs/TASKS.md`、`CLAUDE.md`、`docs/LESSONS.md`、`docs/TESTING.md`、`docs/AGENT-COLLABORATION.md`、`docs/features/*.md`
+>
+> **为什么**：多个 Agent（包括 nodex）会远程修改这些文件。未提交的本地改动会在下次 `git pull/merge` 后遮盖上游更新，导致 Agent 读到过时内容却以为已经是最新（`git pull` 显示 "Already up to date" 但工作区文件是旧的）。
+>
+> **正确做法**：编辑共享文档 → 立即 `git add` + `git commit` → 继续其他工作
+>
+> **错误做法**：编辑共享文档 → 先做其他开发 → 稍后一起 commit（期间其他 Agent 的更新会被遮盖）
+
+### 3.3 详细规则
 
 #### CLAUDE.md（治理核心）
 
@@ -205,7 +225,7 @@ Dev Agent（nodex-codex / nodex-cc / nodex-cc-2）**绝对不能**直接向 `mai
   - `src/types/system-nodes.ts`
 - **冲突预防**: 任务认领前先检查目标文件是否有其他 Agent 在改
 
-### 3.3 交付后文档同步清单
+### 3.4 交付后文档同步清单
 
 每次完成"实现/修复/更新"后，Agent 应按此清单同步文档：
 
@@ -348,6 +368,7 @@ git worktree prune
 - 不要在 worktree 中 checkout 另一个 worktree 正在使用的分支（git 会报错）
 - Claude Code 的项目记忆按路径索引（`~/.claude/projects/-Users-...-nodex-cc/`），路径不变所以记忆保留
 - 主仓库 `nodex/` 的 `.git/worktrees/` 目录存储 worktree 元数据，不要手动删除
+- **worktree 脏文件陷阱**：`git pull/merge` 只更新 committed history，不覆盖工作区的未提交修改。当其他 Agent 在 main 上更新了共享文档（如 TASKS.md），你的 worktree pull 后会显示 "Already up to date"，但文件内容仍是旧的。**解决**：pull 前先 `git stash`（见 §2.1 启动协议）
 
 ---
 

@@ -15,18 +15,20 @@ Chrome Side Panel 云端知识管理工具，忠实复刻 Tana 核心功能。
 | Dev Server 端口 | `5200`（`PORT=5200 npm run dev:test`） |
 | 主要职责 | 功能开发、提交 PR |
 | 次要职责 | Bug 修复 |
-| Clone 路径 | `nodex-codex`（独立 clone） |
+| Worktree 路径 | `nodex-codex`（worktree，共享主仓库 `nodex/` 的 `.git`） |
 
 其他 Agent：
-- **nodex**（主 clone）：Review PR、合并到 main
-- **nodex-cc**（独立 clone）：功能开发，分支 `cc/<feature>`，端口 `5201`
-- **nodex-cc-2**（独立 clone）：功能开发，分支 `cc2/<feature>`，端口 `5202`
+- **nodex**（主仓库）：Review PR、合并到 main
+- **nodex-cc**（worktree）：功能开发，分支 `cc/<feature>`，端口 `5201`
+- **nodex-cc-2**（worktree）：功能开发，分支 `cc2/<feature>`，端口 `5202`
+
+> 所有 worktree 共享一个 `.git` 仓库（`nodex/`）。`git fetch origin` 一次，所有 worktree 立即可见。
 
 ## Session 启动协议
 
 每次新 session 开始时，**必须**按以下顺序执行：
 
-1. `git pull origin main`，rebase 自己的分支
+1. `git fetch origin`（一次 fetch，所有 worktree 共享），rebase 自己的分支
 2. `Read docs/LESSONS.md` — 了解项目经验教训和陷阱（避免重复踩坑）
 3. `Read docs/TASKS.md` — 了解全局状态、收件箱、自己的进行中任务
 4. `gh pr list --author @me` — 检查是否有 review comment 需要处理

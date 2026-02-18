@@ -163,7 +163,7 @@ interface NodeStore {
 
   // ─── Tag operations ───
 
-  /** Apply a supertag to a content node (creates metanode + tuple chain) */
+  /** Apply a supertag to a content node (creates tag tuple in node.meta + field tuples) */
   applyTag(nodeId: string, tagDefId: string, workspaceId: string, userId: string): Promise<void>;
 
   /** Remove a supertag from a content node */
@@ -1127,18 +1127,11 @@ export const useNodeStore = create<NodeStore>()(
         const n = state.entities[nodeId];
         if (!n) return;
 
-        // 1. Get or create metanode
-        let metanodeId = n.props._metaNodeId;
-        if (!metanodeId || !state.entities[metanodeId]) {
-          metanodeId = nanoid();
-          state.entities[metanodeId] = makeNodeLocal(metanodeId, nodeId, 'metanode');
-          n.props._metaNodeId = metanodeId;
-        }
-
-        const metanode = state.entities[metanodeId];
+        // 1. Initialize meta if needed
+        if (!n.meta) n.meta = [];
 
         // 2. Check if already tagged
-        const alreadyTagged = (metanode.children ?? []).some((cid) => {
+        const alreadyTagged = n.meta.some((cid) => {
           const t = state.entities[cid];
           return t?.props._docType === 'tuple' &&
             t.children?.[0] === SYS_A.NODE_SUPERTAGS &&
@@ -1146,11 +1139,10 @@ export const useNodeStore = create<NodeStore>()(
         });
         if (alreadyTagged) return;
 
-        // 3. Create SYS_A13 tag tuple
+        // 3. Create SYS_A13 tag tuple (_ownerId = nodeId, stored in node.meta)
         const tagTupleId = nanoid();
-        state.entities[tagTupleId] = makeNodeLocal(tagTupleId, metanodeId, 'tuple', [SYS_A.NODE_SUPERTAGS, tagDefId]);
-        if (!metanode.children) metanode.children = [];
-        metanode.children.push(tagTupleId);
+        state.entities[tagTupleId] = makeNodeLocal(tagTupleId, nodeId, 'tuple', [SYS_A.NODE_SUPERTAGS, tagDefId]);
+        n.meta.push(tagTupleId);
 
         // 4. Build inheritance chain (ancestors first, then self)
         const extendsChain = getExtendsChain(state.entities, tagDefId);
@@ -1248,21 +1240,18 @@ export const useNodeStore = create<NodeStore>()(
     removeTag: async (nodeId, tagDefId, _userId) => {
       set((state) => {
         const node = state.entities[nodeId];
-        if (!node?.props._metaNodeId) return;
+        if (!node?.meta || node.meta.length === 0) return;
 
-        const metanode = state.entities[node.props._metaNodeId];
-        if (!metanode?.children) return;
-
-        // 1. Remove SYS_A13 tuple from metanode
-        const idx = metanode.children.findIndex((cid) => {
+        // 1. Remove SYS_A13 tuple from node.meta
+        const idx = node.meta.findIndex((cid) => {
           const t = state.entities[cid];
           return t?.props._docType === 'tuple' &&
             t.children?.[0] === SYS_A.NODE_SUPERTAGS &&
             t.children?.[1] === tagDefId;
         });
         if (idx >= 0) {
-          const tupleId = metanode.children[idx];
-          metanode.children.splice(idx, 1);
+          const tupleId = node.meta[idx];
+          node.meta.splice(idx, 1);
           delete state.entities[tupleId];
         }
 
@@ -1353,7 +1342,7 @@ export const useNodeStore = create<NodeStore>()(
         schema.children.push(id);
       });
 
-      // Apply SYS_T01 (Supertag) tag — creates metanode + config tuples
+      // Apply SYS_T01 (Supertag) tag — creates tag tuple in meta + config tuples
       if (get().entities[SYS_T.SUPERTAG]) {
         await get().applyTag(id, SYS_T.SUPERTAG, workspaceId, userId);
       }
@@ -1422,7 +1411,7 @@ export const useNodeStore = create<NodeStore>()(
         }
       });
 
-      // Apply SYS_T02 (Field Definition) tag — creates metanode + config tuples
+      // Apply SYS_T02 (Field Definition) tag — creates tag tuple in meta + config tuples
       if (get().entities[SYS_T.FIELD_DEFINITION]) {
         await get().applyTag(attrDefId, SYS_T.FIELD_DEFINITION, workspaceId, userId);
       }
@@ -2181,6 +2170,12 @@ export const useNodeStore = create<NodeStore>()(
           if (oldAttrDef.children) {
             for (const cid of oldAttrDef.children) {
               delete state.entities[cid];
+            }
+          }
+          // Delete meta tuples (e.g. SYS_T02 tag tuple)
+          if (oldAttrDef.meta) {
+            for (const mid of oldAttrDef.meta) {
+              delete state.entities[mid];
             }
           }
           delete state.entities[oldAttrDefId];

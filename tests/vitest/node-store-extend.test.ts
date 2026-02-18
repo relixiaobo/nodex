@@ -244,17 +244,16 @@ describe('Supertag Extend (Inheritance)', () => {
       }
     });
 
-    it('removeTag tag binding is removed from metanode', async () => {
+    it('removeTag tag binding is removed from node.meta', async () => {
       const nodeId = 'note_2';
       const tagDefId = 'tagDef_dev_task';
 
       await getState().applyTag(nodeId, tagDefId, 'ws_default', 'user_default');
-      const metanodeId = getState().entities[nodeId].props._metaNodeId!;
 
       await getState().removeTag(nodeId, tagDefId, 'user_default');
 
-      const metanode = getState().entities[metanodeId];
-      const stillHasTag = (metanode?.children ?? []).some((cid) => {
+      const nodeAfterRemove = getState().entities[nodeId];
+      const stillHasTag = (nodeAfterRemove.meta ?? []).some((cid) => {
         const t = getState().entities[cid];
         return t?.props._docType === 'tuple' &&
           t.children?.[0] === SYS_A.NODE_SUPERTAGS &&

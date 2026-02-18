@@ -10,9 +10,7 @@ describe('node-store trash semantics', () => {
 
   it('trashing a tagDef keeps existing tag bindings and template field instances', async () => {
     const taskNode = useNodeStore.getState().entities.task_1;
-    const taskMetaId = taskNode.props._metaNodeId;
-    expect(taskMetaId).toBeTruthy();
-    if (!taskMetaId) return;
+    expect(taskNode.meta?.length).toBeGreaterThan(0);
 
     await useNodeStore.getState().trashNode('tagDef_task', 'ws_default', 'user_default');
 
@@ -20,7 +18,7 @@ describe('node-store trash semantics', () => {
     expect(state.entities.tagDef_task.props._ownerId).toBe('ws_default_TRASH');
     expect(state.entities.ws_default_TRASH.children ?? []).toContain('tagDef_task');
 
-    const stillHasTagBinding = (state.entities[taskMetaId].children ?? []).some((cid) => {
+    const stillHasTagBinding = (state.entities.task_1.meta ?? []).some((cid) => {
       const t = state.entities[cid];
       return t?.props._docType === 'tuple' &&
         t.children?.[0] === SYS_A.NODE_SUPERTAGS &&

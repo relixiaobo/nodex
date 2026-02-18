@@ -117,13 +117,9 @@ function buildDoneStateMappingEntities(opts?: {
 
   // Node n1 tagged with tagDef1
   entities['n1'] = makeNode('n1', {
-    props: { created: 1, _metaNodeId: 'meta1' },
+    meta: ['tuple_tag'],
     children: ['fld_status'],
     associationMap: { fld_status: 'assoc_status' },
-  });
-  entities['meta1'] = makeNode('meta1', {
-    props: { created: 1, _docType: 'metanode' as DocType },
-    children: ['tuple_tag'],
   });
   entities['tuple_tag'] = makeNode('tuple_tag', {
     props: { created: 1, _docType: 'tuple' as DocType },
@@ -183,13 +179,9 @@ function buildLegacyEntities(opts?: {
   });
 
   entities['n1'] = makeNode('n1', {
-    props: { created: 1, _metaNodeId: 'meta1' },
+    meta: ['tuple_tag'],
     children: ['fld_status'],
     associationMap: { fld_status: 'assoc_status' },
-  });
-  entities['meta1'] = makeNode('meta1', {
-    props: { created: 1, _docType: 'metanode' as DocType },
-    children: ['tuple_tag'],
   });
   entities['tuple_tag'] = makeNode('tuple_tag', {
     props: { created: 1, _docType: 'tuple' as DocType },

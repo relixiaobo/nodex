@@ -85,7 +85,7 @@ export function resolveSourceSupertag(
 
 /**
  * Find all content nodes tagged with a given tagDefId.
- * Walks every entity → metanode → tuples looking for [SYS_A13, tagDefId].
+ * Walks every entity → node.meta tuples looking for [SYS_A13, tagDefId].
  */
 export function resolveTaggedNodes(
   entities: Record<string, NodexNode>, tagDefId: string
@@ -93,11 +93,8 @@ export function resolveTaggedNodes(
   const result: string[] = [];
   for (const [id, node] of Object.entries(entities)) {
     if (node.props._docType) continue;
-    const metaId = node.props._metaNodeId;
-    if (!metaId) continue;
-    const meta = entities[metaId];
-    if (!meta?.children) continue;
-    for (const cid of meta.children) {
+    if (!node.meta || node.meta.length === 0) continue;
+    for (const cid of node.meta) {
       const tuple = entities[cid];
       if (
         tuple?.props._docType === 'tuple' &&
@@ -492,7 +489,7 @@ export const TAGDEF_OUTLINER_FIELDS = TAGDEF_CONFIG_FIELDS
 
 /**
  * Resolve default child supertag IDs for a parent node.
- * Walks the parent's tags (metanode → SYS_A13 tuples) and reads SYS_A14 from each tagDef.
+ * Walks the parent's tags (node.meta → SYS_A13 tuples) and reads SYS_A14 from each tagDef.
  * Returns deduplicated tagDef IDs that should be auto-applied to new children.
  */
 export function resolveChildSupertags(
@@ -500,15 +497,10 @@ export function resolveChildSupertags(
   parentId: string,
 ): string[] {
   const parent = entities[parentId];
-  if (!parent) return [];
-
-  const metaId = parent.props._metaNodeId;
-  if (!metaId) return [];
-  const meta = entities[metaId];
-  if (!meta?.children) return [];
+  if (!parent?.meta || parent.meta.length === 0) return [];
 
   const result: string[] = [];
-  for (const cid of meta.children) {
+  for (const cid of parent.meta) {
     const tuple = entities[cid];
     if (
       tuple?.props._docType === 'tuple' &&
@@ -635,12 +627,9 @@ export function resolveSystemFieldValue(
       return { text: ownerNode?.props.name ?? ownerId, refNodeId: ownerId };
     }
     case 'metanode': {
-      const metaId = node.props._metaNodeId;
-      if (!metaId) return { text: '' };
-      const meta = entities[metaId];
-      if (!meta?.children) return { text: '' };
+      if (!node.meta || node.meta.length === 0) return { text: '' };
       const tagNames: string[] = [];
-      for (const cid of meta.children) {
+      for (const cid of node.meta) {
         const tuple = entities[cid];
         if (tuple?.props._docType === 'tuple' && tuple.children?.[0] === SYS_A.NODE_SUPERTAGS && tuple.children[1]) {
           const tagDef = entities[tuple.children[1]];

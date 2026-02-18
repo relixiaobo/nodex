@@ -3,15 +3,12 @@ import { useNodeStore } from '../../src/stores/node-store.js';
 import { resolveChildSupertags } from '../../src/lib/field-utils.js';
 import { resetAndSeed } from './helpers/test-state.js';
 
-/** Check if a node has a specific tag via its metanode SYS_A13 tuples. */
+/** Check if a node has a specific tag via its node.meta SYS_A13 tuples. */
 function hasTag(nodeId: string, tagDefId: string): boolean {
   const state = useNodeStore.getState();
   const node = state.entities[nodeId];
-  const metaId = node?.props._metaNodeId;
-  if (!metaId) return false;
-  const meta = state.entities[metaId];
-  if (!meta?.children) return false;
-  return meta.children.some((cid) => {
+  if (!node?.meta || node.meta.length === 0) return false;
+  return node.meta.some((cid) => {
     const t = state.entities[cid];
     return t?.props._docType === 'tuple' &&
       t.children?.[0] === SYS_A.NODE_SUPERTAGS &&
@@ -103,7 +100,7 @@ describe('Default Child Supertag (SYS_A14)', () => {
       );
 
       expect(hasTag(child.id, 'tagDef_dev_task')).toBe(false);
-      expect(child.props._metaNodeId).toBeUndefined();
+      expect(child.meta).toBeUndefined();
     });
 
     it('does not auto-apply when parent has no tags', async () => {
@@ -111,7 +108,7 @@ describe('Default Child Supertag (SYS_A14)', () => {
         'note_2', 'ws_default', 'user_default', 'New idea',
       );
 
-      expect(child.props._metaNodeId).toBeUndefined();
+      expect(child.meta).toBeUndefined();
     });
 
     it('handles multiple tags with different SYS_A14 values', async () => {
@@ -150,7 +147,7 @@ describe('Default Child Supertag (SYS_A14)', () => {
         'subtask_1a', 'ws_default', 'user_default', 'New sibling',
       );
 
-      expect(sibling.props._metaNodeId).toBeUndefined();
+      expect(sibling.meta).toBeUndefined();
     });
   });
 });

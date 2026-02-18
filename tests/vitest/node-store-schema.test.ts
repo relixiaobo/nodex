@@ -27,11 +27,9 @@ describe('node-store schema flows', () => {
     expect(tagDef?.props._ownerId).toBe('ws_default_SCHEMA');
     expect(state.entities.ws_default_SCHEMA.children ?? []).toContain(created.id);
 
-    const metanodeId = tagDef?.props._metaNodeId;
-    expect(metanodeId).toBeTruthy();
-    if (!metanodeId) return;
+    expect(tagDef?.meta?.length).toBeGreaterThan(0);
 
-    const hasSupertagBinding = (state.entities[metanodeId].children ?? []).some((cid) => {
+    const hasSupertagBinding = (tagDef!.meta ?? []).some((cid) => {
       const tuple = state.entities[cid];
       return tuple?.props._docType === 'tuple' &&
         tuple.children?.[0] === SYS_A.NODE_SUPERTAGS &&
@@ -95,11 +93,9 @@ describe('node-store schema flows', () => {
     expect(typeTupleIds.length).toBe(1);
     expect(state.entities[typeTupleIds[0]]?.children?.[1]).toBe(SYS_D.NUMBER);
 
-    const metanodeId = attrDef?.props._metaNodeId;
-    expect(metanodeId).toBeTruthy();
-    if (!metanodeId) return;
+    expect(attrDef?.meta?.length).toBeGreaterThan(0);
 
-    const hasFieldDefinitionBinding = (state.entities[metanodeId].children ?? []).some((cid) => {
+    const hasFieldDefinitionBinding = (attrDef!.meta ?? []).some((cid) => {
       const tuple = state.entities[cid];
       return tuple?.props._docType === 'tuple' &&
         tuple.children?.[0] === SYS_A.NODE_SUPERTAGS &&

@@ -68,15 +68,9 @@ export function hasTagShowCheckbox(
   entities: Record<string, NodexNode>,
 ): boolean {
   const node = entities[nodeId];
-  if (!node) return false;
+  if (!node?.meta || node.meta.length === 0) return false;
 
-  const metaNodeId = node.props._metaNodeId;
-  if (!metaNodeId) return false;
-
-  const meta = entities[metaNodeId];
-  if (!meta?.children) return false;
-
-  for (const tupleId of meta.children) {
+  for (const tupleId of node.meta) {
     const tuple = entities[tupleId];
     if (!tuple?.children || tuple.children.length < 2) continue;
     if (tuple.children[0] !== SYS_A.NODE_SUPERTAGS) continue;
@@ -291,17 +285,11 @@ export function getDoneStateMappings(
   entities: Record<string, NodexNode>,
 ): DoneStateMapping[] {
   const node = entities[nodeId];
-  if (!node) return [];
-
-  const metaNodeId = node.props._metaNodeId;
-  if (!metaNodeId) return [];
-
-  const meta = entities[metaNodeId];
-  if (!meta?.children) return [];
+  if (!node?.meta || node.meta.length === 0) return [];
 
   const result: DoneStateMapping[] = [];
 
-  for (const tupleId of meta.children) {
+  for (const tupleId of node.meta) {
     const tuple = entities[tupleId];
     if (!tuple?.children || tuple.children.length < 2) continue;
     if (tuple.children[0] !== SYS_A.NODE_SUPERTAGS) continue;

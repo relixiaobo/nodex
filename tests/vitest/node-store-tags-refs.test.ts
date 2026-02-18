@@ -27,10 +27,8 @@ describe('node-store tag + reference flows', () => {
     await useNodeStore.getState().applyTag(nodeId, tagDefId, 'ws_default', 'user_default');
 
     const nodeAfterApply = useNodeStore.getState().entities[nodeId];
-    expect(nodeAfterApply.props._metaNodeId).toBeTruthy();
-    const metanodeId = nodeAfterApply.props._metaNodeId!;
-    const metanode = useNodeStore.getState().entities[metanodeId];
-    const hasTagBinding = (metanode.children ?? []).some((cid) => {
+    expect(nodeAfterApply.meta?.length).toBeGreaterThan(0);
+    const hasTagBinding = (nodeAfterApply.meta ?? []).some((cid) => {
       const t = useNodeStore.getState().entities[cid];
       return t?.props._docType === 'tuple' &&
         t.children?.[0] === SYS_A.NODE_SUPERTAGS &&
@@ -52,8 +50,7 @@ describe('node-store tag + reference flows', () => {
     await useNodeStore.getState().removeTag(nodeId, tagDefId, 'user_default');
 
     const nodeAfterRemove = useNodeStore.getState().entities[nodeId];
-    const metanodeAfterRemove = useNodeStore.getState().entities[metanodeId];
-    const stillHasTagBinding = (metanodeAfterRemove?.children ?? []).some((cid) => {
+    const stillHasTagBinding = (nodeAfterRemove.meta ?? []).some((cid) => {
       const t = useNodeStore.getState().entities[cid];
       return t?.props._docType === 'tuple' &&
         t.children?.[0] === SYS_A.NODE_SUPERTAGS &&
@@ -90,11 +87,9 @@ describe('node-store tag + reference flows', () => {
     await useNodeStore.getState().applyTag(nodeId, tagDefId, 'ws_default', 'user_default');
 
     const nodeAfterDoubleApply = useNodeStore.getState().entities[nodeId];
-    const metanodeId = nodeAfterDoubleApply.props._metaNodeId;
-    expect(metanodeId).toBeTruthy();
-    if (!metanodeId) return;
+    expect(nodeAfterDoubleApply.meta?.length).toBeGreaterThan(0);
 
-    const tagBindingCount = (useNodeStore.getState().entities[metanodeId].children ?? []).filter((cid) => {
+    const tagBindingCount = (nodeAfterDoubleApply.meta ?? []).filter((cid) => {
       const t = useNodeStore.getState().entities[cid];
       return t?.props._docType === 'tuple' &&
         t.children?.[0] === SYS_A.NODE_SUPERTAGS &&

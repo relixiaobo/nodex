@@ -137,8 +137,8 @@ export function seedTestData() {
       ]),
       props: {
         ...makeNode('task_1', 'Design the data model', 'proj_1').props,
-        _metaNodeId: 'meta_task_1',
       },
+      meta: ['meta_task_1_tag'],
       associationMap: {
         task1_fld_status: 'task1_assoc_status',
         task1_fld_priority: 'task1_assoc_priority',
@@ -174,8 +174,8 @@ export function seedTestData() {
       ]),
       props: {
         ...makeNode('person_1', 'Alice Johnson', libraryId).props,
-        _metaNodeId: 'meta_person_1',
       },
+      meta: ['meta_person_1_tag'],
       associationMap: {
         person1_fld_email: 'person1_assoc_email',
         person1_fld_company: 'person1_assoc_company',
@@ -456,7 +456,8 @@ export function seedTestData() {
       ...makeNode('attrDef_status', 'Status', 'taskField_status', [
         ...statusCfg.childIds, 'opt_todo', 'opt_in_progress', 'opt_done',
       ], 'attrDef'),
-      props: { ...makeNode('attrDef_status', '', '').props, _docType: 'attrDef' as DocType, name: 'Status', _ownerId: 'taskField_status', _metaNodeId: 'meta_attrDef_status' },
+      props: { ...makeNode('attrDef_status', '', '').props, _docType: 'attrDef' as DocType, name: 'Status', _ownerId: 'taskField_status' },
+      meta: ['meta_attrDef_status_tag'],
       associationMap: statusCfg.map,
     },
     ...statusCfg.nodes,
@@ -472,7 +473,8 @@ export function seedTestData() {
       ...makeNode('attrDef_priority', 'Priority', 'taskField_priority', [
         ...priorityCfg.childIds, 'opt_high', 'opt_medium', 'opt_low',
       ], 'attrDef'),
-      props: { ...makeNode('attrDef_priority', '', '').props, _docType: 'attrDef' as DocType, name: 'Priority', _ownerId: 'taskField_priority', _metaNodeId: 'meta_attrDef_priority' },
+      props: { ...makeNode('attrDef_priority', '', '').props, _docType: 'attrDef' as DocType, name: 'Priority', _ownerId: 'taskField_priority' },
+      meta: ['meta_attrDef_priority_tag'],
       associationMap: priorityCfg.map,
     },
     ...priorityCfg.nodes,
@@ -486,7 +488,8 @@ export function seedTestData() {
   const attrDefDueNodes: NodexNode[] = [
     {
       ...makeNode('attrDef_due', 'Due', 'taskField_due', dueCfg.childIds, 'attrDef'),
-      props: { ...makeNode('attrDef_due', '', '').props, _docType: 'attrDef' as DocType, name: 'Due', _ownerId: 'taskField_due', _metaNodeId: 'meta_attrDef_due' },
+      props: { ...makeNode('attrDef_due', '', '').props, _docType: 'attrDef' as DocType, name: 'Due', _ownerId: 'taskField_due' },
+      meta: ['meta_attrDef_due_tag'],
       associationMap: dueCfg.map,
     },
     ...dueCfg.nodes,
@@ -497,7 +500,8 @@ export function seedTestData() {
   const attrDefEmailNodes: NodexNode[] = [
     {
       ...makeNode('attrDef_email', 'Email', 'personField_email', emailCfg.childIds, 'attrDef'),
-      props: { ...makeNode('attrDef_email', '', '').props, _docType: 'attrDef' as DocType, name: 'Email', _ownerId: 'personField_email', _metaNodeId: 'meta_attrDef_email' },
+      props: { ...makeNode('attrDef_email', '', '').props, _docType: 'attrDef' as DocType, name: 'Email', _ownerId: 'personField_email' },
+      meta: ['meta_attrDef_email_tag'],
       associationMap: emailCfg.map,
     },
     ...emailCfg.nodes,
@@ -508,7 +512,8 @@ export function seedTestData() {
   const attrDefCompanyNodes: NodexNode[] = [
     {
       ...makeNode('attrDef_company', 'Company', 'personField_company', companyCfg.childIds, 'attrDef'),
-      props: { ...makeNode('attrDef_company', '', '').props, _docType: 'attrDef' as DocType, name: 'Company', _ownerId: 'personField_company', _metaNodeId: 'meta_attrDef_company' },
+      props: { ...makeNode('attrDef_company', '', '').props, _docType: 'attrDef' as DocType, name: 'Company', _ownerId: 'personField_company' },
+      meta: ['meta_attrDef_company_tag'],
       associationMap: companyCfg.map,
     },
     ...companyCfg.nodes,
@@ -519,7 +524,8 @@ export function seedTestData() {
   const attrDefAgeNodes: NodexNode[] = [
     {
       ...makeNode('attrDef_age', 'Age', 'personField_age', ageCfg.childIds, 'attrDef'),
-      props: { ...makeNode('attrDef_age', '', '').props, _docType: 'attrDef' as DocType, name: 'Age', _ownerId: 'personField_age', _metaNodeId: 'meta_attrDef_age' },
+      props: { ...makeNode('attrDef_age', '', '').props, _docType: 'attrDef' as DocType, name: 'Age', _ownerId: 'personField_age' },
+      meta: ['meta_attrDef_age_tag'],
       associationMap: ageCfg.map,
     },
     ...ageCfg.nodes,
@@ -530,7 +536,8 @@ export function seedTestData() {
   const attrDefWebsiteNodes: NodexNode[] = [
     {
       ...makeNode('attrDef_website', 'Website', 'personField_website', websiteCfg.childIds, 'attrDef'),
-      props: { ...makeNode('attrDef_website', '', '').props, _docType: 'attrDef' as DocType, name: 'Website', _ownerId: 'personField_website', _metaNodeId: 'meta_attrDef_website' },
+      props: { ...makeNode('attrDef_website', '', '').props, _docType: 'attrDef' as DocType, name: 'Website', _ownerId: 'personField_website' },
+      meta: ['meta_attrDef_website_tag'],
       associationMap: websiteCfg.map,
     },
     ...websiteCfg.nodes,
@@ -541,7 +548,8 @@ export function seedTestData() {
   const attrDefDoneNodes: NodexNode[] = [
     {
       ...makeNode('attrDef_done', 'Done', 'taskField_done', doneCfg.childIds, 'attrDef'),
-      props: { ...makeNode('attrDef_done', '', '').props, _docType: 'attrDef' as DocType, name: 'Done', _ownerId: 'taskField_done', _metaNodeId: 'meta_attrDef_done' },
+      props: { ...makeNode('attrDef_done', '', '').props, _docType: 'attrDef' as DocType, name: 'Done', _ownerId: 'taskField_done' },
+      meta: ['meta_attrDef_done_tag'],
       associationMap: doneCfg.map,
     },
     ...doneCfg.nodes,
@@ -552,7 +560,8 @@ export function seedTestData() {
   const attrDefBranchNodes: NodexNode[] = [
     {
       ...makeNode('attrDef_branch', 'Branch', 'devTaskField_branch', branchCfg.childIds, 'attrDef'),
-      props: { ...makeNode('attrDef_branch', '', '').props, _docType: 'attrDef' as DocType, name: 'Branch', _ownerId: 'devTaskField_branch', _metaNodeId: 'meta_attrDef_branch' },
+      props: { ...makeNode('attrDef_branch', '', '').props, _docType: 'attrDef' as DocType, name: 'Branch', _ownerId: 'devTaskField_branch' },
+      meta: ['meta_attrDef_branch_tag'],
       associationMap: branchCfg.map,
     },
     ...branchCfg.nodes,
@@ -563,34 +572,25 @@ export function seedTestData() {
   const attrDefSourceUrlNodes: NodexNode[] = [
     {
       ...makeNode('attrDef_source_url', 'Source URL', 'webClipField_source_url', sourceUrlCfg.childIds, 'attrDef'),
-      props: { ...makeNode('attrDef_source_url', '', '').props, _docType: 'attrDef' as DocType, name: 'Source URL', _ownerId: 'webClipField_source_url', _metaNodeId: 'meta_attrDef_source_url' },
+      props: { ...makeNode('attrDef_source_url', '', '').props, _docType: 'attrDef' as DocType, name: 'Source URL', _ownerId: 'webClipField_source_url' },
+      meta: ['meta_attrDef_source_url_tag'],
       associationMap: sourceUrlCfg.map,
     },
     ...sourceUrlCfg.nodes,
   ];
 
-  // Metanodes for attrDefs (SYS_T02 tag application chain)
-  const attrDefMetanodes: NodexNode[] = [
-    makeNode('meta_attrDef_status', '', 'attrDef_status', ['meta_attrDef_status_tag'], 'metanode'),
-    makeNode('meta_attrDef_status_tag', '', 'meta_attrDef_status', [SYS_A.NODE_SUPERTAGS, 'SYS_T02'], 'tuple'),
-    makeNode('meta_attrDef_priority', '', 'attrDef_priority', ['meta_attrDef_priority_tag'], 'metanode'),
-    makeNode('meta_attrDef_priority_tag', '', 'meta_attrDef_priority', [SYS_A.NODE_SUPERTAGS, 'SYS_T02'], 'tuple'),
-    makeNode('meta_attrDef_due', '', 'attrDef_due', ['meta_attrDef_due_tag'], 'metanode'),
-    makeNode('meta_attrDef_due_tag', '', 'meta_attrDef_due', [SYS_A.NODE_SUPERTAGS, 'SYS_T02'], 'tuple'),
-    makeNode('meta_attrDef_email', '', 'attrDef_email', ['meta_attrDef_email_tag'], 'metanode'),
-    makeNode('meta_attrDef_email_tag', '', 'meta_attrDef_email', [SYS_A.NODE_SUPERTAGS, 'SYS_T02'], 'tuple'),
-    makeNode('meta_attrDef_company', '', 'attrDef_company', ['meta_attrDef_company_tag'], 'metanode'),
-    makeNode('meta_attrDef_company_tag', '', 'meta_attrDef_company', [SYS_A.NODE_SUPERTAGS, 'SYS_T02'], 'tuple'),
-    makeNode('meta_attrDef_age', '', 'attrDef_age', ['meta_attrDef_age_tag'], 'metanode'),
-    makeNode('meta_attrDef_age_tag', '', 'meta_attrDef_age', [SYS_A.NODE_SUPERTAGS, 'SYS_T02'], 'tuple'),
-    makeNode('meta_attrDef_website', '', 'attrDef_website', ['meta_attrDef_website_tag'], 'metanode'),
-    makeNode('meta_attrDef_website_tag', '', 'meta_attrDef_website', [SYS_A.NODE_SUPERTAGS, 'SYS_T02'], 'tuple'),
-    makeNode('meta_attrDef_done', '', 'attrDef_done', ['meta_attrDef_done_tag'], 'metanode'),
-    makeNode('meta_attrDef_done_tag', '', 'meta_attrDef_done', [SYS_A.NODE_SUPERTAGS, 'SYS_T02'], 'tuple'),
-    makeNode('meta_attrDef_branch', '', 'attrDef_branch', ['meta_attrDef_branch_tag'], 'metanode'),
-    makeNode('meta_attrDef_branch_tag', '', 'meta_attrDef_branch', [SYS_A.NODE_SUPERTAGS, 'SYS_T02'], 'tuple'),
-    makeNode('meta_attrDef_source_url', '', 'attrDef_source_url', ['meta_attrDef_source_url_tag'], 'metanode'),
-    makeNode('meta_attrDef_source_url_tag', '', 'meta_attrDef_source_url', [SYS_A.NODE_SUPERTAGS, 'SYS_T02'], 'tuple'),
+  // Tag tuples for attrDefs (SYS_T02 tag, stored in node.meta)
+  const attrDefTagTuples: NodexNode[] = [
+    makeNode('meta_attrDef_status_tag', '', 'attrDef_status', [SYS_A.NODE_SUPERTAGS, 'SYS_T02'], 'tuple'),
+    makeNode('meta_attrDef_priority_tag', '', 'attrDef_priority', [SYS_A.NODE_SUPERTAGS, 'SYS_T02'], 'tuple'),
+    makeNode('meta_attrDef_due_tag', '', 'attrDef_due', [SYS_A.NODE_SUPERTAGS, 'SYS_T02'], 'tuple'),
+    makeNode('meta_attrDef_email_tag', '', 'attrDef_email', [SYS_A.NODE_SUPERTAGS, 'SYS_T02'], 'tuple'),
+    makeNode('meta_attrDef_company_tag', '', 'attrDef_company', [SYS_A.NODE_SUPERTAGS, 'SYS_T02'], 'tuple'),
+    makeNode('meta_attrDef_age_tag', '', 'attrDef_age', [SYS_A.NODE_SUPERTAGS, 'SYS_T02'], 'tuple'),
+    makeNode('meta_attrDef_website_tag', '', 'attrDef_website', [SYS_A.NODE_SUPERTAGS, 'SYS_T02'], 'tuple'),
+    makeNode('meta_attrDef_done_tag', '', 'attrDef_done', [SYS_A.NODE_SUPERTAGS, 'SYS_T02'], 'tuple'),
+    makeNode('meta_attrDef_branch_tag', '', 'attrDef_branch', [SYS_A.NODE_SUPERTAGS, 'SYS_T02'], 'tuple'),
+    makeNode('meta_attrDef_source_url_tag', '', 'attrDef_source_url', [SYS_A.NODE_SUPERTAGS, 'SYS_T02'], 'tuple'),
   ];
 
   // ═══════════════════════════════════════════════════════════════
@@ -658,7 +658,8 @@ export function seedTestData() {
         'taskField_status', 'taskField_priority', 'taskField_due', 'taskField_done',
         'taskTpl_default_note',
       ], 'tagDef'),
-      props: { ...makeNode('tagDef_task', '', '').props, _docType: 'tagDef' as DocType, name: 'Task', _ownerId: schemaId, _metaNodeId: 'meta_tagDef_task' },
+      props: { ...makeNode('tagDef_task', '', '').props, _docType: 'tagDef' as DocType, name: 'Task', _ownerId: schemaId },
+      meta: ['meta_tagDef_task_tag'],
       associationMap: taskCfg.map,
     },
     ...taskCfg.nodes,
@@ -679,9 +680,10 @@ export function seedTestData() {
       ], 'tagDef'),
       props: {
         ...makeNode('tagDef_person', '', '').props, _docType: 'tagDef' as DocType,
-        name: 'Person', _ownerId: schemaId, _metaNodeId: 'meta_tagDef_person',
+        name: 'Person', _ownerId: schemaId,
         description: 'Tag for tracking people and their contact info',
       },
+      meta: ['meta_tagDef_person_tag'],
       associationMap: personCfg.map,
     },
     ...personCfg.nodes,
@@ -704,9 +706,10 @@ export function seedTestData() {
       ], 'tagDef'),
       props: {
         ...makeNode('tagDef_dev_task', '', '').props, _docType: 'tagDef' as DocType,
-        name: 'Dev Task', _ownerId: schemaId, _metaNodeId: 'meta_tagDef_dev_task',
+        name: 'Dev Task', _ownerId: schemaId,
         description: 'Dev task extending Task with a Branch field',
       },
+      meta: ['meta_tagDef_dev_task_tag'],
       associationMap: devTaskCfg.map,
     },
     ...devTaskCfg.nodes,
@@ -721,29 +724,25 @@ export function seedTestData() {
         ...webClipCfg.childIds,
         'webClipField_source_url',
       ], 'tagDef'),
-      props: { ...makeNode('tagDef_web_clip', '', '').props, _docType: 'tagDef' as DocType, name: 'web_clip', _ownerId: schemaId, _metaNodeId: 'meta_tagDef_web_clip' },
+      props: { ...makeNode('tagDef_web_clip', '', '').props, _docType: 'tagDef' as DocType, name: 'web_clip', _ownerId: schemaId },
+      meta: ['meta_tagDef_web_clip_tag'],
       associationMap: webClipCfg.map,
     },
     ...webClipCfg.nodes,
     makeNode('webClipField_source_url', '', 'tagDef_web_clip', ['attrDef_source_url'], 'tuple'),
   ];
 
-  // Metanodes for tagDefs (SYS_T01 tag application chain)
-  const tagDefMetanodes: NodexNode[] = [
-    makeNode('meta_tagDef_task', '', 'tagDef_task', ['meta_tagDef_task_tag'], 'metanode'),
-    makeNode('meta_tagDef_task_tag', '', 'meta_tagDef_task', [SYS_A.NODE_SUPERTAGS, SYS_T.SUPERTAG], 'tuple'),
-    makeNode('meta_tagDef_person', '', 'tagDef_person', ['meta_tagDef_person_tag'], 'metanode'),
-    makeNode('meta_tagDef_person_tag', '', 'meta_tagDef_person', [SYS_A.NODE_SUPERTAGS, SYS_T.SUPERTAG], 'tuple'),
-    makeNode('meta_tagDef_dev_task', '', 'tagDef_dev_task', ['meta_tagDef_dev_task_tag'], 'metanode'),
-    makeNode('meta_tagDef_dev_task_tag', '', 'meta_tagDef_dev_task', [SYS_A.NODE_SUPERTAGS, SYS_T.SUPERTAG], 'tuple'),
-    makeNode('meta_tagDef_web_clip', '', 'tagDef_web_clip', ['meta_tagDef_web_clip_tag'], 'metanode'),
-    makeNode('meta_tagDef_web_clip_tag', '', 'meta_tagDef_web_clip', [SYS_A.NODE_SUPERTAGS, SYS_T.SUPERTAG], 'tuple'),
+  // Tag tuples for tagDefs (SYS_T01 tag, stored in node.meta)
+  const tagDefTagTuples: NodexNode[] = [
+    makeNode('meta_tagDef_task_tag', '', 'tagDef_task', [SYS_A.NODE_SUPERTAGS, SYS_T.SUPERTAG], 'tuple'),
+    makeNode('meta_tagDef_person_tag', '', 'tagDef_person', [SYS_A.NODE_SUPERTAGS, SYS_T.SUPERTAG], 'tuple'),
+    makeNode('meta_tagDef_dev_task_tag', '', 'tagDef_dev_task', [SYS_A.NODE_SUPERTAGS, SYS_T.SUPERTAG], 'tuple'),
+    makeNode('meta_tagDef_web_clip_tag', '', 'tagDef_web_clip', [SYS_A.NODE_SUPERTAGS, SYS_T.SUPERTAG], 'tuple'),
   ];
 
   // ─── Pre-tag task_1 with "Task" tag (demo fields on startup) ───
-  const task1MetanodeNodes: NodexNode[] = [
-    makeNode('meta_task_1', '', 'task_1', ['meta_task_1_tag'], 'metanode'),
-    makeNode('meta_task_1_tag', '', 'meta_task_1', [SYS_A.NODE_SUPERTAGS, 'tagDef_task'], 'tuple'),
+  const task1TagTuples: NodexNode[] = [
+    makeNode('meta_task_1_tag', '', 'task_1', [SYS_A.NODE_SUPERTAGS, 'tagDef_task'], 'tuple'),
   ];
   const task1FieldNodes: NodexNode[] = [
     makeNode('task1_fld_status', '', 'task_1', ['attrDef_status'], 'tuple'),
@@ -761,9 +760,8 @@ export function seedTestData() {
   task1FieldNodes[3].props._sourceId = 'taskField_done';
 
   // ─── Pre-tag person_1 with "Person" tag ───
-  const person1MetanodeNodes: NodexNode[] = [
-    makeNode('meta_person_1', '', 'person_1', ['meta_person_1_tag'], 'metanode'),
-    makeNode('meta_person_1_tag', '', 'meta_person_1', [SYS_A.NODE_SUPERTAGS, 'tagDef_person'], 'tuple'),
+  const person1TagTuples: NodexNode[] = [
+    makeNode('meta_person_1_tag', '', 'person_1', [SYS_A.NODE_SUPERTAGS, 'tagDef_person'], 'tuple'),
   ];
   const person1FieldNodes: NodexNode[] = [
     makeNode('person1_fld_email', '', 'person_1', ['attrDef_email'], 'tuple'),
@@ -787,17 +785,16 @@ export function seedTestData() {
       props: {
         ...makeNode('webclip_1', 'Example Article — Medium', inboxId).props,
         description: 'A sample web clip to demonstrate the clipping feature',
-        _metaNodeId: 'meta_webclip_1',
       },
+      meta: ['meta_webclip_1_tag'],
       associationMap: { webclip1_fld_source_url: 'webclip1_assoc_source_url' },
     },
-    makeNode('meta_webclip_1', '', 'webclip_1', ['meta_webclip_1_tag'], 'metanode'),
-    makeNode('meta_webclip_1_tag', '', 'meta_webclip_1', [SYS_A.NODE_SUPERTAGS, 'tagDef_web_clip'], 'tuple'),
+    makeNode('meta_webclip_1_tag', '', 'webclip_1', [SYS_A.NODE_SUPERTAGS, 'tagDef_web_clip'], 'tuple'),
     makeNode('webclip1_fld_source_url', '', 'webclip_1', ['attrDef_source_url', 'webclip1_val_url'], 'tuple'),
     makeNode('webclip1_val_url', 'https://medium.com/example-article', 'webclip1_assoc_source_url'),
     makeNode('webclip1_assoc_source_url', '', 'webclip_1', ['webclip1_val_url'], 'associatedData'),
   ];
-  webclip1Nodes[3].props._sourceId = 'webClipField_source_url';
+  webclip1Nodes[2].props._sourceId = 'webClipField_source_url';
 
   // ─── Set all nodes ───
   const allNodes = [
@@ -825,18 +822,18 @@ export function seedTestData() {
     ...attrDefDoneNodes,
     ...attrDefBranchNodes,
     ...attrDefSourceUrlNodes,
-    ...attrDefMetanodes,
+    ...attrDefTagTuples,
     // TagDefs
     ...tagDefTaskNodes,
     ...tagDefPersonNodes,
     ...tagDefDevTaskNodes,
     ...tagDefWebClipNodes,
-    ...tagDefMetanodes,
+    ...tagDefTagTuples,
     // Pre-tagged instances
     ...webclip1Nodes,
-    ...task1MetanodeNodes,
+    ...task1TagTuples,
     ...task1FieldNodes,
-    ...person1MetanodeNodes,
+    ...person1TagTuples,
     ...person1FieldNodes,
   ];
 

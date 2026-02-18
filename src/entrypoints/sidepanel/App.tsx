@@ -7,6 +7,7 @@ import { useNavUndoKeyboard } from '../../hooks/use-nav-undo-keyboard';
 import { Sidebar } from '../../components/sidebar/Sidebar';
 import { PanelStack } from '../../components/panel/PanelStack';
 import { CommandPalette } from '../../components/search/CommandPalette';
+import { LoginScreen } from '../../components/auth/LoginScreen';
 import { WORKSPACE_CONTAINERS, getContainerId } from '../../types/index.js';
 import type { NodexNode, WorkspaceContainerSuffix } from '../../types/index.js';
 import { resetSupabase } from '../../services/supabase.js';
@@ -63,9 +64,16 @@ function seedWorkspace(wsId: string, userId: string) {
   }
 }
 
-function useBootstrap() {
+interface BootstrapResult {
+  ready: boolean;
+  requiresAuth: boolean;
+}
+
+function useBootstrap(): BootstrapResult {
   const [ready, setReady] = useState(false);
+  const [requiresAuth, setRequiresAuth] = useState(false);
   const wsId = useWorkspaceStore((s) => s.currentWorkspaceId);
+  const isAuthenticated = useWorkspaceStore((s) => s.isAuthenticated);
   const setWorkspace = useWorkspaceStore((s) => s.setWorkspace);
   const setUser = useWorkspaceStore((s) => s.setUser);
   const panelHistory = useUIStore((s) => s.panelHistory);
@@ -73,6 +81,8 @@ function useBootstrap() {
   const fetchNode = useNodeStore((s) => s.fetchNode);
 
   useEffect(() => {
+    let authUnsubscribe: (() => void) | undefined;
+
     async function init() {
       let supabaseReady = false;
 
@@ -89,27 +99,37 @@ function useBootstrap() {
         resetSupabase();
       }
 
+      // When Supabase is available, require authentication
+      if (supabaseReady) {
+        const initAuth = useWorkspaceStore.getState().initAuth;
+        authUnsubscribe = await initAuth();
+
+        const authenticated = useWorkspaceStore.getState().isAuthenticated;
+        if (!authenticated) {
+          // Signal to App that we need a login screen
+          setRequiresAuth(true);
+          setReady(true);
+          return;
+        }
+      }
+
       // Bootstrap workspace
       let currentWsId = wsId;
       const currentUserId = useWorkspaceStore.getState().userId;
       if (!currentWsId) {
-        currentWsId = 'ws_default';
+        currentWsId = supabaseReady
+          ? (useWorkspaceStore.getState().userId ?? 'ws_default')
+          : 'ws_default';
         setWorkspace(currentWsId);
-        setUser('user_default');
+        if (!supabaseReady) setUser('user_default');
       }
 
       // Seed workspace root + container nodes (for offline/demo mode)
-      seedWorkspace(
-        currentWsId,
-        currentUserId ?? 'user_default',
-      );
+      seedWorkspace(currentWsId, currentUserId ?? 'user_default');
 
       // Navigate to Library if panel stack is empty
       if (panelHistory.length === 0) {
-        const libraryId = getContainerId(
-          currentWsId,
-          WORKSPACE_CONTAINERS.LIBRARY,
-        );
+        const libraryId = getContainerId(currentWsId, WORKSPACE_CONTAINERS.LIBRARY);
         navigateTo(libraryId);
 
         // Try to fetch from Supabase (will use local seed if fails)
@@ -122,15 +142,33 @@ function useBootstrap() {
     }
 
     init();
+
+    return () => authUnsubscribe?.();
   }, []); // Run once on mount
 
-  return ready;
+  // Re-evaluate auth requirement when isAuthenticated changes (e.g. after login)
+  useEffect(() => {
+    if (isAuthenticated && requiresAuth) {
+      setRequiresAuth(false);
+      // Re-run workspace bootstrap after successful login
+      const currentWsId = useWorkspaceStore.getState().currentWorkspaceId;
+      const userId = useWorkspaceStore.getState().userId;
+      if (userId && !currentWsId) {
+        useWorkspaceStore.getState().setWorkspace(userId);
+        seedWorkspace(userId, userId);
+        const libraryId = getContainerId(userId, WORKSPACE_CONTAINERS.LIBRARY);
+        useUIStore.getState().navigateTo(libraryId);
+      }
+    }
+  }, [isAuthenticated, requiresAuth]);
+
+  return { ready, requiresAuth };
 }
 
 export function App() {
   const sidebarOpen = useUIStore((s) => s.sidebarOpen);
   const wsId = useWorkspaceStore((s) => s.currentWorkspaceId);
-  const ready = useBootstrap();
+  const { ready, requiresAuth } = useBootstrap();
 
   useEffect(() => {
     if (!import.meta.env.DEV) return;
@@ -152,6 +190,11 @@ export function App() {
         Loading...
       </div>
     );
+  }
+
+  // Show login screen when Supabase is available but user is not authenticated
+  if (requiresAuth) {
+    return <LoginScreen />;
   }
 
   return (

@@ -7,7 +7,7 @@ export default defineConfig({
   manifest: {
     name: 'Nodex',
     description: 'Cloud knowledge management in Chrome Side Panel',
-    permissions: ['storage', 'sidePanel', 'activeTab'],
+    permissions: ['storage', 'sidePanel', 'activeTab', 'identity'],
     side_panel: {
       default_path: 'sidepanel.html',
     },

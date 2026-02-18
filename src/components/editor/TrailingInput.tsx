@@ -23,6 +23,7 @@ import { getLastVisibleNode } from '../../lib/tree-utils.js';
 import { getPrimaryShortcutKey } from '../../lib/shortcut-registry';
 import { resolveTrailingUpdateAction } from '../../lib/trailing-input-actions.js';
 import {
+  resolveTrailingEnterIntent,
   resolveTrailingArrowDownIntent,
   resolveTrailingArrowUpIntent,
   resolveTrailingBackspaceIntent,
@@ -168,9 +169,15 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
         [KEY_TRAILING_ENTER]: (_state, _dispatch, view) => {
           if (!view) return false;
           const ref = callbacksRef.current;
+          const rawText = getEditorText(view);
+          const intent = resolveTrailingEnterIntent({
+            optionsOpen: ref.isOptions && ref.optionsOpen,
+            optionCount: ref.filteredOptions.length,
+            hasText: rawText.trim().length > 0,
+          });
 
           // Options autocomplete: select highlighted option
-          if (ref.isOptions && ref.optionsOpen && ref.filteredOptions.length > 0) {
+          if (intent === 'options_confirm') {
             const selected = ref.filteredOptions[ref.optionsIndex];
             if (selected && ref.userId) {
               committingRef.current = true;
@@ -187,24 +194,45 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
             return true;
           }
 
-          const text = getEditorText(view).trim();
-          if (text.length > 0) {
-            commitContent(getEditorText(view), view);
-          } else {
-            // Empty Enter → create empty child so user can keep creating nodes
-            if (!ref.wsId || !ref.userId) return true;
+          if (intent === 'create_content_and_continue') {
+            if (!ref.wsId || !ref.userId || committingRef.current) return true;
             committingRef.current = true;
-            ref.createChild(ref.effectiveParentId, ref.wsId, ref.userId, '').then((newNode) => {
-              ref.setExpanded(ref.effectiveParentEK, true);
-              ref.setFocusClickCoords({
-                nodeId: newNode.id,
-                parentId: ref.effectiveParentId,
-                textOffset: 0,
+            resetEditorContent(view);
+            setHasContent(false);
+            const targetParentId = ref.effectiveParentId;
+            ref.createChild(targetParentId, ref.wsId, ref.userId, rawText)
+              .then(() => {
+                ref.setExpanded(ref.effectiveParentEK, true);
+                return ref.createChild(targetParentId, ref.wsId!, ref.userId!, '');
+              })
+              .then((newNode) => {
+                ref.setExpanded(ref.effectiveParentEK, true);
+                ref.setFocusClickCoords({
+                  nodeId: newNode.id,
+                  parentId: targetParentId,
+                  textOffset: 0,
+                });
+                ref.setFocusedNode(newNode.id, targetParentId);
+              })
+              .finally(() => {
+                queueMicrotask(() => { committingRef.current = false; });
               });
-              ref.setFocusedNode(newNode.id, ref.effectiveParentId);
-              queueMicrotask(() => { committingRef.current = false; });
-            });
+            return true;
           }
+
+          // Empty Enter → create empty child so user can keep creating nodes
+          if (!ref.wsId || !ref.userId) return true;
+          committingRef.current = true;
+          ref.createChild(ref.effectiveParentId, ref.wsId, ref.userId, '').then((newNode) => {
+            ref.setExpanded(ref.effectiveParentEK, true);
+            ref.setFocusClickCoords({
+              nodeId: newNode.id,
+              parentId: ref.effectiveParentId,
+              textOffset: 0,
+            });
+            ref.setFocusedNode(newNode.id, ref.effectiveParentId);
+            queueMicrotask(() => { committingRef.current = false; });
+          });
           return true;
         },
         [KEY_TRAILING_INDENT]: () => {

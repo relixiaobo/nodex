@@ -1,4 +1,5 @@
 import {
+  resolveTrailingEnterIntent,
   resolveTrailingArrowDownIntent,
   resolveTrailingArrowUpIntent,
   resolveTrailingBackspaceIntent,
@@ -120,5 +121,31 @@ describe('trailing input navigation resolver', () => {
   it('resolves escape intent by options visibility', () => {
     expect(resolveTrailingEscapeIntent(true)).toBe('close_options');
     expect(resolveTrailingEscapeIntent(false)).toBe('blur_editor');
+  });
+
+  it('resolves enter intent', () => {
+    expect(
+      resolveTrailingEnterIntent({
+        optionsOpen: true,
+        optionCount: 2,
+        hasText: true,
+      }),
+    ).toBe('options_confirm');
+
+    expect(
+      resolveTrailingEnterIntent({
+        optionsOpen: false,
+        optionCount: 0,
+        hasText: true,
+      }),
+    ).toBe('create_content_and_continue');
+
+    expect(
+      resolveTrailingEnterIntent({
+        optionsOpen: false,
+        optionCount: 0,
+        hasText: false,
+      }),
+    ).toBe('create_empty');
   });
 });

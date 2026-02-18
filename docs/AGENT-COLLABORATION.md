@@ -1,7 +1,7 @@
 # 多 Agent 协作方案
 
 > 本文档定义多个 AI Agent 并行开发同一项目的协作规范。
-> 所有 Agent 通过 CLAUDE.md 中的引用读到本文件。
+> 所有 Agent 通过 git worktree 共享同一仓库，在独立分支上工作，通过 CLAUDE.md 中的引用读到本文件。
 
 ---
 
@@ -10,26 +10,26 @@
 | 角色 | 说明 |
 |------|------|
 | **用户** | 最终决策者：优先级调整、方向纠偏、合并/拒绝 |
-| **Agent** | 各自在独立 clone + 独立分支工作，通过 `docs/TASKS.md` + Git PR 异步协调 |
+| **Agent** | 各自在独立 worktree + 独立分支工作，通过 `docs/TASKS.md` + Git PR 异步协调 |
 
 每个 Agent 工作时在 commit 和文档中使用自己的身份标识，方便追溯。
 
 ### 当前 Agent 清单
 
-| Agent ID | 工具 | 主要职责 | 次要职责 | 分支前缀 | Dev Server 端口 | Clone 路径 |
-|----------|------|---------|---------|---------|----------------|-----------|
-| **nodex** | Claude Code (主会话) | Review PR、合并到 main、协调任务 | 小修复、紧急改动 | `main` 或临时分支 | `5199` | 主 clone |
-| **nodex-codex** | Codex | 功能开发、提交 PR | Bug 修复 | `codex/<feature>` | `5200` | 独立 clone |
-| **nodex-cc** | Claude Code (独立会话) | 功能开发、提交 PR | Bug 修复 | `cc/<feature>` | `5201` | 独立 clone |
-| **nodex-cc-2** | Claude Code (独立会话) | 功能开发、提交 PR | Bug 修复 | `cc2/<feature>` | `5202` | 独立 clone |
+| Agent ID | 工具 | 主要职责 | 次要职责 | 分支前缀 | Dev Server 端口 | Worktree 路径 |
+|----------|------|---------|---------|---------|----------------|--------------|
+| **nodex** | Claude Code (主会话) | Review PR、合并到 main、协调任务 | 小修复、紧急改动 | `main` 或临时分支 | `5199` | 主仓库 (`nodex/`) |
+| **nodex-codex** | Codex | 功能开发、提交 PR | Bug 修复 | `codex/<feature>` | `5200` | worktree (`nodex-codex/`) |
+| **nodex-cc** | Claude Code (独立会话) | 功能开发、提交 PR | Bug 修复 | `cc/<feature>` | `5201` | worktree (`nodex-cc/`) |
+| **nodex-cc-2** | Claude Code (独立会话) | 功能开发、提交 PR | Bug 修复 | `cc2/<feature>` | `5202` | worktree (`nodex-cc-2/`) |
 
 ### Agent 自我识别
 
-所有 Agent 共享同一套 `CLAUDE.md` 和 `AGENT-COLLABORATION.md`。每个 Agent 通过以下方式确认自己的身份：
+所有 worktree 共享同一个 `.git` 仓库（`nodex/`），代码和文档通过 git 同步。每个 Agent 通过以下方式确认自己的身份：
 
 | 识别依据 | nodex | nodex-codex | nodex-cc | nodex-cc-2 |
 |---------|-----------|-------------|----------|------------|
-| Clone 路径 | `nodex`（主 clone） | `nodex-codex` | `nodex-cc` | `nodex-cc-2` |
+| Worktree 路径 | `nodex`（主仓库） | `nodex-codex` | `nodex-cc` | `nodex-cc-2` |
 | Dev Server 端口 | `5199` | `5200` | `5201` | `5202` |
 | Git 分支 | `main` | `codex/*` | `cc/*` | `cc2/*` |
 
@@ -48,8 +48,8 @@
 
 每次新 session 开始时，Agent **必须**按以下顺序执行：
 
-1. **识别自己**：通过 clone 路径 / 端口 / 分支确认身份
-2. **同步代码**：`git pull origin main`（dev agent 额外 rebase 自己的分支）
+1. **识别自己**：通过 worktree 路径 / 端口 / 分支确认身份
+2. **同步代码**：`git fetch origin`（一次 fetch，所有 worktree 共享。dev agent 额外 rebase 自己的分支）
 3. **读取共享知识**：`Read docs/LESSONS.md` — 了解项目经验教训和陷阱
 4. **检查自己的 open PR**：`gh pr list --author @me` — 是否有 review comment 需要处理
 5. **检查待办**：
@@ -299,7 +299,59 @@ gh pr list --state open --json number,title,files --jq '.[] | "\(.number) \(.tit
 
 ---
 
-## 6. 用户角色：决策者而非中继站
+## 6. Git Worktree 管理
+
+所有 Agent 通过 git worktree 共享同一个 `.git` 仓库（主仓库 `nodex/`），不再各自维护独立 clone。
+
+### 目录结构
+
+```
+~/Documents/Coding/
+├── nodex/          ← 主仓库 (.git 在此)，nodex agent，分支 main
+├── nodex-cc/       ← worktree，nodex-cc agent，空闲时在 cc/idle
+├── nodex-cc-2/     ← worktree，nodex-cc-2 agent，空闲时在 cc2/idle
+└── nodex-codex/    ← worktree，nodex-codex agent，空闲时在 codex/idle
+```
+
+### 关键特性
+
+- **fetch 一次 = 全局更新**：任意 worktree 执行 `git fetch origin`，所有 worktree 立即可见
+- **分支互斥**：同一分支不能在两个 worktree 同时检出（git 自动阻止），天然防冲突
+- **node_modules 独立**：每个 worktree 需各自 `npm install`（.git 共享，node_modules 不共享）
+- **idle 分支**：Agent 空闲时停在 `cc/idle`、`cc2/idle`、`codex/idle`（"停车位"）
+
+### 常用操作
+
+```bash
+# 查看所有 worktree
+git worktree list
+
+# 在 worktree 中开始新任务（与之前相同）
+cd ~/Documents/Coding/nodex-cc
+git checkout -b cc/<feature> origin/main
+
+# 任务完成后回到 idle
+git checkout cc/idle
+
+# 添加新 worktree
+git worktree add -b <branch> <path> main
+
+# 移除 worktree
+git worktree remove <path>
+
+# 清理已删除 worktree 的残留引用
+git worktree prune
+```
+
+### 注意事项
+
+- 不要在 worktree 中 checkout 另一个 worktree 正在使用的分支（git 会报错）
+- Claude Code 的项目记忆按路径索引（`~/.claude/projects/-Users-...-nodex-cc/`），路径不变所以记忆保留
+- 主仓库 `nodex/` 的 `.git/worktrees/` 目录存储 worktree 元数据，不要手动删除
+
+---
+
+## 7. 用户角色：决策者而非中继站
 
 以下环节**不再需要用户手动传话**：
 
@@ -319,7 +371,7 @@ gh pr list --state open --json number,title,files --jq '.[] | "\(.number) \(.tit
 
 ---
 
-## 7. 与 CLAUDE.md 的关系
+## 8. 与 CLAUDE.md 的关系
 
 CLAUDE.md 的"多 Agent 协作规则"段引用本文件：
 

@@ -23,12 +23,9 @@ import { FieldValueOutliner } from './FieldValueOutliner';
 import { FieldNameInput } from './FieldNameInput';
 import { ConfigOutliner } from './ConfigOutliner';
 import { AutoCollectSection } from './AutoCollectSection';
-import { BulletChevron } from '../outliner/BulletChevron';
 import { VALIDATED_FIELD_TYPES, validateFieldValue, ValidationWarning } from './field-validation';
 import { ATTRDEF_OUTLINER_FIELDS, TAGDEF_OUTLINER_FIELDS } from '../../lib/field-utils.js';
 import { SYS_A } from '../../types/index.js';
-
-const noop = () => {};
 
 function focusTrailingInputForParent(parentId: string): boolean {
   const roots = document.querySelectorAll<HTMLElement>('[data-trailing-parent-id]');
@@ -50,7 +47,6 @@ interface FieldRowProps {
   valueNodeId?: string;
   valueName?: string;
   dataType: string;
-  assocDataId?: string;
   isLastInGroup?: boolean;
   trashed?: boolean;
   /** When true AND isEmpty, show red asterisk on field name */
@@ -77,7 +73,6 @@ export function FieldRow({
   valueNodeId,
   valueName,
   dataType,
-  assocDataId,
   isLastInGroup,
   trashed,
   isRequired,
@@ -117,15 +112,16 @@ export function FieldRow({
     : undefined;
   const Icon = getFieldTypeIcon(dataType);
 
-  // Validation: read first content child of assocData to check value
+  // Validation: read first value child of tuple (children[1]) to check value
   const validationWarning = useNodeStore((s) => {
-    if (!assocDataId || !VALIDATED_FIELD_TYPES.has(dataType)) return null;
-    const assoc = s.entities[assocDataId];
-    if (!assoc?.children) return null;
+    if (!VALIDATED_FIELD_TYPES.has(dataType)) return null;
+    const tuple = s.entities[tupleId];
+    if (!tuple?.children || tuple.children.length < 2) return null;
     const min = resolveMinValue(s.entities, attrDefId);
     const max = resolveMaxValue(s.entities, attrDefId);
-    for (const cid of assoc.children) {
-      const child = s.entities[cid];
+    // tuple.children[0] is the key (attrDefId), children[1:] are values
+    for (let i = 1; i < tuple.children.length; i++) {
+      const child = s.entities[tuple.children[i]];
       if (child && !child.props._docType && child.props.name) {
         return validateFieldValue(dataType, child.props.name, { min, max });
       }
@@ -200,9 +196,8 @@ export function FieldRow({
     if (!prev) return;
 
     if (prev.type === 'field') {
-      const prevAssocId = useNodeStore.getState().entities[nodeId]?.associationMap?.[prev.id];
-      if (!prevAssocId) return;
-      void moveFieldTuple(nodeId, tupleId, prevAssocId, userId);
+      // Move this tuple under the previous field's tuple directly
+      void moveFieldTuple(nodeId, tupleId, prev.id, userId);
       return;
     }
 
@@ -218,17 +213,11 @@ export function FieldRow({
     if (!grandparentId) return;
     const grandparent = useNodeStore.getState().entities[grandparentId];
     if (!grandparent?.children) return;
-    const ownerTupleId = Object.entries(grandparent.associationMap ?? {}).find(
-      ([, assocId]) => assocId === nodeId,
-    )?.[0];
+    // The parent node's _ownerId is the grandparent. Find the insertion point
+    // after the parent node (or the tuple that owns the parent) in the grandparent's children.
     let insertAt = grandparent.children.length;
-    if (ownerTupleId) {
-      const ownerTupleIndex = grandparent.children.indexOf(ownerTupleId);
-      if (ownerTupleIndex >= 0) insertAt = ownerTupleIndex + 1;
-    } else {
-      const parentIndex = grandparent.children.indexOf(nodeId);
-      if (parentIndex >= 0) insertAt = parentIndex + 1;
-    }
+    const parentIndex = grandparent.children.indexOf(nodeId);
+    if (parentIndex >= 0) insertAt = parentIndex + 1;
     void moveFieldTuple(nodeId, tupleId, grandparentId, userId, insertAt);
   }, [tupleId, userId, nodeId, moveFieldTuple]);
 
@@ -404,33 +393,21 @@ export function FieldRow({
             <ConfigOutliner nodeId={nodeId} />
           ) : isAutoCollect ? (
             <>
-              {assocDataId ? (
-                <FieldValueOutliner
-                  assocDataId={assocDataId}
-                  fieldDataType={dataType}
-                  attrDefId={attrDefId}
-                  onNavigateOut={onNavigateOut}
-                />
-              ) : (
-                <div className="flex min-h-7 items-center gap-2 py-1" style={{ paddingLeft: 6 }}>
-                  <BulletChevron hasChildren={false} isExpanded={false} onBulletClick={noop} dimmed />
-                  <span className="text-sm leading-[21px] text-foreground-tertiary select-none">Empty</span>
-                </div>
-              )}
+              <FieldValueOutliner
+                tupleId={tupleId}
+                fieldDataType={dataType}
+                attrDefId={attrDefId}
+                onNavigateOut={onNavigateOut}
+              />
               <AutoCollectSection tupleId={tupleId} />
             </>
-          ) : assocDataId ? (
+          ) : (
             <FieldValueOutliner
-              assocDataId={assocDataId}
+              tupleId={tupleId}
               fieldDataType={dataType}
               attrDefId={attrDefId}
               onNavigateOut={onNavigateOut}
             />
-          ) : (
-            <div className="flex min-h-7 items-center gap-2 py-1" style={{ paddingLeft: 6 }}>
-              <BulletChevron hasChildren={false} isExpanded={false} onBulletClick={noop} dimmed />
-              <span className="text-sm leading-[21px] text-foreground-tertiary select-none">Empty</span>
-            </div>
           )}
         </div>
       </div>
@@ -497,13 +474,8 @@ export function FieldRow({
         <div className="flex-1 min-w-0">
           {isOutliner ? (
             <ConfigOutliner nodeId={nodeId} />
-          ) : assocDataId ? (
-            <FieldValueOutliner assocDataId={assocDataId} fieldDataType={dataType} attrDefId={attrDefId} onNavigateOut={onNavigateOut} />
           ) : (
-            <div className="flex min-h-7 items-start gap-2 py-1" style={{ paddingLeft: 6 }}>
-              <BulletChevron hasChildren={false} isExpanded={false} onBulletClick={noop} dimmed bulletColor={ownerTagColor} />
-              <span className="text-sm leading-[21px] text-foreground-tertiary select-none">Empty</span>
-            </div>
+            <FieldValueOutliner tupleId={tupleId} fieldDataType={dataType} attrDefId={attrDefId} onNavigateOut={onNavigateOut} />
           )}
         </div>
         {validationWarning && (

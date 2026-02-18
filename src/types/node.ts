@@ -21,6 +21,7 @@ export type DocType =
   // ── 核心结构类型（Tana 间接层，忠实保留）──
   | 'tuple'           // 万能键值对容器 (Tana 29.3%)
   | 'metanode'        // 元信息代理节点 (Tana 13.5%)
+  /** @deprecated No longer created for new data. Kept for legacy/import compatibility. */
   | 'associatedData'  // 字段值索引数据 (Tana 6.3%)
 
   // ── 定义类型 ──
@@ -201,10 +202,8 @@ export interface NodexNode {
    *  常见的 meta Tuple 键：SYS_A13(标签)、SYS_A55(checkbox)、SYS_A16(视图)、SYS_A12(锁定) */
   meta?: string[];
 
-  /** 字段值关联映射。key=子节点ID（字段 Tuple）, value=associatedData 节点 ID。
-   *  提供字段值的快速索引查找。
-   *
-   *  关键发现：Tana 中 2,605/2,606 的 associationMap 值指向 associatedData 类型节点。 */
+  /** @deprecated No longer used for new data. Field values are stored in Tuple.children[1:].
+   *  Kept for legacy/import compatibility. Previously mapped child node ID → associatedData node ID. */
   associationMap?: Record<string, string>;
 
   /** 各编辑者的访问/编辑计数。索引对应全局 editors 数组 */

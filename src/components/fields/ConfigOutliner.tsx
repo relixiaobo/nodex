@@ -142,7 +142,7 @@ export function ConfigOutliner({ nodeId }: ConfigOutlinerProps) {
             ownerTagDefId: nodeId,
           });
         }
-        // else skip: config tuples, metanode, associatedData, etc.
+        // else skip: config tuples, metanode, etc.
       }
     }
 
@@ -176,7 +176,6 @@ export function ConfigOutliner({ nodeId }: ConfigOutlinerProps) {
               valueNodeId={fieldEntry.valueNodeId}
               valueName={fieldEntry.valueName}
               dataType={fieldEntry.dataType}
-              assocDataId={fieldEntry.assocDataId}
               isLastInGroup={i === mergedItems.length - 1 || mergedItems[i + 1].type !== 'field'}
               trashed={fieldEntry.trashed}
               ownerTagColor={ownerColor}

@@ -11,35 +11,23 @@ import { SWATCH_OPTIONS } from '../../lib/tag-colors.js';
 import { BulletChevron } from '../outliner/BulletChevron';
 
 interface ColorSwatchPickerProps {
-  assocDataId: string;
+  tupleId: string;
 }
 
-export function ColorSwatchPicker({ assocDataId }: ColorSwatchPickerProps) {
+export function ColorSwatchPicker({ tupleId }: ColorSwatchPickerProps) {
   const setConfigValue = useNodeStore((s) => s.setConfigValue);
   const userId = useWorkspaceStore((s) => s.userId);
 
-  // Reverse-lookup tupleId from assocDataId (same pattern as BOOLEAN/SupertagPicker)
-  const tupleId = useNodeStore((s) => {
-    const assoc = s.entities[assocDataId];
-    const parentId = assoc?.props._ownerId;
-    const parent = parentId ? s.entities[parentId] : undefined;
-    if (!parent?.associationMap) return undefined;
-    for (const [tid, aid] of Object.entries(parent.associationMap)) {
-      if (aid === assocDataId) return tid;
-    }
-    return undefined;
-  });
-
-  // Read current color key directly from AssociatedData children[0].
+  // Read current color key from tuple.children[1].
   // Color values are stored as raw strings ("emerald", "violet"), not node references.
   const selectedKey = useNodeStore((s) => {
-    const assoc = s.entities[assocDataId];
-    return assoc?.children?.[0] || undefined;
+    const tuple = s.entities[tupleId];
+    return tuple?.children?.[1] || undefined;
   });
 
   const handleSelect = useCallback(
     (key: string) => {
-      if (!userId || !tupleId) return;
+      if (!userId) return;
       // Toggle: click same color → clear
       if (key === selectedKey) {
         setConfigValue(tupleId, '', userId);

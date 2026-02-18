@@ -241,8 +241,7 @@ async function getExtendsTagIds(tagDef: NodexNode): Promise<string[]> {
  * TagDef.children 中的每个 Tuple [attrDefId, defaultValueId] 被克隆：
  *   - 创建新 Tuple，children 相同
  *   - 设置 _sourceId 指向原模板 Tuple（模板-实例继承）
- *   - 创建 AssociatedData 节点
- *   - 更新 ContentNode.associationMap
+ *   - 字段值直接存储在 Tuple.children[1:] 中（无需 AssociatedData）
  */
 async function instantiateFieldTemplates(
   contentNode: NodexNode,
@@ -253,7 +252,6 @@ async function instantiateFieldTemplates(
 
   const templateTuples = await getNodes(tagDef.children);
   const newChildren = [...(contentNode.children ?? [])];
-  const newAssociationMap = { ...(contentNode.associationMap ?? {}) };
 
   for (const template of templateTuples) {
     if (template.props._docType !== 'tuple' || !template.children) continue;
@@ -266,7 +264,7 @@ async function instantiateFieldTemplates(
     );
     if (alreadyInstantiated) continue;
 
-    // Step 5a: 克隆 Tuple，设置 _sourceId 指向模板
+    // 克隆 Tuple，设置 _sourceId 指向模板
     const instanceTuple = await createNode(
       {
         workspaceId: contentNode.workspaceId,
@@ -280,19 +278,6 @@ async function instantiateFieldTemplates(
       userId,
     );
     newChildren.push(instanceTuple.id);
-
-    // Step 6: 创建 AssociatedData 节点
-    const associatedData = await createNode(
-      {
-        workspaceId: contentNode.workspaceId,
-        props: {
-          _docType: 'associatedData',
-          _ownerId: contentNode.id,
-        },
-      },
-      userId,
-    );
-    newAssociationMap[instanceTuple.id] = associatedData.id;
   }
 
   // 更新内容节点
@@ -300,7 +285,6 @@ async function instantiateFieldTemplates(
     contentNode.id,
     {
       children: newChildren,
-      associationMap: newAssociationMap,
     },
     userId,
   );

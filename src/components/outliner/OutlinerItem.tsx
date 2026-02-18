@@ -995,8 +995,12 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     })();
     const textRightEdge = getRenderedTextRightEdge(container);
     const textLength = getNodeTextLengthById(nodeId, useNodeStore.getState().entities);
+    const rect = container.getBoundingClientRect();
+    const forceEndWhenRightBlank = textOffset === 0 && textLength > 0 && e.clientX > rect.left + 24;
     const resolvedOffset = textRightEdge !== null && e.clientX > textRightEdge + 1
       ? textLength
+      : textRightEdge === null && forceEndWhenRightBlank
+        ? textLength
       : fallbackOffset;
     useUIStore.getState().setFocusClickCoords(
       { nodeId, parentId, textOffset: resolvedOffset },
@@ -2294,11 +2298,49 @@ function getTextOffsetFromPoint(container: HTMLElement, clientX: number, clientY
 function getRenderedTextRightEdge(container: HTMLElement): number | null {
   const doc = container.ownerDocument;
   try {
-    const range = doc.createRange();
-    range.selectNodeContents(container);
-    const rects = Array.from(range.getClientRects());
-    if (rects.length === 0) return null;
-    return rects.reduce((maxRight, rect) => Math.max(maxRight, rect.right), -Infinity);
+    let maxRight = -Infinity;
+    const walker = doc.createTreeWalker(
+      container,
+      NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT,
+      {
+        acceptNode: (node) => {
+          if (node.nodeType === Node.TEXT_NODE) {
+            return (node.textContent ?? '').length > 0
+              ? NodeFilter.FILTER_ACCEPT
+              : NodeFilter.FILTER_REJECT;
+          }
+          const el = node as HTMLElement;
+          if (el === container) return NodeFilter.FILTER_SKIP;
+          // Inline reference chips should count as visible text width.
+          if (el.matches('[data-inlineref-node], .inline-ref, .inline-reference')) {
+            return NodeFilter.FILTER_ACCEPT;
+          }
+          return NodeFilter.FILTER_SKIP;
+        },
+      },
+    );
+
+    let node: Node | null = walker.nextNode();
+    while (node) {
+      if (node.nodeType === Node.TEXT_NODE) {
+        const range = doc.createRange();
+        range.selectNodeContents(node);
+        const rects = Array.from(range.getClientRects());
+        for (const rect of rects) {
+          if (rect.width > 0 || rect.height > 0) {
+            maxRight = Math.max(maxRight, rect.right);
+          }
+        }
+      } else if (node instanceof HTMLElement) {
+        const rect = node.getBoundingClientRect();
+        if (rect.width > 0 || rect.height > 0) {
+          maxRight = Math.max(maxRight, rect.right);
+        }
+      }
+      node = walker.nextNode();
+    }
+
+    return Number.isFinite(maxRight) ? maxRight : null;
   } catch {
     return null;
   }

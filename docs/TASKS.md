@@ -77,6 +77,7 @@ _(空)_
   - [2026-02-18 nodex-codex] 针对你最新复测继续修复 IME 漏网路径：`pendingInputChar` 升级为“定向 payload（char+nodeId+parentId）”，仅目标编辑器消费，避免残留字符串到 Enter 新建节点；`OutlinerItem` 选中态键盘新增全局 `focusedNodeId` 守卫；`type_char` 与 reference `convert_printable` 改为“字母键不强制 preventDefault/不手动注入”，reference 字母输入直接进入编辑（不再走 inline 转换），并通过 `beforeinput/compositionstart` 清理 pending，避免拼音首字母污染。验证通过 `typecheck`、`test:run`（349/349）、`build`、`check:test-sync`。
   - [2026-02-18 nodex-codex] 继续修复“仅 Enter 新建空节点触发 IME 异常”：`OutlinerItem.handleEnter` 的 createChild/createSibling 回调改为“仅必要时回补焦点”，若用户已切到其他编辑器或当前目标已在焦点则不再二次 `setFocusedNode`，避免输入法组合态被异步回调抢焦点打断。验证通过 `typecheck`、`test:run`（349/349）、`build`、`check:test-sync`。
   - [2026-02-18 nodex-codex] 继续做根因级兜底：`OutlinerItem` 选中态 document keydown 新增 `activeElement` 可编辑守卫（任何 contenteditable/input 焦点时不抢键）；`RichTextEditor.syncInitialFocus` 改为“立即聚焦 + rAF 非抢占回补”，并在回补阶段避免从其他可编辑目标偷焦点，降低 Enter 新建后一帧焦点竞态导致的 IME 组合中断。验证通过 `typecheck`、`test:run`（349/349）、`build`、`check:test-sync`。
+  - [2026-02-18 nodex-codex] 继续修复 Enter 新建节点 IME 时序与点击回归：`RichTextEditor` 的 EditorView 挂载从 `useEffect` 提前到 `useLayoutEffect`，缩短 Enter 后首字符输入窗口期；`OutlinerItem` 的行尾空白点击判定改为文本节点/inline-ref 精确右边界计算（不再用容器整体 rect），并在右侧空白且误判 offset=0 时强制落尾，修复“首次点击行尾空白光标到开头”的回归。验证通过 `typecheck`、`test:run`（349/349）、`build`、`check:test-sync`。
 
 ### 性能基线测量
 > **Owner: nodex-cc-2** | Branch: `cc2/perf-baseline` | Priority: P2

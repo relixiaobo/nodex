@@ -235,7 +235,7 @@ ContentNode
 
 > **核心判断标准**：这个信息该存为节点/Tuple，还是 JSON/字符串/UI 状态？**答案永远是前者。**
 
-实现 P2/P3 功能时，以下 6 条守则不可违背：
+实现 P2/P3 功能时，以下 7 条守则不可违背：
 
 1. **视图配置 = ViewDef 节点 + Tuple**，不是 JSON blob。视图可通过 supertag 模板继承
 2. **Filter/Sort/Group = ViewDef 的持久化 Tuple**，不是 React state 或 Zustand 临时状态。视图切换时自动保存/恢复
@@ -243,6 +243,7 @@ ContentNode
 4. **日期字段值 = 日节点引用**，不是字符串 `"2026-02-16"`。日期是一等公民（可挂 children/tag/field）
 5. **剪藏元数据 = Supertag 字段**，不是节点属性。所有新增元数据走 attrDef，不加 NodexNode 顶层属性
 6. **AI 命令 = Command Node**，prompt/参数/输出全部是节点/字段/children，不建独立配置系统
+7. **查询语言 = NQL AST**，不是 SQL/DSL 字符串。Tuple 是持久化形态，NQL 是规范化执行形态
 
 详细设计见 `docs/features/data-model.md` § 设计守则。
 
@@ -251,6 +252,7 @@ ContentNode
 - **单表 `nodes`**: 所有 Tana props 平铺为 PostgreSQL 列（snake_case）
 - **`children TEXT[]`**: 有序子节点列表，GIN 索引
 - **`association_map JSONB`**: 字段值索引映射，GIN 索引
+- **查询事实（Read Model）**: 仅作执行加速的派生层，不承载业务真值
 - **乐观锁**: `version` 列，每次更新 +1，updateNode 先读后写验证
 - **RLS**: 基于 `workspace_members` 表的工作区级别行级安全
 - **Realtime**: `nodes` 表已加入 `supabase_realtime` publication

@@ -8,6 +8,8 @@
 
 侧栏 "Today" 入口一键跳转到今日节点，如不存在则自动创建整条路径。
 
+> 约束：月是 UI 导航维度，不是持久化节点层级。持久化结构固定为年/周/日。
+
 ## 数据模型
 
 ### 节点层级
@@ -189,14 +191,33 @@ Daily notes / 2026 / Week 07 / Sat, Feb 14           ← 非当天
 **实现顺序**：
 1. 先完成日节点层级创建（ensureTodayNode）— Phase 1
 2. 再让日期字段值引用日节点（日期选择器 → find-or-create 日节点 → 存引用）— Phase 2
-3. 最后支持内联日期引用（TipTap extension）— Phase 3
+3. 最后支持内联日期引用（编辑器 inline date extension）— Phase 3
+
+### 与 NQL / Query Facts 的接口
+
+Date 功能在查询层的目标形态：
+
+1. 写模型真值：字段值引用 day 节点（`date_node_id`）。
+2. 读模型派生：按需维护 `date_epoch` / `iso_year` / `iso_week` 等查询事实。
+3. 语言模型：NQL 使用 `before/after/between` 操作符，底层由 `date_epoch` 执行比较。
+
+推荐的事实字段（派生层）：
+
+| 字段 | 含义 |
+|------|------|
+| `date_node_id` | 引用的 day `journalPart` 节点 ID |
+| `date_epoch` | 该 day 节点对应的 UTC/时区归一时间戳 |
+| `iso_year` | ISO 年 |
+| `iso_week` | ISO 周 |
+
+这些字段都可从节点图重建，不作为业务真值。
 
 ### 自然语言日期 — 延后
 
 - `@today` / `@tomorrow` / `@next Monday` / `@November 15` 等
 - 在编辑器中输入 `@` + 日期关键词 → 解析为日期引用
 - 插入内联日期 chip（显示格式化日期，点击跳转到日节点）
-- 依赖：inline date extension（TipTap）、日期解析库
+- 依赖：inline date extension、日期解析库
 
 ## 实现范围
 
@@ -215,7 +236,7 @@ Daily notes / 2026 / Week 07 / Sat, Feb 14           ← 非当天
 
 | 功能 | 原因 |
 |------|------|
-| 自然语言日期解析 | 需 TipTap inline date extension + 解析库 |
+| 自然语言日期解析 | 需 inline date extension + 解析库 |
 | 日期字段链接到日节点 | 需日期字段值的 click handler |
 | 系统字段 "Date from calendar node" | 需向上遍历 `_ownerId` 链找 journalPart 祖先 |
 
@@ -235,7 +256,8 @@ Daily notes / 2026 / Week 07 / Sat, Feb 14           ← 非当天
 | 2026-02-14 | 不设月层级，采用年/周/日 | 与 Tana 一致；月层级会导致周跨月时归属歧义 |
 | 2026-02-14 | 采用 ISO 8601 周编号 | 与 Tana 一致；国际标准，跨年处理明确 |
 | 2026-02-14 | doc_type 使用 `journalPart`（非自定义类型） | 与 Tana 数据模型一致，年/周/日共用同一 doc_type，通过标签区分 |
-| 2026-02-14 | 自然语言日期解析延后 | 需额外依赖（解析库 + TipTap extension），非 MVP 必需 |
+| 2026-02-14 | 自然语言日期解析延后 | 需额外依赖（解析库 + inline date extension），非 MVP 必需 |
 | 2026-02-14 | 日节点命名跟随 Tana 格式 `Sat, Feb 14` | 截图确认 Tana 实际格式；"Today" 前缀仅在面包屑中动态添加，不存入 props.name |
 | 2026-02-14 | 日期导航栏（`< >` / Today / 日历）Phase 1 实现 | 截图确认为日记核心交互，非可选功能 |
 | 2026-02-16 | 日期字段值 = 日节点引用（非字符串） | "一切皆节点"守则；让日期成为可挂 children/tag/field 的一等公民 |
+| 2026-02-18 | Date 查询通过 Query Facts 派生字段执行 | 保持节点真值不变，同时支持 NQL 高效区间过滤与排序 |

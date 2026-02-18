@@ -29,7 +29,7 @@ _(空)_
 |-------|---------|------|-------------|
 | nodex-cc | 用户认证 — Google 登录 (#45) | cc/google-auth | `src/lib/auth.ts`, `src/components/auth/*`, `workspace-store.ts` |
 | nodex-cc-2 | 性能基线测量 | cc2/perf-baseline | `docs/research/performance-baseline.md` |
-| nodex-codex | “一切皆节点”重构文档系统 Review | codex/everything-as-nodes-review | `docs/features/data-model.md`, `docs/features/date-nodes.md`, `docs/features/search.md`, `docs/features/views.md`, `docs/TASKS.md` |
+| nodex-codex | “一切皆节点”重构文档系统 Review | codex/everything-as-nodes-review | `docs/features/data-model.md`, `docs/features/date-nodes.md`, `docs/features/search.md`, `docs/features/views.md`, `docs/features/nql.md`, `docs/TASKS.md` |
 
 ---
 
@@ -37,7 +37,7 @@ _(空)_
 
 ### “一切皆节点”重构：文档/计划系统 Review
 > **Owner: nodex-codex** | Branch: `codex/everything-as-nodes-review` | Priority: P1
-> **Scope**: `docs/features/data-model.md`, `docs/features/date-nodes.md`, `docs/features/search.md`, `docs/features/views.md`, `CLAUDE.md`
+> **Scope**: `docs/features/data-model.md`, `docs/features/date-nodes.md`, `docs/features/search.md`, `docs/features/views.md`, `docs/features/nql.md`, `CLAUDE.md`
 > **产出**: `docs/research/everything-as-nodes-review.md`
 
 对“`一切皆节点`”相关文档、计划与约束做系统性合理性审查，确保后续 #22/#23/#25/#24/#26/#27/#28 的执行顺序与数据模型一致。
@@ -47,10 +47,15 @@ _(空)_
   2. 执行顺序合理性：Date Nodes → Search → View Infra → 各视图是否存在前置缺口
   3. 可实现性风险：是否有“文档正确但工程上不可落地”的描述
   4. 术语一致性：同一概念是否在不同文档中出现冲突定义
-- **Files**: `docs/features/data-model.md`, `docs/features/date-nodes.md`, `docs/features/search.md`, `docs/features/views.md`, `docs/TASKS.md`, `docs/research/everything-as-nodes-review.md`
+- **重构路线（文档冻结）**：
+  1. 写模型 = 节点图（Node + Tuple + Metanode + AssociatedData）
+  2. 读模型 = 查询事实（Query Facts，派生层）
+  3. 语言模型 = NQL AST（Query Builder/NL 统一入口）
+- **Files**: `docs/features/data-model.md`, `docs/features/date-nodes.md`, `docs/features/search.md`, `docs/features/views.md`, `docs/features/nql.md`, `docs/TASKS.md`, `docs/research/everything-as-nodes-review.md`
 - **迭代日志**:
   - [2026-02-18 nodex-codex] 创建专用分支并认领任务，开始汇总“一切皆节点”相关文档，准备输出系统 review 结论与修订建议。
   - [2026-02-18 nodex-codex] 完成首轮系统 review，输出 `docs/research/everything-as-nodes-review.md`：识别 3 个 P0（日期层级冲突、日期值模型不一致、Search 实现状态偏差）与 3 个 P1/P2 协调项，建议先对齐文档契约再进入实现。
+  - [2026-02-18 nodex-codex] 按“写模型=节点图，读模型=查询事实，语言模型=NQL AST”一次性联动改写 `data-model/search/views/date-nodes/TASKS`，新增 `docs/features/nql.md` 作为查询规范。
 
 ### Editor 迁移：TipTap → 直接 ProseMirror
 > **Owner: nodex-codex** | Branch: `codex/editor-migration` | Priority: P1
@@ -135,7 +140,7 @@ _(空)_
 #### Date 节点 & 日记 (#22)
 > 执行顺序 ①（"一切皆节点"系列首项，后续 Search/Views 依赖日期节点）
 
-- [ ] 年/月/周/日节点层级（自动生成）
+- [ ] 年/周/日节点层级（自动生成）
 - [ ] Today 快捷入口（侧栏按钮 + 快捷键 Ctrl+Shift+D）
 - [ ] 自然语言日期解析（@today / @next Monday / @November）
 - [ ] 日记模板（#day supertag 配置）
@@ -173,7 +178,7 @@ _(空)_
 ### P3
 
 #### Search Nodes / Live Queries (#23)
-> 执行顺序 ②（搜索条件 = Tuple 树，依赖 #22 的日期节点做日期操作符）
+> 执行顺序 ②（搜索条件 = Tuple 树 + NQL AST，依赖 #22 的日期节点做日期操作符）
 
 - [ ] `?` 触发创建搜索节点（放大镜图标）
 - [ ] 基础搜索操作符（#tag / field 值 / 文本 / 日期）
@@ -193,7 +198,7 @@ _(空)_
 - **Spec**: `docs/features/views.md`
 
 #### Filter / Group / Sort 工具栏 (#25)
-> 执行顺序 ③（视图基础设施，Filter/Sort/Group = ViewDef 的 Tuple，所有视图共用）
+> 执行顺序 ③（视图基础设施，Filter/Sort/Group = ViewDef Tuple + NQL 映射，所有视图共用）
 
 - [ ] 通用视图工具栏（适用于所有视图）
 - [ ] 按字段值过滤

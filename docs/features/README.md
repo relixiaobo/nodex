@@ -29,6 +29,7 @@
 |---|---|
 | `docs/features/search.md` | Search Nodes / Live Queries |
 | `docs/features/views.md` | 视图系统（List/Table/Cards/Calendar 等） |
+| `docs/features/nql.md` | NQL 查询语言规范（AST、执行管线、Tuple 映射） |
 
 ## 4. 扩展交互与入口
 

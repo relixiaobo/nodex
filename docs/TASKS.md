@@ -80,6 +80,7 @@ _(空)_
   - [2026-02-18 nodex-codex] 继续修复 Enter 新建节点 IME 时序与点击回归：`RichTextEditor` 的 EditorView 挂载从 `useEffect` 提前到 `useLayoutEffect`，缩短 Enter 后首字符输入窗口期；`OutlinerItem` 的行尾空白点击判定改为文本节点/inline-ref 精确右边界计算（不再用容器整体 rect），并在右侧空白且误判 offset=0 时强制落尾，修复“首次点击行尾空白光标到开头”的回归。验证通过 `typecheck`、`test:run`（349/349）、`build`、`check:test-sync`。
   - [2026-02-18 nodex-codex] 按用户要求先详细记录 Enter+IME 阻断问题：新增 `docs/issues/editor-ime-enter-empty-node.md`（含稳定复现路径、边界确认、期望/实际、已尝试清单与下一步建议），作为独立跟踪文档。
   - [2026-02-18 nodex-codex] 优先修复“首次点击 node 行尾空白落到开头”回归：`handleContentMouseDown` 优先使用静态 `.node-content` 的真实右边界判定右侧空白（`getStaticNodeContentRightEdge`），仅在缺失时回退到文本 rect 推导，降低首击命中容器空白时 offset=0 的误判。
+  - [2026-02-18 nodex-codex] 针对“首次点击行尾空白仍落开头”再加兜底：当点击位置在内容容器右侧 1/3 区域且解析 offset 仍为 0 时，强制视为落尾（`textOffset=textLength`），修复由浏览器 caret-from-point 在静态 HTML 上返回 0 的尾部误判。
 
 ### 性能基线测量
 > **Owner: nodex-cc-2** | Branch: `cc2/perf-baseline` | Priority: P2

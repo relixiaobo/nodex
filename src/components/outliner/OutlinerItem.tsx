@@ -997,11 +997,15 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     const textLength = getNodeTextLengthById(nodeId, useNodeStore.getState().entities);
     const rect = container.getBoundingClientRect();
     const forceEndWhenRightBlank = textOffset === 0 && textLength > 0 && e.clientX > rect.left + 24;
-    const resolvedOffset = textRightEdge !== null && e.clientX > textRightEdge + 1
+    const forceEndWhenFarRight = textLength > 0 && e.clientX >= rect.left + rect.width * 0.66;
+    const offsetFromRightEdge = textRightEdge !== null && e.clientX > textRightEdge + 1
       ? textLength
       : textRightEdge === null && forceEndWhenRightBlank
         ? textLength
       : fallbackOffset;
+    const resolvedOffset = offsetFromRightEdge === 0 && forceEndWhenFarRight
+      ? textLength
+      : offsetFromRightEdge;
     useUIStore.getState().setFocusClickCoords(
       { nodeId, parentId, textOffset: resolvedOffset },
     );

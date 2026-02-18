@@ -1,7 +1,7 @@
 /**
  * Options field value picker — thin wrapper around NodePicker.
  *
- * Connects field-specific data (useFieldOptions, assocData, store actions)
+ * Connects field-specific data (useFieldOptions, tuple, store actions)
  * to the generic NodePicker combobox interaction.
  *
  * - allowCreate: true (auto-collect new option values)
@@ -17,22 +17,23 @@ import { NodePicker } from './NodePicker';
 interface OptionsPickerProps {
   nodeId: string;
   attrDefId: string;
-  assocDataId?: string;
+  tupleId?: string;
 }
 
-export function OptionsPicker({ nodeId, attrDefId, assocDataId }: OptionsPickerProps) {
+export function OptionsPicker({ nodeId, attrDefId, tupleId }: OptionsPickerProps) {
   const options = useFieldOptions(attrDefId);
   const setOptionsFieldValue = useNodeStore((s) => s.setOptionsFieldValue);
   const autoCollectOption = useNodeStore((s) => s.autoCollectOption);
   const userId = useWorkspaceStore((s) => s.userId);
   const workspaceId = useWorkspaceStore((s) => s.currentWorkspaceId);
 
-  // Load current selection from assocData.children
-  useChildren(assocDataId ?? '');
+  // Load current selection from tuple.children[1:]
+  useChildren(tupleId ?? '');
   const selectedId = useNodeStore((s) => {
-    if (!assocDataId) return undefined;
-    const assoc = s.entities[assocDataId];
-    return assoc?.children?.[0] || undefined;
+    if (!tupleId) return undefined;
+    const tuple = s.entities[tupleId];
+    const valIds = tuple?.children?.slice(1) ?? [];
+    return valIds.find((cid) => options.some((opt) => opt.id === cid)) || undefined;
   });
 
   const handleSelect = useCallback(
@@ -52,12 +53,15 @@ export function OptionsPicker({ nodeId, attrDefId, assocDataId }: OptionsPickerP
   );
 
   const handleClear = useCallback(() => {
-    if (!assocDataId) return;
+    if (!tupleId) return;
     useNodeStore.setState((state) => {
-      const assoc = state.entities[assocDataId];
-      if (assoc) assoc.children = [];
+      const tuple = state.entities[tupleId];
+      if (tuple && tuple.children) {
+        // Keep children[0] (the key/attrDefId), remove value children
+        tuple.children = [tuple.children[0]];
+      }
     });
-  }, [assocDataId]);
+  }, [tupleId]);
 
   return (
     <NodePicker

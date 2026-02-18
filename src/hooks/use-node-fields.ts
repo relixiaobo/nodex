@@ -22,8 +22,6 @@ export interface FieldEntry {
   valueNodeId?: string;
   valueName?: string;
   dataType: string;
-  /** @deprecated Will be removed in Phase 2c. Use tupleId + tuple.children[1:] instead. */
-  assocDataId?: string;
   /** True when the attrDef has been trashed (moved to Trash container) */
   trashed?: boolean;
   /** Hide-field condition from attrDef config (SYS_V.NEVER by default) */
@@ -101,7 +99,6 @@ function computeFields(entities: Record<string, NodexNode>, nodeId: string): Fie
 
     const valueNodeId = child.children[1];
     const valueNode = valueNodeId ? entities[valueNodeId] : undefined;
-    const assocDataId = node.associationMap?.[childId]; // deprecated — Phase 2c will remove
     const trashed = !isSysConfig && (attrDef.props._ownerId?.endsWith('_TRASH') ?? false);
 
     // Determine if the field value is empty: check tuple.children[1:]
@@ -114,7 +111,6 @@ function computeFields(entities: Record<string, NodexNode>, nodeId: string): Fie
       valueNodeId,
       valueName: valueNode?.props.name,
       dataType: resolveDataType(entities, keyId),
-      assocDataId,
       trashed,
       hideMode: isSysConfig ? undefined : resolveHideField(entities, keyId),
       isEmpty: !hasContent,

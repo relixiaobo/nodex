@@ -5,10 +5,7 @@
  *   ContentNode.children → fieldTuple (docType='tuple')
  *   fieldTuple.children = [attrDefId, valueNodeId]
  *
- * AssociationMap 说明（数据验证修正）：
- *   ContentNode.associationMap 的 KEY 主要是普通内容子节点（88.1%），
- *   不限于字段 Tuple。AssociationMap 是 children 到 associatedData
- *   的通用映射机制，用于附加辅助数据。
+ * 字段值直接存储在 Tuple.children[1:] 中（简化后无需 AssociatedData 间接层）。
  *
  * 字段数据类型由 AttrDef 的 Tuple [SYS_A02, SYS_D*] 决定。
  */

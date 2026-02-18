@@ -24,9 +24,9 @@ export function isWorkspaceRoot(nodeId: string, entities: Record<string, NodexNo
 // ─── Structural node detection ───
 
 /** Structural doc types that are not meaningful navigation targets. */
-const STRUCTURAL_DOC_TYPES = new Set(['tuple', 'metanode', 'associatedData']);
+const STRUCTURAL_DOC_TYPES = new Set(['tuple', 'metanode']);
 
-/** Check if a node is a structural node (tuple/metanode/associatedData). */
+/** Check if a node is a structural node (tuple/metanode). */
 function isStructuralNode(node: NodexNode): boolean {
   return !!node.props._docType && STRUCTURAL_DOC_TYPES.has(node.props._docType);
 }
@@ -44,7 +44,7 @@ export interface AncestorInfo {
  * Containers are included as normal ancestors. The workspace root is recorded
  * separately as `workspaceRootId`.
  *
- * Structural nodes (tuple, metanode, associatedData) are skipped — they are
+ * Structural nodes (tuple, metanode) are skipped — they are
  * not meaningful navigation targets.
  */
 export function getAncestorChain(
@@ -73,7 +73,7 @@ export function getAncestorChain(
     const parentNode = entities[parentId];
     if (!parentNode) break;
 
-    // Skip structural nodes (tuple/metanode/associatedData) — continue walking up
+    // Skip structural nodes (tuple/metanode) — continue walking up
     if (isStructuralNode(parentNode)) {
       currentId = parentId;
       continue;
@@ -92,7 +92,7 @@ export function getAncestorChain(
 
 /**
  * Find the first navigable (non-structural) parent of a node.
- * Skips tuple, metanode, and associatedData nodes.
+ * Skips tuple and metanode nodes.
  */
 export function getNavigableParentId(
   nodeId: string,

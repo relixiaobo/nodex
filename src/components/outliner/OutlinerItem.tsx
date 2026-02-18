@@ -546,6 +546,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       if (e.defaultPrevented) return;
 
       const uiState = useUIStore.getState();
+      if (uiState.focusedNodeId) return;
 
       // For multi-select, only the anchor node processes keyboard events
       if (uiState.selectedNodeIds.size > 1 && !isSelectionAnchor) {
@@ -562,7 +563,24 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
             clearSelection();
             return;
           }
-          if (refAction === 'convert_arrow_right' || refAction === 'convert_printable') {
+          if (refAction === 'convert_printable') {
+            const isAsciiLetter = /^[a-zA-Z]$/.test(e.key);
+            if (!isAsciiLetter) e.preventDefault();
+            const currentEntities = useNodeStore.getState().entities;
+            const editAtEnd = getNodeTextLengthById(nodeId, currentEntities);
+            if (!isAsciiLetter) {
+              setPendingInputChar({ char: e.key, nodeId, parentId });
+            }
+            clearSelection();
+            useUIStore.getState().setFocusClickCoords({
+              nodeId,
+              parentId,
+              textOffset: editAtEnd,
+            });
+            setFocusedNode(nodeId, parentId);
+            return;
+          }
+          if (refAction === 'convert_arrow_right') {
             e.preventDefault();
             if (!wsId || !userId) return;
             const parent = entities[parentId];
@@ -570,10 +588,6 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
             if (pos < 0) return;
             removeReference(parentId, nodeId, userId);
             const tempNodeId = startRefConversion(nodeId, parentId, pos, wsId, userId);
-            if (refAction === 'convert_printable') {
-              const tempName = useNodeStore.getState().entities[tempNodeId]?.props.name ?? '';
-              useNodeStore.getState().setNodeNameLocal(tempNodeId, tempName + e.key);
-            }
             setPendingRefConversion({ tempNodeId, refNodeId: nodeId, parentId });
             clearSelection();
             setTimeout(() => setFocusedNode(tempNodeId, parentId), 0);
@@ -611,9 +625,8 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       const selAction = resolveSelectionKeyboardAction(e);
       if (!selAction) return;
 
-      e.preventDefault();
-
       if (selAction === 'clear_selection') {
+        e.preventDefault();
         // Second Escape: re-enter edit mode on the same node so the cursor
         // returns to its original position (matching Tana behavior).
         clearSelection();
@@ -622,6 +635,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       }
 
       if (selAction === 'select_all') {
+        e.preventDefault();
         // Select all top-level content children of root
         const storeEntities = useNodeStore.getState().entities;
         const rootNode = storeEntities[rootNodeId];
@@ -637,6 +651,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       // ─── Batch operations (Phase 3) ───
 
       if (selAction === 'batch_delete') {
+        e.preventDefault();
         if (!wsId || !userId) return;
         const latestUi = useUIStore.getState();
         const storeEntities = useNodeStore.getState().entities;
@@ -656,6 +671,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       }
 
       if (selAction === 'batch_indent') {
+        e.preventDefault();
         if (!userId) return;
         const latestUi = useUIStore.getState();
         const storeEntities = useNodeStore.getState().entities;
@@ -681,6 +697,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       }
 
       if (selAction === 'batch_outdent') {
+        e.preventDefault();
         if (!userId) return;
         const latestUi = useUIStore.getState();
         const storeEntities = useNodeStore.getState().entities;
@@ -695,6 +712,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       }
 
       if (selAction === 'batch_duplicate') {
+        e.preventDefault();
         if (!wsId || !userId) return;
         const latestUi = useUIStore.getState();
         const storeEntities = useNodeStore.getState().entities;
@@ -711,6 +729,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       }
 
       if (selAction === 'batch_checkbox') {
+        e.preventDefault();
         if (!userId) return;
         const latestUi = useUIStore.getState();
         const ids = [...latestUi.selectedNodeIds];
@@ -724,6 +743,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       }
 
       if (selAction === 'extend_up' || selAction === 'extend_down') {
+        e.preventDefault();
         const storeEntities = useNodeStore.getState().entities;
         const latestUi = useUIStore.getState();
         const flatList = getFlattenedVisibleNodes(rootChildIds, storeEntities, latestUi.expandedNodes, rootNodeId);
@@ -776,6 +796,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       const flatList = getFlattenedVisibleNodes(rootChildIds, storeEntities, latestUi.expandedNodes, rootNodeId);
 
       if (selAction === 'navigate_up') {
+        e.preventDefault();
         const bounds = getSelectionBounds(latestUi.selectedNodeIds, flatList);
         if (!bounds) return;
         const prev = getPreviousVisibleNode(bounds.first.nodeId, bounds.first.parentId, flatList);
@@ -794,6 +815,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       }
 
       if (selAction === 'navigate_down') {
+        e.preventDefault();
         const bounds = getSelectionBounds(latestUi.selectedNodeIds, flatList);
         if (!bounds) return;
         const next = getNextVisibleNode(bounds.last.nodeId, bounds.last.parentId, flatList);
@@ -811,8 +833,15 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
         if (!first) return;
         const currentEntities = useNodeStore.getState().entities;
         const editAtEnd = getNodeTextLengthById(first.nodeId, currentEntities);
+        if (selAction === 'enter_edit') {
+          e.preventDefault();
+        }
         if (selAction === 'type_char') {
-          setPendingInputChar(e.key);
+          const isAsciiLetter = /^[a-zA-Z]$/.test(e.key);
+          if (!isAsciiLetter) {
+            e.preventDefault();
+            setPendingInputChar({ char: e.key, nodeId: first.nodeId, parentId: first.parentId });
+          }
         }
         clearSelection();
         // typing in selected mode should append at end of the first selected node

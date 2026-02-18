@@ -1,4 +1,5 @@
 import { getShortcutKeys, matchesShortcutEvent } from './shortcut-registry.js';
+import { isImeComposingEvent } from './ime-keyboard.js';
 
 export type SelectedReferenceShortcutAction =
   | 'delete'
@@ -17,6 +18,10 @@ export function resolveSelectedReferenceShortcut(
   e: KeyboardEvent,
   optionsOpen: boolean,
 ): SelectedReferenceShortcutAction | null {
+  if (isImeComposingEvent(e)) {
+    return null;
+  }
+
   const deleteBindings = getShortcutKeys('selected_ref.delete', ['Backspace', 'Delete']);
   const convertArrowBindings = getShortcutKeys('selected_ref.convert_arrow_right', ['ArrowRight']);
   const optionsDownBindings = getShortcutKeys('selected_ref.options_down', ['ArrowDown']);

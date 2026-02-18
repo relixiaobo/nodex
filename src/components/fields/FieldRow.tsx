@@ -12,8 +12,9 @@
  *        [description]     • value node 2
  * ──────────────────────────────────────
  */
-import { useCallback, useRef, useEffect } from 'react';
+import { useCallback, useRef, useEffect, useMemo } from 'react';
 import { Trash2 } from 'lucide-react';
+import { useNodeFields } from '../../hooks/use-node-fields';
 import { useNodeStore } from '../../stores/node-store';
 import { useUIStore } from '../../stores/ui-store';
 import { useWorkspaceStore } from '../../stores/workspace-store';
@@ -28,6 +29,18 @@ import { ATTRDEF_OUTLINER_FIELDS, TAGDEF_OUTLINER_FIELDS } from '../../lib/field
 import { SYS_A } from '../../types/index.js';
 
 const noop = () => {};
+
+function focusTrailingInputForParent(parentId: string): boolean {
+  const roots = document.querySelectorAll<HTMLElement>('[data-trailing-parent-id]');
+  for (const root of roots) {
+    if (root.dataset.trailingParentId !== parentId) continue;
+    const editor = root.querySelector<HTMLElement>('.ProseMirror');
+    if (!editor) continue;
+    editor.focus();
+    return true;
+  }
+  return false;
+}
 
 interface FieldRowProps {
   nodeId: string;
@@ -78,12 +91,16 @@ export function FieldRow({
   const editingFieldNameId = useUIStore((s) => s.editingFieldNameId);
   const setEditingFieldName = useUIStore((s) => s.setEditingFieldName);
   const setFocusedNode = useUIStore((s) => s.setFocusedNode);
+  const clearFocus = useUIStore((s) => s.clearFocus);
   // Derive boolean from Set to avoid Zustand infinite re-render (Set creates new reference each time)
   const isTupleInSelectedSet = useUIStore((s) => s.selectedNodeIds.has(tupleId));
   const focusedNodeId = useUIStore((s) => s.focusedNodeId);
   const clearSelection = useUIStore((s) => s.clearSelection);
   const createChild = useNodeStore((s) => s.createChild);
+  const moveFieldTuple = useNodeStore((s) => s.moveFieldTuple);
   const removeField = useNodeStore((s) => s.removeField);
+  const entities = useNodeStore((s) => s.entities);
+  const siblingFields = useNodeFields(nodeId);
   const wsId = useWorkspaceStore((s) => s.currentWorkspaceId);
   const userId = useWorkspaceStore((s) => s.userId);
   const clickOffsetXRef = useRef<number | undefined>(undefined);
@@ -123,6 +140,97 @@ export function FieldRow({
     const tuple = s.entities[tupleId];
     return Math.max(0, (tuple?.children?.length ?? 0) - 2);
   });
+
+  const siblingFieldIds = useMemo(
+    () => new Set(siblingFields.map((f) => f.tupleId)),
+    [siblingFields],
+  );
+  const renderableSiblings = useMemo(() => {
+    const parentChildren = entities[nodeId]?.children ?? [];
+    const result: Array<{ id: string; type: 'field' | 'content' }> = [];
+    for (const cid of parentChildren) {
+      if (siblingFieldIds.has(cid)) {
+        result.push({ id: cid, type: 'field' });
+        continue;
+      }
+      if (!entities[cid]?.props._docType) {
+        result.push({ id: cid, type: 'content' });
+      }
+    }
+    return result;
+  }, [entities, nodeId, siblingFieldIds]);
+
+  const moveToSibling = useCallback((direction: 'up' | 'down') => {
+    const index = renderableSiblings.findIndex((item) => item.type === 'field' && item.id === tupleId);
+    if (index < 0) return false;
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex >= 0 && targetIndex < renderableSiblings.length) {
+      const target = renderableSiblings[targetIndex];
+      if (target.type === 'field') {
+        clearFocus();
+        setEditingFieldName(target.id);
+        return true;
+      }
+      useUIStore.getState().setFocusClickCoords({
+        nodeId: target.id,
+        parentId: nodeId,
+        textOffset: direction === 'up'
+          ? (useNodeStore.getState().entities[target.id]?.props.name ?? '').length
+          : 0,
+      });
+      setFocusedNode(target.id, nodeId);
+      return true;
+    }
+    if (direction === 'down' && focusTrailingInputForParent(nodeId)) {
+      return true;
+    }
+    if (onNavigateOut) {
+      onNavigateOut(direction);
+      return true;
+    }
+    return false;
+  }, [renderableSiblings, tupleId, clearFocus, setEditingFieldName, nodeId, setFocusedNode, onNavigateOut]);
+
+  const handleIndentField = useCallback(() => {
+    if (!userId) return;
+    const index = renderableSiblings.findIndex((item) => item.type === 'field' && item.id === tupleId);
+    if (index <= 0) return;
+
+    const prev = renderableSiblings[index - 1];
+    if (!prev) return;
+
+    if (prev.type === 'field') {
+      const prevAssocId = useNodeStore.getState().entities[nodeId]?.associationMap?.[prev.id];
+      if (!prevAssocId) return;
+      void moveFieldTuple(nodeId, tupleId, prevAssocId, userId);
+      return;
+    }
+
+    if (prev.type === 'content') {
+      void moveFieldTuple(nodeId, tupleId, prev.id, userId);
+    }
+  }, [tupleId, userId, renderableSiblings, nodeId, moveFieldTuple]);
+
+  const handleOutdentField = useCallback(() => {
+    if (!userId) return;
+    const currentParent = useNodeStore.getState().entities[nodeId];
+    const grandparentId = currentParent?.props._ownerId;
+    if (!grandparentId) return;
+    const grandparent = useNodeStore.getState().entities[grandparentId];
+    if (!grandparent?.children) return;
+    const ownerTupleId = Object.entries(grandparent.associationMap ?? {}).find(
+      ([, assocId]) => assocId === nodeId,
+    )?.[0];
+    let insertAt = grandparent.children.length;
+    if (ownerTupleId) {
+      const ownerTupleIndex = grandparent.children.indexOf(ownerTupleId);
+      if (ownerTupleIndex >= 0) insertAt = ownerTupleIndex + 1;
+    } else {
+      const parentIndex = grandparent.children.indexOf(nodeId);
+      if (parentIndex >= 0) insertAt = parentIndex + 1;
+    }
+    void moveFieldTuple(nodeId, tupleId, grandparentId, userId, insertAt);
+  }, [tupleId, userId, nodeId, moveFieldTuple]);
 
   const handleEnterConfirm = useCallback(() => {
     if (!wsId || !userId) return;
@@ -173,11 +281,19 @@ export function FieldRow({
         e.preventDefault();
         clearSelection();
         setEditingFieldName(tupleId);
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        clearSelection();
+        moveToSibling('up');
+      } else if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        clearSelection();
+        moveToSibling('down');
       }
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isFieldSelected, tupleId, clearSelection, setEditingFieldName]);
+  }, [isFieldSelected, tupleId, clearSelection, setEditingFieldName, moveToSibling]);
 
   // ─── Path 1: System metadata fields (NDX_SYS_*) — read-only ───
   if (isSystemField) {
@@ -185,7 +301,14 @@ export function FieldRow({
     const SysIcon = sysFieldDef?.icon;
     const displayText = valueName || '—';
     return (
-      <div className={`border-t ${isLastInGroup ? 'border-b' : ''} border-border-subtle flex flex-col @sm:flex-row @sm:items-start min-h-[28px]`} data-field-row>
+      <div
+        className={`border-t ${isLastInGroup ? 'border-b' : ''} border-border-subtle flex flex-col @sm:flex-row @sm:items-start min-h-[28px]`}
+        data-field-row
+        data-field-row-id={tupleId}
+        data-node-id={tupleId}
+        data-parent-id={nodeId}
+        data-row-kind="field"
+      >
         <div className="flex items-center gap-1 @sm:shrink-0 @sm:w-[130px] min-w-0 h-7 py-1">
           <span className="shrink-0 w-[15px] flex items-center justify-center text-foreground-tertiary">
             {SysIcon && <SysIcon size={12} />}
@@ -203,6 +326,18 @@ export function FieldRow({
                 if (wsId && userId) removeField(nodeId, tupleId, wsId, userId);
               } else if (e.key === 'Escape') {
                 (e.target as HTMLElement).blur();
+              } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                moveToSibling('up');
+              } else if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                moveToSibling('down');
+              } else if (e.key === 'Tab' && !e.shiftKey) {
+                e.preventDefault();
+                handleIndentField();
+              } else if (e.key === 'Tab' && e.shiftKey) {
+                e.preventDefault();
+                handleOutdentField();
               }
             }}
           >
@@ -235,7 +370,14 @@ export function FieldRow({
       : attrDefName;
 
     return (
-      <div className={`border-t ${isLastInGroup ? 'border-b' : ''} border-border-subtle flex flex-col @sm:flex-row @sm:items-start min-h-[28px] py-1.5`} data-field-row>
+      <div
+        className={`border-t ${isLastInGroup ? 'border-b' : ''} border-border-subtle flex flex-col @sm:flex-row @sm:items-start min-h-[28px] py-1.5`}
+        data-field-row
+        data-field-row-id={tupleId}
+        data-node-id={tupleId}
+        data-parent-id={nodeId}
+        data-row-kind="field"
+      >
         {/* Name column — icon + name + description */}
         <div className="flex gap-1 @sm:shrink-0 @sm:w-[180px] min-w-0">
           {Icon ? (
@@ -263,7 +405,12 @@ export function FieldRow({
           ) : isAutoCollect ? (
             <>
               {assocDataId ? (
-                <FieldValueOutliner assocDataId={assocDataId} fieldDataType={dataType} attrDefId={attrDefId} />
+                <FieldValueOutliner
+                  assocDataId={assocDataId}
+                  fieldDataType={dataType}
+                  attrDefId={attrDefId}
+                  onNavigateOut={onNavigateOut}
+                />
               ) : (
                 <div className="flex min-h-7 items-center gap-2 py-1" style={{ paddingLeft: 6 }}>
                   <BulletChevron hasChildren={false} isExpanded={false} onBulletClick={noop} dimmed />
@@ -273,7 +420,12 @@ export function FieldRow({
               <AutoCollectSection tupleId={tupleId} />
             </>
           ) : assocDataId ? (
-            <FieldValueOutliner assocDataId={assocDataId} fieldDataType={dataType} attrDefId={attrDefId} />
+            <FieldValueOutliner
+              assocDataId={assocDataId}
+              fieldDataType={dataType}
+              attrDefId={attrDefId}
+              onNavigateOut={onNavigateOut}
+            />
           ) : (
             <div className="flex min-h-7 items-center gap-2 py-1" style={{ paddingLeft: 6 }}>
               <BulletChevron hasChildren={false} isExpanded={false} onBulletClick={noop} dimmed />
@@ -287,7 +439,14 @@ export function FieldRow({
 
   // ─── Path 3: Regular fields — editable name, FieldValueOutliner ───
   return (
-    <div className={`relative border-t ${isLastInGroup ? 'border-b' : ''} border-border-subtle flex flex-col @sm:flex-row @sm:items-start min-h-[28px]`} data-field-row>
+    <div
+      className={`relative border-t ${isLastInGroup ? 'border-b' : ''} border-border-subtle flex flex-col @sm:flex-row @sm:items-start min-h-[28px]`}
+      data-field-row
+      data-field-row-id={tupleId}
+      data-node-id={tupleId}
+      data-parent-id={nodeId}
+      data-row-kind="field"
+    >
       {isFieldSelected && (
         <div className="absolute inset-0 bg-selection-row rounded-sm pointer-events-none z-0" />
       )}
@@ -317,6 +476,9 @@ export function FieldRow({
               attrDefId={attrDefId}
               currentName={attrDefName}
               onEnterConfirm={handleEnterConfirm}
+              onNavigateRow={moveToSibling}
+              onIndentRow={handleIndentField}
+              onOutdentRow={handleOutdentField}
               clickOffsetX={clickOffsetXRef.current}
             />
           ) : (

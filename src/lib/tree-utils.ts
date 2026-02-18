@@ -259,17 +259,27 @@ export function getPreviousSiblingId(
 }
 
 /**
- * Check if HTML content is only a single inline reference (no additional text).
+ * Check if content is only a single inline reference (no additional text).
  * Empty content also returns true (treat as revertable).
  */
-export function isOnlyInlineRef(html: string): boolean {
-  if (!html?.trim()) return true;
+export function isOnlyInlineRef(content: string, inlineRefs?: Array<{ offset: number }>): boolean {
+  const normalized = (content ?? '').replace(/\u200B/g, '').trim();
+  if (!normalized) return true;
+
+  // New model: '\uFFFC' + one inlineRef entry at offset 0
+  if (inlineRefs && inlineRefs.length > 0) {
+    return normalized === '\uFFFC' && inlineRefs.length === 1 && inlineRefs[0]?.offset === 0;
+  }
+
+  // Legacy fallback: HTML inline-ref span
+  if (normalized === '\uFFFC') return true;
+
   const div = document.createElement('div');
-  div.innerHTML = html.trim();
-  const inlineRefs = div.querySelectorAll('[data-inlineref-node]');
-  if (inlineRefs.length !== 1) return false;
+  div.innerHTML = normalized;
+  const inlineRefEls = div.querySelectorAll('[data-inlineref-node]');
+  if (inlineRefEls.length !== 1) return false;
   const allText = div.textContent?.trim() ?? '';
-  const refText = inlineRefs[0].textContent?.trim() ?? '';
+  const refText = inlineRefEls[0].textContent?.trim() ?? '';
   return allText === refText;
 }
 

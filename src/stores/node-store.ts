@@ -9,7 +9,7 @@
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 import { nanoid } from 'nanoid';
-import type { NodexNode, DocType } from '../types/index.js';
+import type { NodexNode, DocType, TextMark, InlineRefEntry } from '../types/index.js';
 import { WORKSPACE_CONTAINERS, SYS_A, SYS_D, SYS_T, SYS_V } from '../types/index.js';
 import { ATTRDEF_CONFIG_MAP, findAutoCollectTupleId, getExtendsChain, isSystemConfigField, resolveChildSupertags } from '../lib/field-utils.js';
 import { resolveCheckboxClick, resolveCmdEnterCycle, hasTagShowCheckbox, resolveForwardDoneMapping, resolveReverseDoneMapping } from '../lib/checkbox-utils.js';
@@ -85,6 +85,8 @@ interface NodeStore {
     userId: string,
     name?: string,
     position?: number,
+    marks?: TextMark[],
+    inlineRefs?: InlineRefEntry[],
   ): Promise<NodexNode>;
 
   /** Create a sibling node after the given nodeId */
@@ -93,6 +95,8 @@ interface NodeStore {
     workspaceId: string,
     userId: string,
     name?: string,
+    marks?: TextMark[],
+    inlineRefs?: InlineRefEntry[],
   ): Promise<NodexNode>;
 
   /** Update a node's name locally (no Supabase sync — for live typing updates) */
@@ -100,6 +104,18 @@ interface NodeStore {
 
   /** Update a node's name (optimistic + Supabase sync) */
   updateNodeName(id: string, name: string, userId: string): Promise<void>;
+
+  /** Update text+marks+inlineRefs locally (no Supabase sync — for live typing updates) */
+  setNodeContentLocal(id: string, name: string, marks: TextMark[], inlineRefs: InlineRefEntry[]): void;
+
+  /** Update text+marks+inlineRefs (optimistic + Supabase sync) */
+  updateNodeContent(
+    id: string,
+    name: string,
+    marks: TextMark[],
+    inlineRefs: InlineRefEntry[],
+    userId: string,
+  ): Promise<void>;
 
   /** Update a node's description (optimistic + Supabase sync) */
   updateNodeDescription(id: string, description: string, userId: string): Promise<void>;
@@ -128,6 +144,18 @@ interface NodeStore {
     newParentId: string,
     position: number,
     userId: string,
+  ): Promise<void>;
+
+  /**
+   * Move a field tuple between parents, keeping associationMap + associatedData ownership in sync.
+   * Used by field-row Tab/Shift+Tab indentation.
+   */
+  moveFieldTuple(
+    currentParentId: string,
+    tupleId: string,
+    newParentId: string,
+    userId: string,
+    position?: number,
   ): Promise<void>;
 
   /** Move node to trash */
@@ -327,7 +355,7 @@ export const useNodeStore = create<NodeStore>()(
       }
     },
 
-    createChild: async (parentId, workspaceId, userId, name, position) => {
+    createChild: async (parentId, workspaceId, userId, name, position, marks, inlineRefs) => {
       const id = nanoid();
       const now = Date.now();
 
@@ -335,7 +363,13 @@ export const useNodeStore = create<NodeStore>()(
       const optimisticNode: NodexNode = {
         id,
         workspaceId,
-        props: { created: now, name: name ?? '', _ownerId: parentId },
+        props: {
+          created: now,
+          name: name ?? '',
+          ...(marks && marks.length > 0 ? { _marks: marks } : {}),
+          ...(inlineRefs && inlineRefs.length > 0 ? { _inlineRefs: inlineRefs } : {}),
+          _ownerId: parentId,
+        },
         children: [],
         version: 1,
         updatedAt: now,
@@ -368,7 +402,17 @@ export const useNodeStore = create<NodeStore>()(
 
       try {
         const node = await nodeService.createNode(
-          { id, workspaceId, props: { created: now, name: name ?? '', _ownerId: parentId } },
+          {
+            id,
+            workspaceId,
+            props: {
+              created: now,
+              name: name ?? '',
+              ...(marks && marks.length > 0 ? { _marks: marks } : {}),
+              ...(inlineRefs && inlineRefs.length > 0 ? { _inlineRefs: inlineRefs } : {}),
+              _ownerId: parentId,
+            },
+          },
           userId,
         );
         await nodeService.addChild(parentId, id, userId, position);
@@ -390,7 +434,7 @@ export const useNodeStore = create<NodeStore>()(
       }
     },
 
-    createSibling: async (nodeId, workspaceId, userId, name) => {
+    createSibling: async (nodeId, workspaceId, userId, name, marks, inlineRefs) => {
       const { entities } = get();
       const node = entities[nodeId];
       const parentId = node?.props._ownerId;
@@ -407,7 +451,13 @@ export const useNodeStore = create<NodeStore>()(
       const optimisticNode: NodexNode = {
         id,
         workspaceId,
-        props: { created: now, name: name ?? '', _ownerId: parentId },
+        props: {
+          created: now,
+          name: name ?? '',
+          ...(marks && marks.length > 0 ? { _marks: marks } : {}),
+          ...(inlineRefs && inlineRefs.length > 0 ? { _inlineRefs: inlineRefs } : {}),
+          _ownerId: parentId,
+        },
         children: [],
         version: 1,
         updatedAt: now,
@@ -436,7 +486,17 @@ export const useNodeStore = create<NodeStore>()(
 
       try {
         const newNode = await nodeService.createNode(
-          { id, workspaceId, props: { created: now, name: name ?? '', _ownerId: parentId } },
+          {
+            id,
+            workspaceId,
+            props: {
+              created: now,
+              name: name ?? '',
+              ...(marks && marks.length > 0 ? { _marks: marks } : {}),
+              ...(inlineRefs && inlineRefs.length > 0 ? { _inlineRefs: inlineRefs } : {}),
+              _ownerId: parentId,
+            },
+          },
           userId,
         );
         await nodeService.addChild(parentId, id, userId, insertPosition);
@@ -458,37 +518,66 @@ export const useNodeStore = create<NodeStore>()(
       }
     },
 
-    setNodeNameLocal: (id, name) => {
+    setNodeContentLocal: (id, name, marks, inlineRefs) => {
       set((state) => {
         if (state.entities[id]) {
           state.entities[id].props.name = name;
+          state.entities[id].props._marks = marks.length > 0 ? marks : undefined;
+          state.entities[id].props._inlineRefs = inlineRefs.length > 0 ? inlineRefs : undefined;
         }
       });
     },
 
-    updateNodeName: async (id, name, userId) => {
+    updateNodeContent: async (id, name, marks, inlineRefs, userId) => {
       const { entities } = get();
       const oldName = entities[id]?.props.name;
+      const oldMarks = entities[id]?.props._marks;
+      const oldInlineRefs = entities[id]?.props._inlineRefs;
 
       // Optimistic
       set((state) => {
         if (state.entities[id]) {
           state.entities[id].props.name = name;
+          state.entities[id].props._marks = marks.length > 0 ? marks : undefined;
+          state.entities[id].props._inlineRefs = inlineRefs.length > 0 ? inlineRefs : undefined;
         }
       });
 
       if (!isSupabaseReady()) return;
 
       try {
-        await nodeService.updateNode(id, { props: { name } }, userId);
+        await nodeService.updateNode(id, { props: { name, _marks: marks, _inlineRefs: inlineRefs } }, userId);
       } catch {
         // Rollback
         set((state) => {
           if (state.entities[id]) {
             state.entities[id].props.name = oldName;
+            state.entities[id].props._marks = oldMarks;
+            state.entities[id].props._inlineRefs = oldInlineRefs;
           }
         });
       }
+    },
+
+    setNodeNameLocal: (id, name) => {
+      const node = get().entities[id];
+      get().setNodeContentLocal(
+        id,
+        name,
+        node?.props._marks ?? [],
+        node?.props._inlineRefs ?? [],
+      );
+    },
+
+    updateNodeName: async (id, name, userId) => {
+      const node = get().entities[id];
+      await get().updateNodeContent(
+        id,
+        name,
+        node?.props._marks ?? [],
+        node?.props._inlineRefs ?? [],
+        userId,
+      );
     },
 
     updateNodeDescription: async (id, description, userId) => {
@@ -835,6 +924,125 @@ export const useNodeStore = create<NodeStore>()(
           }
           if (state.entities[nodeId]) {
             state.entities[nodeId].props._ownerId = oldParentId;
+          }
+        });
+      }
+    },
+
+    moveFieldTuple: async (currentParentId, tupleId, newParentId, userId, position) => {
+      const snapshot = (() => {
+        const entities = get().entities;
+        const currentParent = entities[currentParentId];
+        const targetParent = entities[newParentId];
+        const tuple = entities[tupleId];
+        if (!currentParent || !targetParent || !tuple) return null;
+        const assocId = currentParent.associationMap?.[tupleId];
+        const assoc = assocId ? entities[assocId] : undefined;
+        return {
+          currentParentChildren: [...(currentParent.children ?? [])],
+          currentParentAssociation: { ...(currentParent.associationMap ?? {}) },
+          targetParentChildren: [...(targetParent.children ?? [])],
+          targetParentAssociation: { ...(targetParent.associationMap ?? {}) },
+          tupleOwnerId: tuple.props._ownerId,
+          assocId,
+          assocOwnerId: assoc?.props._ownerId,
+        };
+      })();
+      if (!snapshot) return;
+
+      set((state) => {
+        const currentParent = state.entities[currentParentId];
+        const targetParent = state.entities[newParentId];
+        const tuple = state.entities[tupleId];
+        if (!currentParent || !targetParent || !tuple) return;
+
+        const assocId = currentParent.associationMap?.[tupleId];
+
+        if (currentParent.children) {
+          currentParent.children = currentParent.children.filter((id) => id !== tupleId);
+        }
+        if (currentParent.associationMap) {
+          delete currentParent.associationMap[tupleId];
+        }
+
+        if (!targetParent.children) targetParent.children = [];
+        const insertAt = position !== undefined
+          ? Math.max(0, Math.min(position, targetParent.children.length))
+          : targetParent.children.length;
+        targetParent.children.splice(insertAt, 0, tupleId);
+
+        if (assocId) {
+          if (!targetParent.associationMap) targetParent.associationMap = {};
+          targetParent.associationMap[tupleId] = assocId;
+        }
+
+        tuple.props._ownerId = newParentId;
+        if (assocId && state.entities[assocId]) {
+          state.entities[assocId].props._ownerId = newParentId;
+          state.entities[assocId].updatedAt = Date.now();
+          state.entities[assocId].updatedBy = userId;
+        }
+
+        currentParent.updatedAt = Date.now();
+        currentParent.updatedBy = userId;
+        targetParent.updatedAt = Date.now();
+        targetParent.updatedBy = userId;
+        tuple.updatedAt = Date.now();
+        tuple.updatedBy = userId;
+      });
+
+      if (!isSupabaseReady()) return;
+
+      try {
+        const entities = get().entities;
+        const currentParent = entities[currentParentId];
+        const targetParent = entities[newParentId];
+        const tuple = entities[tupleId];
+        if (!currentParent || !targetParent || !tuple) return;
+
+        await nodeService.updateNode(
+          currentParentId,
+          {
+            children: currentParent.children ?? [],
+            associationMap: currentParent.associationMap ?? {},
+          },
+          userId,
+        );
+        await nodeService.updateNode(
+          newParentId,
+          {
+            children: targetParent.children ?? [],
+            associationMap: targetParent.associationMap ?? {},
+          },
+          userId,
+        );
+        await nodeService.updateNode(
+          tupleId,
+          { props: { _ownerId: newParentId } },
+          userId,
+        );
+        if (snapshot.assocId) {
+          await nodeService.updateNode(
+            snapshot.assocId,
+            { props: { _ownerId: newParentId } },
+            userId,
+          );
+        }
+      } catch {
+        set((state) => {
+          const currentParent = state.entities[currentParentId];
+          const targetParent = state.entities[newParentId];
+          const tuple = state.entities[tupleId];
+          if (!currentParent || !targetParent || !tuple) return;
+
+          currentParent.children = [...snapshot.currentParentChildren];
+          currentParent.associationMap = { ...snapshot.currentParentAssociation };
+          targetParent.children = [...snapshot.targetParentChildren];
+          targetParent.associationMap = { ...snapshot.targetParentAssociation };
+          tuple.props._ownerId = snapshot.tupleOwnerId;
+
+          if (snapshot.assocId && state.entities[snapshot.assocId]) {
+            state.entities[snapshot.assocId].props._ownerId = snapshot.assocOwnerId;
           }
         });
       }
@@ -2015,14 +2223,17 @@ export const useNodeStore = create<NodeStore>()(
       const now = Date.now();
       set((state) => {
         const refNode = state.entities[refNodeId];
-        const rawName = refNode?.props.name ?? '';
-        const refName = rawName.replace(/<[^>]+>/g, '').trim() || 'Untitled';
-        const inlineRefHTML = `<span data-inlineref-node="${refNodeId}">${refName}</span>`;
+        const refName = (refNode?.props.name ?? '').replace(/<[^>]+>/g, '').trim() || 'Untitled';
 
         state.entities[tempId] = {
           id: tempId,
           workspaceId,
-          props: { created: now, name: inlineRefHTML, _ownerId: parentId },
+          props: {
+            created: now,
+            name: '\uFFFC',
+            _inlineRefs: [{ offset: 0, targetNodeId: refNodeId, displayName: refName }],
+            _ownerId: parentId,
+          },
           children: [],
           version: 1,
           updatedAt: now,

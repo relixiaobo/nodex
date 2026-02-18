@@ -1,7 +1,6 @@
 import React from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { flushSync } from 'react-dom';
-import type { Editor } from '@tiptap/react';
 import { FloatingToolbar } from '../../src/components/editor/FloatingToolbar.js';
 
 type Listener = () => void;
@@ -12,6 +11,8 @@ function createSelection(from: number, to: number, kind: SelectionKind) {
     from,
     to,
     empty: from === to,
+    anchor: from,
+    head: to,
     constructor: { name: kind },
   };
 }
@@ -30,6 +31,7 @@ class FakeEditor {
     coordsAtPos: (pos: number) => ({
       top: 200,
       left: pos * 10,
+      right: pos * 10 + 8,
     }),
   };
 
@@ -108,7 +110,7 @@ describe('FloatingToolbar selection behavior', () => {
     flushSync(() => {
       root.render(
         React.createElement(FloatingToolbar, {
-          editor: editor as unknown as Editor,
+          editor: editor,
         }),
       );
     });
@@ -138,6 +140,19 @@ describe('FloatingToolbar selection behavior', () => {
     });
 
     expect(getToolbar()).not.toBeNull();
+  });
+
+  it('positions by selection focus edge instead of range midpoint', () => {
+    editor.setSelection(20, 40, 'TextSelection');
+
+    flushSync(() => {
+      editor.emit('selectionUpdate');
+    });
+
+    const toolbar = getToolbar() as HTMLDivElement;
+    expect(toolbar).not.toBeNull();
+    // Forward selection focuses at to-1 = 39, center = (390 + 398) / 2 = 394.
+    expect(toolbar.style.left).toBe('394px');
   });
 
   it('hides toolbar for empty or non-text selection', () => {

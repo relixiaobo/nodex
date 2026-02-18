@@ -6,6 +6,7 @@
  * mouseDown.preventDefault() keeps editor focus when clicking items.
  */
 import { useMemo, useEffect, useLayoutEffect, useRef, useState, forwardRef, useImperativeHandle } from 'react';
+import { createPortal } from 'react-dom';
 import { Hash, Plus } from 'lucide-react';
 import { useWorkspaceTags } from '../../hooks/use-workspace-tags';
 
@@ -27,6 +28,7 @@ interface TagSelectorProps {
 
 export const TagSelector = forwardRef<TagDropdownHandle, TagSelectorProps>(
   function TagSelector({ open, onSelect, onCreateNew, existingTagIds, query, selectedIndex }, ref) {
+    const anchorRef = useRef<HTMLSpanElement>(null);
     const allTags = useWorkspaceTags();
     const listRef = useRef<HTMLDivElement>(null);
 
@@ -74,9 +76,8 @@ export const TagSelector = forwardRef<TagDropdownHandle, TagSelectorProps>(
       position: 'fixed', top: -9999, left: -9999,
     });
     useLayoutEffect(() => {
-      if (!open || !listRef.current) return;
-      const anchor = listRef.current.parentElement;
-      if (!anchor) return;
+      if (!open || !anchorRef.current) return;
+      const anchor = anchorRef.current;
 
       const update = () => {
         const rect = anchor.getBoundingClientRect();
@@ -104,10 +105,10 @@ export const TagSelector = forwardRef<TagDropdownHandle, TagSelectorProps>(
 
     if (!open) return null;
 
-    return (
+    const menu = (
       <div
         ref={listRef}
-        className="z-50 w-56 max-h-52 overflow-y-auto rounded-lg border border-border bg-popover shadow-lg p-1"
+        className="z-[1000] w-56 max-h-52 overflow-y-auto rounded-lg border border-border bg-popover/100 shadow-lg p-1"
         style={dropStyle}
         onMouseDown={(e) => e.preventDefault()}
       >
@@ -121,8 +122,11 @@ export const TagSelector = forwardRef<TagDropdownHandle, TagSelectorProps>(
             className={`flex w-full items-center gap-1.5 rounded-md px-2 py-1 text-sm text-foreground transition-colors text-left ${
               i === boundedIndex ? 'bg-accent' : 'hover:bg-foreground/5'
             }`}
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={() => onSelect(tag.id)}
+            onMouseDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onSelect(tag.id);
+            }}
           >
             <Hash size={14} className="text-foreground-secondary shrink-0" />
             {tag.name}
@@ -136,8 +140,11 @@ export const TagSelector = forwardRef<TagDropdownHandle, TagSelectorProps>(
               className={`flex w-full items-center gap-1.5 rounded-md px-2 py-1 text-sm text-foreground transition-colors text-left ${
                 boundedIndex === filteredTags.length ? 'bg-accent' : 'hover:bg-foreground/5'
               }`}
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => onCreateNew(query.trim())}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onCreateNew(query.trim());
+              }}
             >
               <Plus size={14} className="text-foreground-secondary shrink-0" />
               Create &ldquo;{query}&rdquo;
@@ -146,6 +153,13 @@ export const TagSelector = forwardRef<TagDropdownHandle, TagSelectorProps>(
           </>
         )}
       </div>
+    );
+
+    return (
+      <>
+        <span ref={anchorRef} className="pointer-events-none absolute left-0 top-0 h-0 w-0" />
+        {typeof document === 'undefined' ? menu : createPortal(menu, document.body)}
+      </>
     );
   },
 );

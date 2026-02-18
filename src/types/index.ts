@@ -1,6 +1,8 @@
 export type {
   DocType,
   ViewMode,
+  TextMark,
+  InlineRefEntry,
   NodeProps,
   NodexNode,
   WorkspaceContainerSuffix,

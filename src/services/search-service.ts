@@ -279,18 +279,17 @@ export async function getBacklinks(nodeId: string): Promise<NodexNode[]> {
 }
 
 /**
- * 获取名称中包含内联引用的节点。
+ * 获取包含指定内联引用的节点。
  *
- * 搜索 name 中包含 data-inlineref-node="nodeId" 的节点。
+ * 搜索 inline_refs 中 targetNodeId = nodeId 的节点。
  */
 export async function getInlineBacklinks(nodeId: string): Promise<NodexNode[]> {
   const supabase = getSupabase();
 
-  const searchPattern = `data-inlineref-node="${nodeId}"`;
   const { data, error } = await supabase
     .from('nodes')
     .select('id')
-    .like('name', `%${searchPattern}%`);
+    .contains('inline_refs', [{ targetNodeId: nodeId }]);
 
   if (error) throw new Error(`Inline backlinks query failed: ${error.message}`);
 

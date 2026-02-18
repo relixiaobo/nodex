@@ -1175,9 +1175,13 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
         if (optimisticNewId) setFocusedNode(optimisticNewId, nodeId);
 
         createPromise.then((newNode) => {
-          if (useNodeStore.getState().entities[newNode.id]) {
-            setFocusedNode(newNode.id, nodeId);
-          }
+          if (!useNodeStore.getState().entities[newNode.id]) return;
+          const ui = useUIStore.getState();
+          // Avoid stealing focus back while user has already started typing
+          // in another editor (e.g. IME composition right after Enter-create).
+          if (ui.focusedNodeId === newNode.id && ui.focusedParentId === nodeId) return;
+          if (ui.focusedNodeId && ui.focusedNodeId !== nodeId && ui.focusedNodeId !== newNode.id) return;
+          setFocusedNode(newNode.id, nodeId);
         });
       } else {
         // Collapsed or leaf → create sibling after this node
@@ -1196,9 +1200,13 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
         if (optimisticNewId) setFocusedNode(optimisticNewId, parentId);
 
         createPromise.then((newNode) => {
-          if (useNodeStore.getState().entities[newNode.id]) {
-            setFocusedNode(newNode.id, parentId);
-          }
+          if (!useNodeStore.getState().entities[newNode.id]) return;
+          const ui = useUIStore.getState();
+          // Avoid stealing focus back while user has already started typing
+          // in another editor (e.g. IME composition right after Enter-create).
+          if (ui.focusedNodeId === newNode.id && ui.focusedParentId === parentId) return;
+          if (ui.focusedNodeId && ui.focusedNodeId !== nodeId && ui.focusedNodeId !== newNode.id) return;
+          setFocusedNode(newNode.id, parentId);
         });
       }
     },

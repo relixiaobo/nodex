@@ -10,7 +10,7 @@ describe('ui-store history guard behaviors', () => {
     const ui = useUIStore.getState();
     const before = useUIStore.getState();
 
-    ui.navigateTo('ws_default_LIBRARY');
+    ui.navigateTo('LIBRARY');
 
     const after = useUIStore.getState();
     expect(after.panelHistory).toEqual(before.panelHistory);

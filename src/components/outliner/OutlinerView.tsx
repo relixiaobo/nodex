@@ -4,6 +4,7 @@ import { useChildren } from '../../hooks/use-children';
 import { useNodeFields, type FieldEntry } from '../../hooks/use-node-fields';
 import { useNodeStore } from '../../stores/node-store';
 import { useUIStore } from '../../stores/ui-store';
+import * as loroDoc from '../../lib/loro-doc.js';
 import { OutlinerItem } from './OutlinerItem';
 import { FieldRow } from '../fields/FieldRow';
 import { TrailingInput } from '../editor/TrailingInput';
@@ -21,7 +22,7 @@ export function OutlinerView({ rootNodeId, showTemplateTuples }: OutlinerViewPro
   useChildren(rootNodeId);
 
   const allChildIds = node?.children ?? [];
-  const entities = useNodeStore((s) => s.entities);
+  const _version = useNodeStore((s) => s._version);
   const setFocusedNode = useUIStore((s) => s.setFocusedNode);
   const clearFocus = useUIStore((s) => s.clearFocus);
   const setEditingFieldName = useUIStore((s) => s.setEditingFieldName);
@@ -60,12 +61,13 @@ export function OutlinerView({ rootNodeId, showTemplateTuples }: OutlinerViewPro
         }
         result.push({ id: cid, type: 'field', hidden });
       } else {
-        const dt = entities[cid]?.props._docType;
-        if (!dt) result.push({ id: cid, type: 'content' });
+        const nodeType = useNodeStore.getState().getNode(cid)?.type;
+        if (!nodeType) result.push({ id: cid, type: 'content' });
       }
     }
     return result;
-  }, [allChildIds, fieldMap, entities, showTemplateTuples]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allChildIds, fieldMap, _version, showTemplateTuples]);
 
   // Content-only IDs for keyboard navigation (rootChildIds)
   const contentChildIds = useMemo(
@@ -139,7 +141,7 @@ export function OutlinerView({ rootNodeId, showTemplateTuples }: OutlinerViewPro
                     useUIStore.getState().setFocusClickCoords({
                       nodeId: prev.id,
                       parentId: rootNodeId,
-                      textOffset: (useNodeStore.getState().entities[prev.id]?.props.name ?? '').length,
+                      textOffset: (useNodeStore.getState().getNode(prev.id)?.name ?? '').length,
                     });
                     setFocusedNode(prev.id, rootNodeId);
                     return;
@@ -181,7 +183,7 @@ export function OutlinerView({ rootNodeId, showTemplateTuples }: OutlinerViewPro
         parentId={rootNodeId}
         depth={0}
         autoFocus={visibleChildren.length === 0}
-        parentExpandKey={`${node?.props._ownerId ?? ''}:${rootNodeId}`}
+        parentExpandKey={`${loroDoc.getParentId(rootNodeId) ?? ''}:${rootNodeId}`}
         onNavigateOut={(direction) => {
           if (direction !== 'up') return;
           for (let j = visibleChildren.length - 1; j >= 0; j--) {
@@ -195,7 +197,7 @@ export function OutlinerView({ rootNodeId, showTemplateTuples }: OutlinerViewPro
             useUIStore.getState().setFocusClickCoords({
               nodeId: last.id,
               parentId: rootNodeId,
-              textOffset: (useNodeStore.getState().entities[last.id]?.props.name ?? '').length,
+              textOffset: (useNodeStore.getState().getNode(last.id)?.name ?? '').length,
             });
             setFocusedNode(last.id, rootNodeId);
             return;

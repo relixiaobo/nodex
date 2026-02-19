@@ -1,14 +1,14 @@
 /**
  * In-memory node search hook.
  *
- * Filters store entities by name, skipping system nodes (tuple, tagDef,
- * etc.). Returns results with breadcrumb paths.
+ * Filters Loro nodes by name, skipping structural/system types.
+ * Returns results with breadcrumb paths.
  *
- * Uses JSON-string selector pattern to avoid React 19 infinite re-render
- * (same as useWorkspaceTags / useNodeFields).
+ * Uses JSON-string selector pattern to avoid React 19 infinite re-render.
  */
 import { useMemo } from 'react';
 import { useNodeStore } from '../stores/node-store';
+import * as loroDoc from '../lib/loro-doc.js';
 
 export interface NodeSearchResult {
   id: string;
@@ -16,44 +16,48 @@ export interface NodeSearchResult {
   breadcrumb: string;
 }
 
-/** System doc types to skip in search results */
+/** Node types to skip in search results */
 const SKIP_DOC_TYPES = new Set([
-  'tuple', 'tagDef',
-  'attrDef', 'workspace', 'user',
+  'fieldEntry', 'fieldDef', 'tagDef',
+  'reference', 'workspace', 'user',
 ]);
 
 export function useNodeSearch(query: string, excludeId?: string): NodeSearchResult[] {
   const json = useNodeStore((state) => {
+    void state._version;
     const q = query.trim().toLowerCase();
     if (!q) return '[]';
 
     const matches: NodeSearchResult[] = [];
+    const allIds = loroDoc.getAllNodeIds();
 
-    for (const [id, node] of Object.entries(state.entities)) {
+    for (const id of allIds) {
       if (id === excludeId) continue;
 
-      // Skip system doc types
-      const dt = node.props._docType;
-      if (dt && SKIP_DOC_TYPES.has(dt)) continue;
+      const node = loroDoc.toNodexNode(id);
+      if (!node) continue;
+
+      // Skip structural/system node types
+      if (node.type && SKIP_DOC_TYPES.has(node.type)) continue;
 
       // Skip nodes with no name
-      const rawName = node.props.name ?? '';
+      const rawName = node.name ?? '';
       const plainText = rawName.replace(/<[^>]+>/g, '').trim();
       if (!plainText) continue;
 
       // Match by name
       if (!plainText.toLowerCase().includes(q)) continue;
 
-      // Build breadcrumb by walking _ownerId chain (max 3 levels)
+      // Build breadcrumb by walking parent chain (max 3 levels)
       const crumbs: string[] = [];
-      let parentId = node.props._ownerId;
+      let parentId = loroDoc.getParentId(id);
       let depth = 0;
       while (parentId && depth < 3) {
-        const parent = state.entities[parentId];
+        const parent = loroDoc.toNodexNode(parentId);
         if (!parent) break;
-        const pName = (parent.props.name ?? '').replace(/<[^>]+>/g, '').trim();
+        const pName = (parent.name ?? '').replace(/<[^>]+>/g, '').trim();
         if (pName) crumbs.unshift(pName);
-        parentId = parent.props._ownerId;
+        parentId = loroDoc.getParentId(parentId);
         depth++;
       }
 

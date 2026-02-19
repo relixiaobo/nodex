@@ -16,15 +16,17 @@ interface AutoCollectSectionProps {
 const noop = () => {};
 
 export function AutoCollectSection({ tupleId }: AutoCollectSectionProps) {
-  // Read auto-collected value IDs from tuple children[2+]
+  // Read auto-collected value IDs from fieldEntry children[1+]
+  // (children[0] = mode value SYS_V03|SYS_V04, children[1+] = collected values)
   const collectedJson = useNodeStore((s) => {
-    const tuple = s.entities[tupleId];
-    if (!tuple?.children || tuple.children.length <= 2) return '[]';
-    const ids = tuple.children.slice(2);
+    void s._version;
+    const tuple = s.getNode(tupleId);
+    if (!tuple?.children || tuple.children.length <= 1) return '[]';
+    const ids = tuple.children.slice(1);
     const items = ids
       .map((id) => {
-        const node = s.entities[id];
-        return node ? { id, name: node.props.name ?? '' } : null;
+        const node = s.getNode(id);
+        return node ? { id, name: node.name ?? '' } : null;
       })
       .filter(Boolean);
     return JSON.stringify(items);

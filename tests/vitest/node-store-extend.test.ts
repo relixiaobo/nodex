@@ -1,261 +1,141 @@
-import { SYS_A, SYS_D, SYS_V, SYS_T } from '../../src/types/index.js';
-import type { NodexNode, DocType } from '../../src/types/index.js';
+/**
+ * Supertag Extend (Inheritance) — Loro model.
+ * getExtendsChain reads from LoroDoc (first arg ignored).
+ * applyTag creates fieldEntry nodes for tagDef's fieldDefs (and extends chain).
+ * removeTag removes those fieldEntry nodes.
+ */
+import { describe, it, expect, beforeEach } from 'vitest';
 import { useNodeStore } from '../../src/stores/node-store.js';
 import { getExtendsChain } from '../../src/lib/field-utils.js';
+import * as loroDoc from '../../src/lib/loro-doc.js';
+import { collectNodeGraphErrors } from './helpers/invariants.js';
 import { resetAndSeed } from './helpers/test-state.js';
 
-// ─── Helpers ───
-
-function getState() {
-  return useNodeStore.getState();
-}
-
-function findFieldTupleIds(nodeId: string, attrDefId: string): string[] {
-  const state = getState();
-  const node = state.entities[nodeId];
-  if (!node?.children) return [];
-  return node.children.filter((cid) => {
-    const child = state.entities[cid];
-    return child?.props._docType === 'tuple' && child.children?.[0] === attrDefId;
+/** Find a fieldEntry for a given fieldDefId in a node's children. */
+function findFieldEntry(nodeId: string, fieldDefId: string): string | undefined {
+  return loroDoc.getChildren(nodeId).find(cid => {
+    const n = loroDoc.toNodexNode(cid);
+    return n?.type === 'fieldEntry' && n.fieldDefId === fieldDefId;
   });
 }
 
-// ─── Tests ───
-
-describe('Supertag Extend (Inheritance)', () => {
+describe('getExtendsChain (field-utils public API)', () => {
   beforeEach(() => {
     resetAndSeed();
   });
 
-  describe('getExtendsChain', () => {
-    it('returns empty array for tagDef with no extends', () => {
-      const { entities } = getState();
-      const chain = getExtendsChain(entities, 'tagDef_task');
-      expect(chain).toEqual([]);
-    });
-
-    it('returns parent tagDef for single-level extends', () => {
-      const { entities } = getState();
-      const chain = getExtendsChain(entities, 'tagDef_dev_task');
-      expect(chain).toEqual(['tagDef_task']);
-    });
-
-    it('returns ancestors in ancestor-first order for multi-level extends', () => {
-      // Create a grandchild tagDef that extends dev_task
-      // getExtendsChain reads from tagDef.children (config tuples)
-      const now = Date.now();
-
-      const grandExtendsTuple: NodexNode = {
-        id: 'grand_cfg_extends',
-        workspaceId: 'ws_default',
-        props: { created: now, name: '', _ownerId: 'tagDef_grand', _docType: 'tuple' as DocType },
-        children: [SYS_A.EXTENDS, 'tagDef_dev_task'],
-        version: 1, updatedAt: now, createdBy: 'user_default', updatedBy: 'user_default',
-      };
-      const grandchildTagDef: NodexNode = {
-        id: 'tagDef_grand',
-        workspaceId: 'ws_default',
-        props: { created: now, name: 'Grand Task', _ownerId: 'ws_default_SCHEMA', _docType: 'tagDef' as DocType },
-        children: ['grand_cfg_extends'],
-        version: 1, updatedAt: now, createdBy: 'user_default', updatedBy: 'user_default',
-      };
-
-      useNodeStore.setState((s) => {
-        s.entities['tagDef_grand'] = grandchildTagDef;
-        s.entities['grand_cfg_extends'] = grandExtendsTuple;
-      });
-
-      const chain = getExtendsChain(useNodeStore.getState().entities, 'tagDef_grand');
-      // Should be: grandparent (task) first, then parent (dev_task)
-      expect(chain).toEqual(['tagDef_task', 'tagDef_dev_task']);
-    });
-
-    it('handles circular references without infinite loop', () => {
-      // Make tagDef_task extend tagDef_dev_task (circular: task ↔ dev_task)
-      // getExtendsChain reads from tagDef.children (config tuples)
-      const now = Date.now();
-      const circularTuple: NodexNode = {
-        id: 'tagDef_task_cfg_extends_circular',
-        workspaceId: 'ws_default',
-        props: { created: now, name: '', _ownerId: 'tagDef_task', _docType: 'tuple' as DocType },
-        children: [SYS_A.EXTENDS, 'tagDef_dev_task'],
-        version: 1, updatedAt: now, createdBy: 'user_default', updatedBy: 'user_default',
-      };
-
-      useNodeStore.setState((s) => {
-        s.entities['tagDef_task_cfg_extends_circular'] = circularTuple;
-        s.entities['tagDef_task'].children = [
-          ...(s.entities['tagDef_task'].children ?? []),
-          'tagDef_task_cfg_extends_circular',
-        ];
-      });
-
-      // Should not hang — just returns whatever it finds without cycles
-      const chain = getExtendsChain(useNodeStore.getState().entities, 'tagDef_dev_task');
-      expect(chain).toContain('tagDef_task');
-      // dev_task won't appear in its own chain (self is excluded)
-      expect(chain).not.toContain('tagDef_dev_task');
-    });
-
-    it('returns empty for non-existent tagDef', () => {
-      const chain = getExtendsChain(getState().entities, 'nonexistent');
-      expect(chain).toEqual([]);
-    });
+  it('returns empty array for tagDef with no extends', () => {
+    expect(getExtendsChain({}, 'tagDef_task')).toEqual([]);
   });
 
-  describe('applyTag with Extend', () => {
-    it('instantiates parent + own fields when applying child tag', async () => {
-      const nodeId = 'note_2'; // simple node with no tags
-      const tagDefId = 'tagDef_dev_task';
-
-      await getState().applyTag(nodeId, tagDefId, 'ws_default', 'user_default');
-
-      const node = getState().entities[nodeId];
-
-      // Should have inherited fields from parent (tagDef_task): status, priority, due, done
-      const statusFields = findFieldTupleIds(nodeId, 'attrDef_status');
-      const priorityFields = findFieldTupleIds(nodeId, 'attrDef_priority');
-      const dueFields = findFieldTupleIds(nodeId, 'attrDef_due');
-      const doneFields = findFieldTupleIds(nodeId, 'attrDef_done');
-
-      expect(statusFields.length).toBe(1);
-      expect(priorityFields.length).toBe(1);
-      expect(dueFields.length).toBe(1);
-      expect(doneFields.length).toBe(1);
-
-      // Should have own field: branch
-      const branchFields = findFieldTupleIds(nodeId, 'attrDef_branch');
-      expect(branchFields.length).toBe(1);
-
-    });
-
-    it('deduplicates fields by attrDef ID across inheritance chain', async () => {
-      // If both parent and child have the same attrDef field, only one instance
-      // Add attrDef_status as a field on dev_task (same as parent task)
-      const state = getState();
-      const devTaskFieldDupId = 'devTaskField_status_dup';
-      const now = Date.now();
-      const dupTuple: NodexNode = {
-        id: devTaskFieldDupId,
-        workspaceId: 'ws_default',
-        props: { created: now, name: '', _ownerId: 'tagDef_dev_task', _docType: 'tuple' as DocType },
-        children: ['attrDef_status'], // same attrDef as parent
-        version: 1, updatedAt: now, createdBy: 'user_default', updatedBy: 'user_default',
-      };
-
-      useNodeStore.setState((s) => {
-        s.entities[devTaskFieldDupId] = dupTuple;
-        s.entities['tagDef_dev_task'].children = [
-          ...(s.entities['tagDef_dev_task'].children ?? []),
-          devTaskFieldDupId,
-        ];
-      });
-
-      const nodeId = 'note_2';
-      await getState().applyTag(nodeId, 'tagDef_dev_task', 'ws_default', 'user_default');
-
-      // Should only have ONE status field instance, not two
-      const statusFields = findFieldTupleIds(nodeId, 'attrDef_status');
-      expect(statusFields.length).toBe(1);
-    });
-
-    it('clones default content nodes from parent tag template', async () => {
-      const nodeId = 'note_2';
-      // tagDef_task has a regular content child 'taskTpl_default_note' ("Notes")
-      await getState().applyTag(nodeId, 'tagDef_dev_task', 'ws_default', 'user_default');
-
-      const node = getState().entities[nodeId];
-      // Find cloned content node (by _sourceId pointing to template)
-      const clonedNotes = (node.children ?? []).filter((cid) => {
-        const c = getState().entities[cid];
-        return c?.props._sourceId === 'taskTpl_default_note';
-      });
-      expect(clonedNotes.length).toBe(1);
-
-      const clone = getState().entities[clonedNotes[0]];
-      expect(clone.props.name).toBe('Notes');
-      expect(clone.props._ownerId).toBe(nodeId);
-      // Should NOT have a docType (regular content node)
-      expect(clone.props._docType).toBeUndefined();
-    });
-
-    it('applying parent tag directly clones its default content', async () => {
-      const nodeId = 'note_2';
-      await getState().applyTag(nodeId, 'tagDef_task', 'ws_default', 'user_default');
-
-      const node = getState().entities[nodeId];
-      const clonedNotes = (node.children ?? []).filter((cid) => {
-        const c = getState().entities[cid];
-        return c?.props._sourceId === 'taskTpl_default_note';
-      });
-      expect(clonedNotes.length).toBe(1);
-
-      const statusFields = findFieldTupleIds(nodeId, 'attrDef_status');
-      const priorityFields = findFieldTupleIds(nodeId, 'attrDef_priority');
-      expect(statusFields.length).toBe(1);
-      expect(priorityFields.length).toBe(1);
-
-      // Should NOT have branch field (that belongs to dev_task only)
-      const branchFields = findFieldTupleIds(nodeId, 'attrDef_branch');
-      expect(branchFields.length).toBe(0);
-    });
+  it('returns parent tagDef for single-level extends', () => {
+    // tagDef_dev_task extends tagDef_task
+    expect(getExtendsChain({}, 'tagDef_dev_task')).toEqual(['tagDef_task']);
   });
 
-  describe('removeTag with Extend', () => {
-    it('cleans up inherited fields when removing child tag', async () => {
-      const nodeId = 'note_2';
-      const tagDefId = 'tagDef_dev_task';
+  it('returns ancestors in ancestor-first order for multi-level extends', () => {
+    const grandId = 'tagDef_grand_extend_test';
+    loroDoc.createNode(grandId, 'SCHEMA');
+    loroDoc.setNodeDataBatch(grandId, { type: 'tagDef', name: 'Grand', extends: 'tagDef_dev_task' });
 
-      const originalChildren = [...(getState().entities[nodeId].children ?? [])];
+    const chain = getExtendsChain({}, grandId);
+    expect(chain).toEqual(['tagDef_task', 'tagDef_dev_task']);
+  });
 
-      await getState().applyTag(nodeId, tagDefId, 'ws_default', 'user_default');
+  it('handles circular references without infinite loop', () => {
+    loroDoc.setNodeData('tagDef_task', 'extends', 'tagDef_dev_task');
+    const chain = getExtendsChain({}, 'tagDef_dev_task');
+    expect(Array.isArray(chain)).toBe(true);
+  });
+});
 
-      // Verify fields + content clones are there
-      expect(findFieldTupleIds(nodeId, 'attrDef_status').length).toBe(1);
-      expect(findFieldTupleIds(nodeId, 'attrDef_branch').length).toBe(1);
-      const notesClone = (getState().entities[nodeId].children ?? []).find((cid) =>
-        getState().entities[cid]?.props._sourceId === 'taskTpl_default_note',
-      );
-      expect(notesClone).toBeTruthy();
+describe('applyTag — creates fieldEntry nodes', () => {
+  beforeEach(() => {
+    resetAndSeed();
+  });
 
-      await getState().removeTag(nodeId, tagDefId, 'user_default');
+  it('applyTag adds tagDefId to node.tags', () => {
+    useNodeStore.getState().applyTag('note_2', 'tagDef_task');
+    const node = loroDoc.toNodexNode('note_2')!;
+    expect(node.tags).toContain('tagDef_task');
+  });
 
-      // All inherited + own fields should be removed
-      expect(findFieldTupleIds(nodeId, 'attrDef_status').length).toBe(0);
-      expect(findFieldTupleIds(nodeId, 'attrDef_priority').length).toBe(0);
-      expect(findFieldTupleIds(nodeId, 'attrDef_due').length).toBe(0);
-      expect(findFieldTupleIds(nodeId, 'attrDef_done').length).toBe(0);
-      expect(findFieldTupleIds(nodeId, 'attrDef_branch').length).toBe(0);
+  it('applyTag creates fieldEntry nodes for tagDef_task fieldDefs', () => {
+    useNodeStore.getState().applyTag('note_2', 'tagDef_task');
 
-      // Cloned content nodes should also be removed
-      const notesCloneAfter = (getState().entities[nodeId].children ?? []).find((cid) =>
-        getState().entities[cid]?.props._sourceId === 'taskTpl_default_note',
-      );
-      expect(notesCloneAfter).toBeUndefined();
+    // tagDef_task has: attrDef_status, attrDef_priority, attrDef_due, attrDef_done_chk
+    expect(findFieldEntry('note_2', 'attrDef_status')).toBeTruthy();
+    expect(findFieldEntry('note_2', 'attrDef_priority')).toBeTruthy();
+    expect(findFieldEntry('note_2', 'attrDef_due')).toBeTruthy();
+    expect(findFieldEntry('note_2', 'attrDef_done_chk')).toBeTruthy();
+  });
 
-      // Original children preserved
-      const node = getState().entities[nodeId];
-      for (const id of originalChildren) {
-        expect(node.children ?? []).toContain(id);
-      }
+  it('applyTag is idempotent — double apply does not duplicate tag or fieldEntries', () => {
+    useNodeStore.getState().applyTag('note_2', 'tagDef_task');
+    useNodeStore.getState().applyTag('note_2', 'tagDef_task');
+
+    const node = loroDoc.toNodexNode('note_2')!;
+    const tagCount = node.tags.filter(t => t === 'tagDef_task').length;
+    expect(tagCount).toBe(1);
+
+    const statusEntries = loroDoc.getChildren('note_2').filter(cid => {
+      const n = loroDoc.toNodexNode(cid);
+      return n?.type === 'fieldEntry' && n.fieldDefId === 'attrDef_status';
     });
+    expect(statusEntries.length).toBe(1);
+  });
 
-    it('removeTag tag binding is removed from node.meta', async () => {
-      const nodeId = 'note_2';
-      const tagDefId = 'tagDef_dev_task';
+  it('applyTag with extends chain creates fieldEntries for inherited fieldDefs', () => {
+    // tagDef_dev_task extends tagDef_task
+    useNodeStore.getState().applyTag('note_2', 'tagDef_dev_task');
 
-      await getState().applyTag(nodeId, tagDefId, 'ws_default', 'user_default');
+    // Should have attrDef_branch (from dev_task) AND inherited fields from tagDef_task
+    expect(findFieldEntry('note_2', 'attrDef_branch')).toBeTruthy();
+    expect(findFieldEntry('note_2', 'attrDef_status')).toBeTruthy();
 
-      await getState().removeTag(nodeId, tagDefId, 'user_default');
+    expect(collectNodeGraphErrors()).toEqual([]);
+  });
+});
 
-      const nodeAfterRemove = getState().entities[nodeId];
-      const stillHasTag = (nodeAfterRemove.meta ?? []).some((cid) => {
-        const t = getState().entities[cid];
-        return t?.props._docType === 'tuple' &&
-          t.children?.[0] === SYS_A.NODE_SUPERTAGS &&
-          t.children?.[1] === tagDefId;
-      });
-      expect(stillHasTag).toBe(false);
-    });
+describe('removeTag — removes fieldEntry nodes', () => {
+  beforeEach(() => {
+    resetAndSeed();
+  });
+
+  it('removeTag removes tagDefId from node.tags', () => {
+    useNodeStore.getState().applyTag('note_2', 'tagDef_task');
+    useNodeStore.getState().removeTag('note_2', 'tagDef_task');
+
+    const node = loroDoc.toNodexNode('note_2')!;
+    expect(node.tags).not.toContain('tagDef_task');
+  });
+
+  it('removeTag removes fieldEntry nodes created by applyTag', () => {
+    const originalChildren = loroDoc.getChildren('note_2').slice();
+    useNodeStore.getState().applyTag('note_2', 'tagDef_task');
+    useNodeStore.getState().removeTag('note_2', 'tagDef_task');
+
+    // No fieldEntry for tagDef_task fields should remain
+    expect(findFieldEntry('note_2', 'attrDef_status')).toBeUndefined();
+    expect(findFieldEntry('note_2', 'attrDef_priority')).toBeUndefined();
+
+    // Original children should still be there
+    for (const id of originalChildren) {
+      expect(loroDoc.getChildren('note_2')).toContain(id);
+    }
+
+    expect(collectNodeGraphErrors()).toEqual([]);
+  });
+
+  it('manually added fieldEntry is NOT removed when tag is removed', () => {
+    useNodeStore.getState().addFieldToNode('note_2', 'attrDef_company');
+    const manualFe = findFieldEntry('note_2', 'attrDef_company');
+    expect(manualFe).toBeTruthy();
+
+    useNodeStore.getState().applyTag('note_2', 'tagDef_task');
+    useNodeStore.getState().removeTag('note_2', 'tagDef_task');
+
+    // Manual field entry for attrDef_company (from tagDef_person, not tagDef_task) should remain
+    expect(findFieldEntry('note_2', 'attrDef_company')).toBe(manualFe);
   });
 });

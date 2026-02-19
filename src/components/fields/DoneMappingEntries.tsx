@@ -4,18 +4,19 @@
  * Shows existing field+option pairs as "FieldName: OptionValue" entries with delete button.
  * Provides a two-step picker (select field → select option) to add new entries.
  *
- * Data model (unified): entries are tuples [NDX_A07|NDX_A08, attrDefId, optionId]
- * stored as children of the NDX_A07/A08 field tuple (tuple.children[1:]).
+ * Data model (Loro): entries are stored directly on the tagDef as DoneMappingEntry[],
+ * accessed via loroDoc.getDoneMappings(tagDefId, checked).
  *
  * Uses JSON.stringify as Zustand selector return to avoid React 19 infinite loop.
  */
 import { useState, useCallback, useMemo } from 'react';
 import { X } from 'lucide-react';
 import { useNodeStore } from '../../stores/node-store';
-import { useWorkspaceStore } from '../../stores/workspace-store';
 import { useWorkspaceFields } from '../../hooks/use-workspace-fields';
 import { NodePicker, type NodePickerOption } from './NodePicker';
 import { BulletChevron } from '../outliner/BulletChevron';
+import * as loroDoc from '../../lib/loro-doc.js';
+import { SYS_A } from '../../types/index.js';
 
 const noop = () => {};
 const EMPTY = '[]';
@@ -28,51 +29,38 @@ interface DoneMappingEntriesProps {
 }
 
 interface MappingEntry {
-  entryTupleId: string;
-  attrDefId: string;
-  attrDefName: string;
+  index: number;
+  fieldDefId: string;
+  fieldDefName: string;
   optionId: string;
   optionName: string;
 }
 
 export function DoneMappingEntries({ toggleTupleId, mappingKey }: DoneMappingEntriesProps) {
-  const userId = useWorkspaceStore((s) => s.userId) ?? 'local';
   const addDoneMappingEntry = useNodeStore((s) => s.addDoneMappingEntry);
   const removeDoneMappingEntry = useNodeStore((s) => s.removeDoneMappingEntry);
+
+  // Derive tagDefId and checked from props
+  const tagDefId = loroDoc.getParentId(toggleTupleId) ?? '';
+  const checked = mappingKey === SYS_A.DONE_MAP_CHECKED;
 
   // Two-step picker state
   const [pickerStep, setPickerStep] = useState<null | 'field' | 'option'>(null);
   const [selectedFieldId, setSelectedFieldId] = useState<string | null>(null);
 
-  // Read existing entries from toggle tuple's children[1:] (after the key at position 0)
+  // Read existing entries from loroDoc done mappings
   const entriesJson = useNodeStore((s) => {
-    const result: MappingEntry[] = [];
-
-    const tuple = s.entities[toggleTupleId];
-    if (!tuple?.children) return EMPTY;
-
-    // Entries are child tuples referenced in tuple.children[1:]
-    // (children[0] is the key, e.g. NDX_A07/A08)
-    for (let i = 1; i < tuple.children.length; i++) {
-      const cid = tuple.children[i];
-      const child = s.entities[cid];
-      if (!child?.children || child.props._docType !== 'tuple') continue;
-      if (child.children[0] !== mappingKey) continue;
-      const attrDefId = child.children[1];
-      const optionId = child.children[2];
-      if (!attrDefId || !optionId) continue;
-      const attrDef = s.entities[attrDefId];
-      const option = s.entities[optionId];
-      result.push({
-        entryTupleId: cid,
-        attrDefId,
-        attrDefName: attrDef?.props.name ?? 'Unknown field',
-        optionId,
-        optionName: option?.props.name ?? 'Unknown option',
-      });
-    }
-
-    if (result.length === 0) return EMPTY;
+    void s._version;
+    if (!tagDefId) return EMPTY;
+    const raw = loroDoc.getDoneMappings(tagDefId, checked);
+    if (raw.length === 0) return EMPTY;
+    const result: MappingEntry[] = raw.map((entry, i) => ({
+      index: i,
+      fieldDefId: entry.fieldDefId,
+      fieldDefName: s.getNode(entry.fieldDefId)?.name ?? 'Unknown field',
+      optionId: entry.optionId,
+      optionName: s.getNode(entry.optionId)?.name ?? 'Unknown option',
+    }));
     return JSON.stringify(result);
   });
   const entries: MappingEntry[] = useMemo(
@@ -87,15 +75,15 @@ export function DoneMappingEntries({ toggleTupleId, mappingKey }: DoneMappingEnt
     [allFields],
   );
 
-  // Options for step 2 picker
+  // Options for step 2 picker (children of selectedFieldId that are regular content nodes)
   const optionOptionsJson = useNodeStore((s) => {
+    void s._version;
     if (!selectedFieldId) return EMPTY;
-    const attrDef = s.entities[selectedFieldId];
-    if (!attrDef?.children) return EMPTY;
-    const opts = attrDef.children
-      .map(cid => s.entities[cid])
-      .filter(n => n && !n.props._docType)
-      .map(n => ({ id: n!.id, name: n!.props.name ?? 'Untitled' }));
+    const children = loroDoc.getChildren(selectedFieldId);
+    const opts = children
+      .map(cid => s.getNode(cid))
+      .filter(n => n && !n.type)
+      .map(n => ({ id: n!.id, name: n!.name ?? 'Untitled' }));
     if (opts.length === 0) return EMPTY;
     return JSON.stringify(opts);
   });
@@ -105,10 +93,11 @@ export function DoneMappingEntries({ toggleTupleId, mappingKey }: DoneMappingEnt
   );
 
   const handleDelete = useCallback(
-    (entryTupleId: string) => {
-      removeDoneMappingEntry(toggleTupleId, entryTupleId, userId);
+    (index: number) => {
+      if (!tagDefId) return;
+      removeDoneMappingEntry(tagDefId, checked, index);
     },
-    [toggleTupleId, removeDoneMappingEntry, userId],
+    [tagDefId, checked, removeDoneMappingEntry],
   );
 
   const handleFieldSelect = useCallback((fieldId: string) => {
@@ -118,12 +107,12 @@ export function DoneMappingEntries({ toggleTupleId, mappingKey }: DoneMappingEnt
 
   const handleOptionSelect = useCallback(
     (optionId: string) => {
-      if (!selectedFieldId) return;
-      addDoneMappingEntry(toggleTupleId, mappingKey, selectedFieldId, optionId, userId);
+      if (!selectedFieldId || !tagDefId) return;
+      addDoneMappingEntry(tagDefId, checked, selectedFieldId, optionId);
       setPickerStep(null);
       setSelectedFieldId(null);
     },
-    [toggleTupleId, mappingKey, selectedFieldId, addDoneMappingEntry, userId],
+    [tagDefId, checked, selectedFieldId, addDoneMappingEntry],
   );
 
   const handlePickerCancel = useCallback(() => {
@@ -141,17 +130,17 @@ export function DoneMappingEntries({ toggleTupleId, mappingKey }: DoneMappingEnt
       {/* Existing entries */}
       {entries.map((entry) => (
         <div
-          key={entry.entryTupleId}
+          key={entry.index}
           className="flex min-h-7 items-center gap-2 py-1 group/entry"
           style={{ paddingLeft: 6 }}
         >
           <BulletChevron hasChildren={false} isExpanded={false} onBulletClick={noop} />
           <span className="flex-1 min-w-0 text-sm leading-[21px] text-foreground truncate">
-            {entry.attrDefName}: {entry.optionName}
+            {entry.fieldDefName}: {entry.optionName}
           </span>
           <button
             className="shrink-0 opacity-0 group-hover/entry:opacity-100 transition-opacity text-foreground-tertiary hover:text-destructive p-0.5"
-            onClick={() => handleDelete(entry.entryTupleId)}
+            onClick={() => handleDelete(entry.index)}
             title="Remove mapping"
           >
             <X size={12} />

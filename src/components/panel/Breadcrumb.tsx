@@ -23,6 +23,7 @@ import { useNodeStore } from '../../stores/node-store';
 import { useWorkspaceStore } from '../../stores/workspace-store';
 import { useAncestors } from '../../hooks/use-ancestors';
 import { getNavigableParentId } from '../../lib/tree-utils';
+import * as loroDoc from '../../lib/loro-doc.js';
 
 interface BreadcrumbProps {
   nodeId: string;
@@ -38,14 +39,15 @@ export function Breadcrumb({ nodeId, showCurrentName }: BreadcrumbProps) {
   const isRootView = !!workspaceRootId && nodeId === workspaceRootId;
 
   // Get parent ID for ← button (navigate to first non-structural parent)
-  const parentId = useNodeStore((s) => getNavigableParentId(nodeId, s.entities));
+  const parentId = useNodeStore((s) => { void s._version; return getNavigableParentId(nodeId); });
 
   // Workspace name for avatar
   const wsId = useWorkspaceStore((s) => s.currentWorkspaceId);
   const wsInitial = useNodeStore((s) => {
+    void s._version;
     if (!wsId) return 'W';
-    const wsNode = s.entities[wsId];
-    const raw = wsNode?.props.name ?? '';
+    const wsNode = loroDoc.toNodexNode(wsId);
+    const raw = wsNode?.name ?? '';
     const clean = raw.replace(/<[^>]+>/g, '').trim();
     return clean.charAt(0).toUpperCase() || 'W';
   });
@@ -165,8 +167,9 @@ export function Breadcrumb({ nodeId, showCurrentName }: BreadcrumbProps) {
 /** Subscribes to node name for the conditional breadcrumb display. */
 function BreadcrumbCurrentName({ nodeId }: { nodeId: string }) {
   const name = useNodeStore((s) => {
-    const node = s.entities[nodeId];
-    const raw = node?.props.name ?? '';
+    void s._version;
+    const node = s.getNode(nodeId);
+    const raw = node?.name ?? '';
     return raw.replace(/<[^>]+>/g, '') || 'Untitled';
   });
 

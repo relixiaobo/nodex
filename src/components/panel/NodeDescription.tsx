@@ -9,7 +9,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNode } from '../../hooks/use-node';
 import { useNodeStore } from '../../stores/node-store';
-import { useWorkspaceStore } from '../../stores/workspace-store';
 
 interface NodeDescriptionProps {
   nodeId: string;
@@ -18,9 +17,8 @@ interface NodeDescriptionProps {
 export function NodeDescription({ nodeId }: NodeDescriptionProps) {
   const node = useNode(nodeId);
   const updateNodeDescription = useNodeStore((s) => s.updateNodeDescription);
-  const userId = useWorkspaceStore((s) => s.userId) ?? 'local';
 
-  const description = node?.props.description ?? '';
+  const description = node?.description ?? '';
   const [editing, setEditing] = useState(false);
   const descRef = useRef<HTMLDivElement>(null);
   const clickCoordsRef = useRef<{ x: number; y: number } | null>(null);
@@ -80,10 +78,10 @@ export function NodeDescription({ nodeId }: NodeDescriptionProps) {
     if (!descRef.current) return;
     const newDesc = descRef.current.textContent?.trim() ?? '';
     if (newDesc !== description) {
-      updateNodeDescription(nodeId, newDesc, userId);
+      updateNodeDescription(nodeId, newDesc);
     }
     setEditing(false);
-  }, [nodeId, description, userId, updateNodeDescription]);
+  }, [nodeId, description, updateNodeDescription]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {

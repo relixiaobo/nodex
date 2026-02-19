@@ -35,42 +35,61 @@ _(空)_
 
 ## 进行中
 
-### BUG: Supabase 连接时 Enter/失焦后节点消失
-
-**现象**: 登录 Google（Supabase 已连接）后，输入内容按 Enter 或失焦，节点"跳一下"然后消失。离线模式不复现。
-
-**已修复的子问题（3 个 commit，已在 main）**:
-1. `e88d4ae` — 内容从不写入 DB：`saveContent()` 的变更检测用 `propsRef.current`（被 re-render 持续更新），导致 `contentEquals()` 永远为 true → 加 `initialContentRef` 固定基线
-2. `e88d4ae` — `createSibling` 异步回调用 DB 版本覆盖本地内容：改为 merge metadata only
-3. `97e6dda` — 容器节点未持久化到 Supabase：`addChild(libraryId, ...)` → DB 中找不到 Library → throw → rollback 删除节点。修复：`seedWorkspace` upsert 容器到 DB
-
-**已修复的子问题（续，`fe25175`）**:
-4. `fe25175` — Realtime 自回显覆盖乐观 children 状态：快速创建时 echo 带旧 children 覆盖本地已有的新节点 → 空白节点；trashNode 不更新 parent.children 到 DB → 删除后节点复活。修复：`_pendingChildrenOps` ref-count 保护 + trashNode 同步 parent.children 到 DB
-
-**仍然复现的问题**:
-- **快速输入文本时**：Realtime echo 覆盖正在编辑的节点内容（`_dirtyContentIds` 保护了 `name/marks/inlineRefs`，但 Realtime echo 仍可能在 dirty 清除的瞬间竞争）
-  - 场景：创建节点后极快速输入 → `updateNodeContent` 清除 dirty → echo 到达覆盖内容
-  - 与 children echo 问题类似，但发生在内容层面
-- 用户报告在 extension 中仍然偶尔出现节点消失
-
-**关键代码位置**:
-- `src/stores/node-store.ts` — `_pendingChildrenOps`（children echo 保护，已修复）
-- `src/stores/node-store.ts` — `_dirtyContentIds`（content echo 保护，存在竞态窗口）
-- `src/hooks/use-realtime.ts:31-33` — Realtime handler calls `store.setNode()`
-- `src/components/editor/RichTextEditor.tsx` — `initialContentRef` + `saveContent()` 变更检测
-
-**调试环境**:
-- Standalone + Supabase: `http://localhost:5199/standalone/index.html`（需已配置 Supabase redirect URL）
-- `?offline=true` 强制离线模式对比
-- `window.__nodeStore` / `window.__uiStore` 可在 DevTools 控制台访问
-
-**下一步**:
-- 调查快速输入文本时的 content echo 竞态：`updateNodeContent` 清除 dirty 后到 Realtime echo 到达之间的窗口
-- 可能方案：类似 `_pendingChildrenOps` 的 `_pendingContentOps` 保护，或延迟清除 dirty flag
+_(空)_
 
 ---
 
 ## 待办
+
+### P0
+
+#### Loro CRDT 迁移 Phase 1 — 本地数据引擎
+> **详细方案**: `docs/plans/loro-migration-phase1.md`
+> **Owner**: nodex-cc
+> **分支**: `cc/loro-migration-phase1`
+> **锁定文件**: `node-store.ts`
+
+用 Loro CRDT (`LoroTree` + `LoroMap`) 替换 Zustand entities + Supabase 作为节点数据层。纯本地，不含网络同步。
+
+**背景**: 当前 `node-store.ts`（2176 行）用 `children: string[]` 模拟树结构，手动 `splice()` 导致 Realtime echo 覆盖、并发安全等一系列 bug。Loro 的 `LoroTree` 是原生树结构（Kleppmann 算法，防循环，Fractional Indexing 排序），树操作变为原子调用。
+
+**关键约束**:
+- `NodexNode` 接口（`src/types/node.ts`）保持不变 — 35 个 UI 组件不需要改
+- Zustand 的 selector 机制保留 — 通过 `_version` 计数器触发 re-render
+- `children` 从节点属性变为树结构的衍生值
+- 所有操作变为同步（无网络 I/O）
+
+**实施步骤**:
+- [ ] Step 0: 安装 `loro-crdt`，验证 WASM 在 Vite + WXT 中加载正常
+- [ ] Step 1: 实现 `src/lib/loro-doc.ts`（Loro 单例 + ID 映射 + 树操作 API + IndexedDB 持久化）
+- [ ] Step 2: 实现 `toNodexNode()` 转换函数（Loro 树节点 → NodexNode 视图对象）
+- [ ] Step 3: 重构 `node-store.ts`（去 Supabase，底层改为 Loro）
+  - [ ] 3a: 基础读写（替换 entities map）
+  - [ ] 3b: 树操作（createChild/moveNodeTo/indentNode/trashNode 等）
+  - [ ] 3c: Tag/Field 操作
+  - [ ] 3d: 内容编辑
+- [ ] Step 4: 种子数据迁移（`seed-data.ts` 改用 Loro API）
+- [ ] Step 5: Hooks 适配（use-node/use-children 去 fetch，use-realtime 注释掉）
+- [ ] Step 6: 工具函数适配（tree-utils.ts 等）
+- [ ] Step 7: 测试（Vitest 单元 + standalone 功能验证 + IndexedDB 持久化验证）
+
+**验收标准**:
+- `npm run typecheck` 通过
+- `npm run test:run` 通过
+- standalone 所有现有交互正常
+- 刷新页面后数据从 IndexedDB 恢复
+- 无 Supabase 调用
+- 无 `_pendingChildrenOps`、`_dirtyContentIds`、3s timeout hack
+
+**Phase 2（后续，不在本任务范围）**: 加同步层 — Loro `exportUpdates()` / `importUpdates()` 通过网络传输，实现多设备同步。
+
+---
+
+#### BUG: Supabase Realtime echo 导致节点错乱（已被 Loro 迁移取代）
+> **状态**: 不再单独修复。Loro 迁移（上方任务）从根本上消除此问题（去掉 Supabase Realtime，本地 CRDT 无 echo）。
+> **已有的临时修复**（`_pendingChildrenOps`）在迁移完成后移除。
+
+---
 
 ### P1
 

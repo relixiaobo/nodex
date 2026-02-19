@@ -28,7 +28,7 @@ _(空)_
 | Agent | 当前任务 | 分支 | 修改中的文件 |
 |-------|---------|------|-------------|
 | nodex-cc | 数据模型简化：消除 Metanode + AssociatedData | cc/simplify-data-model | `node-store.ts`, `node.ts`, `seed-data.ts`, `tag-service.ts`, `meta-utils.ts` (new) |
-| nodex-cc-2 | 用户认证 — Google 登录 (#45) | cc2/google-auth | `src/lib/auth.ts`, `src/components/auth/*`, `workspace-store.ts` |
+| nodex-cc-2 | 用户认证 — Google 登录 (#45) | cc2/google-auth | `src/lib/auth.ts`, `src/components/auth/*`, `workspace-store.ts`, `App.tsx`, `wxt.config.ts`, `Sidebar.tsx` |
 | nodex-codex | _(idle)_ | — | — |
 
 ---
@@ -52,8 +52,9 @@ Chrome Extension 环境下的 Google OAuth 登录 + Supabase Auth 集成。
 - [ ] wxt.config.ts 新增 `identity` 权限
 - [ ] 工作区绑定（登录后自动关联 workspaceId）
 
-- **Files**: `src/lib/auth.ts` (new), `src/components/auth/*` (new), `workspace-store.ts`, `App.tsx`, `wxt.config.ts`
-- **迭代日志**: _(开始后追加)_
+- **Files**: `src/lib/auth.ts` (new), `src/components/auth/*` (new), `workspace-store.ts`, `App.tsx`, `wxt.config.ts`, `Sidebar.tsx`
+- **迭代日志**:
+  - [2026-02-18 cc2] 开始实现：chrome.identity + Supabase PKCE OAuth 流程；LoginScreen + UserMenu UI；App.tsx 路由守卫（Supabase 可用时要求登录，离线模式跳过）；Sidebar 底部嵌入 UserMenu
 
 ### 数据模型简化：消除 Metanode + AssociatedData
 > **Owner: nodex-cc** | Branch: `cc/simplify-data-model` | Priority: P0

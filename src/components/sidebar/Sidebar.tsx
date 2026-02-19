@@ -3,6 +3,7 @@ import { useUIStore } from '../../stores/ui-store';
 import { useNodeStore } from '../../stores/node-store';
 import { useWorkspaceStore } from '../../stores/workspace-store';
 import { SidebarNav } from './SidebarNav';
+import { UserMenu } from '../auth/UserMenu';
 
 export function Sidebar() {
   const openSearch = useUIStore((s) => s.openSearch);
@@ -28,6 +29,7 @@ export function Sidebar() {
         </button>
       </div>
       <SidebarNav />
+      <UserMenu />
     </aside>
   );
 }

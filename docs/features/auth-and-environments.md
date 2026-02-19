@@ -1,7 +1,7 @@
 # 用户认证 & 环境策略
 
 > **目标读者**: 开发者 + 产品（用户）
-> **当前阶段**: 未上线，仅开发环境
+> **当前阶段**: Dev 环境已完成（代码 + 外部服务配置均已验证通过）
 
 ---
 
@@ -82,39 +82,47 @@ https://<extension-id>.chromiumapp.org/
 
 Extension ID 在开发模式下每次加载可能变化（除非固定 key），而 Chrome Web Store 发布后会分配固定 ID。因此 Dev 和 Production 需要**不同的 Google OAuth Client ID**。
 
-### 认证流程
+### 认证流程（PKCE via Supabase）
 
 ```
 用户点击「Google 登录」
-  → chrome.identity.launchWebAuthFlow({ url: supabaseAuthUrl })
-  → Google 登录页（浏览器弹窗）
-  → Google 返回 auth code 到 redirect URI
-  → Supabase 交换 token
-  → 获取 session → 存入 workspace-store
-  → UI 更新为已登录状态
+  → Supabase signInWithOAuth (PKCE, skipBrowserRedirect: true)
+  → 返回 Supabase /authorize URL，存储 code_verifier 到 localStorage
+  → chrome.identity.launchWebAuthFlow 打开弹窗
+  → Supabase /authorize → Google 登录页
+  → Google 回调到 Supabase callback URL
+  → Supabase 处理回调，重定向到 chromiumapp.org/?code=xxx
+  → 扩展提取 code，调用 exchangeCodeForSession(code)
+  → Supabase 用 code + code_verifier 完成 PKCE 交换
+  → 获取 session → 存入 workspace-store → UI 更新
 ```
+
+> **关键**：Google 的 redirect URI 指向 Supabase callback（不是 chromiumapp.org），
+> 因此 Google Cloud Console 只需注册 Supabase 的 callback URL。
 
 ### Supabase Auth 配置清单
 
-- [ ] Supabase Dashboard → Authentication → Providers → 启用 Google
-- [ ] 填入 Google OAuth Client ID 和 Client Secret
-- [ ] Redirect URLs 添加：`https://<dev-ext-id>.chromiumapp.org/`
+- [x] Supabase Dashboard → Authentication → Providers → 启用 Google
+- [x] 填入 **Web Application** 类型的 Google OAuth Client ID 和 Client Secret
+- [x] Redirect URLs 添加：`https://<dev-ext-id>.chromiumapp.org/`
 - [ ] （生产时）Redirect URLs 添加：`https://<prod-ext-id>.chromiumapp.org/`
 
 ### Google Cloud Console 配置清单
 
-- [ ] 创建项目（或使用现有项目）
-- [ ] APIs & Services → Credentials → Create OAuth 2.0 Client ID
-- [ ] Application type: **Chrome Extension**（Dev 用）或 **Web application**
-- [ ] 填入 Chrome Extension ID
-- [ ] 获取 Client ID 和 Client Secret → 填入 Supabase
+- [x] 创建项目
+- [x] 创建 **Web Application** 类型 OAuth Client（必须是 Web Application，不是 Chrome Extension）
+- [x] Authorized redirect URIs 添加：`https://<supabase-project>.supabase.co/auth/v1/callback`
+- [x] 获取 Client ID + Client Secret → 填入 Supabase Google Provider
+- [ ] （生产时）创建新的 Web Application Client，配置生产 Supabase callback
 
 ### Chrome Extension Manifest 变更
 
 ```typescript
-// wxt.config.ts — 需要新增的权限
+// wxt.config.ts — 需要的权限
 permissions: ['storage', 'sidePanel', 'activeTab', 'identity'],
 ```
+
+> 不需要 `oauth2` 块。PKCE 流程通过 Supabase 中转，不直接调用 Google OAuth 端点。
 
 ### 固定开发 Extension ID
 
@@ -129,6 +137,16 @@ manifest: {
 ```
 
 生成方式：打包一次扩展 → 从 `.crx` 提取 public key → base64 编码。
+
+### 踩坑记录
+
+| 问题 | 原因 | 解决 |
+|------|------|------|
+| `Authorization page could not be loaded` | Supabase Google Provider 未启用或 Client Secret 缺失 | 在 Supabase 填入 Web App Client ID + Secret |
+| `missing OAuth secret` | Google Provider 启用了但 Secret 为空 | 使用 Web Application 类型 Client（有 Secret） |
+| `redirect_uri_mismatch` | 直接用 chromiumapp.org 作为 Google redirect URI，Google 不认 | 改用 PKCE 流程，Google redirect 到 Supabase callback |
+| `both auth code and code verifier should be non-empty` | 把整个 callback URL 传给 `exchangeCodeForSession` | 从 URL 提取 `code` 参数再传入 |
+| Chrome Extension 类型 Client 无 Secret | Chrome Extension OAuth Client 不提供 Secret | 改用 Web Application 类型 Client |
 
 ---
 
@@ -194,3 +212,11 @@ if (isAuthenticated)  → 显示正常 App（当前的 Sidebar + PanelStack）
 | 2026-02-17 | 当前只搭 Dev + Production，不建 Preview | 产品未上线，无内测用户 |
 | 2026-02-17 | 一个 Supabase 项目，Dev/Prod 用不同环境变量 | 简化管理，后续可拆分 |
 | 2026-02-17 | 两个 Google OAuth Client ID（Dev/Prod） | Chrome Extension ID 不同，redirect URI 不同 |
+| 2026-02-18 | 使用 Supabase PKCE OAuth 流程（`skipBrowserRedirect: true` + `exchangeCodeForSession`） | 比 implicit flow 更安全，Supabase v2 推荐 |
+| 2026-02-18 | Supabase 不可用时降级为 offline 模式（不强制登录） | 保留 dev 无 `.env` 时的可用性 |
+| 2026-02-18 | `authUser` 不持久化到 chrome.storage，每次从 Supabase getUser 重新水化 | token 由 Supabase 内部 localStorage 管理，避免双重存储 |
+| 2026-02-18 | `partialize` 只持久化 `currentWorkspaceId / userId / isAuthenticated` | 最小持久化原则 |
+| 2026-02-18 | Google OAuth 使用 **Web Application** 类型 Client（非 Chrome Extension 类型） | PKCE 流程需要 Client Secret；Chrome Extension 类型不提供 Secret |
+| 2026-02-18 | Google redirect URI 指向 Supabase callback，不直接用 chromiumapp.org | Google 不允许 Web App Client 注册 chromiumapp.org 为 redirect URI |
+| 2026-02-18 | Supabase Client 显式配置 `auth: { flowType: 'pkce' }` | 确保 code_verifier 被正确存储和检索 |
+| 2026-02-18 | 不需要 manifest `oauth2` 块 | PKCE 流程通过 Supabase 中转，不直接调用 Google OAuth 端点 |

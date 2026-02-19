@@ -31,6 +31,23 @@ const CONTAINER_DEFS: Array<{ suffix: WorkspaceContainerSuffix; name: string }> 
 
 /** Seed workspace containers locally, and upsert to Supabase when connected. */
 async function seedWorkspaceContainers(wsId: string, userId: string) {
+  // Provision user + workspace_members in Supabase (required for RLS)
+  if (isSupabaseReady()) {
+    try {
+      const { getSupabase } = await import('../src/lib/supabase');
+      const { useWorkspaceStore } = await import('../src/stores/workspace-store');
+      const authUser = useWorkspaceStore.getState().authUser;
+      await getSupabase().rpc('provision_workspace', {
+        p_user_id: userId,
+        p_email: authUser?.email ?? '',
+        p_display_name: authUser?.name ?? null,
+        p_avatar_url: authUser?.avatarUrl ?? null,
+      });
+    } catch {
+      // Non-fatal
+    }
+  }
+
   const store = useNodeStore.getState();
   const now = Date.now();
 

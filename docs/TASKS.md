@@ -69,7 +69,7 @@ Chrome Extension 环境下的 Google OAuth 登录 + Supabase Auth 集成。
 - [x] Phase 2b: 字段写路径迁移（不再创建 AssociatedData）✓
 - [x] Phase 2c: UI 组件迁移（FieldValueOutliner + FieldRow + OptionsPicker 等 15 文件）✓
 - [x] Phase 2d: 种子数据 + 测试迁移（8 测试文件 + seed-data）✓
-- [ ] Phase 3: 类型清理 + 数据库迁移（移除 association_map 列）+ 文档更新
+- [x] Phase 3: 类型清理 + 数据库迁移（移除 meta_node_id + association_map 列）✓
 
 - **Files**: node-store.ts, node.ts, seed-data.ts, tag-service.ts, field-service.ts,
   search-service.ts, checkbox-utils.ts, field-utils.ts, use-node-fields.ts,
@@ -78,6 +78,7 @@ Chrome Extension 环境下的 Google OAuth 登录 + Supabase Auth 集成。
   - [2026-02-18 nodex-cc] Phase 0+1 完成：meta 列 + 工具函数 + 读写路径迁移 + 测试。362 tests pass。
   - [2026-02-18 nodex-cc] Phase 2 完成：AssociatedData 完全消除。store 写路径(15 方法)、UI 组件(15 文件)、种子数据、8 测试文件全部更新。净删 ~340 行。362 tests pass, build 846KB。
   - [2026-02-18 nodex-cc] 残留：node-service.ts（DB 层 association_map 列映射）、tana-import.ts（导入兼容）、node.ts（@deprecated 标记）→ Phase 3
+  - [2026-02-19 nodex-cc] Phase 3 完成：从 DocType/NodeProps/NodexNode 移除 metanode+associatedData+_metaNodeId+associationMap。DB migration 004 移除 meta_node_id + association_map 列。tana-import 保留原始格式读取但不写入已废弃字段。全部 362 tests pass，build 846KB。**数据模型简化任务完成。**
 
 ---
 

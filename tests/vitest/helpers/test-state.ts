@@ -16,6 +16,7 @@ export function resetStores(): void {
     entities: {},
     loading: new Set<string>(),
     _dirtyContentIds: new Set<string>(),
+    _pendingChildrenOps: new Map<string, number>(),
   });
 
   useWorkspaceStore.setState({

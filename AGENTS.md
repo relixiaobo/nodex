@@ -151,8 +151,8 @@ npm run build            # 生产构建
 
 - **一切皆节点**：单表 `nodes`，`doc_type` 区分类型
 - **Tuple**（`doc_type='tuple'`）：万能键值对，`children[0]` = 键，`children[1:]` = 值
-- **Metanode**（`doc_type='metanode'`）：元信息代理，通过 `_metaNodeId` 链接到内容节点
-- **AssociatedData**（`doc_type='associatedData'`）：通过 `associationMap` 映射，提供字段值索引
+- **node.meta**（`TEXT[]` 列）：元信息 Tuple ID 列表（标签、checkbox、视图等）
+- 字段值直接存 `Tuple.children[1:]`（无间接层）
 - 完整数据模型见 `CLAUDE.md` 的"数据模型核心概念"段
 
 ### "一切皆节点"设计守则（实现时必须遵守）

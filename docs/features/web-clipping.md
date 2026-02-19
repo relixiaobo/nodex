@@ -101,9 +101,8 @@ tagDef_tweet      extends #web_clip
 ```
 clip_node
   props: { name: '页面标题', description: '页面摘要（可选）' }
-  _metaNodeId → metanode
-    children:
-      - tuple [SYS_A13, tagDef_web_clip]
+  meta: [tagTupleId]
+    └── Tuple [SYS_A13, tagDef_web_clip]
   children:
     - tuple [attrDef_source_url, valueNode]  ← Source URL 字段（含值）
     - (V2: 正文内容子节点)
@@ -116,7 +115,7 @@ clip_node
 3. `applyWebClipToNode()` 就地转换当前节点：
    - Find-or-create `#web_clip` tagDef + `Source URL` attrDef
    - `updateNodeName(nodeId, title)` 将当前节点改名为页面标题
-   - `applyTag(tagDef_web_clip)` 打标签（创建 metanode + 实例化模板字段）
+   - `applyTag(tagDef_web_clip)` 打标签（创建 meta Tuple + 实例化模板字段）
    - `setFieldValue(sourceUrlAttrDefId, url)` 写 Source URL 值
    - 如有 description，`updateNodeDescription()` 写入
 4. 保持当前页面状态不变（不导航、不创建新节点）

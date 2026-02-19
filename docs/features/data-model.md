@@ -82,8 +82,8 @@ NodexNode
 | DocType | 占比 | 用途 | 详见 |
 |---------|------|------|------|
 | `tuple` | 29.3% | 万能键值对容器 | §间接层简化 |
-| `metanode` | 13.5% | **已废弃** 元信息代理节点（由 `node.meta` 替代） | §间接层简化 |
-| `associatedData` | 6.3% | **已废弃** 字段值索引数据（值直接存 Tuple.children） | §间接层简化 |
+| ~~`metanode`~~ | — | **已移除** (PR #60) — 元信息由 `node.meta` 替代 | §间接层简化 |
+| ~~`associatedData`~~ | — | **已移除** (PR #60) — 值直接存 Tuple.children | §间接层简化 |
 
 ### 定义类型
 

@@ -49,7 +49,7 @@ _(空)_
 3. **命名统一**: 扁平化 `props`、去 `_` 前缀、`DocType→NodeType`、`tuple→fieldEntry`、`attrDef→fieldDef`、`_done→completedAt` 等
 
 **实施步骤**:
-- [ ] Step 0: 安装 `loro-crdt`，验证 WASM 加载 + 冷启动时间
+- [x] Step 0: 安装 `loro-crdt`，验证 WASM 加载 + 冷启动时间
 - [ ] Step 1: 类型系统重构（新 NodexNode 接口 + NodeType + FIELD_TYPES + SYSTEM_TAGS）
 - [ ] Step 2: 实现 `loro-doc.ts`（Loro 单例 + ID 映射 + 树操作 + tags LoroList + toNodexNode）
 - [ ] Step 3: 重构 `node-store.ts`（去 Supabase，底层改 Loro，applyTag 简化）
@@ -73,7 +73,7 @@ _(空)_
 **Phase 2（后续）**: 同步层 + LoroText 替换 name+marks+inlineRefs + createdBy/updatedBy 复活
 
 迭代日志:
-- _(nodex-cc 开工后在此追加)_
+- [2026-02-20 nodex-cc] Step 0 完成：npm install loro-crdt@1.10.6，Node.js 环境冷启动 0.03ms，7 项验证全通过（LoroTree CRUD、LoroList tags、树移动、快照持久化、循环检测）。关键 API 确认：setContainer 需传实例 `new LoroList()` 而非字符串；getOrCreateContainer 是幂等写法；MV3 CSP 已配置 `wasm-unsafe-eval`。浏览器 WASM 加载耗时预计 50-100ms，在 App 初始化时预加载可隐藏。
 
 ---
 

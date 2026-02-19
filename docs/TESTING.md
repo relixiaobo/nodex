@@ -144,6 +144,18 @@ npm run test:run
 5. dirty 标记清除后 `setNode` 恢复正常全量替换
 6. `fetchChildren` 跳过 dirty 节点的覆盖
 
+### 1.3.2 Realtime 自回显保护
+
+**测试文件**: `tests/vitest/realtime-echo-protection.test.ts`
+
+**覆盖点**:
+
+1. `_pendingChildrenOps` 保护 — `setNode` 跳过 children 覆盖当 parent 有 in-flight 操作
+2. pending 清除后 `setNode` 恢复正常全量替换
+3. pending ref count 正确追踪并发操作（+1/-1/清零）
+4. pending 状态下仍更新 non-children props（version/updatedBy/description 等）
+5. `trashNode` 乐观更新正确从 parent.children 移除节点
+
 ### 1.4 边界条件
 
 **测试文件**: `tests/vitest/edge-cases.test.ts`

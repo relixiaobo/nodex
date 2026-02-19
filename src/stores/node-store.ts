@@ -62,6 +62,13 @@ interface NodeStore {
   /** Node IDs with local content edits not yet persisted to Supabase */
   _dirtyContentIds: Set<string>;
 
+  /**
+   * Parent IDs with in-flight children mutations (createChild/createSibling/trashNode).
+   * Value = ref count of concurrent ops. While pending, Realtime echo events
+   * will NOT overwrite local children/meta for these parents.
+   */
+  _pendingChildrenOps: Map<string, number>;
+
   // ─── Local state mutations ───
 
   /** Set a single node in the cache */
@@ -289,10 +296,26 @@ export const useNodeStore = create<NodeStore>()(
     entities: {},
     loading: new Set<string>(),
     _dirtyContentIds: new Set<string>(),
+    _pendingChildrenOps: new Map<string, number>(),
 
     setNode: (node) =>
       set((state) => {
         const existing = state.entities[node.id];
+
+        // If this parent has in-flight children ops (createChild/createSibling/trashNode),
+        // preserve local children & meta to prevent Realtime echo from overwriting
+        // optimistic state. Other fields are still updated.
+        if (state._pendingChildrenOps.has(node.id) && existing) {
+          existing.version = Math.max(existing.version ?? 0, node.version ?? 0);
+          existing.updatedAt = node.updatedAt;
+          existing.updatedBy = node.updatedBy;
+          // Keep local children and meta — do NOT overwrite
+          if (!state._dirtyContentIds.has(node.id)) {
+            existing.props = { ...existing.props, ...node.props };
+          }
+          return;
+        }
+
         // If this node has unsaved local content edits, preserve them
         // instead of blindly overwriting with (potentially stale) DB data.
         if (state._dirtyContentIds.has(node.id)) {
@@ -420,6 +443,12 @@ export const useNodeStore = create<NodeStore>()(
       // Persist to Supabase (skip if not connected)
       if (!isSupabaseReady()) return optimisticNode;
 
+      // Mark parent as having in-flight children op (protects against Realtime echo)
+      set((state) => {
+        state._pendingChildrenOps.set(parentId,
+          (state._pendingChildrenOps.get(parentId) ?? 0) + 1);
+      });
+
       try {
         const node = await nodeService.createNode(
           {
@@ -461,6 +490,15 @@ export const useNodeStore = create<NodeStore>()(
           }
         });
         return optimisticNode;
+      } finally {
+        // Release pending after 3s to tolerate Realtime echo delay
+        setTimeout(() => {
+          set((state) => {
+            const n = (state._pendingChildrenOps.get(parentId) ?? 1) - 1;
+            if (n <= 0) state._pendingChildrenOps.delete(parentId);
+            else state._pendingChildrenOps.set(parentId, n);
+          });
+        }, 3000);
       }
     },
 
@@ -514,6 +552,12 @@ export const useNodeStore = create<NodeStore>()(
       // Persist (skip if not connected)
       if (!isSupabaseReady()) return optimisticNode;
 
+      // Mark parent as having in-flight children op (protects against Realtime echo)
+      set((state) => {
+        state._pendingChildrenOps.set(parentId,
+          (state._pendingChildrenOps.get(parentId) ?? 0) + 1);
+      });
+
       try {
         const newNode = await nodeService.createNode(
           {
@@ -556,6 +600,15 @@ export const useNodeStore = create<NodeStore>()(
           }
         });
         return optimisticNode;
+      } finally {
+        // Release pending after 3s to tolerate Realtime echo delay
+        setTimeout(() => {
+          set((state) => {
+            const n = (state._pendingChildrenOps.get(parentId) ?? 1) - 1;
+            if (n <= 0) state._pendingChildrenOps.delete(parentId);
+            else state._pendingChildrenOps.set(parentId, n);
+          });
+        }, 3000);
       }
     },
 
@@ -1084,8 +1137,22 @@ export const useNodeStore = create<NodeStore>()(
 
       if (!isSupabaseReady()) return;
 
+      // Mark old parent as having in-flight children op (protects against Realtime echo)
+      if (oldOwnerId) {
+        set((state) => {
+          state._pendingChildrenOps.set(oldOwnerId,
+            (state._pendingChildrenOps.get(oldOwnerId) ?? 0) + 1);
+        });
+      }
+
       try {
         await nodeService.trashNode(nodeId, workspaceId, userId);
+        // Sync parent.children to DB (remove trashed node) to prevent
+        // stale children from resurrecting via Realtime echo
+        if (oldOwnerId) {
+          const currentChildren = get().entities[oldOwnerId]?.children ?? [];
+          await nodeService.updateNode(oldOwnerId, { children: currentChildren }, userId);
+        }
       } catch {
         // Rollback
         set((state) => {
@@ -1107,6 +1174,17 @@ export const useNodeStore = create<NodeStore>()(
             }
           }
         });
+      } finally {
+        // Release pending after 3s to tolerate Realtime echo delay
+        if (oldOwnerId) {
+          setTimeout(() => {
+            set((state) => {
+              const n = (state._pendingChildrenOps.get(oldOwnerId) ?? 1) - 1;
+              if (n <= 0) state._pendingChildrenOps.delete(oldOwnerId);
+              else state._pendingChildrenOps.set(oldOwnerId, n);
+            });
+          }, 3000);
+        }
       }
     },
 

@@ -127,6 +127,15 @@ export function RichTextEditor(props: RichTextEditorProps) {
   const propsRef = useRef(props);
   propsRef.current = props;
 
+  // Capture content baseline at editor creation time for change detection.
+  // NOT updated by re-renders from setNodeContentLocal (typing) — only updated
+  // when a genuine external sync occurs (e.g., Realtime update from another client).
+  const initialContentRef = useRef({
+    text: props.initialText,
+    marks: props.initialMarks,
+    inlineRefs: props.initialInlineRefs,
+  });
+
   const userId = useWorkspaceStore((s) => s.userId);
   const setNodeContentLocal = useNodeStore((s) => s.setNodeContentLocal);
   const updateNodeContent = useNodeStore((s) => s.updateNodeContent);
@@ -141,9 +150,9 @@ export function RichTextEditor(props: RichTextEditorProps) {
       parsed.text,
       parsed.marks,
       parsed.inlineRefs,
-      propsRef.current.initialText,
-      propsRef.current.initialMarks,
-      propsRef.current.initialInlineRefs,
+      initialContentRef.current.text,
+      initialContentRef.current.marks,
+      initialContentRef.current.inlineRefs,
     );
 
     if (changed && userId) {
@@ -710,6 +719,14 @@ export function RichTextEditor(props: RichTextEditorProps) {
     } finally {
       isExternalSyncRef.current = false;
     }
+
+    // Update baseline after genuine external sync so that saveContent doesn't
+    // redundantly re-save content that was already persisted by another source.
+    initialContentRef.current = {
+      text: props.initialText,
+      marks: props.initialMarks,
+      inlineRefs: props.initialInlineRefs,
+    };
   }, [props.initialInlineRefs, props.initialMarks, props.initialText]);
 
   return (

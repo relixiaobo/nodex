@@ -177,6 +177,11 @@ export interface NodexNode {
 
   /** 来源 URL (网页剪藏) */
   sourceUrl?: string;
+
+  // ─── Reference 专用 ───
+
+  /** 引用目标节点 ID（仅 type='reference' 时有值） */
+  targetId?: string;
 }
 ```
 
@@ -220,6 +225,7 @@ export interface NodexNode {
 
 export type NodeType =
   | 'fieldEntry'        // 旧 'tuple'。字段实例（key + values）
+  | 'reference'         // 新增。引用节点（指向目标节点，LoroTree 单亲兼容）
   | 'tagDef'            // 不变
   | 'fieldDef'          // 旧 'attrDef'。统一为 "field"
   | 'viewDef'           // 不变
@@ -350,6 +356,7 @@ const tree = doc.getTree("nodes");
 | `searchContext` | `node.data.set("searchContext", str)` | |
 | `aiSummary` | `node.data.set("aiSummary", str)` | |
 | `sourceUrl` | `node.data.set("sourceUrl", str)` | |
+| `targetId` | `node.data.set("targetId", str)` | 仅 type='reference' |
 
 **消除的字段不在 Loro 中存储**：`_ownerId`（LoroTree parent）、`workspaceId`（LoroDoc 隔离）、`version`（Loro 版本向量）、`meta`（直接属性）、`touchCounts/modifiedTs/createdBy/updatedBy`（删除）。
 
@@ -395,10 +402,18 @@ tagDefNode.data = {
   id: "tag_xxx",
   type: "tagDef",
   name: "Task",
+
+  // ─── 简单标量配置（旧 config Tuple → 直接属性） ───
   showCheckbox: true,           // 旧 [SYS_A55, SYS_V03] config tuple
   childSupertag: "tag_yyy",     // 旧 [SYS_A14, tagDefId] config tuple
   color: "blue",                // 旧 [SYS_A11, value] config tuple
+  extends: "tag_parent",        // 旧 [NDX_A05, tagDefId] config tuple
   templateFields: LoroList,     // [fieldDefId1, fieldDefId2]
+
+  // ─── Done-State Mapping（旧 NDX_A06/07/08 嵌套 Tuple → LoroList 直接属性） ───
+  doneStateEnabled: true,                 // 旧 [NDX_A06, SYS_V03(YES)]
+  doneCheckedMappings: LoroList,          // [{fieldDefId, optionId}, ...]  旧 NDX_A07 Tuple children
+  doneUncheckedMappings: LoroList,        // [{fieldDefId, optionId}, ...]  旧 NDX_A08 Tuple children
 }
 
 // FieldDef 节点 (旧 attrDef)
@@ -409,8 +424,46 @@ fieldDefNode.data = {
   fieldType: "options",         // 旧 [SYS_A02, SYS_D06] → 现在直接用可读字符串
   cardinality: "single",        // 旧 [SYS_A10, SYS_V01] → 'single' | 'list'
   options: LoroList,            // 选项列表
+  nullable: false,              // 旧 [SYS_A01, SYS_V03]
+  hideField: 'never',           // 旧 [NDX_A01, SYS_V.NEVER]
+  autoInitialize: false,        // 旧 [NDX_A03, SYS_V04]
+  autocollectOptions: false,    // 旧 [SYS_A44, SYS_V04]
 }
 ```
+
+**Done-State Mapping 迁移详解**：
+
+旧模型是 3 层 Tuple 嵌套：
+```
+tagDef.children → [cfg_done_mapping (NDX_A06 toggle)]
+  cfg_done_mapping.children → [NDX_A06, SYS_V03(YES)]
+    nested entry: [NDX_A07, attrDefId, optionId]  ← checked mapping
+tagDef.children → [cfg_done_checked (NDX_A07 field tuple)]
+  cfg_done_checked.children → [NDX_A07, entry1Id, entry2Id, ...]
+    entry1.children → [NDX_A07, attrDefId, optionId]
+```
+
+新模型直接化：
+```typescript
+// 开关 — 布尔值
+tagDefNode.data.set("doneStateEnabled", true);
+
+// 映射条目 — LoroList 存 JSON 对象（不再需要中间 Tuple 节点）
+const checked = tagDefNode.data.getOrCreateContainer("doneCheckedMappings", "List");
+checked.push({ fieldDefId: "field_status", optionId: "opt_done" });
+
+const unchecked = tagDefNode.data.getOrCreateContainer("doneUncheckedMappings", "List");
+unchecked.push({ fieldDefId: "field_status", optionId: "opt_todo" });
+
+// 读取时
+const mappings = tagDefNode.data.getList("doneCheckedMappings").toArray();
+// → [{fieldDefId: "field_status", optionId: "opt_done"}]
+```
+
+**checkbox-utils.ts 大幅简化**（旧 270+ 行 → 预计 ~80 行）：
+- 删除 `collectLegacyMappings()`、`isLegacyFormat()` 等兼容逻辑
+- `getDoneMappings()` 直接读 LoroList，无需 Tuple 树遍历
+- `hasDoneMappingEnabled()` 直接读 `tagDef.doneStateEnabled`
 
 ### 2.9 Field Tuple（fieldEntry）改进
 
@@ -458,7 +511,90 @@ node.data.delete("_trashedFrom");
 node.data.delete("_trashedIndex");
 ```
 
-### 2.11 ID 映射策略
+### 2.11 Reference 节点设计（LoroTree 单亲约束兼容）
+
+**问题**：当前模型中 `addReference(parentId, refNodeId)` 把同一个 nodeId 塞进多个 parent 的 `children` 数组——这在 `Record<string, NodexNode>` 模型中可行（children 只是字符串数组），但 LoroTree 的每个 TreeID **有且仅有一个 parent**，无法实现同一节点出现在多个父节点下。
+
+**当前使用场景**（均在 `OutlinerItem.tsx` + `TrailingInput.tsx` 中活跃使用）：
+- `addReference` — @-引用创建（TrailingInput `>` 触发）
+- `removeReference` — Backspace 删除引用
+- `startRefConversion` — 引用→内联文本转换
+- `revertRefConversion` — 转换回退
+
+**新方案：Reference = 独立树节点**
+
+```typescript
+// Reference 不再是把原节点 ID 塞进另一个 parent 的 children
+// 而是创建一个 type='reference' 的独立轻量树节点
+function addReference(parentId: string, targetNodeId: string, index?: number): string {
+  const refNodeId = nanoid();
+  loroDoc.createNode(refNodeId, parentId, index);
+  loroDoc.setNodeDataBatch(refNodeId, {
+    type: 'reference',
+    targetId: targetNodeId,   // 指向真实节点
+    createdAt: Date.now(),
+  });
+  return refNodeId;
+}
+
+// 删除引用 = 删除 reference 节点，不影响目标节点
+function removeReference(refNodeId: string): void {
+  loroDoc.deleteNode(refNodeId);
+}
+```
+
+**UI 渲染适配**：
+
+```typescript
+// OutlinerItem 渲染逻辑
+const node = useNode(nodeId);
+if (node?.type === 'reference') {
+  // 解析目标节点用于显示
+  const target = useNode(node.targetId);
+  // 渲染 target 的 name/content，但交互操作作用于 refNodeId
+  // isReference 判断：node.type === 'reference'（替代旧的 parent.children.includes 检查）
+}
+```
+
+**引用→内联转换**：
+```typescript
+function startRefConversion(refNodeId: string, parentId: string, position: number): string {
+  const refNode = loroDoc.getNodeData(refNodeId);
+  const targetId = refNode?.targetId;
+  const targetNode = loroDoc.getNodeData(targetId);
+  const targetName = targetNode?.name ?? 'Untitled';
+
+  // 删除 reference 节点
+  loroDoc.deleteNode(refNodeId);
+
+  // 创建临时内联引用节点
+  const tempId = nanoid();
+  loroDoc.createNode(tempId, parentId, position);
+  loroDoc.setNodeDataBatch(tempId, {
+    name: '\uFFFC',
+    inlineRefs: [{ offset: 0, targetNodeId: targetId, displayName: targetName }],
+    createdAt: Date.now(),
+  });
+  return tempId;
+}
+```
+
+**收益**：
+- 完全符合 LoroTree 单亲约束
+- Reference 是一等公民树节点，有自己的 TreeID 和元数据
+- 并发场景安全（每个引用是独立节点，不存在多端同时操作同一 children 数组的冲突）
+- `toNodexNode()` 对 reference 节点返回 `{ type: 'reference', targetId: '...' }`，UI 层解析
+
+**NodexNode 新增字段**：
+```typescript
+interface NodexNode {
+  // ... 现有字段 ...
+  /** 引用目标节点 ID（仅 type='reference' 时有值） */
+  targetId?: string;
+}
+```
+
+### 2.12 ID 映射策略
 
 Loro 的 TreeID 是内部类型（`{ peer: bigint, counter: number }`），不适合直接当 Nodex ID 用。
 
@@ -490,7 +626,7 @@ function createNode(nodexId: string, parentNodexId: string | null, index?: numbe
 
 **持久化**：映射表不需要单独持久化——从 Loro snapshot 恢复时遍历所有树节点重建。
 
-### 2.12 工作区隔离与树根结构
+### 2.13 工作区隔离与树根结构
 
 **旧模式**：每个节点存 `workspaceId`，用于 Supabase WHERE 子句。
 
@@ -573,6 +709,11 @@ export interface LoroDocManager {
   removeTag(nodeId: string, tagDefId: string): void;
   getTags(nodeId: string): string[];  // 返回去重后的列表
 
+  // LoroList 操作（Done-State Mapping 等复合属性）
+  getNodeList(id: string, key: string): unknown[];
+  pushToNodeList(id: string, key: string, value: unknown): void;
+  removeFromNodeList(id: string, key: string, index: number): void;
+
   // 查询
   getChildren(parentId: string): string[];
   getParentId(id: string): string | null;
@@ -614,28 +755,108 @@ interface NodeStore {
   // === 内容编辑（同步） ===
   setNodeName(id: string, name: string): void;
   updateNodeContent(id: string, data: Partial<NodexNode>): void;
+  updateNodeDescription(id: string, description: string): void;
 
-  // === 标签/字段操作（大幅简化） ===
+  // === 标签操作 ===
   applyTag(nodeId: string, tagDefId: string): void;
   removeTag(nodeId: string, tagDefId: string): void;
   createTagDef(name: string, options?: { showCheckbox?: boolean }): NodexNode;
+
+  // === 字段操作 ===
   createFieldDef(name: string, fieldType: FieldType): NodexNode;  // 旧 createAttrDef
   setFieldValue(nodeId: string, fieldDefId: string, values: string[]): void;
+  setOptionsFieldValue(nodeId: string, fieldDefId: string, optionNodeId: string): void;
+  selectFieldOption(fieldEntryId: string, optionNodeId: string, oldOptionNodeId?: string): void;
+  clearFieldValue(nodeId: string, fieldDefId: string): void;
+  addFieldToNode(nodeId: string, fieldDefId: string): void;
+  addUnnamedFieldToNode(nodeId: string, afterChildId?: string): { fieldEntryId: string; fieldDefId: string };
+  moveFieldEntry(currentParentId: string, fieldEntryId: string, newParentId: string, position?: number): void;
+  removeField(nodeId: string, fieldEntryId: string): void;
+  renameFieldDef(fieldDefId: string, newName: string): void;     // 旧 renameAttrDef
+  changeFieldType(fieldDefId: string, newType: string): void;
+  addFieldOption(fieldDefId: string, name: string): string;
+  removeFieldOption(fieldDefId: string, optionId: string): void;
+  autoCollectOption(nodeId: string, fieldDefId: string, name: string): string;
+  toggleCheckboxField(fieldEntryId: string): void;
+  replaceFieldDef(nodeId: string, fieldEntryId: string, oldFieldDefId: string, newFieldDefId: string): void;
+
+  // === Checkbox 操作 ===
+  toggleNodeDone(nodeId: string): void;
+  cycleNodeCheckbox(nodeId: string): void;
+
+  // === 配置操作 ===
+  setConfigValue(nodeId: string, configKey: string, value: unknown): void;  // 直接设属性
+  addDoneMappingEntry(tagDefId: string, checked: boolean, fieldDefId: string, optionId: string): void;
+  removeDoneMappingEntry(tagDefId: string, checked: boolean, index: number): void;
+
+  // === Reference 操作（新设计，见 §2.11） ===
+  addReference(parentId: string, targetNodeId: string, position?: number): string;  // 返回 refNodeId
+  removeReference(refNodeId: string): void;
+  startRefConversion(refNodeId: string, parentId: string, position: number): string; // 返回 tempNodeId
+  revertRefConversion(tempNodeId: string, targetNodeId: string, parentId: string): void;
 
   // === 响应式 ===
   _version: number;
 }
 ```
 
+**完整 API 分类**（与当前 node-store.ts 逐一对照）：
+
+| 当前 API | 新 API | 变化 |
+|----------|--------|------|
+| `setNode(node)` | **删除** | Realtime echo 不再存在 |
+| `fetchNode(id)` | **删除** | 数据在本地 LoroDoc |
+| `fetchChildren(id)` | **删除** | 数据在本地 LoroDoc |
+| `createChild(...)` | `createChild(parentId, index?, data?)` | 同步化，去 userId/wsId |
+| `createSibling(...)` | `createSibling(siblingId, data?)` | 同步化 |
+| `moveNodeTo(...)` | `moveNodeTo(nodeId, parentId, index?)` | 同步化 |
+| `indentNode(...)` | `indentNode(nodeId)` | 同步化，去 userId |
+| `outdentNode(...)` | `outdentNode(nodeId)` | 同步化 |
+| `moveNodeUp/Down(...)` | `moveNodeUp/Down(nodeId)` | 同步化 |
+| `trashNode(...)` | `trashNode(nodeId)` | 同步化，用 tree.move() |
+| *（无 restoreNode）* | `restoreNode(nodeId)` | **新增** |
+| `updateNodeContent(...)` | `updateNodeContent(id, data)` | 去 userId |
+| `updateNodeDescription(...)` | `updateNodeDescription(id, desc)` | 去 userId |
+| `applyTag(...)` | `applyTag(nodeId, tagDefId)` | 大幅简化 |
+| `removeTag(...)` | `removeTag(nodeId, tagDefId)` | 简化 |
+| `createTagDef(...)` | `createTagDef(name, options?)` | 去 wsId/userId |
+| `createAttrDef(...)` | `createFieldDef(name, type)` | 重命名 + 简化 |
+| `setFieldValue(...)` | `setFieldValue(nodeId, fieldDefId, values)` | 同步化 |
+| `setOptionsFieldValue(...)` | `setOptionsFieldValue(...)` | 保留 |
+| `selectFieldOption(...)` | `selectFieldOption(...)` | 保留，去 userId |
+| `clearFieldValue(...)` | `clearFieldValue(...)` | 同步化 |
+| `addFieldToNode(...)` | `addFieldToNode(...)` | 同步化 |
+| `addUnnamedFieldToNode(...)` | `addUnnamedFieldToNode(...)` | 同步化 |
+| `moveFieldTuple(...)` | `moveFieldEntry(...)` | 重命名 |
+| `removeField(...)` | `removeField(...)` | 保留 |
+| `renameAttrDef(...)` | `renameFieldDef(...)` | 重命名 |
+| `changeFieldType(...)` | `changeFieldType(...)` | 保留 |
+| `addFieldOption(...)` | `addFieldOption(...)` | 保留 |
+| `removeFieldOption(...)` | `removeFieldOption(...)` | 保留 |
+| `autoCollectOption(...)` | `autoCollectOption(...)` | 保留 |
+| `toggleCheckboxField(...)` | `toggleCheckboxField(...)` | 保留 |
+| `toggleNodeDone(...)` | `toggleNodeDone(...)` | 保留 |
+| `cycleNodeCheckbox(...)` | `cycleNodeCheckbox(...)` | 保留 |
+| `setConfigValue(tupleId, val)` | `setConfigValue(nodeId, key, val)` | **重设计**：直接属性，不操作 Tuple |
+| `addDoneMappingEntry(...)` | `addDoneMappingEntry(...)` | **重设计**：操作 LoroList |
+| `removeDoneMappingEntry(...)` | `removeDoneMappingEntry(...)` | **重设计**：操作 LoroList |
+| `replaceFieldAttrDef(...)` | `replaceFieldDef(...)` | 重命名 |
+| `addReference(parent, refNode)` | `addReference(parent, target)` | **重设计**：创建 reference 节点 |
+| `removeReference(parent, refNode)` | `removeReference(refNodeId)` | **重设计**：删除 reference 节点 |
+| `startRefConversion(...)` | `startRefConversion(...)` | 适配 reference 节点 |
+| `revertRefConversion(...)` | `revertRefConversion(...)` | 适配 reference 节点 |
+
 **关键变化**：
 
 1. **删除** `entities`, `loading`, `_dirtyContentIds`, `_pendingChildrenOps`
 2. **删除** 所有 `nodeService.*` 调用
 3. **删除** `fetchNode`/`fetchChildren`（数据在本地 Loro Doc）
-4. **所有操作变为同步**（Loro WASM 调用无网络 I/O）
+4. **所有操作变为同步**（Loro WASM 调用无网络 I/O），签名去掉 `userId`/`workspaceId`
 5. **`applyTag` 大幅简化**：旧 9 步 → 新 3 步
    - 旧：创建 TagTuple → 设 children → 设 _ownerId → push meta → 持久化 × 2 → 解析模板 → 创建 FieldTuple → 持久化
    - 新：`loroDoc.addTag(nodeId, tagDefId)` → 解析模板 → 创建 fieldEntry 树节点
+6. **Reference 操作重设计**：创建独立 `type='reference'` 树节点（见 §2.11）
+7. **配置操作重设计**：`setConfigValue` 直接设节点属性，不再操作 Tuple children
 
 ### 3.3 `toNodexNode()` 转换函数
 
@@ -679,6 +900,7 @@ export function toNodexNode(nodexId: string): NodexNode | null {
     searchContext: data.get("searchContext"),
     aiSummary: data.get("aiSummary"),
     sourceUrl: data.get("sourceUrl"),
+    targetId: data.get("targetId"),
   };
 }
 ```
@@ -844,7 +1066,7 @@ npm install loro-crdt
 1. 验证 WASM 在 Vite + WXT 中加载正常
 2. 创建 LoroDoc + LoroTree，基本 CRUD 操作
 3. 测量 Side Panel 冷启动时间（WASM 初始化耗时）
-4. 验证 CSP `wasm-unsafe-eval` 配置（如需）
+4. 验证 CSP 配置：Chrome MV3 需要在 `wxt.config.ts` 的 manifest 中声明 `content_security_policy.extension_pages: "script-src 'self' 'wasm-unsafe-eval'"`（或确认 Vite WASM 插件是否自动处理）
 
 **验证通过才继续**。如果 WASM 有问题，先在 standalone（http://localhost）上开发，Extension 适配最后做。
 
@@ -876,6 +1098,8 @@ npm install loro-crdt
 - tags LoroList 操作
 - fieldEntry 创建（验证 fieldDefId 在 data 上，children 只有值节点）
 - Trash 操作（move to trash + 记录 _trashedFrom）
+- Reference 节点（创建 type='reference' + targetId，验证 toNodexNode 正确转换）
+- LoroList 复合属性（Done-State Mapping 条目的 push/remove/read）
 - 导出 → 导入 → 状态一致
 - ID 映射恢复
 
@@ -897,11 +1121,22 @@ npm install loro-crdt
 - `applyTag`：简化为 `loroDoc.addTag()` + 模板字段创建
 - `removeTag`：简化为 `loroDoc.removeTag()` + 清理 fieldEntry
 - `createTagDef` / `createFieldDef`：直接属性化配置
-- `setFieldValue`：更新 fieldEntry children
+- `setFieldValue` / `setOptionsFieldValue` / `selectFieldOption` / `clearFieldValue`
+- `addFieldToNode` / `addUnnamedFieldToNode` / `moveFieldEntry` / `removeField`
+- `renameFieldDef` / `changeFieldType` / `addFieldOption` / `removeFieldOption` / `autoCollectOption`
+- `toggleCheckboxField` / `toggleNodeDone` / `cycleNodeCheckbox`
+- `replaceFieldDef`
 
 #### 3d. 内容编辑
 - `setNodeName(id, name)` → `loroDoc.setNodeData(id, "name", name)`
 - `updateNodeContent(id, data)` → `loroDoc.setNodeDataBatch(id, data)`
+- `updateNodeDescription(id, desc)` → `loroDoc.setNodeData(id, "description", desc)`
+
+#### 3e. Reference + 配置操作
+- `addReference` / `removeReference` — 创建/删除 type='reference' 树节点（见 §2.11）
+- `startRefConversion` / `revertRefConversion` — 适配 reference 节点模型
+- `setConfigValue` — 重设计为直接属性设置（不再操作 Tuple children）
+- `addDoneMappingEntry` / `removeDoneMappingEntry` — 操作 LoroList（见 §2.8）
 
 ### Step 4: 种子数据重写
 
@@ -944,6 +1179,20 @@ export function seedTestData() {
   // 字段值作为 fieldEntry 的 tree children
   doc.createNode('val_in_progress', 'fe_status');
   doc.setNodeDataBatch('val_in_progress', { name: 'In Progress', createdAt: Date.now() });
+
+  // Reference 节点（@-引用）— 独立树节点，不是把 nodeId 塞进多个 parent
+  doc.createNode('ref_1', 'proj_1');
+  doc.setNodeDataBatch('ref_1', {
+    type: 'reference',
+    targetId: 'some_other_node',  // 指向被引用的节点
+    createdAt: Date.now(),
+  });
+
+  // Done-State Mapping — LoroList 存储
+  doc.pushToNodeList('tag_task', 'doneCheckedMappings',
+    { fieldDefId: 'field_status', optionId: 'opt_done' });
+  doc.pushToNodeList('tag_task', 'doneUncheckedMappings',
+    { fieldDefId: 'field_status', optionId: 'opt_todo' });
 }
 ```
 
@@ -953,12 +1202,69 @@ export function seedTestData() {
 
 1. `use-node.ts` / `use-children.ts` — 去 useEffect，加 `_version`
 2. `use-node-tags.ts` — 读 `node.tags` 替代 meta Tuple 查找
-3. `use-node-checkbox.ts` — 读 TagDef.showCheckbox
-4. `use-node-fields.ts` / `use-has-fields.ts` — fieldEntry 新模型
+3. `use-node-checkbox.ts` — 读 TagDef.showCheckbox 直接属性
+4. `use-node-fields.ts` / `use-has-fields.ts` — **重点改造**（见下方详解）
 5. `tree-utils.ts` — 适配 `getNode()` + 新属性名
-6. `field-utils.ts` — 适配 fieldEntry 新模型
-7. `checkbox-utils.ts` — 大幅简化
+6. `field-utils.ts` — 适配 fieldEntry 新模型 + 配置元数据驱动
+7. `checkbox-utils.ts` — 大幅简化（270+ 行 → ~80 行，见 §2.8 Done-State Mapping）
 8. 删除 `meta-utils.ts` 的所有引用
+
+**`use-node-fields.ts` 配置页改造详解**：
+
+当前 `computeFields()` 遍历 `node.children` 查找 Tuple 节点来构建字段列表（175 行，含 visibleWhen 条件、virtual entries、排序逻辑）。配置直接化后需要分两条路径：
+
+```typescript
+function computeFields(store: NodeStore, nodeId: string): FieldEntry[] {
+  const node = store.getNode(nodeId);
+  if (!node) return [];
+
+  // ─── 路径 A: 普通内容节点 — 遍历 tree children 找 fieldEntry ───
+  // 这条路径和旧逻辑类似，但更简单（fieldEntry 节点有 fieldDefId 属性）
+  const fields: FieldEntry[] = [];
+  for (const childId of node.children) {
+    const child = store.getNode(childId);
+    if (child?.type !== 'fieldEntry') continue;
+    const fieldDef = store.getNode(child.fieldDefId);
+    // ... 构建 FieldEntry（dataType、值、hiddenMode 等从 fieldDef 直接属性读取）
+  }
+
+  // ─── 路径 B: TagDef/FieldDef 配置页 — 元数据驱动 ───
+  // 不再遍历 Tuple children，改为从 CONFIG_FIELDS 元数据列表生成
+  if (node.type === 'tagDef') {
+    for (const def of TAGDEF_CONFIG_FIELDS) {
+      // visibleWhen 条件检查（直接读节点属性）
+      if (def.visibleWhen) {
+        const val = node[def.visibleWhen.dependsOn];
+        if (val !== def.visibleWhen.value) continue;
+      }
+      fields.push({
+        fieldDefId: def.key,
+        name: def.name,
+        value: node[def.dataKey],  // 从 tagDef 直接属性读取
+        control: def.control,       // toggle | picker | done_map_entries | outliner
+        ...
+      });
+    }
+  }
+
+  if (node.type === 'fieldDef') {
+    for (const def of FIELDDEF_CONFIG_FIELDS) {
+      // appliesTo 条件：某些配置只对特定 fieldType 有效
+      if (def.appliesTo !== '*' && !def.appliesTo.includes(node.fieldType)) continue;
+      // ... 类似逻辑
+    }
+  }
+
+  return fields;
+}
+```
+
+**关键简化**：
+- 删除 Tuple 查找逻辑（`child.props._docType !== 'tuple'` 判断）
+- 删除 `children[0]` 作为 key 的解析
+- `visibleWhen` 直接读节点属性，不再需要 `resolveConfigValue()` Tuple 遍历
+- `resolveDataType()` 直接读 `fieldDef.fieldType`，不再需要 Tuple 链查找
+- `SYSTEM_FIELD_MAP` 虚拟字段（NDX_SYS_*）保持不变（它们是只读计算字段）
 
 ### Step 6: 组件层全局替换
 
@@ -980,11 +1286,16 @@ export function seedTestData() {
    - 缩进/反缩进
    - 标签应用/移除
    - 字段值设置
+   - Reference 创建/删除（@-引用）
+   - TagDef/FieldDef 配置页渲染（所有配置字段可见）
+   - Done-State Mapping 开关 + 条目增删
+   - Checkbox toggle + Done-State 联动
    - 刷新后数据恢复（IndexedDB）
 3. **清理**：
    - 删除未使用的 import
    - 确认无 `props.` 残留
    - 确认无 `_docType` / `_ownerId` / `meta` 残留
+   - 确认无 `tupleId` 残留（统一为 `fieldEntryId`）
 
 ## 7. 性能考量
 
@@ -1035,8 +1346,12 @@ Phase 1 完成的定义：
 - [ ] 无 `props.` 访问残留（全部扁平化）
 - [ ] 无 `meta` / `_ownerId` / `workspaceId` / `version` 残留
 - [ ] 无 `DocType` / `_docType` / `'tuple'` / `'attrDef'` 残留
+- [ ] 无 `tupleId` 残留（统一为 `fieldEntryId`）
 - [ ] 标签应用不再创建 meta Tuple 节点
 - [ ] Trash 操作通过 `tree.move()` 实现
+- [ ] Reference 通过独立 `type='reference'` 树节点实现（非 children 数组复用）
+- [ ] TagDef/FieldDef 配置页正确渲染所有配置字段（直接属性驱动）
+- [ ] Done-State Mapping 通过 LoroList 存储（非 Tuple 嵌套）
 
 ## 10. Phase 2 预留
 

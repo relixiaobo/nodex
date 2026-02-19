@@ -1,5 +1,6 @@
 import { defineConfig } from 'wxt';
 import tailwindcss from '@tailwindcss/vite';
+import wasm from 'vite-plugin-wasm';
 
 export default defineConfig({
   srcDir: 'src',
@@ -23,6 +24,6 @@ export default defineConfig({
     },
   },
   vite: () => ({
-    plugins: [tailwindcss()],
+    plugins: [wasm(), tailwindcss()],
   }),
 });

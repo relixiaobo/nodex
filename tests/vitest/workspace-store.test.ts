@@ -31,16 +31,13 @@ describe('workspace-store auth and persistence', () => {
       isAuthenticated: true,
     });
 
+    // Only currentWorkspaceId is persisted (auth state derived from Supabase session)
     const persisted = localStorage.getItem('nodex-workspace');
     expect(persisted).not.toBeNull();
-    expect(JSON.parse(persisted as string)).toMatchObject({
-      state: {
-        currentWorkspaceId: 'ws_1',
-        userId: 'user_1',
-        isAuthenticated: true,
-      },
-      version: 0,
-    });
+    const parsed = JSON.parse(persisted as string);
+    expect(parsed.state.currentWorkspaceId).toBe('ws_1');
+    expect(parsed.state.userId).toBeUndefined();
+    expect(parsed.state.isAuthenticated).toBeUndefined();
 
     useWorkspaceStore.getState().logout();
     expect(useWorkspaceStore.getState()).toMatchObject({
@@ -51,7 +48,7 @@ describe('workspace-store auth and persistence', () => {
     });
   });
 
-  it('authUser is not persisted to storage', () => {
+  it('only currentWorkspaceId is persisted — auth state is not', () => {
     useWorkspaceStore.setState({
       currentWorkspaceId: 'ws_1',
       userId: 'user_1',
@@ -62,7 +59,10 @@ describe('workspace-store auth and persistence', () => {
     const persisted = localStorage.getItem('nodex-workspace');
     expect(persisted).not.toBeNull();
     const parsed = JSON.parse(persisted as string);
-    // authUser should NOT appear in persisted state
+    // Only workspace preference is persisted; auth state comes from Supabase session
+    expect(parsed.state.currentWorkspaceId).toBe('ws_1');
+    expect(parsed.state.userId).toBeUndefined();
+    expect(parsed.state.isAuthenticated).toBeUndefined();
     expect(parsed.state.authUser).toBeUndefined();
   });
 

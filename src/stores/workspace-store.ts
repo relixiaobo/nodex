@@ -53,6 +53,8 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
       signInWithGoogle: async () => {
         const { signInWithGoogle: authSignIn } = await import('../lib/auth.js');
         const user = await authSignIn();
+        // TODO: currentWorkspaceId = user.id assumes single workspace per user.
+        // When multi-workspace is needed, derive from a workspace list instead.
         set({
           userId: user.id,
           currentWorkspaceId: user.id,
@@ -109,11 +111,11 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
     {
       name: 'nodex-workspace',
       storage: chromeLocalStorage,
-      // Don't persist authUser — always re-hydrated from Supabase session
+      // Only persist UI preference. Auth state (userId, isAuthenticated, authUser)
+      // is the sole responsibility of Supabase session — derived via initAuth()
+      // on each startup. This avoids desync when Supabase refresh token expires.
       partialize: (s) => ({
         currentWorkspaceId: s.currentWorkspaceId,
-        userId: s.userId,
-        isAuthenticated: s.isAuthenticated,
       }),
     },
   ),

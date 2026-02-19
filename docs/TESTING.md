@@ -218,82 +218,83 @@ npm run test:run
 
 **测试文件**: `tests/vitest/node-store-tags-refs.test.ts`
 
-**覆盖点**:
+**覆盖点（Loro 模型）**:
 
-1. applyTag/removeTag（模板字段实例化与清理）
-2. add/remove reference 去重与删除
-3. reference ↔ inline conversion 临时节点替换链路（临时节点内容为 `\uFFFC + _inlineRefs`）
-4. **数据模型变更**: applyTag 写入 node.meta（直接存储 tag tuple ID）
+1. `applyTag(nodeId, tagDefId)` — 向 node.tags 写入 tagDefId，为 tagDef 所有 fieldDef 创建 fieldEntry 子节点
+2. `removeTag(nodeId, tagDefId)` — 从 node.tags 移除，删除模板来源的 fieldEntry 子节点
+3. applyTag 幂等（重复调用不产生重复 tag 或重复 fieldEntry）
+4. removeTag 仅清理模板来源字段，手动添加字段保留
+5. `addReference(parentId, targetId)` 非幂等 — 每次创建新的 reference 节点
+6. `removeReference(refNodeId)` 删除 reference 节点
+7. `startRefConversion(refId, parentId, idx)` 替换 ref 节点为 inline content 节点
 
 ### 1.8 字段状态流（Node Store）
 
 **测试文件**: `tests/vitest/node-store-fields.test.ts`
 
-**覆盖点**:
+**覆盖点（Loro 模型）**:
 
-1. `setFieldValue` 对已有字段值节点的创建/复用/更新
-2. 缺失字段时自动创建 tuple + value（值直接存 Tuple.children）
-3. `addFieldToNode` 去重与 `setOptionsFieldValue` 单选写入
-4. `removeField` 将 tuple 移入 Trash
-5. `removeField` 系统配置保护：tuple key 为 SYS_*/NDX_* 前缀时跳过删除（防误删 config field）
-6. `toggleCheckboxField` 的 `YES/NO` 切换链路
-7. `addUnnamedFieldToNode` 的原地插入（`afterChildId`）与 attrDef 初始化
-8. `autoCollectOption` 的值回填与 autocollect tuple 引用追加
-9. `removeFieldOption` 从 attrDef children 移除并删除 option 节点
-10. `replaceFieldAttrDef` 的占位 attrDef 置换与重复字段保护
-11. `changeFieldType` / `setConfigValue` 配置 tuple 原地更新
-12. `moveFieldTuple` 跨父节点迁移 tuple 时同步 `_ownerId`
+1. `setFieldValue(nodeId, fieldDefId, values[])` — 清空旧值，创建新 value 节点（children of fieldEntry）
+2. `clearFieldValue(nodeId, fieldDefId)` — 删除 fieldEntry 的所有 value 子节点
+3. `setOptionsFieldValue(nodeId, fieldDefId, optionId)` — value 节点含 `name` + `targetId`
+4. `addFieldToNode(nodeId, fieldDefId)` — 幂等（已存在则返回已有 feId）
+5. `removeField(nodeId, feId)` — 直接删除 fieldEntry 节点（Loro 不移入 Trash）
+6. `toggleCheckboxField(feId)` — 无子节点时创建 `name:'true'` 节点；有子节点则删除全部
+7. `addUnnamedFieldToNode(nodeId)` — 返回 `{ fieldEntryId, fieldDefId }`，占位 fieldDef 创建在 SCHEMA
+8. `replaceFieldDef(nodeId, feId, oldFdId, newFdId)` — 直接写入 fieldDefId（无所有权校验）
 
 ### 1.9 Schema / Supertag 构建链路
 
 **测试文件**: `tests/vitest/node-store-schema.test.ts`
 
-**覆盖点**:
+**覆盖点（Loro 模型）**:
 
-1. `createTagDef` 自动归属 SCHEMA + 自动应用 `SYS_T01`（7 个 config tuple：checkbox/childtag/color/extends/done_mapping/checked/unchecked）
-2. **统一配置字段架构验证**: 所有 config tuple 值直接存 Tuple.children（与用户字段同结构）
-3. Config tuple key 为真实 attrDef 实体节点（`attrDef_show_checkbox` 等），非裸 SYS_A* ID
-4. `createAttrDef` 的 template tuple/type tuple/`SYS_T02` 配置链路
-5. 新建 `attrDef` 在后续 `applyTag` 中被正确实例化到内容节点
+1. `createTagDef(name, opts?)` — 创建 type='tagDef' 节点归属 CONTAINER_IDS.SCHEMA，无 SYS_T01 meta / config tuples
+2. 可选参数 `showCheckbox` / `color` 直接写入节点属性（平铺，无 Tuple 间接层）
+3. `createFieldDef(name, fieldType, tagDefId)` — 创建 type='fieldDef' 节点归属 tagDefId
+4. `createAttrDef(name, tagDefId, fieldType)` — createFieldDef 别名（参数顺序不同）
+5. `changeFieldType(fieldDefId, newType)` — 直接更新 fieldType 属性
 
 ### 1.10 Supertag Extend（继承）
 
 **测试文件**: `tests/vitest/node-store-extend.test.ts`
 
-**覆盖点**:
+**覆盖点（Loro 模型）**:
 
-1. `getExtendsChain` 无继承时返回空数组
-2. `getExtendsChain` 单级继承返回父 tagDef
-3. `getExtendsChain` 多级继承按 ancestor-first 顺序
-4. `getExtendsChain` 循环引用安全（不死循环，排除自身）
-5. `applyTag` 子标签同时实例化父标签和自有字段
-6. `applyTag` 跨继承链按 attrDef ID 去重
-7. `applyTag` 直接应用父标签仍正常工作
-8. `removeTag` 清理继承链上所有模板来源的字段
-9. `removeTag` 正确移除 node.meta 中的 tag binding
+1. `getExtendsChain({}, tagDefId)` 公共 API（field-utils）：无继承 → `[]`，ancestor-first 顺序，排除自身
+2. 局部 `getExtendsChain` (node-store.ts 内部)：**包含自身**，applyTag/removeTag 用此版本
+3. `applyTag(nodeId, tagDefId)` — 为 tagDef 及全部 ancestors 的 fieldDef 创建 fieldEntry（含自身）
+4. `applyTag` 幂等 — 重复调用不产生重复 fieldEntry
+5. `applyTag` 子标签 (tagDef_dev_task extends tagDef_task) 实例化全链路 fieldDef（4+1=5 条）
+6. `removeTag` 删除继承链上所有模板来源的 fieldEntry 节点
+7. `removeTag` 保留手动添加（非模板来源）的 fieldEntry 节点
+8. `removeTag` 从 node.tags 数组移除 tagDefId
 
 ### 1.11 Guard Rails（错误输入防护）
 
 **测试文件**: `tests/vitest/node-store-guard-rails.test.ts`
 
-**覆盖点**:
+**覆盖点（Loro 模型）**:
 
-1. `setConfigValue` 对非 tuple ID 的保护（防止误写）
-2. `addFieldOption` 仅允许 `attrDef` 目标，非法目标返回空 ID
-3. `removeFieldOption` 仅删除目标 attrDef 挂载的 option，避免误删
-4. `replaceFieldAttrDef` 的 owner/oldAttrDef 一致性保护
-
-**注意**: `removeField` 的系统配置字段保护（SYS_*/NDX_* key guard）在 1.8 node-store-fields 中覆盖。
+1. `setConfigValue(nodeId, key, value)` — 直接写入节点属性（无 Tuple 间接层，无所有权校验）
+2. `addFieldOption(fieldDefId, name)` — 在 fieldDef 下创建 option 节点，返回 optionId
+3. `removeFieldOption(fieldDefId, optionId)` — 直接删除节点（无所有权校验），不存在时不报错
+4. `addUnnamedFieldToNode(nodeId)` — 返回 `{ fieldEntryId, fieldDefId }` 结构
+5. `replaceFieldDef(nodeId, feId, oldFdId, newFdId)` — 直接写入 fieldDefId（Loro 无 owner 校验）
 
 ### 1.12 Trash 语义（TagDef / AttrDef）
 
 **测试文件**: `tests/vitest/node-store-trash-semantics.test.ts`
 
-**覆盖点**:
+**覆盖点（Loro 模型）**:
 
-1. `trashNode(tagDef)` 不级联清理既有标签绑定与模板实例字段
-2. `trashNode(attrDef)` 保留已实例化字段引用，同时模板 tuple key 解绑
-3. `tagDef` 已入 Trash 后，`removeTag` 仍可清理模板来源字段
+1. `trashNode(nodeId)` — 同步移至 CONTAINER_IDS.TRASH，记录 `_trashedFrom` / `_trashedIndex`
+2. trashNode 将节点从原父节点 children 中移除
+3. 多节点可同时在 TRASH 中
+4. `trashNode(tagDefId)` 不移除其他节点 tags 数组中的 tagDefId（不级联清理）
+5. `restoreNode(nodeId)` — 恢复到 `_trashedFrom` 原父节点，原位置优先
+6. `restoreNode` 原父不存在时回退到 CONTAINER_IDS.LIBRARY
+7. `tagDef` 已入 Trash 后，`removeTag` 仍可清理模板来源的 fieldEntry 节点
 
 ### 1.13 拖拽落点语义（纯函数）
 
@@ -310,11 +311,14 @@ npm run test:run
 
 **测试文件**: `tests/vitest/node-store-move-node-to.test.ts`
 
-**覆盖点**:
+**覆盖点（Loro 模型）**:
 
-1. 防自环、防后代放置
-2. 同父移动时索引修正（remove 后 insert 位置偏移）
-3. 跨父节点移动的 children/owner 一致性
+1. `moveNodeTo(nodeId, newParentId, index?)` — 防自环、防后代放置（no-op）
+2. 同父重排：`note_2` 子节点 `[idea_1, idea_2]` 重排正确（LoroDoc movable list 语义）
+3. 跨父移动：移出旧父 children，进入新父 children，parentId 更新
+4. 末尾追加（无 index 参数）
+5. 指定索引插入
+6. `moveNodeUp` / `moveNodeDown` — 同父节点内上下移一位，边界为 no-op
 
 ### 1.15 Drag UI Store 状态机
 
@@ -454,24 +458,26 @@ npm run test:run
 
 **测试文件**: `tests/vitest/invariants-helper.test.ts`
 
-**覆盖点**:
+**覆盖点（Loro 模型）**:
 
-1. 有效最小图返回空错误列表
-2. owner 缺失 / owner-child 不一致 / child 重复 ID 报错
-3. tuple value 引用节点不触发 owner-child mismatch 误报
-4. children 引用的非 tuple 子节点缺失时报错
+1. `collectNodeGraphErrors()` 无参数版本，直接读取 LoroDoc
+2. 种子图（seeded graph）无错误
+3. 合法操作后图结构仍有效（trashNode / createChild / moveNodeTo）
+4. 孤儿节点（child 存在但父节点 children 列表未包含）可被检测
+5. 子节点重复 ID 报错
 
 ### 1.29 Field Utils 解析与映射
 
 **测试文件**: `tests/vitest/field-utils.test.ts`
 
-**覆盖点**:
+**覆盖点（Loro 模型）**:
 
-1. attrDef 配置 tuple 解析（dataType/sourceTag/hide/required/min/max）及默认值
-2. 非法 min/max 数值回退为 `undefined`
-3. options 与 autocollect 节点解析（含开关关闭场景）
-4. meta + supertag tuple 的 tagged node 解析
-5. field type label/icon/plain 判定映射
+1. `resolveDataType({}, fieldDefId)` — 读取 fieldDef.fieldType，缺失时回退 FIELD_TYPES.PLAIN
+2. `resolveFieldOptions({}, fieldDefId)` — 返回 fieldDef 子节点中 type='option' 节点
+3. `getExtendsChain({}, tagDefId)` — 读 tagDef.extends，ancestor-first，排除自身
+4. `resolveHideField({}, nodeId, fieldDefId)` — 读 fieldDef.hideField 属性
+5. `findAutoCollectTupleId` — Loro Phase 1 始终返回 null（待实现）
+6. `resolveDataType` 对 seed 中大写 fieldType 值（'OPTIONS'）的原样返回
 
 ### 1.30 Chrome Storage 适配层
 
@@ -508,33 +514,31 @@ npm run test:run
 
 **测试文件**: `tests/vitest/checkbox-utils.test.ts`
 
-**覆盖点**:
+**覆盖点（Loro 模型）**:
 
-shouldNodeShowCheckbox（7 cases）:
-1. 无标签节点 → showCheckbox=false
-2. 有标签但 SYS_A55=NO → showCheckbox=false
-3. 有标签且 SYS_A55=YES → showCheckbox=true, isDone=false
-4. 标签 SYS_A55=YES + `_done>0` → showCheckbox=true, isDone=true
-5. `_done=0`（手动 undone）→ showCheckbox=true, isDone=false
-6. `_done>0`（手动 done）→ showCheckbox=true, isDone=true
-7. 不存在的节点 → 安全回退
+`shouldNodeShowCheckbox(node: NodexNode)`:
+1. 无 tags → showCheckbox=false
+2. 有 tags，tagDef.showCheckbox=false → showCheckbox=false
+3. tagDef.showCheckbox=true, completedAt 未设 → isDone=false
+4. tagDef.showCheckbox=true, completedAt>0 → isDone=true
+5. completedAt=0（手动 undone）→ isDone=false
+6. node.completedAt>0（独立，无 tag）→ isDone=true
+7. 不存在节点 → 安全回退
 
-resolveCheckboxClick（4 cases）:
+`resolveCheckboxClick(node)`:
 8. undone→done（manual）: 返回 timestamp
-9. done→undone=0（manual）: 保留 checkbox
+9. done→undone（manual）: completedAt=0
 10. undone→done（tag-driven）: 返回 timestamp
-11. done→undefined（tag-driven）: tag 保持 checkbox
+11. done→undone（tag-driven）: completedAt=undefined
 
-resolveCmdEnterCycle（5 cases）:
+`resolveCmdEnterCycle(node)`:
 12. manual: No→Undone(0)
 13. manual: Undone→Done(timestamp)
 14. manual: Done→No(undefined)
-15. tag-driven: undone→done
-16. tag-driven: done→undone(undefined)
 
-Store integration（2 cases）:
-17. `toggleNodeDone` click toggle undone↔done
-18. `cycleNodeCheckbox` 3-state cycle for manual nodes
+Store integration:
+15. `toggleNodeDone` — undone↔done 切换
+16. `cycleNodeCheckbox` — 3-state cycle（manual nodes）
 
 ### 1.34 Editor isEmpty / handleDelete 零宽空格 + Hash Cleanup Safety
 
@@ -622,24 +626,22 @@ hash trigger cleanup safety（2 cases, Bug #53 回归）:
 8. `removeMetaTupleId` 移除存在的 ID
 9. `removeMetaTupleId` 对不存在的 ID 返回原数组
 
-### 1.48 Tana 导入 — meta 填充与 DocType 安全
+### 1.48 Tana 导入 — Phase 1 Stub 契约
 
 **测试文件**: `tests/vitest/tana-import.test.ts`
 
-**覆盖点**:
+**覆盖点（Loro Phase 1 — stub 合约）**:
 
-meta[] population（3 cases）:
-1. `_metaNodeId` → metanode.children 正确填充到 node.meta
-2. 无 `_metaNodeId` 的节点 meta 保持 undefined
-3. `_metaNodeId` 指向缺失 metanode 时不崩溃
+importTanaExport（4 cases）:
+1. `importedNodes: 0`（stub 不导入任何节点）
+2. `skippedNodes === totalDocs`（所有文档被跳过）
+3. `errors: []`（无错误）
+4. `workspaceId` 等于 `currentWorkspaceId()`
 
-DocType sanitization（3 cases）:
-4. `metanode` docType 被过滤为 undefined
-5. `associatedData` docType 被过滤为 undefined
-6. 有效 docType（tuple/tagDef）保留
-
-validateTanaExport（1 case）:
-7. 检测 children/owner/metaNode/associationMap 引用缺失
+validateTanaExport（3 cases）:
+5. 返回 `{ totalDocs, missingChildRefs: [], missingOwnerRefs: [], missingMetaNodeRefs: [], missingAssociationRefs: [] }`
+6. 任意输入均返回空引用缺失数组
+7. `docTypeDistribution` 为空 Map
 
 ### 1.43 Floating Toolbar 循环渲染防回归
 
@@ -654,76 +656,38 @@ validateTanaExport（1 case）:
 5. 双击选词路径在第二次点击 `mouseup` 后即可显示（不需要额外点击）
 6. 失焦（blur）立即隐藏
 
-### 1.38 Done State Mapping（checkbox ↔ Options 联动，统一字段模型）
+### 1.38 Done State Mapping（checkbox ↔ Options 联动，Loro 模型）
 
 **测试文件**: `tests/vitest/done-state-mapping.test.ts`
 
-**说明**: DoneMappingEntries 从 Tuple.children 读取映射数据（统一配置字段架构）。DoneMappingEntries selectors 使用 JSON.stringify 防止 React 19 无限循环。
+**说明（Loro 模型）**: DoneMappingEntries 存储在 LoroDoc 的 done mappings 容器中（非 Tuple.children）。前置条件：`loroDoc.setNodeData(tagDefId, 'doneStateEnabled', true)`。
 
 **覆盖点**:
 
-纯函数 — getDoneStateMappings（8 cases）:
-1. 无标签 → 空
-2. 有标签但无映射配置 → 空
-3. 新格式 (toggle+嵌套 NDX_A07/A08) → 返回映射 (checked only)
-4. 含 uncheckedOptionIds 配置
-5. 多个 checked option IDs
-6. 多个 unchecked option IDs
-7. Toggle OFF → 空
-8. 沿 Extend 链继承
-9. 不存在节点 → 空
+纯函数 — getDoneStateMappings（4 cases）:
+1. 无标签 → 空（[]）
+2. 有标签，tagDef.doneStateEnabled=false → 空
+3. 有标签，doneStateEnabled=true，有 mapping → 返回 `{ tagDefId, fieldDefId, checkedOptionIds, uncheckedOptionIds }`
+4. 沿 Extend 链继承（父 tagDef 的 mapping 对子标签节点可见）
 
-纯函数 — 旧格式向后兼容（3 cases）:
-10. 旧格式 (NDX_A06 children>=3) 正常解析
-11. 旧格式含 uncheckedOptionId
-12. 旧格式 Extend 链继承
+纯函数 — resolveForwardDoneMapping（3 cases）:
+5. isDone=true → 第一个 checkedOptionId
+6. isDone=false + uncheckedOptionIds → 第一个 uncheckedOptionId
+7. 无映射 → 空
 
-嵌套结构验证（3 cases）:
-35. 嵌套 NDX_A07/A08 在 NDX_A06 toggle 子节点中正确读取
-36. toggle OFF 时嵌套子节点存在但不返回映射
-37. 嵌套结构 Extend 链继承
-
-纯函数 — resolveForwardDoneMapping（5 cases）:
-13. isDone=true → 第一个 checkedOptionId
-14. isDone=true + 多 checked → 仍取第一个
-15. isDone=false + unchecked → 第一个 uncheckedOptionId
-16. isDone=false 无 unchecked → 空
-17. 无映射 → 空
-
-纯函数 — resolveReverseDoneMapping（7 cases）:
-18. checkedOption → newDone=true
-19. 多 checked 中任一匹配 → newDone=true
-20. uncheckedOption → newDone=false
-21. 多 unchecked 中任一匹配 → newDone=false
-22. 无关 option → null
-23. attrDefId 不匹配 → null
-24. 无 unchecked + non-checked option → null
-
-Store 集成 — setOptionsFieldValue（3 cases）:
-25. `setOptionsFieldValue`（opt_done）→ checkbox 自动勾选
-26. `setOptionsFieldValue`（opt_todo）→ checkbox 自动取消
-27. `setOptionsFieldValue`（opt_in_progress）→ checkbox 不变
-
-Store 集成 — selectFieldOption / UI 路径（4 cases）:
-28. `selectFieldOption` via assocDataId（opt_done）→ checkbox 自动勾选
-29. `selectFieldOption` via assocDataId（opt_todo）→ checkbox 自动取消
-30. `selectFieldOption` via assocDataId（opt_in_progress）→ checkbox 不变
-31. `selectFieldOption` old→new option swap（children 替换正确）
-
-Store 集成 — forward mapping（2 cases）:
-32. `toggleNodeDone`（undone→done）→ Status 设为 opt_done
-33. `toggleNodeDone`（done→undone）→ Status 设为 opt_todo
-
-Store 集成 — 安全性（1 case）:
-34. 原子 set() 无循环：forward + reverse 独立操作
+纯函数 — resolveReverseDoneMapping（4 cases）:
+8. 选中 checkedOption → newDone=true
+9. 选中 uncheckedOption → newDone=false
+10. 无关 option → null
+11. fieldDefId 不匹配 → null
 
 Store 集成 — addDoneMappingEntry（2 cases）:
-38. 创建 mapping entry tuple，追加到 toggle children
-39. 新条目被 getDoneStateMappings 正确读取
+12. `store.addDoneMappingEntry(tagDefId, true, fieldDefId, optionId)` — 写入 loroDoc
+13. 新条目被 getDoneStateMappings 正确读取
 
 Store 集成 — removeDoneMappingEntry（2 cases）:
-40. 从 toggle children 中移除并删除 entity
-41. 移除后 getDoneStateMappings 结果为空
+14. `store.removeDoneMappingEntry(tagDefId, true, fieldDefId, optionId)` — 从 loroDoc 移除
+15. 移除后 getDoneStateMappings 结果为空
 
 ### 1.39 Web Clip 落库服务
 
@@ -731,55 +695,56 @@ Store 集成 — removeDoneMappingEntry（2 cases）:
 
 **覆盖点**:
 
-findTagDefByName（4 cases）:
-1. 按名称查找已有 tagDef（大小写不敏感）
+findTagDefByName（4 cases，Loro 模型）:
+1. 按名称查找已有 tagDef（大小写不敏感，读取 CONTAINER_IDS.SCHEMA 子节点）
 2. 不同大小写匹配
 3. 不存在的 tagDef 返回 undefined
-4. 不存在的 schema 返回 undefined
+4. 忽略 _schemaId 参数 — 始终读取 CONTAINER_IDS.SCHEMA（旧 ws_missing_SCHEMA 等价于存在）
 
-findTemplateAttrDef（3 cases）:
-5. 在 tagDef 模板中查找 attrDef
-6. 不存在的字段名返回 undefined
-7. 不存在的 tagDef 返回 undefined
+findTemplateAttrDef（4 cases）:
+5. 在 tagDef 的 fieldDef 子节点中按名查找（大小写不敏感）
+6. 不同大小写匹配
+7. 不存在的字段名返回 undefined
+8. 不存在的 tagDef 返回 undefined
 
-saveWebClip（8 cases）:
-8. 在 Inbox 创建节点（默认 parentId，title + ownerId 正确）
-9. 在自定义 parentId 下创建节点（非 Inbox）
-10. 自动打 `#web_clip` 标签（复用已有 tagDef）
-11. 写入 Source URL 字段值
-12. 设置 description（如有）
-13. description 为空时不写入
-14. 首次剪藏时自动创建 tagDef
-15. 重复剪藏复用同一 tagDef
+saveWebClip（8 cases，Loro 模型）:
+9. 在 CONTAINER_IDS.INBOX 创建节点（默认 parentId），验证 `loroDoc.getParentId(clipId)`
+10. 在自定义 parentId 下创建节点（非 INBOX）
+11. 自动打 `#web_clip` 标签（`node.tags.includes('tagDef_web_clip')`）
+12. 写入 Source URL 字段值（fieldEntry 子节点 → value 子节点）
+13. 设置 description（如有）
+14. description 为空时不写入
+15. 首次剪藏时自动创建 tagDef（移走 tagDef_web_clip 后验证）
+16. 重复剪藏复用同一 tagDef（SCHEMA 中 web_clip tagDef 只有 1 个）
 
 applyWebClipToNode（5 cases）:
-16. 就地改名为页面标题
-17. 就地打 `#web_clip` 标签
-18. 就地写入 Source URL 字段值
-19. 就地设置 description
-20. 不改变节点 ownership（留在原父节点）
+17. 就地改名为页面标题
+18. 就地打 `#web_clip` 标签
+19. 就地写入 Source URL 字段值
+20. 就地设置 description
+21. 不改变节点 parentId（留在原父节点）
 
-### 1.42 Default Child Supertag (SYS_A14)
+### 1.42 Default Child Supertag（Loro 模型）
 
 **测试文件**: `tests/vitest/child-supertag.test.ts`
 
-**覆盖点**:
+**覆盖点（Loro 模型）**:
 
-resolveChildSupertags 纯函数（4 cases）:
+resolveChildSupertags({}, parentId) 纯函数（4 cases）:
 1. 无标签父节点 → 空
-2. 有标签但无 SYS_A14 → 空
-3. SYS_A14 已配置 → 返回 child tag ID
+2. 有标签但 tagDef.childSupertag 未设 → 空
+3. `store.setConfigValue(tagDefId, 'childSupertag', childTagDefId)` 后 → 返回 childTagDefId
 4. 不存在的父节点 → 空
 
 createChild 自动标签（4 cases）:
-5. 父有 SYS_A14 → 新子节点自动标签
-6. 父无 SYS_A14 → 无自动标签
+5. 父有 childSupertag → 新子节点 node.tags 含 child tagDefId
+6. 父无 childSupertag → 无自动标签
 7. 父无标签 → 无自动标签
-8. 多标签各有 SYS_A14 → 全部应用
+8. 多标签各有 childSupertag → 全部应用（多个 tagDefId 写入 node.tags）
 
 createSibling 自动标签（2 cases）:
-9. 兄弟父有 SYS_A14 → 新兄弟自动标签
-10. 兄弟父无 SYS_A14 → 无自动标签
+9. 兄弟父有 childSupertag → 新兄弟 node.tags 含 child tagDefId
+10. 兄弟父无 childSupertag → 无自动标签
 
 ### 1.39 Selection Mode 键盘决策纯函数
 

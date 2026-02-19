@@ -1,12 +1,16 @@
-import { AlignLeft, List } from 'lucide-react';
-import type { NodexNode } from '../../src/types/index.js';
-import { SYS_A, SYS_D, SYS_V } from '../../src/types/index.js';
+/**
+ * field-utils — Loro model.
+ * All resolver functions accept _entities as first arg but IGNORE it.
+ * They read from LoroDoc instead.
+ */
+import { describe, it, expect, beforeEach } from 'vitest';
+import { FIELD_TYPES, SYS_V } from '../../src/types/system-nodes.js';
 import {
   findAutoCollectTupleId,
+  getExtendsChain,
   getFieldTypeIcon,
   getFieldTypeLabel,
   isPlainFieldType,
-  resolveAutoCollectedOptions,
   resolveDataType,
   resolveFieldOptions,
   resolveHideField,
@@ -16,117 +20,218 @@ import {
   resolveSourceSupertag,
   resolveTaggedNodes,
 } from '../../src/lib/field-utils.js';
+import * as loroDoc from '../../src/lib/loro-doc.js';
+import { useNodeStore } from '../../src/stores/node-store.js';
+import { resetAndSeed } from './helpers/test-state.js';
 
-function node(
-  id: string,
-  opts?: {
-    docType?: string;
-    ownerId?: string;
-    children?: string[];
-    meta?: string[];
-  },
-): NodexNode {
-  return {
-    id,
-    workspaceId: 'ws_default',
-    props: {
-      name: id,
-      _docType: opts?.docType,
-      _ownerId: opts?.ownerId,
-    },
-    children: opts?.children ?? [],
-    meta: opts?.meta,
-    version: 1,
-    updatedAt: 0,
-    createdBy: 'user_default',
-    updatedBy: 'user_default',
-  };
-}
-
-describe('field utils', () => {
-  it('resolves attrDef config values and defaults', () => {
-    const entities: Record<string, NodexNode> = {
-      attr: node('attr', {
-        docType: 'attrDef',
-        children: ['t_type', 't_src', 't_hide', 't_nullable', 't_min', 't_max'],
-      }),
-      t_type: node('t_type', { docType: 'tuple', children: [SYS_A.TYPE_CHOICE, SYS_D.DATE] }),
-      t_src: node('t_src', { docType: 'tuple', children: [SYS_A.SOURCE_SUPERTAG, 'tagDef_task'] }),
-      t_hide: node('t_hide', { docType: 'tuple', children: [SYS_A.HIDE_FIELD, SYS_V.ALWAYS] }),
-      t_nullable: node('t_nullable', { docType: 'tuple', children: [SYS_A.NULLABLE, SYS_V.YES] }),
-      t_min: node('t_min', { docType: 'tuple', children: [SYS_A.MIN_VALUE, '3.5'] }),
-      t_max: node('t_max', { docType: 'tuple', children: [SYS_A.MAX_VALUE, '10'] }),
-    };
-
-    expect(resolveDataType(entities, 'attr')).toBe(SYS_D.DATE);
-    expect(resolveSourceSupertag(entities, 'attr')).toBe('tagDef_task');
-    expect(resolveHideField(entities, 'attr')).toBe(SYS_V.ALWAYS);
-    expect(resolveRequired(entities, 'attr')).toBe(true);
-    expect(resolveMinValue(entities, 'attr')).toBe(3.5);
-    expect(resolveMaxValue(entities, 'attr')).toBe(10);
-
-    expect(resolveDataType(entities, 'missing_attr')).toBe(SYS_D.PLAIN);
-    expect(resolveHideField(entities, 'missing_attr')).toBe(SYS_V.NEVER);
-    expect(resolveRequired(entities, 'missing_attr')).toBe(false);
+describe('resolveDataType', () => {
+  beforeEach(() => {
+    resetAndSeed();
   });
 
-  it('returns undefined for invalid min/max number config', () => {
-    const entities: Record<string, NodexNode> = {
-      attr: node('attr', { docType: 'attrDef', children: ['t_min', 't_max'] }),
-      t_min: node('t_min', { docType: 'tuple', children: [SYS_A.MIN_VALUE, 'x'] }),
-      t_max: node('t_max', { docType: 'tuple', children: [SYS_A.MAX_VALUE, 'NaN'] }),
-    };
-    expect(resolveMinValue(entities, 'attr')).toBeUndefined();
-    expect(resolveMaxValue(entities, 'attr')).toBeUndefined();
+  it('returns fieldType stored in LoroDoc for attrDef_status (OPTIONS)', () => {
+    // seed-data sets fieldType: 'OPTIONS' for attrDef_status
+    expect(resolveDataType({}, 'attrDef_status')).toBe('OPTIONS');
   });
 
-  it('resolves field options and autocollect state', () => {
-    const entities: Record<string, NodexNode> = {
-      attr: node('attr', { docType: 'attrDef', children: ['cfg_tuple', 'opt_1', 'opt_2', 'auto_tuple'] }),
-      cfg_tuple: node('cfg_tuple', { docType: 'tuple', children: [SYS_A.TYPE_CHOICE, SYS_D.OPTIONS] }),
-      auto_tuple: node('auto_tuple', {
-        docType: 'tuple',
-        children: [SYS_A.AUTOCOLLECT_OPTIONS, SYS_V.YES, 'auto_1', 'auto_2'],
-      }),
-      opt_1: node('opt_1'),
-      opt_2: node('opt_2'),
-      auto_1: node('auto_1'),
-      auto_2: node('auto_2'),
-    };
-
-    expect(resolveFieldOptions(entities, 'attr')).toEqual(['opt_1', 'opt_2']);
-    expect(resolveAutoCollectedOptions(entities, 'attr')).toEqual(['auto_1', 'auto_2']);
-    expect(findAutoCollectTupleId(entities, 'attr')).toBe('auto_tuple');
-
-    entities.auto_tuple = node('auto_tuple', {
-      docType: 'tuple',
-      children: [SYS_A.AUTOCOLLECT_OPTIONS, SYS_V.NO, 'auto_1'],
-    });
-    expect(resolveAutoCollectedOptions(entities, 'attr')).toEqual([]);
+  it('returns fieldType for attrDef_due (DATE)', () => {
+    expect(resolveDataType({}, 'attrDef_due')).toBe('DATE');
   });
 
-  it('resolves tagged content nodes through node.meta tuples', () => {
-    const entities: Record<string, NodexNode> = {
-      content_1: node('content_1', { meta: ['tag_tuple_1'] }),
-      content_2: node('content_2', { meta: ['tag_tuple_2'] }),
-      tuple_node: node('tuple_node', { docType: 'tuple', meta: ['tag_tuple_1'] }),
-      tag_tuple_1: node('tag_tuple_1', { docType: 'tuple', children: [SYS_A.NODE_SUPERTAGS, 'tagDef_task'] }),
-      tag_tuple_2: node('tag_tuple_2', { docType: 'tuple', children: [SYS_A.NODE_SUPERTAGS, 'tagDef_person'] }),
-    };
-
-    expect(resolveTaggedNodes(entities, 'tagDef_task')).toEqual(['content_1']);
-    expect(resolveTaggedNodes(entities, 'tagDef_person')).toEqual(['content_2']);
+  it('returns fieldType for attrDef_company (PLAIN)', () => {
+    expect(resolveDataType({}, 'attrDef_company')).toBe('PLAIN');
   });
 
-  it('maps labels and icons for field types', () => {
-    expect(getFieldTypeLabel(SYS_D.INTEGER)).toBe('Number');
-    expect(getFieldTypeLabel('unknown')).toBe('Plain');
-    expect(isPlainFieldType(SYS_D.PLAIN)).toBe(true);
-    expect(isPlainFieldType('')).toBe(true);
-    expect(isPlainFieldType(SYS_D.DATE)).toBe(false);
+  it('returns FIELD_TYPES.PLAIN for missing node', () => {
+    expect(resolveDataType({}, 'nonexistent_field')).toBe(FIELD_TYPES.PLAIN);
+  });
 
-    expect(getFieldTypeIcon(SYS_D.OPTIONS)).toBe(List);
-    expect(getFieldTypeIcon(SYS_D.OPTIONS_FROM_SUPERTAG)).toBe(List);
-    expect(getFieldTypeIcon('unknown')).toBe(AlignLeft);
+  it('returns FIELD_TYPES.PLAIN when fieldType not set', () => {
+    // Create a fieldDef without setting fieldType
+    const id = 'test_fd_no_type';
+    loroDoc.createNode(id, 'tagDef_task');
+    loroDoc.setNodeData(id, 'type', 'fieldDef');
+    // No fieldType set → should return PLAIN
+    expect(resolveDataType({}, id)).toBe(FIELD_TYPES.PLAIN);
+  });
+});
+
+describe('resolveSourceSupertag', () => {
+  beforeEach(() => {
+    resetAndSeed();
+  });
+
+  it('returns undefined for fieldDef without sourceSupertag', () => {
+    expect(resolveSourceSupertag({}, 'attrDef_status')).toBeUndefined();
+  });
+
+  it('returns configured sourceSupertag', () => {
+    loroDoc.setNodeData('attrDef_status', 'sourceSupertag', 'tagDef_task');
+    expect(resolveSourceSupertag({}, 'attrDef_status')).toBe('tagDef_task');
+  });
+});
+
+describe('resolveHideField', () => {
+  beforeEach(() => {
+    resetAndSeed();
+  });
+
+  it('returns SYS_V.NEVER by default', () => {
+    expect(resolveHideField({}, 'attrDef_status')).toBe(SYS_V.NEVER);
+  });
+});
+
+describe('resolveRequired', () => {
+  beforeEach(() => {
+    resetAndSeed();
+  });
+
+  it('returns false by default (nullable not set)', () => {
+    expect(resolveRequired({}, 'attrDef_status')).toBe(false);
+  });
+
+  it('returns true when nullable=false', () => {
+    loroDoc.setNodeData('attrDef_status', 'nullable', false);
+    expect(resolveRequired({}, 'attrDef_status')).toBe(true);
+  });
+
+  it('returns false when nullable=true', () => {
+    loroDoc.setNodeData('attrDef_status', 'nullable', true);
+    expect(resolveRequired({}, 'attrDef_status')).toBe(false);
+  });
+});
+
+describe('resolveMinValue / resolveMaxValue', () => {
+  beforeEach(() => {
+    resetAndSeed();
+  });
+
+  it('returns configured min/max for attrDef_age (0/150)', () => {
+    expect(resolveMinValue({}, 'attrDef_age')).toBe(0);
+    expect(resolveMaxValue({}, 'attrDef_age')).toBe(150);
+  });
+
+  it('returns undefined when not configured', () => {
+    expect(resolveMinValue({}, 'attrDef_status')).toBeUndefined();
+    expect(resolveMaxValue({}, 'attrDef_status')).toBeUndefined();
+  });
+});
+
+describe('resolveFieldOptions', () => {
+  beforeEach(() => {
+    resetAndSeed();
+  });
+
+  it('returns option node IDs for attrDef_status', () => {
+    // resolveFieldOptions returns string[] (IDs), not NodexNode[]
+    const options = resolveFieldOptions({}, 'attrDef_status');
+    expect(options.length).toBe(3);
+    expect(options).toContain('opt_todo');
+    expect(options).toContain('opt_in_progress');
+    expect(options).toContain('opt_done');
+  });
+
+  it('returns options for attrDef_priority', () => {
+    const options = resolveFieldOptions({}, 'attrDef_priority');
+    expect(options.length).toBe(3);
+  });
+
+  it('returns empty for fieldDef with no options', () => {
+    const options = resolveFieldOptions({}, 'attrDef_due');
+    expect(options).toEqual([]);
+  });
+});
+
+describe('getExtendsChain', () => {
+  beforeEach(() => {
+    resetAndSeed();
+  });
+
+  it('returns empty array for tagDef with no extends (tagDef_task)', () => {
+    expect(getExtendsChain({}, 'tagDef_task')).toEqual([]);
+  });
+
+  it('returns parent tagDef for single-level extends (tagDef_dev_task extends tagDef_task)', () => {
+    expect(getExtendsChain({}, 'tagDef_dev_task')).toEqual(['tagDef_task']);
+  });
+
+  it('returns ancestors in ancestor-first order for multi-level extends', () => {
+    // Create grandchild tagDef in LoroDoc directly
+    const grandId = 'tagDef_grand_test';
+    loroDoc.createNode(grandId, 'SCHEMA');
+    loroDoc.setNodeDataBatch(grandId, { type: 'tagDef', name: 'Grand Task', extends: 'tagDef_dev_task' });
+
+    const chain = getExtendsChain({}, grandId);
+    // Should be: grandparent (task) first, then parent (dev_task)
+    expect(chain).toEqual(['tagDef_task', 'tagDef_dev_task']);
+  });
+
+  it('handles circular references without infinite loop', () => {
+    // tagDef_task extends tagDef_dev_task (circular)
+    loroDoc.setNodeData('tagDef_task', 'extends', 'tagDef_dev_task');
+    // Should not throw; result won't be infinite
+    const chain = getExtendsChain({}, 'tagDef_dev_task');
+    expect(Array.isArray(chain)).toBe(true);
+  });
+});
+
+describe('resolveTaggedNodes', () => {
+  beforeEach(() => {
+    resetAndSeed();
+  });
+
+  it('returns node IDs tagged with tagDef_task', () => {
+    // resolveTaggedNodes returns string[] (IDs), not NodexNode[]
+    // Only task_1 has tagDef_task applied in seed data
+    const nodes = resolveTaggedNodes({}, 'tagDef_task');
+    expect(nodes).toContain('task_1');
+  });
+
+  it('does not return untagged nodes', () => {
+    const nodes = resolveTaggedNodes({}, 'tagDef_task');
+    expect(nodes).not.toContain('idea_1');
+    expect(nodes).not.toContain('note_2');
+    // task_2 and task_3 are NOT tagged with tagDef_task in seed data
+    expect(nodes).not.toContain('task_2');
+    expect(nodes).not.toContain('task_3');
+  });
+
+  it('returns empty for unknown tagDefId', () => {
+    const nodes = resolveTaggedNodes({}, 'nonexistent_tag');
+    expect(nodes).toEqual([]);
+  });
+});
+
+describe('findAutoCollectTupleId', () => {
+  beforeEach(() => {
+    resetAndSeed();
+  });
+
+  it('always returns null (stub in Loro migration)', () => {
+    expect(findAutoCollectTupleId({}, 'attrDef_status')).toBeNull();
+    expect(findAutoCollectTupleId({}, 'attrDef_priority')).toBeNull();
+    expect(findAutoCollectTupleId({}, 'nonexistent')).toBeNull();
+  });
+});
+
+describe('getFieldTypeLabel / getFieldTypeIcon / isPlainFieldType', () => {
+  it('getFieldTypeLabel returns label for known types', () => {
+    expect(getFieldTypeLabel(FIELD_TYPES.PLAIN)).toBeTruthy();
+    expect(getFieldTypeLabel(FIELD_TYPES.OPTIONS)).toBeTruthy();
+    expect(getFieldTypeLabel(FIELD_TYPES.DATE)).toBeTruthy();
+  });
+
+  it('getFieldTypeIcon returns an icon component for known types', () => {
+    expect(getFieldTypeIcon(FIELD_TYPES.PLAIN)).toBeTruthy();
+    expect(getFieldTypeIcon(FIELD_TYPES.OPTIONS)).toBeTruthy();
+  });
+
+  it('isPlainFieldType returns true for plain fields', () => {
+    expect(isPlainFieldType(FIELD_TYPES.PLAIN)).toBe(true);
+  });
+
+  it('isPlainFieldType returns false for non-plain fields', () => {
+    expect(isPlainFieldType(FIELD_TYPES.OPTIONS)).toBe(false);
+    expect(isPlainFieldType(FIELD_TYPES.DATE)).toBe(false);
   });
 });

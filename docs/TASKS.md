@@ -35,7 +35,41 @@ _(空)_
 
 ## 进行中
 
-_(空)_
+### BUG: Supabase 连接时 Enter/失焦后节点消失
+
+**现象**: 登录 Google（Supabase 已连接）后，输入内容按 Enter 或失焦，节点"跳一下"然后消失。离线模式不复现。
+
+**已修复的子问题（3 个 commit，已在 main）**:
+1. `e88d4ae` — 内容从不写入 DB：`saveContent()` 的变更检测用 `propsRef.current`（被 re-render 持续更新），导致 `contentEquals()` 永远为 true → 加 `initialContentRef` 固定基线
+2. `e88d4ae` — `createSibling` 异步回调用 DB 版本覆盖本地内容：改为 merge metadata only
+3. `97e6dda` — 容器节点未持久化到 Supabase：`addChild(libraryId, ...)` → DB 中找不到 Library → throw → rollback 删除节点。修复：`seedWorkspace` upsert 容器到 DB
+
+**仍然复现的问题**:
+- 用户报告在 extension 中仍然出现节点消失
+- Standalone 测试环境已支持 Supabase 连接（`TestApp.tsx` 改造完成），可在 `http://localhost:5199/standalone/index.html` 复现
+
+**核心嫌疑路径（待验证）**:
+- `nodeService.addChild()` 从 DB 读取 parent.children，拼接新 child 后写回 DB
+- 如果 DB 中的 parent.children 与本地不同步（例如前一个 `addChild` 还未完成，或 Realtime 事件尚未到达），写回的 children 数组会**丢失**其他乐观添加的节点
+- Realtime INSERT/UPDATE 事件触发 `store.setNode(parent)` → 用 DB 版 children 覆盖本地版 → 导致乐观添加的节点从 UI 消失
+
+**关键代码位置**:
+- `src/services/node-service.ts:324-347` — `addChild()`: 读 DB parent → splice → 写回 DB → 更新 child._ownerId
+- `src/stores/node-store.ts:378-464` — `createChild()`: 乐观更新 → createNode → addChild → merge/rollback
+- `src/stores/node-store.ts:466-557` — `createSibling()`: 同上模式
+- `src/hooks/use-realtime.ts:31-33` — Realtime handler blindly calls `store.setNode()`
+- `src/stores/node-store.ts:560-568` — `setNodeContentLocal` + dirty tracking
+- `src/components/editor/RichTextEditor.tsx` — `initialContentRef` + `saveContent()` 变更检测
+
+**调试环境**:
+- Standalone + Supabase: `http://localhost:5199/standalone/index.html`（需已配置 Supabase redirect URL）
+- `?offline=true` 强制离线模式对比
+- `window.__nodeStore` / `window.__uiStore` 可在 DevTools 控制台访问
+
+**下一步**:
+- 用 claude-in-chrome MCP 在 standalone 环境中实际复现
+- 在 `addChild` 和 Realtime handler 中加 console.log 追踪 children 数组变化
+- 验证是否是 `addChild` 读写 DB 导致 children 不一致
 
 ---
 

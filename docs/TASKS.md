@@ -43,45 +43,42 @@ _(空)_
 
 ### P0
 
-#### Loro CRDT 迁移 Phase 1 — 本地数据引擎
+#### Loro CRDT 迁移 Phase 1 — 本地数据引擎 + 数据模型原生化 + 命名统一
 > **详细方案**: `docs/plans/loro-migration-phase1.md`
 > **Owner**: nodex-cc
 > **分支**: `cc/loro-migration-phase1`
-> **锁定文件**: `node-store.ts`
+> **锁定文件**: `node-store.ts`、`node.ts`、`system-nodes.ts`
 
-用 Loro CRDT (`LoroTree` + `LoroMap`) 替换 Zustand entities + Supabase 作为节点数据层。纯本地，不含网络同步。
+三位一体迁移：Loro CRDT 引擎 + 消除 Firebase 时代间接层 + 全局命名重构。纯本地，不含网络同步。
 
-**背景**: 当前 `node-store.ts`（2176 行）用 `children: string[]` 模拟树结构，手动 `splice()` 导致 Realtime echo 覆盖、并发安全等一系列 bug。Loro 的 `LoroTree` 是原生树结构（Kleppmann 算法，防循环，Fractional Indexing 排序），树操作变为原子调用。
-
-**关键约束**:
-- `NodexNode` 接口（`src/types/node.ts`）保持不变 — 35 个 UI 组件不需要改
-- Zustand 的 selector 机制保留 — 通过 `_version` 计数器触发 re-render
-- `children` 从节点属性变为树结构的衍生值
-- 所有操作变为同步（无网络 I/O）
+**三个维度**:
+1. **存储引擎**: Loro (`LoroTree` + `LoroMap` + `LoroList`) 替换 Zustand entities + Supabase
+2. **数据模型原生化**: 消除 meta Tuple、`_ownerId`、`workspaceId`、`version` 等间接层，标签/配置直接存 LoroMap 属性
+3. **命名统一**: 扁平化 `props`、去 `_` 前缀、`DocType→NodeType`、`tuple→fieldEntry`、`attrDef→fieldDef`、`_done→completedAt` 等
 
 **实施步骤**:
-- [ ] Step 0: 安装 `loro-crdt`，验证 WASM 在 Vite + WXT 中加载正常
-- [ ] Step 1: 实现 `src/lib/loro-doc.ts`（Loro 单例 + ID 映射 + 树操作 API + IndexedDB 持久化）
-- [ ] Step 2: 实现 `toNodexNode()` 转换函数（Loro 树节点 → NodexNode 视图对象）
-- [ ] Step 3: 重构 `node-store.ts`（去 Supabase，底层改为 Loro）
+- [ ] Step 0: 安装 `loro-crdt`，验证 WASM 加载 + 冷启动时间
+- [ ] Step 1: 类型系统重构（新 NodexNode 接口 + NodeType + FIELD_TYPES + SYSTEM_TAGS）
+- [ ] Step 2: 实现 `loro-doc.ts`（Loro 单例 + ID 映射 + 树操作 + tags LoroList + toNodexNode）
+- [ ] Step 3: 重构 `node-store.ts`（去 Supabase，底层改 Loro，applyTag 简化）
   - [ ] 3a: 基础读写（替换 entities map）
-  - [ ] 3b: 树操作（createChild/moveNodeTo/indentNode/trashNode 等）
-  - [ ] 3c: Tag/Field 操作
+  - [ ] 3b: 树操作（createChild/moveNodeTo/trashNode 等）
+  - [ ] 3c: Tag/Field 操作（applyTag 从 9 步简化为 3 步）
   - [ ] 3d: 内容编辑
-- [ ] Step 4: 种子数据迁移（`seed-data.ts` 改用 Loro API）
-- [ ] Step 5: Hooks 适配（use-node/use-children 去 fetch，use-realtime 注释掉）
-- [ ] Step 6: 工具函数适配（tree-utils.ts 等）
-- [ ] Step 7: 测试（Vitest 单元 + standalone 功能验证 + IndexedDB 持久化验证）
+- [ ] Step 4: 种子数据重写（Loro API + 新命名 + 无 meta Tuple）
+- [ ] Step 5: Hooks + 工具函数适配（use-node-tags 读 node.tags，checkbox-utils 简化，删 meta-utils）
+- [ ] Step 6: 组件层全局替换（40 文件 `props.xxx` → `xxx`，TypeScript 编译器引导）
+- [ ] Step 7: 测试 + 清理
 
 **验收标准**:
-- `npm run typecheck` 通过
-- `npm run test:run` 通过
-- standalone 所有现有交互正常
-- 刷新页面后数据从 IndexedDB 恢复
-- 无 Supabase 调用
-- 无 `_pendingChildrenOps`、`_dirtyContentIds`、3s timeout hack
+- `npm run typecheck` + `npm run test:run` 通过
+- standalone 所有现有交互正常 + IndexedDB 持久化
+- 无 Supabase 调用、无 `_pendingChildrenOps`/`_dirtyContentIds`
+- 无 `props.` 访问残留、无 `meta`/`_ownerId`/`workspaceId`/`version` 残留
+- 无 `DocType`/`_docType`/`'tuple'`/`'attrDef'` 残留
+- 标签应用不再创建 meta Tuple 节点
 
-**Phase 2（后续，不在本任务范围）**: 加同步层 — Loro `exportUpdates()` / `importUpdates()` 通过网络传输，实现多设备同步。
+**Phase 2（后续）**: 同步层 + LoroText 替换 name+marks+inlineRefs + createdBy/updatedBy 复活
 
 ---
 

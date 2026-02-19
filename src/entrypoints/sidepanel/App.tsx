@@ -80,6 +80,9 @@ function useBootstrap(): BootstrapResult {
   const navigateTo = useUIStore((s) => s.navigateTo);
   const fetchNode = useNodeStore((s) => s.fetchNode);
 
+  // Guard against StrictMode double-mount calling initAuth() twice
+  const initAuthCalled = useRef(false);
+
   useEffect(() => {
     let authUnsubscribe: (() => void) | undefined;
 
@@ -100,7 +103,8 @@ function useBootstrap(): BootstrapResult {
       }
 
       // When Supabase is available, require authentication
-      if (supabaseReady) {
+      if (supabaseReady && !initAuthCalled.current) {
+        initAuthCalled.current = true;
         const initAuth = useWorkspaceStore.getState().initAuth;
         authUnsubscribe = await initAuth();
 

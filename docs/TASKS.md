@@ -44,21 +44,19 @@ _(空)_
 2. `e88d4ae` — `createSibling` 异步回调用 DB 版本覆盖本地内容：改为 merge metadata only
 3. `97e6dda` — 容器节点未持久化到 Supabase：`addChild(libraryId, ...)` → DB 中找不到 Library → throw → rollback 删除节点。修复：`seedWorkspace` upsert 容器到 DB
 
-**仍然复现的问题**:
-- 用户报告在 extension 中仍然出现节点消失
-- Standalone 测试环境已支持 Supabase 连接（`TestApp.tsx` 改造完成），可在 `http://localhost:5199/standalone/index.html` 复现
+**已修复的子问题（续，`fe25175`）**:
+4. `fe25175` — Realtime 自回显覆盖乐观 children 状态：快速创建时 echo 带旧 children 覆盖本地已有的新节点 → 空白节点；trashNode 不更新 parent.children 到 DB → 删除后节点复活。修复：`_pendingChildrenOps` ref-count 保护 + trashNode 同步 parent.children 到 DB
 
-**核心嫌疑路径（待验证）**:
-- `nodeService.addChild()` 从 DB 读取 parent.children，拼接新 child 后写回 DB
-- 如果 DB 中的 parent.children 与本地不同步（例如前一个 `addChild` 还未完成，或 Realtime 事件尚未到达），写回的 children 数组会**丢失**其他乐观添加的节点
-- Realtime INSERT/UPDATE 事件触发 `store.setNode(parent)` → 用 DB 版 children 覆盖本地版 → 导致乐观添加的节点从 UI 消失
+**仍然复现的问题**:
+- **快速输入文本时**：Realtime echo 覆盖正在编辑的节点内容（`_dirtyContentIds` 保护了 `name/marks/inlineRefs`，但 Realtime echo 仍可能在 dirty 清除的瞬间竞争）
+  - 场景：创建节点后极快速输入 → `updateNodeContent` 清除 dirty → echo 到达覆盖内容
+  - 与 children echo 问题类似，但发生在内容层面
+- 用户报告在 extension 中仍然偶尔出现节点消失
 
 **关键代码位置**:
-- `src/services/node-service.ts:324-347` — `addChild()`: 读 DB parent → splice → 写回 DB → 更新 child._ownerId
-- `src/stores/node-store.ts:378-464` — `createChild()`: 乐观更新 → createNode → addChild → merge/rollback
-- `src/stores/node-store.ts:466-557` — `createSibling()`: 同上模式
-- `src/hooks/use-realtime.ts:31-33` — Realtime handler blindly calls `store.setNode()`
-- `src/stores/node-store.ts:560-568` — `setNodeContentLocal` + dirty tracking
+- `src/stores/node-store.ts` — `_pendingChildrenOps`（children echo 保护，已修复）
+- `src/stores/node-store.ts` — `_dirtyContentIds`（content echo 保护，存在竞态窗口）
+- `src/hooks/use-realtime.ts:31-33` — Realtime handler calls `store.setNode()`
 - `src/components/editor/RichTextEditor.tsx` — `initialContentRef` + `saveContent()` 变更检测
 
 **调试环境**:
@@ -67,9 +65,8 @@ _(空)_
 - `window.__nodeStore` / `window.__uiStore` 可在 DevTools 控制台访问
 
 **下一步**:
-- 用 claude-in-chrome MCP 在 standalone 环境中实际复现
-- 在 `addChild` 和 Realtime handler 中加 console.log 追踪 children 数组变化
-- 验证是否是 `addChild` 读写 DB 导致 children 不一致
+- 调查快速输入文本时的 content echo 竞态：`updateNodeContent` 清除 dirty 后到 Realtime echo 到达之间的窗口
+- 可能方案：类似 `_pendingChildrenOps` 的 `_pendingContentOps` 保护，或延迟清除 dirty flag
 
 ---
 

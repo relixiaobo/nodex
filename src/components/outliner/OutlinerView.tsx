@@ -122,7 +122,6 @@ export function OutlinerView({ rootNodeId, showTemplateTuples }: OutlinerViewPro
               valueNodeId={fieldMap.get(id)!.valueNodeId}
               valueName={fieldMap.get(id)!.valueName}
               dataType={fieldMap.get(id)!.dataType}
-              assocDataId={fieldMap.get(id)!.assocDataId}
               isLastInGroup={i === visibleChildren.length - 1 || visibleChildren[i + 1].type !== 'field'}
               trashed={fieldMap.get(id)!.trashed}
               isRequired={fieldMap.get(id)!.isRequired}

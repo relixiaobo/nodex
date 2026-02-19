@@ -5,10 +5,7 @@
  *   ContentNode.children → fieldTuple (docType='tuple')
  *   fieldTuple.children = [attrDefId, valueNodeId]
  *
- * AssociationMap 说明（数据验证修正）：
- *   ContentNode.associationMap 的 KEY 主要是普通内容子节点（88.1%），
- *   不限于字段 Tuple。AssociationMap 是 children 到 associatedData
- *   的通用映射机制，用于附加辅助数据。
+ * 字段值直接存储在 Tuple.children[1:] 中（简化后无需 AssociatedData 间接层）。
  *
  * 字段数据类型由 AttrDef 的 Tuple [SYS_A02, SYS_D*] 决定。
  */
@@ -50,7 +47,7 @@ export async function getFieldValues(
 
     const keyId = child.children[0];
 
-    // 跳过系统属性 Tuple（SYS_A*）—— 这些属于 Metanode 级别的元数据
+    // 跳过系统属性 Tuple（SYS_A*）—— 这些属于 meta 级别的元数据
     if (keyId.startsWith('SYS_')) continue;
 
     const valueNodeId = child.children[1];
@@ -61,8 +58,6 @@ export async function getFieldValues(
       tupleNode: child,
       valueNodeId,
       valueNode: valueNode ?? undefined,
-      // associatedData（如果存在）
-      associatedDataId: node.associationMap?.[child.id],
     };
   }
 
@@ -144,7 +139,7 @@ export async function getFieldOptions(
  * 设置节点的字段值。
  *
  * 如果字段 Tuple 已存在（通过 _sourceId 或 attrDefId 匹配），更新其 children[1]。
- * 如果不存在，创建新的 Tuple + AssociatedData。
+ * 如果不存在，创建新的 Tuple。
  *
  * @param nodeId 内容节点 ID
  * @param attrDefId 字段定义 ID
@@ -180,33 +175,9 @@ export async function setFieldValue(
       userId,
     );
 
-    // 创建 AssociatedData 节点
-    const associatedData = await createNode(
-      {
-        workspaceId: node.workspaceId,
-        props: {
-          _docType: 'associatedData',
-          _ownerId: nodeId,
-        },
-      },
-      userId,
-    );
-
     // 更新内容节点
     const newChildren = [...(node.children ?? []), tuple.id];
-    const newAssociationMap = {
-      ...(node.associationMap ?? {}),
-      [tuple.id]: associatedData.id,
-    };
-
-    await updateNode(
-      nodeId,
-      {
-        children: newChildren,
-        associationMap: newAssociationMap,
-      },
-      userId,
-    );
+    await updateNode(nodeId, { children: newChildren }, userId);
   }
 }
 
@@ -308,8 +279,6 @@ export interface FieldValueEntry {
   valueNodeId: string;
   /** 值节点（如果已加载） */
   valueNode?: NodexNode;
-  /** AssociatedData 节点 ID */
-  associatedDataId?: string;
 }
 
 /** 字段值映射 { attrDefId → FieldValueEntry } */

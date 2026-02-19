@@ -1,17 +1,14 @@
-import { SYS_A, SYS_V } from '../../src/types/index.js';
+import { SYS_A } from '../../src/types/index.js';
 import { useNodeStore } from '../../src/stores/node-store.js';
 import { resolveChildSupertags } from '../../src/lib/field-utils.js';
 import { resetAndSeed } from './helpers/test-state.js';
 
-/** Check if a node has a specific tag via its metanode SYS_A13 tuples. */
+/** Check if a node has a specific tag via its node.meta SYS_A13 tuples. */
 function hasTag(nodeId: string, tagDefId: string): boolean {
   const state = useNodeStore.getState();
   const node = state.entities[nodeId];
-  const metaId = node?.props._metaNodeId;
-  if (!metaId) return false;
-  const meta = state.entities[metaId];
-  if (!meta?.children) return false;
-  return meta.children.some((cid) => {
+  if (!node?.meta || node.meta.length === 0) return false;
+  return node.meta.some((cid) => {
     const t = state.entities[cid];
     return t?.props._docType === 'tuple' &&
       t.children?.[0] === SYS_A.NODE_SUPERTAGS &&
@@ -19,30 +16,26 @@ function hasTag(nodeId: string, tagDefId: string): boolean {
   });
 }
 
-/** Set the SYS_A14 (CHILD_SUPERTAG) config value on a tagDef's AssociatedData. */
+/** Set the SYS_A14 (CHILD_SUPERTAG) config value on a tagDef's config tuple. */
 function setChildSupertag(tagDefId: string, childTagDefId: string) {
   const state = useNodeStore.getState();
   const tagDef = state.entities[tagDefId];
   if (!tagDef?.children) throw new Error(`tagDef ${tagDefId} not found`);
 
-  // Find the SYS_A14 config tuple
+  // Find the SYS_A14 config tuple and write value into children[1]
   for (const cid of tagDef.children) {
     const child = state.entities[cid];
     if (
       child?.props._docType === 'tuple' &&
       child.children?.[0] === SYS_A.CHILD_SUPERTAG
     ) {
-      // Write value into its AssociatedData
-      const assocId = tagDef.associationMap?.[cid];
-      if (assocId) {
-        useNodeStore.setState((prev) => {
-          const assoc = prev.entities[assocId];
-          if (assoc) {
-            assoc.children = [childTagDefId];
-          }
-        });
-        return;
-      }
+      useNodeStore.setState((prev) => {
+        const tuple = prev.entities[cid];
+        if (tuple) {
+          tuple.children = [SYS_A.CHILD_SUPERTAG, childTagDefId];
+        }
+      });
+      return;
     }
   }
   throw new Error(`SYS_A14 config tuple not found on ${tagDefId}`);
@@ -103,7 +96,7 @@ describe('Default Child Supertag (SYS_A14)', () => {
       );
 
       expect(hasTag(child.id, 'tagDef_dev_task')).toBe(false);
-      expect(child.props._metaNodeId).toBeUndefined();
+      expect(child.meta).toBeUndefined();
     });
 
     it('does not auto-apply when parent has no tags', async () => {
@@ -111,7 +104,7 @@ describe('Default Child Supertag (SYS_A14)', () => {
         'note_2', 'ws_default', 'user_default', 'New idea',
       );
 
-      expect(child.props._metaNodeId).toBeUndefined();
+      expect(child.meta).toBeUndefined();
     });
 
     it('handles multiple tags with different SYS_A14 values', async () => {
@@ -150,7 +143,7 @@ describe('Default Child Supertag (SYS_A14)', () => {
         'subtask_1a', 'ws_default', 'user_default', 'New sibling',
       );
 
-      expect(sibling.props._metaNodeId).toBeUndefined();
+      expect(sibling.meta).toBeUndefined();
     });
   });
 });

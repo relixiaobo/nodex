@@ -27,11 +27,7 @@ function buildTagCheckboxEntities(
   checkboxValue: string,
 ): Record<string, NodexNode> {
   return {
-    n1: makeNode('n1', { props: { created: 1, _metaNodeId: 'meta1' } }),
-    meta1: makeNode('meta1', {
-      props: { created: 1, _docType: 'metanode' },
-      children: ['tuple_tag'],
-    }),
+    n1: makeNode('n1', { meta: ['tuple_tag'] }),
     tuple_tag: makeNode('tuple_tag', {
       props: { created: 1, _docType: 'tuple' },
       children: [SYS_A.NODE_SUPERTAGS, 'tagDef1'],

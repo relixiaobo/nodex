@@ -119,11 +119,10 @@ describe('webclip-service', () => {
 
       const entities = useNodeStore.getState().entities;
       const clip = entities[clipId];
-      const metanode = clip?.props._metaNodeId ? entities[clip.props._metaNodeId] : undefined;
-      expect(metanode).toBeDefined();
+      expect(clip?.meta?.length).toBeGreaterThan(0);
 
-      // Check SYS_A13 tag tuple referencing tagDef_web_clip
-      const tagTuple = metanode!.children?.find((cid) => {
+      // Check SYS_A13 tag tuple referencing tagDef_web_clip in node.meta
+      const tagTuple = clip!.meta?.find((cid) => {
         const t = entities[cid];
         return t?.props._docType === 'tuple' &&
           t.children?.[0] === SYS_A.NODE_SUPERTAGS &&
@@ -154,11 +153,8 @@ describe('webclip-service', () => {
       expect(valueNodeId).toBeDefined();
       expect(entities[valueNodeId!]?.props.name).toBe('https://example.com/test');
 
-      // Check value node is also in associatedData.children (for FieldValueOutliner rendering)
-      const assocId = clip!.associationMap?.[urlTuple!];
-      expect(assocId).toBeDefined();
-      const assoc = entities[assocId!];
-      expect(assoc?.children).toContain(valueNodeId);
+      // Value is stored directly in tuple.children[1]
+      expect(tuple?.children?.[1]).toBe(valueNodeId);
     });
 
     it('sets description when available', async () => {
@@ -255,10 +251,9 @@ describe('webclip-service', () => {
 
       const entities = useNodeStore.getState().entities;
       const node = entities.idea_1;
-      const metanode = node.props._metaNodeId ? entities[node.props._metaNodeId] : undefined;
-      expect(metanode).toBeDefined();
+      expect(node.meta?.length).toBeGreaterThan(0);
 
-      const tagTuple = metanode!.children?.find((cid) => {
+      const tagTuple = node.meta?.find((cid) => {
         const t = entities[cid];
         return t?.props._docType === 'tuple' &&
           t.children?.[0] === SYS_A.NODE_SUPERTAGS &&
@@ -285,11 +280,8 @@ describe('webclip-service', () => {
       const valueNodeId = tuple?.children?.[1];
       expect(entities[valueNodeId!]?.props.name).toBe('https://example.com/clipped');
 
-      // Check value node is also in associatedData.children
-      const assocId = node.associationMap?.[urlTuple!];
-      expect(assocId).toBeDefined();
-      const assoc = entities[assocId!];
-      expect(assoc?.children).toContain(valueNodeId);
+      // Value is stored directly in tuple.children[1]
+      expect(tuple?.children?.[1]).toBe(valueNodeId);
     });
 
     it('sets description on existing node', async () => {

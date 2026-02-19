@@ -1,8 +1,9 @@
 /**
  * Mini outliner for field values (all types that store values as nodes).
  *
- * Uses AssociatedData node as the root. Its children are value nodes
- * rendered with full OutlinerItem capabilities (Enter, Tab, children, etc.).
+ * Uses the field Tuple as the root. Values are stored in tuple.children[1:]
+ * (children[0] is the key/attrDefId). Value nodes are rendered with full
+ * OutlinerItem capabilities (Enter, Tab, children, etc.).
  * Field tuples are rendered as FieldRow (same as OutlinerItem).
  * Shows a TrailingInput when empty or at the end.
  *
@@ -26,7 +27,7 @@ import { DatePicker, formatDateDisplay } from './DatePicker.js';
 import { useUIStore } from '../../stores/ui-store.js';
 
 interface FieldValueOutlinerProps {
-  assocDataId: string;
+  tupleId: string;
   /** Field data type (e.g., SYS_D.OPTIONS) — for future type-specific value rendering */
   fieldDataType?: string;
   /** AttrDef ID — for future option autocomplete */
@@ -42,13 +43,21 @@ export function shouldShowFieldValueTrailingInput(
   return items[items.length - 1]?.type === 'field';
 }
 
-export function FieldValueOutliner({ assocDataId, fieldDataType, attrDefId, onNavigateOut }: FieldValueOutlinerProps) {
-  useChildren(assocDataId);
-  const childIds = useNodeStore((s) => s.entities[assocDataId]?.children ?? []);
+export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, onNavigateOut }: FieldValueOutlinerProps) {
+  useChildren(tupleId);
+
+  // Values are tuple.children[1:] — skip children[0] which is the key (attrDefId)
+  const childIdsJson = useNodeStore((s) => {
+    const t = s.entities[tupleId];
+    const c = t?.children?.slice(1) ?? [];
+    return JSON.stringify(c);
+  });
+  const childIds: string[] = useMemo(() => JSON.parse(childIdsJson), [childIdsJson]);
+
   const entities = useNodeStore((s) => s.entities);
 
-  // Detect fields on the AssociatedData (created via > trigger inside field values)
-  const fields = useNodeFields(assocDataId);
+  // Detect fields on the Tuple (created via > trigger inside field values)
+  const fields = useNodeFields(tupleId);
   const fieldMap = useMemo(() => {
     const m = new Map<string, FieldEntry>();
     for (const f of fields) m.set(f.tupleId, f);
@@ -64,7 +73,7 @@ export function FieldValueOutliner({ assocDataId, fieldDataType, attrDefId, onNa
       } else {
         const dt = entities[cid]?.props._docType;
         if (!dt) result.push({ id: cid, type: 'content' });
-        // else skip: metanode, associatedData, SYS tuple, tag tuple
+        // else skip: SYS tuple, tag tuple, etc.
       }
     }
     return result;
@@ -87,21 +96,9 @@ export function FieldValueOutliner({ assocDataId, fieldDataType, attrDefId, onNa
   const setEditingFieldName = useUIStore((s) => s.setEditingFieldName);
 
   // --- BOOLEAN: Yes/No toggle switch ---
-  // Reads value from AssociatedData children[0] (reference to SYS_V.YES or SYS_V.NO)
+  // Reads value from tuple.children[1] (reference to SYS_V.YES or SYS_V.NO)
   const isBoolean = fieldDataType === SYS_D.BOOLEAN;
-  const booleanTupleId = useNodeStore((s) => {
-    if (!isBoolean) return undefined;
-    // Find the tuple that owns this assocData via parent's associationMap
-    const assoc = s.entities[assocDataId];
-    const parentId = assoc?.props._ownerId;
-    const parent = parentId ? s.entities[parentId] : undefined;
-    if (!parent?.associationMap) return undefined;
-    for (const [tid, aid] of Object.entries(parent.associationMap)) {
-      if (aid === assocDataId) return tid;
-    }
-    return undefined;
-  });
-  if (isBoolean && booleanTupleId) {
+  if (isBoolean) {
     const currentValue = contentChildIds[0];
     const isYes = currentValue === SYS_V.YES;
     const label = isYes ? 'Yes' : 'No';
@@ -113,7 +110,7 @@ export function FieldValueOutliner({ assocDataId, fieldDataType, attrDefId, onNa
           onClick={() => {
             if (!userId) return;
             const newVal = isYes ? SYS_V.NO : SYS_V.YES;
-            setConfigValue(booleanTupleId, newVal, userId);
+            setConfigValue(tupleId, newVal, userId);
           }}
           className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
             isYes ? 'bg-primary' : 'bg-muted'
@@ -134,13 +131,13 @@ export function FieldValueOutliner({ assocDataId, fieldDataType, attrDefId, onNa
 
   // --- COLOR: swatch selector ---
   if (fieldDataType === SYS_D.COLOR) {
-    return <ColorSwatchPicker assocDataId={assocDataId} />;
+    return <ColorSwatchPicker tupleId={tupleId} />;
   }
 
   // --- OPTIONS_FROM_SUPERTAG: single-select supertag picker ---
   if (fieldDataType === SYS_D.OPTIONS_FROM_SUPERTAG) {
     return (
-      <SupertagPickerField assocDataId={assocDataId} />
+      <SupertagPickerField tupleId={tupleId} />
     );
   }
 
@@ -159,7 +156,7 @@ export function FieldValueOutliner({ assocDataId, fieldDataType, attrDefId, onNa
           type="checkbox"
           checked={checked}
           onChange={() => {
-            if (wsId && userId) toggleCheckboxField(assocDataId, wsId, userId);
+            if (wsId && userId) toggleCheckboxField(tupleId, wsId, userId);
           }}
           className="mt-[3px] h-3.5 w-3.5 rounded border-border accent-primary cursor-pointer"
         />
@@ -186,7 +183,7 @@ export function FieldValueOutliner({ assocDataId, fieldDataType, attrDefId, onNa
           if (valueNodeId) {
             updateNodeName(valueNodeId, v, userId);
           } else {
-            createChild(assocDataId, wsId, userId, v);
+            createChild(tupleId, wsId, userId, v);
           }
         }}
       />
@@ -213,32 +210,31 @@ export function FieldValueOutliner({ assocDataId, fieldDataType, attrDefId, onNa
       }
       useUIStore.getState().setFocusClickCoords({
         nodeId: last.id,
-        parentId: assocDataId,
+        parentId: tupleId,
         textOffset: (useNodeStore.getState().entities[last.id]?.props.name ?? '').length,
       });
-      setFocusedNode(last.id, assocDataId);
+      setFocusedNode(last.id, tupleId);
       return;
     }
     onNavigateOut?.('down');
-  }, [visibleChildren, onNavigateOut, clearFocus, setEditingFieldName, assocDataId, setFocusedNode]);
+  }, [visibleChildren, onNavigateOut, clearFocus, setEditingFieldName, tupleId, setFocusedNode]);
 
   return (
     <div
       className={`min-h-[22px]${firstIsField ? ' pt-1' : ''}${lastIsField ? ' pb-1' : ''}`}
-      data-row-scope-parent-id={assocDataId}
+      data-row-scope-parent-id={tupleId}
     >
       {visibleChildren.map(({ id, type }, i) =>
         type === 'field' ? (
           <div key={id} className="@container" style={{ paddingLeft: 6 + 15 + 4 }}>
             <FieldRow
-              nodeId={assocDataId}
+              nodeId={tupleId}
               attrDefId={fieldMap.get(id)!.attrDefId}
               attrDefName={fieldMap.get(id)!.attrDefName}
               tupleId={id}
               valueNodeId={fieldMap.get(id)!.valueNodeId}
               valueName={fieldMap.get(id)!.valueName}
               dataType={fieldMap.get(id)!.dataType}
-              assocDataId={fieldMap.get(id)!.assocDataId}
               isLastInGroup={i === visibleChildren.length - 1 || visibleChildren[i + 1].type !== 'field'}
               trashed={fieldMap.get(id)!.trashed}
               isRequired={fieldMap.get(id)!.isRequired}
@@ -251,8 +247,8 @@ export function FieldValueOutliner({ assocDataId, fieldDataType, attrDefId, onNa
             nodeId={id}
             depth={0}
             rootChildIds={contentChildIds}
-            parentId={assocDataId}
-            rootNodeId={assocDataId}
+            parentId={tupleId}
+            rootNodeId={tupleId}
             fieldDataType={fieldDataType}
             attrDefId={attrDefId}
             onNavigateOut={onNavigateOut}
@@ -261,9 +257,9 @@ export function FieldValueOutliner({ assocDataId, fieldDataType, attrDefId, onNa
       )}
       {showTrailingInput && (
         <TrailingInput
-          parentId={assocDataId}
+          parentId={tupleId}
           depth={0}
-          parentExpandKey={`${entities[assocDataId]?.props._ownerId ?? ''}:${assocDataId}`}
+          parentExpandKey={`${entities[tupleId]?.props._ownerId ?? ''}:${tupleId}`}
           fieldDataType={fieldDataType}
           attrDefId={attrDefId}
           onNavigateOut={handleTrailingNavigateOut}
@@ -274,28 +270,15 @@ export function FieldValueOutliner({ assocDataId, fieldDataType, attrDefId, onNa
 }
 
 /** Single-select supertag picker for OPTIONS_FROM_SUPERTAG config fields. */
-function SupertagPickerField({ assocDataId }: { assocDataId: string }) {
+function SupertagPickerField({ tupleId }: { tupleId: string }) {
   const tags = useWorkspaceTags();
   const setConfigValue = useNodeStore((s) => s.setConfigValue);
   const userId = useWorkspaceStore((s) => s.userId);
 
-  // Reverse-lookup tupleId from assocDataId (same as BOOLEAN)
-  const tupleId = useNodeStore((s) => {
-    const assoc = s.entities[assocDataId];
-    const parentId = assoc?.props._ownerId;
-    const parent = parentId ? s.entities[parentId] : undefined;
-    if (!parent?.associationMap) return undefined;
-    for (const [tid, aid] of Object.entries(parent.associationMap)) {
-      if (aid === assocDataId) return tid;
-    }
-    return undefined;
-  });
-
-  // Read selected value directly from assocData.children[0]
-  // (tagDef refs have _docType so contentChildIds would filter them out)
+  // Read selected value from tuple.children[1] (first value after the key)
   const selectedId = useNodeStore((s) => {
-    const assoc = s.entities[assocDataId];
-    return assoc?.children?.[0] || undefined;
+    const tuple = s.entities[tupleId];
+    return tuple?.children?.[1] || undefined;
   });
 
   const options: NodePickerOption[] = useMemo(
@@ -305,14 +288,14 @@ function SupertagPickerField({ assocDataId }: { assocDataId: string }) {
 
   const handleSelect = useCallback(
     (id: string) => {
-      if (!userId || !tupleId) return;
+      if (!userId) return;
       setConfigValue(tupleId, id, userId);
     },
     [userId, tupleId, setConfigValue],
   );
 
   const handleClear = useCallback(() => {
-    if (!userId || !tupleId) return;
+    if (!userId) return;
     setConfigValue(tupleId, '', userId);
   }, [userId, tupleId, setConfigValue]);
 

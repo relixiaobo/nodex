@@ -123,7 +123,7 @@ npm run test:run
 | 5 | trashNode | 入 trash.children 且出 parent.children |
 | 6 | createChild | 出现在 parent.children 且 name 正确 |
 | 7 | updateNodeName | props.name 更新后还原 |
-| 8 | graph invariants | `children` / `_ownerId` / associationMap 一致性 |
+| 8 | graph invariants | `children` / `_ownerId` / `meta` 一致性 |
 
 ### 1.3 UI Store 操作
 
@@ -254,7 +254,7 @@ npm run test:run
 6. `applyTag` 跨继承链按 attrDef ID 去重
 7. `applyTag` 直接应用父标签仍正常工作
 8. `removeTag` 清理继承链上所有模板来源的字段
-9. `removeTag` 正确移除 metanode 中的 tag binding
+9. `removeTag` 正确移除 node.meta 中的 tag binding
 
 ### 1.11 Guard Rails（错误输入防护）
 
@@ -443,7 +443,7 @@ npm run test:run
 1. 有效最小图返回空错误列表
 2. owner 缺失 / owner-child 不一致 / child 重复 ID 报错
 3. tuple value 引用节点不触发 owner-child mismatch 误报
-4. meta 数组中的 ID 都指向存在的 tuple 节点
+4. children 引用的非 tuple 子节点缺失时报错
 
 ### 1.29 Field Utils 解析与映射
 
@@ -454,7 +454,7 @@ npm run test:run
 1. attrDef 配置 tuple 解析（dataType/sourceTag/hide/required/min/max）及默认值
 2. 非法 min/max 数值回退为 `undefined`
 3. options 与 autocollect 节点解析（含开关关闭场景）
-4. metanode + supertag tuple 的 tagged node 解析
+4. meta + supertag tuple 的 tagged node 解析
 5. field type label/icon/plain 判定映射
 
 ### 1.30 Chrome Storage 适配层
@@ -550,7 +550,7 @@ hash trigger cleanup safety（2 cases, Bug #53 回归）:
 
 1. `tagDef` 节点被过滤（不出现在搜索结果中）
 2. `attrDef` 节点被过滤
-3. `tuple` 节点被过滤（metanode docType 已废弃）
+3. `tuple` 节点被过滤
 4. 普通内容节点正常返回
 
 ### 1.36 Workspace Store 认证状态与持久化
@@ -605,6 +605,25 @@ hash trigger cleanup safety（2 cases, Bug #53 回归）:
 7. `addMetaTupleId` 去重（已存在的 ID 不重复添加）
 8. `removeMetaTupleId` 移除存在的 ID
 9. `removeMetaTupleId` 对不存在的 ID 返回原数组
+
+### 1.48 Tana 导入 — meta 填充与 DocType 安全
+
+**测试文件**: `tests/vitest/tana-import.test.ts`
+
+**覆盖点**:
+
+meta[] population（3 cases）:
+1. `_metaNodeId` → metanode.children 正确填充到 node.meta
+2. 无 `_metaNodeId` 的节点 meta 保持 undefined
+3. `_metaNodeId` 指向缺失 metanode 时不崩溃
+
+DocType sanitization（3 cases）:
+4. `metanode` docType 被过滤为 undefined
+5. `associatedData` docType 被过滤为 undefined
+6. 有效 docType（tuple/tagDef）保留
+
+validateTanaExport（1 case）:
+7. 检测 children/owner/metaNode/associationMap 引用缺失
 
 ### 1.43 Floating Toolbar 循环渲染防回归
 
@@ -893,6 +912,7 @@ createSibling 自动标签（2 cases）:
 | 1.45 | ConfigOutliner TrailingInput 显示规则 | PASS/FAIL |
 | 1.46 | FieldValueOutliner TrailingInput 显示规则 | PASS/FAIL |
 | 1.47 | Meta-Utils 工具函数 | PASS/FAIL |
+| 1.48 | Tana 导入 meta 填充与 DocType 安全 | PASS/FAIL |
 | 2 | 视觉渲染 | PASS/FAIL/SKIP |
 | 3 | 扩展构建 | PASS/FAIL |
 
@@ -943,7 +963,7 @@ Pre-tagged: task_1 → #Task (meta: [tag_tuple, cb_tuple], field tuples in child
 | 5 | **createSibling 父节点** | `node-store.ts` | 安全测试节点：`subtask_1a`（父 `task_1` 始终存在） |
 | 6 | **BulletChevron** | `BulletChevron.tsx` | Tana: bullet 始终可见，chevron 仅 hover/expanded 时显示 |
 | 7 | **Zustand selector 无限循环** | hooks/*.ts | React 19 + Zustand v5: selector 返回新引用 → `useShallow` 或 JSON.stringify |
-| 8 | **内部结构节点泄漏** | `OutlinerItem.tsx` | 必须过滤 `tuple` 类型子节点（metanode/associatedData 已废弃） |
+| 8 | **内部结构节点泄漏** | `OutlinerItem.tsx` | 必须过滤 `tuple` 类型子节点 |
 | 9 | **outdent 容器边界** | `node-store.ts` | 父节点是容器时 outdent 应为 no-op |
 | 10 | **BulletChevron rotate** | `BulletChevron.tsx` | 旋转条件必须 `hasChildren && isExpanded` |
 

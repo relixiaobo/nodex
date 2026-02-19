@@ -265,7 +265,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       } else {
         const dt = entities[cid]?.props._docType;
         if (!dt) result.push({ id: cid, type: 'content' });
-        // else skip: metanode, associatedData, SYS tuple, tag tuple
+        // else skip: SYS tuple, tag tuple, etc.
       }
     }
     return result;
@@ -2144,7 +2144,6 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
                   valueNodeId={fieldMap.get(id)!.valueNodeId}
                   valueName={fieldMap.get(id)!.valueName}
                   dataType={fieldMap.get(id)!.dataType}
-                  assocDataId={fieldMap.get(id)!.assocDataId}
                   isLastInGroup={i === visibleChildren.length - 1 || visibleChildren[i + 1].type !== 'field'}
                   trashed={fieldMap.get(id)!.trashed}
                   isRequired={fieldMap.get(id)!.isRequired}

@@ -23,7 +23,7 @@ function node(
     docType?: string;
     ownerId?: string;
     children?: string[];
-    metaNodeId?: string;
+    meta?: string[];
   },
 ): NodexNode {
   return {
@@ -33,9 +33,9 @@ function node(
       name: id,
       _docType: opts?.docType,
       _ownerId: opts?.ownerId,
-      _metaNodeId: opts?.metaNodeId,
     },
     children: opts?.children ?? [],
+    meta: opts?.meta,
     version: 1,
     updatedAt: 0,
     createdBy: 'user_default',
@@ -105,13 +105,11 @@ describe('field utils', () => {
     expect(resolveAutoCollectedOptions(entities, 'attr')).toEqual([]);
   });
 
-  it('resolves tagged content nodes through metanode tuples', () => {
+  it('resolves tagged content nodes through node.meta tuples', () => {
     const entities: Record<string, NodexNode> = {
-      content_1: node('content_1', { metaNodeId: 'meta_1' }),
-      content_2: node('content_2', { metaNodeId: 'meta_2' }),
-      tuple_node: node('tuple_node', { docType: 'tuple', metaNodeId: 'meta_1' }),
-      meta_1: node('meta_1', { docType: 'metanode', children: ['tag_tuple_1'] }),
-      meta_2: node('meta_2', { docType: 'metanode', children: ['tag_tuple_2'] }),
+      content_1: node('content_1', { meta: ['tag_tuple_1'] }),
+      content_2: node('content_2', { meta: ['tag_tuple_2'] }),
+      tuple_node: node('tuple_node', { docType: 'tuple', meta: ['tag_tuple_1'] }),
       tag_tuple_1: node('tag_tuple_1', { docType: 'tuple', children: [SYS_A.NODE_SUPERTAGS, 'tagDef_task'] }),
       tag_tuple_2: node('tag_tuple_2', { docType: 'tuple', children: [SYS_A.NODE_SUPERTAGS, 'tagDef_person'] }),
     };

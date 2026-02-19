@@ -27,11 +27,9 @@ describe('node-store schema flows', () => {
     expect(tagDef?.props._ownerId).toBe('ws_default_SCHEMA');
     expect(state.entities.ws_default_SCHEMA.children ?? []).toContain(created.id);
 
-    const metanodeId = tagDef?.props._metaNodeId;
-    expect(metanodeId).toBeTruthy();
-    if (!metanodeId) return;
+    expect(tagDef?.meta?.length).toBeGreaterThan(0);
 
-    const hasSupertagBinding = (state.entities[metanodeId].children ?? []).some((cid) => {
+    const hasSupertagBinding = (tagDef!.meta ?? []).some((cid) => {
       const tuple = state.entities[cid];
       return tuple?.props._docType === 'tuple' &&
         tuple.children?.[0] === SYS_A.NODE_SUPERTAGS &&
@@ -54,15 +52,6 @@ describe('node-store schema flows', () => {
     expect(configKeys.has(SYS_A.DONE_STATE_MAPPING)).toBe(true);
     expect(configKeys.has(SYS_A.DONE_MAP_CHECKED)).toBe(true);
     expect(configKeys.has(SYS_A.DONE_MAP_UNCHECKED)).toBe(true);
-
-    // All config tuples should have AssociatedData via parent associationMap
-    for (const cid of configTupleIds) {
-      const assocId = tagDef!.associationMap?.[cid];
-      expect(assocId).toBeTruthy();
-      if (assocId) {
-        expect(state.entities[assocId]?.props._docType).toBe('associatedData');
-      }
-    }
 
     expect(collectNodeGraphErrors(useNodeStore.getState().entities)).toEqual([]);
   });
@@ -95,11 +84,9 @@ describe('node-store schema flows', () => {
     expect(typeTupleIds.length).toBe(1);
     expect(state.entities[typeTupleIds[0]]?.children?.[1]).toBe(SYS_D.NUMBER);
 
-    const metanodeId = attrDef?.props._metaNodeId;
-    expect(metanodeId).toBeTruthy();
-    if (!metanodeId) return;
+    expect(attrDef?.meta?.length).toBeGreaterThan(0);
 
-    const hasFieldDefinitionBinding = (state.entities[metanodeId].children ?? []).some((cid) => {
+    const hasFieldDefinitionBinding = (attrDef!.meta ?? []).some((cid) => {
       const tuple = state.entities[cid];
       return tuple?.props._docType === 'tuple' &&
         tuple.children?.[0] === SYS_A.NODE_SUPERTAGS &&
@@ -117,19 +104,11 @@ describe('node-store schema flows', () => {
     expect(hideTupleId).toBeTruthy();
     if (!autoCollectTupleId || !autoInitTupleId || !requiredTupleId || !hideTupleId) return;
 
-    // Default values in both children[1] and AssociatedData
+    // Default values stored in tuple.children[1]
     expect(state.entities[autoCollectTupleId].children?.[1]).toBe(SYS_V.YES);
     expect(state.entities[autoInitTupleId].children?.[1]).toBe(SYS_V.NO);
     expect(state.entities[requiredTupleId].children?.[1]).toBe(SYS_V.NO);
     expect(state.entities[hideTupleId].children?.[1]).toBe(SYS_V.NEVER);
-
-    // AssociatedData should also have the default values
-    const createdAttrDef = state.entities[created.id];
-    const autoCollectAssoc = createdAttrDef?.associationMap?.[autoCollectTupleId];
-    expect(autoCollectAssoc).toBeTruthy();
-    if (autoCollectAssoc) {
-      expect(state.entities[autoCollectAssoc]?.children?.[0]).toBe(SYS_V.YES);
-    }
 
     expect(collectNodeGraphErrors(useNodeStore.getState().entities)).toEqual([]);
   });
@@ -162,11 +141,6 @@ describe('node-store schema flows', () => {
     });
     expect(instanceTupleId).toBeTruthy();
     if (!instanceTupleId) return;
-
-    const assocId = state.entities.note_2.associationMap?.[instanceTupleId];
-    expect(assocId).toBeTruthy();
-    if (!assocId) return;
-    expect(state.entities[assocId]?.props._docType).toBe('associatedData');
 
     expect(collectNodeGraphErrors(useNodeStore.getState().entities)).toEqual([]);
   });

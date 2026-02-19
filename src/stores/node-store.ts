@@ -8,6 +8,9 @@
  */
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
+import { enableMapSet } from 'immer';
+
+enableMapSet();
 import { nanoid } from 'nanoid';
 import type { NodexNode, DocType, TextMark, InlineRefEntry } from '../types/index.js';
 import { WORKSPACE_CONTAINERS, SYS_A, SYS_D, SYS_T, SYS_V } from '../types/index.js';
@@ -55,6 +58,9 @@ interface NodeStore {
 
   /** IDs currently being fetched (prevent duplicate requests) */
   loading: Set<string>;
+
+  /** Node IDs with local content edits not yet persisted to Supabase */
+  _dirtyContentIds: Set<string>;
 
   // ─── Local state mutations ───
 
@@ -282,9 +288,24 @@ export const useNodeStore = create<NodeStore>()(
   immer((set, get) => ({
     entities: {},
     loading: new Set<string>(),
+    _dirtyContentIds: new Set<string>(),
 
     setNode: (node) =>
       set((state) => {
+        // If this node has unsaved local content edits, preserve them
+        // instead of blindly overwriting with (potentially stale) DB data.
+        if (state._dirtyContentIds.has(node.id)) {
+          const existing = state.entities[node.id];
+          if (existing) {
+            // Update metadata from the incoming node, keep local content
+            existing.version = Math.max(existing.version ?? 0, node.version ?? 0);
+            existing.updatedAt = node.updatedAt;
+            existing.updatedBy = node.updatedBy;
+            existing.children = node.children;
+            existing.meta = node.meta;
+            return;
+          }
+        }
         state.entities[node.id] = node;
       }),
 
@@ -342,6 +363,8 @@ export const useNodeStore = create<NodeStore>()(
         if (children.length > 0) {
           set((state) => {
             for (const child of children) {
+              // Skip overwriting entities with unsaved local content edits
+              if (state._dirtyContentIds.has(child.id)) continue;
               state.entities[child.id] = child;
             }
           });
@@ -414,8 +437,17 @@ export const useNodeStore = create<NodeStore>()(
         );
         await nodeService.addChild(parentId, id, userId, position);
 
+        // Merge DB metadata without overwriting content that may have been
+        // locally edited while the async write was in flight.
         set((state) => {
-          state.entities[node.id] = node;
+          const existing = state.entities[node.id];
+          if (existing) {
+            existing.version = node.version;
+            existing.updatedAt = node.updatedAt;
+            existing.updatedBy = node.updatedBy;
+          } else {
+            state.entities[node.id] = node;
+          }
         });
         return node;
       } catch {
@@ -498,8 +530,18 @@ export const useNodeStore = create<NodeStore>()(
         );
         await nodeService.addChild(parentId, id, userId, insertPosition);
 
+        // Merge DB metadata without overwriting content that may have been
+        // locally edited (via setNodeContentLocal) while the async write was
+        // in flight.
         set((state) => {
-          state.entities[newNode.id] = newNode;
+          const existing = state.entities[newNode.id];
+          if (existing) {
+            existing.version = newNode.version;
+            existing.updatedAt = newNode.updatedAt;
+            existing.updatedBy = newNode.updatedBy;
+          } else {
+            state.entities[newNode.id] = newNode;
+          }
         });
         return newNode;
       } catch {
@@ -521,6 +563,7 @@ export const useNodeStore = create<NodeStore>()(
           state.entities[id].props.name = name;
           state.entities[id].props._marks = marks.length > 0 ? marks : undefined;
           state.entities[id].props._inlineRefs = inlineRefs.length > 0 ? inlineRefs : undefined;
+          state._dirtyContentIds.add(id);
         }
       });
     },
@@ -544,6 +587,11 @@ export const useNodeStore = create<NodeStore>()(
 
       try {
         await nodeService.updateNode(id, { props: { name, _marks: marks, _inlineRefs: inlineRefs } }, userId);
+        // Content successfully persisted — clear dirty flag so Realtime events
+        // for this node can flow through normally.
+        set((state) => {
+          state._dirtyContentIds.delete(id);
+        });
       } catch {
         // Rollback
         set((state) => {

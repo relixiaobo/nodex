@@ -139,6 +139,10 @@ npm run test:run
 
 1. `setNodeContentLocal` 同步写入 `name + _marks + _inlineRefs`
 2. `updateNodeName` 路径保留已有 `_marks/_inlineRefs`（兼容旧调用）
+3. `setNodeContentLocal` 标记节点为 dirty（`_dirtyContentIds`）
+4. `setNode` 保留 dirty 节点的内容（不被 Realtime/fetch 覆盖）
+5. dirty 标记清除后 `setNode` 恢复正常全量替换
+6. `fetchChildren` 跳过 dirty 节点的覆盖
 
 ### 1.4 边界条件
 

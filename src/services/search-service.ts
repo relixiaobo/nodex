@@ -3,7 +3,7 @@
  *
  * 忠实复制 Tana 的搜索系统：
  *   - 搜索节点 (docType='search') 是持久化的动态查询
- *   - 搜索配置存储在 Metanode 的 Tuple 中：
+ *   - 搜索配置存储在 node.meta 的 Tuple 中：
  *       [SYS_A15, tagDefId]              搜索表达式
  *       [SYS_A15, tagDefId, filterTuple] 带过滤的搜索
  *       [SYS_A16, viewDefId]             视图配置

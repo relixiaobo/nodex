@@ -47,7 +47,7 @@ export async function getFieldValues(
 
     const keyId = child.children[0];
 
-    // 跳过系统属性 Tuple（SYS_A*）—— 这些属于 Metanode 级别的元数据
+    // 跳过系统属性 Tuple（SYS_A*）—— 这些属于 meta 级别的元数据
     if (keyId.startsWith('SYS_')) continue;
 
     const valueNodeId = child.children[1];
@@ -139,7 +139,7 @@ export async function getFieldOptions(
  * 设置节点的字段值。
  *
  * 如果字段 Tuple 已存在（通过 _sourceId 或 attrDefId 匹配），更新其 children[1]。
- * 如果不存在，创建新的 Tuple + AssociatedData。
+ * 如果不存在，创建新的 Tuple。
  *
  * @param nodeId 内容节点 ID
  * @param attrDefId 字段定义 ID

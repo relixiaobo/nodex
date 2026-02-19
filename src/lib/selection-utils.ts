@@ -4,16 +4,16 @@
  * Core principle: selecting a parent = implicitly selecting all descendants.
  * The selection set only stores root-level selected node IDs.
  */
-import type { NodexNode } from '../types/index.js';
+import * as loroDoc from './loro-doc.js';
 
 /**
  * Check if a node is selected — either directly or via a selected ancestor.
- * Walks up the _ownerId chain looking for any node in selectedIds.
+ * Walks up the parent chain (via loroDoc) looking for any node in selectedIds.
  */
 export function isNodeOrAncestorSelected(
   nodeId: string,
   selectedIds: Set<string>,
-  entities: Record<string, NodexNode>,
+  _entities?: unknown,
 ): boolean {
   if (selectedIds.size === 0) return false;
   if (selectedIds.has(nodeId)) return true;
@@ -21,9 +21,7 @@ export function isNodeOrAncestorSelected(
   let current = nodeId;
   const visited = new Set<string>();
   while (true) {
-    const node = entities[current];
-    if (!node) return false;
-    const parentId = node.props._ownerId;
+    const parentId = loroDoc.getParentId(current);
     if (!parentId || visited.has(parentId)) return false;
     visited.add(parentId);
     if (selectedIds.has(parentId)) return true;
@@ -37,14 +35,12 @@ export function isNodeOrAncestorSelected(
 export function hasSelectedAncestor(
   nodeId: string,
   selectedIds: Set<string>,
-  entities: Record<string, NodexNode>,
+  _entities?: unknown,
 ): boolean {
   if (selectedIds.size === 0) return false;
-  const node = entities[nodeId];
-  if (!node) return false;
-  const parentId = node.props._ownerId;
+  const parentId = loroDoc.getParentId(nodeId);
   if (!parentId) return false;
-  return isNodeOrAncestorSelected(parentId, selectedIds, entities);
+  return isNodeOrAncestorSelected(parentId, selectedIds);
 }
 
 /**
@@ -53,14 +49,12 @@ export function hasSelectedAncestor(
 function isAncestorOf(
   ancestorId: string,
   descendantId: string,
-  entities: Record<string, NodexNode>,
+  _entities?: unknown,
 ): boolean {
   let current = descendantId;
   const visited = new Set<string>();
   while (true) {
-    const node = entities[current];
-    if (!node) return false;
-    const parentId = node.props._ownerId;
+    const parentId = loroDoc.getParentId(current);
     if (!parentId || visited.has(parentId)) return false;
     visited.add(parentId);
     if (parentId === ancestorId) return true;
@@ -79,7 +73,7 @@ function isAncestorOf(
 export function toggleNodeInSelection(
   nodeId: string,
   currentSelection: Set<string>,
-  entities: Record<string, NodexNode>,
+  _entities?: unknown,
 ): Set<string> {
   // Already directly selected → deselect
   if (currentSelection.has(nodeId)) {
@@ -89,17 +83,15 @@ export function toggleNodeInSelection(
   }
 
   // Has a selected ancestor → ignore (already implicitly selected)
-  if (hasSelectedAncestor(nodeId, currentSelection, entities)) {
+  if (hasSelectedAncestor(nodeId, currentSelection)) {
     return currentSelection;
   }
 
   // Check if this node is an ancestor of any currently selected nodes → absorb
   const next = new Set(currentSelection);
-  let absorbed = false;
   for (const selectedId of currentSelection) {
-    if (isAncestorOf(nodeId, selectedId, entities)) {
+    if (isAncestorOf(nodeId, selectedId)) {
       next.delete(selectedId);
-      absorbed = true;
     }
   }
 
@@ -116,7 +108,7 @@ export function computeRangeSelection(
   anchorId: string,
   targetId: string,
   flatList: Array<{ nodeId: string; parentId: string }>,
-  entities: Record<string, NodexNode>,
+  _entities?: unknown,
 ): Set<string> {
   const anchorIdx = flatList.findIndex((n) => n.nodeId === anchorId);
   const targetIdx = flatList.findIndex((n) => n.nodeId === targetId);
@@ -133,14 +125,12 @@ export function computeRangeSelection(
     rangeIds.add(flatList[i].nodeId);
   }
 
-  return filterToRootLevel(rangeIds, entities, flatList);
+  return filterToRootLevel(rangeIds, undefined, flatList);
 }
 
 /**
  * Check if a node has a display-tree ancestor in the given set.
  * Walks up the flatList parentId chain (visual hierarchy) instead of _ownerId.
- * This correctly handles reference nodes whose _ownerId differs from their
- * display parent.
  */
 function hasDisplayAncestorInSet(
   nodeId: string,
@@ -160,15 +150,13 @@ function hasDisplayAncestorInSet(
 
 /**
  * Filter a set of node IDs to only root-level: remove any node whose ancestor
- * is also in the set. This enforces "select parent = select all descendants".
+ * is also in the set.
  *
- * When flatList is provided, uses display-tree hierarchy (parentId from flatList)
- * instead of _ownerId. This fixes reference nodes whose _ownerId points to
- * their original owner rather than the display context parent.
+ * When flatList is provided, uses display-tree hierarchy (parentId from flatList).
  */
 export function filterToRootLevel(
   nodeIds: Set<string>,
-  entities: Record<string, NodexNode>,
+  _entities?: unknown,
   flatList?: Array<{ nodeId: string; parentId: string }>,
 ): Set<string> {
   if (flatList) {
@@ -186,7 +174,7 @@ export function filterToRootLevel(
   }
   const result = new Set<string>();
   for (const id of nodeIds) {
-    if (!hasSelectedAncestor(id, nodeIds, entities)) {
+    if (!hasSelectedAncestor(id, nodeIds)) {
       result.add(id);
     }
   }
@@ -208,8 +196,6 @@ export function getFirstSelectedInOrder(
 
 /**
  * Check if a node is selected or has a display-ancestor that is selected.
- * Uses flatList parentId chain (display hierarchy) to correctly handle
- * reference nodes.
  */
 function isNodeOrDisplayAncestorSelected(
   nodeId: string,
@@ -230,18 +216,12 @@ function isNodeOrDisplayAncestorSelected(
 
 /**
  * Get effective selection bounds including implicitly selected descendants.
- * When a parent is selected, all its visible descendants count toward the bounds.
- * Returns flat-list indices (not node references) for use in extend operations.
- *
- * Uses display hierarchy (flatList parentId) instead of _ownerId to correctly
- * handle reference nodes.
  */
 export function getEffectiveSelectionBounds(
   selectedIds: Set<string>,
   flatList: Array<{ nodeId: string; parentId: string }>,
-  entities: Record<string, NodexNode>,
+  _entities?: unknown,
 ): { firstIdx: number; lastIdx: number } | null {
-  // Build display parent map from flatList
   const displayParent = new Map<string, string>();
   for (const item of flatList) {
     displayParent.set(item.nodeId, item.parentId);
@@ -262,7 +242,6 @@ export function getEffectiveSelectionBounds(
 
 /**
  * Return the selected node IDs in visible (flat-list) order.
- * Used by batch operations to iterate in correct traversal direction.
  */
 export function getSelectedIdsInOrder(
   selectedIds: Set<string>,
@@ -275,7 +254,6 @@ export function getSelectedIdsInOrder(
 
 /**
  * Get the topmost and bottommost selected nodes in visible order.
- * Used for ↑/↓ navigation from multi-select.
  */
 export function getSelectionBounds(
   selectedIds: Set<string>,

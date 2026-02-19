@@ -7,18 +7,19 @@ import { ATTRDEF_CONFIG_MAP } from '../lib/field-utils.js';
 
 export function useHasFields(nodeId: string): boolean {
   return useNodeStore((state) => {
-    const node = state.entities[nodeId];
+    void state._version;
+    const node = state.getNode(nodeId);
     if (!node?.children) return false;
 
-    const isAttrDef = node.props._docType === 'attrDef';
+    const isFieldDef = node.type === 'fieldDef';
 
     for (const childId of node.children) {
-      const child = state.entities[childId];
-      if (child?.props._docType !== 'tuple' || !child.children?.length) continue;
-      const keyId = child.children[0];
-      // attrDef nodes: config tuples from SYS_T02 template count as fields
-      if (isAttrDef && ATTRDEF_CONFIG_MAP.has(keyId)) return true;
-      if (!keyId.startsWith('SYS_') && !keyId.startsWith('NDX_') && state.entities[keyId]?.props._docType === 'attrDef') {
+      const child = state.getNode(childId);
+      if (child?.type !== 'fieldEntry' || !child.fieldDefId) continue;
+      const keyId = child.fieldDefId;
+      // fieldDef nodes: config fieldEntries from SYS_T02 template count as fields
+      if (isFieldDef && ATTRDEF_CONFIG_MAP.has(keyId)) return true;
+      if (!keyId.startsWith('SYS_') && !keyId.startsWith('NDX_') && state.getNode(keyId)?.type === 'fieldDef') {
         return true;
       }
     }

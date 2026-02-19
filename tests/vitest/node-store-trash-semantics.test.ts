@@ -1,75 +1,135 @@
-import { SYS_A } from '../../src/types/index.js';
+/**
+ * node-store trash semantics — Loro model.
+ * trashNode(nodeId): sync, moves to CONTAINER_IDS.TRASH.
+ * restoreNode(nodeId): sync, moves back to original parent.
+ * Tags on other nodes are NOT affected by trashing the tagDef.
+ */
+import { describe, it, expect, beforeEach } from 'vitest';
 import { useNodeStore } from '../../src/stores/node-store.js';
+import * as loroDoc from '../../src/lib/loro-doc.js';
+import { CONTAINER_IDS } from '../../src/types/index.js';
 import { collectNodeGraphErrors } from './helpers/invariants.js';
 import { resetAndSeed } from './helpers/test-state.js';
 
-describe('node-store trash semantics', () => {
+describe('trashNode', () => {
   beforeEach(() => {
     resetAndSeed();
   });
 
-  it('trashing a tagDef keeps existing tag bindings and template field instances', async () => {
-    const taskNode = useNodeStore.getState().entities.task_1;
-    expect(taskNode.meta?.length).toBeGreaterThan(0);
-
-    await useNodeStore.getState().trashNode('tagDef_task', 'ws_default', 'user_default');
-
-    const state = useNodeStore.getState();
-    expect(state.entities.tagDef_task.props._ownerId).toBe('ws_default_TRASH');
-    expect(state.entities.ws_default_TRASH.children ?? []).toContain('tagDef_task');
-
-    const stillHasTagBinding = (state.entities.task_1.meta ?? []).some((cid) => {
-      const t = state.entities[cid];
-      return t?.props._docType === 'tuple' &&
-        t.children?.[0] === SYS_A.NODE_SUPERTAGS &&
-        t.children?.[1] === 'tagDef_task';
-    });
-    expect(stillHasTagBinding).toBe(true);
-
-    // Pre-seeded template field tuple on task_1 should remain.
-    expect(state.entities.task_1.children ?? []).toContain('task1_fld_status');
-    expect(state.entities.task1_fld_status.props._sourceId).toBe('taskField_status');
-
-    expect(collectNodeGraphErrors(useNodeStore.getState().entities)).toEqual([]);
+  it('moves node to CONTAINER_IDS.TRASH', () => {
+    useNodeStore.getState().trashNode('idea_1');
+    expect(loroDoc.getParentId('idea_1')).toBe(CONTAINER_IDS.TRASH);
+    expect(loroDoc.getChildren(CONTAINER_IDS.TRASH)).toContain('idea_1');
   });
 
-  it('trashing an attrDef preserves existing field instances but detaches template tuple key', async () => {
-    expect(useNodeStore.getState().entities.task1_fld_status.children?.[0]).toBe('attrDef_status');
-    expect(useNodeStore.getState().entities.taskField_status.children?.[0]).toBe('attrDef_status');
-
-    await useNodeStore.getState().trashNode('attrDef_status', 'ws_default', 'user_default');
-
-    const state = useNodeStore.getState();
-    expect(state.entities.attrDef_status.props._ownerId).toBe('ws_default_TRASH');
-    expect(state.entities.ws_default_TRASH.children ?? []).toContain('attrDef_status');
-
-    // Existing instantiated content field still references trashed attrDef.
-    expect(state.entities.task1_fld_status.children?.[0]).toBe('attrDef_status');
-    // Template tuple no longer points to attrDef (owner-child unlink during trash).
-    expect(state.entities.taskField_status.children?.[0]).toBeUndefined();
-
-    expect(collectNodeGraphErrors(useNodeStore.getState().entities)).toEqual([]);
+  it('removes node from original parent children', () => {
+    useNodeStore.getState().trashNode('idea_1');
+    expect(loroDoc.getChildren('note_2')).not.toContain('idea_1');
   });
 
-  it('removeTag still cleans template-sourced tuples even after tagDef is trashed', async () => {
-    await useNodeStore.getState().applyTag('note_2', 'tagDef_task', 'ws_default', 'user_default');
+  it('trashing tagDef moves it to TRASH', () => {
+    useNodeStore.getState().trashNode('tagDef_task');
+    expect(loroDoc.getParentId('tagDef_task')).toBe(CONTAINER_IDS.TRASH);
+    expect(loroDoc.getChildren(CONTAINER_IDS.TRASH)).toContain('tagDef_task');
+  });
 
-    const appliedTupleIds = (useNodeStore.getState().entities.note_2.children ?? []).filter((cid) => {
-      const child = useNodeStore.getState().entities[cid];
-      return child?.props._docType === 'tuple' &&
-        ['taskField_status', 'taskField_priority', 'taskField_due', 'taskField_done'].includes(child.props._sourceId ?? '');
+  it('trashing tagDef does not remove tag from nodes that had it applied', () => {
+    // task_1 has tagDef_task in its tags
+    const taskBefore = loroDoc.toNodexNode('task_1')!;
+    expect(taskBefore.tags).toContain('tagDef_task');
+
+    useNodeStore.getState().trashNode('tagDef_task');
+
+    // task_1 still has the tag (tags array not cleaned up on trash)
+    const taskAfter = loroDoc.toNodexNode('task_1')!;
+    expect(taskAfter.tags).toContain('tagDef_task');
+  });
+
+  it('graph is valid after trashNode', () => {
+    useNodeStore.getState().trashNode('idea_1');
+    expect(collectNodeGraphErrors()).toEqual([]);
+  });
+
+  it('multiple nodes can be trashed', () => {
+    useNodeStore.getState().trashNode('idea_1');
+    useNodeStore.getState().trashNode('idea_2');
+    expect(loroDoc.getChildren(CONTAINER_IDS.TRASH)).toContain('idea_1');
+    expect(loroDoc.getChildren(CONTAINER_IDS.TRASH)).toContain('idea_2');
+    expect(collectNodeGraphErrors()).toEqual([]);
+  });
+});
+
+describe('restoreNode', () => {
+  beforeEach(() => {
+    resetAndSeed();
+  });
+
+  it('restores node to its original parent', () => {
+    const originalParent = loroDoc.getParentId('idea_1'); // note_2
+    useNodeStore.getState().trashNode('idea_1');
+    useNodeStore.getState().restoreNode('idea_1');
+
+    expect(loroDoc.getParentId('idea_1')).toBe(originalParent);
+    expect(loroDoc.getChildren(originalParent!)).toContain('idea_1');
+    expect(loroDoc.getChildren(CONTAINER_IDS.TRASH)).not.toContain('idea_1');
+  });
+
+  it('restores to original position', () => {
+    // note_2 children: [idea_1, idea_2]
+    useNodeStore.getState().trashNode('idea_1'); // trashes first child
+    useNodeStore.getState().restoreNode('idea_1');
+
+    const children = loroDoc.getChildren('note_2');
+    expect(children[0]).toBe('idea_1');
+  });
+
+  it('graph is valid after restore', () => {
+    useNodeStore.getState().trashNode('idea_1');
+    useNodeStore.getState().restoreNode('idea_1');
+    expect(collectNodeGraphErrors()).toEqual([]);
+  });
+
+  it('restores to LIBRARY when original parent is gone', () => {
+    // Trash the parent first, then the node
+    useNodeStore.getState().trashNode('note_2');
+    // note_2 is now in TRASH, idea_1 is a child of note_2 (still in note_2)
+    // Now trash idea_1 separately (it's moved with note_2 to trash already)
+    // Test with a fresh node whose parent will be missing
+    const newNode = useNodeStore.getState().createChild('note_2', undefined, { name: 'Orphan test' });
+    const newId = newNode.id;
+    loroDoc.setNodeData(newId, '_trashedFrom', 'nonexistent_parent');
+    loroDoc.setNodeData(newId, '_trashedIndex', 0);
+    loroDoc.moveNode(newId, CONTAINER_IDS.TRASH);
+
+    useNodeStore.getState().restoreNode(newId);
+    expect(loroDoc.getParentId(newId)).toBe(CONTAINER_IDS.LIBRARY);
+  });
+});
+
+describe('removeTag after trashNode', () => {
+  beforeEach(() => {
+    resetAndSeed();
+  });
+
+  it('removeTag still cleans fieldEntries even after tagDef is trashed', () => {
+    useNodeStore.getState().applyTag('note_2', 'tagDef_task');
+
+    const statusFe = loroDoc.getChildren('note_2').find(cid => {
+      const n = loroDoc.toNodexNode(cid);
+      return n?.type === 'fieldEntry' && n.fieldDefId === 'attrDef_status';
     });
-    expect(appliedTupleIds.length).toBe(4);
+    expect(statusFe).toBeTruthy();
 
-    await useNodeStore.getState().trashNode('tagDef_task', 'ws_default', 'user_default');
-    await useNodeStore.getState().removeTag('note_2', 'tagDef_task', 'user_default');
+    useNodeStore.getState().trashNode('tagDef_task');
+    useNodeStore.getState().removeTag('note_2', 'tagDef_task');
 
-    const state = useNodeStore.getState();
-    for (const tupleId of appliedTupleIds) {
-      expect(state.entities.note_2.children ?? []).not.toContain(tupleId);
-      expect(state.entities[tupleId]).toBeUndefined();
-    }
+    // fieldEntry for attrDef_status should be removed
+    const remaining = loroDoc.getChildren('note_2').find(cid => {
+      const n = loroDoc.toNodexNode(cid);
+      return n?.type === 'fieldEntry' && n.fieldDefId === 'attrDef_status';
+    });
+    expect(remaining).toBeUndefined();
 
-    expect(collectNodeGraphErrors(useNodeStore.getState().entities)).toEqual([]);
+    expect(collectNodeGraphErrors()).toEqual([]);
   });
 });

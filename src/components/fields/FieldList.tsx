@@ -17,8 +17,9 @@ export function FieldList({ nodeId }: FieldListProps) {
   const allFields = useNodeFields(nodeId);
   const isDefinitionNode = useNodeStore(
     (s) => {
-      const dt = s.entities[nodeId]?.props._docType;
-      return dt === 'attrDef' || dt === 'tagDef';
+      void s._version;
+      const dt = s.getNode(nodeId)?.type;
+      return dt === 'fieldDef' || dt === 'tagDef';
     },
   );
 

@@ -1,149 +1,105 @@
-import { SYS_A } from '../../src/types/index.js';
+/**
+ * Default Child Supertag — auto-tagging children with parent's configured childSupertag.
+ *
+ * Loro model:
+ * - store.setConfigValue(tagDefId, 'childSupertag', childTagDefId) sets directly
+ * - resolveChildSupertags({}, parentId) reads tagDef.childSupertag via LoroDoc
+ * - createChild/createSibling auto-applies childSupertag from parent's tags
+ */
+import { describe, it, expect, beforeEach } from 'vitest';
 import { useNodeStore } from '../../src/stores/node-store.js';
 import { resolveChildSupertags } from '../../src/lib/field-utils.js';
+import * as loroDoc from '../../src/lib/loro-doc.js';
 import { resetAndSeed } from './helpers/test-state.js';
 
-/** Check if a node has a specific tag via its node.meta SYS_A13 tuples. */
-function hasTag(nodeId: string, tagDefId: string): boolean {
-  const state = useNodeStore.getState();
-  const node = state.entities[nodeId];
-  if (!node?.meta || node.meta.length === 0) return false;
-  return node.meta.some((cid) => {
-    const t = state.entities[cid];
-    return t?.props._docType === 'tuple' &&
-      t.children?.[0] === SYS_A.NODE_SUPERTAGS &&
-      t.children?.[1] === tagDefId;
-  });
-}
-
-/** Set the SYS_A14 (CHILD_SUPERTAG) config value on a tagDef's config tuple. */
-function setChildSupertag(tagDefId: string, childTagDefId: string) {
-  const state = useNodeStore.getState();
-  const tagDef = state.entities[tagDefId];
-  if (!tagDef?.children) throw new Error(`tagDef ${tagDefId} not found`);
-
-  // Find the SYS_A14 config tuple and write value into children[1]
-  for (const cid of tagDef.children) {
-    const child = state.entities[cid];
-    if (
-      child?.props._docType === 'tuple' &&
-      child.children?.[0] === SYS_A.CHILD_SUPERTAG
-    ) {
-      useNodeStore.setState((prev) => {
-        const tuple = prev.entities[cid];
-        if (tuple) {
-          tuple.children = [SYS_A.CHILD_SUPERTAG, childTagDefId];
-        }
-      });
-      return;
-    }
-  }
-  throw new Error(`SYS_A14 config tuple not found on ${tagDefId}`);
-}
-
-describe('Default Child Supertag (SYS_A14)', () => {
+describe('Default Child Supertag', () => {
   beforeEach(() => {
     resetAndSeed();
   });
 
   describe('resolveChildSupertags', () => {
-    it('returns empty for parent without tags', () => {
-      const entities = useNodeStore.getState().entities;
-      const result = resolveChildSupertags(entities, 'note_2');
+    it('returns empty for parent without tags (note_2)', () => {
+      const result = resolveChildSupertags({}, 'note_2');
       expect(result).toEqual([]);
     });
 
-    it('returns empty for parent with tag but no SYS_A14 configured', () => {
-      const entities = useNodeStore.getState().entities;
-      // task_1 is tagged with tagDef_task, which has no child supertag set
-      const result = resolveChildSupertags(entities, 'task_1');
+    it('returns empty when tagged parent has no childSupertag configured', () => {
+      // task_1 is tagged with tagDef_task, which has no childSupertag set
+      const result = resolveChildSupertags({}, 'task_1');
       expect(result).toEqual([]);
     });
 
-    it('returns child tag ID when SYS_A14 is configured', () => {
-      // Configure tagDef_task to have default child = tagDef_dev_task
-      setChildSupertag('tagDef_task', 'tagDef_dev_task');
-
-      const entities = useNodeStore.getState().entities;
-      const result = resolveChildSupertags(entities, 'task_1');
+    it('returns childTagDefId when childSupertag is configured', () => {
+      useNodeStore.getState().setConfigValue('tagDef_task', 'childSupertag', 'tagDef_dev_task');
+      const result = resolveChildSupertags({}, 'task_1');
       expect(result).toEqual(['tagDef_dev_task']);
     });
 
     it('returns empty for nonexistent parent', () => {
-      const entities = useNodeStore.getState().entities;
-      const result = resolveChildSupertags(entities, 'nonexistent');
+      const result = resolveChildSupertags({}, 'nonexistent_node');
       expect(result).toEqual([]);
     });
   });
 
   describe('createChild auto-tag', () => {
-    it('auto-applies tag when parent has SYS_A14 configured', async () => {
-      // Configure tagDef_task default child = tagDef_dev_task
-      setChildSupertag('tagDef_task', 'tagDef_dev_task');
+    it('auto-applies childSupertag when parent tag has childSupertag configured', () => {
+      useNodeStore.getState().setConfigValue('tagDef_task', 'childSupertag', 'tagDef_dev_task');
 
-      // task_1 is already tagged with tagDef_task
-      const child = await useNodeStore.getState().createChild(
-        'task_1', 'ws_default', 'user_default', 'New subtask',
-      );
+      // task_1 is tagged with tagDef_task
+      const child = useNodeStore.getState().createChild('task_1', undefined, { name: 'New subtask' });
 
-      expect(hasTag(child.id, 'tagDef_dev_task')).toBe(true);
+      const childNode = loroDoc.toNodexNode(child.id)!;
+      expect(childNode.tags).toContain('tagDef_dev_task');
     });
 
-    it('does not auto-apply when parent has no SYS_A14', async () => {
-      // task_1 is tagged with tagDef_task but no SYS_A14 configured
-      const child = await useNodeStore.getState().createChild(
-        'task_1', 'ws_default', 'user_default', 'New subtask',
-      );
+    it('does not auto-apply when parent tag has no childSupertag', () => {
+      // tagDef_task has no childSupertag configured
+      const child = useNodeStore.getState().createChild('task_1', undefined, { name: 'New subtask' });
 
-      expect(hasTag(child.id, 'tagDef_dev_task')).toBe(false);
-      expect(child.meta).toBeUndefined();
+      const childNode = loroDoc.toNodexNode(child.id)!;
+      expect(childNode.tags).not.toContain('tagDef_dev_task');
+      expect(childNode.tags).toHaveLength(0);
     });
 
-    it('does not auto-apply when parent has no tags', async () => {
-      const child = await useNodeStore.getState().createChild(
-        'note_2', 'ws_default', 'user_default', 'New idea',
-      );
+    it('does not auto-apply when parent has no tags', () => {
+      // note_2 has no tags
+      const child = useNodeStore.getState().createChild('note_2', undefined, { name: 'New idea' });
 
-      expect(child.meta).toBeUndefined();
+      const childNode = loroDoc.toNodexNode(child.id)!;
+      expect(childNode.tags).toHaveLength(0);
     });
 
-    it('handles multiple tags with different SYS_A14 values', async () => {
-      // Configure tagDef_task → child = tagDef_person
-      setChildSupertag('tagDef_task', 'tagDef_person');
+    it('applies multiple childSupertags when parent has multiple tags with different childSupertag values', () => {
+      useNodeStore.getState().setConfigValue('tagDef_task', 'childSupertag', 'tagDef_person');
+      useNodeStore.getState().applyTag('task_1', 'tagDef_dev_task');
+      useNodeStore.getState().setConfigValue('tagDef_dev_task', 'childSupertag', 'tagDef_web_clip');
 
-      // Apply a second tag (tagDef_dev_task) to task_1 with its own child supertag
-      await useNodeStore.getState().applyTag('task_1', 'tagDef_dev_task', 'ws_default', 'user_default');
-      setChildSupertag('tagDef_dev_task', 'tagDef_web_clip');
+      const child = useNodeStore.getState().createChild('task_1', undefined, { name: 'Multi-tag child' });
 
-      const child = await useNodeStore.getState().createChild(
-        'task_1', 'ws_default', 'user_default', 'Multi-tag child',
-      );
-
-      expect(hasTag(child.id, 'tagDef_person')).toBe(true);
-      expect(hasTag(child.id, 'tagDef_web_clip')).toBe(true);
+      const childNode = loroDoc.toNodexNode(child.id)!;
+      // Both childSupertags from task's two tags should be applied
+      expect(childNode.tags).toContain('tagDef_person');
+      expect(childNode.tags).toContain('tagDef_web_clip');
     });
   });
 
   describe('createSibling auto-tag', () => {
-    it('auto-applies tag when sibling parent has SYS_A14 configured', async () => {
-      // Configure tagDef_task default child = tagDef_dev_task
-      setChildSupertag('tagDef_task', 'tagDef_dev_task');
+    it('auto-applies childSupertag when sibling parent has it configured', () => {
+      useNodeStore.getState().setConfigValue('tagDef_task', 'childSupertag', 'tagDef_dev_task');
 
       // subtask_1a's parent is task_1 (tagged with tagDef_task)
-      const sibling = await useNodeStore.getState().createSibling(
-        'subtask_1a', 'ws_default', 'user_default', 'New sibling',
-      );
+      const sibling = useNodeStore.getState().createSibling('subtask_1a', { name: 'New sibling' });
 
-      expect(hasTag(sibling.id, 'tagDef_dev_task')).toBe(true);
+      const siblingNode = loroDoc.toNodexNode(sibling.id)!;
+      expect(siblingNode.tags).toContain('tagDef_dev_task');
     });
 
-    it('does not auto-apply for sibling when parent has no SYS_A14', async () => {
-      // subtask_1a's parent is task_1 (tagged but no SYS_A14)
-      const sibling = await useNodeStore.getState().createSibling(
-        'subtask_1a', 'ws_default', 'user_default', 'New sibling',
-      );
+    it('does not auto-apply when parent has no childSupertag', () => {
+      // subtask_1a's parent is task_1, but no childSupertag configured
+      const sibling = useNodeStore.getState().createSibling('subtask_1a', { name: 'New sibling' });
 
-      expect(sibling.meta).toBeUndefined();
+      const siblingNode = loroDoc.toNodexNode(sibling.id)!;
+      expect(siblingNode.tags).toHaveLength(0);
     });
   });
 });

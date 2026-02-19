@@ -22,9 +22,9 @@ import { NodePicker, type NodePickerOption } from './NodePicker';
 import { BulletChevron } from '../outliner/BulletChevron';
 import { SYS_D, SYS_V } from '../../types';
 import { ColorSwatchPicker } from './ColorSwatchPicker';
-import { useWorkspaceStore } from '../../stores/workspace-store';
 import { DatePicker, formatDateDisplay } from './DatePicker.js';
 import { useUIStore } from '../../stores/ui-store.js';
+import * as loroDoc from '../../lib/loro-doc.js';
 
 interface FieldValueOutlinerProps {
   tupleId: string;
@@ -46,15 +46,16 @@ export function shouldShowFieldValueTrailingInput(
 export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, onNavigateOut }: FieldValueOutlinerProps) {
   useChildren(tupleId);
 
-  // Values are tuple.children[1:] — skip children[0] which is the key (attrDefId)
+  // Values are fieldEntry.children (no key prefix in new model)
   const childIdsJson = useNodeStore((s) => {
-    const t = s.entities[tupleId];
-    const c = t?.children?.slice(1) ?? [];
+    void s._version;
+    const t = s.getNode(tupleId);
+    const c = t?.children ?? [];
     return JSON.stringify(c);
   });
   const childIds: string[] = useMemo(() => JSON.parse(childIdsJson), [childIdsJson]);
 
-  const entities = useNodeStore((s) => s.entities);
+  const _version = useNodeStore((s) => s._version);
 
   // Detect fields on the Tuple (created via > trigger inside field values)
   const fields = useNodeFields(tupleId);
@@ -71,13 +72,14 @@ export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, onNaviga
       if (fieldMap.has(cid)) {
         result.push({ id: cid, type: 'field' });
       } else {
-        const dt = entities[cid]?.props._docType;
-        if (!dt) result.push({ id: cid, type: 'content' });
-        // else skip: SYS tuple, tag tuple, etc.
+        const nodeType = useNodeStore.getState().getNode(cid)?.type;
+        if (!nodeType) result.push({ id: cid, type: 'content' });
+        // else skip: fieldEntry, reference, etc.
       }
     }
     return result;
-  }, [childIds, fieldMap, entities]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [childIds, fieldMap, _version]);
 
   const contentChildIds = useMemo(
     () => visibleChildren.filter((c) => c.type === 'content').map((c) => c.id),
@@ -85,12 +87,10 @@ export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, onNaviga
   );
 
   // --- Special control early returns (Boolean, Checkbox, Date) ---
-  const wsId = useWorkspaceStore((s) => s.currentWorkspaceId);
-  const userId = useWorkspaceStore((s) => s.userId);
   const toggleCheckboxField = useNodeStore((s) => s.toggleCheckboxField);
-  const setConfigValue = useNodeStore((s) => s.setConfigValue);
+  const setFieldValue = useNodeStore((s) => s.setFieldValue);
   const createChild = useNodeStore((s) => s.createChild);
-  const updateNodeName = useNodeStore((s) => s.updateNodeName);
+  const setNodeName = useNodeStore((s) => s.setNodeName);
   const setFocusedNode = useUIStore((s) => s.setFocusedNode);
   const clearFocus = useUIStore((s) => s.clearFocus);
   const setEditingFieldName = useUIStore((s) => s.setEditingFieldName);
@@ -108,9 +108,10 @@ export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, onNaviga
         <BulletChevron hasChildren={false} isExpanded={false} onBulletClick={() => {}} />
         <button
           onClick={() => {
-            if (!userId) return;
             const newVal = isYes ? SYS_V.NO : SYS_V.YES;
-            setConfigValue(tupleId, newVal, userId);
+            const parentId = loroDoc.getParentId(tupleId) ?? '';
+            const fieldDefId = loroDoc.toNodexNode(tupleId)?.fieldDefId ?? '';
+            if (parentId && fieldDefId) setFieldValue(parentId, fieldDefId, [newVal]);
           }}
           className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
             isYes ? 'bg-primary' : 'bg-muted'
@@ -144,8 +145,8 @@ export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, onNaviga
   const isCheckbox = fieldDataType === SYS_D.CHECKBOX;
   if (isCheckbox) {
     const valueNodeId = contentChildIds[0];
-    const valueNode = valueNodeId ? entities[valueNodeId] : undefined;
-    const checked = valueNode?.props.name === SYS_V.YES;
+    const valueNode = valueNodeId ? useNodeStore.getState().getNode(valueNodeId) : undefined;
+    const isChecked = valueNode?.name === SYS_V.YES;
 
     // paddingLeft: 6(base) + 15(chevron space) + 4(gap-1) = 25
     // Then BulletChevron (15px) + gap-2 (8px) + checkbox → bullet aligns with sibling fields
@@ -154,10 +155,8 @@ export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, onNaviga
         <BulletChevron hasChildren={false} isExpanded={false} onBulletClick={() => {}} />
         <input
           type="checkbox"
-          checked={checked}
-          onChange={() => {
-            if (wsId && userId) toggleCheckboxField(tupleId, wsId, userId);
-          }}
+          checked={isChecked}
+          onChange={() => toggleCheckboxField(tupleId)}
           className="mt-[3px] h-3.5 w-3.5 rounded border-border accent-primary cursor-pointer"
         />
       </div>
@@ -167,23 +166,22 @@ export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, onNaviga
   // --- DATE: click-to-pick, similar to Options pattern ---
   if (fieldDataType === SYS_D.DATE) {
     const valueNodeId = contentChildIds[0];
-    const valueNode = valueNodeId ? entities[valueNodeId] : undefined;
-    const currentValue = valueNode?.props.name ?? '';
+    const valueNode = valueNodeId ? useNodeStore.getState().getNode(valueNodeId) : undefined;
+    const currentValue = valueNode?.name ?? '';
 
     return (
       <DatePickerField
         value={currentValue}
         onSelect={(v) => {
-          if (!wsId || !userId) return;
           if (v === '') {
             // Clear: if value node exists, set name to empty
-            if (valueNodeId) updateNodeName(valueNodeId, '', userId);
+            if (valueNodeId) setNodeName(valueNodeId, '');
             return;
           }
           if (valueNodeId) {
-            updateNodeName(valueNodeId, v, userId);
+            setNodeName(valueNodeId, v);
           } else {
-            createChild(tupleId, wsId, userId, v);
+            createChild(tupleId, undefined, { name: v });
           }
         }}
       />
@@ -211,7 +209,7 @@ export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, onNaviga
       useUIStore.getState().setFocusClickCoords({
         nodeId: last.id,
         parentId: tupleId,
-        textOffset: (useNodeStore.getState().entities[last.id]?.props.name ?? '').length,
+        textOffset: (useNodeStore.getState().getNode(last.id)?.name ?? '').length,
       });
       setFocusedNode(last.id, tupleId);
       return;
@@ -259,7 +257,7 @@ export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, onNaviga
         <TrailingInput
           parentId={tupleId}
           depth={0}
-          parentExpandKey={`${entities[tupleId]?.props._ownerId ?? ''}:${tupleId}`}
+          parentExpandKey={`${loroDoc.getParentId(tupleId) ?? ''}:${tupleId}`}
           fieldDataType={fieldDataType}
           attrDefId={attrDefId}
           onNavigateOut={handleTrailingNavigateOut}
@@ -272,13 +270,14 @@ export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, onNaviga
 /** Single-select supertag picker for OPTIONS_FROM_SUPERTAG config fields. */
 function SupertagPickerField({ tupleId }: { tupleId: string }) {
   const tags = useWorkspaceTags();
-  const setConfigValue = useNodeStore((s) => s.setConfigValue);
-  const userId = useWorkspaceStore((s) => s.userId);
+  const setFieldValue = useNodeStore((s) => s.setFieldValue);
+  const clearFieldValue = useNodeStore((s) => s.clearFieldValue);
 
-  // Read selected value from tuple.children[1] (first value after the key)
+  // Read selected value from fieldEntry.children[0] (first value in new model)
   const selectedId = useNodeStore((s) => {
-    const tuple = s.entities[tupleId];
-    return tuple?.children?.[1] || undefined;
+    void s._version;
+    const tuple = s.getNode(tupleId);
+    return tuple?.children?.[0] || undefined;
   });
 
   const options: NodePickerOption[] = useMemo(
@@ -288,16 +287,18 @@ function SupertagPickerField({ tupleId }: { tupleId: string }) {
 
   const handleSelect = useCallback(
     (id: string) => {
-      if (!userId) return;
-      setConfigValue(tupleId, id, userId);
+      const parentId = loroDoc.getParentId(tupleId) ?? '';
+      const fieldDefId = loroDoc.toNodexNode(tupleId)?.fieldDefId ?? '';
+      if (parentId && fieldDefId) setFieldValue(parentId, fieldDefId, [id]);
     },
-    [userId, tupleId, setConfigValue],
+    [tupleId, setFieldValue],
   );
 
   const handleClear = useCallback(() => {
-    if (!userId) return;
-    setConfigValue(tupleId, '', userId);
-  }, [userId, tupleId, setConfigValue]);
+    const parentId = loroDoc.getParentId(tupleId) ?? '';
+    const fieldDefId = loroDoc.toNodexNode(tupleId)?.fieldDefId ?? '';
+    if (parentId && fieldDefId) clearFieldValue(parentId, fieldDefId);
+  }, [tupleId, clearFieldValue]);
 
   return (
     <NodePicker

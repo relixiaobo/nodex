@@ -1,23 +1,18 @@
-import { seedTestData } from '../../../src/entrypoints/test/seed-data.js';
-import { resetSupabase } from '../../../src/services/supabase.js';
+import { seedTestDataSync } from '../../../src/entrypoints/test/seed-data.js';
+import { resetLoroDoc } from '../../../src/lib/loro-doc.js';
 import { useNodeStore } from '../../../src/stores/node-store.js';
 import { useUIStore } from '../../../src/stores/ui-store.js';
 import { useWorkspaceStore } from '../../../src/stores/workspace-store.js';
 
 /**
- * Reset all in-memory stores to a clean baseline before each test.
- * We intentionally keep Supabase disconnected for deterministic offline tests.
+ * Reset all in-memory stores and LoroDoc to a clean baseline before each test.
+ * Supabase disconnected for deterministic offline tests.
  */
 export function resetStores(): void {
-  resetSupabase();
+  resetLoroDoc();
   localStorage.clear();
 
-  useNodeStore.setState({
-    entities: {},
-    loading: new Set<string>(),
-    _dirtyContentIds: new Set<string>(),
-    _pendingChildrenOps: new Map<string, number>(),
-  });
+  useNodeStore.setState({ _version: 0 });
 
   useWorkspaceStore.setState({
     currentWorkspaceId: null,
@@ -51,6 +46,5 @@ export function resetStores(): void {
 
 export function resetAndSeed(): void {
   resetStores();
-  seedTestData();
+  seedTestDataSync();
 }
-

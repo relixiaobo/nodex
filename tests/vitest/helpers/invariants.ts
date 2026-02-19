@@ -1,47 +1,28 @@
-import type { NodexNode } from '../../../src/types/index.js';
+import * as loroDoc from '../../../src/lib/loro-doc.js';
 
 /**
- * Core structural invariants for outliner tree safety.
- * These checks catch silent corruption after move/indent/outdent/trash flows.
+ * Core structural invariants for outliner tree safety (Loro model).
+ * Verifies that all node children are in LoroDoc and have the correct parent.
  */
-export function collectNodeGraphErrors(entities: Record<string, NodexNode>): string[] {
+export function collectNodeGraphErrors(): string[] {
   const errors: string[] = [];
-  const tupleValueRefs = new Set<string>();
+  const allIds = loroDoc.getAllNodeIds();
 
-  for (const node of Object.values(entities)) {
-    if (node.props._docType !== 'tuple') continue;
-    for (const childId of node.children?.slice(1) ?? []) {
-      tupleValueRefs.add(childId);
-    }
-  }
-
-  for (const [nodeId, node] of Object.entries(entities)) {
-    const ownerId = node.props._ownerId;
-    const docType = node.props._docType;
-
-    // meta tuples are linked via owner.meta, not owner.children
-    if (ownerId) {
-      const owner = entities[ownerId];
-      if (!owner) {
-        errors.push(`owner missing: node=${nodeId} owner=${ownerId}`);
-      } else if (
-        !owner.children?.includes(nodeId) &&
-        !owner.meta?.includes(nodeId) &&
-        !tupleValueRefs.has(nodeId)
-      ) {
-        errors.push(`owner-child mismatch: node=${nodeId} owner=${ownerId}`);
-      }
-    }
-
-    const children = node.children ?? [];
+  for (const nodeId of allIds) {
+    const children = loroDoc.getChildren(nodeId);
     const seen = new Set<string>();
 
-    // tuple children are key/value payloads — not guaranteed to be node IDs.
-    const shouldValidateChildIds = docType !== 'tuple';
     for (const childId of children) {
-      if (shouldValidateChildIds && !entities[childId]) {
+      // Child must exist in LoroDoc
+      if (!loroDoc.hasNode(childId)) {
         errors.push(`child missing: parent=${nodeId} child=${childId}`);
       }
+      // Parent must match
+      const childParent = loroDoc.getParentId(childId);
+      if (childParent !== nodeId) {
+        errors.push(`parent mismatch: child=${childId} expected parent=${nodeId} actual=${childParent}`);
+      }
+      // No duplicate children
       if (seen.has(childId)) {
         errors.push(`duplicate child id: parent=${nodeId} child=${childId}`);
       }

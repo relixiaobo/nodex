@@ -1,50 +1,56 @@
 /**
  * Shared field utilities: data type resolution and icon mapping.
+ *
+ * Loro 迁移后：
+ * - 所有 config 值从 NodexNode 直接属性读取（无 Tuple 间接层）
+ * - entities 参数已移除，改用 loroDoc 全局访问
  */
 import type { LucideIcon } from 'lucide-react';
-import { AlignLeft, Building2, Calendar, CalendarCheck, CalendarClock, CalendarPlus, CheckSquare, ChevronDown, FileText, Hash, Link, List, ListTree, Mail, Play, Asterisk, EyeOff, Settings2, SquareUser, Sparkles, Tag, ToggleLeft, UserPen } from 'lucide-react';
-import { SYS_A, SYS_D, SYS_V } from '../types/index.js';
+import {
+  AlignLeft, Building2, Calendar, CalendarCheck, CalendarClock, CalendarPlus,
+  CheckSquare, ChevronDown, FileText, Hash, Link, List, ListTree, Mail,
+  Play, Asterisk, EyeOff, Settings2, SquareUser, Sparkles, Tag, ToggleLeft, UserPen,
+} from 'lucide-react';
+import { SYS_A, SYS_D, SYS_V, FIELD_TYPES } from '../types/index.js';
 import type { NodexNode } from '../types/index.js';
+import * as loroDoc from './loro-doc.js';
+
+// ─── resolveConfigValue（向后兼容：SYS_A* key → NodexNode 属性） ───
+
+/** Mapping from SYS_A* config keys to flat NodexNode property names. */
+const SYS_A_TO_PROP: Partial<Record<string, keyof NodexNode>> = {
+  [SYS_A.SHOW_CHECKBOX]:     'showCheckbox',
+  [SYS_A.CHILD_SUPERTAG]:    'childSupertag',
+  [SYS_A.COLOR]:             'color',
+  [SYS_A.EXTENDS]:           'extends',
+  [SYS_A.DONE_STATE_MAPPING]:'doneStateEnabled',
+  [SYS_A.TYPE_CHOICE]:       'fieldType',
+  [SYS_A.NULLABLE]:          'nullable',
+  [SYS_A.SOURCE_SUPERTAG]:   'sourceSupertag',
+  [SYS_A.AUTO_INITIALIZE]:   'autoInitialize',
+  [SYS_A.AUTOCOLLECT_OPTIONS]:'autocollectOptions',
+  [SYS_A.HIDE_FIELD]:        'hideField',
+  [SYS_A.MIN_VALUE]:         'minValue',
+  [SYS_A.MAX_VALUE]:         'maxValue',
+};
 
 /**
- * Resolve a config value from an attrDef by walking its children
- * for a Tuple [configKey, value].
- */
-function resolveAttrDefConfig(entities: Record<string, NodexNode>, attrDefId: string, configKey: string): string | undefined {
-  const attrDef = entities[attrDefId];
-  if (!attrDef?.children) return undefined;
-
-  for (const childId of attrDef.children) {
-    const child = entities[childId];
-    if (
-      child?.props._docType === 'tuple' &&
-      child.children?.[0] === configKey &&
-      child.children.length >= 2
-    ) {
-      return child.children[1];
-    }
-  }
-  return undefined;
-}
-
-/**
- * Resolve a config/field value from a node by walking its children for a Tuple [configKey, ...].
- * Reads directly from Tuple.children[1].
+ * Resolve a config value from a node by looking up its flat NodexNode property.
+ * Converts boolean properties to SYS_V.YES / SYS_V.NO for backward compat.
+ *
+ * @deprecated In new code, read NodexNode properties directly.
  */
 export function resolveConfigValue(
-  entities: Record<string, NodexNode>,
+  _entities: unknown,
   node: NodexNode,
   configKey: string,
 ): string | undefined {
-  if (!node.children) return undefined;
-  for (const childId of node.children) {
-    const child = entities[childId];
-    if (child?.props._docType === 'tuple' && child.children?.[0] === configKey) {
-      if (child.children.length >= 2) return child.children[1];
-      return undefined;
-    }
-  }
-  return undefined;
+  const propName = SYS_A_TO_PROP[configKey];
+  if (!propName) return undefined;
+  const val = node[propName];
+  if (val === undefined || val === null) return undefined;
+  if (typeof val === 'boolean') return val ? SYS_V.YES : SYS_V.NO;
+  return String(val);
 }
 
 /**
@@ -55,110 +61,100 @@ export function isSystemConfigField(keyId: string): boolean {
 }
 
 /**
- * Resolve the data type of an attrDef by walking its children
- * for a Tuple [SYS_A02, SYS_D*].
+ * Resolve the data type of a fieldDef.
+ * Returns a FIELD_TYPES string (e.g., 'plain', 'options').
  */
-export function resolveDataType(entities: Record<string, NodexNode>, attrDefId: string): string {
-  const attrDef = entities[attrDefId];
-  if (!attrDef) return SYS_D.PLAIN;
-  return resolveConfigValue(entities, attrDef, SYS_A.TYPE_CHOICE) ?? SYS_D.PLAIN;
+export function resolveDataType(_entities: unknown, fieldDefId: string): string {
+  const fieldDef = loroDoc.toNodexNode(fieldDefId);
+  if (!fieldDef) return FIELD_TYPES.PLAIN;
+  return fieldDef.fieldType ?? FIELD_TYPES.PLAIN;
 }
 
 /**
- * Resolve the source supertag ID for an OPTIONS_FROM_SUPERTAG attrDef.
- * Reads the Tuple [SYS_A06, tagDefId] from attrDef children.
+ * Resolve the source supertag ID for an OPTIONS_FROM_SUPERTAG fieldDef.
  */
 export function resolveSourceSupertag(
-  entities: Record<string, NodexNode>, attrDefId: string
+  _entities: unknown,
+  fieldDefId: string,
 ): string | undefined {
-  const attrDef = entities[attrDefId];
-  if (!attrDef) return undefined;
-  return resolveConfigValue(entities, attrDef, SYS_A.SOURCE_SUPERTAG);
+  const fieldDef = loroDoc.toNodexNode(fieldDefId);
+  return fieldDef?.sourceSupertag;
 }
 
 /**
  * Find all content nodes tagged with a given tagDefId.
- * Walks every entity → node.meta tuples looking for [SYS_A13, tagDefId].
+ * Iterates all known node IDs and checks node.tags.
  */
-export function resolveTaggedNodes(
-  entities: Record<string, NodexNode>, tagDefId: string
-): string[] {
+export function resolveTaggedNodes(_entities: unknown, tagDefId: string): string[] {
   const result: string[] = [];
-  for (const [id, node] of Object.entries(entities)) {
-    if (node.props._docType) continue;
-    if (!node.meta || node.meta.length === 0) continue;
-    for (const cid of node.meta) {
-      const tuple = entities[cid];
-      if (
-        tuple?.props._docType === 'tuple' &&
-        tuple.children?.[0] === SYS_A.NODE_SUPERTAGS &&
-        tuple.children[1] === tagDefId
-      ) {
-        result.push(id);
-        break;
-      }
-    }
+  for (const id of loroDoc.getAllNodeIds()) {
+    const node = loroDoc.toNodexNode(id);
+    if (!node || node.type) continue; // skip structural nodes
+    if (node.tags.includes(tagDefId)) result.push(id);
   }
   return result;
 }
 
 /**
- * Resolve the hide-field condition from an attrDef.
- * Returns the SYS_V constant (NEVER, WHEN_EMPTY, WHEN_NOT_EMPTY, WHEN_VALUE_IS_DEFAULT, ALWAYS).
+ * Resolve the hide-field condition from a fieldDef.
+ * Returns the SYS_V constant (NEVER, WHEN_EMPTY, etc.) or the string value.
  */
-export function resolveHideField(entities: Record<string, NodexNode>, attrDefId: string): string {
-  const attrDef = entities[attrDefId];
-  if (!attrDef) return SYS_V.NEVER;
-  return resolveConfigValue(entities, attrDef, SYS_A.HIDE_FIELD) ?? SYS_V.NEVER;
+export function resolveHideField(_entities: unknown, fieldDefId: string): string {
+  const fieldDef = loroDoc.toNodexNode(fieldDefId);
+  return fieldDef?.hideField ?? SYS_V.NEVER;
 }
 
 /**
- * Resolve whether an attrDef field is marked as required.
+ * Resolve whether a fieldDef field is marked as required (nullable = false).
  */
-export function resolveRequired(entities: Record<string, NodexNode>, attrDefId: string): boolean {
-  const attrDef = entities[attrDefId];
-  if (!attrDef) return false;
-  return resolveConfigValue(entities, attrDef, SYS_A.NULLABLE) === SYS_V.YES;
+export function resolveRequired(_entities: unknown, fieldDefId: string): boolean {
+  const fieldDef = loroDoc.toNodexNode(fieldDefId);
+  // nullable=false means required=true (confusingly named legacy)
+  return fieldDef?.nullable === false;
 }
 
-/** Resolve minimum value for Number/Integer fields. Returns number or undefined. */
-export function resolveMinValue(entities: Record<string, NodexNode>, attrDefId: string): number | undefined {
-  const attrDef = entities[attrDefId];
-  if (!attrDef) return undefined;
-  const v = resolveConfigValue(entities, attrDef, SYS_A.MIN_VALUE);
-  if (v && !isNaN(Number(v))) return Number(v);
-  return undefined;
+/** Resolve minimum value for Number/Integer fields. */
+export function resolveMinValue(_entities: unknown, fieldDefId: string): number | undefined {
+  const fieldDef = loroDoc.toNodexNode(fieldDefId);
+  return fieldDef?.minValue;
 }
 
-/** Resolve maximum value for Number/Integer fields. Returns number or undefined. */
-export function resolveMaxValue(entities: Record<string, NodexNode>, attrDefId: string): number | undefined {
-  const attrDef = entities[attrDefId];
-  if (!attrDef) return undefined;
-  const v = resolveConfigValue(entities, attrDef, SYS_A.MAX_VALUE);
-  if (v && !isNaN(Number(v))) return Number(v);
-  return undefined;
+/** Resolve maximum value for Number/Integer fields. */
+export function resolveMaxValue(_entities: unknown, fieldDefId: string): number | undefined {
+  const fieldDef = loroDoc.toNodexNode(fieldDefId);
+  return fieldDef?.maxValue;
 }
 
 /**
- * Map a SYS_D data type constant to a lucide icon component.
+ * Map a field type constant to a lucide icon component.
  */
 export function getFieldTypeIcon(dataType: string): LucideIcon {
   switch (dataType) {
     case SYS_D.DATE:
+    case FIELD_TYPES.DATE:
       return Calendar;
     case SYS_D.CHECKBOX:
+    case FIELD_TYPES.CHECKBOX:
       return CheckSquare;
     case SYS_D.OPTIONS:
+    case SYS_D.OPTIONS_ALT:
+    case FIELD_TYPES.OPTIONS:
     case SYS_D.OPTIONS_FROM_SUPERTAG:
+    case FIELD_TYPES.OPTIONS_FROM_SUPERTAG:
       return List;
     case SYS_D.NUMBER:
+    case FIELD_TYPES.NUMBER:
     case SYS_D.INTEGER:
+    case FIELD_TYPES.INTEGER:
       return Hash;
     case SYS_D.URL:
+    case FIELD_TYPES.URL:
       return Link;
     case SYS_D.EMAIL:
+    case FIELD_TYPES.EMAIL:
       return Mail;
     case SYS_D.BOOLEAN:
+    case FIELD_TYPES.BOOLEAN:
       return ToggleLeft;
     default:
       return AlignLeft;
@@ -166,98 +162,71 @@ export function getFieldTypeIcon(dataType: string): LucideIcon {
 }
 
 /**
- * Resolve option node IDs for an OPTIONS-type attrDef.
- * Options are direct non-tuple children of the attrDef node.
+ * Resolve option node IDs for an OPTIONS-type fieldDef.
+ * Options are direct non-fieldDef, non-fieldEntry children of the fieldDef node.
  */
-export function resolveFieldOptions(
-  entities: Record<string, NodexNode>,
-  attrDefId: string,
-): string[] {
-  const attrDef = entities[attrDefId];
-  if (!attrDef?.children) return [];
-
-  return attrDef.children.filter((cid) => {
-    const child = entities[cid];
-    return child && child.props._docType !== 'tuple';
+export function resolveFieldOptions(_entities: unknown, fieldDefId: string): string[] {
+  const children = loroDoc.getChildren(fieldDefId);
+  return children.filter((cid) => {
+    const child = loroDoc.toNodexNode(cid);
+    return child && child.type !== 'fieldEntry' && child.type !== 'fieldDef';
   });
 }
 
 /**
- * Resolve auto-collected option node IDs for an OPTIONS-type attrDef.
- * Auto-collected values are stored as children[2+] of the autocollect Tuple
- * (children[0] = SYS_A44 key, children[1] = toggle value, children[2+] = collected IDs).
- * Returns IDs only when the toggle is ON (SYS_V.YES).
+ * Resolve auto-collected option node IDs for an OPTIONS-type fieldDef.
+ * In the new model, autocollect options are stored directly as children.
+ * Returns them when fieldDef.autocollectOptions is true.
  */
 export function resolveAutoCollectedOptions(
-  entities: Record<string, NodexNode>,
-  attrDefId: string,
+  _entities: unknown,
+  fieldDefId: string,
 ): string[] {
-  const attrDef = entities[attrDefId];
-  if (!attrDef?.children) return [];
-
-  for (const cid of attrDef.children) {
-    const child = entities[cid];
-    if (
-      child?.props._docType === 'tuple' &&
-      child.children?.[0] === SYS_A.AUTOCOLLECT_OPTIONS
-    ) {
-      const isEnabled = child.children[1] === SYS_V.YES;
-      if (!isEnabled || child.children.length <= 2) return [];
-      return child.children.slice(2);
-    }
-  }
-  return [];
+  const fieldDef = loroDoc.toNodexNode(fieldDefId);
+  if (!fieldDef?.autocollectOptions) return [];
+  // Auto-collected options are also in children (same pool as pre-defined options)
+  return resolveFieldOptions(null, fieldDefId);
 }
 
 /**
- * Find the autocollect Tuple ID for an attrDef.
+ * Find the autocollect toggle for a fieldDef.
+ * In the new model, just check fieldDef.autocollectOptions.
+ * @deprecated In new code, read fieldDef.autocollectOptions directly.
  */
 export function findAutoCollectTupleId(
-  entities: Record<string, NodexNode>,
-  attrDefId: string,
+  _entities: unknown,
+  _fieldDefId: string,
 ): string | null {
-  const attrDef = entities[attrDefId];
-  if (!attrDef?.children) return null;
-
-  for (const cid of attrDef.children) {
-    const child = entities[cid];
-    if (
-      child?.props._docType === 'tuple' &&
-      child.children?.[0] === SYS_A.AUTOCOLLECT_OPTIONS
-    ) {
-      return cid;
-    }
-  }
-  return null;
+  return null; // No longer stored as a Tuple
 }
 
 /**
  * Ordered list of field types for the type selector UI.
- * Matches Tana's dropdown order exactly (no Integer — Tana only shows Number).
+ * Matches Tana's dropdown order exactly.
  */
 export const FIELD_TYPE_LIST: Array<{ value: string; label: string }> = [
-  { value: SYS_D.PLAIN, label: 'Plain' },
-  { value: SYS_D.OPTIONS, label: 'Options' },
-  { value: SYS_D.OPTIONS_FROM_SUPERTAG, label: 'Options from supertag' },
-  { value: SYS_D.DATE, label: 'Date' },
-  { value: SYS_D.NUMBER, label: 'Number' },
-  { value: SYS_D.URL, label: 'URL' },
-  { value: SYS_D.EMAIL, label: 'Email' },
-  { value: SYS_D.CHECKBOX, label: 'Checkbox' },
+  { value: FIELD_TYPES.PLAIN, label: 'Plain' },
+  { value: FIELD_TYPES.OPTIONS, label: 'Options' },
+  { value: FIELD_TYPES.OPTIONS_FROM_SUPERTAG, label: 'Options from supertag' },
+  { value: FIELD_TYPES.DATE, label: 'Date' },
+  { value: FIELD_TYPES.NUMBER, label: 'Number' },
+  { value: FIELD_TYPES.URL, label: 'URL' },
+  { value: FIELD_TYPES.EMAIL, label: 'Email' },
+  { value: FIELD_TYPES.CHECKBOX, label: 'Checkbox' },
 ];
 
-/** Get a human-readable label for a SYS_D data type constant. */
+/** Get a human-readable label for a field type constant. */
 export function getFieldTypeLabel(dataType: string): string {
-  if (dataType === SYS_D.INTEGER) return 'Number'; // INTEGER maps to Number in UI
+  if (dataType === SYS_D.INTEGER || dataType === FIELD_TYPES.INTEGER) return 'Number';
   return FIELD_TYPE_LIST.find((t) => t.value === dataType)?.label ?? 'Plain';
 }
 
 /** Check if a data type is "plain" (uses outliner for values). */
 export function isPlainFieldType(dataType: string): boolean {
-  return dataType === SYS_D.PLAIN || !dataType;
+  return dataType === FIELD_TYPES.PLAIN || dataType === SYS_D.PLAIN || !dataType;
 }
 
-// ─── AttrDef config field registry ───
+// ─── AttrDef / FieldDef config field registry ───
 
 export interface ConfigFieldDef {
   key: string;
@@ -273,15 +242,8 @@ export interface ConfigFieldDef {
 }
 
 /**
- * Registry of config fields for attrDef nodes.
- * Maps to SYS_T02 (FIELD_DEFINITION) template tuples.
+ * Registry of config fields for fieldDef nodes.
  * Order matches Tana's config page layout.
- *
- * control types:
- * - type_choice: Field type dropdown picker
- * - toggle: Boolean switch (Yes/No)
- * - select: Dropdown with predefined options
- * - section_label: Label + description rendered between FieldList and OutlinerView (no tuple)
  */
 export const ATTRDEF_CONFIG_FIELDS: ConfigFieldDef[] = [
   {
@@ -289,17 +251,16 @@ export const ATTRDEF_CONFIG_FIELDS: ConfigFieldDef[] = [
     name: 'Field type',
     control: 'type_choice',
     icon: Settings2,
-    defaultValue: SYS_D.PLAIN,
+    defaultValue: FIELD_TYPES.PLAIN,
     appliesTo: '*',
   },
-  // outliner fields — rendered as field rows with embedded outliner
   {
     key: 'NDX_SECTION_PRE_OPTIONS',
     name: 'Pre-determined options',
     control: 'outliner',
     icon: ListTree,
     defaultValue: '',
-    appliesTo: [SYS_D.OPTIONS],
+    appliesTo: [FIELD_TYPES.OPTIONS],
     description: 'Each node included will become an option',
   },
   {
@@ -308,17 +269,16 @@ export const ATTRDEF_CONFIG_FIELDS: ConfigFieldDef[] = [
     control: 'tag_picker',
     icon: Tag,
     defaultValue: '',
-    appliesTo: [SYS_D.OPTIONS_FROM_SUPERTAG],
+    appliesTo: [FIELD_TYPES.OPTIONS_FROM_SUPERTAG],
     description: 'Nodes tagged with this supertag become options',
   },
-  // tuple-based config fields
   {
     key: SYS_A.AUTOCOLLECT_OPTIONS,
     name: 'Auto-collect values',
     control: 'autocollect',
     icon: Sparkles,
     defaultValue: SYS_V.YES,
-    appliesTo: [SYS_D.OPTIONS],
+    appliesTo: [FIELD_TYPES.OPTIONS],
     description: 'Values created from field input',
   },
   {
@@ -360,7 +320,7 @@ export const ATTRDEF_CONFIG_FIELDS: ConfigFieldDef[] = [
     control: 'number_input',
     icon: Hash,
     defaultValue: '',
-    appliesTo: [SYS_D.NUMBER, SYS_D.INTEGER],
+    appliesTo: [FIELD_TYPES.NUMBER, FIELD_TYPES.INTEGER],
     description: 'Warn when value is below this number',
   },
   {
@@ -369,12 +329,12 @@ export const ATTRDEF_CONFIG_FIELDS: ConfigFieldDef[] = [
     control: 'number_input',
     icon: Hash,
     defaultValue: '',
-    appliesTo: [SYS_D.NUMBER, SYS_D.INTEGER],
+    appliesTo: [FIELD_TYPES.NUMBER, FIELD_TYPES.INTEGER],
     description: 'Warn when value exceeds this number',
   },
 ];
 
-/** O(1) lookup by config field key (SYS_A* or NDX_A*). Excludes outliner entries (no backing tuple). */
+/** O(1) lookup by config field key. Excludes outliner entries. */
 export const ATTRDEF_CONFIG_MAP = new Map(
   ATTRDEF_CONFIG_FIELDS
     .filter(f => f.control !== 'outliner')
@@ -382,19 +342,16 @@ export const ATTRDEF_CONFIG_MAP = new Map(
 );
 
 /** Outliner-type config fields (virtual entries — no backing tuple). */
-export const ATTRDEF_OUTLINER_FIELDS = ATTRDEF_CONFIG_FIELDS
-  .filter(f => f.control === 'outliner');
+export const ATTRDEF_OUTLINER_FIELDS = ATTRDEF_CONFIG_FIELDS.filter(f => f.control === 'outliner');
 
 // ─── TagDef (SYS_T01) config field registry ───
 
 /**
  * Registry of config fields for tagDef nodes.
- * Maps to SYS_T01 (SUPERTAG) template tuples.
- * Mirrors ATTRDEF_CONFIG_FIELDS pattern.
  */
 export const TAGDEF_CONFIG_FIELDS: ConfigFieldDef[] = [
   {
-    key: SYS_A.COLOR,           // SYS_A11
+    key: SYS_A.COLOR,
     name: 'Color',
     control: 'color_picker',
     icon: undefined,
@@ -402,7 +359,7 @@ export const TAGDEF_CONFIG_FIELDS: ConfigFieldDef[] = [
     appliesTo: '*',
   },
   {
-    key: SYS_A.EXTENDS,           // NDX_A05
+    key: SYS_A.EXTENDS,
     name: 'Extend from',
     control: 'tag_picker',
     icon: ListTree,
@@ -411,7 +368,7 @@ export const TAGDEF_CONFIG_FIELDS: ConfigFieldDef[] = [
     description: 'Inherit fields and content from another tag',
   },
   {
-    key: SYS_A.SHOW_CHECKBOX,   // SYS_A55
+    key: SYS_A.SHOW_CHECKBOX,
     name: 'Show as checkbox',
     control: 'toggle',
     icon: CheckSquare,
@@ -420,7 +377,7 @@ export const TAGDEF_CONFIG_FIELDS: ConfigFieldDef[] = [
     description: 'Show done/not done checkbox on tagged nodes',
   },
   {
-    key: SYS_A.DONE_STATE_MAPPING,  // NDX_A06
+    key: SYS_A.DONE_STATE_MAPPING,
     name: 'Done state mapping',
     control: 'toggle',
     icon: CheckSquare,
@@ -430,7 +387,7 @@ export const TAGDEF_CONFIG_FIELDS: ConfigFieldDef[] = [
     visibleWhen: { dependsOn: SYS_A.SHOW_CHECKBOX, value: SYS_V.YES },
   },
   {
-    key: SYS_A.DONE_MAP_CHECKED,   // NDX_A07
+    key: SYS_A.DONE_MAP_CHECKED,
     name: 'Map checked to',
     control: 'done_map_entries',
     icon: CheckSquare,
@@ -440,7 +397,7 @@ export const TAGDEF_CONFIG_FIELDS: ConfigFieldDef[] = [
     visibleWhen: { dependsOn: SYS_A.DONE_STATE_MAPPING, value: SYS_V.YES },
   },
   {
-    key: SYS_A.DONE_MAP_UNCHECKED, // NDX_A08
+    key: SYS_A.DONE_MAP_UNCHECKED,
     name: 'Map unchecked to',
     control: 'done_map_entries',
     icon: CheckSquare,
@@ -449,7 +406,6 @@ export const TAGDEF_CONFIG_FIELDS: ConfigFieldDef[] = [
     description: 'Field+option pairs that mean "not done"',
     visibleWhen: { dependsOn: SYS_A.DONE_STATE_MAPPING, value: SYS_V.YES },
   },
-  // outliner field — rendered as field row with embedded outliner (template children)
   {
     key: 'NDX_SECTION_DEFAULT_CONTENT',
     name: 'Default content',
@@ -459,7 +415,7 @@ export const TAGDEF_CONFIG_FIELDS: ConfigFieldDef[] = [
     appliesTo: '*',
   },
   {
-    key: SYS_A.CHILD_SUPERTAG,  // SYS_A14
+    key: SYS_A.CHILD_SUPERTAG,
     name: 'Default child supertag',
     control: 'tag_picker',
     icon: ChevronDown,
@@ -469,7 +425,7 @@ export const TAGDEF_CONFIG_FIELDS: ConfigFieldDef[] = [
   },
 ];
 
-/** O(1) lookup by config field key (SYS_A*). Excludes outliner entries. */
+/** O(1) lookup by config field key. Excludes outliner entries. */
 export const TAGDEF_CONFIG_MAP = new Map(
   TAGDEF_CONFIG_FIELDS
     .filter(f => f.control !== 'outliner')
@@ -477,68 +433,46 @@ export const TAGDEF_CONFIG_MAP = new Map(
 );
 
 /** Outliner-type config fields for tagDef (virtual entries — no backing tuple). */
-export const TAGDEF_OUTLINER_FIELDS = TAGDEF_CONFIG_FIELDS
-  .filter(f => f.control === 'outliner');
+export const TAGDEF_OUTLINER_FIELDS = TAGDEF_CONFIG_FIELDS.filter(f => f.control === 'outliner');
 
 /**
  * Resolve default child supertag IDs for a parent node.
- * Walks the parent's tags (node.meta → SYS_A13 tuples) and reads SYS_A14 from each tagDef.
- * Returns deduplicated tagDef IDs that should be auto-applied to new children.
+ * Walks the parent's tags and reads tagDef.childSupertag from each tagDef.
  */
-export function resolveChildSupertags(
-  entities: Record<string, NodexNode>,
-  parentId: string,
-): string[] {
-  const parent = entities[parentId];
-  if (!parent?.meta || parent.meta.length === 0) return [];
+export function resolveChildSupertags(_entities: unknown, parentId: string): string[] {
+  const parent = loroDoc.toNodexNode(parentId);
+  if (!parent?.tags.length) return [];
 
   const result: string[] = [];
-  for (const cid of parent.meta) {
-    const tuple = entities[cid];
-    if (
-      tuple?.props._docType === 'tuple' &&
-      tuple.children?.[0] === SYS_A.NODE_SUPERTAGS &&
-      tuple.children[1]
-    ) {
-      const tagDefId = tuple.children[1];
-      const tagDef = entities[tagDefId];
-      if (!tagDef) continue;
-      const childTagId = resolveConfigValue(entities, tagDef, SYS_A.CHILD_SUPERTAG);
-      if (childTagId && entities[childTagId] && !result.includes(childTagId)) {
-        result.push(childTagId);
-      }
+  for (const tagDefId of parent.tags) {
+    const tagDef = loroDoc.toNodexNode(tagDefId);
+    if (!tagDef?.childSupertag) continue;
+    if (!loroDoc.hasNode(tagDef.childSupertag)) continue;
+    if (!result.includes(tagDef.childSupertag)) {
+      result.push(tagDef.childSupertag);
     }
   }
   return result;
 }
 
-// ─── Extend chain resolution (synchronous, for immer context) ───
+// ─── Extend chain resolution ───
 
 /**
  * Walk the Extend chain for a tagDef and return ancestor tagDef IDs
- * in ancestor-first order (grandparent before parent). Does not include self.
- * Handles circular references via visited set.
- *
- * Reads from tagDef.children (config tuple) — this is the source of truth
- * that the config field UI edits via setConfigValue.
+ * in ancestor-first order. Does not include self. Handles circular refs.
  */
-export function getExtendsChain(
-  entities: Record<string, NodexNode>,
-  tagDefId: string,
-): string[] {
+export function getExtendsChain(_entities: unknown, tagDefId: string): string[] {
   const chain: string[] = [];
   const visited = new Set<string>();
 
   function walk(id: string) {
-    if (visited.has(id)) return; // circular guard
+    if (visited.has(id)) return;
     visited.add(id);
-    const tagDef = entities[id];
-    if (!tagDef) return;
-
-    const parentId = resolveConfigValue(entities, tagDef, SYS_A.EXTENDS);
-    if (!parentId) return;
+    const tagDef = loroDoc.toNodexNode(id);
+    if (!tagDef?.extends) return;
+    const parentId = tagDef.extends;
     if (parentId === tagDefId) return; // exclude self (circular)
-    if (!entities[parentId]) return; // skip invalid
+    if (!loroDoc.hasNode(parentId)) return;
 
     walk(parentId); // recurse ancestors first
     if (!chain.includes(parentId)) chain.push(parentId);
@@ -557,16 +491,16 @@ export interface SystemFieldDef {
   icon: LucideIcon;
 }
 
-/** 8 system fields available for Nodex. Key = NDX_SYS_* stored in tuple children[0]. */
+/** 8 system fields available for Nodex. */
 export const SYSTEM_FIELDS: SystemFieldDef[] = [
-  { key: 'NDX_SYS_DESCRIPTION', name: 'Node description', source: 'props.description', dataType: '__system_text__', icon: FileText },
-  { key: 'NDX_SYS_CREATED', name: 'Created time', source: 'props.created', dataType: '__system_date__', icon: CalendarPlus },
+  { key: 'NDX_SYS_DESCRIPTION', name: 'Node description', source: 'description', dataType: '__system_text__', icon: FileText },
+  { key: 'NDX_SYS_CREATED', name: 'Created time', source: 'createdAt', dataType: '__system_date__', icon: CalendarPlus },
   { key: 'NDX_SYS_LAST_EDITED', name: 'Last edited time', source: 'updatedAt', dataType: '__system_date__', icon: CalendarClock },
   { key: 'NDX_SYS_LAST_EDITED_BY', name: 'Last edited by', source: 'updatedBy', dataType: '__system_text__', icon: UserPen },
-  { key: 'NDX_SYS_OWNER', name: 'Owner node', source: 'props._ownerId', dataType: '__system_node__', icon: SquareUser },
-  { key: 'NDX_SYS_TAGS', name: 'Tags', source: 'meta', dataType: '__system_text__', icon: Tag },
-  { key: 'NDX_SYS_WORKSPACE', name: 'Workspace', source: 'workspaceId', dataType: '__system_text__', icon: Building2 },
-  { key: 'NDX_SYS_DONE_TIME', name: 'Done time', source: 'props._done', dataType: '__system_date__', icon: CalendarCheck },
+  { key: 'NDX_SYS_OWNER', name: 'Owner node', source: 'parentId', dataType: '__system_node__', icon: SquareUser },
+  { key: 'NDX_SYS_TAGS', name: 'Tags', source: 'tags', dataType: '__system_text__', icon: Tag },
+  { key: 'NDX_SYS_WORKSPACE', name: 'Workspace', source: 'workspace', dataType: '__system_text__', icon: Building2 },
+  { key: 'NDX_SYS_DONE_TIME', name: 'Done time', source: 'completedAt', dataType: '__system_date__', icon: CalendarCheck },
 ];
 
 /** O(1) lookup by system field key. */
@@ -593,52 +527,42 @@ export function formatTimestamp(ms: number | undefined): string {
 
 /**
  * Resolve the display value for a system field on a given node.
- * Returns { text, refNodeId? } where refNodeId is set for __system_node__ types.
  */
 export function resolveSystemFieldValue(
-  entities: Record<string, NodexNode>,
+  _entities: unknown,
   nodeId: string,
   sysDef: SystemFieldDef,
 ): { text: string; refNodeId?: string } {
-  const node = entities[nodeId];
+  const node = loroDoc.toNodexNode(nodeId);
   if (!node) return { text: '' };
 
   switch (sysDef.source) {
-    case 'props.description':
-      return { text: node.props.description ?? '' };
-    case 'props.created':
-      return { text: formatTimestamp(node.props.created) };
+    case 'description':
+      return { text: node.description ?? '' };
+    case 'createdAt':
+      return { text: formatTimestamp(node.createdAt) };
     case 'updatedAt':
       return { text: formatTimestamp(node.updatedAt) };
     case 'updatedBy':
-      return { text: node.updatedBy ?? '' };
-    case 'props._ownerId': {
-      const ownerId = node.props._ownerId;
-      if (!ownerId) return { text: '' };
-      const ownerNode = entities[ownerId];
-      return { text: ownerNode?.props.name ?? ownerId, refNodeId: ownerId };
+      return { text: '' }; // Phase 2: Loro PeerID
+    case 'parentId': {
+      const parentId = loroDoc.getParentId(nodeId);
+      if (!parentId) return { text: '' };
+      const parentNode = loroDoc.toNodexNode(parentId);
+      return { text: parentNode?.name ?? parentId, refNodeId: parentId };
     }
-    case 'meta': {
-      if (!node.meta || node.meta.length === 0) return { text: '' };
+    case 'tags': {
       const tagNames: string[] = [];
-      for (const cid of node.meta) {
-        const tuple = entities[cid];
-        if (tuple?.props._docType === 'tuple' && tuple.children?.[0] === SYS_A.NODE_SUPERTAGS && tuple.children[1]) {
-          const tagDef = entities[tuple.children[1]];
-          if (tagDef?.props.name) tagNames.push(tagDef.props.name);
-        }
+      for (const tagDefId of node.tags) {
+        const tagDef = loroDoc.toNodexNode(tagDefId);
+        if (tagDef?.name) tagNames.push(tagDef.name);
       }
       return { text: tagNames.join(', ') };
     }
-    case 'workspaceId': {
-      const wsId = node.workspaceId;
-      const wsNode = entities[wsId];
-      return { text: wsNode?.props.name ?? wsId };
-    }
-    case 'props._done': {
-      const done = node.props._done;
-      return { text: done ? formatTimestamp(done) : '' };
-    }
+    case 'workspace':
+      return { text: 'workspace' }; // Phase 2: workspace ID from LoroDoc peer
+    case 'completedAt':
+      return { text: formatTimestamp(node.completedAt) };
     default:
       return { text: '' };
   }

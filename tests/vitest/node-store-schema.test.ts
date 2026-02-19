@@ -1,147 +1,114 @@
+/**
+ * node-store schema flows — Loro model.
+ * createTagDef: creates type='tagDef' in SCHEMA with direct properties.
+ * No SYS_T01 meta bindings. No config tuples. Just flat properties.
+ * createFieldDef/createAttrDef: creates type='fieldDef' under tagDef.
+ */
+import { describe, it, expect, beforeEach } from 'vitest';
 import { useNodeStore } from '../../src/stores/node-store.js';
-import { SYS_A, SYS_D, SYS_T, SYS_V } from '../../src/types/index.js';
 import { collectNodeGraphErrors } from './helpers/invariants.js';
+import * as loroDoc from '../../src/lib/loro-doc.js';
+import { CONTAINER_IDS } from '../../src/types/index.js';
+import { FIELD_TYPES } from '../../src/types/system-nodes.js';
 import { resetAndSeed } from './helpers/test-state.js';
 
-function findTupleByKey(nodeId: string, keyId: string): string | undefined {
-  const state = useNodeStore.getState();
-  const node = state.entities[nodeId];
-  if (!node?.children) return undefined;
-
-  return node.children.find((cid) => {
-    const child = state.entities[cid];
-    return child?.props._docType === 'tuple' && child.children?.[0] === keyId;
-  });
-}
-
-describe('node-store schema flows', () => {
+describe('createTagDef', () => {
   beforeEach(() => {
     resetAndSeed();
   });
 
-  it('createTagDef puts node under SCHEMA and auto-applies SYS_T01 config chain', async () => {
-    const created = await useNodeStore.getState().createTagDef('My New Tag', 'ws_default', 'user_default');
-    const state = useNodeStore.getState();
-    const tagDef = state.entities[created.id];
-    expect(tagDef?.props._docType).toBe('tagDef');
-    expect(tagDef?.props._ownerId).toBe('ws_default_SCHEMA');
-    expect(state.entities.ws_default_SCHEMA.children ?? []).toContain(created.id);
-
-    expect(tagDef?.meta?.length).toBeGreaterThan(0);
-
-    const hasSupertagBinding = (tagDef!.meta ?? []).some((cid) => {
-      const tuple = state.entities[cid];
-      return tuple?.props._docType === 'tuple' &&
-        tuple.children?.[0] === SYS_A.NODE_SUPERTAGS &&
-        tuple.children?.[1] === SYS_T.SUPERTAG;
-    });
-    expect(hasSupertagBinding).toBe(true);
-
-    // Config tuples: 7 top-level (all SYS_T01 template fields are top-level in unified model)
-    const configTupleIds = (tagDef?.children ?? []).filter((cid) => {
-      const child = state.entities[cid];
-      return child?.props._docType === 'tuple' && (child.props._sourceId ?? '').startsWith('sysT01_tpl_');
-    });
-    expect(configTupleIds.length).toBe(7);
-
-    const configKeys = new Set(configTupleIds.map((cid) => state.entities[cid].children?.[0]));
-    expect(configKeys.has(SYS_A.SHOW_CHECKBOX)).toBe(true);
-    expect(configKeys.has(SYS_A.CHILD_SUPERTAG)).toBe(true);
-    expect(configKeys.has(SYS_A.COLOR)).toBe(true);
-    expect(configKeys.has(SYS_A.EXTENDS)).toBe(true);
-    expect(configKeys.has(SYS_A.DONE_STATE_MAPPING)).toBe(true);
-    expect(configKeys.has(SYS_A.DONE_MAP_CHECKED)).toBe(true);
-    expect(configKeys.has(SYS_A.DONE_MAP_UNCHECKED)).toBe(true);
-
-    expect(collectNodeGraphErrors(useNodeStore.getState().entities)).toEqual([]);
+  it('creates node with type=tagDef in SCHEMA', () => {
+    const created = useNodeStore.getState().createTagDef('My New Tag');
+    const tagDef = loroDoc.toNodexNode(created.id)!;
+    expect(tagDef.type).toBe('tagDef');
+    expect(tagDef.name).toBe('My New Tag');
+    expect(loroDoc.getParentId(created.id)).toBe(CONTAINER_IDS.SCHEMA);
+    expect(loroDoc.getChildren(CONTAINER_IDS.SCHEMA)).toContain(created.id);
   });
 
-  it('createAttrDef wires template tuple + type tuple and auto-applies SYS_T02 config', async () => {
-    const created = await useNodeStore.getState().createAttrDef(
-      'Estimate',
-      'tagDef_task',
-      SYS_D.NUMBER,
-      'ws_default',
-      'user_default',
-    );
-
-    const state = useNodeStore.getState();
-    const attrDef = state.entities[created.id];
-    expect(attrDef?.props._docType).toBe('attrDef');
-
-    const templateTupleId = (state.entities.tagDef_task.children ?? []).find((cid) => {
-      const child = state.entities[cid];
-      return child?.props._docType === 'tuple' && child.children?.[0] === created.id;
-    });
-    expect(templateTupleId).toBeTruthy();
-    if (!templateTupleId) return;
-    expect(attrDef?.props._ownerId).toBe(templateTupleId);
-
-    const typeTupleIds = (attrDef?.children ?? []).filter((cid) => {
-      const tuple = state.entities[cid];
-      return tuple?.props._docType === 'tuple' && tuple.children?.[0] === SYS_A.TYPE_CHOICE;
-    });
-    expect(typeTupleIds.length).toBe(1);
-    expect(state.entities[typeTupleIds[0]]?.children?.[1]).toBe(SYS_D.NUMBER);
-
-    expect(attrDef?.meta?.length).toBeGreaterThan(0);
-
-    const hasFieldDefinitionBinding = (attrDef!.meta ?? []).some((cid) => {
-      const tuple = state.entities[cid];
-      return tuple?.props._docType === 'tuple' &&
-        tuple.children?.[0] === SYS_A.NODE_SUPERTAGS &&
-        tuple.children?.[1] === SYS_T.FIELD_DEFINITION;
-    });
-    expect(hasFieldDefinitionBinding).toBe(true);
-
-    const autoCollectTupleId = findTupleByKey(created.id, SYS_A.AUTOCOLLECT_OPTIONS);
-    const autoInitTupleId = findTupleByKey(created.id, SYS_A.AUTO_INITIALIZE);
-    const requiredTupleId = findTupleByKey(created.id, SYS_A.NULLABLE);
-    const hideTupleId = findTupleByKey(created.id, SYS_A.HIDE_FIELD);
-    expect(autoCollectTupleId).toBeTruthy();
-    expect(autoInitTupleId).toBeTruthy();
-    expect(requiredTupleId).toBeTruthy();
-    expect(hideTupleId).toBeTruthy();
-    if (!autoCollectTupleId || !autoInitTupleId || !requiredTupleId || !hideTupleId) return;
-
-    // Default values stored in tuple.children[1]
-    expect(state.entities[autoCollectTupleId].children?.[1]).toBe(SYS_V.YES);
-    expect(state.entities[autoInitTupleId].children?.[1]).toBe(SYS_V.NO);
-    expect(state.entities[requiredTupleId].children?.[1]).toBe(SYS_V.NO);
-    expect(state.entities[hideTupleId].children?.[1]).toBe(SYS_V.NEVER);
-
-    expect(collectNodeGraphErrors(useNodeStore.getState().entities)).toEqual([]);
+  it('sets showCheckbox when option provided', () => {
+    const created = useNodeStore.getState().createTagDef('Checkbox Tag', { showCheckbox: true });
+    const tagDef = loroDoc.toNodexNode(created.id)!;
+    expect(tagDef.showCheckbox).toBe(true);
   });
 
-  it('newly created attrDef template is instantiated when tag is applied to a content node', async () => {
-    const created = await useNodeStore.getState().createAttrDef(
-      'Estimate',
-      'tagDef_task',
-      SYS_D.NUMBER,
-      'ws_default',
-      'user_default',
-    );
+  it('sets color when option provided', () => {
+    const created = useNodeStore.getState().createTagDef('Colored Tag', { color: 'emerald' });
+    const tagDef = loroDoc.toNodexNode(created.id)!;
+    expect(tagDef.color).toBe('emerald');
+  });
 
-    const stateBeforeApply = useNodeStore.getState();
-    const templateTupleId = (stateBeforeApply.entities.tagDef_task.children ?? []).find((cid) => {
-      const child = stateBeforeApply.entities[cid];
-      return child?.props._docType === 'tuple' && child.children?.[0] === created.id;
-    });
-    expect(templateTupleId).toBeTruthy();
-    if (!templateTupleId) return;
+  it('no SYS_T01 meta bindings (no meta/tuples)', () => {
+    const created = useNodeStore.getState().createTagDef('Clean Tag');
+    const tagDef = loroDoc.toNodexNode(created.id)!;
+    // New model has no meta array or config tuples
+    expect(tagDef.tags ?? []).toHaveLength(0);
+  });
 
-    await useNodeStore.getState().applyTag('note_2', 'tagDef_task', 'ws_default', 'user_default');
+  it('graph is valid after createTagDef', () => {
+    useNodeStore.getState().createTagDef('Test Tag');
+    expect(collectNodeGraphErrors()).toEqual([]);
+  });
+});
 
-    const state = useNodeStore.getState();
-    const instanceTupleId = (state.entities.note_2.children ?? []).find((cid) => {
-      const child = state.entities[cid];
-      return child?.props._docType === 'tuple' &&
-        child.props._sourceId === templateTupleId &&
-        child.children?.[0] === created.id;
-    });
-    expect(instanceTupleId).toBeTruthy();
-    if (!instanceTupleId) return;
+describe('createFieldDef', () => {
+  beforeEach(() => {
+    resetAndSeed();
+  });
 
-    expect(collectNodeGraphErrors(useNodeStore.getState().entities)).toEqual([]);
+  it('creates node with type=fieldDef under tagDef', () => {
+    const created = useNodeStore.getState().createFieldDef('Estimate', FIELD_TYPES.NUMBER, 'tagDef_task');
+    const fd = loroDoc.toNodexNode(created.id)!;
+    expect(fd.type).toBe('fieldDef');
+    expect(fd.name).toBe('Estimate');
+    expect(fd.fieldType).toBe(FIELD_TYPES.NUMBER);
+    expect(loroDoc.getParentId(created.id)).toBe('tagDef_task');
+  });
+
+  it('adds fieldDef to tagDef children', () => {
+    const created = useNodeStore.getState().createFieldDef('Notes', FIELD_TYPES.PLAIN, 'tagDef_task');
+    expect(loroDoc.getChildren('tagDef_task')).toContain(created.id);
+  });
+
+  it('graph is valid after createFieldDef', () => {
+    useNodeStore.getState().createFieldDef('Score', FIELD_TYPES.NUMBER, 'tagDef_task');
+    expect(collectNodeGraphErrors()).toEqual([]);
+  });
+});
+
+describe('createAttrDef (alias for createFieldDef)', () => {
+  beforeEach(() => {
+    resetAndSeed();
+  });
+
+  it('creates fieldDef under specified tagDef', () => {
+    const created = useNodeStore.getState().createAttrDef('Estimate', 'tagDef_task', FIELD_TYPES.NUMBER);
+    const fd = loroDoc.toNodexNode(created.id)!;
+    expect(fd.type).toBe('fieldDef');
+    expect(fd.name).toBe('Estimate');
+    expect(loroDoc.getParentId(created.id)).toBe('tagDef_task');
+  });
+
+  it('is equivalent to createFieldDef (same structure)', () => {
+    const viaAttrDef = useNodeStore.getState().createAttrDef('Field1', 'tagDef_task', FIELD_TYPES.PLAIN);
+    const viaFieldDef = useNodeStore.getState().createFieldDef('Field2', FIELD_TYPES.PLAIN, 'tagDef_task');
+
+    const fd1 = loroDoc.toNodexNode(viaAttrDef.id)!;
+    const fd2 = loroDoc.toNodexNode(viaFieldDef.id)!;
+    expect(fd1.type).toBe('fieldDef');
+    expect(fd2.type).toBe('fieldDef');
+    expect(loroDoc.getParentId(viaAttrDef.id)).toBe(loroDoc.getParentId(viaFieldDef.id));
+  });
+});
+
+describe('changeFieldType', () => {
+  beforeEach(() => {
+    resetAndSeed();
+  });
+
+  it('updates fieldType on a fieldDef', () => {
+    useNodeStore.getState().changeFieldType('attrDef_status', FIELD_TYPES.PLAIN);
+    const fd = loroDoc.toNodexNode('attrDef_status')!;
+    expect(fd.fieldType).toBe(FIELD_TYPES.PLAIN);
   });
 });

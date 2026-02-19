@@ -1,4 +1,3 @@
-import type { NodexNode } from '../../src/types/index.js';
 import {
   getAncestorChain,
   getFlattenedVisibleNodes,
@@ -11,107 +10,95 @@ import {
   getPreviousVisibleNode,
   isOnlyInlineRef,
   isWorkspaceContainer,
-  isWorkspaceRoot,
 } from '../../src/lib/tree-utils.js';
+import { resetLoroDoc, initLoroDocForTest, createNode, setNodeDataBatch } from '../../src/lib/loro-doc.js';
+import { CONTAINER_IDS } from '../../src/types/index.js';
 
-function node(
-  id: string,
-  workspaceId: string,
-  ownerId?: string,
-  children?: string[],
-  docType?: NodexNode['props']['_docType'],
-  name?: string,
-): NodexNode {
-  return {
-    id,
-    workspaceId,
-    props: {
-      created: Date.now(),
-      ...(ownerId ? { _ownerId: ownerId } : {}),
-      ...(docType ? { _docType: docType } : {}),
-      ...(name ? { name } : {}),
-    },
-    ...(children ? { children } : {}),
-    version: 1,
-    updatedAt: Date.now(),
-    createdBy: 'u',
-    updatedBy: 'u',
-  };
-}
+beforeEach(() => {
+  resetLoroDoc();
+  initLoroDocForTest('ws_default');
+});
 
 describe('tree-utils', () => {
-  it('detects workspace containers and roots', () => {
-    const entities: Record<string, NodexNode> = {
-      ws_default: node('ws_default', 'ws_default'),
-      ws_default_LIBRARY: node('ws_default_LIBRARY', 'ws_default', 'ws_default'),
-    };
-
-    expect(isWorkspaceContainer('ws_default_LIBRARY')).toBe(true);
+  it('detects workspace containers', () => {
+    expect(isWorkspaceContainer(CONTAINER_IDS.LIBRARY)).toBe(true);
     expect(isWorkspaceContainer('note_1')).toBe(false);
-    expect(isWorkspaceRoot('ws_default', entities)).toBe(true);
-    expect(isWorkspaceRoot('ws_default_LIBRARY', entities)).toBe(false);
+    expect(isWorkspaceContainer(CONTAINER_IDS.INBOX)).toBe(true);
   });
 
   it('builds ancestor chain while skipping structural nodes', () => {
-    const entities: Record<string, NodexNode> = {
-      ws: node('ws', 'ws', undefined, ['ws_LIBRARY'], undefined, 'Workspace'),
-      ws_LIBRARY: node('ws_LIBRARY', 'ws', 'ws', ['parent'], undefined, 'Library'),
-      parent: node('parent', 'ws', 'ws_LIBRARY', ['tuple1'], undefined, '<b>Parent</b>'),
-      tuple1: node('tuple1', 'ws', 'parent', ['tuple2'], 'tuple'),
-      tuple2: node('tuple2', 'ws', 'tuple1', ['target'], 'tuple'),
-      target: node('target', 'ws', 'tuple2'),
-    };
+    // Build tree: LIBRARY → parent → fieldEntry → target
+    createNode(CONTAINER_IDS.LIBRARY, null);
+    setNodeDataBatch(CONTAINER_IDS.LIBRARY, { name: 'Library' });
 
-    const { ancestors, workspaceRootId } = getAncestorChain('target', entities);
-    expect(workspaceRootId).toBe('ws');
+    createNode('parent', CONTAINER_IDS.LIBRARY);
+    setNodeDataBatch('parent', { name: 'Parent' });
+
+    createNode('fieldEntry1', 'parent');
+    setNodeDataBatch('fieldEntry1', { type: 'fieldEntry' });
+
+    createNode('target', 'fieldEntry1');
+    setNodeDataBatch('target', { name: 'Target' });
+
+    const { ancestors, workspaceRootId } = getAncestorChain('target');
+    expect(workspaceRootId).toBe(CONTAINER_IDS.LIBRARY);
+    // fieldEntry1 is skipped (structural), so ancestors = [parent]
     expect(ancestors).toEqual([
-      { id: 'ws_LIBRARY', name: 'Library' },
       { id: 'parent', name: 'Parent' },
     ]);
 
-    expect(getNavigableParentId('target', entities)).toBe('parent');
+    expect(getNavigableParentId('target')).toBe('parent');
   });
 
   it('flattens visible nodes and navigates with parent disambiguation', () => {
-    const entities: Record<string, NodexNode> = {
-      root: node('root', 'ws', undefined, ['a', 'r']),
-      a: node('a', 'ws', 'root', ['a1', 'a2']),
-      a1: node('a1', 'ws', 'a', ['a1c']),
-      a1c: node('a1c', 'ws', 'a1'),
-      a2: node('a2', 'ws', 'a'),
-      r: node('r', 'ws', 'root', ['a1']), // reference-like duplicate appearance
-    };
+    // Build: root → [a, r]; a → [a1, a2]; a1 → [a1c]
+    createNode('root', null);
+    createNode('a', 'root');
+    createNode('a1', 'a');
+    createNode('a1c', 'a1');
+    createNode('a2', 'a');
+    createNode('r', 'root');
+    // r also has a1 as child (reference-like - in this test just re-create)
+    createNode('a1_ref', 'r');
+    setNodeDataBatch('a1_ref', { name: 'a1_ref' });
+
     const expanded = new Set<string>(['root:a', 'a:a1', 'root:r']);
 
-    const flat = getFlattenedVisibleNodes(['a', 'r'], entities, expanded, 'root');
+    const flat = getFlattenedVisibleNodes(['a', 'r'], expanded, 'root');
     expect(flat.map((x) => `${x.parentId}/${x.nodeId}`)).toEqual([
       'root/a',
       'a/a1',
       'a1/a1c',
       'a/a2',
       'root/r',
-      'r/a1',
+      'r/a1_ref',
     ]);
 
-    expect(getPreviousVisibleNode('a1', 'r', flat)).toEqual({ nodeId: 'r', parentId: 'root' });
+    expect(getPreviousVisibleNode('a1', 'a', flat)).toEqual({ nodeId: 'a', parentId: 'root' });
     expect(getNextVisibleNode('a1', 'a', flat)).toEqual({ nodeId: 'a1c', parentId: 'a1' });
   });
 
   it('finds last visible node and sibling/index helpers', () => {
-    const entities: Record<string, NodexNode> = {
-      p: node('p', 'ws', undefined, ['c1', 'tupleX', 'c2']),
-      c1: node('c1', 'ws', 'p'),
-      tupleX: node('tupleX', 'ws', 'p', ['SYS_A13', 'tagDef'], 'tuple'),
-      c2: node('c2', 'ws', 'p', ['c2a']),
-      c2a: node('c2a', 'ws', 'c2'),
-    };
+    // Build: p → [c1, fieldEntry, c2]; c2 → [c2a]
+    createNode('p', null);
+    createNode('c1', 'p');
+    createNode('fieldEntry', 'p');
+    setNodeDataBatch('fieldEntry', { type: 'fieldEntry' });
+    createNode('c2', 'p');
+    createNode('c2a', 'c2');
 
-    expect(getLastVisibleNode('p', entities, new Set(['p:c2']))).toEqual({ nodeId: 'c2a', parentId: 'c2' });
-    expect(getLastVisibleNode('p', entities, new Set())).toEqual({ nodeId: 'c2', parentId: 'p' });
+    // getLastVisibleNode skips structural nodes (fieldEntry)
+    // with c2 expanded:
+    const result = getLastVisibleNode('p', new Set(['p:c2']));
+    expect(result).toEqual({ nodeId: 'c2a', parentId: 'c2' });
 
-    expect(getParentId('c2a', entities)).toBe('c2');
-    expect(getPreviousSiblingId('c2', entities)).toBe('tupleX');
-    expect(getNodeIndex('c2', entities)).toBe(2);
+    // without expansion:
+    const resultCollapsed = getLastVisibleNode('p', new Set());
+    expect(resultCollapsed).toEqual({ nodeId: 'c2', parentId: 'p' });
+
+    expect(getParentId('c2a')).toBe('c2');
+    expect(getPreviousSiblingId('c2')).toBe('fieldEntry');
+    expect(getNodeIndex('c2')).toBe(2);
   });
 
   it('validates inline-ref-only HTML correctly', () => {

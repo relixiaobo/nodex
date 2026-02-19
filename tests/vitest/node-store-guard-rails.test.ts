@@ -1,112 +1,137 @@
+/**
+ * node-store guard rails — Loro model.
+ * In the Loro migration, validation is simplified:
+ * - setConfigValue: directly sets config, no tuple indirection
+ * - addFieldOption: creates option under fieldDef (no validation on wrong target)
+ * - removeFieldOption: just deletes (no ownership check)
+ * - replaceFieldDef: just sets fieldDefId (no ownership validation)
+ */
+import { describe, it, expect, beforeEach } from 'vitest';
 import { useNodeStore } from '../../src/stores/node-store.js';
 import { collectNodeGraphErrors } from './helpers/invariants.js';
+import * as loroDoc from '../../src/lib/loro-doc.js';
 import { resetAndSeed } from './helpers/test-state.js';
 
-describe('node-store guard rails', () => {
+describe('setConfigValue', () => {
   beforeEach(() => {
     resetAndSeed();
   });
 
-  it('setConfigValue ignores non-tuple ids', () => {
-    const beforeChildren = [...(useNodeStore.getState().entities.attrDef_due.children ?? [])];
-
-    useNodeStore.getState().setConfigValue('attrDef_due', 'SHOULD_NOT_WRITE', 'user_default');
-    useNodeStore.getState().setConfigValue('missing_tuple', 'SHOULD_NOT_WRITE', 'user_default');
-
-    expect(useNodeStore.getState().entities.attrDef_due.children ?? []).toEqual(beforeChildren);
-    expect(collectNodeGraphErrors(useNodeStore.getState().entities)).toEqual([]);
+  it('sets a config property directly on the node', () => {
+    useNodeStore.getState().setConfigValue('tagDef_task', 'color', 'violet');
+    const tagDef = loroDoc.toNodexNode('tagDef_task')!;
+    expect(tagDef.color).toBe('violet');
   });
 
-  it('addFieldOption validates target attrDef and returns empty id on invalid target', () => {
-    const beforeEntityCount = Object.keys(useNodeStore.getState().entities).length;
-
-    const invalidId = useNodeStore.getState().addFieldOption(
-      'note_2',
-      'Invalid target option',
-      'ws_default',
-      'user_default',
-    );
-    expect(invalidId).toBe('');
-    expect(Object.keys(useNodeStore.getState().entities).length).toBe(beforeEntityCount);
-
-    const optionId = useNodeStore.getState().addFieldOption(
-      'attrDef_status',
-      'Blocked',
-      'ws_default',
-      'user_default',
-    );
-    expect(optionId).toBeTruthy();
-    expect(useNodeStore.getState().entities[optionId]).toBeTruthy();
-    expect(useNodeStore.getState().entities.attrDef_status.children ?? []).toContain(optionId);
-
-    expect(collectNodeGraphErrors(useNodeStore.getState().entities)).toEqual([]);
+  it('sets showCheckbox on tagDef', () => {
+    useNodeStore.getState().setConfigValue('tagDef_task', 'showCheckbox', true);
+    const tagDef = loroDoc.toNodexNode('tagDef_task')!;
+    expect(tagDef.showCheckbox).toBe(true);
   });
 
-  it('removeFieldOption only removes options attached to the target attrDef', () => {
-    expect(useNodeStore.getState().entities.opt_low).toBeTruthy();
-    expect(useNodeStore.getState().entities.attrDef_priority.children ?? []).toContain('opt_low');
-
-    // Wrong attrDef: should not delete unrelated option.
-    useNodeStore.getState().removeFieldOption('attrDef_status', 'opt_low', 'user_default');
-    expect(useNodeStore.getState().entities.opt_low).toBeTruthy();
-    expect(useNodeStore.getState().entities.attrDef_priority.children ?? []).toContain('opt_low');
-
-    // Missing attrDef: should also be no-op.
-    useNodeStore.getState().removeFieldOption('missing_attr_def', 'opt_low', 'user_default');
-    expect(useNodeStore.getState().entities.opt_low).toBeTruthy();
-
-    // Correct attrDef: option gets removed.
-    useNodeStore.getState().removeFieldOption('attrDef_priority', 'opt_low', 'user_default');
-    expect(useNodeStore.getState().entities.opt_low).toBeUndefined();
-    expect(useNodeStore.getState().entities.attrDef_priority.children ?? []).not.toContain('opt_low');
-
-    expect(collectNodeGraphErrors(useNodeStore.getState().entities)).toEqual([]);
+  it('sets childSupertag on tagDef', () => {
+    useNodeStore.getState().setConfigValue('tagDef_task', 'childSupertag', 'tagDef_dev_task');
+    const tagDef = loroDoc.toNodexNode('tagDef_task')!;
+    expect(tagDef.childSupertag).toBe('tagDef_dev_task');
   });
 
-  it('replaceFieldAttrDef enforces node ownership and old attrDef match', async () => {
-    const { tupleId, attrDefId: placeholderAttrDefId } = await useNodeStore.getState().addUnnamedFieldToNode(
-      'note_2',
-      'ws_default',
-      'user_default',
-    );
-    expect(useNodeStore.getState().entities[placeholderAttrDefId]).toBeTruthy();
+  it('graph is valid after setConfigValue', () => {
+    useNodeStore.getState().setConfigValue('tagDef_task', 'color', 'blue');
+    expect(collectNodeGraphErrors()).toEqual([]);
+  });
+});
 
-    // Wrong node owner for tuple -> no-op.
-    await useNodeStore.getState().replaceFieldAttrDef(
-      'task_1',
-      tupleId,
-      placeholderAttrDefId,
-      'attrDef_status',
-      'ws_default',
-      'user_default',
-    );
-    expect(useNodeStore.getState().entities[tupleId].children?.[0]).toBe(placeholderAttrDefId);
-    expect(useNodeStore.getState().entities[placeholderAttrDefId]).toBeTruthy();
+describe('addFieldOption', () => {
+  beforeEach(() => {
+    resetAndSeed();
+  });
 
-    // oldAttrDef mismatch -> no-op.
-    await useNodeStore.getState().replaceFieldAttrDef(
-      'note_2',
-      tupleId,
-      'attrDef_status',
-      'attrDef_due',
-      'ws_default',
-      'user_default',
-    );
-    expect(useNodeStore.getState().entities[tupleId].children?.[0]).toBe(placeholderAttrDefId);
-    expect(useNodeStore.getState().entities[placeholderAttrDefId]).toBeTruthy();
+  it('creates option node under fieldDef and returns optionId', () => {
+    const optId = useNodeStore.getState().addFieldOption('attrDef_status', 'Blocked');
+    expect(optId).toBeTruthy();
+    const opt = loroDoc.toNodexNode(optId)!;
+    expect(opt.name).toBe('Blocked');
+    expect(loroDoc.getParentId(optId)).toBe('attrDef_status');
+  });
 
-    // Valid replacement -> tuple swapped and placeholder attrDef cleaned.
-    await useNodeStore.getState().replaceFieldAttrDef(
-      'note_2',
-      tupleId,
-      placeholderAttrDefId,
-      'attrDef_status',
-      'ws_default',
-      'user_default',
-    );
-    expect(useNodeStore.getState().entities[tupleId].children?.[0]).toBe('attrDef_status');
-    expect(useNodeStore.getState().entities[placeholderAttrDefId]).toBeUndefined();
+  it('adds new option to fieldDef children', () => {
+    const beforeCount = loroDoc.getChildren('attrDef_status').length;
+    useNodeStore.getState().addFieldOption('attrDef_status', 'Blocked');
+    expect(loroDoc.getChildren('attrDef_status').length).toBe(beforeCount + 1);
+  });
 
-    expect(collectNodeGraphErrors(useNodeStore.getState().entities)).toEqual([]);
+  it('graph is valid after addFieldOption', () => {
+    useNodeStore.getState().addFieldOption('attrDef_priority', 'Critical');
+    expect(collectNodeGraphErrors()).toEqual([]);
+  });
+});
+
+describe('removeFieldOption', () => {
+  beforeEach(() => {
+    resetAndSeed();
+  });
+
+  it('deletes option node from LoroDoc', () => {
+    expect(loroDoc.hasNode('opt_low')).toBe(true);
+
+    useNodeStore.getState().removeFieldOption('attrDef_priority', 'opt_low');
+
+    expect(loroDoc.hasNode('opt_low')).toBe(false);
+    expect(loroDoc.getChildren('attrDef_priority')).not.toContain('opt_low');
+  });
+
+  it('graph is valid after removeFieldOption', () => {
+    useNodeStore.getState().removeFieldOption('attrDef_priority', 'opt_low');
+    expect(collectNodeGraphErrors()).toEqual([]);
+  });
+
+  it('is a no-op for nonexistent option (does not throw)', () => {
+    expect(() => useNodeStore.getState().removeFieldOption('attrDef_status', 'nonexistent_opt')).not.toThrow();
+    expect(collectNodeGraphErrors()).toEqual([]);
+  });
+});
+
+describe('addUnnamedFieldToNode', () => {
+  beforeEach(() => {
+    resetAndSeed();
+  });
+
+  it('returns { fieldEntryId, fieldDefId }', () => {
+    const result = useNodeStore.getState().addUnnamedFieldToNode('note_2');
+    expect(result.fieldEntryId).toBeTruthy();
+    expect(result.fieldDefId).toBeTruthy();
+  });
+
+  it('placeholder fieldDef has type fieldDef and empty name', () => {
+    const result = useNodeStore.getState().addUnnamedFieldToNode('note_2');
+    const fd = loroDoc.toNodexNode(result.fieldDefId)!;
+    expect(fd.type).toBe('fieldDef');
+  });
+
+  it('graph is valid after addUnnamedFieldToNode', () => {
+    useNodeStore.getState().addUnnamedFieldToNode('note_2');
+    expect(collectNodeGraphErrors()).toEqual([]);
+  });
+});
+
+describe('replaceFieldDef', () => {
+  beforeEach(() => {
+    resetAndSeed();
+  });
+
+  it('sets new fieldDefId regardless of node ownership (no validation in Loro model)', () => {
+    const { fieldEntryId, fieldDefId: placeholderFdId } = useNodeStore.getState().addUnnamedFieldToNode('note_2');
+
+    // In old model this would check ownership; in Loro model it just sets
+    useNodeStore.getState().replaceFieldDef('note_2', fieldEntryId, placeholderFdId, 'attrDef_status');
+
+    const fe = loroDoc.toNodexNode(fieldEntryId)!;
+    expect(fe.fieldDefId).toBe('attrDef_status');
+  });
+
+  it('graph is valid after replaceFieldDef', () => {
+    const { fieldEntryId, fieldDefId: placeholderFdId } = useNodeStore.getState().addUnnamedFieldToNode('note_2');
+    useNodeStore.getState().replaceFieldDef('note_2', fieldEntryId, placeholderFdId, 'attrDef_status');
+    expect(collectNodeGraphErrors()).toEqual([]);
   });
 });

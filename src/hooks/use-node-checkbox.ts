@@ -1,9 +1,11 @@
 /**
  * Hook to derive checkbox visibility and done state for a node.
  *
- * Depends on: node._done, node.meta tuples, tagDef.children (multi-layer).
- * Uses JSON.stringify fingerprint to avoid infinite re-render from Zustand selector
- * returning a new object reference every time.
+ * In the new Loro model:
+ * - Done state: node.completedAt (undefined = no checkbox, 0 = undone, >0 = done)
+ * - Tag-driven: node.tags[] → tagDef.showCheckbox
+ *
+ * Uses a stable fingerprint to avoid infinite re-render.
  */
 import { useMemo } from 'react';
 import { useNodeStore } from '../stores/node-store.js';
@@ -11,30 +13,18 @@ import { shouldNodeShowCheckbox, type CheckboxState } from '../lib/checkbox-util
 
 export function useNodeCheckbox(nodeId: string): CheckboxState {
   // Build a stable fingerprint of all data the pure function depends on.
-  // This avoids creating a new object on every render (Zustand + React 19 gotcha).
   const fingerprint = useNodeStore((s) => {
-    const node = s.entities[nodeId];
+    void s._version;
+    const node = s.getNode(nodeId);
     if (!node) return '';
-
-    // Collect relevant data: _done (3 states), meta tuples, tagDef config tuples
-    // Must distinguish undefined / 0 / >0 for the three-state checkbox model
-    const parts: string[] = [String(node.props._done ?? 'x')];
-
-    if (node.meta) {
-      for (const tid of node.meta) {
-        const tuple = s.entities[tid];
-        if (tuple?.children) {
-          parts.push(tuple.children.join(','));
-        }
-      }
-    }
-
-    return parts.join('|');
+    // Include completedAt and tags for checkbox visibility
+    return `${node.completedAt ?? 'x'}|${(node.tags ?? []).join(',')}`;
   });
 
   return useMemo(() => {
-    const entities = useNodeStore.getState().entities;
-    return shouldNodeShowCheckbox(nodeId, entities);
+    const node = useNodeStore.getState().getNode(nodeId);
+    if (!node) return { showCheckbox: false, isDone: false };
+    return shouldNodeShowCheckbox(node);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nodeId, fingerprint]);
 }

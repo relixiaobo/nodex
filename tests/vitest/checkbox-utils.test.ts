@@ -1,183 +1,154 @@
+/**
+ * Pure functions for checkbox visibility and state transitions.
+ * New Loro model: all functions take NodexNode directly (no entity dict).
+ * - task_1 is tagged with tagDef_task (showCheckbox=true in seed)
+ * - idea_1 is untagged (inside note_2)
+ */
 import {
   shouldNodeShowCheckbox,
   hasTagShowCheckbox,
   resolveCheckboxClick,
   resolveCmdEnterCycle,
 } from '../../src/lib/checkbox-utils.js';
-import type { NodexNode } from '../../src/types/node.js';
-import { SYS_A, SYS_V } from '../../src/types/index.js';
-
-function makeNode(id: string, overrides: Partial<NodexNode> = {}): NodexNode {
-  return {
-    id,
-    props: { created: 1 },
-    children: [],
-    workspaceId: 'ws',
-    version: 1,
-    updatedAt: 1,
-    createdBy: 'u',
-    updatedBy: 'u',
-    ...overrides,
-  };
-}
-
-// ─── Tag helper for building SYS_A55 config chain ───
-
-function buildTagCheckboxEntities(
-  checkboxValue: string,
-): Record<string, NodexNode> {
-  return {
-    n1: makeNode('n1', { meta: ['tuple_tag'] }),
-    tuple_tag: makeNode('tuple_tag', {
-      props: { created: 1, _docType: 'tuple' },
-      children: [SYS_A.NODE_SUPERTAGS, 'tagDef1'],
-    }),
-    tagDef1: makeNode('tagDef1', {
-      props: { created: 1, _docType: 'tagDef' },
-      children: ['cfg_cb'],
-    }),
-    cfg_cb: makeNode('cfg_cb', {
-      props: { created: 1, _docType: 'tuple' },
-      children: [SYS_A.SHOW_CHECKBOX, checkboxValue],
-    }),
-  };
-}
-
-// ─── shouldNodeShowCheckbox ───
+import * as loroDoc from '../../src/lib/loro-doc.js';
+import { useNodeStore } from '../../src/stores/node-store.js';
+import { resetAndSeed } from './helpers/test-state.js';
 
 describe('shouldNodeShowCheckbox', () => {
-  it('returns false for node without tags and no _done', () => {
-    const entities = { n1: makeNode('n1') };
-    expect(shouldNodeShowCheckbox('n1', entities)).toEqual({ showCheckbox: false, isDone: false });
+  beforeEach(() => {
+    resetAndSeed();
   });
 
-  it('returns false when tag has SYS_A55=NO and no _done', () => {
-    const entities = buildTagCheckboxEntities(SYS_V.NO);
-    expect(shouldNodeShowCheckbox('n1', entities)).toEqual({ showCheckbox: false, isDone: false });
+  it('tag-driven node: showCheckbox=true, isDone=false (no completedAt)', () => {
+    const node = loroDoc.toNodexNode('task_1')!;
+    const result = shouldNodeShowCheckbox(node);
+    expect(result.showCheckbox).toBe(true);
+    expect(result.isDone).toBe(false);
   });
 
-  it('returns showCheckbox=true when tag has SYS_A55=YES', () => {
-    const entities = buildTagCheckboxEntities(SYS_V.YES);
-    expect(shouldNodeShowCheckbox('n1', entities)).toEqual({ showCheckbox: true, isDone: false });
+  it('untagged node without completedAt: showCheckbox=false', () => {
+    const node = loroDoc.toNodexNode('idea_1')!;
+    const result = shouldNodeShowCheckbox(node);
+    expect(result.showCheckbox).toBe(false);
+    expect(result.isDone).toBe(false);
   });
 
-  it('returns isDone=true when tag has SYS_A55=YES and _done > 0', () => {
-    const entities = buildTagCheckboxEntities(SYS_V.YES);
-    entities.n1.props._done = 1700000000000;
-    expect(shouldNodeShowCheckbox('n1', entities)).toEqual({ showCheckbox: true, isDone: true });
+  it('manual node with completedAt=0 (undone sentinel): showCheckbox=true, isDone=false', () => {
+    loroDoc.setNodeData('idea_1', 'completedAt', 0);
+    const node = loroDoc.toNodexNode('idea_1')!;
+    const result = shouldNodeShowCheckbox(node);
+    expect(result.showCheckbox).toBe(true);
+    expect(result.isDone).toBe(false);
   });
 
-  it('returns showCheckbox=true, isDone=false when _done=0 (manual undone)', () => {
-    const entities = { n1: makeNode('n1', { props: { created: 1, _done: 0 } }) };
-    expect(shouldNodeShowCheckbox('n1', entities)).toEqual({ showCheckbox: true, isDone: false });
+  it('manual node with completedAt=timestamp: showCheckbox=true, isDone=true', () => {
+    loroDoc.setNodeData('idea_1', 'completedAt', Date.now());
+    const node = loroDoc.toNodexNode('idea_1')!;
+    const result = shouldNodeShowCheckbox(node);
+    expect(result.showCheckbox).toBe(true);
+    expect(result.isDone).toBe(true);
   });
 
-  it('returns showCheckbox=true, isDone=true when _done > 0 (manual done)', () => {
-    const entities = { n1: makeNode('n1', { props: { created: 1, _done: 1700000000000 } }) };
-    expect(shouldNodeShowCheckbox('n1', entities)).toEqual({ showCheckbox: true, isDone: true });
-  });
-
-  it('returns false for nonexistent node', () => {
-    expect(shouldNodeShowCheckbox('missing', {})).toEqual({ showCheckbox: false, isDone: false });
+  it('tag-driven done: showCheckbox=true, isDone=true', () => {
+    loroDoc.setNodeData('task_1', 'completedAt', Date.now());
+    const node = loroDoc.toNodexNode('task_1')!;
+    const result = shouldNodeShowCheckbox(node);
+    expect(result.showCheckbox).toBe(true);
+    expect(result.isDone).toBe(true);
   });
 });
 
-// ─── resolveCheckboxClick ───
+describe('hasTagShowCheckbox', () => {
+  beforeEach(() => {
+    resetAndSeed();
+  });
+
+  it('returns true for node tagged with showCheckbox=true tagDef', () => {
+    const node = loroDoc.toNodexNode('task_1')!;
+    expect(hasTagShowCheckbox(node)).toBe(true);
+  });
+
+  it('returns false for untagged node', () => {
+    const node = loroDoc.toNodexNode('idea_1')!;
+    expect(hasTagShowCheckbox(node)).toBe(false);
+  });
+
+  it('returns true via extends chain (tagDef_dev_task extends tagDef_task with showCheckbox)', () => {
+    // tagDef_dev_task has showCheckbox=true directly in seed data
+    useNodeStore.getState().applyTag('idea_1', 'tagDef_dev_task');
+    const node = loroDoc.toNodexNode('idea_1')!;
+    expect(hasTagShowCheckbox(node)).toBe(true);
+  });
+});
 
 describe('resolveCheckboxClick', () => {
-  it('undone → done (manual node)', () => {
-    const result = resolveCheckboxClick(0, false);
-    expect(result).toBeGreaterThan(0);
+  beforeEach(() => {
+    resetAndSeed();
   });
 
-  it('done → undone=0 (manual node, keeps checkbox)', () => {
-    expect(resolveCheckboxClick(1700000000000, false)).toBe(0);
+  it('tag-driven undone → done: returns completedAt > 0', () => {
+    const node = loroDoc.toNodexNode('task_1')!;
+    const result = resolveCheckboxClick(node);
+    expect(result.completedAt).toBeGreaterThan(0);
   });
 
-  it('undone → done (tag-driven node)', () => {
-    const result = resolveCheckboxClick(undefined, true);
-    expect(result).toBeGreaterThan(0);
+  it('tag-driven done → undone: returns undefined (tag keeps checkbox visible)', () => {
+    loroDoc.setNodeData('task_1', 'completedAt', Date.now());
+    const node = loroDoc.toNodexNode('task_1')!;
+    const result = resolveCheckboxClick(node);
+    expect(result.completedAt).toBeUndefined();
   });
 
-  it('done → undefined (tag-driven, tag keeps checkbox)', () => {
-    expect(resolveCheckboxClick(1700000000000, true)).toBeUndefined();
+  it('manual undone (completedAt=0) → done: returns timestamp > 0', () => {
+    loroDoc.setNodeData('idea_1', 'completedAt', 0);
+    const node = loroDoc.toNodexNode('idea_1')!;
+    const result = resolveCheckboxClick(node);
+    expect(result.completedAt).toBeGreaterThan(0);
+  });
+
+  it('manual done → undone: returns 0 (keeps checkbox)', () => {
+    loroDoc.setNodeData('idea_1', 'completedAt', Date.now());
+    const node = loroDoc.toNodexNode('idea_1')!;
+    const result = resolveCheckboxClick(node);
+    expect(result.completedAt).toBe(0);
   });
 });
-
-// ─── resolveCmdEnterCycle ───
 
 describe('resolveCmdEnterCycle', () => {
-  describe('manual node (no tag)', () => {
-    it('No → Undone (0)', () => {
-      expect(resolveCmdEnterCycle(undefined, false)).toBe(0);
-    });
-
-    it('Undone → Done (timestamp)', () => {
-      const result = resolveCmdEnterCycle(0, false);
-      expect(result).toBeGreaterThan(0);
-    });
-
-    it('Done → No (undefined)', () => {
-      expect(resolveCmdEnterCycle(1700000000000, false)).toBeUndefined();
-    });
+  beforeEach(() => {
+    resetAndSeed();
   });
 
-  describe('tag-driven node', () => {
-    it('undone → done', () => {
-      const result = resolveCmdEnterCycle(undefined, true);
-      expect(result).toBeGreaterThan(0);
-    });
-
-    it('done → undone (undefined, tag keeps checkbox)', () => {
-      expect(resolveCmdEnterCycle(1700000000000, true)).toBeUndefined();
-    });
-  });
-});
-
-// ─── Store integration ───
-
-describe('store toggleNodeDone + cycleNodeCheckbox', () => {
-  it('toggleNodeDone: click toggles undone ↔ done', async () => {
-    const { useNodeStore } = await import('../../src/stores/node-store.js');
-
-    // Seed a node with checkbox undone (_done=0)
-    useNodeStore.setState({
-      entities: {
-        test_node: makeNode('test_node', { props: { created: 1, _done: 0 } }),
-      },
-    });
-
-    // Click: undone → done
-    await useNodeStore.getState().toggleNodeDone('test_node', 'user1');
-    const doneTs = useNodeStore.getState().entities.test_node.props._done;
-    expect(doneTs).toBeGreaterThan(0);
-
-    // Click: done → undone (0, keeps checkbox)
-    await useNodeStore.getState().toggleNodeDone('test_node', 'user1');
-    expect(useNodeStore.getState().entities.test_node.props._done).toBe(0);
+  it('tag-driven undone → done (2-state): returns timestamp', () => {
+    const node = loroDoc.toNodexNode('task_1')!;
+    const result = resolveCmdEnterCycle(node);
+    expect(result.completedAt).toBeGreaterThan(0);
   });
 
-  it('cycleNodeCheckbox: 3-state cycle for manual nodes', async () => {
-    const { useNodeStore } = await import('../../src/stores/node-store.js');
+  it('tag-driven done → undone (2-state): returns undefined', () => {
+    loroDoc.setNodeData('task_1', 'completedAt', Date.now());
+    const node = loroDoc.toNodexNode('task_1')!;
+    const result = resolveCmdEnterCycle(node);
+    expect(result.completedAt).toBeUndefined();
+  });
 
-    // Seed a plain node (no checkbox)
-    useNodeStore.setState({
-      entities: {
-        test_node: makeNode('test_node'),
-      },
-    });
+  it('manual No → Undone (3-state): returns 0', () => {
+    const node = loroDoc.toNodexNode('idea_1')!; // completedAt = undefined
+    const result = resolveCmdEnterCycle(node);
+    expect(result.completedAt).toBe(0);
+  });
 
-    // Cmd+Enter: No → Undone (0)
-    await useNodeStore.getState().cycleNodeCheckbox('test_node', 'user1');
-    expect(useNodeStore.getState().entities.test_node.props._done).toBe(0);
+  it('manual Undone → Done (3-state): returns timestamp > 0', () => {
+    loroDoc.setNodeData('idea_1', 'completedAt', 0);
+    const node = loroDoc.toNodexNode('idea_1')!;
+    const result = resolveCmdEnterCycle(node);
+    expect(result.completedAt).toBeGreaterThan(0);
+  });
 
-    // Cmd+Enter: Undone → Done (timestamp)
-    await useNodeStore.getState().cycleNodeCheckbox('test_node', 'user1');
-    const doneTs = useNodeStore.getState().entities.test_node.props._done;
-    expect(doneTs).toBeGreaterThan(0);
-
-    // Cmd+Enter: Done → No (undefined)
-    await useNodeStore.getState().cycleNodeCheckbox('test_node', 'user1');
-    expect(useNodeStore.getState().entities.test_node.props._done).toBeUndefined();
+  it('manual Done → No (3-state): returns undefined', () => {
+    loroDoc.setNodeData('idea_1', 'completedAt', Date.now());
+    const node = loroDoc.toNodexNode('idea_1')!;
+    const result = resolveCmdEnterCycle(node);
+    expect(result.completedAt).toBeUndefined();
   });
 });

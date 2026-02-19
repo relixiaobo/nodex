@@ -11,6 +11,7 @@ import { useUIStore } from '../../stores/ui-store';
 import { useNodeStore } from '../../stores/node-store';
 import { useWorkspaceStore } from '../../stores/workspace-store';
 import { WORKSPACE_CONTAINERS } from '../../types/index.js';
+import * as loroDoc from '../../lib/loro-doc.js';
 
 export function CommandPalette() {
   const searchOpen = useUIStore((s) => s.searchOpen);
@@ -18,7 +19,7 @@ export function CommandPalette() {
   const searchQuery = useUIStore((s) => s.searchQuery);
   const setSearchQuery = useUIStore((s) => s.setSearchQuery);
   const navigateTo = useUIStore((s) => s.navigateTo);
-  const entities = useNodeStore((s) => s.entities);
+  const _version = useNodeStore((s) => s._version);
   const wsId = useWorkspaceStore((s) => s.currentWorkspaceId);
 
   // Global Cmd+K shortcut
@@ -51,9 +52,11 @@ export function CommandPalette() {
     const query = searchQuery.toLowerCase();
     const matches: Array<{ id: string; name: string }> = [];
 
-    for (const [id, node] of Object.entries(entities)) {
+    for (const id of loroDoc.getAllNodeIds()) {
+      const node = loroDoc.toNodexNode(id);
+      if (!node) continue;
       // Skip system/container nodes unless explicitly searching
-      const name = node.props.name ?? '';
+      const name = node.name ?? '';
       const plainText = name.replace(/<[^>]+>/g, '').toLowerCase();
 
       if (plainText.includes(query)) {
@@ -63,7 +66,8 @@ export function CommandPalette() {
     }
 
     return matches;
-  }, [entities, searchQuery]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [_version, searchQuery]);
 
   // Container quick-access items
   const containers = useMemo(() => {

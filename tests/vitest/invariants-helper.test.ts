@@ -1,74 +1,44 @@
-import type { NodexNode } from '../../src/types/index.js';
+/**
+ * LoroDoc structural invariants (Loro model).
+ * collectNodeGraphErrors() reads from LoroDoc — no entity dict needed.
+ * All operations must leave the graph in a consistent state.
+ */
+import { describe, it, expect, beforeEach } from 'vitest';
 import { collectNodeGraphErrors } from './helpers/invariants.js';
+import { resetAndSeed } from './helpers/test-state.js';
+import { useNodeStore } from '../../src/stores/node-store.js';
 
-function makeNode(
-  id: string,
-  opts?: {
-    ownerId?: string;
-    docType?: string;
-    children?: string[];
-  },
-): NodexNode {
-  return {
-    id,
-    workspaceId: 'ws_default',
-    props: {
-      name: id,
-      _ownerId: opts?.ownerId,
-      _docType: opts?.docType,
-    },
-    children: opts?.children ?? [],
-    version: 1,
-    updatedAt: 0,
-    createdBy: 'user_default',
-    updatedBy: 'user_default',
-  };
-}
-
-describe('graph invariant helper', () => {
-  it('returns empty list for a valid small graph', () => {
-    const entities: Record<string, NodexNode> = {
-      root: makeNode('root', { children: ['child'] }),
-      child: makeNode('child', { ownerId: 'root' }),
-    };
-    expect(collectNodeGraphErrors(entities)).toEqual([]);
+describe('LoroDoc structural invariants', () => {
+  beforeEach(() => {
+    resetAndSeed();
   });
 
-  it('reports owner/child structure errors', () => {
-    const entities: Record<string, NodexNode> = {
-      root: makeNode('root'),
-      orphan: makeNode('orphan', { ownerId: 'missing_owner' }),
-      mismatch: makeNode('mismatch', { ownerId: 'root' }),
-      dup_parent: makeNode('dup_parent', { children: ['x', 'x'] }),
-    };
-    expect(collectNodeGraphErrors(entities)).toEqual(
-      expect.arrayContaining([
-        'owner missing: node=orphan owner=missing_owner',
-        'owner-child mismatch: node=mismatch owner=root',
-        'duplicate child id: parent=dup_parent child=x',
-      ]),
-    );
+  it('seeded graph has no structural errors', () => {
+    expect(collectNodeGraphErrors()).toEqual([]);
   });
 
-  it('skips owner-child mismatch for tuple value refs', () => {
-    const entities: Record<string, NodexNode> = {
-      parent: makeNode('parent', { children: ['tuple_1'] }),
-      tuple_1: makeNode('tuple_1', { ownerId: 'parent', docType: 'tuple', children: ['key', 'value_1'] }),
-      value_1: makeNode('value_1', { ownerId: 'parent' }),
-    };
-    const errors = collectNodeGraphErrors(entities);
-    expect(errors).not.toContain('owner-child mismatch: node=value_1 owner=parent');
+  it('after creating a child node, graph remains valid', () => {
+    useNodeStore.getState().createChild('note_2', undefined, { name: 'New idea' });
+    expect(collectNodeGraphErrors()).toEqual([]);
   });
 
-  it('detects child missing for non-tuple nodes', () => {
-    const entities: Record<string, NodexNode> = {
-      parent: makeNode('parent', { children: ['existing', 'missing_child'] }),
-      existing: makeNode('existing', { ownerId: 'parent' }),
-    };
-    expect(collectNodeGraphErrors(entities)).toEqual(
-      expect.arrayContaining([
-        'child missing: parent=parent child=missing_child',
-      ]),
-    );
+  it('after trashing a node, graph remains valid', () => {
+    useNodeStore.getState().trashNode('idea_1');
+    expect(collectNodeGraphErrors()).toEqual([]);
+  });
+
+  it('after applyTag (creates fieldEntry nodes), graph remains valid', () => {
+    useNodeStore.getState().applyTag('note_2', 'tagDef_task');
+    expect(collectNodeGraphErrors()).toEqual([]);
+  });
+
+  it('after moveNodeTo, graph remains valid', () => {
+    useNodeStore.getState().moveNodeTo('idea_1', 'proj_1');
+    expect(collectNodeGraphErrors()).toEqual([]);
+  });
+
+  it('after setFieldValue, graph remains valid', () => {
+    useNodeStore.getState().setFieldValue('task_1', 'attrDef_due', ['2026-03-01']);
+    expect(collectNodeGraphErrors()).toEqual([]);
   });
 });

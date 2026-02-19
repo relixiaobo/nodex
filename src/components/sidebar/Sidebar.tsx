@@ -8,7 +8,7 @@ import { UserMenu } from '../auth/UserMenu';
 export function Sidebar() {
   const openSearch = useUIStore((s) => s.openSearch);
   const wsId = useWorkspaceStore((s) => s.currentWorkspaceId);
-  const wsName = useNodeStore((s) => s.entities[wsId ?? '']?.props.name);
+  const wsName = useNodeStore((s) => { void s._version; return s.getNode(wsId ?? '')?.name; });
 
   return (
     <aside className="flex h-full w-56 shrink-0 flex-col border-r border-border bg-surface">

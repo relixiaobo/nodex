@@ -155,14 +155,12 @@ export function RichTextEditor(props: RichTextEditorProps) {
       initialContentRef.current.inlineRefs,
     );
 
-    if (changed && userId) {
-      updateNodeContent(
-        propsRef.current.nodeId,
-        parsed.text,
-        parsed.marks,
-        parsed.inlineRefs,
-        userId,
-      );
+    if (changed) {
+      updateNodeContent(propsRef.current.nodeId, {
+        name: parsed.text,
+        marks: parsed.marks,
+        inlineRefs: parsed.inlineRefs,
+      });
     }
   }, [updateNodeContent, userId]);
 

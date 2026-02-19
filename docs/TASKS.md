@@ -35,51 +35,7 @@ _(空)_
 
 ## 进行中
 
-### 用户认证 — Google 登录 (#45)
-> **Owner: nodex-cc-2** | Branch: `cc2/google-auth` | Priority: P2
-> **Spec**: `docs/features/auth-and-environments.md`
-
-Chrome Extension 环境下的 Google OAuth 登录 + Supabase Auth 集成。
-
-- [ ] 环境配置：固定 Dev Extension ID + `.env` / `.env.production` 双套
-- [ ] Supabase Auth 配置（启用 Google Provider，添加 redirect URIs）
-- [ ] Google Cloud Console OAuth Client ID 创建（Dev + Prod 各一个）
-- [ ] `src/lib/auth.ts` — chrome.identity + Supabase Auth 流程封装
-- [ ] `workspace-store.ts` 扩展 — signInWithGoogle / onAuthStateChange / signOut
-- [ ] `src/components/auth/LoginScreen.tsx` — 登录页 UI
-- [ ] `src/components/auth/UserMenu.tsx` — 用户头像 + 登出菜单
-- [ ] App.tsx 路由守卫（未登录 → LoginScreen）
-- [ ] wxt.config.ts 新增 `identity` 权限
-- [ ] 工作区绑定（登录后自动关联 workspaceId）
-
-- **Files**: `src/lib/auth.ts` (new), `src/components/auth/*` (new), `workspace-store.ts`, `App.tsx`, `wxt.config.ts`, `Sidebar.tsx`
-- **迭代日志**:
-  - [2026-02-18 cc2] 开始实现：chrome.identity + Supabase PKCE OAuth 流程；LoginScreen + UserMenu UI；App.tsx 路由守卫（Supabase 可用时要求登录，离线模式跳过）；Sidebar 底部嵌入 UserMenu
-
-### 数据模型简化：消除 Metanode + AssociatedData
-> **Owner: nodex-cc** | Branch: `cc/simplify-data-model` | Priority: P0
-> **计划文档**: `docs/plans/simplify-data-model-eliminate-metanode-assocdata.md`
-
-简化三层间接为一层（只保留 Tuple），消除 Metanode 和 AssociatedData。
-
-- [x] Phase 0: 添加 meta 列 + 类型 + helper ✓
-- [x] Phase 1a: 读路径迁移（meta 优先，fallback _metaNodeId）✓
-- [x] Phase 1b: 写路径迁移（不再创建 Metanode）✓
-- [x] Phase 1c: 种子数据 + 测试迁移 ✓
-- [x] Phase 2a: 字段读路径迁移（Tuple.children 直接读值）✓
-- [x] Phase 2b: 字段写路径迁移（不再创建 AssociatedData）✓
-- [x] Phase 2c: UI 组件迁移（FieldValueOutliner + FieldRow + OptionsPicker 等 15 文件）✓
-- [x] Phase 2d: 种子数据 + 测试迁移（8 测试文件 + seed-data）✓
-- [x] Phase 3: 类型清理 + 数据库迁移（移除 meta_node_id + association_map 列）✓
-
-- **Files**: node-store.ts, node.ts, seed-data.ts, tag-service.ts, field-service.ts,
-  search-service.ts, checkbox-utils.ts, field-utils.ts, use-node-fields.ts,
-  FieldValueOutliner.tsx, node-service.ts, meta-utils.ts (new)
-- **迭代日志**:
-  - [2026-02-18 nodex-cc] Phase 0+1 完成：meta 列 + 工具函数 + 读写路径迁移 + 测试。362 tests pass。
-  - [2026-02-18 nodex-cc] Phase 2 完成：AssociatedData 完全消除。store 写路径(15 方法)、UI 组件(15 文件)、种子数据、8 测试文件全部更新。净删 ~340 行。362 tests pass, build 846KB。
-  - [2026-02-18 nodex-cc] 残留：node-service.ts（DB 层 association_map 列映射）、tana-import.ts（导入兼容）、node.ts（@deprecated 标记）→ Phase 3
-  - [2026-02-19 nodex-cc] Phase 3 完成：从 DocType/NodeProps/NodexNode 移除 metanode+associatedData+_metaNodeId+associationMap。DB migration 004 移除 meta_node_id + association_map 列。tana-import 保留原始格式读取但不写入已废弃字段。全部 362 tests pass，build 846KB。**数据模型简化任务完成。**
+_(空)_
 
 ---
 
@@ -93,12 +49,6 @@ Chrome Extension 环境下的 Google OAuth 登录 + Supabase Auth 集成。
 - 根因：ProseMirror focus 后多条路径延迟调用 `selectionToDOM()`，重置 Chrome IME 上下文
 - 已尝试 9 种外部修复方案均无法完全覆盖所有 `selectionToDOM` 路径
 - 可行方案：fork `prosemirror-view` 添加 composing 守卫 / 保活 EditorView 避免重建
-
-#### Editor Bug: 首次点击节点行尾空白光标落到开头
-> 详见 `docs/issues/editor-tail-click-first-open.md`
-
-- 仅首次点击（节点从静态 HTML 切换到 ProseMirror 编辑态）时复现
-- 可能与 `caretPositionFromPoint` 在静态 DOM 上的行为有关
 
 ### P2
 
@@ -273,6 +223,9 @@ Chrome Extension 环境下的 Google OAuth 登录 + Supabase Auth 集成。
 
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
+| 2026-02-19 | Editor Bug: 首次点击行尾空白光标落到开头 | nodex | — |
+| 2026-02-19 | 数据模型简化：消除 Metanode + AssociatedData (Phase 0-3) | nodex-cc | #60 |
+| 2026-02-19 | 用户认证 — Google OAuth 登录 + Supabase Auth | nodex-cc-2 | #61 |
 | 2026-02-18 | Editor 迁移 TipTap → ProseMirror（Phase 1-4 + text+marks 数据模型 + 交互修复 30+ 轮）| nodex-codex | #58 |
 | 2026-02-17 | Floating Toolbar BUG 修复 — 移除 BubbleMenu，改为自管理 Portal 浮层 | nodex-codex | #57 |
 | 2026-02-16 | Ctrl+I Description 切换修复 — registry 匹配 + 光标位置恢复 | nodex-codex | #56 |

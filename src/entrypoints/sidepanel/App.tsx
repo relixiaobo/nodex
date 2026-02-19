@@ -10,30 +10,35 @@ import { CommandPalette } from '../../components/search/CommandPalette';
 import { LoginScreen } from '../../components/auth/LoginScreen';
 import { WORKSPACE_CONTAINERS, getContainerId } from '../../types/index.js';
 import type { NodexNode, WorkspaceContainerSuffix } from '../../types/index.js';
-import { resetSupabase } from '../../services/supabase.js';
+import { isSupabaseReady, resetSupabase } from '../../services/supabase.js';
+import { nodeToRow } from '../../services/node-service.js';
+import { getSupabase } from '../../lib/supabase.js';
 import { findUnexpectedShortcutConflicts } from '../../lib/shortcut-registry.js';
+
+const CONTAINER_DEFS: Array<{ suffix: WorkspaceContainerSuffix; name: string }> = [
+  { suffix: WORKSPACE_CONTAINERS.LIBRARY, name: 'Library' },
+  { suffix: WORKSPACE_CONTAINERS.INBOX, name: 'Inbox' },
+  { suffix: WORKSPACE_CONTAINERS.JOURNAL, name: 'Journal' },
+  { suffix: WORKSPACE_CONTAINERS.SEARCHES, name: 'Searches' },
+  { suffix: WORKSPACE_CONTAINERS.TRASH, name: 'Trash' },
+];
 
 /**
  * Bootstrap workspace root node and container nodes.
- * Called when no Supabase data is available (offline/demo mode).
+ * Seeds into local Zustand store, and persists to Supabase via upsert when connected.
  */
-function seedWorkspace(wsId: string, userId: string) {
+async function seedWorkspace(wsId: string, userId: string) {
   const store = useNodeStore.getState();
   const now = Date.now();
 
-  const containers: Array<{ suffix: WorkspaceContainerSuffix; name: string }> = [
-    { suffix: WORKSPACE_CONTAINERS.LIBRARY, name: 'Library' },
-    { suffix: WORKSPACE_CONTAINERS.INBOX, name: 'Inbox' },
-    { suffix: WORKSPACE_CONTAINERS.JOURNAL, name: 'Journal' },
-    { suffix: WORKSPACE_CONTAINERS.SEARCHES, name: 'Searches' },
-    { suffix: WORKSPACE_CONTAINERS.TRASH, name: 'Trash' },
-  ];
+  const containerIds = CONTAINER_DEFS.map(({ suffix }) => getContainerId(wsId, suffix));
 
-  const containerIds = containers.map(({ suffix }) => getContainerId(wsId, suffix));
+  // Build list of nodes to seed
+  const toSeed: NodexNode[] = [];
 
-  // Create workspace root node (id === wsId)
+  // Workspace root node (id === wsId)
   if (!store.entities[wsId]) {
-    store.setNode({
+    const wsRoot: NodexNode = {
       id: wsId,
       workspaceId: wsId,
       props: { created: now, name: 'My Workspace' },
@@ -42,11 +47,13 @@ function seedWorkspace(wsId: string, userId: string) {
       updatedAt: now,
       createdBy: userId,
       updatedBy: userId,
-    });
+    };
+    store.setNode(wsRoot);
+    toSeed.push(wsRoot);
   }
 
-  // Create container nodes
-  for (const { suffix, name } of containers) {
+  // Container nodes
+  for (const { suffix, name } of CONTAINER_DEFS) {
     const id = getContainerId(wsId, suffix);
     if (!store.entities[id]) {
       const node: NodexNode = {
@@ -60,6 +67,19 @@ function seedWorkspace(wsId: string, userId: string) {
         updatedBy: userId,
       };
       store.setNode(node);
+      toSeed.push(node);
+    }
+  }
+
+  // Persist to Supabase (upsert — skip if already exists in DB)
+  if (isSupabaseReady() && toSeed.length > 0) {
+    try {
+      const rows = toSeed.map((n) => nodeToRow(n));
+      await getSupabase()
+        .from('nodes')
+        .upsert(rows, { onConflict: 'id', ignoreDuplicates: true });
+    } catch {
+      // Non-fatal: local seeds still work for the session
     }
   }
 }
@@ -128,8 +148,8 @@ function useBootstrap(): BootstrapResult {
         if (!supabaseReady) setUser('user_default');
       }
 
-      // Seed workspace root + container nodes (for offline/demo mode)
-      seedWorkspace(currentWsId, currentUserId ?? 'user_default');
+      // Seed workspace root + container nodes (persists to Supabase when connected)
+      await seedWorkspace(currentWsId, currentUserId ?? 'user_default');
 
       // Navigate to Library if panel stack is empty
       if (panelHistory.length === 0) {
@@ -160,9 +180,15 @@ function useBootstrap(): BootstrapResult {
     const wsId = useWorkspaceStore.getState().currentWorkspaceId;
     const userId = useWorkspaceStore.getState().userId;
     if (userId) {
+      const effectiveWsId = wsId ?? userId;
       if (!wsId) useWorkspaceStore.getState().setWorkspace(userId);
-      seedWorkspace(wsId ?? userId, userId);
-      const libraryId = getContainerId(wsId ?? userId, WORKSPACE_CONTAINERS.LIBRARY);
+      // Seed + persist containers to Supabase (async, non-blocking for UI)
+      seedWorkspace(effectiveWsId, userId).then(() => {
+        // Fetch Library from DB to pick up any existing children
+        const libraryId = getContainerId(effectiveWsId, WORKSPACE_CONTAINERS.LIBRARY);
+        return useNodeStore.getState().fetchNode(libraryId);
+      });
+      const libraryId = getContainerId(effectiveWsId, WORKSPACE_CONTAINERS.LIBRARY);
       useUIStore.getState().navigateTo(libraryId);
     }
   }, [isAuthenticated, requiresAuth]);

@@ -93,7 +93,7 @@ export function rowToNode(row: NodeRow): NodexNode {
 }
 
 /** 将 NodexNode 转换为 PostgreSQL 行 */
-function nodeToRow(node: NodexNode): NodeRow {
+export function nodeToRow(node: NodexNode): NodeRow {
   return {
     id: node.id,
     workspace_id: node.workspaceId,

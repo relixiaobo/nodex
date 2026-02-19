@@ -479,7 +479,7 @@ ViewContainer 负责：
 |------|------|------|
 | 2026-02-14 | Table 优先实现 | 最高用户价值；搜索节点 + Table = 类 Notion Database |
 | 2026-02-14 | Filter/Sort 独立于视图类型 | 避免每个视图重复实现；统一数据管道 |
-| 2026-02-14 | ViewDef 存储在 meta Tuple 中 | 与 Tana 数据模型一致（Metanode 已简化为 meta 数组） |
+| 2026-02-14 | ViewDef 存储在 meta Tuple 中 | 与 Tana 数据模型一致（ViewDef 通过 node.meta 中的 SYS_A16 Tuple 关联） |
 | 2026-02-14 | 不实现 Side Menu 视图 | Chrome Side Panel 本身就是侧栏，Side Menu 视图功能重叠 |
 | 2026-02-14 | Calendar 依赖日期节点 | 需要先完成 #22 Date 节点才能确定日历定位字段 |
 | 2026-02-14 | 合并 5 种视图 + Filter/Group/Sort 为一份文档 | 它们是同一个系统的不同维度，分开文档会导致重复描述数据模型 |

@@ -207,7 +207,7 @@ npm run test:run
 1. applyTag/removeTag（模板字段实例化与清理）
 2. add/remove reference 去重与删除
 3. reference ↔ inline conversion 临时节点替换链路（临时节点内容为 `\uFFFC + _inlineRefs`）
-4. **数据模型变更**: applyTag 写入 node.meta 而非 Metanode.children
+4. **数据模型变更**: applyTag 写入 node.meta（直接存储 tag tuple ID）
 
 ### 1.8 字段状态流（Node Store）
 

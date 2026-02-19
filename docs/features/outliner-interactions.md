@@ -25,7 +25,7 @@
 ### 可见节点与导航范围
 
 - 键盘上下导航基于 `getFlattenedVisibleNodes()` 的可见扁平列表。
-- `tuple` / `metanode` / `associatedData` 属于结构节点，不作为可导航内容项。
+- `tuple` 属于结构节点，不作为可导航内容项。
 - 引用节点通过 `(nodeId, parentId)` 共同定位，避免同一节点多处出现时歧义。
 
 ### Enter（编辑节点）

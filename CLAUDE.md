@@ -224,10 +224,6 @@ ContentNode
 
 容器节点 ID = `{workspaceId}_{SUFFIX}`，后缀见 `WORKSPACE_CONTAINERS` 常量。
 
-### AssociationMap 语义（已废弃）
-
-~~经数据验证修正：AssociationMap 的 KEY 主要是普通内容子节点（88.1%），不限于字段 Tuple。~~ AssociationMap 已废弃。字段值直接存储在 Tuple.children[1:] 中。
-
 ### "一切皆节点"设计守则（实现时必须遵守）
 
 > **核心判断标准**：这个信息该存为节点/Tuple，还是 JSON/字符串/UI 状态？**答案永远是前者。**

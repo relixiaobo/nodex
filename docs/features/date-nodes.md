@@ -48,7 +48,7 @@
 
 | 常量 | 值 | 用途 |
 |------|-----|------|
-| `SYS_A.JOURNAL_DATE` | `SYS_A169` | 日志日期元数据（存储在 Metanode Tuple 中） |
+| `SYS_A.JOURNAL_DATE` | `SYS_A169` | 日志日期元数据（存储在 node.meta Tuple 中） |
 
 ### 节点命名规则
 
@@ -68,13 +68,12 @@
 - 跨年周归属：按 ISO 规则，12 月末可能属于下一年第 1 周，1 月初可能属于上一年最后一周
 - 例：2025-12-29（周一）属于 2026 年 Week 01
 
-### 日节点 Metanode 结构
+### 日节点 Meta 结构
 
 ```
-日节点._metaNodeId → Metanode
-  Metanode.children:
-    ├── Tuple [SYS_A13, SYS_T124]     ← #day 标签绑定
-    └── Tuple [SYS_A169, dateRef]      ← 日志日期元数据
+日节点.meta: [tagTupleId, dateTupleId]
+  ├── Tuple [SYS_A13, SYS_T124]     ← #day 标签绑定
+  └── Tuple [SYS_A169, dateRef]      ← 日志日期元数据
 ```
 
 `SYS_A169` Tuple 存储日期信息，用于系统字段 "Date from calendar node" 的向上遍历解析。
@@ -183,7 +182,7 @@ Daily notes / 2026 / Week 07 / Sat, Feb 14           ← 非当天
 
 **Tana 验证**：
 - 内联日期引用 `<span data-inlineref-date='{"dateTimeString":"2026-01-26","timezone":"..."}'></span>` — 日期是引用对象
-- Metanode 中的 `[SYS_A169, dateRef]` — 日志日期是节点引用
+- Tana meta Tuple `[SYS_A169, dateRef]` — 日志日期是节点引用
 - 日历视图通过日期字段值定位节点到日历格子
 
 **实现顺序**：

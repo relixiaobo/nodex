@@ -27,21 +27,13 @@ _(空)_
 
 | Agent | 当前任务 | 分支 | 修改中的文件 |
 |-------|---------|------|-------------|
-| nodex-cc | _(idle — PR #60 merged)_ | — | — |
+| nodex-cc | Loro CRDT 迁移 Phase 1 | `cc/loro-migration-phase1` | `node-store.ts`, `node.ts`, `system-nodes.ts` |
 | nodex-cc-2 | _(idle — PR #61 merged)_ | — | — |
 | nodex-codex | _(idle)_ | — | — |
 
 ---
 
 ## 进行中
-
-_(空)_
-
----
-
-## 待办
-
-### P0
 
 #### Loro CRDT 迁移 Phase 1 — 本地数据引擎 + 数据模型原生化 + 命名统一
 > **详细方案**: `docs/plans/loro-migration-phase1.md`
@@ -80,11 +72,19 @@ _(空)_
 
 **Phase 2（后续）**: 同步层 + LoroText 替换 name+marks+inlineRefs + createdBy/updatedBy 复活
 
+迭代日志:
+- _(nodex-cc 开工后在此追加)_
+
 ---
 
+## 待办
+
+### P0
+
+_(Loro 迁移已移到「进行中」)_
+
 #### BUG: Supabase Realtime echo 导致节点错乱（已被 Loro 迁移取代）
-> **状态**: 不再单独修复。Loro 迁移（上方任务）从根本上消除此问题（去掉 Supabase Realtime，本地 CRDT 无 echo）。
-> **已有的临时修复**（`_pendingChildrenOps`）在迁移完成后移除。
+> **状态**: 不再单独修复。Loro 迁移从根本上消除此问题。`_pendingChildrenOps` 在迁移完成后移除。
 
 ---
 

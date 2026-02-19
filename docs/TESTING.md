@@ -591,6 +591,25 @@ hash trigger cleanup safety（2 cases, Bug #53 回归）:
 8. `removeMetaTupleId` 移除存在的 ID
 9. `removeMetaTupleId` 对不存在的 ID 返回原数组
 
+### 1.48 Tana 导入 — meta 填充与 DocType 安全
+
+**测试文件**: `tests/vitest/tana-import.test.ts`
+
+**覆盖点**:
+
+meta[] population（3 cases）:
+1. `_metaNodeId` → metanode.children 正确填充到 node.meta
+2. 无 `_metaNodeId` 的节点 meta 保持 undefined
+3. `_metaNodeId` 指向缺失 metanode 时不崩溃
+
+DocType sanitization（3 cases）:
+4. `metanode` docType 被过滤为 undefined
+5. `associatedData` docType 被过滤为 undefined
+6. 有效 docType（tuple/tagDef）保留
+
+validateTanaExport（1 case）:
+7. 检测 children/owner/metaNode/associationMap 引用缺失
+
 ### 1.43 Floating Toolbar 循环渲染防回归
 
 **测试文件**: `tests/vitest/floating-toolbar.test.ts`
@@ -878,6 +897,7 @@ createSibling 自动标签（2 cases）:
 | 1.45 | ConfigOutliner TrailingInput 显示规则 | PASS/FAIL |
 | 1.46 | FieldValueOutliner TrailingInput 显示规则 | PASS/FAIL |
 | 1.47 | Meta-Utils 工具函数 | PASS/FAIL |
+| 1.48 | Tana 导入 meta 填充与 DocType 安全 | PASS/FAIL |
 | 2 | 视觉渲染 | PASS/FAIL/SKIP |
 | 3 | 扩展构建 | PASS/FAIL |
 

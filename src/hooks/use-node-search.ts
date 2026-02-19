@@ -1,8 +1,8 @@
 /**
  * In-memory node search hook.
  *
- * Filters store entities by name, skipping system nodes (tuple, metanode,
- * associatedData, etc.). Returns results with breadcrumb paths.
+ * Filters store entities by name, skipping system nodes (tuple, tagDef,
+ * etc.). Returns results with breadcrumb paths.
  *
  * Uses JSON-string selector pattern to avoid React 19 infinite re-render
  * (same as useWorkspaceTags / useNodeFields).
@@ -18,7 +18,7 @@ export interface NodeSearchResult {
 
 /** System doc types to skip in search results */
 const SKIP_DOC_TYPES = new Set([
-  'tuple', 'metanode', 'associatedData', 'tagDef',
+  'tuple', 'tagDef',
   'attrDef', 'workspace', 'user',
 ]);
 

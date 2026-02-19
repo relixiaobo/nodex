@@ -5,7 +5,7 @@
  * Provides a two-step picker (select field → select option) to add new entries.
  *
  * Data model (unified): entries are tuples [NDX_A07|NDX_A08, attrDefId, optionId]
- * stored as children of the AssociatedData node for the NDX_A07/A08 field tuple.
+ * stored as children of the NDX_A07/A08 field tuple (tuple.children[1:]).
  *
  * Uses JSON.stringify as Zustand selector return to avoid React 19 infinite loop.
  */
@@ -44,60 +44,32 @@ export function DoneMappingEntries({ toggleTupleId, mappingKey }: DoneMappingEnt
   const [pickerStep, setPickerStep] = useState<null | 'field' | 'option'>(null);
   const [selectedFieldId, setSelectedFieldId] = useState<string | null>(null);
 
-  // Read existing entries from AssociatedData (unified model)
-  // Fallback: also check toggle tuple's direct children (legacy nested model)
+  // Read existing entries from toggle tuple's children[1:] (after the key at position 0)
   const entriesJson = useNodeStore((s) => {
     const result: MappingEntry[] = [];
 
-    // Unified model: find parent (tagDef) → associationMap → AssociatedData
-    // Walk entities to find which node has this tuple as a child
     const tuple = s.entities[toggleTupleId];
-    if (!tuple) return EMPTY;
+    if (!tuple?.children) return EMPTY;
 
-    const parentId = tuple.props._ownerId;
-    const parent = parentId ? s.entities[parentId] : undefined;
-    const assocId = parent?.associationMap?.[toggleTupleId];
-    const assoc = assocId ? s.entities[assocId] : undefined;
-
-    if (assoc?.children) {
-      for (const cid of assoc.children) {
-        const child = s.entities[cid];
-        if (!child?.children || child.props._docType !== 'tuple') continue;
-        if (child.children[0] !== mappingKey) continue;
-        const attrDefId = child.children[1];
-        const optionId = child.children[2];
-        if (!attrDefId || !optionId) continue;
-        const attrDef = s.entities[attrDefId];
-        const option = s.entities[optionId];
-        result.push({
-          entryTupleId: cid,
-          attrDefId,
-          attrDefName: attrDef?.props.name ?? 'Unknown field',
-          optionId,
-          optionName: option?.props.name ?? 'Unknown option',
-        });
-      }
-    }
-
-    // Fallback: legacy model where entries are direct children of toggle tuple
-    if (result.length === 0 && tuple.children) {
-      for (const cid of tuple.children) {
-        const child = s.entities[cid];
-        if (!child?.children || child.props._docType !== 'tuple') continue;
-        if (child.children[0] !== mappingKey) continue;
-        const attrDefId = child.children[1];
-        const optionId = child.children[2];
-        if (!attrDefId || !optionId) continue;
-        const attrDef = s.entities[attrDefId];
-        const option = s.entities[optionId];
-        result.push({
-          entryTupleId: cid,
-          attrDefId,
-          attrDefName: attrDef?.props.name ?? 'Unknown field',
-          optionId,
-          optionName: option?.props.name ?? 'Unknown option',
-        });
-      }
+    // Entries are child tuples referenced in tuple.children[1:]
+    // (children[0] is the key, e.g. NDX_A07/A08)
+    for (let i = 1; i < tuple.children.length; i++) {
+      const cid = tuple.children[i];
+      const child = s.entities[cid];
+      if (!child?.children || child.props._docType !== 'tuple') continue;
+      if (child.children[0] !== mappingKey) continue;
+      const attrDefId = child.children[1];
+      const optionId = child.children[2];
+      if (!attrDefId || !optionId) continue;
+      const attrDef = s.entities[attrDefId];
+      const option = s.entities[optionId];
+      result.push({
+        entryTupleId: cid,
+        attrDefId,
+        attrDefName: attrDef?.props.name ?? 'Unknown field',
+        optionId,
+        optionName: option?.props.name ?? 'Unknown option',
+      });
     }
 
     if (result.length === 0) return EMPTY;

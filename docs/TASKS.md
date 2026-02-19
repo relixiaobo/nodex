@@ -27,8 +27,8 @@ _(空)_
 
 | Agent | 当前任务 | 分支 | 修改中的文件 |
 |-------|---------|------|-------------|
-| nodex-cc | 数据模型简化：消除 Metanode + AssociatedData | cc/simplify-data-model | `node-store.ts`, `node.ts`, `seed-data.ts`, `tag-service.ts`, `meta-utils.ts` (new) |
-| nodex-cc-2 | 用户认证 — Google 登录 (#45) | cc2/google-auth | `src/lib/auth.ts`, `src/components/auth/*`, `workspace-store.ts`, `App.tsx`, `wxt.config.ts`, `Sidebar.tsx` |
+| nodex-cc | _(idle — PR #60 merged)_ | — | — |
+| nodex-cc-2 | _(idle — PR #61 merged)_ | — | — |
 | nodex-codex | _(idle)_ | — | — |
 
 ---
@@ -62,20 +62,24 @@ Chrome Extension 环境下的 Google OAuth 登录 + Supabase Auth 集成。
 
 简化三层间接为一层（只保留 Tuple），消除 Metanode 和 AssociatedData。
 
-- [ ] Phase 0: 添加 meta 列 + 类型 + helper
-- [ ] Phase 1a: 读路径迁移（meta 优先，fallback _metaNodeId）
-- [ ] Phase 1b: 写路径迁移（不再创建 Metanode）
-- [ ] Phase 1c: 种子数据 + 测试迁移
-- [ ] Phase 2a: 字段读路径迁移（Tuple.children 直接读值）
-- [ ] Phase 2b: 字段写路径迁移（不再创建 AssociatedData）
-- [ ] Phase 2c: UI 组件迁移（FieldValueOutliner）
-- [ ] Phase 2d: 种子数据 + 测试迁移
-- [ ] Phase 3: 类型清理 + 数据库清理 + 视图重写 + 文档最终更新
+- [x] Phase 0: 添加 meta 列 + 类型 + helper ✓
+- [x] Phase 1a: 读路径迁移（meta 优先，fallback _metaNodeId）✓
+- [x] Phase 1b: 写路径迁移（不再创建 Metanode）✓
+- [x] Phase 1c: 种子数据 + 测试迁移 ✓
+- [x] Phase 2a: 字段读路径迁移（Tuple.children 直接读值）✓
+- [x] Phase 2b: 字段写路径迁移（不再创建 AssociatedData）✓
+- [x] Phase 2c: UI 组件迁移（FieldValueOutliner + FieldRow + OptionsPicker 等 15 文件）✓
+- [x] Phase 2d: 种子数据 + 测试迁移（8 测试文件 + seed-data）✓
+- [x] Phase 3: 类型清理 + 数据库迁移（移除 meta_node_id + association_map 列）✓
 
 - **Files**: node-store.ts, node.ts, seed-data.ts, tag-service.ts, field-service.ts,
   search-service.ts, checkbox-utils.ts, field-utils.ts, use-node-fields.ts,
   FieldValueOutliner.tsx, node-service.ts, meta-utils.ts (new)
-- **迭代日志**: _(开始后追加)_
+- **迭代日志**:
+  - [2026-02-18 nodex-cc] Phase 0+1 完成：meta 列 + 工具函数 + 读写路径迁移 + 测试。362 tests pass。
+  - [2026-02-18 nodex-cc] Phase 2 完成：AssociatedData 完全消除。store 写路径(15 方法)、UI 组件(15 文件)、种子数据、8 测试文件全部更新。净删 ~340 行。362 tests pass, build 846KB。
+  - [2026-02-18 nodex-cc] 残留：node-service.ts（DB 层 association_map 列映射）、tana-import.ts（导入兼容）、node.ts（@deprecated 标记）→ Phase 3
+  - [2026-02-19 nodex-cc] Phase 3 完成：从 DocType/NodeProps/NodexNode 移除 metanode+associatedData+_metaNodeId+associationMap。DB migration 004 移除 meta_node_id + association_map 列。tana-import 保留原始格式读取但不写入已废弃字段。全部 362 tests pass，build 846KB。**数据模型简化任务完成。**
 
 ---
 

@@ -201,8 +201,7 @@ Tana 的配置页面（字段配置、标签配置等）不是定制 UI，而是
 ### 间接层（简化后只保留 Tuple）
 
 1. **Tuple** (`doc_type='tuple'`, 占 29.3%): 万能键值对。`children[0]` = 键 (SYS_A* 或 attrDefId)，`children[1:]` = 值（字段值直接存这里）。
-2. **node.meta** (`TEXT[]` 列): 元信息 Tuple ID 列表，替代原来的 Metanode 间接层。`meta = [tagTupleId, checkboxTupleId, ...]`
-3. ~~Metanode~~ / ~~AssociatedData~~: 已废弃，被 `meta` 列和 Tuple.children 直接值存储替代。
+2. **node.meta** (`TEXT[]` 列): 元信息 Tuple ID 列表。`meta = [tagTupleId, checkboxTupleId, ...]`
 
 ### 标签应用链路 (四步)
 
@@ -285,7 +284,6 @@ ContentNode
 | `props._sourceId` | `source_id` |
 | `props._flags` | `flags` |
 | `props._done` | `done` |
-| `associationMap` | `association_map` |
 | `touchCounts` | `touch_counts` |
 | `modifiedTs` | `modified_ts` |
 | `updatedAt` | `updated_at` |

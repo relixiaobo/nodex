@@ -1,16 +1,13 @@
 /**
  * Nodex 标签（Supertag）服务
  *
- * 忠实复制 Tana 的标签应用链路：
- *   TagDef → Metanode → Tuple [SYS_A13, tagDefId] → ContentNode._metaNodeId
+ * 简化后的标签应用链路：
+ *   ContentNode.meta → [tagTupleId, ...] → Tuple [SYS_A13, tagDefId]
  *
  * 标签应用完整流程：
- *   1. 创建/获取 Metanode（docType='metanode', _ownerId=contentNodeId）
- *   2. 创建 Tuple [SYS_A13, tagDefId]（docType='tuple', _ownerId=metanodeId）
- *   3. 添加 Tuple 到 Metanode.children
- *   4. 设置 ContentNode._metaNodeId = metanodeId
- *   5. 从 TagDef 字段模板实例化字段 Tuple 到 ContentNode.children
- *   6. 为每个字段创建 AssociatedData 节点，更新 ContentNode.associationMap
+ *   1. 创建 Tuple [SYS_A13, tagDefId]（docType='tuple', _ownerId=nodeId）
+ *   2. 将 tupleId 加入 ContentNode.meta 数组
+ *   3. 从 TagDef 字段模板实例化字段 Tuple 到 ContentNode.children
  */
 import { nanoid } from 'nanoid';
 import { SYS_A, SYS_V } from '../types/index.js';
@@ -30,7 +27,7 @@ import type { NodexNode } from '../types/index.js';
 /**
  * 为节点应用标签（Supertag）。
  *
- * 忠实执行 Tana 的 6 步标签应用链路。
+ * 简化链路：创建 tag tuple → 加入 node.meta → 实例化字段模板。
  */
 export async function applyTag(
   nodeId: string,
@@ -45,68 +42,52 @@ export async function applyTag(
     throw new Error(`TagDef not found: ${tagDefId}`);
   }
 
-  // Step 1: 获取或创建 Metanode
-  let metanode: NodexNode;
-  if (node.props._metaNodeId) {
-    const existing = await getNode(node.props._metaNodeId);
-    if (existing) {
-      metanode = existing;
-    } else {
-      metanode = await createMetanode(nodeId, node.workspaceId, userId);
-      await updateNode(nodeId, { props: { _metaNodeId: metanode.id } }, userId);
-    }
-  } else {
-    metanode = await createMetanode(nodeId, node.workspaceId, userId);
-    // Step 4: 设置 ContentNode._metaNodeId
-    await updateNode(nodeId, { props: { _metaNodeId: metanode.id } }, userId);
-  }
-
   // 检查是否已有此标签
-  const existingTags = await getNodeTagIds(metanode);
-  if (existingTags.includes(tagDefId)) return; // 已有此标签
+  const existingTags = await getNodeTags(nodeId);
+  if (existingTags.includes(tagDefId)) return;
 
-  // Step 2: 创建 Tuple [SYS_A13, tagDefId]
+  // Step 1: 创建 Tuple [SYS_A13, tagDefId]（_ownerId = nodeId）
   const tagTuple = await createNode(
     {
       workspaceId: node.workspaceId,
       props: {
         _docType: 'tuple',
-        _ownerId: metanode.id,
+        _ownerId: nodeId,
       },
       children: [SYS_A.NODE_SUPERTAGS, tagDefId],
     },
     userId,
   );
 
-  // Step 3: 添加 Tuple 到 Metanode.children
-  const metaChildren = [...(metanode.children ?? []), tagTuple.id];
-  await updateNode(metanode.id, { children: metaChildren }, userId);
+  // Step 2: 将 tupleId 加入 node.meta
+  const newMeta = [...(node.meta ?? []), tagTuple.id];
 
-  // Step 5: 检查 TagDef 的 checkbox 配置，创建 SYS_A55 Tuple
+  // 检查 TagDef 的 checkbox 配置，创建 SYS_A55 Tuple
   if (await shouldShowCheckbox(tagDef)) {
     const checkboxTuple = await createNode(
       {
         workspaceId: node.workspaceId,
         props: {
           _docType: 'tuple',
-          _ownerId: metanode.id,
+          _ownerId: nodeId,
         },
         children: [SYS_A.SHOW_CHECKBOX, SYS_V.YES],
       },
       userId,
     );
-    metaChildren.push(checkboxTuple.id);
-    await updateNode(metanode.id, { children: metaChildren }, userId);
+    newMeta.push(checkboxTuple.id);
   }
 
-  // Step 5: 从 TagDef 字段模板实例化到 ContentNode.children
+  await updateNode(nodeId, { meta: newMeta }, userId);
+
+  // Step 3: 从 TagDef 字段模板实例化到 ContentNode.children
   await instantiateFieldTemplates(node, tagDef, userId);
 }
 
 /**
  * 从节点移除标签。
  *
- * 从 Metanode 中删除对应的 SYS_A13 Tuple。
+ * 从 node.meta 中删除对应的 SYS_A13 Tuple。
  * 不删除已实例化的字段 Tuple（与 Tana 行为一致）。
  */
 export async function removeTag(
@@ -115,13 +96,10 @@ export async function removeTag(
   userId: string,
 ): Promise<void> {
   const node = await getNode(nodeId);
-  if (!node || !node.props._metaNodeId) return;
-
-  const metanode = await getNode(node.props._metaNodeId);
-  if (!metanode || !metanode.children) return;
+  if (!node?.meta || node.meta.length === 0) return;
 
   // 找到 SYS_A13 Tuple
-  const tuples = await getNodes(metanode.children);
+  const tuples = await getNodes(node.meta);
   const tagTupleIds: string[] = [];
   for (const tuple of tuples) {
     if (
@@ -136,24 +114,33 @@ export async function removeTag(
 
   if (tagTupleIds.length === 0) return;
 
-  // 从 Metanode.children 中移除
-  const newChildren = metanode.children.filter(id => !tagTupleIds.includes(id));
-  await updateNode(metanode.id, { children: newChildren }, userId);
+  // 从 node.meta 中移除
+  const newMeta = node.meta.filter(id => !tagTupleIds.includes(id));
+  await updateNode(nodeId, { meta: newMeta }, userId);
 }
 
 /**
  * 获取节点的所有标签 ID。
  *
- * 通过 Metanode → Tuple [SYS_A13] 链路获取。
+ * 通过 node.meta → Tuple [SYS_A13] 链路获取。
  */
 export async function getNodeTags(nodeId: string): Promise<string[]> {
   const node = await getNode(nodeId);
-  if (!node || !node.props._metaNodeId) return [];
+  if (!node?.meta || node.meta.length === 0) return [];
 
-  const metanode = await getNode(node.props._metaNodeId);
-  if (!metanode) return [];
-
-  return getNodeTagIds(metanode);
+  const tuples = await getNodes(node.meta);
+  const tagIds: string[] = [];
+  for (const tuple of tuples) {
+    if (
+      tuple.props._docType === 'tuple' &&
+      tuple.children &&
+      tuple.children[0] === SYS_A.NODE_SUPERTAGS &&
+      tuple.children.length >= 2
+    ) {
+      tagIds.push(tuple.children[1]);
+    }
+  }
+  return tagIds;
 }
 
 /**
@@ -178,12 +165,7 @@ export async function resolveTagFields(tagDefId: string): Promise<string[]> {
 
   const fieldAttrDefIds: string[] = [];
 
-  // 递归获取父标签的字段
-  const metanode = tagDef.props._metaNodeId
-    ? await getNode(tagDef.props._metaNodeId)
-    : null;
-
-  // 检查 extends 关系（通过 TagDef 的 Metanode 或 children 中的配置）
+  // 检查 extends 关系（通过 TagDef.children 中的配置 Tuple）
   const parentTagIds = await getExtendsTagIds(tagDef);
   for (const parentId of parentTagIds) {
     const parentFields = await resolveTagFields(parentId);
@@ -212,53 +194,11 @@ export async function resolveTagFields(tagDefId: string): Promise<string[]> {
 // 内部辅助函数
 // ============================================================
 
-/** 创建 Metanode */
-async function createMetanode(
-  contentNodeId: string,
-  workspaceId: string,
-  userId: string,
-): Promise<NodexNode> {
-  return createNode(
-    {
-      workspaceId,
-      props: {
-        _docType: 'metanode',
-        _ownerId: contentNodeId, // 双向链接：Metanode._ownerId → ContentNode
-      },
-    },
-    userId,
-  );
-}
-
-/** 从 Metanode 的 Tuple 子节点中提取标签 ID */
-async function getNodeTagIds(metanode: NodexNode): Promise<string[]> {
-  if (!metanode.children || metanode.children.length === 0) return [];
-
-  const tuples = await getNodes(metanode.children);
-  const tagIds: string[] = [];
-
-  for (const tuple of tuples) {
-    if (
-      tuple.props._docType === 'tuple' &&
-      tuple.children &&
-      tuple.children[0] === SYS_A.NODE_SUPERTAGS &&
-      tuple.children.length >= 2
-    ) {
-      tagIds.push(tuple.children[1]);
-    }
-  }
-
-  return tagIds;
-}
-
-/** 检查 TagDef 是否配置了 show checkbox */
+/** 检查 TagDef 是否配置了 show checkbox。从 tagDef.children 配置 Tuple 中读取。 */
 async function shouldShowCheckbox(tagDef: NodexNode): Promise<boolean> {
-  if (!tagDef.props._metaNodeId) return false;
+  if (!tagDef.children || tagDef.children.length === 0) return false;
 
-  const metanode = await getNode(tagDef.props._metaNodeId);
-  if (!metanode || !metanode.children) return false;
-
-  const tuples = await getNodes(metanode.children);
+  const tuples = await getNodes(tagDef.children);
   for (const tuple of tuples) {
     if (
       tuple.props._docType === 'tuple' &&
@@ -301,8 +241,7 @@ async function getExtendsTagIds(tagDef: NodexNode): Promise<string[]> {
  * TagDef.children 中的每个 Tuple [attrDefId, defaultValueId] 被克隆：
  *   - 创建新 Tuple，children 相同
  *   - 设置 _sourceId 指向原模板 Tuple（模板-实例继承）
- *   - 创建 AssociatedData 节点
- *   - 更新 ContentNode.associationMap
+ *   - 字段值直接存储在 Tuple.children[1:] 中（无需 AssociatedData）
  */
 async function instantiateFieldTemplates(
   contentNode: NodexNode,
@@ -313,7 +252,6 @@ async function instantiateFieldTemplates(
 
   const templateTuples = await getNodes(tagDef.children);
   const newChildren = [...(contentNode.children ?? [])];
-  const newAssociationMap = { ...(contentNode.associationMap ?? {}) };
 
   for (const template of templateTuples) {
     if (template.props._docType !== 'tuple' || !template.children) continue;
@@ -326,7 +264,7 @@ async function instantiateFieldTemplates(
     );
     if (alreadyInstantiated) continue;
 
-    // Step 5a: 克隆 Tuple，设置 _sourceId 指向模板
+    // 克隆 Tuple，设置 _sourceId 指向模板
     const instanceTuple = await createNode(
       {
         workspaceId: contentNode.workspaceId,
@@ -340,19 +278,6 @@ async function instantiateFieldTemplates(
       userId,
     );
     newChildren.push(instanceTuple.id);
-
-    // Step 6: 创建 AssociatedData 节点
-    const associatedData = await createNode(
-      {
-        workspaceId: contentNode.workspaceId,
-        props: {
-          _docType: 'associatedData',
-          _ownerId: contentNode.id,
-        },
-      },
-      userId,
-    );
-    newAssociationMap[instanceTuple.id] = associatedData.id;
   }
 
   // 更新内容节点
@@ -360,7 +285,6 @@ async function instantiateFieldTemplates(
     contentNode.id,
     {
       children: newChildren,
-      associationMap: newAssociationMap,
     },
     userId,
   );

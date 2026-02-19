@@ -3,8 +3,9 @@
  *
  * 从 Tana 导出的 JSON 文件导入数据到 Nodex (Supabase)。
  *
- * 由于 Nodex 忠实复制 Tana 的数据模型（保留 Tuple/Metanode/AssociatedData），
- * 迁移逻辑大幅简化：无需结构转换，直接映射即可。
+ * Tana 导出数据包含 Metanode 和 AssociatedData 间接层，Nodex 已将其简化
+ * （meta[] 替代 Metanode，Tuple.children[1:] 替代 AssociatedData）。
+ * 导入时将旧结构转换为新格式（meta[] 填充、docType 过滤）。
  *
  * Tana 导出 JSON 顶层结构：
  * {
@@ -231,6 +232,12 @@ export async function importTanaExport(
   const nodes: NodexNode[] = [];
   const now = Date.now();
 
+  // 预构建 ID → doc 映射，供后处理步骤使用
+  const docById = new Map<string, TanaDoc>();
+  for (const doc of data.docs) {
+    docById.set(doc.id, doc);
+  }
+
   for (const doc of data.docs) {
     try {
       const node = tanaDocToNodexNode(doc, wsMap, userId, now);
@@ -242,6 +249,27 @@ export async function importTanaExport(
       });
       result.skippedNodes++;
     }
+  }
+
+  // Step 2.5: 后处理 — 将 Tana 的 _metaNodeId → node.meta[]
+  // Tana 模型：ContentNode._metaNodeId → Metanode → Metanode.children = [tupleId, ...]
+  // Nodex 模型：ContentNode.meta = [tupleId, ...]（直接存储，无 Metanode 间接层）
+  const nodeById = new Map<string, NodexNode>();
+  for (const node of nodes) {
+    nodeById.set(node.id, node);
+  }
+
+  for (const doc of data.docs) {
+    if (!doc.props._metaNodeId) continue;
+
+    const contentNode = nodeById.get(doc.id);
+    if (!contentNode) continue;
+
+    const metanodeDoc = docById.get(doc.props._metaNodeId);
+    if (!metanodeDoc?.children?.length) continue;
+
+    // Metanode.children 就是 meta tuple IDs，直接赋给 content node
+    contentNode.meta = metanodeDoc.children;
   }
 
   // Step 3: 批量插入
@@ -288,6 +316,19 @@ function parseCompactArray(value: number[] | string | undefined): number[] {
   return [];
 }
 
+/** Deprecated Tana docType values that are no longer in the DocType union. */
+const DEPRECATED_DOC_TYPES = new Set(['metanode', 'associatedData']);
+
+/**
+ * Filter deprecated docType values to undefined.
+ * Tana exports may contain 'metanode' or 'associatedData' which are no longer valid.
+ */
+function sanitizeDocType(raw: string | undefined): DocType | undefined {
+  if (!raw) return undefined;
+  if (DEPRECATED_DOC_TYPES.has(raw)) return undefined;
+  return raw as DocType;
+}
+
 /**
  * 将单个 TanaDoc 转换为 NodexNode。
  *
@@ -321,9 +362,9 @@ function tanaDocToNodexNode(
       ...(parsedName.marks.length > 0 ? { _marks: parsedName.marks } : {}),
       ...(parsedName.inlineRefs.length > 0 ? { _inlineRefs: parsedName.inlineRefs } : {}),
       description: doc.props.description,
-      _docType: doc.props._docType as DocType | undefined,
+      _docType: sanitizeDocType(doc.props._docType),
       _ownerId: doc.props._ownerId,
-      _metaNodeId: doc.props._metaNodeId,
+      // _metaNodeId: dropped (replaced by node.meta[])
       _sourceId: doc.props._sourceId,
       _flags: doc.props._flags,
       _done: doc.props._done,
@@ -335,7 +376,7 @@ function tanaDocToNodexNode(
       searchContextNode: doc.props.searchContextNode,
     },
     children: doc.children,
-    associationMap: doc.associationMap,
+    // associationMap: dropped (field values now in Tuple.children[1:])
     touchCounts,
     modifiedTs,
     version: 1,
@@ -352,11 +393,11 @@ function tanaDocToNodexNode(
 /**
  * 验证导入数据的完整性。
  *
- * 检查：
+ * 检查 Tana 导出数据的引用完整性（在导入前诊断数据质量）：
  * - 所有 children 引用的节点是否存在
  * - 所有 _ownerId 引用的节点是否存在
- * - 所有 _metaNodeId 引用的节点是否存在
- * - 所有 associationMap 中引用的节点是否存在
+ * - 所有 _metaNodeId 引用的节点是否存在（Tana 原始格式）
+ * - 所有 associationMap 中引用的节点是否存在（Tana 原始格式）
  */
 export function validateTanaExport(data: TanaExportData): ValidationResult {
   const docIds = new Set(data.docs.map(d => d.id));

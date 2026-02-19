@@ -38,8 +38,8 @@ describe('node-store field operations', () => {
     if (!firstValueId) return;
 
     expect(useNodeStore.getState().entities[firstValueId]?.props.name).toBe('2026-02-13');
-    // Value node's _ownerId should be the associatedData (parent in FieldValueOutliner)
-    expect(useNodeStore.getState().entities[firstValueId]?.props._ownerId).toBe('task1_assoc_due');
+    // Value node's _ownerId is the content node (no associatedData layer)
+    expect(useNodeStore.getState().entities[firstValueId]?.props._ownerId).toBe('task_1');
 
     await useNodeStore.getState().setFieldValue(
       'task_1',
@@ -59,7 +59,7 @@ describe('node-store field operations', () => {
     expect(collectNodeGraphErrors(useNodeStore.getState().entities)).toEqual([]);
   });
 
-  it('setFieldValue creates tuple + value + associatedData for missing field', async () => {
+  it('setFieldValue creates tuple + value for missing field', async () => {
     expect(findFieldTupleId('note_2', 'attrDef_status')).toBeUndefined();
 
     await useNodeStore.getState().setFieldValue(
@@ -77,15 +77,11 @@ describe('node-store field operations', () => {
     const state = useNodeStore.getState();
     const tuple = state.entities[tupleId];
     const valueId = tuple.children?.[1];
-    const assocId = state.entities.note_2.associationMap?.[tupleId];
 
     expect(valueId).toBeTruthy();
-    expect(assocId).toBeTruthy();
-    if (!valueId || !assocId) return;
+    if (!valueId) return;
 
     expect(state.entities[valueId]?.props.name).toBe('To Do');
-    expect(state.entities[assocId]?.props._docType).toBe('associatedData');
-    expect(state.entities[assocId]?.props._ownerId).toBe('note_2');
     expect(state.entities.note_2.children ?? []).toContain(tupleId);
 
     expect(collectNodeGraphErrors(useNodeStore.getState().entities)).toEqual([]);
@@ -110,20 +106,18 @@ describe('node-store field operations', () => {
     expect(tupleId).toBeTruthy();
     if (!tupleId) return;
 
-    const assocId = useNodeStore.getState().entities.note_2.associationMap?.[tupleId];
-    expect(assocId).toBeTruthy();
-    if (!assocId) return;
-
     useNodeStore.getState().setOptionsFieldValue('note_2', 'attrDef_status', 'opt_done', 'user_default');
-    expect(useNodeStore.getState().entities[assocId].children).toEqual(['opt_done']);
+    const tuple = useNodeStore.getState().entities[tupleId];
+    expect(tuple.children?.[1]).toBe('opt_done');
 
     useNodeStore.getState().setOptionsFieldValue('note_2', 'attrDef_status', 'opt_todo', 'user_default');
-    expect(useNodeStore.getState().entities[assocId].children).toEqual(['opt_todo']);
+    const tupleAfter = useNodeStore.getState().entities[tupleId];
+    expect(tupleAfter.children?.[1]).toBe('opt_todo');
 
     expect(collectNodeGraphErrors(useNodeStore.getState().entities)).toEqual([]);
   });
 
-  it('moveFieldTuple nests a field under previous field value and keeps associations aligned', async () => {
+  it('moveFieldTuple moves a field between parents and keeps ownership in sync', async () => {
     await useNodeStore.getState().addFieldToNode('note_2', 'attrDef_status', 'ws_default', 'user_default');
     await useNodeStore.getState().addFieldToNode('note_2', 'attrDef_priority', 'ws_default', 'user_default');
 
@@ -133,77 +127,61 @@ describe('node-store field operations', () => {
     expect(priorityTupleId).toBeTruthy();
     if (!statusTupleId || !priorityTupleId) return;
 
-    const before = useNodeStore.getState();
-    const statusAssocId = before.entities.note_2.associationMap?.[statusTupleId];
-    const priorityAssocId = before.entities.note_2.associationMap?.[priorityTupleId];
-    expect(statusAssocId).toBeTruthy();
-    expect(priorityAssocId).toBeTruthy();
-    if (!statusAssocId || !priorityAssocId) return;
-
     await useNodeStore.getState().moveFieldTuple(
       'note_2',
       priorityTupleId,
-      statusAssocId,
+      'task_1',
       'user_default',
     );
 
     const state = useNodeStore.getState();
     expect(state.entities.note_2.children ?? []).toContain(statusTupleId);
     expect(state.entities.note_2.children ?? []).not.toContain(priorityTupleId);
-    expect(state.entities.note_2.associationMap?.[priorityTupleId]).toBeUndefined();
 
-    expect(state.entities[statusAssocId].children ?? []).toContain(priorityTupleId);
-    expect(state.entities[statusAssocId].associationMap?.[priorityTupleId]).toBe(priorityAssocId);
-    expect(state.entities[priorityTupleId]?.props._ownerId).toBe(statusAssocId);
-    expect(state.entities[priorityAssocId]?.props._ownerId).toBe(statusAssocId);
+    expect(state.entities.task_1.children ?? []).toContain(priorityTupleId);
+    expect(state.entities[priorityTupleId]?.props._ownerId).toBe('task_1');
 
     expect(collectNodeGraphErrors(state.entities)).toEqual([]);
   });
 
-  it('removeField moves tuple and associatedData to trash and cleans associationMap', async () => {
+  it('removeField moves tuple to trash', async () => {
     await useNodeStore.getState().addFieldToNode('note_2', 'attrDef_priority', 'ws_default', 'user_default');
     const tupleId = findFieldTupleId('note_2', 'attrDef_priority');
     expect(tupleId).toBeTruthy();
     if (!tupleId) return;
 
-    const assocId = useNodeStore.getState().entities.note_2.associationMap?.[tupleId];
-    expect(assocId).toBeTruthy();
-    if (!assocId) return;
-
     useNodeStore.getState().removeField('note_2', tupleId, 'ws_default', 'user_default');
 
     const state = useNodeStore.getState();
     expect(state.entities.note_2.children ?? []).not.toContain(tupleId);
-    expect(state.entities.note_2.associationMap?.[tupleId]).toBeUndefined();
     expect(state.entities[tupleId]?.props._ownerId).toBe('ws_default_TRASH');
-    expect(state.entities[assocId]?.props._ownerId).toBe('ws_default_TRASH');
     expect(state.entities.ws_default_TRASH.children ?? []).toContain(tupleId);
-    expect(state.entities.ws_default_TRASH.children ?? []).toContain(assocId);
 
     expect(collectNodeGraphErrors(useNodeStore.getState().entities)).toEqual([]);
   });
 
   it('toggleCheckboxField creates YES and toggles YES/NO on repeated clicks', () => {
-    const assocId = 'task1_assoc_done';
-    expect(useNodeStore.getState().entities[assocId].children).toEqual([]);
+    const tupleId = 'task1_fld_done';
+    // Done tuple starts with children = ['attrDef_done'] (key only, no value yet)
+    expect(useNodeStore.getState().entities[tupleId].children).toEqual(['attrDef_done']);
 
-    useNodeStore.getState().toggleCheckboxField(assocId, 'ws_default', 'user_default');
-    const valueId = useNodeStore.getState().entities[assocId].children?.[0];
+    useNodeStore.getState().toggleCheckboxField(tupleId, 'ws_default', 'user_default');
+    const valueId = useNodeStore.getState().entities[tupleId].children?.[1];
     expect(valueId).toBeTruthy();
     if (!valueId) return;
 
     expect(useNodeStore.getState().entities[valueId]?.props.name).toBe(SYS_V.YES);
 
-    useNodeStore.getState().toggleCheckboxField(assocId, 'ws_default', 'user_default');
+    useNodeStore.getState().toggleCheckboxField(tupleId, 'ws_default', 'user_default');
     expect(useNodeStore.getState().entities[valueId]?.props.name).toBe(SYS_V.NO);
 
-    useNodeStore.getState().toggleCheckboxField(assocId, 'ws_default', 'user_default');
+    useNodeStore.getState().toggleCheckboxField(tupleId, 'ws_default', 'user_default');
     expect(useNodeStore.getState().entities[valueId]?.props.name).toBe(SYS_V.YES);
 
     expect(collectNodeGraphErrors(useNodeStore.getState().entities)).toEqual([]);
   });
 
-  it('addUnnamedFieldToNode inserts tuple in-place and creates attrDef + associatedData chain', async () => {
+  it('addUnnamedFieldToNode inserts tuple in-place and creates attrDef chain', async () => {
     const beforeChildren = [...(useNodeStore.getState().entities.note_2.children ?? [])];
     expect(beforeChildren).toEqual(['idea_1', 'idea_2']);
 
@@ -223,17 +201,11 @@ describe('node-store field operations', () => {
     expect(tuple?.props._ownerId).toBe('note_2');
     expect(tuple?.children?.[0]).toBe(attrDefId);
 
-    const assocId = state.entities.note_2.associationMap?.[tupleId];
-    expect(assocId).toBeTruthy();
-    if (!assocId) return;
-    expect(state.entities[assocId]?.props._docType).toBe('associatedData');
-    expect(state.entities[assocId]?.props._ownerId).toBe('note_2');
-
     const attrDef = state.entities[attrDefId];
     expect(attrDef?.props._docType).toBe('attrDef');
     expect(attrDef?.props.name).toBe('');
     expect(attrDef?.props._ownerId).toBe(tupleId);
-    expect(attrDef?.props._metaNodeId).toBeTruthy();
+    expect(attrDef?.meta?.length).toBeGreaterThan(0);
 
     const hasPlainTypeTuple = (attrDef?.children ?? []).some((cid) => {
       const child = state.entities[cid];
@@ -259,7 +231,10 @@ describe('node-store field operations', () => {
 
     const state = useNodeStore.getState();
     expect(state.entities[valueId]?.props.name).toBe('Blocked');
-    expect(state.entities.task1_assoc_status.children).toEqual([valueId]);
+    const statusTupleId = findFieldTupleId('task_1', 'attrDef_status');
+    expect(statusTupleId).toBeTruthy();
+    const statusTuple = state.entities[statusTupleId!];
+    expect(statusTuple.children?.[1]).toBe(valueId);
 
     const afterChildren = state.entities.attrDef_status_autocollect.children ?? [];
     expect(afterChildren.length).toBe(beforeAutoCollectLen + 1);

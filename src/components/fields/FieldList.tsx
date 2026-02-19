@@ -42,7 +42,6 @@ export function FieldList({ nodeId }: FieldListProps) {
             valueNodeId={f.valueNodeId}
             valueName={f.valueName}
             dataType={f.dataType}
-            assocDataId={f.assocDataId}
             trashed={f.trashed}
             hideMode={f.hideMode}
             isEmpty={f.isEmpty}

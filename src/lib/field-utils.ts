@@ -29,7 +29,7 @@ function resolveAttrDefConfig(entities: Record<string, NodexNode>, attrDefId: st
 
 /**
  * Resolve a config/field value from a node by walking its children for a Tuple [configKey, ...].
- * Reads from AssociatedData first (unified model), falls back to children[1] (legacy/internal tuples).
+ * Reads directly from Tuple.children[1].
  */
 export function resolveConfigValue(
   entities: Record<string, NodexNode>,
@@ -40,13 +40,6 @@ export function resolveConfigValue(
   for (const childId of node.children) {
     const child = entities[childId];
     if (child?.props._docType === 'tuple' && child.children?.[0] === configKey) {
-      // Unified model: read from AssociatedData
-      const assocId = node.associationMap?.[childId];
-      if (assocId) {
-        const assoc = entities[assocId];
-        if (assoc?.children?.length) return assoc.children[0];
-      }
-      // Legacy/internal: read from children[1]
       if (child.children.length >= 2) return child.children[1];
       return undefined;
     }
@@ -85,7 +78,7 @@ export function resolveSourceSupertag(
 
 /**
  * Find all content nodes tagged with a given tagDefId.
- * Walks every entity → metanode → tuples looking for [SYS_A13, tagDefId].
+ * Walks every entity → node.meta tuples looking for [SYS_A13, tagDefId].
  */
 export function resolveTaggedNodes(
   entities: Record<string, NodexNode>, tagDefId: string
@@ -93,11 +86,8 @@ export function resolveTaggedNodes(
   const result: string[] = [];
   for (const [id, node] of Object.entries(entities)) {
     if (node.props._docType) continue;
-    const metaId = node.props._metaNodeId;
-    if (!metaId) continue;
-    const meta = entities[metaId];
-    if (!meta?.children) continue;
-    for (const cid of meta.children) {
+    if (!node.meta || node.meta.length === 0) continue;
+    for (const cid of node.meta) {
       const tuple = entities[cid];
       if (
         tuple?.props._docType === 'tuple' &&
@@ -492,7 +482,7 @@ export const TAGDEF_OUTLINER_FIELDS = TAGDEF_CONFIG_FIELDS
 
 /**
  * Resolve default child supertag IDs for a parent node.
- * Walks the parent's tags (metanode → SYS_A13 tuples) and reads SYS_A14 from each tagDef.
+ * Walks the parent's tags (node.meta → SYS_A13 tuples) and reads SYS_A14 from each tagDef.
  * Returns deduplicated tagDef IDs that should be auto-applied to new children.
  */
 export function resolveChildSupertags(
@@ -500,15 +490,10 @@ export function resolveChildSupertags(
   parentId: string,
 ): string[] {
   const parent = entities[parentId];
-  if (!parent) return [];
-
-  const metaId = parent.props._metaNodeId;
-  if (!metaId) return [];
-  const meta = entities[metaId];
-  if (!meta?.children) return [];
+  if (!parent?.meta || parent.meta.length === 0) return [];
 
   const result: string[] = [];
-  for (const cid of meta.children) {
+  for (const cid of parent.meta) {
     const tuple = entities[cid];
     if (
       tuple?.props._docType === 'tuple' &&
@@ -535,8 +520,7 @@ export function resolveChildSupertags(
  * Handles circular references via visited set.
  *
  * Reads from tagDef.children (config tuple) — this is the source of truth
- * that the config field UI edits via setConfigValue. Previously read from metanode,
- * which caused the bug where changing Extends didn't update Default content.
+ * that the config field UI edits via setConfigValue.
  */
 export function getExtendsChain(
   entities: Record<string, NodexNode>,
@@ -580,7 +564,7 @@ export const SYSTEM_FIELDS: SystemFieldDef[] = [
   { key: 'NDX_SYS_LAST_EDITED', name: 'Last edited time', source: 'updatedAt', dataType: '__system_date__', icon: CalendarClock },
   { key: 'NDX_SYS_LAST_EDITED_BY', name: 'Last edited by', source: 'updatedBy', dataType: '__system_text__', icon: UserPen },
   { key: 'NDX_SYS_OWNER', name: 'Owner node', source: 'props._ownerId', dataType: '__system_node__', icon: SquareUser },
-  { key: 'NDX_SYS_TAGS', name: 'Tags', source: 'metanode', dataType: '__system_text__', icon: Tag },
+  { key: 'NDX_SYS_TAGS', name: 'Tags', source: 'meta', dataType: '__system_text__', icon: Tag },
   { key: 'NDX_SYS_WORKSPACE', name: 'Workspace', source: 'workspaceId', dataType: '__system_text__', icon: Building2 },
   { key: 'NDX_SYS_DONE_TIME', name: 'Done time', source: 'props._done', dataType: '__system_date__', icon: CalendarCheck },
 ];
@@ -634,13 +618,10 @@ export function resolveSystemFieldValue(
       const ownerNode = entities[ownerId];
       return { text: ownerNode?.props.name ?? ownerId, refNodeId: ownerId };
     }
-    case 'metanode': {
-      const metaId = node.props._metaNodeId;
-      if (!metaId) return { text: '' };
-      const meta = entities[metaId];
-      if (!meta?.children) return { text: '' };
+    case 'meta': {
+      if (!node.meta || node.meta.length === 0) return { text: '' };
       const tagNames: string[] = [];
-      for (const cid of meta.children) {
+      for (const cid of node.meta) {
         const tuple = entities[cid];
         if (tuple?.props._docType === 'tuple' && tuple.children?.[0] === SYS_A.NODE_SUPERTAGS && tuple.children[1]) {
           const tagDef = entities[tuple.children[1]];

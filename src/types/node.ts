@@ -1,8 +1,8 @@
 /**
  * Nodex 核心节点类型定义
  *
- * 忠实复制 Tana 的 "Everything is a Node" 数据模型。
- * 所有实体（内容、标签定义、字段定义、搜索、视图、Tuple、Metanode、AssociatedData）
+ * 基于 Tana 的 "Everything is a Node" 数据模型，简化为只保留 Tuple 间接层。
+ * 所有实体（内容、标签定义、字段定义、搜索、视图、Tuple）
  * 共享同一 Node 结构，通过 docType 区分。
  *
  * 参考：research/tana-data-model-specification.md
@@ -14,14 +14,13 @@
 
 /**
  * 文档类型枚举。
- * 忠实保留 Tana 全部 22 种类型 + Nodex 新增类型。
+ * Based on Tana's 22 types + Nodex additions. Metanode and AssociatedData
+ * have been eliminated (replaced by node.meta[] and Tuple.children[1:]).
  * 无 docType 的节点为普通用户内容节点（Tana 中占 46.6%）。
  */
 export type DocType =
-  // ── 核心结构类型（Tana 间接层，忠实保留）──
+  // ── 核心结构类型 ──
   | 'tuple'           // 万能键值对容器 (Tana 29.3%)
-  | 'metanode'        // 元信息代理节点 (Tana 13.5%)
-  | 'associatedData'  // 字段值索引数据 (Tana 6.3%)
 
   // ── 定义类型 ──
   | 'tagDef'          // 超级标签定义
@@ -122,12 +121,6 @@ export interface NodeProps {
    *  特殊值: "{wsId}_TRASH"(回收站), "{wsId}_SCHEMA"(架构), "SYS_0"(系统根) */
   _ownerId?: string;
 
-  /** 关联元节点 ID。Metanode 存储标签、锁定状态等元信息。
-   *  Metanode 的 children 全部是 Tuple，每个 Tuple 承载一条元信息。
-   *  ContentNode._metaNodeId → Metanode
-   *  Metanode._ownerId → ContentNode （双向链接） */
-  _metaNodeId?: string;
-
   /** 模板来源 ID。从 TagDef 模板实例化时，指向原始模板 Tuple。
    *  用于追踪字段 Tuple 的来源定义。 */
   _sourceId?: string;
@@ -168,10 +161,10 @@ export interface NodeProps {
 /**
  * Nodex 核心节点 —— "一切皆节点"。
  *
- * 忠实复制 Tana 的 Node 结构，包括：
+ * Based on Tana's Node structure, simplified to one indirection layer:
  * - Tuple 万能键值对 (children[0]=key, children[1:]=values)
- * - Metanode 元信息代理 (通过 _metaNodeId 链接)
- * - AssociatedData 字段值索引 (通过 associationMap 映射)
+ * - node.meta[] 元信息 Tuple ID 列表（替代 Metanode）
+ * - 字段值直接存 Tuple.children[1:]（替代 AssociatedData）
  *
  * Nodex 扩展字段：workspaceId, aiSummary, sourceUrl, version, updatedAt, createdBy, updatedBy
  */
@@ -192,18 +185,14 @@ export interface NodexNode {
    *    children[0] = 键 (SYS_A* 系统属性 ID 或 attrDef 字段定义 ID)
    *    children[1:] = 值 (节点 ID 或 SYS_V* 枚举值 ID)
    *
-   *  对于 Metanode (docType='metanode'):
-   *    children = [tupleId1, tupleId2, ...] 全部是 Tuple 子节点
-   *
    *  对于普通内容节点:
    *    children = [childId1, childId2, ...] 混合内容子节点和字段 Tuple */
   children?: string[];
 
-  /** 字段值关联映射。key=子节点ID（字段 Tuple）, value=associatedData 节点 ID。
-   *  提供字段值的快速索引查找。
-   *
-   *  关键发现：Tana 中 2,605/2,606 的 associationMap 值指向 associatedData 类型节点。 */
-  associationMap?: Record<string, string>;
+  /** 元信息 Tuple ID 列表（替代 Metanode 间接层）。
+   *  每个元素是一个 Tuple 节点的 ID，这些 Tuple 的 _ownerId = 本节点 ID。
+   *  常见的 meta Tuple 键：SYS_A13(标签)、SYS_A55(checkbox)、SYS_A16(视图)、SYS_A12(锁定) */
+  meta?: string[];
 
   /** 各编辑者的访问/编辑计数。索引对应全局 editors 数组 */
   touchCounts?: number[];
@@ -308,6 +297,7 @@ export type CreateNodeInput = {
   workspaceId: string;
   props: Partial<NodeProps> & { _docType?: DocType; _ownerId?: string };
   children?: string[];
+  meta?: string[];
 };
 
 /**

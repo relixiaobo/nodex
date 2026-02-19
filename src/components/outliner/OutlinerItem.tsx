@@ -265,7 +265,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       } else {
         const dt = entities[cid]?.props._docType;
         if (!dt) result.push({ id: cid, type: 'content' });
-        // else skip: metanode, SYS tuple, tag tuple
+        // else skip: SYS tuple, tag tuple, etc.
       }
     }
     return result;

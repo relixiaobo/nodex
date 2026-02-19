@@ -31,7 +31,6 @@ export interface NodeRow {
   description: string | null;
   doc_type: string | null;
   owner_id: string | null;
-  meta_node_id: string | null;
   source_id: string | null;
   flags: number;
   done: number | null;
@@ -43,7 +42,6 @@ export interface NodeRow {
   search_context_node: string | null;
   children: string[];
   meta: string[];
-  association_map: Record<string, string>;
   touch_counts: number[];
   modified_ts: number[];
   ai_summary: string | null;
@@ -71,7 +69,6 @@ export function rowToNode(row: NodeRow): NodexNode {
       description: row.description || undefined,
       _docType: (row.doc_type as NodexNode['props']['_docType']) || undefined,
       _ownerId: row.owner_id || undefined,
-      _metaNodeId: row.meta_node_id || undefined,
       _sourceId: row.source_id || undefined,
       _flags: row.flags || undefined,
       _done: row.done || undefined,
@@ -84,7 +81,6 @@ export function rowToNode(row: NodeRow): NodexNode {
     },
     children: row.children.length > 0 ? row.children : undefined,
     meta: row.meta.length > 0 ? row.meta : undefined,
-    associationMap: Object.keys(row.association_map).length > 0 ? row.association_map : undefined,
     touchCounts: row.touch_counts.length > 0 ? row.touch_counts : undefined,
     modifiedTs: row.modified_ts.length > 0 ? row.modified_ts : undefined,
     aiSummary: row.ai_summary || undefined,
@@ -108,7 +104,6 @@ function nodeToRow(node: NodexNode): NodeRow {
     description: node.props.description ?? null,
     doc_type: node.props._docType ?? null,
     owner_id: node.props._ownerId ?? null,
-    meta_node_id: node.props._metaNodeId ?? null,
     source_id: node.props._sourceId ?? null,
     flags: node.props._flags ?? 0,
     done: node.props._done ?? null,
@@ -120,7 +115,6 @@ function nodeToRow(node: NodexNode): NodeRow {
     search_context_node: node.props.searchContextNode ?? null,
     children: node.children ?? [],
     meta: node.meta ?? [],
-    association_map: node.associationMap ?? {},
     touch_counts: node.touchCounts ?? [],
     modified_ts: node.modifiedTs ?? [],
     ai_summary: node.aiSummary ?? null,
@@ -228,7 +222,6 @@ export async function updateNode(
     if (p.description !== undefined) updates.description = p.description ?? null;
     if (p._docType !== undefined) updates.doc_type = p._docType ?? null;
     if (p._ownerId !== undefined) updates.owner_id = p._ownerId ?? null;
-    if (p._metaNodeId !== undefined) updates.meta_node_id = p._metaNodeId ?? null;
     if (p._sourceId !== undefined) updates.source_id = p._sourceId ?? null;
     if (p._flags !== undefined) updates.flags = p._flags ?? 0;
     if (p._done !== undefined) updates.done = p._done ?? null;
@@ -242,7 +235,6 @@ export async function updateNode(
 
   if (changes.children !== undefined) updates.children = changes.children ?? [];
   if (changes.meta !== undefined) updates.meta = changes.meta ?? [];
-  if (changes.associationMap !== undefined) updates.association_map = changes.associationMap ?? {};
   if (changes.touchCounts !== undefined) updates.touch_counts = changes.touchCounts ?? [];
   if (changes.modifiedTs !== undefined) updates.modified_ts = changes.modifiedTs ?? [];
   if (changes.aiSummary !== undefined) updates.ai_summary = changes.aiSummary ?? null;

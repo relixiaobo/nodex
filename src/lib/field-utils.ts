@@ -520,8 +520,7 @@ export function resolveChildSupertags(
  * Handles circular references via visited set.
  *
  * Reads from tagDef.children (config tuple) — this is the source of truth
- * that the config field UI edits via setConfigValue. Previously read from metanode,
- * which caused the bug where changing Extends didn't update Default content.
+ * that the config field UI edits via setConfigValue.
  */
 export function getExtendsChain(
   entities: Record<string, NodexNode>,
@@ -565,7 +564,7 @@ export const SYSTEM_FIELDS: SystemFieldDef[] = [
   { key: 'NDX_SYS_LAST_EDITED', name: 'Last edited time', source: 'updatedAt', dataType: '__system_date__', icon: CalendarClock },
   { key: 'NDX_SYS_LAST_EDITED_BY', name: 'Last edited by', source: 'updatedBy', dataType: '__system_text__', icon: UserPen },
   { key: 'NDX_SYS_OWNER', name: 'Owner node', source: 'props._ownerId', dataType: '__system_node__', icon: SquareUser },
-  { key: 'NDX_SYS_TAGS', name: 'Tags', source: 'metanode', dataType: '__system_text__', icon: Tag },
+  { key: 'NDX_SYS_TAGS', name: 'Tags', source: 'meta', dataType: '__system_text__', icon: Tag },
   { key: 'NDX_SYS_WORKSPACE', name: 'Workspace', source: 'workspaceId', dataType: '__system_text__', icon: Building2 },
   { key: 'NDX_SYS_DONE_TIME', name: 'Done time', source: 'props._done', dataType: '__system_date__', icon: CalendarCheck },
 ];
@@ -619,7 +618,7 @@ export function resolveSystemFieldValue(
       const ownerNode = entities[ownerId];
       return { text: ownerNode?.props.name ?? ownerId, refNodeId: ownerId };
     }
-    case 'metanode': {
+    case 'meta': {
       if (!node.meta || node.meta.length === 0) return { text: '' };
       const tagNames: string[] = [];
       for (const cid of node.meta) {

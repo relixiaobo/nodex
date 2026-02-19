@@ -56,10 +56,10 @@ describe('tree-utils', () => {
     const entities: Record<string, NodexNode> = {
       ws: node('ws', 'ws', undefined, ['ws_LIBRARY'], undefined, 'Workspace'),
       ws_LIBRARY: node('ws_LIBRARY', 'ws', 'ws', ['parent'], undefined, 'Library'),
-      parent: node('parent', 'ws', 'ws_LIBRARY', ['meta'], undefined, '<b>Parent</b>'),
-      meta: node('meta', 'ws', 'parent', ['tuple'], 'metanode'),
-      tuple: node('tuple', 'ws', 'meta', ['target'], 'tuple'),
-      target: node('target', 'ws', 'tuple'),
+      parent: node('parent', 'ws', 'ws_LIBRARY', ['tuple1'], undefined, '<b>Parent</b>'),
+      tuple1: node('tuple1', 'ws', 'parent', ['tuple2'], 'tuple'),
+      tuple2: node('tuple2', 'ws', 'tuple1', ['target'], 'tuple'),
+      target: node('target', 'ws', 'tuple2'),
     };
 
     const { ancestors, workspaceRootId } = getAncestorChain('target', entities);

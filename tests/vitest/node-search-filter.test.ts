@@ -10,7 +10,7 @@ import { useNodeStore } from '../../src/stores/node-store.js';
 /** Replicates the SKIP_DOC_TYPES filter logic from use-node-search.ts */
 function searchNodes(query: string, excludeId?: string) {
   const SKIP_DOC_TYPES = new Set([
-    'tuple', 'metanode', 'associatedData', 'tagDef',
+    'tuple', 'tagDef',
     'attrDef', 'workspace', 'user',
   ]);
 
@@ -39,31 +39,27 @@ describe('node search SKIP_DOC_TYPES filter', () => {
       entities: {
         'ws_LIBRARY': {
           id: 'ws_LIBRARY', workspaceId: 'ws', children: ['n1', 'n2', 'td1', 'ad1'],
-          props: { name: 'Library' }, associationMap: {},
+          props: { name: 'Library' },
         },
         n1: {
           id: 'n1', workspaceId: 'ws', children: [],
-          props: { name: 'My Person Note', _ownerId: 'ws_LIBRARY' }, associationMap: {},
+          props: { name: 'My Person Note', _ownerId: 'ws_LIBRARY' },
         },
         n2: {
           id: 'n2', workspaceId: 'ws', children: [],
-          props: { name: 'Another Note', _ownerId: 'ws_LIBRARY' }, associationMap: {},
+          props: { name: 'Another Note', _ownerId: 'ws_LIBRARY' },
         },
         td1: {
           id: 'td1', workspaceId: 'ws', children: [],
-          props: { name: 'Person', _docType: 'tagDef', _ownerId: 'ws_LIBRARY' }, associationMap: {},
+          props: { name: 'Person', _docType: 'tagDef', _ownerId: 'ws_LIBRARY' },
         },
         ad1: {
           id: 'ad1', workspaceId: 'ws', children: [],
-          props: { name: 'Email', _docType: 'attrDef', _ownerId: 'ws_LIBRARY' }, associationMap: {},
+          props: { name: 'Email', _docType: 'attrDef', _ownerId: 'ws_LIBRARY' },
         },
         tup1: {
           id: 'tup1', workspaceId: 'ws', children: [],
-          props: { name: 'tuple data', _docType: 'tuple', _ownerId: 'n1' }, associationMap: {},
-        },
-        meta1: {
-          id: 'meta1', workspaceId: 'ws', children: [],
-          props: { name: 'meta data', _docType: 'metanode', _ownerId: 'n1' }, associationMap: {},
+          props: { name: 'tuple data', _docType: 'tuple', _ownerId: 'n1' },
         },
       },
     });
@@ -81,10 +77,9 @@ describe('node search SKIP_DOC_TYPES filter', () => {
     expect(results.some(r => r.id === 'ad1')).toBe(false); // attrDef "Email" — filtered
   });
 
-  it('filters out tuple and metanode nodes', () => {
+  it('filters out tuple nodes', () => {
     const results = searchNodes('data');
     expect(results.some(r => r.id === 'tup1')).toBe(false);
-    expect(results.some(r => r.id === 'meta1')).toBe(false);
   });
 
   it('returns normal content nodes', () => {

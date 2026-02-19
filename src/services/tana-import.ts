@@ -3,8 +3,9 @@
  *
  * 从 Tana 导出的 JSON 文件导入数据到 Nodex (Supabase)。
  *
- * 由于 Nodex 忠实复制 Tana 的数据模型（保留 Tuple/Metanode/AssociatedData），
- * 迁移逻辑大幅简化：无需结构转换，直接映射即可。
+ * Tana 导出数据包含 Metanode 和 AssociatedData 间接层，Nodex 已将其简化
+ * （meta[] 替代 Metanode，Tuple.children[1:] 替代 AssociatedData）。
+ * 导入时保留原始结构以维持引用完整性，运行时代码同时兼容新旧格式。
  *
  * Tana 导出 JSON 顶层结构：
  * {
@@ -323,7 +324,7 @@ function tanaDocToNodexNode(
       description: doc.props.description,
       _docType: doc.props._docType as DocType | undefined,
       _ownerId: doc.props._ownerId,
-      _metaNodeId: doc.props._metaNodeId,
+      // _metaNodeId: dropped (replaced by node.meta[])
       _sourceId: doc.props._sourceId,
       _flags: doc.props._flags,
       _done: doc.props._done,
@@ -335,7 +336,7 @@ function tanaDocToNodexNode(
       searchContextNode: doc.props.searchContextNode,
     },
     children: doc.children,
-    associationMap: doc.associationMap,
+    // associationMap: dropped (field values now in Tuple.children[1:])
     touchCounts,
     modifiedTs,
     version: 1,

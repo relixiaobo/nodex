@@ -19,13 +19,8 @@ export function collectNodeGraphErrors(entities: Record<string, NodexNode>): str
     const ownerId = node.props._ownerId;
     const docType = node.props._docType;
 
-    // associatedData are linked via associationMap, not parent.children
     // meta tuples are linked via owner.meta, not owner.children
-    const shouldBeInOwnerChildrenOrMeta =
-      ownerId &&
-      docType !== 'associatedData';
-
-    if (shouldBeInOwnerChildrenOrMeta) {
+    if (ownerId) {
       const owner = entities[ownerId];
       if (!owner) {
         errors.push(`owner missing: node=${nodeId} owner=${ownerId}`);
@@ -41,9 +36,8 @@ export function collectNodeGraphErrors(entities: Record<string, NodexNode>): str
     const children = node.children ?? [];
     const seen = new Set<string>();
 
-    // tuple children are key/value payloads; associatedData children can be
-    // raw strings (e.g., color config "emerald"). Neither is guaranteed to be node IDs.
-    const shouldValidateChildIds = docType !== 'tuple' && docType !== 'associatedData';
+    // tuple children are key/value payloads — not guaranteed to be node IDs.
+    const shouldValidateChildIds = docType !== 'tuple';
     for (const childId of children) {
       if (shouldValidateChildIds && !entities[childId]) {
         errors.push(`child missing: parent=${nodeId} child=${childId}`);
@@ -52,17 +46,6 @@ export function collectNodeGraphErrors(entities: Record<string, NodexNode>): str
         errors.push(`duplicate child id: parent=${nodeId} child=${childId}`);
       }
       seen.add(childId);
-    }
-
-    if (node.associationMap) {
-      for (const [tupleId, assocId] of Object.entries(node.associationMap)) {
-        if (!entities[tupleId]) {
-          errors.push(`association key missing: node=${nodeId} tuple=${tupleId}`);
-        }
-        if (!entities[assocId]) {
-          errors.push(`association value missing: node=${nodeId} assoc=${assocId}`);
-        }
-      }
     }
   }
 

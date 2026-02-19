@@ -42,7 +42,7 @@ describe('Supertag Extend (Inheritance)', () => {
 
     it('returns ancestors in ancestor-first order for multi-level extends', () => {
       // Create a grandchild tagDef that extends dev_task
-      // getExtendsChain reads from tagDef.children (config tuples), not metanode
+      // getExtendsChain reads from tagDef.children (config tuples)
       const now = Date.now();
 
       const grandExtendsTuple: NodexNode = {

@@ -7,7 +7,6 @@ function makeNode(
     ownerId?: string;
     docType?: string;
     children?: string[];
-    associationMap?: Record<string, string>;
   },
 ): NodexNode {
   return {
@@ -19,7 +18,6 @@ function makeNode(
       _docType: opts?.docType,
     },
     children: opts?.children ?? [],
-    associationMap: opts?.associationMap,
     version: 1,
     updatedAt: 0,
     createdBy: 'user_default',
@@ -62,21 +60,14 @@ describe('graph invariant helper', () => {
     expect(errors).not.toContain('owner-child mismatch: node=value_1 owner=parent');
   });
 
-  it('reports association map key/value missing errors', () => {
+  it('detects child missing for non-tuple nodes', () => {
     const entities: Record<string, NodexNode> = {
-      node_1: makeNode('node_1', {
-        associationMap: {
-          missing_tuple: 'assoc_ok',
-          tuple_ok: 'missing_assoc',
-        },
-      }),
-      tuple_ok: makeNode('tuple_ok', { ownerId: 'node_1', docType: 'tuple' }),
-      assoc_ok: makeNode('assoc_ok', { ownerId: 'node_1', docType: 'associatedData' }),
+      parent: makeNode('parent', { children: ['existing', 'missing_child'] }),
+      existing: makeNode('existing', { ownerId: 'parent' }),
     };
     expect(collectNodeGraphErrors(entities)).toEqual(
       expect.arrayContaining([
-        'association key missing: node=node_1 tuple=missing_tuple',
-        'association value missing: node=node_1 assoc=missing_assoc',
+        'child missing: parent=parent child=missing_child',
       ]),
     );
   });

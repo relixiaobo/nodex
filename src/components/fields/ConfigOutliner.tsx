@@ -142,7 +142,7 @@ export function ConfigOutliner({ nodeId }: ConfigOutlinerProps) {
             ownerTagDefId: nodeId,
           });
         }
-        // else skip: config tuples, metanode, etc.
+        // else skip: config tuples, etc.
       }
     }
 

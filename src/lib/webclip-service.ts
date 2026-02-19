@@ -106,7 +106,7 @@ export async function saveWebClip(
   // 3. Create the clip node under parent (defaults to Inbox)
   const clipNode = await store.createChild(targetParentId, workspaceId, userId, payload.title);
 
-  // 4. Apply #web_clip tag (creates metanode + instantiates template fields)
+  // 4. Apply #web_clip tag (adds meta tuple + instantiates template fields)
   await store.applyTag(clipNode.id, tagDef.id, workspaceId, userId);
 
   // 5. Write Source URL field value

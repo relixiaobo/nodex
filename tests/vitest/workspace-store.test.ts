@@ -83,23 +83,32 @@ describe('workspace-store auth and persistence', () => {
     expect(state.currentWorkspaceId).toBeNull();
   });
 
-  it('signInWithGoogle updates store when auth succeeds', async () => {
-    // Mock the dynamic import of auth.ts
+  it('signInWithGoogle action updates store with user and workspaceId', async () => {
     const mockUser = { id: 'guser_1', email: 'g@example.com', name: 'Google User' };
     vi.doMock('../../src/lib/auth.js', () => ({
       signInWithGoogle: vi.fn().mockResolvedValue(mockUser),
     }));
 
-    // Simulate what signInWithGoogle action does (without actual chrome.identity)
-    useWorkspaceStore.setState({
-      userId: mockUser.id,
-      isAuthenticated: true,
-      authUser: mockUser,
-    });
+    // Call the actual store action (dynamic import will use our mock)
+    await useWorkspaceStore.getState().signInWithGoogle();
 
     const state = useWorkspaceStore.getState();
     expect(state.userId).toBe('guser_1');
+    expect(state.currentWorkspaceId).toBe('guser_1');
     expect(state.isAuthenticated).toBe(true);
     expect(state.authUser).toMatchObject({ email: 'g@example.com', name: 'Google User' });
+  });
+
+  it('signInWithGoogle action propagates auth errors', async () => {
+    vi.doMock('../../src/lib/auth.js', () => ({
+      signInWithGoogle: vi.fn().mockRejectedValue(new Error('Auth cancelled')),
+    }));
+
+    await expect(useWorkspaceStore.getState().signInWithGoogle()).rejects.toThrow('Auth cancelled');
+
+    // Store should remain unauthenticated on failure
+    const state = useWorkspaceStore.getState();
+    expect(state.isAuthenticated).toBe(false);
+    expect(state.authUser).toBeNull();
   });
 });

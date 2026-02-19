@@ -55,6 +55,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
         const user = await authSignIn();
         set({
           userId: user.id,
+          currentWorkspaceId: user.id,
           isAuthenticated: true,
           authUser: user,
         });
@@ -77,7 +78,13 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
         // Restore session if one exists
         const user = await getCurrentUser();
         if (user) {
-          set({ userId: user.id, isAuthenticated: true, authUser: user });
+          const currentWsId = useWorkspaceStore.getState().currentWorkspaceId;
+          set({
+            userId: user.id,
+            currentWorkspaceId: currentWsId ?? user.id,
+            isAuthenticated: true,
+            authUser: user,
+          });
         } else {
           set({ userId: null, isAuthenticated: false, authUser: null });
         }

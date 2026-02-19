@@ -65,10 +65,8 @@ export async function signInWithGoogle(): Promise<AuthUser> {
   const authCode = url.searchParams.get('code');
 
   if (!authCode) {
-    throw new Error(
-      'No authorization code found in callback URL. Got: ' +
-        callbackUrl.substring(0, 100),
-    );
+    console.error('[auth] No code in callback URL:', callbackUrl);
+    throw new Error('Authentication failed — no authorization code received');
   }
 
   // Exchange PKCE authorization code for Supabase session

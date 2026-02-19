@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useWorkspaceStore } from '../../stores/workspace-store';
 import { useUIStore } from '../../stores/ui-store';
 import { useNodeStore } from '../../stores/node-store';
@@ -146,19 +146,20 @@ function useBootstrap(): BootstrapResult {
     return () => authUnsubscribe?.();
   }, []); // Run once on mount
 
-  // Re-evaluate auth requirement when isAuthenticated changes (e.g. after login)
+  // Re-bootstrap workspace after successful login
+  const bootstrappedAfterLogin = useRef(false);
   useEffect(() => {
-    if (isAuthenticated && requiresAuth) {
-      setRequiresAuth(false);
-      // Re-run workspace bootstrap after successful login
-      const currentWsId = useWorkspaceStore.getState().currentWorkspaceId;
-      const userId = useWorkspaceStore.getState().userId;
-      if (userId && !currentWsId) {
-        useWorkspaceStore.getState().setWorkspace(userId);
-        seedWorkspace(userId, userId);
-        const libraryId = getContainerId(userId, WORKSPACE_CONTAINERS.LIBRARY);
-        useUIStore.getState().navigateTo(libraryId);
-      }
+    if (!isAuthenticated || !requiresAuth || bootstrappedAfterLogin.current) return;
+    bootstrappedAfterLogin.current = true;
+    setRequiresAuth(false);
+
+    const wsId = useWorkspaceStore.getState().currentWorkspaceId;
+    const userId = useWorkspaceStore.getState().userId;
+    if (userId) {
+      if (!wsId) useWorkspaceStore.getState().setWorkspace(userId);
+      seedWorkspace(wsId ?? userId, userId);
+      const libraryId = getContainerId(wsId ?? userId, WORKSPACE_CONTAINERS.LIBRARY);
+      useUIStore.getState().navigateTo(libraryId);
     }
   }, [isAuthenticated, requiresAuth]);
 

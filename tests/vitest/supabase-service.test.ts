@@ -32,7 +32,7 @@ describe('supabase service lifecycle', () => {
 
     const client = initSupabase('https://example.supabase.co', 'anon_key_1');
 
-    expect(createClientMock).toHaveBeenCalledWith('https://example.supabase.co', 'anon_key_1');
+    expect(createClientMock).toHaveBeenCalledWith('https://example.supabase.co', 'anon_key_1', { auth: { flowType: 'pkce' } });
     expect(client).toBe(fakeClient);
     expect(getSupabase()).toBe(fakeClient);
     expect(isSupabaseReady()).toBe(true);

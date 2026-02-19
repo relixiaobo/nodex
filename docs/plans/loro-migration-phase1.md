@@ -284,9 +284,30 @@ export const SYSTEM_TAGS = {
 
 // ─── SYS_A* → 大部分消除 ───
 // Meta Tuple 消除后，SYS_A13/A55/A12/A11/A14 等不再需要作为 Tuple key。
-// 剩余的 SYS_A* 用于 Field Tuple 和 view/search 配置，
+// 剩余的 SYS_A* 用于 fieldEntry 和 view/search 配置，
 // 可逐步替换为可读属性名。
 // 迁移期间保留 SYS_A 常量对象以便过渡，但逐步减少引用。
+```
+
+**系统节点在 LoroTree 中的归属**：
+
+| 类别 | 是否为 LoroTree 节点 | 说明 |
+|------|---------------------|------|
+| 用户可见系统标签（TASK, MEETING, PERSON 等） | **是** | 有 name、showCheckbox、color 等配置，需要树节点。ID 用 SYSTEM_TAGS 值 |
+| 元标签（SUPERTAG, FIELD_DEFINITION） | **否** | 旧模型中用于 meta-circular 标识节点角色。新模型用 `type: 'tagDef'` / `type: 'fieldDef'` 直接标识，不再需要 |
+| FIELD_TYPES 值（'checkbox', 'plain' 等） | **否** | 纯字符串枚举，不是节点 |
+| SYSTEM_TAGS 值（'sys:supertag' 等） | 仅用户可见的 | 元标签的值只作为历史参考常量，不创建节点 |
+
+种子数据中需要创建的系统节点示例：
+```typescript
+// 用户可见系统标签 → LoroTree 节点
+doc.createNode(SYSTEM_TAGS.TASK, CONTAINERS.SCHEMA);
+doc.setNodeDataBatch(SYSTEM_TAGS.TASK, {
+  type: 'tagDef', name: 'Task', showCheckbox: true,
+});
+
+// 元标签（SUPERTAG, FIELD_DEFINITION）→ 不创建节点
+// 识别方式：node.type === 'tagDef' 即为标签定义，无需额外标记
 ```
 
 ### 2.5 LoroDoc 结构
@@ -345,6 +366,12 @@ node.meta → [tupleId1, tupleId2]
 ```typescript
 // 标签 — LoroList，并发 insert 自动合并
 node.data.getList("tags")  // [tagDefId1, tagDefId2]
+
+// ⚠️ 去重约定（重要）：
+// LoroList 并发 insert 可能产生重复（两端同时 addTag 同一 tagDefId）。
+// - addTag() 操作必须 check-before-push（本地去重）
+// - toNodexNode() 读取 tags 时做去重保护：[...new Set(tagsContainer.toArray())]
+// - Phase 2 同步场景下重复概率更高，此约定从 Phase 1 就必须遵守
 
 // 其他原 meta 属性 — 直接存储
 node.data.get("completedAt")     // timestamp (旧 _done，来自 SYS_A55 checkbox)
@@ -417,6 +444,8 @@ fieldEntry.data = {
 恢复时需要知道原位置：
 ```typescript
 // 移入 Trash 时，在节点 data 上记录来源
+// ⚠️ Phase 2 并发注意：这三步不是原子的。并发 peer 可能覆盖 _trashedFrom。
+// 解决方案：Phase 2 用 doc.commit() 事务包裹，使其在 CRDT 版本向量中为单一操作。
 node.data.set("_trashedFrom", parentId);
 node.data.set("_trashedIndex", childIndex);
 tree.move(nodeId, trashContainerId);
@@ -433,15 +462,23 @@ node.data.delete("_trashedIndex");
 
 Loro 的 TreeID 是内部类型（`{ peer: bigint, counter: number }`），不适合直接当 Nodex ID 用。
 
-**方案**：维护双向映射 `Map<string, TreeID>` + `Map<TreeID, string>`
+**方案**：维护双向映射 `Map<string, TreeID>` + `Map<serialized_TreeID, string>`
 
 ```typescript
 // loro-doc.ts
-const nodexIdToTreeId = new Map<string, TreeID>();
-const treeIdToNodexId = new Map<string, string>();
 
-function createNode(nodexId: string, parentNodexId: string, index?: number): TreeID {
-  const parentTreeId = nodexIdToTreeId.get(parentNodexId);
+// ⚠️ TreeID 是对象，不能直接做 Map key（引用相等）。
+// 必须序列化为字符串。bigint 不能 JSON.stringify，需显式 toString()。
+function treeIdStr(id: TreeID): string {
+  return `${id.peer.toString()}_${id.counter}`;
+}
+
+const nodexIdToTreeId = new Map<string, TreeID>();
+const treeIdToNodexId = new Map<string, string>(); // key = treeIdStr(treeId)
+
+function createNode(nodexId: string, parentNodexId: string | null, index?: number): TreeID {
+  // parentNodexId === null → 挂在 LoroTree 虚拟根下
+  const parentTreeId = parentNodexId ? nodexIdToTreeId.get(parentNodexId) : undefined;
   const treeNode = tree.createNode(parentTreeId, index);
   const treeId = treeNode.id;
   nodexIdToTreeId.set(nodexId, treeId);
@@ -453,7 +490,7 @@ function createNode(nodexId: string, parentNodexId: string, index?: number): Tre
 
 **持久化**：映射表不需要单独持久化——从 Loro snapshot 恢复时遍历所有树节点重建。
 
-### 2.12 工作区隔离
+### 2.12 工作区隔离与树根结构
 
 **旧模式**：每个节点存 `workspaceId`，用于 Supabase WHERE 子句。
 
@@ -465,6 +502,52 @@ function createNode(nodexId: string, parentNodexId: string, index?: number): Tre
 ```
 
 工作区切换 = 加载不同的 LoroDoc。`workspaceId` 从节点上消除。
+
+**LoroTree 根结构**：
+
+LoroTree 有一个隐式虚拟根（parent = `null`/`undefined`）。工作区节点直接挂在虚拟根下：
+
+```
+LoroTree 虚拟根 (null)
+  └── 工作区根节点 (id: WS_ID)
+        ├── LIBRARY 容器
+        ├── INBOX 容器
+        ├── TRASH 容器
+        ├── SCHEMA 容器
+        └── ...
+```
+
+```typescript
+// 常量定义
+const LORO_ROOT = null; // LoroTree 虚拟根，createNode 的 parent 传 null 表示挂在虚根
+
+// 创建工作区根
+doc.createNode(WS_ID, LORO_ROOT);
+```
+
+**容器 ID 简化**：一个 LoroDoc = 一个工作区后，容器 ID 不再需要 `{wsId}_` 前缀。
+
+```typescript
+// 旧模式
+const LIBRARY_ID = `${workspaceId}_LIBRARY`; // "ws_001_LIBRARY"
+
+// 新模式 — 固定 ID（LoroDoc 已隔离工作区）
+export const CONTAINERS = {
+  LIBRARY: 'LIBRARY',
+  INBOX: 'INBOX',
+  TRASH: 'TRASH',
+  SCHEMA: 'SCHEMA',
+  JOURNAL: 'JOURNAL',
+  SEARCHES: 'SEARCHES',
+  CLIPS: 'CLIPS',
+  // ... 其他容器
+} as const;
+
+// getContainerId() 不再需要 workspaceId 参数
+export function getContainerId(suffix: ContainerSuffix): string {
+  return suffix;  // 直接返回常量
+}
+```
 
 ## 3. 核心模块设计
 
@@ -485,10 +568,10 @@ export interface LoroDocManager {
   setNodeData(id: string, key: string, value: unknown): void;
   setNodeDataBatch(id: string, data: Record<string, unknown>): void;
 
-  // 标签操作（LoroList 原生）
+  // 标签操作（LoroList 原生，addTag 内部 check-before-push 去重）
   addTag(nodeId: string, tagDefId: string): void;
   removeTag(nodeId: string, tagDefId: string): void;
-  getTags(nodeId: string): string[];
+  getTags(nodeId: string): string[];  // 返回去重后的列表
 
   // 查询
   getChildren(parentId: string): string[];
@@ -570,9 +653,9 @@ export function toNodexNode(nodexId: string): NodexNode | null {
     .map(c => treeIdToNodexId.get(treeIdStr(c.id)))
     .filter(Boolean) as string[];
 
-  // 读取 tags LoroList
+  // 读取 tags LoroList（去重保护，防止并发 insert 产生重复）
   const tagsContainer = data.getOrCreateContainer("tags", "List");
-  const tags = tagsContainer.toArray() as string[];
+  const tags = [...new Set(tagsContainer.toArray() as string[])];
 
   return {
     id: nodexId,
@@ -828,8 +911,8 @@ npm install loro-crdt
 export function seedTestData() {
   const doc = getLoroDoc();
 
-  // 工作区根
-  doc.createNode(WS_ID, ROOT_ID);
+  // 工作区根（挂在 LoroTree 虚拟根下，parent = null）
+  doc.createNode(WS_ID, null);
   doc.setNodeDataBatch(WS_ID, {
     type: 'workspace',
     name: 'My Workspace',

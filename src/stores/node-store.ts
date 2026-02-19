@@ -292,10 +292,10 @@ export const useNodeStore = create<NodeStore>()(
 
     setNode: (node) =>
       set((state) => {
+        const existing = state.entities[node.id];
         // If this node has unsaved local content edits, preserve them
         // instead of blindly overwriting with (potentially stale) DB data.
         if (state._dirtyContentIds.has(node.id)) {
-          const existing = state.entities[node.id];
           if (existing) {
             // Update metadata from the incoming node, keep local content
             existing.version = Math.max(existing.version ?? 0, node.version ?? 0);
@@ -450,8 +450,9 @@ export const useNodeStore = create<NodeStore>()(
           }
         });
         return node;
-      } catch {
+      } catch (err) {
         // Rollback on server failure
+        console.warn('[createChild] Supabase persist failed:', err);
         set((state) => {
           delete state.entities[id];
           const parent = state.entities[parentId];
@@ -544,8 +545,9 @@ export const useNodeStore = create<NodeStore>()(
           }
         });
         return newNode;
-      } catch {
+      } catch (err) {
         // Rollback
+        console.warn('[createSibling] Supabase persist failed:', err);
         set((state) => {
           delete state.entities[id];
           const p = state.entities[parentId];

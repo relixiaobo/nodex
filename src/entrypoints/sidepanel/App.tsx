@@ -28,6 +28,22 @@ const CONTAINER_DEFS: Array<{ suffix: WorkspaceContainerSuffix; name: string }> 
  * Seeds into local Zustand store, and persists to Supabase via upsert when connected.
  */
 async function seedWorkspace(wsId: string, userId: string) {
+  // Provision user + workspace_members in Supabase (required for RLS)
+  if (isSupabaseReady()) {
+    try {
+      const authUser = useWorkspaceStore.getState().authUser;
+      await getSupabase().rpc('provision_workspace', {
+        p_user_id: userId,
+        p_email: authUser?.email ?? '',
+        p_display_name: authUser?.name ?? null,
+        p_avatar_url: authUser?.avatarUrl ?? null,
+      });
+    } catch {
+      // Non-fatal: RLS may block node ops if this fails,
+      // but local-only mode still works.
+    }
+  }
+
   const store = useNodeStore.getState();
   const now = Date.now();
 

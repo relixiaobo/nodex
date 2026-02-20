@@ -562,6 +562,72 @@ hash trigger cleanup safety（2 cases, Bug #53 回归）:
 9. DOM cleanup 失败后检测残留 `#` 触发词
 10. DOM cleanup 成功后无残留
 
+### 1.51 P0 Loro 基础设施 — 7项底层 API
+
+**测试文件**: `tests/vitest/loro-infra.test.ts`
+
+**覆盖点（P0 Loro Infrastructure）**:
+
+② Fine-grained subscriptions:
+1. `subscribeNode(nodeA, cb)` → A 数据变更触发 cb
+2. `subscribeNode(nodeA, cb)` → B 数据变更**不**触发 A 的 cb（隔离性）
+3. `subscribeNode(nodeB, cb)` → A 数据变更**不**触发 B 的 cb
+4. 取消订阅后变更不再触发
+5. 同一节点多个 callback 各自独立触发
+
+⑤ Incremental Sync:
+6. `getVersionVector()` 返回 VersionVector 对象（有 encode() 方法）
+7. `exportFrom(vv)` 返回 Uint8Array delta
+8. 两 LoroDoc 实例通过增量同步（delta1 全量、delta2 仅增量）达到一致
+9. `importUpdates()` 幂等 — 重复导入不影响状态
+
+④ Time Travel / Checkout:
+10. `getVersionHistory()` 返回按 lamport 排序的历史（需 `setDocChangeMergeInterval(-1)`）
+11. `checkout(f1)` 后 `isDetached()` = true，数据反映历史状态
+12. `checkoutToLatest()` 退出历史模式，数据恢复最新
+13. checkout 后历史版本不存在的节点 `hasNode()` = false
+14. `getVersionHistory()` 每条记录含 id / peer / lamport / deps 字段
+
+③ LoroText + Peritext marks:
+15. `getNodeText()` 未初始化时返回 null
+16. `getOrCreateNodeText()` 创建 LoroText 容器
+17. LoroText insert 文本后 toString() 正确
+18. LoroText mark(bold/italic) 后 toDelta() 正确
+19. `getOrCreateNodeText()` 幂等
+20. 不存在 nodexId 返回 null
+
+① LoroMovableList 并发安全验证:
+21. LoroTree.move() 并发安全 — 两端同时移动同一节点最终收敛（Kleppmann 算法验证）
+22. `createMovableList()` 返回有效 LoroMovableList（有 insert/move 方法）
+23. LoroMovableList.move() 并发安全重排序
+
+⑥ doc.fork():
+24. fork 后修改 fork doc 不影响主 doc
+25. `merge()` 将 fork 变更导入主 doc（新节点在主 doc 可见）
+26. `merge()` 幂等 — 多次 merge 不产生重复数据
+27. fork 前的数据在 fork doc 中可见
+
+⑦ Awareness (awareness.ts):
+28. `setLocalUser()` 初始化本地用户
+29. `setLocalState()` 更新光标位置
+30. `setLocalState()` 未初始化用户时抛出错误
+31. `applyRemoteState()` 存储远端状态
+32. `removeRemoteState()` 移除远端状态
+33. `getStates()` 包含本地和所有远端用户（共 3 个）
+34. `onRemoteStateChange()` 在状态变化时触发回调，取消订阅后不再触发
+35. `onRemoteStateChange()` 回调接收全量状态 Map（size=2）
+36. `serializeLocalState()` / `deserializeAndApplyState()` 往返序列化
+37. `updatedAt` 在 `setLocalState()` 后更新（单调递增）
+
+**设计要点**:
+- `subscribeNode` 通过 Loro LoroMap.subscribe() 实现容器级订阅，rebuildMappings() 后自动重新挂载
+- `getVersionHistory()` 依赖 `getAllChanges()` 返回 Map；需要 `setDocChangeMergeInterval(-1)` 禁用合并以获取精确历史
+- `checkout(frontiers)` 进入 detached 模式后 rebuildMappings() 更新 nodexId 映射
+- `forkDoc()` 用 vvAtFork 记录分叉点，merge() 只导出分叉后的增量
+- awareness.ts 纯内存，不含网络传输
+
+---
+
 ### 1.50 Loro UndoManager — 结构性撤销/重做
 
 **测试文件**: `tests/vitest/loro-undo.test.ts`
@@ -917,6 +983,7 @@ createSibling 自动标签（2 cases）:
 | 1.47 | Meta-Utils 工具函数 | PASS/FAIL |
 | 1.48 | Tana 导入 meta 填充与 DocType 安全 | PASS/FAIL |
 | 1.50 | Loro UndoManager 结构性撤销/重做 | PASS/FAIL |
+| 1.51 | P0 Loro 基础设施 — 7项底层API（subscribeNode/增量同步/时间旅行/LoroText/fork/Awareness） | PASS/FAIL |
 | 2 | 视觉渲染 | PASS/FAIL/SKIP |
 | 3 | 扩展构建 | PASS/FAIL |
 

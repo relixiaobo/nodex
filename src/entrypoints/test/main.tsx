@@ -11,11 +11,11 @@ import { App } from '../sidepanel/App';
 import { seedTestData } from './seed-data';
 import '../../assets/main.css';
 
-// Seed sample nodes before React renders
-seedTestData();
-
-ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>,
-);
+// Seed sample nodes before React renders (async: initializes LoroDoc first)
+seedTestData().then(() => {
+  ReactDOM.createRoot(document.getElementById('root')!).render(
+    <React.StrictMode>
+      <App />
+    </React.StrictMode>,
+  );
+});

@@ -17,8 +17,9 @@ export function FieldList({ nodeId }: FieldListProps) {
   const allFields = useNodeFields(nodeId);
   const isDefinitionNode = useNodeStore(
     (s) => {
-      const dt = s.entities[nodeId]?.props._docType;
-      return dt === 'attrDef' || dt === 'tagDef';
+      void s._version;
+      const dt = s.getNode(nodeId)?.type;
+      return dt === 'fieldDef' || dt === 'tagDef';
     },
   );
 
@@ -33,12 +34,12 @@ export function FieldList({ nodeId }: FieldListProps) {
   return (
     <div className="@container mt-0.5 ml-1">
       {fields.map((f) => (
-        <div key={f.tupleId}>
+        <div key={f.fieldEntryId}>
           <FieldRow
             nodeId={nodeId}
-            attrDefId={f.attrDefId}
+            attrDefId={f.fieldDefId}
             attrDefName={f.attrDefName}
-            tupleId={f.tupleId}
+            tupleId={f.fieldEntryId}
             valueNodeId={f.valueNodeId}
             valueName={f.valueName}
             dataType={f.dataType}

@@ -17,7 +17,7 @@ import { Trash2 } from 'lucide-react';
 import { useNodeFields } from '../../hooks/use-node-fields';
 import { useNodeStore } from '../../stores/node-store';
 import { useUIStore } from '../../stores/ui-store';
-import { useWorkspaceStore } from '../../stores/workspace-store';
+import * as loroDoc from '../../lib/loro-doc.js';
 import { getFieldTypeIcon, ATTRDEF_CONFIG_MAP, TAGDEF_CONFIG_MAP, resolveMinValue, resolveMaxValue, SYSTEM_FIELD_MAP } from '../../lib/field-utils.js';
 import { FieldValueOutliner } from './FieldValueOutliner';
 import { FieldNameInput } from './FieldNameInput';
@@ -94,10 +94,8 @@ export function FieldRow({
   const createChild = useNodeStore((s) => s.createChild);
   const moveFieldTuple = useNodeStore((s) => s.moveFieldTuple);
   const removeField = useNodeStore((s) => s.removeField);
-  const entities = useNodeStore((s) => s.entities);
+  const _version = useNodeStore((s) => s._version);
   const siblingFields = useNodeFields(nodeId);
-  const wsId = useWorkspaceStore((s) => s.currentWorkspaceId);
-  const userId = useWorkspaceStore((s) => s.userId);
   const clickOffsetXRef = useRef<number | undefined>(undefined);
 
   const isSystemField = dataType === '__system_date__' || dataType === '__system_text__' || dataType === '__system_node__';
@@ -112,18 +110,18 @@ export function FieldRow({
     : undefined;
   const Icon = getFieldTypeIcon(dataType);
 
-  // Validation: read first value child of tuple (children[1]) to check value
+  // Validation: read first value child of fieldEntry to check value
   const validationWarning = useNodeStore((s) => {
+    void s._version;
     if (!VALIDATED_FIELD_TYPES.has(dataType)) return null;
-    const tuple = s.entities[tupleId];
-    if (!tuple?.children || tuple.children.length < 2) return null;
-    const min = resolveMinValue(s.entities, attrDefId);
-    const max = resolveMaxValue(s.entities, attrDefId);
-    // tuple.children[0] is the key (attrDefId), children[1:] are values
-    for (let i = 1; i < tuple.children.length; i++) {
-      const child = s.entities[tuple.children[i]];
-      if (child && !child.props._docType && child.props.name) {
-        return validateFieldValue(dataType, child.props.name, { min, max });
+    const tuple = s.getNode(tupleId);
+    if (!tuple?.children || tuple.children.length === 0) return null;
+    const min = resolveMinValue(attrDefId);
+    const max = resolveMaxValue(attrDefId);
+    for (const cid of tuple.children) {
+      const child = s.getNode(cid);
+      if (child && !child.type && child.name) {
+        return validateFieldValue(dataType, child.name, { min, max });
       }
     }
     return null;
@@ -132,29 +130,32 @@ export function FieldRow({
   // Auto-collect count for SYS_A44 name display
   const isAutoCollect = configKey === SYS_A.AUTOCOLLECT_OPTIONS;
   const autoCollectCount = useNodeStore((s) => {
+    void s._version;
     if (!isAutoCollect) return 0;
-    const tuple = s.entities[tupleId];
-    return Math.max(0, (tuple?.children?.length ?? 0) - 2);
+    const tuple = s.getNode(tupleId);
+    // fieldEntry.children = value nodes (no key prefix in new model)
+    return Math.max(0, (tuple?.children?.length ?? 0) - 1);
   });
 
   const siblingFieldIds = useMemo(
-    () => new Set(siblingFields.map((f) => f.tupleId)),
+    () => new Set(siblingFields.map((f) => f.fieldEntryId)),
     [siblingFields],
   );
   const renderableSiblings = useMemo(() => {
-    const parentChildren = entities[nodeId]?.children ?? [];
+    const parentChildren = useNodeStore.getState().getNode(nodeId)?.children ?? [];
     const result: Array<{ id: string; type: 'field' | 'content' }> = [];
     for (const cid of parentChildren) {
       if (siblingFieldIds.has(cid)) {
         result.push({ id: cid, type: 'field' });
         continue;
       }
-      if (!entities[cid]?.props._docType) {
+      if (!useNodeStore.getState().getNode(cid)?.type) {
         result.push({ id: cid, type: 'content' });
       }
     }
     return result;
-  }, [entities, nodeId, siblingFieldIds]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [_version, nodeId, siblingFieldIds]);
 
   const moveToSibling = useCallback((direction: 'up' | 'down') => {
     const index = renderableSiblings.findIndex((item) => item.type === 'field' && item.id === tupleId);
@@ -171,7 +172,7 @@ export function FieldRow({
         nodeId: target.id,
         parentId: nodeId,
         textOffset: direction === 'up'
-          ? (useNodeStore.getState().entities[target.id]?.props.name ?? '').length
+          ? (useNodeStore.getState().getNode(target.id)?.name ?? '').length
           : 0,
       });
       setFocusedNode(target.id, nodeId);
@@ -188,7 +189,6 @@ export function FieldRow({
   }, [renderableSiblings, tupleId, clearFocus, setEditingFieldName, nodeId, setFocusedNode, onNavigateOut]);
 
   const handleIndentField = useCallback(() => {
-    if (!userId) return;
     const index = renderableSiblings.findIndex((item) => item.type === 'field' && item.id === tupleId);
     if (index <= 0) return;
 
@@ -197,58 +197,43 @@ export function FieldRow({
 
     if (prev.type === 'field') {
       // Move this tuple under the previous field's tuple directly
-      void moveFieldTuple(nodeId, tupleId, prev.id, userId);
+      void moveFieldTuple(nodeId, tupleId, prev.id, '');
       return;
     }
 
     if (prev.type === 'content') {
-      void moveFieldTuple(nodeId, tupleId, prev.id, userId);
+      void moveFieldTuple(nodeId, tupleId, prev.id, '');
     }
-  }, [tupleId, userId, renderableSiblings, nodeId, moveFieldTuple]);
+  }, [tupleId, renderableSiblings, nodeId, moveFieldTuple]);
 
   const handleOutdentField = useCallback(() => {
-    if (!userId) return;
-    const currentParent = useNodeStore.getState().entities[nodeId];
-    const grandparentId = currentParent?.props._ownerId;
+    const grandparentId = loroDoc.getParentId(nodeId);
     if (!grandparentId) return;
-    const grandparent = useNodeStore.getState().entities[grandparentId];
+    const grandparent = useNodeStore.getState().getNode(grandparentId);
     if (!grandparent?.children) return;
-    // The parent node's _ownerId is the grandparent. Find the insertion point
-    // after the parent node (or the tuple that owns the parent) in the grandparent's children.
+    // Find the insertion point after the parent node in the grandparent's children.
     let insertAt = grandparent.children.length;
     const parentIndex = grandparent.children.indexOf(nodeId);
     if (parentIndex >= 0) insertAt = parentIndex + 1;
-    void moveFieldTuple(nodeId, tupleId, grandparentId, userId, insertAt);
-  }, [tupleId, userId, nodeId, moveFieldTuple]);
+    void moveFieldTuple(nodeId, tupleId, grandparentId, '', insertAt);
+  }, [tupleId, nodeId, moveFieldTuple]);
 
   const handleEnterConfirm = useCallback(() => {
-    if (!wsId || !userId) return;
-    const state = useNodeStore.getState();
-    const entities = state.entities;
-
     let insertParentId = nodeId;
-    if (!entities[nodeId]?.children?.includes(tupleId)) {
-      const fallbackParent = Object.values(entities).find((n) => n.children?.includes(tupleId));
-      if (fallbackParent) insertParentId = fallbackParent.id;
+    const parent = useNodeStore.getState().getNode(insertParentId);
+    if (!parent?.children?.includes(tupleId)) {
+      // Fallback: find the parent that contains this tupleId via loroDoc
+      const actualParentId = loroDoc.getParentId(tupleId);
+      if (actualParentId) insertParentId = actualParentId;
     }
 
-    const parent = entities[insertParentId];
-    const beforeIds = new Set(parent?.children ?? []);
-    const tupleIdx = parent?.children?.indexOf(tupleId) ?? -1;
+    const actualParent = useNodeStore.getState().getNode(insertParentId);
+    const tupleIdx = actualParent?.children?.indexOf(tupleId) ?? -1;
     const position = tupleIdx >= 0 ? tupleIdx + 1 : undefined;
 
-    const createPromise = createChild(insertParentId, wsId, userId, '', position);
-
-    const optimisticParent = useNodeStore.getState().entities[insertParentId];
-    const optimisticNewId = optimisticParent?.children?.find((cid) => !beforeIds.has(cid));
-    if (optimisticNewId) setFocusedNode(optimisticNewId, insertParentId);
-
-    createPromise.then((newNode) => {
-      if (useNodeStore.getState().entities[newNode.id]) {
-        setFocusedNode(newNode.id, insertParentId);
-      }
-    });
-  }, [tupleId, nodeId, wsId, userId, createChild, setFocusedNode]);
+    const newNode = createChild(insertParentId, position);
+    setFocusedNode(newNode.id, insertParentId);
+  }, [tupleId, nodeId, createChild, setFocusedNode]);
 
   const handleNameClick = useCallback((e: React.MouseEvent<HTMLSpanElement>) => {
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
@@ -312,7 +297,7 @@ export function FieldRow({
                 handleEnterConfirm();
               } else if (e.key === 'Backspace') {
                 e.preventDefault();
-                if (wsId && userId) removeField(nodeId, tupleId, wsId, userId);
+                removeField(nodeId, tupleId);
               } else if (e.key === 'Escape') {
                 (e.target as HTMLElement).blur();
               } else if (e.key === 'ArrowUp') {

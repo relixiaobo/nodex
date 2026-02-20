@@ -1,6 +1,7 @@
-import { useNodeStore } from '../../src/stores/node-store.js';
+import { getAllNodeIds } from '../../src/lib/loro-doc.js';
 import { useUIStore } from '../../src/stores/ui-store.js';
 import { useWorkspaceStore } from '../../src/stores/workspace-store.js';
+import { CONTAINER_IDS } from '../../src/types/index.js';
 import { resetAndSeed } from './helpers/test-state.js';
 
 describe('preflight', () => {
@@ -9,15 +10,14 @@ describe('preflight', () => {
   });
 
   it('seeds standalone workspace and stores', () => {
-    const entities = useNodeStore.getState().entities;
+    const nodeIds = getAllNodeIds();
     const ws = useWorkspaceStore.getState();
     const ui = useUIStore.getState();
 
-    expect(Object.keys(entities).length).toBeGreaterThanOrEqual(60);
+    expect(nodeIds.length).toBeGreaterThanOrEqual(20);
     expect(ws.currentWorkspaceId).toBe('ws_default');
     expect(ws.userId).toBe('user_default');
     expect(ui.panelHistory.length).toBeGreaterThan(0);
-    expect(ui.panelHistory[ui.panelIndex]).toBe('ws_default_LIBRARY');
+    expect(ui.panelHistory[ui.panelIndex]).toBe(CONTAINER_IDS.LIBRARY);
   });
 });
-

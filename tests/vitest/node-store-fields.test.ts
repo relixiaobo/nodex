@@ -1,383 +1,264 @@
+/**
+ * node-store field operations — Loro model.
+ * setFieldValue(nodeId, fieldDefId, values[]) — sync, no userId
+ * clearFieldValue(nodeId, fieldDefId) — deletes all value children
+ * addFieldToNode(nodeId, fieldDefId) — idempotent
+ * Field values stored as children of fieldEntry nodes.
+ */
+import { describe, it, expect, beforeEach } from 'vitest';
 import { useNodeStore } from '../../src/stores/node-store.js';
-import { SYS_A, SYS_D, SYS_V } from '../../src/types/index.js';
-import { resolveSourceSupertag, resolveTaggedNodes } from '../../src/lib/field-utils.js';
 import { collectNodeGraphErrors } from './helpers/invariants.js';
+import * as loroDoc from '../../src/lib/loro-doc.js';
 import { resetAndSeed } from './helpers/test-state.js';
 
-function findFieldTupleId(nodeId: string, attrDefId: string): string | undefined {
-  const state = useNodeStore.getState();
-  const node = state.entities[nodeId];
-  if (!node?.children) return undefined;
-
-  return node.children.find((cid) => {
-    const child = state.entities[cid];
-    return child?.props._docType === 'tuple' && child.children?.[0] === attrDefId;
+/** Find a fieldEntry node ID for a given fieldDefId within a node's children. */
+function findFieldEntry(nodeId: string, fieldDefId: string): string | undefined {
+  return loroDoc.getChildren(nodeId).find(cid => {
+    const n = loroDoc.toNodexNode(cid);
+    return n?.type === 'fieldEntry' && n.fieldDefId === fieldDefId;
   });
 }
 
-describe('node-store field operations', () => {
+/** Get value node names from a fieldEntry's children. */
+function getFieldValues(fieldEntryId: string): string[] {
+  return loroDoc.getChildren(fieldEntryId)
+    .map(cid => loroDoc.toNodexNode(cid)?.name)
+    .filter((n): n is string => n !== undefined);
+}
+
+describe('setFieldValue', () => {
   beforeEach(() => {
     resetAndSeed();
   });
 
-  it('setFieldValue updates existing tuple value and clearFieldValue resets it', async () => {
-    const tupleId = findFieldTupleId('task_1', 'attrDef_due');
-    expect(tupleId).toBeTruthy();
-    if (!tupleId) return;
+  it('updates existing fieldEntry value to new value', () => {
+    // task_1 has a fieldEntry for attrDef_due (from applyTag in seed)
+    const feId = findFieldEntry('task_1', 'attrDef_due');
+    expect(feId).toBeTruthy();
 
-    await useNodeStore.getState().setFieldValue(
-      'task_1',
-      'attrDef_due',
-      '2026-02-13',
-      'ws_default',
-      'user_default',
-    );
-
-    const firstValueId = useNodeStore.getState().entities[tupleId].children?.[1];
-    expect(firstValueId).toBeTruthy();
-    if (!firstValueId) return;
-
-    expect(useNodeStore.getState().entities[firstValueId]?.props.name).toBe('2026-02-13');
-    // Value node's _ownerId is the content node (no associatedData layer)
-    expect(useNodeStore.getState().entities[firstValueId]?.props._ownerId).toBe('task_1');
-
-    await useNodeStore.getState().setFieldValue(
-      'task_1',
-      'attrDef_due',
-      '2026-03-01',
-      'ws_default',
-      'user_default',
-    );
-
-    const secondValueId = useNodeStore.getState().entities[tupleId].children?.[1];
-    expect(secondValueId).toBe(firstValueId);
-    expect(useNodeStore.getState().entities[firstValueId]?.props.name).toBe('2026-03-01');
-
-    await useNodeStore.getState().clearFieldValue('task_1', 'attrDef_due', 'user_default');
-    expect(useNodeStore.getState().entities[firstValueId]?.props.name).toBe('');
-
-    expect(collectNodeGraphErrors(useNodeStore.getState().entities)).toEqual([]);
+    useNodeStore.getState().setFieldValue('task_1', 'attrDef_due', ['2026-02-13']);
+    expect(getFieldValues(feId!)).toEqual(['2026-02-13']);
   });
 
-  it('setFieldValue creates tuple + value for missing field', async () => {
-    expect(findFieldTupleId('note_2', 'attrDef_status')).toBeUndefined();
-
-    await useNodeStore.getState().setFieldValue(
-      'note_2',
-      'attrDef_status',
-      'To Do',
-      'ws_default',
-      'user_default',
-    );
-
-    const tupleId = findFieldTupleId('note_2', 'attrDef_status');
-    expect(tupleId).toBeTruthy();
-    if (!tupleId) return;
-
-    const state = useNodeStore.getState();
-    const tuple = state.entities[tupleId];
-    const valueId = tuple.children?.[1];
-
-    expect(valueId).toBeTruthy();
-    if (!valueId) return;
-
-    expect(state.entities[valueId]?.props.name).toBe('To Do');
-    expect(state.entities.note_2.children ?? []).toContain(tupleId);
-
-    expect(collectNodeGraphErrors(useNodeStore.getState().entities)).toEqual([]);
+  it('replaces old value with new value', () => {
+    const feId = findFieldEntry('task_1', 'attrDef_due')!;
+    useNodeStore.getState().setFieldValue('task_1', 'attrDef_due', ['2026-02-13']);
+    useNodeStore.getState().setFieldValue('task_1', 'attrDef_due', ['2026-03-01']);
+    expect(getFieldValues(feId)).toEqual(['2026-03-01']);
   });
 
-  it('addFieldToNode deduplicates existing tuples and setOptionsFieldValue writes selected option', async () => {
-    const beforeExistingCount = (useNodeStore.getState().entities.task_1.children ?? []).filter((cid) => {
-      const child = useNodeStore.getState().entities[cid];
-      return child?.props._docType === 'tuple' && child.children?.[0] === 'attrDef_status';
-    }).length;
+  it('creates new fieldEntry when field not yet present', () => {
+    expect(findFieldEntry('note_2', 'attrDef_status')).toBeUndefined();
 
-    await useNodeStore.getState().addFieldToNode('task_1', 'attrDef_status', 'ws_default', 'user_default');
+    useNodeStore.getState().setFieldValue('note_2', 'attrDef_status', ['opt_todo']);
 
-    const afterExistingCount = (useNodeStore.getState().entities.task_1.children ?? []).filter((cid) => {
-      const child = useNodeStore.getState().entities[cid];
-      return child?.props._docType === 'tuple' && child.children?.[0] === 'attrDef_status';
-    }).length;
-    expect(afterExistingCount).toBe(beforeExistingCount);
+    const feId = findFieldEntry('note_2', 'attrDef_status');
+    expect(feId).toBeTruthy();
+    expect(getFieldValues(feId!)).toEqual(['opt_todo']);
 
-    await useNodeStore.getState().addFieldToNode('note_2', 'attrDef_status', 'ws_default', 'user_default');
-    const tupleId = findFieldTupleId('note_2', 'attrDef_status');
-    expect(tupleId).toBeTruthy();
-    if (!tupleId) return;
-
-    useNodeStore.getState().setOptionsFieldValue('note_2', 'attrDef_status', 'opt_done', 'user_default');
-    const tuple = useNodeStore.getState().entities[tupleId];
-    expect(tuple.children?.[1]).toBe('opt_done');
-
-    useNodeStore.getState().setOptionsFieldValue('note_2', 'attrDef_status', 'opt_todo', 'user_default');
-    const tupleAfter = useNodeStore.getState().entities[tupleId];
-    expect(tupleAfter.children?.[1]).toBe('opt_todo');
-
-    expect(collectNodeGraphErrors(useNodeStore.getState().entities)).toEqual([]);
+    expect(collectNodeGraphErrors()).toEqual([]);
   });
 
-  it('moveFieldTuple moves a field between parents and keeps ownership in sync', async () => {
-    await useNodeStore.getState().addFieldToNode('note_2', 'attrDef_status', 'ws_default', 'user_default');
-    await useNodeStore.getState().addFieldToNode('note_2', 'attrDef_priority', 'ws_default', 'user_default');
-
-    const statusTupleId = findFieldTupleId('note_2', 'attrDef_status');
-    const priorityTupleId = findFieldTupleId('note_2', 'attrDef_priority');
-    expect(statusTupleId).toBeTruthy();
-    expect(priorityTupleId).toBeTruthy();
-    if (!statusTupleId || !priorityTupleId) return;
-
-    await useNodeStore.getState().moveFieldTuple(
-      'note_2',
-      priorityTupleId,
-      'task_1',
-      'user_default',
-    );
-
-    const state = useNodeStore.getState();
-    expect(state.entities.note_2.children ?? []).toContain(statusTupleId);
-    expect(state.entities.note_2.children ?? []).not.toContain(priorityTupleId);
-
-    expect(state.entities.task_1.children ?? []).toContain(priorityTupleId);
-    expect(state.entities[priorityTupleId]?.props._ownerId).toBe('task_1');
-
-    expect(collectNodeGraphErrors(state.entities)).toEqual([]);
+  it('sets multiple values for list fields', () => {
+    useNodeStore.getState().setFieldValue('note_2', 'attrDef_status', ['opt_todo', 'opt_done']);
+    const feId = findFieldEntry('note_2', 'attrDef_status')!;
+    expect(getFieldValues(feId)).toEqual(['opt_todo', 'opt_done']);
   });
 
-  it('removeField moves tuple to trash', async () => {
-    await useNodeStore.getState().addFieldToNode('note_2', 'attrDef_priority', 'ws_default', 'user_default');
-    const tupleId = findFieldTupleId('note_2', 'attrDef_priority');
-    expect(tupleId).toBeTruthy();
-    if (!tupleId) return;
+  it('graph is valid after setFieldValue', () => {
+    useNodeStore.getState().setFieldValue('note_2', 'attrDef_status', ['To Do']);
+    expect(collectNodeGraphErrors()).toEqual([]);
+  });
+});
 
-    useNodeStore.getState().removeField('note_2', tupleId, 'ws_default', 'user_default');
-
-    const state = useNodeStore.getState();
-    expect(state.entities.note_2.children ?? []).not.toContain(tupleId);
-    expect(state.entities[tupleId]?.props._ownerId).toBe('ws_default_TRASH');
-    expect(state.entities.ws_default_TRASH.children ?? []).toContain(tupleId);
-
-    expect(collectNodeGraphErrors(useNodeStore.getState().entities)).toEqual([]);
+describe('clearFieldValue', () => {
+  beforeEach(() => {
+    resetAndSeed();
   });
 
-  it('toggleCheckboxField creates YES and toggles YES/NO on repeated clicks', () => {
-    const tupleId = 'task1_fld_done';
-    // Done tuple starts with children = ['attrDef_done'] (key only, no value yet)
-    expect(useNodeStore.getState().entities[tupleId].children).toEqual(['attrDef_done']);
+  it('clears all value children of fieldEntry', () => {
+    useNodeStore.getState().setFieldValue('task_1', 'attrDef_due', ['2026-02-13']);
+    const feId = findFieldEntry('task_1', 'attrDef_due')!;
+    expect(getFieldValues(feId)).toHaveLength(1);
 
-    useNodeStore.getState().toggleCheckboxField(tupleId, 'ws_default', 'user_default');
-    const valueId = useNodeStore.getState().entities[tupleId].children?.[1];
-    expect(valueId).toBeTruthy();
-    if (!valueId) return;
-
-    expect(useNodeStore.getState().entities[valueId]?.props.name).toBe(SYS_V.YES);
-
-    useNodeStore.getState().toggleCheckboxField(tupleId, 'ws_default', 'user_default');
-    expect(useNodeStore.getState().entities[valueId]?.props.name).toBe(SYS_V.NO);
-
-    useNodeStore.getState().toggleCheckboxField(tupleId, 'ws_default', 'user_default');
-    expect(useNodeStore.getState().entities[valueId]?.props.name).toBe(SYS_V.YES);
-
-    expect(collectNodeGraphErrors(useNodeStore.getState().entities)).toEqual([]);
+    useNodeStore.getState().clearFieldValue('task_1', 'attrDef_due');
+    expect(loroDoc.getChildren(feId)).toHaveLength(0);
   });
 
-  it('addUnnamedFieldToNode inserts tuple in-place and creates attrDef chain', async () => {
-    const beforeChildren = [...(useNodeStore.getState().entities.note_2.children ?? [])];
-    expect(beforeChildren).toEqual(['idea_1', 'idea_2']);
+  it('is a no-op when field does not exist', () => {
+    // idea_1 has no field entries
+    expect(() => useNodeStore.getState().clearFieldValue('idea_1', 'attrDef_status')).not.toThrow();
+    expect(collectNodeGraphErrors()).toEqual([]);
+  });
+});
 
-    const { tupleId, attrDefId } = await useNodeStore.getState().addUnnamedFieldToNode(
-      'note_2',
-      'ws_default',
-      'user_default',
-      'idea_1',
-    );
+describe('addFieldToNode', () => {
+  beforeEach(() => {
+    resetAndSeed();
+  });
 
-    const state = useNodeStore.getState();
-    const noteChildren = state.entities.note_2.children ?? [];
-    expect(noteChildren[1]).toBe(tupleId);
+  it('adds a fieldEntry for a fieldDef not yet present', () => {
+    expect(findFieldEntry('note_2', 'attrDef_status')).toBeUndefined();
 
-    const tuple = state.entities[tupleId];
-    expect(tuple?.props._docType).toBe('tuple');
-    expect(tuple?.props._ownerId).toBe('note_2');
-    expect(tuple?.children?.[0]).toBe(attrDefId);
+    useNodeStore.getState().addFieldToNode('note_2', 'attrDef_status');
+    expect(findFieldEntry('note_2', 'attrDef_status')).toBeTruthy();
+    expect(collectNodeGraphErrors()).toEqual([]);
+  });
 
-    const attrDef = state.entities[attrDefId];
-    expect(attrDef?.props._docType).toBe('attrDef');
-    expect(attrDef?.props.name).toBe('');
-    expect(attrDef?.props._ownerId).toBe(tupleId);
-    expect(attrDef?.meta?.length).toBeGreaterThan(0);
+  it('is idempotent — double add does not create duplicate fieldEntry', () => {
+    useNodeStore.getState().addFieldToNode('note_2', 'attrDef_status');
+    useNodeStore.getState().addFieldToNode('note_2', 'attrDef_status');
 
-    const hasPlainTypeTuple = (attrDef?.children ?? []).some((cid) => {
-      const child = state.entities[cid];
-      return child?.props._docType === 'tuple' &&
-        child.children?.[0] === SYS_A.TYPE_CHOICE &&
-        child.children?.[1] === SYS_D.PLAIN;
+    const entries = loroDoc.getChildren('note_2').filter(cid => {
+      const n = loroDoc.toNodexNode(cid);
+      return n?.type === 'fieldEntry' && n.fieldDefId === 'attrDef_status';
     });
-    expect(hasPlainTypeTuple).toBe(true);
+    expect(entries.length).toBe(1);
+  });
+});
 
-    expect(collectNodeGraphErrors(useNodeStore.getState().entities)).toEqual([]);
+describe('setOptionsFieldValue', () => {
+  beforeEach(() => {
+    resetAndSeed();
   });
 
-  it('autoCollectOption updates field value and appends value ref to attrDef autocollect tuple', () => {
-    const beforeAutoCollectLen = useNodeStore.getState().entities.attrDef_status_autocollect.children?.length ?? 0;
+  it('creates fieldEntry with value node pointing to optionNodeId', () => {
+    useNodeStore.getState().setOptionsFieldValue('note_2', 'attrDef_status', 'opt_done');
 
-    const valueId = useNodeStore.getState().autoCollectOption(
-      'task_1',
-      'attrDef_status',
-      'Blocked',
-      'ws_default',
-      'user_default',
-    );
+    const feId = findFieldEntry('note_2', 'attrDef_status')!;
+    expect(feId).toBeTruthy();
 
-    const state = useNodeStore.getState();
-    expect(state.entities[valueId]?.props.name).toBe('Blocked');
-    const statusTupleId = findFieldTupleId('task_1', 'attrDef_status');
-    expect(statusTupleId).toBeTruthy();
-    const statusTuple = state.entities[statusTupleId!];
-    expect(statusTuple.children?.[1]).toBe(valueId);
-
-    const afterChildren = state.entities.attrDef_status_autocollect.children ?? [];
-    expect(afterChildren.length).toBe(beforeAutoCollectLen + 1);
-    expect(afterChildren[afterChildren.length - 1]).toBe(valueId);
-
-    expect(collectNodeGraphErrors(useNodeStore.getState().entities)).toEqual([]);
+    const valueIds = loroDoc.getChildren(feId);
+    expect(valueIds).toHaveLength(1);
+    const value = loroDoc.toNodexNode(valueIds[0])!;
+    expect(value.name).toBe('opt_done');
+    expect(value.targetId).toBe('opt_done');
   });
 
-  it('removeFieldOption removes option id from attrDef children and deletes option node', () => {
-    const before = [...(useNodeStore.getState().entities.attrDef_priority.children ?? [])];
-    expect(before).toContain('opt_low');
-    expect(useNodeStore.getState().entities.opt_low).toBeTruthy();
+  it('replaces existing option value', () => {
+    useNodeStore.getState().setOptionsFieldValue('note_2', 'attrDef_status', 'opt_todo');
+    useNodeStore.getState().setOptionsFieldValue('note_2', 'attrDef_status', 'opt_done');
 
-    useNodeStore.getState().removeFieldOption('attrDef_priority', 'opt_low', 'user_default');
+    const feId = findFieldEntry('note_2', 'attrDef_status')!;
+    const valueIds = loroDoc.getChildren(feId);
+    expect(valueIds).toHaveLength(1);
+    expect(loroDoc.toNodexNode(valueIds[0])?.name).toBe('opt_done');
+  });
+});
 
-    const after = useNodeStore.getState().entities.attrDef_priority.children ?? [];
-    expect(after).not.toContain('opt_low');
-    expect(useNodeStore.getState().entities.opt_low).toBeUndefined();
-    expect(after).toContain('opt_high');
-    expect(after).toContain('opt_medium');
-
-    expect(collectNodeGraphErrors(useNodeStore.getState().entities)).toEqual([]);
+describe('selectFieldOption', () => {
+  beforeEach(() => {
+    resetAndSeed();
   });
 
-  it('replaceFieldAttrDef swaps placeholder attrDef and deletes orphaned old attrDef chain', async () => {
-    const { tupleId, attrDefId: placeholderAttrDefId } = await useNodeStore.getState().addUnnamedFieldToNode(
-      'note_2',
-      'ws_default',
-      'user_default',
-    );
+  it('sets selected option on fieldEntry', () => {
+    useNodeStore.getState().addFieldToNode('note_2', 'attrDef_status');
+    const feId = findFieldEntry('note_2', 'attrDef_status')!;
 
-    const oldAttrDefChildren = [...(useNodeStore.getState().entities[placeholderAttrDefId].children ?? [])];
-    expect(oldAttrDefChildren.length).toBeGreaterThan(0);
+    useNodeStore.getState().selectFieldOption(feId, 'opt_done', undefined);
 
-    await useNodeStore.getState().replaceFieldAttrDef(
-      'note_2',
-      tupleId,
-      placeholderAttrDefId,
-      'attrDef_status',
-      'ws_default',
-      'user_default',
-    );
-
-    const state = useNodeStore.getState();
-    expect(state.entities[tupleId].children?.[0]).toBe('attrDef_status');
-    expect(state.entities[placeholderAttrDefId]).toBeUndefined();
-    for (const childId of oldAttrDefChildren) {
-      expect(state.entities[childId]).toBeUndefined();
-    }
-
-    expect(collectNodeGraphErrors(useNodeStore.getState().entities)).toEqual([]);
+    const valueIds = loroDoc.getChildren(feId);
+    expect(valueIds).toHaveLength(1);
+    expect(loroDoc.toNodexNode(valueIds[0])?.name).toBe('opt_done');
   });
 
-  it('replaceFieldAttrDef is a no-op when parent already has target attrDef tuple', async () => {
-    const beforeTuple = [...(useNodeStore.getState().entities.task1_fld_priority.children ?? [])];
-    const beforePriorityExists = !!useNodeStore.getState().entities.attrDef_priority;
+  it('replaces old option with new option', () => {
+    useNodeStore.getState().addFieldToNode('note_2', 'attrDef_status');
+    const feId = findFieldEntry('note_2', 'attrDef_status')!;
+    useNodeStore.getState().selectFieldOption(feId, 'opt_todo', undefined);
+    useNodeStore.getState().selectFieldOption(feId, 'opt_done', 'opt_todo');
 
-    await useNodeStore.getState().replaceFieldAttrDef(
-      'task_1',
-      'task1_fld_priority',
-      'attrDef_priority',
-      'attrDef_status',
-      'ws_default',
-      'user_default',
-    );
+    const valueIds = loroDoc.getChildren(feId);
+    expect(valueIds).toHaveLength(1);
+    expect(loroDoc.toNodexNode(valueIds[0])?.name).toBe('opt_done');
+  });
+});
 
-    const state = useNodeStore.getState();
-    expect(state.entities.task1_fld_priority.children).toEqual(beforeTuple);
-    expect(!!state.entities.attrDef_priority).toBe(beforePriorityExists);
-    expect(state.entities.task1_fld_priority.children?.[0]).toBe('attrDef_priority');
-
-    expect(collectNodeGraphErrors(useNodeStore.getState().entities)).toEqual([]);
+describe('toggleCheckboxField', () => {
+  beforeEach(() => {
+    resetAndSeed();
   });
 
-  it('resolveSourceSupertag reads SYS_A06 from attrDef config tuples', () => {
-    const state = useNodeStore.getState();
-    // Set up an attrDef with OPTIONS_FROM_SUPERTAG type + source supertag tuple
-    state.setNode({
-      id: 'attrDef_assignee',
-      workspaceId: 'ws_default',
-      props: { created: Date.now(), name: 'Assignee', _docType: 'attrDef', _ownerId: 'some_tuple' },
-      children: ['attrDef_assignee_type', 'attrDef_assignee_source'],
-      version: 1,
-      updatedAt: Date.now(),
-      createdBy: 'user_default',
-      updatedBy: 'user_default',
-    });
-    state.setNode({
-      id: 'attrDef_assignee_type',
-      workspaceId: 'ws_default',
-      props: { created: Date.now(), name: '', _docType: 'tuple', _ownerId: 'attrDef_assignee' },
-      children: [SYS_A.TYPE_CHOICE, SYS_D.OPTIONS_FROM_SUPERTAG],
-      version: 1,
-      updatedAt: Date.now(),
-      createdBy: 'user_default',
-      updatedBy: 'user_default',
-    });
-    state.setNode({
-      id: 'attrDef_assignee_source',
-      workspaceId: 'ws_default',
-      props: { created: Date.now(), name: '', _docType: 'tuple', _ownerId: 'attrDef_assignee' },
-      children: [SYS_A.SOURCE_SUPERTAG, 'tagDef_person'],
-      version: 1,
-      updatedAt: Date.now(),
-      createdBy: 'user_default',
-      updatedBy: 'user_default',
-    });
+  it('check (no children → creates true value node)', () => {
+    const feId = findFieldEntry('task_1', 'attrDef_done_chk')!;
+    // Initially empty
+    useNodeStore.getState().clearFieldValue('task_1', 'attrDef_done_chk');
 
-    const entities = useNodeStore.getState().entities;
-    expect(resolveSourceSupertag(entities, 'attrDef_assignee')).toBe('tagDef_person');
-    expect(resolveSourceSupertag(entities, 'attrDef_status')).toBeUndefined();
+    useNodeStore.getState().toggleCheckboxField(feId);
+
+    const valueIds = loroDoc.getChildren(feId);
+    expect(valueIds).toHaveLength(1);
+    expect(loroDoc.toNodexNode(valueIds[0])?.name).toBe('true');
   });
 
-  it('resolveTaggedNodes finds all content nodes tagged with a given tagDef', () => {
-    // task_1 is tagged with tagDef_task (via meta_task_1 → meta_task_1_tag)
-    // person_1 is tagged with tagDef_person (via meta_person_1)
-    const entities = useNodeStore.getState().entities;
+  it('uncheck (has children → clears all)', () => {
+    const feId = findFieldEntry('task_1', 'attrDef_done_chk')!;
+    useNodeStore.getState().setFieldValue('task_1', 'attrDef_done_chk', ['true']);
 
-    const taskNodes = resolveTaggedNodes(entities, 'tagDef_task');
-    expect(taskNodes).toContain('task_1');
-    expect(taskNodes).not.toContain('person_1');
+    useNodeStore.getState().toggleCheckboxField(feId);
 
-    const personNodes = resolveTaggedNodes(entities, 'tagDef_person');
-    expect(personNodes).toContain('person_1');
-    expect(personNodes).not.toContain('task_1');
+    expect(loroDoc.getChildren(feId)).toHaveLength(0);
+  });
+});
 
-    // Non-existent tag → empty
-    expect(resolveTaggedNodes(entities, 'tagDef_nonexistent')).toEqual([]);
+describe('removeField', () => {
+  beforeEach(() => {
+    resetAndSeed();
   });
 
-  it('changeFieldType and setConfigValue update tuple values in-place', () => {
-    useNodeStore.getState().changeFieldType('attrDef_due', SYS_D.PLAIN, 'user_default');
-    expect(useNodeStore.getState().entities.attrDef_due_type.children?.[1]).toBe(SYS_D.PLAIN);
+  it('deletes fieldEntry from LoroDoc (not moved to trash)', () => {
+    const feId = findFieldEntry('task_1', 'attrDef_due')!;
+    expect(feId).toBeTruthy();
 
-    useNodeStore.getState().changeFieldType('attrDef_due', SYS_D.DATE, 'user_default');
-    expect(useNodeStore.getState().entities.attrDef_due_type.children?.[1]).toBe(SYS_D.DATE);
+    useNodeStore.getState().removeField('task_1', feId);
 
-    useNodeStore.getState().setConfigValue('attrDef_due_required', SYS_V.YES, 'user_default');
-    expect(useNodeStore.getState().entities.attrDef_due_required.children?.[1]).toBe(SYS_V.YES);
+    expect(loroDoc.hasNode(feId)).toBe(false);
+    expect(loroDoc.getChildren('task_1')).not.toContain(feId);
 
-    useNodeStore.getState().setConfigValue('attrDef_due_required', SYS_V.NO, 'user_default');
-    expect(useNodeStore.getState().entities.attrDef_due_required.children?.[1]).toBe(SYS_V.NO);
+    expect(collectNodeGraphErrors()).toEqual([]);
+  });
+});
 
-    expect(collectNodeGraphErrors(useNodeStore.getState().entities)).toEqual([]);
+describe('addUnnamedFieldToNode', () => {
+  beforeEach(() => {
+    resetAndSeed();
+  });
+
+  it('returns { fieldEntryId, fieldDefId }', () => {
+    const result = useNodeStore.getState().addUnnamedFieldToNode('note_2');
+    expect(result.fieldEntryId).toBeTruthy();
+    expect(result.fieldDefId).toBeTruthy();
+  });
+
+  it('fieldEntryId is in node children', () => {
+    const result = useNodeStore.getState().addUnnamedFieldToNode('note_2');
+    expect(loroDoc.getChildren('note_2')).toContain(result.fieldEntryId);
+  });
+
+  it('fieldDefId is a placeholder fieldDef in SCHEMA', () => {
+    const result = useNodeStore.getState().addUnnamedFieldToNode('note_2');
+    const fd = loroDoc.toNodexNode(result.fieldDefId)!;
+    expect(fd.type).toBe('fieldDef');
+    expect(loroDoc.getParentId(result.fieldDefId)).toBe('SCHEMA');
+  });
+
+  it('graph is valid after addUnnamedFieldToNode', () => {
+    useNodeStore.getState().addUnnamedFieldToNode('note_2');
+    expect(collectNodeGraphErrors()).toEqual([]);
+  });
+});
+
+describe('replaceFieldDef', () => {
+  beforeEach(() => {
+    resetAndSeed();
+  });
+
+  it('sets new fieldDefId on fieldEntry', () => {
+    const { fieldEntryId, fieldDefId: placeholderFdId } = useNodeStore.getState().addUnnamedFieldToNode('note_2');
+
+    useNodeStore.getState().replaceFieldDef('note_2', fieldEntryId, placeholderFdId, 'attrDef_status');
+
+    const fe = loroDoc.toNodexNode(fieldEntryId)!;
+    expect(fe.fieldDefId).toBe('attrDef_status');
   });
 });

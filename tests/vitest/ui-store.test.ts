@@ -1,4 +1,5 @@
 import { useUIStore } from '../../src/stores/ui-store.js';
+import { CONTAINER_IDS } from '../../src/types/index.js';
 import { resetAndSeed } from './helpers/test-state.js';
 
 describe('ui-store navigation and UI state', () => {
@@ -15,7 +16,7 @@ describe('ui-store navigation and UI state', () => {
 
     ui.goBack();
     state = useUIStore.getState();
-    expect(state.panelHistory[state.panelIndex]).toBe('ws_default_LIBRARY');
+    expect(state.panelHistory[state.panelIndex]).toBe(CONTAINER_IDS.LIBRARY);
 
     ui.goForward();
     state = useUIStore.getState();
@@ -25,16 +26,16 @@ describe('ui-store navigation and UI state', () => {
     state = useUIStore.getState();
     expect(state.panelHistory[state.panelIndex]).toBe('note_2');
 
-    ui.setExpanded('ws_default_LIBRARY:note_2', true);
-    expect(useUIStore.getState().expandedNodes.has('ws_default_LIBRARY:note_2')).toBe(true);
+    ui.setExpanded(`${CONTAINER_IDS.LIBRARY}:note_2`, true);
+    expect(useUIStore.getState().expandedNodes.has(`${CONTAINER_IDS.LIBRARY}:note_2`)).toBe(true);
 
-    ui.setExpanded('ws_default_LIBRARY:note_2', false);
-    expect(useUIStore.getState().expandedNodes.has('ws_default_LIBRARY:note_2')).toBe(false);
+    ui.setExpanded(`${CONTAINER_IDS.LIBRARY}:note_2`, false);
+    expect(useUIStore.getState().expandedNodes.has(`${CONTAINER_IDS.LIBRARY}:note_2`)).toBe(false);
 
-    ui.toggleExpanded('ws_default_LIBRARY:note_2');
-    expect(useUIStore.getState().expandedNodes.has('ws_default_LIBRARY:note_2')).toBe(true);
-    ui.toggleExpanded('ws_default_LIBRARY:note_2');
-    expect(useUIStore.getState().expandedNodes.has('ws_default_LIBRARY:note_2')).toBe(false);
+    ui.toggleExpanded(`${CONTAINER_IDS.LIBRARY}:note_2`);
+    expect(useUIStore.getState().expandedNodes.has(`${CONTAINER_IDS.LIBRARY}:note_2`)).toBe(true);
+    ui.toggleExpanded(`${CONTAINER_IDS.LIBRARY}:note_2`);
+    expect(useUIStore.getState().expandedNodes.has(`${CONTAINER_IDS.LIBRARY}:note_2`)).toBe(false);
 
     ui.setFocusedNode('subtask_1a');
     expect(useUIStore.getState().focusedNodeId).toBe('subtask_1a');
@@ -54,4 +55,3 @@ describe('ui-store navigation and UI state', () => {
     expect(useUIStore.getState().searchQuery).toBe('');
   });
 });
-

@@ -1,30 +1,30 @@
 /**
- * Nodex 核心节点类型定义
+ * Nodex 核心节点类型定义 — Loro 迁移后新版本
  *
- * 基于 Tana 的 "Everything is a Node" 数据模型，简化为只保留 Tuple 间接层。
- * 所有实体（内容、标签定义、字段定义、搜索、视图、Tuple）
- * 共享同一 Node 结构，通过 docType 区分。
- *
- * 参考：research/tana-data-model-specification.md
+ * 核心变化：
+ * - 消除 props 包装层（所有属性直接在 NodexNode 顶层）
+ * - 消除 meta Tuple 间接层（tags 直接是 string[]）
+ * - 消除 workspaceId per-node（一个 LoroDoc = 一个工作区）
+ * - 消除 version / createdBy / updatedBy（Loro 版本向量 + Phase 2 PeerID）
+ * - DocType → NodeType（'tuple'→'fieldEntry'，'attrDef'→'fieldDef'，新增'reference'）
  */
 
 // ============================================================
-// DocType 枚举
+// NodeType 枚举
 // ============================================================
 
 /**
- * 文档类型枚举。
- * Based on Tana's 22 types + Nodex additions. Metanode and AssociatedData
- * have been eliminated (replaced by node.meta[] and Tuple.children[1:]).
- * 无 docType 的节点为普通用户内容节点（Tana 中占 46.6%）。
+ * 节点类型枚举。
+ * 无 type 的节点为普通用户内容节点。
  */
-export type DocType =
+export type NodeType =
   // ── 核心结构类型 ──
-  | 'tuple'           // 万能键值对容器 (Tana 29.3%)
+  | 'fieldEntry'      // 字段实例（旧 'tuple'）。fieldDefId 存属性，children = 值节点列表
+  | 'reference'       // 引用节点（新增）。targetId 指向被引用节点，符合 LoroTree 单亲约束
 
   // ── 定义类型 ──
   | 'tagDef'          // 超级标签定义
-  | 'attrDef'         // 字段/属性定义
+  | 'fieldDef'        // 字段定义（旧 'attrDef'）
   | 'viewDef'         // 视图定义
 
   // ── 内容类型 ──
@@ -34,8 +34,8 @@ export type DocType =
   | 'chat'            // 聊天对话
 
   // ── 日志类型 ──
-  | 'journal'         // 日志根容器 (Calendar)
-  | 'journalPart'     // 日志分区 (年/周/日)
+  | 'journal'         // 日志根容器
+  | 'journalPart'     // 日志分区（年/周/日）
 
   // ── 搜索与查询 ──
   | 'search'          // Live Search / 动态查询
@@ -52,12 +52,11 @@ export type DocType =
   | 'home'            // 主页根节点
   | 'settings'        // 设置容器
 
-  // ── Nodex 新增 ──
+  // ── Nodex 扩展 ──
   | 'webClip';        // 网页剪藏
 
 /**
  * 视图模式枚举。
- * 对应 Tana 的 _view 属性值。
  */
 export type ViewMode =
   | 'list'            // 大纲/层级（默认）
@@ -67,12 +66,12 @@ export type ViewMode =
   | 'navigationList'; // 简单列表导航
 
 // ============================================================
-// 节点属性（Props）
+// 富文本类型（Phase 2 升级为 LoroText，Phase 1 沿用）
 // ============================================================
 
 /**
  * 文本格式标记。
- * 偏移区间遵循 [start, end)（start 包含，end 不包含）。
+ * 偏移区间遵循 [start, end)。
  */
 export interface TextMark {
   start: number;
@@ -83,7 +82,7 @@ export interface TextMark {
 
 /**
  * 行内引用条目。
- * offset 指向 props.name 中的 '\uFFFC' 位置。
+ * offset 指向 name 中的 '\uFFFC' 占位符位置。
  */
 export interface InlineRefEntry {
   offset: number;
@@ -91,218 +90,258 @@ export interface InlineRefEntry {
   displayName?: string;
 }
 
-/**
- * 节点属性接口。
- * 忠实复制 Tana Node 的 props 结构。
- */
-export interface NodeProps {
-  /** 创建时间戳（毫秒，JavaScript epoch）—— 所有节点必有 */
-  created: number;
+// ============================================================
+// DoneState Mapping（存储在 tagDef 节点的 LoroList 中）
+// ============================================================
 
-  /** 节点名称/内容（纯文本）。
-   *  行内引用占位符使用 '\uFFFC'。 */
-  name?: string;
-
-  /** 稀疏文本格式标记（bold/italic/strike/code/highlight/heading/link） */
-  _marks?: TextMark[];
-
-  /** 行内引用映射（offset 与 name 中 '\uFFFC' 对齐） */
-  _inlineRefs?: InlineRefEntry[];
-
-  /** 节点描述。辅助文本，UI 显示为灰色小字 */
-  description?: string;
-
-  // ─── 类型与所有权 ───
-
-  /** 文档类型标识。22+1 种枚举值。无此字段表示普通内容节点 */
-  _docType?: DocType;
-
-  /** 父/所有者节点 ID。每个节点恰好一个 Owner。
-   *  特殊值: "{wsId}_TRASH"(回收站), "{wsId}_SCHEMA"(架构), "SYS_0"(系统根) */
-  _ownerId?: string;
-
-  /** 模板来源 ID。从 TagDef 模板实例化时，指向原始模板 Tuple。
-   *  用于追踪字段 Tuple 的来源定义。 */
-  _sourceId?: string;
-
-  // ─── 状态标记 ───
-
-  /** 位标志。1=基础标记, 2=次要, 64=特殊, 65=组合 */
-  _flags?: number;
-
-  /** 完成时间戳（毫秒）。非布尔值，记录 checkbox 勾选的精确时刻。
-   *  null/undefined = 未完成 */
-  _done?: number;
-
-  // ─── 视觉/媒体 ───
-
-  /** 图片宽度（像素） */
-  _imageWidth?: number;
-  /** 图片高度（像素） */
-  _imageHeight?: number;
-
-  /** 视图模式 */
-  _view?: ViewMode;
-
-  /** 发布时间戳 */
-  _published?: number;
-
-  /** 编辑模式标志 */
-  _editMode?: boolean;
-
-  /** 搜索上下文节点 */
-  searchContextNode?: string;
+export interface DoneMappingEntry {
+  fieldDefId: string;
+  optionId: string;
 }
 
 // ============================================================
-// 核心节点类型
+// 核心节点类型（扁平化，无 props 包装层）
 // ============================================================
 
 /**
  * Nodex 核心节点 —— "一切皆节点"。
  *
- * Based on Tana's Node structure, simplified to one indirection layer:
- * - Tuple 万能键值对 (children[0]=key, children[1:]=values)
- * - node.meta[] 元信息 Tuple ID 列表（替代 Metanode）
- * - 字段值直接存 Tuple.children[1:]（替代 AssociatedData）
- *
- * Nodex 扩展字段：workspaceId, aiSummary, sourceUrl, version, updatedAt, createdBy, updatedBy
+ * 与旧接口相比：
+ * - 扁平化：消除 props 包装层
+ * - 去 _ 前缀：所有属性直接命名
+ * - 消除间接层：meta Tuple → 直接 tags 属性
+ * - 语义化：_done → completedAt, _sourceId → templateId
+ * - 消除：workspaceId, version, createdBy, updatedBy, meta, touchCounts, modifiedTs
  */
 export interface NodexNode {
-  /** 全局唯一标识符。
-   *  用户节点：nanoid 生成（21 字符，URL-safe base64）
-   *  系统节点：以 "SYS_" 前缀（如 SYS_A13, SYS_D06, SYS_V03） */
+  /** 全局唯一标识符 (nanoid 21 字符 或 系统固定 ID) */
   id: string;
 
-  /** 节点属性 */
-  props: NodeProps;
+  // ─── 核心属性 ───
 
-  // ─── 关系与数据 ───
+  /** 节点类型。无此字段 = 普通内容节点 */
+  type?: NodeType;
 
-  /** 子节点 ID 有序列表。决定 UI 中的渲染顺序。
-   *
-   *  对于 Tuple (docType='tuple'):
-   *    children[0] = 键 (SYS_A* 系统属性 ID 或 attrDef 字段定义 ID)
-   *    children[1:] = 值 (节点 ID 或 SYS_V* 枚举值 ID)
-   *
-   *  对于普通内容节点:
-   *    children = [childId1, childId2, ...] 混合内容子节点和字段 Tuple */
-  children?: string[];
+  /** 节点名称/内容（纯文本，\uFFFC 为内联引用占位符） */
+  name?: string;
 
-  /** 元信息 Tuple ID 列表（替代 Metanode 间接层）。
-   *  每个元素是一个 Tuple 节点的 ID，这些 Tuple 的 _ownerId = 本节点 ID。
-   *  常见的 meta Tuple 键：SYS_A13(标签)、SYS_A55(checkbox)、SYS_A16(视图)、SYS_A12(锁定) */
-  meta?: string[];
+  /** 辅助描述文本 */
+  description?: string;
 
-  /** 各编辑者的访问/编辑计数。索引对应全局 editors 数组 */
-  touchCounts?: number[];
+  // ─── 关系（均从 LoroTree 衍生） ───
 
-  /** 各编辑者的最后修改时间戳。索引对应全局 editors 数组。0=未修改 */
-  modifiedTs?: number[];
+  /** 有序子节点 ID 列表（LoroTree children 衍生） */
+  children: string[];
 
-  // ─── Nodex 扩展字段 ───
+  /** 已应用的标签定义 ID 列表（替代 meta→TagTuple 链） */
+  tags: string[];
 
-  /** 工作区 ID。
-   *  Tana 通过 _ownerId 链向上追溯推导工作区归属。
-   *  Nodex 直接存储以提升查询效率（PostgreSQL WHERE 子句）。 */
-  workspaceId: string;
+  // ─── 时间戳（统一 *At 后缀） ───
 
-  /** AI 生成的摘要。用于搜索预览和语义理解。 */
-  aiSummary?: string;
+  /** 创建时间 (ms) */
+  createdAt: number;
 
-  /** 来源 URL。网页剪藏时记录原始页面地址。Nodex 特有功能。 */
-  sourceUrl?: string;
-
-  /** 乐观锁版本号。每次更新 +1，用于冲突检测。 */
-  version: number;
-
-  /** 最后修改时间戳（毫秒）。系统自动维护。 */
+  /** 最后修改时间 (ms) */
   updatedAt: number;
 
-  /** 创建者用户 ID */
-  createdBy: string;
+  /** 完成时间 (ms)。null/undefined = 未完成（旧 props._done） */
+  completedAt?: number;
 
-  /** 最后修改者用户 ID */
-  updatedBy: string;
+  /** 发布时间 (ms)（旧 props._published） */
+  publishedAt?: number;
+
+  // ─── 富文本（Phase 2 → LoroText 替代） ───
+
+  /** 文本格式标记（旧 props._marks） */
+  marks?: TextMark[];
+
+  /** 行内引用（旧 props._inlineRefs） */
+  inlineRefs?: InlineRefEntry[];
+
+  // ─── 通用属性 ───
+
+  /** 模板来源 ID（旧 props._sourceId） */
+  templateId?: string;
+
+  /** 视图模式（旧 props._view） */
+  viewMode?: ViewMode;
+
+  /** 编辑模式（旧 props._editMode） */
+  editMode?: boolean;
+
+  /** 位标志（旧 props._flags） */
+  flags?: number;
+
+  /** 图片宽度 (px)（旧 props._imageWidth） */
+  imageWidth?: number;
+
+  /** 图片高度 (px)（旧 props._imageHeight） */
+  imageHeight?: number;
+
+  /** 搜索上下文节点 ID（旧 props.searchContextNode） */
+  searchContext?: string;
+
+  // ─── Nodex 扩展 ───
+
+  /** AI 生成摘要 */
+  aiSummary?: string;
+
+  /** 来源 URL（网页剪藏） */
+  sourceUrl?: string;
+
+  // ─── Reference 专用 ───
+
+  /** 引用目标节点 ID（仅 type='reference' 时有值） */
+  targetId?: string;
+
+  // ─── fieldEntry 专用 ───
+
+  /** 字段定义 ID（仅 type='fieldEntry' 时有值，旧 Tuple.children[0]） */
+  fieldDefId?: string;
+
+  // ─── tagDef 专用（直接属性，旧为 config Tuple 间接存储） ───
+
+  /** 是否显示 checkbox（旧 [SYS_A55, SYS_V03] config tuple） */
+  showCheckbox?: boolean;
+
+  /** 默认子标签 ID（旧 [SYS_A14, tagDefId] config tuple） */
+  childSupertag?: string;
+
+  /** 节点颜色（旧 [SYS_A11, value] config tuple） */
+  color?: string;
+
+  /** 继承自的父标签 ID（旧 NDX_A05 config tuple） */
+  extends?: string;
+
+  /** Done-State Mapping 开关（旧 NDX_A06 config tuple） */
+  doneStateEnabled?: boolean;
+
+  // ─── fieldDef 专用（直接属性，旧为 config Tuple 间接存储） ───
+
+  /** 字段数据类型（旧 [SYS_A02, SYS_D*]，现用可读字符串） */
+  fieldType?: string;
+
+  /** 基数：'single' | 'list'（旧 [SYS_A10, SYS_V01/02]） */
+  cardinality?: 'single' | 'list';
+
+  /** 可为空（旧 [SYS_A01, SYS_V03/04]） */
+  nullable?: boolean;
+
+  /** 隐藏字段条件（旧 NDX_A01） */
+  hideField?: string;
+
+  /** 自动初始化（旧 NDX_A03） */
+  autoInitialize?: boolean;
+
+  /** 自动收集选项（旧 SYS_A44） */
+  autocollectOptions?: boolean;
+
+  /** Number 最小值（旧 NDX_A03） */
+  minValue?: number;
+
+  /** Number 最大值（旧 NDX_A04） */
+  maxValue?: number;
+
+  /** Options from supertag 来源标签 ID（旧 SYS_A06） */
+  sourceSupertag?: string;
 }
 
 // ============================================================
-// 工作区容器命名约定
+// 工作区容器（新版：固定 ID，无 workspaceId 前缀）
 // ============================================================
 
 /**
- * 工作区系统容器后缀。
- * 容器节点 ID 格式："{workspaceId}_{suffix}"
+ * 工作区系统容器 ID 常量（旧版）。
  *
- * 示例：工作区 "ws_001" 的 Schema 容器 ID = "ws_001_SCHEMA"
+ * @deprecated 请改用 {@link CONTAINER_IDS}。
+ * 该常量包含历史遗留的 `SCHEMA: 'LIBRARY'` 混淆映射，且键集与 `CONTAINER_IDS` 不一致。
+ * `CONTAINER_IDS` 是 Loro 迁移后的规范常量，仅保留实际使用的 8 个容器 ID。
  */
-export const WORKSPACE_CONTAINERS = {
-  SCHEMA: 'SCHEMA',             // 标签/字段定义
-  LIBRARY: 'LIBRARY',           // 用户内容根（Tana 中为特定 nodeId）
-  INBOX: 'INBOX',               // 快速收集（对应 Tana CAPTURE_INBOX）
-  JOURNAL: 'JOURNAL',           // 日志/日记
-  SEARCHES: 'SEARCHES',         // 保存的搜索
-  TRASH: 'TRASH',               // 回收站
-  WORKSPACE: 'WORKSPACE',       // 工作区布局配置
-  CLIPS: 'CLIPS',               // 网页剪藏（Nodex 新增）
-  STASH: 'STASH',               // 暂存区
+export const CONTAINERS = {
+  SCHEMA: 'LIBRARY',      // 注意：实际结构中 SCHEMA 是 LIBRARY 的子节点
+  LIBRARY: 'LIBRARY',
+  INBOX: 'INBOX',
+  JOURNAL: 'JOURNAL',
+  SEARCHES: 'SEARCHES',
+  TRASH: 'TRASH',
+  WORKSPACE: 'WORKSPACE',
+  CLIPS: 'CLIPS',
+  STASH: 'STASH',
   SIDEBAR_AREAS: 'SIDEBAR_AREAS',
-  PINS: 'PINS',                 // 固定节点
-  QUICK_ADD: 'QUICK_ADD',       // 快速添加配置
-  USERS: 'USERS',               // 用户列表
+  PINS: 'PINS',
+  QUICK_ADD: 'QUICK_ADD',
+  USERS: 'USERS',
 } as const;
 
-export type WorkspaceContainerSuffix = typeof WORKSPACE_CONTAINERS[keyof typeof WORKSPACE_CONTAINERS];
+export type ContainerSuffix = typeof CONTAINERS[keyof typeof CONTAINERS];
 
 /**
- * 生成工作区容器节点 ID
+ * 工作区容器专用 ID（使用独立键，不与 CONTAINERS 混淆）
  */
-export function getContainerId(workspaceId: string, suffix: WorkspaceContainerSuffix): string {
-  return `${workspaceId}_${suffix}`;
+export const CONTAINER_IDS = {
+  LIBRARY: 'LIBRARY',
+  INBOX: 'INBOX',
+  JOURNAL: 'JOURNAL',
+  SEARCHES: 'SEARCHES',
+  TRASH: 'TRASH',
+  SCHEMA: 'SCHEMA',
+  CLIPS: 'CLIPS',
+  STASH: 'STASH',
+} as const;
+
+export type ContainerId = typeof CONTAINER_IDS[keyof typeof CONTAINER_IDS];
+
+/**
+ * 获取容器 ID（新版：直接返回固定常量，无需 workspaceId 参数）
+ */
+export function getContainerId(containerId: ContainerId): string {
+  return containerId;
 }
 
 /**
- * 判断一个节点是否是 workspace root 节点。
- * workspace root 的 ID 等于 workspaceId 本身。
+ * 判断一个节点 ID 是否是工作区容器
  */
-export function isWorkspaceRoot(nodeId: string, workspaceId: string): boolean {
-  return nodeId === workspaceId;
+export function isContainerNode(nodeId: string): boolean {
+  return Object.values(CONTAINER_IDS).includes(nodeId as ContainerId);
 }
 
 // ============================================================
-// 编辑者信息
+// 编辑者信息（保留类型，实际数据 Phase 2 用 Loro PeerID 替代）
 // ============================================================
 
-/**
- * 全局编辑者列表。
- * Tana 中存储在导出 JSON 的顶层 editors 字段。
- * touchCounts 和 modifiedTs 的数组索引对应 editors 数组索引。
- */
 export interface Editor {
-  /** 编辑者标识（邮箱或系统标识） */
   identifier: string;
-  /** 在 touchCounts/modifiedTs 数组中的索引 */
   index: number;
 }
 
 // ============================================================
-// 辅助类型
+// 辅助输入类型（适配新 NodexNode 接口）
 // ============================================================
 
 /**
- * 节点创建参数。只需提供必要字段。
+ * 节点创建参数。
  */
 export type CreateNodeInput = {
   id?: string;
-  workspaceId: string;
-  props: Partial<NodeProps> & { _docType?: DocType; _ownerId?: string };
-  children?: string[];
-  meta?: string[];
+  parentId: string;
+  index?: number;
+  data?: Partial<Omit<NodexNode, 'id' | 'children' | 'tags' | 'createdAt' | 'updatedAt'>>;
 };
 
 /**
- * 节点更新参数。所有字段可选。props 中所有字段也为可选。
+ * 节点更新参数。
  */
-export type UpdateNodeInput = Omit<Partial<NodexNode>, 'id' | 'createdBy' | 'props'> & {
-  props?: Partial<NodeProps>;
-};
+export type UpdateNodeInput = Partial<Omit<NodexNode, 'id' | 'children' | 'tags' | 'createdAt'>>;
+
+// ============================================================
+// 向后兼容别名（迁移期间过渡用，后续清理）
+// ============================================================
+
+/** @deprecated 使用 NodeType */
+export type DocType = NodeType;
+
+/** @deprecated 使用 CONTAINER_IDS */
+export const WORKSPACE_CONTAINERS = CONTAINER_IDS;
+
+/** @deprecated 使用 ContainerId */
+export type WorkspaceContainerSuffix = ContainerId;

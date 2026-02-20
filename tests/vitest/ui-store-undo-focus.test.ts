@@ -10,7 +10,7 @@ describe('ui-store undo/redo + focus/selection semantics', () => {
     const ui = useUIStore.getState();
 
     // Seed starts at Library panel.
-    expect(useUIStore.getState().panelHistory[useUIStore.getState().panelIndex]).toBe('ws_default_LIBRARY');
+    expect(useUIStore.getState().panelHistory[useUIStore.getState().panelIndex]).toBe('LIBRARY');
 
     ui.navigateTo('note_2');
     ui.navigateTo('task_1');
@@ -20,7 +20,7 @@ describe('ui-store undo/redo + focus/selection semantics', () => {
     expect(useUIStore.getState().panelHistory[useUIStore.getState().panelIndex]).toBe('note_2');
 
     ui.navUndo();
-    expect(useUIStore.getState().panelHistory[useUIStore.getState().panelIndex]).toBe('ws_default_LIBRARY');
+    expect(useUIStore.getState().panelHistory[useUIStore.getState().panelIndex]).toBe('LIBRARY');
 
     ui.navRedo();
     expect(useUIStore.getState().panelHistory[useUIStore.getState().panelIndex]).toBe('note_2');

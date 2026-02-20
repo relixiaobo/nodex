@@ -1,2176 +1,711 @@
 /**
- * Normalized node entity store.
+ * Nodex 节点 Store — Loro 迁移后新版本
  *
- * Central cache for all NodexNode entities loaded from Supabase.
- * Components select individual nodes by ID for minimal re-renders.
- *
- * NOT persisted (node data lives in Supabase; local cache is ephemeral).
+ * 薄 Zustand wrapper，底层数据全部存在 LoroDoc 中。
+ * - 不持有 entities 数据（getNode/getChildren 实时从 Loro 读取）
+ * - 所有操作同步（Loro WASM 无网络 I/O）
+ * - _version 计数器触发 React re-render
  */
 import { create } from 'zustand';
-import { immer } from 'zustand/middleware/immer';
-import { enableMapSet } from 'immer';
-
-enableMapSet();
 import { nanoid } from 'nanoid';
-import type { NodexNode, DocType, TextMark, InlineRefEntry } from '../types/index.js';
-import { WORKSPACE_CONTAINERS, SYS_A, SYS_D, SYS_T, SYS_V } from '../types/index.js';
-import { ATTRDEF_CONFIG_MAP, findAutoCollectTupleId, getExtendsChain, isSystemConfigField, resolveChildSupertags } from '../lib/field-utils.js';
-import { resolveCheckboxClick, resolveCmdEnterCycle, hasTagShowCheckbox, resolveForwardDoneMapping, resolveReverseDoneMapping } from '../lib/checkbox-utils.js';
-import * as nodeService from '../services/node-service.js';
-import { isSupabaseReady } from '../services/supabase.js';
+import type { NodexNode, TextMark, InlineRefEntry, FieldType } from '../types/index.js';
+import { CONTAINER_IDS } from '../types/index.js';
+import * as loroDoc from '../lib/loro-doc.js';
+import { resolveCheckboxClick, resolveCmdEnterCycle, resolveForwardDoneMapping, resolveReverseDoneMapping } from '../lib/checkbox-utils.js';
+import type { DoneMappingEntry } from '../types/node.js';
 
-const CONTAINER_SUFFIXES = Object.values(WORKSPACE_CONTAINERS);
-function isWorkspaceContainer(nodeId: string): boolean {
-  return CONTAINER_SUFFIXES.some(suffix => nodeId.endsWith(`_${suffix}`));
-}
-function isWorkspaceRoot(nodeId: string, entities: Record<string, NodexNode>): boolean {
-  const node = entities[nodeId];
-  return !!node && node.id === node.workspaceId && !node.props._ownerId;
-}
-
-/**
- * Apply an option value to a field tuple in-place (for immer state).
- * Used by done-state mapping to update Options fields atomically within a set().
- */
-function applyFieldValueInPlace(
-  state: { entities: Record<string, NodexNode> },
-  nodeId: string,
-  attrDefId: string,
-  optionNodeId: string,
-): void {
-  const node = state.entities[nodeId];
-  if (!node?.children) return;
-
-  for (const cid of node.children) {
-    const child = state.entities[cid];
-    if (child?.props._docType === 'tuple' && child.children?.[0] === attrDefId) {
-      // Value stored directly in tuple.children[1:]
-      child.children = [attrDefId, optionNodeId];
-      child.updatedAt = Date.now();
-      return;
-    }
-  }
-}
+// ============================================================
+// Store 接口
+// ============================================================
 
 interface NodeStore {
-  /** Normalized entities map: { [nodeId]: NodexNode } */
-  entities: Record<string, NodexNode>;
+  /** 版本计数器——Loro 变更时 +1，驱动 React re-render */
+  _version: number;
 
-  /** IDs currently being fetched (prevent duplicate requests) */
-  loading: Set<string>;
+  // ─── 读取 ───
 
-  /** Node IDs with local content edits not yet persisted to Supabase */
-  _dirtyContentIds: Set<string>;
+  getNode(id: string): NodexNode | null;
+  getChildren(parentId: string): NodexNode[];
 
-  /**
-   * Parent IDs with in-flight children mutations (createChild/createSibling/trashNode).
-   * Value = ref count of concurrent ops. While pending, Realtime echo events
-   * will NOT overwrite local children/meta for these parents.
-   */
-  _pendingChildrenOps: Map<string, number>;
+  // ─── 树操作（同步） ───
 
-  // ─── Local state mutations ───
+  createChild(parentId: string, index?: number, data?: Partial<NodexNode>): NodexNode;
+  createSibling(siblingId: string, data?: Partial<NodexNode>): NodexNode;
+  moveNodeTo(nodeId: string, newParentId: string, index?: number): void;
+  indentNode(nodeId: string): void;
+  outdentNode(nodeId: string): void;
+  moveNodeUp(nodeId: string): void;
+  moveNodeDown(nodeId: string): void;
+  trashNode(nodeId: string): void;
+  restoreNode(nodeId: string): void;
 
-  /** Set a single node in the cache */
-  setNode(node: NodexNode): void;
+  // ─── 内容编辑（同步） ───
 
-  /** Set multiple nodes in the cache */
-  setNodes(nodes: NodexNode[]): void;
-
-  /** Remove a node from the cache */
-  removeNode(id: string): void;
-
-  // ─── Async data operations ───
-
-  /** Fetch a single node from Supabase and cache it */
-  fetchNode(id: string): Promise<NodexNode | null>;
-
-  /** Fetch all children of a node and cache them */
-  fetchChildren(nodeId: string): Promise<NodexNode[]>;
-
-  /** Create a new child node under parentId */
-  createChild(
-    parentId: string,
-    workspaceId: string,
-    userId: string,
-    name?: string,
-    position?: number,
-    marks?: TextMark[],
-    inlineRefs?: InlineRefEntry[],
-  ): Promise<NodexNode>;
-
-  /** Create a sibling node after the given nodeId */
-  createSibling(
-    nodeId: string,
-    workspaceId: string,
-    userId: string,
-    name?: string,
-    marks?: TextMark[],
-    inlineRefs?: InlineRefEntry[],
-  ): Promise<NodexNode>;
-
-  /** Update a node's name locally (no Supabase sync — for live typing updates) */
+  setNodeName(id: string, name: string): void;
+  /** @deprecated 使用 setNodeName，marks/inlineRefs 单独通过 updateNodeContent */
   setNodeNameLocal(id: string, name: string): void;
-
-  /** Update a node's name (optimistic + Supabase sync) */
-  updateNodeName(id: string, name: string, userId: string): Promise<void>;
-
-  /** Update text+marks+inlineRefs locally (no Supabase sync — for live typing updates) */
+  updateNodeContent(id: string, data: { name?: string; marks?: TextMark[]; inlineRefs?: InlineRefEntry[] }): void;
+  /** @deprecated 使用 updateNodeContent */
   setNodeContentLocal(id: string, name: string, marks: TextMark[], inlineRefs: InlineRefEntry[]): void;
+  updateNodeDescription(id: string, description: string): void;
 
-  /** Update text+marks+inlineRefs (optimistic + Supabase sync) */
-  updateNodeContent(
-    id: string,
-    name: string,
-    marks: TextMark[],
-    inlineRefs: InlineRefEntry[],
-    userId: string,
-  ): Promise<void>;
+  // ─── 标签操作 ───
 
-  /** Update a node's description (optimistic + Supabase sync) */
-  updateNodeDescription(id: string, description: string, userId: string): Promise<void>;
+  applyTag(nodeId: string, tagDefId: string): void;
+  removeTag(nodeId: string, tagDefId: string): void;
+  createTagDef(name: string, options?: { showCheckbox?: boolean; color?: string }): NodexNode;
 
-  /** Toggle node's done state via checkbox click (undone ↔ done, never removes checkbox) */
-  toggleNodeDone(nodeId: string, userId: string): Promise<void>;
+  // ─── 字段操作 ───
 
-  /** Cycle checkbox via Cmd+Enter: manual 3-state (No→Undone→Done→No), tag-driven 2-state */
-  cycleNodeCheckbox(nodeId: string, userId: string): Promise<void>;
+  /** 旧 createAttrDef */
+  createFieldDef(name: string, fieldType: FieldType, tagDefId: string): NodexNode;
+  /** @deprecated 使用 createFieldDef */
+  createAttrDef(name: string, tagDefId: string, dataType: string): NodexNode;
 
-  /** Indent node: make it a child of its previous sibling */
-  indentNode(nodeId: string, userId: string): Promise<void>;
+  setFieldValue(nodeId: string, fieldDefId: string, values: string[]): void;
+  setOptionsFieldValue(nodeId: string, fieldDefId: string, optionNodeId: string): void;
+  selectFieldOption(fieldEntryId: string, optionNodeId: string, oldOptionNodeId?: string): void;
+  clearFieldValue(nodeId: string, fieldDefId: string): void;
+  addFieldToNode(nodeId: string, fieldDefId: string): void;
+  addUnnamedFieldToNode(nodeId: string, afterChildId?: string): { fieldEntryId: string; fieldDefId: string };
+  /** 旧 moveFieldTuple */
+  moveFieldEntry(currentParentId: string, fieldEntryId: string, newParentId: string, position?: number): void;
+  /** @deprecated 使用 moveFieldEntry */
+  moveFieldTuple(currentParentId: string, tupleId: string, newParentId: string, _userId: string, position?: number): void;
+  removeField(nodeId: string, fieldEntryId: string): void;
+  /** 旧 renameAttrDef */
+  renameFieldDef(fieldDefId: string, newName: string): void;
+  /** @deprecated 使用 renameFieldDef */
+  renameAttrDef(attrDefId: string, newName: string): void;
+  changeFieldType(fieldDefId: string, newType: string): void;
+  addFieldOption(fieldDefId: string, name: string): string;
+  removeFieldOption(fieldDefId: string, optionId: string): void;
+  autoCollectOption(nodeId: string, fieldDefId: string, name: string): string;
+  toggleCheckboxField(fieldEntryId: string): void;
+  /** 旧 replaceFieldAttrDef */
+  replaceFieldDef(nodeId: string, fieldEntryId: string, oldFieldDefId: string, newFieldDefId: string): void;
 
-  /** Outdent node: make it a sibling of its parent */
-  outdentNode(nodeId: string, userId: string): Promise<void>;
+  // ─── Checkbox 操作 ───
 
-  /** Move node up among siblings */
-  moveNodeUp(nodeId: string, userId: string): Promise<void>;
+  toggleNodeDone(nodeId: string): void;
+  cycleNodeCheckbox(nodeId: string): void;
 
-  /** Move node down among siblings */
-  moveNodeDown(nodeId: string, userId: string): Promise<void>;
+  // ─── 配置操作（直接属性，不再操作 Tuple） ───
 
-  /** Move node to a new parent at a specific position (for drag-and-drop) */
-  moveNodeTo(
-    nodeId: string,
-    newParentId: string,
-    position: number,
-    userId: string,
-  ): Promise<void>;
+  /** 设置节点的直接配置属性（tagDef/fieldDef 的配置字段） */
+  setConfigValue(nodeId: string, configKey: string, value: unknown): void;
+  addDoneMappingEntry(tagDefId: string, checked: boolean, fieldDefId: string, optionId: string): void;
+  removeDoneMappingEntry(tagDefId: string, checked: boolean, index: number): void;
 
-  /**
-   * Move a field tuple between parents (children array + _ownerId sync).
-   * Used by field-row Tab/Shift+Tab indentation.
-   */
-  moveFieldTuple(
-    currentParentId: string,
-    tupleId: string,
-    newParentId: string,
-    userId: string,
-    position?: number,
-  ): Promise<void>;
+  // ─── Reference 操作（新设计：独立 reference 树节点） ───
 
-  /** Move node to trash */
-  trashNode(nodeId: string, workspaceId: string, userId: string): Promise<void>;
-
-  // ─── Tag operations ───
-
-  /** Apply a supertag to a content node (creates tag tuple in node.meta + field tuples) */
-  applyTag(nodeId: string, tagDefId: string, workspaceId: string, userId: string): Promise<void>;
-
-  /** Remove a supertag from a content node */
-  removeTag(nodeId: string, tagDefId: string, userId: string): Promise<void>;
-
-  /** Create a new TagDef node in the SCHEMA container */
-  createTagDef(name: string, workspaceId: string, userId: string): Promise<NodexNode>;
-
-  /** Create a new AttrDef (field definition) and add it as a template tuple to a TagDef */
-  createAttrDef(
-    name: string,
-    tagDefId: string,
-    dataType: string,
-    workspaceId: string,
-    userId: string,
-  ): Promise<NodexNode>;
-
-  // ─── Field operations ───
-
-  /** Set a field value on a content node */
-  setFieldValue(
-    nodeId: string,
-    attrDefId: string,
-    valueText: string,
-    workspaceId: string,
-    userId: string,
-  ): Promise<void>;
-
-  /** Set an OPTIONS-type field to a specific option node */
-  setOptionsFieldValue(nodeId: string, attrDefId: string, optionNodeId: string, userId: string): void;
-
-  /**
-   * Select an option for a field via tuple reference (used by UI pickers).
-   * Replaces old reference with new one and applies reverse done-state mapping.
-   */
-  selectFieldOption(tupleId: string, optionNodeId: string, oldOptionNodeId: string | undefined, userId: string): void;
-
-  /** Clear a field value (set to empty) */
-  clearFieldValue(nodeId: string, attrDefId: string, userId: string): Promise<void>;
-
-  /** Add an ad-hoc field to a node (creates tuple) */
-  addFieldToNode(
-    nodeId: string,
-    attrDefId: string,
-    workspaceId: string,
-    userId: string,
-  ): Promise<void>;
-
-  /** Create an unnamed field on a node (for `>` trigger: instant creation) */
-  addUnnamedFieldToNode(
-    nodeId: string,
-    workspaceId: string,
-    userId: string,
-    afterChildId?: string,
-  ): Promise<{ tupleId: string; attrDefId: string }>;
-
-  // ─── Reference operations ───
-
-  /** Add a node as a reference child (no _ownerId change) */
-  addReference(parentId: string, refNodeId: string, userId: string, position?: number): void;
-
-  /** Remove a reference from parent.children (node itself is NOT trashed) */
-  removeReference(parentId: string, refNodeId: string, userId: string): void;
-
-  /** Start ref→inline conversion: create temp node with inline-ref content, return tempNodeId */
-  startRefConversion(refNodeId: string, parentId: string, position: number, workspaceId: string, userId: string): string;
-
-  /** Revert conversion: replace temp node with reference in parent.children */
-  revertRefConversion(tempNodeId: string, refNodeId: string, parentId: string): void;
-
-  /** Remove a field from a node (trash the tuple) */
-  removeField(nodeId: string, tupleId: string, workspaceId: string, userId: string): void;
-
-  /** Rename an attrDef node */
-  renameAttrDef(attrDefId: string, newName: string, userId: string): Promise<void>;
-
-  /** Change the data type of a field definition */
-  changeFieldType(attrDefId: string, newType: string, userId: string): void;
-
-  /** Add an option node to an OPTIONS-type field definition */
-  addFieldOption(attrDefId: string, name: string, workspaceId: string, userId: string): string;
-
-  /** Create a new option from field value, set as value, and auto-collect in attrDef */
-  autoCollectOption(nodeId: string, attrDefId: string, name: string, workspaceId: string, userId: string): string;
-
-  /** Toggle a checkbox field value. Creates value node if needed. */
-  toggleCheckboxField(tupleId: string, workspaceId: string, userId: string): void;
-
-  /** Remove an option node from a field definition */
-  removeFieldOption(attrDefId: string, optionId: string, userId: string): void;
-
-  /** Update a config Tuple's value (children[1]) */
-  setConfigValue(tupleId: string, newValue: string, userId: string): void;
-
-  /** Add a done-mapping entry tuple as a child of the NDX_A06 toggle tuple */
-  addDoneMappingEntry(
-    toggleTupleId: string,
-    mappingKey: string,
-    attrDefId: string,
-    optionId: string,
-    userId: string,
-  ): void;
-
-  /** Remove a done-mapping entry tuple from the NDX_A06 toggle tuple */
-  removeDoneMappingEntry(toggleTupleId: string, entryTupleId: string, userId: string): void;
-
-  /** Replace a field's attrDef (swap placeholder → existing) and clean up orphan */
-  replaceFieldAttrDef(
-    nodeId: string,
-    tupleId: string,
-    oldAttrDefId: string,
-    newAttrDefId: string,
-    workspaceId: string,
-    userId: string,
-  ): Promise<void>;
+  addReference(parentId: string, targetNodeId: string, position?: number): string;
+  removeReference(refNodeId: string): void;
+  startRefConversion(refNodeId: string, parentId: string, position: number): string;
+  revertRefConversion(tempNodeId: string, targetNodeId: string, parentId: string): void;
 }
 
-export const useNodeStore = create<NodeStore>()(
-  immer((set, get) => ({
-    entities: {},
-    loading: new Set<string>(),
-    _dirtyContentIds: new Set<string>(),
-    _pendingChildrenOps: new Map<string, number>(),
+// ============================================================
+// 辅助：找到 fieldEntry 节点
+// ============================================================
 
-    setNode: (node) =>
-      set((state) => {
-        const existing = state.entities[node.id];
+function findFieldEntry(nodeId: string, fieldDefId: string): string | null {
+  const children = loroDoc.getChildren(nodeId);
+  for (const cid of children) {
+    const c = loroDoc.toNodexNode(cid);
+    if (c?.type === 'fieldEntry' && c.fieldDefId === fieldDefId) {
+      return cid;
+    }
+  }
+  return null;
+}
 
-        // If this parent has in-flight children ops (createChild/createSibling/trashNode),
-        // preserve local children & meta to prevent Realtime echo from overwriting
-        // optimistic state. Other fields are still updated.
-        if (state._pendingChildrenOps.has(node.id) && existing) {
-          existing.version = Math.max(existing.version ?? 0, node.version ?? 0);
-          existing.updatedAt = node.updatedAt;
-          existing.updatedBy = node.updatedBy;
-          // Keep local children and meta — do NOT overwrite
-          if (!state._dirtyContentIds.has(node.id)) {
-            existing.props = { ...existing.props, ...node.props };
-          }
-          return;
-        }
+/** 查找 tagDef 下的模板 fieldDef 列表 */
+function getTemplateFieldDefs(tagDefId: string): string[] {
+  const children = loroDoc.getChildren(tagDefId);
+  return children.filter(cid => {
+    const c = loroDoc.toNodexNode(cid);
+    return c?.type === 'fieldDef';
+  });
+}
 
-        // If this node has unsaved local content edits, preserve them
-        // instead of blindly overwriting with (potentially stale) DB data.
-        if (state._dirtyContentIds.has(node.id)) {
-          if (existing) {
-            // Update metadata from the incoming node, keep local content
-            existing.version = Math.max(existing.version ?? 0, node.version ?? 0);
-            existing.updatedAt = node.updatedAt;
-            existing.updatedBy = node.updatedBy;
-            existing.children = node.children;
-            existing.meta = node.meta;
-            return;
-          }
-        }
-        state.entities[node.id] = node;
-      }),
+/** 递归获取 tagDef 的 extends 链（包含自身） */
+function getExtendsChain(tagDefId: string, visited = new Set<string>()): string[] {
+  if (visited.has(tagDefId)) return [];
+  visited.add(tagDefId);
+  const tagDef = loroDoc.toNodexNode(tagDefId);
+  if (!tagDef) return [tagDefId];
+  const chain = [tagDefId];
+  if (tagDef.extends) {
+    chain.push(...getExtendsChain(tagDef.extends, visited));
+  }
+  return chain;
+}
 
-    setNodes: (nodes) =>
-      set((state) => {
-        for (const node of nodes) {
-          state.entities[node.id] = node;
-        }
-      }),
+// ============================================================
+// Store 实现
+// ============================================================
 
-    removeNode: (id) =>
-      set((state) => {
-        delete state.entities[id];
-      }),
+export const useNodeStore = create<NodeStore>((set, get) => {
+  // 订阅 Loro 变更 → 递增 _version → 触发 React re-render
+  loroDoc.subscribe(() => {
+    set(state => ({ _version: state._version + 1 }));
+  });
 
-    fetchNode: async (id) => {
-      const { loading, entities } = get();
-      // Return cached if exists
-      if (entities[id]) return entities[id];
-      // Skip remote fetch if Supabase not connected
-      if (!isSupabaseReady()) return null;
-      // Prevent duplicate fetches
-      if (loading.has(id)) return null;
+  return {
+    _version: 0,
 
-      set((state) => {
-        state.loading.add(id);
-      });
+    // ─── 读取 ───
 
-      try {
-        const node = await nodeService.getNode(id);
-        if (node) {
-          set((state) => {
-            state.entities[node.id] = node;
-            state.loading.delete(id);
-          });
-        } else {
-          set((state) => {
-            state.loading.delete(id);
-          });
-        }
-        return node;
-      } catch {
-        set((state) => {
-          state.loading.delete(id);
-        });
-        return null;
-      }
+    getNode: (id) => loroDoc.toNodexNode(id),
+
+    getChildren: (parentId) => {
+      const ids = loroDoc.getChildren(parentId);
+      return ids.map(id => loroDoc.toNodexNode(id)).filter((n): n is NodexNode => n !== null);
     },
 
-    fetchChildren: async (nodeId) => {
-      if (!isSupabaseReady()) return [];
+    // ─── 树操作 ───
 
-      try {
-        const children = await nodeService.getChildren(nodeId);
-        if (children.length > 0) {
-          set((state) => {
-            for (const child of children) {
-              // Skip overwriting entities with unsaved local content edits
-              if (state._dirtyContentIds.has(child.id)) continue;
-              state.entities[child.id] = child;
-            }
-          });
-        }
-        return children;
-      } catch {
-        return [];
-      }
-    },
-
-    createChild: async (parentId, workspaceId, userId, name, position, marks, inlineRefs) => {
+    createChild: (parentId, index, data) => {
       const id = nanoid();
-      const now = Date.now();
+      loroDoc.createNode(id, parentId, index);
+      if (data) {
+        const { type, name, description, ...rest } = data;
+        const batch: Record<string, unknown> = {};
+        if (type !== undefined) batch.type = type;
+        if (name !== undefined) batch.name = name;
+        if (description !== undefined) batch.description = description;
+        Object.assign(batch, rest);
+        if (Object.keys(batch).length > 0) {
+          loroDoc.setNodeDataBatch(id, batch);
+        }
+      }
 
-      // Optimistic: add to store immediately
-      const optimisticNode: NodexNode = {
-        id,
-        workspaceId,
-        props: {
-          created: now,
-          name: name ?? '',
-          ...(marks && marks.length > 0 ? { _marks: marks } : {}),
-          ...(inlineRefs && inlineRefs.length > 0 ? { _inlineRefs: inlineRefs } : {}),
-          _ownerId: parentId,
-        },
-        children: [],
-        version: 1,
-        updatedAt: now,
-        createdBy: userId,
-        updatedBy: userId,
-      };
-
-      set((state) => {
-        state.entities[id] = optimisticNode;
-        // Add to parent's children
-        const parent = state.entities[parentId];
-        if (parent) {
-          if (!parent.children) parent.children = [];
-          if (position !== undefined) {
-            parent.children.splice(position, 0, id);
-          } else {
-            parent.children.push(id);
+      // Auto-apply child supertags from parent's tags
+      const parentNode = loroDoc.toNodexNode(parentId);
+      if (parentNode) {
+        for (const tagId of parentNode.tags) {
+          const tagDef = loroDoc.toNodexNode(tagId);
+          if (tagDef?.childSupertag) {
+            get().applyTag(id, tagDef.childSupertag);
           }
         }
-      });
-
-      // Auto-apply default child supertags from parent's tags
-      const childTags = resolveChildSupertags(get().entities, parentId);
-      for (const tagId of childTags) {
-        get().applyTag(id, tagId, workspaceId, userId);
       }
 
-      // Persist to Supabase (skip if not connected)
-      if (!isSupabaseReady()) return optimisticNode;
-
-      // Mark parent as having in-flight children op (protects against Realtime echo)
-      set((state) => {
-        state._pendingChildrenOps.set(parentId,
-          (state._pendingChildrenOps.get(parentId) ?? 0) + 1);
-      });
-
-      try {
-        const node = await nodeService.createNode(
-          {
-            id,
-            workspaceId,
-            props: {
-              created: now,
-              name: name ?? '',
-              ...(marks && marks.length > 0 ? { _marks: marks } : {}),
-              ...(inlineRefs && inlineRefs.length > 0 ? { _inlineRefs: inlineRefs } : {}),
-              _ownerId: parentId,
-            },
-          },
-          userId,
-        );
-        await nodeService.addChild(parentId, id, userId, position);
-
-        // Merge DB metadata without overwriting content that may have been
-        // locally edited while the async write was in flight.
-        set((state) => {
-          const existing = state.entities[node.id];
-          if (existing) {
-            existing.version = node.version;
-            existing.updatedAt = node.updatedAt;
-            existing.updatedBy = node.updatedBy;
-          } else {
-            state.entities[node.id] = node;
-          }
-        });
-        return node;
-      } catch (err) {
-        // Rollback on server failure
-        console.warn('[createChild] Supabase persist failed:', err);
-        set((state) => {
-          delete state.entities[id];
-          const parent = state.entities[parentId];
-          if (parent?.children) {
-            parent.children = parent.children.filter((cid) => cid !== id);
-          }
-        });
-        return optimisticNode;
-      } finally {
-        // Release pending after 3s to tolerate Realtime echo delay
-        setTimeout(() => {
-          set((state) => {
-            const n = (state._pendingChildrenOps.get(parentId) ?? 1) - 1;
-            if (n <= 0) state._pendingChildrenOps.delete(parentId);
-            else state._pendingChildrenOps.set(parentId, n);
-          });
-        }, 3000);
-      }
+      loroDoc.commitDoc();
+      return loroDoc.toNodexNode(id)!;
     },
 
-    createSibling: async (nodeId, workspaceId, userId, name, marks, inlineRefs) => {
-      const { entities } = get();
-      const node = entities[nodeId];
-      const parentId = node?.props._ownerId;
-      if (!parentId) throw new Error('Cannot create sibling: no parent');
+    createSibling: (siblingId, data) => {
+      const parentId = loroDoc.getParentId(siblingId);
+      if (!parentId) throw new Error('[createSibling] no parent');
 
-      const parent = entities[parentId];
-      const siblings = parent?.children ?? [];
-      const currentIndex = siblings.indexOf(nodeId);
-      const insertPosition = currentIndex >= 0 ? currentIndex + 1 : siblings.length;
+      const siblings = loroDoc.getChildren(parentId);
+      const idx = siblings.indexOf(siblingId);
+      const insertAt = idx >= 0 ? idx + 1 : siblings.length;
 
-      const id = nanoid();
-      const now = Date.now();
-
-      const optimisticNode: NodexNode = {
-        id,
-        workspaceId,
-        props: {
-          created: now,
-          name: name ?? '',
-          ...(marks && marks.length > 0 ? { _marks: marks } : {}),
-          ...(inlineRefs && inlineRefs.length > 0 ? { _inlineRefs: inlineRefs } : {}),
-          _ownerId: parentId,
-        },
-        children: [],
-        version: 1,
-        updatedAt: now,
-        createdBy: userId,
-        updatedBy: userId,
-      };
-
-      // Optimistic update
-      set((state) => {
-        state.entities[id] = optimisticNode;
-        const p = state.entities[parentId];
-        if (p) {
-          if (!p.children) p.children = [];
-          p.children.splice(insertPosition, 0, id);
-        }
-      });
-
-      // Auto-apply default child supertags from parent's tags
-      const childTags = resolveChildSupertags(get().entities, parentId);
-      for (const tagId of childTags) {
-        get().applyTag(id, tagId, workspaceId, userId);
-      }
-
-      // Persist (skip if not connected)
-      if (!isSupabaseReady()) return optimisticNode;
-
-      // Mark parent as having in-flight children op (protects against Realtime echo)
-      set((state) => {
-        state._pendingChildrenOps.set(parentId,
-          (state._pendingChildrenOps.get(parentId) ?? 0) + 1);
-      });
-
-      try {
-        const newNode = await nodeService.createNode(
-          {
-            id,
-            workspaceId,
-            props: {
-              created: now,
-              name: name ?? '',
-              ...(marks && marks.length > 0 ? { _marks: marks } : {}),
-              ...(inlineRefs && inlineRefs.length > 0 ? { _inlineRefs: inlineRefs } : {}),
-              _ownerId: parentId,
-            },
-          },
-          userId,
-        );
-        await nodeService.addChild(parentId, id, userId, insertPosition);
-
-        // Merge DB metadata without overwriting content that may have been
-        // locally edited (via setNodeContentLocal) while the async write was
-        // in flight.
-        set((state) => {
-          const existing = state.entities[newNode.id];
-          if (existing) {
-            existing.version = newNode.version;
-            existing.updatedAt = newNode.updatedAt;
-            existing.updatedBy = newNode.updatedBy;
-          } else {
-            state.entities[newNode.id] = newNode;
-          }
-        });
-        return newNode;
-      } catch (err) {
-        // Rollback
-        console.warn('[createSibling] Supabase persist failed:', err);
-        set((state) => {
-          delete state.entities[id];
-          const p = state.entities[parentId];
-          if (p?.children) {
-            p.children = p.children.filter((cid) => cid !== id);
-          }
-        });
-        return optimisticNode;
-      } finally {
-        // Release pending after 3s to tolerate Realtime echo delay
-        setTimeout(() => {
-          set((state) => {
-            const n = (state._pendingChildrenOps.get(parentId) ?? 1) - 1;
-            if (n <= 0) state._pendingChildrenOps.delete(parentId);
-            else state._pendingChildrenOps.set(parentId, n);
-          });
-        }, 3000);
-      }
+      return get().createChild(parentId, insertAt, data);
     },
 
-    setNodeContentLocal: (id, name, marks, inlineRefs) => {
-      set((state) => {
-        if (state.entities[id]) {
-          state.entities[id].props.name = name;
-          state.entities[id].props._marks = marks.length > 0 ? marks : undefined;
-          state.entities[id].props._inlineRefs = inlineRefs.length > 0 ? inlineRefs : undefined;
-          state._dirtyContentIds.add(id);
+    moveNodeTo: (nodeId, newParentId, index) => {
+      // Guard: no self-move
+      if (nodeId === newParentId) return;
+      // Guard: no descendant move (prevent cycle)
+      let cursor: string | null = newParentId;
+      while (cursor) {
+        if (cursor === nodeId) return;
+        cursor = loroDoc.getParentId(cursor);
+      }
+      // Same-parent reordering: adjust index for removal offset
+      const currentParent = loroDoc.getParentId(nodeId);
+      let adjustedIndex = index;
+      if (currentParent === newParentId && adjustedIndex !== undefined) {
+        const siblings = loroDoc.getChildren(currentParent);
+        const currentIdx = siblings.indexOf(nodeId);
+        if (currentIdx !== -1 && currentIdx < adjustedIndex) {
+          adjustedIndex = adjustedIndex - 1;
         }
-      });
+      }
+      loroDoc.moveNode(nodeId, newParentId, adjustedIndex);
+      loroDoc.commitDoc();
     },
 
-    updateNodeContent: async (id, name, marks, inlineRefs, userId) => {
-      const { entities } = get();
-      const oldName = entities[id]?.props.name;
-      const oldMarks = entities[id]?.props._marks;
-      const oldInlineRefs = entities[id]?.props._inlineRefs;
+    indentNode: (nodeId) => {
+      const parentId = loroDoc.getParentId(nodeId);
+      if (!parentId) return;
+      const siblings = loroDoc.getChildren(parentId);
+      const idx = siblings.indexOf(nodeId);
+      if (idx <= 0) return; // no previous sibling
+      const newParentId = siblings[idx - 1];
+      // Move to end of previous sibling's children
+      const newParentChildren = loroDoc.getChildren(newParentId);
+      loroDoc.moveNode(nodeId, newParentId, newParentChildren.length);
+      loroDoc.commitDoc();
+    },
 
-      // Optimistic
-      set((state) => {
-        if (state.entities[id]) {
-          state.entities[id].props.name = name;
-          state.entities[id].props._marks = marks.length > 0 ? marks : undefined;
-          state.entities[id].props._inlineRefs = inlineRefs.length > 0 ? inlineRefs : undefined;
-        }
+    outdentNode: (nodeId) => {
+      const parentId = loroDoc.getParentId(nodeId);
+      if (!parentId) return;
+      const grandParentId = loroDoc.getParentId(parentId);
+      if (!grandParentId) return;
+
+      // Insert after parent in grandparent's children
+      const gpChildren = loroDoc.getChildren(grandParentId);
+      const parentIdx = gpChildren.indexOf(parentId);
+      loroDoc.moveNode(nodeId, grandParentId, parentIdx + 1);
+      loroDoc.commitDoc();
+    },
+
+    moveNodeUp: (nodeId) => {
+      const parentId = loroDoc.getParentId(nodeId);
+      if (!parentId) return;
+      const siblings = loroDoc.getChildren(parentId);
+      const idx = siblings.indexOf(nodeId);
+      if (idx <= 0) return;
+      loroDoc.moveNode(nodeId, parentId, idx - 1);
+      loroDoc.commitDoc();
+    },
+
+    moveNodeDown: (nodeId) => {
+      const parentId = loroDoc.getParentId(nodeId);
+      if (!parentId) return;
+      const siblings = loroDoc.getChildren(parentId);
+      const idx = siblings.indexOf(nodeId);
+      if (idx < 0 || idx >= siblings.length - 1) return;
+      loroDoc.moveNode(nodeId, parentId, idx + 1);
+      loroDoc.commitDoc();
+    },
+
+    trashNode: (nodeId) => {
+      const parentId = loroDoc.getParentId(nodeId);
+      const siblings = parentId ? loroDoc.getChildren(parentId) : [];
+      const index = siblings.indexOf(nodeId);
+
+      // 记录来源以便恢复
+      loroDoc.setNodeDataBatch(nodeId, {
+        _trashedFrom: parentId,
+        _trashedIndex: index >= 0 ? index : undefined,
       });
 
-      if (!isSupabaseReady()) return;
+      loroDoc.moveNode(nodeId, CONTAINER_IDS.TRASH);
+      loroDoc.commitDoc();
+    },
 
-      try {
-        await nodeService.updateNode(id, { props: { name, _marks: marks, _inlineRefs: inlineRefs } }, userId);
-        // Content successfully persisted — clear dirty flag so Realtime events
-        // for this node can flow through normally.
-        set((state) => {
-          state._dirtyContentIds.delete(id);
-        });
-      } catch {
-        // Rollback
-        set((state) => {
-          if (state.entities[id]) {
-            state.entities[id].props.name = oldName;
-            state.entities[id].props._marks = oldMarks;
-            state.entities[id].props._inlineRefs = oldInlineRefs;
-          }
-        });
+    restoreNode: (nodeId) => {
+      const node = loroDoc.toNodexNode(nodeId);
+      if (!node) return;
+      const from = loroDoc.getNodeData(nodeId)?._trashedFrom as string | undefined;
+      const fromIndex = loroDoc.getNodeData(nodeId)?._trashedIndex as number | undefined;
+
+      if (from && loroDoc.hasNode(from)) {
+        loroDoc.moveNode(nodeId, from, fromIndex);
+      } else {
+        // Fallback: restore to LIBRARY
+        loroDoc.moveNode(nodeId, CONTAINER_IDS.LIBRARY);
       }
+
+      loroDoc.deleteNodeData(nodeId, '_trashedFrom');
+      loroDoc.deleteNodeData(nodeId, '_trashedIndex');
+      loroDoc.commitDoc();
+    },
+
+    // ─── 内容编辑 ───
+
+    setNodeName: (id, name) => {
+      loroDoc.setNodeData(id, 'name', name);
     },
 
     setNodeNameLocal: (id, name) => {
-      const node = get().entities[id];
-      get().setNodeContentLocal(
-        id,
-        name,
-        node?.props._marks ?? [],
-        node?.props._inlineRefs ?? [],
-      );
+      loroDoc.setNodeData(id, 'name', name);
     },
 
-    updateNodeName: async (id, name, userId) => {
-      const node = get().entities[id];
-      await get().updateNodeContent(
-        id,
-        name,
-        node?.props._marks ?? [],
-        node?.props._inlineRefs ?? [],
-        userId,
-      );
+    updateNodeContent: (id, data) => {
+      const batch: Record<string, unknown> = {};
+      if (data.name !== undefined) batch.name = data.name;
+      if (data.marks !== undefined) batch.marks = data.marks.length > 0 ? data.marks : undefined;
+      if (data.inlineRefs !== undefined) batch.inlineRefs = data.inlineRefs.length > 0 ? data.inlineRefs : undefined;
+      if (Object.keys(batch).length > 0) loroDoc.setNodeDataBatch(id, batch);
     },
 
-    updateNodeDescription: async (id, description, userId) => {
-      const { entities } = get();
-      const oldDesc = entities[id]?.props.description;
-
-      // Optimistic
-      set((state) => {
-        if (state.entities[id]) {
-          state.entities[id].props.description = description || undefined;
-        }
-      });
-
-      if (!isSupabaseReady()) return;
-
-      try {
-        await nodeService.updateNode(id, { props: { description: description || undefined } }, userId);
-      } catch {
-        // Rollback
-        set((state) => {
-          if (state.entities[id]) {
-            state.entities[id].props.description = oldDesc;
-          }
-        });
-      }
+    setNodeContentLocal: (id, name, marks, inlineRefs) => {
+      get().updateNodeContent(id, { name, marks, inlineRefs });
     },
 
-    toggleNodeDone: async (nodeId, userId) => {
-      const { entities } = get();
-      const oldDone = entities[nodeId]?.props._done;
-      const hasTag = hasTagShowCheckbox(nodeId, entities);
-      const newDone = resolveCheckboxClick(oldDone, hasTag);
-      const isDone = newDone !== undefined && newDone > 0;
-
-      // Forward done-state mapping: checkbox → Options field
-      const fieldUpdates = resolveForwardDoneMapping(nodeId, isDone, entities);
-
-      set((state) => {
-        if (state.entities[nodeId]) {
-          state.entities[nodeId].props._done = newDone;
-        }
-        // Apply field value changes in the same atomic set()
-        for (const { attrDefId, optionNodeId } of fieldUpdates) {
-          applyFieldValueInPlace(state, nodeId, attrDefId, optionNodeId);
-        }
-      });
-
-      if (!isSupabaseReady()) return;
-
-      try {
-        await nodeService.updateNode(nodeId, { props: { _done: newDone } }, userId);
-      } catch {
-        set((state) => {
-          if (state.entities[nodeId]) {
-            state.entities[nodeId].props._done = oldDone;
-          }
-        });
-      }
+    updateNodeDescription: (id, description) => {
+      loroDoc.setNodeData(id, 'description', description || undefined);
     },
 
-    cycleNodeCheckbox: async (nodeId, userId) => {
-      const { entities } = get();
-      const oldDone = entities[nodeId]?.props._done;
-      const hasTag = hasTagShowCheckbox(nodeId, entities);
-      const newDone = resolveCmdEnterCycle(oldDone, hasTag);
-      const isDone = newDone !== undefined && newDone > 0;
+    // ─── 标签操作 ───
 
-      // Forward done-state mapping: checkbox → Options field
-      const fieldUpdates = resolveForwardDoneMapping(nodeId, isDone, entities);
+    applyTag: (nodeId, tagDefId) => {
+      // 1. 添加标签
+      loroDoc.addTag(nodeId, tagDefId);
 
-      set((state) => {
-        if (state.entities[nodeId]) {
-          state.entities[nodeId].props._done = newDone;
-        }
-        // Apply field value changes in the same atomic set()
-        for (const { attrDefId, optionNodeId } of fieldUpdates) {
-          applyFieldValueInPlace(state, nodeId, attrDefId, optionNodeId);
-        }
-      });
+      // 2. 处理 extends 链（继承父标签的 fieldDefs）
+      const extendsChain = getExtendsChain(tagDefId);
 
-      if (!isSupabaseReady()) return;
-
-      try {
-        await nodeService.updateNode(nodeId, { props: { _done: newDone } }, userId);
-      } catch {
-        set((state) => {
-          if (state.entities[nodeId]) {
-            state.entities[nodeId].props._done = oldDone;
-          }
-        });
-      }
-    },
-
-    indentNode: async (nodeId, userId) => {
-      const { entities } = get();
-      const node = entities[nodeId];
-      const parentId = node?.props._ownerId;
-      if (!parentId) return;
-
-      const parent = entities[parentId];
-      if (!parent?.children) return;
-
-      const index = parent.children.indexOf(nodeId);
-      if (index <= 0) return; // Can't indent first child
-
-      const newParentId = parent.children[index - 1];
-
-      // Optimistic: move in local state
-      set((state) => {
-        const p = state.entities[parentId];
-        if (p?.children) {
-          p.children = p.children.filter((id) => id !== nodeId);
-        }
-        const newParent = state.entities[newParentId];
-        if (newParent) {
-          if (!newParent.children) newParent.children = [];
-          newParent.children.push(nodeId);
-        }
-        if (state.entities[nodeId]) {
-          state.entities[nodeId].props._ownerId = newParentId;
-        }
-      });
-
-      if (!isSupabaseReady()) return;
-
-      try {
-        await nodeService.moveNode(nodeId, newParentId, userId);
-      } catch {
-        // Rollback
-        set((state) => {
-          const newParent = state.entities[newParentId];
-          if (newParent?.children) {
-            newParent.children = newParent.children.filter((id) => id !== nodeId);
-          }
-          const p = state.entities[parentId];
-          if (p?.children) {
-            p.children.splice(index, 0, nodeId);
-          }
-          if (state.entities[nodeId]) {
-            state.entities[nodeId].props._ownerId = parentId;
-          }
-        });
-      }
-    },
-
-    outdentNode: async (nodeId, userId) => {
-      const { entities } = get();
-      const node = entities[nodeId];
-      const parentId = node?.props._ownerId;
-      if (!parentId) return;
-
-      const parent = entities[parentId];
-      const grandparentId = parent?.props._ownerId;
-      if (!grandparentId) return; // Parent is top-level, can't outdent
-      if (isWorkspaceContainer(parentId)) return; // Parent is a container, can't outdent
-      if (isWorkspaceRoot(parentId, entities)) return; // Parent is workspace root, can't outdent
-
-      const grandparent = entities[grandparentId];
-      if (!grandparent?.children) return;
-
-      const parentIndex = grandparent.children.indexOf(parentId);
-      const insertPosition = parentIndex + 1;
-
-      // Optimistic
-      set((state) => {
-        // Remove from current parent
-        const p = state.entities[parentId];
-        if (p?.children) {
-          p.children = p.children.filter((id) => id !== nodeId);
-        }
-        // Add to grandparent after parent
-        const gp = state.entities[grandparentId];
-        if (gp?.children) {
-          gp.children.splice(insertPosition, 0, nodeId);
-        }
-        if (state.entities[nodeId]) {
-          state.entities[nodeId].props._ownerId = grandparentId;
-        }
-      });
-
-      if (!isSupabaseReady()) return;
-
-      try {
-        await nodeService.moveNode(nodeId, grandparentId, userId, insertPosition);
-      } catch {
-        // Rollback
-        set((state) => {
-          const gp = state.entities[grandparentId];
-          if (gp?.children) {
-            gp.children = gp.children.filter((id) => id !== nodeId);
-          }
-          const p = state.entities[parentId];
-          if (p?.children) {
-            p.children.push(nodeId);
-          }
-          if (state.entities[nodeId]) {
-            state.entities[nodeId].props._ownerId = parentId;
-          }
-        });
-      }
-    },
-
-    moveNodeUp: async (nodeId, userId) => {
-      const { entities } = get();
-      const node = entities[nodeId];
-      const parentId = node?.props._ownerId;
-      if (!parentId) return;
-
-      const parent = entities[parentId];
-      if (!parent?.children) return;
-
-      const index = parent.children.indexOf(nodeId);
-      if (index <= 0) return; // Already first
-
-      // Optimistic: swap with previous sibling
-      set((state) => {
-        const p = state.entities[parentId];
-        if (p?.children && p.children.length > index) {
-          const temp = p.children[index - 1];
-          p.children[index - 1] = nodeId;
-          p.children[index] = temp;
-        }
-      });
-
-      if (!isSupabaseReady()) return;
-
-      try {
-        const newChildren = get().entities[parentId]?.children;
-        if (newChildren) {
-          await nodeService.reorderChildren(parentId, newChildren, userId);
-        }
-      } catch {
-        // Rollback: swap back
-        set((state) => {
-          const p = state.entities[parentId];
-          if (p?.children && p.children.length > index) {
-            const temp = p.children[index - 1];
-            p.children[index - 1] = p.children[index];
-            p.children[index] = temp;
-          }
-        });
-      }
-    },
-
-    moveNodeDown: async (nodeId, userId) => {
-      const { entities } = get();
-      const node = entities[nodeId];
-      const parentId = node?.props._ownerId;
-      if (!parentId) return;
-
-      const parent = entities[parentId];
-      if (!parent?.children) return;
-
-      const index = parent.children.indexOf(nodeId);
-      if (index < 0 || index >= parent.children.length - 1) return; // Already last
-
-      // Optimistic: swap with next sibling
-      set((state) => {
-        const p = state.entities[parentId];
-        if (p?.children && p.children.length > index + 1) {
-          const temp = p.children[index + 1];
-          p.children[index + 1] = nodeId;
-          p.children[index] = temp;
-        }
-      });
-
-      if (!isSupabaseReady()) return;
-
-      try {
-        const newChildren = get().entities[parentId]?.children;
-        if (newChildren) {
-          await nodeService.reorderChildren(parentId, newChildren, userId);
-        }
-      } catch {
-        // Rollback: swap back
-        set((state) => {
-          const p = state.entities[parentId];
-          if (p?.children && p.children.length > index + 1) {
-            const temp = p.children[index + 1];
-            p.children[index + 1] = p.children[index];
-            p.children[index] = temp;
-          }
-        });
-      }
-    },
-
-    moveNodeTo: async (nodeId, newParentId, position, userId) => {
-      const { entities } = get();
-      const node = entities[nodeId];
-      const oldParentId = node?.props._ownerId;
-      if (!oldParentId) return;
-
-      // Don't drop onto self or own descendant
-      if (nodeId === newParentId) return;
-      let checkId: string | undefined = newParentId;
-      while (checkId) {
-        if (checkId === nodeId) return; // Descendant check
-        checkId = entities[checkId]?.props._ownerId;
-      }
-
-      const oldParent = entities[oldParentId];
-      const oldIndex = oldParent?.children?.indexOf(nodeId) ?? -1;
-
-      // Optimistic
-      set((state) => {
-        // Remove from old parent
-        const op = state.entities[oldParentId];
-        if (op?.children) {
-          op.children = op.children.filter((id) => id !== nodeId);
-        }
-        // Add to new parent at position
-        const np = state.entities[newParentId];
-        if (np) {
-          if (!np.children) np.children = [];
-          // Adjust position if same parent and removing shifted indices
-          let insertAt = position;
-          if (oldParentId === newParentId && oldIndex < position) {
-            insertAt = Math.max(0, position - 1);
-          }
-          np.children.splice(insertAt, 0, nodeId);
-        }
-        if (state.entities[nodeId]) {
-          state.entities[nodeId].props._ownerId = newParentId;
-        }
-      });
-
-      if (!isSupabaseReady()) return;
-
-      try {
-        await nodeService.moveNode(nodeId, newParentId, userId, position);
-      } catch {
-        // Rollback
-        set((state) => {
-          // Remove from new parent
-          const np = state.entities[newParentId];
-          if (np?.children) {
-            np.children = np.children.filter((id) => id !== nodeId);
-          }
-          // Restore to old parent
-          const op = state.entities[oldParentId];
-          if (op) {
-            if (!op.children) op.children = [];
-            op.children.splice(oldIndex >= 0 ? oldIndex : op.children.length, 0, nodeId);
-          }
-          if (state.entities[nodeId]) {
-            state.entities[nodeId].props._ownerId = oldParentId;
-          }
-        });
-      }
-    },
-
-    moveFieldTuple: async (currentParentId, tupleId, newParentId, userId, position) => {
-      const snapshot = (() => {
-        const entities = get().entities;
-        const currentParent = entities[currentParentId];
-        const targetParent = entities[newParentId];
-        const tuple = entities[tupleId];
-        if (!currentParent || !targetParent || !tuple) return null;
-        return {
-          currentParentChildren: [...(currentParent.children ?? [])],
-          targetParentChildren: [...(targetParent.children ?? [])],
-          tupleOwnerId: tuple.props._ownerId,
-        };
-      })();
-      if (!snapshot) return;
-
-      set((state) => {
-        const currentParent = state.entities[currentParentId];
-        const targetParent = state.entities[newParentId];
-        const tuple = state.entities[tupleId];
-        if (!currentParent || !targetParent || !tuple) return;
-
-        if (currentParent.children) {
-          currentParent.children = currentParent.children.filter((id) => id !== tupleId);
-        }
-
-        if (!targetParent.children) targetParent.children = [];
-        const insertAt = position !== undefined
-          ? Math.max(0, Math.min(position, targetParent.children.length))
-          : targetParent.children.length;
-        targetParent.children.splice(insertAt, 0, tupleId);
-
-        tuple.props._ownerId = newParentId;
-
-        currentParent.updatedAt = Date.now();
-        currentParent.updatedBy = userId;
-        targetParent.updatedAt = Date.now();
-        targetParent.updatedBy = userId;
-        tuple.updatedAt = Date.now();
-        tuple.updatedBy = userId;
-      });
-
-      if (!isSupabaseReady()) return;
-
-      try {
-        const entities = get().entities;
-        const currentParent = entities[currentParentId];
-        const targetParent = entities[newParentId];
-        const tuple = entities[tupleId];
-        if (!currentParent || !targetParent || !tuple) return;
-
-        await nodeService.updateNode(
-          currentParentId,
-          { children: currentParent.children ?? [] },
-          userId,
-        );
-        await nodeService.updateNode(
-          newParentId,
-          { children: targetParent.children ?? [] },
-          userId,
-        );
-        await nodeService.updateNode(
-          tupleId,
-          { props: { _ownerId: newParentId } },
-          userId,
-        );
-      } catch {
-        set((state) => {
-          const currentParent = state.entities[currentParentId];
-          const targetParent = state.entities[newParentId];
-          const tuple = state.entities[tupleId];
-          if (!currentParent || !targetParent || !tuple) return;
-
-          currentParent.children = [...snapshot.currentParentChildren];
-          targetParent.children = [...snapshot.targetParentChildren];
-          tuple.props._ownerId = snapshot.tupleOwnerId;
-        });
-      }
-    },
-
-    trashNode: async (nodeId, workspaceId, userId) => {
-      const { entities } = get();
-      const node = entities[nodeId];
-      const oldOwnerId = node?.props._ownerId;
-
-      const trashId = `${workspaceId}_TRASH`;
-
-      // Optimistic: remove from parent's children, add to trash, update ownerId
-      // NOTE: No cascade cleanup — trashed tagDef/attrDef references are preserved.
-      // UI components detect trashed definitions and show ⚠️🗑️ visual state.
-      set((state) => {
-        if (oldOwnerId) {
-          const parent = state.entities[oldOwnerId];
-          if (parent?.children) {
-            parent.children = parent.children.filter((id) => id !== nodeId);
-          }
-        }
-        const trash = state.entities[trashId];
-        if (trash) {
-          if (!trash.children) trash.children = [];
-          trash.children.push(nodeId);
-        }
-        if (state.entities[nodeId]) {
-          state.entities[nodeId].props._ownerId = trashId;
-        }
-      });
-
-      if (!isSupabaseReady()) return;
-
-      // Mark old parent as having in-flight children op (protects against Realtime echo)
-      if (oldOwnerId) {
-        set((state) => {
-          state._pendingChildrenOps.set(oldOwnerId,
-            (state._pendingChildrenOps.get(oldOwnerId) ?? 0) + 1);
-        });
-      }
-
-      try {
-        await nodeService.trashNode(nodeId, workspaceId, userId);
-        // Sync parent.children to DB (remove trashed node) to prevent
-        // stale children from resurrecting via Realtime echo
-        if (oldOwnerId) {
-          const currentChildren = get().entities[oldOwnerId]?.children ?? [];
-          await nodeService.updateNode(oldOwnerId, { children: currentChildren }, userId);
-        }
-      } catch {
-        // Rollback
-        set((state) => {
-          // Remove from trash
-          const trash = state.entities[trashId];
-          if (trash?.children) {
-            trash.children = trash.children.filter((id) => id !== nodeId);
-          }
-          // Restore owner
-          if (state.entities[nodeId]) {
-            state.entities[nodeId].props._ownerId = oldOwnerId;
-          }
-          // Re-add to original parent
-          if (oldOwnerId) {
-            const parent = state.entities[oldOwnerId];
-            if (parent) {
-              if (!parent.children) parent.children = [];
-              parent.children.push(nodeId);
-            }
-          }
-        });
-      } finally {
-        // Release pending after 3s to tolerate Realtime echo delay
-        if (oldOwnerId) {
-          setTimeout(() => {
-            set((state) => {
-              const n = (state._pendingChildrenOps.get(oldOwnerId) ?? 1) - 1;
-              if (n <= 0) state._pendingChildrenOps.delete(oldOwnerId);
-              else state._pendingChildrenOps.set(oldOwnerId, n);
+      // 3. 为所有 fieldDef 创建 fieldEntry（若不存在）
+      for (const chainTagId of extendsChain) {
+        const fieldDefs = getTemplateFieldDefs(chainTagId);
+        for (const fdId of fieldDefs) {
+          if (!findFieldEntry(nodeId, fdId)) {
+            const feId = nanoid();
+            // 找到插入位置（fieldEntry 排在 content children 之后）
+            loroDoc.createNode(feId, nodeId);
+            loroDoc.setNodeDataBatch(feId, {
+              type: 'fieldEntry',
+              fieldDefId: fdId,
+              templateId: fdId,
             });
-          }, 3000);
+          }
+        }
+      }
+
+      // 4. 传播 childSupertag
+      const tagDef = loroDoc.toNodexNode(tagDefId);
+      // childSupertag 是给新创建的子节点用的，不在 applyTag 时处理
+      // （由 createChild 在创建子节点时自动检测）
+      void tagDef; // suppress lint warning
+    },
+
+    removeTag: (nodeId, tagDefId) => {
+      loroDoc.removeTag(nodeId, tagDefId);
+
+      // 移除来自该标签（含 extends 链）的 fieldEntry 节点
+      const extendsChain = getExtendsChain(tagDefId);
+      for (const chainTagId of extendsChain) {
+        const fieldDefs = getTemplateFieldDefs(chainTagId);
+        for (const fdId of fieldDefs) {
+          const feId = findFieldEntry(nodeId, fdId);
+          if (feId) {
+            loroDoc.deleteNode(feId);
+          }
         }
       }
     },
 
-    // ─── Tag operations ───
-
-    applyTag: async (nodeId, tagDefId, workspaceId, userId) => {
-      const { entities } = get();
-      const node = entities[nodeId];
-      if (!node) return;
-
-      const now = Date.now();
-      // Use nanoid() for all ID generation
-      const makeNodeLocal = (id: string, ownerId: string, docType: DocType, children?: string[]): NodexNode => ({
-        id,
-        workspaceId,
-        props: { created: now, name: '', _ownerId: ownerId, _docType: docType },
-        children: children ?? [],
-        version: 1,
-        updatedAt: now,
-        createdBy: userId,
-        updatedBy: userId,
+    createTagDef: (name, options = {}) => {
+      const id = nanoid();
+      loroDoc.createNode(id, CONTAINER_IDS.SCHEMA);
+      loroDoc.setNodeDataBatch(id, {
+        type: 'tagDef',
+        name,
+        ...(options.showCheckbox !== undefined && { showCheckbox: options.showCheckbox }),
+        ...(options.color !== undefined && { color: options.color }),
       });
-
-      set((state) => {
-        const n = state.entities[nodeId];
-        if (!n) return;
-
-        // 1. Initialize meta if needed
-        if (!n.meta) n.meta = [];
-
-        // 2. Check if already tagged
-        const alreadyTagged = n.meta.some((cid) => {
-          const t = state.entities[cid];
-          return t?.props._docType === 'tuple' &&
-            t.children?.[0] === SYS_A.NODE_SUPERTAGS &&
-            t.children?.[1] === tagDefId;
-        });
-        if (alreadyTagged) return;
-
-        // 3. Create SYS_A13 tag tuple (_ownerId = nodeId, stored in node.meta)
-        const tagTupleId = nanoid();
-        state.entities[tagTupleId] = makeNodeLocal(tagTupleId, nodeId, 'tuple', [SYS_A.NODE_SUPERTAGS, tagDefId]);
-        n.meta.push(tagTupleId);
-
-        // 4. Build inheritance chain (ancestors first, then self)
-        const extendsChain = getExtendsChain(state.entities, tagDefId);
-        const tagDefsToInstantiate = [...extendsChain, tagDefId]
-          .map(id => state.entities[id])
-          .filter((t): t is NodexNode => !!t && !!t.children);
-
-        if (tagDefsToInstantiate.length === 0) return;
-
-        if (!n.children) n.children = [];
-
-        // Track seen attrDefs to dedup across inheritance chain
-        const seenAttrDefs = new Set<string>();
-
-        for (const td of tagDefsToInstantiate) {
-          for (const templateChildId of td.children!) {
-            const template = state.entities[templateChildId];
-            if (!template) continue;
-
-            // ── Regular content node (default content) ──
-            if (!template.props._docType || template.props._docType !== 'tuple') {
-              // Check if already cloned (by _sourceId)
-              const alreadyCloned = n.children.some((cid) => {
-                return state.entities[cid]?.props._sourceId === templateChildId;
-              });
-              if (alreadyCloned) continue;
-
-              // Clone template content node (shallow — children not deep-cloned)
-              const cloneId = nanoid();
-              const clone: NodexNode = {
-                id: cloneId,
-                workspaceId,
-                props: { created: now, name: template.props.name ?? '', _ownerId: nodeId, _sourceId: templateChildId },
-                children: [],
-                version: 1,
-                updatedAt: now,
-                createdBy: userId,
-                updatedBy: userId,
-              };
-              state.entities[cloneId] = clone;
-              n.children.push(cloneId);
-              continue;
-            }
-
-            // ── Tuple children: unified path for all attrDef fields ──
-            const keyId = template.children?.[0];
-            if (!keyId) continue;
-
-            // Key must reference a real attrDef entity (system or user)
-            const attrDef = state.entities[keyId];
-            if (!attrDef || attrDef.props._docType !== 'attrDef') continue;
-
-            // Skip system config fields (Color, Extends, Show checkbox, etc.)
-            // when applying to content nodes — these belong on tagDef config pages only
-            if (!n.props._docType && isSystemConfigField(keyId)) continue;
-
-            // Dedup by attrDef ID across inheritance chain
-            if (seenAttrDefs.has(keyId)) continue;
-            seenAttrDefs.add(keyId);
-
-            // Check if field already instantiated (by attrDef key match)
-            const alreadyHasField = n.children.some((cid) => {
-              const c = state.entities[cid];
-              return c?.props._docType === 'tuple' && c.children?.[0] === keyId;
-            });
-            if (alreadyHasField) continue;
-
-            // Default value from template (children[1] if present)
-            const defaultValueId = template.children?.[1];
-
-            // Create instance tuple
-            const instanceId = nanoid();
-            const tupleChildren = defaultValueId ? [keyId, defaultValueId] : [keyId];
-            const instanceNode = makeNodeLocal(instanceId, nodeId, 'tuple', tupleChildren);
-            instanceNode.props._sourceId = templateChildId;
-            state.entities[instanceId] = instanceNode;
-
-            // Wire up — value stored directly in tuple.children[1:]
-            n.children.push(instanceId);
-          }
-        }
-      });
-
-      // TODO: Supabase sync when ready
+      return loroDoc.toNodexNode(id)!;
     },
 
-    removeTag: async (nodeId, tagDefId, _userId) => {
-      set((state) => {
-        const node = state.entities[nodeId];
-        if (!node?.meta || node.meta.length === 0) return;
+    // ─── 字段操作 ───
 
-        // 1. Remove SYS_A13 tuple from node.meta
-        const idx = node.meta.findIndex((cid) => {
-          const t = state.entities[cid];
-          return t?.props._docType === 'tuple' &&
-            t.children?.[0] === SYS_A.NODE_SUPERTAGS &&
-            t.children?.[1] === tagDefId;
-        });
-        if (idx >= 0) {
-          const tupleId = node.meta[idx];
-          node.meta.splice(idx, 1);
-          delete state.entities[tupleId];
-        }
+    createFieldDef: (name, fieldType, tagDefId) => {
+      const id = nanoid();
+      loroDoc.createNode(id, tagDefId);
+      loroDoc.setNodeDataBatch(id, {
+        type: 'fieldDef',
+        name,
+        fieldType,
+        cardinality: 'single',
+        nullable: true,
+      });
+      return loroDoc.toNodexNode(id)!;
+    },
 
-        // 2. Remove template-sourced field tuples from node.children
-        //    Include fields from the full Extend chain (self + all ancestors)
-        const chain = getExtendsChain(state.entities, tagDefId);
-        const allTagDefs = [...chain, tagDefId];
-        const templateTupleIds = new Set<string>();
-        for (const tdId of allTagDefs) {
-          const td = state.entities[tdId];
-          if (td?.children) {
-            for (const cid of td.children) templateTupleIds.add(cid);
-          }
-        }
-        if (templateTupleIds.size === 0 || !node.children) return;
-        const toRemove: string[] = [];
+    createAttrDef: (name, tagDefId, dataType) => {
+      // 兼容旧调用：dataType 可能是 SYS_D* opaque ID
+      // 这里做简单传递，实际调用方应使用 FIELD_TYPES 常量
+      return get().createFieldDef(name, dataType as FieldType, tagDefId);
+    },
 
-        for (const cid of node.children) {
-          const child = state.entities[cid];
-          if (child?.props._sourceId && templateTupleIds.has(child.props._sourceId)) {
-            toRemove.push(cid);
-            // Clean up nested children (e.g. NDX_A07/A08 under NDX_A06 instance)
-            if (child.children) {
-              for (const nestedId of child.children) {
-                if (state.entities[nestedId]?.props._ownerId === cid) {
-                  delete state.entities[nestedId];
-                }
+    setFieldValue: (nodeId, fieldDefId, values) => {
+      // 找到或创建 fieldEntry
+      let feId = findFieldEntry(nodeId, fieldDefId);
+      if (!feId) {
+        feId = nanoid();
+        loroDoc.createNode(feId, nodeId);
+        loroDoc.setNodeDataBatch(feId, { type: 'fieldEntry', fieldDefId });
+      }
+
+      // 清除旧值节点
+      const oldChildren = loroDoc.getChildren(feId);
+      for (const oldId of oldChildren) {
+        loroDoc.deleteNode(oldId);
+      }
+
+      // 创建新值节点
+      for (const val of values) {
+        const valId = nanoid();
+        loroDoc.createNode(valId, feId);
+        loroDoc.setNodeData(valId, 'name', val);
+      }
+    },
+
+    setOptionsFieldValue: (nodeId, fieldDefId, optionNodeId) => {
+      let feId = findFieldEntry(nodeId, fieldDefId);
+      if (!feId) {
+        feId = nanoid();
+        loroDoc.createNode(feId, nodeId);
+        loroDoc.setNodeDataBatch(feId, { type: 'fieldEntry', fieldDefId });
+      }
+
+      // Options field: fieldEntry children = [optionNodeId]（引用，非值节点）
+      const oldChildren = loroDoc.getChildren(feId);
+      for (const oldId of oldChildren) loroDoc.deleteNode(oldId);
+
+      const valId = nanoid();
+      loroDoc.createNode(valId, feId);
+      loroDoc.setNodeDataBatch(valId, { name: optionNodeId, targetId: optionNodeId });
+    },
+
+    selectFieldOption: (fieldEntryId, optionNodeId, oldOptionNodeId) => {
+      const oldChildren = loroDoc.getChildren(fieldEntryId);
+      for (const oldId of oldChildren) loroDoc.deleteNode(oldId);
+
+      const valId = nanoid();
+      loroDoc.createNode(valId, fieldEntryId);
+      loroDoc.setNodeDataBatch(valId, { name: optionNodeId, targetId: optionNodeId });
+
+      // 应用 reverse done-state mapping（勾选选项时联动 checkbox）
+      const feNode = loroDoc.toNodexNode(fieldEntryId);
+      if (feNode?.fieldDefId) {
+        const parentId = loroDoc.getParentId(fieldEntryId);
+        if (parentId) {
+          const parentNode = loroDoc.toNodexNode(parentId);
+          if (parentNode) {
+            const mapping = resolveReverseDoneMapping(parentNode, feNode.fieldDefId, optionNodeId);
+            if (mapping !== null) {
+              if (mapping.newDone) {
+                loroDoc.setNodeData(parentId, 'completedAt', Date.now());
+              } else {
+                loroDoc.setNodeData(parentId, 'completedAt', 0);
               }
             }
-            delete state.entities[cid];
           }
         }
-
-        if (toRemove.length > 0) {
-          const removeSet = new Set(toRemove);
-          node.children = node.children.filter(cid => !removeSet.has(cid));
-        }
-      });
-    },
-
-    createTagDef: async (name, workspaceId, userId) => {
-      const id = nanoid();
-      const now = Date.now();
-      const schemaId = `${workspaceId}_SCHEMA`;
-
-      const tagDef: NodexNode = {
-        id,
-        workspaceId,
-        props: { created: now, name, _ownerId: schemaId, _docType: 'tagDef' },
-        children: [],
-        version: 1,
-        updatedAt: now,
-        createdBy: userId,
-        updatedBy: userId,
-      };
-
-      set((state) => {
-        // Ensure SCHEMA container exists
-        if (!state.entities[schemaId]) {
-          state.entities[schemaId] = {
-            id: schemaId,
-            workspaceId,
-            props: { created: now, name: 'Schema', _ownerId: workspaceId },
-            children: [],
-            version: 1,
-            updatedAt: now,
-            createdBy: userId,
-            updatedBy: userId,
-          };
-          // Add SCHEMA to workspace root's children
-          const wsRoot = state.entities[workspaceId];
-          if (wsRoot) {
-            if (!wsRoot.children) wsRoot.children = [];
-            if (!wsRoot.children.includes(schemaId)) {
-              wsRoot.children.push(schemaId);
-            }
-          }
-        }
-        state.entities[id] = tagDef;
-        const schema = state.entities[schemaId];
-        if (!schema.children) schema.children = [];
-        schema.children.push(id);
-      });
-
-      // Apply SYS_T01 (Supertag) tag — creates tag tuple in meta + config tuples
-      if (get().entities[SYS_T.SUPERTAG]) {
-        await get().applyTag(id, SYS_T.SUPERTAG, workspaceId, userId);
       }
 
-      return get().entities[id] ?? tagDef;
+      void oldOptionNodeId; // suppress lint
     },
 
-    createAttrDef: async (name, tagDefId, dataType, workspaceId, userId) => {
-      const attrDefId = nanoid();
-      const typeTupleId = nanoid();
-      const autoInitTupleId = nanoid();
-      const requiredTupleId = nanoid();
-      const hideTupleId = nanoid();
-      const templateTupleId = nanoid();
-      const now = Date.now();
+    clearFieldValue: (nodeId, fieldDefId) => {
+      const feId = findFieldEntry(nodeId, fieldDefId);
+      if (!feId) return;
+      const children = loroDoc.getChildren(feId);
+      for (const cid of children) loroDoc.deleteNode(cid);
+    },
 
-      const makeTuple = (id: string, children: string[]): NodexNode => ({
-        id,
-        workspaceId,
-        props: { created: now, name: '', _ownerId: attrDefId, _docType: 'tuple' as const },
-        children,
-        version: 1,
-        updatedAt: now,
-        createdBy: userId,
-        updatedBy: userId,
+    addFieldToNode: (nodeId, fieldDefId) => {
+      if (findFieldEntry(nodeId, fieldDefId)) return; // already exists
+      const feId = nanoid();
+      loroDoc.createNode(feId, nodeId);
+      loroDoc.setNodeDataBatch(feId, { type: 'fieldEntry', fieldDefId });
+    },
+
+    addUnnamedFieldToNode: (nodeId, afterChildId) => {
+      // 创建临时 fieldDef（placeholder）
+      const fdId = nanoid();
+      loroDoc.createNode(fdId, CONTAINER_IDS.SCHEMA);
+      loroDoc.setNodeDataBatch(fdId, {
+        type: 'fieldDef',
+        name: '',
+        fieldType: 'plain',
+        cardinality: 'single',
+        nullable: true,
       });
 
-      const attrDef: NodexNode = {
-        id: attrDefId,
-        workspaceId,
-        props: { created: now, name, _ownerId: templateTupleId, _docType: 'attrDef' },
-        children: [typeTupleId, autoInitTupleId, requiredTupleId, hideTupleId],
-        version: 1,
-        updatedAt: now,
-        createdBy: userId,
-        updatedBy: userId,
-      };
-
-      set((state) => {
-        // AttrDef node
-        state.entities[attrDefId] = attrDef;
-
-        // Config tuples with default values
-        state.entities[typeTupleId] = makeTuple(typeTupleId, [SYS_A.TYPE_CHOICE, dataType]);
-        state.entities[autoInitTupleId] = makeTuple(autoInitTupleId, [SYS_A.AUTO_INITIALIZE, SYS_V.NO]);
-        state.entities[requiredTupleId] = makeTuple(requiredTupleId, [SYS_A.NULLABLE, SYS_V.NO]);
-        state.entities[hideTupleId] = makeTuple(hideTupleId, [SYS_A.HIDE_FIELD, SYS_V.NEVER]);
-
-        // Template tuple in tagDef: [attrDefId]
-        state.entities[templateTupleId] = {
-          id: templateTupleId,
-          workspaceId,
-          props: { created: now, name: '', _ownerId: tagDefId, _docType: 'tuple' },
-          children: [attrDefId],
-          version: 1,
-          updatedAt: now,
-          createdBy: userId,
-          updatedBy: userId,
-        };
-
-        // Add template to tagDef
-        const tagDef = state.entities[tagDefId];
-        if (tagDef) {
-          if (!tagDef.children) tagDef.children = [];
-          tagDef.children.push(templateTupleId);
-        }
-      });
-
-      // Apply SYS_T02 (Field Definition) tag — creates tag tuple in meta + config tuples
-      if (get().entities[SYS_T.FIELD_DEFINITION]) {
-        await get().applyTag(attrDefId, SYS_T.FIELD_DEFINITION, workspaceId, userId);
+      // 确定插入位置
+      let insertIdx: number | undefined;
+      if (afterChildId) {
+        const siblings = loroDoc.getChildren(nodeId);
+        const idx = siblings.indexOf(afterChildId);
+        if (idx >= 0) insertIdx = idx + 1;
       }
 
-      return get().entities[attrDefId] ?? attrDef;
+      const feId = nanoid();
+      loroDoc.createNode(feId, nodeId, insertIdx);
+      loroDoc.setNodeDataBatch(feId, { type: 'fieldEntry', fieldDefId: fdId });
+
+      return { fieldEntryId: feId, fieldDefId: fdId };
     },
 
-    // ─── Field operations ───
-
-    setFieldValue: async (nodeId, attrDefId, valueText, workspaceId, userId) => {
-      const now = Date.now();
-
-      set((state) => {
-        const node = state.entities[nodeId];
-        if (!node?.children) return;
-
-        // Find existing field tuple by attrDefId
-        let tupleId: string | undefined;
-        for (const cid of node.children) {
-          const child = state.entities[cid];
-          if (child?.props._docType === 'tuple' && child.children?.[0] === attrDefId) {
-            tupleId = cid;
-            break;
-          }
-        }
-
-        if (tupleId) {
-          // Update existing: create/update value node
-          const tuple = state.entities[tupleId];
-          if (!tuple) return;
-          let valueNodeId = tuple.children?.[1];
-
-          if (valueNodeId && state.entities[valueNodeId]) {
-            // Update existing value node
-            state.entities[valueNodeId].props.name = valueText;
-          } else {
-            // Create new value node
-            valueNodeId = nanoid();
-            state.entities[valueNodeId] = {
-              id: valueNodeId,
-              workspaceId,
-              props: { created: now, name: valueText, _ownerId: nodeId },
-              children: [],
-              version: 1,
-              updatedAt: now,
-              createdBy: userId,
-              updatedBy: userId,
-            };
-            if (!tuple.children) tuple.children = [attrDefId];
-            tuple.children[1] = valueNodeId;
-          }
-        } else {
-          // Create new field tuple + value node (values stored in tuple.children[1:])
-          const newTupleId = nanoid();
-          const valueNodeId = nanoid();
-
-          state.entities[valueNodeId] = {
-            id: valueNodeId,
-            workspaceId,
-            props: { created: now, name: valueText, _ownerId: nodeId },
-            children: [],
-            version: 1,
-            updatedAt: now,
-            createdBy: userId,
-            updatedBy: userId,
-          };
-
-          state.entities[newTupleId] = {
-            id: newTupleId,
-            workspaceId,
-            props: { created: now, name: '', _ownerId: nodeId, _docType: 'tuple' },
-            children: [attrDefId, valueNodeId],
-            version: 1,
-            updatedAt: now,
-            createdBy: userId,
-            updatedBy: userId,
-          };
-
-          node.children.push(newTupleId);
-        }
-      });
+    moveFieldEntry: (currentParentId, fieldEntryId, newParentId, position) => {
+      loroDoc.moveNode(fieldEntryId, newParentId, position);
+      void currentParentId; // suppress lint
     },
 
-    setOptionsFieldValue: (nodeId, attrDefId, optionNodeId, userId) => {
-      // Pre-compute reverse done-state mapping before set() to read clean state
-      const { entities } = get();
-      const reverseResult = resolveReverseDoneMapping(nodeId, attrDefId, optionNodeId, entities);
-
-      set((state) => {
-        const node = state.entities[nodeId];
-        if (!node?.children) return;
-
-        // Find the field tuple for this attrDef
-        for (const cid of node.children) {
-          const child = state.entities[cid];
-          if (child?.props._docType === 'tuple' && child.children?.[0] === attrDefId) {
-            // Value stored directly in tuple.children[1:]
-            child.children = [attrDefId, optionNodeId];
-            child.updatedAt = Date.now();
-            child.updatedBy = userId;
-
-            // Reverse done-state mapping: Options field → checkbox
-            if (reverseResult && state.entities[nodeId]) {
-              state.entities[nodeId].props._done = reverseResult.newDone ? Date.now() : undefined;
-            }
-            return;
-          }
-        }
-      });
+    moveFieldTuple: (currentParentId, tupleId, newParentId, _userId, position) => {
+      get().moveFieldEntry(currentParentId, tupleId, newParentId, position);
     },
 
-    selectFieldOption: (tupleId, optionNodeId, oldOptionNodeId, userId) => {
-      // Pre-compute reverse done-state mapping before set()
-      const { entities } = get();
-      const tuple = entities[tupleId];
-      const contentNodeId = tuple?.props._ownerId;
-      let reverseResult: { newDone: boolean } | null = null;
-      if (contentNodeId && tuple?.children?.[0]) {
-        reverseResult = resolveReverseDoneMapping(
-          contentNodeId, tuple.children[0], optionNodeId, entities,
-        );
+    removeField: (nodeId, fieldEntryId) => {
+      loroDoc.deleteNode(fieldEntryId);
+      void nodeId; // suppress lint
+    },
+
+    renameFieldDef: (fieldDefId, newName) => {
+      loroDoc.setNodeData(fieldDefId, 'name', newName);
+    },
+
+    renameAttrDef: (attrDefId, newName) => {
+      get().renameFieldDef(attrDefId, newName);
+    },
+
+    changeFieldType: (fieldDefId, newType) => {
+      loroDoc.setNodeData(fieldDefId, 'fieldType', newType);
+    },
+
+    addFieldOption: (fieldDefId, name) => {
+      const optId = nanoid();
+      loroDoc.createNode(optId, fieldDefId);
+      loroDoc.setNodeData(optId, 'name', name);
+      return optId;
+    },
+
+    removeFieldOption: (fieldDefId, optionId) => {
+      loroDoc.deleteNode(optionId);
+      void fieldDefId; // suppress lint
+    },
+
+    autoCollectOption: (nodeId, fieldDefId, name) => {
+      // 在 fieldDef 下创建新选项
+      const optId = get().addFieldOption(fieldDefId, name);
+
+      // 在 node 的 fieldEntry 中设置该选项
+      let feId = findFieldEntry(nodeId, fieldDefId);
+      if (!feId) {
+        feId = nanoid();
+        loroDoc.createNode(feId, nodeId);
+        loroDoc.setNodeDataBatch(feId, { type: 'fieldEntry', fieldDefId });
       }
+      const oldChildren = loroDoc.getChildren(feId);
+      for (const oldId of oldChildren) loroDoc.deleteNode(oldId);
+      const valId = nanoid();
+      loroDoc.createNode(valId, feId);
+      loroDoc.setNodeDataBatch(valId, { name: optId, targetId: optId });
 
-      set((state) => {
-        const t = state.entities[tupleId];
-        if (!t?.children) return;
-
-        // Remove old reference from tuple.children[1:]
-        if (oldOptionNodeId) {
-          const idx = t.children.indexOf(oldOptionNodeId);
-          if (idx > 0) t.children.splice(idx, 1); // idx > 0 to skip children[0] (attrDefId)
-        }
-
-        // Add new reference (prevent duplicate)
-        if (!t.children.includes(optionNodeId)) {
-          t.children.push(optionNodeId);
-        }
-        t.updatedAt = Date.now();
-        t.updatedBy = userId;
-
-        // Reverse done-state mapping
-        if (reverseResult && contentNodeId && state.entities[contentNodeId]) {
-          state.entities[contentNodeId].props._done = reverseResult.newDone ? Date.now() : undefined;
-        }
-      });
+      return optId;
     },
 
-    clearFieldValue: async (nodeId, attrDefId, _userId) => {
-      set((state) => {
-        const node = state.entities[nodeId];
-        if (!node?.children) return;
-
-        for (const cid of node.children) {
-          const child = state.entities[cid];
-          if (child?.props._docType === 'tuple' && child.children?.[0] === attrDefId) {
-            const valueNodeId = child.children[1];
-            if (valueNodeId && state.entities[valueNodeId]) {
-              state.entities[valueNodeId].props.name = '';
-            }
-            break;
-          }
-        }
-      });
-    },
-
-    addFieldToNode: async (nodeId, attrDefId, workspaceId, userId) => {
-      set((state) => {
-        const node = state.entities[nodeId];
-        if (!node) return;
-
-        // Check if field already exists
-        const alreadyHasField = (node.children ?? []).some((cid) => {
-          const child = state.entities[cid];
-          return child?.props._docType === 'tuple' && child.children?.[0] === attrDefId;
-        });
-        if (alreadyHasField) return;
-
-        const now = Date.now();
-        const tupleId = nanoid();
-
-        // Create field tuple — value stored directly in tuple.children[1:]
-        state.entities[tupleId] = {
-          id: tupleId,
-          workspaceId,
-          props: { created: now, name: '', _ownerId: nodeId, _docType: 'tuple' },
-          children: [attrDefId],
-          version: 1,
-          updatedAt: now,
-          createdBy: userId,
-          updatedBy: userId,
-        };
-
-        // Wire up
-        if (!node.children) node.children = [];
-        node.children.push(tupleId);
-      });
-    },
-
-    addUnnamedFieldToNode: async (nodeId, workspaceId, userId, afterChildId?) => {
-      const attrDefId = nanoid();
-      const typeTupleId = nanoid();
-      const tupleId = nanoid();
-      const now = Date.now();
-
-      set((state) => {
-        const node = state.entities[nodeId];
-        if (!node) return;
-
-        // 1. Create empty-name attrDef (owned by its field tuple)
-        state.entities[attrDefId] = {
-          id: attrDefId,
-          workspaceId,
-          props: { created: now, name: '', _ownerId: tupleId, _docType: 'attrDef' },
-          children: [typeTupleId],
-          version: 1,
-          updatedAt: now,
-          createdBy: userId,
-          updatedBy: userId,
-        };
-        state.entities[typeTupleId] = {
-          id: typeTupleId,
-          workspaceId,
-          props: { created: now, name: '', _ownerId: attrDefId, _docType: 'tuple' },
-          children: [SYS_A.TYPE_CHOICE, SYS_D.PLAIN],
-          version: 1,
-          updatedAt: now,
-          createdBy: userId,
-          updatedBy: userId,
-        };
-
-        // 2. Create field tuple [attrDefId] on node
-        state.entities[tupleId] = {
-          id: tupleId,
-          workspaceId,
-          props: { created: now, name: '', _ownerId: nodeId, _docType: 'tuple' },
-          children: [attrDefId],
-          version: 1,
-          updatedAt: now,
-          createdBy: userId,
-          updatedBy: userId,
-        };
-
-        // 3. Wire up — value stored directly in tuple.children[1:]
-        if (!node.children) node.children = [];
-        if (afterChildId) {
-          const idx = node.children.indexOf(afterChildId);
-          if (idx >= 0) {
-            node.children.splice(idx + 1, 0, tupleId);
-          } else {
-            node.children.push(tupleId);
-          }
-        } else {
-          node.children.push(tupleId);
-        }
-        node.updatedAt = now;
-        node.updatedBy = userId;
-      });
-
-      // Apply SYS_T02 (Field Definition) tag — creates config tuples
-      if (get().entities[SYS_T.FIELD_DEFINITION]) {
-        await get().applyTag(attrDefId, SYS_T.FIELD_DEFINITION, workspaceId, userId);
+    toggleCheckboxField: (fieldEntryId) => {
+      const fe = loroDoc.toNodexNode(fieldEntryId);
+      if (!fe) return;
+      const children = loroDoc.getChildren(fieldEntryId);
+      if (children.length > 0) {
+        // 有值 → 清除（取消勾选）
+        for (const cid of children) loroDoc.deleteNode(cid);
+      } else {
+        // 无值 → 创建 true 值节点（勾选）
+        const valId = nanoid();
+        loroDoc.createNode(valId, fieldEntryId);
+        loroDoc.setNodeData(valId, 'name', 'true');
       }
-
-      return { tupleId, attrDefId };
     },
 
-    removeField: (nodeId, tupleId, workspaceId, userId) => {
-      set((state) => {
-        const node = state.entities[nodeId];
-        if (!node) return;
+    replaceFieldDef: (nodeId, fieldEntryId, oldFieldDefId, newFieldDefId) => {
+      loroDoc.setNodeData(fieldEntryId, 'fieldDefId', newFieldDefId);
+      void nodeId; void oldFieldDefId; // suppress lint
+    },
 
-        // Guard: system config fields cannot be deleted
-        const fieldKey = state.entities[tupleId]?.children?.[0];
-        if (fieldKey && (fieldKey.startsWith('SYS_') || fieldKey.startsWith('NDX_'))) return;
+    // ─── Checkbox 操作 ───
 
-        // Remove tuple from parent.children
-        if (node.children) {
-          const idx = node.children.indexOf(tupleId);
-          if (idx >= 0) node.children.splice(idx, 1);
-        }
-
-        // Trash the tuple itself
-        const tuple = state.entities[tupleId];
-        if (tuple) {
-          tuple.props._ownerId = `${workspaceId}_TRASH`;
-          const trash = state.entities[`${workspaceId}_TRASH`];
-          if (trash?.children && !trash.children.includes(tupleId)) {
-            trash.children.push(tupleId);
+    toggleNodeDone: (nodeId) => {
+      const node = loroDoc.toNodexNode(nodeId);
+      if (!node) return;
+      const result = resolveCheckboxClick(node);
+      if (result.completedAt === undefined) {
+        loroDoc.deleteNodeData(nodeId, 'completedAt');
+      } else {
+        loroDoc.setNodeData(nodeId, 'completedAt', result.completedAt);
+      }
+      if (result.doneMappings) {
+        for (const { fieldDefId, optionId } of result.doneMappings) {
+          const feId = findFieldEntry(nodeId, fieldDefId);
+          if (feId) {
+            get().selectFieldOption(feId, optionId, undefined);
           }
         }
-
-        node.updatedAt = Date.now();
-        node.updatedBy = userId;
-      });
+      }
     },
 
-    renameAttrDef: async (attrDefId, newName, userId) => {
-      set((state) => {
-        const attrDef = state.entities[attrDefId];
-        if (!attrDef) return;
-        attrDef.props.name = newName;
-        attrDef.updatedAt = Date.now();
-        attrDef.updatedBy = userId;
-      });
+    cycleNodeCheckbox: (nodeId) => {
+      const node = loroDoc.toNodexNode(nodeId);
+      if (!node) return;
+      const result = resolveCmdEnterCycle(node);
+      if (result.completedAt === undefined) {
+        loroDoc.deleteNodeData(nodeId, 'completedAt');
+      } else {
+        loroDoc.setNodeData(nodeId, 'completedAt', result.completedAt);
+      }
     },
 
-    changeFieldType: (attrDefId, newType, userId) => {
-      set((state) => {
-        const attrDef = state.entities[attrDefId];
-        if (!attrDef?.children) return;
-        const now = Date.now();
+    // ─── 配置操作 ───
 
-        // Find existing type Tuple [SYS_A02, SYS_D*]
-        let found = false;
-        for (const childId of attrDef.children) {
-          const child = state.entities[childId];
-          if (
-            child?.props._docType === 'tuple' &&
-            child.children?.[0] === SYS_A.TYPE_CHOICE
-          ) {
-            child.children[1] = newType;
-            child.updatedAt = now;
-            child.updatedBy = userId;
-            found = true;
-            break;
-          }
-        }
-
-        if (!found) {
-          // No type tuple found — create one (value in tuple.children[1])
-          const tupleId = nanoid();
-          state.entities[tupleId] = {
-            id: tupleId,
-            workspaceId: attrDef.workspaceId,
-            props: { created: now, name: '', _ownerId: attrDefId, _docType: 'tuple' },
-            children: [SYS_A.TYPE_CHOICE, newType],
-            version: 1,
-            updatedAt: now,
-            createdBy: userId,
-            updatedBy: userId,
-          };
-          attrDef.children.push(tupleId);
-        }
-
-        // Auto-create missing config tuples required by the new type
-        const existingKeys = new Set<string>();
-        for (const childId of attrDef.children) {
-          const child = state.entities[childId];
-          if (child?.props._docType === 'tuple' && child.children?.[0]) {
-            existingKeys.add(child.children[0]);
-          }
-        }
-        for (const [key, def] of ATTRDEF_CONFIG_MAP) {
-          if (existingKeys.has(key)) continue;
-          const applies = def.appliesTo === '*' || def.appliesTo.includes(newType);
-          if (!applies) continue;
-          const tid = nanoid();
-          state.entities[tid] = {
-            id: tid,
-            workspaceId: attrDef.workspaceId,
-            props: { created: now, name: '', _ownerId: attrDefId, _docType: 'tuple' },
-            children: [key, def.defaultValue],
-            version: 1,
-            updatedAt: now,
-            createdBy: userId,
-            updatedBy: userId,
-          };
-          attrDef.children.push(tid);
-        }
-      });
+    setConfigValue: (nodeId, configKey, value) => {
+      loroDoc.setNodeData(nodeId, configKey, value);
     },
 
-    toggleCheckboxField: (tupleId, workspaceId, userId) => {
-      set((state) => {
-        const tuple = state.entities[tupleId];
-        if (!tuple || tuple.props._docType !== 'tuple') return;
-        const now = Date.now();
-
-        // Value stored in tuple.children[1] — find existing value node
-        const valueId = tuple.children?.[1];
-        const valNode = valueId ? state.entities[valueId] : undefined;
-
-        if (valNode && !valNode.props._docType) {
-          valNode.props.name = valNode.props.name === SYS_V.YES ? SYS_V.NO : SYS_V.YES;
-          valNode.updatedAt = now;
-          valNode.updatedBy = userId;
-        } else {
-          // Create new value node (default: YES since user is clicking to turn ON)
-          const id = nanoid();
-          state.entities[id] = {
-            id,
-            workspaceId,
-            props: { created: now, name: SYS_V.YES, _ownerId: tupleId },
-            children: [],
-            version: 1,
-            updatedAt: now,
-            createdBy: userId,
-            updatedBy: userId,
-          };
-          if (!tuple.children) tuple.children = [];
-          // Set as tuple.children[1] (preserve children[0] = key)
-          if (tuple.children.length < 2) {
-            tuple.children.push(id);
-          } else {
-            tuple.children[1] = id;
-          }
-        }
-      });
+    addDoneMappingEntry: (tagDefId, checked, fieldDefId, optionId) => {
+      loroDoc.addDoneMappingEntry(tagDefId, checked, { fieldDefId, optionId } satisfies DoneMappingEntry);
     },
 
-    addFieldOption: (attrDefId, name, workspaceId, userId) => {
-      const id = nanoid();
-      const now = Date.now();
-      let created = false;
-
-      set((state) => {
-        const attrDef = state.entities[attrDefId];
-        if (!attrDef || attrDef.props._docType !== 'attrDef') return;
-
-        state.entities[id] = {
-          id,
-          workspaceId,
-          props: { created: now, name, _ownerId: attrDefId },
-          children: [],
-          version: 1,
-          updatedAt: now,
-          createdBy: userId,
-          updatedBy: userId,
-        };
-
-        if (!attrDef.children) attrDef.children = [];
-        attrDef.children.push(id);
-        created = true;
-      });
-
-      return created ? id : '';
+    removeDoneMappingEntry: (tagDefId, checked, index) => {
+      loroDoc.removeDoneMappingEntry(tagDefId, checked, index);
     },
 
-    autoCollectOption: (nodeId, attrDefId, name, workspaceId, userId) => {
-      const valueId = nanoid();
-      const now = Date.now();
+    // ─── Reference 操作 ───
 
-      // Pre-compute reverse done-state mapping (new auto-collected option)
-      const { entities } = get();
-      const reverseResult = resolveReverseDoneMapping(nodeId, attrDefId, valueId, entities);
-
-      set((state) => {
-        // 1. Create the value node (original lives in field value)
-        state.entities[valueId] = {
-          id: valueId,
-          workspaceId,
-          props: { created: now, name },
-          children: [],
-          version: 1,
-          updatedAt: now,
-          createdBy: userId,
-          updatedBy: userId,
-        };
-
-        // 2. Set as field value (inline setOptionsFieldValue logic)
-        const node = state.entities[nodeId];
-        if (node?.children) {
-          for (const cid of node.children) {
-            const child = state.entities[cid];
-            if (child?.props._docType === 'tuple' && child.children?.[0] === attrDefId) {
-              // Value stored directly in tuple.children[1:]
-              child.children = [attrDefId, valueId];
-              child.updatedAt = now;
-              child.updatedBy = userId;
-              break;
-            }
-          }
-        }
-
-        // 3. Add reference to autocollect Tuple (children[2+])
-        const acTupleId = findAutoCollectTupleId(state.entities, attrDefId);
-        if (acTupleId) {
-          const acTuple = state.entities[acTupleId];
-          if (acTuple?.children) {
-            acTuple.children.push(valueId);
-          }
-        }
-
-        // 4. Reverse done-state mapping: Options field → checkbox
-        if (reverseResult && state.entities[nodeId]) {
-          state.entities[nodeId].props._done = reverseResult.newDone ? Date.now() : undefined;
-        }
+    addReference: (parentId, targetNodeId, position) => {
+      const refId = nanoid();
+      loroDoc.createNode(refId, parentId, position);
+      loroDoc.setNodeDataBatch(refId, {
+        type: 'reference',
+        targetId: targetNodeId,
       });
-
-      return valueId;
+      return refId;
     },
 
-    removeFieldOption: (attrDefId, optionId, _userId) => {
-      set((state) => {
-        const attrDef = state.entities[attrDefId];
-        if (!attrDef || attrDef.props._docType !== 'attrDef' || !attrDef.children) return;
-        const idx = attrDef.children.indexOf(optionId);
-        if (idx < 0) return;
-        attrDef.children.splice(idx, 1);
-        delete state.entities[optionId];
-      });
+    removeReference: (refNodeId) => {
+      loroDoc.deleteNode(refNodeId);
     },
 
-    setConfigValue: (tupleId, newValue, userId) => {
-      set((state) => {
-        const tuple = state.entities[tupleId];
-        if (!tuple || tuple.props._docType !== 'tuple' || !tuple.children || tuple.children.length < 1) return;
-        const now = Date.now();
-        tuple.children[1] = newValue;
-        tuple.updatedAt = now;
-        tuple.updatedBy = userId;
-      });
-    },
+    startRefConversion: (refNodeId, parentId, position) => {
+      const refNode = loroDoc.toNodexNode(refNodeId);
+      const targetId = refNode?.targetId;
+      const targetNode = targetId ? loroDoc.toNodexNode(targetId) : null;
+      const targetName = targetNode?.name ?? 'Untitled';
 
-    addDoneMappingEntry: (toggleTupleId, mappingKey, attrDefId, optionId, userId) => {
-      set((state) => {
-        const toggle = state.entities[toggleTupleId];
-        if (!toggle || toggle.props._docType !== 'tuple') return;
+      // 删除 reference 节点
+      loroDoc.deleteNode(refNodeId);
 
-        const now = Date.now();
-        const entryId = nanoid();
-        state.entities[entryId] = {
-          id: entryId,
-          props: { created: now, _docType: 'tuple' as DocType, _ownerId: toggleTupleId },
-          children: [mappingKey, attrDefId, optionId],
-          workspaceId: toggle.workspaceId,
-          version: 1,
-          updatedAt: now,
-          createdBy: userId,
-          updatedBy: userId,
-        };
-
-        // Add entry to toggle tuple.children
-        if (!toggle.children) toggle.children = [];
-        toggle.children.push(entryId);
-        toggle.updatedAt = now;
-        toggle.updatedBy = userId;
-      });
-    },
-
-    removeDoneMappingEntry: (toggleTupleId, entryTupleId, userId) => {
-      set((state) => {
-        const toggle = state.entities[toggleTupleId];
-        if (!toggle) return;
-
-        const now = Date.now();
-
-        // Remove entry from toggle tuple.children
-        if (toggle.children) {
-          const idx = toggle.children.indexOf(entryTupleId);
-          if (idx >= 0) {
-            toggle.children.splice(idx, 1);
-            toggle.updatedAt = now;
-            toggle.updatedBy = userId;
-          }
-        }
-
-        delete state.entities[entryTupleId];
-      });
-    },
-
-    replaceFieldAttrDef: async (nodeId, tupleId, oldAttrDefId, newAttrDefId, workspaceId, userId) => {
-      set((state) => {
-        const node = state.entities[nodeId];
-        const tuple = state.entities[tupleId];
-        if (
-          !node ||
-          !node.children?.includes(tupleId) ||
-          !tuple ||
-          tuple.props._docType !== 'tuple' ||
-          tuple.props._ownerId !== nodeId ||
-          !tuple.children ||
-          tuple.children[0] !== oldAttrDefId
-        ) return;
-
-        // Guard: don't replace if parent already has a field with newAttrDefId
-        const alreadyHas = node.children?.some((cid) => {
-          if (cid === tupleId) return false; // skip current tuple
-          const c = state.entities[cid];
-          return c?.props._docType === 'tuple' && c.children?.[0] === newAttrDefId;
-        });
-        if (alreadyHas) return;
-
-        // Swap attrDefId in tuple
-        tuple.children[0] = newAttrDefId;
-        tuple.updatedAt = Date.now();
-        tuple.updatedBy = userId;
-
-        // Clean up orphaned placeholder attrDef (owned by this tuple only).
-        const oldAttrDef = state.entities[oldAttrDefId];
-        if (
-          oldAttrDef?.props._docType === 'attrDef' &&
-          oldAttrDef.props._ownerId === tupleId
-        ) {
-          // Delete type tuple children
-          if (oldAttrDef.children) {
-            for (const cid of oldAttrDef.children) {
-              delete state.entities[cid];
-            }
-          }
-          // Delete meta tuples (e.g. SYS_T02 tag tuple)
-          if (oldAttrDef.meta) {
-            for (const mid of oldAttrDef.meta) {
-              delete state.entities[mid];
-            }
-          }
-          delete state.entities[oldAttrDefId];
-        }
-      });
-    },
-
-    // ─── Reference operations ───
-
-    addReference: (parentId, refNodeId, _userId, position) => {
-      set((state) => {
-        const parent = state.entities[parentId];
-        if (!parent) return;
-        if (!parent.children) parent.children = [];
-        // Prevent duplicate reference
-        if (parent.children.includes(refNodeId)) return;
-        if (position !== undefined && position >= 0 && position <= parent.children.length) {
-          parent.children.splice(position, 0, refNodeId);
-        } else {
-          parent.children.push(refNodeId);
-        }
-        parent.updatedAt = Date.now();
-      });
-    },
-
-    removeReference: (parentId, refNodeId, _userId) => {
-      set((state) => {
-        const parent = state.entities[parentId];
-        if (!parent?.children) return;
-        const idx = parent.children.indexOf(refNodeId);
-        if (idx >= 0) {
-          parent.children.splice(idx, 1);
-          parent.updatedAt = Date.now();
-        }
-      });
-    },
-
-    startRefConversion: (refNodeId, parentId, position, workspaceId, userId) => {
+      // 创建临时内联引用节点
       const tempId = nanoid();
-      const now = Date.now();
-      set((state) => {
-        const refNode = state.entities[refNodeId];
-        const refName = (refNode?.props.name ?? '').replace(/<[^>]+>/g, '').trim() || 'Untitled';
-
-        state.entities[tempId] = {
-          id: tempId,
-          workspaceId,
-          props: {
-            created: now,
-            name: '\uFFFC',
-            _inlineRefs: [{ offset: 0, targetNodeId: refNodeId, displayName: refName }],
-            _ownerId: parentId,
-          },
-          children: [],
-          version: 1,
-          updatedAt: now,
-          createdBy: userId,
-          updatedBy: userId,
-        };
-
-        const parent = state.entities[parentId];
-        if (parent?.children) {
-          const insertPos = Math.min(Math.max(position, 0), parent.children.length);
-          parent.children.splice(insertPos, 0, tempId);
-        }
+      loroDoc.createNode(tempId, parentId, position);
+      loroDoc.setNodeDataBatch(tempId, {
+        name: '\uFFFC',
+        inlineRefs: [{ offset: 0, targetNodeId: targetId ?? '', displayName: targetName }],
       });
       return tempId;
     },
 
-    revertRefConversion: (tempNodeId, refNodeId, parentId) => {
-      set((state) => {
-        const parent = state.entities[parentId];
-        if (!parent?.children) return;
-        const pos = parent.children.indexOf(tempNodeId);
-        if (pos >= 0) {
-          // Safety: don't create duplicate if refNodeId is already in children
-          if (parent.children.includes(refNodeId)) {
-            parent.children.splice(pos, 1);
-          } else {
-            parent.children[pos] = refNodeId;
-          }
-        }
-        delete state.entities[tempNodeId];
-      });
+    revertRefConversion: (tempNodeId, targetNodeId, parentId) => {
+      const parentChildren = loroDoc.getChildren(parentId);
+      const position = parentChildren.indexOf(tempNodeId);
+
+      loroDoc.deleteNode(tempNodeId);
+
+      get().addReference(parentId, targetNodeId, position >= 0 ? position : undefined);
     },
-  })),
-);
+  };
+});
+
+// ─── 向后兼容的异步包装（组件中 await 调用不报错，实际同步完成） ───
+
+// 这些不需要单独 export，Zustand store 会直接返回函数
+// 组件里 `await store.createChild(...)` 会直接返回 NodexNode（非 Promise）
+// TypeScript 允许对非 Promise 调用 await（返回值包装为 resolved Promise）
+
+// ─── 全局 store 访问（供 standalone 调试）───
+
+if (typeof window !== 'undefined') {
+  (window as unknown as Record<string, unknown>).__nodeStore = useNodeStore;
+}

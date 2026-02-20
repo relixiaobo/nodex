@@ -1,56 +1,110 @@
+/**
+ * node-store moveNodeTo — Loro model.
+ * moveNodeTo(nodeId, newParentId, index?) — sync, no userId.
+ * Uses note_2 (idea_1, idea_2) for simple reordering tests — no fieldEntries.
+ */
+import { describe, it, expect, beforeEach } from 'vitest';
 import { useNodeStore } from '../../src/stores/node-store.js';
 import { collectNodeGraphErrors } from './helpers/invariants.js';
+import * as loroDoc from '../../src/lib/loro-doc.js';
 import { resetAndSeed } from './helpers/test-state.js';
 
-describe('node-store moveNodeTo', () => {
+describe('moveNodeTo', () => {
   beforeEach(() => {
     resetAndSeed();
   });
 
-  it('blocks invalid moves (onto self or own descendant)', async () => {
-    const beforeProjChildren = [...(useNodeStore.getState().entities.proj_1.children ?? [])];
-    const beforeTaskChildren = [...(useNodeStore.getState().entities.task_1.children ?? [])];
-    const beforeOwner = useNodeStore.getState().entities.task_1.props._ownerId;
-
-    await useNodeStore.getState().moveNodeTo('task_1', 'task_1', 0, 'user_default');
-    await useNodeStore.getState().moveNodeTo('task_1', 'subtask_1a', 0, 'user_default');
-
-    expect(useNodeStore.getState().entities.task_1.props._ownerId).toBe(beforeOwner);
-    expect(useNodeStore.getState().entities.proj_1.children ?? []).toEqual(beforeProjChildren);
-    expect(useNodeStore.getState().entities.task_1.children ?? []).toEqual(beforeTaskChildren);
-    expect(collectNodeGraphErrors(useNodeStore.getState().entities)).toEqual([]);
+  it('blocks moving a node onto itself', () => {
+    const beforeParent = loroDoc.getParentId('idea_1');
+    useNodeStore.getState().moveNodeTo('idea_1', 'idea_1', 0);
+    expect(loroDoc.getParentId('idea_1')).toBe(beforeParent);
+    expect(collectNodeGraphErrors()).toEqual([]);
   });
 
-  it('adjusts insert index correctly when reordering within same parent', async () => {
-    const before = [...(useNodeStore.getState().entities.task_1.children ?? [])];
-    expect(before[0]).toBe('subtask_1a');
-    expect(before[1]).toBe('subtask_1b');
-
-    // Move first child to index=2 in the same parent.
-    // Implementation removes first, then adjusts insertAt (position-1).
-    await useNodeStore.getState().moveNodeTo('subtask_1a', 'task_1', 2, 'user_default');
-
-    const after = useNodeStore.getState().entities.task_1.children ?? [];
-    expect(after[0]).toBe('subtask_1b');
-    expect(after[1]).toBe('subtask_1a');
-    expect(useNodeStore.getState().entities.subtask_1a.props._ownerId).toBe('task_1');
-    expect(collectNodeGraphErrors(useNodeStore.getState().entities)).toEqual([]);
+  it('blocks moving a node onto its own descendant', () => {
+    // proj_1 → task_1 → subtask_1a; try to move proj_1 under subtask_1a
+    const beforeParent = loroDoc.getParentId('proj_1');
+    useNodeStore.getState().moveNodeTo('proj_1', 'subtask_1a', 0);
+    expect(loroDoc.getParentId('proj_1')).toBe(beforeParent);
+    expect(collectNodeGraphErrors()).toEqual([]);
   });
 
-  it('moves node across parents and updates ownership + children arrays', async () => {
-    const oldParentBefore = [...(useNodeStore.getState().entities.task_1.children ?? [])];
-    const newParentBefore = [...(useNodeStore.getState().entities.note_2.children ?? [])];
-    expect(oldParentBefore).toContain('subtask_1b');
+  it('reorders within same parent (note_2: idea_1, idea_2)', () => {
+    const before = loroDoc.getChildren('note_2');
+    expect(before[0]).toBe('idea_1');
+    expect(before[1]).toBe('idea_2');
 
-    await useNodeStore.getState().moveNodeTo('subtask_1b', 'note_2', 1, 'user_default');
+    // Move idea_1 to index=2 in same parent → goes after idea_2
+    useNodeStore.getState().moveNodeTo('idea_1', 'note_2', 2);
 
-    const oldParentAfter = useNodeStore.getState().entities.task_1.children ?? [];
-    const newParentAfter = useNodeStore.getState().entities.note_2.children ?? [];
+    const after = loroDoc.getChildren('note_2');
+    expect(after[0]).toBe('idea_2');
+    expect(after[1]).toBe('idea_1');
+    expect(collectNodeGraphErrors()).toEqual([]);
+  });
 
-    expect(oldParentAfter).not.toContain('subtask_1b');
-    expect(newParentAfter[1]).toBe('subtask_1b');
-    expect(useNodeStore.getState().entities.subtask_1b.props._ownerId).toBe('note_2');
-    expect(newParentAfter.length).toBe(newParentBefore.length + 1);
-    expect(collectNodeGraphErrors(useNodeStore.getState().entities)).toEqual([]);
+  it('moves node to a different parent', () => {
+    const beforeNoteChildren = loroDoc.getChildren('note_2').slice();
+    expect(beforeNoteChildren).toContain('idea_2');
+
+    useNodeStore.getState().moveNodeTo('idea_2', 'proj_1', 0);
+
+    expect(loroDoc.getChildren('note_2')).not.toContain('idea_2');
+    expect(loroDoc.getChildren('proj_1')).toContain('idea_2');
+    expect(loroDoc.getParentId('idea_2')).toBe('proj_1');
+    expect(collectNodeGraphErrors()).toEqual([]);
+  });
+
+  it('appends to end when no index specified', () => {
+    const beforeProjLen = loroDoc.getChildren('proj_1').length;
+    useNodeStore.getState().moveNodeTo('idea_1', 'proj_1');
+    const afterProjChildren = loroDoc.getChildren('proj_1');
+    expect(afterProjChildren.length).toBe(beforeProjLen + 1);
+    expect(afterProjChildren[afterProjChildren.length - 1]).toBe('idea_1');
+    expect(collectNodeGraphErrors()).toEqual([]);
+  });
+
+  it('inserts at specified index in new parent', () => {
+    useNodeStore.getState().moveNodeTo('idea_2', 'proj_1', 1);
+
+    const projChildren = loroDoc.getChildren('proj_1');
+    expect(projChildren[1]).toBe('idea_2');
+    expect(collectNodeGraphErrors()).toEqual([]);
+  });
+});
+
+describe('moveNodeUp / moveNodeDown', () => {
+  beforeEach(() => {
+    resetAndSeed();
+  });
+
+  it('moveNodeDown moves node one position down in parent', () => {
+    // note_2 children: [idea_1, idea_2]
+    useNodeStore.getState().moveNodeDown('idea_1');
+    const after = loroDoc.getChildren('note_2');
+    expect(after[0]).toBe('idea_2');
+    expect(after[1]).toBe('idea_1');
+    expect(collectNodeGraphErrors()).toEqual([]);
+  });
+
+  it('moveNodeDown is no-op for last child', () => {
+    const before = loroDoc.getChildren('note_2').slice();
+    useNodeStore.getState().moveNodeDown('idea_2'); // already last
+    expect(loroDoc.getChildren('note_2')).toEqual(before);
+  });
+
+  it('moveNodeUp moves node one position up in parent', () => {
+    // note_2 children: [idea_1, idea_2]
+    useNodeStore.getState().moveNodeUp('idea_2');
+    const after = loroDoc.getChildren('note_2');
+    expect(after[0]).toBe('idea_2');
+    expect(after[1]).toBe('idea_1');
+    expect(collectNodeGraphErrors()).toEqual([]);
+  });
+
+  it('moveNodeUp is no-op for first child', () => {
+    const before = loroDoc.getChildren('note_2').slice();
+    useNodeStore.getState().moveNodeUp('idea_1'); // already first
+    expect(loroDoc.getChildren('note_2')).toEqual(before);
   });
 });

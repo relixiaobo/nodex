@@ -10,7 +10,6 @@
 import { useCallback } from 'react';
 import { useFieldOptions } from '../../hooks/use-field-options';
 import { useNodeStore } from '../../stores/node-store';
-import { useWorkspaceStore } from '../../stores/workspace-store';
 import { useChildren } from '../../hooks/use-children';
 import { NodePicker } from './NodePicker';
 
@@ -24,44 +23,35 @@ export function OptionsPicker({ nodeId, attrDefId, tupleId }: OptionsPickerProps
   const options = useFieldOptions(attrDefId);
   const setOptionsFieldValue = useNodeStore((s) => s.setOptionsFieldValue);
   const autoCollectOption = useNodeStore((s) => s.autoCollectOption);
-  const userId = useWorkspaceStore((s) => s.userId);
-  const workspaceId = useWorkspaceStore((s) => s.currentWorkspaceId);
+  const clearFieldValue = useNodeStore((s) => s.clearFieldValue);
 
-  // Load current selection from tuple.children[1:]
+  // Load current selection from fieldEntry.children (new model: no key prefix)
   useChildren(tupleId ?? '');
   const selectedId = useNodeStore((s) => {
+    void s._version;
     if (!tupleId) return undefined;
-    const tuple = s.entities[tupleId];
-    const valIds = tuple?.children?.slice(1) ?? [];
+    const tuple = s.getNode(tupleId);
+    const valIds = tuple?.children ?? [];
     return valIds.find((cid) => options.some((opt) => opt.id === cid)) || undefined;
   });
 
   const handleSelect = useCallback(
     (optionId: string) => {
-      if (!userId) return;
-      setOptionsFieldValue(nodeId, attrDefId, optionId, userId);
+      setOptionsFieldValue(nodeId, attrDefId, optionId);
     },
-    [nodeId, attrDefId, userId, setOptionsFieldValue],
+    [nodeId, attrDefId, setOptionsFieldValue],
   );
 
   const handleCreate = useCallback(
     (name: string) => {
-      if (!userId || !workspaceId) return;
-      autoCollectOption(nodeId, attrDefId, name, workspaceId, userId);
+      autoCollectOption(nodeId, attrDefId, name);
     },
-    [nodeId, attrDefId, userId, workspaceId, autoCollectOption],
+    [nodeId, attrDefId, autoCollectOption],
   );
 
   const handleClear = useCallback(() => {
-    if (!tupleId) return;
-    useNodeStore.setState((state) => {
-      const tuple = state.entities[tupleId];
-      if (tuple && tuple.children) {
-        // Keep children[0] (the key/attrDefId), remove value children
-        tuple.children = [tuple.children[0]];
-      }
-    });
-  }, [tupleId]);
+    clearFieldValue(nodeId, attrDefId);
+  }, [nodeId, attrDefId, clearFieldValue]);
 
   return (
     <NodePicker

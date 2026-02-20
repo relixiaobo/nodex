@@ -1,48 +1,40 @@
 /**
- * meta-utils: node.meta 数组操作工具函数
+ * meta-utils: 向后兼容存根
  *
- * node.meta TEXT[] 替代原来的 Metanode 间接层，
- * 直接在节点上存储元信息 Tuple ID 列表。
+ * Loro 迁移后 node.meta 间接层已被消除。
+ * 标签现在直接存储在 node.tags: string[] 中。
+ * 这些函数保留签名供现有调用链使用，但实现已适配新模型。
  */
 import type { NodexNode } from '../types/index.js';
 
 /**
- * 获取节点 meta 数组中对应的 Tuple 节点列表。
- * 跳过 entities 中不存在的 ID。
+ * 获取节点的标签 ID 列表（旧 meta Tuple 路径已废弃）。
+ * 现在直接返回 node.tags。
  */
 export function getMetaTuples(
   node: NodexNode,
-  entities: Record<string, NodexNode>,
+  _entities: Record<string, NodexNode>,
 ): NodexNode[] {
-  if (!node.meta || node.meta.length === 0) return [];
-  const result: NodexNode[] = [];
-  for (const id of node.meta) {
-    const tuple = entities[id];
-    if (tuple) result.push(tuple);
-  }
-  return result;
+  // In Loro model, tags are direct IDs in node.tags.
+  // This function's semantics (returning Tuple nodes) no longer applies.
+  // Callers should use node.tags directly.
+  void _entities;
+  return [];
 }
 
 /**
- * 按 children[0] key 查找 meta 中的特定 Tuple。
- * 例如 findMetaTuple(node, 'SYS_A13', entities) 查找标签 Tuple。
+ * @deprecated meta Tuple 模式已废弃，始终返回 undefined。
  */
 export function findMetaTuple(
-  node: NodexNode,
-  key: string,
-  entities: Record<string, NodexNode>,
+  _node: NodexNode,
+  _key: string,
+  _entities: Record<string, NodexNode>,
 ): NodexNode | undefined {
-  if (!node.meta || node.meta.length === 0) return undefined;
-  for (const id of node.meta) {
-    const tuple = entities[id];
-    if (tuple?.children?.[0] === key) return tuple;
-  }
   return undefined;
 }
 
 /**
- * 向 meta 数组追加一个 Tuple ID（去重）。
- * 返回新数组（不修改原数组）。
+ * 向 meta 数组追加一个 ID（向后兼容，不再使用）。
  */
 export function addMetaTupleId(
   meta: string[] | undefined,
@@ -54,9 +46,7 @@ export function addMetaTupleId(
 }
 
 /**
- * 从 meta 数组移除一个 Tuple ID。
- * 返回新数组（不修改原数组）。
- * 若 ID 不存在，返回原数组引用。
+ * 从 meta 数组移除一个 ID（向后兼容，不再使用）。
  */
 export function removeMetaTupleId(
   meta: string[] | undefined,

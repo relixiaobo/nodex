@@ -16,10 +16,10 @@ import { keymap } from 'prosemirror-keymap';
 import { baseKeymap } from 'prosemirror-commands';
 import { EditorView } from 'prosemirror-view';
 import { useNodeStore } from '../../stores/node-store';
-import { useWorkspaceStore } from '../../stores/workspace-store';
 import { useUIStore } from '../../stores/ui-store';
-import { WORKSPACE_CONTAINERS, SYS_D } from '../../types';
-import { getLastVisibleNode } from '../../lib/tree-utils.js';
+import { SYS_D } from '../../types';
+import { getLastVisibleNode, isWorkspaceContainer } from '../../lib/tree-utils.js';
+import * as loroDoc from '../../lib/loro-doc.js';
 import { getPrimaryShortcutKey } from '../../lib/shortcut-registry';
 import { isImeComposingEvent } from '../../lib/ime-keyboard.js';
 import { resolveTrailingUpdateAction } from '../../lib/trailing-input-actions.js';
@@ -35,10 +35,6 @@ import { BulletChevron } from '../outliner/BulletChevron';
 import { pmSchema } from './pm-schema.js';
 import { marksToDoc } from '../../lib/pm-doc-utils.js';
 
-const CONTAINER_SUFFIXES = Object.values(WORKSPACE_CONTAINERS);
-function isWorkspaceContainer(nodeId: string): boolean {
-  return CONTAINER_SUFFIXES.some((suffix) => nodeId.endsWith(`_${suffix}`));
-}
 
 const KEY_TRAILING_ENTER = getPrimaryShortcutKey('trailing.enter', 'Enter');
 const KEY_TRAILING_INDENT = getPrimaryShortcutKey('trailing.indent_depth', 'Tab');
@@ -77,8 +73,6 @@ function getEditorText(view: EditorView): string {
 export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fieldDataType, attrDefId, onNavigateOut }: TrailingInputProps) {
   const createChild = useNodeStore((s) => s.createChild);
   const addUnnamedFieldToNode = useNodeStore((s) => s.addUnnamedFieldToNode);
-  const wsId = useWorkspaceStore((s) => s.currentWorkspaceId);
-  const userId = useWorkspaceStore((s) => s.userId);
   const setExpanded = useUIStore((s) => s.setExpanded);
   const setFocusedNode = useUIStore((s) => s.setFocusedNode);
   const setFocusClickCoords = useUIStore((s) => s.setFocusClickCoords);
@@ -123,7 +117,7 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
   }, [isOptions, optionsOpen, optionsQuery, allOptions]);
 
   const callbacksRef = useRef({
-    createChild, addUnnamedFieldToNode, addReference, selectFieldOption, wsId, userId,
+    createChild, addUnnamedFieldToNode, addReference, selectFieldOption,
     parentId, effectiveParentId, effectiveDepth, effectiveParentEK,
     setEffectiveParentId, setEffectiveDepth, setEffectiveParentEK,
     setExpanded, setFocusedNode, setFocusClickCoords, setEditingFieldName, setTriggerHint,
@@ -132,7 +126,7 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
     onNavigateOut,
   });
   callbacksRef.current = {
-    createChild, addUnnamedFieldToNode, addReference, selectFieldOption, wsId, userId,
+    createChild, addUnnamedFieldToNode, addReference, selectFieldOption,
     parentId, effectiveParentId, effectiveDepth, effectiveParentEK,
     setEffectiveParentId, setEffectiveDepth, setEffectiveParentEK,
     setExpanded, setFocusedNode, setFocusClickCoords, setEditingFieldName, setTriggerHint,
@@ -145,24 +139,21 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
     if (!rawText.trim() || committingRef.current) return;
 
     const ref = callbacksRef.current;
-    if (!ref.wsId || !ref.userId) return;
-
     committingRef.current = true;
     resetEditorContent(view);
     setHasContent(false);
 
     // Create child and focus it (TrailingInput unmounts once there are children,
     // so we focus the new node to keep the cursor visible)
-    ref.createChild(ref.effectiveParentId, ref.wsId, ref.userId, rawText).then((newNode) => {
-      ref.setExpanded(ref.effectiveParentEK, true);
-      ref.setFocusClickCoords({
-        nodeId: newNode.id,
-        parentId: ref.effectiveParentId,
-        textOffset: rawText.length,
-      });
-      ref.setFocusedNode(newNode.id, ref.effectiveParentId);
-      queueMicrotask(() => { committingRef.current = false; });
+    const newNode = ref.createChild(ref.effectiveParentId, undefined, { name: rawText });
+    ref.setExpanded(ref.effectiveParentEK, true);
+    ref.setFocusClickCoords({
+      nodeId: newNode.id,
+      parentId: ref.effectiveParentId,
+      textOffset: rawText.length,
     });
+    ref.setFocusedNode(newNode.id, ref.effectiveParentId);
+    queueMicrotask(() => { committingRef.current = false; });
   }, []);
 
   const plugins = useMemo<Plugin[]>(() => {
@@ -184,9 +175,9 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
           // Options autocomplete: select highlighted option
           if (intent === 'options_confirm') {
             const selected = ref.filteredOptions[ref.optionsIndex];
-            if (selected && ref.userId) {
+            if (selected) {
               committingRef.current = true;
-              ref.selectFieldOption(ref.effectiveParentId, selected.id, undefined, ref.userId);
+              ref.selectFieldOption(ref.effectiveParentId, selected.id, undefined);
               resetEditorContent(view);
               setHasContent(false);
               ref.setOptionsOpen(false);
@@ -200,51 +191,43 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
           }
 
           if (intent === 'create_content_and_continue') {
-            if (!ref.wsId || !ref.userId || committingRef.current) return true;
+            if (committingRef.current) return true;
             committingRef.current = true;
             resetEditorContent(view);
             setHasContent(false);
             const targetParentId = ref.effectiveParentId;
-            ref.createChild(targetParentId, ref.wsId, ref.userId, rawText)
-              .then(() => {
-                ref.setExpanded(ref.effectiveParentEK, true);
-                return ref.createChild(targetParentId, ref.wsId!, ref.userId!, '');
-              })
-              .then((newNode) => {
-                ref.setExpanded(ref.effectiveParentEK, true);
-                ref.setFocusClickCoords({
-                  nodeId: newNode.id,
-                  parentId: targetParentId,
-                  textOffset: 0,
-                });
-                ref.setFocusedNode(newNode.id, targetParentId);
-              })
-              .finally(() => {
-                queueMicrotask(() => { committingRef.current = false; });
-              });
+            ref.createChild(targetParentId, undefined, { name: rawText });
+            ref.setExpanded(ref.effectiveParentEK, true);
+            const newNode = ref.createChild(targetParentId, undefined, { name: '' });
+            ref.setExpanded(ref.effectiveParentEK, true);
+            ref.setFocusClickCoords({
+              nodeId: newNode.id,
+              parentId: targetParentId,
+              textOffset: 0,
+            });
+            ref.setFocusedNode(newNode.id, targetParentId);
+            queueMicrotask(() => { committingRef.current = false; });
             return true;
           }
 
           // Empty Enter → create empty child so user can keep creating nodes
-          if (!ref.wsId || !ref.userId) return true;
           committingRef.current = true;
-          ref.createChild(ref.effectiveParentId, ref.wsId, ref.userId, '').then((newNode) => {
-            ref.setExpanded(ref.effectiveParentEK, true);
-            ref.setFocusClickCoords({
-              nodeId: newNode.id,
-              parentId: ref.effectiveParentId,
-              textOffset: 0,
-            });
-            ref.setFocusedNode(newNode.id, ref.effectiveParentId);
-            queueMicrotask(() => { committingRef.current = false; });
+          const newEmptyNode = ref.createChild(ref.effectiveParentId, undefined, { name: '' });
+          ref.setExpanded(ref.effectiveParentEK, true);
+          ref.setFocusClickCoords({
+            nodeId: newEmptyNode.id,
+            parentId: ref.effectiveParentId,
+            textOffset: 0,
           });
+          ref.setFocusedNode(newEmptyNode.id, ref.effectiveParentId);
+          queueMicrotask(() => { committingRef.current = false; });
           return true;
         },
         [KEY_TRAILING_INDENT]: (_state, _dispatch, view) => {
           if (isComposing(view)) return false;
           // Indent: move effective parent to last child of current parent
           const ref = callbacksRef.current;
-          const parent = useNodeStore.getState().entities[ref.effectiveParentId];
+          const parent = useNodeStore.getState().getNode(ref.effectiveParentId);
           const siblings = parent?.children ?? [];
           if (siblings.length === 0) return true; // No siblings to indent under
 
@@ -267,12 +250,11 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
           if (ref.effectiveDepth <= 0) return true;
           if (isWorkspaceContainer(ref.effectiveParentId)) return true;
 
-          const currentParent = useNodeStore.getState().entities[ref.effectiveParentId];
-          const grandparentId = currentParent?.props._ownerId;
+          const grandparentId = loroDoc.getParentId(ref.effectiveParentId);
           if (!grandparentId || isWorkspaceContainer(grandparentId)) return true;
 
-          // Compute expand key for grandparent (best-effort via _ownerId)
-          const ggpId = useNodeStore.getState().entities[grandparentId]?.props._ownerId ?? '';
+          // Compute expand key for grandparent (best-effort via parent chain)
+          const ggpId = loroDoc.getParentId(grandparentId) ?? '';
           ref.setEffectiveParentEK(`${ggpId}:${grandparentId}`);
           ref.setEffectiveParentId(grandparentId);
           ref.setEffectiveDepth(ref.effectiveDepth - 1);
@@ -282,10 +264,9 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
           if (!view || isComposing(view)) return false;
           const ref = callbacksRef.current;
           const isEditorEmpty = getEditorText(view).length === 0;
-          const entities = useNodeStore.getState().entities;
           const expanded = useUIStore.getState().expandedNodes;
-          const parent = entities[ref.effectiveParentId];
-          const target = getLastVisibleNode(ref.effectiveParentId, entities, expanded);
+          const parent = useNodeStore.getState().getNode(ref.effectiveParentId);
+          const target = getLastVisibleNode(ref.effectiveParentId, expanded);
           const intent = resolveTrailingBackspaceIntent({
             isEditorEmpty,
             depthShifted: ref.effectiveParentId !== ref.parentId,
@@ -307,7 +288,7 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
           if (intent === 'collapse_parent') {
             const expandKey = ref.effectiveParentEK;
             if (expandKey) ref.setExpanded(expandKey, false);
-            const gpId = parent?.props._ownerId;
+            const gpId = loroDoc.getParentId(ref.effectiveParentId);
             if (gpId) ref.setFocusedNode(ref.effectiveParentId, gpId);
             return true;
           }
@@ -340,9 +321,8 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
         [KEY_TRAILING_ARROW_UP]: (_state, _dispatch, view) => {
           if (isComposing(view)) return false;
           const ref = callbacksRef.current;
-          const entities = useNodeStore.getState().entities;
           const expanded = useUIStore.getState().expandedNodes;
-          const target = getLastVisibleNode(ref.effectiveParentId, entities, expanded);
+          const target = getLastVisibleNode(ref.effectiveParentId, expanded);
           const intent = resolveTrailingArrowUpIntent({
             optionsOpen: ref.isOptions && ref.optionsOpen,
             optionCount: ref.filteredOptions.length,
@@ -404,7 +384,6 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
         if (committingRef.current) return;
 
         const ref = callbacksRef.current;
-        if (!ref.wsId || !ref.userId) return;
 
         const action = resolveTrailingUpdateAction({
           text,
@@ -418,10 +397,9 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
           setHasContent(false);
           ref.setOptionsOpen(false);
 
-          ref.addUnnamedFieldToNode(ref.effectiveParentId, ref.wsId, ref.userId).then(({ tupleId }) => {
-            ref.setEditingFieldName(tupleId);
-            queueMicrotask(() => { committingRef.current = false; });
-          });
+          const { fieldEntryId } = ref.addUnnamedFieldToNode(ref.effectiveParentId);
+          ref.setEditingFieldName(fieldEntryId);
+          queueMicrotask(() => { committingRef.current = false; });
           return;
         }
 
@@ -434,11 +412,10 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
           ref.setOptionsOpen(false);
 
           ref.setTriggerHint(action.trigger);
-          ref.createChild(ref.effectiveParentId, ref.wsId, ref.userId, action.trigger).then((newNode) => {
-            ref.setExpanded(ref.effectiveParentEK, true);
-            ref.setFocusedNode(newNode.id, ref.effectiveParentId);
-            queueMicrotask(() => { committingRef.current = false; });
-          });
+          const triggerNode = ref.createChild(ref.effectiveParentId, undefined, { name: action.trigger });
+          ref.setExpanded(ref.effectiveParentEK, true);
+          ref.setFocusedNode(triggerNode.id, ref.effectiveParentId);
+          queueMicrotask(() => { committingRef.current = false; });
           return;
         }
 
@@ -526,10 +503,10 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
   const handleOptionClick = useCallback((optionId: string) => {
     const ref = callbacksRef.current;
     const view = viewRef.current;
-    if (!ref.userId || !view || view.isDestroyed) return;
+    if (!view || view.isDestroyed) return;
 
     committingRef.current = true;
-    ref.selectFieldOption(ref.effectiveParentId, optionId, undefined, ref.userId);
+    ref.selectFieldOption(ref.effectiveParentId, optionId, undefined);
     resetEditorContent(view);
     setHasContent(false);
     setOptionsOpen(false);

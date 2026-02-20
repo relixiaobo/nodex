@@ -169,7 +169,7 @@ npm run test:run
 **覆盖点**:
 
 1. workspace 容器/root 检测
-2. ancestor chain + structural 节点跳过
+2. ancestor chain + structural 节点跳过 + **容器节点包含在 ancestors chain 中**（面包屑显示 Library/Inbox 等）
 3. 可见节点 flatten 与上下导航（含 reference 场景 parentId 消歧）
 4. last visible node / sibling / index helpers
 5. inline reference 纯度判断（兼容 legacy HTML + 新模型 `\uFFFC + _inlineRefs`）

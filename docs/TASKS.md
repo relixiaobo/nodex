@@ -29,11 +29,27 @@ _(空)_
 |-------|---------|------|-------------|
 | nodex-cc | _(idle — PR #63 merged)_ | — | — |
 | nodex-cc-2 | _(idle — PR #61 merged)_ | — | — |
-| nodex-codex | Loro 迁移全量 Review | main（只读） | docs/reviews/loro-full-review-2026-02-21.md |
+| nodex-codex | 修复 Loro 全量 Review 问题（联调通过，待 review） | codex/loro-review-fixes | docs/TASKS.md, src/stores/node-store.ts, src/components/outliner/OutlinerItem.tsx, src/components/outliner/OutlinerView.tsx, src/components/fields/FieldValueOutliner.tsx, src/lib/node-type-utils.ts, src/lib/tree-utils.ts, tests/vitest/*.test.ts, docs/TESTING.md |
 
 ---
 
 ## 进行中
+
+### Bugfix — Loro 全量 Review 问题修复 (2026-02-21)
+> **Owner**: nodex-codex | **Branch**: codex/loro-review-fixes
+> **目标**: 修复 `docs/reviews/loro-full-review-2026-02-21.md` 中全部问题（P0/P1/P2）并补齐测试缺口
+> **Files**: `src/stores/node-store.ts`, `src/components/outliner/OutlinerItem.tsx`, `src/components/outliner/OutlinerView.tsx`, `src/components/fields/FieldValueOutliner.tsx`, `src/lib/node-type-utils.ts`, `src/lib/tree-utils.ts`, `src/hooks/use-realtime.ts`, `tests/vitest/*`, `docs/TESTING.md`
+> **Progress**:
+> - [x] 修复引用创建误删目标节点 + 引用节点可见性
+> - [x] 修复 removeTag 共享字段误删
+> - [x] 修复 toggleNodeDone 多次 commit（Undo 原子性）
+> - [x] 修复 Options-from-supertag 回显 + Date commit 路径
+> - [x] 增加容器节点不可变守卫
+> - [x] 清理废弃兼容代码（无运行路径）
+> - [x] 补齐测试并更新 `docs/TESTING.md`
+> **迭代日志**:
+> - [2026-02-21 nodex-codex] 任务认领，创建修复分支并开始实现
+> - [2026-02-21 nodex-codex] 完成修复并通过 `npm run typecheck` / `npm run test:run` / `npm run build`：修正引用转换误删目标、reference 渲染分类、removeTag 共享字段保护、toggleNodeDone 单 commit、Date 与 Options-from-supertag 值路径；新增 `node-type-utils` 与对应测试；删除无运行路径 `src/hooks/use-realtime.ts`
 
 ### 代码 Review — Loro 迁移全量 (2026-02-21)
 > **Owner**: nodex-codex | **Branch**: main（只读，不修改代码）

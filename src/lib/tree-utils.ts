@@ -5,6 +5,7 @@
  */
 import { isContainerNode } from '../types/index.js';
 import type { NodexNode } from '../types/index.js';
+import { isOutlinerContentNodeType } from './node-type-utils.js';
 import * as loroDoc from './loro-doc.js';
 
 // ─── Container / root detection ───
@@ -185,7 +186,7 @@ export function getLastVisibleNode(
   // Filter for visible content nodes (no structural type = regular content)
   const visibleChildren = parentChildren.filter((cid) => {
     const n = loroDoc.toNodexNode(cid);
-    return n && !n.type;
+    return !!n && isOutlinerContentNodeType(n.type);
   });
   if (visibleChildren.length === 0) return null;
 
@@ -202,7 +203,7 @@ export function getLastVisibleNode(
 
     const childVisible = childrenIds.filter((cid) => {
       const n = loroDoc.toNodexNode(cid);
-      return n && !n.type;
+      return !!n && isOutlinerContentNodeType(n.type);
     });
     if (childVisible.length === 0) break;
 

@@ -5,6 +5,7 @@ import { useNodeFields, type FieldEntry } from '../../hooks/use-node-fields';
 import { useNodeStore } from '../../stores/node-store';
 import { useUIStore } from '../../stores/ui-store';
 import * as loroDoc from '../../lib/loro-doc.js';
+import { isOutlinerContentNodeType } from '../../lib/node-type-utils.js';
 import { OutlinerItem } from './OutlinerItem';
 import { FieldRow } from '../fields/FieldRow';
 import { TrailingInput } from '../editor/TrailingInput';
@@ -62,7 +63,7 @@ export function OutlinerView({ rootNodeId, showTemplateTuples }: OutlinerViewPro
         result.push({ id: cid, type: 'field', hidden });
       } else {
         const nodeType = useNodeStore.getState().getNode(cid)?.type;
-        if (!nodeType) result.push({ id: cid, type: 'content' });
+        if (isOutlinerContentNodeType(nodeType)) result.push({ id: cid, type: 'content' });
       }
     }
     return result;

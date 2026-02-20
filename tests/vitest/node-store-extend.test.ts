@@ -138,4 +138,29 @@ describe('removeTag — removes fieldEntry nodes', () => {
     // Manual field entry for attrDef_company (from tagDef_person, not tagDef_task) should remain
     expect(findFieldEntry('note_2', 'attrDef_company')).toBe(manualFe);
   });
+
+  it('keeps inherited shared fieldEntries when removing child tag and base tag remains', () => {
+    useNodeStore.getState().applyTag('note_2', 'tagDef_task');
+    useNodeStore.getState().applyTag('note_2', 'tagDef_dev_task');
+
+    useNodeStore.getState().removeTag('note_2', 'tagDef_dev_task');
+
+    // shared via extends chain of tagDef_task should stay
+    expect(findFieldEntry('note_2', 'attrDef_status')).toBeTruthy();
+    expect(findFieldEntry('note_2', 'attrDef_priority')).toBeTruthy();
+    // dev-only field should be removed
+    expect(findFieldEntry('note_2', 'attrDef_branch')).toBeUndefined();
+  });
+
+  it('keeps inherited shared fieldEntries when removing base tag and child tag remains', () => {
+    useNodeStore.getState().applyTag('note_2', 'tagDef_task');
+    useNodeStore.getState().applyTag('note_2', 'tagDef_dev_task');
+
+    useNodeStore.getState().removeTag('note_2', 'tagDef_task');
+
+    // tagDef_dev_task extends tagDef_task, so inherited fields should still exist
+    expect(findFieldEntry('note_2', 'attrDef_status')).toBeTruthy();
+    expect(findFieldEntry('note_2', 'attrDef_priority')).toBeTruthy();
+    expect(findFieldEntry('note_2', 'attrDef_branch')).toBeTruthy();
+  });
 });

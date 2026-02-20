@@ -359,6 +359,32 @@ describe('④ Time Travel / Checkout', () => {
     expect(hasNode('node2')).toBe(true);
   });
 
+  it('detached 模式下写操作被忽略且不抛错', () => {
+    const n = createNode('node1', null);
+    setNodeData(n, 'name', 'original');
+    commitDoc();
+    const f1 = getCurrentFrontiers();
+
+    setNodeData(n, 'name', 'latest');
+    commitDoc();
+
+    checkout(f1);
+    expect(isDetached()).toBe(true);
+    expect(toNodexNode('node1')?.name).toBe('original');
+
+    expect(() => {
+      createNode('detached_new', 'node1');
+      setNodeData('node1', 'name', 'detached-write');
+      commitDoc();
+    }).not.toThrow();
+
+    expect(hasNode('detached_new')).toBe(false);
+    expect(toNodexNode('node1')?.name).toBe('original');
+
+    checkoutToLatest();
+    expect(toNodexNode('node1')?.name).toBe('latest');
+  });
+
   it('getVersionHistory 包含 message 字段（通过 commitDoc with message）', () => {
     const n = createNode('node1', null);
     setNodeData(n, 'name', 'test');

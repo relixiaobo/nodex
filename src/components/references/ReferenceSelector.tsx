@@ -13,6 +13,7 @@ import { AtSign, Plus } from 'lucide-react';
 import { useNodeSearch, type NodeSearchResult } from '../../hooks/use-node-search';
 import { useUIStore } from '../../stores/ui-store';
 import { useNodeStore } from '../../stores/node-store';
+import * as loroDoc from '../../lib/loro-doc.js';
 
 export interface ReferenceDropdownHandle {
   getItemCount(): number;
@@ -37,7 +38,7 @@ export const ReferenceSelector = forwardRef<ReferenceDropdownHandle, ReferenceSe
     // When query is empty, show recently opened nodes from navigation history
     const panelHistory = useUIStore((s) => s.panelHistory);
     const panelIndex = useUIStore((s) => s.panelIndex);
-    const entities = useNodeStore((s) => s.entities);
+    const _version = useNodeStore((s) => s._version);
 
     const recentNodes = useMemo(() => {
       if (query.trim()) return [];
@@ -48,14 +49,15 @@ export const ReferenceSelector = forwardRef<ReferenceDropdownHandle, ReferenceSe
         const id = panelHistory[i];
         if (id === currentNodeId || seen.has(id)) continue;
         seen.add(id);
-        const node = entities[id];
+        const node = loroDoc.toNodexNode(id);
         if (!node) continue;
-        const name = (node.props.name ?? '').replace(/<[^>]+>/g, '').trim();
+        const name = (node.name ?? '').replace(/<[^>]+>/g, '').trim();
         if (!name) continue;
         results.push({ id, name, breadcrumb: '' });
       }
       return results;
-    }, [query, panelHistory, panelIndex, entities, currentNodeId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [query, panelHistory, panelIndex, _version, currentNodeId]);
 
     const items = query.trim() ? searchResults : recentNodes;
     const hasCreateOption = !!(query.trim() && onCreateNew);

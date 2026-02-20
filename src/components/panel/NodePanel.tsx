@@ -3,7 +3,6 @@ import { Trash2 } from 'lucide-react';
 import { useNode } from '../../hooks/use-node';
 import { useNodeStore } from '../../stores/node-store';
 import { useUIStore } from '../../stores/ui-store';
-import { useWorkspaceStore } from '../../stores/workspace-store';
 import { NodePanelHeader } from './NodePanelHeader';
 import { PanelTitle } from './PanelTitle';
 import { OutlinerView } from '../outliner/OutlinerView';
@@ -17,17 +16,16 @@ interface NodePanelProps {
 export function NodePanel({ nodeId }: NodePanelProps) {
   const node = useNode(nodeId);
   const goBack = useUIStore((s) => s.goBack);
-  const wsId = useWorkspaceStore((s) => s.currentWorkspaceId) ?? '';
-  const userId = useWorkspaceStore((s) => s.userId) ?? 'local';
 
-  const isAttrDef = node?.props._docType === 'attrDef';
-  const isTagDef = node?.props._docType === 'tagDef';
-  const isDefinitionNode = isAttrDef || isTagDef;
+  const isFieldDef = node?.type === 'fieldDef';
+  const isTagDef = node?.type === 'tagDef';
+  const isDefinitionNode = isFieldDef || isTagDef;
 
   // TagDef: colored gradient at top reflecting configured color
-  const tagDefColor = useNodeStore((s) =>
-    isTagDef ? resolveTagColor(s.entities, nodeId) : null,
-  );
+  const tagDefColor = useNodeStore((s) => {
+    void s._version;
+    return isTagDef ? resolveTagColor(nodeId) : null;
+  });
 
   // IntersectionObserver: detect when title scrolls out of view
   const [titleVisible, setTitleVisible] = useState(true);
@@ -51,9 +49,9 @@ export function NodePanel({ nodeId }: NodePanelProps) {
   }, [nodeId]);
 
   const handleDelete = useCallback(() => {
-    useNodeStore.getState().trashNode(nodeId, wsId, userId);
+    useNodeStore.getState().trashNode(nodeId);
     goBack();
-  }, [nodeId, wsId, userId, goBack]);
+  }, [nodeId, goBack]);
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
@@ -83,7 +81,7 @@ export function NodePanel({ nodeId }: NodePanelProps) {
               className="flex items-center gap-2 text-sm text-foreground-secondary hover:text-destructive transition-colors"
             >
               <Trash2 size={14} />
-              <span>{isAttrDef ? 'Delete field' : 'Delete tag'}</span>
+              <span>{isFieldDef ? 'Delete field' : 'Delete tag'}</span>
             </button>
           </div>
         )}

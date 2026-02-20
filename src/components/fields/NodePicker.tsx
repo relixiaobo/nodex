@@ -17,7 +17,7 @@ import { useNodeStore } from '../../stores/node-store';
 
 /** Memoized colored # bullet — subscribes only to the specific tagDef's color config. */
 const TagDefBullet = memo(function TagDefBullet({ tagDefId }: { tagDefId: string }) {
-  const color = useNodeStore((s) => resolveTagColor(s.entities, tagDefId).text);
+  const color = useNodeStore((s) => { void s._version; return resolveTagColor(tagDefId).text; });
   return (
     <span
       className="flex h-[13px] w-[13px] items-center justify-center rounded-full"
@@ -72,9 +72,10 @@ export function NodePicker({
   }, [options, selectedId]);
 
   const selectedName = selectedOption?.name;
-  const selectedTagDefColor = useNodeStore((s) =>
-    selectedOption?.isTagDef ? resolveTagColor(s.entities, selectedOption.id).text : undefined,
-  );
+  const selectedTagDefColor = useNodeStore((s) => {
+    void s._version;
+    return selectedOption?.isTagDef ? resolveTagColor(selectedOption.id).text : undefined;
+  });
 
   // Show all options when: textSelected (reference just opened), empty input,
   // or input matches selectedName exactly (non-reference just opened, not yet typed)

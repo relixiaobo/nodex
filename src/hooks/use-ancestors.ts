@@ -18,8 +18,9 @@ const EMPTY_JSON = JSON.stringify(EMPTY);
 
 export function useAncestors(nodeId: string | null): AncestorResult {
   const json = useNodeStore((state) => {
+    void state._version;
     if (!nodeId) return EMPTY_JSON;
-    const result = getAncestorChain(nodeId, state.entities);
+    const result = getAncestorChain(nodeId);
     if (result.ancestors.length === 0 && !result.workspaceRootId) return EMPTY_JSON;
     return JSON.stringify(result);
   });

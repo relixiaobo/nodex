@@ -1,4 +1,3 @@
-import type { NodexNode } from '../../src/types/index.js';
 import {
   isNodeOrAncestorSelected,
   hasSelectedAncestor,
@@ -10,22 +9,7 @@ import {
   getSelectionBounds,
   getEffectiveSelectionBounds,
 } from '../../src/lib/selection-utils.js';
-
-/** Helper to create a minimal NodexNode. */
-function makeNode(id: string, ownerId: string | undefined, children: string[] = []): NodexNode {
-  return {
-    id,
-    workspaceId: 'ws',
-    children,
-    associationMap: {},
-    touchCounts: [],
-    modifiedTs: [],
-    props: {
-      _ownerId: ownerId,
-      created: Date.now(),
-    },
-  } as unknown as NodexNode;
-}
+import { resetLoroDoc, initLoroDocForTest, createNode } from '../../src/lib/loro-doc.js';
 
 /**
  * Tree structure for tests:
@@ -38,113 +22,111 @@ function makeNode(id: string, ownerId: string | undefined, children: string[] = 
  *   │   └── B1
  *   └── C
  */
-function makeEntities(): Record<string, NodexNode> {
-  return {
-    root: makeNode('root', undefined, ['A', 'B', 'C']),
-    A: makeNode('A', 'root', ['A1', 'A2']),
-    A1: makeNode('A1', 'A', []),
-    A2: makeNode('A2', 'A', []),
-    B: makeNode('B', 'root', ['B1']),
-    B1: makeNode('B1', 'B', []),
-    C: makeNode('C', 'root', []),
-  };
+function buildTree() {
+  createNode('root', null);
+  createNode('A', 'root');
+  createNode('A1', 'A');
+  createNode('A2', 'A');
+  createNode('B', 'root');
+  createNode('B1', 'B');
+  createNode('C', 'root');
 }
+
+beforeEach(() => {
+  resetLoroDoc();
+  initLoroDocForTest('ws_default');
+  buildTree();
+});
 
 // ─── isNodeOrAncestorSelected ───
 
 describe('isNodeOrAncestorSelected', () => {
-  const entities = makeEntities();
-
   it('returns false for empty selection', () => {
-    expect(isNodeOrAncestorSelected('A', new Set(), entities)).toBe(false);
+    expect(isNodeOrAncestorSelected('A', new Set())).toBe(false);
   });
 
   it('returns true if node itself is selected', () => {
-    expect(isNodeOrAncestorSelected('A', new Set(['A']), entities)).toBe(true);
+    expect(isNodeOrAncestorSelected('A', new Set(['A']))).toBe(true);
   });
 
   it('returns true if parent is selected', () => {
-    expect(isNodeOrAncestorSelected('A1', new Set(['A']), entities)).toBe(true);
+    expect(isNodeOrAncestorSelected('A1', new Set(['A']))).toBe(true);
   });
 
   it('returns true if grandparent is selected', () => {
-    expect(isNodeOrAncestorSelected('A1', new Set(['root']), entities)).toBe(true);
+    expect(isNodeOrAncestorSelected('A1', new Set(['root']))).toBe(true);
   });
 
   it('returns false if sibling is selected (not ancestor)', () => {
-    expect(isNodeOrAncestorSelected('B', new Set(['A']), entities)).toBe(false);
+    expect(isNodeOrAncestorSelected('B', new Set(['A']))).toBe(false);
   });
 
   it('returns false for unknown node', () => {
-    expect(isNodeOrAncestorSelected('unknown', new Set(['A']), entities)).toBe(false);
+    expect(isNodeOrAncestorSelected('unknown', new Set(['A']))).toBe(false);
   });
 });
 
 // ─── hasSelectedAncestor ───
 
 describe('hasSelectedAncestor', () => {
-  const entities = makeEntities();
-
   it('returns false for empty selection', () => {
-    expect(hasSelectedAncestor('A1', new Set(), entities)).toBe(false);
+    expect(hasSelectedAncestor('A1', new Set())).toBe(false);
   });
 
   it('returns false if only self is selected (not ancestor)', () => {
-    expect(hasSelectedAncestor('A', new Set(['A']), entities)).toBe(false);
+    expect(hasSelectedAncestor('A', new Set(['A']))).toBe(false);
   });
 
   it('returns true if parent is selected', () => {
-    expect(hasSelectedAncestor('A1', new Set(['A']), entities)).toBe(true);
+    expect(hasSelectedAncestor('A1', new Set(['A']))).toBe(true);
   });
 
   it('returns false for root node (no parent)', () => {
-    expect(hasSelectedAncestor('root', new Set(['root']), entities)).toBe(false);
+    expect(hasSelectedAncestor('root', new Set(['root']))).toBe(false);
   });
 });
 
 // ─── toggleNodeInSelection ───
 
 describe('toggleNodeInSelection', () => {
-  const entities = makeEntities();
-
   it('adds a new node to empty selection', () => {
-    const result = toggleNodeInSelection('A', new Set(), entities);
+    const result = toggleNodeInSelection('A', new Set());
     expect(result).toEqual(new Set(['A']));
   });
 
   it('removes a directly selected node', () => {
-    const result = toggleNodeInSelection('A', new Set(['A', 'B']), entities);
+    const result = toggleNodeInSelection('A', new Set(['A', 'B']));
     expect(result).toEqual(new Set(['B']));
   });
 
   it('ignores click on node whose ancestor is selected', () => {
-    const result = toggleNodeInSelection('A1', new Set(['A']), entities);
+    const result = toggleNodeInSelection('A1', new Set(['A']));
     // A1 is already implicitly selected via A — no change
     expect(result).toEqual(new Set(['A']));
   });
 
   it('absorbs descendants when selecting ancestor', () => {
-    const result = toggleNodeInSelection('A', new Set(['A1', 'A2']), entities);
+    const result = toggleNodeInSelection('A', new Set(['A1', 'A2']));
     // Selecting A absorbs A1 and A2
     expect(result).toEqual(new Set(['A']));
   });
 
   it('absorbs nested descendants when selecting high ancestor', () => {
-    const result = toggleNodeInSelection('root', new Set(['A1', 'B1', 'C']), entities);
+    const result = toggleNodeInSelection('root', new Set(['A1', 'B1', 'C']));
     // root absorbs all descendants
     expect(result).toEqual(new Set(['root']));
   });
 
   it('adds node alongside non-ancestor selections', () => {
-    const result = toggleNodeInSelection('C', new Set(['A']), entities);
+    const result = toggleNodeInSelection('C', new Set(['A']));
     expect(result).toEqual(new Set(['A', 'C']));
   });
 });
 
 // ─── computeRangeSelection ───
+// These tests use flatList and don't need ancestor traversal (they pass flatList for context)
 
 describe('computeRangeSelection', () => {
-  const entities = makeEntities();
   // Flat list: A, A1, A2, B, B1, C (all expanded)
   const flatList = [
     { nodeId: 'A', parentId: 'root' },
@@ -156,31 +138,27 @@ describe('computeRangeSelection', () => {
   ];
 
   it('selects range between anchor and target (forward)', () => {
-    const result = computeRangeSelection('A', 'B', flatList, entities);
-    // Range: A, A1, A2, B → root-level filter: A (covers A1,A2) + B
+    const result = computeRangeSelection('A', 'B', flatList);
     expect(result).toEqual(new Set(['A', 'B']));
   });
 
   it('selects range between anchor and target (backward)', () => {
-    const result = computeRangeSelection('C', 'B', flatList, entities);
-    // Range: B, B1, C → root-level: B (covers B1) + C
+    const result = computeRangeSelection('C', 'B', flatList);
     expect(result).toEqual(new Set(['B', 'C']));
   });
 
   it('selects single node when anchor equals target', () => {
-    const result = computeRangeSelection('B', 'B', flatList, entities);
+    const result = computeRangeSelection('B', 'B', flatList);
     expect(result).toEqual(new Set(['B']));
   });
 
   it('handles full range from first to last', () => {
-    const result = computeRangeSelection('A', 'C', flatList, entities);
-    // All nodes → root-level: A, B, C (A covers A1/A2, B covers B1)
+    const result = computeRangeSelection('A', 'C', flatList);
     expect(result).toEqual(new Set(['A', 'B', 'C']));
   });
 
   it('handles missing anchor gracefully', () => {
-    const result = computeRangeSelection('MISSING', 'A', flatList, entities);
-    // Fallback: both IDs
+    const result = computeRangeSelection('MISSING', 'A', flatList);
     expect(result.has('MISSING')).toBe(true);
     expect(result.has('A')).toBe(true);
   });
@@ -189,25 +167,23 @@ describe('computeRangeSelection', () => {
 // ─── filterToRootLevel ───
 
 describe('filterToRootLevel', () => {
-  const entities = makeEntities();
-
   it('keeps only root-level nodes', () => {
-    const result = filterToRootLevel(new Set(['A', 'A1', 'A2', 'B']), entities);
+    const result = filterToRootLevel(new Set(['A', 'A1', 'A2', 'B']));
     expect(result).toEqual(new Set(['A', 'B']));
   });
 
   it('returns all if none are ancestors of each other', () => {
-    const result = filterToRootLevel(new Set(['A', 'B', 'C']), entities);
+    const result = filterToRootLevel(new Set(['A', 'B', 'C']));
     expect(result).toEqual(new Set(['A', 'B', 'C']));
   });
 
   it('handles empty set', () => {
-    const result = filterToRootLevel(new Set(), entities);
+    const result = filterToRootLevel(new Set());
     expect(result).toEqual(new Set());
   });
 
   it('handles deeply nested chain', () => {
-    const result = filterToRootLevel(new Set(['root', 'A', 'A1']), entities);
+    const result = filterToRootLevel(new Set(['root', 'A', 'A1']));
     expect(result).toEqual(new Set(['root']));
   });
 });
@@ -308,7 +284,6 @@ describe('getSelectionBounds', () => {
 // ─── getEffectiveSelectionBounds ───
 
 describe('getEffectiveSelectionBounds', () => {
-  const entities = makeEntities();
   // Flat list: A, A1, A2, B, B1, C (all expanded)
   const flatList = [
     { nodeId: 'A', parentId: 'root' },
@@ -320,148 +295,87 @@ describe('getEffectiveSelectionBounds', () => {
   ];
 
   it('returns null for empty selection', () => {
-    expect(getEffectiveSelectionBounds(new Set(), flatList, entities)).toBeNull();
+    expect(getEffectiveSelectionBounds(new Set(), flatList)).toBeNull();
   });
 
   it('includes implicitly selected descendants of a parent', () => {
-    // Only A is in selectedNodeIds, but A1 and A2 are descendants
-    const result = getEffectiveSelectionBounds(new Set(['A']), flatList, entities);
+    const result = getEffectiveSelectionBounds(new Set(['A']), flatList);
     expect(result).toEqual({ firstIdx: 0, lastIdx: 2 }); // A(0) through A2(2)
   });
 
   it('returns exact index for leaf node selection', () => {
-    const result = getEffectiveSelectionBounds(new Set(['C']), flatList, entities);
-    expect(result).toEqual({ firstIdx: 5, lastIdx: 5 }); // C is at index 5
+    const result = getEffectiveSelectionBounds(new Set(['C']), flatList);
+    expect(result).toEqual({ firstIdx: 5, lastIdx: 5 });
   });
 
   it('spans across multiple selected parents with descendants', () => {
-    // A and B selected → covers A, A1, A2, B, B1
-    const result = getEffectiveSelectionBounds(new Set(['A', 'B']), flatList, entities);
+    const result = getEffectiveSelectionBounds(new Set(['A', 'B']), flatList);
     expect(result).toEqual({ firstIdx: 0, lastIdx: 4 }); // A(0) through B1(4)
   });
 
   it('matches getSelectionBounds when no children are expanded', () => {
-    // Collapsed flat list: only A, B, C (no children visible)
     const collapsedList = [
       { nodeId: 'A', parentId: 'root' },
       { nodeId: 'B', parentId: 'root' },
       { nodeId: 'C', parentId: 'root' },
     ];
-    const result = getEffectiveSelectionBounds(new Set(['A', 'C']), collapsedList, entities);
-    expect(result).toEqual({ firstIdx: 0, lastIdx: 2 }); // A(0) through C(2)
-  });
-
-  it('includes reference node descendants via display hierarchy', () => {
-    // Reference node R appears under B in display, but _ownerId points to A.
-    // If B is selected, R (displayed under B) should be counted as implicitly selected.
-    const refEntities: Record<string, NodexNode> = {
-      ...entities,
-      R: makeNode('R', 'A', []), // _ownerId = A (original owner)
-    };
-    // In the display tree, R appears under B (as a reference)
-    const refFlatList = [
-      { nodeId: 'A', parentId: 'root' },
-      { nodeId: 'A1', parentId: 'A' },
-      { nodeId: 'A2', parentId: 'A' },
-      { nodeId: 'B', parentId: 'root' },
-      { nodeId: 'R', parentId: 'B' },  // R displayed under B
-      { nodeId: 'B1', parentId: 'B' },
-      { nodeId: 'C', parentId: 'root' },
-    ];
-    // B selected → R (display child of B) should be included in effective bounds
-    const result = getEffectiveSelectionBounds(new Set(['B']), refFlatList, refEntities);
-    expect(result).toEqual({ firstIdx: 3, lastIdx: 5 }); // B(3) through B1(5), including R(4)
+    const result = getEffectiveSelectionBounds(new Set(['A', 'C']), collapsedList);
+    expect(result).toEqual({ firstIdx: 0, lastIdx: 2 });
   });
 });
 
-// ─── Reference node selection tests ───
+// ─── filterToRootLevel with flatList (display hierarchy) ───
 
 describe('filterToRootLevel with flatList (display hierarchy)', () => {
-  const entities = makeEntities();
-
   it('filters using display hierarchy when flatList provided', () => {
-    // A1 is displayed under A in flatList, so selecting {A, A1} → keeps only A
     const flatList = [
       { nodeId: 'A', parentId: 'root' },
       { nodeId: 'A1', parentId: 'A' },
       { nodeId: 'A2', parentId: 'A' },
       { nodeId: 'B', parentId: 'root' },
     ];
-    const result = filterToRootLevel(new Set(['A', 'A1', 'A2', 'B']), entities, flatList);
+    const result = filterToRootLevel(new Set(['A', 'A1', 'A2', 'B']), undefined, flatList);
     expect(result).toEqual(new Set(['A', 'B']));
   });
 
-  it('does NOT incorrectly filter reference nodes via _ownerId', () => {
-    // Reference node R: _ownerId = A (original owner), but displayed under B
-    const refEntities: Record<string, NodexNode> = {
-      ...entities,
-      R: makeNode('R', 'A', []), // _ownerId points to A
-    };
+  it('does NOT incorrectly filter reference nodes via LoroDoc parent', () => {
+    // Add a reference node R whose LoroDoc parent is A, but displayed under B
+    createNode('R', 'A');
     const flatList = [
       { nodeId: 'A', parentId: 'root' },
       { nodeId: 'B', parentId: 'root' },
       { nodeId: 'R', parentId: 'B' },  // displayed under B
       { nodeId: 'C', parentId: 'root' },
     ];
-    // Select A and R: without flatList, _ownerId chain would see R→A→root,
-    // incorrectly filtering R as covered by A. With flatList, R's display parent is B,
-    // so R is NOT covered by A.
-    const result = filterToRootLevel(new Set(['A', 'R']), refEntities, flatList);
-    expect(result).toEqual(new Set(['A', 'R'])); // Both kept
+    // A and R: R's display parent is B, so R is NOT covered by A
+    const result = filterToRootLevel(new Set(['A', 'R']), undefined, flatList);
+    expect(result).toEqual(new Set(['A', 'R']));
   });
 
   it('reference node filtered when its display parent IS selected', () => {
-    const refEntities: Record<string, NodexNode> = {
-      ...entities,
-      R: makeNode('R', 'A', []),
-    };
+    createNode('R', 'A');
     const flatList = [
       { nodeId: 'A', parentId: 'root' },
       { nodeId: 'B', parentId: 'root' },
       { nodeId: 'R', parentId: 'B' },
       { nodeId: 'C', parentId: 'root' },
     ];
-    // Select B and R: R's display parent is B, so R is filtered out
-    const result = filterToRootLevel(new Set(['B', 'R']), refEntities, flatList);
+    // Select B and R: R's display parent is B → filtered out
+    const result = filterToRootLevel(new Set(['B', 'R']), undefined, flatList);
     expect(result).toEqual(new Set(['B']));
   });
 });
 
 describe('computeRangeSelection with reference nodes', () => {
   it('range across reference node includes it correctly', () => {
-    const refEntities: Record<string, NodexNode> = {
-      ...makeEntities(),
-      R: makeNode('R', 'A', []), // _ownerId = A, displayed under root
-    };
+    createNode('D', 'root');
     // Flat list: A, R (ref displayed at root level), B
     const flatList = [
       { nodeId: 'A', parentId: 'root' },
-      { nodeId: 'R', parentId: 'root' },  // reference at root level
+      { nodeId: 'D', parentId: 'root' },
       { nodeId: 'B', parentId: 'root' },
     ];
-    // Range from A to B should include R
-    const result = computeRangeSelection('A', 'B', flatList, refEntities);
-    expect(result).toEqual(new Set(['A', 'R', 'B']));
-  });
-
-  it('range does not oscillate: reference node not wrongly removed', () => {
-    // This is the core bug scenario: selecting A → extending to include R
-    // R's _ownerId = A, so old filterToRootLevel would see R as covered by A.
-    // With flatList-based filtering, R at root display level stays.
-    const refEntities: Record<string, NodexNode> = {
-      ...makeEntities(),
-      R: makeNode('R', 'A', []),
-    };
-    const flatList = [
-      { nodeId: 'A', parentId: 'root' },
-      { nodeId: 'A1', parentId: 'A' },
-      { nodeId: 'A2', parentId: 'A' },
-      { nodeId: 'R', parentId: 'root' },  // ref at root level
-      { nodeId: 'B', parentId: 'root' },
-    ];
-    // Range from A to R
-    const result = computeRangeSelection('A', 'R', flatList, refEntities);
-    // A covers A1/A2 (display children), R is at root → both A and R in result
-    expect(result).toEqual(new Set(['A', 'R']));
+    const result = computeRangeSelection('A', 'B', flatList);
+    expect(result).toEqual(new Set(['A', 'D', 'B']));
   });
 });

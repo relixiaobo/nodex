@@ -151,9 +151,8 @@ export function useDragSelect({ containerRef, rootChildIds, rootNodeId }: UseDra
       if (!hoverNode) return;
 
       const uiState = useUIStore.getState();
-      const storeEntities = useNodeStore.getState().entities;
       const { rootChildIds: rcIds, rootNodeId: rnId } = contextRef.current;
-      const flatList = getFlattenedVisibleNodes(rcIds, storeEntities, uiState.expandedNodes, rnId);
+      const flatList = getFlattenedVisibleNodes(rcIds, uiState.expandedNodes, rnId);
 
       // Validate hover node belongs to this outliner context
       if (!flatList.some((item) => item.nodeId === hoverNode.nodeId)) return;
@@ -162,7 +161,6 @@ export function useDragSelect({ containerRef, rootChildIds, rootNodeId }: UseDra
         s.startNodeId!,
         hoverNode.nodeId,
         flatList,
-        storeEntities,
       );
       useUIStore.getState().setSelectedNodes(range, s.startNodeId);
     };

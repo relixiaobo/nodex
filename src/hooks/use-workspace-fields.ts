@@ -1,5 +1,5 @@
 /**
- * Get all AttrDef (field definition) nodes in the store.
+ * Get all FieldDef (field definition) nodes in the Loro store.
  * Used by FieldNameInput for autocomplete suggestions.
  *
  * Uses JSON.stringify as selector return to avoid React 19 infinite loop.
@@ -7,18 +7,21 @@
 import { useMemo } from 'react';
 import { useNodeStore } from '../stores/node-store';
 import { resolveDataType, SYSTEM_FIELD_ENTRIES } from '../lib/field-utils.js';
+import * as loroDoc from '../lib/loro-doc.js';
 
 const EMPTY = '[]';
 
 export function useWorkspaceFields(): Array<{ id: string; name: string; dataType: string }> {
   const json = useNodeStore((state) => {
+    void state._version;
     const fields: Array<{ id: string; name: string; dataType: string }> = [];
-    for (const [id, node] of Object.entries(state.entities)) {
-      if (node.props._docType === 'attrDef') {
+    for (const id of loroDoc.getAllNodeIds()) {
+      const node = loroDoc.toNodexNode(id);
+      if (node?.type === 'fieldDef') {
         fields.push({
           id,
-          name: node.props.name ?? 'Untitled',
-          dataType: resolveDataType(state.entities, id),
+          name: node.name ?? 'Untitled',
+          dataType: resolveDataType(id),
         });
       }
     }

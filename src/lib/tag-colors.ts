@@ -7,6 +7,7 @@
 import { SYS_A } from '../types/index.js';
 import type { NodexNode } from '../types/index.js';
 import { resolveConfigValue } from './field-utils.js';
+import * as loroDoc from './loro-doc.js';
 
 export interface TagColor {
   bg: string;
@@ -84,16 +85,15 @@ export function getTagColor(tagDefId: string): TagColor {
  * 3. Fallback → deterministic hash
  */
 export function resolveTagColor(
-  entities: Record<string, NodexNode>,
   tagDefId: string,
 ): TagColor {
   // System tags always gray
   if (tagDefId.startsWith('SYS_T')) return TAG_COLOR_GRAY;
 
-  // Check SYS_A11 config
-  const tagDef = entities[tagDefId];
+  // Check configured color via loroDoc
+  const tagDef = loroDoc.toNodexNode(tagDefId);
   if (tagDef) {
-    const colorKey = resolveConfigValue(entities, tagDef, SYS_A.COLOR);
+    const colorKey = resolveConfigValue(tagDef, SYS_A.COLOR);
     if (colorKey && TAG_COLOR_MAP[colorKey]) {
       return TAG_COLOR_MAP[colorKey];
     }

@@ -9,7 +9,6 @@
 import { useState, useRef, useEffect, useCallback, type KeyboardEvent } from 'react';
 import { useWorkspaceFields } from '../../hooks/use-workspace-fields';
 import { useNodeStore } from '../../stores/node-store';
-import { useWorkspaceStore } from '../../stores/workspace-store';
 import { useUIStore } from '../../stores/ui-store';
 
 interface FieldNameInputProps {
@@ -42,11 +41,9 @@ export function FieldNameInput({
   const confirmedRef = useRef(false);
 
   const allFields = useWorkspaceFields();
-  const renameAttrDef = useNodeStore((s) => s.renameAttrDef);
-  const replaceFieldAttrDef = useNodeStore((s) => s.replaceFieldAttrDef);
+  const renameFieldDef = useNodeStore((s) => s.renameFieldDef);
+  const replaceFieldDef = useNodeStore((s) => s.replaceFieldDef);
   const removeField = useNodeStore((s) => s.removeField);
-  const wsId = useWorkspaceStore((s) => s.currentWorkspaceId);
-  const userId = useWorkspaceStore((s) => s.userId);
   const setEditingFieldName = useUIStore((s) => s.setEditingFieldName);
   const setSelectedNode = useUIStore((s) => s.setSelectedNode);
 
@@ -91,15 +88,11 @@ export function FieldNameInput({
   }, []);
 
   const confirm = useCallback(
-    async (opts?: { focusValue?: boolean }) => {
+    (opts?: { focusValue?: boolean }) => {
       if (confirmedRef.current) return;
       confirmedRef.current = true;
 
       const trimmed = value.trim();
-      if (!wsId || !userId) {
-        setEditingFieldName(null);
-        return;
-      }
 
       // Check if typed name matches an existing field definition
       const match = trimmed
@@ -107,11 +100,11 @@ export function FieldNameInput({
         : null;
 
       if (match) {
-        // Reuse existing attrDef → swap + delete placeholder
-        await replaceFieldAttrDef(nodeId, tupleId, attrDefId, match.id, wsId, userId);
+        // Reuse existing fieldDef → swap + delete placeholder
+        replaceFieldDef(nodeId, tupleId, attrDefId, match.id);
       } else if (trimmed && trimmed !== currentName) {
-        // Rename placeholder attrDef
-        await renameAttrDef(attrDefId, trimmed, userId);
+        // Rename placeholder fieldDef
+        renameFieldDef(attrDefId, trimmed);
       }
 
       setEditingFieldName(null);
@@ -127,21 +120,17 @@ export function FieldNameInput({
         });
       }
     },
-    [value, allFields, attrDefId, nodeId, tupleId, wsId, userId, currentName, renameAttrDef, replaceFieldAttrDef, setEditingFieldName],
+    [value, allFields, attrDefId, nodeId, tupleId, currentName, renameFieldDef, replaceFieldDef, setEditingFieldName],
   );
 
   const selectSuggestion = useCallback(
-    async (fieldId: string) => {
+    (fieldId: string) => {
       if (confirmedRef.current) return;
       confirmedRef.current = true;
-      if (!wsId || !userId) {
-        setEditingFieldName(null);
-        return;
-      }
-      await replaceFieldAttrDef(nodeId, tupleId, attrDefId, fieldId, wsId, userId);
+      replaceFieldDef(nodeId, tupleId, attrDefId, fieldId);
       setEditingFieldName(null);
     },
-    [nodeId, tupleId, attrDefId, wsId, userId, replaceFieldAttrDef, setEditingFieldName],
+    [nodeId, tupleId, attrDefId, replaceFieldDef, setEditingFieldName],
   );
 
   const handleKeyDown = useCallback(
@@ -156,9 +145,11 @@ export function FieldNameInput({
       } else if (e.key === 'Tab') {
         e.preventDefault();
         if (e.shiftKey) {
-          void confirm().then(() => onOutdentRow?.());
+          confirm();
+          onOutdentRow?.();
         } else {
-          void confirm().then(() => onIndentRow?.());
+          confirm();
+          onIndentRow?.();
         }
       } else if (e.key === 'Escape') {
         e.preventDefault();
@@ -168,25 +159,27 @@ export function FieldNameInput({
         setSelectedNode(tupleId, nodeId);
       } else if (e.key === 'Backspace') {
         // Empty field name + Backspace → delete the entire field
-        if (value === '' && wsId && userId) {
+        if (value === '') {
           e.preventDefault();
           confirmedRef.current = true;
           setEditingFieldName(null);
-          removeField(nodeId, tupleId, wsId, userId);
+          removeField(nodeId, tupleId);
         }
       } else if (e.key === 'ArrowDown') {
         e.preventDefault();
         if (suggestions.length > 0) {
           setSelectedIndex((i) => Math.min(i + 1, suggestions.length - 1));
         } else if (onNavigateRow) {
-          void confirm().then(() => onNavigateRow('down'));
+          confirm();
+          onNavigateRow('down');
         }
       } else if (e.key === 'ArrowUp') {
         e.preventDefault();
         if (suggestions.length > 0) {
           setSelectedIndex((i) => Math.max(i - 1, 0));
         } else if (onNavigateRow) {
-          void confirm().then(() => onNavigateRow('up'));
+          confirm();
+          onNavigateRow('up');
         }
       }
     },
@@ -199,8 +192,6 @@ export function FieldNameInput({
       suggestions.length,
       setEditingFieldName,
       value,
-      wsId,
-      userId,
       nodeId,
       tupleId,
       removeField,

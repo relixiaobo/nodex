@@ -1,11 +1,14 @@
 /**
- * Hook returning option nodes for an OPTIONS-type attrDef.
- * Supports both SYS_D12 (predetermined + auto-collect) and SYS_D05 (from supertag).
+ * Hook returning option nodes for an OPTIONS-type fieldDef.
+ * Supports both options-from-supertag and predetermined + auto-collected.
  * Uses JSON-string selector pattern to avoid React 19 infinite re-render.
  */
 import { useMemo } from 'react';
 import { useNodeStore } from '../stores/node-store';
-import { resolveDataType, resolveFieldOptions, resolveAutoCollectedOptions, resolveSourceSupertag, resolveTaggedNodes } from '../lib/field-utils.js';
+import {
+  resolveDataType, resolveFieldOptions, resolveAutoCollectedOptions,
+  resolveSourceSupertag, resolveTaggedNodes,
+} from '../lib/field-utils.js';
 import { SYS_D } from '../types/index.js';
 
 export interface FieldOption {
@@ -17,27 +20,29 @@ const EMPTY = '[]';
 
 export function useFieldOptions(attrDefId: string): FieldOption[] {
   const json = useNodeStore((state) => {
-    const dataType = resolveDataType(state.entities, attrDefId);
+    void state._version;
+    if (!attrDefId) return EMPTY;
 
-    // SYS_D05: Options from supertag — all nodes tagged with source supertag
+    const dataType = resolveDataType(attrDefId);
+
+    // Options from supertag — all nodes tagged with source supertag
     if (dataType === SYS_D.OPTIONS_FROM_SUPERTAG) {
-      const tagDefId = resolveSourceSupertag(state.entities, attrDefId);
+      const tagDefId = resolveSourceSupertag(attrDefId);
       if (!tagDefId) return EMPTY;
-      const ids = resolveTaggedNodes(state.entities, tagDefId);
+      const ids = resolveTaggedNodes(tagDefId);
       if (ids.length === 0) return EMPTY;
       const options = ids
         .map((id) => {
-          const n = state.entities[id];
-          return n ? { id, name: n.props.name ?? '' } : null;
+          const n = state.getNode(id);
+          return n ? { id, name: n.name ?? '' } : null;
         })
         .filter(Boolean);
       return JSON.stringify(options);
     }
 
-    // SYS_D12: Predetermined + auto-collected options
-    const predeterminedIds = resolveFieldOptions(state.entities, attrDefId);
-    const autoCollectedIds = resolveAutoCollectedOptions(state.entities, attrDefId);
-    // Merge, dedup (auto-collected could overlap if value was also pre-determined)
+    // Predetermined + auto-collected options
+    const predeterminedIds = resolveFieldOptions(attrDefId);
+    const autoCollectedIds = resolveAutoCollectedOptions(attrDefId);
     const seen = new Set<string>();
     const allIds: string[] = [];
     for (const id of predeterminedIds) {
@@ -49,8 +54,8 @@ export function useFieldOptions(attrDefId: string): FieldOption[] {
     if (allIds.length === 0) return EMPTY;
     const options = allIds
       .map((id) => {
-        const node = state.entities[id];
-        return node ? { id, name: node.props.name ?? '' } : null;
+        const node = state.getNode(id);
+        return node ? { id, name: node.name ?? '' } : null;
       })
       .filter(Boolean);
     return JSON.stringify(options);

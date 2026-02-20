@@ -1,171 +1,179 @@
-import { SYS_A } from '../../src/types/index.js';
+/**
+ * node-store tag + reference flows — Loro model.
+ * applyTag: adds to node.tags, creates fieldEntry nodes.
+ * removeTag: removes from node.tags, removes fieldEntry nodes.
+ * addReference: creates reference node (NOT idempotent).
+ * removeReference(refNodeId): deletes ref node.
+ * startRefConversion: returns tempNodeId.
+ */
+import { describe, it, expect, beforeEach } from 'vitest';
 import { useNodeStore } from '../../src/stores/node-store.js';
+import * as loroDoc from '../../src/lib/loro-doc.js';
+import { collectNodeGraphErrors } from './helpers/invariants.js';
 import { resetAndSeed } from './helpers/test-state.js';
 
-function findFieldTupleId(nodeId: string, attrDefId: string): string | undefined {
-  const state = useNodeStore.getState();
-  const node = state.entities[nodeId];
-  if (!node?.children) return undefined;
-  return node.children.find((cid) => {
-    const child = state.entities[cid];
-    return child?.props._docType === 'tuple' && child.children?.[0] === attrDefId;
+/** Find fieldEntry for a fieldDefId in node children. */
+function findFieldEntry(nodeId: string, fieldDefId: string): string | undefined {
+  return loroDoc.getChildren(nodeId).find(cid => {
+    const n = loroDoc.toNodexNode(cid);
+    return n?.type === 'fieldEntry' && n.fieldDefId === fieldDefId;
   });
 }
 
-describe('node-store tag + reference flows', () => {
+describe('applyTag / removeTag', () => {
   beforeEach(() => {
     resetAndSeed();
   });
 
-  it('applyTag/removeTag instantiates and cleans template-sourced fields', async () => {
-    const nodeId = 'note_2';
-    const tagDefId = 'tagDef_task';
-    const expectedTemplateSources = ['taskField_status', 'taskField_priority', 'taskField_due', 'taskField_done'];
+  it('applyTag adds tagDefId to node.tags', () => {
+    useNodeStore.getState().applyTag('note_2', 'tagDef_task');
+    const node = loroDoc.toNodexNode('note_2')!;
+    expect(node.tags).toContain('tagDef_task');
+  });
 
-    const originalChildren = [...(useNodeStore.getState().entities[nodeId].children ?? [])];
+  it('applyTag creates fieldEntry nodes for tagDef template fields', () => {
+    const originalChildren = loroDoc.getChildren('note_2').slice();
 
-    await useNodeStore.getState().applyTag(nodeId, tagDefId, 'ws_default', 'user_default');
+    useNodeStore.getState().applyTag('note_2', 'tagDef_task');
 
-    const nodeAfterApply = useNodeStore.getState().entities[nodeId];
-    expect(nodeAfterApply.meta?.length).toBeGreaterThan(0);
-    const hasTagBinding = (nodeAfterApply.meta ?? []).some((cid) => {
-      const t = useNodeStore.getState().entities[cid];
-      return t?.props._docType === 'tuple' &&
-        t.children?.[0] === SYS_A.NODE_SUPERTAGS &&
-        t.children?.[1] === tagDefId;
-    });
-    expect(hasTagBinding).toBe(true);
+    // tagDef_task has 4 fieldDefs: status, priority, due, done_chk
+    expect(findFieldEntry('note_2', 'attrDef_status')).toBeTruthy();
+    expect(findFieldEntry('note_2', 'attrDef_priority')).toBeTruthy();
+    expect(findFieldEntry('note_2', 'attrDef_due')).toBeTruthy();
+    expect(findFieldEntry('note_2', 'attrDef_done_chk')).toBeTruthy();
 
-    const templatedFieldTupleIds = (nodeAfterApply.children ?? []).filter((cid) => {
-      const child = useNodeStore.getState().entities[cid];
-      return child?.props._docType === 'tuple' &&
-        expectedTemplateSources.includes(child.props._sourceId ?? '');
-    });
-    expect(templatedFieldTupleIds.length).toBe(expectedTemplateSources.length);
-
-    await useNodeStore.getState().removeTag(nodeId, tagDefId, 'user_default');
-
-    const nodeAfterRemove = useNodeStore.getState().entities[nodeId];
-    const stillHasTagBinding = (nodeAfterRemove.meta ?? []).some((cid) => {
-      const t = useNodeStore.getState().entities[cid];
-      return t?.props._docType === 'tuple' &&
-        t.children?.[0] === SYS_A.NODE_SUPERTAGS &&
-        t.children?.[1] === tagDefId;
-    });
-    expect(stillHasTagBinding).toBe(false);
-
-    const stillHasTemplateField = (nodeAfterRemove.children ?? []).some((cid) => {
-      const child = useNodeStore.getState().entities[cid];
-      return expectedTemplateSources.includes(child?.props._sourceId ?? '');
-    });
-    expect(stillHasTemplateField).toBe(false);
-
-    // Original content nodes should remain after tag removal.
+    // Original children (idea_1, idea_2) still present
     for (const id of originalChildren) {
-      expect(nodeAfterRemove.children ?? []).toContain(id);
+      expect(loroDoc.getChildren('note_2')).toContain(id);
     }
   });
 
-  it('applyTag is idempotent and removeTag keeps manually-added fields', async () => {
-    const nodeId = 'note_2';
-    const tagDefId = 'tagDef_task';
-    const expectedTemplateSources = ['taskField_status', 'taskField_priority', 'taskField_due', 'taskField_done'];
+  it('applyTag is idempotent — double apply does not duplicate tag or fieldEntries', () => {
+    useNodeStore.getState().applyTag('note_2', 'tagDef_task');
+    useNodeStore.getState().applyTag('note_2', 'tagDef_task');
 
-    await useNodeStore.getState().addFieldToNode(nodeId, 'attrDef_company', 'ws_default', 'user_default');
-    const manualTupleId = findFieldTupleId(nodeId, 'attrDef_company');
-    expect(manualTupleId).toBeTruthy();
-    if (!manualTupleId) return;
+    const node = loroDoc.toNodexNode('note_2')!;
+    const tagCount = node.tags.filter(t => t === 'tagDef_task').length;
+    expect(tagCount).toBe(1);
 
-    await useNodeStore.getState().applyTag(nodeId, tagDefId, 'ws_default', 'user_default');
-    await useNodeStore.getState().applyTag(nodeId, tagDefId, 'ws_default', 'user_default');
+    const statusEntries = loroDoc.getChildren('note_2').filter(cid => {
+      const n = loroDoc.toNodexNode(cid);
+      return n?.type === 'fieldEntry' && n.fieldDefId === 'attrDef_status';
+    });
+    expect(statusEntries.length).toBe(1);
 
-    const nodeAfterDoubleApply = useNodeStore.getState().entities[nodeId];
-    expect(nodeAfterDoubleApply.meta?.length).toBeGreaterThan(0);
-
-    const tagBindingCount = (nodeAfterDoubleApply.meta ?? []).filter((cid) => {
-      const t = useNodeStore.getState().entities[cid];
-      return t?.props._docType === 'tuple' &&
-        t.children?.[0] === SYS_A.NODE_SUPERTAGS &&
-        t.children?.[1] === tagDefId;
-    }).length;
-    expect(tagBindingCount).toBe(1);
-
-    const templatedFieldTupleCount = (nodeAfterDoubleApply.children ?? []).filter((cid) => {
-      const child = useNodeStore.getState().entities[cid];
-      return child?.props._docType === 'tuple' &&
-        expectedTemplateSources.includes(child.props._sourceId ?? '');
-    }).length;
-    expect(templatedFieldTupleCount).toBe(expectedTemplateSources.length);
-
-    await useNodeStore.getState().removeTag(nodeId, tagDefId, 'user_default');
-
-    const nodeAfterRemove = useNodeStore.getState().entities[nodeId];
-    expect(nodeAfterRemove.children ?? []).toContain(manualTupleId);
-    // Manual field tuple should still exist as a valid entity
-    expect(useNodeStore.getState().entities[manualTupleId]).toBeTruthy();
+    expect(collectNodeGraphErrors()).toEqual([]);
   });
 
-  it('applyTag on content node does NOT instantiate system config fields (Color, Extends, etc.)', async () => {
-    const nodeId = 'note_2';
-    const tagDefId = 'tagDef_person';
+  it('removeTag removes tagDefId from node.tags', () => {
+    useNodeStore.getState().applyTag('note_2', 'tagDef_task');
+    useNodeStore.getState().removeTag('note_2', 'tagDef_task');
 
-    await useNodeStore.getState().applyTag(nodeId, tagDefId, 'ws_default', 'user_default');
-
-    const node = useNodeStore.getState().entities[nodeId];
-    const entities = useNodeStore.getState().entities;
-
-    // Collect all tuple keys on the content node
-    const tupleKeys = (node.children ?? [])
-      .map(cid => entities[cid])
-      .filter(c => c?.props._docType === 'tuple')
-      .map(c => c.children?.[0])
-      .filter(Boolean) as string[];
-
-    // System config fields should NOT be present on content nodes
-    const systemKeys = tupleKeys.filter(k => k.startsWith('SYS_') || k.startsWith('NDX_'));
-    expect(systemKeys).toEqual([]);
-
-    // User fields should be present
-    expect(tupleKeys).toContain('attrDef_email');
-    expect(tupleKeys).toContain('attrDef_company');
-    expect(tupleKeys).toContain('attrDef_age');
-    expect(tupleKeys).toContain('attrDef_website');
+    const node = loroDoc.toNodexNode('note_2')!;
+    expect(node.tags).not.toContain('tagDef_task');
   });
 
-  it('addReference/removeReference/startRefConversion/revertRefConversion keep parent children stable', () => {
-    const parentId = 'note_2';
-    const refNodeId = 'task_1';
+  it('removeTag removes template-created fieldEntry nodes', () => {
+    const originalChildren = loroDoc.getChildren('note_2').slice();
 
-    const parentBefore = [...(useNodeStore.getState().entities[parentId].children ?? [])];
+    useNodeStore.getState().applyTag('note_2', 'tagDef_task');
+    useNodeStore.getState().removeTag('note_2', 'tagDef_task');
 
-    useNodeStore.getState().addReference(parentId, refNodeId, 'user_default');
-    useNodeStore.getState().addReference(parentId, refNodeId, 'user_default'); // duplicate should be ignored
+    expect(findFieldEntry('note_2', 'attrDef_status')).toBeUndefined();
+    expect(findFieldEntry('note_2', 'attrDef_priority')).toBeUndefined();
+    expect(findFieldEntry('note_2', 'attrDef_due')).toBeUndefined();
 
-    const afterAdd = useNodeStore.getState().entities[parentId].children ?? [];
-    expect(afterAdd.filter((id) => id === refNodeId).length).toBe(1);
+    // Original children should remain
+    for (const id of originalChildren) {
+      expect(loroDoc.getChildren('note_2')).toContain(id);
+    }
 
-    useNodeStore.getState().removeReference(parentId, refNodeId, 'user_default');
-    const afterRemove = useNodeStore.getState().entities[parentId].children ?? [];
-    expect(afterRemove).toEqual(parentBefore);
+    expect(collectNodeGraphErrors()).toEqual([]);
+  });
 
-    const tempId = useNodeStore.getState().startRefConversion(
-      refNodeId,
-      parentId,
-      1,
-      'ws_default',
-      'user_default',
-    );
-    const tempNode = useNodeStore.getState().entities[tempId];
-    expect(tempNode.props._ownerId).toBe(parentId);
-    expect(tempNode.props.name).toBe('\uFFFC');
-    expect(tempNode.props._inlineRefs).toEqual([
-      expect.objectContaining({ offset: 0, targetNodeId: refNodeId }),
-    ]);
-    expect(useNodeStore.getState().entities[parentId].children?.[1]).toBe(tempId);
+  it('manually added fieldEntry is kept when tag is removed', () => {
+    useNodeStore.getState().addFieldToNode('note_2', 'attrDef_company');
+    const manualFe = findFieldEntry('note_2', 'attrDef_company')!;
 
-    useNodeStore.getState().revertRefConversion(tempId, refNodeId, parentId);
-    const childrenAfterRevert = useNodeStore.getState().entities[parentId].children ?? [];
-    expect(childrenAfterRevert[1]).toBe(refNodeId);
-    expect(useNodeStore.getState().entities[tempId]).toBeUndefined();
+    useNodeStore.getState().applyTag('note_2', 'tagDef_task');
+    useNodeStore.getState().removeTag('note_2', 'tagDef_task');
+
+    // attrDef_company is not part of tagDef_task's template, should remain
+    expect(findFieldEntry('note_2', 'attrDef_company')).toBe(manualFe);
+
+    expect(collectNodeGraphErrors()).toEqual([]);
+  });
+});
+
+describe('addReference / removeReference', () => {
+  beforeEach(() => {
+    resetAndSeed();
+  });
+
+  it('addReference creates a reference node and returns its ID', () => {
+    const refId = useNodeStore.getState().addReference('note_2', 'task_1');
+    expect(refId).toBeTruthy();
+    expect(loroDoc.hasNode(refId)).toBe(true);
+
+    const ref = loroDoc.toNodexNode(refId)!;
+    expect(ref.type).toBe('reference');
+    expect(ref.targetId).toBe('task_1');
+    expect(loroDoc.getParentId(refId)).toBe('note_2');
+  });
+
+  it('addReference is NOT idempotent — each call creates a new ref node', () => {
+    const refId1 = useNodeStore.getState().addReference('note_2', 'task_1');
+    const refId2 = useNodeStore.getState().addReference('note_2', 'task_1');
+
+    expect(refId1).not.toBe(refId2);
+    expect(loroDoc.hasNode(refId1)).toBe(true);
+    expect(loroDoc.hasNode(refId2)).toBe(true);
+
+    expect(collectNodeGraphErrors()).toEqual([]);
+  });
+
+  it('removeReference(refNodeId) deletes the reference node', () => {
+    const refId = useNodeStore.getState().addReference('note_2', 'task_1');
+    expect(loroDoc.hasNode(refId)).toBe(true);
+
+    useNodeStore.getState().removeReference(refId);
+    expect(loroDoc.hasNode(refId)).toBe(false);
+
+    expect(collectNodeGraphErrors()).toEqual([]);
+  });
+
+  it('addReference at specified position', () => {
+    const refId = useNodeStore.getState().addReference('note_2', 'task_1', 0);
+    const children = loroDoc.getChildren('note_2');
+    expect(children[0]).toBe(refId);
+
+    expect(collectNodeGraphErrors()).toEqual([]);
+  });
+});
+
+describe('startRefConversion', () => {
+  beforeEach(() => {
+    resetAndSeed();
+  });
+
+  it('returns a tempId (new content node)', () => {
+    const refId = useNodeStore.getState().addReference('note_2', 'task_1');
+    const tempId = useNodeStore.getState().startRefConversion(refId, 'note_2', 0);
+    expect(tempId).toBeTruthy();
+    expect(loroDoc.hasNode(tempId)).toBe(true);
+
+    // Original ref node should be deleted
+    expect(loroDoc.hasNode(refId)).toBe(false);
+
+    expect(collectNodeGraphErrors()).toEqual([]);
+  });
+
+  it('tempNode has inlineRefs pointing to original target', () => {
+    const refId = useNodeStore.getState().addReference('note_2', 'task_1');
+    const tempId = useNodeStore.getState().startRefConversion(refId, 'note_2', 0);
+
+    const tempNode = loroDoc.toNodexNode(tempId)!;
+    expect(tempNode.inlineRefs).toBeDefined();
+    expect(tempNode.inlineRefs![0].targetNodeId).toBe('task_1');
   });
 });

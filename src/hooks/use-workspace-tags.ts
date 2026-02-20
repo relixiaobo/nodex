@@ -1,20 +1,23 @@
 /**
- * Get all TagDef nodes in the store.
+ * Get all TagDef nodes in the Loro store.
  * Used by TagSelector for the dropdown list.
  *
  * Uses JSON.stringify as selector return to avoid React 19 infinite loop.
  */
 import { useMemo } from 'react';
 import { useNodeStore } from '../stores/node-store';
+import * as loroDoc from '../lib/loro-doc.js';
 
 const EMPTY = '[]';
 
 export function useWorkspaceTags(): Array<{ id: string; name: string }> {
   const json = useNodeStore((state) => {
+    void state._version;
     const tags: Array<{ id: string; name: string }> = [];
-    for (const [id, node] of Object.entries(state.entities)) {
-      if (node.props._docType === 'tagDef') {
-        tags.push({ id, name: node.props.name ?? 'Untitled' });
+    for (const id of loroDoc.getAllNodeIds()) {
+      const node = loroDoc.toNodexNode(id);
+      if (node?.type === 'tagDef') {
+        tags.push({ id, name: node.name ?? 'Untitled' });
       }
     }
     if (tags.length === 0) return EMPTY;

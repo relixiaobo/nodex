@@ -18,11 +18,12 @@ export function ColorSwatchPicker({ tupleId }: ColorSwatchPickerProps) {
   const setConfigValue = useNodeStore((s) => s.setConfigValue);
   const userId = useWorkspaceStore((s) => s.userId);
 
-  // Read current color key from tuple.children[1].
+  // Read current color key from fieldEntry.children[0].
   // Color values are stored as raw strings ("emerald", "violet"), not node references.
   const selectedKey = useNodeStore((s) => {
-    const tuple = s.entities[tupleId];
-    return tuple?.children?.[1] || undefined;
+    void s._version;
+    const tuple = s.getNode(tupleId);
+    return tuple?.children?.[0] || undefined;
   });
 
   const handleSelect = useCallback(

@@ -1,34 +1,27 @@
 /**
  * Tree traversal and manipulation utilities for the outliner.
  *
- * Works with the normalized NodexNode entities in the Zustand store.
+ * Uses LoroDoc as the source of truth. All node lookups go through loroDoc.toNodexNode().
  */
-import { WORKSPACE_CONTAINERS } from '../types/index.js';
+import { isContainerNode } from '../types/index.js';
 import type { NodexNode } from '../types/index.js';
+import * as loroDoc from './loro-doc.js';
 
-// ─── Workspace container / root detection ───
+// ─── Container / root detection ───
 
-const CONTAINER_SUFFIXES = Object.values(WORKSPACE_CONTAINERS);
-
-/** Check if a node ID is a workspace container (e.g., ws_default_LIBRARY). */
+/** Check if a node ID is a workspace container (LIBRARY, INBOX, etc.). */
 export function isWorkspaceContainer(nodeId: string): boolean {
-  return CONTAINER_SUFFIXES.some(suffix => nodeId.endsWith(`_${suffix}`));
-}
-
-/** Check if a node is a workspace root (id === workspaceId). */
-export function isWorkspaceRoot(nodeId: string, entities: Record<string, NodexNode>): boolean {
-  const node = entities[nodeId];
-  return !!node && node.id === node.workspaceId && !node.props._ownerId;
+  return isContainerNode(nodeId);
 }
 
 // ─── Structural node detection ───
 
-/** Structural doc types that are not meaningful navigation targets. */
-const STRUCTURAL_DOC_TYPES = new Set(['tuple']);
+/** Structural node types that are not meaningful navigation targets. */
+const STRUCTURAL_TYPES = new Set<string | undefined>(['fieldEntry', 'reference']);
 
-/** Check if a node is a structural node (tuple). */
+/** Check if a node is a structural node (fieldEntry, reference). */
 function isStructuralNode(node: NodexNode): boolean {
-  return !!node.props._docType && STRUCTURAL_DOC_TYPES.has(node.props._docType);
+  return STRUCTURAL_TYPES.has(node.type);
 }
 
 // ─── Ancestor chain for breadcrumb navigation ───
@@ -39,17 +32,12 @@ export interface AncestorInfo {
 }
 
 /**
- * Walk _ownerId chain from nodeId up to (but excluding) the workspace root.
+ * Walk the LoroTree parent chain from nodeId up to the root.
  * Returns ancestors ordered root-most → immediate parent (top to bottom).
- * Containers are included as normal ancestors. The workspace root is recorded
- * separately as `workspaceRootId`.
- *
- * Structural nodes (tuple) are skipped — they are
- * not meaningful navigation targets.
+ * Structural nodes (fieldEntry, reference) are skipped.
  */
 export function getAncestorChain(
   nodeId: string,
-  entities: Record<string, NodexNode>,
 ): { ancestors: AncestorInfo[]; workspaceRootId: string | null } {
   const chain: AncestorInfo[] = [];
   let currentId = nodeId;
@@ -57,30 +45,27 @@ export function getAncestorChain(
   const visited = new Set<string>();
 
   while (true) {
-    const node = entities[currentId];
-    if (!node) break;
-
-    const parentId = node.props._ownerId;
+    const parentId = loroDoc.getParentId(currentId);
     if (!parentId || visited.has(parentId)) break;
     visited.add(parentId);
 
-    // Stop at workspace root — record it but don't add to chain
-    if (isWorkspaceRoot(parentId, entities)) {
+    // If parent is a container node, record as workspace root and stop
+    if (isContainerNode(parentId)) {
       workspaceRootId = parentId;
       break;
     }
 
-    const parentNode = entities[parentId];
+    const parentNode = loroDoc.toNodexNode(parentId);
     if (!parentNode) break;
 
-    // Skip structural nodes (tuple) — continue walking up
+    // Skip structural nodes — continue walking up
     if (isStructuralNode(parentNode)) {
       currentId = parentId;
       continue;
     }
 
-    // Add parent to chain (will be reversed later) — containers included
-    const rawName = parentNode.props.name ?? '';
+    // Add parent to chain (will be reversed later)
+    const rawName = parentNode.name ?? '';
     const displayName = rawName.replace(/<[^>]+>/g, '') || parentId;
     chain.push({ id: parentId, name: displayName });
 
@@ -92,24 +77,18 @@ export function getAncestorChain(
 
 /**
  * Find the first navigable (non-structural) parent of a node.
- * Skips tuple nodes.
+ * Skips fieldEntry and reference nodes.
  */
-export function getNavigableParentId(
-  nodeId: string,
-  entities: Record<string, NodexNode>,
-): string | null {
+export function getNavigableParentId(nodeId: string): string | null {
   let currentId = nodeId;
   const visited = new Set<string>();
 
   while (true) {
-    const node = entities[currentId];
-    if (!node) return null;
-
-    const parentId = node.props._ownerId;
+    const parentId = loroDoc.getParentId(currentId);
     if (!parentId || visited.has(parentId)) return null;
     visited.add(parentId);
 
-    const parentNode = entities[parentId];
+    const parentNode = loroDoc.toNodexNode(parentId);
     if (!parentNode) return null;
 
     // Skip structural nodes
@@ -129,7 +108,6 @@ export function getNavigableParentId(
  */
 export function getFlattenedVisibleNodes(
   rootChildIds: string[],
-  entities: Record<string, NodexNode>,
   expandedNodes: Set<string>,
   rootParentId: string = '',
 ): Array<{ nodeId: string; depth: number; parentId: string }> {
@@ -137,12 +115,15 @@ export function getFlattenedVisibleNodes(
 
   function traverse(childIds: string[], depth: number, currentParentId: string) {
     for (const childId of childIds) {
-      const node = entities[childId];
+      const node = loroDoc.toNodexNode(childId);
       if (!node) continue;
 
       result.push({ nodeId: childId, depth, parentId: currentParentId });
 
-      if (expandedNodes.has(`${currentParentId}:${childId}`) && node.children && node.children.length > 0) {
+      if (
+        expandedNodes.has(`${currentParentId}:${childId}`) &&
+        node.children.length > 0
+      ) {
         traverse(node.children, depth + 1, childId);
       }
     }
@@ -186,23 +167,20 @@ export function getNextVisibleNode(
  * Find the last visible node before a TrailingInput position.
  *
  * Starting from the parent's last visible content child, walks down
- * expanded descendants to find the deepest visible leaf. This is the
- * node that should receive focus on Backspace in TrailingInput.
- *
- * Returns null if the parent has no visible content children.
+ * expanded descendants to find the deepest visible leaf.
  */
 export function getLastVisibleNode(
   parentId: string,
-  entities: Record<string, NodexNode>,
   expandedNodes: Set<string>,
 ): { nodeId: string; parentId: string } | null {
-  const parent = entities[parentId];
-  if (!parent?.children?.length) return null;
+  const parentChildren = loroDoc.getChildren(parentId);
+  if (!parentChildren.length) return null;
 
-  // Filter for visible content nodes (no docType = regular content)
-  const visibleChildren = parent.children.filter(
-    (cid) => !entities[cid]?.props._docType,
-  );
+  // Filter for visible content nodes (no structural type = regular content)
+  const visibleChildren = parentChildren.filter((cid) => {
+    const n = loroDoc.toNodexNode(cid);
+    return n && !n.type;
+  });
   if (visibleChildren.length === 0) return null;
 
   // Start from the last visible child and walk down
@@ -213,12 +191,13 @@ export function getLastVisibleNode(
     const expandKey = `${currentParentId}:${currentId}`;
     if (!expandedNodes.has(expandKey)) break;
 
-    const node = entities[currentId];
-    if (!node?.children?.length) break;
+    const childrenIds = loroDoc.getChildren(currentId);
+    if (!childrenIds.length) break;
 
-    const childVisible = node.children.filter(
-      (cid) => !entities[cid]?.props._docType,
-    );
+    const childVisible = childrenIds.filter((cid) => {
+      const n = loroDoc.toNodexNode(cid);
+      return n && !n.type;
+    });
     if (childVisible.length === 0) break;
 
     currentParentId = currentId;
@@ -229,33 +208,24 @@ export function getLastVisibleNode(
 }
 
 /**
- * Find the parent node ID by looking up _ownerId.
+ * Find the parent node ID via LoroTree.
  */
-export function getParentId(
-  nodeId: string,
-  entities: Record<string, NodexNode>,
-): string | null {
-  const node = entities[nodeId];
-  return node?.props._ownerId ?? null;
+export function getParentId(nodeId: string): string | null {
+  return loroDoc.getParentId(nodeId);
 }
 
 /**
  * Find the previous sibling of a node within its parent's children array.
  */
-export function getPreviousSiblingId(
-  nodeId: string,
-  entities: Record<string, NodexNode>,
-): string | null {
-  const parentId = getParentId(nodeId, entities);
+export function getPreviousSiblingId(nodeId: string): string | null {
+  const parentId = loroDoc.getParentId(nodeId);
   if (!parentId) return null;
 
-  const parent = entities[parentId];
-  if (!parent?.children) return null;
-
-  const index = parent.children.indexOf(nodeId);
+  const siblings = loroDoc.getChildren(parentId);
+  const index = siblings.indexOf(nodeId);
   if (index <= 0) return null;
 
-  return parent.children[index - 1];
+  return siblings[index - 1];
 }
 
 /**
@@ -286,15 +256,10 @@ export function isOnlyInlineRef(content: string, inlineRefs?: Array<{ offset: nu
 /**
  * Find the index of a node within its parent's children array.
  */
-export function getNodeIndex(
-  nodeId: string,
-  entities: Record<string, NodexNode>,
-): number {
-  const parentId = getParentId(nodeId, entities);
+export function getNodeIndex(nodeId: string): number {
+  const parentId = loroDoc.getParentId(nodeId);
   if (!parentId) return -1;
 
-  const parent = entities[parentId];
-  if (!parent?.children) return -1;
-
-  return parent.children.indexOf(nodeId);
+  const siblings = loroDoc.getChildren(parentId);
+  return siblings.indexOf(nodeId);
 }

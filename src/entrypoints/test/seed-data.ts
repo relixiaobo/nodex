@@ -4,808 +4,237 @@
  * Creates a realistic outliner tree with various node types
  * to exercise all outliner interactions.
  *
- * Config tuples store values directly in Tuple.children[1:].
- * System attrDef nodes (SYS_A, NDX_A)
- * are created as real attrDef entities, enabling a single rendering path.
+ * New model (Loro Phase 1):
+ * - Flat NodexNode: no `props` wrapper
+ * - NodeType: 'fieldEntry' (was 'tuple'), 'fieldDef' (was 'attrDef')
+ * - Tags: direct node.tags array (no meta tuples)
+ * - TagDef config: direct properties (showCheckbox, color, etc.)
+ * - FieldDef config: direct properties (fieldType, minValue, etc.)
+ * - Container IDs: fixed (CONTAINER_IDS.*)
  */
+import { initLoroDoc, initLoroDocForTest, commitDoc } from '../../lib/loro-doc.js';
+import * as loroDoc from '../../lib/loro-doc.js';
 import { useNodeStore } from '../../stores/node-store';
 import { useUIStore } from '../../stores/ui-store';
 import { useWorkspaceStore } from '../../stores/workspace-store';
-import type { NodexNode, DocType, TextMark, InlineRefEntry } from '../../types/index.js';
-import { SYS_A, SYS_D, SYS_T, SYS_V } from '../../types/index.js';
+import { CONTAINER_IDS } from '../../types/index.js';
 
 const WS_ID = 'ws_default';
-const USER_ID = 'user_default';
 
-function makeNode(
-  id: string,
-  name: string,
-  parentId: string,
-  children: string[] = [],
-  docType?: DocType,
-  content?: { marks?: TextMark[]; inlineRefs?: InlineRefEntry[] },
-): NodexNode {
-  const now = Date.now();
-  return {
-    id,
-    workspaceId: WS_ID,
-    props: {
-      created: now,
-      name,
-      ...(content?.marks && content.marks.length > 0 ? { _marks: content.marks } : {}),
-      ...(content?.inlineRefs && content.inlineRefs.length > 0 ? { _inlineRefs: content.inlineRefs } : {}),
-      _ownerId: parentId,
-      ...(docType ? { _docType: docType } : {}),
-    },
-    children,
-    version: 1,
-    updatedAt: now,
-    createdBy: USER_ID,
-    updatedBy: USER_ID,
-  };
+/** Create a node with specific ID and data if it doesn't already exist. */
+function cn(id: string, parentId: string | null, data: Record<string, unknown>, index?: number): void {
+  if (loroDoc.hasNode(id)) return;
+  loroDoc.createNode(id, parentId, index);
+  if (Object.keys(data).length > 0) {
+    loroDoc.setNodeDataBatch(id, data);
+  }
 }
 
-/**
- * Create a config tuple with value stored directly in children[1].
- * Returns tuple node and its childId (for parent's children array).
- */
-function makeConfigEntry(
-  tupleId: string,
-  owner: string,
-  key: string,
-  value: string | undefined,
-  sourceId?: string,
-): { nodes: NodexNode[]; childId: string } {
-  const tupleChildren = value !== undefined ? [key, value] : [key];
-  const tuple = makeNode(tupleId, '', owner, tupleChildren, 'tuple');
-  if (sourceId) tuple.props._sourceId = sourceId;
-  return { nodes: [tuple], childId: tupleId };
-}
+function seedBody(): void {
+  // Skip if already seeded (avoid re-seeding on hot reload)
+  if (loroDoc.getAllNodeIds().length > 10) return;
 
-export function seedTestData() {
-  const store = useNodeStore.getState();
-  const wsStore = useWorkspaceStore.getState();
+  // ─── Workspace containers (root-level, no parent) ───
+  cn(CONTAINER_IDS.LIBRARY,  null, { name: 'Library' });
+  cn(CONTAINER_IDS.INBOX,    null, { name: 'Inbox' });
+  cn(CONTAINER_IDS.JOURNAL,  null, { name: 'Journal' });
+  cn(CONTAINER_IDS.SEARCHES, null, { name: 'Searches' });
+  cn(CONTAINER_IDS.TRASH,    null, { name: 'Trash' });
+  cn(CONTAINER_IDS.SCHEMA,   null, { name: 'Schema' });
+
+  // ═══════════════════════════════════════════════════════════════
+  // TagDef: Task (showCheckbox, color, done-state mapping via direct props)
+  // ═══════════════════════════════════════════════════════════════
+  cn('tagDef_task', CONTAINER_IDS.SCHEMA, {
+    type: 'tagDef', name: 'Task', showCheckbox: true, color: 'emerald',
+  });
+
+  // FieldDef: Status (OPTIONS)
+  cn('attrDef_status', 'tagDef_task', { type: 'fieldDef', name: 'Status', fieldType: 'OPTIONS' });
+  cn('opt_todo',        'attrDef_status', { name: 'To Do' });
+  cn('opt_in_progress', 'attrDef_status', { name: 'In Progress' });
+  cn('opt_done',        'attrDef_status', { name: 'Done' });
+
+  // FieldDef: Priority (OPTIONS)
+  cn('attrDef_priority', 'tagDef_task', { type: 'fieldDef', name: 'Priority', fieldType: 'OPTIONS' });
+  cn('opt_high',   'attrDef_priority', { name: 'High' });
+  cn('opt_medium', 'attrDef_priority', { name: 'Medium' });
+  cn('opt_low',    'attrDef_priority', { name: 'Low' });
+
+  // FieldDef: Due (DATE)
+  cn('attrDef_due', 'tagDef_task', { type: 'fieldDef', name: 'Due', fieldType: 'DATE' });
+
+  // FieldDef: Done (CHECKBOX)
+  cn('attrDef_done_chk', 'tagDef_task', { type: 'fieldDef', name: 'Done', fieldType: 'CHECKBOX' });
+
+  // ═══════════════════════════════════════════════════════════════
+  // TagDef: Person
+  // ═══════════════════════════════════════════════════════════════
+  cn('tagDef_person', CONTAINER_IDS.SCHEMA, {
+    type: 'tagDef', name: 'Person',
+    description: 'Tag for tracking people and their contact info',
+  });
+  cn('attrDef_email',   'tagDef_person', { type: 'fieldDef', name: 'Email',   fieldType: 'EMAIL'  });
+  cn('attrDef_company', 'tagDef_person', { type: 'fieldDef', name: 'Company', fieldType: 'PLAIN'  });
+  cn('attrDef_age',     'tagDef_person', { type: 'fieldDef', name: 'Age',     fieldType: 'NUMBER', minValue: 0, maxValue: 150 });
+  cn('attrDef_website', 'tagDef_person', { type: 'fieldDef', name: 'Website', fieldType: 'URL'    });
+
+  // ═══════════════════════════════════════════════════════════════
+  // TagDef: DevTask (extends Task)
+  // ═══════════════════════════════════════════════════════════════
+  cn('tagDef_dev_task', CONTAINER_IDS.SCHEMA, {
+    type: 'tagDef', name: 'Dev Task', showCheckbox: true,
+    extends: 'tagDef_task',
+    description: 'Dev task extending Task with a Branch field',
+  });
+  cn('attrDef_branch', 'tagDef_dev_task', { type: 'fieldDef', name: 'Branch', fieldType: 'PLAIN' });
+
+  // ═══════════════════════════════════════════════════════════════
+  // TagDef: WebClip
+  // ═══════════════════════════════════════════════════════════════
+  cn('tagDef_web_clip', CONTAINER_IDS.SCHEMA, { type: 'tagDef', name: 'web_clip' });
+  cn('attrDef_source_url', 'tagDef_web_clip', { type: 'fieldDef', name: 'Source URL', fieldType: 'URL' });
+
+  // ═══════════════════════════════════════════════════════════════
+  // Library content
+  // ═══════════════════════════════════════════════════════════════
+
+  // ── Project ──
+  cn('proj_1', CONTAINER_IDS.LIBRARY, {
+    name: 'My Project',
+    description: 'A sample project to demonstrate outliner features',
+  });
+
+  // task_1: tagged with Task — applyTag auto-creates fieldEntry children
+  cn('task_1', 'proj_1', { name: 'Design the data model' });
+  useNodeStore.getState().applyTag('task_1', 'tagDef_task');
+  cn('subtask_1a', 'task_1', { name: 'Define node types and properties' });
+  cn('subtask_1b', 'task_1', { name: 'Create database migration' });
+
+  cn('task_2', 'proj_1', { name: 'Build the outliner UI' });
+  cn('subtask_2a', 'task_2', { name: 'Implement BulletChevron component' });
+  cn('subtask_2b', 'task_2', { name: 'Add keyboard navigation' });
+  cn('subtask_2c', 'task_2', { name: 'Implement drag and drop' });
+
+  cn('task_3', 'proj_1', { name: 'Connect to Supabase' });
+
+  // ── Person node ──
+  cn('person_1', CONTAINER_IDS.LIBRARY, { name: 'Alice Johnson' });
+  useNodeStore.getState().applyTag('person_1', 'tagDef_person');
+
+  // ── Simple notes ──
+  cn('note_1', CONTAINER_IDS.LIBRARY, { name: 'Meeting notes - Team standup' });
+  cn('note_1a', 'note_1', { name: 'Discussed project timeline' });
+  cn('note_1b', 'note_1', { name: 'Need to review PR #42' });
+  cn('note_1c', 'note_1', { name: 'Next meeting on Friday' });
+
+  cn('note_2', CONTAINER_IDS.LIBRARY, { name: 'Quick ideas' });
+  cn('idea_1', 'note_2', { name: 'Try using virtual scrolling for large lists' });
+  cn('idea_2', 'note_2', { name: 'Add dark mode support' });
+
+  // ── Rich text test nodes ──
+  cn('note_rich', CONTAINER_IDS.LIBRARY, { name: 'Rich text formatting tests' });
+  cn('rich_1', 'note_rich', {
+    name: 'Bold text mixed with normal',
+    marks: [{ start: 0, end: 9, type: 'bold' }],
+  });
+  cn('rich_2', 'note_rich', {
+    name: 'Italic text and bold italic',
+    marks: [
+      { start: 0, end: 11, type: 'italic' },
+      { start: 16, end: 27, type: 'bold' },
+      { start: 16, end: 27, type: 'italic' },
+    ],
+  });
+  cn('rich_3', 'note_rich', {
+    name: 'Inline code snippet in a sentence',
+    marks: [{ start: 7, end: 19, type: 'code' }],
+  });
+  cn('rich_4', 'note_rich', {
+    name: 'Strikethrough text for done items',
+    marks: [{ start: 0, end: 17, type: 'strike' }],
+  });
+  cn('rich_5', 'note_rich', {
+    name: 'Text with highlighted parts',
+    marks: [{ start: 10, end: 21, type: 'highlight' }],
+  });
+  cn('rich_inline_ref', 'note_rich', {
+    name: 'Refer to \uFFFC for details',
+    inlineRefs: [{ offset: 9, targetNodeId: 'task_1', displayName: 'Design the data model' }],
+  });
+
+  // ═══════════════════════════════════════════════════════════════
+  // Inbox content
+  // ═══════════════════════════════════════════════════════════════
+  cn('inbox_1', CONTAINER_IDS.INBOX, { name: 'Read the article about Chrome extensions' });
+  cn('inbox_2', CONTAINER_IDS.INBOX, { name: 'Respond to email from client' });
+  cn('inbox_3', CONTAINER_IDS.INBOX, { name: 'Review pull request' });
+  cn('inbox_3a', 'inbox_3', { name: 'Check test coverage' });
+  cn('inbox_3b', 'inbox_3', { name: 'Verify performance impact' });
+
+  // Web clip (pre-tagged)
+  cn('webclip_1', CONTAINER_IDS.INBOX, {
+    name: 'Example Article — Medium',
+    description: 'A sample web clip to demonstrate the clipping feature',
+  });
+  useNodeStore.getState().applyTag('webclip_1', 'tagDef_web_clip');
+  // Set Source URL value: create a value node under the fieldEntry
+  const wcFeId = loroDoc.getChildren('webclip_1')
+    .find((c) => {
+      const n = loroDoc.toNodexNode(c);
+      return n?.type === 'fieldEntry' && n.fieldDefId === 'attrDef_source_url';
+    });
+  if (wcFeId) {
+    cn('webclip1_val_url', wcFeId, { name: 'https://medium.com/example-article' });
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // Journal content
+  // ═══════════════════════════════════════════════════════════════
+  cn('journal_1', CONTAINER_IDS.JOURNAL, { name: "Today's Journal" });
+  cn('j_1', 'journal_1', { name: 'Started working on the outliner component' });
+  cn('j_2', 'journal_1', { name: 'Fixed a bug in the drag and drop handler' });
+  cn('j_3', 'journal_1', { name: 'Learned about TipTap keyboard shortcuts' });
+
+  // ═══════════════════════════════════════════════════════════════
+  // UI State: navigation + expand defaults
+  // ═══════════════════════════════════════════════════════════════
   const uiStore = useUIStore.getState();
 
-  // Only seed if store is empty (avoid re-seeding on hot reload)
-  if (Object.keys(store.entities).length > 10) return;
-
-  // Set workspace
-  wsStore.setWorkspace(WS_ID);
-  wsStore.setUser(USER_ID);
-
-  // ─── Workspace root node ───
-  const libraryId = `${WS_ID}_LIBRARY`;
-  const inboxId = `${WS_ID}_INBOX`;
-  const journalId = `${WS_ID}_JOURNAL`;
-  const searchesId = `${WS_ID}_SEARCHES`;
-  const trashId = `${WS_ID}_TRASH`;
-  const schemaId = `${WS_ID}_SCHEMA`;
-
-  const wsRoot: NodexNode = {
-    id: WS_ID,
-    workspaceId: WS_ID,
-    props: { created: Date.now(), name: 'My Workspace' },
-    children: [libraryId, inboxId, journalId, searchesId, trashId, schemaId],
-    version: 1,
-    updatedAt: Date.now(),
-    createdBy: USER_ID,
-    updatedBy: USER_ID,
-  };
-
-  // ─── Container nodes ───
-  const containers = [
-    makeNode(libraryId, 'Library', WS_ID, ['proj_1', 'person_1', 'note_1', 'note_2', 'note_rich']),
-    makeNode(inboxId, 'Inbox', WS_ID, ['inbox_1', 'inbox_2', 'inbox_3', 'webclip_1']),
-    makeNode(journalId, 'Journal', WS_ID, ['journal_1']),
-    makeNode(searchesId, 'Searches', WS_ID, []),
-    makeNode(trashId, 'Trash', WS_ID, []),
-    makeNode(schemaId, 'Schema', WS_ID, [
-      // System value nodes
-      SYS_V.YES, SYS_V.NO,
-      SYS_D.PLAIN, SYS_D.OPTIONS, SYS_D.OPTIONS_FROM_SUPERTAG, SYS_D.DATE, SYS_D.NUMBER, SYS_D.URL, SYS_D.EMAIL, SYS_D.CHECKBOX, SYS_D.BOOLEAN, SYS_D.COLOR,
-      SYS_V.NEVER, SYS_V.WHEN_EMPTY, SYS_V.WHEN_NOT_EMPTY, SYS_V.WHEN_VALUE_IS_DEFAULT, SYS_V.ALWAYS,
-      // System attrDef nodes
-      SYS_A.COLOR, SYS_A.EXTENDS, SYS_A.SHOW_CHECKBOX,
-      SYS_A.DONE_STATE_MAPPING, SYS_A.DONE_MAP_CHECKED, SYS_A.DONE_MAP_UNCHECKED,
-      SYS_A.CHILD_SUPERTAG,
-      SYS_A.TYPE_CHOICE, SYS_A.SOURCE_SUPERTAG, SYS_A.AUTOCOLLECT_OPTIONS,
-      SYS_A.AUTO_INITIALIZE, SYS_A.NULLABLE, SYS_A.HIDE_FIELD,
-      SYS_A.MIN_VALUE, SYS_A.MAX_VALUE,
-      // System tag templates + user tagDefs
-      'SYS_T01', 'SYS_T02',
-      'tagDef_task', 'tagDef_person', 'tagDef_dev_task', 'tagDef_web_clip',
-    ]),
-  ];
-
-  // ─── Library nodes ───
-
-  // Project with nested structure
-  const projectNodes = [
-    {
-      ...makeNode('proj_1', 'My Project', libraryId, ['task_1', 'task_2', 'task_3', 'note_1a']),
-      props: {
-        ...makeNode('proj_1', 'My Project', libraryId).props,
-        description: 'A sample project to demonstrate outliner features',
-      },
-    },
-    {
-      ...makeNode('task_1', 'Design the data model', 'proj_1', [
-        'subtask_1a', 'subtask_1b',
-        'task1_fld_status', 'task1_fld_priority', 'task1_fld_due', 'task1_fld_done',
-      ]),
-      props: {
-        ...makeNode('task_1', 'Design the data model', 'proj_1').props,
-      },
-      meta: ['meta_task_1_tag'],
-    },
-    makeNode('subtask_1a', 'Define node types and properties', 'task_1', []),
-    makeNode('subtask_1b', 'Create database migration', 'task_1', []),
-    makeNode('task_2', 'Build the outliner UI', 'proj_1', ['subtask_2a', 'subtask_2b', 'subtask_2c']),
-    makeNode('subtask_2a', 'Implement BulletChevron component', 'task_2', []),
-    makeNode('subtask_2b', 'Add keyboard navigation', 'task_2', []),
-    makeNode('subtask_2c', 'Implement drag and drop', 'task_2', []),
-    makeNode('task_3', 'Connect to Supabase', 'proj_1', []),
-  ];
-
-  // Simple notes
-  const noteNodes = [
-    makeNode('note_1', 'Meeting notes - Team standup', libraryId, ['note_1a', 'note_1b', 'note_1c']),
-    makeNode('note_1a', 'Discussed project timeline', 'note_1', []),
-    makeNode('note_1b', 'Need to review PR #42', 'note_1', []),
-    makeNode('note_1c', 'Next meeting on Friday', 'note_1', []),
-    makeNode('note_2', 'Quick ideas', libraryId, ['idea_1', 'idea_2']),
-    makeNode('idea_1', 'Try using virtual scrolling for large lists', 'note_2', []),
-    makeNode('idea_2', 'Add dark mode support', 'note_2', []),
-  ];
-
-  // Person node tagged with Person tag
-  const personNodes = [
-    {
-      ...makeNode('person_1', 'Alice Johnson', libraryId, [
-        'person1_fld_email', 'person1_fld_company', 'person1_fld_age', 'person1_fld_website',
-      ]),
-      props: {
-        ...makeNode('person_1', 'Alice Johnson', libraryId).props,
-      },
-      meta: ['meta_person_1_tag'],
-    },
-  ];
-
-  // Rich text test node
-  const richTextNodes = [
-    makeNode(
-      'note_rich',
-      'Rich text formatting tests',
-      libraryId,
-      ['rich_1', 'rich_2', 'rich_3', 'rich_4', 'rich_5', 'rich_inline_ref'],
-    ),
-    makeNode('rich_1', 'Bold text mixed with normal', 'note_rich', [], undefined, {
-      marks: [{ start: 0, end: 9, type: 'bold' }],
-    }),
-    makeNode('rich_2', 'Italic text and bold italic', 'note_rich', [], undefined, {
-      marks: [
-        { start: 0, end: 11, type: 'italic' },
-        { start: 16, end: 27, type: 'bold' },
-        { start: 16, end: 27, type: 'italic' },
-      ],
-    }),
-    makeNode('rich_3', 'Inline code snippet in a sentence', 'note_rich', [], undefined, {
-      marks: [{ start: 7, end: 19, type: 'code' }],
-    }),
-    makeNode('rich_4', 'Strikethrough text for done items', 'note_rich', [], undefined, {
-      marks: [{ start: 0, end: 17, type: 'strike' }],
-    }),
-    makeNode('rich_5', 'Text with highlighted parts', 'note_rich', [], undefined, {
-      marks: [{ start: 10, end: 21, type: 'highlight' }],
-    }),
-    makeNode('rich_inline_ref', 'Refer to \uFFFC for details', 'note_rich', [], undefined, {
-      inlineRefs: [{ offset: 9, targetNodeId: 'task_1', displayName: 'Design the data model' }],
-    }),
-  ];
-
-  // ─── Inbox nodes ───
-  const inboxNodes = [
-    makeNode('inbox_1', 'Read the article about Chrome extensions', inboxId, []),
-    makeNode('inbox_2', 'Respond to email from client', inboxId, []),
-    makeNode('inbox_3', 'Review pull request', inboxId, ['inbox_3a', 'inbox_3b']),
-    makeNode('inbox_3a', 'Check test coverage', 'inbox_3', []),
-    makeNode('inbox_3b', 'Verify performance impact', 'inbox_3', []),
-  ];
-
-  // ─── Journal node ───
-  const journalNodes = [
-    makeNode('journal_1', 'Today\'s Journal', journalId, ['j_1', 'j_2', 'j_3']),
-    makeNode('j_1', 'Started working on the outliner component', 'journal_1', []),
-    makeNode('j_2', 'Fixed a bug in the drag and drop handler', 'journal_1', []),
-    makeNode('j_3', 'Learned about TipTap keyboard shortcuts', 'journal_1', []),
-  ];
-
-  // ═══════════════════════════════════════════════════════════════
-  // System value nodes — shared enumerations used by system attrDefs
-  // ═══════════════════════════════════════════════════════════════
-
-  const systemValueNodes: NodexNode[] = [
-    // Boolean enum
-    makeNode(SYS_V.YES, 'Yes', schemaId),
-    makeNode(SYS_V.NO, 'No', schemaId),
-    // Data type enum
-    makeNode(SYS_D.PLAIN, 'Plain', schemaId),
-    makeNode(SYS_D.OPTIONS, 'Options', schemaId),
-    makeNode(SYS_D.OPTIONS_FROM_SUPERTAG, 'Options from supertag', schemaId),
-    makeNode(SYS_D.DATE, 'Date', schemaId),
-    makeNode(SYS_D.NUMBER, 'Number', schemaId),
-    makeNode(SYS_D.URL, 'URL', schemaId),
-    makeNode(SYS_D.EMAIL, 'Email', schemaId),
-    makeNode(SYS_D.CHECKBOX, 'Checkbox', schemaId),
-    makeNode(SYS_D.BOOLEAN, 'Boolean', schemaId),
-    makeNode(SYS_D.COLOR, 'Color', schemaId),
-    // Hide field enum
-    makeNode(SYS_V.NEVER, 'Never', schemaId),
-    makeNode(SYS_V.WHEN_EMPTY, 'When empty', schemaId),
-    makeNode(SYS_V.WHEN_NOT_EMPTY, 'When not empty', schemaId),
-    makeNode(SYS_V.WHEN_VALUE_IS_DEFAULT, 'When value is default', schemaId),
-    makeNode(SYS_V.ALWAYS, 'Always', schemaId),
-  ];
-
-  // ═══════════════════════════════════════════════════════════════
-  // System attrDef nodes — config fields for tagDef (SYS_T01) and attrDef (SYS_T02)
-  // Each has: _docType='attrDef', children=[type_tuple, ...options], type_tuple=[SYS_A02, dataType]
-  // ═══════════════════════════════════════════════════════════════
-
-  // --- TagDef config attrDefs (SYS_T01 template fields) ---
-
-  // SYS_A11 Color — COLOR type (swatch picker)
-  const sysAttrDefColor: NodexNode[] = [
-    makeNode(SYS_A.COLOR, 'Color', schemaId, [`${SYS_A.COLOR}_type`], 'attrDef'),
-    makeNode(`${SYS_A.COLOR}_type`, '', SYS_A.COLOR, [SYS_A.TYPE_CHOICE, SYS_D.COLOR], 'tuple'),
-  ];
-
-  // NDX_A05 Extends — OPTIONS_FROM_SUPERTAG type, source = SYS_T01
-  const sysAttrDefExtends: NodexNode[] = [
-    makeNode(SYS_A.EXTENDS, 'Extend from', schemaId, [`${SYS_A.EXTENDS}_type`, `${SYS_A.EXTENDS}_source`], 'attrDef'),
-    makeNode(`${SYS_A.EXTENDS}_type`, '', SYS_A.EXTENDS, [SYS_A.TYPE_CHOICE, SYS_D.OPTIONS_FROM_SUPERTAG], 'tuple'),
-    makeNode(`${SYS_A.EXTENDS}_source`, '', SYS_A.EXTENDS, [SYS_A.SOURCE_SUPERTAG, SYS_T.SUPERTAG], 'tuple'),
-  ];
-
-  // SYS_A55 Show as checkbox — OPTIONS type [Yes/No]
-  const sysAttrDefCheckbox: NodexNode[] = [
-    makeNode(SYS_A.SHOW_CHECKBOX, 'Show as checkbox', schemaId, [`${SYS_A.SHOW_CHECKBOX}_type`, SYS_V.YES, SYS_V.NO], 'attrDef'),
-    makeNode(`${SYS_A.SHOW_CHECKBOX}_type`, '', SYS_A.SHOW_CHECKBOX, [SYS_A.TYPE_CHOICE, SYS_D.BOOLEAN], 'tuple'),
-  ];
-
-  // NDX_A06 Done state mapping — OPTIONS type [Yes/No]
-  const sysAttrDefDoneMapping: NodexNode[] = [
-    makeNode(SYS_A.DONE_STATE_MAPPING, 'Done state mapping', schemaId, [`${SYS_A.DONE_STATE_MAPPING}_type`, SYS_V.YES, SYS_V.NO], 'attrDef'),
-    makeNode(`${SYS_A.DONE_STATE_MAPPING}_type`, '', SYS_A.DONE_STATE_MAPPING, [SYS_A.TYPE_CHOICE, SYS_D.BOOLEAN], 'tuple'),
-  ];
-
-  // NDX_A07 Map checked to — PLAIN type (entries in Tuple.children[1:])
-  const sysAttrDefDoneChecked: NodexNode[] = [
-    makeNode(SYS_A.DONE_MAP_CHECKED, 'Map checked to', schemaId, [`${SYS_A.DONE_MAP_CHECKED}_type`], 'attrDef'),
-    makeNode(`${SYS_A.DONE_MAP_CHECKED}_type`, '', SYS_A.DONE_MAP_CHECKED, [SYS_A.TYPE_CHOICE, SYS_D.PLAIN], 'tuple'),
-  ];
-
-  // NDX_A08 Map unchecked to — PLAIN type (entries in Tuple.children[1:])
-  const sysAttrDefDoneUnchecked: NodexNode[] = [
-    makeNode(SYS_A.DONE_MAP_UNCHECKED, 'Map unchecked to', schemaId, [`${SYS_A.DONE_MAP_UNCHECKED}_type`], 'attrDef'),
-    makeNode(`${SYS_A.DONE_MAP_UNCHECKED}_type`, '', SYS_A.DONE_MAP_UNCHECKED, [SYS_A.TYPE_CHOICE, SYS_D.PLAIN], 'tuple'),
-  ];
-
-  // SYS_A14 Default child supertag — OPTIONS_FROM_SUPERTAG type, source = SYS_T01
-  const sysAttrDefChildTag: NodexNode[] = [
-    makeNode(SYS_A.CHILD_SUPERTAG, 'Default child supertag', schemaId, [`${SYS_A.CHILD_SUPERTAG}_type`, `${SYS_A.CHILD_SUPERTAG}_source`], 'attrDef'),
-    makeNode(`${SYS_A.CHILD_SUPERTAG}_type`, '', SYS_A.CHILD_SUPERTAG, [SYS_A.TYPE_CHOICE, SYS_D.OPTIONS_FROM_SUPERTAG], 'tuple'),
-    makeNode(`${SYS_A.CHILD_SUPERTAG}_source`, '', SYS_A.CHILD_SUPERTAG, [SYS_A.SOURCE_SUPERTAG, SYS_T.SUPERTAG], 'tuple'),
-  ];
-
-  // --- AttrDef config attrDefs (SYS_T02 template fields) ---
-
-  // SYS_A02 Field type — OPTIONS type [data type enums]
-  const sysAttrDefFieldType: NodexNode[] = [
-    makeNode(SYS_A.TYPE_CHOICE, 'Field type', schemaId, [
-      `${SYS_A.TYPE_CHOICE}_type`,
-      SYS_D.PLAIN, SYS_D.OPTIONS, SYS_D.OPTIONS_FROM_SUPERTAG, SYS_D.DATE, SYS_D.NUMBER, SYS_D.URL, SYS_D.EMAIL, SYS_D.CHECKBOX,
-    ], 'attrDef'),
-    makeNode(`${SYS_A.TYPE_CHOICE}_type`, '', SYS_A.TYPE_CHOICE, [SYS_A.TYPE_CHOICE, SYS_D.OPTIONS], 'tuple'),
-  ];
-
-  // SYS_A06 Source supertag — OPTIONS_FROM_SUPERTAG type, source = SYS_T01
-  const sysAttrDefSourceTag: NodexNode[] = [
-    makeNode(SYS_A.SOURCE_SUPERTAG, 'Source supertag', schemaId, [`${SYS_A.SOURCE_SUPERTAG}_type`, `${SYS_A.SOURCE_SUPERTAG}_source`], 'attrDef'),
-    makeNode(`${SYS_A.SOURCE_SUPERTAG}_type`, '', SYS_A.SOURCE_SUPERTAG, [SYS_A.TYPE_CHOICE, SYS_D.OPTIONS_FROM_SUPERTAG], 'tuple'),
-    makeNode(`${SYS_A.SOURCE_SUPERTAG}_source`, '', SYS_A.SOURCE_SUPERTAG, [SYS_A.SOURCE_SUPERTAG, SYS_T.SUPERTAG], 'tuple'),
-  ];
-
-  // SYS_A44 Auto-collect values — OPTIONS type [Yes/No]
-  const sysAttrDefAutocollect: NodexNode[] = [
-    makeNode(SYS_A.AUTOCOLLECT_OPTIONS, 'Auto-collect values', schemaId, [`${SYS_A.AUTOCOLLECT_OPTIONS}_type`, SYS_V.YES, SYS_V.NO], 'attrDef'),
-    makeNode(`${SYS_A.AUTOCOLLECT_OPTIONS}_type`, '', SYS_A.AUTOCOLLECT_OPTIONS, [SYS_A.TYPE_CHOICE, SYS_D.BOOLEAN], 'tuple'),
-  ];
-
-  // NDX_A02 Auto-initialize — OPTIONS type [Yes/No]
-  const sysAttrDefAutoInit: NodexNode[] = [
-    makeNode(SYS_A.AUTO_INITIALIZE, 'Auto-initialize', schemaId, [`${SYS_A.AUTO_INITIALIZE}_type`, SYS_V.YES, SYS_V.NO], 'attrDef'),
-    makeNode(`${SYS_A.AUTO_INITIALIZE}_type`, '', SYS_A.AUTO_INITIALIZE, [SYS_A.TYPE_CHOICE, SYS_D.BOOLEAN], 'tuple'),
-  ];
-
-  // SYS_A01 Required — OPTIONS type [Yes/No]
-  const sysAttrDefRequired: NodexNode[] = [
-    makeNode(SYS_A.NULLABLE, 'Required', schemaId, [`${SYS_A.NULLABLE}_type`, SYS_V.YES, SYS_V.NO], 'attrDef'),
-    makeNode(`${SYS_A.NULLABLE}_type`, '', SYS_A.NULLABLE, [SYS_A.TYPE_CHOICE, SYS_D.BOOLEAN], 'tuple'),
-  ];
-
-  // NDX_A01 Hide field — OPTIONS type [hide enum values]
-  const sysAttrDefHideField: NodexNode[] = [
-    makeNode(SYS_A.HIDE_FIELD, 'Hide field', schemaId, [
-      `${SYS_A.HIDE_FIELD}_type`,
-      SYS_V.NEVER, SYS_V.WHEN_EMPTY, SYS_V.WHEN_NOT_EMPTY, SYS_V.WHEN_VALUE_IS_DEFAULT, SYS_V.ALWAYS,
-    ], 'attrDef'),
-    makeNode(`${SYS_A.HIDE_FIELD}_type`, '', SYS_A.HIDE_FIELD, [SYS_A.TYPE_CHOICE, SYS_D.OPTIONS], 'tuple'),
-  ];
-
-  // NDX_A03 Minimum value — NUMBER type
-  const sysAttrDefMinValue: NodexNode[] = [
-    makeNode(SYS_A.MIN_VALUE, 'Minimum value', schemaId, [`${SYS_A.MIN_VALUE}_type`], 'attrDef'),
-    makeNode(`${SYS_A.MIN_VALUE}_type`, '', SYS_A.MIN_VALUE, [SYS_A.TYPE_CHOICE, SYS_D.NUMBER], 'tuple'),
-  ];
-
-  // NDX_A04 Maximum value — NUMBER type
-  const sysAttrDefMaxValue: NodexNode[] = [
-    makeNode(SYS_A.MAX_VALUE, 'Maximum value', schemaId, [`${SYS_A.MAX_VALUE}_type`], 'attrDef'),
-    makeNode(`${SYS_A.MAX_VALUE}_type`, '', SYS_A.MAX_VALUE, [SYS_A.TYPE_CHOICE, SYS_D.NUMBER], 'tuple'),
-  ];
-
-  const systemAttrDefNodes: NodexNode[] = [
-    ...sysAttrDefColor, ...sysAttrDefExtends, ...sysAttrDefCheckbox,
-    ...sysAttrDefDoneMapping, ...sysAttrDefDoneChecked, ...sysAttrDefDoneUnchecked,
-    ...sysAttrDefChildTag,
-    ...sysAttrDefFieldType, ...sysAttrDefSourceTag, ...sysAttrDefAutocollect,
-    ...sysAttrDefAutoInit, ...sysAttrDefRequired, ...sysAttrDefHideField,
-    ...sysAttrDefMinValue, ...sysAttrDefMaxValue,
-  ];
-
-  // ═══════════════════════════════════════════════════════════════
-  // SYS_T01 (Supertag) — system tag for tagDef config pages
-  // Template tuples reference system attrDef IDs as keys
-  // ═══════════════════════════════════════════════════════════════
-
-  const sysT01Nodes: NodexNode[] = [
-    makeNode('SYS_T01', 'Supertag', schemaId, [
-      'sysT01_tpl_color', 'sysT01_tpl_extends', 'sysT01_tpl_checkbox',
-      'sysT01_tpl_done_mapping', 'sysT01_tpl_done_map_checked', 'sysT01_tpl_done_map_unchecked',
-      'sysT01_tpl_childtag',
-    ], 'tagDef'),
-    makeNode('sysT01_tpl_color', '', 'SYS_T01', [SYS_A.COLOR], 'tuple'),
-    makeNode('sysT01_tpl_extends', '', 'SYS_T01', [SYS_A.EXTENDS], 'tuple'),
-    makeNode('sysT01_tpl_checkbox', '', 'SYS_T01', [SYS_A.SHOW_CHECKBOX, SYS_V.NO], 'tuple'),
-    makeNode('sysT01_tpl_done_mapping', '', 'SYS_T01', [SYS_A.DONE_STATE_MAPPING, SYS_V.NO], 'tuple'),
-    makeNode('sysT01_tpl_done_map_checked', '', 'SYS_T01', [SYS_A.DONE_MAP_CHECKED], 'tuple'),
-    makeNode('sysT01_tpl_done_map_unchecked', '', 'SYS_T01', [SYS_A.DONE_MAP_UNCHECKED], 'tuple'),
-    makeNode('sysT01_tpl_childtag', '', 'SYS_T01', [SYS_A.CHILD_SUPERTAG], 'tuple'),
-  ];
-
-  // SYS_T02 (Field Definition) — system tag for attrDef config pages
-  const sysT02Nodes: NodexNode[] = [
-    makeNode('SYS_T02', 'Field Definition', schemaId, [
-      'sysT02_tpl_type', 'sysT02_tpl_source_supertag', 'sysT02_tpl_autocollect',
-      'sysT02_tpl_autoinit', 'sysT02_tpl_required', 'sysT02_tpl_hide',
-      'sysT02_tpl_min', 'sysT02_tpl_max',
-    ], 'tagDef'),
-    makeNode('sysT02_tpl_type', '', 'SYS_T02', [SYS_A.TYPE_CHOICE, SYS_D.PLAIN], 'tuple'),
-    makeNode('sysT02_tpl_source_supertag', '', 'SYS_T02', [SYS_A.SOURCE_SUPERTAG], 'tuple'),
-    makeNode('sysT02_tpl_autocollect', '', 'SYS_T02', [SYS_A.AUTOCOLLECT_OPTIONS, SYS_V.YES], 'tuple'),
-    makeNode('sysT02_tpl_autoinit', '', 'SYS_T02', [SYS_A.AUTO_INITIALIZE, SYS_V.NO], 'tuple'),
-    makeNode('sysT02_tpl_required', '', 'SYS_T02', [SYS_A.NULLABLE, SYS_V.NO], 'tuple'),
-    makeNode('sysT02_tpl_hide', '', 'SYS_T02', [SYS_A.HIDE_FIELD, SYS_V.NEVER], 'tuple'),
-    makeNode('sysT02_tpl_min', '', 'SYS_T02', [SYS_A.MIN_VALUE], 'tuple'),
-    makeNode('sysT02_tpl_max', '', 'SYS_T02', [SYS_A.MAX_VALUE], 'tuple'),
-  ];
-
-  // ═══════════════════════════════════════════════════════════════
-  // User AttrDef nodes — each with config tuples (values in children[1:])
-  // ═══════════════════════════════════════════════════════════════
-
-  // Helper: create standard attrDef config tuples for SYS_T02 template
-  function makeAttrDefConfigTuples(prefix: string, owner: string, dataType: string, extra?: { min?: string; max?: string }) {
-    // For number min/max: create content nodes to hold the value (not raw strings)
-    const minValueNodeId = extra?.min !== undefined ? `${prefix}_min_val` : undefined;
-    const maxValueNodeId = extra?.max !== undefined ? `${prefix}_max_val` : undefined;
-    const extraNodes: NodexNode[] = [];
-    if (minValueNodeId && extra?.min !== undefined) {
-      extraNodes.push(makeNode(minValueNodeId, extra.min, `${prefix}_min`));
-    }
-    if (maxValueNodeId && extra?.max !== undefined) {
-      extraNodes.push(makeNode(maxValueNodeId, extra.max, `${prefix}_max`));
-    }
-
-    const entries = [
-      makeConfigEntry(`${prefix}_type`, owner, SYS_A.TYPE_CHOICE, dataType, 'sysT02_tpl_type'),
-      makeConfigEntry(`${prefix}_source_supertag`, owner, SYS_A.SOURCE_SUPERTAG, undefined, 'sysT02_tpl_source_supertag'),
-      makeConfigEntry(`${prefix}_autocollect`, owner, SYS_A.AUTOCOLLECT_OPTIONS, SYS_V.YES, 'sysT02_tpl_autocollect'),
-      makeConfigEntry(`${prefix}_autoinit`, owner, SYS_A.AUTO_INITIALIZE, SYS_V.NO, 'sysT02_tpl_autoinit'),
-      makeConfigEntry(`${prefix}_required`, owner, SYS_A.NULLABLE, SYS_V.NO, 'sysT02_tpl_required'),
-      makeConfigEntry(`${prefix}_hide`, owner, SYS_A.HIDE_FIELD, SYS_V.NEVER, 'sysT02_tpl_hide'),
-      makeConfigEntry(`${prefix}_min`, owner, SYS_A.MIN_VALUE, minValueNodeId, 'sysT02_tpl_min'),
-      makeConfigEntry(`${prefix}_max`, owner, SYS_A.MAX_VALUE, maxValueNodeId, 'sysT02_tpl_max'),
-    ];
-    const nodes = [...entries.flatMap(e => e.nodes), ...extraNodes];
-    const childIds = entries.map(e => e.childId);
-    return { nodes, childIds };
-  }
-
-  // AttrDef: Status (OPTIONS)
-  const statusCfg = makeAttrDefConfigTuples('attrDef_status', 'attrDef_status', SYS_D.OPTIONS);
-  const attrDefStatusNodes: NodexNode[] = [
-    {
-      ...makeNode('attrDef_status', 'Status', 'taskField_status', [
-        ...statusCfg.childIds, 'opt_todo', 'opt_in_progress', 'opt_done',
-      ], 'attrDef'),
-      props: { ...makeNode('attrDef_status', '', '').props, _docType: 'attrDef' as DocType, name: 'Status', _ownerId: 'taskField_status' },
-      meta: ['meta_attrDef_status_tag'],
-    },
-    ...statusCfg.nodes,
-    makeNode('opt_todo', 'To Do', 'attrDef_status'),
-    makeNode('opt_in_progress', 'In Progress', 'attrDef_status'),
-    makeNode('opt_done', 'Done', 'attrDef_status'),
-  ];
-
-  // AttrDef: Priority (OPTIONS)
-  const priorityCfg = makeAttrDefConfigTuples('attrDef_priority', 'attrDef_priority', SYS_D.OPTIONS);
-  const attrDefPriorityNodes: NodexNode[] = [
-    {
-      ...makeNode('attrDef_priority', 'Priority', 'taskField_priority', [
-        ...priorityCfg.childIds, 'opt_high', 'opt_medium', 'opt_low',
-      ], 'attrDef'),
-      props: { ...makeNode('attrDef_priority', '', '').props, _docType: 'attrDef' as DocType, name: 'Priority', _ownerId: 'taskField_priority' },
-      meta: ['meta_attrDef_priority_tag'],
-    },
-    ...priorityCfg.nodes,
-    makeNode('opt_high', 'High', 'attrDef_priority'),
-    makeNode('opt_medium', 'Medium', 'attrDef_priority'),
-    makeNode('opt_low', 'Low', 'attrDef_priority'),
-  ];
-
-  // AttrDef: Due (DATE)
-  const dueCfg = makeAttrDefConfigTuples('attrDef_due', 'attrDef_due', SYS_D.DATE);
-  const attrDefDueNodes: NodexNode[] = [
-    {
-      ...makeNode('attrDef_due', 'Due', 'taskField_due', dueCfg.childIds, 'attrDef'),
-      props: { ...makeNode('attrDef_due', '', '').props, _docType: 'attrDef' as DocType, name: 'Due', _ownerId: 'taskField_due' },
-      meta: ['meta_attrDef_due_tag'],
-    },
-    ...dueCfg.nodes,
-  ];
-
-  // AttrDef: Email (EMAIL)
-  const emailCfg = makeAttrDefConfigTuples('attrDef_email', 'attrDef_email', SYS_D.EMAIL);
-  const attrDefEmailNodes: NodexNode[] = [
-    {
-      ...makeNode('attrDef_email', 'Email', 'personField_email', emailCfg.childIds, 'attrDef'),
-      props: { ...makeNode('attrDef_email', '', '').props, _docType: 'attrDef' as DocType, name: 'Email', _ownerId: 'personField_email' },
-      meta: ['meta_attrDef_email_tag'],
-    },
-    ...emailCfg.nodes,
-  ];
-
-  // AttrDef: Company (PLAIN)
-  const companyCfg = makeAttrDefConfigTuples('attrDef_company', 'attrDef_company', SYS_D.PLAIN);
-  const attrDefCompanyNodes: NodexNode[] = [
-    {
-      ...makeNode('attrDef_company', 'Company', 'personField_company', companyCfg.childIds, 'attrDef'),
-      props: { ...makeNode('attrDef_company', '', '').props, _docType: 'attrDef' as DocType, name: 'Company', _ownerId: 'personField_company' },
-      meta: ['meta_attrDef_company_tag'],
-    },
-    ...companyCfg.nodes,
-  ];
-
-  // AttrDef: Age (NUMBER)
-  const ageCfg = makeAttrDefConfigTuples('attrDef_age', 'attrDef_age', SYS_D.NUMBER, { min: '0', max: '150' });
-  const attrDefAgeNodes: NodexNode[] = [
-    {
-      ...makeNode('attrDef_age', 'Age', 'personField_age', ageCfg.childIds, 'attrDef'),
-      props: { ...makeNode('attrDef_age', '', '').props, _docType: 'attrDef' as DocType, name: 'Age', _ownerId: 'personField_age' },
-      meta: ['meta_attrDef_age_tag'],
-    },
-    ...ageCfg.nodes,
-  ];
-
-  // AttrDef: Website (URL)
-  const websiteCfg = makeAttrDefConfigTuples('attrDef_website', 'attrDef_website', SYS_D.URL);
-  const attrDefWebsiteNodes: NodexNode[] = [
-    {
-      ...makeNode('attrDef_website', 'Website', 'personField_website', websiteCfg.childIds, 'attrDef'),
-      props: { ...makeNode('attrDef_website', '', '').props, _docType: 'attrDef' as DocType, name: 'Website', _ownerId: 'personField_website' },
-      meta: ['meta_attrDef_website_tag'],
-    },
-    ...websiteCfg.nodes,
-  ];
-
-  // AttrDef: Done (CHECKBOX)
-  const doneCfg = makeAttrDefConfigTuples('attrDef_done', 'attrDef_done', SYS_D.CHECKBOX);
-  const attrDefDoneNodes: NodexNode[] = [
-    {
-      ...makeNode('attrDef_done', 'Done', 'taskField_done', doneCfg.childIds, 'attrDef'),
-      props: { ...makeNode('attrDef_done', '', '').props, _docType: 'attrDef' as DocType, name: 'Done', _ownerId: 'taskField_done' },
-      meta: ['meta_attrDef_done_tag'],
-    },
-    ...doneCfg.nodes,
-  ];
-
-  // AttrDef: Branch (PLAIN) — for dev_task tag
-  const branchCfg = makeAttrDefConfigTuples('attrDef_branch', 'attrDef_branch', SYS_D.PLAIN);
-  const attrDefBranchNodes: NodexNode[] = [
-    {
-      ...makeNode('attrDef_branch', 'Branch', 'devTaskField_branch', branchCfg.childIds, 'attrDef'),
-      props: { ...makeNode('attrDef_branch', '', '').props, _docType: 'attrDef' as DocType, name: 'Branch', _ownerId: 'devTaskField_branch' },
-      meta: ['meta_attrDef_branch_tag'],
-    },
-    ...branchCfg.nodes,
-  ];
-
-  // AttrDef: Source URL (URL) — for web_clip tag
-  const sourceUrlCfg = makeAttrDefConfigTuples('attrDef_source_url', 'attrDef_source_url', SYS_D.URL);
-  const attrDefSourceUrlNodes: NodexNode[] = [
-    {
-      ...makeNode('attrDef_source_url', 'Source URL', 'webClipField_source_url', sourceUrlCfg.childIds, 'attrDef'),
-      props: { ...makeNode('attrDef_source_url', '', '').props, _docType: 'attrDef' as DocType, name: 'Source URL', _ownerId: 'webClipField_source_url' },
-      meta: ['meta_attrDef_source_url_tag'],
-    },
-    ...sourceUrlCfg.nodes,
-  ];
-
-  // Tag tuples for attrDefs (SYS_T02 tag, stored in node.meta)
-  const attrDefTagTuples: NodexNode[] = [
-    makeNode('meta_attrDef_status_tag', '', 'attrDef_status', [SYS_A.NODE_SUPERTAGS, 'SYS_T02'], 'tuple'),
-    makeNode('meta_attrDef_priority_tag', '', 'attrDef_priority', [SYS_A.NODE_SUPERTAGS, 'SYS_T02'], 'tuple'),
-    makeNode('meta_attrDef_due_tag', '', 'attrDef_due', [SYS_A.NODE_SUPERTAGS, 'SYS_T02'], 'tuple'),
-    makeNode('meta_attrDef_email_tag', '', 'attrDef_email', [SYS_A.NODE_SUPERTAGS, 'SYS_T02'], 'tuple'),
-    makeNode('meta_attrDef_company_tag', '', 'attrDef_company', [SYS_A.NODE_SUPERTAGS, 'SYS_T02'], 'tuple'),
-    makeNode('meta_attrDef_age_tag', '', 'attrDef_age', [SYS_A.NODE_SUPERTAGS, 'SYS_T02'], 'tuple'),
-    makeNode('meta_attrDef_website_tag', '', 'attrDef_website', [SYS_A.NODE_SUPERTAGS, 'SYS_T02'], 'tuple'),
-    makeNode('meta_attrDef_done_tag', '', 'attrDef_done', [SYS_A.NODE_SUPERTAGS, 'SYS_T02'], 'tuple'),
-    makeNode('meta_attrDef_branch_tag', '', 'attrDef_branch', [SYS_A.NODE_SUPERTAGS, 'SYS_T02'], 'tuple'),
-    makeNode('meta_attrDef_source_url_tag', '', 'attrDef_source_url', [SYS_A.NODE_SUPERTAGS, 'SYS_T02'], 'tuple'),
-  ];
-
-  // ═══════════════════════════════════════════════════════════════
-  // TagDef nodes — config tuples use direct value model (Tuple.children[1:])
-  // ═══════════════════════════════════════════════════════════════
-
-  // Helper: create tagDef config tuples from SYS_T01 template
-  function makeTagDefConfigTuples(prefix: string, owner: string, opts: {
-    color?: string; checkbox?: string; extends?: string; doneMapping?: string;
-    doneCheckedEntries?: NodexNode[]; doneUncheckedEntries?: NodexNode[];
-  }) {
-    const entries = [
-      makeConfigEntry(`${prefix}_cfg_color`, owner, SYS_A.COLOR, opts.color, 'sysT01_tpl_color'),
-      makeConfigEntry(`${prefix}_cfg_extends`, owner, SYS_A.EXTENDS, opts.extends, 'sysT01_tpl_extends'),
-      makeConfigEntry(`${prefix}_cfg_checkbox`, owner, SYS_A.SHOW_CHECKBOX, opts.checkbox ?? SYS_V.NO, 'sysT01_tpl_checkbox'),
-      makeConfigEntry(`${prefix}_cfg_done_mapping`, owner, SYS_A.DONE_STATE_MAPPING, opts.doneMapping ?? SYS_V.NO, 'sysT01_tpl_done_mapping'),
-      makeConfigEntry(`${prefix}_cfg_done_checked`, owner, SYS_A.DONE_MAP_CHECKED, undefined, 'sysT01_tpl_done_map_checked'),
-      makeConfigEntry(`${prefix}_cfg_done_unchecked`, owner, SYS_A.DONE_MAP_UNCHECKED, undefined, 'sysT01_tpl_done_map_unchecked'),
-      makeConfigEntry(`${prefix}_cfg_childtag`, owner, SYS_A.CHILD_SUPERTAG, undefined, 'sysT01_tpl_childtag'),
-    ];
-    const nodes = entries.flatMap(e => e.nodes);
-    const childIds = entries.map(e => e.childId);
-
-    // Add done mapping entries directly to tuple's children (after the key)
-    if (opts.doneCheckedEntries?.length) {
-      const tupleId = `${prefix}_cfg_done_checked`;
-      const tuple = nodes.find(n => n.id === tupleId);
-      if (tuple) {
-        tuple.children = [...(tuple.children ?? []), ...opts.doneCheckedEntries.map(e => e.id)];
-        nodes.push(...opts.doneCheckedEntries);
-      }
-    }
-    if (opts.doneUncheckedEntries?.length) {
-      const tupleId = `${prefix}_cfg_done_unchecked`;
-      const tuple = nodes.find(n => n.id === tupleId);
-      if (tuple) {
-        tuple.children = [...(tuple.children ?? []), ...opts.doneUncheckedEntries.map(e => e.id)];
-        nodes.push(...opts.doneUncheckedEntries);
-      }
-    }
-
-    return { nodes, childIds };
-  }
-
-  // TagDef: Task (with done state mapping)
-  const taskCfg = makeTagDefConfigTuples('tagDef_task', 'tagDef_task', {
-    color: 'emerald',
-    checkbox: SYS_V.YES,
-    doneMapping: SYS_V.YES,
-    doneCheckedEntries: [
-      makeNode('tagDef_task_dm_checked_1', '', 'tagDef_task_cfg_done_checked',
-        [SYS_A.DONE_MAP_CHECKED, 'attrDef_status', 'opt_done'], 'tuple'),
-    ],
-    doneUncheckedEntries: [
-      makeNode('tagDef_task_dm_unchecked_1', '', 'tagDef_task_cfg_done_unchecked',
-        [SYS_A.DONE_MAP_UNCHECKED, 'attrDef_status', 'opt_todo'], 'tuple'),
-    ],
-  });
-  const tagDefTaskNodes: NodexNode[] = [
-    {
-      ...makeNode('tagDef_task', 'Task', schemaId, [
-        ...taskCfg.childIds,
-        'taskField_status', 'taskField_priority', 'taskField_due', 'taskField_done',
-        'taskTpl_default_note',
-      ], 'tagDef'),
-      props: { ...makeNode('tagDef_task', '', '').props, _docType: 'tagDef' as DocType, name: 'Task', _ownerId: schemaId },
-      meta: ['meta_tagDef_task_tag'],
-    },
-    ...taskCfg.nodes,
-    makeNode('taskField_status', '', 'tagDef_task', ['attrDef_status'], 'tuple'),
-    makeNode('taskField_priority', '', 'tagDef_task', ['attrDef_priority'], 'tuple'),
-    makeNode('taskField_due', '', 'tagDef_task', ['attrDef_due'], 'tuple'),
-    makeNode('taskField_done', '', 'tagDef_task', ['attrDef_done'], 'tuple'),
-    makeNode('taskTpl_default_note', 'Notes', 'tagDef_task'),
-  ];
-
-  // TagDef: Person
-  const personCfg = makeTagDefConfigTuples('tagDef_person', 'tagDef_person', {});
-  const tagDefPersonNodes: NodexNode[] = [
-    {
-      ...makeNode('tagDef_person', 'Person', schemaId, [
-        ...personCfg.childIds,
-        'personField_email', 'personField_company', 'personField_age', 'personField_website',
-      ], 'tagDef'),
-      props: {
-        ...makeNode('tagDef_person', '', '').props, _docType: 'tagDef' as DocType,
-        name: 'Person', _ownerId: schemaId,
-        description: 'Tag for tracking people and their contact info',
-      },
-      meta: ['meta_tagDef_person_tag'],
-    },
-    ...personCfg.nodes,
-    makeNode('personField_email', '', 'tagDef_person', ['attrDef_email'], 'tuple'),
-    makeNode('personField_company', '', 'tagDef_person', ['attrDef_company'], 'tuple'),
-    makeNode('personField_age', '', 'tagDef_person', ['attrDef_age'], 'tuple'),
-    makeNode('personField_website', '', 'tagDef_person', ['attrDef_website'], 'tuple'),
-  ];
-
-  // TagDef: Dev Task — extends Task
-  const devTaskCfg = makeTagDefConfigTuples('tagDef_dev_task', 'tagDef_dev_task', {
-    checkbox: SYS_V.YES,
-    extends: 'tagDef_task',
-  });
-  const tagDefDevTaskNodes: NodexNode[] = [
-    {
-      ...makeNode('tagDef_dev_task', 'Dev Task', schemaId, [
-        ...devTaskCfg.childIds,
-        'devTaskField_branch',
-      ], 'tagDef'),
-      props: {
-        ...makeNode('tagDef_dev_task', '', '').props, _docType: 'tagDef' as DocType,
-        name: 'Dev Task', _ownerId: schemaId,
-        description: 'Dev task extending Task with a Branch field',
-      },
-      meta: ['meta_tagDef_dev_task_tag'],
-    },
-    ...devTaskCfg.nodes,
-    makeNode('devTaskField_branch', '', 'tagDef_dev_task', ['attrDef_branch'], 'tuple'),
-  ];
-
-  // TagDef: web_clip
-  const webClipCfg = makeTagDefConfigTuples('tagDef_web_clip', 'tagDef_web_clip', {});
-  const tagDefWebClipNodes: NodexNode[] = [
-    {
-      ...makeNode('tagDef_web_clip', 'web_clip', schemaId, [
-        ...webClipCfg.childIds,
-        'webClipField_source_url',
-      ], 'tagDef'),
-      props: { ...makeNode('tagDef_web_clip', '', '').props, _docType: 'tagDef' as DocType, name: 'web_clip', _ownerId: schemaId },
-      meta: ['meta_tagDef_web_clip_tag'],
-    },
-    ...webClipCfg.nodes,
-    makeNode('webClipField_source_url', '', 'tagDef_web_clip', ['attrDef_source_url'], 'tuple'),
-  ];
-
-  // Tag tuples for tagDefs (SYS_T01 tag, stored in node.meta)
-  const tagDefTagTuples: NodexNode[] = [
-    makeNode('meta_tagDef_task_tag', '', 'tagDef_task', [SYS_A.NODE_SUPERTAGS, SYS_T.SUPERTAG], 'tuple'),
-    makeNode('meta_tagDef_person_tag', '', 'tagDef_person', [SYS_A.NODE_SUPERTAGS, SYS_T.SUPERTAG], 'tuple'),
-    makeNode('meta_tagDef_dev_task_tag', '', 'tagDef_dev_task', [SYS_A.NODE_SUPERTAGS, SYS_T.SUPERTAG], 'tuple'),
-    makeNode('meta_tagDef_web_clip_tag', '', 'tagDef_web_clip', [SYS_A.NODE_SUPERTAGS, SYS_T.SUPERTAG], 'tuple'),
-  ];
-
-  // ─── Pre-tag task_1 with "Task" tag (demo fields on startup) ───
-  const task1TagTuples: NodexNode[] = [
-    makeNode('meta_task_1_tag', '', 'task_1', [SYS_A.NODE_SUPERTAGS, 'tagDef_task'], 'tuple'),
-  ];
-  const task1FieldNodes: NodexNode[] = [
-    makeNode('task1_fld_status', '', 'task_1', ['attrDef_status'], 'tuple'),
-    makeNode('task1_fld_priority', '', 'task_1', ['attrDef_priority'], 'tuple'),
-    makeNode('task1_fld_due', '', 'task_1', ['attrDef_due'], 'tuple'),
-    makeNode('task1_fld_done', '', 'task_1', ['attrDef_done'], 'tuple'),
-  ];
-  task1FieldNodes[0].props._sourceId = 'taskField_status';
-  task1FieldNodes[1].props._sourceId = 'taskField_priority';
-  task1FieldNodes[2].props._sourceId = 'taskField_due';
-  task1FieldNodes[3].props._sourceId = 'taskField_done';
-
-  // ─── Pre-tag person_1 with "Person" tag ───
-  const person1TagTuples: NodexNode[] = [
-    makeNode('meta_person_1_tag', '', 'person_1', [SYS_A.NODE_SUPERTAGS, 'tagDef_person'], 'tuple'),
-  ];
-  const person1FieldNodes: NodexNode[] = [
-    makeNode('person1_fld_email', '', 'person_1', ['attrDef_email'], 'tuple'),
-    makeNode('person1_fld_company', '', 'person_1', ['attrDef_company'], 'tuple'),
-    makeNode('person1_fld_age', '', 'person_1', ['attrDef_age'], 'tuple'),
-    makeNode('person1_fld_website', '', 'person_1', ['attrDef_website'], 'tuple'),
-  ];
-  person1FieldNodes[0].props._sourceId = 'personField_email';
-  person1FieldNodes[1].props._sourceId = 'personField_company';
-  person1FieldNodes[2].props._sourceId = 'personField_age';
-  person1FieldNodes[3].props._sourceId = 'personField_website';
-
-  // ─── Sample web clip node (pre-tagged) ───
-  const webclip1Nodes: NodexNode[] = [
-    {
-      ...makeNode('webclip_1', 'Example Article — Medium', inboxId, ['webclip1_fld_source_url']),
-      props: {
-        ...makeNode('webclip_1', 'Example Article — Medium', inboxId).props,
-        description: 'A sample web clip to demonstrate the clipping feature',
-      },
-      meta: ['meta_webclip_1_tag'],
-    },
-    makeNode('meta_webclip_1_tag', '', 'webclip_1', [SYS_A.NODE_SUPERTAGS, 'tagDef_web_clip'], 'tuple'),
-    makeNode('webclip1_fld_source_url', '', 'webclip_1', ['attrDef_source_url', 'webclip1_val_url'], 'tuple'),
-    makeNode('webclip1_val_url', 'https://medium.com/example-article', 'webclip1_fld_source_url'),
-  ];
-  webclip1Nodes[2].props._sourceId = 'webClipField_source_url';
-
-  // ─── Set all nodes ───
-  const allNodes = [
-    wsRoot,
-    ...containers,
-    ...projectNodes,
-    ...personNodes,
-    ...noteNodes,
-    ...richTextNodes,
-    ...inboxNodes,
-    ...journalNodes,
-    // System
-    ...systemValueNodes,
-    ...systemAttrDefNodes,
-    ...sysT01Nodes,
-    ...sysT02Nodes,
-    // User attrDefs
-    ...attrDefStatusNodes,
-    ...attrDefPriorityNodes,
-    ...attrDefDueNodes,
-    ...attrDefEmailNodes,
-    ...attrDefCompanyNodes,
-    ...attrDefAgeNodes,
-    ...attrDefWebsiteNodes,
-    ...attrDefDoneNodes,
-    ...attrDefBranchNodes,
-    ...attrDefSourceUrlNodes,
-    ...attrDefTagTuples,
-    // TagDefs
-    ...tagDefTaskNodes,
-    ...tagDefPersonNodes,
-    ...tagDefDevTaskNodes,
-    ...tagDefWebClipNodes,
-    ...tagDefTagTuples,
-    // Pre-tagged instances
-    ...webclip1Nodes,
-    ...task1TagTuples,
-    ...task1FieldNodes,
-    ...person1TagTuples,
-    ...person1FieldNodes,
-  ];
-
-  store.setNodes(allNodes);
-
-  // Expand some nodes by default for testing (compound keys: parentId:nodeId)
-  uiStore.setExpanded(`${libraryId}:proj_1`, true);
-  uiStore.setExpanded(`proj_1:task_1`, true);
-  uiStore.setExpanded(`proj_1:task_2`, true);
-  uiStore.setExpanded(`${libraryId}:note_rich`, true);
+  // Expand some nodes by default for testing
+  uiStore.setExpanded(`${CONTAINER_IDS.LIBRARY}:proj_1`, true);
+  uiStore.setExpanded('proj_1:task_1', true);
+  uiStore.setExpanded('proj_1:task_2', true);
+  uiStore.setExpanded(`${CONTAINER_IDS.LIBRARY}:note_rich`, true);
 
   // Navigate to Library
   if (uiStore.panelHistory.length === 0) {
-    uiStore.navigateTo(libraryId);
+    uiStore.navigateTo(CONTAINER_IDS.LIBRARY);
   }
+}
+
+export async function seedTestData(): Promise<void> {
+  // Initialize LoroDoc first (async)
+  await initLoroDoc(WS_ID);
+
+  // Set workspace/user in stores
+  useWorkspaceStore.getState().setWorkspace(WS_ID);
+  useWorkspaceStore.getState().setUser('user_default');
+
+  seedBody();
+}
+
+/** Sync seed for test environments (call after initLoroDocForTest). */
+export function seedTestDataSync(): void {
+  initLoroDocForTest(WS_ID);
+
+  // Set workspace/user in stores
+  useWorkspaceStore.getState().setWorkspace(WS_ID);
+  useWorkspaceStore.getState().setUser('user_default');
+
+  seedBody();
+
+  // Commit seed state with a special origin so UndoManager excludes it.
+  // Any subsequent user operations will start a clean undo history.
+  commitDoc('__seed__');
 }

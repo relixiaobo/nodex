@@ -9,7 +9,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNode } from '../../hooks/use-node';
 import { useNodeStore } from '../../stores/node-store';
-import { useWorkspaceStore } from '../../stores/workspace-store';
 import { resolveDataType, getFieldTypeIcon } from '../../lib/field-utils.js';
 import { resolveTagColor } from '../../lib/tag-colors.js';
 import { TagBar } from '../tags/TagBar';
@@ -22,22 +21,23 @@ interface PanelTitleProps {
 
 export function PanelTitle({ nodeId, onTitleRef }: PanelTitleProps) {
   const node = useNode(nodeId);
-  const updateNodeName = useNodeStore((s) => s.updateNodeName);
-  const userId = useWorkspaceStore((s) => s.userId) ?? 'local';
+  const setNodeName = useNodeStore((s) => s.setNodeName);
 
-  const isAttrDef = node?.props._docType === 'attrDef';
-  const isTagDef = node?.props._docType === 'tagDef';
-  const dataType = useNodeStore((s) =>
-    isAttrDef ? resolveDataType(s.entities, nodeId) : '',
-  );
+  const isAttrDef = node?.type === 'fieldDef';
+  const isTagDef = node?.type === 'tagDef';
+  const dataType = useNodeStore((s) => {
+    void s._version;
+    return isAttrDef ? resolveDataType(nodeId) : '';
+  });
   const FieldIcon = isAttrDef ? getFieldTypeIcon(dataType) : null;
 
   // TagDef: colored # badge reflecting configured SYS_A11 color
-  const tagDefColor = useNodeStore((s) =>
-    isTagDef ? resolveTagColor(s.entities, nodeId) : null,
-  );
+  const tagDefColor = useNodeStore((s) => {
+    void s._version;
+    return isTagDef ? resolveTagColor(nodeId) : null;
+  });
 
-  const rawName = node?.props.name ?? '';
+  const rawName = node?.name ?? '';
   const displayName = rawName.replace(/<[^>]+>/g, '') || '';
 
   const [editing, setEditing] = useState(false);
@@ -70,10 +70,10 @@ export function PanelTitle({ nodeId, onTitleRef }: PanelTitleProps) {
     if (!titleRef.current) return;
     const newName = titleRef.current.textContent?.trim() ?? '';
     if (newName !== displayName) {
-      updateNodeName(nodeId, newName, userId);
+      setNodeName(nodeId, newName);
     }
     setEditing(false);
-  }, [nodeId, displayName, userId, updateNodeName]);
+  }, [nodeId, displayName, setNodeName]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {

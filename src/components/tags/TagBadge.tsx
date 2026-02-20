@@ -3,6 +3,8 @@ import { X, XCircle, Hash, Settings, Trash2, AlertTriangle } from 'lucide-react'
 import { createPortal } from 'react-dom';
 import { useNodeStore } from '../../stores/node-store';
 import { resolveTagColor } from '../../lib/tag-colors.js';
+import * as loroDoc from '../../lib/loro-doc.js';
+import { CONTAINER_IDS } from '../../types/index.js';
 
 interface TagBadgeProps {
   tagDefId: string;
@@ -12,9 +14,9 @@ interface TagBadgeProps {
 }
 
 export function TagBadge({ tagDefId, onRemove, onNavigate }: TagBadgeProps) {
-  const tagName = useNodeStore((s) => s.entities[tagDefId]?.props.name ?? 'Untitled');
-  const isTrashed = useNodeStore((s) => s.entities[tagDefId]?.props._ownerId?.endsWith('_TRASH') ?? false);
-  const color = useNodeStore((s) => resolveTagColor(s.entities, tagDefId));
+  const tagName = useNodeStore((s) => { void s._version; return s.getNode(tagDefId)?.name ?? 'Untitled'; });
+  const isTrashed = useNodeStore((s) => { void s._version; return loroDoc.getParentId(tagDefId) === CONTAINER_IDS.TRASH; });
+  const color = useNodeStore((s) => { void s._version; return resolveTagColor(tagDefId); });
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 

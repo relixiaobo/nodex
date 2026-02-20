@@ -6,7 +6,8 @@ import { useNodeTags } from '../../hooks/use-node-tags';
 import { useNodeFields, type FieldEntry } from '../../hooks/use-node-fields';
 import { useNodeStore } from '../../stores/node-store';
 import { useUIStore } from '../../stores/ui-store';
-import { useWorkspaceStore } from '../../stores/workspace-store';
+import * as loroDoc from '../../lib/loro-doc.js';
+import { CONTAINER_IDS } from '../../types/index.js';
 import { BulletChevron, ChevronButton } from './BulletChevron';
 import { RichTextEditor, type EditorContentPayload } from '../editor/RichTextEditor';
 import { SlashCommandMenu } from '../editor/SlashCommandMenu';
@@ -86,8 +87,8 @@ interface OutlinerItemProps {
   bulletColor?: string;
 }
 
-function getNodeTextLengthById(nodeId: string, entities: Record<string, { props?: { name?: string } }>): number {
-  return (entities[nodeId]?.props?.name ?? '').length;
+function getNodeTextLengthById(nodeId: string): number {
+  return (loroDoc.toNodexNode(nodeId)?.name ?? '').length;
 }
 
 function focusTrailingInputForParent(parentId: string): boolean {
@@ -131,9 +132,6 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   const setDrag = useUIStore((s) => s.setDrag);
   const setDropTarget = useUIStore((s) => s.setDropTarget);
 
-  const wsId = useWorkspaceStore((s) => s.currentWorkspaceId);
-  const userId = useWorkspaceStore((s) => s.userId);
-
   const createSibling = useNodeStore((s) => s.createSibling);
   const createChild = useNodeStore((s) => s.createChild);
   const indentNode = useNodeStore((s) => s.indentNode);
@@ -144,7 +142,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   const trashNode = useNodeStore((s) => s.trashNode);
   const toggleNodeDone = useNodeStore((s) => s.toggleNodeDone);
   const cycleNodeCheckbox = useNodeStore((s) => s.cycleNodeCheckbox);
-  const entities = useNodeStore((s) => s.entities);
+  const _version = useNodeStore((s) => s._version);
 
   const rowRef = useRef<HTMLDivElement>(null);
   const contentAreaRef = useRef<HTMLDivElement>(null);
@@ -159,7 +157,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   const tagDropdownRef = useRef<TagDropdownHandle>(null);
   const applyTag = useNodeStore((s) => s.applyTag);
   const createTagDef = useNodeStore((s) => s.createTagDef);
-  const updateNodeName = useNodeStore((s) => s.updateNodeName);
+  const setNodeName = useNodeStore((s) => s.setNodeName);
   const updateNodeContent = useNodeStore((s) => s.updateNodeContent);
   const updateNodeDescription = useNodeStore((s) => s.updateNodeDescription);
   const removeReference = useNodeStore((s) => s.removeReference);
@@ -206,7 +204,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
           hidden = !f.isEmpty;
           break;
       }
-      visibility.set(f.tupleId, !hidden);
+      visibility.set(f.fieldEntryId, !hidden);
     }
     return visibility;
   }, [parentFields]);
@@ -217,7 +215,9 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
 
   const allChildIds = node?.children ?? [];
   const renderableSiblings = useMemo(() => {
-    const parentChildren = entities[parentId]?.children ?? [];
+    void _version;
+    const getNode = useNodeStore.getState().getNode;
+    const parentChildren = getNode(parentId)?.children ?? [];
     const result: Array<{ id: string; type: 'field' | 'content' }> = [];
     for (const cid of parentChildren) {
       if (parentFieldVisibility.has(cid)) {
@@ -225,17 +225,18 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
         result.push({ id: cid, type: 'field' });
         continue;
       }
-      if (!entities[cid]?.props._docType) {
+      if (!getNode(cid)?.type) {
         result.push({ id: cid, type: 'content' });
       }
     }
     return result;
-  }, [entities, parentId, parentFieldVisibility]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [_version, parentId, parentFieldVisibility]);
 
   // Build field lookup by tuple ID
   const fieldMap = useMemo(() => {
     const m = new Map<string, FieldEntry>();
-    for (const f of fields) m.set(f.tupleId, f);
+    for (const f of fields) m.set(f.fieldEntryId, f);
     return m;
   }, [fields]);
 
@@ -263,13 +264,14 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
         }
         result.push({ id: cid, type: 'field', hidden });
       } else {
-        const dt = entities[cid]?.props._docType;
+        const dt = useNodeStore.getState().getNode(cid)?.type;
         if (!dt) result.push({ id: cid, type: 'content' });
-        // else skip: SYS tuple, tag tuple, etc.
+        // else skip: SYS fieldEntry, tag fieldEntry, etc.
       }
     }
     return result;
-  }, [allChildIds, fieldMap, entities]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allChildIds, fieldMap, _version]);
 
   const childIds = useMemo(
     () => visibleChildren.filter((c) => c.type === 'content').map((c) => c.id),
@@ -307,8 +309,8 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     (focusedParentId === null || focusedParentId === parentId);
   const hasTags = tagIds.length > 0;
   const hasFields = fields.length > 0;
-  const isReference = !!node && node.props._ownerId !== parentId;
-  const isTagDef = node?.props._docType === 'tagDef';
+  const isReference = !!node && loroDoc.getParentId(nodeId) !== parentId;
+  const isTagDef = node?.type === 'tagDef';
   const isPendingConversion = useUIStore((s) => s.pendingRefConversion?.tempNodeId === nodeId);
   // Multi-select: check derived boolean. For single-select with parent disambiguation (reference nodes),
   // also check selectedParentId to support the same node appearing in multiple places.
@@ -332,19 +334,18 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
 
   // Click on checkbox: toggles undone ↔ done (never removes checkbox)
   const handleCheckboxToggle = useCallback(() => {
-    if (userId) toggleNodeDone(nodeId, userId);
-  }, [nodeId, userId, toggleNodeDone]);
+    toggleNodeDone(nodeId);
+  }, [nodeId, toggleNodeDone]);
 
   // Cmd+Enter: 3-state cycle for manual, 2-state for tag-driven
   const handleCycleCheckbox = useCallback(() => {
-    if (userId) cycleNodeCheckbox(nodeId, userId);
-  }, [nodeId, userId, cycleNodeCheckbox]);
+    cycleNodeCheckbox(nodeId);
+  }, [nodeId, cycleNodeCheckbox]);
 
   // Cmd+Click: toggle node in multi-selection
   const handleCmdClick = useCallback(() => {
     const state = useUIStore.getState();
-    const storeEntities = useNodeStore.getState().entities;
-    const newSelection = toggleNodeInSelection(nodeId, state.selectedNodeIds, storeEntities);
+    const newSelection = toggleNodeInSelection(nodeId, state.selectedNodeIds);
     // If anchor was deselected, pick another selected node
     let newAnchor = state.selectionAnchorId;
     if (newAnchor && !newSelection.has(newAnchor)) {
@@ -364,9 +365,8 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       setSelectedNode(nodeId, parentId);
       return;
     }
-    const storeEntities = useNodeStore.getState().entities;
-    const flatList = getFlattenedVisibleNodes(rootChildIds, storeEntities, state.expandedNodes, rootNodeId);
-    const range = computeRangeSelection(anchor, nodeId, flatList, storeEntities);
+    const flatList = getFlattenedVisibleNodes(rootChildIds, state.expandedNodes, rootNodeId);
+    const range = computeRangeSelection(anchor, nodeId, flatList);
     setSelectedNodes(range, anchor);
   }, [nodeId, parentId, rootChildIds, rootNodeId, setSelectedNode, setSelectedNodes]);
 
@@ -383,10 +383,10 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   // Cmd+A (double-press) in editor → select all top-level nodes
   const handleSelectAll = useCallback(() => {
     clearFocus();
-    const storeEntities = useNodeStore.getState().entities;
-    const rootNode = storeEntities[rootNodeId];
+    const getNode = useNodeStore.getState().getNode;
+    const rootNode = getNode(rootNodeId);
     const topLevelIds = (rootNode?.children ?? []).filter(
-      (cid) => !storeEntities[cid]?.props._docType,
+      (cid) => !getNode(cid)?.type,
     );
     if (topLevelIds.length > 0) {
       setSelectedNodes(new Set(topLevelIds), topLevelIds[0]);
@@ -396,7 +396,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   // Description editing state
   const [editingDescription, setEditingDescription] = useState(false);
   const descriptionRef = useRef<HTMLDivElement>(null);
-  const description = node?.props.description ?? '';
+  const description = node?.description ?? '';
 
   // Pending click coordinates for description cursor placement
   const descClickCoordsRef = useRef<{ x: number; y: number } | null>(null);
@@ -417,10 +417,10 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   const commitDescriptionDraft = useCallback(() => {
     if (!descriptionRef.current) return;
     const newDesc = descriptionRef.current.textContent?.trim() ?? '';
-    if (newDesc !== description && userId) {
-      updateNodeDescription(nodeId, newDesc, userId);
+    if (newDesc !== description) {
+      updateNodeDescription(nodeId, newDesc);
     }
-  }, [nodeId, description, userId, updateNodeDescription]);
+  }, [nodeId, description, updateNodeDescription]);
 
   const handleDescriptionMouseDown = useCallback((e: React.MouseEvent) => {
     e.preventDefault(); // Prevent native focus churn
@@ -539,7 +539,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   useEffect(() => {
     if (!isSelected || isFocused) return;
     const handleKeyDown = (e: KeyboardEvent) => {
-      // If TipTap/ProseMirror already handled this key (e.g. Escape in editor
+      // If ProseMirror already handled this key (e.g. Escape in editor
       // called clearFocus() synchronously before this handler runs), skip it.
       // Without this, the same Escape event that transitions edit→selected
       // would also immediately clear the selection.
@@ -568,15 +568,14 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
         if (refAction) {
           if (refAction === 'delete') {
             e.preventDefault();
-            if (userId) removeReference(parentId, nodeId, userId);
+            removeReference(nodeId);
             clearSelection();
             return;
           }
           if (refAction === 'convert_printable') {
             const isAsciiLetter = /^[a-zA-Z]$/.test(e.key);
             if (!isAsciiLetter) e.preventDefault();
-            const currentEntities = useNodeStore.getState().entities;
-            const editAtEnd = getNodeTextLengthById(nodeId, currentEntities);
+            const editAtEnd = getNodeTextLengthById(nodeId);
             if (!isAsciiLetter) {
               setPendingInputChar({ char: e.key, nodeId, parentId });
             }
@@ -591,12 +590,12 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
           }
           if (refAction === 'convert_arrow_right') {
             e.preventDefault();
-            if (!wsId || !userId) return;
-            const parent = entities[parentId];
+            const getNode = useNodeStore.getState().getNode;
+            const parent = getNode(parentId);
             const pos = parent?.children?.indexOf(nodeId) ?? -1;
             if (pos < 0) return;
-            removeReference(parentId, nodeId, userId);
-            const tempNodeId = startRefConversion(nodeId, parentId, pos, wsId, userId);
+            removeReference(nodeId);
+            const tempNodeId = startRefConversion(nodeId, parentId, pos);
             setPendingRefConversion({ tempNodeId, refNodeId: nodeId, parentId });
             clearSelection();
             setTimeout(() => setFocusedNode(tempNodeId, parentId), 0);
@@ -615,8 +614,8 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
           if (refAction === 'options_confirm' && allFieldOptions.length > 0) {
             e.preventDefault();
             const opt = allFieldOptions[optionsPickerIndex];
-            if (opt && userId) {
-              selectFieldOption(parentId, opt.id, nodeId, userId);
+            if (opt) {
+              selectFieldOption(parentId, opt.id, nodeId);
             }
             clearSelection();
             return;
@@ -646,10 +645,10 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       if (selAction === 'select_all') {
         e.preventDefault();
         // Select all top-level content children of root
-        const storeEntities = useNodeStore.getState().entities;
-        const rootNode = storeEntities[rootNodeId];
+        const getNode = useNodeStore.getState().getNode;
+        const rootNode = getNode(rootNodeId);
         const topLevelIds = (rootNode?.children ?? []).filter(
-          (cid) => !storeEntities[cid]?.props._docType,
+          (cid) => !getNode(cid)?.type,
         );
         if (topLevelIds.length > 0) {
           setSelectedNodes(new Set(topLevelIds), topLevelIds[0]);
@@ -661,16 +660,14 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
 
       if (selAction === 'batch_delete') {
         e.preventDefault();
-        if (!wsId || !userId) return;
         const latestUi = useUIStore.getState();
-        const storeEntities = useNodeStore.getState().entities;
-        const flatList = getFlattenedVisibleNodes(rootChildIds, storeEntities, latestUi.expandedNodes, rootNodeId);
+        const flatList = getFlattenedVisibleNodes(rootChildIds, latestUi.expandedNodes, rootNodeId);
         const bounds = getSelectionBounds(latestUi.selectedNodeIds, flatList);
         const prev = bounds ? getPreviousVisibleNode(bounds.first.nodeId, bounds.first.parentId, flatList) : null;
         const orderedIds = getSelectedIdsInOrder(latestUi.selectedNodeIds, flatList);
         // Bottom-up: avoid index shift when deleting upper nodes first
         for (let i = orderedIds.length - 1; i >= 0; i--) {
-          trashNode(orderedIds[i], wsId, userId);
+          trashNode(orderedIds[i]);
         }
         clearSelection();
         if (prev) {
@@ -681,25 +678,23 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
 
       if (selAction === 'batch_indent') {
         e.preventDefault();
-        if (!userId) return;
         const latestUi = useUIStore.getState();
-        const storeEntities = useNodeStore.getState().entities;
-        const flatList = getFlattenedVisibleNodes(rootChildIds, storeEntities, latestUi.expandedNodes, rootNodeId);
+        const flatList = getFlattenedVisibleNodes(rootChildIds, latestUi.expandedNodes, rootNodeId);
         const orderedIds = getSelectedIdsInOrder(latestUi.selectedNodeIds, flatList);
         // Top-down: upper nodes indent first so lower ones follow into the same parent
         for (const id of orderedIds) {
-          const currentEntities = useNodeStore.getState().entities;
-          const currentNode = currentEntities[id];
+          const getNode = useNodeStore.getState().getNode;
+          const currentNode = getNode(id);
           if (!currentNode) continue;
-          const ownerId = currentNode.props._ownerId;
+          const ownerId = loroDoc.getParentId(id);
           if (!ownerId) continue;
-          const parent = currentEntities[ownerId];
+          const parent = getNode(ownerId);
           if (!parent?.children) continue;
           const index = parent.children.indexOf(id);
           if (index <= 0) continue;
           const newParentId = parent.children[index - 1];
           setExpanded(`${ownerId}:${newParentId}`, true);
-          indentNode(id, userId);
+          indentNode(id);
         }
         clearSelection();
         return;
@@ -707,14 +702,12 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
 
       if (selAction === 'batch_outdent') {
         e.preventDefault();
-        if (!userId) return;
         const latestUi = useUIStore.getState();
-        const storeEntities = useNodeStore.getState().entities;
-        const flatList = getFlattenedVisibleNodes(rootChildIds, storeEntities, latestUi.expandedNodes, rootNodeId);
+        const flatList = getFlattenedVisibleNodes(rootChildIds, latestUi.expandedNodes, rootNodeId);
         const orderedIds = getSelectedIdsInOrder(latestUi.selectedNodeIds, flatList);
         // Bottom-up: lower nodes outdent first to avoid parent relationship issues
         for (let i = orderedIds.length - 1; i >= 0; i--) {
-          outdentNode(orderedIds[i], userId);
+          outdentNode(orderedIds[i]);
         }
         clearSelection();
         return;
@@ -722,16 +715,13 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
 
       if (selAction === 'batch_duplicate') {
         e.preventDefault();
-        if (!wsId || !userId) return;
         const latestUi = useUIStore.getState();
-        const storeEntities = useNodeStore.getState().entities;
-        const flatList = getFlattenedVisibleNodes(rootChildIds, storeEntities, latestUi.expandedNodes, rootNodeId);
+        const flatList = getFlattenedVisibleNodes(rootChildIds, latestUi.expandedNodes, rootNodeId);
         const orderedIds = getSelectedIdsInOrder(latestUi.selectedNodeIds, flatList);
         // Bottom-up: insert positions stay correct when lower nodes duplicate first
         for (let i = orderedIds.length - 1; i >= 0; i--) {
-          const currentEntities = useNodeStore.getState().entities;
-          const name = currentEntities[orderedIds[i]]?.props.name ?? '';
-          createSibling(orderedIds[i], wsId, userId, name);
+          const name = useNodeStore.getState().getNode(orderedIds[i])?.name ?? '';
+          createSibling(orderedIds[i], { name });
         }
         clearSelection();
         return;
@@ -739,13 +729,12 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
 
       if (selAction === 'batch_checkbox') {
         e.preventDefault();
-        if (!userId) return;
         const latestUi = useUIStore.getState();
         const ids = [...latestUi.selectedNodeIds];
         // 3-state cycle per node: No → Undone → Done → No (manual)
         //                         Undone → Done → Undone (tag-driven)
         for (const id of ids) {
-          cycleNodeCheckbox(id, userId);
+          cycleNodeCheckbox(id);
         }
         // Keep selection (don't clear)
         return;
@@ -753,9 +742,8 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
 
       if (selAction === 'extend_up' || selAction === 'extend_down') {
         e.preventDefault();
-        const storeEntities = useNodeStore.getState().entities;
         const latestUi = useUIStore.getState();
-        const flatList = getFlattenedVisibleNodes(rootChildIds, storeEntities, latestUi.expandedNodes, rootNodeId);
+        const flatList = getFlattenedVisibleNodes(rootChildIds, latestUi.expandedNodes, rootNodeId);
 
         const anchor = latestUi.selectionAnchorId;
         if (!anchor) return;
@@ -767,7 +755,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
         // Without this, selecting a parent with expanded children would get
         // stuck: filterToRootLevel removes children, so bounds.last = parent,
         // and the extent can never move past the children.
-        const effectiveBounds = getEffectiveSelectionBounds(latestUi.selectedNodeIds, flatList, storeEntities);
+        const effectiveBounds = getEffectiveSelectionBounds(latestUi.selectedNodeIds, flatList);
         if (!effectiveBounds) return;
 
         const { firstIdx, lastIdx } = effectiveBounds;
@@ -794,15 +782,14 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
         for (let i = start; i <= end; i++) {
           rangeIds.add(flatList[i].nodeId);
         }
-        const filtered = filterToRootLevel(rangeIds, storeEntities, flatList);
+        const filtered = filterToRootLevel(rangeIds, undefined, flatList);
         setSelectedNodes(filtered, anchor);
         return;
       }
 
       // For navigate/enter/type: use fresh state for multi-select bounds
-      const storeEntities = useNodeStore.getState().entities;
       const latestUi = useUIStore.getState();
-      const flatList = getFlattenedVisibleNodes(rootChildIds, storeEntities, latestUi.expandedNodes, rootNodeId);
+      const flatList = getFlattenedVisibleNodes(rootChildIds, latestUi.expandedNodes, rootNodeId);
 
       if (selAction === 'navigate_up') {
         e.preventDefault();
@@ -812,11 +799,10 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
         if (prev) {
           clearSelection();
           // ↑ → cursor at text end
-          const currentEntities = useNodeStore.getState().entities;
           useUIStore.getState().setFocusClickCoords({
             nodeId: prev.nodeId,
             parentId: prev.parentId,
-            textOffset: getNodeTextLengthById(prev.nodeId, currentEntities),
+            textOffset: getNodeTextLengthById(prev.nodeId),
           });
           setFocusedNode(prev.nodeId, prev.parentId);
         }
@@ -840,8 +826,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       if (selAction === 'enter_edit' || selAction === 'type_char') {
         const first = getFirstSelectedInOrder(latestUi.selectedNodeIds, flatList);
         if (!first) return;
-        const currentEntities = useNodeStore.getState().entities;
-        const editAtEnd = getNodeTextLengthById(first.nodeId, currentEntities);
+        const editAtEnd = getNodeTextLengthById(first.nodeId);
         if (selAction === 'enter_edit') {
           e.preventDefault();
         }
@@ -865,7 +850,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isSelected, isFocused, isReference, isSelectionAnchor, optionsPickerOpen, allFieldOptions, optionsPickerIndex, parentId, nodeId, userId, wsId, rootNodeId, rootChildIds, entities, expandedNodes, removeReference, selectFieldOption, setSelectedNode, setSelectedNodes, clearSelection, setFocusedNode, startRefConversion, setPendingRefConversion, setPendingInputChar]);
+  }, [isSelected, isFocused, isReference, isSelectionAnchor, optionsPickerOpen, allFieldOptions, optionsPickerIndex, parentId, nodeId, rootNodeId, rootChildIds, expandedNodes, removeReference, selectFieldOption, setSelectedNode, setSelectedNodes, clearSelection, setFocusedNode, startRefConversion, setPendingRefConversion, setPendingInputChar]);
 
   // When TrailingInput creates a node with #/@/, it sets triggerHint so we
   // can immediately open the dropdown (extensions don't fire on mount because
@@ -934,9 +919,9 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     // Check pending ref conversion: if this is a temp node, decide revert or keep
     const pending = useUIStore.getState().pendingRefConversion;
     if (pending && pending.tempNodeId === nodeId) {
-      const tempNode = useNodeStore.getState().entities[nodeId];
-      const content = tempNode?.props.name ?? '';
-      if (isOnlyInlineRef(content, tempNode?.props._inlineRefs)) {
+      const tempNode = useNodeStore.getState().getNode(nodeId);
+      const content = tempNode?.name ?? '';
+      if (isOnlyInlineRef(content, tempNode?.inlineRefs)) {
         revertRefConversion(pending.tempNodeId, pending.refNodeId, pending.parentId);
       }
       useUIStore.getState().setPendingRefConversion(null);
@@ -962,7 +947,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
 
   // mousedown: record text offset for cursor placement, but DON'T enter edit
   // mode. Edit mode is deferred to click so drag-select can take over if the
-  // user drags (mounting TipTap on mousedown captures subsequent mouse events).
+  // user drags (mounting RichTextEditor on mousedown captures subsequent mouse events).
   const handleContentMouseDown = useCallback((e: React.MouseEvent) => {
     if (fieldDataType === SYS_D.CHECKBOX) return;
     const target = e.target as HTMLElement;
@@ -988,7 +973,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     const container = e.currentTarget as HTMLElement;
     const textOffset = getTextOffsetFromPoint(container, e.clientX, e.clientY);
     const fallbackOffset = (() => {
-      const textLength = getNodeTextLengthById(nodeId, useNodeStore.getState().entities);
+      const textLength = getNodeTextLengthById(nodeId);
       if (textOffset !== null) return textOffset;
       const rect = container.getBoundingClientRect();
       return e.clientX <= rect.left + 2 ? 0 : textLength;
@@ -999,7 +984,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     // width rather than the text width, causing first-click tail detection to
     // fail (cursor placed at offset 0 instead of end).
     const textRightEdge = getRenderedTextRightEdge(container);
-    const textLength = getNodeTextLengthById(nodeId, useNodeStore.getState().entities);
+    const textLength = getNodeTextLengthById(nodeId);
     const rect = container.getBoundingClientRect();
     const forceEndWhenRightBlank = textOffset === 0 && textLength > 0 && e.clientX > rect.left + 24;
     const forceEndWhenFarRight = textLength > 0 && e.clientX >= rect.left + rect.width * 0.66;
@@ -1125,8 +1110,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
 
   const handleToggle = useCallback(() => {
     const ek = `${parentId}:${nodeId}`;
-    const currentNode = useNodeStore.getState().entities[nodeId];
-    const currentHasChildren = (currentNode?.children ?? []).length > 0;
+    const currentHasChildren = (useNodeStore.getState().getNode(nodeId)?.children ?? []).length > 0;
     const currentlyExpanded = useUIStore.getState().expandedNodes.has(ek);
 
     if (!currentHasChildren && !currentlyExpanded) {
@@ -1147,7 +1131,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
 
   const handleIndentLineClick = useCallback(() => {
     // Toggle expand/collapse all direct children (Tana indent guide line behavior)
-    const currentChildIds = useNodeStore.getState().entities[nodeId]?.children ?? [];
+    const currentChildIds = useNodeStore.getState().getNode(nodeId)?.children ?? [];
     const expanded = useUIStore.getState().expandedNodes;
     // Check if any child is expanded (compound key: nodeId is parent of children)
     const anyChildExpanded = currentChildIds.some((cid) => expanded.has(`${nodeId}:${cid}`));
@@ -1167,8 +1151,6 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
 
   const handleEnter = useCallback(
     (afterContent?: EditorContentPayload) => {
-      if (!wsId || !userId) return;
-
       // Single-value field types: Enter navigates out instead of creating sibling
       if (fieldDataType && SINGLE_VALUE_FIELD_TYPES.has(fieldDataType)) {
         if (onNavigateOut) onNavigateOut('down');
@@ -1176,78 +1158,40 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       }
 
       const currentlyExpanded = useUIStore.getState().expandedNodes.has(`${parentId}:${nodeId}`);
-      const currentHasChildren =
-        (useNodeStore.getState().entities[nodeId]?.children ?? []).length > 0;
+      const currentHasChildren = (useNodeStore.getState().getNode(nodeId)?.children ?? []).length > 0;
 
       if (currentlyExpanded && currentHasChildren) {
         // Expanded with children → new node becomes first child (position 0)
-        const beforeIds = new Set(useNodeStore.getState().entities[nodeId]?.children ?? []);
-        const createPromise = createChild(
-          nodeId,
-          wsId,
-          userId,
-          afterContent?.text ?? '',
-          0,
-          afterContent?.marks,
-          afterContent?.inlineRefs,
-        );
-
-        const optimisticIds = useNodeStore.getState().entities[nodeId]?.children ?? [];
-        const optimisticNewId = optimisticIds.find((cid) => !beforeIds.has(cid));
-        if (optimisticNewId) setFocusedNode(optimisticNewId, nodeId);
-
-        createPromise.then((newNode) => {
-          if (!useNodeStore.getState().entities[newNode.id]) return;
-          const ui = useUIStore.getState();
-          // Avoid stealing focus back while user has already started typing
-          // in another editor (e.g. IME composition right after Enter-create).
-          if (ui.focusedNodeId === newNode.id && ui.focusedParentId === nodeId) return;
-          if (ui.focusedNodeId && ui.focusedNodeId !== nodeId && ui.focusedNodeId !== newNode.id) return;
-          setFocusedNode(newNode.id, nodeId);
+        const newNode = createChild(nodeId, 0, {
+          name: afterContent?.text ?? '',
+          marks: afterContent?.marks,
+          inlineRefs: afterContent?.inlineRefs,
         });
+        setFocusedNode(newNode.id, nodeId);
       } else {
         // Collapsed or leaf → create sibling after this node
-        const beforeIds = new Set(useNodeStore.getState().entities[parentId]?.children ?? []);
-        const createPromise = createSibling(
-          nodeId,
-          wsId,
-          userId,
-          afterContent?.text,
-          afterContent?.marks,
-          afterContent?.inlineRefs,
-        );
-
-        const optimisticIds = useNodeStore.getState().entities[parentId]?.children ?? [];
-        const optimisticNewId = optimisticIds.find((cid) => !beforeIds.has(cid));
-        if (optimisticNewId) setFocusedNode(optimisticNewId, parentId);
-
-        createPromise.then((newNode) => {
-          if (!useNodeStore.getState().entities[newNode.id]) return;
-          const ui = useUIStore.getState();
-          // Avoid stealing focus back while user has already started typing
-          // in another editor (e.g. IME composition right after Enter-create).
-          if (ui.focusedNodeId === newNode.id && ui.focusedParentId === parentId) return;
-          if (ui.focusedNodeId && ui.focusedNodeId !== nodeId && ui.focusedNodeId !== newNode.id) return;
-          setFocusedNode(newNode.id, parentId);
+        const newNode = createSibling(nodeId, {
+          name: afterContent?.text,
+          marks: afterContent?.marks,
+          inlineRefs: afterContent?.inlineRefs,
         });
+        setFocusedNode(newNode.id, parentId);
       }
     },
-    [nodeId, parentId, wsId, userId, fieldDataType, onNavigateOut, createSibling, createChild, setFocusedNode],
+    [nodeId, parentId, fieldDataType, onNavigateOut, createSibling, createChild, setFocusedNode],
   );
 
   const handleIndent = useCallback(() => {
-    if (!userId) return;
     // References cannot be indented (would cause ownership conflicts)
-    const currentNode = useNodeStore.getState().entities[nodeId];
-    if (currentNode && currentNode.props._ownerId !== parentId) return;
+    if (loroDoc.getParentId(nodeId) !== parentId) return;
 
     // Pre-compute new parent (previous sibling) and expand it BEFORE moving.
     // This prevents the node from being unmounted between state updates,
     // which would cause blur → focus loss.
-    const ownerId = currentNode?.props._ownerId;
+    const ownerId = loroDoc.getParentId(nodeId);
     if (!ownerId) return;
 
-    const parent = useNodeStore.getState().entities[ownerId];
+    const parent = useNodeStore.getState().getNode(ownerId);
     if (!parent?.children) return;
 
     const index = parent.children.indexOf(nodeId);
@@ -1255,67 +1199,61 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
 
     const newParentId = parent.children[index - 1];
     setExpanded(`${ownerId}:${newParentId}`, true);
-    indentNode(nodeId, userId);
+    indentNode(nodeId);
     // Update focusedParentId so the node keeps focus under its new parent
     setFocusedNode(nodeId, newParentId);
-  }, [nodeId, userId, parentId, indentNode, setExpanded, setFocusedNode]);
+  }, [nodeId, parentId, indentNode, setExpanded, setFocusedNode]);
 
   const handleOutdent = useCallback(() => {
-    if (!userId) return;
     // References cannot be outdented (would cause ownership conflicts)
-    const currentNode = useNodeStore.getState().entities[nodeId];
-    if (currentNode && currentNode.props._ownerId !== parentId) return;
+    if (loroDoc.getParentId(nodeId) !== parentId) return;
     // Compute grandparent before moving so we can update focusedParentId
-    const grandparentId = useNodeStore.getState().entities[parentId]?.props._ownerId;
-    outdentNode(nodeId, userId);
+    const grandparentId = loroDoc.getParentId(parentId);
+    outdentNode(nodeId);
     if (grandparentId) {
       setFocusedNode(nodeId, grandparentId);
     }
-  }, [nodeId, userId, parentId, outdentNode, setFocusedNode]);
+  }, [nodeId, parentId, outdentNode, setFocusedNode]);
 
   const handleDelete = useCallback((): boolean => {
-    if (!wsId || !userId) return false;
     // Read current name from store — the closure's `node` may be stale
     // because saveContent() updates the store synchronously before this runs.
-    // Strip HTML tags before checking: TipTap may save empty paragraphs as
+    // Strip HTML tags before checking: ProseMirror may save empty paragraphs as
     // '<br>' or '<br class="ProseMirror-trailingBreak">' which are non-empty
     // strings but represent visually empty content.
-    const currentName = useNodeStore.getState().entities[nodeId]?.props.name ?? '';
+    const currentName = useNodeStore.getState().getNode(nodeId)?.name ?? '';
     const textOnly = currentName.replace(/<[^>]*>/g, '').trim();
     if (textOnly.length > 0) return false;
     // Prevent deleting a whole subtree when Backspace is pressed on an empty parent.
     if (hasChildren) return true;
 
-    const flatList = getFlattenedVisibleNodes(rootChildIds, entities, expandedNodes, rootNodeId);
+    const latestUi = useUIStore.getState();
+    const flatList = getFlattenedVisibleNodes(rootChildIds, latestUi.expandedNodes, rootNodeId);
     const prev = getPreviousVisibleNode(nodeId, parentId, flatList);
 
     // Reference: just remove from parent's children, don't trash the node.
     // Guard: also verify the node is actually in parentId's children. After indent,
     // the closure's parentId may be stale (old parent) while _ownerId is already
     // the new parent — this is NOT a reference, just a stale closure.
-    const currentNode = useNodeStore.getState().entities[nodeId];
-    const parentChildren = useNodeStore.getState().entities[parentId]?.children ?? [];
-    const isReference = currentNode
-      && currentNode.props._ownerId !== parentId
-      && parentChildren.includes(nodeId);
-    if (isReference) {
-      removeReference(parentId, nodeId, userId);
+    const parentChildren = useNodeStore.getState().getNode(parentId)?.children ?? [];
+    const isActualRef = loroDoc.getParentId(nodeId) !== parentId && parentChildren.includes(nodeId);
+    if (isActualRef) {
+      removeReference(nodeId);
     } else {
-      trashNode(nodeId, wsId, userId);
+      trashNode(nodeId);
     }
     if (prev) {
-      const currentEntities = useNodeStore.getState().entities;
       useUIStore.getState().setFocusClickCoords({
         nodeId: prev.nodeId,
         parentId: prev.parentId,
-        textOffset: getNodeTextLengthById(prev.nodeId, currentEntities),
+        textOffset: getNodeTextLengthById(prev.nodeId),
       });
       setFocusedNode(prev.nodeId, prev.parentId);
     } else {
       setFocusedNode(null);
     }
     return true;
-  }, [nodeId, wsId, userId, parentId, rootNodeId, rootChildIds, entities, expandedNodes, trashNode, removeReference, setFocusedNode, hasChildren]);
+  }, [nodeId, parentId, rootNodeId, rootChildIds, trashNode, removeReference, setFocusedNode, hasChildren]);
 
   const handleArrowUp = useCallback(() => {
     const siblingIndex = renderableSiblings.findIndex((item) => item.type === 'content' && item.id === nodeId);
@@ -1328,20 +1266,19 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       }
     }
 
-    const flatList = getFlattenedVisibleNodes(rootChildIds, entities, expandedNodes, rootNodeId);
+    const flatList = getFlattenedVisibleNodes(rootChildIds, expandedNodes, rootNodeId);
     const prev = getPreviousVisibleNode(nodeId, parentId, flatList);
     if (prev) {
-      const currentEntities = useNodeStore.getState().entities;
       useUIStore.getState().setFocusClickCoords({
         nodeId: prev.nodeId,
         parentId: prev.parentId,
-        textOffset: getNodeTextLengthById(prev.nodeId, currentEntities),
+        textOffset: getNodeTextLengthById(prev.nodeId),
       });
       setFocusedNode(prev.nodeId, prev.parentId);
     } else if (onNavigateOut) {
       onNavigateOut('up');
     }
-  }, [nodeId, parentId, rootNodeId, rootChildIds, entities, expandedNodes, setFocusedNode, onNavigateOut, renderableSiblings, clearFocus, setEditingFieldName]);
+  }, [nodeId, parentId, rootNodeId, rootChildIds, expandedNodes, setFocusedNode, onNavigateOut, renderableSiblings, clearFocus, setEditingFieldName]);
 
   const handleArrowDown = useCallback(() => {
     // When expanded, ArrowDown first enters this node's child scope
@@ -1377,7 +1314,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       return;
     }
 
-    const flatList = getFlattenedVisibleNodes(rootChildIds, entities, expandedNodes, rootNodeId);
+    const flatList = getFlattenedVisibleNodes(rootChildIds, expandedNodes, rootNodeId);
     const next = getNextVisibleNode(nodeId, parentId, flatList);
     if (next) {
       setFocusedNode(next.nodeId, next.parentId);
@@ -1389,17 +1326,16 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     } else if (onNavigateOut) {
       onNavigateOut('down');
     }
-  }, [nodeId, parentId, rootNodeId, rootChildIds, entities, expandedNodes, isExpanded, shouldShowTrailingInput, firstRenderableChild, setFocusedNode, onNavigateOut, renderableSiblings, clearFocus, setEditingFieldName]);
+  }, [nodeId, parentId, rootNodeId, rootChildIds, expandedNodes, isExpanded, shouldShowTrailingInput, firstRenderableChild, setFocusedNode, onNavigateOut, renderableSiblings, clearFocus, setEditingFieldName]);
 
   const handleMoveUp = useCallback(() => {
-    if (!userId) return;
     const ed = editorRef.current;
     const textOffset = isEditorViewAlive(ed)
       ? Math.max(0, ed.state.selection.from - 1)
-      : getNodeTextLengthById(nodeId, useNodeStore.getState().entities);
+      : getNodeTextLengthById(nodeId);
 
     useUIStore.getState().setFocusClickCoords({ nodeId, parentId, textOffset });
-    void moveNodeUp(nodeId, userId);
+    moveNodeUp(nodeId);
 
     requestAnimationFrame(() => {
       const currentEditor = editorRef.current;
@@ -1410,17 +1346,16 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       currentEditor.focus();
       useUIStore.getState().setFocusClickCoords(null);
     });
-  }, [nodeId, parentId, userId, moveNodeUp]);
+  }, [nodeId, parentId, moveNodeUp]);
 
   const handleMoveDown = useCallback(() => {
-    if (!userId) return;
     const ed = editorRef.current;
     const textOffset = isEditorViewAlive(ed)
       ? Math.max(0, ed.state.selection.from - 1)
-      : getNodeTextLengthById(nodeId, useNodeStore.getState().entities);
+      : getNodeTextLengthById(nodeId);
 
     useUIStore.getState().setFocusClickCoords({ nodeId, parentId, textOffset });
-    void moveNodeDown(nodeId, userId);
+    moveNodeDown(nodeId);
 
     requestAnimationFrame(() => {
       const currentEditor = editorRef.current;
@@ -1431,7 +1366,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       currentEditor.focus();
       useUIStore.getState().setFocusClickCoords(null);
     });
-  }, [nodeId, parentId, userId, moveNodeDown]);
+  }, [nodeId, parentId, moveNodeDown]);
 
   // ─── # trigger handlers ───
 
@@ -1457,32 +1392,30 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     deleteEditorRange(ed, from, to);
 
     const parsed = docToMarks(ed.state.doc);
-    if (userId) updateNodeContent(nodeId, parsed.text, parsed.marks, parsed.inlineRefs, userId);
-  }, [nodeId, userId, updateNodeContent]);
+    updateNodeContent(nodeId, { name: parsed.text, marks: parsed.marks, inlineRefs: parsed.inlineRefs });
+  }, [nodeId, updateNodeContent]);
 
   const handleHashTagSelect = useCallback(
     (tagDefId: string) => {
-      if (!wsId || !userId) return;
       cleanupHashTagText();
-      applyTag(nodeId, tagDefId, wsId, userId);
+      applyTag(nodeId, tagDefId);
       setHashTagOpen(false);
       setHashTagQuery('');
       setHashTagSelectedIndex(0);
     },
-    [nodeId, wsId, userId, applyTag, cleanupHashTagText],
+    [nodeId, applyTag, cleanupHashTagText],
   );
 
   const handleHashTagCreateNew = useCallback(
-    async (name: string) => {
-      if (!wsId || !userId) return;
+    (name: string) => {
       cleanupHashTagText();
-      const tagDef = await createTagDef(name, wsId, userId);
-      applyTag(nodeId, tagDef.id, wsId, userId);
+      const tagDef = createTagDef(name);
+      applyTag(nodeId, tagDef.id);
       setHashTagOpen(false);
       setHashTagQuery('');
       setHashTagSelectedIndex(0);
     },
-    [nodeId, wsId, userId, createTagDef, applyTag, cleanupHashTagText],
+    [nodeId, createTagDef, applyTag, cleanupHashTagText],
   );
 
   // Keyboard forwarding: confirm selected item in dropdown
@@ -1526,13 +1459,13 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
 
   // ─── > field trigger (fire-once: instantly creates unnamed field) ───
 
-  const handleFieldTriggerFire = useCallback(async () => {
-    const parentId = node?.props._ownerId;
-    if (!parentId || !wsId || !userId) return;
-    const { tupleId } = await addUnnamedFieldToNode(parentId, wsId, userId, nodeId);
-    trashNode(nodeId, wsId, userId);
-    setEditingFieldName(tupleId);
-  }, [nodeId, node?.props._ownerId, wsId, userId, addUnnamedFieldToNode, trashNode, setEditingFieldName]);
+  const handleFieldTriggerFire = useCallback(() => {
+    const actualParentId = loroDoc.getParentId(nodeId);
+    if (!actualParentId) return;
+    const { fieldEntryId } = addUnnamedFieldToNode(actualParentId, nodeId);
+    trashNode(nodeId);
+    setEditingFieldName(fieldEntryId);
+  }, [nodeId, addUnnamedFieldToNode, trashNode, setEditingFieldName]);
 
   // ─── @ reference trigger handlers ───
 
@@ -1551,7 +1484,6 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
 
   const handleReferenceSelect = useCallback(
     (refNodeId: string) => {
-      if (!wsId || !userId) return;
       const ed = editorRef.current;
       if (!isEditorViewAlive(ed)) return;
 
@@ -1564,31 +1496,31 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       const isEmptyAround = beforeAt.trim() === '' && afterQuery.trim() === '';
 
       if (isEmptyAround) {
-        const parent = entities[parentId];
+        const parent = useNodeStore.getState().getNode(parentId);
         const alreadyChild = parent?.children?.includes(refNodeId) ?? false;
 
         if (alreadyChild) {
           // Target is already a child (owned or reference) — can't create duplicate reference.
           // Tana behavior: insert inline ref instead, keeping this as a regular content node.
-          const refNode = entities[refNodeId];
-          const refName = (refNode?.props.name ?? '').trim() || 'Untitled';
+          const refNode = loroDoc.toNodexNode(refNodeId);
+          const refName = (refNode?.name ?? '').trim() || 'Untitled';
           replaceEditorRangeWithInlineRef(ed, from, to, refNodeId, refName);
         } else {
           // Empty node @: trash this node, create temp node in conversion mode
           // Temp node has inline ref content — user sees reference bullet + cursor at end.
           // Typing adds text → keeps as normal node; blur without typing → reverts to reference.
           const pos = parent?.children?.indexOf(nodeId) ?? -1;
-          trashNode(nodeId, wsId, userId);
-          const tempNodeId = startRefConversion(refNodeId, parentId, pos >= 0 ? pos : 0, wsId, userId);
+          trashNode(nodeId);
+          const tempNodeId = startRefConversion(refNodeId, parentId, pos >= 0 ? pos : 0);
           setPendingRefConversion({ tempNodeId, refNodeId, parentId });
-          const gpId = entities[parentId]?.props._ownerId;
+          const gpId = loroDoc.getParentId(parentId);
           if (gpId) setExpanded(`${gpId}:${parentId}`, true);
           setTimeout(() => setFocusedNode(tempNodeId, parentId), 0);
         }
       } else {
         // Mid-text @: insert inline reference
-        const refNode = entities[refNodeId];
-        const refName = (refNode?.props.name ?? '').trim() || 'Untitled';
+        const refNode = loroDoc.toNodexNode(refNodeId);
+        const refName = (refNode?.name ?? '').trim() || 'Untitled';
         replaceEditorRangeWithInlineRef(ed, from, to, refNodeId, refName);
       }
 
@@ -1596,17 +1528,15 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       setRefQuery('');
       setRefSelectedIndex(0);
     },
-    [nodeId, parentId, wsId, userId, entities, trashNode, setExpanded, setFocusedNode, startRefConversion, setPendingRefConversion],
+    [nodeId, parentId, trashNode, setExpanded, setFocusedNode, startRefConversion, setPendingRefConversion],
   );
 
   const handleReferenceCreateNew = useCallback(
-    async (name: string) => {
-      if (!wsId || !userId) return;
-      const libraryId = `${wsId}_LIBRARY`;
-      const newNode = await useNodeStore.getState().createChild(libraryId, wsId, userId, name);
+    (name: string) => {
+      const newNode = useNodeStore.getState().createChild(CONTAINER_IDS.LIBRARY, undefined, { name });
       handleReferenceSelect(newNode.id);
     },
-    [wsId, userId, handleReferenceSelect],
+    [handleReferenceSelect],
   );
 
   const handleReferenceConfirm = useCallback(() => {
@@ -1716,7 +1646,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
         !!chrome.runtime &&
         !!chrome.runtime.sendMessage;
 
-      if (!canUseRuntime || !wsId || !userId) return;
+      if (!canUseRuntime) return;
 
       try {
         const response = await chrome.runtime.sendMessage({
@@ -1729,7 +1659,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
         }
 
         const store = useNodeStore.getState();
-        await applyWebClipToNode(nodeId, response.payload, store, wsId, userId);
+        await applyWebClipToNode(nodeId, response.payload, store);
 
         // Sync editor content with the new title so it's visible immediately
         // (without this, the editor still shows empty until focus moves away)
@@ -1741,7 +1671,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
         console.error('Clip failed:', err instanceof Error ? err.message : String(err));
       }
     }
-  }, [replaceSlashTriggerText, closeSlashMenu, openSearch, handleCycleCheckbox, wsId, userId, nodeId]);
+  }, [replaceSlashTriggerText, closeSlashMenu, openSearch, handleCycleCheckbox, nodeId]);
 
   const handleSlashCommand = useCallback((query: string, from: number, to: number) => {
     slashRangeRef.current = { from, to };
@@ -1814,18 +1744,18 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   const handleDrop = useCallback(
     (e: DragEvent) => {
       e.preventDefault();
-      if (!dragNodeId || !userId || dragNodeId === nodeId) {
+      if (!dragNodeId || dragNodeId === nodeId) {
         setDrag(null);
         return;
       }
 
-      const dropParentId = node?.props._ownerId;
+      const dropParentId = loroDoc.getParentId(nodeId);
       if (!dropParentId) {
         setDrag(null);
         return;
       }
 
-      const dropParent = entities[dropParentId];
+      const dropParent = useNodeStore.getState().getNode(dropParentId);
       const siblingIndex = dropParent?.children?.indexOf(nodeId) ?? 0;
 
       const decision = resolveDropMove({
@@ -1840,7 +1770,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       });
 
       if (decision) {
-        moveNodeTo(dragNodeId, decision.newParentId, decision.position, userId);
+        moveNodeTo(dragNodeId, decision.newParentId, decision.position);
         if (decision.expandKey) {
           setExpanded(decision.expandKey, true);
         }
@@ -1848,7 +1778,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
 
       setDrag(null);
     },
-    [dragNodeId, nodeId, parentId, userId, node, entities, dropPosition, hasChildren, isExpanded, moveNodeTo, setExpanded, setDrag],
+    [dragNodeId, nodeId, parentId, dropPosition, hasChildren, isExpanded, moveNodeTo, setExpanded, setDrag],
   );
 
   const handleDragEnd = useCallback(() => {
@@ -1870,9 +1800,9 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
 
   const isDropTarget = dropTargetId === nodeId;
   const isDragging = dragNodeId === nodeId;
-  const nodeText = node.props.name ?? '';
-  const nodeMarks = node.props._marks ?? [];
-  const nodeInlineRefs = node.props._inlineRefs ?? [];
+  const nodeText = node.name ?? '';
+  const nodeMarks = node.marks ?? [];
+  const nodeInlineRefs = node.inlineRefs ?? [];
   const nodeContentHtml = marksToHtml(nodeText, nodeMarks, nodeInlineRefs);
   const hasOverlayOpen = isFocused && (hashTagOpen || refOpen || slashOpen || optionsPickerOpen);
 
@@ -1922,7 +1852,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
             isExpanded={isExpanded}
             onBulletClick={handleBulletClick}
             isReference={isReference || isPendingConversion}
-            tagDefColor={isTagDef ? resolveTagColor(entities, nodeId).text : undefined}
+            tagDefColor={isTagDef ? resolveTagColor(nodeId).text : undefined}
             bulletColor={bulletColor}
           />
           {showCheckbox && (
@@ -1946,9 +1876,9 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
             {fieldDataType === SYS_D.CHECKBOX ? (
               <input
                 type="checkbox"
-                checked={node.props.name === SYS_V.YES}
+                checked={node.name === SYS_V.YES}
                 onChange={(e) => {
-                  if (userId) updateNodeName(nodeId, e.target.checked ? SYS_V.YES : SYS_V.NO, userId);
+                  setNodeName(nodeId, e.target.checked ? SYS_V.YES : SYS_V.NO);
                 }}
                 className="mt-[3px] h-3.5 w-3.5 rounded border-border accent-primary cursor-pointer"
               />
@@ -2071,8 +2001,8 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
                 }`}
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => {
-                  if (userId && opt.id !== nodeId) {
-                    selectFieldOption(parentId, opt.id, nodeId, userId);
+                  if (opt.id !== nodeId) {
+                    selectFieldOption(parentId, opt.id, nodeId);
                   }
                   setSelectedNode(null);
                 }}
@@ -2138,7 +2068,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
               <div key={id} className="@container" style={{ paddingLeft: (depth + 1) * 28 + 6 + 15 + 4 }}>
                 <FieldRow
                   nodeId={nodeId}
-                  attrDefId={fieldMap.get(id)!.attrDefId}
+                  attrDefId={fieldMap.get(id)!.fieldDefId}
                   attrDefName={fieldMap.get(id)!.attrDefName}
                   tupleId={id}
                   valueNodeId={fieldMap.get(id)!.valueNodeId}
@@ -2154,7 +2084,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
                       useUIStore.getState().setFocusClickCoords({
                         nodeId,
                         parentId,
-                        textOffset: (useNodeStore.getState().entities[nodeId]?.props.name ?? '').length,
+                        textOffset: (useNodeStore.getState().getNode(nodeId)?.name ?? '').length,
                       });
                       setFocusedNode(nodeId, parentId);
                     } else {
@@ -2184,7 +2114,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
                         if (focusTrailingInputForParent(nodeId)) {
                           return;
                         }
-                        const fl = getFlattenedVisibleNodes(rootChildIds, useNodeStore.getState().entities, useUIStore.getState().expandedNodes, rootNodeId);
+                        const fl = getFlattenedVisibleNodes(rootChildIds, useUIStore.getState().expandedNodes, rootNodeId);
                         const nx = getNextVisibleNode(nodeId, parentId, fl);
                         if (nx) {
                           useUIStore.getState().setFocusClickCoords({
@@ -2227,7 +2157,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
                     useUIStore.getState().setFocusClickCoords({
                       nodeId: lastRenderableChild.id,
                       parentId: nodeId,
-                      textOffset: (useNodeStore.getState().entities[lastRenderableChild.id]?.props.name ?? '').length,
+                      textOffset: (useNodeStore.getState().getNode(lastRenderableChild.id)?.name ?? '').length,
                     });
                     setFocusedNode(lastRenderableChild.id, nodeId);
                     return;
@@ -2235,14 +2165,13 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
                   useUIStore.getState().setFocusClickCoords({
                     nodeId,
                     parentId,
-                    textOffset: (useNodeStore.getState().entities[nodeId]?.props.name ?? '').length,
+                    textOffset: (useNodeStore.getState().getNode(nodeId)?.name ?? '').length,
                   });
                   setFocusedNode(nodeId, parentId);
                   return;
                 }
                 const fl = getFlattenedVisibleNodes(
                   rootChildIds,
-                  useNodeStore.getState().entities,
                   useUIStore.getState().expandedNodes,
                   rootNodeId,
                 );

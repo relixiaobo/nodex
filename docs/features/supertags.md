@@ -48,23 +48,24 @@
      - Extends (tag_picker) — NDX_A05
      - Done state mapping (toggle + nested entries) — NDX_A06/A07/A08
   3. **"Default content" 标签 + ConfigOutliner**: tagDef.children 中的用户模板内容
-     - 模板字段 tuple（key 为 attrDefId）→ 渲染为 FieldRow
-     - 普通内容节点（无 docType）→ 渲染为 OutlinerItem
+     - **Loro 模型**：tagDef.children 直接存放 `type='fieldDef'` 模板字段节点 → 渲染为 OutlinerItem
+     - 普通内容节点（无 type）→ 渲染为 OutlinerItem
      - 支持 TrailingInput 在模板中新建内容
-     - ConfigOutliner 根据 `f.isSystemConfig` 标志区分系统配置项和用户模板内容（不再用 dataType 前缀）
+     - ConfigOutliner 的 own items 循环包含 `!type || type==='fieldDef'`（fieldDef 节点在新模型中是模板字段）
   4. **Delete tag** 按钮
 
-#### 统一配置字段架构（2026-02-16 重构）
+#### 配置字段架构（Loro 迁移后，2026-02-20 更新）
 
-配置字段（SYS_A*/NDX_A* key 的 tuple）与用户字段现在使用**完全相同的数据结构**：
+**Loro 新模型**：配置值直接存储为 NodexNode 扁平属性（`showCheckbox`, `color`, `extends` 等），不再有 Tuple 间接层。
 
-- **Key**: 真实 attrDef 实体节点（如 `attrDef_show_checkbox`），不再使用 SYS_A* 裸 ID 作为 tuple key
-- **Value**: 存储在 Tuple.children[1:] 中（与用户字段完全一致）
-- **applyTag 统一路径**: 创建 config 和 user 字段 tuple 时值直接存 children
-- **渲染统一**: `FieldValueOutliner` 处理所有字段类型（OPTIONS picker、plain outliner 等），不再有专用 config 组件
-- **系统保护**: `removeField` 通过检查 tuple key 是否为 `SYS_*` 或 `NDX_*` 前缀来保护系统配置字段不被删除
-- **已删除的专用组件**（5 个）: `ConfigTagPicker`、`ConfigSelect`、`ConfigNumberInput`、`FieldTypePicker`、`ConfigToggle`
-- **DoneMappingEntries** 从 Tuple.children 读取映射数据（统一模型）
+- **读**: `loroDoc.toNodexNode(tagDefId)?.showCheckbox` / `.color` / `.extends`
+- **写**: `setConfigValue(tagDefId, 'showCheckbox', true)` → `loroDoc.setNodeData(tagDefId, 'showCheckbox', true)`
+- **虚拟 FieldEntry**: `computeFields` 为所有 `TAGDEF_CONFIG_FIELDS` 生成 `fieldEntryId=__virtual_${def.key}__` 的虚拟条目
+  - outliner 类型 → `dataType='__outliner__'` → FieldRow 渲染 ConfigOutliner
+  - toggle 类型 → `dataType=SYS_D.BOOLEAN` → FieldValueOutliner 检测虚拟 tupleId，从节点属性读取
+  - color_picker 类型 → `dataType=SYS_D.COLOR` → ColorSwatchPicker 检测虚拟 tupleId，从 `node.color` 读取
+  - 其他类型（tag_picker / done_map_entries 等）→ `dataType=FIELD_TYPES.PLAIN`（值显示待完善）
+- **SYS_A_TO_PROP 映射**: `field-utils.ts` 中维护 SYS_A* key → NodexNode propName 的映射，用于 `resolveConfigValue` 和 `configKeyToPropName`
 
 ### createTagDef 自动配置
 

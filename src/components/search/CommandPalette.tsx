@@ -6,7 +6,7 @@
  */
 import { useEffect, useCallback, useMemo } from 'react';
 import { Command } from 'cmdk';
-import { Search, FileText, Library, Inbox, CalendarDays, Trash2 } from 'lucide-react';
+import { Search, FileText, Library, Inbox, CalendarDays, Trash2 } from '../../lib/icons.js';
 import { useUIStore } from '../../stores/ui-store';
 import { useNodeStore } from '../../stores/node-store';
 import { CONTAINER_IDS } from '../../types/index.js';

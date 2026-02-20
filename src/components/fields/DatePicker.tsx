@@ -14,7 +14,7 @@
  *   YYYY-MM-DD | YYYY-MM-DDTHH:MM | YYYY-MM-DD/YYYY-MM-DD | YYYY-MM-DDTHH:MM/YYYY-MM-DDTHH:MM
  */
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from '../../lib/icons.js';
 
 // ─── Helpers ──────────────────────────────────────────────────────
 

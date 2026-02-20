@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { toggleMark } from 'prosemirror-commands';
 import { TextSelection } from 'prosemirror-state';
 import type { EditorView } from 'prosemirror-view';
-import { Bold, Check, Code2, Heading, Highlighter, Italic, Link2, Strikethrough, Unlink, X } from 'lucide-react';
+import { Bold, Check, Code2, Heading, Highlighter, Italic, Link2, Strikethrough, Unlink, X } from '../../lib/icons.js';
 import { pmSchema } from './pm-schema.js';
 
 interface FloatingToolbarProps {

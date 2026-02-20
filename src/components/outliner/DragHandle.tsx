@@ -1,4 +1,4 @@
-import { GripVertical } from 'lucide-react';
+import { GripVertical } from '../../lib/icons.js';
 
 interface DragHandleProps {
   onDragStart: () => void;

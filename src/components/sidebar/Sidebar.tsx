@@ -1,4 +1,4 @@
-import { Search } from 'lucide-react';
+import { Search } from '../../lib/icons.js';
 import { useUIStore } from '../../stores/ui-store';
 import { useNodeStore } from '../../stores/node-store';
 import { useWorkspaceStore } from '../../stores/workspace-store';

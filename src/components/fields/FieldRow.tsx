@@ -13,7 +13,7 @@
  * ──────────────────────────────────────
  */
 import { useCallback, useRef, useEffect, useMemo } from 'react';
-import { Trash2 } from 'lucide-react';
+import { Trash2 } from '../../lib/icons.js';
 import { useNodeFields } from '../../hooks/use-node-fields';
 import { useNodeStore } from '../../stores/node-store';
 import { useUIStore } from '../../stores/ui-store';

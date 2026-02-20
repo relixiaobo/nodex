@@ -9,7 +9,7 @@
  */
 import { useMemo, useEffect, useLayoutEffect, useRef, useState, forwardRef, useImperativeHandle } from 'react';
 import { createPortal } from 'react-dom';
-import { AtSign, Plus } from 'lucide-react';
+import { AtSign, Plus } from '../../lib/icons.js';
 import { useNodeSearch, type NodeSearchResult } from '../../hooks/use-node-search';
 import { useUIStore } from '../../stores/ui-store';
 import { useNodeStore } from '../../stores/node-store';

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { LogOut } from 'lucide-react';
+import { LogOut } from '../../lib/icons.js';
 import { useWorkspaceStore } from '../../stores/workspace-store';
 
 export function UserMenu() {

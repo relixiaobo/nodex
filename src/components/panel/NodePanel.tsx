@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Trash2 } from 'lucide-react';
+import { Trash2 } from '../../lib/icons.js';
 import { useNode } from '../../hooks/use-node';
 import { useNodeStore } from '../../stores/node-store';
 import { useUIStore } from '../../stores/ui-store';

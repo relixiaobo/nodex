@@ -10,7 +10,7 @@
  * Uses JSON.stringify as Zustand selector return to avoid React 19 infinite loop.
  */
 import { useState, useCallback, useMemo } from 'react';
-import { X } from 'lucide-react';
+import { X } from '../../lib/icons.js';
 import { useNodeStore } from '../../stores/node-store';
 import { useWorkspaceFields } from '../../hooks/use-workspace-fields';
 import { NodePicker, type NodePickerOption } from './NodePicker';

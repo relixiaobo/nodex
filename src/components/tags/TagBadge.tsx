@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef, forwardRef } from 'react';
-import { X, XCircle, Hash, Settings, Trash2, AlertTriangle } from 'lucide-react';
+import { X, XCircle, Hash, Settings, Trash2, AlertTriangle } from '../../lib/icons.js';
 import { createPortal } from 'react-dom';
 import { useNodeStore } from '../../stores/node-store';
 import { resolveTagColor } from '../../lib/tag-colors.js';

@@ -1,6 +1,6 @@
 # Feature: 撤销与重做
 
-> Phase 2 | 文本撤销已有（TipTap 内置），导航撤销已有，节点操作撤销未实现
+> Phase 2 | 文本撤销已有（TipTap 内置），导航撤销已有，结构性撤销已实现（Loro UndoManager，2026-02-20）
 
 ## 概述
 

@@ -27,7 +27,7 @@ _(空)_
 
 | Agent | 当前任务 | 分支 | 修改中的文件 |
 |-------|---------|------|-------------|
-| nodex-cc | Loro CRDT 迁移 Phase 1 | `cc/loro-migration-phase1` | `node-store.ts`, `node.ts`, `system-nodes.ts` |
+| nodex-cc | Loro Phase 2: UndoManager | `cc/loro-migration-phase1` | `loro-doc.ts`, `node-store.ts`, `use-nav-undo-keyboard.ts`, `seed-data.ts` |
 | nodex-cc-2 | _(idle — PR #61 merged)_ | — | — |
 | nodex-codex | _(idle)_ | — | — |
 
@@ -69,11 +69,32 @@ _(空)_
 - ✅ `npm run build` 通过（已添加 vite-plugin-wasm）
 - ⏳ standalone 交互验证 + IndexedDB 持久化（待 PR review 后验证）
 
-**Phase 2（后续）**: 同步层 + LoroText 替换 name+marks+inlineRefs + createdBy/updatedBy 复活
+**Phase 2（进行中）**: UndoManager 结构性撤销/重做 — 见下方任务
 
 迭代日志:
 - [2026-02-20 nodex-cc] Step 0 完成：npm install loro-crdt@1.10.6，Node.js 环境冷启动 0.03ms，7 项验证全通过（LoroTree CRUD、LoroList tags、树移动、快照持久化、循环检测）。关键 API 确认：setContainer 需传实例 `new LoroList()` 而非字符串；getOrCreateContainer 是幂等写法；MV3 CSP 已配置 `wasm-unsafe-eval`。浏览器 WASM 加载耗时预计 50-100ms，在 App 初始化时预加载可隐藏。
 - [2026-02-20 nodex-cc] Phase 1 完成：Steps 1-7 全部实现。436 vitest tests 全通过，typecheck 0 错误，build 成功。关键完成项：loro-doc.ts 单例 + toNodexNode；node-store.ts 全面 Loro 化；14 个失败测试全部重写适配新 API；修复 moveNodeTo 循环检测 + 同父索引调整；vite-plugin-wasm 解决 WASM build 问题。
+- [2026-02-20 nodex-cc] Phase 2 UndoManager 实现：447 tests 全通过（新增 11 个 loro-undo 测试）。关键设计：(1) `commitDoc('__seed__')` 在 seed 后提交并被 UndoManager excludeOriginPrefixes 过滤；(2) node-store 关键操作（createChild/moveNodeTo/trashNode 等）结尾调用 `commitDoc()` 记录 undo 步骤；(3) undo/redo 后调用 `rebuildMappings()` 重建 TreeID 映射（Loro undo/redo 产生新 TreeID）；(4) Cmd+Z 优先 canUndoDoc() → structuralUndo，fallback → navUndo。
+
+#### Loro Phase 2 — UndoManager 结构性撤销/重做
+> **Owner**: nodex-cc
+> **分支**: `cc/loro-migration-phase1`
+> **详细方案**: 同本 PR（计划文件在聊天中）
+
+- [x] `loro-doc.ts`: 添加 `UndoManager` + `commitDoc` + `undoDoc/redoDoc/canUndoDoc/canRedoDoc` 导出
+- [x] `seed-data.ts`: `seedTestDataSync` 结尾调用 `commitDoc('__seed__')` 隔离种子操作
+- [x] `node-store.ts`: `createChild/moveNodeTo/trashNode/restoreNode/indent/outdent/moveUp/moveDown` 结尾调用 `commitDoc()`
+- [x] `use-nav-undo-keyboard.ts`: Cmd+Z 三层优先级（TipTap → Loro structural → nav）
+- [x] `tests/vitest/loro-undo.test.ts`: 11 项结构性撤销/重做测试
+- [x] `docs/TESTING.md`: 新增 §1.50
+- [x] 447 tests pass, typecheck clean, build success
+
+**Roadmap（NOT in this PR）**:
+- Phase 2b: LoroMovableList（doneCheckedMappings 并发安全重排，UI 未就绪）
+- Phase 2c: Fine-grained subscriptions（LoroTree diff 替换 O(n) re-render，待稳定后实施）
+- Phase 3: LoroText + Peritext（rich text，需数据迁移）
+- Phase 3: Time Travel / Checkout（版本历史 UI，待设计）
+- Phase 4: Incremental Sync、doc.fork()
 
 ---
 

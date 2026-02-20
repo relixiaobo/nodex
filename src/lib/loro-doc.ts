@@ -5,7 +5,7 @@
  * TreeID 在 loro-crdt 1.x 中为字符串 `"counter@peer"`，可直接用作 Map key。
  */
 
-import { LoroDoc, LoroList, type TreeID } from 'loro-crdt';
+import { LoroDoc, LoroList, UndoManager, type TreeID } from 'loro-crdt';
 import { nanoid } from 'nanoid';
 import type { NodexNode, DoneMappingEntry } from '../types/node.js';
 import { saveSnapshot, loadSnapshot } from './loro-persistence.js';
@@ -15,6 +15,7 @@ import { saveSnapshot, loadSnapshot } from './loro-persistence.js';
 // ============================================================
 
 let doc: LoroDoc | null = null;
+let undoManager: UndoManager | null = null;
 
 /** Nodex ID → Loro TreeID（字符串） */
 const nodexToTree = new Map<string, TreeID>();
@@ -116,6 +117,8 @@ export async function initLoroDoc(workspaceId: string): Promise<void> {
     console.warn('[loro-doc] 快照加载失败，从空白开始:', e);
   }
 
+  undoManager = new UndoManager(doc, { mergeInterval: 500 });
+
   doc.subscribe(() => {
     notifySubscribers();
     scheduleSave();
@@ -132,6 +135,7 @@ export async function initLoroDoc(workspaceId: string): Promise<void> {
 /** 重置（仅测试用） */
 export function resetLoroDoc(): void {
   doc = null;
+  undoManager = null;
   nodexToTree.clear();
   treeToNodex.clear();
   currentWorkspaceId = null;
@@ -144,6 +148,9 @@ export function initLoroDocForTest(workspaceId: string): void {
   currentWorkspaceId = workspaceId;
   nodexToTree.clear();
   treeToNodex.clear();
+  // mergeInterval=0 for deterministic tests; exclude '__seed__' origin so
+  // seed-data commits are not tracked in the undo stack.
+  undoManager = new UndoManager(doc, { mergeInterval: 0, excludeOriginPrefixes: ['__seed__'] });
   doc.subscribe(() => notifySubscribers());
 }
 
@@ -470,4 +477,34 @@ export function getDoneMappings(tagDefId: string, checked: boolean): DoneMapping
 export function getLoroDoc(): LoroDoc {
   if (!doc) throw new Error('[loro-doc] LoroDoc 未初始化');
   return doc;
+}
+
+// ============================================================
+// UndoManager — 结构性撤销/重做
+// ============================================================
+
+/** 显式提交当前 pending 事务（origin 用于 UndoManager 过滤）*/
+export function commitDoc(origin?: string): void {
+  if (!doc) return;
+  doc.commit(origin ? { origin } : undefined);
+}
+
+export function undoDoc(): boolean {
+  const result = undoManager?.undo() ?? false;
+  if (result) rebuildMappings();
+  return result;
+}
+
+export function redoDoc(): boolean {
+  const result = undoManager?.redo() ?? false;
+  if (result) rebuildMappings();
+  return result;
+}
+
+export function canUndoDoc(): boolean {
+  return undoManager?.canUndo() ?? false;
+}
+
+export function canRedoDoc(): boolean {
+  return undoManager?.canRedo() ?? false;
 }

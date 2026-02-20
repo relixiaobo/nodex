@@ -192,6 +192,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
         }
       }
 
+      loroDoc.commitDoc();
       return loroDoc.toNodexNode(id)!;
     },
 
@@ -226,6 +227,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
         }
       }
       loroDoc.moveNode(nodeId, newParentId, adjustedIndex);
+      loroDoc.commitDoc();
     },
 
     indentNode: (nodeId) => {
@@ -238,6 +240,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
       // Move to end of previous sibling's children
       const newParentChildren = loroDoc.getChildren(newParentId);
       loroDoc.moveNode(nodeId, newParentId, newParentChildren.length);
+      loroDoc.commitDoc();
     },
 
     outdentNode: (nodeId) => {
@@ -250,6 +253,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
       const gpChildren = loroDoc.getChildren(grandParentId);
       const parentIdx = gpChildren.indexOf(parentId);
       loroDoc.moveNode(nodeId, grandParentId, parentIdx + 1);
+      loroDoc.commitDoc();
     },
 
     moveNodeUp: (nodeId) => {
@@ -259,6 +263,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
       const idx = siblings.indexOf(nodeId);
       if (idx <= 0) return;
       loroDoc.moveNode(nodeId, parentId, idx - 1);
+      loroDoc.commitDoc();
     },
 
     moveNodeDown: (nodeId) => {
@@ -268,6 +273,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
       const idx = siblings.indexOf(nodeId);
       if (idx < 0 || idx >= siblings.length - 1) return;
       loroDoc.moveNode(nodeId, parentId, idx + 1);
+      loroDoc.commitDoc();
     },
 
     trashNode: (nodeId) => {
@@ -282,6 +288,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
       });
 
       loroDoc.moveNode(nodeId, CONTAINER_IDS.TRASH);
+      loroDoc.commitDoc();
     },
 
     restoreNode: (nodeId) => {
@@ -299,6 +306,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
 
       loroDoc.deleteNodeData(nodeId, '_trashedFrom');
       loroDoc.deleteNodeData(nodeId, '_trashedIndex');
+      loroDoc.commitDoc();
     },
 
     // ─── 内容编辑 ───

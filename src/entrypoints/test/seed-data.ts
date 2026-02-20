@@ -12,7 +12,7 @@
  * - FieldDef config: direct properties (fieldType, minValue, etc.)
  * - Container IDs: fixed (CONTAINER_IDS.*)
  */
-import { initLoroDoc, initLoroDocForTest } from '../../lib/loro-doc.js';
+import { initLoroDoc, initLoroDocForTest, commitDoc } from '../../lib/loro-doc.js';
 import * as loroDoc from '../../lib/loro-doc.js';
 import { useNodeStore } from '../../stores/node-store';
 import { useUIStore } from '../../stores/ui-store';
@@ -233,4 +233,8 @@ export function seedTestDataSync(): void {
   useWorkspaceStore.getState().setUser('user_default');
 
   seedBody();
+
+  // Commit seed state with a special origin so UndoManager excludes it.
+  // Any subsequent user operations will start a clean undo history.
+  commitDoc('__seed__');
 }

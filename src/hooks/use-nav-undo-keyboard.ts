@@ -9,6 +9,7 @@
 import { useEffect } from 'react';
 import { useUIStore } from '../stores/ui-store';
 import { getShortcutKeys, matchesShortcutEvent } from '../lib/shortcut-registry';
+import { undoDoc, redoDoc, canUndoDoc, canRedoDoc } from '../lib/loro-doc.js';
 
 export type NavUndoAction = 'undo' | 'redo' | null;
 
@@ -47,9 +48,17 @@ export function useNavUndoKeyboard() {
       e.preventDefault();
 
       if (action === 'redo') {
-        useUIStore.getState().navRedo();
+        if (canRedoDoc()) {
+          redoDoc();
+        } else {
+          useUIStore.getState().navRedo();
+        }
       } else {
-        useUIStore.getState().navUndo();
+        if (canUndoDoc()) {
+          undoDoc();
+        } else {
+          useUIStore.getState().navUndo();
+        }
       }
     }
 

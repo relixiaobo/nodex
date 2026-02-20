@@ -25,6 +25,9 @@ describe('node-store content model actions', () => {
     expect(node?.inlineRefs).toEqual([
       { offset: 3, targetNodeId: 'task_1', displayName: 'Design the data model' },
     ]);
+
+    const richText = loroDoc.getNodeText('idea_1');
+    expect(richText?.toString()).toBe('Hi \uFFFC');
   });
 
   it('setNodeName updates name, preserves marks and inlineRefs', () => {
@@ -39,7 +42,8 @@ describe('node-store content model actions', () => {
     useNodeStore.getState().setNodeName('idea_1', 'Renamed \uFFFC');
     const node = loroDoc.toNodexNode('idea_1');
     expect(node?.name).toBe('Renamed \uFFFC');
-    // Marks preserved (setNodeName only touches name field)
+    expect(node?.marks).toEqual([{ start: 0, end: 2, type: 'bold' }]);
+    expect(node?.inlineRefs).toEqual([{ offset: 8, targetNodeId: 'task_1' }]);
   });
 
   it('updateNodeContent with empty marks clears marks', () => {

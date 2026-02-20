@@ -150,6 +150,30 @@ function getExtendsChain(tagDefId: string, visited = new Set<string>()): string[
 
 let _childrenNodesCacheVer = -1;
 const _childrenNodesCache = new Map<string, NodexNode[]>();
+const INLINE_REF_CHAR = '\uFFFC';
+
+function remapInlineRefsByPlaceholderOrder(
+  nextText: string,
+  prevInlineRefs: InlineRefEntry[] | undefined,
+): InlineRefEntry[] {
+  if (!prevInlineRefs || prevInlineRefs.length === 0) return [];
+  const prev = [...prevInlineRefs].sort((a, b) => a.offset - b.offset);
+  const nextOffsets: number[] = [];
+  for (let i = 0; i < nextText.length; i++) {
+    if (nextText[i] === INLINE_REF_CHAR) nextOffsets.push(i);
+  }
+  const len = Math.min(prev.length, nextOffsets.length);
+  const remapped: InlineRefEntry[] = [];
+  for (let i = 0; i < len; i++) {
+    const oldRef = prev[i];
+    remapped.push({
+      offset: nextOffsets[i],
+      targetNodeId: oldRef.targetNodeId,
+      ...(oldRef.displayName ? { displayName: oldRef.displayName } : {}),
+    });
+  }
+  return remapped;
+}
 
 // ============================================================
 // Store 实现
@@ -394,19 +418,35 @@ export const useNodeStore = create<NodeStore>((set, get) => {
     // ─── 内容编辑 ───
 
     setNodeName: (id, name) => {
+      const current = loroDoc.toNodexNode(id);
+      const nextInlineRefs = remapInlineRefsByPlaceholderOrder(name, current?.inlineRefs);
       loroDoc.setNodeData(id, 'name', name);
+      loroDoc.setNodeRichTextContent(id, name, current?.marks ?? [], nextInlineRefs);
     },
 
     setNodeNameLocal: (id, name) => {
+      const current = loroDoc.toNodexNode(id);
+      const nextInlineRefs = remapInlineRefsByPlaceholderOrder(name, current?.inlineRefs);
       loroDoc.setNodeData(id, 'name', name);
+      loroDoc.setNodeRichTextContent(id, name, current?.marks ?? [], nextInlineRefs);
     },
 
     updateNodeContent: (id, data) => {
+      const current = loroDoc.toNodexNode(id);
+      const nextName = data.name ?? current?.name ?? '';
+      const nextMarks = data.marks ?? current?.marks ?? [];
+      const nextInlineRefs = data.inlineRefs
+        ?? (data.name !== undefined
+          ? remapInlineRefsByPlaceholderOrder(nextName, current?.inlineRefs)
+          : current?.inlineRefs ?? []);
       const batch: Record<string, unknown> = {};
       if (data.name !== undefined) batch.name = data.name;
       if (data.marks !== undefined) batch.marks = data.marks.length > 0 ? data.marks : undefined;
       if (data.inlineRefs !== undefined) batch.inlineRefs = data.inlineRefs.length > 0 ? data.inlineRefs : undefined;
       if (Object.keys(batch).length > 0) loroDoc.setNodeDataBatch(id, batch);
+      if (data.name !== undefined || data.marks !== undefined || data.inlineRefs !== undefined) {
+        loroDoc.setNodeRichTextContent(id, nextName, nextMarks, nextInlineRefs);
+      }
     },
 
     setNodeContentLocal: (id, name, marks, inlineRefs) => {

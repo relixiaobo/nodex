@@ -10,6 +10,7 @@ import { nanoid } from 'nanoid';
 import type { NodexNode, DoneMappingEntry } from '../types/node.js';
 import { saveSnapshot, loadSnapshot } from './loro-persistence.js';
 import { resetAwareness } from './awareness.js';
+import { readRichTextFromLoroText, writeRichTextToLoroText } from './loro-text-bridge.js';
 
 export const DEFAULT_USER_COMMIT_ORIGIN = 'user:implicit';
 const UNDO_EXCLUDED_ORIGIN_PREFIXES = ['__seed__', 'system:'] as const;
@@ -321,6 +322,23 @@ export function getNodeData(nodexId: string): Record<string, unknown> | null {
   return node.data.toJSON() as Record<string, unknown>;
 }
 
+export function setNodeRichTextContent(
+  nodexId: string,
+  text: string,
+  marks: NodexNode['marks'] = [],
+  inlineRefs: NodexNode['inlineRefs'] = [],
+): void {
+  if (!canApplyMutation('setNodeRichTextContent')) return;
+  invalidateCache();
+  const richText = getOrCreateNodeText(nodexId);
+  if (!richText) return;
+  writeRichTextToLoroText(richText, {
+    text: text ?? '',
+    marks: marks ?? [],
+    inlineRefs: inlineRefs ?? [],
+  });
+}
+
 export function setNodeData(nodexId: string, key: string, value: unknown): void {
   if (!canApplyMutation('setNodeData')) return;
   invalidateCache();
@@ -512,11 +530,16 @@ export function toNodexNode(nodexId: string): NodexNode | null {
   const tagsRaw = data.getOrCreateContainer('tags', new LoroList()) as LoroList;
   const tags = [...new Set(tagsRaw.toArray() as string[])];
   const now = Date.now();
+  const richText = data.get('richText');
+  const richTextParsed = richText instanceof LoroText ? readRichTextFromLoroText(richText) : null;
+  const nodeName = richTextParsed ? richTextParsed.text : (data.get('name') as string | undefined);
+  const nodeMarks = richTextParsed ? richTextParsed.marks : (data.get('marks') as NodexNode['marks']);
+  const nodeInlineRefs = richTextParsed ? richTextParsed.inlineRefs : (data.get('inlineRefs') as NodexNode['inlineRefs']);
 
   const result: NodexNode = {
     id: nodexId,
     type: data.get('type') as NodexNode['type'],
-    name: data.get('name') as string | undefined,
+    name: nodeName,
     description: data.get('description') as string | undefined,
     children: childIds,
     tags,
@@ -524,8 +547,8 @@ export function toNodexNode(nodexId: string): NodexNode | null {
     updatedAt: (data.get('updatedAt') as number | undefined) ?? now,
     completedAt: data.get('completedAt') as number | undefined,
     publishedAt: data.get('publishedAt') as number | undefined,
-    marks: data.get('marks') as NodexNode['marks'],
-    inlineRefs: data.get('inlineRefs') as NodexNode['inlineRefs'],
+    marks: nodeMarks,
+    inlineRefs: nodeInlineRefs,
     templateId: data.get('templateId') as string | undefined,
     viewMode: data.get('viewMode') as NodexNode['viewMode'],
     editMode: data.get('editMode') as boolean | undefined,

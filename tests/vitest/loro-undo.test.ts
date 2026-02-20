@@ -16,6 +16,8 @@ import {
   getChildren,
   getParentId,
   commitDoc,
+  createNode,
+  setNodeData,
 } from '../../src/lib/loro-doc.js';
 import { useNodeStore } from '../../src/stores/node-store.js';
 import { resetAndSeed } from './helpers/test-state.js';
@@ -98,6 +100,14 @@ describe('commitDoc 直接测试', () => {
     commitDoc();
     // Could be true or false - just verify no crash
     expect(typeof canUndoDoc()).toBe('boolean');
+  });
+
+  it('system origin 提交不进入 undo 栈', () => {
+    const n = createNode('system_node', null);
+    setNodeData(n, 'name', 'system');
+    commitDoc('system:bootstrap');
+
+    expect(canUndoDoc()).toBe(false);
   });
 });
 

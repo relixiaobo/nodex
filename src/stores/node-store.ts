@@ -161,6 +161,26 @@ export const useNodeStore = create<NodeStore>((set, get) => {
     set(state => ({ _version: state._version + 1 }));
   });
 
+  const detachedStoreWarnings = new Set<string>();
+  function canMutate(action: string): boolean {
+    if (!loroDoc.isDetached()) return true;
+    if (!detachedStoreWarnings.has(action)) {
+      detachedStoreWarnings.add(action);
+      console.warn(`[node-store] detached checkout 模式下忽略写操作: ${action}`);
+    }
+    return false;
+  }
+
+  function detachedNodeFallback(nodeId: string): NodexNode {
+    return loroDoc.toNodexNode(nodeId) ?? {
+      id: nodeId,
+      children: [],
+      tags: [],
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+  }
+
   function setFieldOptionValue(fieldEntryId: string, optionNodeId: string, applyReverseDoneMapping: boolean) {
     const oldChildren = loroDoc.getChildren(fieldEntryId);
     for (const oldId of oldChildren) loroDoc.deleteNode(oldId);
@@ -212,6 +232,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
     // ─── 树操作 ───
 
     createChild: (parentId, index, data) => {
+      if (!canMutate('createChild')) return detachedNodeFallback(parentId);
       const id = nanoid();
       loroDoc.createNode(id, parentId, index);
       if (data) {
@@ -457,6 +478,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
     },
 
     createTagDef: (name, options = {}) => {
+      if (!canMutate('createTagDef')) return detachedNodeFallback(CONTAINER_IDS.SCHEMA);
       const id = nanoid();
       loroDoc.createNode(id, CONTAINER_IDS.SCHEMA);
       loroDoc.setNodeDataBatch(id, {
@@ -472,6 +494,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
     // ─── 字段操作 ───
 
     createFieldDef: (name, fieldType, tagDefId) => {
+      if (!canMutate('createFieldDef')) return detachedNodeFallback(tagDefId);
       const id = nanoid();
       loroDoc.createNode(id, tagDefId);
       loroDoc.setNodeDataBatch(id, {
@@ -556,6 +579,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
     },
 
     addUnnamedFieldToNode: (nodeId, afterChildId) => {
+      if (!canMutate('addUnnamedFieldToNode')) return { fieldEntryId: '', fieldDefId: '' };
       // 创建临时 fieldDef（placeholder）
       const fdId = nanoid();
       loroDoc.createNode(fdId, CONTAINER_IDS.SCHEMA);
@@ -614,6 +638,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
     },
 
     addFieldOption: (fieldDefId, name) => {
+      if (!canMutate('addFieldOption')) return '';
       const optId = nanoid();
       loroDoc.createNode(optId, fieldDefId);
       loroDoc.setNodeData(optId, 'name', name);
@@ -628,6 +653,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
     },
 
     autoCollectOption: (nodeId, fieldDefId, name) => {
+      if (!canMutate('autoCollectOption')) return '';
       // 在 fieldDef 下创建新选项
       // NOTE: addFieldOption already calls commitDoc; we batch all mutations
       // here and commit once at the end for atomicity.
@@ -728,6 +754,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
     // ─── Reference 操作 ───
 
     addReference: (parentId, targetNodeId, position) => {
+      if (!canMutate('addReference')) return '';
       const refId = nanoid();
       loroDoc.createNode(refId, parentId, position);
       loroDoc.setNodeDataBatch(refId, {
@@ -744,6 +771,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
     },
 
     startRefConversion: (refNodeId, parentId, position) => {
+      if (!canMutate('startRefConversion')) return '';
       const refNode = loroDoc.toNodexNode(refNodeId);
       const isReferenceNode = refNode?.type === 'reference';
       const targetId = isReferenceNode ? refNode?.targetId : refNodeId;

@@ -49,6 +49,12 @@
 
 **种子测试数据与 UndoManager 的交互陷阱**：`seedTestDataSync()` 在初始化时调用了 store actions（如 `applyTag`），这些 action 内部调用 `commitDoc()` 时没有 `'__seed__'` origin，导致 UndoManager 记录了种子操作（pre-existing test 期望 `canUndo() === false`）。修复方法：在 `seedTestDataSync()` 末尾调用 `clearUndoHistoryForTest()`（重新初始化 UndoManager），清除种子操作产生的 undo 记录。
 
+**detached checkout 写操作陷阱**：Loro 在 detached（时间旅行）状态下执行写操作会抛错（`The doc is readonly when detached`），不能依赖“写入后 commit no-op”。修复策略：
+- `loro-doc.ts` 所有 mutation API + `commitDoc` 统一加 detached guard（忽略写入并 warning 一次）
+- `node-store.ts` 对有返回值的 mutation（如 `createChild/createTagDef/createFieldDef`）加上层 guard，避免下层 no-op 后出现空节点断言崩溃
+
+**commit origin 分层**：统一使用 `user:* / system:* / __seed__` 语义前缀，并在 UndoManager 过滤 `['__seed__', 'system:']`，确保系统提交不污染用户撤销栈。
+
 ### 树操作边界条件
 
 - **handleBlur 竞态**: onBlur 须检查 `focusedNodeId === nodeId` 再清除（现已改为 rAF 延迟）

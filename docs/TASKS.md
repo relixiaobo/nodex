@@ -48,6 +48,7 @@ _(空)_
 > - [2026-02-21 nodex-codex] 任务认领，启动 Phase 2 开发
 > - [2026-02-21 nodex-codex] 完成 Phase 2 第一批收口：新增 `loro-text-bridge`（TextMark/inlineRef 双向桥接），`node-store` 内容写入路径改为 legacy 字段 + `richText` 双写，`toNodexNode` 优先读 `richText`（旧字段 fallback），并补齐 `loro-text-bridge`/`loro-infra`/`node-store-content` 回归测试
 > - [2026-02-21 nodex-codex] 完成主编辑创建链路补齐：`createChild` 与 `startRefConversion` 在创建节点时即时写入 `richText`，避免“首次创建无 richText 需二次编辑才迁移”；新增 `node-store-content` / `node-store-tags-refs` 断言覆盖
+> - [2026-02-21 nodex-codex] 继续收口：主编辑写入停止 mirror `marks/inlineRefs` 到 legacy 节点字段（仅保留 `name` 镜像 + `richText` 真实源），并在 `setNodeRichTextContent` 统一刷新 `updatedAt`
 
 ### Refactor — Loro 收口 Phase 1：detached guard + origin 策略 (2026-02-21)
 > **Owner**: nodex-codex | **Branch**: codex/loro-phase1-guards

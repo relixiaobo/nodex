@@ -268,7 +268,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
       const id = nanoid();
       loroDoc.createNode(id, parentId, index);
       if (data) {
-        const { type, name, description, ...rest } = data;
+        const { type, name, description, marks, inlineRefs, ...rest } = data;
         const batch: Record<string, unknown> = {};
         if (type !== undefined) batch.type = type;
         if (name !== undefined) batch.name = name;
@@ -278,12 +278,12 @@ export const useNodeStore = create<NodeStore>((set, get) => {
           loroDoc.setNodeDataBatch(id, batch);
         }
 
-        if (name !== undefined || data.marks !== undefined || data.inlineRefs !== undefined) {
+        if (name !== undefined || marks !== undefined || inlineRefs !== undefined) {
           loroDoc.setNodeRichTextContent(
             id,
             name ?? '',
-            data.marks ?? [],
-            data.inlineRefs ?? [],
+            marks ?? [],
+            inlineRefs ?? [],
           );
         }
       }
@@ -448,11 +448,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
         ?? (data.name !== undefined
           ? remapInlineRefsByPlaceholderOrder(nextName, current?.inlineRefs)
           : current?.inlineRefs ?? []);
-      const batch: Record<string, unknown> = {};
-      if (data.name !== undefined) batch.name = data.name;
-      if (data.marks !== undefined) batch.marks = data.marks.length > 0 ? data.marks : undefined;
-      if (data.inlineRefs !== undefined) batch.inlineRefs = data.inlineRefs.length > 0 ? data.inlineRefs : undefined;
-      if (Object.keys(batch).length > 0) loroDoc.setNodeDataBatch(id, batch);
+      if (data.name !== undefined) loroDoc.setNodeData(id, 'name', data.name);
       if (data.name !== undefined || data.marks !== undefined || data.inlineRefs !== undefined) {
         loroDoc.setNodeRichTextContent(id, nextName, nextMarks, nextInlineRefs);
       }
@@ -846,7 +842,6 @@ export const useNodeStore = create<NodeStore>((set, get) => {
       loroDoc.createNode(tempId, parentId, position);
       loroDoc.setNodeDataBatch(tempId, {
         name: '\uFFFC',
-        inlineRefs,
       });
       loroDoc.setNodeRichTextContent(tempId, '\uFFFC', [], inlineRefs);
       loroDoc.commitDoc();

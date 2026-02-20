@@ -10,12 +10,12 @@ import { useMemo } from 'react';
 import { useNodeStore } from '../stores/node-store';
 import {
   resolveDataType, resolveHideField, resolveRequired, resolveConfigValue,
-  isSystemConfigField, ATTRDEF_CONFIG_MAP, ATTRDEF_CONFIG_FIELDS, ATTRDEF_OUTLINER_FIELDS,
-  TAGDEF_CONFIG_MAP, TAGDEF_CONFIG_FIELDS, TAGDEF_OUTLINER_FIELDS,
+  isSystemConfigField, ATTRDEF_CONFIG_MAP, ATTRDEF_CONFIG_FIELDS,
+  TAGDEF_CONFIG_MAP, TAGDEF_CONFIG_FIELDS,
   SYSTEM_FIELD_MAP, resolveSystemFieldValue, type ConfigFieldDef,
 } from '../lib/field-utils.js';
 import type { NodexNode } from '../types/index.js';
-import { CONTAINER_IDS } from '../types/index.js';
+import { CONTAINER_IDS, SYS_D, FIELD_TYPES } from '../types/index.js';
 import * as loroDoc from '../lib/loro-doc.js';
 
 export interface FieldEntry {
@@ -122,34 +122,45 @@ function computeFields(
     });
   }
 
-  // For fieldDef: emit virtual entries for outliner-type config fields
+  // Map config control type to FieldValueOutliner data type
+  function configControlToDataType(control: ConfigFieldDef['control']): string {
+    switch (control) {
+      case 'toggle': return SYS_D.BOOLEAN;
+      case 'color_picker': return SYS_D.COLOR;
+      case 'outliner': return '__outliner__';
+      default: return FIELD_TYPES.PLAIN;
+    }
+  }
+
+  // For fieldDef: emit virtual entries for all applicable config fields
   if (isFieldDef) {
     const currentType = resolveDataType(nodeId);
-    for (const def of ATTRDEF_OUTLINER_FIELDS) {
+    for (const def of ATTRDEF_CONFIG_FIELDS) {
       const applies = def.appliesTo === '*' || def.appliesTo.includes(currentType);
-      if (applies) {
-        fields.push({
-          fieldDefId: def.key,
-          attrDefName: def.name,
-          fieldEntryId: `__virtual_${def.key}__`,
-          dataType: '__outliner__',
-          isSystemConfig: true,
-          configKey: def.key,
-        });
-      }
+      if (!applies) continue;
+      if (def.visibleWhen && !isVisibleWhenSatisfied(def.visibleWhen, node)) continue;
+      fields.push({
+        fieldDefId: def.key,
+        attrDefName: def.name,
+        fieldEntryId: `__virtual_${def.key}__`,
+        dataType: configControlToDataType(def.control),
+        isSystemConfig: true,
+        configKey: def.key,
+      });
     }
     const orderMap = new Map(ATTRDEF_CONFIG_FIELDS.map((f, i) => [f.key, i]));
     fields.sort((a, b) => (orderMap.get(a.fieldDefId) ?? Infinity) - (orderMap.get(b.fieldDefId) ?? Infinity));
   }
 
-  // For tagDef: emit virtual entries for outliner-type config fields
+  // For tagDef: emit virtual entries for all config fields (outliner + non-outliner)
   if (isTagDef) {
-    for (const def of TAGDEF_OUTLINER_FIELDS) {
+    for (const def of TAGDEF_CONFIG_FIELDS) {
+      if (def.visibleWhen && !isVisibleWhenSatisfied(def.visibleWhen, node)) continue;
       fields.push({
         fieldDefId: def.key,
         attrDefName: def.name,
         fieldEntryId: `__virtual_${def.key}__`,
-        dataType: '__outliner__',
+        dataType: configControlToDataType(def.control),
         isSystemConfig: true,
         configKey: def.key,
       });

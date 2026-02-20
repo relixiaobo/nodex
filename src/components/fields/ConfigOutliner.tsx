@@ -127,14 +127,15 @@ export function ConfigOutliner({ nodeId }: ConfigOutlinerProps) {
         });
       } else {
         const nodeType = getNode(cid)?.type;
-        if (!nodeType) {
+        // Include plain content nodes AND fieldDef children (template fields in new Loro model)
+        if (!nodeType || nodeType === 'fieldDef') {
           items.push({
             id: cid,
             type: 'content',
             ownerTagDefId: nodeId,
           });
         }
-        // else skip: fieldEntry config items, etc.
+        // else skip: fieldEntry config items, reference, etc.
       }
     }
 

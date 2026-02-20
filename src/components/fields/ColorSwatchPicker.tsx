@@ -2,41 +2,48 @@
  * Color swatch selector for tagDef SYS_A11 (Color) config field.
  *
  * Renders 10 preset color circles in a grid. Click to select, click again to clear.
- * Selected color stored as named key (e.g., "violet", "rose") in the tuple value.
+ * Selected color stored as named key (e.g., "violet", "rose") in the node attribute.
+ *
+ * For virtual config entries (configNodeId provided): reads/writes from tagDef.color directly.
  */
 import { useCallback } from 'react';
 import { useNodeStore } from '../../stores/node-store';
-import { useWorkspaceStore } from '../../stores/workspace-store';
 import { SWATCH_OPTIONS } from '../../lib/tag-colors.js';
 import { BulletChevron } from '../outliner/BulletChevron';
+import * as loroDoc from '../../lib/loro-doc.js';
 
 interface ColorSwatchPickerProps {
   tupleId: string;
+  /** For virtual config entries: parent tagDef/fieldDef node ID to resolve color from */
+  configNodeId?: string;
 }
 
-export function ColorSwatchPicker({ tupleId }: ColorSwatchPickerProps) {
+export function ColorSwatchPicker({ tupleId, configNodeId }: ColorSwatchPickerProps) {
   const setConfigValue = useNodeStore((s) => s.setConfigValue);
-  const userId = useWorkspaceStore((s) => s.userId);
+  const isVirtual = tupleId.startsWith('__virtual_');
 
-  // Read current color key from fieldEntry.children[0].
-  // Color values are stored as raw strings ("emerald", "violet"), not node references.
+  // Read current color key.
+  // For virtual config entries: read from tagDef.color attribute directly.
+  // For real fieldEntry: read from fieldEntry.children[0].
   const selectedKey = useNodeStore((s) => {
     void s._version;
+    if (isVirtual && configNodeId) {
+      return loroDoc.toNodexNode(configNodeId)?.color ?? undefined;
+    }
     const tuple = s.getNode(tupleId);
     return tuple?.children?.[0] || undefined;
   });
 
   const handleSelect = useCallback(
     (key: string) => {
-      if (!userId) return;
-      // Toggle: click same color → clear
-      if (key === selectedKey) {
-        setConfigValue(tupleId, '', userId);
-      } else {
-        setConfigValue(tupleId, key, userId);
+      if (isVirtual && configNodeId) {
+        // Write directly to tagDef.color node attribute
+        const newColor = key === selectedKey ? '' : key;
+        setConfigValue(configNodeId, 'color', newColor || null);
       }
+      // Non-virtual path is not currently used in new Loro model
     },
-    [userId, tupleId, selectedKey, setConfigValue],
+    [isVirtual, configNodeId, selectedKey, setConfigValue],
   );
 
   return (

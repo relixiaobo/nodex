@@ -429,14 +429,12 @@ export const useNodeStore = create<NodeStore>((set, get) => {
     setNodeName: (id, name) => {
       const current = loroDoc.toNodexNode(id);
       const nextInlineRefs = remapInlineRefsByPlaceholderOrder(name, current?.inlineRefs);
-      loroDoc.setNodeData(id, 'name', name);
       loroDoc.setNodeRichTextContent(id, name, current?.marks ?? [], nextInlineRefs);
     },
 
     setNodeNameLocal: (id, name) => {
       const current = loroDoc.toNodexNode(id);
       const nextInlineRefs = remapInlineRefsByPlaceholderOrder(name, current?.inlineRefs);
-      loroDoc.setNodeData(id, 'name', name);
       loroDoc.setNodeRichTextContent(id, name, current?.marks ?? [], nextInlineRefs);
     },
 
@@ -448,7 +446,6 @@ export const useNodeStore = create<NodeStore>((set, get) => {
         ?? (data.name !== undefined
           ? remapInlineRefsByPlaceholderOrder(nextName, current?.inlineRefs)
           : current?.inlineRefs ?? []);
-      if (data.name !== undefined) loroDoc.setNodeData(id, 'name', data.name);
       if (data.name !== undefined || data.marks !== undefined || data.inlineRefs !== undefined) {
         loroDoc.setNodeRichTextContent(id, nextName, nextMarks, nextInlineRefs);
       }

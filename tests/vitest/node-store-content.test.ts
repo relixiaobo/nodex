@@ -43,12 +43,15 @@ describe('node-store content model actions', () => {
       inlineRefs: [{ offset: 3, targetNodeId: 'task_1' }],
     });
 
+    const rawBefore = loroDoc.getNodeData('idea_1')?.name;
+
     // setNodeName only updates name
     useNodeStore.getState().setNodeName('idea_1', 'Renamed \uFFFC');
     const node = loroDoc.toNodexNode('idea_1');
     expect(node?.name).toBe('Renamed \uFFFC');
     expect(node?.marks).toEqual([{ start: 0, end: 2, type: 'bold' }]);
     expect(node?.inlineRefs).toEqual([{ offset: 8, targetNodeId: 'task_1' }]);
+    expect(loroDoc.getNodeData('idea_1')?.name).toBe(rawBefore);
   });
 
   it('updateNodeContent with empty marks clears marks', () => {

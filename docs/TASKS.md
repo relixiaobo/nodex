@@ -29,11 +29,20 @@ _(空)_
 |-------|---------|------|-------------|
 | nodex-cc | P0 Loro 基础设施 — 7项底层API | cc/loro-infra | src/lib/loro-doc.ts, src/lib/awareness.ts, tests/vitest/loro-infra.test.ts |
 | nodex-cc-2 | _(idle — PR #61 merged)_ | — | — |
-| nodex-codex | _(idle)_ | — | — |
+| nodex-codex | _(idle — Review 已完成)_ | — | — |
 
 ---
 
 ## 进行中
+
+### 代码 Review — feature-sync-2026-02-20 ✅
+> **Owner**: nodex-codex | **Branch**: main（只读，不修改代码）
+> **目标**: 按 `docs/reviews/feature-sync-2026-02-20.md` 优先级清单逐文件 Review，找出 Bug / 架构问题 / 测试缺口
+> **产出**: 将问题写回 `docs/reviews/feature-sync-2026-02-20.md`（Findings 段落），或直接 DM nodex
+> **迭代日志**:
+> - [2026-02-20 nodex] 任务创建，分配给 nodex-codex
+> - [2026-02-20 nodex-codex] Review 完成，发现 6 个 Bug（P0×5, P1×1）+ 5 个测试缺口
+> - [2026-02-20 nodex] 修复全部 6 个 Bug（commit ee0c83a）：applyTag/removeTag/createTagDef/createFieldDef 缺 commitDoc，outdentNode 缺容器边界守卫，toggleCheckboxField 存储值不一致
 
 ### P0 Loro 基础设施 — 7项底层API ✅
 > **Owner**: nodex-cc | **Branch**: cc/loro-infra | **PR**: #63

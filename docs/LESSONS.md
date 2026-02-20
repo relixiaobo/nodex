@@ -45,7 +45,9 @@
 
 **`autoCollectOption` 教训**：原来调用 `get().addFieldOption()`（内含 commitDoc）导致后续 mutations 在 commit 之后执行，没有被纳入同一个原子提交。修复方法：内联 mutations，在所有步骤完成后统一 commitDoc。
 
-**已修复的函数列表**（2026-02-20）：`setFieldValue`、`setOptionsFieldValue`、`selectFieldOption`、`clearFieldValue`、`addFieldToNode`、`addUnnamedFieldToNode`、`moveFieldEntry`、`removeField`、`renameFieldDef`、`changeFieldType`、`addFieldOption`、`removeFieldOption`、`autoCollectOption`、`toggleCheckboxField`、`replaceFieldDef`、`toggleNodeDone`、`cycleNodeCheckbox`、**`setConfigValue`**、`addDoneMappingEntry`、`removeDoneMappingEntry`、`addReference`、`removeReference`、`startRefConversion`。
+**已修复的函数列表**（2026-02-20）：`setFieldValue`、`setOptionsFieldValue`、`selectFieldOption`、`clearFieldValue`、`addFieldToNode`、`addUnnamedFieldToNode`、`moveFieldEntry`、`removeField`、`renameFieldDef`、`changeFieldType`、`addFieldOption`、`removeFieldOption`、`autoCollectOption`、`toggleCheckboxField`、`replaceFieldDef`、`toggleNodeDone`、`cycleNodeCheckbox`、**`setConfigValue`**、`addDoneMappingEntry`、`removeDoneMappingEntry`、`addReference`、`removeReference`、`startRefConversion`、`applyTag`、`removeTag`、`createTagDef`、`createFieldDef`。
+
+**种子测试数据与 UndoManager 的交互陷阱**：`seedTestDataSync()` 在初始化时调用了 store actions（如 `applyTag`），这些 action 内部调用 `commitDoc()` 时没有 `'__seed__'` origin，导致 UndoManager 记录了种子操作（pre-existing test 期望 `canUndo() === false`）。修复方法：在 `seedTestDataSync()` 末尾调用 `clearUndoHistoryForTest()`（重新初始化 UndoManager），清除种子操作产生的 undo 记录。
 
 ### 树操作边界条件
 

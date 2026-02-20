@@ -142,6 +142,7 @@ npm run test:run
 3. 清空 marks/inlineRefs 后读取结果为空数组
 4. LoroDoc 作为单一事实来源：更新后立即可读
 5. `createChild` 传入内容 payload 时立即初始化 `richText`（无需二次编辑触发迁移）
+6. 仅更新 marks 时，`updatedAt` 也会通过 `richText` 写路径刷新
 
 ### 1.3.2 Realtime 自回显保护
 

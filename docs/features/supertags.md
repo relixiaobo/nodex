@@ -187,12 +187,13 @@ tagDef.children:
 - 支持多级继承（grandparent → parent → child）和循环引用防护
 - Seed data 包含 `#Dev Task` extends `#Task` 的测试示例
 
-**Phase 1.1 已实现（2026-02-15）— 配置页颜色继承**:
+**Phase 1.1 已实现（2026-02-15，2026-02-20 更新）— 配置页颜色继承**:
 - 子标签配置页的 "Default content" 区域合并显示继承模板 + 自有模板
 - 每个模板项（字段/节点）的图标和 bullet 颜色标识所属 tagDef
 - 继承自父标签的项 → 父标签颜色，子标签自有的项 → 子标签颜色
-- 无 Extend 关系时不显示颜色（保持原有灰色样式）
-- 颜色来自 `resolveTagColor(entities, tagDefId)`: SYS_A11 配置 → 命名色; 无配置 → 确定性哈希 fallback
+- **颜色始终显示**（不论是否有 Extend 关系）— ConfigOutliner 对所有项传入 ownerTagDef 颜色
+- 颜色来自 `resolveTagColor(tagDefId)`: SYS_A11 配置 → 命名色; 无配置 → 确定性哈希 fallback
+- fieldDef 节点显示**结构化图标**（由 `resolveNodeStructuralIcon` 根据 fieldType 选择图标），图标颜色 = ownerTagDef 颜色
 
 **Phase 2 待实现**:
 - 父标签模板变更后自动传播到所有子标签实例（无需手动同步）
@@ -246,6 +247,39 @@ tagDef_article
 **配置页展示**（Phase 1.1 已实现）:
 - 子标签配置页中，继承模板项通过**颜色**区分所属（父标签颜色 vs 子标签颜色）
 - 继承字段不可拖拽排序，不显示删除按钮（Phase 2 UI 锁定）
+
+### Supertag Bullet 颜色 — 已实现（2026-02-20）
+
+**视觉规则**（基于节点的 `node.tags` 数组）:
+
+| 标签数量 | Bullet 样式 |
+|---------|------------|
+| 0 个 | 灰色实心点（默认） |
+| 1 个 | 该 tagDef 的纯色实心点 |
+| 2+ 个 | conic-gradient 饼图，每段等分，颜色对应各 tagDef |
+
+**实现**:
+- `resolveNodeBulletColors(nodeId): string[]` — 读取 `node.tags`，返回对应颜色数组
+- `BulletChevron.buildBulletStyle(colors)` — 1 色返回 `backgroundColor`，多色构建 `conic-gradient`
+- `OutlinerItem` 计算 `effectiveBulletColors = bulletColors ?? tagBulletColors`（父组件可覆盖）
+- ConfigOutliner 中 fieldDef/content 模板项传入 `bulletColors=[ownerColor]`（ownerTagDef 颜色）
+
+**fieldDef 图标**（结构化图标）:
+- `resolveNodeStructuralIcon(node): AppIcon | null` — `node.type === 'fieldDef'` 时返回对应字段类型图标
+- 图标颜色 = `bulletColors?.[0] ?? var(--color-foreground-secondary)`（继承 ownerTagDef 颜色）
+- tagDef 配置页中所有模板字段（fieldDef 节点）显示字段类型图标 + ownerTagDef 颜色
+
+### 字段排序规则 — 已实现（2026-02-20）
+
+打了多个 supertag 的节点，子节点显示顺序：
+
+1. **Supertag 字段** — 按 `node.tags` 顺序分桶，每个 tagDef 的 fieldEntry 按桶顺序连续输出
+2. **其他字段**（fieldEntry 的 fieldDef 父节点不在 tagIds 中，如手动添加的字段）— 在 supertag 字段之后
+3. **Content 节点**（无 `type` 的普通内容节点）— 最后
+
+**目的**: 让 supertag 注入的字段始终出现在节点内容顶部，与 Tana 一致的字段视觉层级。
+
+**实现**: `visibleChildren` useMemo 先 `Map<tagDefId, Child[]>` 分桶，再 `for (tagId of tagIds)` 有序输出，最后追加 content 节点。
 
 ### Base Type — 参考（暂不实现）
 
@@ -403,6 +437,10 @@ tagDef_article
 | 2026-02-18 | 消除 Metanode 间接层，用 node.meta TEXT[] 替代 | PostgreSQL 原生数组替代 Firebase 容器节点 |
 | 2026-02-18 | 消除 AssociatedData，值直接存 Tuple.children[1:] | Tuple 本身就是列表，无需额外容器 |
 | 2026-02-20 | 所有 store mutation action 末尾必须调用 `loroDoc.commitDoc()` | Loro `doc.subscribe` 仅在 `doc.commit()` 后触发，缺失会导致 `_version` 不更新、React UI 冻结；系统性修复 22 个 functions（见 `docs/LESSONS.md` § Loro CRDT：mutations 必须 commitDoc()） |
+| 2026-02-20 | Bullet 颜色 = supertag 成员身份（颜色语义层），图标/形状 = NodeType（结构语义层） | 两层分离：颜色传达"打了哪些标签"，图标传达"这个节点是什么结构类型"，互不耦合 |
+| 2026-02-20 | 多标签 conic-gradient 饼图（等分色段），而非混色/叠加 | 最多 5 色，等分饼图在小 bullet（5px）上可清晰区分；叠加色会产生无意义混色 |
+| 2026-02-20 | ConfigOutliner ownerColor 始终传入（不再限定于有 Extend 关系时） | 所有模板项（自有 + 继承）都属于某个 tagDef，始终显示颜色更一致；之前的"无 Extend 不显色"逻辑是初始保守设计，已无必要 |
+| 2026-02-20 | 字段排序：supertag 字段按 tagIds 顺序排在最前，content 节点排在最后 | 与 Tana 一致：字段作为 supertag 的语义元数据，优先于用户自由内容显示 |
 
 ## 当前状态
 
@@ -429,6 +467,8 @@ tagDef_article
 - [ ] Optional fields
 - [x] 标签继承 / Extend Phase 1（applyTag/removeTag 字段继承 + config UI）
 - [x] Extend Phase 1.1 — 配置页颜色继承（owning tagDef 颜色标识模板项归属）
+- [x] Supertag bullet 彩色渲染 — 0 标签灰点 / 1 标签纯色 / 多标签 conic-gradient 饼图
+- [x] 大纲节点字段顺序 — supertag 字段按标签顺序排在 content 子节点之前
 - [ ] Extend Phase 2（父变更传播 + 配置页继承项锁定 + 多态搜索）
 - [ ] Convert to supertag
 - [ ] 批量标签操作
@@ -451,3 +491,4 @@ tagDef_article
 - Tana 支持 "Convert to supertag" 快捷转换，Nodex 暂不支持
 - Tana Extend 支持多重继承 + 自动传播父标签变更，Nodex Phase 1 支持继承链字段实例化但不支持自动传播
 - Tana Base Type（13 种语义类型）服务于 AI，Nodex 暂不需要
+- Tana 多标签节点 bullet 颜色：Nodex 用 conic-gradient 饼图，Tana 具体实现未逆向确认

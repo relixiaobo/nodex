@@ -420,7 +420,7 @@ npm run test:run
 2. 非法高度（`<=0`）下的安全回退（`inside`）
 3. 临界值 `1/3` 与 `2/3` 命中中间区（`inside`）
 
-### 1.25 Tag 颜色映射 + Color Swatch Selector
+### 1.25 Tag 颜色映射 + Color Swatch Selector + Bullet Colors
 
 **测试文件**: `tests/vitest/tag-colors.test.ts`
 
@@ -434,6 +434,9 @@ npm run test:run
 6. `resolveTagColor` 未知色名 → fallback to hash
 7. `SWATCH_OPTIONS` 10 项 + 键映射完整性
 8. SYS_A11 attrDef 使用 `NDX_D02` (COLOR) 数据类型
+
+**待覆盖（2026-02-20 新增函数）**:
+- `resolveNodeBulletColors(nodeId)` — 0 标签返回 []；1 标签返回 [color]；多标签返回各 tagDef 颜色数组
 
 ### 1.26 UI Store 当前面板选择器
 
@@ -472,12 +475,18 @@ npm run test:run
 
 **覆盖点（Loro 模型）**:
 
-1. `resolveDataType({}, fieldDefId)` — 读取 fieldDef.fieldType，缺失时回退 FIELD_TYPES.PLAIN
-2. `resolveFieldOptions({}, fieldDefId)` — 返回 fieldDef 子节点中 type='option' 节点
-3. `getExtendsChain({}, tagDefId)` — 读 tagDef.extends，ancestor-first，排除自身
-4. `resolveHideField({}, nodeId, fieldDefId)` — 读 fieldDef.hideField 属性
-5. `findAutoCollectTupleId` — Loro Phase 1 始终返回 null（待实现）
-6. `resolveDataType` 对 seed 中大写 fieldType 值（'OPTIONS'）的原样返回
+1. `resolveDataType(fieldDefId)` — 读取 fieldDef.fieldType，缺失时回退 FIELD_TYPES.PLAIN
+2. `resolveFieldOptions(fieldDefId)` — 返回 fieldDef 子节点中 option 节点（按 children 顺序）
+3. `getExtendsChain(tagDefId)` — 读 tagDef.extends，ancestor-first 顺序，排除自身
+4. `resolveHideField(fieldDefId)` — 读 fieldDef.hideField 属性，默认 SYS_V.NEVER
+5. `resolveRequired(fieldDefId)` — nullable=false → true，其他 → false
+6. `resolveMinValue` / `resolveMaxValue` — 读 fieldDef.minValue/maxValue
+7. `resolveSourceSupertag(fieldDefId)` — 读 fieldDef.sourceSupertag
+8. `resolveTaggedNodes(tagDefId)` — 返回所有含该 tagDefId 在 node.tags 中的节点 ID
+9. `findAutoCollectTupleId` — Loro Phase 1 始终返回 null（待实现）
+10. `getFieldTypeLabel` / `getFieldTypeIcon` / `isPlainFieldType` — 字段类型元数据
+
+**注意（2026-02-20 更新）**: seed-data.ts 已修正，所有 fieldType 使用 `FIELD_TYPES.*` 常量（小写），测试期望值同步更新为 `FIELD_TYPES.OPTIONS` / `FIELD_TYPES.DATE` / `FIELD_TYPES.PLAIN`，不再使用大写字符串。
 
 ### 1.30 Chrome Storage 适配层
 
@@ -1008,14 +1017,15 @@ createSibling 自动标签（2 cases）:
 
 Library:    proj_1, task_1~3, subtask_1a~1b, subtask_2a~2c,
             note_1, note_1a~1c, note_2, idea_1~2,
-            note_rich, rich_1~5
+            note_rich, rich_1~5, rich_inline_ref
 Inbox:      inbox_1~3, inbox_3a~3b, webclip_1
 Journal:    journal_1, j_1~3
-Containers: ws_default_LIBRARY, ws_default_INBOX, ws_default_JOURNAL,
-            ws_default_SEARCHES, ws_default_TRASH, ws_default_SCHEMA
-Schema:     tagDef_task, tagDef_person, tagDef_dev_task, tagDef_web_clip,
-            attrDef_status/priority/due/email/company/source_url + type tuples + option nodes
-Pre-tagged: task_1 → #Task (meta: [tag_tuple, cb_tuple], field tuples in children, checkbox=YES)
+Containers: LIBRARY, INBOX, JOURNAL, SEARCHES, TRASH, SCHEMA（短格式，见 CONTAINER_IDS）
+Schema:     tagDef_task, tagDef_person, tagDef_dev_task, tagDef_web_clip
+            fieldDef 子节点（type='fieldDef'）+ option 子节点
+            fieldType 使用 FIELD_TYPES.* 常量（小写值：'options', 'date', 'plain', 'number', 'url', 'email', 'checkbox'）
+Pre-tagged: task_1 → #Task (node.tags=['tagDef_task'], fieldEntry 子节点)
+            person_1 → #Person (node.tags=['tagDef_person'], fieldEntry 子节点)
             webclip_1 → #web_clip (Source URL = https://medium.com/example-article)
 
 默认展开: proj_1, task_1, task_2, note_rich

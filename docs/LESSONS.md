@@ -65,6 +65,37 @@
 - **新增键盘/导航行为时**: 检查在 FieldValueOutliner 上下文中是否也正常工作
 - **回调链**: OutlinerItem(parent) → FieldRow → FieldValueOutliner → OutlinerItem(child)/TrailingInput
 
+### FIELD_TYPES 常量大小写陷阱
+
+- `FIELD_TYPES.*` 的值全部为**小写**（`'options'`, `'date'`, `'plain'`, `'number'`, `'url'`, `'email'`, `'checkbox'`）
+- 种子数据和测试中曾使用大写字符串（`'OPTIONS'`, `'DATE'`），导致字段图标逻辑匹配失败（显示 AlignLeft ≡ 而非 List 图标）
+- **规则**: 所有写入 `fieldType` 的地方必须使用 `FIELD_TYPES.*` 常量，不要硬编码字符串
+- 测试期望值也必须用 `FIELD_TYPES.*`，不要写裸字符串
+
+### Node 图标系统 — 两层设计
+
+**架构**: 颜色（语义层）+ 形状（结构层）分离
+
+- **颜色** = supertag 成员身份 → `resolveNodeBulletColors(nodeId): string[]`
+  - 0 个标签 → `[]`（灰色默认点）
+  - 1 个标签 → `[color]`（纯色点）
+  - 2+ 个标签 → `[c1, c2, ...]`（conic-gradient 饼图，每段等分）
+  - conic-gradient 在 `BulletChevron.buildBulletStyle()` 中构建
+- **形状** = 结构类型 → `resolveNodeStructuralIcon(node): AppIcon | null`
+  - `node.type === 'fieldDef'` → `getFieldTypeIcon(node.fieldType ?? FIELD_TYPES.PLAIN)`
+  - 其他 → `null`（使用默认圆点）
+- **传播**: `effectiveBulletColors = bulletColors ?? tagBulletColors`，父组件可覆盖（ConfigOutliner 模板项传入 ownerTagDef 颜色）
+- **继承项颜色**: ConfigOutliner 总是传入 `ownerColor`（无论是否有 Extend 关系），让所有 fieldDef 图标与所属 tagDef 颜色一致
+
+### 多标签字段排序
+
+`visibleChildren` 的排序规则：
+1. **supertag 字段** — 按 `node.tags` 顺序分桶，每个 tagDefId 的字段按桶顺序输出
+2. **孤立字段**（fieldEntry 的 fieldDefId 父节点不在 tagIds 中）— 在所有 supertag 字段之后
+3. **content 节点**（type 为 undefined 的普通内容节点）— 最后
+
+实现：先 `Map<tagDefId, Child[]>` 分桶，再 `for (tagId of tagIds)` 有序输出。
+
 ### 类型系统
 
 - `CreateNodeInput.props` 和 `UpdateNodeInput.props` 都是 `Partial<NodeProps>`

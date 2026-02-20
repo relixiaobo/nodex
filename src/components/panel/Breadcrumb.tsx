@@ -23,7 +23,7 @@ import { useNodeStore } from '../../stores/node-store';
 import { useWorkspaceStore } from '../../stores/workspace-store';
 import { useAncestors } from '../../hooks/use-ancestors';
 import { getNavigableParentId } from '../../lib/tree-utils';
-import { isContainerNode } from '../../types/index.js';
+import { CONTAINER_IDS } from '../../types/index.js';
 import * as loroDoc from '../../lib/loro-doc.js';
 
 interface BreadcrumbProps {
@@ -37,8 +37,10 @@ export function Breadcrumb({ nodeId, showCurrentName }: BreadcrumbProps) {
   const openSearch = useUIStore((s) => s.openSearch);
 
   const { ancestors, workspaceRootId } = useAncestors(nodeId);
-  // Container nodes (Library, Inbox, etc.) are root-level; treat them as root view
-  const isRootView = isContainerNode(nodeId) || (!!workspaceRootId && nodeId === workspaceRootId);
+  // isRootView: only true if there is an explicit workspace root node AND we're viewing it.
+  // Container nodes (Library, Inbox, etc.) are NOT treated as root view — they still show
+  // the workspace [W] avatar, just with no ancestor chain.
+  const isRootView = !!workspaceRootId && nodeId === workspaceRootId;
 
   // Get parent ID for ← button (navigate to first non-structural parent)
   const parentId = useNodeStore((s) => { void s._version; return getNavigableParentId(nodeId); });
@@ -66,7 +68,9 @@ export function Breadcrumb({ nodeId, showCurrentName }: BreadcrumbProps) {
   }, [parentId, navigateTo]);
 
   const handleAvatarClick = useCallback(() => {
-    if (workspaceRootId) navigateTo(workspaceRootId);
+    // Navigate to the closest workspace-level root: the explicit workspaceRootId if available,
+    // otherwise fall back to Library (e.g. when already at a container node with no parent).
+    navigateTo(workspaceRootId ?? CONTAINER_IDS.LIBRARY);
   }, [workspaceRootId, navigateTo]);
 
   // Determine which ancestors to show
@@ -103,8 +107,10 @@ export function Breadcrumb({ nodeId, showCurrentName }: BreadcrumbProps) {
       {/* Root view: only show toolbar (sidebar toggle + search), no breadcrumb content */}
       {!isRootView && (
         <>
-          {/* Workspace avatar */}
-          {workspaceRootId && (
+          {/* Workspace avatar — shown whenever workspace is initialized.
+              For container nodes (Library, Inbox…) workspaceRootId is null because they
+              have no parent; we still show [W] to indicate workspace context. */}
+          {!!wsId && (
             <button
               onClick={handleAvatarClick}
               className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/15 text-[10px] font-semibold text-primary hover:bg-primary/25"

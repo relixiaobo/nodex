@@ -5,7 +5,7 @@
  * TreeID 在 loro-crdt 1.x 中为字符串 `"counter@peer"`，可直接用作 Map key。
  */
 
-import { LoroDoc, LoroList, UndoManager, type TreeID } from 'loro-crdt';
+import { LoroDoc, LoroList, LoroText, LoroMovableList, UndoManager, VersionVector, type TreeID, type PeerID } from 'loro-crdt';
 import { nanoid } from 'nanoid';
 import type { NodexNode, DoneMappingEntry } from '../types/node.js';
 import { saveSnapshot, loadSnapshot } from './loro-persistence.js';
@@ -26,8 +26,39 @@ const treeToNodex = new Map<TreeID, string>();
 /** 当前工作区 ID */
 let currentWorkspaceId: string | null = null;
 
-/** 变更订阅回调 */
+/** 全局变更订阅回调 */
 const subscribers = new Set<() => void>();
+
+// ============================================================
+// ② Fine-grained subscriptions — per-node 订阅内部状态
+// ============================================================
+
+interface NodeSub {
+  callbacks: Set<() => void>;
+  unsub: (() => void) | null;
+}
+
+/** nodexId → 该节点的订阅集合 */
+const nodeSubscriptions = new Map<string, NodeSub>();
+
+function attachNodeDataSub(nodexId: string, sub: NodeSub): void {
+  sub.unsub?.();
+  sub.unsub = null;
+  if (!doc) return;
+  const treeId = nodexToTree.get(nodexId);
+  if (!treeId) return;
+  const treeNode = doc.getTree('nodes').getNodeByID(treeId);
+  if (!treeNode) return;
+  sub.unsub = treeNode.data.subscribe(() => {
+    for (const cb of sub.callbacks) cb();
+  });
+}
+
+function reattachNodeSubs(): void {
+  for (const [nodexId, sub] of nodeSubscriptions) {
+    attachNodeDataSub(nodexId, sub);
+  }
+}
 
 /** 防抖保存定时器 */
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
@@ -93,6 +124,8 @@ function rebuildMappings(): void {
       registerMapping(storedId, node.id);
     }
   }
+  // ② 重建后重新挂载 per-node 订阅（checkout/import 后 TreeNode 引用可能失效）
+  reattachNodeSubs();
 }
 
 // ============================================================
@@ -159,6 +192,10 @@ export async function initLoroDoc(workspaceId: string): Promise<void> {
 
 /** 重置（仅测试用） */
 export function resetLoroDoc(): void {
+  // ② 清理 per-node 订阅
+  for (const sub of nodeSubscriptions.values()) sub.unsub?.();
+  nodeSubscriptions.clear();
+
   doc = null;
   undoManager = null;
   nodexToTree.clear();
@@ -178,6 +215,16 @@ export function initLoroDocForTest(workspaceId: string): void {
   // seed-data commits are not tracked in the undo stack.
   undoManager = new UndoManager(doc, { mergeInterval: 0, excludeOriginPrefixes: ['__seed__'] });
   doc.subscribe(() => notifySubscribers());
+}
+
+/**
+ * 设置提交合并间隔（毫秒）。
+ * 设为 -1 禁用合并（每次 commitDoc 产生独立 Change，用于确保 getVersionHistory 精确）。
+ * 设为 0 使用 Loro 默认行为（同步内连续提交会被合并）。
+ */
+export function setDocChangeMergeInterval(ms: number): void {
+  if (!doc) throw new Error('[loro-doc] LoroDoc 未初始化');
+  doc.setChangeMergeInterval(ms);
 }
 
 // ============================================================
@@ -558,4 +605,266 @@ export function canUndoDoc(): boolean {
 
 export function canRedoDoc(): boolean {
   return undoManager?.canRedo() ?? false;
+}
+
+// ============================================================
+// ② Fine-grained subscriptions — per-node 订阅 API
+// ============================================================
+
+/**
+ * 订阅单个节点的数据变更（name / type / tags / 字段等）。
+ *
+ * - 仅触发该节点 LoroMap 数据变化，不触发无关节点
+ * - 结构变更（children 增删移）仍需通过全局 subscribe() 监听
+ * - 保留全局 _version 作为 fallback，本 API 为 opt-in
+ *
+ * @returns 取消订阅函数
+ *
+ * @example
+ * ```ts
+ * const unsub = subscribeNode('nodeA', () => console.log('A changed'));
+ * // Later:
+ * unsub();
+ * ```
+ */
+export function subscribeNode(nodexId: string, callback: () => void): () => void {
+  let sub = nodeSubscriptions.get(nodexId);
+  if (!sub) {
+    sub = { callbacks: new Set(), unsub: null };
+    nodeSubscriptions.set(nodexId, sub);
+    attachNodeDataSub(nodexId, sub);
+  }
+  sub.callbacks.add(callback);
+  return () => {
+    sub!.callbacks.delete(callback);
+    if (sub!.callbacks.size === 0) {
+      sub!.unsub?.();
+      nodeSubscriptions.delete(nodexId);
+    }
+  };
+}
+
+// ============================================================
+// ⑤ Incremental Sync — 增量更新导出/导入
+// ============================================================
+
+/**
+ * 获取当前文档的版本向量（VersionVector）。
+ * 配合 exportFrom() 实现增量同步：目标端先 getVersionVector()，
+ * 再传给源端的 exportFrom()，只导出目标端缺少的部分。
+ */
+export function getVersionVector(): VersionVector {
+  if (!doc) throw new Error('[loro-doc] LoroDoc 未初始化');
+  return doc.oplogVersion();
+}
+
+/**
+ * 从指定版本向量导出增量更新（update bytes）。
+ * @param from 目标端的版本向量（通过 getVersionVector() 获取）
+ * @returns Uint8Array，可直接传给对端的 importUpdates()
+ */
+export function exportFrom(from: VersionVector): Uint8Array {
+  if (!doc) throw new Error('[loro-doc] LoroDoc 未初始化');
+  return doc.export({ mode: 'update', from });
+}
+
+// ============================================================
+// ④ Time Travel / Checkout — 版本历史记录
+// ============================================================
+
+/** getVersionHistory() 返回的单条历史记录 */
+export interface VersionHistoryEntry {
+  /** 唯一 ID，格式 `${peer}_${counter}` */
+  id: string;
+  peer: PeerID;
+  /** 该 Change 起始 counter */
+  counter: number;
+  /** Lamport 时间戳（全局排序依据） */
+  lamport: number;
+  /** 提交消息（通过 commitDoc({ message }) 设置） */
+  message: string | undefined;
+  /** Unix 秒时间戳（需 setRecordTimestamp(true)，否则为 0） */
+  timestamp: number;
+  /** 前驱操作 ID（DAG deps） */
+  deps: Array<{ peer: PeerID; counter: number }>;
+}
+
+/**
+ * 获取文档全部版本历史，按 lamport 时间戳升序排列。
+ * 每条记录对应一次 doc.commit()。
+ */
+export function getVersionHistory(): VersionHistoryEntry[] {
+  if (!doc) return [];
+  // getAllChanges() 返回 Map<peer, Change[]>
+  const allChanges = doc.getAllChanges() as Map<PeerID, Array<{
+    lamport: number;
+    length: number;
+    counter: number;
+    deps: Array<{ peer: PeerID; counter: number }>;
+    timestamp: number;
+    message: string | undefined;
+  }>>;
+  const history: VersionHistoryEntry[] = [];
+  for (const [peer, changes] of allChanges) {
+    for (const change of changes) {
+      history.push({
+        id: `${peer}_${change.counter}`,
+        peer,
+        counter: change.counter,
+        lamport: change.lamport,
+        message: change.message,
+        timestamp: change.timestamp,
+        deps: change.deps,
+      });
+    }
+  }
+  return history.sort((a, b) => a.lamport - b.lamport);
+}
+
+/**
+ * Checkout 到指定 frontiers（进入 detached 只读历史状态）。
+ * @param frontiers 格式：`[{ peer, counter }]`，来自 doc.frontiers() 或 getVersionHistory()
+ *
+ * 注意：checkout 后 doc 处于 detached 模式，写操作无效。
+ * 调用 checkoutToLatest() 退出历史模式。
+ */
+export function checkout(frontiers: Array<{ peer: PeerID; counter: number }>): void {
+  if (!doc) throw new Error('[loro-doc] LoroDoc 未初始化');
+  doc.checkout(frontiers);
+  rebuildMappings();
+}
+
+/**
+ * 退出 detached 历史模式，回到最新状态。
+ */
+export function checkoutToLatest(): void {
+  if (!doc) throw new Error('[loro-doc] LoroDoc 未初始化');
+  doc.checkoutToLatest();
+  rebuildMappings();
+}
+
+/**
+ * 当前是否处于 detached（历史 checkout）模式。
+ */
+export function isDetached(): boolean {
+  return doc?.isDetached() ?? false;
+}
+
+/**
+ * 获取当前 frontiers（最新提交位置）。
+ * 可传给 checkout() 实现版本跳转。
+ */
+export function getCurrentFrontiers(): Array<{ peer: PeerID; counter: number }> {
+  if (!doc) return [];
+  return doc.frontiers() as Array<{ peer: PeerID; counter: number }>;
+}
+
+// ============================================================
+// ③ LoroText + Peritext marks 基础设施
+// ============================================================
+
+/**
+ * 获取节点的富文本容器（只读，不自动创建）。
+ * 若节点不存在或未初始化富文本，返回 null。
+ *
+ * 注意：name 字段仍使用 string（ProseMirror 当前 source of truth）。
+ * 此 API 为 Phase 2 ProseMirror↔Loro 同步预留基础设施。
+ */
+export function getNodeText(nodexId: string): LoroText | null {
+  const treeId = nodexToTree.get(nodexId);
+  if (!treeId) return null;
+  const node = getTree().getNodeByID(treeId);
+  if (!node) return null;
+  const existing = node.data.get('richText');
+  if (existing instanceof LoroText) return existing;
+  return null;
+}
+
+/**
+ * 获取或创建节点的富文本容器（Peritext marks 支持）。
+ * 幂等：多次调用返回同一 LoroText 实例。
+ *
+ * 使用方式：
+ * ```ts
+ * const text = getOrCreateNodeText('nodeId');
+ * text?.insert(0, 'Hello');
+ * text?.mark({ start: 0, end: 5 }, 'bold', true);
+ * commitDoc();
+ * ```
+ */
+export function getOrCreateNodeText(nodexId: string): LoroText | null {
+  invalidateCache();
+  const treeId = nodexToTree.get(nodexId);
+  if (!treeId) return null;
+  const node = getTree().getNodeByID(treeId);
+  if (!node) return null;
+  return node.data.getOrCreateContainer('richText', new LoroText()) as LoroText;
+}
+
+// ============================================================
+// ① LoroMovableList — 并发安全性评估
+//
+// 结论：LoroTree.move() 已是 Kleppmann 2021 并发安全树移动算法。
+// 测试验证：两个 peer 并发移动同一节点到不同父节点，merge 后收敛
+// （见 loro-step0-validation.test.ts 循环引用检测 + loro-infra.test.ts 并发移动收敛）。
+//
+// tags 使用 LoroList（字符串 ID 列表）：
+// - addTag/removeTag 并发安全：两端同时 addTag 不会丢失（LWW），不会产生重复（去重）
+// - 标签顺序在语义上不重要，LoroList 的 insert 并发顺序不影响功能
+// - 结论：tags 保持 LoroList，无需迁移至 LoroMovableList
+//
+// LoroMovableList 适用场景：需要并发安全重排序的有序列表（如用户手动排序的视图列表）
+// ============================================================
+
+/**
+ * [仅供参考] 检查 LoroMovableList 是否可用。
+ * 当需要并发安全的列表重排序时，使用此工厂方法。
+ */
+export function createMovableList(): LoroMovableList {
+  return new LoroMovableList();
+}
+
+// ============================================================
+// ⑥ doc.fork() — 文档分支
+// ============================================================
+
+/** forkDoc() 返回值 */
+export interface DocFork {
+  /** 独立分支文档（可随意修改，不影响主 doc） */
+  doc: LoroDoc;
+  /** 将分支变更合并回主 doc（幂等） */
+  merge: () => void;
+}
+
+/**
+ * 创建主 doc 的独立分支。
+ *
+ * - fork 从当前最新状态开始，与主 doc 完全隔离
+ * - fork.doc 可独立修改，主 doc 不受影响
+ * - fork.merge() 将 fork 的增量变更导入主 doc（可多次调用）
+ *
+ * @example
+ * ```ts
+ * const { doc: fork, merge } = forkDoc();
+ * fork.getTree('nodes').createNode(); // 修改 fork，主 doc 不变
+ * fork.commit();
+ * merge(); // 合并回主 doc
+ * ```
+ */
+export function forkDoc(): DocFork {
+  if (!doc) throw new Error('[loro-doc] LoroDoc 未初始化');
+  const mainDoc = doc;
+  const vvAtFork = mainDoc.oplogVersion();
+  const forkedDoc = mainDoc.fork();
+  return {
+    doc: forkedDoc,
+    merge: () => {
+      if (!doc) throw new Error('[loro-doc] 主 doc 已重置，无法合并');
+      const delta = forkedDoc.export({ mode: 'update', from: vvAtFork });
+      if (delta.length > 0) {
+        doc.import(delta);
+        rebuildMappings();
+      }
+    },
+  };
 }

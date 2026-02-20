@@ -57,6 +57,12 @@ _(空)_
 >   - Bug 3: `use-node-fields.ts:computeFields` — tagDef/fieldDef 只生成 outliner 类型虚拟条目，非 outliner 配置字段（Color/Show as checkbox 等）不显示
 >   - 同步修复 `FieldValueOutliner` + `ColorSwatchPicker` 支持虚拟 tupleId 读写节点属性（boolean/color）
 >   - 485 tests pass, typecheck clean
+> - [2026-02-20 nodex] 追加修复 4 个运行时回归（用户测试发现）：
+>   - Bug 4: `SidebarNav.tsx` — 用 `${wsId}_${suffix}` 构造容器 ID，但 Loro 迁移后 ID 为短格式（LIBRARY 等），导致侧栏点击导航到不存在的节点（"Untitled" + 空树）
+>   - Bug 5: `CommandPalette.tsx` — 同上，容器快速跳转也用了旧格式
+>   - Bug 6: `Breadcrumb.tsx` — `isRootView` 未处理直接浏览容器节点的情况（workspaceRootId=null）
+>   - Bug 7: `App.tsx` bootstrap — 不等待 UIStore persist hydration，stale panel ID 不被清除；同步修复 `seed-data.ts` 的 `?fresh` 清理逻辑
+>   - 485 tests pass, typecheck clean
 
 ---
 

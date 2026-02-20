@@ -630,11 +630,13 @@ hash trigger cleanup safety（2 cases, Bug #53 回归）:
 35. `onRemoteStateChange()` 回调接收全量状态 Map（size=2）
 36. `serializeLocalState()` / `deserializeAndApplyState()` 往返序列化
 37. `updatedAt` 在 `setLocalState()` 后更新（单调递增）
+38. detached checkout 下 `createNode/setNodeData/commitDoc` 忽略写入且不抛错
 
 **设计要点**:
 - `subscribeNode` 通过 Loro LoroMap.subscribe() 实现容器级订阅，rebuildMappings() 后自动重新挂载
 - `getVersionHistory()` 依赖 `getAllChanges()` 返回 Map；需要 `setDocChangeMergeInterval(-1)` 禁用合并以获取精确历史
 - `checkout(frontiers)` 进入 detached 模式后 rebuildMappings() 更新 nodexId 映射
+- detached 模式写入统一在 `loro-doc.ts` guard（mutations + `commitDoc`）被忽略并发出一次性 warning
 - `forkDoc()` 用 vvAtFork 记录分叉点，merge() 只导出分叉后的增量
 - awareness.ts 纯内存，不含网络传输
 
@@ -656,9 +658,11 @@ hash trigger cleanup safety（2 cases, Bug #53 回归）:
 8. N 次操作后可依次撤销（mergeInterval=0 每次独立步骤）
 9. 全部撤销后 `canRedoDoc()` 为 true
 10. 新操作清空 redo 栈
+11. `commitDoc('system:*')` 提交不进入 undo 栈（被 `excludeOriginPrefixes` 过滤）
 
 **设计要点**:
 - `seedTestDataSync` 在 `seedBody()` 后调用 `commitDoc('__seed__')`，被 UndoManager 的 `excludeOriginPrefixes` 过滤
+- 生产与测试统一过滤前缀：`['__seed__', 'system:']`
 - node-store.ts 的 `createChild`、`moveNodeTo`、`trashNode`、`restoreNode`、`indent/outdent/moveUp/moveDown` 各自结尾调用 `commitDoc()` 记录撤销步骤
 - undo/redo 后调用 `rebuildMappings()` 重新同步 nodexToTree / treeToNodex（Loro undo/redo 可能产生新 TreeID）
 

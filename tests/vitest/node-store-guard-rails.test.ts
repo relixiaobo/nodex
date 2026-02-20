@@ -161,3 +161,49 @@ describe('workspace container immutability', () => {
     expect(loroDoc.getParentId('INBOX')).toBeNull();
   });
 });
+
+describe('detached checkout write guard', () => {
+  beforeEach(() => {
+    resetAndSeed();
+  });
+
+  it('createChild in detached mode is no-op and does not throw', () => {
+    const beforeName = loroDoc.toNodexNode('proj_1')?.name ?? '';
+    loroDoc.setNodeData('proj_1', 'name', `${beforeName}__latest`);
+    loroDoc.commitDoc();
+    const latestName = loroDoc.toNodexNode('proj_1')?.name;
+    const frontiers = loroDoc.getCurrentFrontiers();
+    loroDoc.setNodeData('proj_1', 'name', `${beforeName}__newer`);
+    loroDoc.commitDoc();
+    const before = loroDoc.getChildren('proj_1').slice();
+
+    loroDoc.checkout(frontiers);
+    expect(loroDoc.isDetached()).toBe(true);
+    expect(loroDoc.toNodexNode('proj_1')?.name).toBe(latestName);
+
+    expect(() => useNodeStore.getState().createChild('proj_1')).not.toThrow();
+    expect(loroDoc.getChildren('proj_1')).toEqual(before);
+
+    loroDoc.checkoutToLatest();
+  });
+
+  it('setNodeName in detached mode is no-op', () => {
+    const beforeName = loroDoc.toNodexNode('idea_1')?.name ?? '';
+    loroDoc.setNodeData('idea_1', 'name', `${beforeName}__latest`);
+    loroDoc.commitDoc();
+    const latestName = loroDoc.toNodexNode('idea_1')?.name;
+    const frontiers = loroDoc.getCurrentFrontiers();
+    loroDoc.setNodeData('idea_1', 'name', `${beforeName}__newer`);
+    loroDoc.commitDoc();
+
+    loroDoc.checkout(frontiers);
+    expect(loroDoc.isDetached()).toBe(true);
+    expect(loroDoc.toNodexNode('idea_1')?.name).toBe(latestName);
+
+    useNodeStore.getState().setNodeName('idea_1', 'changed-in-detached');
+    loroDoc.commitDoc();
+    expect(loroDoc.toNodexNode('idea_1')?.name).toBe(latestName);
+
+    loroDoc.checkoutToLatest();
+  });
+});

@@ -28,6 +28,11 @@ describe('node-store content model actions', () => {
 
     const richText = loroDoc.getNodeText('idea_1');
     expect(richText?.toString()).toBe('Hi \uFFFC');
+
+    // Phase 2: marks/inlineRefs no longer mirror-write to legacy node data fields.
+    const raw = loroDoc.getNodeData('idea_1');
+    expect(raw?.marks).toBeUndefined();
+    expect(raw?.inlineRefs).toBeUndefined();
   });
 
   it('setNodeName updates name, preserves marks and inlineRefs', () => {

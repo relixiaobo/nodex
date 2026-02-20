@@ -330,6 +330,12 @@ export function setNodeRichTextContent(
 ): void {
   if (!canApplyMutation('setNodeRichTextContent')) return;
   invalidateCache();
+  const tree = getTree();
+  const treeId = nodexToTree.get(nodexId);
+  if (!treeId) return;
+  const node = tree.getNodeByID(treeId);
+  if (!node) return;
+
   const richText = getOrCreateNodeText(nodexId);
   if (!richText) return;
   writeRichTextToLoroText(richText, {
@@ -337,6 +343,7 @@ export function setNodeRichTextContent(
     marks: marks ?? [],
     inlineRefs: inlineRefs ?? [],
   });
+  node.data.set('updatedAt', Date.now());
 }
 
 export function setNodeData(nodexId: string, key: string, value: unknown): void {

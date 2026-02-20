@@ -17,43 +17,29 @@
  * 节点类型枚举。
  * 无 type 的节点为普通用户内容节点。
  */
+/**
+ * 节点类型枚举。
+ *
+ * 仅包含「结构类型」——数据模型或渲染逻辑与普通内容节点有本质差异、
+ * 无法用 supertag 替代的类型。
+ *
+ * 「语义类型」（webClip / journal day / url 等）应通过 supertag 表达，
+ * 不在此枚举中定义，符合「一切皆节点」原则。
+ *
+ * undefined = 普通内容节点（占绝大多数）
+ */
 export type NodeType =
   // ── 核心结构类型 ──
-  | 'fieldEntry'      // 字段实例（旧 'tuple'）。fieldDefId 存属性，children = 值节点列表
-  | 'reference'       // 引用节点（新增）。targetId 指向被引用节点，符合 LoroTree 单亲约束
+  | 'fieldEntry'   // 字段实例：children = 值节点列表，fieldDefId 指向定义
+  | 'reference'    // 引用节点：targetId 指向被引用节点（LoroTree 单亲约束）
 
-  // ── 定义类型 ──
-  | 'tagDef'          // 超级标签定义
-  | 'fieldDef'        // 字段定义（旧 'attrDef'）
-  | 'viewDef'         // 视图定义
+  // ── 定义类型（Schema 层）──
+  | 'tagDef'       // Supertag 定义
+  | 'fieldDef'     // 字段定义
 
-  // ── 内容类型 ──
-  | 'codeblock'       // 代码块
-  | 'visual'          // 图片/视觉内容
-  | 'url'             // URL 链接
-  | 'chat'            // 聊天对话
-
-  // ── 日志类型 ──
-  | 'journal'         // 日志根容器
-  | 'journalPart'     // 日志分区（年/周/日）
-
-  // ── 搜索与查询 ──
-  | 'search'          // Live Search / 动态查询
-
-  // ── 系统/工具类型 ──
-  | 'command'         // 系统命令
-  | 'systemTool'      // 系统工具
-  | 'chatbot'         // 聊天机器人定义
-  | 'syntax'          // 语法定义
-  | 'placeholder'     // 占位符
-
-  // ── 工作区类型 ──
-  | 'workspace'       // 工作区/布局节点
-  | 'home'            // 主页根节点
-  | 'settings'        // 设置容器
-
-  // ── Nodex 扩展 ──
-  | 'webClip';        // 网页剪藏
+  // ── 查询与视图 ──
+  | 'viewDef'      // 视图配置节点（P3）
+  | 'search';      // Live Search / 动态查询节点（P3）
 
 /**
  * 视图模式枚举。

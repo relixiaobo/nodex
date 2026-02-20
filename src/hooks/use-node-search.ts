@@ -9,6 +9,7 @@
 import { useMemo } from 'react';
 import { useNodeStore } from '../stores/node-store';
 import * as loroDoc from '../lib/loro-doc.js';
+import { isWorkspaceContainer } from '../lib/tree-utils.js';
 
 export interface NodeSearchResult {
   id: string;
@@ -16,10 +17,9 @@ export interface NodeSearchResult {
   breadcrumb: string;
 }
 
-/** Node types to skip in search results */
-const SKIP_DOC_TYPES = new Set([
-  'fieldEntry', 'fieldDef', 'tagDef',
-  'reference', 'workspace', 'user',
+/** Structural node types to skip in search results (not meaningful as search targets). */
+const SKIP_DOC_TYPES = new Set<string>([
+  'fieldEntry', 'fieldDef', 'tagDef', 'reference',
 ]);
 
 export function useNodeSearch(query: string, excludeId?: string): NodeSearchResult[] {
@@ -37,7 +37,8 @@ export function useNodeSearch(query: string, excludeId?: string): NodeSearchResu
       const node = loroDoc.toNodexNode(id);
       if (!node) continue;
 
-      // Skip structural/system node types
+      // Skip workspace containers (LIBRARY, INBOX, etc.) and structural node types
+      if (isWorkspaceContainer(id)) continue;
       if (node.type && SKIP_DOC_TYPES.has(node.type)) continue;
 
       // Skip nodes with no name

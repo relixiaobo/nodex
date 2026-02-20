@@ -30,7 +30,7 @@ async function seedWorkspace(wsId: string): Promise<void> {
   for (const { id, name } of CONTAINER_DEFS) {
     if (!loroDoc.hasNode(id)) {
       loroDoc.createNode(id, null);
-      loroDoc.setNodeDataBatch(id, { name, type: 'workspace' });
+      loroDoc.setNodeDataBatch(id, { name });
     }
   }
 }

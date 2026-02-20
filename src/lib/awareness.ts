@@ -168,15 +168,22 @@ export function serializeLocalState(): string | null {
  * 反序列化并应用远端传来的状态（网络接收端调用）。
  */
 export function deserializeAndApplyState(payload: string): void {
-  const { userId, state } = JSON.parse(payload) as {
-    userId: string;
-    state: AwarenessState;
-  };
+  const parsed = JSON.parse(payload) as unknown;
+  const obj = parsed as Record<string, unknown>;
+  if (
+    typeof parsed !== 'object' || parsed === null ||
+    typeof obj.userId !== 'string' ||
+    typeof obj.state !== 'object' || obj.state === null
+  ) {
+    console.warn('[awareness] deserializeAndApplyState: 无效 payload，已忽略');
+    return;
+  }
+  const { userId, state } = obj as { userId: string; state: AwarenessState };
   applyRemoteState(userId, state);
 }
 
 /**
- * 重置所有状态（仅测试用）。
+ * 重置所有状态（切换工作区时由 initLoroDoc 自动调用，也可用于测试）。
  */
 export function resetAwareness(): void {
   localUserId = null;

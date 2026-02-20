@@ -9,6 +9,7 @@ import { LoroDoc, LoroList, LoroText, LoroMovableList, UndoManager, VersionVecto
 import { nanoid } from 'nanoid';
 import type { NodexNode, DoneMappingEntry } from '../types/node.js';
 import { saveSnapshot, loadSnapshot } from './loro-persistence.js';
+import { resetAwareness } from './awareness.js';
 
 // ============================================================
 // 内部状态
@@ -163,6 +164,8 @@ export async function initLoroDoc(workspaceId: string): Promise<void> {
   if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
   currentWorkspaceId = workspaceId;
   doc = new LoroDoc();
+  // 切换工作区时清除上一个工作区的 awareness 状态，避免跨工作区泄露
+  resetAwareness();
 
   try {
     const snapshot = await loadSnapshot(workspaceId);
@@ -718,7 +721,7 @@ export function getVersionHistory(): VersionHistoryEntry[] {
       });
     }
   }
-  return history.sort((a, b) => a.lamport - b.lamport);
+  return history.sort((a, b) => a.lamport - b.lamport || (a.peer < b.peer ? -1 : 1));
 }
 
 /**
@@ -818,7 +821,8 @@ export function getOrCreateNodeText(nodexId: string): LoroText | null {
 
 /**
  * [仅供参考] 检查 LoroMovableList 是否可用。
- * 当需要并发安全的列表重排序时，使用此工厂方法。
+ * 注意：返回的是独立实例，未绑定到任何 LoroDoc container，无法持久化/同步。
+ * 实际持久化场景需通过 treeNode.data.getOrCreateContainer('key', new LoroMovableList()) 获取。
  */
 export function createMovableList(): LoroMovableList {
   return new LoroMovableList();
@@ -854,15 +858,17 @@ export interface DocFork {
 export function forkDoc(): DocFork {
   if (!doc) throw new Error('[loro-doc] LoroDoc 未初始化');
   const mainDoc = doc;
-  const vvAtFork = mainDoc.oplogVersion();
   const forkedDoc = mainDoc.fork();
+  // 记录每次 merge 完成后 forked doc 的版本，避免重复导出已合并的 delta
+  let lastMergedVV = mainDoc.oplogVersion();
   return {
     doc: forkedDoc,
     merge: () => {
       if (!doc) throw new Error('[loro-doc] 主 doc 已重置，无法合并');
-      const delta = forkedDoc.export({ mode: 'update', from: vvAtFork });
+      const delta = forkedDoc.export({ mode: 'update', from: lastMergedVV });
       if (delta.length > 0) {
         doc.import(delta);
+        lastMergedVV = forkedDoc.oplogVersion();
         rebuildMappings();
       }
     },

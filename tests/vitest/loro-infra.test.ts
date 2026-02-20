@@ -751,6 +751,15 @@ describe('⑦ Awareness', () => {
     unsub();
   });
 
+  it('deserializeAndApplyState 忽略结构不合法的 payload（不抛出）', () => {
+    // userId 非 string — 应忽略，不抛出
+    expect(() => deserializeAndApplyState(JSON.stringify({ userId: 123, state: {} }))).not.toThrow();
+    // 缺少必要字段 — 应忽略，不抛出
+    expect(() => deserializeAndApplyState(JSON.stringify({ missing: 'fields' }))).not.toThrow();
+    // state 为 null — 应忽略，不抛出
+    expect(() => deserializeAndApplyState(JSON.stringify({ userId: 'u1', state: null }))).not.toThrow();
+  });
+
   it('updatedAt 在 setLocalState 后更新', async () => {
     setLocalUser({ id: 'u1', name: 'Alice', color: '#FF5733' });
     const t1 = getLocalState()!.updatedAt;

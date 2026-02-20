@@ -6,33 +6,7 @@ import type { EditorView } from 'prosemirror-view';
 import { Bold, Check, Code2, Heading, Highlighter, Italic, Link2, Strikethrough, Unlink, X } from 'lucide-react';
 import { pmSchema } from './pm-schema.js';
 
-interface TiptapLikeChain {
-  focus: () => TiptapLikeChain;
-  extendMarkRange: (_mark: string) => TiptapLikeChain;
-  setLink: (_attrs: { href: string }) => TiptapLikeChain;
-  unsetLink: () => TiptapLikeChain;
-  toggleBold: () => TiptapLikeChain;
-  toggleItalic: () => TiptapLikeChain;
-  toggleStrike: () => TiptapLikeChain;
-  toggleCode: () => TiptapLikeChain;
-  toggleHighlight: () => TiptapLikeChain;
-  toggleHeadingMark: () => TiptapLikeChain;
-  run: () => boolean;
-}
-
-interface TiptapLikeEditor {
-  state: { selection: { from: number; to: number; empty?: boolean; constructor?: { name?: string } } };
-  isEditable: boolean;
-  view: EditorView;
-  on: (_event: string, _callback: () => void) => void;
-  off: (_event: string, _callback: () => void) => void;
-  getAttributes: (_mark: string) => { href?: string };
-  isActive: (_mark: string) => boolean;
-  chain: () => TiptapLikeChain;
-}
-
 interface FloatingToolbarProps {
-  editor?: TiptapLikeEditor;
   view?: EditorView | null;
   tick?: number;
 }
@@ -185,7 +159,7 @@ function removeLinkInView(view: EditorView) {
   view.focus();
 }
 
-export function FloatingToolbar({ editor, view, tick = 0 }: FloatingToolbarProps) {
+export function FloatingToolbar({ view, tick = 0 }: FloatingToolbarProps) {
   const [renderTick, setRenderTick] = useState(0);
   const [toolbarPosition, setToolbarPosition] = useState<ToolbarPosition>({ show: false, top: 0, left: 0 });
   const [editingLink, setEditingLink] = useState(false);
@@ -193,7 +167,7 @@ export function FloatingToolbar({ editor, view, tick = 0 }: FloatingToolbarProps
   const inputRef = useRef<HTMLInputElement>(null);
   const pointerSelectingRef = useRef(false);
 
-  const activeView = view ?? editor?.view ?? null;
+  const activeView = view ?? null;
 
   const hideToolbar = useCallback(() => {
     setToolbarPosition((prev) => (prev.show ? { ...prev, show: false } : prev));
@@ -205,9 +179,9 @@ export function FloatingToolbar({ editor, view, tick = 0 }: FloatingToolbarProps
       return false;
     }
 
-    const selection = editor ? editor.state.selection : activeView.state.selection;
+    const selection = activeView.state.selection;
     const hasTextSelection = isTextSelectionRange(selection);
-    const isEditable = editor ? editor.isEditable : !!activeView.editable;
+    const isEditable = !!activeView.editable;
     const shouldShow = isEditable && activeView.hasFocus() && hasTextSelection && !pointerSelectingRef.current;
 
     if (!shouldShow) {
@@ -216,8 +190,7 @@ export function FloatingToolbar({ editor, view, tick = 0 }: FloatingToolbarProps
     }
 
     try {
-      const anchor = ('anchor' in selection ? selection.anchor : selection.from);
-      const head = ('head' in selection ? selection.head : selection.to);
+      const { anchor, head } = selection;
       const forward = head >= anchor;
       const selectionFrom = selection.from;
       const selectionTo = selection.to;
@@ -243,39 +216,10 @@ export function FloatingToolbar({ editor, view, tick = 0 }: FloatingToolbarProps
       hideToolbar();
       return false;
     }
-  }, [activeView, editor, hideToolbar]);
+  }, [activeView, hideToolbar]);
 
   useEffect(() => {
-    if (!editor) return;
-
-    const syncToolbar = () => {
-      updateToolbarFromSelection();
-      setRenderTick((value) => value + 1);
-    };
-    const handleBlur = () => {
-      pointerSelectingRef.current = false;
-      setEditingLink(false);
-      hideToolbar();
-      setRenderTick((value) => value + 1);
-    };
-
-    editor.on('selectionUpdate', syncToolbar);
-    editor.on('transaction', syncToolbar);
-    editor.on('focus', syncToolbar);
-    editor.on('blur', handleBlur);
-
-    syncToolbar();
-
-    return () => {
-      editor.off('selectionUpdate', syncToolbar);
-      editor.off('transaction', syncToolbar);
-      editor.off('focus', syncToolbar);
-      editor.off('blur', handleBlur);
-    };
-  }, [editor, hideToolbar, updateToolbarFromSelection]);
-
-  useEffect(() => {
-    if (editor || !activeView) return;
+    if (!activeView) return;
 
     const syncToolbar = () => {
       updateToolbarFromSelection();
@@ -297,14 +241,14 @@ export function FloatingToolbar({ editor, view, tick = 0 }: FloatingToolbarProps
       activeView.dom.removeEventListener('focus', syncToolbar, true);
       activeView.dom.removeEventListener('blur', handleBlur, true);
     };
-  }, [activeView, editor, hideToolbar, updateToolbarFromSelection]);
+  }, [activeView, hideToolbar, updateToolbarFromSelection]);
 
   useEffect(() => {
-    if (editor || !activeView) return;
+    if (!activeView) return;
 
     updateToolbarFromSelection();
     setRenderTick((value) => value + 1);
-  }, [activeView, editor, tick, updateToolbarFromSelection]);
+  }, [activeView, tick, updateToolbarFromSelection]);
 
   useEffect(() => {
     if (!activeView) return;
@@ -354,27 +298,13 @@ export function FloatingToolbar({ editor, view, tick = 0 }: FloatingToolbarProps
       return;
     }
 
-    const selection = editor ? editor.state.selection : activeView?.state.selection;
+    const selection = activeView?.state.selection;
     if (!selection || selection.empty) {
       setEditingLink(false);
     }
   }, [activeView, editingLink, toolbarPosition.show, renderTick]);
 
   const state = useMemo<ToolbarState>(() => {
-    if (editor) {
-      const href = editor.getAttributes('link').href;
-      return {
-        isBold: editor.isActive('bold'),
-        isItalic: editor.isActive('italic'),
-        isStrike: editor.isActive('strike'),
-        isCode: editor.isActive('code'),
-        isHighlight: editor.isActive('highlight'),
-        isHeading: editor.isActive('headingMark'),
-        isLink: editor.isActive('link'),
-        currentHref: typeof href === 'string' ? href : '',
-      };
-    }
-
     if (!activeView) {
       return {
         isBold: false,
@@ -398,12 +328,10 @@ export function FloatingToolbar({ editor, view, tick = 0 }: FloatingToolbarProps
       isLink: isMarkActiveInView(activeView, 'link'),
       currentHref: getCurrentLinkHrefInView(activeView),
     };
-  }, [activeView, editor, renderTick]);
+  }, [activeView, renderTick]);
 
-  const toggleNamedMark = (markName: keyof typeof pmSchema.marks, tiptapToggle?: () => void) => {
-    if (editor && tiptapToggle) {
-      tiptapToggle();
-    } else if (activeView) {
+  const toggleNamedMark = (markName: keyof typeof pmSchema.marks) => {
+    if (activeView) {
       toggleMarkInView(activeView, markName);
     }
     setRenderTick((value) => value + 1);
@@ -418,9 +346,7 @@ export function FloatingToolbar({ editor, view, tick = 0 }: FloatingToolbarProps
     const normalizedHref = normalizeLinkHref(linkDraft);
     if (!normalizedHref) return;
 
-    if (editor) {
-      editor.chain().focus().extendMarkRange('link').setLink({ href: normalizedHref }).run();
-    } else if (activeView) {
+    if (activeView) {
       applyLinkInView(activeView, normalizedHref);
     }
 
@@ -430,9 +356,7 @@ export function FloatingToolbar({ editor, view, tick = 0 }: FloatingToolbarProps
   };
 
   const removeLink = () => {
-    if (editor) {
-      editor.chain().focus().extendMarkRange('link').unsetLink().run();
-    } else if (activeView) {
+    if (activeView) {
       removeLinkInView(activeView);
     }
 
@@ -527,54 +451,42 @@ export function FloatingToolbar({ editor, view, tick = 0 }: FloatingToolbarProps
             <ToolbarButton
               title="Bold"
               active={state.isBold}
-              onClick={() => {
-                toggleNamedMark('bold', () => editor?.chain().focus().toggleBold().run());
-              }}
+              onClick={() => toggleNamedMark('bold')}
             >
               <Bold size={14} />
             </ToolbarButton>
             <ToolbarButton
               title="Italic"
               active={state.isItalic}
-              onClick={() => {
-                toggleNamedMark('italic', () => editor?.chain().focus().toggleItalic().run());
-              }}
+              onClick={() => toggleNamedMark('italic')}
             >
               <Italic size={14} />
             </ToolbarButton>
             <ToolbarButton
               title="Strikethrough"
               active={state.isStrike}
-              onClick={() => {
-                toggleNamedMark('strike', () => editor?.chain().focus().toggleStrike().run());
-              }}
+              onClick={() => toggleNamedMark('strike')}
             >
               <Strikethrough size={14} />
             </ToolbarButton>
             <ToolbarButton
               title="Code"
               active={state.isCode}
-              onClick={() => {
-                toggleNamedMark('code', () => editor?.chain().focus().toggleCode().run());
-              }}
+              onClick={() => toggleNamedMark('code')}
             >
               <Code2 size={14} />
             </ToolbarButton>
             <ToolbarButton
               title="Highlight"
               active={state.isHighlight}
-              onClick={() => {
-                toggleNamedMark('highlight', () => editor?.chain().focus().toggleHighlight().run());
-              }}
+              onClick={() => toggleNamedMark('highlight')}
             >
               <Highlighter size={14} />
             </ToolbarButton>
             <ToolbarButton
               title="Heading"
               active={state.isHeading}
-              onClick={() => {
-                toggleNamedMark('headingMark', () => editor?.chain().focus().toggleHeadingMark().run());
-              }}
+              onClick={() => toggleNamedMark('headingMark')}
             >
               <Heading size={14} />
             </ToolbarButton>

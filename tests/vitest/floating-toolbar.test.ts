@@ -2,97 +2,72 @@ import React from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { flushSync } from 'react-dom';
 import { FloatingToolbar } from '../../src/components/editor/FloatingToolbar.js';
+import type { EditorView } from 'prosemirror-view';
 
-type Listener = () => void;
 type SelectionKind = 'TextSelection' | 'NodeSelection';
 
-function createSelection(from: number, to: number, kind: SelectionKind) {
+type FakeSel = {
+  from: number;
+  to: number;
+  empty: boolean;
+  anchor: number;
+  head: number;
+  constructor: { name: string };
+  $from: { marks: () => never[] };
+};
+
+function makeSel(from: number, to: number, kind: SelectionKind): FakeSel {
   return {
-    from,
-    to,
-    empty: from === to,
-    anchor: from,
-    head: to,
+    from, to, empty: from === to, anchor: from, head: to,
     constructor: { name: kind },
+    $from: { marks: () => [] },
   };
 }
 
-class FakeEditor {
-  private readonly listeners = new Map<string, Set<Listener>>();
+function createFakeView() {
+  const dom = document.createElement('div');
+  let sel: FakeSel = makeSel(1, 1, 'TextSelection');
 
-  public isFocused = true;
-  public isEditable = true;
-  public state = {
-    selection: createSelection(1, 1, 'TextSelection'),
+  const view = {
+    dom,
+    isFocused: true,
+    editable: true,
+    get state() {
+      return {
+        selection: sel,
+        storedMarks: null,
+        doc: { nodesBetween(_f: number, _t: number, _cb: () => void) {} },
+      };
+    },
+    hasFocus() {
+      return view.isFocused;
+    },
+    coordsAtPos: (pos: number) => ({ top: 200, left: pos * 10, right: pos * 10 + 8 }),
+    setSelection(from: number, to: number, kind: SelectionKind = 'TextSelection') {
+      sel = makeSel(from, to, kind);
+    },
   };
-  public view = {
-    dom: document.createElement('div'),
-    hasFocus: () => this.isFocused,
-    coordsAtPos: (pos: number) => ({
-      top: 200,
-      left: pos * 10,
-      right: pos * 10 + 8,
-    }),
-  };
 
-  on(event: string, callback: Listener) {
-    if (!this.listeners.has(event)) {
-      this.listeners.set(event, new Set());
-    }
-    this.listeners.get(event)!.add(callback);
-  }
-
-  off(event: string, callback: Listener) {
-    this.listeners.get(event)?.delete(callback);
-  }
-
-  emit(event: string) {
-    for (const callback of this.listeners.get(event) ?? []) {
-      callback();
-    }
-  }
-
-  listenerCount(event: string) {
-    return this.listeners.get(event)?.size ?? 0;
-  }
-
-  setSelection(from: number, to: number, kind: SelectionKind = 'TextSelection') {
-    this.state.selection = createSelection(from, to, kind);
-  }
-
-  getAttributes(_mark: string) {
-    return { href: '' };
-  }
-
-  isActive(_mark: string) {
-    return false;
-  }
-
-  chain() {
-    const chainApi = {
-      focus: () => chainApi,
-      extendMarkRange: (_mark: string) => chainApi,
-      setLink: (_attrs: { href: string }) => chainApi,
-      unsetLink: () => chainApi,
-      toggleBold: () => chainApi,
-      toggleItalic: () => chainApi,
-      toggleStrike: () => chainApi,
-      toggleCode: () => chainApi,
-      toggleHighlight: () => chainApi,
-      toggleHeadingMark: () => chainApi,
-      run: () => true,
-    };
-    return chainApi;
-  }
+  return view;
 }
 
 describe('FloatingToolbar selection behavior', () => {
   let container: HTMLDivElement;
   let root: Root;
-  let editor: FakeEditor;
+  let fakeView: ReturnType<typeof createFakeView>;
   let originalRaf: typeof requestAnimationFrame;
 
   const getToolbar = () => document.querySelector('[data-testid="floating-toolbar"]');
+
+  /**
+   * Trigger updateToolbarFromSelection by simulating mousedown + mouseup.
+   * mousedown sets pointerSelectingRef = true; mouseup clears it and calls
+   * updateToolbarFromSelection via RAF (mocked to synchronous in tests).
+   */
+  const triggerUpdate = () => {
+    fakeView.dom.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0 }));
+    document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, button: 0 }));
+  };
 
   beforeEach(() => {
     originalRaf = window.requestAnimationFrame;
@@ -101,8 +76,8 @@ describe('FloatingToolbar selection behavior', () => {
       return 1;
     };
 
-    editor = new FakeEditor();
-    document.body.appendChild(editor.view.dom);
+    fakeView = createFakeView();
+    document.body.appendChild(fakeView.dom);
     container = document.createElement('div');
     document.body.appendChild(container);
     root = createRoot(container);
@@ -110,7 +85,7 @@ describe('FloatingToolbar selection behavior', () => {
     flushSync(() => {
       root.render(
         React.createElement(FloatingToolbar, {
-          editor: editor,
+          view: fakeView as unknown as EditorView,
         }),
       );
     });
@@ -121,33 +96,20 @@ describe('FloatingToolbar selection behavior', () => {
       root.unmount();
     });
     window.requestAnimationFrame = originalRaf;
-    editor.view.dom.remove();
+    fakeView.dom.remove();
     container.remove();
   });
 
-  it('subscribes to selection/focus/blur/transaction events', () => {
-    expect(editor.listenerCount('selectionUpdate')).toBe(1);
-    expect(editor.listenerCount('transaction')).toBe(1);
-    expect(editor.listenerCount('focus')).toBe(1);
-    expect(editor.listenerCount('blur')).toBe(1);
-  });
-
   it('shows toolbar for focused non-empty text selection', () => {
-    editor.setSelection(2, 8, 'TextSelection');
-
-    flushSync(() => {
-      editor.emit('selectionUpdate');
-    });
+    fakeView.setSelection(2, 8, 'TextSelection');
+    flushSync(() => triggerUpdate());
 
     expect(getToolbar()).not.toBeNull();
   });
 
   it('positions by selection focus edge instead of range midpoint', () => {
-    editor.setSelection(20, 40, 'TextSelection');
-
-    flushSync(() => {
-      editor.emit('selectionUpdate');
-    });
+    fakeView.setSelection(20, 40, 'TextSelection');
+    flushSync(() => triggerUpdate());
 
     const toolbar = getToolbar() as HTMLDivElement;
     expect(toolbar).not.toBeNull();
@@ -156,31 +118,23 @@ describe('FloatingToolbar selection behavior', () => {
   });
 
   it('hides toolbar for empty or non-text selection', () => {
-    editor.setSelection(2, 8, 'TextSelection');
-    flushSync(() => {
-      editor.emit('selectionUpdate');
-    });
+    fakeView.setSelection(2, 8, 'TextSelection');
+    flushSync(() => triggerUpdate());
     expect(getToolbar()).not.toBeNull();
 
-    editor.setSelection(4, 4, 'TextSelection');
-    flushSync(() => {
-      editor.emit('selectionUpdate');
-    });
+    fakeView.setSelection(4, 4, 'TextSelection');
+    flushSync(() => triggerUpdate());
     expect(getToolbar()).toBeNull();
 
-    editor.setSelection(2, 8, 'NodeSelection');
-    flushSync(() => {
-      editor.emit('selectionUpdate');
-    });
+    fakeView.setSelection(2, 8, 'NodeSelection');
+    flushSync(() => triggerUpdate());
     expect(getToolbar()).toBeNull();
   });
 
   it('shows only after mouseup while dragging selection', () => {
-    editor.setSelection(2, 8, 'TextSelection');
-
+    fakeView.setSelection(2, 8, 'TextSelection');
     flushSync(() => {
-      editor.view.dom.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0 }));
-      editor.emit('selectionUpdate');
+      fakeView.dom.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0 }));
     });
     expect(getToolbar()).toBeNull();
 
@@ -191,19 +145,16 @@ describe('FloatingToolbar selection behavior', () => {
   });
 
   it('shows on second click mouseup for double-click word selection path', () => {
-    editor.setSelection(4, 4, 'TextSelection');
-
+    fakeView.setSelection(4, 4, 'TextSelection');
     flushSync(() => {
-      editor.view.dom.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0, detail: 1 }));
+      fakeView.dom.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0, detail: 1 }));
       document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, button: 0, detail: 1 }));
-      editor.emit('selectionUpdate');
     });
     expect(getToolbar()).toBeNull();
 
-    editor.setSelection(4, 9, 'TextSelection');
+    fakeView.setSelection(4, 9, 'TextSelection');
     flushSync(() => {
-      editor.view.dom.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0, detail: 2 }));
-      editor.emit('selectionUpdate');
+      fakeView.dom.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0, detail: 2 }));
     });
     expect(getToolbar()).toBeNull();
 
@@ -213,17 +164,13 @@ describe('FloatingToolbar selection behavior', () => {
     expect(getToolbar()).not.toBeNull();
   });
 
-  it('hides toolbar when editor blurs', () => {
-    editor.setSelection(2, 8, 'TextSelection');
-    flushSync(() => {
-      editor.emit('selectionUpdate');
-    });
+  it('hides toolbar when view loses focus', () => {
+    fakeView.setSelection(2, 8, 'TextSelection');
+    flushSync(() => triggerUpdate());
     expect(getToolbar()).not.toBeNull();
 
-    editor.isFocused = false;
-    flushSync(() => {
-      editor.emit('blur');
-    });
+    fakeView.isFocused = false;
+    flushSync(() => triggerUpdate());
     expect(getToolbar()).toBeNull();
   });
 });

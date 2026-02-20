@@ -53,6 +53,14 @@ export function resolveConfigValue(
 }
 
 /**
+ * Map a SYS_A config key to its NodexNode property name for direct setNodeData calls.
+ * Returns undefined when the key has no direct prop mapping.
+ */
+export function configKeyToPropName(configKey: string): string | undefined {
+  return SYS_A_TO_PROP[configKey] as string | undefined;
+}
+
+/**
  * Check whether a node ID is a system config attrDef (SYS_A* or NDX_A*).
  */
 export function isSystemConfigField(keyId: string): boolean {

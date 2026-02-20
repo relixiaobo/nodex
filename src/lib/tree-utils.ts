@@ -49,9 +49,15 @@ export function getAncestorChain(
     if (!parentId || visited.has(parentId)) break;
     visited.add(parentId);
 
-    // If parent is a container node, record as workspace root and stop
+    // If parent is a container node, record as workspace root, add it to chain, and stop
     if (isContainerNode(parentId)) {
       workspaceRootId = parentId;
+      const containerNode = loroDoc.toNodexNode(parentId);
+      if (containerNode) {
+        const rawName = containerNode.name ?? '';
+        const displayName = rawName.replace(/<[^>]+>/g, '') || parentId;
+        chain.push({ id: parentId, name: displayName });
+      }
       break;
     }
 

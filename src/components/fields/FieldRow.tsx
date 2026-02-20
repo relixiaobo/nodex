@@ -382,6 +382,7 @@ export function FieldRow({
                 tupleId={tupleId}
                 fieldDataType={dataType}
                 attrDefId={attrDefId}
+                configNodeId={isVirtual ? nodeId : undefined}
                 onNavigateOut={onNavigateOut}
               />
               <AutoCollectSection tupleId={tupleId} />
@@ -391,6 +392,7 @@ export function FieldRow({
               tupleId={tupleId}
               fieldDataType={dataType}
               attrDefId={attrDefId}
+              configNodeId={isVirtual ? nodeId : undefined}
               onNavigateOut={onNavigateOut}
             />
           )}

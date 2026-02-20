@@ -42,8 +42,10 @@ describe('tree-utils', () => {
 
     const { ancestors, workspaceRootId } = getAncestorChain('target');
     expect(workspaceRootId).toBe(CONTAINER_IDS.LIBRARY);
-    // fieldEntry1 is skipped (structural), so ancestors = [parent]
+    // fieldEntry1 is skipped (structural); container (LIBRARY) is included in chain
+    // ancestors order: root-most first → [LIBRARY, parent]
     expect(ancestors).toEqual([
+      { id: CONTAINER_IDS.LIBRARY, name: 'Library' },
       { id: 'parent', name: 'Parent' },
     ]);
 

@@ -21,6 +21,7 @@ import { FieldRow } from './FieldRow';
 import { NodePicker, type NodePickerOption } from './NodePicker';
 import { BulletChevron } from '../outliner/BulletChevron';
 import { SYS_D, SYS_V } from '../../types';
+import { resolveConfigValue, configKeyToPropName } from '../../lib/field-utils.js';
 import { ColorSwatchPicker } from './ColorSwatchPicker';
 import { DatePicker, formatDateDisplay } from './DatePicker.js';
 import { useUIStore } from '../../stores/ui-store.js';
@@ -32,6 +33,8 @@ interface FieldValueOutlinerProps {
   fieldDataType?: string;
   /** AttrDef ID — for future option autocomplete */
   attrDefId?: string;
+  /** For virtual config entries (__virtual_*): parent tagDef/fieldDef node ID to resolve value from */
+  configNodeId?: string;
   /** Called when arrow navigation escapes field value boundaries */
   onNavigateOut?: (direction: 'up' | 'down') => void;
 }
@@ -43,7 +46,7 @@ export function shouldShowFieldValueTrailingInput(
   return items[items.length - 1]?.type === 'field';
 }
 
-export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, onNavigateOut }: FieldValueOutlinerProps) {
+export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, configNodeId, onNavigateOut }: FieldValueOutlinerProps) {
   useChildren(tupleId);
 
   // Values are fieldEntry.children (no key prefix in new model)
@@ -89,6 +92,7 @@ export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, onNaviga
   // --- Special control early returns (Boolean, Checkbox, Date) ---
   const toggleCheckboxField = useNodeStore((s) => s.toggleCheckboxField);
   const setFieldValue = useNodeStore((s) => s.setFieldValue);
+  const setConfigValue = useNodeStore((s) => s.setConfigValue);
   const createChild = useNodeStore((s) => s.createChild);
   const setNodeName = useNodeStore((s) => s.setNodeName);
   const setFocusedNode = useUIStore((s) => s.setFocusedNode);
@@ -96,11 +100,20 @@ export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, onNaviga
   const setEditingFieldName = useUIStore((s) => s.setEditingFieldName);
 
   // --- BOOLEAN: Yes/No toggle switch ---
-  // Reads value from tuple.children[1] (reference to SYS_V.YES or SYS_V.NO)
+  // For virtual config entries: read from node attribute directly.
+  // For real fieldEntry: reads value from tuple.children[0] (SYS_V.YES or SYS_V.NO).
   const isBoolean = fieldDataType === SYS_D.BOOLEAN;
   if (isBoolean) {
-    const currentValue = contentChildIds[0];
-    const isYes = currentValue === SYS_V.YES;
+    const isVirtualEntry = tupleId.startsWith('__virtual_');
+    let isYes: boolean;
+    if (isVirtualEntry && configNodeId && attrDefId) {
+      const configNode = loroDoc.toNodexNode(configNodeId);
+      const val = configNode ? resolveConfigValue(configNode, attrDefId) : undefined;
+      isYes = val === SYS_V.YES;
+    } else {
+      const currentValue = contentChildIds[0];
+      isYes = currentValue === SYS_V.YES;
+    }
     const label = isYes ? 'Yes' : 'No';
 
     return (
@@ -108,10 +121,15 @@ export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, onNaviga
         <BulletChevron hasChildren={false} isExpanded={false} onBulletClick={() => {}} />
         <button
           onClick={() => {
-            const newVal = isYes ? SYS_V.NO : SYS_V.YES;
-            const parentId = loroDoc.getParentId(tupleId) ?? '';
-            const fieldDefId = loroDoc.toNodexNode(tupleId)?.fieldDefId ?? '';
-            if (parentId && fieldDefId) setFieldValue(parentId, fieldDefId, [newVal]);
+            const newIsYes = !isYes;
+            if (isVirtualEntry && configNodeId && attrDefId) {
+              const propName = configKeyToPropName(attrDefId);
+              if (propName) setConfigValue(configNodeId, propName, newIsYes);
+            } else {
+              const parentId = loroDoc.getParentId(tupleId) ?? '';
+              const fieldDefId = loroDoc.toNodexNode(tupleId)?.fieldDefId ?? '';
+              if (parentId && fieldDefId) setFieldValue(parentId, fieldDefId, [newIsYes ? SYS_V.YES : SYS_V.NO]);
+            }
           }}
           className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
             isYes ? 'bg-primary' : 'bg-muted'
@@ -132,7 +150,7 @@ export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, onNaviga
 
   // --- COLOR: swatch selector ---
   if (fieldDataType === SYS_D.COLOR) {
-    return <ColorSwatchPicker tupleId={tupleId} />;
+    return <ColorSwatchPicker tupleId={tupleId} configNodeId={configNodeId} />;
   }
 
   // --- OPTIONS_FROM_SUPERTAG: single-select supertag picker ---

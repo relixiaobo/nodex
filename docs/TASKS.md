@@ -48,6 +48,16 @@ _(空)_
 >   - ⑦ Awareness: src/lib/awareness.ts 纯内存模块
 > - 484 tests pass, typecheck clean, build 4.1MB
 
+### P0 Loro 迁移后 UI 回归修复 ✅
+> **Owner**: nodex | **Branch**: main（直接修复）
+> **迭代日志**:
+> - [2026-02-20 nodex] 修复 PR #62/#63 引入的三个 UI 回归：
+>   - Bug 1: `tree-utils.ts:getAncestorChain` — 容器节点（LIBRARY 等）不加入 ancestors，面包屑缺"Library"层级
+>   - Bug 2: `ConfigOutliner.tsx` — own items 循环跳过 `type==='fieldDef'` 节点，"Default content" 下模板字段（Status/Priority/Due/Done）不显示
+>   - Bug 3: `use-node-fields.ts:computeFields` — tagDef/fieldDef 只生成 outliner 类型虚拟条目，非 outliner 配置字段（Color/Show as checkbox 等）不显示
+>   - 同步修复 `FieldValueOutliner` + `ColorSwatchPicker` 支持虚拟 tupleId 读写节点属性（boolean/color）
+>   - 485 tests pass, typecheck clean
+
 ---
 
 ## 待办

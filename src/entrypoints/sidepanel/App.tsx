@@ -64,8 +64,19 @@ function useBootstrap(): BootstrapResult {
       // Bootstrap LoroDoc + seed containers
       await seedWorkspace(currentWsId);
 
-      // Navigate to Library if panel stack is empty
-      if (panelHistory.length === 0) {
+      // Wait for UIStore persist hydration before checking panel validity
+      // (persist.getItem is async, so the initial render may have stale default state)
+      if (!useUIStore.persist.hasHydrated()) {
+        await new Promise<void>((resolve) => {
+          useUIStore.persist.onFinishHydration(() => resolve());
+        });
+      }
+
+      // Navigate to Library if panel stack is empty or current panel node is invalid.
+      const latestHistory = useUIStore.getState().panelHistory;
+      const latestIndex = useUIStore.getState().panelIndex;
+      const currentPanelId = latestHistory[latestIndex] ?? latestHistory[latestHistory.length - 1];
+      if (latestHistory.length === 0 || (currentPanelId && !loroDoc.hasNode(currentPanelId))) {
         navigateTo(CONTAINER_IDS.LIBRARY);
       }
 

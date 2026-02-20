@@ -221,6 +221,12 @@ export async function seedTestData(): Promise<void> {
   if (forceFresh) {
     // Bypass IndexedDB — pure in-memory LoroDoc
     initLoroDocForTest(WS_ID);
+    // Reset UIStore state directly: localStorage was already read at module load time
+    // so removeItem alone won't help — we need to reset the in-memory store too.
+    useUIStore.setState({ panelHistory: [], panelIndex: -1, expandedNodes: new Set() });
+    if (typeof localStorage !== 'undefined') {
+      localStorage.removeItem('nodex-ui');
+    }
   } else {
     // Normal: load from IndexedDB snapshot if available
     await initLoroDoc(WS_ID);

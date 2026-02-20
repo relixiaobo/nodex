@@ -23,6 +23,7 @@ import { useNodeStore } from '../../stores/node-store';
 import { useWorkspaceStore } from '../../stores/workspace-store';
 import { useAncestors } from '../../hooks/use-ancestors';
 import { getNavigableParentId } from '../../lib/tree-utils';
+import { isContainerNode } from '../../types/index.js';
 import * as loroDoc from '../../lib/loro-doc.js';
 
 interface BreadcrumbProps {
@@ -36,7 +37,8 @@ export function Breadcrumb({ nodeId, showCurrentName }: BreadcrumbProps) {
   const openSearch = useUIStore((s) => s.openSearch);
 
   const { ancestors, workspaceRootId } = useAncestors(nodeId);
-  const isRootView = !!workspaceRootId && nodeId === workspaceRootId;
+  // Container nodes (Library, Inbox, etc.) are root-level; treat them as root view
+  const isRootView = isContainerNode(nodeId) || (!!workspaceRootId && nodeId === workspaceRootId);
 
   // Get parent ID for ← button (navigate to first non-structural parent)
   const parentId = useNodeStore((s) => { void s._version; return getNavigableParentId(nodeId); });

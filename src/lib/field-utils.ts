@@ -5,12 +5,12 @@
  * - 所有 config 值从 NodexNode 直接属性读取（无 Tuple 间接层）
  * - entities 参数已移除，改用 loroDoc 全局访问
  */
-import type { LucideIcon } from 'lucide-react';
 import {
+  type AppIcon,
   AlignLeft, Building2, Calendar, CalendarCheck, CalendarClock, CalendarPlus,
   CheckSquare, ChevronDown, FileText, Hash, Link, List, ListTree, Mail,
   Play, Asterisk, EyeOff, Settings2, SquareUser, Sparkles, Tag, ToggleLeft, UserPen,
-} from 'lucide-react';
+} from './icons.js';
 import { SYS_A, SYS_D, SYS_V, FIELD_TYPES } from '../types/index.js';
 import type { NodexNode } from '../types/index.js';
 import * as loroDoc from './loro-doc.js';
@@ -134,7 +134,7 @@ export function resolveMaxValue(fieldDefId: string): number | undefined {
 /**
  * Map a field type constant to a lucide icon component.
  */
-export function getFieldTypeIcon(dataType: string): LucideIcon {
+export function getFieldTypeIcon(dataType: string): AppIcon {
   switch (dataType) {
     case SYS_D.DATE:
     case FIELD_TYPES.DATE:
@@ -238,7 +238,7 @@ export interface ConfigFieldDef {
   control: 'type_choice' | 'toggle' | 'select' | 'outliner' | 'autocollect' | 'tag_picker' | 'color_picker' | 'number_input' | 'done_map_entries';
   defaultValue: string;
   appliesTo: string[] | '*';
-  icon?: LucideIcon;
+  icon?: AppIcon;
   description?: string;
   options?: Array<{ value: string; label: string }>;
   /** Conditional visibility: only show when another config field has a specific value */
@@ -492,7 +492,7 @@ export interface SystemFieldDef {
   name: string;
   source: string;
   dataType: '__system_date__' | '__system_text__' | '__system_node__';
-  icon: LucideIcon;
+  icon: AppIcon;
 }
 
 /** 8 system fields available for Nodex. */

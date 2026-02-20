@@ -12,15 +12,15 @@ import {
   Scissors,
   Search,
   SquareCheck,
-  type LucideIcon,
-} from 'lucide-react';
+  type AppIcon,
+} from '../../lib/icons.js';
 import {
   SLASH_DISABLED_HINT_DEFAULT,
   type SlashCommandDefinition,
   type SlashCommandId,
 } from '../../lib/slash-commands.js';
 
-const ICON_MAP: Record<SlashCommandId, LucideIcon> = {
+const ICON_MAP: Record<SlashCommandId, AppIcon> = {
   paste: ClipboardPaste,
   clip_page: Scissors,
   search_node: Search,

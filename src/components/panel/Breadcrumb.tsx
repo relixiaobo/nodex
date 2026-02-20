@@ -17,7 +17,7 @@
  * [...] expands in-place (no navigation). Resets when nodeId changes.
  */
 import { useState, useEffect, useCallback } from 'react';
-import { PanelLeft, ChevronLeft, ChevronRight, Search, MoreHorizontal } from 'lucide-react';
+import { PanelLeft, ChevronLeft, ChevronRight, Search, MoreHorizontal } from '../../lib/icons.js';
 import { useUIStore } from '../../stores/ui-store';
 import { useNodeStore } from '../../stores/node-store';
 import { useWorkspaceStore } from '../../stores/workspace-store';

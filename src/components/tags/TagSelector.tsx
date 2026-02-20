@@ -7,7 +7,7 @@
  */
 import { useMemo, useEffect, useLayoutEffect, useRef, useState, forwardRef, useImperativeHandle } from 'react';
 import { createPortal } from 'react-dom';
-import { Hash, Plus } from 'lucide-react';
+import { Hash, Plus } from '../../lib/icons.js';
 import { useWorkspaceTags } from '../../hooks/use-workspace-tags';
 
 export interface TagDropdownHandle {

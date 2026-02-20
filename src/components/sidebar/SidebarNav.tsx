@@ -1,4 +1,4 @@
-import { Library, Inbox, CalendarDays, Search, Trash2, type LucideIcon } from 'lucide-react';
+import { Library, Inbox, CalendarDays, Search, Trash2, type AppIcon } from '../../lib/icons.js';
 import { useUIStore } from '../../stores/ui-store';
 import { CONTAINER_IDS } from '../../types/index.js';
 import type { ContainerId } from '../../types/index.js';
@@ -6,7 +6,7 @@ import type { ContainerId } from '../../types/index.js';
 interface NavItem {
   label: string;
   containerId: ContainerId;
-  icon: LucideIcon;
+  icon: AppIcon;
 }
 
 const NAV_ITEMS: NavItem[] = [

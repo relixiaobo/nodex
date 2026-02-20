@@ -5,7 +5,7 @@
  * contains text that doesn't match the expected field data type.
  * Validation is non-blocking — any value is accepted, only a visual hint is shown.
  */
-import { CircleAlert } from 'lucide-react';
+import { CircleAlert } from '../../lib/icons.js';
 import { SYS_D } from '../../types/index.js';
 
 /** Field data types that have value validation */

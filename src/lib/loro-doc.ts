@@ -221,6 +221,17 @@ export function initLoroDocForTest(workspaceId: string): void {
 }
 
 /**
+ * 重置 UndoManager（仅测试用）。
+ * 在 seedTestDataSync 末尾调用，清除种子操作产生的（非 __seed__ origin）撤销记录。
+ * Store actions（如 applyTag）内部调用 commitDoc() 时 origin=undefined，
+ * 不会被 excludeOriginPrefixes 过滤，需在 seeding 完成后手动重置。
+ */
+export function clearUndoHistoryForTest(): void {
+  if (!doc) return;
+  undoManager = new UndoManager(doc, { mergeInterval: 0, excludeOriginPrefixes: ['__seed__'] });
+}
+
+/**
  * 设置提交合并间隔（毫秒）。
  * 设为 -1 禁用合并（每次 commitDoc 产生独立 Change，用于确保 getVersionHistory 精确）。
  * 设为 0 使用 Loro 默认行为（同步内连续提交会被合并）。

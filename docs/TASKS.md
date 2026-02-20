@@ -27,7 +27,7 @@ _(空)_
 
 | Agent | 当前任务 | 分支 | 修改中的文件 |
 |-------|---------|------|-------------|
-| nodex-cc | _(idle — PR #62 merged)_ | — | — |
+| nodex-cc | P0 Loro 基础设施 — 7项底层API | cc/loro-infra | src/lib/loro-doc.ts, src/lib/awareness.ts, tests/vitest/loro-infra.test.ts |
 | nodex-cc-2 | _(idle — PR #61 merged)_ | — | — |
 | nodex-codex | _(idle)_ | — | — |
 
@@ -35,7 +35,10 @@ _(空)_
 
 ## 进行中
 
-_(空)_
+### P0 Loro 基础设施 — 7项底层API
+> **Owner**: nodex-cc | **Branch**: cc/loro-infra
+> **迭代日志**:
+> - [2026-02-20 cc] 探索 Loro API（subscribeNode/VersionVector/checkout/LoroText/fork/awareness），确认全部可行，开始实现
 
 ---
 

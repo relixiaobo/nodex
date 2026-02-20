@@ -562,6 +562,28 @@ hash trigger cleanup safety（2 cases, Bug #53 回归）:
 9. DOM cleanup 失败后检测残留 `#` 触发词
 10. DOM cleanup 成功后无残留
 
+### 1.50 Loro UndoManager — 结构性撤销/重做
+
+**测试文件**: `tests/vitest/loro-undo.test.ts`
+
+**覆盖点（Loro Phase 2）**:
+
+1. `seedTestDataSync` 以 `__seed__` origin 提交 → `canUndoDoc()` 初始为 false
+2. `createChild(parentId)` 后 `canUndoDoc()` 为 true
+3. `undoDoc()` → 子节点从父节点 children 中消失
+4. `undoDoc()` 后 `canRedoDoc()` 为 true
+5. `redoDoc()` → 子节点重新出现（含 TreeID 重建映射）
+6. `moveNodeTo(nodeId, newParentId)` 后 `canUndoDoc()` 为 true
+7. `undoDoc()` 后节点回到原父节点
+8. N 次操作后可依次撤销（mergeInterval=0 每次独立步骤）
+9. 全部撤销后 `canRedoDoc()` 为 true
+10. 新操作清空 redo 栈
+
+**设计要点**:
+- `seedTestDataSync` 在 `seedBody()` 后调用 `commitDoc('__seed__')`，被 UndoManager 的 `excludeOriginPrefixes` 过滤
+- node-store.ts 的 `createChild`、`moveNodeTo`、`trashNode`、`restoreNode`、`indent/outdent/moveUp/moveDown` 各自结尾调用 `commitDoc()` 记录撤销步骤
+- undo/redo 后调用 `rebuildMappings()` 重新同步 nodexToTree / treeToNodex（Loro undo/redo 可能产生新 TreeID）
+
 ### 1.35 节点搜索 SKIP_DOC_TYPES 过滤
 
 **测试文件**: `tests/vitest/node-search-filter.test.ts`
@@ -894,6 +916,7 @@ createSibling 自动标签（2 cases）:
 | 1.46 | FieldValueOutliner TrailingInput 显示规则 | PASS/FAIL |
 | 1.47 | Meta-Utils 工具函数 | PASS/FAIL |
 | 1.48 | Tana 导入 meta 填充与 DocType 安全 | PASS/FAIL |
+| 1.50 | Loro UndoManager 结构性撤销/重做 | PASS/FAIL |
 | 2 | 视觉渲染 | PASS/FAIL/SKIP |
 | 3 | 扩展构建 | PASS/FAIL |
 

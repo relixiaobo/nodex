@@ -251,38 +251,54 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     return m;
   }, [fieldMap]);
 
-  // Classify each child: field tuple → 'field', regular node → 'content', else skip
-  // Also evaluate hide-field rules for field entries
+  // Classify children and reorder: fields grouped by supertag (in tagIds order) → content.
+  // This ensures supertag-injected fields always appear before the node's own content children.
   const visibleChildren = useMemo(() => {
-    const result: { id: string; type: 'field' | 'content'; hidden?: boolean }[] = [];
+    type Child = { id: string; type: 'field' | 'content'; hidden?: boolean };
+
+    const tagIdSet = new Set(tagIds);
+    const fieldsByTagDef = new Map<string, Child[]>();
+    const otherFields: Child[] = [];   // fields whose ownerTagDef isn't in tagIds (rare)
+    const contentItems: Child[] = [];
+
     for (const cid of allChildIds) {
       if (fieldMap.has(cid)) {
         const f = fieldMap.get(cid)!;
         // Evaluate hide-field condition
         let hidden = false;
         switch (f.hideMode) {
-          case SYS_V.ALWAYS:
-            hidden = true;
-            break;
-          case SYS_V.WHEN_EMPTY:
-            hidden = !!f.isEmpty;
-            break;
-          case SYS_V.WHEN_NOT_EMPTY:
-            hidden = !f.isEmpty;
-            break;
-          // WHEN_VALUE_IS_DEFAULT: needs "default" concept — skip for now
+          case SYS_V.ALWAYS: hidden = true; break;
+          case SYS_V.WHEN_EMPTY: hidden = !!f.isEmpty; break;
+          case SYS_V.WHEN_NOT_EMPTY: hidden = !f.isEmpty; break;
           // NEVER: default, not hidden
         }
-        result.push({ id: cid, type: 'field', hidden });
+        const child: Child = { id: cid, type: 'field', hidden };
+        const ownerTagDefId = loroDoc.getParentId(f.fieldDefId);
+        if (ownerTagDefId && tagIdSet.has(ownerTagDefId)) {
+          let bucket = fieldsByTagDef.get(ownerTagDefId);
+          if (!bucket) { bucket = []; fieldsByTagDef.set(ownerTagDefId, bucket); }
+          bucket.push(child);
+        } else {
+          otherFields.push(child);
+        }
       } else {
         const dt = useNodeStore.getState().getNode(cid)?.type;
-        if (!dt) result.push({ id: cid, type: 'content' });
-        // else skip: SYS fieldEntry, tag fieldEntry, etc.
+        if (!dt) contentItems.push({ id: cid, type: 'content' });
+        // else skip: structural nodes (fieldEntry, reference, etc.)
       }
     }
+
+    // Emit fields in supertag order, then any unmatched fields, then content
+    const result: Child[] = [];
+    for (const tagId of tagIds) {
+      const bucket = fieldsByTagDef.get(tagId);
+      if (bucket) result.push(...bucket);
+    }
+    result.push(...otherFields);
+    result.push(...contentItems);
     return result;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allChildIds, fieldMap, _version]);
+  }, [allChildIds, fieldMap, tagIds, _version]);
 
   const childIds = useMemo(
     () => visibleChildren.filter((c) => c.type === 'content').map((c) => c.id),

@@ -29,11 +29,19 @@ _(空)_
 |-------|---------|------|-------------|
 | nodex-cc | _(idle — PR #63 merged)_ | — | — |
 | nodex-cc-2 | _(idle — PR #61 merged)_ | — | — |
-| nodex-codex | _(idle — Review 已完成)_ | — | — |
+| nodex-codex | Loro 迁移全量 Review | main（只读） | docs/reviews/loro-full-review-2026-02-21.md |
 
 ---
 
 ## 进行中
+
+### 代码 Review — Loro 迁移全量 (2026-02-21)
+> **Owner**: nodex-codex | **Branch**: main（只读，不修改代码）
+> **目标**: 以全新视角对 `8b722f1^..HEAD`（Loro 迁移启动至今，31 commits，~80 文件）做系统 Review
+> **角度**: ① 数据完整性 & 不变量 ② React 渲染正确性 ③ Loro API 使用正确性 ④ NodeType 重构完整性
+> **产出**: 将发现写入 `docs/reviews/loro-full-review-2026-02-21.md`（Findings + 测试缺口清单）
+> **迭代日志**:
+> - [2026-02-21 nodex] 任务创建，合并 feature-sync-2026-02-20 + loro-migration 两份文档，换视角重新 Review
 
 ### 代码 Review — feature-sync-2026-02-20 ✅
 > **Owner**: nodex-codex | **Branch**: main（只读，不修改代码）

@@ -39,6 +39,7 @@ export function resetStores(): void {
     triggerHint: null,
     focusClickCoords: null,
     pendingRefConversion: null,
+    expandedHiddenFields: new Set<string>(),
     navUndoStack: [],
     navRedoStack: [],
   });

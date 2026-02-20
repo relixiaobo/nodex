@@ -9,8 +9,7 @@ import { Command } from 'cmdk';
 import { Search, FileText, Library, Inbox, CalendarDays, Trash2 } from 'lucide-react';
 import { useUIStore } from '../../stores/ui-store';
 import { useNodeStore } from '../../stores/node-store';
-import { useWorkspaceStore } from '../../stores/workspace-store';
-import { WORKSPACE_CONTAINERS } from '../../types/index.js';
+import { CONTAINER_IDS } from '../../types/index.js';
 import * as loroDoc from '../../lib/loro-doc.js';
 
 export function CommandPalette() {
@@ -20,7 +19,7 @@ export function CommandPalette() {
   const setSearchQuery = useUIStore((s) => s.setSearchQuery);
   const navigateTo = useUIStore((s) => s.navigateTo);
   const _version = useNodeStore((s) => s._version);
-  const wsId = useWorkspaceStore((s) => s.currentWorkspaceId);
+
 
   // Global Cmd+K shortcut
   useEffect(() => {
@@ -70,15 +69,12 @@ export function CommandPalette() {
   }, [_version, searchQuery]);
 
   // Container quick-access items
-  const containers = useMemo(() => {
-    if (!wsId) return [];
-    return [
-      { label: 'Library', suffix: WORKSPACE_CONTAINERS.LIBRARY, icon: Library },
-      { label: 'Inbox', suffix: WORKSPACE_CONTAINERS.INBOX, icon: Inbox },
-      { label: 'Journal', suffix: WORKSPACE_CONTAINERS.JOURNAL, icon: CalendarDays },
-      { label: 'Trash', suffix: WORKSPACE_CONTAINERS.TRASH, icon: Trash2 },
-    ].map((c) => ({ ...c, id: `${wsId}_${c.suffix}` }));
-  }, [wsId]);
+  const containers = useMemo(() => [
+    { label: 'Library', id: CONTAINER_IDS.LIBRARY, icon: Library },
+    { label: 'Inbox', id: CONTAINER_IDS.INBOX, icon: Inbox },
+    { label: 'Journal', id: CONTAINER_IDS.JOURNAL, icon: CalendarDays },
+    { label: 'Trash', id: CONTAINER_IDS.TRASH, icon: Trash2 },
+  ], []);
 
   if (!searchOpen) return null;
 

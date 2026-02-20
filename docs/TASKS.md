@@ -40,12 +40,13 @@ _(空)_
 > **目标**: 将主编辑读写从 `name+marks+inlineRefs` 迁移到 `LoroText` 容器，建立后续多端协同一致性基础
 > **Files**: `src/lib/loro-doc.ts`, `src/components/editor/*.ts`, `src/components/outliner/OutlinerItem.tsx`, `tests/vitest/loro-*.test.ts`, `docs/TESTING.md`
 > **Progress**:
-> - [ ] 设计并落地 LoroText <-> 当前编辑器数据桥接层
+> - [x] 设计并落地 LoroText <-> 当前编辑器数据桥接层
 > - [ ] Outliner 主编辑输入路径切换到 LoroText
-> - [ ] 兼容旧数据读取与惰性迁移
-> - [ ] 补齐回归测试并更新 `docs/TESTING.md`
+> - [x] 兼容旧数据读取与惰性迁移
+> - [x] 补齐回归测试并更新 `docs/TESTING.md`
 > **迭代日志**:
 > - [2026-02-21 nodex-codex] 任务认领，启动 Phase 2 开发
+> - [2026-02-21 nodex-codex] 完成 Phase 2 第一批收口：新增 `loro-text-bridge`（TextMark/inlineRef 双向桥接），`node-store` 内容写入路径改为 legacy 字段 + `richText` 双写，`toNodexNode` 优先读 `richText`（旧字段 fallback），并补齐 `loro-text-bridge`/`loro-infra`/`node-store-content` 回归测试
 
 ### Refactor — Loro 收口 Phase 1：detached guard + origin 策略 (2026-02-21)
 > **Owner**: nodex-codex | **Branch**: codex/loro-phase1-guards

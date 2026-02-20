@@ -22,6 +22,7 @@ import { NodePicker, type NodePickerOption } from './NodePicker';
 import { BulletChevron } from '../outliner/BulletChevron';
 import { SYS_D, SYS_V } from '../../types';
 import { resolveConfigValue, configKeyToPropName } from '../../lib/field-utils.js';
+import { isOutlinerContentNodeType } from '../../lib/node-type-utils.js';
 import { ColorSwatchPicker } from './ColorSwatchPicker';
 import { DatePicker, formatDateDisplay } from './DatePicker.js';
 import { useUIStore } from '../../stores/ui-store.js';
@@ -44,6 +45,17 @@ export function shouldShowFieldValueTrailingInput(
 ): boolean {
   if (items.length === 0) return true;
   return items[items.length - 1]?.type === 'field';
+}
+
+export function resolveSupertagPickerSelectedId(
+  tupleId: string,
+  getNode: (id: string) => { children?: string[]; name?: string; targetId?: string } | null,
+): string | undefined {
+  const tuple = getNode(tupleId);
+  const valueNodeId = tuple?.children?.[0];
+  if (!valueNodeId) return undefined;
+  const valueNode = getNode(valueNodeId);
+  return valueNode?.name || valueNode?.targetId || undefined;
 }
 
 export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, configNodeId, onNavigateOut }: FieldValueOutlinerProps) {
@@ -76,8 +88,8 @@ export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, configNo
         result.push({ id: cid, type: 'field' });
       } else {
         const nodeType = useNodeStore.getState().getNode(cid)?.type;
-        if (!nodeType) result.push({ id: cid, type: 'content' });
-        // else skip: fieldEntry, reference, etc.
+        if (isOutlinerContentNodeType(nodeType)) result.push({ id: cid, type: 'content' });
+        // else skip: fieldEntry/fieldDef/tagDef 等结构节点
       }
     }
     return result;
@@ -92,9 +104,8 @@ export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, configNo
   // --- Special control early returns (Boolean, Checkbox, Date) ---
   const toggleCheckboxField = useNodeStore((s) => s.toggleCheckboxField);
   const setFieldValue = useNodeStore((s) => s.setFieldValue);
+  const clearFieldValue = useNodeStore((s) => s.clearFieldValue);
   const setConfigValue = useNodeStore((s) => s.setConfigValue);
-  const createChild = useNodeStore((s) => s.createChild);
-  const setNodeName = useNodeStore((s) => s.setNodeName);
   const setFocusedNode = useUIStore((s) => s.setFocusedNode);
   const clearFocus = useUIStore((s) => s.clearFocus);
   const setEditingFieldName = useUIStore((s) => s.setEditingFieldName);
@@ -191,16 +202,14 @@ export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, configNo
       <DatePickerField
         value={currentValue}
         onSelect={(v) => {
+          const parentId = loroDoc.getParentId(tupleId) ?? '';
+          const fieldDefId = loroDoc.toNodexNode(tupleId)?.fieldDefId ?? '';
+          if (!parentId || !fieldDefId) return;
           if (v === '') {
-            // Clear: if value node exists, set name to empty
-            if (valueNodeId) setNodeName(valueNodeId, '');
+            clearFieldValue(parentId, fieldDefId);
             return;
           }
-          if (valueNodeId) {
-            setNodeName(valueNodeId, v);
-          } else {
-            createChild(tupleId, undefined, { name: v });
-          }
+          setFieldValue(parentId, fieldDefId, [v]);
         }}
       />
     );
@@ -291,11 +300,10 @@ function SupertagPickerField({ tupleId }: { tupleId: string }) {
   const setFieldValue = useNodeStore((s) => s.setFieldValue);
   const clearFieldValue = useNodeStore((s) => s.clearFieldValue);
 
-  // Read selected value from fieldEntry.children[0] (first value in new model)
+  // Read selected supertagId from value node name.
   const selectedId = useNodeStore((s) => {
     void s._version;
-    const tuple = s.getNode(tupleId);
-    return tuple?.children?.[0] || undefined;
+    return resolveSupertagPickerSelectedId(tupleId, s.getNode);
   });
 
   const options: NodePickerOption[] = useMemo(

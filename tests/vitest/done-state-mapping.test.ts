@@ -226,4 +226,11 @@ describe('Store: toggleNodeDone with done-state mapping', () => {
     const task = loroDoc.toNodexNode('task_1')!;
     expect(task.completedAt).toBeUndefined();
   });
+
+  it('toggleNodeDone performs a single commit even with doneMappings', () => {
+    const beforeVersion = useNodeStore.getState()._version;
+    useNodeStore.getState().toggleNodeDone('task_1');
+    const afterVersion = useNodeStore.getState()._version;
+    expect(afterVersion - beforeVersion).toBe(1);
+  });
 });

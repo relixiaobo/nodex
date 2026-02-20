@@ -3,7 +3,7 @@
  *
  * Loro model:
  * - store.setConfigValue(tagDefId, 'childSupertag', childTagDefId) sets directly
- * - resolveChildSupertags({}, parentId) reads tagDef.childSupertag via LoroDoc
+ * - resolveChildSupertags(parentId) reads tagDef.childSupertag via LoroDoc
  * - createChild/createSibling auto-applies childSupertag from parent's tags
  */
 import { describe, it, expect, beforeEach } from 'vitest';
@@ -19,24 +19,24 @@ describe('Default Child Supertag', () => {
 
   describe('resolveChildSupertags', () => {
     it('returns empty for parent without tags (note_2)', () => {
-      const result = resolveChildSupertags({}, 'note_2');
+      const result = resolveChildSupertags('note_2');
       expect(result).toEqual([]);
     });
 
     it('returns empty when tagged parent has no childSupertag configured', () => {
       // task_1 is tagged with tagDef_task, which has no childSupertag set
-      const result = resolveChildSupertags({}, 'task_1');
+      const result = resolveChildSupertags('task_1');
       expect(result).toEqual([]);
     });
 
     it('returns childTagDefId when childSupertag is configured', () => {
       useNodeStore.getState().setConfigValue('tagDef_task', 'childSupertag', 'tagDef_dev_task');
-      const result = resolveChildSupertags({}, 'task_1');
+      const result = resolveChildSupertags('task_1');
       expect(result).toEqual(['tagDef_dev_task']);
     });
 
     it('returns empty for nonexistent parent', () => {
-      const result = resolveChildSupertags({}, 'nonexistent_node');
+      const result = resolveChildSupertags('nonexistent_node');
       expect(result).toEqual([]);
     });
   });

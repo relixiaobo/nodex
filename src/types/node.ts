@@ -251,8 +251,11 @@ export interface NodexNode {
 // ============================================================
 
 /**
- * 工作区系统容器 ID 常量。
- * 一个 LoroDoc = 一个工作区，容器 ID 不再需要 workspaceId 前缀。
+ * 工作区系统容器 ID 常量（旧版）。
+ *
+ * @deprecated 请改用 {@link CONTAINER_IDS}。
+ * 该常量包含历史遗留的 `SCHEMA: 'LIBRARY'` 混淆映射，且键集与 `CONTAINER_IDS` 不一致。
+ * `CONTAINER_IDS` 是 Loro 迁移后的规范常量，仅保留实际使用的 8 个容器 ID。
  */
 export const CONTAINERS = {
   SCHEMA: 'LIBRARY',      // 注意：实际结构中 SCHEMA 是 LIBRARY 的子节点

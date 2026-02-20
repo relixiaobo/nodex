@@ -24,7 +24,7 @@ export function NodePanel({ nodeId }: NodePanelProps) {
   // TagDef: colored gradient at top reflecting configured color
   const tagDefColor = useNodeStore((s) => {
     void s._version;
-    return isTagDef ? resolveTagColor({}, nodeId) : null;
+    return isTagDef ? resolveTagColor(nodeId) : null;
   });
 
   // IntersectionObserver: detect when title scrolls out of view

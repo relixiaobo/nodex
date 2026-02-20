@@ -44,19 +44,19 @@ describe('resolveTagColor', () => {
   });
 
   it('returns gray for system tags (SYS_T*)', () => {
-    expect(resolveTagColor({}, 'SYS_T01')).toEqual(TAG_COLOR_GRAY);
-    expect(resolveTagColor({}, 'SYS_T02')).toEqual(TAG_COLOR_GRAY);
+    expect(resolveTagColor('SYS_T01')).toEqual(TAG_COLOR_GRAY);
+    expect(resolveTagColor('SYS_T02')).toEqual(TAG_COLOR_GRAY);
   });
 
   it('falls back to hash when no color config', () => {
     // tagDef_dev_task has no color configured in seed
-    const color = resolveTagColor({}, 'tagDef_dev_task');
+    const color = resolveTagColor('tagDef_dev_task');
     expect(color).toEqual(getTagColor('tagDef_dev_task'));
   });
 
   it('reads pre-configured emerald for tagDef_task from seed', () => {
     // tagDef_task has color: 'emerald' in seed
-    expect(resolveTagColor({}, 'tagDef_task')).toEqual(TAG_COLOR_MAP.emerald);
+    expect(resolveTagColor('tagDef_task')).toEqual(TAG_COLOR_MAP.emerald);
   });
 
   it('reads configured color value via setConfigValue', () => {
@@ -64,7 +64,7 @@ describe('resolveTagColor', () => {
     // Use setConfigValue to update tagDef_task color directly
     store.setConfigValue('tagDef_task', 'color', 'violet');
 
-    const result = resolveTagColor({}, 'tagDef_task');
+    const result = resolveTagColor('tagDef_task');
     expect(result).toEqual(TAG_COLOR_MAP.violet);
   });
 
@@ -73,12 +73,12 @@ describe('resolveTagColor', () => {
     store.setConfigValue('tagDef_task', 'color', 'nonexistent_color');
 
     // Falls back to hash since 'nonexistent_color' is not in TAG_COLOR_MAP
-    const result = resolveTagColor({}, 'tagDef_task');
+    const result = resolveTagColor('tagDef_task');
     expect(result).toEqual(getTagColor('tagDef_task'));
   });
 
   it('returns hash for nonexistent tagDefId', () => {
-    const color = resolveTagColor({}, 'nonexistent_tagDef');
+    const color = resolveTagColor('nonexistent_tagDef');
     expect(TAG_COLORS).toContainEqual(color);
   });
 });

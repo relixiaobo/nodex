@@ -21,7 +21,7 @@ export function useWorkspaceFields(): Array<{ id: string; name: string; dataType
         fields.push({
           id,
           name: node.name ?? 'Untitled',
-          dataType: resolveDataType({}, id),
+          dataType: resolveDataType(id),
         });
       }
     }

@@ -1,7 +1,6 @@
 /**
  * field-utils — Loro model.
- * All resolver functions accept _entities as first arg but IGNORE it.
- * They read from LoroDoc instead.
+ * All resolver functions read directly from LoroDoc (no _entities arg).
  */
 import { describe, it, expect, beforeEach } from 'vitest';
 import { FIELD_TYPES, SYS_V } from '../../src/types/system-nodes.js';
@@ -31,19 +30,19 @@ describe('resolveDataType', () => {
 
   it('returns fieldType stored in LoroDoc for attrDef_status (OPTIONS)', () => {
     // seed-data sets fieldType: 'OPTIONS' for attrDef_status
-    expect(resolveDataType({}, 'attrDef_status')).toBe('OPTIONS');
+    expect(resolveDataType('attrDef_status')).toBe('OPTIONS');
   });
 
   it('returns fieldType for attrDef_due (DATE)', () => {
-    expect(resolveDataType({}, 'attrDef_due')).toBe('DATE');
+    expect(resolveDataType('attrDef_due')).toBe('DATE');
   });
 
   it('returns fieldType for attrDef_company (PLAIN)', () => {
-    expect(resolveDataType({}, 'attrDef_company')).toBe('PLAIN');
+    expect(resolveDataType('attrDef_company')).toBe('PLAIN');
   });
 
   it('returns FIELD_TYPES.PLAIN for missing node', () => {
-    expect(resolveDataType({}, 'nonexistent_field')).toBe(FIELD_TYPES.PLAIN);
+    expect(resolveDataType('nonexistent_field')).toBe(FIELD_TYPES.PLAIN);
   });
 
   it('returns FIELD_TYPES.PLAIN when fieldType not set', () => {
@@ -62,12 +61,12 @@ describe('resolveSourceSupertag', () => {
   });
 
   it('returns undefined for fieldDef without sourceSupertag', () => {
-    expect(resolveSourceSupertag({}, 'attrDef_status')).toBeUndefined();
+    expect(resolveSourceSupertag('attrDef_status')).toBeUndefined();
   });
 
   it('returns configured sourceSupertag', () => {
     loroDoc.setNodeData('attrDef_status', 'sourceSupertag', 'tagDef_task');
-    expect(resolveSourceSupertag({}, 'attrDef_status')).toBe('tagDef_task');
+    expect(resolveSourceSupertag('attrDef_status')).toBe('tagDef_task');
   });
 });
 
@@ -77,7 +76,7 @@ describe('resolveHideField', () => {
   });
 
   it('returns SYS_V.NEVER by default', () => {
-    expect(resolveHideField({}, 'attrDef_status')).toBe(SYS_V.NEVER);
+    expect(resolveHideField('attrDef_status')).toBe(SYS_V.NEVER);
   });
 });
 
@@ -87,17 +86,17 @@ describe('resolveRequired', () => {
   });
 
   it('returns false by default (nullable not set)', () => {
-    expect(resolveRequired({}, 'attrDef_status')).toBe(false);
+    expect(resolveRequired('attrDef_status')).toBe(false);
   });
 
   it('returns true when nullable=false', () => {
     loroDoc.setNodeData('attrDef_status', 'nullable', false);
-    expect(resolveRequired({}, 'attrDef_status')).toBe(true);
+    expect(resolveRequired('attrDef_status')).toBe(true);
   });
 
   it('returns false when nullable=true', () => {
     loroDoc.setNodeData('attrDef_status', 'nullable', true);
-    expect(resolveRequired({}, 'attrDef_status')).toBe(false);
+    expect(resolveRequired('attrDef_status')).toBe(false);
   });
 });
 
@@ -107,13 +106,13 @@ describe('resolveMinValue / resolveMaxValue', () => {
   });
 
   it('returns configured min/max for attrDef_age (0/150)', () => {
-    expect(resolveMinValue({}, 'attrDef_age')).toBe(0);
-    expect(resolveMaxValue({}, 'attrDef_age')).toBe(150);
+    expect(resolveMinValue('attrDef_age')).toBe(0);
+    expect(resolveMaxValue('attrDef_age')).toBe(150);
   });
 
   it('returns undefined when not configured', () => {
-    expect(resolveMinValue({}, 'attrDef_status')).toBeUndefined();
-    expect(resolveMaxValue({}, 'attrDef_status')).toBeUndefined();
+    expect(resolveMinValue('attrDef_status')).toBeUndefined();
+    expect(resolveMaxValue('attrDef_status')).toBeUndefined();
   });
 });
 
@@ -124,7 +123,7 @@ describe('resolveFieldOptions', () => {
 
   it('returns option node IDs for attrDef_status', () => {
     // resolveFieldOptions returns string[] (IDs), not NodexNode[]
-    const options = resolveFieldOptions({}, 'attrDef_status');
+    const options = resolveFieldOptions('attrDef_status');
     expect(options.length).toBe(3);
     expect(options).toContain('opt_todo');
     expect(options).toContain('opt_in_progress');
@@ -132,12 +131,12 @@ describe('resolveFieldOptions', () => {
   });
 
   it('returns options for attrDef_priority', () => {
-    const options = resolveFieldOptions({}, 'attrDef_priority');
+    const options = resolveFieldOptions('attrDef_priority');
     expect(options.length).toBe(3);
   });
 
   it('returns empty for fieldDef with no options', () => {
-    const options = resolveFieldOptions({}, 'attrDef_due');
+    const options = resolveFieldOptions('attrDef_due');
     expect(options).toEqual([]);
   });
 });
@@ -148,11 +147,11 @@ describe('getExtendsChain', () => {
   });
 
   it('returns empty array for tagDef with no extends (tagDef_task)', () => {
-    expect(getExtendsChain({}, 'tagDef_task')).toEqual([]);
+    expect(getExtendsChain('tagDef_task')).toEqual([]);
   });
 
   it('returns parent tagDef for single-level extends (tagDef_dev_task extends tagDef_task)', () => {
-    expect(getExtendsChain({}, 'tagDef_dev_task')).toEqual(['tagDef_task']);
+    expect(getExtendsChain('tagDef_dev_task')).toEqual(['tagDef_task']);
   });
 
   it('returns ancestors in ancestor-first order for multi-level extends', () => {
@@ -161,7 +160,7 @@ describe('getExtendsChain', () => {
     loroDoc.createNode(grandId, 'SCHEMA');
     loroDoc.setNodeDataBatch(grandId, { type: 'tagDef', name: 'Grand Task', extends: 'tagDef_dev_task' });
 
-    const chain = getExtendsChain({}, grandId);
+    const chain = getExtendsChain(grandId);
     // Should be: grandparent (task) first, then parent (dev_task)
     expect(chain).toEqual(['tagDef_task', 'tagDef_dev_task']);
   });
@@ -170,7 +169,7 @@ describe('getExtendsChain', () => {
     // tagDef_task extends tagDef_dev_task (circular)
     loroDoc.setNodeData('tagDef_task', 'extends', 'tagDef_dev_task');
     // Should not throw; result won't be infinite
-    const chain = getExtendsChain({}, 'tagDef_dev_task');
+    const chain = getExtendsChain('tagDef_dev_task');
     expect(Array.isArray(chain)).toBe(true);
   });
 });
@@ -183,12 +182,12 @@ describe('resolveTaggedNodes', () => {
   it('returns node IDs tagged with tagDef_task', () => {
     // resolveTaggedNodes returns string[] (IDs), not NodexNode[]
     // Only task_1 has tagDef_task applied in seed data
-    const nodes = resolveTaggedNodes({}, 'tagDef_task');
+    const nodes = resolveTaggedNodes('tagDef_task');
     expect(nodes).toContain('task_1');
   });
 
   it('does not return untagged nodes', () => {
-    const nodes = resolveTaggedNodes({}, 'tagDef_task');
+    const nodes = resolveTaggedNodes('tagDef_task');
     expect(nodes).not.toContain('idea_1');
     expect(nodes).not.toContain('note_2');
     // task_2 and task_3 are NOT tagged with tagDef_task in seed data
@@ -197,7 +196,7 @@ describe('resolveTaggedNodes', () => {
   });
 
   it('returns empty for unknown tagDefId', () => {
-    const nodes = resolveTaggedNodes({}, 'nonexistent_tag');
+    const nodes = resolveTaggedNodes('nonexistent_tag');
     expect(nodes).toEqual([]);
   });
 });
@@ -208,9 +207,9 @@ describe('findAutoCollectTupleId', () => {
   });
 
   it('always returns null (stub in Loro migration)', () => {
-    expect(findAutoCollectTupleId({}, 'attrDef_status')).toBeNull();
-    expect(findAutoCollectTupleId({}, 'attrDef_priority')).toBeNull();
-    expect(findAutoCollectTupleId({}, 'nonexistent')).toBeNull();
+    expect(findAutoCollectTupleId('attrDef_status')).toBeNull();
+    expect(findAutoCollectTupleId('attrDef_priority')).toBeNull();
+    expect(findAutoCollectTupleId('nonexistent')).toBeNull();
   });
 });
 

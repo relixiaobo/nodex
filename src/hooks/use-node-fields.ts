@@ -19,9 +19,9 @@ import { CONTAINER_IDS } from '../types/index.js';
 import * as loroDoc from '../lib/loro-doc.js';
 
 export interface FieldEntry {
-  attrDefId: string;
+  fieldDefId: string;
   attrDefName: string;
-  tupleId: string;
+  fieldEntryId: string;
   valueNodeId?: string;
   valueName?: string;
   dataType: string;
@@ -44,7 +44,7 @@ function isVisibleWhenSatisfied(
   condition: NonNullable<ConfigFieldDef['visibleWhen']>,
   node: NodexNode,
 ): boolean {
-  const val = resolveConfigValue({}, node, condition.dependsOn);
+  const val = resolveConfigValue(node, condition.dependsOn);
   return val === condition.value;
 }
 
@@ -69,11 +69,11 @@ function computeFields(
     // System fields: read-only, auto-derived from node metadata
     const sysDef = SYSTEM_FIELD_MAP.get(keyId);
     if (sysDef) {
-      const resolved = resolveSystemFieldValue({}, nodeId, sysDef);
+      const resolved = resolveSystemFieldValue(nodeId, sysDef);
       fields.push({
-        attrDefId: keyId,
+        fieldDefId: keyId,
         attrDefName: sysDef.name,
-        tupleId: child.id,
+        fieldEntryId: child.id,
         valueName: resolved.text,
         valueNodeId: resolved.refNodeId,
         dataType: sysDef.dataType,
@@ -93,7 +93,7 @@ function computeFields(
           continue;
         }
         if (isFieldDef && configDef.appliesTo !== '*') {
-          const currentType = resolveDataType({}, nodeId);
+          const currentType = resolveDataType(nodeId);
           if (!configDef.appliesTo.includes(currentType)) continue;
         }
       }
@@ -107,16 +107,16 @@ function computeFields(
     const hasContent = valueChildren.length > 0;
 
     fields.push({
-      attrDefId: keyId,
+      fieldDefId: keyId,
       attrDefName: fieldDef.name ?? 'Untitled',
-      tupleId: child.id,
+      fieldEntryId: child.id,
       valueNodeId,
       valueName: valueNode?.name,
-      dataType: resolveDataType({}, keyId),
+      dataType: resolveDataType(keyId),
       trashed,
-      hideMode: isSysConfig ? undefined : resolveHideField({}, keyId),
+      hideMode: isSysConfig ? undefined : resolveHideField(keyId),
       isEmpty: !hasContent,
-      isRequired: isSysConfig ? undefined : resolveRequired({}, keyId),
+      isRequired: isSysConfig ? undefined : resolveRequired(keyId),
       isSystemConfig: isSysConfig || undefined,
       configKey: isSysConfig ? keyId : undefined,
     });
@@ -124,14 +124,14 @@ function computeFields(
 
   // For fieldDef: emit virtual entries for outliner-type config fields
   if (isFieldDef) {
-    const currentType = resolveDataType({}, nodeId);
+    const currentType = resolveDataType(nodeId);
     for (const def of ATTRDEF_OUTLINER_FIELDS) {
       const applies = def.appliesTo === '*' || def.appliesTo.includes(currentType);
       if (applies) {
         fields.push({
-          attrDefId: def.key,
+          fieldDefId: def.key,
           attrDefName: def.name,
-          tupleId: `__virtual_${def.key}__`,
+          fieldEntryId: `__virtual_${def.key}__`,
           dataType: '__outliner__',
           isSystemConfig: true,
           configKey: def.key,
@@ -139,23 +139,23 @@ function computeFields(
       }
     }
     const orderMap = new Map(ATTRDEF_CONFIG_FIELDS.map((f, i) => [f.key, i]));
-    fields.sort((a, b) => (orderMap.get(a.attrDefId) ?? Infinity) - (orderMap.get(b.attrDefId) ?? Infinity));
+    fields.sort((a, b) => (orderMap.get(a.fieldDefId) ?? Infinity) - (orderMap.get(b.fieldDefId) ?? Infinity));
   }
 
   // For tagDef: emit virtual entries for outliner-type config fields
   if (isTagDef) {
     for (const def of TAGDEF_OUTLINER_FIELDS) {
       fields.push({
-        attrDefId: def.key,
+        fieldDefId: def.key,
         attrDefName: def.name,
-        tupleId: `__virtual_${def.key}__`,
+        fieldEntryId: `__virtual_${def.key}__`,
         dataType: '__outliner__',
         isSystemConfig: true,
         configKey: def.key,
       });
     }
     const orderMap = new Map(TAGDEF_CONFIG_FIELDS.map((f, i) => [f.key, i]));
-    fields.sort((a, b) => (orderMap.get(a.attrDefId) ?? Infinity) - (orderMap.get(b.attrDefId) ?? Infinity));
+    fields.sort((a, b) => (orderMap.get(a.fieldDefId) ?? Infinity) - (orderMap.get(b.fieldDefId) ?? Infinity));
   }
 
   return fields;

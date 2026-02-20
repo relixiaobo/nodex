@@ -204,7 +204,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
           hidden = !f.isEmpty;
           break;
       }
-      visibility.set(f.tupleId, !hidden);
+      visibility.set(f.fieldEntryId, !hidden);
     }
     return visibility;
   }, [parentFields]);
@@ -236,7 +236,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   // Build field lookup by tuple ID
   const fieldMap = useMemo(() => {
     const m = new Map<string, FieldEntry>();
-    for (const f of fields) m.set(f.tupleId, f);
+    for (const f of fields) m.set(f.fieldEntryId, f);
     return m;
   }, [fields]);
 
@@ -1852,7 +1852,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
             isExpanded={isExpanded}
             onBulletClick={handleBulletClick}
             isReference={isReference || isPendingConversion}
-            tagDefColor={isTagDef ? resolveTagColor({}, nodeId).text : undefined}
+            tagDefColor={isTagDef ? resolveTagColor(nodeId).text : undefined}
             bulletColor={bulletColor}
           />
           {showCheckbox && (
@@ -2068,7 +2068,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
               <div key={id} className="@container" style={{ paddingLeft: (depth + 1) * 28 + 6 + 15 + 4 }}>
                 <FieldRow
                   nodeId={nodeId}
-                  attrDefId={fieldMap.get(id)!.attrDefId}
+                  attrDefId={fieldMap.get(id)!.fieldDefId}
                   attrDefName={fieldMap.get(id)!.attrDefName}
                   tupleId={id}
                   valueNodeId={fieldMap.get(id)!.valueNodeId}

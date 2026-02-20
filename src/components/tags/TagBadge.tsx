@@ -16,7 +16,7 @@ interface TagBadgeProps {
 export function TagBadge({ tagDefId, onRemove, onNavigate }: TagBadgeProps) {
   const tagName = useNodeStore((s) => { void s._version; return s.getNode(tagDefId)?.name ?? 'Untitled'; });
   const isTrashed = useNodeStore((s) => { void s._version; return loroDoc.getParentId(tagDefId) === CONTAINER_IDS.TRASH; });
-  const color = useNodeStore((s) => { void s._version; return resolveTagColor({}, tagDefId); });
+  const color = useNodeStore((s) => { void s._version; return resolveTagColor(tagDefId); });
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 

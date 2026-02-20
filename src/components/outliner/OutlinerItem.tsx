@@ -20,6 +20,7 @@ import { SYS_D, SYS_V } from '../../types/index.js';
 import { useFieldOptions } from '../../hooks/use-field-options.js';
 import { resolveTagColor } from '../../lib/tag-colors.js';
 import { resolveNodeStructuralIcon } from '../../lib/field-utils.js';
+import { isOutlinerContentNodeType } from '../../lib/node-type-utils.js';
 import { applyWebClipToNode } from '../../lib/webclip-service.js';
 import { marksToHtml } from '../../lib/editor-marks.js';
 import { docToMarks } from '../../lib/pm-doc-utils.js';
@@ -164,6 +165,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   const removeReference = useNodeStore((s) => s.removeReference);
   const selectFieldOption = useNodeStore((s) => s.selectFieldOption);
   const startRefConversion = useNodeStore((s) => s.startRefConversion);
+  const addReference = useNodeStore((s) => s.addReference);
   const revertRefConversion = useNodeStore((s) => s.revertRefConversion);
   const setPendingRefConversion = useUIStore((s) => s.setPendingRefConversion);
 
@@ -226,7 +228,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
         result.push({ id: cid, type: 'field' });
         continue;
       }
-      if (!getNode(cid)?.type) {
+      if (isOutlinerContentNodeType(getNode(cid)?.type)) {
         result.push({ id: cid, type: 'content' });
       }
     }
@@ -283,8 +285,8 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
         }
       } else {
         const dt = useNodeStore.getState().getNode(cid)?.type;
-        if (!dt) contentItems.push({ id: cid, type: 'content' });
-        // else skip: structural nodes (fieldEntry, reference, etc.)
+        if (isOutlinerContentNodeType(dt)) contentItems.push({ id: cid, type: 'content' });
+        // else skip: structural nodes (fieldEntry, fieldDef, etc.)
       }
     }
 
@@ -1532,7 +1534,11 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
 
       if (isEmptyAround) {
         const parent = useNodeStore.getState().getNode(parentId);
-        const alreadyChild = parent?.children?.includes(refNodeId) ?? false;
+        const alreadyChild = (parent?.children?.some((cid) => {
+          if (cid === refNodeId) return true;
+          const child = loroDoc.toNodexNode(cid);
+          return child?.type === 'reference' && child.targetId === refNodeId;
+        })) ?? false;
 
         if (alreadyChild) {
           // Target is already a child (owned or reference) — can't create duplicate reference.
@@ -1545,8 +1551,10 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
           // Temp node has inline ref content — user sees reference bullet + cursor at end.
           // Typing adds text → keeps as normal node; blur without typing → reverts to reference.
           const pos = parent?.children?.indexOf(nodeId) ?? -1;
+          const insertPos = pos >= 0 ? pos : 0;
+          const newRefId = addReference(parentId, refNodeId, insertPos);
           trashNode(nodeId);
-          const tempNodeId = startRefConversion(refNodeId, parentId, pos >= 0 ? pos : 0);
+          const tempNodeId = startRefConversion(newRefId, parentId, insertPos);
           setPendingRefConversion({ tempNodeId, refNodeId, parentId });
           const gpId = loroDoc.getParentId(parentId);
           if (gpId) setExpanded(`${gpId}:${parentId}`, true);
@@ -1563,7 +1571,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       setRefQuery('');
       setRefSelectedIndex(0);
     },
-    [nodeId, parentId, trashNode, setExpanded, setFocusedNode, startRefConversion, setPendingRefConversion],
+    [nodeId, parentId, addReference, trashNode, setExpanded, setFocusedNode, startRefConversion, setPendingRefConversion],
   );
 
   const handleReferenceCreateNew = useCallback(
@@ -2319,4 +2327,3 @@ function getRenderedTextRightEdge(container: HTMLElement): number | null {
     return null;
   }
 }
-

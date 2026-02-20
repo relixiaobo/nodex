@@ -158,12 +158,20 @@ const _childrenNodesCache = new Map<string, NodexNode[]>();
 export const useNodeStore = create<NodeStore>((set, get) => {
   // 订阅 Loro 变更 → 递增 _version → 触发 React re-render
   loroDoc.subscribe(() => {
+    if (!loroDoc.isDetached() && detachedStoreWarnings.size > 0) {
+      detachedStoreWarnings.clear();
+    }
     set(state => ({ _version: state._version + 1 }));
   });
 
   const detachedStoreWarnings = new Set<string>();
   function canMutate(action: string): boolean {
-    if (!loroDoc.isDetached()) return true;
+    if (!loroDoc.isDetached()) {
+      if (detachedStoreWarnings.size > 0) {
+        detachedStoreWarnings.clear();
+      }
+      return true;
+    }
     if (!detachedStoreWarnings.has(action)) {
       detachedStoreWarnings.add(action);
       console.warn(`[node-store] detached checkout 模式下忽略写操作: ${action}`);

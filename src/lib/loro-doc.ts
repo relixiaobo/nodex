@@ -11,6 +11,10 @@ import type { NodexNode, DoneMappingEntry } from '../types/node.js';
 import { saveSnapshot, loadSnapshot } from './loro-persistence.js';
 import { resetAwareness } from './awareness.js';
 
+export const DEFAULT_USER_COMMIT_ORIGIN = 'user:implicit';
+const UNDO_EXCLUDED_ORIGIN_PREFIXES = ['__seed__', 'system:'] as const;
+const detachedMutationWarnings = new Set<string>();
+
 // ============================================================
 // 内部状态
 // ============================================================
@@ -96,6 +100,16 @@ function getTree() {
   return doc.getTree('nodes');
 }
 
+function canApplyMutation(action: string): boolean {
+  if (!doc) throw new Error('[loro-doc] LoroDoc 未初始化，请先调用 initLoroDoc()');
+  if (!doc.isDetached()) return true;
+  if (!detachedMutationWarnings.has(action)) {
+    detachedMutationWarnings.add(action);
+    console.warn(`[loro-doc] detached checkout 模式下忽略写操作: ${action}`);
+  }
+  return false;
+}
+
 // ============================================================
 // 映射维护
 // ============================================================
@@ -164,6 +178,7 @@ export async function initLoroDoc(workspaceId: string): Promise<void> {
   if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
   currentWorkspaceId = workspaceId;
   doc = new LoroDoc();
+  detachedMutationWarnings.clear();
   // 切换工作区时清除上一个工作区的 awareness 状态，避免跨工作区泄露
   resetAwareness();
 
@@ -178,7 +193,7 @@ export async function initLoroDoc(workspaceId: string): Promise<void> {
     console.warn('[loro-doc] 快照加载失败，从空白开始:', e);
   }
 
-  undoManager = new UndoManager(doc, { mergeInterval: 500 });
+  undoManager = new UndoManager(doc, { mergeInterval: 500, excludeOriginPrefixes: [...UNDO_EXCLUDED_ORIGIN_PREFIXES] });
 
   doc.subscribe(() => {
     notifySubscribers();
@@ -204,6 +219,7 @@ export function resetLoroDoc(): void {
   nodexToTree.clear();
   treeToNodex.clear();
   currentWorkspaceId = null;
+  detachedMutationWarnings.clear();
   invalidateCache();
   if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
 }
@@ -212,23 +228,22 @@ export function resetLoroDoc(): void {
 export function initLoroDocForTest(workspaceId: string): void {
   doc = new LoroDoc();
   currentWorkspaceId = workspaceId;
+  detachedMutationWarnings.clear();
   nodexToTree.clear();
   treeToNodex.clear();
-  // mergeInterval=0 for deterministic tests; exclude '__seed__' origin so
-  // seed-data commits are not tracked in the undo stack.
-  undoManager = new UndoManager(doc, { mergeInterval: 0, excludeOriginPrefixes: ['__seed__'] });
+  // mergeInterval=0 for deterministic tests; exclude '__seed__' and system origins
+  // so seed/system commits are not tracked in the undo stack.
+  undoManager = new UndoManager(doc, { mergeInterval: 0, excludeOriginPrefixes: [...UNDO_EXCLUDED_ORIGIN_PREFIXES] });
   doc.subscribe(() => notifySubscribers());
 }
 
 /**
  * 重置 UndoManager（仅测试用）。
- * 在 seedTestDataSync 末尾调用，清除种子操作产生的（非 __seed__ origin）撤销记录。
- * Store actions（如 applyTag）内部调用 commitDoc() 时 origin=undefined，
- * 不会被 excludeOriginPrefixes 过滤，需在 seeding 完成后手动重置。
+ * 在 seedTestDataSync 末尾调用，清除种子操作产生的撤销记录。
  */
 export function clearUndoHistoryForTest(): void {
   if (!doc) return;
-  undoManager = new UndoManager(doc, { mergeInterval: 0, excludeOriginPrefixes: ['__seed__'] });
+  undoManager = new UndoManager(doc, { mergeInterval: 0, excludeOriginPrefixes: [...UNDO_EXCLUDED_ORIGIN_PREFIXES] });
 }
 
 /**
@@ -250,9 +265,10 @@ export function createNode(
   parentNodexId: string | null,
   index?: number,
 ): string {
+  const id = nodexId ?? nanoid();
+  if (!canApplyMutation('createNode')) return id;
   invalidateCache();
   const tree = getTree();
-  const id = nodexId ?? nanoid();
   const parentTreeId = parentNodexId ? nodexToTree.get(parentNodexId) : undefined;
   const treeNode = tree.createNode(parentTreeId, index);
   registerMapping(id, treeNode.id);
@@ -264,6 +280,7 @@ export function createNode(
 }
 
 export function moveNode(nodexId: string, newParentNodexId: string, index?: number): void {
+  if (!canApplyMutation('moveNode')) return;
   invalidateCache();
   const tree = getTree();
   const treeId = nodexToTree.get(nodexId);
@@ -281,6 +298,7 @@ function collectDescendants(nodexId: string): string[] {
 }
 
 export function deleteNode(nodexId: string): void {
+  if (!canApplyMutation('deleteNode')) return;
   invalidateCache();
   const tree = getTree();
   const treeId = nodexToTree.get(nodexId);
@@ -304,6 +322,7 @@ export function getNodeData(nodexId: string): Record<string, unknown> | null {
 }
 
 export function setNodeData(nodexId: string, key: string, value: unknown): void {
+  if (!canApplyMutation('setNodeData')) return;
   invalidateCache();
   const tree = getTree();
   const treeId = nodexToTree.get(nodexId);
@@ -316,6 +335,7 @@ export function setNodeData(nodexId: string, key: string, value: unknown): void 
 }
 
 export function setNodeDataBatch(nodexId: string, data: Record<string, unknown>): void {
+  if (!canApplyMutation('setNodeDataBatch')) return;
   invalidateCache();
   const tree = getTree();
   const treeId = nodexToTree.get(nodexId);
@@ -330,6 +350,7 @@ export function setNodeDataBatch(nodexId: string, data: Record<string, unknown>)
 }
 
 export function deleteNodeData(nodexId: string, key: string): void {
+  if (!canApplyMutation('deleteNodeData')) return;
   invalidateCache();
   const tree = getTree();
   const treeId = nodexToTree.get(nodexId);
@@ -353,6 +374,7 @@ function getTagsContainer(nodexId: string): LoroList | null {
 }
 
 export function addTag(nodexId: string, tagDefId: string): void {
+  if (!canApplyMutation('addTag')) return;
   invalidateCache();
   const tags = getTagsContainer(nodexId);
   if (!tags) return;
@@ -361,6 +383,7 @@ export function addTag(nodexId: string, tagDefId: string): void {
 }
 
 export function removeTag(nodexId: string, tagDefId: string): void {
+  if (!canApplyMutation('removeTag')) return;
   invalidateCache();
   const tags = getTagsContainer(nodexId);
   if (!tags) return;
@@ -394,6 +417,7 @@ export function getNodeList(nodexId: string, key: string): unknown[] {
 }
 
 export function pushToNodeList(nodexId: string, key: string, value: unknown): void {
+  if (!canApplyMutation(`pushToNodeList:${key}`)) return;
   invalidateCache();
   const list = getListContainer(nodexId, key);
   if (!list) return;
@@ -401,6 +425,7 @@ export function pushToNodeList(nodexId: string, key: string, value: unknown): vo
 }
 
 export function removeFromNodeList(nodexId: string, key: string, index: number): void {
+  if (!canApplyMutation(`removeFromNodeList:${key}`)) return;
   invalidateCache();
   const list = getListContainer(nodexId, key);
   if (!list) return;
@@ -408,6 +433,7 @@ export function removeFromNodeList(nodexId: string, key: string, index: number):
 }
 
 export function clearNodeList(nodexId: string, key: string): void {
+  if (!canApplyMutation(`clearNodeList:${key}`)) return;
   invalidateCache();
   const list = getListContainer(nodexId, key);
   if (!list || list.length === 0) return;
@@ -596,9 +622,10 @@ export function getLoroDoc(): LoroDoc {
 // ============================================================
 
 /** 显式提交当前 pending 事务（origin 用于 UndoManager 过滤）*/
-export function commitDoc(origin?: string): void {
+export function commitDoc(origin: string = DEFAULT_USER_COMMIT_ORIGIN): void {
   if (!doc) return;
-  doc.commit(origin ? { origin } : undefined);
+  if (!canApplyMutation('commitDoc')) return;
+  doc.commit({ origin });
 }
 
 export function undoDoc(): boolean {
@@ -754,6 +781,7 @@ export function checkout(frontiers: Array<{ peer: PeerID; counter: number }>): v
 export function checkoutToLatest(): void {
   if (!doc) throw new Error('[loro-doc] LoroDoc 未初始化');
   doc.checkoutToLatest();
+  detachedMutationWarnings.clear();
   rebuildMappings();
 }
 
@@ -807,6 +835,7 @@ export function getNodeText(nodexId: string): LoroText | null {
  * ```
  */
 export function getOrCreateNodeText(nodexId: string): LoroText | null {
+  if (!canApplyMutation('getOrCreateNodeText')) return getNodeText(nodexId);
   invalidateCache();
   const treeId = nodexToTree.get(nodexId);
   if (!treeId) return null;

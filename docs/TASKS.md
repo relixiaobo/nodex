@@ -40,12 +40,13 @@ _(空)_
 > **目标**: 为 Loro 主链路增加写操作安全边界与可追踪提交语义，作为 LoroText 主链路迁移前置
 > **Files**: `src/lib/loro-doc.ts`, `src/stores/node-store.ts`, `tests/vitest/loro-*.test.ts`, `tests/vitest/node-store-*.test.ts`, `docs/TESTING.md`, `docs/LESSONS.md`
 > **Progress**:
-> - [ ] detached checkout 状态下 mutation 统一 guard（禁止写）
-> - [ ] commit origin 规范落地（user/system/seed）
-> - [ ] UndoManager 过滤规则与 origin 对齐
-> - [ ] 补齐回归测试并更新 `docs/TESTING.md`
+> - [x] detached checkout 状态下 mutation 统一 guard（禁止写）
+> - [x] commit origin 规范落地（user/system/seed）
+> - [x] UndoManager 过滤规则与 origin 对齐
+> - [x] 补齐回归测试并更新 `docs/TESTING.md`
 > **迭代日志**:
 > - [2026-02-21 nodex-codex] 任务认领，按收口计划启动 Phase 1
+> - [2026-02-21 nodex-codex] 完成 Phase 1：`loro-doc` 增加 detached mutation/commit guard、`commitDoc` 默认 `user:implicit`、UndoManager 统一过滤 `['__seed__','system:']`；`node-store` 为返回值 mutation 增加 detached 兜底；新增/更新 `loro-infra`、`loro-undo`、`node-store-guard-rails` 用例并同步测试文档与 LESSONS
 
 ### Bugfix — Loro 全量 Review 问题修复 (2026-02-21)
 > **Owner**: nodex-codex | **Branch**: codex/loro-review-fixes

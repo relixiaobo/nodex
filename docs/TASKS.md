@@ -93,6 +93,22 @@ _(空)_
 
 ### P1
 
+#### NodePanel Header 重设计
+> **Owner**: 待分配（nodex-cc）| **Spec**: `docs/features/node-panel-header.md`
+
+统一 NodePanel 标题区布局，建立 Header → OutlinerView 连贯的三列对齐网格。
+
+- [ ] 新建 `NodeHeader.tsx`，替换现有 `PanelTitle.tsx`
+  - Icon 区块（32px，条件显示）
+  - Name 行：drag handle（列A）+ checkbox（列B，条件）+ 节点名称（列C）
+  - Supertag 行：TagBar，条件显示（有 tag 且非 tagDef/fieldDef）
+  - Extra 行：插槽，预留 + 日期节点占位
+- [ ] `NodePanel.tsx` 接入 `NodeHeader`，移除旧 PanelTitle
+- [ ] `ui-store.ts` 新增 `expandedHiddenFields: Set<string>` 及 toggle action
+- [ ] `OutlinerView.tsx` 顶部渲染隐藏字段占位行（`⊕ FieldName`），临时展开逻辑
+- [ ] Drag handle 右键触发 context menu（替代 `...` 按钮）
+- [ ] 对齐验证：drag handle 与 chevron 同列A，checkbox 与 field 图标/bullet 同列B
+
 #### Editor Bug: Enter 新建空节点后 CJK IME 组合输入异常
 > 详见 `docs/issues/editor-ime-enter-empty-node.md`
 

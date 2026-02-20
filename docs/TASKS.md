@@ -27,7 +27,7 @@ _(空)_
 
 | Agent | 当前任务 | 分支 | 修改中的文件 |
 |-------|---------|------|-------------|
-| nodex-cc | P0 Loro 基础设施 — 7项底层API | cc/loro-infra | src/lib/loro-doc.ts, src/lib/awareness.ts, tests/vitest/loro-infra.test.ts |
+| nodex-cc | _(idle — PR #63 merged)_ | — | — |
 | nodex-cc-2 | _(idle — PR #61 merged)_ | — | — |
 | nodex-codex | _(idle — Review 已完成)_ | — | — |
 
@@ -265,6 +265,8 @@ _(空)_
 
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
+| 2026-02-20 | Node 图标系统 — supertag bullet 彩色（conic-gradient）+ fieldDef 结构化图标 + 字段颜色继承 + 字段排序 | nodex | — |
+| 2026-02-20 | FIELD_TYPES 大小写修复 — seed-data.ts + field-utils.test.ts 统一使用小写常量 | nodex | — |
 | 2026-02-20 | Loro CRDT 迁移 Phase 1 — 本地数据引擎 + 数据模型 + 命名 + UndoManager | nodex-cc | #62 |
 | 2026-02-19 | Editor Bug: 首次点击行尾空白光标落到开头 | nodex | — |
 | 2026-02-19 | 数据模型简化：消除 Metanode + AssociatedData (Phase 0-3) | nodex-cc | #60 |

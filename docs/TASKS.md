@@ -27,7 +27,7 @@ _(空)_
 
 | Agent | 当前任务 | 分支 | 修改中的文件 |
 |-------|---------|------|-------------|
-| nodex-cc | _(idle — PR #62 merged)_ | — | — |
+| nodex-cc | P0 Loro 基础设施 — 7项底层API | cc/loro-infra | src/lib/loro-doc.ts, src/lib/awareness.ts, tests/vitest/loro-infra.test.ts |
 | nodex-cc-2 | _(idle — PR #61 merged)_ | — | — |
 | nodex-codex | _(idle)_ | — | — |
 
@@ -35,7 +35,18 @@ _(空)_
 
 ## 进行中
 
-_(空)_
+### P0 Loro 基础设施 — 7项底层API ✅
+> **Owner**: nodex-cc | **Branch**: cc/loro-infra | **PR**: #63
+> **迭代日志**:
+> - [2026-02-20 cc] 探索 Loro API，确认全部可行，实现完成：
+>   - ② subscribeNode: LoroMap.subscribe() 容器级隔离订阅，rebuildMappings 后自动重挂载
+>   - ⑤ getVersionVector/exportFrom: oplogVersion + export({mode:'update',from}) 增量同步
+>   - ④ getVersionHistory/checkout/checkoutToLatest: getAllChanges lamport排序 + doc.checkout
+>   - ③ getNodeText/getOrCreateNodeText: LoroText Peritext marks 基础设施
+>   - ① LoroMovableList评估: LoroTree.move()已是Kleppmann算法，tags保持LoroList
+>   - ⑥ forkDoc: doc.fork() + merge()增量合并回主doc
+>   - ⑦ Awareness: src/lib/awareness.ts 纯内存模块
+> - 484 tests pass, typecheck clean, build 4.1MB
 
 ---
 
@@ -43,45 +54,7 @@ _(空)_
 
 ### P0
 
-#### Loro 基础设施 — 7 项底层 API（仅基础设施，不含 UI）
-> **详细方案**: PR #62 review comment
-> **前置**: Loro Phase 1 已合入 main (#62)
-> **优先级**: ② > ⑤ > ④ > ③ > ① > ⑥ > ⑦
-
-所有项只做底层 API，不做 UI 展现。每项完成后单独 commit。
-
-- [ ] ② Fine-grained subscriptions — per-node 订阅基础
-  - `loro-doc.ts` 新增 `subscribeNode(nodexId, callback)` API
-  - 内部使用 Loro tree/container 级别订阅
-  - 保留全局 `_version` 作为 fallback，新 API 为 opt-in
-  - 测试：修改 node A 不触发 node B 的订阅回调
-- [ ] ⑤ Incremental Sync — 增量更新导出/导入
-  - `loro-doc.ts` 新增 `exportFrom(versionVector)` + `getVersionVector()` API
-  - 验证 `importUpdates` 幂等性
-  - 测试：两个 LoroDoc 实例 → doc A 修改 → export delta → doc B import → 验证同步
-- [ ] ④ Time Travel / Checkout — 版本历史记录
-  - `loro-doc.ts` 新增 `getVersionHistory()` + `checkout(frontiers)` + `checkoutToLatest()` API
-  - 使用 Loro `doc.frontiers()` 和 `doc.checkout()` 原生 API
-  - 测试：创建 3 个版本 → checkout 到版本 1 → 验证节点状态 → checkout 回最新
-- [ ] ③ LoroText + Peritext marks 基础设施
-  - `loro-doc.ts` 新增 `getNodeText(nodexId): LoroText` + `setNodeText()` API
-  - LoroText 使用 Peritext 标记算法（Loro 内置）
-  - 暂不改 ProseMirror ↔ Loro 同步（Phase 2），只确保底层 API 可用
-  - 测试：写入带 marks 的文本 → 读回验证 marks 正确
-- [ ] ① LoroMovableList — 评估并发安全性
-  - 评估 LoroTree 自身 `move()` 是否已是 Kleppmann 算法
-  - 如果 LoroTree.move 不够，tags LoroList → LoroMovableList
-  - 提供 benchmark 或分析说明当前方案的并发安全性
-- [ ] ⑥ doc.fork() — 文档分支
-  - `loro-doc.ts` 新增 `forkDoc(): { doc, merge }` API
-  - fork 可独立编辑，不影响主 doc；`merge()` 合并回主 doc
-  - 测试：fork → 修改 → 主 doc 不变 → merge → 主 doc 更新
-- [ ] ⑦ Awareness — 实时在线状态协议
-  - 设计 `awareness.ts` 模块（如 loro-crdt 不内置）
-  - API: `setLocalState()`, `onRemoteStateChange()`, `getStates()`
-  - State 结构: `{ cursor?, selection?, user: { id, name, color } }`
-  - 暂只做 API 层，不做网络传输
-  - 测试：设置 local state → 读回验证
+#### ~~Loro 基础设施 — 7 项底层 API~~ ✅ 已完成 (PR #63)
 
 ---
 

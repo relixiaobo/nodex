@@ -84,5 +84,18 @@ describe('node-store content model actions', () => {
     const node = loroDoc.toNodexNode(child.id);
     expect(node?.marks).toEqual([{ start: 0, end: 2, type: 'bold' }]);
     expect(node?.inlineRefs).toEqual([{ offset: 3, targetNodeId: 'task_1' }]);
+
+    const raw = loroDoc.getNodeData(child.id);
+    expect(raw?.marks).toBeUndefined();
+    expect(raw?.inlineRefs).toBeUndefined();
+  });
+
+  it('marks-only update still refreshes updatedAt through richText path', () => {
+    const before = loroDoc.toNodexNode('idea_1')?.updatedAt ?? 0;
+    useNodeStore.getState().updateNodeContent('idea_1', {
+      marks: [{ start: 0, end: 4, type: 'italic' }],
+    });
+    const after = loroDoc.toNodexNode('idea_1')?.updatedAt ?? 0;
+    expect(after).toBeGreaterThanOrEqual(before);
   });
 });

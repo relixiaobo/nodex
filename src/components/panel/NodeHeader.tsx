@@ -126,11 +126,11 @@ export function NodeHeader({ nodeId, onTitleRef }: NodeHeaderProps) {
         <div className="mb-1" style={{ paddingLeft: COL_B_OFFSET }}>
           {isTagDef && tagDefColor && (
             <span
-              className="flex h-8 w-8 items-center justify-center rounded-full"
+              className="flex h-8 w-8 items-center justify-center rounded-lg"
               style={{ backgroundColor: tagDefColor.bg }}
             >
               <span
-                className="text-base font-bold select-none"
+                className="text-lg font-bold select-none"
                 style={{ color: tagDefColor.text }}
               >
                 #
@@ -138,7 +138,7 @@ export function NodeHeader({ nodeId, onTitleRef }: NodeHeaderProps) {
             </span>
           )}
           {isFieldDef && FieldIcon && (
-            <span className="flex h-8 w-8 items-center justify-center text-foreground-tertiary">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg text-foreground-tertiary">
               <FieldIcon size={20} />
             </span>
           )}

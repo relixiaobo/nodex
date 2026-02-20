@@ -102,3 +102,15 @@ export function resolveTagColor(
   // Fallback to hash
   return getTagColor(tagDefId);
 }
+
+/**
+ * Resolve bullet colors for a node based on its supertag memberships.
+ * - [] → neutral grey dot (0 tags)
+ * - [c] → solid color (1 tag)
+ * - [c1, c2, ...] → conic-gradient pie segments (2+ tags)
+ */
+export function resolveNodeBulletColors(nodeId: string): string[] {
+  const node = loroDoc.toNodexNode(nodeId);
+  if (!node || !node.tags.length) return [];
+  return node.tags.map((tagId) => resolveTagColor(tagId).text);
+}

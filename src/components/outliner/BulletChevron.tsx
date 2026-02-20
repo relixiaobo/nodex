@@ -1,3 +1,14 @@
+import type { AppIcon } from '../../lib/icons.js';
+
+/** Build inline style for a multi-color conic-gradient or solid bullet. */
+function buildBulletStyle(colors: string[]): React.CSSProperties {
+  if (colors.length === 0) return {};
+  if (colors.length === 1) return { backgroundColor: colors[0] };
+  const seg = 100 / colors.length;
+  const stops = colors.map((c, i) => `${c} ${i * seg}% ${(i + 1) * seg}%`).join(', ');
+  return { background: `conic-gradient(${stops})` };
+}
+
 interface BulletChevronProps {
   hasChildren: boolean;
   isExpanded: boolean;
@@ -8,8 +19,10 @@ interface BulletChevronProps {
   isReference?: boolean;
   /** TagDef color: renders colored circle with white # instead of plain dot */
   tagDefColor?: string;
-  /** Owner tag color: tints the regular bullet dot in this color (template items) */
-  bulletColor?: string;
+  /** Supertag colors: tints/multi-colors the bullet dot based on applied supertags */
+  bulletColors?: string[];
+  /** Structural icon: renders a small icon instead of the dot (e.g. for fieldDef nodes) */
+  icon?: AppIcon | null;
 }
 
 /**
@@ -29,7 +42,8 @@ export function BulletChevron({
   dimmed,
   isReference,
   tagDefColor,
-  bulletColor,
+  bulletColors,
+  icon: Icon,
 }: BulletChevronProps) {
   const showOuterRing = hasChildren && !isExpanded;
 
@@ -52,6 +66,29 @@ export function BulletChevron({
     );
   }
 
+  // FieldDef bullet: structural icon (field type) with optional supertag color
+  if (Icon) {
+    const iconColor = bulletColors?.[0] ?? 'var(--color-foreground-secondary)';
+    return (
+      <span
+        role="button"
+        className="flex shrink-0 h-[21px] w-[15px] items-center justify-center cursor-pointer group/bullet"
+        onClick={onBulletClick}
+        title="Zoom in"
+      >
+        <Icon
+          size={12}
+          className="transition-transform group-hover/bullet:scale-110 group-active/bullet:scale-90"
+          style={{ color: iconColor }}
+        />
+      </span>
+    );
+  }
+
+  // Plain bullet: solid dot or multi-color conic-gradient pie
+  const hasColors = bulletColors && bulletColors.length > 0;
+  const bulletStyle = hasColors ? buildBulletStyle(bulletColors!) : undefined;
+
   return (
     <span
       role="button"
@@ -65,8 +102,8 @@ export function BulletChevron({
         } ${showOuterRing ? 'bg-foreground/[0.08]' : ''}`}
       >
         <div
-          className={`h-[5px] w-[5px] rounded-full transition-transform group-hover/bullet:scale-[1.375] ${!bulletColor ? (dimmed ? 'bg-foreground/15' : 'bg-foreground/50') : ''}`}
-          style={bulletColor ? { backgroundColor: bulletColor } : undefined}
+          className={`h-[5px] w-[5px] rounded-full transition-transform group-hover/bullet:scale-[1.375] ${!hasColors ? (dimmed ? 'bg-foreground/15' : 'bg-foreground/50') : ''}`}
+          style={bulletStyle}
         />
       </div>
     </span>

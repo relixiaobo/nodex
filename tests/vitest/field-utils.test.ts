@@ -29,16 +29,15 @@ describe('resolveDataType', () => {
   });
 
   it('returns fieldType stored in LoroDoc for attrDef_status (OPTIONS)', () => {
-    // seed-data sets fieldType: 'OPTIONS' for attrDef_status
-    expect(resolveDataType('attrDef_status')).toBe('OPTIONS');
+    expect(resolveDataType('attrDef_status')).toBe(FIELD_TYPES.OPTIONS);
   });
 
   it('returns fieldType for attrDef_due (DATE)', () => {
-    expect(resolveDataType('attrDef_due')).toBe('DATE');
+    expect(resolveDataType('attrDef_due')).toBe(FIELD_TYPES.DATE);
   });
 
   it('returns fieldType for attrDef_company (PLAIN)', () => {
-    expect(resolveDataType('attrDef_company')).toBe('PLAIN');
+    expect(resolveDataType('attrDef_company')).toBe(FIELD_TYPES.PLAIN);
   });
 
   it('returns FIELD_TYPES.PLAIN for missing node', () => {

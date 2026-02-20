@@ -168,6 +168,18 @@ export function getFieldTypeIcon(dataType: string): AppIcon {
 }
 
 /**
+ * Resolve the structural bullet icon for a node based on its type.
+ * Returns null for plain content nodes (use bullet dot instead).
+ * tagDef and reference are handled separately via tagDefColor / isReference.
+ */
+export function resolveNodeStructuralIcon(node: NodexNode): AppIcon | null {
+  if (node.type === 'fieldDef') {
+    return getFieldTypeIcon(node.fieldType ?? FIELD_TYPES.PLAIN);
+  }
+  return null;
+}
+
+/**
  * Resolve option node IDs for an OPTIONS-type fieldDef.
  * Options are direct non-fieldDef, non-fieldEntry children of the fieldDef node.
  */

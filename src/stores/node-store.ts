@@ -277,6 +277,15 @@ export const useNodeStore = create<NodeStore>((set, get) => {
         if (Object.keys(batch).length > 0) {
           loroDoc.setNodeDataBatch(id, batch);
         }
+
+        if (name !== undefined || data.marks !== undefined || data.inlineRefs !== undefined) {
+          loroDoc.setNodeRichTextContent(
+            id,
+            name ?? '',
+            data.marks ?? [],
+            data.inlineRefs ?? [],
+          );
+        }
       }
 
       // Auto-apply child supertags from parent's tags
@@ -833,11 +842,13 @@ export const useNodeStore = create<NodeStore>((set, get) => {
 
       // 创建临时内联引用节点
       const tempId = nanoid();
+      const inlineRefs = [{ offset: 0, targetNodeId: targetId ?? '', displayName: targetName }];
       loroDoc.createNode(tempId, parentId, position);
       loroDoc.setNodeDataBatch(tempId, {
         name: '\uFFFC',
-        inlineRefs: [{ offset: 0, targetNodeId: targetId ?? '', displayName: targetName }],
+        inlineRefs,
       });
+      loroDoc.setNodeRichTextContent(tempId, '\uFFFC', [], inlineRefs);
       loroDoc.commitDoc();
       return tempId;
     },

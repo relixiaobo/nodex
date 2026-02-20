@@ -66,4 +66,18 @@ describe('node-store content model actions', () => {
     expect(after).not.toBe(before);
     expect(after).toBe('Changed');
   });
+
+  it('createChild with content payload initializes richText immediately', () => {
+    const child = useNodeStore.getState().createChild('note_2', undefined, {
+      name: 'Hi \uFFFC',
+      marks: [{ start: 0, end: 2, type: 'bold' }],
+      inlineRefs: [{ offset: 3, targetNodeId: 'task_1' }],
+    });
+
+    const richText = loroDoc.getNodeText(child.id);
+    expect(richText?.toString()).toBe('Hi \uFFFC');
+    const node = loroDoc.toNodexNode(child.id);
+    expect(node?.marks).toEqual([{ start: 0, end: 2, type: 'bold' }]);
+    expect(node?.inlineRefs).toEqual([{ offset: 3, targetNodeId: 'task_1' }]);
+  });
 });

@@ -24,13 +24,13 @@ describe('Step 0: loro-crdt 基础验证', () => {
     // 设置属性（LoroMap）
     root.data.set('id', 'node_001');
     root.data.set('name', 'Hello Loro');
-    root.data.set('type', 'workspace');
+    root.data.set('type', 'tagDef');  // any valid NodeType
     root.data.set('createdAt', Date.now());
 
     // 读取属性
     expect(root.data.get('id')).toBe('node_001');
     expect(root.data.get('name')).toBe('Hello Loro');
-    expect(root.data.get('type')).toBe('workspace');
+    expect(root.data.get('type')).toBe('tagDef');
 
     // 创建子节点
     const child = tree.createNode(root.id);

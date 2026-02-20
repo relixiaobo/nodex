@@ -17,11 +17,12 @@ import {
   getAllNodeIds,
   toNodexNode,
 } from '../../src/lib/loro-doc.js';
+import { isWorkspaceContainer } from '../../src/lib/tree-utils.js';
+import { CONTAINER_IDS } from '../../src/types/index.js';
 
-/** SKIP_DOC_TYPES as defined in use-node-search.ts */
-const SKIP_DOC_TYPES = new Set([
-  'fieldEntry', 'fieldDef', 'tagDef',
-  'reference', 'workspace', 'user',
+/** Structural NodeTypes excluded from search (mirrors use-node-search.ts). */
+const SKIP_DOC_TYPES = new Set<string>([
+  'fieldEntry', 'fieldDef', 'tagDef', 'reference',
 ]);
 
 /** Replicate the actual search logic from use-node-search.ts */
@@ -34,6 +35,8 @@ function searchNodes(query: string, excludeId?: string) {
     if (id === excludeId) continue;
     const node = toNodexNode(id);
     if (!node) continue;
+    // Workspace containers are excluded by ID, not by type
+    if (isWorkspaceContainer(id)) continue;
     if (node.type && SKIP_DOC_TYPES.has(node.type)) continue;
     const plainText = (node.name ?? '').replace(/<[^>]+>/g, '').trim();
     if (!plainText) continue;
@@ -51,12 +54,16 @@ beforeEach(() => {
   createNode('n1', null); setNodeDataBatch('n1', { name: 'My Person Note' });
   createNode('n2', null); setNodeDataBatch('n2', { name: 'Another Note' });
 
-  // System/structural nodes — must be filtered out
-  createNode('td1', null); setNodeDataBatch('td1', { name: 'Person',        type: 'tagDef' });
-  createNode('fd1', null); setNodeDataBatch('fd1', { name: 'Email',         type: 'fieldDef' });
-  createNode('fe1', null); setNodeDataBatch('fe1', { name: 'field entry',   type: 'fieldEntry' });
-  createNode('ws1', null); setNodeDataBatch('ws1', { name: 'Workspace',     type: 'workspace' });
-  createNode('ref1', null); setNodeDataBatch('ref1', { name: 'ref data',    type: 'reference' });
+  // Structural nodes — must be filtered out by type
+  createNode('td1', null); setNodeDataBatch('td1', { name: 'Person',      type: 'tagDef' });
+  createNode('fd1', null); setNodeDataBatch('fd1', { name: 'Email',        type: 'fieldDef' });
+  createNode('fe1', null); setNodeDataBatch('fe1', { name: 'field entry',  type: 'fieldEntry' });
+  createNode('ref1', null); setNodeDataBatch('ref1', { name: 'ref data',   type: 'reference' });
+
+  // Workspace container — must be filtered out by isWorkspaceContainer()
+  // Container nodes are identified by their fixed IDs, not by a 'type' field.
+  createNode(CONTAINER_IDS.LIBRARY, null);
+  setNodeDataBatch(CONTAINER_IDS.LIBRARY, { name: 'Library' });
 
   commitDoc('__seed__');
 });
@@ -70,7 +77,7 @@ describe('node search SKIP_DOC_TYPES filter', () => {
 
   it('filters out tagDef nodes', () => {
     const ids = searchNodes('Person').map(r => r.id);
-    expect(ids).toContain('n1');    // "My Person Note" — content node
+    expect(ids).toContain('n1');      // "My Person Note" — content node
     expect(ids).not.toContain('td1'); // tagDef "Person" — filtered
   });
 
@@ -82,12 +89,13 @@ describe('node search SKIP_DOC_TYPES filter', () => {
     expect(searchNodes('field').map(r => r.id)).not.toContain('fe1');
   });
 
-  it('filters out workspace nodes', () => {
-    expect(searchNodes('Workspace').map(r => r.id)).not.toContain('ws1');
-  });
-
   it('filters out reference nodes', () => {
     expect(searchNodes('ref').map(r => r.id)).not.toContain('ref1');
+  });
+
+  it('filters out workspace container nodes (by ID, not by type)', () => {
+    // CONTAINER_IDS.LIBRARY is excluded via isWorkspaceContainer(), not by node.type
+    expect(searchNodes('Library').map(r => r.id)).not.toContain(CONTAINER_IDS.LIBRARY);
   });
 
   it('returns empty for blank query', () => {

@@ -29,11 +29,23 @@ _(空)_
 |-------|---------|------|-------------|
 | nodex-cc | _(idle — PR #63 merged)_ | — | — |
 | nodex-cc-2 | _(idle — PR #61 merged)_ | — | — |
-| nodex-codex | Loro 收口 Phase 1（detached guard + origin 策略） | codex/loro-phase1-guards | docs/TASKS.md, src/lib/loro-doc.ts, src/stores/node-store.ts, tests/vitest/loro-*.test.ts, tests/vitest/node-store-*.test.ts, docs/TESTING.md, docs/LESSONS.md |
+| nodex-codex | Loro 收口 Phase 2（LoroText 主编辑链路迁移） | codex/loro-phase2-lorotext | docs/TASKS.md, src/lib/loro-doc.ts, src/components/editor/*.ts, src/components/outliner/OutlinerItem.tsx, tests/vitest/loro-*.test.ts, docs/TESTING.md |
 
 ---
 
 ## 进行中
+
+### Refactor — Loro 收口 Phase 2：LoroText 主编辑链路迁移 (2026-02-21)
+> **Owner**: nodex-codex | **Branch**: codex/loro-phase2-lorotext
+> **目标**: 将主编辑读写从 `name+marks+inlineRefs` 迁移到 `LoroText` 容器，建立后续多端协同一致性基础
+> **Files**: `src/lib/loro-doc.ts`, `src/components/editor/*.ts`, `src/components/outliner/OutlinerItem.tsx`, `tests/vitest/loro-*.test.ts`, `docs/TESTING.md`
+> **Progress**:
+> - [ ] 设计并落地 LoroText <-> 当前编辑器数据桥接层
+> - [ ] Outliner 主编辑输入路径切换到 LoroText
+> - [ ] 兼容旧数据读取与惰性迁移
+> - [ ] 补齐回归测试并更新 `docs/TESTING.md`
+> **迭代日志**:
+> - [2026-02-21 nodex-codex] 任务认领，启动 Phase 2 开发
 
 ### Refactor — Loro 收口 Phase 1：detached guard + origin 策略 (2026-02-21)
 > **Owner**: nodex-codex | **Branch**: codex/loro-phase1-guards

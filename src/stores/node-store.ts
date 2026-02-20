@@ -455,6 +455,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
         loroDoc.createNode(valId, feId);
         loroDoc.setNodeData(valId, 'name', val);
       }
+      loroDoc.commitDoc();
     },
 
     setOptionsFieldValue: (nodeId, fieldDefId, optionNodeId) => {
@@ -472,6 +473,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
       const valId = nanoid();
       loroDoc.createNode(valId, feId);
       loroDoc.setNodeDataBatch(valId, { name: optionNodeId, targetId: optionNodeId });
+      loroDoc.commitDoc();
     },
 
     selectFieldOption: (fieldEntryId, optionNodeId, oldOptionNodeId) => {
@@ -501,6 +503,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
         }
       }
 
+      loroDoc.commitDoc();
       void oldOptionNodeId; // suppress lint
     },
 
@@ -509,6 +512,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
       if (!feId) return;
       const children = loroDoc.getChildren(feId);
       for (const cid of children) loroDoc.deleteNode(cid);
+      loroDoc.commitDoc();
     },
 
     addFieldToNode: (nodeId, fieldDefId) => {
@@ -516,6 +520,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
       const feId = nanoid();
       loroDoc.createNode(feId, nodeId);
       loroDoc.setNodeDataBatch(feId, { type: 'fieldEntry', fieldDefId });
+      loroDoc.commitDoc();
     },
 
     addUnnamedFieldToNode: (nodeId, afterChildId) => {
@@ -541,12 +546,14 @@ export const useNodeStore = create<NodeStore>((set, get) => {
       const feId = nanoid();
       loroDoc.createNode(feId, nodeId, insertIdx);
       loroDoc.setNodeDataBatch(feId, { type: 'fieldEntry', fieldDefId: fdId });
+      loroDoc.commitDoc();
 
       return { fieldEntryId: feId, fieldDefId: fdId };
     },
 
     moveFieldEntry: (currentParentId, fieldEntryId, newParentId, position) => {
       loroDoc.moveNode(fieldEntryId, newParentId, position);
+      loroDoc.commitDoc();
       void currentParentId; // suppress lint
     },
 
@@ -556,11 +563,13 @@ export const useNodeStore = create<NodeStore>((set, get) => {
 
     removeField: (nodeId, fieldEntryId) => {
       loroDoc.deleteNode(fieldEntryId);
+      loroDoc.commitDoc();
       void nodeId; // suppress lint
     },
 
     renameFieldDef: (fieldDefId, newName) => {
       loroDoc.setNodeData(fieldDefId, 'name', newName);
+      loroDoc.commitDoc();
     },
 
     renameAttrDef: (attrDefId, newName) => {
@@ -569,23 +578,30 @@ export const useNodeStore = create<NodeStore>((set, get) => {
 
     changeFieldType: (fieldDefId, newType) => {
       loroDoc.setNodeData(fieldDefId, 'fieldType', newType);
+      loroDoc.commitDoc();
     },
 
     addFieldOption: (fieldDefId, name) => {
       const optId = nanoid();
       loroDoc.createNode(optId, fieldDefId);
       loroDoc.setNodeData(optId, 'name', name);
+      loroDoc.commitDoc();
       return optId;
     },
 
     removeFieldOption: (fieldDefId, optionId) => {
       loroDoc.deleteNode(optionId);
+      loroDoc.commitDoc();
       void fieldDefId; // suppress lint
     },
 
     autoCollectOption: (nodeId, fieldDefId, name) => {
       // 在 fieldDef 下创建新选项
-      const optId = get().addFieldOption(fieldDefId, name);
+      // NOTE: addFieldOption already calls commitDoc; we batch all mutations
+      // here and commit once at the end for atomicity.
+      const optId = nanoid();
+      loroDoc.createNode(optId, fieldDefId);
+      loroDoc.setNodeData(optId, 'name', name);
 
       // 在 node 的 fieldEntry 中设置该选项
       let feId = findFieldEntry(nodeId, fieldDefId);
@@ -599,6 +615,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
       const valId = nanoid();
       loroDoc.createNode(valId, feId);
       loroDoc.setNodeDataBatch(valId, { name: optId, targetId: optId });
+      loroDoc.commitDoc();
 
       return optId;
     },
@@ -616,10 +633,12 @@ export const useNodeStore = create<NodeStore>((set, get) => {
         loroDoc.createNode(valId, fieldEntryId);
         loroDoc.setNodeData(valId, 'name', 'true');
       }
+      loroDoc.commitDoc();
     },
 
     replaceFieldDef: (nodeId, fieldEntryId, oldFieldDefId, newFieldDefId) => {
       loroDoc.setNodeData(fieldEntryId, 'fieldDefId', newFieldDefId);
+      loroDoc.commitDoc();
       void nodeId; void oldFieldDefId; // suppress lint
     },
 
@@ -642,6 +661,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
           }
         }
       }
+      loroDoc.commitDoc();
     },
 
     cycleNodeCheckbox: (nodeId) => {
@@ -653,20 +673,24 @@ export const useNodeStore = create<NodeStore>((set, get) => {
       } else {
         loroDoc.setNodeData(nodeId, 'completedAt', result.completedAt);
       }
+      loroDoc.commitDoc();
     },
 
     // ─── 配置操作 ───
 
     setConfigValue: (nodeId, configKey, value) => {
       loroDoc.setNodeData(nodeId, configKey, value);
+      loroDoc.commitDoc();
     },
 
     addDoneMappingEntry: (tagDefId, checked, fieldDefId, optionId) => {
       loroDoc.addDoneMappingEntry(tagDefId, checked, { fieldDefId, optionId } satisfies DoneMappingEntry);
+      loroDoc.commitDoc();
     },
 
     removeDoneMappingEntry: (tagDefId, checked, index) => {
       loroDoc.removeDoneMappingEntry(tagDefId, checked, index);
+      loroDoc.commitDoc();
     },
 
     // ─── Reference 操作 ───
@@ -678,11 +702,13 @@ export const useNodeStore = create<NodeStore>((set, get) => {
         type: 'reference',
         targetId: targetNodeId,
       });
+      loroDoc.commitDoc();
       return refId;
     },
 
     removeReference: (refNodeId) => {
       loroDoc.deleteNode(refNodeId);
+      loroDoc.commitDoc();
     },
 
     startRefConversion: (refNodeId, parentId, position) => {
@@ -701,6 +727,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
         name: '\uFFFC',
         inlineRefs: [{ offset: 0, targetNodeId: targetId ?? '', displayName: targetName }],
       });
+      loroDoc.commitDoc();
       return tempId;
     },
 
@@ -711,6 +738,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
       loroDoc.deleteNode(tempNodeId);
 
       get().addReference(parentId, targetNodeId, position >= 0 ? position : undefined);
+      // addReference already calls commitDoc
     },
   };
 });

@@ -27,13 +27,18 @@ _(空)_
 
 | Agent | 当前任务 | 分支 | 修改中的文件 |
 |-------|---------|------|-------------|
-| nodex-cc | _(idle — PR #63 merged)_ | — | — |
+| nodex-cc | P1 NodePanel Header 重设计 | cc/node-panel-header | src/components/panel/NodeHeader.tsx, NodePanel.tsx, OutlinerView.tsx, ui-store.ts |
 | nodex-cc-2 | _(idle — PR #61 merged)_ | — | — |
 | nodex-codex | Loro 迁移全量 Review | main（只读） | docs/reviews/loro-full-review-2026-02-21.md |
 
 ---
 
 ## 进行中
+
+### P1 NodePanel Header 重设计
+> **Owner**: nodex-cc | **Branch**: cc/node-panel-header | **Spec**: `docs/features/node-panel-header.md`
+> **迭代日志**:
+> - [2026-02-21 cc] 开始实现：重构 PanelTitle → NodeHeader，三列对齐网格，隐藏字段占位行
 
 ### 代码 Review — Loro 迁移全量 (2026-02-21)
 > **Owner**: nodex-codex | **Branch**: main（只读，不修改代码）

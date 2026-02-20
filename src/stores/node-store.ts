@@ -143,6 +143,14 @@ function getExtendsChain(tagDefId: string, visited = new Set<string>()): string[
 }
 
 // ============================================================
+// 读取缓存 — getChildren(NodexNode[]) 需要在 store 层缓存
+// （loro-doc 层缓存了 string[]，但 map+filter 每次创建新数组）
+// ============================================================
+
+let _childrenNodesCacheVer = -1;
+const _childrenNodesCache = new Map<string, NodexNode[]>();
+
+// ============================================================
 // Store 实现
 // ============================================================
 
@@ -160,8 +168,17 @@ export const useNodeStore = create<NodeStore>((set, get) => {
     getNode: (id) => loroDoc.toNodexNode(id),
 
     getChildren: (parentId) => {
+      const ver = get()._version;
+      if (ver !== _childrenNodesCacheVer) {
+        _childrenNodesCache.clear();
+        _childrenNodesCacheVer = ver;
+      }
+      const cached = _childrenNodesCache.get(parentId);
+      if (cached) return cached;
       const ids = loroDoc.getChildren(parentId);
-      return ids.map(id => loroDoc.toNodexNode(id)).filter((n): n is NodexNode => n !== null);
+      const result = ids.map(id => loroDoc.toNodexNode(id)).filter((n): n is NodexNode => n !== null);
+      _childrenNodesCache.set(parentId, result);
+      return result;
     },
 
     // ─── 树操作 ───

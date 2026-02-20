@@ -124,10 +124,13 @@ export function partializeUIStore(state: UIStore): PersistedUIStoreState {
 }
 
 export function migrateUIStoreState(persisted: unknown, version: number): unknown {
-  if (version === 0) {
-    const old = persisted as { panelStack?: string[] };
+  let state = persisted;
+
+  // v0 → v1: panelStack renamed to panelHistory
+  if (version < 1) {
+    const old = state as { panelStack?: string[] };
     if (old.panelStack) {
-      return {
+      state = {
         ...old,
         panelHistory: old.panelStack,
         panelIndex: old.panelStack.length - 1,
@@ -135,7 +138,19 @@ export function migrateUIStoreState(persisted: unknown, version: number): unknow
       };
     }
   }
-  return persisted;
+
+  // v1 → v2: Loro migration — container IDs changed format (e.g. 'ws_default_LIBRARY' → 'LIBRARY').
+  // Reset navigation and expand state since old node IDs are no longer valid.
+  if (version < 2) {
+    state = {
+      ...(state as object),
+      panelHistory: [],
+      panelIndex: -1,
+      expandedNodes: new Set<string>(),
+    };
+  }
+
+  return state;
 }
 
 export const useUIStore = create<UIStore>()(
@@ -347,7 +362,7 @@ export const useUIStore = create<UIStore>()(
     }),
     {
       name: 'nodex-ui',
-      version: 1,
+      version: 2,
       storage: chromeLocalStorage,
       partialize: partializeUIStore,
       // Migrate from old panelStack format to new history model

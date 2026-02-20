@@ -214,14 +214,26 @@ function seedBody(): void {
 }
 
 export async function seedTestData(): Promise<void> {
-  // Initialize LoroDoc first (async)
-  await initLoroDoc(WS_ID);
+  // Check for ?reset or ?fresh to bypass IndexedDB
+  const params = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+  const forceFresh = params?.has('reset') || params?.has('fresh');
+
+  if (forceFresh) {
+    // Bypass IndexedDB — pure in-memory LoroDoc
+    initLoroDocForTest(WS_ID);
+  } else {
+    // Normal: load from IndexedDB snapshot if available
+    await initLoroDoc(WS_ID);
+  }
 
   // Set workspace/user in stores
   useWorkspaceStore.getState().setWorkspace(WS_ID);
   useWorkspaceStore.getState().setUser('user_default');
 
   seedBody();
+
+  // Commit so Loro subscriptions fire and _version bumps for React
+  commitDoc('__seed__');
 }
 
 /** Sync seed for test environments (call after initLoroDocForTest). */

@@ -26,7 +26,7 @@ describe('ui-store persistence helpers', () => {
     });
   });
 
-  it('migrates v0 panelStack to history/index', () => {
+  it('migrates v0 panelStack through to v2 (Loro reset)', () => {
     const migrated = migrateUIStoreState(
       {
         panelStack: ['a', 'b', 'c'],
@@ -39,14 +39,25 @@ describe('ui-store persistence helpers', () => {
       sidebarOpen: boolean;
     };
 
-    expect(migrated.panelHistory).toEqual(['a', 'b', 'c']);
-    expect(migrated.panelIndex).toBe(2);
+    // v0→v2: panelStack is converted, then Loro migration resets navigation
+    expect(migrated.panelHistory).toEqual([]);
+    expect(migrated.panelIndex).toBe(-1);
     expect(migrated.sidebarOpen).toBe(false);
   });
 
-  it('keeps state untouched when no migration is needed', () => {
-    const state = { panelHistory: ['x'], panelIndex: 0 };
-    expect(migrateUIStoreState(state, 0)).toBe(state);
-    expect(migrateUIStoreState(state, 1)).toBe(state);
+  it('migrates v1 state to v2 (Loro reset)', () => {
+    const migrated = migrateUIStoreState(
+      { panelHistory: ['ws_default_LIBRARY'], panelIndex: 0, sidebarOpen: true },
+      1,
+    ) as { panelHistory: string[]; panelIndex: number };
+
+    // v1→v2: old container IDs are invalid, reset navigation
+    expect(migrated.panelHistory).toEqual([]);
+    expect(migrated.panelIndex).toBe(-1);
+  });
+
+  it('keeps state untouched when at current version', () => {
+    const state = { panelHistory: ['LIBRARY'], panelIndex: 0 };
+    expect(migrateUIStoreState(state, 2)).toBe(state);
   });
 });

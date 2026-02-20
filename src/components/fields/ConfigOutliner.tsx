@@ -183,7 +183,7 @@ export function ConfigOutliner({ nodeId }: ConfigOutlinerProps) {
             rootChildIds={contentChildIds}
             parentId={ownerTagDefId}
             rootNodeId={nodeId}
-            bulletColor={ownerColor}
+            bulletColors={ownerColor ? [ownerColor] : undefined}
           />
         );
       })}

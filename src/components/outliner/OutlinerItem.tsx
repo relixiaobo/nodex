@@ -19,6 +19,7 @@ import { FieldRow } from '../fields/FieldRow';
 import { SYS_D, SYS_V } from '../../types/index.js';
 import { useFieldOptions } from '../../hooks/use-field-options.js';
 import { resolveTagColor } from '../../lib/tag-colors.js';
+import { resolveNodeStructuralIcon } from '../../lib/field-utils.js';
 import { applyWebClipToNode } from '../../lib/webclip-service.js';
 import { marksToHtml } from '../../lib/editor-marks.js';
 import { docToMarks } from '../../lib/pm-doc-utils.js';
@@ -83,8 +84,8 @@ interface OutlinerItemProps {
   /** Called when arrow navigation reaches a boundary (first/last node in scope).
    *  Allows field-value OutlinerItems to escape to the parent outliner context. */
   onNavigateOut?: (direction: 'up' | 'down') => void;
-  /** Owner tag color: tints the bullet dot in this color (template items in config page) */
-  bulletColor?: string;
+  /** Override bullet colors (e.g. ownerColor for template items in config page). When omitted, colors derive from the node's own supertags. */
+  bulletColors?: string[];
 }
 
 function getNodeTextLengthById(nodeId: string): number {
@@ -103,7 +104,7 @@ function focusTrailingInputForParent(parentId: string): boolean {
   return false;
 }
 
-export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId, fieldDataType, attrDefId, onNavigateOut, bulletColor }: OutlinerItemProps) {
+export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId, fieldDataType, attrDefId, onNavigateOut, bulletColors }: OutlinerItemProps) {
   const node = useNode(nodeId);
   const expandKey = `${parentId}:${nodeId}`;
   const isExpanded = useUIStore((s) => s.expandedNodes.has(`${parentId}:${nodeId}`));
@@ -311,6 +312,14 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   const hasFields = fields.length > 0;
   const isReference = !!node && loroDoc.getParentId(nodeId) !== parentId;
   const isTagDef = node?.type === 'tagDef';
+  // Bullet colors: use prop override (template items) or derive from the node's own supertags
+  const tagBulletColors = useMemo(
+    () => tagIds.map((id) => resolveTagColor(id).text),
+    [tagIds],
+  );
+  const effectiveBulletColors = bulletColors ?? tagBulletColors;
+  // Structural icon: fieldDef nodes show the field type icon instead of a dot
+  const structuralIcon = node ? resolveNodeStructuralIcon(node) : null;
   const isPendingConversion = useUIStore((s) => s.pendingRefConversion?.tempNodeId === nodeId);
   // Multi-select: check derived boolean. For single-select with parent disambiguation (reference nodes),
   // also check selectedParentId to support the same node appearing in multiple places.
@@ -1853,7 +1862,8 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
             onBulletClick={handleBulletClick}
             isReference={isReference || isPendingConversion}
             tagDefColor={isTagDef ? resolveTagColor(nodeId).text : undefined}
-            bulletColor={bulletColor}
+            bulletColors={effectiveBulletColors}
+            icon={structuralIcon}
           />
           {showCheckbox && (
             <span className="flex shrink-0 h-[21px] w-[15px] items-center justify-center">

@@ -17,7 +17,7 @@ import * as loroDoc from '../../lib/loro-doc.js';
 import { useNodeStore } from '../../stores/node-store';
 import { useUIStore } from '../../stores/ui-store';
 import { useWorkspaceStore } from '../../stores/workspace-store';
-import { CONTAINER_IDS } from '../../types/index.js';
+import { CONTAINER_IDS, FIELD_TYPES } from '../../types/index.js';
 
 const WS_ID = 'ws_default';
 
@@ -50,22 +50,22 @@ function seedBody(): void {
   });
 
   // FieldDef: Status (OPTIONS)
-  cn('attrDef_status', 'tagDef_task', { type: 'fieldDef', name: 'Status', fieldType: 'OPTIONS' });
+  cn('attrDef_status', 'tagDef_task', { type: 'fieldDef', name: 'Status', fieldType: FIELD_TYPES.OPTIONS });
   cn('opt_todo',        'attrDef_status', { name: 'To Do' });
   cn('opt_in_progress', 'attrDef_status', { name: 'In Progress' });
   cn('opt_done',        'attrDef_status', { name: 'Done' });
 
   // FieldDef: Priority (OPTIONS)
-  cn('attrDef_priority', 'tagDef_task', { type: 'fieldDef', name: 'Priority', fieldType: 'OPTIONS' });
+  cn('attrDef_priority', 'tagDef_task', { type: 'fieldDef', name: 'Priority', fieldType: FIELD_TYPES.OPTIONS });
   cn('opt_high',   'attrDef_priority', { name: 'High' });
   cn('opt_medium', 'attrDef_priority', { name: 'Medium' });
   cn('opt_low',    'attrDef_priority', { name: 'Low' });
 
   // FieldDef: Due (DATE)
-  cn('attrDef_due', 'tagDef_task', { type: 'fieldDef', name: 'Due', fieldType: 'DATE' });
+  cn('attrDef_due', 'tagDef_task', { type: 'fieldDef', name: 'Due', fieldType: FIELD_TYPES.DATE });
 
   // FieldDef: Done (CHECKBOX)
-  cn('attrDef_done_chk', 'tagDef_task', { type: 'fieldDef', name: 'Done', fieldType: 'CHECKBOX' });
+  cn('attrDef_done_chk', 'tagDef_task', { type: 'fieldDef', name: 'Done', fieldType: FIELD_TYPES.CHECKBOX });
 
   // ═══════════════════════════════════════════════════════════════
   // TagDef: Person
@@ -74,10 +74,10 @@ function seedBody(): void {
     type: 'tagDef', name: 'Person',
     description: 'Tag for tracking people and their contact info',
   });
-  cn('attrDef_email',   'tagDef_person', { type: 'fieldDef', name: 'Email',   fieldType: 'EMAIL'  });
-  cn('attrDef_company', 'tagDef_person', { type: 'fieldDef', name: 'Company', fieldType: 'PLAIN'  });
-  cn('attrDef_age',     'tagDef_person', { type: 'fieldDef', name: 'Age',     fieldType: 'NUMBER', minValue: 0, maxValue: 150 });
-  cn('attrDef_website', 'tagDef_person', { type: 'fieldDef', name: 'Website', fieldType: 'URL'    });
+  cn('attrDef_email',   'tagDef_person', { type: 'fieldDef', name: 'Email',   fieldType: FIELD_TYPES.EMAIL  });
+  cn('attrDef_company', 'tagDef_person', { type: 'fieldDef', name: 'Company', fieldType: FIELD_TYPES.PLAIN  });
+  cn('attrDef_age',     'tagDef_person', { type: 'fieldDef', name: 'Age',     fieldType: FIELD_TYPES.NUMBER, minValue: 0, maxValue: 150 });
+  cn('attrDef_website', 'tagDef_person', { type: 'fieldDef', name: 'Website', fieldType: FIELD_TYPES.URL    });
 
   // ═══════════════════════════════════════════════════════════════
   // TagDef: DevTask (extends Task)
@@ -87,13 +87,13 @@ function seedBody(): void {
     extends: 'tagDef_task',
     description: 'Dev task extending Task with a Branch field',
   });
-  cn('attrDef_branch', 'tagDef_dev_task', { type: 'fieldDef', name: 'Branch', fieldType: 'PLAIN' });
+  cn('attrDef_branch', 'tagDef_dev_task', { type: 'fieldDef', name: 'Branch', fieldType: FIELD_TYPES.PLAIN });
 
   // ═══════════════════════════════════════════════════════════════
   // TagDef: WebClip
   // ═══════════════════════════════════════════════════════════════
   cn('tagDef_web_clip', CONTAINER_IDS.SCHEMA, { type: 'tagDef', name: 'web_clip' });
-  cn('attrDef_source_url', 'tagDef_web_clip', { type: 'fieldDef', name: 'Source URL', fieldType: 'URL' });
+  cn('attrDef_source_url', 'tagDef_web_clip', { type: 'fieldDef', name: 'Source URL', fieldType: FIELD_TYPES.URL });
 
   // ═══════════════════════════════════════════════════════════════
   // Library content

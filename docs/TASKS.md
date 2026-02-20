@@ -27,7 +27,7 @@ _(空)_
 
 | Agent | 当前任务 | 分支 | 修改中的文件 |
 |-------|---------|------|-------------|
-| nodex-cc | Loro Phase 2: UndoManager | `cc/loro-migration-phase1` | `loro-doc.ts`, `node-store.ts`, `use-nav-undo-keyboard.ts`, `seed-data.ts` |
+| nodex-cc | _(idle — PR #62 merged)_ | — | — |
 | nodex-cc-2 | _(idle — PR #61 merged)_ | — | — |
 | nodex-codex | _(idle)_ | — | — |
 
@@ -35,66 +35,7 @@ _(空)_
 
 ## 进行中
 
-#### Loro CRDT 迁移 Phase 1 — 本地数据引擎 + 数据模型原生化 + 命名统一
-> **详细方案**: `docs/plans/loro-migration-phase1.md`
-> **Owner**: nodex-cc
-> **分支**: `cc/loro-migration-phase1`
-> **锁定文件**: `node-store.ts`、`node.ts`、`system-nodes.ts`
-
-三位一体迁移：Loro CRDT 引擎 + 消除 Firebase 时代间接层 + 全局命名重构。纯本地，不含网络同步。
-
-**三个维度**:
-1. **存储引擎**: Loro (`LoroTree` + `LoroMap` + `LoroList`) 替换 Zustand entities + Supabase
-2. **数据模型原生化**: 消除 meta Tuple、`_ownerId`、`workspaceId`、`version` 等间接层，标签/配置直接存 LoroMap 属性
-3. **命名统一**: 扁平化 `props`、去 `_` 前缀、`DocType→NodeType`、`tuple→fieldEntry`、`attrDef→fieldDef`、`_done→completedAt` 等
-
-**实施步骤**:
-- [x] Step 0: 安装 `loro-crdt`，验证 WASM 加载 + 冷启动时间
-- [x] Step 1: 类型系统重构（新 NodexNode 接口 + NodeType + FIELD_TYPES + SYSTEM_TAGS）
-- [x] Step 2: 实现 `loro-doc.ts`（Loro 单例 + ID 映射 + 树操作 + tags LoroList + toNodexNode）
-- [x] Step 3: 重构 `node-store.ts`（去 Supabase，底层改 Loro，applyTag 简化）
-  - [x] 3a: 基础读写（替换 entities map）
-  - [x] 3b: 树操作（createChild/moveNodeTo/trashNode 等；修复 moveNodeTo 循环检测 + 同父索引调整）
-  - [x] 3c: Tag/Field 操作（applyTag 写 node.tags + 创建 fieldEntry 子节点）
-  - [x] 3d: 内容编辑
-- [x] Step 4: 种子数据重写（Loro API + 新命名 + 无 meta Tuple）
-- [x] Step 5: Hooks + 工具函数适配（use-node-tags 读 node.tags，checkbox-utils 简化）
-- [x] Step 6: 组件层全局替换（40+ 文件 `props.xxx` → `xxx`，TypeScript 编译器引导）
-- [x] Step 7: 测试 + 清理（14 个失败测试全部重写，全部 436 tests / 55 files 通过）
-
-**验收标准** ✅:
-- ✅ `npm run typecheck` 通过（0 错误）
-- ✅ `npm run check:test-sync` 通过
-- ✅ `npm run test:run` 通过（436/436 tests）
-- ✅ `npm run build` 通过（已添加 vite-plugin-wasm）
-- ⏳ standalone 交互验证 + IndexedDB 持久化（待 PR review 后验证）
-
-**Phase 2（进行中）**: UndoManager 结构性撤销/重做 — 见下方任务
-
-迭代日志:
-- [2026-02-20 nodex-cc] Step 0 完成：npm install loro-crdt@1.10.6，Node.js 环境冷启动 0.03ms，7 项验证全通过（LoroTree CRUD、LoroList tags、树移动、快照持久化、循环检测）。关键 API 确认：setContainer 需传实例 `new LoroList()` 而非字符串；getOrCreateContainer 是幂等写法；MV3 CSP 已配置 `wasm-unsafe-eval`。浏览器 WASM 加载耗时预计 50-100ms，在 App 初始化时预加载可隐藏。
-- [2026-02-20 nodex-cc] Phase 1 完成：Steps 1-7 全部实现。436 vitest tests 全通过，typecheck 0 错误，build 成功。关键完成项：loro-doc.ts 单例 + toNodexNode；node-store.ts 全面 Loro 化；14 个失败测试全部重写适配新 API；修复 moveNodeTo 循环检测 + 同父索引调整；vite-plugin-wasm 解决 WASM build 问题。
-- [2026-02-20 nodex-cc] Phase 2 UndoManager 实现：447 tests 全通过（新增 11 个 loro-undo 测试）。关键设计：(1) `commitDoc('__seed__')` 在 seed 后提交并被 UndoManager excludeOriginPrefixes 过滤；(2) node-store 关键操作（createChild/moveNodeTo/trashNode 等）结尾调用 `commitDoc()` 记录 undo 步骤；(3) undo/redo 后调用 `rebuildMappings()` 重建 TreeID 映射（Loro undo/redo 产生新 TreeID）；(4) Cmd+Z 优先 canUndoDoc() → structuralUndo，fallback → navUndo。
-
-#### Loro Phase 2 — UndoManager 结构性撤销/重做
-> **Owner**: nodex-cc
-> **分支**: `cc/loro-migration-phase1`
-> **详细方案**: 同本 PR（计划文件在聊天中）
-
-- [x] `loro-doc.ts`: 添加 `UndoManager` + `commitDoc` + `undoDoc/redoDoc/canUndoDoc/canRedoDoc` 导出
-- [x] `seed-data.ts`: `seedTestDataSync` 结尾调用 `commitDoc('__seed__')` 隔离种子操作
-- [x] `node-store.ts`: `createChild/moveNodeTo/trashNode/restoreNode/indent/outdent/moveUp/moveDown` 结尾调用 `commitDoc()`
-- [x] `use-nav-undo-keyboard.ts`: Cmd+Z 三层优先级（ProseMirror → Loro structural → nav）
-- [x] `tests/vitest/loro-undo.test.ts`: 11 项结构性撤销/重做测试
-- [x] `docs/TESTING.md`: 新增 §1.50
-- [x] 447 tests pass, typecheck clean, build success
-
-**Roadmap（NOT in this PR）**:
-- Phase 2b: LoroMovableList（doneCheckedMappings 并发安全重排，UI 未就绪）
-- Phase 2c: Fine-grained subscriptions（LoroTree diff 替换 O(n) re-render，待稳定后实施）
-- Phase 3: LoroText + Peritext（rich text，需数据迁移）
-- Phase 3: Time Travel / Checkout（版本历史 UI，待设计）
-- Phase 4: Incremental Sync、doc.fork()
+_(空)_
 
 ---
 
@@ -102,10 +43,7 @@ _(空)_
 
 ### P0
 
-_(Loro 迁移已移到「进行中」)_
-
-#### BUG: Supabase Realtime echo 导致节点错乱（已被 Loro 迁移取代）
-> **状态**: 不再单独修复。Loro 迁移从根本上消除此问题。`_pendingChildrenOps` 在迁移完成后移除。
+_(空)_
 
 ---
 
@@ -291,6 +229,7 @@ _(Loro 迁移已移到「进行中」)_
 
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
+| 2026-02-20 | Loro CRDT 迁移 Phase 1 — 本地数据引擎 + 数据模型 + 命名 + UndoManager | nodex-cc | #62 |
 | 2026-02-19 | Editor Bug: 首次点击行尾空白光标落到开头 | nodex | — |
 | 2026-02-19 | 数据模型简化：消除 Metanode + AssociatedData (Phase 0-3) | nodex-cc | #60 |
 | 2026-02-19 | 用户认证 — Google OAuth 登录 + Supabase Auth | nodex-cc-2 | #61 |

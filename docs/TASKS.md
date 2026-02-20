@@ -43,6 +43,7 @@ _(空)_
 > **迭代日志**:
 > - [2026-02-21 nodex] 任务创建，合并 feature-sync-2026-02-20 + loro-migration 两份文档，换视角重新 Review
 > - [2026-02-20 nodex-codex] 认领任务，创建分支 `codex/loro-full-review`，开始按四个角度执行全量 Review
+> - [2026-02-20 nodex-codex] 完成首轮全量审查，新增 P0×2 / P1×3 / P2×3，并补充 7 项测试缺口与废弃代码清理清单
 
 ### 代码 Review — feature-sync-2026-02-20 ✅
 > **Owner**: nodex-codex | **Branch**: main（只读，不修改代码）

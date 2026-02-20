@@ -402,6 +402,7 @@ tagDef_article
 | 2026-02-16 | NDX_D02 (COLOR) 注册为新数据类型 | FieldValueOutliner 新增 COLOR 分支渲染 ColorSwatchPicker |
 | 2026-02-18 | 消除 Metanode 间接层，用 node.meta TEXT[] 替代 | PostgreSQL 原生数组替代 Firebase 容器节点 |
 | 2026-02-18 | 消除 AssociatedData，值直接存 Tuple.children[1:] | Tuple 本身就是列表，无需额外容器 |
+| 2026-02-20 | 所有 store mutation action 末尾必须调用 `loroDoc.commitDoc()` | Loro `doc.subscribe` 仅在 `doc.commit()` 后触发，缺失会导致 `_version` 不更新、React UI 冻结；系统性修复 22 个 functions（见 `docs/LESSONS.md` § Loro CRDT：mutations 必须 commitDoc()） |
 
 ## 当前状态
 

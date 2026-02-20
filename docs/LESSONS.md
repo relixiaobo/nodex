@@ -27,6 +27,26 @@
 - **store 中的瞬态共享数据必须带身份标识**：`focusClickCoords` 须含 `nodeId + parentId`，防止快速切换时旧数据被新组件错误消费
 - **`caretPositionFromPoint`（标准）优先，`caretRangeFromPoint`（webkit）兜底**
 
+### Loro CRDT：mutations 必须 commitDoc()
+
+**根本原因**：Loro 的 `doc.subscribe(cb)` 只在 `doc.commit()` 调用后才触发，raw mutations（`node.data.set(key, val)`、`tree.create()`、`tree.delete()`）不会触发订阅。node-store 的 `_version` 完全依赖 `doc.subscribe` 回调，React 选择器靠 `_version` 变化决定是否重渲染。
+
+**症状**：点击 toggle/color 等控件，数据确实写入了（`getNode()` 能读到新值），但 UI 冻结不更新。
+
+**规则**：**每个 store action 结束时必须调用 `loroDoc.commitDoc()`**，包括：
+- 直接调用 `loroDoc.setNodeData/setNodeDataBatch/deleteNodeData`
+- 直接调用 `loroDoc.createNode/deleteNode/moveNode`
+- 调用 `loroDoc.addDoneMappingEntry/removeDoneMappingEntry` 等高层封装
+- **例外**：如果 action 会调用另一个已包含 `commitDoc` 的 action，可以不重复；
+  但如果同一个 action 内有"其他 action 调用之外"的额外 mutations，结束时仍需 commitDoc
+
+**批量场景**：多步 mutations 放在同一个 action 里，最后一次 commitDoc 即可（原子性）。
+不要每步都 commitDoc（会产生多次提交，但功能正确，只是产生多个历史记录）。
+
+**`autoCollectOption` 教训**：原来调用 `get().addFieldOption()`（内含 commitDoc）导致后续 mutations 在 commit 之后执行，没有被纳入同一个原子提交。修复方法：内联 mutations，在所有步骤完成后统一 commitDoc。
+
+**已修复的函数列表**（2026-02-20）：`setFieldValue`、`setOptionsFieldValue`、`selectFieldOption`、`clearFieldValue`、`addFieldToNode`、`addUnnamedFieldToNode`、`moveFieldEntry`、`removeField`、`renameFieldDef`、`changeFieldType`、`addFieldOption`、`removeFieldOption`、`autoCollectOption`、`toggleCheckboxField`、`replaceFieldDef`、`toggleNodeDone`、`cycleNodeCheckbox`、**`setConfigValue`**、`addDoneMappingEntry`、`removeDoneMappingEntry`、`addReference`、`removeReference`、`startRefConversion`。
+
 ### 树操作边界条件
 
 - **handleBlur 竞态**: onBlur 须检查 `focusedNodeId === nodeId` 再清除（现已改为 rAF 延迟）

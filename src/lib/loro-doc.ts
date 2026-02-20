@@ -33,6 +33,29 @@ const subscribers = new Set<() => void>();
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 
 // ============================================================
+// 读取缓存 — 保证同一 version 内 toNodexNode/getChildren 返回稳定引用
+// React 的 useSyncExternalStore 要求 getSnapshot 返回缓存结果，
+// 否则会因引用不稳定触发无限 re-render。
+// ============================================================
+
+let _cacheVer = 0;
+let _lastCacheVer = -1;
+const _nodeCache = new Map<string, NodexNode | null>();
+const _childrenCache = new Map<string, string[]>();
+
+/** 标记缓存失效（每次 Loro 数据变更时调用） */
+function invalidateCache(): void { _cacheVer++; }
+
+/** 在读取前调用 — 若版本变化则清空缓存 */
+function checkCache(): void {
+  if (_lastCacheVer !== _cacheVer) {
+    _nodeCache.clear();
+    _childrenCache.clear();
+    _lastCacheVer = _cacheVer;
+  }
+}
+
+// ============================================================
 // 树访问辅助
 // ============================================================
 
@@ -62,6 +85,7 @@ function removeMapping(nodexId: string): void {
 function rebuildMappings(): void {
   nodexToTree.clear();
   treeToNodex.clear();
+  invalidateCache();
   const tree = getTree();
   for (const node of tree.nodes()) {
     const storedId = node.data.get('id') as string | undefined;
@@ -76,6 +100,7 @@ function rebuildMappings(): void {
 // ============================================================
 
 function notifySubscribers(): void {
+  invalidateCache();
   for (const cb of subscribers) cb();
 }
 
@@ -139,6 +164,7 @@ export function resetLoroDoc(): void {
   nodexToTree.clear();
   treeToNodex.clear();
   currentWorkspaceId = null;
+  invalidateCache();
   if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
 }
 
@@ -163,6 +189,7 @@ export function createNode(
   parentNodexId: string | null,
   index?: number,
 ): string {
+  invalidateCache();
   const tree = getTree();
   const id = nodexId ?? nanoid();
   const parentTreeId = parentNodexId ? nodexToTree.get(parentNodexId) : undefined;
@@ -176,6 +203,7 @@ export function createNode(
 }
 
 export function moveNode(nodexId: string, newParentNodexId: string, index?: number): void {
+  invalidateCache();
   const tree = getTree();
   const treeId = nodexToTree.get(nodexId);
   const parentTreeId = nodexToTree.get(newParentNodexId);
@@ -192,6 +220,7 @@ function collectDescendants(nodexId: string): string[] {
 }
 
 export function deleteNode(nodexId: string): void {
+  invalidateCache();
   const tree = getTree();
   const treeId = nodexToTree.get(nodexId);
   if (!treeId) return;
@@ -214,6 +243,7 @@ export function getNodeData(nodexId: string): Record<string, unknown> | null {
 }
 
 export function setNodeData(nodexId: string, key: string, value: unknown): void {
+  invalidateCache();
   const tree = getTree();
   const treeId = nodexToTree.get(nodexId);
   if (!treeId) return;
@@ -225,6 +255,7 @@ export function setNodeData(nodexId: string, key: string, value: unknown): void 
 }
 
 export function setNodeDataBatch(nodexId: string, data: Record<string, unknown>): void {
+  invalidateCache();
   const tree = getTree();
   const treeId = nodexToTree.get(nodexId);
   if (!treeId) return;
@@ -238,6 +269,7 @@ export function setNodeDataBatch(nodexId: string, data: Record<string, unknown>)
 }
 
 export function deleteNodeData(nodexId: string, key: string): void {
+  invalidateCache();
   const tree = getTree();
   const treeId = nodexToTree.get(nodexId);
   if (!treeId) return;
@@ -260,6 +292,7 @@ function getTagsContainer(nodexId: string): LoroList | null {
 }
 
 export function addTag(nodexId: string, tagDefId: string): void {
+  invalidateCache();
   const tags = getTagsContainer(nodexId);
   if (!tags) return;
   const arr = tags.toArray() as string[];
@@ -267,6 +300,7 @@ export function addTag(nodexId: string, tagDefId: string): void {
 }
 
 export function removeTag(nodexId: string, tagDefId: string): void {
+  invalidateCache();
   const tags = getTagsContainer(nodexId);
   if (!tags) return;
   const arr = tags.toArray() as string[];
@@ -299,18 +333,21 @@ export function getNodeList(nodexId: string, key: string): unknown[] {
 }
 
 export function pushToNodeList(nodexId: string, key: string, value: unknown): void {
+  invalidateCache();
   const list = getListContainer(nodexId, key);
   if (!list) return;
   list.insert(list.length, value);
 }
 
 export function removeFromNodeList(nodexId: string, key: string, index: number): void {
+  invalidateCache();
   const list = getListContainer(nodexId, key);
   if (!list) return;
   list.delete(index, 1);
 }
 
 export function clearNodeList(nodexId: string, key: string): void {
+  invalidateCache();
   const list = getListContainer(nodexId, key);
   if (!list || list.length === 0) return;
   list.delete(0, list.length);
@@ -320,15 +357,23 @@ export function clearNodeList(nodexId: string, key: string): void {
 // 查询
 // ============================================================
 
+const EMPTY_CHILDREN: string[] = [];
+
 export function getChildren(parentNodexId: string): string[] {
+  checkCache();
+  const cached = _childrenCache.get(parentNodexId);
+  if (cached !== undefined) return cached;
+
   const tree = getTree();
   const parentTreeId = nodexToTree.get(parentNodexId);
-  if (!parentTreeId) return [];
+  if (!parentTreeId) { _childrenCache.set(parentNodexId, EMPTY_CHILDREN); return EMPTY_CHILDREN; }
   const parent = tree.getNodeByID(parentTreeId);
-  if (!parent) return [];
-  return (parent.children() ?? [])
+  if (!parent) { _childrenCache.set(parentNodexId, EMPTY_CHILDREN); return EMPTY_CHILDREN; }
+  const result = (parent.children() ?? [])
     .map(c => treeToNodex.get(c.id))
     .filter((id): id is string => id !== undefined);
+  _childrenCache.set(parentNodexId, result);
+  return result;
 }
 
 export function getParentId(nodexId: string): string | null {
@@ -362,11 +407,15 @@ export function getRootNodeIds(): string[] {
 // ============================================================
 
 export function toNodexNode(nodexId: string): NodexNode | null {
+  checkCache();
+  const cached = _nodeCache.get(nodexId);
+  if (cached !== undefined) return cached;
+
   const tree = getTree();
   const treeId = nodexToTree.get(nodexId);
-  if (!treeId) return null;
+  if (!treeId) { _nodeCache.set(nodexId, null); return null; }
   const treeNode = tree.getNodeByID(treeId);
-  if (!treeNode) return null;
+  if (!treeNode) { _nodeCache.set(nodexId, null); return null; }
 
   const data = treeNode.data;
   const childIds = (treeNode.children() ?? [])
@@ -377,7 +426,7 @@ export function toNodexNode(nodexId: string): NodexNode | null {
   const tags = [...new Set(tagsRaw.toArray() as string[])];
   const now = Date.now();
 
-  return {
+  const result: NodexNode = {
     id: nodexId,
     type: data.get('type') as NodexNode['type'],
     name: data.get('name') as string | undefined,
@@ -416,6 +465,8 @@ export function toNodexNode(nodexId: string): NodexNode | null {
     maxValue: data.get('maxValue') as number | undefined,
     sourceSupertag: data.get('sourceSupertag') as string | undefined,
   };
+  _nodeCache.set(nodexId, result);
+  return result;
 }
 
 // ============================================================

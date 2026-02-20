@@ -23,13 +23,13 @@ export function useFieldOptions(attrDefId: string): FieldOption[] {
     void state._version;
     if (!attrDefId) return EMPTY;
 
-    const dataType = resolveDataType({}, attrDefId);
+    const dataType = resolveDataType(attrDefId);
 
     // Options from supertag — all nodes tagged with source supertag
     if (dataType === SYS_D.OPTIONS_FROM_SUPERTAG) {
-      const tagDefId = resolveSourceSupertag({}, attrDefId);
+      const tagDefId = resolveSourceSupertag(attrDefId);
       if (!tagDefId) return EMPTY;
-      const ids = resolveTaggedNodes({}, tagDefId);
+      const ids = resolveTaggedNodes(tagDefId);
       if (ids.length === 0) return EMPTY;
       const options = ids
         .map((id) => {
@@ -41,8 +41,8 @@ export function useFieldOptions(attrDefId: string): FieldOption[] {
     }
 
     // Predetermined + auto-collected options
-    const predeterminedIds = resolveFieldOptions({}, attrDefId);
-    const autoCollectedIds = resolveAutoCollectedOptions({}, attrDefId);
+    const predeterminedIds = resolveFieldOptions(attrDefId);
+    const autoCollectedIds = resolveAutoCollectedOptions(attrDefId);
     const seen = new Set<string>();
     const allIds: string[] = [];
     for (const id of predeterminedIds) {

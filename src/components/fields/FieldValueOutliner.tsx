@@ -61,7 +61,7 @@ export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, onNaviga
   const fields = useNodeFields(tupleId);
   const fieldMap = useMemo(() => {
     const m = new Map<string, FieldEntry>();
-    for (const f of fields) m.set(f.tupleId, f);
+    for (const f of fields) m.set(f.fieldEntryId, f);
     return m;
   }, [fields]);
 
@@ -227,7 +227,7 @@ export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, onNaviga
           <div key={id} className="@container" style={{ paddingLeft: 6 + 15 + 4 }}>
             <FieldRow
               nodeId={tupleId}
-              attrDefId={fieldMap.get(id)!.attrDefId}
+              attrDefId={fieldMap.get(id)!.fieldDefId}
               attrDefName={fieldMap.get(id)!.attrDefName}
               tupleId={id}
               valueNodeId={fieldMap.get(id)!.valueNodeId}

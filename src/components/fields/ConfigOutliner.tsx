@@ -50,7 +50,7 @@ export function ConfigOutliner({ nodeId }: ConfigOutlinerProps) {
 
   // For tagDef: get Extend chain (ancestor tagDef IDs)
   const extendsChain = useMemo(
-    () => (isTagDef ? getExtendsChain({}, nodeId) : []),
+    () => (isTagDef ? getExtendsChain(nodeId) : []),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [isTagDef, _version, nodeId],
   );
@@ -64,7 +64,7 @@ export function ConfigOutliner({ nodeId }: ConfigOutlinerProps) {
     for (const f of fields) {
       // Skip config fields — those are rendered by FieldList
       if (f.isSystemConfig) continue;
-      m.set(f.tupleId, f);
+      m.set(f.fieldEntryId, f);
     }
     return m;
   }, [fields]);
@@ -97,10 +97,10 @@ export function ConfigOutliner({ nodeId }: ConfigOutlinerProps) {
             type: 'field',
             ownerTagDefId: ancestorId,
             fieldEntry: {
-              attrDefId: keyId,
+              fieldDefId: keyId,
               attrDefName: fieldDef.name ?? 'Untitled',
-              tupleId: cid,
-              dataType: resolveDataType({}, keyId),
+              fieldEntryId: cid,
+              dataType: resolveDataType(keyId),
             },
           });
         } else if (!child.type) {
@@ -157,13 +157,13 @@ export function ConfigOutliner({ nodeId }: ConfigOutlinerProps) {
     <div className={`min-h-[22px]${firstIsField ? ' pt-1' : ''}${lastIsField ? ' pb-1' : ''}`}>
       {mergedItems.map(({ id, type, ownerTagDefId, fieldEntry }, i) => {
         // Color from owning tagDef (only for tagDef config pages with extends)
-        const ownerColor = extendsChain.length > 0 ? resolveTagColor({}, ownerTagDefId).text : undefined;
+        const ownerColor = extendsChain.length > 0 ? resolveTagColor(ownerTagDefId).text : undefined;
 
         return type === 'field' && fieldEntry ? (
           <div key={id} className="@container" style={{ paddingLeft: 6 + 15 + 4 }}>
             <FieldRow
               nodeId={ownerTagDefId}
-              attrDefId={fieldEntry.attrDefId}
+              attrDefId={fieldEntry.fieldDefId}
               attrDefName={fieldEntry.attrDefName}
               tupleId={id}
               valueNodeId={fieldEntry.valueNodeId}

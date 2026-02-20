@@ -85,7 +85,6 @@ export function getTagColor(tagDefId: string): TagColor {
  * 3. Fallback → deterministic hash
  */
 export function resolveTagColor(
-  _entities: Record<string, NodexNode> | unknown,
   tagDefId: string,
 ): TagColor {
   // System tags always gray
@@ -94,7 +93,7 @@ export function resolveTagColor(
   // Check configured color via loroDoc
   const tagDef = loroDoc.toNodexNode(tagDefId);
   if (tagDef) {
-    const colorKey = resolveConfigValue({}, tagDef, SYS_A.COLOR);
+    const colorKey = resolveConfigValue(tagDef, SYS_A.COLOR);
     if (colorKey && TAG_COLOR_MAP[colorKey]) {
       return TAG_COLOR_MAP[colorKey];
     }

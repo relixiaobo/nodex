@@ -1,6 +1,6 @@
 /**
  * Supertag Extend (Inheritance) — Loro model.
- * getExtendsChain reads from LoroDoc (first arg ignored).
+ * getExtendsChain reads from LoroDoc.
  * applyTag creates fieldEntry nodes for tagDef's fieldDefs (and extends chain).
  * removeTag removes those fieldEntry nodes.
  */
@@ -25,12 +25,12 @@ describe('getExtendsChain (field-utils public API)', () => {
   });
 
   it('returns empty array for tagDef with no extends', () => {
-    expect(getExtendsChain({}, 'tagDef_task')).toEqual([]);
+    expect(getExtendsChain('tagDef_task')).toEqual([]);
   });
 
   it('returns parent tagDef for single-level extends', () => {
     // tagDef_dev_task extends tagDef_task
-    expect(getExtendsChain({}, 'tagDef_dev_task')).toEqual(['tagDef_task']);
+    expect(getExtendsChain('tagDef_dev_task')).toEqual(['tagDef_task']);
   });
 
   it('returns ancestors in ancestor-first order for multi-level extends', () => {
@@ -38,13 +38,13 @@ describe('getExtendsChain (field-utils public API)', () => {
     loroDoc.createNode(grandId, 'SCHEMA');
     loroDoc.setNodeDataBatch(grandId, { type: 'tagDef', name: 'Grand', extends: 'tagDef_dev_task' });
 
-    const chain = getExtendsChain({}, grandId);
+    const chain = getExtendsChain(grandId);
     expect(chain).toEqual(['tagDef_task', 'tagDef_dev_task']);
   });
 
   it('handles circular references without infinite loop', () => {
     loroDoc.setNodeData('tagDef_task', 'extends', 'tagDef_dev_task');
-    const chain = getExtendsChain({}, 'tagDef_dev_task');
+    const chain = getExtendsChain('tagDef_dev_task');
     expect(Array.isArray(chain)).toBe(true);
   });
 });

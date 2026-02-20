@@ -27,14 +27,14 @@ export function PanelTitle({ nodeId, onTitleRef }: PanelTitleProps) {
   const isTagDef = node?.type === 'tagDef';
   const dataType = useNodeStore((s) => {
     void s._version;
-    return isAttrDef ? resolveDataType({}, nodeId) : '';
+    return isAttrDef ? resolveDataType(nodeId) : '';
   });
   const FieldIcon = isAttrDef ? getFieldTypeIcon(dataType) : null;
 
   // TagDef: colored # badge reflecting configured SYS_A11 color
   const tagDefColor = useNodeStore((s) => {
     void s._version;
-    return isTagDef ? resolveTagColor({}, nodeId) : null;
+    return isTagDef ? resolveTagColor(nodeId) : null;
   });
 
   const rawName = node?.name ?? '';

@@ -116,8 +116,8 @@ export function FieldRow({
     if (!VALIDATED_FIELD_TYPES.has(dataType)) return null;
     const tuple = s.getNode(tupleId);
     if (!tuple?.children || tuple.children.length === 0) return null;
-    const min = resolveMinValue({}, attrDefId);
-    const max = resolveMaxValue({}, attrDefId);
+    const min = resolveMinValue(attrDefId);
+    const max = resolveMaxValue(attrDefId);
     for (const cid of tuple.children) {
       const child = s.getNode(cid);
       if (child && !child.type && child.name) {
@@ -138,7 +138,7 @@ export function FieldRow({
   });
 
   const siblingFieldIds = useMemo(
-    () => new Set(siblingFields.map((f) => f.tupleId)),
+    () => new Set(siblingFields.map((f) => f.fieldEntryId)),
     [siblingFields],
   );
   const renderableSiblings = useMemo(() => {

@@ -41,7 +41,6 @@ const SYS_A_TO_PROP: Partial<Record<string, keyof NodexNode>> = {
  * @deprecated In new code, read NodexNode properties directly.
  */
 export function resolveConfigValue(
-  _entities: unknown,
   node: NodexNode,
   configKey: string,
 ): string | undefined {
@@ -64,7 +63,7 @@ export function isSystemConfigField(keyId: string): boolean {
  * Resolve the data type of a fieldDef.
  * Returns a FIELD_TYPES string (e.g., 'plain', 'options').
  */
-export function resolveDataType(_entities: unknown, fieldDefId: string): string {
+export function resolveDataType(fieldDefId: string): string {
   const fieldDef = loroDoc.toNodexNode(fieldDefId);
   if (!fieldDef) return FIELD_TYPES.PLAIN;
   return fieldDef.fieldType ?? FIELD_TYPES.PLAIN;
@@ -74,7 +73,6 @@ export function resolveDataType(_entities: unknown, fieldDefId: string): string 
  * Resolve the source supertag ID for an OPTIONS_FROM_SUPERTAG fieldDef.
  */
 export function resolveSourceSupertag(
-  _entities: unknown,
   fieldDefId: string,
 ): string | undefined {
   const fieldDef = loroDoc.toNodexNode(fieldDefId);
@@ -85,7 +83,7 @@ export function resolveSourceSupertag(
  * Find all content nodes tagged with a given tagDefId.
  * Iterates all known node IDs and checks node.tags.
  */
-export function resolveTaggedNodes(_entities: unknown, tagDefId: string): string[] {
+export function resolveTaggedNodes(tagDefId: string): string[] {
   const result: string[] = [];
   for (const id of loroDoc.getAllNodeIds()) {
     const node = loroDoc.toNodexNode(id);
@@ -99,7 +97,7 @@ export function resolveTaggedNodes(_entities: unknown, tagDefId: string): string
  * Resolve the hide-field condition from a fieldDef.
  * Returns the SYS_V constant (NEVER, WHEN_EMPTY, etc.) or the string value.
  */
-export function resolveHideField(_entities: unknown, fieldDefId: string): string {
+export function resolveHideField(fieldDefId: string): string {
   const fieldDef = loroDoc.toNodexNode(fieldDefId);
   return fieldDef?.hideField ?? SYS_V.NEVER;
 }
@@ -107,20 +105,20 @@ export function resolveHideField(_entities: unknown, fieldDefId: string): string
 /**
  * Resolve whether a fieldDef field is marked as required (nullable = false).
  */
-export function resolveRequired(_entities: unknown, fieldDefId: string): boolean {
+export function resolveRequired(fieldDefId: string): boolean {
   const fieldDef = loroDoc.toNodexNode(fieldDefId);
   // nullable=false means required=true (confusingly named legacy)
   return fieldDef?.nullable === false;
 }
 
 /** Resolve minimum value for Number/Integer fields. */
-export function resolveMinValue(_entities: unknown, fieldDefId: string): number | undefined {
+export function resolveMinValue(fieldDefId: string): number | undefined {
   const fieldDef = loroDoc.toNodexNode(fieldDefId);
   return fieldDef?.minValue;
 }
 
 /** Resolve maximum value for Number/Integer fields. */
-export function resolveMaxValue(_entities: unknown, fieldDefId: string): number | undefined {
+export function resolveMaxValue(fieldDefId: string): number | undefined {
   const fieldDef = loroDoc.toNodexNode(fieldDefId);
   return fieldDef?.maxValue;
 }
@@ -165,7 +163,7 @@ export function getFieldTypeIcon(dataType: string): LucideIcon {
  * Resolve option node IDs for an OPTIONS-type fieldDef.
  * Options are direct non-fieldDef, non-fieldEntry children of the fieldDef node.
  */
-export function resolveFieldOptions(_entities: unknown, fieldDefId: string): string[] {
+export function resolveFieldOptions(fieldDefId: string): string[] {
   const children = loroDoc.getChildren(fieldDefId);
   return children.filter((cid) => {
     const child = loroDoc.toNodexNode(cid);
@@ -179,13 +177,12 @@ export function resolveFieldOptions(_entities: unknown, fieldDefId: string): str
  * Returns them when fieldDef.autocollectOptions is true.
  */
 export function resolveAutoCollectedOptions(
-  _entities: unknown,
   fieldDefId: string,
 ): string[] {
   const fieldDef = loroDoc.toNodexNode(fieldDefId);
   if (!fieldDef?.autocollectOptions) return [];
   // Auto-collected options are also in children (same pool as pre-defined options)
-  return resolveFieldOptions(null, fieldDefId);
+  return resolveFieldOptions(fieldDefId);
 }
 
 /**
@@ -194,7 +191,6 @@ export function resolveAutoCollectedOptions(
  * @deprecated In new code, read fieldDef.autocollectOptions directly.
  */
 export function findAutoCollectTupleId(
-  _entities: unknown,
   _fieldDefId: string,
 ): string | null {
   return null; // No longer stored as a Tuple
@@ -439,7 +435,7 @@ export const TAGDEF_OUTLINER_FIELDS = TAGDEF_CONFIG_FIELDS.filter(f => f.control
  * Resolve default child supertag IDs for a parent node.
  * Walks the parent's tags and reads tagDef.childSupertag from each tagDef.
  */
-export function resolveChildSupertags(_entities: unknown, parentId: string): string[] {
+export function resolveChildSupertags(parentId: string): string[] {
   const parent = loroDoc.toNodexNode(parentId);
   if (!parent?.tags.length) return [];
 
@@ -461,7 +457,7 @@ export function resolveChildSupertags(_entities: unknown, parentId: string): str
  * Walk the Extend chain for a tagDef and return ancestor tagDef IDs
  * in ancestor-first order. Does not include self. Handles circular refs.
  */
-export function getExtendsChain(_entities: unknown, tagDefId: string): string[] {
+export function getExtendsChain(tagDefId: string): string[] {
   const chain: string[] = [];
   const visited = new Set<string>();
 
@@ -529,7 +525,6 @@ export function formatTimestamp(ms: number | undefined): string {
  * Resolve the display value for a system field on a given node.
  */
 export function resolveSystemFieldValue(
-  _entities: unknown,
   nodeId: string,
   sysDef: SystemFieldDef,
 ): { text: string; refNodeId?: string } {

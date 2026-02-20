@@ -31,7 +31,7 @@ export function OutlinerView({ rootNodeId, showTemplateTuples }: OutlinerViewPro
   // Build field lookup by tuple ID (same pattern as OutlinerItem)
   const fieldMap = useMemo(() => {
     const m = new Map<string, FieldEntry>();
-    for (const f of fields) m.set(f.tupleId, f);
+    for (const f of fields) m.set(f.fieldEntryId, f);
     return m;
   }, [fields]);
 
@@ -118,7 +118,7 @@ export function OutlinerView({ rootNodeId, showTemplateTuples }: OutlinerViewPro
           <div key={id} className="@container" style={{ paddingLeft: 6 + 15 + 4 }}>
             <FieldRow
               nodeId={rootNodeId}
-              attrDefId={fieldMap.get(id)!.attrDefId}
+              attrDefId={fieldMap.get(id)!.fieldDefId}
               attrDefName={fieldMap.get(id)!.attrDefName}
               tupleId={id}
               valueNodeId={fieldMap.get(id)!.valueNodeId}

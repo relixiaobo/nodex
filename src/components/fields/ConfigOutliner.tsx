@@ -157,8 +157,8 @@ export function ConfigOutliner({ nodeId }: ConfigOutlinerProps) {
   return (
     <div className={`min-h-[22px]${firstIsField ? ' pt-1' : ''}${lastIsField ? ' pb-1' : ''}`}>
       {mergedItems.map(({ id, type, ownerTagDefId, fieldEntry }, i) => {
-        // Color from owning tagDef (only for tagDef config pages with extends)
-        const ownerColor = extendsChain.length > 0 ? resolveTagColor(ownerTagDefId).text : undefined;
+        // Color from owning tagDef — always tint fieldDef icons to match the supertag's color
+        const ownerColor = resolveTagColor(ownerTagDefId).text;
 
         return type === 'field' && fieldEntry ? (
           <div key={id} className="@container" style={{ paddingLeft: 6 + 15 + 4 }}>

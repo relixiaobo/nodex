@@ -176,4 +176,12 @@ describe('startRefConversion', () => {
     expect(tempNode.inlineRefs).toBeDefined();
     expect(tempNode.inlineRefs![0].targetNodeId).toBe('task_1');
   });
+
+  it('keeps target node when called with targetId directly (defensive path)', () => {
+    const tempId = useNodeStore.getState().startRefConversion('task_1', 'note_2', 0);
+    expect(tempId).toBeTruthy();
+    expect(loroDoc.hasNode('task_1')).toBe(true);
+    const tempNode = loroDoc.toNodexNode(tempId)!;
+    expect(tempNode.inlineRefs?.[0]?.targetNodeId).toBe('task_1');
+  });
 });

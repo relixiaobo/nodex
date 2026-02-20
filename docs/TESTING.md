@@ -227,6 +227,7 @@ npm run test:run
 5. `addReference(parentId, targetId)` 非幂等 — 每次创建新的 reference 节点
 6. `removeReference(refNodeId)` 删除 reference 节点
 7. `startRefConversion(refId, parentId, idx)` 替换 ref 节点为 inline content 节点
+8. `startRefConversion(targetId, parentId, idx)` 防御路径：不删除 target，本地生成 inline content 节点
 
 ### 1.8 字段状态流（Node Store）
 
@@ -269,6 +270,7 @@ npm run test:run
 6. `removeTag` 删除继承链上所有模板来源的 fieldEntry 节点
 7. `removeTag` 保留手动添加（非模板来源）的 fieldEntry 节点
 8. `removeTag` 从 node.tags 数组移除 tagDefId
+9. 多标签共享继承字段时，`removeTag` 不误删仍被其他标签需要的 fieldEntry
 
 ### 1.11 Guard Rails（错误输入防护）
 
@@ -281,6 +283,7 @@ npm run test:run
 3. `removeFieldOption(fieldDefId, optionId)` — 直接删除节点（无所有权校验），不存在时不报错
 4. `addUnnamedFieldToNode(nodeId)` — 返回 `{ fieldEntryId, fieldDefId }` 结构
 5. `replaceFieldDef(nodeId, feId, oldFdId, newFdId)` — 直接写入 fieldDefId（Loro 无 owner 校验）
+6. Workspace 容器节点不可移动/不可入 Trash（move/indent/up/down/trash guard）
 
 ### 1.12 Trash 语义（TagDef / AttrDef）
 
@@ -786,6 +789,9 @@ Store 集成 — removeDoneMappingEntry（2 cases）:
 14. `store.removeDoneMappingEntry(tagDefId, true, fieldDefId, optionId)` — 从 loroDoc 移除
 15. 移除后 getDoneStateMappings 结果为空
 
+Store 集成 — toggleNodeDone（1 case）:
+16. 有 doneMapping 时仍只产生一次 commit（`_version` 仅 +1）
+
 ### 1.39 Web Clip 落库服务
 
 **测试文件**: `tests/vitest/webclip-service.test.ts`
@@ -904,6 +910,17 @@ createSibling 自动标签（2 cases）:
 1. 空 FieldValueOutliner 显示 TrailingInput
 2. 最后一项为 field 时显示 TrailingInput
 3. 最后一项为 content 时隐藏 TrailingInput
+4. `resolveSupertagPickerSelectedId` 从 value node `name` 读取已选 supertag id（并支持 targetId 回退）
+
+### 1.47 Outliner 内容类型判定
+
+**测试文件**: `tests/vitest/node-type-utils.test.ts`
+
+**覆盖点**:
+
+1. `isOutlinerContentNodeType(undefined)` = true（普通内容节点）
+2. `isOutlinerContentNodeType('reference')` = true（reference 可渲染）
+3. `fieldEntry/tagDef/fieldDef` 等结构类型返回 false
 
 ---
 

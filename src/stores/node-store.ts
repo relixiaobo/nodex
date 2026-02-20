@@ -161,6 +161,33 @@ export const useNodeStore = create<NodeStore>((set, get) => {
     set(state => ({ _version: state._version + 1 }));
   });
 
+  function setFieldOptionValue(fieldEntryId: string, optionNodeId: string, applyReverseDoneMapping: boolean) {
+    const oldChildren = loroDoc.getChildren(fieldEntryId);
+    for (const oldId of oldChildren) loroDoc.deleteNode(oldId);
+
+    const valId = nanoid();
+    loroDoc.createNode(valId, fieldEntryId);
+    loroDoc.setNodeDataBatch(valId, { name: optionNodeId, targetId: optionNodeId });
+
+    if (!applyReverseDoneMapping) return;
+
+    // 应用 reverse done-state mapping（勾选选项时联动 checkbox）
+    const feNode = loroDoc.toNodexNode(fieldEntryId);
+    if (!feNode?.fieldDefId) return;
+    const parentId = loroDoc.getParentId(fieldEntryId);
+    if (!parentId) return;
+    const parentNode = loroDoc.toNodexNode(parentId);
+    if (!parentNode) return;
+
+    const mapping = resolveReverseDoneMapping(parentNode, feNode.fieldDefId, optionNodeId);
+    if (mapping === null) return;
+    if (mapping.newDone) {
+      loroDoc.setNodeData(parentId, 'completedAt', Date.now());
+    } else {
+      loroDoc.setNodeData(parentId, 'completedAt', 0);
+    }
+  }
+
   return {
     _version: 0,
 
@@ -226,6 +253,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
     },
 
     moveNodeTo: (nodeId, newParentId, index) => {
+      if (isWorkspaceContainer(nodeId)) return;
       // Guard: no self-move
       if (nodeId === newParentId) return;
       // Guard: no descendant move (prevent cycle)
@@ -249,6 +277,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
     },
 
     indentNode: (nodeId) => {
+      if (isWorkspaceContainer(nodeId)) return;
       const parentId = loroDoc.getParentId(nodeId);
       if (!parentId) return;
       const siblings = loroDoc.getChildren(parentId);
@@ -262,6 +291,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
     },
 
     outdentNode: (nodeId) => {
+      if (isWorkspaceContainer(nodeId)) return;
       const parentId = loroDoc.getParentId(nodeId);
       if (!parentId) return;
       // Cannot outdent out of a workspace container (LIBRARY, INBOX, etc.)
@@ -277,6 +307,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
     },
 
     moveNodeUp: (nodeId) => {
+      if (isWorkspaceContainer(nodeId)) return;
       const parentId = loroDoc.getParentId(nodeId);
       if (!parentId) return;
       const siblings = loroDoc.getChildren(parentId);
@@ -287,6 +318,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
     },
 
     moveNodeDown: (nodeId) => {
+      if (isWorkspaceContainer(nodeId)) return;
       const parentId = loroDoc.getParentId(nodeId);
       if (!parentId) return;
       const siblings = loroDoc.getChildren(parentId);
@@ -297,6 +329,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
     },
 
     trashNode: (nodeId) => {
+      if (isWorkspaceContainer(nodeId)) return;
       const parentId = loroDoc.getParentId(nodeId);
       const siblings = parentId ? loroDoc.getChildren(parentId) : [];
       const index = siblings.indexOf(nodeId);
@@ -390,18 +423,35 @@ export const useNodeStore = create<NodeStore>((set, get) => {
     },
 
     removeTag: (nodeId, tagDefId) => {
+      const node = loroDoc.toNodexNode(nodeId);
+      const hadTag = node?.tags.includes(tagDefId) ?? false;
       loroDoc.removeTag(nodeId, tagDefId);
+      if (!hadTag) {
+        loroDoc.commitDoc();
+        return;
+      }
 
-      // 移除来自该标签（含 extends 链）的 fieldEntry 节点
+      // 移除「仅由被移除标签贡献」的 fieldEntry，保留仍被其他标签需要的字段。
+      const remainingTags = loroDoc.toNodexNode(nodeId)?.tags ?? [];
+      const requiredByRemaining = new Set<string>();
+      for (const remainingTagId of remainingTags) {
+        for (const chainTagId of getExtendsChain(remainingTagId)) {
+          const fieldDefs = getTemplateFieldDefs(chainTagId);
+          for (const fdId of fieldDefs) requiredByRemaining.add(fdId);
+        }
+      }
+
+      const fieldDefsFromRemovedTag = new Set<string>();
       const extendsChain = getExtendsChain(tagDefId);
       for (const chainTagId of extendsChain) {
         const fieldDefs = getTemplateFieldDefs(chainTagId);
-        for (const fdId of fieldDefs) {
-          const feId = findFieldEntry(nodeId, fdId);
-          if (feId) {
-            loroDoc.deleteNode(feId);
-          }
-        }
+        for (const fdId of fieldDefs) fieldDefsFromRemovedTag.add(fdId);
+      }
+
+      for (const fdId of fieldDefsFromRemovedTag) {
+        if (requiredByRemaining.has(fdId)) continue;
+        const feId = findFieldEntry(nodeId, fdId);
+        if (feId) loroDoc.deleteNode(feId);
       }
       loroDoc.commitDoc();
     },
@@ -484,32 +534,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
     },
 
     selectFieldOption: (fieldEntryId, optionNodeId, oldOptionNodeId) => {
-      const oldChildren = loroDoc.getChildren(fieldEntryId);
-      for (const oldId of oldChildren) loroDoc.deleteNode(oldId);
-
-      const valId = nanoid();
-      loroDoc.createNode(valId, fieldEntryId);
-      loroDoc.setNodeDataBatch(valId, { name: optionNodeId, targetId: optionNodeId });
-
-      // 应用 reverse done-state mapping（勾选选项时联动 checkbox）
-      const feNode = loroDoc.toNodexNode(fieldEntryId);
-      if (feNode?.fieldDefId) {
-        const parentId = loroDoc.getParentId(fieldEntryId);
-        if (parentId) {
-          const parentNode = loroDoc.toNodexNode(parentId);
-          if (parentNode) {
-            const mapping = resolveReverseDoneMapping(parentNode, feNode.fieldDefId, optionNodeId);
-            if (mapping !== null) {
-              if (mapping.newDone) {
-                loroDoc.setNodeData(parentId, 'completedAt', Date.now());
-              } else {
-                loroDoc.setNodeData(parentId, 'completedAt', 0);
-              }
-            }
-          }
-        }
-      }
-
+      setFieldOptionValue(fieldEntryId, optionNodeId, true);
       loroDoc.commitDoc();
       void oldOptionNodeId; // suppress lint
     },
@@ -664,7 +689,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
         for (const { fieldDefId, optionId } of result.doneMappings) {
           const feId = findFieldEntry(nodeId, fieldDefId);
           if (feId) {
-            get().selectFieldOption(feId, optionId, undefined);
+            setFieldOptionValue(feId, optionId, false);
           }
         }
       }
@@ -720,12 +745,15 @@ export const useNodeStore = create<NodeStore>((set, get) => {
 
     startRefConversion: (refNodeId, parentId, position) => {
       const refNode = loroDoc.toNodexNode(refNodeId);
-      const targetId = refNode?.targetId;
+      const isReferenceNode = refNode?.type === 'reference';
+      const targetId = isReferenceNode ? refNode?.targetId : refNodeId;
       const targetNode = targetId ? loroDoc.toNodexNode(targetId) : null;
       const targetName = targetNode?.name ?? 'Untitled';
 
-      // 删除 reference 节点
-      loroDoc.deleteNode(refNodeId);
+      // 仅当传入 reference 节点时删除该引用节点。
+      if (isReferenceNode) {
+        loroDoc.deleteNode(refNodeId);
+      }
 
       // 创建临时内联引用节点
       const tempId = nanoid();

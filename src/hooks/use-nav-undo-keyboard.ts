@@ -4,7 +4,7 @@
  * Cmd+Z → navUndo(), Cmd+Shift+Z → navRedo()
  *
  * Does NOT intercept when a contentEditable element is focused
- * (lets TipTap handle its own undo/redo).
+ * (lets ProseMirror handle its own undo/redo).
  */
 import { useEffect } from 'react';
 import { useUIStore } from '../stores/ui-store';

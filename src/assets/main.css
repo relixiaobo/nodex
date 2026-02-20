@@ -44,10 +44,9 @@
   --font-mono: "JetBrains Mono", "Fira Code", monospace;
 }
 
-/* Shared inline element styles — used by both TipTap editor (.tiptap)
+/* Shared inline element styles — used by both ProseMirror editor (.ProseMirror)
    and static node display (.node-content) to prevent visual jumping
    when switching between edit and display modes. */
-.tiptap code,
 .ProseMirror code,
 .node-content code {
   background-color: var(--color-muted);
@@ -58,7 +57,6 @@
   line-height: inherit;
 }
 
-.tiptap mark,
 .ProseMirror mark,
 .node-content mark {
   background-color: rgba(250, 204, 21, 0.4);
@@ -67,14 +65,12 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  .tiptap mark,
   .ProseMirror mark,
   .node-content mark {
     background-color: rgba(251, 191, 36, 0.2);
   }
 }
 
-.tiptap a,
 .ProseMirror a,
 .node-content a {
   color: var(--color-primary);
@@ -82,20 +78,17 @@
   cursor: pointer;
 }
 
-.tiptap strong,
 .ProseMirror strong,
 .node-content strong {
   font-weight: 600;
 }
 
-.tiptap s,
 .ProseMirror s,
 .node-content s {
   text-decoration: line-through;
   opacity: 0.5;
 }
 
-.tiptap [data-heading-mark],
 .ProseMirror [data-heading-mark],
 .node-content [data-heading-mark] {
   font-size: 1.125em;
@@ -104,50 +97,29 @@
 }
 
 /* Static node display: match editor-inline layout so text doesn't reflow on blur.
-   TipTap wraps text in <p> which defaults to display:block; force inline. */
+   ProseMirror wraps text in <p> which defaults to display:block; force inline. */
 .node-content p {
   display: inline;
   margin: 0;
 }
 
-/* TipTap editor-only styles */
-.tiptap {
-  outline: none;
-}
-
+/* ProseMirror editor-only styles */
 .ProseMirror {
   outline: none;
-}
-
-.tiptap p {
-  margin: 0;
 }
 
 .ProseMirror p {
   margin: 0;
 }
 
-.tiptap p.is-editor-empty:first-child::before {
-  color: var(--color-foreground-tertiary);
-  content: attr(data-placeholder);
-  float: left;
-  height: 0;
-  pointer-events: none;
-}
-
 /* Inline editor mode: tags follow right after text.
    Outer wrappers + <p> become inline so text flows alongside tag badges.
-   .tiptap (contenteditable) uses inline-block — NOT inline — because Chrome
+   .ProseMirror (contenteditable) uses inline-block — NOT inline — because Chrome
    has a rendering bug where the native caret is invisible inside inline marks
    (<code>, <mark>) when the contenteditable element has display:inline. */
 .editor-inline,
 .editor-inline > div {
   display: inline;
-}
-
-.editor-inline .tiptap {
-  display: inline-block;
-  caret-color: currentColor;
 }
 
 .editor-inline .ProseMirror {
@@ -158,13 +130,6 @@
 /* Keep paragraph inline with tags while avoiding empty-node double-height.
    ProseMirror uses <br class="ProseMirror-trailingBreak"> for empty lines; when
    paragraph is inline this <br> introduces an extra visual line in our row layout. */
-.editor-inline .tiptap p {
-  display: inline-block;
-  margin: 0;
-  min-width: 1px;
-  vertical-align: top;
-}
-
 .editor-inline .ProseMirror p {
   display: inline-block;
   margin: 0;
@@ -172,23 +137,11 @@
   vertical-align: top;
 }
 
-.editor-inline .tiptap p > br.ProseMirror-trailingBreak:only-child {
-  display: none;
-}
-
 .editor-inline .ProseMirror p > br.ProseMirror-trailingBreak:only-child {
   display: none;
 }
 
-/* Override placeholder float for inline mode —
-   regular inline content so it takes horizontal space. */
-.editor-inline .tiptap p.is-editor-empty:first-child::before {
-  float: none;
-  height: auto;
-}
-
 /* Inline references — clickable blue node links (Tana: data-inlineref-node) */
-.tiptap [data-inlineref-node],
 .ProseMirror [data-inlineref-node],
 .node-content [data-inlineref-node] {
   color: var(--color-primary);
@@ -197,7 +150,6 @@
   padding: 0 0.0625rem;
 }
 
-.tiptap [data-inlineref-node]:hover,
 .ProseMirror [data-inlineref-node]:hover,
 .node-content [data-inlineref-node]:hover {
   text-decoration: underline;
@@ -208,10 +160,6 @@
 @keyframes ref-conversion-shimmer {
   0%, 100% { color: var(--color-foreground); }
   35% { color: var(--color-primary); }
-}
-
-.ref-converting .tiptap [data-inlineref-node] {
-  animation: ref-conversion-shimmer 2.5s ease-in-out infinite;
 }
 
 .ref-converting .ProseMirror [data-inlineref-node] {

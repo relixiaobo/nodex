@@ -84,7 +84,7 @@ _(空)_
 - [x] `loro-doc.ts`: 添加 `UndoManager` + `commitDoc` + `undoDoc/redoDoc/canUndoDoc/canRedoDoc` 导出
 - [x] `seed-data.ts`: `seedTestDataSync` 结尾调用 `commitDoc('__seed__')` 隔离种子操作
 - [x] `node-store.ts`: `createChild/moveNodeTo/trashNode/restoreNode/indent/outdent/moveUp/moveDown` 结尾调用 `commitDoc()`
-- [x] `use-nav-undo-keyboard.ts`: Cmd+Z 三层优先级（TipTap → Loro structural → nav）
+- [x] `use-nav-undo-keyboard.ts`: Cmd+Z 三层优先级（ProseMirror → Loro structural → nav）
 - [x] `tests/vitest/loro-undo.test.ts`: 11 项结构性撤销/重做测试
 - [x] `docs/TESTING.md`: 新增 §1.50
 - [x] 447 tests pass, typecheck clean, build success
@@ -178,7 +178,7 @@ _(Loro 迁移已移到「进行中」)_
 - **Spec**: `docs/features/web-clipping.md`
 
 #### 撤销与重做 (#44)
-> 已完成：文本编辑撤销（TipTap 内置）、导航撤销（navUndoStack）
+> 已完成：文本编辑撤销（ProseMirror History）、导航撤销（navUndoStack）、结构性操作撤销（Loro UndoManager）
 
 - [ ] 创建/删除节点撤销
 - [ ] 缩进/反缩进/移动撤销

@@ -137,12 +137,11 @@ npm run test:run
 
 **覆盖点**:
 
-1. `setNodeContentLocal` 同步写入 `name + _marks + _inlineRefs`
-2. `updateNodeName` 路径保留已有 `_marks/_inlineRefs`（兼容旧调用）
-3. `setNodeContentLocal` 标记节点为 dirty（`_dirtyContentIds`）
-4. `setNode` 保留 dirty 节点的内容（不被 Realtime/fetch 覆盖）
-5. dirty 标记清除后 `setNode` 恢复正常全量替换
-6. `fetchChildren` 跳过 dirty 节点的覆盖
+1. `updateNodeContent` 同步写入 `name + marks + inlineRefs`（并写入 `richText`）
+2. `setNodeName` 保留已有 `marks/inlineRefs`，并按占位符顺序重映射 inlineRef offset
+3. 清空 marks/inlineRefs 后读取结果为空数组
+4. LoroDoc 作为单一事实来源：更新后立即可读
+5. `createChild` 传入内容 payload 时立即初始化 `richText`（无需二次编辑触发迁移）
 
 ### 1.3.2 Realtime 自回显保护
 
@@ -228,6 +227,7 @@ npm run test:run
 6. `removeReference(refNodeId)` 删除 reference 节点
 7. `startRefConversion(refId, parentId, idx)` 替换 ref 节点为 inline content 节点
 8. `startRefConversion(targetId, parentId, idx)` 防御路径：不删除 target，本地生成 inline content 节点
+9. `startRefConversion` 创建的临时 inline content 节点会立即写入 `richText` 容器
 
 ### 1.8 字段状态流（Node Store）
 

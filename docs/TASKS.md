@@ -41,12 +41,13 @@ _(空)_
 > **Files**: `src/lib/loro-doc.ts`, `src/components/editor/*.ts`, `src/components/outliner/OutlinerItem.tsx`, `tests/vitest/loro-*.test.ts`, `docs/TESTING.md`
 > **Progress**:
 > - [x] 设计并落地 LoroText <-> 当前编辑器数据桥接层
-> - [ ] Outliner 主编辑输入路径切换到 LoroText
+> - [x] Outliner 主编辑输入路径切换到 LoroText
 > - [x] 兼容旧数据读取与惰性迁移
 > - [x] 补齐回归测试并更新 `docs/TESTING.md`
 > **迭代日志**:
 > - [2026-02-21 nodex-codex] 任务认领，启动 Phase 2 开发
 > - [2026-02-21 nodex-codex] 完成 Phase 2 第一批收口：新增 `loro-text-bridge`（TextMark/inlineRef 双向桥接），`node-store` 内容写入路径改为 legacy 字段 + `richText` 双写，`toNodexNode` 优先读 `richText`（旧字段 fallback），并补齐 `loro-text-bridge`/`loro-infra`/`node-store-content` 回归测试
+> - [2026-02-21 nodex-codex] 完成主编辑创建链路补齐：`createChild` 与 `startRefConversion` 在创建节点时即时写入 `richText`，避免“首次创建无 richText 需二次编辑才迁移”；新增 `node-store-content` / `node-store-tags-refs` 断言覆盖
 
 ### Refactor — Loro 收口 Phase 1：detached guard + origin 策略 (2026-02-21)
 > **Owner**: nodex-codex | **Branch**: codex/loro-phase1-guards

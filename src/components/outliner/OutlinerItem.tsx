@@ -539,7 +539,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   useEffect(() => {
     if (!isSelected || isFocused) return;
     const handleKeyDown = (e: KeyboardEvent) => {
-      // If TipTap/ProseMirror already handled this key (e.g. Escape in editor
+      // If ProseMirror already handled this key (e.g. Escape in editor
       // called clearFocus() synchronously before this handler runs), skip it.
       // Without this, the same Escape event that transitions edit→selected
       // would also immediately clear the selection.
@@ -947,7 +947,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
 
   // mousedown: record text offset for cursor placement, but DON'T enter edit
   // mode. Edit mode is deferred to click so drag-select can take over if the
-  // user drags (mounting TipTap on mousedown captures subsequent mouse events).
+  // user drags (mounting RichTextEditor on mousedown captures subsequent mouse events).
   const handleContentMouseDown = useCallback((e: React.MouseEvent) => {
     if (fieldDataType === SYS_D.CHECKBOX) return;
     const target = e.target as HTMLElement;
@@ -1218,7 +1218,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   const handleDelete = useCallback((): boolean => {
     // Read current name from store — the closure's `node` may be stale
     // because saveContent() updates the store synchronously before this runs.
-    // Strip HTML tags before checking: TipTap may save empty paragraphs as
+    // Strip HTML tags before checking: ProseMirror may save empty paragraphs as
     // '<br>' or '<br class="ProseMirror-trailingBreak">' which are non-empty
     // strings but represent visually empty content.
     const currentName = useNodeStore.getState().getNode(nodeId)?.name ?? '';

@@ -55,7 +55,7 @@ CREATE TABLE nodes (
   doc_type TEXT,
 
   -- 父/所有者节点 ID。每个节点恰好一个 Owner。
-  -- 特殊值: "{wsId}_TRASH", "{wsId}_SCHEMA", "SYS_0"
+  -- 特殊值: "TRASH", "SCHEMA", "SYS_0"（固定常量，见 CONTAINER_IDS）
   owner_id TEXT,
 
   -- 关联元节点 ID —— Metanode 间接层核心

@@ -1,31 +1,41 @@
 /**
  * Regression tests for node search filtering (SKIP_DOC_TYPES).
  *
- * Bug: use-node-search.ts used 'tagDefinition' and 'attributeDefinition'
- * instead of the actual _docType values 'tagDef' and 'attrDef', causing
- * tagDefs/attrDefs to leak into @ search results.
+ * Exercises the same filter logic as use-node-search.ts but via LoroDoc
+ * directly (no React renderer needed). Tests that structural/system node
+ * types are excluded from inline-ref search results.
+ *
+ * Bug history: old code used 'tagDefinition'/'attributeDefinition' instead
+ * of the actual type values 'tagDef'/'fieldDef', causing leakage.
  */
-import { useNodeStore } from '../../src/stores/node-store.js';
+import {
+  resetLoroDoc,
+  initLoroDocForTest,
+  createNode,
+  setNodeDataBatch,
+  commitDoc,
+  getAllNodeIds,
+  toNodexNode,
+} from '../../src/lib/loro-doc.js';
 
-/** Replicates the SKIP_DOC_TYPES filter logic from use-node-search.ts */
+/** SKIP_DOC_TYPES as defined in use-node-search.ts */
+const SKIP_DOC_TYPES = new Set([
+  'fieldEntry', 'fieldDef', 'tagDef',
+  'reference', 'workspace', 'user',
+]);
+
+/** Replicate the actual search logic from use-node-search.ts */
 function searchNodes(query: string, excludeId?: string) {
-  const SKIP_DOC_TYPES = new Set([
-    'tuple', 'tagDef',
-    'attrDef', 'workspace', 'user',
-  ]);
-
   const q = query.trim().toLowerCase();
   if (!q) return [];
 
-  const entities = useNodeStore.getState().entities;
   const matches: { id: string; name: string }[] = [];
-
-  for (const [id, node] of Object.entries(entities)) {
+  for (const id of getAllNodeIds()) {
     if (id === excludeId) continue;
-    const dt = node.props._docType;
-    if (dt && SKIP_DOC_TYPES.has(dt)) continue;
-    const rawName = node.props.name ?? '';
-    const plainText = rawName.replace(/<[^>]+>/g, '').trim();
+    const node = toNodexNode(id);
+    if (!node) continue;
+    if (node.type && SKIP_DOC_TYPES.has(node.type)) continue;
+    const plainText = (node.name ?? '').replace(/<[^>]+>/g, '').trim();
     if (!plainText) continue;
     if (!plainText.toLowerCase().includes(q)) continue;
     matches.push({ id, name: plainText });
@@ -33,58 +43,60 @@ function searchNodes(query: string, excludeId?: string) {
   return matches;
 }
 
+beforeEach(() => {
+  resetLoroDoc();
+  initLoroDocForTest('ws_test');
+
+  // Content nodes — should appear in search
+  createNode('n1', null); setNodeDataBatch('n1', { name: 'My Person Note' });
+  createNode('n2', null); setNodeDataBatch('n2', { name: 'Another Note' });
+
+  // System/structural nodes — must be filtered out
+  createNode('td1', null); setNodeDataBatch('td1', { name: 'Person',        type: 'tagDef' });
+  createNode('fd1', null); setNodeDataBatch('fd1', { name: 'Email',         type: 'fieldDef' });
+  createNode('fe1', null); setNodeDataBatch('fe1', { name: 'field entry',   type: 'fieldEntry' });
+  createNode('ws1', null); setNodeDataBatch('ws1', { name: 'Workspace',     type: 'workspace' });
+  createNode('ref1', null); setNodeDataBatch('ref1', { name: 'ref data',    type: 'reference' });
+
+  commitDoc('__seed__');
+});
+
 describe('node search SKIP_DOC_TYPES filter', () => {
-  beforeEach(() => {
-    useNodeStore.setState({
-      entities: {
-        'ws_LIBRARY': {
-          id: 'ws_LIBRARY', workspaceId: 'ws', children: ['n1', 'n2', 'td1', 'ad1'],
-          props: { name: 'Library' },
-        },
-        n1: {
-          id: 'n1', workspaceId: 'ws', children: [],
-          props: { name: 'My Person Note', _ownerId: 'ws_LIBRARY' },
-        },
-        n2: {
-          id: 'n2', workspaceId: 'ws', children: [],
-          props: { name: 'Another Note', _ownerId: 'ws_LIBRARY' },
-        },
-        td1: {
-          id: 'td1', workspaceId: 'ws', children: [],
-          props: { name: 'Person', _docType: 'tagDef', _ownerId: 'ws_LIBRARY' },
-        },
-        ad1: {
-          id: 'ad1', workspaceId: 'ws', children: [],
-          props: { name: 'Email', _docType: 'attrDef', _ownerId: 'ws_LIBRARY' },
-        },
-        tup1: {
-          id: 'tup1', workspaceId: 'ws', children: [],
-          props: { name: 'tuple data', _docType: 'tuple', _ownerId: 'n1' },
-        },
-      },
-    });
+  it('finds content nodes by name', () => {
+    const ids = searchNodes('Note').map(r => r.id);
+    expect(ids).toContain('n1');
+    expect(ids).toContain('n2');
   });
 
-  it('filters out tagDef nodes from search results', () => {
-    const results = searchNodes('Person');
-    // Should find the content node but NOT the tagDef
-    expect(results.some(r => r.id === 'n1')).toBe(true); // "My Person Note"
-    expect(results.some(r => r.id === 'td1')).toBe(false); // tagDef "Person" — filtered
+  it('filters out tagDef nodes', () => {
+    const ids = searchNodes('Person').map(r => r.id);
+    expect(ids).toContain('n1');    // "My Person Note" — content node
+    expect(ids).not.toContain('td1'); // tagDef "Person" — filtered
   });
 
-  it('filters out attrDef nodes from search results', () => {
-    const results = searchNodes('Email');
-    expect(results.some(r => r.id === 'ad1')).toBe(false); // attrDef "Email" — filtered
+  it('filters out fieldDef nodes', () => {
+    expect(searchNodes('Email').map(r => r.id)).not.toContain('fd1');
   });
 
-  it('filters out tuple nodes', () => {
-    const results = searchNodes('data');
-    expect(results.some(r => r.id === 'tup1')).toBe(false);
+  it('filters out fieldEntry nodes', () => {
+    expect(searchNodes('field').map(r => r.id)).not.toContain('fe1');
   });
 
-  it('returns normal content nodes', () => {
-    const results = searchNodes('Note');
-    expect(results).toHaveLength(2);
-    expect(results.map(r => r.id).sort()).toEqual(['n1', 'n2']);
+  it('filters out workspace nodes', () => {
+    expect(searchNodes('Workspace').map(r => r.id)).not.toContain('ws1');
+  });
+
+  it('filters out reference nodes', () => {
+    expect(searchNodes('ref').map(r => r.id)).not.toContain('ref1');
+  });
+
+  it('returns empty for blank query', () => {
+    expect(searchNodes('')).toHaveLength(0);
+  });
+
+  it('respects excludeId', () => {
+    const ids = searchNodes('Note', 'n1').map(r => r.id);
+    expect(ids).not.toContain('n1');
+    expect(ids).toContain('n2');
   });
 });

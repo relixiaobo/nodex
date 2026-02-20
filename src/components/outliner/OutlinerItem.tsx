@@ -241,6 +241,16 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     return m;
   }, [fields]);
 
+  // Owning tagDef color per fieldEntry — for coloring FieldRow icons
+  const fieldOwnerColors = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const [entryId, entry] of fieldMap) {
+      const ownerTagDefId = loroDoc.getParentId(entry.fieldDefId);
+      if (ownerTagDefId) m.set(entryId, resolveTagColor(ownerTagDefId).text);
+    }
+    return m;
+  }, [fieldMap]);
+
   // Classify each child: field tuple → 'field', regular node → 'content', else skip
   // Also evaluate hide-field rules for field entries
   const visibleChildren = useMemo(() => {
@@ -2088,6 +2098,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
                   trashed={fieldMap.get(id)!.trashed}
                   isRequired={fieldMap.get(id)!.isRequired}
                   isEmpty={fieldMap.get(id)!.isEmpty}
+                  ownerTagColor={fieldOwnerColors.get(id)}
                   onNavigateOut={(direction) => {
                     if (direction === 'up') {
                       // Escape up from first field/value block → focus parent content node.

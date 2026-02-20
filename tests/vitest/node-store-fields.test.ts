@@ -9,6 +9,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { useNodeStore } from '../../src/stores/node-store.js';
 import { collectNodeGraphErrors } from './helpers/invariants.js';
 import * as loroDoc from '../../src/lib/loro-doc.js';
+import { SYS_V } from '../../src/types/index.js';
 import { resetAndSeed } from './helpers/test-state.js';
 
 /** Find a fieldEntry node ID for a given fieldDefId within a node's children. */
@@ -179,7 +180,7 @@ describe('toggleCheckboxField', () => {
     resetAndSeed();
   });
 
-  it('check (no children → creates true value node)', () => {
+  it('check (no children → creates SYS_V.YES value node)', () => {
     const feId = findFieldEntry('task_1', 'attrDef_done_chk')!;
     // Initially empty
     useNodeStore.getState().clearFieldValue('task_1', 'attrDef_done_chk');
@@ -188,7 +189,8 @@ describe('toggleCheckboxField', () => {
 
     const valueIds = loroDoc.getChildren(feId);
     expect(valueIds).toHaveLength(1);
-    expect(loroDoc.toNodexNode(valueIds[0])?.name).toBe('true');
+    // Must store SYS_V.YES so FieldValueOutliner (which reads === SYS_V.YES) shows checked
+    expect(loroDoc.toNodexNode(valueIds[0])?.name).toBe(SYS_V.YES);
   });
 
   it('uncheck (has children → clears all)', () => {

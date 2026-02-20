@@ -9,7 +9,8 @@
 import { create } from 'zustand';
 import { nanoid } from 'nanoid';
 import type { NodexNode, TextMark, InlineRefEntry, FieldType } from '../types/index.js';
-import { CONTAINER_IDS } from '../types/index.js';
+import { CONTAINER_IDS, SYS_V } from '../types/index.js';
+import { isWorkspaceContainer } from '../lib/tree-utils.js';
 import * as loroDoc from '../lib/loro-doc.js';
 import { resolveCheckboxClick, resolveCmdEnterCycle, resolveForwardDoneMapping, resolveReverseDoneMapping } from '../lib/checkbox-utils.js';
 import type { DoneMappingEntry } from '../types/node.js';
@@ -263,6 +264,8 @@ export const useNodeStore = create<NodeStore>((set, get) => {
     outdentNode: (nodeId) => {
       const parentId = loroDoc.getParentId(nodeId);
       if (!parentId) return;
+      // Cannot outdent out of a workspace container (LIBRARY, INBOX, etc.)
+      if (isWorkspaceContainer(parentId)) return;
       const grandParentId = loroDoc.getParentId(parentId);
       if (!grandParentId) return;
 
@@ -383,6 +386,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
       // childSupertag 是给新创建的子节点用的，不在 applyTag 时处理
       // （由 createChild 在创建子节点时自动检测）
       void tagDef; // suppress lint warning
+      loroDoc.commitDoc();
     },
 
     removeTag: (nodeId, tagDefId) => {
@@ -399,6 +403,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
           }
         }
       }
+      loroDoc.commitDoc();
     },
 
     createTagDef: (name, options = {}) => {
@@ -410,6 +415,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
         ...(options.showCheckbox !== undefined && { showCheckbox: options.showCheckbox }),
         ...(options.color !== undefined && { color: options.color }),
       });
+      loroDoc.commitDoc();
       return loroDoc.toNodexNode(id)!;
     },
 
@@ -425,6 +431,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
         cardinality: 'single',
         nullable: true,
       });
+      loroDoc.commitDoc();
       return loroDoc.toNodexNode(id)!;
     },
 
@@ -628,10 +635,10 @@ export const useNodeStore = create<NodeStore>((set, get) => {
         // 有值 → 清除（取消勾选）
         for (const cid of children) loroDoc.deleteNode(cid);
       } else {
-        // 无值 → 创建 true 值节点（勾选）
+        // 无值 → 创建 SYS_V.YES 值节点（勾选）
         const valId = nanoid();
         loroDoc.createNode(valId, fieldEntryId);
-        loroDoc.setNodeData(valId, 'name', 'true');
+        loroDoc.setNodeData(valId, 'name', SYS_V.YES);
       }
       loroDoc.commitDoc();
     },

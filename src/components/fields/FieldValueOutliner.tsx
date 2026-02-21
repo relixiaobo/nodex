@@ -18,15 +18,25 @@ import { useWorkspaceTags } from '../../hooks/use-workspace-tags';
 import { OutlinerItem } from '../outliner/OutlinerItem';
 import { TrailingInput } from '../editor/TrailingInput';
 import { FieldRow } from './FieldRow';
+import { toFieldRowEntryProps } from './field-row-props.js';
 import { NodePicker, type NodePickerOption } from './NodePicker';
 import { BulletChevron } from '../outliner/BulletChevron';
-import { SYS_D, SYS_V } from '../../types';
-import { resolveConfigValue, configKeyToPropName } from '../../lib/field-utils.js';
+import { SYS_A, SYS_V } from '../../types';
+import {
+  configKeyToPropName,
+  isBooleanFieldType,
+  isCheckboxFieldType,
+  isColorFieldType,
+  isDateFieldType,
+  isOptionsFromSupertagFieldType,
+  resolveConfigValue,
+} from '../../lib/field-utils.js';
 import { isOutlinerContentNodeType } from '../../lib/node-type-utils.js';
 import { ColorSwatchPicker } from './ColorSwatchPicker';
 import { DatePicker, formatDateDisplay } from './DatePicker.js';
 import { useUIStore } from '../../stores/ui-store.js';
 import * as loroDoc from '../../lib/loro-doc.js';
+import { FIELD_OVERLAY_Z_INDEX, FIELD_VALUE_INSET } from './field-layout.js';
 
 interface FieldValueOutlinerProps {
   tupleId: string;
@@ -55,7 +65,7 @@ export function resolveSupertagPickerSelectedId(
   const valueNodeId = tuple?.children?.[0];
   if (!valueNodeId) return undefined;
   const valueNode = getNode(valueNodeId);
-  return valueNode?.name || valueNode?.targetId || undefined;
+  return valueNode?.name || undefined;
 }
 
 export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, configNodeId, onNavigateOut }: FieldValueOutlinerProps) {
@@ -113,14 +123,16 @@ export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, configNo
   // --- BOOLEAN: Yes/No toggle switch ---
   // For virtual config entries: read from node attribute directly.
   // For real fieldEntry: reads value from tuple.children[0] (SYS_V.YES or SYS_V.NO).
-  const isBoolean = fieldDataType === SYS_D.BOOLEAN;
+  const isBoolean = isBooleanFieldType(fieldDataType);
   if (isBoolean) {
     const isVirtualEntry = tupleId.startsWith('__virtual_');
     let isYes: boolean;
     if (isVirtualEntry && configNodeId && attrDefId) {
       const configNode = loroDoc.toNodexNode(configNodeId);
       const val = configNode ? resolveConfigValue(configNode, attrDefId) : undefined;
-      isYes = val === SYS_V.YES;
+      isYes = val === undefined
+        ? attrDefId === SYS_A.AUTOCOLLECT_OPTIONS
+        : val === SYS_V.YES;
     } else {
       const currentValue = contentChildIds[0];
       isYes = currentValue === SYS_V.YES;
@@ -128,7 +140,7 @@ export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, configNo
     const label = isYes ? 'Yes' : 'No';
 
     return (
-      <div className="flex min-h-7 items-center gap-2 py-1" style={{ paddingLeft: 25 }}>
+      <div className="flex min-h-7 items-center gap-2 py-1" style={{ paddingLeft: FIELD_VALUE_INSET }}>
         <BulletChevron hasChildren={false} isExpanded={false} onBulletClick={() => {}} />
         <button
           onClick={() => {
@@ -160,27 +172,25 @@ export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, configNo
   }
 
   // --- COLOR: swatch selector ---
-  if (fieldDataType === SYS_D.COLOR) {
+  if (isColorFieldType(fieldDataType)) {
     return <ColorSwatchPicker tupleId={tupleId} configNodeId={configNodeId} />;
   }
 
   // --- OPTIONS_FROM_SUPERTAG: single-select supertag picker ---
-  if (fieldDataType === SYS_D.OPTIONS_FROM_SUPERTAG) {
+  if (isOptionsFromSupertagFieldType(fieldDataType)) {
     return (
       <SupertagPickerField tupleId={tupleId} />
     );
   }
 
-  const isCheckbox = fieldDataType === SYS_D.CHECKBOX;
+  const isCheckbox = isCheckboxFieldType(fieldDataType);
   if (isCheckbox) {
     const valueNodeId = contentChildIds[0];
     const valueNode = valueNodeId ? useNodeStore.getState().getNode(valueNodeId) : undefined;
     const isChecked = valueNode?.name === SYS_V.YES;
 
-    // paddingLeft: 6(base) + 15(chevron space) + 4(gap-1) = 25
-    // Then BulletChevron (15px) + gap-2 (8px) + checkbox → bullet aligns with sibling fields
     return (
-      <div className="flex min-h-7 items-start gap-2 py-1" style={{ paddingLeft: 25 }}>
+      <div className="flex min-h-7 items-start gap-2 py-1" style={{ paddingLeft: FIELD_VALUE_INSET }}>
         <BulletChevron hasChildren={false} isExpanded={false} onBulletClick={() => {}} />
         <input
           type="checkbox"
@@ -193,7 +203,7 @@ export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, configNo
   }
 
   // --- DATE: click-to-pick, similar to Options pattern ---
-  if (fieldDataType === SYS_D.DATE) {
+  if (isDateFieldType(fieldDataType)) {
     const valueNodeId = contentChildIds[0];
     const valueNode = valueNodeId ? useNodeStore.getState().getNode(valueNodeId) : undefined;
     const currentValue = valueNode?.name ?? '';
@@ -254,16 +264,8 @@ export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, configNo
           <div key={id} className="@container" style={{ paddingLeft: 6 + 15 + 4 }}>
             <FieldRow
               nodeId={tupleId}
-              attrDefId={fieldMap.get(id)!.fieldDefId}
-              attrDefName={fieldMap.get(id)!.attrDefName}
-              tupleId={id}
-              valueNodeId={fieldMap.get(id)!.valueNodeId}
-              valueName={fieldMap.get(id)!.valueName}
-              dataType={fieldMap.get(id)!.dataType}
+              {...toFieldRowEntryProps(fieldMap.get(id)!)}
               isLastInGroup={i === visibleChildren.length - 1 || visibleChildren[i + 1].type !== 'field'}
-              trashed={fieldMap.get(id)!.trashed}
-              isRequired={fieldMap.get(id)!.isRequired}
-              isEmpty={fieldMap.get(id)!.isEmpty}
             />
           </div>
         ) : (
@@ -347,8 +349,8 @@ function DatePickerField({ value, onSelect }: { value: string; onSelect: (v: str
   }, []);
 
   return (
-    <div className="relative">
-      <div className="flex min-h-7 items-start gap-2 py-1" style={{ paddingLeft: 25 }}>
+    <div className={`relative ${open ? 'isolate' : ''}`} style={open ? { zIndex: FIELD_OVERLAY_Z_INDEX } : undefined}>
+      <div className="flex min-h-7 items-start gap-2 py-1" style={{ paddingLeft: FIELD_VALUE_INSET }}>
         <BulletChevron hasChildren={false} isExpanded={false} onBulletClick={() => {}} dimmed={!value} />
         <div className="flex-1 min-w-0 flex items-center cursor-pointer" onClick={handleClick}>
           <span className={`text-sm leading-[21px] select-none ${value ? '' : 'text-foreground-tertiary'}`}>

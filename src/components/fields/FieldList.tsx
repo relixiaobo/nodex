@@ -8,6 +8,7 @@ import { useMemo } from 'react';
 import { useNodeFields } from '../../hooks/use-node-fields';
 import { useNodeStore } from '../../stores/node-store';
 import { FieldRow } from './FieldRow';
+import { toFieldRowEntryProps } from './field-row-props.js';
 
 interface FieldListProps {
   nodeId: string;
@@ -37,18 +38,8 @@ export function FieldList({ nodeId }: FieldListProps) {
         <div key={f.fieldEntryId}>
           <FieldRow
             nodeId={nodeId}
-            attrDefId={f.fieldDefId}
-            attrDefName={f.attrDefName}
-            tupleId={f.fieldEntryId}
-            valueNodeId={f.valueNodeId}
-            valueName={f.valueName}
-            dataType={f.dataType}
-            trashed={f.trashed}
+            {...toFieldRowEntryProps(f)}
             hideMode={f.hideMode}
-            isEmpty={f.isEmpty}
-            isRequired={f.isRequired}
-            isSystemConfig={f.isSystemConfig}
-            configKey={f.configKey}
           />
         </div>
       ))}

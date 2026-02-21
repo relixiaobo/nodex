@@ -169,11 +169,11 @@ describe('detached checkout write guard', () => {
 
   it('createChild in detached mode is no-op and does not throw', () => {
     const beforeName = loroDoc.toNodexNode('proj_1')?.name ?? '';
-    loroDoc.setNodeData('proj_1', 'name', `${beforeName}__latest`);
+    loroDoc.setNodeRichTextContent('proj_1', `${beforeName}__latest`, [], []);
     loroDoc.commitDoc();
     const latestName = loroDoc.toNodexNode('proj_1')?.name;
     const frontiers = loroDoc.getCurrentFrontiers();
-    loroDoc.setNodeData('proj_1', 'name', `${beforeName}__newer`);
+    loroDoc.setNodeRichTextContent('proj_1', `${beforeName}__newer`, [], []);
     loroDoc.commitDoc();
     const before = loroDoc.getChildren('proj_1').slice();
 
@@ -189,11 +189,11 @@ describe('detached checkout write guard', () => {
 
   it('setNodeName in detached mode is no-op', () => {
     const beforeName = loroDoc.toNodexNode('idea_1')?.name ?? '';
-    loroDoc.setNodeData('idea_1', 'name', `${beforeName}__latest`);
+    loroDoc.setNodeRichTextContent('idea_1', `${beforeName}__latest`, [], []);
     loroDoc.commitDoc();
     const latestName = loroDoc.toNodexNode('idea_1')?.name;
     const frontiers = loroDoc.getCurrentFrontiers();
-    loroDoc.setNodeData('idea_1', 'name', `${beforeName}__newer`);
+    loroDoc.setNodeRichTextContent('idea_1', `${beforeName}__newer`, [], []);
     loroDoc.commitDoc();
 
     loroDoc.checkout(frontiers);

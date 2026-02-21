@@ -1,32 +1,31 @@
 /**
  * Auto-collect values outliner for OPTIONS-type attrDef config page.
  *
- * Renders auto-collected value nodes as reference bullets.
- * Values are stored as children[2+] of the autocollect Tuple:
- *   children = [SYS_A44, SYS_V03|SYS_V04, valId1, valId2, ...]
+ * Renders option nodes under the fieldDef as reference bullets.
  */
 import { useMemo } from 'react';
 import { useNodeStore } from '../../stores/node-store';
 import { BulletChevron } from '../outliner/BulletChevron';
+import { FIELD_VALUE_INSET } from './field-layout.js';
 
 interface AutoCollectSectionProps {
-  tupleId: string;
+  fieldDefId: string;
 }
 
 const noop = () => {};
 
-export function AutoCollectSection({ tupleId }: AutoCollectSectionProps) {
-  // Read auto-collected value IDs from fieldEntry children[1+]
-  // (children[0] = mode value SYS_V03|SYS_V04, children[1+] = collected values)
+export function AutoCollectSection({ fieldDefId }: AutoCollectSectionProps) {
+  // Read option nodes directly from fieldDef.children.
   const collectedJson = useNodeStore((s) => {
     void s._version;
-    const tuple = s.getNode(tupleId);
-    if (!tuple?.children || tuple.children.length <= 1) return '[]';
-    const ids = tuple.children.slice(1);
+    const fieldDef = s.getNode(fieldDefId);
+    if (!fieldDef?.children || fieldDef.children.length === 0) return '[]';
+    const ids = fieldDef.children;
     const items = ids
       .map((id) => {
         const node = s.getNode(id);
-        return node ? { id, name: node.name ?? '' } : null;
+        if (!node || node.type) return null;
+        return { id, name: node.name ?? '' };
       })
       .filter(Boolean);
     return JSON.stringify(items);
@@ -41,7 +40,7 @@ export function AutoCollectSection({ tupleId }: AutoCollectSectionProps) {
     return (
       <div
         className="flex min-h-7 items-start gap-2 py-0.5"
-        style={{ paddingLeft: 6 }}
+        style={{ paddingLeft: FIELD_VALUE_INSET }}
       >
         <BulletChevron
           hasChildren={false}
@@ -62,7 +61,7 @@ export function AutoCollectSection({ tupleId }: AutoCollectSectionProps) {
         <div
           key={item.id}
           className="flex min-h-7 items-start gap-2 py-0.5"
-          style={{ paddingLeft: 6 }}
+          style={{ paddingLeft: FIELD_VALUE_INSET }}
         >
           <BulletChevron
             hasChildren={false}

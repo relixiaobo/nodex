@@ -15,7 +15,7 @@ import { SYS_A, SYS_D, SYS_V, FIELD_TYPES } from '../types/index.js';
 import type { NodexNode } from '../types/index.js';
 import * as loroDoc from './loro-doc.js';
 
-// ─── resolveConfigValue（向后兼容：SYS_A* key → NodexNode 属性） ───
+// ─── Config key -> NodexNode 属性映射 ───
 
 /** Mapping from SYS_A* config keys to flat NodexNode property names. */
 const SYS_A_TO_PROP: Partial<Record<string, keyof NodexNode>> = {
@@ -36,9 +36,7 @@ const SYS_A_TO_PROP: Partial<Record<string, keyof NodexNode>> = {
 
 /**
  * Resolve a config value from a node by looking up its flat NodexNode property.
- * Converts boolean properties to SYS_V.YES / SYS_V.NO for backward compat.
- *
- * @deprecated In new code, read NodexNode properties directly.
+ * Boolean properties are normalized to SYS_V.YES / SYS_V.NO for config controls.
  */
 export function resolveConfigValue(
   node: NodexNode,
@@ -115,20 +113,25 @@ export function resolveHideField(fieldDefId: string): string {
  */
 export function resolveRequired(fieldDefId: string): boolean {
   const fieldDef = loroDoc.toNodexNode(fieldDefId);
-  // nullable=false means required=true (confusingly named legacy)
   return fieldDef?.nullable === false;
 }
 
 /** Resolve minimum value for Number/Integer fields. */
 export function resolveMinValue(fieldDefId: string): number | undefined {
   const fieldDef = loroDoc.toNodexNode(fieldDefId);
-  return fieldDef?.minValue;
+  const raw = fieldDef?.minValue as unknown;
+  if (raw === undefined || raw === null || raw === '') return undefined;
+  const num = Number(raw);
+  return Number.isFinite(num) ? num : undefined;
 }
 
 /** Resolve maximum value for Number/Integer fields. */
 export function resolveMaxValue(fieldDefId: string): number | undefined {
   const fieldDef = loroDoc.toNodexNode(fieldDefId);
-  return fieldDef?.maxValue;
+  const raw = fieldDef?.maxValue as unknown;
+  if (raw === undefined || raw === null || raw === '') return undefined;
+  const num = Number(raw);
+  return Number.isFinite(num) ? num : undefined;
 }
 
 /**
@@ -206,17 +209,6 @@ export function resolveAutoCollectedOptions(
 }
 
 /**
- * Find the autocollect toggle for a fieldDef.
- * In the new model, just check fieldDef.autocollectOptions.
- * @deprecated In new code, read fieldDef.autocollectOptions directly.
- */
-export function findAutoCollectTupleId(
-  _fieldDefId: string,
-): string | null {
-  return null; // No longer stored as a Tuple
-}
-
-/**
  * Ordered list of field types for the type selector UI.
  * Matches Tana's dropdown order exactly.
  */
@@ -240,6 +232,68 @@ export function getFieldTypeLabel(dataType: string): string {
 /** Check if a data type is "plain" (uses outliner for values). */
 export function isPlainFieldType(dataType: string): boolean {
   return dataType === FIELD_TYPES.PLAIN || dataType === SYS_D.PLAIN || !dataType;
+}
+
+/** Check if a field type uses options selection (regular or options-from-supertag). */
+export function isOptionsFieldType(dataType: string | undefined): boolean {
+  if (!dataType) return false;
+  return (
+    dataType === FIELD_TYPES.OPTIONS ||
+    dataType === FIELD_TYPES.OPTIONS_FROM_SUPERTAG ||
+    dataType === SYS_D.OPTIONS ||
+    dataType === SYS_D.OPTIONS_ALT ||
+    dataType === SYS_D.OPTIONS_FROM_SUPERTAG
+  );
+}
+
+export function isOptionsFromSupertagFieldType(dataType: string | undefined): boolean {
+  if (!dataType) return false;
+  return dataType === FIELD_TYPES.OPTIONS_FROM_SUPERTAG || dataType === SYS_D.OPTIONS_FROM_SUPERTAG;
+}
+
+export function isCheckboxFieldType(dataType: string | undefined): boolean {
+  if (!dataType) return false;
+  return dataType === FIELD_TYPES.CHECKBOX || dataType === SYS_D.CHECKBOX;
+}
+
+export function isDateFieldType(dataType: string | undefined): boolean {
+  if (!dataType) return false;
+  return dataType === FIELD_TYPES.DATE || dataType === SYS_D.DATE;
+}
+
+export function isBooleanFieldType(dataType: string | undefined): boolean {
+  if (!dataType) return false;
+  return dataType === FIELD_TYPES.BOOLEAN || dataType === SYS_D.BOOLEAN;
+}
+
+export function isColorFieldType(dataType: string | undefined): boolean {
+  if (!dataType) return false;
+  return dataType === FIELD_TYPES.COLOR || dataType === SYS_D.COLOR;
+}
+
+export function isNumberLikeFieldType(dataType: string | undefined): boolean {
+  if (!dataType) return false;
+  return (
+    dataType === FIELD_TYPES.NUMBER ||
+    dataType === FIELD_TYPES.INTEGER ||
+    dataType === SYS_D.NUMBER ||
+    dataType === SYS_D.INTEGER
+  );
+}
+
+export function isUrlFieldType(dataType: string | undefined): boolean {
+  if (!dataType) return false;
+  return dataType === FIELD_TYPES.URL || dataType === SYS_D.URL;
+}
+
+export function isEmailFieldType(dataType: string | undefined): boolean {
+  if (!dataType) return false;
+  return dataType === FIELD_TYPES.EMAIL || dataType === SYS_D.EMAIL;
+}
+
+/** Enter on these field values should navigate out instead of creating sibling content. */
+export function isSingleValueFieldType(dataType: string | undefined): boolean {
+  return isNumberLikeFieldType(dataType) || isUrlFieldType(dataType) || isEmailFieldType(dataType);
 }
 
 // ─── AttrDef / FieldDef config field registry ───

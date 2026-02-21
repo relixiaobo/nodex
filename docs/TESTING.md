@@ -133,16 +133,21 @@ npm run test:run
 
 ### 1.3.1 内容模型联动（Node Store）
 
-**测试文件**: `tests/vitest/node-store-content.test.ts`
+**测试文件**:
+- `tests/vitest/node-store-content.test.ts`
+- `tests/vitest/node-store-inline-refs.test.ts`
 
 **覆盖点**:
 
-1. `setNodeContentLocal` 同步写入 `name + _marks + _inlineRefs`
-2. `updateNodeName` 路径保留已有 `_marks/_inlineRefs`（兼容旧调用）
-3. `setNodeContentLocal` 标记节点为 dirty（`_dirtyContentIds`）
-4. `setNode` 保留 dirty 节点的内容（不被 Realtime/fetch 覆盖）
-5. dirty 标记清除后 `setNode` 恢复正常全量替换
-6. `fetchChildren` 跳过 dirty 节点的覆盖
+1. `updateNodeContent` 同步写入 `name + marks + inlineRefs`（并写入 `richText`）
+2. `setNodeName` 保留已有 `marks/inlineRefs`，并按占位符顺序重映射 inlineRef offset
+3. 清空 marks/inlineRefs 后读取结果为空数组
+4. LoroDoc 作为单一事实来源：更新后立即可读
+5. `createChild` 传入内容 payload 时立即初始化 `richText`（无需二次编辑触发迁移）
+6. 仅更新 marks 时，`updatedAt` 也会通过 `richText` 写路径刷新
+7. `setNodeName` 更新后，`raw name` 保持原值（编辑链路不再实时镜像 `name`）
+8. 普通内容节点 `createChild` 后 `raw name` 为空（仅 `richText` 持有内容）
+9. `remapInlineRefsByPlaceholderOrder` 独立覆盖占位符增减/重排场景（删除占位符会截断、增加占位符不生成新引用、旧 offset 先排序再映射）
 
 ### 1.3.2 Realtime 自回显保护
 
@@ -172,7 +177,7 @@ npm run test:run
 2. ancestor chain + structural 节点跳过 + **容器节点包含在 ancestors chain 中**（面包屑显示 Library/Inbox 等）
 3. 可见节点 flatten 与上下导航（含 reference 场景 parentId 消歧）
 4. last visible node / sibling / index helpers
-5. inline reference 纯度判断（兼容 legacy HTML + 新模型 `\uFFFC + _inlineRefs`）
+5. inline reference 纯度判断（仅基于新模型 `\uFFFC + inlineRefs`）
 
 ### 1.5.1 富文本 marks / ProseMirror 基础设施
 
@@ -210,9 +215,32 @@ npm run test:run
 
 **覆盖点**:
 
-1. Number/Integer 数值校验 + min/max 边界
-2. URL/Email 格式校验
+1. Number/Integer 数值校验 + min/max 边界（兼容 `FIELD_TYPES.*` / `SYS_D.*`）
+2. URL/Email 格式校验（兼容 `FIELD_TYPES.*` / `SYS_D.*`）
 3. 非验证类型返回 null
+
+### 1.6.1 FieldRow 配置字段渲染映射
+
+**测试文件**:
+- `tests/vitest/field-row-props.test.ts`
+- `tests/vitest/use-node-fields-config.test.ts`
+- `tests/vitest/field-list-config-render.test.ts`
+- `tests/vitest/field-row-config-render.test.ts`
+- `tests/vitest/options-picker.test.ts`
+
+**覆盖点**:
+
+1. `toFieldRowEntryProps` 保留系统配置字段渲染必需元数据（`isSystemConfig/configKey/configControl`）
+2. `computeNodeFields` 为 tagDef/fieldDef 虚拟配置字段正确输出 `configControl`
+3. `FieldList` 渲染配置行时，tag_picker/type_choice/select 控件保持专用 UI（不退化到灰点 outliner）
+4. `FieldRow` 在 `configControl` 缺失时可基于 `configKey` 注册表兜底分发控件
+5. `OutlinerItem/OutlinerView/FieldList` 统一复用同一映射，避免调用方漏传导致配置控件退化
+6. `OptionsPicker` 的新建选项能力受 `autocollectOptions` 控制（未显式关闭时允许，显式关闭后禁止）
+7. 字段 value 布局基线由共享常量 `FIELD_VALUE_INSET` 驱动，`FieldRow` 配置项渲染测试锁定该常量对齐
+8. `computeNodeFields` 对 options value 优先按 `targetId -> option.name` 解引用，避免 UI 展示内部 optionId（如 `opt_in_progress`）
+9. `number_input` 虚拟配置字段的数据类型标记为 `FIELD_TYPES.NUMBER`（`Minimum/Maximum value` 语义为 Number）
+10. `number_input` 配置控件使用文本输入（不依赖原生 number spinner），与普通 Number 字段一致走 warning 校验路径
+11. `number_input` 配置值为非法数字字符串时，FieldRow value 区右侧展示同款 warning 图标（与普通 Number 字段位置一致）
 
 ### 1.7 标签与引用状态流
 
@@ -228,6 +256,7 @@ npm run test:run
 6. `removeReference(refNodeId)` 删除 reference 节点
 7. `startRefConversion(refId, parentId, idx)` 替换 ref 节点为 inline content 节点
 8. `startRefConversion(targetId, parentId, idx)` 防御路径：不删除 target，本地生成 inline content 节点
+9. `startRefConversion` 创建的临时 inline content 节点会立即写入 `richText` 容器
 
 ### 1.8 字段状态流（Node Store）
 
@@ -237,12 +266,13 @@ npm run test:run
 
 1. `setFieldValue(nodeId, fieldDefId, values[])` — 清空旧值，创建新 value 节点（children of fieldEntry）
 2. `clearFieldValue(nodeId, fieldDefId)` — 删除 fieldEntry 的所有 value 子节点
-3. `setOptionsFieldValue(nodeId, fieldDefId, optionId)` — value 节点含 `name` + `targetId`
-4. `addFieldToNode(nodeId, fieldDefId)` — 幂等（已存在则返回已有 feId）
-5. `removeField(nodeId, feId)` — 直接删除 fieldEntry 节点（Loro 不移入 Trash）
-6. `toggleCheckboxField(feId)` — 无子节点时创建 `name:'true'` 节点；有子节点则删除全部
-7. `addUnnamedFieldToNode(nodeId)` — 返回 `{ fieldEntryId, fieldDefId }`，占位 fieldDef 创建在 SCHEMA
-8. `replaceFieldDef(nodeId, feId, oldFdId, newFdId)` — 直接写入 fieldDefId（无所有权校验）
+3. `setOptionsFieldValue(nodeId, fieldDefId, optionId)` — value 节点仅写 `targetId`（不冗余 `name`）
+4. `addDoneMappingEntry/removeDoneMappingEntry` 的 option 值节点同样仅用 `targetId`，`checkbox-utils` 读取不再依赖 `name` fallback
+5. `addFieldToNode(nodeId, fieldDefId)` — 幂等（已存在则返回已有 feId）
+6. `removeField(nodeId, feId)` — 直接删除 fieldEntry 节点（Loro 不移入 Trash）
+7. `toggleCheckboxField(feId)` — 无子节点时创建 `name:'true'` 节点；有子节点则删除全部
+8. `addUnnamedFieldToNode(nodeId)` — 返回 `{ fieldEntryId, fieldDefId }`，占位 fieldDef 创建在 SCHEMA
+9. `replaceFieldDef(nodeId, feId, oldFdId, newFdId)` — 直接写入 fieldDefId（无所有权校验）
 
 ### 1.9 Schema / Supertag 构建链路
 
@@ -253,8 +283,7 @@ npm run test:run
 1. `createTagDef(name, opts?)` — 创建 type='tagDef' 节点归属 CONTAINER_IDS.SCHEMA，无 SYS_T01 meta / config tuples
 2. 可选参数 `showCheckbox` / `color` 直接写入节点属性（平铺，无 Tuple 间接层）
 3. `createFieldDef(name, fieldType, tagDefId)` — 创建 type='fieldDef' 节点归属 tagDefId
-4. `createAttrDef(name, tagDefId, fieldType)` — createFieldDef 别名（参数顺序不同）
-5. `changeFieldType(fieldDefId, newType)` — 直接更新 fieldType 属性
+4. `changeFieldType(fieldDefId, newType)` — 直接更新 fieldType 属性
 
 ### 1.10 Supertag Extend（继承）
 
@@ -457,8 +486,7 @@ npm run test:run
 **覆盖点**:
 
 1. `partializeUIStore` 仅保留持久化白名单字段
-2. `migrateUIStoreState` 将 v0 `panelStack` 迁移为 `panelHistory/panelIndex`
-3. 无需迁移场景下保持原对象语义
+2. 当前持久化结构下 `panelHistory/panelIndex` 保持稳定
 
 ### 1.28 图结构不变量 helper 自检
 
@@ -483,11 +511,10 @@ npm run test:run
 3. `getExtendsChain(tagDefId)` — 读 tagDef.extends，ancestor-first 顺序，排除自身
 4. `resolveHideField(fieldDefId)` — 读 fieldDef.hideField 属性，默认 SYS_V.NEVER
 5. `resolveRequired(fieldDefId)` — nullable=false → true，其他 → false
-6. `resolveMinValue` / `resolveMaxValue` — 读 fieldDef.minValue/maxValue
+6. `resolveMinValue` / `resolveMaxValue` — 读 fieldDef.minValue/maxValue，并仅在值可解析为 finite number 时生效（非法字符串返回 undefined）
 7. `resolveSourceSupertag(fieldDefId)` — 读 fieldDef.sourceSupertag
 8. `resolveTaggedNodes(tagDefId)` — 返回所有含该 tagDefId 在 node.tags 中的节点 ID
-9. `findAutoCollectTupleId` — Loro Phase 1 始终返回 null（待实现）
-10. `getFieldTypeLabel` / `getFieldTypeIcon` / `isPlainFieldType` — 字段类型元数据
+9. `getFieldTypeLabel` / `getFieldTypeIcon` / `isPlainFieldType` / `isOptionsFieldType` / `isOptionsFromSupertagFieldType` / `isCheckboxFieldType` / `isDateFieldType` / `isNumberLikeFieldType` / `isUrlFieldType` / `isEmailFieldType` / `isSingleValueFieldType` — 字段类型元数据与统一判定（兼容 `FIELD_TYPES.*` 与 `SYS_D.*`）
 
 **注意（2026-02-20 更新）**: seed-data.ts 已修正，所有 fieldType 使用 `FIELD_TYPES.*` 常量（小写），测试期望值同步更新为 `FIELD_TYPES.OPTIONS` / `FIELD_TYPES.DATE` / `FIELD_TYPES.PLAIN`，不再使用大写字符串。
 
@@ -565,14 +592,13 @@ editor isEmpty（7 cases）:
 4. `\u200B` + 实际文本视为非空
 5. 空字符串与纯空白符边界
 
-handleDelete isEmpty（6 cases, Bug #54 回归）:
-6. HTML name 仅含 `\u200B` → 允许删除
-7. 空 HTML / HTML 标签包裹 `\u200B` → 允许删除
-8. 真实文本 / `\u200B` + 真实文本 → 阻止删除
+handleDelete isEmpty（5 cases, Bug #54 回归）:
+6. name 仅含 `\u200B` / 空字符串 → 允许删除
+7. 真实文本 / `\u200B` + 真实文本 → 阻止删除
 
 hash trigger cleanup safety（2 cases, Bug #53 回归）:
-9. DOM cleanup 失败后检测残留 `#` 触发词
-10. DOM cleanup 成功后无残留
+8. DOM cleanup 失败后检测残留 `#` 触发词
+9. DOM cleanup 成功后无残留
 
 ### 1.51 P0 Loro 基础设施 — 7项底层 API
 
@@ -639,6 +665,30 @@ hash trigger cleanup safety（2 cases, Bug #53 回归）:
 - detached 模式写入统一在 `loro-doc.ts` guard（mutations + `commitDoc`）被忽略并发出一次性 warning
 - `forkDoc()` 用 vvAtFork 记录分叉点，merge() 只导出分叉后的增量
 - awareness.ts 纯内存，不含网络传输
+
+---
+
+### 1.52 LoroText Bridge（TextMark / InlineRef 双向桥接）
+
+**测试文件**: `tests/vitest/loro-text-bridge.test.ts`
+
+**覆盖点**:
+
+1. `writeRichTextToLoroText` + `readRichTextFromLoroText` 文本 roundtrip 保真
+2. `link` mark 与 `inlineRefs` 可同时编码并正确解码
+3. 非法 mark 区间会被 clamp/忽略，不污染输出
+4. 非法 inlineRef offset 或非占位符位置会被忽略
+
+---
+
+### 1.53 Test 入口 Bootstrap（防测试数据回流）
+
+**测试文件**: `tests/vitest/test-entrypoint-bootstrap.test.ts`
+
+**覆盖点**:
+
+1. `src/entrypoints/test/main.tsx` 启动时调用 `seedTestData({ forceFresh: true })`
+2. test 页面渲染 `App` 时传入 `skipBootstrap`，避免 sidepanel bootstrap 重新接入持久化链路
 
 ---
 
@@ -715,21 +765,6 @@ hash trigger cleanup safety（2 cases, Bug #53 回归）:
 5. `heading` 命令处于 enabled 状态
 6. 全部禁用时返回 `-1`
 
-### 1.47 Meta-Utils 工具函数
-
-**测试文件**: `tests/vitest/meta-utils.test.ts`
-
-**覆盖点**:
-1. `getMetaTuples` 正确返回 meta 数组中的 tuple 节点
-2. `getMetaTuples` 跳过不存在的 ID
-3. `getMetaTuples` 空 meta 返回空数组
-4. `findMetaTuple` 按 children[0] key 查找（如 SYS_A13）
-5. `findMetaTuple` 未找到返回 undefined
-6. `addMetaTupleId` 追加新 ID
-7. `addMetaTupleId` 去重（已存在的 ID 不重复添加）
-8. `removeMetaTupleId` 移除存在的 ID
-9. `removeMetaTupleId` 对不存在的 ID 返回原数组
-
 ### 1.48 Tana 导入 — Phase 1 Stub 契约
 
 **测试文件**: `tests/vitest/tana-import.test.ts`
@@ -764,7 +799,7 @@ validateTanaExport（3 cases）:
 
 **测试文件**: `tests/vitest/done-state-mapping.test.ts`
 
-**说明（Loro 模型）**: DoneMappingEntries 存储在 LoroDoc 的 done mappings 容器中（非 Tuple.children）。前置条件：`loroDoc.setNodeData(tagDefId, 'doneStateEnabled', true)`。
+**说明（Loro 模型）**: DoneMappingEntries 存储在 `tagDef` 下的 `NDX_A07/NDX_A08` fieldEntry 子树中（普通 outliner 结构）。前置条件：`loroDoc.setNodeData(tagDefId, 'doneStateEnabled', true)`。
 
 **覆盖点**:
 
@@ -786,15 +821,16 @@ validateTanaExport（3 cases）:
 11. fieldDefId 不匹配 → null
 
 Store 集成 — addDoneMappingEntry（2 cases）:
-12. `store.addDoneMappingEntry(tagDefId, true, fieldDefId, optionId)` — 写入 loroDoc
-13. 新条目被 getDoneStateMappings 正确读取
+12. `store.addDoneMappingEntry(tagDefId, true, fieldDefId, optionId)` — 写入 `NDX_A07` fieldEntry 子树
+13. 新条目被 getDoneStateMappings 正确读取（fieldDefId 分组）
 
 Store 集成 — removeDoneMappingEntry（2 cases）:
-14. `store.removeDoneMappingEntry(tagDefId, true, fieldDefId, optionId)` — 从 loroDoc 移除
-15. 移除后 getDoneStateMappings 结果为空
+14. `store.removeDoneMappingEntry(tagDefId, true, index)` — 从 `NDX_A07` 子树按顺序移除条目
+15. 移除后 getDoneStateMappings 结果与预期一致
+16. 容器中混入噪声节点/无效 fieldEntry 时，index 解析仍按“有效 mapping entry”计算，不会删错
 
 Store 集成 — toggleNodeDone（1 case）:
-16. 有 doneMapping 时仍只产生一次 commit（`_version` 仅 +1）
+17. 有 doneMapping 时仍只产生一次 commit（`_version` 仅 +1）
 
 ### 1.39 Web Clip 落库服务
 
@@ -914,7 +950,7 @@ createSibling 自动标签（2 cases）:
 1. 空 FieldValueOutliner 显示 TrailingInput
 2. 最后一项为 field 时显示 TrailingInput
 3. 最后一项为 content 时隐藏 TrailingInput
-4. `resolveSupertagPickerSelectedId` 从 value node `name` 读取已选 supertag id（并支持 targetId 回退）
+4. `resolveSupertagPickerSelectedId` 仅从 value node `name` 读取已选 supertag id
 
 ### 1.47 Outliner 内容类型判定
 
@@ -1010,10 +1046,11 @@ createSibling 自动标签（2 cases）:
 | 1.44 | PM EditorView 操作工具 | PASS/FAIL |
 | 1.45 | ConfigOutliner TrailingInput 显示规则 | PASS/FAIL |
 | 1.46 | FieldValueOutliner TrailingInput 显示规则 | PASS/FAIL |
-| 1.47 | Meta-Utils 工具函数 | PASS/FAIL |
 | 1.48 | Tana 导入 meta 填充与 DocType 安全 | PASS/FAIL |
 | 1.50 | Loro UndoManager 结构性撤销/重做 | PASS/FAIL |
 | 1.51 | P0 Loro 基础设施 — 7项底层API（subscribeNode/增量同步/时间旅行/LoroText/fork/Awareness） | PASS/FAIL |
+| 1.52 | LoroText Bridge（TextMark/InlineRef 双向桥接） | PASS/FAIL |
+| 1.53 | Test 入口 Bootstrap（防测试数据回流） | PASS/FAIL |
 | 2 | 视觉渲染 | PASS/FAIL/SKIP |
 | 3 | 扩展构建 | PASS/FAIL |
 

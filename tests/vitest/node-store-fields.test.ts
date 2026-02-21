@@ -132,7 +132,7 @@ describe('setOptionsFieldValue', () => {
     const valueIds = loroDoc.getChildren(feId);
     expect(valueIds).toHaveLength(1);
     const value = loroDoc.toNodexNode(valueIds[0])!;
-    expect(value.name).toBe('opt_done');
+    expect(value.name).toBeUndefined();
     expect(value.targetId).toBe('opt_done');
   });
 
@@ -143,7 +143,7 @@ describe('setOptionsFieldValue', () => {
     const feId = findFieldEntry('note_2', 'attrDef_status')!;
     const valueIds = loroDoc.getChildren(feId);
     expect(valueIds).toHaveLength(1);
-    expect(loroDoc.toNodexNode(valueIds[0])?.name).toBe('opt_done');
+    expect(loroDoc.toNodexNode(valueIds[0])?.targetId).toBe('opt_done');
   });
 });
 
@@ -160,7 +160,7 @@ describe('selectFieldOption', () => {
 
     const valueIds = loroDoc.getChildren(feId);
     expect(valueIds).toHaveLength(1);
-    expect(loroDoc.toNodexNode(valueIds[0])?.name).toBe('opt_done');
+    expect(loroDoc.toNodexNode(valueIds[0])?.targetId).toBe('opt_done');
   });
 
   it('replaces old option with new option', () => {
@@ -171,7 +171,7 @@ describe('selectFieldOption', () => {
 
     const valueIds = loroDoc.getChildren(feId);
     expect(valueIds).toHaveLength(1);
-    expect(loroDoc.toNodexNode(valueIds[0])?.name).toBe('opt_done');
+    expect(loroDoc.toNodexNode(valueIds[0])?.targetId).toBe('opt_done');
   });
 });
 

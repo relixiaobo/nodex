@@ -15,6 +15,7 @@
  */
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { ChevronLeft, ChevronRight } from '../../lib/icons.js';
+import { FIELD_OVERLAY_Z_INDEX } from './field-layout.js';
 
 // ─── Helpers ──────────────────────────────────────────────────────
 
@@ -233,13 +234,13 @@ export function DatePicker({ value, onSelect, onClose }: DatePickerProps) {
 
   // Close on click outside
   useEffect(() => {
-    const handler = (e: MouseEvent) => {
+    const handler = (e: PointerEvent) => {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         onClose();
       }
     };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
+    document.addEventListener('pointerdown', handler, true);
+    return () => document.removeEventListener('pointerdown', handler, true);
   }, [onClose]);
 
   // Close on Escape
@@ -353,7 +354,8 @@ export function DatePicker({ value, onSelect, onClose }: DatePickerProps) {
   return (
     <div
       ref={containerRef}
-      className="absolute left-0 top-full z-50 mt-1 w-full min-w-[248px] max-w-[280px] rounded-lg border border-border bg-popover shadow-lg p-3"
+      className="absolute isolate left-0 top-full mt-1 w-full min-w-[248px] max-w-[280px] overflow-hidden rounded-lg border border-border bg-surface shadow-lg p-3"
+      style={{ zIndex: FIELD_OVERLAY_Z_INDEX }}
       onMouseDown={(e) => e.stopPropagation()}
     >
       {/* ─── Top date input field(s) ─── */}

@@ -13,8 +13,8 @@ function isEditorEmpty(textContent: string): boolean {
 }
 
 /** Replicates the textOnly extraction from OutlinerItem.handleDelete */
-function isDeleteTextEmpty(htmlName: string): boolean {
-  const textOnly = htmlName.replace(/<[^>]*>/g, '').replace(/\u200B/g, '').trim();
+function isDeleteTextEmpty(name: string): boolean {
+  const textOnly = name.replace(/\u200B/g, '').trim();
   return textOnly.length === 0;
 }
 
@@ -51,24 +51,19 @@ describe('editor isEmpty with zero-width space', () => {
 });
 
 describe('handleDelete isEmpty with \u200B (Bug #54)', () => {
-  it('treats HTML name with only \u200B as empty → allows delete', () => {
+  it('treats name with only \u200B as empty → allows delete', () => {
     expect(isDeleteTextEmpty('\u200B')).toBe(true);
   });
 
-  it('treats empty HTML as empty', () => {
+  it('treats empty name as empty', () => {
     expect(isDeleteTextEmpty('')).toBe(true);
   });
 
-  it('treats HTML with tags but only \u200B text as empty', () => {
-    expect(isDeleteTextEmpty('<span>\u200B</span>')).toBe(true);
-  });
-
-  it('treats HTML with real text as non-empty → blocks delete', () => {
+  it('treats text as non-empty → blocks delete', () => {
     expect(isDeleteTextEmpty('hello')).toBe(false);
-    expect(isDeleteTextEmpty('<b>hello</b>')).toBe(false);
   });
 
-  it('treats HTML with \u200B and real text as non-empty', () => {
+  it('treats \u200B mixed with real text as non-empty', () => {
     expect(isDeleteTextEmpty('\u200Bhello')).toBe(false);
   });
 
@@ -78,7 +73,7 @@ describe('handleDelete isEmpty with \u200B (Bug #54)', () => {
     // in empty contentEditable). Without \u200B stripping, textOnly
     // would be '\u200B' (length 1) → handleDelete refuses to delete.
     const name = '\u200B';
-    const textOnly = name.replace(/<[^>]*>/g, '').replace(/\u200B/g, '').trim();
+    const textOnly = name.replace(/\u200B/g, '').trim();
     expect(textOnly.length).toBe(0);
   });
 });

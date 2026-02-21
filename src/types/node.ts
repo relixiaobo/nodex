@@ -233,37 +233,10 @@ export interface NodexNode {
 }
 
 // ============================================================
-// 工作区容器（新版：固定 ID，无 workspaceId 前缀）
+// 工作区容器（固定 ID，无 workspaceId 前缀）
 // ============================================================
 
-/**
- * 工作区系统容器 ID 常量（旧版）。
- *
- * @deprecated 请改用 {@link CONTAINER_IDS}。
- * 该常量包含历史遗留的 `SCHEMA: 'LIBRARY'` 混淆映射，且键集与 `CONTAINER_IDS` 不一致。
- * `CONTAINER_IDS` 是 Loro 迁移后的规范常量，仅保留实际使用的 8 个容器 ID。
- */
-export const CONTAINERS = {
-  SCHEMA: 'LIBRARY',      // 注意：实际结构中 SCHEMA 是 LIBRARY 的子节点
-  LIBRARY: 'LIBRARY',
-  INBOX: 'INBOX',
-  JOURNAL: 'JOURNAL',
-  SEARCHES: 'SEARCHES',
-  TRASH: 'TRASH',
-  WORKSPACE: 'WORKSPACE',
-  CLIPS: 'CLIPS',
-  STASH: 'STASH',
-  SIDEBAR_AREAS: 'SIDEBAR_AREAS',
-  PINS: 'PINS',
-  QUICK_ADD: 'QUICK_ADD',
-  USERS: 'USERS',
-} as const;
-
-export type ContainerSuffix = typeof CONTAINERS[keyof typeof CONTAINERS];
-
-/**
- * 工作区容器专用 ID（使用独立键，不与 CONTAINERS 混淆）
- */
+/** 工作区容器专用 ID。 */
 export const CONTAINER_IDS = {
   LIBRARY: 'LIBRARY',
   INBOX: 'INBOX',
@@ -318,16 +291,3 @@ export type CreateNodeInput = {
  * 节点更新参数。
  */
 export type UpdateNodeInput = Partial<Omit<NodexNode, 'id' | 'children' | 'tags' | 'createdAt'>>;
-
-// ============================================================
-// 向后兼容别名（迁移期间过渡用，后续清理）
-// ============================================================
-
-/** @deprecated 使用 NodeType */
-export type DocType = NodeType;
-
-/** @deprecated 使用 CONTAINER_IDS */
-export const WORKSPACE_CONTAINERS = CONTAINER_IDS;
-
-/** @deprecated 使用 ContainerId */
-export type WorkspaceContainerSuffix = ContainerId;

@@ -3,13 +3,20 @@
  * All resolver functions read directly from LoroDoc (no _entities arg).
  */
 import { describe, it, expect, beforeEach } from 'vitest';
-import { FIELD_TYPES, SYS_V } from '../../src/types/system-nodes.js';
+import { FIELD_TYPES, SYS_D, SYS_V } from '../../src/types/system-nodes.js';
 import {
-  findAutoCollectTupleId,
   getExtendsChain,
   getFieldTypeIcon,
   getFieldTypeLabel,
+  isCheckboxFieldType,
+  isDateFieldType,
+  isEmailFieldType,
+  isNumberLikeFieldType,
+  isOptionsFieldType,
+  isOptionsFromSupertagFieldType,
   isPlainFieldType,
+  isSingleValueFieldType,
+  isUrlFieldType,
   resolveDataType,
   resolveFieldOptions,
   resolveHideField,
@@ -50,7 +57,7 @@ describe('resolveDataType', () => {
     loroDoc.createNode(id, 'tagDef_task');
     loroDoc.setNodeData(id, 'type', 'fieldDef');
     // No fieldType set → should return PLAIN
-    expect(resolveDataType({}, id)).toBe(FIELD_TYPES.PLAIN);
+    expect(resolveDataType(id)).toBe(FIELD_TYPES.PLAIN);
   });
 });
 
@@ -112,6 +119,13 @@ describe('resolveMinValue / resolveMaxValue', () => {
   it('returns undefined when not configured', () => {
     expect(resolveMinValue('attrDef_status')).toBeUndefined();
     expect(resolveMaxValue('attrDef_status')).toBeUndefined();
+  });
+
+  it('returns undefined when min/max are non-numeric strings', () => {
+    loroDoc.setNodeData('attrDef_age', 'minValue', 'abc');
+    loroDoc.setNodeData('attrDef_age', 'maxValue', 'xyz');
+    expect(resolveMinValue('attrDef_age')).toBeUndefined();
+    expect(resolveMaxValue('attrDef_age')).toBeUndefined();
   });
 });
 
@@ -200,18 +214,6 @@ describe('resolveTaggedNodes', () => {
   });
 });
 
-describe('findAutoCollectTupleId', () => {
-  beforeEach(() => {
-    resetAndSeed();
-  });
-
-  it('always returns null (stub in Loro migration)', () => {
-    expect(findAutoCollectTupleId('attrDef_status')).toBeNull();
-    expect(findAutoCollectTupleId('attrDef_priority')).toBeNull();
-    expect(findAutoCollectTupleId('nonexistent')).toBeNull();
-  });
-});
-
 describe('getFieldTypeLabel / getFieldTypeIcon / isPlainFieldType', () => {
   it('getFieldTypeLabel returns label for known types', () => {
     expect(getFieldTypeLabel(FIELD_TYPES.PLAIN)).toBeTruthy();
@@ -231,5 +233,32 @@ describe('getFieldTypeLabel / getFieldTypeIcon / isPlainFieldType', () => {
   it('isPlainFieldType returns false for non-plain fields', () => {
     expect(isPlainFieldType(FIELD_TYPES.OPTIONS)).toBe(false);
     expect(isPlainFieldType(FIELD_TYPES.DATE)).toBe(false);
+  });
+
+  it('isOptionsFieldType supports both FIELD_TYPES and SYS_D constants', () => {
+    expect(isOptionsFieldType(FIELD_TYPES.OPTIONS)).toBe(true);
+    expect(isOptionsFieldType(FIELD_TYPES.OPTIONS_FROM_SUPERTAG)).toBe(true);
+    expect(isOptionsFieldType(SYS_D.OPTIONS)).toBe(true);
+    expect(isOptionsFieldType(SYS_D.OPTIONS_FROM_SUPERTAG)).toBe(true);
+    expect(isOptionsFieldType(FIELD_TYPES.PLAIN)).toBe(false);
+  });
+
+  it('type predicate helpers support both FIELD_TYPES and SYS_D constants', () => {
+    expect(isOptionsFromSupertagFieldType(FIELD_TYPES.OPTIONS_FROM_SUPERTAG)).toBe(true);
+    expect(isOptionsFromSupertagFieldType(SYS_D.OPTIONS_FROM_SUPERTAG)).toBe(true);
+    expect(isCheckboxFieldType(FIELD_TYPES.CHECKBOX)).toBe(true);
+    expect(isCheckboxFieldType(SYS_D.CHECKBOX)).toBe(true);
+    expect(isDateFieldType(FIELD_TYPES.DATE)).toBe(true);
+    expect(isDateFieldType(SYS_D.DATE)).toBe(true);
+    expect(isNumberLikeFieldType(FIELD_TYPES.NUMBER)).toBe(true);
+    expect(isNumberLikeFieldType(SYS_D.INTEGER)).toBe(true);
+    expect(isUrlFieldType(FIELD_TYPES.URL)).toBe(true);
+    expect(isUrlFieldType(SYS_D.URL)).toBe(true);
+    expect(isEmailFieldType(FIELD_TYPES.EMAIL)).toBe(true);
+    expect(isEmailFieldType(SYS_D.EMAIL)).toBe(true);
+    expect(isSingleValueFieldType(FIELD_TYPES.NUMBER)).toBe(true);
+    expect(isSingleValueFieldType(FIELD_TYPES.URL)).toBe(true);
+    expect(isSingleValueFieldType(FIELD_TYPES.EMAIL)).toBe(true);
+    expect(isSingleValueFieldType(FIELD_TYPES.PLAIN)).toBe(false);
   });
 });

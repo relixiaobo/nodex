@@ -425,6 +425,18 @@ describe('③ LoroText + Peritext marks', () => {
     expect(text).toBeInstanceOf(LoroText);
   });
 
+  it('toNodexNode 从 richText 读取内容与 marks', () => {
+    const n = createNode('node1', null);
+    const text = getOrCreateNodeText(n)!;
+    text.insert(0, 'rich');
+    text.mark({ start: 0, end: 4 }, 'italic', true);
+    commitDoc();
+
+    const node = toNodexNode(n)!;
+    expect(node.name).toBe('rich');
+    expect(node.marks).toEqual([{ start: 0, end: 4, type: 'italic' }]);
+  });
+
   it('LoroText 支持文本写入和读取', () => {
     const n = createNode('node1', null);
     commitDoc();

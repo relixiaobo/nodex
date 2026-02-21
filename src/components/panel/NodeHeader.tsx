@@ -7,11 +7,10 @@
  *   Col B (15px): checkbox / icon — aligns with bullet
  *   Col C (flex): node name / tags — aligns with text
  *
- * Four conditional blocks:
+ * Three conditional blocks:
  *   ① Icon row (conditional: tagDef or fieldDef)
  *   ② Name row (always)
  *   ③ Supertag row (conditional: has tags, not a definition node)
- *   ④ Extra row (plugin slot, currently unused)
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { GripVertical } from '../../lib/icons.js';
@@ -62,8 +61,7 @@ export function NodeHeader({ nodeId, onTitleRef }: NodeHeaderProps) {
   const hasTags = (node?.tags ?? []).length > 0;
 
   // Title editing
-  const rawName = node?.name ?? '';
-  const displayName = rawName.replace(/<[^>]+>/g, '') || '';
+  const displayName = node?.name ?? '';
   const [editing, setEditing] = useState(false);
   const titleRef = useRef<HTMLHeadingElement>(null);
 
@@ -183,16 +181,9 @@ export function NodeHeader({ nodeId, onTitleRef }: NodeHeaderProps) {
             }}
             onBlur={handleBlur}
             onKeyDown={editing ? handleKeyDown : undefined}
-            dangerouslySetInnerHTML={
-              editing
-                ? undefined
-                : {
-                    __html:
-                      displayName ||
-                      '<span class="text-foreground-tertiary">Untitled</span>',
-                  }
-            }
-          />
+          >
+            {!editing && (displayName || <span className="text-foreground-tertiary">Untitled</span>)}
+          </h1>
         </div>
       </div>
 
@@ -202,8 +193,6 @@ export function NodeHeader({ nodeId, onTitleRef }: NodeHeaderProps) {
           <TagBar nodeId={nodeId} />
         </div>
       )}
-
-      {/* ── Block ④: Extra row (plugin slot — currently unused) ── */}
 
       {/* ── Description ── */}
       <div style={{ paddingLeft: COL_B_OFFSET }}>

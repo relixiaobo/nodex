@@ -42,6 +42,7 @@ import { NodePicker, type NodePickerOption } from './NodePicker';
 import { DoneMappingEntries } from './DoneMappingEntries';
 import { BulletChevron } from '../outliner/BulletChevron';
 import { FIELD_VALUE_INSET } from './field-layout.js';
+import { dragState } from '../../hooks/use-drag-select.js';
 
 function focusTrailingInputForParent(parentId: string): boolean {
   const roots = document.querySelectorAll<HTMLElement>('[data-trailing-parent-id]');
@@ -88,6 +89,24 @@ export const FIELD_ROW_SELECTION_OVERLAY_CLASS =
 // Align with OutlinerItem row highlight left edge. FieldRow wrapper starts 4px to the right
 // (chevron-bullet gap), so the selection mask compensates with left: -4.
 export const FIELD_ROW_SELECTION_OVERLAY_STYLE: CSSProperties = { left: -4, top: 1, bottom: 1 };
+
+export function isFieldRowInteractiveTarget(target: HTMLElement | null): boolean {
+  if (!target) return true;
+  if (target.closest('button, input, textarea, select, a, label, [role="button"], [contenteditable]')) return true;
+  // Value column contains mini outliners/pickers; clicks there should keep their own behavior.
+  if (target.closest('[data-field-value]')) return true;
+  return false;
+}
+
+export function shouldSelectFieldRow(params: {
+  isEditing: boolean;
+  justDragged: boolean;
+  target: HTMLElement | null;
+}): boolean {
+  const { isEditing, justDragged, target } = params;
+  if (isEditing || justDragged) return false;
+  return !isFieldRowInteractiveTarget(target);
+}
 
 function ConfigTagPicker({ nodeId, configKey, placeholder }: { nodeId: string; configKey: string; placeholder: string }) {
   const tags = useWorkspaceTags();
@@ -342,6 +361,7 @@ export function FieldRow({
   const editingFieldNameId = useUIStore((s) => s.editingFieldNameId);
   const setEditingFieldName = useUIStore((s) => s.setEditingFieldName);
   const setFocusedNode = useUIStore((s) => s.setFocusedNode);
+  const setSelectedNode = useUIStore((s) => s.setSelectedNode);
   const clearFocus = useUIStore((s) => s.clearFocus);
   // Derive boolean from Set to avoid Zustand infinite re-render (Set creates new reference each time)
   const isTupleInSelectedSet = useUIStore((s) => s.selectedNodeIds.has(tupleId));
@@ -513,11 +533,19 @@ export function FieldRow({
     setFocusedNode(newNode.id, insertParentId);
   }, [tupleId, nodeId, createChild, setFocusedNode]);
 
-  const handleNameClick = useCallback((e: React.MouseEvent<HTMLSpanElement>) => {
+  const handleNameClick = useCallback((e: React.MouseEvent<HTMLElement>) => {
+    e.stopPropagation();
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
     clickOffsetXRef.current = e.clientX - rect.left;
     setEditingFieldName(tupleId);
   }, [tupleId, setEditingFieldName]);
+
+  const handleFieldRowClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    const target = e.target instanceof HTMLElement ? e.target : null;
+    if (!shouldSelectFieldRow({ isEditing, justDragged: dragState.justDragged, target })) return;
+    setEditingFieldName(null);
+    setSelectedNode(tupleId, nodeId, 'global');
+  }, [isEditing, nodeId, tupleId, setSelectedNode, setEditingFieldName]);
 
   // Keyboard handler for field-selected state: Escape clears, Enter re-edits
   useEffect(() => {
@@ -560,6 +588,7 @@ export function FieldRow({
         data-node-id={tupleId}
         data-parent-id={nodeId}
         data-row-kind="field"
+        onClick={handleFieldRowClick}
       >
         <div className="flex items-center gap-1 @sm:shrink-0 @sm:w-[130px] min-w-0 h-7 py-1">
           <span className="shrink-0 w-[15px] flex items-center justify-center text-foreground-tertiary">
@@ -639,6 +668,7 @@ export function FieldRow({
         data-node-id={tupleId}
         data-parent-id={nodeId}
         data-row-kind="field"
+        onClick={handleFieldRowClick}
       >
         {/* Name column — icon + name + description */}
         <div className="flex gap-1 @sm:shrink-0 @sm:w-[180px] min-w-0">
@@ -684,6 +714,7 @@ export function FieldRow({
       data-node-id={tupleId}
       data-parent-id={nodeId}
       data-row-kind="field"
+      onClick={handleFieldRowClick}
     >
       {isFieldSelected && (
         <div className={FIELD_ROW_SELECTION_OVERLAY_CLASS} style={FIELD_ROW_SELECTION_OVERLAY_STYLE} />

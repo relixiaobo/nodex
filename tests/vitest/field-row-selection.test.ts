@@ -5,6 +5,8 @@ import {
   FieldRow,
   FIELD_ROW_SELECTION_OVERLAY_CLASS,
   FIELD_ROW_SELECTION_OVERLAY_STYLE,
+  isFieldRowInteractiveTarget,
+  shouldSelectFieldRow,
 } from '../../src/components/fields/FieldRow.js';
 import { FIELD_TYPES } from '../../src/types/index.js';
 import { useNodeStore } from '../../src/stores/node-store.js';
@@ -53,5 +55,31 @@ describe('FieldRow selected highlight', () => {
 
     expect(html).toContain('relative z-[1] flex items-center gap-1');
     expect(html).toContain('relative z-[1] flex flex-1 min-w-0 items-start');
+  });
+
+  it('treats only non-interactive name-side clicks as tuple selection triggers', () => {
+    const nameSide = document.createElement('div');
+    const valueSide = document.createElement('div');
+    valueSide.setAttribute('data-field-value', '');
+    const innerButton = document.createElement('button');
+    valueSide.appendChild(innerButton);
+
+    expect(isFieldRowInteractiveTarget(nameSide)).toBe(false);
+    expect(isFieldRowInteractiveTarget(innerButton)).toBe(true);
+    expect(isFieldRowInteractiveTarget(valueSide)).toBe(true);
+    expect(isFieldRowInteractiveTarget(null)).toBe(true);
+  });
+
+  it('suppresses row selection during editing and post-drag click', () => {
+    const nameSide = document.createElement('div');
+    expect(
+      shouldSelectFieldRow({ isEditing: false, justDragged: false, target: nameSide }),
+    ).toBe(true);
+    expect(
+      shouldSelectFieldRow({ isEditing: true, justDragged: false, target: nameSide }),
+    ).toBe(false);
+    expect(
+      shouldSelectFieldRow({ isEditing: false, justDragged: true, target: nameSide }),
+    ).toBe(false);
   });
 });

@@ -128,6 +128,8 @@ selectionAnchorId: string | null;   // 范围选中 / Shift+Arrow 的锚点
 |------|------|
 | **点击任意节点** | 聚焦该节点，光标由浏览器根据点击坐标放置 |
 
+> FieldRow 补充：字段行（fieldEntry）在**非交互区**单击进入全局选中（tuple 选中），与普通节点保持一致；`data-field-value` 区域及 button/input 等交互控件保持原有行为，不被行选中逻辑抢占。
+
 ### Esc 三级退出链
 
 连续按 Esc 依次经过：**编辑模式 → 选中模式 → 无选择**。如果当前处于 Zoom（聚焦某节点的子树视图），无选择状态下按 Esc 还会退出 Zoom（PanelStack.pop）。

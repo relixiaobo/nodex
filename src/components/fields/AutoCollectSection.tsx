@@ -6,6 +6,7 @@
 import { useMemo } from 'react';
 import { useNodeStore } from '../../stores/node-store';
 import { BulletChevron } from '../outliner/BulletChevron';
+import { FIELD_VALUE_INSET } from './field-layout.js';
 
 interface AutoCollectSectionProps {
   fieldDefId: string;
@@ -39,7 +40,7 @@ export function AutoCollectSection({ fieldDefId }: AutoCollectSectionProps) {
     return (
       <div
         className="flex min-h-7 items-start gap-2 py-0.5"
-        style={{ paddingLeft: 25 }}
+        style={{ paddingLeft: FIELD_VALUE_INSET }}
       >
         <BulletChevron
           hasChildren={false}
@@ -60,7 +61,7 @@ export function AutoCollectSection({ fieldDefId }: AutoCollectSectionProps) {
         <div
           key={item.id}
           className="flex min-h-7 items-start gap-2 py-0.5"
-          style={{ paddingLeft: 25 }}
+          style={{ paddingLeft: FIELD_VALUE_INSET }}
         >
           <BulletChevron
             hasChildren={false}

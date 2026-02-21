@@ -233,6 +233,7 @@ npm run test:run
 4. `FieldRow` 在 `configControl` 缺失时可基于 `configKey` 注册表兜底分发控件
 5. `OutlinerItem/OutlinerView/FieldList` 统一复用同一映射，避免调用方漏传导致配置控件退化
 6. `OptionsPicker` 的新建选项能力受 `autocollectOptions` 控制（未显式关闭时允许，显式关闭后禁止）
+7. 字段 value 布局基线由共享常量 `FIELD_VALUE_INSET` 驱动，`FieldRow` 配置项渲染测试锁定该常量对齐
 
 ### 1.7 标签与引用状态流
 

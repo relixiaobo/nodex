@@ -59,6 +59,7 @@ _(空)_
 > - [2026-02-21 nodex-codex] 追加兜底：`FieldRow` 系统配置渲染从 `configControl` 回退到 `configKey` 注册表（`resolvedControl`），避免配置字段因单点元数据缺失退化；新增 `use-node-fields-config` / `field-list-config-render` / `field-row-config-render` 回归测试锁定
 > - [2026-02-21 nodex-codex] 根据最新冒烟反馈继续修复：统一配置控件 value 区 bullet 基线（NodePicker/DoneMapping/AutoCollect/NumberInput 统一 25px inset，tag `#` 子弹尺寸统一 15px）；`Auto-collect` 关闭时隐藏列表子行；`OptionsPicker` 新建能力改为受 `autocollectOptions` 开关控制；新增 `options-picker.test.ts`
 > - [2026-02-21 nodex-codex] 启动“清晰/简单/优雅”收口：将 `FieldRow` 的配置项分发改为显式 registry（替代多层条件分支），并提取统一布局常量消除多处 magic number
+> - [2026-02-21 nodex-codex] 完成收口：新增 `FIELD_VALUE_INSET` 统一 value 布局基线；`FieldRow` system-config 渲染改为 `control -> renderer` 显式注册（覆盖 outliner/color_picker/toggle/tag_picker/type_choice/select/done_map_entries/number_input/autocollect），仅未知 control 才进入默认渲染并在 dev 警告
 
 ### Refactor — Loro 收口 Phase 1：detached guard + origin 策略 (2026-02-21)
 > **Owner**: nodex-codex | **Branch**: codex/loro-phase1-guards

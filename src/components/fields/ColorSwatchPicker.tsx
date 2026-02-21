@@ -11,6 +11,7 @@ import { useNodeStore } from '../../stores/node-store';
 import { SWATCH_OPTIONS } from '../../lib/tag-colors.js';
 import { BulletChevron } from '../outliner/BulletChevron';
 import * as loroDoc from '../../lib/loro-doc.js';
+import { FIELD_VALUE_INSET } from './field-layout.js';
 
 interface ColorSwatchPickerProps {
   tupleId: string;
@@ -47,7 +48,7 @@ export function ColorSwatchPicker({ tupleId, configNodeId }: ColorSwatchPickerPr
   );
 
   return (
-    <div className="flex min-h-7 items-center gap-2 py-1.5" style={{ paddingLeft: 25 }}>
+    <div className="flex min-h-7 items-center gap-2 py-1.5" style={{ paddingLeft: FIELD_VALUE_INSET }}>
       <BulletChevron hasChildren={false} isExpanded={false} onBulletClick={() => {}} />
       <div className="flex flex-wrap gap-2">
         {SWATCH_OPTIONS.map((swatch) => {

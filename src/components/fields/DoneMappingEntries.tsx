@@ -17,6 +17,7 @@ import { NodePicker, type NodePickerOption } from './NodePicker';
 import { BulletChevron } from '../outliner/BulletChevron';
 import * as loroDoc from '../../lib/loro-doc.js';
 import { SYS_A } from '../../types/index.js';
+import { FIELD_VALUE_INSET } from './field-layout.js';
 
 const noop = () => {};
 const EMPTY = '[]';
@@ -131,7 +132,7 @@ export function DoneMappingEntries({ tagDefId, mappingKey }: DoneMappingEntriesP
         <div
           key={entry.index}
           className="flex min-h-7 items-center gap-2 py-1 group/entry"
-          style={{ paddingLeft: 25 }}
+          style={{ paddingLeft: FIELD_VALUE_INSET }}
         >
           <BulletChevron hasChildren={false} isExpanded={false} onBulletClick={noop} />
           <span className="flex-1 min-w-0 text-sm leading-[21px] text-foreground truncate">
@@ -155,7 +156,7 @@ export function DoneMappingEntries({ tagDefId, mappingKey }: DoneMappingEntriesP
             onSelect={handleFieldSelect}
             onClear={handlePickerCancel}
             placeholder="Select field..."
-            insetLeft={25}
+            insetLeft={FIELD_VALUE_INSET}
           />
         </div>
       ) : pickerStep === 'option' ? (
@@ -165,13 +166,13 @@ export function DoneMappingEntries({ tagDefId, mappingKey }: DoneMappingEntriesP
             onSelect={handleOptionSelect}
             onClear={handlePickerCancel}
             placeholder="Select option value..."
-            insetLeft={25}
+            insetLeft={FIELD_VALUE_INSET}
           />
         </div>
       ) : (
         <div
           className="flex min-h-7 items-center gap-2 py-1 cursor-pointer group/add"
-          style={{ paddingLeft: 25 }}
+          style={{ paddingLeft: FIELD_VALUE_INSET }}
           onClick={handleAddClick}
         >
           <BulletChevron hasChildren={false} isExpanded={false} onBulletClick={noop} dimmed />

@@ -36,7 +36,7 @@ describe('FieldRow selected highlight', () => {
     expect(FIELD_ROW_SELECTION_OVERLAY_CLASS).toContain('bg-selection-row');
     expect(FIELD_ROW_SELECTION_OVERLAY_CLASS).toContain('border-primary/[0.15]');
     expect(FIELD_ROW_SELECTION_OVERLAY_CLASS).not.toContain('z-0');
-    expect(FIELD_ROW_SELECTION_OVERLAY_STYLE).toMatchObject({ left: 0, top: 1, bottom: 1 });
+    expect(FIELD_ROW_SELECTION_OVERLAY_STYLE).toMatchObject({ left: -4, top: 1, bottom: 1 });
   });
 
   it('keeps name/value layers above the selection mask', () => {

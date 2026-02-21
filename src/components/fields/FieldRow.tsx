@@ -85,7 +85,9 @@ interface FieldRowProps {
 
 export const FIELD_ROW_SELECTION_OVERLAY_CLASS =
   'absolute right-0 bg-selection-row rounded-sm border border-primary/[0.15] pointer-events-none';
-export const FIELD_ROW_SELECTION_OVERLAY_STYLE: CSSProperties = { left: 0, top: 1, bottom: 1 };
+// Align with OutlinerItem row highlight left edge. FieldRow wrapper starts 4px to the right
+// (chevron-bullet gap), so the selection mask compensates with left: -4.
+export const FIELD_ROW_SELECTION_OVERLAY_STYLE: CSSProperties = { left: -4, top: 1, bottom: 1 };
 
 function ConfigTagPicker({ nodeId, configKey, placeholder }: { nodeId: string; configKey: string; placeholder: string }) {
   const tags = useWorkspaceTags();

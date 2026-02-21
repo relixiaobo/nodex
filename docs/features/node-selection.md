@@ -301,6 +301,7 @@ mouseup (document, 动态)
 > 行高亮有 1px 垂直内缩 (`top: 1; bottom: 1`)，相邻直接选中行之间有 2px 可见间隙。
 > 子树遮罩有 1px 底部内缩 (`bottom: 1`)，与下一兄弟节点保持一致的 2px 间隙。
 > 字段行（FieldRow）与内容行（content node）共享同一行高亮视觉配方；字段行内容层（name/value）必须在遮罩之上，避免选中后值区文本不可见。
+> 字段行选中遮罩左边界对齐到 content row 基线（FieldRow 内部做 `left: -4px` 补偿 chevron-bullet gap）。
 
 **视觉效果**：
 - 单选展开的父节点：子树区域被浅紫色连续遮罩覆盖，父节点行颜色更深（不透明 `#E8E0FA`）

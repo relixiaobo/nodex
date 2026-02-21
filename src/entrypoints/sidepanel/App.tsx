@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useWorkspaceStore } from '../../stores/workspace-store';
 import { useUIStore } from '../../stores/ui-store';
 import { useNavUndoKeyboard } from '../../hooks/use-nav-undo-keyboard';
+import { useTodayShortcut } from '../../hooks/use-today-shortcut';
 import { Sidebar } from '../../components/sidebar/Sidebar';
 import { PanelStack } from '../../components/panel/PanelStack';
 import { CommandPalette } from '../../components/search/CommandPalette';
@@ -111,6 +112,8 @@ export function App({ skipBootstrap = false }: AppProps) {
 
   // Global Cmd+Z / Cmd+Shift+Z for navigation undo/redo
   useNavUndoKeyboard();
+  // Global Cmd+Shift+D for go to today
+  useTodayShortcut();
 
   if (!ready) {
     return (

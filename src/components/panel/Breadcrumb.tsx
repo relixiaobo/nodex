@@ -25,6 +25,8 @@ import { useAncestors } from '../../hooks/use-ancestors';
 import { getNavigableParentId } from '../../lib/tree-utils';
 import { CONTAINER_IDS } from '../../types/index.js';
 import * as loroDoc from '../../lib/loro-doc.js';
+import { isDayNode } from '../../lib/journal.js';
+import { parseDayNodeName, parseYearNodeName, isToday } from '../../lib/date-utils.js';
 
 interface BreadcrumbProps {
   nodeId: string;
@@ -142,7 +144,7 @@ export function Breadcrumb({ nodeId, showCurrentName }: BreadcrumbProps) {
                 onClick={() => navigateTo(ancestor.id)}
                 className="truncate max-w-[120px] rounded px-0.5 hover:bg-foreground/5 hover:text-foreground"
               >
-                {ancestor.name}
+                {resolveBreadcrumbLabel(ancestor.id, ancestor.name)}
               </button>
             </span>
           ))}
@@ -172,13 +174,33 @@ export function Breadcrumb({ nodeId, showCurrentName }: BreadcrumbProps) {
   );
 }
 
+/**
+ * Resolve display label for a breadcrumb segment.
+ * If the node is today's day node, prefix with "Today, ".
+ */
+function resolveBreadcrumbLabel(nodeId: string, name: string): string {
+  if (!isDayNode(nodeId)) return name;
+  // Find year from ancestor chain: day → week → year
+  const weekId = loroDoc.getParentId(nodeId);
+  if (!weekId) return name;
+  const yearId = loroDoc.getParentId(weekId);
+  if (!yearId) return name;
+  const yearNode = loroDoc.toNodexNode(yearId);
+  const year = yearNode?.name ? parseYearNodeName(yearNode.name) : null;
+  if (year === null) return name;
+  const date = parseDayNodeName(name, year);
+  if (date && isToday(date)) return `Today, ${name}`;
+  return name;
+}
+
 /** Subscribes to node name for the conditional breadcrumb display. */
 function BreadcrumbCurrentName({ nodeId }: { nodeId: string }) {
   const name = useNodeStore((s) => {
     void s._version;
     const node = s.getNode(nodeId);
     const raw = node?.name ?? '';
-    return raw.replace(/<[^>]+>/g, '') || 'Untitled';
+    const clean = raw.replace(/<[^>]+>/g, '') || 'Untitled';
+    return resolveBreadcrumbLabel(nodeId, clean);
   });
 
   return <span className="truncate max-w-[100px] text-xs font-medium">{name}</span>;

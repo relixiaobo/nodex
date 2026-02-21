@@ -20,6 +20,7 @@ import { useUIStore } from '../../stores/ui-store';
 import { useWorkspaceStore } from '../../stores/workspace-store';
 import { CONTAINER_IDS, FIELD_TYPES } from '../../types/index.js';
 import type { InlineRefEntry, TextMark } from '../../types/index.js';
+import { ensureDateNode } from '../../lib/journal.js';
 
 const WS_ID = 'ws_default';
 
@@ -202,12 +203,23 @@ function seedBody(): void {
   }
 
   // ═══════════════════════════════════════════════════════════════
-  // Journal content
+  // Journal content (real date hierarchy: Year → Week → Day)
   // ═══════════════════════════════════════════════════════════════
-  cn('journal_1', CONTAINER_IDS.JOURNAL, { name: "Today's Journal" });
-  cn('j_1', 'journal_1', { name: 'Started working on the outliner component' });
-  cn('j_2', 'journal_1', { name: 'Fixed a bug in the drag and drop handler' });
-  cn('j_3', 'journal_1', { name: 'Learned about TipTap keyboard shortcuts' });
+  const today = new Date();
+  const yesterday = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1);
+
+  // ensureDateNode creates Year → Week → Day with system tags + descending sort
+  const todayDayId = ensureDateNode(today);
+  const yesterdayDayId = ensureDateNode(yesterday);
+
+  // Today's notes
+  cn('j_today_1', todayDayId, { name: 'Started working on the outliner component' });
+  cn('j_today_2', todayDayId, { name: 'Fixed a bug in the drag and drop handler' });
+  cn('j_today_3', todayDayId, { name: 'Learned about TipTap keyboard shortcuts' });
+
+  // Yesterday's notes
+  cn('j_yest_1', yesterdayDayId, { name: 'Reviewed PR for data model migration' });
+  cn('j_yest_2', yesterdayDayId, { name: 'Sketched out the journal feature plan' });
 
   // ═══════════════════════════════════════════════════════════════
   // UI State: navigation + expand defaults

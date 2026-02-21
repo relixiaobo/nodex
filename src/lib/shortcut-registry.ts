@@ -243,6 +243,14 @@ export const SHORTCUT_REGISTRY: ShortcutDefinition[] = [
   },
 
   {
+    id: 'global.go_to_today',
+    scope: 'global',
+    keys: ['Mod-Shift-d'],
+    when: 'Focus not in contentEditable/input/textarea and no node focused',
+    action: 'Navigate to today\'s journal day node',
+    source: 'src/hooks/use-today-shortcut.ts',
+  },
+  {
     id: 'global.nav_undo',
     scope: 'global',
     keys: ['Mod-z', 'Ctrl-z'],

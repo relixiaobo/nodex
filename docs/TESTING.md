@@ -795,6 +795,15 @@ hash trigger cleanup safety（3 cases, Bug #53 + CJK hashtag 回归）:
 1. `node-selected-ref` 采用 `::before` 绝对定位 overlay 渲染选中框（非布局 border/padding）
 2. 基础选择器不包含 `padding/margin/border`，确保选中/未选中高度一致
 
+### 1.59 Outliner Drag Select 覆盖 Field 行
+
+**测试文件**: `tests/vitest/outliner-view-drag-select.test.ts`
+
+**覆盖点**:
+
+1. drag-select 根列表包含可见 `field + content` 行（不再仅 content）
+2. hidden field 仅在“已手动 reveal”时进入 drag-select 根列表
+
 ### 1.48 Auth 工具函数（Google OAuth + Supabase）
 
 **测试文件**: `tests/vitest/auth.test.ts`

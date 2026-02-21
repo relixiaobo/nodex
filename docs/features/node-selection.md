@@ -198,6 +198,7 @@ selectionAnchorId: string | null;   // 范围选中 / Shift+Arrow 的锚点
 从非文本区域开始拖动时，超过 5px 阈值即激活拖选。
 
 > 设计意图：在文字上拖动大概率是选择文字，移到其他节点或 padding 才说明意图是多选。
+> NodePanel 补充：drag-select 根列表包含同级 `content row + field row`，所以从内容节点拖过字段区域时，字段 tuple 会进入选区（不再被过滤）。
 
 ### 拖选过程
 

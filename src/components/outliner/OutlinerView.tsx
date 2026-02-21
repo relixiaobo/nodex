@@ -19,6 +19,21 @@ interface OutlinerViewProps {
   showTemplateTuples?: boolean;
 }
 
+export interface OutlinerVisibleChildRow {
+  id: string;
+  type: 'field' | 'content';
+  hidden?: boolean;
+}
+
+export function getDragSelectableRootIds(
+  rows: OutlinerVisibleChildRow[],
+  isFieldRevealed: (fieldEntryId: string) => boolean,
+): string[] {
+  return rows
+    .filter((row) => !row.hidden || isFieldRevealed(row.id))
+    .map((row) => row.id);
+}
+
 export function OutlinerView({ rootNodeId, showTemplateTuples }: OutlinerViewProps) {
   const node = useNode(rootNodeId);
   useChildren(rootNodeId);
@@ -80,6 +95,10 @@ export function OutlinerView({ rootNodeId, showTemplateTuples }: OutlinerViewPro
     () => visibleChildren.filter((c) => c.type === 'content').map((c) => c.id),
     [visibleChildren],
   );
+  const dragSelectableRootIds = useMemo(
+    () => getDragSelectableRootIds(visibleChildren, isFieldRevealed),
+    [visibleChildren, expandedHiddenFields, rootNodeId],
+  );
 
   // All hidden fields (including ALWAYS): shown as compact pills, click to temporarily reveal
   const hiddenRevealableFields = useMemo(
@@ -95,7 +114,7 @@ export function OutlinerView({ rootNodeId, showTemplateTuples }: OutlinerViewPro
 
   // Drag select: document-level mouse tracking for multi-node selection
   const containerRef = useRef<HTMLDivElement>(null);
-  useDragSelect({ containerRef, rootChildIds: contentChildIds, rootNodeId });
+  useDragSelect({ containerRef, rootChildIds: dragSelectableRootIds, rootNodeId });
 
   return (
     <div

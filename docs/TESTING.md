@@ -761,9 +761,29 @@ hash trigger cleanup safety（3 cases, Bug #53 + CJK hashtag 回归）:
 
 **覆盖点**:
 
-1. workspace 节点存在时，头像/根节点导航目标优先指向 `currentWorkspaceId`
-2. workspace 节点缺失时，回退到当前 ancestor chain 的 `workspaceRootId`
+1. 头像/根节点导航目标优先指向 `currentWorkspaceId`（不再依赖节点已存在）
+2. `currentWorkspaceId` 缺失时，回退到当前 ancestor chain 的 `workspaceRootId`
 3. 两者都不可用时，最终回退到 `LIBRARY`
+
+### 1.56 ReferenceSelector 空查询 Recently Used
+
+**测试文件**: `tests/vitest/reference-selector-recent.test.ts`
+
+**覆盖点**:
+
+1. 空 query 时 recent 列表可由“全局最近编辑节点”补齐（避免仅显示 `Library`）
+2. 历史来源优先级高于 fallback（按 panelHistory 最近访问顺序）
+3. history + fallback 去重，且过滤 container/结构节点
+
+### 1.57 Workspace Home 节点兜底创建
+
+**测试文件**: `tests/vitest/workspace-root.test.ts`
+
+**覆盖点**:
+
+1. `ensureWorkspaceHomeNode` 在 workspace 根节点缺失时自动补建
+2. 已存在 workspace 根节点时保持幂等（不重复创建，不覆盖已有名称）
+3. 传入空 workspaceId 时安全返回
 
 ### 1.48 Auth 工具函数（Google OAuth + Supabase）
 

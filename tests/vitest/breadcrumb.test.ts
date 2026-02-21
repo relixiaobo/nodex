@@ -2,20 +2,18 @@ import { resolveWorkspaceRootTargetId } from '../../src/components/panel/Breadcr
 import { CONTAINER_IDS } from '../../src/types/index.js';
 
 describe('breadcrumb workspace root target', () => {
-  it('prefers current workspace node when it exists', () => {
+  it('always prefers workspaceId when present', () => {
     const target = resolveWorkspaceRootTargetId({
       workspaceId: 'ws_1',
       workspaceRootId: CONTAINER_IDS.INBOX,
-      hasWorkspaceNode: (id) => id === 'ws_1',
     });
     expect(target).toBe('ws_1');
   });
 
-  it('falls back to workspaceRootId when workspace node is missing', () => {
+  it('falls back to workspaceRootId when workspaceId is missing', () => {
     const target = resolveWorkspaceRootTargetId({
-      workspaceId: 'ws_missing',
+      workspaceId: null,
       workspaceRootId: CONTAINER_IDS.JOURNAL,
-      hasWorkspaceNode: () => false,
     });
     expect(target).toBe(CONTAINER_IDS.JOURNAL);
   });
@@ -24,7 +22,6 @@ describe('breadcrumb workspace root target', () => {
     const target = resolveWorkspaceRootTargetId({
       workspaceId: null,
       workspaceRootId: null,
-      hasWorkspaceNode: () => false,
     });
     expect(target).toBe(CONTAINER_IDS.LIBRARY);
   });

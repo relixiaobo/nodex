@@ -24,6 +24,7 @@ import { useWorkspaceStore } from '../../stores/workspace-store';
 import { useAncestors } from '../../hooks/use-ancestors';
 import { getNavigableParentId } from '../../lib/tree-utils';
 import { CONTAINER_IDS } from '../../types/index.js';
+import { ensureWorkspaceHomeNode } from '../../lib/workspace-root.js';
 import * as loroDoc from '../../lib/loro-doc.js';
 import { isDayNode } from '../../lib/journal.js';
 import { parseDayNodeName, parseYearNodeName, isToday } from '../../lib/date-utils.js';
@@ -36,10 +37,9 @@ interface BreadcrumbProps {
 export function resolveWorkspaceRootTargetId(params: {
   workspaceId: string | null;
   workspaceRootId: string | null;
-  hasWorkspaceNode: (nodeId: string) => boolean;
 }): string {
-  const { workspaceId, workspaceRootId, hasWorkspaceNode } = params;
-  if (workspaceId && hasWorkspaceNode(workspaceId)) return workspaceId;
+  const { workspaceId, workspaceRootId } = params;
+  if (workspaceId) return workspaceId;
   if (workspaceRootId) return workspaceRootId;
   return CONTAINER_IDS.LIBRARY;
 }
@@ -63,7 +63,6 @@ export function Breadcrumb({ nodeId, showCurrentName }: BreadcrumbProps) {
   const workspaceRootTargetId = resolveWorkspaceRootTargetId({
     workspaceId: wsId,
     workspaceRootId,
-    hasWorkspaceNode: (id) => !!loroDoc.toNodexNode(id),
   });
   const wsInitial = useNodeStore((s) => {
     void s._version;
@@ -85,9 +84,12 @@ export function Breadcrumb({ nodeId, showCurrentName }: BreadcrumbProps) {
     if (parentId) navigateTo(parentId);
   }, [parentId, navigateTo]);
 
-  const handleAvatarClick = useCallback(() => {
+  const handleNavigateToWorkspaceRoot = useCallback(() => {
+    if (wsId && workspaceRootTargetId === wsId) {
+      ensureWorkspaceHomeNode(wsId);
+    }
     navigateTo(workspaceRootTargetId);
-  }, [workspaceRootTargetId, navigateTo]);
+  }, [workspaceRootTargetId, navigateTo, wsId]);
 
   // Determine which ancestors to show
   const needsFolding = ancestors.length >= 3 && !expanded;
@@ -128,7 +130,7 @@ export function Breadcrumb({ nodeId, showCurrentName }: BreadcrumbProps) {
               have no parent; we still show [W] to indicate workspace context. */}
           {!!wsId && (
             <button
-              onClick={handleAvatarClick}
+              onClick={handleNavigateToWorkspaceRoot}
               className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/15 text-[10px] font-semibold text-primary hover:bg-primary/25"
               title="Go to workspace root"
             >
@@ -155,9 +157,13 @@ export function Breadcrumb({ nodeId, showCurrentName }: BreadcrumbProps) {
             <span key={ancestor.id} className="flex items-center shrink-0 min-w-0">
               <ChevronRight size={10} className="shrink-0 text-foreground-tertiary mx-0.5" />
               <button
-                onClick={() => navigateTo(
-                  ancestor.id === workspaceRootId ? workspaceRootTargetId : ancestor.id,
-                )}
+                onClick={() => {
+                  if (ancestor.id === workspaceRootId) {
+                    handleNavigateToWorkspaceRoot();
+                    return;
+                  }
+                  navigateTo(ancestor.id);
+                }}
                 className="truncate max-w-[120px] rounded px-0.5 hover:bg-foreground/5 hover:text-foreground"
               >
                 {resolveBreadcrumbLabel(ancestor.id, ancestor.name)}

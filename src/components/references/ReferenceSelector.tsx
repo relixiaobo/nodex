@@ -13,6 +13,7 @@ import { AtSign, Plus } from '../../lib/icons.js';
 import { useNodeSearch, type NodeSearchResult } from '../../hooks/use-node-search';
 import { useUIStore } from '../../stores/ui-store';
 import { useNodeStore } from '../../stores/node-store';
+import { isWorkspaceContainer } from '../../lib/tree-utils.js';
 import * as loroDoc from '../../lib/loro-doc.js';
 
 export interface ReferenceDropdownHandle {
@@ -31,33 +32,85 @@ interface ReferenceSelectorProps {
   anchor?: { left: number; top: number; bottom: number };
 }
 
+const SKIP_RECENT_DOC_TYPES = new Set<string>(['fieldEntry', 'fieldDef', 'tagDef', 'reference']);
+
+function normalizeRecentNode(
+  id: string,
+  currentNodeId: string,
+): NodeSearchResult | null {
+  if (id === currentNodeId) return null;
+  if (isWorkspaceContainer(id)) return null;
+  const node = loroDoc.toNodexNode(id);
+  if (!node) return null;
+  if (node.type && SKIP_RECENT_DOC_TYPES.has(node.type)) return null;
+  const name = (node.name ?? '').replace(/<[^>]+>/g, '').trim();
+  if (!name) return null;
+  return { id, name, breadcrumb: '', updatedAt: node.updatedAt ?? 0 };
+}
+
+export function collectRecentReferenceNodes(params: {
+  currentNodeId: string;
+  panelHistory: string[];
+  panelIndex: number;
+  limit?: number;
+}): NodeSearchResult[] {
+  const { currentNodeId, panelHistory, panelIndex, limit = 5 } = params;
+  const seen = new Set<string>();
+  const results: NodeSearchResult[] = [];
+
+  const pushIfValid = (id: string) => {
+    if (seen.has(id)) return;
+    const normalized = normalizeRecentNode(id, currentNodeId);
+    if (!normalized) return;
+    seen.add(id);
+    results.push(normalized);
+  };
+
+  // Primary source: navigation history (most recently opened first).
+  for (let i = panelIndex; i >= 0 && results.length < limit; i--) {
+    const id = panelHistory[i];
+    if (!id) continue;
+    pushIfValid(id);
+  }
+
+  // Fallback source: most recently edited nodes globally.
+  if (results.length < limit) {
+    const candidates = loroDoc
+      .getAllNodeIds()
+      .map((id) => normalizeRecentNode(id, currentNodeId))
+      .filter((item): item is NodeSearchResult => !!item && !seen.has(item.id))
+      .sort((a, b) => {
+        if (b.updatedAt !== a.updatedAt) return b.updatedAt - a.updatedAt;
+        const byName = a.name.localeCompare(b.name, 'en');
+        if (byName !== 0) return byName;
+        return a.id.localeCompare(b.id, 'en');
+      });
+
+    for (const item of candidates) {
+      if (results.length >= limit) break;
+      seen.add(item.id);
+      results.push(item);
+    }
+  }
+
+  return results;
+}
+
 export const ReferenceSelector = forwardRef<ReferenceDropdownHandle, ReferenceSelectorProps>(
   function ReferenceSelector({ open, onSelect, onCreateNew, query, selectedIndex, currentNodeId, anchor }, ref) {
     const anchorRef = useRef<HTMLSpanElement>(null);
     const searchResults = useNodeSearch(query, currentNodeId);
     const listRef = useRef<HTMLDivElement>(null);
 
-    // When query is empty, show recently opened nodes from navigation history
+    // When query is empty, show recently used nodes:
+    // navigation history first, then recently edited fallback.
     const panelHistory = useUIStore((s) => s.panelHistory);
     const panelIndex = useUIStore((s) => s.panelIndex);
     const _version = useNodeStore((s) => s._version);
 
     const recentNodes = useMemo(() => {
       if (query.trim()) return [];
-      const seen = new Set<string>();
-      const results: NodeSearchResult[] = [];
-      // Walk history backwards from current position for most recently visited
-      for (let i = panelIndex; i >= 0 && results.length < 5; i--) {
-        const id = panelHistory[i];
-        if (id === currentNodeId || seen.has(id)) continue;
-        seen.add(id);
-        const node = loroDoc.toNodexNode(id);
-        if (!node) continue;
-        const name = (node.name ?? '').replace(/<[^>]+>/g, '').trim();
-        if (!name) continue;
-        results.push({ id, name, breadcrumb: '', updatedAt: node.updatedAt ?? 0 });
-      }
-      return results;
+      return collectRecentReferenceNodes({ currentNodeId, panelHistory, panelIndex, limit: 5 });
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [query, panelHistory, panelIndex, _version, currentNodeId]);
 
@@ -141,7 +194,7 @@ export const ReferenceSelector = forwardRef<ReferenceDropdownHandle, ReferenceSe
         {/* Section header */}
         {!query.trim() && recentNodes.length > 0 && (
           <div className="px-2 py-1 text-[10px] font-medium text-foreground-secondary uppercase tracking-wider">
-            Recently opened
+            Recently used
           </div>
         )}
         {query.trim() && items.length > 0 && (

@@ -9,6 +9,7 @@ import { CommandPalette } from '../../components/search/CommandPalette';
 import { CONTAINER_IDS } from '../../types/index.js';
 import { initLoroDoc } from '../../lib/loro-doc.js';
 import * as loroDoc from '../../lib/loro-doc.js';
+import { ensureWorkspaceHomeNode } from '../../lib/workspace-root.js';
 import { findUnexpectedShortcutConflicts } from '../../lib/shortcut-registry.js';
 import { Toaster } from 'sonner';
 
@@ -27,6 +28,7 @@ const CONTAINER_DEFS: Array<{ id: string; name: string }> = [
  */
 async function seedWorkspace(wsId: string): Promise<void> {
   await initLoroDoc(wsId);
+  ensureWorkspaceHomeNode(wsId);
 
   // Create container nodes if they don't already exist
   for (const { id, name } of CONTAINER_DEFS) {

@@ -28,7 +28,7 @@ _(空)_
 | Agent | 当前任务 | 分支 | 修改中的文件 |
 |-------|---------|------|-------------|
 | nodex-cc | Date 节点 & 日记 (#22) | cc/date-nodes | _(待开始)_ |
-| nodex-cc-2 | 网页剪藏 (#30) | cc2/web-clipping | _(待开始)_ |
+| nodex-cc-2 | 网页剪藏 (#30) | cc2/web-clipping | webclip-service.ts, OutlinerItem.tsx, Toast 组件 |
 | nodex-codex | Bug 修复 & 基础优化（面包屑导航 + @ reference 排序） | codex/ux-polish | _(待开始)_ |
 
 ---
@@ -103,14 +103,15 @@ _(空)_
 - **Spec**: `docs/features/date-nodes.md`
 
 #### 网页剪藏 (#30)
-> 已完成：消息类型定义、Content Script 提取（defuddle）、Background 中转、Sidebar 剪藏按钮、Capture Tab 复制到剪贴板
+> 已完成：消息类型定义、Content Script 提取（defuddle）、Background 中转、`/clip` slash command 全链路、`#web_clip` tagDef + Source URL attrDef 惰性创建、Vitest 20 cases
+> **Owner**: nodex-cc-2 | **Branch**: cc2/web-clipping
 
-- [ ] 将捕获数据保存为节点（Supertag Extend 已就绪）
-- [ ] 自动打 web_clip 标签
-- [ ] Source URL 字段写入
-- [ ] 剪藏结果 Toast 反馈
-- [ ] 一键保存到 Inbox / Today / 指定节点
-- [ ] 保留源 URL 引用
+- [x] 将捕获数据保存为节点 ✓ `/clip` + `applyWebClipToNode`
+- [x] 自动打 web_clip 标签 ✓ `applyTag(tagDef_web_clip)`
+- [x] Source URL 字段写入 ✓ `setFieldValue(sourceUrlAttrDefId, url)`
+- [ ] 剪藏结果 Toast 反馈（成功/失败提示）
+- [ ] 一键保存到 Inbox / Today / 指定节点（UI 入口 + 目标选择）
+- [ ] 保留源 URL 引用（URL 字段值渲染为可点击链接）
 - **Spec**: `docs/features/web-clipping.md`
 
 #### 撤销与重做 (#44)

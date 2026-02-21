@@ -804,6 +804,15 @@ hash trigger cleanup safety（3 cases, Bug #53 + CJK hashtag 回归）:
 1. drag-select 根列表包含可见 `field + content` 行（不再仅 content）
 2. hidden field 仅在“已手动 reveal”时进入 drag-select 根列表
 
+### 1.60 OutlinerView 渲染安全（白屏回归）
+
+**测试文件**: `tests/vitest/outliner-view-render.test.ts`
+
+**覆盖点**:
+
+1. `OutlinerView` 在 NodePanel 场景可正常渲染（字段行 + 内容行同时存在）
+2. 防止运行时初始化顺序错误（TDZ）导致首屏白屏
+
 ### 1.48 Auth 工具函数（Google OAuth + Supabase）
 
 **测试文件**: `tests/vitest/auth.test.ts`

@@ -95,6 +95,11 @@ export function OutlinerView({ rootNodeId, showTemplateTuples }: OutlinerViewPro
     () => visibleChildren.filter((c) => c.type === 'content').map((c) => c.id),
     [visibleChildren],
   );
+
+  /** Check if a hidden field has been temporarily revealed via UIStore */
+  const isFieldRevealed = (fieldEntryId: string) =>
+    expandedHiddenFields.has(`${rootNodeId}:${fieldEntryId}`);
+
   const dragSelectableRootIds = useMemo(
     () => getDragSelectableRootIds(visibleChildren, isFieldRevealed),
     [visibleChildren, expandedHiddenFields, rootNodeId],
@@ -107,10 +112,6 @@ export function OutlinerView({ rootNodeId, showTemplateTuples }: OutlinerViewPro
       .map((c) => ({ id: c.id, name: fieldMap.get(c.id)!.attrDefName })),
     [visibleChildren, fieldMap],
   );
-
-  /** Check if a hidden field has been temporarily revealed via UIStore */
-  const isFieldRevealed = (fieldEntryId: string) =>
-    expandedHiddenFields.has(`${rootNodeId}:${fieldEntryId}`);
 
   // Drag select: document-level mouse tracking for multi-node selection
   const containerRef = useRef<HTMLDivElement>(null);

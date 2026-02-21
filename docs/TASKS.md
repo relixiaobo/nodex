@@ -58,6 +58,7 @@ _(空)_
 > - [2026-02-21 nodex-codex] 四次回归修复：针对仍存在的 `@` 创建后 caret 掉到下一行问题，增加 inline-ref 段落级别 CSS 兜底（`:has([data-inlineref-node])` 时隐藏 `ProseMirror-separator` 与 `trailingBreak`），避免原子引用段落被浏览器渲染成伪换行光标
 > - [2026-02-21 nodex-codex] 五次回归修复：将 inline-ref 段落兜底改为“保留 separator 作为 caret 锚点但零宽隐藏 + 隐藏 trailingBreak”，避免光标回退到行首；新增 `.ProseMirror-selectednode` inline-ref 样式，使左/右方向键移动到原子引用时可见整体框选态
 > - [2026-02-21 nodex-codex] 六次回归修复：补齐 pending reference conversion 的非 blur 收口（例如 Esc 触发 clearFocus）；在 `OutlinerItem` 增加 `finalizePendingRefConversion` 并在失焦 effect + blur 双路径执行，修复“reference 文本仍紫色 + 单击出现全行高亮与 fit-content 边框叠加”的双选中状态
+> - [2026-02-21 nodex-codex] 七次回归修复：修正六次版本的“失焦即收口”副作用；改为仅在 temp 节点发生 `focused -> unfocused` 转换后再 finalize，避免 `ArrowRight` 转换时临时节点在首帧未聚焦就被提前回退（导致无法把光标移动到 reference 框后）
 
 ### Refactor — Loro 收口 Phase 2：LoroText 主编辑链路迁移 (2026-02-21)
 > **Owner**: nodex-codex | **Branch**: codex/loro-phase2-lorotext

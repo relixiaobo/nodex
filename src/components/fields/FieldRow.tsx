@@ -17,15 +17,29 @@ import { Trash2 } from '../../lib/icons.js';
 import { useNodeFields } from '../../hooks/use-node-fields';
 import { useNodeStore } from '../../stores/node-store';
 import { useUIStore } from '../../stores/ui-store';
+import { useWorkspaceTags } from '../../hooks/use-workspace-tags';
 import * as loroDoc from '../../lib/loro-doc.js';
-import { getFieldTypeIcon, ATTRDEF_CONFIG_MAP, TAGDEF_CONFIG_MAP, resolveMinValue, resolveMaxValue, SYSTEM_FIELD_MAP } from '../../lib/field-utils.js';
+import {
+  getFieldTypeIcon,
+  ATTRDEF_CONFIG_MAP,
+  TAGDEF_CONFIG_MAP,
+  resolveMinValue,
+  resolveMaxValue,
+  SYSTEM_FIELD_MAP,
+  FIELD_TYPE_LIST,
+  configKeyToPropName,
+  resolveConfigValue,
+} from '../../lib/field-utils.js';
 import { FieldValueOutliner } from './FieldValueOutliner';
 import { FieldNameInput } from './FieldNameInput';
 import { ConfigOutliner } from './ConfigOutliner';
 import { AutoCollectSection } from './AutoCollectSection';
 import { VALIDATED_FIELD_TYPES, validateFieldValue, ValidationWarning } from './field-validation';
 import { ATTRDEF_OUTLINER_FIELDS, TAGDEF_OUTLINER_FIELDS } from '../../lib/field-utils.js';
-import { SYS_A } from '../../types/index.js';
+import { SYS_A, SYS_D } from '../../types/index.js';
+import { NodePicker, type NodePickerOption } from './NodePicker';
+import { DoneMappingEntries } from './DoneMappingEntries';
+import { BulletChevron } from '../outliner/BulletChevron';
 
 function focusTrailingInputForParent(parentId: string): boolean {
   const roots = document.querySelectorAll<HTMLElement>('[data-trailing-parent-id]');
@@ -63,6 +77,117 @@ interface FieldRowProps {
   isSystemConfig?: boolean;
   /** Config field metadata key for looking up icon/description */
   configKey?: string;
+}
+
+function ConfigTagPicker({ nodeId, configKey, placeholder }: { nodeId: string; configKey: string; placeholder: string }) {
+  const tags = useWorkspaceTags();
+  const setConfigValue = useNodeStore((s) => s.setConfigValue);
+  const selectedId = useNodeStore((s) => {
+    void s._version;
+    const node = s.getNode(nodeId);
+    return node ? resolveConfigValue(node, configKey) : undefined;
+  });
+
+  const options: NodePickerOption[] = useMemo(
+    () => tags.map((t) => ({ id: t.id, name: t.name, isTagDef: true })),
+    [tags],
+  );
+
+  const propName = configKeyToPropName(configKey);
+  const handleSelect = useCallback((id: string) => {
+    if (!propName) return;
+    setConfigValue(nodeId, propName, id);
+  }, [nodeId, propName, setConfigValue]);
+  const handleClear = useCallback(() => {
+    if (!propName) return;
+    setConfigValue(nodeId, propName, undefined);
+  }, [nodeId, propName, setConfigValue]);
+
+  return (
+    <NodePicker
+      options={options}
+      selectedId={selectedId}
+      onSelect={handleSelect}
+      onClear={handleClear}
+      placeholder={placeholder}
+      isReference
+    />
+  );
+}
+
+function ConfigSelectPicker({
+  nodeId,
+  configKey,
+  options,
+  placeholder,
+}: {
+  nodeId: string;
+  configKey: string;
+  options: Array<{ value: string; label: string }>;
+  placeholder: string;
+}) {
+  const setConfigValue = useNodeStore((s) => s.setConfigValue);
+  const selectedId = useNodeStore((s) => {
+    void s._version;
+    const node = s.getNode(nodeId);
+    return node ? resolveConfigValue(node, configKey) : undefined;
+  });
+  const pickerOptions: NodePickerOption[] = useMemo(
+    () => options.map((o) => ({ id: o.value, name: o.label })),
+    [options],
+  );
+
+  const propName = configKeyToPropName(configKey);
+  const handleSelect = useCallback((id: string) => {
+    if (!propName) return;
+    setConfigValue(nodeId, propName, id);
+  }, [nodeId, propName, setConfigValue]);
+  const handleClear = useCallback(() => {
+    if (!propName) return;
+    setConfigValue(nodeId, propName, undefined);
+  }, [nodeId, propName, setConfigValue]);
+
+  return (
+    <NodePicker
+      options={pickerOptions}
+      selectedId={selectedId}
+      onSelect={handleSelect}
+      onClear={handleClear}
+      placeholder={placeholder}
+    />
+  );
+}
+
+function ConfigNumberInput({ nodeId, configKey }: { nodeId: string; configKey: string }) {
+  const setConfigValue = useNodeStore((s) => s.setConfigValue);
+  const value = useNodeStore((s) => {
+    void s._version;
+    const node = s.getNode(nodeId);
+    return node ? resolveConfigValue(node, configKey) : undefined;
+  });
+  const propName = configKeyToPropName(configKey);
+
+  return (
+    <div className="flex min-h-7 items-center gap-2 py-1" style={{ paddingLeft: 6 }}>
+      <BulletChevron hasChildren={false} isExpanded={false} onBulletClick={() => {}} />
+      <input
+        type="number"
+        className="h-7 w-[140px] rounded border border-border px-2 text-sm leading-[21px] bg-background text-foreground outline-none focus:ring-2 focus:ring-ring"
+        value={value ?? ''}
+        onChange={(e) => {
+          if (!propName) return;
+          const raw = e.target.value.trim();
+          if (!raw) {
+            setConfigValue(nodeId, propName, undefined);
+            return;
+          }
+          const num = Number(raw);
+          if (Number.isFinite(num)) setConfigValue(nodeId, propName, num);
+        }}
+        placeholder="Enter number"
+      />
+    </div>
+  );
 }
 
 export function FieldRow({
@@ -132,9 +257,12 @@ export function FieldRow({
   const autoCollectCount = useNodeStore((s) => {
     void s._version;
     if (!isAutoCollect) return 0;
-    const tuple = s.getNode(tupleId);
-    // fieldEntry.children = value nodes (no key prefix in new model)
-    return Math.max(0, (tuple?.children?.length ?? 0) - 1);
+    const fieldDef = s.getNode(nodeId);
+    if (!fieldDef?.children) return 0;
+    return fieldDef.children.reduce((count, cid) => {
+      const child = s.getNode(cid);
+      return child && !child.type ? count + 1 : count;
+    }, 0);
   });
 
   const siblingFieldIds = useMemo(
@@ -374,18 +502,38 @@ export function FieldRow({
         </div>
         {/* Value column — unified rendering */}
         <div className="flex-1 min-w-0 min-h-[22px]" data-field-value>
-          {isOutliner ? (
+          {configDef?.control === 'outliner' ? (
             <ConfigOutliner nodeId={nodeId} />
-          ) : isAutoCollect ? (
+          ) : configDef?.control === 'tag_picker' ? (
+            <ConfigTagPicker nodeId={nodeId} configKey={attrDefId} placeholder="Select supertag" />
+          ) : configDef?.control === 'type_choice' ? (
+            <ConfigSelectPicker
+              nodeId={nodeId}
+              configKey={attrDefId}
+              options={FIELD_TYPE_LIST.map((f) => ({ value: f.value, label: f.label }))}
+              placeholder="Select field type"
+            />
+          ) : configDef?.control === 'select' ? (
+            <ConfigSelectPicker
+              nodeId={nodeId}
+              configKey={attrDefId}
+              options={configDef.options ?? []}
+              placeholder="Select value"
+            />
+          ) : configDef?.control === 'done_map_entries' ? (
+            <DoneMappingEntries tagDefId={nodeId} mappingKey={attrDefId} />
+          ) : configDef?.control === 'number_input' ? (
+            <ConfigNumberInput nodeId={nodeId} configKey={attrDefId} />
+          ) : configDef?.control === 'autocollect' ? (
             <>
               <FieldValueOutliner
                 tupleId={tupleId}
-                fieldDataType={dataType}
+                fieldDataType={SYS_D.BOOLEAN}
                 attrDefId={attrDefId}
                 configNodeId={isVirtual ? nodeId : undefined}
                 onNavigateOut={onNavigateOut}
               />
-              <AutoCollectSection tupleId={tupleId} />
+              <AutoCollectSection fieldDefId={nodeId} />
             </>
           ) : (
             <FieldValueOutliner

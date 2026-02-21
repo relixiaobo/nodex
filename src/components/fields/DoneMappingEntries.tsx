@@ -22,8 +22,8 @@ const noop = () => {};
 const EMPTY = '[]';
 
 interface DoneMappingEntriesProps {
-  /** NDX_A07/A08 field tuple ID on the tagDef */
-  toggleTupleId: string;
+  /** Owner tagDef ID */
+  tagDefId: string;
   /** NDX_A07 (checked) or NDX_A08 (unchecked) attrDef key */
   mappingKey: string;
 }
@@ -36,12 +36,11 @@ interface MappingEntry {
   optionName: string;
 }
 
-export function DoneMappingEntries({ toggleTupleId, mappingKey }: DoneMappingEntriesProps) {
+export function DoneMappingEntries({ tagDefId, mappingKey }: DoneMappingEntriesProps) {
   const addDoneMappingEntry = useNodeStore((s) => s.addDoneMappingEntry);
   const removeDoneMappingEntry = useNodeStore((s) => s.removeDoneMappingEntry);
 
-  // Derive tagDefId and checked from props
-  const tagDefId = loroDoc.getParentId(toggleTupleId) ?? '';
+  // Derive checked flag from config key
   const checked = mappingKey === SYS_A.DONE_MAP_CHECKED;
 
   // Two-step picker state

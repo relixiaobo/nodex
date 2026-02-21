@@ -53,6 +53,7 @@ _(空)_
 > - [2026-02-21 nodex-codex] 继续收口：`createChild` 对普通内容节点不再落 `raw name`，`startRefConversion` 去除 `raw name` 写入；workspace 容器初始化改为直接写 `richText`
 > - [2026-02-21 nodex-codex] 按“未上线无需历史兼容”原则，移除编辑链路中“清理 legacy 脏字段”兼容逻辑与对应测试，保持实现最小化
 > - [2026-02-21 nodex-codex] 继续清理历史兼容残留：删除 node-store 旧 API 别名（`createAttrDef/moveFieldTuple/renameAttrDef/setNodeNameLocal/setNodeContentLocal`）及调用点；移除 `findAutoCollectTupleId` stub、`resolveSupertagPickerSelectedId` 的 `targetId` 回退、`handleDelete` 的 HTML 文本回退；同步更新测试与 `docs/TESTING.md`
+> - [2026-02-21 nodex-codex] 修复配置页控制器回归：`FieldRow` 按 `configDef.control` 渲染专用控件（tag_picker/type_choice/select/done_map_entries/number_input/autocollect），不再把虚拟配置字段误走普通 outliner；`DoneMappingEntries` 改为直接绑定 `tagDefId`；`AutoCollectSection` 改为读取 `fieldDef` 选项子节点
 
 ### Refactor — Loro 收口 Phase 1：detached guard + origin 策略 (2026-02-21)
 > **Owner**: nodex-codex | **Branch**: codex/loro-phase1-guards

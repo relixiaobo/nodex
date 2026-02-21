@@ -39,7 +39,8 @@ interface UIStore {
   // Selection (reference nodes: single click = select, double click = edit/focus)
   selectedNodeId: string | null;
   selectedParentId: string | null;
-  setSelectedNode(nodeId: string | null, parentId?: string | null): void;
+  selectionSource: 'global' | 'ref-click' | null;
+  setSelectedNode(nodeId: string | null, parentId?: string | null, source?: 'global' | 'ref-click'): void;
 
   // Multi-selection (root-level node IDs only; ancestors cover descendants)
   selectedNodeIds: Set<string>;
@@ -213,6 +214,7 @@ export const useUIStore = create<UIStore>()(
             focusedParentId: parentId ?? null,
             selectedNodeId: nodeId,
             selectedParentId: parentId ?? null,
+            selectionSource: 'global',
             selectedNodeIds: new Set([nodeId]),
             selectionAnchorId: nodeId,
           });
@@ -223,6 +225,7 @@ export const useUIStore = create<UIStore>()(
             focusedParentId: null,
             selectedNodeId: null,
             selectedParentId: null,
+            selectionSource: null,
             selectedNodeIds: new Set(),
             selectionAnchorId: null,
           });
@@ -236,9 +239,11 @@ export const useUIStore = create<UIStore>()(
       // Selection (single)
       selectedNodeId: null,
       selectedParentId: null,
-      setSelectedNode: (nodeId, parentId) => set({
+      selectionSource: null,
+      setSelectedNode: (nodeId, parentId, source = 'global') => set({
         selectedNodeId: nodeId,
         selectedParentId: parentId ?? null,
+        selectionSource: nodeId ? source : null,
         selectedNodeIds: nodeId ? new Set([nodeId]) : new Set(),
         selectionAnchorId: nodeId,
         // Clear focus when selecting (exit edit mode)
@@ -255,6 +260,7 @@ export const useUIStore = create<UIStore>()(
         // Sync single-select fields from multi-select state.
         selectedNodeId: nodeIds.size === 1 ? [...nodeIds][0] : null,
         selectedParentId: null,
+        selectionSource: nodeIds.size > 0 ? 'global' : null,
         // Clear focus
         focusedNodeId: null,
         focusedParentId: null,
@@ -262,6 +268,7 @@ export const useUIStore = create<UIStore>()(
       clearSelection: () => set({
         selectedNodeId: null,
         selectedParentId: null,
+        selectionSource: null,
         selectedNodeIds: new Set(),
         selectionAnchorId: null,
       }),

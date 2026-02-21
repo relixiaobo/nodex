@@ -39,9 +39,11 @@ interface SlashCommandMenuProps {
   commands: SlashCommandDefinition[];
   selectedIndex: number;
   onSelect: (commandId: SlashCommandId) => void;
+  /** Caret anchor in viewport coordinates (preferred over local anchorRef). */
+  anchor?: { left: number; top: number; bottom: number };
 }
 
-export function SlashCommandMenu({ open, commands, selectedIndex, onSelect }: SlashCommandMenuProps) {
+export function SlashCommandMenu({ open, commands, selectedIndex, onSelect, anchor }: SlashCommandMenuProps) {
   const anchorRef = useRef<HTMLSpanElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const [dropStyle, setDropStyle] = useState<CSSProperties>({
@@ -51,11 +53,14 @@ export function SlashCommandMenu({ open, commands, selectedIndex, onSelect }: Sl
   });
 
   useLayoutEffect(() => {
-    if (!open || !anchorRef.current) return;
-    const anchor = anchorRef.current;
+    if (!open) return;
+    if (!anchor && !anchorRef.current) return;
 
     const update = () => {
-      const rect = anchor.getBoundingClientRect();
+      const rect = anchor
+        ? { left: anchor.left, top: anchor.top, bottom: anchor.bottom }
+        : anchorRef.current?.getBoundingClientRect();
+      if (!rect) return;
       const viewH = window.innerHeight;
       const maxH = 320;
       const gap = 4;
@@ -76,7 +81,7 @@ export function SlashCommandMenu({ open, commands, selectedIndex, onSelect }: Sl
       window.removeEventListener('scroll', update, true);
       window.removeEventListener('resize', update);
     };
-  }, [open]);
+  }, [open, anchor?.left, anchor?.top, anchor?.bottom]);
 
   if (!open) return null;
 

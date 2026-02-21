@@ -35,7 +35,7 @@ function useTestBootstrap(): boolean {
   useEffect(() => {
     async function init() {
       // Initialize LoroDoc + seed test data (async: loads IndexedDB snapshot if any)
-      await seedTestData();
+      await seedTestData({ forceFresh: true });
 
       // Navigate to Library if no panel open
       if (panelHistory.length === 0) {

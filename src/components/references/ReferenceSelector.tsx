@@ -27,10 +27,12 @@ interface ReferenceSelectorProps {
   query: string;
   selectedIndex: number;
   currentNodeId: string;
+  /** Caret anchor in viewport coordinates (preferred over local anchorRef). */
+  anchor?: { left: number; top: number; bottom: number };
 }
 
 export const ReferenceSelector = forwardRef<ReferenceDropdownHandle, ReferenceSelectorProps>(
-  function ReferenceSelector({ open, onSelect, onCreateNew, query, selectedIndex, currentNodeId }, ref) {
+  function ReferenceSelector({ open, onSelect, onCreateNew, query, selectedIndex, currentNodeId, anchor }, ref) {
     const anchorRef = useRef<HTMLSpanElement>(null);
     const searchResults = useNodeSearch(query, currentNodeId);
     const listRef = useRef<HTMLDivElement>(null);
@@ -97,11 +99,14 @@ export const ReferenceSelector = forwardRef<ReferenceDropdownHandle, ReferenceSe
       position: 'fixed', top: -9999, left: -9999,
     });
     useLayoutEffect(() => {
-      if (!open || !anchorRef.current) return;
-      const anchor = anchorRef.current;
+      if (!open) return;
+      if (!anchor && !anchorRef.current) return;
 
       const update = () => {
-        const rect = anchor.getBoundingClientRect();
+        const rect = anchor
+          ? { left: anchor.left, top: anchor.top, bottom: anchor.bottom }
+          : anchorRef.current?.getBoundingClientRect();
+        if (!rect) return;
         const viewH = window.innerHeight;
         const maxH = 240; // max-h-60
         const gap = 4;
@@ -122,7 +127,7 @@ export const ReferenceSelector = forwardRef<ReferenceDropdownHandle, ReferenceSe
         window.removeEventListener('scroll', update, true);
         window.removeEventListener('resize', update);
       };
-    }, [open]);
+    }, [open, anchor?.left, anchor?.top, anchor?.bottom]);
 
     if (!open) return null;
 

@@ -373,6 +373,7 @@ npm run test:run
 4. `clearFocus` 保留 selection（Escape 编辑→选中过渡）
 5. `setFocusedNode(null)` 清空 focus + selection（blur 到空白区域）
 6. `setFocusedNode` 多选时收窄为单选（设计意图：进入编辑=放弃多选）
+7. `selectionSource` 语义：reference 单击可标记 `ref-click`，进入编辑/多选/Esc 过渡统一归一为 `global`
 
 ### 1.17 快捷键注册表一致性
 

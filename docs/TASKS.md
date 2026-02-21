@@ -29,7 +29,7 @@ _(空)_
 |-------|---------|------|-------------|
 | nodex-cc | P1 NodePanel Header 重设计 | cc/node-panel-header | src/components/panel/NodeHeader.tsx, NodePanel.tsx, OutlinerView.tsx, ui-store.ts |
 | nodex-cc-2 | _(idle — PR #61 merged)_ | — | — |
-| nodex-codex | Loro 收口 Phase 2（field value 交互/样式/语义收口） | codex/loro-phase2-lorotext | docs/TASKS.md, docs/TESTING.md, src/components/fields/field-layout.ts, src/components/fields/FieldRow.tsx, src/hooks/use-node-fields.ts, src/components/fields/DatePicker.tsx, src/components/fields/FieldValueOutliner.tsx, src/components/outliner/OutlinerItem.tsx, src/components/fields/NodePicker.tsx, src/components/editor/TrailingInput.tsx, src/lib/field-utils.ts, src/lib/checkbox-utils.ts, src/stores/node-store.ts, src/entrypoints/sidepanel/App.tsx, src/entrypoints/test/main.tsx, src/entrypoints/test/seed-data.ts, tests/vitest/use-node-fields-config.test.ts, tests/vitest/done-state-mapping.test.ts, tests/vitest/node-store-fields.test.ts, tests/vitest/field-row-config-render.test.ts, tests/vitest/field-utils.test.ts, tests/vitest/node-store-inline-refs.test.ts, tests/vitest/test-entrypoint-bootstrap.test.ts |
+| nodex-codex | Reference 交互收口（单击选中/ESC选中区分 + inline 转换输入） | codex/reference-selection-interactions | docs/TASKS.md, docs/features/references.md, docs/features/node-selection.md, src/components/outliner/OutlinerItem.tsx, src/stores/ui-store.ts, src/assets/main.css, tests/vitest/ui-store-undo-focus.test.ts, tests/vitest/selected-reference-shortcuts.test.ts |
 
 ---
 
@@ -39,6 +39,29 @@ _(空)_
 > **Owner**: nodex-cc | **Branch**: cc/node-panel-header | **Spec**: `docs/features/node-panel-header.md`
 > **迭代日志**:
 > - [2026-02-21 cc] 开始实现：重构 PanelTitle → NodeHeader，三列对齐网格，隐藏字段占位行
+
+### P1 Reference 交互收口：单击选中 vs Esc/框选 + inline 转换输入
+> **Owner**: nodex-codex | **Branch**: codex/reference-selection-interactions | **Spec**: `docs/features/references.md`, `docs/features/node-selection.md`
+> **目标**: 区分 reference 单击选中与全局选中视觉语义，恢复/收口 reference ↔ inline reference 切换与输入交互一致性
+> **Files**: `src/components/outliner/OutlinerItem.tsx`, `src/components/editor/RichTextEditor.tsx`, `src/components/tags/TagSelector.tsx`, `src/components/references/ReferenceSelector.tsx`, `src/components/editor/SlashCommandMenu.tsx`, `src/stores/ui-store.ts`, `src/assets/main.css`, `standalone/TestApp.tsx`, `tests/vitest/ui-store-undo-focus.test.ts`, `docs/features/references.md`, `docs/features/node-selection.md`
+> **Progress**:
+> - [x] 增加 selection source（`ref-click` vs `global`）并接入选中/聚焦状态流
+> - [x] 恢复 reference 单击 `fit-content` 边框样式，保留 Esc/框选全行高亮
+> - [x] 收口 selected reference 输入转换路径（ArrowRight/可打印字符/blur 回退）
+> - [x] 补齐回归测试并更新 feature 文档
+> **迭代日志**:
+> - [2026-02-21 nodex-codex] 任务认领：先整理行为-commit 映射，确认“全行高亮（global）”与“reference 单击边框（ref-click）”并存方案，再开始实现
+> - [2026-02-21 nodex-codex] 实现完成：`ui-store` 新增 `selectionSource`，`OutlinerItem` 区分 `selected_global` 与 `selected_ref_click` 两套视觉；恢复 selected reference 可打印字符转换路径（转 inline conversion 并续写）；补充 store 语义断言并同步 `references/node-selection` 规格；自检通过 `npm run typecheck`、`npm run test:run`、`npm run build`
+> - [2026-02-21 nodex-codex] 用户回归反馈修复：修正 inline ref-only 场景 `ProseMirror-trailingBreak` 显示条件（避免 `@` 转换后换行光标）；reference 转换去除“先删再转”路径，避免目标ID失真导致 blur 后偶发消失；pending conversion 行纳入 reference-like 点击语义（单击可进入 ref-click 选中边框）
+> - [2026-02-21 nodex-codex] 二次回归修复：`OutlinerItem` 改为以 `node.type==='reference'` 识别引用节点并读取 target 节点文本/marks/inlineRefs（修复 blur 回退后“看起来消失”）；selected reference 转换改为使用 `targetId` 作为回退目标（修复 blur 后偶发错误引用）；reference 单击边框颜色改为固定 RGBA，避免 `color-mix` 在部分环境不可见
+> - [2026-02-21 nodex-codex] 三次回归修复：`dev:test` 改为默认 `forceFresh`，消除历史测试数据干扰；reference 行渲染统一切到 `effectiveNodeId(target)`（tags/fields/checkbox/children/TagBar 与字段导航上下文同步），修复 field 丢失与引用子树上下文错位；补充 atom 尾部 `ProseMirror-separator + trailingBreak` 隐藏规则，修复 `@` 创建后光标换行问题
+> - [2026-02-21 nodex-codex] 四次回归修复：针对仍存在的 `@` 创建后 caret 掉到下一行问题，增加 inline-ref 段落级别 CSS 兜底（`:has([data-inlineref-node])` 时隐藏 `ProseMirror-separator` 与 `trailingBreak`），避免原子引用段落被浏览器渲染成伪换行光标
+> - [2026-02-21 nodex-codex] 五次回归修复：将 inline-ref 段落兜底改为“保留 separator 作为 caret 锚点但零宽隐藏 + 隐藏 trailingBreak”，避免光标回退到行首；新增 `.ProseMirror-selectednode` inline-ref 样式，使左/右方向键移动到原子引用时可见整体框选态
+> - [2026-02-21 nodex-codex] 六次回归修复：补齐 pending reference conversion 的非 blur 收口（例如 Esc 触发 clearFocus）；在 `OutlinerItem` 增加 `finalizePendingRefConversion` 并在失焦 effect + blur 双路径执行，修复“reference 文本仍紫色 + 单击出现全行高亮与 fit-content 边框叠加”的双选中状态
+> - [2026-02-21 nodex-codex] 七次回归修复：修正六次版本的“失焦即收口”副作用；改为仅在 temp 节点发生 `focused -> unfocused` 转换后再 finalize，避免 `ArrowRight` 转换时临时节点在首帧未聚焦就被提前回退（导致无法把光标移动到 reference 框后）
+> - [2026-02-21 nodex-codex] 八次回归修复：统一 `#/@//` 浮窗锚点逻辑为 caret 坐标驱动（`RichTextEditor` 通过 `coordsAtPos` 回传 anchor，`OutlinerItem` 管理三类 anchor 状态并传给 `TagSelector/ReferenceSelector/SlashCommandMenu`）；修复菜单锚在行容器左上角导致的偏位问题，并保证三类菜单定位行为一致
+> - [2026-02-21 nodex-codex] 九次回归修复：移除 inline reference hover 下划线样式，保留主题色与点击行为，仅在键盘导航选中原子引用时显示边框态，避免 hover 视觉噪音
+> - [2026-02-21 nodex-codex] 根据 review 建议补充说明：`expandKey` 注释明确“reference 实例独立展开状态”是设计意图；delete 快捷键注释明确仅删除真实 reference 节点；ProseMirror `separator/trailingBreak` 规则补充分层注释并修正 TASKS 文件清单（移除未改动的 `selected-reference-shortcuts.test.ts`）
 
 ### Refactor — Loro 收口 Phase 2：LoroText 主编辑链路迁移 (2026-02-21)
 > **Owner**: nodex-codex | **Branch**: codex/loro-phase2-lorotext

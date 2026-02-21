@@ -9,20 +9,29 @@
 - 空节点或编辑器中输入 `@` 触发 ReferenceSelector 搜索面板
 - 搜索面板实时过滤所有工作区节点（按名称匹配）
 - 选择节点后：
-  - **空节点 `@`**：当前节点变为树引用（整个节点指向目标，bullet 变同心圆）
+  - **空节点 `@`**：先创建树引用，再立即进入“转换模式”（显示 reference bullet + inline ref，可直接继续输入）
   - **文本中 `@`**：插入内联引用（蓝色链接文本，TipTap inline node）
 - 引用创建不复制目标节点，只存储引用关系
 
 ### 树引用（Reference Node）
 
 - Bullet 显示为同心圆（双圈），区别于普通实心圆点
-- **单击 = 选中**（蓝色 ring 高亮，cursor-default），不进入编辑
+- **单击 = reference 专用选中态**（`fit-content` 边框，仅包裹 bullet+文本），不进入编辑
 - **双击 = 编辑**（创建 TipTap 编辑器，编辑原始节点 `props.name`）
 - 选中状态与编辑状态互斥（`selectedNodeId` vs `focusedNodeId`）
 - 编辑引用节点的文本 = 编辑原始节点的 `props.name`（双向同步）
 - 展开引用节点显示原始节点的 children（实时）
 - 引用节点有独立的展开/折叠状态（compound key: `parentId:nodeId`）
 - 删除引用节点只删除引用关系，不删除原始节点
+
+### 转换模式（Reference ↔ Inline）
+
+- `@` 在空节点确认后进入转换模式：光标位于 inline ref atom 之后，用户可以继续输入
+- 在 reference 专用选中态下：
+  - `ArrowRight` 进入转换模式
+  - 可打印字符输入直接进入转换模式并续写字符
+- blur 时若内容仍“仅有一个 inline ref”（无额外文本），自动回退为树引用
+- blur 时若已有额外文本，保留为普通内容节点（含 inline ref）
 
 ### 内联引用（Inline Reference）
 
@@ -66,7 +75,8 @@
 - [x] 内联引用显示（蓝色链接、可点击导航）
 - [x] 引用独立展开/折叠状态
 - [x] 删除引用不删除原始节点
-- [x] 引用节点单击选中（ring 高亮）、双击编辑
+- [x] 引用节点单击选中（fit-content 边框）、双击编辑
+- [x] 空节点 `@` 创建后进入转换模式，可继续输入
 - [ ] 反向链接 section
 - [ ] 引用计数 badge
 - [ ] 合并节点

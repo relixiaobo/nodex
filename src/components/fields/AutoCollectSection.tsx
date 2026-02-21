@@ -39,7 +39,7 @@ export function AutoCollectSection({ fieldDefId }: AutoCollectSectionProps) {
     return (
       <div
         className="flex min-h-7 items-start gap-2 py-0.5"
-        style={{ paddingLeft: 6 }}
+        style={{ paddingLeft: 25 }}
       >
         <BulletChevron
           hasChildren={false}
@@ -60,7 +60,7 @@ export function AutoCollectSection({ fieldDefId }: AutoCollectSectionProps) {
         <div
           key={item.id}
           className="flex min-h-7 items-start gap-2 py-0.5"
-          style={{ paddingLeft: 6 }}
+          style={{ paddingLeft: 25 }}
         >
           <BulletChevron
             hasChildren={false}

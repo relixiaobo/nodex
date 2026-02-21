@@ -21,7 +21,7 @@ import { FieldRow } from './FieldRow';
 import { toFieldRowEntryProps } from './field-row-props.js';
 import { NodePicker, type NodePickerOption } from './NodePicker';
 import { BulletChevron } from '../outliner/BulletChevron';
-import { SYS_D, SYS_V } from '../../types';
+import { SYS_A, SYS_D, SYS_V } from '../../types';
 import { resolveConfigValue, configKeyToPropName } from '../../lib/field-utils.js';
 import { isOutlinerContentNodeType } from '../../lib/node-type-utils.js';
 import { ColorSwatchPicker } from './ColorSwatchPicker';
@@ -121,7 +121,9 @@ export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, configNo
     if (isVirtualEntry && configNodeId && attrDefId) {
       const configNode = loroDoc.toNodexNode(configNodeId);
       const val = configNode ? resolveConfigValue(configNode, attrDefId) : undefined;
-      isYes = val === SYS_V.YES;
+      isYes = val === undefined
+        ? attrDefId === SYS_A.AUTOCOLLECT_OPTIONS
+        : val === SYS_V.YES;
     } else {
       const currentValue = contentChildIds[0];
       isYes = currentValue === SYS_V.YES;

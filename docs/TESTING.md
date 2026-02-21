@@ -223,6 +223,7 @@ npm run test:run
 - `tests/vitest/use-node-fields-config.test.ts`
 - `tests/vitest/field-list-config-render.test.ts`
 - `tests/vitest/field-row-config-render.test.ts`
+- `tests/vitest/options-picker.test.ts`
 
 **覆盖点**:
 
@@ -231,6 +232,7 @@ npm run test:run
 3. `FieldList` 渲染配置行时，tag_picker/type_choice/select 控件保持专用 UI（不退化到灰点 outliner）
 4. `FieldRow` 在 `configControl` 缺失时可基于 `configKey` 注册表兜底分发控件
 5. `OutlinerItem/OutlinerView/FieldList` 统一复用同一映射，避免调用方漏传导致配置控件退化
+6. `OptionsPicker` 的新建选项能力受 `autocollectOptions` 控制（未显式关闭时允许，显式关闭后禁止）
 
 ### 1.7 标签与引用状态流
 

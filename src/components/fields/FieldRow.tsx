@@ -37,7 +37,7 @@ import { ConfigOutliner } from './ConfigOutliner';
 import { AutoCollectSection } from './AutoCollectSection';
 import { VALIDATED_FIELD_TYPES, validateFieldValue, ValidationWarning } from './field-validation';
 import { ATTRDEF_OUTLINER_FIELDS, TAGDEF_OUTLINER_FIELDS } from '../../lib/field-utils.js';
-import { SYS_A, SYS_D } from '../../types/index.js';
+import { SYS_A, SYS_D, SYS_V } from '../../types/index.js';
 import { NodePicker, type NodePickerOption } from './NodePicker';
 import { DoneMappingEntries } from './DoneMappingEntries';
 import { BulletChevron } from '../outliner/BulletChevron';
@@ -171,7 +171,7 @@ function ConfigNumberInput({ nodeId, configKey }: { nodeId: string; configKey: s
   const propName = configKeyToPropName(configKey);
 
   return (
-    <div className="flex min-h-7 items-center gap-2 py-1" style={{ paddingLeft: 6 }}>
+    <div className="flex min-h-7 items-center gap-2 py-1" style={{ paddingLeft: 25 }}>
       <BulletChevron hasChildren={false} isExpanded={false} onBulletClick={() => {}} />
       <input
         type="number"
@@ -259,6 +259,14 @@ export function FieldRow({
 
   // Auto-collect count for SYS_A44 name display
   const isAutoCollect = configKey === SYS_A.AUTOCOLLECT_OPTIONS;
+  const isAutoCollectEnabled = useNodeStore((s) => {
+    void s._version;
+    if (!isAutoCollect) return false;
+    const n = s.getNode(nodeId);
+    if (!n) return false;
+    const val = resolveConfigValue(n, attrDefId);
+    return val !== SYS_V.NO;
+  });
   const autoCollectCount = useNodeStore((s) => {
     void s._version;
     if (!isAutoCollect) return 0;
@@ -538,7 +546,7 @@ export function FieldRow({
                 configNodeId={isVirtual ? nodeId : undefined}
                 onNavigateOut={onNavigateOut}
               />
-              <AutoCollectSection fieldDefId={nodeId} />
+              {isAutoCollectEnabled && <AutoCollectSection fieldDefId={nodeId} />}
             </>
           ) : (
             <FieldValueOutliner

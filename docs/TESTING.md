@@ -216,6 +216,15 @@ npm run test:run
 2. URL/Email 格式校验
 3. 非验证类型返回 null
 
+### 1.6.1 FieldRow 配置字段渲染映射
+
+**测试文件**: `tests/vitest/field-row-props.test.ts`
+
+**覆盖点**:
+
+1. `toFieldRowEntryProps` 保留系统配置字段渲染必需元数据（`isSystemConfig/configKey/configControl`）
+2. `OutlinerItem/OutlinerView/FieldList` 统一复用该映射，避免调用方漏传导致配置控件退化为普通字段渲染
+
 ### 1.7 标签与引用状态流
 
 **测试文件**: `tests/vitest/node-store-tags-refs.test.ts`

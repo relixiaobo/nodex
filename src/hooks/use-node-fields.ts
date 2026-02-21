@@ -37,6 +37,8 @@ export interface FieldEntry {
   isSystemConfig?: boolean;
   /** Config field metadata key for looking up icon/description in FieldRow */
   configKey?: string;
+  /** Explicit control type for system config rendering */
+  configControl?: ConfigFieldDef['control'];
 }
 
 /** Check if a visibleWhen condition is satisfied by looking at node config values. */
@@ -85,17 +87,15 @@ function computeFields(
     if (!fieldDef || fieldDef.type !== 'fieldDef') continue;
 
     const isSysConfig = isSystemConfigField(keyId);
+    const configDef = isSysConfig ? (ATTRDEF_CONFIG_MAP.get(keyId) ?? TAGDEF_CONFIG_MAP.get(keyId)) : undefined;
 
-    if (isSysConfig) {
-      const configDef = ATTRDEF_CONFIG_MAP.get(keyId) ?? TAGDEF_CONFIG_MAP.get(keyId);
-      if (configDef) {
-        if (configDef.visibleWhen && !isVisibleWhenSatisfied(configDef.visibleWhen, node)) {
-          continue;
-        }
-        if (isFieldDef && configDef.appliesTo !== '*') {
-          const currentType = resolveDataType(nodeId);
-          if (!configDef.appliesTo.includes(currentType)) continue;
-        }
+    if (configDef) {
+      if (configDef.visibleWhen && !isVisibleWhenSatisfied(configDef.visibleWhen, node)) {
+        continue;
+      }
+      if (isFieldDef && configDef.appliesTo !== '*') {
+        const currentType = resolveDataType(nodeId);
+        if (!configDef.appliesTo.includes(currentType)) continue;
       }
     }
 
@@ -119,6 +119,7 @@ function computeFields(
       isRequired: isSysConfig ? undefined : resolveRequired(keyId),
       isSystemConfig: isSysConfig || undefined,
       configKey: isSysConfig ? keyId : undefined,
+      configControl: configDef?.control,
     });
   }
 
@@ -146,6 +147,7 @@ function computeFields(
         dataType: configControlToDataType(def.control),
         isSystemConfig: true,
         configKey: def.key,
+        configControl: def.control,
       });
     }
     const orderMap = new Map(ATTRDEF_CONFIG_FIELDS.map((f, i) => [f.key, i]));
@@ -163,6 +165,7 @@ function computeFields(
         dataType: configControlToDataType(def.control),
         isSystemConfig: true,
         configKey: def.key,
+        configControl: def.control,
       });
     }
     const orderMap = new Map(TAGDEF_CONFIG_FIELDS.map((f, i) => [f.key, i]));

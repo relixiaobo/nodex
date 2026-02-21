@@ -18,6 +18,7 @@ import { useWorkspaceTags } from '../../hooks/use-workspace-tags';
 import { OutlinerItem } from '../outliner/OutlinerItem';
 import { TrailingInput } from '../editor/TrailingInput';
 import { FieldRow } from './FieldRow';
+import { toFieldRowEntryProps } from './field-row-props.js';
 import { NodePicker, type NodePickerOption } from './NodePicker';
 import { BulletChevron } from '../outliner/BulletChevron';
 import { SYS_D, SYS_V } from '../../types';
@@ -254,16 +255,8 @@ export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, configNo
           <div key={id} className="@container" style={{ paddingLeft: 6 + 15 + 4 }}>
             <FieldRow
               nodeId={tupleId}
-              attrDefId={fieldMap.get(id)!.fieldDefId}
-              attrDefName={fieldMap.get(id)!.attrDefName}
-              tupleId={id}
-              valueNodeId={fieldMap.get(id)!.valueNodeId}
-              valueName={fieldMap.get(id)!.valueName}
-              dataType={fieldMap.get(id)!.dataType}
+              {...toFieldRowEntryProps(fieldMap.get(id)!)}
               isLastInGroup={i === visibleChildren.length - 1 || visibleChildren[i + 1].type !== 'field'}
-              trashed={fieldMap.get(id)!.trashed}
-              isRequired={fieldMap.get(id)!.isRequired}
-              isEmpty={fieldMap.get(id)!.isEmpty}
             />
           </div>
         ) : (

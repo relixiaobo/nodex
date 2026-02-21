@@ -9,11 +9,11 @@ import { useUIStore } from '../../stores/ui-store.js';
 import { getPrimaryShortcutKey, getShortcutKeys } from '../../lib/shortcut-registry.js';
 import { isImeComposingEvent } from '../../lib/ime-keyboard.js';
 import {
-  resolveNodeEditorArrowIntent,
-  resolveNodeEditorEnterIntent,
-  resolveNodeEditorEscapeIntent,
-  resolveNodeEditorForceCreateIntent,
-} from '../../lib/node-editor-shortcuts.js';
+  resolveContentRowArrowIntent as resolveNodeEditorArrowIntent,
+  resolveContentRowEnterIntent as resolveNodeEditorEnterIntent,
+  resolveContentRowEscapeIntent as resolveNodeEditorEscapeIntent,
+  resolveContentRowForceCreateIntent as resolveNodeEditorForceCreateIntent,
+} from '../../lib/row-interactions.js';
 import type { InlineRefEntry, TextMark } from '../../types/index.js';
 import { docToMarks, marksToDoc } from '../../lib/pm-doc-utils.js';
 import { pmSchema } from './pm-schema.js';
@@ -426,9 +426,11 @@ export function RichTextEditor(props: RichTextEditorProps) {
 
     const handleEscape = () => {
       const intent = resolveNodeEditorEscapeIntent(
-        propsRef.current.referenceActive ?? false,
-        propsRef.current.hashTagActive ?? false,
-        propsRef.current.slashActive ?? false,
+        {
+          referenceActive: propsRef.current.referenceActive ?? false,
+          hashTagActive: propsRef.current.hashTagActive ?? false,
+          slashActive: propsRef.current.slashActive ?? false,
+        },
       );
       if (intent === 'reference_close') {
         propsRef.current.onReferenceClose?.();
@@ -509,9 +511,11 @@ export function RichTextEditor(props: RichTextEditorProps) {
         [KEY_EDITOR_DROPDOWN_FORCE_CREATE]: (_state, _dispatch, view) => {
           if (isComposing(view)) return false;
           const intent = resolveNodeEditorForceCreateIntent(
-            propsRef.current.referenceActive ?? false,
-            propsRef.current.hashTagActive ?? false,
-            propsRef.current.slashActive ?? false,
+            {
+              referenceActive: propsRef.current.referenceActive ?? false,
+              hashTagActive: propsRef.current.hashTagActive ?? false,
+              slashActive: propsRef.current.slashActive ?? false,
+            },
           );
           if (intent === 'reference_create') {
             propsRef.current.onReferenceCreate?.();

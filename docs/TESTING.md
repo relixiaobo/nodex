@@ -999,6 +999,16 @@ createSibling 自动标签（2 cases）:
 | 14 | definition 节点不显示 supertag 行 | type 为 tagDef/fieldDef |
 | 15–17 | 列对齐常量 | paddingLeft=6, colB=25, drop=21 |
 
+### 1.55 TrailingInput `@` 触发后光标定位回归
+
+**测试文件**: `tests/vitest/trailing-input-trigger-focus.test.ts`
+
+**覆盖点**:
+
+1. 在 `TrailingInput` 输入 `@` 会创建触发节点并设置 `triggerHint='@'`
+2. 新建触发节点后会写入 `focusClickCoords.textOffset=1`（光标在 `@` 后）
+3. `focusedNodeId/focusedParentId` 指向新建节点与当前父节点
+
 ---
 
 ## Phase 2: 视觉检查点
@@ -1090,6 +1100,7 @@ createSibling 自动标签（2 cases）:
 | 1.52 | LoroText Bridge（TextMark/InlineRef 双向桥接） | PASS/FAIL |
 | 1.53 | Test 入口 Bootstrap（防测试数据回流） | PASS/FAIL |
 | 1.54 | NodePanel Header 重设计（UIStore expandedHiddenFields + block 可见性 + 列对齐） | PASS/FAIL |
+| 1.55 | TrailingInput `@` 触发后光标定位回归 | PASS/FAIL |
 | 2 | 视觉渲染 | PASS/FAIL/SKIP |
 | 3 | 扩展构建 | PASS/FAIL |
 

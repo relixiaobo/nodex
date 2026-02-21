@@ -22,14 +22,14 @@ import { isOptionsFieldType } from '../../lib/field-utils.js';
 import * as loroDoc from '../../lib/loro-doc.js';
 import { getPrimaryShortcutKey } from '../../lib/shortcut-registry';
 import { isImeComposingEvent } from '../../lib/ime-keyboard.js';
-import { resolveTrailingRowUpdateAction } from '../../lib/row-interactions.js';
 import {
-  resolveTrailingEnterIntent,
-  resolveTrailingArrowDownIntent,
-  resolveTrailingArrowUpIntent,
-  resolveTrailingBackspaceIntent,
-  resolveTrailingEscapeIntent,
-} from '../../lib/trailing-input-navigation.js';
+  resolveTrailingRowUpdateAction,
+  resolveTrailingRowEnterIntent as resolveTrailingEnterIntent,
+  resolveTrailingRowArrowDownIntent as resolveTrailingArrowDownIntent,
+  resolveTrailingRowArrowUpIntent as resolveTrailingArrowUpIntent,
+  resolveTrailingRowBackspaceIntent as resolveTrailingBackspaceIntent,
+  resolveTrailingRowEscapeIntent as resolveTrailingEscapeIntent,
+} from '../../lib/row-interactions.js';
 import { useFieldOptions } from '../../hooks/use-field-options.js';
 import { BulletChevron } from '../outliner/BulletChevron';
 import { FIELD_OVERLAY_Z_INDEX } from '../fields/field-layout.js';

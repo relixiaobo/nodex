@@ -29,7 +29,7 @@ _(空)_
 |-------|---------|------|-------------|
 | nodex-cc | _(idle — PR #63 merged)_ | — | — |
 | nodex-cc-2 | _(idle — PR #61 merged)_ | — | — |
-| nodex-codex | Loro 收口 Phase 2（FieldRow 配置渲染架构收口） | codex/loro-phase2-lorotext | docs/TASKS.md, src/components/fields/*.tsx, src/components/fields/field-layout.ts, src/hooks/use-node-fields.ts, tests/vitest/*field*.test.ts, tests/vitest/options-picker.test.ts, docs/TESTING.md |
+| nodex-codex | Loro 收口 Phase 2（Map checked/unchecked value 回归修复） | codex/loro-phase2-lorotext | docs/TASKS.md, src/components/fields/DoneMappingEntries.tsx, src/lib/checkbox-utils.ts, src/stores/node-store.ts, src/lib/loro-doc.ts, tests/vitest/done-state-mapping.test.ts, docs/features/supertags.md, docs/TESTING.md |
 
 ---
 
@@ -60,6 +60,7 @@ _(空)_
 > - [2026-02-21 nodex-codex] 根据最新冒烟反馈继续修复：统一配置控件 value 区 bullet 基线（NodePicker/DoneMapping/AutoCollect/NumberInput 统一 25px inset，tag `#` 子弹尺寸统一 15px）；`Auto-collect` 关闭时隐藏列表子行；`OptionsPicker` 新建能力改为受 `autocollectOptions` 开关控制；新增 `options-picker.test.ts`
 > - [2026-02-21 nodex-codex] 启动“清晰/简单/优雅”收口：将 `FieldRow` 的配置项分发改为显式 registry（替代多层条件分支），并提取统一布局常量消除多处 magic number
 > - [2026-02-21 nodex-codex] 完成收口：新增 `FIELD_VALUE_INSET` 统一 value 布局基线；`FieldRow` system-config 渲染改为 `control -> renderer` 显式注册（覆盖 outliner/color_picker/toggle/tag_picker/type_choice/select/done_map_entries/number_input/autocollect），仅未知 control 才进入默认渲染并在 dev 警告
+> - [2026-02-21 nodex-codex] 按“保持简单”回归修复：`Map checked/unchecked` value 改回普通 outliner（支持 `>` 选字段+设值）；删除 done mappings 容器读写路径，改为从 `NDX_A07/NDX_A08` fieldEntry 子树解析；同步更新 `node-store` 写入与 done-state-mapping 测试
 
 ### Refactor — Loro 收口 Phase 1：detached guard + origin 策略 (2026-02-21)
 > **Owner**: nodex-codex | **Branch**: codex/loro-phase1-guards

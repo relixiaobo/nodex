@@ -119,6 +119,8 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   const referenceTargetNode = useNode(referenceTargetId);
   const effectiveNodeId = referenceTargetId ?? nodeId;
   const effectiveNode = referenceTargetNode ?? node;
+  // Expansion is instance-scoped by design: the same target referenced from two places
+  // can keep independent expanded/collapsed state, so the key stays on ref nodeId.
   const expandKey = `${parentId}:${nodeId}`;
   const isExpanded = useUIStore((s) => s.expandedNodes.has(`${parentId}:${nodeId}`));
   const focusedNodeId = useUIStore((s) => s.focusedNodeId);
@@ -653,6 +655,8 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
         const refAction = resolveSelectedReferenceShortcut(e, optionsPickerOpen);
         if (refAction) {
           if (refAction === 'delete') {
+            // Delete shortcut only removes concrete reference entries.
+            // Reference-like aliases are display contexts, not removable nodes.
             if (!isReferenceNode) return;
             e.preventDefault();
             removeReference(nodeId);

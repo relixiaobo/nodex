@@ -146,17 +146,19 @@
   vertical-align: top;
 }
 
+/* Generic paragraph rule: when paragraph has visible content, hide synthetic
+   trailingBreak so inline editor row doesn't gain an extra visual line. */
 .editor-inline .ProseMirror p > br.ProseMirror-trailingBreak:not(:only-child) {
   display: none;
 }
 
-/* ProseMirror may inject an <img.ProseMirror-separator> before trailingBreak
-   when paragraph ends with an atom (inline reference). Keep caret on the same line. */
+/* Fallback for atom-ended paragraphs: hide trailingBreak that follows separator.
+   This still applies even when we cannot detect inline ref via :has(). */
 .editor-inline .ProseMirror p > img.ProseMirror-separator + br.ProseMirror-trailingBreak {
   display: none;
 }
 
-/* Inline reference paragraph caret anchoring:
+/* Inline-reference specific caret anchoring:
    keep ProseMirror separator in DOM (caret anchor), but make it zero-width/invisible;
    hide trailingBreak so no extra visual line appears. */
 .editor-inline .ProseMirror p:has([data-inlineref-node]) > img.ProseMirror-separator {

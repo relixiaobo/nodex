@@ -24,10 +24,12 @@ interface TagSelectorProps {
   query: string;
   /** Currently highlighted item index (managed by parent) */
   selectedIndex: number;
+  /** Caret anchor in viewport coordinates (preferred over local anchorRef). */
+  anchor?: { left: number; top: number; bottom: number };
 }
 
 export const TagSelector = forwardRef<TagDropdownHandle, TagSelectorProps>(
-  function TagSelector({ open, onSelect, onCreateNew, existingTagIds, query, selectedIndex }, ref) {
+  function TagSelector({ open, onSelect, onCreateNew, existingTagIds, query, selectedIndex, anchor }, ref) {
     const anchorRef = useRef<HTMLSpanElement>(null);
     const allTags = useWorkspaceTags();
     const listRef = useRef<HTMLDivElement>(null);
@@ -76,11 +78,13 @@ export const TagSelector = forwardRef<TagDropdownHandle, TagSelectorProps>(
       position: 'fixed', top: -9999, left: -9999,
     });
     useLayoutEffect(() => {
-      if (!open || !anchorRef.current) return;
-      const anchor = anchorRef.current;
-
+      if (!open) return;
+      if (!anchor && !anchorRef.current) return;
       const update = () => {
-        const rect = anchor.getBoundingClientRect();
+        const rect = anchor
+          ? { left: anchor.left, top: anchor.top, bottom: anchor.bottom }
+          : anchorRef.current?.getBoundingClientRect();
+        if (!rect) return;
         const viewH = window.innerHeight;
         const maxH = 208; // max-h-52
         const gap = 4;
@@ -101,7 +105,7 @@ export const TagSelector = forwardRef<TagDropdownHandle, TagSelectorProps>(
         window.removeEventListener('scroll', update, true);
         window.removeEventListener('resize', update);
       };
-    }, [open]);
+    }, [open, anchor?.left, anchor?.top, anchor?.bottom]);
 
     if (!open) return null;
 

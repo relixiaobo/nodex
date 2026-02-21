@@ -9,7 +9,7 @@ import { useUIStore } from '../../stores/ui-store';
 import * as loroDoc from '../../lib/loro-doc.js';
 import { CONTAINER_IDS } from '../../types/index.js';
 import { BulletChevron, ChevronButton } from './BulletChevron';
-import { RichTextEditor, type EditorContentPayload } from '../editor/RichTextEditor';
+import { RichTextEditor, type EditorContentPayload, type TriggerAnchorRect } from '../editor/RichTextEditor';
 import { SlashCommandMenu } from '../editor/SlashCommandMenu';
 import { TrailingInput } from '../editor/TrailingInput';
 import { TagBar } from '../tags/TagBar';
@@ -93,7 +93,12 @@ interface OutlinerItemProps {
 }
 
 function getNodeTextLengthById(nodeId: string): number {
-  return (loroDoc.toNodexNode(nodeId)?.name ?? '').length;
+  const node = loroDoc.toNodexNode(nodeId);
+  if (!node) return 0;
+  if (node.type === 'reference' && node.targetId) {
+    return (loroDoc.toNodexNode(node.targetId)?.name ?? '').length;
+  }
+  return (node.name ?? '').length;
 }
 
 function focusTrailingInputForParent(parentId: string): boolean {
@@ -110,6 +115,12 @@ function focusTrailingInputForParent(parentId: string): boolean {
 
 export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId, fieldDataType, attrDefId, onNavigateOut, bulletColors }: OutlinerItemProps) {
   const node = useNode(nodeId);
+  const referenceTargetId = node?.type === 'reference' ? (node.targetId ?? null) : null;
+  const referenceTargetNode = useNode(referenceTargetId);
+  const effectiveNodeId = referenceTargetId ?? nodeId;
+  const effectiveNode = referenceTargetNode ?? node;
+  // Expansion is instance-scoped by design: the same target referenced from two places
+  // can keep independent expanded/collapsed state, so the key stays on ref nodeId.
   const expandKey = `${parentId}:${nodeId}`;
   const isExpanded = useUIStore((s) => s.expandedNodes.has(`${parentId}:${nodeId}`));
   const focusedNodeId = useUIStore((s) => s.focusedNodeId);
@@ -117,6 +128,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   const setFocusedNode = useUIStore((s) => s.setFocusedNode);
   const selectedNodeId = useUIStore((s) => s.selectedNodeId);
   const selectedParentId = useUIStore((s) => s.selectedParentId);
+  const selectionSource = useUIStore((s) => s.selectionSource);
   const setSelectedNode = useUIStore((s) => s.setSelectedNode);
   // Derive booleans from Set to avoid Zustand infinite re-render (Set creates new reference each time)
   const isInSelectedSet = useUIStore((s) => s.selectedNodeIds.has(nodeId));
@@ -153,11 +165,13 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   const contentAreaRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<EditorView | null>(null);
   const blurClearRafRef = useRef<number | null>(null);
+  const wasFocusedRef = useRef(false);
 
   // # trigger state
   const [hashTagOpen, setHashTagOpen] = useState(false);
   const [hashTagQuery, setHashTagQuery] = useState('');
   const [hashTagSelectedIndex, setHashTagSelectedIndex] = useState(0);
+  const [hashTagAnchor, setHashTagAnchor] = useState<TriggerAnchorRect | undefined>(undefined);
   const hashRangeRef = useRef<{ from: number; to: number }>({ from: 0, to: 0 });
   const tagDropdownRef = useRef<TagDropdownHandle>(null);
   const applyTag = useNodeStore((s) => s.applyTag);
@@ -176,6 +190,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   const [refOpen, setRefOpen] = useState(false);
   const [refQuery, setRefQuery] = useState('');
   const [refSelectedIndex, setRefSelectedIndex] = useState(0);
+  const [refAnchor, setRefAnchor] = useState<TriggerAnchorRect | undefined>(undefined);
   const refRangeRef = useRef<{ from: number; to: number }>({ from: 0, to: 0 });
   const refDropdownRef = useRef<ReferenceDropdownHandle>(null);
 
@@ -183,6 +198,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   const [slashOpen, setSlashOpen] = useState(false);
   const [slashQuery, setSlashQuery] = useState('');
   const [slashSelectedIndex, setSlashSelectedIndex] = useState(-1);
+  const [slashAnchor, setSlashAnchor] = useState<TriggerAnchorRect | undefined>(undefined);
   const slashRangeRef = useRef<{ from: number; to: number }>({ from: 0, to: 0 });
 
   // > trigger (fire-once: instantly creates field)
@@ -190,10 +206,10 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   const setEditingFieldName = useUIStore((s) => s.setEditingFieldName);
 
   // Lazy-load children when expanded
-  useChildren(isExpanded ? nodeId : null);
+  useChildren(isExpanded ? effectiveNodeId : null);
 
-  const tagIds = useNodeTags(nodeId);
-  const fields = useNodeFields(nodeId);
+  const tagIds = useNodeTags(effectiveNodeId);
+  const fields = useNodeFields(effectiveNodeId);
   const parentFields = useNodeFields(parentId);
   const parentFieldVisibility = useMemo(() => {
     const visibility = new Map<string, boolean>();
@@ -219,7 +235,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     [slashQuery],
   );
 
-  const allChildIds = node?.children ?? [];
+  const allChildIds = effectiveNode?.children ?? [];
   const renderableSiblings = useMemo(() => {
     void _version;
     const getNode = useNodeStore.getState().getNode;
@@ -341,8 +357,10 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     (focusedParentId === null || focusedParentId === parentId);
   const hasTags = tagIds.length > 0;
   const hasFields = fields.length > 0;
-  const isReference = !!node && loroDoc.getParentId(nodeId) !== parentId;
-  const isTagDef = node?.type === 'tagDef';
+  const isReferenceNode = node?.type === 'reference';
+  const isReferenceAlias = !isReferenceNode && !!node && loroDoc.getParentId(nodeId) !== parentId;
+  const isReference = isReferenceNode || isReferenceAlias;
+  const isTagDef = effectiveNode?.type === 'tagDef';
   // Bullet colors: use prop override (template items) or derive from the node's own supertags
   const tagBulletColors = useMemo(
     () => tagIds.map((id) => resolveTagColor(id).text),
@@ -359,9 +377,13 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     selectedParentId === null ||
     selectedParentId === parentId
   );
+  const isSelectedGlobal = isSelected && !isFocused && (
+    selectionSource === 'global' || !isReference || isMultiSelected
+  );
+  const isSelectedRefClick = isSelected && !isFocused && (isReference || isPendingConversion) && !isMultiSelected && selectionSource === 'ref-click';
 
   // Per-row highlight: only for directly selected nodes (children use subtree mask)
-  const showRowHighlight = isSelected && !isFocused;
+  const showRowHighlight = isSelectedGlobal;
 
   // Options field dropdown (for changing selected option value)
   const isOptionsField = isOptionsFieldType(fieldDataType);
@@ -369,29 +391,29 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   const [optionsPickerIndex, setOptionsPickerIndex] = useState(0);
   const allFieldOptions = useFieldOptions(isOptionsField && attrDefId ? attrDefId : '');
   const selectedOptionId = useMemo(() => {
-    if (!isOptionsField || !node) return undefined;
-    const targetId = node.targetId;
+    if (!isOptionsField || !effectiveNode) return undefined;
+    const targetId = effectiveNode.targetId;
     return targetId && allFieldOptions.some((opt) => opt.id === targetId) ? targetId : undefined;
-  }, [isOptionsField, node, allFieldOptions]);
+  }, [isOptionsField, effectiveNode, allFieldOptions]);
   const selectedOptionName = useMemo(
     () => allFieldOptions.find((opt) => opt.id === selectedOptionId)?.name ?? '',
     [allFieldOptions, selectedOptionId],
   );
   const isOptionsValueNode = isOptionsField && !!selectedOptionId;
-  const isReferenceLikeRow = isReference || isOptionsValueNode;
+  const isReferenceLikeRow = isReference || isPendingConversion || isOptionsValueNode;
 
   // Checkbox state (supertag SYS_A55 or manual _done)
-  const { showCheckbox, isDone } = useNodeCheckbox(nodeId);
+  const { showCheckbox, isDone } = useNodeCheckbox(effectiveNodeId);
 
   // Click on checkbox: toggles undone ↔ done (never removes checkbox)
   const handleCheckboxToggle = useCallback(() => {
-    toggleNodeDone(nodeId);
-  }, [nodeId, toggleNodeDone]);
+    toggleNodeDone(effectiveNodeId);
+  }, [effectiveNodeId, toggleNodeDone]);
 
   // Cmd+Enter: 3-state cycle for manual, 2-state for tag-driven
   const handleCycleCheckbox = useCallback(() => {
-    cycleNodeCheckbox(nodeId);
-  }, [nodeId, cycleNodeCheckbox]);
+    cycleNodeCheckbox(effectiveNodeId);
+  }, [effectiveNodeId, cycleNodeCheckbox]);
 
   // Cmd+Click: toggle node in multi-selection
   const handleCmdClick = useCallback(() => {
@@ -633,40 +655,52 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
         const refAction = resolveSelectedReferenceShortcut(e, optionsPickerOpen);
         if (refAction) {
           if (refAction === 'delete') {
-            if (!isReference) return;
+            // Delete shortcut only removes concrete reference entries.
+            // Reference-like aliases are display contexts, not removable nodes.
+            if (!isReferenceNode) return;
             e.preventDefault();
             removeReference(nodeId);
             clearSelection();
             return;
           }
           if (refAction === 'convert_printable') {
-            if (!isReference) return;
-            const isAsciiLetter = /^[a-zA-Z]$/.test(e.key);
-            if (!isAsciiLetter) e.preventDefault();
-            const editAtEnd = getNodeTextLengthById(nodeId);
-            if (!isAsciiLetter) {
-              setPendingInputChar({ char: e.key, nodeId, parentId });
-            }
-            clearSelection();
-            useUIStore.getState().setFocusClickCoords({
-              nodeId,
-              parentId,
-              textOffset: editAtEnd,
-            });
-            setFocusedNode(nodeId, parentId);
-            return;
-          }
-          if (refAction === 'convert_arrow_right') {
-            if (!isReference) return;
+            if (!isReferenceNode) return;
             e.preventDefault();
             const getNode = useNodeStore.getState().getNode;
             const parent = getNode(parentId);
             const pos = parent?.children?.indexOf(nodeId) ?? -1;
             if (pos < 0) return;
-            removeReference(nodeId);
+            const revertTargetId = getNode(nodeId)?.targetId;
+            if (!revertTargetId) return;
             const tempNodeId = startRefConversion(nodeId, parentId, pos);
-            setPendingRefConversion({ tempNodeId, refNodeId: nodeId, parentId });
+            setPendingRefConversion({ tempNodeId, refNodeId: revertTargetId, parentId });
+            setPendingInputChar({ char: e.key, nodeId: tempNodeId, parentId });
             clearSelection();
+            useUIStore.getState().setFocusClickCoords({
+              nodeId: tempNodeId,
+              parentId,
+              textOffset: 1,
+            });
+            setFocusedNode(tempNodeId, parentId);
+            return;
+          }
+          if (refAction === 'convert_arrow_right') {
+            if (!isReferenceNode) return;
+            e.preventDefault();
+            const getNode = useNodeStore.getState().getNode;
+            const parent = getNode(parentId);
+            const pos = parent?.children?.indexOf(nodeId) ?? -1;
+            if (pos < 0) return;
+            const revertTargetId = getNode(nodeId)?.targetId;
+            if (!revertTargetId) return;
+            const tempNodeId = startRefConversion(nodeId, parentId, pos);
+            setPendingRefConversion({ tempNodeId, refNodeId: revertTargetId, parentId });
+            clearSelection();
+            useUIStore.getState().setFocusClickCoords({
+              nodeId: tempNodeId,
+              parentId,
+              textOffset: 1,
+            });
             setTimeout(() => setFocusedNode(tempNodeId, parentId), 0);
             return;
           }
@@ -934,15 +968,18 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       // The editor content is '#' — set range to cover it
       setHashTagQuery('');
       setHashTagSelectedIndex(0);
+      setHashTagAnchor(undefined);
       hashRangeRef.current = { from: 1, to: 2 }; // position of '#' in ProseMirror doc
       setHashTagOpen(true);
     } else if (hint === '@') {
       setRefQuery('');
       setRefSelectedIndex(0);
+      setRefAnchor(undefined);
       refRangeRef.current = { from: 1, to: 2 };
       setRefOpen(true);
     } else if (hint === '/') {
       setSlashQuery('');
+      setSlashAnchor(undefined);
       slashRangeRef.current = { from: 1, to: 2 };
       setSlashOpen(true);
     }
@@ -971,6 +1008,31 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     };
   }, []);
 
+  const finalizePendingRefConversion = useCallback(() => {
+    const pending = useUIStore.getState().pendingRefConversion;
+    if (!pending || pending.tempNodeId !== nodeId) return;
+
+    const tempNode = useNodeStore.getState().getNode(nodeId);
+    const content = tempNode?.name ?? '';
+    if (isOnlyInlineRef(content, tempNode?.inlineRefs)) {
+      revertRefConversion(pending.tempNodeId, pending.refNodeId, pending.parentId);
+    }
+    setPendingRefConversion(null);
+  }, [nodeId, revertRefConversion, setPendingRefConversion]);
+
+  // Pending reference conversion must be finalized when focus transitions
+  // from focused -> unfocused (including non-blur paths like Escape clearFocus).
+  // Do NOT finalize on initial mount while still waiting for async focus handoff.
+  useEffect(() => {
+    if (isFocused) {
+      wasFocusedRef.current = true;
+      return;
+    }
+    if (!wasFocusedRef.current) return;
+    wasFocusedRef.current = false;
+    finalizePendingRefConversion();
+  }, [isFocused, finalizePendingRefConversion]);
+
   const handleBlur = useCallback(() => {
     // Reset any open dropdown state so it doesn't persist across focus cycles.
     // Without this, clicking away while dropdown is open → re-focusing the same
@@ -978,23 +1040,18 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     setHashTagOpen(false);
     setHashTagQuery('');
     setHashTagSelectedIndex(0);
+    setHashTagAnchor(undefined);
     setRefOpen(false);
     setRefQuery('');
     setRefSelectedIndex(0);
+    setRefAnchor(undefined);
     setSlashOpen(false);
     setSlashQuery('');
     setSlashSelectedIndex(-1);
+    setSlashAnchor(undefined);
 
-    // Check pending ref conversion: if this is a temp node, decide revert or keep
-    const pending = useUIStore.getState().pendingRefConversion;
-    if (pending && pending.tempNodeId === nodeId) {
-      const tempNode = useNodeStore.getState().getNode(nodeId);
-      const content = tempNode?.name ?? '';
-      if (isOnlyInlineRef(content, tempNode?.inlineRefs)) {
-        revertRefConversion(pending.tempNodeId, pending.refNodeId, pending.parentId);
-      }
-      useUIStore.getState().setPendingRefConversion(null);
-    }
+    // Check pending ref conversion: if this is a temp node, decide revert or keep.
+    finalizePendingRefConversion();
 
     if (blurClearRafRef.current !== null) {
       cancelAnimationFrame(blurClearRafRef.current);
@@ -1012,7 +1069,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
         setFocusedNode(null);
       }
     });
-  }, [nodeId, parentId, setFocusedNode, revertRefConversion]);
+  }, [nodeId, parentId, setFocusedNode, finalizePendingRefConversion]);
 
   // mousedown: record text offset for cursor placement, but DON'T enter edit
   // mode. Edit mode is deferred to click so drag-select can take over if the
@@ -1142,7 +1199,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     // Intercept clicks on inline references (blue links in static display)
     const target = e.target as HTMLElement;
     const refEl = target.closest('[data-inlineref-node]') as HTMLElement;
-    if (refEl) {
+    if (refEl && !isReferenceLikeRow) {
       e.stopPropagation();
       useUIStore.getState().setFocusClickCoords(null);
       const refId = refEl.getAttribute('data-inlineref-node');
@@ -1154,18 +1211,18 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     // Reference nodes: single click = select (frame), double click = edit
     // Cmd+Click and Shift+Click are handled in handleContentMouseDown
     if (isReferenceLikeRow && !e.metaKey && !e.ctrlKey && !e.shiftKey) {
-      setSelectedNode(nodeId, parentId);
+      setSelectedNode(nodeId, parentId, isReferenceLikeRow ? 'ref-click' : 'global');
       return;
     }
     // Non-reference: enter edit mode (text offset already recorded in mousedown)
     if (!isReferenceLikeRow) {
       setFocusedNode(nodeId, parentId);
     }
-  }, [nodeId, parentId, isReferenceLikeRow, setSelectedNode, setFocusedNode, navigateTo]);
+  }, [nodeId, parentId, isReferenceLikeRow, isReference, setSelectedNode, setFocusedNode, navigateTo]);
 
   const handleContentDoubleClick = useCallback((e: React.MouseEvent) => {
     // Double click on reference node → enter edit mode
-    if (isReference && !isOptionsValueNode) {
+    if ((isReference || isPendingConversion) && !isOptionsValueNode) {
       const container = e.currentTarget as HTMLElement;
       const textOffset = getTextOffsetFromPoint(container, e.clientX, e.clientY);
       useUIStore.getState().setFocusClickCoords(
@@ -1175,7 +1232,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       );
       setFocusedNode(nodeId, parentId);
     }
-  }, [nodeId, parentId, isReference, isOptionsValueNode, setFocusedNode]);
+  }, [nodeId, parentId, isReference, isPendingConversion, isOptionsValueNode, setFocusedNode]);
 
   const handleToggle = useCallback(() => {
     const ek = `${parentId}:${nodeId}`;
@@ -1436,10 +1493,11 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
 
   // ─── # trigger handlers ───
 
-  const handleHashTag = useCallback((query: string, from: number, to: number) => {
+  const handleHashTag = useCallback((query: string, from: number, to: number, anchor?: TriggerAnchorRect) => {
     hashRangeRef.current = { from, to };
     setHashTagQuery(query);
     setHashTagSelectedIndex(0);
+    setHashTagAnchor(anchor);
     if (!hashTagOpen) setHashTagOpen(true);
   }, [hashTagOpen, nodeId]);
 
@@ -1447,6 +1505,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     setHashTagOpen(false);
     setHashTagQuery('');
     setHashTagSelectedIndex(0);
+    setHashTagAnchor(undefined);
   }, [nodeId]);
 
   /** Delete #query text from editor, save corrected content, refocus */
@@ -1468,6 +1527,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       setHashTagOpen(false);
       setHashTagQuery('');
       setHashTagSelectedIndex(0);
+      setHashTagAnchor(undefined);
     },
     [nodeId, applyTag, cleanupHashTagText],
   );
@@ -1480,6 +1540,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       setHashTagOpen(false);
       setHashTagQuery('');
       setHashTagSelectedIndex(0);
+      setHashTagAnchor(undefined);
     },
     [nodeId, createTagDef, applyTag, cleanupHashTagText],
   );
@@ -1521,6 +1582,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     setHashTagOpen(false);
     setHashTagQuery('');
     setHashTagSelectedIndex(0);
+    setHashTagAnchor(undefined);
   }, []);
 
   // ─── > field trigger (fire-once: instantly creates unnamed field) ───
@@ -1535,10 +1597,11 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
 
   // ─── @ reference trigger handlers ───
 
-  const handleReference = useCallback((query: string, from: number, to: number) => {
+  const handleReference = useCallback((query: string, from: number, to: number, anchor?: TriggerAnchorRect) => {
     refRangeRef.current = { from, to };
     setRefQuery(query);
     setRefSelectedIndex(0);
+    setRefAnchor(anchor);
     if (!refOpen) setRefOpen(true);
   }, [refOpen]);
 
@@ -1546,6 +1609,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     setRefOpen(false);
     setRefQuery('');
     setRefSelectedIndex(0);
+    setRefAnchor(undefined);
   }, []);
 
   const handleReferenceSelect = useCallback(
@@ -1587,6 +1651,12 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
           setPendingRefConversion({ tempNodeId, refNodeId, parentId });
           const gpId = loroDoc.getParentId(parentId);
           if (gpId) setExpanded(`${gpId}:${parentId}`, true);
+          useUIStore.getState().setPendingInputChar(null);
+          useUIStore.getState().setFocusClickCoords({
+            nodeId: tempNodeId,
+            parentId,
+            textOffset: 1,
+          });
           setTimeout(() => setFocusedNode(tempNodeId, parentId), 0);
         }
       } else {
@@ -1599,6 +1669,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       setRefOpen(false);
       setRefQuery('');
       setRefSelectedIndex(0);
+      setRefAnchor(undefined);
     },
     [nodeId, parentId, addReference, trashNode, setExpanded, setFocusedNode, startRefConversion, setPendingRefConversion],
   );
@@ -1643,6 +1714,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     setRefOpen(false);
     setRefQuery('');
     setRefSelectedIndex(0);
+    setRefAnchor(undefined);
   }, []);
 
   // ─── / slash command handlers ───
@@ -1658,6 +1730,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     setSlashOpen(false);
     setSlashQuery('');
     setSlashSelectedIndex(-1);
+    setSlashAnchor(undefined);
   }, []);
 
   const executeSlashCommand = useCallback(async (commandId: SlashCommandId) => {
@@ -1745,18 +1818,21 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     }
   }, [replaceSlashTriggerText, closeSlashMenu, openSearch, handleCycleCheckbox, nodeId]);
 
-  const handleSlashCommand = useCallback((query: string, from: number, to: number) => {
+  const handleSlashCommand = useCallback((query: string, from: number, to: number, anchor?: TriggerAnchorRect) => {
     slashRangeRef.current = { from, to };
     setSlashQuery(query);
+    setSlashAnchor(anchor);
     setSlashOpen(true);
 
     // Slash command has its own menu; close other trigger dropdowns.
     setHashTagOpen(false);
     setHashTagQuery('');
     setHashTagSelectedIndex(0);
+    setHashTagAnchor(undefined);
     setRefOpen(false);
     setRefQuery('');
     setRefSelectedIndex(0);
+    setRefAnchor(undefined);
   }, []);
 
   const handleSlashDeactivate = useCallback(() => {
@@ -1872,10 +1948,10 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
 
   const isDropTarget = dropTargetId === nodeId;
   const isDragging = dragNodeId === nodeId;
-  const nodeText = node.name ?? '';
+  const nodeText = effectiveNode?.name ?? '';
   const nodeDisplayText = isOptionsValueNode ? (selectedOptionName || nodeText) : nodeText;
-  const nodeMarks = node.marks ?? [];
-  const nodeInlineRefs = node.inlineRefs ?? [];
+  const nodeMarks = effectiveNode?.marks ?? [];
+  const nodeInlineRefs = effectiveNode?.inlineRefs ?? [];
   const nodeContentHtml = marksToHtml(
     nodeDisplayText,
     isOptionsValueNode ? [] : nodeMarks,
@@ -1912,7 +1988,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
         onDrop={handleDrop}
         onDragEnd={handleDragEnd}
       >
-        {/* Per-row selection highlight: only directly selected rows */}
+        {/* Per-row selection highlight: global selection mode only (Esc/drag/multi-select). */}
         {showRowHighlight && (
           <div
             className="absolute right-0 bg-selection-row rounded-sm border border-primary/[0.15] pointer-events-none"
@@ -1925,7 +2001,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
           onToggle={handleToggle}
           onDrillDown={handleDrillDown}
         />
-        <div className="flex items-start gap-2 flex-1 min-w-0 relative">
+        <div className={`flex items-start gap-2 min-w-0 relative ${isSelectedRefClick ? 'node-selected-ref w-fit flex-none' : 'flex-1'}`}>
           <BulletChevron
             hasChildren={hasChildren}
             isExpanded={isExpanded}
@@ -2017,7 +2093,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
             )}
             {hasTags && (
               <span className="inline-flex align-[0.125em] ml-1.5" onClick={(e) => e.stopPropagation()}>
-                <TagBar nodeId={nodeId} />
+                <TagBar nodeId={effectiveNodeId} />
               </span>
             )}
           </div>
@@ -2044,6 +2120,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
               existingTagIds={tagIds}
               query={hashTagQuery}
               selectedIndex={hashTagSelectedIndex}
+              anchor={hashTagAnchor}
             />
           )}
           {refOpen && isFocused && (
@@ -2055,6 +2132,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
               query={refQuery}
               selectedIndex={refSelectedIndex}
               currentNodeId={nodeId}
+              anchor={refAnchor}
             />
           )}
           {slashOpen && isFocused && (
@@ -2063,6 +2141,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
               commands={filteredSlashCommands}
               selectedIndex={slashSelectedIndex}
               onSelect={executeSlashCommand}
+              anchor={slashAnchor}
             />
           )}
         </div>
@@ -2107,8 +2186,8 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       )}
       {isExpanded && (
         <div className="relative" data-row-scope-parent-id={nodeId} ref={childrenScopeRef}>
-          {/* Selection subtree mask: children area, connects to parent row above */}
-          {isSelected && !isFocused && (
+          {/* Selection subtree mask: children area, connects to parent row above (global selection only). */}
+          {isSelectedGlobal && (
             <div
               className="absolute right-0 bg-selection rounded-b-sm rounded-t-none pointer-events-none z-0"
               style={{ left: depth * 28 + 6 + 15, top: -1, bottom: 1 }}
@@ -2150,7 +2229,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
             return type === 'field' ? (
               <div key={id} className="@container" style={{ paddingLeft: (depth + 1) * 28 + 6 + 15 + 4 }}>
                 <FieldRow
-                  nodeId={nodeId}
+                  nodeId={effectiveNodeId}
                   {...toFieldRowEntryProps(fieldMap.get(id)!)}
                   isLastInGroup={i === visibleChildren.length - 1 || visibleChildren[i + 1].type !== 'field'}
                   ownerTagColor={fieldOwnerColors.get(id)}
@@ -2160,7 +2239,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
                       useUIStore.getState().setFocusClickCoords({
                         nodeId,
                         parentId,
-                        textOffset: (useNodeStore.getState().getNode(nodeId)?.name ?? '').length,
+                        textOffset: getNodeTextLengthById(nodeId),
                       });
                       setFocusedNode(nodeId, parentId);
                     } else {
@@ -2178,16 +2257,16 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
                         if (nextItem.type === 'content') {
                           useUIStore.getState().setFocusClickCoords({
                             nodeId: nextItem.id,
-                            parentId: nodeId,
+                            parentId: effectiveNodeId,
                             textOffset: 0,
                           });
-                          setFocusedNode(nextItem.id, nodeId);
+                          setFocusedNode(nextItem.id, effectiveNodeId);
                           found = true;
                           break;
                         }
                       }
                       if (!found) {
-                        if (focusTrailingInputForParent(nodeId)) {
+                        if (focusTrailingInputForParent(effectiveNodeId)) {
                           return;
                         }
                         const fl = getFlattenedVisibleNodes(rootChildIds, useUIStore.getState().expandedNodes, rootNodeId);
@@ -2211,14 +2290,14 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
                 nodeId={id}
                 depth={depth + 1}
                 rootChildIds={rootChildIds}
-                parentId={nodeId}
+                parentId={effectiveNodeId}
                 rootNodeId={rootNodeId}
               />
             );
           })}
           {shouldShowTrailingInput && (
             <TrailingInput
-              parentId={nodeId}
+              parentId={effectiveNodeId}
               depth={depth + 1}
               autoFocus={!lastRenderableChild}
               parentExpandKey={expandKey}
@@ -2232,16 +2311,16 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
                     }
                     useUIStore.getState().setFocusClickCoords({
                       nodeId: lastRenderableChild.id,
-                      parentId: nodeId,
+                      parentId: effectiveNodeId,
                       textOffset: (useNodeStore.getState().getNode(lastRenderableChild.id)?.name ?? '').length,
                     });
-                    setFocusedNode(lastRenderableChild.id, nodeId);
+                    setFocusedNode(lastRenderableChild.id, effectiveNodeId);
                     return;
                   }
                   useUIStore.getState().setFocusClickCoords({
                     nodeId,
                     parentId,
-                    textOffset: (useNodeStore.getState().getNode(nodeId)?.name ?? '').length,
+                    textOffset: getNodeTextLengthById(nodeId),
                   });
                   setFocusedNode(nodeId, parentId);
                   return;

@@ -9,7 +9,7 @@ import { useUIStore } from '../../stores/ui-store';
 import * as loroDoc from '../../lib/loro-doc.js';
 import { CONTAINER_IDS } from '../../types/index.js';
 import { BulletChevron, ChevronButton } from './BulletChevron';
-import { RichTextEditor, type EditorContentPayload } from '../editor/RichTextEditor';
+import { RichTextEditor, type EditorContentPayload, type TriggerAnchorRect } from '../editor/RichTextEditor';
 import { SlashCommandMenu } from '../editor/SlashCommandMenu';
 import { TrailingInput } from '../editor/TrailingInput';
 import { TagBar } from '../tags/TagBar';
@@ -169,6 +169,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   const [hashTagOpen, setHashTagOpen] = useState(false);
   const [hashTagQuery, setHashTagQuery] = useState('');
   const [hashTagSelectedIndex, setHashTagSelectedIndex] = useState(0);
+  const [hashTagAnchor, setHashTagAnchor] = useState<TriggerAnchorRect | undefined>(undefined);
   const hashRangeRef = useRef<{ from: number; to: number }>({ from: 0, to: 0 });
   const tagDropdownRef = useRef<TagDropdownHandle>(null);
   const applyTag = useNodeStore((s) => s.applyTag);
@@ -187,6 +188,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   const [refOpen, setRefOpen] = useState(false);
   const [refQuery, setRefQuery] = useState('');
   const [refSelectedIndex, setRefSelectedIndex] = useState(0);
+  const [refAnchor, setRefAnchor] = useState<TriggerAnchorRect | undefined>(undefined);
   const refRangeRef = useRef<{ from: number; to: number }>({ from: 0, to: 0 });
   const refDropdownRef = useRef<ReferenceDropdownHandle>(null);
 
@@ -194,6 +196,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   const [slashOpen, setSlashOpen] = useState(false);
   const [slashQuery, setSlashQuery] = useState('');
   const [slashSelectedIndex, setSlashSelectedIndex] = useState(-1);
+  const [slashAnchor, setSlashAnchor] = useState<TriggerAnchorRect | undefined>(undefined);
   const slashRangeRef = useRef<{ from: number; to: number }>({ from: 0, to: 0 });
 
   // > trigger (fire-once: instantly creates field)
@@ -961,15 +964,18 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       // The editor content is '#' — set range to cover it
       setHashTagQuery('');
       setHashTagSelectedIndex(0);
+      setHashTagAnchor(undefined);
       hashRangeRef.current = { from: 1, to: 2 }; // position of '#' in ProseMirror doc
       setHashTagOpen(true);
     } else if (hint === '@') {
       setRefQuery('');
       setRefSelectedIndex(0);
+      setRefAnchor(undefined);
       refRangeRef.current = { from: 1, to: 2 };
       setRefOpen(true);
     } else if (hint === '/') {
       setSlashQuery('');
+      setSlashAnchor(undefined);
       slashRangeRef.current = { from: 1, to: 2 };
       setSlashOpen(true);
     }
@@ -1030,12 +1036,15 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     setHashTagOpen(false);
     setHashTagQuery('');
     setHashTagSelectedIndex(0);
+    setHashTagAnchor(undefined);
     setRefOpen(false);
     setRefQuery('');
     setRefSelectedIndex(0);
+    setRefAnchor(undefined);
     setSlashOpen(false);
     setSlashQuery('');
     setSlashSelectedIndex(-1);
+    setSlashAnchor(undefined);
 
     // Check pending ref conversion: if this is a temp node, decide revert or keep.
     finalizePendingRefConversion();
@@ -1480,10 +1489,11 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
 
   // ─── # trigger handlers ───
 
-  const handleHashTag = useCallback((query: string, from: number, to: number) => {
+  const handleHashTag = useCallback((query: string, from: number, to: number, anchor?: TriggerAnchorRect) => {
     hashRangeRef.current = { from, to };
     setHashTagQuery(query);
     setHashTagSelectedIndex(0);
+    setHashTagAnchor(anchor);
     if (!hashTagOpen) setHashTagOpen(true);
   }, [hashTagOpen, nodeId]);
 
@@ -1491,6 +1501,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     setHashTagOpen(false);
     setHashTagQuery('');
     setHashTagSelectedIndex(0);
+    setHashTagAnchor(undefined);
   }, [nodeId]);
 
   /** Delete #query text from editor, save corrected content, refocus */
@@ -1512,6 +1523,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       setHashTagOpen(false);
       setHashTagQuery('');
       setHashTagSelectedIndex(0);
+      setHashTagAnchor(undefined);
     },
     [nodeId, applyTag, cleanupHashTagText],
   );
@@ -1524,6 +1536,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       setHashTagOpen(false);
       setHashTagQuery('');
       setHashTagSelectedIndex(0);
+      setHashTagAnchor(undefined);
     },
     [nodeId, createTagDef, applyTag, cleanupHashTagText],
   );
@@ -1565,6 +1578,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     setHashTagOpen(false);
     setHashTagQuery('');
     setHashTagSelectedIndex(0);
+    setHashTagAnchor(undefined);
   }, []);
 
   // ─── > field trigger (fire-once: instantly creates unnamed field) ───
@@ -1579,10 +1593,11 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
 
   // ─── @ reference trigger handlers ───
 
-  const handleReference = useCallback((query: string, from: number, to: number) => {
+  const handleReference = useCallback((query: string, from: number, to: number, anchor?: TriggerAnchorRect) => {
     refRangeRef.current = { from, to };
     setRefQuery(query);
     setRefSelectedIndex(0);
+    setRefAnchor(anchor);
     if (!refOpen) setRefOpen(true);
   }, [refOpen]);
 
@@ -1590,6 +1605,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     setRefOpen(false);
     setRefQuery('');
     setRefSelectedIndex(0);
+    setRefAnchor(undefined);
   }, []);
 
   const handleReferenceSelect = useCallback(
@@ -1649,6 +1665,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       setRefOpen(false);
       setRefQuery('');
       setRefSelectedIndex(0);
+      setRefAnchor(undefined);
     },
     [nodeId, parentId, addReference, trashNode, setExpanded, setFocusedNode, startRefConversion, setPendingRefConversion],
   );
@@ -1693,6 +1710,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     setRefOpen(false);
     setRefQuery('');
     setRefSelectedIndex(0);
+    setRefAnchor(undefined);
   }, []);
 
   // ─── / slash command handlers ───
@@ -1708,6 +1726,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     setSlashOpen(false);
     setSlashQuery('');
     setSlashSelectedIndex(-1);
+    setSlashAnchor(undefined);
   }, []);
 
   const executeSlashCommand = useCallback(async (commandId: SlashCommandId) => {
@@ -1795,18 +1814,21 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     }
   }, [replaceSlashTriggerText, closeSlashMenu, openSearch, handleCycleCheckbox, nodeId]);
 
-  const handleSlashCommand = useCallback((query: string, from: number, to: number) => {
+  const handleSlashCommand = useCallback((query: string, from: number, to: number, anchor?: TriggerAnchorRect) => {
     slashRangeRef.current = { from, to };
     setSlashQuery(query);
+    setSlashAnchor(anchor);
     setSlashOpen(true);
 
     // Slash command has its own menu; close other trigger dropdowns.
     setHashTagOpen(false);
     setHashTagQuery('');
     setHashTagSelectedIndex(0);
+    setHashTagAnchor(undefined);
     setRefOpen(false);
     setRefQuery('');
     setRefSelectedIndex(0);
+    setRefAnchor(undefined);
   }, []);
 
   const handleSlashDeactivate = useCallback(() => {
@@ -2094,6 +2116,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
               existingTagIds={tagIds}
               query={hashTagQuery}
               selectedIndex={hashTagSelectedIndex}
+              anchor={hashTagAnchor}
             />
           )}
           {refOpen && isFocused && (
@@ -2105,6 +2128,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
               query={refQuery}
               selectedIndex={refSelectedIndex}
               currentNodeId={nodeId}
+              anchor={refAnchor}
             />
           )}
           {slashOpen && isFocused && (
@@ -2113,6 +2137,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
               commands={filteredSlashCommands}
               selectedIndex={slashSelectedIndex}
               onSelect={executeSlashCommand}
+              anchor={slashAnchor}
             />
           )}
         </div>

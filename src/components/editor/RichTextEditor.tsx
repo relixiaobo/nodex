@@ -35,6 +35,12 @@ interface TriggerRuntimeState {
   fieldFired: boolean;
 }
 
+export interface TriggerAnchorRect {
+  left: number;
+  top: number;
+  bottom: number;
+}
+
 interface RichTextEditorProps {
   nodeId: string;
   parentId: string;
@@ -50,7 +56,7 @@ interface RichTextEditorProps {
   onArrowDown: () => void;
   onMoveUp: () => void;
   onMoveDown: () => void;
-  onHashTag?: (query: string, from: number, to: number) => void;
+  onHashTag?: (query: string, from: number, to: number, anchor?: TriggerAnchorRect) => void;
   onHashTagDeactivate?: () => void;
   editorRef?: MutableRefObject<EditorView | null>;
   hashTagActive?: boolean;
@@ -60,7 +66,7 @@ interface RichTextEditorProps {
   onHashTagCreate?: () => void;
   onHashTagClose?: () => void;
   onFieldTriggerFire?: () => void;
-  onReference?: (query: string, from: number, to: number) => void;
+  onReference?: (query: string, from: number, to: number, anchor?: TriggerAnchorRect) => void;
   onReferenceDeactivate?: () => void;
   referenceActive?: boolean;
   onReferenceConfirm?: () => void;
@@ -68,7 +74,7 @@ interface RichTextEditorProps {
   onReferenceNavUp?: () => void;
   onReferenceCreate?: () => void;
   onReferenceClose?: () => void;
-  onSlashCommand?: (query: string, from: number, to: number) => void;
+  onSlashCommand?: (query: string, from: number, to: number, anchor?: TriggerAnchorRect) => void;
   onSlashCommandDeactivate?: () => void;
   slashActive?: boolean;
   onSlashConfirm?: () => void;
@@ -86,6 +92,15 @@ export interface EditorContentPayload {
   text: string;
   marks: TextMark[];
   inlineRefs: InlineRefEntry[];
+}
+
+function getCaretAnchorRect(view: EditorView, pos: number): TriggerAnchorRect | undefined {
+  try {
+    const rect = view.coordsAtPos(pos);
+    return { left: rect.left, top: rect.top, bottom: rect.bottom };
+  } catch {
+    return undefined;
+  }
 }
 
 function marksEqual(a: TextMark[], b: TextMark[]): boolean {
@@ -250,7 +265,7 @@ export function RichTextEditor(props: RichTextEditorProps) {
       stateRef.hashActive = true;
       const query = hashMatch[1];
       const hashStart = from - hashMatch[0].length;
-      propsRef.current.onHashTag?.(query, hashStart, from);
+      propsRef.current.onHashTag?.(query, hashStart, from, getCaretAnchorRect(view, from));
     } else {
       if (stateRef.hashActive) propsRef.current.onHashTagDeactivate?.();
       stateRef.hashActive = false;
@@ -261,7 +276,7 @@ export function RichTextEditor(props: RichTextEditorProps) {
       stateRef.referenceActive = true;
       const query = refMatch[1];
       const atStart = from - refMatch[0].length;
-      propsRef.current.onReference?.(query, atStart, from);
+      propsRef.current.onReference?.(query, atStart, from, getCaretAnchorRect(view, from));
     } else {
       if (stateRef.referenceActive) propsRef.current.onReferenceDeactivate?.();
       stateRef.referenceActive = false;
@@ -281,7 +296,7 @@ export function RichTextEditor(props: RichTextEditorProps) {
       stateRef.slashActive = true;
       const query = slashMatch[1];
       const slashStart = from - (query.length + 1);
-      propsRef.current.onSlashCommand?.(query, slashStart, from);
+      propsRef.current.onSlashCommand?.(query, slashStart, from, getCaretAnchorRect(view, from));
     } else {
       if (stateRef.slashActive) propsRef.current.onSlashCommandDeactivate?.();
       stateRef.slashActive = false;

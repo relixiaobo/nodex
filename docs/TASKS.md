@@ -29,7 +29,7 @@ _(空)_
 |-------|---------|------|-------------|
 | nodex-cc | _(idle — PR #63 merged)_ | — | — |
 | nodex-cc-2 | _(idle — PR #61 merged)_ | — | — |
-| nodex-codex | Loro 收口 Phase 2（LoroText 主编辑链路迁移） | codex/loro-phase2-lorotext | docs/TASKS.md, src/lib/loro-doc.ts, src/components/editor/*.ts, src/components/outliner/OutlinerItem.tsx, tests/vitest/loro-*.test.ts, docs/TESTING.md |
+| nodex-codex | Loro 收口 Phase 2（配置字段渲染链路收口） | codex/loro-phase2-lorotext | docs/TASKS.md, src/components/fields/*.tsx, src/components/outliner/OutlinerItem.tsx, src/hooks/use-node-fields.ts, tests/vitest/*field*.test.ts, docs/features/*.md |
 
 ---
 
@@ -54,6 +54,7 @@ _(空)_
 > - [2026-02-21 nodex-codex] 按“未上线无需历史兼容”原则，移除编辑链路中“清理 legacy 脏字段”兼容逻辑与对应测试，保持实现最小化
 > - [2026-02-21 nodex-codex] 继续清理历史兼容残留：删除 node-store 旧 API 别名（`createAttrDef/moveFieldTuple/renameAttrDef/setNodeNameLocal/setNodeContentLocal`）及调用点；移除 `findAutoCollectTupleId` stub、`resolveSupertagPickerSelectedId` 的 `targetId` 回退、`handleDelete` 的 HTML 文本回退；同步更新测试与 `docs/TESTING.md`
 > - [2026-02-21 nodex-codex] 修复配置页控制器回归：`FieldRow` 按 `configDef.control` 渲染专用控件（tag_picker/type_choice/select/done_map_entries/number_input/autocollect），不再把虚拟配置字段误走普通 outliner；`DoneMappingEntries` 改为直接绑定 `tagDefId`；`AutoCollectSection` 改为读取 `fieldDef` 选项子节点
+> - [2026-02-21 nodex-codex] 用户反馈回归未消失，定位到 `OutlinerItem` 未透传 `isSystemConfig/configKey` 造成配置字段退化；本轮按“分层渲染 + 无隐式 fallback”重构 `FieldRow` 配置链路并补矩阵回归测试
 
 ### Refactor — Loro 收口 Phase 1：detached guard + origin 策略 (2026-02-21)
 > **Owner**: nodex-codex | **Branch**: codex/loro-phase1-guards

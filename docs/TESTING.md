@@ -421,7 +421,7 @@ npm run test:run
 4. trailing row backspace/arrow/escape 的优先级与原语义一致
 5. trailing row onUpdate（`#/@/>/options`）决策统一由共享层提供
 
-### 1.21 TrailingInput onUpdate 决策纯函数
+### 1.21 TrailingInput onUpdate 决策纯函数（direct import `row-interactions`）
 
 **测试文件**: `tests/vitest/trailing-input-actions.test.ts`
 
@@ -432,7 +432,7 @@ npm run test:run
 3. Options 字段下的 open/close dropdown 决策
 4. 普通文本（非 Options）返回 no-op
 
-### 1.22 TrailingInput 键盘导航决策纯函数
+### 1.22 TrailingInput 键盘导航决策纯函数（direct import `row-interactions`）
 
 **测试文件**: `tests/vitest/trailing-input-navigation.test.ts`
 
@@ -444,7 +444,7 @@ npm run test:run
 4. `Escape` 的 close-options vs blur-editor 决策
 5. `Enter` 的 options-confirm / create-content-and-continue / create-empty 决策
 
-### 1.23 NodeEditor 键盘决策纯函数
+### 1.23 NodeEditor 键盘决策纯函数（direct import `row-interactions`）
 
 **测试文件**: `tests/vitest/node-editor-shortcuts.test.ts`
 

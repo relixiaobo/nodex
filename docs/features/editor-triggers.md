@@ -73,7 +73,7 @@ TrailingInput 没有挂 `HashTagExtension` / `ReferenceExtension` / `FieldTrigge
   - 写入 `uiStore.triggerHint`
   - 聚焦新节点，由 OutlinerItem 在 mount/focus 时读取 hint 打开对应下拉
 
-对应判定逻辑已下沉为纯函数：`src/lib/trailing-input-actions.ts#resolveTrailingUpdateAction`。
+对应判定逻辑已下沉为纯函数：`src/lib/row-interactions.ts#resolveTrailingRowUpdateAction`。
 
 该策略保证了 TrailingInput 与普通编辑节点在交互上保持一致。
 
@@ -106,7 +106,7 @@ TrailingInput 没有挂 `HashTagExtension` / `ReferenceExtension` / `FieldTrigge
 - `src/components/editor/FieldTriggerExtension.ts`
 - `src/components/editor/NodeEditor.tsx`
 - `src/components/editor/TrailingInput.tsx`
-- `src/lib/trailing-input-actions.ts`
+- `src/lib/row-interactions.ts`
 - `src/lib/editor-html.ts`
 - `src/components/outliner/OutlinerItem.tsx`
 - `src/stores/ui-store.ts`

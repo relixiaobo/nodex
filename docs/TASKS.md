@@ -43,7 +43,7 @@ _(空)_
 ### P1 Reference 交互收口：单击选中 vs Esc/框选 + inline 转换输入
 > **Owner**: nodex-codex | **Branch**: codex/reference-selection-interactions | **Spec**: `docs/features/references.md`, `docs/features/node-selection.md`
 > **目标**: 区分 reference 单击选中与全局选中视觉语义，恢复/收口 reference ↔ inline reference 切换与输入交互一致性
-> **Files**: `src/components/outliner/OutlinerItem.tsx`, `src/stores/ui-store.ts`, `src/assets/main.css`, `tests/vitest/ui-store-undo-focus.test.ts`, `tests/vitest/selected-reference-shortcuts.test.ts`, `docs/features/references.md`, `docs/features/node-selection.md`
+> **Files**: `src/components/outliner/OutlinerItem.tsx`, `src/stores/ui-store.ts`, `src/assets/main.css`, `standalone/TestApp.tsx`, `tests/vitest/ui-store-undo-focus.test.ts`, `tests/vitest/selected-reference-shortcuts.test.ts`, `docs/features/references.md`, `docs/features/node-selection.md`
 > **Progress**:
 > - [x] 增加 selection source（`ref-click` vs `global`）并接入选中/聚焦状态流
 > - [x] 恢复 reference 单击 `fit-content` 边框样式，保留 Esc/框选全行高亮
@@ -54,6 +54,7 @@ _(空)_
 > - [2026-02-21 nodex-codex] 实现完成：`ui-store` 新增 `selectionSource`，`OutlinerItem` 区分 `selected_global` 与 `selected_ref_click` 两套视觉；恢复 selected reference 可打印字符转换路径（转 inline conversion 并续写）；补充 store 语义断言并同步 `references/node-selection` 规格；自检通过 `npm run typecheck`、`npm run test:run`、`npm run build`
 > - [2026-02-21 nodex-codex] 用户回归反馈修复：修正 inline ref-only 场景 `ProseMirror-trailingBreak` 显示条件（避免 `@` 转换后换行光标）；reference 转换去除“先删再转”路径，避免目标ID失真导致 blur 后偶发消失；pending conversion 行纳入 reference-like 点击语义（单击可进入 ref-click 选中边框）
 > - [2026-02-21 nodex-codex] 二次回归修复：`OutlinerItem` 改为以 `node.type==='reference'` 识别引用节点并读取 target 节点文本/marks/inlineRefs（修复 blur 回退后“看起来消失”）；selected reference 转换改为使用 `targetId` 作为回退目标（修复 blur 后偶发错误引用）；reference 单击边框颜色改为固定 RGBA，避免 `color-mix` 在部分环境不可见
+> - [2026-02-21 nodex-codex] 三次回归修复：`dev:test` 改为默认 `forceFresh`，消除历史测试数据干扰；reference 行渲染统一切到 `effectiveNodeId(target)`（tags/fields/checkbox/children/TagBar 与字段导航上下文同步），修复 field 丢失与引用子树上下文错位；补充 atom 尾部 `ProseMirror-separator + trailingBreak` 隐藏规则，修复 `@` 创建后光标换行问题
 
 ### Refactor — Loro 收口 Phase 2：LoroText 主编辑链路迁移 (2026-02-21)
 > **Owner**: nodex-codex | **Branch**: codex/loro-phase2-lorotext

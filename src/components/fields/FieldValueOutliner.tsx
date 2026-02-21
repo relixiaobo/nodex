@@ -36,7 +36,7 @@ import { ColorSwatchPicker } from './ColorSwatchPicker';
 import { DatePicker, formatDateDisplay } from './DatePicker.js';
 import { useUIStore } from '../../stores/ui-store.js';
 import * as loroDoc from '../../lib/loro-doc.js';
-import { FIELD_VALUE_INSET } from './field-layout.js';
+import { FIELD_OVERLAY_Z_INDEX, FIELD_VALUE_INSET } from './field-layout.js';
 
 interface FieldValueOutlinerProps {
   tupleId: string;
@@ -349,7 +349,7 @@ function DatePickerField({ value, onSelect }: { value: string; onSelect: (v: str
   }, []);
 
   return (
-    <div className={`relative ${open ? 'isolate z-[1200]' : ''}`}>
+    <div className={`relative ${open ? 'isolate' : ''}`} style={open ? { zIndex: FIELD_OVERLAY_Z_INDEX } : undefined}>
       <div className="flex min-h-7 items-start gap-2 py-1" style={{ paddingLeft: FIELD_VALUE_INSET }}>
         <BulletChevron hasChildren={false} isExpanded={false} onBulletClick={() => {}} dimmed={!value} />
         <div className="flex-1 min-w-0 flex items-center cursor-pointer" onClick={handleClick}>

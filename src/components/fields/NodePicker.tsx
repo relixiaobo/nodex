@@ -14,7 +14,7 @@ import { useState, useRef, useEffect, useCallback, useMemo, memo } from 'react';
 import { BulletChevron } from '../outliner/BulletChevron';
 import { resolveTagColor } from '../../lib/tag-colors.js';
 import { useNodeStore } from '../../stores/node-store';
-import { FIELD_VALUE_INSET } from './field-layout.js';
+import { FIELD_OVERLAY_Z_INDEX, FIELD_VALUE_INSET } from './field-layout.js';
 
 /** Memoized colored # bullet — subscribes only to the specific tagDef's color config. */
 const TagDefBullet = memo(function TagDefBullet({ tagDefId }: { tagDefId: string }) {
@@ -288,8 +288,8 @@ export function NodePicker({
       {/* Dropdown — shown below the value */}
       {open && (
         <div
-          className="absolute top-full z-[1200] mt-0.5 w-56 max-h-52 overflow-y-auto rounded-lg border border-border bg-surface shadow-lg p-1"
-          style={{ left: insetLeft }}
+          className="absolute top-full mt-0.5 w-56 max-h-52 overflow-y-auto rounded-lg border border-border bg-surface shadow-lg p-1"
+          style={{ left: insetLeft, zIndex: FIELD_OVERLAY_Z_INDEX }}
           onMouseDown={(e) => e.preventDefault()}
         >
           {/* Option list — bullet + text per item */}

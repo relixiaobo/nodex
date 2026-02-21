@@ -15,6 +15,7 @@
  */
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { ChevronLeft, ChevronRight } from '../../lib/icons.js';
+import { FIELD_OVERLAY_Z_INDEX } from './field-layout.js';
 
 // ─── Helpers ──────────────────────────────────────────────────────
 
@@ -353,7 +354,8 @@ export function DatePicker({ value, onSelect, onClose }: DatePickerProps) {
   return (
     <div
       ref={containerRef}
-      className="absolute isolate left-0 top-full z-[1200] mt-1 w-full min-w-[248px] max-w-[280px] overflow-hidden rounded-lg border border-border bg-surface shadow-lg p-3"
+      className="absolute isolate left-0 top-full mt-1 w-full min-w-[248px] max-w-[280px] overflow-hidden rounded-lg border border-border bg-surface shadow-lg p-3"
+      style={{ zIndex: FIELD_OVERLAY_Z_INDEX }}
       onMouseDown={(e) => e.stopPropagation()}
     >
       {/* ─── Top date input field(s) ─── */}

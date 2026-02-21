@@ -247,6 +247,7 @@ npm run test:run
 13. FieldRow 非交互区点击可选中 tuple（NodePanel/Outliner 统一），交互区（`data-field-value`/button/input 等）不被 row 选中逻辑抢占
 14. FieldRow 非交互区支持 `Cmd/Ctrl+Click` 多选切换、`Shift+Click` 范围选中、`Shift+↑/↓` 从锚点扩展选区（field/content 共享同一选择域）
 15. OutlinerItem 子行排序遵循“模板字段置顶 + 手动字段保持插入位”；字段 icon 着色仅限 `tagDef` owner（schema/manual 字段保持中性灰）
+16. NodePanel（`OutlinerView`）中的模板字段 icon 同步应用 owner supertag 颜色，避免 root 视图/内层视图着色行为不一致
 
 ### 1.7 标签与引用状态流
 

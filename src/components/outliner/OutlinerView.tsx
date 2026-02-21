@@ -6,11 +6,12 @@ import { useNodeStore } from '../../stores/node-store';
 import { useUIStore } from '../../stores/ui-store';
 import * as loroDoc from '../../lib/loro-doc.js';
 import { isOutlinerContentNodeType } from '../../lib/node-type-utils.js';
-import { OutlinerItem } from './OutlinerItem';
+import { OutlinerItem, buildFieldOwnerColors } from './OutlinerItem';
 import { FieldRow } from '../fields/FieldRow';
 import { toFieldRowEntryProps } from '../fields/field-row-props.js';
 import { TrailingInput } from '../editor/TrailingInput';
 import { SYS_V } from '../../types/index.js';
+import { resolveTagColor } from '../../lib/tag-colors.js';
 import { useDragSelect } from '../../hooks/use-drag-select.js';
 
 interface OutlinerViewProps {
@@ -55,6 +56,15 @@ export function OutlinerView({ rootNodeId, showTemplateTuples }: OutlinerViewPro
     for (const f of fields) m.set(f.fieldEntryId, f);
     return m;
   }, [fields]);
+
+  const fieldOwnerColors = useMemo(() => (
+    buildFieldOwnerColors(
+      fieldMap,
+      (fieldDefId) => loroDoc.getParentId(fieldDefId),
+      (ownerId) => useNodeStore.getState().getNode(ownerId)?.type,
+      (ownerId) => resolveTagColor(ownerId).text,
+    )
+  ), [fieldMap]);
 
   // Classify each child: field tuple → 'field', regular node → 'content', else skip
   // Also evaluate hide-field rules for field entries
@@ -151,6 +161,7 @@ export function OutlinerView({ rootNodeId, showTemplateTuples }: OutlinerViewPro
               rootChildIds={dragSelectableRootIds}
               rootNodeId={rootNodeId}
               isLastInGroup={i === visibleChildren.length - 1 || visibleChildren[i + 1].type !== 'field'}
+              ownerTagColor={fieldOwnerColors.get(id)}
               onNavigateOut={(direction) => {
                 if (direction === 'up') {
                   for (let j = i - 1; j >= 0; j--) {

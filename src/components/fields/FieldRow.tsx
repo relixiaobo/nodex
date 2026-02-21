@@ -669,8 +669,22 @@ export function FieldRow({
       handleShiftClick();
       return;
     }
-    setSelectedNode(tupleId, nodeId, 'global');
-  }, [isEditing, nodeId, tupleId, setSelectedNode, setEditingFieldName, handleCmdClick, handleShiftClick]);
+    // Plain click on the field-name side should enter field-name editing,
+    // matching node/content click-to-edit behavior.
+    if (!trashed && !isVirtual && !isSystemConfig && !isSystemField) {
+      setEditingFieldName(tupleId);
+    }
+  }, [
+    isEditing,
+    tupleId,
+    setEditingFieldName,
+    handleCmdClick,
+    handleShiftClick,
+    trashed,
+    isVirtual,
+    isSystemConfig,
+    isSystemField,
+  ]);
 
   // Keyboard handler for field-selected state: Escape clears, Enter re-edits
   useEffect(() => {
@@ -861,7 +875,7 @@ export function FieldRow({
           {Icon && <Icon size={12} />}
         </button>
         <div
-          className={`flex-1 min-w-0 flex items-center gap-0.5${!trashed && !isVirtual && !isEditing ? ' cursor-default' : ''}`}
+          className={`flex-1 min-w-0 flex items-center gap-0.5${!trashed && !isVirtual && !isEditing ? ' cursor-text' : ''}`}
           onDoubleClick={!trashed && !isVirtual && !isEditing ? handleNameDoubleClick : undefined}
         >
           {trashed && (

@@ -12,7 +12,7 @@
  *        [description]     • value node 2
  * ──────────────────────────────────────
  */
-import { useCallback, useRef, useEffect, useMemo, type ReactNode } from 'react';
+import { useCallback, useRef, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Trash2 } from '../../lib/icons.js';
 import { useNodeFields } from '../../hooks/use-node-fields';
 import { useNodeStore } from '../../stores/node-store';
@@ -170,25 +170,50 @@ function ConfigNumberInput({ nodeId, configKey }: { nodeId: string; configKey: s
     return node ? resolveConfigValue(node, configKey) : undefined;
   });
   const propName = configKeyToPropName(configKey);
+  const valueText = value === undefined || value === null ? '' : String(value);
+  const [draft, setDraft] = useState(valueText);
+
+  useEffect(() => {
+    setDraft(valueText);
+  }, [valueText]);
+
+  const commitDraft = useCallback(() => {
+    if (!propName) return;
+    const raw = draft.trim();
+    if (!raw) {
+      setConfigValue(nodeId, propName, undefined);
+      return;
+    }
+    const num = Number(raw);
+    if (!Number.isFinite(num)) {
+      setDraft(valueText);
+      return;
+    }
+    setConfigValue(nodeId, propName, num);
+  }, [draft, nodeId, propName, setConfigValue, valueText]);
 
   return (
     <div className="flex min-h-7 items-center gap-2 py-1" style={{ paddingLeft: FIELD_VALUE_INSET }}>
       <BulletChevron hasChildren={false} isExpanded={false} onBulletClick={() => {}} />
       <input
-        type="number"
-        className="h-7 w-[140px] rounded border border-border px-2 text-sm leading-[21px] bg-background text-foreground outline-none focus:ring-2 focus:ring-ring"
-        value={value ?? ''}
-        onChange={(e) => {
-          if (!propName) return;
-          const raw = e.target.value.trim();
-          if (!raw) {
-            setConfigValue(nodeId, propName, undefined);
-            return;
+        type="text"
+        inputMode="decimal"
+        className="h-[21px] min-w-[120px] bg-transparent p-0 text-sm leading-[21px] text-foreground outline-none placeholder:text-foreground-tertiary"
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commitDraft}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            commitDraft();
+            (e.currentTarget as HTMLInputElement).blur();
+          } else if (e.key === 'Escape') {
+            e.preventDefault();
+            setDraft(valueText);
+            (e.currentTarget as HTMLInputElement).blur();
           }
-          const num = Number(raw);
-          if (Number.isFinite(num)) setConfigValue(nodeId, propName, num);
         }}
-        placeholder="Enter number"
+        placeholder="Empty"
       />
     </div>
   );

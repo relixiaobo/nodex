@@ -367,6 +367,20 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   const [optionsPickerOpen, setOptionsPickerOpen] = useState(false);
   const [optionsPickerIndex, setOptionsPickerIndex] = useState(0);
   const allFieldOptions = useFieldOptions(isOptionsField && attrDefId ? attrDefId : '');
+  const selectedOptionId = useMemo(() => {
+    if (!isOptionsField || !node) return undefined;
+    const targetId = node.targetId;
+    if (targetId && allFieldOptions.some((opt) => opt.id === targetId)) return targetId;
+    const rawName = node.name ?? '';
+    if (rawName && allFieldOptions.some((opt) => opt.id === rawName)) return rawName;
+    return undefined;
+  }, [isOptionsField, node, allFieldOptions]);
+  const selectedOptionName = useMemo(
+    () => allFieldOptions.find((opt) => opt.id === selectedOptionId)?.name ?? '',
+    [allFieldOptions, selectedOptionId],
+  );
+  const isOptionsValueNode = isOptionsField && !!selectedOptionId;
+  const isReferenceLikeRow = isReference || isOptionsValueNode;
 
   // Checkbox state (supertag SYS_A55 or manual _done)
   const { showCheckbox, isDone } = useNodeCheckbox(nodeId);
@@ -557,17 +571,17 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     });
   }, [captureNameEditorOffset]);
 
-  // Open options picker when Options-field reference is selected
+  // Open options picker when selected Options value row/reference is selected
   useEffect(() => {
-    if (isSelected && isReference && isOptionsField) {
+    if (isSelected && isOptionsField && (isReference || isOptionsValueNode)) {
       setOptionsPickerOpen(true);
       // Highlight the currently selected option
-      const idx = allFieldOptions.findIndex((o) => o.id === nodeId);
+      const idx = allFieldOptions.findIndex((o) => o.id === selectedOptionId);
       setOptionsPickerIndex(idx >= 0 ? idx : 0);
     } else {
       setOptionsPickerOpen(false);
     }
-  }, [isSelected, isReference, isOptionsField, allFieldOptions, nodeId]);
+  }, [isSelected, isReference, isOptionsField, isOptionsValueNode, allFieldOptions, selectedOptionId]);
 
   // Unified keyboard handler for selected nodes (both reference and non-reference).
   // Reference-specific actions (delete ref, convert to inline) are checked first;
@@ -602,16 +616,18 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       }
 
       // 1. Reference-specific actions (only for single-selected reference nodes)
-      if (isReference && uiState.selectedNodeIds.size <= 1) {
+      if ((isReference || isOptionsValueNode) && uiState.selectedNodeIds.size <= 1) {
         const refAction = resolveSelectedReferenceShortcut(e, optionsPickerOpen);
         if (refAction) {
           if (refAction === 'delete') {
+            if (!isReference) return;
             e.preventDefault();
             removeReference(nodeId);
             clearSelection();
             return;
           }
           if (refAction === 'convert_printable') {
+            if (!isReference) return;
             const isAsciiLetter = /^[a-zA-Z]$/.test(e.key);
             if (!isAsciiLetter) e.preventDefault();
             const editAtEnd = getNodeTextLengthById(nodeId);
@@ -628,6 +644,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
             return;
           }
           if (refAction === 'convert_arrow_right') {
+            if (!isReference) return;
             e.preventDefault();
             const getNode = useNodeStore.getState().getNode;
             const parent = getNode(parentId);
@@ -889,7 +906,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isSelected, isFocused, isReference, isSelectionAnchor, optionsPickerOpen, allFieldOptions, optionsPickerIndex, parentId, nodeId, rootNodeId, rootChildIds, expandedNodes, removeReference, selectFieldOption, setSelectedNode, setSelectedNodes, clearSelection, setFocusedNode, startRefConversion, setPendingRefConversion, setPendingInputChar]);
+  }, [isSelected, isFocused, isReference, isOptionsValueNode, isSelectionAnchor, optionsPickerOpen, allFieldOptions, optionsPickerIndex, parentId, nodeId, rootNodeId, rootChildIds, expandedNodes, removeReference, selectFieldOption, setSelectedNode, setSelectedNodes, clearSelection, setFocusedNode, startRefConversion, setPendingRefConversion, setPendingInputChar]);
 
   // When TrailingInput creates a node with #/@/, it sets triggerHint so we
   // can immediately open the dropdown (extensions don't fire on mount because
@@ -1005,7 +1022,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       return;
     }
 
-    if (isReference) return;
+    if (isReferenceLikeRow) return;
 
     // Record text offset now (mousedown position = click position for simple clicks).
     // Will be consumed by RichTextEditor when it mounts (after setFocusedNode in click).
@@ -1040,7 +1057,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     );
     // Prevent native selection/focus churn on the static HTML layer.
     e.preventDefault();
-  }, [isReference, fieldDataType, nodeId, parentId, handleCmdClick, handleShiftClick]);
+  }, [isReferenceLikeRow, fieldDataType, nodeId, parentId, handleCmdClick, handleShiftClick]);
 
   // While editing, clicking the large blank area to the right of inline editor
   // should keep caret at end instead of blurring/re-entering at offset 0.
@@ -1123,19 +1140,19 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     }
     // Reference nodes: single click = select (frame), double click = edit
     // Cmd+Click and Shift+Click are handled in handleContentMouseDown
-    if (isReference && !e.metaKey && !e.ctrlKey && !e.shiftKey) {
+    if (isReferenceLikeRow && !e.metaKey && !e.ctrlKey && !e.shiftKey) {
       setSelectedNode(nodeId, parentId);
       return;
     }
     // Non-reference: enter edit mode (text offset already recorded in mousedown)
-    if (!isReference) {
+    if (!isReferenceLikeRow) {
       setFocusedNode(nodeId, parentId);
     }
-  }, [nodeId, parentId, isReference, setSelectedNode, setFocusedNode, navigateTo]);
+  }, [nodeId, parentId, isReferenceLikeRow, setSelectedNode, setFocusedNode, navigateTo]);
 
   const handleContentDoubleClick = useCallback((e: React.MouseEvent) => {
     // Double click on reference node → enter edit mode
-    if (isReference) {
+    if (isReference && !isOptionsValueNode) {
       const container = e.currentTarget as HTMLElement;
       const textOffset = getTextOffsetFromPoint(container, e.clientX, e.clientY);
       useUIStore.getState().setFocusClickCoords(
@@ -1145,7 +1162,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       );
       setFocusedNode(nodeId, parentId);
     }
-  }, [nodeId, parentId, isReference, setFocusedNode]);
+  }, [nodeId, parentId, isReference, isOptionsValueNode, setFocusedNode]);
 
   const handleToggle = useCallback(() => {
     const ek = `${parentId}:${nodeId}`;
@@ -1843,9 +1860,14 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   const isDropTarget = dropTargetId === nodeId;
   const isDragging = dragNodeId === nodeId;
   const nodeText = node.name ?? '';
+  const nodeDisplayText = isOptionsValueNode ? (selectedOptionName || nodeText) : nodeText;
   const nodeMarks = node.marks ?? [];
   const nodeInlineRefs = node.inlineRefs ?? [];
-  const nodeContentHtml = marksToHtml(nodeText, nodeMarks, nodeInlineRefs);
+  const nodeContentHtml = marksToHtml(
+    nodeDisplayText,
+    isOptionsValueNode ? [] : nodeMarks,
+    isOptionsValueNode ? [] : nodeInlineRefs,
+  );
   const hasOverlayOpen = isFocused && (hashTagOpen || refOpen || slashOpen || optionsPickerOpen);
 
   return (
@@ -1911,10 +1933,10 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
           <div className={`relative flex-1 min-w-0 ${isPendingConversion ? 'ref-converting' : ''} ${isDone ? 'text-foreground/50' : ''}`}>
           <div
             ref={contentAreaRef}
-            className={`text-sm leading-[21px] ${!isCheckboxFieldType(fieldDataType) && !isFocused ? (isReference ? 'cursor-default' : 'cursor-text') : ''}`}
+            className={`text-sm leading-[21px] ${!isCheckboxFieldType(fieldDataType) && !isFocused ? (isReferenceLikeRow ? 'cursor-default' : 'cursor-text') : ''}`}
             onMouseDown={!isCheckboxFieldType(fieldDataType) ? (isFocused ? handleFocusedContentMouseDown : handleContentMouseDown) : undefined}
             onClick={!isCheckboxFieldType(fieldDataType) && !isFocused ? handleContentClick : undefined}
-            onDoubleClick={!isCheckboxFieldType(fieldDataType) && !isFocused && isReference ? handleContentDoubleClick : undefined}
+            onDoubleClick={!isCheckboxFieldType(fieldDataType) && !isFocused && isReference && !isOptionsValueNode ? handleContentDoubleClick : undefined}
           >
             {isCheckboxFieldType(fieldDataType) ? (
               <input
@@ -2029,14 +2051,14 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
             />
           )}
         </div>
-        {/* Options picker dropdown: shown when clicking selected Options-field reference */}
+        {/* Options picker dropdown: shown when selecting an Options value row/reference */}
         {optionsPickerOpen && allFieldOptions.length > 0 && (
           <div className="absolute left-0 top-full z-50 mt-0.5 max-h-48 w-56 overflow-y-auto rounded-lg border border-border bg-popover p-1 shadow-lg">
             {allFieldOptions.map((opt, i) => (
               <div
                 key={opt.id}
                 className={`flex cursor-pointer items-center gap-2 rounded-md px-2 py-1 text-sm ${
-                  opt.id === nodeId
+                  opt.id === selectedOptionId
                     ? 'bg-primary text-primary-foreground'
                     : i === optionsPickerIndex
                       ? 'bg-accent text-accent-foreground'
@@ -2044,7 +2066,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
                 }`}
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => {
-                  if (opt.id !== nodeId) {
+                  if (opt.id !== selectedOptionId) {
                     selectFieldOption(parentId, opt.id, nodeId);
                   }
                   setSelectedNode(null);

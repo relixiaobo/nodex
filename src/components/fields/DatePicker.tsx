@@ -353,7 +353,7 @@ export function DatePicker({ value, onSelect, onClose }: DatePickerProps) {
   return (
     <div
       ref={containerRef}
-      className="absolute left-0 top-full z-50 mt-1 w-full min-w-[248px] max-w-[280px] rounded-lg border border-border bg-popover shadow-lg p-3"
+      className="absolute left-0 top-full z-[1000] mt-1 w-full min-w-[248px] max-w-[280px] overflow-hidden rounded-lg border border-border bg-popover/100 shadow-lg p-3"
       onMouseDown={(e) => e.stopPropagation()}
     >
       {/* ─── Top date input field(s) ─── */}

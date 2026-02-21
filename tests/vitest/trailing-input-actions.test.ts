@@ -11,14 +11,17 @@ describe('trailing input update action resolver', () => {
     expect(resolveTrailingUpdateAction({ text: '#', isOptionsField: false })).toEqual({
       type: 'create_trigger_node',
       trigger: '#',
+      textOffset: 1,
     });
     expect(resolveTrailingUpdateAction({ text: '@', isOptionsField: false })).toEqual({
       type: 'create_trigger_node',
       trigger: '@',
+      textOffset: 1,
     });
     expect(resolveTrailingUpdateAction({ text: '/', isOptionsField: false })).toEqual({
       type: 'create_trigger_node',
       trigger: '/',
+      textOffset: 1,
     });
   });
 

@@ -415,6 +415,11 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
           ref.setTriggerHint(action.trigger);
           const triggerNode = ref.createChild(ref.effectiveParentId, undefined, { name: action.trigger });
           ref.setExpanded(ref.effectiveParentEK, true);
+          ref.setFocusClickCoords({
+            nodeId: triggerNode.id,
+            parentId: ref.effectiveParentId,
+            textOffset: action.textOffset,
+          });
           ref.setFocusedNode(triggerNode.id, ref.effectiveParentId);
           queueMicrotask(() => { committingRef.current = false; });
           return;

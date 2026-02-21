@@ -51,6 +51,7 @@ _(空)_
 > **迭代日志**:
 > - [2026-02-21 nodex-codex] 任务认领：先对齐 content node 与 trailing input 的行为矩阵，再抽取共享 intent 层，最后用回归测试锁定一致性
 > - [2026-02-21 nodex-codex] 完成重构：新增 `row-interactions` 统一 content/trailing 意图解析，`node-editor-shortcuts` 与 `trailing-input-navigation` 改为薄封装转发；新增 `row-interactions.test.ts` 锁定跨模式语义；同步更新 outliner 与测试文档；自检通过 `npm run typecheck`、`npm run test:run`、`npm run build`
+> - [2026-02-21 nodex-codex] 用户反馈修复：`TrailingInput` 输入 `@/#//` 创建触发节点后补齐 `focusClickCoords(textOffset)`，确保新节点光标落在触发符后而不是行首；`trailing-input-actions` 同步返回 `textOffset` 并更新单测
 
 ### P1 Reference 交互收口：单击选中 vs Esc/框选 + inline 转换输入
 > **Owner**: nodex-codex | **Branch**: codex/reference-selection-interactions | **Spec**: `docs/features/references.md`, `docs/features/node-selection.md`

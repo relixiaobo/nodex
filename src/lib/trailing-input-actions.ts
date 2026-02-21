@@ -1,7 +1,7 @@
 export type TrailingUpdateAction =
   | { type: 'none' }
   | { type: 'create_field' }
-  | { type: 'create_trigger_node'; trigger: '#' | '@' | '/' }
+  | { type: 'create_trigger_node'; trigger: '#' | '@' | '/'; textOffset: number }
   | { type: 'open_options'; query: string }
   | { type: 'close_options' };
 
@@ -20,7 +20,8 @@ export function resolveTrailingUpdateAction(
 
   if (text === '>') return { type: 'create_field' };
   if (text === '#' || text === '@' || text === '/') {
-    return { type: 'create_trigger_node', trigger: text };
+    // Keep caret after trigger char when the created node receives focus.
+    return { type: 'create_trigger_node', trigger: text, textOffset: text.length };
   }
 
   if (isOptionsField) {

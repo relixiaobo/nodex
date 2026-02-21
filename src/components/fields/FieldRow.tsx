@@ -43,6 +43,13 @@ import { DoneMappingEntries } from './DoneMappingEntries';
 import { BulletChevron } from '../outliner/BulletChevron';
 import { FIELD_VALUE_INSET } from './field-layout.js';
 import { dragState } from '../../hooks/use-drag-select.js';
+import { getFlattenedVisibleNodes } from '../../lib/tree-utils.js';
+import {
+  computeRangeSelection,
+  filterToRootLevel,
+  getEffectiveSelectionBounds,
+  toggleNodeInSelection,
+} from '../../lib/selection-utils.js';
 
 function focusTrailingInputForParent(parentId: string): boolean {
   const roots = document.querySelectorAll<HTMLElement>('[data-trailing-parent-id]');
@@ -82,6 +89,9 @@ interface FieldRowProps {
   configKey?: string;
   /** Explicit config control type for system config rows */
   configControl?: ConfigFieldDef['control'];
+  /** Root outliner context for unified range selection across field/content rows */
+  rootChildIds?: string[];
+  rootNodeId?: string;
 }
 
 export const FIELD_ROW_SELECTION_OVERLAY_CLASS =
@@ -106,6 +116,28 @@ export function shouldSelectFieldRow(params: {
   const { isEditing, justDragged, target } = params;
   if (isEditing || justDragged) return false;
   return !isFieldRowInteractiveTarget(target);
+}
+
+export type FieldRowSelectAction = 'single' | 'toggle' | 'range' | null;
+
+export function resolveFieldRowSelectAction(params: {
+  isEditing: boolean;
+  justDragged: boolean;
+  target: HTMLElement | null;
+  metaKey: boolean;
+  ctrlKey: boolean;
+  shiftKey: boolean;
+}): FieldRowSelectAction {
+  if (!shouldSelectFieldRow({
+    isEditing: params.isEditing,
+    justDragged: params.justDragged,
+    target: params.target,
+  })) {
+    return null;
+  }
+  if (params.metaKey || params.ctrlKey) return 'toggle';
+  if (params.shiftKey) return 'range';
+  return 'single';
 }
 
 function ConfigTagPicker({ nodeId, configKey, placeholder }: { nodeId: string; configKey: string; placeholder: string }) {
@@ -356,12 +388,15 @@ export function FieldRow({
   isSystemConfig,
   configKey,
   configControl,
+  rootChildIds,
+  rootNodeId,
 }: FieldRowProps) {
   const navigateTo = useUIStore((s) => s.navigateTo);
   const editingFieldNameId = useUIStore((s) => s.editingFieldNameId);
   const setEditingFieldName = useUIStore((s) => s.setEditingFieldName);
   const setFocusedNode = useUIStore((s) => s.setFocusedNode);
   const setSelectedNode = useUIStore((s) => s.setSelectedNode);
+  const setSelectedNodes = useUIStore((s) => s.setSelectedNodes);
   const clearFocus = useUIStore((s) => s.clearFocus);
   // Derive boolean from Set to avoid Zustand infinite re-render (Set creates new reference each time)
   const isTupleInSelectedSet = useUIStore((s) => s.selectedNodeIds.has(tupleId));
@@ -455,6 +490,17 @@ export function FieldRow({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [_version, nodeId, siblingFieldIds]);
 
+  const selectionRootChildIds = useMemo(
+    () => (rootChildIds && rootChildIds.length > 0
+      ? rootChildIds
+      : renderableSiblings.map((item) => item.id)),
+    [rootChildIds, renderableSiblings],
+  );
+  const selectionRootId = rootNodeId ?? nodeId;
+  const getSelectionFlatList = useCallback((expandedNodes: Set<string>) => (
+    getFlattenedVisibleNodes(selectionRootChildIds, expandedNodes, selectionRootId)
+  ), [selectionRootChildIds, selectionRootId]);
+
   const moveToSibling = useCallback((direction: 'up' | 'down') => {
     const index = renderableSiblings.findIndex((item) => item.type === 'field' && item.id === tupleId);
     if (index < 0) return false;
@@ -540,32 +586,117 @@ export function FieldRow({
     setEditingFieldName(tupleId);
   }, [tupleId, setEditingFieldName]);
 
+  const handleCmdClick = useCallback(() => {
+    const state = useUIStore.getState();
+    const newSelection = toggleNodeInSelection(tupleId, state.selectedNodeIds);
+    let newAnchor = state.selectionAnchorId;
+    if (newAnchor && !newSelection.has(newAnchor)) {
+      newAnchor = newSelection.size > 0 ? [...newSelection][0] : null;
+    }
+    if (!newAnchor && newSelection.has(tupleId)) {
+      newAnchor = tupleId;
+    }
+    setSelectedNodes(newSelection, newAnchor);
+  }, [tupleId, setSelectedNodes]);
+
+  const handleShiftClick = useCallback(() => {
+    const state = useUIStore.getState();
+    const anchor = state.selectionAnchorId;
+    if (!anchor) {
+      setSelectedNode(tupleId, nodeId, 'global');
+      return;
+    }
+    const flatList = getSelectionFlatList(state.expandedNodes);
+    const range = computeRangeSelection(anchor, tupleId, flatList);
+    setSelectedNodes(range, anchor);
+  }, [tupleId, nodeId, setSelectedNode, setSelectedNodes, getSelectionFlatList]);
+
+  const extendSelectionFromAnchor = useCallback((direction: 'up' | 'down') => {
+    const state = useUIStore.getState();
+    const anchor = state.selectionAnchorId;
+    if (!anchor) return;
+
+    const flatList = getSelectionFlatList(state.expandedNodes);
+    const anchorIdx = flatList.findIndex((item) => item.nodeId === anchor);
+    if (anchorIdx < 0) return;
+
+    const effectiveBounds = getEffectiveSelectionBounds(state.selectedNodeIds, flatList);
+    if (!effectiveBounds) return;
+
+    const { firstIdx, lastIdx } = effectiveBounds;
+    let extentIdx: number;
+    if (anchorIdx <= firstIdx) {
+      extentIdx = lastIdx;
+    } else if (anchorIdx >= lastIdx) {
+      extentIdx = firstIdx;
+    } else {
+      extentIdx = direction === 'down' ? lastIdx : firstIdx;
+    }
+
+    const newExtentIdx = direction === 'up'
+      ? Math.max(0, extentIdx - 1)
+      : Math.min(flatList.length - 1, extentIdx + 1);
+
+    const start = Math.min(anchorIdx, newExtentIdx);
+    const end = Math.max(anchorIdx, newExtentIdx);
+    const rangeIds = new Set<string>();
+    for (let i = start; i <= end; i++) {
+      rangeIds.add(flatList[i].nodeId);
+    }
+    const filtered = filterToRootLevel(rangeIds, undefined, flatList);
+    setSelectedNodes(filtered, anchor);
+  }, [getSelectionFlatList, setSelectedNodes]);
+
   const handleFieldRowClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     const target = e.target instanceof HTMLElement ? e.target : null;
-    if (!shouldSelectFieldRow({ isEditing, justDragged: dragState.justDragged, target })) return;
+    const action = resolveFieldRowSelectAction({
+      isEditing,
+      justDragged: dragState.justDragged,
+      target,
+      metaKey: e.metaKey,
+      ctrlKey: e.ctrlKey,
+      shiftKey: e.shiftKey,
+    });
+    if (!action) return;
     setEditingFieldName(null);
+    if (action === 'toggle') {
+      e.preventDefault();
+      handleCmdClick();
+      return;
+    }
+    if (action === 'range') {
+      e.preventDefault();
+      handleShiftClick();
+      return;
+    }
     setSelectedNode(tupleId, nodeId, 'global');
-  }, [isEditing, nodeId, tupleId, setSelectedNode, setEditingFieldName]);
+  }, [isEditing, nodeId, tupleId, setSelectedNode, setEditingFieldName, handleCmdClick, handleShiftClick]);
 
   // Keyboard handler for field-selected state: Escape clears, Enter re-edits
   useEffect(() => {
     if (!isFieldSelected) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.defaultPrevented) return;
-      if (e.key === 'Escape') {
+      if (e.shiftKey && !e.metaKey && !e.ctrlKey && !e.altKey && e.key === 'ArrowUp') {
+        e.preventDefault();
+        extendSelectionFromAnchor('up');
+      } else if (e.shiftKey && !e.metaKey && !e.ctrlKey && !e.altKey && e.key === 'ArrowDown') {
+        e.preventDefault();
+        extendSelectionFromAnchor('down');
+      } else if (!e.metaKey && !e.ctrlKey && !e.altKey && e.key === 'Escape') {
         e.preventDefault();
         // Second Escape: re-enter field name editing so cursor returns
         clearSelection();
         setEditingFieldName(tupleId);
-      } else if (e.key === 'Enter') {
+      } else if (!e.shiftKey && !e.metaKey && !e.ctrlKey && !e.altKey && e.key === 'Enter') {
         e.preventDefault();
         clearSelection();
         setEditingFieldName(tupleId);
-      } else if (e.key === 'ArrowUp') {
+      } else if (!e.shiftKey && !e.metaKey && !e.ctrlKey && !e.altKey && e.key === 'ArrowUp') {
         e.preventDefault();
         clearSelection();
         moveToSibling('up');
-      } else if (e.key === 'ArrowDown') {
+      } else if (!e.shiftKey && !e.metaKey && !e.ctrlKey && !e.altKey && e.key === 'ArrowDown') {
         e.preventDefault();
         clearSelection();
         moveToSibling('down');
@@ -573,7 +704,7 @@ export function FieldRow({
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isFieldSelected, tupleId, clearSelection, setEditingFieldName, moveToSibling]);
+  }, [isFieldSelected, tupleId, clearSelection, setEditingFieldName, moveToSibling, extendSelectionFromAnchor]);
 
   // ─── Path 1: System metadata fields (NDX_SYS_*) — read-only ───
   if (isSystemField) {

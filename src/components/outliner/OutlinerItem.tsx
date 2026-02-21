@@ -8,6 +8,7 @@ import { useNodeStore } from '../../stores/node-store';
 import { useUIStore } from '../../stores/ui-store';
 import * as loroDoc from '../../lib/loro-doc.js';
 import { CONTAINER_IDS } from '../../types/index.js';
+import type { NodeType } from '../../types/index.js';
 import { BulletChevron, ChevronButton } from './BulletChevron';
 import { RichTextEditor, type EditorContentPayload, type TriggerAnchorRect } from '../editor/RichTextEditor';
 import { SlashCommandMenu } from '../editor/SlashCommandMenu';
@@ -112,6 +113,105 @@ function focusTrailingInputForParent(parentId: string): boolean {
     return true;
   }
   return false;
+}
+
+export interface OutlinerVisibleChild {
+  id: string;
+  type: 'field' | 'content';
+  hidden?: boolean;
+}
+
+export function isHiddenFieldRow(hideMode: string | undefined, isEmpty: boolean | undefined): boolean {
+  switch (hideMode) {
+    case SYS_V.ALWAYS:
+      return true;
+    case SYS_V.WHEN_EMPTY:
+      return !!isEmpty;
+    case SYS_V.WHEN_NOT_EMPTY:
+      return !isEmpty;
+    default:
+      return false;
+  }
+}
+
+export function buildFieldOwnerColors(
+  fieldMap: Map<string, Pick<FieldEntry, 'fieldDefId'>>,
+  getFieldDefOwnerId: (fieldDefId: string) => string | null,
+  getNodeType: (nodeId: string) => string | undefined,
+  resolveOwnerColor: (ownerTagDefId: string) => string,
+): Map<string, string> {
+  const result = new Map<string, string>();
+  for (const [entryId, entry] of fieldMap) {
+    const ownerTagDefId = getFieldDefOwnerId(entry.fieldDefId);
+    if (!ownerTagDefId) continue;
+    if (getNodeType(ownerTagDefId) !== 'tagDef') continue;
+    result.set(entryId, resolveOwnerColor(ownerTagDefId));
+  }
+  return result;
+}
+
+export function buildVisibleChildrenRows(params: {
+  allChildIds: string[];
+  fieldMap: Map<string, Pick<FieldEntry, 'fieldDefId' | 'templateId' | 'hideMode' | 'isEmpty'>>;
+  tagIds: string[];
+  getFieldDefOwnerId: (fieldDefId: string) => string | null;
+  getNodeType: (nodeId: string) => string | undefined;
+  getChildNodeType: (childId: string) => NodeType | undefined;
+  isOutlinerContentType: (nodeType: NodeType | undefined) => boolean;
+}): OutlinerVisibleChild[] {
+  const {
+    allChildIds,
+    fieldMap,
+    tagIds,
+    getFieldDefOwnerId,
+    getNodeType,
+    getChildNodeType,
+    isOutlinerContentType,
+  } = params;
+
+  const tagIdSet = new Set(tagIds);
+  const templateFieldsByTagDef = new Map<string, OutlinerVisibleChild[]>();
+  const remainingItems: OutlinerVisibleChild[] = [];
+
+  for (const cid of allChildIds) {
+    const fieldEntry = fieldMap.get(cid);
+    if (fieldEntry) {
+      const child: OutlinerVisibleChild = {
+        id: cid,
+        type: 'field',
+        hidden: isHiddenFieldRow(fieldEntry.hideMode, fieldEntry.isEmpty),
+      };
+      const ownerTagDefId = getFieldDefOwnerId(fieldEntry.fieldDefId);
+      const isTemplateField = !!fieldEntry.templateId
+        && ownerTagDefId !== null
+        && getNodeType(ownerTagDefId) === 'tagDef'
+        && tagIdSet.has(ownerTagDefId);
+      if (isTemplateField && ownerTagDefId) {
+        let bucket = templateFieldsByTagDef.get(ownerTagDefId);
+        if (!bucket) {
+          bucket = [];
+          templateFieldsByTagDef.set(ownerTagDefId, bucket);
+        }
+        bucket.push(child);
+      } else {
+        remainingItems.push(child);
+      }
+      continue;
+    }
+
+    const childType = getChildNodeType(cid);
+    if (isOutlinerContentType(childType)) {
+      remainingItems.push({ id: cid, type: 'content' });
+    }
+  }
+
+  const result: OutlinerVisibleChild[] = [];
+  for (const tagId of tagIds) {
+    const bucket = templateFieldsByTagDef.get(tagId);
+    if (bucket) result.push(...bucket);
+  }
+  result.push(...remainingItems);
+  return result;
 }
 
 export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId, fieldDataType, attrDefId, onNavigateOut, bulletColors }: OutlinerItemProps) {
@@ -263,64 +363,32 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     return m;
   }, [fields]);
 
-  // Owning tagDef color per fieldEntry — for coloring FieldRow icons
-  const fieldOwnerColors = useMemo(() => {
-    const m = new Map<string, string>();
-    for (const [entryId, entry] of fieldMap) {
-      const ownerTagDefId = loroDoc.getParentId(entry.fieldDefId);
-      if (ownerTagDefId) m.set(entryId, resolveTagColor(ownerTagDefId).text);
-    }
-    return m;
-  }, [fieldMap]);
+  // Owning tagDef color per fieldEntry — for coloring FieldRow icons.
+  // Only tagDef-owned template fields get tint colors. Schema/manual fields stay neutral.
+  const fieldOwnerColors = useMemo(() => (
+    buildFieldOwnerColors(
+      fieldMap,
+      (fieldDefId) => loroDoc.getParentId(fieldDefId),
+      (ownerId) => useNodeStore.getState().getNode(ownerId)?.type,
+      (ownerId) => resolveTagColor(ownerId).text,
+    )
+  ), [fieldMap]);
 
-  // Classify children and reorder: fields grouped by supertag (in tagIds order) → content.
-  // This ensures supertag-injected fields always appear before the node's own content children.
-  const visibleChildren = useMemo(() => {
-    type Child = { id: string; type: 'field' | 'content'; hidden?: boolean };
-
-    const tagIdSet = new Set(tagIds);
-    const fieldsByTagDef = new Map<string, Child[]>();
-    const otherFields: Child[] = [];   // fields whose ownerTagDef isn't in tagIds (rare)
-    const contentItems: Child[] = [];
-
-    for (const cid of allChildIds) {
-      if (fieldMap.has(cid)) {
-        const f = fieldMap.get(cid)!;
-        // Evaluate hide-field condition
-        let hidden = false;
-        switch (f.hideMode) {
-          case SYS_V.ALWAYS: hidden = true; break;
-          case SYS_V.WHEN_EMPTY: hidden = !!f.isEmpty; break;
-          case SYS_V.WHEN_NOT_EMPTY: hidden = !f.isEmpty; break;
-          // NEVER: default, not hidden
-        }
-        const child: Child = { id: cid, type: 'field', hidden };
-        const ownerTagDefId = loroDoc.getParentId(f.fieldDefId);
-        if (ownerTagDefId && tagIdSet.has(ownerTagDefId)) {
-          let bucket = fieldsByTagDef.get(ownerTagDefId);
-          if (!bucket) { bucket = []; fieldsByTagDef.set(ownerTagDefId, bucket); }
-          bucket.push(child);
-        } else {
-          otherFields.push(child);
-        }
-      } else {
-        const dt = useNodeStore.getState().getNode(cid)?.type;
-        if (isOutlinerContentNodeType(dt)) contentItems.push({ id: cid, type: 'content' });
-        // else skip: structural nodes (fieldEntry, fieldDef, etc.)
-      }
-    }
-
-    // Emit fields in supertag order, then any unmatched fields, then content
-    const result: Child[] = [];
-    for (const tagId of tagIds) {
-      const bucket = fieldsByTagDef.get(tagId);
-      if (bucket) result.push(...bucket);
-    }
-    result.push(...otherFields);
-    result.push(...contentItems);
-    return result;
+  // Classify children for render order:
+  // 1) template fields pinned on top, grouped by current supertag order,
+  // 2) all remaining children (manual fields + content) keep original sibling order.
+  const visibleChildren = useMemo(() => (
+    buildVisibleChildrenRows({
+      allChildIds,
+      fieldMap,
+      tagIds,
+      getFieldDefOwnerId: (fieldDefId) => loroDoc.getParentId(fieldDefId),
+      getNodeType: (id) => useNodeStore.getState().getNode(id)?.type,
+      getChildNodeType: (id) => useNodeStore.getState().getNode(id)?.type,
+      isOutlinerContentType: isOutlinerContentNodeType,
+    })
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allChildIds, fieldMap, tagIds, _version]);
+  ), [allChildIds, fieldMap, tagIds, _version]);
 
   const childIds = useMemo(
     () => visibleChildren.filter((c) => c.type === 'content').map((c) => c.id),
@@ -2234,6 +2302,8 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
                 <FieldRow
                   nodeId={effectiveNodeId}
                   {...toFieldRowEntryProps(fieldMap.get(id)!)}
+                  rootChildIds={rootChildIds}
+                  rootNodeId={rootNodeId}
                   isLastInGroup={i === visibleChildren.length - 1 || visibleChildren[i + 1].type !== 'field'}
                   ownerTagColor={fieldOwnerColors.get(id)}
                   onNavigateOut={(direction) => {

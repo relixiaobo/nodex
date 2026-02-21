@@ -6,6 +6,7 @@ import {
   FIELD_ROW_SELECTION_OVERLAY_CLASS,
   FIELD_ROW_SELECTION_OVERLAY_STYLE,
   isFieldRowInteractiveTarget,
+  resolveFieldRowSelectAction,
   shouldSelectFieldRow,
 } from '../../src/components/fields/FieldRow.js';
 import { FIELD_TYPES } from '../../src/types/index.js';
@@ -81,5 +82,33 @@ describe('FieldRow selected highlight', () => {
     expect(
       shouldSelectFieldRow({ isEditing: false, justDragged: true, target: nameSide }),
     ).toBe(false);
+  });
+
+  it('maps modifiers to single/toggle/range selection actions', () => {
+    const nameSide = document.createElement('div');
+    expect(resolveFieldRowSelectAction({
+      isEditing: false,
+      justDragged: false,
+      target: nameSide,
+      metaKey: false,
+      ctrlKey: false,
+      shiftKey: false,
+    })).toBe('single');
+    expect(resolveFieldRowSelectAction({
+      isEditing: false,
+      justDragged: false,
+      target: nameSide,
+      metaKey: true,
+      ctrlKey: false,
+      shiftKey: false,
+    })).toBe('toggle');
+    expect(resolveFieldRowSelectAction({
+      isEditing: false,
+      justDragged: false,
+      target: nameSide,
+      metaKey: false,
+      ctrlKey: false,
+      shiftKey: true,
+    })).toBe('range');
   });
 });

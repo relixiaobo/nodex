@@ -128,7 +128,7 @@ selectionAnchorId: string | null;   // 范围选中 / Shift+Arrow 的锚点
 |------|------|
 | **点击任意节点** | 聚焦该节点，光标由浏览器根据点击坐标放置 |
 
-> FieldRow 补充：字段行（fieldEntry）在**非交互区**单击进入全局选中（tuple 选中），与普通节点保持一致；`data-field-value` 区域及 button/input 等交互控件保持原有行为，不被行选中逻辑抢占。
+> FieldRow 补充：字段行（fieldEntry）在**非交互区**单击进入全局选中（tuple 选中），与普通节点保持一致；`data-field-value` 区域及 button/input 等交互控件保持原有行为，不被行选中逻辑抢占。字段行同时支持 `Cmd/Ctrl+Click` 多选切换、`Shift+Click` 范围选中、以及在选中态下 `Shift+↑/↓` 扩展选区。
 
 ### Esc 三级退出链
 

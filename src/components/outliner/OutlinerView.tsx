@@ -148,6 +148,8 @@ export function OutlinerView({ rootNodeId, showTemplateTuples }: OutlinerViewPro
             <FieldRow
               nodeId={rootNodeId}
               {...toFieldRowEntryProps(fieldMap.get(id)!)}
+              rootChildIds={dragSelectableRootIds}
+              rootNodeId={rootNodeId}
               isLastInGroup={i === visibleChildren.length - 1 || visibleChildren[i + 1].type !== 'field'}
               onNavigateOut={(direction) => {
                 if (direction === 'up') {

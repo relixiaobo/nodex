@@ -227,6 +227,7 @@ npm run test:run
 - `tests/vitest/field-list-config-render.test.ts`
 - `tests/vitest/field-row-config-render.test.ts`
 - `tests/vitest/field-row-selection.test.ts`
+- `tests/vitest/outliner-item-field-order.test.ts`
 - `tests/vitest/options-picker.test.ts`
 
 **覆盖点**:
@@ -244,6 +245,8 @@ npm run test:run
 11. `number_input` 配置值为非法数字字符串时，FieldRow value 区右侧展示同款 warning 图标（与普通 Number 字段位置一致）
 12. FieldRow 选中遮罩与 content row 使用同款视觉配方（`bg-selection-row + border + top/bottom inset`），并保证名称/值层级高于遮罩（避免选中后值区文本被遮盖）
 13. FieldRow 非交互区点击可选中 tuple（NodePanel/Outliner 统一），交互区（`data-field-value`/button/input 等）不被 row 选中逻辑抢占
+14. FieldRow 非交互区支持 `Cmd/Ctrl+Click` 多选切换、`Shift+Click` 范围选中、`Shift+↑/↓` 从锚点扩展选区（field/content 共享同一选择域）
+15. OutlinerItem 子行排序遵循“模板字段置顶 + 手动字段保持插入位”；字段 icon 着色仅限 `tagDef` owner（schema/manual 字段保持中性灰）
 
 ### 1.7 标签与引用状态流
 

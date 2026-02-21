@@ -23,27 +23,30 @@ interface DateNavigationBarProps {
 export function DateNavigationBar({ dayNodeId }: DateNavigationBarProps) {
   const navigateTo = useUIStore((s) => s.navigateTo);
 
-  // Current day node's date info (for calendar selection + view)
-  const currentDateInfo = useNodeStore((s) => {
+  // Current day node's date as YYYY-MM-DD string (primitive to avoid infinite re-render)
+  const currentDateStr = useNodeStore((s) => {
     void s._version;
     const node = s.getNode(dayNodeId);
-    if (!node?.name) return null;
+    if (!node?.name) return '';
     const weekId = loroDoc.getParentId(dayNodeId);
-    if (!weekId) return null;
+    if (!weekId) return '';
     const yearId = loroDoc.getParentId(weekId);
-    if (!yearId) return null;
+    if (!yearId) return '';
     const yearNode = loroDoc.toNodexNode(yearId);
-    if (!yearNode?.name) return null;
+    if (!yearNode?.name) return '';
     const year = parseYearNodeName(yearNode.name);
-    if (year === null) return null;
+    if (year === null) return '';
     const date = parseDayNodeName(node.name, year);
-    if (!date) return null;
-    return {
-      year: date.getFullYear(),
-      month: date.getMonth(),
-      dateStr: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`,
-    };
+    if (!date) return '';
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
   });
+
+  // Derive year/month from the date string (for calendar view initialization)
+  const currentDateInfo = useMemo(() => {
+    if (!currentDateStr) return null;
+    const [y, m] = currentDateStr.split('-').map(Number);
+    return { year: y, month: m - 1, dateStr: currentDateStr };
+  }, [currentDateStr]);
 
   const todayStr = useMemo(() => {
     const d = new Date();

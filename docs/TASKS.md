@@ -56,6 +56,7 @@ _(空)_
 > - [2026-02-21 nodex-codex] 修复配置页控制器回归：`FieldRow` 按 `configDef.control` 渲染专用控件（tag_picker/type_choice/select/done_map_entries/number_input/autocollect），不再把虚拟配置字段误走普通 outliner；`DoneMappingEntries` 改为直接绑定 `tagDefId`；`AutoCollectSection` 改为读取 `fieldDef` 选项子节点
 > - [2026-02-21 nodex-codex] 用户反馈回归未消失，定位到 `OutlinerItem` 未透传 `isSystemConfig/configKey` 造成配置字段退化；本轮按“分层渲染 + 无隐式 fallback”重构 `FieldRow` 配置链路并补矩阵回归测试
 > - [2026-02-21 nodex-codex] 完成修复：`FieldEntry` 显式携带 `configControl`，新增 `toFieldRowEntryProps` 统一映射并接入 `OutlinerItem/OutlinerView/FieldList/FieldValueOutliner/ConfigOutliner`，消除漏传风险；新增 `field-row-props.test.ts` 与 `docs/TESTING.md` 覆盖映射
+> - [2026-02-21 nodex-codex] 追加兜底：`FieldRow` 系统配置渲染从 `configControl` 回退到 `configKey` 注册表（`resolvedControl`），避免配置字段因单点元数据缺失退化；新增 `use-node-fields-config` / `field-list-config-render` / `field-row-config-render` 回归测试锁定
 
 ### Refactor — Loro 收口 Phase 1：detached guard + origin 策略 (2026-02-21)
 > **Owner**: nodex-codex | **Branch**: codex/loro-phase1-guards

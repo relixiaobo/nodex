@@ -237,6 +237,7 @@ export function FieldRow({
   const configDef = configKey
     ? ATTRDEF_CONFIG_MAP.get(configKey) ?? TAGDEF_CONFIG_MAP.get(configKey) ?? ATTRDEF_OUTLINER_FIELDS.find(f => f.key === configKey) ?? TAGDEF_OUTLINER_FIELDS.find(f => f.key === configKey)
     : undefined;
+  const resolvedControl = configControl ?? configDef?.control;
   const Icon = getFieldTypeIcon(dataType);
 
   // Validation: read first value child of fieldEntry to check value
@@ -506,29 +507,29 @@ export function FieldRow({
         </div>
         {/* Value column — unified rendering */}
         <div className="flex-1 min-w-0 min-h-[22px]" data-field-value>
-          {configControl === 'outliner' ? (
+          {resolvedControl === 'outliner' ? (
             <ConfigOutliner nodeId={nodeId} />
-          ) : configControl === 'tag_picker' ? (
+          ) : resolvedControl === 'tag_picker' ? (
             <ConfigTagPicker nodeId={nodeId} configKey={attrDefId} placeholder="Select supertag" />
-          ) : configControl === 'type_choice' ? (
+          ) : resolvedControl === 'type_choice' ? (
             <ConfigSelectPicker
               nodeId={nodeId}
               configKey={attrDefId}
               options={FIELD_TYPE_LIST.map((f) => ({ value: f.value, label: f.label }))}
               placeholder="Select field type"
             />
-          ) : configControl === 'select' ? (
+          ) : resolvedControl === 'select' ? (
             <ConfigSelectPicker
               nodeId={nodeId}
               configKey={attrDefId}
               options={configDef?.options ?? []}
               placeholder="Select value"
             />
-          ) : configControl === 'done_map_entries' ? (
+          ) : resolvedControl === 'done_map_entries' ? (
             <DoneMappingEntries tagDefId={nodeId} mappingKey={attrDefId} />
-          ) : configControl === 'number_input' ? (
+          ) : resolvedControl === 'number_input' ? (
             <ConfigNumberInput nodeId={nodeId} configKey={attrDefId} />
-          ) : configControl === 'autocollect' ? (
+          ) : resolvedControl === 'autocollect' ? (
             <>
               <FieldValueOutliner
                 tupleId={tupleId}

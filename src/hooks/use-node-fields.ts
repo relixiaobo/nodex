@@ -50,7 +50,7 @@ function isVisibleWhenSatisfied(
   return val === condition.value;
 }
 
-function computeFields(
+export function computeNodeFields(
   getNode: (id: string) => NodexNode | null,
   getChildren: (id: string) => NodexNode[],
   nodeId: string,
@@ -180,7 +180,7 @@ const EMPTY = '[]';
 export function useNodeFields(nodeId: string): FieldEntry[] {
   const json = useNodeStore((state) => {
     void state._version;
-    const fields = computeFields(state.getNode, state.getChildren, nodeId);
+    const fields = computeNodeFields(state.getNode, state.getChildren, nodeId);
     if (fields.length === 0) return EMPTY;
     return JSON.stringify(fields);
   });

@@ -67,6 +67,7 @@ _(空)_
 > - [2026-02-21 nodex-codex] 完成 options value 最终收口：`setOptionsFieldValue/selectFieldOption/autoCollectOption` 仅写 `targetId`（不再冗余 `name`）；`OutlinerItem` 删除 options 的 `name` fallback；`OptionsPicker` 选中值解析改为读取 value node `targetId`；同步更新 `node-store-fields` 与 `done-state-mapping` 断言
 > - [2026-02-21 nodex-codex] 响应最新三点反馈：`Minimum/Maximum` 保持普通 outliner 风格但恢复 `number` 语义输入，并将 `number_input` 虚拟配置字段标记为 `FIELD_TYPES.NUMBER`；Date/Options 下拉统一提升为 `z-[1200] + bg-surface` 消除穿模/透底；Pre-determined options value 在 `OutlinerItem` 中按 reference 样式 bullet 渲染；done mapping 读取去掉 `targetId ?? name` fallback，完全对齐 targetId-only 模型
 > - [2026-02-21 nodex-codex] 继续追查穿模根因：`OutlinerItem` 的 overlay 层级此前绑定 `isFocused`，而 options 下拉可在“selected 但未 focused”状态打开，导致 row 仍在普通 stacking context 被兄弟行覆盖；已改为 `optionsPickerOpen` 单独触发行层级提升，并移除默认 `z-[1]` 以避免无必要 stacking context
+> - [2026-02-21 nodex-codex] 继续修复弹层残留与日期穿模：`DatePicker/NodePicker/OptionsPicker` outside click 统一切到 `pointerdown + capture`；移除 `OutlinerItem` children 容器 `z-[1]`（避免子树 stacking context 互压）；`Minimum/Maximum` 改为文本输入并复用 Number warning 逻辑，非法值可输入且显示告警（min/max 解析仅对合法数字生效）
 
 ### Refactor — Loro 收口 Phase 1：detached guard + origin 策略 (2026-02-21)
 > **Owner**: nodex-codex | **Branch**: codex/loro-phase1-guards

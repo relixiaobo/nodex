@@ -119,13 +119,19 @@ export function resolveRequired(fieldDefId: string): boolean {
 /** Resolve minimum value for Number/Integer fields. */
 export function resolveMinValue(fieldDefId: string): number | undefined {
   const fieldDef = loroDoc.toNodexNode(fieldDefId);
-  return fieldDef?.minValue;
+  const raw = fieldDef?.minValue as unknown;
+  if (raw === undefined || raw === null || raw === '') return undefined;
+  const num = Number(raw);
+  return Number.isFinite(num) ? num : undefined;
 }
 
 /** Resolve maximum value for Number/Integer fields. */
 export function resolveMaxValue(fieldDefId: string): number | undefined {
   const fieldDef = loroDoc.toNodexNode(fieldDefId);
-  return fieldDef?.maxValue;
+  const raw = fieldDef?.maxValue as unknown;
+  if (raw === undefined || raw === null || raw === '') return undefined;
+  const num = Number(raw);
+  return Number.isFinite(num) ? num : undefined;
 }
 
 /**

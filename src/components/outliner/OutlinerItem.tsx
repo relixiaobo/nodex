@@ -580,6 +580,21 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     }
   }, [isSelected, isReference, isOptionsField, isOptionsValueNode, allFieldOptions, selectedOptionId]);
 
+  // Close options picker on outside pointer down (capture phase).
+  // This keeps behavior consistent with other popovers and avoids "stuck open" overlays.
+  useEffect(() => {
+    if (!optionsPickerOpen) return;
+    const handler = (e: PointerEvent) => {
+      const row = rowRef.current;
+      if (!row) return;
+      if (!row.contains(e.target as Node)) {
+        setOptionsPickerOpen(false);
+      }
+    };
+    document.addEventListener('pointerdown', handler, true);
+    return () => document.removeEventListener('pointerdown', handler, true);
+  }, [optionsPickerOpen]);
+
   // Unified keyboard handler for selected nodes (both reference and non-reference).
   // Reference-specific actions (delete ref, convert to inline) are checked first;
   // general selection actions (↑/↓ navigate, Shift+↑/↓ extend, Enter edit, Cmd+A,
@@ -2087,7 +2102,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
         />
       )}
       {isExpanded && (
-        <div className="relative z-[1]" data-row-scope-parent-id={nodeId} ref={childrenScopeRef}>
+        <div className="relative" data-row-scope-parent-id={nodeId} ref={childrenScopeRef}>
           {/* Selection subtree mask: children area, connects to parent row above */}
           {isSelected && !isFocused && (
             <div

@@ -37,7 +37,7 @@ import { ConfigOutliner } from './ConfigOutliner';
 import { AutoCollectSection } from './AutoCollectSection';
 import { VALIDATED_FIELD_TYPES, validateFieldValue, ValidationWarning } from './field-validation';
 import { ATTRDEF_OUTLINER_FIELDS, TAGDEF_OUTLINER_FIELDS } from '../../lib/field-utils.js';
-import { SYS_A, SYS_D, SYS_V } from '../../types/index.js';
+import { FIELD_TYPES, SYS_A, SYS_D, SYS_V } from '../../types/index.js';
 import { NodePicker, type NodePickerOption } from './NodePicker';
 import { DoneMappingEntries } from './DoneMappingEntries';
 import { BulletChevron } from '../outliner/BulletChevron';
@@ -184,20 +184,17 @@ function ConfigNumberInput({ nodeId, configKey }: { nodeId: string; configKey: s
       setConfigValue(nodeId, propName, undefined);
       return;
     }
-    const num = Number(raw);
-    if (!Number.isFinite(num)) {
-      setDraft(valueText);
-      return;
-    }
-    setConfigValue(nodeId, propName, num);
+    // Keep same behavior as normal number fields: allow any text, validate via warning only.
+    setConfigValue(nodeId, propName, raw);
   }, [draft, nodeId, propName, setConfigValue, valueText]);
+
+  const validationWarning = validateFieldValue(FIELD_TYPES.NUMBER, draft.trim());
 
   return (
     <div className="flex min-h-7 items-center gap-2 py-1" style={{ paddingLeft: FIELD_VALUE_INSET }}>
       <BulletChevron hasChildren={false} isExpanded={false} onBulletClick={() => {}} />
       <input
-        type="number"
-        step="any"
+        type="text"
         inputMode="decimal"
         className="h-[21px] min-w-[120px] bg-transparent p-0 text-sm leading-[21px] text-foreground outline-none placeholder:text-foreground-tertiary"
         value={draft}
@@ -216,6 +213,7 @@ function ConfigNumberInput({ nodeId, configKey }: { nodeId: string; configKey: s
         }}
         placeholder="Empty"
       />
+      {validationWarning && <ValidationWarning message={validationWarning} />}
     </div>
   );
 }

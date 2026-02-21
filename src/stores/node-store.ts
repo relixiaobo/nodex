@@ -9,11 +9,10 @@
 import { create } from 'zustand';
 import { nanoid } from 'nanoid';
 import type { NodexNode, TextMark, InlineRefEntry, FieldType } from '../types/index.js';
-import { CONTAINER_IDS, SYS_V } from '../types/index.js';
+import { CONTAINER_IDS, SYS_A, SYS_V } from '../types/index.js';
 import { isWorkspaceContainer } from '../lib/tree-utils.js';
 import * as loroDoc from '../lib/loro-doc.js';
 import { resolveCheckboxClick, resolveCmdEnterCycle, resolveForwardDoneMapping, resolveReverseDoneMapping } from '../lib/checkbox-utils.js';
-import type { DoneMappingEntry } from '../types/node.js';
 
 // ============================================================
 // Store 接口
@@ -757,12 +756,51 @@ export const useNodeStore = create<NodeStore>((set, get) => {
     },
 
     addDoneMappingEntry: (tagDefId, checked, fieldDefId, optionId) => {
-      loroDoc.addDoneMappingEntry(tagDefId, checked, { fieldDefId, optionId } satisfies DoneMappingEntry);
+      const mappingKey = checked ? SYS_A.DONE_MAP_CHECKED : SYS_A.DONE_MAP_UNCHECKED;
+
+      let mappingTupleId = findFieldEntry(tagDefId, mappingKey);
+      if (!mappingTupleId) {
+        mappingTupleId = nanoid();
+        loroDoc.createNode(mappingTupleId, tagDefId);
+        loroDoc.setNodeDataBatch(mappingTupleId, { type: 'fieldEntry', fieldDefId: mappingKey });
+      }
+
+      // Keep entries unique by (fieldDefId, optionId)
+      const entryIds = loroDoc.getChildren(mappingTupleId);
+      for (const entryId of entryIds) {
+        const entryNode = loroDoc.toNodexNode(entryId);
+        if (!entryNode || entryNode.type !== 'fieldEntry' || entryNode.fieldDefId !== fieldDefId) continue;
+
+        for (const valueId of entryNode.children ?? []) {
+          const valueNode = loroDoc.toNodexNode(valueId);
+          const existingOptionId = valueNode?.targetId ?? valueNode?.name;
+          if (existingOptionId === optionId) return;
+        }
+      }
+
+      const mappingEntryId = nanoid();
+      loroDoc.createNode(mappingEntryId, mappingTupleId);
+      loroDoc.setNodeDataBatch(mappingEntryId, { type: 'fieldEntry', fieldDefId });
+
+      const valueId = nanoid();
+      loroDoc.createNode(valueId, mappingEntryId);
+      loroDoc.setNodeDataBatch(valueId, { name: optionId, targetId: optionId });
       loroDoc.commitDoc();
     },
 
     removeDoneMappingEntry: (tagDefId, checked, index) => {
-      loroDoc.removeDoneMappingEntry(tagDefId, checked, index);
+      const mappingKey = checked ? SYS_A.DONE_MAP_CHECKED : SYS_A.DONE_MAP_UNCHECKED;
+      const mappingTupleId = findFieldEntry(tagDefId, mappingKey);
+      if (!mappingTupleId) return;
+
+      const entries = loroDoc.getChildren(mappingTupleId).filter((cid) => {
+        const node = loroDoc.toNodexNode(cid);
+        return node?.type === 'fieldEntry';
+      });
+      const targetId = entries[index];
+      if (!targetId) return;
+
+      loroDoc.deleteNode(targetId);
       loroDoc.commitDoc();
     },
 

@@ -7,7 +7,7 @@
 
 import { LoroDoc, LoroList, LoroText, LoroMovableList, UndoManager, VersionVector, type TreeID, type PeerID } from 'loro-crdt';
 import { nanoid } from 'nanoid';
-import type { NodexNode, DoneMappingEntry } from '../types/node.js';
+import type { NodexNode } from '../types/node.js';
 import { saveSnapshot, loadSnapshot } from './loro-persistence.js';
 import { resetAwareness } from './awareness.js';
 import { readRichTextFromLoroText, writeRichTextToLoroText } from './loro-text-bridge.js';
@@ -439,48 +439,6 @@ export function getTags(nodexId: string): string[] {
 }
 
 // ============================================================
-// LoroList 复合属性
-// ============================================================
-
-function getListContainer(nodexId: string, key: string): LoroList | null {
-  const tree = getTree();
-  const treeId = nodexToTree.get(nodexId);
-  if (!treeId) return null;
-  const node = tree.getNodeByID(treeId);
-  if (!node) return null;
-  return node.data.getOrCreateContainer(key, new LoroList()) as LoroList;
-}
-
-export function getNodeList(nodexId: string, key: string): unknown[] {
-  const list = getListContainer(nodexId, key);
-  return list ? (list.toArray() as unknown[]) : [];
-}
-
-export function pushToNodeList(nodexId: string, key: string, value: unknown): void {
-  if (!canApplyMutation(`pushToNodeList:${key}`)) return;
-  invalidateCache();
-  const list = getListContainer(nodexId, key);
-  if (!list) return;
-  list.insert(list.length, value);
-}
-
-export function removeFromNodeList(nodexId: string, key: string, index: number): void {
-  if (!canApplyMutation(`removeFromNodeList:${key}`)) return;
-  invalidateCache();
-  const list = getListContainer(nodexId, key);
-  if (!list) return;
-  list.delete(index, 1);
-}
-
-export function clearNodeList(nodexId: string, key: string): void {
-  if (!canApplyMutation(`clearNodeList:${key}`)) return;
-  invalidateCache();
-  const list = getListContainer(nodexId, key);
-  if (!list || list.length === 0) return;
-  list.delete(0, list.length);
-}
-
-// ============================================================
 // 查询
 // ============================================================
 
@@ -628,33 +586,6 @@ export function importUpdates(data: Uint8Array): void {
 export function subscribe(callback: () => void): () => void {
   subscribers.add(callback);
   return () => subscribers.delete(callback);
-}
-
-// ============================================================
-// Done-State Mapping 专用 API
-// ============================================================
-
-export function addDoneMappingEntry(
-  tagDefId: string,
-  checked: boolean,
-  entry: DoneMappingEntry,
-): void {
-  const key = checked ? 'doneCheckedMappings' : 'doneUncheckedMappings';
-  pushToNodeList(tagDefId, key, entry);
-}
-
-export function removeDoneMappingEntry(
-  tagDefId: string,
-  checked: boolean,
-  index: number,
-): void {
-  const key = checked ? 'doneCheckedMappings' : 'doneUncheckedMappings';
-  removeFromNodeList(tagDefId, key, index);
-}
-
-export function getDoneMappings(tagDefId: string, checked: boolean): DoneMappingEntry[] {
-  const key = checked ? 'doneCheckedMappings' : 'doneUncheckedMappings';
-  return getNodeList(tagDefId, key) as DoneMappingEntry[];
 }
 
 export function getLoroDoc(): LoroDoc {

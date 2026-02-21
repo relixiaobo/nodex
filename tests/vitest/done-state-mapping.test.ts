@@ -1,7 +1,7 @@
 /**
  * Done State Mapping — checkbox ↔ Options field bidirectional sync.
  *
- * Loro model: mappings stored in LoroDoc via loroDoc.addDoneMappingEntry.
+ * Loro model: mappings stored in NDX_A07/NDX_A08 fieldEntry trees.
  * DoneStateMapping uses fieldDefId (not attrDefId).
  * All functions take NodexNode directly (no entity dict).
  */
@@ -13,6 +13,7 @@ import {
 } from '../../src/lib/checkbox-utils.js';
 import * as loroDoc from '../../src/lib/loro-doc.js';
 import { useNodeStore } from '../../src/stores/node-store.js';
+import { SYS_A } from '../../src/types/index.js';
 import { resetAndSeed } from './helpers/test-state.js';
 
 /** Enable done-state mapping on tagDef_task and add a checked mapping. */
@@ -27,9 +28,9 @@ function setupDoneMapping(opts: {
   if (!opts.toggleOff) {
     loroDoc.setNodeData('tagDef_task', 'doneStateEnabled', true);
     if (!opts.skipMapping) {
-      loroDoc.addDoneMappingEntry('tagDef_task', true, { fieldDefId: 'attrDef_status', optionId: checkedOptionId });
+      useNodeStore.getState().addDoneMappingEntry('tagDef_task', true, 'attrDef_status', checkedOptionId);
       if (opts.uncheckedOptionId) {
-        loroDoc.addDoneMappingEntry('tagDef_task', false, { fieldDefId: 'attrDef_status', optionId: opts.uncheckedOptionId });
+        useNodeStore.getState().addDoneMappingEntry('tagDef_task', false, 'attrDef_status', opts.uncheckedOptionId);
       }
     }
   }
@@ -168,6 +169,27 @@ describe('Store: addDoneMappingEntry / removeDoneMappingEntry', () => {
     expect(mappings[0].checkedOptionIds).toContain('opt_done');
   });
 
+  it('addDoneMappingEntry: persists as fieldEntry outliner tree', () => {
+    const store = useNodeStore.getState();
+    store.addDoneMappingEntry('tagDef_task', true, 'attrDef_status', 'opt_done');
+
+    const checkedTupleId = loroDoc.getChildren('tagDef_task').find((cid) => {
+      const node = loroDoc.toNodexNode(cid);
+      return node?.type === 'fieldEntry' && node.fieldDefId === SYS_A.DONE_MAP_CHECKED;
+    });
+    expect(checkedTupleId).toBeTruthy();
+
+    const mappingEntryId = loroDoc.getChildren(checkedTupleId!).find((cid) => {
+      const node = loroDoc.toNodexNode(cid);
+      return node?.type === 'fieldEntry' && node.fieldDefId === 'attrDef_status';
+    });
+    expect(mappingEntryId).toBeTruthy();
+
+    const valueNodeId = loroDoc.getChildren(mappingEntryId!)[0];
+    const valueNode = valueNodeId ? loroDoc.toNodexNode(valueNodeId) : null;
+    expect(valueNode?.targetId).toBe('opt_done');
+  });
+
   it('removeDoneMappingEntry: removes by index', () => {
     const store = useNodeStore.getState();
     store.addDoneMappingEntry('tagDef_task', true, 'attrDef_status', 'opt_done');
@@ -199,8 +221,8 @@ describe('Store: toggleNodeDone with done-state mapping', () => {
   beforeEach(() => {
     resetAndSeed();
     loroDoc.setNodeData('tagDef_task', 'doneStateEnabled', true);
-    loroDoc.addDoneMappingEntry('tagDef_task', true, { fieldDefId: 'attrDef_status', optionId: 'opt_done' });
-    loroDoc.addDoneMappingEntry('tagDef_task', false, { fieldDefId: 'attrDef_status', optionId: 'opt_todo' });
+    useNodeStore.getState().addDoneMappingEntry('tagDef_task', true, 'attrDef_status', 'opt_done');
+    useNodeStore.getState().addDoneMappingEntry('tagDef_task', false, 'attrDef_status', 'opt_todo');
   });
 
   it('toggleNodeDone: undone → done sets field to checkedOptionId', () => {

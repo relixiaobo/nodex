@@ -138,7 +138,7 @@ tagDef.children:
 - 按 attrDefId 分组为 `DoneStateMapping { checkedOptionIds[], uncheckedOptionIds[] }`
 - 条件可见性: NDX_A06 仅在 SYS_A55=YES 时可见；NDX_A07/A08 嵌套可见性由树结构决定（toggle ON 时展开）
 - 配置页缩进渲染: NDX_A07/A08 相对 NDX_A06 缩进 28px（depth=1）
-- **UI 控件**: "Map checked to" / "Map unchecked to" 使用 `DoneMappingEntries` 组件（普通字段值输入），显示已有条目列表（"FieldName: OptionValue" + 删除按钮）+ 两步 picker（先选字段，再选 option）添加新条目
+- **UI 控件**: "Map checked to" / "Map unchecked to" 的 value 使用普通 outliner（`FieldValueOutliner`）。用户通过 `>` 选择字段，并在该字段 value 中设置对应 option。
 - **配置项排序**: Color → Extends → Show checkbox → Done mapping → Map checked → Map unchecked → Default content → Default child supertag
 
 **向后兼容**: 旧格式 `[NDX_A06, attrDefId, checkedOptionId, uncheckedOptionId?]`（children.length >= 3）仍可读取。
@@ -417,7 +417,7 @@ tagDef_article
 | 2026-02-16 | applyTag 递归实例化嵌套 config template | SYS_T01 模板中 NDX_A07/A08 作为 NDX_A06 的嵌套模板，applyTag 自动递归创建对应实例 |
 | 2026-02-16 | removeTag 级联清理嵌套 config 子节点 | 删除 NDX_A06 实例时同时清理其 NDX_A07/A08 嵌套子节点，防止孤儿实体 |
 | 2026-02-16 | FieldEntry 新增 depth 属性支持配置页缩进渲染 | NDX_A06 depth=0，NDX_A07/A08 depth=1，FieldList 通过 paddingLeft 渲染层级 |
-| 2026-02-16 | NDX_A07/A08 控件从 tag_picker 改为 done_map_entries | "Map checked/unchecked to" 使用普通字段值输入（两步 picker: 选字段 → 选 option），匹配 Tana 行为 |
+| 2026-02-16 | NDX_A07/A08 控件从 tag_picker 改为 done_map_entries | "Map checked/unchecked to" value 使用普通 outliner，支持 `>` 选字段后设置 option 值 |
 | 2026-02-16 | TagDef 配置项重排序 | Color → Extends → Show checkbox → Done mapping → Map checked/unchecked → Default content → Default child supertag |
 | 2026-02-16 | use-node-fields 聚合 NDX_A07/A08 为两个 FieldEntry | 不再逐个嵌套 child 发射，而是聚合为 "Map checked to" + "Map unchecked to" 两个条目，组件内部扫描 toggle children |
 | 2026-02-16 | 统一配置字段架构（issue #20 重构） | Config fields 使用真实 attrDef 实体节点作为 key，values 存储在 Tuple.children 中（与用户字段完全统一） |

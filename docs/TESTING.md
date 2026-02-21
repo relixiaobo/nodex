@@ -780,7 +780,7 @@ validateTanaExport（3 cases）:
 
 **测试文件**: `tests/vitest/done-state-mapping.test.ts`
 
-**说明（Loro 模型）**: DoneMappingEntries 存储在 LoroDoc 的 done mappings 容器中（非 Tuple.children）。前置条件：`loroDoc.setNodeData(tagDefId, 'doneStateEnabled', true)`。
+**说明（Loro 模型）**: DoneMappingEntries 存储在 `tagDef` 下的 `NDX_A07/NDX_A08` fieldEntry 子树中（普通 outliner 结构）。前置条件：`loroDoc.setNodeData(tagDefId, 'doneStateEnabled', true)`。
 
 **覆盖点**:
 
@@ -802,12 +802,12 @@ validateTanaExport（3 cases）:
 11. fieldDefId 不匹配 → null
 
 Store 集成 — addDoneMappingEntry（2 cases）:
-12. `store.addDoneMappingEntry(tagDefId, true, fieldDefId, optionId)` — 写入 loroDoc
-13. 新条目被 getDoneStateMappings 正确读取
+12. `store.addDoneMappingEntry(tagDefId, true, fieldDefId, optionId)` — 写入 `NDX_A07` fieldEntry 子树
+13. 新条目被 getDoneStateMappings 正确读取（fieldDefId 分组）
 
 Store 集成 — removeDoneMappingEntry（2 cases）:
-14. `store.removeDoneMappingEntry(tagDefId, true, fieldDefId, optionId)` — 从 loroDoc 移除
-15. 移除后 getDoneStateMappings 结果为空
+14. `store.removeDoneMappingEntry(tagDefId, true, index)` — 从 `NDX_A07` 子树按顺序移除条目
+15. 移除后 getDoneStateMappings 结果与预期一致
 
 Store 集成 — toggleNodeDone（1 case）:
 16. 有 doneMapping 时仍只产生一次 commit（`_version` 仅 +1）

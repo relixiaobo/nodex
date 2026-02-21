@@ -236,6 +236,7 @@ npm run test:run
 7. 字段 value 布局基线由共享常量 `FIELD_VALUE_INSET` 驱动，`FieldRow` 配置项渲染测试锁定该常量对齐
 8. `computeNodeFields` 对 options value 优先按 `targetId -> option.name` 解引用，避免 UI 展示内部 optionId（如 `opt_in_progress`）
 9. `number_input` 虚拟配置字段的数据类型标记为 `FIELD_TYPES.NUMBER`（`Minimum/Maximum value` 语义为 Number）
+10. `number_input` 配置控件使用文本输入（不依赖原生 number spinner），与普通 Number 字段一致走 warning 校验路径
 
 ### 1.7 标签与引用状态流
 
@@ -506,7 +507,7 @@ npm run test:run
 3. `getExtendsChain(tagDefId)` — 读 tagDef.extends，ancestor-first 顺序，排除自身
 4. `resolveHideField(fieldDefId)` — 读 fieldDef.hideField 属性，默认 SYS_V.NEVER
 5. `resolveRequired(fieldDefId)` — nullable=false → true，其他 → false
-6. `resolveMinValue` / `resolveMaxValue` — 读 fieldDef.minValue/maxValue
+6. `resolveMinValue` / `resolveMaxValue` — 读 fieldDef.minValue/maxValue，并仅在值可解析为 finite number 时生效（非法字符串返回 undefined）
 7. `resolveSourceSupertag(fieldDefId)` — 读 fieldDef.sourceSupertag
 8. `resolveTaggedNodes(tagDefId)` — 返回所有含该 tagDefId 在 node.tags 中的节点 ID
 9. `getFieldTypeLabel` / `getFieldTypeIcon` / `isPlainFieldType` / `isOptionsFieldType` / `isOptionsFromSupertagFieldType` / `isCheckboxFieldType` / `isDateFieldType` / `isNumberLikeFieldType` / `isUrlFieldType` / `isEmailFieldType` / `isSingleValueFieldType` — 字段类型元数据与统一判定（兼容 `FIELD_TYPES.*` 与 `SYS_D.*`）

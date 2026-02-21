@@ -25,4 +25,20 @@ describe('FieldRow config control resolution', () => {
     expect(html).toContain('Select supertag');
     expect(html).toContain(`padding-left:${FIELD_VALUE_INSET}px`);
   });
+
+  it('renders number_input config as plain text input (no native spinner control)', () => {
+    const html = renderToStaticMarkup(createElement(FieldRow, {
+      nodeId: 'attrDef_age',
+      attrDefId: SYS_A.MIN_VALUE,
+      attrDefName: 'Minimum value',
+      tupleId: '__virtual_NDX_A03__',
+      dataType: 'plain',
+      isSystemConfig: true,
+      configKey: SYS_A.MIN_VALUE,
+      configControl: 'number_input',
+    }));
+
+    expect(html).toContain('type="text"');
+    expect(html).toContain('placeholder="Empty"');
+  });
 });

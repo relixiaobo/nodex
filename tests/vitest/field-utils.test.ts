@@ -120,6 +120,13 @@ describe('resolveMinValue / resolveMaxValue', () => {
     expect(resolveMinValue('attrDef_status')).toBeUndefined();
     expect(resolveMaxValue('attrDef_status')).toBeUndefined();
   });
+
+  it('returns undefined when min/max are non-numeric strings', () => {
+    loroDoc.setNodeData('attrDef_age', 'minValue', 'abc');
+    loroDoc.setNodeData('attrDef_age', 'maxValue', 'xyz');
+    expect(resolveMinValue('attrDef_age')).toBeUndefined();
+    expect(resolveMaxValue('attrDef_age')).toBeUndefined();
+  });
 });
 
 describe('resolveFieldOptions', () => {

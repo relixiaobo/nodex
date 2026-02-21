@@ -3,11 +3,12 @@
  * All resolver functions read directly from LoroDoc (no _entities arg).
  */
 import { describe, it, expect, beforeEach } from 'vitest';
-import { FIELD_TYPES, SYS_V } from '../../src/types/system-nodes.js';
+import { FIELD_TYPES, SYS_D, SYS_V } from '../../src/types/system-nodes.js';
 import {
   getExtendsChain,
   getFieldTypeIcon,
   getFieldTypeLabel,
+  isOptionsFieldType,
   isPlainFieldType,
   resolveDataType,
   resolveFieldOptions,
@@ -218,5 +219,13 @@ describe('getFieldTypeLabel / getFieldTypeIcon / isPlainFieldType', () => {
   it('isPlainFieldType returns false for non-plain fields', () => {
     expect(isPlainFieldType(FIELD_TYPES.OPTIONS)).toBe(false);
     expect(isPlainFieldType(FIELD_TYPES.DATE)).toBe(false);
+  });
+
+  it('isOptionsFieldType supports both FIELD_TYPES and SYS_D constants', () => {
+    expect(isOptionsFieldType(FIELD_TYPES.OPTIONS)).toBe(true);
+    expect(isOptionsFieldType(FIELD_TYPES.OPTIONS_FROM_SUPERTAG)).toBe(true);
+    expect(isOptionsFieldType(SYS_D.OPTIONS)).toBe(true);
+    expect(isOptionsFieldType(SYS_D.OPTIONS_FROM_SUPERTAG)).toBe(true);
+    expect(isOptionsFieldType(FIELD_TYPES.PLAIN)).toBe(false);
   });
 });

@@ -506,7 +506,7 @@ npm run test:run
 6. `resolveMinValue` / `resolveMaxValue` — 读 fieldDef.minValue/maxValue
 7. `resolveSourceSupertag(fieldDefId)` — 读 fieldDef.sourceSupertag
 8. `resolveTaggedNodes(tagDefId)` — 返回所有含该 tagDefId 在 node.tags 中的节点 ID
-9. `getFieldTypeLabel` / `getFieldTypeIcon` / `isPlainFieldType` — 字段类型元数据
+9. `getFieldTypeLabel` / `getFieldTypeIcon` / `isPlainFieldType` / `isOptionsFieldType` — 字段类型元数据与 options 类型判定（兼容 `FIELD_TYPES.*` 与 `SYS_D.*`）
 
 **注意（2026-02-20 更新）**: seed-data.ts 已修正，所有 fieldType 使用 `FIELD_TYPES.*` 常量（小写），测试期望值同步更新为 `FIELD_TYPES.OPTIONS` / `FIELD_TYPES.DATE` / `FIELD_TYPES.PLAIN`，不再使用大写字符串。
 

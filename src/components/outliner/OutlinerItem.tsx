@@ -20,7 +20,7 @@ import { toFieldRowEntryProps } from '../fields/field-row-props.js';
 import { SYS_D, SYS_V } from '../../types/index.js';
 import { useFieldOptions } from '../../hooks/use-field-options.js';
 import { resolveTagColor } from '../../lib/tag-colors.js';
-import { resolveNodeStructuralIcon } from '../../lib/field-utils.js';
+import { isOptionsFieldType, resolveNodeStructuralIcon } from '../../lib/field-utils.js';
 import { isOutlinerContentNodeType } from '../../lib/node-type-utils.js';
 import { applyWebClipToNode } from '../../lib/webclip-service.js';
 import { marksToHtml } from '../../lib/editor-marks.js';
@@ -362,7 +362,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   const showRowHighlight = isSelected && !isFocused;
 
   // Options field dropdown (for changing selected option value)
-  const isOptionsField = fieldDataType === SYS_D.OPTIONS || fieldDataType === SYS_D.OPTIONS_FROM_SUPERTAG;
+  const isOptionsField = isOptionsFieldType(fieldDataType);
   const [optionsPickerOpen, setOptionsPickerOpen] = useState(false);
   const [optionsPickerIndex, setOptionsPickerIndex] = useState(0);
   const allFieldOptions = useFieldOptions(isOptionsField && attrDefId ? attrDefId : '');

@@ -228,6 +228,18 @@ export function isPlainFieldType(dataType: string): boolean {
   return dataType === FIELD_TYPES.PLAIN || dataType === SYS_D.PLAIN || !dataType;
 }
 
+/** Check if a field type uses options selection (regular or options-from-supertag). */
+export function isOptionsFieldType(dataType: string | undefined): boolean {
+  if (!dataType) return false;
+  return (
+    dataType === FIELD_TYPES.OPTIONS ||
+    dataType === FIELD_TYPES.OPTIONS_FROM_SUPERTAG ||
+    dataType === SYS_D.OPTIONS ||
+    dataType === SYS_D.OPTIONS_ALT ||
+    dataType === SYS_D.OPTIONS_FROM_SUPERTAG
+  );
+}
+
 // ─── AttrDef / FieldDef config field registry ───
 
 export interface ConfigFieldDef {

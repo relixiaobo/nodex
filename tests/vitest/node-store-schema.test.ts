@@ -2,7 +2,7 @@
  * node-store schema flows — Loro model.
  * createTagDef: creates type='tagDef' in SCHEMA with direct properties.
  * No SYS_T01 meta bindings. No config tuples. Just flat properties.
- * createFieldDef/createAttrDef: creates type='fieldDef' under tagDef.
+ * createFieldDef: creates type='fieldDef' under tagDef.
  */
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useNodeStore } from '../../src/stores/node-store.js';
@@ -73,31 +73,6 @@ describe('createFieldDef', () => {
   it('graph is valid after createFieldDef', () => {
     useNodeStore.getState().createFieldDef('Score', FIELD_TYPES.NUMBER, 'tagDef_task');
     expect(collectNodeGraphErrors()).toEqual([]);
-  });
-});
-
-describe('createAttrDef (alias for createFieldDef)', () => {
-  beforeEach(() => {
-    resetAndSeed();
-  });
-
-  it('creates fieldDef under specified tagDef', () => {
-    const created = useNodeStore.getState().createAttrDef('Estimate', 'tagDef_task', FIELD_TYPES.NUMBER);
-    const fd = loroDoc.toNodexNode(created.id)!;
-    expect(fd.type).toBe('fieldDef');
-    expect(fd.name).toBe('Estimate');
-    expect(loroDoc.getParentId(created.id)).toBe('tagDef_task');
-  });
-
-  it('is equivalent to createFieldDef (same structure)', () => {
-    const viaAttrDef = useNodeStore.getState().createAttrDef('Field1', 'tagDef_task', FIELD_TYPES.PLAIN);
-    const viaFieldDef = useNodeStore.getState().createFieldDef('Field2', FIELD_TYPES.PLAIN, 'tagDef_task');
-
-    const fd1 = loroDoc.toNodexNode(viaAttrDef.id)!;
-    const fd2 = loroDoc.toNodexNode(viaFieldDef.id)!;
-    expect(fd1.type).toBe('fieldDef');
-    expect(fd2.type).toBe('fieldDef');
-    expect(loroDoc.getParentId(viaAttrDef.id)).toBe(loroDoc.getParentId(viaFieldDef.id));
   });
 });
 

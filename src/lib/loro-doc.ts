@@ -15,6 +15,15 @@ import { readRichTextFromLoroText, writeRichTextToLoroText } from './loro-text-b
 export const DEFAULT_USER_COMMIT_ORIGIN = 'user:implicit';
 const UNDO_EXCLUDED_ORIGIN_PREFIXES = ['__seed__', 'system:'] as const;
 const detachedMutationWarnings = new Set<string>();
+const RICH_TEXT_STYLE_CONFIG = {
+  bold: { expand: 'after' },
+  italic: { expand: 'after' },
+  strike: { expand: 'after' },
+  code: { expand: 'after' },
+  highlight: { expand: 'after' },
+  headingMark: { expand: 'after' },
+  link: { expand: 'after' },
+} as const;
 
 // ============================================================
 // 内部状态
@@ -101,6 +110,10 @@ function getTree() {
   return doc.getTree('nodes');
 }
 
+function configureTextStyles(target: LoroDoc): void {
+  target.configTextStyle(RICH_TEXT_STYLE_CONFIG);
+}
+
 function canApplyMutation(action: string): boolean {
   if (!doc) throw new Error('[loro-doc] LoroDoc 未初始化，请先调用 initLoroDoc()');
   if (!doc.isDetached()) return true;
@@ -179,6 +192,7 @@ export async function initLoroDoc(workspaceId: string): Promise<void> {
   if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
   currentWorkspaceId = workspaceId;
   doc = new LoroDoc();
+  configureTextStyles(doc);
   detachedMutationWarnings.clear();
   // 切换工作区时清除上一个工作区的 awareness 状态，避免跨工作区泄露
   resetAwareness();
@@ -228,6 +242,7 @@ export function resetLoroDoc(): void {
 /** 同步初始化（仅测试用，不加载快照） */
 export function initLoroDocForTest(workspaceId: string): void {
   doc = new LoroDoc();
+  configureTextStyles(doc);
   currentWorkspaceId = workspaceId;
   detachedMutationWarnings.clear();
   nodexToTree.clear();
@@ -540,8 +555,8 @@ export function toNodexNode(nodexId: string): NodexNode | null {
   const richText = data.get('richText');
   const richTextParsed = richText instanceof LoroText ? readRichTextFromLoroText(richText) : null;
   const nodeName = richTextParsed ? richTextParsed.text : (data.get('name') as string | undefined);
-  const nodeMarks = richTextParsed ? richTextParsed.marks : (data.get('marks') as NodexNode['marks']);
-  const nodeInlineRefs = richTextParsed ? richTextParsed.inlineRefs : (data.get('inlineRefs') as NodexNode['inlineRefs']);
+  const nodeMarks = richTextParsed?.marks ?? [];
+  const nodeInlineRefs = richTextParsed?.inlineRefs ?? [];
 
   const result: NodexNode = {
     id: nodexId,

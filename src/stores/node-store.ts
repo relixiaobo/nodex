@@ -43,11 +43,7 @@ interface NodeStore {
   // ─── 内容编辑（同步） ───
 
   setNodeName(id: string, name: string): void;
-  /** @deprecated 使用 setNodeName，marks/inlineRefs 单独通过 updateNodeContent */
-  setNodeNameLocal(id: string, name: string): void;
   updateNodeContent(id: string, data: { name?: string; marks?: TextMark[]; inlineRefs?: InlineRefEntry[] }): void;
-  /** @deprecated 使用 updateNodeContent */
-  setNodeContentLocal(id: string, name: string, marks: TextMark[], inlineRefs: InlineRefEntry[]): void;
   updateNodeDescription(id: string, description: string): void;
 
   // ─── 标签操作 ───
@@ -58,10 +54,7 @@ interface NodeStore {
 
   // ─── 字段操作 ───
 
-  /** 旧 createAttrDef */
   createFieldDef(name: string, fieldType: FieldType, tagDefId: string): NodexNode;
-  /** @deprecated 使用 createFieldDef */
-  createAttrDef(name: string, tagDefId: string, dataType: string): NodexNode;
 
   setFieldValue(nodeId: string, fieldDefId: string, values: string[]): void;
   setOptionsFieldValue(nodeId: string, fieldDefId: string, optionNodeId: string): void;
@@ -69,15 +62,9 @@ interface NodeStore {
   clearFieldValue(nodeId: string, fieldDefId: string): void;
   addFieldToNode(nodeId: string, fieldDefId: string): void;
   addUnnamedFieldToNode(nodeId: string, afterChildId?: string): { fieldEntryId: string; fieldDefId: string };
-  /** 旧 moveFieldTuple */
   moveFieldEntry(currentParentId: string, fieldEntryId: string, newParentId: string, position?: number): void;
-  /** @deprecated 使用 moveFieldEntry */
-  moveFieldTuple(currentParentId: string, tupleId: string, newParentId: string, _userId: string, position?: number): void;
   removeField(nodeId: string, fieldEntryId: string): void;
-  /** 旧 renameAttrDef */
   renameFieldDef(fieldDefId: string, newName: string): void;
-  /** @deprecated 使用 renameFieldDef */
-  renameAttrDef(attrDefId: string, newName: string): void;
   changeFieldType(fieldDefId: string, newType: string): void;
   addFieldOption(fieldDefId: string, name: string): string;
   removeFieldOption(fieldDefId: string, optionId: string): void;
@@ -434,12 +421,6 @@ export const useNodeStore = create<NodeStore>((set, get) => {
       loroDoc.setNodeRichTextContent(id, name, current?.marks ?? [], nextInlineRefs);
     },
 
-    setNodeNameLocal: (id, name) => {
-      const current = loroDoc.toNodexNode(id);
-      const nextInlineRefs = remapInlineRefsByPlaceholderOrder(name, current?.inlineRefs);
-      loroDoc.setNodeRichTextContent(id, name, current?.marks ?? [], nextInlineRefs);
-    },
-
     updateNodeContent: (id, data) => {
       const current = loroDoc.toNodexNode(id);
       const nextName = data.name ?? current?.name ?? '';
@@ -451,10 +432,6 @@ export const useNodeStore = create<NodeStore>((set, get) => {
       if (data.name !== undefined || data.marks !== undefined || data.inlineRefs !== undefined) {
         loroDoc.setNodeRichTextContent(id, nextName, nextMarks, nextInlineRefs);
       }
-    },
-
-    setNodeContentLocal: (id, name, marks, inlineRefs) => {
-      get().updateNodeContent(id, { name, marks, inlineRefs });
     },
 
     updateNodeDescription: (id, description) => {
@@ -560,12 +537,6 @@ export const useNodeStore = create<NodeStore>((set, get) => {
       return loroDoc.toNodexNode(id)!;
     },
 
-    createAttrDef: (name, tagDefId, dataType) => {
-      // 兼容旧调用：dataType 可能是 SYS_D* opaque ID
-      // 这里做简单传递，实际调用方应使用 FIELD_TYPES 常量
-      return get().createFieldDef(name, dataType as FieldType, tagDefId);
-    },
-
     setFieldValue: (nodeId, fieldDefId, values) => {
       // 找到或创建 fieldEntry
       let feId = findFieldEntry(nodeId, fieldDefId);
@@ -665,10 +636,6 @@ export const useNodeStore = create<NodeStore>((set, get) => {
       void currentParentId; // suppress lint
     },
 
-    moveFieldTuple: (currentParentId, tupleId, newParentId, _userId, position) => {
-      get().moveFieldEntry(currentParentId, tupleId, newParentId, position);
-    },
-
     removeField: (nodeId, fieldEntryId) => {
       loroDoc.deleteNode(fieldEntryId);
       loroDoc.commitDoc();
@@ -678,10 +645,6 @@ export const useNodeStore = create<NodeStore>((set, get) => {
     renameFieldDef: (fieldDefId, newName) => {
       loroDoc.setNodeData(fieldDefId, 'name', newName);
       loroDoc.commitDoc();
-    },
-
-    renameAttrDef: (attrDefId, newName) => {
-      get().renameFieldDef(attrDefId, newName);
     },
 
     changeFieldType: (fieldDefId, newType) => {
@@ -855,12 +818,6 @@ export const useNodeStore = create<NodeStore>((set, get) => {
     },
   };
 });
-
-// ─── 向后兼容的异步包装（组件中 await 调用不报错，实际同步完成） ───
-
-// 这些不需要单独 export，Zustand store 会直接返回函数
-// 组件里 `await store.createChild(...)` 会直接返回 NodexNode（非 Promise）
-// TypeScript 允许对非 Promise 调用 await（返回值包装为 resolved Promise）
 
 // ─── 全局 store 访问（供 standalone 调试）───
 

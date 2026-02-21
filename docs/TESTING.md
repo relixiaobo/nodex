@@ -174,7 +174,7 @@ npm run test:run
 2. ancestor chain + structural 节点跳过 + **容器节点包含在 ancestors chain 中**（面包屑显示 Library/Inbox 等）
 3. 可见节点 flatten 与上下导航（含 reference 场景 parentId 消歧）
 4. last visible node / sibling / index helpers
-5. inline reference 纯度判断（兼容 legacy HTML + 新模型 `\uFFFC + _inlineRefs`）
+5. inline reference 纯度判断（仅基于新模型 `\uFFFC + inlineRefs`）
 
 ### 1.5.1 富文本 marks / ProseMirror 基础设施
 
@@ -256,8 +256,7 @@ npm run test:run
 1. `createTagDef(name, opts?)` — 创建 type='tagDef' 节点归属 CONTAINER_IDS.SCHEMA，无 SYS_T01 meta / config tuples
 2. 可选参数 `showCheckbox` / `color` 直接写入节点属性（平铺，无 Tuple 间接层）
 3. `createFieldDef(name, fieldType, tagDefId)` — 创建 type='fieldDef' 节点归属 tagDefId
-4. `createAttrDef(name, tagDefId, fieldType)` — createFieldDef 别名（参数顺序不同）
-5. `changeFieldType(fieldDefId, newType)` — 直接更新 fieldType 属性
+4. `changeFieldType(fieldDefId, newType)` — 直接更新 fieldType 属性
 
 ### 1.10 Supertag Extend（继承）
 
@@ -460,8 +459,7 @@ npm run test:run
 **覆盖点**:
 
 1. `partializeUIStore` 仅保留持久化白名单字段
-2. `migrateUIStoreState` 将 v0 `panelStack` 迁移为 `panelHistory/panelIndex`
-3. 无需迁移场景下保持原对象语义
+2. 当前持久化结构下 `panelHistory/panelIndex` 保持稳定
 
 ### 1.28 图结构不变量 helper 自检
 
@@ -489,8 +487,7 @@ npm run test:run
 6. `resolveMinValue` / `resolveMaxValue` — 读 fieldDef.minValue/maxValue
 7. `resolveSourceSupertag(fieldDefId)` — 读 fieldDef.sourceSupertag
 8. `resolveTaggedNodes(tagDefId)` — 返回所有含该 tagDefId 在 node.tags 中的节点 ID
-9. `findAutoCollectTupleId` — Loro Phase 1 始终返回 null（待实现）
-10. `getFieldTypeLabel` / `getFieldTypeIcon` / `isPlainFieldType` — 字段类型元数据
+9. `getFieldTypeLabel` / `getFieldTypeIcon` / `isPlainFieldType` — 字段类型元数据
 
 **注意（2026-02-20 更新）**: seed-data.ts 已修正，所有 fieldType 使用 `FIELD_TYPES.*` 常量（小写），测试期望值同步更新为 `FIELD_TYPES.OPTIONS` / `FIELD_TYPES.DATE` / `FIELD_TYPES.PLAIN`，不再使用大写字符串。
 
@@ -568,14 +565,13 @@ editor isEmpty（7 cases）:
 4. `\u200B` + 实际文本视为非空
 5. 空字符串与纯空白符边界
 
-handleDelete isEmpty（6 cases, Bug #54 回归）:
-6. HTML name 仅含 `\u200B` → 允许删除
-7. 空 HTML / HTML 标签包裹 `\u200B` → 允许删除
-8. 真实文本 / `\u200B` + 真实文本 → 阻止删除
+handleDelete isEmpty（5 cases, Bug #54 回归）:
+6. name 仅含 `\u200B` / 空字符串 → 允许删除
+7. 真实文本 / `\u200B` + 真实文本 → 阻止删除
 
 hash trigger cleanup safety（2 cases, Bug #53 回归）:
-9. DOM cleanup 失败后检测残留 `#` 触发词
-10. DOM cleanup 成功后无残留
+8. DOM cleanup 失败后检测残留 `#` 触发词
+9. DOM cleanup 成功后无残留
 
 ### 1.51 P0 Loro 基础设施 — 7项底层 API
 
@@ -730,21 +726,6 @@ hash trigger cleanup safety（2 cases, Bug #53 回归）:
 4. `getNextEnabledSlashIndex` 仅在 enabled 项间上下移动（含 `heading`），边界 clamp
 5. `heading` 命令处于 enabled 状态
 6. 全部禁用时返回 `-1`
-
-### 1.47 Meta-Utils 工具函数
-
-**测试文件**: `tests/vitest/meta-utils.test.ts`
-
-**覆盖点**:
-1. `getMetaTuples` 正确返回 meta 数组中的 tuple 节点
-2. `getMetaTuples` 跳过不存在的 ID
-3. `getMetaTuples` 空 meta 返回空数组
-4. `findMetaTuple` 按 children[0] key 查找（如 SYS_A13）
-5. `findMetaTuple` 未找到返回 undefined
-6. `addMetaTupleId` 追加新 ID
-7. `addMetaTupleId` 去重（已存在的 ID 不重复添加）
-8. `removeMetaTupleId` 移除存在的 ID
-9. `removeMetaTupleId` 对不存在的 ID 返回原数组
 
 ### 1.48 Tana 导入 — Phase 1 Stub 契约
 
@@ -930,7 +911,7 @@ createSibling 自动标签（2 cases）:
 1. 空 FieldValueOutliner 显示 TrailingInput
 2. 最后一项为 field 时显示 TrailingInput
 3. 最后一项为 content 时隐藏 TrailingInput
-4. `resolveSupertagPickerSelectedId` 从 value node `name` 读取已选 supertag id（并支持 targetId 回退）
+4. `resolveSupertagPickerSelectedId` 仅从 value node `name` 读取已选 supertag id
 
 ### 1.47 Outliner 内容类型判定
 
@@ -1026,7 +1007,6 @@ createSibling 自动标签（2 cases）:
 | 1.44 | PM EditorView 操作工具 | PASS/FAIL |
 | 1.45 | ConfigOutliner TrailingInput 显示规则 | PASS/FAIL |
 | 1.46 | FieldValueOutliner TrailingInput 显示规则 | PASS/FAIL |
-| 1.47 | Meta-Utils 工具函数 | PASS/FAIL |
 | 1.48 | Tana 导入 meta 填充与 DocType 安全 | PASS/FAIL |
 | 1.50 | Loro UndoManager 结构性撤销/重做 | PASS/FAIL |
 | 1.51 | P0 Loro 基础设施 — 7项底层API（subscribeNode/增量同步/时间旅行/LoroText/fork/Awareness） | PASS/FAIL |

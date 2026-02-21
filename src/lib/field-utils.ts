@@ -15,7 +15,7 @@ import { SYS_A, SYS_D, SYS_V, FIELD_TYPES } from '../types/index.js';
 import type { NodexNode } from '../types/index.js';
 import * as loroDoc from './loro-doc.js';
 
-// ─── resolveConfigValue（向后兼容：SYS_A* key → NodexNode 属性） ───
+// ─── Config key -> NodexNode 属性映射 ───
 
 /** Mapping from SYS_A* config keys to flat NodexNode property names. */
 const SYS_A_TO_PROP: Partial<Record<string, keyof NodexNode>> = {
@@ -36,9 +36,7 @@ const SYS_A_TO_PROP: Partial<Record<string, keyof NodexNode>> = {
 
 /**
  * Resolve a config value from a node by looking up its flat NodexNode property.
- * Converts boolean properties to SYS_V.YES / SYS_V.NO for backward compat.
- *
- * @deprecated In new code, read NodexNode properties directly.
+ * Boolean properties are normalized to SYS_V.YES / SYS_V.NO for config controls.
  */
 export function resolveConfigValue(
   node: NodexNode,
@@ -115,7 +113,6 @@ export function resolveHideField(fieldDefId: string): string {
  */
 export function resolveRequired(fieldDefId: string): boolean {
   const fieldDef = loroDoc.toNodexNode(fieldDefId);
-  // nullable=false means required=true (confusingly named legacy)
   return fieldDef?.nullable === false;
 }
 
@@ -203,17 +200,6 @@ export function resolveAutoCollectedOptions(
   if (!fieldDef?.autocollectOptions) return [];
   // Auto-collected options are also in children (same pool as pre-defined options)
   return resolveFieldOptions(fieldDefId);
-}
-
-/**
- * Find the autocollect toggle for a fieldDef.
- * In the new model, just check fieldDef.autocollectOptions.
- * @deprecated In new code, read fieldDef.autocollectOptions directly.
- */
-export function findAutoCollectTupleId(
-  _fieldDefId: string,
-): string | null {
-  return null; // No longer stored as a Tuple
 }
 
 /**

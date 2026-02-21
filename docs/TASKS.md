@@ -42,7 +42,7 @@ _(空)_
 > **Progress**:
 > - [x] 设计并落地 LoroText <-> 当前编辑器数据桥接层
 > - [x] Outliner 主编辑输入路径切换到 LoroText
-> - [x] 兼容旧数据读取与惰性迁移
+> - [x] 移除历史兼容路径（未上线场景直接切换）
 > - [x] 补齐回归测试并更新 `docs/TESTING.md`
 > **迭代日志**:
 > - [2026-02-21 nodex-codex] 任务认领，启动 Phase 2 开发
@@ -52,6 +52,7 @@ _(空)_
 > - [2026-02-21 nodex-codex] 继续收口：`setNodeName/setNodeNameLocal/updateNodeContent` 停止实时写 `raw name`，编辑链路仅写 `richText`（`toNodexNode` 读路径不变，仍优先 `richText`）
 > - [2026-02-21 nodex-codex] 继续收口：`createChild` 对普通内容节点不再落 `raw name`，`startRefConversion` 去除 `raw name` 写入；workspace 容器初始化改为直接写 `richText`
 > - [2026-02-21 nodex-codex] 按“未上线无需历史兼容”原则，移除编辑链路中“清理 legacy 脏字段”兼容逻辑与对应测试，保持实现最小化
+> - [2026-02-21 nodex-codex] 继续清理历史兼容残留：删除 node-store 旧 API 别名（`createAttrDef/moveFieldTuple/renameAttrDef/setNodeNameLocal/setNodeContentLocal`）及调用点；移除 `findAutoCollectTupleId` stub、`resolveSupertagPickerSelectedId` 的 `targetId` 回退、`handleDelete` 的 HTML 文本回退；同步更新测试与 `docs/TESTING.md`
 
 ### Refactor — Loro 收口 Phase 1：detached guard + origin 策略 (2026-02-21)
 > **Owner**: nodex-codex | **Branch**: codex/loro-phase1-guards

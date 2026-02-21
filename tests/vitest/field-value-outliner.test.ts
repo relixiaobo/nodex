@@ -38,13 +38,13 @@ describe('resolveSupertagPickerSelectedId', () => {
     expect(resolveSupertagPickerSelectedId('tuple_1', getNode)).toBe('tagDef_task');
   });
 
-  it('falls back to targetId when value name is missing', () => {
+  it('returns undefined when value name is missing', () => {
     const nodes: Record<string, { children?: string[]; name?: string; targetId?: string }> = {
       tuple_1: { children: ['value_1'] },
       value_1: { targetId: 'tagDef_person' },
     };
     const getNode = (id: string) => nodes[id] ?? null;
 
-    expect(resolveSupertagPickerSelectedId('tuple_1', getNode)).toBe('tagDef_person');
+    expect(resolveSupertagPickerSelectedId('tuple_1', getNode)).toBeUndefined();
   });
 });

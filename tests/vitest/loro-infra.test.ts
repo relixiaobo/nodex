@@ -425,12 +425,8 @@ describe('③ LoroText + Peritext marks', () => {
     expect(text).toBeInstanceOf(LoroText);
   });
 
-  it('toNodexNode 优先读取 richText 内容（覆盖旧 name/marks 字段）', () => {
+  it('toNodexNode 从 richText 读取内容与 marks', () => {
     const n = createNode('node1', null);
-    setNodeData(n, 'name', 'legacy-name');
-    setNodeData(n, 'marks', [{ start: 0, end: 6, type: 'bold' }]);
-    commitDoc();
-
     const text = getOrCreateNodeText(n)!;
     text.insert(0, 'rich');
     text.mark({ start: 0, end: 4 }, 'italic', true);

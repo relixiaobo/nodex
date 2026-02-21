@@ -14,7 +14,14 @@ interface TagBadgeProps {
 }
 
 export function TagBadge({ tagDefId, onRemove, onNavigate }: TagBadgeProps) {
-  const tagName = useNodeStore((s) => { void s._version; return s.getNode(tagDefId)?.name ?? 'Untitled'; });
+  const tagName = useNodeStore((s) => {
+    void s._version;
+    const node = s.getNode(tagDefId);
+    if (node?.name) return node.name;
+    // System tags (e.g. 'sys:day') may not have tree nodes — extract readable name from ID
+    if (tagDefId.startsWith('sys:')) return tagDefId.slice(4);
+    return 'Untitled';
+  });
   const isTrashed = useNodeStore((s) => { void s._version; return loroDoc.getParentId(tagDefId) === CONTAINER_IDS.TRASH; });
   const color = useNodeStore((s) => { void s._version; return resolveTagColor(tagDefId); });
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);

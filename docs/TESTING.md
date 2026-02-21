@@ -1010,6 +1010,51 @@ createSibling 自动标签（2 cases）:
 2. 新建触发节点后会写入 `focusClickCoords.textOffset=1`（光标在 `@` 后）
 3. `focusedNodeId/focusedParentId` 指向新建节点与当前父节点
 
+### 1.56 Date Utils
+
+**测试文件**: `tests/vitest/date-utils.test.ts`
+
+**覆盖点**:
+
+| # | 场景 | 验证 |
+|---|------|------|
+| 1 | ISO Week 普通日期 | getISOWeekNumber 返回正确 year+week |
+| 2 | ISO Week 元旦边界 (Jan 1 2026) | week=1, year=2026 |
+| 3 | ISO Week 跨年 (Dec 29 2025) | year=2026, week=1 |
+| 4 | ISO Week 年末 | 正确处理第52/53周 |
+| 5 | formatDayName | "Sat, Feb 14" 格式 |
+| 6 | formatWeekName | "Week 07" 零填充 |
+| 7 | formatYearName | "2026" 字符串 |
+| 8–10 | parseDayNodeName | 正常解析、无效月份返回 null、无效日期返回 null |
+| 11–12 | parseWeekNodeName | 正常解析 + 范围校验 |
+| 13–14 | parseYearNodeName | 正常解析 + 非数字返回 null |
+| 15 | getAdjacentDay 前进 | +1 天跨月正确 |
+| 16 | getAdjacentDay 后退 | -1 天跨月正确 |
+| 17 | isToday | 今天返回 true，其他日期返回 false |
+| 18–20 | extractSortValue | 年/周/日分别返回正确排序值 |
+
+### 1.57 Journal
+
+**测试文件**: `tests/vitest/journal.test.ts`
+
+**覆盖点**:
+
+| # | 场景 | 验证 |
+|---|------|------|
+| 1 | ensureDateNode 创建层级 | JOURNAL → Year → Week → Day 正确嵌套 |
+| 2 | ensureDateNode 幂等 | 重复调用返回相同 ID |
+| 3 | 同年不同周 | 创建独立 Week 节点 |
+| 4 | 跨年 ISO 周 | Dec 29 归入下一年 Week 01 |
+| 5 | 年降序排列 | 最新年份在前 |
+| 6 | 周降序排列 | 最新周在前 |
+| 7 | 日降序排列 | 最新日在前 |
+| 8 | SYSTEM_TAGS 应用 | DAY/WEEK/YEAR 标签正确 |
+| 9 | ensureTodayNode | 返回有效 ID + DAY 标签 |
+| 10 | getAdjacentDayNodeId +1 | 返回下一天节点 |
+| 11 | getAdjacentDayNodeId -1 | 返回前一天节点 |
+| 12 | getAdjacentDayNodeId 非日节点 | 返回 null |
+| 13–16 | isDayNode/isWeekNode/isYearNode/isJournalNode | 正确判断 |
+
 ---
 
 ## Phase 2: 视觉检查点

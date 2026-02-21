@@ -778,7 +778,7 @@ function SettingRow({ label, checked, onChange }: { label: string; checked: bool
 
 // ─── CalendarGrid ─────────────────────────────────────────────────
 
-interface CalendarGridProps {
+export interface CalendarGridProps {
   viewYear: number;
   viewMonth: number;
   onViewChange: (year: number, month: number) => void;
@@ -793,7 +793,7 @@ interface CalendarGridProps {
   onHover?: (dateStr: string) => void;
 }
 
-function CalendarGrid({
+export function CalendarGrid({
   viewYear,
   viewMonth,
   onViewChange,

@@ -8,6 +8,8 @@ import { NodeHeader } from './NodeHeader';
 import { OutlinerView } from '../outliner/OutlinerView';
 import { FieldList } from '../fields/FieldList';
 import { resolveTagColor } from '../../lib/tag-colors.js';
+import { isDayNode } from '../../lib/journal.js';
+import { DateNavigationBar } from '../journal/DateNavigationBar';
 
 interface NodePanelProps {
   nodeId: string;
@@ -20,6 +22,12 @@ export function NodePanel({ nodeId }: NodePanelProps) {
   const isFieldDef = node?.type === 'fieldDef';
   const isTagDef = node?.type === 'tagDef';
   const isDefinitionNode = isFieldDef || isTagDef;
+
+  // Check if this is a day node (for date navigation bar)
+  const showDateNav = useNodeStore((s) => {
+    void s._version;
+    return isDayNode(nodeId);
+  });
 
   // TagDef: colored gradient at top reflecting configured color
   const tagDefColor = useNodeStore((s) => {
@@ -66,6 +74,7 @@ export function NodePanel({ nodeId }: NodePanelProps) {
           />
         )}
         <NodeHeader nodeId={nodeId} onTitleRef={handleTitleRef} />
+        {showDateNav && <DateNavigationBar dayNodeId={nodeId} />}
         {isDefinitionNode && (
           <div className="mb-2 ml-4 px-2">
             <FieldList nodeId={nodeId} />

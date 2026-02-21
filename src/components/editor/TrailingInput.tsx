@@ -22,14 +22,14 @@ import { isOptionsFieldType } from '../../lib/field-utils.js';
 import * as loroDoc from '../../lib/loro-doc.js';
 import { getPrimaryShortcutKey } from '../../lib/shortcut-registry';
 import { isImeComposingEvent } from '../../lib/ime-keyboard.js';
-import { resolveTrailingUpdateAction } from '../../lib/trailing-input-actions.js';
 import {
-  resolveTrailingEnterIntent,
-  resolveTrailingArrowDownIntent,
-  resolveTrailingArrowUpIntent,
-  resolveTrailingBackspaceIntent,
-  resolveTrailingEscapeIntent,
-} from '../../lib/trailing-input-navigation.js';
+  resolveTrailingRowUpdateAction,
+  resolveTrailingRowEnterIntent as resolveTrailingEnterIntent,
+  resolveTrailingRowArrowDownIntent as resolveTrailingArrowDownIntent,
+  resolveTrailingRowArrowUpIntent as resolveTrailingArrowUpIntent,
+  resolveTrailingRowBackspaceIntent as resolveTrailingBackspaceIntent,
+  resolveTrailingRowEscapeIntent as resolveTrailingEscapeIntent,
+} from '../../lib/row-interactions.js';
 import { useFieldOptions } from '../../hooks/use-field-options.js';
 import { BulletChevron } from '../outliner/BulletChevron';
 import { FIELD_OVERLAY_Z_INDEX } from '../fields/field-layout.js';
@@ -386,7 +386,7 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
 
         const ref = callbacksRef.current;
 
-        const action = resolveTrailingUpdateAction({
+        const action = resolveTrailingRowUpdateAction({
           text,
           isOptionsField: ref.isOptions,
         });
@@ -415,6 +415,11 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
           ref.setTriggerHint(action.trigger);
           const triggerNode = ref.createChild(ref.effectiveParentId, undefined, { name: action.trigger });
           ref.setExpanded(ref.effectiveParentEK, true);
+          ref.setFocusClickCoords({
+            nodeId: triggerNode.id,
+            parentId: ref.effectiveParentId,
+            textOffset: action.textOffset,
+          });
           ref.setFocusedNode(triggerNode.id, ref.effectiveParentId);
           queueMicrotask(() => { committingRef.current = false; });
           return;

@@ -55,7 +55,7 @@ export const ReferenceSelector = forwardRef<ReferenceDropdownHandle, ReferenceSe
         if (!node) continue;
         const name = (node.name ?? '').replace(/<[^>]+>/g, '').trim();
         if (!name) continue;
-        results.push({ id, name, breadcrumb: '' });
+        results.push({ id, name, breadcrumb: '', updatedAt: node.updatedAt ?? 0 });
       }
       return results;
     // eslint-disable-next-line react-hooks/exhaustive-deps

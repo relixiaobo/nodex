@@ -736,10 +736,10 @@ hash trigger cleanup safety（3 cases, Bug #53 + CJK hashtag 回归）:
 
 **覆盖点**:
 
-1. `tagDef` 节点被过滤（不出现在搜索结果中）
-2. `attrDef` 节点被过滤
-3. `tuple` 节点被过滤
-4. 普通内容节点正常返回
+1. `tagDef/fieldDef/fieldEntry/reference` 结构节点被过滤（不出现在搜索结果中）
+2. workspace container（如 `LIBRARY`）按 ID 过滤
+3. 普通内容节点正常返回，且支持 `excludeId` 排除当前节点
+4. 匹配结果按 `updatedAt` 降序排序（最近编辑优先）
 
 ### 1.36 Workspace Store 认证状态与持久化
 
@@ -752,6 +752,16 @@ hash trigger cleanup safety（3 cases, Bug #53 + CJK hashtag 回归）:
 3. `logout` 清空用户与工作区上下文，并恢复未登录状态（含 `authUser`）
 4. `authUser` 不被持久化到 storage（通过 `partialize` 排除）
 5. `signInWithGoogle` 成功后 `userId / isAuthenticated / authUser` 正确写入
+
+### 1.51 Breadcrumb Workspace Root 导航
+
+**测试文件**: `tests/vitest/breadcrumb.test.ts`
+
+**覆盖点**:
+
+1. workspace 节点存在时，头像/根节点导航目标优先指向 `currentWorkspaceId`
+2. workspace 节点缺失时，回退到当前 ancestor chain 的 `workspaceRootId`
+3. 两者都不可用时，最终回退到 `LIBRARY`
 
 ### 1.48 Auth 工具函数（Google OAuth + Supabase）
 

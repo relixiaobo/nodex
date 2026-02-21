@@ -15,6 +15,7 @@ export interface NodeSearchResult {
   id: string;
   name: string;
   breadcrumb: string;
+  updatedAt: number;
 }
 
 /** Structural node types to skip in search results (not meaningful as search targets). */
@@ -62,10 +63,22 @@ export function useNodeSearch(query: string, excludeId?: string): NodeSearchResu
         depth++;
       }
 
-      matches.push({ id, name: plainText, breadcrumb: crumbs.join(' / ') });
-      if (matches.length >= 15) break;
+      matches.push({
+        id,
+        name: plainText,
+        breadcrumb: crumbs.join(' / '),
+        updatedAt: node.updatedAt ?? 0,
+      });
     }
 
+    matches.sort((a, b) => {
+      if (b.updatedAt !== a.updatedAt) return b.updatedAt - a.updatedAt;
+      const byName = a.name.localeCompare(b.name, 'en');
+      if (byName !== 0) return byName;
+      return a.id.localeCompare(b.id, 'en');
+    });
+
+    if (matches.length > 15) matches.length = 15;
     return JSON.stringify(matches);
   });
 

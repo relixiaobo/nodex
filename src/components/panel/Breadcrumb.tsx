@@ -33,6 +33,17 @@ interface BreadcrumbProps {
   showCurrentName?: boolean;
 }
 
+export function resolveWorkspaceRootTargetId(params: {
+  workspaceId: string | null;
+  workspaceRootId: string | null;
+  hasWorkspaceNode: (nodeId: string) => boolean;
+}): string {
+  const { workspaceId, workspaceRootId, hasWorkspaceNode } = params;
+  if (workspaceId && hasWorkspaceNode(workspaceId)) return workspaceId;
+  if (workspaceRootId) return workspaceRootId;
+  return CONTAINER_IDS.LIBRARY;
+}
+
 export function Breadcrumb({ nodeId, showCurrentName }: BreadcrumbProps) {
   const navigateTo = useUIStore((s) => s.navigateTo);
   const toggleSidebar = useUIStore((s) => s.toggleSidebar);
@@ -49,6 +60,11 @@ export function Breadcrumb({ nodeId, showCurrentName }: BreadcrumbProps) {
 
   // Workspace name for avatar
   const wsId = useWorkspaceStore((s) => s.currentWorkspaceId);
+  const workspaceRootTargetId = resolveWorkspaceRootTargetId({
+    workspaceId: wsId,
+    workspaceRootId,
+    hasWorkspaceNode: (id) => !!loroDoc.toNodexNode(id),
+  });
   const wsInitial = useNodeStore((s) => {
     void s._version;
     if (!wsId) return 'W';
@@ -70,10 +86,8 @@ export function Breadcrumb({ nodeId, showCurrentName }: BreadcrumbProps) {
   }, [parentId, navigateTo]);
 
   const handleAvatarClick = useCallback(() => {
-    // Navigate to the closest workspace-level root: the explicit workspaceRootId if available,
-    // otherwise fall back to Library (e.g. when already at a container node with no parent).
-    navigateTo(workspaceRootId ?? CONTAINER_IDS.LIBRARY);
-  }, [workspaceRootId, navigateTo]);
+    navigateTo(workspaceRootTargetId);
+  }, [workspaceRootTargetId, navigateTo]);
 
   // Determine which ancestors to show
   const needsFolding = ancestors.length >= 3 && !expanded;
@@ -141,7 +155,9 @@ export function Breadcrumb({ nodeId, showCurrentName }: BreadcrumbProps) {
             <span key={ancestor.id} className="flex items-center shrink-0 min-w-0">
               <ChevronRight size={10} className="shrink-0 text-foreground-tertiary mx-0.5" />
               <button
-                onClick={() => navigateTo(ancestor.id)}
+                onClick={() => navigateTo(
+                  ancestor.id === workspaceRootId ? workspaceRootTargetId : ancestor.id,
+                )}
                 className="truncate max-w-[120px] rounded px-0.5 hover:bg-foreground/5 hover:text-foreground"
               >
                 {resolveBreadcrumbLabel(ancestor.id, ancestor.name)}

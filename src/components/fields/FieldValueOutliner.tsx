@@ -28,7 +28,9 @@ import {
   isCheckboxFieldType,
   isColorFieldType,
   isDateFieldType,
+  isEmailFieldType,
   isOptionsFromSupertagFieldType,
+  isUrlFieldType,
   resolveConfigValue,
 } from '../../lib/field-utils.js';
 import { isOutlinerContentNodeType } from '../../lib/node-type-utils.js';
@@ -222,6 +224,62 @@ export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, configNo
           setFieldValue(parentId, fieldDefId, [v]);
         }}
       />
+    );
+  }
+
+  // --- URL: clickable link ---
+  if (isUrlFieldType(fieldDataType)) {
+    const valueNodeId = contentChildIds[0];
+    const valueNode = valueNodeId ? useNodeStore.getState().getNode(valueNodeId) : undefined;
+    const url = valueNode?.name ?? '';
+
+    return (
+      <div className="flex min-h-7 items-start gap-2 py-1" style={{ paddingLeft: FIELD_VALUE_INSET }}>
+        <BulletChevron hasChildren={false} isExpanded={false} onBulletClick={() => {}} dimmed={!url} />
+        <div className="flex-1 min-w-0 flex items-center">
+          {url ? (
+            <a
+              href={url}
+              target="_blank"
+              rel="noopener noreferrer"
+              title={url}
+              className="text-sm leading-[21px] text-primary underline truncate"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {url}
+            </a>
+          ) : (
+            <span className="text-sm leading-[21px] text-foreground-tertiary select-none">Empty</span>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // --- EMAIL: clickable mailto link ---
+  if (isEmailFieldType(fieldDataType)) {
+    const valueNodeId = contentChildIds[0];
+    const valueNode = valueNodeId ? useNodeStore.getState().getNode(valueNodeId) : undefined;
+    const email = valueNode?.name ?? '';
+
+    return (
+      <div className="flex min-h-7 items-start gap-2 py-1" style={{ paddingLeft: FIELD_VALUE_INSET }}>
+        <BulletChevron hasChildren={false} isExpanded={false} onBulletClick={() => {}} dimmed={!email} />
+        <div className="flex-1 min-w-0 flex items-center">
+          {email ? (
+            <a
+              href={`mailto:${email}`}
+              title={email}
+              className="text-sm leading-[21px] text-primary underline truncate"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {email}
+            </a>
+          ) : (
+            <span className="text-sm leading-[21px] text-foreground-tertiary select-none">Empty</span>
+          )}
+        </div>
+      </div>
     );
   }
 

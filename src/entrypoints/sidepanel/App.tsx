@@ -10,6 +10,7 @@ import { CONTAINER_IDS } from '../../types/index.js';
 import { initLoroDoc } from '../../lib/loro-doc.js';
 import * as loroDoc from '../../lib/loro-doc.js';
 import { findUnexpectedShortcutConflicts } from '../../lib/shortcut-registry.js';
+import { Toaster } from 'sonner';
 
 const CONTAINER_DEFS: Array<{ id: string; name: string }> = [
   { id: CONTAINER_IDS.LIBRARY, name: 'Library' },
@@ -128,6 +129,7 @@ export function App({ skipBootstrap = false }: AppProps) {
       {sidebarOpen && <Sidebar />}
       <PanelStack />
       <CommandPalette />
+      <Toaster position="bottom-center" />
     </div>
   );
 }

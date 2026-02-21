@@ -363,7 +363,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   const isSelectedGlobal = isSelected && !isFocused && (
     selectionSource === 'global' || !isReference || isMultiSelected
   );
-  const isSelectedRefClick = isSelected && !isFocused && isReference && !isMultiSelected && selectionSource === 'ref-click';
+  const isSelectedRefClick = isSelected && !isFocused && (isReference || isPendingConversion) && !isMultiSelected && selectionSource === 'ref-click';
 
   // Per-row highlight: only for directly selected nodes (children use subtree mask)
   const showRowHighlight = isSelectedGlobal;
@@ -383,7 +383,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     [allFieldOptions, selectedOptionId],
   );
   const isOptionsValueNode = isOptionsField && !!selectedOptionId;
-  const isReferenceLikeRow = isReference || isOptionsValueNode;
+  const isReferenceLikeRow = isReference || isPendingConversion || isOptionsValueNode;
 
   // Checkbox state (supertag SYS_A55 or manual _done)
   const { showCheckbox, isDone } = useNodeCheckbox(nodeId);
@@ -651,7 +651,6 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
             const parent = getNode(parentId);
             const pos = parent?.children?.indexOf(nodeId) ?? -1;
             if (pos < 0) return;
-            removeReference(nodeId);
             const tempNodeId = startRefConversion(nodeId, parentId, pos);
             setPendingRefConversion({ tempNodeId, refNodeId: nodeId, parentId });
             setPendingInputChar({ char: e.key, nodeId: tempNodeId, parentId });
@@ -671,7 +670,6 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
             const parent = getNode(parentId);
             const pos = parent?.children?.indexOf(nodeId) ?? -1;
             if (pos < 0) return;
-            removeReference(nodeId);
             const tempNodeId = startRefConversion(nodeId, parentId, pos);
             setPendingRefConversion({ tempNodeId, refNodeId: nodeId, parentId });
             clearSelection();
@@ -1155,7 +1153,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     // Intercept clicks on inline references (blue links in static display)
     const target = e.target as HTMLElement;
     const refEl = target.closest('[data-inlineref-node]') as HTMLElement;
-    if (refEl) {
+    if (refEl && !isReferenceLikeRow) {
       e.stopPropagation();
       useUIStore.getState().setFocusClickCoords(null);
       const refId = refEl.getAttribute('data-inlineref-node');
@@ -1178,7 +1176,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
 
   const handleContentDoubleClick = useCallback((e: React.MouseEvent) => {
     // Double click on reference node → enter edit mode
-    if (isReference && !isOptionsValueNode) {
+    if ((isReference || isPendingConversion) && !isOptionsValueNode) {
       const container = e.currentTarget as HTMLElement;
       const textOffset = getTextOffsetFromPoint(container, e.clientX, e.clientY);
       useUIStore.getState().setFocusClickCoords(
@@ -1188,7 +1186,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       );
       setFocusedNode(nodeId, parentId);
     }
-  }, [nodeId, parentId, isReference, isOptionsValueNode, setFocusedNode]);
+  }, [nodeId, parentId, isReference, isPendingConversion, isOptionsValueNode, setFocusedNode]);
 
   const handleToggle = useCallback(() => {
     const ek = `${parentId}:${nodeId}`;

@@ -56,7 +56,7 @@ export function getAncestorChain(
       const containerNode = loroDoc.toNodexNode(parentId);
       if (containerNode) {
         const rawName = containerNode.name ?? '';
-        const displayName = rawName.replace(/<[^>]+>/g, '') || parentId;
+        const displayName = rawName.trim() || parentId;
         chain.push({ id: parentId, name: displayName });
       }
       break;
@@ -73,7 +73,7 @@ export function getAncestorChain(
 
     // Add parent to chain (will be reversed later)
     const rawName = parentNode.name ?? '';
-    const displayName = rawName.replace(/<[^>]+>/g, '') || parentId;
+    const displayName = rawName.trim() || parentId;
     chain.push({ id: parentId, name: displayName });
 
     currentId = parentId;
@@ -243,21 +243,7 @@ export function isOnlyInlineRef(content: string, inlineRefs?: Array<{ offset: nu
   const normalized = (content ?? '').replace(/\u200B/g, '').trim();
   if (!normalized) return true;
 
-  // New model: '\uFFFC' + one inlineRef entry at offset 0
-  if (inlineRefs && inlineRefs.length > 0) {
-    return normalized === '\uFFFC' && inlineRefs.length === 1 && inlineRefs[0]?.offset === 0;
-  }
-
-  // Legacy fallback: HTML inline-ref span
-  if (normalized === '\uFFFC') return true;
-
-  const div = document.createElement('div');
-  div.innerHTML = normalized;
-  const inlineRefEls = div.querySelectorAll('[data-inlineref-node]');
-  if (inlineRefEls.length !== 1) return false;
-  const allText = div.textContent?.trim() ?? '';
-  const refText = inlineRefEls[0].textContent?.trim() ?? '';
-  return allText === refText;
+  return normalized === '\uFFFC' && !!inlineRefs && inlineRefs.length === 1 && inlineRefs[0]?.offset === 0;
 }
 
 /**

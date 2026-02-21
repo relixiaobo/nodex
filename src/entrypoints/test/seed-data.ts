@@ -18,6 +18,7 @@ import { useNodeStore } from '../../stores/node-store';
 import { useUIStore } from '../../stores/ui-store';
 import { useWorkspaceStore } from '../../stores/workspace-store';
 import { CONTAINER_IDS, FIELD_TYPES } from '../../types/index.js';
+import type { InlineRefEntry, TextMark } from '../../types/index.js';
 
 const WS_ID = 'ws_default';
 
@@ -25,6 +26,17 @@ const WS_ID = 'ws_default';
 function cn(id: string, parentId: string | null, data: Record<string, unknown>, index?: number): void {
   if (loroDoc.hasNode(id)) return;
   loroDoc.createNode(id, parentId, index);
+  const marks = data.marks as TextMark[] | undefined;
+  const inlineRefs = data.inlineRefs as InlineRefEntry[] | undefined;
+  const name = data.name as string | undefined;
+
+  if (marks || inlineRefs) {
+    const { marks: _marks, inlineRefs: _inlineRefs, ...rest } = data;
+    if (Object.keys(rest).length > 0) loroDoc.setNodeDataBatch(id, rest);
+    loroDoc.setNodeRichTextContent(id, name ?? '', marks ?? [], inlineRefs ?? []);
+    return;
+  }
+
   if (Object.keys(data).length > 0) {
     loroDoc.setNodeDataBatch(id, data);
   }

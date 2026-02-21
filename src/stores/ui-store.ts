@@ -123,36 +123,6 @@ export function partializeUIStore(state: UIStore): PersistedUIStoreState {
   };
 }
 
-export function migrateUIStoreState(persisted: unknown, version: number): unknown {
-  let state = persisted;
-
-  // v0 → v1: panelStack renamed to panelHistory
-  if (version < 1) {
-    const old = state as { panelStack?: string[] };
-    if (old.panelStack) {
-      state = {
-        ...old,
-        panelHistory: old.panelStack,
-        panelIndex: old.panelStack.length - 1,
-        panelStack: undefined,
-      };
-    }
-  }
-
-  // v1 → v2: Loro migration — container IDs changed format (e.g. 'ws_default_LIBRARY' → 'LIBRARY').
-  // Reset navigation and expand state since old node IDs are no longer valid.
-  if (version < 2) {
-    state = {
-      ...(state as object),
-      panelHistory: [],
-      panelIndex: -1,
-      expandedNodes: new Set<string>(),
-    };
-  }
-
-  return state;
-}
-
 export const useUIStore = create<UIStore>()(
   persist(
     (set) => ({
@@ -276,7 +246,7 @@ export const useUIStore = create<UIStore>()(
       setSelectedNodes: (nodeIds, anchorId) => set({
         selectedNodeIds: nodeIds,
         selectionAnchorId: anchorId ?? null,
-        // Sync single-select fields (for backward compat with reference node logic)
+        // Sync single-select fields from multi-select state.
         selectedNodeId: nodeIds.size === 1 ? [...nodeIds][0] : null,
         selectedParentId: null,
         // Clear focus
@@ -365,8 +335,6 @@ export const useUIStore = create<UIStore>()(
       version: 2,
       storage: chromeLocalStorage,
       partialize: partializeUIStore,
-      // Migrate from old panelStack format to new history model
-      migrate: migrateUIStoreState,
     },
   ),
 );

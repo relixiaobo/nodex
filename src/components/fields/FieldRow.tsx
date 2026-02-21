@@ -92,7 +92,7 @@ export function FieldRow({
   const focusedNodeId = useUIStore((s) => s.focusedNodeId);
   const clearSelection = useUIStore((s) => s.clearSelection);
   const createChild = useNodeStore((s) => s.createChild);
-  const moveFieldTuple = useNodeStore((s) => s.moveFieldTuple);
+  const moveFieldEntry = useNodeStore((s) => s.moveFieldEntry);
   const removeField = useNodeStore((s) => s.removeField);
   const _version = useNodeStore((s) => s._version);
   const siblingFields = useNodeFields(nodeId);
@@ -197,14 +197,14 @@ export function FieldRow({
 
     if (prev.type === 'field') {
       // Move this tuple under the previous field's tuple directly
-      void moveFieldTuple(nodeId, tupleId, prev.id, '');
+      void moveFieldEntry(nodeId, tupleId, prev.id);
       return;
     }
 
     if (prev.type === 'content') {
-      void moveFieldTuple(nodeId, tupleId, prev.id, '');
+      void moveFieldEntry(nodeId, tupleId, prev.id);
     }
-  }, [tupleId, renderableSiblings, nodeId, moveFieldTuple]);
+  }, [tupleId, renderableSiblings, nodeId, moveFieldEntry]);
 
   const handleOutdentField = useCallback(() => {
     const grandparentId = loroDoc.getParentId(nodeId);
@@ -215,8 +215,8 @@ export function FieldRow({
     let insertAt = grandparent.children.length;
     const parentIndex = grandparent.children.indexOf(nodeId);
     if (parentIndex >= 0) insertAt = parentIndex + 1;
-    void moveFieldTuple(nodeId, tupleId, grandparentId, '', insertAt);
-  }, [tupleId, nodeId, moveFieldTuple]);
+    void moveFieldEntry(nodeId, tupleId, grandparentId, insertAt);
+  }, [tupleId, nodeId, moveFieldEntry]);
 
   const handleEnterConfirm = useCallback(() => {
     let insertParentId = nodeId;

@@ -1255,11 +1255,8 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   const handleDelete = useCallback((): boolean => {
     // Read current name from store — the closure's `node` may be stale
     // because saveContent() updates the store synchronously before this runs.
-    // Strip HTML tags before checking: ProseMirror may save empty paragraphs as
-    // '<br>' or '<br class="ProseMirror-trailingBreak">' which are non-empty
-    // strings but represent visually empty content.
     const currentName = useNodeStore.getState().getNode(nodeId)?.name ?? '';
-    const textOnly = currentName.replace(/<[^>]*>/g, '').trim();
+    const textOnly = currentName.replace(/\u200B/g, '').trim();
     if (textOnly.length > 0) return false;
     // Prevent deleting a whole subtree when Backspace is pressed on an empty parent.
     if (hasChildren) return true;

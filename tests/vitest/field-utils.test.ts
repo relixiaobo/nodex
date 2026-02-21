@@ -5,7 +5,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { FIELD_TYPES, SYS_V } from '../../src/types/system-nodes.js';
 import {
-  findAutoCollectTupleId,
   getExtendsChain,
   getFieldTypeIcon,
   getFieldTypeLabel,
@@ -50,7 +49,7 @@ describe('resolveDataType', () => {
     loroDoc.createNode(id, 'tagDef_task');
     loroDoc.setNodeData(id, 'type', 'fieldDef');
     // No fieldType set → should return PLAIN
-    expect(resolveDataType({}, id)).toBe(FIELD_TYPES.PLAIN);
+    expect(resolveDataType(id)).toBe(FIELD_TYPES.PLAIN);
   });
 });
 
@@ -197,18 +196,6 @@ describe('resolveTaggedNodes', () => {
   it('returns empty for unknown tagDefId', () => {
     const nodes = resolveTaggedNodes('nonexistent_tag');
     expect(nodes).toEqual([]);
-  });
-});
-
-describe('findAutoCollectTupleId', () => {
-  beforeEach(() => {
-    resetAndSeed();
-  });
-
-  it('always returns null (stub in Loro migration)', () => {
-    expect(findAutoCollectTupleId('attrDef_status')).toBeNull();
-    expect(findAutoCollectTupleId('attrDef_priority')).toBeNull();
-    expect(findAutoCollectTupleId('nonexistent')).toBeNull();
   });
 });
 

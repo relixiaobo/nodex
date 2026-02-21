@@ -1,6 +1,6 @@
 # Feature: Date 节点 & 日记
 
-> Phase 1.4 | 未实现
+> Phase 1.4 | Phase 1 已实现 (2026-02-21)
 
 ## 概述
 
@@ -238,3 +238,8 @@ Daily notes / 2026 / Week 07 / Sat, Feb 14           ← 非当天
 | 2026-02-14 | 日节点命名跟随 Tana 格式 `Sat, Feb 14` | 截图确认 Tana 实际格式；"Today" 前缀仅在面包屑中动态添加，不存入 props.name |
 | 2026-02-14 | 日期导航栏（`< >` / Today / 日历）Phase 1 实现 | 截图确认为日记核心交互，非可选功能 |
 | 2026-02-16 | 日期字段值 = 日节点引用（非字符串） | "一切皆节点"守则；让日期成为可挂 children/tag/field 的一等公民 |
+| 2026-02-21 | Phase 1 实现：Loro 模型（无 doc_type/meta） | 使用 SYSTEM_TAGS.DAY/WEEK/YEAR 直接标签，无 meta Tuple；容器 ID 为 CONTAINER_IDS.JOURNAL（无 wsId 前缀） |
+| 2026-02-21 | 侧栏 "Daily notes" + Today 按钮 | 重命名 Journal → Daily notes，CalendarCheck 图标按钮触发 ensureTodayNode |
+| 2026-02-21 | Cmd+Shift+D 全局快捷键 | 非编辑/选中模式下触发（编辑模式下 batch_duplicate 优先） |
+| 2026-02-21 | DateNavigationBar 日期导航栏 | `< >` 前后天 + Today + Calendar 占位；仅日节点面板显示 |
+| 2026-02-21 | 面包屑 "Today" 前缀 | resolveBreadcrumbLabel 检测当日日节点并添加 "Today, " 前缀 |

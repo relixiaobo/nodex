@@ -138,11 +138,18 @@ describe('ensureDateNode', () => {
     expect(yearId).toBeTruthy();
 
     const weekNames = loroDoc.getChildren(yearId!)
-      .map(id => loroDoc.toNodexNode(id)?.name);
+      .map(id => loroDoc.toNodexNode(id)?.name)
+      .filter((n): n is string => !!n);
 
-    expect(weekNames[0]).toBe('Week 11');
-    expect(weekNames[1]).toBe('Week 07');
-    expect(weekNames[2]).toBe('Week 02');
+    // Seed data may add extra weeks (today/yesterday). Verify descending order.
+    const weekNums = weekNames.map(n => parseInt(n.replace('Week ', ''), 10));
+    for (let i = 1; i < weekNums.length; i++) {
+      expect(weekNums[i]).toBeLessThan(weekNums[i - 1]);
+    }
+    // Our three weeks must be present
+    expect(weekNames).toContain('Week 11');
+    expect(weekNames).toContain('Week 07');
+    expect(weekNames).toContain('Week 02');
   });
 
   it('sorts day nodes in descending order within a week', () => {

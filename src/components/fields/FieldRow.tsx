@@ -669,14 +669,17 @@ export function FieldRow({
       handleShiftClick();
       return;
     }
-    // Plain click on the field-name side should enter field-name editing,
-    // matching node/content click-to-edit behavior.
+    // Plain click follows content-row semantics: establish single selection first,
+    // then enter edit mode for editable field names.
+    setSelectedNode(tupleId, nodeId, 'global');
     if (!trashed && !isVirtual && !isSystemConfig && !isSystemField) {
       setEditingFieldName(tupleId);
     }
   }, [
     isEditing,
+    nodeId,
     tupleId,
+    setSelectedNode,
     setEditingFieldName,
     handleCmdClick,
     handleShiftClick,

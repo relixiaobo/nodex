@@ -43,7 +43,7 @@ _(空)_
 ### P1 Reference 交互收口：单击选中 vs Esc/框选 + inline 转换输入
 > **Owner**: nodex-codex | **Branch**: codex/reference-selection-interactions | **Spec**: `docs/features/references.md`, `docs/features/node-selection.md`
 > **目标**: 区分 reference 单击选中与全局选中视觉语义，恢复/收口 reference ↔ inline reference 切换与输入交互一致性
-> **Files**: `src/components/outliner/OutlinerItem.tsx`, `src/stores/ui-store.ts`, `src/assets/main.css`, `standalone/TestApp.tsx`, `tests/vitest/ui-store-undo-focus.test.ts`, `tests/vitest/selected-reference-shortcuts.test.ts`, `docs/features/references.md`, `docs/features/node-selection.md`
+> **Files**: `src/components/outliner/OutlinerItem.tsx`, `src/components/editor/RichTextEditor.tsx`, `src/components/tags/TagSelector.tsx`, `src/components/references/ReferenceSelector.tsx`, `src/components/editor/SlashCommandMenu.tsx`, `src/stores/ui-store.ts`, `src/assets/main.css`, `standalone/TestApp.tsx`, `tests/vitest/ui-store-undo-focus.test.ts`, `tests/vitest/selected-reference-shortcuts.test.ts`, `docs/features/references.md`, `docs/features/node-selection.md`
 > **Progress**:
 > - [x] 增加 selection source（`ref-click` vs `global`）并接入选中/聚焦状态流
 > - [x] 恢复 reference 单击 `fit-content` 边框样式，保留 Esc/框选全行高亮
@@ -59,6 +59,7 @@ _(空)_
 > - [2026-02-21 nodex-codex] 五次回归修复：将 inline-ref 段落兜底改为“保留 separator 作为 caret 锚点但零宽隐藏 + 隐藏 trailingBreak”，避免光标回退到行首；新增 `.ProseMirror-selectednode` inline-ref 样式，使左/右方向键移动到原子引用时可见整体框选态
 > - [2026-02-21 nodex-codex] 六次回归修复：补齐 pending reference conversion 的非 blur 收口（例如 Esc 触发 clearFocus）；在 `OutlinerItem` 增加 `finalizePendingRefConversion` 并在失焦 effect + blur 双路径执行，修复“reference 文本仍紫色 + 单击出现全行高亮与 fit-content 边框叠加”的双选中状态
 > - [2026-02-21 nodex-codex] 七次回归修复：修正六次版本的“失焦即收口”副作用；改为仅在 temp 节点发生 `focused -> unfocused` 转换后再 finalize，避免 `ArrowRight` 转换时临时节点在首帧未聚焦就被提前回退（导致无法把光标移动到 reference 框后）
+> - [2026-02-21 nodex-codex] 八次回归修复：统一 `#/@//` 浮窗锚点逻辑为 caret 坐标驱动（`RichTextEditor` 通过 `coordsAtPos` 回传 anchor，`OutlinerItem` 管理三类 anchor 状态并传给 `TagSelector/ReferenceSelector/SlashCommandMenu`）；修复菜单锚在行容器左上角导致的偏位问题，并保证三类菜单定位行为一致
 
 ### Refactor — Loro 收口 Phase 2：LoroText 主编辑链路迁移 (2026-02-21)
 > **Owner**: nodex-codex | **Branch**: codex/loro-phase2-lorotext

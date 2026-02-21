@@ -17,8 +17,8 @@ import { baseKeymap } from 'prosemirror-commands';
 import { EditorView } from 'prosemirror-view';
 import { useNodeStore } from '../../stores/node-store';
 import { useUIStore } from '../../stores/ui-store';
-import { SYS_D } from '../../types';
 import { getLastVisibleNode, isWorkspaceContainer } from '../../lib/tree-utils.js';
+import { isOptionsFieldType } from '../../lib/field-utils.js';
 import * as loroDoc from '../../lib/loro-doc.js';
 import { getPrimaryShortcutKey } from '../../lib/shortcut-registry';
 import { isImeComposingEvent } from '../../lib/ime-keyboard.js';
@@ -100,7 +100,7 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
   const viewRef = useRef<EditorView | null>(null);
 
   // Options autocomplete state
-  const isOptions = fieldDataType === SYS_D.OPTIONS || fieldDataType === SYS_D.OPTIONS_FROM_SUPERTAG;
+  const isOptions = isOptionsFieldType(fieldDataType);
   const allOptions = useFieldOptions(isOptions ? (attrDefId ?? '') : '');
   const addReference = useNodeStore((s) => s.addReference);
   const selectFieldOption = useNodeStore((s) => s.selectFieldOption);

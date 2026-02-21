@@ -144,6 +144,7 @@ npm run test:run
 5. `createChild` 传入内容 payload 时立即初始化 `richText`（无需二次编辑触发迁移）
 6. 仅更新 marks 时，`updatedAt` 也会通过 `richText` 写路径刷新
 7. `setNodeName` 更新后，`raw name` 保持原值（编辑链路不再实时镜像 `name`）
+8. 普通内容节点 `createChild` 后 `raw name` 为空（仅 `richText` 持有内容）
 
 ### 1.3.2 Realtime 自回显保护
 

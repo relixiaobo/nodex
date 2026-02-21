@@ -8,6 +8,7 @@ import {
   resolveTrailingRowBackspaceIntent,
   resolveTrailingRowEnterIntent,
   resolveTrailingRowEscapeIntent,
+  resolveTrailingRowUpdateAction,
 } from '../../src/lib/row-interactions.js';
 
 describe('row interaction intents', () => {
@@ -100,5 +101,22 @@ describe('row interaction intents', () => {
   it('trailing row escape still differentiates options and blur', () => {
     expect(resolveTrailingRowEscapeIntent(true)).toBe('close_options');
     expect(resolveTrailingRowEscapeIntent(false)).toBe('blur_editor');
+  });
+
+  it('trailing row onUpdate trigger intent is shared here', () => {
+    expect(
+      resolveTrailingRowUpdateAction({ text: '@', isOptionsField: false }),
+    ).toEqual({
+      type: 'create_trigger_node',
+      trigger: '@',
+      textOffset: 1,
+    });
+
+    expect(
+      resolveTrailingRowUpdateAction({ text: 'opt', isOptionsField: true }),
+    ).toEqual({
+      type: 'open_options',
+      query: 'opt',
+    });
   });
 });

@@ -419,6 +419,7 @@ npm run test:run
 2. content row 边界导航与默认导航分支
 3. trailing row options intent 仅在 `optionsOpen && optionCount > 0` 时生效
 4. trailing row backspace/arrow/escape 的优先级与原语义一致
+5. trailing row onUpdate（`#/@/>/options`）决策统一由共享层提供
 
 ### 1.21 TrailingInput onUpdate 决策纯函数
 

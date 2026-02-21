@@ -22,7 +22,7 @@ import { isOptionsFieldType } from '../../lib/field-utils.js';
 import * as loroDoc from '../../lib/loro-doc.js';
 import { getPrimaryShortcutKey } from '../../lib/shortcut-registry';
 import { isImeComposingEvent } from '../../lib/ime-keyboard.js';
-import { resolveTrailingUpdateAction } from '../../lib/trailing-input-actions.js';
+import { resolveTrailingRowUpdateAction } from '../../lib/row-interactions.js';
 import {
   resolveTrailingEnterIntent,
   resolveTrailingArrowDownIntent,
@@ -386,7 +386,7 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
 
         const ref = callbacksRef.current;
 
-        const action = resolveTrailingUpdateAction({
+        const action = resolveTrailingRowUpdateAction({
           text,
           isOptionsField: ref.isOptions,
         });

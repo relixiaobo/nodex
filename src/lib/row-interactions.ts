@@ -177,3 +177,33 @@ export function resolveTrailingRowEnterIntent(
   if (params.hasText) return 'create_content_and_continue';
   return 'create_empty';
 }
+
+export type TrailingRowUpdateAction =
+  | { type: 'none' }
+  | { type: 'create_field' }
+  | { type: 'create_trigger_node'; trigger: '#' | '@' | '/'; textOffset: number }
+  | { type: 'open_options'; query: string }
+  | { type: 'close_options' };
+
+interface ResolveTrailingRowUpdateActionParams {
+  text: string;
+  isOptionsField: boolean;
+}
+
+export function resolveTrailingRowUpdateAction(
+  params: ResolveTrailingRowUpdateActionParams,
+): TrailingRowUpdateAction {
+  const { text, isOptionsField } = params;
+
+  if (text === '>') return { type: 'create_field' };
+  if (text === '#' || text === '@' || text === '/') {
+    return { type: 'create_trigger_node', trigger: text, textOffset: text.length };
+  }
+
+  if (isOptionsField) {
+    if (text.length > 0) return { type: 'open_options', query: text };
+    return { type: 'close_options' };
+  }
+
+  return { type: 'none' };
+}

@@ -98,7 +98,7 @@
 - [x] Mod+Shift+Arrow 同级重排
 - [x] TrailingInput 深度偏移 + Blur 自动提交
 - [x] 结构节点跳过（不参与内容导航）
-- [x] content/trailing 共享 intent 决策层（`row-interactions`）
+- [x] content/trailing 共享 intent 决策层（`row-interactions`，含 trailing onUpdate 触发）
 
 ## 相关实现文件
 

@@ -110,6 +110,7 @@ function focusTrailingInputForParent(parentId: string): boolean {
 
 export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId, fieldDataType, attrDefId, onNavigateOut, bulletColors }: OutlinerItemProps) {
   const node = useNode(nodeId);
+  const referenceTargetNode = useNode(node?.type === 'reference' ? (node.targetId ?? null) : null);
   const expandKey = `${parentId}:${nodeId}`;
   const isExpanded = useUIStore((s) => s.expandedNodes.has(`${parentId}:${nodeId}`));
   const focusedNodeId = useUIStore((s) => s.focusedNodeId);
@@ -220,7 +221,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     [slashQuery],
   );
 
-  const allChildIds = node?.children ?? [];
+  const allChildIds = (node?.type === 'reference' ? referenceTargetNode?.children : node?.children) ?? [];
   const renderableSiblings = useMemo(() => {
     void _version;
     const getNode = useNodeStore.getState().getNode;
@@ -342,7 +343,9 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     (focusedParentId === null || focusedParentId === parentId);
   const hasTags = tagIds.length > 0;
   const hasFields = fields.length > 0;
-  const isReference = !!node && loroDoc.getParentId(nodeId) !== parentId;
+  const isReferenceNode = node?.type === 'reference';
+  const isReferenceAlias = !isReferenceNode && !!node && loroDoc.getParentId(nodeId) !== parentId;
+  const isReference = isReferenceNode || isReferenceAlias;
   const isTagDef = node?.type === 'tagDef';
   // Bullet colors: use prop override (template items) or derive from the node's own supertags
   const tagBulletColors = useMemo(
@@ -638,21 +641,23 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
         const refAction = resolveSelectedReferenceShortcut(e, optionsPickerOpen);
         if (refAction) {
           if (refAction === 'delete') {
-            if (!isReference) return;
+            if (!isReferenceNode) return;
             e.preventDefault();
             removeReference(nodeId);
             clearSelection();
             return;
           }
           if (refAction === 'convert_printable') {
-            if (!isReference) return;
+            if (!isReferenceNode) return;
             e.preventDefault();
             const getNode = useNodeStore.getState().getNode;
             const parent = getNode(parentId);
             const pos = parent?.children?.indexOf(nodeId) ?? -1;
             if (pos < 0) return;
+            const revertTargetId = getNode(nodeId)?.targetId;
+            if (!revertTargetId) return;
             const tempNodeId = startRefConversion(nodeId, parentId, pos);
-            setPendingRefConversion({ tempNodeId, refNodeId: nodeId, parentId });
+            setPendingRefConversion({ tempNodeId, refNodeId: revertTargetId, parentId });
             setPendingInputChar({ char: e.key, nodeId: tempNodeId, parentId });
             clearSelection();
             useUIStore.getState().setFocusClickCoords({
@@ -664,14 +669,16 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
             return;
           }
           if (refAction === 'convert_arrow_right') {
-            if (!isReference) return;
+            if (!isReferenceNode) return;
             e.preventDefault();
             const getNode = useNodeStore.getState().getNode;
             const parent = getNode(parentId);
             const pos = parent?.children?.indexOf(nodeId) ?? -1;
             if (pos < 0) return;
+            const revertTargetId = getNode(nodeId)?.targetId;
+            if (!revertTargetId) return;
             const tempNodeId = startRefConversion(nodeId, parentId, pos);
-            setPendingRefConversion({ tempNodeId, refNodeId: nodeId, parentId });
+            setPendingRefConversion({ tempNodeId, refNodeId: revertTargetId, parentId });
             clearSelection();
             useUIStore.getState().setFocusClickCoords({
               nodeId: tempNodeId,
@@ -1598,6 +1605,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
           setPendingRefConversion({ tempNodeId, refNodeId, parentId });
           const gpId = loroDoc.getParentId(parentId);
           if (gpId) setExpanded(`${gpId}:${parentId}`, true);
+          useUIStore.getState().setPendingInputChar(null);
           useUIStore.getState().setFocusClickCoords({
             nodeId: tempNodeId,
             parentId,
@@ -1888,10 +1896,10 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
 
   const isDropTarget = dropTargetId === nodeId;
   const isDragging = dragNodeId === nodeId;
-  const nodeText = node.name ?? '';
+  const nodeText = (isReferenceNode ? referenceTargetNode?.name : node.name) ?? '';
   const nodeDisplayText = isOptionsValueNode ? (selectedOptionName || nodeText) : nodeText;
-  const nodeMarks = node.marks ?? [];
-  const nodeInlineRefs = node.inlineRefs ?? [];
+  const nodeMarks = isReferenceNode ? (referenceTargetNode?.marks ?? []) : (node.marks ?? []);
+  const nodeInlineRefs = isReferenceNode ? (referenceTargetNode?.inlineRefs ?? []) : (node.inlineRefs ?? []);
   const nodeContentHtml = marksToHtml(
     nodeDisplayText,
     isOptionsValueNode ? [] : nodeMarks,

@@ -46,9 +46,9 @@
 
 /* Reference single-click selection: compact fit-content frame (not full-row highlight). */
 .node-selected-ref {
-  border: 1px solid color-mix(in srgb, var(--color-primary) 35%, transparent);
+  border: 1px solid rgba(147, 197, 253, 0.95);
   border-radius: 0.25rem;
-  background: color-mix(in srgb, var(--color-primary) 8%, transparent);
+  background: rgba(147, 197, 253, 0.12);
   padding: 1px 6px;
   margin: -1px 0 -1px -6px;
 }

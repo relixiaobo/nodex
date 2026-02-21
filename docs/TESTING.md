@@ -237,6 +237,7 @@ npm run test:run
 8. `computeNodeFields` 对 options value 优先按 `targetId -> option.name` 解引用，避免 UI 展示内部 optionId（如 `opt_in_progress`）
 9. `number_input` 虚拟配置字段的数据类型标记为 `FIELD_TYPES.NUMBER`（`Minimum/Maximum value` 语义为 Number）
 10. `number_input` 配置控件使用文本输入（不依赖原生 number spinner），与普通 Number 字段一致走 warning 校验路径
+11. `number_input` 配置值为非法数字字符串时，FieldRow value 区右侧展示同款 warning 图标（与普通 Number 字段位置一致）
 
 ### 1.7 标签与引用状态流
 

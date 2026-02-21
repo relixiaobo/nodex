@@ -29,7 +29,7 @@ _(空)_
 |-------|---------|------|-------------|
 | nodex-cc | _(idle — PR #63 merged)_ | — | — |
 | nodex-cc-2 | _(idle — PR #61 merged)_ | — | — |
-| nodex-codex | Loro 收口 Phase 2（field value 交互/样式/语义收口） | codex/loro-phase2-lorotext | docs/TASKS.md, src/components/fields/FieldRow.tsx, src/hooks/use-node-fields.ts, src/components/fields/DatePicker.tsx, src/components/fields/FieldValueOutliner.tsx, src/components/outliner/OutlinerItem.tsx, src/components/fields/NodePicker.tsx, src/components/editor/TrailingInput.tsx, src/lib/checkbox-utils.ts, src/stores/node-store.ts, tests/vitest/use-node-fields-config.test.ts, tests/vitest/done-state-mapping.test.ts, tests/vitest/node-store-fields.test.ts, docs/TESTING.md |
+| nodex-codex | Loro 收口 Phase 2（field value 交互/样式/语义收口） | codex/loro-phase2-lorotext | docs/TASKS.md, docs/TESTING.md, src/components/fields/FieldRow.tsx, src/hooks/use-node-fields.ts, src/components/fields/DatePicker.tsx, src/components/fields/FieldValueOutliner.tsx, src/components/outliner/OutlinerItem.tsx, src/components/fields/NodePicker.tsx, src/components/editor/TrailingInput.tsx, src/lib/field-utils.ts, src/lib/checkbox-utils.ts, src/stores/node-store.ts, src/entrypoints/sidepanel/App.tsx, src/entrypoints/test/main.tsx, src/entrypoints/test/seed-data.ts, tests/vitest/use-node-fields-config.test.ts, tests/vitest/done-state-mapping.test.ts, tests/vitest/node-store-fields.test.ts, tests/vitest/field-row-config-render.test.ts, tests/vitest/field-utils.test.ts |
 
 ---
 
@@ -68,6 +68,7 @@ _(空)_
 > - [2026-02-21 nodex-codex] 响应最新三点反馈：`Minimum/Maximum` 保持普通 outliner 风格但恢复 `number` 语义输入，并将 `number_input` 虚拟配置字段标记为 `FIELD_TYPES.NUMBER`；Date/Options 下拉统一提升为 `z-[1200] + bg-surface` 消除穿模/透底；Pre-determined options value 在 `OutlinerItem` 中按 reference 样式 bullet 渲染；done mapping 读取去掉 `targetId ?? name` fallback，完全对齐 targetId-only 模型
 > - [2026-02-21 nodex-codex] 继续追查穿模根因：`OutlinerItem` 的 overlay 层级此前绑定 `isFocused`，而 options 下拉可在“selected 但未 focused”状态打开，导致 row 仍在普通 stacking context 被兄弟行覆盖；已改为 `optionsPickerOpen` 单独触发行层级提升，并移除默认 `z-[1]` 以避免无必要 stacking context
 > - [2026-02-21 nodex-codex] 继续修复弹层残留与日期穿模：`DatePicker/NodePicker/OptionsPicker` outside click 统一切到 `pointerdown + capture`；移除 `OutlinerItem` children 容器 `z-[1]`（避免子树 stacking context 互压）；`Minimum/Maximum` 改为文本输入并复用 Number warning 逻辑，非法值可输入且显示告警（min/max 解析仅对合法数字生效）
+> - [2026-02-21 nodex-codex] 修复测试数据“先新后旧回流”：test 入口改为 `seedTestData({ forceFresh: true }) + <App skipBootstrap />`，避免 test 页面再走 sidepanel 的持久化 bootstrap；fresh 模式同时清理 snapshot 与 persist（UI/workspace）状态，确保每次进入 test 页都是确定性种子数据
 
 ### Refactor — Loro 收口 Phase 1：detached guard + origin 策略 (2026-02-21)
 > **Owner**: nodex-codex | **Branch**: codex/loro-phase1-guards

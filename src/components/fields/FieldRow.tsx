@@ -196,7 +196,8 @@ function ConfigNumberInput({ nodeId, configKey }: { nodeId: string; configKey: s
     <div className="flex min-h-7 items-center gap-2 py-1" style={{ paddingLeft: FIELD_VALUE_INSET }}>
       <BulletChevron hasChildren={false} isExpanded={false} onBulletClick={() => {}} />
       <input
-        type="text"
+        type="number"
+        step="any"
         inputMode="decimal"
         className="h-[21px] min-w-[120px] bg-transparent p-0 text-sm leading-[21px] text-foreground outline-none placeholder:text-foreground-tertiary"
         value={draft}

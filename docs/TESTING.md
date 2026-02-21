@@ -235,6 +235,7 @@ npm run test:run
 6. `OptionsPicker` 的新建选项能力受 `autocollectOptions` 控制（未显式关闭时允许，显式关闭后禁止）
 7. 字段 value 布局基线由共享常量 `FIELD_VALUE_INSET` 驱动，`FieldRow` 配置项渲染测试锁定该常量对齐
 8. `computeNodeFields` 对 options value 优先按 `targetId -> option.name` 解引用，避免 UI 展示内部 optionId（如 `opt_in_progress`）
+9. `number_input` 虚拟配置字段的数据类型标记为 `FIELD_TYPES.NUMBER`（`Minimum/Maximum value` 语义为 Number）
 
 ### 1.7 标签与引用状态流
 
@@ -261,11 +262,12 @@ npm run test:run
 1. `setFieldValue(nodeId, fieldDefId, values[])` — 清空旧值，创建新 value 节点（children of fieldEntry）
 2. `clearFieldValue(nodeId, fieldDefId)` — 删除 fieldEntry 的所有 value 子节点
 3. `setOptionsFieldValue(nodeId, fieldDefId, optionId)` — value 节点仅写 `targetId`（不冗余 `name`）
-4. `addFieldToNode(nodeId, fieldDefId)` — 幂等（已存在则返回已有 feId）
-5. `removeField(nodeId, feId)` — 直接删除 fieldEntry 节点（Loro 不移入 Trash）
-6. `toggleCheckboxField(feId)` — 无子节点时创建 `name:'true'` 节点；有子节点则删除全部
-7. `addUnnamedFieldToNode(nodeId)` — 返回 `{ fieldEntryId, fieldDefId }`，占位 fieldDef 创建在 SCHEMA
-8. `replaceFieldDef(nodeId, feId, oldFdId, newFdId)` — 直接写入 fieldDefId（无所有权校验）
+4. `addDoneMappingEntry/removeDoneMappingEntry` 的 option 值节点同样仅用 `targetId`，`checkbox-utils` 读取不再依赖 `name` fallback
+5. `addFieldToNode(nodeId, fieldDefId)` — 幂等（已存在则返回已有 feId）
+6. `removeField(nodeId, feId)` — 直接删除 fieldEntry 节点（Loro 不移入 Trash）
+7. `toggleCheckboxField(feId)` — 无子节点时创建 `name:'true'` 节点；有子节点则删除全部
+8. `addUnnamedFieldToNode(nodeId)` — 返回 `{ fieldEntryId, fieldDefId }`，占位 fieldDef 创建在 SCHEMA
+9. `replaceFieldDef(nodeId, feId, oldFdId, newFdId)` — 直接写入 fieldDefId（无所有权校验）
 
 ### 1.9 Schema / Supertag 构建链路
 

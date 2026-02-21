@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { computeNodeFields } from '../../src/hooks/use-node-fields.js';
 import { useNodeStore } from '../../src/stores/node-store.js';
 import { resetAndSeed } from './helpers/test-state.js';
-import { SYS_A } from '../../src/types/index.js';
+import { FIELD_TYPES, SYS_A } from '../../src/types/index.js';
 
 describe('computeNodeFields config controls', () => {
   beforeEach(() => {
@@ -41,5 +41,16 @@ describe('computeNodeFields config controls', () => {
     const status = fields.find((f) => f.fieldDefId === 'attrDef_status');
 
     expect(status?.valueName).toBe('In Progress');
+  });
+
+  it('exposes number_input virtual config fields as NUMBER data type', () => {
+    const store = useNodeStore.getState();
+    const fields = computeNodeFields(store.getNode, store.getChildren, 'attrDef_age');
+    const byKey = new Map(fields.map((f) => [f.fieldDefId, f]));
+
+    expect(byKey.get(SYS_A.MIN_VALUE)?.configControl).toBe('number_input');
+    expect(byKey.get(SYS_A.MIN_VALUE)?.dataType).toBe(FIELD_TYPES.NUMBER);
+    expect(byKey.get(SYS_A.MAX_VALUE)?.configControl).toBe('number_input');
+    expect(byKey.get(SYS_A.MAX_VALUE)?.dataType).toBe(FIELD_TYPES.NUMBER);
   });
 });

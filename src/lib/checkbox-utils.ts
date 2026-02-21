@@ -204,7 +204,7 @@ function readDoneMappingEntries(
     for (const valueId of valueIds) {
       const valueNode = loroDoc.toNodexNode(valueId);
       if (!valueNode) continue;
-      const optionId = valueNode.targetId ?? valueNode.name;
+      const optionId = valueNode.targetId;
       if (!optionId) continue;
       result.push({ fieldDefId: mappingEntry.fieldDefId, optionId });
     }

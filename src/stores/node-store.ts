@@ -773,7 +773,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
 
         for (const valueId of entryNode.children ?? []) {
           const valueNode = loroDoc.toNodexNode(valueId);
-          const existingOptionId = valueNode?.targetId ?? valueNode?.name;
+          const existingOptionId = valueNode?.targetId;
           if (existingOptionId === optionId) return;
         }
       }
@@ -784,7 +784,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
 
       const valueId = nanoid();
       loroDoc.createNode(valueId, mappingEntryId);
-      loroDoc.setNodeDataBatch(valueId, { name: optionId, targetId: optionId });
+      loroDoc.setNodeData(valueId, 'targetId', optionId);
       loroDoc.commitDoc();
     },
 

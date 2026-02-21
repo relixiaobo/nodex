@@ -288,7 +288,7 @@ export function NodePicker({
       {/* Dropdown — shown below the value */}
       {open && (
         <div
-          className="absolute top-full z-50 mt-0.5 w-56 max-h-52 overflow-y-auto rounded-lg border border-border bg-popover shadow-lg p-1"
+          className="absolute top-full z-[1200] mt-0.5 w-56 max-h-52 overflow-y-auto rounded-lg border border-border bg-surface shadow-lg p-1"
           style={{ left: insetLeft }}
           onMouseDown={(e) => e.preventDefault()}
         >

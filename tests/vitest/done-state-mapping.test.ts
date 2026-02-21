@@ -188,6 +188,7 @@ describe('Store: addDoneMappingEntry / removeDoneMappingEntry', () => {
     const valueNodeId = loroDoc.getChildren(mappingEntryId!)[0];
     const valueNode = valueNodeId ? loroDoc.toNodexNode(valueNodeId) : null;
     expect(valueNode?.targetId).toBe('opt_done');
+    expect(valueNode?.name).toBeUndefined();
   });
 
   it('removeDoneMappingEntry: removes by index', () => {

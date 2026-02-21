@@ -136,6 +136,7 @@ export function computeNodeFields(
     switch (control) {
       case 'toggle': return SYS_D.BOOLEAN;
       case 'color_picker': return SYS_D.COLOR;
+      case 'number_input': return FIELD_TYPES.NUMBER;
       case 'outliner': return '__outliner__';
       default: return FIELD_TYPES.PLAIN;
     }

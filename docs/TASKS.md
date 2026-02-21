@@ -29,7 +29,7 @@ _(空)_
 |-------|---------|------|-------------|
 | nodex-cc | P1 NodePanel Header 重设计 | cc/node-panel-header | src/components/panel/NodeHeader.tsx, NodePanel.tsx, OutlinerView.tsx, ui-store.ts |
 | nodex-cc-2 | _(idle — PR #61 merged)_ | — | — |
-| nodex-codex | Loro 收口 Phase 2（field value 交互/样式/语义收口） | codex/loro-phase2-lorotext | docs/TASKS.md, docs/TESTING.md, src/components/fields/field-layout.ts, src/components/fields/FieldRow.tsx, src/hooks/use-node-fields.ts, src/components/fields/DatePicker.tsx, src/components/fields/FieldValueOutliner.tsx, src/components/outliner/OutlinerItem.tsx, src/components/fields/NodePicker.tsx, src/components/editor/TrailingInput.tsx, src/lib/field-utils.ts, src/lib/checkbox-utils.ts, src/stores/node-store.ts, src/entrypoints/sidepanel/App.tsx, src/entrypoints/test/main.tsx, src/entrypoints/test/seed-data.ts, tests/vitest/use-node-fields-config.test.ts, tests/vitest/done-state-mapping.test.ts, tests/vitest/node-store-fields.test.ts, tests/vitest/field-row-config-render.test.ts, tests/vitest/field-utils.test.ts, tests/vitest/node-store-inline-refs.test.ts, tests/vitest/test-entrypoint-bootstrap.test.ts |
+| nodex-codex | Reference 交互收口（单击选中/ESC选中区分 + inline 转换输入） | codex/reference-selection-interactions | docs/TASKS.md, docs/features/references.md, docs/features/node-selection.md, src/components/outliner/OutlinerItem.tsx, src/stores/ui-store.ts, src/assets/main.css, tests/vitest/ui-store-undo-focus.test.ts, tests/vitest/selected-reference-shortcuts.test.ts |
 
 ---
 
@@ -39,6 +39,18 @@ _(空)_
 > **Owner**: nodex-cc | **Branch**: cc/node-panel-header | **Spec**: `docs/features/node-panel-header.md`
 > **迭代日志**:
 > - [2026-02-21 cc] 开始实现：重构 PanelTitle → NodeHeader，三列对齐网格，隐藏字段占位行
+
+### P1 Reference 交互收口：单击选中 vs Esc/框选 + inline 转换输入
+> **Owner**: nodex-codex | **Branch**: codex/reference-selection-interactions | **Spec**: `docs/features/references.md`, `docs/features/node-selection.md`
+> **目标**: 区分 reference 单击选中与全局选中视觉语义，恢复/收口 reference ↔ inline reference 切换与输入交互一致性
+> **Files**: `src/components/outliner/OutlinerItem.tsx`, `src/stores/ui-store.ts`, `src/assets/main.css`, `tests/vitest/ui-store-undo-focus.test.ts`, `tests/vitest/selected-reference-shortcuts.test.ts`, `docs/features/references.md`, `docs/features/node-selection.md`
+> **Progress**:
+> - [ ] 增加 selection source（`ref-click` vs `global`）并接入选中/聚焦状态流
+> - [ ] 恢复 reference 单击 `fit-content` 边框样式，保留 Esc/框选全行高亮
+> - [ ] 收口 selected reference 输入转换路径（ArrowRight/可打印字符/blur 回退）
+> - [ ] 补齐回归测试并更新 feature 文档
+> **迭代日志**:
+> - [2026-02-21 nodex-codex] 任务认领：先整理行为-commit 映射，确认“全行高亮（global）”与“reference 单击边框（ref-click）”并存方案，再开始实现
 
 ### Refactor — Loro 收口 Phase 2：LoroText 主编辑链路迁移 (2026-02-21)
 > **Owner**: nodex-codex | **Branch**: codex/loro-phase2-lorotext

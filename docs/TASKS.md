@@ -29,7 +29,7 @@ _(空)_
 |-------|---------|------|-------------|
 | nodex-cc | P1 NodePanel Header 重设计 | cc/node-panel-header | src/components/panel/NodeHeader.tsx, NodePanel.tsx, OutlinerView.tsx, ui-store.ts |
 | nodex-cc-2 | _(idle — PR #61 merged)_ | — | — |
-| nodex-codex | Reference 交互收口（单击选中/ESC选中区分 + inline 转换输入） | codex/reference-selection-interactions | docs/TASKS.md, docs/features/references.md, docs/features/node-selection.md, src/components/outliner/OutlinerItem.tsx, src/stores/ui-store.ts, src/assets/main.css, tests/vitest/ui-store-undo-focus.test.ts, tests/vitest/selected-reference-shortcuts.test.ts |
+| nodex-codex | Refactor — Row 交互统一（content node + trailing input + field value） | codex/row-interaction-unify | docs/TASKS.md, src/lib/row-interactions.ts, src/lib/node-editor-shortcuts.ts, src/lib/trailing-input-navigation.ts, src/components/editor/RichTextEditor.tsx, src/components/editor/TrailingInput.tsx, tests/vitest/row-interactions.test.ts, tests/vitest/node-editor-shortcuts.test.ts, tests/vitest/trailing-input-navigation.test.ts, docs/features/outliner-interactions.md |
 
 ---
 
@@ -39,6 +39,17 @@ _(空)_
 > **Owner**: nodex-cc | **Branch**: cc/node-panel-header | **Spec**: `docs/features/node-panel-header.md`
 > **迭代日志**:
 > - [2026-02-21 cc] 开始实现：重构 PanelTitle → NodeHeader，三列对齐网格，隐藏字段占位行
+
+### Refactor — Row 交互统一（content node + trailing input + field value）
+> **Owner**: nodex-codex | **Branch**: codex/row-interaction-unify | **Spec**: `docs/features/outliner-interactions.md`, `docs/features/editor-triggers.md`, `docs/features/keyboard-shortcuts.md`
+> **目标**: 统一 content node / trailing input / field value 的键盘交互语义，抽出共享 intent 层，减少分叉逻辑并保持现有行为
+> **Files**: `src/lib/row-interactions.ts`, `src/lib/node-editor-shortcuts.ts`, `src/lib/trailing-input-navigation.ts`, `src/components/editor/RichTextEditor.tsx`, `src/components/editor/TrailingInput.tsx`, `tests/vitest/row-interactions.test.ts`, `tests/vitest/node-editor-shortcuts.test.ts`, `tests/vitest/trailing-input-navigation.test.ts`, `docs/features/outliner-interactions.md`
+> **Progress**:
+> - [ ] 抽取共享 row interaction intents（Enter/Arrow/Escape + 边界语义）
+> - [ ] RichTextEditor / TrailingInput 切换到共享 intent 层（行为不变）
+> - [ ] 增加跨模式一致性测试并更新文档
+> **迭代日志**:
+> - [2026-02-21 nodex-codex] 任务认领：先对齐 content node 与 trailing input 的行为矩阵，再抽取共享 intent 层，最后用回归测试锁定一致性
 
 ### P1 Reference 交互收口：单击选中 vs Esc/框选 + inline 转换输入
 > **Owner**: nodex-codex | **Branch**: codex/reference-selection-interactions | **Spec**: `docs/features/references.md`, `docs/features/node-selection.md`

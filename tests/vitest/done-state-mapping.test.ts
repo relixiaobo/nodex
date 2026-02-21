@@ -205,6 +205,35 @@ describe('Store: addDoneMappingEntry / removeDoneMappingEntry', () => {
     expect(mappings[0].checkedOptionIds).toContain('opt_in_progress');
   });
 
+  it('removeDoneMappingEntry: ignores malformed/non-entry children when resolving index', () => {
+    const store = useNodeStore.getState();
+    store.addDoneMappingEntry('tagDef_task', true, 'attrDef_status', 'opt_done');
+    store.addDoneMappingEntry('tagDef_task', true, 'attrDef_status', 'opt_in_progress');
+
+    const checkedTupleId = loroDoc.getChildren('tagDef_task').find((cid) => {
+      const node = loroDoc.toNodexNode(cid);
+      return node?.type === 'fieldEntry' && node.fieldDefId === SYS_A.DONE_MAP_CHECKED;
+    });
+    expect(checkedTupleId).toBeTruthy();
+
+    // Non-fieldEntry child mixed into the container
+    loroDoc.createNode('done_map_noise_content', checkedTupleId!);
+    loroDoc.setNodeData('done_map_noise_content', 'name', 'noise');
+    // Malformed fieldEntry without targetId value
+    loroDoc.createNode('done_map_noise_entry', checkedTupleId!);
+    loroDoc.setNodeDataBatch('done_map_noise_entry', { type: 'fieldEntry', fieldDefId: 'attrDef_status' });
+    loroDoc.createNode('done_map_noise_value', 'done_map_noise_entry');
+    loroDoc.setNodeData('done_map_noise_value', 'name', 'legacy-no-target');
+    loroDoc.commitDoc();
+
+    // Should still delete the 2nd valid mapping entry
+    store.removeDoneMappingEntry('tagDef_task', true, 1);
+
+    const node = loroDoc.toNodexNode('task_1')!;
+    const mappings = getDoneStateMappings(node);
+    expect(mappings[0].checkedOptionIds).toEqual(['opt_done']);
+  });
+
   it('unchecked mapping is separate from checked', () => {
     const store = useNodeStore.getState();
     store.addDoneMappingEntry('tagDef_task', true, 'attrDef_status', 'opt_done');

@@ -138,7 +138,7 @@ let _childrenNodesCacheVer = -1;
 const _childrenNodesCache = new Map<string, NodexNode[]>();
 const INLINE_REF_CHAR = '\uFFFC';
 
-function remapInlineRefsByPlaceholderOrder(
+export function remapInlineRefsByPlaceholderOrder(
   nextText: string,
   prevInlineRefs: InlineRefEntry[] | undefined,
 ): InlineRefEntry[] {
@@ -793,9 +793,16 @@ export const useNodeStore = create<NodeStore>((set, get) => {
       const mappingTupleId = findFieldEntry(tagDefId, mappingKey);
       if (!mappingTupleId) return;
 
+      // Keep index behavior aligned with UI list: only count valid mapping entries
+      // (fieldEntry with at least one targetId value child).
       const entries = loroDoc.getChildren(mappingTupleId).filter((cid) => {
         const node = loroDoc.toNodexNode(cid);
-        return node?.type === 'fieldEntry';
+        if (node?.type !== 'fieldEntry') return false;
+        const hasValueTarget = (node.children ?? []).some((valueId) => {
+          const valueNode = loroDoc.toNodexNode(valueId);
+          return !!valueNode?.targetId;
+        });
+        return hasValueTarget;
       });
       const targetId = entries[index];
       if (!targetId) return;

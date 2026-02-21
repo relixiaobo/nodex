@@ -16,6 +16,7 @@ import { TagBar } from '../tags/TagBar';
 import { TagSelector, type TagDropdownHandle } from '../tags/TagSelector';
 import { ReferenceSelector, type ReferenceDropdownHandle } from '../references/ReferenceSelector';
 import { FieldRow } from '../fields/FieldRow';
+import { FIELD_OVERLAY_Z_INDEX } from '../fields/field-layout.js';
 import { toFieldRowEntryProps } from '../fields/field-row-props.js';
 import { SYS_V } from '../../types/index.js';
 import { useFieldOptions } from '../../hooks/use-field-options.js';
@@ -2067,7 +2068,10 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
         </div>
         {/* Options picker dropdown: shown when selecting an Options value row/reference */}
         {optionsPickerOpen && allFieldOptions.length > 0 && (
-          <div className="absolute left-0 top-full z-[1200] mt-0.5 max-h-48 w-56 overflow-y-auto rounded-lg border border-border bg-surface p-1 shadow-lg">
+          <div
+            className="absolute left-0 top-full mt-0.5 max-h-48 w-56 overflow-y-auto rounded-lg border border-border bg-surface p-1 shadow-lg"
+            style={{ zIndex: FIELD_OVERLAY_Z_INDEX }}
+          >
             {allFieldOptions.map((opt, i) => (
               <div
                 key={opt.id}

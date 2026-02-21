@@ -186,7 +186,7 @@ function ConfigNumberInput({ nodeId, configKey }: { nodeId: string; configKey: s
     }
     // Keep same behavior as normal number fields: allow any text, validate via warning only.
     setConfigValue(nodeId, propName, raw);
-  }, [draft, nodeId, propName, setConfigValue, valueText]);
+  }, [draft, nodeId, propName, setConfigValue]);
 
   return (
     <div className="flex min-h-7 items-center gap-2 py-1" style={{ paddingLeft: FIELD_VALUE_INSET }}>

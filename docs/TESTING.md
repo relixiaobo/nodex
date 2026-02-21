@@ -133,7 +133,9 @@ npm run test:run
 
 ### 1.3.1 内容模型联动（Node Store）
 
-**测试文件**: `tests/vitest/node-store-content.test.ts`
+**测试文件**:
+- `tests/vitest/node-store-content.test.ts`
+- `tests/vitest/node-store-inline-refs.test.ts`
 
 **覆盖点**:
 
@@ -145,6 +147,7 @@ npm run test:run
 6. 仅更新 marks 时，`updatedAt` 也会通过 `richText` 写路径刷新
 7. `setNodeName` 更新后，`raw name` 保持原值（编辑链路不再实时镜像 `name`）
 8. 普通内容节点 `createChild` 后 `raw name` 为空（仅 `richText` 持有内容）
+9. `remapInlineRefsByPlaceholderOrder` 独立覆盖占位符增减/重排场景（删除占位符会截断、增加占位符不生成新引用、旧 offset 先排序再映射）
 
 ### 1.3.2 Realtime 自回显保护
 
@@ -824,9 +827,10 @@ Store 集成 — addDoneMappingEntry（2 cases）:
 Store 集成 — removeDoneMappingEntry（2 cases）:
 14. `store.removeDoneMappingEntry(tagDefId, true, index)` — 从 `NDX_A07` 子树按顺序移除条目
 15. 移除后 getDoneStateMappings 结果与预期一致
+16. 容器中混入噪声节点/无效 fieldEntry 时，index 解析仍按“有效 mapping entry”计算，不会删错
 
 Store 集成 — toggleNodeDone（1 case）:
-16. 有 doneMapping 时仍只产生一次 commit（`_version` 仅 +1）
+17. 有 doneMapping 时仍只产生一次 commit（`_version` 仅 +1）
 
 ### 1.39 Web Clip 落库服务
 

@@ -409,7 +409,19 @@ npm run test:run
 3. options 关闭时 `Escape` 的 clear-selection 语义
 4. IME 组合输入事件（`isComposing` / `Process` / `keyCode=229`）不触发 reference 选中态快捷键
 
-### 1.21 TrailingInput onUpdate 决策纯函数
+### 1.20 Row Interactions 共享意图层
+
+**测试文件**: `tests/vitest/row-interactions.test.ts`
+
+**覆盖点**:
+
+1. content row 在 reference/hashTag/slash 下拉打开时的优先级决策
+2. content row 边界导航与默认导航分支
+3. trailing row options intent 仅在 `optionsOpen && optionCount > 0` 时生效
+4. trailing row backspace/arrow/escape 的优先级与原语义一致
+5. trailing row onUpdate（`#/@/>/options`）决策统一由共享层提供
+
+### 1.21 TrailingInput onUpdate 决策纯函数（direct import `row-interactions`）
 
 **测试文件**: `tests/vitest/trailing-input-actions.test.ts`
 
@@ -420,7 +432,7 @@ npm run test:run
 3. Options 字段下的 open/close dropdown 决策
 4. 普通文本（非 Options）返回 no-op
 
-### 1.22 TrailingInput 键盘导航决策纯函数
+### 1.22 TrailingInput 键盘导航决策纯函数（direct import `row-interactions`）
 
 **测试文件**: `tests/vitest/trailing-input-navigation.test.ts`
 
@@ -432,7 +444,7 @@ npm run test:run
 4. `Escape` 的 close-options vs blur-editor 决策
 5. `Enter` 的 options-confirm / create-content-and-continue / create-empty 决策
 
-### 1.23 NodeEditor 键盘决策纯函数
+### 1.23 NodeEditor 键盘决策纯函数（direct import `row-interactions`）
 
 **测试文件**: `tests/vitest/node-editor-shortcuts.test.ts`
 
@@ -597,9 +609,10 @@ handleDelete isEmpty（5 cases, Bug #54 回归）:
 6. name 仅含 `\u200B` / 空字符串 → 允许删除
 7. 真实文本 / `\u200B` + 真实文本 → 阻止删除
 
-hash trigger cleanup safety（2 cases, Bug #53 回归）:
+hash trigger cleanup safety（3 cases, Bug #53 + CJK hashtag 回归）:
 8. DOM cleanup 失败后检测残留 `#` 触发词
 9. DOM cleanup 成功后无残留
+10. `#中文` 可被 hashtag trigger 正确匹配（Unicode 查询）
 
 ### 1.51 P0 Loro 基础设施 — 7项底层 API
 
@@ -987,6 +1000,16 @@ createSibling 自动标签（2 cases）:
 | 14 | definition 节点不显示 supertag 行 | type 为 tagDef/fieldDef |
 | 15–17 | 列对齐常量 | paddingLeft=6, colB=25, drop=21 |
 
+### 1.55 TrailingInput `@` 触发后光标定位回归
+
+**测试文件**: `tests/vitest/trailing-input-trigger-focus.test.ts`
+
+**覆盖点**:
+
+1. 在 `TrailingInput` 输入 `@` 会创建触发节点并设置 `triggerHint='@'`
+2. 新建触发节点后会写入 `focusClickCoords.textOffset=1`（光标在 `@` 后）
+3. `focusedNodeId/focusedParentId` 指向新建节点与当前父节点
+
 ---
 
 ## Phase 2: 视觉检查点
@@ -1047,6 +1070,7 @@ createSibling 自动标签（2 cases）:
 | 1.17 | 快捷键注册表一致性 | PASS/FAIL |
 | 1.18 | 全局导航快捷键拦截保护 | PASS/FAIL |
 | 1.19 | Selected Reference 快捷键解析 | PASS/FAIL |
+| 1.20 | Row Interactions 共享意图层 | PASS/FAIL |
 | 1.21 | TrailingInput onUpdate 决策纯函数 | PASS/FAIL |
 | 1.22 | TrailingInput 键盘导航决策纯函数 | PASS/FAIL |
 | 1.23 | NodeEditor 键盘决策纯函数 | PASS/FAIL |
@@ -1077,6 +1101,7 @@ createSibling 自动标签（2 cases）:
 | 1.52 | LoroText Bridge（TextMark/InlineRef 双向桥接） | PASS/FAIL |
 | 1.53 | Test 入口 Bootstrap（防测试数据回流） | PASS/FAIL |
 | 1.54 | NodePanel Header 重设计（UIStore expandedHiddenFields + block 可见性 + 列对齐） | PASS/FAIL |
+| 1.55 | TrailingInput `@` 触发后光标定位回归 | PASS/FAIL |
 | 2 | 视觉渲染 | PASS/FAIL/SKIP |
 | 3 | 扩展构建 | PASS/FAIL |
 

@@ -1,28 +1,28 @@
 import {
-  resolveNodeEditorArrowIntent,
-  resolveNodeEditorEnterIntent,
-  resolveNodeEditorEscapeIntent,
-  resolveNodeEditorForceCreateIntent,
-} from '../../src/lib/node-editor-shortcuts.js';
+  resolveContentRowArrowIntent,
+  resolveContentRowEnterIntent,
+  resolveContentRowEscapeIntent,
+  resolveContentRowForceCreateIntent,
+} from '../../src/lib/row-interactions.js';
 
 describe('node editor shortcut resolver', () => {
   it('resolves enter intent with dropdown priority', () => {
-    expect(resolveNodeEditorEnterIntent({
+    expect(resolveContentRowEnterIntent({
       referenceActive: true,
       hashTagActive: true,
       slashActive: true,
     })).toBe('reference_confirm');
-    expect(resolveNodeEditorEnterIntent({
+    expect(resolveContentRowEnterIntent({
       referenceActive: false,
       hashTagActive: true,
       slashActive: true,
     })).toBe('hashtag_confirm');
-    expect(resolveNodeEditorEnterIntent({
+    expect(resolveContentRowEnterIntent({
       referenceActive: false,
       hashTagActive: false,
       slashActive: true,
     })).toBe('slash_confirm');
-    expect(resolveNodeEditorEnterIntent({
+    expect(resolveContentRowEnterIntent({
       referenceActive: false,
       hashTagActive: false,
       slashActive: false,
@@ -31,7 +31,7 @@ describe('node editor shortcut resolver', () => {
 
   it('resolves arrow intent with dropdown and boundary priority', () => {
     expect(
-      resolveNodeEditorArrowIntent({
+      resolveContentRowArrowIntent({
         referenceActive: true,
         hashTagActive: false,
         slashActive: false,
@@ -40,7 +40,7 @@ describe('node editor shortcut resolver', () => {
     ).toBe('reference_nav');
 
     expect(
-      resolveNodeEditorArrowIntent({
+      resolveContentRowArrowIntent({
         referenceActive: false,
         hashTagActive: true,
         slashActive: false,
@@ -49,7 +49,7 @@ describe('node editor shortcut resolver', () => {
     ).toBe('hashtag_nav');
 
     expect(
-      resolveNodeEditorArrowIntent({
+      resolveContentRowArrowIntent({
         referenceActive: false,
         hashTagActive: false,
         slashActive: true,
@@ -58,7 +58,7 @@ describe('node editor shortcut resolver', () => {
     ).toBe('slash_nav');
 
     expect(
-      resolveNodeEditorArrowIntent({
+      resolveContentRowArrowIntent({
         referenceActive: false,
         hashTagActive: false,
         slashActive: false,
@@ -67,7 +67,7 @@ describe('node editor shortcut resolver', () => {
     ).toBe('navigate_outliner');
 
     expect(
-      resolveNodeEditorArrowIntent({
+      resolveContentRowArrowIntent({
         referenceActive: false,
         hashTagActive: false,
         slashActive: false,
@@ -77,14 +77,46 @@ describe('node editor shortcut resolver', () => {
   });
 
   it('resolves escape and force-create intents', () => {
-    expect(resolveNodeEditorEscapeIntent(true, false, true)).toBe('reference_close');
-    expect(resolveNodeEditorEscapeIntent(false, true, true)).toBe('hashtag_close');
-    expect(resolveNodeEditorEscapeIntent(false, false, true)).toBe('slash_close');
-    expect(resolveNodeEditorEscapeIntent(false, false, false)).toBe('select_current');
+    expect(resolveContentRowEscapeIntent({
+      referenceActive: true,
+      hashTagActive: false,
+      slashActive: true,
+    })).toBe('reference_close');
+    expect(resolveContentRowEscapeIntent({
+      referenceActive: false,
+      hashTagActive: true,
+      slashActive: true,
+    })).toBe('hashtag_close');
+    expect(resolveContentRowEscapeIntent({
+      referenceActive: false,
+      hashTagActive: false,
+      slashActive: true,
+    })).toBe('slash_close');
+    expect(resolveContentRowEscapeIntent({
+      referenceActive: false,
+      hashTagActive: false,
+      slashActive: false,
+    })).toBe('select_current');
 
-    expect(resolveNodeEditorForceCreateIntent(true, false, true)).toBe('reference_create');
-    expect(resolveNodeEditorForceCreateIntent(false, true, true)).toBe('hashtag_create');
-    expect(resolveNodeEditorForceCreateIntent(false, false, true)).toBe('noop');
-    expect(resolveNodeEditorForceCreateIntent(false, false, false)).toBe('toggle_done');
+    expect(resolveContentRowForceCreateIntent({
+      referenceActive: true,
+      hashTagActive: false,
+      slashActive: true,
+    })).toBe('reference_create');
+    expect(resolveContentRowForceCreateIntent({
+      referenceActive: false,
+      hashTagActive: true,
+      slashActive: true,
+    })).toBe('hashtag_create');
+    expect(resolveContentRowForceCreateIntent({
+      referenceActive: false,
+      hashTagActive: false,
+      slashActive: true,
+    })).toBe('noop');
+    expect(resolveContentRowForceCreateIntent({
+      referenceActive: false,
+      hashTagActive: false,
+      slashActive: false,
+    })).toBe('toggle_done');
   });
 });

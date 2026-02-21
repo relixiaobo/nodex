@@ -794,11 +794,11 @@ import { toggleMark } from 'prosemirror-commands';
 import { TextSelection } from 'prosemirror-state';
 import { schema } from './pm-schema';
 import {
-  resolveNodeEditorEnterIntent,
-  resolveNodeEditorArrowIntent,
-  resolveNodeEditorEscapeIntent,
-  resolveNodeEditorForceCreateIntent,
-} from '../../lib/node-editor-shortcuts.js';
+  resolveContentRowEnterIntent as resolveNodeEditorEnterIntent,
+  resolveContentRowArrowIntent as resolveNodeEditorArrowIntent,
+  resolveContentRowEscapeIntent as resolveNodeEditorEscapeIntent,
+  resolveContentRowForceCreateIntent as resolveNodeEditorForceCreateIntent,
+} from '../../lib/row-interactions.js';
 import { getPrimaryShortcutKey, getShortcutKeys } from '../../lib/shortcut-registry';
 
 // shortcut-registry 的键名映射到 PM keymap 格式（已兼容，无需转换）

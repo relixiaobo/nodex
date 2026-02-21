@@ -1,15 +1,15 @@
 import {
-  resolveTrailingEnterIntent,
-  resolveTrailingArrowDownIntent,
-  resolveTrailingArrowUpIntent,
-  resolveTrailingBackspaceIntent,
-  resolveTrailingEscapeIntent,
-} from '../../src/lib/trailing-input-navigation.js';
+  resolveTrailingRowEnterIntent,
+  resolveTrailingRowArrowDownIntent,
+  resolveTrailingRowArrowUpIntent,
+  resolveTrailingRowBackspaceIntent,
+  resolveTrailingRowEscapeIntent,
+} from '../../src/lib/row-interactions.js';
 
 describe('trailing input navigation resolver', () => {
   it('resolves backspace intents by priority', () => {
     expect(
-      resolveTrailingBackspaceIntent({
+      resolveTrailingRowBackspaceIntent({
         isEditorEmpty: false,
         depthShifted: true,
         parentChildCount: 0,
@@ -18,7 +18,7 @@ describe('trailing input navigation resolver', () => {
     ).toBe('allow_default');
 
     expect(
-      resolveTrailingBackspaceIntent({
+      resolveTrailingRowBackspaceIntent({
         isEditorEmpty: true,
         depthShifted: true,
         parentChildCount: 0,
@@ -27,7 +27,7 @@ describe('trailing input navigation resolver', () => {
     ).toBe('reset_depth_shift');
 
     expect(
-      resolveTrailingBackspaceIntent({
+      resolveTrailingRowBackspaceIntent({
         isEditorEmpty: true,
         depthShifted: false,
         parentChildCount: 0,
@@ -36,7 +36,7 @@ describe('trailing input navigation resolver', () => {
     ).toBe('collapse_parent');
 
     expect(
-      resolveTrailingBackspaceIntent({
+      resolveTrailingRowBackspaceIntent({
         isEditorEmpty: true,
         depthShifted: false,
         parentChildCount: 2,
@@ -45,7 +45,7 @@ describe('trailing input navigation resolver', () => {
     ).toBe('focus_last_visible');
 
     expect(
-      resolveTrailingBackspaceIntent({
+      resolveTrailingRowBackspaceIntent({
         isEditorEmpty: true,
         depthShifted: false,
         parentChildCount: 2,
@@ -56,7 +56,7 @@ describe('trailing input navigation resolver', () => {
 
   it('resolves arrow-down intents', () => {
     expect(
-      resolveTrailingArrowDownIntent({
+      resolveTrailingRowArrowDownIntent({
         optionsOpen: true,
         optionCount: 2,
         hasNavigateOut: true,
@@ -64,7 +64,7 @@ describe('trailing input navigation resolver', () => {
     ).toBe('options_down');
 
     expect(
-      resolveTrailingArrowDownIntent({
+      resolveTrailingRowArrowDownIntent({
         optionsOpen: false,
         optionCount: 0,
         hasNavigateOut: true,
@@ -72,7 +72,7 @@ describe('trailing input navigation resolver', () => {
     ).toBe('navigate_out_down');
 
     expect(
-      resolveTrailingArrowDownIntent({
+      resolveTrailingRowArrowDownIntent({
         optionsOpen: false,
         optionCount: 0,
         hasNavigateOut: false,
@@ -82,7 +82,7 @@ describe('trailing input navigation resolver', () => {
 
   it('resolves arrow-up intents', () => {
     expect(
-      resolveTrailingArrowUpIntent({
+      resolveTrailingRowArrowUpIntent({
         optionsOpen: true,
         optionCount: 1,
         hasLastVisibleTarget: true,
@@ -91,7 +91,7 @@ describe('trailing input navigation resolver', () => {
     ).toBe('options_up');
 
     expect(
-      resolveTrailingArrowUpIntent({
+      resolveTrailingRowArrowUpIntent({
         optionsOpen: false,
         optionCount: 0,
         hasLastVisibleTarget: true,
@@ -100,7 +100,7 @@ describe('trailing input navigation resolver', () => {
     ).toBe('navigate_out_up');
 
     expect(
-      resolveTrailingArrowUpIntent({
+      resolveTrailingRowArrowUpIntent({
         optionsOpen: false,
         optionCount: 0,
         hasLastVisibleTarget: false,
@@ -109,7 +109,7 @@ describe('trailing input navigation resolver', () => {
     ).toBe('navigate_out_up');
 
     expect(
-      resolveTrailingArrowUpIntent({
+      resolveTrailingRowArrowUpIntent({
         optionsOpen: false,
         optionCount: 0,
         hasLastVisibleTarget: false,
@@ -119,13 +119,13 @@ describe('trailing input navigation resolver', () => {
   });
 
   it('resolves escape intent by options visibility', () => {
-    expect(resolveTrailingEscapeIntent(true)).toBe('close_options');
-    expect(resolveTrailingEscapeIntent(false)).toBe('blur_editor');
+    expect(resolveTrailingRowEscapeIntent(true)).toBe('close_options');
+    expect(resolveTrailingRowEscapeIntent(false)).toBe('blur_editor');
   });
 
   it('resolves enter intent', () => {
     expect(
-      resolveTrailingEnterIntent({
+      resolveTrailingRowEnterIntent({
         optionsOpen: true,
         optionCount: 2,
         hasText: true,
@@ -133,7 +133,7 @@ describe('trailing input navigation resolver', () => {
     ).toBe('options_confirm');
 
     expect(
-      resolveTrailingEnterIntent({
+      resolveTrailingRowEnterIntent({
         optionsOpen: false,
         optionCount: 0,
         hasText: true,
@@ -141,7 +141,7 @@ describe('trailing input navigation resolver', () => {
     ).toBe('create_content_and_continue');
 
     expect(
-      resolveTrailingEnterIntent({
+      resolveTrailingRowEnterIntent({
         optionsOpen: false,
         optionCount: 0,
         hasText: false,

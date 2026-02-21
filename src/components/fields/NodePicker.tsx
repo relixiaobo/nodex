@@ -20,7 +20,7 @@ const TagDefBullet = memo(function TagDefBullet({ tagDefId }: { tagDefId: string
   const color = useNodeStore((s) => { void s._version; return resolveTagColor(tagDefId).text; });
   return (
     <span
-      className="flex h-[13px] w-[13px] items-center justify-center rounded-full"
+      className="flex h-[15px] w-[15px] items-center justify-center rounded-full"
       style={{ backgroundColor: color }}
     >
       <span className="text-[9px] font-bold leading-none text-white select-none">#</span>
@@ -44,6 +44,8 @@ interface NodePickerProps {
   onCreate?: (name: string) => void;
   placeholder?: string;
   isReference?: boolean;
+  /** Left inset for value-row bullet alignment */
+  insetLeft?: number;
 }
 
 const noop = () => {};
@@ -57,6 +59,7 @@ export function NodePicker({
   onCreate,
   placeholder = 'Select...',
   isReference = false,
+  insetLeft = 25,
 }: NodePickerProps) {
   const [open, setOpen] = useState(false);
   const [inputValue, setInputValue] = useState('');
@@ -207,7 +210,7 @@ export function NodePicker({
           /* Reference mode: outline wraps bullet+text */
           <div
             className="flex min-h-7 items-start py-1"
-            style={{ paddingLeft: 6 }}
+            style={{ paddingLeft: insetLeft }}
           >
             {/* Outline wraps reference bullet + text together (like Tana) */}
             <span className="inline-flex items-center gap-2 rounded-sm outline outline-1 outline-primary/50">
@@ -215,7 +218,7 @@ export function NodePicker({
               <span className="flex shrink-0 h-[21px] w-[15px] items-center justify-center">
                 {selectedTagDefColor ? (
                   <span
-                    className="flex h-[13px] w-[13px] items-center justify-center rounded-full"
+                    className="flex h-[15px] w-[15px] items-center justify-center rounded-full"
                     style={{ backgroundColor: selectedTagDefColor }}
                   >
                     <span className="text-[9px] font-bold leading-none text-white select-none">#</span>
@@ -245,7 +248,7 @@ export function NodePicker({
           /* Non-reference mode or closed state */
           <div
             className="flex min-h-7 items-start gap-2 py-1"
-            style={{ paddingLeft: 6 }}
+            style={{ paddingLeft: insetLeft }}
           >
             <BulletChevron
               hasChildren={false}
@@ -284,7 +287,8 @@ export function NodePicker({
       {/* Dropdown — shown below the value */}
       {open && (
         <div
-          className="absolute left-6 top-full z-50 mt-0.5 w-56 max-h-52 overflow-y-auto rounded-lg border border-border bg-popover shadow-lg p-1"
+          className="absolute top-full z-50 mt-0.5 w-56 max-h-52 overflow-y-auto rounded-lg border border-border bg-popover shadow-lg p-1"
+          style={{ left: insetLeft }}
           onMouseDown={(e) => e.preventDefault()}
         >
           {/* Option list — bullet + text per item */}

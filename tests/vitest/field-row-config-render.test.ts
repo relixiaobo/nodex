@@ -22,5 +22,6 @@ describe('FieldRow config control resolution', () => {
     }));
 
     expect(html).toContain('Select supertag');
+    expect(html).toContain('padding-left:25px');
   });
 });

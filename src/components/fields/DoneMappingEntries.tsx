@@ -131,7 +131,7 @@ export function DoneMappingEntries({ tagDefId, mappingKey }: DoneMappingEntriesP
         <div
           key={entry.index}
           className="flex min-h-7 items-center gap-2 py-1 group/entry"
-          style={{ paddingLeft: 6 }}
+          style={{ paddingLeft: 25 }}
         >
           <BulletChevron hasChildren={false} isExpanded={false} onBulletClick={noop} />
           <span className="flex-1 min-w-0 text-sm leading-[21px] text-foreground truncate">
@@ -149,27 +149,29 @@ export function DoneMappingEntries({ tagDefId, mappingKey }: DoneMappingEntriesP
 
       {/* Add area — step-based picker */}
       {pickerStep === 'field' ? (
-        <div style={{ paddingLeft: 6 }}>
+        <div>
           <NodePicker
             options={fieldOptions}
             onSelect={handleFieldSelect}
             onClear={handlePickerCancel}
             placeholder="Select field..."
+            insetLeft={25}
           />
         </div>
       ) : pickerStep === 'option' ? (
-        <div style={{ paddingLeft: 6 }}>
+        <div>
           <NodePicker
             options={optionOptions}
             onSelect={handleOptionSelect}
             onClear={handlePickerCancel}
             placeholder="Select option value..."
+            insetLeft={25}
           />
         </div>
       ) : (
         <div
           className="flex min-h-7 items-center gap-2 py-1 cursor-pointer group/add"
-          style={{ paddingLeft: 6 }}
+          style={{ paddingLeft: 25 }}
           onClick={handleAddClick}
         >
           <BulletChevron hasChildren={false} isExpanded={false} onBulletClick={noop} dimmed />

@@ -27,21 +27,13 @@ _(空)_
 
 | Agent | 当前任务 | 分支 | 修改中的文件 |
 |-------|---------|------|-------------|
-| nodex-cc | Date 节点 & 日记 (#22) | cc/date-nodes | _(待开始)_ |
-| nodex-cc-2 | 网页剪藏 (#30) | cc2/web-clipping | webclip-service.ts, OutlinerItem.tsx, Toast 组件 |
+| nodex-cc | _(idle)_ | — | — |
+| nodex-cc-2 | _(idle)_ | — | — |
 | nodex-codex | Bug 修复 & 基础优化（面包屑导航 + @ reference 排序） | codex/ux-polish | _(待开始)_ |
 
 ---
 
 ## 进行中
-
-### Date 节点 & 日记 (#22)
-> **Owner**: nodex-cc | **Branch**: cc/date-nodes | **Spec**: `docs/features/date-nodes.md`
-> **目标**: 实现年/月/周/日节点层级、Today 快捷入口、自然语言日期解析、日记模板、日期字段链接到日节点
-
-### 网页剪藏 (#30)
-> **Owner**: nodex-cc-2 | **Branch**: cc2/web-clipping | **Spec**: `docs/features/web-clipping.md`
-> **目标**: 将捕获数据保存为节点、自动打标签、Source URL 字段、Toast 反馈、一键保存到 Inbox/Today/指定节点
 
 ### Bug 修复 & 基础优化
 > **Owner**: nodex-codex | **Branch**: codex/ux-polish
@@ -94,9 +86,12 @@ _(空)_
 
 #### Date 节点 & 日记 (#22)
 > 执行顺序 ①（"一切皆节点"系列首项，后续 Search/Views 依赖日期节点）
+> Phase 1 已完成 (PR #73): Year→Week→Day 层级 + Today 入口 + DateNavigationBar + 日历选择器
 
-- [ ] 年/月/周/日节点层级（自动生成）
-- [ ] Today 快捷入口（侧栏按钮 + 快捷键 Ctrl+Shift+D）
+- [x] 年/周/日节点层级（自动生成，ISO 8601 周 + 降序排列） ✓ PR #73
+- [x] Today 快捷入口（侧栏按钮 + 快捷键 Cmd+Shift+D） ✓ PR #73
+- [x] DateNavigationBar（< > Today + Calendar popover） ✓ PR #73
+- [x] 面包屑/标题 "Today" 前缀 ✓ PR #73
 - [ ] 自然语言日期解析（@today / @next Monday / @November）
 - [ ] 日记模板（#day supertag 配置）
 - [ ] 日期字段链接到日节点
@@ -229,6 +224,8 @@ _(空)_
 
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
+| 2026-02-22 | 网页剪藏增强 — sonner toast 反馈 + URL/Email 字段可点击链接 + V2 HTML→子节点树（heading 层级解析 + marks 保留） | nodex-cc-2 | #71 |
+| 2026-02-22 | Date 节点 & 日记 Phase 1 — Year→Week→Day 层级 + Today 入口 + DateNavigationBar + 日历 popover + 面包屑前缀 | nodex-cc | #73 |
 | 2026-02-21 | Editor Bug: CJK IME 组合输入异常（fork prosemirror-view 添加 composing 守卫） | nodex-codex | — |
 | 2026-02-21 | Refactor — Row 交互统一（content/trailing/field-value 共享 intent 层 + CJK hashtag 修复 + trigger caret 修复） | nodex-codex | #70 |
 | 2026-02-21 | P1 Reference 交互收口（单击选中/Esc/框选 + inline 转换 + 浮窗锚点统一） | nodex-codex | #69 |

@@ -60,6 +60,7 @@ _(空)_
 > - [2026-02-21 nodex-codex] 六次回归修复：补齐 pending reference conversion 的非 blur 收口（例如 Esc 触发 clearFocus）；在 `OutlinerItem` 增加 `finalizePendingRefConversion` 并在失焦 effect + blur 双路径执行，修复“reference 文本仍紫色 + 单击出现全行高亮与 fit-content 边框叠加”的双选中状态
 > - [2026-02-21 nodex-codex] 七次回归修复：修正六次版本的“失焦即收口”副作用；改为仅在 temp 节点发生 `focused -> unfocused` 转换后再 finalize，避免 `ArrowRight` 转换时临时节点在首帧未聚焦就被提前回退（导致无法把光标移动到 reference 框后）
 > - [2026-02-21 nodex-codex] 八次回归修复：统一 `#/@//` 浮窗锚点逻辑为 caret 坐标驱动（`RichTextEditor` 通过 `coordsAtPos` 回传 anchor，`OutlinerItem` 管理三类 anchor 状态并传给 `TagSelector/ReferenceSelector/SlashCommandMenu`）；修复菜单锚在行容器左上角导致的偏位问题，并保证三类菜单定位行为一致
+> - [2026-02-21 nodex-codex] 九次回归修复：移除 inline reference hover 下划线样式，保留主题色与点击行为，仅在键盘导航选中原子引用时显示边框态，避免 hover 视觉噪音
 
 ### Refactor — Loro 收口 Phase 2：LoroText 主编辑链路迁移 (2026-02-21)
 > **Owner**: nodex-codex | **Branch**: codex/loro-phase2-lorotext

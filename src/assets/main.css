@@ -183,11 +183,6 @@
   padding: 0 0.0625rem;
 }
 
-.ProseMirror [data-inlineref-node]:hover,
-.node-content [data-inlineref-node]:hover {
-  text-decoration: underline;
-}
-
 /* Keyboard navigation onto inline atom (ArrowLeft/ArrowRight) should be visible. */
 .editor-inline .ProseMirror [data-inlineref-node].ProseMirror-selectednode {
   outline: 1px solid rgba(147, 197, 253, 0.95);

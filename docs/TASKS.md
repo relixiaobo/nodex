@@ -56,6 +56,7 @@ _(空)_
 > - [2026-02-21 nodex-codex] 用户反馈修复：`TrailingInput` 输入 `@/#//` 创建触发节点后补齐 `focusClickCoords(textOffset)`，确保新节点光标落在触发符后而不是行首；`trailing-input-actions` 同步返回 `textOffset` 并更新单测
 > - [2026-02-21 nodex-codex] 第二层收敛：`resolveTrailingUpdateAction` 核心逻辑迁移至 `row-interactions`（新增 `resolveTrailingRowUpdateAction`），`TrailingInput` 直接消费共享层，`trailing-input-actions` 保留兼容转发；补充共享层测试覆盖 onUpdate 触发决策
 > - [2026-02-21 nodex-codex] 第三层收敛：`RichTextEditor` 与 `TrailingInput` 运行时决策统一直连 `row-interactions`（wrapper 保留兼容）；新增 `trailing-input-trigger-focus.test.ts` 组件级回归，锁定 `TrailingInput` 输入 `@` 的 focus/offset 链路
+> - [2026-02-21 nodex-codex] 用户手测通过（content/trailing/field-value 三种上下文下 `@/#/>`），准备转 PR Ready
 
 ### P1 Reference 交互收口：单击选中 vs Esc/框选 + inline 转换输入
 > **Owner**: nodex-codex | **Branch**: codex/reference-selection-interactions | **Spec**: `docs/features/references.md`, `docs/features/node-selection.md`

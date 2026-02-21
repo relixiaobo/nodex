@@ -230,6 +230,8 @@ npm run test:run
 - `tests/vitest/outliner-item-field-order.test.ts`
 - `tests/vitest/options-picker.test.ts`
 - `tests/vitest/row-pointer-selection.test.ts`
+- `tests/vitest/row-interactions.test.ts`
+- `tests/vitest/rich-text-merge.test.ts`
 
 **覆盖点**:
 
@@ -250,6 +252,8 @@ npm run test:run
 15. `OutlinerView` / `ConfigOutliner` / `FieldValueOutliner` 的选择域统一使用“可见 field + content”同一 `rootChildIds`，避免 node 类型导致的范围选行为分叉
 16. OutlinerItem 子行排序遵循“模板字段置顶 + 手动字段保持插入位”；字段 icon 着色仅限 `tagDef` owner（schema/manual 字段保持中性灰）
 17. 模板字段 icon 着色支持 `templateId` owner 回退（fieldDef 本体非 tagDef owner 时仍可继承 supertag 颜色）
+18. 全局 pointerdown 在 outliner 行外触发 `clearSelection`，保证“点击其他区域/执行其他操作”后选区自动清空
+19. content row Backspace 在“无下拉 + 光标行首 + 非空文本”触发 merge intent：合并到上一内容节点并保留 marks/inlineRefs；引用行保持仅导航不做文本合并
 
 ### 1.7 标签与引用状态流
 

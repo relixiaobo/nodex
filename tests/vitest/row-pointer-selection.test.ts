@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { resolveRowPointerSelectAction } from '../../src/lib/row-pointer-selection.js';
+import {
+  resolveRowPointerSelectAction,
+  shouldClearSelectionOnPointerDown,
+} from '../../src/lib/row-pointer-selection.js';
 
 describe('resolveRowPointerSelectAction', () => {
   it('prioritizes modifier-based selection actions', () => {
@@ -55,5 +58,19 @@ describe('resolveRowPointerSelectAction', () => {
       shiftKey: true,
       allowSingle: true,
     })).toBe(null);
+  });
+
+  it('clears selection only when pointer target is outside outliner rows', () => {
+    const outside = document.createElement('div');
+    expect(shouldClearSelectionOnPointerDown(outside)).toBe(true);
+
+    const row = document.createElement('div');
+    row.setAttribute('data-node-id', 'n1');
+    row.appendChild(document.createElement('span'));
+    expect(shouldClearSelectionOnPointerDown(row.firstElementChild as HTMLElement)).toBe(false);
+
+    const editor = document.createElement('div');
+    editor.className = 'ProseMirror';
+    expect(shouldClearSelectionOnPointerDown(editor)).toBe(false);
   });
 });

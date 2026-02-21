@@ -75,6 +75,7 @@ import {
   toggleHeadingMark,
 } from '../../lib/pm-editor-view.js';
 import { dragState } from '../../hooks/use-drag-select';
+import { mergeRichTextPayload } from '../../lib/rich-text-merge.js';
 
 const DESCRIPTION_SHORTCUT_KEYS = getShortcutKeys('editor.edit_description', ['Ctrl-i']);
 
@@ -1468,6 +1469,86 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     return true;
   }, [nodeId, parentId, rootNodeId, rootChildIds, trashNode, removeReference, setFocusedNode, hasChildren]);
 
+  const handleBackspaceAtStart = useCallback((): boolean => {
+    const latestUi = useUIStore.getState();
+    const flatList = getFlattenedVisibleNodes(rootChildIds, latestUi.expandedNodes, rootNodeId);
+    const prev = getPreviousVisibleNode(nodeId, parentId, flatList);
+    if (!prev) return false;
+
+    const prevNode = useNodeStore.getState().getNode(prev.nodeId);
+    const currentNode = useNodeStore.getState().getNode(nodeId);
+    if (!currentNode) return false;
+
+    // Reference-like rows do not merge text into previous content;
+    // they only navigate/focus previous row.
+    if (isReferenceLikeRow) {
+      if (prevNode && isOutlinerContentNodeType(prevNode.type)) {
+        useUIStore.getState().setFocusClickCoords({
+          nodeId: prev.nodeId,
+          parentId: prev.parentId,
+          textOffset: getNodeTextLengthById(prev.nodeId),
+        });
+        setFocusedNode(prev.nodeId, prev.parentId);
+        return true;
+      }
+      if (prevNode?.type === 'fieldEntry') {
+        clearFocus();
+        setEditingFieldName(prev.nodeId);
+        return true;
+      }
+      return false;
+    }
+
+    // Only merge into a regular content row. If previous is a field row,
+    // fallback to moving focus there without destructive changes.
+    if (!prevNode || !isOutlinerContentNodeType(prevNode.type)) {
+      if (prevNode?.type === 'fieldEntry') {
+        clearFocus();
+        setEditingFieldName(prev.nodeId);
+        return true;
+      }
+      return false;
+    }
+
+    const prevPayload = {
+      text: prevNode.name ?? '',
+      marks: prevNode.marks ?? [],
+      inlineRefs: prevNode.inlineRefs ?? [],
+    };
+    const currentPayload = {
+      text: currentNode.name ?? '',
+      marks: currentNode.marks ?? [],
+      inlineRefs: currentNode.inlineRefs ?? [],
+    };
+    const merged = mergeRichTextPayload(prevPayload, currentPayload);
+    const joinOffset = prevPayload.text.length;
+
+    updateNodeContent(prev.nodeId, {
+      name: merged.text,
+      marks: merged.marks,
+      inlineRefs: merged.inlineRefs,
+    });
+    trashNode(nodeId);
+    useUIStore.getState().setFocusClickCoords({
+      nodeId: prev.nodeId,
+      parentId: prev.parentId,
+      textOffset: joinOffset,
+    });
+    setFocusedNode(prev.nodeId, prev.parentId);
+    return true;
+  }, [
+    rootChildIds,
+    rootNodeId,
+    nodeId,
+    parentId,
+    isReferenceLikeRow,
+    clearFocus,
+    setEditingFieldName,
+    updateNodeContent,
+    trashNode,
+    setFocusedNode,
+  ]);
+
   const handleArrowUp = useCallback(() => {
     const siblingIndex = renderableSiblings.findIndex((item) => item.type === 'content' && item.id === nodeId);
     if (siblingIndex > 0) {
@@ -2142,6 +2223,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
                 onIndent={handleIndent}
                 onOutdent={handleOutdent}
                 onDelete={handleDelete}
+                onBackspaceAtStart={handleBackspaceAtStart}
                 onArrowUp={handleArrowUp}
                 onArrowDown={handleArrowDown}
                 onMoveUp={handleMoveUp}

@@ -12,6 +12,7 @@ import * as loroDoc from '../../lib/loro-doc.js';
 import { ensureWorkspaceHomeNode } from '../../lib/workspace-root.js';
 import { findUnexpectedShortcutConflicts } from '../../lib/shortcut-registry.js';
 import { Toaster } from 'sonner';
+import { shouldClearSelectionOnPointerDown } from '../../lib/row-pointer-selection.js';
 
 const CONTAINER_DEFS: Array<{ id: string; name: string }> = [
   { id: CONTAINER_IDS.LIBRARY, name: 'Library' },
@@ -117,6 +118,21 @@ export function App({ skipBootstrap = false }: AppProps) {
   useNavUndoKeyboard();
   // Global Cmd+Shift+D for go to today
   useTodayShortcut();
+
+  useEffect(() => {
+    const handlePointerDown = (event: PointerEvent) => {
+      const state = useUIStore.getState();
+      if (state.selectedNodeIds.size === 0) return;
+
+      const target = event.target instanceof HTMLElement ? event.target : null;
+      if (!shouldClearSelectionOnPointerDown(target)) return;
+
+      state.clearSelection();
+    };
+
+    document.addEventListener('pointerdown', handlePointerDown, true);
+    return () => document.removeEventListener('pointerdown', handlePointerDown, true);
+  }, []);
 
   if (!ready) {
     return (

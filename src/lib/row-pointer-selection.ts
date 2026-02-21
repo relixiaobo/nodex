@@ -16,3 +16,18 @@ export function resolveRowPointerSelectAction(params: {
 
   return params.allowSingle ? 'single' : null;
 }
+
+export function shouldClearSelectionOnPointerDown(target: HTMLElement | null): boolean {
+  if (!target) return true;
+
+  if (
+    target.closest('[data-node-id]') ||
+    target.closest('[data-field-row]') ||
+    target.closest('[data-trailing-parent-id]') ||
+    target.closest('.ProseMirror')
+  ) {
+    return false;
+  }
+
+  return true;
+}

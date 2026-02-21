@@ -98,6 +98,7 @@
 - [x] Mod+Shift+Arrow 同级重排
 - [x] TrailingInput 深度偏移 + Blur 自动提交
 - [x] 结构节点跳过（不参与内容导航）
+- [x] content/trailing 共享 intent 决策层（`row-interactions`）
 
 ## 相关实现文件
 
@@ -107,6 +108,7 @@
 - `src/components/editor/TrailingInput.tsx`
 - `src/lib/editor-html.ts`
 - `src/lib/node-editor-shortcuts.ts`
+- `src/lib/row-interactions.ts`
 - `src/lib/drag-drop-position.ts`
 - `src/lib/trailing-input-actions.ts`
 - `src/lib/trailing-input-navigation.ts`

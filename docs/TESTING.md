@@ -409,6 +409,17 @@ npm run test:run
 3. options 关闭时 `Escape` 的 clear-selection 语义
 4. IME 组合输入事件（`isComposing` / `Process` / `keyCode=229`）不触发 reference 选中态快捷键
 
+### 1.20 Row Interactions 共享意图层
+
+**测试文件**: `tests/vitest/row-interactions.test.ts`
+
+**覆盖点**:
+
+1. content row 在 reference/hashTag/slash 下拉打开时的优先级决策
+2. content row 边界导航与默认导航分支
+3. trailing row options intent 仅在 `optionsOpen && optionCount > 0` 时生效
+4. trailing row backspace/arrow/escape 的优先级与原语义一致
+
 ### 1.21 TrailingInput onUpdate 决策纯函数
 
 **测试文件**: `tests/vitest/trailing-input-actions.test.ts`
@@ -1047,6 +1058,7 @@ createSibling 自动标签（2 cases）:
 | 1.17 | 快捷键注册表一致性 | PASS/FAIL |
 | 1.18 | 全局导航快捷键拦截保护 | PASS/FAIL |
 | 1.19 | Selected Reference 快捷键解析 | PASS/FAIL |
+| 1.20 | Row Interactions 共享意图层 | PASS/FAIL |
 | 1.21 | TrailingInput onUpdate 决策纯函数 | PASS/FAIL |
 | 1.22 | TrailingInput 键盘导航决策纯函数 | PASS/FAIL |
 | 1.23 | NodeEditor 键盘决策纯函数 | PASS/FAIL |

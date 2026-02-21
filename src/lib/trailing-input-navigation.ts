@@ -1,9 +1,17 @@
-export type TrailingBackspaceIntent =
-  | 'allow_default'
-  | 'reset_depth_shift'
-  | 'collapse_parent'
-  | 'focus_last_visible'
-  | 'noop';
+import {
+  type TrailingRowArrowDownIntent,
+  type TrailingRowArrowUpIntent,
+  type TrailingRowBackspaceIntent,
+  type TrailingRowEnterIntent,
+  type TrailingRowEscapeIntent,
+  resolveTrailingRowArrowDownIntent,
+  resolveTrailingRowArrowUpIntent,
+  resolveTrailingRowBackspaceIntent,
+  resolveTrailingRowEnterIntent,
+  resolveTrailingRowEscapeIntent,
+} from './row-interactions.js';
+
+export type TrailingBackspaceIntent = TrailingRowBackspaceIntent;
 
 interface ResolveTrailingBackspaceIntentParams {
   isEditorEmpty: boolean;
@@ -15,24 +23,10 @@ interface ResolveTrailingBackspaceIntentParams {
 export function resolveTrailingBackspaceIntent(
   params: ResolveTrailingBackspaceIntentParams,
 ): TrailingBackspaceIntent {
-  const {
-    isEditorEmpty,
-    depthShifted,
-    parentChildCount,
-    hasLastVisibleTarget,
-  } = params;
-
-  if (!isEditorEmpty) return 'allow_default';
-  if (depthShifted) return 'reset_depth_shift';
-  if (parentChildCount === 0) return 'collapse_parent';
-  if (hasLastVisibleTarget) return 'focus_last_visible';
-  return 'noop';
+  return resolveTrailingRowBackspaceIntent(params);
 }
 
-export type TrailingArrowDownIntent =
-  | 'options_down'
-  | 'navigate_out_down'
-  | 'allow_default';
+export type TrailingArrowDownIntent = TrailingRowArrowDownIntent;
 
 interface ResolveTrailingArrowDownIntentParams {
   optionsOpen: boolean;
@@ -43,17 +37,10 @@ interface ResolveTrailingArrowDownIntentParams {
 export function resolveTrailingArrowDownIntent(
   params: ResolveTrailingArrowDownIntentParams,
 ): TrailingArrowDownIntent {
-  const { optionsOpen, optionCount, hasNavigateOut } = params;
-  if (optionsOpen && optionCount > 0) return 'options_down';
-  if (hasNavigateOut) return 'navigate_out_down';
-  return 'allow_default';
+  return resolveTrailingRowArrowDownIntent(params);
 }
 
-export type TrailingArrowUpIntent =
-  | 'options_up'
-  | 'focus_last_visible'
-  | 'navigate_out_up'
-  | 'allow_default';
+export type TrailingArrowUpIntent = TrailingRowArrowUpIntent;
 
 interface ResolveTrailingArrowUpIntentParams {
   optionsOpen: boolean;
@@ -65,23 +52,16 @@ interface ResolveTrailingArrowUpIntentParams {
 export function resolveTrailingArrowUpIntent(
   params: ResolveTrailingArrowUpIntentParams,
 ): TrailingArrowUpIntent {
-  const { optionsOpen, optionCount, hasLastVisibleTarget, hasNavigateOut } = params;
-  if (optionsOpen && optionCount > 0) return 'options_up';
-  if (hasNavigateOut) return 'navigate_out_up';
-  if (hasLastVisibleTarget) return 'focus_last_visible';
-  return 'allow_default';
+  return resolveTrailingRowArrowUpIntent(params);
 }
 
-export type TrailingEscapeIntent = 'close_options' | 'blur_editor';
+export type TrailingEscapeIntent = TrailingRowEscapeIntent;
 
 export function resolveTrailingEscapeIntent(optionsOpen: boolean): TrailingEscapeIntent {
-  return optionsOpen ? 'close_options' : 'blur_editor';
+  return resolveTrailingRowEscapeIntent(optionsOpen);
 }
 
-export type TrailingEnterIntent =
-  | 'options_confirm'
-  | 'create_content_and_continue'
-  | 'create_empty';
+export type TrailingEnterIntent = TrailingRowEnterIntent;
 
 interface ResolveTrailingEnterIntentParams {
   optionsOpen: boolean;
@@ -92,8 +72,5 @@ interface ResolveTrailingEnterIntentParams {
 export function resolveTrailingEnterIntent(
   params: ResolveTrailingEnterIntentParams,
 ): TrailingEnterIntent {
-  const { optionsOpen, optionCount, hasText } = params;
-  if (optionsOpen && optionCount > 0) return 'options_confirm';
-  if (hasText) return 'create_content_and_continue';
-  return 'create_empty';
+  return resolveTrailingRowEnterIntent(params);
 }

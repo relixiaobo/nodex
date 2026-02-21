@@ -579,7 +579,7 @@ export function FieldRow({
     setFocusedNode(newNode.id, insertParentId);
   }, [tupleId, nodeId, createChild, setFocusedNode]);
 
-  const handleNameClick = useCallback((e: React.MouseEvent<HTMLElement>) => {
+  const handleNameDoubleClick = useCallback((e: React.MouseEvent<HTMLElement>) => {
     e.stopPropagation();
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
     clickOffsetXRef.current = e.clientX - rect.left;
@@ -861,8 +861,8 @@ export function FieldRow({
           {Icon && <Icon size={12} />}
         </button>
         <div
-          className={`flex-1 min-w-0 flex items-center gap-0.5${!trashed && !isVirtual && !isEditing ? ' cursor-text' : ''}`}
-          onClick={!trashed && !isVirtual && !isEditing ? handleNameClick : undefined}
+          className={`flex-1 min-w-0 flex items-center gap-0.5${!trashed && !isVirtual && !isEditing ? ' cursor-default' : ''}`}
+          onDoubleClick={!trashed && !isVirtual && !isEditing ? handleNameDoubleClick : undefined}
         >
           {trashed && (
             <span title={`Field "${attrDefName}" has been deleted`}>

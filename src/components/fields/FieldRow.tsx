@@ -12,7 +12,7 @@
  *        [description]     • value node 2
  * ──────────────────────────────────────
  */
-import { useCallback, useRef, useEffect, useMemo } from 'react';
+import { useCallback, useRef, useEffect, useMemo, type ReactNode } from 'react';
 import { Trash2 } from '../../lib/icons.js';
 import { useNodeFields } from '../../hooks/use-node-fields';
 import { useNodeStore } from '../../stores/node-store';
@@ -41,6 +41,7 @@ import { SYS_A, SYS_D, SYS_V } from '../../types/index.js';
 import { NodePicker, type NodePickerOption } from './NodePicker';
 import { DoneMappingEntries } from './DoneMappingEntries';
 import { BulletChevron } from '../outliner/BulletChevron';
+import { FIELD_VALUE_INSET } from './field-layout.js';
 
 function focusTrailingInputForParent(parentId: string): boolean {
   const roots = document.querySelectorAll<HTMLElement>('[data-trailing-parent-id]');
@@ -171,7 +172,7 @@ function ConfigNumberInput({ nodeId, configKey }: { nodeId: string; configKey: s
   const propName = configKeyToPropName(configKey);
 
   return (
-    <div className="flex min-h-7 items-center gap-2 py-1" style={{ paddingLeft: 25 }}>
+    <div className="flex min-h-7 items-center gap-2 py-1" style={{ paddingLeft: FIELD_VALUE_INSET }}>
       <BulletChevron hasChildren={false} isExpanded={false} onBulletClick={() => {}} />
       <input
         type="number"
@@ -191,6 +192,105 @@ function ConfigNumberInput({ nodeId, configKey }: { nodeId: string; configKey: s
       />
     </div>
   );
+}
+
+interface SystemConfigValueContext {
+  nodeId: string;
+  attrDefId: string;
+  tupleId: string;
+  dataType: string;
+  isVirtual: boolean;
+  onNavigateOut?: (direction: 'up' | 'down') => void;
+  isAutoCollectEnabled: boolean;
+  configOptions?: Array<{ value: string; label: string }>;
+}
+
+type SystemConfigValueRenderer = (context: SystemConfigValueContext) => ReactNode;
+
+const SYSTEM_CONFIG_VALUE_RENDERERS: Partial<Record<ConfigFieldDef['control'], SystemConfigValueRenderer>> = {
+  outliner: ({ nodeId }) => <ConfigOutliner nodeId={nodeId} />,
+  color_picker: ({ tupleId, attrDefId, nodeId, isVirtual, onNavigateOut }) => (
+    <FieldValueOutliner
+      tupleId={tupleId}
+      fieldDataType={SYS_D.COLOR}
+      attrDefId={attrDefId}
+      configNodeId={isVirtual ? nodeId : undefined}
+      onNavigateOut={onNavigateOut}
+    />
+  ),
+  toggle: ({ tupleId, attrDefId, nodeId, isVirtual, onNavigateOut }) => (
+    <FieldValueOutliner
+      tupleId={tupleId}
+      fieldDataType={SYS_D.BOOLEAN}
+      attrDefId={attrDefId}
+      configNodeId={isVirtual ? nodeId : undefined}
+      onNavigateOut={onNavigateOut}
+    />
+  ),
+  tag_picker: ({ nodeId, attrDefId }) => (
+    <ConfigTagPicker nodeId={nodeId} configKey={attrDefId} placeholder="Select supertag" />
+  ),
+  type_choice: ({ nodeId, attrDefId }) => (
+    <ConfigSelectPicker
+      nodeId={nodeId}
+      configKey={attrDefId}
+      options={FIELD_TYPE_LIST.map((f) => ({ value: f.value, label: f.label }))}
+      placeholder="Select field type"
+    />
+  ),
+  select: ({ nodeId, attrDefId, configOptions }) => (
+    <ConfigSelectPicker
+      nodeId={nodeId}
+      configKey={attrDefId}
+      options={configOptions ?? []}
+      placeholder="Select value"
+    />
+  ),
+  done_map_entries: ({ nodeId, attrDefId }) => (
+    <DoneMappingEntries tagDefId={nodeId} mappingKey={attrDefId} />
+  ),
+  number_input: ({ nodeId, attrDefId }) => (
+    <ConfigNumberInput nodeId={nodeId} configKey={attrDefId} />
+  ),
+  autocollect: ({ tupleId, attrDefId, nodeId, isVirtual, onNavigateOut, isAutoCollectEnabled }) => (
+    <>
+      <FieldValueOutliner
+        tupleId={tupleId}
+        fieldDataType={SYS_D.BOOLEAN}
+        attrDefId={attrDefId}
+        configNodeId={isVirtual ? nodeId : undefined}
+        onNavigateOut={onNavigateOut}
+      />
+      {isAutoCollectEnabled ? <AutoCollectSection fieldDefId={nodeId} /> : null}
+    </>
+  ),
+};
+
+function renderDefaultSystemConfigValue(context: SystemConfigValueContext): ReactNode {
+  return (
+    <FieldValueOutliner
+      tupleId={context.tupleId}
+      fieldDataType={context.dataType}
+      attrDefId={context.attrDefId}
+      configNodeId={context.isVirtual ? context.nodeId : undefined}
+      onNavigateOut={context.onNavigateOut}
+    />
+  );
+}
+
+function renderSystemConfigValue(
+  control: ConfigFieldDef['control'] | undefined,
+  context: SystemConfigValueContext,
+): ReactNode {
+  if (!control) return renderDefaultSystemConfigValue(context);
+
+  const renderer = SYSTEM_CONFIG_VALUE_RENDERERS[control];
+  if (renderer) return renderer(context);
+
+  if (import.meta.env.DEV) {
+    console.warn(`[FieldRow] Unhandled config control "${control}" for ${context.attrDefId}`);
+  }
+  return renderDefaultSystemConfigValue(context);
 }
 
 export function FieldRow({
@@ -483,6 +583,16 @@ export function FieldRow({
     const displayName = isAutoCollect && autoCollectCount > 0
       ? `${attrDefName} (${autoCollectCount})`
       : attrDefName;
+    const systemConfigValueContext: SystemConfigValueContext = {
+      nodeId,
+      attrDefId,
+      tupleId,
+      dataType,
+      isVirtual,
+      onNavigateOut,
+      isAutoCollectEnabled,
+      configOptions: configDef?.options,
+    };
 
     return (
       <div
@@ -515,48 +625,7 @@ export function FieldRow({
         </div>
         {/* Value column — unified rendering */}
         <div className="flex-1 min-w-0 min-h-[22px]" data-field-value>
-          {resolvedControl === 'outliner' ? (
-            <ConfigOutliner nodeId={nodeId} />
-          ) : resolvedControl === 'tag_picker' ? (
-            <ConfigTagPicker nodeId={nodeId} configKey={attrDefId} placeholder="Select supertag" />
-          ) : resolvedControl === 'type_choice' ? (
-            <ConfigSelectPicker
-              nodeId={nodeId}
-              configKey={attrDefId}
-              options={FIELD_TYPE_LIST.map((f) => ({ value: f.value, label: f.label }))}
-              placeholder="Select field type"
-            />
-          ) : resolvedControl === 'select' ? (
-            <ConfigSelectPicker
-              nodeId={nodeId}
-              configKey={attrDefId}
-              options={configDef?.options ?? []}
-              placeholder="Select value"
-            />
-          ) : resolvedControl === 'done_map_entries' ? (
-            <DoneMappingEntries tagDefId={nodeId} mappingKey={attrDefId} />
-          ) : resolvedControl === 'number_input' ? (
-            <ConfigNumberInput nodeId={nodeId} configKey={attrDefId} />
-          ) : resolvedControl === 'autocollect' ? (
-            <>
-              <FieldValueOutliner
-                tupleId={tupleId}
-                fieldDataType={SYS_D.BOOLEAN}
-                attrDefId={attrDefId}
-                configNodeId={isVirtual ? nodeId : undefined}
-                onNavigateOut={onNavigateOut}
-              />
-              {isAutoCollectEnabled && <AutoCollectSection fieldDefId={nodeId} />}
-            </>
-          ) : (
-            <FieldValueOutliner
-              tupleId={tupleId}
-              fieldDataType={dataType}
-              attrDefId={attrDefId}
-              configNodeId={isVirtual ? nodeId : undefined}
-              onNavigateOut={onNavigateOut}
-            />
-          )}
+          {renderSystemConfigValue(resolvedControl, systemConfigValueContext)}
         </div>
       </div>
     );

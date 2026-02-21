@@ -4,6 +4,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { FieldRow } from '../../src/components/fields/FieldRow.js';
 import { resetAndSeed } from './helpers/test-state.js';
 import { SYS_A } from '../../src/types/index.js';
+import { FIELD_VALUE_INSET } from '../../src/components/fields/field-layout.js';
 
 describe('FieldRow config control resolution', () => {
   beforeEach(() => {
@@ -22,6 +23,6 @@ describe('FieldRow config control resolution', () => {
     }));
 
     expect(html).toContain('Select supertag');
-    expect(html).toContain('padding-left:25px');
+    expect(html).toContain(`padding-left:${FIELD_VALUE_INSET}px`);
   });
 });

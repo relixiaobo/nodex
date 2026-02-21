@@ -28,6 +28,7 @@ import { ColorSwatchPicker } from './ColorSwatchPicker';
 import { DatePicker, formatDateDisplay } from './DatePicker.js';
 import { useUIStore } from '../../stores/ui-store.js';
 import * as loroDoc from '../../lib/loro-doc.js';
+import { FIELD_VALUE_INSET } from './field-layout.js';
 
 interface FieldValueOutlinerProps {
   tupleId: string;
@@ -131,7 +132,7 @@ export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, configNo
     const label = isYes ? 'Yes' : 'No';
 
     return (
-      <div className="flex min-h-7 items-center gap-2 py-1" style={{ paddingLeft: 25 }}>
+      <div className="flex min-h-7 items-center gap-2 py-1" style={{ paddingLeft: FIELD_VALUE_INSET }}>
         <BulletChevron hasChildren={false} isExpanded={false} onBulletClick={() => {}} />
         <button
           onClick={() => {
@@ -180,10 +181,8 @@ export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, configNo
     const valueNode = valueNodeId ? useNodeStore.getState().getNode(valueNodeId) : undefined;
     const isChecked = valueNode?.name === SYS_V.YES;
 
-    // paddingLeft: 6(base) + 15(chevron space) + 4(gap-1) = 25
-    // Then BulletChevron (15px) + gap-2 (8px) + checkbox → bullet aligns with sibling fields
     return (
-      <div className="flex min-h-7 items-start gap-2 py-1" style={{ paddingLeft: 25 }}>
+      <div className="flex min-h-7 items-start gap-2 py-1" style={{ paddingLeft: FIELD_VALUE_INSET }}>
         <BulletChevron hasChildren={false} isExpanded={false} onBulletClick={() => {}} />
         <input
           type="checkbox"
@@ -343,7 +342,7 @@ function DatePickerField({ value, onSelect }: { value: string; onSelect: (v: str
 
   return (
     <div className="relative">
-      <div className="flex min-h-7 items-start gap-2 py-1" style={{ paddingLeft: 25 }}>
+      <div className="flex min-h-7 items-start gap-2 py-1" style={{ paddingLeft: FIELD_VALUE_INSET }}>
         <BulletChevron hasChildren={false} isExpanded={false} onBulletClick={() => {}} dimmed={!value} />
         <div className="flex-1 min-w-0 flex items-center cursor-pointer" onClick={handleClick}>
           <span className={`text-sm leading-[21px] select-none ${value ? '' : 'text-foreground-tertiary'}`}>

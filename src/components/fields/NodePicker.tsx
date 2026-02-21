@@ -14,6 +14,7 @@ import { useState, useRef, useEffect, useCallback, useMemo, memo } from 'react';
 import { BulletChevron } from '../outliner/BulletChevron';
 import { resolveTagColor } from '../../lib/tag-colors.js';
 import { useNodeStore } from '../../stores/node-store';
+import { FIELD_VALUE_INSET } from './field-layout.js';
 
 /** Memoized colored # bullet — subscribes only to the specific tagDef's color config. */
 const TagDefBullet = memo(function TagDefBullet({ tagDefId }: { tagDefId: string }) {
@@ -59,7 +60,7 @@ export function NodePicker({
   onCreate,
   placeholder = 'Select...',
   isReference = false,
-  insetLeft = 25,
+  insetLeft = FIELD_VALUE_INSET,
 }: NodePickerProps) {
   const [open, setOpen] = useState(false);
   const [inputValue, setInputValue] = useState('');

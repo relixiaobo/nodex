@@ -1,5 +1,5 @@
 /**
- * Editable description line for PanelTitle.
+ * Editable description line for NodeHeader.
  *
  * Displays below TagBar as gray small text.
  * MouseDown to edit (contentEditable), blur/Enter to save, Escape to cancel.

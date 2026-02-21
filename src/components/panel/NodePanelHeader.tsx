@@ -1,7 +1,7 @@
 /**
  * Node panel header — thin wrapper around Breadcrumb.
  *
- * Fixed at top of NodePanel. Title and TagBar have moved to PanelTitle
+ * Fixed at top of NodePanel. Title and TagBar have moved to NodeHeader
  * in the scrollable content area.
  */
 import { Breadcrumb } from './Breadcrumb';

@@ -5,7 +5,6 @@ import { keymap } from 'prosemirror-keymap';
 import { baseKeymap, toggleMark } from 'prosemirror-commands';
 import { history, redo, undo } from 'prosemirror-history';
 import { useNodeStore } from '../../stores/node-store.js';
-import { useWorkspaceStore } from '../../stores/workspace-store.js';
 import { useUIStore } from '../../stores/ui-store.js';
 import { getPrimaryShortcutKey, getShortcutKeys } from '../../lib/shortcut-registry.js';
 import { isImeComposingEvent } from '../../lib/ime-keyboard.js';
@@ -128,7 +127,7 @@ export function RichTextEditor(props: RichTextEditorProps) {
   propsRef.current = props;
 
   // Capture content baseline at editor creation time for change detection.
-  // NOT updated by re-renders from setNodeContentLocal (typing) — only updated
+  // NOT updated by re-renders from updateNodeContent (typing) — only updated
   // when a genuine external sync occurs (e.g., Realtime update from another client).
   const initialContentRef = useRef({
     text: props.initialText,
@@ -136,8 +135,6 @@ export function RichTextEditor(props: RichTextEditorProps) {
     inlineRefs: props.initialInlineRefs,
   });
 
-  const userId = useWorkspaceStore((s) => s.userId);
-  const setNodeContentLocal = useNodeStore((s) => s.setNodeContentLocal);
   const updateNodeContent = useNodeStore((s) => s.updateNodeContent);
 
   const saveContent = useCallback(() => {
@@ -162,7 +159,7 @@ export function RichTextEditor(props: RichTextEditorProps) {
         inlineRefs: parsed.inlineRefs,
       });
     }
-  }, [updateNodeContent, userId]);
+  }, [updateNodeContent]);
 
   const syncInitialFocus = useCallback((view: EditorView) => {
     if (viewRef.current !== view) return;
@@ -352,7 +349,7 @@ export function RichTextEditor(props: RichTextEditorProps) {
       const parsed = docToMarks(view.state.doc);
       const isEmpty = parsed.text.replace(/\u200B/g, '').trim().length === 0;
       if (!isEmpty) return false;
-      setNodeContentLocal(propsRef.current.nodeId, '', [], []);
+      updateNodeContent(propsRef.current.nodeId, { name: '', marks: [], inlineRefs: [] });
       saveContent();
       return propsRef.current.onDelete();
     };
@@ -544,7 +541,7 @@ export function RichTextEditor(props: RichTextEditorProps) {
       }),
       keymap(baseKeymap),
     ];
-  }, [saveContent, setNodeContentLocal]);
+  }, [saveContent, updateNodeContent]);
 
   useLayoutEffect(() => {
     if (!mountRef.current) return;
@@ -577,7 +574,11 @@ export function RichTextEditor(props: RichTextEditorProps) {
 
         if (tr.docChanged && !isExternalSyncRef.current && !isComposing) {
           const parsed = docToMarks(newState.doc);
-          setNodeContentLocal(propsRef.current.nodeId, parsed.text, parsed.marks, parsed.inlineRefs);
+          updateNodeContent(propsRef.current.nodeId, {
+            name: parsed.text,
+            marks: parsed.marks,
+            inlineRefs: parsed.inlineRefs,
+          });
         }
 
         if (!isExternalSyncRef.current && !isComposing) {
@@ -622,7 +623,11 @@ export function RichTextEditor(props: RichTextEditorProps) {
         compositionend: (view) => {
           isComposingRef.current = false;
           const parsed = docToMarks(view.state.doc);
-          setNodeContentLocal(propsRef.current.nodeId, parsed.text, parsed.marks, parsed.inlineRefs);
+          updateNodeContent(propsRef.current.nodeId, {
+            name: parsed.text,
+            marks: parsed.marks,
+            inlineRefs: parsed.inlineRefs,
+          });
           runTriggerDetection(view, true);
           return false;
         },
@@ -681,7 +686,7 @@ export function RichTextEditor(props: RichTextEditorProps) {
       view.destroy();
       viewRef.current = null;
     };
-  }, [plugins, runTriggerDetection, saveContent, setNodeContentLocal, syncInitialFocus]);
+  }, [plugins, runTriggerDetection, saveContent, syncInitialFocus, updateNodeContent]);
 
   useEffect(() => {
     const view = viewRef.current;

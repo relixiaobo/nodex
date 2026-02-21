@@ -12,20 +12,36 @@
  *        [description]     • value node 2
  * ──────────────────────────────────────
  */
-import { useCallback, useRef, useEffect, useMemo } from 'react';
+import { useCallback, useRef, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Trash2 } from '../../lib/icons.js';
 import { useNodeFields } from '../../hooks/use-node-fields';
 import { useNodeStore } from '../../stores/node-store';
 import { useUIStore } from '../../stores/ui-store';
+import { useWorkspaceTags } from '../../hooks/use-workspace-tags';
 import * as loroDoc from '../../lib/loro-doc.js';
-import { getFieldTypeIcon, ATTRDEF_CONFIG_MAP, TAGDEF_CONFIG_MAP, resolveMinValue, resolveMaxValue, SYSTEM_FIELD_MAP } from '../../lib/field-utils.js';
+import {
+  getFieldTypeIcon,
+  ATTRDEF_CONFIG_MAP,
+  TAGDEF_CONFIG_MAP,
+  resolveMinValue,
+  resolveMaxValue,
+  SYSTEM_FIELD_MAP,
+  FIELD_TYPE_LIST,
+  configKeyToPropName,
+  resolveConfigValue,
+  type ConfigFieldDef,
+} from '../../lib/field-utils.js';
 import { FieldValueOutliner } from './FieldValueOutliner';
 import { FieldNameInput } from './FieldNameInput';
 import { ConfigOutliner } from './ConfigOutliner';
 import { AutoCollectSection } from './AutoCollectSection';
 import { VALIDATED_FIELD_TYPES, validateFieldValue, ValidationWarning } from './field-validation';
 import { ATTRDEF_OUTLINER_FIELDS, TAGDEF_OUTLINER_FIELDS } from '../../lib/field-utils.js';
-import { SYS_A } from '../../types/index.js';
+import { FIELD_TYPES, SYS_A, SYS_D, SYS_V } from '../../types/index.js';
+import { NodePicker, type NodePickerOption } from './NodePicker';
+import { DoneMappingEntries } from './DoneMappingEntries';
+import { BulletChevron } from '../outliner/BulletChevron';
+import { FIELD_VALUE_INSET } from './field-layout.js';
 
 function focusTrailingInputForParent(parentId: string): boolean {
   const roots = document.querySelectorAll<HTMLElement>('[data-trailing-parent-id]');
@@ -63,6 +79,239 @@ interface FieldRowProps {
   isSystemConfig?: boolean;
   /** Config field metadata key for looking up icon/description */
   configKey?: string;
+  /** Explicit config control type for system config rows */
+  configControl?: ConfigFieldDef['control'];
+}
+
+function ConfigTagPicker({ nodeId, configKey, placeholder }: { nodeId: string; configKey: string; placeholder: string }) {
+  const tags = useWorkspaceTags();
+  const setConfigValue = useNodeStore((s) => s.setConfigValue);
+  const selectedId = useNodeStore((s) => {
+    void s._version;
+    const node = s.getNode(nodeId);
+    return node ? resolveConfigValue(node, configKey) : undefined;
+  });
+
+  const options: NodePickerOption[] = useMemo(
+    () => tags.map((t) => ({ id: t.id, name: t.name, isTagDef: true })),
+    [tags],
+  );
+
+  const propName = configKeyToPropName(configKey);
+  const handleSelect = useCallback((id: string) => {
+    if (!propName) return;
+    setConfigValue(nodeId, propName, id);
+  }, [nodeId, propName, setConfigValue]);
+  const handleClear = useCallback(() => {
+    if (!propName) return;
+    setConfigValue(nodeId, propName, undefined);
+  }, [nodeId, propName, setConfigValue]);
+
+  return (
+    <NodePicker
+      options={options}
+      selectedId={selectedId}
+      onSelect={handleSelect}
+      onClear={handleClear}
+      placeholder={placeholder}
+      isReference
+    />
+  );
+}
+
+function ConfigSelectPicker({
+  nodeId,
+  configKey,
+  options,
+  placeholder,
+}: {
+  nodeId: string;
+  configKey: string;
+  options: Array<{ value: string; label: string }>;
+  placeholder: string;
+}) {
+  const setConfigValue = useNodeStore((s) => s.setConfigValue);
+  const selectedId = useNodeStore((s) => {
+    void s._version;
+    const node = s.getNode(nodeId);
+    return node ? resolveConfigValue(node, configKey) : undefined;
+  });
+  const pickerOptions: NodePickerOption[] = useMemo(
+    () => options.map((o) => ({ id: o.value, name: o.label })),
+    [options],
+  );
+
+  const propName = configKeyToPropName(configKey);
+  const handleSelect = useCallback((id: string) => {
+    if (!propName) return;
+    setConfigValue(nodeId, propName, id);
+  }, [nodeId, propName, setConfigValue]);
+  const handleClear = useCallback(() => {
+    if (!propName) return;
+    setConfigValue(nodeId, propName, undefined);
+  }, [nodeId, propName, setConfigValue]);
+
+  return (
+    <NodePicker
+      options={pickerOptions}
+      selectedId={selectedId}
+      onSelect={handleSelect}
+      onClear={handleClear}
+      placeholder={placeholder}
+    />
+  );
+}
+
+function ConfigNumberInput({ nodeId, configKey }: { nodeId: string; configKey: string }) {
+  const setConfigValue = useNodeStore((s) => s.setConfigValue);
+  const value = useNodeStore((s) => {
+    void s._version;
+    const node = s.getNode(nodeId);
+    return node ? resolveConfigValue(node, configKey) : undefined;
+  });
+  const propName = configKeyToPropName(configKey);
+  const valueText = value === undefined || value === null ? '' : String(value);
+  const [draft, setDraft] = useState(valueText);
+
+  useEffect(() => {
+    setDraft(valueText);
+  }, [valueText]);
+
+  const commitDraft = useCallback(() => {
+    if (!propName) return;
+    const raw = draft.trim();
+    if (!raw) {
+      setConfigValue(nodeId, propName, undefined);
+      return;
+    }
+    // Keep same behavior as normal number fields: allow any text, validate via warning only.
+    setConfigValue(nodeId, propName, raw);
+  }, [draft, nodeId, propName, setConfigValue]);
+
+  return (
+    <div className="flex min-h-7 items-center gap-2 py-1" style={{ paddingLeft: FIELD_VALUE_INSET }}>
+      <BulletChevron hasChildren={false} isExpanded={false} onBulletClick={() => {}} />
+      <input
+        type="text"
+        inputMode="decimal"
+        className="h-[21px] min-w-[120px] bg-transparent p-0 text-sm leading-[21px] text-foreground outline-none placeholder:text-foreground-tertiary"
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commitDraft}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            commitDraft();
+            (e.currentTarget as HTMLInputElement).blur();
+          } else if (e.key === 'Escape') {
+            e.preventDefault();
+            setDraft(valueText);
+            (e.currentTarget as HTMLInputElement).blur();
+          }
+        }}
+        placeholder="Empty"
+      />
+    </div>
+  );
+}
+
+interface SystemConfigValueContext {
+  nodeId: string;
+  attrDefId: string;
+  tupleId: string;
+  dataType: string;
+  isVirtual: boolean;
+  onNavigateOut?: (direction: 'up' | 'down') => void;
+  isAutoCollectEnabled: boolean;
+  configOptions?: Array<{ value: string; label: string }>;
+}
+
+type SystemConfigValueRenderer = (context: SystemConfigValueContext) => ReactNode;
+
+const SYSTEM_CONFIG_VALUE_RENDERERS: Partial<Record<ConfigFieldDef['control'], SystemConfigValueRenderer>> = {
+  outliner: ({ nodeId }) => <ConfigOutliner nodeId={nodeId} />,
+  color_picker: ({ tupleId, attrDefId, nodeId, isVirtual, onNavigateOut }) => (
+    <FieldValueOutliner
+      tupleId={tupleId}
+      fieldDataType={SYS_D.COLOR}
+      attrDefId={attrDefId}
+      configNodeId={isVirtual ? nodeId : undefined}
+      onNavigateOut={onNavigateOut}
+    />
+  ),
+  toggle: ({ tupleId, attrDefId, nodeId, isVirtual, onNavigateOut }) => (
+    <FieldValueOutliner
+      tupleId={tupleId}
+      fieldDataType={SYS_D.BOOLEAN}
+      attrDefId={attrDefId}
+      configNodeId={isVirtual ? nodeId : undefined}
+      onNavigateOut={onNavigateOut}
+    />
+  ),
+  tag_picker: ({ nodeId, attrDefId }) => (
+    <ConfigTagPicker nodeId={nodeId} configKey={attrDefId} placeholder="Select supertag" />
+  ),
+  type_choice: ({ nodeId, attrDefId }) => (
+    <ConfigSelectPicker
+      nodeId={nodeId}
+      configKey={attrDefId}
+      options={FIELD_TYPE_LIST.map((f) => ({ value: f.value, label: f.label }))}
+      placeholder="Select field type"
+    />
+  ),
+  select: ({ nodeId, attrDefId, configOptions }) => (
+    <ConfigSelectPicker
+      nodeId={nodeId}
+      configKey={attrDefId}
+      options={configOptions ?? []}
+      placeholder="Select value"
+    />
+  ),
+  done_map_entries: ({ nodeId, attrDefId }) => (
+    <DoneMappingEntries tagDefId={nodeId} mappingKey={attrDefId} />
+  ),
+  number_input: ({ nodeId, attrDefId }) => (
+    <ConfigNumberInput nodeId={nodeId} configKey={attrDefId} />
+  ),
+  autocollect: ({ tupleId, attrDefId, nodeId, isVirtual, onNavigateOut, isAutoCollectEnabled }) => (
+    <>
+      <FieldValueOutliner
+        tupleId={tupleId}
+        fieldDataType={SYS_D.BOOLEAN}
+        attrDefId={attrDefId}
+        configNodeId={isVirtual ? nodeId : undefined}
+        onNavigateOut={onNavigateOut}
+      />
+      {isAutoCollectEnabled ? <AutoCollectSection fieldDefId={nodeId} /> : null}
+    </>
+  ),
+};
+
+function renderDefaultSystemConfigValue(context: SystemConfigValueContext): ReactNode {
+  return (
+    <FieldValueOutliner
+      tupleId={context.tupleId}
+      fieldDataType={context.dataType}
+      attrDefId={context.attrDefId}
+      configNodeId={context.isVirtual ? context.nodeId : undefined}
+      onNavigateOut={context.onNavigateOut}
+    />
+  );
+}
+
+function renderSystemConfigValue(
+  control: ConfigFieldDef['control'] | undefined,
+  context: SystemConfigValueContext,
+): ReactNode {
+  if (!control) return renderDefaultSystemConfigValue(context);
+
+  const renderer = SYSTEM_CONFIG_VALUE_RENDERERS[control];
+  if (renderer) return renderer(context);
+
+  if (import.meta.env.DEV) {
+    console.warn(`[FieldRow] Unhandled config control "${control}" for ${context.attrDefId}`);
+  }
+  return renderDefaultSystemConfigValue(context);
 }
 
 export function FieldRow({
@@ -81,6 +330,7 @@ export function FieldRow({
   ownerTagColor,
   isSystemConfig,
   configKey,
+  configControl,
 }: FieldRowProps) {
   const navigateTo = useUIStore((s) => s.navigateTo);
   const editingFieldNameId = useUIStore((s) => s.editingFieldNameId);
@@ -92,7 +342,7 @@ export function FieldRow({
   const focusedNodeId = useUIStore((s) => s.focusedNodeId);
   const clearSelection = useUIStore((s) => s.clearSelection);
   const createChild = useNodeStore((s) => s.createChild);
-  const moveFieldTuple = useNodeStore((s) => s.moveFieldTuple);
+  const moveFieldEntry = useNodeStore((s) => s.moveFieldEntry);
   const removeField = useNodeStore((s) => s.removeField);
   const _version = useNodeStore((s) => s._version);
   const siblingFields = useNodeFields(nodeId);
@@ -108,6 +358,7 @@ export function FieldRow({
   const configDef = configKey
     ? ATTRDEF_CONFIG_MAP.get(configKey) ?? TAGDEF_CONFIG_MAP.get(configKey) ?? ATTRDEF_OUTLINER_FIELDS.find(f => f.key === configKey) ?? TAGDEF_OUTLINER_FIELDS.find(f => f.key === configKey)
     : undefined;
+  const resolvedControl = configControl ?? configDef?.control;
   const Icon = getFieldTypeIcon(dataType);
 
   // Validation: read first value child of fieldEntry to check value
@@ -127,14 +378,35 @@ export function FieldRow({
     return null;
   });
 
+  const configNumberValidationWarning = useNodeStore((s) => {
+    void s._version;
+    if (!isSystemConfig || resolvedControl !== 'number_input') return null;
+    const n = s.getNode(nodeId);
+    if (!n) return null;
+    const raw = resolveConfigValue(n, attrDefId);
+    if (raw === undefined || raw === null || raw === '') return null;
+    return validateFieldValue(FIELD_TYPES.NUMBER, String(raw));
+  });
+
   // Auto-collect count for SYS_A44 name display
   const isAutoCollect = configKey === SYS_A.AUTOCOLLECT_OPTIONS;
+  const isAutoCollectEnabled = useNodeStore((s) => {
+    void s._version;
+    if (!isAutoCollect) return false;
+    const n = s.getNode(nodeId);
+    if (!n) return false;
+    const val = resolveConfigValue(n, attrDefId);
+    return val !== SYS_V.NO;
+  });
   const autoCollectCount = useNodeStore((s) => {
     void s._version;
     if (!isAutoCollect) return 0;
-    const tuple = s.getNode(tupleId);
-    // fieldEntry.children = value nodes (no key prefix in new model)
-    return Math.max(0, (tuple?.children?.length ?? 0) - 1);
+    const fieldDef = s.getNode(nodeId);
+    if (!fieldDef?.children) return 0;
+    return fieldDef.children.reduce((count, cid) => {
+      const child = s.getNode(cid);
+      return child && !child.type ? count + 1 : count;
+    }, 0);
   });
 
   const siblingFieldIds = useMemo(
@@ -197,14 +469,14 @@ export function FieldRow({
 
     if (prev.type === 'field') {
       // Move this tuple under the previous field's tuple directly
-      void moveFieldTuple(nodeId, tupleId, prev.id, '');
+      void moveFieldEntry(nodeId, tupleId, prev.id);
       return;
     }
 
     if (prev.type === 'content') {
-      void moveFieldTuple(nodeId, tupleId, prev.id, '');
+      void moveFieldEntry(nodeId, tupleId, prev.id);
     }
-  }, [tupleId, renderableSiblings, nodeId, moveFieldTuple]);
+  }, [tupleId, renderableSiblings, nodeId, moveFieldEntry]);
 
   const handleOutdentField = useCallback(() => {
     const grandparentId = loroDoc.getParentId(nodeId);
@@ -215,8 +487,8 @@ export function FieldRow({
     let insertAt = grandparent.children.length;
     const parentIndex = grandparent.children.indexOf(nodeId);
     if (parentIndex >= 0) insertAt = parentIndex + 1;
-    void moveFieldTuple(nodeId, tupleId, grandparentId, '', insertAt);
-  }, [tupleId, nodeId, moveFieldTuple]);
+    void moveFieldEntry(nodeId, tupleId, grandparentId, insertAt);
+  }, [tupleId, nodeId, moveFieldEntry]);
 
   const handleEnterConfirm = useCallback(() => {
     let insertParentId = nodeId;
@@ -342,6 +614,16 @@ export function FieldRow({
     const displayName = isAutoCollect && autoCollectCount > 0
       ? `${attrDefName} (${autoCollectCount})`
       : attrDefName;
+    const systemConfigValueContext: SystemConfigValueContext = {
+      nodeId,
+      attrDefId,
+      tupleId,
+      dataType,
+      isVirtual,
+      onNavigateOut,
+      isAutoCollectEnabled,
+      configOptions: configDef?.options,
+    };
 
     return (
       <div
@@ -373,28 +655,14 @@ export function FieldRow({
           </div>
         </div>
         {/* Value column — unified rendering */}
-        <div className="flex-1 min-w-0 min-h-[22px]" data-field-value>
-          {isOutliner ? (
-            <ConfigOutliner nodeId={nodeId} />
-          ) : isAutoCollect ? (
-            <>
-              <FieldValueOutliner
-                tupleId={tupleId}
-                fieldDataType={dataType}
-                attrDefId={attrDefId}
-                configNodeId={isVirtual ? nodeId : undefined}
-                onNavigateOut={onNavigateOut}
-              />
-              <AutoCollectSection tupleId={tupleId} />
-            </>
-          ) : (
-            <FieldValueOutliner
-              tupleId={tupleId}
-              fieldDataType={dataType}
-              attrDefId={attrDefId}
-              configNodeId={isVirtual ? nodeId : undefined}
-              onNavigateOut={onNavigateOut}
-            />
+        <div className="flex flex-1 min-w-0 items-start" data-field-value>
+          <div className="flex-1 min-w-0 min-h-[22px]">
+            {renderSystemConfigValue(resolvedControl, systemConfigValueContext)}
+          </div>
+          {configNumberValidationWarning && (
+            <div className="flex items-center h-7 pr-1">
+              <ValidationWarning message={configNumberValidationWarning} />
+            </div>
           )}
         </div>
       </div>

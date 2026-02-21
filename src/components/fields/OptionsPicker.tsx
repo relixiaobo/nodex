@@ -12,6 +12,7 @@ import { useFieldOptions } from '../../hooks/use-field-options';
 import { useNodeStore } from '../../stores/node-store';
 import { useChildren } from '../../hooks/use-children';
 import { NodePicker } from './NodePicker';
+import type { NodexNode } from '../../types/index.js';
 
 interface OptionsPickerProps {
   nodeId: string;
@@ -19,11 +20,21 @@ interface OptionsPickerProps {
   tupleId?: string;
 }
 
+export function isAutoCollectCreationEnabled(fieldDef: NodexNode | null | undefined): boolean {
+  // Default-on semantics unless explicitly disabled.
+  return fieldDef?.autocollectOptions !== false;
+}
+
 export function OptionsPicker({ nodeId, attrDefId, tupleId }: OptionsPickerProps) {
   const options = useFieldOptions(attrDefId);
   const setOptionsFieldValue = useNodeStore((s) => s.setOptionsFieldValue);
   const autoCollectOption = useNodeStore((s) => s.autoCollectOption);
   const clearFieldValue = useNodeStore((s) => s.clearFieldValue);
+  const allowCreate = useNodeStore((s) => {
+    void s._version;
+    const fieldDef = s.getNode(attrDefId);
+    return isAutoCollectCreationEnabled(fieldDef);
+  });
 
   // Load current selection from fieldEntry.children (new model: no key prefix)
   useChildren(tupleId ?? '');
@@ -31,8 +42,11 @@ export function OptionsPicker({ nodeId, attrDefId, tupleId }: OptionsPickerProps
     void s._version;
     if (!tupleId) return undefined;
     const tuple = s.getNode(tupleId);
-    const valIds = tuple?.children ?? [];
-    return valIds.find((cid) => options.some((opt) => opt.id === cid)) || undefined;
+    const valueNodeId = tuple?.children?.[0];
+    if (!valueNodeId) return undefined;
+    const valueNode = s.getNode(valueNodeId);
+    const targetId = valueNode?.targetId;
+    return targetId && options.some((opt) => opt.id === targetId) ? targetId : undefined;
   });
 
   const handleSelect = useCallback(
@@ -59,7 +73,7 @@ export function OptionsPicker({ nodeId, attrDefId, tupleId }: OptionsPickerProps
       selectedId={selectedId}
       onSelect={handleSelect}
       onClear={handleClear}
-      allowCreate
+      allowCreate={allowCreate}
       onCreate={handleCreate}
       placeholder="Select option"
       isReference

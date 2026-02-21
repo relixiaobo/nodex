@@ -7,13 +7,23 @@
 
 import { LoroDoc, LoroList, LoroText, LoroMovableList, UndoManager, VersionVector, type TreeID, type PeerID } from 'loro-crdt';
 import { nanoid } from 'nanoid';
-import type { NodexNode, DoneMappingEntry } from '../types/node.js';
+import type { NodexNode } from '../types/node.js';
 import { saveSnapshot, loadSnapshot } from './loro-persistence.js';
 import { resetAwareness } from './awareness.js';
+import { readRichTextFromLoroText, writeRichTextToLoroText } from './loro-text-bridge.js';
 
 export const DEFAULT_USER_COMMIT_ORIGIN = 'user:implicit';
 const UNDO_EXCLUDED_ORIGIN_PREFIXES = ['__seed__', 'system:'] as const;
 const detachedMutationWarnings = new Set<string>();
+const RICH_TEXT_STYLE_CONFIG = {
+  bold: { expand: 'after' },
+  italic: { expand: 'after' },
+  strike: { expand: 'after' },
+  code: { expand: 'after' },
+  highlight: { expand: 'after' },
+  headingMark: { expand: 'after' },
+  link: { expand: 'after' },
+} as const;
 
 // ============================================================
 // 内部状态
@@ -100,6 +110,10 @@ function getTree() {
   return doc.getTree('nodes');
 }
 
+function configureTextStyles(target: LoroDoc): void {
+  target.configTextStyle(RICH_TEXT_STYLE_CONFIG);
+}
+
 function canApplyMutation(action: string): boolean {
   if (!doc) throw new Error('[loro-doc] LoroDoc 未初始化，请先调用 initLoroDoc()');
   if (!doc.isDetached()) return true;
@@ -178,6 +192,7 @@ export async function initLoroDoc(workspaceId: string): Promise<void> {
   if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
   currentWorkspaceId = workspaceId;
   doc = new LoroDoc();
+  configureTextStyles(doc);
   detachedMutationWarnings.clear();
   // 切换工作区时清除上一个工作区的 awareness 状态，避免跨工作区泄露
   resetAwareness();
@@ -227,6 +242,7 @@ export function resetLoroDoc(): void {
 /** 同步初始化（仅测试用，不加载快照） */
 export function initLoroDocForTest(workspaceId: string): void {
   doc = new LoroDoc();
+  configureTextStyles(doc);
   currentWorkspaceId = workspaceId;
   detachedMutationWarnings.clear();
   nodexToTree.clear();
@@ -321,6 +337,30 @@ export function getNodeData(nodexId: string): Record<string, unknown> | null {
   return node.data.toJSON() as Record<string, unknown>;
 }
 
+export function setNodeRichTextContent(
+  nodexId: string,
+  text: string,
+  marks: NodexNode['marks'] = [],
+  inlineRefs: NodexNode['inlineRefs'] = [],
+): void {
+  if (!canApplyMutation('setNodeRichTextContent')) return;
+  invalidateCache();
+  const tree = getTree();
+  const treeId = nodexToTree.get(nodexId);
+  if (!treeId) return;
+  const node = tree.getNodeByID(treeId);
+  if (!node) return;
+
+  const richText = getOrCreateNodeText(nodexId);
+  if (!richText) return;
+  writeRichTextToLoroText(richText, {
+    text: text ?? '',
+    marks: marks ?? [],
+    inlineRefs: inlineRefs ?? [],
+  });
+  node.data.set('updatedAt', Date.now());
+}
+
 export function setNodeData(nodexId: string, key: string, value: unknown): void {
   if (!canApplyMutation('setNodeData')) return;
   invalidateCache();
@@ -399,48 +439,6 @@ export function getTags(nodexId: string): string[] {
 }
 
 // ============================================================
-// LoroList 复合属性
-// ============================================================
-
-function getListContainer(nodexId: string, key: string): LoroList | null {
-  const tree = getTree();
-  const treeId = nodexToTree.get(nodexId);
-  if (!treeId) return null;
-  const node = tree.getNodeByID(treeId);
-  if (!node) return null;
-  return node.data.getOrCreateContainer(key, new LoroList()) as LoroList;
-}
-
-export function getNodeList(nodexId: string, key: string): unknown[] {
-  const list = getListContainer(nodexId, key);
-  return list ? (list.toArray() as unknown[]) : [];
-}
-
-export function pushToNodeList(nodexId: string, key: string, value: unknown): void {
-  if (!canApplyMutation(`pushToNodeList:${key}`)) return;
-  invalidateCache();
-  const list = getListContainer(nodexId, key);
-  if (!list) return;
-  list.insert(list.length, value);
-}
-
-export function removeFromNodeList(nodexId: string, key: string, index: number): void {
-  if (!canApplyMutation(`removeFromNodeList:${key}`)) return;
-  invalidateCache();
-  const list = getListContainer(nodexId, key);
-  if (!list) return;
-  list.delete(index, 1);
-}
-
-export function clearNodeList(nodexId: string, key: string): void {
-  if (!canApplyMutation(`clearNodeList:${key}`)) return;
-  invalidateCache();
-  const list = getListContainer(nodexId, key);
-  if (!list || list.length === 0) return;
-  list.delete(0, list.length);
-}
-
-// ============================================================
 // 查询
 // ============================================================
 
@@ -512,11 +510,16 @@ export function toNodexNode(nodexId: string): NodexNode | null {
   const tagsRaw = data.getOrCreateContainer('tags', new LoroList()) as LoroList;
   const tags = [...new Set(tagsRaw.toArray() as string[])];
   const now = Date.now();
+  const richText = data.get('richText');
+  const richTextParsed = richText instanceof LoroText ? readRichTextFromLoroText(richText) : null;
+  const nodeName = richTextParsed ? richTextParsed.text : (data.get('name') as string | undefined);
+  const nodeMarks = richTextParsed?.marks ?? [];
+  const nodeInlineRefs = richTextParsed?.inlineRefs ?? [];
 
   const result: NodexNode = {
     id: nodexId,
     type: data.get('type') as NodexNode['type'],
-    name: data.get('name') as string | undefined,
+    name: nodeName,
     description: data.get('description') as string | undefined,
     children: childIds,
     tags,
@@ -524,8 +527,8 @@ export function toNodexNode(nodexId: string): NodexNode | null {
     updatedAt: (data.get('updatedAt') as number | undefined) ?? now,
     completedAt: data.get('completedAt') as number | undefined,
     publishedAt: data.get('publishedAt') as number | undefined,
-    marks: data.get('marks') as NodexNode['marks'],
-    inlineRefs: data.get('inlineRefs') as NodexNode['inlineRefs'],
+    marks: nodeMarks,
+    inlineRefs: nodeInlineRefs,
     templateId: data.get('templateId') as string | undefined,
     viewMode: data.get('viewMode') as NodexNode['viewMode'],
     editMode: data.get('editMode') as boolean | undefined,
@@ -583,33 +586,6 @@ export function importUpdates(data: Uint8Array): void {
 export function subscribe(callback: () => void): () => void {
   subscribers.add(callback);
   return () => subscribers.delete(callback);
-}
-
-// ============================================================
-// Done-State Mapping 专用 API
-// ============================================================
-
-export function addDoneMappingEntry(
-  tagDefId: string,
-  checked: boolean,
-  entry: DoneMappingEntry,
-): void {
-  const key = checked ? 'doneCheckedMappings' : 'doneUncheckedMappings';
-  pushToNodeList(tagDefId, key, entry);
-}
-
-export function removeDoneMappingEntry(
-  tagDefId: string,
-  checked: boolean,
-  index: number,
-): void {
-  const key = checked ? 'doneCheckedMappings' : 'doneUncheckedMappings';
-  removeFromNodeList(tagDefId, key, index);
-}
-
-export function getDoneMappings(tagDefId: string, checked: boolean): DoneMappingEntry[] {
-  const key = checked ? 'doneCheckedMappings' : 'doneUncheckedMappings';
-  return getNodeList(tagDefId, key) as DoneMappingEntry[];
 }
 
 export function getLoroDoc(): LoroDoc {

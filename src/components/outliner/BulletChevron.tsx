@@ -57,7 +57,7 @@ export function BulletChevron({
         title="Zoom in"
       >
         <div
-          className="flex h-[13px] w-[13px] items-center justify-center rounded-full transition-transform group-hover/bullet:scale-110 group-active/bullet:scale-90"
+          className="flex h-[15px] w-[15px] items-center justify-center rounded-full transition-transform group-hover/bullet:scale-110 group-active/bullet:scale-90"
           style={{ backgroundColor: tagDefColor }}
         >
           <span className="text-[9px] font-bold leading-none text-white select-none">#</span>

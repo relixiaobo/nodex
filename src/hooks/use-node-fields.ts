@@ -37,6 +37,8 @@ export interface FieldEntry {
   isSystemConfig?: boolean;
   /** Config field metadata key for looking up icon/description in FieldRow */
   configKey?: string;
+  /** Explicit control type for system config rendering */
+  configControl?: ConfigFieldDef['control'];
 }
 
 /** Check if a visibleWhen condition is satisfied by looking at node config values. */
@@ -48,7 +50,7 @@ function isVisibleWhenSatisfied(
   return val === condition.value;
 }
 
-function computeFields(
+export function computeNodeFields(
   getNode: (id: string) => NodexNode | null,
   getChildren: (id: string) => NodexNode[],
   nodeId: string,
@@ -85,23 +87,29 @@ function computeFields(
     if (!fieldDef || fieldDef.type !== 'fieldDef') continue;
 
     const isSysConfig = isSystemConfigField(keyId);
+    const configDef = isSysConfig ? (ATTRDEF_CONFIG_MAP.get(keyId) ?? TAGDEF_CONFIG_MAP.get(keyId)) : undefined;
 
-    if (isSysConfig) {
-      const configDef = ATTRDEF_CONFIG_MAP.get(keyId) ?? TAGDEF_CONFIG_MAP.get(keyId);
-      if (configDef) {
-        if (configDef.visibleWhen && !isVisibleWhenSatisfied(configDef.visibleWhen, node)) {
-          continue;
-        }
-        if (isFieldDef && configDef.appliesTo !== '*') {
-          const currentType = resolveDataType(nodeId);
-          if (!configDef.appliesTo.includes(currentType)) continue;
-        }
+    if (configDef) {
+      if (configDef.visibleWhen && !isVisibleWhenSatisfied(configDef.visibleWhen, node)) {
+        continue;
+      }
+      if (isFieldDef && configDef.appliesTo !== '*') {
+        const currentType = resolveDataType(nodeId);
+        if (!configDef.appliesTo.includes(currentType)) continue;
       }
     }
 
     const valueChildren = getChildren(child.id);
     const valueNodeId = valueChildren[0]?.id;
     const valueNode = valueNodeId ? getNode(valueNodeId) : undefined;
+    const valueName = (() => {
+      if (!valueNode) return undefined;
+      if (valueNode.targetId) {
+        const targetNode = getNode(valueNode.targetId);
+        if (targetNode?.name) return targetNode.name;
+      }
+      return valueNode.name;
+    })();
 
     const trashed = !isSysConfig && (loroDoc.getParentId(keyId) === CONTAINER_IDS.TRASH);
     const hasContent = valueChildren.length > 0;
@@ -111,7 +119,7 @@ function computeFields(
       attrDefName: fieldDef.name ?? 'Untitled',
       fieldEntryId: child.id,
       valueNodeId,
-      valueName: valueNode?.name,
+      valueName,
       dataType: resolveDataType(keyId),
       trashed,
       hideMode: isSysConfig ? undefined : resolveHideField(keyId),
@@ -119,6 +127,7 @@ function computeFields(
       isRequired: isSysConfig ? undefined : resolveRequired(keyId),
       isSystemConfig: isSysConfig || undefined,
       configKey: isSysConfig ? keyId : undefined,
+      configControl: configDef?.control,
     });
   }
 
@@ -127,6 +136,7 @@ function computeFields(
     switch (control) {
       case 'toggle': return SYS_D.BOOLEAN;
       case 'color_picker': return SYS_D.COLOR;
+      case 'number_input': return FIELD_TYPES.NUMBER;
       case 'outliner': return '__outliner__';
       default: return FIELD_TYPES.PLAIN;
     }
@@ -146,6 +156,7 @@ function computeFields(
         dataType: configControlToDataType(def.control),
         isSystemConfig: true,
         configKey: def.key,
+        configControl: def.control,
       });
     }
     const orderMap = new Map(ATTRDEF_CONFIG_FIELDS.map((f, i) => [f.key, i]));
@@ -163,6 +174,7 @@ function computeFields(
         dataType: configControlToDataType(def.control),
         isSystemConfig: true,
         configKey: def.key,
+        configControl: def.control,
       });
     }
     const orderMap = new Map(TAGDEF_CONFIG_FIELDS.map((f, i) => [f.key, i]));
@@ -177,7 +189,7 @@ const EMPTY = '[]';
 export function useNodeFields(nodeId: string): FieldEntry[] {
   const json = useNodeStore((state) => {
     void state._version;
-    const fields = computeFields(state.getNode, state.getChildren, nodeId);
+    const fields = computeNodeFields(state.getNode, state.getChildren, nodeId);
     if (fields.length === 0) return EMPTY;
     return JSON.stringify(fields);
   });

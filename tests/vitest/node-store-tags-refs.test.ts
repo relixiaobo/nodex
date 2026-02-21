@@ -175,6 +175,7 @@ describe('startRefConversion', () => {
     const tempNode = loroDoc.toNodexNode(tempId)!;
     expect(tempNode.inlineRefs).toBeDefined();
     expect(tempNode.inlineRefs![0].targetNodeId).toBe('task_1');
+    expect(loroDoc.getNodeText(tempId)?.toString()).toBe('\uFFFC');
   });
 
   it('keeps target node when called with targetId directly (defensive path)', () => {

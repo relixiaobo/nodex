@@ -25,6 +25,14 @@ describe('node-store content model actions', () => {
     expect(node?.inlineRefs).toEqual([
       { offset: 3, targetNodeId: 'task_1', displayName: 'Design the data model' },
     ]);
+
+    const richText = loroDoc.getNodeText('idea_1');
+    expect(richText?.toString()).toBe('Hi \uFFFC');
+
+    // richText is the single source for formatted content; raw fields stay unset.
+    const raw = loroDoc.getNodeData('idea_1');
+    expect(raw?.marks).toBeUndefined();
+    expect(raw?.inlineRefs).toBeUndefined();
   });
 
   it('setNodeName updates name, preserves marks and inlineRefs', () => {
@@ -35,11 +43,15 @@ describe('node-store content model actions', () => {
       inlineRefs: [{ offset: 3, targetNodeId: 'task_1' }],
     });
 
+    const rawBefore = loroDoc.getNodeData('idea_1')?.name;
+
     // setNodeName only updates name
     useNodeStore.getState().setNodeName('idea_1', 'Renamed \uFFFC');
     const node = loroDoc.toNodexNode('idea_1');
     expect(node?.name).toBe('Renamed \uFFFC');
-    // Marks preserved (setNodeName only touches name field)
+    expect(node?.marks).toEqual([{ start: 0, end: 2, type: 'bold' }]);
+    expect(node?.inlineRefs).toEqual([{ offset: 8, targetNodeId: 'task_1' }]);
+    expect(loroDoc.getNodeData('idea_1')?.name).toBe(rawBefore);
   });
 
   it('updateNodeContent with empty marks clears marks', () => {
@@ -61,5 +73,33 @@ describe('node-store content model actions', () => {
     const after = loroDoc.toNodexNode('idea_1')?.name;
     expect(after).not.toBe(before);
     expect(after).toBe('Changed');
+  });
+
+  it('createChild with content payload initializes richText immediately', () => {
+    const child = useNodeStore.getState().createChild('note_2', undefined, {
+      name: 'Hi \uFFFC',
+      marks: [{ start: 0, end: 2, type: 'bold' }],
+      inlineRefs: [{ offset: 3, targetNodeId: 'task_1' }],
+    });
+
+    const richText = loroDoc.getNodeText(child.id);
+    expect(richText?.toString()).toBe('Hi \uFFFC');
+    const node = loroDoc.toNodexNode(child.id);
+    expect(node?.marks).toEqual([{ start: 0, end: 2, type: 'bold' }]);
+    expect(node?.inlineRefs).toEqual([{ offset: 3, targetNodeId: 'task_1' }]);
+
+    const raw = loroDoc.getNodeData(child.id);
+    expect(raw?.name).toBeUndefined();
+    expect(raw?.marks).toBeUndefined();
+    expect(raw?.inlineRefs).toBeUndefined();
+  });
+
+  it('marks-only update still refreshes updatedAt through richText path', () => {
+    const before = loroDoc.toNodexNode('idea_1')?.updatedAt ?? 0;
+    useNodeStore.getState().updateNodeContent('idea_1', {
+      marks: [{ start: 0, end: 4, type: 'italic' }],
+    });
+    const after = loroDoc.toNodexNode('idea_1')?.updatedAt ?? 0;
+    expect(after).toBeGreaterThanOrEqual(before);
   });
 });

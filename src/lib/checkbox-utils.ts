@@ -28,6 +28,7 @@
  */
 import type { NodexNode } from '../types/node.js';
 import * as loroDoc from './loro-doc.js';
+import { SYS_A } from '../types/index.js';
 
 export interface CheckboxState {
   showCheckbox: boolean;
@@ -140,7 +141,7 @@ export interface DoneStateMapping {
 
 /**
  * Get all done-state mapping configs from a node's supertags (including Extend chain).
- * Reads from LoroDoc's DoneMapping storage (set via loroDoc.addDoneMappingEntry).
+ * Reads from tagDef mapping field entries (NDX_A07 / NDX_A08).
  */
 export function getDoneStateMappings(node: NodexNode): DoneStateMapping[] {
   const result: DoneStateMapping[] = [];
@@ -155,8 +156,8 @@ export function getDoneStateMappings(node: NodexNode): DoneStateMapping[] {
       const td = loroDoc.toNodexNode(tdId);
       if (!td?.doneStateEnabled) continue;
 
-      const checkedEntries = loroDoc.getDoneMappings(tdId, true);
-      const uncheckedEntries = loroDoc.getDoneMappings(tdId, false);
+      const checkedEntries = readDoneMappingEntries(tdId, true);
+      const uncheckedEntries = readDoneMappingEntries(tdId, false);
 
       // Group by fieldDefId
       const byField = new Map<string, { checked: string[]; unchecked: string[] }>();
@@ -180,6 +181,34 @@ export function getDoneStateMappings(node: NodexNode): DoneStateMapping[] {
     }
   }
 
+  return result;
+}
+
+function readDoneMappingEntries(
+  tagDefId: string,
+  checked: boolean,
+): Array<{ fieldDefId: string; optionId: string }> {
+  const mappingFieldId = checked ? SYS_A.DONE_MAP_CHECKED : SYS_A.DONE_MAP_UNCHECKED;
+  const tupleId = loroDoc.getChildren(tagDefId).find((cid) => {
+    const child = loroDoc.toNodexNode(cid);
+    return child?.type === 'fieldEntry' && child.fieldDefId === mappingFieldId;
+  });
+  if (!tupleId) return [];
+
+  const result: Array<{ fieldDefId: string; optionId: string }> = [];
+  for (const mappingEntryId of loroDoc.getChildren(tupleId)) {
+    const mappingEntry = loroDoc.toNodexNode(mappingEntryId);
+    if (!mappingEntry || mappingEntry.type !== 'fieldEntry' || !mappingEntry.fieldDefId) continue;
+
+    const valueIds = mappingEntry.children ?? [];
+    for (const valueId of valueIds) {
+      const valueNode = loroDoc.toNodexNode(valueId);
+      if (!valueNode) continue;
+      const optionId = valueNode.targetId;
+      if (!optionId) continue;
+      result.push({ fieldDefId: mappingEntry.fieldDefId, optionId });
+    }
+  }
   return result;
 }
 

@@ -17,8 +17,8 @@ import { baseKeymap } from 'prosemirror-commands';
 import { EditorView } from 'prosemirror-view';
 import { useNodeStore } from '../../stores/node-store';
 import { useUIStore } from '../../stores/ui-store';
-import { SYS_D } from '../../types';
 import { getLastVisibleNode, isWorkspaceContainer } from '../../lib/tree-utils.js';
+import { isOptionsFieldType } from '../../lib/field-utils.js';
 import * as loroDoc from '../../lib/loro-doc.js';
 import { getPrimaryShortcutKey } from '../../lib/shortcut-registry';
 import { isImeComposingEvent } from '../../lib/ime-keyboard.js';
@@ -32,6 +32,7 @@ import {
 } from '../../lib/trailing-input-navigation.js';
 import { useFieldOptions } from '../../hooks/use-field-options.js';
 import { BulletChevron } from '../outliner/BulletChevron';
+import { FIELD_OVERLAY_Z_INDEX } from '../fields/field-layout.js';
 import { pmSchema } from './pm-schema.js';
 import { marksToDoc } from '../../lib/pm-doc-utils.js';
 
@@ -100,7 +101,7 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
   const viewRef = useRef<EditorView | null>(null);
 
   // Options autocomplete state
-  const isOptions = fieldDataType === SYS_D.OPTIONS || fieldDataType === SYS_D.OPTIONS_FROM_SUPERTAG;
+  const isOptions = isOptionsFieldType(fieldDataType);
   const allOptions = useFieldOptions(isOptions ? (attrDefId ?? '') : '');
   const addReference = useNodeStore((s) => s.addReference);
   const selectFieldOption = useNodeStore((s) => s.selectFieldOption);
@@ -532,7 +533,10 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
       <div className="relative flex-1 min-w-0">
         <div ref={mountRef} className="outline-none text-sm leading-[21px]" />
         {optionsOpen && filteredOptions.length > 0 && (
-          <div className="absolute left-0 top-full z-50 mt-0.5 max-h-48 w-56 overflow-y-auto rounded-lg border border-border bg-popover p-1 shadow-lg">
+          <div
+            className="absolute left-0 top-full mt-0.5 max-h-48 w-56 overflow-y-auto rounded-lg border border-border bg-surface p-1 shadow-lg"
+            style={{ zIndex: FIELD_OVERLAY_Z_INDEX }}
+          >
             {filteredOptions.map((opt, i) => (
               <div
                 key={opt.id}

@@ -9,11 +9,10 @@
 import { create } from 'zustand';
 import { nanoid } from 'nanoid';
 import type { NodexNode, TextMark, InlineRefEntry, FieldType } from '../types/index.js';
-import { CONTAINER_IDS, SYS_V } from '../types/index.js';
+import { CONTAINER_IDS, SYS_A, SYS_V } from '../types/index.js';
 import { isWorkspaceContainer } from '../lib/tree-utils.js';
 import * as loroDoc from '../lib/loro-doc.js';
 import { resolveCheckboxClick, resolveCmdEnterCycle, resolveForwardDoneMapping, resolveReverseDoneMapping } from '../lib/checkbox-utils.js';
-import type { DoneMappingEntry } from '../types/node.js';
 
 // ============================================================
 // Store 接口
@@ -43,11 +42,7 @@ interface NodeStore {
   // ─── 内容编辑（同步） ───
 
   setNodeName(id: string, name: string): void;
-  /** @deprecated 使用 setNodeName，marks/inlineRefs 单独通过 updateNodeContent */
-  setNodeNameLocal(id: string, name: string): void;
   updateNodeContent(id: string, data: { name?: string; marks?: TextMark[]; inlineRefs?: InlineRefEntry[] }): void;
-  /** @deprecated 使用 updateNodeContent */
-  setNodeContentLocal(id: string, name: string, marks: TextMark[], inlineRefs: InlineRefEntry[]): void;
   updateNodeDescription(id: string, description: string): void;
 
   // ─── 标签操作 ───
@@ -58,10 +53,7 @@ interface NodeStore {
 
   // ─── 字段操作 ───
 
-  /** 旧 createAttrDef */
   createFieldDef(name: string, fieldType: FieldType, tagDefId: string): NodexNode;
-  /** @deprecated 使用 createFieldDef */
-  createAttrDef(name: string, tagDefId: string, dataType: string): NodexNode;
 
   setFieldValue(nodeId: string, fieldDefId: string, values: string[]): void;
   setOptionsFieldValue(nodeId: string, fieldDefId: string, optionNodeId: string): void;
@@ -69,15 +61,9 @@ interface NodeStore {
   clearFieldValue(nodeId: string, fieldDefId: string): void;
   addFieldToNode(nodeId: string, fieldDefId: string): void;
   addUnnamedFieldToNode(nodeId: string, afterChildId?: string): { fieldEntryId: string; fieldDefId: string };
-  /** 旧 moveFieldTuple */
   moveFieldEntry(currentParentId: string, fieldEntryId: string, newParentId: string, position?: number): void;
-  /** @deprecated 使用 moveFieldEntry */
-  moveFieldTuple(currentParentId: string, tupleId: string, newParentId: string, _userId: string, position?: number): void;
   removeField(nodeId: string, fieldEntryId: string): void;
-  /** 旧 renameAttrDef */
   renameFieldDef(fieldDefId: string, newName: string): void;
-  /** @deprecated 使用 renameFieldDef */
-  renameAttrDef(attrDefId: string, newName: string): void;
   changeFieldType(fieldDefId: string, newType: string): void;
   addFieldOption(fieldDefId: string, name: string): string;
   removeFieldOption(fieldDefId: string, optionId: string): void;
@@ -150,6 +136,30 @@ function getExtendsChain(tagDefId: string, visited = new Set<string>()): string[
 
 let _childrenNodesCacheVer = -1;
 const _childrenNodesCache = new Map<string, NodexNode[]>();
+const INLINE_REF_CHAR = '\uFFFC';
+
+export function remapInlineRefsByPlaceholderOrder(
+  nextText: string,
+  prevInlineRefs: InlineRefEntry[] | undefined,
+): InlineRefEntry[] {
+  if (!prevInlineRefs || prevInlineRefs.length === 0) return [];
+  const prev = [...prevInlineRefs].sort((a, b) => a.offset - b.offset);
+  const nextOffsets: number[] = [];
+  for (let i = 0; i < nextText.length; i++) {
+    if (nextText[i] === INLINE_REF_CHAR) nextOffsets.push(i);
+  }
+  const len = Math.min(prev.length, nextOffsets.length);
+  const remapped: InlineRefEntry[] = [];
+  for (let i = 0; i < len; i++) {
+    const oldRef = prev[i];
+    remapped.push({
+      offset: nextOffsets[i],
+      targetNodeId: oldRef.targetNodeId,
+      ...(oldRef.displayName ? { displayName: oldRef.displayName } : {}),
+    });
+  }
+  return remapped;
+}
 
 // ============================================================
 // Store 实现
@@ -195,7 +205,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
 
     const valId = nanoid();
     loroDoc.createNode(valId, fieldEntryId);
-    loroDoc.setNodeDataBatch(valId, { name: optionNodeId, targetId: optionNodeId });
+    loroDoc.setNodeData(valId, 'targetId', optionNodeId);
 
     if (!applyReverseDoneMapping) return;
 
@@ -244,14 +254,25 @@ export const useNodeStore = create<NodeStore>((set, get) => {
       const id = nanoid();
       loroDoc.createNode(id, parentId, index);
       if (data) {
-        const { type, name, description, ...rest } = data;
+        const { type, name, description, marks, inlineRefs, ...rest } = data;
         const batch: Record<string, unknown> = {};
         if (type !== undefined) batch.type = type;
-        if (name !== undefined) batch.name = name;
+        const shouldPersistLegacyName = type !== undefined && name !== undefined && marks === undefined && inlineRefs === undefined;
+        if (shouldPersistLegacyName) batch.name = name;
         if (description !== undefined) batch.description = description;
         Object.assign(batch, rest);
         if (Object.keys(batch).length > 0) {
           loroDoc.setNodeDataBatch(id, batch);
+        }
+
+        const shouldWriteRichText = type === undefined && (name !== undefined || marks !== undefined || inlineRefs !== undefined);
+        if (shouldWriteRichText) {
+          loroDoc.setNodeRichTextContent(
+            id,
+            name ?? '',
+            marks ?? [],
+            inlineRefs ?? [],
+          );
         }
       }
 
@@ -394,23 +415,22 @@ export const useNodeStore = create<NodeStore>((set, get) => {
     // ─── 内容编辑 ───
 
     setNodeName: (id, name) => {
-      loroDoc.setNodeData(id, 'name', name);
-    },
-
-    setNodeNameLocal: (id, name) => {
-      loroDoc.setNodeData(id, 'name', name);
+      const current = loroDoc.toNodexNode(id);
+      const nextInlineRefs = remapInlineRefsByPlaceholderOrder(name, current?.inlineRefs);
+      loroDoc.setNodeRichTextContent(id, name, current?.marks ?? [], nextInlineRefs);
     },
 
     updateNodeContent: (id, data) => {
-      const batch: Record<string, unknown> = {};
-      if (data.name !== undefined) batch.name = data.name;
-      if (data.marks !== undefined) batch.marks = data.marks.length > 0 ? data.marks : undefined;
-      if (data.inlineRefs !== undefined) batch.inlineRefs = data.inlineRefs.length > 0 ? data.inlineRefs : undefined;
-      if (Object.keys(batch).length > 0) loroDoc.setNodeDataBatch(id, batch);
-    },
-
-    setNodeContentLocal: (id, name, marks, inlineRefs) => {
-      get().updateNodeContent(id, { name, marks, inlineRefs });
+      const current = loroDoc.toNodexNode(id);
+      const nextName = data.name ?? current?.name ?? '';
+      const nextMarks = data.marks ?? current?.marks ?? [];
+      const nextInlineRefs = data.inlineRefs
+        ?? (data.name !== undefined
+          ? remapInlineRefsByPlaceholderOrder(nextName, current?.inlineRefs)
+          : current?.inlineRefs ?? []);
+      if (data.name !== undefined || data.marks !== undefined || data.inlineRefs !== undefined) {
+        loroDoc.setNodeRichTextContent(id, nextName, nextMarks, nextInlineRefs);
+      }
     },
 
     updateNodeDescription: (id, description) => {
@@ -516,12 +536,6 @@ export const useNodeStore = create<NodeStore>((set, get) => {
       return loroDoc.toNodexNode(id)!;
     },
 
-    createAttrDef: (name, tagDefId, dataType) => {
-      // 兼容旧调用：dataType 可能是 SYS_D* opaque ID
-      // 这里做简单传递，实际调用方应使用 FIELD_TYPES 常量
-      return get().createFieldDef(name, dataType as FieldType, tagDefId);
-    },
-
     setFieldValue: (nodeId, fieldDefId, values) => {
       // 找到或创建 fieldEntry
       let feId = findFieldEntry(nodeId, fieldDefId);
@@ -554,13 +568,13 @@ export const useNodeStore = create<NodeStore>((set, get) => {
         loroDoc.setNodeDataBatch(feId, { type: 'fieldEntry', fieldDefId });
       }
 
-      // Options field: fieldEntry children = [optionNodeId]（引用，非值节点）
+      // Options field: fieldEntry children = [valueNode], valueNode.targetId = optionNodeId
       const oldChildren = loroDoc.getChildren(feId);
       for (const oldId of oldChildren) loroDoc.deleteNode(oldId);
 
       const valId = nanoid();
       loroDoc.createNode(valId, feId);
-      loroDoc.setNodeDataBatch(valId, { name: optionNodeId, targetId: optionNodeId });
+      loroDoc.setNodeData(valId, 'targetId', optionNodeId);
       loroDoc.commitDoc();
     },
 
@@ -621,10 +635,6 @@ export const useNodeStore = create<NodeStore>((set, get) => {
       void currentParentId; // suppress lint
     },
 
-    moveFieldTuple: (currentParentId, tupleId, newParentId, _userId, position) => {
-      get().moveFieldEntry(currentParentId, tupleId, newParentId, position);
-    },
-
     removeField: (nodeId, fieldEntryId) => {
       loroDoc.deleteNode(fieldEntryId);
       loroDoc.commitDoc();
@@ -634,10 +644,6 @@ export const useNodeStore = create<NodeStore>((set, get) => {
     renameFieldDef: (fieldDefId, newName) => {
       loroDoc.setNodeData(fieldDefId, 'name', newName);
       loroDoc.commitDoc();
-    },
-
-    renameAttrDef: (attrDefId, newName) => {
-      get().renameFieldDef(attrDefId, newName);
     },
 
     changeFieldType: (fieldDefId, newType) => {
@@ -680,7 +686,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
       for (const oldId of oldChildren) loroDoc.deleteNode(oldId);
       const valId = nanoid();
       loroDoc.createNode(valId, feId);
-      loroDoc.setNodeDataBatch(valId, { name: optId, targetId: optId });
+      loroDoc.setNodeData(valId, 'targetId', optId);
       loroDoc.commitDoc();
 
       return optId;
@@ -750,12 +756,58 @@ export const useNodeStore = create<NodeStore>((set, get) => {
     },
 
     addDoneMappingEntry: (tagDefId, checked, fieldDefId, optionId) => {
-      loroDoc.addDoneMappingEntry(tagDefId, checked, { fieldDefId, optionId } satisfies DoneMappingEntry);
+      const mappingKey = checked ? SYS_A.DONE_MAP_CHECKED : SYS_A.DONE_MAP_UNCHECKED;
+
+      let mappingTupleId = findFieldEntry(tagDefId, mappingKey);
+      if (!mappingTupleId) {
+        mappingTupleId = nanoid();
+        loroDoc.createNode(mappingTupleId, tagDefId);
+        loroDoc.setNodeDataBatch(mappingTupleId, { type: 'fieldEntry', fieldDefId: mappingKey });
+      }
+
+      // Keep entries unique by (fieldDefId, optionId)
+      const entryIds = loroDoc.getChildren(mappingTupleId);
+      for (const entryId of entryIds) {
+        const entryNode = loroDoc.toNodexNode(entryId);
+        if (!entryNode || entryNode.type !== 'fieldEntry' || entryNode.fieldDefId !== fieldDefId) continue;
+
+        for (const valueId of entryNode.children ?? []) {
+          const valueNode = loroDoc.toNodexNode(valueId);
+          const existingOptionId = valueNode?.targetId;
+          if (existingOptionId === optionId) return;
+        }
+      }
+
+      const mappingEntryId = nanoid();
+      loroDoc.createNode(mappingEntryId, mappingTupleId);
+      loroDoc.setNodeDataBatch(mappingEntryId, { type: 'fieldEntry', fieldDefId });
+
+      const valueId = nanoid();
+      loroDoc.createNode(valueId, mappingEntryId);
+      loroDoc.setNodeData(valueId, 'targetId', optionId);
       loroDoc.commitDoc();
     },
 
     removeDoneMappingEntry: (tagDefId, checked, index) => {
-      loroDoc.removeDoneMappingEntry(tagDefId, checked, index);
+      const mappingKey = checked ? SYS_A.DONE_MAP_CHECKED : SYS_A.DONE_MAP_UNCHECKED;
+      const mappingTupleId = findFieldEntry(tagDefId, mappingKey);
+      if (!mappingTupleId) return;
+
+      // Keep index behavior aligned with UI list: only count valid mapping entries
+      // (fieldEntry with at least one targetId value child).
+      const entries = loroDoc.getChildren(mappingTupleId).filter((cid) => {
+        const node = loroDoc.toNodexNode(cid);
+        if (node?.type !== 'fieldEntry') return false;
+        const hasValueTarget = (node.children ?? []).some((valueId) => {
+          const valueNode = loroDoc.toNodexNode(valueId);
+          return !!valueNode?.targetId;
+        });
+        return hasValueTarget;
+      });
+      const targetId = entries[index];
+      if (!targetId) return;
+
+      loroDoc.deleteNode(targetId);
       loroDoc.commitDoc();
     },
 
@@ -793,11 +845,9 @@ export const useNodeStore = create<NodeStore>((set, get) => {
 
       // 创建临时内联引用节点
       const tempId = nanoid();
+      const inlineRefs = [{ offset: 0, targetNodeId: targetId ?? '', displayName: targetName }];
       loroDoc.createNode(tempId, parentId, position);
-      loroDoc.setNodeDataBatch(tempId, {
-        name: '\uFFFC',
-        inlineRefs: [{ offset: 0, targetNodeId: targetId ?? '', displayName: targetName }],
-      });
+      loroDoc.setNodeRichTextContent(tempId, '\uFFFC', [], inlineRefs);
       loroDoc.commitDoc();
       return tempId;
     },
@@ -813,12 +863,6 @@ export const useNodeStore = create<NodeStore>((set, get) => {
     },
   };
 });
-
-// ─── 向后兼容的异步包装（组件中 await 调用不报错，实际同步完成） ───
-
-// 这些不需要单独 export，Zustand store 会直接返回函数
-// 组件里 `await store.createChild(...)` 会直接返回 NodexNode（非 Promise）
-// TypeScript 允许对非 Promise 调用 await（返回值包装为 resolved Promise）
 
 // ─── 全局 store 访问（供 standalone 调试）───
 

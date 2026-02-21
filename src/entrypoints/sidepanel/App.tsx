@@ -30,7 +30,7 @@ async function seedWorkspace(wsId: string): Promise<void> {
   for (const { id, name } of CONTAINER_DEFS) {
     if (!loroDoc.hasNode(id)) {
       loroDoc.createNode(id, null);
-      loroDoc.setNodeDataBatch(id, { name });
+      loroDoc.setNodeRichTextContent(id, name, [], []);
     }
   }
 }
@@ -39,8 +39,8 @@ interface BootstrapResult {
   ready: boolean;
 }
 
-function useBootstrap(): BootstrapResult {
-  const [ready, setReady] = useState(false);
+function useBootstrap(skip: boolean): BootstrapResult {
+  const [ready, setReady] = useState(skip);
   const wsId = useWorkspaceStore((s) => s.currentWorkspaceId);
   const setWorkspace = useWorkspaceStore((s) => s.setWorkspace);
   const setUser = useWorkspaceStore((s) => s.setUser);
@@ -50,6 +50,10 @@ function useBootstrap(): BootstrapResult {
   const initCalled = useRef(false);
 
   useEffect(() => {
+    if (skip) {
+      setReady(true);
+      return;
+    }
     if (initCalled.current) return;
     initCalled.current = true;
 
@@ -84,14 +88,18 @@ function useBootstrap(): BootstrapResult {
     }
 
     init();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [skip]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return { ready };
 }
 
-export function App() {
+interface AppProps {
+  skipBootstrap?: boolean;
+}
+
+export function App({ skipBootstrap = false }: AppProps) {
   const sidebarOpen = useUIStore((s) => s.sidebarOpen);
-  const { ready } = useBootstrap();
+  const { ready } = useBootstrap(skipBootstrap);
 
   useEffect(() => {
     if (!import.meta.env.DEV) return;

@@ -29,11 +29,48 @@ _(空)_
 |-------|---------|------|-------------|
 | nodex-cc | _(idle — PR #63 merged)_ | — | — |
 | nodex-cc-2 | _(idle — PR #61 merged)_ | — | — |
-| nodex-codex | Loro 收口 Phase 1（detached guard + origin 策略） | codex/loro-phase1-guards | docs/TASKS.md, src/lib/loro-doc.ts, src/stores/node-store.ts, tests/vitest/loro-*.test.ts, tests/vitest/node-store-*.test.ts, docs/TESTING.md, docs/LESSONS.md |
+| nodex-codex | Loro 收口 Phase 2（field value 交互/样式/语义收口） | codex/loro-phase2-lorotext | docs/TASKS.md, docs/TESTING.md, src/components/fields/field-layout.ts, src/components/fields/FieldRow.tsx, src/hooks/use-node-fields.ts, src/components/fields/DatePicker.tsx, src/components/fields/FieldValueOutliner.tsx, src/components/outliner/OutlinerItem.tsx, src/components/fields/NodePicker.tsx, src/components/editor/TrailingInput.tsx, src/lib/field-utils.ts, src/lib/checkbox-utils.ts, src/stores/node-store.ts, src/entrypoints/sidepanel/App.tsx, src/entrypoints/test/main.tsx, src/entrypoints/test/seed-data.ts, tests/vitest/use-node-fields-config.test.ts, tests/vitest/done-state-mapping.test.ts, tests/vitest/node-store-fields.test.ts, tests/vitest/field-row-config-render.test.ts, tests/vitest/field-utils.test.ts, tests/vitest/node-store-inline-refs.test.ts, tests/vitest/test-entrypoint-bootstrap.test.ts |
 
 ---
 
 ## 进行中
+
+### Refactor — Loro 收口 Phase 2：LoroText 主编辑链路迁移 (2026-02-21)
+> **Owner**: nodex-codex | **Branch**: codex/loro-phase2-lorotext
+> **目标**: 将主编辑读写从 `name+marks+inlineRefs` 迁移到 `LoroText` 容器，建立后续多端协同一致性基础
+> **Files**: `src/lib/loro-doc.ts`, `src/components/editor/*.ts`, `src/components/outliner/OutlinerItem.tsx`, `tests/vitest/loro-*.test.ts`, `docs/TESTING.md`
+> **Progress**:
+> - [x] 设计并落地 LoroText <-> 当前编辑器数据桥接层
+> - [x] Outliner 主编辑输入路径切换到 LoroText
+> - [x] 移除历史兼容路径（未上线场景直接切换）
+> - [x] 补齐回归测试并更新 `docs/TESTING.md`
+> **迭代日志**:
+> - [2026-02-21 nodex-codex] 任务认领，启动 Phase 2 开发
+> - [2026-02-21 nodex-codex] 完成 Phase 2 第一批收口：新增 `loro-text-bridge`（TextMark/inlineRef 双向桥接），`node-store` 内容写入路径改为 legacy 字段 + `richText` 双写，`toNodexNode` 优先读 `richText`（旧字段 fallback），并补齐 `loro-text-bridge`/`loro-infra`/`node-store-content` 回归测试
+> - [2026-02-21 nodex-codex] 完成主编辑创建链路补齐：`createChild` 与 `startRefConversion` 在创建节点时即时写入 `richText`，避免“首次创建无 richText 需二次编辑才迁移”；新增 `node-store-content` / `node-store-tags-refs` 断言覆盖
+> - [2026-02-21 nodex-codex] 继续收口：主编辑写入停止 mirror `marks/inlineRefs` 到 legacy 节点字段（仅保留 `name` 镜像 + `richText` 真实源），并在 `setNodeRichTextContent` 统一刷新 `updatedAt`
+> - [2026-02-21 nodex-codex] 继续收口：`setNodeName/setNodeNameLocal/updateNodeContent` 停止实时写 `raw name`，编辑链路仅写 `richText`（`toNodexNode` 读路径不变，仍优先 `richText`）
+> - [2026-02-21 nodex-codex] 继续收口：`createChild` 对普通内容节点不再落 `raw name`，`startRefConversion` 去除 `raw name` 写入；workspace 容器初始化改为直接写 `richText`
+> - [2026-02-21 nodex-codex] 按“未上线无需历史兼容”原则，移除编辑链路中“清理 legacy 脏字段”兼容逻辑与对应测试，保持实现最小化
+> - [2026-02-21 nodex-codex] 继续清理历史兼容残留：删除 node-store 旧 API 别名（`createAttrDef/moveFieldTuple/renameAttrDef/setNodeNameLocal/setNodeContentLocal`）及调用点；移除 `findAutoCollectTupleId` stub、`resolveSupertagPickerSelectedId` 的 `targetId` 回退、`handleDelete` 的 HTML 文本回退；同步更新测试与 `docs/TESTING.md`
+> - [2026-02-21 nodex-codex] 修复配置页控制器回归：`FieldRow` 按 `configDef.control` 渲染专用控件（tag_picker/type_choice/select/done_map_entries/number_input/autocollect），不再把虚拟配置字段误走普通 outliner；`DoneMappingEntries` 改为直接绑定 `tagDefId`；`AutoCollectSection` 改为读取 `fieldDef` 选项子节点
+> - [2026-02-21 nodex-codex] 用户反馈回归未消失，定位到 `OutlinerItem` 未透传 `isSystemConfig/configKey` 造成配置字段退化；本轮按“分层渲染 + 无隐式 fallback”重构 `FieldRow` 配置链路并补矩阵回归测试
+> - [2026-02-21 nodex-codex] 完成修复：`FieldEntry` 显式携带 `configControl`，新增 `toFieldRowEntryProps` 统一映射并接入 `OutlinerItem/OutlinerView/FieldList/FieldValueOutliner/ConfigOutliner`，消除漏传风险；新增 `field-row-props.test.ts` 与 `docs/TESTING.md` 覆盖映射
+> - [2026-02-21 nodex-codex] 追加兜底：`FieldRow` 系统配置渲染从 `configControl` 回退到 `configKey` 注册表（`resolvedControl`），避免配置字段因单点元数据缺失退化；新增 `use-node-fields-config` / `field-list-config-render` / `field-row-config-render` 回归测试锁定
+> - [2026-02-21 nodex-codex] 根据最新冒烟反馈继续修复：统一配置控件 value 区 bullet 基线（NodePicker/DoneMapping/AutoCollect/NumberInput 统一 25px inset，tag `#` 子弹尺寸统一 15px）；`Auto-collect` 关闭时隐藏列表子行；`OptionsPicker` 新建能力改为受 `autocollectOptions` 开关控制；新增 `options-picker.test.ts`
+> - [2026-02-21 nodex-codex] 启动“清晰/简单/优雅”收口：将 `FieldRow` 的配置项分发改为显式 registry（替代多层条件分支），并提取统一布局常量消除多处 magic number
+> - [2026-02-21 nodex-codex] 完成收口：新增 `FIELD_VALUE_INSET` 统一 value 布局基线；`FieldRow` system-config 渲染改为 `control -> renderer` 显式注册（覆盖 outliner/color_picker/toggle/tag_picker/type_choice/select/done_map_entries/number_input/autocollect），仅未知 control 才进入默认渲染并在 dev 警告
+> - [2026-02-21 nodex-codex] 按“保持简单”回归修复：`Map checked/unchecked` value 改回普通 outliner（支持 `>` 选字段+设值）；删除 done mappings 容器读写路径，改为从 `NDX_A07/NDX_A08` fieldEntry 子树解析；同步更新 `node-store` 写入与 done-state-mapping 测试
+> - [2026-02-21 nodex-codex] 修复 options 下拉不弹出：统一 options 类型判断（`FIELD_TYPES.*` + `SYS_D.*`），`TrailingInput` 与 `OutlinerItem` 改用 `isOptionsFieldType`，点击空 value 行即可显示 options 下拉；补充 `field-utils` 回归测试
+> - [2026-02-21 nodex-codex] 全量排查 field value 同类风险：统一 `FieldValueOutliner/OutlinerItem/use-field-options/field-validation` 的类型判定为 shared predicates（checkbox/date/options-from-supertag/number/url/email 等同时兼容 `FIELD_TYPES.*` 与 `SYS_D.*`），补齐回归测试并全量通过
+> - [2026-02-21 nodex-codex] 修复用户最新冒烟反馈：Options value 显示优先解引用 `targetId`（避免展示 `opt_*`），Options picker 选中态/高亮按 optionId 对齐；DatePicker 弹层提升到高层级并加 `overflow-hidden` 解决穿模；Number 配置输入改为普通 outliner 风格文本输入（去除特殊边框 number box）
+> - [2026-02-21 nodex-codex] 完成 options value 最终收口：`setOptionsFieldValue/selectFieldOption/autoCollectOption` 仅写 `targetId`（不再冗余 `name`）；`OutlinerItem` 删除 options 的 `name` fallback；`OptionsPicker` 选中值解析改为读取 value node `targetId`；同步更新 `node-store-fields` 与 `done-state-mapping` 断言
+> - [2026-02-21 nodex-codex] 响应最新三点反馈：`Minimum/Maximum` 保持普通 outliner 风格但恢复 `number` 语义输入，并将 `number_input` 虚拟配置字段标记为 `FIELD_TYPES.NUMBER`；Date/Options 下拉统一提升为 `z-[1200] + bg-surface` 消除穿模/透底；Pre-determined options value 在 `OutlinerItem` 中按 reference 样式 bullet 渲染；done mapping 读取去掉 `targetId ?? name` fallback，完全对齐 targetId-only 模型
+> - [2026-02-21 nodex-codex] 继续追查穿模根因：`OutlinerItem` 的 overlay 层级此前绑定 `isFocused`，而 options 下拉可在“selected 但未 focused”状态打开，导致 row 仍在普通 stacking context 被兄弟行覆盖；已改为 `optionsPickerOpen` 单独触发行层级提升，并移除默认 `z-[1]` 以避免无必要 stacking context
+> - [2026-02-21 nodex-codex] 继续修复弹层残留与日期穿模：`DatePicker/NodePicker/OptionsPicker` outside click 统一切到 `pointerdown + capture`；移除 `OutlinerItem` children 容器 `z-[1]`（避免子树 stacking context 互压）；`Minimum/Maximum` 改为文本输入并复用 Number warning 逻辑，非法值可输入且显示告警（min/max 解析仅对合法数字生效）
+> - [2026-02-21 nodex-codex] 修复测试数据“先新后旧回流”：test 入口改为 `seedTestData({ forceFresh: true }) + <App skipBootstrap />`，避免 test 页面再走 sidepanel 的持久化 bootstrap；fresh 模式同时清理 snapshot 与 persist（UI/workspace）状态，确保每次进入 test 页都是确定性种子数据
+> - [2026-02-21 nodex-codex] 补回归测试锁定测试入口收口：新增 `test-entrypoint-bootstrap.test.ts`，断言 test main 强制 `forceFresh` seed 且以 `skipBootstrap` 渲染 App，防止“先新后旧”回流问题回归
+> - [2026-02-21 nodex-codex] 处理 PR #68 review 建议：提取 `FIELD_OVERLAY_Z_INDEX` 统一 Date/NodePicker/OptionsPicker/TrailingInput/OutlinerItem 层级；清理 `ConfigNumberInput.commitDraft` 多余 deps；为 `remapInlineRefsByPlaceholderOrder` 新增独立单测（占位符增减/重排）；`removeDoneMappingEntry` 改为按“有效 mapping entry”索引删除并补噪声节点回归用例
 
 ### Refactor — Loro 收口 Phase 1：detached guard + origin 策略 (2026-02-21)
 > **Owner**: nodex-codex | **Branch**: codex/loro-phase1-guards

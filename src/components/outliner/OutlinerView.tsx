@@ -8,6 +8,7 @@ import * as loroDoc from '../../lib/loro-doc.js';
 import { isOutlinerContentNodeType } from '../../lib/node-type-utils.js';
 import { OutlinerItem } from './OutlinerItem';
 import { FieldRow } from '../fields/FieldRow';
+import { toFieldRowEntryProps } from '../fields/field-row-props.js';
 import { TrailingInput } from '../editor/TrailingInput';
 import { SYS_V } from '../../types/index.js';
 import { useDragSelect } from '../../hooks/use-drag-select.js';
@@ -119,16 +120,8 @@ export function OutlinerView({ rootNodeId, showTemplateTuples }: OutlinerViewPro
           <div key={id} className="@container" style={{ paddingLeft: 6 + 15 + 4 }}>
             <FieldRow
               nodeId={rootNodeId}
-              attrDefId={fieldMap.get(id)!.fieldDefId}
-              attrDefName={fieldMap.get(id)!.attrDefName}
-              tupleId={id}
-              valueNodeId={fieldMap.get(id)!.valueNodeId}
-              valueName={fieldMap.get(id)!.valueName}
-              dataType={fieldMap.get(id)!.dataType}
+              {...toFieldRowEntryProps(fieldMap.get(id)!)}
               isLastInGroup={i === visibleChildren.length - 1 || visibleChildren[i + 1].type !== 'field'}
-              trashed={fieldMap.get(id)!.trashed}
-              isRequired={fieldMap.get(id)!.isRequired}
-              isEmpty={fieldMap.get(id)!.isEmpty}
               onNavigateOut={(direction) => {
                 if (direction === 'up') {
                   for (let j = i - 1; j >= 0; j--) {

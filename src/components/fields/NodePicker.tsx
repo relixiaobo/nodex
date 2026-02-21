@@ -14,13 +14,14 @@ import { useState, useRef, useEffect, useCallback, useMemo, memo } from 'react';
 import { BulletChevron } from '../outliner/BulletChevron';
 import { resolveTagColor } from '../../lib/tag-colors.js';
 import { useNodeStore } from '../../stores/node-store';
+import { FIELD_OVERLAY_Z_INDEX, FIELD_VALUE_INSET } from './field-layout.js';
 
 /** Memoized colored # bullet — subscribes only to the specific tagDef's color config. */
 const TagDefBullet = memo(function TagDefBullet({ tagDefId }: { tagDefId: string }) {
   const color = useNodeStore((s) => { void s._version; return resolveTagColor(tagDefId).text; });
   return (
     <span
-      className="flex h-[13px] w-[13px] items-center justify-center rounded-full"
+      className="flex h-[15px] w-[15px] items-center justify-center rounded-full"
       style={{ backgroundColor: color }}
     >
       <span className="text-[9px] font-bold leading-none text-white select-none">#</span>
@@ -44,6 +45,8 @@ interface NodePickerProps {
   onCreate?: (name: string) => void;
   placeholder?: string;
   isReference?: boolean;
+  /** Left inset for value-row bullet alignment */
+  insetLeft?: number;
 }
 
 const noop = () => {};
@@ -57,6 +60,7 @@ export function NodePicker({
   onCreate,
   placeholder = 'Select...',
   isReference = false,
+  insetLeft = FIELD_VALUE_INSET,
 }: NodePickerProps) {
   const [open, setOpen] = useState(false);
   const [inputValue, setInputValue] = useState('');
@@ -117,13 +121,13 @@ export function NodePicker({
   // Close on click outside
   useEffect(() => {
     if (!open) return;
-    const handler = (e: MouseEvent) => {
+    const handler = (e: PointerEvent) => {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         closeDropdown();
       }
     };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
+    document.addEventListener('pointerdown', handler, true);
+    return () => document.removeEventListener('pointerdown', handler, true);
   }, [open, closeDropdown]);
 
   const handleSelect = useCallback(
@@ -207,7 +211,7 @@ export function NodePicker({
           /* Reference mode: outline wraps bullet+text */
           <div
             className="flex min-h-7 items-start py-1"
-            style={{ paddingLeft: 6 }}
+            style={{ paddingLeft: insetLeft }}
           >
             {/* Outline wraps reference bullet + text together (like Tana) */}
             <span className="inline-flex items-center gap-2 rounded-sm outline outline-1 outline-primary/50">
@@ -215,7 +219,7 @@ export function NodePicker({
               <span className="flex shrink-0 h-[21px] w-[15px] items-center justify-center">
                 {selectedTagDefColor ? (
                   <span
-                    className="flex h-[13px] w-[13px] items-center justify-center rounded-full"
+                    className="flex h-[15px] w-[15px] items-center justify-center rounded-full"
                     style={{ backgroundColor: selectedTagDefColor }}
                   >
                     <span className="text-[9px] font-bold leading-none text-white select-none">#</span>
@@ -245,7 +249,7 @@ export function NodePicker({
           /* Non-reference mode or closed state */
           <div
             className="flex min-h-7 items-start gap-2 py-1"
-            style={{ paddingLeft: 6 }}
+            style={{ paddingLeft: insetLeft }}
           >
             <BulletChevron
               hasChildren={false}
@@ -284,7 +288,8 @@ export function NodePicker({
       {/* Dropdown — shown below the value */}
       {open && (
         <div
-          className="absolute left-6 top-full z-50 mt-0.5 w-56 max-h-52 overflow-y-auto rounded-lg border border-border bg-popover shadow-lg p-1"
+          className="absolute top-full mt-0.5 w-56 max-h-52 overflow-y-auto rounded-lg border border-border bg-surface shadow-lg p-1"
+          style={{ left: insetLeft, zIndex: FIELD_OVERLAY_Z_INDEX }}
           onMouseDown={(e) => e.preventDefault()}
         >
           {/* Option list — bullet + text per item */}

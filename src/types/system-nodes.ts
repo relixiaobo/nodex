@@ -2,10 +2,9 @@
  * Tana 系统节点常量定义 — Loro 迁移后新版本
  *
  * 核心变化：
- * - 新增 FIELD_TYPES：可读字符串替代 SYS_D* opaque ID
- * - 新增 SYSTEM_TAGS：可读 ID 替代 SYS_T* opaque ID
- * - SYS_A/SYS_D/SYS_V/SYS_T 保留（迁移期间过渡用）
- *   fieldEntry/viewDef 配置仍需 SYS_A，逐步减少引用
+ * - FIELD_TYPES：可读字符串字段类型
+ * - SYSTEM_TAGS：可读系统标签 ID
+ * - SYS_A/SYS_D/SYS_V/SYS_T：系统常量
  */
 
 // ============================================================
@@ -40,24 +39,6 @@ export const FIELD_TYPES = {
 } as const;
 
 export type FieldType = typeof FIELD_TYPES[keyof typeof FIELD_TYPES];
-
-// SYS_D* → FIELD_TYPES 映射（用于从旧数据迁移）
-export const SYS_D_TO_FIELD_TYPE: Record<string, FieldType> = {
-  SYS_D01: FIELD_TYPES.CHECKBOX,
-  SYS_D02: FIELD_TYPES.INTEGER,
-  SYS_D03: FIELD_TYPES.DATE,
-  SYS_D05: FIELD_TYPES.OPTIONS_FROM_SUPERTAG,
-  SYS_D06: FIELD_TYPES.PLAIN,
-  SYS_D07: FIELD_TYPES.FORMULA,
-  SYS_D08: FIELD_TYPES.NUMBER,
-  SYS_D09: FIELD_TYPES.TANA_USER,
-  SYS_D10: FIELD_TYPES.URL,
-  SYS_D11: FIELD_TYPES.EMAIL,
-  SYS_D12: FIELD_TYPES.OPTIONS,
-  SYS_D13: FIELD_TYPES.OPTIONS,
-  NDX_D01: FIELD_TYPES.BOOLEAN,
-  NDX_D02: FIELD_TYPES.COLOR,
-};
 
 // ============================================================
 // SYSTEM_TAGS —— 系统标签固定 ID（可读，替代 SYS_T* opaque ID）
@@ -95,27 +76,6 @@ export const SYSTEM_TAGS = {
 } as const;
 
 export type SystemTagId = typeof SYSTEM_TAGS[keyof typeof SYSTEM_TAGS];
-
-// SYS_T* → SYSTEM_TAGS 映射（用于从旧数据迁移）
-export const SYS_T_TO_SYSTEM_TAG: Record<string, SystemTagId> = {
-  SYS_T01: SYSTEM_TAGS.SUPERTAG,
-  SYS_T02: SYSTEM_TAGS.FIELD_DEFINITION,
-  SYS_T03: SYSTEM_TAGS.OPTIONS,
-  SYS_T98: SYSTEM_TAGS.MEETING,
-  SYS_T99: SYSTEM_TAGS.PERSON,
-  SYS_T100: SYSTEM_TAGS.TASK,
-  SYS_T101: SYSTEM_TAGS.ORGANIZATION,
-  SYS_T102: SYSTEM_TAGS.LOCATION,
-  SYS_T103: SYSTEM_TAGS.EVENT,
-  SYS_T104: SYSTEM_TAGS.PROJECT,
-  SYS_T105: SYSTEM_TAGS.TOPIC,
-  SYS_T117: SYSTEM_TAGS.ARTICLE,
-  SYS_T118: SYSTEM_TAGS.MEMO,
-  SYS_T119: SYSTEM_TAGS.REFLECTION,
-  SYS_T124: SYSTEM_TAGS.DAY,
-  SYS_T125: SYSTEM_TAGS.WEEK,
-  SYS_T126: SYSTEM_TAGS.YEAR,
-};
 
 // ============================================================
 // SYS_A* —— 系统属性（保留，fieldEntry/viewDef 配置仍需）

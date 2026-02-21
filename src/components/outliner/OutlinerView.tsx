@@ -100,12 +100,6 @@ export function OutlinerView({ rootNodeId, showTemplateTuples }: OutlinerViewPro
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allChildIds, fieldMap, _version, showTemplateTuples]);
 
-  // Content-only IDs for keyboard navigation (rootChildIds)
-  const contentChildIds = useMemo(
-    () => visibleChildren.filter((c) => c.type === 'content').map((c) => c.id),
-    [visibleChildren],
-  );
-
   /** Check if a hidden field has been temporarily revealed via UIStore */
   const isFieldRevealed = (fieldEntryId: string) =>
     expandedHiddenFields.has(`${rootNodeId}:${fieldEntryId}`);
@@ -207,7 +201,7 @@ export function OutlinerView({ rootNodeId, showTemplateTuples }: OutlinerViewPro
             key={id}
             nodeId={id}
             depth={0}
-            rootChildIds={contentChildIds}
+            rootChildIds={dragSelectableRootIds}
             parentId={rootNodeId}
             rootNodeId={rootNodeId}
           />

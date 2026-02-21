@@ -48,6 +48,7 @@ import { resolveDropHoverPosition } from '../../lib/drag-drop-position';
 import { resolveDropMove } from '../../lib/drag-drop';
 import { resolveSelectedReferenceShortcut } from '../../lib/selected-reference-shortcuts';
 import { resolveSelectionKeyboardAction } from '../../lib/selection-keyboard';
+import { resolveRowPointerSelectAction } from '../../lib/row-pointer-selection';
 import {
   toggleNodeInSelection,
   computeRangeSelection,
@@ -135,16 +136,26 @@ export function isHiddenFieldRow(hideMode: string | undefined, isEmpty: boolean 
 }
 
 export function buildFieldOwnerColors(
-  fieldMap: Map<string, Pick<FieldEntry, 'fieldDefId'>>,
+  fieldMap: Map<string, Pick<FieldEntry, 'fieldDefId' | 'templateId'>>,
   getFieldDefOwnerId: (fieldDefId: string) => string | null,
   getNodeType: (nodeId: string) => string | undefined,
   resolveOwnerColor: (ownerTagDefId: string) => string,
 ): Map<string, string> {
   const result = new Map<string, string>();
   for (const [entryId, entry] of fieldMap) {
-    const ownerTagDefId = getFieldDefOwnerId(entry.fieldDefId);
+    const ownerLookupIds = [entry.fieldDefId];
+    if (entry.templateId && entry.templateId !== entry.fieldDefId) {
+      ownerLookupIds.unshift(entry.templateId);
+    }
+    let ownerTagDefId: string | null = null;
+    for (const lookupId of ownerLookupIds) {
+      const ownerId = getFieldDefOwnerId(lookupId);
+      if (!ownerId) continue;
+      if (getNodeType(ownerId) !== 'tagDef') continue;
+      ownerTagDefId = ownerId;
+      break;
+    }
     if (!ownerTagDefId) continue;
-    if (getNodeType(ownerTagDefId) !== 'tagDef') continue;
     result.set(entryId, resolveOwnerColor(ownerTagDefId));
   }
   return result;
@@ -181,7 +192,9 @@ export function buildVisibleChildrenRows(params: {
         type: 'field',
         hidden: isHiddenFieldRow(fieldEntry.hideMode, fieldEntry.isEmpty),
       };
-      const ownerTagDefId = getFieldDefOwnerId(fieldEntry.fieldDefId);
+      const ownerTagDefId = fieldEntry.templateId
+        ? getFieldDefOwnerId(fieldEntry.templateId)
+        : getFieldDefOwnerId(fieldEntry.fieldDefId);
       const isTemplateField = !!fieldEntry.templateId
         && ownerTagDefId !== null
         && getNodeType(ownerTagDefId) === 'tagDef'
@@ -1149,13 +1162,21 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     const refEl = target.closest('[data-inlineref-node]') as HTMLElement | null;
     if (refEl) return;
 
+    const selectAction = resolveRowPointerSelectAction({
+      justDragged: dragState.justDragged,
+      metaKey: e.metaKey,
+      ctrlKey: e.ctrlKey,
+      shiftKey: e.shiftKey,
+      allowSingle: false,
+    });
+
     // Multi-select modifiers: Cmd+Click / Shift+Click (both reference and non-reference)
-    if (e.metaKey || e.ctrlKey) {
+    if (selectAction === 'toggle') {
       e.preventDefault();
       handleCmdClick();
       return;
     }
-    if (e.shiftKey) {
+    if (selectAction === 'range') {
       e.preventDefault();
       handleShiftClick();
       return;

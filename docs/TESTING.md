@@ -229,6 +229,7 @@ npm run test:run
 - `tests/vitest/field-row-selection.test.ts`
 - `tests/vitest/outliner-item-field-order.test.ts`
 - `tests/vitest/options-picker.test.ts`
+- `tests/vitest/row-pointer-selection.test.ts`
 
 **覆盖点**:
 
@@ -244,10 +245,11 @@ npm run test:run
 10. `number_input` 配置控件使用文本输入（不依赖原生 number spinner），与普通 Number 字段一致走 warning 校验路径
 11. `number_input` 配置值为非法数字字符串时，FieldRow value 区右侧展示同款 warning 图标（与普通 Number 字段位置一致）
 12. FieldRow 选中遮罩与 content row 使用同款视觉配方（`bg-selection-row + border + top/bottom inset`），并保证名称/值层级高于遮罩（避免选中后值区文本被遮盖）
-13. FieldRow 非交互区点击可选中 tuple（NodePanel/Outliner 统一），交互区（`data-field-value`/button/input 等）不被 row 选中逻辑抢占
-14. FieldRow 非交互区支持 `Cmd/Ctrl+Click` 多选切换、`Shift+Click` 范围选中、`Shift+↑/↓` 从锚点扩展选区（field/content 共享同一选择域）
-15. OutlinerItem 子行排序遵循“模板字段置顶 + 手动字段保持插入位”；字段 icon 着色仅限 `tagDef` owner（schema/manual 字段保持中性灰）
-16. NodePanel（`OutlinerView`）中的模板字段 icon 同步应用 owner supertag 颜色，避免 root 视图/内层视图着色行为不一致
+13. FieldRow 保持“单击编辑优先”（name 进字段名编辑，value 保持值交互）；普通单击不再把 tuple 置入选区
+14. FieldRow 的 `Cmd/Ctrl+Click`、`Shift+Click` 走统一 pointer-intent 解析（即使落在 value 交互区，也优先按多选手势处理）
+15. `OutlinerView` / `ConfigOutliner` / `FieldValueOutliner` 的选择域统一使用“可见 field + content”同一 `rootChildIds`，避免 node 类型导致的范围选行为分叉
+16. OutlinerItem 子行排序遵循“模板字段置顶 + 手动字段保持插入位”；字段 icon 着色仅限 `tagDef` owner（schema/manual 字段保持中性灰）
+17. 模板字段 icon 着色支持 `templateId` owner 回退（fieldDef 本体非 tagDef owner 时仍可继承 supertag 颜色）
 
 ### 1.7 标签与引用状态流
 

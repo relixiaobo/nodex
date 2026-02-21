@@ -129,6 +129,7 @@ selectionAnchorId: string | null;   // 范围选中 / Shift+Arrow 的锚点
 | **点击任意节点** | 聚焦该节点，光标由浏览器根据点击坐标放置 |
 
 > FieldRow 补充：普通单击遵循“编辑优先”——点击 `field name` 进入字段名编辑，点击 `value` 区进入对应值编辑/交互态；不再把普通单击解释为 tuple 选中。多选仍由 `Cmd/Ctrl+Click`、`Shift+Click`、拖选与 `Shift+↑/↓` 扩展完成。
+> 手势优先级补充：`Cmd/Ctrl` 与 `Shift` 选择手势在 FieldRow/ContentRow 共享同一 pointer-intent 解析，保证 node 类型不影响多选行为。
 
 ### Esc 三级退出链
 

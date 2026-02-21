@@ -50,6 +50,7 @@ import {
   getEffectiveSelectionBounds,
   toggleNodeInSelection,
 } from '../../lib/selection-utils.js';
+import { resolveRowPointerSelectAction } from '../../lib/row-pointer-selection.js';
 
 function focusTrailingInputForParent(parentId: string): boolean {
   const roots = document.querySelectorAll<HTMLElement>('[data-trailing-parent-id]');
@@ -128,16 +129,18 @@ export function resolveFieldRowSelectAction(params: {
   ctrlKey: boolean;
   shiftKey: boolean;
 }): FieldRowSelectAction {
-  if (!shouldSelectFieldRow({
-    isEditing: params.isEditing,
+  return resolveRowPointerSelectAction({
     justDragged: params.justDragged,
-    target: params.target,
-  })) {
-    return null;
-  }
-  if (params.metaKey || params.ctrlKey) return 'toggle';
-  if (params.shiftKey) return 'range';
-  return 'single';
+    metaKey: params.metaKey,
+    ctrlKey: params.ctrlKey,
+    shiftKey: params.shiftKey,
+    isEditing: params.isEditing,
+    allowSingle: shouldSelectFieldRow({
+      isEditing: params.isEditing,
+      justDragged: params.justDragged,
+      target: params.target,
+    }),
+  });
 }
 
 function ConfigTagPicker({ nodeId, configKey, placeholder }: { nodeId: string; configKey: string; placeholder: string }) {
@@ -669,17 +672,14 @@ export function FieldRow({
       handleShiftClick();
       return;
     }
-    // Plain click follows content-row semantics: establish single selection first,
-    // then enter edit mode for editable field names.
-    setSelectedNode(tupleId, nodeId, 'global');
+    // Plain click on non-interactive name area enters field-name editing.
+    // Selection is handled only by modifier/range/drag flows, same as content rows.
     if (!trashed && !isVirtual && !isSystemConfig && !isSystemField) {
       setEditingFieldName(tupleId);
     }
   }, [
     isEditing,
-    nodeId,
     tupleId,
-    setSelectedNode,
     setEditingFieldName,
     handleCmdClick,
     handleShiftClick,

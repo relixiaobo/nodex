@@ -55,4 +55,21 @@ describe('OutlinerItem field ordering and color', () => {
     expect(colors.get('template_entry')).toBe('tag_task-color');
     expect(colors.has('manual_entry')).toBe(false);
   });
+
+  it('uses templateId owner for inherited template field colors', () => {
+    const colors = buildFieldOwnerColors(
+      new Map([
+        ['inherited_entry', { fieldDefId: 'field_local_copy', templateId: 'field_template' }],
+      ]),
+      (fieldDefId) => {
+        if (fieldDefId === 'field_local_copy') return 'schema';
+        if (fieldDefId === 'field_template') return 'tag_task';
+        return null;
+      },
+      (nodeId) => (nodeId === 'tag_task' ? 'tagDef' : undefined),
+      (tagDefId) => `${tagDefId}-color`,
+    );
+
+    expect(colors.get('inherited_entry')).toBe('tag_task-color');
+  });
 });

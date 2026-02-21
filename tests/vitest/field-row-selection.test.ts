@@ -86,6 +86,8 @@ describe('FieldRow selected highlight', () => {
 
   it('maps modifiers to single/toggle/range selection actions', () => {
     const nameSide = document.createElement('div');
+    const valueSide = document.createElement('div');
+    valueSide.setAttribute('data-field-value', '');
     expect(resolveFieldRowSelectAction({
       isEditing: false,
       justDragged: false,
@@ -110,5 +112,21 @@ describe('FieldRow selected highlight', () => {
       ctrlKey: false,
       shiftKey: true,
     })).toBe('range');
+    expect(resolveFieldRowSelectAction({
+      isEditing: false,
+      justDragged: false,
+      target: valueSide,
+      metaKey: false,
+      ctrlKey: false,
+      shiftKey: false,
+    })).toBe(null);
+    expect(resolveFieldRowSelectAction({
+      isEditing: false,
+      justDragged: false,
+      target: valueSide,
+      metaKey: true,
+      ctrlKey: false,
+      shiftKey: false,
+    })).toBe('toggle');
   });
 });

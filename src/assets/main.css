@@ -156,6 +156,14 @@
   display: none;
 }
 
+/* More specific safeguard for inline-reference-only paragraphs:
+   Chrome can still place caret on a synthetic trailing break line.
+   Hide both helper nodes only when paragraph actually contains inline refs. */
+.editor-inline .ProseMirror p:has([data-inlineref-node]) > img.ProseMirror-separator,
+.editor-inline .ProseMirror p:has([data-inlineref-node]) > br.ProseMirror-trailingBreak {
+  display: none;
+}
+
 /* Inline references — clickable blue node links (Tana: data-inlineref-node) */
 .ProseMirror [data-inlineref-node],
 .node-content [data-inlineref-node] {

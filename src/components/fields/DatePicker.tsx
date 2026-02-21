@@ -791,6 +791,16 @@ export interface CalendarGridProps {
   rangeEnd?: string;
   hoveredDate?: string;
   onHover?: (dateStr: string) => void;
+  /** Optional: date → note count for heatmap display */
+  noteCountMap?: Map<string, number>;
+}
+
+/** Map note count → heatmap CSS class (bg opacity levels) */
+function heatmapClass(count: number | undefined): string {
+  if (!count || count <= 0) return '';
+  if (count <= 2) return 'bg-primary/8';
+  if (count <= 4) return 'bg-primary/15';
+  return 'bg-primary/25';
 }
 
 export function CalendarGrid({
@@ -806,6 +816,7 @@ export function CalendarGrid({
   rangeEnd,
   hoveredDate,
   onHover,
+  noteCountMap,
 }: CalendarGridProps) {
   const weeks = useMemo(() => generateCalendarDays(viewYear, viewMonth), [viewYear, viewMonth]);
 
@@ -854,10 +865,10 @@ export function CalendarGrid({
         </div>
       </div>
 
-      {/* Day headers — 7 columns */}
+      {/* Day headers — 7 columns, square cells */}
       <div className="grid grid-cols-7 gap-0 mb-0.5">
         {DAY_HEADERS.map((d, i) => (
-          <div key={i} className="text-center text-xs text-foreground-tertiary">
+          <div key={i} className="aspect-square flex items-center justify-center text-xs text-foreground-tertiary">
             {d}
           </div>
         ))}
@@ -878,31 +889,34 @@ export function CalendarGrid({
             const isRangeActive = !!rangeStart;
             const disabled = isOverflow && !isRangeActive && !inRange;
 
-            // Full-width cells for continuous range band
-            let cls = 'h-7 flex items-center justify-center text-sm transition-colors';
+            // Heatmap: only show on non-highlighted, non-disabled, current-month cells
+            const isHighlighted = isSelected || isStart || isEnd || inRange;
+            const noteCount = noteCountMap?.get(cell.dateStr);
+            const heatBg = !isHighlighted && !disabled && cell.isCurrentMonth
+              ? heatmapClass(noteCount)
+              : '';
+
+            // Square cells with aspect-square for consistent sizing
+            let cls = 'aspect-square flex items-center justify-center text-sm transition-colors';
 
             if (isStart && isEnd) {
-              // Same day range: fully rounded
               cls += ' bg-primary text-primary-foreground font-medium rounded-md';
             } else if (isStart) {
-              // Range start: filled blue, rounded left only (right connects to range)
               cls += ' bg-primary text-primary-foreground font-medium rounded-l-md';
             } else if (isEnd) {
-              // Range end: filled blue, rounded right only
               cls += ' bg-primary text-primary-foreground font-medium rounded-r-md';
             } else if (isSelected) {
-              // Single selected: fully rounded
               cls += ' bg-primary text-primary-foreground font-medium rounded-md';
             } else if (inRange) {
-              // Range middle: no rounding for continuous band
               cls += ' bg-primary-muted';
-              // Round edges at row boundaries for clean look
               if (ci === 0) cls += ' rounded-l-md';
               if (ci === 6) cls += ' rounded-r-md';
             } else if (isToday) {
               cls += ' ring-1 ring-primary/30 font-medium rounded-md';
+              if (heatBg) cls += ` ${heatBg}`;
             } else {
               cls += ' rounded-md';
+              if (heatBg) cls += ` ${heatBg}`;
               if (!disabled) cls += ' hover:bg-foreground/5';
             }
 

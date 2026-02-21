@@ -11,7 +11,7 @@ import { useCallback, useState, useEffect, useRef, useMemo } from 'react';
 import { ChevronLeft, ChevronRight, Calendar } from '../../lib/icons.js';
 import { useUIStore } from '../../stores/ui-store';
 import { useNodeStore } from '../../stores/node-store';
-import { ensureTodayNode, ensureDateNode, getAdjacentDayNodeId } from '../../lib/journal.js';
+import { ensureTodayNode, ensureDateNode, getAdjacentDayNodeId, getDayNoteCountsForMonth } from '../../lib/journal.js';
 import { parseDayNodeName, parseYearNodeName } from '../../lib/date-utils.js';
 import * as loroDoc from '../../lib/loro-doc.js';
 import { CalendarGrid } from '../fields/DatePicker.js';
@@ -114,6 +114,13 @@ export function DateNavigationBar({ dayNodeId }: DateNavigationBarProps) {
     return () => document.removeEventListener('keydown', handler);
   }, [calendarOpen]);
 
+  // Compute note counts for the current calendar view month (heatmap data)
+  const version = useNodeStore((s) => s._version);
+  const noteCountMap = useMemo(() => {
+    void version; // re-compute when data changes
+    return getDayNoteCountsForMonth(viewYear, viewMonth);
+  }, [viewYear, viewMonth, version]);
+
   // Select a date from calendar → ensureDateNode → navigateTo
   const handleCalendarSelect = useCallback((dateStr: string) => {
     const [y, m, d] = dateStr.split('-').map(Number);
@@ -186,6 +193,7 @@ export function DateNavigationBar({ dayNodeId }: DateNavigationBarProps) {
             onSelectDate={handleCalendarSelect}
             today={todayStr}
             onToday={handleCalendarToday}
+            noteCountMap={noteCountMap}
           />
         </div>
       )}

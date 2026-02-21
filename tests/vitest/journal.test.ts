@@ -12,6 +12,7 @@ import {
   ensureDateNode,
   ensureTodayNode,
   getAdjacentDayNodeId,
+  getDayNoteCountsForMonth,
   isDayNode,
   isWeekNode,
   isYearNode,
@@ -267,5 +268,60 @@ describe('isJournalNode', () => {
 
   it('returns false for other containers', () => {
     expect(isJournalNode(CONTAINER_IDS.LIBRARY)).toBe(false);
+  });
+});
+
+describe('getDayNoteCountsForMonth', () => {
+  it('returns empty map for a month with no day nodes', () => {
+    // 2020-06 — no day nodes created
+    const counts = getDayNoteCountsForMonth(2020, 5); // month is 0-based
+    expect(counts.size).toBe(0);
+  });
+
+  it('returns correct note counts for days with content', () => {
+    // Seed data creates today + yesterday with notes.
+    // today: 3 notes (j_today_1, j_today_2, j_today_3)
+    // yesterday: 2 notes (j_yest_1, j_yest_2)
+    const today = new Date();
+    const counts = getDayNoteCountsForMonth(today.getFullYear(), today.getMonth());
+
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    expect(counts.get(todayStr)).toBe(3);
+
+    const yesterday = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1);
+    // Yesterday might be in a different month — only check if same month
+    if (yesterday.getMonth() === today.getMonth()) {
+      const yestStr = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, '0')}-${String(yesterday.getDate()).padStart(2, '0')}`;
+      expect(counts.get(yestStr)).toBe(2);
+    }
+  });
+
+  it('does not count fieldEntry children', () => {
+    // Create a day node and add both a content child and a fieldEntry child
+    const date = new Date(2026, 3, 15); // April 15, 2026
+    const dayId = ensureDateNode(date);
+
+    // Add a regular content child
+    loroDoc.createNode('test_content_child', dayId);
+    loroDoc.setNodeData('test_content_child', 'name', 'A note');
+
+    // Add a fieldEntry child (should be excluded from count)
+    loroDoc.createNode('test_field_entry', dayId);
+    loroDoc.setNodeData('test_field_entry', 'type', 'fieldEntry');
+    loroDoc.setNodeData('test_field_entry', 'name', 'field');
+
+    loroDoc.commitDoc();
+
+    const counts = getDayNoteCountsForMonth(2026, 3); // April (0-based)
+    expect(counts.get('2026-04-15')).toBe(1); // Only the content child
+  });
+
+  it('returns empty map for month with day nodes but no content children', () => {
+    // Create a day node with no children
+    const date = new Date(2026, 6, 10); // July 10, 2026
+    ensureDateNode(date);
+
+    const counts = getDayNoteCountsForMonth(2026, 6); // July (0-based)
+    expect(counts.has('2026-07-10')).toBe(false); // No entries for 0-count days
   });
 });

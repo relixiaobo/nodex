@@ -43,7 +43,7 @@ _(空)_
 ### P1 Reference 交互收口：单击选中 vs Esc/框选 + inline 转换输入
 > **Owner**: nodex-codex | **Branch**: codex/reference-selection-interactions | **Spec**: `docs/features/references.md`, `docs/features/node-selection.md`
 > **目标**: 区分 reference 单击选中与全局选中视觉语义，恢复/收口 reference ↔ inline reference 切换与输入交互一致性
-> **Files**: `src/components/outliner/OutlinerItem.tsx`, `src/components/editor/RichTextEditor.tsx`, `src/components/tags/TagSelector.tsx`, `src/components/references/ReferenceSelector.tsx`, `src/components/editor/SlashCommandMenu.tsx`, `src/stores/ui-store.ts`, `src/assets/main.css`, `standalone/TestApp.tsx`, `tests/vitest/ui-store-undo-focus.test.ts`, `tests/vitest/selected-reference-shortcuts.test.ts`, `docs/features/references.md`, `docs/features/node-selection.md`
+> **Files**: `src/components/outliner/OutlinerItem.tsx`, `src/components/editor/RichTextEditor.tsx`, `src/components/tags/TagSelector.tsx`, `src/components/references/ReferenceSelector.tsx`, `src/components/editor/SlashCommandMenu.tsx`, `src/stores/ui-store.ts`, `src/assets/main.css`, `standalone/TestApp.tsx`, `tests/vitest/ui-store-undo-focus.test.ts`, `docs/features/references.md`, `docs/features/node-selection.md`
 > **Progress**:
 > - [x] 增加 selection source（`ref-click` vs `global`）并接入选中/聚焦状态流
 > - [x] 恢复 reference 单击 `fit-content` 边框样式，保留 Esc/框选全行高亮
@@ -61,6 +61,7 @@ _(空)_
 > - [2026-02-21 nodex-codex] 七次回归修复：修正六次版本的“失焦即收口”副作用；改为仅在 temp 节点发生 `focused -> unfocused` 转换后再 finalize，避免 `ArrowRight` 转换时临时节点在首帧未聚焦就被提前回退（导致无法把光标移动到 reference 框后）
 > - [2026-02-21 nodex-codex] 八次回归修复：统一 `#/@//` 浮窗锚点逻辑为 caret 坐标驱动（`RichTextEditor` 通过 `coordsAtPos` 回传 anchor，`OutlinerItem` 管理三类 anchor 状态并传给 `TagSelector/ReferenceSelector/SlashCommandMenu`）；修复菜单锚在行容器左上角导致的偏位问题，并保证三类菜单定位行为一致
 > - [2026-02-21 nodex-codex] 九次回归修复：移除 inline reference hover 下划线样式，保留主题色与点击行为，仅在键盘导航选中原子引用时显示边框态，避免 hover 视觉噪音
+> - [2026-02-21 nodex-codex] 根据 review 建议补充说明：`expandKey` 注释明确“reference 实例独立展开状态”是设计意图；delete 快捷键注释明确仅删除真实 reference 节点；ProseMirror `separator/trailingBreak` 规则补充分层注释并修正 TASKS 文件清单（移除未改动的 `selected-reference-shortcuts.test.ts`）
 
 ### Refactor — Loro 收口 Phase 2：LoroText 主编辑链路迁移 (2026-02-21)
 > **Owner**: nodex-codex | **Branch**: codex/loro-phase2-lorotext

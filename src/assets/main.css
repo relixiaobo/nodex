@@ -150,6 +150,12 @@
   display: none;
 }
 
+/* ProseMirror may inject an <img.ProseMirror-separator> before trailingBreak
+   when paragraph ends with an atom (inline reference). Keep caret on the same line. */
+.editor-inline .ProseMirror p > img.ProseMirror-separator + br.ProseMirror-trailingBreak {
+  display: none;
+}
+
 /* Inline references — clickable blue node links (Tana: data-inlineref-node) */
 .ProseMirror [data-inlineref-node],
 .node-content [data-inlineref-node] {

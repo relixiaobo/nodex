@@ -1,12 +1,12 @@
 # Feature: 网页剪藏
 
-> Phase 3 | V1 落库完成 | 提取→落库→导航 全链路可用
+> Phase 5 | V2 正文内容转子节点 | 提取→落库→反馈→导航→正文大纲化 全链路可用
 
 ## 概述
 
 Chrome Side Panel 的核心场景：用户浏览网页时，将内容剪藏为 Nodex 节点。剪藏结果是一个普通节点，通过 Supertag + Field 携带来源元数据，并支持 Read Later（正文大纲化）。
 
-## 当前实现状态（2026-02-15）
+## 当前实现状态（2026-02-21）
 
 - ✅ Side Panel -> Background -> Content Script 消息链路已打通
 - ✅ Content Script 已切换为 `defuddle` 提取，提取 title/url/content/author/published/description/siteName
@@ -18,9 +18,12 @@ Chrome Side Panel 的核心场景：用户浏览网页时，将内容剪藏为 N
 - ✅ 字段值节点 `_ownerId` 指向 `assocDataId`（非内容节点），避免 reference 误判
 - ✅ `createAttrDef` 创建完整配置 tuples（Field type / Auto-initialize / Required / Hide field）
 - ✅ 页面 description（如有）写入节点 description
-- ✅ 种子数据包含 `#web_clip` tagDef + 示例剪藏节点
-- ✅ Vitest 测试覆盖 `findTagDefByName`/`findTemplateAttrDef`/`saveWebClip`/`applyWebClipToNode`（20 cases）
+- ✅ 种子数据包含 `#web_clip` tagDef + 示例剪藏节点 + 正文子节点树
+- ✅ Vitest 测试覆盖 `findTagDefByName`/`findTemplateAttrDef`/`saveWebClip`/`applyWebClipToNode`（26 cases）
 - ✅ Sidebar "Clip Page" 按钮已移除，入口迁移至 slash command
+- ✅ sonner toast 反馈：成功 `toast.success('Page clipped')`、失败 `toast.error('Clip failed')`
+- ✅ URL 字段值渲染为蓝色可点击链接（`<a target="_blank">`），Email 字段值渲染为 `mailto:` 链接
+- ✅ **V2 正文内容转子节点**：`defuddle` 返回的 HTML 正文通过 `parseHtmlToNodes()` 解析为 heading-based 层级树，通过 `createContentNodes()` 批量创建为 Loro 子节点（29 test cases）
 
 ## 前因后果（决策演进）
 
@@ -96,16 +99,22 @@ tagDef_tweet      extends #web_clip
 | Author | `attrDef_author` | `SYS_D.PLAIN` | 作者（可选） |
 | Published At | `attrDef_published_at` | `SYS_D.DATE` | 发布时间（可选） |
 
-### 剪藏后的节点结构（V1）
+### 剪藏后的节点结构（V2）
 
 ```
-clip_node
-  props: { name: '页面标题', description: '页面摘要（可选）' }
-  meta: [tagTupleId]
-    └── Tuple [SYS_A13, tagDef_web_clip]
+clip_node "文章标题"
+  tags: [tagDef_web_clip]
+  description: '页面摘要（可选）'
   children:
-    - tuple [attrDef_source_url, valueNode]  ← Source URL 字段（含值）
-    - (V2: 正文内容子节点)
+    - fieldEntry [fieldDefId=attrDef_source_url]  ← Source URL 字段
+        └── valueNode "https://example.com/article"
+    - "Introduction"                    ← h2 → 一级子节点（heading-based 层级）
+    │   ├── "This is important text..." ← p → Introduction 的子节点
+    │   └── "Background"                ← h3 → Introduction 的子节点
+    │       ├── "Some context."         ← p
+    │       └── "First point"           ← li
+    └── "Conclusion"                    ← h2 → 一级子节点
+        └── "Final thoughts."           ← p
 ```
 
 ## 剪藏流程（V1 实现）
@@ -158,14 +167,13 @@ V1 已确立此原则（Source URL = attrDef 字段）。V2 新增的元数据**
 
 ## 待定事项
 
-- 正文 → 子节点（V2）：提取正文内容转为 outliner 子节点树
+- ~~正文 → 子节点（V2）：提取正文内容转为 outliner 子节点树~~ ✅ 已完成
 - 子类型标签（V2）：`#article`/`#video`/`#tweet` extend `#web_clip`，auto-detect
 - Author/Published At/SiteName/Favicon 字段（V2）：payload 已提取，待创建 attrDef 并加入 tagDef 模板
 - 正文提取优化：`defuddle` 参数调优、站点特化提取规则、失败样本池策略
 - 剪藏模式：全页 / 选中文本 / 简化阅读模式
 - AI 摘要：是否自动写入 `description`
 - 离线队列：无网络时暂存，上线后同步
-- Toast 组件升级：当前复用 sidebar status 文本，后续引入 sonner 等 toast 库
 - **清理 `sourceUrl` 废弃代码**：移除 `NodexNode.sourceUrl` 属性、DB `source_url` 列、`nodeToRow`/`rowToNode` 中的映射
 
 ## 决策记录
@@ -190,3 +198,9 @@ V1 已确立此原则（Source URL = attrDef 字段）。V2 新增的元数据**
 | 2026-02-15 | `setFieldValue` 同时写入 `tuple.children` 和 `assocData.children` | `FieldValueOutliner` 从 assocData.children 读取值节点，两处必须同步 |
 | 2026-02-15 | 字段值节点 `_ownerId` 指向 `assocDataId`（非内容节点） | 避免 `OutlinerItem.isReference` 误判为 reference 样式 |
 | 2026-02-15 | `createAttrDef` 创建完整 4 个配置 tuples | 确保字段配置页显示所有配置项（Field type / Auto-init / Required / Hide） |
+| 2026-02-21 | Toast 反馈用 sonner（~3KB gzipped, 零依赖） | 替代 console.error，给用户可见反馈 |
+| 2026-02-21 | URL/Email 字段值渲染为可点击 `<a>` 链接 | Source URL 可直接点击在新标签页打开，与 Date 字段一致的 Empty 占位符 |
+| 2026-02-21 | V2 正文 HTML → heading-based 子节点树 | `parseHtmlToNodes()` 纯函数解析 + `createContentNodes()` 批量 Loro 物化 |
+| 2026-02-21 | 正文节点上限 200，超出截断 | 长文防爆，truncated flag 标记 |
+| 2026-02-21 | h1 跳过，figure/img/hr 跳过 | h1 与 clip title 重复；V1 不支持图片 |
+| 2026-02-21 | 复用 `htmlToMarks()` 提取行内格式 | bold/italic/strike/code/highlight/link marks 保留到子节点 |

@@ -29,6 +29,7 @@ import {
 } from '../../lib/field-utils.js';
 import { isOutlinerContentNodeType } from '../../lib/node-type-utils.js';
 import { applyWebClipToNode } from '../../lib/webclip-service.js';
+import { toast } from 'sonner';
 import { marksToHtml } from '../../lib/editor-marks.js';
 import { docToMarks } from '../../lib/pm-doc-utils.js';
 import {
@@ -1799,7 +1800,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
         }) as WebClipCaptureResponse;
 
         if (!response?.ok) {
-          console.error('Clip failed:', response?.error ?? 'unknown error');
+          toast.error('Clip failed', { description: response?.error ?? 'unknown error' });
           return;
         }
 
@@ -1812,8 +1813,10 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
         if (isEditorViewAlive(ed) && response.payload.title) {
           setEditorPlainTextContent(ed, response.payload.title);
         }
+
+        toast.success('Page clipped', { description: response.payload.title });
       } catch (err) {
-        console.error('Clip failed:', err instanceof Error ? err.message : String(err));
+        toast.error('Clip failed', { description: err instanceof Error ? err.message : String(err) });
       }
     }
   }, [replaceSlashTriggerText, closeSlashMenu, openSearch, handleCycleCheckbox, nodeId]);

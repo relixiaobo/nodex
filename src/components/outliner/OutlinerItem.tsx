@@ -163,6 +163,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   const contentAreaRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<EditorView | null>(null);
   const blurClearRafRef = useRef<number | null>(null);
+  const wasFocusedRef = useRef(false);
 
   // # trigger state
   const [hashTagOpen, setHashTagOpen] = useState(false);
@@ -1009,10 +1010,16 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     setPendingRefConversion(null);
   }, [nodeId, revertRefConversion, setPendingRefConversion]);
 
-  // Pending reference conversion must be finalized whenever focus leaves the temp row,
-  // including non-blur paths (e.g. Escape clearFocus).
+  // Pending reference conversion must be finalized when focus transitions
+  // from focused -> unfocused (including non-blur paths like Escape clearFocus).
+  // Do NOT finalize on initial mount while still waiting for async focus handoff.
   useEffect(() => {
-    if (isFocused) return;
+    if (isFocused) {
+      wasFocusedRef.current = true;
+      return;
+    }
+    if (!wasFocusedRef.current) return;
+    wasFocusedRef.current = false;
     finalizePendingRefConversion();
   }, [isFocused, finalizePendingRefConversion]);
 

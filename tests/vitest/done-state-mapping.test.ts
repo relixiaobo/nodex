@@ -239,7 +239,7 @@ describe('Store: toggleNodeDone with done-state mapping', () => {
     const valueIds = loroDoc.getChildren(feId!);
     expect(valueIds.length).toBeGreaterThan(0);
     const value = loroDoc.toNodexNode(valueIds[0]);
-    expect(value?.name).toBe('opt_done');
+    expect(value?.targetId).toBe('opt_done');
   });
 
   it('toggleNodeDone: done → undone sets field to uncheckedOptionId', () => {

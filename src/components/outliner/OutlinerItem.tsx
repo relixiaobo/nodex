@@ -370,10 +370,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   const selectedOptionId = useMemo(() => {
     if (!isOptionsField || !node) return undefined;
     const targetId = node.targetId;
-    if (targetId && allFieldOptions.some((opt) => opt.id === targetId)) return targetId;
-    const rawName = node.name ?? '';
-    if (rawName && allFieldOptions.some((opt) => opt.id === rawName)) return rawName;
-    return undefined;
+    return targetId && allFieldOptions.some((opt) => opt.id === targetId) ? targetId : undefined;
   }, [isOptionsField, node, allFieldOptions]);
   const selectedOptionName = useMemo(
     () => allFieldOptions.find((opt) => opt.id === selectedOptionId)?.name ?? '',

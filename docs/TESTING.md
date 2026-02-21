@@ -260,7 +260,7 @@ npm run test:run
 
 1. `setFieldValue(nodeId, fieldDefId, values[])` — 清空旧值，创建新 value 节点（children of fieldEntry）
 2. `clearFieldValue(nodeId, fieldDefId)` — 删除 fieldEntry 的所有 value 子节点
-3. `setOptionsFieldValue(nodeId, fieldDefId, optionId)` — value 节点含 `name` + `targetId`
+3. `setOptionsFieldValue(nodeId, fieldDefId, optionId)` — value 节点仅写 `targetId`（不冗余 `name`）
 4. `addFieldToNode(nodeId, fieldDefId)` — 幂等（已存在则返回已有 feId）
 5. `removeField(nodeId, feId)` — 直接删除 fieldEntry 节点（Loro 不移入 Trash）
 6. `toggleCheckboxField(feId)` — 无子节点时创建 `name:'true'` 节点；有子节点则删除全部

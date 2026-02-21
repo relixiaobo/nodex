@@ -42,8 +42,11 @@ export function OptionsPicker({ nodeId, attrDefId, tupleId }: OptionsPickerProps
     void s._version;
     if (!tupleId) return undefined;
     const tuple = s.getNode(tupleId);
-    const valIds = tuple?.children ?? [];
-    return valIds.find((cid) => options.some((opt) => opt.id === cid)) || undefined;
+    const valueNodeId = tuple?.children?.[0];
+    if (!valueNodeId) return undefined;
+    const valueNode = s.getNode(valueNodeId);
+    const targetId = valueNode?.targetId;
+    return targetId && options.some((opt) => opt.id === targetId) ? targetId : undefined;
   });
 
   const handleSelect = useCallback(

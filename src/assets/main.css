@@ -156,10 +156,20 @@
   display: none;
 }
 
-/* More specific safeguard for inline-reference-only paragraphs:
-   Chrome can still place caret on a synthetic trailing break line.
-   Hide both helper nodes only when paragraph actually contains inline refs. */
-.editor-inline .ProseMirror p:has([data-inlineref-node]) > img.ProseMirror-separator,
+/* Inline reference paragraph caret anchoring:
+   keep ProseMirror separator in DOM (caret anchor), but make it zero-width/invisible;
+   hide trailingBreak so no extra visual line appears. */
+.editor-inline .ProseMirror p:has([data-inlineref-node]) > img.ProseMirror-separator {
+  display: inline-block;
+  width: 0;
+  height: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  overflow: hidden;
+}
+
 .editor-inline .ProseMirror p:has([data-inlineref-node]) > br.ProseMirror-trailingBreak {
   display: none;
 }
@@ -176,6 +186,13 @@
 .ProseMirror [data-inlineref-node]:hover,
 .node-content [data-inlineref-node]:hover {
   text-decoration: underline;
+}
+
+/* Keyboard navigation onto inline atom (ArrowLeft/ArrowRight) should be visible. */
+.editor-inline .ProseMirror [data-inlineref-node].ProseMirror-selectednode {
+  outline: 1px solid rgba(147, 197, 253, 0.95);
+  border-radius: 0.25rem;
+  background: rgba(147, 197, 253, 0.12);
 }
 
 /* Ref conversion shimmer: color breathes between foreground and primary.

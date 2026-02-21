@@ -21,6 +21,9 @@ import { resolveDataType, getFieldTypeIcon } from '../../lib/field-utils.js';
 import { resolveTagColor } from '../../lib/tag-colors.js';
 import { TagBar } from '../tags/TagBar';
 import { NodeDescription } from './NodeDescription';
+import { isDayNode } from '../../lib/journal.js';
+import { parseDayNodeName, parseYearNodeName, isToday } from '../../lib/date-utils.js';
+import * as loroDoc from '../../lib/loro-doc.js';
 
 /** Depth-0 padding formula from OutlinerItem: depth * 28 + 6. Header is always depth 0. */
 const ROW_PADDING_LEFT = 6;
@@ -60,8 +63,22 @@ export function NodeHeader({ nodeId, onTitleRef }: NodeHeaderProps) {
   // Has supertags (for block ③)
   const hasTags = (node?.tags ?? []).length > 0;
 
-  // Title editing
-  const displayName = node?.name ?? '';
+  // Title editing — day nodes show "Today, " prefix when viewing today
+  const rawName = node?.name ?? '';
+  const isTodayNode = useNodeStore((s) => {
+    void s._version;
+    if (!isDayNode(nodeId)) return false;
+    const weekId = loroDoc.getParentId(nodeId);
+    if (!weekId) return false;
+    const yearId = loroDoc.getParentId(weekId);
+    if (!yearId) return false;
+    const yearNode = loroDoc.toNodexNode(yearId);
+    const year = yearNode?.name ? parseYearNodeName(yearNode.name) : null;
+    if (year === null) return false;
+    const date = parseDayNodeName(rawName, year);
+    return date ? isToday(date) : false;
+  });
+  const displayName = isTodayNode ? `Today, ${rawName}` : rawName;
   const [editing, setEditing] = useState(false);
   const titleRef = useRef<HTMLHeadingElement>(null);
 
@@ -74,10 +91,10 @@ export function NodeHeader({ nodeId, onTitleRef }: NodeHeaderProps) {
     [onTitleRef],
   );
 
-  // When entering edit mode, set content and focus
+  // When entering edit mode, set content and focus (use rawName, not displayName with "Today, " prefix)
   useEffect(() => {
     if (editing && titleRef.current) {
-      titleRef.current.textContent = displayName;
+      titleRef.current.textContent = rawName;
       const range = document.createRange();
       const sel = window.getSelection();
       range.selectNodeContents(titleRef.current);
@@ -85,16 +102,16 @@ export function NodeHeader({ nodeId, onTitleRef }: NodeHeaderProps) {
       sel?.removeAllRanges();
       sel?.addRange(range);
     }
-  }, [editing, displayName]);
+  }, [editing, rawName]);
 
   const handleBlur = useCallback(() => {
     if (!titleRef.current) return;
     const newName = titleRef.current.textContent?.trim() ?? '';
-    if (newName !== displayName) {
+    if (newName !== rawName) {
       setNodeName(nodeId, newName);
     }
     setEditing(false);
-  }, [nodeId, displayName, setNodeName]);
+  }, [nodeId, rawName, setNodeName]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -103,11 +120,11 @@ export function NodeHeader({ nodeId, onTitleRef }: NodeHeaderProps) {
         titleRef.current?.blur();
       } else if (e.key === 'Escape') {
         e.preventDefault();
-        if (titleRef.current) titleRef.current.textContent = displayName;
+        if (titleRef.current) titleRef.current.textContent = rawName;
         setEditing(false);
       }
     },
-    [displayName],
+    [rawName],
   );
 
   const handleCheckboxChange = useCallback(() => {

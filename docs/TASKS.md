@@ -52,6 +52,7 @@ _(空)_
 > **迭代日志**:
 > - [2026-02-21 nodex-codex] 任务认领：先整理行为-commit 映射，确认“全行高亮（global）”与“reference 单击边框（ref-click）”并存方案，再开始实现
 > - [2026-02-21 nodex-codex] 实现完成：`ui-store` 新增 `selectionSource`，`OutlinerItem` 区分 `selected_global` 与 `selected_ref_click` 两套视觉；恢复 selected reference 可打印字符转换路径（转 inline conversion 并续写）；补充 store 语义断言并同步 `references/node-selection` 规格；自检通过 `npm run typecheck`、`npm run test:run`、`npm run build`
+> - [2026-02-21 nodex-codex] 用户回归反馈修复：修正 inline ref-only 场景 `ProseMirror-trailingBreak` 显示条件（避免 `@` 转换后换行光标）；reference 转换去除“先删再转”路径，避免目标ID失真导致 blur 后偶发消失；pending conversion 行纳入 reference-like 点击语义（单击可进入 ref-click 选中边框）
 
 ### Refactor — Loro 收口 Phase 2：LoroText 主编辑链路迁移 (2026-02-21)
 > **Owner**: nodex-codex | **Branch**: codex/loro-phase2-lorotext

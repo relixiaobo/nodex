@@ -1912,7 +1912,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
             hasChildren={hasChildren}
             isExpanded={isExpanded}
             onBulletClick={handleBulletClick}
-            isReference={isReference || isPendingConversion}
+            isReference={isReferenceLikeRow || isPendingConversion}
             tagDefColor={isTagDef ? resolveTagColor(nodeId).text : undefined}
             bulletColors={effectiveBulletColors}
             icon={structuralIcon}
@@ -2050,7 +2050,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
         </div>
         {/* Options picker dropdown: shown when selecting an Options value row/reference */}
         {optionsPickerOpen && allFieldOptions.length > 0 && (
-          <div className="absolute left-0 top-full z-50 mt-0.5 max-h-48 w-56 overflow-y-auto rounded-lg border border-border bg-popover p-1 shadow-lg">
+          <div className="absolute left-0 top-full z-[1200] mt-0.5 max-h-48 w-56 overflow-y-auto rounded-lg border border-border bg-surface p-1 shadow-lg">
             {allFieldOptions.map((opt, i) => (
               <div
                 key={opt.id}

@@ -226,6 +226,7 @@ npm run test:run
 - `tests/vitest/use-node-fields-config.test.ts`
 - `tests/vitest/field-list-config-render.test.ts`
 - `tests/vitest/field-row-config-render.test.ts`
+- `tests/vitest/field-row-selection.test.ts`
 - `tests/vitest/options-picker.test.ts`
 
 **覆盖点**:
@@ -241,6 +242,7 @@ npm run test:run
 9. `number_input` 虚拟配置字段的数据类型标记为 `FIELD_TYPES.NUMBER`（`Minimum/Maximum value` 语义为 Number）
 10. `number_input` 配置控件使用文本输入（不依赖原生 number spinner），与普通 Number 字段一致走 warning 校验路径
 11. `number_input` 配置值为非法数字字符串时，FieldRow value 区右侧展示同款 warning 图标（与普通 Number 字段位置一致）
+12. FieldRow 选中遮罩与 content row 使用同款视觉配方（`bg-selection-row + border + top/bottom inset`），并保证名称/值层级高于遮罩（避免选中后值区文本被遮盖）
 
 ### 1.7 标签与引用状态流
 

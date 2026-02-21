@@ -12,7 +12,7 @@
  *        [description]     • value node 2
  * ──────────────────────────────────────
  */
-import { useCallback, useRef, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useRef, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import { Trash2 } from '../../lib/icons.js';
 import { useNodeFields } from '../../hooks/use-node-fields';
 import { useNodeStore } from '../../stores/node-store';
@@ -82,6 +82,10 @@ interface FieldRowProps {
   /** Explicit config control type for system config rows */
   configControl?: ConfigFieldDef['control'];
 }
+
+export const FIELD_ROW_SELECTION_OVERLAY_CLASS =
+  'absolute right-0 bg-selection-row rounded-sm border border-primary/[0.15] pointer-events-none';
+export const FIELD_ROW_SELECTION_OVERLAY_STYLE: CSSProperties = { left: 0, top: 1, bottom: 1 };
 
 function ConfigTagPicker({ nodeId, configKey, placeholder }: { nodeId: string; configKey: string; placeholder: string }) {
   const tags = useWorkspaceTags();
@@ -680,10 +684,10 @@ export function FieldRow({
       data-row-kind="field"
     >
       {isFieldSelected && (
-        <div className="absolute inset-0 bg-selection-row rounded-sm pointer-events-none z-0" />
+        <div className={FIELD_ROW_SELECTION_OVERLAY_CLASS} style={FIELD_ROW_SELECTION_OVERLAY_STYLE} />
       )}
       {/* Name column — aligned to first line of value */}
-      <div className="flex items-center gap-1 @sm:shrink-0 @sm:w-[130px] min-w-0 h-7 py-1">
+      <div className="relative z-[1] flex items-center gap-1 @sm:shrink-0 @sm:w-[130px] min-w-0 h-7 py-1">
         <button
           className={`shrink-0 w-[15px] flex items-center justify-center transition-colors ${ownerTagColor ? '' : 'text-foreground-tertiary hover:text-foreground-secondary'}`}
           onClick={trashed || isVirtual ? undefined : () => navigateTo(attrDefId)}
@@ -725,7 +729,7 @@ export function FieldRow({
         </div>
       </div>
       {/* Value column */}
-      <div className="flex flex-1 min-w-0 items-start" data-field-value>
+      <div className="relative z-[1] flex flex-1 min-w-0 items-start" data-field-value>
         <div className="flex-1 min-w-0">
           {isOutliner ? (
             <ConfigOutliner nodeId={nodeId} />

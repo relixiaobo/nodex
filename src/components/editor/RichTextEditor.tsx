@@ -260,7 +260,7 @@ export function RichTextEditor(props: RichTextEditorProps) {
     const $from = view.state.doc.resolve(from);
     const textBefore = $from.parent.textBetween(0, $from.parentOffset, undefined, '\ufffc');
 
-    const hashMatch = textBefore.match(/#(\w*)$/);
+    const hashMatch = textBefore.match(/#([^\s#@]*)$/u);
     if (hashMatch && stateRef.hasUserEdited && (docChanged || stateRef.hashActive)) {
       stateRef.hashActive = true;
       const query = hashMatch[1];

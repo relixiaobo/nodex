@@ -95,4 +95,11 @@ describe('hash trigger cleanup safety (Bug #53)', () => {
     const stillHasHash = afterText.match(/#([^\s#@]*)$/u);
     expect(stillHasHash).toBeNull();
   });
+
+  it('supports CJK query in # trigger detection', () => {
+    const afterText = '#中文';
+    const hashMatch = afterText.match(/#([^\s#@]*)$/u);
+    expect(hashMatch).not.toBeNull();
+    expect(hashMatch?.[1]).toBe('中文');
+  });
 });

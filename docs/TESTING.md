@@ -609,9 +609,10 @@ handleDelete isEmpty（5 cases, Bug #54 回归）:
 6. name 仅含 `\u200B` / 空字符串 → 允许删除
 7. 真实文本 / `\u200B` + 真实文本 → 阻止删除
 
-hash trigger cleanup safety（2 cases, Bug #53 回归）:
+hash trigger cleanup safety（3 cases, Bug #53 + CJK hashtag 回归）:
 8. DOM cleanup 失败后检测残留 `#` 触发词
 9. DOM cleanup 成功后无残留
+10. `#中文` 可被 hashtag trigger 正确匹配（Unicode 查询）
 
 ### 1.51 P0 Loro 基础设施 — 7项底层 API
 

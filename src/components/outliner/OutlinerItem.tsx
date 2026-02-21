@@ -117,6 +117,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   const setFocusedNode = useUIStore((s) => s.setFocusedNode);
   const selectedNodeId = useUIStore((s) => s.selectedNodeId);
   const selectedParentId = useUIStore((s) => s.selectedParentId);
+  const selectionSource = useUIStore((s) => s.selectionSource);
   const setSelectedNode = useUIStore((s) => s.setSelectedNode);
   // Derive booleans from Set to avoid Zustand infinite re-render (Set creates new reference each time)
   const isInSelectedSet = useUIStore((s) => s.selectedNodeIds.has(nodeId));
@@ -359,9 +360,13 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     selectedParentId === null ||
     selectedParentId === parentId
   );
+  const isSelectedGlobal = isSelected && !isFocused && (
+    selectionSource === 'global' || !isReference || isMultiSelected
+  );
+  const isSelectedRefClick = isSelected && !isFocused && isReference && !isMultiSelected && selectionSource === 'ref-click';
 
   // Per-row highlight: only for directly selected nodes (children use subtree mask)
-  const showRowHighlight = isSelected && !isFocused;
+  const showRowHighlight = isSelectedGlobal;
 
   // Options field dropdown (for changing selected option value)
   const isOptionsField = isOptionsFieldType(fieldDataType);
@@ -641,19 +646,22 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
           }
           if (refAction === 'convert_printable') {
             if (!isReference) return;
-            const isAsciiLetter = /^[a-zA-Z]$/.test(e.key);
-            if (!isAsciiLetter) e.preventDefault();
-            const editAtEnd = getNodeTextLengthById(nodeId);
-            if (!isAsciiLetter) {
-              setPendingInputChar({ char: e.key, nodeId, parentId });
-            }
+            e.preventDefault();
+            const getNode = useNodeStore.getState().getNode;
+            const parent = getNode(parentId);
+            const pos = parent?.children?.indexOf(nodeId) ?? -1;
+            if (pos < 0) return;
+            removeReference(nodeId);
+            const tempNodeId = startRefConversion(nodeId, parentId, pos);
+            setPendingRefConversion({ tempNodeId, refNodeId: nodeId, parentId });
+            setPendingInputChar({ char: e.key, nodeId: tempNodeId, parentId });
             clearSelection();
             useUIStore.getState().setFocusClickCoords({
-              nodeId,
+              nodeId: tempNodeId,
               parentId,
-              textOffset: editAtEnd,
+              textOffset: 1,
             });
-            setFocusedNode(nodeId, parentId);
+            setFocusedNode(tempNodeId, parentId);
             return;
           }
           if (refAction === 'convert_arrow_right') {
@@ -667,6 +675,11 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
             const tempNodeId = startRefConversion(nodeId, parentId, pos);
             setPendingRefConversion({ tempNodeId, refNodeId: nodeId, parentId });
             clearSelection();
+            useUIStore.getState().setFocusClickCoords({
+              nodeId: tempNodeId,
+              parentId,
+              textOffset: 1,
+            });
             setTimeout(() => setFocusedNode(tempNodeId, parentId), 0);
             return;
           }
@@ -1154,14 +1167,14 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     // Reference nodes: single click = select (frame), double click = edit
     // Cmd+Click and Shift+Click are handled in handleContentMouseDown
     if (isReferenceLikeRow && !e.metaKey && !e.ctrlKey && !e.shiftKey) {
-      setSelectedNode(nodeId, parentId);
+      setSelectedNode(nodeId, parentId, isReference ? 'ref-click' : 'global');
       return;
     }
     // Non-reference: enter edit mode (text offset already recorded in mousedown)
     if (!isReferenceLikeRow) {
       setFocusedNode(nodeId, parentId);
     }
-  }, [nodeId, parentId, isReferenceLikeRow, setSelectedNode, setFocusedNode, navigateTo]);
+  }, [nodeId, parentId, isReferenceLikeRow, isReference, setSelectedNode, setFocusedNode, navigateTo]);
 
   const handleContentDoubleClick = useCallback((e: React.MouseEvent) => {
     // Double click on reference node → enter edit mode
@@ -1587,6 +1600,11 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
           setPendingRefConversion({ tempNodeId, refNodeId, parentId });
           const gpId = loroDoc.getParentId(parentId);
           if (gpId) setExpanded(`${gpId}:${parentId}`, true);
+          useUIStore.getState().setFocusClickCoords({
+            nodeId: tempNodeId,
+            parentId,
+            textOffset: 1,
+          });
           setTimeout(() => setFocusedNode(tempNodeId, parentId), 0);
         }
       } else {
@@ -1912,7 +1930,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
         onDrop={handleDrop}
         onDragEnd={handleDragEnd}
       >
-        {/* Per-row selection highlight: only directly selected rows */}
+        {/* Per-row selection highlight: global selection mode only (Esc/drag/multi-select). */}
         {showRowHighlight && (
           <div
             className="absolute right-0 bg-selection-row rounded-sm border border-primary/[0.15] pointer-events-none"
@@ -1925,7 +1943,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
           onToggle={handleToggle}
           onDrillDown={handleDrillDown}
         />
-        <div className="flex items-start gap-2 flex-1 min-w-0 relative">
+        <div className={`flex items-start gap-2 min-w-0 relative ${isSelectedRefClick ? 'node-selected-ref w-fit flex-none' : 'flex-1'}`}>
           <BulletChevron
             hasChildren={hasChildren}
             isExpanded={isExpanded}
@@ -2107,8 +2125,8 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       )}
       {isExpanded && (
         <div className="relative" data-row-scope-parent-id={nodeId} ref={childrenScopeRef}>
-          {/* Selection subtree mask: children area, connects to parent row above */}
-          {isSelected && !isFocused && (
+          {/* Selection subtree mask: children area, connects to parent row above (global selection only). */}
+          {isSelectedGlobal && (
             <div
               className="absolute right-0 bg-selection rounded-b-sm rounded-t-none pointer-events-none z-0"
               style={{ left: depth * 28 + 6 + 15, top: -1, bottom: 1 }}

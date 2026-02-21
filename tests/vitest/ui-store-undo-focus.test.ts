@@ -36,23 +36,26 @@ describe('ui-store undo/redo + focus/selection semantics', () => {
   it('keeps focus/selection mutually exclusive and preserves parent disambiguation', () => {
     const ui = useUIStore.getState();
 
-    ui.setSelectedNode('task_1', 'proj_1');
+    ui.setSelectedNode('task_1', 'proj_1', 'ref-click');
     expect(useUIStore.getState().selectedNodeId).toBe('task_1');
     expect(useUIStore.getState().selectedParentId).toBe('proj_1');
+    expect(useUIStore.getState().selectionSource).toBe('ref-click');
     expect(useUIStore.getState().focusedNodeId).toBeNull();
     expect(useUIStore.getState().focusedParentId).toBeNull();
 
-    // setFocusedNode now sets selection alongside focus (click-time selection pattern)
+    // setFocusedNode now sets selection alongside focus and normalizes source to global.
     ui.setFocusedNode('subtask_1a', 'task_1');
     expect(useUIStore.getState().focusedNodeId).toBe('subtask_1a');
     expect(useUIStore.getState().focusedParentId).toBe('task_1');
     expect(useUIStore.getState().selectedNodeId).toBe('subtask_1a');
     expect(useUIStore.getState().selectedParentId).toBe('task_1');
+    expect(useUIStore.getState().selectionSource).toBe('global');
 
     // ParentId omitted => normalized to null.
     ui.setSelectedNode('note_2');
     expect(useUIStore.getState().selectedNodeId).toBe('note_2');
     expect(useUIStore.getState().selectedParentId).toBeNull();
+    expect(useUIStore.getState().selectionSource).toBe('global');
     expect(useUIStore.getState().focusedNodeId).toBeNull();
   });
 
@@ -65,6 +68,7 @@ describe('ui-store undo/redo + focus/selection semantics', () => {
     expect(useUIStore.getState().selectedNodeId).toBe('task_1');
     expect(useUIStore.getState().selectedNodeIds.has('task_1')).toBe(true);
     expect(useUIStore.getState().selectionAnchorId).toBe('task_1');
+    expect(useUIStore.getState().selectionSource).toBe('global');
 
     // Simulate Escape: clearFocus only clears focus, selection survives
     ui.clearFocus();
@@ -75,12 +79,14 @@ describe('ui-store undo/redo + focus/selection semantics', () => {
     expect(useUIStore.getState().selectedParentId).toBe('proj_1');
     expect(useUIStore.getState().selectedNodeIds.has('task_1')).toBe(true);
     expect(useUIStore.getState().selectionAnchorId).toBe('task_1');
+    expect(useUIStore.getState().selectionSource).toBe('global');
 
     // Second Escape: clearSelection clears everything
     ui.clearSelection();
     expect(useUIStore.getState().selectedNodeId).toBeNull();
     expect(useUIStore.getState().selectedNodeIds.size).toBe(0);
     expect(useUIStore.getState().selectionAnchorId).toBeNull();
+    expect(useUIStore.getState().selectionSource).toBeNull();
   });
 
   it('setFocusedNode collapses multi-select to single node (intentional design)', () => {
@@ -89,6 +95,7 @@ describe('ui-store undo/redo + focus/selection semantics', () => {
     // Set up multi-select: 3 nodes selected
     ui.setSelectedNodes(new Set(['task_1', 'task_2', 'task_3']), 'task_1');
     expect(useUIStore.getState().selectedNodeIds.size).toBe(3);
+    expect(useUIStore.getState().selectionSource).toBe('global');
 
     // setFocusedNode enters edit mode → collapses to single node
     ui.setFocusedNode('task_2', 'proj_1');
@@ -111,5 +118,6 @@ describe('ui-store undo/redo + focus/selection semantics', () => {
     expect(useUIStore.getState().focusedNodeId).toBeNull();
     expect(useUIStore.getState().selectedNodeId).toBeNull();
     expect(useUIStore.getState().selectedNodeIds.size).toBe(0);
+    expect(useUIStore.getState().selectionSource).toBeNull();
   });
 });

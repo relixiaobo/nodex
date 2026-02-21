@@ -45,12 +45,13 @@ _(空)_
 > **目标**: 区分 reference 单击选中与全局选中视觉语义，恢复/收口 reference ↔ inline reference 切换与输入交互一致性
 > **Files**: `src/components/outliner/OutlinerItem.tsx`, `src/stores/ui-store.ts`, `src/assets/main.css`, `tests/vitest/ui-store-undo-focus.test.ts`, `tests/vitest/selected-reference-shortcuts.test.ts`, `docs/features/references.md`, `docs/features/node-selection.md`
 > **Progress**:
-> - [ ] 增加 selection source（`ref-click` vs `global`）并接入选中/聚焦状态流
-> - [ ] 恢复 reference 单击 `fit-content` 边框样式，保留 Esc/框选全行高亮
-> - [ ] 收口 selected reference 输入转换路径（ArrowRight/可打印字符/blur 回退）
-> - [ ] 补齐回归测试并更新 feature 文档
+> - [x] 增加 selection source（`ref-click` vs `global`）并接入选中/聚焦状态流
+> - [x] 恢复 reference 单击 `fit-content` 边框样式，保留 Esc/框选全行高亮
+> - [x] 收口 selected reference 输入转换路径（ArrowRight/可打印字符/blur 回退）
+> - [x] 补齐回归测试并更新 feature 文档
 > **迭代日志**:
 > - [2026-02-21 nodex-codex] 任务认领：先整理行为-commit 映射，确认“全行高亮（global）”与“reference 单击边框（ref-click）”并存方案，再开始实现
+> - [2026-02-21 nodex-codex] 实现完成：`ui-store` 新增 `selectionSource`，`OutlinerItem` 区分 `selected_global` 与 `selected_ref_click` 两套视觉；恢复 selected reference 可打印字符转换路径（转 inline conversion 并续写）；补充 store 语义断言并同步 `references/node-selection` 规格；自检通过 `npm run typecheck`、`npm run test:run`、`npm run build`
 
 ### Refactor — Loro 收口 Phase 2：LoroText 主编辑链路迁移 (2026-02-21)
 > **Owner**: nodex-codex | **Branch**: codex/loro-phase2-lorotext

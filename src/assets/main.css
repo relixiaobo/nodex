@@ -44,6 +44,15 @@
   --font-mono: "JetBrains Mono", "Fira Code", monospace;
 }
 
+/* Reference single-click selection: compact fit-content frame (not full-row highlight). */
+.node-selected-ref {
+  border: 1px solid color-mix(in srgb, var(--color-primary) 35%, transparent);
+  border-radius: 0.25rem;
+  background: color-mix(in srgb, var(--color-primary) 8%, transparent);
+  padding: 1px 6px;
+  margin: -1px 0 -1px -6px;
+}
+
 /* Shared inline element styles — used by both ProseMirror editor (.ProseMirror)
    and static node display (.node-content) to prevent visual jumping
    when switching between edit and display modes. */

@@ -905,7 +905,7 @@ createSibling 自动标签（2 cases）:
 2. 最后一项为 field 时显示 TrailingInput
 3. 最后一项为 content 时隐藏 TrailingInput
 
-### 1.52 NodePanel Header 重设计
+### 1.54 NodePanel Header 重设计
 
 **测试文件**: `tests/vitest/node-header.test.ts`
 
@@ -1017,6 +1017,7 @@ createSibling 自动标签（2 cases）:
 | 1.48 | Tana 导入 meta 填充与 DocType 安全 | PASS/FAIL |
 | 1.50 | Loro UndoManager 结构性撤销/重做 | PASS/FAIL |
 | 1.51 | P0 Loro 基础设施 — 7项底层API（subscribeNode/增量同步/时间旅行/LoroText/fork/Awareness） | PASS/FAIL |
+| 1.54 | NodePanel Header 重设计（UIStore expandedHiddenFields + block 可见性 + 列对齐） | PASS/FAIL |
 | 2 | 视觉渲染 | PASS/FAIL/SKIP |
 | 3 | 扩展构建 | PASS/FAIL |
 

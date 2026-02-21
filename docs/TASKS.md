@@ -27,28 +27,32 @@ _(空)_
 
 | Agent | 当前任务 | 分支 | 修改中的文件 |
 |-------|---------|------|-------------|
-| nodex-cc | _(idle — PR #66 merged)_ | — | — |
-| nodex-cc-2 | _(idle — PR #61 merged)_ | — | — |
-| nodex-codex | _(idle — PR #70 merged)_ | — | — |
+| nodex-cc | Date 节点 & 日记 (#22) | cc/date-nodes | _(待开始)_ |
+| nodex-cc-2 | 网页剪藏 (#30) | cc2/web-clipping | _(待开始)_ |
+| nodex-codex | Bug 修复 & 基础优化（面包屑导航 + @ reference 排序） | codex/ux-polish | _(待开始)_ |
 
 ---
 
 ## 进行中
 
-_(空)_
+### Date 节点 & 日记 (#22)
+> **Owner**: nodex-cc | **Branch**: cc/date-nodes | **Spec**: `docs/features/date-nodes.md`
+> **目标**: 实现年/月/周/日节点层级、Today 快捷入口、自然语言日期解析、日记模板、日期字段链接到日节点
+
+### 网页剪藏 (#30)
+> **Owner**: nodex-cc-2 | **Branch**: cc2/web-clipping | **Spec**: `docs/features/web-clipping.md`
+> **目标**: 将捕获数据保存为节点、自动打标签、Source URL 字段、Toast 反馈、一键保存到 Inbox/Today/指定节点
+
+### Bug 修复 & 基础优化
+> **Owner**: nodex-codex | **Branch**: codex/ux-polish
+> **目标**: 面包屑导航 + @ reference 搜索排序优化
+> **子任务**:
+> - [ ] 面包屑导航中 workspace 头像/根节点支持点击（导航到 workspace 根）
+> - [ ] @ reference 搜索结果按最近编辑排序（优先显示最近编辑过的节点）
 
 ---
 
 ## 待办
-
-### P1
-
-#### Editor Bug: Enter 新建空节点后 CJK IME 组合输入异常
-> 详见 `docs/issues/editor-ime-enter-empty-node.md`
-
-- 根因：ProseMirror focus 后多条路径延迟调用 `selectionToDOM()`，重置 Chrome IME 上下文
-- 已尝试 9 种外部修复方案均无法完全覆盖所有 `selectionToDOM` 路径
-- 可行方案：fork `prosemirror-view` 添加 composing 守卫 / 保活 EditorView 避免重建
 
 ### P2
 
@@ -223,6 +227,7 @@ _(空)_
 
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
+| 2026-02-21 | Editor Bug: CJK IME 组合输入异常（fork prosemirror-view 添加 composing 守卫） | nodex-codex | — |
 | 2026-02-21 | Refactor — Row 交互统一（content/trailing/field-value 共享 intent 层 + CJK hashtag 修复 + trigger caret 修复） | nodex-codex | #70 |
 | 2026-02-21 | P1 Reference 交互收口（单击选中/Esc/框选 + inline 转换 + 浮窗锚点统一） | nodex-codex | #69 |
 | 2026-02-21 | Refactor — Loro 收口 Phase 2: LoroText 主编辑链路迁移 + config field 重构 | nodex-codex | #68 |

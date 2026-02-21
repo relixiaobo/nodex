@@ -29,7 +29,7 @@ _(空)_
 |-------|---------|------|-------------|
 | nodex-cc | _(idle — PR #63 merged)_ | — | — |
 | nodex-cc-2 | _(idle — PR #61 merged)_ | — | — |
-| nodex-codex | Loro 收口 Phase 2（配置字段渲染链路收口） | codex/loro-phase2-lorotext | docs/TASKS.md, src/components/fields/*.tsx, src/components/outliner/OutlinerItem.tsx, src/hooks/use-node-fields.ts, tests/vitest/*field*.test.ts, docs/features/*.md |
+| nodex-codex | Loro 收口 Phase 2（FieldRow 配置渲染架构收口） | codex/loro-phase2-lorotext | docs/TASKS.md, src/components/fields/*.tsx, src/components/fields/field-layout.ts, src/hooks/use-node-fields.ts, tests/vitest/*field*.test.ts, tests/vitest/options-picker.test.ts, docs/TESTING.md |
 
 ---
 
@@ -58,6 +58,7 @@ _(空)_
 > - [2026-02-21 nodex-codex] 完成修复：`FieldEntry` 显式携带 `configControl`，新增 `toFieldRowEntryProps` 统一映射并接入 `OutlinerItem/OutlinerView/FieldList/FieldValueOutliner/ConfigOutliner`，消除漏传风险；新增 `field-row-props.test.ts` 与 `docs/TESTING.md` 覆盖映射
 > - [2026-02-21 nodex-codex] 追加兜底：`FieldRow` 系统配置渲染从 `configControl` 回退到 `configKey` 注册表（`resolvedControl`），避免配置字段因单点元数据缺失退化；新增 `use-node-fields-config` / `field-list-config-render` / `field-row-config-render` 回归测试锁定
 > - [2026-02-21 nodex-codex] 根据最新冒烟反馈继续修复：统一配置控件 value 区 bullet 基线（NodePicker/DoneMapping/AutoCollect/NumberInput 统一 25px inset，tag `#` 子弹尺寸统一 15px）；`Auto-collect` 关闭时隐藏列表子行；`OptionsPicker` 新建能力改为受 `autocollectOptions` 开关控制；新增 `options-picker.test.ts`
+> - [2026-02-21 nodex-codex] 启动“清晰/简单/优雅”收口：将 `FieldRow` 的配置项分发改为显式 registry（替代多层条件分支），并提取统一布局常量消除多处 magic number
 
 ### Refactor — Loro 收口 Phase 1：detached guard + origin 策略 (2026-02-21)
 > **Owner**: nodex-codex | **Branch**: codex/loro-phase1-guards

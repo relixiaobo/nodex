@@ -21,8 +21,16 @@ import { FieldRow } from './FieldRow';
 import { toFieldRowEntryProps } from './field-row-props.js';
 import { NodePicker, type NodePickerOption } from './NodePicker';
 import { BulletChevron } from '../outliner/BulletChevron';
-import { SYS_A, SYS_D, SYS_V } from '../../types';
-import { resolveConfigValue, configKeyToPropName } from '../../lib/field-utils.js';
+import { SYS_A, SYS_V } from '../../types';
+import {
+  configKeyToPropName,
+  isBooleanFieldType,
+  isCheckboxFieldType,
+  isColorFieldType,
+  isDateFieldType,
+  isOptionsFromSupertagFieldType,
+  resolveConfigValue,
+} from '../../lib/field-utils.js';
 import { isOutlinerContentNodeType } from '../../lib/node-type-utils.js';
 import { ColorSwatchPicker } from './ColorSwatchPicker';
 import { DatePicker, formatDateDisplay } from './DatePicker.js';
@@ -115,7 +123,7 @@ export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, configNo
   // --- BOOLEAN: Yes/No toggle switch ---
   // For virtual config entries: read from node attribute directly.
   // For real fieldEntry: reads value from tuple.children[0] (SYS_V.YES or SYS_V.NO).
-  const isBoolean = fieldDataType === SYS_D.BOOLEAN;
+  const isBoolean = isBooleanFieldType(fieldDataType);
   if (isBoolean) {
     const isVirtualEntry = tupleId.startsWith('__virtual_');
     let isYes: boolean;
@@ -164,18 +172,18 @@ export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, configNo
   }
 
   // --- COLOR: swatch selector ---
-  if (fieldDataType === SYS_D.COLOR) {
+  if (isColorFieldType(fieldDataType)) {
     return <ColorSwatchPicker tupleId={tupleId} configNodeId={configNodeId} />;
   }
 
   // --- OPTIONS_FROM_SUPERTAG: single-select supertag picker ---
-  if (fieldDataType === SYS_D.OPTIONS_FROM_SUPERTAG) {
+  if (isOptionsFromSupertagFieldType(fieldDataType)) {
     return (
       <SupertagPickerField tupleId={tupleId} />
     );
   }
 
-  const isCheckbox = fieldDataType === SYS_D.CHECKBOX;
+  const isCheckbox = isCheckboxFieldType(fieldDataType);
   if (isCheckbox) {
     const valueNodeId = contentChildIds[0];
     const valueNode = valueNodeId ? useNodeStore.getState().getNode(valueNodeId) : undefined;
@@ -195,7 +203,7 @@ export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, configNo
   }
 
   // --- DATE: click-to-pick, similar to Options pattern ---
-  if (fieldDataType === SYS_D.DATE) {
+  if (isDateFieldType(fieldDataType)) {
     const valueNodeId = contentChildIds[0];
     const valueNode = valueNodeId ? useNodeStore.getState().getNode(valueNodeId) : undefined;
     const currentValue = valueNode?.name ?? '';

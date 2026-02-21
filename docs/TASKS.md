@@ -62,6 +62,7 @@ _(空)_
 > - [2026-02-21 nodex-codex] 完成收口：新增 `FIELD_VALUE_INSET` 统一 value 布局基线；`FieldRow` system-config 渲染改为 `control -> renderer` 显式注册（覆盖 outliner/color_picker/toggle/tag_picker/type_choice/select/done_map_entries/number_input/autocollect），仅未知 control 才进入默认渲染并在 dev 警告
 > - [2026-02-21 nodex-codex] 按“保持简单”回归修复：`Map checked/unchecked` value 改回普通 outliner（支持 `>` 选字段+设值）；删除 done mappings 容器读写路径，改为从 `NDX_A07/NDX_A08` fieldEntry 子树解析；同步更新 `node-store` 写入与 done-state-mapping 测试
 > - [2026-02-21 nodex-codex] 修复 options 下拉不弹出：统一 options 类型判断（`FIELD_TYPES.*` + `SYS_D.*`），`TrailingInput` 与 `OutlinerItem` 改用 `isOptionsFieldType`，点击空 value 行即可显示 options 下拉；补充 `field-utils` 回归测试
+> - [2026-02-21 nodex-codex] 全量排查 field value 同类风险：统一 `FieldValueOutliner/OutlinerItem/use-field-options/field-validation` 的类型判定为 shared predicates（checkbox/date/options-from-supertag/number/url/email 等同时兼容 `FIELD_TYPES.*` 与 `SYS_D.*`），补齐回归测试并全量通过
 
 ### Refactor — Loro 收口 Phase 1：detached guard + origin 策略 (2026-02-21)
 > **Owner**: nodex-codex | **Branch**: codex/loro-phase1-guards

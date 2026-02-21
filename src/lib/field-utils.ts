@@ -240,6 +240,56 @@ export function isOptionsFieldType(dataType: string | undefined): boolean {
   );
 }
 
+export function isOptionsFromSupertagFieldType(dataType: string | undefined): boolean {
+  if (!dataType) return false;
+  return dataType === FIELD_TYPES.OPTIONS_FROM_SUPERTAG || dataType === SYS_D.OPTIONS_FROM_SUPERTAG;
+}
+
+export function isCheckboxFieldType(dataType: string | undefined): boolean {
+  if (!dataType) return false;
+  return dataType === FIELD_TYPES.CHECKBOX || dataType === SYS_D.CHECKBOX;
+}
+
+export function isDateFieldType(dataType: string | undefined): boolean {
+  if (!dataType) return false;
+  return dataType === FIELD_TYPES.DATE || dataType === SYS_D.DATE;
+}
+
+export function isBooleanFieldType(dataType: string | undefined): boolean {
+  if (!dataType) return false;
+  return dataType === FIELD_TYPES.BOOLEAN || dataType === SYS_D.BOOLEAN;
+}
+
+export function isColorFieldType(dataType: string | undefined): boolean {
+  if (!dataType) return false;
+  return dataType === FIELD_TYPES.COLOR || dataType === SYS_D.COLOR;
+}
+
+export function isNumberLikeFieldType(dataType: string | undefined): boolean {
+  if (!dataType) return false;
+  return (
+    dataType === FIELD_TYPES.NUMBER ||
+    dataType === FIELD_TYPES.INTEGER ||
+    dataType === SYS_D.NUMBER ||
+    dataType === SYS_D.INTEGER
+  );
+}
+
+export function isUrlFieldType(dataType: string | undefined): boolean {
+  if (!dataType) return false;
+  return dataType === FIELD_TYPES.URL || dataType === SYS_D.URL;
+}
+
+export function isEmailFieldType(dataType: string | undefined): boolean {
+  if (!dataType) return false;
+  return dataType === FIELD_TYPES.EMAIL || dataType === SYS_D.EMAIL;
+}
+
+/** Enter on these field values should navigate out instead of creating sibling content. */
+export function isSingleValueFieldType(dataType: string | undefined): boolean {
+  return isNumberLikeFieldType(dataType) || isUrlFieldType(dataType) || isEmailFieldType(dataType);
+}
+
 // ─── AttrDef / FieldDef config field registry ───
 
 export interface ConfigFieldDef {

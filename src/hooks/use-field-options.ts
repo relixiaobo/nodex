@@ -6,10 +6,10 @@
 import { useMemo } from 'react';
 import { useNodeStore } from '../stores/node-store';
 import {
+  isOptionsFromSupertagFieldType,
   resolveDataType, resolveFieldOptions, resolveAutoCollectedOptions,
   resolveSourceSupertag, resolveTaggedNodes,
 } from '../lib/field-utils.js';
-import { SYS_D } from '../types/index.js';
 
 export interface FieldOption {
   id: string;
@@ -26,7 +26,7 @@ export function useFieldOptions(attrDefId: string): FieldOption[] {
     const dataType = resolveDataType(attrDefId);
 
     // Options from supertag — all nodes tagged with source supertag
-    if (dataType === SYS_D.OPTIONS_FROM_SUPERTAG) {
+    if (isOptionsFromSupertagFieldType(dataType)) {
       const tagDefId = resolveSourceSupertag(attrDefId);
       if (!tagDefId) return EMPTY;
       const ids = resolveTaggedNodes(tagDefId);

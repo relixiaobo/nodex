@@ -14,6 +14,7 @@
  */
 import { initLoroDoc, initLoroDocForTest, commitDoc, clearUndoHistoryForTest } from '../../lib/loro-doc.js';
 import * as loroDoc from '../../lib/loro-doc.js';
+import { deleteSnapshot } from '../../lib/loro-persistence.js';
 import { useNodeStore } from '../../stores/node-store';
 import { useUIStore } from '../../stores/ui-store';
 import { useWorkspaceStore } from '../../stores/workspace-store';
@@ -225,17 +226,21 @@ function seedBody(): void {
   }
 }
 
-export async function seedTestData(): Promise<void> {
+export async function seedTestData(options?: { forceFresh?: boolean }): Promise<void> {
   // Check for ?reset or ?fresh to bypass IndexedDB
   const params = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
-  const forceFresh = params?.has('reset') || params?.has('fresh');
+  const forceFresh = options?.forceFresh ?? (params?.has('reset') || params?.has('fresh'));
 
   if (forceFresh) {
+    // Ensure old persisted snapshot cannot reappear on next bootstrap.
+    await deleteSnapshot(WS_ID);
     // Bypass IndexedDB — pure in-memory LoroDoc
     initLoroDocForTest(WS_ID);
-    // Reset UIStore state directly: localStorage was already read at module load time
-    // so removeItem alone won't help — we need to reset the in-memory store too.
+    // Reset persisted UI/workspace state for deterministic test page boot.
+    await useUIStore.persist.clearStorage();
+    await useWorkspaceStore.persist.clearStorage();
     useUIStore.setState({ panelHistory: [], panelIndex: -1, expandedNodes: new Set() });
+    useWorkspaceStore.setState({ currentWorkspaceId: null, userId: null, isAuthenticated: false, authUser: null });
     if (typeof localStorage !== 'undefined') {
       localStorage.removeItem('nodex-ui');
     }

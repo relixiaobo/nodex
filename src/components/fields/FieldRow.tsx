@@ -188,8 +188,6 @@ function ConfigNumberInput({ nodeId, configKey }: { nodeId: string; configKey: s
     setConfigValue(nodeId, propName, raw);
   }, [draft, nodeId, propName, setConfigValue, valueText]);
 
-  const validationWarning = validateFieldValue(FIELD_TYPES.NUMBER, draft.trim());
-
   return (
     <div className="flex min-h-7 items-center gap-2 py-1" style={{ paddingLeft: FIELD_VALUE_INSET }}>
       <BulletChevron hasChildren={false} isExpanded={false} onBulletClick={() => {}} />
@@ -213,7 +211,6 @@ function ConfigNumberInput({ nodeId, configKey }: { nodeId: string; configKey: s
         }}
         placeholder="Empty"
       />
-      {validationWarning && <ValidationWarning message={validationWarning} />}
     </div>
   );
 }
@@ -379,6 +376,16 @@ export function FieldRow({
       }
     }
     return null;
+  });
+
+  const configNumberValidationWarning = useNodeStore((s) => {
+    void s._version;
+    if (!isSystemConfig || resolvedControl !== 'number_input') return null;
+    const n = s.getNode(nodeId);
+    if (!n) return null;
+    const raw = resolveConfigValue(n, attrDefId);
+    if (raw === undefined || raw === null || raw === '') return null;
+    return validateFieldValue(FIELD_TYPES.NUMBER, String(raw));
   });
 
   // Auto-collect count for SYS_A44 name display
@@ -648,8 +655,15 @@ export function FieldRow({
           </div>
         </div>
         {/* Value column — unified rendering */}
-        <div className="flex-1 min-w-0 min-h-[22px]" data-field-value>
-          {renderSystemConfigValue(resolvedControl, systemConfigValueContext)}
+        <div className="flex flex-1 min-w-0 items-start" data-field-value>
+          <div className="flex-1 min-w-0 min-h-[22px]">
+            {renderSystemConfigValue(resolvedControl, systemConfigValueContext)}
+          </div>
+          {configNumberValidationWarning && (
+            <div className="flex items-center h-7 pr-1">
+              <ValidationWarning message={configNumberValidationWarning} />
+            </div>
+          )}
         </div>
       </div>
     );

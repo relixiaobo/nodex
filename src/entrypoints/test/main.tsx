@@ -11,11 +11,11 @@ import { App } from '../sidepanel/App';
 import { seedTestData } from './seed-data';
 import '../../assets/main.css';
 
-// Seed sample nodes before React renders (async: initializes LoroDoc first)
-seedTestData().then(() => {
+// Test page always boots from a deterministic fresh dataset.
+seedTestData({ forceFresh: true }).then(() => {
   ReactDOM.createRoot(document.getElementById('root')!).render(
     <React.StrictMode>
-      <App />
+      <App skipBootstrap />
     </React.StrictMode>,
   );
 });

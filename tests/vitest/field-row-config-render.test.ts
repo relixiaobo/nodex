@@ -5,6 +5,7 @@ import { FieldRow } from '../../src/components/fields/FieldRow.js';
 import { resetAndSeed } from './helpers/test-state.js';
 import { SYS_A } from '../../src/types/index.js';
 import { FIELD_VALUE_INSET } from '../../src/components/fields/field-layout.js';
+import * as loroDoc from '../../src/lib/loro-doc.js';
 
 describe('FieldRow config control resolution', () => {
   beforeEach(() => {
@@ -40,5 +41,22 @@ describe('FieldRow config control resolution', () => {
 
     expect(html).toContain('type="text"');
     expect(html).toContain('placeholder="Empty"');
+  });
+
+  it('shows validation warning for invalid number_input config value', () => {
+    loroDoc.setNodeData('attrDef_age', 'minValue', 'not-a-number');
+
+    const html = renderToStaticMarkup(createElement(FieldRow, {
+      nodeId: 'attrDef_age',
+      attrDefId: SYS_A.MIN_VALUE,
+      attrDefName: 'Minimum value',
+      tupleId: '__virtual_NDX_A03__',
+      dataType: 'plain',
+      isSystemConfig: true,
+      configKey: SYS_A.MIN_VALUE,
+      configControl: 'number_input',
+    }));
+
+    expect(html).toContain('text-warning');
   });
 });

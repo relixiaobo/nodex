@@ -1865,7 +1865,9 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     isOptionsValueNode ? [] : nodeMarks,
     isOptionsValueNode ? [] : nodeInlineRefs,
   );
-  const hasOverlayOpen = isFocused && (hashTagOpen || refOpen || slashOpen || optionsPickerOpen);
+  // optionsPicker can open on selected (not focused) reference-like rows.
+  // Keep row on top whenever any overlay is open, otherwise sibling rows may paint above it.
+  const hasOverlayOpen = (isFocused && (hashTagOpen || refOpen || slashOpen)) || optionsPickerOpen;
 
   return (
     <div role="treeitem" aria-expanded={isExpanded} className="relative">
@@ -1882,7 +1884,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
           isDropTarget && dropPosition === 'inside'
             ? 'bg-primary/10 ring-1 ring-primary/30 rounded-sm'
             : ''
-        } ${isDragging ? 'opacity-40' : ''} ${hasOverlayOpen ? 'z-[80]' : 'z-[1]'}`}
+        } ${isDragging ? 'opacity-40' : ''} ${hasOverlayOpen ? 'z-[80]' : ''}`}
         style={{ paddingLeft: depth * 28 + 6 }}
         data-node-id={nodeId}
         data-parent-id={parentId}

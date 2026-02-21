@@ -997,6 +997,25 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     };
   }, []);
 
+  const finalizePendingRefConversion = useCallback(() => {
+    const pending = useUIStore.getState().pendingRefConversion;
+    if (!pending || pending.tempNodeId !== nodeId) return;
+
+    const tempNode = useNodeStore.getState().getNode(nodeId);
+    const content = tempNode?.name ?? '';
+    if (isOnlyInlineRef(content, tempNode?.inlineRefs)) {
+      revertRefConversion(pending.tempNodeId, pending.refNodeId, pending.parentId);
+    }
+    setPendingRefConversion(null);
+  }, [nodeId, revertRefConversion, setPendingRefConversion]);
+
+  // Pending reference conversion must be finalized whenever focus leaves the temp row,
+  // including non-blur paths (e.g. Escape clearFocus).
+  useEffect(() => {
+    if (isFocused) return;
+    finalizePendingRefConversion();
+  }, [isFocused, finalizePendingRefConversion]);
+
   const handleBlur = useCallback(() => {
     // Reset any open dropdown state so it doesn't persist across focus cycles.
     // Without this, clicking away while dropdown is open → re-focusing the same
@@ -1011,16 +1030,8 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     setSlashQuery('');
     setSlashSelectedIndex(-1);
 
-    // Check pending ref conversion: if this is a temp node, decide revert or keep
-    const pending = useUIStore.getState().pendingRefConversion;
-    if (pending && pending.tempNodeId === nodeId) {
-      const tempNode = useNodeStore.getState().getNode(nodeId);
-      const content = tempNode?.name ?? '';
-      if (isOnlyInlineRef(content, tempNode?.inlineRefs)) {
-        revertRefConversion(pending.tempNodeId, pending.refNodeId, pending.parentId);
-      }
-      useUIStore.getState().setPendingRefConversion(null);
-    }
+    // Check pending ref conversion: if this is a temp node, decide revert or keep.
+    finalizePendingRefConversion();
 
     if (blurClearRafRef.current !== null) {
       cancelAnimationFrame(blurClearRafRef.current);
@@ -1038,7 +1049,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
         setFocusedNode(null);
       }
     });
-  }, [nodeId, parentId, setFocusedNode, revertRefConversion]);
+  }, [nodeId, parentId, setFocusedNode, finalizePendingRefConversion]);
 
   // mousedown: record text offset for cursor placement, but DON'T enter edit
   // mode. Edit mode is deferred to click so drag-select can take over if the

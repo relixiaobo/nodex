@@ -57,6 +57,7 @@ _(空)_
 > - [2026-02-21 nodex-codex] 三次回归修复：`dev:test` 改为默认 `forceFresh`，消除历史测试数据干扰；reference 行渲染统一切到 `effectiveNodeId(target)`（tags/fields/checkbox/children/TagBar 与字段导航上下文同步），修复 field 丢失与引用子树上下文错位；补充 atom 尾部 `ProseMirror-separator + trailingBreak` 隐藏规则，修复 `@` 创建后光标换行问题
 > - [2026-02-21 nodex-codex] 四次回归修复：针对仍存在的 `@` 创建后 caret 掉到下一行问题，增加 inline-ref 段落级别 CSS 兜底（`:has([data-inlineref-node])` 时隐藏 `ProseMirror-separator` 与 `trailingBreak`），避免原子引用段落被浏览器渲染成伪换行光标
 > - [2026-02-21 nodex-codex] 五次回归修复：将 inline-ref 段落兜底改为“保留 separator 作为 caret 锚点但零宽隐藏 + 隐藏 trailingBreak”，避免光标回退到行首；新增 `.ProseMirror-selectednode` inline-ref 样式，使左/右方向键移动到原子引用时可见整体框选态
+> - [2026-02-21 nodex-codex] 六次回归修复：补齐 pending reference conversion 的非 blur 收口（例如 Esc 触发 clearFocus）；在 `OutlinerItem` 增加 `finalizePendingRefConversion` 并在失焦 effect + blur 双路径执行，修复“reference 文本仍紫色 + 单击出现全行高亮与 fit-content 边框叠加”的双选中状态
 
 ### Refactor — Loro 收口 Phase 2：LoroText 主编辑链路迁移 (2026-02-21)
 > **Owner**: nodex-codex | **Branch**: codex/loro-phase2-lorotext

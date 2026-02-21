@@ -785,6 +785,15 @@ hash trigger cleanup safety（3 cases, Bug #53 + CJK hashtag 回归）:
 2. 已存在 workspace 根节点时保持幂等（不重复创建，不覆盖已有名称）
 3. 传入空 workspaceId 时安全返回
 
+### 1.58 Reference 选中态无布局抖动
+
+**测试文件**: `tests/vitest/reference-selection-style.test.ts`
+
+**覆盖点**:
+
+1. `node-selected-ref` 采用 `::before` 绝对定位 overlay 渲染选中框（非布局 border/padding）
+2. 基础选择器不包含 `padding/margin/border`，确保选中/未选中高度一致
+
 ### 1.48 Auth 工具函数（Google OAuth + Supabase）
 
 **测试文件**: `tests/vitest/auth.test.ts`

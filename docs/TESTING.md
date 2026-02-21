@@ -1177,6 +1177,10 @@ createSibling 自动标签（2 cases）:
 | 11 | getAdjacentDayNodeId -1 | 返回前一天节点 |
 | 12 | getAdjacentDayNodeId 非日节点 | 返回 null |
 | 13–16 | isDayNode/isWeekNode/isYearNode/isJournalNode | 正确判断 |
+| 17 | getDayNoteCountsForMonth 空月份 | 返回空 Map |
+| 18 | getDayNoteCountsForMonth 有笔记 | 正确计数（today=3, yesterday=2） |
+| 19 | getDayNoteCountsForMonth 排除 fieldEntry | 仅计算内容子节点 |
+| 20 | getDayNoteCountsForMonth 无内容日 | 0-count 日不出现在 Map 中 |
 
 ---
 

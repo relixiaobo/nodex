@@ -138,6 +138,65 @@ export function getAdjacentDayNodeId(currentDayNodeId: string, offset: number): 
 }
 
 // ============================================================
+// Heatmap: note counts per day
+// ============================================================
+
+/**
+ * Get note counts for all day nodes in a given month.
+ * Scans the entire Journal tree (all years → weeks → days),
+ * filtering for the target month.
+ *
+ * Returns Map<dateStr (YYYY-MM-DD), count>.
+ * Only counts user content children (excludes fieldEntry nodes).
+ */
+export function getDayNoteCountsForMonth(year: number, month: number): Map<string, number> {
+  const journalId = CONTAINER_IDS.JOURNAL;
+  const result = new Map<string, number>();
+
+  // Scan all year nodes under JOURNAL
+  const yearIds = loroDoc.getChildren(journalId);
+  for (const yearId of yearIds) {
+    const yearNode = loroDoc.toNodexNode(yearId);
+    if (!yearNode?.name) continue;
+    const yearVal = parseYearNodeName(yearNode.name);
+    if (yearVal === null) continue;
+
+    // ISO weeks can cross year boundaries, so check adjacent years too
+    // e.g. 2026-01-01 might be in ISO year 2025 W53
+    if (Math.abs(yearVal - year) > 1) continue;
+
+    const weekIds = loroDoc.getChildren(yearId);
+    for (const weekId of weekIds) {
+      const dayIds = loroDoc.getChildren(weekId);
+      for (const dayId of dayIds) {
+        const dayNode = loroDoc.toNodexNode(dayId);
+        if (!dayNode?.name) continue;
+        const date = parseDayNodeName(dayNode.name, yearVal);
+        if (!date) continue;
+
+        // Filter: must match target year and month (0-based)
+        if (date.getFullYear() !== year || date.getMonth() !== month) continue;
+
+        // Count content children (exclude fieldEntry nodes)
+        const childIds = loroDoc.getChildren(dayId);
+        let count = 0;
+        for (const cid of childIds) {
+          const child = loroDoc.toNodexNode(cid);
+          if (child && child.type !== 'fieldEntry') count++;
+        }
+
+        if (count > 0) {
+          const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+          result.set(dateStr, count);
+        }
+      }
+    }
+  }
+
+  return result;
+}
+
+// ============================================================
 // Query helpers
 // ============================================================
 

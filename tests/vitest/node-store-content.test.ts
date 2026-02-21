@@ -89,6 +89,7 @@ describe('node-store content model actions', () => {
     expect(node?.inlineRefs).toEqual([{ offset: 3, targetNodeId: 'task_1' }]);
 
     const raw = loroDoc.getNodeData(child.id);
+    expect(raw?.name).toBeUndefined();
     expect(raw?.marks).toBeUndefined();
     expect(raw?.inlineRefs).toBeUndefined();
   });

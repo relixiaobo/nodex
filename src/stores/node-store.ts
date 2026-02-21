@@ -271,14 +271,16 @@ export const useNodeStore = create<NodeStore>((set, get) => {
         const { type, name, description, marks, inlineRefs, ...rest } = data;
         const batch: Record<string, unknown> = {};
         if (type !== undefined) batch.type = type;
-        if (name !== undefined) batch.name = name;
+        const shouldPersistLegacyName = type !== undefined && name !== undefined && marks === undefined && inlineRefs === undefined;
+        if (shouldPersistLegacyName) batch.name = name;
         if (description !== undefined) batch.description = description;
         Object.assign(batch, rest);
         if (Object.keys(batch).length > 0) {
           loroDoc.setNodeDataBatch(id, batch);
         }
 
-        if (name !== undefined || marks !== undefined || inlineRefs !== undefined) {
+        const shouldWriteRichText = type === undefined && (name !== undefined || marks !== undefined || inlineRefs !== undefined);
+        if (shouldWriteRichText) {
           loroDoc.setNodeRichTextContent(
             id,
             name ?? '',
@@ -837,9 +839,6 @@ export const useNodeStore = create<NodeStore>((set, get) => {
       const tempId = nanoid();
       const inlineRefs = [{ offset: 0, targetNodeId: targetId ?? '', displayName: targetName }];
       loroDoc.createNode(tempId, parentId, position);
-      loroDoc.setNodeDataBatch(tempId, {
-        name: '\uFFFC',
-      });
       loroDoc.setNodeRichTextContent(tempId, '\uFFFC', [], inlineRefs);
       loroDoc.commitDoc();
       return tempId;

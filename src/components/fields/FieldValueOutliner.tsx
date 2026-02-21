@@ -349,7 +349,7 @@ function DatePickerField({ value, onSelect }: { value: string; onSelect: (v: str
   }, []);
 
   return (
-    <div className="relative">
+    <div className={`relative ${open ? 'z-[1000]' : ''}`}>
       <div className="flex min-h-7 items-start gap-2 py-1" style={{ paddingLeft: FIELD_VALUE_INSET }}>
         <BulletChevron hasChildren={false} isExpanded={false} onBulletClick={() => {}} dimmed={!value} />
         <div className="flex-1 min-w-0 flex items-center cursor-pointer" onClick={handleClick}>

@@ -102,6 +102,14 @@ export function computeNodeFields(
     const valueChildren = getChildren(child.id);
     const valueNodeId = valueChildren[0]?.id;
     const valueNode = valueNodeId ? getNode(valueNodeId) : undefined;
+    const valueName = (() => {
+      if (!valueNode) return undefined;
+      if (valueNode.targetId) {
+        const targetNode = getNode(valueNode.targetId);
+        if (targetNode?.name) return targetNode.name;
+      }
+      return valueNode.name;
+    })();
 
     const trashed = !isSysConfig && (loroDoc.getParentId(keyId) === CONTAINER_IDS.TRASH);
     const hasContent = valueChildren.length > 0;
@@ -111,7 +119,7 @@ export function computeNodeFields(
       attrDefName: fieldDef.name ?? 'Untitled',
       fieldEntryId: child.id,
       valueNodeId,
-      valueName: valueNode?.name,
+      valueName,
       dataType: resolveDataType(keyId),
       trashed,
       hideMode: isSysConfig ? undefined : resolveHideField(keyId),

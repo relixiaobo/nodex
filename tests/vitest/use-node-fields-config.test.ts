@@ -32,4 +32,14 @@ describe('computeNodeFields config controls', () => {
     expect(byKey.get(SYS_A.AUTOCOLLECT_OPTIONS)?.configControl).toBe('autocollect');
     expect(byKey.get(SYS_A.HIDE_FIELD)?.configControl).toBe('select');
   });
+
+  it('resolves options valueName from target option node name', () => {
+    const store = useNodeStore.getState();
+    store.setOptionsFieldValue('task_1', 'attrDef_status', 'opt_in_progress');
+
+    const fields = computeNodeFields(store.getNode, store.getChildren, 'task_1');
+    const status = fields.find((f) => f.fieldDefId === 'attrDef_status');
+
+    expect(status?.valueName).toBe('In Progress');
+  });
 });

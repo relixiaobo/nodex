@@ -29,7 +29,7 @@ _(空)_
 |-------|---------|------|-------------|
 | nodex-cc | P1 NodePanel Header 重设计 | cc/node-panel-header | src/components/panel/NodeHeader.tsx, NodePanel.tsx, OutlinerView.tsx, ui-store.ts |
 | nodex-cc-2 | _(idle — PR #61 merged)_ | — | — |
-| nodex-codex | Refactor — Row 交互统一（content node + trailing input + field value） | codex/row-interaction-unify | docs/TASKS.md, docs/TESTING.md, docs/features/outliner-interactions.md, docs/features/editor-triggers.md, docs/features/editor-migration.md, src/components/editor/RichTextEditor.tsx, src/components/editor/TrailingInput.tsx, src/lib/row-interactions.ts, tests/vitest/row-interactions.test.ts, tests/vitest/trailing-input-actions.test.ts, tests/vitest/trailing-input-trigger-focus.test.ts, tests/vitest/node-editor-shortcuts.test.ts, tests/vitest/trailing-input-navigation.test.ts, tests/vitest/editor-isEmpty.test.ts |
+| nodex-codex | _(idle — PR #70 merged)_ | — | — |
 
 ---
 
@@ -39,28 +39,6 @@ _(空)_
 > **Owner**: nodex-cc | **Branch**: cc/node-panel-header | **Spec**: `docs/features/node-panel-header.md`
 > **迭代日志**:
 > - [2026-02-21 cc] 开始实现：重构 PanelTitle → NodeHeader，三列对齐网格，隐藏字段占位行
-
-### Refactor — Row 交互统一（content node + trailing input + field value）
-> **Owner**: nodex-codex | **Branch**: codex/row-interaction-unify | **Spec**: `docs/features/outliner-interactions.md`, `docs/features/editor-triggers.md`, `docs/features/keyboard-shortcuts.md`
-> **目标**: 统一 content node / trailing input / field value 的键盘交互语义，抽出共享 intent 层，减少分叉逻辑并保持现有行为
-> **Files**: `src/components/editor/RichTextEditor.tsx`, `src/components/editor/TrailingInput.tsx`, `src/lib/row-interactions.ts`, `tests/vitest/row-interactions.test.ts`, `tests/vitest/trailing-input-actions.test.ts`, `tests/vitest/trailing-input-trigger-focus.test.ts`, `tests/vitest/node-editor-shortcuts.test.ts`, `tests/vitest/trailing-input-navigation.test.ts`, `tests/vitest/editor-isEmpty.test.ts`, `docs/features/outliner-interactions.md`, `docs/features/editor-triggers.md`, `docs/features/editor-migration.md`, `docs/TESTING.md`
-> **Progress**:
-> - [x] 抽取共享 row interaction intents（Enter/Arrow/Escape + 边界语义）
-> - [x] RichTextEditor / TrailingInput 切换到共享 intent 层（行为不变）
-> - [x] 增加跨模式一致性测试并更新文档
-> - [x] `TrailingInput` onUpdate（`#/@/>/options`）收敛到共享 intent 层
-> - [x] 增加组件级回归测试：`TrailingInput` 输入 `@` 后 caret 定位
-> **迭代日志**:
-> - [2026-02-21 nodex-codex] 任务认领：先对齐 content node 与 trailing input 的行为矩阵，再抽取共享 intent 层，最后用回归测试锁定一致性
-> - [2026-02-21 nodex-codex] 完成重构：新增 `row-interactions` 统一 content/trailing 意图解析，`node-editor-shortcuts` 与 `trailing-input-navigation` 改为薄封装转发；新增 `row-interactions.test.ts` 锁定跨模式语义；同步更新 outliner 与测试文档；自检通过 `npm run typecheck`、`npm run test:run`、`npm run build`
-> - [2026-02-21 nodex-codex] 用户反馈修复：`TrailingInput` 输入 `@/#//` 创建触发节点后补齐 `focusClickCoords(textOffset)`，确保新节点光标落在触发符后而不是行首；`trailing-input-actions` 同步返回 `textOffset` 并更新单测
-> - [2026-02-21 nodex-codex] 第二层收敛：`resolveTrailingUpdateAction` 核心逻辑迁移至 `row-interactions`（新增 `resolveTrailingRowUpdateAction`），`TrailingInput` 直接消费共享层，`trailing-input-actions` 保留兼容转发；补充共享层测试覆盖 onUpdate 触发决策
-> - [2026-02-21 nodex-codex] 第三层收敛：`RichTextEditor` 与 `TrailingInput` 运行时决策统一直连 `row-interactions`（wrapper 保留兼容）；新增 `trailing-input-trigger-focus.test.ts` 组件级回归，锁定 `TrailingInput` 输入 `@` 的 focus/offset 链路
-> - [2026-02-21 nodex-codex] 用户手测通过（content/trailing/field-value 三种上下文下 `@/#/>`），准备转 PR Ready
-> - [2026-02-21 nodex-codex] 用户新反馈修复中：中文 IME 下 `#中文` 未触发 tag 下拉，定位为 hashtag 匹配正则 `\\w` 仅支持 ASCII，改为 Unicode 兼容模式并补回归测试
-> - [2026-02-21 nodex-codex] 修复完成：`RichTextEditor` hashtag 检测改为 `/#([^\\s#@]*)$/u`，支持 `#中文` 触发下拉/新建路径；新增 `editor-isEmpty.test.ts` 的 CJK hashtag 断言并同步 `docs/TESTING.md`，全量通过 `npm run typecheck` / `npm run test:run` / `npm run build`
-> - [2026-02-21 nodex-codex] 根据 PR review 开始 wrapper 清理：测试导入迁移到 `row-interactions`，删除 `node-editor-shortcuts` / `trailing-input-actions` / `trailing-input-navigation` 三个兼容层并同步文档
-> - [2026-02-21 nodex-codex] wrapper 清理完成：3 个测试文件改为直接 import `row-interactions`（移除旧 wrapper API 依赖），删除 3 个 wrapper 文件；同步更新 `outliner-interactions` / `editor-triggers` / `editor-migration` / `TESTING` 文档，验证通过 `npm run typecheck` / `npm run test:run` / `npm run build`
 
 ### P1 Reference 交互收口：单击选中 vs Esc/框选 + inline 转换输入
 > **Owner**: nodex-codex | **Branch**: codex/reference-selection-interactions | **Spec**: `docs/features/references.md`, `docs/features/node-selection.md`
@@ -405,6 +383,7 @@ _(空)_
 
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
+| 2026-02-21 | Refactor — Row 交互统一（content/trailing/field-value 共享 intent 层 + CJK hashtag 修复 + trigger caret 修复） | nodex-codex | #70 |
 | 2026-02-20 | Node 图标系统 — supertag bullet 彩色（conic-gradient）+ fieldDef 结构化图标 + 字段颜色继承 + 字段排序 | nodex | — |
 | 2026-02-20 | FIELD_TYPES 大小写修复 — seed-data.ts + field-utils.test.ts 统一使用小写常量 | nodex | — |
 | 2026-02-20 | Loro CRDT 迁移 Phase 1 — 本地数据引擎 + 数据模型 + 命名 + UndoManager | nodex-cc | #62 |

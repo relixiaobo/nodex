@@ -962,6 +962,30 @@ createSibling 自动标签（2 cases）:
 2. `isOutlinerContentNodeType('reference')` = true（reference 可渲染）
 3. `fieldEntry/tagDef/fieldDef` 等结构类型返回 false
 
+### 1.54 NodePanel Header 重设计
+
+**测试文件**: `tests/vitest/node-header.test.ts`
+
+**覆盖点**:
+
+| # | 场景 | 验证 |
+|---|------|------|
+| 1 | expandedHiddenFields 初始状态 | 空 Set |
+| 2 | toggleHiddenField 添加 | `panelId:fieldId` key 存在 |
+| 3 | toggleHiddenField 移除 | 二次 toggle 回到空 |
+| 4 | 多 panel:field 独立 | 3 个不同 key 互不干扰 |
+| 5 | clearExpandedHiddenFields | 重置为空 |
+| 6 | 非持久化 | partializeUIStore 不含此字段 |
+| 7 | tagDef 颜色可解析 | resolveTagColor 返回 text + bg |
+| 8 | fieldDef 有结构图标 | resolveNodeStructuralIcon 非 null |
+| 9 | 普通节点无结构图标 | resolveNodeStructuralIcon 为 null |
+| 10 | task 节点显示 checkbox | shouldNodeShowCheckbox true |
+| 11 | 普通节点不显示 checkbox | shouldNodeShowCheckbox false |
+| 12 | 已标记节点有 tags | tags.length > 0 |
+| 13 | 未标记节点无 tags | tags.length === 0 |
+| 14 | definition 节点不显示 supertag 行 | type 为 tagDef/fieldDef |
+| 15–17 | 列对齐常量 | paddingLeft=6, colB=25, drop=21 |
+
 ---
 
 ## Phase 2: 视觉检查点
@@ -1051,6 +1075,7 @@ createSibling 自动标签（2 cases）:
 | 1.51 | P0 Loro 基础设施 — 7项底层API（subscribeNode/增量同步/时间旅行/LoroText/fork/Awareness） | PASS/FAIL |
 | 1.52 | LoroText Bridge（TextMark/InlineRef 双向桥接） | PASS/FAIL |
 | 1.53 | Test 入口 Bootstrap（防测试数据回流） | PASS/FAIL |
+| 1.54 | NodePanel Header 重设计（UIStore expandedHiddenFields + block 可见性 + 列对齐） | PASS/FAIL |
 | 2 | 视觉渲染 | PASS/FAIL/SKIP |
 | 3 | 扩展构建 | PASS/FAIL |
 

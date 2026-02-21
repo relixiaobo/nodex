@@ -4,7 +4,7 @@ import { useNode } from '../../hooks/use-node';
 import { useNodeStore } from '../../stores/node-store';
 import { useUIStore } from '../../stores/ui-store';
 import { NodePanelHeader } from './NodePanelHeader';
-import { PanelTitle } from './PanelTitle';
+import { NodeHeader } from './NodeHeader';
 import { OutlinerView } from '../outliner/OutlinerView';
 import { FieldList } from '../fields/FieldList';
 import { resolveTagColor } from '../../lib/tag-colors.js';
@@ -65,7 +65,7 @@ export function NodePanel({ nodeId }: NodePanelProps) {
             }}
           />
         )}
-        <PanelTitle nodeId={nodeId} onTitleRef={handleTitleRef} />
+        <NodeHeader nodeId={nodeId} onTitleRef={handleTitleRef} />
         {isDefinitionNode && (
           <div className="mb-2 ml-4 px-2">
             <FieldList nodeId={nodeId} />

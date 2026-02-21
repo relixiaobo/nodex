@@ -123,4 +123,13 @@ OutlinerView 内容区的**最顶部**，在所有 field rows 之前。
 
 ## 当前状态
 
-- [ ] 未实现（待开发）
+- [x] NodeHeader.tsx 替代 PanelTitle.tsx（PR #66）
+  - Block ①: Icon 行 — tagDef 32px 彩色 #，fieldDef 20px 字段图标
+  - Block ②: Name 行 — drag handle (col A) + checkbox (col B) + 可编辑名称 (col C, text-xl)
+  - Block ③: Supertag 行 — TagBar，条件：has tags && not definition node
+  - Block ④: Extra 行 — 插槽预留（空）
+- [x] UIStore expandedHiddenFields — session-only Set<string>，toggleHiddenField/clearExpandedHiddenFields
+- [x] OutlinerView 隐藏字段 reveal 从 useState 迁移到 UIStore
+- [x] 三列对齐：drag handle = chevron (w-15px), checkbox = bullet (w-15px), paddingLeft 6px
+- [ ] Drag handle 右键 context menu（预留，未实现完整命令列表）
+- [ ] Extra 行 Date 导航实现（依赖 Date 节点 #22）

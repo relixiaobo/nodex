@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useRef } from 'react';
 import { useNode } from '../../hooks/use-node';
 import { useChildren } from '../../hooks/use-children';
 import { useNodeFields, type FieldEntry } from '../../hooks/use-node-fields';
@@ -29,6 +29,10 @@ export function OutlinerView({ rootNodeId, showTemplateTuples }: OutlinerViewPro
   const clearFocus = useUIStore((s) => s.clearFocus);
   const setEditingFieldName = useUIStore((s) => s.setEditingFieldName);
   const fields = useNodeFields(rootNodeId);
+
+  // Hidden field reveal state from UIStore (session-only, keyed by "panelNodeId:fieldEntryId")
+  const expandedHiddenFields = useUIStore((s) => s.expandedHiddenFields);
+  const toggleHiddenField = useUIStore((s) => s.toggleHiddenField);
 
   // Build field lookup by tuple ID (same pattern as OutlinerItem)
   const fieldMap = useMemo(() => {
@@ -84,7 +88,10 @@ export function OutlinerView({ rootNodeId, showTemplateTuples }: OutlinerViewPro
       .map((c) => ({ id: c.id, name: fieldMap.get(c.id)!.attrDefName })),
     [visibleChildren, fieldMap],
   );
-  const [revealedFieldIds, setRevealedFieldIds] = useState<Set<string>>(() => new Set());
+
+  /** Check if a hidden field has been temporarily revealed via UIStore */
+  const isFieldRevealed = (fieldEntryId: string) =>
+    expandedHiddenFields.has(`${rootNodeId}:${fieldEntryId}`);
 
   // Drag select: document-level mouse tracking for multi-node selection
   const containerRef = useRef<HTMLDivElement>(null);
@@ -97,14 +104,14 @@ export function OutlinerView({ rootNodeId, showTemplateTuples }: OutlinerViewPro
       role="tree"
       data-row-scope-parent-id={rootNodeId}
     >
-      {/* Hidden field pills: compact clickable chips to temporarily reveal hidden fields */}
-      {hiddenRevealableFields.length > 0 && hiddenRevealableFields.some(f => !revealedFieldIds.has(f.id)) && (
+      {/* Hidden field placeholder rows: ⊕ FieldName, aligned to col B */}
+      {hiddenRevealableFields.length > 0 && hiddenRevealableFields.some(f => !isFieldRevealed(f.id)) && (
         <div className="flex flex-wrap gap-x-3 min-h-7 items-center" style={{ paddingLeft: 6 + 15 + 4 }}>
-          {hiddenRevealableFields.filter(f => !revealedFieldIds.has(f.id)).map(f => (
+          {hiddenRevealableFields.filter(f => !isFieldRevealed(f.id)).map(f => (
             <button
               key={f.id}
               className="flex items-center gap-0.5 h-7 text-xs text-foreground-tertiary hover:text-foreground-secondary transition-colors cursor-pointer"
-              onClick={() => setRevealedFieldIds(prev => new Set(prev).add(f.id))}
+              onClick={() => toggleHiddenField(rootNodeId, f.id)}
               title={`Show ${f.name}`}
             >
               <span className="w-[15px] flex items-center justify-center text-[11px] leading-none shrink-0">+</span>
@@ -114,8 +121,8 @@ export function OutlinerView({ rootNodeId, showTemplateTuples }: OutlinerViewPro
         </div>
       )}
       {visibleChildren.map(({ id, type, hidden }, i) => {
-        // Hidden fields: skip unless manually revealed via pill click
-        if (hidden && !revealedFieldIds.has(id)) return null;
+        // Hidden fields: skip unless manually revealed via UIStore toggle
+        if (hidden && !isFieldRevealed(id)) return null;
         return type === 'field' ? (
           <div key={id} className="@container" style={{ paddingLeft: 6 + 15 + 4 }}>
             <FieldRow
@@ -182,7 +189,7 @@ export function OutlinerView({ rootNodeId, showTemplateTuples }: OutlinerViewPro
           if (direction !== 'up') return;
           for (let j = visibleChildren.length - 1; j >= 0; j--) {
             const last = visibleChildren[j];
-            if (last.hidden && !revealedFieldIds.has(last.id)) continue;
+            if (last.hidden && !isFieldRevealed(last.id)) continue;
             if (last.type === 'field') {
               clearFocus();
               setEditingFieldName(last.id);

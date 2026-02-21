@@ -94,6 +94,12 @@ interface UIStore {
   } | null;
   setPendingRefConversion(info: { tempNodeId: string; refNodeId: string; parentId: string } | null): void;
 
+  // Hidden field temporary reveal (session-only, not persisted)
+  // Key format: "panelNodeId:fieldEntryId"
+  expandedHiddenFields: Set<string>;
+  toggleHiddenField(panelNodeId: string, fieldEntryId: string): void;
+  clearExpandedHiddenFields(): void;
+
   // Navigation undo/redo (session-only, not persisted)
   navUndoStack: Array<{ panelHistory: string[]; panelIndex: number }>;
   navRedoStack: Array<{ panelHistory: string[]; panelIndex: number }>;
@@ -301,6 +307,18 @@ export const useUIStore = create<UIStore>()(
       // Pending reference conversion (session-only)
       pendingRefConversion: null,
       setPendingRefConversion: (info) => set({ pendingRefConversion: info }),
+
+      // Hidden field temporary reveal (session-only)
+      expandedHiddenFields: new Set<string>(),
+      toggleHiddenField: (panelNodeId, fieldEntryId) =>
+        set((s) => {
+          const key = `${panelNodeId}:${fieldEntryId}`;
+          const next = new Set(s.expandedHiddenFields);
+          if (next.has(key)) next.delete(key);
+          else next.add(key);
+          return { expandedHiddenFields: next };
+        }),
+      clearExpandedHiddenFields: () => set({ expandedHiddenFields: new Set<string>() }),
 
       // Navigation undo/redo (session-only)
       navUndoStack: [],

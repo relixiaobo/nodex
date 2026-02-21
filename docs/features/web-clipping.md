@@ -1,12 +1,12 @@
 # Feature: 网页剪藏
 
-> Phase 3 | V1 落库完成 | 提取→落库→导航 全链路可用
+> Phase 4 | V1 落库 + Toast + URL 链接 | 提取→落库→反馈→导航 全链路可用
 
 ## 概述
 
 Chrome Side Panel 的核心场景：用户浏览网页时，将内容剪藏为 Nodex 节点。剪藏结果是一个普通节点，通过 Supertag + Field 携带来源元数据，并支持 Read Later（正文大纲化）。
 
-## 当前实现状态（2026-02-15）
+## 当前实现状态（2026-02-21）
 
 - ✅ Side Panel -> Background -> Content Script 消息链路已打通
 - ✅ Content Script 已切换为 `defuddle` 提取，提取 title/url/content/author/published/description/siteName
@@ -19,8 +19,10 @@ Chrome Side Panel 的核心场景：用户浏览网页时，将内容剪藏为 N
 - ✅ `createAttrDef` 创建完整配置 tuples（Field type / Auto-initialize / Required / Hide field）
 - ✅ 页面 description（如有）写入节点 description
 - ✅ 种子数据包含 `#web_clip` tagDef + 示例剪藏节点
-- ✅ Vitest 测试覆盖 `findTagDefByName`/`findTemplateAttrDef`/`saveWebClip`/`applyWebClipToNode`（20 cases）
+- ✅ Vitest 测试覆盖 `findTagDefByName`/`findTemplateAttrDef`/`saveWebClip`/`applyWebClipToNode`（22 cases）
 - ✅ Sidebar "Clip Page" 按钮已移除，入口迁移至 slash command
+- ✅ sonner toast 反馈：成功 `toast.success('Page clipped')`、失败 `toast.error('Clip failed')`
+- ✅ URL 字段值渲染为蓝色可点击链接（`<a target="_blank">`），Email 字段值渲染为 `mailto:` 链接
 
 ## 前因后果（决策演进）
 
@@ -165,7 +167,6 @@ V1 已确立此原则（Source URL = attrDef 字段）。V2 新增的元数据**
 - 剪藏模式：全页 / 选中文本 / 简化阅读模式
 - AI 摘要：是否自动写入 `description`
 - 离线队列：无网络时暂存，上线后同步
-- Toast 组件升级：当前复用 sidebar status 文本，后续引入 sonner 等 toast 库
 - **清理 `sourceUrl` 废弃代码**：移除 `NodexNode.sourceUrl` 属性、DB `source_url` 列、`nodeToRow`/`rowToNode` 中的映射
 
 ## 决策记录
@@ -190,3 +191,5 @@ V1 已确立此原则（Source URL = attrDef 字段）。V2 新增的元数据**
 | 2026-02-15 | `setFieldValue` 同时写入 `tuple.children` 和 `assocData.children` | `FieldValueOutliner` 从 assocData.children 读取值节点，两处必须同步 |
 | 2026-02-15 | 字段值节点 `_ownerId` 指向 `assocDataId`（非内容节点） | 避免 `OutlinerItem.isReference` 误判为 reference 样式 |
 | 2026-02-15 | `createAttrDef` 创建完整 4 个配置 tuples | 确保字段配置页显示所有配置项（Field type / Auto-init / Required / Hide） |
+| 2026-02-21 | Toast 反馈用 sonner（~3KB gzipped, 零依赖） | 替代 console.error，给用户可见反馈 |
+| 2026-02-21 | URL/Email 字段值渲染为可点击 `<a>` 链接 | Source URL 可直接点击在新标签页打开，与 Date 字段一致的 Empty 占位符 |

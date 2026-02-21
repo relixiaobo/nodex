@@ -858,11 +858,12 @@ findTagDefByName（4 cases，Loro 模型）:
 3. 不存在的 tagDef 返回 undefined
 4. 忽略 _schemaId 参数 — 始终读取 CONTAINER_IDS.SCHEMA（旧 ws_missing_SCHEMA 等价于存在）
 
-findTemplateAttrDef（4 cases）:
+findTemplateAttrDef（5 cases）:
 5. 在 tagDef 的 fieldDef 子节点中按名查找（大小写不敏感）
 6. 不同大小写匹配
 7. 不存在的字段名返回 undefined
 8. 不存在的 tagDef 返回 undefined
+9. Source URL attrDef 的 fieldType = URL
 
 saveWebClip（8 cases，Loro 模型）:
 9. 在 CONTAINER_IDS.INBOX 创建节点（默认 parentId），验证 `loroDoc.getParentId(clipId)`
@@ -880,6 +881,27 @@ applyWebClipToNode（5 cases）:
 19. 就地写入 Source URL 字段值
 20. 就地设置 description
 21. 不改变节点 parentId（留在原父节点）
+
+### 1.41 URL/Email 字段值渲染
+
+**测试文件**: `tests/vitest/field-value-url.test.ts`
+
+**覆盖点**:
+
+isUrlFieldType（3 cases）:
+1. `FIELD_TYPES.URL` → true
+2. `SYS_D.URL` → true
+3. 其他类型（PLAIN/DATE/undefined）→ false
+
+isEmailFieldType（3 cases）:
+4. `FIELD_TYPES.EMAIL` → true
+5. `SYS_D.EMAIL` → true
+6. 其他类型（PLAIN/URL/undefined）→ false
+
+Seed data 验证（3 cases）:
+7. Source URL fieldDef 的 fieldType = `FIELD_TYPES.URL`
+8. Email fieldDef 的 fieldType = `FIELD_TYPES.EMAIL`
+9. Website fieldDef 的 fieldType = `FIELD_TYPES.URL`
 
 ### 1.42 Default Child Supertag（Loro 模型）
 
@@ -1090,6 +1112,7 @@ createSibling 自动标签（2 cases）:
 | 1.37 | Slash Command 注册与导航 | PASS/FAIL |
 | 1.38 | Done State Mapping | PASS/FAIL |
 | 1.39 | Web Clip 落库服务 | PASS/FAIL |
+| 1.41 | URL/Email 字段值渲染 | PASS/FAIL |
 | 1.42 | Default Child Supertag (SYS_A14) | PASS/FAIL |
 | 1.43 | Floating Toolbar 循环渲染防回归 | PASS/FAIL |
 | 1.44 | PM EditorView 操作工具 | PASS/FAIL |

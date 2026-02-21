@@ -109,9 +109,9 @@ _(空)_
 - [x] 将捕获数据保存为节点 ✓ `/clip` + `applyWebClipToNode`
 - [x] 自动打 web_clip 标签 ✓ `applyTag(tagDef_web_clip)`
 - [x] Source URL 字段写入 ✓ `setFieldValue(sourceUrlAttrDefId, url)`
-- [ ] 剪藏结果 Toast 反馈（成功/失败提示）
+- [x] 剪藏结果 Toast 反馈（成功/失败提示）✓ sonner toast
 - [ ] 一键保存到 Inbox / Today / 指定节点（UI 入口 + 目标选择）
-- [ ] 保留源 URL 引用（URL 字段值渲染为可点击链接）
+- [x] 保留源 URL 引用（URL 字段值渲染为可点击链接）✓ FieldValueOutliner URL/Email 早返回
 - **Spec**: `docs/features/web-clipping.md`
 
 #### 撤销与重做 (#44)

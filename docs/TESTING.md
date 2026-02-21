@@ -218,12 +218,19 @@ npm run test:run
 
 ### 1.6.1 FieldRow 配置字段渲染映射
 
-**测试文件**: `tests/vitest/field-row-props.test.ts`
+**测试文件**:
+- `tests/vitest/field-row-props.test.ts`
+- `tests/vitest/use-node-fields-config.test.ts`
+- `tests/vitest/field-list-config-render.test.ts`
+- `tests/vitest/field-row-config-render.test.ts`
 
 **覆盖点**:
 
 1. `toFieldRowEntryProps` 保留系统配置字段渲染必需元数据（`isSystemConfig/configKey/configControl`）
-2. `OutlinerItem/OutlinerView/FieldList` 统一复用该映射，避免调用方漏传导致配置控件退化为普通字段渲染
+2. `computeNodeFields` 为 tagDef/fieldDef 虚拟配置字段正确输出 `configControl`
+3. `FieldList` 渲染配置行时，tag_picker/type_choice/select 控件保持专用 UI（不退化到灰点 outliner）
+4. `FieldRow` 在 `configControl` 缺失时可基于 `configKey` 注册表兜底分发控件
+5. `OutlinerItem/OutlinerView/FieldList` 统一复用同一映射，避免调用方漏传导致配置控件退化
 
 ### 1.7 标签与引用状态流
 

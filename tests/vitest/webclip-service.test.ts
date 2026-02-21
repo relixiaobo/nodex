@@ -92,6 +92,12 @@ describe('findTemplateAttrDef', () => {
     const result = findTemplateAttrDef({}, 'nonexistent_tag', 'Source URL');
     expect(result).toBeUndefined();
   });
+
+  it('Source URL attrDef has fieldType = URL', () => {
+    const result = findTemplateAttrDef({}, 'tagDef_web_clip', 'Source URL');
+    expect(result).toBeDefined();
+    expect(result!.fieldType).toBe('url');
+  });
 });
 
 describe('saveWebClip', () => {

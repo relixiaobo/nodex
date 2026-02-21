@@ -69,6 +69,7 @@ _(空)_
 > - [2026-02-21 nodex-codex] 继续追查穿模根因：`OutlinerItem` 的 overlay 层级此前绑定 `isFocused`，而 options 下拉可在“selected 但未 focused”状态打开，导致 row 仍在普通 stacking context 被兄弟行覆盖；已改为 `optionsPickerOpen` 单独触发行层级提升，并移除默认 `z-[1]` 以避免无必要 stacking context
 > - [2026-02-21 nodex-codex] 继续修复弹层残留与日期穿模：`DatePicker/NodePicker/OptionsPicker` outside click 统一切到 `pointerdown + capture`；移除 `OutlinerItem` children 容器 `z-[1]`（避免子树 stacking context 互压）；`Minimum/Maximum` 改为文本输入并复用 Number warning 逻辑，非法值可输入且显示告警（min/max 解析仅对合法数字生效）
 > - [2026-02-21 nodex-codex] 修复测试数据“先新后旧回流”：test 入口改为 `seedTestData({ forceFresh: true }) + <App skipBootstrap />`，避免 test 页面再走 sidepanel 的持久化 bootstrap；fresh 模式同时清理 snapshot 与 persist（UI/workspace）状态，确保每次进入 test 页都是确定性种子数据
+> - [2026-02-21 nodex-codex] 补回归测试锁定测试入口收口：新增 `test-entrypoint-bootstrap.test.ts`，断言 test main 强制 `forceFresh` seed 且以 `skipBootstrap` 渲染 App，防止“先新后旧”回流问题回归
 
 ### Refactor — Loro 收口 Phase 1：detached guard + origin 策略 (2026-02-21)
 > **Owner**: nodex-codex | **Branch**: codex/loro-phase1-guards

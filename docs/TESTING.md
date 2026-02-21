@@ -678,6 +678,17 @@ hash trigger cleanup safety（2 cases, Bug #53 回归）:
 
 ---
 
+### 1.53 Test 入口 Bootstrap（防测试数据回流）
+
+**测试文件**: `tests/vitest/test-entrypoint-bootstrap.test.ts`
+
+**覆盖点**:
+
+1. `src/entrypoints/test/main.tsx` 启动时调用 `seedTestData({ forceFresh: true })`
+2. test 页面渲染 `App` 时传入 `skipBootstrap`，避免 sidepanel bootstrap 重新接入持久化链路
+
+---
+
 ### 1.50 Loro UndoManager — 结构性撤销/重做
 
 **测试文件**: `tests/vitest/loro-undo.test.ts`
@@ -1035,6 +1046,7 @@ createSibling 自动标签（2 cases）:
 | 1.50 | Loro UndoManager 结构性撤销/重做 | PASS/FAIL |
 | 1.51 | P0 Loro 基础设施 — 7项底层API（subscribeNode/增量同步/时间旅行/LoroText/fork/Awareness） | PASS/FAIL |
 | 1.52 | LoroText Bridge（TextMark/InlineRef 双向桥接） | PASS/FAIL |
+| 1.53 | Test 入口 Bootstrap（防测试数据回流） | PASS/FAIL |
 | 2 | 视觉渲染 | PASS/FAIL/SKIP |
 | 3 | 扩展构建 | PASS/FAIL |
 

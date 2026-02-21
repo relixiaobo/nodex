@@ -137,7 +137,20 @@ export function App({ skipBootstrap = false }: AppProps) {
       {sidebarOpen && <Sidebar />}
       <PanelStack />
       <CommandPalette />
-      <Toaster position="bottom-center" />
+      <Toaster
+        position="bottom-center"
+        toastOptions={{
+          style: {
+            fontFamily: 'var(--font-sans)',
+            fontSize: '13px',
+            borderRadius: 'var(--radius-lg)',
+            border: '1px solid var(--color-border)',
+            background: 'var(--color-surface)',
+            color: 'var(--color-foreground)',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+          },
+        }}
+      />
     </div>
   );
 }

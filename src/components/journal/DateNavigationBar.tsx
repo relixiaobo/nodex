@@ -131,7 +131,7 @@ export function DateNavigationBar({ dayNodeId }: DateNavigationBarProps) {
   }, [navigateTo]);
 
   return (
-    <div className="flex items-center gap-1 px-6 py-1.5 text-sm text-foreground-secondary">
+    <div className="relative flex items-center gap-1 px-6 py-1.5 text-sm text-foreground-secondary" ref={calendarRef}>
       {/* Previous day */}
       <button
         onClick={handlePrevDay}
@@ -159,37 +159,36 @@ export function DateNavigationBar({ dayNodeId }: DateNavigationBarProps) {
         Today
       </button>
 
-      {/* Calendar icon + popover */}
-      <div className="relative" ref={calendarRef}>
-        <button
-          onClick={handleToggleCalendar}
-          className={`flex h-7 w-7 items-center justify-center rounded-md transition-colors ${
-            calendarOpen
-              ? 'bg-foreground/10 text-foreground'
-              : 'hover:bg-foreground/5 hover:text-foreground'
-          }`}
-          title="Pick a date"
-        >
-          <Calendar size={14} />
-        </button>
+      {/* Calendar icon */}
+      <button
+        onClick={handleToggleCalendar}
+        className={`flex h-7 w-7 items-center justify-center rounded-md transition-colors ${
+          calendarOpen
+            ? 'bg-foreground/12 text-foreground'
+            : 'hover:bg-foreground/5 hover:text-foreground'
+        }`}
+        title="Pick a date"
+      >
+        <Calendar size={14} />
+      </button>
 
-        {calendarOpen && (
-          <div
-            className="absolute left-0 top-full z-50 mt-1 min-w-[248px] max-w-[280px] rounded-lg border border-border bg-popover shadow-lg p-3"
-            onMouseDown={(e) => e.stopPropagation()}
-          >
-            <CalendarGrid
-              viewYear={viewYear}
-              viewMonth={viewMonth}
-              onViewChange={(y, m) => { setViewYear(y); setViewMonth(m); }}
-              selectedDate={currentDateInfo?.dateStr ?? todayStr}
-              onSelectDate={handleCalendarSelect}
-              today={todayStr}
-              onToday={handleCalendarToday}
-            />
-          </div>
-        )}
-      </div>
+      {/* Calendar popover — positioned relative to the full bar to avoid clipping in narrow panels */}
+      {calendarOpen && (
+        <div
+          className="absolute right-6 top-full z-50 mt-1 min-w-[248px] max-w-[280px] rounded-lg border border-border bg-popover shadow-lg p-3"
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          <CalendarGrid
+            viewYear={viewYear}
+            viewMonth={viewMonth}
+            onViewChange={(y, m) => { setViewYear(y); setViewMonth(m); }}
+            selectedDate={currentDateInfo?.dateStr ?? todayStr}
+            onSelectDate={handleCalendarSelect}
+            today={todayStr}
+            onToday={handleCalendarToday}
+          />
+        </div>
+      )}
     </div>
   );
 }

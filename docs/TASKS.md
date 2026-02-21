@@ -29,7 +29,7 @@ _(空)_
 |-------|---------|------|-------------|
 | nodex-cc | _(idle — PR #63 merged)_ | — | — |
 | nodex-cc-2 | _(idle — PR #61 merged)_ | — | — |
-| nodex-codex | Loro 收口 Phase 2（field value 回归修复） | codex/loro-phase2-lorotext | docs/TASKS.md, src/components/outliner/OutlinerItem.tsx, src/components/fields/FieldRow.tsx, src/components/fields/FieldValueOutliner.tsx, src/components/fields/DatePicker.tsx, src/hooks/use-node-fields.ts, tests/vitest/use-node-fields-config.test.ts, docs/TESTING.md |
+| nodex-codex | Loro 收口 Phase 2（options targetId-only 收口） | codex/loro-phase2-lorotext | docs/TASKS.md, src/stores/node-store.ts, src/components/outliner/OutlinerItem.tsx, src/components/fields/OptionsPicker.tsx, tests/vitest/node-store-fields.test.ts, tests/vitest/done-state-mapping.test.ts, docs/TESTING.md |
 
 ---
 
@@ -64,6 +64,7 @@ _(空)_
 > - [2026-02-21 nodex-codex] 修复 options 下拉不弹出：统一 options 类型判断（`FIELD_TYPES.*` + `SYS_D.*`），`TrailingInput` 与 `OutlinerItem` 改用 `isOptionsFieldType`，点击空 value 行即可显示 options 下拉；补充 `field-utils` 回归测试
 > - [2026-02-21 nodex-codex] 全量排查 field value 同类风险：统一 `FieldValueOutliner/OutlinerItem/use-field-options/field-validation` 的类型判定为 shared predicates（checkbox/date/options-from-supertag/number/url/email 等同时兼容 `FIELD_TYPES.*` 与 `SYS_D.*`），补齐回归测试并全量通过
 > - [2026-02-21 nodex-codex] 修复用户最新冒烟反馈：Options value 显示优先解引用 `targetId`（避免展示 `opt_*`），Options picker 选中态/高亮按 optionId 对齐；DatePicker 弹层提升到高层级并加 `overflow-hidden` 解决穿模；Number 配置输入改为普通 outliner 风格文本输入（去除特殊边框 number box）
+> - [2026-02-21 nodex-codex] 完成 options value 最终收口：`setOptionsFieldValue/selectFieldOption/autoCollectOption` 仅写 `targetId`（不再冗余 `name`）；`OutlinerItem` 删除 options 的 `name` fallback；`OptionsPicker` 选中值解析改为读取 value node `targetId`；同步更新 `node-store-fields` 与 `done-state-mapping` 断言
 
 ### Refactor — Loro 收口 Phase 1：detached guard + origin 策略 (2026-02-21)
 > **Owner**: nodex-codex | **Branch**: codex/loro-phase1-guards

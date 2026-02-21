@@ -205,7 +205,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
 
     const valId = nanoid();
     loroDoc.createNode(valId, fieldEntryId);
-    loroDoc.setNodeDataBatch(valId, { name: optionNodeId, targetId: optionNodeId });
+    loroDoc.setNodeData(valId, 'targetId', optionNodeId);
 
     if (!applyReverseDoneMapping) return;
 
@@ -568,13 +568,13 @@ export const useNodeStore = create<NodeStore>((set, get) => {
         loroDoc.setNodeDataBatch(feId, { type: 'fieldEntry', fieldDefId });
       }
 
-      // Options field: fieldEntry children = [optionNodeId]（引用，非值节点）
+      // Options field: fieldEntry children = [valueNode], valueNode.targetId = optionNodeId
       const oldChildren = loroDoc.getChildren(feId);
       for (const oldId of oldChildren) loroDoc.deleteNode(oldId);
 
       const valId = nanoid();
       loroDoc.createNode(valId, feId);
-      loroDoc.setNodeDataBatch(valId, { name: optionNodeId, targetId: optionNodeId });
+      loroDoc.setNodeData(valId, 'targetId', optionNodeId);
       loroDoc.commitDoc();
     },
 
@@ -686,7 +686,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
       for (const oldId of oldChildren) loroDoc.deleteNode(oldId);
       const valId = nanoid();
       loroDoc.createNode(valId, feId);
-      loroDoc.setNodeDataBatch(valId, { name: optId, targetId: optId });
+      loroDoc.setNodeData(valId, 'targetId', optId);
       loroDoc.commitDoc();
 
       return optId;

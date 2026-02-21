@@ -8,8 +8,15 @@ import {
   getExtendsChain,
   getFieldTypeIcon,
   getFieldTypeLabel,
+  isCheckboxFieldType,
+  isDateFieldType,
+  isEmailFieldType,
+  isNumberLikeFieldType,
   isOptionsFieldType,
+  isOptionsFromSupertagFieldType,
   isPlainFieldType,
+  isSingleValueFieldType,
+  isUrlFieldType,
   resolveDataType,
   resolveFieldOptions,
   resolveHideField,
@@ -227,5 +234,24 @@ describe('getFieldTypeLabel / getFieldTypeIcon / isPlainFieldType', () => {
     expect(isOptionsFieldType(SYS_D.OPTIONS)).toBe(true);
     expect(isOptionsFieldType(SYS_D.OPTIONS_FROM_SUPERTAG)).toBe(true);
     expect(isOptionsFieldType(FIELD_TYPES.PLAIN)).toBe(false);
+  });
+
+  it('type predicate helpers support both FIELD_TYPES and SYS_D constants', () => {
+    expect(isOptionsFromSupertagFieldType(FIELD_TYPES.OPTIONS_FROM_SUPERTAG)).toBe(true);
+    expect(isOptionsFromSupertagFieldType(SYS_D.OPTIONS_FROM_SUPERTAG)).toBe(true);
+    expect(isCheckboxFieldType(FIELD_TYPES.CHECKBOX)).toBe(true);
+    expect(isCheckboxFieldType(SYS_D.CHECKBOX)).toBe(true);
+    expect(isDateFieldType(FIELD_TYPES.DATE)).toBe(true);
+    expect(isDateFieldType(SYS_D.DATE)).toBe(true);
+    expect(isNumberLikeFieldType(FIELD_TYPES.NUMBER)).toBe(true);
+    expect(isNumberLikeFieldType(SYS_D.INTEGER)).toBe(true);
+    expect(isUrlFieldType(FIELD_TYPES.URL)).toBe(true);
+    expect(isUrlFieldType(SYS_D.URL)).toBe(true);
+    expect(isEmailFieldType(FIELD_TYPES.EMAIL)).toBe(true);
+    expect(isEmailFieldType(SYS_D.EMAIL)).toBe(true);
+    expect(isSingleValueFieldType(FIELD_TYPES.NUMBER)).toBe(true);
+    expect(isSingleValueFieldType(FIELD_TYPES.URL)).toBe(true);
+    expect(isSingleValueFieldType(FIELD_TYPES.EMAIL)).toBe(true);
+    expect(isSingleValueFieldType(FIELD_TYPES.PLAIN)).toBe(false);
   });
 });

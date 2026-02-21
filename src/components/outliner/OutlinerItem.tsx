@@ -17,10 +17,15 @@ import { TagSelector, type TagDropdownHandle } from '../tags/TagSelector';
 import { ReferenceSelector, type ReferenceDropdownHandle } from '../references/ReferenceSelector';
 import { FieldRow } from '../fields/FieldRow';
 import { toFieldRowEntryProps } from '../fields/field-row-props.js';
-import { SYS_D, SYS_V } from '../../types/index.js';
+import { SYS_V } from '../../types/index.js';
 import { useFieldOptions } from '../../hooks/use-field-options.js';
 import { resolveTagColor } from '../../lib/tag-colors.js';
-import { isOptionsFieldType, resolveNodeStructuralIcon } from '../../lib/field-utils.js';
+import {
+  isCheckboxFieldType,
+  isOptionsFieldType,
+  isSingleValueFieldType,
+  resolveNodeStructuralIcon,
+} from '../../lib/field-utils.js';
 import { isOutlinerContentNodeType } from '../../lib/node-type-utils.js';
 import { applyWebClipToNode } from '../../lib/webclip-service.js';
 import { marksToHtml } from '../../lib/editor-marks.js';
@@ -67,10 +72,6 @@ import {
 } from '../../lib/pm-editor-view.js';
 import { dragState } from '../../hooks/use-drag-select';
 
-/** Field types that accept only a single value node. Enter navigates out instead of creating siblings. */
-const SINGLE_VALUE_FIELD_TYPES: Set<string> = new Set([
-  SYS_D.NUMBER, SYS_D.INTEGER, SYS_D.URL, SYS_D.EMAIL,
-]);
 const DESCRIPTION_SHORTCUT_KEYS = getShortcutKeys('editor.edit_description', ['Ctrl-i']);
 
 interface OutlinerItemProps {
@@ -987,7 +988,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   // mode. Edit mode is deferred to click so drag-select can take over if the
   // user drags (mounting RichTextEditor on mousedown captures subsequent mouse events).
   const handleContentMouseDown = useCallback((e: React.MouseEvent) => {
-    if (fieldDataType === SYS_D.CHECKBOX) return;
+    if (isCheckboxFieldType(fieldDataType)) return;
     const target = e.target as HTMLElement;
     const refEl = target.closest('[data-inlineref-node]') as HTMLElement | null;
     if (refEl) return;
@@ -1044,7 +1045,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   // While editing, clicking the large blank area to the right of inline editor
   // should keep caret at end instead of blurring/re-entering at offset 0.
   const handleFocusedContentMouseDown = useCallback((e: React.MouseEvent) => {
-    if (fieldDataType === SYS_D.CHECKBOX) return;
+    if (isCheckboxFieldType(fieldDataType)) return;
     if (e.button !== 0) return;
     if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
 
@@ -1071,7 +1072,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   // Fallback for large row blank area clicks: keep caret at end while focused.
   const handleFocusedRowMouseDownCapture = useCallback((e: React.MouseEvent) => {
     if (!isFocused) return;
-    if (fieldDataType === SYS_D.CHECKBOX) return;
+    if (isCheckboxFieldType(fieldDataType)) return;
     if (e.button !== 0) return;
     if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
 
@@ -1190,7 +1191,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   const handleEnter = useCallback(
     (afterContent?: EditorContentPayload) => {
       // Single-value field types: Enter navigates out instead of creating sibling
-      if (fieldDataType && SINGLE_VALUE_FIELD_TYPES.has(fieldDataType)) {
+      if (isSingleValueFieldType(fieldDataType)) {
         if (onNavigateOut) onNavigateOut('down');
         return;
       }
@@ -1910,12 +1911,12 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
           <div className={`relative flex-1 min-w-0 ${isPendingConversion ? 'ref-converting' : ''} ${isDone ? 'text-foreground/50' : ''}`}>
           <div
             ref={contentAreaRef}
-            className={`text-sm leading-[21px] ${fieldDataType !== SYS_D.CHECKBOX && !isFocused ? (isReference ? 'cursor-default' : 'cursor-text') : ''}`}
-            onMouseDown={fieldDataType !== SYS_D.CHECKBOX ? (isFocused ? handleFocusedContentMouseDown : handleContentMouseDown) : undefined}
-            onClick={fieldDataType !== SYS_D.CHECKBOX && !isFocused ? handleContentClick : undefined}
-            onDoubleClick={fieldDataType !== SYS_D.CHECKBOX && !isFocused && isReference ? handleContentDoubleClick : undefined}
+            className={`text-sm leading-[21px] ${!isCheckboxFieldType(fieldDataType) && !isFocused ? (isReference ? 'cursor-default' : 'cursor-text') : ''}`}
+            onMouseDown={!isCheckboxFieldType(fieldDataType) ? (isFocused ? handleFocusedContentMouseDown : handleContentMouseDown) : undefined}
+            onClick={!isCheckboxFieldType(fieldDataType) && !isFocused ? handleContentClick : undefined}
+            onDoubleClick={!isCheckboxFieldType(fieldDataType) && !isFocused && isReference ? handleContentDoubleClick : undefined}
           >
-            {fieldDataType === SYS_D.CHECKBOX ? (
+            {isCheckboxFieldType(fieldDataType) ? (
               <input
                 type="checkbox"
                 checked={node.name === SYS_V.YES}

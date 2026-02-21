@@ -20,6 +20,7 @@ import { resolveTagColor } from '../../lib/tag-colors.js';
 import { OutlinerItem } from '../outliner/OutlinerItem';
 import { TrailingInput } from '../editor/TrailingInput';
 import { FieldRow } from './FieldRow';
+import { toFieldRowEntryProps } from './field-row-props.js';
 import * as loroDoc from '../../lib/loro-doc.js';
 
 interface ConfigOutlinerProps {
@@ -164,14 +165,8 @@ export function ConfigOutliner({ nodeId }: ConfigOutlinerProps) {
           <div key={id} className="@container" style={{ paddingLeft: 6 + 15 + 4 }}>
             <FieldRow
               nodeId={ownerTagDefId}
-              attrDefId={fieldEntry.fieldDefId}
-              attrDefName={fieldEntry.attrDefName}
-              tupleId={id}
-              valueNodeId={fieldEntry.valueNodeId}
-              valueName={fieldEntry.valueName}
-              dataType={fieldEntry.dataType}
+              {...toFieldRowEntryProps(fieldEntry)}
               isLastInGroup={i === mergedItems.length - 1 || mergedItems[i + 1].type !== 'field'}
-              trashed={fieldEntry.trashed}
               ownerTagColor={ownerColor}
             />
           </div>

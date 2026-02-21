@@ -16,6 +16,7 @@ import { TagBar } from '../tags/TagBar';
 import { TagSelector, type TagDropdownHandle } from '../tags/TagSelector';
 import { ReferenceSelector, type ReferenceDropdownHandle } from '../references/ReferenceSelector';
 import { FieldRow } from '../fields/FieldRow';
+import { toFieldRowEntryProps } from '../fields/field-row-props.js';
 import { SYS_D, SYS_V } from '../../types/index.js';
 import { useFieldOptions } from '../../hooks/use-field-options.js';
 import { resolveTagColor } from '../../lib/tag-colors.js';
@@ -2109,16 +2110,8 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
               <div key={id} className="@container" style={{ paddingLeft: (depth + 1) * 28 + 6 + 15 + 4 }}>
                 <FieldRow
                   nodeId={nodeId}
-                  attrDefId={fieldMap.get(id)!.fieldDefId}
-                  attrDefName={fieldMap.get(id)!.attrDefName}
-                  tupleId={id}
-                  valueNodeId={fieldMap.get(id)!.valueNodeId}
-                  valueName={fieldMap.get(id)!.valueName}
-                  dataType={fieldMap.get(id)!.dataType}
+                  {...toFieldRowEntryProps(fieldMap.get(id)!)}
                   isLastInGroup={i === visibleChildren.length - 1 || visibleChildren[i + 1].type !== 'field'}
-                  trashed={fieldMap.get(id)!.trashed}
-                  isRequired={fieldMap.get(id)!.isRequired}
-                  isEmpty={fieldMap.get(id)!.isEmpty}
                   ownerTagColor={fieldOwnerColors.get(id)}
                   onNavigateOut={(direction) => {
                     if (direction === 'up') {

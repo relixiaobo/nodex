@@ -29,6 +29,7 @@ import {
   FIELD_TYPE_LIST,
   configKeyToPropName,
   resolveConfigValue,
+  type ConfigFieldDef,
 } from '../../lib/field-utils.js';
 import { FieldValueOutliner } from './FieldValueOutliner';
 import { FieldNameInput } from './FieldNameInput';
@@ -77,6 +78,8 @@ interface FieldRowProps {
   isSystemConfig?: boolean;
   /** Config field metadata key for looking up icon/description */
   configKey?: string;
+  /** Explicit config control type for system config rows */
+  configControl?: ConfigFieldDef['control'];
 }
 
 function ConfigTagPicker({ nodeId, configKey, placeholder }: { nodeId: string; configKey: string; placeholder: string }) {
@@ -206,6 +209,7 @@ export function FieldRow({
   ownerTagColor,
   isSystemConfig,
   configKey,
+  configControl,
 }: FieldRowProps) {
   const navigateTo = useUIStore((s) => s.navigateTo);
   const editingFieldNameId = useUIStore((s) => s.editingFieldNameId);
@@ -502,29 +506,29 @@ export function FieldRow({
         </div>
         {/* Value column — unified rendering */}
         <div className="flex-1 min-w-0 min-h-[22px]" data-field-value>
-          {configDef?.control === 'outliner' ? (
+          {configControl === 'outliner' ? (
             <ConfigOutliner nodeId={nodeId} />
-          ) : configDef?.control === 'tag_picker' ? (
+          ) : configControl === 'tag_picker' ? (
             <ConfigTagPicker nodeId={nodeId} configKey={attrDefId} placeholder="Select supertag" />
-          ) : configDef?.control === 'type_choice' ? (
+          ) : configControl === 'type_choice' ? (
             <ConfigSelectPicker
               nodeId={nodeId}
               configKey={attrDefId}
               options={FIELD_TYPE_LIST.map((f) => ({ value: f.value, label: f.label }))}
               placeholder="Select field type"
             />
-          ) : configDef?.control === 'select' ? (
+          ) : configControl === 'select' ? (
             <ConfigSelectPicker
               nodeId={nodeId}
               configKey={attrDefId}
-              options={configDef.options ?? []}
+              options={configDef?.options ?? []}
               placeholder="Select value"
             />
-          ) : configDef?.control === 'done_map_entries' ? (
+          ) : configControl === 'done_map_entries' ? (
             <DoneMappingEntries tagDefId={nodeId} mappingKey={attrDefId} />
-          ) : configDef?.control === 'number_input' ? (
+          ) : configControl === 'number_input' ? (
             <ConfigNumberInput nodeId={nodeId} configKey={attrDefId} />
-          ) : configDef?.control === 'autocollect' ? (
+          ) : configControl === 'autocollect' ? (
             <>
               <FieldValueOutliner
                 tupleId={tupleId}

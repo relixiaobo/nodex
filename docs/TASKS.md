@@ -27,7 +27,7 @@ _(空)_
 
 | Agent | 当前任务 | 分支 | 修改中的文件 |
 |-------|---------|------|-------------|
-| nodex-cc | P1 NodePanel Header 重设计 | cc/node-panel-header | src/components/panel/NodeHeader.tsx, NodePanel.tsx, OutlinerView.tsx, ui-store.ts |
+| nodex-cc | _(idle — PR #66 merged)_ | — | — |
 | nodex-cc-2 | _(idle — PR #61 merged)_ | — | — |
 | nodex-codex | _(idle — PR #70 merged)_ | — | — |
 
@@ -35,173 +35,13 @@ _(空)_
 
 ## 进行中
 
-### P1 NodePanel Header 重设计
-> **Owner**: nodex-cc | **Branch**: cc/node-panel-header | **Spec**: `docs/features/node-panel-header.md`
-> **迭代日志**:
-> - [2026-02-21 cc] 开始实现：重构 PanelTitle → NodeHeader，三列对齐网格，隐藏字段占位行
-
-### P1 Reference 交互收口：单击选中 vs Esc/框选 + inline 转换输入
-> **Owner**: nodex-codex | **Branch**: codex/reference-selection-interactions | **Spec**: `docs/features/references.md`, `docs/features/node-selection.md`
-> **目标**: 区分 reference 单击选中与全局选中视觉语义，恢复/收口 reference ↔ inline reference 切换与输入交互一致性
-> **Files**: `src/components/outliner/OutlinerItem.tsx`, `src/components/editor/RichTextEditor.tsx`, `src/components/tags/TagSelector.tsx`, `src/components/references/ReferenceSelector.tsx`, `src/components/editor/SlashCommandMenu.tsx`, `src/stores/ui-store.ts`, `src/assets/main.css`, `standalone/TestApp.tsx`, `tests/vitest/ui-store-undo-focus.test.ts`, `docs/features/references.md`, `docs/features/node-selection.md`
-> **Progress**:
-> - [x] 增加 selection source（`ref-click` vs `global`）并接入选中/聚焦状态流
-> - [x] 恢复 reference 单击 `fit-content` 边框样式，保留 Esc/框选全行高亮
-> - [x] 收口 selected reference 输入转换路径（ArrowRight/可打印字符/blur 回退）
-> - [x] 补齐回归测试并更新 feature 文档
-> **迭代日志**:
-> - [2026-02-21 nodex-codex] 任务认领：先整理行为-commit 映射，确认“全行高亮（global）”与“reference 单击边框（ref-click）”并存方案，再开始实现
-> - [2026-02-21 nodex-codex] 实现完成：`ui-store` 新增 `selectionSource`，`OutlinerItem` 区分 `selected_global` 与 `selected_ref_click` 两套视觉；恢复 selected reference 可打印字符转换路径（转 inline conversion 并续写）；补充 store 语义断言并同步 `references/node-selection` 规格；自检通过 `npm run typecheck`、`npm run test:run`、`npm run build`
-> - [2026-02-21 nodex-codex] 用户回归反馈修复：修正 inline ref-only 场景 `ProseMirror-trailingBreak` 显示条件（避免 `@` 转换后换行光标）；reference 转换去除“先删再转”路径，避免目标ID失真导致 blur 后偶发消失；pending conversion 行纳入 reference-like 点击语义（单击可进入 ref-click 选中边框）
-> - [2026-02-21 nodex-codex] 二次回归修复：`OutlinerItem` 改为以 `node.type==='reference'` 识别引用节点并读取 target 节点文本/marks/inlineRefs（修复 blur 回退后“看起来消失”）；selected reference 转换改为使用 `targetId` 作为回退目标（修复 blur 后偶发错误引用）；reference 单击边框颜色改为固定 RGBA，避免 `color-mix` 在部分环境不可见
-> - [2026-02-21 nodex-codex] 三次回归修复：`dev:test` 改为默认 `forceFresh`，消除历史测试数据干扰；reference 行渲染统一切到 `effectiveNodeId(target)`（tags/fields/checkbox/children/TagBar 与字段导航上下文同步），修复 field 丢失与引用子树上下文错位；补充 atom 尾部 `ProseMirror-separator + trailingBreak` 隐藏规则，修复 `@` 创建后光标换行问题
-> - [2026-02-21 nodex-codex] 四次回归修复：针对仍存在的 `@` 创建后 caret 掉到下一行问题，增加 inline-ref 段落级别 CSS 兜底（`:has([data-inlineref-node])` 时隐藏 `ProseMirror-separator` 与 `trailingBreak`），避免原子引用段落被浏览器渲染成伪换行光标
-> - [2026-02-21 nodex-codex] 五次回归修复：将 inline-ref 段落兜底改为“保留 separator 作为 caret 锚点但零宽隐藏 + 隐藏 trailingBreak”，避免光标回退到行首；新增 `.ProseMirror-selectednode` inline-ref 样式，使左/右方向键移动到原子引用时可见整体框选态
-> - [2026-02-21 nodex-codex] 六次回归修复：补齐 pending reference conversion 的非 blur 收口（例如 Esc 触发 clearFocus）；在 `OutlinerItem` 增加 `finalizePendingRefConversion` 并在失焦 effect + blur 双路径执行，修复“reference 文本仍紫色 + 单击出现全行高亮与 fit-content 边框叠加”的双选中状态
-> - [2026-02-21 nodex-codex] 七次回归修复：修正六次版本的“失焦即收口”副作用；改为仅在 temp 节点发生 `focused -> unfocused` 转换后再 finalize，避免 `ArrowRight` 转换时临时节点在首帧未聚焦就被提前回退（导致无法把光标移动到 reference 框后）
-> - [2026-02-21 nodex-codex] 八次回归修复：统一 `#/@//` 浮窗锚点逻辑为 caret 坐标驱动（`RichTextEditor` 通过 `coordsAtPos` 回传 anchor，`OutlinerItem` 管理三类 anchor 状态并传给 `TagSelector/ReferenceSelector/SlashCommandMenu`）；修复菜单锚在行容器左上角导致的偏位问题，并保证三类菜单定位行为一致
-> - [2026-02-21 nodex-codex] 九次回归修复：移除 inline reference hover 下划线样式，保留主题色与点击行为，仅在键盘导航选中原子引用时显示边框态，避免 hover 视觉噪音
-> - [2026-02-21 nodex-codex] 根据 review 建议补充说明：`expandKey` 注释明确“reference 实例独立展开状态”是设计意图；delete 快捷键注释明确仅删除真实 reference 节点；ProseMirror `separator/trailingBreak` 规则补充分层注释并修正 TASKS 文件清单（移除未改动的 `selected-reference-shortcuts.test.ts`）
-
-### Refactor — Loro 收口 Phase 2：LoroText 主编辑链路迁移 (2026-02-21)
-> **Owner**: nodex-codex | **Branch**: codex/loro-phase2-lorotext
-> **目标**: 将主编辑读写从 `name+marks+inlineRefs` 迁移到 `LoroText` 容器，建立后续多端协同一致性基础
-> **Files**: `src/lib/loro-doc.ts`, `src/components/editor/*.ts`, `src/components/outliner/OutlinerItem.tsx`, `tests/vitest/loro-*.test.ts`, `docs/TESTING.md`
-> **Progress**:
-> - [x] 设计并落地 LoroText <-> 当前编辑器数据桥接层
-> - [x] Outliner 主编辑输入路径切换到 LoroText
-> - [x] 移除历史兼容路径（未上线场景直接切换）
-> - [x] 补齐回归测试并更新 `docs/TESTING.md`
-> **迭代日志**:
-> - [2026-02-21 nodex-codex] 任务认领，启动 Phase 2 开发
-> - [2026-02-21 nodex-codex] 完成 Phase 2 第一批收口：新增 `loro-text-bridge`（TextMark/inlineRef 双向桥接），`node-store` 内容写入路径改为 legacy 字段 + `richText` 双写，`toNodexNode` 优先读 `richText`（旧字段 fallback），并补齐 `loro-text-bridge`/`loro-infra`/`node-store-content` 回归测试
-> - [2026-02-21 nodex-codex] 完成主编辑创建链路补齐：`createChild` 与 `startRefConversion` 在创建节点时即时写入 `richText`，避免“首次创建无 richText 需二次编辑才迁移”；新增 `node-store-content` / `node-store-tags-refs` 断言覆盖
-> - [2026-02-21 nodex-codex] 继续收口：主编辑写入停止 mirror `marks/inlineRefs` 到 legacy 节点字段（仅保留 `name` 镜像 + `richText` 真实源），并在 `setNodeRichTextContent` 统一刷新 `updatedAt`
-> - [2026-02-21 nodex-codex] 继续收口：`setNodeName/setNodeNameLocal/updateNodeContent` 停止实时写 `raw name`，编辑链路仅写 `richText`（`toNodexNode` 读路径不变，仍优先 `richText`）
-> - [2026-02-21 nodex-codex] 继续收口：`createChild` 对普通内容节点不再落 `raw name`，`startRefConversion` 去除 `raw name` 写入；workspace 容器初始化改为直接写 `richText`
-> - [2026-02-21 nodex-codex] 按“未上线无需历史兼容”原则，移除编辑链路中“清理 legacy 脏字段”兼容逻辑与对应测试，保持实现最小化
-> - [2026-02-21 nodex-codex] 继续清理历史兼容残留：删除 node-store 旧 API 别名（`createAttrDef/moveFieldTuple/renameAttrDef/setNodeNameLocal/setNodeContentLocal`）及调用点；移除 `findAutoCollectTupleId` stub、`resolveSupertagPickerSelectedId` 的 `targetId` 回退、`handleDelete` 的 HTML 文本回退；同步更新测试与 `docs/TESTING.md`
-> - [2026-02-21 nodex-codex] 修复配置页控制器回归：`FieldRow` 按 `configDef.control` 渲染专用控件（tag_picker/type_choice/select/done_map_entries/number_input/autocollect），不再把虚拟配置字段误走普通 outliner；`DoneMappingEntries` 改为直接绑定 `tagDefId`；`AutoCollectSection` 改为读取 `fieldDef` 选项子节点
-> - [2026-02-21 nodex-codex] 用户反馈回归未消失，定位到 `OutlinerItem` 未透传 `isSystemConfig/configKey` 造成配置字段退化；本轮按“分层渲染 + 无隐式 fallback”重构 `FieldRow` 配置链路并补矩阵回归测试
-> - [2026-02-21 nodex-codex] 完成修复：`FieldEntry` 显式携带 `configControl`，新增 `toFieldRowEntryProps` 统一映射并接入 `OutlinerItem/OutlinerView/FieldList/FieldValueOutliner/ConfigOutliner`，消除漏传风险；新增 `field-row-props.test.ts` 与 `docs/TESTING.md` 覆盖映射
-> - [2026-02-21 nodex-codex] 追加兜底：`FieldRow` 系统配置渲染从 `configControl` 回退到 `configKey` 注册表（`resolvedControl`），避免配置字段因单点元数据缺失退化；新增 `use-node-fields-config` / `field-list-config-render` / `field-row-config-render` 回归测试锁定
-> - [2026-02-21 nodex-codex] 根据最新冒烟反馈继续修复：统一配置控件 value 区 bullet 基线（NodePicker/DoneMapping/AutoCollect/NumberInput 统一 25px inset，tag `#` 子弹尺寸统一 15px）；`Auto-collect` 关闭时隐藏列表子行；`OptionsPicker` 新建能力改为受 `autocollectOptions` 开关控制；新增 `options-picker.test.ts`
-> - [2026-02-21 nodex-codex] 启动“清晰/简单/优雅”收口：将 `FieldRow` 的配置项分发改为显式 registry（替代多层条件分支），并提取统一布局常量消除多处 magic number
-> - [2026-02-21 nodex-codex] 完成收口：新增 `FIELD_VALUE_INSET` 统一 value 布局基线；`FieldRow` system-config 渲染改为 `control -> renderer` 显式注册（覆盖 outliner/color_picker/toggle/tag_picker/type_choice/select/done_map_entries/number_input/autocollect），仅未知 control 才进入默认渲染并在 dev 警告
-> - [2026-02-21 nodex-codex] 按“保持简单”回归修复：`Map checked/unchecked` value 改回普通 outliner（支持 `>` 选字段+设值）；删除 done mappings 容器读写路径，改为从 `NDX_A07/NDX_A08` fieldEntry 子树解析；同步更新 `node-store` 写入与 done-state-mapping 测试
-> - [2026-02-21 nodex-codex] 修复 options 下拉不弹出：统一 options 类型判断（`FIELD_TYPES.*` + `SYS_D.*`），`TrailingInput` 与 `OutlinerItem` 改用 `isOptionsFieldType`，点击空 value 行即可显示 options 下拉；补充 `field-utils` 回归测试
-> - [2026-02-21 nodex-codex] 全量排查 field value 同类风险：统一 `FieldValueOutliner/OutlinerItem/use-field-options/field-validation` 的类型判定为 shared predicates（checkbox/date/options-from-supertag/number/url/email 等同时兼容 `FIELD_TYPES.*` 与 `SYS_D.*`），补齐回归测试并全量通过
-> - [2026-02-21 nodex-codex] 修复用户最新冒烟反馈：Options value 显示优先解引用 `targetId`（避免展示 `opt_*`），Options picker 选中态/高亮按 optionId 对齐；DatePicker 弹层提升到高层级并加 `overflow-hidden` 解决穿模；Number 配置输入改为普通 outliner 风格文本输入（去除特殊边框 number box）
-> - [2026-02-21 nodex-codex] 完成 options value 最终收口：`setOptionsFieldValue/selectFieldOption/autoCollectOption` 仅写 `targetId`（不再冗余 `name`）；`OutlinerItem` 删除 options 的 `name` fallback；`OptionsPicker` 选中值解析改为读取 value node `targetId`；同步更新 `node-store-fields` 与 `done-state-mapping` 断言
-> - [2026-02-21 nodex-codex] 响应最新三点反馈：`Minimum/Maximum` 保持普通 outliner 风格但恢复 `number` 语义输入，并将 `number_input` 虚拟配置字段标记为 `FIELD_TYPES.NUMBER`；Date/Options 下拉统一提升为 `z-[1200] + bg-surface` 消除穿模/透底；Pre-determined options value 在 `OutlinerItem` 中按 reference 样式 bullet 渲染；done mapping 读取去掉 `targetId ?? name` fallback，完全对齐 targetId-only 模型
-> - [2026-02-21 nodex-codex] 继续追查穿模根因：`OutlinerItem` 的 overlay 层级此前绑定 `isFocused`，而 options 下拉可在“selected 但未 focused”状态打开，导致 row 仍在普通 stacking context 被兄弟行覆盖；已改为 `optionsPickerOpen` 单独触发行层级提升，并移除默认 `z-[1]` 以避免无必要 stacking context
-> - [2026-02-21 nodex-codex] 继续修复弹层残留与日期穿模：`DatePicker/NodePicker/OptionsPicker` outside click 统一切到 `pointerdown + capture`；移除 `OutlinerItem` children 容器 `z-[1]`（避免子树 stacking context 互压）；`Minimum/Maximum` 改为文本输入并复用 Number warning 逻辑，非法值可输入且显示告警（min/max 解析仅对合法数字生效）
-> - [2026-02-21 nodex-codex] 修复测试数据“先新后旧回流”：test 入口改为 `seedTestData({ forceFresh: true }) + <App skipBootstrap />`，避免 test 页面再走 sidepanel 的持久化 bootstrap；fresh 模式同时清理 snapshot 与 persist（UI/workspace）状态，确保每次进入 test 页都是确定性种子数据
-> - [2026-02-21 nodex-codex] 补回归测试锁定测试入口收口：新增 `test-entrypoint-bootstrap.test.ts`，断言 test main 强制 `forceFresh` seed 且以 `skipBootstrap` 渲染 App，防止“先新后旧”回流问题回归
-> - [2026-02-21 nodex-codex] 处理 PR #68 review 建议：提取 `FIELD_OVERLAY_Z_INDEX` 统一 Date/NodePicker/OptionsPicker/TrailingInput/OutlinerItem 层级；清理 `ConfigNumberInput.commitDraft` 多余 deps；为 `remapInlineRefsByPlaceholderOrder` 新增独立单测（占位符增减/重排）；`removeDoneMappingEntry` 改为按“有效 mapping entry”索引删除并补噪声节点回归用例
-
-### Refactor — Loro 收口 Phase 1：detached guard + origin 策略 (2026-02-21)
-> **Owner**: nodex-codex | **Branch**: codex/loro-phase1-guards
-> **目标**: 为 Loro 主链路增加写操作安全边界与可追踪提交语义，作为 LoroText 主链路迁移前置
-> **Files**: `src/lib/loro-doc.ts`, `src/stores/node-store.ts`, `tests/vitest/loro-*.test.ts`, `tests/vitest/node-store-*.test.ts`, `docs/TESTING.md`, `docs/LESSONS.md`
-> **Progress**:
-> - [x] detached checkout 状态下 mutation 统一 guard（禁止写）
-> - [x] commit origin 规范落地（user/system/seed）
-> - [x] UndoManager 过滤规则与 origin 对齐
-> - [x] 补齐回归测试并更新 `docs/TESTING.md`
-> **迭代日志**:
-> - [2026-02-21 nodex-codex] 任务认领，按收口计划启动 Phase 1
-> - [2026-02-21 nodex-codex] 完成 Phase 1：`loro-doc` 增加 detached mutation/commit guard、`commitDoc` 默认 `user:implicit`、UndoManager 统一过滤 `['__seed__','system:']`；`node-store` 为返回值 mutation 增加 detached 兜底；新增/更新 `loro-infra`、`loro-undo`、`node-store-guard-rails` 用例并同步测试文档与 LESSONS
-
-### Bugfix — Loro 全量 Review 问题修复 (2026-02-21)
-> **Owner**: nodex-codex | **Branch**: codex/loro-review-fixes
-> **目标**: 修复 `docs/reviews/loro-full-review-2026-02-21.md` 中全部问题（P0/P1/P2）并补齐测试缺口
-> **Files**: `src/stores/node-store.ts`, `src/components/outliner/OutlinerItem.tsx`, `src/components/outliner/OutlinerView.tsx`, `src/components/fields/FieldValueOutliner.tsx`, `src/lib/node-type-utils.ts`, `src/lib/tree-utils.ts`, `src/hooks/use-realtime.ts`, `tests/vitest/*`, `docs/TESTING.md`
-> **Progress**:
-> - [x] 修复引用创建误删目标节点 + 引用节点可见性
-> - [x] 修复 removeTag 共享字段误删
-> - [x] 修复 toggleNodeDone 多次 commit（Undo 原子性）
-> - [x] 修复 Options-from-supertag 回显 + Date commit 路径
-> - [x] 增加容器节点不可变守卫
-> - [x] 清理废弃兼容代码（无运行路径）
-> - [x] 补齐测试并更新 `docs/TESTING.md`
-> **迭代日志**:
-> - [2026-02-21 nodex-codex] 任务认领，创建修复分支并开始实现
-> - [2026-02-21 nodex-codex] 完成修复并通过 `npm run typecheck` / `npm run test:run` / `npm run build`：修正引用转换误删目标、reference 渲染分类、removeTag 共享字段保护、toggleNodeDone 单 commit、Date 与 Options-from-supertag 值路径；新增 `node-type-utils` 与对应测试；删除无运行路径 `src/hooks/use-realtime.ts`
-
-### 代码 Review — Loro 迁移全量 (2026-02-21)
-> **Owner**: nodex-codex | **Branch**: main（只读，不修改代码）
-> **目标**: 以全新视角对 `8b722f1^..HEAD`（Loro 迁移启动至今，31 commits，~80 文件）做系统 Review
-> **角度**: ① 数据完整性 & 不变量 ② React 渲染正确性 ③ Loro API 使用正确性 ④ NodeType 重构完整性
-> **产出**: 将发现写入 `docs/reviews/loro-full-review-2026-02-21.md`（Findings + 测试缺口清单）
-> **迭代日志**:
-> - [2026-02-21 nodex] 任务创建，合并 feature-sync-2026-02-20 + loro-migration 两份文档，换视角重新 Review
-
-### 代码 Review — feature-sync-2026-02-20 ✅
-> **Owner**: nodex-codex | **Branch**: main（只读，不修改代码）
-> **目标**: 按 `docs/reviews/feature-sync-2026-02-20.md` 优先级清单逐文件 Review，找出 Bug / 架构问题 / 测试缺口
-> **产出**: 将问题写回 `docs/reviews/feature-sync-2026-02-20.md`（Findings 段落），或直接 DM nodex
-> **迭代日志**:
-> - [2026-02-20 nodex] 任务创建，分配给 nodex-codex
-> - [2026-02-20 nodex-codex] Review 完成，发现 6 个 Bug（P0×5, P1×1）+ 5 个测试缺口
-> - [2026-02-20 nodex] 修复全部 6 个 Bug（commit ee0c83a）：applyTag/removeTag/createTagDef/createFieldDef 缺 commitDoc，outdentNode 缺容器边界守卫，toggleCheckboxField 存储值不一致
-
-### P0 Loro 基础设施 — 7项底层API ✅
-> **Owner**: nodex-cc | **Branch**: cc/loro-infra | **PR**: #63
-> **迭代日志**:
-> - [2026-02-20 cc] 探索 Loro API，确认全部可行，实现完成：
->   - ② subscribeNode: LoroMap.subscribe() 容器级隔离订阅，rebuildMappings 后自动重挂载
->   - ⑤ getVersionVector/exportFrom: oplogVersion + export({mode:'update',from}) 增量同步
->   - ④ getVersionHistory/checkout/checkoutToLatest: getAllChanges lamport排序 + doc.checkout
->   - ③ getNodeText/getOrCreateNodeText: LoroText Peritext marks 基础设施
->   - ① LoroMovableList评估: LoroTree.move()已是Kleppmann算法，tags保持LoroList
->   - ⑥ forkDoc: doc.fork() + merge()增量合并回主doc
->   - ⑦ Awareness: src/lib/awareness.ts 纯内存模块
-> - 484 tests pass, typecheck clean, build 4.1MB
-
-### P0 Loro 迁移后 UI 回归修复 ✅
-> **Owner**: nodex | **Branch**: main（直接修复）
-> **迭代日志**:
-> - [2026-02-20 nodex] 修复 PR #62/#63 引入的三个 UI 回归：
->   - Bug 1: `tree-utils.ts:getAncestorChain` — 容器节点（LIBRARY 等）不加入 ancestors，面包屑缺"Library"层级
->   - Bug 2: `ConfigOutliner.tsx` — own items 循环跳过 `type==='fieldDef'` 节点，"Default content" 下模板字段（Status/Priority/Due/Done）不显示
->   - Bug 3: `use-node-fields.ts:computeFields` — tagDef/fieldDef 只生成 outliner 类型虚拟条目，非 outliner 配置字段（Color/Show as checkbox 等）不显示
->   - 同步修复 `FieldValueOutliner` + `ColorSwatchPicker` 支持虚拟 tupleId 读写节点属性（boolean/color）
->   - 485 tests pass, typecheck clean
-> - [2026-02-20 nodex] 追加修复 4 个运行时回归（用户测试发现）：
->   - Bug 4: `SidebarNav.tsx` — 用 `${wsId}_${suffix}` 构造容器 ID，但 Loro 迁移后 ID 为短格式（LIBRARY 等），导致侧栏点击导航到不存在的节点（"Untitled" + 空树）
->   - Bug 5: `CommandPalette.tsx` — 同上，容器快速跳转也用了旧格式
->   - Bug 6: `Breadcrumb.tsx` — `isRootView` 未处理直接浏览容器节点的情况（workspaceRootId=null）
->   - Bug 7: `App.tsx` bootstrap — 不等待 UIStore persist hydration，stale panel ID 不被清除；同步修复 `seed-data.ts` 的 `?fresh` 清理逻辑
->   - 485 tests pass, typecheck clean
+_(空)_
 
 ---
 
 ## 待办
 
-### P0
-
-#### ~~Loro 基础设施 — 7 项底层 API~~ ✅ 已完成 (PR #63)
-
----
-
 ### P1
-
-#### NodePanel Header 重设计
-> **Owner**: 待分配（nodex-cc）| **Spec**: `docs/features/node-panel-header.md`
-
-统一 NodePanel 标题区布局，建立 Header → OutlinerView 连贯的三列对齐网格。
-
-- [ ] 新建 `NodeHeader.tsx`，替换现有 `PanelTitle.tsx`
-  - Icon 区块（32px，条件显示）
-  - Name 行：drag handle（列A）+ checkbox（列B，条件）+ 节点名称（列C）
-  - Supertag 行：TagBar，条件显示（有 tag 且非 tagDef/fieldDef）
-  - Extra 行：插槽，预留 + 日期节点占位
-- [ ] `NodePanel.tsx` 接入 `NodeHeader`，移除旧 PanelTitle
-- [ ] `ui-store.ts` 新增 `expandedHiddenFields: Set<string>` 及 toggle action
-- [ ] `OutlinerView.tsx` 顶部渲染隐藏字段占位行（`⊕ FieldName`），临时展开逻辑
-- [ ] Drag handle 右键触发 context menu（替代 `...` 按钮）
-- [ ] 对齐验证：drag handle 与 chevron 同列A，checkbox 与 field 图标/bullet 同列B
 
 #### Editor Bug: Enter 新建空节点后 CJK IME 组合输入异常
 > 详见 `docs/issues/editor-ime-enter-empty-node.md`
@@ -384,6 +224,13 @@ _(空)_
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
 | 2026-02-21 | Refactor — Row 交互统一（content/trailing/field-value 共享 intent 层 + CJK hashtag 修复 + trigger caret 修复） | nodex-codex | #70 |
+| 2026-02-21 | P1 Reference 交互收口（单击选中/Esc/框选 + inline 转换 + 浮窗锚点统一） | nodex-codex | #69 |
+| 2026-02-21 | Refactor — Loro 收口 Phase 2: LoroText 主编辑链路迁移 + config field 重构 | nodex-codex | #68 |
+| 2026-02-21 | Refactor — Loro 收口 Phase 1: detached guard + origin 策略 | nodex-codex | #67 |
+| 2026-02-21 | P1 NodePanel Header 重设计（三列对齐网格 + 隐藏字段占位行） | nodex-cc | #66 |
+| 2026-02-21 | Bugfix — Loro 全量 Review 问题修复（引用误删/removeTag/toggleDone/Options/Date） | nodex-codex | #65 |
+| 2026-02-21 | 代码 Review — Loro 迁移全量（数据完整性/React 渲染/Loro API/NodeType 重构） | nodex-codex | — |
+| 2026-02-20 | 代码 Review — feature-sync-2026-02-20（6 Bug + 5 测试缺口） | nodex-codex | — |
 | 2026-02-20 | Node 图标系统 — supertag bullet 彩色（conic-gradient）+ fieldDef 结构化图标 + 字段颜色继承 + 字段排序 | nodex | — |
 | 2026-02-20 | FIELD_TYPES 大小写修复 — seed-data.ts + field-utils.test.ts 统一使用小写常量 | nodex | — |
 | 2026-02-20 | Loro CRDT 迁移 Phase 1 — 本地数据引擎 + 数据模型 + 命名 + UndoManager | nodex-cc | #62 |

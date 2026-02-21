@@ -103,7 +103,7 @@ _(空)_
 - **Spec**: `docs/features/date-nodes.md`
 
 #### 网页剪藏 (#30)
-> 已完成：消息类型定义、Content Script 提取（defuddle）、Background 中转、`/clip` slash command 全链路、`#web_clip` tagDef + Source URL attrDef 惰性创建、Vitest 20 cases
+> 已完成：消息类型定义、Content Script 提取（defuddle）、Background 中转、`/clip` slash command 全链路、`#web_clip` tagDef + Source URL attrDef 惰性创建、V2 正文→子节点、Vitest 55 cases
 > **Owner**: nodex-cc-2 | **Branch**: cc2/web-clipping
 
 - [x] 将捕获数据保存为节点 ✓ `/clip` + `applyWebClipToNode`
@@ -112,6 +112,7 @@ _(空)_
 - [x] 剪藏结果 Toast 反馈（成功/失败提示）✓ sonner toast
 - [ ] 一键保存到 Inbox / Today / 指定节点（UI 入口 + 目标选择）
 - [x] 保留源 URL 引用（URL 字段值渲染为可点击链接）✓ FieldValueOutliner URL/Email 早返回
+- [x] 正文内容转子节点（V2）✓ `parseHtmlToNodes()` + `createContentNodes()` heading-based 层级树
 - **Spec**: `docs/features/web-clipping.md`
 
 #### 撤销与重做 (#44)

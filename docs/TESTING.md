@@ -846,9 +846,11 @@ Store 集成 — removeDoneMappingEntry（2 cases）:
 Store 集成 — toggleNodeDone（1 case）:
 17. 有 doneMapping 时仍只产生一次 commit（`_version` 仅 +1）
 
-### 1.39 Web Clip 落库服务
+### 1.39 Web Clip 落库服务 + 正文解析
 
-**测试文件**: `tests/vitest/webclip-service.test.ts`
+**测试文件**:
+- `tests/vitest/webclip-service.test.ts`
+- `tests/vitest/html-to-nodes.test.ts`
 
 **覆盖点**:
 
@@ -865,7 +867,7 @@ findTemplateAttrDef（5 cases）:
 8. 不存在的 tagDef 返回 undefined
 9. Source URL attrDef 的 fieldType = URL
 
-saveWebClip（8 cases，Loro 模型）:
+saveWebClip（10 cases，Loro 模型）:
 9. 在 CONTAINER_IDS.INBOX 创建节点（默认 parentId），验证 `loroDoc.getParentId(clipId)`
 10. 在自定义 parentId 下创建节点（非 INBOX）
 11. 自动打 `#web_clip` 标签（`node.tags.includes('tagDef_web_clip')`）
@@ -874,13 +876,40 @@ saveWebClip（8 cases，Loro 模型）:
 14. description 为空时不写入
 15. 首次剪藏时自动创建 tagDef（移走 tagDef_web_clip 后验证）
 16. 重复剪藏复用同一 tagDef（SCHEMA 中 web_clip tagDef 只有 1 个）
+17. pageText HTML 解析后创建 content 子节点树（heading 层级 + 段落）
+18. pageText 为空时不创建 content 子节点
 
-applyWebClipToNode（5 cases）:
-17. 就地改名为页面标题
-18. 就地打 `#web_clip` 标签
-19. 就地写入 Source URL 字段值
-20. 就地设置 description
-21. 不改变节点 parentId（留在原父节点）
+applyWebClipToNode（8 cases）:
+19. 就地改名为页面标题
+20. 就地打 `#web_clip` 标签
+21. 就地写入 Source URL 字段值
+22. 就地设置 description
+23. 不改变节点 parentId（留在原父节点）
+24. pageText HTML 解析后创建 content 子节点
+25. 已有子节点保留（新 content 追加在后）
+
+parseHtmlToNodes 纯函数（25 cases）:
+26. 空 HTML → 空结果
+27. 单段落 / 多段落
+28. bold / italic / link / code marks 保留
+29. h2 → section parent，后续 p 为 children
+30. h2 > h3 嵌套层级
+31. heading level reset（h2 → h3 → h2 回退）
+32. h1 跳过
+33. 扁平 list items / 嵌套 list 递归
+34. blockquote（纯文本 + 含 block children）
+35. pre > code block（code mark）
+36. figure/img/hr 跳过
+37. table rows → pipe-joined text
+38. div 透明容器
+39. maxNodes 截断（扁平 + 嵌套计数）
+40. 混合内容端到端
+
+createContentNodes Loro 物化（4 cases）:
+41. 扁平子节点创建
+42. 嵌套子节点层级
+43. marks 保留到 Loro richText
+44. 空 nodes 返回空 ids
 
 ### 1.41 URL/Email 字段值渲染
 
@@ -1111,7 +1140,7 @@ createSibling 自动标签（2 cases）:
 | 1.36 | Workspace Store 认证状态与持久化 | PASS/FAIL |
 | 1.37 | Slash Command 注册与导航 | PASS/FAIL |
 | 1.38 | Done State Mapping | PASS/FAIL |
-| 1.39 | Web Clip 落库服务 | PASS/FAIL |
+| 1.39 | Web Clip 落库服务 + 正文解析（html-to-nodes + webclip-service 集成） | PASS/FAIL |
 | 1.41 | URL/Email 字段值渲染 | PASS/FAIL |
 | 1.42 | Default Child Supertag (SYS_A14) | PASS/FAIL |
 | 1.43 | Floating Toolbar 循环渲染防回归 | PASS/FAIL |
@@ -1145,12 +1174,12 @@ createSibling 自动标签（2 cases）:
 ## Seed Data 速查
 
 ```
-总数: ~85 节点
+总数: ~90 节点
 
 Library:    proj_1, task_1~3, subtask_1a~1b, subtask_2a~2c,
             note_1, note_1a~1c, note_2, idea_1~2,
             note_rich, rich_1~5, rich_inline_ref
-Inbox:      inbox_1~3, inbox_3a~3b, webclip_1
+Inbox:      inbox_1~3, inbox_3a~3b, webclip_1 (+ wc1_section1~2, wc1_p1~3 正文子节点)
 Journal:    journal_1, j_1~3
 Containers: LIBRARY, INBOX, JOURNAL, SEARCHES, TRASH, SCHEMA（短格式，见 CONTAINER_IDS）
 Schema:     tagDef_task, tagDef_person, tagDef_dev_task, tagDef_web_clip

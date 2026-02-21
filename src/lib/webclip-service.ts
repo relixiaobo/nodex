@@ -7,6 +7,7 @@ import type { NodexNode } from '../types/index.js';
 import { SYS_D, CONTAINER_IDS } from '../types/index.js';
 import type { WebClipCapturePayload } from './webclip-messaging.js';
 import * as loroDoc from './loro-doc.js';
+import { parseHtmlToNodes, createContentNodes } from './html-to-nodes.js';
 
 // Re-export for convenience
 export type { WebClipCapturePayload };
@@ -102,6 +103,14 @@ export async function saveWebClip(
     store.updateNodeDescription(clipNode.id, payload.description);
   }
 
+  // 7. Parse and create content child nodes from page HTML
+  if (payload.pageText) {
+    const { nodes } = parseHtmlToNodes(payload.pageText, { maxNodes: 200 });
+    if (nodes.length > 0) {
+      createContentNodes(clipNode.id, nodes);
+    }
+  }
+
   return clipNode.id;
 }
 
@@ -139,5 +148,13 @@ export async function applyWebClipToNode(
   // 6. Set description if available
   if (payload.description) {
     store.updateNodeDescription(nodeId, payload.description);
+  }
+
+  // 7. Parse and create content child nodes from page HTML (appended after existing children)
+  if (payload.pageText) {
+    const { nodes } = parseHtmlToNodes(payload.pageText, { maxNodes: 200 });
+    if (nodes.length > 0) {
+      createContentNodes(nodeId, nodes);
+    }
   }
 }

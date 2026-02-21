@@ -201,6 +201,19 @@ function seedBody(): void {
     cn('webclip1_val_url', wcFeId, { name: 'https://medium.com/example-article' });
   }
 
+  // Web clip content child nodes (simulating parsed article body)
+  cn('wc1_section1', 'webclip_1', {
+    name: 'Introduction',
+    marks: [{ start: 0, end: 12, type: 'bold' as const }],
+  });
+  cn('wc1_p1', 'wc1_section1', { name: 'This article explores the fundamentals of web clipping and knowledge management.' });
+  cn('wc1_p2', 'wc1_section1', {
+    name: 'Key concepts include structured note-taking and semantic tagging.',
+    marks: [{ start: 22, end: 47, type: 'bold' as const }],
+  });
+  cn('wc1_section2', 'webclip_1', { name: 'Conclusion' });
+  cn('wc1_p3', 'wc1_section2', { name: 'Web clipping transforms passive reading into active knowledge building.' });
+
   // ═══════════════════════════════════════════════════════════════
   // Journal content
   // ═══════════════════════════════════════════════════════════════

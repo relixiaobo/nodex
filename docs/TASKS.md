@@ -51,6 +51,7 @@ _(空)_
 > - [2026-02-21 nodex-codex] 继续收口：主编辑写入停止 mirror `marks/inlineRefs` 到 legacy 节点字段（仅保留 `name` 镜像 + `richText` 真实源），并在 `setNodeRichTextContent` 统一刷新 `updatedAt`
 > - [2026-02-21 nodex-codex] 继续收口：`setNodeName/setNodeNameLocal/updateNodeContent` 停止实时写 `raw name`，编辑链路仅写 `richText`（`toNodexNode` 读路径不变，仍优先 `richText`）
 > - [2026-02-21 nodex-codex] 继续收口：`createChild` 对普通内容节点不再落 `raw name`，`startRefConversion` 去除 `raw name` 写入；workspace 容器初始化改为直接写 `richText`
+> - [2026-02-21 nodex-codex] 继续收口：编辑写路径（`setNodeName/setNodeContentLocal/updateNodeContent`）在写 `richText` 前主动清理 legacy `marks/inlineRefs` 字段，防止历史脏字段持续残留
 
 ### Refactor — Loro 收口 Phase 1：detached guard + origin 策略 (2026-02-21)
 > **Owner**: nodex-codex | **Branch**: codex/loro-phase1-guards

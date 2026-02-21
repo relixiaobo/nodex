@@ -54,6 +54,23 @@ describe('node-store content model actions', () => {
     expect(loroDoc.getNodeData('idea_1')?.name).toBe(rawBefore);
   });
 
+  it('setNodeName clears stale legacy marks/inlineRefs fields', () => {
+    useNodeStore.getState().updateNodeContent('idea_1', {
+      name: 'Hello \uFFFC',
+      marks: [{ start: 0, end: 5, type: 'bold' }],
+      inlineRefs: [{ offset: 6, targetNodeId: 'task_1' }],
+    });
+
+    loroDoc.setNodeData('idea_1', 'marks', [{ start: 0, end: 5, type: 'strike' }]);
+    loroDoc.setNodeData('idea_1', 'inlineRefs', [{ offset: 0, targetNodeId: 'task_2' }]);
+
+    useNodeStore.getState().setNodeName('idea_1', 'Renamed \uFFFC');
+
+    const raw = loroDoc.getNodeData('idea_1');
+    expect(raw?.marks).toBeUndefined();
+    expect(raw?.inlineRefs).toBeUndefined();
+  });
+
   it('updateNodeContent with empty marks clears marks', () => {
     useNodeStore.getState().updateNodeContent('idea_1', {
       name: 'Plain text',

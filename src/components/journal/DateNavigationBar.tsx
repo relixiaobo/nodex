@@ -1,16 +1,20 @@
 /**
  * Date navigation bar — shown below NodePanelHeader when viewing a day node.
  *
- * Layout: [<] [>]  Today  [Calendar icon for date picker]
+ * Layout: [<] [>]  Today  [Calendar icon → date picker popover]
  *
  * - < > buttons: navigate to previous/next day
  * - Today button: jump to today's day node
- * - Calendar icon: placeholder for future DatePicker integration
+ * - Calendar icon: opens a calendar popover for jumping to any date
  */
-import { useCallback, useState, useEffect, useRef } from 'react';
+import { useCallback, useState, useEffect, useRef, useMemo } from 'react';
 import { ChevronLeft, ChevronRight, Calendar } from '../../lib/icons.js';
 import { useUIStore } from '../../stores/ui-store';
-import { ensureTodayNode, getAdjacentDayNodeId } from '../../lib/journal.js';
+import { useNodeStore } from '../../stores/node-store';
+import { ensureTodayNode, ensureDateNode, getAdjacentDayNodeId } from '../../lib/journal.js';
+import { parseDayNodeName, parseYearNodeName } from '../../lib/date-utils.js';
+import * as loroDoc from '../../lib/loro-doc.js';
+import { CalendarGrid } from '../fields/DatePicker.js';
 
 interface DateNavigationBarProps {
   dayNodeId: string;
@@ -18,6 +22,35 @@ interface DateNavigationBarProps {
 
 export function DateNavigationBar({ dayNodeId }: DateNavigationBarProps) {
   const navigateTo = useUIStore((s) => s.navigateTo);
+
+  // Current day node's date info (for calendar selection + view)
+  const currentDateInfo = useNodeStore((s) => {
+    void s._version;
+    const node = s.getNode(dayNodeId);
+    if (!node?.name) return null;
+    const weekId = loroDoc.getParentId(dayNodeId);
+    if (!weekId) return null;
+    const yearId = loroDoc.getParentId(weekId);
+    if (!yearId) return null;
+    const yearNode = loroDoc.toNodexNode(yearId);
+    if (!yearNode?.name) return null;
+    const year = parseYearNodeName(yearNode.name);
+    if (year === null) return null;
+    const date = parseDayNodeName(node.name, year);
+    if (!date) return null;
+    return {
+      year: date.getFullYear(),
+      month: date.getMonth(),
+      dateStr: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`,
+    };
+  });
+
+  const todayStr = useMemo(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }, []);
+
+  // ── Day navigation ──
 
   const handlePrevDay = useCallback(() => {
     const prevId = getAdjacentDayNodeId(dayNodeId, -1);
@@ -32,6 +65,66 @@ export function DateNavigationBar({ dayNodeId }: DateNavigationBarProps) {
   const handleToday = useCallback(() => {
     const todayId = ensureTodayNode();
     navigateTo(todayId);
+  }, [navigateTo]);
+
+  // ── Calendar popover ──
+
+  const [calendarOpen, setCalendarOpen] = useState(false);
+  const [viewYear, setViewYear] = useState(() => currentDateInfo?.year ?? new Date().getFullYear());
+  const [viewMonth, setViewMonth] = useState(() => currentDateInfo?.month ?? new Date().getMonth());
+  const calendarRef = useRef<HTMLDivElement>(null);
+
+  // Close calendar when navigating to a different day
+  useEffect(() => {
+    setCalendarOpen(false);
+  }, [dayNodeId]);
+
+  // Reset calendar view to current day's month when opening
+  const handleToggleCalendar = useCallback(() => {
+    if (!calendarOpen) {
+      const now = new Date();
+      setViewYear(currentDateInfo?.year ?? now.getFullYear());
+      setViewMonth(currentDateInfo?.month ?? now.getMonth());
+    }
+    setCalendarOpen((v) => !v);
+  }, [calendarOpen, currentDateInfo]);
+
+  // Close on click outside
+  useEffect(() => {
+    if (!calendarOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (calendarRef.current && !calendarRef.current.contains(e.target as Node)) {
+        setCalendarOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [calendarOpen]);
+
+  // Close on Escape
+  useEffect(() => {
+    if (!calendarOpen) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setCalendarOpen(false);
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [calendarOpen]);
+
+  // Select a date from calendar → ensureDateNode → navigateTo
+  const handleCalendarSelect = useCallback((dateStr: string) => {
+    const [y, m, d] = dateStr.split('-').map(Number);
+    const date = new Date(y, m - 1, d);
+    const dayId = ensureDateNode(date);
+    navigateTo(dayId);
+    setCalendarOpen(false);
+  }, [navigateTo]);
+
+  // "Today" button inside calendar
+  const handleCalendarToday = useCallback(() => {
+    const todayId = ensureTodayNode();
+    navigateTo(todayId);
+    setCalendarOpen(false);
   }, [navigateTo]);
 
   return (
@@ -63,14 +156,37 @@ export function DateNavigationBar({ dayNodeId }: DateNavigationBarProps) {
         Today
       </button>
 
-      {/* Calendar icon (placeholder for future date picker) */}
-      <button
-        className="flex h-7 w-7 items-center justify-center rounded-md hover:bg-foreground/5 hover:text-foreground transition-colors"
-        title="Pick a date"
-        onClick={handleToday}
-      >
-        <Calendar size={14} />
-      </button>
+      {/* Calendar icon + popover */}
+      <div className="relative" ref={calendarRef}>
+        <button
+          onClick={handleToggleCalendar}
+          className={`flex h-7 w-7 items-center justify-center rounded-md transition-colors ${
+            calendarOpen
+              ? 'bg-foreground/10 text-foreground'
+              : 'hover:bg-foreground/5 hover:text-foreground'
+          }`}
+          title="Pick a date"
+        >
+          <Calendar size={14} />
+        </button>
+
+        {calendarOpen && (
+          <div
+            className="absolute left-0 top-full z-50 mt-1 min-w-[248px] max-w-[280px] rounded-lg border border-border bg-popover shadow-lg p-3"
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <CalendarGrid
+              viewYear={viewYear}
+              viewMonth={viewMonth}
+              onViewChange={(y, m) => { setViewYear(y); setViewMonth(m); }}
+              selectedDate={currentDateInfo?.dateStr ?? todayStr}
+              onSelectDate={handleCalendarSelect}
+              today={todayStr}
+              onToday={handleCalendarToday}
+            />
+          </div>
+        )}
+      </div>
     </div>
   );
 }

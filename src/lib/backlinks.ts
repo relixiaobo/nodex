@@ -53,6 +53,11 @@ function isInTrash(nodeId: string): boolean {
   return false;
 }
 
+// ─── Count map cache (invalidated by _version from node-store) ───
+
+let _countMapCacheVer = -1;
+let _countMapCache: Map<string, number> | null = null;
+
 // ─── Core ───
 
 /**
@@ -78,6 +83,8 @@ export function computeBacklinks(targetNodeId: string): BacklinksResult {
       const contextId = loroDoc.getParentId(id);
       if (!contextId) continue;
       const contextNode = loroDoc.toNodexNode(contextId);
+      // Skip if parent is a fieldEntry — handled by field value check (#3) below
+      if (contextNode?.type === 'fieldEntry') continue;
       const { ancestors } = getAncestorChain(contextId);
       mentionedIn.push({
         referencingNodeId: contextId,
@@ -160,20 +167,17 @@ export function computeBacklinks(targetNodeId: string): BacklinksResult {
  * Build a map of targetNodeId → backlink count for ALL referenced nodes.
  *
  * Single-pass scan: O(N) where N = total nodes. Each OutlinerItem reads O(1).
+ * Cached by version — repeated calls within the same _version return O(1).
  */
-export function buildBacklinkCountMap(): Map<string, number> {
+export function buildBacklinkCountMap(version: number): Map<string, number> {
+  if (version === _countMapCacheVer && _countMapCache) return _countMapCache;
+
   const counts = new Map<string, number>();
   const allIds = loroDoc.getAllNodeIds();
 
   for (const id of allIds) {
     const node = loroDoc.toNodexNode(id);
     if (!node) continue;
-
-    // Skip nodes in trash
-    // (We do a lightweight parent check — only first parent, for perf.
-    //  Full isInTrash walk is too expensive for count map.)
-    // Actually, for correctness we need full trash check.
-    // But for performance, we cache the trash children set.
 
     // Tree reference
     if (node.type === 'reference' && node.targetId) {
@@ -196,7 +200,6 @@ export function buildBacklinkCountMap(): Map<string, number> {
       if (!isInTrash(id)) {
         for (const childId of node.children) {
           const child = loroDoc.toNodexNode(childId);
-          // Value nodes in options fields have targetId set (without type='reference')
           if (child?.targetId) {
             counts.set(child.targetId, (counts.get(child.targetId) ?? 0) + 1);
           }
@@ -205,5 +208,7 @@ export function buildBacklinkCountMap(): Map<string, number> {
     }
   }
 
+  _countMapCacheVer = version;
+  _countMapCache = counts;
   return counts;
 }

@@ -139,24 +139,27 @@ describe('computeBacklinks', () => {
 });
 
 describe('buildBacklinkCountMap', () => {
+  let ver: number;
+
   beforeEach(() => {
     resetAndSeed();
+    ver = 0;
   });
 
   it('returns counts for referenced nodes', () => {
     // Seed has rich_inline_ref → task_1 inline reference
-    const map = buildBacklinkCountMap();
+    const map = buildBacklinkCountMap(ver++);
     expect(map.get('task_1')).toBeGreaterThanOrEqual(1);
   });
 
   it('tree reference increments count', () => {
-    const before = buildBacklinkCountMap();
+    const before = buildBacklinkCountMap(ver++);
     const countBefore = before.get('task_3') ?? 0;
 
     useNodeStore.getState().addReference('proj_1', 'task_3');
     loroDoc.commitDoc();
 
-    const after = buildBacklinkCountMap();
+    const after = buildBacklinkCountMap(ver++);
     expect(after.get('task_3')).toBe(countBefore + 1);
   });
 
@@ -166,14 +169,14 @@ describe('buildBacklinkCountMap', () => {
     store.addReference(node.id, 'task_3');
     loroDoc.commitDoc();
 
-    const before = buildBacklinkCountMap();
+    const before = buildBacklinkCountMap(ver++);
     const countBefore = before.get('task_3') ?? 0;
     expect(countBefore).toBeGreaterThanOrEqual(1);
 
     store.trashNode(node.id);
     loroDoc.commitDoc();
 
-    const after = buildBacklinkCountMap();
+    const after = buildBacklinkCountMap(ver++);
     expect(after.get('task_3') ?? 0).toBe(countBefore - 1);
   });
 });

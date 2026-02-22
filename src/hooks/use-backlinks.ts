@@ -38,35 +38,11 @@ export function useBacklinks(nodeId: string): BacklinksResult {
 /**
  * Subscribe to the backlink count for a single node.
  * Returns a primitive number — only re-renders when this node's count changes.
- * Uses the global count map internally (computed once per _version).
+ * Uses the cached global count map (computed once per _version).
  */
 export function useBacklinkCount(nodeId: string): number {
   return useNodeStore((state) => {
-    void state._version;
-    const map = buildBacklinkCountMap();
+    const map = buildBacklinkCountMap(state._version);
     return map.get(nodeId) ?? 0;
   });
-}
-
-// ─── useBacklinkCountMap (all nodes) ───
-
-const EMPTY_MAP_JSON = '{}';
-
-/**
- * Subscribe to the global backlink count map.
- * Returns a Record<nodeId, count> for all referenced nodes.
- * Each OutlinerItem reads O(1) from this map.
- */
-export function useBacklinkCountMap(): Record<string, number> {
-  const json = useNodeStore((state) => {
-    void state._version;
-    const map = buildBacklinkCountMap();
-    if (map.size === 0) return EMPTY_MAP_JSON;
-    return JSON.stringify(Object.fromEntries(map));
-  });
-
-  return useMemo(
-    () => (json === EMPTY_MAP_JSON ? {} : JSON.parse(json) as Record<string, number>),
-    [json],
-  );
 }

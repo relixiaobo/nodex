@@ -786,7 +786,8 @@ export interface CalendarGridProps {
   endDate?: string;
   onSelectDate: (dateStr: string) => void;
   today: string;
-  onToday: () => void;
+  /** If provided, shows a "Today" button in the header. Omit to hide. */
+  onToday?: () => void;
   rangeStart?: string;
   rangeEnd?: string;
   hoveredDate?: string;
@@ -872,12 +873,14 @@ export function CalendarGrid({
           {MONTH_NAMES[viewMonth]} {viewYear}
         </span>
         <div className="flex items-center gap-1">
-          <button
-            className="rounded-md px-1.5 h-7 text-xs text-foreground-secondary hover:bg-foreground/5 transition-colors cursor-pointer"
-            onClick={onToday}
-          >
-            Today
-          </button>
+          {onToday && (
+            <button
+              className="rounded-md px-1.5 h-7 text-xs text-foreground-secondary hover:bg-foreground/5 transition-colors cursor-pointer"
+              onClick={onToday}
+            >
+              Today
+            </button>
+          )}
           <button className="text-foreground-tertiary hover:text-foreground-secondary transition-colors w-7 h-7 flex items-center justify-center rounded-md cursor-pointer" onClick={prevMonth}>
             <ChevronLeft size={16} />
           </button>
@@ -893,7 +896,7 @@ export function CalendarGrid({
         {DAY_HEADERS.map((d, i) => (
           <div
             key={`h${i}`}
-            className={`aspect-square flex items-center justify-center text-xs ${
+            className={`aspect-square flex items-center justify-center text-xs font-medium ${
               i === 0 || i === 6 ? 'text-destructive/40' : 'text-foreground-tertiary'
             }`}
           >

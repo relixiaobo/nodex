@@ -29,13 +29,22 @@ _(空)_
 |-------|---------|------|-------------|
 | nodex-cc | _(idle)_ | — | — |
 | nodex-cc-2 | _(idle)_ | — | — |
-| nodex-codex | _(idle)_ | — | — |
+| nodex-codex | Sync Phase 0 实现多角度 Review | `codex/sync-phase0-impl-review` | `docs/TASKS.md` |
 
 ---
 
 ## 进行中
 
-_(空)_
+### Sync Phase 0 实现多角度 Review（基于 main）
+> 从正确性/边界条件/并发与同步语义/持久化兼容性/测试覆盖等角度复审 Phase 0（含 Step 1 方案与 Step 2 客户端 Sync-Ready 实施）。
+> **Owner**: nodex-codex | **Branch**: `codex/sync-phase0-impl-review` | **Files**: `docs/TASKS.md`
+
+- [ ] 阅读实现与相关测试（Sync Phase 0）
+- [ ] 从多个角度输出 review findings（含文件/行号）
+- [ ] 如有必要补充复现步骤或风险说明
+
+**迭代日志**
+- [2026-02-22 nodex-codex] 领取任务，准备基于 `origin/main` 新建 review 分支并开始多角度复审 Sync Phase 0 实现。
 
 ---
 

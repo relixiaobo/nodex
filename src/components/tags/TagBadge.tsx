@@ -13,7 +13,15 @@ interface TagBadgeProps {
   onNavigate?: () => void;
 }
 
+export function canNavigateToTagNode(hasBackingNode: boolean): boolean {
+  return hasBackingNode;
+}
+
 export function TagBadge({ tagDefId, onRemove, onNavigate }: TagBadgeProps) {
+  const hasBackingNode = useNodeStore((s) => {
+    void s._version;
+    return !!s.getNode(tagDefId);
+  });
   const tagName = useNodeStore((s) => {
     void s._version;
     const node = s.getNode(tagDefId);
@@ -24,6 +32,7 @@ export function TagBadge({ tagDefId, onRemove, onNavigate }: TagBadgeProps) {
   });
   const isTrashed = useNodeStore((s) => { void s._version; return loroDoc.getParentId(tagDefId) === CONTAINER_IDS.TRASH; });
   const color = useNodeStore((s) => { void s._version; return resolveTagColor(tagDefId); });
+  const canNavigate = !!onNavigate && canNavigateToTagNode(hasBackingNode);
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -65,10 +74,11 @@ export function TagBadge({ tagDefId, onRemove, onNavigate }: TagBadgeProps) {
 
   const handleNameClick = useCallback(
     (e: React.MouseEvent) => {
+      if (!canNavigate) return;
       e.stopPropagation();
       onNavigate?.();
     },
-    [onNavigate],
+    [canNavigate, onNavigate],
   );
 
   // Trashed tagDef: show warning style instead of normal badge
@@ -114,8 +124,10 @@ export function TagBadge({ tagDefId, onRemove, onNavigate }: TagBadgeProps) {
         </span>
         {/* Tag name area: colored bg always, rounded-r by default → rounded on hover */}
         <span
-          className="px-1.5 rounded-r bg-[var(--tag-bg)] transition-all group-hover/tag:rounded hover:bg-black/[0.06] cursor-pointer"
-          onClick={onNavigate ? handleNameClick : undefined}
+          className={`px-1.5 rounded-r bg-[var(--tag-bg)] transition-all group-hover/tag:rounded ${
+            canNavigate ? 'hover:bg-black/[0.06] cursor-pointer' : 'cursor-default'
+          }`}
+          onClick={canNavigate ? handleNameClick : undefined}
         >
           {tagName}
         </span>
@@ -134,10 +146,12 @@ export function TagBadge({ tagDefId, onRemove, onNavigate }: TagBadgeProps) {
               // TODO: navigate to "Everything tagged #tagName"
               setMenu(null);
             }}
-            onConfigure={() => {
-              onNavigate?.();
-              setMenu(null);
-            }}
+            onConfigure={canNavigate
+              ? () => {
+                onNavigate?.();
+                setMenu(null);
+              }
+              : undefined}
           />,
           document.body,
         )}
@@ -153,7 +167,7 @@ interface TagContextMenuProps {
   tagName: string;
   onRemove?: () => void;
   onSearch: () => void;
-  onConfigure: () => void;
+  onConfigure?: () => void;
 }
 
 const TagContextMenu = forwardRef<HTMLDivElement, TagContextMenuProps>(
@@ -180,7 +194,7 @@ const TagContextMenu = forwardRef<HTMLDivElement, TagContextMenuProps>(
           <Hash size={14} className="text-muted-foreground" />
           Everything tagged #{tagName}
         </button>
-        {onRemove && (
+        {onRemove && onConfigure && (
           <>
             <div className="my-1 h-px bg-border" />
             <button

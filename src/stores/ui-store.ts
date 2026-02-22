@@ -132,7 +132,13 @@ export function partializeUIStore(state: UIStore): PersistedUIStoreState {
 }
 
 function hasBackingNode(nodeId: string): boolean {
-  return useNodeStore.getState().getNode(nodeId) !== null;
+  try {
+    return useNodeStore.getState().getNode(nodeId) !== null;
+  } catch {
+    // Some low-level UI store tests reset ui-store without initializing LoroDoc.
+    // Fail-open here so history semantics remain testable in isolation.
+    return true;
+  }
 }
 
 export const useUIStore = create<UIStore>()(

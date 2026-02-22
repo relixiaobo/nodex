@@ -49,6 +49,7 @@ _(空)_
 - [2026-02-22 nodex-codex] 追加排查 `#day` 空白页：`TagBadge` 对系统标签 `sys:day` 仅做显示名兜底，但仍允许 `navigateTo(tagId)`，导致打开无 backing node 的空白 Panel；计划改为禁用无 backing node 标签导航。
 - [2026-02-22 nodex-codex] 已实现 `TagBadge` 导航守卫：仅当标签有 backing node 时允许点击进入 panel，并隐藏无 backing node 标签的 Configure 菜单项；新增 Vitest 覆盖 `canNavigateToTagNode()`。
 - [2026-02-22 nodex-codex] 统一收口类似问题：在 `ui-store.navigateTo/replacePanel` 增加 backing node 校验（无效 ID no-op），并在 `NodePanel` 增加 missing-node 兜底视图，避免历史中的旧无效 ID 导致空白页；补 `ui-store.test.ts` 回归用例。
+- [2026-02-22 nodex-codex] 根据 PR #81 review 修复：`hasBackingNode()` 对未初始化 LoroDoc 场景改为 fail-open（避免 `ui-store-history-guards` 测试抛错），并修正 `docs/TESTING.md` 重复编号。
 
 ---
 

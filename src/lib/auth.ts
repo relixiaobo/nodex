@@ -42,16 +42,33 @@ export async function signInWithGoogle(): Promise<AuthUser> {
   const apiUrl = getSyncApiUrl();
   const extensionRedirect = `${apiUrl}/auth/extension-redirect`;
 
-  // Build Better Auth sign-in URL
-  // After OAuth completes, Better Auth redirects to callbackURL (our extension-redirect endpoint)
-  const signInUrl = new URL(`${apiUrl}/api/auth/sign-in/social`);
-  signInUrl.searchParams.set('provider', 'google');
-  signInUrl.searchParams.set('callbackURL', extensionRedirect);
+  // Step 1: POST to Better Auth to get the Google OAuth URL
+  // (Better Auth stores PKCE state in DB and returns the Google redirect URL)
+  const signInRes = await fetch(`${apiUrl}/api/auth/sign-in/social`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      provider: 'google',
+      callbackURL: extensionRedirect,
+    }),
+  });
 
-  // Launch Chrome identity web auth flow (opens a Google popup)
+  if (!signInRes.ok) {
+    throw new Error(`Failed to initiate sign-in: ${signInRes.status}`);
+  }
+
+  const signInData = await signInRes.json() as { url?: string; redirect?: boolean };
+  if (!signInData.url) {
+    throw new Error('No redirect URL returned from sign-in endpoint');
+  }
+
+  // Step 2: Open the Google OAuth URL via chrome.identity.launchWebAuthFlow
+  // Google login → callback to Worker → Worker creates session + sets cookie →
+  // Worker redirects to /auth/extension-redirect → reads cookie → redirects to
+  // https://{ext-id}.chromiumapp.org/?session_token=TOKEN
   const callbackUrl = await new Promise<string>((resolve, reject) => {
     chrome.identity.launchWebAuthFlow(
-      { url: signInUrl.toString(), interactive: true },
+      { url: signInData.url!, interactive: true },
       (responseUrl) => {
         if (chrome.runtime.lastError) {
           reject(new Error(chrome.runtime.lastError.message));

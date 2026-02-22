@@ -463,35 +463,39 @@ LoroDoc
   └── On open → HTTP pull → doc.import()
 
 服务端:
-  对象存储: /{wsId}/updates/{seq}.bin (append-only)
+  对象存储: /{wsId}/updates/{hash}.bin (bytes by SHA-256)
   对象存储: /{wsId}/snapshot.bin (定期 compaction)
-  Postgres: sync_cursors (workspace_id, device_id, last_seq)
+  Postgres: sync_workspaces + sync_devices + sync_updates
 ```
 
 **同步协议（HTTP 包装 Loro 二进制 updates；实时阶段再复用 `loro-protocol` WebSocket 线协议）**：
 
 ```
 POST /sync/push
-  Body: { workspaceId, updates, clientVV }   // updates/clientVV 为二进制字段（非原生 JSON）
-  → 服务端存 update，更新 cursor
-  ← { serverVV, ack: true }
+  Body: { workspaceId, deviceId, updates, updateHash, clientVV }
+  → 查重（workspaceId + updateHash）→ R2 存 bytes → DB 事务分配 seq 并写 `sync_updates`
+  ← { seq, deduped, serverVV }
 
 POST /sync/pull
-  Body: { workspaceId, clientVV }            // clientVV 为二进制字段
-  ← { updates, serverVV }                    // updates/serverVV 为二进制字段
+  Body: { workspaceId, deviceId, lastSeq }   // lastSeq = 扫描进度 cursor
+  ← { type, updates, latestSeq, nextCursorSeq, hasMore, ...snapshotFields }
   → 客户端 doc.import() 每个 update
 ```
 
 **传输格式约束（必须明确）**：
-- 上述 `Uint8Array` 为逻辑字段类型，HTTP 实现不能直接塞 JSON；需选定一种编码：
-  - `application/octet-stream`（推荐，二进制 envelope/帧）
-  - JSON + Base64（实现简单，但体积膨胀约 33%）
-- Phase 2 先定一种并写入协议文档（字段名、编码、压缩、最大 payload）
+- Phase 2 v1 已定：**JSON + Base64**
+- 原因：实现简单、调试友好；个人同步场景下体积膨胀可接受
+- 后续可升级为 `application/octet-stream`（二进制 envelope/帧）
 
 **幂等保证**：
-- 每个 update 附带 `client_update_hash`（SHA-256），服务端去重
-- `seq` 单调递增，客户端通过 `last_seq` cursor 拉取
+- 每个 update 附带 `updateHash`（SHA-256），服务端按 `(workspace_id, update_hash)` 去重
+- `seq` 单调递增；客户端通过 `lastSeq`/`nextCursorSeq`（扫描进度 cursor）拉取
 - 断网重试安全（同一 update 多次上传 = 幂等）
+
+**v1 额外约束（实施计划 review 后定案）**：
+- echo 过滤基于 `sync_updates.device_id`（不依赖 R2 object metadata）
+- `nextCursorSeq` 可能大于本页返回 updates 的最大 seq（因为 echo 过滤），客户端必须用 `nextCursorSeq` 推进 cursor
+- v1 客户端 push 不合并 pending updates，按队列逐条 push（先求正确性）
 
 **Compaction 策略**：
 - 当 update log 超过 N 条（如 1000）或总大小超过 M MB
@@ -564,7 +568,7 @@ Side Panel closed:
 | Supabase Auth (Google OAuth) | **保留** | JWT 可移植，不绑定 sync 层 |
 | Supabase Postgres | **保留，用于元数据** | workspace 成员、sync cursors、权限、billing |
 | `nodes` 表 (5 个 migration) | **冻结，不继续开发** | 为行级同步设计，CRDT sync 不需要。未来可降级为搜索索引 |
-| RLS 策略 | **保留** | workspace 级别权限模型可复用 |
+| RLS 策略 | **保留（但不作为 Worker 主鉴权）** | workspace 级别权限模型可复用；Worker + Hyperdrive 直连 Postgres 仍以应用层鉴权为准 |
 | Realtime publication | **暂不使用** | 行级变更流不适合 CRDT sync；Phase 3 评估是否用于 presence 通知 |
 
 ---
@@ -575,11 +579,13 @@ Side Panel closed:
 
 | 风险 | 缓解措施 |
 |------|---------|
-| 幂等与重复上传（断网重试） | `client_update_hash` 去重 |
+| 幂等与重复上传（断网重试） | `updateHash` 去重（`UNIQUE (workspace_id, update_hash)`） |
 | snapshot 与 update 边界错位 | `seq/cursor` 单调递增 + `snapshot.covers_seq` |
 | 本地 pending queue 损坏 | pending queue 持久化到 IndexedDB + 启动重放 |
 | Auth 过期误以为数据丢失 | 明确 UI 状态区分"认证过期"vs"数据丢失" |
 | 对象存储与 Postgres 部分写入成功 | 先写对象存储 → 成功后更新 Postgres |
+| echo 过滤导致 cursor 停滞 | Pull 响应返回 `nextCursorSeq`（扫描进度），客户端按该值推进 |
+| Worker 直连 Postgres 时误信 RLS | Worker 应用层鉴权为主；RLS 仅作兜底 |
 | 可观测性不足 | 最小同步埋点（push/pull/apply/cursor mismatch） |
 
 ### Phase 2+ (成长期)

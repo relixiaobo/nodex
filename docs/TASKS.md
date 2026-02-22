@@ -47,6 +47,7 @@ _(空)_
 - [2026-02-22 nodex-codex] 领取任务，基于 `origin/main` 新建 `codex/sync-incremental-plan-review`，准备 review Sync 增量同步实施计划。
 - [2026-02-22 nodex-codex] 完成计划 review，输出关键风险：seq 分配与 R2 写入顺序导致 hole、echo 过滤与 cursor 前进语义冲突、`lastSeq` 与本地文档状态非原子持久化、push 幂等/去重元数据未落到 schema。
 - [2026-02-22 nodex-codex] 根据 review findings 回写实施计划：补 `sync_updates` 元数据表、明确 cursor 语义与 checkpoint 持久化、统一 v1 push 策略（先不合并）。
+- [2026-02-22 nodex-codex] 同步更新 `sync-architecture.md` 的 Phase 2 摘要与风险项，避免与实施计划在协议字段/幂等/cursor 语义上漂移。
 
 ---
 

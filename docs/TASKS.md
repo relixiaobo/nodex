@@ -35,19 +35,16 @@ _(空)_
 
 ## 进行中
 
-### References 增强 (#19)
+### References 增强 (#19) — 反向链接 + 引用计数 ✅ PR #76
 > **Owner**: nodex-cc-2 | **Branch**: cc2/references | **Spec**: `docs/features/references.md`
-> **目标**: 反向链接 section、引用计数 badge、合并节点
-> **第一步**: 研究 Tana 反向链接 UI 交互，沉淀到 docs/research/ 或更新 docs/features/references.md
 
 - [x] **研究**: Tana 反向链接 UI 交互 → `docs/research/tana-backlinks-ui.md`
 - [x] 反向链接 section（BacklinksSection + computeBacklinks + 11 Vitest 用例）
 - [x] 引用计数 badge（useBacklinkCount + OutlinerItem 行右侧半透明数字）
-- [ ] 合并节点（选中重复节点 → 合并 children/tags，更新所有引用）
 
 迭代日志：
 - [2026-02-22 nodex-cc-2] 接手任务，创建分支 cc2/references，开始 Tana 反向链接 UI 研究
-- [2026-02-22 nodex-cc-2] 实现 backlinks: src/lib/backlinks.ts (computeBacklinks + buildBacklinkCountMap), src/hooks/use-backlinks.ts (useBacklinks + useBacklinkCount), src/components/panel/BacklinksSection.tsx, NodePanel 集成, OutlinerItem 引用计数 badge, 11 Vitest tests 全通过
+- [2026-02-22 nodex-cc-2] 实现 backlinks 全部完成，PR #76 Ready for review
 
 ---
 
@@ -77,14 +74,12 @@ _(空)_
 
 ### P2
 
-#### References 增强 (#19)
-> MVP 已完成（@触发搜索、树引用+内联引用、引用 bullet、删除引用）
-> **Owner**: nodex-cc-2
+#### References 增强 (#19) — ✅ 反向链接 + 引用计数已完成 (PR #76)
+> MVP + 反向链接已完成
 
 - [x] **研究**: Tana 反向链接 UI 交互 → `docs/research/tana-backlinks-ui.md`
 - [x] 反向链接 section（BacklinksSection 组件）
 - [x] 引用计数 badge（OutlinerItem 行右侧）
-- [ ] 合并节点（选中重复节点 → 合并 children/tags，更新所有引用）
 - **Spec**: `docs/features/references.md`
 
 #### Supertags 完善 (#20)
@@ -162,6 +157,13 @@ _(空)_
 - **Spec**: `docs/features/node-selection.md`
 
 ### P3
+
+#### 合并节点（Merge Nodes）
+> 从 References 增强 (#19) 拆出的独立任务
+
+- [ ] 选中多个重复节点 → 合并为一个（保留第一个，合并 children/tags）
+- [ ] 所有引用（树引用 + 内联引用 + 字段值引用）更新为指向合并后的节点
+- **Spec**: `docs/features/references.md`
 
 #### Search Nodes / Live Queries (#23)
 > 执行顺序 ②（搜索条件 = Tuple 树，依赖 #22 的日期节点做日期操作符）

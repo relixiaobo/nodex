@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent } from 'react';
 import type { EditorView } from 'prosemirror-view';
 import { useNode } from '../../hooks/use-node';
 import { useChildren } from '../../hooks/use-children';
@@ -8,6 +8,7 @@ import { useNodeStore } from '../../stores/node-store';
 import { useUIStore } from '../../stores/ui-store';
 import * as loroDoc from '../../lib/loro-doc.js';
 import { CONTAINER_IDS } from '../../types/index.js';
+import type { NodeType } from '../../types/index.js';
 import { BulletChevron, ChevronButton } from './BulletChevron';
 import { RichTextEditor, type EditorContentPayload, type TriggerAnchorRect } from '../editor/RichTextEditor';
 import { SlashCommandMenu } from '../editor/SlashCommandMenu';
@@ -20,7 +21,7 @@ import { FIELD_OVERLAY_Z_INDEX } from '../fields/field-layout.js';
 import { toFieldRowEntryProps } from '../fields/field-row-props.js';
 import { SYS_V } from '../../types/index.js';
 import { useFieldOptions } from '../../hooks/use-field-options.js';
-import { resolveTagColor } from '../../lib/tag-colors.js';
+import { resolveInlineReferenceTextColor, resolveTagColor } from '../../lib/tag-colors.js';
 import {
   isCheckboxFieldType,
   isOptionsFieldType,
@@ -47,6 +48,7 @@ import { resolveDropHoverPosition } from '../../lib/drag-drop-position';
 import { resolveDropMove } from '../../lib/drag-drop';
 import { resolveSelectedReferenceShortcut } from '../../lib/selected-reference-shortcuts';
 import { resolveSelectionKeyboardAction } from '../../lib/selection-keyboard';
+import { resolveRowPointerSelectAction } from '../../lib/row-pointer-selection';
 import {
   toggleNodeInSelection,
   computeRangeSelection,
@@ -73,6 +75,7 @@ import {
   toggleHeadingMark,
 } from '../../lib/pm-editor-view.js';
 import { dragState } from '../../hooks/use-drag-select';
+import { mergeRichTextPayload } from '../../lib/rich-text-merge.js';
 
 const DESCRIPTION_SHORTCUT_KEYS = getShortcutKeys('editor.edit_description', ['Ctrl-i']);
 
@@ -112,6 +115,117 @@ function focusTrailingInputForParent(parentId: string): boolean {
     return true;
   }
   return false;
+}
+
+export interface OutlinerVisibleChild {
+  id: string;
+  type: 'field' | 'content';
+  hidden?: boolean;
+}
+
+export function isHiddenFieldRow(hideMode: string | undefined, isEmpty: boolean | undefined): boolean {
+  switch (hideMode) {
+    case SYS_V.ALWAYS:
+      return true;
+    case SYS_V.WHEN_EMPTY:
+      return !!isEmpty;
+    case SYS_V.WHEN_NOT_EMPTY:
+      return !isEmpty;
+    default:
+      return false;
+  }
+}
+
+export function buildFieldOwnerColors(
+  fieldMap: Map<string, Pick<FieldEntry, 'fieldDefId' | 'templateId'>>,
+  getFieldDefOwnerId: (fieldDefId: string) => string | null,
+  getNodeType: (nodeId: string) => string | undefined,
+  resolveOwnerColor: (ownerTagDefId: string) => string,
+): Map<string, string> {
+  const result = new Map<string, string>();
+  for (const [entryId, entry] of fieldMap) {
+    const ownerLookupIds = [entry.fieldDefId];
+    if (entry.templateId && entry.templateId !== entry.fieldDefId) {
+      ownerLookupIds.unshift(entry.templateId);
+    }
+    let ownerTagDefId: string | null = null;
+    for (const lookupId of ownerLookupIds) {
+      const ownerId = getFieldDefOwnerId(lookupId);
+      if (!ownerId) continue;
+      if (getNodeType(ownerId) !== 'tagDef') continue;
+      ownerTagDefId = ownerId;
+      break;
+    }
+    if (!ownerTagDefId) continue;
+    result.set(entryId, resolveOwnerColor(ownerTagDefId));
+  }
+  return result;
+}
+
+export function buildVisibleChildrenRows(params: {
+  allChildIds: string[];
+  fieldMap: Map<string, Pick<FieldEntry, 'fieldDefId' | 'templateId' | 'hideMode' | 'isEmpty'>>;
+  tagIds: string[];
+  getFieldDefOwnerId: (fieldDefId: string) => string | null;
+  getNodeType: (nodeId: string) => string | undefined;
+  getChildNodeType: (childId: string) => NodeType | undefined;
+  isOutlinerContentType: (nodeType: NodeType | undefined) => boolean;
+}): OutlinerVisibleChild[] {
+  const {
+    allChildIds,
+    fieldMap,
+    tagIds,
+    getFieldDefOwnerId,
+    getNodeType,
+    getChildNodeType,
+    isOutlinerContentType,
+  } = params;
+
+  const tagIdSet = new Set(tagIds);
+  const templateFieldsByTagDef = new Map<string, OutlinerVisibleChild[]>();
+  const remainingItems: OutlinerVisibleChild[] = [];
+
+  for (const cid of allChildIds) {
+    const fieldEntry = fieldMap.get(cid);
+    if (fieldEntry) {
+      const child: OutlinerVisibleChild = {
+        id: cid,
+        type: 'field',
+        hidden: isHiddenFieldRow(fieldEntry.hideMode, fieldEntry.isEmpty),
+      };
+      const ownerTagDefId = fieldEntry.templateId
+        ? getFieldDefOwnerId(fieldEntry.templateId)
+        : getFieldDefOwnerId(fieldEntry.fieldDefId);
+      const isTemplateField = !!fieldEntry.templateId
+        && ownerTagDefId !== null
+        && getNodeType(ownerTagDefId) === 'tagDef'
+        && tagIdSet.has(ownerTagDefId);
+      if (isTemplateField && ownerTagDefId) {
+        let bucket = templateFieldsByTagDef.get(ownerTagDefId);
+        if (!bucket) {
+          bucket = [];
+          templateFieldsByTagDef.set(ownerTagDefId, bucket);
+        }
+        bucket.push(child);
+      } else {
+        remainingItems.push(child);
+      }
+      continue;
+    }
+
+    const childType = getChildNodeType(cid);
+    if (isOutlinerContentType(childType)) {
+      remainingItems.push({ id: cid, type: 'content' });
+    }
+  }
+
+  const result: OutlinerVisibleChild[] = [];
+  for (const tagId of tagIds) {
+    const bucket = templateFieldsByTagDef.get(tagId);
+    if (bucket) result.push(...bucket);
+  }
+  result.push(...remainingItems);
+  return result;
 }
 
 export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId, fieldDataType, attrDefId, onNavigateOut, bulletColors }: OutlinerItemProps) {
@@ -166,7 +280,9 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   const contentAreaRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<EditorView | null>(null);
   const blurClearRafRef = useRef<number | null>(null);
+  const deleteBlockedPulseTimeoutRef = useRef<number | null>(null);
   const wasFocusedRef = useRef(false);
+  const [deleteBlockedPulse, setDeleteBlockedPulse] = useState(false);
 
   // # trigger state
   const [hashTagOpen, setHashTagOpen] = useState(false);
@@ -263,64 +379,32 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     return m;
   }, [fields]);
 
-  // Owning tagDef color per fieldEntry — for coloring FieldRow icons
-  const fieldOwnerColors = useMemo(() => {
-    const m = new Map<string, string>();
-    for (const [entryId, entry] of fieldMap) {
-      const ownerTagDefId = loroDoc.getParentId(entry.fieldDefId);
-      if (ownerTagDefId) m.set(entryId, resolveTagColor(ownerTagDefId).text);
-    }
-    return m;
-  }, [fieldMap]);
+  // Owning tagDef color per fieldEntry — for coloring FieldRow icons.
+  // Only tagDef-owned template fields get tint colors. Schema/manual fields stay neutral.
+  const fieldOwnerColors = useMemo(() => (
+    buildFieldOwnerColors(
+      fieldMap,
+      (fieldDefId) => loroDoc.getParentId(fieldDefId),
+      (ownerId) => useNodeStore.getState().getNode(ownerId)?.type,
+      (ownerId) => resolveTagColor(ownerId).text,
+    )
+  ), [fieldMap]);
 
-  // Classify children and reorder: fields grouped by supertag (in tagIds order) → content.
-  // This ensures supertag-injected fields always appear before the node's own content children.
-  const visibleChildren = useMemo(() => {
-    type Child = { id: string; type: 'field' | 'content'; hidden?: boolean };
-
-    const tagIdSet = new Set(tagIds);
-    const fieldsByTagDef = new Map<string, Child[]>();
-    const otherFields: Child[] = [];   // fields whose ownerTagDef isn't in tagIds (rare)
-    const contentItems: Child[] = [];
-
-    for (const cid of allChildIds) {
-      if (fieldMap.has(cid)) {
-        const f = fieldMap.get(cid)!;
-        // Evaluate hide-field condition
-        let hidden = false;
-        switch (f.hideMode) {
-          case SYS_V.ALWAYS: hidden = true; break;
-          case SYS_V.WHEN_EMPTY: hidden = !!f.isEmpty; break;
-          case SYS_V.WHEN_NOT_EMPTY: hidden = !f.isEmpty; break;
-          // NEVER: default, not hidden
-        }
-        const child: Child = { id: cid, type: 'field', hidden };
-        const ownerTagDefId = loroDoc.getParentId(f.fieldDefId);
-        if (ownerTagDefId && tagIdSet.has(ownerTagDefId)) {
-          let bucket = fieldsByTagDef.get(ownerTagDefId);
-          if (!bucket) { bucket = []; fieldsByTagDef.set(ownerTagDefId, bucket); }
-          bucket.push(child);
-        } else {
-          otherFields.push(child);
-        }
-      } else {
-        const dt = useNodeStore.getState().getNode(cid)?.type;
-        if (isOutlinerContentNodeType(dt)) contentItems.push({ id: cid, type: 'content' });
-        // else skip: structural nodes (fieldEntry, fieldDef, etc.)
-      }
-    }
-
-    // Emit fields in supertag order, then any unmatched fields, then content
-    const result: Child[] = [];
-    for (const tagId of tagIds) {
-      const bucket = fieldsByTagDef.get(tagId);
-      if (bucket) result.push(...bucket);
-    }
-    result.push(...otherFields);
-    result.push(...contentItems);
-    return result;
+  // Classify children for render order:
+  // 1) template fields pinned on top, grouped by current supertag order,
+  // 2) all remaining children (manual fields + content) keep original sibling order.
+  const visibleChildren = useMemo(() => (
+    buildVisibleChildrenRows({
+      allChildIds,
+      fieldMap,
+      tagIds,
+      getFieldDefOwnerId: (fieldDefId) => loroDoc.getParentId(fieldDefId),
+      getNodeType: (id) => useNodeStore.getState().getNode(id)?.type,
+      getChildNodeType: (id) => useNodeStore.getState().getNode(id)?.type,
+      isOutlinerContentType: isOutlinerContentNodeType,
+    })
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allChildIds, fieldMap, tagIds, _version]);
+  ), [allChildIds, fieldMap, tagIds, _version]);
 
   const childIds = useMemo(
     () => visibleChildren.filter((c) => c.type === 'content').map((c) => c.id),
@@ -371,6 +455,19 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   // Structural icon: fieldDef nodes show the field type icon instead of a dot
   const structuralIcon = node ? resolveNodeStructuralIcon(node) : null;
   const isPendingConversion = useUIStore((s) => s.pendingRefConversion?.tempNodeId === nodeId);
+  const pendingConversionRefTargetId = useUIStore((s) =>
+    s.pendingRefConversion?.tempNodeId === nodeId ? s.pendingRefConversion.refNodeId : null,
+  );
+  // Visual fallback: pending-conversion is stored in UI state and can be transient.
+  // If the row content is exactly a single inline reference atom, keep the dashed
+  // reference bullet style even if the pending marker was cleared already.
+  const hasSingleInlineRefAtomContent = useMemo(() => {
+    if (!node || node.type) return false;
+    const inlineRefs = node.inlineRefs ?? [];
+    if (inlineRefs.length !== 1 || inlineRefs[0]?.offset !== 0) return false;
+    const normalized = (node.name ?? '').replace(/\u200B/g, '').trim();
+    return normalized === '\uFFFC';
+  }, [node]);
   // Multi-select: check derived boolean. For single-select with parent disambiguation (reference nodes),
   // also check selectedParentId to support the same node appearing in multiple places.
   const isSelected = isInSelectedSet && (
@@ -402,6 +499,18 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   );
   const isOptionsValueNode = isOptionsField && !!selectedOptionId;
   const isReferenceLikeRow = isReference || isPendingConversion || isOptionsValueNode;
+  const pendingConversionInlineRefColor = useMemo(
+    () => (pendingConversionRefTargetId ? resolveInlineReferenceTextColor(pendingConversionRefTargetId) : undefined),
+    [pendingConversionRefTargetId, _version],
+  );
+  const pendingConversionStyle = useMemo<CSSProperties | undefined>(() => (
+    isPendingConversion
+      ? {
+        ['--ref-conversion-accent' as string]: pendingConversionInlineRefColor ?? 'var(--color-primary)',
+        ['--ref-conversion-dark' as string]: 'var(--color-foreground)',
+      }
+      : undefined
+  ), [isPendingConversion, pendingConversionInlineRefColor]);
 
   // Checkbox state (supertag SYS_A55 or manual _done)
   const { showCheckbox, isDone } = useNodeCheckbox(effectiveNodeId);
@@ -475,6 +584,28 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   // Pending click coordinates for description cursor placement
   const descClickCoordsRef = useRef<{ x: number; y: number } | null>(null);
   const descriptionReturnOffsetRef = useRef<number | null>(null);
+
+  const triggerDeleteBlockedPulse = useCallback(() => {
+    if (deleteBlockedPulseTimeoutRef.current !== null) {
+      window.clearTimeout(deleteBlockedPulseTimeoutRef.current);
+      deleteBlockedPulseTimeoutRef.current = null;
+    }
+    setDeleteBlockedPulse(false);
+    requestAnimationFrame(() => {
+      setDeleteBlockedPulse(true);
+      deleteBlockedPulseTimeoutRef.current = window.setTimeout(() => {
+        setDeleteBlockedPulse(false);
+        deleteBlockedPulseTimeoutRef.current = null;
+      }, 280);
+    });
+  }, []);
+
+  useEffect(() => () => {
+    if (deleteBlockedPulseTimeoutRef.current !== null) {
+      window.clearTimeout(deleteBlockedPulseTimeoutRef.current);
+      deleteBlockedPulseTimeoutRef.current = null;
+    }
+  }, []);
 
   const captureNameEditorOffset = useCallback(() => {
     const editor = editorRef.current;
@@ -1081,19 +1212,28 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     const refEl = target.closest('[data-inlineref-node]') as HTMLElement | null;
     if (refEl) return;
 
+    const selectAction = resolveRowPointerSelectAction({
+      justDragged: dragState.justDragged,
+      metaKey: e.metaKey,
+      ctrlKey: e.ctrlKey,
+      shiftKey: e.shiftKey,
+      allowSingle: false,
+    });
+
     // Multi-select modifiers: Cmd+Click / Shift+Click (both reference and non-reference)
-    if (e.metaKey || e.ctrlKey) {
+    if (selectAction === 'toggle') {
       e.preventDefault();
       handleCmdClick();
       return;
     }
-    if (e.shiftKey) {
+    if (selectAction === 'range') {
       e.preventDefault();
       handleShiftClick();
       return;
     }
 
-    if (isReferenceLikeRow) return;
+    const hasMultiSelection = useUIStore.getState().selectedNodeIds.size > 1;
+    if (isReferenceLikeRow && !hasMultiSelection) return;
 
     // Record text offset now (mousedown position = click position for simple clicks).
     // Will be consumed by RichTextEditor when it mounts (after setFocusedNode in click).
@@ -1209,10 +1349,17 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
         return;
       }
     }
-    // Reference nodes: single click = select (frame), double click = edit
-    // Cmd+Click and Shift+Click are handled in handleContentMouseDown
+    const hasMultiSelection = useUIStore.getState().selectedNodeIds.size > 1;
+
+    // Reference nodes:
+    // - default: single click = select (frame), double click = edit
+    // - while multi-select is active: single click exits selection mode and enters edit
     if (isReferenceLikeRow && !e.metaKey && !e.ctrlKey && !e.shiftKey) {
-      setSelectedNode(nodeId, parentId, isReferenceLikeRow ? 'ref-click' : 'global');
+      if (hasMultiSelection) {
+        setFocusedNode(nodeId, parentId);
+        return;
+      }
+      setSelectedNode(nodeId, parentId, 'ref-click');
       return;
     }
     // Non-reference: enter edit mode (text offset already recorded in mousedown)
@@ -1349,7 +1496,10 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     const textOnly = currentName.replace(/\u200B/g, '').trim();
     if (textOnly.length > 0) return false;
     // Prevent deleting a whole subtree when Backspace is pressed on an empty parent.
-    if (hasChildren) return true;
+    if (hasChildren) {
+      triggerDeleteBlockedPulse();
+      return true;
+    }
 
     const latestUi = useUIStore.getState();
     const flatList = getFlattenedVisibleNodes(rootChildIds, latestUi.expandedNodes, rootNodeId);
@@ -1377,7 +1527,97 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       setFocusedNode(null);
     }
     return true;
-  }, [nodeId, parentId, rootNodeId, rootChildIds, trashNode, removeReference, setFocusedNode, hasChildren]);
+  }, [
+    nodeId,
+    parentId,
+    rootNodeId,
+    rootChildIds,
+    trashNode,
+    removeReference,
+    setFocusedNode,
+    hasChildren,
+    triggerDeleteBlockedPulse,
+  ]);
+
+  const handleBackspaceAtStart = useCallback((): boolean => {
+    const latestUi = useUIStore.getState();
+    const flatList = getFlattenedVisibleNodes(rootChildIds, latestUi.expandedNodes, rootNodeId);
+    const prev = getPreviousVisibleNode(nodeId, parentId, flatList);
+    if (!prev) return false;
+
+    const prevNode = useNodeStore.getState().getNode(prev.nodeId);
+    const currentNode = useNodeStore.getState().getNode(nodeId);
+    if (!currentNode) return false;
+
+    // Reference-like rows do not merge text into previous content;
+    // they only navigate/focus previous row.
+    if (isReferenceLikeRow) {
+      if (prevNode && isOutlinerContentNodeType(prevNode.type)) {
+        useUIStore.getState().setFocusClickCoords({
+          nodeId: prev.nodeId,
+          parentId: prev.parentId,
+          textOffset: getNodeTextLengthById(prev.nodeId),
+        });
+        setFocusedNode(prev.nodeId, prev.parentId);
+        return true;
+      }
+      if (prevNode?.type === 'fieldEntry') {
+        clearFocus();
+        setEditingFieldName(prev.nodeId);
+        return true;
+      }
+      return false;
+    }
+
+    // Only merge into a regular content row. If previous is a field row,
+    // fallback to moving focus there without destructive changes.
+    if (!prevNode || !isOutlinerContentNodeType(prevNode.type)) {
+      if (prevNode?.type === 'fieldEntry') {
+        clearFocus();
+        setEditingFieldName(prev.nodeId);
+        return true;
+      }
+      return false;
+    }
+
+    const prevPayload = {
+      text: prevNode.name ?? '',
+      marks: prevNode.marks ?? [],
+      inlineRefs: prevNode.inlineRefs ?? [],
+    };
+    const currentPayload = {
+      text: currentNode.name ?? '',
+      marks: currentNode.marks ?? [],
+      inlineRefs: currentNode.inlineRefs ?? [],
+    };
+    const merged = mergeRichTextPayload(prevPayload, currentPayload);
+    const joinOffset = prevPayload.text.length;
+
+    updateNodeContent(prev.nodeId, {
+      name: merged.text,
+      marks: merged.marks,
+      inlineRefs: merged.inlineRefs,
+    });
+    trashNode(nodeId);
+    useUIStore.getState().setFocusClickCoords({
+      nodeId: prev.nodeId,
+      parentId: prev.parentId,
+      textOffset: joinOffset,
+    });
+    setFocusedNode(prev.nodeId, prev.parentId);
+    return true;
+  }, [
+    rootChildIds,
+    rootNodeId,
+    nodeId,
+    parentId,
+    isReferenceLikeRow,
+    clearFocus,
+    setEditingFieldName,
+    updateNodeContent,
+    trashNode,
+    setFocusedNode,
+  ]);
 
   const handleArrowUp = useCallback(() => {
     const siblingIndex = renderableSiblings.findIndex((item) => item.type === 'content' && item.id === nodeId);
@@ -2005,15 +2245,17 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
           onDrillDown={handleDrillDown}
         />
         <div className={`flex items-start gap-2 min-w-0 relative ${isSelectedRefClick ? 'node-selected-ref w-fit flex-none' : 'flex-1'}`}>
-          <BulletChevron
-            hasChildren={hasChildren}
-            isExpanded={isExpanded}
-            onBulletClick={handleBulletClick}
-            isReference={isReferenceLikeRow || isPendingConversion}
-            tagDefColor={isTagDef ? resolveTagColor(nodeId).text : undefined}
-            bulletColors={effectiveBulletColors}
-            icon={structuralIcon}
-          />
+          <div className={deleteBlockedPulse ? 'node-delete-blocked-pulse' : ''}>
+            <BulletChevron
+              hasChildren={hasChildren}
+              isExpanded={isExpanded}
+              onBulletClick={handleBulletClick}
+              isReference={isReferenceLikeRow || isPendingConversion || hasSingleInlineRefAtomContent}
+              tagDefColor={isTagDef ? resolveTagColor(nodeId).text : undefined}
+              bulletColors={effectiveBulletColors}
+              icon={structuralIcon}
+            />
+          </div>
           {showCheckbox && (
             <span className="flex shrink-0 h-[21px] w-[15px] items-center justify-center">
               <input
@@ -2024,7 +2266,10 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
               />
             </span>
           )}
-          <div className={`relative flex-1 min-w-0 ${isPendingConversion ? 'ref-converting' : ''} ${isDone ? 'text-foreground/50' : ''}`}>
+          <div
+            className={`relative flex-1 min-w-0 ${isPendingConversion ? 'ref-converting' : ''} ${isDone ? 'text-foreground/50' : ''}`}
+            style={pendingConversionStyle}
+          >
           <div
             ref={contentAreaRef}
             className={`text-sm leading-[21px] ${!isCheckboxFieldType(fieldDataType) && !isFocused ? (isReferenceLikeRow ? 'cursor-default' : 'cursor-text') : ''}`}
@@ -2053,6 +2298,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
                 onIndent={handleIndent}
                 onOutdent={handleOutdent}
                 onDelete={handleDelete}
+                onBackspaceAtStart={handleBackspaceAtStart}
                 onArrowUp={handleArrowUp}
                 onArrowDown={handleArrowDown}
                 onMoveUp={handleMoveUp}
@@ -2234,6 +2480,8 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
                 <FieldRow
                   nodeId={effectiveNodeId}
                   {...toFieldRowEntryProps(fieldMap.get(id)!)}
+                  rootChildIds={rootChildIds}
+                  rootNodeId={rootNodeId}
                   isLastInGroup={i === visibleChildren.length - 1 || visibleChildren[i + 1].type !== 'field'}
                   ownerTagColor={fieldOwnerColors.get(id)}
                   onNavigateOut={(direction) => {

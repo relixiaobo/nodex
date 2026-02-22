@@ -226,7 +226,12 @@ npm run test:run
 - `tests/vitest/use-node-fields-config.test.ts`
 - `tests/vitest/field-list-config-render.test.ts`
 - `tests/vitest/field-row-config-render.test.ts`
+- `tests/vitest/field-row-selection.test.ts`
+- `tests/vitest/outliner-item-field-order.test.ts`
 - `tests/vitest/options-picker.test.ts`
+- `tests/vitest/row-pointer-selection.test.ts`
+- `tests/vitest/row-interactions.test.ts`
+- `tests/vitest/rich-text-merge.test.ts`
 
 **覆盖点**:
 
@@ -241,6 +246,16 @@ npm run test:run
 9. `number_input` 虚拟配置字段的数据类型标记为 `FIELD_TYPES.NUMBER`（`Minimum/Maximum value` 语义为 Number）
 10. `number_input` 配置控件使用文本输入（不依赖原生 number spinner），与普通 Number 字段一致走 warning 校验路径
 11. `number_input` 配置值为非法数字字符串时，FieldRow value 区右侧展示同款 warning 图标（与普通 Number 字段位置一致）
+12. FieldRow 选中遮罩与 content row 使用同款视觉配方（`bg-selection-row + border + top/bottom inset`），并保证名称/值层级高于遮罩（避免选中后值区文本被遮盖）
+13. FieldRow 保持“单击编辑优先”（name 进字段名编辑，value 保持值交互）；普通单击不再把 tuple 置入选区
+14. FieldRow 的 `Cmd/Ctrl+Click`、`Shift+Click` 走统一 pointer-intent 解析（即使落在 value 交互区，也优先按多选手势处理）
+15. `OutlinerView` / `ConfigOutliner` / `FieldValueOutliner` 的选择域统一使用“可见 field + content”同一 `rootChildIds`，避免 node 类型导致的范围选行为分叉
+16. OutlinerItem 子行排序遵循“模板字段置顶 + 手动字段保持插入位”；字段 icon 着色仅限 `tagDef` owner（schema/manual 字段保持中性灰）
+17. 模板字段 icon 着色支持 `templateId` owner 回退（fieldDef 本体非 tagDef owner 时仍可继承 supertag 颜色）
+18. 全局 pointerdown 在 outliner 行外触发 `clearSelection`，保证“点击其他区域/执行其他操作”后选区自动清空
+19. content row Backspace 在“无下拉 + 光标行首 + 非空文本”触发 merge intent：合并到上一内容节点并保留 marks/inlineRefs；引用行保持仅导航不做文本合并
+20. outliner 作用域判定基于 `data-row-scope-parent-id`（而非 `data-node-id`），避免侧栏节点点击被误判为“仍在 outliner 内”
+21. 空文本且有子节点时 Backspace 不删除子树，触发 bullet/icon 抖动反馈（避免“按键无响应”的体感）
 
 ### 1.7 标签与引用状态流
 
@@ -736,10 +751,10 @@ hash trigger cleanup safety（3 cases, Bug #53 + CJK hashtag 回归）:
 
 **覆盖点**:
 
-1. `tagDef` 节点被过滤（不出现在搜索结果中）
-2. `attrDef` 节点被过滤
-3. `tuple` 节点被过滤
-4. 普通内容节点正常返回
+1. `tagDef/fieldDef/fieldEntry/reference` 结构节点被过滤（不出现在搜索结果中）
+2. workspace container（如 `LIBRARY`）按 ID 过滤
+3. 普通内容节点正常返回，且支持 `excludeId` 排除当前节点
+4. 匹配结果按 `updatedAt` 降序排序（最近编辑优先）
 
 ### 1.36 Workspace Store 认证状态与持久化
 
@@ -752,6 +767,63 @@ hash trigger cleanup safety（3 cases, Bug #53 + CJK hashtag 回归）:
 3. `logout` 清空用户与工作区上下文，并恢复未登录状态（含 `authUser`）
 4. `authUser` 不被持久化到 storage（通过 `partialize` 排除）
 5. `signInWithGoogle` 成功后 `userId / isAuthenticated / authUser` 正确写入
+
+### 1.51 Breadcrumb Workspace Root 导航
+
+**测试文件**: `tests/vitest/breadcrumb.test.ts`
+
+**覆盖点**:
+
+1. 头像/根节点导航目标优先指向 `currentWorkspaceId`（不再依赖节点已存在）
+2. `currentWorkspaceId` 缺失时，回退到当前 ancestor chain 的 `workspaceRootId`
+3. 两者都不可用时，最终回退到 `LIBRARY`
+
+### 1.56 ReferenceSelector 空查询 Recently Used
+
+**测试文件**: `tests/vitest/reference-selector-recent.test.ts`
+
+**覆盖点**:
+
+1. 空 query 时 recent 列表可由“全局最近编辑节点”补齐（避免仅显示 `Library`）
+2. 历史来源优先级高于 fallback（按 panelHistory 最近访问顺序）
+3. history + fallback 去重，且过滤 container/结构节点
+
+### 1.57 Workspace Home 节点兜底创建
+
+**测试文件**: `tests/vitest/workspace-root.test.ts`
+
+**覆盖点**:
+
+1. `ensureWorkspaceHomeNode` 在 workspace 根节点缺失时自动补建
+2. 已存在 workspace 根节点时保持幂等（不重复创建，不覆盖已有名称）
+3. 传入空 workspaceId 时安全返回
+
+### 1.58 Reference 选中态无布局抖动
+
+**测试文件**: `tests/vitest/reference-selection-style.test.ts`
+
+**覆盖点**:
+
+1. `node-selected-ref` 采用 `::before` 绝对定位 overlay 渲染选中框（非布局 border/padding）
+2. 基础选择器不包含 `padding/margin/border`，确保选中/未选中高度一致
+
+### 1.59 Outliner Drag Select 覆盖 Field 行
+
+**测试文件**: `tests/vitest/outliner-view-drag-select.test.ts`
+
+**覆盖点**:
+
+1. drag-select 根列表包含可见 `field + content` 行（不再仅 content）
+2. hidden field 仅在“已手动 reveal”时进入 drag-select 根列表
+
+### 1.60 OutlinerView 渲染安全（白屏回归）
+
+**测试文件**: `tests/vitest/outliner-view-render.test.ts`
+
+**覆盖点**:
+
+1. `OutlinerView` 在 NodePanel 场景可正常渲染（字段行 + 内容行同时存在）
+2. 防止运行时初始化顺序错误（TDZ）导致首屏白屏
 
 ### 1.48 Auth 工具函数（Google OAuth + Supabase）
 

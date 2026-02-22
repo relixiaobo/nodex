@@ -9,11 +9,14 @@
  */
 import { useMemo, useEffect, useLayoutEffect, useRef, useState, forwardRef, useImperativeHandle } from 'react';
 import { createPortal } from 'react-dom';
-import { AtSign, Plus } from '../../lib/icons.js';
+import { AtSign, Calendar, Plus } from '../../lib/icons.js';
 import { useNodeSearch, type NodeSearchResult } from '../../hooks/use-node-search';
 import { useUIStore } from '../../stores/ui-store';
 import { useNodeStore } from '../../stores/node-store';
+import { isWorkspaceContainer } from '../../lib/tree-utils.js';
 import * as loroDoc from '../../lib/loro-doc.js';
+import { ensureDateNode } from '../../lib/journal.js';
+import { formatDayName } from '../../lib/date-utils.js';
 
 export interface ReferenceDropdownHandle {
   getItemCount(): number;
@@ -31,39 +34,128 @@ interface ReferenceSelectorProps {
   anchor?: { left: number; top: number; bottom: number };
 }
 
+const SKIP_RECENT_DOC_TYPES = new Set<string>(['fieldEntry', 'fieldDef', 'tagDef', 'reference']);
+
+interface DateShortcut {
+  keyword: string;
+  label: string;
+  getDate: () => Date;
+}
+
+const DATE_SHORTCUTS: DateShortcut[] = [
+  { keyword: 'today', label: 'Today', getDate: () => new Date() },
+  {
+    keyword: 'tomorrow',
+    label: 'Tomorrow',
+    getDate: () => {
+      const d = new Date();
+      d.setDate(d.getDate() + 1);
+      return d;
+    },
+  },
+  {
+    keyword: 'yesterday',
+    label: 'Yesterday',
+    getDate: () => {
+      const d = new Date();
+      d.setDate(d.getDate() - 1);
+      return d;
+    },
+  },
+];
+
+export function matchDateShortcuts(query: string): Array<DateShortcut & { dateName: string }> {
+  if (!query.trim()) return [];
+  const q = query.trim().toLowerCase();
+  return DATE_SHORTCUTS
+    .filter((shortcut) => shortcut.keyword.startsWith(q))
+    .map((shortcut) => ({ ...shortcut, dateName: formatDayName(shortcut.getDate()) }));
+}
+
+function normalizeRecentNode(
+  id: string,
+  currentNodeId: string,
+): NodeSearchResult | null {
+  if (id === currentNodeId) return null;
+  if (isWorkspaceContainer(id)) return null;
+  const node = loroDoc.toNodexNode(id);
+  if (!node) return null;
+  if (node.type && SKIP_RECENT_DOC_TYPES.has(node.type)) return null;
+  const name = (node.name ?? '').replace(/<[^>]+>/g, '').trim();
+  if (!name) return null;
+  return { id, name, breadcrumb: '', updatedAt: node.updatedAt ?? 0 };
+}
+
+export function collectRecentReferenceNodes(params: {
+  currentNodeId: string;
+  panelHistory: string[];
+  panelIndex: number;
+  limit?: number;
+}): NodeSearchResult[] {
+  const { currentNodeId, panelHistory, panelIndex, limit = 5 } = params;
+  const seen = new Set<string>();
+  const results: NodeSearchResult[] = [];
+
+  const pushIfValid = (id: string) => {
+    if (seen.has(id)) return;
+    const normalized = normalizeRecentNode(id, currentNodeId);
+    if (!normalized) return;
+    seen.add(id);
+    results.push(normalized);
+  };
+
+  // Primary source: navigation history (most recently opened first).
+  for (let i = panelIndex; i >= 0 && results.length < limit; i--) {
+    const id = panelHistory[i];
+    if (!id) continue;
+    pushIfValid(id);
+  }
+
+  // Fallback source: most recently edited nodes globally.
+  if (results.length < limit) {
+    const candidates = loroDoc
+      .getAllNodeIds()
+      .map((id) => normalizeRecentNode(id, currentNodeId))
+      .filter((item): item is NodeSearchResult => !!item && !seen.has(item.id))
+      .sort((a, b) => {
+        if (b.updatedAt !== a.updatedAt) return b.updatedAt - a.updatedAt;
+        const byName = a.name.localeCompare(b.name, 'en');
+        if (byName !== 0) return byName;
+        return a.id.localeCompare(b.id, 'en');
+      });
+
+    for (const item of candidates) {
+      if (results.length >= limit) break;
+      seen.add(item.id);
+      results.push(item);
+    }
+  }
+
+  return results;
+}
+
 export const ReferenceSelector = forwardRef<ReferenceDropdownHandle, ReferenceSelectorProps>(
   function ReferenceSelector({ open, onSelect, onCreateNew, query, selectedIndex, currentNodeId, anchor }, ref) {
     const anchorRef = useRef<HTMLSpanElement>(null);
     const searchResults = useNodeSearch(query, currentNodeId);
     const listRef = useRef<HTMLDivElement>(null);
 
-    // When query is empty, show recently opened nodes from navigation history
+    // When query is empty, show recently used nodes:
+    // navigation history first, then recently edited fallback.
     const panelHistory = useUIStore((s) => s.panelHistory);
     const panelIndex = useUIStore((s) => s.panelIndex);
     const _version = useNodeStore((s) => s._version);
 
     const recentNodes = useMemo(() => {
       if (query.trim()) return [];
-      const seen = new Set<string>();
-      const results: NodeSearchResult[] = [];
-      // Walk history backwards from current position for most recently visited
-      for (let i = panelIndex; i >= 0 && results.length < 5; i--) {
-        const id = panelHistory[i];
-        if (id === currentNodeId || seen.has(id)) continue;
-        seen.add(id);
-        const node = loroDoc.toNodexNode(id);
-        if (!node) continue;
-        const name = (node.name ?? '').replace(/<[^>]+>/g, '').trim();
-        if (!name) continue;
-        results.push({ id, name, breadcrumb: '' });
-      }
-      return results;
+      return collectRecentReferenceNodes({ currentNodeId, panelHistory, panelIndex, limit: 5 });
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [query, panelHistory, panelIndex, _version, currentNodeId]);
 
+    const dateMatches = useMemo(() => matchDateShortcuts(query), [query]);
     const items = query.trim() ? searchResults : recentNodes;
     const hasCreateOption = !!(query.trim() && onCreateNew);
-    const totalItems = items.length + (hasCreateOption ? 1 : 0);
+    const totalItems = dateMatches.length + items.length + (hasCreateOption ? 1 : 0);
     const boundedIndex = totalItems > 0 ? Math.min(Math.max(0, selectedIndex), totalItems - 1) : -1;
 
     // Scroll highlighted item into view
@@ -73,6 +165,11 @@ export const ReferenceSelector = forwardRef<ReferenceDropdownHandle, ReferenceSe
       el[boundedIndex]?.scrollIntoView({ block: 'nearest' });
     }, [boundedIndex]);
 
+    const selectDateShortcut = (shortcut: DateShortcut) => {
+      const dayId = ensureDateNode(shortcut.getDate());
+      onSelect(dayId);
+    };
+
     useImperativeHandle(
       ref,
       () => ({
@@ -81,8 +178,14 @@ export const ReferenceSelector = forwardRef<ReferenceDropdownHandle, ReferenceSe
         },
         getSelectedItem() {
           if (totalItems === 0 || boundedIndex < 0) return null;
-          if (boundedIndex < items.length) {
-            return { type: 'existing', id: items[boundedIndex].id, name: items[boundedIndex].name };
+          if (boundedIndex < dateMatches.length) {
+            const shortcut = dateMatches[boundedIndex];
+            const dayId = ensureDateNode(shortcut.getDate());
+            return { type: 'existing', id: dayId, name: shortcut.dateName };
+          }
+          const itemIndex = boundedIndex - dateMatches.length;
+          if (itemIndex < items.length) {
+            return { type: 'existing', id: items[itemIndex].id, name: items[itemIndex].name };
           }
           if (hasCreateOption) {
             return { type: 'create', name: query.trim() };
@@ -90,7 +193,7 @@ export const ReferenceSelector = forwardRef<ReferenceDropdownHandle, ReferenceSe
           return null;
         },
       }),
-      [items, boundedIndex, totalItems, hasCreateOption, query],
+      [items, dateMatches, boundedIndex, totalItems, hasCreateOption, query],
     );
 
     // Fixed positioning to escape overflow containers + auto-flip.
@@ -138,10 +241,37 @@ export const ReferenceSelector = forwardRef<ReferenceDropdownHandle, ReferenceSe
         style={dropStyle}
         onMouseDown={(e) => e.preventDefault()}
       >
+        {dateMatches.length > 0 && (
+          <>
+            <div className="px-2 py-1 text-[10px] font-medium text-foreground-secondary uppercase tracking-wider">
+              Dates
+            </div>
+            {dateMatches.map((dm, i) => (
+              <button
+                key={dm.keyword}
+                data-ref-item
+                className={`flex w-full items-center gap-1.5 rounded-md px-2 py-1 text-left transition-colors ${
+                  i === boundedIndex ? 'bg-accent' : 'hover:bg-foreground/5'
+                }`}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  selectDateShortcut(dm);
+                }}
+              >
+                <Calendar size={14} className="text-foreground-secondary shrink-0" />
+                <span className="text-sm text-foreground">{dm.label}</span>
+                <span className="ml-auto text-[10px] text-foreground-tertiary">{dm.dateName}</span>
+              </button>
+            ))}
+            {items.length > 0 && <div className="my-0.5 h-px bg-border" />}
+          </>
+        )}
+
         {/* Section header */}
         {!query.trim() && recentNodes.length > 0 && (
           <div className="px-2 py-1 text-[10px] font-medium text-foreground-secondary uppercase tracking-wider">
-            Recently opened
+            Recently used
           </div>
         )}
         {query.trim() && items.length > 0 && (
@@ -150,7 +280,7 @@ export const ReferenceSelector = forwardRef<ReferenceDropdownHandle, ReferenceSe
           </div>
         )}
 
-        {items.length === 0 && !hasCreateOption && (
+        {items.length === 0 && dateMatches.length === 0 && !hasCreateOption && (
           <div className="px-2 py-2 text-sm text-foreground-secondary">No matches</div>
         )}
 
@@ -159,7 +289,7 @@ export const ReferenceSelector = forwardRef<ReferenceDropdownHandle, ReferenceSe
             key={item.id}
             data-ref-item
             className={`flex w-full flex-col items-start rounded-md px-2 py-1 text-left transition-colors ${
-              i === boundedIndex ? 'bg-accent' : 'hover:bg-foreground/5'
+              dateMatches.length + i === boundedIndex ? 'bg-accent' : 'hover:bg-foreground/5'
             }`}
             onMouseDown={(e) => {
               e.preventDefault();
@@ -181,11 +311,11 @@ export const ReferenceSelector = forwardRef<ReferenceDropdownHandle, ReferenceSe
 
         {hasCreateOption && (
           <>
-            {items.length > 0 && <div className="my-0.5 h-px bg-border" />}
+            {(items.length > 0 || dateMatches.length > 0) && <div className="my-0.5 h-px bg-border" />}
             <button
               data-ref-item
               className={`flex w-full items-center gap-1.5 rounded-md px-2 py-1 text-sm text-foreground transition-colors text-left ${
-                boundedIndex === items.length ? 'bg-accent' : 'hover:bg-foreground/5'
+                boundedIndex === dateMatches.length + items.length ? 'bg-accent' : 'hover:bg-foreground/5'
               }`}
               onMouseDown={(e) => {
                 e.preventDefault();

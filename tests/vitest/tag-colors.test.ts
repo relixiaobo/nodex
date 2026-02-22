@@ -7,6 +7,8 @@ import {
   TAG_COLOR_MAP,
   SWATCH_OPTIONS,
   getTagColor,
+  INLINE_REF_FALLBACK_TEXT_COLOR,
+  resolveInlineReferenceTextColor,
   resolveTagColor,
 } from '../../src/lib/tag-colors.js';
 
@@ -80,6 +82,13 @@ describe('resolveTagColor', () => {
   it('returns hash for nonexistent tagDefId', () => {
     const color = resolveTagColor('nonexistent_tagDef');
     expect(TAG_COLORS).toContainEqual(color);
+  });
+});
+
+describe('resolveInlineReferenceTextColor', () => {
+  it('falls back safely before LoroDoc is initialized', () => {
+    loroDoc.resetLoroDoc();
+    expect(resolveInlineReferenceTextColor('node_1')).toBe(INLINE_REF_FALLBACK_TEXT_COLOR);
   });
 });
 

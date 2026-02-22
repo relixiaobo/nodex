@@ -144,10 +144,10 @@ export function ConfigOutliner({ nodeId }: ConfigOutlinerProps) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [_version, extendsChain, nodeId, fieldMap]);
 
-  // Collect content child IDs (for OutlinerItem rootChildIds — own items only)
-  const contentChildIds = useMemo(
-    () => mergedItems.filter((c) => c.type === 'content' && c.ownerTagDefId === nodeId).map((c) => c.id),
-    [mergedItems, nodeId],
+  // Unified selectable rows for range/multi-selection.
+  const selectableRootIds = useMemo(
+    () => mergedItems.map((c) => c.id),
+    [mergedItems],
   );
 
   // Prevent border stacking: when nested FieldRows are first/last, add padding
@@ -166,6 +166,8 @@ export function ConfigOutliner({ nodeId }: ConfigOutlinerProps) {
             <FieldRow
               nodeId={ownerTagDefId}
               {...toFieldRowEntryProps(fieldEntry)}
+              rootChildIds={selectableRootIds}
+              rootNodeId={nodeId}
               isLastInGroup={i === mergedItems.length - 1 || mergedItems[i + 1].type !== 'field'}
               ownerTagColor={ownerColor}
             />
@@ -175,7 +177,7 @@ export function ConfigOutliner({ nodeId }: ConfigOutlinerProps) {
             key={id}
             nodeId={id}
             depth={0}
-            rootChildIds={contentChildIds}
+            rootChildIds={selectableRootIds}
             parentId={ownerTagDefId}
             rootNodeId={nodeId}
             bulletColors={ownerColor ? [ownerColor] : undefined}

@@ -83,6 +83,26 @@ export function resolveContentRowForceCreateIntent(
   return 'toggle_done';
 }
 
+export type ContentRowBackspaceIntent =
+  | 'allow_default'
+  | 'merge_with_previous'
+  | 'delete_empty';
+
+interface ResolveContentRowBackspaceIntentParams extends ContentDropdownState {
+  isEmpty: boolean;
+  isAtStart: boolean;
+}
+
+export function resolveContentRowBackspaceIntent(
+  params: ResolveContentRowBackspaceIntentParams,
+): ContentRowBackspaceIntent {
+  const kind = resolveContentDropdownKind(params);
+  if (kind) return 'allow_default';
+  if (params.isEmpty) return 'delete_empty';
+  if (params.isAtStart) return 'merge_with_previous';
+  return 'allow_default';
+}
+
 interface TrailingOptionsState {
   optionsOpen: boolean;
   optionCount: number;

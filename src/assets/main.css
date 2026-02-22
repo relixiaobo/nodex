@@ -44,13 +44,30 @@
   --font-mono: "JetBrains Mono", "Fira Code", monospace;
 }
 
-/* Reference single-click selection: compact fit-content frame (not full-row highlight). */
+/* Reference single-click selection: compact frame rendered as overlay.
+   Important: use pseudo-element instead of border/padding on layout box,
+   so selected/unselected states keep identical row height (no visual jump). */
 .node-selected-ref {
+  position: relative;
+}
+
+.node-selected-ref::before {
+  content: "";
+  position: absolute;
+  top: -1px;
+  right: -6px;
+  bottom: -1px;
+  left: -6px;
   border: 1px solid rgba(147, 197, 253, 0.95);
   border-radius: 0.25rem;
   background: rgba(147, 197, 253, 0.12);
-  padding: 1px 6px;
-  margin: -1px 0 -1px -6px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.node-selected-ref > * {
+  position: relative;
+  z-index: 1;
 }
 
 /* Shared inline element styles — used by both ProseMirror editor (.ProseMirror)
@@ -192,14 +209,17 @@
   background: rgba(147, 197, 253, 0.12);
 }
 
-/* Ref conversion shimmer: color breathes between foreground and primary.
-   Peak at 35% → return takes 65% of cycle for a gentle fade back. */
+/* Ref conversion shimmer: keep the original timing/feel, but color source is
+   now per-reference (supertag accent) + foreground (soft black in light theme). */
 @keyframes ref-conversion-shimmer {
-  0%, 100% { color: var(--color-foreground); }
-  35% { color: var(--color-primary); }
+  0%, 100% { color: var(--ref-conversion-dark, var(--color-foreground)); }
+  35% { color: var(--inline-ref-accent, var(--ref-conversion-accent, var(--color-primary))); }
 }
 
-.ref-converting .ProseMirror [data-inlineref-node] {
+.ref-converting .ProseMirror [data-inlineref-node],
+.ref-converting .node-content [data-inlineref-node] {
+  --ref-conversion-accent: var(--color-primary);
+  --ref-conversion-dark: var(--color-foreground);
   animation: ref-conversion-shimmer 2.5s ease-in-out infinite;
 }
 
@@ -209,6 +229,18 @@
    overlapping with child ChevronButton hover zone. */
 .indent-line:hover > .indent-line-inner {
   width: 3px;
+}
+
+@keyframes node-delete-blocked-pulse {
+  0% { transform: translateX(0); }
+  20% { transform: translateX(-2px); }
+  45% { transform: translateX(2px); }
+  70% { transform: translateX(-1px); }
+  100% { transform: translateX(0); }
+}
+
+.node-delete-blocked-pulse {
+  animation: node-delete-blocked-pulse 220ms ease-out;
 }
 
 /* cmdk command palette styles */

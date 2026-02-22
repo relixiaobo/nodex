@@ -121,12 +121,16 @@ selectionAnchorId: string | null;   // 范围选中 / Shift+Arrow 的锚点
 | 触发 | 行为 |
 |------|------|
 | **Esc** | 清除所有选择 |
+| **点击/聚焦到 outliner 作用域外（侧栏、面包屑、其他面板）** | 清除所有选择 |
 
 ### 无选择 → 编辑模式
 
 | 触发 | 行为 |
 |------|------|
 | **点击任意节点** | 聚焦该节点，光标由浏览器根据点击坐标放置 |
+
+> FieldRow 补充：普通单击遵循“编辑优先”——点击 `field name` 进入字段名编辑，点击 `value` 区进入对应值编辑/交互态；不再把普通单击解释为 tuple 选中。多选仍由 `Cmd/Ctrl+Click`、`Shift+Click`、拖选与 `Shift+↑/↓` 扩展完成。
+> 手势优先级补充：`Cmd/Ctrl` 与 `Shift` 选择手势在 FieldRow/ContentRow 共享同一 pointer-intent 解析，保证 node 类型不影响多选行为。
 
 ### Esc 三级退出链
 
@@ -196,6 +200,7 @@ selectionAnchorId: string | null;   // 范围选中 / Shift+Arrow 的锚点
 从非文本区域开始拖动时，超过 5px 阈值即激活拖选。
 
 > 设计意图：在文字上拖动大概率是选择文字，移到其他节点或 padding 才说明意图是多选。
+> NodePanel 补充：drag-select 根列表包含同级 `content row + field row`，所以从内容节点拖过字段区域时，字段 tuple 会进入选区（不再被过滤）。
 
 ### 拖选过程
 
@@ -300,6 +305,8 @@ mouseup (document, 动态)
 
 > 行高亮有 1px 垂直内缩 (`top: 1; bottom: 1`)，相邻直接选中行之间有 2px 可见间隙。
 > 子树遮罩有 1px 底部内缩 (`bottom: 1`)，与下一兄弟节点保持一致的 2px 间隙。
+> 字段行（FieldRow）与内容行（content node）共享同一行高亮视觉配方；字段行内容层（name/value）必须在遮罩之上，避免选中后值区文本不可见。
+> 字段行选中遮罩左边界对齐到 content row 基线（FieldRow 内部做 `left: -4px` 补偿 chevron-bullet gap）。
 
 **视觉效果**：
 - 单选展开的父节点：子树区域被浅紫色连续遮罩覆盖，父节点行颜色更深（不透明 `#E8E0FA`）

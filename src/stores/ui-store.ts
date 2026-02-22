@@ -149,6 +149,13 @@ export const useUIStore = create<UIStore>()(
             panelIndex: newHistory.length - 1,
             navUndoStack: [...s.navUndoStack, snapshot],
             navRedoStack: [],
+            focusedNodeId: null,
+            focusedParentId: null,
+            selectedNodeId: null,
+            selectedParentId: null,
+            selectionSource: null,
+            selectedNodeIds: new Set(),
+            selectionAnchorId: null,
           };
         }),
       goBack: () =>
@@ -159,6 +166,13 @@ export const useUIStore = create<UIStore>()(
             panelIndex: s.panelIndex - 1,
             navUndoStack: [...s.navUndoStack, snapshot],
             navRedoStack: [],
+            focusedNodeId: null,
+            focusedParentId: null,
+            selectedNodeId: null,
+            selectedParentId: null,
+            selectionSource: null,
+            selectedNodeIds: new Set(),
+            selectionAnchorId: null,
           };
         }),
       goForward: () =>
@@ -169,16 +183,42 @@ export const useUIStore = create<UIStore>()(
             panelIndex: s.panelIndex + 1,
             navUndoStack: [...s.navUndoStack, snapshot],
             navRedoStack: [],
+            focusedNodeId: null,
+            focusedParentId: null,
+            selectedNodeId: null,
+            selectedParentId: null,
+            selectionSource: null,
+            selectedNodeIds: new Set(),
+            selectionAnchorId: null,
           };
         }),
       replacePanel: (nodeId) =>
         set((s) => {
           if (s.panelHistory.length === 0) {
-            return { panelHistory: [nodeId], panelIndex: 0 };
+            return {
+              panelHistory: [nodeId],
+              panelIndex: 0,
+              focusedNodeId: null,
+              focusedParentId: null,
+              selectedNodeId: null,
+              selectedParentId: null,
+              selectionSource: null,
+              selectedNodeIds: new Set(),
+              selectionAnchorId: null,
+            };
           }
           const next = [...s.panelHistory];
           next[s.panelIndex] = nodeId;
-          return { panelHistory: next };
+          return {
+            panelHistory: next,
+            focusedNodeId: null,
+            focusedParentId: null,
+            selectedNodeId: null,
+            selectedParentId: null,
+            selectionSource: null,
+            selectedNodeIds: new Set(),
+            selectionAnchorId: null,
+          };
         }),
 
       // Expand/collapse

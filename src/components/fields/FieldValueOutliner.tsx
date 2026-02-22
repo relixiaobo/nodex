@@ -108,8 +108,8 @@ export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, configNo
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [childIds, fieldMap, _version]);
 
-  const contentChildIds = useMemo(
-    () => visibleChildren.filter((c) => c.type === 'content').map((c) => c.id),
+  const selectableChildIds = useMemo(
+    () => visibleChildren.map((c) => c.id),
     [visibleChildren],
   );
 
@@ -136,7 +136,7 @@ export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, configNo
         ? attrDefId === SYS_A.AUTOCOLLECT_OPTIONS
         : val === SYS_V.YES;
     } else {
-      const currentValue = contentChildIds[0];
+      const currentValue = selectableChildIds[0];
       isYes = currentValue === SYS_V.YES;
     }
     const label = isYes ? 'Yes' : 'No';
@@ -187,7 +187,7 @@ export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, configNo
 
   const isCheckbox = isCheckboxFieldType(fieldDataType);
   if (isCheckbox) {
-    const valueNodeId = contentChildIds[0];
+    const valueNodeId = selectableChildIds[0];
     const valueNode = valueNodeId ? useNodeStore.getState().getNode(valueNodeId) : undefined;
     const isChecked = valueNode?.name === SYS_V.YES;
 
@@ -206,7 +206,7 @@ export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, configNo
 
   // --- DATE: click-to-pick, similar to Options pattern ---
   if (isDateFieldType(fieldDataType)) {
-    const valueNodeId = contentChildIds[0];
+    const valueNodeId = selectableChildIds[0];
     const valueNode = valueNodeId ? useNodeStore.getState().getNode(valueNodeId) : undefined;
     const currentValue = valueNode?.name ?? '';
 
@@ -229,7 +229,7 @@ export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, configNo
 
   // --- URL: clickable link ---
   if (isUrlFieldType(fieldDataType)) {
-    const valueNodeId = contentChildIds[0];
+    const valueNodeId = selectableChildIds[0];
     const valueNode = valueNodeId ? useNodeStore.getState().getNode(valueNodeId) : undefined;
     const url = valueNode?.name ?? '';
 
@@ -258,7 +258,7 @@ export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, configNo
 
   // --- EMAIL: clickable mailto link ---
   if (isEmailFieldType(fieldDataType)) {
-    const valueNodeId = contentChildIds[0];
+    const valueNodeId = selectableChildIds[0];
     const valueNode = valueNodeId ? useNodeStore.getState().getNode(valueNodeId) : undefined;
     const email = valueNode?.name ?? '';
 
@@ -323,6 +323,8 @@ export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, configNo
             <FieldRow
               nodeId={tupleId}
               {...toFieldRowEntryProps(fieldMap.get(id)!)}
+              rootChildIds={selectableChildIds}
+              rootNodeId={tupleId}
               isLastInGroup={i === visibleChildren.length - 1 || visibleChildren[i + 1].type !== 'field'}
             />
           </div>
@@ -331,7 +333,7 @@ export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, configNo
             key={id}
             nodeId={id}
             depth={0}
-            rootChildIds={contentChildIds}
+            rootChildIds={selectableChildIds}
             parentId={tupleId}
             rootNodeId={tupleId}
             fieldDataType={fieldDataType}

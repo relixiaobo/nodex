@@ -3,7 +3,7 @@
  *
  * 1. PeerID 持久化 — save/restore round-trip, format validation
  * 2. VersionVector 持久化 — encode/decode round-trip
- * 3. SnapshotRecord 格式兼容 — backward-compat detection logic
+ * 3. SnapshotRecord 格式验证 — 字段完整性 + 旧格式拒绝
  * 4. Workspace ID 规范化 — 生成唯一 ws_{nanoid}
  * 5. subscribeLocalUpdates hook — 注册 + 清理 + import 不触发
  */
@@ -30,38 +30,27 @@ import {
 } from '../../src/lib/workspace-id.js';
 
 // ============================================================
-// SnapshotRecord format backward compatibility (unit logic test)
+// SnapshotRecord format validation
 // ============================================================
 
-describe('SnapshotRecord format detection', () => {
+describe('SnapshotRecord format validation', () => {
   /**
-   * Simulates the loadSnapshotRecord logic:
-   * - If result is Uint8Array (old format), wrap in SnapshotRecord with empty peerIdStr/VV
-   * - If result is SnapshotRecord, return as-is
-   * - If result is null, return null
+   * Simulates the loadSnapshotRecord logic (post-cleanup):
+   * - Bare Uint8Array (old format) → null (discarded, no backward compat)
+   * - Valid SnapshotRecord → return as-is
+   * - null/undefined → null
    */
   function parseSnapshotResult(result: unknown): SnapshotRecord | null {
     if (!result) return null;
-    if (result instanceof Uint8Array) {
-      return {
-        snapshot: result,
-        peerIdStr: '',
-        versionVector: new Uint8Array(0),
-        savedAt: 0,
-      };
-    }
+    // Old bare Uint8Array format is discarded — project not yet launched
+    if (result instanceof Uint8Array) return null;
+    if (!(result as SnapshotRecord).snapshot) return null;
     return result as SnapshotRecord;
   }
 
-  it('wraps bare Uint8Array (old format) into SnapshotRecord', () => {
+  it('rejects bare Uint8Array (old format) — returns null', () => {
     const oldData = new Uint8Array([1, 2, 3, 4]);
-    const record = parseSnapshotResult(oldData);
-
-    expect(record).not.toBeNull();
-    expect(record!.snapshot).toBe(oldData);
-    expect(record!.peerIdStr).toBe('');
-    expect(record!.versionVector.length).toBe(0);
-    expect(record!.savedAt).toBe(0);
+    expect(parseSnapshotResult(oldData)).toBeNull();
   });
 
   it('passes through SnapshotRecord unchanged', () => {

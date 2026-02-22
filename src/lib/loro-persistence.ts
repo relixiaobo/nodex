@@ -58,7 +58,8 @@ export async function saveSnapshotRecord(workspaceId: string, record: SnapshotRe
 
 /**
  * 加载 SnapshotRecord。
- * 兼容旧格式：如果存储的是裸 Uint8Array（Phase 0 之前），自动包装为 SnapshotRecord。
+ * 仅识别 SnapshotRecord 格式；旧格式（裸 Uint8Array）视为无效数据，返回 null。
+ * 项目未上线，不需要兼容历史快照格式。
  */
 export async function loadSnapshotRecord(workspaceId: string): Promise<SnapshotRecord | null> {
   const db = await openDB();
@@ -72,46 +73,17 @@ export async function loadSnapshotRecord(workspaceId: string): Promise<SnapshotR
         resolve(null);
         return;
       }
-      // Backward compatibility: old format was bare Uint8Array
-      if (result instanceof Uint8Array) {
-        resolve({
-          snapshot: result,
-          peerIdStr: '',       // no saved peer ID — will use random
-          versionVector: new Uint8Array(0),
-          savedAt: 0,
-        });
+      // Only accept SnapshotRecord format (has snapshot + peerIdStr fields).
+      // Old bare Uint8Array format is discarded — project not yet launched.
+      if (result instanceof Uint8Array || !result.snapshot) {
+        console.warn('[loro-persistence] Discarding unrecognized snapshot format, will start fresh');
+        resolve(null);
         return;
       }
-      // New SnapshotRecord format
       resolve(result as SnapshotRecord);
     };
     req.onerror = (e) => reject((e.target as IDBRequest).error);
   });
-}
-
-// ---- Legacy API (kept for backward compatibility, delegates to new format) ----
-
-/**
- * @deprecated Use saveSnapshotRecord() instead. Kept for tests and migration.
- */
-export async function saveSnapshot(workspaceId: string, data: Uint8Array): Promise<void> {
-  const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, 'readwrite');
-    const store = tx.objectStore(STORE_NAME);
-    const req = store.put(data, workspaceId);
-    req.onsuccess = () => resolve();
-    req.onerror = (e) => reject((e.target as IDBRequest).error);
-  });
-}
-
-/**
- * @deprecated Use loadSnapshotRecord() instead. Kept for tests and migration.
- */
-export async function loadSnapshot(workspaceId: string): Promise<Uint8Array | null> {
-  const record = await loadSnapshotRecord(workspaceId);
-  if (!record) return null;
-  return record.snapshot;
 }
 
 export async function deleteSnapshot(workspaceId: string): Promise<void> {

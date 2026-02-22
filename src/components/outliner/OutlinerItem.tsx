@@ -341,6 +341,7 @@ export function OutlinerItem({
   const [refQuery, setRefQuery] = useState('');
   const [refSelectedIndex, setRefSelectedIndex] = useState(0);
   const [refAnchor, setRefAnchor] = useState<TriggerAnchorRect | undefined>(undefined);
+  const [refTreeContextParentId, setRefTreeContextParentId] = useState<string | null>(null);
   const refRangeRef = useRef<{ from: number; to: number }>({ from: 0, to: 0 });
   const refDropdownRef = useRef<ReferenceDropdownHandle>(null);
 
@@ -1873,17 +1874,28 @@ export function OutlinerItem({
 
   const handleReference = useCallback((query: string, from: number, to: number, anchor?: TriggerAnchorRect) => {
     refRangeRef.current = { from, to };
+    const ed = editorRef.current;
+    if (isEditorViewAlive(ed)) {
+      const fullText = ed.state.doc.textContent;
+      const beforeAt = fullText.substring(0, from - 1);
+      const afterQuery = fullText.substring(to - 1);
+      const isEmptyAround = beforeAt.trim() === '' && afterQuery.trim() === '';
+      setRefTreeContextParentId(isEmptyAround ? parentId : null);
+    } else {
+      setRefTreeContextParentId(null);
+    }
     setRefQuery(query);
     setRefSelectedIndex(0);
     setRefAnchor(anchor);
     if (!refOpen) setRefOpen(true);
-  }, [refOpen]);
+  }, [refOpen, parentId]);
 
   const handleReferenceDeactivate = useCallback(() => {
     setRefOpen(false);
     setRefQuery('');
     setRefSelectedIndex(0);
     setRefAnchor(undefined);
+    setRefTreeContextParentId(null);
   }, []);
 
   const handleReferenceSelect = useCallback(
@@ -1957,6 +1969,7 @@ export function OutlinerItem({
       setRefQuery('');
       setRefSelectedIndex(0);
       setRefAnchor(undefined);
+      setRefTreeContextParentId(null);
     },
     [nodeId, parentId, addReference, trashNode, setExpanded, setFocusedNode, startRefConversion, setPendingRefConversion],
   );
@@ -2427,6 +2440,7 @@ export function OutlinerItem({
               query={refQuery}
               selectedIndex={refSelectedIndex}
               currentNodeId={nodeId}
+              treeReferenceParentId={refTreeContextParentId}
               anchor={refAnchor}
             />
           )}

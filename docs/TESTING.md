@@ -791,6 +791,7 @@ hash trigger cleanup safety（3 cases, Bug #53 + CJK hashtag 回归）:
 1. 空 query 时 recent 列表可由“全局最近编辑节点”补齐（避免仅显示 `Library`）
 2. 历史来源优先级高于 fallback（按 panelHistory 最近访问顺序）
 3. history + fallback 去重，且过滤 container/结构节点
+4. 树引用上下文下非法目标在 selector 中被禁用，并可给出禁用原因（self / 循环引用）
 
 ### 1.57 Workspace Home 节点兜底创建
 

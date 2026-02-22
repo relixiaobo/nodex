@@ -48,6 +48,7 @@ _(空)_
 > **迭代日志**:
 > - [2026-02-22 nodex-codex] 任务认领，准备在新 PR 中收口 reference 环路规则并实现防护。
 > - [2026-02-22 nodex-codex] 落地 `reference-rules` 统一判定：树引用创建前按“显示图无环”校验；UI 空节点 `@` 选择非法目标时 toast warning；渲染层新增循环展开兜底防卡死。
+> - [2026-02-22 nodex-codex] 将非法树引用前移到 `ReferenceSelector`：仅在树引用上下文禁用候选项，并通过 hover/高亮展示禁用原因；inline 引用上下文不受限制。
 
 ---
 

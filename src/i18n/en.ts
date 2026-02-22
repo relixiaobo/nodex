@@ -1,4 +1,8 @@
 export const enMessages = {
+  common: {
+    untitled: 'Untitled',
+    todayPrefix: 'Today, {name}',
+  },
   reference: {
     blocked: {
       selfChild: 'Cannot reference a node as its own child',
@@ -48,6 +52,42 @@ export const enMessages = {
   nodePicker: {
     create: 'Create "{name}"',
     createPrefix: 'Create',
+  },
+  dateNavigationBar: {
+    previousDay: 'Previous day',
+    nextDay: 'Next day',
+    goToToday: 'Go to today',
+    today: 'Today',
+    pickDate: 'Pick a date',
+  },
+  datePicker: {
+    datePlaceholder: 'YYYY/MM/DD',
+    settingEndDate: 'End date',
+    settingIncludeTime: 'Include time',
+    clear: 'Clear',
+    today: 'Today',
+  },
+  breadcrumb: {
+    toggleSidebar: 'Toggle sidebar',
+    goToParent: 'Go to parent',
+    goToWorkspaceRoot: 'Go to workspace root',
+    search: 'Search (Cmd+K)',
+  },
+  nodeHeader: {
+    dragToMove: 'Drag to move (right-click for menu)',
+  },
+  floatingToolbar: {
+    linkPlaceholder: 'https://example.com',
+    applyLink: 'Apply link',
+    cancel: 'Cancel',
+    removeLink: 'Remove link',
+    bold: 'Bold',
+    italic: 'Italic',
+    strikethrough: 'Strikethrough',
+    code: 'Code',
+    highlight: 'Highlight',
+    heading: 'Heading',
+    link: 'Link',
   },
 } as const;
 

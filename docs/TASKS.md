@@ -53,6 +53,7 @@ _(空)_
 > - [2026-02-22 nodex-codex] 扩展轻量 i18n 使用范围到 `TagSelector` / `SlashCommandMenu`（空态与创建文案），验证 `t()` 插值与 key 覆盖。
 > - [2026-02-22 nodex-codex] 将 `ReferenceSelector` 剩余 section/empty/create 文案（Dates/Recently used/Nodes/No matches/Create）迁移到 i18n，补齐 reference 链路示范。
 > - [2026-02-22 nodex-codex] 新增非阻塞 `check:i18n-copy` 扫描脚本（组件裸文案 advisory 报告），并完成下一批迁移：`ReferenceSelector` 日期快捷词、`CommandPalette`、`NodePicker` 的关键用户文案。
+> - [2026-02-22 nodex-codex] Batch 2 完成：迁移 `DateNavigationBar` / `DatePicker`（直接按钮/placeholder/setting 文案）、`Breadcrumb` / `NodeHeader`（tooltip + Today 前缀 + Untitled）、`FloatingToolbar`（title/placeholder）；`check:i18n-copy` 报告对应条目已消失。仍保留 `DatePicker` 月份/星期格式常量待后续用 `Intl` 单独处理。
 
 ---
 

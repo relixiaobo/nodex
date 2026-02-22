@@ -839,7 +839,7 @@ hash trigger cleanup safety（3 cases, Bug #53 + CJK hashtag 回归）:
 1. `t(key)` 读取英文默认文案（en-only 基础层）
 2. 缺失 key fallback 返回原 key（便于开发期发现漏翻）
 3. `getLocale/setLocale` 与基础文案读取保持稳定（后续多语言扩展入口）
-4. 覆盖 reference/tag/slash/search/node-picker 关键 UI 文案 key（含 `ReferenceSelector` / `TagSelector` 的 `Create "{name}"` 插值）
+4. 覆盖 reference/tag/slash/search/node-picker/date/breadcrumb/floating-toolbar 关键 UI 文案 key（含 `ReferenceSelector` / `TagSelector` 的 `Create "{name}"` 插值与 `Today, {name}`）
 2. hidden field 仅在“已手动 reveal”时进入 drag-select 根列表
 
 ### 1.60 OutlinerView 渲染安全（白屏回归）

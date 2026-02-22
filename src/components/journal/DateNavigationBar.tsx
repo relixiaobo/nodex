@@ -15,6 +15,7 @@ import { ensureTodayNode, ensureDateNode, getAdjacentDayNodeId, getDayNoteCounts
 import { parseDayNodeName, parseYearNodeName } from '../../lib/date-utils.js';
 import * as loroDoc from '../../lib/loro-doc.js';
 import { CalendarGrid } from '../fields/DatePicker.js';
+import { t } from '../../i18n/strings.js';
 
 interface DateNavigationBarProps {
   dayNodeId: string;
@@ -136,7 +137,7 @@ export function DateNavigationBar({ dayNodeId }: DateNavigationBarProps) {
       <button
         onClick={handlePrevDay}
         className="flex h-7 w-7 items-center justify-center rounded-md hover:bg-foreground/5 hover:text-foreground transition-colors"
-        title="Previous day"
+        title={t('dateNavigationBar.previousDay')}
       >
         <ChevronLeft size={16} strokeWidth={1.5} />
       </button>
@@ -145,7 +146,7 @@ export function DateNavigationBar({ dayNodeId }: DateNavigationBarProps) {
       <button
         onClick={handleNextDay}
         className="flex h-7 w-7 items-center justify-center rounded-md hover:bg-foreground/5 hover:text-foreground transition-colors"
-        title="Next day"
+        title={t('dateNavigationBar.nextDay')}
       >
         <ChevronRight size={16} strokeWidth={1.5} />
       </button>
@@ -154,9 +155,9 @@ export function DateNavigationBar({ dayNodeId }: DateNavigationBarProps) {
       <button
         onClick={handleToday}
         className="flex h-7 items-center rounded-md px-2 text-sm hover:bg-foreground/5 hover:text-foreground transition-colors"
-        title="Go to today"
+        title={t('dateNavigationBar.goToToday')}
       >
-        Today
+        {t('dateNavigationBar.today')}
       </button>
 
       {/* Calendar icon */}
@@ -167,7 +168,7 @@ export function DateNavigationBar({ dayNodeId }: DateNavigationBarProps) {
             ? 'bg-foreground/12 text-foreground'
             : 'hover:bg-foreground/5 hover:text-foreground'
         }`}
-        title="Pick a date"
+        title={t('dateNavigationBar.pickDate')}
       >
         <Calendar size={14} />
       </button>

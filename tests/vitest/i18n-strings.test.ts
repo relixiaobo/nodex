@@ -11,6 +11,11 @@ describe('i18n strings', () => {
     expect(t('search.commandPalette.placeholder')).toBe('Search nodes...');
     expect(t('tag.selector.noTagsAvailable')).toBe('No tags available');
     expect(t('nodePicker.createPrefix')).toBe('Create');
+    expect(t('dateNavigationBar.previousDay')).toBe('Previous day');
+    expect(t('datePicker.clear')).toBe('Clear');
+    expect(t('breadcrumb.search')).toBe('Search (Cmd+K)');
+    expect(t('nodeHeader.dragToMove')).toBe('Drag to move (right-click for menu)');
+    expect(t('floatingToolbar.link')).toBe('Link');
   });
 
   it('falls back to key when message is missing', () => {
@@ -25,5 +30,6 @@ describe('i18n strings', () => {
     expect(t('reference.selector.create', { name: 'Node' })).toBe('Create "Node"');
     expect(t('tag.selector.create', { name: 'Task' })).toBe('Create "Task"');
     expect(t('nodePicker.create', { name: 'Option' })).toBe('Create "Option"');
+    expect(t('common.todayPrefix', { name: 'Feb 22' })).toBe('Today, Feb 22');
   });
 });

@@ -1209,6 +1209,25 @@ createSibling 自动标签（2 cases）:
 | 19 | getDayNoteCountsForMonth 排除 fieldEntry | 仅计算内容子节点 |
 | 20 | getDayNoteCountsForMonth 无内容日 | 0-count 日不出现在 Map 中 |
 
+### 1.62 反向链接查询与计数
+
+**测试文件**: `tests/vitest/backlinks.test.ts`
+
+**覆盖点**:
+
+| # | 场景 | 验证 |
+|---|------|------|
+| 1 | 无引用节点 | totalCount === 0, mentionedIn/fieldValueRefs 为空 |
+| 2 | 树引用检测 | mentionedIn 含 refType='tree', referencingNodeId 正确 |
+| 3 | 内联引用检测 | mentionedIn 含 refType='inline' |
+| 4 | 字段值引用检测 | fieldValueRefs 按 fieldDefName 分组，ownerNodeId 正确 |
+| 5 | TRASH 排除 | 已 trash 的引用不计入结果 |
+| 6 | 多类型引用累加 | totalCount = mentionedIn + fieldValueRefs 总和 |
+| 7 | 面包屑路径 | 祖先链包含 Library/Project/Task |
+| 8 | 字段值分组 | 多个节点引用同一 option → 同一 fieldDefName 下多条 |
+| 9 | buildBacklinkCountMap | 全局计数正确，tree ref 递增 |
+| 10 | buildBacklinkCountMap TRASH 排除 | trash 后计数减少 |
+
 ---
 
 ## Phase 2: 视觉检查点

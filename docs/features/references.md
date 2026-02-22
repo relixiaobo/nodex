@@ -76,7 +76,7 @@
 - 原始节点名称变更时，所有内联引用自动更新显示
 - 编辑模式下内联引用显示为不可编辑的 inline chip
 
-### 反向链接（Backlinks）— 未实现
+### 反向链接（Backlinks）
 
 > 研究文档：`docs/research/tana-backlinks-ui.md`
 
@@ -115,7 +115,7 @@
 - **字段值引用**: `type='fieldEntry'` 的节点，其 children 包含 `nodeId`
 - **性能**: 需要在 LoroDoc 层建立反向索引（`nodeId → Set<referencing nodeId>`）
 
-### 引用计数 Badge — 未实现
+### 引用计数 Badge
 
 - 节点行**右侧**浮现半透明引用计数数字
 - 仅在节点**未聚焦/未 zoom in** 时显示
@@ -142,6 +142,9 @@
 | 2026-02-22 | 反向链接分两组: "Mentioned in" + "Appears as [Field] in" | 匹配 Tana 分组逻辑，字段引用比普通引用有更强语义 |
 | 2026-02-22 | 反向链接默认折叠，标题显示总计数 | 避免页面过长，与 Tana 一致 |
 | 2026-02-22 | 暂不实现 Unlinked mentions | 需要全文索引支持，P3 再考虑 |
+| 2026-02-22 | 反向链接 section 实现（computeBacklinks + BacklinksSection） | 全量扫描 LoroDoc，三类引用（tree/inline/fieldValue），TRASH 排除 |
+| 2026-02-22 | 引用计数 badge（useBacklinkCount + OutlinerItem） | 行右侧 10px 半透明数字，点击 navigateTo zoom in 查看完整 references |
+| 2026-02-22 | 字段值引用检测：检查 child.targetId 而非 child.type==='reference' | Options 字段的值节点没有 type='reference'，只有 targetId 属性 |
 
 ## 当前状态
 
@@ -153,8 +156,8 @@
 - [x] 删除引用不删除原始节点
 - [x] 引用节点单击选中（fit-content 边框）、双击编辑
 - [x] 空节点 `@` 创建后进入转换模式，可继续输入
-- [ ] 反向链接 section
-- [ ] 引用计数 badge
+- [x] 反向链接 section（"Mentioned in..." + "Appears as [Field] in..." 分组）
+- [x] 引用计数 badge（OutlinerItem 行右侧半透明数字）
 - [ ] 合并节点
 
 ## 与 Tana 的已知差异

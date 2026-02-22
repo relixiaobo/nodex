@@ -27,7 +27,7 @@ _(空)_
 
 | Agent | 当前任务 | 分支 | 修改中的文件 |
 |-------|---------|------|-------------|
-| nodex-cc | _(idle)_ | — | — |
+| nodex-cc | Sync 增量同步（Cloudflare-only）— Step 0 起 | `cc/sync-phase1` | `docs/plans/sync-incremental-impl.md`, `server/*` |
 | nodex-cc-2 | _(idle)_ | — | — |
 | nodex-codex | _(idle)_ | — | — |
 
@@ -46,7 +46,7 @@ _(空)_
 #### Sync 增量同步（Phase 1-2 合并实施）— Cloudflare-only 全栈
 > Phase 0 客户端预留已完成（PR #75 + #77 + #78）。基础设施：**Cloudflare-only**（Workers + R2 + D1 + Better Auth），完全消除 Supabase 依赖。
 > 跳过纯备份（Phase 1），直接实现多端增量同步（Phase 2）。
-> **Owner**: _(待分配 nodex-cc 执行)_
+> **Owner**: nodex-cc
 > **Plan**: `docs/plans/sync-incremental-impl.md` | **Arch**: `docs/plans/sync-architecture.md` | **Auth**: `docs/plans/auth-cloudflare-only.md`
 >
 > **当前状态**: 计划已 Review + Cloudflare-only 修订完成，可交 nodex-cc 执行

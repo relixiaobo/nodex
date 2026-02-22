@@ -122,19 +122,27 @@ export function App({ skipBootstrap = false }: AppProps) {
   // Global Cmd+Shift+D for go to today
   useTodayShortcut();
 
+  const handleAppPointerDownCapture = (event: React.PointerEvent<HTMLDivElement>) => {
+    const state = useUIStore.getState();
+    if (state.selectedNodeIds.size === 0) return;
+    // Preserve multi-select modifier gestures (Cmd/Ctrl/Shift+click).
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+
+    const target = event.target instanceof HTMLElement ? event.target : null;
+    if (!shouldClearSelectionOnPointerDown(target)) return;
+    state.clearSelection();
+  };
+
+  const handleAppFocusCapture = (event: React.FocusEvent<HTMLDivElement>) => {
+    const state = useUIStore.getState();
+    if (state.selectedNodeIds.size === 0) return;
+
+    const target = event.target instanceof HTMLElement ? event.target : null;
+    if (!shouldClearSelectionOnFocusIn(target)) return;
+    state.clearSelection();
+  };
+
   useEffect(() => {
-    const handlePointerDown = (event: PointerEvent) => {
-      const state = useUIStore.getState();
-      if (state.selectedNodeIds.size === 0) return;
-      // Preserve multi-select modifier gestures (Cmd/Ctrl/Shift+click).
-      if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-
-      const target = event.target instanceof HTMLElement ? event.target : null;
-      if (!shouldClearSelectionOnPointerDown(target)) return;
-
-      state.clearSelection();
-    };
-
     const handleFocusIn = (event: FocusEvent) => {
       const state = useUIStore.getState();
       if (state.selectedNodeIds.size === 0) return;
@@ -145,10 +153,8 @@ export function App({ skipBootstrap = false }: AppProps) {
       state.clearSelection();
     };
 
-    document.addEventListener('pointerdown', handlePointerDown, true);
     document.addEventListener('focusin', handleFocusIn, true);
     return () => {
-      document.removeEventListener('pointerdown', handlePointerDown, true);
       document.removeEventListener('focusin', handleFocusIn, true);
     };
   }, []);
@@ -162,7 +168,11 @@ export function App({ skipBootstrap = false }: AppProps) {
   }
 
   return (
-    <div className="flex h-screen w-full overflow-hidden bg-background text-foreground">
+    <div
+      className="flex h-screen w-full overflow-hidden bg-background text-foreground"
+      onPointerDownCapture={handleAppPointerDownCapture}
+      onFocusCapture={handleAppFocusCapture}
+    >
       {sidebarOpen && <Sidebar />}
       <PanelStack />
       <CommandPalette />

@@ -12,7 +12,10 @@ import * as loroDoc from '../../lib/loro-doc.js';
 import { ensureWorkspaceHomeNode } from '../../lib/workspace-root.js';
 import { findUnexpectedShortcutConflicts } from '../../lib/shortcut-registry.js';
 import { Toaster } from 'sonner';
-import { shouldClearSelectionOnPointerDown } from '../../lib/row-pointer-selection.js';
+import {
+  shouldClearSelectionOnFocusIn,
+  shouldClearSelectionOnPointerDown,
+} from '../../lib/row-pointer-selection.js';
 
 const CONTAINER_DEFS: Array<{ id: string; name: string }> = [
   { id: CONTAINER_IDS.LIBRARY, name: 'Library' },
@@ -123,6 +126,8 @@ export function App({ skipBootstrap = false }: AppProps) {
     const handlePointerDown = (event: PointerEvent) => {
       const state = useUIStore.getState();
       if (state.selectedNodeIds.size === 0) return;
+      // Preserve multi-select modifier gestures (Cmd/Ctrl/Shift+click).
+      if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
 
       const target = event.target instanceof HTMLElement ? event.target : null;
       if (!shouldClearSelectionOnPointerDown(target)) return;
@@ -135,7 +140,7 @@ export function App({ skipBootstrap = false }: AppProps) {
       if (state.selectedNodeIds.size === 0) return;
 
       const target = event.target instanceof HTMLElement ? event.target : null;
-      if (!shouldClearSelectionOnPointerDown(target)) return;
+      if (!shouldClearSelectionOnFocusIn(target)) return;
 
       state.clearSelection();
     };

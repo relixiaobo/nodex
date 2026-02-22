@@ -18,10 +18,18 @@ export function resolveRowPointerSelectAction(params: {
 }
 
 export function shouldClearSelectionOnPointerDown(target: HTMLElement | null): boolean {
-  if (!target) return true;
+  void target;
+  // Unmodified pointer interactions should always exit multi-selection mode.
+  return true;
+}
 
-  // Keep selection only when interacting with a concrete outliner row.
-  // Blank regions (including trailing-input area whitespace) should clear selection.
-  const rowLikeTarget = target.closest('[data-node-id][data-parent-id], [data-field-row]');
-  return !rowLikeTarget;
+function isOutlinerRowTarget(target: HTMLElement | null): boolean {
+  if (!target) return false;
+  return !!target.closest('[data-node-id][data-parent-id], [data-field-row]');
+}
+
+export function shouldClearSelectionOnFocusIn(target: HTMLElement | null): boolean {
+  // Keep selection while focus remains inside a concrete outliner row/editor.
+  // Clear when focus moves to any non-row surface (sidebar, toolbar, blank chrome, etc.).
+  return !isOutlinerRowTarget(target);
 }

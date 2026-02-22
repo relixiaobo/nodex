@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   resolveRowPointerSelectAction,
+  shouldClearSelectionOnFocusIn,
   shouldClearSelectionOnPointerDown,
 } from '../../src/lib/row-pointer-selection.js';
 
@@ -60,13 +61,26 @@ describe('resolveRowPointerSelectAction', () => {
     })).toBe(null);
   });
 
-  it('clears selection when pointer target is not a concrete outliner row', () => {
+  it('always clears selection on plain pointer interactions', () => {
     const outside = document.createElement('div');
     expect(shouldClearSelectionOnPointerDown(outside)).toBe(true);
+    expect(shouldClearSelectionOnPointerDown(null)).toBe(true);
+
+    const row = document.createElement('div');
+    row.setAttribute('data-node-id', 'n1');
+    row.setAttribute('data-parent-id', 'root_1');
+    const rowInner = document.createElement('span');
+    row.appendChild(rowInner);
+    expect(shouldClearSelectionOnPointerDown(rowInner)).toBe(true);
+  });
+
+  it('keeps selection only when focus remains inside outliner rows', () => {
+    const outside = document.createElement('div');
+    expect(shouldClearSelectionOnFocusIn(outside)).toBe(true);
 
     const sidebarLikeNode = document.createElement('div');
     sidebarLikeNode.setAttribute('data-node-id', 'sidebar_node');
-    expect(shouldClearSelectionOnPointerDown(sidebarLikeNode)).toBe(true);
+    expect(shouldClearSelectionOnFocusIn(sidebarLikeNode)).toBe(true);
 
     const scope = document.createElement('div');
     const row = document.createElement('div');
@@ -75,14 +89,14 @@ describe('resolveRowPointerSelectAction', () => {
     const rowInner = document.createElement('span');
     row.appendChild(rowInner);
     scope.appendChild(row);
-    expect(shouldClearSelectionOnPointerDown(rowInner)).toBe(false);
+    expect(shouldClearSelectionOnFocusIn(rowInner)).toBe(false);
 
     const fieldRow = document.createElement('div');
     fieldRow.setAttribute('data-field-row', 'true');
     const fieldInner = document.createElement('span');
     fieldRow.appendChild(fieldInner);
     scope.appendChild(fieldRow);
-    expect(shouldClearSelectionOnPointerDown(fieldInner)).toBe(false);
+    expect(shouldClearSelectionOnFocusIn(fieldInner)).toBe(false);
 
     const trailing = document.createElement('div');
     trailing.setAttribute('data-trailing-parent-id', 'root_1');
@@ -90,11 +104,11 @@ describe('resolveRowPointerSelectAction', () => {
     trailingEditor.className = 'ProseMirror';
     trailing.appendChild(trailingEditor);
     scope.appendChild(trailing);
-    expect(shouldClearSelectionOnPointerDown(trailingEditor)).toBe(true);
+    expect(shouldClearSelectionOnFocusIn(trailingEditor)).toBe(true);
 
     const editor = document.createElement('div');
     editor.className = 'ProseMirror';
     scope.appendChild(editor);
-    expect(shouldClearSelectionOnPointerDown(editor)).toBe(true);
+    expect(shouldClearSelectionOnFocusIn(editor)).toBe(true);
   });
 });

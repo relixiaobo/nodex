@@ -29,13 +29,23 @@ _(空)_
 |-------|---------|------|-------------|
 | nodex-cc | _(idle)_ | — | — |
 | nodex-cc-2 | _(idle)_ | — | — |
-| nodex-codex | _(idle)_ | — | — |
+| nodex-codex | Reference 引用环路防护（自引用/祖先引用规则） | codex/reference-cycle-guard | `docs/TASKS.md`, `docs/features/references.md`, `src/stores/node-store.ts`, `tests/vitest/*reference*.test.ts` |
 
 ---
 
 ## 进行中
 
-_(空)_
+### Reference 引用环路防护（自引用/祖先引用规则）
+> **Owner**: nodex-codex | **Branch**: codex/reference-cycle-guard
+> **目标**: 明确 reference 的允许/禁止规则，并在创建入口阻止会导致递归卡死的环路引用
+> **Files**: `docs/features/references.md`, `src/stores/node-store.ts`, `src/**/*reference*.ts`, `tests/vitest/*reference*.test.ts`
+> **Progress**:
+> - [ ] 梳理现有 reference 创建入口与渲染递归路径
+> - [ ] 定义统一引用校验规则（允许/禁止矩阵）
+> - [ ] 在 store/action 层落地环路防护并补测试
+> - [ ] 更新 references spec 文档
+> **迭代日志**:
+> - [2026-02-22 nodex-codex] 任务认领，准备在新 PR 中收口 reference 环路规则并实现防护。
 
 ---
 

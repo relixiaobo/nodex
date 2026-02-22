@@ -1,6 +1,6 @@
 # Sync Architecture Plan
 
-> 状态: **规划中** | 创建: 2026-02-22 | 最后更新: 2026-02-22
+> 状态: **规划中** | 创建: 2026-02-22 | 最后更新: 2026-02-22 (基础设施选型)
 
 ## 目标
 
@@ -20,15 +20,16 @@
 | Auth | Supabase Google OAuth | 已实现。JWT 可移植，不绑定 sync 层 |
 | 同步协议 | 采用 `loro-dev/protocol` 官方线协议 | 已有 WebSocket 客户端/服务端、room 复用、E2E 加密、auth hook |
 | Awareness | 已有 `awareness.ts` + 未来 `LoroEphemeralAdaptor` | presence 不落库，与持久 update 分通道 |
+| Blob 存储 | **Cloudflare R2** | 零出口费（CRDT 同步场景关键）、$0.015/GB/月、10 GB 免费、S3 兼容 |
+| 同步网关 | **Cloudflare Workers** | 100 MB 请求体（CRDT 大快照无障碍）、<5ms 冷启动、$5/月基价 |
+| 元数据 + Auth | **Supabase**（保留） | Postgres 存 sync cursors/权限、Google OAuth JWT 可移植 |
 
 ### 延后决策（各 Phase 开始时再定）
 
 | 决策 | 时机 | 选项 |
 |------|------|------|
-| Blob 存储 | Phase 1 | Supabase Storage（集成简单） vs Cloudflare R2（零出口费） |
-| 同步网关 | Phase 2 | Supabase Edge Functions vs Cloudflare Workers |
-| 实时层 | Phase 3 | `loro-websocket` SimpleServer vs Cloudflare Durable Objects vs PartyKit |
-| 全套方案 vs 自建 | Phase 2 | `@loro-extended` 适配器 vs 基于 `loro-protocol` 自建 |
+| 实时层 | Phase 3 | Cloudflare Durable Objects（首选，自然演进）vs `loro-websocket` SimpleServer |
+| 全套方案 vs 自建 | Phase 2 | 基于 `loro-protocol` 自建（首选）vs `@loro-extended` 适配器 |
 
 ---
 
@@ -213,6 +214,126 @@ const meta = decodeImportBlobMeta(blob, true);
 
 ---
 
+## 基础设施选型调研（2026-02-22）
+
+> **结论**：采用 **Supabase（Auth + Postgres）+ Cloudflare（Workers + R2）** 混合架构。
+> 各取所长：Supabase 管身份和元数据，Cloudflare 管计算和存储。
+
+### 选型驱动因素
+
+CRDT 同步场景有两个特殊需求，直接决定了选型方向：
+
+1. **大二进制 payload**：Loro 快照/增量 update 是 `Uint8Array`，典型大小 1-50 MB。API 端点必须能接收和返回这个量级的二进制数据。
+2. **高频读取出口**：每次 pull 同步都要从存储下载数据。用户越多、设备越多，出口流量线性增长。出口计费模型直接影响可持续性。
+
+### 方案 A：Supabase 全家桶（Storage + Edge Functions）
+
+**优势**：
+- 一站式控制台，Auth / Postgres / Storage / Functions 统一管理
+- Edge Functions 对 Supabase Auth JWT 验证开箱即用（一行代码）
+- 已有 Google OAuth 集成，无需额外接入
+- 团队只需掌握一套体系
+
+**劣势**：
+- **Edge Functions 请求体限制 ~4 MB**——无法直接传输大 CRDT 快照，必须分片或走 presigned URL 绕过
+- Storage 出口流量 $0.09/GB（Pro 含 250 GB 后），同步场景下成本增长快
+- Realtime 是行级变更流，不适合 CRDT 传输，Phase 3 需另找方案
+- Edge Functions 冷启动较慢（几十到几百毫秒）
+
+| 资源 | 免费额度 | Pro ($25/月) |
+|------|---------|-------------|
+| Storage 存储 | 1 GB | 100 GB 含 |
+| Storage 出口 | 2 GB | 250 GB 含，超出 $0.09/GB |
+| Edge Functions 调用 | 50 万次/月 | 含在 Pro 内 |
+| Edge Functions CPU | 2s/请求 | 2s/请求 |
+| Edge Functions 请求体 | ~4 MB | ~4 MB |
+| Edge Functions 墙钟 | 150s | 400s |
+| Edge Functions 内存 | 256 MB | 256 MB |
+
+### 方案 B：Cloudflare 组合（R2 + Workers）
+
+**优势**：
+- **R2 零出口费**——同步场景下成本可控
+- **Workers 100 MB 请求体**——CRDT 大快照无障碍
+- < 5ms 冷启动（V8 isolate 模型，冷启动在 TLS 握手期间完成）
+- Durable Objects 为 Phase 3 实时协作提供天然升级路径
+- $5/月基价 vs Supabase $25/月
+
+**劣势**：
+- 需自行验证 Supabase JWT（额外几十行代码）
+- 运维两套平台（Supabase 管 Auth + Postgres，Cloudflare 管计算 + 存储）
+- Workers 内存 128 MB，50 MB 快照需流式处理不能全缓冲
+- Hyperdrive 连接 Supabase Postgres 需额外配置
+
+| 资源 | 免费额度 | 付费 ($5/月) |
+|------|---------|-------------|
+| R2 存储 | 10 GB | $0.015/GB/月 |
+| R2 出口 | **无限** | **无限** |
+| R2 写操作 | 100 万次/月 | $4.50/百万次 |
+| R2 读操作 | 1000 万次/月 | $0.36/百万次 |
+| Workers 请求 | 10 万次/天 | 1000 万次/月 含 |
+| Workers CPU | 10ms/请求 | 30s/请求 |
+| Workers 请求体 | 100 MB | 100 MB |
+| Workers 墙钟 | 无硬限制 | 无硬限制 |
+| Workers 内存 | 128 MB | 128 MB |
+| Hyperdrive | 10 万查询/天 | 含在 $5/月内 |
+
+### 对比决策矩阵
+
+| 维度 | Supabase | Cloudflare | 胜出 |
+|------|----------|-----------|------|
+| 请求体大小 | ~4 MB | 100 MB | **Cloudflare**（决定性） |
+| 出口流量费 | $0.09/GB | $0 | **Cloudflare**（决定性） |
+| 基础月费 | $25 | $5 | Cloudflare |
+| 冷启动 | 几十~几百 ms | < 5 ms | Cloudflare |
+| Auth 集成 | 原生一行代码 | 需自行验证 JWT | Supabase |
+| 开发体验 | 一站式 | 双平台 | Supabase |
+| Phase 3 扩展 | 需另选实时层 | DO 天然升级 | Cloudflare |
+| Postgres 访问 | 原生 | Hyperdrive | Supabase（略优） |
+
+### 成本估算（5 设备 × 20 次/天 × 5 MB 平均）
+
+| 项目 | Supabase | Cloudflare |
+|------|----------|-----------|
+| 基础月费 | $25 | $5 |
+| 存储（10 GB） | $0.21 | $0.15 |
+| 计算（~3000 次/月） | 含在 Pro 内 | 含在 $5 内 |
+| 出口（~150 GB/月） | ~$13.50 | $0 |
+| **合计** | **~$38.71/月** | **~$5.15/月** |
+
+### 最终决策
+
+**采用 Cloudflare Workers + R2**，搭配 **Supabase Auth + Postgres**。
+
+决策理由：
+1. **4 MB 请求体限制是硬伤**——绕过它的分片协议/presigned URL 复杂度不亚于直接用 Workers
+2. **零出口费在同步场景下价值巨大**——用户和设备增长后差距会持续放大
+3. **Phase 3 升级路径清晰**——Workers → Durable Objects 是同一平台的自然演进
+4. **Supabase 继续承担擅长的部分**——Auth（JWT 可移植）和 Postgres（元数据/权限/cursors）
+
+### Phase 3 展望：Durable Objects
+
+Cloudflare Durable Objects 几乎为 CRDT 实时协作量身打造：
+
+| 能力 | 说明 |
+|------|------|
+| 每工作区一个 DO 实例 | 天然的文档级"房间"，强一致性 |
+| 原生 WebSocket | 单 DO 可管理数千并发连接 |
+| WebSocket Hibernation | 空闲连接近零成本（不计 duration） |
+| 内置 SQLite | 每 DO 10 GB，可存 update log |
+| WebSocket 计费 | 20 条消息 = 1 次请求（极低） |
+| Alarms | 定时 compaction / 清理 |
+
+| 资源 | 免费/天 | 付费（含/月） | 超出 |
+|------|--------|-------------|------|
+| DO 请求 | 10 万 | 100 万 | $0.15/百万 |
+| DO duration | 13K GB-s | 40 万 GB-s | $12.50/百万 GB-s |
+| SQLite 读 | 500 万/天 | 250 亿 | $0.001/百万 |
+| SQLite 写 | 10 万/天 | 5000 万 | $1.00/百万 |
+| SQLite 存储 | 5 GB | 5 GB-月 | $0.20/GB-月 |
+
+---
+
 ## 竞品参考
 
 | 产品 | 架构 | 要点 |
@@ -328,9 +449,7 @@ Postgres (元数据):
 - 手动：用户点击"备份"按钮
 - 自动：每 N 分钟（如果有变更）
 
-**基础设施选择（Phase 1 开始时决定）**：
-- 简单路线：Supabase Storage + Edge Function
-- 性能路线：Cloudflare R2 + Worker
+**基础设施**：Cloudflare R2（存储）+ Cloudflare Workers（API）+ Supabase Postgres（元数据）。详见 §基础设施选型调研。
 
 ### Phase 2: 多端同步（非实时）
 
@@ -424,10 +543,7 @@ Side Panel closed:
 - **连接级权限校验**：权限变更时踢断 WebSocket
 - **Payload 限制**：单条 update 上限（如 1MB），防止恶意/异常客户端
 
-**基础设施选择（Phase 3 开始时决定）**：
-- 简单路线：`loro-websocket` SimpleServer（Node.js/Deno）
-- 扩展路线：Cloudflare Durable Objects（每文档一个 DO，内置 SQLite）
-- 托管路线：PartyKit（已被 Cloudflare 收购，DO 的高级封装）
+**基础设施**：Cloudflare Durable Objects（首选，与 Phase 1-2 的 Workers + R2 同一平台，天然升级路径）。详见 §基础设施选型调研 > Phase 3 展望。
 
 ### Phase 4: 权限与共享
 
@@ -509,8 +625,23 @@ Side Panel closed:
 - [How Notion made offline available](https://www.notion.com/blog/how-we-made-notion-available-offline)
 - [Architectures for Central Server Collaboration (Weidner 2024)](https://mattweidner.com/2024/06/04/server-architectures.html)
 
-### 基础设施
-- [Cloudflare Durable Objects + SQLite](https://blog.cloudflare.com/sqlite-in-durable-objects/)
+### 基础设施（Cloudflare）
+- [Cloudflare Workers Pricing](https://developers.cloudflare.com/workers/platform/pricing/)
+- [Cloudflare Workers Limits](https://developers.cloudflare.com/workers/platform/limits/)
 - [Cloudflare R2 Pricing](https://developers.cloudflare.com/r2/pricing/)
+- [Cloudflare R2 Limits](https://developers.cloudflare.com/r2/platform/limits/)
+- [R2 Workers API](https://developers.cloudflare.com/r2/api/workers/workers-api-reference/)
+- [Cloudflare Durable Objects + SQLite](https://blog.cloudflare.com/sqlite-in-durable-objects/)
+- [Durable Objects Pricing](https://developers.cloudflare.com/durable-objects/platform/pricing/)
+- [Hyperdrive + Supabase](https://developers.cloudflare.com/hyperdrive/examples/connect-to-postgres/postgres-database-providers/supabase/)
+- [Workers Smart Placement](https://developers.cloudflare.com/workers/configuration/smart-placement/)
+- [Eliminating Cold Starts](https://blog.cloudflare.com/eliminating-cold-starts-2-shard-and-conquer/)
+
+### 基础设施（Supabase）
+- [Supabase Pricing](https://supabase.com/pricing)
+- [Supabase Edge Functions Limits](https://supabase.com/docs/guides/functions/limits)
+- [Supabase Storage Pricing](https://supabase.com/docs/guides/storage/pricing)
+
+### Chrome 扩展
 - [Chrome Extension Storage](https://developer.chrome.com/docs/extensions/mv3/storage-and-cookies)
 - [Chrome MV3 Service Worker Lifecycle](https://developer.chrome.com/docs/extensions/develop/concepts/service-workers/lifecycle)

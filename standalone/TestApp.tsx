@@ -8,6 +8,7 @@ import { useEffect, useState } from 'react';
 import { useWorkspaceStore } from '../src/stores/workspace-store';
 import { useUIStore } from '../src/stores/ui-store';
 import { useNodeStore } from '../src/stores/node-store';
+import { useGlobalSelectionDismiss } from '../src/hooks/use-global-selection-dismiss.js';
 import { Sidebar } from '../src/components/sidebar/Sidebar';
 import { PanelStack } from '../src/components/panel/PanelStack';
 import { CommandPalette } from '../src/components/search/CommandPalette';
@@ -64,6 +65,7 @@ function useTestBootstrap(): boolean {
 export function TestApp() {
   const sidebarOpen = useUIStore((s) => s.sidebarOpen);
   const ready = useTestBootstrap();
+  const selectionDismissHandlers = useGlobalSelectionDismiss();
 
   if (!ready) {
     return (
@@ -76,7 +78,11 @@ export function TestApp() {
   const agent = getAgentInfo();
 
   return (
-    <div className="flex h-screen w-full overflow-hidden bg-background text-foreground">
+    <div
+      className="flex h-screen w-full overflow-hidden bg-background text-foreground"
+      onPointerDownCapture={selectionDismissHandlers.onPointerDownCapture}
+      onFocusCapture={selectionDismissHandlers.onFocusCapture}
+    >
       {sidebarOpen && <Sidebar />}
       <PanelStack />
       <CommandPalette />

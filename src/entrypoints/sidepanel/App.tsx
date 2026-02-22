@@ -3,6 +3,8 @@ import { useWorkspaceStore } from '../../stores/workspace-store';
 import { useUIStore } from '../../stores/ui-store';
 import { useNavUndoKeyboard } from '../../hooks/use-nav-undo-keyboard';
 import { useTodayShortcut } from '../../hooks/use-today-shortcut';
+import { useGlobalSelectionDismiss } from '../../hooks/use-global-selection-dismiss.js';
+import { useTodayShortcut } from '../../hooks/use-today-shortcut';
 import { Sidebar } from '../../components/sidebar/Sidebar';
 import { PanelStack } from '../../components/panel/PanelStack';
 import { CommandPalette } from '../../components/search/CommandPalette';
@@ -12,10 +14,6 @@ import * as loroDoc from '../../lib/loro-doc.js';
 import { ensureWorkspaceHomeNode } from '../../lib/workspace-root.js';
 import { findUnexpectedShortcutConflicts } from '../../lib/shortcut-registry.js';
 import { Toaster } from 'sonner';
-import {
-  shouldClearSelectionOnFocusIn,
-  shouldClearSelectionOnPointerDown,
-} from '../../lib/row-pointer-selection.js';
 
 const CONTAINER_DEFS: Array<{ id: string; name: string }> = [
   { id: CONTAINER_IDS.LIBRARY, name: 'Library' },
@@ -108,6 +106,7 @@ interface AppProps {
 export function App({ skipBootstrap = false }: AppProps) {
   const sidebarOpen = useUIStore((s) => s.sidebarOpen);
   const { ready } = useBootstrap(skipBootstrap);
+  const selectionDismissHandlers = useGlobalSelectionDismiss();
 
   useEffect(() => {
     if (!import.meta.env.DEV) return;
@@ -122,58 +121,6 @@ export function App({ skipBootstrap = false }: AppProps) {
   // Global Cmd+Shift+D for go to today
   useTodayShortcut();
 
-  const handleAppPointerDownCapture = (event: React.PointerEvent<HTMLDivElement>) => {
-    const state = useUIStore.getState();
-    if (state.selectedNodeIds.size === 0) return;
-    // Preserve multi-select modifier gestures (Cmd/Ctrl/Shift+click).
-    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-
-    const target = event.target instanceof HTMLElement ? event.target : null;
-    if (!shouldClearSelectionOnPointerDown(target)) return;
-    state.clearSelection();
-  };
-
-  const handleAppFocusCapture = (event: React.FocusEvent<HTMLDivElement>) => {
-    const state = useUIStore.getState();
-    if (state.selectedNodeIds.size === 0) return;
-
-    const target = event.target instanceof HTMLElement ? event.target : null;
-    if (!shouldClearSelectionOnFocusIn(target)) return;
-    state.clearSelection();
-  };
-
-  useEffect(() => {
-    const handleGlobalPointerOrMouseDown = (event: PointerEvent | MouseEvent) => {
-      const state = useUIStore.getState();
-      if (state.selectedNodeIds.size === 0) return;
-      // Preserve multi-select modifier gestures (Cmd/Ctrl/Shift+click).
-      if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-
-      const target = event.target instanceof HTMLElement ? event.target : null;
-      if (!shouldClearSelectionOnPointerDown(target)) return;
-      state.clearSelection();
-    };
-
-    const handleFocusIn = (event: FocusEvent) => {
-      const state = useUIStore.getState();
-      if (state.selectedNodeIds.size === 0) return;
-
-      const target = event.target instanceof HTMLElement ? event.target : null;
-      if (!shouldClearSelectionOnFocusIn(target)) return;
-
-      state.clearSelection();
-    };
-
-    window.addEventListener('pointerdown', handleGlobalPointerOrMouseDown, true);
-    window.addEventListener('mousedown', handleGlobalPointerOrMouseDown, true);
-    document.addEventListener('focusin', handleFocusIn, true);
-    return () => {
-      window.removeEventListener('pointerdown', handleGlobalPointerOrMouseDown, true);
-      window.removeEventListener('mousedown', handleGlobalPointerOrMouseDown, true);
-      document.removeEventListener('focusin', handleFocusIn, true);
-    };
-  }, []);
-
   if (!ready) {
     return (
       <div className="flex h-screen items-center justify-center text-sm text-muted-foreground">
@@ -185,8 +132,8 @@ export function App({ skipBootstrap = false }: AppProps) {
   return (
     <div
       className="flex h-screen w-full overflow-hidden bg-background text-foreground"
-      onPointerDownCapture={handleAppPointerDownCapture}
-      onFocusCapture={handleAppFocusCapture}
+      onPointerDownCapture={selectionDismissHandlers.onPointerDownCapture}
+      onFocusCapture={selectionDismissHandlers.onFocusCapture}
     >
       {sidebarOpen && <Sidebar />}
       <PanelStack />

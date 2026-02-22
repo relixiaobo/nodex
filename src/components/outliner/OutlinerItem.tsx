@@ -76,8 +76,10 @@ import {
 } from '../../lib/pm-editor-view.js';
 import { dragState } from '../../hooks/use-drag-select';
 import { mergeRichTextPayload } from '../../lib/rich-text-merge.js';
+import { getTreeReferenceBlockReason, isReferenceDisplayCycle } from '../../lib/reference-rules.js';
 
 const DESCRIPTION_SHORTCUT_KEYS = getShortcutKeys('editor.edit_description', ['Ctrl-i']);
+const EMPTY_REFERENCE_PATH: readonly string[] = [];
 
 interface OutlinerItemProps {
   nodeId: string;
@@ -94,6 +96,8 @@ interface OutlinerItemProps {
   onNavigateOut?: (direction: 'up' | 'down') => void;
   /** Override bullet colors (e.g. ownerColor for template items in config page). When omitted, colors derive from the node's own supertags. */
   bulletColors?: string[];
+  /** Effective-node path in current display recursion (used to stop cyclic reference expansion). */
+  referencePath?: readonly string[];
 }
 
 function getNodeTextLengthById(nodeId: string): number {
@@ -115,6 +119,19 @@ function focusTrailingInputForParent(parentId: string): boolean {
     return true;
   }
   return false;
+}
+
+function getTreeReferenceBlockMessage(reason: ReturnType<typeof getTreeReferenceBlockReason>): string {
+  switch (reason) {
+    case 'self_parent':
+      return '不能在节点自己的子节点中引用它自己';
+    case 'would_create_display_cycle':
+      return '不能创建该树引用（会形成循环引用）';
+    case 'missing_parent':
+    case 'missing_target':
+    default:
+      return '该引用无法创建';
+  }
 }
 
 export interface OutlinerVisibleChild {
@@ -228,12 +245,28 @@ export function buildVisibleChildrenRows(params: {
   return result;
 }
 
-export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId, fieldDataType, attrDefId, onNavigateOut, bulletColors }: OutlinerItemProps) {
+export function OutlinerItem({
+  nodeId,
+  depth,
+  rootChildIds,
+  parentId,
+  rootNodeId,
+  fieldDataType,
+  attrDefId,
+  onNavigateOut,
+  bulletColors,
+  referencePath = EMPTY_REFERENCE_PATH,
+}: OutlinerItemProps) {
   const node = useNode(nodeId);
   const referenceTargetId = node?.type === 'reference' ? (node.targetId ?? null) : null;
   const referenceTargetNode = useNode(referenceTargetId);
   const effectiveNodeId = referenceTargetId ?? nodeId;
   const effectiveNode = referenceTargetNode ?? node;
+  const isCyclicReferenceExpansion = !!referenceTargetId && isReferenceDisplayCycle(effectiveNodeId, referencePath);
+  const nextReferencePath = useMemo(
+    () => [...referencePath, effectiveNodeId],
+    [referencePath, effectiveNodeId],
+  );
   // Expansion is instance-scoped by design: the same target referenced from two places
   // can keep independent expanded/collapsed state, so the key stays on ref nodeId.
   const expandKey = `${parentId}:${nodeId}`;
@@ -323,7 +356,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   const setEditingFieldName = useUIStore((s) => s.setEditingFieldName);
 
   // Lazy-load children when expanded
-  useChildren(isExpanded ? effectiveNodeId : null);
+  useChildren(isExpanded && !isCyclicReferenceExpansion ? effectiveNodeId : null);
 
   const tagIds = useNodeTags(effectiveNodeId);
   const fields = useNodeFields(effectiveNodeId);
@@ -411,7 +444,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     [visibleChildren],
   );
   // For hasChildren: count non-hidden items (hidden-always fields don't count toward expand chevron)
-  const hasChildren = visibleChildren.some((c) => !c.hidden);
+  const hasChildren = !isCyclicReferenceExpansion && visibleChildren.some((c) => !c.hidden);
   // All hidden fields (including ALWAYS): shown as compact pills, click to temporarily reveal
   const hiddenRevealableFields = useMemo(
     () => visibleChildren
@@ -1868,6 +1901,15 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
 
       if (isEmptyAround) {
         const parent = useNodeStore.getState().getNode(parentId);
+        const blockReason = getTreeReferenceBlockReason(parentId, refNodeId, {
+          hasNode: loroDoc.hasNode,
+          getNode: loroDoc.toNodexNode,
+          getChildren: loroDoc.getChildren,
+        });
+        if (blockReason) {
+          toast.warning(getTreeReferenceBlockMessage(blockReason));
+          return;
+        }
         const alreadyChild = (parent?.children?.some((cid) => {
           if (cid === refNodeId) return true;
           const child = loroDoc.toNodexNode(cid);
@@ -1887,6 +1929,10 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
           const pos = parent?.children?.indexOf(nodeId) ?? -1;
           const insertPos = pos >= 0 ? pos : 0;
           const newRefId = addReference(parentId, refNodeId, insertPos);
+          if (!newRefId) {
+            toast.warning('该引用无法创建（可能会形成循环引用）');
+            return;
+          }
           trashNode(nodeId);
           const tempNodeId = startRefConversion(newRefId, parentId, insertPos);
           setPendingRefConversion({ tempNodeId, refNodeId, parentId });
@@ -2433,7 +2479,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
           style={{ marginLeft: depth * 28 + 6 + 15 + 4 }}
         />
       )}
-      {isExpanded && (
+      {isExpanded && !isCyclicReferenceExpansion && (
         <div className="relative" data-row-scope-parent-id={nodeId} ref={childrenScopeRef}>
           {/* Selection subtree mask: children area, connects to parent row above (global selection only). */}
           {isSelectedGlobal && (
@@ -2543,6 +2589,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
                 rootChildIds={rootChildIds}
                 parentId={effectiveNodeId}
                 rootNodeId={rootNodeId}
+                referencePath={nextReferencePath}
               />
             );
           })}

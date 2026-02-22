@@ -9,6 +9,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useNodeStore } from '../../src/stores/node-store.js';
 import * as loroDoc from '../../src/lib/loro-doc.js';
+import { CONTAINER_IDS } from '../../src/types/index.js';
 import { collectNodeGraphErrors } from './helpers/invariants.js';
 import { resetAndSeed } from './helpers/test-state.js';
 
@@ -147,6 +148,43 @@ describe('addReference / removeReference', () => {
     const children = loroDoc.getChildren('note_2');
     expect(children[0]).toBe(refId);
 
+    expect(collectNodeGraphErrors()).toEqual([]);
+  });
+
+  it('blocks self tree reference under the same parent node', () => {
+    const beforeChildren = loroDoc.getChildren('note_2').slice();
+    const refId = useNodeStore.getState().addReference('note_2', 'note_2');
+
+    expect(refId).toBe('');
+    expect(loroDoc.getChildren('note_2')).toEqual(beforeChildren);
+    expect(collectNodeGraphErrors()).toEqual([]);
+  });
+
+  it('blocks tree reference to an ancestor (would create display cycle)', () => {
+    const parentId = 'idea_1'; // child of note_2 in seeded tree
+    const targetAncestorId = 'note_2';
+    const beforeChildren = loroDoc.getChildren(parentId).slice();
+
+    const refId = useNodeStore.getState().addReference(parentId, targetAncestorId);
+
+    expect(refId).toBe('');
+    expect(loroDoc.getChildren(parentId)).toEqual(beforeChildren);
+    expect(collectNodeGraphErrors()).toEqual([]);
+  });
+
+  it('blocks cross-branch mutual references when second edge closes a display cycle', () => {
+    const a = useNodeStore.getState().createChild(CONTAINER_IDS.LIBRARY, undefined, { name: 'A' }).id;
+    const b = useNodeStore.getState().createChild(CONTAINER_IDS.LIBRARY, undefined, { name: 'B' }).id;
+
+    const refAB = useNodeStore.getState().addReference(a, b);
+    const refBA = useNodeStore.getState().addReference(b, a);
+
+    expect(refAB).toBeTruthy();
+    expect(refBA).toBe('');
+    expect(loroDoc.getChildren(b).some((cid) => {
+      const n = loroDoc.toNodexNode(cid);
+      return n?.type === 'reference' && n.targetId === a;
+    })).toBe(false);
     expect(collectNodeGraphErrors()).toEqual([]);
   });
 });

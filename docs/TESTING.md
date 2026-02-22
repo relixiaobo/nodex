@@ -259,7 +259,9 @@ npm run test:run
 
 ### 1.7 标签与引用状态流
 
-**测试文件**: `tests/vitest/node-store-tags-refs.test.ts`
+**测试文件**:
+- `tests/vitest/node-store-tags-refs.test.ts`
+- `tests/vitest/reference-rules.test.ts`
 
 **覆盖点（Loro 模型）**:
 
@@ -268,10 +270,12 @@ npm run test:run
 3. applyTag 幂等（重复调用不产生重复 tag 或重复 fieldEntry）
 4. removeTag 仅清理模板来源字段，手动添加字段保留
 5. `addReference(parentId, targetId)` 非幂等 — 每次创建新的 reference 节点
-6. `removeReference(refNodeId)` 删除 reference 节点
-7. `startRefConversion(refId, parentId, idx)` 替换 ref 节点为 inline content 节点
-8. `startRefConversion(targetId, parentId, idx)` 防御路径：不删除 target，本地生成 inline content 节点
-9. `startRefConversion` 创建的临时 inline content 节点会立即写入 `richText` 容器
+6. `addReference(parentId, targetId)` 阻止非法树引用：self 引用、祖先引用、跨分支互引闭环（显示图成环）
+7. `reference-rules`：`getTreeReferenceBlockReason` 按“显示图无环”判定合法性；`isReferenceDisplayCycle` 用于渲染层循环展开兜底
+8. `removeReference(refNodeId)` 删除 reference 节点
+9. `startRefConversion(refId, parentId, idx)` 替换 ref 节点为 inline content 节点
+10. `startRefConversion(targetId, parentId, idx)` 防御路径：不删除 target，本地生成 inline content 节点
+11. `startRefConversion` 创建的临时 inline content 节点会立即写入 `richText` 容器
 
 ### 1.8 字段状态流（Node Store）
 

@@ -29,23 +29,25 @@ _(空)_
 |-------|---------|------|-------------|
 | nodex-cc | _(idle)_ | — | — |
 | nodex-cc-2 | _(idle)_ | — | — |
-| nodex-codex | Reference 引用环路防护（自引用/祖先引用规则） | codex/reference-cycle-guard | `docs/TASKS.md`, `docs/features/references.md`, `src/stores/node-store.ts`, `tests/vitest/*reference*.test.ts` |
+| nodex-codex | Reference 引用环路防护（树引用合法性规则 + warning） | codex/reference-cycle-guard | `docs/features/references.md`, `src/components/outliner/OutlinerItem.tsx`, `src/stores/node-store.ts`, `src/lib/reference-rules.ts`, `tests/vitest/node-store-tags-refs.test.ts`, `tests/vitest/reference-rules.test.ts` |
 
 ---
 
 ## 进行中
 
-### Reference 引用环路防护（自引用/祖先引用规则）
+### Reference 引用环路防护（树引用合法性规则 + warning）
 > **Owner**: nodex-codex | **Branch**: codex/reference-cycle-guard
-> **目标**: 明确 reference 的允许/禁止规则，并在创建入口阻止会导致递归卡死的环路引用
-> **Files**: `docs/features/references.md`, `src/stores/node-store.ts`, `src/**/*reference*.ts`, `tests/vitest/*reference*.test.ts`
+> **目标**: 明确 reference 的允许/禁止规则，并在创建入口阻止会导致递归卡死的环路引用（含 warning 提示）
+> **Files**: `docs/features/references.md`, `src/components/outliner/OutlinerItem.tsx`, `src/stores/node-store.ts`, `src/lib/reference-rules.ts`, `tests/vitest/node-store-tags-refs.test.ts`, `tests/vitest/reference-rules.test.ts`, `docs/TESTING.md`
 > **Progress**:
-> - [ ] 梳理现有 reference 创建入口与渲染递归路径
-> - [ ] 定义统一引用校验规则（允许/禁止矩阵）
-> - [ ] 在 store/action 层落地环路防护并补测试
-> - [ ] 更新 references spec 文档
+> - [x] 梳理现有 reference 创建入口与渲染递归路径
+> - [x] 定义统一引用校验规则（树引用=显示图无环；inline 引用不受环路限制）
+> - [x] 在 store/action 层落地环路防护并补测试
+> - [x] 非法树引用 warning 提示（空节点 `@` 选择非法目标）
+> - [x] 更新 references spec 文档
 > **迭代日志**:
 > - [2026-02-22 nodex-codex] 任务认领，准备在新 PR 中收口 reference 环路规则并实现防护。
+> - [2026-02-22 nodex-codex] 落地 `reference-rules` 统一判定：树引用创建前按“显示图无环”校验；UI 空节点 `@` 选择非法目标时 toast warning；渲染层新增循环展开兜底防卡死。
 
 ---
 

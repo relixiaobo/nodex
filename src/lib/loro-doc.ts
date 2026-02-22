@@ -81,6 +81,9 @@ let saveTimer: ReturnType<typeof setTimeout> | null = null;
 /** subscribeLocalUpdates 的 unsubscribe 函数（Phase 0 no-op hook，切换工作区时清理） */
 let unsubLocalUpdates: (() => void) | null = null;
 
+/** visibilitychange 监听器的 AbortController（防止重复 initLoroDoc 时累积监听器） */
+let visibilityAbort: AbortController | null = null;
+
 // ============================================================
 // 读取缓存 — 保证同一 version 内 toNodexNode/getChildren 返回稳定引用
 // React 的 useSyncExternalStore 要求 getSnapshot 返回缓存结果，
@@ -241,10 +244,14 @@ export async function initLoroDoc(workspaceId: string): Promise<void> {
   });
 
   if (typeof window !== 'undefined') {
+    // Abort previous listeners to prevent accumulation on repeated initLoroDoc calls
+    visibilityAbort?.abort();
+    visibilityAbort = new AbortController();
+    const { signal } = visibilityAbort;
     window.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'hidden') void persistSnapshot();
-    });
-    window.addEventListener('beforeunload', () => void persistSnapshot(), { once: true });
+    }, { signal });
+    window.addEventListener('beforeunload', () => void persistSnapshot(), { once: true, signal });
   }
 }
 
@@ -256,6 +263,10 @@ export function resetLoroDoc(): void {
 
   // Clean up subscribeLocalUpdates hook
   if (unsubLocalUpdates) { unsubLocalUpdates(); unsubLocalUpdates = null; }
+
+  // Abort visibilitychange / beforeunload listeners
+  visibilityAbort?.abort();
+  visibilityAbort = null;
 
   doc = null;
   undoManager = null;

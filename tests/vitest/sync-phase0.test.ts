@@ -8,7 +8,7 @@
  * 5. subscribeLocalUpdates hook — 注册 + 清理 + import 不触发
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { LoroDoc, VersionVector } from 'loro-crdt';
 
 import {

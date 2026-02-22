@@ -179,10 +179,10 @@ export function DateNavigationBar({ dayNodeId }: DateNavigationBarProps) {
         <Calendar size={14} />
       </button>
 
-      {/* Calendar popover — positioned relative to the full bar to avoid clipping in narrow panels */}
+      {/* Calendar popover — left-aligned with bar padding, stays within panel */}
       {calendarOpen && (
         <div
-          className="absolute right-6 top-full z-50 mt-1 min-w-[248px] max-w-[280px] rounded-lg border border-border bg-popover shadow-lg p-3"
+          className="absolute left-6 top-full z-50 mt-1 w-[252px] rounded-lg border border-border bg-popover shadow-lg p-3"
           onMouseDown={(e) => e.stopPropagation()}
         >
           <CalendarGrid

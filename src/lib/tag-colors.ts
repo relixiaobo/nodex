@@ -33,6 +33,9 @@ export const TAG_COLOR_GRAY: TagColor = {
   text: '#737373',
 };
 
+/** Inline ref default color (matches current link-like purple theme token). */
+export const INLINE_REF_FALLBACK_TEXT_COLOR = 'var(--color-primary)';
+
 /**
  * Named color map: config value string → TagColor.
  * Stored in SYS_A11 config via AssociatedData.
@@ -113,4 +116,16 @@ export function resolveNodeBulletColors(nodeId: string): string[] {
   const node = loroDoc.toNodexNode(nodeId);
   if (!node || !node.tags.length) return [];
   return node.tags.map((tagId) => resolveTagColor(tagId).text);
+}
+
+/**
+ * Inline reference text color:
+ * - If referenced node has at least one supertag, use the first supertag color.
+ * - Otherwise fall back to the current inline-ref theme color (purple token).
+ */
+export function resolveInlineReferenceTextColor(targetNodeId: string): string {
+  const node = loroDoc.toNodexNode(targetNodeId);
+  const firstTagId = node?.tags?.[0];
+  if (!firstTagId) return INLINE_REF_FALLBACK_TEXT_COLOR;
+  return resolveTagColor(firstTagId).text;
 }

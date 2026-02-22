@@ -1,4 +1,5 @@
 import type { InlineRefEntry, TextMark } from '../types/index.js';
+import { resolveInlineReferenceTextColor } from './tag-colors.js';
 
 const INLINE_REF_CHAR = '\uFFFC';
 
@@ -277,7 +278,8 @@ export function marksToHtml(
 
     if (segment === INLINE_REF_CHAR && refByOffset.has(start)) {
       const ref = refByOffset.get(start)!;
-      html += `<span data-inlineref-node="${escapeHtml(ref.targetNodeId)}" class="inline-ref">${escapeHtml(ref.displayName ?? '')}</span>`;
+      const refColor = resolveInlineReferenceTextColor(ref.targetNodeId);
+      html += `<span data-inlineref-node="${escapeHtml(ref.targetNodeId)}" class="inline-ref" style="color:${escapeHtml(refColor)}">${escapeHtml(ref.displayName ?? '')}</span>`;
       continue;
     }
 
@@ -295,4 +297,3 @@ export function marksToHtml(
 
   return html;
 }
-

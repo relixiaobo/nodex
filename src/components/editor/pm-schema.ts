@@ -1,4 +1,5 @@
 import { Schema } from 'prosemirror-model';
+import { resolveInlineReferenceTextColor } from '../../lib/tag-colors.js';
 
 export const pmSchema = new Schema({
   nodes: {
@@ -20,10 +21,12 @@ export const pmSchema = new Schema({
         displayName: { default: '' },
       },
       toDOM(node) {
+        const refColor = resolveInlineReferenceTextColor(node.attrs.targetNodeId);
         return ['span', {
           class: 'inline-ref',
           'data-inlineref-node': node.attrs.targetNodeId,
           contenteditable: 'false',
+          style: `color:${refColor}`,
         }, node.attrs.displayName || '...'];
       },
       parseDOM: [{

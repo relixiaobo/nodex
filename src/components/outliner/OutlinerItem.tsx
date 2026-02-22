@@ -458,6 +458,16 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   const pendingConversionRefTargetId = useUIStore((s) =>
     s.pendingRefConversion?.tempNodeId === nodeId ? s.pendingRefConversion.refNodeId : null,
   );
+  // Visual fallback: pending-conversion is stored in UI state and can be transient.
+  // If the row content is exactly a single inline reference atom, keep the dashed
+  // reference bullet style even if the pending marker was cleared already.
+  const hasSingleInlineRefAtomContent = useMemo(() => {
+    if (!node || node.type) return false;
+    const inlineRefs = node.inlineRefs ?? [];
+    if (inlineRefs.length !== 1 || inlineRefs[0]?.offset !== 0) return false;
+    const normalized = (node.name ?? '').replace(/\u200B/g, '').trim();
+    return normalized === '\uFFFC';
+  }, [node]);
   // Multi-select: check derived boolean. For single-select with parent disambiguation (reference nodes),
   // also check selectedParentId to support the same node appearing in multiple places.
   const isSelected = isInSelectedSet && (
@@ -2240,7 +2250,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
               hasChildren={hasChildren}
               isExpanded={isExpanded}
               onBulletClick={handleBulletClick}
-              isReference={isReferenceLikeRow || isPendingConversion}
+              isReference={isReferenceLikeRow || isPendingConversion || hasSingleInlineRefAtomContent}
               tagDefColor={isTagDef ? resolveTagColor(nodeId).text : undefined}
               bulletColors={effectiveBulletColors}
               icon={structuralIcon}

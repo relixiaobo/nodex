@@ -36,9 +36,14 @@ app.use('*', async (c, next) => {
 // Better Auth routes
 // ---------------------------------------------------------------------------
 
-app.on(['POST', 'GET'], '/api/auth/**', (c) => {
-  const auth = createAuth(c.env);
-  return auth.handler(c.req.raw);
+app.on(['POST', 'GET'], '/api/auth/**', async (c) => {
+  try {
+    const auth = createAuth(c.env);
+    return await auth.handler(c.req.raw);
+  } catch (err: unknown) {
+    console.error('[auth] handler error:', err);
+    return c.json({ error: 'Internal auth error' }, 500);
+  }
 });
 
 // ---------------------------------------------------------------------------

@@ -3,24 +3,30 @@
  *
  * Creates a new Better Auth instance per request (required because D1 binding
  * is only available from the request context in Cloudflare Workers).
+ *
+ * Uses Kysely + D1Dialect instead of Drizzle because drizzle-orm's D1 driver
+ * has issues with RETURNING clauses that Better Auth relies on.
  */
 import { betterAuth } from 'better-auth';
 import { bearer } from 'better-auth/plugins';
-import { drizzleAdapter } from 'better-auth/adapters/drizzle';
-import { drizzle } from 'drizzle-orm/d1';
+import { Kysely } from 'kysely';
+import { D1Dialect } from 'kysely-d1';
 import type { Env } from '../types.js';
 
 export function createAuth(env: Env) {
-  const db = drizzle(env.SYNC_DB);
+  const db = new Kysely({
+    dialect: new D1Dialect({ database: env.SYNC_DB }),
+  });
 
   return betterAuth({
     baseURL: env.BETTER_AUTH_URL,
     basePath: '/api/auth',
     secret: env.BETTER_AUTH_SECRET,
 
-    database: drizzleAdapter(db, {
-      provider: 'sqlite',
-    }),
+    database: {
+      db,
+      type: 'sqlite',
+    },
 
     socialProviders: {
       google: {

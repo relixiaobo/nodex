@@ -1,5 +1,5 @@
 -- Better Auth core tables (D1 / SQLite)
--- Generated based on Better Auth v1.x schema requirements.
+-- Uses TEXT for dates (ISO 8601) to match Better Auth's drizzle adapter expectations.
 
 CREATE TABLE IF NOT EXISTS "user" (
   "id" TEXT PRIMARY KEY NOT NULL,
@@ -7,19 +7,19 @@ CREATE TABLE IF NOT EXISTS "user" (
   "email" TEXT NOT NULL UNIQUE,
   "emailVerified" INTEGER NOT NULL DEFAULT 0,
   "image" TEXT,
-  "createdAt" INTEGER NOT NULL DEFAULT (unixepoch()),
-  "updatedAt" INTEGER NOT NULL DEFAULT (unixepoch())
+  "createdAt" TEXT NOT NULL DEFAULT (datetime('now')),
+  "updatedAt" TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
 CREATE TABLE IF NOT EXISTS "session" (
   "id" TEXT PRIMARY KEY NOT NULL,
   "token" TEXT NOT NULL UNIQUE,
   "userId" TEXT NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
-  "expiresAt" INTEGER NOT NULL,
+  "expiresAt" TEXT NOT NULL,
   "ipAddress" TEXT,
   "userAgent" TEXT,
-  "createdAt" INTEGER NOT NULL DEFAULT (unixepoch()),
-  "updatedAt" INTEGER NOT NULL DEFAULT (unixepoch())
+  "createdAt" TEXT NOT NULL DEFAULT (datetime('now')),
+  "updatedAt" TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
 CREATE TABLE IF NOT EXISTS "account" (
@@ -30,19 +30,19 @@ CREATE TABLE IF NOT EXISTS "account" (
   "accessToken" TEXT,
   "refreshToken" TEXT,
   "idToken" TEXT,
-  "accessTokenExpiresAt" INTEGER,
-  "refreshTokenExpiresAt" INTEGER,
+  "accessTokenExpiresAt" TEXT,
+  "refreshTokenExpiresAt" TEXT,
   "scope" TEXT,
   "password" TEXT,
-  "createdAt" INTEGER NOT NULL DEFAULT (unixepoch()),
-  "updatedAt" INTEGER NOT NULL DEFAULT (unixepoch())
+  "createdAt" TEXT NOT NULL DEFAULT (datetime('now')),
+  "updatedAt" TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
 CREATE TABLE IF NOT EXISTS "verification" (
   "id" TEXT PRIMARY KEY NOT NULL,
   "identifier" TEXT NOT NULL,
   "value" TEXT NOT NULL,
-  "expiresAt" INTEGER NOT NULL,
-  "createdAt" INTEGER DEFAULT (unixepoch()),
-  "updatedAt" INTEGER DEFAULT (unixepoch())
+  "expiresAt" TEXT NOT NULL,
+  "createdAt" TEXT DEFAULT (datetime('now')),
+  "updatedAt" TEXT DEFAULT (datetime('now'))
 );

@@ -36,10 +36,10 @@ export function BacklinksSection({ nodeId }: BacklinksSectionProps) {
   if (result.totalCount === 0) return null;
 
   return (
-    <div className="mt-16 pl-[36px] pr-4 pb-4">
-      {/* Header: "N references ∨" — text aligns with node text, chevron after text (matches Tana) */}
+    <div className="mt-16 pl-[21px] pr-4 pb-4">
+      {/* Header: "N references ∨" — ml-[15px] skips chevron column so text aligns with node text */}
       <button
-        className="flex items-center gap-1 text-sm text-foreground-secondary hover:text-foreground transition-colors cursor-pointer"
+        className="flex items-center gap-1 ml-[15px] text-sm text-foreground-secondary hover:text-foreground transition-colors cursor-pointer"
         onClick={() => setExpanded(v => !v)}
       >
         <span className="tabular-nums">{result.totalCount}</span>
@@ -67,12 +67,27 @@ export function BacklinksSection({ nodeId }: BacklinksSectionProps) {
   );
 }
 
+// ─── Row chevron (matches OutlinerItem ChevronButton visual) ───
+
+/** Static chevron that appears on row hover, matching the outliner's expand/collapse button style. */
+function RowChevron() {
+  return (
+    <span className="flex shrink-0 h-[21px] w-[15px] items-center justify-center opacity-0 group-hover/row:opacity-100 transition-opacity">
+      <span className="flex h-[15px] w-[15px] items-center justify-center rounded-full bg-background outline outline-1 outline-border-emphasis">
+        <svg width="10" height="10" viewBox="0 0 12 12" className="text-foreground-secondary">
+          <path d="M4.5 2.5L8 6L4.5 9.5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </span>
+    </span>
+  );
+}
+
 // ─── Mentioned in... ───
 
 function MentionedInGroup({ items }: { items: MentionedInRef[] }) {
   return (
     <div>
-      <div className="text-xs text-foreground-tertiary mb-2">Mentioned in...</div>
+      <div className="text-xs text-foreground-tertiary mb-2 ml-[15px]">Mentioned in...</div>
       <div className="space-y-2">
         {items.map((ref) => (
           <MentionedInItem key={`${ref.refType}:${ref.refNodeId}`} item={ref} />
@@ -90,25 +105,25 @@ function MentionedInItem({ item }: { item: MentionedInRef }) {
   }, [navigateTo, item.referencingNodeId]);
 
   return (
-    <div>
-      {/* Breadcrumb */}
+    <div className="group/row">
+      {/* Breadcrumb — indented past chevron column to align with text */}
       {item.breadcrumb.length > 0 && (
-        <BreadcrumbPath ancestors={item.breadcrumb} />
+        <div className="ml-[15px]">
+          <BreadcrumbPath ancestors={item.breadcrumb} />
+        </div>
       )}
-      {/* Content box — uses design system tokens: primary-muted bg, primary border, standard bullet */}
+      {/* Content box with chevron + bullet (matches outliner row layout) */}
       <div
-        className="mt-1 py-1 px-2 bg-foreground/[0.03] border-l-2 border-primary/20 rounded-r-sm cursor-pointer hover:bg-foreground/[0.06] transition-colors"
+        className="mt-1 flex items-start bg-foreground/[0.03] border-l-2 border-primary/20 rounded-r-sm cursor-pointer hover:bg-foreground/[0.06] transition-colors"
         onClick={handleNavigate}
       >
-        <div className="flex items-start gap-2">
-          {/* Standard bullet: 5px dot in 15×21px container (matches BulletChevron) */}
-          <span className="shrink-0 h-[21px] w-[15px] flex items-center justify-center">
-            <span className="w-[5px] h-[5px] rounded-full bg-foreground/50" />
-          </span>
-          <span className="text-sm leading-[21px] min-w-0 break-words">
-            {item.refNodeName || <span className="text-foreground-tertiary italic">Untitled</span>}
-          </span>
-        </div>
+        <RowChevron />
+        <span className="shrink-0 h-[21px] w-[15px] flex items-center justify-center">
+          <span className="w-[5px] h-[5px] rounded-full bg-foreground/50" />
+        </span>
+        <span className="text-sm leading-[21px] min-w-0 break-words py-1 pr-2">
+          {item.refNodeName || <span className="text-foreground-tertiary italic">Untitled</span>}
+        </span>
       </div>
     </div>
   );
@@ -142,7 +157,7 @@ function BreadcrumbPath({ ancestors }: { ancestors: AncestorInfo[] }) {
 function FieldValueGroup({ fieldName, items }: { fieldName: string; items: FieldValueRef[] }) {
   return (
     <div>
-      <div className="text-xs text-foreground-tertiary mb-2">
+      <div className="text-xs text-foreground-tertiary mb-2 ml-[15px]">
         Appears as <span className="font-medium text-foreground-secondary">{fieldName}</span> in...
       </div>
       <div className="space-y-1">
@@ -163,21 +178,22 @@ function FieldValueItem({ item }: { item: FieldValueRef }) {
 
   return (
     <div
-      className="flex items-center gap-2 py-1 cursor-pointer hover:bg-foreground/5 rounded-sm px-1 transition-colors"
+      className="group/row flex items-center cursor-pointer hover:bg-foreground/5 rounded-sm transition-colors"
       onClick={handleNavigate}
     >
+      <RowChevron />
       {/* Reference bullet — same as BulletChevron isReference style */}
       <span className="shrink-0 w-[15px] h-[21px] flex items-center justify-center">
         <span className="flex h-[15px] w-[15px] items-center justify-center rounded-full border border-dashed border-foreground/40">
           <span className="h-[5px] w-[5px] rounded-full bg-foreground/50" />
         </span>
       </span>
-      <span className="text-sm leading-[21px] truncate min-w-0">
+      <span className="text-sm leading-[21px] truncate min-w-0 ml-2">
         {item.ownerNodeName || <span className="text-foreground-tertiary italic">Untitled</span>}
       </span>
       {/* Tag badges */}
       {item.ownerTags.length > 0 && (
-        <span className="flex items-center gap-1 shrink-0 ml-auto">
+        <span className="flex items-center gap-1 shrink-0 ml-auto pr-1">
           {item.ownerTags.slice(0, 2).map(tagId => (
             <FieldValueTagBadge key={tagId} tagDefId={tagId} />
           ))}

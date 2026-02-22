@@ -29,18 +29,13 @@ _(空)_
 |-------|---------|------|-------------|
 | nodex-cc | _(idle)_ | — | — |
 | nodex-cc-2 | _(idle)_ | — | — |
-| nodex-codex | Bug 修复 & 基础优化（面包屑导航 + @ reference 排序） | codex/ux-polish | _(待开始)_ |
+| nodex-codex | _(idle)_ | — | — |
 
 ---
 
 ## 进行中
 
-### Bug 修复 & 基础优化
-> **Owner**: nodex-codex | **Branch**: codex/ux-polish
-> **目标**: 面包屑导航 + @ reference 搜索排序优化
-> **子任务**:
-> - [ ] 面包屑导航中 workspace 头像/根节点支持点击（导航到 workspace 根）
-> - [ ] @ reference 搜索结果按最近编辑排序（优先显示最近编辑过的节点）
+_(空)_
 
 ---
 
@@ -92,7 +87,8 @@ _(空)_
 - [x] Today 快捷入口（侧栏按钮 + 快捷键 Cmd+Shift+D） ✓ PR #73
 - [x] DateNavigationBar（< > Today + Calendar popover） ✓ PR #73
 - [x] 面包屑/标题 "Today" 前缀 ✓ PR #73
-- [ ] 自然语言日期解析（@today / @next Monday / @November）
+- [x] `@today`/`@tomorrow`/`@yesterday` 日期快捷引用 ✓ main + PR #72
+- [ ] 自然语言日期解析扩展（@next Monday / @November / @last week）
 - [ ] 日记模板（#day supertag 配置）
 - [ ] 日期字段链接到日节点
 - **Spec**: `docs/features/date-nodes.md`
@@ -121,8 +117,10 @@ _(空)_
 - **Spec**: `docs/features/undo-redo.md`
 
 #### 节点选中 — 后续增强 (#47)
-> Phase 1-3 已合并（PR #51）。以下为未覆盖的后续项：
+> Phase 1-3 已合并（PR #51）。PR #72 补充了字段行选中 + 全局选区清除。以下为未覆盖的后续项：
 
+- [x] 字段行统一选中（pointer-intent + Cmd/Shift+Click） ✓ PR #72
+- [x] 全局 pointerdown 选区清除（outliner 外点击自动清空） ✓ PR #72
 - [ ] Cmd+Shift+D 批量复制
 - [ ] 拖动选择优化（跨面板边界防护）
 - **Spec**: `docs/features/node-selection.md`
@@ -224,6 +222,8 @@ _(空)_
 
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
+| 2026-02-22 | Outliner 选区统一 & Reference UX 优化 — row-pointer-selection 提取 + 字段行选中 + inline ref supertag 着色 + 全局选区清除 + 搜索 recency 排序 + 面包屑根导航 | nodex-codex | #72 |
+| 2026-02-22 | Calendar Heatmap + `@today`/`@tomorrow`/`@yesterday` 日期快捷引用 + 日历 UI 优化（正方形 cell + 热力图 + 周末着色 + Today 按钮优化） | nodex | — |
 | 2026-02-22 | 网页剪藏增强 — sonner toast 反馈 + URL/Email 字段可点击链接 + V2 HTML→子节点树（heading 层级解析 + marks 保留） | nodex-cc-2 | #71 |
 | 2026-02-22 | Date 节点 & 日记 Phase 1 — Year→Week→Day 层级 + Today 入口 + DateNavigationBar + 日历 popover + 面包屑前缀 | nodex-cc | #73 |
 | 2026-02-21 | Editor Bug: CJK IME 组合输入异常（fork prosemirror-view 添加 composing 守卫） | nodex-codex | — |

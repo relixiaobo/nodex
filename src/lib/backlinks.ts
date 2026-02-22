@@ -40,7 +40,7 @@ export interface BacklinksResult {
 
 // ─── Helpers ───
 
-/** Check if a node is inside the TRASH container. */
+/** Check if a node is inside the TRASH container (walks parent chain). */
 function isInTrash(nodeId: string): boolean {
   let currentId: string | null = nodeId;
   const visited = new Set<string>();
@@ -53,10 +53,32 @@ function isInTrash(nodeId: string): boolean {
   return false;
 }
 
-// ─── Count map cache (invalidated by _version from node-store) ───
+/** Pre-compute the set of all node IDs inside TRASH (single walk from TRASH root). */
+function buildTrashSet(): Set<string> {
+  const trashSet = new Set<string>();
+  const trashNode = loroDoc.toNodexNode(CONTAINER_IDS.TRASH);
+  if (!trashNode) return trashSet;
+  const queue = [...trashNode.children];
+  while (queue.length > 0) {
+    const id = queue.pop()!;
+    if (trashSet.has(id)) continue;
+    trashSet.add(id);
+    const node = loroDoc.toNodexNode(id);
+    if (node) {
+      for (const childId of node.children) queue.push(childId);
+    }
+  }
+  return trashSet;
+}
+
+// ─── Caches (invalidated by _version from node-store) ───
 
 let _countMapCacheVer = -1;
 let _countMapCache: Map<string, number> | null = null;
+
+let _backlinksCacheVer = -1;
+let _backlinksCacheKey: string | null = null;
+let _backlinksCacheResult: BacklinksResult | null = null;
 
 // ─── Core ───
 
@@ -64,8 +86,14 @@ let _countMapCache: Map<string, number> | null = null;
  * Compute all backlinks (references pointing to targetNodeId).
  *
  * Scans every node in the LoroDoc once. Skips references inside TRASH.
+ * Cached by (version, targetNodeId) — repeated calls with same args return O(1).
  */
-export function computeBacklinks(targetNodeId: string): BacklinksResult {
+export function computeBacklinks(targetNodeId: string, version?: number): BacklinksResult {
+  if (version !== undefined && version === _backlinksCacheVer
+      && targetNodeId === _backlinksCacheKey && _backlinksCacheResult) {
+    return _backlinksCacheResult;
+  }
+
   const mentionedIn: MentionedInRef[] = [];
   const fieldValueMap: Record<string, FieldValueRef[]> = {};
   let totalCount = 0;
@@ -160,7 +188,15 @@ export function computeBacklinks(targetNodeId: string): BacklinksResult {
     return pathA.localeCompare(pathB);
   });
 
-  return { mentionedIn, fieldValueRefs: fieldValueMap, totalCount };
+  const result = { mentionedIn, fieldValueRefs: fieldValueMap, totalCount };
+
+  if (version !== undefined) {
+    _backlinksCacheVer = version;
+    _backlinksCacheKey = targetNodeId;
+    _backlinksCacheResult = result;
+  }
+
+  return result;
 }
 
 /**
@@ -168,41 +204,45 @@ export function computeBacklinks(targetNodeId: string): BacklinksResult {
  *
  * Single-pass scan: O(N) where N = total nodes. Each OutlinerItem reads O(1).
  * Cached by version — repeated calls within the same _version return O(1).
+ * Pre-computes trash set to avoid per-node parent chain walks.
  */
 export function buildBacklinkCountMap(version: number): Map<string, number> {
   if (version === _countMapCacheVer && _countMapCache) return _countMapCache;
 
   const counts = new Map<string, number>();
+  const trashSet = buildTrashSet();
   const allIds = loroDoc.getAllNodeIds();
 
   for (const id of allIds) {
+    if (trashSet.has(id)) continue;
+
     const node = loroDoc.toNodexNode(id);
     if (!node) continue;
 
-    // Tree reference
+    // Tree reference — skip refs inside fieldEntry (counted by field value check below)
     if (node.type === 'reference' && node.targetId) {
-      if (!isInTrash(id)) {
-        counts.set(node.targetId, (counts.get(node.targetId) ?? 0) + 1);
+      const parentId = loroDoc.getParentId(id);
+      if (parentId) {
+        const parentNode = loroDoc.toNodexNode(parentId);
+        if (parentNode?.type !== 'fieldEntry') {
+          counts.set(node.targetId, (counts.get(node.targetId) ?? 0) + 1);
+        }
       }
     }
 
     // Inline references
     if (node.inlineRefs && node.inlineRefs.length > 0) {
-      if (!isInTrash(id)) {
-        for (const ref of node.inlineRefs) {
-          counts.set(ref.targetNodeId, (counts.get(ref.targetNodeId) ?? 0) + 1);
-        }
+      for (const ref of node.inlineRefs) {
+        counts.set(ref.targetNodeId, (counts.get(ref.targetNodeId) ?? 0) + 1);
       }
     }
 
     // Field value references — children of fieldEntry
     if (node.type === 'fieldEntry') {
-      if (!isInTrash(id)) {
-        for (const childId of node.children) {
-          const child = loroDoc.toNodexNode(childId);
-          if (child?.targetId) {
-            counts.set(child.targetId, (counts.get(child.targetId) ?? 0) + 1);
-          }
+      for (const childId of node.children) {
+        const child = loroDoc.toNodexNode(childId);
+        if (child?.targetId) {
+          counts.set(child.targetId, (counts.get(child.targetId) ?? 0) + 1);
         }
       }
     }

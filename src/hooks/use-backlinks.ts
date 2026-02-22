@@ -21,8 +21,7 @@ const EMPTY_JSON = '{"m":[],"f":{},"t":0}';
  */
 export function useBacklinks(nodeId: string): BacklinksResult {
   const json = useNodeStore((state) => {
-    void state._version;
-    const result = computeBacklinks(nodeId);
+    const result = computeBacklinks(nodeId, state._version);
     if (result.totalCount === 0) return EMPTY_JSON;
     return JSON.stringify(result);
   });

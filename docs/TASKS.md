@@ -43,18 +43,21 @@ _(空)_
 
 ### P1
 
-#### Sync 增量同步（Phase 1-2 合并实施）
-> Phase 0 客户端预留已完成（PR #75 + #77 + #78）。基础设施选型已完成：Cloudflare Workers + R2 + Supabase Auth/Postgres。
+#### Sync 增量同步（Phase 1-2 合并实施）— Cloudflare-only 全栈
+> Phase 0 客户端预留已完成（PR #75 + #77 + #78）。基础设施：**Cloudflare-only**（Workers + R2 + D1 + Better Auth），完全消除 Supabase 依赖。
 > 跳过纯备份（Phase 1），直接实现多端增量同步（Phase 2）。
-> **Owner**: _(待分配，计划由 nodex-codex review 后交 nodex-cc 执行)_
-> **Plan**: `docs/plans/sync-incremental-impl.md` | **Arch**: `docs/plans/sync-architecture.md`
+> **Owner**: _(待分配 nodex-cc 执行)_
+> **Plan**: `docs/plans/sync-incremental-impl.md` | **Arch**: `docs/plans/sync-architecture.md` | **Auth**: `docs/plans/auth-cloudflare-only.md`
 >
-> **当前状态**: 计划已 Review（PR #79），可交 nodex-cc 执行
+> **当前状态**: 计划已 Review + Cloudflare-only 修订完成，可交 nodex-cc 执行
 
 - [x] **Review**: nodex-codex review 实施计划（含 7 个开放问题） ✓ nodex-codex（2026-02-22）
-- [ ] Step 1: 服务端项目骨架（Workers + R2 binding）
-- [ ] Step 2: Supabase 数据库迁移（sync_workspaces + sync_devices）
-- [ ] Step 3: 服务端 JWT 验证中间件
+- [x] **修订**: Postgres → D1 迁移 + Auth 评估 ✓ nodex-codex（2026-02-22）
+- [x] **修订**: Cloudflare-only 全栈（Auth PoC 纳入 Step 0） ✓ nodex（2026-02-23）
+- [ ] Step 0: Auth PoC（Better Auth + D1 + Workers）— **前置任务**
+- [ ] Step 1: 服务端项目骨架（Workers + R2 + D1 binding + Auth 集成）
+- [ ] Step 2: D1 Sync Schema 迁移（sync_workspaces + sync_devices + sync_updates）
+- [ ] Step 3: 服务端鉴权中间件（Better Auth session 验证）
 - [ ] Step 4: 服务端 Push 端点
 - [ ] Step 5: 服务端 Pull 端点 + 快照兜底
 - [ ] Step 6: 客户端 Pending Queue（可与 1-5 并行）

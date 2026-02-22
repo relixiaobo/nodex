@@ -36,18 +36,18 @@ export function BacklinksSection({ nodeId }: BacklinksSectionProps) {
   if (result.totalCount === 0) return null;
 
   return (
-    <div className="mt-12 pl-[21px] pr-4 pb-4">
-      {/* Header: "N references" toggle */}
+    <div className="mt-12 pl-[36px] pr-4 pb-4">
+      {/* Header: "N references ∨" — text aligns with node text, chevron after text (matches Tana) */}
       <button
-        className="flex items-center gap-1.5 text-sm text-foreground-secondary hover:text-foreground transition-colors cursor-pointer"
+        className="flex items-center gap-1 text-sm text-foreground-secondary hover:text-foreground transition-colors cursor-pointer"
         onClick={() => setExpanded(v => !v)}
       >
+        <span className="tabular-nums">{result.totalCount}</span>
+        <span>{result.totalCount === 1 ? 'reference' : 'references'}</span>
         {expanded
           ? <ChevronDown size={14} className="shrink-0" />
           : <ChevronRight size={14} className="shrink-0" />
         }
-        <span className="tabular-nums">{result.totalCount}</span>
-        <span>{result.totalCount === 1 ? 'reference' : 'references'}</span>
       </button>
 
       {expanded && (

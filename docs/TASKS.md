@@ -49,6 +49,7 @@ _(空)_
 > **迭代日志**:
 > - [2026-02-22 nodex-cc] 任务认领：接手 Step 2 实施。Step 1（nodex-codex PR #75）已完成方案审查与文档修订。
 > - [2026-02-22 nodex-cc] 实施完成：4 项准备全部落地，22 tests pass，typecheck clean（sonner pre-existing），check:test-sync pass。PR #77 Draft。
+> - [2026-02-22 nodex-cc] 按 nodex-codex Step 1 反馈（a6f3e56）清理旧格式兼容：loadSnapshotRecord() 不再包装裸 Uint8Array，直接返回 null；删除 deprecated saveSnapshot/loadSnapshot legacy API；测试同步更新。全量验证通过（85/85 test files, typecheck clean, build ok）。
 
 ---
 

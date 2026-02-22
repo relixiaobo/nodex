@@ -36,7 +36,7 @@ export function BacklinksSection({ nodeId }: BacklinksSectionProps) {
   if (result.totalCount === 0) return null;
 
   return (
-    <div className="mt-6 px-4 pb-4">
+    <div className="mt-12 pl-[21px] pr-4 pb-4">
       {/* Header: "N references" toggle */}
       <button
         className="flex items-center gap-1.5 text-sm text-foreground-secondary hover:text-foreground transition-colors cursor-pointer"

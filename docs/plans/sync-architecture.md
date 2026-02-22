@@ -17,12 +17,12 @@
 |------|------|------|
 | 本地数据引擎 | Loro CRDT (LoroDoc + LoroTree) | 已完成迁移，所有操作同步，支持富文本 Peritext marks |
 | 同步方式 | Loro 原生增量同步（snapshot + updates） | 不走 Supabase 行级同步。CRDT 管内容冲突，SQL 管元数据/权限 |
-| Auth | Supabase Google OAuth | 已实现。JWT 可移植，不绑定 sync 层 |
+| Auth | **Better Auth + D1**（Cloudflare-only） | Google OAuth；PoC 验证后替代 Supabase Auth。评估见 `auth-cloudflare-only.md` |
 | 同步协议 | 采用 `loro-dev/protocol` 官方线协议 | 已有 WebSocket 客户端/服务端、room 复用、E2E 加密、auth hook |
 | Awareness | 已有 `awareness.ts` + 未来 `LoroEphemeralAdaptor` | presence 不落库，与持久 update 分通道 |
 | Blob 存储 | **Cloudflare R2** | 零出口费（CRDT 同步场景关键）、$0.015/GB/月、10 GB 免费、S3 兼容 |
 | 同步网关 | **Cloudflare Workers** | 100 MB 请求体（CRDT 大快照无障碍）、<5ms 冷启动、$5/月基价 |
-| 元数据 + Auth | **Supabase**（保留） | Postgres 存 sync cursors/权限、Google OAuth JWT 可移植 |
+| 同步元数据 | **Cloudflare D1** | Worker 原生 binding，消除 Hyperdrive 配置与 RLS 歧义；免费额度覆盖 sync 元数据需求 |
 
 ### 延后决策（各 Phase 开始时再定）
 
@@ -216,8 +216,8 @@ const meta = decodeImportBlobMeta(blob, true);
 
 ## 基础设施选型调研（2026-02-22）
 
-> **结论**：采用 **Supabase（Auth + Postgres）+ Cloudflare（Workers + R2）** 混合架构。
-> 各取所长：Supabase 管身份和元数据，Cloudflare 管计算和存储。
+> **结论（最终修订）**：采用 **Cloudflare-only 全栈**：Workers + R2 + D1 + Better Auth。
+> 完全消除 Supabase 依赖。Auth 迁移评估见 `docs/plans/auth-cloudflare-only.md`。
 
 ### 选型驱动因素
 
@@ -256,14 +256,15 @@ CRDT 同步场景有两个特殊需求，直接决定了选型方向：
 - **R2 零出口费**——同步场景下成本可控
 - **Workers 100 MB 请求体**——CRDT 大快照无障碍
 - < 5ms 冷启动（V8 isolate 模型，冷启动在 TLS 握手期间完成）
+- **D1 原生 binding**——Worker 直连元数据，无需 Hyperdrive/连接池
+- **Better Auth + D1**——Auth 也在 Cloudflare 内完成，单一平台运维
 - Durable Objects 为 Phase 3 实时协作提供天然升级路径
 - $5/月基价 vs Supabase $25/月
 
 **劣势**：
-- 需自行验证 Supabase JWT（额外几十行代码）
-- 运维两套平台（Supabase 管 Auth + Postgres，Cloudflare 管计算 + 存储）
+- Auth 需自建（Better Auth 框架降低成本，但仍需 PoC 验证 Chrome Extension 集成）
 - Workers 内存 128 MB，50 MB 快照需流式处理不能全缓冲
-- Hyperdrive 连接 Supabase Postgres 需额外配置
+- D1 为 SQLite 方言，需维护独立 schema（但 sync + auth 表结构简单）
 
 | 资源 | 免费额度 | 付费 ($5/月) |
 |------|---------|-------------|
@@ -276,7 +277,9 @@ CRDT 同步场景有两个特殊需求，直接决定了选型方向：
 | Workers 请求体 | 100 MB | 100 MB |
 | Workers 墙钟 | 无硬限制 | 无硬限制 |
 | Workers 内存 | 128 MB | 128 MB |
-| Hyperdrive | 10 万查询/天 | 含在 $5/月内 |
+| D1 存储 | 5 GB | 按量计费 |
+| D1 读取 | 500 万次/天 | 按量计费 |
+| D1 写入 | 10 万次/天 | 按量计费 |
 
 ### 对比决策矩阵
 
@@ -286,10 +289,10 @@ CRDT 同步场景有两个特殊需求，直接决定了选型方向：
 | 出口流量费 | $0.09/GB | $0 | **Cloudflare**（决定性） |
 | 基础月费 | $25 | $5 | Cloudflare |
 | 冷启动 | 几十~几百 ms | < 5 ms | Cloudflare |
-| Auth 集成 | 原生一行代码 | 需自行验证 JWT | Supabase |
-| 开发体验 | 一站式 | 双平台 | Supabase |
+| Auth 集成 | 原生一行代码 | Better Auth + D1（需 PoC） | Supabase（略优） |
+| 开发体验 | 一站式 | 全栈单平台（Auth + Sync + 存储） | **Cloudflare** |
 | Phase 3 扩展 | 需另选实时层 | DO 天然升级 | Cloudflare |
-| Postgres 访问 | 原生 | Hyperdrive | Supabase（略优） |
+| 同步元数据访问 | Postgres 原生 | D1 原生 binding | **Cloudflare** |
 
 ### 成本估算（5 设备 × 20 次/天 × 5 MB 平均）
 
@@ -303,13 +306,15 @@ CRDT 同步场景有两个特殊需求，直接决定了选型方向：
 
 ### 最终决策
 
-**采用 Cloudflare Workers + R2**，搭配 **Supabase Auth + Postgres**。
+**采用 Cloudflare-only 全栈**：Workers + R2 + D1 + Better Auth。
 
 决策理由：
 1. **4 MB 请求体限制是硬伤**——绕过它的分片协议/presigned URL 复杂度不亚于直接用 Workers
 2. **零出口费在同步场景下价值巨大**——用户和设备增长后差距会持续放大
 3. **Phase 3 升级路径清晰**——Workers → Durable Objects 是同一平台的自然演进
-4. **Supabase 继续承担擅长的部分**——Auth（JWT 可移植）和 Postgres（元数据/权限/cursors）
+4. **D1 消除了 Hyperdrive 与 RLS 语义歧义**——sync 元数据查询全部走 Worker 应用层鉴权 + D1 binding
+5. **单一平台运维**——Auth (Better Auth + D1) + Sync (Workers + R2 + D1)，消除 Supabase 依赖，降低运维复杂度和成本（$5/月 vs $25/月）
+6. **Auth PoC 前置验证**——Better Auth + D1 作为 Sync Phase 1 Step 0，在写 sync 代码前验证 Chrome Extension OAuth 集成
 
 ### Phase 3 展望：Durable Objects
 
@@ -435,13 +440,13 @@ LoroDoc → IndexedDB (本地)
 对象存储:
   /{workspaceId}/snapshot.bin        ← 最新快照
 
-Postgres (元数据):
+D1 (元数据):
   workspace_backups (
     workspace_id TEXT PRIMARY KEY,
     snapshot_key  TEXT,              -- 对象存储 key
-    version_vector BYTEA,           -- 快照对应的 VV
+    version_vector BLOB,            -- 快照对应的 VV
     size_bytes    INTEGER,
-    updated_at    TIMESTAMPTZ
+    updated_at    TEXT
   )
 ```
 
@@ -449,7 +454,7 @@ Postgres (元数据):
 - 手动：用户点击"备份"按钮
 - 自动：每 N 分钟（如果有变更）
 
-**基础设施**：Cloudflare R2（存储）+ Cloudflare Workers（API）+ Supabase Postgres（元数据）。详见 §基础设施选型调研。
+**基础设施**：Cloudflare R2（存储）+ Cloudflare Workers（API）+ Cloudflare D1（元数据）+ Better Auth（鉴权）。详见 §基础设施选型调研。
 
 ### Phase 2: 多端同步（非实时）
 
@@ -465,7 +470,7 @@ LoroDoc
 服务端:
   对象存储: /{wsId}/updates/{hash}.bin (bytes by SHA-256)
   对象存储: /{wsId}/snapshot.bin (定期 compaction)
-  Postgres: sync_workspaces + sync_devices + sync_updates
+  D1: sync_workspaces + sync_devices + sync_updates
 ```
 
 **同步协议（HTTP 包装 Loro 二进制 updates；实时阶段再复用 `loro-protocol` WebSocket 线协议）**：
@@ -554,7 +559,7 @@ Side Panel closed:
 **目标**：workspace 成员角色、文档级权限、审计与恢复。
 
 **架构**：
-- Postgres: `workspace_members (workspace_id, user_id, role)`
+- D1: `workspace_members (workspace_id, user_id, role)`
 - Auth hook: `loro-websocket` 的 `authenticate` 回调检查权限
 - 审计：保留 update log + snapshot 恢复工具
 - 角色：owner / editor / viewer
@@ -565,11 +570,12 @@ Side Panel closed:
 
 | 资产 | 处理 | 理由 |
 |------|------|------|
-| Supabase Auth (Google OAuth) | **保留** | JWT 可移植，不绑定 sync 层 |
-| Supabase Postgres | **保留，用于元数据** | workspace 成员、sync cursors、权限、billing |
+| Supabase Auth (Google OAuth) | **迁移到 Better Auth + D1** | Auth PoC 通过后替代；Step 0 前置验证 |
+| Supabase Postgres | **冻结，不再新增表** | 现有 `nodes` 表保留为历史存档；sync 元数据迁入 D1 |
 | `nodes` 表 (5 个 migration) | **冻结，不继续开发** | 为行级同步设计，CRDT sync 不需要。未来可降级为搜索索引 |
-| RLS 策略 | **保留（但不作为 Worker 主鉴权）** | workspace 级别权限模型可复用；Worker + Hyperdrive 直连 Postgres 仍以应用层鉴权为准 |
-| Realtime publication | **暂不使用** | 行级变更流不适合 CRDT sync；Phase 3 评估是否用于 presence 通知 |
+| RLS 策略 | **不再使用** | sync 路径走 Worker + D1 应用层鉴权 |
+| Realtime publication | **不再使用** | 行级变更流不适合 CRDT sync |
+| `supabase-js` SDK | **移除** | Auth 迁移完成后删除依赖 |
 
 ---
 
@@ -583,9 +589,10 @@ Side Panel closed:
 | snapshot 与 update 边界错位 | `seq/cursor` 单调递增 + `snapshot.covers_seq` |
 | 本地 pending queue 损坏 | pending queue 持久化到 IndexedDB + 启动重放 |
 | Auth 过期误以为数据丢失 | 明确 UI 状态区分"认证过期"vs"数据丢失" |
-| 对象存储与 Postgres 部分写入成功 | 先写对象存储 → 成功后更新 Postgres |
+| 对象存储与 D1 部分写入成功 | 先写对象存储 → 成功后更新 D1（允许 orphan blob，异步清理） |
 | echo 过滤导致 cursor 停滞 | Pull 响应返回 `nextCursorSeq`（扫描进度），客户端按该值推进 |
-| Worker 直连 Postgres 时误信 RLS | Worker 应用层鉴权为主；RLS 仅作兜底 |
+| D1 无 RLS | Worker 应用层鉴权为主；所有 sync 路径统一鉴权中间件 |
+| Auth 迁移风险 | Better Auth PoC 前置验证（Step 0）；通过后再写 sync 代码 |
 | 可观测性不足 | 最小同步埋点（push/pull/apply/cursor mismatch） |
 
 ### Phase 2+ (成长期)

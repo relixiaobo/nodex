@@ -120,7 +120,7 @@ const room = await client.join({ roomId: "ws-123", crdtAdaptor: adaptor });
 // 构造函数不接受 peerID 参数，始终随机生成
 const doc = new LoroDoc();
 
-// 构造后设置（必须在任何操作之前）
+// 构造后立即设置（必须在 import/commit/本地写操作之前）
 doc.setPeerId(savedPeerId);  // 接受 number | bigint | `${number}`
 
 // 读取
@@ -131,6 +131,7 @@ doc.peerId;     // bigint
 **安全规则**：
 - 绝不允许两个并行 peer 共享同一 PeerID（会导致文档分叉）
 - Chrome Side Panel 单实例，可安全复用 PeerID（保存/恢复模式）
+- `setPeerId()` 必须在文档仍为空（无 oplog）时调用；**先 `import(snapshot)` 再 `setPeerId()` 是错误顺序**
 
 ### VersionVector 序列化
 
@@ -139,9 +140,13 @@ doc.peerId;     // bigint
 const bytes = vv.encode();              // → Uint8Array
 const restored = VersionVector.decode(bytes);
 
-// JSON（存储/调试用）
+// 结构化克隆 / 调试（注意：toJSON() 返回 Map，不可直接 JSON.stringify）
 const map = vv.toJSON();                // → Map<PeerID, number>
 const restored = VersionVector.parseJSON(map);
+
+// 如需 JSON 字符串持久化，先转 entries 数组
+const entries = [...vv.toJSON().entries()];
+const json = JSON.stringify(entries);
 ```
 
 ### 增量同步（两轮交换）
@@ -196,14 +201,14 @@ const meta = decodeImportBlobMeta(blob, true);
 |------|------|
 | SW 空闲 30s 后终止，无法维持长连接 | WebSocket 放 Side Panel（打开时持久），不放 SW |
 | SW 重启丢失内存状态 | sync 状态持久化到 IndexedDB |
-| 无 Background Sync API | `chrome.alarms`（最短 1 分钟间隔）触发批量 HTTP 同步 |
-| `unlimitedStorage` 权限 | 豁免配额 + 不被清除（即使用户清浏览数据） |
-| Side Panel 同一时间只有一个实例 | 不需要多 Tab 协调（BroadcastChannel），简化 PeerID 管理 |
+| 无 Background Sync API | 用 `chrome.alarms` 触发批量 HTTP 同步（Chrome 120+ 最短 30s；实现上先按 1 分钟基线） |
+| `unlimitedStorage` 权限 | 放宽扩展存储配额（尤其大快照/队列场景）；**不要**将其视为“永不清除”保证 |
+| Side Panel 同一时间通常只有一个可见实例 | 可简化 PeerID 管理，但初始化/恢复逻辑仍应保持幂等（应对快速重开/重载） |
 
 **同步生命周期**：
 1. Side Panel 打开 → WebSocket 连接 → 实时同步
 2. Side Panel 关闭 → 断开 WebSocket → pending 状态写 IndexedDB
-3. `chrome.alarms` 定期唤醒 SW → HTTP 批量同步 pending updates
+3. `chrome.alarms` 定期唤醒 SW → HTTP 批量同步 pending updates（实现上按 1 分钟基线；Chrome 120+ 可到 30s）
 4. Side Panel 重新打开 → 读 IndexedDB → 重连 WebSocket → delta sync
 
 ---
@@ -241,18 +246,22 @@ interface SnapshotRecord {
   savedAt: number;
 }
 
-// loro-doc.ts initLoroDoc() — 恢复 peer 身份
+// loro-doc.ts initLoroDoc() — 恢复 peer 身份（顺序关键）
 const saved = await loadSnapshotRecord(workspaceId);
 doc = new LoroDoc();
-if (saved?.snapshot) doc.import(saved.snapshot);
 if (saved?.peerIdStr) doc.setPeerId(saved.peerIdStr);
+if (saved?.snapshot) doc.import(saved.snapshot);
 ```
+
+**实现注意**：
+- `peerIdStr` 恢复失败（格式非法/损坏）时应降级为随机 PeerID，并记录 warning，避免启动失败
+- 当前项目未上线，**允许不兼容旧快照格式**（旧 `Uint8Array` 记录可直接作废）；Phase 0 可直接升级到 `SnapshotRecord` 存储结构，必要时清空本地开发数据并重建测试数据
 
 #### 准备项 2: VersionVector 持久化
 
 **问题**：VV 只在内存中。重启后无法计算"上次同步以来的增量"。
 
-**方案**：与 snapshot 一起保存到 IndexedDB（见上方 `SnapshotRecord`）。
+**方案**：与 snapshot 一起保存在同一条 IndexedDB 记录（见上方 `SnapshotRecord`），保证 snapshot / peerId / VV 原子一致。
 
 #### 准备项 3: `subscribeLocalUpdates` hook 点
 
@@ -261,12 +270,16 @@ if (saved?.peerIdStr) doc.setPeerId(saved.peerIdStr);
 **方案**：在 `initLoroDoc()` 末尾注册，Phase 0 为 no-op。
 
 ```typescript
-// loro-doc.ts initLoroDoc() 末尾
-doc.subscribeLocalUpdates((_bytes: Uint8Array) => {
+// loro-doc.ts initLoroDoc() 末尾（保存 unsubscribe，切换 workspace/reset 时清理）
+const unsubLocalUpdates = doc.subscribeLocalUpdates((_bytes: Uint8Array) => {
   // Phase 0: no-op，仅预留入口
   // Phase 2+: syncManager.bufferUpdate(bytes)
 });
 ```
+
+**实现注意**：
+- `subscribeLocalUpdates` 只捕获**本地**提交；`doc.import(remoteBytes)` 不应回灌进 pending queue（这是期望行为）
+- 预留 hook 点时需保存并清理 unsubscribe，避免未来切换工作区后重复注册
 
 #### 准备项 4: Workspace ID 规范化 + unlimitedStorage
 
@@ -336,19 +349,25 @@ LoroDoc
   Postgres: sync_cursors (workspace_id, device_id, last_seq)
 ```
 
-**同步协议（基于 loro-protocol 线格式）**：
+**同步协议（HTTP 包装 Loro 二进制 updates；实时阶段再复用 `loro-protocol` WebSocket 线协议）**：
 
 ```
 POST /sync/push
-  Body: { workspaceId, updates: Uint8Array, clientVV: Uint8Array }
+  Body: { workspaceId, updates, clientVV }   // updates/clientVV 为二进制字段（非原生 JSON）
   → 服务端存 update，更新 cursor
   ← { serverVV, ack: true }
 
 POST /sync/pull
-  Body: { workspaceId, clientVV: Uint8Array }
-  ← { updates: Uint8Array[], serverVV: Uint8Array }
+  Body: { workspaceId, clientVV }            // clientVV 为二进制字段
+  ← { updates, serverVV }                    // updates/serverVV 为二进制字段
   → 客户端 doc.import() 每个 update
 ```
+
+**传输格式约束（必须明确）**：
+- 上述 `Uint8Array` 为逻辑字段类型，HTTP 实现不能直接塞 JSON；需选定一种编码：
+  - `application/octet-stream`（推荐，二进制 envelope/帧）
+  - JSON + Base64（实现简单，但体积膨胀约 33%）
+- Phase 2 先定一种并写入协议文档（字段名、编码、压缩、最大 payload）
 
 **幂等保证**：
 - 每个 update 附带 `client_update_hash`（SHA-256），服务端去重
@@ -358,6 +377,7 @@ POST /sync/pull
 **Compaction 策略**：
 - 当 update log 超过 N 条（如 1000）或总大小超过 M MB
 - 服务端加载 snapshot + 所有 updates → 导出新 snapshot（或 shallow-snapshot）→ 清理旧 updates
+- 若使用 shallow-snapshot，需记录其覆盖边界（frontiers/seq），并在 `pull` 时检测客户端是否仍在覆盖范围内；不在范围内时返回全量/较新 snapshot 回退
 - 参考 Figma：100 万 tombstone 触发 compaction
 
 **客户端同步状态机**：

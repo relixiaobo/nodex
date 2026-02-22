@@ -8,7 +8,7 @@
  * 5. subscribeLocalUpdates hook — 注册 + 清理 + import 不触发
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, beforeAll, afterAll } from 'vitest';
 import { LoroDoc, VersionVector } from 'loro-crdt';
 
 import {
@@ -23,56 +23,181 @@ import {
 } from '../../src/lib/loro-doc.js';
 
 import type { SnapshotRecord } from '../../src/lib/loro-persistence.js';
+import {
+  saveSnapshotRecord,
+  loadSnapshotRecord,
+  deleteSnapshot,
+  _resetDBForTest,
+} from '../../src/lib/loro-persistence.js';
 
 import {
   getOrCreateDefaultWorkspaceId,
   DEFAULT_WORKSPACE_STORAGE_KEY,
+  _resetWorkspaceIdCacheForTest,
 } from '../../src/lib/workspace-id.js';
+
+// ============================================================
+// Minimal IndexedDB test double (jsdom has no indexedDB)
+// ============================================================
+
+function createAsyncRequest<T>(producer: () => T): IDBRequest<T> {
+  const req = {
+    onsuccess: null,
+    onerror: null,
+    result: undefined,
+    error: null,
+  } as unknown as IDBRequest<T>;
+  queueMicrotask(() => {
+    try {
+      (req as { result: T }).result = producer();
+      req.onsuccess?.({ target: req } as Event);
+    } catch (error) {
+      (req as { error: DOMException }).error = error as DOMException;
+      req.onerror?.({ target: req } as Event);
+    }
+  });
+  return req;
+}
+
+function createFakeIndexedDB(): {
+  indexedDB: IDBFactory;
+  putRaw(storeName: string, key: string, value: unknown): void;
+  reset(): void;
+} {
+  const stores = new Map<string, Map<string, unknown>>();
+  let initialized = false;
+
+  function ensureStore(name: string): Map<string, unknown> {
+    let store = stores.get(name);
+    if (!store) {
+      store = new Map<string, unknown>();
+      stores.set(name, store);
+    }
+    return store;
+  }
+
+  const db = {
+    objectStoreNames: {
+      contains: (name: string) => stores.has(name),
+    },
+    createObjectStore: (name: string) => {
+      ensureStore(name);
+      return {} as IDBObjectStore;
+    },
+    transaction: (storeName: string) => ({
+      objectStore: (name: string) => {
+        const target = ensureStore(name || storeName);
+        return {
+          put: (value: unknown, key: string) => createAsyncRequest(() => {
+            target.set(key, value);
+            return key;
+          }),
+          get: (key: string) => createAsyncRequest(() => target.get(key)),
+          delete: (key: string) => createAsyncRequest(() => {
+            target.delete(key);
+            return undefined;
+          }),
+        } as unknown as IDBObjectStore;
+      },
+    }),
+  } as unknown as IDBDatabase;
+
+  const indexedDB = {
+    open: (_name: string, _version?: number) => {
+      const req = {
+        onsuccess: null,
+        onerror: null,
+        onupgradeneeded: null,
+        result: undefined,
+        error: null,
+      } as unknown as IDBOpenDBRequest;
+      queueMicrotask(() => {
+        (req as { result: IDBDatabase }).result = db;
+        if (!initialized) {
+          initialized = true;
+          req.onupgradeneeded?.({ target: req } as IDBVersionChangeEvent);
+        }
+        req.onsuccess?.({ target: req } as Event);
+      });
+      return req;
+    },
+  } as unknown as IDBFactory;
+
+  return {
+    indexedDB,
+    putRaw(storeName: string, key: string, value: unknown) {
+      ensureStore(storeName).set(key, value);
+    },
+    reset() {
+      stores.clear();
+      initialized = false;
+    },
+  };
+}
+
+const fakeIndexedDb = createFakeIndexedDB();
+const originalIndexedDB = globalThis.indexedDB;
+
+beforeAll(() => {
+  (globalThis as { indexedDB?: IDBFactory }).indexedDB = fakeIndexedDb.indexedDB;
+});
+
+afterAll(() => {
+  if (originalIndexedDB) {
+    (globalThis as { indexedDB?: IDBFactory }).indexedDB = originalIndexedDB;
+  } else {
+    delete (globalThis as { indexedDB?: IDBFactory }).indexedDB;
+  }
+});
 
 // ============================================================
 // SnapshotRecord format validation
 // ============================================================
 
 describe('SnapshotRecord format validation', () => {
-  /**
-   * Simulates the loadSnapshotRecord logic (post-cleanup):
-   * - Bare Uint8Array (old format) → null (discarded, no backward compat)
-   * - Valid SnapshotRecord → return as-is
-   * - null/undefined → null
-   */
-  function parseSnapshotResult(result: unknown): SnapshotRecord | null {
-    if (!result) return null;
-    // Old bare Uint8Array format is discarded — project not yet launched
-    if (result instanceof Uint8Array) return null;
-    if (!(result as SnapshotRecord).snapshot) return null;
-    return result as SnapshotRecord;
-  }
-
-  it('rejects bare Uint8Array (old format) — returns null', () => {
-    const oldData = new Uint8Array([1, 2, 3, 4]);
-    expect(parseSnapshotResult(oldData)).toBeNull();
+  beforeEach(() => {
+    fakeIndexedDb.reset();
+    _resetDBForTest();
+    resetLoroDoc();
   });
 
-  it('passes through SnapshotRecord unchanged', () => {
+  it('rejects bare Uint8Array (old format) in persisted store — returns null', async () => {
+    fakeIndexedDb.putRaw('loro_snapshots', 'ws_old', new Uint8Array([1, 2, 3, 4]));
+    await expect(loadSnapshotRecord('ws_old')).resolves.toBeNull();
+  });
+
+  it('loads valid SnapshotRecord through persistence API', async () => {
     const original: SnapshotRecord = {
       snapshot: new Uint8Array([5, 6, 7]),
       peerIdStr: '12345',
       versionVector: new Uint8Array([8, 9]),
       savedAt: 1000,
     };
-    const record = parseSnapshotResult(original);
+    await saveSnapshotRecord('ws_valid', original);
+    const record = await loadSnapshotRecord('ws_valid');
 
-    expect(record).toBe(original);
+    expect(record).not.toBeNull();
+    expect(record!.snapshot).toEqual(original.snapshot);
     expect(record!.peerIdStr).toBe('12345');
+    expect(record!.versionVector).toEqual(original.versionVector);
     expect(record!.savedAt).toBe(1000);
   });
 
-  it('returns null for missing data', () => {
-    expect(parseSnapshotResult(null)).toBeNull();
-    expect(parseSnapshotResult(undefined)).toBeNull();
+  it('rejects partial/corrupt SnapshotRecord object — returns null', async () => {
+    fakeIndexedDb.putRaw('loro_snapshots', 'ws_corrupt', {
+      snapshot: new Uint8Array([1]),
+      peerIdStr: 12345,
+      versionVector: new Uint8Array([2]),
+      savedAt: 10,
+    });
+    await expect(loadSnapshotRecord('ws_corrupt')).resolves.toBeNull();
   });
 
-  it('SnapshotRecord fields are all populated from real doc', () => {
+  it('returns null for missing data', async () => {
+    await expect(loadSnapshotRecord('ws_missing')).resolves.toBeNull();
+  });
+
+  it('SnapshotRecord fields are all populated from real doc', async () => {
     initLoroDocForTest('ws_snap');
     createNode('n1', null);
     commitDoc();
@@ -82,13 +207,17 @@ describe('SnapshotRecord format validation', () => {
     const vvBytes = doc.oplogVersion().encode();
     const peerIdStr = doc.peerIdStr;
 
-    const record: SnapshotRecord = {
+    const original: SnapshotRecord = {
       snapshot,
       peerIdStr,
       versionVector: vvBytes,
       savedAt: Date.now(),
     };
 
+    await saveSnapshotRecord('ws_snap_record', original);
+    const record = await loadSnapshotRecord('ws_snap_record');
+
+    expect(record).not.toBeNull();
     expect(record.snapshot.length).toBeGreaterThan(0);
     expect(record.peerIdStr).toMatch(/^\d+$/);
     expect(record.versionVector.length).toBeGreaterThan(0);
@@ -104,6 +233,7 @@ describe('SnapshotRecord format validation', () => {
     expect(restoredVV.toJSON().size).toBeGreaterThan(0);
 
     resetLoroDoc();
+    await deleteSnapshot('ws_snap_record');
   });
 });
 
@@ -249,20 +379,31 @@ describe('VersionVector persistence', () => {
     commitDoc();
 
     const vvBefore = getVersionVector();
+    const snapshotBefore = exportSnapshot();
 
     createNode('n2', null);
     commitDoc();
 
-    const doc = getLoroDoc();
+    const sourceDoc = getLoroDoc();
     // Export only the delta since vvBefore
-    const delta = doc.export({ mode: 'update', from: vvBefore });
+    const delta = sourceDoc.export({ mode: 'update', from: vvBefore });
     expect(delta).toBeInstanceOf(Uint8Array);
     expect(delta.length).toBeGreaterThan(0);
 
-    // Delta should be importable into a copy of the doc at vvBefore state
-    const docCopy = new LoroDoc();
-    docCopy.import(doc.export({ mode: 'snapshot' }));
-    // The import should not throw
+    // Delta should upgrade a replica at vvBefore to the latest state.
+    const receiverDoc = new LoroDoc();
+    receiverDoc.import(snapshotBefore);
+    const beforeCount = receiverDoc.getTree('nodes').nodes().length;
+    receiverDoc.import(delta);
+
+    expect(receiverDoc.getTree('nodes').nodes().length).toBe(beforeCount + 1);
+
+    const sourceVV = sourceDoc.oplogVersion().toJSON();
+    const receiverVV = receiverDoc.oplogVersion().toJSON();
+    expect(receiverVV.size).toBe(sourceVV.size);
+    for (const [peer, counter] of sourceVV) {
+      expect(receiverVV.get(peer)).toBe(counter);
+    }
   });
 });
 
@@ -272,6 +413,7 @@ describe('VersionVector persistence', () => {
 
 describe('Workspace ID normalization', () => {
   beforeEach(() => {
+    _resetWorkspaceIdCacheForTest();
     localStorage.removeItem(DEFAULT_WORKSPACE_STORAGE_KEY);
   });
 
@@ -304,6 +446,15 @@ describe('Workspace ID normalization', () => {
     const wsId2 = await getOrCreateDefaultWorkspaceId();
     // Should be different since we cleared storage between calls
     expect(wsId1).not.toBe(wsId2);
+  });
+
+  it('concurrent first-run calls in same context resolve to the same ID', async () => {
+    const [wsId1, wsId2] = await Promise.all([
+      getOrCreateDefaultWorkspaceId(),
+      getOrCreateDefaultWorkspaceId(),
+    ]);
+    expect(wsId1).toBe(wsId2);
+    expect(localStorage.getItem(DEFAULT_WORKSPACE_STORAGE_KEY)).toBe(wsId1);
   });
 });
 

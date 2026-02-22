@@ -1230,7 +1230,9 @@ createSibling 自动标签（2 cases）:
 
 **实现要点**:
 - `buildBacklinkCountMap(version)` 按 `_version` 缓存，同一版本重复调用 O(1)；测试中用递增 `ver` 确保每次变更后重新扫描
-- `computeBacklinks` 跳过 parent 为 fieldEntry 的树引用（避免与 fieldValueRefs 重复计数）
+- `computeBacklinks(nodeId, version)` 按 `(version, nodeId)` 缓存，同一 `_version` + 同一节点不重复扫描
+- `computeBacklinks` 和 `buildBacklinkCountMap` 均跳过 fieldEntry 内的树引用（避免与 fieldValueRefs 重复计数，保证 badge 数字 = section 展开后条目数）
+- `buildBacklinkCountMap` 预计算 trash set（BFS from TRASH root），避免逐节点 `isInTrash()` parent chain walk
 - 已删除未使用的 `useBacklinkCountMap` hook（仅 `useBacklinkCount` 在 OutlinerItem 中使用）
 
 ---

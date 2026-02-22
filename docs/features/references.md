@@ -121,8 +121,11 @@
 - **树引用**: 所有 `type='reference' && targetId === nodeId` 的节点（排除 parent 为 fieldEntry 的，避免与字段值引用重复）
 - **内联引用**: 所有节点 `inlineRefs` 中 `targetNodeId === nodeId` 的条目
 - **字段值引用**: `type='fieldEntry'` 的节点，其 children 包含 `nodeId`
-- **去重规则**: 同一引用不会同时出现在 "Mentioned in" 和 "Appears as [Field] in" 中
-- **性能**: `buildBacklinkCountMap` 按 `_version` 缓存，同一渲染周期内多个 `useBacklinkCount` 调用 O(1)
+- **去重规则**: 同一引用不会同时出现在 "Mentioned in" 和 "Appears as [Field] in" 中（`computeBacklinks` 和 `buildBacklinkCountMap` 均跳过 fieldEntry 内的树引用）
+- **性能**:
+  - `buildBacklinkCountMap(version)` 按 `_version` 缓存，同一渲染周期内多个 `useBacklinkCount` 调用 O(1)
+  - `computeBacklinks(nodeId, version)` 按 `(version, nodeId)` 缓存，同一 `_version` 内同一节点不重复扫描
+  - `buildBacklinkCountMap` 预计算 trash set（从 TRASH 根节点 BFS），避免每个节点重复走 parent chain
 
 ### 引用计数 Badge
 
@@ -159,6 +162,9 @@
 | 2026-02-22 | BacklinksSection 行布局复用 OutlinerItem depth-0 结构 | paddingLeft/flex gap/absolute highlight overlay 与 OutlinerItem 完全一致 |
 | 2026-02-22 | 标签/分组标签对齐 bullet 列（25px），非文本列（48px） | 信息层级：标签是分组元数据，不是内容文本 |
 | 2026-02-22 | 删除未使用的 useBacklinkCountMap hook | 仅 useBacklinkCount（单节点）在使用，全量 map hook 无消费者 |
+| 2026-02-23 | buildBacklinkCountMap 也跳过 fieldEntry 内的树引用 | PR review: badge 计数必须与展开后 section 一致，不能双重计数 |
+| 2026-02-23 | computeBacklinks 添加 (version, nodeId) 缓存 | PR review: Zustand selector 每次 _version 变化触发，缓存避免冗余全量扫描 |
+| 2026-02-23 | buildBacklinkCountMap 预计算 trash set（BFS from TRASH root） | PR review: 替代逐节点 isInTrash() parent chain walk，O(T) 预计算 vs O(N×D) 逐条 |
 
 ## 当前状态
 

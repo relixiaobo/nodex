@@ -5,19 +5,17 @@
  *   - "Mentioned in..." group: tree references + inline references with breadcrumbs
  *   - "Appears as [Field] in..." groups: field value references by field name
  *
- * Matches Tana's backlinks UI behavior:
- *   - Default collapsed, resets on nodeId change
- *   - Breadcrumb paths are clickable (navigate to ancestor)
- *   - Reference entries are clickable (navigate to referencing node)
+ * Reuses existing outliner components (BulletChevron, ChevronButton, TagBadge)
+ * for visual consistency with the main outliner.
  */
 
 import { useCallback, useEffect, useState } from 'react';
 import { ChevronRight, ChevronDown } from '../../lib/icons.js';
 import { useBacklinks } from '../../hooks/use-backlinks';
 import { useUIStore } from '../../stores/ui-store';
-import { useNodeStore } from '../../stores/node-store';
-import { resolveTagColor } from '../../lib/tag-colors.js';
-import type { MentionedInRef, FieldValueRef, BacklinksResult } from '../../lib/backlinks.js';
+import { BulletChevron, ChevronButton } from '../outliner/BulletChevron';
+import { TagBadge } from '../tags/TagBadge';
+import type { MentionedInRef, FieldValueRef } from '../../lib/backlinks.js';
 import type { AncestorInfo } from '../../lib/tree-utils.js';
 
 interface BacklinksSectionProps {
@@ -67,21 +65,6 @@ export function BacklinksSection({ nodeId }: BacklinksSectionProps) {
   );
 }
 
-// ─── Row chevron (matches OutlinerItem ChevronButton visual) ───
-
-/** Static chevron that appears on row hover, matching the outliner's expand/collapse button style. */
-function RowChevron() {
-  return (
-    <span className="flex shrink-0 h-[21px] w-[15px] items-center justify-center opacity-0 group-hover/row:opacity-100 transition-opacity">
-      <span className="flex h-[15px] w-[15px] items-center justify-center rounded-full bg-background outline outline-1 outline-border-emphasis">
-        <svg width="10" height="10" viewBox="0 0 12 12" className="text-foreground-secondary">
-          <path d="M4.5 2.5L8 6L4.5 9.5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      </span>
-    </span>
-  );
-}
-
 // ─── Mentioned in... ───
 
 function MentionedInGroup({ items }: { items: MentionedInRef[] }) {
@@ -112,16 +95,22 @@ function MentionedInItem({ item }: { item: MentionedInRef }) {
           <BreadcrumbPath ancestors={item.breadcrumb} />
         </div>
       )}
-      {/* Content box with chevron + bullet (matches outliner row layout) */}
+      {/* Content box with real ChevronButton + BulletChevron */}
       <div
         className="mt-1 flex items-start bg-foreground/[0.03] border-l-2 border-primary/20 rounded-r-sm cursor-pointer hover:bg-foreground/[0.06] transition-colors"
         onClick={handleNavigate}
       >
-        <RowChevron />
-        <span className="shrink-0 h-[21px] w-[15px] flex items-center justify-center">
-          <span className="w-[5px] h-[5px] rounded-full bg-foreground/50" />
-        </span>
-        <span className="text-sm leading-[21px] min-w-0 break-words py-1 pr-2">
+        <ChevronButton
+          isExpanded={false}
+          onToggle={handleNavigate}
+          onDrillDown={handleNavigate}
+        />
+        <BulletChevron
+          hasChildren={false}
+          isExpanded={false}
+          onBulletClick={handleNavigate}
+        />
+        <span className="text-sm leading-[21px] min-w-0 break-words py-1 pr-2 ml-2">
           {item.refNodeName || <span className="text-foreground-tertiary italic">Untitled</span>}
         </span>
       </div>
@@ -181,47 +170,28 @@ function FieldValueItem({ item }: { item: FieldValueRef }) {
       className="group/row flex items-center cursor-pointer hover:bg-foreground/5 rounded-sm transition-colors"
       onClick={handleNavigate}
     >
-      <RowChevron />
-      {/* Reference bullet — same as BulletChevron isReference style */}
-      <span className="shrink-0 w-[15px] h-[21px] flex items-center justify-center">
-        <span className="flex h-[15px] w-[15px] items-center justify-center rounded-full border border-dashed border-foreground/40">
-          <span className="h-[5px] w-[5px] rounded-full bg-foreground/50" />
-        </span>
-      </span>
+      <ChevronButton
+        isExpanded={false}
+        onToggle={handleNavigate}
+        onDrillDown={handleNavigate}
+      />
+      <BulletChevron
+        hasChildren={false}
+        isExpanded={false}
+        isReference={true}
+        onBulletClick={handleNavigate}
+      />
       <span className="text-sm leading-[21px] truncate min-w-0 ml-2">
         {item.ownerNodeName || <span className="text-foreground-tertiary italic">Untitled</span>}
       </span>
-      {/* Tag badges */}
+      {/* Tag badges — reuse real TagBadge (read-only, no remove handler) */}
       {item.ownerTags.length > 0 && (
         <span className="flex items-center gap-1 shrink-0 ml-auto pr-1">
           {item.ownerTags.slice(0, 2).map(tagId => (
-            <FieldValueTagBadge key={tagId} tagDefId={tagId} />
+            <TagBadge key={tagId} tagDefId={tagId} />
           ))}
         </span>
       )}
     </div>
-  );
-}
-
-/** Minimal inline tag badge for field value refs (read-only, no context menu). */
-function FieldValueTagBadge({ tagDefId }: { tagDefId: string }) {
-  const tagName = useNodeStore((s) => {
-    void s._version;
-    const node = s.getNode(tagDefId);
-    return node?.name ?? tagDefId;
-  });
-  const color = useNodeStore((s) => {
-    void s._version;
-    return resolveTagColor(tagDefId);
-  });
-
-  return (
-    <span
-      className="inline-flex items-center text-[11px] font-medium leading-4 px-1 rounded"
-      style={{ backgroundColor: color.bg, color: color.text }}
-    >
-      <span className="text-[10px] mr-0.5">#</span>
-      {tagName}
-    </span>
   );
 }

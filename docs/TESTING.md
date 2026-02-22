@@ -1225,8 +1225,13 @@ createSibling 自动标签（2 cases）:
 | 6 | 多类型引用累加 | totalCount = mentionedIn + fieldValueRefs 总和 |
 | 7 | 面包屑路径 | 祖先链包含 Library/Project/Task |
 | 8 | 字段值分组 | 多个节点引用同一 option → 同一 fieldDefName 下多条 |
-| 9 | buildBacklinkCountMap | 全局计数正确，tree ref 递增 |
+| 9 | buildBacklinkCountMap(version) | 全局计数正确，tree ref 递增（需传递递增 version 以绕过缓存） |
 | 10 | buildBacklinkCountMap TRASH 排除 | trash 后计数减少 |
+
+**实现要点**:
+- `buildBacklinkCountMap(version)` 按 `_version` 缓存，同一版本重复调用 O(1)；测试中用递增 `ver` 确保每次变更后重新扫描
+- `computeBacklinks` 跳过 parent 为 fieldEntry 的树引用（避免与 fieldValueRefs 重复计数）
+- 已删除未使用的 `useBacklinkCountMap` hook（仅 `useBacklinkCount` 在 OutlinerItem 中使用）
 
 ---
 

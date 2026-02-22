@@ -225,14 +225,60 @@ function seedBody(): void {
   const todayDayId = ensureDateNode(today);
   const yesterdayDayId = ensureDateNode(yesterday);
 
-  // Today's notes
+  // Today's notes (3 notes → heatmap tier 2: bg-primary/15)
   cn('j_today_1', todayDayId, { name: 'Started working on the outliner component' });
   cn('j_today_2', todayDayId, { name: 'Fixed a bug in the drag and drop handler' });
   cn('j_today_3', todayDayId, { name: 'Learned about TipTap keyboard shortcuts' });
 
-  // Yesterday's notes
+  // Yesterday's notes (2 notes → heatmap tier 1: bg-primary/8)
   cn('j_yest_1', yesterdayDayId, { name: 'Reviewed PR for data model migration' });
   cn('j_yest_2', yesterdayDayId, { name: 'Sketched out the journal feature plan' });
+
+  // ── More journal days for heatmap demo ──
+  // -2 days: 5 notes → heatmap tier 3: bg-primary/25
+  const day2ago = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 2);
+  const day2agoId = ensureDateNode(day2ago);
+  cn('j_d2_1', day2agoId, { name: 'Deep work: refactored node-store architecture' });
+  cn('j_d2_2', day2agoId, { name: 'Code review for 3 PRs' });
+  cn('j_d2_3', day2agoId, { name: 'Fixed drag-and-drop edge case in nested outliner' });
+  cn('j_d2_4', day2agoId, { name: 'Updated TESTING.md with new coverage' });
+  cn('j_d2_5', day2agoId, { name: 'Deployed staging build and verified' });
+
+  // -4 days: 1 note → heatmap tier 1: bg-primary/8
+  const day4ago = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 4);
+  const day4agoId = ensureDateNode(day4ago);
+  cn('j_d4_1', day4agoId, { name: 'Quick standup sync — no blockers' });
+
+  // -5 days: 4 notes → heatmap tier 2: bg-primary/15
+  const day5ago = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 5);
+  const day5agoId = ensureDateNode(day5ago);
+  cn('j_d5_1', day5agoId, { name: 'Researched Tana config page architecture' });
+  cn('j_d5_2', day5agoId, { name: 'Drafted supertag inheritance design' });
+  cn('j_d5_3', day5agoId, { name: 'Pair programming on field validation' });
+  cn('j_d5_4', day5agoId, { name: 'Wrote field-utils test coverage' });
+
+  // -7 days: 6 notes → heatmap tier 3: bg-primary/25
+  const day7ago = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 7);
+  const day7agoId = ensureDateNode(day7ago);
+  cn('j_d7_1', day7agoId, { name: 'Kickoff meeting for calendar heatmap feature' });
+  cn('j_d7_2', day7agoId, { name: 'Designed data model for note counts' });
+  cn('j_d7_3', day7agoId, { name: 'Implemented getDayNoteCountsForMonth' });
+  cn('j_d7_4', day7agoId, { name: 'Built CalendarGrid heatmap UI' });
+  cn('j_d7_5', day7agoId, { name: 'Wrote vitest coverage for heatmap' });
+  cn('j_d7_6', day7agoId, { name: 'Visual verification and polish' });
+
+  // -10 days: 2 notes → heatmap tier 1: bg-primary/8
+  const day10ago = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 10);
+  const day10agoId = ensureDateNode(day10ago);
+  cn('j_d10_1', day10agoId, { name: 'Sprint retrospective notes' });
+  cn('j_d10_2', day10agoId, { name: 'Planned next sprint priorities' });
+
+  // -14 days: 3 notes → heatmap tier 2: bg-primary/15
+  const day14ago = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 14);
+  const day14agoId = ensureDateNode(day14ago);
+  cn('j_d14_1', day14agoId, { name: 'Explored Loro CRDT merge semantics' });
+  cn('j_d14_2', day14agoId, { name: 'Benchmarked tree traversal performance' });
+  cn('j_d14_3', day14agoId, { name: 'Fixed undo/redo edge case' });
 
   // ═══════════════════════════════════════════════════════════════
   // UI State: navigation + expand defaults

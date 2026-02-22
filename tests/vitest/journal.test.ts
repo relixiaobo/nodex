@@ -166,11 +166,21 @@ describe('ensureDateNode', () => {
     const weekId = yearChildren.find(id => loroDoc.toNodexNode(id)?.name === 'Week 07')!;
 
     const dayNames = loroDoc.getChildren(weekId)
-      .map(id => loroDoc.toNodexNode(id)?.name);
+      .map(id => loroDoc.toNodexNode(id)?.name)
+      .filter((n): n is string => !!n);
 
-    expect(dayNames[0]).toBe('Sat, Feb 14');
-    expect(dayNames[1]).toBe('Wed, Feb 11');
-    expect(dayNames[2]).toBe('Mon, Feb 9');
+    // Seed data may add extra days (e.g. today-7). Verify descending order.
+    const dayNums = dayNames.map(n => {
+      const m = n.match(/(\d+)$/);
+      return m ? parseInt(m[1], 10) : 0;
+    });
+    for (let i = 1; i < dayNums.length; i++) {
+      expect(dayNums[i]).toBeLessThan(dayNums[i - 1]);
+    }
+    // Our three days must be present
+    expect(dayNames).toContain('Sat, Feb 14');
+    expect(dayNames).toContain('Wed, Feb 11');
+    expect(dayNames).toContain('Mon, Feb 9');
   });
 });
 

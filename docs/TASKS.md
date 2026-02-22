@@ -52,6 +52,7 @@ _(空)_
 > - [2026-02-22 nodex-codex] 新增轻量 `i18n` 基础层（en-only `t()` + fallback），并将本次 reference warning/selector 文案迁移到字典，避免组件内继续散落裸字符串。
 > - [2026-02-22 nodex-codex] 扩展轻量 i18n 使用范围到 `TagSelector` / `SlashCommandMenu`（空态与创建文案），验证 `t()` 插值与 key 覆盖。
 > - [2026-02-22 nodex-codex] 将 `ReferenceSelector` 剩余 section/empty/create 文案（Dates/Recently used/Nodes/No matches/Create）迁移到 i18n，补齐 reference 链路示范。
+> - [2026-02-22 nodex-codex] 新增非阻塞 `check:i18n-copy` 扫描脚本（组件裸文案 advisory 报告），并完成下一批迁移：`ReferenceSelector` 日期快捷词、`CommandPalette`、`NodePicker` 的关键用户文案。
 
 ---
 

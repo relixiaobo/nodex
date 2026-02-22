@@ -43,6 +43,16 @@ PR / main push 会执行以下检查：
 1. 若改动了 `src/`，必须同时改动 `tests/vitest/*.test.ts`
 2. 若改动了 `tests/vitest/`，必须同时更新 `docs/TESTING.md`
 
+### i18n Copy Advisory Scan（非阻塞）
+
+命令：`npm run check:i18n-copy`
+
+说明：
+
+1. 扫描 `src/components/**/*.tsx` 中“可能是用户可见文案”的裸字符串（JSX 文本节点 + 常见可见属性）
+2. 仅输出报告（warning），**不**阻塞本地开发 / CI
+3. 用于分批迁移到 `src/i18n/*` 时查漏，不追求零误报
+
 ---
 
 ## 环境配置
@@ -829,7 +839,7 @@ hash trigger cleanup safety（3 cases, Bug #53 + CJK hashtag 回归）:
 1. `t(key)` 读取英文默认文案（en-only 基础层）
 2. 缺失 key fallback 返回原 key（便于开发期发现漏翻）
 3. `getLocale/setLocale` 与基础文案读取保持稳定（后续多语言扩展入口）
-4. 覆盖 reference/tag/slash 关键 UI 文案 key（含 `ReferenceSelector` / `TagSelector` 的 `Create "{name}"` 插值）
+4. 覆盖 reference/tag/slash/search/node-picker 关键 UI 文案 key（含 `ReferenceSelector` / `TagSelector` 的 `Create "{name}"` 插值）
 2. hidden field 仅在“已手动 reveal”时进入 drag-select 根列表
 
 ### 1.60 OutlinerView 渲染安全（白屏回归）

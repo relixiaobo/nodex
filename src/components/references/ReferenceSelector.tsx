@@ -18,7 +18,7 @@ import * as loroDoc from '../../lib/loro-doc.js';
 import { ensureDateNode } from '../../lib/journal.js';
 import { formatDayName } from '../../lib/date-utils.js';
 import { getTreeReferenceBlockReason, type TreeReferenceBlockReason } from '../../lib/reference-rules.js';
-import { t } from '../../i18n/strings.js';
+import { t, type TranslationKey } from '../../i18n/strings.js';
 
 export interface ReferenceDropdownHandle {
   getItemCount(): number;
@@ -42,15 +42,15 @@ const SKIP_RECENT_DOC_TYPES = new Set<string>(['fieldEntry', 'fieldDef', 'tagDef
 
 interface DateShortcut {
   keyword: string;
-  label: string;
+  labelKey: TranslationKey;
   getDate: () => Date;
 }
 
 const DATE_SHORTCUTS: DateShortcut[] = [
-  { keyword: 'today', label: 'Today', getDate: () => new Date() },
+  { keyword: 'today', labelKey: 'reference.selector.shortcutToday', getDate: () => new Date() },
   {
     keyword: 'tomorrow',
-    label: 'Tomorrow',
+    labelKey: 'reference.selector.shortcutTomorrow',
     getDate: () => {
       const d = new Date();
       d.setDate(d.getDate() + 1);
@@ -59,7 +59,7 @@ const DATE_SHORTCUTS: DateShortcut[] = [
   },
   {
     keyword: 'yesterday',
-    label: 'Yesterday',
+    labelKey: 'reference.selector.shortcutYesterday',
     getDate: () => {
       const d = new Date();
       d.setDate(d.getDate() - 1);
@@ -310,7 +310,7 @@ export const ReferenceSelector = forwardRef<ReferenceDropdownHandle, ReferenceSe
                 }}
               >
                 <Calendar size={14} className="text-foreground-secondary shrink-0" />
-                <span className="text-sm text-foreground">{dm.label}</span>
+                <span className="text-sm text-foreground">{t(dm.labelKey)}</span>
                 <span className="ml-auto text-[10px] text-foreground-tertiary">{dm.dateName}</span>
               </button>
             ))}

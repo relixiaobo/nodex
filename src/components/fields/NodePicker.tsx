@@ -15,6 +15,7 @@ import { BulletChevron } from '../outliner/BulletChevron';
 import { resolveTagColor } from '../../lib/tag-colors.js';
 import { useNodeStore } from '../../stores/node-store';
 import { FIELD_OVERLAY_Z_INDEX, FIELD_VALUE_INSET } from './field-layout.js';
+import { t } from '../../i18n/strings.js';
 
 /** Memoized colored # bullet — subscribes only to the specific tagDef's color config. */
 const TagDefBullet = memo(function TagDefBullet({ tagDefId }: { tagDefId: string }) {
@@ -329,7 +330,7 @@ export function NodePicker({
                   <span className="block h-[5px] w-[5px] rounded-full bg-foreground/50" />
                 </span>
                 <span className="text-sm leading-[21px]">
-                  Create "<span className="font-medium">{inputValue.trim()}</span>"
+                  {t('nodePicker.createPrefix')} <span className="font-medium">"{inputValue.trim()}"</span>
                 </span>
               </button>
             </div>

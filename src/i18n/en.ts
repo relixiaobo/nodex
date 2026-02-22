@@ -16,6 +16,9 @@ export const enMessages = {
       sectionNodes: 'Nodes',
       noMatches: 'No matches',
       create: 'Create "{name}"',
+      shortcutToday: 'Today',
+      shortcutTomorrow: 'Tomorrow',
+      shortcutYesterday: 'Yesterday',
     },
   },
   tag: {
@@ -28,6 +31,23 @@ export const enMessages = {
     menu: {
       noResults: 'No results',
     },
+  },
+  search: {
+    commandPalette: {
+      placeholder: 'Search nodes...',
+      noResults: 'No results found.',
+      groupNavigate: 'Navigate',
+      groupNodes: 'Nodes',
+      containerLibrary: 'Library',
+      containerInbox: 'Inbox',
+      containerJournal: 'Journal',
+      containerTrash: 'Trash',
+      untitled: 'Untitled',
+    },
+  },
+  nodePicker: {
+    create: 'Create "{name}"',
+    createPrefix: 'Create',
   },
 } as const;
 

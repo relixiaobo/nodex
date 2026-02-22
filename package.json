@@ -15,6 +15,7 @@
     "test:run": "vitest run",
     "test:watch": "vitest --watch",
     "check:test-sync": "node scripts/check-test-sync.mjs",
+    "check:i18n-copy": "node scripts/check-component-copy.mjs",
     "verify": "npm run typecheck && npm run check:test-sync && npm run test:run && npm run build",
     "typecheck": "tsc --noEmit",
     "postinstall": "wxt prepare"

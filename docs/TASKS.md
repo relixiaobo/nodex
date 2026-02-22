@@ -67,7 +67,11 @@ _(空)_
 
 #### References 增强 (#19)
 > MVP 已完成（@触发搜索、树引用+内联引用、引用 bullet、删除引用）
+> **Owner**: nodex-cc-2
 
+**第一步：研究 Tana 的反向链接交互（截图 + 文档），沉淀到 `docs/research/` 或更新 `docs/features/references.md`，再开始写代码。**
+
+- [ ] **研究**: Tana 反向链接 UI 交互（位置、样式、展开/折叠、面包屑、计数 badge 等）
 - [ ] 反向链接 section（节点底部显示所有引用位置 + 面包屑路径）
 - [ ] 引用计数 badge
 - [ ] 合并节点（选中重复节点 → 合并 children/tags，更新所有引用）

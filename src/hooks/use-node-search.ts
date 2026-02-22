@@ -22,6 +22,10 @@ export interface NodeSearchResult {
 const SKIP_DOC_TYPES = new Set<string>([
   'fieldEntry', 'fieldDef', 'tagDef', 'reference',
 ]);
+const MAX_RESULTS = 15;
+// Bound broad queries so large workspaces don't scan all nodes on every keystroke.
+// We still sort by updatedAt within this candidate pool, preserving recency behavior.
+const MAX_MATCH_CANDIDATES = 120;
 
 export function useNodeSearch(query: string, excludeId?: string): NodeSearchResult[] {
   const json = useNodeStore((state) => {
@@ -69,6 +73,8 @@ export function useNodeSearch(query: string, excludeId?: string): NodeSearchResu
         breadcrumb: crumbs.join(' / '),
         updatedAt: node.updatedAt ?? 0,
       });
+
+      if (matches.length >= MAX_MATCH_CANDIDATES) break;
     }
 
     matches.sort((a, b) => {
@@ -78,7 +84,7 @@ export function useNodeSearch(query: string, excludeId?: string): NodeSearchResu
       return a.id.localeCompare(b.id, 'en');
     });
 
-    if (matches.length > 15) matches.length = 15;
+    if (matches.length > MAX_RESULTS) matches.length = MAX_RESULTS;
     return JSON.stringify(matches);
   });
 

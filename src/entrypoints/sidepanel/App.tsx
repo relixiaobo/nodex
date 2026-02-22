@@ -4,7 +4,6 @@ import { useUIStore } from '../../stores/ui-store';
 import { useNavUndoKeyboard } from '../../hooks/use-nav-undo-keyboard';
 import { useTodayShortcut } from '../../hooks/use-today-shortcut';
 import { useGlobalSelectionDismiss } from '../../hooks/use-global-selection-dismiss.js';
-import { useTodayShortcut } from '../../hooks/use-today-shortcut';
 import { Sidebar } from '../../components/sidebar/Sidebar';
 import { PanelStack } from '../../components/panel/PanelStack';
 import { CommandPalette } from '../../components/search/CommandPalette';

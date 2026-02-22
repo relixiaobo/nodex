@@ -124,8 +124,14 @@ export function resolveNodeBulletColors(nodeId: string): string[] {
  * - Otherwise fall back to the current inline-ref theme color (purple token).
  */
 export function resolveInlineReferenceTextColor(targetNodeId: string): string {
-  const node = loroDoc.toNodexNode(targetNodeId);
-  const firstTagId = node?.tags?.[0];
-  if (!firstTagId) return INLINE_REF_FALLBACK_TEXT_COLOR;
-  return resolveTagColor(firstTagId).text;
+  if (!targetNodeId) return INLINE_REF_FALLBACK_TEXT_COLOR;
+  try {
+    const node = loroDoc.toNodexNode(targetNodeId);
+    const firstTagId = node?.tags?.[0];
+    if (!firstTagId) return INLINE_REF_FALLBACK_TEXT_COLOR;
+    return resolveTagColor(firstTagId).text;
+  } catch {
+    // ProseMirror schema `toDOM` can run before LoroDoc bootstrap completes.
+    return INLINE_REF_FALLBACK_TEXT_COLOR;
+  }
 }

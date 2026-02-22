@@ -29,13 +29,24 @@ _(空)_
 |-------|---------|------|-------------|
 | nodex-cc | _(idle)_ | — | — |
 | nodex-cc-2 | _(idle)_ | — | — |
-| nodex-codex | _(idle)_ | — | — |
+| nodex-codex | Sync Phase 0 Step 1 — Review & 优化方案（方案审查 + 文档修订） | codex/sync-phase0-step1-review | `docs/TASKS.md`, `docs/plans/sync-architecture.md`, `docs/LESSONS.md` |
 
 ---
 
 ## 进行中
 
-_(空)_
+### Sync Phase 0 Step 1 — Review & 优化方案（方案审查 + 文档修订）
+> **Owner**: nodex-codex | **Branch**: codex/sync-phase0-step1-review
+> **目标**: Review `docs/plans/sync-architecture.md` 的 Loro API / Chrome 扩展约束 / Sync 架构设计，直接修订文档并给出可执行优化方案
+> **Files**: `docs/plans/sync-architecture.md`, `docs/TASKS.md`, `docs/LESSONS.md`
+> **Progress**:
+> - [ ] 通读并校验 Phase 0 四项准备的 API 设计与接口假设
+> - [ ] 校验 Chrome 扩展运行时约束假设（side panel / service worker / storage）
+> - [ ] 审查 Phase 1-3 协议与生命周期设计，补齐遗漏/风险
+> - [ ] 直接更新 `docs/plans/sync-architecture.md`（问题修正 + 优化建议）
+> - [ ] 更新 `docs/TASKS.md` 进度记录（必要时补充 `docs/LESSONS.md`）
+> **迭代日志**:
+> - [2026-02-22 nodex-codex] 任务认领：开始执行 Sync Phase 0 Step 1（方案 review + 文档优化），先完成 TASKS/分支/PR 建立，再进行逐段审查。
 
 ---
 

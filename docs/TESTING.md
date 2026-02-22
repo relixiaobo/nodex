@@ -712,6 +712,54 @@ hash trigger cleanup safety（3 cases, Bug #53 + CJK hashtag 回归）:
 
 ---
 
+### 1.515 Sync Phase 0 — Client Sync-Ready 准备项
+
+**测试文件**: `tests/vitest/sync-phase0.test.ts`
+
+**覆盖点（Sync Phase 0 Client Prep）**:
+
+SnapshotRecord format validation:
+1. bare Uint8Array (old format) rejected — returns null (no backward compat, project not launched)
+2. SnapshotRecord passes through unchanged
+3. null/undefined returns null
+4. Real doc produces valid SnapshotRecord with non-empty snapshot/peerIdStr/VV
+
+PeerID persistence:
+5. PeerID round-trip: save peerIdStr → setPeerId on new doc → same peerIdStr
+6. setPeerId before import preserves identity through snapshot round-trip (all changes under same peer)
+7. peerIdStr format is numeric string
+8. Different LoroDoc instances get different random peer IDs
+9. Invalid peerIdStr graceful degradation (try/catch path)
+
+VersionVector persistence:
+10. VV encode/decode round-trip preserves peer entries (Map contents match)
+11. Empty doc produces valid encodable VV
+12. VV grows after operations (counter increases)
+13. VV can be used for incremental export (delta between versions)
+
+Workspace ID normalization:
+14. First call generates `ws_{nanoid()}` pattern
+15. Subsequent calls return same ID (persistence)
+16. Value persists to localStorage
+17. Pre-existing value is reused
+18. Two fresh calls (with clear between) produce different IDs
+
+subscribeLocalUpdates hook:
+19. Callback fires on commit (Uint8Array bytes)
+20. Unsubscribe stops callback
+21. Import does not trigger subscribeLocalUpdates (local-only)
+22. Multiple subscribes coexist and unsubscribe independently
+
+**设计要点**:
+- `loadSnapshotRecord()` 仅接受 `SnapshotRecord` 格式，旧格式（bare `Uint8Array`）返回 null（项目未上线，不兼容）
+- PeerID 恢复顺序：`new LoroDoc()` → `setPeerId(saved)` → `import(snapshot)`（文档必须无 oplog）
+- `persistSnapshot()` 原子保存 snapshot + peerIdStr + VV + savedAt
+- `subscribeLocalUpdates` 仅捕获本地提交，`import(remoteBytes)` 不触发（避免 echo）
+- `unsubLocalUpdates` 在 `resetLoroDoc()` 和工作区切换时清理
+- Workspace ID 持久化到 `chrome.storage.local`（扩展）或 `localStorage`（standalone）
+
+---
+
 ### 1.52 LoroText Bridge（TextMark / InlineRef 双向桥接）
 
 **测试文件**: `tests/vitest/loro-text-bridge.test.ts`

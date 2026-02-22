@@ -8,7 +8,7 @@
 import { LoroDoc, LoroList, LoroText, LoroMovableList, UndoManager, VersionVector, type TreeID, type PeerID } from 'loro-crdt';
 import { nanoid } from 'nanoid';
 import type { NodexNode } from '../types/node.js';
-import { saveSnapshot, loadSnapshot } from './loro-persistence.js';
+import { saveSnapshotRecord, loadSnapshotRecord } from './loro-persistence.js';
 import { resetAwareness } from './awareness.js';
 import { readRichTextFromLoroText, writeRichTextToLoroText } from './loro-text-bridge.js';
 
@@ -77,6 +77,12 @@ function reattachNodeSubs(): void {
 
 /** 防抖保存定时器 */
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** subscribeLocalUpdates 的 unsubscribe 函数（Phase 0 no-op hook，切换工作区时清理） */
+let unsubLocalUpdates: (() => void) | null = null;
+
+/** visibilitychange 监听器的 AbortController（防止重复 initLoroDoc 时累积监听器） */
+let visibilityAbort: AbortController | null = null;
 
 // ============================================================
 // 读取缓存 — 保证同一 version 内 toNodexNode/getChildren 返回稳定引用
@@ -176,7 +182,13 @@ async function persistSnapshot(): Promise<void> {
   if (!doc || !currentWorkspaceId) return;
   try {
     const snapshot = doc.export({ mode: 'snapshot' });
-    await saveSnapshot(currentWorkspaceId, snapshot);
+    const vvBytes = doc.oplogVersion().encode();
+    await saveSnapshotRecord(currentWorkspaceId, {
+      snapshot,
+      peerIdStr: doc.peerIdStr,
+      versionVector: vvBytes,
+      savedAt: Date.now(),
+    });
   } catch (e) {
     console.warn('[loro-doc] 快照保存失败:', e);
   }
@@ -190,6 +202,8 @@ export async function initLoroDoc(workspaceId: string): Promise<void> {
   if (doc && currentWorkspaceId === workspaceId) return;
 
   if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
+  // Clean up previous subscribeLocalUpdates hook (avoid duplicate registration on workspace switch)
+  if (unsubLocalUpdates) { unsubLocalUpdates(); unsubLocalUpdates = null; }
   currentWorkspaceId = workspaceId;
   doc = new LoroDoc();
   configureTextStyles(doc);
@@ -198,11 +212,19 @@ export async function initLoroDoc(workspaceId: string): Promise<void> {
   resetAwareness();
 
   try {
-    const snapshot = await loadSnapshot(workspaceId);
-    if (snapshot) {
-      doc.import(snapshot);
+    const saved = await loadSnapshotRecord(workspaceId);
+    if (saved?.snapshot) {
+      // PeerID restore order is critical: setPeerId BEFORE import (doc must have no oplog)
+      if (saved.peerIdStr) {
+        try {
+          doc.setPeerId(saved.peerIdStr as `${number}`);
+        } catch (e) {
+          console.warn('[loro-doc] PeerID 恢复失败，使用随机 PeerID:', e);
+        }
+      }
+      doc.import(saved.snapshot);
       rebuildMappings();
-      console.log(`[loro-doc] 从快照恢复 ${workspaceId}，节点数: ${nodexToTree.size}`);
+      console.log(`[loro-doc] 从快照恢复 ${workspaceId}，节点数: ${nodexToTree.size}，peerIdStr: ${doc.peerIdStr}`);
     }
   } catch (e) {
     console.warn('[loro-doc] 快照加载失败，从空白开始:', e);
@@ -215,11 +237,21 @@ export async function initLoroDoc(workspaceId: string): Promise<void> {
     scheduleSave();
   });
 
+  // Phase 0: subscribeLocalUpdates — no-op hook point for future sync buffer
+  unsubLocalUpdates = doc.subscribeLocalUpdates((_bytes: Uint8Array) => {
+    // Phase 0: no-op, 仅预留入口
+    // Phase 2+: syncManager.bufferUpdate(bytes)
+  });
+
   if (typeof window !== 'undefined') {
+    // Abort previous listeners to prevent accumulation on repeated initLoroDoc calls
+    visibilityAbort?.abort();
+    visibilityAbort = new AbortController();
+    const { signal } = visibilityAbort;
     window.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'hidden') void persistSnapshot();
-    });
-    window.addEventListener('beforeunload', () => void persistSnapshot(), { once: true });
+    }, { signal });
+    window.addEventListener('beforeunload', () => void persistSnapshot(), { once: true, signal });
   }
 }
 
@@ -228,6 +260,13 @@ export function resetLoroDoc(): void {
   // ② 清理 per-node 订阅
   for (const sub of nodeSubscriptions.values()) sub.unsub?.();
   nodeSubscriptions.clear();
+
+  // Clean up subscribeLocalUpdates hook
+  if (unsubLocalUpdates) { unsubLocalUpdates(); unsubLocalUpdates = null; }
+
+  // Abort visibilitychange / beforeunload listeners
+  visibilityAbort?.abort();
+  visibilityAbort = null;
 
   doc = null;
   undoManager = null;

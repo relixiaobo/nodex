@@ -29,26 +29,13 @@ _(空)_
 |-------|---------|------|-------------|
 | nodex-cc | _(idle)_ | — | — |
 | nodex-cc-2 | _(idle)_ | — | — |
-| nodex-codex | Sync Phase 0 Step 1 — Review & 优化方案（方案审查 + 文档修订） | codex/sync-phase0-step1-review | `docs/TASKS.md`, `docs/plans/sync-architecture.md`, `docs/LESSONS.md` |
+| nodex-codex | _(idle)_ | — | — |
 
 ---
 
 ## 进行中
 
-### Sync Phase 0 Step 1 — Review & 优化方案（方案审查 + 文档修订）
-> **Owner**: nodex-codex | **Branch**: codex/sync-phase0-step1-review
-> **目标**: Review `docs/plans/sync-architecture.md` 的 Loro API / Chrome 扩展约束 / Sync 架构设计，直接修订文档并给出可执行优化方案
-> **Files**: `docs/plans/sync-architecture.md`, `docs/TASKS.md`, `docs/LESSONS.md`
-> **Progress**:
-> - [x] 通读并校验 Phase 0 四项准备的 API 设计与接口假设
-> - [x] 校验 Chrome 扩展运行时约束假设（side panel / service worker / storage）
-> - [x] 审查 Phase 1-3 协议与生命周期设计，补齐遗漏/风险
-> - [x] 直接更新 `docs/plans/sync-architecture.md`（问题修正 + 优化建议）
-> - [x] 更新 `docs/TASKS.md` 进度记录（必要时补充 `docs/LESSONS.md`）
-> **迭代日志**:
-> - [2026-02-22 nodex-codex] 任务认领：开始执行 Sync Phase 0 Step 1（方案 review + 文档优化），先完成 TASKS/分支/PR 建立，再进行逐段审查。
-> - [2026-02-22 nodex-codex] 完成第一轮方案审查并修订 `sync-architecture.md`：修正 PeerID 恢复顺序（先 setPeerId 再 import）、澄清 VV `toJSON()` 返回 Map 不是 JSON 字符串、补充 `subscribeLocalUpdates` 清理/本地语义说明、收紧 `chrome.alarms`/`unlimitedStorage` 表述，并为 Phase 2 增加二进制 HTTP 编码约束与 shallow-snapshot 覆盖边界回退策略。
-> - [2026-02-22 nodex-codex] 根据“未上线且可丢弃本地开发数据”的新前提，调整 Step 1 结论：Phase 0 明确允许不兼容旧 `loro-persistence` 快照格式，Step 2 可直接升级到 `SnapshotRecord`，不要求迁移旧 IndexedDB 记录。
+_(空)_
 
 ---
 
@@ -56,31 +43,19 @@ _(空)_
 
 ### P1
 
-#### Sync Phase 0 Step 1 — Review & 优化方案
-> Review `docs/plans/sync-architecture.md` 全文，验证 Loro API 用法、Chrome 扩展约束、架构设计，提出优化建议并直接修改方案文档。
-> **Owner**: nodex-codex | **Spec**: `docs/plans/sync-architecture.md`
-
-- [ ] 验证 Phase 0 四项准备的 Loro API 用法是否正确（setPeerId 时机、VV encode/decode、subscribeLocalUpdates 签名）
-- [ ] 验证 Chrome 扩展约束假设（Side Panel 单实例、SW 生命周期、unlimitedStorage 行为）
-- [ ] 审查 Phase 1-3 架构设计（增量同步协议、compaction 策略、WebSocket 生命周期）是否有遗漏或错误
-- [ ] 直接修改 `docs/plans/sync-architecture.md`，提交优化后的方案（含发现的问题和改进）
-
-#### Sync Phase 0 Step 2 — 客户端 Sync-Ready 实施
-> 基于 nodex-codex review 后的方案，实施 4 项客户端架构预留。
-> **Owner**: nodex-cc | **Spec**: `docs/plans/sync-architecture.md` | **Blocked by**: Step 1
-
-- [ ] **准备项 1**: PeerID 持久化 — 扩展 `loro-persistence.ts` 存储格式为 `{ snapshot, peerIdStr, versionVector, savedAt }`，`initLoroDoc()` 中恢复 peerIdStr
-- [ ] **准备项 2**: VersionVector 持久化 — 与 snapshot 一起保存 `doc.oplogVersion().encode()` 到 IndexedDB
-- [ ] **准备项 3**: `subscribeLocalUpdates` hook 点 — `initLoroDoc()` 末尾注册 no-op 回调，为未来 sync buffer 预留入口
-- [ ] **准备项 4**: Workspace ID 规范化 — 未登录时生成持久化唯一 `ws_{nanoid()}`，不再用 `'ws_default'`；manifest.json 添加 `unlimitedStorage` 权限
-- [ ] 补充 Vitest 测试（PeerID 恢复、VV 序列化/反序列化、workspace ID 持久化）
-- [ ] 更新 `docs/TESTING.md` 覆盖映射
+#### Sync Phase 0 Step 3 — Supabase Sync 后端
+> Phase 0 客户端预留已完成（PR #75 + PR #77），下一步实施服务端同步协议。
+> **Owner**: _(待分配)_ | **Spec**: `docs/plans/sync-architecture.md` Phase 1-2
 
 ### P2
 
 #### References 增强 (#19)
 > MVP 已完成（@触发搜索、树引用+内联引用、引用 bullet、删除引用）
+> **Owner**: nodex-cc-2
 
+**第一步：研究 Tana 的反向链接交互（截图 + 文档），沉淀到 `docs/research/` 或更新 `docs/features/references.md`，再开始写代码。**
+
+- [ ] **研究**: Tana 反向链接 UI 交互（位置、样式、展开/折叠、面包屑、计数 badge 等）
 - [ ] 反向链接 section（节点底部显示所有引用位置 + 面包屑路径）
 - [ ] 引用计数 badge
 - [ ] 合并节点（选中重复节点 → 合并 children/tags，更新所有引用）
@@ -257,6 +232,8 @@ _(空)_
 
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
+| 2026-02-22 | Sync Phase 0 Step 2 — 客户端 Sync-Ready 实施（PeerID/VV 持久化、subscribeLocalUpdates hook、Workspace ID 规范化、unlimitedStorage） | nodex-cc | #77 |
+| 2026-02-22 | Sync Phase 0 Step 1 — Review & 优化方案（Loro API/Chrome 约束/架构审查，修订 sync-architecture.md） | nodex-codex | #75 |
 | 2026-02-22 | Reference 引用环路防护 + 轻量 i18n 基础层 — 树引用显示图无环校验 + ReferenceSelector 禁用非法目标 + 渲染层循环展开兜底 + `t()` 文案迁移 | nodex-codex | #74 |
 | 2026-02-22 | Outliner 选区统一 & Reference UX 优化 — row-pointer-selection 提取 + 字段行选中 + inline ref supertag 着色 + 全局选区清除 + 搜索 recency 排序 + 面包屑根导航 | nodex-codex | #72 |
 | 2026-02-22 | Calendar Heatmap + `@today`/`@tomorrow`/`@yesterday` 日期快捷引用 + 日历 UI 优化（正方形 cell + 热力图 + 周末着色 + Today 按钮优化） | nodex | — |

@@ -28,14 +28,25 @@ _(空)_
 | Agent | 当前任务 | 分支 | 修改中的文件 |
 |-------|---------|------|-------------|
 | nodex-cc | _(idle)_ | — | — |
-| nodex-cc-2 | _(idle)_ | — | — |
+| nodex-cc-2 | References 增强 (#19) | cc2/references | docs/features/references.md, docs/research/ |
 | nodex-codex | _(idle)_ | — | — |
 
 ---
 
 ## 进行中
 
-_(空)_
+### References 增强 (#19)
+> **Owner**: nodex-cc-2 | **Branch**: cc2/references | **Spec**: `docs/features/references.md`
+> **目标**: 反向链接 section、引用计数 badge、合并节点
+> **第一步**: 研究 Tana 反向链接 UI 交互，沉淀到 docs/research/ 或更新 docs/features/references.md
+
+- [ ] **研究**: Tana 反向链接 UI 交互（位置、样式、展开/折叠、面包屑、计数 badge 等）
+- [ ] 反向链接 section（节点底部显示所有引用位置 + 面包屑路径）
+- [ ] 引用计数 badge
+- [ ] 合并节点（选中重复节点 → 合并 children/tags，更新所有引用）
+
+迭代日志：
+- [2026-02-22 nodex-cc-2] 接手任务，创建分支 cc2/references，开始 Tana 反向链接 UI 研究
 
 ---
 

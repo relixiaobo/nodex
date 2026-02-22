@@ -26,6 +26,17 @@ describe('ui-store navigation and UI state', () => {
     state = useUIStore.getState();
     expect(state.panelHistory[state.panelIndex]).toBe('note_2');
 
+    const beforeInvalidNavigate = useUIStore.getState();
+    ui.navigateTo('missing_node_for_panel_navigation');
+    state = useUIStore.getState();
+    expect(state.panelHistory).toEqual(beforeInvalidNavigate.panelHistory);
+    expect(state.panelIndex).toBe(beforeInvalidNavigate.panelIndex);
+
+    ui.replacePanel('missing_node_for_panel_navigation');
+    state = useUIStore.getState();
+    expect(state.panelHistory).toEqual(beforeInvalidNavigate.panelHistory);
+    expect(state.panelIndex).toBe(beforeInvalidNavigate.panelIndex);
+
     ui.setExpanded(`${CONTAINER_IDS.LIBRARY}:note_2`, true);
     expect(useUIStore.getState().expandedNodes.has(`${CONTAINER_IDS.LIBRARY}:note_2`)).toBe(true);
 

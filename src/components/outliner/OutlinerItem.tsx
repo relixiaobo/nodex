@@ -155,6 +155,10 @@ export function isHiddenFieldRow(hideMode: string | undefined, isEmpty: boolean 
   }
 }
 
+export function resolvePanelNavigationNodeId(nodeId: string, referenceTargetId: string | null): string {
+  return referenceTargetId ?? nodeId;
+}
+
 export function buildFieldOwnerColors(
   fieldMap: Map<string, Pick<FieldEntry, 'fieldDefId' | 'templateId'>>,
   getFieldDefOwnerId: (fieldDefId: string) => string | null,
@@ -263,6 +267,7 @@ export function OutlinerItem({
   const referenceTargetId = node?.type === 'reference' ? (node.targetId ?? null) : null;
   const referenceTargetNode = useNode(referenceTargetId);
   const effectiveNodeId = referenceTargetId ?? nodeId;
+  const panelNavigationNodeId = resolvePanelNavigationNodeId(nodeId, referenceTargetId);
   const effectiveNode = referenceTargetNode ?? node;
   const backlinkCount = useBacklinkCount(effectiveNodeId);
   const isCyclicReferenceExpansion = !!referenceTargetId && isReferenceDisplayCycle(effectiveNodeId, referencePath);
@@ -1433,12 +1438,12 @@ export function OutlinerItem({
   }, [nodeId, parentId, toggleExpanded, setExpanded]);
 
   const handleDrillDown = useCallback(() => {
-    navigateTo(nodeId);
-  }, [nodeId, navigateTo]);
+    navigateTo(panelNavigationNodeId);
+  }, [panelNavigationNodeId, navigateTo]);
 
   const handleBulletClick = useCallback(() => {
-    navigateTo(nodeId);
-  }, [nodeId, navigateTo]);
+    navigateTo(panelNavigationNodeId);
+  }, [panelNavigationNodeId, navigateTo]);
 
   const handleIndentLineClick = useCallback(() => {
     // Toggle expand/collapse all direct children (Tana indent guide line behavior)

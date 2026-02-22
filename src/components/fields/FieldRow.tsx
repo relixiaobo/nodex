@@ -675,11 +675,13 @@ export function FieldRow({
     // Plain click on non-interactive name area enters field-name editing.
     // Selection is handled only by modifier/range/drag flows, same as content rows.
     if (!trashed && !isVirtual && !isSystemConfig && !isSystemField) {
+      clearSelection();
       setEditingFieldName(tupleId);
     }
   }, [
     isEditing,
     tupleId,
+    clearSelection,
     setEditingFieldName,
     handleCmdClick,
     handleShiftClick,

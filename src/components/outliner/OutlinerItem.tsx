@@ -1207,7 +1207,8 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       return;
     }
 
-    if (isReferenceLikeRow) return;
+    const hasMultiSelection = useUIStore.getState().selectedNodeIds.size > 1;
+    if (isReferenceLikeRow && !hasMultiSelection) return;
 
     // Record text offset now (mousedown position = click position for simple clicks).
     // Will be consumed by RichTextEditor when it mounts (after setFocusedNode in click).
@@ -1323,10 +1324,17 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
         return;
       }
     }
-    // Reference nodes: single click = select (frame), double click = edit
-    // Cmd+Click and Shift+Click are handled in handleContentMouseDown
+    const hasMultiSelection = useUIStore.getState().selectedNodeIds.size > 1;
+
+    // Reference nodes:
+    // - default: single click = select (frame), double click = edit
+    // - while multi-select is active: single click exits selection mode and enters edit
     if (isReferenceLikeRow && !e.metaKey && !e.ctrlKey && !e.shiftKey) {
-      setSelectedNode(nodeId, parentId, isReferenceLikeRow ? 'ref-click' : 'global');
+      if (hasMultiSelection) {
+        setFocusedNode(nodeId, parentId);
+        return;
+      }
+      setSelectedNode(nodeId, parentId, 'ref-click');
       return;
     }
     // Non-reference: enter edit mode (text offset already recorded in mousedown)

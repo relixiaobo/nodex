@@ -15,7 +15,8 @@ BETTER_AUTH_URL = "http://localhost:8787"
 [[d1_databases]]
 binding = "SYNC_DB"
 database_name = "nodex-sync"
-database_id = "placeholder-replace-after-d1-create"
+database_id = "2ce73b94-7256-4940-ae38-680b84661c2e"
+migrations_dir = "migrations"
 
 [[r2_buckets]]
 binding = "SYNC_BUCKET"

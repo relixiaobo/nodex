@@ -239,6 +239,7 @@ npm run test:run
 - `tests/vitest/field-row-config-render.test.ts`
 - `tests/vitest/field-row-selection.test.ts`
 - `tests/vitest/outliner-item-field-order.test.ts`
+- `tests/vitest/outliner-item-reference-navigation.test.ts`
 - `tests/vitest/options-picker.test.ts`
 - `tests/vitest/row-pointer-selection.test.ts`
 - `tests/vitest/row-interactions.test.ts`
@@ -258,6 +259,7 @@ npm run test:run
 10. `number_input` 配置控件使用文本输入（不依赖原生 number spinner），与普通 Number 字段一致走 warning 校验路径
 11. `number_input` 配置值为非法数字字符串时，FieldRow value 区右侧展示同款 warning 图标（与普通 Number 字段位置一致）
 12. FieldRow 选中遮罩与 content row 使用同款视觉配方（`bg-selection-row + border + top/bottom inset`），并保证名称/值层级高于遮罩（避免选中后值区文本被遮盖）
+13. `OutlinerItem` panel 导航目标使用 `referenceTargetId ?? nodeId`（点击 reference row 的 bullet / drillDown 打开目标节点页面，而非引用壳节点空页）
 13. FieldRow 保持“单击编辑优先”（name 进字段名编辑，value 保持值交互）；普通单击不再把 tuple 置入选区
 14. FieldRow 的 `Cmd/Ctrl+Click`、`Shift+Click` 走统一 pointer-intent 解析（即使落在 value 交互区，也优先按多选手势处理）
 15. `OutlinerView` / `ConfigOutliner` / `FieldValueOutliner` 的选择域统一使用“可见 field + content”同一 `rootChildIds`，避免 node 类型导致的范围选行为分叉

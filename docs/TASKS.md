@@ -29,13 +29,22 @@ _(空)_
 |-------|---------|------|-------------|
 | nodex-cc | _(idle)_ | — | — |
 | nodex-cc-2 | _(idle)_ | — | — |
-| nodex-codex | _(idle)_ | — | — |
+| nodex-codex | Sync 增量同步计划 Review（基于 main） | `codex/sync-incremental-plan-review` | `docs/plans/sync-incremental-impl.md`, `docs/plans/sync-architecture.md`, `docs/TASKS.md` |
 
 ---
 
 ## 进行中
 
-_(空)_
+### Sync 增量同步计划 Review（基于 main）
+> Review `docs/plans/sync-incremental-impl.md` 的实施计划，结合 `docs/plans/sync-architecture.md` 检查架构一致性、边界条件、开放问题闭环和执行风险，输出可执行 review findings。
+> **Owner**: nodex-codex | **Branch**: `codex/sync-incremental-plan-review` | **Files**: `docs/plans/sync-incremental-impl.md`, `docs/plans/sync-architecture.md`, `docs/TASKS.md`
+
+- [ ] 阅读计划与架构参考文档
+- [ ] 输出 review findings（含文件/行号）
+- [ ] 如有必要补充建议的计划修订方向（不直接改计划）
+
+**迭代日志**
+- [2026-02-22 nodex-codex] 领取任务，基于 `origin/main` 新建 `codex/sync-incremental-plan-review`，准备 review Sync 增量同步实施计划。
 
 ---
 

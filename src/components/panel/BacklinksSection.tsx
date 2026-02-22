@@ -36,7 +36,7 @@ export function BacklinksSection({ nodeId }: BacklinksSectionProps) {
   if (result.totalCount === 0) return null;
 
   return (
-    <div className="mt-12 pl-[36px] pr-4 pb-4">
+    <div className="mt-16 pl-[36px] pr-4 pb-4">
       {/* Header: "N references ∨" — text aligns with node text, chevron after text (matches Tana) */}
       <button
         className="flex items-center gap-1 text-sm text-foreground-secondary hover:text-foreground transition-colors cursor-pointer"
@@ -97,7 +97,7 @@ function MentionedInItem({ item }: { item: MentionedInRef }) {
       )}
       {/* Content box — uses design system tokens: primary-muted bg, primary border, standard bullet */}
       <div
-        className="mt-1 py-1 px-2 bg-primary-muted border-l-2 border-primary/30 rounded-r-sm cursor-pointer hover:bg-foreground/5 transition-colors"
+        className="mt-1 py-1 px-2 bg-foreground/[0.03] border-l-2 border-primary/20 rounded-r-sm cursor-pointer hover:bg-foreground/[0.06] transition-colors"
         onClick={handleNavigate}
       >
         <div className="flex items-start gap-2">
@@ -166,12 +166,11 @@ function FieldValueItem({ item }: { item: FieldValueRef }) {
       className="flex items-center gap-2 py-1 cursor-pointer hover:bg-foreground/5 rounded-sm px-1 transition-colors"
       onClick={handleNavigate}
     >
-      {/* Reference bullet ◎ — 15×21px container (matches BulletChevron sizing) */}
+      {/* Reference bullet — same as BulletChevron isReference style */}
       <span className="shrink-0 w-[15px] h-[21px] flex items-center justify-center">
-        <svg width="8" height="8" viewBox="0 0 8 8" className="text-foreground/40">
-          <circle cx="4" cy="4" r="3" fill="none" stroke="currentColor" strokeWidth="1" />
-          <circle cx="4" cy="4" r="1.2" fill="currentColor" />
-        </svg>
+        <span className="flex h-[15px] w-[15px] items-center justify-center rounded-full border border-dashed border-foreground/40">
+          <span className="h-[5px] w-[5px] rounded-full bg-foreground/50" />
+        </span>
       </span>
       <span className="text-sm leading-[21px] truncate min-w-0">
         {item.ownerNodeName || <span className="text-foreground-tertiary italic">Untitled</span>}

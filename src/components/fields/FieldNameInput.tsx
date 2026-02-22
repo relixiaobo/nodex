@@ -10,6 +10,7 @@ import { useState, useRef, useEffect, useCallback, type KeyboardEvent } from 're
 import { useWorkspaceFields } from '../../hooks/use-workspace-fields';
 import { useNodeStore } from '../../stores/node-store';
 import { useUIStore } from '../../stores/ui-store';
+import { t } from '../../i18n/strings.js';
 
 interface FieldNameInputProps {
   tupleId: string;
@@ -34,7 +35,7 @@ export function FieldNameInput({
   onOutdentRow,
   clickOffsetX,
 }: FieldNameInputProps) {
-  const [value, setValue] = useState(currentName === 'Untitled' ? '' : currentName);
+  const [value, setValue] = useState(currentName === t('common.untitled') ? '' : currentName);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -204,7 +205,7 @@ export function FieldNameInput({
         ref={inputRef}
         type="text"
         className="block w-full bg-transparent text-sm text-foreground outline-none border-0 py-0 px-0 m-0 h-[22px] leading-[22px]"
-        placeholder="Field name..."
+        placeholder={t('field.fieldNamePlaceholder')}
         value={value}
         onChange={(e) => {
           setValue(e.target.value);

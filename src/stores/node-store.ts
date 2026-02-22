@@ -12,6 +12,7 @@ import type { NodexNode, TextMark, InlineRefEntry, FieldType } from '../types/in
 import { CONTAINER_IDS, SYS_A, SYS_V } from '../types/index.js';
 import { isWorkspaceContainer } from '../lib/tree-utils.js';
 import * as loroDoc from '../lib/loro-doc.js';
+import { getTreeReferenceBlockReason } from '../lib/reference-rules.js';
 import { resolveCheckboxClick, resolveCmdEnterCycle, resolveForwardDoneMapping, resolveReverseDoneMapping } from '../lib/checkbox-utils.js';
 
 // ============================================================
@@ -815,11 +816,25 @@ export const useNodeStore = create<NodeStore>((set, get) => {
 
     addReference: (parentId, targetNodeId, position) => {
       if (!canMutate('addReference')) return '';
+      const rawTargetNode = loroDoc.toNodexNode(targetNodeId);
+      const effectiveTargetId =
+        rawTargetNode?.type === 'reference' && rawTargetNode.targetId
+          ? rawTargetNode.targetId
+          : targetNodeId;
+      const blockReason = getTreeReferenceBlockReason(parentId, targetNodeId, {
+        hasNode: loroDoc.hasNode,
+        getNode: loroDoc.toNodexNode,
+        getChildren: loroDoc.getChildren,
+      });
+      if (blockReason) {
+        console.warn('[node-store] blocked tree reference', { parentId, targetNodeId, reason: blockReason });
+        return '';
+      }
       const refId = nanoid();
       loroDoc.createNode(refId, parentId, position);
       loroDoc.setNodeDataBatch(refId, {
         type: 'reference',
-        targetId: targetNodeId,
+        targetId: effectiveTargetId,
       });
       loroDoc.commitDoc();
       return refId;
@@ -853,6 +868,18 @@ export const useNodeStore = create<NodeStore>((set, get) => {
     },
 
     revertRefConversion: (tempNodeId, targetNodeId, parentId) => {
+      const blockReason = getTreeReferenceBlockReason(parentId, targetNodeId, {
+        hasNode: loroDoc.hasNode,
+        getNode: loroDoc.toNodexNode,
+        getChildren: loroDoc.getChildren,
+      });
+      if (blockReason) {
+        console.warn('[node-store] blocked revertRefConversion -> tree reference', {
+          tempNodeId, parentId, targetNodeId, reason: blockReason,
+        });
+        return;
+      }
+
       const parentChildren = loroDoc.getChildren(parentId);
       const position = parentChildren.indexOf(tempNodeId);
 

@@ -43,6 +43,17 @@ PR / main push 会执行以下检查：
 1. 若改动了 `src/`，必须同时改动 `tests/vitest/*.test.ts`
 2. 若改动了 `tests/vitest/`，必须同时更新 `docs/TESTING.md`
 
+### i18n Copy Advisory Scan（非阻塞）
+
+命令：`npm run check:i18n-copy`
+
+说明：
+
+1. 扫描 `src/components/**/*.tsx` 中“可能是用户可见文案”的裸字符串（JSX 文本节点 + 常见可见属性）
+2. 仅输出报告（warning），**不**阻塞本地开发 / CI
+3. 用于分批迁移到 `src/i18n/*` 时查漏，不追求零误报
+4. JSX 文本匹配已过滤比较运算符场景（避免 `a > b && a < c` 误报）
+
 ---
 
 ## 环境配置
@@ -259,7 +270,9 @@ npm run test:run
 
 ### 1.7 标签与引用状态流
 
-**测试文件**: `tests/vitest/node-store-tags-refs.test.ts`
+**测试文件**:
+- `tests/vitest/node-store-tags-refs.test.ts`
+- `tests/vitest/reference-rules.test.ts`
 
 **覆盖点（Loro 模型）**:
 
@@ -268,10 +281,12 @@ npm run test:run
 3. applyTag 幂等（重复调用不产生重复 tag 或重复 fieldEntry）
 4. removeTag 仅清理模板来源字段，手动添加字段保留
 5. `addReference(parentId, targetId)` 非幂等 — 每次创建新的 reference 节点
-6. `removeReference(refNodeId)` 删除 reference 节点
-7. `startRefConversion(refId, parentId, idx)` 替换 ref 节点为 inline content 节点
-8. `startRefConversion(targetId, parentId, idx)` 防御路径：不删除 target，本地生成 inline content 节点
-9. `startRefConversion` 创建的临时 inline content 节点会立即写入 `richText` 容器
+6. `addReference(parentId, targetId)` 阻止非法树引用：self 引用、祖先引用、跨分支互引闭环（显示图成环）
+7. `reference-rules`：`getTreeReferenceBlockReason` 按“显示图无环”判定合法性；`isReferenceDisplayCycle` 用于渲染层循环展开兜底
+8. `removeReference(refNodeId)` 删除 reference 节点
+9. `startRefConversion(refId, parentId, idx)` 替换 ref 节点为 inline content 节点
+10. `startRefConversion(targetId, parentId, idx)` 防御路径：不删除 target，本地生成 inline content 节点
+11. `startRefConversion` 创建的临时 inline content 节点会立即写入 `richText` 容器
 
 ### 1.8 字段状态流（Node Store）
 
@@ -787,6 +802,7 @@ hash trigger cleanup safety（3 cases, Bug #53 + CJK hashtag 回归）:
 1. 空 query 时 recent 列表可由“全局最近编辑节点”补齐（避免仅显示 `Library`）
 2. 历史来源优先级高于 fallback（按 panelHistory 最近访问顺序）
 3. history + fallback 去重，且过滤 container/结构节点
+4. 树引用上下文下非法目标在 selector 中被禁用，并可给出禁用原因（self / 循环引用）
 
 ### 1.57 Workspace Home 节点兜底创建
 
@@ -816,7 +832,18 @@ hash trigger cleanup safety（3 cases, Bug #53 + CJK hashtag 回归）:
 1. drag-select 根列表包含可见 `field + content` 行（不再仅 content）
 2. hidden field 仅在“已手动 reveal”时进入 drag-select 根列表
 
-### 1.60 OutlinerView 渲染安全（白屏回归）
+### 1.60 Lightweight i18n Strings
+
+**测试文件**: `tests/vitest/i18n-strings.test.ts`
+
+**覆盖点**:
+
+1. `t(key)` 读取英文默认文案（en-only 基础层）
+2. 缺失 key fallback 返回原 key（便于开发期发现漏翻）
+3. `getLocale/setLocale` 与基础文案读取保持稳定（后续多语言扩展入口）
+4. 覆盖 reference/tag/slash/search/node-picker/date/breadcrumb/floating-toolbar 关键 UI 文案 key（含 `ReferenceSelector` / `TagSelector` 的 `Create "{name}"` 插值与 `Today, {name}`）
+
+### 1.61 OutlinerView 渲染安全（白屏回归）
 
 **测试文件**: `tests/vitest/outliner-view-render.test.ts`
 

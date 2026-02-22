@@ -8,6 +8,7 @@ import {
 } from '../../src/lib/loro-doc.js';
 import {
   collectRecentReferenceNodes,
+  getReferenceCandidateDisabledReason,
   matchDateShortcuts,
 } from '../../src/components/references/ReferenceSelector.js';
 import { CONTAINER_IDS } from '../../src/types/index.js';
@@ -86,5 +87,41 @@ describe('matchDateShortcuts', () => {
 
   it('returns empty on blank query', () => {
     expect(matchDateShortcuts('')).toEqual([]);
+  });
+});
+
+describe('getReferenceCandidateDisabledReason', () => {
+  beforeEach(() => {
+    resetLoroDoc();
+    initLoroDocForTest('ws_test');
+  });
+
+  it('returns null when not in tree-reference context', () => {
+    createNamedNode('a', 'A', 100);
+    expect(getReferenceCandidateDisabledReason({
+      treeReferenceParentId: null,
+      targetNodeId: 'a',
+    })).toBeNull();
+  });
+
+  it('disables self target in tree-reference context', () => {
+    createNamedNode('a', 'A', 100);
+    commitDoc('__seed__');
+    expect(getReferenceCandidateDisabledReason({
+      treeReferenceParentId: 'a',
+      targetNodeId: 'a',
+    })).toContain('own child');
+  });
+
+  it('disables ancestor target in tree-reference context', () => {
+    createNamedNode('a', 'A', 100);
+    createNode('b', 'a');
+    setNodeDataBatch('b', { name: 'B', updatedAt: 101 });
+    commitDoc('__seed__');
+
+    expect(getReferenceCandidateDisabledReason({
+      treeReferenceParentId: 'b',
+      targetNodeId: 'a',
+    })).toContain('circular');
   });
 });

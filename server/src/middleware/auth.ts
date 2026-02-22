@@ -1,37 +1,50 @@
 /**
  * Auth middleware for protected routes.
  *
- * Validates the Better Auth session from the request (cookie or Bearer token)
- * and attaches user/session info to the Hono context.
- *
- * Used by /sync/* routes (Steps 3+).
+ * Validates the session via direct D1 query using the Bearer token.
+ * We use direct D1 queries instead of Better Auth's `getSession()` because
+ * the latter doesn't reliably work with Bearer tokens from cross-origin
+ * Chrome Extension contexts (discovered during Auth PoC).
  */
 import { createMiddleware } from 'hono/factory';
-import { createAuth } from '../lib/auth.js';
 import type { Env } from '../types.js';
 
 export interface AuthVariables {
   userId: string;
-  session: unknown;
+  sessionId: string;
 }
 
 /**
- * Middleware that requires a valid Better Auth session.
+ * Middleware that requires a valid session via Bearer token.
+ * Extracts userId and sessionId into Hono context variables.
  * Returns 401 if no valid session is found.
  */
 export const requireAuth = createMiddleware<{
   Bindings: Env;
   Variables: AuthVariables;
 }>(async (c, next) => {
-  const auth = createAuth(c.env);
-  const session = await auth.api.getSession({ headers: c.req.raw.headers });
+  const authHeader = c.req.header('authorization');
+  const token = authHeader?.replace(/^Bearer\s+/i, '');
 
-  if (!session?.user) {
-    return c.json({ error: 'Unauthorized' }, 401);
+  if (!token) {
+    return c.json({ error: 'Unauthorized — no token' }, 401);
   }
 
-  c.set('userId', session.user.id);
-  c.set('session', session.session);
+  try {
+    const session = await c.env.SYNC_DB.prepare(
+      'SELECT s.id, s."userId", s."expiresAt" FROM session s WHERE s.token = ? AND s."expiresAt" > datetime(\'now\')'
+    ).bind(token).first<{ id: string; userId: string; expiresAt: string }>();
 
-  await next();
+    if (!session) {
+      return c.json({ error: 'Unauthorized — invalid or expired session' }, 401);
+    }
+
+    c.set('userId', session.userId);
+    c.set('sessionId', session.id);
+
+    await next();
+  } catch (err) {
+    console.error('[auth middleware] error:', err);
+    return c.json({ error: 'Internal auth error' }, 500);
+  }
 });

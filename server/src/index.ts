@@ -4,12 +4,14 @@
  * Routes:
  *   /api/auth/*            — Better Auth (Google OAuth, session management)
  *   /auth/extension-redirect — Chrome Extension OAuth redirect helper
- *   /sync/*                — Sync endpoints (Steps 4-5, stubbed for now)
+ *   /api/session           — Custom session endpoint for Chrome Extension
+ *   /sync/*                — Sync endpoints (auth-protected, Steps 4-5)
  */
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { getCookie } from 'hono/cookie';
 import { createAuth } from './lib/auth.js';
+import { requireAuth, type AuthVariables } from './middleware/auth.js';
 import type { Env } from './types.js';
 
 const app = new Hono<{ Bindings: Env }>();
@@ -132,10 +134,22 @@ app.get('/health', (c) => {
 });
 
 // ---------------------------------------------------------------------------
-// Sync endpoints (stub — implemented in Steps 4-5)
+// Sync endpoints (auth-protected — push/pull implemented in Steps 4-5)
 // ---------------------------------------------------------------------------
 
-app.post('/sync/push', (c) => c.json({ error: 'Not implemented' }, 501));
-app.post('/sync/pull', (c) => c.json({ error: 'Not implemented' }, 501));
+const sync = new Hono<{ Bindings: Env; Variables: AuthVariables }>();
+sync.use('*', requireAuth);
+
+sync.post('/push', (c) => {
+  const userId = c.get('userId');
+  return c.json({ error: 'Not implemented', userId }, 501);
+});
+
+sync.post('/pull', (c) => {
+  const userId = c.get('userId');
+  return c.json({ error: 'Not implemented', userId }, 501);
+});
+
+app.route('/sync', sync);
 
 export default app;

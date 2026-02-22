@@ -5,6 +5,7 @@ import { TextSelection } from 'prosemirror-state';
 import type { EditorView } from 'prosemirror-view';
 import { Bold, Check, Code2, Heading, Highlighter, Italic, Link2, Strikethrough, Unlink, X } from '../../lib/icons.js';
 import { pmSchema } from './pm-schema.js';
+import { t } from '../../i18n/strings.js';
 
 interface FloatingToolbarProps {
   view?: EditorView | null;
@@ -413,12 +414,12 @@ export function FloatingToolbar({ view, tick = 0 }: FloatingToolbarProps) {
               value={linkDraft}
               onChange={(event) => setLinkDraft(event.target.value)}
               onKeyDown={handleLinkInputKeyDown}
-              placeholder="https://example.com"
+              placeholder={t('floatingToolbar.linkPlaceholder')}
               className="h-7 w-56 rounded-md border border-border bg-background px-2 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/40"
             />
             <button
               type="button"
-              title="Apply link"
+              title={t('floatingToolbar.applyLink')}
               className="flex h-7 w-7 items-center justify-center rounded-md text-foreground-secondary transition-colors duration-150 hover:bg-foreground/5 hover:text-foreground"
               onMouseDown={(event) => event.preventDefault()}
               onClick={applyLink}
@@ -427,7 +428,7 @@ export function FloatingToolbar({ view, tick = 0 }: FloatingToolbarProps) {
             </button>
             <button
               type="button"
-              title="Cancel"
+              title={t('floatingToolbar.cancel')}
               className="flex h-7 w-7 items-center justify-center rounded-md text-foreground-secondary transition-colors duration-150 hover:bg-foreground/5 hover:text-foreground"
               onMouseDown={(event) => event.preventDefault()}
               onClick={() => setEditingLink(false)}
@@ -437,7 +438,7 @@ export function FloatingToolbar({ view, tick = 0 }: FloatingToolbarProps) {
             {state.isLink && (
               <button
                 type="button"
-                title="Remove link"
+                title={t('floatingToolbar.removeLink')}
                 className="flex h-7 w-7 items-center justify-center rounded-md text-foreground-secondary transition-colors duration-150 hover:bg-foreground/5 hover:text-foreground"
                 onMouseDown={(event) => event.preventDefault()}
                 onClick={removeLink}
@@ -449,48 +450,48 @@ export function FloatingToolbar({ view, tick = 0 }: FloatingToolbarProps) {
         ) : (
           <>
             <ToolbarButton
-              title="Bold"
+              title={t('floatingToolbar.bold')}
               active={state.isBold}
               onClick={() => toggleNamedMark('bold')}
             >
               <Bold size={14} />
             </ToolbarButton>
             <ToolbarButton
-              title="Italic"
+              title={t('floatingToolbar.italic')}
               active={state.isItalic}
               onClick={() => toggleNamedMark('italic')}
             >
               <Italic size={14} />
             </ToolbarButton>
             <ToolbarButton
-              title="Strikethrough"
+              title={t('floatingToolbar.strikethrough')}
               active={state.isStrike}
               onClick={() => toggleNamedMark('strike')}
             >
               <Strikethrough size={14} />
             </ToolbarButton>
             <ToolbarButton
-              title="Code"
+              title={t('floatingToolbar.code')}
               active={state.isCode}
               onClick={() => toggleNamedMark('code')}
             >
               <Code2 size={14} />
             </ToolbarButton>
             <ToolbarButton
-              title="Highlight"
+              title={t('floatingToolbar.highlight')}
               active={state.isHighlight}
               onClick={() => toggleNamedMark('highlight')}
             >
               <Highlighter size={14} />
             </ToolbarButton>
             <ToolbarButton
-              title="Heading"
+              title={t('floatingToolbar.heading')}
               active={state.isHeading}
               onClick={() => toggleNamedMark('headingMark')}
             >
               <Heading size={14} />
             </ToolbarButton>
-            <ToolbarButton title="Link" active={state.isLink} onClick={openLinkEditor}>
+            <ToolbarButton title={t('floatingToolbar.link')} active={state.isLink} onClick={openLinkEditor}>
               <Link2 size={14} />
             </ToolbarButton>
           </>

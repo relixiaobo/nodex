@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { LogOut } from '../../lib/icons.js';
 import { useWorkspaceStore } from '../../stores/workspace-store';
+import { t } from '../../i18n/strings.js';
 
 export function UserMenu() {
   const authUser = useWorkspaceStore((s) => s.authUser);
@@ -43,11 +44,11 @@ export function UserMenu() {
         onClick={() => setOpen((v) => !v)}
         disabled={signingOut}
         className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs transition-colors hover:bg-foreground/5 disabled:opacity-50"
-        aria-label="User menu"
+        aria-label={t('userMenu.ariaLabel')}
       >
         <Avatar src={authUser.avatarUrl} initials={initials} />
         <span className="flex-1 truncate text-foreground-secondary">
-          {authUser.name ?? authUser.email ?? 'Signed in'}
+          {authUser.name ?? authUser.email ?? t('userMenu.signedInFallback')}
         </span>
       </button>
 
@@ -77,7 +78,7 @@ export function UserMenu() {
             className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-foreground transition-colors hover:bg-foreground/5"
           >
             <LogOut size={13} className="shrink-0" />
-            Sign out
+            {t('userMenu.signOut')}
           </button>
         </div>
       )}
@@ -102,7 +103,7 @@ function Avatar({ src, initials, size = 'sm' }: AvatarProps) {
     return (
       <img
         src={src}
-        alt="avatar"
+        alt={t('userMenu.avatarAlt')}
         referrerPolicy="no-referrer"
         className={`${dim} shrink-0 rounded-full object-cover`}
       />

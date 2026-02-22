@@ -11,6 +11,7 @@ import { useUIStore } from '../../stores/ui-store';
 import { useNodeStore } from '../../stores/node-store';
 import { CONTAINER_IDS } from '../../types/index.js';
 import * as loroDoc from '../../lib/loro-doc.js';
+import { t } from '../../i18n/strings.js';
 
 export function CommandPalette() {
   const searchOpen = useUIStore((s) => s.searchOpen);
@@ -59,7 +60,7 @@ export function CommandPalette() {
       const plainText = name.replace(/<[^>]+>/g, '').toLowerCase();
 
       if (plainText.includes(query)) {
-        matches.push({ id, name: plainText || 'Untitled' });
+        matches.push({ id, name: plainText || t('search.commandPalette.untitled') });
         if (matches.length >= 20) break;
       }
     }
@@ -70,10 +71,10 @@ export function CommandPalette() {
 
   // Container quick-access items
   const containers = useMemo(() => [
-    { label: 'Library', id: CONTAINER_IDS.LIBRARY, icon: Library },
-    { label: 'Inbox', id: CONTAINER_IDS.INBOX, icon: Inbox },
-    { label: 'Journal', id: CONTAINER_IDS.JOURNAL, icon: CalendarDays },
-    { label: 'Trash', id: CONTAINER_IDS.TRASH, icon: Trash2 },
+    { label: t('search.commandPalette.containerLibrary'), id: CONTAINER_IDS.LIBRARY, icon: Library },
+    { label: t('search.commandPalette.containerInbox'), id: CONTAINER_IDS.INBOX, icon: Inbox },
+    { label: t('search.commandPalette.containerJournal'), id: CONTAINER_IDS.JOURNAL, icon: CalendarDays },
+    { label: t('search.commandPalette.containerTrash'), id: CONTAINER_IDS.TRASH, icon: Trash2 },
   ], []);
 
   if (!searchOpen) return null;
@@ -95,7 +96,7 @@ export function CommandPalette() {
           <Command.Input
             value={searchQuery}
             onValueChange={setSearchQuery}
-            placeholder="Search nodes..."
+            placeholder={t('search.commandPalette.placeholder')}
             className="h-10 flex-1 bg-transparent text-sm outline-none placeholder:text-foreground-tertiary"
           />
           <kbd className="hidden sm:inline-flex h-5 items-center rounded border border-border bg-background px-1.5 text-[10px] font-medium text-foreground-tertiary">
@@ -104,12 +105,12 @@ export function CommandPalette() {
         </div>
         <Command.List className="max-h-72 overflow-y-auto p-1">
           <Command.Empty className="py-6 text-center text-sm text-foreground-secondary">
-            No results found.
+            {t('search.commandPalette.noResults')}
           </Command.Empty>
 
           {/* Quick navigation */}
           {!searchQuery.trim() && (
-            <Command.Group heading="Navigate" className="px-1 py-1.5 text-xs font-medium text-foreground-secondary">
+            <Command.Group heading={t('search.commandPalette.groupNavigate')} className="px-1 py-1.5 text-xs font-medium text-foreground-secondary">
               {containers.map((c) => {
                 const Icon = c.icon;
                 return (
@@ -129,7 +130,7 @@ export function CommandPalette() {
 
           {/* Search results */}
           {searchQuery.trim() && results.length > 0 && (
-            <Command.Group heading="Nodes" className="px-1 py-1.5 text-xs font-medium text-foreground-secondary">
+            <Command.Group heading={t('search.commandPalette.groupNodes')} className="px-1 py-1.5 text-xs font-medium text-foreground-secondary">
               {results.map((r) => (
                 <Command.Item
                   key={r.id}

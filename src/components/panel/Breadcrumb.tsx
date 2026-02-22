@@ -28,6 +28,7 @@ import { ensureWorkspaceHomeNode } from '../../lib/workspace-root.js';
 import * as loroDoc from '../../lib/loro-doc.js';
 import { isDayNode } from '../../lib/journal.js';
 import { parseDayNodeName, parseYearNodeName, isToday } from '../../lib/date-utils.js';
+import { t } from '../../i18n/strings.js';
 
 interface BreadcrumbProps {
   nodeId: string;
@@ -106,7 +107,7 @@ export function Breadcrumb({ nodeId, showCurrentName }: BreadcrumbProps) {
       <button
         onClick={toggleSidebar}
         className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md hover:bg-foreground/5 hover:text-foreground"
-        title="Toggle sidebar"
+        title={t('breadcrumb.toggleSidebar')}
       >
         <PanelLeft size={16} strokeWidth={1.5} />
       </button>
@@ -116,7 +117,7 @@ export function Breadcrumb({ nodeId, showCurrentName }: BreadcrumbProps) {
         <button
           onClick={handleGoUp}
           className="flex h-7 w-6 shrink-0 items-center justify-center rounded-md hover:bg-foreground/5 hover:text-foreground"
-          title="Go to parent"
+          title={t('breadcrumb.goToParent')}
         >
           <ChevronLeft size={16} strokeWidth={1.5} />
         </button>
@@ -132,7 +133,7 @@ export function Breadcrumb({ nodeId, showCurrentName }: BreadcrumbProps) {
             <button
               onClick={handleNavigateToWorkspaceRoot}
               className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/15 text-[10px] font-semibold text-primary hover:bg-primary/25"
-              title="Go to workspace root"
+              title={t('breadcrumb.goToWorkspaceRoot')}
             >
               {wsInitial}
             </button>
@@ -188,7 +189,7 @@ export function Breadcrumb({ nodeId, showCurrentName }: BreadcrumbProps) {
       <button
         onClick={openSearch}
         className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md hover:bg-foreground/5 hover:text-foreground"
-        title="Search (Cmd+K)"
+        title={t('breadcrumb.search')}
       >
         <Search size={16} strokeWidth={1.5} />
       </button>
@@ -211,7 +212,7 @@ function resolveBreadcrumbLabel(nodeId: string, name: string): string {
   const year = yearNode?.name ? parseYearNodeName(yearNode.name) : null;
   if (year === null) return name;
   const date = parseDayNodeName(name, year);
-  if (date && isToday(date)) return `Today, ${name}`;
+  if (date && isToday(date)) return t('common.todayPrefix', { name });
   return name;
 }
 
@@ -221,7 +222,7 @@ function BreadcrumbCurrentName({ nodeId }: { nodeId: string }) {
     void s._version;
     const node = s.getNode(nodeId);
     const raw = node?.name ?? '';
-    const clean = raw.replace(/<[^>]+>/g, '') || 'Untitled';
+    const clean = raw.replace(/<[^>]+>/g, '') || t('common.untitled');
     return resolveBreadcrumbLabel(nodeId, clean);
   });
 

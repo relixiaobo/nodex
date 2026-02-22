@@ -13,6 +13,7 @@ import { useNodeStore } from '../../stores/node-store';
 import { useChildren } from '../../hooks/use-children';
 import { NodePicker } from './NodePicker';
 import type { NodexNode } from '../../types/index.js';
+import { t } from '../../i18n/strings.js';
 
 interface OptionsPickerProps {
   nodeId: string;
@@ -75,7 +76,7 @@ export function OptionsPicker({ nodeId, attrDefId, tupleId }: OptionsPickerProps
       onClear={handleClear}
       allowCreate={allowCreate}
       onCreate={handleCreate}
-      placeholder="Select option"
+      placeholder={t('field.selectOption')}
       isReference
     />
   );

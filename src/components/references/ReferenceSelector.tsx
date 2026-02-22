@@ -17,6 +17,8 @@ import { isWorkspaceContainer } from '../../lib/tree-utils.js';
 import * as loroDoc from '../../lib/loro-doc.js';
 import { ensureDateNode } from '../../lib/journal.js';
 import { formatDayName } from '../../lib/date-utils.js';
+import { getTreeReferenceBlockReason, type TreeReferenceBlockReason } from '../../lib/reference-rules.js';
+import { t, type TranslationKey } from '../../i18n/strings.js';
 
 export interface ReferenceDropdownHandle {
   getItemCount(): number;
@@ -30,6 +32,8 @@ interface ReferenceSelectorProps {
   query: string;
   selectedIndex: number;
   currentNodeId: string;
+  /** When provided, selector disables candidates that are invalid as tree references under this parent. */
+  treeReferenceParentId?: string | null;
   /** Caret anchor in viewport coordinates (preferred over local anchorRef). */
   anchor?: { left: number; top: number; bottom: number };
 }
@@ -38,15 +42,15 @@ const SKIP_RECENT_DOC_TYPES = new Set<string>(['fieldEntry', 'fieldDef', 'tagDef
 
 interface DateShortcut {
   keyword: string;
-  label: string;
+  labelKey: TranslationKey;
   getDate: () => Date;
 }
 
 const DATE_SHORTCUTS: DateShortcut[] = [
-  { keyword: 'today', label: 'Today', getDate: () => new Date() },
+  { keyword: 'today', labelKey: 'reference.selector.shortcutToday', getDate: () => new Date() },
   {
     keyword: 'tomorrow',
-    label: 'Tomorrow',
+    labelKey: 'reference.selector.shortcutTomorrow',
     getDate: () => {
       const d = new Date();
       d.setDate(d.getDate() + 1);
@@ -55,7 +59,7 @@ const DATE_SHORTCUTS: DateShortcut[] = [
   },
   {
     keyword: 'yesterday',
-    label: 'Yesterday',
+    labelKey: 'reference.selector.shortcutYesterday',
     getDate: () => {
       const d = new Date();
       d.setDate(d.getDate() - 1);
@@ -134,8 +138,45 @@ export function collectRecentReferenceNodes(params: {
   return results;
 }
 
+function getTreeReferenceDisabledReason(reason: TreeReferenceBlockReason | null): string | null {
+  switch (reason) {
+    case 'self_parent':
+      return t('reference.selector.disabledReasonSelfChild');
+    case 'would_create_display_cycle':
+      return t('reference.selector.disabledReasonCycle');
+    case 'missing_parent':
+    case 'missing_target':
+      return t('reference.selector.disabledReasonUnavailable');
+    default:
+      return null;
+  }
+}
+
+export function getReferenceCandidateDisabledReason(params: {
+  treeReferenceParentId?: string | null;
+  targetNodeId: string;
+}): string | null {
+  const { treeReferenceParentId, targetNodeId } = params;
+  if (!treeReferenceParentId) return null;
+  const reason = getTreeReferenceBlockReason(treeReferenceParentId, targetNodeId, {
+    hasNode: loroDoc.hasNode,
+    getNode: loroDoc.toNodexNode,
+    getChildren: loroDoc.getChildren,
+  });
+  return getTreeReferenceDisabledReason(reason);
+}
+
 export const ReferenceSelector = forwardRef<ReferenceDropdownHandle, ReferenceSelectorProps>(
-  function ReferenceSelector({ open, onSelect, onCreateNew, query, selectedIndex, currentNodeId, anchor }, ref) {
+  function ReferenceSelector({
+    open,
+    onSelect,
+    onCreateNew,
+    query,
+    selectedIndex,
+    currentNodeId,
+    treeReferenceParentId,
+    anchor,
+  }, ref) {
     const anchorRef = useRef<HTMLSpanElement>(null);
     const searchResults = useNodeSearch(query, currentNodeId);
     const listRef = useRef<HTMLDivElement>(null);
@@ -154,6 +195,13 @@ export const ReferenceSelector = forwardRef<ReferenceDropdownHandle, ReferenceSe
 
     const dateMatches = useMemo(() => matchDateShortcuts(query), [query]);
     const items = query.trim() ? searchResults : recentNodes;
+    const itemDisabledReasons = useMemo(
+      () => new Map(items.map((item) => [item.id, getReferenceCandidateDisabledReason({
+        treeReferenceParentId,
+        targetNodeId: item.id,
+      })] as const)),
+      [items, treeReferenceParentId],
+    );
     const hasCreateOption = !!(query.trim() && onCreateNew);
     const totalItems = dateMatches.length + items.length + (hasCreateOption ? 1 : 0);
     const boundedIndex = totalItems > 0 ? Math.min(Math.max(0, selectedIndex), totalItems - 1) : -1;
@@ -185,7 +233,9 @@ export const ReferenceSelector = forwardRef<ReferenceDropdownHandle, ReferenceSe
           }
           const itemIndex = boundedIndex - dateMatches.length;
           if (itemIndex < items.length) {
-            return { type: 'existing', id: items[itemIndex].id, name: items[itemIndex].name };
+            const item = items[itemIndex];
+            if (itemDisabledReasons.get(item.id)) return null;
+            return { type: 'existing', id: item.id, name: item.name };
           }
           if (hasCreateOption) {
             return { type: 'create', name: query.trim() };
@@ -193,7 +243,7 @@ export const ReferenceSelector = forwardRef<ReferenceDropdownHandle, ReferenceSe
           return null;
         },
       }),
-      [items, dateMatches, boundedIndex, totalItems, hasCreateOption, query],
+      [items, itemDisabledReasons, dateMatches, boundedIndex, totalItems, hasCreateOption, query],
     );
 
     // Fixed positioning to escape overflow containers + auto-flip.
@@ -244,7 +294,7 @@ export const ReferenceSelector = forwardRef<ReferenceDropdownHandle, ReferenceSe
         {dateMatches.length > 0 && (
           <>
             <div className="px-2 py-1 text-[10px] font-medium text-foreground-secondary uppercase tracking-wider">
-              Dates
+              {t('reference.selector.sectionDates')}
             </div>
             {dateMatches.map((dm, i) => (
               <button
@@ -260,7 +310,7 @@ export const ReferenceSelector = forwardRef<ReferenceDropdownHandle, ReferenceSe
                 }}
               >
                 <Calendar size={14} className="text-foreground-secondary shrink-0" />
-                <span className="text-sm text-foreground">{dm.label}</span>
+                <span className="text-sm text-foreground">{t(dm.labelKey)}</span>
                 <span className="ml-auto text-[10px] text-foreground-tertiary">{dm.dateName}</span>
               </button>
             ))}
@@ -271,39 +321,54 @@ export const ReferenceSelector = forwardRef<ReferenceDropdownHandle, ReferenceSe
         {/* Section header */}
         {!query.trim() && recentNodes.length > 0 && (
           <div className="px-2 py-1 text-[10px] font-medium text-foreground-secondary uppercase tracking-wider">
-            Recently used
+            {t('reference.selector.sectionRecentlyUsed')}
           </div>
         )}
         {query.trim() && items.length > 0 && (
           <div className="px-2 py-1 text-[10px] font-medium text-foreground-secondary uppercase tracking-wider">
-            Nodes
+            {t('reference.selector.sectionNodes')}
           </div>
         )}
 
         {items.length === 0 && dateMatches.length === 0 && !hasCreateOption && (
-          <div className="px-2 py-2 text-sm text-foreground-secondary">No matches</div>
+          <div className="px-2 py-2 text-sm text-foreground-secondary">{t('reference.selector.noMatches')}</div>
         )}
 
         {items.map((item, i) => (
           <button
             key={item.id}
             data-ref-item
+            aria-disabled={!!itemDisabledReasons.get(item.id)}
+            title={itemDisabledReasons.get(item.id) ?? undefined}
             className={`flex w-full flex-col items-start rounded-md px-2 py-1 text-left transition-colors ${
               dateMatches.length + i === boundedIndex ? 'bg-accent' : 'hover:bg-foreground/5'
+            } ${
+              itemDisabledReasons.get(item.id) ? 'opacity-50 cursor-not-allowed' : ''
             }`}
             onMouseDown={(e) => {
               e.preventDefault();
               e.stopPropagation();
+              if (itemDisabledReasons.get(item.id)) return;
               onSelect(item.id);
             }}
           >
             <div className="flex w-full items-center gap-1.5">
               <AtSign size={14} className="text-foreground-secondary shrink-0" />
               <span className="text-sm text-foreground truncate">{item.name}</span>
+              {itemDisabledReasons.get(item.id) && (
+                <span className="ml-auto text-[10px] text-foreground-tertiary shrink-0">
+                  {t('reference.selector.blockedBadge')}
+                </span>
+              )}
             </div>
             {item.breadcrumb && (
               <span className="text-[10px] text-foreground-secondary truncate ml-[18px]">
                 {item.breadcrumb}
+              </span>
+            )}
+            {itemDisabledReasons.get(item.id) && dateMatches.length + i === boundedIndex && (
+              <span className="text-[10px] text-amber-600 truncate ml-[18px]">
+                {itemDisabledReasons.get(item.id)}
               </span>
             )}
           </button>
@@ -324,7 +389,7 @@ export const ReferenceSelector = forwardRef<ReferenceDropdownHandle, ReferenceSe
               }}
             >
               <Plus size={14} className="text-foreground-secondary shrink-0" />
-              Create &ldquo;{query}&rdquo;
+              {t('reference.selector.create', { name: query })}
               <span className="ml-auto text-[10px] text-foreground-tertiary shrink-0">⌘↵</span>
             </button>
           </>

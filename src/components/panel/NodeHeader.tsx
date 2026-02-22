@@ -24,6 +24,7 @@ import { NodeDescription } from './NodeDescription';
 import { isDayNode } from '../../lib/journal.js';
 import { parseDayNodeName, parseYearNodeName, isToday } from '../../lib/date-utils.js';
 import * as loroDoc from '../../lib/loro-doc.js';
+import { t } from '../../i18n/strings.js';
 
 /** Depth-0 padding formula from OutlinerItem: depth * 28 + 6. Header is always depth 0. */
 const ROW_PADDING_LEFT = 6;
@@ -78,7 +79,7 @@ export function NodeHeader({ nodeId, onTitleRef }: NodeHeaderProps) {
     const date = parseDayNodeName(rawName, year);
     return date ? isToday(date) : false;
   });
-  const displayName = isTodayNode ? `Today, ${rawName}` : rawName;
+  const displayName = isTodayNode ? t('common.todayPrefix', { name: rawName }) : rawName;
   const [editing, setEditing] = useState(false);
   const titleRef = useRef<HTMLHeadingElement>(null);
 
@@ -168,7 +169,7 @@ export function NodeHeader({ nodeId, onTitleRef }: NodeHeaderProps) {
         {/* Col A: Drag handle (same position as chevron) */}
         <span
           className="flex shrink-0 h-7 w-[15px] items-center justify-center opacity-0 group-hover/header-row:opacity-40 hover:!opacity-100 cursor-grab transition-opacity"
-          title="Drag to move (right-click for menu)"
+          title={t('nodeHeader.dragToMove')}
         >
           <GripVertical size={12} />
         </span>
@@ -199,7 +200,7 @@ export function NodeHeader({ nodeId, onTitleRef }: NodeHeaderProps) {
             onBlur={handleBlur}
             onKeyDown={editing ? handleKeyDown : undefined}
           >
-            {!editing && (displayName || <span className="text-foreground-tertiary">Untitled</span>)}
+            {!editing && (displayName || <span className="text-foreground-tertiary">{t('common.untitled')}</span>)}
           </h1>
         </div>
       </div>

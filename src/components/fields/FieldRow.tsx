@@ -38,6 +38,7 @@ import { AutoCollectSection } from './AutoCollectSection';
 import { VALIDATED_FIELD_TYPES, validateFieldValue, ValidationWarning } from './field-validation';
 import { ATTRDEF_OUTLINER_FIELDS, TAGDEF_OUTLINER_FIELDS } from '../../lib/field-utils.js';
 import { FIELD_TYPES, SYS_A, SYS_D, SYS_V } from '../../types/index.js';
+import { t } from '../../i18n/strings.js';
 import { NodePicker, type NodePickerOption } from './NodePicker';
 import { DoneMappingEntries } from './DoneMappingEntries';
 import { BulletChevron } from '../outliner/BulletChevron';
@@ -269,7 +270,7 @@ function ConfigNumberInput({ nodeId, configKey }: { nodeId: string; configKey: s
             (e.currentTarget as HTMLInputElement).blur();
           }
         }}
-        placeholder="Empty"
+        placeholder={t('field.empty')}
       />
     </div>
   );
@@ -309,14 +310,14 @@ const SYSTEM_CONFIG_VALUE_RENDERERS: Partial<Record<ConfigFieldDef['control'], S
     />
   ),
   tag_picker: ({ nodeId, attrDefId }) => (
-    <ConfigTagPicker nodeId={nodeId} configKey={attrDefId} placeholder="Select supertag" />
+    <ConfigTagPicker nodeId={nodeId} configKey={attrDefId} placeholder={t('field.selectSupertag')} />
   ),
   type_choice: ({ nodeId, attrDefId }) => (
     <ConfigSelectPicker
       nodeId={nodeId}
       configKey={attrDefId}
       options={FIELD_TYPE_LIST.map((f) => ({ value: f.value, label: f.label }))}
-      placeholder="Select field type"
+      placeholder={t('field.selectFieldType')}
     />
   ),
   select: ({ nodeId, attrDefId, configOptions }) => (
@@ -324,7 +325,7 @@ const SYSTEM_CONFIG_VALUE_RENDERERS: Partial<Record<ConfigFieldDef['control'], S
       nodeId={nodeId}
       configKey={attrDefId}
       options={configOptions ?? []}
-      placeholder="Select value"
+      placeholder={t('field.selectValue')}
     />
   ),
   done_map_entries: ({ nodeId, attrDefId }) => (

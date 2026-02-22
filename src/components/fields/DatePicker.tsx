@@ -16,6 +16,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { ChevronLeft, ChevronRight } from '../../lib/icons.js';
 import { FIELD_OVERLAY_Z_INDEX } from './field-layout.js';
+import { t } from '../../i18n/strings.js';
 
 // ─── Helpers ──────────────────────────────────────────────────────
 
@@ -364,7 +365,7 @@ export function DatePicker({ value, onSelect, onClose }: DatePickerProps) {
         <DateInputField
           dateStr={selectedDate}
           timeStr={includeTime ? selectedTime : ''}
-          placeholder="YYYY/MM/DD"
+          placeholder={t('datePicker.datePlaceholder')}
           active={!includeEnd || editingEnd === 'start'}
           showRing={includeEnd}
           onClick={() => setEditingEnd('start')}
@@ -376,7 +377,7 @@ export function DatePicker({ value, onSelect, onClose }: DatePickerProps) {
           <DateInputField
             dateStr={endDate}
             timeStr={includeTime ? endTime : ''}
-            placeholder="YYYY/MM/DD"
+            placeholder={t('datePicker.datePlaceholder')}
             active={editingEnd === 'end'}
             showRing
             onClick={() => setEditingEnd('end')}
@@ -404,8 +405,8 @@ export function DatePicker({ value, onSelect, onClose }: DatePickerProps) {
 
       {/* ─── Settings toggles ─── */}
       <div className="border-t border-border mt-2 pt-2 space-y-0.5">
-        <SettingRow label="End date" checked={includeEnd} onChange={toggleEnd} />
-        <SettingRow label="Include time" checked={includeTime} onChange={toggleTime} />
+        <SettingRow label={t('datePicker.settingEndDate')} checked={includeEnd} onChange={toggleEnd} />
+        <SettingRow label={t('datePicker.settingIncludeTime')} checked={includeTime} onChange={toggleTime} />
       </div>
 
       {/* ─── Clear ─── */}
@@ -415,7 +416,7 @@ export function DatePicker({ value, onSelect, onClose }: DatePickerProps) {
             className="text-sm text-foreground-secondary hover:text-destructive transition-colors cursor-pointer h-7 flex items-center"
             onClick={handleClearDate}
           >
-            Clear
+            {t('datePicker.clear')}
           </button>
         </div>
       )}
@@ -878,7 +879,7 @@ export function CalendarGrid({
               className="rounded-md px-1.5 h-7 text-xs text-foreground-secondary hover:bg-foreground/5 transition-colors cursor-pointer"
               onClick={onToday}
             >
-              Today
+              {t('datePicker.today')}
             </button>
           )}
           <button className="text-foreground-tertiary hover:text-foreground-secondary transition-colors w-7 h-7 flex items-center justify-center rounded-md cursor-pointer" onClick={prevMonth}>

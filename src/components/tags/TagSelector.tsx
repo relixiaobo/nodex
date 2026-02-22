@@ -9,6 +9,7 @@ import { useMemo, useEffect, useLayoutEffect, useRef, useState, forwardRef, useI
 import { createPortal } from 'react-dom';
 import { Hash, Plus } from '../../lib/icons.js';
 import { useWorkspaceTags } from '../../hooks/use-workspace-tags';
+import { t } from '../../i18n/strings.js';
 
 export interface TagDropdownHandle {
   getItemCount(): number;
@@ -117,7 +118,7 @@ export const TagSelector = forwardRef<TagDropdownHandle, TagSelectorProps>(
         onMouseDown={(e) => e.preventDefault()}
       >
         {filteredTags.length === 0 && !hasCreateOption && (
-          <div className="px-2 py-2 text-sm text-foreground-secondary">No tags available</div>
+          <div className="px-2 py-2 text-sm text-foreground-secondary">{t('tag.selector.noTagsAvailable')}</div>
         )}
         {filteredTags.map((tag, i) => (
           <button
@@ -151,7 +152,7 @@ export const TagSelector = forwardRef<TagDropdownHandle, TagSelectorProps>(
               }}
             >
               <Plus size={14} className="text-foreground-secondary shrink-0" />
-              Create &ldquo;{query}&rdquo;
+              {t('tag.selector.create', { name: query })}
               <span className="ml-auto text-[10px] text-foreground-tertiary shrink-0">⌘↵</span>
             </button>
           </>

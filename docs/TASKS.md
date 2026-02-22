@@ -29,13 +29,33 @@ _(空)_
 |-------|---------|------|-------------|
 | nodex-cc | _(idle)_ | — | — |
 | nodex-cc-2 | _(idle)_ | — | — |
-| nodex-codex | _(idle)_ | — | — |
+| nodex-codex | Reference 引用环路防护（树引用合法性规则 + warning） | codex/reference-cycle-guard | `docs/features/references.md`, `src/components/outliner/OutlinerItem.tsx`, `src/stores/node-store.ts`, `src/lib/reference-rules.ts`, `tests/vitest/node-store-tags-refs.test.ts`, `tests/vitest/reference-rules.test.ts` |
 
 ---
 
 ## 进行中
 
-_(空)_
+### Reference 引用环路防护（树引用合法性规则 + warning）
+> **Owner**: nodex-codex | **Branch**: codex/reference-cycle-guard
+> **目标**: 明确 reference 的允许/禁止规则，并在创建入口阻止会导致递归卡死的环路引用（含 warning 提示）
+> **Files**: `docs/features/references.md`, `src/components/outliner/OutlinerItem.tsx`, `src/stores/node-store.ts`, `src/lib/reference-rules.ts`, `tests/vitest/node-store-tags-refs.test.ts`, `tests/vitest/reference-rules.test.ts`, `docs/TESTING.md`
+> **Progress**:
+> - [x] 梳理现有 reference 创建入口与渲染递归路径
+> - [x] 定义统一引用校验规则（树引用=显示图无环；inline 引用不受环路限制）
+> - [x] 在 store/action 层落地环路防护并补测试
+> - [x] 非法树引用 warning 提示（空节点 `@` 选择非法目标）
+> - [x] 更新 references spec 文档
+> **迭代日志**:
+> - [2026-02-22 nodex-codex] 任务认领，准备在新 PR 中收口 reference 环路规则并实现防护。
+> - [2026-02-22 nodex-codex] 落地 `reference-rules` 统一判定：树引用创建前按“显示图无环”校验；UI 空节点 `@` 选择非法目标时 toast warning；渲染层新增循环展开兜底防卡死。
+> - [2026-02-22 nodex-codex] 将非法树引用前移到 `ReferenceSelector`：仅在树引用上下文禁用候选项，并通过 hover/高亮展示禁用原因；inline 引用上下文不受限制。
+> - [2026-02-22 nodex-codex] 新增轻量 `i18n` 基础层（en-only `t()` + fallback），并将本次 reference warning/selector 文案迁移到字典，避免组件内继续散落裸字符串。
+> - [2026-02-22 nodex-codex] 扩展轻量 i18n 使用范围到 `TagSelector` / `SlashCommandMenu`（空态与创建文案），验证 `t()` 插值与 key 覆盖。
+> - [2026-02-22 nodex-codex] 将 `ReferenceSelector` 剩余 section/empty/create 文案（Dates/Recently used/Nodes/No matches/Create）迁移到 i18n，补齐 reference 链路示范。
+> - [2026-02-22 nodex-codex] 新增非阻塞 `check:i18n-copy` 扫描脚本（组件裸文案 advisory 报告），并完成下一批迁移：`ReferenceSelector` 日期快捷词、`CommandPalette`、`NodePicker` 的关键用户文案。
+> - [2026-02-22 nodex-codex] Batch 2 完成：迁移 `DateNavigationBar` / `DatePicker`（直接按钮/placeholder/setting 文案）、`Breadcrumb` / `NodeHeader`（tooltip + Today 前缀 + Untitled）、`FloatingToolbar`（title/placeholder）；`check:i18n-copy` 报告对应条目已消失。仍保留 `DatePicker` 月份/星期格式常量待后续用 `Intl` 单独处理。
+> - [2026-02-22 nodex-codex] Batch 3 完成：迁移 `FieldRow/FieldValueOutliner/OptionsPicker/FieldNameInput`、`SidebarNav/UserMenu`、`BulletChevron/OutlinerItem` 的 placeholder/tooltip/label 文案；`check:i18n-copy` 现仅剩 `DatePicker` 一条误报。
+> - [2026-02-22 nodex-codex] 收尾：优化 `check:i18n-copy` 的 JSX 文本匹配规则，仅匹配后续为标签的文本节点，消除 `DatePicker` 比较表达式误报；脚本结果已收敛到 0 条。
 
 ---
 

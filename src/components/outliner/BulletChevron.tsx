@@ -1,4 +1,5 @@
 import type { AppIcon } from '../../lib/icons.js';
+import { t } from '../../i18n/strings.js';
 
 /** Build inline style for a multi-color conic-gradient or solid bullet. */
 function buildBulletStyle(colors: string[]): React.CSSProperties {
@@ -54,7 +55,7 @@ export function BulletChevron({
         role="button"
         className="flex shrink-0 h-[21px] w-[15px] items-center justify-center cursor-pointer group/bullet"
         onClick={onBulletClick}
-        title="Zoom in"
+        title={t('outliner.zoomIn')}
       >
         <div
           className="flex h-[15px] w-[15px] items-center justify-center rounded-full transition-transform group-hover/bullet:scale-110 group-active/bullet:scale-90"
@@ -74,7 +75,7 @@ export function BulletChevron({
         role="button"
         className="flex shrink-0 h-[21px] w-[15px] items-center justify-center cursor-pointer group/bullet"
         onClick={onBulletClick}
-        title="Zoom in"
+        title={t('outliner.zoomIn')}
       >
         <Icon
           size={12}
@@ -94,7 +95,7 @@ export function BulletChevron({
       role="button"
       className="flex shrink-0 h-[21px] w-[15px] items-center justify-center cursor-pointer group/bullet"
       onClick={onBulletClick}
-      title="Zoom in"
+      title={t('outliner.zoomIn')}
     >
       <div
         className={`flex h-[15px] w-[15px] items-center justify-center rounded-full transition-colors group-active/bullet:scale-90 ${

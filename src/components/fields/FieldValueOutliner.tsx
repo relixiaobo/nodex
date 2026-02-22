@@ -229,7 +229,7 @@ export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, configNo
 
   // --- URL: clickable link ---
   if (isUrlFieldType(fieldDataType)) {
-    const valueNodeId = contentChildIds[0];
+    const valueNodeId = selectableChildIds[0];
     const valueNode = valueNodeId ? useNodeStore.getState().getNode(valueNodeId) : undefined;
     const url = valueNode?.name ?? '';
 
@@ -258,7 +258,7 @@ export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, configNo
 
   // --- EMAIL: clickable mailto link ---
   if (isEmailFieldType(fieldDataType)) {
-    const valueNodeId = contentChildIds[0];
+    const valueNodeId = selectableChildIds[0];
     const valueNode = valueNodeId ? useNodeStore.getState().getNode(valueNodeId) : undefined;
     const email = valueNode?.name ?? '';
 

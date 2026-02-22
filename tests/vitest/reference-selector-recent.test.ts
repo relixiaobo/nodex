@@ -6,7 +6,10 @@ import {
   resetLoroDoc,
   setNodeDataBatch,
 } from '../../src/lib/loro-doc.js';
-import { collectRecentReferenceNodes } from '../../src/components/references/ReferenceSelector.js';
+import {
+  collectRecentReferenceNodes,
+  matchDateShortcuts,
+} from '../../src/components/references/ReferenceSelector.js';
 import { CONTAINER_IDS } from '../../src/types/index.js';
 
 function createNamedNode(id: string, name: string, updatedAt: number, type?: string) {
@@ -71,5 +74,17 @@ describe('collectRecentReferenceNodes', () => {
     });
 
     expect(recent.map((n) => n.id)).toEqual(['dup_1', 'n_1']);
+  });
+});
+
+describe('matchDateShortcuts', () => {
+  it('matches date shortcuts by prefix', () => {
+    const matches = matchDateShortcuts('to');
+    expect(matches.map((m) => m.keyword)).toEqual(['today', 'tomorrow']);
+    expect(matches.every((m) => typeof m.dateName === 'string' && m.dateName.length > 0)).toBe(true);
+  });
+
+  it('returns empty on blank query', () => {
+    expect(matchDateShortcuts('')).toEqual([]);
   });
 });

@@ -31,11 +31,12 @@
 │ sync-store (Zustand)       │ HTTP │                                 │
 │   ↓ UI 状态指示             │      │ Cloudflare R2                   │
 └────────────────────────────┘      │   ├── /{wsId}/snapshot.bin      │
-                                    │   └── /{wsId}/updates/{seq}.bin │
+                                    │   └── /{wsId}/updates/{hash}.bin │
                                     │                                 │
                                     │ Supabase Postgres               │
                                     │   ├── sync_workspaces (元数据)   │
-                                    │   └── sync_devices (游标)        │
+                                    │   ├── sync_devices (设备游标)    │
+                                    │   └── sync_updates (增量元数据)  │
                                     └─────────────────────────────────┘
 ```
 
@@ -66,23 +67,25 @@ Content-Type: application/json
   "workspaceId": "ws_abc123",
   "deviceId": "peer_12345",
   "updates": "<base64>",         // Uint8Array — 本次增量 bytes
-  "clientVV": "<base64>"         // Uint8Array — 当前客户端 VersionVector
+  "updateHash": "<hex-sha256>",  // 幂等去重键（客户端计算）
+  "clientVV": "<base64>"         // Uint8Array — 当前客户端 VersionVector（观测/调试用，v1 不参与服务端 diff）
 }
 
 Response 200:
 {
-  "seq": 42,                     // 服务端分配的序号
-  "serverVV": "<base64>"         // 当前服务端最新 VV（供客户端参考）
+  "seq": 42,                     // 服务端分配的序号（若重复 push 返回已有 seq）
+  "deduped": false,              // true = 命中幂等去重，无新写入
+  "serverVV": null               // v1 暂不维护，保留字段
 }
 ```
 
 **服务端处理**：
 1. 验证 JWT → 提取 user_id
 2. 校验 user 对 workspaceId 有写权限
-3. 生成下一个 seq（原子递增）
-4. 存 update blob 到 R2: `/{wsId}/updates/{seq}.bin`
-5. 更新 Postgres: `sync_devices` 表的 `last_push_seq`
-6. 返回 seq + 当前 serverVV
+3. 用 `(workspaceId, updateHash)` 查重（命中则直接返回已有 seq）
+4. 先写 R2 update blob（key 不依赖 seq，避免 seq hole）
+5. Postgres 事务内：原子递增 seq + 写入 `sync_updates` 元数据 + 更新 `sync_devices.last_push_seq`
+6. 返回 seq + `deduped` + 当前 serverVV（v1 为 `null`）
 
 ### 3.3 Pull（服务端 → 客户端）
 
@@ -94,17 +97,17 @@ Content-Type: application/json
 {
   "workspaceId": "ws_abc123",
   "deviceId": "peer_12345",
-  "lastSeq": 35                  // 客户端已收到的最大 seq（0 = 首次同步）
+  "lastSeq": 35                  // 客户端已扫描/确认的 cursor seq（0 = 首次同步）
 }
 
 Response 200 (增量):
 {
   "type": "incremental",
   "updates": [
-    { "seq": 36, "data": "<base64>", "deviceId": "peer_67890" },
-    { "seq": 37, "data": "<base64>", "deviceId": "peer_12345" }
+    { "seq": 36, "data": "<base64>", "deviceId": "peer_67890" }
   ],
   "latestSeq": 42,
+  "nextCursorSeq": 37,           // 本次服务端扫描到的最大 seq（含被 echo 过滤掉的项）
   "hasMore": false               // true 时客户端应继续拉取
 }
 
@@ -117,6 +120,7 @@ Response 200 (全量快照 — 首次同步或落后太多):
     { "seq": 41, "data": "<base64>", "deviceId": "peer_67890" }
   ],
   "latestSeq": 42,
+  "nextCursorSeq": 41,
   "hasMore": false
 }
 ```
@@ -126,13 +130,14 @@ Response 200 (全量快照 — 首次同步或落后太多):
 2. 查 `sync_workspaces` 获取当前 `latest_seq` 和 `snapshot_seq`
 3. 如果 `lastSeq < snapshot_seq`（客户端落后于快照）→ 返回全量快照 + 快照后的增量
 4. 如果 `lastSeq == 0`（首次同步）→ 同上
-5. 否则 → 从 R2 读取 `lastSeq+1` 到 `latest_seq` 的 update blobs → 返回增量
-6. 每次最多返回 50 条 updates（`hasMore: true` 分页）
-7. 不返回客户端自己推送的 updates（通过 `deviceId` 过滤，避免 echo）
+5. 否则 → 先查 `sync_updates`（`seq > lastSeq ORDER BY seq LIMIT 50`）得到扫描窗口
+6. 按 `sync_updates.r2_key` 从 R2 读取 bytes；对请求者 `deviceId` 做 echo 过滤（仅过滤响应项，不影响 cursor 前进）
+7. 返回 `nextCursorSeq = 扫描窗口最大 seq`；客户端必须用它推进 cursor（而非用返回 updates 最大 seq）
+8. 每次最多扫描 50 条（`hasMore: true` 分页）
 
 ### 3.4 幂等保证
 
-- **Push 幂等**：每次 push 附带 `clientVV`，服务端可以用 SHA-256 hash 检测重复。相同内容重复 push 返回已有 seq，不产生新记录。
+- **Push 幂等**：每次 push 附带 `updateHash`（SHA-256），服务端按 `(workspace_id, update_hash)` 去重。相同内容重复 push 返回已有 seq，不产生新记录。
 - **Pull 幂等**：`lastSeq` 是确定性游标，重复 pull 返回相同结果。
 - **Import 幂等**：Loro CRDT `doc.import()` 天然幂等，重复导入相同 bytes 无副作用。
 
@@ -162,22 +167,45 @@ CREATE TABLE sync_devices (
   device_id     TEXT NOT NULL,                   -- PeerID string
   user_id       UUID NOT NULL REFERENCES auth.users(id),
   last_push_seq BIGINT NOT NULL DEFAULT 0,       -- 该设备最后 push 的 seq
-  last_pull_seq BIGINT NOT NULL DEFAULT 0,       -- 该设备最后 pull 到的 seq
+  last_pull_seq BIGINT NOT NULL DEFAULT 0,       -- 该设备最后确认的 cursor seq（扫描进度，不等于返回给客户端的最后一条）
   last_seen_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
   created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
   PRIMARY KEY (workspace_id, device_id)
 );
 
+-- 增量元数据（服务端 append log 索引；R2 存 bytes，Postgres 存 seq/device/hash/key）
+CREATE TABLE sync_updates (
+  workspace_id  TEXT NOT NULL REFERENCES sync_workspaces(workspace_id),
+  seq           BIGINT NOT NULL,                 -- workspace 内单调递增序号
+  device_id     TEXT NOT NULL,                   -- 来源设备（用于 echo 过滤）
+  user_id       UUID NOT NULL REFERENCES auth.users(id),
+  update_hash   TEXT NOT NULL,                   -- SHA-256 hex（幂等去重）
+  r2_key        TEXT NOT NULL,                   -- R2 object key（不依赖 seq）
+  size_bytes    INTEGER NOT NULL,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (workspace_id, seq),
+  UNIQUE (workspace_id, update_hash)
+);
+
 -- RLS: 只允许 workspace owner 访问
 ALTER TABLE sync_workspaces ENABLE ROW LEVEL SECURITY;
 ALTER TABLE sync_devices ENABLE ROW LEVEL SECURITY;
+ALTER TABLE sync_updates ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "owner_access" ON sync_workspaces
   FOR ALL USING (owner_id = auth.uid());
 
 CREATE POLICY "owner_access" ON sync_devices
   FOR ALL USING (user_id = auth.uid());
+
+CREATE POLICY "owner_access" ON sync_updates
+  FOR ALL USING (user_id = auth.uid());
 ```
+
+**实现注意（RLS 与 Worker 直连）**：
+- Cloudflare Worker 通过 Hyperdrive 直连 Postgres 时，`auth.uid()` 不会自动注入请求 JWT claims。
+- 因此 v1 **不能把 RLS 当作主鉴权机制**；服务端仍需在应用层用 `jwt.sub` 显式校验 `workspace.owner_id` / `user_id`。
+- 上述 RLS 保留用于 Supabase 控制台/未来 REST 路径的兜底，不替代 Worker 中间件鉴权。
 
 ### 4.2 R2 存储结构
 
@@ -186,10 +214,10 @@ nodex-sync/                          ← R2 Bucket 名
   {workspaceId}/
     snapshot.bin                      ← 最新全量快照（compaction 产出）
     updates/
-      000001.bin                     ← seq=1 的增量 update
-      000002.bin
+      a1b2c3...f0.bin                ← SHA-256(update bytes) 命名（seq 在 Postgres `sync_updates`）
+      6f7e8d...1a.bin
       ...
-      000042.bin                     ← 最新 update
+      9c0d1e...ab.bin
 ```
 
 ---
@@ -244,7 +272,7 @@ src/
 ```
 supabase/
   migrations/
-    002_sync_tables.sql              # sync_workspaces + sync_devices
+    002_sync_tables.sql              # sync_workspaces + sync_devices + sync_updates
 ```
 
 ---
@@ -268,10 +296,10 @@ supabase/
 
 ### Step 2: Supabase 数据库迁移 → (Step 1)
 
-**目标**：`sync_workspaces` 和 `sync_devices` 表在 Supabase 中创建。
+**目标**：`sync_workspaces`、`sync_devices`、`sync_updates` 表在 Supabase 中创建。
 
 **产出**：
-- `supabase/migrations/002_sync_tables.sql`
+- `supabase/migrations/002_sync_tables.sql`（含去重索引与 `sync_updates` 元数据表）
 - 本地 `supabase db push` 或远程 migration 验证通过
 
 **预计改动**：1 个新文件
@@ -303,17 +331,22 @@ supabase/
 - `server/src/routes/push.ts`
 - `server/src/lib/r2.ts`（R2 读写封装）
 - `server/src/lib/db.ts`（Postgres 查询封装）
-- `server/src/lib/seq.ts`（seq 原子递增：读 `sync_workspaces.latest_seq` → +1 → 写回）
-- `server/src/lib/protocol.ts`（请求体解析 + Base64 解码）
+- `server/src/lib/seq.ts`（seq 原子递增辅助：事务内 `UPDATE ... RETURNING latest_seq`）
+- `server/src/lib/protocol.ts`（请求体解析 + Base64 编解码）
+- `server/src/lib/hash.ts`（SHA-256 / hex）
 
 **处理流程**：
-1. 解析请求体 `{ workspaceId, deviceId, updates, clientVV }`
+1. 解析请求体 `{ workspaceId, deviceId, updates, updateHash, clientVV }`
 2. Base64 解码 `updates` 和 `clientVV` → `Uint8Array`
-3. 校验 user 对 workspace 有权限（查 `sync_workspaces.owner_id`，首次 push 自动创建记录）
-4. 原子递增 `latest_seq` → 得到新 seq
-5. R2 `PUT /{wsId}/updates/{seq.toString().padStart(9, '0')}.bin` ← update bytes
-6. 更新 `sync_devices`: `last_push_seq = seq`, `last_seen_at = now()`
-7. 返回 `{ seq, serverVV: null }`（v1 serverVV 暂不维护，后续 compaction 时填入）
+3. 服务端重算 SHA-256 并校验 `updateHash`（防篡改/实现统一）
+4. 校验 user 对 workspace 有权限（查 `sync_workspaces.owner_id`，首次 push 自动创建记录）
+5. 查 `sync_updates (workspace_id, update_hash)`：若已存在 → 返回已有 `{ seq, deduped: true }`
+6. 先写 R2 `PUT /{wsId}/updates/{updateHash}.bin` ← update bytes（避免先分配 seq 造成 hole）
+7. Postgres 事务内：
+   - 原子递增 `sync_workspaces.latest_seq` → 得到新 seq
+   - 插入 `sync_updates(workspace_id, seq, device_id, user_id, update_hash, r2_key, size_bytes)`
+   - upsert `sync_devices.last_push_seq = seq, last_seen_at = now()`
+8. 返回 `{ seq, deduped: false, serverVV: null }`（v1 `serverVV` 暂不维护）
 
 **预计改动**：5-6 个新文件
 
@@ -321,6 +354,8 @@ supabase/
 - 首次 push：`sync_workspaces` 不存在 → `INSERT` 新记录（`owner_id = jwt.sub`）
 - 空 update bytes → 400 拒绝
 - 请求体超过 50 MB → 413 拒绝（预留安全余量）
+- R2 写成功但 DB 事务失败 → 返回 500；允许留下 orphan blob，后续离线清理（以 `sync_updates` 为准）
+- 并发重复 push（相同 `updateHash`）→ 以 `UNIQUE (workspace_id, update_hash)` 为最终裁决；冲突时读取已有 seq 并返回 `deduped: true`
 
 ### Step 5: 服务端 Pull 端点 → (Step 4)
 
@@ -332,29 +367,31 @@ supabase/
 **处理流程**：
 1. 解析请求体 `{ workspaceId, deviceId, lastSeq }`
 2. 查 `sync_workspaces` 获取 `latest_seq`, `snapshot_seq`, `snapshot_key`
-3. 如果 `lastSeq >= latest_seq` → 返回 `{ type: "incremental", updates: [], latestSeq, hasMore: false }`（已是最新）
+3. 如果 `lastSeq >= latest_seq` → 返回 `{ type: "incremental", updates: [], latestSeq, nextCursorSeq: lastSeq, hasMore: false }`（已是最新）
 4. 如果 `lastSeq < snapshot_seq` 或 `lastSeq == 0`（需要快照）：
    - 从 R2 读取 `snapshot.bin` → Base64 编码
-   - 从 R2 读取 `snapshot_seq+1` 到 `latest_seq` 的 updates（最多 50 条）
-   - 返回 `{ type: "snapshot", snapshot, snapshotSeq, updates, latestSeq, hasMore }`
+   - 查 `sync_updates`（`seq > snapshot_seq ORDER BY seq LIMIT 50`）得到扫描窗口
+   - 按 `r2_key` 从 R2 读取 updates，并过滤 echo（响应层）
+   - 返回 `{ type: "snapshot", snapshot, snapshotSeq, updates, latestSeq, nextCursorSeq, hasMore }`
 5. 否则（增量）：
-   - 从 R2 读取 `lastSeq+1` 到 `latest_seq` 的 updates（最多 50 条）
+   - 查 `sync_updates`（`seq > lastSeq ORDER BY seq LIMIT 50`）得到扫描窗口
+   - 按 `r2_key` 从 R2 读取 updates
    - 过滤掉 `deviceId` 等于请求者的条目（避免 echo）
-   - 返回 `{ type: "incremental", updates, latestSeq, hasMore }`
-6. 更新 `sync_devices`: `last_pull_seq = 实际返回的最大 seq`, `last_seen_at = now()`
+   - 返回 `{ type: "incremental", updates, latestSeq, nextCursorSeq, hasMore }`
+6. 更新 `sync_devices`: `last_pull_seq = nextCursorSeq`, `last_seen_at = now()`（cursor=扫描进度）
 
 **预计改动**：1-2 个新文件
 
 **边界条件**：
-- workspace 不存在 → 返回空（`{ type: "incremental", updates: [], latestSeq: 0 }`）
+- workspace 不存在 → 返回空（`{ type: "incremental", updates: [], latestSeq: 0, nextCursorSeq: 0, hasMore: false }`）
 - 快照不存在但有 updates → 只返回 updates（客户端从本地状态 + updates 合并）
 - R2 读取失败 → 500 + 错误日志
+- 扫描窗口全部被 echo 过滤 → `updates=[]` 但 `nextCursorSeq` 仍前进（客户端必须继续用 `nextCursorSeq`）
 
 **echo 过滤的设计说明**：
 - 客户端 push 的 update 包含自己的操作，pull 时不需要再收到
-- 通过在 R2 存储时把 `deviceId` 作为 object metadata（`x-amz-meta-device-id`），pull 时读取并过滤
-- 或者：在 Postgres 中记录每个 seq 的来源 deviceId（更简单但多一列）
-- **推荐后者**：在 `sync_workspaces` 逻辑中增加一个 `sync_updates` 辅助表，或把 deviceId 存在 update key 的命名中（如 `{seq}_{deviceId}.bin`）
+- v1 采用 `sync_updates.device_id` 做过滤（不依赖 R2 metadata / key 命名）
+- 这样同时解决：echo 过滤、幂等去重（`update_hash`）、分页扫描与调试审计
 
 ### Step 6: 客户端 Pending Queue → (无依赖，可与 Step 1-5 并行)
 
@@ -380,7 +417,7 @@ export async function getPendingCount(workspaceId: string): Promise<number>;
 export async function clearPendingUpdates(workspaceId: string): Promise<void>;
 ```
 
-**存储**：复用 `loro-persistence.ts` 的 IndexedDB 实例（`nodex` 数据库），新增 `pending_updates` object store。需要 DB version 升级（1 → 2）。
+**存储**：复用 `loro-persistence.ts` 的 IndexedDB 实例（`nodex` 数据库），新增 `pending_updates` object store，并预留 `sync_cursors`（或将 cursor 合并进 `SnapshotRecord`）。统一一次 DB version 升级（1 → 2）。
 
 **改动 `loro-doc.ts`**：
 - `subscribeLocalUpdates` 回调从 no-op 改为调用 `enqueuePendingUpdate()`
@@ -420,13 +457,17 @@ export class SyncManager {
 ```
 
 **同步周期**：
-1. `push()`：从 pending queue 取出所有待推送 updates → 合并为单次 POST `/sync/push` → 成功后从 queue 删除
-2. `pull()`：发送 `lastSeq` → 收到 updates → 逐条 `importUpdates()` → 更新本地 `lastSeq`
+1. `push()`：v1 **不合并** pending updates；按队列顺序逐条 POST `/sync/push`（每轮可设最大条数）→ 成功后删除对应队列项
+2. `pull()`：发送 `lastSeq` → 收到 updates → 逐条 `importUpdates()` → 用 `nextCursorSeq` 更新本地 cursor（即使本页被 echo 过滤后 `updates=[]`）
 3. 每 30 秒执行一次（`setInterval`）
 4. 页面 `visibilitychange` 时立即触发一次（切回前台 = 立即同步）
 5. `subscribeLocalUpdates` 入队后也触发一次（有新本地变更 = 尽快推送）
 
-**`lastSeq` 持久化**：存 `chrome.storage.local`（key: `sync_last_seq_{workspaceId}`）。
+**`lastSeq` 持久化（修订）**：
+- 不使用 `chrome.storage.local` 单独持久化 cursor（避免与本地 Loro 状态分离）
+- 将 `lastSeq` checkpoint 持久化到 `loro-persistence.ts` 的 IndexedDB（`sync_cursors` store 或扩展 `SnapshotRecord`）
+- `pull()` 成功应用一批 updates 后，按顺序执行：`doc.import()` → 持久化本地 checkpoint（至少含 `lastSeq`，建议同写 `versionVector`/snapshot 元数据）→ 再标记本轮成功
+- 目标：避免“cursor 已前进，但本地状态未落盘”导致重启后漏拉数据
 
 **sync-protocol.ts**：
 ```typescript
@@ -438,6 +479,10 @@ export async function pullUpdates(params: PullRequest): Promise<PullResponse>;
 export function uint8ArrayToBase64(bytes: Uint8Array): string;
 export function base64ToUint8Array(base64: string): Uint8Array;
 ```
+
+**请求/响应语义约束（新增）**：
+- PushRequest 必含 `updateHash`（hex SHA-256）
+- PullResponse 必含 `nextCursorSeq`（扫描进度）；客户端推进 cursor 只能用该字段
 
 **与 workspace-store 集成**：
 - `initAuth()` 中，`SIGNED_IN` 事件 → `syncManager.start()`
@@ -492,9 +537,10 @@ sync-e2e.test.ts:
   3. 两个 device 各自 push → 各自 pull 对方的 update
   4. 首次同步（lastSeq=0）→ 收到 snapshot 或全量 updates
   5. push 幂等（相同内容重复 push）
-  6. pull echo 过滤（不收到自己 push 的内容）
-  7. 断网恢复后 pending queue 正确 drain
-  8. JWT 过期 → 401 → 状态变 error → 刷新 token 后恢复
+  6. pull echo 过滤（不收到自己 push 的内容）+ `nextCursorSeq` 仍正确前进
+  7. R2 成功 / DB 失败场景不产生可见 seq hole（以 `sync_updates` 查询为准）
+  8. 断网恢复后 pending queue 正确 drain
+  9. JWT 过期 → 401 → 状态变 error → 刷新 token 后恢复
 
 sync-pending-queue.test.ts:
   1. enqueue → dequeue 顺序一致
@@ -601,26 +647,31 @@ id = "<hyperdrive-config-id>"
 | 重放攻击 | CRDT import 天然幂等，重放无副作用 |
 | Token 泄露 | HTTPS only；JWT 短有效期 + refresh token |
 | R2 直接访问 | R2 不开放公共访问，只通过 Workers 代理 |
+| 误把 RLS 当 Worker 主鉴权 | Worker 直连 Postgres 仍以应用层鉴权为准；RLS 仅作兜底 |
 
 ---
 
-## 十、待 Review 的开放问题
+## 十、Review 结论与剩余开放问题
 
-以下问题请 reviewer 评估：
+### 10.1 本轮 Review 已定案（已反映到上文）
 
-1. **echo 过滤实现方式**：在 R2 key 中嵌入 deviceId（如 `{seq}_{deviceId}.bin`）vs Postgres 辅助列 vs R2 object metadata。推荐 R2 key 嵌入方案（最简单，pull 时 list + filter）。
+1. **echo 过滤实现**：采用 Postgres `sync_updates.device_id` 做过滤；不使用 R2 object metadata / key 嵌入 deviceId。
+2. **push 幂等实现**：PushRequest 增加 `updateHash`，`sync_updates` 上建 `UNIQUE (workspace_id, update_hash)`。
+3. **seq hole 风险**：先写 R2（key 使用 `updateHash`，不依赖 seq），再在 DB 事务内分配 seq + 写 `sync_updates`，避免“先分 seq 后 R2 失败”。
+4. **cursor 语义**：PullResponse 增加 `nextCursorSeq`，表示服务端扫描进度；客户端推进 cursor 只能使用该字段（避免 echo 过滤导致停滞）。
+5. **v1 push 策略**：先不合并 pending updates，按队列逐条 push，降低实现复杂度与临时 LoroDoc 成本。
+6. **本地 checkpoint 持久化**：`lastSeq` 不单独存 `chrome.storage.local`；改为存 IndexedDB（与 Loro 持久化同域）。
+7. **鉴权边界**：Worker + Hyperdrive 直连 Postgres 路径不依赖 RLS，主鉴权在 Worker 应用层完成。
 
-2. **update 合并策略**：push 时是否应该把 pending queue 中多条 update 合并为一条？Loro 支持合并多个 updates（`doc.import` 多次后 `doc.export` 一次），但合并需要在客户端加载临时 LoroDoc。v1 可以先不合并，逐条推送。
+### 10.2 剩余开放问题（执行前/执行中确认）
 
-3. **Seq 原子递增**：Workers 是无状态的，`latest_seq` 存在 Postgres 中。并发 push 时需要原子递增。方案：`UPDATE sync_workspaces SET latest_seq = latest_seq + 1 WHERE workspace_id = $1 RETURNING latest_seq`（单条 SQL 原子操作）。
+1. **首次同步无快照**：未 compaction 时，新设备 `lastSeq=0` 直接回放全量 updates。v1 可接受；需在 PR-C 前实测启动耗时阈值（如 >3s 时再优先补 snapshot 兜底）。
 
-4. **首次同步无快照**：如果还没跑过 compaction，新设备首次 pull 时 `snapshot_seq = 0`、无 snapshot。此时返回 `lastSeq=0` 到 `latest_seq` 的所有 updates。客户端依次 import 到空 LoroDoc。这是否可接受？（update 数量少时没问题，多时可能慢）。
+2. **多 workspace 同步**：v1 是否只支持单 workspace 自动同步（当前 UI/状态机更简单），还是允许多实例 `SyncManager` 并行？建议 v1 明确单 workspace，后续再扩展。
 
-5. **多 workspace 同步**：当前设计按 workspace 隔离。登录用户如果有多个 workspace，需要分别启动 SyncManager 实例。v1 是否只支持单 workspace？
+3. **离线编辑合并顺序**：理论上 CRDT 保证最终一致；执行时用 E2E 用例确认 Loro 对乱序导入的行为与预期一致（尤其跨设备交错 push/pull）。
 
-6. **离线编辑合并顺序**：两台设备离线各编辑，联网后的 push/pull 顺序是否影响最终状态？答案：不影响（CRDT 保证），但请 reviewer 确认 Loro 的 `import` 对乱序 updates 的处理。
-
-7. **Workers 部署区域**：是否启用 Smart Placement（自动靠近 Supabase 所在区域）？推荐启用。
+4. **Workers 部署区域**：是否启用 Smart Placement（更靠近 Supabase 区域）作为默认部署配置。建议在首个 staging 部署时启用并观察延迟。
 
 ---
 

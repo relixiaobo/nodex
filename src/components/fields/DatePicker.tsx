@@ -865,10 +865,10 @@ export function CalendarGrid({
         </div>
       </div>
 
-      {/* Day headers — 7 columns, square cells */}
+      {/* Day headers — 7 columns */}
       <div className="grid grid-cols-7 gap-0 mb-0.5">
         {DAY_HEADERS.map((d, i) => (
-          <div key={i} className="aspect-square flex items-center justify-center text-xs text-foreground-tertiary">
+          <div key={i} className="h-7 flex items-center justify-center text-xs text-foreground-tertiary">
             {d}
           </div>
         ))}
@@ -896,8 +896,7 @@ export function CalendarGrid({
               ? heatmapClass(noteCount)
               : '';
 
-            // Square cells with aspect-square for consistent sizing
-            let cls = 'aspect-square flex items-center justify-center text-sm transition-colors';
+            let cls = 'h-7 flex items-center justify-center text-sm transition-colors';
 
             if (isStart && isEnd) {
               cls += ' bg-primary text-primary-foreground font-medium rounded-md';

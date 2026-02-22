@@ -108,12 +108,21 @@
 - 点击面包屑层级 → 导航到对应层级节点
 - 反向链接是**实时计算**的，非存储（基于反向索引）
 
+#### 布局规则
+
+- 行布局与 OutlinerItem depth-0 完全一致：`paddingLeft: 6` → `flex gap-1` → `[ChevronButton 15px]` + `flex gap-2` → `[Bullet 15px][text]`
+- 高亮区域（mention 背景、hover）使用 absolute overlay，`left: 21px`（跳过 chevron），覆盖 gap + bullet + text，与 OutlinerItem 的 `showRowHighlight` 一致
+- 分组标签（"N references"、"Mentioned in..."、"Appears as..."）对齐 bullet 列（`paddingLeft: 25px`），非文本列
+- 面包屑路径也对齐 bullet 列
+- Tag badge 以 `inline-flex` 跟在文本后面（与 OutlinerItem 的 TagBar 模式一致），不用 `ml-auto` 推到右侧
+
 #### 数据查询
 
-- **树引用**: 所有 `type='reference' && targetId === nodeId` 的节点
+- **树引用**: 所有 `type='reference' && targetId === nodeId` 的节点（排除 parent 为 fieldEntry 的，避免与字段值引用重复）
 - **内联引用**: 所有节点 `inlineRefs` 中 `targetNodeId === nodeId` 的条目
 - **字段值引用**: `type='fieldEntry'` 的节点，其 children 包含 `nodeId`
-- **性能**: 需要在 LoroDoc 层建立反向索引（`nodeId → Set<referencing nodeId>`）
+- **去重规则**: 同一引用不会同时出现在 "Mentioned in" 和 "Appears as [Field] in" 中
+- **性能**: `buildBacklinkCountMap` 按 `_version` 缓存，同一渲染周期内多个 `useBacklinkCount` 调用 O(1)
 
 ### 引用计数 Badge
 
@@ -145,6 +154,11 @@
 | 2026-02-22 | 反向链接 section 实现（computeBacklinks + BacklinksSection） | 全量扫描 LoroDoc，三类引用（tree/inline/fieldValue），TRASH 排除 |
 | 2026-02-22 | 引用计数 badge（useBacklinkCount + OutlinerItem） | 行右侧 10px 半透明数字，点击 navigateTo zoom in 查看完整 references |
 | 2026-02-22 | 字段值引用检测：检查 child.targetId 而非 child.type==='reference' | Options 字段的值节点没有 type='reference'，只有 targetId 属性 |
+| 2026-02-22 | buildBacklinkCountMap 添加 version 缓存 | 每个 OutlinerItem 独立调用 useBacklinkCount → 同一 _version 内复用缓存避免 O(N×M) |
+| 2026-02-22 | 树引用在 fieldEntry 内时跳过 "Mentioned in" | 避免与 "Appears as [Field] in..." 重复计数 |
+| 2026-02-22 | BacklinksSection 行布局复用 OutlinerItem depth-0 结构 | paddingLeft/flex gap/absolute highlight overlay 与 OutlinerItem 完全一致 |
+| 2026-02-22 | 标签/分组标签对齐 bullet 列（25px），非文本列（48px） | 信息层级：标签是分组元数据，不是内容文本 |
+| 2026-02-22 | 删除未使用的 useBacklinkCountMap hook | 仅 useBacklinkCount（单节点）在使用，全量 map hook 无消费者 |
 
 ## 当前状态
 

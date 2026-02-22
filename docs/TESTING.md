@@ -712,6 +712,58 @@ hash trigger cleanup safety（3 cases, Bug #53 + CJK hashtag 回归）:
 
 ---
 
+### 1.515 Sync Phase 0 — Client Sync-Ready 准备项
+
+**测试文件**: `tests/vitest/sync-phase0.test.ts`
+
+**覆盖点（Sync Phase 0 Client Prep）**:
+
+SnapshotRecord format validation:
+1. bare Uint8Array (old format) rejected — returns null (no backward compat, project not launched)
+2. Valid `SnapshotRecord` round-trip through persistence API (`saveSnapshotRecord` → `loadSnapshotRecord`)
+3. Partial/corrupt object (wrong field types) rejected — returns null
+4. Missing persisted key returns null
+5. Real doc produces valid SnapshotRecord with non-empty snapshot/peerIdStr/VV and is restorable
+
+PeerID persistence:
+6. PeerID round-trip: save peerIdStr → setPeerId on new doc → same peerIdStr
+7. setPeerId before import preserves identity through snapshot round-trip (all changes under same peer)
+8. peerIdStr format is numeric string
+9. Different LoroDoc instances get different random peer IDs
+10. Invalid peerIdStr graceful degradation (try/catch path)
+
+VersionVector persistence:
+11. VV encode/decode round-trip preserves peer entries (Map contents match)
+12. Empty doc produces valid encodable VV
+13. VV grows after operations (counter increases)
+14. VV incremental export delta can upgrade a replica at `vvBefore` to latest (node count + VV match)
+
+Workspace ID normalization:
+15. First call generates `ws_{nanoid()}` pattern
+16. Subsequent calls return same ID (persistence)
+17. Value persists to localStorage
+18. Pre-existing value is reused
+19. Two fresh calls (with clear between) produce different IDs
+20. Concurrent first-run calls in same JS context resolve to the same ID (in-flight de-dupe)
+
+subscribeLocalUpdates hook:
+21. Callback fires on commit (Uint8Array bytes)
+22. Unsubscribe stops callback
+23. Import does not trigger subscribeLocalUpdates (local-only)
+24. Multiple subscribes coexist and unsubscribe independently
+
+**设计要点**:
+- `loadSnapshotRecord()` 仅接受 `SnapshotRecord` 格式，旧格式（bare `Uint8Array`）返回 null（项目未上线，不兼容）
+- `loadSnapshotRecord()` 同时校验 `snapshot/versionVector` 为 `Uint8Array`、`peerIdStr` 为 string、`savedAt` 为非负有限 number，部分损坏记录直接丢弃
+- PeerID 恢复顺序：`new LoroDoc()` → `setPeerId(saved)` → `import(snapshot)`（文档必须无 oplog）
+- `persistSnapshot()` 原子保存 snapshot + peerIdStr + VV + savedAt
+- `workspace-id` 增加同进程 in-flight 去重；支持 `navigator.locks` 时使用 Web Locks 降低多窗口首次启动竞态
+- `subscribeLocalUpdates` 仅捕获本地提交，`import(remoteBytes)` 不触发（避免 echo）
+- `unsubLocalUpdates` 在 `resetLoroDoc()` 和工作区切换时清理
+- Workspace ID 持久化到 `chrome.storage.local`（扩展）或 `localStorage`（standalone）
+
+---
+
 ### 1.52 LoroText Bridge（TextMark / InlineRef 双向桥接）
 
 **测试文件**: `tests/vitest/loro-text-bridge.test.ts`

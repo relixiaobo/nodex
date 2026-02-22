@@ -55,6 +55,8 @@
 
 **commit origin 分层**：统一使用 `user:* / system:* / __seed__` 语义前缀，并在 UndoManager 过滤 `['__seed__', 'system:']`，确保系统提交不污染用户撤销栈。
 
+**PeerID 恢复顺序陷阱**：`doc.setPeerId()` 必须在文档仍为空（无 oplog）时调用。恢复流程应为 `new LoroDoc()` → `setPeerId(savedPeerId)` → `import(snapshot)`；若先 `import` 再 `setPeerId`，在已有 oplog 的文档上会失败（或行为不符合预期）。
+
 ### 树操作边界条件
 
 - **handleBlur 竞态**: onBlur 须检查 `focusedNodeId === nodeId` 再清除（现已改为 rAF 延迟）

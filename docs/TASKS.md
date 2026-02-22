@@ -27,8 +27,8 @@ _(空)_
 
 | Agent | 当前任务 | 分支 | 修改中的文件 |
 |-------|---------|------|-------------|
-| nodex-cc | _(idle)_ | — | — |
-| nodex-cc-2 | References 增强 (#19) | cc2/references | src/lib/backlinks.ts, src/hooks/use-backlinks.ts, src/components/panel/BacklinksSection.tsx, src/components/outliner/OutlinerItem.tsx, src/components/panel/NodePanel.tsx |
+| nodex-cc | Sync 增量同步（Cloudflare-only）— Step 0 起 | `cc/sync-phase1` | `docs/plans/sync-incremental-impl.md`, `server/*` |
+| nodex-cc-2 | _(idle)_ | — | — |
 | nodex-codex | _(idle)_ | — | — |
 
 ---
@@ -52,25 +52,28 @@ _(空)_
 
 ### P1
 
-#### Sync Phase 0 Step 1 — Review & 优化方案
-> Review `docs/plans/sync-architecture.md` 全文，验证 Loro API 用法、Chrome 扩展约束、架构设计，提出优化建议并直接修改方案文档。
-> **Owner**: nodex-codex | **Spec**: `docs/plans/sync-architecture.md`
+#### Sync 增量同步（Phase 1-2 合并实施）— Cloudflare-only 全栈
+> Phase 0 客户端预留已完成（PR #75 + #77 + #78）。基础设施：**Cloudflare-only**（Workers + R2 + D1 + Better Auth），完全消除 Supabase 依赖。
+> 跳过纯备份（Phase 1），直接实现多端增量同步（Phase 2）。
+> **Owner**: nodex-cc
+> **Plan**: `docs/plans/sync-incremental-impl.md` | **Arch**: `docs/plans/sync-architecture.md` | **Auth**: `docs/plans/auth-cloudflare-only.md`
+>
+> **当前状态**: 计划已 Review + Cloudflare-only 修订完成，可交 nodex-cc 执行
 
-- [ ] 验证 Phase 0 四项准备的 Loro API 用法是否正确（setPeerId 时机、VV encode/decode、subscribeLocalUpdates 签名）
-- [ ] 验证 Chrome 扩展约束假设（Side Panel 单实例、SW 生命周期、unlimitedStorage 行为）
-- [ ] 审查 Phase 1-3 架构设计（增量同步协议、compaction 策略、WebSocket 生命周期）是否有遗漏或错误
-- [ ] 直接修改 `docs/plans/sync-architecture.md`，提交优化后的方案（含发现的问题和改进）
-
-#### Sync Phase 0 Step 2 — 客户端 Sync-Ready 实施
-> 基于 nodex-codex review 后的方案，实施 4 项客户端架构预留。
-> **Owner**: nodex-cc | **Spec**: `docs/plans/sync-architecture.md` | **Blocked by**: Step 1
-
-- [ ] **准备项 1**: PeerID 持久化 — 扩展 `loro-persistence.ts` 存储格式为 `{ snapshot, peerIdStr, versionVector, savedAt }`，`initLoroDoc()` 中恢复 peerIdStr
-- [ ] **准备项 2**: VersionVector 持久化 — 与 snapshot 一起保存 `doc.oplogVersion().encode()` 到 IndexedDB
-- [ ] **准备项 3**: `subscribeLocalUpdates` hook 点 — `initLoroDoc()` 末尾注册 no-op 回调，为未来 sync buffer 预留入口
-- [ ] **准备项 4**: Workspace ID 规范化 — 未登录时生成持久化唯一 `ws_{nanoid()}`，不再用 `'ws_default'`；manifest.json 添加 `unlimitedStorage` 权限
-- [ ] 补充 Vitest 测试（PeerID 恢复、VV 序列化/反序列化、workspace ID 持久化）
-- [ ] 更新 `docs/TESTING.md` 覆盖映射
+- [x] **Review**: nodex-codex review 实施计划（含 7 个开放问题） ✓ nodex-codex（2026-02-22）
+- [x] **修订**: Postgres → D1 迁移 + Auth 评估 ✓ nodex-codex（2026-02-22）
+- [x] **修订**: Cloudflare-only 全栈（Auth PoC 纳入 Step 0） ✓ nodex（2026-02-23）
+- [ ] Step 0: Auth PoC（Better Auth + D1 + Workers）— **前置任务**
+- [ ] Step 1: 服务端项目骨架（Workers + R2 + D1 binding + Auth 集成）
+- [ ] Step 2: D1 Sync Schema 迁移（sync_workspaces + sync_devices + sync_updates）
+- [ ] Step 3: 服务端鉴权中间件（Better Auth session 验证）
+- [ ] Step 4: 服务端 Push 端点
+- [ ] Step 5: 服务端 Pull 端点 + 快照兜底
+- [ ] Step 6: 客户端 Pending Queue（可与 1-5 并行）
+- [ ] Step 7: 客户端 Sync Manager
+- [ ] Step 8: 客户端 Sync 状态 UI
+- [ ] Step 9: 端到端测试
+- [ ] Step 10: Compaction（延后到上线后）
 
 ### P2
 
@@ -260,6 +263,10 @@ _(空)_
 
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
+| 2026-02-22 | Sync 增量同步计划 Review — 补 sync_updates 表、修正 seq hole/cursor 语义/checkpoint 持久化/RLS 边界 | nodex-codex | #79 |
+| 2026-02-22 | Sync Phase 0 实现复审 + 修复（workspace ID 并发竞态、SnapshotRecord 校验加固、测试真实持久化路径、VV 增量断言修正） | nodex-codex | #78 |
+| 2026-02-22 | Sync Phase 0 Step 2 — 客户端 Sync-Ready 实施（PeerID/VV 持久化、subscribeLocalUpdates hook、Workspace ID 规范化、unlimitedStorage） | nodex-cc | #77 |
+| 2026-02-22 | Sync Phase 0 Step 1 — Review & 优化方案（Loro API/Chrome 约束/架构审查，修订 sync-architecture.md） | nodex-codex | #75 |
 | 2026-02-22 | Reference 引用环路防护 + 轻量 i18n 基础层 — 树引用显示图无环校验 + ReferenceSelector 禁用非法目标 + 渲染层循环展开兜底 + `t()` 文案迁移 | nodex-codex | #74 |
 | 2026-02-22 | Outliner 选区统一 & Reference UX 优化 — row-pointer-selection 提取 + 字段行选中 + inline ref supertag 着色 + 全局选区清除 + 搜索 recency 排序 + 面包屑根导航 | nodex-codex | #72 |
 | 2026-02-22 | Calendar Heatmap + `@today`/`@tomorrow`/`@yesterday` 日期快捷引用 + 日历 UI 优化（正方形 cell + 热力图 + 周末着色 + Today 按钮优化） | nodex | — |

@@ -228,6 +228,18 @@
   width: 3px;
 }
 
+@keyframes node-delete-blocked-pulse {
+  0% { transform: translateX(0); }
+  20% { transform: translateX(-2px); }
+  45% { transform: translateX(2px); }
+  70% { transform: translateX(-1px); }
+  100% { transform: translateX(0); }
+}
+
+.node-delete-blocked-pulse {
+  animation: node-delete-blocked-pulse 220ms ease-out;
+}
+
 /* cmdk command palette styles */
 [cmdk-group-heading] {
   padding: 0.25rem 0.5rem;

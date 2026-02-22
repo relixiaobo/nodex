@@ -254,6 +254,8 @@ npm run test:run
 17. 模板字段 icon 着色支持 `templateId` owner 回退（fieldDef 本体非 tagDef owner 时仍可继承 supertag 颜色）
 18. 全局 pointerdown 在 outliner 行外触发 `clearSelection`，保证“点击其他区域/执行其他操作”后选区自动清空
 19. content row Backspace 在“无下拉 + 光标行首 + 非空文本”触发 merge intent：合并到上一内容节点并保留 marks/inlineRefs；引用行保持仅导航不做文本合并
+20. outliner 作用域判定基于 `data-row-scope-parent-id`（而非 `data-node-id`），避免侧栏节点点击被误判为“仍在 outliner 内”
+21. 空文本且有子节点时 Backspace 不删除子树，触发 bullet/icon 抖动反馈（避免“按键无响应”的体感）
 
 ### 1.7 标签与引用状态流
 

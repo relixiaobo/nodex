@@ -280,7 +280,9 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   const contentAreaRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<EditorView | null>(null);
   const blurClearRafRef = useRef<number | null>(null);
+  const deleteBlockedPulseTimeoutRef = useRef<number | null>(null);
   const wasFocusedRef = useRef(false);
+  const [deleteBlockedPulse, setDeleteBlockedPulse] = useState(false);
 
   // # trigger state
   const [hashTagOpen, setHashTagOpen] = useState(false);
@@ -557,6 +559,28 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   // Pending click coordinates for description cursor placement
   const descClickCoordsRef = useRef<{ x: number; y: number } | null>(null);
   const descriptionReturnOffsetRef = useRef<number | null>(null);
+
+  const triggerDeleteBlockedPulse = useCallback(() => {
+    if (deleteBlockedPulseTimeoutRef.current !== null) {
+      window.clearTimeout(deleteBlockedPulseTimeoutRef.current);
+      deleteBlockedPulseTimeoutRef.current = null;
+    }
+    setDeleteBlockedPulse(false);
+    requestAnimationFrame(() => {
+      setDeleteBlockedPulse(true);
+      deleteBlockedPulseTimeoutRef.current = window.setTimeout(() => {
+        setDeleteBlockedPulse(false);
+        deleteBlockedPulseTimeoutRef.current = null;
+      }, 280);
+    });
+  }, []);
+
+  useEffect(() => () => {
+    if (deleteBlockedPulseTimeoutRef.current !== null) {
+      window.clearTimeout(deleteBlockedPulseTimeoutRef.current);
+      deleteBlockedPulseTimeoutRef.current = null;
+    }
+  }, []);
 
   const captureNameEditorOffset = useCallback(() => {
     const editor = editorRef.current;
@@ -1439,7 +1463,10 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     const textOnly = currentName.replace(/\u200B/g, '').trim();
     if (textOnly.length > 0) return false;
     // Prevent deleting a whole subtree when Backspace is pressed on an empty parent.
-    if (hasChildren) return true;
+    if (hasChildren) {
+      triggerDeleteBlockedPulse();
+      return true;
+    }
 
     const latestUi = useUIStore.getState();
     const flatList = getFlattenedVisibleNodes(rootChildIds, latestUi.expandedNodes, rootNodeId);
@@ -1467,7 +1494,17 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
       setFocusedNode(null);
     }
     return true;
-  }, [nodeId, parentId, rootNodeId, rootChildIds, trashNode, removeReference, setFocusedNode, hasChildren]);
+  }, [
+    nodeId,
+    parentId,
+    rootNodeId,
+    rootChildIds,
+    trashNode,
+    removeReference,
+    setFocusedNode,
+    hasChildren,
+    triggerDeleteBlockedPulse,
+  ]);
 
   const handleBackspaceAtStart = useCallback((): boolean => {
     const latestUi = useUIStore.getState();
@@ -2175,15 +2212,17 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
           onDrillDown={handleDrillDown}
         />
         <div className={`flex items-start gap-2 min-w-0 relative ${isSelectedRefClick ? 'node-selected-ref w-fit flex-none' : 'flex-1'}`}>
-          <BulletChevron
-            hasChildren={hasChildren}
-            isExpanded={isExpanded}
-            onBulletClick={handleBulletClick}
-            isReference={isReferenceLikeRow || isPendingConversion}
-            tagDefColor={isTagDef ? resolveTagColor(nodeId).text : undefined}
-            bulletColors={effectiveBulletColors}
-            icon={structuralIcon}
-          />
+          <div className={deleteBlockedPulse ? 'node-delete-blocked-pulse' : ''}>
+            <BulletChevron
+              hasChildren={hasChildren}
+              isExpanded={isExpanded}
+              onBulletClick={handleBulletClick}
+              isReference={isReferenceLikeRow || isPendingConversion}
+              tagDefColor={isTagDef ? resolveTagColor(nodeId).text : undefined}
+              bulletColors={effectiveBulletColors}
+              icon={structuralIcon}
+            />
+          </div>
           {showCheckbox && (
             <span className="flex shrink-0 h-[21px] w-[15px] items-center justify-center">
               <input

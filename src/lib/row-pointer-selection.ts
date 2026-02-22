@@ -17,17 +17,12 @@ export function resolveRowPointerSelectAction(params: {
   return params.allowSingle ? 'single' : null;
 }
 
+function isInsideOutlinerScope(target: HTMLElement): boolean {
+  return !!target.closest('[data-row-scope-parent-id]');
+}
+
 export function shouldClearSelectionOnPointerDown(target: HTMLElement | null): boolean {
   if (!target) return true;
 
-  if (
-    target.closest('[data-node-id]') ||
-    target.closest('[data-field-row]') ||
-    target.closest('[data-trailing-parent-id]') ||
-    target.closest('.ProseMirror')
-  ) {
-    return false;
-  }
-
-  return true;
+  return !isInsideOutlinerScope(target);
 }

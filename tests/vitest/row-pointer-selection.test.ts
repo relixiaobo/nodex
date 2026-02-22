@@ -64,13 +64,22 @@ describe('resolveRowPointerSelectAction', () => {
     const outside = document.createElement('div');
     expect(shouldClearSelectionOnPointerDown(outside)).toBe(true);
 
+    const sidebarLikeNode = document.createElement('div');
+    sidebarLikeNode.setAttribute('data-node-id', 'sidebar_node');
+    expect(shouldClearSelectionOnPointerDown(sidebarLikeNode)).toBe(true);
+
+    const scope = document.createElement('div');
+    scope.setAttribute('data-row-scope-parent-id', 'root_1');
     const row = document.createElement('div');
     row.setAttribute('data-node-id', 'n1');
-    row.appendChild(document.createElement('span'));
-    expect(shouldClearSelectionOnPointerDown(row.firstElementChild as HTMLElement)).toBe(false);
+    const rowInner = document.createElement('span');
+    row.appendChild(rowInner);
+    scope.appendChild(row);
+    expect(shouldClearSelectionOnPointerDown(rowInner)).toBe(false);
 
     const editor = document.createElement('div');
     editor.className = 'ProseMirror';
+    scope.appendChild(editor);
     expect(shouldClearSelectionOnPointerDown(editor)).toBe(false);
   });
 });

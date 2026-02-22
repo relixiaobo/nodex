@@ -130,8 +130,22 @@ export function App({ skipBootstrap = false }: AppProps) {
       state.clearSelection();
     };
 
+    const handleFocusIn = (event: FocusEvent) => {
+      const state = useUIStore.getState();
+      if (state.selectedNodeIds.size === 0) return;
+
+      const target = event.target instanceof HTMLElement ? event.target : null;
+      if (!shouldClearSelectionOnPointerDown(target)) return;
+
+      state.clearSelection();
+    };
+
     document.addEventListener('pointerdown', handlePointerDown, true);
-    return () => document.removeEventListener('pointerdown', handlePointerDown, true);
+    document.addEventListener('focusin', handleFocusIn, true);
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown, true);
+      document.removeEventListener('focusin', handleFocusIn, true);
+    };
   }, []);
 
   if (!ready) {

@@ -162,7 +162,7 @@ export async function getStoredToken(): Promise<string | null> {
 async function fetchCurrentUser(token: string): Promise<AuthUser | null> {
   try {
     const apiUrl = getSyncApiUrl();
-    const res = await fetch(`${apiUrl}/api/auth/get-session`, {
+    const res = await fetch(`${apiUrl}/api/session`, {
       headers: { Authorization: `Bearer ${token}` },
     });
 
@@ -170,9 +170,9 @@ async function fetchCurrentUser(token: string): Promise<AuthUser | null> {
 
     const data = await res.json() as {
       user?: { id: string; name?: string; email?: string; image?: string };
-    };
+    } | null;
 
-    if (!data.user) return null;
+    if (!data?.user) return null;
 
     return {
       id: data.user.id,

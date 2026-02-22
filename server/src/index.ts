@@ -59,18 +59,68 @@ app.get('/auth/extension-redirect', async (c) => {
   const extId = c.env.CHROME_EXTENSION_ID;
   const extRedirectBase = `https://${extId}.chromiumapp.org/`;
 
-  // Read the session token from Better Auth's cookie
-  const sessionToken = getCookie(c, 'better-auth.session_token');
+  // Read the session token from Better Auth's cookie.
+  // Cookie format is "token.signature" — extract just the token part for Bearer use.
+  const rawCookie = getCookie(c, 'better-auth.session_token');
 
-  if (!sessionToken) {
+  if (!rawCookie) {
     console.error('[auth] extension-redirect: no session cookie found');
     return c.redirect(`${extRedirectBase}?error=no_session`);
   }
 
-  // Redirect to Chrome Extension with the session token
+  const decoded = decodeURIComponent(rawCookie);
+  const sessionToken = decoded.split('.')[0];
+
   const redirectUrl = new URL(extRedirectBase);
   redirectUrl.searchParams.set('session_token', sessionToken);
   return c.redirect(redirectUrl.toString());
+});
+
+// ---------------------------------------------------------------------------
+// Custom session endpoint for Chrome Extension
+//
+// Better Auth's built-in get-session may not reliably work with Bearer tokens
+// from cross-origin extension contexts. This endpoint directly queries the
+// session table using the Bearer token.
+// ---------------------------------------------------------------------------
+
+app.get('/api/session', async (c) => {
+  const authHeader = c.req.header('authorization');
+  const token = authHeader?.replace(/^Bearer\s+/i, '');
+
+  if (!token) {
+    return c.json(null, 200);
+  }
+
+  try {
+    // Look up session by token
+    const session = await c.env.SYNC_DB.prepare(
+      'SELECT s.*, u.id as uid, u.name, u.email, u."emailVerified", u.image FROM session s JOIN user u ON s."userId" = u.id WHERE s.token = ? AND s."expiresAt" > datetime(\'now\')'
+    ).bind(token).first();
+
+    if (!session) {
+      return c.json(null, 200);
+    }
+
+    return c.json({
+      session: {
+        id: session.id,
+        token: session.token,
+        userId: session.userId,
+        expiresAt: session.expiresAt,
+      },
+      user: {
+        id: session.uid,
+        name: session.name,
+        email: session.email,
+        emailVerified: session.emailVerified,
+        image: session.image,
+      },
+    });
+  } catch (err) {
+    console.error('[auth] /api/session error:', err);
+    return c.json(null, 200);
+  }
 });
 
 // ---------------------------------------------------------------------------

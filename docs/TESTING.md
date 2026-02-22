@@ -140,7 +140,7 @@ npm run test:run
 
 **测试文件**: `tests/vitest/ui-store.test.ts`
 
-**覆盖点**: navigateTo, goBack, goForward, replacePanel, expand, collapse, toggleExpand, setFocus, clearFocus, openSearch, closeSearch, toggleSidebar
+**覆盖点**: navigateTo, goBack, goForward, replacePanel, expand, collapse, toggleExpand, setFocus, clearFocus, openSearch, closeSearch, toggleSidebar；并验证 `navigateTo/replacePanel` 对无 backing node 的目标 ID 为 no-op（避免空白 panel）
 
 ### 1.3.1 内容模型联动（Node Store）
 

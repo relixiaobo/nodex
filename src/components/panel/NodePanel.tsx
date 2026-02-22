@@ -20,6 +20,23 @@ export function NodePanel({ nodeId }: NodePanelProps) {
   const node = useNode(nodeId);
   const goBack = useUIStore((s) => s.goBack);
 
+  if (!node) {
+    return (
+      <div className="flex flex-1 items-center justify-center p-6">
+        <div className="text-center">
+          <div className="text-sm text-muted-foreground">This page is unavailable.</div>
+          <button
+            type="button"
+            onClick={goBack}
+            className="mt-3 text-sm text-primary hover:underline"
+          >
+            Go back
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   const isFieldDef = node?.type === 'fieldDef';
   const isTagDef = node?.type === 'tagDef';
   const isDefinitionNode = isFieldDef || isTagDef;

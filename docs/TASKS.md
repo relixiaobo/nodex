@@ -29,15 +29,15 @@ _(空)_
 |-------|---------|------|-------------|
 | nodex-cc | Sync 增量同步（Cloudflare-only）— Step 0 起 | `cc/sync-phase1` | `docs/plans/sync-incremental-impl.md`, `server/*` |
 | nodex-cc-2 | _(idle)_ | — | — |
-| nodex-codex | 空白 NodePanel 导航问题排查（reference bullet / system tag） | `codex/reference-bullet-nodepanel-empty` | `src/components/outliner/OutlinerItem.tsx`, `src/components/tags/TagBadge.tsx`, `tests/vitest/outliner-item-reference-navigation.test.ts`, `tests/vitest/tag-badge-navigation.test.ts`, `docs/TESTING.md`, `docs/TASKS.md` |
+| nodex-codex | 空白 NodePanel 导航问题排查（reference / system tag / dangling IDs） | `codex/reference-bullet-nodepanel-empty` | `src/components/outliner/OutlinerItem.tsx`, `src/components/tags/TagBadge.tsx`, `src/stores/ui-store.ts`, `src/components/panel/NodePanel.tsx`, `tests/vitest/outliner-item-reference-navigation.test.ts`, `tests/vitest/tag-badge-navigation.test.ts`, `tests/vitest/ui-store.test.ts`, `docs/TESTING.md`, `docs/TASKS.md` |
 
 ---
 
 ## 进行中
 
-### 空白 NodePanel 导航问题排查（reference bullet / system tag）
-> 复现并定位：点击 reference node 的 bullet 或系统标签（如 `#day`）后，NodePanel 打开的页面为空。
-> **Owner**: nodex-codex | **Branch**: `codex/reference-bullet-nodepanel-empty` | **Files**: `src/components/outliner/OutlinerItem.tsx`, `src/components/tags/TagBadge.tsx`, `tests/vitest/outliner-item-reference-navigation.test.ts`, `tests/vitest/tag-badge-navigation.test.ts`, `docs/TESTING.md`, `docs/TASKS.md`
+### 空白 NodePanel 导航问题排查（reference / system tag / dangling IDs）
+> 复现并定位：点击 reference node 的 bullet、系统标签（如 `#day`）或其他无 backing node 的动态入口后，NodePanel 打开的页面为空。
+> **Owner**: nodex-codex | **Branch**: `codex/reference-bullet-nodepanel-empty` | **Files**: `src/components/outliner/OutlinerItem.tsx`, `src/components/tags/TagBadge.tsx`, `src/stores/ui-store.ts`, `src/components/panel/NodePanel.tsx`, `tests/vitest/outliner-item-reference-navigation.test.ts`, `tests/vitest/tag-badge-navigation.test.ts`, `tests/vitest/ui-store.test.ts`, `docs/TESTING.md`, `docs/TASKS.md`
 
 - [x] 复现问题并定位触发链路（reference bullet → panel navigation）
 - [x] 确认 root cause（引用节点 ID / 面板页面栈 / selector 上下文）
@@ -48,6 +48,7 @@ _(空)_
 - [2026-02-22 nodex-codex] 定位根因：`OutlinerItem` 的 reference 行 bullet/drillDown 导航错误传入引用壳节点 `nodeId`，`NodePanel` 打开空壳页；修复为 `referenceTargetId ?? nodeId`，并新增 Vitest 覆盖 `resolvePanelNavigationNodeId()`。
 - [2026-02-22 nodex-codex] 追加排查 `#day` 空白页：`TagBadge` 对系统标签 `sys:day` 仅做显示名兜底，但仍允许 `navigateTo(tagId)`，导致打开无 backing node 的空白 Panel；计划改为禁用无 backing node 标签导航。
 - [2026-02-22 nodex-codex] 已实现 `TagBadge` 导航守卫：仅当标签有 backing node 时允许点击进入 panel，并隐藏无 backing node 标签的 Configure 菜单项；新增 Vitest 覆盖 `canNavigateToTagNode()`。
+- [2026-02-22 nodex-codex] 统一收口类似问题：在 `ui-store.navigateTo/replacePanel` 增加 backing node 校验（无效 ID no-op），并在 `NodePanel` 增加 missing-node 兜底视图，避免历史中的旧无效 ID 导致空白页；补 `ui-store.test.ts` 回归用例。
 
 ---
 
@@ -121,6 +122,24 @@ _(空)_
 - [ ] 日记模板（#day supertag 配置）
 - [ ] 日期字段链接到日节点
 - **Spec**: `docs/features/date-nodes.md`
+
+#### 系统预置标签节点化（day/week/year + 其他 system tags）
+> 将 `day/week/year`（以及后续需要开放配置的系统预置标签）从“仅系统语义 ID”升级为**系统预置 tagDef 节点**：保留稳定语义/固定 ID，同时具备真实 tagDef 页面、模板字段、默认内容配置能力。
+> **Owner**: _(待分配)_
+>
+> **目标**
+> - `#day/#week/#year` 可点击进入真实 tagDef 页面（非空白页）
+> - 可为这些系统预置标签配置模板/字段/默认内容
+> - `journal` 等功能仍基于稳定系统语义识别（不依赖用户可变名称）
+> - 为其他系统预置标签复用同一机制（system preset tag registry）
+
+- [ ] 设计：系统语义 ID 与预置 tagDef 节点 ID 的映射模型（兼容现有 `sys:*` / `SYS_T*`）
+- [ ] 数据迁移：初始化/升级时确保预置 tagDef 节点存在（幂等）
+- [ ] journal 逻辑切换到“系统预置 tagDef”识别路径（day/week/year）
+- [ ] TagBadge/TagBar 导航恢复为可进入 `#day/#week/#year` 配置页
+- [ ] 模板字段/默认内容在 day/week/year 节点上生效（行为验证）
+- [ ] 测试：迁移 + journal 识别 + 导航 + 模板配置回归
+- [ ] 文档：`docs/features/date-nodes.md` / `docs/features/supertags.md` / `docs/TESTING.md`
 
 #### 网页剪藏 (#30)
 > 已完成：消息类型定义、Content Script 提取（defuddle）、Background 中转、`/clip` slash command 全链路、`#web_clip` tagDef + Source URL attrDef 惰性创建、V2 正文→子节点、Vitest 55 cases

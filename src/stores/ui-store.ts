@@ -12,6 +12,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { chromeLocalStorage } from '../lib/chrome-storage';
+import { useNodeStore } from './node-store';
 
 interface UIStore {
   // Browser-like navigation history
@@ -130,6 +131,10 @@ export function partializeUIStore(state: UIStore): PersistedUIStoreState {
   };
 }
 
+function hasBackingNode(nodeId: string): boolean {
+  return useNodeStore.getState().getNode(nodeId) !== null;
+}
+
 export const useUIStore = create<UIStore>()(
   persist(
     (set) => ({
@@ -138,6 +143,7 @@ export const useUIStore = create<UIStore>()(
       panelIndex: -1,
       navigateTo: (nodeId) =>
         set((s) => {
+          if (!hasBackingNode(nodeId)) return {};
           // Truncate forward history, skip duplicate of current page
           const newHistory = s.panelHistory.slice(0, s.panelIndex + 1);
           if (newHistory[newHistory.length - 1] === nodeId) return {};
@@ -194,6 +200,7 @@ export const useUIStore = create<UIStore>()(
         }),
       replacePanel: (nodeId) =>
         set((s) => {
+          if (!hasBackingNode(nodeId)) return {};
           if (s.panelHistory.length === 0) {
             return {
               panelHistory: [nodeId],

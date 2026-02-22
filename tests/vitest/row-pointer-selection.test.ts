@@ -60,7 +60,7 @@ describe('resolveRowPointerSelectAction', () => {
     })).toBe(null);
   });
 
-  it('clears selection only when pointer target is outside outliner rows', () => {
+  it('clears selection when pointer target is not a concrete outliner row', () => {
     const outside = document.createElement('div');
     expect(shouldClearSelectionOnPointerDown(outside)).toBe(true);
 
@@ -69,17 +69,32 @@ describe('resolveRowPointerSelectAction', () => {
     expect(shouldClearSelectionOnPointerDown(sidebarLikeNode)).toBe(true);
 
     const scope = document.createElement('div');
-    scope.setAttribute('data-row-scope-parent-id', 'root_1');
     const row = document.createElement('div');
     row.setAttribute('data-node-id', 'n1');
+    row.setAttribute('data-parent-id', 'root_1');
     const rowInner = document.createElement('span');
     row.appendChild(rowInner);
     scope.appendChild(row);
     expect(shouldClearSelectionOnPointerDown(rowInner)).toBe(false);
 
+    const fieldRow = document.createElement('div');
+    fieldRow.setAttribute('data-field-row', 'true');
+    const fieldInner = document.createElement('span');
+    fieldRow.appendChild(fieldInner);
+    scope.appendChild(fieldRow);
+    expect(shouldClearSelectionOnPointerDown(fieldInner)).toBe(false);
+
+    const trailing = document.createElement('div');
+    trailing.setAttribute('data-trailing-parent-id', 'root_1');
+    const trailingEditor = document.createElement('div');
+    trailingEditor.className = 'ProseMirror';
+    trailing.appendChild(trailingEditor);
+    scope.appendChild(trailing);
+    expect(shouldClearSelectionOnPointerDown(trailingEditor)).toBe(true);
+
     const editor = document.createElement('div');
     editor.className = 'ProseMirror';
     scope.appendChild(editor);
-    expect(shouldClearSelectionOnPointerDown(editor)).toBe(false);
+    expect(shouldClearSelectionOnPointerDown(editor)).toBe(true);
   });
 });

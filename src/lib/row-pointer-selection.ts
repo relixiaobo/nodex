@@ -17,12 +17,11 @@ export function resolveRowPointerSelectAction(params: {
   return params.allowSingle ? 'single' : null;
 }
 
-function isInsideOutlinerScope(target: HTMLElement): boolean {
-  return !!target.closest('[data-row-scope-parent-id]');
-}
-
 export function shouldClearSelectionOnPointerDown(target: HTMLElement | null): boolean {
   if (!target) return true;
 
-  return !isInsideOutlinerScope(target);
+  // Keep selection only when interacting with a concrete outliner row.
+  // Blank regions (including trailing-input area whitespace) should clear selection.
+  const rowLikeTarget = target.closest('[data-node-id][data-parent-id], [data-field-row]');
+  return !rowLikeTarget;
 }

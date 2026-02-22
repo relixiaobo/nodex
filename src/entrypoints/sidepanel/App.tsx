@@ -143,6 +143,17 @@ export function App({ skipBootstrap = false }: AppProps) {
   };
 
   useEffect(() => {
+    const handleGlobalPointerOrMouseDown = (event: PointerEvent | MouseEvent) => {
+      const state = useUIStore.getState();
+      if (state.selectedNodeIds.size === 0) return;
+      // Preserve multi-select modifier gestures (Cmd/Ctrl/Shift+click).
+      if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+
+      const target = event.target instanceof HTMLElement ? event.target : null;
+      if (!shouldClearSelectionOnPointerDown(target)) return;
+      state.clearSelection();
+    };
+
     const handleFocusIn = (event: FocusEvent) => {
       const state = useUIStore.getState();
       if (state.selectedNodeIds.size === 0) return;
@@ -153,8 +164,12 @@ export function App({ skipBootstrap = false }: AppProps) {
       state.clearSelection();
     };
 
+    window.addEventListener('pointerdown', handleGlobalPointerOrMouseDown, true);
+    window.addEventListener('mousedown', handleGlobalPointerOrMouseDown, true);
     document.addEventListener('focusin', handleFocusIn, true);
     return () => {
+      window.removeEventListener('pointerdown', handleGlobalPointerOrMouseDown, true);
+      window.removeEventListener('mousedown', handleGlobalPointerOrMouseDown, true);
       document.removeEventListener('focusin', handleFocusIn, true);
     };
   }, []);

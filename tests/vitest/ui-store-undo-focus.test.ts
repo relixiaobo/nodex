@@ -59,6 +59,19 @@ describe('ui-store undo/redo + focus/selection semantics', () => {
     expect(useUIStore.getState().focusedNodeId).toBeNull();
   });
 
+  it('clears focus and selection on panel navigation', () => {
+    const ui = useUIStore.getState();
+
+    ui.setSelectedNodes(new Set(['task_1', 'task_2']), 'task_1');
+    expect(useUIStore.getState().selectedNodeIds.size).toBe(2);
+
+    ui.navigateTo('note_2');
+    expect(useUIStore.getState().selectedNodeIds.size).toBe(0);
+    expect(useUIStore.getState().selectionAnchorId).toBeNull();
+    expect(useUIStore.getState().focusedNodeId).toBeNull();
+    expect(useUIStore.getState().focusedParentId).toBeNull();
+  });
+
   it('clearFocus preserves selection for Escape edit→selected transition', () => {
     const ui = useUIStore.getState();
 

@@ -140,12 +140,12 @@ export function collectRecentReferenceNodes(params: {
 function getTreeReferenceDisabledReason(reason: TreeReferenceBlockReason | null): string | null {
   switch (reason) {
     case 'self_parent':
-      return '不能在节点自己的子节点中引用它自己';
+      return 'Cannot reference a node as its own child';
     case 'would_create_display_cycle':
-      return '会形成循环引用';
+      return 'Would create a circular tree reference';
     case 'missing_parent':
     case 'missing_target':
-      return '该节点当前不可引用';
+      return 'This node cannot be referenced right now';
     default:
       return null;
   }
@@ -356,7 +356,7 @@ export const ReferenceSelector = forwardRef<ReferenceDropdownHandle, ReferenceSe
               <span className="text-sm text-foreground truncate">{item.name}</span>
               {itemDisabledReasons.get(item.id) && (
                 <span className="ml-auto text-[10px] text-foreground-tertiary shrink-0">
-                  禁用
+                  Blocked
                 </span>
               )}
             </div>

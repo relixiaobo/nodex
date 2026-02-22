@@ -124,13 +124,13 @@ function focusTrailingInputForParent(parentId: string): boolean {
 function getTreeReferenceBlockMessage(reason: ReturnType<typeof getTreeReferenceBlockReason>): string {
   switch (reason) {
     case 'self_parent':
-      return '不能在节点自己的子节点中引用它自己';
+      return 'Cannot reference a node as its own child';
     case 'would_create_display_cycle':
-      return '不能创建该树引用（会形成循环引用）';
+      return 'Cannot create this tree reference (would create a cycle)';
     case 'missing_parent':
     case 'missing_target':
     default:
-      return '该引用无法创建';
+      return 'This reference cannot be created';
   }
 }
 
@@ -1942,7 +1942,7 @@ export function OutlinerItem({
           const insertPos = pos >= 0 ? pos : 0;
           const newRefId = addReference(parentId, refNodeId, insertPos);
           if (!newRefId) {
-            toast.warning('该引用无法创建（可能会形成循环引用）');
+            toast.warning('This tree reference cannot be created (it may create a cycle)');
             return;
           }
           trashNode(nodeId);

@@ -110,7 +110,7 @@ describe('getReferenceCandidateDisabledReason', () => {
     expect(getReferenceCandidateDisabledReason({
       treeReferenceParentId: 'a',
       targetNodeId: 'a',
-    })).toContain('自己');
+    })).toContain('own child');
   });
 
   it('disables ancestor target in tree-reference context', () => {
@@ -122,6 +122,6 @@ describe('getReferenceCandidateDisabledReason', () => {
     expect(getReferenceCandidateDisabledReason({
       treeReferenceParentId: 'b',
       targetNodeId: 'a',
-    })).toContain('循环引用');
+    })).toContain('circular');
   });
 });

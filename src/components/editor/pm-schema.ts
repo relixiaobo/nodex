@@ -26,7 +26,7 @@ export const pmSchema = new Schema({
           class: 'inline-ref',
           'data-inlineref-node': node.attrs.targetNodeId,
           contenteditable: 'false',
-          style: `color:${refColor}`,
+          style: `color:${refColor};--inline-ref-accent:${refColor}`,
         }, node.attrs.displayName || '...'];
       },
       parseDOM: [{

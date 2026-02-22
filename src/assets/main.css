@@ -213,7 +213,7 @@
    now per-reference (supertag accent) + foreground (soft black in light theme). */
 @keyframes ref-conversion-shimmer {
   0%, 100% { color: var(--ref-conversion-dark, var(--color-foreground)); }
-  35% { color: var(--ref-conversion-accent, var(--color-primary)); }
+  35% { color: var(--inline-ref-accent, var(--ref-conversion-accent, var(--color-primary))); }
 }
 
 .ref-converting .ProseMirror [data-inlineref-node],

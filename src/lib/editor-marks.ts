@@ -279,7 +279,7 @@ export function marksToHtml(
     if (segment === INLINE_REF_CHAR && refByOffset.has(start)) {
       const ref = refByOffset.get(start)!;
       const refColor = resolveInlineReferenceTextColor(ref.targetNodeId);
-      html += `<span data-inlineref-node="${escapeHtml(ref.targetNodeId)}" class="inline-ref" style="color:${escapeHtml(refColor)}">${escapeHtml(ref.displayName ?? '')}</span>`;
+      html += `<span data-inlineref-node="${escapeHtml(ref.targetNodeId)}" class="inline-ref" style="color:${escapeHtml(refColor)};--inline-ref-accent:${escapeHtml(refColor)}">${escapeHtml(ref.displayName ?? '')}</span>`;
       continue;
     }
 

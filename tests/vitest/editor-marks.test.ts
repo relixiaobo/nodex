@@ -36,7 +36,7 @@ describe('editor-marks', () => {
     expect(html).toContain('<strong>See</strong>');
     expect(html).toContain('data-inlineref-node="task_1"');
     expect(html).toContain('class="inline-ref"');
-    expect(html).toContain(`style="color:${resolveTagColor('tagDef_task').text}"`);
+    expect(html).toContain(`style="color:${resolveTagColor('tagDef_task').text};--inline-ref-accent:${resolveTagColor('tagDef_task').text}"`);
   });
 
   it('falls back to current inline-ref color when target has no supertag', () => {
@@ -45,7 +45,7 @@ describe('editor-marks', () => {
       [],
       [{ offset: 0, targetNodeId: 'note_2', displayName: 'Quick ideas' }],
     );
-    expect(html).toContain('style="color:var(--color-primary)"');
+    expect(html).toContain('style="color:var(--color-primary);--inline-ref-accent:var(--color-primary)"');
   });
 
   it('keeps semantic equality for html -> marks -> html', () => {

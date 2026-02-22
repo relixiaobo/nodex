@@ -10,6 +10,7 @@ import { FieldList } from '../fields/FieldList';
 import { resolveTagColor } from '../../lib/tag-colors.js';
 import { isDayNode } from '../../lib/journal.js';
 import { DateNavigationBar } from '../journal/DateNavigationBar';
+import { BacklinksSection } from './BacklinksSection';
 
 interface NodePanelProps {
   nodeId: string;
@@ -83,6 +84,7 @@ export function NodePanel({ nodeId }: NodePanelProps) {
         {/* tagDef: default content is now rendered as a FieldRow inside FieldList */}
         {/* Non-definition: OutlinerView handles field/content interleaved rendering */}
         {!isDefinitionNode && <OutlinerView rootNodeId={nodeId} />}
+        {!isDefinitionNode && <BacklinksSection nodeId={nodeId} />}
         {isDefinitionNode && (
           <div className="mt-4 ml-4 px-2 pb-4">
             <button

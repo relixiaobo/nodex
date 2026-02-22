@@ -23,7 +23,9 @@ const IGNORE_LINE_PATTERNS = [
   /t\(/,
 ];
 
-const JSX_TEXT_RE = />\s*([A-Za-z][^<>{]{1,80})\s*</g;
+// Only match text nodes that are immediately followed by a JSX tag (`<Tag` or `</Tag`).
+// This avoids false positives on TS comparisons like `a > b && a < c`.
+const JSX_TEXT_RE = />\s*([A-Za-z][^<>{]{1,80})\s*(?=<\/?[A-Za-z])/g;
 const ATTR_RE = /\b(?:title|placeholder|aria-label|alt|heading)=["']([A-Za-z][^"']{0,120})["']/g;
 
 function collectFindings(path) {

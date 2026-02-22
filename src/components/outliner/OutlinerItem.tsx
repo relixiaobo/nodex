@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent } from 'react';
 import type { EditorView } from 'prosemirror-view';
 import { useNode } from '../../hooks/use-node';
 import { useChildren } from '../../hooks/use-children';
@@ -21,7 +21,7 @@ import { FIELD_OVERLAY_Z_INDEX } from '../fields/field-layout.js';
 import { toFieldRowEntryProps } from '../fields/field-row-props.js';
 import { SYS_V } from '../../types/index.js';
 import { useFieldOptions } from '../../hooks/use-field-options.js';
-import { resolveTagColor } from '../../lib/tag-colors.js';
+import { resolveInlineReferenceTextColor, resolveTagColor } from '../../lib/tag-colors.js';
 import {
   isCheckboxFieldType,
   isOptionsFieldType,
@@ -455,6 +455,9 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   // Structural icon: fieldDef nodes show the field type icon instead of a dot
   const structuralIcon = node ? resolveNodeStructuralIcon(node) : null;
   const isPendingConversion = useUIStore((s) => s.pendingRefConversion?.tempNodeId === nodeId);
+  const pendingConversionRefTargetId = useUIStore((s) =>
+    s.pendingRefConversion?.tempNodeId === nodeId ? s.pendingRefConversion.refNodeId : null,
+  );
   // Multi-select: check derived boolean. For single-select with parent disambiguation (reference nodes),
   // also check selectedParentId to support the same node appearing in multiple places.
   const isSelected = isInSelectedSet && (
@@ -486,6 +489,18 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
   );
   const isOptionsValueNode = isOptionsField && !!selectedOptionId;
   const isReferenceLikeRow = isReference || isPendingConversion || isOptionsValueNode;
+  const pendingConversionInlineRefColor = useMemo(
+    () => (pendingConversionRefTargetId ? resolveInlineReferenceTextColor(pendingConversionRefTargetId) : undefined),
+    [pendingConversionRefTargetId, _version],
+  );
+  const pendingConversionStyle = useMemo<CSSProperties | undefined>(() => (
+    isPendingConversion
+      ? {
+        ['--ref-conversion-accent' as string]: pendingConversionInlineRefColor ?? 'var(--color-primary)',
+        ['--ref-conversion-dark' as string]: '#111111',
+      }
+      : undefined
+  ), [isPendingConversion, pendingConversionInlineRefColor]);
 
   // Checkbox state (supertag SYS_A55 or manual _done)
   const { showCheckbox, isDone } = useNodeCheckbox(effectiveNodeId);
@@ -2241,7 +2256,10 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
               />
             </span>
           )}
-          <div className={`relative flex-1 min-w-0 ${isPendingConversion ? 'ref-converting' : ''} ${isDone ? 'text-foreground/50' : ''}`}>
+          <div
+            className={`relative flex-1 min-w-0 ${isPendingConversion ? 'ref-converting' : ''} ${isDone ? 'text-foreground/50' : ''}`}
+            style={pendingConversionStyle}
+          >
           <div
             ref={contentAreaRef}
             className={`text-sm leading-[21px] ${!isCheckboxFieldType(fieldDataType) && !isFocused ? (isReferenceLikeRow ? 'cursor-default' : 'cursor-text') : ''}`}

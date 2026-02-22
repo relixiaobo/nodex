@@ -209,15 +209,33 @@
   background: rgba(147, 197, 253, 0.12);
 }
 
-/* Ref conversion shimmer: color breathes between foreground and primary.
-   Peak at 35% → return takes 65% of cycle for a gentle fade back. */
-@keyframes ref-conversion-shimmer {
-  0%, 100% { color: var(--color-foreground); }
-  35% { color: var(--color-primary); }
+/* Ref conversion flow: animated theme-color ↔ black highlight sweep.
+   Uses per-row CSS vars set by OutlinerItem when pending conversion. */
+@keyframes ref-conversion-flow {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 200% 50%; }
 }
 
-.ref-converting .ProseMirror [data-inlineref-node] {
-  animation: ref-conversion-shimmer 2.5s ease-in-out infinite;
+.ref-converting .ProseMirror [data-inlineref-node],
+.ref-converting .node-content [data-inlineref-node] {
+  --ref-conversion-accent: var(--color-primary);
+  --ref-conversion-dark: #111111;
+  background-image: linear-gradient(
+    110deg,
+    var(--ref-conversion-accent) 0%,
+    var(--ref-conversion-accent) 28%,
+    var(--ref-conversion-dark) 45%,
+    var(--ref-conversion-accent) 62%,
+    var(--ref-conversion-accent) 100%
+  );
+  background-size: 200% 100%;
+  background-repeat: repeat;
+  background-position: 0% 50%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent !important;
+  animation: ref-conversion-flow 1.5s linear infinite;
 }
 
 /* Indent guide line — hover thickens line subtly, no background fill.

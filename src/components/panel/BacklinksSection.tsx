@@ -95,13 +95,16 @@ function MentionedInItem({ item }: { item: MentionedInRef }) {
       {item.breadcrumb.length > 0 && (
         <BreadcrumbPath ancestors={item.breadcrumb} />
       )}
-      {/* Content box */}
+      {/* Content box — uses design system tokens: primary-muted bg, primary border, standard bullet */}
       <div
-        className="mt-1 py-1 px-2.5 bg-muted/50 border-l-2 border-primary/20 rounded-r-sm cursor-pointer hover:bg-muted/80 transition-colors"
+        className="mt-1 py-1 px-2 bg-primary-muted border-l-2 border-primary/30 rounded-r-sm cursor-pointer hover:bg-foreground/5 transition-colors"
         onClick={handleNavigate}
       >
-        <div className="flex items-start gap-1.5">
-          <span className="mt-[5px] shrink-0 w-1.5 h-1.5 rounded-full bg-foreground-tertiary" />
+        <div className="flex items-start gap-2">
+          {/* Standard bullet: 5px dot in 15×21px container (matches BulletChevron) */}
+          <span className="shrink-0 h-[21px] w-[15px] flex items-center justify-center">
+            <span className="w-[5px] h-[5px] rounded-full bg-foreground/50" />
+          </span>
           <span className="text-sm leading-[21px] min-w-0 break-words">
             {item.refNodeName || <span className="text-foreground-tertiary italic">Untitled</span>}
           </span>
@@ -160,12 +163,12 @@ function FieldValueItem({ item }: { item: FieldValueRef }) {
 
   return (
     <div
-      className="flex items-center gap-1.5 py-0.5 cursor-pointer hover:bg-accent/50 rounded-sm px-1 transition-colors"
+      className="flex items-center gap-2 py-1 cursor-pointer hover:bg-foreground/5 rounded-sm px-1 transition-colors"
       onClick={handleNavigate}
     >
-      {/* Reference bullet ◎ */}
-      <span className="shrink-0 w-[15px] h-[15px] flex items-center justify-center">
-        <svg width="8" height="8" viewBox="0 0 8 8" className="text-foreground-tertiary">
+      {/* Reference bullet ◎ — 15×21px container (matches BulletChevron sizing) */}
+      <span className="shrink-0 w-[15px] h-[21px] flex items-center justify-center">
+        <svg width="8" height="8" viewBox="0 0 8 8" className="text-foreground/40">
           <circle cx="4" cy="4" r="3" fill="none" stroke="currentColor" strokeWidth="1" />
           <circle cx="4" cy="4" r="1.2" fill="currentColor" />
         </svg>

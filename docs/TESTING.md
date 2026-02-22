@@ -718,8 +718,8 @@ hash trigger cleanup safety（3 cases, Bug #53 + CJK hashtag 回归）:
 
 **覆盖点（Sync Phase 0 Client Prep）**:
 
-SnapshotRecord format detection:
-1. bare Uint8Array (old format) wraps into SnapshotRecord with empty peerIdStr/VV
+SnapshotRecord format validation:
+1. bare Uint8Array (old format) rejected — returns null (no backward compat, project not launched)
 2. SnapshotRecord passes through unchanged
 3. null/undefined returns null
 4. Real doc produces valid SnapshotRecord with non-empty snapshot/peerIdStr/VV
@@ -751,7 +751,7 @@ subscribeLocalUpdates hook:
 22. Multiple subscribes coexist and unsubscribe independently
 
 **设计要点**:
-- `loadSnapshotRecord()` 兼容旧格式（bare `Uint8Array`）和新格式（`SnapshotRecord`）
+- `loadSnapshotRecord()` 仅接受 `SnapshotRecord` 格式，旧格式（bare `Uint8Array`）返回 null（项目未上线，不兼容）
 - PeerID 恢复顺序：`new LoroDoc()` → `setPeerId(saved)` → `import(snapshot)`（文档必须无 oplog）
 - `persistSnapshot()` 原子保存 snapshot + peerIdStr + VV + savedAt
 - `subscribeLocalUpdates` 仅捕获本地提交，`import(remoteBytes)` 不触发（避免 echo）

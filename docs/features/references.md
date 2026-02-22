@@ -78,17 +78,52 @@
 
 ### 反向链接（Backlinks）— 未实现
 
-- 节点底部显示"Referenced by"区域
-- 列出所有引用该节点的位置（节点名 + 面包屑路径）
-- 点击反向链接 → navigateTo 引用所在的节点
-- 反向链接是实时计算的，非存储
+> 研究文档：`docs/research/tana-backlinks-ui.md`
 
-### 引用计数 — 未实现
+#### 整体结构
 
-- 被引用的节点在某些视图中显示引用计数 badge
-- 计数 = 树引用 + 内联引用总数
+- 位于**节点内容最底部**（zoom into 节点后可见，在 children / fields 之后）
+- 与节点内容之间有明显留白分隔
+- 可折叠：标题行显示 `N references ∨`，点击展开/折叠
+- **默认折叠**，每次 zoom in 重新折叠
 
-### 合并节点 — 未实现
+#### 引用分组（匹配 Tana）
+
+**分组 1: "Mentioned in..."** — 普通 @引用（树引用 + 内联引用）
+- 灰色小字号标题 `Mentioned in...`
+- 每条引用显示：
+  - **面包屑路径**: 引用所在节点的祖先层级（如 `📂 Daily notes / 2026 / Week 08 / Yesterday, Sat, Feb 21`），每层可点击导航
+  - **引用节点内容**: 浅色高亮背景框，显示完整节点文本
+- 按引用所在面包屑位置分组（同一父链下的引用归在同一面包屑下）
+
+**分组 2: "Appears as [Field Name] in..."** — 字段值引用
+- 当前节点被用作某字段的值时出现
+- 灰色小字号标题 `Appears as [Field Name] in...`（Field Name 动态替换为实际字段定义名）
+- 每条引用显示为标准 outliner item 行：reference bullet ◎ + 节点文本 + tag badge
+- 不显示面包屑（字段关系已提供上下文）
+
+#### 交互
+
+- 点击引用节点 → navigateTo 引用所在的节点（push panel）
+- 点击面包屑层级 → 导航到对应层级节点
+- 反向链接是**实时计算**的，非存储（基于反向索引）
+
+#### 数据查询
+
+- **树引用**: 所有 `type='reference' && targetId === nodeId` 的节点
+- **内联引用**: 所有节点 `inlineRefs` 中 `targetNodeId === nodeId` 的条目
+- **字段值引用**: `type='fieldEntry'` 的节点，其 children 包含 `nodeId`
+- **性能**: 需要在 LoroDoc 层建立反向索引（`nodeId → Set<referencing nodeId>`）
+
+### 引用计数 Badge — 未实现
+
+- 节点行**右侧**浮现半透明引用计数数字
+- 仅在节点**未聚焦/未 zoom in** 时显示
+- 计数 = 树引用 + 内联引用 + 字段值引用总数
+- 点击计数数字 → 展开引用列表（或导航到该节点显示 references section）
+- 可通过设置开关控制显示/隐藏
+
+### 合并节点 — 未实现（P3）
 
 - 选中多个重复节点 → 合并为一个
 - 合并策略：保留第一个节点，合并所有 children 和 tags
@@ -104,6 +139,9 @@
 | 2026-02-12 | Reference 节点单击选中、双击编辑 | 区分选中（框选预览）和编辑（修改原始节点）两种交互意图 |
 | 2026-02-22 | `@today/tomorrow/yesterday` 日期快捷方式 | 匹配 Tana 行为，自然语言引用日期节点 |
 | 2026-02-22 | 树引用禁止显示图成环；内联引用允许 self/ancestor 引用 | 树引用会参与递归展开，必须从数据层保证无环；内联引用不展开 |
+| 2026-02-22 | 反向链接分两组: "Mentioned in" + "Appears as [Field] in" | 匹配 Tana 分组逻辑，字段引用比普通引用有更强语义 |
+| 2026-02-22 | 反向链接默认折叠，标题显示总计数 | 避免页面过长，与 Tana 一致 |
+| 2026-02-22 | 暂不实现 Unlinked mentions | 需要全文索引支持，P3 再考虑 |
 
 ## 当前状态
 
@@ -122,4 +160,6 @@
 ## 与 Tana 的已知差异
 
 - Tana 支持引用节点的拖拽排序（Nodex 已支持）
-- Tana 的反向链接有更丰富的分组显示（按引用类型），Nodex 计划先做 flat 列表
+- Tana 有 "Unlinked mentions" 功能（名称文本匹配但未正式链接），Nodex 暂不实现（需全文索引）
+- Tana 有 `LINKS_TO` 系统字段用于 Live Search 自定义反向链接视图，Nodex 依赖 Search Nodes (#23)
+- Tana 引用计数 badge 可在设置中开关，Nodex 初始实现默认显示

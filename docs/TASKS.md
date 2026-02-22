@@ -43,9 +43,25 @@ _(空)_
 
 ### P1
 
-#### Sync Phase 0 Step 3 — Supabase Sync 后端
-> Phase 0 客户端预留已完成（PR #75 + PR #77），下一步实施服务端同步协议。
-> **Owner**: _(待分配)_ | **Spec**: `docs/plans/sync-architecture.md` Phase 1-2
+#### Sync 增量同步（Phase 1-2 合并实施）
+> Phase 0 客户端预留已完成（PR #75 + #77 + #78）。基础设施选型已完成：Cloudflare Workers + R2 + Supabase Auth/Postgres。
+> 跳过纯备份（Phase 1），直接实现多端增量同步（Phase 2）。
+> **Owner**: _(待分配，计划由 nodex-codex review 后交 nodex-cc 执行)_
+> **Plan**: `docs/plans/sync-incremental-impl.md` | **Arch**: `docs/plans/sync-architecture.md`
+>
+> **当前状态**: 实施计划待 Review
+
+- [ ] **Review**: nodex-codex review 实施计划（含 7 个开放问题）
+- [ ] Step 1: 服务端项目骨架（Workers + R2 binding）
+- [ ] Step 2: Supabase 数据库迁移（sync_workspaces + sync_devices）
+- [ ] Step 3: 服务端 JWT 验证中间件
+- [ ] Step 4: 服务端 Push 端点
+- [ ] Step 5: 服务端 Pull 端点 + 快照兜底
+- [ ] Step 6: 客户端 Pending Queue（可与 1-5 并行）
+- [ ] Step 7: 客户端 Sync Manager
+- [ ] Step 8: 客户端 Sync 状态 UI
+- [ ] Step 9: 端到端测试
+- [ ] Step 10: Compaction（延后到上线后）
 
 ### P2
 

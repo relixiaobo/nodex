@@ -10,7 +10,6 @@ describe('i18n strings', () => {
     expect(t('slash.menu.noResults')).toBe('No results');
     expect(t('search.commandPalette.placeholder')).toBe('Search nodes...');
     expect(t('tag.selector.noTagsAvailable')).toBe('No tags available');
-    expect(t('nodePicker.createPrefix')).toBe('Create');
     expect(t('dateNavigationBar.previousDay')).toBe('Previous day');
     expect(t('datePicker.clear')).toBe('Clear');
     expect(t('breadcrumb.search')).toBe('Search (Cmd+K)');

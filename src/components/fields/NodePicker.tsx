@@ -330,7 +330,7 @@ export function NodePicker({
                   <span className="block h-[5px] w-[5px] rounded-full bg-foreground/50" />
                 </span>
                 <span className="text-sm leading-[21px]">
-                  {t('nodePicker.createPrefix')} <span className="font-medium">"{inputValue.trim()}"</span>
+                  {t('nodePicker.create', { name: inputValue.trim() })}
                 </span>
               </button>
             </div>

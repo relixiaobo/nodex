@@ -51,7 +51,6 @@ export const enMessages = {
   },
   nodePicker: {
     create: 'Create "{name}"',
-    createPrefix: 'Create',
   },
   dateNavigationBar: {
     previousDay: 'Previous day',

@@ -362,10 +362,10 @@ export function DatePicker({ value, onSelect, onClose }: DatePickerProps) {
       {/* ─── Top date input field(s) ─── */}
       <div className="mb-2 space-y-1">
         {/* Start date input */}
-          <DateInputField
-            dateStr={selectedDate}
-            timeStr={includeTime ? selectedTime : ''}
-            placeholder={t('datePicker.datePlaceholder')}
+        <DateInputField
+          dateStr={selectedDate}
+          timeStr={includeTime ? selectedTime : ''}
+          placeholder={t('datePicker.datePlaceholder')}
           active={!includeEnd || editingEnd === 'start'}
           showRing={includeEnd}
           onClick={() => setEditingEnd('start')}

@@ -41,6 +41,22 @@ _(空)_
 
 ## 待办
 
+### P1
+
+#### Sync Architecture Phase 0 — 客户端 Sync-Ready 预留
+> 在继续打磨本地功能的同时，完成 4 项客户端架构预留，确保未来接入云端同步时不需要大改。
+> **Owner**: nodex-codex | **Spec**: `docs/plans/sync-architecture.md`
+
+**第一步：Review `docs/plans/sync-architecture.md`，确认方案无误后按阶段实施。**
+
+- [ ] **Review**: 阅读 `docs/plans/sync-architecture.md` 全文，验证 Loro API 用法、Chrome 扩展约束、架构设计是否有遗漏或错误
+- [ ] **准备项 1**: PeerID 持久化 — 扩展 `loro-persistence.ts` 存储格式为 `{ snapshot, peerIdStr, versionVector, savedAt }`，`initLoroDoc()` 中恢复 peerIdStr
+- [ ] **准备项 2**: VersionVector 持久化 — 与 snapshot 一起保存 `doc.oplogVersion().encode()` 到 IndexedDB
+- [ ] **准备项 3**: `subscribeLocalUpdates` hook 点 — `initLoroDoc()` 末尾注册 no-op 回调，为未来 sync buffer 预留入口
+- [ ] **准备项 4**: Workspace ID 规范化 — 未登录时生成持久化唯一 `ws_{nanoid()}`，不再用 `'ws_default'`；manifest.json 添加 `unlimitedStorage` 权限
+- [ ] 补充 Vitest 测试（PeerID 恢复、VV 序列化/反序列化、workspace ID 持久化）
+- [ ] 更新 `docs/TESTING.md` 覆盖映射
+
 ### P2
 
 #### References 增强 (#19)

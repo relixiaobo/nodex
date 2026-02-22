@@ -29,13 +29,25 @@ _(空)_
 |-------|---------|------|-------------|
 | nodex-cc | _(idle)_ | — | — |
 | nodex-cc-2 | _(idle)_ | — | — |
-| nodex-codex | _(idle)_ | — | — |
+| nodex-codex | Sync 增量同步计划 Review（基于 main） | `codex/sync-incremental-plan-review` | `docs/plans/sync-incremental-impl.md`, `docs/plans/sync-architecture.md`, `docs/TASKS.md` |
 
 ---
 
 ## 进行中
 
-_(空)_
+### Sync 增量同步计划 Review（基于 main）
+> Review `docs/plans/sync-incremental-impl.md` 的实施计划，结合 `docs/plans/sync-architecture.md` 检查架构一致性、边界条件、开放问题闭环和执行风险，输出可执行 review findings。
+> **Owner**: nodex-codex | **Branch**: `codex/sync-incremental-plan-review` | **Files**: `docs/plans/sync-incremental-impl.md`, `docs/plans/sync-architecture.md`, `docs/TASKS.md`
+
+- [x] 阅读计划与架构参考文档
+- [x] 输出 review findings（含文件/行号）
+- [x] 如有必要补充建议的计划修订方向（不直接改计划）
+
+**迭代日志**
+- [2026-02-22 nodex-codex] 领取任务，基于 `origin/main` 新建 `codex/sync-incremental-plan-review`，准备 review Sync 增量同步实施计划。
+- [2026-02-22 nodex-codex] 完成计划 review，输出关键风险：seq 分配与 R2 写入顺序导致 hole、echo 过滤与 cursor 前进语义冲突、`lastSeq` 与本地文档状态非原子持久化、push 幂等/去重元数据未落到 schema。
+- [2026-02-22 nodex-codex] 根据 review findings 回写实施计划：补 `sync_updates` 元数据表、明确 cursor 语义与 checkpoint 持久化、统一 v1 push 策略（先不合并）。
+- [2026-02-22 nodex-codex] 同步更新 `sync-architecture.md` 的 Phase 2 摘要与风险项，避免与实施计划在协议字段/幂等/cursor 语义上漂移。
 
 ---
 
@@ -51,7 +63,7 @@ _(空)_
 >
 > **当前状态**: 实施计划待 Review
 
-- [ ] **Review**: nodex-codex review 实施计划（含 7 个开放问题）
+- [x] **Review**: nodex-codex review 实施计划（含 7 个开放问题） ✓ nodex-codex（2026-02-22）
 - [ ] Step 1: 服务端项目骨架（Workers + R2 binding）
 - [ ] Step 2: Supabase 数据库迁移（sync_workspaces + sync_devices）
 - [ ] Step 3: 服务端 JWT 验证中间件

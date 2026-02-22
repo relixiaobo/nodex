@@ -12,6 +12,7 @@ import { cors } from 'hono/cors';
 import { getCookie } from 'hono/cookie';
 import { createAuth } from './lib/auth.js';
 import { requireAuth, type AuthVariables } from './middleware/auth.js';
+import { handlePush } from './routes/push.js';
 import type { Env } from './types.js';
 
 const app = new Hono<{ Bindings: Env }>();
@@ -140,10 +141,7 @@ app.get('/health', (c) => {
 const sync = new Hono<{ Bindings: Env; Variables: AuthVariables }>();
 sync.use('*', requireAuth);
 
-sync.post('/push', (c) => {
-  const userId = c.get('userId');
-  return c.json({ error: 'Not implemented', userId }, 501);
-});
+sync.post('/push', handlePush);
 
 sync.post('/pull', (c) => {
   const userId = c.get('userId');

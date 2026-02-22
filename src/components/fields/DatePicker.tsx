@@ -795,6 +795,11 @@ export interface CalendarGridProps {
   noteCountMap?: Map<string, number>;
 }
 
+// Teal #0D9488, Purple #8B5CF6
+const TEAL_SOLID = 'rgba(13,148,136,0.75)';
+const PURPLE_SOLID = 'rgba(139,92,246,0.75)';
+const NEUTRAL_BORDER = 'rgba(0,0,0,0.20)';
+
 /** Map note count → teal heatmap background (rgba string) */
 function heatmapBg(count: number | undefined): string {
   if (!count || count <= 0) return '';
@@ -811,6 +816,13 @@ function todayBg(count: number | undefined): string {
   if (count <= 2) return 'rgba(139,92,246,0.15)';
   if (count <= 4) return 'rgba(139,92,246,0.25)';
   return 'rgba(139,92,246,0.40)';
+}
+
+/** Get inset border color for selected state — matches cell's theme color */
+function selectedBorderColor(isToday: boolean, hasHeatmap: boolean): string {
+  if (isToday) return PURPLE_SOLID;
+  if (hasHeatmap) return TEAL_SOLID;
+  return NEUTRAL_BORDER;
 }
 
 export function CalendarGrid({
@@ -878,7 +890,7 @@ export function CalendarGrid({
       {/* Day headers — 7 columns */}
       <div className="grid grid-cols-7 gap-1 mb-0.5">
         {DAY_HEADERS.map((d, i) => (
-          <div key={i} className="h-6 flex items-center justify-center text-xs text-foreground-tertiary">
+          <div key={i} className="aspect-square flex items-center justify-center text-xs text-foreground-tertiary">
             {d}
           </div>
         ))}
@@ -901,52 +913,45 @@ export function CalendarGrid({
 
             // Note count for this cell
             const noteCount = noteCountMap?.get(cell.dateStr);
+            const cellHeat = (!disabled && cell.isCurrentMonth) ? heatmapBg(noteCount) : '';
 
             // Build inline style for backgrounds
             const style: React.CSSProperties = {};
 
-            let cls = 'h-6 flex items-center justify-center text-xs transition-colors';
+            let cls = 'aspect-square flex items-center justify-center text-xs transition-colors';
 
             if (isStart && isEnd) {
-              // Single-date range + selected: outline with offset
               cls += ' font-medium rounded-sm';
-              style.outline = '1.5px solid var(--color-primary)';
-              style.outlineOffset = '1.5px';
               if (isToday) {
                 style.backgroundColor = todayBg(noteCount);
-              } else if (!disabled && cell.isCurrentMonth) {
-                const bg = heatmapBg(noteCount);
-                if (bg) style.backgroundColor = bg;
+              } else if (cellHeat) {
+                style.backgroundColor = cellHeat;
               }
+              // Inset border matching cell theme
+              style.boxShadow = `inset 0 0 0 1.5px ${selectedBorderColor(isToday, !!cellHeat)}`;
             } else if (isStart) {
               cls += ' bg-primary text-primary-foreground font-medium rounded-l-sm';
             } else if (isEnd) {
               cls += ' bg-primary text-primary-foreground font-medium rounded-r-sm';
             } else if (isSelected) {
-              // Selected: outline with offset
               cls += ' font-medium rounded-sm';
-              style.outline = '1.5px solid var(--color-primary)';
-              style.outlineOffset = '1.5px';
               if (isToday) {
                 style.backgroundColor = todayBg(noteCount);
-              } else if (!disabled && cell.isCurrentMonth) {
-                const bg = heatmapBg(noteCount);
-                if (bg) style.backgroundColor = bg;
+              } else if (cellHeat) {
+                style.backgroundColor = cellHeat;
               }
+              // Inset border matching cell theme
+              style.boxShadow = `inset 0 0 0 1.5px ${selectedBorderColor(isToday, !!cellHeat)}`;
             } else if (inRange) {
               cls += ' bg-primary-muted';
               if (ci === 0) cls += ' rounded-l-sm';
               if (ci === 6) cls += ' rounded-r-sm';
             } else if (isToday) {
-              // Today: purple primary background, depth by note count
               cls += ' font-medium rounded-sm';
               style.backgroundColor = todayBg(noteCount);
             } else {
               cls += ' rounded-sm';
-              if (!disabled && cell.isCurrentMonth) {
-                const bg = heatmapBg(noteCount);
-                if (bg) style.backgroundColor = bg;
-              }
+              if (cellHeat) style.backgroundColor = cellHeat;
               if (!disabled) cls += ' hover:bg-foreground/5';
             }
 

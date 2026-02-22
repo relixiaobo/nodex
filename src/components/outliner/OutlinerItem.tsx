@@ -497,7 +497,7 @@ export function OutlinerItem({ nodeId, depth, rootChildIds, parentId, rootNodeId
     isPendingConversion
       ? {
         ['--ref-conversion-accent' as string]: pendingConversionInlineRefColor ?? 'var(--color-primary)',
-        ['--ref-conversion-dark' as string]: '#111111',
+        ['--ref-conversion-dark' as string]: 'var(--color-foreground)',
       }
       : undefined
   ), [isPendingConversion, pendingConversionInlineRefColor]);

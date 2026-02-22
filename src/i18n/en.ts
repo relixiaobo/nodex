@@ -13,6 +13,17 @@ export const enMessages = {
       disabledReasonUnavailable: 'This node cannot be referenced right now',
     },
   },
+  tag: {
+    selector: {
+      noTagsAvailable: 'No tags available',
+      create: 'Create "{name}"',
+    },
+  },
+  slash: {
+    menu: {
+      noResults: 'No results',
+    },
+  },
 } as const;
 
 export type EnMessages = typeof enMessages;

@@ -19,6 +19,7 @@ import {
   type SlashCommandDefinition,
   type SlashCommandId,
 } from '../../lib/slash-commands.js';
+import { t } from '../../i18n/strings.js';
 
 const ICON_MAP: Record<SlashCommandId, AppIcon> = {
   paste: ClipboardPaste,
@@ -93,7 +94,7 @@ export function SlashCommandMenu({ open, commands, selectedIndex, onSelect, anch
       onMouseDown={(e) => e.preventDefault()}
     >
       {commands.length === 0 && (
-        <div className="px-2 py-2 text-sm text-foreground-secondary">No results</div>
+        <div className="px-2 py-2 text-sm text-foreground-secondary">{t('slash.menu.noResults')}</div>
       )}
       {commands.map((command, index) => {
         const Icon = ICON_MAP[command.id];

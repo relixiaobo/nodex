@@ -38,6 +38,7 @@ import { ColorSwatchPicker } from './ColorSwatchPicker';
 import { DatePicker, formatDateDisplay } from './DatePicker.js';
 import { useUIStore } from '../../stores/ui-store.js';
 import * as loroDoc from '../../lib/loro-doc.js';
+import { t } from '../../i18n/strings.js';
 import { FIELD_OVERLAY_Z_INDEX, FIELD_VALUE_INSET } from './field-layout.js';
 
 interface FieldValueOutlinerProps {
@@ -394,7 +395,7 @@ function SupertagPickerField({ tupleId }: { tupleId: string }) {
       selectedId={selectedId}
       onSelect={handleSelect}
       onClear={handleClear}
-      placeholder="Select supertag"
+      placeholder={t('field.selectSupertag')}
       isReference
     />
   );
@@ -414,7 +415,7 @@ function DatePickerField({ value, onSelect }: { value: string; onSelect: (v: str
         <BulletChevron hasChildren={false} isExpanded={false} onBulletClick={() => {}} dimmed={!value} />
         <div className="flex-1 min-w-0 flex items-center cursor-pointer" onClick={handleClick}>
           <span className={`text-sm leading-[21px] select-none ${value ? '' : 'text-foreground-tertiary'}`}>
-            {value ? formatDateDisplay(value) : 'Empty'}
+            {value ? formatDateDisplay(value) : t('field.empty')}
           </span>
         </div>
       </div>

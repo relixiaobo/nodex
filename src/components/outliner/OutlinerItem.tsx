@@ -2512,7 +2512,7 @@ export function OutlinerItem({
             className="indent-line absolute top-0 bottom-0 z-10 flex justify-end cursor-pointer"
             style={{ left: depth * 28 + 17, width: 16 }}
             onClick={handleIndentLineClick}
-            title="Toggle children"
+            title={t('outliner.toggleChildren')}
           >
             <div className="indent-line-inner w-px h-full bg-border rounded-full" />
           </button>
@@ -2524,7 +2524,7 @@ export function OutlinerItem({
                   key={f.id}
                   className="flex items-center gap-0.5 h-7 text-xs text-foreground-tertiary hover:text-foreground-secondary transition-colors cursor-pointer"
                   onClick={() => setRevealedFieldIds(prev => new Set(prev).add(f.id))}
-                  title={`Show ${f.name}`}
+                  title={t('outliner.showField', { name: f.name })}
                 >
                   <span className="w-[15px] flex items-center justify-center text-[11px] leading-none shrink-0">+</span>
                   <span>{f.name}</span>

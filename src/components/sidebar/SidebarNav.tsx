@@ -4,19 +4,25 @@ import { useUIStore } from '../../stores/ui-store';
 import { CONTAINER_IDS } from '../../types/index.js';
 import type { ContainerId } from '../../types/index.js';
 import { ensureTodayNode } from '../../lib/journal.js';
+import { t } from '../../i18n/strings.js';
 
 interface NavItem {
-  label: string;
+  labelKey:
+    | 'sidebar.nav.library'
+    | 'sidebar.nav.inbox'
+    | 'sidebar.nav.dailyNotes'
+    | 'sidebar.nav.searches'
+    | 'sidebar.nav.trash';
   containerId: ContainerId;
   icon: AppIcon;
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { label: 'Library', containerId: CONTAINER_IDS.LIBRARY, icon: Library },
-  { label: 'Inbox', containerId: CONTAINER_IDS.INBOX, icon: Inbox },
-  { label: 'Daily notes', containerId: CONTAINER_IDS.JOURNAL, icon: CalendarDays },
-  { label: 'Searches', containerId: CONTAINER_IDS.SEARCHES, icon: Search },
-  { label: 'Trash', containerId: CONTAINER_IDS.TRASH, icon: Trash2 },
+  { labelKey: 'sidebar.nav.library', containerId: CONTAINER_IDS.LIBRARY, icon: Library },
+  { labelKey: 'sidebar.nav.inbox', containerId: CONTAINER_IDS.INBOX, icon: Inbox },
+  { labelKey: 'sidebar.nav.dailyNotes', containerId: CONTAINER_IDS.JOURNAL, icon: CalendarDays },
+  { labelKey: 'sidebar.nav.searches', containerId: CONTAINER_IDS.SEARCHES, icon: Search },
+  { labelKey: 'sidebar.nav.trash', containerId: CONTAINER_IDS.TRASH, icon: Trash2 },
 ];
 
 export function SidebarNav() {
@@ -45,13 +51,13 @@ export function SidebarNav() {
               }`}
             >
               <Icon size={14} />
-              <span>{item.label}</span>
+              <span>{t(item.labelKey)}</span>
             </button>
             {item.containerId === CONTAINER_IDS.JOURNAL && (
               <button
                 onClick={handleTodayClick}
                 className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-foreground-secondary hover:bg-foreground/5 hover:text-foreground transition-colors"
-                title="Go to today (Cmd+Shift+D)"
+                title={t('sidebar.nav.goToTodayShortcut')}
               >
                 <CalendarCheck size={14} />
               </button>

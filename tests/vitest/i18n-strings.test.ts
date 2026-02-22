@@ -15,6 +15,11 @@ describe('i18n strings', () => {
     expect(t('datePicker.clear')).toBe('Clear');
     expect(t('breadcrumb.search')).toBe('Search (Cmd+K)');
     expect(t('nodeHeader.dragToMove')).toBe('Drag to move (right-click for menu)');
+    expect(t('outliner.zoomIn')).toBe('Zoom in');
+    expect(t('field.selectOption')).toBe('Select option');
+    expect(t('field.fieldNamePlaceholder')).toBe('Field name...');
+    expect(t('sidebar.nav.dailyNotes')).toBe('Daily notes');
+    expect(t('userMenu.signOut')).toBe('Sign out');
     expect(t('floatingToolbar.link')).toBe('Link');
   });
 
@@ -31,5 +36,6 @@ describe('i18n strings', () => {
     expect(t('tag.selector.create', { name: 'Task' })).toBe('Create "Task"');
     expect(t('nodePicker.create', { name: 'Option' })).toBe('Create "Option"');
     expect(t('common.todayPrefix', { name: 'Feb 22' })).toBe('Today, Feb 22');
+    expect(t('outliner.showField', { name: 'Status' })).toBe('Show Status');
   });
 });

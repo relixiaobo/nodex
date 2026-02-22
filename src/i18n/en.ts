@@ -76,6 +76,35 @@ export const enMessages = {
   nodeHeader: {
     dragToMove: 'Drag to move (right-click for menu)',
   },
+  outliner: {
+    zoomIn: 'Zoom in',
+    toggleChildren: 'Toggle children',
+    showField: 'Show {name}',
+  },
+  field: {
+    empty: 'Empty',
+    selectSupertag: 'Select supertag',
+    selectFieldType: 'Select field type',
+    selectValue: 'Select value',
+    selectOption: 'Select option',
+    fieldNamePlaceholder: 'Field name...',
+  },
+  sidebar: {
+    nav: {
+      library: 'Library',
+      inbox: 'Inbox',
+      dailyNotes: 'Daily notes',
+      searches: 'Searches',
+      trash: 'Trash',
+      goToTodayShortcut: 'Go to today (Cmd+Shift+D)',
+    },
+  },
+  userMenu: {
+    ariaLabel: 'User menu',
+    signedInFallback: 'Signed in',
+    signOut: 'Sign out',
+    avatarAlt: 'avatar',
+  },
   floatingToolbar: {
     linkPlaceholder: 'https://example.com',
     applyLink: 'Apply link',

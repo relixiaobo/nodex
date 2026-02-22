@@ -43,13 +43,19 @@ _(空)_
 
 ### P1
 
-#### Sync Architecture Phase 0 — 客户端 Sync-Ready 预留
-> 在继续打磨本地功能的同时，完成 4 项客户端架构预留，确保未来接入云端同步时不需要大改。
+#### Sync Phase 0 Step 1 — Review & 优化方案
+> Review `docs/plans/sync-architecture.md` 全文，验证 Loro API 用法、Chrome 扩展约束、架构设计，提出优化建议并直接修改方案文档。
 > **Owner**: nodex-codex | **Spec**: `docs/plans/sync-architecture.md`
 
-**第一步：Review `docs/plans/sync-architecture.md`，确认方案无误后按阶段实施。**
+- [ ] 验证 Phase 0 四项准备的 Loro API 用法是否正确（setPeerId 时机、VV encode/decode、subscribeLocalUpdates 签名）
+- [ ] 验证 Chrome 扩展约束假设（Side Panel 单实例、SW 生命周期、unlimitedStorage 行为）
+- [ ] 审查 Phase 1-3 架构设计（增量同步协议、compaction 策略、WebSocket 生命周期）是否有遗漏或错误
+- [ ] 直接修改 `docs/plans/sync-architecture.md`，提交优化后的方案（含发现的问题和改进）
 
-- [ ] **Review**: 阅读 `docs/plans/sync-architecture.md` 全文，验证 Loro API 用法、Chrome 扩展约束、架构设计是否有遗漏或错误
+#### Sync Phase 0 Step 2 — 客户端 Sync-Ready 实施
+> 基于 nodex-codex review 后的方案，实施 4 项客户端架构预留。
+> **Owner**: nodex-cc | **Spec**: `docs/plans/sync-architecture.md` | **Blocked by**: Step 1
+
 - [ ] **准备项 1**: PeerID 持久化 — 扩展 `loro-persistence.ts` 存储格式为 `{ snapshot, peerIdStr, versionVector, savedAt }`，`initLoroDoc()` 中恢复 peerIdStr
 - [ ] **准备项 2**: VersionVector 持久化 — 与 snapshot 一起保存 `doc.oplogVersion().encode()` 到 IndexedDB
 - [ ] **准备项 3**: `subscribeLocalUpdates` hook 点 — `initLoroDoc()` 末尾注册 no-op 回调，为未来 sync buffer 预留入口

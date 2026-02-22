@@ -92,7 +92,7 @@ export function DateNavigationBar({ dayNodeId }: DateNavigationBarProps) {
     setCalendarOpen((v) => !v);
   }, [calendarOpen, currentDateInfo]);
 
-  // Close on click outside
+  // Close on click outside (capture phase to beat stopPropagation in other components)
   useEffect(() => {
     if (!calendarOpen) return;
     const handler = (e: MouseEvent) => {
@@ -100,8 +100,8 @@ export function DateNavigationBar({ dayNodeId }: DateNavigationBarProps) {
         setCalendarOpen(false);
       }
     };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
+    document.addEventListener('mousedown', handler, true);
+    return () => document.removeEventListener('mousedown', handler, true);
   }, [calendarOpen]);
 
   // Close on Escape

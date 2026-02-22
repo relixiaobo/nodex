@@ -905,14 +905,11 @@ export function CalendarGrid({
             const isEnd = cell.dateStr === effectiveEnd && hasRange;
             const isStart = cell.dateStr === effectiveStart && hasRange;
             const inRange = isInRange(cell.dateStr);
-            // Non-current month dates: not clickable in single mode (like Notion)
             const isOverflow = !cell.isCurrentMonth;
-            const isRangeActive = !!rangeStart;
-            const disabled = isOverflow && !isRangeActive && !inRange;
 
             // Note count for this cell
             const noteCount = noteCountMap?.get(cell.dateStr);
-            const cellHeat = (!disabled && cell.isCurrentMonth) ? heatmapBg(noteCount) : '';
+            const cellHeat = cell.isCurrentMonth ? heatmapBg(noteCount) : '';
 
             // Build inline style for backgrounds
             const style: React.CSSProperties = {};
@@ -951,12 +948,10 @@ export function CalendarGrid({
             } else {
               cls += ' rounded-sm';
               if (cellHeat) style.backgroundColor = cellHeat;
-              if (!disabled) cls += ' hover:bg-foreground/5';
+              cls += ' hover:bg-foreground/5';
             }
 
-            if (disabled) {
-              cls += ' text-foreground-tertiary opacity-50 cursor-not-allowed';
-            } else if (isOverflow && !isSelected && !isStart && !isEnd && !inRange) {
+            if (isOverflow && !isSelected && !isStart && !isEnd && !inRange) {
               cls += ' text-foreground-tertiary cursor-pointer';
             } else {
               cls += ' cursor-pointer';
@@ -967,10 +962,9 @@ export function CalendarGrid({
                 key={cell.dateStr}
                 className={cls}
                 style={style}
-                onClick={() => !disabled && onSelectDate(cell.dateStr)}
-                onMouseEnter={() => !disabled && onHover?.(cell.dateStr)}
+                onClick={() => onSelectDate(cell.dateStr)}
+                onMouseEnter={() => onHover?.(cell.dateStr)}
                 onMouseLeave={() => onHover?.('')}
-                disabled={disabled}
               >
                 {cell.day}
               </button>

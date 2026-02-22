@@ -7,10 +7,15 @@
 ### 创建引用
 
 - 空节点或编辑器中输入 `@` 触发 ReferenceSelector 搜索面板
+<<<<<<< HEAD
 - 搜索面板实时过滤所有工作区节点（按名称匹配），并按最近编辑时间（`updatedAt`）降序排序
 - 当 `@` 后 query 为空时，下拉显示 `Recently used`：
   - 优先展示 panel navigation history（最近打开）
   - 若历史不足则用全局最近编辑节点补齐（过滤 container/结构节点）
+- 日期快捷方式：输入 `@today`、`@tomorrow`、`@yesterday` 匹配对应日期节点
+  - 前缀匹配：`@to` 同时匹配 today 和 tomorrow
+  - 选中后自动创建/查找对应的 Journal 日节点并插入引用
+  - 显示为 "Dates" 分区，附带 Calendar 图标和日期预览
 - 选择节点后：
   - **空节点 `@`**：先创建树引用，再立即进入“转换模式”（显示 reference bullet + inline ref，可直接继续输入）
   - **文本中 `@`**：插入内联引用（蓝色链接文本，TipTap inline node）
@@ -69,10 +74,11 @@
 | 2026-02-01 | 编辑引用 = 编辑原始节点 | 与 Tana 行为一致 |
 | 2026-02-03 | 内联引用用 TipTap inline node extension | ProseMirror 原生支持 inline node 渲染 |
 | 2026-02-12 | Reference 节点单击选中、双击编辑 | 区分选中（框选预览）和编辑（修改原始节点）两种交互意图 |
+| 2026-02-22 | `@today/tomorrow/yesterday` 日期快捷方式 | 匹配 Tana 行为，自然语言引用日期节点 |
 
 ## 当前状态
 
-- [x] `@` 触发搜索并引用节点
+- [x] `@` 触发搜索并引用节点（含 `@today`/`@tomorrow`/`@yesterday` 日期快捷方式）
 - [x] 树引用 bullet（同心圆）
 - [x] 编辑引用即编辑原始节点
 - [x] 内联引用显示（蓝色链接、可点击导航）

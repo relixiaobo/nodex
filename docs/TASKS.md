@@ -29,25 +29,13 @@ _(空)_
 |-------|---------|------|-------------|
 | nodex-cc | _(idle)_ | — | — |
 | nodex-cc-2 | _(idle)_ | — | — |
-| nodex-codex | Sync 增量同步计划 Review（基于 main） | `codex/sync-incremental-plan-review` | `docs/plans/sync-incremental-impl.md`, `docs/plans/sync-architecture.md`, `docs/TASKS.md` |
+| nodex-codex | _(idle)_ | — | — |
 
 ---
 
 ## 进行中
 
-### Sync 增量同步计划 Review（基于 main）
-> Review `docs/plans/sync-incremental-impl.md` 的实施计划，结合 `docs/plans/sync-architecture.md` 检查架构一致性、边界条件、开放问题闭环和执行风险，输出可执行 review findings。
-> **Owner**: nodex-codex | **Branch**: `codex/sync-incremental-plan-review` | **Files**: `docs/plans/sync-incremental-impl.md`, `docs/plans/sync-architecture.md`, `docs/TASKS.md`
-
-- [x] 阅读计划与架构参考文档
-- [x] 输出 review findings（含文件/行号）
-- [x] 如有必要补充建议的计划修订方向（不直接改计划）
-
-**迭代日志**
-- [2026-02-22 nodex-codex] 领取任务，基于 `origin/main` 新建 `codex/sync-incremental-plan-review`，准备 review Sync 增量同步实施计划。
-- [2026-02-22 nodex-codex] 完成计划 review，输出关键风险：seq 分配与 R2 写入顺序导致 hole、echo 过滤与 cursor 前进语义冲突、`lastSeq` 与本地文档状态非原子持久化、push 幂等/去重元数据未落到 schema。
-- [2026-02-22 nodex-codex] 根据 review findings 回写实施计划：补 `sync_updates` 元数据表、明确 cursor 语义与 checkpoint 持久化、统一 v1 push 策略（先不合并）。
-- [2026-02-22 nodex-codex] 同步更新 `sync-architecture.md` 的 Phase 2 摘要与风险项，避免与实施计划在协议字段/幂等/cursor 语义上漂移。
+_(空)_
 
 ---
 
@@ -61,7 +49,7 @@ _(空)_
 > **Owner**: _(待分配，计划由 nodex-codex review 后交 nodex-cc 执行)_
 > **Plan**: `docs/plans/sync-incremental-impl.md` | **Arch**: `docs/plans/sync-architecture.md`
 >
-> **当前状态**: 实施计划待 Review
+> **当前状态**: 计划已 Review（PR #79），可交 nodex-cc 执行
 
 - [x] **Review**: nodex-codex review 实施计划（含 7 个开放问题） ✓ nodex-codex（2026-02-22）
 - [ ] Step 1: 服务端项目骨架（Workers + R2 binding）
@@ -260,6 +248,7 @@ _(空)_
 
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
+| 2026-02-22 | Sync 增量同步计划 Review — 补 sync_updates 表、修正 seq hole/cursor 语义/checkpoint 持久化/RLS 边界 | nodex-codex | #79 |
 | 2026-02-22 | Sync Phase 0 实现复审 + 修复（workspace ID 并发竞态、SnapshotRecord 校验加固、测试真实持久化路径、VV 增量断言修正） | nodex-codex | #78 |
 | 2026-02-22 | Sync Phase 0 Step 2 — 客户端 Sync-Ready 实施（PeerID/VV 持久化、subscribeLocalUpdates hook、Workspace ID 规范化、unlimitedStorage） | nodex-cc | #77 |
 | 2026-02-22 | Sync Phase 0 Step 1 — Review & 优化方案（Loro API/Chrome 约束/架构审查，修订 sync-architecture.md） | nodex-codex | #75 |

@@ -795,12 +795,22 @@ export interface CalendarGridProps {
   noteCountMap?: Map<string, number>;
 }
 
-/** Map note count → heatmap CSS class (neutral gray tints — data channel) */
-function heatmapClass(count: number | undefined): string {
+/** Map note count → teal heatmap background (rgba string) */
+function heatmapBg(count: number | undefined): string {
   if (!count || count <= 0) return '';
-  if (count <= 2) return 'bg-foreground/5';
-  if (count <= 4) return 'bg-foreground/8';
-  return 'bg-foreground/12';
+  // Teal #0D9488 at different opacities
+  if (count <= 2) return 'rgba(13,148,136,0.10)';
+  if (count <= 4) return 'rgba(13,148,136,0.20)';
+  return 'rgba(13,148,136,0.35)';
+}
+
+/** Map note count → purple "today" background (rgba string) */
+function todayBg(count: number | undefined): string {
+  // Always show at least a light purple for today
+  if (!count || count <= 0) return 'rgba(139,92,246,0.10)';
+  if (count <= 2) return 'rgba(139,92,246,0.15)';
+  if (count <= 4) return 'rgba(139,92,246,0.25)';
+  return 'rgba(139,92,246,0.40)';
 }
 
 export function CalendarGrid({
@@ -866,9 +876,9 @@ export function CalendarGrid({
       </div>
 
       {/* Day headers — 7 columns */}
-      <div className="grid grid-cols-7 gap-0.5 mb-0.5">
+      <div className="grid grid-cols-7 gap-1 mb-0.5">
         {DAY_HEADERS.map((d, i) => (
-          <div key={i} className="h-7 flex items-center justify-center text-xs text-foreground-tertiary">
+          <div key={i} className="h-6 flex items-center justify-center text-xs text-foreground-tertiary">
             {d}
           </div>
         ))}
@@ -876,7 +886,7 @@ export function CalendarGrid({
 
       {/* Weeks — 7 columns, no week numbers */}
       {weeks.map((week, wi) => (
-        <div key={wi} className="grid grid-cols-7 gap-0.5">
+        <div key={wi} className="grid grid-cols-7 gap-1">
           {week.map((cell, ci) => {
             const isToday = cell.dateStr === today;
             const isSelected = cell.dateStr === selectedDate;
@@ -889,32 +899,54 @@ export function CalendarGrid({
             const isRangeActive = !!rangeStart;
             const disabled = isOverflow && !isRangeActive && !inRange;
 
-            // Heatmap: only show on non-highlighted, non-disabled, current-month cells
-            const isHighlighted = isSelected || isStart || isEnd || inRange;
+            // Note count for this cell
             const noteCount = noteCountMap?.get(cell.dateStr);
-            const heatBg = !isHighlighted && !disabled && cell.isCurrentMonth
-              ? heatmapClass(noteCount)
-              : '';
 
-            let cls = 'relative h-7 flex items-center justify-center text-sm transition-colors';
+            // Build inline style for backgrounds
+            const style: React.CSSProperties = {};
+
+            let cls = 'h-6 flex items-center justify-center text-xs transition-colors';
 
             if (isStart && isEnd) {
-              cls += ' ring-2 ring-primary font-medium rounded-md';
-              if (heatBg) cls += ` ${heatBg}`;
+              // Single-date range + selected: outline with offset
+              cls += ' font-medium rounded-sm';
+              style.outline = '1.5px solid var(--color-primary)';
+              style.outlineOffset = '1.5px';
+              if (isToday) {
+                style.backgroundColor = todayBg(noteCount);
+              } else if (!disabled && cell.isCurrentMonth) {
+                const bg = heatmapBg(noteCount);
+                if (bg) style.backgroundColor = bg;
+              }
             } else if (isStart) {
-              cls += ' bg-primary text-primary-foreground font-medium rounded-l-md';
+              cls += ' bg-primary text-primary-foreground font-medium rounded-l-sm';
             } else if (isEnd) {
-              cls += ' bg-primary text-primary-foreground font-medium rounded-r-md';
+              cls += ' bg-primary text-primary-foreground font-medium rounded-r-sm';
             } else if (isSelected) {
-              cls += ' ring-2 ring-primary font-medium rounded-md';
-              if (heatBg) cls += ` ${heatBg}`;
+              // Selected: outline with offset
+              cls += ' font-medium rounded-sm';
+              style.outline = '1.5px solid var(--color-primary)';
+              style.outlineOffset = '1.5px';
+              if (isToday) {
+                style.backgroundColor = todayBg(noteCount);
+              } else if (!disabled && cell.isCurrentMonth) {
+                const bg = heatmapBg(noteCount);
+                if (bg) style.backgroundColor = bg;
+              }
             } else if (inRange) {
               cls += ' bg-primary-muted';
-              if (ci === 0) cls += ' rounded-l-md';
-              if (ci === 6) cls += ' rounded-r-md';
+              if (ci === 0) cls += ' rounded-l-sm';
+              if (ci === 6) cls += ' rounded-r-sm';
+            } else if (isToday) {
+              // Today: purple primary background, depth by note count
+              cls += ' font-medium rounded-sm';
+              style.backgroundColor = todayBg(noteCount);
             } else {
-              cls += ' rounded-md';
-              if (heatBg) cls += ` ${heatBg}`;
+              cls += ' rounded-sm';
+              if (!disabled && cell.isCurrentMonth) {
+                const bg = heatmapBg(noteCount);
+                if (bg) style.backgroundColor = bg;
+              }
               if (!disabled) cls += ' hover:bg-foreground/5';
             }
 
@@ -926,22 +958,17 @@ export function CalendarGrid({
               cls += ' cursor-pointer';
             }
 
-            // Today indicator: small dot below the number
-            const showTodayDot = isToday && !disabled;
-
             return (
               <button
                 key={cell.dateStr}
                 className={cls}
+                style={style}
                 onClick={() => !disabled && onSelectDate(cell.dateStr)}
                 onMouseEnter={() => !disabled && onHover?.(cell.dateStr)}
                 onMouseLeave={() => onHover?.('')}
                 disabled={disabled}
               >
                 {cell.day}
-                {showTodayDot && (
-                  <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 h-1 w-1 rounded-full bg-primary" />
-                )}
               </button>
             );
           })}

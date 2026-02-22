@@ -7,7 +7,10 @@
 ### 创建引用
 
 - 空节点或编辑器中输入 `@` 触发 ReferenceSelector 搜索面板
-- 搜索面板实时过滤所有工作区节点（按名称匹配）
+- 搜索面板实时过滤所有工作区节点（按名称匹配），并按最近编辑时间（`updatedAt`）降序排序
+- 当 `@` 后 query 为空时，下拉显示 `Recently used`：
+  - 优先展示 panel navigation history（最近打开）
+  - 若历史不足则用全局最近编辑节点补齐（过滤 container/结构节点）
 - 选择节点后：
   - **空节点 `@`**：先创建树引用，再立即进入“转换模式”（显示 reference bullet + inline ref，可直接继续输入）
   - **文本中 `@`**：插入内联引用（蓝色链接文本，TipTap inline node）

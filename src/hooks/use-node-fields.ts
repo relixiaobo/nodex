@@ -39,6 +39,8 @@ export interface FieldEntry {
   configKey?: string;
   /** Explicit control type for system config rendering */
   configControl?: ConfigFieldDef['control'];
+  /** For tag-template entries, references the source fieldDef id */
+  templateId?: string;
 }
 
 /** Check if a visibleWhen condition is satisfied by looking at node config values. */
@@ -128,6 +130,7 @@ export function computeNodeFields(
       isSystemConfig: isSysConfig || undefined,
       configKey: isSysConfig ? keyId : undefined,
       configControl: configDef?.control,
+      templateId: child.templateId,
     });
   }
 

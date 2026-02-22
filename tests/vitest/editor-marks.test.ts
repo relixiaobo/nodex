@@ -1,6 +1,12 @@
 import { htmlToMarks, marksToHtml, mergeAdjacentMarks } from '../../src/lib/editor-marks.js';
+import { resetAndSeed } from './helpers/test-state.js';
+import { resolveTagColor } from '../../src/lib/tag-colors.js';
 
 describe('editor-marks', () => {
+  beforeEach(() => {
+    resetAndSeed();
+  });
+
   it('parses plain text and decodes html entities', () => {
     expect(htmlToMarks('')).toEqual({ text: '', marks: [], inlineRefs: [] });
     expect(htmlToMarks('a &amp; b')).toEqual({ text: 'a & b', marks: [], inlineRefs: [] });
@@ -30,6 +36,16 @@ describe('editor-marks', () => {
     expect(html).toContain('<strong>See</strong>');
     expect(html).toContain('data-inlineref-node="task_1"');
     expect(html).toContain('class="inline-ref"');
+    expect(html).toContain(`style="color:${resolveTagColor('tagDef_task').text};--inline-ref-accent:${resolveTagColor('tagDef_task').text}"`);
+  });
+
+  it('falls back to current inline-ref color when target has no supertag', () => {
+    const html = marksToHtml(
+      '\uFFFC',
+      [],
+      [{ offset: 0, targetNodeId: 'note_2', displayName: 'Quick ideas' }],
+    );
+    expect(html).toContain('style="color:var(--color-primary);--inline-ref-accent:var(--color-primary)"');
   });
 
   it('keeps semantic equality for html -> marks -> html', () => {

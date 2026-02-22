@@ -3,12 +3,14 @@ import { useWorkspaceStore } from '../../stores/workspace-store';
 import { useUIStore } from '../../stores/ui-store';
 import { useNavUndoKeyboard } from '../../hooks/use-nav-undo-keyboard';
 import { useTodayShortcut } from '../../hooks/use-today-shortcut';
+import { useGlobalSelectionDismiss } from '../../hooks/use-global-selection-dismiss.js';
 import { Sidebar } from '../../components/sidebar/Sidebar';
 import { PanelStack } from '../../components/panel/PanelStack';
 import { CommandPalette } from '../../components/search/CommandPalette';
 import { CONTAINER_IDS } from '../../types/index.js';
 import { initLoroDoc } from '../../lib/loro-doc.js';
 import * as loroDoc from '../../lib/loro-doc.js';
+import { ensureWorkspaceHomeNode } from '../../lib/workspace-root.js';
 import { findUnexpectedShortcutConflicts } from '../../lib/shortcut-registry.js';
 import { Toaster } from 'sonner';
 
@@ -27,6 +29,7 @@ const CONTAINER_DEFS: Array<{ id: string; name: string }> = [
  */
 async function seedWorkspace(wsId: string): Promise<void> {
   await initLoroDoc(wsId);
+  ensureWorkspaceHomeNode(wsId);
 
   // Create container nodes if they don't already exist
   for (const { id, name } of CONTAINER_DEFS) {
@@ -102,6 +105,7 @@ interface AppProps {
 export function App({ skipBootstrap = false }: AppProps) {
   const sidebarOpen = useUIStore((s) => s.sidebarOpen);
   const { ready } = useBootstrap(skipBootstrap);
+  const selectionDismissHandlers = useGlobalSelectionDismiss();
 
   useEffect(() => {
     if (!import.meta.env.DEV) return;
@@ -125,7 +129,11 @@ export function App({ skipBootstrap = false }: AppProps) {
   }
 
   return (
-    <div className="flex h-screen w-full overflow-hidden bg-background text-foreground">
+    <div
+      className="flex h-screen w-full overflow-hidden bg-background text-foreground"
+      onPointerDownCapture={selectionDismissHandlers.onPointerDownCapture}
+      onFocusCapture={selectionDismissHandlers.onFocusCapture}
+    >
       {sidebarOpen && <Sidebar />}
       <PanelStack />
       <CommandPalette />

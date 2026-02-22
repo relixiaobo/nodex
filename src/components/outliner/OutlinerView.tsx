@@ -6,17 +6,33 @@ import { useNodeStore } from '../../stores/node-store';
 import { useUIStore } from '../../stores/ui-store';
 import * as loroDoc from '../../lib/loro-doc.js';
 import { isOutlinerContentNodeType } from '../../lib/node-type-utils.js';
-import { OutlinerItem } from './OutlinerItem';
+import { OutlinerItem, buildFieldOwnerColors } from './OutlinerItem';
 import { FieldRow } from '../fields/FieldRow';
 import { toFieldRowEntryProps } from '../fields/field-row-props.js';
 import { TrailingInput } from '../editor/TrailingInput';
 import { SYS_V } from '../../types/index.js';
+import { resolveTagColor } from '../../lib/tag-colors.js';
 import { useDragSelect } from '../../hooks/use-drag-select.js';
 
 interface OutlinerViewProps {
   rootNodeId: string;
   /** When true, show tuple children whose key is an attrDef (tagDef template fields). */
   showTemplateTuples?: boolean;
+}
+
+export interface OutlinerVisibleChildRow {
+  id: string;
+  type: 'field' | 'content';
+  hidden?: boolean;
+}
+
+export function getDragSelectableRootIds(
+  rows: OutlinerVisibleChildRow[],
+  isFieldRevealed: (fieldEntryId: string) => boolean,
+): string[] {
+  return rows
+    .filter((row) => !row.hidden || isFieldRevealed(row.id))
+    .map((row) => row.id);
 }
 
 export function OutlinerView({ rootNodeId, showTemplateTuples }: OutlinerViewProps) {
@@ -40,6 +56,15 @@ export function OutlinerView({ rootNodeId, showTemplateTuples }: OutlinerViewPro
     for (const f of fields) m.set(f.fieldEntryId, f);
     return m;
   }, [fields]);
+
+  const fieldOwnerColors = useMemo(() => (
+    buildFieldOwnerColors(
+      fieldMap,
+      (fieldDefId) => loroDoc.getParentId(fieldDefId),
+      (ownerId) => useNodeStore.getState().getNode(ownerId)?.type,
+      (ownerId) => resolveTagColor(ownerId).text,
+    )
+  ), [fieldMap]);
 
   // Classify each child: field tuple → 'field', regular node → 'content', else skip
   // Also evaluate hide-field rules for field entries
@@ -75,10 +100,13 @@ export function OutlinerView({ rootNodeId, showTemplateTuples }: OutlinerViewPro
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allChildIds, fieldMap, _version, showTemplateTuples]);
 
-  // Content-only IDs for keyboard navigation (rootChildIds)
-  const contentChildIds = useMemo(
-    () => visibleChildren.filter((c) => c.type === 'content').map((c) => c.id),
-    [visibleChildren],
+  /** Check if a hidden field has been temporarily revealed via UIStore */
+  const isFieldRevealed = (fieldEntryId: string) =>
+    expandedHiddenFields.has(`${rootNodeId}:${fieldEntryId}`);
+
+  const dragSelectableRootIds = useMemo(
+    () => getDragSelectableRootIds(visibleChildren, isFieldRevealed),
+    [visibleChildren, expandedHiddenFields, rootNodeId],
   );
 
   // All hidden fields (including ALWAYS): shown as compact pills, click to temporarily reveal
@@ -89,13 +117,9 @@ export function OutlinerView({ rootNodeId, showTemplateTuples }: OutlinerViewPro
     [visibleChildren, fieldMap],
   );
 
-  /** Check if a hidden field has been temporarily revealed via UIStore */
-  const isFieldRevealed = (fieldEntryId: string) =>
-    expandedHiddenFields.has(`${rootNodeId}:${fieldEntryId}`);
-
   // Drag select: document-level mouse tracking for multi-node selection
   const containerRef = useRef<HTMLDivElement>(null);
-  useDragSelect({ containerRef, rootChildIds: contentChildIds, rootNodeId });
+  useDragSelect({ containerRef, rootChildIds: dragSelectableRootIds, rootNodeId });
 
   return (
     <div
@@ -128,7 +152,10 @@ export function OutlinerView({ rootNodeId, showTemplateTuples }: OutlinerViewPro
             <FieldRow
               nodeId={rootNodeId}
               {...toFieldRowEntryProps(fieldMap.get(id)!)}
+              rootChildIds={dragSelectableRootIds}
+              rootNodeId={rootNodeId}
               isLastInGroup={i === visibleChildren.length - 1 || visibleChildren[i + 1].type !== 'field'}
+              ownerTagColor={fieldOwnerColors.get(id)}
               onNavigateOut={(direction) => {
                 if (direction === 'up') {
                   for (let j = i - 1; j >= 0; j--) {
@@ -174,7 +201,7 @@ export function OutlinerView({ rootNodeId, showTemplateTuples }: OutlinerViewPro
             key={id}
             nodeId={id}
             depth={0}
-            rootChildIds={contentChildIds}
+            rootChildIds={dragSelectableRootIds}
             parentId={rootNodeId}
             rootNodeId={rootNodeId}
           />

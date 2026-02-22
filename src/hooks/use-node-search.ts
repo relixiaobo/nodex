@@ -15,12 +15,17 @@ export interface NodeSearchResult {
   id: string;
   name: string;
   breadcrumb: string;
+  updatedAt: number;
 }
 
 /** Structural node types to skip in search results (not meaningful as search targets). */
 const SKIP_DOC_TYPES = new Set<string>([
   'fieldEntry', 'fieldDef', 'tagDef', 'reference',
 ]);
+const MAX_RESULTS = 15;
+// Bound broad queries so large workspaces don't scan all nodes on every keystroke.
+// We still sort by updatedAt within this candidate pool, preserving recency behavior.
+const MAX_MATCH_CANDIDATES = 120;
 
 export function useNodeSearch(query: string, excludeId?: string): NodeSearchResult[] {
   const json = useNodeStore((state) => {
@@ -62,10 +67,24 @@ export function useNodeSearch(query: string, excludeId?: string): NodeSearchResu
         depth++;
       }
 
-      matches.push({ id, name: plainText, breadcrumb: crumbs.join(' / ') });
-      if (matches.length >= 15) break;
+      matches.push({
+        id,
+        name: plainText,
+        breadcrumb: crumbs.join(' / '),
+        updatedAt: node.updatedAt ?? 0,
+      });
+
+      if (matches.length >= MAX_MATCH_CANDIDATES) break;
     }
 
+    matches.sort((a, b) => {
+      if (b.updatedAt !== a.updatedAt) return b.updatedAt - a.updatedAt;
+      const byName = a.name.localeCompare(b.name, 'en');
+      if (byName !== 0) return byName;
+      return a.id.localeCompare(b.id, 'en');
+    });
+
+    if (matches.length > MAX_RESULTS) matches.length = MAX_RESULTS;
     return JSON.stringify(matches);
   });
 

@@ -30,7 +30,7 @@ function searchNodes(query: string, excludeId?: string) {
   const q = query.trim().toLowerCase();
   if (!q) return [];
 
-  const matches: { id: string; name: string }[] = [];
+  const matches: { id: string; name: string; updatedAt: number }[] = [];
   for (const id of getAllNodeIds()) {
     if (id === excludeId) continue;
     const node = toNodexNode(id);
@@ -41,9 +41,17 @@ function searchNodes(query: string, excludeId?: string) {
     const plainText = (node.name ?? '').replace(/<[^>]+>/g, '').trim();
     if (!plainText) continue;
     if (!plainText.toLowerCase().includes(q)) continue;
-    matches.push({ id, name: plainText });
+    matches.push({ id, name: plainText, updatedAt: node.updatedAt ?? 0 });
   }
-  return matches;
+
+  matches.sort((a, b) => {
+    if (b.updatedAt !== a.updatedAt) return b.updatedAt - a.updatedAt;
+    const byName = a.name.localeCompare(b.name, 'en');
+    if (byName !== 0) return byName;
+    return a.id.localeCompare(b.id, 'en');
+  });
+
+  return matches.slice(0, 15);
 }
 
 beforeEach(() => {
@@ -51,8 +59,9 @@ beforeEach(() => {
   initLoroDocForTest('ws_test');
 
   // Content nodes — should appear in search
-  createNode('n1', null); setNodeDataBatch('n1', { name: 'My Person Note' });
-  createNode('n2', null); setNodeDataBatch('n2', { name: 'Another Note' });
+  createNode('n1', null); setNodeDataBatch('n1', { name: 'My Person Note', updatedAt: 1000 });
+  createNode('n2', null); setNodeDataBatch('n2', { name: 'Another Note', updatedAt: 3000 });
+  createNode('n3', null); setNodeDataBatch('n3', { name: 'Third Note', updatedAt: 2000 });
 
   // Structural nodes — must be filtered out by type
   createNode('td1', null); setNodeDataBatch('td1', { name: 'Person',      type: 'tagDef' });
@@ -73,6 +82,12 @@ describe('node search SKIP_DOC_TYPES filter', () => {
     const ids = searchNodes('Note').map(r => r.id);
     expect(ids).toContain('n1');
     expect(ids).toContain('n2');
+    expect(ids).toContain('n3');
+  });
+
+  it('sorts matches by updatedAt desc (most recently edited first)', () => {
+    const ids = searchNodes('Note').map(r => r.id);
+    expect(ids.slice(0, 3)).toEqual(['n2', 'n3', 'n1']);
   });
 
   it('filters out tagDef nodes', () => {

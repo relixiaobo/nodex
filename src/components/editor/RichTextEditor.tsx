@@ -10,6 +10,7 @@ import { getPrimaryShortcutKey, getShortcutKeys } from '../../lib/shortcut-regis
 import { isImeComposingEvent } from '../../lib/ime-keyboard.js';
 import {
   resolveContentRowArrowIntent as resolveNodeEditorArrowIntent,
+  resolveContentRowBackspaceIntent as resolveNodeEditorBackspaceIntent,
   resolveContentRowEnterIntent as resolveNodeEditorEnterIntent,
   resolveContentRowEscapeIntent as resolveNodeEditorEscapeIntent,
   resolveContentRowForceCreateIntent as resolveNodeEditorForceCreateIntent,
@@ -52,6 +53,7 @@ interface RichTextEditorProps {
   onIndent: () => void;
   onOutdent: () => void;
   onDelete: () => boolean;
+  onBackspaceAtStart?: () => boolean;
   onArrowUp: () => void;
   onArrowDown: () => void;
   onMoveUp: () => void;
@@ -363,7 +365,19 @@ export function RichTextEditor(props: RichTextEditorProps) {
     const handleBackspace = (view: EditorView) => {
       const parsed = docToMarks(view.state.doc);
       const isEmpty = parsed.text.replace(/\u200B/g, '').trim().length === 0;
-      if (!isEmpty) return false;
+      const { from, to } = view.state.selection;
+      const intent = resolveNodeEditorBackspaceIntent({
+        referenceActive: propsRef.current.referenceActive ?? false,
+        hashTagActive: propsRef.current.hashTagActive ?? false,
+        slashActive: propsRef.current.slashActive ?? false,
+        isEmpty,
+        isAtStart: from <= 1 && to <= 1,
+      });
+      if (intent === 'allow_default') return false;
+      if (intent === 'merge_with_previous') {
+        saveContent();
+        return propsRef.current.onBackspaceAtStart?.() ?? false;
+      }
       updateNodeContent(propsRef.current.nodeId, { name: '', marks: [], inlineRefs: [] });
       saveContent();
       return propsRef.current.onDelete();

@@ -1,5 +1,6 @@
 import {
   resolveContentRowArrowIntent,
+  resolveContentRowBackspaceIntent,
   resolveContentRowEnterIntent,
   resolveContentRowEscapeIntent,
   resolveContentRowForceCreateIntent,
@@ -60,6 +61,32 @@ describe('row interaction intents', () => {
       hashTagActive: false,
       slashActive: true,
     })).toBe('noop');
+  });
+
+  it('content row backspace resolves merge/delete/default by state', () => {
+    expect(resolveContentRowBackspaceIntent({
+      referenceActive: false,
+      hashTagActive: false,
+      slashActive: false,
+      isEmpty: false,
+      isAtStart: true,
+    })).toBe('merge_with_previous');
+
+    expect(resolveContentRowBackspaceIntent({
+      referenceActive: false,
+      hashTagActive: false,
+      slashActive: false,
+      isEmpty: true,
+      isAtStart: true,
+    })).toBe('delete_empty');
+
+    expect(resolveContentRowBackspaceIntent({
+      referenceActive: true,
+      hashTagActive: false,
+      slashActive: false,
+      isEmpty: false,
+      isAtStart: true,
+    })).toBe('allow_default');
   });
 
   it('trailing row options intent requires non-empty option list', () => {

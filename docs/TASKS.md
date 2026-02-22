@@ -48,6 +48,7 @@ _(空)_
 > **迭代日志**:
 > - [2026-02-22 nodex-codex] 任务认领：开始执行 Sync Phase 0 Step 1（方案 review + 文档优化），先完成 TASKS/分支/PR 建立，再进行逐段审查。
 > - [2026-02-22 nodex-codex] 完成第一轮方案审查并修订 `sync-architecture.md`：修正 PeerID 恢复顺序（先 setPeerId 再 import）、澄清 VV `toJSON()` 返回 Map 不是 JSON 字符串、补充 `subscribeLocalUpdates` 清理/本地语义说明、收紧 `chrome.alarms`/`unlimitedStorage` 表述，并为 Phase 2 增加二进制 HTTP 编码约束与 shallow-snapshot 覆盖边界回退策略。
+> - [2026-02-22 nodex-codex] 根据“未上线且可丢弃本地开发数据”的新前提，调整 Step 1 结论：Phase 0 明确允许不兼容旧 `loro-persistence` 快照格式，Step 2 可直接升级到 `SnapshotRecord`，不要求迁移旧 IndexedDB 记录。
 
 ---
 

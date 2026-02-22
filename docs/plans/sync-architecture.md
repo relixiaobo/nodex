@@ -255,7 +255,7 @@ if (saved?.snapshot) doc.import(saved.snapshot);
 
 **实现注意**：
 - `peerIdStr` 恢复失败（格式非法/损坏）时应降级为随机 PeerID，并记录 warning，避免启动失败
-- Phase 0 落地时建议兼容旧格式（仅 `Uint8Array` 快照）读取，首次写入再迁移到 `SnapshotRecord`
+- 当前项目未上线，**允许不兼容旧快照格式**（旧 `Uint8Array` 记录可直接作废）；Phase 0 可直接升级到 `SnapshotRecord` 存储结构，必要时清空本地开发数据并重建测试数据
 
 #### 准备项 2: VersionVector 持久化
 

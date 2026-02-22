@@ -35,16 +35,7 @@ _(空)_
 
 ## 进行中
 
-### References 增强 (#19) — 反向链接 + 引用计数 ✅ PR #76
-> **Owner**: nodex-cc-2 | **Branch**: cc2/references | **Spec**: `docs/features/references.md`
-
-- [x] **研究**: Tana 反向链接 UI 交互 → `docs/research/tana-backlinks-ui.md`
-- [x] 反向链接 section（BacklinksSection + computeBacklinks + 11 Vitest 用例）
-- [x] 引用计数 badge（useBacklinkCount + OutlinerItem 行右侧半透明数字）
-
-迭代日志：
-- [2026-02-22 nodex-cc-2] 接手任务，创建分支 cc2/references，开始 Tana 反向链接 UI 研究
-- [2026-02-22 nodex-cc-2] 实现 backlinks 全部完成，PR #76 Ready for review
+_(空)_
 
 ---
 
@@ -76,14 +67,6 @@ _(空)_
 - [ ] Step 10: Compaction（延后到上线后）
 
 ### P2
-
-#### References 增强 (#19) — ✅ 反向链接 + 引用计数已完成 (PR #76)
-> MVP + 反向链接已完成
-
-- [x] **研究**: Tana 反向链接 UI 交互 → `docs/research/tana-backlinks-ui.md`
-- [x] 反向链接 section（BacklinksSection 组件）
-- [x] 引用计数 badge（OutlinerItem 行右侧）
-- **Spec**: `docs/features/references.md`
 
 #### Supertags 完善 (#20)
 > 基础已完成（#触发、标签应用/移除、配置页、模板字段、TagBadge 右键菜单）
@@ -263,6 +246,7 @@ _(空)_
 
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
+| 2026-02-23 | References 增强 (#19) — 反向链接 section（Mentioned in + Appears as [Field] in 分组）+ 引用计数 badge + 11 Vitest 用例 + 计数去重/缓存/trash set 性能修复 | nodex-cc-2 | #76 |
 | 2026-02-22 | Sync 增量同步计划 Review — 补 sync_updates 表、修正 seq hole/cursor 语义/checkpoint 持久化/RLS 边界 | nodex-codex | #79 |
 | 2026-02-22 | Sync Phase 0 实现复审 + 修复（workspace ID 并发竞态、SnapshotRecord 校验加固、测试真实持久化路径、VV 增量断言修正） | nodex-codex | #78 |
 | 2026-02-22 | Sync Phase 0 Step 2 — 客户端 Sync-Ready 实施（PeerID/VV 持久化、subscribeLocalUpdates hook、Workspace ID 规范化、unlimitedStorage） | nodex-cc | #77 |

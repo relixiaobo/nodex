@@ -887,19 +887,18 @@ export function CalendarGrid({
         </div>
       </div>
 
-      {/* Day headers — 7 columns */}
-      <div className="grid grid-cols-7 gap-1 mb-0.5">
+      {/* Unified 7-column grid: headers + all day cells — equal gap in both directions */}
+      <div className="grid grid-cols-7 gap-1">
+        {/* Day headers */}
         {DAY_HEADERS.map((d, i) => (
-          <div key={i} className="aspect-square flex items-center justify-center text-xs text-foreground-tertiary">
+          <div key={`h${i}`} className="aspect-square flex items-center justify-center text-xs text-foreground-tertiary">
             {d}
           </div>
         ))}
-      </div>
 
-      {/* Weeks — 7 columns, no week numbers */}
-      {weeks.map((week, wi) => (
-        <div key={wi} className="grid grid-cols-7 gap-1">
-          {week.map((cell, ci) => {
+        {/* Day cells — flattened from weeks */}
+        {weeks.flat().map((cell, idx) => {
+          const ci = idx % 7;
             const isToday = cell.dateStr === today;
             const isSelected = cell.dateStr === selectedDate;
             const hasRange = !!effectiveStart && !!effectiveEnd && effectiveStart !== effectiveEnd;
@@ -977,8 +976,7 @@ export function CalendarGrid({
               </button>
             );
           })}
-        </div>
-      ))}
+      </div>
     </div>
   );
 }

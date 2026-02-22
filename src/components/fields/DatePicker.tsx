@@ -795,12 +795,12 @@ export interface CalendarGridProps {
   noteCountMap?: Map<string, number>;
 }
 
-/** Map note count → heatmap CSS class (bg opacity levels) */
+/** Map note count → heatmap CSS class (neutral gray tints — data channel) */
 function heatmapClass(count: number | undefined): string {
   if (!count || count <= 0) return '';
-  if (count <= 2) return 'bg-primary/8';
-  if (count <= 4) return 'bg-primary/15';
-  return 'bg-primary/25';
+  if (count <= 2) return 'bg-foreground/5';
+  if (count <= 4) return 'bg-foreground/8';
+  return 'bg-foreground/12';
 }
 
 export function CalendarGrid({
@@ -866,7 +866,7 @@ export function CalendarGrid({
       </div>
 
       {/* Day headers — 7 columns */}
-      <div className="grid grid-cols-7 gap-0 mb-0.5">
+      <div className="grid grid-cols-7 gap-0.5 mb-0.5">
         {DAY_HEADERS.map((d, i) => (
           <div key={i} className="h-7 flex items-center justify-center text-xs text-foreground-tertiary">
             {d}
@@ -876,7 +876,7 @@ export function CalendarGrid({
 
       {/* Weeks — 7 columns, no week numbers */}
       {weeks.map((week, wi) => (
-        <div key={wi} className="grid grid-cols-7 gap-0">
+        <div key={wi} className="grid grid-cols-7 gap-0.5">
           {week.map((cell, ci) => {
             const isToday = cell.dateStr === today;
             const isSelected = cell.dateStr === selectedDate;
@@ -896,23 +896,22 @@ export function CalendarGrid({
               ? heatmapClass(noteCount)
               : '';
 
-            let cls = 'h-7 flex items-center justify-center text-sm transition-colors';
+            let cls = 'relative h-7 flex items-center justify-center text-sm transition-colors';
 
             if (isStart && isEnd) {
-              cls += ' bg-primary text-primary-foreground font-medium rounded-md';
+              cls += ' ring-2 ring-primary font-medium rounded-md';
+              if (heatBg) cls += ` ${heatBg}`;
             } else if (isStart) {
               cls += ' bg-primary text-primary-foreground font-medium rounded-l-md';
             } else if (isEnd) {
               cls += ' bg-primary text-primary-foreground font-medium rounded-r-md';
             } else if (isSelected) {
-              cls += ' bg-primary text-primary-foreground font-medium rounded-md';
+              cls += ' ring-2 ring-primary font-medium rounded-md';
+              if (heatBg) cls += ` ${heatBg}`;
             } else if (inRange) {
               cls += ' bg-primary-muted';
               if (ci === 0) cls += ' rounded-l-md';
               if (ci === 6) cls += ' rounded-r-md';
-            } else if (isToday) {
-              cls += ' ring-1 ring-primary/30 font-medium rounded-md';
-              if (heatBg) cls += ` ${heatBg}`;
             } else {
               cls += ' rounded-md';
               if (heatBg) cls += ` ${heatBg}`;
@@ -923,11 +922,12 @@ export function CalendarGrid({
               cls += ' text-foreground-tertiary opacity-50 cursor-not-allowed';
             } else if (isOverflow && !isSelected && !isStart && !isEnd && !inRange) {
               cls += ' text-foreground-tertiary cursor-pointer';
-            } else if (!isSelected && !isStart && !isEnd) {
-              cls += ' cursor-pointer';
             } else {
               cls += ' cursor-pointer';
             }
+
+            // Today indicator: small dot below the number
+            const showTodayDot = isToday && !disabled;
 
             return (
               <button
@@ -939,6 +939,9 @@ export function CalendarGrid({
                 disabled={disabled}
               >
                 {cell.day}
+                {showTodayDot && (
+                  <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 h-1 w-1 rounded-full bg-primary" />
+                )}
               </button>
             );
           })}

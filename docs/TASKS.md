@@ -40,14 +40,15 @@ _(空)_
 > **目标**: 实施 Phase 0 四项客户端预留（PeerID 持久化、VV 持久化、subscribeLocalUpdates hook、Workspace ID 规范化 + unlimitedStorage）
 > **Files**: `src/lib/loro-doc.ts`, `src/lib/loro-persistence.ts`, `src/entrypoints/sidepanel/App.tsx`, `src/stores/workspace-store.ts`, `wxt.config.ts`, `tests/vitest/sync-phase0.test.ts`
 > **Progress**:
-> - [ ] 准备项 1: PeerID 持久化 — 扩展 IndexedDB 存储格式 + initLoroDoc 恢复顺序
-> - [ ] 准备项 2: VersionVector 持久化 — 与 snapshot 同条记录存储
-> - [ ] 准备项 3: subscribeLocalUpdates hook 点 — no-op 预留 + unsubscribe 管理
-> - [ ] 准备项 4: Workspace ID 规范化 + unlimitedStorage 权限
-> - [ ] Vitest 测试覆盖
-> - [ ] 更新 docs/TESTING.md 覆盖映射
+> - [x] 准备项 1: PeerID 持久化 — SnapshotRecord 格式 + initLoroDoc 恢复顺序 + try/catch fallback
+> - [x] 准备项 2: VersionVector 持久化 — persistSnapshot 原子保存 snapshot+peerIdStr+VV+savedAt
+> - [x] 准备项 3: subscribeLocalUpdates hook 点 — no-op + unsubscribe 管理 (resetLoroDoc + 工作区切换)
+> - [x] 准备项 4: Workspace ID 规范化 (`ws_{nanoid()}`) + unlimitedStorage 权限
+> - [x] Vitest 测试覆盖 (22 tests in sync-phase0.test.ts)
+> - [x] 更新 docs/TESTING.md §1.515 覆盖映射
 > **迭代日志**:
 > - [2026-02-22 nodex-cc] 任务认领：接手 Step 2 实施。Step 1（nodex-codex PR #75）已完成方案审查与文档修订。
+> - [2026-02-22 nodex-cc] 实施完成：4 项准备全部落地，22 tests pass，typecheck clean（sonner pre-existing），check:test-sync pass。PR #77 Draft。
 
 ---
 

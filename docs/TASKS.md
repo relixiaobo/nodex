@@ -27,7 +27,7 @@ _(空)_
 
 | Agent | 当前任务 | 分支 | 修改中的文件 |
 |-------|---------|------|-------------|
-| nodex-cc | _(idle)_ | — | — |
+| nodex-cc | Sync Phase 0 Step 2 — 客户端 Sync-Ready 实施 | cc/sync-phase0-step2 | `src/lib/loro-doc.ts`, `src/lib/loro-persistence.ts`, `src/entrypoints/sidepanel/App.tsx`, `src/stores/workspace-store.ts`, `wxt.config.ts` |
 | nodex-cc-2 | _(idle)_ | — | — |
 | nodex-codex | _(idle)_ | — | — |
 
@@ -35,7 +35,21 @@ _(空)_
 
 ## 进行中
 
-_(空)_
+### Sync Phase 0 Step 2 — 客户端 Sync-Ready 实施
+> **Owner**: nodex-cc | **Branch**: cc/sync-phase0-step2
+> **目标**: 实施 Phase 0 四项客户端预留（PeerID 持久化、VV 持久化、subscribeLocalUpdates hook、Workspace ID 规范化 + unlimitedStorage）
+> **Files**: `src/lib/loro-doc.ts`, `src/lib/loro-persistence.ts`, `src/entrypoints/sidepanel/App.tsx`, `src/stores/workspace-store.ts`, `wxt.config.ts`, `tests/vitest/sync-phase0.test.ts`
+> **Progress**:
+> - [x] 准备项 1: PeerID 持久化 — SnapshotRecord 格式 + initLoroDoc 恢复顺序 + try/catch fallback
+> - [x] 准备项 2: VersionVector 持久化 — persistSnapshot 原子保存 snapshot+peerIdStr+VV+savedAt
+> - [x] 准备项 3: subscribeLocalUpdates hook 点 — no-op + unsubscribe 管理 (resetLoroDoc + 工作区切换)
+> - [x] 准备项 4: Workspace ID 规范化 (`ws_{nanoid()}`) + unlimitedStorage 权限
+> - [x] Vitest 测试覆盖 (22 tests in sync-phase0.test.ts)
+> - [x] 更新 docs/TESTING.md §1.515 覆盖映射
+> **迭代日志**:
+> - [2026-02-22 nodex-cc] 任务认领：接手 Step 2 实施。Step 1（nodex-codex PR #75）已完成方案审查与文档修订。
+> - [2026-02-22 nodex-cc] 实施完成：4 项准备全部落地，22 tests pass，typecheck clean（sonner pre-existing），check:test-sync pass。PR #77 Draft。
+> - [2026-02-22 nodex-cc] 按 nodex-codex Step 1 反馈（a6f3e56）清理旧格式兼容：loadSnapshotRecord() 不再包装裸 Uint8Array，直接返回 null；删除 deprecated saveSnapshot/loadSnapshot legacy API；测试同步更新。全量验证通过（85/85 test files, typecheck clean, build ok）。
 
 ---
 

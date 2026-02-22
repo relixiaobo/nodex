@@ -11,6 +11,7 @@ import { CONTAINER_IDS } from '../../types/index.js';
 import { initLoroDoc } from '../../lib/loro-doc.js';
 import * as loroDoc from '../../lib/loro-doc.js';
 import { ensureWorkspaceHomeNode } from '../../lib/workspace-root.js';
+import { getOrCreateDefaultWorkspaceId } from '../../lib/workspace-id.js';
 import { findUnexpectedShortcutConflicts } from '../../lib/shortcut-registry.js';
 import { Toaster } from 'sonner';
 
@@ -64,8 +65,10 @@ function useBootstrap(skip: boolean): BootstrapResult {
 
     async function init() {
       // Phase 1: local-only Loro mode (no Supabase auth)
-      let currentWsId = wsId ?? 'ws_default';
-      if (!wsId) {
+      // Generate persistent unique workspace ID instead of 'ws_default'
+      let currentWsId = wsId;
+      if (!currentWsId) {
+        currentWsId = await getOrCreateDefaultWorkspaceId();
         setWorkspace(currentWsId);
         setUser('user_default');
       }

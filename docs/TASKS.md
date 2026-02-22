@@ -51,6 +51,7 @@ _(空)_
 > - [2026-02-22 nodex-codex] 将非法树引用前移到 `ReferenceSelector`：仅在树引用上下文禁用候选项，并通过 hover/高亮展示禁用原因；inline 引用上下文不受限制。
 > - [2026-02-22 nodex-codex] 新增轻量 `i18n` 基础层（en-only `t()` + fallback），并将本次 reference warning/selector 文案迁移到字典，避免组件内继续散落裸字符串。
 > - [2026-02-22 nodex-codex] 扩展轻量 i18n 使用范围到 `TagSelector` / `SlashCommandMenu`（空态与创建文案），验证 `t()` 插值与 key 覆盖。
+> - [2026-02-22 nodex-codex] 将 `ReferenceSelector` 剩余 section/empty/create 文案（Dates/Recently used/Nodes/No matches/Create）迁移到 i18n，补齐 reference 链路示范。
 
 ---
 

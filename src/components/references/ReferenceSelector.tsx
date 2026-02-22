@@ -294,7 +294,7 @@ export const ReferenceSelector = forwardRef<ReferenceDropdownHandle, ReferenceSe
         {dateMatches.length > 0 && (
           <>
             <div className="px-2 py-1 text-[10px] font-medium text-foreground-secondary uppercase tracking-wider">
-              Dates
+              {t('reference.selector.sectionDates')}
             </div>
             {dateMatches.map((dm, i) => (
               <button
@@ -321,17 +321,17 @@ export const ReferenceSelector = forwardRef<ReferenceDropdownHandle, ReferenceSe
         {/* Section header */}
         {!query.trim() && recentNodes.length > 0 && (
           <div className="px-2 py-1 text-[10px] font-medium text-foreground-secondary uppercase tracking-wider">
-            Recently used
+            {t('reference.selector.sectionRecentlyUsed')}
           </div>
         )}
         {query.trim() && items.length > 0 && (
           <div className="px-2 py-1 text-[10px] font-medium text-foreground-secondary uppercase tracking-wider">
-            Nodes
+            {t('reference.selector.sectionNodes')}
           </div>
         )}
 
         {items.length === 0 && dateMatches.length === 0 && !hasCreateOption && (
-          <div className="px-2 py-2 text-sm text-foreground-secondary">No matches</div>
+          <div className="px-2 py-2 text-sm text-foreground-secondary">{t('reference.selector.noMatches')}</div>
         )}
 
         {items.map((item, i) => (
@@ -389,7 +389,7 @@ export const ReferenceSelector = forwardRef<ReferenceDropdownHandle, ReferenceSe
               }}
             >
               <Plus size={14} className="text-foreground-secondary shrink-0" />
-              Create &ldquo;{query}&rdquo;
+              {t('reference.selector.create', { name: query })}
               <span className="ml-auto text-[10px] text-foreground-tertiary shrink-0">⌘↵</span>
             </button>
           </>

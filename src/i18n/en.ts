@@ -11,6 +11,11 @@ export const enMessages = {
       disabledReasonSelfChild: 'Cannot reference a node as its own child',
       disabledReasonCycle: 'Would create a circular tree reference',
       disabledReasonUnavailable: 'This node cannot be referenced right now',
+      sectionDates: 'Dates',
+      sectionRecentlyUsed: 'Recently used',
+      sectionNodes: 'Nodes',
+      noMatches: 'No matches',
+      create: 'Create "{name}"',
     },
   },
   tag: {

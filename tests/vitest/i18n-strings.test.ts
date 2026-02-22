@@ -4,6 +4,8 @@ import { getLocale, setLocale, t } from '../../src/i18n/strings.js';
 describe('i18n strings', () => {
   it('returns english messages by key', () => {
     expect(t('reference.selector.blockedBadge')).toBe('Blocked');
+    expect(t('reference.selector.sectionDates')).toBe('Dates');
+    expect(t('reference.selector.noMatches')).toBe('No matches');
     expect(t('slash.menu.noResults')).toBe('No results');
     expect(t('tag.selector.noTagsAvailable')).toBe('No tags available');
   });
@@ -17,6 +19,7 @@ describe('i18n strings', () => {
     expect(getLocale()).toBe('en');
     setLocale('en');
     expect(t('reference.blocked.unavailable')).toBe('This reference cannot be created');
+    expect(t('reference.selector.create', { name: 'Node' })).toBe('Create "Node"');
     expect(t('tag.selector.create', { name: 'Task' })).toBe('Create "Task"');
   });
 });

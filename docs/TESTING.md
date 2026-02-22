@@ -819,6 +819,16 @@ hash trigger cleanup safety（3 cases, Bug #53 + CJK hashtag 回归）:
 **覆盖点**:
 
 1. drag-select 根列表包含可见 `field + content` 行（不再仅 content）
+
+### 1.60 Lightweight i18n Strings
+
+**测试文件**: `tests/vitest/i18n-strings.test.ts`
+
+**覆盖点**:
+
+1. `t(key)` 读取英文默认文案（en-only 基础层）
+2. 缺失 key fallback 返回原 key（便于开发期发现漏翻）
+3. `getLocale/setLocale` 与基础文案读取保持稳定（后续多语言扩展入口）
 2. hidden field 仅在“已手动 reveal”时进入 drag-select 根列表
 
 ### 1.60 OutlinerView 渲染安全（白屏回归）

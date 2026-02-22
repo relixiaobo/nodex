@@ -77,6 +77,7 @@ import {
 import { dragState } from '../../hooks/use-drag-select';
 import { mergeRichTextPayload } from '../../lib/rich-text-merge.js';
 import { getTreeReferenceBlockReason, isReferenceDisplayCycle } from '../../lib/reference-rules.js';
+import { t } from '../../i18n/strings.js';
 
 const DESCRIPTION_SHORTCUT_KEYS = getShortcutKeys('editor.edit_description', ['Ctrl-i']);
 const EMPTY_REFERENCE_PATH: readonly string[] = [];
@@ -124,13 +125,13 @@ function focusTrailingInputForParent(parentId: string): boolean {
 function getTreeReferenceBlockMessage(reason: ReturnType<typeof getTreeReferenceBlockReason>): string {
   switch (reason) {
     case 'self_parent':
-      return 'Cannot reference a node as its own child';
+      return t('reference.blocked.selfChild');
     case 'would_create_display_cycle':
-      return 'Cannot create this tree reference (would create a cycle)';
+      return t('reference.blocked.cycle');
     case 'missing_parent':
     case 'missing_target':
     default:
-      return 'This reference cannot be created';
+      return t('reference.blocked.unavailable');
   }
 }
 
@@ -1942,7 +1943,7 @@ export function OutlinerItem({
           const insertPos = pos >= 0 ? pos : 0;
           const newRefId = addReference(parentId, refNodeId, insertPos);
           if (!newRefId) {
-            toast.warning('This tree reference cannot be created (it may create a cycle)');
+            toast.warning(t('reference.blocked.createFallback'));
             return;
           }
           trashNode(nodeId);

@@ -18,6 +18,7 @@ import * as loroDoc from '../../lib/loro-doc.js';
 import { ensureDateNode } from '../../lib/journal.js';
 import { formatDayName } from '../../lib/date-utils.js';
 import { getTreeReferenceBlockReason, type TreeReferenceBlockReason } from '../../lib/reference-rules.js';
+import { t } from '../../i18n/strings.js';
 
 export interface ReferenceDropdownHandle {
   getItemCount(): number;
@@ -140,12 +141,12 @@ export function collectRecentReferenceNodes(params: {
 function getTreeReferenceDisabledReason(reason: TreeReferenceBlockReason | null): string | null {
   switch (reason) {
     case 'self_parent':
-      return 'Cannot reference a node as its own child';
+      return t('reference.selector.disabledReasonSelfChild');
     case 'would_create_display_cycle':
-      return 'Would create a circular tree reference';
+      return t('reference.selector.disabledReasonCycle');
     case 'missing_parent':
     case 'missing_target':
-      return 'This node cannot be referenced right now';
+      return t('reference.selector.disabledReasonUnavailable');
     default:
       return null;
   }
@@ -356,7 +357,7 @@ export const ReferenceSelector = forwardRef<ReferenceDropdownHandle, ReferenceSe
               <span className="text-sm text-foreground truncate">{item.name}</span>
               {itemDisabledReasons.get(item.id) && (
                 <span className="ml-auto text-[10px] text-foreground-tertiary shrink-0">
-                  Blocked
+                  {t('reference.selector.blockedBadge')}
                 </span>
               )}
             </div>

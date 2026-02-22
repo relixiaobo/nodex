@@ -29,13 +29,22 @@ _(空)_
 |-------|---------|------|-------------|
 | nodex-cc | Sync 增量同步（Cloudflare-only）— Step 0 起 | `cc/sync-phase1` | `docs/plans/sync-incremental-impl.md`, `server/*` |
 | nodex-cc-2 | _(idle)_ | — | — |
-| nodex-codex | _(idle)_ | — | — |
+| nodex-codex | Reference node bullet 打开空白 NodePanel 排查 | `codex/reference-bullet-nodepanel-empty` | `src/components/outliner/OutlinerItem.tsx`, `src/components/panel/NodePanel.tsx`, `src/components/panel/PanelStack.tsx`, `docs/TASKS.md` |
 
 ---
 
 ## 进行中
 
-_(空)_
+### Reference node bullet 打开空白 NodePanel 排查
+> 复现并定位：点击 reference node 的 bullet 后，NodePanel 打开的页面为空，而不是引用目标节点的页面。
+> **Owner**: nodex-codex | **Branch**: `codex/reference-bullet-nodepanel-empty` | **Files**: `src/components/outliner/OutlinerItem.tsx`, `src/components/panel/NodePanel.tsx`, `src/components/panel/PanelStack.tsx`, `docs/TASKS.md`
+
+- [ ] 复现问题并定位触发链路（reference bullet → panel navigation）
+- [ ] 确认 root cause（引用节点 ID / 面板页面栈 / selector 上下文）
+- [ ] 修复并补充回归测试（如涉及 `src/` 行为变更）
+
+**迭代日志**
+- [2026-02-22 nodex-codex] 领取任务，基于 `origin/main` 新建 `codex/reference-bullet-nodepanel-empty`，准备排查 reference node bullet 打开空白 NodePanel 的问题。
 
 ---
 

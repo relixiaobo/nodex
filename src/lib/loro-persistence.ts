@@ -22,6 +22,19 @@ export interface SnapshotRecord {
 
 let dbPromise: Promise<IDBDatabase> | null = null;
 
+function isSnapshotRecord(value: unknown): value is SnapshotRecord {
+  if (!value || typeof value !== 'object') return false;
+  const candidate = value as Partial<SnapshotRecord>;
+  return (
+    candidate.snapshot instanceof Uint8Array &&
+    typeof candidate.peerIdStr === 'string' &&
+    candidate.versionVector instanceof Uint8Array &&
+    typeof candidate.savedAt === 'number' &&
+    Number.isFinite(candidate.savedAt) &&
+    candidate.savedAt >= 0
+  );
+}
+
 function openDB(): Promise<IDBDatabase> {
   if (dbPromise) return dbPromise;
   dbPromise = new Promise((resolve, reject) => {
@@ -73,14 +86,14 @@ export async function loadSnapshotRecord(workspaceId: string): Promise<SnapshotR
         resolve(null);
         return;
       }
-      // Only accept SnapshotRecord format (has snapshot + peerIdStr fields).
-      // Old bare Uint8Array format is discarded — project not yet launched.
-      if (result instanceof Uint8Array || !result.snapshot) {
+      // Only accept a fully-validated SnapshotRecord payload.
+      // Old bare Uint8Array format and partial/corrupt objects are discarded.
+      if (!isSnapshotRecord(result)) {
         console.warn('[loro-persistence] Discarding unrecognized snapshot format, will start fresh');
         resolve(null);
         return;
       }
-      resolve(result as SnapshotRecord);
+      resolve(result);
     };
     req.onerror = (e) => reject((e.target as IDBRequest).error);
   });

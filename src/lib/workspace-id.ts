@@ -10,6 +10,10 @@
 import { nanoid } from 'nanoid';
 
 const STORAGE_KEY = 'nodex_default_workspace_id';
+const WORKSPACE_ID_LOCK_NAME = 'nodex-default-workspace-id';
+
+// Deduplicate concurrent first-run bootstrap calls in the same JS context.
+let pendingDefaultWorkspaceId: Promise<string> | null = null;
 
 const hasChromeStorage =
   typeof chrome !== 'undefined' &&
@@ -32,19 +36,48 @@ async function setItem(key: string, value: string): Promise<void> {
   }
 }
 
+function hasWebLocks(): boolean {
+  return typeof navigator !== 'undefined' && !!navigator.locks?.request;
+}
+
+async function withWorkspaceIdLock<T>(fn: () => Promise<T>): Promise<T> {
+  if (!hasWebLocks()) return fn();
+  return navigator.locks.request(WORKSPACE_ID_LOCK_NAME, { mode: 'exclusive' }, fn);
+}
+
+async function getOrCreateDefaultWorkspaceIdUnlocked(): Promise<string> {
+  const existing = await getItem(STORAGE_KEY);
+  if (existing) return existing;
+
+  const generated = `ws_${nanoid()}`;
+  await setItem(STORAGE_KEY, generated);
+
+  // Re-read after write so the caller returns the canonical value if another
+  // context won the race and overwrote the key before we resume.
+  return (await getItem(STORAGE_KEY)) ?? generated;
+}
+
 /**
  * Get or create a persistent default workspace ID.
  * First call generates `ws_{nanoid()}` and persists it.
  * Subsequent calls return the same ID.
  */
 export async function getOrCreateDefaultWorkspaceId(): Promise<string> {
-  const existing = await getItem(STORAGE_KEY);
-  if (existing) return existing;
+  if (pendingDefaultWorkspaceId) return pendingDefaultWorkspaceId;
 
-  const id = `ws_${nanoid()}`;
-  await setItem(STORAGE_KEY, id);
-  return id;
+  const pending = withWorkspaceIdLock(() => getOrCreateDefaultWorkspaceIdUnlocked());
+  pendingDefaultWorkspaceId = pending;
+  try {
+    return await pending;
+  } finally {
+    if (pendingDefaultWorkspaceId === pending) pendingDefaultWorkspaceId = null;
+  }
 }
 
 /** Storage key — exposed for tests */
 export const DEFAULT_WORKSPACE_STORAGE_KEY = STORAGE_KEY;
+
+/** Reset module-level in-flight state — exposed for tests */
+export function _resetWorkspaceIdCacheForTest(): void {
+  pendingDefaultWorkspaceId = null;
+}

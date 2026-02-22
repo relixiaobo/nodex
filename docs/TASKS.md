@@ -27,7 +27,7 @@ _(空)_
 
 | Agent | 当前任务 | 分支 | 修改中的文件 |
 |-------|---------|------|-------------|
-| nodex-cc | _(idle)_ | — | — |
+| nodex-cc | Sync Phase 0 Step 2 — 客户端 Sync-Ready 实施 | cc/sync-phase0-step2 | `src/lib/loro-doc.ts`, `src/lib/loro-persistence.ts`, `src/entrypoints/sidepanel/App.tsx`, `src/stores/workspace-store.ts`, `wxt.config.ts` |
 | nodex-cc-2 | _(idle)_ | — | — |
 | nodex-codex | _(idle)_ | — | — |
 
@@ -35,7 +35,19 @@ _(空)_
 
 ## 进行中
 
-_(空)_
+### Sync Phase 0 Step 2 — 客户端 Sync-Ready 实施
+> **Owner**: nodex-cc | **Branch**: cc/sync-phase0-step2
+> **目标**: 实施 Phase 0 四项客户端预留（PeerID 持久化、VV 持久化、subscribeLocalUpdates hook、Workspace ID 规范化 + unlimitedStorage）
+> **Files**: `src/lib/loro-doc.ts`, `src/lib/loro-persistence.ts`, `src/entrypoints/sidepanel/App.tsx`, `src/stores/workspace-store.ts`, `wxt.config.ts`, `tests/vitest/sync-phase0.test.ts`
+> **Progress**:
+> - [ ] 准备项 1: PeerID 持久化 — 扩展 IndexedDB 存储格式 + initLoroDoc 恢复顺序
+> - [ ] 准备项 2: VersionVector 持久化 — 与 snapshot 同条记录存储
+> - [ ] 准备项 3: subscribeLocalUpdates hook 点 — no-op 预留 + unsubscribe 管理
+> - [ ] 准备项 4: Workspace ID 规范化 + unlimitedStorage 权限
+> - [ ] Vitest 测试覆盖
+> - [ ] 更新 docs/TESTING.md 覆盖映射
+> **迭代日志**:
+> - [2026-02-22 nodex-cc] 任务认领：接手 Step 2 实施。Step 1（nodex-codex PR #75）已完成方案审查与文档修订。
 
 ---
 

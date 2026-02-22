@@ -889,9 +889,14 @@ export function CalendarGrid({
 
       {/* Unified 7-column grid: headers + all day cells — equal gap in both directions */}
       <div className="grid grid-cols-7 gap-1">
-        {/* Day headers */}
+        {/* Day headers — weekend columns (Sun=0, Sat=6) use muted red */}
         {DAY_HEADERS.map((d, i) => (
-          <div key={`h${i}`} className="aspect-square flex items-center justify-center text-xs text-foreground-tertiary">
+          <div
+            key={`h${i}`}
+            className={`aspect-square flex items-center justify-center text-xs ${
+              i === 0 || i === 6 ? 'text-destructive/40' : 'text-foreground-tertiary'
+            }`}
+          >
             {d}
           </div>
         ))}

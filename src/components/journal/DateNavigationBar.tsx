@@ -130,13 +130,6 @@ export function DateNavigationBar({ dayNodeId }: DateNavigationBarProps) {
     setCalendarOpen(false);
   }, [navigateTo]);
 
-  // "Today" button inside calendar
-  const handleCalendarToday = useCallback(() => {
-    const todayId = ensureTodayNode();
-    navigateTo(todayId);
-    setCalendarOpen(false);
-  }, [navigateTo]);
-
   return (
     <div className="relative flex items-center gap-1 px-6 py-1.5 text-sm text-foreground-secondary" ref={calendarRef}>
       {/* Previous day */}
@@ -192,7 +185,6 @@ export function DateNavigationBar({ dayNodeId }: DateNavigationBarProps) {
             selectedDate={currentDateInfo?.dateStr ?? todayStr}
             onSelectDate={handleCalendarSelect}
             today={todayStr}
-            onToday={handleCalendarToday}
             noteCountMap={noteCountMap}
           />
         </div>

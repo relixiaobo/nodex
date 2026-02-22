@@ -2,6 +2,7 @@
  * Workspace & user authentication store.
  *
  * Persisted to chrome.storage.local.
+ * Auth backed by Better Auth (via Worker API) — no Supabase dependency.
  */
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
@@ -23,9 +24,9 @@ interface WorkspaceStore {
   signInWithGoogle(): Promise<void>;
   signOut(): Promise<void>;
   /**
-   * Checks the current Supabase session and subscribes to auth state changes.
-   * Returns an unsubscribe function.
-   * Should be called once during app bootstrap when Supabase is available.
+   * Checks the stored session token against the server and restores auth state.
+   * Returns an unsubscribe function (no-op for Better Auth; kept for API compat).
+   * Should be called once during app bootstrap.
    */
   initAuth(): Promise<() => void>;
 }
@@ -75,9 +76,9 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
       },
 
       initAuth: async () => {
-        const { getCurrentUser, onAuthStateChange } = await import('../lib/auth.js');
+        const { getCurrentUser } = await import('../lib/auth.js');
 
-        // Restore session if one exists
+        // Restore session from stored Bearer token (validated against server)
         const user = await getCurrentUser();
         if (user) {
           const currentWsId = useWorkspaceStore.getState().currentWorkspaceId;
@@ -91,29 +92,18 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
           set({ userId: null, isAuthenticated: false, authUser: null });
         }
 
-        // Subscribe to future auth changes
-        const unsubscribe = onAuthStateChange((user) => {
-          if (user) {
-            set({ userId: user.id, isAuthenticated: true, authUser: user });
-          } else {
-            set({
-              userId: null,
-              isAuthenticated: false,
-              currentWorkspaceId: null,
-              authUser: null,
-            });
-          }
-        });
-
-        return unsubscribe;
+        // No real-time subscription for Better Auth (unlike Supabase).
+        // Auth state is validated on startup; 401 responses during API calls
+        // will trigger re-auth as needed.
+        return () => {};
       },
     }),
     {
       name: 'nodex-workspace',
       storage: chromeLocalStorage,
       // Only persist UI preference. Auth state (userId, isAuthenticated, authUser)
-      // is the sole responsibility of Supabase session — derived via initAuth()
-      // on each startup. This avoids desync when Supabase refresh token expires.
+      // is validated via initAuth() on each startup using the stored Bearer token.
+      // This avoids desync when the session expires.
       partialize: (s) => ({
         currentWorkspaceId: s.currentWorkspaceId,
       }),

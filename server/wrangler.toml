@@ -1,0 +1,22 @@
+name = "nodex-sync"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+BETTER_AUTH_URL = "http://localhost:8787"
+
+# Sensitive vars — set via `wrangler secret put <NAME>`
+# GOOGLE_CLIENT_ID
+# GOOGLE_CLIENT_SECRET
+# BETTER_AUTH_SECRET
+# CHROME_EXTENSION_ID
+
+[[d1_databases]]
+binding = "SYNC_DB"
+database_name = "nodex-sync"
+database_id = "placeholder-replace-after-d1-create"
+
+[[r2_buckets]]
+binding = "SYNC_BUCKET"
+bucket_name = "nodex-sync"

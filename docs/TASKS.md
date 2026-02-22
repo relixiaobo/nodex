@@ -27,7 +27,7 @@ _(空)_
 
 | Agent | 当前任务 | 分支 | 修改中的文件 |
 |-------|---------|------|-------------|
-| nodex-cc | Sync 增量同步（Cloudflare-only）— Step 0 起 | `cc/sync-phase1` | `docs/plans/sync-incremental-impl.md`, `server/*` |
+| nodex-cc | Sync Step 0: Auth PoC（Better Auth + D1 + Workers） | `cc/auth-poc` | `server/*`, `src/lib/auth.ts`, `src/stores/workspace-store.ts` |
 | nodex-cc-2 | _(idle)_ | — | — |
 | nodex-codex | _(idle)_ | — | — |
 

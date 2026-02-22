@@ -1,13 +1,18 @@
 /**
- * Google OAuth + Supabase Auth flow for Chrome Extension.
+ * Google OAuth + Better Auth flow for Chrome Extension.
  *
- * Uses chrome.identity.launchWebAuthFlow with Supabase's PKCE OAuth flow.
- * The flow: Extension → Supabase /authorize → Google → Supabase callback → Extension
- *
- * This avoids needing to register chromiumapp.org in Google Cloud Console,
- * because Google's redirect goes to Supabase's callback URL (already registered).
+ * Flow:
+ *   1. Extension opens chrome.identity.launchWebAuthFlow → Worker sign-in URL
+ *   2. Worker (Better Auth) redirects to Google → user authenticates
+ *   3. Google redirects to Worker callback → Worker creates user + session + sets cookie
+ *   4. Worker redirects to /auth/extension-redirect (same domain → cookie is present)
+ *   5. /auth/extension-redirect reads session token from cookie, redirects to
+ *      https://{ext-id}.chromiumapp.org/?session_token=TOKEN
+ *   6. Extension captures URL, extracts token, stores in chrome.storage.local
+ *   7. All subsequent API calls use Authorization: Bearer <token>
  */
-import { getSupabase } from '../services/supabase.js';
+
+const STORAGE_KEY = 'auth_session_token';
 
 export interface AuthUser {
   id: string;
@@ -17,36 +22,36 @@ export interface AuthUser {
 }
 
 /**
- * Signs in with Google using chrome.identity.launchWebAuthFlow + Supabase PKCE OAuth.
+ * Get the sync API base URL.
+ */
+function getSyncApiUrl(): string {
+  return import.meta.env.VITE_SYNC_API_URL ?? 'http://localhost:8787';
+}
+
+/**
+ * Signs in with Google using chrome.identity.launchWebAuthFlow + Better Auth.
  * Returns the authenticated user on success.
  *
  * Requires:
- *  - Supabase Google provider enabled (Dashboard → Auth → Providers)
- *  - Google OAuth Web Application Client ID + Secret configured in Supabase
- *  - `https://<extension-id>.chromiumapp.org/` added to Supabase redirect URLs
- *  - `identity` permission in manifest
+ *   - Worker running with Better Auth + Google OAuth configured
+ *   - Google OAuth redirect URI registered: {WORKER_URL}/api/auth/callback/google
+ *   - CHROME_EXTENSION_ID set in Worker env
+ *   - `identity` permission in extension manifest
  */
 export async function signInWithGoogle(): Promise<AuthUser> {
-  const supabase = getSupabase();
-  const redirectTo = `https://${chrome.runtime.id}.chromiumapp.org/`;
+  const apiUrl = getSyncApiUrl();
+  const extensionRedirect = `${apiUrl}/auth/extension-redirect`;
 
-  // Get OAuth URL from Supabase (PKCE flow, don't redirect the browser)
-  const { data, error } = await supabase.auth.signInWithOAuth({
-    provider: 'google',
-    options: {
-      redirectTo,
-      skipBrowserRedirect: true,
-    },
-  });
-
-  if (error || !data.url) {
-    throw new Error(error?.message ?? 'Failed to get OAuth URL from Supabase');
-  }
+  // Build Better Auth sign-in URL
+  // After OAuth completes, Better Auth redirects to callbackURL (our extension-redirect endpoint)
+  const signInUrl = new URL(`${apiUrl}/api/auth/sign-in/social`);
+  signInUrl.searchParams.set('provider', 'google');
+  signInUrl.searchParams.set('callbackURL', extensionRedirect);
 
   // Launch Chrome identity web auth flow (opens a Google popup)
   const callbackUrl = await new Promise<string>((resolve, reject) => {
     chrome.identity.launchWebAuthFlow(
-      { url: data.url, interactive: true },
+      { url: signInUrl.toString(), interactive: true },
       (responseUrl) => {
         if (chrome.runtime.lastError) {
           reject(new Error(chrome.runtime.lastError.message));
@@ -59,80 +64,106 @@ export async function signInWithGoogle(): Promise<AuthUser> {
     );
   });
 
-  // Extract the PKCE authorization code from the callback URL
-  // Supabase redirects back with: https://<ext-id>.chromiumapp.org/?code=AUTH_CODE
+  // Extract session token from the callback URL
+  // The extension-redirect endpoint redirects to: https://{ext-id}.chromiumapp.org/?session_token=TOKEN
   const url = new URL(callbackUrl);
-  const authCode = url.searchParams.get('code');
+  const sessionToken = url.searchParams.get('session_token');
+  const error = url.searchParams.get('error');
 
-  if (!authCode) {
-    console.error('[auth] No code in callback URL:', callbackUrl);
-    throw new Error('Authentication failed — no authorization code received');
+  if (error) {
+    console.error('[auth] OAuth error:', error);
+    throw new Error(`Authentication failed: ${error}`);
   }
 
-  // Exchange PKCE authorization code for Supabase session
-  // (Supabase retrieves the stored code_verifier internally)
-  const { data: sessionData, error: sessionError } =
-    await supabase.auth.exchangeCodeForSession(authCode);
-
-  if (sessionError || !sessionData.user) {
-    throw new Error(sessionError?.message ?? 'Failed to exchange code for session');
+  if (!sessionToken) {
+    console.error('[auth] No session_token in callback URL:', callbackUrl);
+    throw new Error('Authentication failed — no session token received');
   }
 
-  return userFromSupabase(sessionData.user);
+  // Persist the session token
+  await chrome.storage.local.set({ [STORAGE_KEY]: sessionToken });
+
+  // Fetch user info using the session token
+  const user = await fetchCurrentUser(sessionToken);
+  if (!user) {
+    throw new Error('Authentication succeeded but failed to fetch user info');
+  }
+
+  return user;
 }
 
 /**
- * Signs out from Supabase.
+ * Signs out: invalidate server session + clear local token.
  */
 export async function signOut(): Promise<void> {
-  const supabase = getSupabase();
-  const { error } = await supabase.auth.signOut();
-  if (error) throw error;
+  const token = await getStoredToken();
+  if (token) {
+    try {
+      const apiUrl = getSyncApiUrl();
+      await fetch(`${apiUrl}/api/auth/sign-out`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+    } catch {
+      // Ignore network errors during sign-out (token will expire anyway)
+    }
+  }
+  await chrome.storage.local.remove(STORAGE_KEY);
 }
 
 /**
  * Returns the current authenticated user, or null if not authenticated.
+ * Validates the stored session token against the server.
  */
 export async function getCurrentUser(): Promise<AuthUser | null> {
-  const supabase = getSupabase();
-  const { data, error } = await supabase.auth.getUser();
-  if (error || !data.user) return null;
-  return userFromSupabase(data.user);
+  const token = await getStoredToken();
+  if (!token) return null;
+
+  const user = await fetchCurrentUser(token);
+  if (!user) {
+    // Token is invalid/expired — clean up
+    await chrome.storage.local.remove(STORAGE_KEY);
+  }
+  return user;
 }
 
 /**
- * Subscribes to auth state changes.
- * Returns an unsubscribe function.
+ * Returns the stored session token, or null.
  */
-export function onAuthStateChange(
-  callback: (user: AuthUser | null) => void,
-): () => void {
-  const supabase = getSupabase();
-  const {
-    data: { subscription },
-  } = supabase.auth.onAuthStateChange((_event, session) => {
-    if (!session?.user) {
-      callback(null);
-      return;
-    }
-    callback(userFromSupabase(session.user));
-  });
-  return () => subscription.unsubscribe();
+export async function getStoredToken(): Promise<string | null> {
+  const result = await chrome.storage.local.get(STORAGE_KEY);
+  return result[STORAGE_KEY] ?? null;
 }
 
 // ---------------------------------------------------------------------------
 // Internal helpers
 // ---------------------------------------------------------------------------
 
-function userFromSupabase(user: {
-  id: string;
-  email?: string;
-  user_metadata?: Record<string, unknown>;
-}): AuthUser {
-  return {
-    id: user.id,
-    email: user.email,
-    avatarUrl: user.user_metadata?.['avatar_url'] as string | undefined,
-    name: user.user_metadata?.['full_name'] as string | undefined,
-  };
+/**
+ * Fetch user info from Better Auth session endpoint using a Bearer token.
+ */
+async function fetchCurrentUser(token: string): Promise<AuthUser | null> {
+  try {
+    const apiUrl = getSyncApiUrl();
+    const res = await fetch(`${apiUrl}/api/auth/get-session`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    if (!res.ok) return null;
+
+    const data = await res.json() as {
+      user?: { id: string; name?: string; email?: string; image?: string };
+    };
+
+    if (!data.user) return null;
+
+    return {
+      id: data.user.id,
+      email: data.user.email,
+      name: data.user.name,
+      avatarUrl: data.user.image,
+    };
+  } catch {
+    return null;
+  }
 }

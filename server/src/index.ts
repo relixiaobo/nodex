@@ -1,0 +1,86 @@
+/**
+ * Nodex Sync Worker — Cloudflare Workers entry point.
+ *
+ * Routes:
+ *   /api/auth/*            — Better Auth (Google OAuth, session management)
+ *   /auth/extension-redirect — Chrome Extension OAuth redirect helper
+ *   /sync/*                — Sync endpoints (Steps 4-5, stubbed for now)
+ */
+import { Hono } from 'hono';
+import { cors } from 'hono/cors';
+import { getCookie } from 'hono/cookie';
+import { createAuth } from './lib/auth.js';
+import type { Env } from './types.js';
+
+const app = new Hono<{ Bindings: Env }>();
+
+// ---------------------------------------------------------------------------
+// CORS — must be before all routes
+// ---------------------------------------------------------------------------
+
+app.use('*', async (c, next) => {
+  const corsMiddleware = cors({
+    origin: [
+      `chrome-extension://${c.env.CHROME_EXTENSION_ID}`,
+      'http://localhost:5201',  // client dev server
+    ],
+    allowHeaders: ['Content-Type', 'Authorization'],
+    allowMethods: ['POST', 'GET', 'OPTIONS'],
+    credentials: true,
+    maxAge: 86400,
+  });
+  return corsMiddleware(c, next);
+});
+
+// ---------------------------------------------------------------------------
+// Better Auth routes
+// ---------------------------------------------------------------------------
+
+app.on(['POST', 'GET'], '/api/auth/**', (c) => {
+  const auth = createAuth(c.env);
+  return auth.handler(c.req.raw);
+});
+
+// ---------------------------------------------------------------------------
+// Chrome Extension OAuth redirect helper
+//
+// After Better Auth completes the Google OAuth flow and sets the session cookie,
+// it redirects here (same Worker domain → cookie is present). We extract the
+// session token from the cookie and redirect to the Chrome Extension URL with
+// the token as a query parameter, since the extension can't read cross-origin cookies.
+// ---------------------------------------------------------------------------
+
+app.get('/auth/extension-redirect', async (c) => {
+  const extId = c.env.CHROME_EXTENSION_ID;
+  const extRedirectBase = `https://${extId}.chromiumapp.org/`;
+
+  // Read the session token from Better Auth's cookie
+  const sessionToken = getCookie(c, 'better-auth.session_token');
+
+  if (!sessionToken) {
+    console.error('[auth] extension-redirect: no session cookie found');
+    return c.redirect(`${extRedirectBase}?error=no_session`);
+  }
+
+  // Redirect to Chrome Extension with the session token
+  const redirectUrl = new URL(extRedirectBase);
+  redirectUrl.searchParams.set('session_token', sessionToken);
+  return c.redirect(redirectUrl.toString());
+});
+
+// ---------------------------------------------------------------------------
+// Health check
+// ---------------------------------------------------------------------------
+
+app.get('/health', (c) => {
+  return c.json({ ok: true, service: 'nodex-sync' });
+});
+
+// ---------------------------------------------------------------------------
+// Sync endpoints (stub — implemented in Steps 4-5)
+// ---------------------------------------------------------------------------
+
+app.post('/sync/push', (c) => c.json({ error: 'Not implemented' }, 501));
+app.post('/sync/pull', (c) => c.json({ error: 'Not implemented' }, 501));
+
+export default app;

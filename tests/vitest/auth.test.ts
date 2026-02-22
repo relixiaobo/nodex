@@ -3,15 +3,39 @@
  *
  * Note: signInWithGoogle() cannot be unit-tested because it requires
  * chrome.identity.launchWebAuthFlow (a real Chrome extension API) and a live
- * Supabase OAuth flow. Those paths are covered by manual verification.
+ * Worker + Google OAuth flow. Those paths are covered by manual verification.
  *
  * What we can test here:
  *  - AuthUser shape contract (via mock)
- *  - getCurrentUser() returns null when Supabase has no session
- *  - onAuthStateChange() calls back with null when session is absent
+ *  - getCurrentUser() returns null when no stored token
+ *  - Exported API surface matches expected shape
  */
 
 import type { AuthUser } from '../../src/lib/auth.js';
+
+// Ensure chrome.storage.local is available in test environment
+beforeEach(() => {
+  const store: Record<string, unknown> = {};
+  globalThis.chrome = {
+    ...globalThis.chrome,
+    runtime: { ...globalThis.chrome?.runtime, id: 'test-extension-id' },
+    storage: {
+      ...globalThis.chrome?.storage,
+      local: {
+        get: vi.fn(async (key: string) => {
+          if (typeof key === 'string') return { [key]: store[key] };
+          return {};
+        }),
+        set: vi.fn(async (items: Record<string, unknown>) => {
+          Object.assign(store, items);
+        }),
+        remove: vi.fn(async (key: string) => {
+          delete store[key];
+        }),
+      },
+    },
+  } as unknown as typeof chrome;
+});
 
 describe('AuthUser type contract', () => {
   it('AuthUser has the expected fields', () => {
@@ -37,38 +61,28 @@ describe('AuthUser type contract', () => {
   });
 });
 
-describe('getCurrentUser with mocked Supabase', () => {
-  it('returns null when supabase.auth.getUser returns an error', async () => {
-    // Mock the supabase service module
-    vi.doMock('../../src/services/supabase.js', () => ({
-      getSupabase: () => ({
-        auth: {
-          getUser: vi.fn().mockResolvedValue({
-            data: { user: null },
-            error: new Error('not authenticated'),
-          }),
-        },
-      }),
-    }));
-
-    // Dynamically import after mock is set up
+describe('getCurrentUser with no stored token', () => {
+  it('returns null when no session token is stored', async () => {
     const { getCurrentUser } = await import('../../src/lib/auth.js');
     const result = await getCurrentUser();
-    // May return null or throw — both are acceptable when Supabase is unavailable
-    // The key assertion is that the function exists and is callable
-    expect(typeof getCurrentUser).toBe('function');
-    // In test environment Supabase isn't initialized, so null is expected
     expect(result).toBeNull();
   });
 });
 
-describe('signOut is exported and callable', () => {
-  it('signOut is a function', async () => {
-    // Just verify the export exists; actual network call is not testable in Vitest
+describe('getStoredToken', () => {
+  it('returns null when no token is stored', async () => {
+    const { getStoredToken } = await import('../../src/lib/auth.js');
+    const token = await getStoredToken();
+    expect(token).toBeNull();
+  });
+});
+
+describe('auth module exports', () => {
+  it('exports the expected functions', async () => {
     const authModule = await import('../../src/lib/auth.js');
     expect(typeof authModule.signOut).toBe('function');
     expect(typeof authModule.signInWithGoogle).toBe('function');
     expect(typeof authModule.getCurrentUser).toBe('function');
-    expect(typeof authModule.onAuthStateChange).toBe('function');
+    expect(typeof authModule.getStoredToken).toBe('function');
   });
 });

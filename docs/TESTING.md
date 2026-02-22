@@ -904,7 +904,7 @@ subscribeLocalUpdates hook:
 1. `OutlinerView` 在 NodePanel 场景可正常渲染（字段行 + 内容行同时存在）
 2. 防止运行时初始化顺序错误（TDZ）导致首屏白屏
 
-### 1.48 Auth 工具函数（Google OAuth + Supabase）
+### 1.48 Auth 工具函数（Google OAuth + Better Auth）
 
 **测试文件**: `tests/vitest/auth.test.ts`
 
@@ -912,10 +912,11 @@ subscribeLocalUpdates hook:
 
 1. `AuthUser` 类型包含 `id / email / avatarUrl / name` 字段
 2. `AuthUser` 允许可选字段缺失（仅 `id` 必填）
-3. `getCurrentUser` 在 Supabase 未初始化或返回错误时返回 `null`
-4. `signOut / signInWithGoogle / getCurrentUser / onAuthStateChange` 全部导出
+3. `getCurrentUser` 在无 stored session token 时返回 `null`
+4. `getStoredToken` 在无 token 时返回 `null`
+5. `signOut / signInWithGoogle / getCurrentUser / getStoredToken` 全部导出
 
-**注**：`signInWithGoogle` 需要 `chrome.identity.launchWebAuthFlow`，无法在 Vitest 中端到端测试，手工验收见 `docs/MANUAL-TEST-CHECKLIST.md`
+**注**：`signInWithGoogle` 需要 `chrome.identity.launchWebAuthFlow` + 运行中的 Worker，无法在 Vitest 中端到端测试，手工验收见 `docs/MANUAL-TEST-CHECKLIST.md`
 
 ### 1.37 Slash Command 注册与导航
 

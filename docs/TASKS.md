@@ -29,28 +29,13 @@ _(空)_
 |-------|---------|------|-------------|
 | nodex-cc | _(idle)_ | — | — |
 | nodex-cc-2 | _(idle)_ | — | — |
-| nodex-codex | Sync Phase 0 实现复审 + 修复 | `codex/sync-phase0-impl-review` | `src/lib/workspace-id.ts`, `src/lib/loro-persistence.ts`, `tests/vitest/sync-phase0.test.ts`, `docs/TESTING.md`, `docs/TASKS.md` |
+| nodex-codex | _(idle)_ | — | — |
 
 ---
 
 ## 进行中
 
-### Sync Phase 0 实现多角度 Review（基于 main）
-> 从正确性/边界条件/并发与同步语义/持久化兼容性/测试覆盖等角度复审 Phase 0（含 Step 1 方案与 Step 2 客户端 Sync-Ready 实施），并落地修复。
-> **Owner**: nodex-codex | **Branch**: `codex/sync-phase0-impl-review` | **Files**: `src/lib/workspace-id.ts`, `src/lib/loro-persistence.ts`, `tests/vitest/sync-phase0.test.ts`, `docs/TESTING.md`, `docs/TASKS.md`
-
-- [x] 阅读实现与相关测试（Sync Phase 0）
-- [x] 从多个角度输出 review findings（含文件/行号）
-- [x] 如有必要补充复现步骤或风险说明
-- [x] 修复 workspace ID 首次并发生成竞态（同进程 in-flight 去重；支持时启用 Web Locks）
-- [x] 加强 SnapshotRecord runtime 校验（拒绝部分损坏记录）
-- [x] 用真实持久化路径补强 sync-phase0 测试，并修正 VV 增量测试断言
-- [x] 更新 `docs/TESTING.md` 覆盖映射
-
-**迭代日志**
-- [2026-02-22 nodex-codex] 领取任务，准备基于 `origin/main` 新建 review 分支并开始多角度复审 Sync Phase 0 实现。
-- [2026-02-22 nodex-codex] 完成代码复审并输出 4 条改进项（workspaceId 并发竞态、SnapshotRecord 校验过宽、测试未走真实持久化路径、VV 增量测试断言不足），开始转化为具体修复。
-- [2026-02-22 nodex-codex] 已落地修复：workspace-id 增加 in-flight + Web Locks 去重；loro-persistence 增加 SnapshotRecord 类型守卫；sync-phase0 测试改为真实 persistence 模块路径（最小 IndexedDB test double）并补强 VV 增量导入断言；`sync-phase0.test.ts` 24 tests pass、`typecheck`/`check:test-sync` 通过。
+_(空)_
 
 ---
 
@@ -247,6 +232,7 @@ _(空)_
 
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
+| 2026-02-22 | Sync Phase 0 实现复审 + 修复（workspace ID 并发竞态、SnapshotRecord 校验加固、测试真实持久化路径、VV 增量断言修正） | nodex-codex | #78 |
 | 2026-02-22 | Sync Phase 0 Step 2 — 客户端 Sync-Ready 实施（PeerID/VV 持久化、subscribeLocalUpdates hook、Workspace ID 规范化、unlimitedStorage） | nodex-cc | #77 |
 | 2026-02-22 | Sync Phase 0 Step 1 — Review & 优化方案（Loro API/Chrome 约束/架构审查，修订 sync-architecture.md） | nodex-codex | #75 |
 | 2026-02-22 | Reference 引用环路防护 + 轻量 i18n 基础层 — 树引用显示图无环校验 + ReferenceSelector 禁用非法目标 + 渲染层循环展开兜底 + `t()` 文案迁移 | nodex-codex | #74 |

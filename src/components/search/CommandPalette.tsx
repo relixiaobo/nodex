@@ -253,12 +253,8 @@ export function CommandPalette() {
   const selectedItem = allItems[selectedIndex];
   const actionLabel = selectedItem ? getActionLabel(selectedItem.type) : 'Open';
 
-  // Compute group boundaries for rendering section headers
+  // Track global index across groups for keyboard selection
   let globalIdx = 0;
-  const suggestionsStart = 0;
-  const suggestionsEnd = hasQuery ? 0 : recentNodes.length + containerItems.length;
-  const commandsStart = suggestionsEnd;
-  const commandsEnd = hasQuery ? 0 : suggestionsEnd + commandItems.length;
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center pt-[12%]">

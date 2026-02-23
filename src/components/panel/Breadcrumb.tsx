@@ -17,7 +17,7 @@
  * [...] expands in-place (no navigation). Resets when nodeId changes.
  */
 import { useState, useEffect, useCallback } from 'react';
-import { PanelLeft, ChevronLeft, ChevronRight, Search, MoreHorizontal } from '../../lib/icons.js';
+import { ChevronLeft, ChevronRight, MoreHorizontal } from '../../lib/icons.js';
 import { useUIStore } from '../../stores/ui-store';
 import { useNodeStore } from '../../stores/node-store';
 import { useWorkspaceStore } from '../../stores/workspace-store';
@@ -47,8 +47,6 @@ export function resolveWorkspaceRootTargetId(params: {
 
 export function Breadcrumb({ nodeId, showCurrentName }: BreadcrumbProps) {
   const navigateTo = useUIStore((s) => s.navigateTo);
-  const toggleSidebar = useUIStore((s) => s.toggleSidebar);
-  const openSearch = useUIStore((s) => s.openSearch);
 
   const { ancestors, workspaceRootId } = useAncestors(nodeId);
   // isRootView: only true if there is an explicit workspace root node AND we're viewing it.
@@ -102,16 +100,7 @@ export function Breadcrumb({ nodeId, showCurrentName }: BreadcrumbProps) {
     : [];
 
   return (
-    <div className="flex h-11 items-center gap-0.5 px-3 text-xs text-foreground-secondary overflow-hidden">
-      {/* Sidebar toggle */}
-      <button
-        onClick={toggleSidebar}
-        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md hover:bg-foreground/5 hover:text-foreground"
-        title={t('breadcrumb.toggleSidebar')}
-      >
-        <PanelLeft size={16} strokeWidth={1.5} />
-      </button>
-
+    <div className="flex h-8 items-center gap-0.5 px-3 text-xs text-foreground-secondary overflow-hidden">
       {/* ← button: navigate to parent (hidden at root view) */}
       {canGoUp && (
         <button
@@ -182,17 +171,6 @@ export function Breadcrumb({ nodeId, showCurrentName }: BreadcrumbProps) {
         </>
       )}
 
-      {/* Spacer */}
-      <div className="flex-1" />
-
-      {/* Search button */}
-      <button
-        onClick={openSearch}
-        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md hover:bg-foreground/5 hover:text-foreground"
-        title={t('breadcrumb.search')}
-      >
-        <Search size={16} strokeWidth={1.5} />
-      </button>
     </div>
   );
 }

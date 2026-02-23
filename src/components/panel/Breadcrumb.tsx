@@ -100,7 +100,7 @@ export function Breadcrumb({ nodeId, showCurrentName }: BreadcrumbProps) {
     : [];
 
   return (
-    <div className="flex h-8 items-center gap-0.5 pl-[6px] pr-3 text-xs text-foreground-secondary overflow-hidden">
+    <div className="flex h-8 items-center gap-0.5 pl-[6px] pr-3 mt-1 text-xs text-foreground-secondary overflow-hidden">
       {/* ← button: navigate to parent (hidden at root view) */}
       {canGoUp && (
         <button

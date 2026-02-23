@@ -142,7 +142,7 @@ export function NodeHeader({ nodeId, onTitleRef }: NodeHeaderProps) {
   const showIconBlock = isTagDef || isFieldDef;
 
   return (
-    <div className="pt-3 pb-1">
+    <div className="pt-1 pb-1">
       {/* ── Block ①: Icon (conditional) ── */}
       {showIconBlock && (
         <div className="mb-1" style={{ paddingLeft: COL_B_OFFSET }}>

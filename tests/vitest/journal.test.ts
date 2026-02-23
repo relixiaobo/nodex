@@ -6,9 +6,11 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { seedTestDataSync } from '../../src/entrypoints/test/seed-data.js';
 import * as loroDoc from '../../src/lib/loro-doc.js';
-import { CONTAINER_IDS } from '../../src/types/index.js';
+import { TAG_COLOR_MAP, resolveTagColor } from '../../src/lib/tag-colors.js';
+import { CONTAINER_IDS, FIELD_TYPES } from '../../src/types/index.js';
 import { SYSTEM_TAGS } from '../../src/types/system-nodes.js';
 import {
+  ensureJournalTagDefs,
   ensureDateNode,
   ensureTodayNode,
   getAdjacentDayNodeId,
@@ -59,6 +61,14 @@ describe('ensureDateNode', () => {
     // Year is under JOURNAL
     const journalId = loroDoc.getParentId(yearId!);
     expect(journalId).toBe(CONTAINER_IDS.JOURNAL);
+
+    // Journal tagDefs are materialized as normal tagDef nodes in Schema
+    expect(loroDoc.toNodexNode(SYSTEM_TAGS.DAY)).toMatchObject({
+      id: SYSTEM_TAGS.DAY,
+      type: 'tagDef',
+      name: 'day',
+    });
+    expect(loroDoc.getParentId(SYSTEM_TAGS.DAY)).toBe(CONTAINER_IDS.SCHEMA);
   });
 
   it('is idempotent — second call returns same ID', () => {
@@ -66,6 +76,61 @@ describe('ensureDateNode', () => {
     const id1 = ensureDateNode(date);
     const id2 = ensureDateNode(date);
     expect(id1).toBe(id2);
+  });
+
+  it('applies #day template fields when creating a new day node', () => {
+    ensureJournalTagDefs();
+
+    const moodFieldId = 'attrDef_day_mood';
+    loroDoc.createNode(moodFieldId, SYSTEM_TAGS.DAY);
+    loroDoc.setNodeDataBatch(moodFieldId, {
+      type: 'fieldDef',
+      name: 'Mood',
+      fieldType: FIELD_TYPES.PLAIN,
+      cardinality: 'single',
+      nullable: true,
+    });
+    loroDoc.commitDoc('system:test-seed-day-tagdef-field');
+
+    const dayId = ensureDateNode(new Date(2026, 1, 14));
+    const dayChildren = loroDoc.getChildren(dayId);
+    const fieldEntryId = dayChildren.find((id) => {
+      const child = loroDoc.toNodexNode(id);
+      return child?.type === 'fieldEntry' && child.fieldDefId === moodFieldId;
+    });
+
+    expect(fieldEntryId).toBeTruthy();
+    expect(loroDoc.toNodexNode(fieldEntryId!)).toMatchObject({
+      type: 'fieldEntry',
+      fieldDefId: moodFieldId,
+      templateId: moodFieldId,
+    });
+  });
+
+  it('applies #day default content (shallow clone) when creating a new day node', () => {
+    ensureJournalTagDefs();
+
+    const templateNodeId = 'tpl_day_prompt';
+    loroDoc.createNode(templateNodeId, SYSTEM_TAGS.DAY);
+    loroDoc.setNodeDataBatch(templateNodeId, {
+      name: 'Top 3 priorities',
+      description: 'Daily template prompt',
+    });
+    loroDoc.createNode('tpl_day_prompt_child', templateNodeId);
+    loroDoc.setNodeDataBatch('tpl_day_prompt_child', { name: 'Nested template item (not shallow-cloned)' });
+    loroDoc.commitDoc('system:test-seed-day-default-content');
+
+    const dayId = ensureDateNode(new Date(2026, 1, 15));
+    const cloned = loroDoc.getChildren(dayId)
+      .map((id) => loroDoc.toNodexNode(id))
+      .find((n) => n?.templateId === templateNodeId);
+
+    expect(cloned).toMatchObject({
+      name: 'Top 3 priorities',
+      description: 'Daily template prompt',
+      templateId: templateNodeId,
+    });
+    expect(loroDoc.getChildren(cloned!.id)).toHaveLength(0);
   });
 
   it('creates separate day nodes for different dates', () => {
@@ -181,6 +246,66 @@ describe('ensureDateNode', () => {
     expect(dayNames).toContain('Sat, Feb 14');
     expect(dayNames).toContain('Wed, Feb 11');
     expect(dayNames).toContain('Mon, Feb 9');
+  });
+});
+
+describe('ensureJournalTagDefs', () => {
+  it('creates fixed-ID day/week/year tagDefs under Schema', () => {
+    ensureJournalTagDefs();
+
+    expect(loroDoc.toNodexNode(SYSTEM_TAGS.DAY)).toMatchObject({
+      type: 'tagDef',
+      name: 'day',
+      color: 'gray',
+    });
+    expect(loroDoc.toNodexNode(SYSTEM_TAGS.WEEK)).toMatchObject({
+      type: 'tagDef',
+      name: 'week',
+      color: 'gray',
+    });
+    expect(loroDoc.toNodexNode(SYSTEM_TAGS.YEAR)).toMatchObject({
+      type: 'tagDef',
+      name: 'year',
+      color: 'gray',
+    });
+
+    expect(loroDoc.getParentId(SYSTEM_TAGS.DAY)).toBe(CONTAINER_IDS.SCHEMA);
+    expect(loroDoc.getParentId(SYSTEM_TAGS.WEEK)).toBe(CONTAINER_IDS.SCHEMA);
+    expect(loroDoc.getParentId(SYSTEM_TAGS.YEAR)).toBe(CONTAINER_IDS.SCHEMA);
+
+    expect(resolveTagColor(SYSTEM_TAGS.DAY)).toEqual(TAG_COLOR_MAP.gray);
+    expect(resolveTagColor(SYSTEM_TAGS.WEEK)).toEqual(TAG_COLOR_MAP.gray);
+    expect(resolveTagColor(SYSTEM_TAGS.YEAR)).toEqual(TAG_COLOR_MAP.gray);
+  });
+
+  it('is idempotent when called multiple times', () => {
+    ensureJournalTagDefs();
+    ensureJournalTagDefs();
+
+    const schemaChildren = loroDoc.getChildren(CONTAINER_IDS.SCHEMA);
+    expect(schemaChildren.filter((id) => id === SYSTEM_TAGS.DAY)).toHaveLength(1);
+    expect(schemaChildren.filter((id) => id === SYSTEM_TAGS.WEEK)).toHaveLength(1);
+    expect(schemaChildren.filter((id) => id === SYSTEM_TAGS.YEAR)).toHaveLength(1);
+  });
+
+  it('backfills defaults without overwriting user custom settings', () => {
+    ensureJournalTagDefs();
+    loroDoc.setNodeDataBatch(SYSTEM_TAGS.WEEK, {
+      color: 'violet',
+    });
+    loroDoc.setNodeDataBatch(SYSTEM_TAGS.YEAR, {
+      color: '',
+    });
+    loroDoc.commitDoc('user:test-customize-journal-tagdefs');
+
+    ensureJournalTagDefs();
+
+    expect(loroDoc.toNodexNode(SYSTEM_TAGS.WEEK)).toMatchObject({
+      color: 'violet',
+    });
+    expect(loroDoc.toNodexNode(SYSTEM_TAGS.YEAR)).toMatchObject({
+      color: 'gray',
+    });
   });
 });
 

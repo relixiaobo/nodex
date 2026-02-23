@@ -41,41 +41,25 @@ export const FIELD_TYPES = {
 export type FieldType = typeof FIELD_TYPES[keyof typeof FIELD_TYPES];
 
 // ============================================================
-// SYSTEM_TAGS —— 系统标签固定 ID（可读，替代 SYS_T* opaque ID）
+// SYSTEM_TAGS —— 日期系统 tagDef 固定 ID（普通 supertag）
 // ============================================================
 
 /**
- * 用户可见系统标签 ID。
- * 这些值同时是 LoroTree 中系统 tagDef 节点的 ID（固定，不用 nanoid）。
- * 元标签（SUPERTAG, FIELD_DEFINITION）不创建为树节点——
- *   识别方式：node.type === 'tagDef' 即为标签定义。
+ * 日期系统使用的固定 tagDef 节点 ID。
+ * `day/week/year` 在数据模型中是普通 tagDef（普通 supertag），
+ * 仅由 journal 功能基于固定 ID 识别其语义。
  */
 export const SYSTEM_TAGS = {
-  // ─── 元标签（不创建树节点，仅作为常量参考）───
-  SUPERTAG: 'sys:supertag',
-  FIELD_DEFINITION: 'sys:field-definition',
-  OPTIONS: 'sys:options',
-
-  // ─── 日历系统（创建树节点）───
   DAY: 'sys:day',
   WEEK: 'sys:week',
   YEAR: 'sys:year',
-
-  // ─── 基础类型（创建树节点）───
-  TASK: 'sys:task',
-  MEETING: 'sys:meeting',
-  PERSON: 'sys:person',
-  ORGANIZATION: 'sys:organization',
-  LOCATION: 'sys:location',
-  EVENT: 'sys:event',
-  PROJECT: 'sys:project',
-  TOPIC: 'sys:topic',
-  ARTICLE: 'sys:article',
-  MEMO: 'sys:memo',
-  REFLECTION: 'sys:reflection',
 } as const;
 
 export type SystemTagId = typeof SYSTEM_TAGS[keyof typeof SYSTEM_TAGS];
+
+export function isJournalSystemTagId(tagId: string): boolean {
+  return tagId === SYSTEM_TAGS.DAY || tagId === SYSTEM_TAGS.WEEK || tagId === SYSTEM_TAGS.YEAR;
+}
 
 // ============================================================
 // SYS_A* —— 系统属性（保留，fieldEntry/viewDef 配置仍需）

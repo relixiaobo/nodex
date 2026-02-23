@@ -8,6 +8,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { useNodeStore } from '../../src/stores/node-store.js';
 import * as loroDoc from '../../src/lib/loro-doc.js';
 import { CONTAINER_IDS } from '../../src/types/index.js';
+import { SYSTEM_TAGS } from '../../src/types/system-nodes.js';
 import { collectNodeGraphErrors } from './helpers/invariants.js';
 import { resetAndSeed } from './helpers/test-state.js';
 
@@ -31,6 +32,23 @@ describe('trashNode', () => {
     useNodeStore.getState().trashNode('tagDef_task');
     expect(loroDoc.getParentId('tagDef_task')).toBe(CONTAINER_IDS.TRASH);
     expect(loroDoc.getChildren(CONTAINER_IDS.TRASH)).toContain('tagDef_task');
+  });
+
+  it('does not trash protected date tagDefs (sys:day/week/year)', () => {
+    const beforeDayParent = loroDoc.getParentId(SYSTEM_TAGS.DAY);
+    const beforeWeekParent = loroDoc.getParentId(SYSTEM_TAGS.WEEK);
+    const beforeYearParent = loroDoc.getParentId(SYSTEM_TAGS.YEAR);
+
+    useNodeStore.getState().trashNode(SYSTEM_TAGS.DAY);
+    useNodeStore.getState().trashNode(SYSTEM_TAGS.WEEK);
+    useNodeStore.getState().trashNode(SYSTEM_TAGS.YEAR);
+
+    expect(loroDoc.getParentId(SYSTEM_TAGS.DAY)).toBe(beforeDayParent);
+    expect(loroDoc.getParentId(SYSTEM_TAGS.WEEK)).toBe(beforeWeekParent);
+    expect(loroDoc.getParentId(SYSTEM_TAGS.YEAR)).toBe(beforeYearParent);
+    expect(loroDoc.getChildren(CONTAINER_IDS.TRASH)).not.toContain(SYSTEM_TAGS.DAY);
+    expect(loroDoc.getChildren(CONTAINER_IDS.TRASH)).not.toContain(SYSTEM_TAGS.WEEK);
+    expect(loroDoc.getChildren(CONTAINER_IDS.TRASH)).not.toContain(SYSTEM_TAGS.YEAR);
   });
 
   it('trashing tagDef does not remove tag from nodes that had it applied', () => {

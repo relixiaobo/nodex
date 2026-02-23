@@ -9,7 +9,7 @@
 import { create } from 'zustand';
 import { nanoid } from 'nanoid';
 import type { NodexNode, TextMark, InlineRefEntry, FieldType } from '../types/index.js';
-import { CONTAINER_IDS, SYS_A, SYS_V } from '../types/index.js';
+import { CONTAINER_IDS, SYS_A, SYS_V, isJournalSystemTagId } from '../types/index.js';
 import { isWorkspaceContainer } from '../lib/tree-utils.js';
 import * as loroDoc from '../lib/loro-doc.js';
 import { getTreeReferenceBlockReason } from '../lib/reference-rules.js';
@@ -117,6 +117,56 @@ function getTemplateFieldDefs(tagDefId: string): string[] {
   });
 }
 
+/** 查找 tagDef 下的默认内容节点（仅顶层普通内容节点，不递归）。 */
+function getTemplateContentNodes(tagDefId: string): string[] {
+  const children = loroDoc.getChildren(tagDefId);
+  return children.filter((cid) => {
+    const c = loroDoc.toNodexNode(cid);
+    return !!c && !c.type;
+  });
+}
+
+function findTemplateContentClone(nodeId: string, templateNodeId: string): string | null {
+  const children = loroDoc.getChildren(nodeId);
+  for (const cid of children) {
+    const c = loroDoc.toNodexNode(cid);
+    if (c?.templateId === templateNodeId) return cid;
+  }
+  return null;
+}
+
+function cloneTemplateContentNodeShallow(parentId: string, templateNodeId: string): void {
+  if (findTemplateContentClone(parentId, templateNodeId)) return;
+
+  const template = loroDoc.toNodexNode(templateNodeId);
+  if (!template || template.type) return;
+
+  const clonedId = nanoid();
+  loroDoc.createNode(clonedId, parentId);
+  loroDoc.setNodeDataBatch(clonedId, {
+    templateId: templateNodeId,
+    ...(template.description !== undefined && { description: template.description }),
+    ...(template.viewMode !== undefined && { viewMode: template.viewMode }),
+    ...(template.editMode !== undefined && { editMode: template.editMode }),
+    ...(template.flags !== undefined && { flags: template.flags }),
+    ...(template.imageWidth !== undefined && { imageWidth: template.imageWidth }),
+    ...(template.imageHeight !== undefined && { imageHeight: template.imageHeight }),
+    ...(template.aiSummary !== undefined && { aiSummary: template.aiSummary }),
+    ...(template.sourceUrl !== undefined && { sourceUrl: template.sourceUrl }),
+  });
+
+  if (template.marks || template.inlineRefs) {
+    loroDoc.setNodeRichTextContent(
+      clonedId,
+      template.name ?? '',
+      template.marks ?? [],
+      template.inlineRefs ?? [],
+    );
+  } else if (template.name !== undefined) {
+    loroDoc.setNodeData(clonedId, 'name', template.name);
+  }
+}
+
 /** 递归获取 tagDef 的 extends 链（包含自身） */
 function getExtendsChain(tagDefId: string, visited = new Set<string>()): string[] {
   if (visited.has(tagDefId)) return [];
@@ -128,6 +178,45 @@ function getExtendsChain(tagDefId: string, visited = new Set<string>()): string[
     chain.push(...getExtendsChain(tagDef.extends, visited));
   }
   return chain;
+}
+
+/**
+ * Apply tag side effects without committing.
+ * Shared by node-store.applyTag() and journal date-node creation so both paths
+ * get the same template field instantiation behavior.
+ */
+export function applyTagMutationsNoCommit(nodeId: string, tagDefId: string): void {
+  // 1. 添加标签
+  loroDoc.addTag(nodeId, tagDefId);
+
+  // 2. 处理 extends 链（继承父标签的 fieldDefs）
+  const extendsChain = getExtendsChain(tagDefId);
+
+  // 3. 为所有 fieldDef 创建 fieldEntry（若不存在）
+  for (const chainTagId of extendsChain) {
+    const fieldDefs = getTemplateFieldDefs(chainTagId);
+    for (const fdId of fieldDefs) {
+      if (!findFieldEntry(nodeId, fdId)) {
+        const feId = nanoid();
+        loroDoc.createNode(feId, nodeId);
+        loroDoc.setNodeDataBatch(feId, {
+          type: 'fieldEntry',
+          fieldDefId: fdId,
+          templateId: fdId,
+        });
+      }
+    }
+  }
+
+  // 4. 克隆默认内容（仅当前 tagDef 的顶层普通内容节点，shallow clone）
+  // 注：继承链上的 default content 自动传播仍属于 Extend Phase 2（未实现）。
+  for (const templateNodeId of getTemplateContentNodes(tagDefId)) {
+    cloneTemplateContentNodeShallow(nodeId, templateNodeId);
+  }
+
+  // 5. 传播 childSupertag
+  const tagDef = loroDoc.toNodexNode(tagDefId);
+  void tagDef; // childSupertag 仅在 createChild/createSibling 时处理
 }
 
 // ============================================================
@@ -381,6 +470,8 @@ export const useNodeStore = create<NodeStore>((set, get) => {
 
     trashNode: (nodeId) => {
       if (isWorkspaceContainer(nodeId)) return;
+      const node = loroDoc.toNodexNode(nodeId);
+      if (node?.type === 'tagDef' && isJournalSystemTagId(nodeId)) return;
       const parentId = loroDoc.getParentId(nodeId);
       const siblings = parentId ? loroDoc.getChildren(parentId) : [];
       const index = siblings.indexOf(nodeId);
@@ -441,34 +532,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
     // ─── 标签操作 ───
 
     applyTag: (nodeId, tagDefId) => {
-      // 1. 添加标签
-      loroDoc.addTag(nodeId, tagDefId);
-
-      // 2. 处理 extends 链（继承父标签的 fieldDefs）
-      const extendsChain = getExtendsChain(tagDefId);
-
-      // 3. 为所有 fieldDef 创建 fieldEntry（若不存在）
-      for (const chainTagId of extendsChain) {
-        const fieldDefs = getTemplateFieldDefs(chainTagId);
-        for (const fdId of fieldDefs) {
-          if (!findFieldEntry(nodeId, fdId)) {
-            const feId = nanoid();
-            // 找到插入位置（fieldEntry 排在 content children 之后）
-            loroDoc.createNode(feId, nodeId);
-            loroDoc.setNodeDataBatch(feId, {
-              type: 'fieldEntry',
-              fieldDefId: fdId,
-              templateId: fdId,
-            });
-          }
-        }
-      }
-
-      // 4. 传播 childSupertag
-      const tagDef = loroDoc.toNodexNode(tagDefId);
-      // childSupertag 是给新创建的子节点用的，不在 applyTag 时处理
-      // （由 createChild 在创建子节点时自动检测）
-      void tagDef; // suppress lint warning
+      applyTagMutationsNoCommit(nodeId, tagDefId);
       loroDoc.commitDoc();
     },
 

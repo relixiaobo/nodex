@@ -13,6 +13,7 @@ import * as loroDoc from '../../lib/loro-doc.js';
 import { ensureWorkspaceHomeNode } from '../../lib/workspace-root.js';
 import { getOrCreateDefaultWorkspaceId } from '../../lib/workspace-id.js';
 import { findUnexpectedShortcutConflicts } from '../../lib/shortcut-registry.js';
+import { ensureJournalTagDefs } from '../../lib/journal.js';
 import { Toaster } from 'sonner';
 
 const CONTAINER_DEFS: Array<{ id: string; name: string }> = [
@@ -39,6 +40,8 @@ async function seedWorkspace(wsId: string): Promise<void> {
       loroDoc.setNodeRichTextContent(id, name, [], []);
     }
   }
+
+  ensureJournalTagDefs();
 }
 
 interface BootstrapResult {

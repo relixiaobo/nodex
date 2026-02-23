@@ -4,7 +4,7 @@
  *
  * Shared between TagBadge, BulletChevron, and NodePicker.
  */
-import { SYS_A } from '../types/index.js';
+import { SYS_A, SYSTEM_TAGS } from '../types/index.js';
 import type { NodexNode } from '../types/index.js';
 import { resolveConfigValue } from './field-utils.js';
 import * as loroDoc from './loro-doc.js';
@@ -53,6 +53,12 @@ export const TAG_COLOR_MAP: Record<string, TagColor> = {
   gray: TAG_COLOR_GRAY,
 };
 
+const JOURNAL_TAG_IDS = new Set<string>([
+  SYSTEM_TAGS.DAY,
+  SYSTEM_TAGS.WEEK,
+  SYSTEM_TAGS.YEAR,
+]);
+
 /**
  * 10 swatch options for the color picker UI.
  * Order matches the visual layout (warm → cool → neutral).
@@ -85,7 +91,8 @@ export function getTagColor(tagDefId: string): TagColor {
  * Resolve tag color with config priority:
  * 1. System tags (SYS_T*) → always gray
  * 2. SYS_A11 config value → named color from TAG_COLOR_MAP
- * 3. Fallback → deterministic hash
+ * 3. Journal date tags (`sys:day/week/year`) default to gray
+ * 4. Fallback → deterministic hash
  */
 export function resolveTagColor(
   tagDefId: string,
@@ -101,6 +108,9 @@ export function resolveTagColor(
       return TAG_COLOR_MAP[colorKey];
     }
   }
+
+  // Date system tagDefs default to gray unless the user explicitly configured a color.
+  if (JOURNAL_TAG_IDS.has(tagDefId)) return TAG_COLOR_GRAY;
 
   // Fallback to hash
   return getTagColor(tagDefId);

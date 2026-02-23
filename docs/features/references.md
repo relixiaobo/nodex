@@ -123,17 +123,9 @@
 - **字段值引用**: `type='fieldEntry'` 的节点，其 children 包含 `nodeId`
 - **去重规则**: 同一引用不会同时出现在 "Mentioned in" 和 "Appears as [Field] in" 中（`computeBacklinks` 和 `buildBacklinkCountMap` 均跳过 fieldEntry 内的树引用）
 - **性能**:
-  - `buildBacklinkCountMap(version)` 按 `_version` 缓存，同一渲染周期内多个 `useBacklinkCount` 调用 O(1)
+  - `buildBacklinkCountMap(version)` 按 `_version` 缓存（供反向链接相关查询复用）
   - `computeBacklinks(nodeId, version)` 按 `(version, nodeId)` 缓存，同一 `_version` 内同一节点不重复扫描
   - `buildBacklinkCountMap` 预计算 trash set（从 TRASH 根节点 BFS），避免每个节点重复走 parent chain
-
-### 引用计数 Badge
-
-- 节点行**右侧**浮现半透明引用计数数字
-- 仅在节点**未聚焦/未 zoom in** 时显示
-- 计数 = 树引用 + 内联引用 + 字段值引用总数
-- 点击计数数字 → 展开引用列表（或导航到该节点显示 references section）
-- 可通过设置开关控制显示/隐藏
 
 ### 合并节点 — 未实现（P3）
 
@@ -166,6 +158,7 @@
 | 2026-02-23 | computeBacklinks 添加 (version, nodeId) 缓存 | PR review: Zustand selector 每次 _version 变化触发，缓存避免冗余全量扫描 |
 | 2026-02-23 | buildBacklinkCountMap 预计算 trash set（BFS from TRASH root） | PR review: 替代逐节点 isInTrash() parent chain walk，O(T) 预计算 vs O(N×D) 逐条 |
 | 2026-02-23 | Reference bullet/drillDown 导航目标改为 `referenceTargetId ?? nodeId` | 修复：点击 reference 行 bullet 错误传入壳节点 ID 导致空白 NodePanel |
+| 2026-02-23 | 移除 Outliner 行尾引用计数 badge | 简化行内视觉层级；引用总数仍保留在 Backlinks section 标题中 |
 
 ## 当前状态
 
@@ -178,7 +171,6 @@
 - [x] 引用节点单击选中（fit-content 边框）、双击编辑
 - [x] 空节点 `@` 创建后进入转换模式，可继续输入
 - [x] 反向链接 section（"Mentioned in..." + "Appears as [Field] in..." 分组）
-- [x] 引用计数 badge（OutlinerItem 行右侧半透明数字）
 - [ ] 合并节点
 
 ## 与 Tana 的已知差异
@@ -186,4 +178,3 @@
 - Tana 支持引用节点的拖拽排序（Nodex 已支持）
 - Tana 有 "Unlinked mentions" 功能（名称文本匹配但未正式链接），Nodex 暂不实现（需全文索引）
 - Tana 有 `LINKS_TO` 系统字段用于 Live Search 自定义反向链接视图，Nodex 依赖 Search Nodes (#23)
-- Tana 引用计数 badge 可在设置中开关，Nodex 初始实现默认显示

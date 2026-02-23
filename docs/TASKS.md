@@ -29,7 +29,7 @@ _(空)_
 |-------|---------|------|-------------|
 | nodex-cc | _(idle)_ | — | — |
 | nodex-cc-2 | _(idle)_ | — | — |
-| nodex-codex | Inline reference 内容节点误显示虚线 bullet（pending-conversion UI 误判）+ 移除 outliner 引用次数数字 | `codex/inline-ref-bullet-style` | `src/components/outliner/OutlinerItem.tsx`, `tests/vitest/outliner-item-reference-bullet.test.ts`, `tests/vitest/outliner-view-render.test.ts`, `docs/TESTING.md`, `docs/TASKS.md` |
+| nodex-codex | Inline reference 内容节点误显示虚线 bullet（pending-conversion UI 误判）+ 移除 outliner 引用次数数字 | `codex/inline-ref-bullet-style` | `src/components/outliner/OutlinerItem.tsx`, `tests/vitest/outliner-item-reference-bullet.test.ts`, `tests/vitest/outliner-view-render.test.ts`, `docs/TESTING.md`, `docs/features/references.md`, `docs/TASKS.md` |
 
 ---
 
@@ -37,7 +37,7 @@ _(空)_
 
 ### Inline reference 内容节点误显示虚线 bullet（pending-conversion UI 误判）+ 移除 outliner 引用次数数字
 > 场景：同父节点已存在目标 child 时，`@` 会回退为 inline reference（普通内容节点 + inline ref），但该节点 bullet 仍显示虚线引用壳样式；同时用户希望移除 outliner 行尾显示的引用次数数字（backlink count badge），简化视觉层级。
-> **Owner**: nodex-codex | **Branch**: `codex/inline-ref-bullet-style` | **Files**: `src/components/outliner/OutlinerItem.tsx`, `tests/vitest/outliner-item-reference-bullet.test.ts`, `tests/vitest/outliner-view-render.test.ts`, `docs/TESTING.md`, `docs/TASKS.md`
+> **Owner**: nodex-codex | **Branch**: `codex/inline-ref-bullet-style` | **Files**: `src/components/outliner/OutlinerItem.tsx`, `tests/vitest/outliner-item-reference-bullet.test.ts`, `tests/vitest/outliner-view-render.test.ts`, `docs/TESTING.md`, `docs/features/references.md`, `docs/TASKS.md`
 
 - [x] 定位虚线 bullet 样式触发条件（pending conversion / single-inline-ref fallback）
 - [x] 修复普通 inline reference 内容节点不再显示虚线 bullet
@@ -49,6 +49,7 @@ _(空)_
 - [2026-02-23 nodex-codex] 确认根因：`OutlinerItem` 将 `hasSingleInlineRefAtomContent` 直接并入 `BulletChevron.isReference`，导致普通内容节点（仅含 inline ref atom）被误渲染为引用壳虚线 bullet；改为只看 `isReference/isPendingConversion/isOptionsValueNode`，并新增 `outliner-item-reference-bullet.test.ts` 锁定回归；`typecheck` / 全量 `test:run` / `build` 均通过。
 - [2026-02-23 nodex-codex] Follow-up（用户反馈样式复杂）：继续在同一分支/PR 上移除 Outliner 行尾 backlink count 数字，保留 backlinks 能力在面板中查看，简化行内视觉信息。
 - [2026-02-23 nodex-codex] 移除 `OutlinerItem` 的 backlink count badge 渲染与 `useBacklinkCount` 订阅（仅影响行内视觉，不影响 Backlinks 面板）；补 `outliner-view-render.test.ts` 断言不再输出 `title=\"N reference(s)\"`，并同步 `docs/TESTING.md` 覆盖说明。
+- [2026-02-23 nodex-codex] 处理 PR #87 review：更新 `docs/features/references.md` 移除过期的引用计数 badge 行为/状态/差异说明并记录“移除 badge”决策；补 `isOptionsValueNode=true` 的虚线 bullet 测试；将 `isReferenceLikeRow` 复用 `shouldRenderReferenceBulletStyle()` 消除重复变量。
 
 ---
 

@@ -18,6 +18,14 @@ describe('OutlinerItem reference bullet style', () => {
     })).toBe(true);
   });
 
+  it('shows dashed bullet for options value rows', () => {
+    expect(shouldRenderReferenceBulletStyle({
+      isReference: false,
+      isPendingConversion: false,
+      isOptionsValueNode: true,
+    })).toBe(true);
+  });
+
   it('does not treat inline reference content rows as reference bullets', () => {
     expect(shouldRenderReferenceBulletStyle({
       isReference: false,

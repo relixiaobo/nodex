@@ -183,6 +183,9 @@ function scheduleSave(): void {
 async function persistSnapshot(): Promise<void> {
   if (!doc || !currentWorkspaceId) return;
   try {
+    // Commit pending changes so subscribeLocalUpdates fires
+    // (produces update bytes for the sync pending queue).
+    doc.commit({ origin: DEFAULT_USER_COMMIT_ORIGIN });
     const snapshot = doc.export({ mode: 'snapshot' });
     const vvBytes = doc.oplogVersion().encode();
     await saveSnapshotRecord(currentWorkspaceId, {

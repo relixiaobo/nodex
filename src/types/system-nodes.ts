@@ -57,6 +57,10 @@ export const SYSTEM_TAGS = {
 
 export type SystemTagId = typeof SYSTEM_TAGS[keyof typeof SYSTEM_TAGS];
 
+export function isJournalSystemTagId(tagId: string): boolean {
+  return tagId === SYSTEM_TAGS.DAY || tagId === SYSTEM_TAGS.WEEK || tagId === SYSTEM_TAGS.YEAR;
+}
+
 // ============================================================
 // SYS_A* —— 系统属性（保留，fieldEntry/viewDef 配置仍需）
 // ============================================================

@@ -9,7 +9,7 @@
 import { create } from 'zustand';
 import { nanoid } from 'nanoid';
 import type { NodexNode, TextMark, InlineRefEntry, FieldType } from '../types/index.js';
-import { CONTAINER_IDS, SYS_A, SYS_V } from '../types/index.js';
+import { CONTAINER_IDS, SYS_A, SYS_V, isJournalSystemTagId } from '../types/index.js';
 import { isWorkspaceContainer } from '../lib/tree-utils.js';
 import * as loroDoc from '../lib/loro-doc.js';
 import { getTreeReferenceBlockReason } from '../lib/reference-rules.js';
@@ -470,6 +470,8 @@ export const useNodeStore = create<NodeStore>((set, get) => {
 
     trashNode: (nodeId) => {
       if (isWorkspaceContainer(nodeId)) return;
+      const node = loroDoc.toNodexNode(nodeId);
+      if (node?.type === 'tagDef' && isJournalSystemTagId(nodeId)) return;
       const parentId = loroDoc.getParentId(nodeId);
       const siblings = parentId ? loroDoc.getChildren(parentId) : [];
       const index = siblings.indexOf(nodeId);

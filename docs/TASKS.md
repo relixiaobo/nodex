@@ -29,7 +29,7 @@ _(空)_
 |-------|---------|------|-------------|
 | nodex-cc | Sync 增量同步（Cloudflare-only）— Step 0 起 | `cc/sync-phase1` | `docs/plans/sync-incremental-impl.md`, `server/*` |
 | nodex-cc-2 | _(idle)_ | — | — |
-| nodex-codex | 日期系统标签节点化（day/week/year 作为普通 supertag） | `codex/date-system-tagdefs` | `src/types/system-nodes.ts`, `src/lib/journal.ts`, `src/lib/tag-colors.ts`, `src/stores/node-store.ts`, `src/entrypoints/sidepanel/App.tsx`, `src/components/tags/TagBadge.tsx`, `tests/vitest/journal.test.ts`, `tests/vitest/node-store-tags-refs.test.ts`, `tests/vitest/tag-badge-navigation.test.ts`, `tests/vitest/tag-colors.test.ts`, `docs/features/date-nodes.md`, `docs/features/supertags.md`, `docs/TESTING.md`, `docs/TASKS.md` |
+| nodex-codex | 日期系统标签节点化（day/week/year 作为普通 supertag） | `codex/date-system-tagdefs` | `src/types/system-nodes.ts`, `src/types/index.ts`, `src/lib/journal.ts`, `src/lib/tag-colors.ts`, `src/stores/node-store.ts`, `src/entrypoints/sidepanel/App.tsx`, `src/components/panel/NodePanel.tsx`, `src/components/tags/TagBadge.tsx`, `tests/vitest/journal.test.ts`, `tests/vitest/node-store-tags-refs.test.ts`, `tests/vitest/node-store-trash-semantics.test.ts`, `tests/vitest/tag-badge-navigation.test.ts`, `tests/vitest/tag-colors.test.ts`, `docs/features/date-nodes.md`, `docs/features/supertags.md`, `docs/TESTING.md`, `docs/TASKS.md` |
 
 ---
 
@@ -37,7 +37,7 @@ _(空)_
 
 ### 日期系统标签节点化（day/week/year 作为普通 supertag）
 > 将 `day/week/year` 从“仅系统语义 ID”升级为真实 `tagDef` 节点，并保持固定 ID（`sys:day/week/year`）。它们在数据模型中是普通 supertag，仅由 journal 功能以固定 ID 识别。
-> **Owner**: nodex-codex | **Branch**: `codex/date-system-tagdefs` | **Files**: `src/types/system-nodes.ts`, `src/lib/journal.ts`, `src/lib/tag-colors.ts`, `src/stores/node-store.ts`, `src/entrypoints/sidepanel/App.tsx`, `src/components/tags/TagBadge.tsx`, `tests/vitest/journal.test.ts`, `tests/vitest/node-store-tags-refs.test.ts`, `tests/vitest/tag-badge-navigation.test.ts`, `tests/vitest/tag-colors.test.ts`, `docs/features/date-nodes.md`, `docs/features/supertags.md`, `docs/TESTING.md`, `docs/TASKS.md`
+> **Owner**: nodex-codex | **Branch**: `codex/date-system-tagdefs` | **Files**: `src/types/system-nodes.ts`, `src/types/index.ts`, `src/lib/journal.ts`, `src/lib/tag-colors.ts`, `src/stores/node-store.ts`, `src/entrypoints/sidepanel/App.tsx`, `src/components/panel/NodePanel.tsx`, `src/components/tags/TagBadge.tsx`, `tests/vitest/journal.test.ts`, `tests/vitest/node-store-tags-refs.test.ts`, `tests/vitest/node-store-trash-semantics.test.ts`, `tests/vitest/tag-badge-navigation.test.ts`, `tests/vitest/tag-colors.test.ts`, `docs/features/date-nodes.md`, `docs/features/supertags.md`, `docs/TESTING.md`, `docs/TASKS.md`
 
 - [x] 设计收口：`day/week/year` 作为普通 `tagDef`，仅保留 3 个固定 ID 供 journal 使用（不引入映射层）
 - [x] 初始化/升级：幂等确保 `sys:day/week/year` tagDef 节点存在（固定 ID）
@@ -54,6 +54,7 @@ _(空)_
 - [2026-02-23 nodex-codex] 为 `applyTagMutationsNoCommit()` 补齐 default content shallow clone（仅当前 tagDef 顶层普通内容节点，`templateId` 标记来源，幂等去重）；新增 `node-store-tags-refs.test.ts` 通用回归与 `journal.test.ts` 的 `#day` default content 回归。
 - [2026-02-23 nodex-codex] 根据手动验收反馈补默认值：`ensureJournalTagDefs()` 现在回填 `year.childSupertag=week`、`week.childSupertag=day` 与默认 `color='gray'`（仅在缺省时，不覆盖用户自定义）；`resolveTagColor()` 对 `sys:day/week/year` 无显式颜色时灰色兜底，补 `journal.test.ts` + `tag-colors.test.ts` 回归。
 - [2026-02-23 nodex-codex] 与用户进一步确认后撤回 `year→week` / `week→day` 默认 `childSupertag`：日期标签不应预设用户在年/周节点下的内容类型（例如年计划/周计划）。保留 gray 默认色；`ensureJournalTagDefs()` 不再自动设置 `childSupertag`。
+- [2026-02-23 nodex-codex] 增加删除保护：`sys:day/week/year` 在 `node-store.trashNode()` 中 no-op（硬保护），`NodePanel` 隐藏其 `Delete tag` 按钮（软保护）；新增 `node-store-trash-semantics.test.ts` 回归。
 
 ---
 

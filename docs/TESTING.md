@@ -358,9 +358,10 @@ npm run test:run
 2. trashNode 将节点从原父节点 children 中移除
 3. 多节点可同时在 TRASH 中
 4. `trashNode(tagDefId)` 不移除其他节点 tags 数组中的 tagDefId（不级联清理）
-5. `restoreNode(nodeId)` — 恢复到 `_trashedFrom` 原父节点，原位置优先
-6. `restoreNode` 原父不存在时回退到 CONTAINER_IDS.LIBRARY
-7. `tagDef` 已入 Trash 后，`removeTag` 仍可清理模板来源的 fieldEntry 节点
+5. `sys:day/week/year` 固定日期 tagDef 受保护：`trashNode` 对其 no-op（不可删除）
+6. `restoreNode(nodeId)` — 恢复到 `_trashedFrom` 原父节点，原位置优先
+7. `restoreNode` 原父不存在时回退到 CONTAINER_IDS.LIBRARY
+8. `tagDef` 已入 Trash 后，`removeTag` 仍可清理模板来源的 fieldEntry 节点
 
 ### 1.13 拖拽落点语义（纯函数）
 

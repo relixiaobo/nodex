@@ -9,6 +9,7 @@ import { OutlinerView } from '../outliner/OutlinerView';
 import { FieldList } from '../fields/FieldList';
 import { resolveTagColor } from '../../lib/tag-colors.js';
 import { isDayNode } from '../../lib/journal.js';
+import { isJournalSystemTagId } from '../../types/index.js';
 import { DateNavigationBar } from '../journal/DateNavigationBar';
 import { BacklinksSection } from './BacklinksSection';
 
@@ -39,6 +40,7 @@ export function NodePanel({ nodeId }: NodePanelProps) {
 
   const isFieldDef = node?.type === 'fieldDef';
   const isTagDef = node?.type === 'tagDef';
+  const isProtectedDateTagDef = isTagDef && isJournalSystemTagId(nodeId);
   const isDefinitionNode = isFieldDef || isTagDef;
 
   // Check if this is a day node (for date navigation bar)
@@ -75,9 +77,10 @@ export function NodePanel({ nodeId }: NodePanelProps) {
   }, [nodeId]);
 
   const handleDelete = useCallback(() => {
+    if (isProtectedDateTagDef) return;
     useNodeStore.getState().trashNode(nodeId);
     goBack();
-  }, [nodeId, goBack]);
+  }, [isProtectedDateTagDef, nodeId, goBack]);
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
@@ -102,7 +105,7 @@ export function NodePanel({ nodeId }: NodePanelProps) {
         {/* Non-definition: OutlinerView handles field/content interleaved rendering */}
         {!isDefinitionNode && <OutlinerView rootNodeId={nodeId} />}
         {!isDefinitionNode && <BacklinksSection nodeId={nodeId} />}
-        {isDefinitionNode && (
+        {isDefinitionNode && !isProtectedDateTagDef && (
           <div className="mt-4 ml-4 px-2 pb-4">
             <button
               onClick={handleDelete}

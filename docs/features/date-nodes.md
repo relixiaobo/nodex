@@ -166,6 +166,7 @@ Daily notes / 2026 / Week 07 / Sat, Feb 14           ← 非当天
 - 用户可为 `#day` 添加模板字段（如 "Mood"、"Top 3"）
 - 新创建的日节点自动应用 `#day` 标签 → 自动添加模板字段
 - `#week` 和 `#year` 同理，可配置各自的模板
+- `#day/#week/#year` 为系统必需标签：允许重命名/改色/配置模板，但**不可删除**
 
 ### 日期字段值 = 日节点引用（核心设计原则）
 
@@ -239,6 +240,7 @@ Daily notes / 2026 / Week 07 / Sat, Feb 14           ← 非当天
 | 2026-02-14 | 日期导航栏（`< >` / Today / 日历）Phase 1 实现 | 截图确认为日记核心交互，非可选功能 |
 | 2026-02-16 | 日期字段值 = 日节点引用（非字符串） | "一切皆节点"守则；让日期成为可挂 children/tag/field 的一等公民 |
 | 2026-02-23 | `day/week/year` 使用固定 ID 普通 tagDef（`sys:day/week/year`） | 简化模型：无映射层、无额外预置类型；journal 仅按 ID 识别 |
+| 2026-02-23 | `day/week/year` 禁止删除（store guard + UI 隐藏 Delete tag） | 避免破坏日记系统基础语义；仍保留普通 tagDef 的配置能力 |
 | 2026-02-21 | Phase 1 实现：Loro 模型（无 doc_type/meta） | 使用 SYSTEM_TAGS.DAY/WEEK/YEAR 直接标签，无 meta Tuple；容器 ID 为 CONTAINER_IDS.JOURNAL（无 wsId 前缀） |
 | 2026-02-21 | 侧栏 "Daily notes" + Today 按钮 | 重命名 Journal → Daily notes，CalendarCheck 图标按钮触发 ensureTodayNode |
 | 2026-02-21 | Cmd+Shift+D 全局快捷键 | 非编辑/选中模式下触发（编辑模式下 batch_duplicate 优先） |

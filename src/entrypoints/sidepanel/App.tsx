@@ -67,9 +67,18 @@ function useBootstrap(skip: boolean): BootstrapResult {
     initCalled.current = true;
 
     async function init() {
-      // Phase 1: local-only Loro mode (no Supabase auth)
-      // Generate persistent unique workspace ID instead of 'ws_default'
-      let currentWsId = wsId;
+      // Wait for WorkspaceStore persist hydration so we read the correct
+      // persisted currentWorkspaceId (e.g. the user's ID from a previous session).
+      // Without this, chrome.storage.local async hydration may not have completed,
+      // causing wsId to be null → wrong local workspace ID → sync push mismatch.
+      if (!useWorkspaceStore.persist.hasHydrated()) {
+        await new Promise<void>((resolve) => {
+          useWorkspaceStore.persist.onFinishHydration(() => resolve());
+        });
+      }
+
+      // Re-read after hydration (the React hook value `wsId` was captured before hydration)
+      let currentWsId = useWorkspaceStore.getState().currentWorkspaceId;
       if (!currentWsId) {
         currentWsId = await getOrCreateDefaultWorkspaceId();
         setWorkspace(currentWsId);
@@ -78,6 +87,12 @@ function useBootstrap(skip: boolean): BootstrapResult {
 
       // Bootstrap LoroDoc + seed containers
       await seedWorkspace(currentWsId);
+
+      // Restore auth session from stored Bearer token (validates against server).
+      // Must run after initLoroDoc so getPeerIdStr() is available for sync start.
+      // Fire-and-forget: UI renders immediately, auth + sync restore in background.
+      const { initAuth } = useWorkspaceStore.getState();
+      void initAuth();
 
       // Wait for UIStore persist hydration before checking panel validity
       // (persist.getItem is async, so the initial render may have stale default state)

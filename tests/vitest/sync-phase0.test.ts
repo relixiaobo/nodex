@@ -80,9 +80,11 @@ function createFakeIndexedDB(): {
     objectStoreNames: {
       contains: (name: string) => stores.has(name),
     },
-    createObjectStore: (name: string) => {
+    createObjectStore: (name: string, _options?: IDBObjectStoreParameters) => {
       ensureStore(name);
-      return {} as IDBObjectStore;
+      return {
+        createIndex: () => ({}),
+      } as unknown as IDBObjectStore;
     },
     transaction: (storeName: string) => ({
       objectStore: (name: string) => {

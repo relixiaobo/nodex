@@ -29,32 +29,13 @@ _(空)_
 |-------|---------|------|-------------|
 | nodex-cc | _(idle)_ | — | — |
 | nodex-cc-2 | _(idle)_ | — | — |
-| nodex-codex | 日期系统标签节点化（day/week/year 作为普通 supertag） | `codex/date-system-tagdefs` | `src/types/system-nodes.ts`, `src/types/index.ts`, `src/lib/journal.ts`, `src/lib/tag-colors.ts`, `src/stores/node-store.ts`, `src/entrypoints/sidepanel/App.tsx`, `src/components/panel/NodePanel.tsx`, `src/components/tags/TagBadge.tsx`, `tests/vitest/journal.test.ts`, `tests/vitest/node-store-tags-refs.test.ts`, `tests/vitest/node-store-trash-semantics.test.ts`, `tests/vitest/tag-badge-navigation.test.ts`, `tests/vitest/tag-colors.test.ts`, `docs/features/date-nodes.md`, `docs/features/supertags.md`, `docs/TESTING.md`, `docs/TASKS.md` |
+| nodex-codex | _(idle)_ | — | — |
 
 ---
 
 ## 进行中
 
-### 日期系统标签节点化（day/week/year 作为普通 supertag）
-> 将 `day/week/year` 从“仅系统语义 ID”升级为真实 `tagDef` 节点，并保持固定 ID（`sys:day/week/year`）。它们在数据模型中是普通 supertag，仅由 journal 功能以固定 ID 识别。
-> **Owner**: nodex-codex | **Branch**: `codex/date-system-tagdefs` | **Files**: `src/types/system-nodes.ts`, `src/types/index.ts`, `src/lib/journal.ts`, `src/lib/tag-colors.ts`, `src/stores/node-store.ts`, `src/entrypoints/sidepanel/App.tsx`, `src/components/panel/NodePanel.tsx`, `src/components/tags/TagBadge.tsx`, `tests/vitest/journal.test.ts`, `tests/vitest/node-store-tags-refs.test.ts`, `tests/vitest/node-store-trash-semantics.test.ts`, `tests/vitest/tag-badge-navigation.test.ts`, `tests/vitest/tag-colors.test.ts`, `docs/features/date-nodes.md`, `docs/features/supertags.md`, `docs/TESTING.md`, `docs/TASKS.md`
-
-- [x] 设计收口：`day/week/year` 作为普通 `tagDef`，仅保留 3 个固定 ID 供 journal 使用（不引入映射层）
-- [x] 初始化/升级：幂等确保 `sys:day/week/year` tagDef 节点存在（固定 ID）
-- [x] journal 逻辑继续使用固定 ID（仅依赖 ID，不依赖名称）
-- [x] TagBadge/TagBar 导航恢复为可进入 `#day/#week/#year` 配置页（backing node 存在）
-- [x] 模板字段在 day/week/year 节点上生效（行为验证）
-- [x] 默认内容在 day/week/year 节点上生效（行为验证）
-- [x] 测试与文档更新（`docs/features/date-nodes.md` / `docs/features/supertags.md` / `docs/TESTING.md`）
-
-**迭代日志**
-- [2026-02-23 nodex-codex] 与用户确认设计方向：不考虑旧数据兼容；移除 `task/person/...` 系统预置基础类型，`day/week/year` 直接作为普通 `tagDef`（固定 ID `sys:*`），journal 仅按 ID 识别。
-- [2026-02-23 nodex-codex] 实现 `ensureJournalTagDefs()`：在 sidepanel bootstrap 与 `ensureDateNode()` 中幂等创建 `sys:day/week/year` 普通 `tagDef`（Schema 下固定 ID）；更新 `journal.test.ts` 验证固定 ID 节点存在，并同步 `date-nodes`/`supertags`/`TESTING` 文档。
-- [2026-02-23 nodex-codex] 抽出 `applyTagMutationsNoCommit()`（共享于 `node-store.applyTag` 与 `journal`）以避免 `journal` 走 store action 产生多次 commit；补 `journal.test.ts` 验证 `#day` 模板字段会在新建日节点上实例化。默认内容复制行为仍待单独确认/实现。
-- [2026-02-23 nodex-codex] 为 `applyTagMutationsNoCommit()` 补齐 default content shallow clone（仅当前 tagDef 顶层普通内容节点，`templateId` 标记来源，幂等去重）；新增 `node-store-tags-refs.test.ts` 通用回归与 `journal.test.ts` 的 `#day` default content 回归。
-- [2026-02-23 nodex-codex] 根据手动验收反馈补默认值：`ensureJournalTagDefs()` 现在回填 `year.childSupertag=week`、`week.childSupertag=day` 与默认 `color='gray'`（仅在缺省时，不覆盖用户自定义）；`resolveTagColor()` 对 `sys:day/week/year` 无显式颜色时灰色兜底，补 `journal.test.ts` + `tag-colors.test.ts` 回归。
-- [2026-02-23 nodex-codex] 与用户进一步确认后撤回 `year→week` / `week→day` 默认 `childSupertag`：日期标签不应预设用户在年/周节点下的内容类型（例如年计划/周计划）。保留 gray 默认色；`ensureJournalTagDefs()` 不再自动设置 `childSupertag`。
-- [2026-02-23 nodex-codex] 增加删除保护：`sys:day/week/year` 在 `node-store.trashNode()` 中 no-op（硬保护），`NodePanel` 隐藏其 `Delete tag` 按钮（软保护）；新增 `node-store-trash-semantics.test.ts` 回归。
+_(空)_
 
 ---
 
@@ -260,6 +241,7 @@ _(空)_
 
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
+| 2026-02-23 | 日期系统标签节点化 — `sys:day/week/year` 普通 tagDef + 模板字段/默认内容实例化 + 删除保护 + applyTagMutationsNoCommit 提取 | nodex-codex | #82 |
 | 2026-02-23 | Auth + Sync Server (Steps 0–5) — Better Auth + D1 + Google OAuth + Extension flow + Push/Pull 端点 + R2 blob 存储 + echo filtering + cursor 管理 | nodex-cc | #80 |
 | 2026-02-23 | 空白 NodePanel 导航修复 — reference bullet 导航到目标节点 + 系统标签导航守卫 + ui-store backing node 校验 + NodePanel 兜底视图 | nodex-codex | #81 |
 | 2026-02-23 | References 增强 (#19) — 反向链接 section（Mentioned in + Appears as [Field] in 分组）+ 引用计数 badge + 11 Vitest 用例 + 计数去重/缓存/trash set 性能修复 | nodex-cc-2 | #76 |

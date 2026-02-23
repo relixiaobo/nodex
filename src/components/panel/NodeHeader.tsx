@@ -23,6 +23,7 @@ import { TagBar } from '../tags/TagBar';
 import { NodeDescription } from './NodeDescription';
 import { isDayNode } from '../../lib/journal.js';
 import { parseDayNodeName, parseYearNodeName, isToday } from '../../lib/date-utils.js';
+import { getNodeCapabilities } from '../../lib/node-capabilities.js';
 import * as loroDoc from '../../lib/loro-doc.js';
 import { t } from '../../i18n/strings.js';
 
@@ -43,6 +44,7 @@ export function NodeHeader({ nodeId, onTitleRef }: NodeHeaderProps) {
   const isFieldDef = node?.type === 'fieldDef';
   const isTagDef = node?.type === 'tagDef';
   const isDefinitionNode = isFieldDef || isTagDef;
+  const canEditNode = getNodeCapabilities(nodeId).canEditNode;
 
   // Checkbox
   const { showCheckbox, isDone } = useNodeCheckbox(nodeId);
@@ -106,13 +108,17 @@ export function NodeHeader({ nodeId, onTitleRef }: NodeHeaderProps) {
   }, [editing, rawName]);
 
   const handleBlur = useCallback(() => {
+    if (!canEditNode) {
+      setEditing(false);
+      return;
+    }
     if (!titleRef.current) return;
     const newName = titleRef.current.textContent?.trim() ?? '';
     if (newName !== rawName) {
       setNodeName(nodeId, newName);
     }
     setEditing(false);
-  }, [nodeId, rawName, setNodeName]);
+  }, [canEditNode, nodeId, rawName, setNodeName]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -191,10 +197,11 @@ export function NodeHeader({ nodeId, onTitleRef }: NodeHeaderProps) {
           {/* Col C: Editable name */}
           <h1
             ref={setRef}
-            contentEditable={editing}
+            contentEditable={canEditNode && editing}
             suppressContentEditableWarning
-            className={`text-xl font-semibold leading-8 outline-none min-h-8 flex-1 cursor-text ${isDone ? 'text-foreground/50 line-through' : ''}`}
+            className={`text-xl font-semibold leading-8 outline-none min-h-8 flex-1 ${canEditNode ? 'cursor-text' : 'cursor-default'} ${isDone ? 'text-foreground/50 line-through' : ''}`}
             onClick={() => {
+              if (!canEditNode) return;
               if (!editing) setEditing(true);
             }}
             onBlur={handleBlur}
@@ -214,7 +221,7 @@ export function NodeHeader({ nodeId, onTitleRef }: NodeHeaderProps) {
 
       {/* ── Description ── */}
       <div style={{ paddingLeft: COL_B_OFFSET }}>
-        <NodeDescription nodeId={nodeId} />
+        <NodeDescription nodeId={nodeId} editable={canEditNode} />
       </div>
     </div>
   );

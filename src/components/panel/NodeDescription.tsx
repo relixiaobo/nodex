@@ -12,9 +12,10 @@ import { useNodeStore } from '../../stores/node-store';
 
 interface NodeDescriptionProps {
   nodeId: string;
+  editable?: boolean;
 }
 
-export function NodeDescription({ nodeId }: NodeDescriptionProps) {
+export function NodeDescription({ nodeId, editable = true }: NodeDescriptionProps) {
   const node = useNode(nodeId);
   const updateNodeDescription = useNodeStore((s) => s.updateNodeDescription);
 
@@ -69,10 +70,11 @@ export function NodeDescription({ nodeId }: NodeDescriptionProps) {
   }, [editing, description]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    if (!editable) return;
     e.preventDefault();
     clickCoordsRef.current = { x: e.clientX, y: e.clientY };
     setEditing(true);
-  }, []);
+  }, [editable]);
 
   const handleBlur = useCallback(() => {
     if (!descRef.current) return;
@@ -104,8 +106,8 @@ export function NodeDescription({ nodeId }: NodeDescriptionProps) {
       ref={editing ? descRef : undefined}
       contentEditable={editing}
       suppressContentEditableWarning
-      className={`text-xs leading-[15px] min-h-[15px] text-foreground-tertiary mt-1 cursor-text ${editing ? 'outline-none' : ''}`}
-      onMouseDown={!editing ? handleMouseDown : undefined}
+      className={`text-xs leading-[15px] min-h-[15px] text-foreground-tertiary mt-1 ${editable ? 'cursor-text' : 'cursor-default'} ${editing ? 'outline-none' : ''}`}
+      onMouseDown={editable && !editing ? handleMouseDown : undefined}
       onBlur={editing ? handleBlur : undefined}
       onKeyDown={editing ? handleKeyDown : undefined}
     >

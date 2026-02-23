@@ -142,23 +142,26 @@ describe('workspace container immutability', () => {
   });
 
   it('moveNodeTo does not move workspace containers', () => {
+    const originalParent = loroDoc.getParentId('INBOX');
     useNodeStore.getState().moveNodeTo('INBOX', 'proj_1', 0);
-    expect(loroDoc.getParentId('INBOX')).toBeNull();
+    expect(loroDoc.getParentId('INBOX')).toBe(originalParent);
     expect(loroDoc.getChildren('proj_1')).not.toContain('INBOX');
   });
 
   it('trashNode ignores workspace containers', () => {
+    const originalParent = loroDoc.getParentId('INBOX');
     const trashChildrenBefore = loroDoc.getChildren('TRASH');
     useNodeStore.getState().trashNode('INBOX');
-    expect(loroDoc.getParentId('INBOX')).toBeNull();
+    expect(loroDoc.getParentId('INBOX')).toBe(originalParent);
     expect(loroDoc.getChildren('TRASH')).toEqual(trashChildrenBefore);
   });
 
   it('indent/move up/down are no-op for workspace containers', () => {
+    const originalParent = loroDoc.getParentId('INBOX');
     expect(() => useNodeStore.getState().indentNode('INBOX')).not.toThrow();
     expect(() => useNodeStore.getState().moveNodeUp('INBOX')).not.toThrow();
     expect(() => useNodeStore.getState().moveNodeDown('INBOX')).not.toThrow();
-    expect(loroDoc.getParentId('INBOX')).toBeNull();
+    expect(loroDoc.getParentId('INBOX')).toBe(originalParent);
   });
 });
 

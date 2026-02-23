@@ -33,11 +33,16 @@ async function seedWorkspace(wsId: string): Promise<void> {
   await initLoroDoc(wsId);
   ensureWorkspaceHomeNode(wsId);
 
-  // Create container nodes if they don't already exist
+  // Create container nodes as children of the workspace home node.
+  // Existing containers created before this change may still be root-level —
+  // move them under the workspace node for consistency.
   for (const { id, name } of CONTAINER_DEFS) {
     if (!loroDoc.hasNode(id)) {
-      loroDoc.createNode(id, null);
+      loroDoc.createNode(id, wsId);
       loroDoc.setNodeRichTextContent(id, name, [], []);
+    } else if (loroDoc.getParentId(id) === null) {
+      // Migrate: container was root-level, move under workspace node
+      loroDoc.moveNode(id, wsId);
     }
   }
 

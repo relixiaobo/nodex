@@ -119,6 +119,18 @@ npm run test:run
 - 页面是否已加载完毕（等待几秒后重试）
 - 是否意外使用了 App 而非 TestApp
 
+### 1.1.1 系统节点 registry（容器元数据单一事实来源）
+
+**测试文件**: `tests/vitest/system-node-registry.test.ts`
+
+**覆盖点**:
+
+1. `SYSTEM_CONTAINER_REGISTRY` 覆盖全部 `CONTAINER_IDS` 且无重复
+2. `BOOTSTRAP_CONTAINER_DEFS` 保持当前 seed 行为与顺序（Library/Inbox/Journal/Searches/Trash/Schema）
+3. `SIDEBAR_CONTAINER_ITEMS` 保持侧边栏显示顺序，Journal 保留 today 快捷按钮标记
+4. `COMMAND_PALETTE_QUICK_CONTAINERS` 保持命令面板快捷入口集合与顺序
+5. `getSystemContainerMeta(id)` 提供按 ID 查询（含未启用 seed 的预留容器如 `CLIPS`）
+
 ### 1.2 CRUD + 树操作
 
 **测试文件**: `tests/vitest/store-crud.test.ts`

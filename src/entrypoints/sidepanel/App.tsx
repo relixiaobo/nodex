@@ -14,16 +14,8 @@ import { ensureWorkspaceHomeNode } from '../../lib/workspace-root.js';
 import { getOrCreateDefaultWorkspaceId } from '../../lib/workspace-id.js';
 import { findUnexpectedShortcutConflicts } from '../../lib/shortcut-registry.js';
 import { ensureJournalTagDefs } from '../../lib/journal.js';
+import { BOOTSTRAP_CONTAINER_DEFS } from '../../lib/system-node-registry.js';
 import { Toaster } from 'sonner';
-
-const CONTAINER_DEFS: Array<{ id: string; name: string }> = [
-  { id: CONTAINER_IDS.LIBRARY, name: 'Library' },
-  { id: CONTAINER_IDS.INBOX, name: 'Inbox' },
-  { id: CONTAINER_IDS.JOURNAL, name: 'Journal' },
-  { id: CONTAINER_IDS.SEARCHES, name: 'Searches' },
-  { id: CONTAINER_IDS.TRASH, name: 'Trash' },
-  { id: CONTAINER_IDS.SCHEMA, name: 'Schema' },
-];
 
 /**
  * Bootstrap workspace containers in LoroDoc.
@@ -36,7 +28,7 @@ async function seedWorkspace(wsId: string): Promise<void> {
   // Create container nodes as children of the workspace home node.
   // Existing containers created before this change may still be root-level —
   // move them under the workspace node for consistency.
-  for (const { id, name } of CONTAINER_DEFS) {
+  for (const { id, name } of BOOTSTRAP_CONTAINER_DEFS) {
     if (!loroDoc.hasNode(id)) {
       loroDoc.createNode(id, wsId);
       loroDoc.setNodeRichTextContent(id, name, [], []);

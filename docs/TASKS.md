@@ -29,13 +29,25 @@ _(空)_
 |-------|---------|------|-------------|
 | nodex-cc | Sync 增量同步（Cloudflare-only）— Step 0 起 | `cc/sync-phase1` | `docs/plans/sync-incremental-impl.md`, `server/*` |
 | nodex-cc-2 | _(idle)_ | — | — |
-| nodex-codex | _(idle)_ | — | — |
+| nodex-codex | 日期系统标签节点化（day/week/year 作为普通 supertag） | `codex/date-system-tagdefs` | `src/types/system-nodes.ts`, `src/lib/journal.ts`, `src/components/tags/TagBadge.tsx`, `src/stores/node-store.ts`, `tests/vitest/*journal*.test.ts`, `tests/vitest/tag-badge-navigation.test.ts`, `docs/features/date-nodes.md`, `docs/features/supertags.md`, `docs/TESTING.md`, `docs/TASKS.md` |
 
 ---
 
 ## 进行中
 
-_(空)_
+### 日期系统标签节点化（day/week/year 作为普通 supertag）
+> 将 `day/week/year` 从“仅系统语义 ID”升级为真实 `tagDef` 节点，并保持固定 ID（`sys:day/week/year`）。它们在数据模型中是普通 supertag，仅由 journal 功能以固定 ID 识别。
+> **Owner**: nodex-codex | **Branch**: `codex/date-system-tagdefs` | **Files**: `src/types/system-nodes.ts`, `src/lib/journal.ts`, `src/components/tags/TagBadge.tsx`, `src/stores/node-store.ts`, `tests/vitest/*journal*.test.ts`, `tests/vitest/tag-badge-navigation.test.ts`, `docs/features/date-nodes.md`, `docs/features/supertags.md`, `docs/TESTING.md`, `docs/TASKS.md`
+
+- [x] 设计收口：`day/week/year` 作为普通 `tagDef`，仅保留 3 个固定 ID 供 journal 使用（不引入映射层）
+- [ ] 初始化/升级：幂等确保 `sys:day/week/year` tagDef 节点存在（固定 ID）
+- [ ] journal 逻辑继续使用固定 ID（仅依赖 ID，不依赖名称）
+- [ ] TagBadge/TagBar 导航恢复为可进入 `#day/#week/#year` 配置页（backing node 存在）
+- [ ] 模板字段/默认内容在 day/week/year 节点上生效（行为验证）
+- [ ] 测试与文档更新（`docs/features/date-nodes.md` / `docs/features/supertags.md` / `docs/TESTING.md`）
+
+**迭代日志**
+- [2026-02-23 nodex-codex] 与用户确认设计方向：不考虑旧数据兼容；移除 `task/person/...` 系统预置基础类型，`day/week/year` 直接作为普通 `tagDef`（固定 ID `sys:*`），journal 仅按 ID 识别。
 
 ---
 
@@ -109,24 +121,6 @@ _(空)_
 - [ ] 日记模板（#day supertag 配置）
 - [ ] 日期字段链接到日节点
 - **Spec**: `docs/features/date-nodes.md`
-
-#### 系统预置标签节点化（day/week/year + 其他 system tags）
-> 将 `day/week/year`（以及后续需要开放配置的系统预置标签）从“仅系统语义 ID”升级为**系统预置 tagDef 节点**：保留稳定语义/固定 ID，同时具备真实 tagDef 页面、模板字段、默认内容配置能力。
-> **Owner**: _(待分配)_
->
-> **目标**
-> - `#day/#week/#year` 可点击进入真实 tagDef 页面（非空白页）
-> - 可为这些系统预置标签配置模板/字段/默认内容
-> - `journal` 等功能仍基于稳定系统语义识别（不依赖用户可变名称）
-> - 为其他系统预置标签复用同一机制（system preset tag registry）
-
-- [ ] 设计：系统语义 ID 与预置 tagDef 节点 ID 的映射模型（兼容现有 `sys:*` / `SYS_T*`）
-- [ ] 数据迁移：初始化/升级时确保预置 tagDef 节点存在（幂等）
-- [ ] journal 逻辑切换到“系统预置 tagDef”识别路径（day/week/year）
-- [ ] TagBadge/TagBar 导航恢复为可进入 `#day/#week/#year` 配置页
-- [ ] 模板字段/默认内容在 day/week/year 节点上生效（行为验证）
-- [ ] 测试：迁移 + journal 识别 + 导航 + 模板配置回归
-- [ ] 文档：`docs/features/date-nodes.md` / `docs/features/supertags.md` / `docs/TESTING.md`
 
 #### 网页剪藏 (#30)
 > 已完成：消息类型定义、Content Script 提取（defuddle）、Background 中转、`/clip` slash command 全链路、`#web_clip` tagDef + Source URL attrDef 惰性创建、V2 正文→子节点、Vitest 55 cases

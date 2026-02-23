@@ -1010,6 +1010,7 @@ npm run dev                # 启动 wrangler dev (localhost:8787)
 
 1. `OutlinerView` 在 NodePanel 场景可正常渲染（字段行 + 内容行同时存在）
 2. 防止运行时初始化顺序错误（TDZ）导致首屏白屏
+3. Outliner 行内不再渲染 backlink count 数字 badge（避免 `title="N reference(s)"` 视觉噪音）
 
 ### 1.48 Auth 工具函数（Google OAuth + Better Auth）
 

@@ -4,7 +4,6 @@ import { useNode } from '../../hooks/use-node';
 import { useChildren } from '../../hooks/use-children';
 import { useNodeTags } from '../../hooks/use-node-tags';
 import { useNodeFields, type FieldEntry } from '../../hooks/use-node-fields';
-import { useBacklinkCount } from '../../hooks/use-backlinks';
 import { useNodeStore } from '../../stores/node-store';
 import { useUIStore } from '../../stores/ui-store';
 import * as loroDoc from '../../lib/loro-doc.js';
@@ -277,7 +276,6 @@ export function OutlinerItem({
   const effectiveNodeId = referenceTargetId ?? nodeId;
   const panelNavigationNodeId = resolvePanelNavigationNodeId(nodeId, referenceTargetId);
   const effectiveNode = referenceTargetNode ?? node;
-  const backlinkCount = useBacklinkCount(effectiveNodeId);
   const isCyclicReferenceExpansion = !!referenceTargetId && isReferenceDisplayCycle(effectiveNodeId, referencePath);
   const nextReferencePath = useMemo(
     () => [...referencePath, effectiveNodeId],
@@ -2496,16 +2494,6 @@ export function OutlinerItem({
           </div>
         )}
         </div>{/* close selection/contents wrapper */}
-        {/* Backlink count badge — shown when node is not focused and has backlinks */}
-        {backlinkCount > 0 && !isFocused && (
-          <span
-            className="self-center shrink-0 text-[10px] text-foreground-tertiary/50 tabular-nums pr-1 cursor-pointer hover:text-foreground-secondary transition-colors"
-            onClick={(e) => { e.stopPropagation(); navigateTo(effectiveNodeId); }}
-            title={`${backlinkCount} reference${backlinkCount === 1 ? '' : 's'}`}
-          >
-            {backlinkCount}
-          </span>
-        )}
       </div>
       {/* Drop indicator: after */}
       {isDropTarget && dropPosition === 'after' && (

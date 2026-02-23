@@ -29,7 +29,7 @@ _(空)_
 |-------|---------|------|-------------|
 | nodex-cc | _(idle)_ | — | — |
 | nodex-cc-2 | _(idle)_ | — | — |
-| nodex-codex | 容器节点 registry 收口（统一 bootstrap/sidebar/command palette 定义） | `codex/container-node-registry` | `src/lib/system-node-registry.ts`, `src/entrypoints/sidepanel/App.tsx`, `src/components/sidebar/SidebarNav.tsx`, `src/components/search/CommandPalette.tsx`, `tests/vitest/*`, `docs/TESTING.md`, `docs/TASKS.md` |
+| nodex-codex | 容器节点 registry 收口（统一 bootstrap/sidebar/command palette 定义） | `codex/container-node-registry` | `src/lib/system-node-registry.ts`, `src/entrypoints/sidepanel/App.tsx`, `src/components/sidebar/SidebarNav.tsx`, `src/components/search/CommandPalette.tsx`, `tests/vitest/system-node-registry.test.ts`, `docs/TESTING.md`, `docs/TASKS.md` |
 
 ---
 
@@ -37,15 +37,16 @@ _(空)_
 
 ### 容器节点 registry 收口（统一 bootstrap/sidebar/command palette 定义）
 > 将容器节点元数据（ID、默认名称、导航显示、快捷入口显示）从 `App/SidebarNav/CommandPalette` 的重复字面量收口到单一 registry，减少定义漂移（例如新增容器只改一处）。
-> **Owner**: nodex-codex | **Branch**: `codex/container-node-registry` | **Files**: `src/lib/system-node-registry.ts`, `src/entrypoints/sidepanel/App.tsx`, `src/components/sidebar/SidebarNav.tsx`, `src/components/search/CommandPalette.tsx`, `tests/vitest/*`, `docs/TESTING.md`, `docs/TASKS.md`
+> **Owner**: nodex-codex | **Branch**: `codex/container-node-registry` | **Files**: `src/lib/system-node-registry.ts`, `src/entrypoints/sidepanel/App.tsx`, `src/components/sidebar/SidebarNav.tsx`, `src/components/search/CommandPalette.tsx`, `tests/vitest/system-node-registry.test.ts`, `docs/TESTING.md`, `docs/TASKS.md`
 
-- [ ] 新增容器 registry（单一事实来源）
-- [ ] `App.tsx` bootstrap 改为读 registry（保留现有行为）
-- [ ] `SidebarNav` / `CommandPalette` 改为读 registry（保留现有顺序与文案）
-- [ ] 补回归测试与 `docs/TESTING.md`
+- [x] 新增容器 registry（单一事实来源）
+- [x] `App.tsx` bootstrap 改为读 registry（保留现有行为）
+- [x] `SidebarNav` / `CommandPalette` 改为读 registry（保留现有顺序与文案）
+- [x] 补回归测试与 `docs/TESTING.md`
 
 **迭代日志**
 - [2026-02-23 nodex-codex] Follow-up to PR #84（已合并）：开始收口容器元数据重复定义，目标先统一 bootstrap/sidebar/command palette 三处容器列表，避免 `CONTAINER_IDS` 与 UI 展示/seed 行为漂移。
+- [2026-02-23 nodex-codex] 新增 `system-node-registry.ts`（含 `seedInWorkspace/sidebar/commandPaletteQuick` 标记 + `iconKey` + 默认名称）；`App` 改用 `BOOTSTRAP_CONTAINER_DEFS`，`SidebarNav` / `CommandPalette` 改用 registry 派生列表，UI 组件仅保留 `iconKey -> Icon` 映射；新增 `system-node-registry.test.ts` 锁定集合与顺序，并同步 `docs/TESTING.md`。
 
 ---
 

@@ -3,24 +3,60 @@ main = "src/index.ts"
 compatibility_date = "2025-01-01"
 compatibility_flags = ["nodejs_compat"]
 
+# ── Local dev (wrangler dev) ─────────────────────────
 [vars]
 BETTER_AUTH_URL = "http://localhost:8787"
 
-# Sensitive vars — set via `wrangler secret put <NAME>`
+# Local D1 (wrangler dev --local uses a SQLite file automatically)
+[[d1_databases]]
+binding = "SYNC_DB"
+database_name = "nodex-sync"
+database_id = "2ce73b94-7256-4940-ae38-680b84661c2e"
+migrations_dir = "migrations"
+
+# R2 — not used yet; uncomment after enabling R2 in Cloudflare Dashboard
+# [[r2_buckets]]
+# binding = "SYNC_BUCKET"
+# bucket_name = "nodex-sync"
+
+# Sensitive vars — set via `wrangler secret put <NAME> --env <env>`
 # GOOGLE_CLIENT_ID
 # GOOGLE_CLIENT_SECRET
 # BETTER_AUTH_SECRET
 # CHROME_EXTENSION_ID
 
-# To create your own D1 instance:
-#   wrangler d1 create nodex-sync
-# Then replace the database_id below with the ID from the output.
-[[d1_databases]]
+# ── Staging ──────────────────────────────────────────
+[env.staging]
+name = "nodex-sync-staging"
+
+[env.staging.vars]
+BETTER_AUTH_URL = "https://nodex-sync-staging.getsoma.workers.dev"
+
+[[env.staging.d1_databases]]
 binding = "SYNC_DB"
-database_name = "nodex-sync"
-database_id = "YOUR_D1_DATABASE_ID"
+database_name = "nodex-sync-staging"
+database_id = "27da737a-e879-44de-bd38-2af7b94c18d1"
 migrations_dir = "migrations"
 
-[[r2_buckets]]
-binding = "SYNC_BUCKET"
-bucket_name = "nodex-sync"
+# R2 requires enabling in Cloudflare Dashboard first
+# [[env.staging.r2_buckets]]
+# binding = "SYNC_BUCKET"
+# bucket_name = "nodex-sync-staging"
+
+# ── Production ───────────────────────────────────────
+[env.production]
+name = "nodex-sync"
+
+[env.production.vars]
+BETTER_AUTH_URL = "https://nodex-sync.getsoma.workers.dev"
+
+[[env.production.d1_databases]]
+binding = "SYNC_DB"
+database_name = "nodex-sync"
+database_id = "2ce73b94-7256-4940-ae38-680b84661c2e"
+migrations_dir = "migrations"
+
+# R2 — uncomment after enabling R2 in Cloudflare Dashboard
+# [[env.production.r2_buckets]]
+# binding = "SYNC_BUCKET"
+# bucket_name = "nodex-sync"

@@ -27,7 +27,7 @@
 
 - 显示在节点名称右侧，编辑器外部
 - 格式：`# TagName`，彩色背景 pill（哈希确定色系）
-- **左键点击 TagBadge 名称** → navigateTo tagDef 节点（进入标签配置页）；**仅当标签有 backing node 时可点击**（无 backing node 的系统标签如 `sys:day` 显示为不可点击）
+- **左键点击 TagBadge 名称** → navigateTo tagDef 节点（进入标签配置页）；**仅当标签有 backing node 时可点击**（未知/悬空 tag id 显示为不可点击；`sys:day/week/year` 为固定 ID tagDef，可点击）
 - **右键菜单**：
   - "Remove tag" — 移除标签
   - "Everything tagged #tagName" — TODO：导航到搜索结果

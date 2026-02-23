@@ -6,9 +6,10 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { seedTestDataSync } from '../../src/entrypoints/test/seed-data.js';
 import * as loroDoc from '../../src/lib/loro-doc.js';
-import { CONTAINER_IDS } from '../../src/types/index.js';
+import { CONTAINER_IDS, FIELD_TYPES } from '../../src/types/index.js';
 import { SYSTEM_TAGS } from '../../src/types/system-nodes.js';
 import {
+  ensureJournalTagDefs,
   ensureDateNode,
   ensureTodayNode,
   getAdjacentDayNodeId,
@@ -59,6 +60,14 @@ describe('ensureDateNode', () => {
     // Year is under JOURNAL
     const journalId = loroDoc.getParentId(yearId!);
     expect(journalId).toBe(CONTAINER_IDS.JOURNAL);
+
+    // Journal tagDefs are materialized as normal tagDef nodes in Schema
+    expect(loroDoc.toNodexNode(SYSTEM_TAGS.DAY)).toMatchObject({
+      id: SYSTEM_TAGS.DAY,
+      type: 'tagDef',
+      name: 'day',
+    });
+    expect(loroDoc.getParentId(SYSTEM_TAGS.DAY)).toBe(CONTAINER_IDS.SCHEMA);
   });
 
   it('is idempotent — second call returns same ID', () => {
@@ -66,6 +75,35 @@ describe('ensureDateNode', () => {
     const id1 = ensureDateNode(date);
     const id2 = ensureDateNode(date);
     expect(id1).toBe(id2);
+  });
+
+  it('applies #day template fields when creating a new day node', () => {
+    ensureJournalTagDefs();
+
+    const moodFieldId = 'attrDef_day_mood';
+    loroDoc.createNode(moodFieldId, SYSTEM_TAGS.DAY);
+    loroDoc.setNodeDataBatch(moodFieldId, {
+      type: 'fieldDef',
+      name: 'Mood',
+      fieldType: FIELD_TYPES.PLAIN,
+      cardinality: 'single',
+      nullable: true,
+    });
+    loroDoc.commitDoc('system:test-seed-day-tagdef-field');
+
+    const dayId = ensureDateNode(new Date(2026, 1, 14));
+    const dayChildren = loroDoc.getChildren(dayId);
+    const fieldEntryId = dayChildren.find((id) => {
+      const child = loroDoc.toNodexNode(id);
+      return child?.type === 'fieldEntry' && child.fieldDefId === moodFieldId;
+    });
+
+    expect(fieldEntryId).toBeTruthy();
+    expect(loroDoc.toNodexNode(fieldEntryId!)).toMatchObject({
+      type: 'fieldEntry',
+      fieldDefId: moodFieldId,
+      templateId: moodFieldId,
+    });
   });
 
   it('creates separate day nodes for different dates', () => {
@@ -181,6 +219,30 @@ describe('ensureDateNode', () => {
     expect(dayNames).toContain('Sat, Feb 14');
     expect(dayNames).toContain('Wed, Feb 11');
     expect(dayNames).toContain('Mon, Feb 9');
+  });
+});
+
+describe('ensureJournalTagDefs', () => {
+  it('creates fixed-ID day/week/year tagDefs under Schema', () => {
+    ensureJournalTagDefs();
+
+    expect(loroDoc.toNodexNode(SYSTEM_TAGS.DAY)).toMatchObject({ type: 'tagDef', name: 'day' });
+    expect(loroDoc.toNodexNode(SYSTEM_TAGS.WEEK)).toMatchObject({ type: 'tagDef', name: 'week' });
+    expect(loroDoc.toNodexNode(SYSTEM_TAGS.YEAR)).toMatchObject({ type: 'tagDef', name: 'year' });
+
+    expect(loroDoc.getParentId(SYSTEM_TAGS.DAY)).toBe(CONTAINER_IDS.SCHEMA);
+    expect(loroDoc.getParentId(SYSTEM_TAGS.WEEK)).toBe(CONTAINER_IDS.SCHEMA);
+    expect(loroDoc.getParentId(SYSTEM_TAGS.YEAR)).toBe(CONTAINER_IDS.SCHEMA);
+  });
+
+  it('is idempotent when called multiple times', () => {
+    ensureJournalTagDefs();
+    ensureJournalTagDefs();
+
+    const schemaChildren = loroDoc.getChildren(CONTAINER_IDS.SCHEMA);
+    expect(schemaChildren.filter((id) => id === SYSTEM_TAGS.DAY)).toHaveLength(1);
+    expect(schemaChildren.filter((id) => id === SYSTEM_TAGS.WEEK)).toHaveLength(1);
+    expect(schemaChildren.filter((id) => id === SYSTEM_TAGS.YEAR)).toHaveLength(1);
   });
 });
 

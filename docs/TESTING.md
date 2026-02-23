@@ -261,7 +261,7 @@ npm run test:run
 11. `number_input` 配置值为非法数字字符串时，FieldRow value 区右侧展示同款 warning 图标（与普通 Number 字段位置一致）
 12. FieldRow 选中遮罩与 content row 使用同款视觉配方（`bg-selection-row + border + top/bottom inset`），并保证名称/值层级高于遮罩（避免选中后值区文本被遮盖）
 13. `OutlinerItem` panel 导航目标使用 `referenceTargetId ?? nodeId`（点击 reference row 的 bullet / drillDown 打开目标节点页面，而非引用壳节点空页）
-14. `TagBadge` 仅在标签存在 backing node 时允许导航（如 `sys:day` 这类系统标签点击不再进入空白 panel）
+14. `TagBadge` 仅在标签存在 backing node 时允许导航（悬空/未知 tag id 不可点击；`sys:day/week/year` 因存在固定 ID tagDef 可导航）
 15. FieldRow 保持“单击编辑优先”（name 进字段名编辑，value 保持值交互）；普通单击不再把 tuple 置入选区
 16. FieldRow 的 `Cmd/Ctrl+Click`、`Shift+Click` 走统一 pointer-intent 解析（即使落在 value 交互区，也优先按多选手势处理）
 17. `OutlinerView` / `ConfigOutliner` / `FieldValueOutliner` 的选择域统一使用“可见 field + content”同一 `rootChildIds`，避免 node 类型导致的范围选行为分叉
@@ -1254,7 +1254,7 @@ createSibling 自动标签（2 cases）:
 | 5 | 年降序排列 | 最新年份在前 |
 | 6 | 周降序排列 | 最新周在前 |
 | 7 | 日降序排列 | 最新日在前 |
-| 8 | SYSTEM_TAGS 应用 | DAY/WEEK/YEAR 标签正确 |
+| 8 | SYSTEM_TAGS 应用 + 固定 ID tagDef | DAY/WEEK/YEAR 标签正确，且 `sys:day/week/year` tagDef 存在于 Schema |
 | 9 | ensureTodayNode | 返回有效 ID + DAY 标签 |
 | 10 | getAdjacentDayNodeId +1 | 返回下一天节点 |
 | 11 | getAdjacentDayNodeId -1 | 返回前一天节点 |

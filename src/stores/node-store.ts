@@ -130,6 +130,39 @@ function getExtendsChain(tagDefId: string, visited = new Set<string>()): string[
   return chain;
 }
 
+/**
+ * Apply tag side effects without committing.
+ * Shared by node-store.applyTag() and journal date-node creation so both paths
+ * get the same template field instantiation behavior.
+ */
+export function applyTagMutationsNoCommit(nodeId: string, tagDefId: string): void {
+  // 1. 添加标签
+  loroDoc.addTag(nodeId, tagDefId);
+
+  // 2. 处理 extends 链（继承父标签的 fieldDefs）
+  const extendsChain = getExtendsChain(tagDefId);
+
+  // 3. 为所有 fieldDef 创建 fieldEntry（若不存在）
+  for (const chainTagId of extendsChain) {
+    const fieldDefs = getTemplateFieldDefs(chainTagId);
+    for (const fdId of fieldDefs) {
+      if (!findFieldEntry(nodeId, fdId)) {
+        const feId = nanoid();
+        loroDoc.createNode(feId, nodeId);
+        loroDoc.setNodeDataBatch(feId, {
+          type: 'fieldEntry',
+          fieldDefId: fdId,
+          templateId: fdId,
+        });
+      }
+    }
+  }
+
+  // 4. 传播 childSupertag
+  const tagDef = loroDoc.toNodexNode(tagDefId);
+  void tagDef; // childSupertag 仅在 createChild/createSibling 时处理
+}
+
 // ============================================================
 // 读取缓存 — getChildren(NodexNode[]) 需要在 store 层缓存
 // （loro-doc 层缓存了 string[]，但 map+filter 每次创建新数组）
@@ -441,34 +474,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
     // ─── 标签操作 ───
 
     applyTag: (nodeId, tagDefId) => {
-      // 1. 添加标签
-      loroDoc.addTag(nodeId, tagDefId);
-
-      // 2. 处理 extends 链（继承父标签的 fieldDefs）
-      const extendsChain = getExtendsChain(tagDefId);
-
-      // 3. 为所有 fieldDef 创建 fieldEntry（若不存在）
-      for (const chainTagId of extendsChain) {
-        const fieldDefs = getTemplateFieldDefs(chainTagId);
-        for (const fdId of fieldDefs) {
-          if (!findFieldEntry(nodeId, fdId)) {
-            const feId = nanoid();
-            // 找到插入位置（fieldEntry 排在 content children 之后）
-            loroDoc.createNode(feId, nodeId);
-            loroDoc.setNodeDataBatch(feId, {
-              type: 'fieldEntry',
-              fieldDefId: fdId,
-              templateId: fdId,
-            });
-          }
-        }
-      }
-
-      // 4. 传播 childSupertag
-      const tagDef = loroDoc.toNodexNode(tagDefId);
-      // childSupertag 是给新创建的子节点用的，不在 applyTag 时处理
-      // （由 createChild 在创建子节点时自动检测）
-      void tagDef; // suppress lint warning
+      applyTagMutationsNoCommit(nodeId, tagDefId);
       loroDoc.commitDoc();
     },
 

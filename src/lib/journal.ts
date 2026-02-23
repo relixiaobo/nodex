@@ -8,6 +8,7 @@
  */
 import { CONTAINER_IDS } from '../types/index.js';
 import { SYSTEM_TAGS } from '../types/system-nodes.js';
+import { applyTagMutationsNoCommit } from '../stores/node-store.js';
 import * as loroDoc from './loro-doc.js';
 import {
   getISOWeekNumber,
@@ -19,6 +20,29 @@ import {
   getAdjacentDay,
   extractSortValue,
 } from './date-utils.js';
+
+const JOURNAL_TAG_DEFS: ReadonlyArray<{ id: string; name: string }> = [
+  { id: SYSTEM_TAGS.DAY, name: 'day' },
+  { id: SYSTEM_TAGS.WEEK, name: 'week' },
+  { id: SYSTEM_TAGS.YEAR, name: 'year' },
+] as const;
+
+/**
+ * Ensure the journal date tags exist as normal tagDef nodes in Schema.
+ * Uses fixed IDs (`sys:day/week/year`) so journal semantics are ID-based.
+ */
+export function ensureJournalTagDefs(): void {
+  let created = false;
+  for (const { id, name } of JOURNAL_TAG_DEFS) {
+    if (loroDoc.hasNode(id)) continue;
+    loroDoc.createNode(id, CONTAINER_IDS.SCHEMA);
+    loroDoc.setNodeDataBatch(id, { type: 'tagDef', name });
+    created = true;
+  }
+  if (created) {
+    loroDoc.commitDoc('system:journal-tagdefs-bootstrap');
+  }
+}
 
 // ============================================================
 // Core: find or create child by name
@@ -70,7 +94,7 @@ function findOrCreateChild(
   const id = loroDoc.createNode(undefined, parentId, index);
   loroDoc.setNodeData(id, 'name', name);
   if (systemTag) {
-    loroDoc.addTag(id, systemTag);
+    applyTagMutationsNoCommit(id, systemTag);
   }
   return id;
 }
@@ -85,6 +109,7 @@ function findOrCreateChild(
  * Nodes are sorted in descending order (newest first).
  */
 export function ensureDateNode(date: Date): string {
+  ensureJournalTagDefs();
   const journalId = CONTAINER_IDS.JOURNAL;
 
   // Year node

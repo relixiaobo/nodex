@@ -29,7 +29,7 @@ _(空)_
 |-------|---------|------|-------------|
 | nodex-cc | Sync 增量同步（Cloudflare-only）— Step 0 起 | `cc/sync-phase1` | `docs/plans/sync-incremental-impl.md`, `server/*` |
 | nodex-cc-2 | _(idle)_ | — | — |
-| nodex-codex | 日期系统标签节点化（day/week/year 作为普通 supertag） | `codex/date-system-tagdefs` | `src/types/system-nodes.ts`, `src/lib/journal.ts`, `src/components/tags/TagBadge.tsx`, `src/stores/node-store.ts`, `tests/vitest/*journal*.test.ts`, `tests/vitest/tag-badge-navigation.test.ts`, `docs/features/date-nodes.md`, `docs/features/supertags.md`, `docs/TESTING.md`, `docs/TASKS.md` |
+| nodex-codex | 日期系统标签节点化（day/week/year 作为普通 supertag） | `codex/date-system-tagdefs` | `src/types/system-nodes.ts`, `src/lib/journal.ts`, `src/stores/node-store.ts`, `src/entrypoints/sidepanel/App.tsx`, `src/components/tags/TagBadge.tsx`, `tests/vitest/journal.test.ts`, `tests/vitest/tag-badge-navigation.test.ts`, `docs/features/date-nodes.md`, `docs/features/supertags.md`, `docs/TESTING.md`, `docs/TASKS.md` |
 
 ---
 
@@ -37,17 +37,20 @@ _(空)_
 
 ### 日期系统标签节点化（day/week/year 作为普通 supertag）
 > 将 `day/week/year` 从“仅系统语义 ID”升级为真实 `tagDef` 节点，并保持固定 ID（`sys:day/week/year`）。它们在数据模型中是普通 supertag，仅由 journal 功能以固定 ID 识别。
-> **Owner**: nodex-codex | **Branch**: `codex/date-system-tagdefs` | **Files**: `src/types/system-nodes.ts`, `src/lib/journal.ts`, `src/components/tags/TagBadge.tsx`, `src/stores/node-store.ts`, `tests/vitest/*journal*.test.ts`, `tests/vitest/tag-badge-navigation.test.ts`, `docs/features/date-nodes.md`, `docs/features/supertags.md`, `docs/TESTING.md`, `docs/TASKS.md`
+> **Owner**: nodex-codex | **Branch**: `codex/date-system-tagdefs` | **Files**: `src/types/system-nodes.ts`, `src/lib/journal.ts`, `src/stores/node-store.ts`, `src/entrypoints/sidepanel/App.tsx`, `src/components/tags/TagBadge.tsx`, `tests/vitest/journal.test.ts`, `tests/vitest/tag-badge-navigation.test.ts`, `docs/features/date-nodes.md`, `docs/features/supertags.md`, `docs/TESTING.md`, `docs/TASKS.md`
 
 - [x] 设计收口：`day/week/year` 作为普通 `tagDef`，仅保留 3 个固定 ID 供 journal 使用（不引入映射层）
-- [ ] 初始化/升级：幂等确保 `sys:day/week/year` tagDef 节点存在（固定 ID）
-- [ ] journal 逻辑继续使用固定 ID（仅依赖 ID，不依赖名称）
-- [ ] TagBadge/TagBar 导航恢复为可进入 `#day/#week/#year` 配置页（backing node 存在）
-- [ ] 模板字段/默认内容在 day/week/year 节点上生效（行为验证）
-- [ ] 测试与文档更新（`docs/features/date-nodes.md` / `docs/features/supertags.md` / `docs/TESTING.md`）
+- [x] 初始化/升级：幂等确保 `sys:day/week/year` tagDef 节点存在（固定 ID）
+- [x] journal 逻辑继续使用固定 ID（仅依赖 ID，不依赖名称）
+- [x] TagBadge/TagBar 导航恢复为可进入 `#day/#week/#year` 配置页（backing node 存在）
+- [x] 模板字段在 day/week/year 节点上生效（行为验证）
+- [ ] 默认内容在 day/week/year 节点上生效（行为验证）
+- [x] 测试与文档更新（`docs/features/date-nodes.md` / `docs/features/supertags.md` / `docs/TESTING.md`）
 
 **迭代日志**
 - [2026-02-23 nodex-codex] 与用户确认设计方向：不考虑旧数据兼容；移除 `task/person/...` 系统预置基础类型，`day/week/year` 直接作为普通 `tagDef`（固定 ID `sys:*`），journal 仅按 ID 识别。
+- [2026-02-23 nodex-codex] 实现 `ensureJournalTagDefs()`：在 sidepanel bootstrap 与 `ensureDateNode()` 中幂等创建 `sys:day/week/year` 普通 `tagDef`（Schema 下固定 ID）；更新 `journal.test.ts` 验证固定 ID 节点存在，并同步 `date-nodes`/`supertags`/`TESTING` 文档。
+- [2026-02-23 nodex-codex] 抽出 `applyTagMutationsNoCommit()`（共享于 `node-store.applyTag` 与 `journal`）以避免 `journal` 走 store action 产生多次 commit；补 `journal.test.ts` 验证 `#day` 模板字段会在新建日节点上实例化。默认内容复制行为仍待单独确认/实现。
 
 ---
 

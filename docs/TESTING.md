@@ -252,6 +252,7 @@ npm run test:run
 - `tests/vitest/field-row-selection.test.ts`
 - `tests/vitest/outliner-item-field-order.test.ts`
 - `tests/vitest/outliner-item-reference-navigation.test.ts`
+- `tests/vitest/outliner-item-reference-bullet.test.ts`
 - `tests/vitest/tag-badge-navigation.test.ts`
 - `tests/vitest/options-picker.test.ts`
 - `tests/vitest/row-pointer-selection.test.ts`
@@ -280,10 +281,11 @@ npm run test:run
 18. OutlinerItem 子行排序遵循“模板字段置顶 + 手动字段保持插入位”；字段 icon 着色仅限 `tagDef` owner（schema/manual 字段保持中性灰）
 19. 模板字段 icon 着色支持 `templateId` owner 回退（fieldDef 本体非 tagDef owner 时仍可继承 supertag 颜色）
 20. 全局 pointerdown 在 outliner 行外触发 `clearSelection`，保证“点击其他区域/执行其他操作”后选区自动清空
-21. content row Backspace 在“无下拉 + 光标行首 + 非空文本”触发 merge intent：合并到上一内容节点并保留 marks/inlineRefs；引用行保持仅导航不做文本合并
-22. 单 inline reference atom 且光标在行尾时，content row Backspace 触发 `select_reference` intent（用于 pending ref conversion 首次退格切回选中 reference row）
-23. outliner 作用域判定基于 `data-row-scope-parent-id`（而非 `data-node-id`），避免侧栏节点点击被误判为“仍在 outliner 内”
-24. 空文本且有子节点时 Backspace 不删除子树，触发 bullet/icon 抖动反馈（避免“按键无响应”的体感）
+21. `OutlinerItem` 的虚线 reference bullet 仅用于真实 reference / pending conversion / options value 行；普通内容节点（即使内容是单个 inline ref）保持普通 bullet
+22. content row Backspace 在”无下拉 + 光标行首 + 非空文本”触发 merge intent：合并到上一内容节点并保留 marks/inlineRefs；引用行保持仅导航不做文本合并
+23. 单 inline reference atom 且光标在行尾时，content row Backspace 触发 `select_reference` intent（用于 pending ref conversion 首次退格切回选中 reference row）
+24. outliner 作用域判定基于 `data-row-scope-parent-id`（而非 `data-node-id`），避免侧栏节点点击被误判为”仍在 outliner 内”
+25. 空文本且有子节点时 Backspace 不删除子树，触发 bullet/icon 抖动反馈（避免”按键无响应”的体感）
 
 ### 1.7 标签与引用状态流
 
@@ -1021,6 +1023,7 @@ npm run dev                # 启动 wrangler dev (localhost:8787)
 
 1. `OutlinerView` 在 NodePanel 场景可正常渲染（字段行 + 内容行同时存在）
 2. 防止运行时初始化顺序错误（TDZ）导致首屏白屏
+3. Outliner 行内不再渲染 backlink count 数字 badge（避免 `title="N reference(s)"` 视觉噪音）
 
 ### 1.48 Auth 工具函数（Google OAuth + Better Auth）
 

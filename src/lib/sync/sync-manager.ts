@@ -51,6 +51,7 @@ export class SyncManager {
   private lastSeq = 0;
   private listener: StateListener | null = null;
   private visibilityHandler: (() => void) | null = null;
+  private sessionToken = 0;
 
   private state: SyncState = {
     status: 'local-only',
@@ -69,6 +70,10 @@ export class SyncManager {
     this.listener?.(this.state);
   }
 
+  private isSessionCurrent(token: number): boolean {
+    return token === this.sessionToken;
+  }
+
   getState(): SyncState {
     return this.state;
   }
@@ -81,14 +86,18 @@ export class SyncManager {
   /** Start sync loop. Call on sign-in or workspace switch. */
   async start(workspaceId: string, accessToken: string, deviceId: string): Promise<void> {
     this.stop();
+    const sessionToken = ++this.sessionToken;
     this.workspaceId = workspaceId;
     this.accessToken = accessToken;
     this.deviceId = deviceId;
 
     // Restore cursor from IndexedDB
     this.lastSeq = await loadCursor(workspaceId);
+    if (!this.isSessionCurrent(sessionToken) || this.workspaceId !== workspaceId) return;
 
     const pending = await getPendingCount(workspaceId);
+    if (!this.isSessionCurrent(sessionToken) || this.workspaceId !== workspaceId) return;
+
     this.updateState({
       status: pending > 0 ? 'pending' : 'synced',
       pendingCount: pending,
@@ -112,6 +121,7 @@ export class SyncManager {
 
   /** Stop sync loop. Call on sign-out or workspace switch. */
   stop(): void {
+    this.sessionToken += 1;
     if (this.intervalId) {
       clearInterval(this.intervalId);
       this.intervalId = null;
@@ -123,7 +133,9 @@ export class SyncManager {
     this.workspaceId = null;
     this.accessToken = null;
     this.deviceId = null;
+    this.lastSeq = 0;
     this.isSyncing = false;
+    this.nudgePending = false;
     this.updateState({ status: 'local-only', error: null, pendingCount: 0 });
   }
 
@@ -135,15 +147,25 @@ export class SyncManager {
       return;
     }
 
+    const sessionToken = this.sessionToken;
+    const workspaceId = this.workspaceId;
+    const accessToken = this.accessToken;
+    const deviceId = this.deviceId;
+
     this.isSyncing = true;
     this.nudgePending = false;
     this.updateState({ status: 'syncing' });
 
     try {
-      await this.push();
-      await this.pull();
+      await this.push(workspaceId, accessToken, deviceId, sessionToken);
+      if (!this.isSessionCurrent(sessionToken)) return;
 
-      const pending = await getPendingCount(this.workspaceId!);
+      await this.pull(workspaceId, accessToken, deviceId, sessionToken);
+      if (!this.isSessionCurrent(sessionToken)) return;
+
+      const pending = await getPendingCount(workspaceId);
+      if (!this.isSessionCurrent(sessionToken)) return;
+
       this.updateState({
         status: pending > 0 ? 'pending' : 'synced',
         lastSyncedAt: Date.now(),
@@ -151,6 +173,7 @@ export class SyncManager {
         error: null,
       });
     } catch (err) {
+      if (!this.isSessionCurrent(sessionToken)) return;
       if (err instanceof AuthError) {
         this.updateState({ status: 'error', error: 'Session expired — please sign in again' });
         this.stop();
@@ -160,6 +183,7 @@ export class SyncManager {
         this.updateState({ status: 'error', error: msg });
       }
     } finally {
+      if (!this.isSessionCurrent(sessionToken)) return;
       this.isSyncing = false;
       // If nudge arrived while syncing, run another cycle immediately
       if (this.nudgePending) {
@@ -182,26 +206,33 @@ export class SyncManager {
   // Push: pending queue → server
   // -------------------------------------------------------------------------
 
-  private async push(): Promise<void> {
-    if (!this.workspaceId || !this.accessToken || !this.deviceId) return;
-
-    const updates = await dequeuePendingUpdates(this.workspaceId, MAX_PUSH_PER_CYCLE);
-    if (updates.length === 0) return;
+  private async push(
+    workspaceId: string,
+    accessToken: string,
+    deviceId: string,
+    sessionToken: number,
+  ): Promise<void> {
+    const updates = await dequeuePendingUpdates(workspaceId, MAX_PUSH_PER_CYCLE);
+    if (updates.length === 0 || !this.isSessionCurrent(sessionToken)) return;
 
     const vv = getVersionVector();
     const clientVV = uint8ToBase64(vv.encode());
 
     for (const update of updates) {
+      if (!this.isSessionCurrent(sessionToken)) return;
+
       const b64 = uint8ToBase64(update.data);
       const hash = await sha256Hex(update.data);
+      if (!this.isSessionCurrent(sessionToken)) return;
 
-      await pushUpdate(this.accessToken, {
-        workspaceId: this.workspaceId,
-        deviceId: this.deviceId,
+      await pushUpdate(accessToken, {
+        workspaceId,
+        deviceId,
         updates: b64,
         updateHash: hash,
         clientVV,
       });
+      if (!this.isSessionCurrent(sessionToken)) return;
 
       // Remove from queue after successful push
       await removePendingUpdates([update.id]);
@@ -212,18 +243,24 @@ export class SyncManager {
   // Pull: server → doc.import()
   // -------------------------------------------------------------------------
 
-  private async pull(): Promise<void> {
-    if (!this.workspaceId || !this.accessToken || !this.deviceId) return;
-
+  private async pull(
+    workspaceId: string,
+    accessToken: string,
+    deviceId: string,
+    sessionToken: number,
+  ): Promise<void> {
     let hasMore = true;
     let cursor = this.lastSeq;
 
     while (hasMore) {
-      const response = await pullUpdates(this.accessToken, {
-        workspaceId: this.workspaceId,
-        deviceId: this.deviceId,
+      if (!this.isSessionCurrent(sessionToken)) return;
+
+      const response = await pullUpdates(accessToken, {
+        workspaceId,
+        deviceId,
         lastSeq: cursor,
       });
+      if (!this.isSessionCurrent(sessionToken)) return;
 
       // Import snapshot if provided
       if (response.type === 'snapshot' && response.snapshot) {
@@ -242,11 +279,14 @@ export class SyncManager {
       hasMore = response.hasMore;
     }
 
+    if (!this.isSessionCurrent(sessionToken)) return;
+
     // Persist: save snapshot + cursor atomically
     if (cursor > this.lastSeq) {
       this.lastSeq = cursor;
       await saveNow();
-      await saveCursor(this.workspaceId, cursor);
+      if (!this.isSessionCurrent(sessionToken)) return;
+      await saveCursor(workspaceId, cursor);
     }
   }
 }

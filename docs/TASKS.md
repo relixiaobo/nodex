@@ -27,7 +27,7 @@ _(空)_
 
 | Agent | 当前任务 | 分支 | 修改中的文件 |
 |-------|---------|------|-------------|
-| nodex-cc | Sync Step 0: Auth PoC（Better Auth + D1 + Workers） | `cc/auth-poc` | `server/*`, `src/lib/auth.ts`, `src/stores/workspace-store.ts` |
+| nodex-cc | _(idle)_ | — | — |
 | nodex-cc-2 | _(idle)_ | — | — |
 | nodex-codex | _(idle)_ | — | — |
 
@@ -54,15 +54,10 @@ _(空)_
 - [x] **Review**: nodex-codex review 实施计划（含 7 个开放问题） ✓ nodex-codex（2026-02-22）
 - [x] **修订**: Postgres → D1 迁移 + Auth 评估 ✓ nodex-codex（2026-02-22）
 - [x] **修订**: Cloudflare-only 全栈（Auth PoC 纳入 Step 0） ✓ nodex（2026-02-23）
-- [ ] Step 0: Auth PoC（Better Auth + D1 + Workers）— **前置任务**
-- [ ] Step 1: 服务端项目骨架（Workers + R2 + D1 binding + Auth 集成）
-- [ ] Step 2: D1 Sync Schema 迁移（sync_workspaces + sync_devices + sync_updates）
-- [ ] Step 3: 服务端鉴权中间件（Better Auth session 验证）
-- [ ] Step 4: 服务端 Push 端点
-- [ ] Step 5: 服务端 Pull 端点 + 快照兜底
-- [ ] Step 6: 客户端 Pending Queue（可与 1-5 并行）
-- [ ] Step 7: 客户端 Sync Manager
-- [ ] Step 8: 客户端 Sync 状态 UI
+- [x] Step 0-5: Auth + Sync Server 全链路 ✓ nodex-cc PR #80（2026-02-23）
+- [ ] Step 6: 客户端 Pending Queue（IndexedDB 队列）
+- [ ] Step 7: 客户端 Sync Manager（push/pull 循环 + retry/backoff）
+- [ ] Step 8: 客户端 Sync 状态 UI（SyncStatusIndicator）
 - [ ] Step 9: 端到端测试
 - [ ] Step 10: Compaction（延后到上线后）
 
@@ -264,6 +259,7 @@ _(空)_
 
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
+| 2026-02-23 | Auth + Sync Server (Steps 0–5) — Better Auth + D1 + Google OAuth + Extension flow + Push/Pull 端点 + R2 blob 存储 + echo filtering + cursor 管理 | nodex-cc | #80 |
 | 2026-02-23 | 空白 NodePanel 导航修复 — reference bullet 导航到目标节点 + 系统标签导航守卫 + ui-store backing node 校验 + NodePanel 兜底视图 | nodex-codex | #81 |
 | 2026-02-23 | References 增强 (#19) — 反向链接 section（Mentioned in + Appears as [Field] in 分组）+ 引用计数 badge + 11 Vitest 用例 + 计数去重/缓存/trash set 性能修复 | nodex-cc-2 | #76 |
 | 2026-02-22 | Sync 增量同步计划 Review — 补 sync_updates 表、修正 seq hole/cursor 语义/checkpoint 持久化/RLS 边界 | nodex-codex | #79 |

@@ -18,10 +18,8 @@ export function TopToolbar() {
       {/* Left: Undo/Redo */}
       <UndoRedoButtons />
 
-      {/* Center: Search trigger */}
-      <div className="flex flex-1 justify-center">
-        <SearchTrigger />
-      </div>
+      {/* Center: Search trigger (fills available space, like Chrome omnibox) */}
+      <SearchTrigger />
 
       {/* Right: Sync dot + User avatar */}
       <div className="flex items-center gap-2">

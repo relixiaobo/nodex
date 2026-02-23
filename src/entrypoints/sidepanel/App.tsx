@@ -88,6 +88,12 @@ function useBootstrap(skip: boolean): BootstrapResult {
       // Bootstrap LoroDoc + seed containers
       await seedWorkspace(currentWsId);
 
+      // Restore auth session from stored Bearer token (validates against server).
+      // Must run after initLoroDoc so getPeerIdStr() is available for sync start.
+      // Fire-and-forget: UI renders immediately, auth + sync restore in background.
+      const { initAuth } = useWorkspaceStore.getState();
+      void initAuth();
+
       // Wait for UIStore persist hydration before checking panel validity
       // (persist.getItem is async, so the initial render may have stale default state)
       if (!useUIStore.persist.hasHydrated()) {

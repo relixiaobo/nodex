@@ -73,6 +73,11 @@ export class SyncManager {
     return this.state;
   }
 
+  /** Current workspace ID (used by loro-doc to enqueue updates under correct key). */
+  getWorkspaceId(): string | null {
+    return this.workspaceId;
+  }
+
   /** Start sync loop. Call on sign-in or workspace switch. */
   async start(workspaceId: string, accessToken: string, deviceId: string): Promise<void> {
     this.stop();

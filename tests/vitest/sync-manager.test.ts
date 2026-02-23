@@ -183,6 +183,17 @@ describe('SyncManager', () => {
       });
     });
 
+    it('getWorkspaceId() returns null before start, workspace after start, null after stop', async () => {
+      expect(mgr.getWorkspaceId()).toBeNull();
+
+      await mgr.start('ws_1', 'tok_1', 'dev_1');
+      await flushAsync();
+      expect(mgr.getWorkspaceId()).toBe('ws_1');
+
+      mgr.stop();
+      expect(mgr.getWorkspaceId()).toBeNull();
+    });
+
     it('start() transitions to synced when no pending updates', async () => {
       const states: string[] = [];
       mgr.onStateChange((s) => states.push(s.status));

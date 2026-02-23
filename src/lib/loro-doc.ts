@@ -246,10 +246,14 @@ export async function initLoroDoc(workspaceId: string): Promise<void> {
   // Only enqueues when user is signed in (syncManager.getState().status !== 'local-only').
   // importUpdates() does NOT trigger subscribeLocalUpdates (Loro native behavior),
   // so remote updates won't re-enter the queue.
+  // Uses syncManager.getWorkspaceId() (not module-level currentWorkspaceId) to ensure
+  // enqueue key matches dequeue key — prevents mismatch when bootstrap wsId differs from
+  // the authenticated workspace ID set during sign-in.
   unsubLocalUpdates = doc.subscribeLocalUpdates((bytes: Uint8Array) => {
     if (syncManager.getState().status === 'local-only') return;
-    if (!currentWorkspaceId) return;
-    void enqueuePendingUpdate(currentWorkspaceId, bytes).then(() => {
+    const syncWsId = syncManager.getWorkspaceId();
+    if (!syncWsId) return;
+    void enqueuePendingUpdate(syncWsId, bytes).then(() => {
       syncManager.nudge();
     });
   });

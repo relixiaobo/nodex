@@ -174,7 +174,7 @@ export function NodeHeader({ nodeId, onTitleRef }: NodeHeaderProps) {
       >
         {/* Col A: Drag handle (same position as chevron) */}
         <span
-          className="flex shrink-0 h-7 w-[15px] items-center justify-center opacity-0 group-hover/header-row:opacity-40 hover:!opacity-100 cursor-grab transition-opacity"
+          className="flex shrink-0 h-8 w-[15px] items-center justify-center opacity-0 group-hover/header-row:opacity-40 hover:!opacity-100 cursor-grab transition-opacity"
           title={t('nodeHeader.dragToMove')}
         >
           <GripVertical size={12} />

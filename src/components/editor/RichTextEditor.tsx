@@ -17,6 +17,7 @@ import {
 } from '../../lib/row-interactions.js';
 import type { InlineRefEntry, TextMark } from '../../types/index.js';
 import { docToMarks, marksToDoc } from '../../lib/pm-doc-utils.js';
+import { isOnlyInlineRef } from '../../lib/tree-utils.js';
 import { pmSchema } from './pm-schema.js';
 import { FloatingToolbar } from './FloatingToolbar.js';
 
@@ -54,6 +55,7 @@ interface RichTextEditorProps {
   onOutdent: () => void;
   onDelete: () => boolean;
   onBackspaceAtStart?: () => boolean;
+  onBackspaceAtEndSingleInlineRef?: () => boolean;
   onArrowUp: () => void;
   onArrowDown: () => void;
   onMoveUp: () => void;
@@ -366,14 +368,24 @@ export function RichTextEditor(props: RichTextEditorProps) {
       const parsed = docToMarks(view.state.doc);
       const isEmpty = parsed.text.replace(/\u200B/g, '').trim().length === 0;
       const { from, to } = view.state.selection;
+      const docEnd = view.state.doc.content.size - 1;
+      const isAtEnd = from >= docEnd && to >= docEnd;
+      const normalized = parsed.text.replace(/\u200B/g, '').trim();
+      const isSingleInlineRefAtom = normalized === '\uFFFC' && isOnlyInlineRef(parsed.text, parsed.inlineRefs);
       const intent = resolveNodeEditorBackspaceIntent({
         referenceActive: propsRef.current.referenceActive ?? false,
         hashTagActive: propsRef.current.hashTagActive ?? false,
         slashActive: propsRef.current.slashActive ?? false,
         isEmpty,
         isAtStart: from <= 1 && to <= 1,
+        isAtEnd,
+        isSingleInlineRefAtom,
       });
       if (intent === 'allow_default') return false;
+      if (intent === 'select_reference') {
+        saveContent();
+        return propsRef.current.onBackspaceAtEndSingleInlineRef?.() ?? false;
+      }
       if (intent === 'merge_with_previous') {
         saveContent();
         return propsRef.current.onBackspaceAtStart?.() ?? false;

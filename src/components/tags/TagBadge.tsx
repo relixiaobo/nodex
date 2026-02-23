@@ -26,7 +26,7 @@ export function TagBadge({ tagDefId, onRemove, onNavigate }: TagBadgeProps) {
     void s._version;
     const node = s.getNode(tagDefId);
     if (node?.name) return node.name;
-    // System tags (e.g. 'sys:day') may not have tree nodes — extract readable name from ID
+    // Defensive fallback for unknown/legacy sys:* IDs without backing nodes
     if (tagDefId.startsWith('sys:')) return tagDefId.slice(4);
     return 'Untitled';
   });

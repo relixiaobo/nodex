@@ -49,6 +49,30 @@ describe('applyTag / removeTag', () => {
     }
   });
 
+  it('applyTag shallow-clones top-level default content nodes from tagDef', () => {
+    loroDoc.createNode('tagDef_task_tpl_plain', 'tagDef_task');
+    loroDoc.setNodeDataBatch('tagDef_task_tpl_plain', {
+      name: 'Task template note',
+      description: 'seeded template content',
+    });
+    loroDoc.createNode('tagDef_task_tpl_child', 'tagDef_task_tpl_plain');
+    loroDoc.setNodeDataBatch('tagDef_task_tpl_child', { name: 'Nested child should not be cloned (shallow)' });
+    loroDoc.commitDoc('system:test-tagdef-default-content');
+
+    useNodeStore.getState().applyTag('note_2', 'tagDef_task');
+
+    const cloned = loroDoc.getChildren('note_2')
+      .map((id) => loroDoc.toNodexNode(id))
+      .find((n) => n?.templateId === 'tagDef_task_tpl_plain');
+
+    expect(cloned).toMatchObject({
+      name: 'Task template note',
+      description: 'seeded template content',
+      templateId: 'tagDef_task_tpl_plain',
+    });
+    expect(loroDoc.getChildren(cloned!.id)).toHaveLength(0);
+  });
+
   it('applyTag is idempotent — double apply does not duplicate tag or fieldEntries', () => {
     useNodeStore.getState().applyTag('note_2', 'tagDef_task');
     useNodeStore.getState().applyTag('note_2', 'tagDef_task');
@@ -64,6 +88,21 @@ describe('applyTag / removeTag', () => {
     expect(statusEntries.length).toBe(1);
 
     expect(collectNodeGraphErrors()).toEqual([]);
+  });
+
+  it('applyTag idempotency also avoids duplicating default content clones', () => {
+    loroDoc.createNode('tagDef_task_tpl_once', 'tagDef_task');
+    loroDoc.setNodeDataBatch('tagDef_task_tpl_once', { name: 'Only clone once' });
+    loroDoc.commitDoc('system:test-tagdef-default-content-idempotent');
+
+    useNodeStore.getState().applyTag('note_2', 'tagDef_task');
+    useNodeStore.getState().applyTag('note_2', 'tagDef_task');
+
+    const clones = loroDoc.getChildren('note_2').filter((cid) => {
+      const n = loroDoc.toNodexNode(cid);
+      return n?.templateId === 'tagDef_task_tpl_once';
+    });
+    expect(clones).toHaveLength(1);
   });
 
   it('removeTag removes tagDefId from node.tags', () => {

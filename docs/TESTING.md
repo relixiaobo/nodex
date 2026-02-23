@@ -261,7 +261,7 @@ npm run test:run
 11. `number_input` 配置值为非法数字字符串时，FieldRow value 区右侧展示同款 warning 图标（与普通 Number 字段位置一致）
 12. FieldRow 选中遮罩与 content row 使用同款视觉配方（`bg-selection-row + border + top/bottom inset`），并保证名称/值层级高于遮罩（避免选中后值区文本被遮盖）
 13. `OutlinerItem` panel 导航目标使用 `referenceTargetId ?? nodeId`（点击 reference row 的 bullet / drillDown 打开目标节点页面，而非引用壳节点空页）
-14. `TagBadge` 仅在标签存在 backing node 时允许导航（如 `sys:day` 这类系统标签点击不再进入空白 panel）
+14. `TagBadge` 仅在标签存在 backing node 时允许导航（悬空/未知 tag id 不可点击；`sys:day/week/year` 因存在固定 ID tagDef 可导航）
 15. FieldRow 保持“单击编辑优先”（name 进字段名编辑，value 保持值交互）；普通单击不再把 tuple 置入选区
 16. FieldRow 的 `Cmd/Ctrl+Click`、`Shift+Click` 走统一 pointer-intent 解析（即使落在 value 交互区，也优先按多选手势处理）
 17. `OutlinerView` / `ConfigOutliner` / `FieldValueOutliner` 的选择域统一使用“可见 field + content”同一 `rootChildIds`，避免 node 类型导致的范围选行为分叉
@@ -280,9 +280,9 @@ npm run test:run
 
 **覆盖点（Loro 模型）**:
 
-1. `applyTag(nodeId, tagDefId)` — 向 node.tags 写入 tagDefId，为 tagDef 所有 fieldDef 创建 fieldEntry 子节点
+1. `applyTag(nodeId, tagDefId)` — 向 node.tags 写入 tagDefId，为 tagDef 所有 fieldDef 创建 fieldEntry 子节点，并 shallow clone 顶层 default content 普通节点（`templateId` 标记来源）
 2. `removeTag(nodeId, tagDefId)` — 从 node.tags 移除，删除模板来源的 fieldEntry 子节点
-3. applyTag 幂等（重复调用不产生重复 tag 或重复 fieldEntry）
+3. applyTag 幂等（重复调用不产生重复 tag / fieldEntry / default content clone）
 4. removeTag 仅清理模板来源字段，手动添加字段保留
 5. `addReference(parentId, targetId)` 非幂等 — 每次创建新的 reference 节点
 6. `addReference(parentId, targetId)` 阻止非法树引用：self 引用、祖先引用、跨分支互引闭环（显示图成环）
@@ -358,9 +358,10 @@ npm run test:run
 2. trashNode 将节点从原父节点 children 中移除
 3. 多节点可同时在 TRASH 中
 4. `trashNode(tagDefId)` 不移除其他节点 tags 数组中的 tagDefId（不级联清理）
-5. `restoreNode(nodeId)` — 恢复到 `_trashedFrom` 原父节点，原位置优先
-6. `restoreNode` 原父不存在时回退到 CONTAINER_IDS.LIBRARY
-7. `tagDef` 已入 Trash 后，`removeTag` 仍可清理模板来源的 fieldEntry 节点
+5. `sys:day/week/year` 固定日期 tagDef 受保护：`trashNode` 对其 no-op（不可删除）
+6. `restoreNode(nodeId)` — 恢复到 `_trashedFrom` 原父节点，原位置优先
+7. `restoreNode` 原父不存在时回退到 CONTAINER_IDS.LIBRARY
+8. `tagDef` 已入 Trash 后，`removeTag` 仍可清理模板来源的 fieldEntry 节点
 
 ### 1.13 拖拽落点语义（纯函数）
 
@@ -508,7 +509,7 @@ npm run test:run
 1. `getTagColor` 确定性哈希：相同 ID → 相同颜色
 2. 返回值必须来自 `TAG_COLORS` 调色板
 3. 多个 tagDefId 的分布不应退化为单一颜色
-4. `resolveTagColor` 优先级：SYS_T* → gray; SYS_A11 config → 命名色; fallback → hash
+4. `resolveTagColor` 优先级：SYS_T* → gray; SYS_A11 config → 命名色; `sys:day/week/year` 默认 gray; fallback → hash
 5. `resolveTagColor` 配置写入后读取 SYS_A11 值
 6. `resolveTagColor` 未知色名 → fallback to hash
 7. `SWATCH_OPTIONS` 10 项 + 键映射完整性
@@ -1255,16 +1256,17 @@ createSibling 自动标签（2 cases）:
 | 5 | 年降序排列 | 最新年份在前 |
 | 6 | 周降序排列 | 最新周在前 |
 | 7 | 日降序排列 | 最新日在前 |
-| 8 | SYSTEM_TAGS 应用 | DAY/WEEK/YEAR 标签正确 |
-| 9 | ensureTodayNode | 返回有效 ID + DAY 标签 |
-| 10 | getAdjacentDayNodeId +1 | 返回下一天节点 |
-| 11 | getAdjacentDayNodeId -1 | 返回前一天节点 |
-| 12 | getAdjacentDayNodeId 非日节点 | 返回 null |
-| 13–16 | isDayNode/isWeekNode/isYearNode/isJournalNode | 正确判断 |
-| 17 | getDayNoteCountsForMonth 空月份 | 返回空 Map |
-| 18 | getDayNoteCountsForMonth 有笔记 | 正确计数（today=3, yesterday=2） |
-| 19 | getDayNoteCountsForMonth 排除 fieldEntry | 仅计算内容子节点 |
-| 20 | getDayNoteCountsForMonth 无内容日 | 0-count 日不出现在 Map 中 |
+| 8 | SYSTEM_TAGS 应用 + 固定 ID tagDef | DAY/WEEK/YEAR 标签正确，且 `sys:day/week/year` tagDef 存在于 Schema |
+| 9 | #day 模板字段/默认内容实例化 | 新建日节点会实例化 fieldEntry 并 shallow clone default content（`templateId` 来源追踪） |
+| 10 | ensureTodayNode | 返回有效 ID + DAY 标签 |
+| 11 | getAdjacentDayNodeId +1 | 返回下一天节点 |
+| 12 | getAdjacentDayNodeId -1 | 返回前一天节点 |
+| 13 | getAdjacentDayNodeId 非日节点 | 返回 null |
+| 14–17 | isDayNode/isWeekNode/isYearNode/isJournalNode | 正确判断 |
+| 18 | getDayNoteCountsForMonth 空月份 | 返回空 Map |
+| 19 | getDayNoteCountsForMonth 有笔记 | 正确计数（today=3, yesterday=2） |
+| 20 | getDayNoteCountsForMonth 排除 fieldEntry | 仅计算内容子节点 |
+| 21 | getDayNoteCountsForMonth 无内容日 | 0-count 日不出现在 Map 中 |
 
 ### 1.62 反向链接查询与计数
 

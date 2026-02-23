@@ -26,6 +26,7 @@ export {
   SYS_T,
   FIELD_TYPES,
   SYSTEM_TAGS,
+  isJournalSystemTagId,
 } from './system-nodes.js';
 
 export type {

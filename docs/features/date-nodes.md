@@ -16,9 +16,9 @@
 {wsId}_JOURNAL              ← 工作区容器 (doc_type: 'journal')
 │                             Tana 面包屑显示为 "Daily notes"
 │
-└── 2026                    ← 年节点 (doc_type: 'journalPart', #year SYS_T126)
-      ├── Week 01           ← 周节点 (doc_type: 'journalPart', #week SYS_T125)
-      │     ├── Mon, Dec 29 ← 日节点 (doc_type: 'journalPart', #day SYS_T124)
+└── 2026                    ← 年节点 (doc_type: 'journalPart', #year, tagDef=`sys:year`)
+      ├── Week 01           ← 周节点 (doc_type: 'journalPart', #week, tagDef=`sys:week`)
+      │     ├── Mon, Dec 29 ← 日节点 (doc_type: 'journalPart', #day, tagDef=`sys:day`)
       │     ├── Tue, Dec 30
       │     └── ...
       ├── Week 02
@@ -40,9 +40,9 @@
 
 | 常量 | 值 | 标签名 | 用途 |
 |------|-----|--------|------|
-| `SYS_T.DAY` | `SYS_T124` | `#day` | 日节点标签 |
-| `SYS_T.WEEK` | `SYS_T125` | `#week` | 周节点标签 |
-| `SYS_T.YEAR` | `SYS_T126` | `#year` | 年节点标签 |
+| `SYSTEM_TAGS.DAY` | `sys:day` | `#day` | 日节点标签（普通 tagDef，固定 ID） |
+| `SYSTEM_TAGS.WEEK` | `sys:week` | `#week` | 周节点标签（普通 tagDef，固定 ID） |
+| `SYSTEM_TAGS.YEAR` | `sys:year` | `#year` | 年节点标签（普通 tagDef，固定 ID） |
 
 ### 系统属性
 
@@ -99,7 +99,7 @@
   4. 在周节点下查找或创建日节点
   5. `navigateTo` 日节点（push panel）
 - 如果今日节点已存在，直接导航，不重复创建
-- 新创建的日节点自动应用 `#day`（SYS_T124）标签
+- 新创建的日节点自动应用 `#day`（`sys:day`）标签
 
 ### 自动创建路径
 
@@ -109,11 +109,11 @@
 ensureTodayNode(wsId, userId):
   1. journalId = `${wsId}_JOURNAL`
   2. yearNode = findOrCreate(journalId, '2026', { _docType: 'journalPart' })
-     → applyTag(yearNode, SYS_T126)
+     → applyTag(yearNode, SYSTEM_TAGS.YEAR /* sys:year */)
   3. weekNode = findOrCreate(yearNode, 'Week 07', { _docType: 'journalPart' })
-     → applyTag(weekNode, SYS_T125)
+     → applyTag(weekNode, SYSTEM_TAGS.WEEK /* sys:week */)
   4. dayNode = findOrCreate(weekNode, 'Sat, Feb 14', { _docType: 'journalPart' })
-     → applyTag(dayNode, SYS_T124)
+     → applyTag(dayNode, SYSTEM_TAGS.DAY /* sys:day */)
      → createMetaTuple(dayNode, SYS_A169, dateRef)
   5. return dayNode
 ```
@@ -162,10 +162,11 @@ Daily notes / 2026 / Week 07 / Sat, Feb 14           ← 非当天
 
 ### 日记模板（#day supertag）
 
-- `#day`（SYS_T124）是系统标签，可配置模板字段
+- `#day`（固定 ID `sys:day`）是普通 `tagDef`，可配置模板字段
 - 用户可为 `#day` 添加模板字段（如 "Mood"、"Top 3"）
 - 新创建的日节点自动应用 `#day` 标签 → 自动添加模板字段
 - `#week` 和 `#year` 同理，可配置各自的模板
+- `#day/#week/#year` 为系统必需标签：允许重命名/改色/配置模板，但**不可删除**
 
 ### 日期字段值 = 日节点引用（核心设计原则）
 
@@ -238,6 +239,8 @@ Daily notes / 2026 / Week 07 / Sat, Feb 14           ← 非当天
 | 2026-02-14 | 日节点命名跟随 Tana 格式 `Sat, Feb 14` | 截图确认 Tana 实际格式；"Today" 前缀仅在面包屑中动态添加，不存入 props.name |
 | 2026-02-14 | 日期导航栏（`< >` / Today / 日历）Phase 1 实现 | 截图确认为日记核心交互，非可选功能 |
 | 2026-02-16 | 日期字段值 = 日节点引用（非字符串） | "一切皆节点"守则；让日期成为可挂 children/tag/field 的一等公民 |
+| 2026-02-23 | `day/week/year` 使用固定 ID 普通 tagDef（`sys:day/week/year`） | 简化模型：无映射层、无额外预置类型；journal 仅按 ID 识别 |
+| 2026-02-23 | `day/week/year` 禁止删除（store guard + UI 隐藏 Delete tag） | 避免破坏日记系统基础语义；仍保留普通 tagDef 的配置能力 |
 | 2026-02-21 | Phase 1 实现：Loro 模型（无 doc_type/meta） | 使用 SYSTEM_TAGS.DAY/WEEK/YEAR 直接标签，无 meta Tuple；容器 ID 为 CONTAINER_IDS.JOURNAL（无 wsId 前缀） |
 | 2026-02-21 | 侧栏 "Daily notes" + Today 按钮 | 重命名 Journal → Daily notes，CalendarCheck 图标按钮触发 ensureTodayNode |
 | 2026-02-21 | Cmd+Shift+D 全局快捷键 | 非编辑/选中模式下触发（编辑模式下 batch_duplicate 优先） |

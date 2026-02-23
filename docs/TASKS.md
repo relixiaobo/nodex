@@ -28,7 +28,7 @@ _(空)_
 | Agent | 当前任务 | 分支 | 修改中的文件 |
 |-------|---------|------|-------------|
 | nodex-cc | _(idle)_ | — | — |
-| nodex-cc-2 | _(idle)_ | — | — |
+| nodex-cc-2 | 统一时间线 Undo/Redo (#44) | cc2/unified-undo | `src/stores/node-store.ts`, `src/lib/loro-doc.ts`, `src/components/editor/RichTextEditor.tsx`, `src/stores/ui-store.ts` |
 | nodex-codex | _(idle)_ | — | — |
 
 ---
@@ -121,15 +121,18 @@ _(空)_
 - [x] 正文内容转子节点（V2）✓ `parseHtmlToNodes()` + `createContentNodes()` heading-based 层级树
 - **Spec**: `docs/features/web-clipping.md`
 
-#### 撤销与重做 (#44)
-> 已完成：文本编辑撤销（ProseMirror History）、导航撤销（navUndoStack）、结构性操作撤销（Loro UndoManager）
+#### 统一时间线 Undo/Redo (#44)
+> 目标：Workflowy 水平的统一 undo — ⌘Z 永远撤销「上一步」，覆盖所有用户操作。
+> 替换当前三栈 fallthrough（ProseMirror History → Loro UndoManager → navUndoStack）为 Loro UndoManager 单一时间线。
+> **Owner**: nodex-cc-2 | **Branch**: cc2/unified-undo
+> **Spec**: `docs/features/undo-redo.md` | **Plan**: `docs/plans/unified-undo.md` | **Research**: `docs/research/tana-undo-redo-analysis.md`
+>
+> 已完成基础：结构操作撤销（Loro UndoManager）、文本撤销（ProseMirror History，待替换）、导航撤销（navUndoStack，待合入）
 
-- [ ] 创建/删除节点撤销
-- [ ] 缩进/反缩进/移动撤销
-- [ ] 拖拽排序撤销
-- [ ] Cmd+Z 三层优先级统一
-- [ ] 标签/字段操作撤销
-- **Spec**: `docs/features/undo-redo.md`
+- [ ] Phase 1: 补全 commitDoc() 覆盖（applyTag / removeTag / setFieldValue / toggleCheckbox 所有路径）
+- [ ] Phase 2: ProseMirror → Loro 实时同步 + 移除 `prosemirror-history` + UndoManager onPush/onPop 回调
+- [ ] Phase 3: UI 状态 marker commit（展开/折叠 + 导航进入 Loro undo 栈）
+- [ ] Phase 4: 统一 ⌘Z handler + 删除旧代码（navUndoStack / 三层 fallthrough / PM History）
 
 #### Side Panel 布局改造 — 移除 Sidebar + ⌘K 重设计
 > 移除 Sidebar，用顶栏（Undo/Redo + 搜索触发器 + 用户头像/同步圆点）替代。

@@ -23,15 +23,14 @@ export const useSyncStore = create<SyncStore>((set) => {
       }
     });
     window.addEventListener('offline', () => {
+      // Do not surface sync UI when sync has never started (local-only mode).
+      if (syncManager.getState().status === 'local-only') return;
       set({ status: 'offline' });
     });
   }
 
   return {
-    status: 'local-only' as SyncStatus,
-    lastSyncedAt: null,
-    pendingCount: 0,
-    error: null,
+    ...syncManager.getState(),
     _update: (partial) => set(partial),
   };
 });

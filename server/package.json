@@ -4,10 +4,12 @@
   "type": "module",
   "scripts": {
     "dev": "wrangler dev",
-    "deploy": "wrangler deploy",
+    "deploy:staging": "wrangler deploy --env staging",
+    "deploy:production": "wrangler deploy --env production",
     "cf-typegen": "wrangler types",
     "db:migrate:local": "wrangler d1 migrations apply nodex-sync --local",
-    "db:migrate:remote": "wrangler d1 migrations apply nodex-sync --remote",
+    "db:migrate:staging": "wrangler d1 migrations apply nodex-sync-staging --env staging --remote",
+    "db:migrate:production": "wrangler d1 migrations apply nodex-sync --env production --remote",
     "db:seed:e2e": "wrangler d1 execute nodex-sync --local --file=scripts/seed-e2e.sql"
   },
   "dependencies": {

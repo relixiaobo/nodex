@@ -27,7 +27,7 @@ _(空)_
 
 | Agent | 当前任务 | 分支 | 修改中的文件 |
 |-------|---------|------|-------------|
-| nodex-cc | Sync 客户端 Steps 6-8（Pending Queue + Sync Manager + 状态 UI） | `cc/sync-client` | `src/lib/pending-queue.ts`, `src/lib/sync-manager.ts`, `src/lib/sync-protocol.ts`, `src/stores/sync-store.ts`, `src/components/sync/SyncStatusIndicator.tsx`, `src/lib/loro-doc.ts` |
+| nodex-cc | _(idle)_ | — | — |
 | nodex-cc-2 | _(idle)_ | — | — |
 | nodex-codex | _(idle)_ | — | — |
 
@@ -35,19 +35,7 @@ _(空)_
 
 ## 进行中
 
-### Sync 客户端 Steps 6-8（Pending Queue + Sync Manager + 状态 UI）
-> 服务端已完成（PR #80），本轮实现客户端 sync 全链路。
-> **Owner**: nodex-cc | **Branch**: `cc/sync-client`
-> **参考**: `docs/plans/sync-incremental-impl.md`（Steps 6-8）、PR #80 comment（建议的文件结构）
->
-> **关键约束**:
-> - `loro-doc.ts` 是高风险文件，改动前确认无其他 Agent 正在修改
-> - `subscribeLocalUpdates` hook（PR #77）已预留，接入 pending queue
-> - 服务端端口 `localhost:8787`，客户端 dev server `5201`（nodex-cc）
-
-- [ ] Step 6: `pending-queue.ts` — IndexedDB 离线队列（Loro update bytes 入队、dequeue、持久化）
-- [ ] Step 7: `sync-manager.ts` + `sync-protocol.ts` — push/pull 循环、retry/backoff、Bearer token 鉴权、echo filtering
-- [ ] Step 8: `sync-store.ts` + `SyncStatusIndicator.tsx` — Zustand sync 状态、UI 指示器（syncing/synced/offline/error）
+_(无)_
 
 ---
 
@@ -61,15 +49,15 @@ _(空)_
 > **Owner**: nodex-cc
 > **Plan**: `docs/plans/sync-incremental-impl.md` | **Arch**: `docs/plans/sync-architecture.md` | **Auth**: `docs/plans/auth-cloudflare-only.md`
 >
-> **当前状态**: 服务端已完成（PR #80），客户端 Steps 6-8 进行中（nodex-cc）
+> **当前状态**: Steps 0-8 完成，端到端测试 + Compaction 待做
 
 - [x] **Review**: nodex-codex review 实施计划（含 7 个开放问题） ✓ nodex-codex（2026-02-22）
 - [x] **修订**: Postgres → D1 迁移 + Auth 评估 ✓ nodex-codex（2026-02-22）
 - [x] **修订**: Cloudflare-only 全栈（Auth PoC 纳入 Step 0） ✓ nodex（2026-02-23）
 - [x] Step 0-5: Auth + Sync Server 全链路 ✓ nodex-cc PR #80（2026-02-23）
-- [ ] Step 6: 客户端 Pending Queue（IndexedDB 队列）
-- [ ] Step 7: 客户端 Sync Manager（push/pull 循环 + retry/backoff）
-- [ ] Step 8: 客户端 Sync 状态 UI（SyncStatusIndicator）
+- [x] Step 6: 客户端 Pending Queue（IndexedDB 队列） ✓ nodex-cc PR #83（2026-02-23）
+- [x] Step 7: 客户端 Sync Manager（push/pull 循环 + retry/backoff） ✓ nodex-cc PR #83（2026-02-23）
+- [x] Step 8: 客户端 Sync 状态 UI（SyncStatusIndicator） ✓ nodex-cc PR #83（2026-02-23）
 - [ ] Step 9: 端到端测试
 - [ ] Step 10: Compaction（延后到上线后）
 
@@ -253,6 +241,7 @@ _(空)_
 
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
+| 2026-02-23 | Sync 客户端 Steps 6-8 — Pending Queue (IndexedDB) + SyncManager (push/pull 30s + nudge + session token) + SyncStatusIndicator + WorkspaceStore hydration fix | nodex-cc | #83 |
 | 2026-02-23 | 日期系统标签节点化 — `sys:day/week/year` 普通 tagDef + 模板字段/默认内容实例化 + 删除保护 + applyTagMutationsNoCommit 提取 | nodex-codex | #82 |
 | 2026-02-23 | Auth + Sync Server (Steps 0–5) — Better Auth + D1 + Google OAuth + Extension flow + Push/Pull 端点 + R2 blob 存储 + echo filtering + cursor 管理 | nodex-cc | #80 |
 | 2026-02-23 | 空白 NodePanel 导航修复 — reference bullet 导航到目标节点 + 系统标签导航守卫 + ui-store backing node 校验 + NodePanel 兜底视图 | nodex-codex | #81 |

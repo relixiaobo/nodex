@@ -102,6 +102,7 @@ export class SyncManager {
       status: pending > 0 ? 'pending' : 'synced',
       pendingCount: pending,
       error: null,
+      lastSyncedAt: null,
     });
 
     // Immediate first sync
@@ -136,7 +137,7 @@ export class SyncManager {
     this.lastSeq = 0;
     this.isSyncing = false;
     this.nudgePending = false;
-    this.updateState({ status: 'local-only', error: null, pendingCount: 0 });
+    this.updateState({ status: 'local-only', error: null, pendingCount: 0, lastSyncedAt: null });
   }
 
   /** Trigger a sync cycle (debounced — skips if already syncing). */

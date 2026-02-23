@@ -8,6 +8,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { chromeLocalStorage } from '../lib/chrome-storage';
 import type { AuthUser } from '../lib/auth.js';
+import { syncManager } from '../lib/sync/sync-manager.js';
 
 interface WorkspaceStore {
   currentWorkspaceId: string | null;
@@ -31,6 +32,24 @@ interface WorkspaceStore {
   initAuth(): Promise<() => void>;
 }
 
+/** Start sync if signed in with a workspace. */
+async function startSyncIfReady(): Promise<void> {
+  const { currentWorkspaceId, isAuthenticated } = useWorkspaceStore.getState();
+  if (!isAuthenticated || !currentWorkspaceId) return;
+
+  const { getStoredToken } = await import('../lib/auth.js');
+  const { getPeerIdStr } = await import('../lib/loro-doc.js');
+  const token = await getStoredToken();
+  if (!token) return;
+
+  try {
+    const deviceId = getPeerIdStr();
+    await syncManager.start(currentWorkspaceId, token, deviceId);
+  } catch {
+    // loro-doc may not be initialized yet — sync will start after initLoroDoc
+  }
+}
+
 export const useWorkspaceStore = create<WorkspaceStore>()(
   persist(
     (set) => ({
@@ -43,13 +62,15 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
 
       setUser: (userId) => set({ userId, isAuthenticated: true }),
 
-      logout: () =>
+      logout: () => {
+        syncManager.stop();
         set({
           userId: null,
           isAuthenticated: false,
           currentWorkspaceId: null,
           authUser: null,
-        }),
+        });
+      },
 
       signInWithGoogle: async () => {
         const { signInWithGoogle: authSignIn } = await import('../lib/auth.js');
@@ -62,9 +83,13 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
           isAuthenticated: true,
           authUser: user,
         });
+
+        // Start sync after sign-in
+        void startSyncIfReady();
       },
 
       signOut: async () => {
+        syncManager.stop();
         const { signOut: authSignOut } = await import('../lib/auth.js');
         await authSignOut();
         set({
@@ -88,6 +113,9 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
             isAuthenticated: true,
             authUser: user,
           });
+
+          // Start sync after auth restoration
+          void startSyncIfReady();
         } else {
           set({ userId: null, isAuthenticated: false, authUser: null });
         }

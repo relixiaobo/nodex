@@ -4,6 +4,7 @@ import { useNodeStore } from '../../stores/node-store';
 import { useWorkspaceStore } from '../../stores/workspace-store';
 import { SidebarNav } from './SidebarNav';
 import { UserMenu } from '../auth/UserMenu';
+import { SyncStatusIndicator } from '../sync/SyncStatusIndicator';
 
 export function Sidebar() {
   const openSearch = useUIStore((s) => s.openSearch);
@@ -29,6 +30,7 @@ export function Sidebar() {
         </button>
       </div>
       <SidebarNav />
+      <SyncStatusIndicator />
       <UserMenu />
     </aside>
   );

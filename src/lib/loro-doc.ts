@@ -11,6 +11,8 @@ import type { NodexNode } from '../types/node.js';
 import { saveSnapshotRecord, loadSnapshotRecord } from './loro-persistence.js';
 import { resetAwareness } from './awareness.js';
 import { readRichTextFromLoroText, writeRichTextToLoroText } from './loro-text-bridge.js';
+import { enqueuePendingUpdate } from './sync/pending-queue.js';
+import { syncManager } from './sync/sync-manager.js';
 
 export const DEFAULT_USER_COMMIT_ORIGIN = 'user:implicit';
 const UNDO_EXCLUDED_ORIGIN_PREFIXES = ['__seed__', 'system:'] as const;
@@ -181,6 +183,9 @@ function scheduleSave(): void {
 async function persistSnapshot(): Promise<void> {
   if (!doc || !currentWorkspaceId) return;
   try {
+    // Commit pending changes so subscribeLocalUpdates fires
+    // (produces update bytes for the sync pending queue).
+    doc.commit({ origin: DEFAULT_USER_COMMIT_ORIGIN });
     const snapshot = doc.export({ mode: 'snapshot' });
     const vvBytes = doc.oplogVersion().encode();
     await saveSnapshotRecord(currentWorkspaceId, {
@@ -237,10 +242,24 @@ export async function initLoroDoc(workspaceId: string): Promise<void> {
     scheduleSave();
   });
 
-  // Phase 0: subscribeLocalUpdates — no-op hook point for future sync buffer
-  unsubLocalUpdates = doc.subscribeLocalUpdates((_bytes: Uint8Array) => {
-    // Phase 0: no-op, 仅预留入口
-    // Phase 2+: syncManager.bufferUpdate(bytes)
+  // Capture local mutations → pending queue for sync.
+  // Only enqueues when user is signed in (syncManager.getState().status !== 'local-only').
+  // importUpdates() does NOT trigger subscribeLocalUpdates (Loro native behavior),
+  // so remote updates won't re-enter the queue.
+  // Uses syncManager.getWorkspaceId() (not module-level currentWorkspaceId) to ensure
+  // enqueue key matches dequeue key — prevents mismatch when bootstrap wsId differs from
+  // the authenticated workspace ID set during sign-in.
+  unsubLocalUpdates = doc.subscribeLocalUpdates((bytes: Uint8Array) => {
+    if (syncManager.getState().status === 'local-only') return;
+    const syncWsId = syncManager.getWorkspaceId();
+    if (!syncWsId) return;
+    void enqueuePendingUpdate(syncWsId, bytes)
+      .then(() => {
+        syncManager.nudge();
+      })
+      .catch((err) => {
+        console.warn('[sync] Failed to enqueue local update:', err);
+      });
   });
 
   if (typeof window !== 'undefined') {
@@ -703,6 +722,14 @@ export function subscribeNode(nodexId: string, callback: () => void): () => void
 // ============================================================
 // ⑤ Incremental Sync — 增量更新导出/导入
 // ============================================================
+
+/**
+ * Get the device's PeerID string (used as deviceId in sync protocol).
+ */
+export function getPeerIdStr(): string {
+  if (!doc) throw new Error('[loro-doc] LoroDoc 未初始化');
+  return doc.peerIdStr;
+}
 
 /**
  * 获取当前文档的版本向量（VersionVector）。

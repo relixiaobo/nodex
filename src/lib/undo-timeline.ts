@@ -56,3 +56,4 @@ export function getUndoDepth(): number {
 export function getRedoDepth(): number {
   return redoStack.length;
 }
+

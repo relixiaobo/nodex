@@ -29,7 +29,7 @@ _(空)_
 |-------|---------|------|-------------|
 | nodex-cc | _(idle)_ | — | — |
 | nodex-cc-2 | _(idle)_ | — | — |
-| nodex-codex | Inline reference 内容节点误显示虚线 bullet（pending-conversion UI 误判） | `codex/inline-ref-bullet-style` | `src/components/outliner/OutlinerItem.tsx`, `tests/vitest/*`, `docs/TASKS.md` |
+| nodex-codex | Inline reference 内容节点误显示虚线 bullet（pending-conversion UI 误判） | `codex/inline-ref-bullet-style` | `src/components/outliner/OutlinerItem.tsx`, `tests/vitest/outliner-item-reference-bullet.test.ts`, `docs/TESTING.md`, `docs/TASKS.md` |
 
 ---
 
@@ -37,14 +37,15 @@ _(空)_
 
 ### Inline reference 内容节点误显示虚线 bullet（pending-conversion UI 误判）
 > 场景：同父节点已存在目标 child 时，`@` 会回退为 inline reference（普通内容节点 + inline ref），但该节点 bullet 仍显示虚线引用壳样式。需要排查 `OutlinerItem` 中 pending-conversion / single-inline-ref 的视觉 fallback 条件是否过宽。
-> **Owner**: nodex-codex | **Branch**: `codex/inline-ref-bullet-style` | **Files**: `src/components/outliner/OutlinerItem.tsx`, `tests/vitest/*`, `docs/TASKS.md`
+> **Owner**: nodex-codex | **Branch**: `codex/inline-ref-bullet-style` | **Files**: `src/components/outliner/OutlinerItem.tsx`, `tests/vitest/outliner-item-reference-bullet.test.ts`, `docs/TESTING.md`, `docs/TASKS.md`
 
-- [ ] 定位虚线 bullet 样式触发条件（pending conversion / single-inline-ref fallback）
-- [ ] 修复普通 inline reference 内容节点不再显示虚线 bullet
-- [ ] 补回归测试（样式判定或状态判定）
+- [x] 定位虚线 bullet 样式触发条件（pending conversion / single-inline-ref fallback）
+- [x] 修复普通 inline reference 内容节点不再显示虚线 bullet
+- [x] 补回归测试（样式判定或状态判定）
 
 **迭代日志**
 - [2026-02-23 nodex-codex] 用户反馈：同父已有 child 时 `@` 回退为 inline reference 内容节点，但 bullet 仍显示虚线；开始排查 `OutlinerItem` 的 pending-conversion 虚线样式判定逻辑。
+- [2026-02-23 nodex-codex] 确认根因：`OutlinerItem` 将 `hasSingleInlineRefAtomContent` 直接并入 `BulletChevron.isReference`，导致普通内容节点（仅含 inline ref atom）被误渲染为引用壳虚线 bullet；改为只看 `isReference/isPendingConversion/isOptionsValueNode`，并新增 `outliner-item-reference-bullet.test.ts` 锁定回归；`typecheck` / 全量 `test:run` / `build` 均通过。
 
 ---
 

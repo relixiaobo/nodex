@@ -68,6 +68,12 @@ const cursorStore = new Map<string, unknown>();
 function makeFakeDB() {
   return {
     transaction: (_storeName: string, _mode?: string) => {
+      const tx = {
+        oncomplete: null as ((e: Event) => void) | null,
+        onerror: null as ((e: Event) => void) | null,
+        onabort: null as ((e: Event) => void) | null,
+        objectStore: (_name: string) => store,
+      };
       const store = {
         get: (key: string) => {
           const req = {
@@ -89,11 +95,12 @@ function makeFakeDB() {
           queueMicrotask(() => {
             cursorStore.set(key, value);
             req.onsuccess?.({ target: req } as unknown as Event);
+            tx.oncomplete?.({ target: tx } as unknown as Event);
           });
           return req;
         },
       };
-      return { objectStore: (_name: string) => store };
+      return tx;
     },
   };
 }
@@ -262,6 +269,58 @@ describe('SyncManager', () => {
         workspaceId: 'ws_2',
         deviceId: 'dev_2',
       }));
+    });
+
+    it('stop() prevents stale in-flight sync from restoring non-local-only status', async () => {
+      mockPullUpdates.mockImplementation(
+        () => new Promise((resolve) => setTimeout(() => resolve({
+          type: 'incremental',
+          updates: [],
+          latestSeq: 0,
+          nextCursorSeq: 0,
+          hasMore: false,
+        }), 100)),
+      );
+
+      await mgr.start('ws_1', 'tok_1', 'dev_1');
+      // Initial sync is now in-flight.
+      mgr.stop();
+
+      await vi.advanceTimersByTimeAsync(200);
+      await flushAsync();
+
+      expect(mgr.getState().status).toBe('local-only');
+      expect(mgr.getWorkspaceId()).toBeNull();
+    });
+
+    it('stale first start() cannot overwrite newer session during async startup', async () => {
+      let resolveFirstPending: ((n: number) => void) | null = null;
+      mockGetPendingCount
+        .mockImplementationOnce(() => new Promise<number>((resolve) => {
+          resolveFirstPending = resolve;
+        }))
+        .mockResolvedValueOnce(0)
+        .mockResolvedValue(0);
+
+      const start1 = mgr.start('ws_1', 'tok_1', 'dev_1');
+      await flushAsync(); // let start1 reach pending-count await
+
+      await mgr.start('ws_2', 'tok_2', 'dev_2');
+      await flushAsync();
+
+      resolveFirstPending?.(0);
+      await start1;
+      await flushAsync();
+
+      expect(mgr.getWorkspaceId()).toBe('ws_2');
+      expect(mockPullUpdates).not.toHaveBeenCalledWith(
+        'tok_1',
+        expect.objectContaining({ workspaceId: 'ws_1' }),
+      );
+      expect(mockPullUpdates).toHaveBeenCalledWith(
+        'tok_2',
+        expect.objectContaining({ workspaceId: 'ws_2' }),
+      );
     });
   });
 

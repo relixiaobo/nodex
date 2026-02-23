@@ -253,9 +253,13 @@ export async function initLoroDoc(workspaceId: string): Promise<void> {
     if (syncManager.getState().status === 'local-only') return;
     const syncWsId = syncManager.getWorkspaceId();
     if (!syncWsId) return;
-    void enqueuePendingUpdate(syncWsId, bytes).then(() => {
-      syncManager.nudge();
-    });
+    void enqueuePendingUpdate(syncWsId, bytes)
+      .then(() => {
+        syncManager.nudge();
+      })
+      .catch((err) => {
+        console.warn('[sync] Failed to enqueue local update:', err);
+      });
   });
 
   if (typeof window !== 'undefined') {

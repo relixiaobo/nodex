@@ -321,7 +321,9 @@ async function saveCursor(workspaceId: string, lastSeq: number): Promise<void> {
       const tx = db.transaction(CURSOR_STORE, 'readwrite');
       const store = tx.objectStore(CURSOR_STORE);
       const req = store.put({ lastSeq, savedAt: Date.now() }, workspaceId);
-      req.onsuccess = () => resolve();
+      tx.oncomplete = () => resolve();
+      tx.onerror = (e) => reject((e.target as IDBTransaction).error);
+      tx.onabort = (e) => reject((e.target as IDBTransaction).error);
       req.onerror = (e) => reject((e.target as IDBRequest).error);
     });
   } catch (e) {

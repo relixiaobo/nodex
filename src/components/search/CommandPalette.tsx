@@ -1,16 +1,29 @@
 /**
- * Cmd+K command palette for quick node search & navigation.
+ * ⌘K Command palette — Raycast-style unified search & command interface.
  *
- * Uses cmdk (https://cmdk.paco.me) for the combobox behavior.
- * Searches across all cached nodes in the store.
+ * Three-layer structure:
+ * 1. Search bar (input + Esc badge)
+ * 2. List area (Suggestions/Results groups, scrollable)
+ * 3. Action bar (fixed bottom, dynamic label per selection type)
+ *
+ * Empty input: Suggestions (recent nodes + containers) + Commands
+ * Typing: single "Results" group with fuzzy-matched nodes + commands
  */
-import { useEffect, useCallback, useMemo } from 'react';
-import { Command } from 'cmdk';
-import { Search, FileText, Library, Inbox, CalendarDays, Trash2, type AppIcon } from '../../lib/icons.js';
+import { useEffect, useCallback, useMemo, useState, useRef } from 'react';
+import { FileText, Library, Inbox, CalendarDays, CalendarCheck, Trash2, type AppIcon } from '../../lib/icons.js';
 import { useUIStore } from '../../stores/ui-store';
 import { useNodeStore } from '../../stores/node-store';
-import { COMMAND_PALETTE_QUICK_CONTAINERS } from '../../lib/system-node-registry.js';
+import { useWorkspaceStore } from '../../stores/workspace-store';
 import * as loroDoc from '../../lib/loro-doc.js';
+import { fuzzyMatch } from '../../lib/fuzzy-search.js';
+import {
+  type PaletteItem,
+  type PaletteItemType,
+  type CommandContext,
+  getAllCommands,
+  getActionLabel,
+} from '../../lib/palette-commands.js';
+import { COMMAND_PALETTE_QUICK_CONTAINERS } from '../../lib/system-node-registry.js';
 import { t } from '../../i18n/strings.js';
 
 const CONTAINER_ICONS: Record<string, AppIcon> = {
@@ -20,14 +33,163 @@ const CONTAINER_ICONS: Record<string, AppIcon> = {
   trash: Trash2,
 };
 
+const TYPE_LABELS: Record<PaletteItemType, string> = {
+  node: 'Node',
+  container: 'Container',
+  command: 'Command',
+};
+
 export function CommandPalette() {
   const searchOpen = useUIStore((s) => s.searchOpen);
   const closeSearch = useUIStore((s) => s.closeSearch);
   const searchQuery = useUIStore((s) => s.searchQuery);
   const setSearchQuery = useUIStore((s) => s.setSearchQuery);
   const navigateTo = useUIStore((s) => s.navigateTo);
+  const panelHistory = useUIStore((s) => s.panelHistory);
+  const panelIndex = useUIStore((s) => s.panelIndex);
   const _version = useNodeStore((s) => s._version);
+  const authUser = useWorkspaceStore((s) => s.authUser);
+  const signInWithGoogle = useWorkspaceStore((s) => s.signInWithGoogle);
+  const signOutFn = useWorkspaceStore((s) => s.signOut);
 
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const listRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Build command context
+  const ctx: CommandContext = useMemo(() => ({
+    navigateTo,
+    closeSearch,
+    isSignedIn: !!authUser,
+    signInWithGoogle,
+    signOut: signOutFn,
+  }), [navigateTo, closeSearch, authUser, signInWithGoogle, signOutFn]);
+
+  // All registered commands
+  const commands = useMemo(() => getAllCommands(ctx), [ctx]);
+
+  // Recent nodes from panel history (deduplicated, most recent first, max 5)
+  const recentNodes = useMemo(() => {
+    const seen = new Set<string>();
+    const items: PaletteItem[] = [];
+    // Walk backwards from current index to find recent unique nodes
+    for (let i = panelIndex; i >= 0 && items.length < 5; i--) {
+      const id = panelHistory[i];
+      if (!id || seen.has(id)) continue;
+      seen.add(id);
+      const node = loroDoc.toNodexNode(id);
+      if (!node) continue;
+      const name = (node.name ?? '').replace(/<[^>]+>/g, '').trim();
+      if (!name) continue;
+      items.push({
+        id,
+        label: name,
+        icon: FileText,
+        type: 'node',
+        action: () => { navigateTo(id); closeSearch(); },
+      });
+    }
+    return items;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [panelHistory, panelIndex, _version, navigateTo, closeSearch]);
+
+  // Container items for Suggestions
+  const containerItems: PaletteItem[] = useMemo(() =>
+    COMMAND_PALETTE_QUICK_CONTAINERS.map((c) => ({
+      id: c.id,
+      label: t(c.labelKey),
+      icon: CONTAINER_ICONS[c.iconKey] ?? Library,
+      type: 'container' as PaletteItemType,
+      action: () => { navigateTo(c.id); closeSearch(); },
+    })),
+  [navigateTo, closeSearch]);
+
+  // Command items for Commands group
+  const commandItems: PaletteItem[] = useMemo(() =>
+    commands.map((cmd) => ({
+      id: cmd.id,
+      label: cmd.label,
+      icon: cmd.icon,
+      type: cmd.type,
+      subtitle: cmd.shortcut,
+      action: () => cmd.action(ctx),
+    })),
+  [commands, ctx]);
+
+  // Fuzzy search results (nodes + commands mixed, sorted by score)
+  const searchResults = useMemo(() => {
+    const q = searchQuery.trim();
+    if (!q) return [];
+
+    const results: PaletteItem[] = [];
+
+    // Search nodes
+    let nodeCount = 0;
+    for (const id of loroDoc.getAllNodeIds()) {
+      if (nodeCount >= 20) break;
+      const node = loroDoc.toNodexNode(id);
+      if (!node) continue;
+      const name = (node.name ?? '').replace(/<[^>]+>/g, '').trim();
+      if (!name) continue;
+      const match = fuzzyMatch(q, name);
+      if (match) {
+        results.push({
+          id,
+          label: name,
+          icon: FileText,
+          type: 'node',
+          score: match.score,
+          action: () => { navigateTo(id); closeSearch(); },
+        });
+        nodeCount++;
+      }
+    }
+
+    // Search commands
+    for (const cmd of commands) {
+      const targets = [cmd.label, ...(cmd.keywords ?? [])];
+      let bestScore: number | null = null;
+      for (const target of targets) {
+        const match = fuzzyMatch(q, target);
+        if (match && (bestScore === null || match.score > bestScore)) {
+          bestScore = match.score;
+        }
+      }
+      if (bestScore !== null) {
+        results.push({
+          id: cmd.id,
+          label: cmd.label,
+          icon: cmd.icon,
+          type: cmd.type,
+          subtitle: cmd.shortcut,
+          score: bestScore,
+          action: () => cmd.action(ctx),
+        });
+      }
+    }
+
+    // Sort by score descending
+    results.sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
+    return results;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [_version, searchQuery, commands, ctx, navigateTo, closeSearch]);
+
+  // Flat list of all visible items (for keyboard navigation)
+  const allItems: PaletteItem[] = useMemo(() => {
+    if (searchQuery.trim()) return searchResults;
+    return [...recentNodes, ...containerItems, ...commandItems];
+  }, [searchQuery, searchResults, recentNodes, containerItems, commandItems]);
+
+  // Reset selection when items change
+  useEffect(() => setSelectedIndex(0), [allItems.length, searchQuery]);
+
+  // Focus input when opened
+  useEffect(() => {
+    if (searchOpen) {
+      // Use requestAnimationFrame to ensure DOM is rendered before focusing
+      requestAnimationFrame(() => inputRef.current?.focus());
+    }
+  }, [searchOpen]);
 
   // Global Cmd+K shortcut
   useEffect(() => {
@@ -45,115 +207,207 @@ export function CommandPalette() {
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [searchOpen, closeSearch]);
 
-  const handleSelect = useCallback(
-    (nodeId: string) => {
-      navigateTo(nodeId);
-      closeSearch();
+  // Keyboard navigation within the palette
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setSelectedIndex((i) => Math.min(i + 1, allItems.length - 1));
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setSelectedIndex((i) => Math.max(i - 1, 0));
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        const item = allItems[selectedIndex];
+        if (item) item.action();
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        closeSearch();
+      }
     },
-    [navigateTo, closeSearch],
+    [allItems, selectedIndex, closeSearch],
   );
 
-  // Filter nodes matching the search query
-  const results = useMemo(() => {
-    if (!searchQuery.trim()) return [];
-    const query = searchQuery.toLowerCase();
-    const matches: Array<{ id: string; name: string }> = [];
-
-    for (const id of loroDoc.getAllNodeIds()) {
-      const node = loroDoc.toNodexNode(id);
-      if (!node) continue;
-      // Skip system/container nodes unless explicitly searching
-      const name = node.name ?? '';
-      const plainText = name.replace(/<[^>]+>/g, '').toLowerCase();
-
-      if (plainText.includes(query)) {
-        matches.push({ id, name: plainText || t('search.commandPalette.untitled') });
-        if (matches.length >= 20) break;
-      }
+  // Scroll selected item into view
+  useEffect(() => {
+    const listEl = listRef.current;
+    if (!listEl) return;
+    const selected = listEl.querySelector('[data-selected="true"]');
+    if (selected) {
+      selected.scrollIntoView({ block: 'nearest' });
     }
-
-    return matches;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [_version, searchQuery]);
-
-  // Container quick-access items
-  const containers = useMemo(() => (
-    COMMAND_PALETTE_QUICK_CONTAINERS.map((c) => ({
-      id: c.id,
-      icon: CONTAINER_ICONS[c.iconKey],
-      label: t(c.labelKey),
-    }))
-  ), []);
+  }, [selectedIndex]);
 
   if (!searchOpen) return null;
 
+  const hasQuery = searchQuery.trim().length > 0;
+  const selectedItem = allItems[selectedIndex];
+  const actionLabel = selectedItem ? getActionLabel(selectedItem.type) : 'Open';
+
+  // Compute group boundaries for rendering section headers
+  let globalIdx = 0;
+  const suggestionsStart = 0;
+  const suggestionsEnd = hasQuery ? 0 : recentNodes.length + containerItems.length;
+  const commandsStart = suggestionsEnd;
+  const commandsEnd = hasQuery ? 0 : suggestionsEnd + commandItems.length;
+
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center pt-[15%]">
+    <div className="fixed inset-0 z-50 flex items-start justify-center pt-[12%]">
       {/* Backdrop */}
-      <div
-        className="absolute inset-0 bg-black/20"
-        onClick={closeSearch}
-      />
+      <div className="absolute inset-0 bg-black/20" onClick={closeSearch} />
+
       {/* Dialog */}
-      <Command
-        className="relative w-full max-w-md rounded-lg border border-border bg-popover shadow-lg"
-        shouldFilter={false}
+      <div
+        className="relative w-full max-w-md rounded-xl border border-border bg-popover shadow-2xl"
+        onKeyDown={handleKeyDown}
       >
-        <div className="flex items-center gap-2 border-b border-border px-3">
-          <Search size={16} className="text-foreground-secondary shrink-0" />
-          <Command.Input
+        {/* Search bar */}
+        <div className="flex items-center border-b border-border px-4">
+          <input
+            ref={inputRef}
             value={searchQuery}
-            onValueChange={setSearchQuery}
-            placeholder={t('search.commandPalette.placeholder')}
-            className="h-10 flex-1 bg-transparent text-sm outline-none placeholder:text-foreground-tertiary"
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search nodes and commands..."
+            className="h-12 flex-1 bg-transparent text-base outline-none placeholder:text-foreground-tertiary"
           />
-          <kbd className="hidden sm:inline-flex h-5 items-center rounded border border-border bg-background px-1.5 text-[10px] font-medium text-foreground-tertiary">
+          <kbd
+            onClick={closeSearch}
+            className="ml-2 inline-flex h-5 cursor-pointer items-center rounded border border-border bg-background px-1.5 text-[10px] font-medium text-foreground-tertiary hover:text-foreground-secondary"
+          >
             Esc
           </kbd>
         </div>
-        <Command.List className="max-h-72 overflow-y-auto p-1">
-          <Command.Empty className="py-6 text-center text-sm text-foreground-secondary">
-            {t('search.commandPalette.noResults')}
-          </Command.Empty>
 
-          {/* Quick navigation */}
-          {!searchQuery.trim() && (
-            <Command.Group heading={t('search.commandPalette.groupNavigate')} className="px-1 py-1.5 text-xs font-medium text-foreground-secondary">
-              {containers.map((c) => {
-                const Icon = c.icon;
-                return (
-                  <Command.Item
-                    key={c.id}
-                    value={c.id}
-                    onSelect={() => handleSelect(c.id)}
-                    className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm text-foreground aria-selected:bg-accent"
-                  >
-                    <Icon size={14} className="text-foreground-secondary" />
-                    {c.label}
-                  </Command.Item>
-                );
-              })}
-            </Command.Group>
+        {/* List area */}
+        <div ref={listRef} className="max-h-80 overflow-y-auto py-2">
+          {hasQuery ? (
+            // Search mode: single "Results" group
+            searchResults.length > 0 ? (
+              <div>
+                <GroupHeader label="Results" />
+                {searchResults.map((item, i) => (
+                  <PaletteRow
+                    key={item.id}
+                    item={item}
+                    selected={selectedIndex === i}
+                    onSelect={() => item.action()}
+                    onHover={() => setSelectedIndex(i)}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="py-8 text-center text-sm text-foreground-secondary">
+                No results found
+              </div>
+            )
+          ) : (
+            // Default mode: Suggestions + Commands
+            <>
+              {(recentNodes.length > 0 || containerItems.length > 0) && (
+                <div>
+                  <GroupHeader label="Suggestions" />
+                  {recentNodes.map((item) => {
+                    const idx = globalIdx++;
+                    return (
+                      <PaletteRow
+                        key={item.id}
+                        item={item}
+                        selected={selectedIndex === idx}
+                        onSelect={() => item.action()}
+                        onHover={() => setSelectedIndex(idx)}
+                      />
+                    );
+                  })}
+                  {containerItems.map((item) => {
+                    const idx = globalIdx++;
+                    return (
+                      <PaletteRow
+                        key={item.id}
+                        item={item}
+                        selected={selectedIndex === idx}
+                        onSelect={() => item.action()}
+                        onHover={() => setSelectedIndex(idx)}
+                      />
+                    );
+                  })}
+                </div>
+              )}
+              {commandItems.length > 0 && (
+                <div>
+                  <GroupHeader label="Commands" />
+                  {commandItems.map((item) => {
+                    const idx = globalIdx++;
+                    return (
+                      <PaletteRow
+                        key={item.id}
+                        item={item}
+                        selected={selectedIndex === idx}
+                        onSelect={() => item.action()}
+                        onHover={() => setSelectedIndex(idx)}
+                      />
+                    );
+                  })}
+                </div>
+              )}
+            </>
           )}
+        </div>
 
-          {/* Search results */}
-          {searchQuery.trim() && results.length > 0 && (
-            <Command.Group heading={t('search.commandPalette.groupNodes')} className="px-1 py-1.5 text-xs font-medium text-foreground-secondary">
-              {results.map((r) => (
-                <Command.Item
-                  key={r.id}
-                  value={r.id}
-                  onSelect={() => handleSelect(r.id)}
-                  className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm text-foreground aria-selected:bg-accent"
-                >
-                  <FileText size={14} className="text-foreground-secondary shrink-0" />
-                  <span className="truncate">{r.name}</span>
-                </Command.Item>
-              ))}
-            </Command.Group>
-          )}
-        </Command.List>
-      </Command>
+        {/* Action bar */}
+        {allItems.length > 0 && (
+          <div className="flex h-9 items-center justify-end border-t border-border px-3">
+            <div className="flex items-center gap-1.5 text-xs text-foreground-secondary">
+              <span>{actionLabel}</span>
+              <kbd className="inline-flex h-5 items-center rounded border border-border bg-background px-1.5 text-[10px] font-medium">
+                ↵
+              </kbd>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Sub-components
+// ---------------------------------------------------------------------------
+
+function GroupHeader({ label }: { label: string }) {
+  return (
+    <div className="px-4 py-2 text-[11px] font-medium text-foreground-tertiary">
+      {label}
+    </div>
+  );
+}
+
+interface PaletteRowProps {
+  item: PaletteItem;
+  selected: boolean;
+  onSelect: () => void;
+  onHover: () => void;
+}
+
+function PaletteRow({ item, selected, onSelect, onHover }: PaletteRowProps) {
+  const Icon = item.icon;
+
+  return (
+    <div
+      data-selected={selected}
+      onClick={onSelect}
+      onMouseMove={onHover}
+      className={`mx-1 flex h-10 cursor-pointer items-center gap-3 rounded-lg px-3 ${
+        selected ? 'bg-accent' : ''
+      }`}
+    >
+      <Icon size={20} className="shrink-0 text-foreground-secondary" />
+      <span className="flex-1 truncate text-sm text-foreground">{item.label}</span>
+      {item.subtitle && (
+        <span className="shrink-0 text-xs text-foreground-tertiary">{item.subtitle}</span>
+      )}
+      <span className="shrink-0 text-xs text-foreground-tertiary">
+        {TYPE_LABELS[item.type]}
+      </span>
     </div>
   );
 }

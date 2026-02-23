@@ -77,7 +77,11 @@ app.get('/auth/extension-redirect', async (c) => {
   // If Better Auth changes this format, the extension-redirect will fail visibly
   // (token won't match any session row → /api/session returns null → client
   // shows "failed to fetch user info"). This is detectable, not a silent bug.
-  const rawCookie = getCookie(c, 'better-auth.session_token');
+  // Better Auth prefixes cookies with `__Secure-` when baseURL is HTTPS.
+  // Check both names to support local dev (HTTP) and staging/production (HTTPS).
+  const rawCookie =
+    getCookie(c, '__Secure-better-auth.session_token') ??
+    getCookie(c, 'better-auth.session_token');
 
   if (!rawCookie) {
     console.error('[auth] extension-redirect: no session cookie found');

@@ -757,6 +757,8 @@ subscribeLocalUpdates hook:
 23. Import does not trigger subscribeLocalUpdates (local-only)
 24. Multiple subscribes coexist and unsubscribe independently
 
+Note: Fake IndexedDB mock supports DB_VERSION 2 schema (pending_updates with keyPath + createIndex, sync_cursors store).
+
 **设计要点**:
 - `loadSnapshotRecord()` 仅接受 `SnapshotRecord` 格式，旧格式（bare `Uint8Array`）返回 null（项目未上线，不兼容）
 - `loadSnapshotRecord()` 同时校验 `snapshot/versionVector` 为 `Uint8Array`、`peerIdStr` 为 string、`savedAt` 为非负有限 number，部分损坏记录直接丢弃
@@ -836,9 +838,10 @@ subscribeLocalUpdates hook:
 
 1. 默认状态为未登录（`currentWorkspaceId/userId = null`，`isAuthenticated = false`，`authUser = null`）
 2. `setWorkspace + setUser` 后状态一致，且写入 `nodex-workspace` 持久化键
-3. `logout` 清空用户与工作区上下文，并恢复未登录状态（含 `authUser`）
+3. `logout` 清空用户与工作区上下文，并恢复未登录状态（含 `authUser`）；调用 `syncManager.stop()`
 4. `authUser` 不被持久化到 storage（通过 `partialize` 排除）
-5. `signInWithGoogle` 成功后 `userId / isAuthenticated / authUser` 正确写入
+5. `signInWithGoogle` 成功后 `userId / isAuthenticated / authUser` 正确写入；异步触发 `startSyncIfReady()`
+6. Mock: `sync-manager.js` (syncManager.start/stop/getState) + auth.js (getStoredToken) + loro-doc.js (getPeerIdStr)
 
 ### 1.51 Breadcrumb Workspace Root 导航
 

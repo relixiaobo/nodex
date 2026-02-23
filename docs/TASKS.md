@@ -27,7 +27,7 @@ _(空)_
 
 | Agent | 当前任务 | 分支 | 修改中的文件 |
 |-------|---------|------|-------------|
-| nodex-cc | _(idle)_ | — | — |
+| nodex-cc | Sync 客户端 Steps 6-8（Pending Queue + Sync Manager + 状态 UI） | `cc/sync-client` | `src/lib/pending-queue.ts`, `src/lib/sync-manager.ts`, `src/lib/sync-protocol.ts`, `src/stores/sync-store.ts`, `src/components/sync/SyncStatusIndicator.tsx`, `src/lib/loro-doc.ts` |
 | nodex-cc-2 | _(idle)_ | — | — |
 | nodex-codex | _(idle)_ | — | — |
 
@@ -35,7 +35,19 @@ _(空)_
 
 ## 进行中
 
-_(空)_
+### Sync 客户端 Steps 6-8（Pending Queue + Sync Manager + 状态 UI）
+> 服务端已完成（PR #80），本轮实现客户端 sync 全链路。
+> **Owner**: nodex-cc | **Branch**: `cc/sync-client`
+> **参考**: `docs/plans/sync-incremental-impl.md`（Steps 6-8）、PR #80 comment（建议的文件结构）
+>
+> **关键约束**:
+> - `loro-doc.ts` 是高风险文件，改动前确认无其他 Agent 正在修改
+> - `subscribeLocalUpdates` hook（PR #77）已预留，接入 pending queue
+> - 服务端端口 `localhost:8787`，客户端 dev server `5201`（nodex-cc）
+
+- [ ] Step 6: `pending-queue.ts` — IndexedDB 离线队列（Loro update bytes 入队、dequeue、持久化）
+- [ ] Step 7: `sync-manager.ts` + `sync-protocol.ts` — push/pull 循环、retry/backoff、Bearer token 鉴权、echo filtering
+- [ ] Step 8: `sync-store.ts` + `SyncStatusIndicator.tsx` — Zustand sync 状态、UI 指示器（syncing/synced/offline/error）
 
 ---
 
@@ -49,7 +61,7 @@ _(空)_
 > **Owner**: nodex-cc
 > **Plan**: `docs/plans/sync-incremental-impl.md` | **Arch**: `docs/plans/sync-architecture.md` | **Auth**: `docs/plans/auth-cloudflare-only.md`
 >
-> **当前状态**: 计划已 Review + Cloudflare-only 修订完成，可交 nodex-cc 执行
+> **当前状态**: 服务端已完成（PR #80），客户端 Steps 6-8 进行中（nodex-cc）
 
 - [x] **Review**: nodex-codex review 实施计划（含 7 个开放问题） ✓ nodex-codex（2026-02-22）
 - [x] **修订**: Postgres → D1 迁移 + Auth 评估 ✓ nodex-codex（2026-02-22）

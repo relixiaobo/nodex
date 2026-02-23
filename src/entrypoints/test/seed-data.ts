@@ -329,6 +329,8 @@ export async function seedTestData(options?: { forceFresh?: boolean }): Promise<
 
   // Commit so Loro subscriptions fire and _version bumps for React
   commitDoc('__seed__');
+  // Clear unified timeline entries accumulated during seeding (navigateTo, applyTag etc.)
+  resetTimeline();
 }
 
 /** Sync seed for test environments (call after initLoroDocForTest). */

@@ -759,6 +759,56 @@ subscribeLocalUpdates hook:
 
 Note: Fake IndexedDB mock supports DB_VERSION 2 schema (pending_updates with keyPath + createIndex, sync_cursors store).
 
+### 1.516 SyncManager 集成测试
+
+**测试文件**: `tests/vitest/sync-manager.test.ts`
+
+**覆盖点（SyncManager lifecycle + push/pull + error handling）**:
+
+Lifecycle & state transitions:
+1. 初始状态为 `local-only`（未 start）
+2. `start()` 无 pending → 状态变为 `synced`
+3. `start()` 有 pending → 状态变为 `pending`
+4. `stop()` 重置为 `local-only`，清除 credentials
+5. `stop()` 清除 interval timer（30s 后无调用）
+6. `start()` 先 stop 前一个 session 再启动新 session
+
+Push flow:
+7. dequeue → sha256 → pushUpdate → removePendingUpdates
+8. 多条 update 逐条 push 并逐条 remove
+9. 空队列跳过 push
+
+Pull flow:
+10. incremental updates → importUpdates 被调用
+11. snapshot + incremental 响应 → 两次 importUpdates（snapshot 先）
+12. hasMore=true → 分页 pull（nextCursorSeq 传递）
+13. 无新数据 → saveNow 不调用
+
+Cursor persistence:
+14. pull 成功后 cursor 写入 IndexedDB
+15. start() 从 IndexedDB 恢复 cursor（pull 使用恢复的 lastSeq）
+
+Offline:
+16. navigator.onLine=false → syncOnce 设置 `offline`，不调用 push/pull
+
+Error handling:
+17. AuthError (push) → 状态先 `error` 再 `stop()` 归位 `local-only`
+18. AuthError (pull) → 同上
+19. 普通 Error (push) → 状态 `error`，不 stop（可重试）
+20. 普通 Error (pull) → 状态 `error` + error message
+
+Periodic sync & nudge:
+21. 30s interval 触发 syncOnce
+22. nudge() 立即触发 syncOnce
+23. 并发 syncOnce 被 isSyncing guard 去重
+
+State listener & guard:
+24. onStateChange 在每次状态变更时触发
+25. pendingCount 来自 getPendingCount
+26. 未 start 时 syncOnce 是 no-op
+
+Mock: pending-queue (dequeue/remove/count), sync-protocol (push/pull/sha256Hex/AuthError), loro-doc (importUpdates/getVersionVector/saveNow), loro-persistence (openDB + fake cursor store).
+
 **设计要点**:
 - `loadSnapshotRecord()` 仅接受 `SnapshotRecord` 格式，旧格式（bare `Uint8Array`）返回 null（项目未上线，不兼容）
 - `loadSnapshotRecord()` 同时校验 `snapshot/versionVector` 为 `Uint8Array`、`peerIdStr` 为 string、`savedAt` 为非负有限 number，部分损坏记录直接丢弃

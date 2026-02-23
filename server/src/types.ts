@@ -17,4 +17,7 @@ export interface Env {
 
   // Chrome Extension ID (for OAuth redirect)
   CHROME_EXTENSION_ID: string;
+
+  // Dev server origin for CORS (optional, defaults to main repo port 5199)
+  DEV_ORIGIN?: string;
 }

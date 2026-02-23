@@ -23,10 +23,11 @@ const app = new Hono<{ Bindings: Env }>();
 // ---------------------------------------------------------------------------
 
 app.use('*', async (c, next) => {
+  const devOrigin = c.env.DEV_ORIGIN ?? 'http://localhost:5199';
   const corsMiddleware = cors({
     origin: [
       `chrome-extension://${c.env.CHROME_EXTENSION_ID}`,
-      'http://localhost:5201',  // client dev server
+      devOrigin,
     ],
     allowHeaders: ['Content-Type', 'Authorization'],
     allowMethods: ['POST', 'GET', 'OPTIONS'],
@@ -64,7 +65,18 @@ app.get('/auth/extension-redirect', async (c) => {
   const extRedirectBase = `https://${extId}.chromiumapp.org/`;
 
   // Read the session token from Better Auth's cookie.
-  // Cookie format is "token.signature" — extract just the token part for Bearer use.
+  //
+  // Better Auth stores session cookies as "token.signature" (HMAC-signed).
+  // The `token` part is the actual session token stored in D1 `session.token`.
+  // The `.signature` suffix is a server-side integrity check — not needed for
+  // Bearer auth since we validate the token directly against D1.
+  //
+  // Reference: Better Auth source — packages/better-auth/src/cookies.ts
+  // (createSessionCookie serializes as `${token}.${sign(token, secret)}`).
+  //
+  // If Better Auth changes this format, the extension-redirect will fail visibly
+  // (token won't match any session row → /api/session returns null → client
+  // shows "failed to fetch user info"). This is detectable, not a silent bug.
   const rawCookie = getCookie(c, 'better-auth.session_token');
 
   if (!rawCookie) {

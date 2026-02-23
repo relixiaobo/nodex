@@ -71,14 +71,20 @@ export async function findUpdateByHash(
 }
 
 // ---------------------------------------------------------------------------
-// Atomic seq allocation + insert (D1 batch = implicit transaction)
+// Atomic seq allocation + insert (single D1 batch = single transaction)
 // ---------------------------------------------------------------------------
 
 /**
  * Atomically allocate next seq, insert update metadata, and upsert device cursor.
- * Uses D1 batch() for transactional guarantees.
  *
- * Returns the allocated seq number.
+ * Uses a single db.batch() call so all statements run within one implicit
+ * transaction — no race window between seq allocation and insert.
+ *
+ * The trick: we can't reference a previous statement's result within the same
+ * batch, so we use a subquery `(SELECT latest_seq FROM sync_workspaces ...)`
+ * in the INSERT to read the seq that was just incremented in the same tx.
+ *
+ * Returns the allocated seq number (read back from the UPDATE ... RETURNING).
  */
 export async function allocateSeqAndInsert(
   db: D1Database,
@@ -89,40 +95,37 @@ export async function allocateSeqAndInsert(
   r2Key: string,
   sizeBytes: number,
 ): Promise<number> {
-  // Step 1: Increment latest_seq and get new value
-  // D1 batch ensures these run in a single transaction
   const results = await db.batch([
-    // Increment seq
+    // 1. Increment seq and return it via RETURNING (D1/SQLite supports this)
     db.prepare(
-      'UPDATE sync_workspaces SET latest_seq = latest_seq + 1, updated_at = datetime(\'now\') WHERE workspace_id = ?'
+      `UPDATE sync_workspaces
+       SET latest_seq = latest_seq + 1, updated_at = datetime('now')
+       WHERE workspace_id = ?
+       RETURNING latest_seq`
     ).bind(workspaceId),
-    // Read the new seq
+
+    // 2. Insert update metadata — subquery reads the seq just incremented above
     db.prepare(
-      'SELECT latest_seq FROM sync_workspaces WHERE workspace_id = ?'
-    ).bind(workspaceId),
+      `INSERT INTO sync_updates (workspace_id, seq, device_id, user_id, update_hash, r2_key, size_bytes)
+       VALUES (?, (SELECT latest_seq FROM sync_workspaces WHERE workspace_id = ?), ?, ?, ?, ?, ?)`
+    ).bind(workspaceId, workspaceId, deviceId, userId, updateHash, r2Key, sizeBytes),
+
+    // 3. Upsert device cursor — same subquery for last_push_seq
+    db.prepare(
+      `INSERT INTO sync_devices (workspace_id, device_id, user_id, last_push_seq, last_seen_at)
+       VALUES (?, ?, ?, (SELECT latest_seq FROM sync_workspaces WHERE workspace_id = ?), datetime('now'))
+       ON CONFLICT (workspace_id, device_id) DO UPDATE SET
+         last_push_seq = (SELECT latest_seq FROM sync_workspaces WHERE workspace_id = ?),
+         last_seen_at = datetime('now')`
+    ).bind(workspaceId, deviceId, userId, workspaceId, workspaceId),
   ]);
 
-  const seqRow = results[1].results[0] as { latest_seq: number } | undefined;
+  // Read the new seq from the RETURNING clause of statement 1
+  const seqRow = results[0].results[0] as { latest_seq: number } | undefined;
   if (!seqRow) {
     throw new Error(`Failed to allocate seq for workspace ${workspaceId}`);
   }
-  const newSeq = seqRow.latest_seq;
-
-  // Step 2: Insert update metadata + upsert device cursor
-  await db.batch([
-    db.prepare(
-      'INSERT INTO sync_updates (workspace_id, seq, device_id, user_id, update_hash, r2_key, size_bytes) VALUES (?, ?, ?, ?, ?, ?, ?)'
-    ).bind(workspaceId, newSeq, deviceId, userId, updateHash, r2Key, sizeBytes),
-    db.prepare(
-      `INSERT INTO sync_devices (workspace_id, device_id, user_id, last_push_seq, last_seen_at)
-       VALUES (?, ?, ?, ?, datetime('now'))
-       ON CONFLICT (workspace_id, device_id) DO UPDATE SET
-         last_push_seq = ?,
-         last_seen_at = datetime('now')`
-    ).bind(workspaceId, deviceId, userId, newSeq, newSeq),
-  ]);
-
-  return newSeq;
+  return seqRow.latest_seq;
 }
 
 // ---------------------------------------------------------------------------

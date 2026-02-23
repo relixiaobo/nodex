@@ -9,3 +9,7 @@ dist/
 research/*.json
 *.pem
 docs/dev-setup.md
+
+# Cloudflare Worker (server/)
+server/.dev.vars
+server/.wrangler/

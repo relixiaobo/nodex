@@ -131,6 +131,16 @@ _(空)_
 - [ ] 标签/字段操作撤销
 - **Spec**: `docs/features/undo-redo.md`
 
+#### Side Panel 布局改造 — 移除 Sidebar + ⌘K 重设计
+> 移除 Sidebar，用顶栏（Undo/Redo + 搜索触发器 + 用户头像/同步圆点）替代。
+> ⌘K 命令面板 Raycast 风格重设计：fuzzy 搜索、混排结果 + 右侧类型标签、底部操作栏、命令注册表。
+> **Plan**: `docs/plans/layout-renovation.md`
+
+- [ ] Phase 1: 顶栏骨架 + 移除 Sidebar（TopToolbar + SearchTrigger + SyncDot + ToolbarUserMenu + Breadcrumb 精简）
+- [ ] Phase 2: ⌘K 命令面板重写（fuzzy search + 命令注册表 + Suggestions/Commands 分组 + 底部 ActionBar）
+- [ ] Phase 3: Undo/Redo 按钮集成（依赖 #44 详细设计）
+- [ ] Phase 4: 清理废弃文件（Sidebar/SidebarNav/SyncStatusIndicator/UserMenu）
+
 #### 节点选中 — 后续增强 (#47)
 > Phase 1-3 已合并（PR #51）。PR #72 补充了字段行选中 + 全局选区清除。以下为未覆盖的后续项：
 

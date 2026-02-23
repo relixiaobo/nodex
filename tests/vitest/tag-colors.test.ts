@@ -11,6 +11,7 @@ import {
   resolveInlineReferenceTextColor,
   resolveTagColor,
 } from '../../src/lib/tag-colors.js';
+import { SYSTEM_TAGS } from '../../src/types/system-nodes.js';
 
 describe('tag colors', () => {
   it('returns deterministic color for the same tagDef id', () => {
@@ -48,6 +49,12 @@ describe('resolveTagColor', () => {
   it('returns gray for system tags (SYS_T*)', () => {
     expect(resolveTagColor('SYS_T01')).toEqual(TAG_COLOR_GRAY);
     expect(resolveTagColor('SYS_T02')).toEqual(TAG_COLOR_GRAY);
+  });
+
+  it('returns gray for date system tag ids (sys:day/week/year) by default', () => {
+    expect(resolveTagColor(SYSTEM_TAGS.DAY)).toEqual(TAG_COLOR_GRAY);
+    expect(resolveTagColor(SYSTEM_TAGS.WEEK)).toEqual(TAG_COLOR_GRAY);
+    expect(resolveTagColor(SYSTEM_TAGS.YEAR)).toEqual(TAG_COLOR_GRAY);
   });
 
   it('falls back to hash when no color config', () => {

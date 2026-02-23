@@ -508,7 +508,7 @@ npm run test:run
 1. `getTagColor` 确定性哈希：相同 ID → 相同颜色
 2. 返回值必须来自 `TAG_COLORS` 调色板
 3. 多个 tagDefId 的分布不应退化为单一颜色
-4. `resolveTagColor` 优先级：SYS_T* → gray; SYS_A11 config → 命名色; fallback → hash
+4. `resolveTagColor` 优先级：SYS_T* → gray; SYS_A11 config → 命名色; `sys:day/week/year` 默认 gray; fallback → hash
 5. `resolveTagColor` 配置写入后读取 SYS_A11 值
 6. `resolveTagColor` 未知色名 → fallback to hash
 7. `SWATCH_OPTIONS` 10 项 + 键映射完整性

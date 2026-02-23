@@ -21,10 +21,15 @@ import {
   extractSortValue,
 } from './date-utils.js';
 
-const JOURNAL_TAG_DEFS: ReadonlyArray<{ id: string; name: string }> = [
-  { id: SYSTEM_TAGS.DAY, name: 'day' },
-  { id: SYSTEM_TAGS.WEEK, name: 'week' },
-  { id: SYSTEM_TAGS.YEAR, name: 'year' },
+const JOURNAL_TAG_DEFS: ReadonlyArray<{
+  id: string;
+  name: string;
+  defaultColor: 'gray';
+  defaultChildSupertag?: string;
+}> = [
+  { id: SYSTEM_TAGS.DAY, name: 'day', defaultColor: 'gray' },
+  { id: SYSTEM_TAGS.WEEK, name: 'week', defaultColor: 'gray', defaultChildSupertag: SYSTEM_TAGS.DAY },
+  { id: SYSTEM_TAGS.YEAR, name: 'year', defaultColor: 'gray', defaultChildSupertag: SYSTEM_TAGS.WEEK },
 ] as const;
 
 /**
@@ -32,14 +37,37 @@ const JOURNAL_TAG_DEFS: ReadonlyArray<{ id: string; name: string }> = [
  * Uses fixed IDs (`sys:day/week/year`) so journal semantics are ID-based.
  */
 export function ensureJournalTagDefs(): void {
-  let created = false;
-  for (const { id, name } of JOURNAL_TAG_DEFS) {
-    if (loroDoc.hasNode(id)) continue;
-    loroDoc.createNode(id, CONTAINER_IDS.SCHEMA);
-    loroDoc.setNodeDataBatch(id, { type: 'tagDef', name });
-    created = true;
+  let changed = false;
+  for (const def of JOURNAL_TAG_DEFS) {
+    const { id, name, defaultColor, defaultChildSupertag } = def;
+    if (!loroDoc.hasNode(id)) {
+      loroDoc.createNode(id, CONTAINER_IDS.SCHEMA);
+      loroDoc.setNodeDataBatch(id, {
+        type: 'tagDef',
+        name,
+        color: defaultColor,
+        ...(defaultChildSupertag ? { childSupertag: defaultChildSupertag } : {}),
+      });
+      changed = true;
+      continue;
+    }
+
+    const node = loroDoc.toNodexNode(id);
+    if (!node) continue;
+
+    const patch: Record<string, unknown> = {};
+    if (node.type !== 'tagDef') patch.type = 'tagDef';
+    if (!node.name) patch.name = name;
+    if (!node.color) patch.color = defaultColor;
+    if (defaultChildSupertag && !node.childSupertag) {
+      patch.childSupertag = defaultChildSupertag;
+    }
+    if (Object.keys(patch).length > 0) {
+      loroDoc.setNodeDataBatch(id, patch);
+      changed = true;
+    }
   }
-  if (created) {
+  if (changed) {
     loroDoc.commitDoc('system:journal-tagdefs-bootstrap');
   }
 }

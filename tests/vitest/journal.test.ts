@@ -6,6 +6,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { seedTestDataSync } from '../../src/entrypoints/test/seed-data.js';
 import * as loroDoc from '../../src/lib/loro-doc.js';
+import { TAG_COLOR_MAP, resolveTagColor } from '../../src/lib/tag-colors.js';
 import { CONTAINER_IDS, FIELD_TYPES } from '../../src/types/index.js';
 import { SYSTEM_TAGS } from '../../src/types/system-nodes.js';
 import {
@@ -252,13 +253,31 @@ describe('ensureJournalTagDefs', () => {
   it('creates fixed-ID day/week/year tagDefs under Schema', () => {
     ensureJournalTagDefs();
 
-    expect(loroDoc.toNodexNode(SYSTEM_TAGS.DAY)).toMatchObject({ type: 'tagDef', name: 'day' });
-    expect(loroDoc.toNodexNode(SYSTEM_TAGS.WEEK)).toMatchObject({ type: 'tagDef', name: 'week' });
-    expect(loroDoc.toNodexNode(SYSTEM_TAGS.YEAR)).toMatchObject({ type: 'tagDef', name: 'year' });
+    expect(loroDoc.toNodexNode(SYSTEM_TAGS.DAY)).toMatchObject({
+      type: 'tagDef',
+      name: 'day',
+      color: 'gray',
+    });
+    expect(loroDoc.toNodexNode(SYSTEM_TAGS.WEEK)).toMatchObject({
+      type: 'tagDef',
+      name: 'week',
+      color: 'gray',
+      childSupertag: SYSTEM_TAGS.DAY,
+    });
+    expect(loroDoc.toNodexNode(SYSTEM_TAGS.YEAR)).toMatchObject({
+      type: 'tagDef',
+      name: 'year',
+      color: 'gray',
+      childSupertag: SYSTEM_TAGS.WEEK,
+    });
 
     expect(loroDoc.getParentId(SYSTEM_TAGS.DAY)).toBe(CONTAINER_IDS.SCHEMA);
     expect(loroDoc.getParentId(SYSTEM_TAGS.WEEK)).toBe(CONTAINER_IDS.SCHEMA);
     expect(loroDoc.getParentId(SYSTEM_TAGS.YEAR)).toBe(CONTAINER_IDS.SCHEMA);
+
+    expect(resolveTagColor(SYSTEM_TAGS.DAY)).toEqual(TAG_COLOR_MAP.gray);
+    expect(resolveTagColor(SYSTEM_TAGS.WEEK)).toEqual(TAG_COLOR_MAP.gray);
+    expect(resolveTagColor(SYSTEM_TAGS.YEAR)).toEqual(TAG_COLOR_MAP.gray);
   });
 
   it('is idempotent when called multiple times', () => {
@@ -269,6 +288,30 @@ describe('ensureJournalTagDefs', () => {
     expect(schemaChildren.filter((id) => id === SYSTEM_TAGS.DAY)).toHaveLength(1);
     expect(schemaChildren.filter((id) => id === SYSTEM_TAGS.WEEK)).toHaveLength(1);
     expect(schemaChildren.filter((id) => id === SYSTEM_TAGS.YEAR)).toHaveLength(1);
+  });
+
+  it('backfills defaults without overwriting user custom settings', () => {
+    ensureJournalTagDefs();
+    loroDoc.setNodeDataBatch(SYSTEM_TAGS.WEEK, {
+      color: 'violet',
+      childSupertag: 'tagDef_person',
+    });
+    loroDoc.setNodeDataBatch(SYSTEM_TAGS.YEAR, {
+      color: '',
+      childSupertag: '',
+    });
+    loroDoc.commitDoc('user:test-customize-journal-tagdefs');
+
+    ensureJournalTagDefs();
+
+    expect(loroDoc.toNodexNode(SYSTEM_TAGS.WEEK)).toMatchObject({
+      color: 'violet',
+      childSupertag: 'tagDef_person',
+    });
+    expect(loroDoc.toNodexNode(SYSTEM_TAGS.YEAR)).toMatchObject({
+      color: 'gray',
+      childSupertag: SYSTEM_TAGS.WEEK,
+    });
   });
 });
 

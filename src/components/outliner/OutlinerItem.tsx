@@ -536,8 +536,7 @@ export function OutlinerItem({
     [allFieldOptions, selectedOptionId],
   );
   const isOptionsValueNode = isOptionsField && !!selectedOptionId;
-  const isReferenceLikeRow = isReference || isPendingConversion || isOptionsValueNode;
-  const showReferenceBulletStyle = shouldRenderReferenceBulletStyle({
+  const isReferenceLikeRow = shouldRenderReferenceBulletStyle({
     isReference,
     isPendingConversion,
     isOptionsValueNode,
@@ -2318,7 +2317,7 @@ export function OutlinerItem({
               hasChildren={hasChildren}
               isExpanded={isExpanded}
               onBulletClick={handleBulletClick}
-              isReference={showReferenceBulletStyle}
+              isReference={isReferenceLikeRow}
               tagDefColor={isTagDef ? resolveTagColor(nodeId).text : undefined}
               bulletColors={effectiveBulletColors}
               icon={structuralIcon}

@@ -49,7 +49,7 @@ _(空)_
 > **Owner**: nodex-cc
 > **Plan**: `docs/plans/sync-incremental-impl.md` | **Arch**: `docs/plans/sync-architecture.md` | **Auth**: `docs/plans/auth-cloudflare-only.md`
 >
-> **当前状态**: Steps 0-9 完成，Compaction 待做
+> **当前状态**: Steps 0-9 完成，Staging 部署完成，Compaction 待做
 
 - [x] **Review**: nodex-codex review 实施计划（含 7 个开放问题） ✓ nodex-codex（2026-02-22）
 - [x] **修订**: Postgres → D1 迁移 + Auth 评估 ✓ nodex-codex（2026-02-22）
@@ -59,7 +59,10 @@ _(空)_
 - [x] Step 7: 客户端 Sync Manager（push/pull 循环 + retry/backoff） ✓ nodex-cc PR #83（2026-02-23）
 - [x] Step 8: 客户端 Sync 状态 UI（SyncStatusIndicator） ✓ nodex-cc PR #83（2026-02-23）
 - [x] Step 9: 端到端测试 ✓ nodex（2026-02-23）— `tests/vitest/sync-e2e.test.ts` 10 cases
+- [x] Staging + Production 双环境部署 ✓ nodex（2026-02-23）— D1 + Worker + Secrets + Google OAuth
+- [x] HTTPS cookie 前缀修复（`__Secure-` prefix） ✓ nodex（2026-02-23）
 - [ ] Step 10: Compaction（延后到上线后）
+- [ ] Production 部署（等 Chrome Web Store 发布后配置）
 
 ### P2
 
@@ -241,6 +244,7 @@ _(空)_
 
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
+| 2026-02-23 | Staging + Production 双环境部署 — D1/Worker/Secrets/Google OAuth + HTTPS cookie 前缀修复 | nodex | — |
 | 2026-02-23 | Inline ref fallback 虚线 bullet 修复 + outliner backlink count badge 移除 | nodex-codex | #87 |
 | 2026-02-23 | Reference node Backspace 选中/删除流程修复（单 inline ref atom 行尾退格 → select_reference intent） | nodex-codex | #86 |
 | 2026-02-23 | 容器节点 registry 收口 — `system-node-registry.ts` 统一 bootstrap/sidebar/command palette 定义 + 5 Vitest 回归 | nodex-codex | #85 |

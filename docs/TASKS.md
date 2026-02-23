@@ -49,7 +49,7 @@ _(无)_
 > **Owner**: nodex-cc
 > **Plan**: `docs/plans/sync-incremental-impl.md` | **Arch**: `docs/plans/sync-architecture.md` | **Auth**: `docs/plans/auth-cloudflare-only.md`
 >
-> **当前状态**: Steps 0-8 完成，端到端测试 + Compaction 待做
+> **当前状态**: Steps 0-9 完成，Compaction 待做
 
 - [x] **Review**: nodex-codex review 实施计划（含 7 个开放问题） ✓ nodex-codex（2026-02-22）
 - [x] **修订**: Postgres → D1 迁移 + Auth 评估 ✓ nodex-codex（2026-02-22）
@@ -58,7 +58,7 @@ _(无)_
 - [x] Step 6: 客户端 Pending Queue（IndexedDB 队列） ✓ nodex-cc PR #83（2026-02-23）
 - [x] Step 7: 客户端 Sync Manager（push/pull 循环 + retry/backoff） ✓ nodex-cc PR #83（2026-02-23）
 - [x] Step 8: 客户端 Sync 状态 UI（SyncStatusIndicator） ✓ nodex-cc PR #83（2026-02-23）
-- [ ] Step 9: 端到端测试
+- [x] Step 9: 端到端测试 ✓ nodex（2026-02-23）— `tests/vitest/sync-e2e.test.ts` 10 cases
 - [ ] Step 10: Compaction（延后到上线后）
 
 ### P2

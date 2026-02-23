@@ -11,6 +11,7 @@ import { nanoid } from 'nanoid';
 import type { NodexNode, TextMark, InlineRefEntry, FieldType } from '../types/index.js';
 import { CONTAINER_IDS, SYS_A, SYS_V, isJournalSystemTagId } from '../types/index.js';
 import { isWorkspaceContainer } from '../lib/tree-utils.js';
+import { getNodeCapabilities } from '../lib/node-capabilities.js';
 import * as loroDoc from '../lib/loro-doc.js';
 import { getTreeReferenceBlockReason } from '../lib/reference-rules.js';
 import { resolveCheckboxClick, resolveCmdEnterCycle, resolveForwardDoneMapping, resolveReverseDoneMapping } from '../lib/checkbox-utils.js';
@@ -393,7 +394,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
     },
 
     moveNodeTo: (nodeId, newParentId, index) => {
-      if (isWorkspaceContainer(nodeId)) return;
+      if (!getNodeCapabilities(nodeId).canMove) return;
       // Guard: no self-move
       if (nodeId === newParentId) return;
       // Guard: no descendant move (prevent cycle)
@@ -417,7 +418,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
     },
 
     indentNode: (nodeId) => {
-      if (isWorkspaceContainer(nodeId)) return;
+      if (!getNodeCapabilities(nodeId).canMove) return;
       const parentId = loroDoc.getParentId(nodeId);
       if (!parentId) return;
       const siblings = loroDoc.getChildren(parentId);
@@ -431,7 +432,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
     },
 
     outdentNode: (nodeId) => {
-      if (isWorkspaceContainer(nodeId)) return;
+      if (!getNodeCapabilities(nodeId).canMove) return;
       const parentId = loroDoc.getParentId(nodeId);
       if (!parentId) return;
       // Cannot outdent out of a workspace container (LIBRARY, INBOX, etc.)
@@ -447,7 +448,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
     },
 
     moveNodeUp: (nodeId) => {
-      if (isWorkspaceContainer(nodeId)) return;
+      if (!getNodeCapabilities(nodeId).canMove) return;
       const parentId = loroDoc.getParentId(nodeId);
       if (!parentId) return;
       const siblings = loroDoc.getChildren(parentId);
@@ -458,7 +459,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
     },
 
     moveNodeDown: (nodeId) => {
-      if (isWorkspaceContainer(nodeId)) return;
+      if (!getNodeCapabilities(nodeId).canMove) return;
       const parentId = loroDoc.getParentId(nodeId);
       if (!parentId) return;
       const siblings = loroDoc.getChildren(parentId);
@@ -469,7 +470,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
     },
 
     trashNode: (nodeId) => {
-      if (isWorkspaceContainer(nodeId)) return;
+      if (!getNodeCapabilities(nodeId).canDelete) return;
       const node = loroDoc.toNodexNode(nodeId);
       if (node?.type === 'tagDef' && isJournalSystemTagId(nodeId)) return;
       const parentId = loroDoc.getParentId(nodeId);
@@ -507,12 +508,14 @@ export const useNodeStore = create<NodeStore>((set, get) => {
     // ─── 内容编辑 ───
 
     setNodeName: (id, name) => {
+      if (!getNodeCapabilities(id).canEditNode) return;
       const current = loroDoc.toNodexNode(id);
       const nextInlineRefs = remapInlineRefsByPlaceholderOrder(name, current?.inlineRefs);
       loroDoc.setNodeRichTextContent(id, name, current?.marks ?? [], nextInlineRefs);
     },
 
     updateNodeContent: (id, data) => {
+      if (!getNodeCapabilities(id).canEditNode) return;
       const current = loroDoc.toNodexNode(id);
       const nextName = data.name ?? current?.name ?? '';
       const nextMarks = data.marks ?? current?.marks ?? [];
@@ -526,6 +529,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
     },
 
     updateNodeDescription: (id, description) => {
+      if (!getNodeCapabilities(id).canEditNode) return;
       loroDoc.setNodeData(id, 'description', description || undefined);
     },
 

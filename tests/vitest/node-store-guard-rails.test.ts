@@ -10,6 +10,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { useNodeStore } from '../../src/stores/node-store.js';
 import { collectNodeGraphErrors } from './helpers/invariants.js';
 import * as loroDoc from '../../src/lib/loro-doc.js';
+import { CONTAINER_IDS } from '../../src/types/index.js';
 import { resetAndSeed } from './helpers/test-state.js';
 
 describe('setConfigValue', () => {
@@ -162,6 +163,42 @@ describe('workspace container immutability', () => {
     expect(() => useNodeStore.getState().moveNodeUp('INBOX')).not.toThrow();
     expect(() => useNodeStore.getState().moveNodeDown('INBOX')).not.toThrow();
     expect(loroDoc.getParentId('INBOX')).toBe(originalParent);
+  });
+});
+
+describe('system root immutability', () => {
+  beforeEach(() => {
+    resetAndSeed();
+  });
+
+  it('moveNodeTo does not move workspace home node', () => {
+    expect(loroDoc.getParentId('ws_default')).toBeNull();
+    useNodeStore.getState().moveNodeTo('ws_default', 'proj_1', 0);
+    expect(loroDoc.getParentId('ws_default')).toBeNull();
+    expect(loroDoc.getChildren('proj_1')).not.toContain('ws_default');
+  });
+
+  it('trashNode ignores workspace home node', () => {
+    const trashBefore = loroDoc.getChildren(CONTAINER_IDS.TRASH);
+    useNodeStore.getState().trashNode('ws_default');
+    expect(loroDoc.getParentId('ws_default')).toBeNull();
+    expect(loroDoc.getChildren(CONTAINER_IDS.TRASH)).toEqual(trashBefore);
+  });
+
+  it('setNodeName ignores workspace home and containers', () => {
+    useNodeStore.getState().setNodeName('ws_default', 'Renamed Workspace');
+    useNodeStore.getState().setNodeName(CONTAINER_IDS.INBOX, 'Renamed Inbox');
+
+    expect(loroDoc.toNodexNode('ws_default')?.name).toBe('Workspace');
+    expect(loroDoc.toNodexNode(CONTAINER_IDS.INBOX)?.name).toBe('Inbox');
+  });
+
+  it('updateNodeDescription ignores workspace home and containers', () => {
+    useNodeStore.getState().updateNodeDescription('ws_default', 'root desc');
+    useNodeStore.getState().updateNodeDescription(CONTAINER_IDS.LIBRARY, 'library desc');
+
+    expect(loroDoc.toNodexNode('ws_default')?.description).toBeUndefined();
+    expect(loroDoc.toNodexNode(CONTAINER_IDS.LIBRARY)?.description).toBeUndefined();
   });
 });
 

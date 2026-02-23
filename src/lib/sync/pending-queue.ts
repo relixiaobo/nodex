@@ -33,7 +33,11 @@ export async function enqueuePendingUpdate(
     const tx = db.transaction(PENDING_STORE, 'readwrite');
     const store = tx.objectStore(PENDING_STORE);
     const req = store.put(record);
-    req.onsuccess = () => resolve();
+    // Resolve only after the transaction commits, otherwise an immediate
+    // dequeue/count in the next microtask can race and miss this update.
+    tx.oncomplete = () => resolve();
+    tx.onerror = (e) => reject((e.target as IDBTransaction).error);
+    tx.onabort = (e) => reject((e.target as IDBTransaction).error);
     req.onerror = (e) => reject((e.target as IDBRequest).error);
   });
 }
@@ -53,14 +57,19 @@ export async function dequeuePendingUpdates(
 
     req.onsuccess = (e) => {
       const cursor = (e.target as IDBRequest<IDBCursorWithValue | null>).result;
-      if (cursor && results.length < limit) {
+      if (cursor) {
         results.push(cursor.value as PendingUpdate);
         cursor.continue();
-      } else {
-        resolve(results);
       }
     };
     req.onerror = (e) => reject((e.target as IDBRequest).error);
+    tx.onerror = (e) => reject((e.target as IDBTransaction).error);
+    tx.oncomplete = () => {
+      // `by_workspace` groups records but does not guarantee createdAt order
+      // (same workspace key falls back to primary key `id`). Preserve FIFO here.
+      results.sort((a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id));
+      resolve(results.slice(0, limit));
+    };
   });
 }
 

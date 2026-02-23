@@ -12,6 +12,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { chromeLocalStorage } from '../lib/chrome-storage';
+import { pushUndoEntry } from '../lib/undo-timeline.js';
 
 interface UIStore {
   // Browser-like navigation history
@@ -143,6 +144,7 @@ export const useUIStore = create<UIStore>()(
           if (newHistory[newHistory.length - 1] === nodeId) return {};
           // Push undo snapshot before modifying
           const snapshot = { panelHistory: [...s.panelHistory], panelIndex: s.panelIndex };
+          pushUndoEntry('nav');
           newHistory.push(nodeId);
           return {
             panelHistory: newHistory,
@@ -162,6 +164,7 @@ export const useUIStore = create<UIStore>()(
         set((s) => {
           if (s.panelIndex <= 0) return {};
           const snapshot = { panelHistory: [...s.panelHistory], panelIndex: s.panelIndex };
+          pushUndoEntry('nav');
           return {
             panelIndex: s.panelIndex - 1,
             navUndoStack: [...s.navUndoStack, snapshot],
@@ -179,6 +182,7 @@ export const useUIStore = create<UIStore>()(
         set((s) => {
           if (s.panelIndex >= s.panelHistory.length - 1) return {};
           const snapshot = { panelHistory: [...s.panelHistory], panelIndex: s.panelIndex };
+          pushUndoEntry('nav');
           return {
             panelIndex: s.panelIndex + 1,
             navUndoStack: [...s.navUndoStack, snapshot],

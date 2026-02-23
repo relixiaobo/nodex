@@ -15,6 +15,7 @@
 import { initLoroDoc, initLoroDocForTest, commitDoc, clearUndoHistoryForTest } from '../../lib/loro-doc.js';
 import * as loroDoc from '../../lib/loro-doc.js';
 import { deleteSnapshot } from '../../lib/loro-persistence.js';
+import { resetTimeline } from '../../lib/undo-timeline.js';
 import { useNodeStore } from '../../stores/node-store';
 import { useUIStore } from '../../stores/ui-store';
 import { useWorkspaceStore } from '../../stores/workspace-store';
@@ -346,4 +347,6 @@ export function seedTestDataSync(): void {
   // Some store actions (applyTag etc.) call commitDoc() internally without '__seed__' origin.
   // Reinitialize UndoManager to clear those intermediate entries.
   clearUndoHistoryForTest();
+  // Clear unified timeline entries accumulated during seeding (navigateTo, applyTag etc.)
+  resetTimeline();
 }

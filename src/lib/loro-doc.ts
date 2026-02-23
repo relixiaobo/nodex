@@ -11,6 +11,7 @@ import type { NodexNode } from '../types/node.js';
 import { saveSnapshotRecord, loadSnapshotRecord } from './loro-persistence.js';
 import { resetAwareness } from './awareness.js';
 import { readRichTextFromLoroText, writeRichTextToLoroText } from './loro-text-bridge.js';
+import { pushUndoEntry, resetTimeline } from './undo-timeline.js';
 
 export const DEFAULT_USER_COMMIT_ORIGIN = 'user:implicit';
 const UNDO_EXCLUDED_ORIGIN_PREFIXES = ['__seed__', 'system:'] as const;
@@ -275,6 +276,7 @@ export function resetLoroDoc(): void {
   currentWorkspaceId = null;
   detachedMutationWarnings.clear();
   invalidateCache();
+  resetTimeline();
   if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
 }
 
@@ -641,6 +643,10 @@ export function commitDoc(origin: string = DEFAULT_USER_COMMIT_ORIGIN): void {
   if (!doc) return;
   if (!canApplyMutation('commitDoc')) return;
   doc.commit({ origin });
+  // 用户提交推入统一时间线（系统 origin 排除）
+  if (!UNDO_EXCLUDED_ORIGIN_PREFIXES.some(p => origin.startsWith(p))) {
+    pushUndoEntry('structural');
+  }
 }
 
 export function undoDoc(): boolean {

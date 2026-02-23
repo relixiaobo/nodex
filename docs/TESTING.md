@@ -812,6 +812,30 @@ subscribeLocalUpdates hook:
 - node-store.ts 的 `createChild`、`moveNodeTo`、`trashNode`、`restoreNode`、`indent/outdent/moveUp/moveDown` 各自结尾调用 `commitDoc()` 记录撤销步骤
 - undo/redo 后调用 `rebuildMappings()` 重新同步 nodexToTree / treeToNodex（Loro undo/redo 可能产生新 TreeID）
 
+### 1.50.1 统一时间线 Undo/Redo
+
+**测试文件**: `tests/vitest/undo-timeline.test.ts`
+
+**覆盖点**:
+
+1. 纯数据结构 push/pop/reset（undoStack/redoStack 基本操作）
+2. `pushUndoEntry` 默认清空 redo，`clearRedo=false` 时保留
+3. `resetTimeline` 清空两个栈
+4. `navigateTo` / `goBack` / `goForward` 推入 'nav' 到统一时间线
+5. `navigateTo` 到当前页面 no-op，不推入 timeline
+6. `commitDoc()` 推入 'structural' 到统一时间线（系统 origin 排除）
+7. 交错操作 S→N→S→N，undo 顺序应为 N→S→N→S（时间逆序）
+8. undo 后 redo 可恢复（结构和导航混合）
+9. Loro mergeInterval 跳过（timeline 有多个 structural 但 canUndoDoc 不够时跳过多余条目）
+10. 新操作清空统一时间线 redo
+11. redo→undo 往返循环稳定
+
+**设计要点**:
+- `undo-timeline.ts` 零外部导入，纯数据结构
+- `performTimelineUndo()` / `performTimelineRedo()` 循环 pop 直到找到可执行的条目或栈空
+- redo 恢复操作推入 undo 时使用 `clearRedo=false`，避免清空后续 redo 条目
+- 种子数据末尾调用 `resetTimeline()` 清除播种期间累积的时间线条目
+
 ### 1.35 节点搜索 SKIP_DOC_TYPES 过滤
 
 **测试文件**: `tests/vitest/node-search-filter.test.ts`
@@ -1375,6 +1399,7 @@ createSibling 自动标签（2 cases）:
 | 1.46 | FieldValueOutliner TrailingInput 显示规则 | PASS/FAIL |
 | 1.48 | Tana 导入 meta 填充与 DocType 安全 | PASS/FAIL |
 | 1.50 | Loro UndoManager 结构性撤销/重做 | PASS/FAIL |
+| 1.50.1 | 统一时间线 Undo/Redo | PASS/FAIL |
 | 1.51 | P0 Loro 基础设施 — 7项底层API（subscribeNode/增量同步/时间旅行/LoroText/fork/Awareness） | PASS/FAIL |
 | 1.52 | LoroText Bridge（TextMark/InlineRef 双向桥接） | PASS/FAIL |
 | 1.53 | Test 入口 Bootstrap（防测试数据回流） | PASS/FAIL |

@@ -9,7 +9,6 @@ describe('ui-store persistence helpers', () => {
       panelHistory: ['library', 'note_1'],
       panelIndex: 1,
       expandedNodes: expanded,
-      sidebarOpen: true,
       viewMode: 'cards',
       searchOpen: true,
       searchQuery: 'x',
@@ -20,7 +19,6 @@ describe('ui-store persistence helpers', () => {
       panelHistory: ['library', 'note_1'],
       panelIndex: 1,
       expandedNodes: expanded,
-      sidebarOpen: true,
       viewMode: 'cards',
     });
   });
@@ -30,7 +28,6 @@ describe('ui-store persistence helpers', () => {
       panelHistory: ['LIBRARY'],
       panelIndex: 0,
       expandedNodes: new Set<string>(),
-      sidebarOpen: false,
       viewMode: 'list',
     } as never);
 

@@ -12,7 +12,6 @@ describe('i18n strings', () => {
     expect(t('tag.selector.noTagsAvailable')).toBe('No tags available');
     expect(t('dateNavigationBar.previousDay')).toBe('Previous day');
     expect(t('datePicker.clear')).toBe('Clear');
-    expect(t('breadcrumb.search')).toBe('Search (Cmd+K)');
     expect(t('nodeHeader.dragToMove')).toBe('Drag to move (right-click for menu)');
     expect(t('outliner.zoomIn')).toBe('Zoom in');
     expect(t('field.selectOption')).toBe('Select option');

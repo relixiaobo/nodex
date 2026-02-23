@@ -67,10 +67,8 @@ export const enMessages = {
     today: 'Today',
   },
   breadcrumb: {
-    toggleSidebar: 'Toggle sidebar',
     goToParent: 'Go to parent',
     goToWorkspaceRoot: 'Go to workspace root',
-    search: 'Search (Cmd+K)',
   },
   nodeHeader: {
     dragToMove: 'Drag to move (right-click for menu)',

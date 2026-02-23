@@ -1,7 +1,7 @@
 /**
  * Breadcrumb navigation bar for zoomed-in node pages.
  *
- * Layout: [SidebarToggle] [← Parent] [W avatar] › ancestor1 › ancestor2 › ... › [currentName?] [Search]
+ * Layout: [← Parent] [W avatar] / ancestor1 / ancestor2 / ... / [currentName?]
  *
  * - Workspace root is represented by a circular avatar (first char of workspace name)
  * - ← button navigates to parent node (not history back)

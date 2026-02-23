@@ -1,7 +1,7 @@
 /**
- * UI state store: navigation history, sidebar, expanded nodes, focus.
+ * UI state store: navigation history, expanded nodes, focus.
  *
- * Persisted to chrome.storage.local (history, expandedNodes, sidebar prefs).
+ * Persisted to chrome.storage.local (history, expandedNodes, viewMode).
  *
  * Navigation uses a browser-like history model:
  * - panelHistory: linear list of visited node IDs
@@ -48,10 +48,6 @@ interface UIStore {
   selectionAnchorId: string | null;
   setSelectedNodes(nodeIds: Set<string>, anchorId?: string | null): void;
   clearSelection(): void;
-
-  // Sidebar
-  sidebarOpen: boolean;
-  toggleSidebar(): void;
 
   // Search
   searchOpen: boolean;
@@ -113,7 +109,6 @@ export interface PersistedUIStoreState {
   panelHistory: string[];
   panelIndex: number;
   expandedNodes: Set<string>;
-  sidebarOpen: boolean;
   viewMode: 'list' | 'table' | 'tiles' | 'cards';
 }
 
@@ -126,7 +121,6 @@ export function partializeUIStore(state: UIStore): PersistedUIStoreState {
     panelHistory: state.panelHistory,
     panelIndex: state.panelIndex,
     expandedNodes: state.expandedNodes,
-    sidebarOpen: state.sidebarOpen,
     viewMode: state.viewMode,
   };
 }
@@ -326,10 +320,6 @@ export const useUIStore = create<UIStore>()(
         selectionAnchorId: null,
       }),
 
-      // Sidebar
-      sidebarOpen: true,
-      toggleSidebar: () => set((s) => ({ sidebarOpen: !s.sidebarOpen })),
-
       // Search
       searchOpen: false,
       searchQuery: '',
@@ -410,7 +400,7 @@ export const useUIStore = create<UIStore>()(
     }),
     {
       name: 'nodex-ui',
-      version: 2,
+      version: 3,
       storage: chromeLocalStorage,
       partialize: partializeUIStore,
     },

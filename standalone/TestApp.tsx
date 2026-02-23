@@ -9,6 +9,7 @@ import { useWorkspaceStore } from '../src/stores/workspace-store';
 import { useUIStore } from '../src/stores/ui-store';
 import { useNodeStore } from '../src/stores/node-store';
 import { useGlobalSelectionDismiss } from '../src/hooks/use-global-selection-dismiss.js';
+import { useNavUndoKeyboard } from '../src/hooks/use-nav-undo-keyboard.js';
 import { Sidebar } from '../src/components/sidebar/Sidebar';
 import { PanelStack } from '../src/components/panel/PanelStack';
 import { CommandPalette } from '../src/components/search/CommandPalette';
@@ -66,6 +67,7 @@ export function TestApp() {
   const sidebarOpen = useUIStore((s) => s.sidebarOpen);
   const ready = useTestBootstrap();
   const selectionDismissHandlers = useGlobalSelectionDismiss();
+  useNavUndoKeyboard();
 
   if (!ready) {
     return (

@@ -267,13 +267,13 @@ export function CommandPalette() {
         onKeyDown={handleKeyDown}
       >
         {/* Search bar */}
-        <div className="flex items-center border-b border-border px-4">
+        <div className="flex items-center border-b border-border px-3">
           <input
             ref={inputRef}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search nodes and commands..."
-            className="h-12 flex-1 bg-transparent text-base outline-none placeholder:text-foreground-tertiary"
+            className="h-10 flex-1 bg-transparent text-sm outline-none placeholder:text-foreground-tertiary"
           />
           <kbd
             onClick={closeSearch}
@@ -284,7 +284,7 @@ export function CommandPalette() {
         </div>
 
         {/* List area */}
-        <div ref={listRef} className="max-h-80 overflow-y-auto py-2">
+        <div ref={listRef} className="max-h-72 overflow-y-auto py-1.5">
           {hasQuery ? (
             // Search mode: single "Results" group
             searchResults.length > 0 ? (
@@ -301,7 +301,7 @@ export function CommandPalette() {
                 ))}
               </div>
             ) : (
-              <div className="py-8 text-center text-sm text-foreground-secondary">
+              <div className="py-6 text-center text-xs text-foreground-secondary">
                 No results found
               </div>
             )
@@ -360,8 +360,8 @@ export function CommandPalette() {
 
         {/* Action bar */}
         {allItems.length > 0 && (
-          <div className="flex h-9 items-center justify-end border-t border-border px-3">
-            <div className="flex items-center gap-1.5 text-xs text-foreground-secondary">
+          <div className="flex h-8 items-center justify-end border-t border-border px-2.5">
+            <div className="flex items-center gap-1.5 text-[10px] text-foreground-secondary">
               <span>{actionLabel}</span>
               <kbd className="inline-flex h-5 items-center rounded border border-border bg-background px-1.5 text-[10px] font-medium">
                 ↵
@@ -380,7 +380,7 @@ export function CommandPalette() {
 
 function GroupHeader({ label }: { label: string }) {
   return (
-    <div className="px-4 py-2 text-[11px] font-medium text-foreground-tertiary">
+    <div className="px-3 py-1.5 text-[10px] font-medium uppercase tracking-wider text-foreground-tertiary">
       {label}
     </div>
   );
@@ -401,16 +401,16 @@ function PaletteRow({ item, selected, onSelect, onHover }: PaletteRowProps) {
       data-selected={selected}
       onClick={onSelect}
       onMouseMove={onHover}
-      className={`mx-1 flex h-10 cursor-pointer items-center gap-3 rounded-lg px-3 transition-colors ${
+      className={`mx-1 flex h-7 cursor-pointer items-center gap-2 rounded-md px-2 transition-colors ${
         selected ? 'bg-accent' : ''
       }`}
     >
-      <Icon size={20} className="shrink-0 text-foreground-secondary" />
-      <span className="flex-1 truncate text-sm text-foreground">{item.label}</span>
+      <Icon size={16} className="shrink-0 text-foreground-secondary" />
+      <span className="flex-1 truncate text-xs text-foreground">{item.label}</span>
       {item.subtitle && (
-        <span className="shrink-0 text-xs text-foreground-tertiary">{item.subtitle}</span>
+        <span className="shrink-0 text-[10px] text-foreground-tertiary">{item.subtitle}</span>
       )}
-      <span className="shrink-0 text-xs text-foreground-tertiary">
+      <span className="shrink-0 text-[10px] text-foreground-tertiary">
         {TYPE_LABELS[item.type]}
       </span>
     </div>

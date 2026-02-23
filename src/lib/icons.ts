@@ -108,6 +108,8 @@ export {
 export {
   Undo2,
   Redo2,
+  ArrowLeft,
+  ArrowRight,
 } from 'lucide-react';
 
 // ─── Sync Status ────────────────────────────────────────────────────────────

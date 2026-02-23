@@ -17,7 +17,7 @@
  * [...] expands in-place (no navigation). Resets when nodeId changes.
  */
 import { useState, useEffect, useCallback } from 'react';
-import { ChevronLeft, ChevronRight, MoreHorizontal } from '../../lib/icons.js';
+import { ChevronLeft, MoreHorizontal } from '../../lib/icons.js';
 import { useUIStore } from '../../stores/ui-store';
 import { useNodeStore } from '../../stores/node-store';
 import { useWorkspaceStore } from '../../stores/workspace-store';
@@ -105,10 +105,10 @@ export function Breadcrumb({ nodeId, showCurrentName }: BreadcrumbProps) {
       {canGoUp && (
         <button
           onClick={handleGoUp}
-          className="flex h-7 w-6 shrink-0 items-center justify-center rounded-md hover:bg-foreground/5 hover:text-foreground"
+          className="flex h-7 w-[15px] shrink-0 items-center justify-center rounded-md hover:bg-foreground/5 hover:text-foreground"
           title={t('breadcrumb.goToParent')}
         >
-          <ChevronLeft size={16} strokeWidth={1.5} />
+          <ChevronLeft size={14} strokeWidth={1.5} />
         </button>
       )}
 
@@ -131,7 +131,7 @@ export function Breadcrumb({ nodeId, showCurrentName }: BreadcrumbProps) {
           {/* Ellipsis for folded ancestors */}
           {needsFolding && (
             <>
-              <ChevronRight size={10} className="shrink-0 text-foreground-tertiary" />
+              <span className="shrink-0 text-foreground-tertiary mx-0.5">/</span>
               <button
                 onClick={() => setExpanded(true)}
                 className="flex h-7 shrink-0 items-center justify-center rounded-md px-1 hover:bg-foreground/5 hover:text-foreground"
@@ -145,7 +145,7 @@ export function Breadcrumb({ nodeId, showCurrentName }: BreadcrumbProps) {
           {/* Visible ancestors */}
           {visibleAncestors.map((ancestor) => (
             <span key={ancestor.id} className="flex items-center shrink-0 min-w-0">
-              <ChevronRight size={10} className="shrink-0 text-foreground-tertiary mx-0.5" />
+              <span className="shrink-0 text-foreground-tertiary mx-0.5">/</span>
               <button
                 onClick={() => {
                   if (ancestor.id === workspaceRootId) {
@@ -164,7 +164,7 @@ export function Breadcrumb({ nodeId, showCurrentName }: BreadcrumbProps) {
           {/* Conditional current node name (when title scrolled out of view) */}
           {showCurrentName && (
             <span className="flex items-center shrink min-w-0 text-foreground-secondary">
-              <ChevronRight size={10} className="shrink-0 text-foreground-tertiary mx-0.5" />
+              <span className="shrink-0 text-foreground-tertiary mx-0.5">/</span>
               <BreadcrumbCurrentName nodeId={nodeId} />
             </span>
           )}

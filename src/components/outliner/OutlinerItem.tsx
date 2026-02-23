@@ -1661,6 +1661,42 @@ export function OutlinerItem({
     setFocusedNode,
   ]);
 
+  const handleBackspaceAtEndSingleInlineRef = useCallback((): boolean => {
+    if (!isPendingConversion || !pendingConversionRefTargetId) return false;
+
+    const beforeChildren = useNodeStore.getState().getNode(parentId)?.children ?? loroDoc.getChildren(parentId);
+    const beforeIndex = beforeChildren.indexOf(nodeId);
+
+    revertRefConversion(nodeId, pendingConversionRefTargetId, parentId);
+    setPendingRefConversion(null);
+
+    const afterChildren = useNodeStore.getState().getNode(parentId)?.children ?? loroDoc.getChildren(parentId);
+    let newRefId = beforeIndex >= 0 ? afterChildren[beforeIndex] : null;
+    const directCandidate = newRefId ? useNodeStore.getState().getNode(newRefId) : null;
+    if (!(directCandidate?.type === 'reference' && directCandidate.targetId === pendingConversionRefTargetId)) {
+      newRefId = afterChildren.find((cid) => {
+        const candidate = useNodeStore.getState().getNode(cid);
+        return candidate?.type === 'reference' && candidate.targetId === pendingConversionRefTargetId;
+      }) ?? null;
+    }
+
+    clearFocus();
+    if (newRefId) {
+      setSelectedNode(newRefId, parentId, 'ref-click');
+      return true;
+    }
+    return false;
+  }, [
+    isPendingConversion,
+    pendingConversionRefTargetId,
+    parentId,
+    nodeId,
+    revertRefConversion,
+    setPendingRefConversion,
+    clearFocus,
+    setSelectedNode,
+  ]);
+
   const handleArrowUp = useCallback(() => {
     const siblingIndex = renderableSiblings.findIndex((item) => item.type === 'content' && item.id === nodeId);
     if (siblingIndex > 0) {
@@ -2366,6 +2402,7 @@ export function OutlinerItem({
                 onOutdent={handleOutdent}
                 onDelete={handleDelete}
                 onBackspaceAtStart={handleBackspaceAtStart}
+                onBackspaceAtEndSingleInlineRef={handleBackspaceAtEndSingleInlineRef}
                 onArrowUp={handleArrowUp}
                 onArrowDown={handleArrowDown}
                 onMoveUp={handleMoveUp}

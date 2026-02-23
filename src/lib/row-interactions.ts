@@ -85,12 +85,15 @@ export function resolveContentRowForceCreateIntent(
 
 export type ContentRowBackspaceIntent =
   | 'allow_default'
+  | 'select_reference'
   | 'merge_with_previous'
   | 'delete_empty';
 
 interface ResolveContentRowBackspaceIntentParams extends ContentDropdownState {
   isEmpty: boolean;
   isAtStart: boolean;
+  isAtEnd?: boolean;
+  isSingleInlineRefAtom?: boolean;
 }
 
 export function resolveContentRowBackspaceIntent(
@@ -98,6 +101,7 @@ export function resolveContentRowBackspaceIntent(
 ): ContentRowBackspaceIntent {
   const kind = resolveContentDropdownKind(params);
   if (kind) return 'allow_default';
+  if (params.isSingleInlineRefAtom && params.isAtEnd) return 'select_reference';
   if (params.isEmpty) return 'delete_empty';
   if (params.isAtStart) return 'merge_with_previous';
   return 'allow_default';

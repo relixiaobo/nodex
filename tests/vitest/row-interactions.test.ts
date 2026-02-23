@@ -87,6 +87,16 @@ describe('row interaction intents', () => {
       isEmpty: false,
       isAtStart: true,
     })).toBe('allow_default');
+
+    expect(resolveContentRowBackspaceIntent({
+      referenceActive: false,
+      hashTagActive: false,
+      slashActive: false,
+      isEmpty: false,
+      isAtStart: false,
+      isAtEnd: true,
+      isSingleInlineRefAtom: true,
+    })).toBe('select_reference');
   });
 
   it('trailing row options intent requires non-empty option list', () => {

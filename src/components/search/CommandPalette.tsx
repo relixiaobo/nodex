@@ -6,12 +6,19 @@
  */
 import { useEffect, useCallback, useMemo } from 'react';
 import { Command } from 'cmdk';
-import { Search, FileText, Library, Inbox, CalendarDays, Trash2 } from '../../lib/icons.js';
+import { Search, FileText, Library, Inbox, CalendarDays, Trash2, type AppIcon } from '../../lib/icons.js';
 import { useUIStore } from '../../stores/ui-store';
 import { useNodeStore } from '../../stores/node-store';
-import { CONTAINER_IDS } from '../../types/index.js';
+import { COMMAND_PALETTE_QUICK_CONTAINERS } from '../../lib/system-node-registry.js';
 import * as loroDoc from '../../lib/loro-doc.js';
 import { t } from '../../i18n/strings.js';
+
+const CONTAINER_ICONS: Record<string, AppIcon> = {
+  library: Library,
+  inbox: Inbox,
+  journal: CalendarDays,
+  trash: Trash2,
+};
 
 export function CommandPalette() {
   const searchOpen = useUIStore((s) => s.searchOpen);
@@ -70,12 +77,13 @@ export function CommandPalette() {
   }, [_version, searchQuery]);
 
   // Container quick-access items
-  const containers = useMemo(() => [
-    { label: t('search.commandPalette.containerLibrary'), id: CONTAINER_IDS.LIBRARY, icon: Library },
-    { label: t('search.commandPalette.containerInbox'), id: CONTAINER_IDS.INBOX, icon: Inbox },
-    { label: t('search.commandPalette.containerJournal'), id: CONTAINER_IDS.JOURNAL, icon: CalendarDays },
-    { label: t('search.commandPalette.containerTrash'), id: CONTAINER_IDS.TRASH, icon: Trash2 },
-  ], []);
+  const containers = useMemo(() => (
+    COMMAND_PALETTE_QUICK_CONTAINERS.map((c) => ({
+      id: c.id,
+      icon: CONTAINER_ICONS[c.iconKey],
+      label: t(c.labelKey),
+    }))
+  ), []);
 
   if (!searchOpen) return null;
 

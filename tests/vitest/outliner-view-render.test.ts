@@ -13,5 +13,6 @@ describe('OutlinerView render safety', () => {
     const html = renderToStaticMarkup(createElement(OutlinerView, { rootNodeId: 'task_1' }));
     expect(html).toContain('Status');
     expect(html).toContain('Define node types and properties');
+    expect(html).not.toMatch(/title="\\d+ references?"/);
   });
 });

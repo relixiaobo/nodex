@@ -131,6 +131,37 @@ npm run test:run
 4. `COMMAND_PALETTE_QUICK_CONTAINERS` 保持命令面板快捷入口集合与顺序
 5. `getSystemContainerMeta(id)` 提供按 ID 查询（含未启用 seed 的预留容器如 `CLIPS`）
 
+### 1.1.2 Fuzzy 搜索算法
+
+**测试文件**: `tests/vitest/fuzzy-search.test.ts`
+
+**覆盖点**:
+
+1. 空查询返回零分结果
+2. 不匹配时返回 null（字符不在目标中、字符不按顺序）
+3. 精确前缀匹配
+4. 散布字符匹配
+5. 连续匹配分数高于散布匹配
+6. 首字母前缀加分
+7. 大小写不敏感
+8. 单词边界加分
+9. 目标长度惩罚（偏好短目标）
+10. `fuzzySort` 按分数排序、限制数量、附带 score/indices
+
+### 1.1.3 命令面板注册表
+
+**测试文件**: `tests/vitest/palette-commands.test.ts`
+
+**覆盖点**:
+
+1. 容器命令包含 Library/Inbox/Journal/Trash，类型为 container
+2. 容器命令 action 调用 navigateTo + closeSearch
+3. 系统命令包含 Go to Today（带快捷键）
+4. Sign in 仅未登录时可见（when 过滤）
+5. Sign out 仅已登录时可见（when 过滤）
+6. `getAllCommands` 根据 context 过滤
+7. `getActionLabel` 返回 Open/Navigate/Run
+
 ### 1.2 CRUD + 树操作
 
 **测试文件**: `tests/vitest/store-crud.test.ts`

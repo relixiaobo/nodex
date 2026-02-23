@@ -29,24 +29,13 @@ _(空)_
 |-------|---------|------|-------------|
 | nodex-cc | _(idle)_ | — | — |
 | nodex-cc-2 | _(idle)_ | — | — |
-| nodex-codex | 系统节点统一模型与锁定约束（home/container 作为普通 node） | `codex/system-node-capabilities` | `src/lib/node-capabilities.ts`, `src/lib/loro-doc.ts`, `src/stores/node-store.ts`, `src/components/panel/NodeHeader.tsx`, `src/components/panel/NodeDescription.tsx`, `tests/vitest/node-capabilities.test.ts`, `tests/vitest/node-store-guard-rails.test.ts`, `docs/TESTING.md`, `docs/TASKS.md` |
+| nodex-codex | _(idle)_ | — | — |
 
 ---
 
 ## 进行中
 
-### 系统节点统一模型与锁定约束（home/container 作为普通 node）
-> 明确 home node / container node / general node 在数据模型上都是统一 Node 概念；通过集中化能力约束（不可删/不可改名/不可移动）保护系统节点，避免 UI/命令入口绕过。
-> **Owner**: nodex-codex | **Branch**: `codex/system-node-capabilities` | **Files**: `src/lib/node-capabilities.ts`, `src/lib/loro-doc.ts`, `src/stores/node-store.ts`, `src/components/panel/NodeHeader.tsx`, `src/components/panel/NodeDescription.tsx`, `tests/vitest/node-capabilities.test.ts`, `tests/vitest/node-store-guard-rails.test.ts`, `docs/TESTING.md`, `docs/TASKS.md`
-
-- [x] 定义集中化系统节点能力判断（container / workspace home）
-- [x] store 层 hard guard：阻止系统节点删除/重命名/移动
-- [x] UI 层 soft guard：隐藏或禁用删除/重命名入口
-- [x] 补 Vitest 回归（系统节点受限、普通节点不受限）
-
-**迭代日志**
-- [2026-02-23 nodex-codex] 根据用户设计收口：container/home/general 统一为 node 概念；本 PR 在 `origin/main` 基础上实现系统节点锁定约束（核心层 hard guard + UI 层 soft guard），避免分叉模型。
-- [2026-02-23 nodex-codex] 新增 `node-capabilities` 规则中心（workspaceHome/container/general）；`node-store` 对 move/trash/setNodeName/updateNodeContent/updateNodeDescription 加 hard guard，`NodeHeader/NodeDescription` 改为系统节点只读；补 `node-capabilities.test.ts` 与 `node-store-guard-rails` 回归，并同步 `docs/TESTING.md`。
+_(无)_
 
 ---
 
@@ -252,6 +241,7 @@ _(空)_
 
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
+| 2026-02-23 | 系统节点锁定约束 — `node-capabilities.ts` 规则中心（workspaceHome/container/general）+ store hard guard（move/trash/setNodeName/updateNodeContent/updateNodeDescription）+ UI soft guard（NodeHeader/NodeDescription 只读）+ 7 Vitest 回归 | nodex-codex | #84 |
 | 2026-02-23 | Sync 客户端 Steps 6-8 — Pending Queue (IndexedDB) + SyncManager (push/pull 30s + nudge + session token) + SyncStatusIndicator + WorkspaceStore hydration fix | nodex-cc | #83 |
 | 2026-02-23 | 日期系统标签节点化 — `sys:day/week/year` 普通 tagDef + 模板字段/默认内容实例化 + 删除保护 + applyTagMutationsNoCommit 提取 | nodex-codex | #82 |
 | 2026-02-23 | Auth + Sync Server (Steps 0–5) — Better Auth + D1 + Google OAuth + Extension flow + Push/Pull 端点 + R2 blob 存储 + echo filtering + cursor 管理 | nodex-cc | #80 |

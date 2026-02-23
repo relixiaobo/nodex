@@ -106,6 +106,32 @@ describe('ensureDateNode', () => {
     });
   });
 
+  it('applies #day default content (shallow clone) when creating a new day node', () => {
+    ensureJournalTagDefs();
+
+    const templateNodeId = 'tpl_day_prompt';
+    loroDoc.createNode(templateNodeId, SYSTEM_TAGS.DAY);
+    loroDoc.setNodeDataBatch(templateNodeId, {
+      name: 'Top 3 priorities',
+      description: 'Daily template prompt',
+    });
+    loroDoc.createNode('tpl_day_prompt_child', templateNodeId);
+    loroDoc.setNodeDataBatch('tpl_day_prompt_child', { name: 'Nested template item (not shallow-cloned)' });
+    loroDoc.commitDoc('system:test-seed-day-default-content');
+
+    const dayId = ensureDateNode(new Date(2026, 1, 15));
+    const cloned = loroDoc.getChildren(dayId)
+      .map((id) => loroDoc.toNodexNode(id))
+      .find((n) => n?.templateId === templateNodeId);
+
+    expect(cloned).toMatchObject({
+      name: 'Top 3 priorities',
+      description: 'Daily template prompt',
+      templateId: templateNodeId,
+    });
+    expect(loroDoc.getChildren(cloned!.id)).toHaveLength(0);
+  });
+
   it('creates separate day nodes for different dates', () => {
     const date1 = new Date(2026, 1, 14);
     const date2 = new Date(2026, 1, 15);

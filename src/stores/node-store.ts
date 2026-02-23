@@ -117,6 +117,56 @@ function getTemplateFieldDefs(tagDefId: string): string[] {
   });
 }
 
+/** 查找 tagDef 下的默认内容节点（仅顶层普通内容节点，不递归）。 */
+function getTemplateContentNodes(tagDefId: string): string[] {
+  const children = loroDoc.getChildren(tagDefId);
+  return children.filter((cid) => {
+    const c = loroDoc.toNodexNode(cid);
+    return !!c && !c.type;
+  });
+}
+
+function findTemplateContentClone(nodeId: string, templateNodeId: string): string | null {
+  const children = loroDoc.getChildren(nodeId);
+  for (const cid of children) {
+    const c = loroDoc.toNodexNode(cid);
+    if (c?.templateId === templateNodeId) return cid;
+  }
+  return null;
+}
+
+function cloneTemplateContentNodeShallow(parentId: string, templateNodeId: string): void {
+  if (findTemplateContentClone(parentId, templateNodeId)) return;
+
+  const template = loroDoc.toNodexNode(templateNodeId);
+  if (!template || template.type) return;
+
+  const clonedId = nanoid();
+  loroDoc.createNode(clonedId, parentId);
+  loroDoc.setNodeDataBatch(clonedId, {
+    templateId: templateNodeId,
+    ...(template.description !== undefined && { description: template.description }),
+    ...(template.viewMode !== undefined && { viewMode: template.viewMode }),
+    ...(template.editMode !== undefined && { editMode: template.editMode }),
+    ...(template.flags !== undefined && { flags: template.flags }),
+    ...(template.imageWidth !== undefined && { imageWidth: template.imageWidth }),
+    ...(template.imageHeight !== undefined && { imageHeight: template.imageHeight }),
+    ...(template.aiSummary !== undefined && { aiSummary: template.aiSummary }),
+    ...(template.sourceUrl !== undefined && { sourceUrl: template.sourceUrl }),
+  });
+
+  if (template.marks || template.inlineRefs) {
+    loroDoc.setNodeRichTextContent(
+      clonedId,
+      template.name ?? '',
+      template.marks ?? [],
+      template.inlineRefs ?? [],
+    );
+  } else if (template.name !== undefined) {
+    loroDoc.setNodeData(clonedId, 'name', template.name);
+  }
+}
+
 /** 递归获取 tagDef 的 extends 链（包含自身） */
 function getExtendsChain(tagDefId: string, visited = new Set<string>()): string[] {
   if (visited.has(tagDefId)) return [];
@@ -158,7 +208,13 @@ export function applyTagMutationsNoCommit(nodeId: string, tagDefId: string): voi
     }
   }
 
-  // 4. 传播 childSupertag
+  // 4. 克隆默认内容（仅当前 tagDef 的顶层普通内容节点，shallow clone）
+  // 注：继承链上的 default content 自动传播仍属于 Extend Phase 2（未实现）。
+  for (const templateNodeId of getTemplateContentNodes(tagDefId)) {
+    cloneTemplateContentNodeShallow(nodeId, templateNodeId);
+  }
+
+  // 5. 传播 childSupertag
   const tagDef = loroDoc.toNodexNode(tagDefId);
   void tagDef; // childSupertag 仅在 createChild/createSibling 时处理
 }

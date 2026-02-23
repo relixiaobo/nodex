@@ -280,9 +280,9 @@ npm run test:run
 
 **覆盖点（Loro 模型）**:
 
-1. `applyTag(nodeId, tagDefId)` — 向 node.tags 写入 tagDefId，为 tagDef 所有 fieldDef 创建 fieldEntry 子节点
+1. `applyTag(nodeId, tagDefId)` — 向 node.tags 写入 tagDefId，为 tagDef 所有 fieldDef 创建 fieldEntry 子节点，并 shallow clone 顶层 default content 普通节点（`templateId` 标记来源）
 2. `removeTag(nodeId, tagDefId)` — 从 node.tags 移除，删除模板来源的 fieldEntry 子节点
-3. applyTag 幂等（重复调用不产生重复 tag 或重复 fieldEntry）
+3. applyTag 幂等（重复调用不产生重复 tag / fieldEntry / default content clone）
 4. removeTag 仅清理模板来源字段，手动添加字段保留
 5. `addReference(parentId, targetId)` 非幂等 — 每次创建新的 reference 节点
 6. `addReference(parentId, targetId)` 阻止非法树引用：self 引用、祖先引用、跨分支互引闭环（显示图成环）
@@ -1255,15 +1255,16 @@ createSibling 自动标签（2 cases）:
 | 6 | 周降序排列 | 最新周在前 |
 | 7 | 日降序排列 | 最新日在前 |
 | 8 | SYSTEM_TAGS 应用 + 固定 ID tagDef | DAY/WEEK/YEAR 标签正确，且 `sys:day/week/year` tagDef 存在于 Schema |
-| 9 | ensureTodayNode | 返回有效 ID + DAY 标签 |
-| 10 | getAdjacentDayNodeId +1 | 返回下一天节点 |
-| 11 | getAdjacentDayNodeId -1 | 返回前一天节点 |
-| 12 | getAdjacentDayNodeId 非日节点 | 返回 null |
-| 13–16 | isDayNode/isWeekNode/isYearNode/isJournalNode | 正确判断 |
-| 17 | getDayNoteCountsForMonth 空月份 | 返回空 Map |
-| 18 | getDayNoteCountsForMonth 有笔记 | 正确计数（today=3, yesterday=2） |
-| 19 | getDayNoteCountsForMonth 排除 fieldEntry | 仅计算内容子节点 |
-| 20 | getDayNoteCountsForMonth 无内容日 | 0-count 日不出现在 Map 中 |
+| 9 | #day 模板字段/默认内容实例化 | 新建日节点会实例化 fieldEntry 并 shallow clone default content（`templateId` 来源追踪） |
+| 10 | ensureTodayNode | 返回有效 ID + DAY 标签 |
+| 11 | getAdjacentDayNodeId +1 | 返回下一天节点 |
+| 12 | getAdjacentDayNodeId -1 | 返回前一天节点 |
+| 13 | getAdjacentDayNodeId 非日节点 | 返回 null |
+| 14–17 | isDayNode/isWeekNode/isYearNode/isJournalNode | 正确判断 |
+| 18 | getDayNoteCountsForMonth 空月份 | 返回空 Map |
+| 19 | getDayNoteCountsForMonth 有笔记 | 正确计数（today=3, yesterday=2） |
+| 20 | getDayNoteCountsForMonth 排除 fieldEntry | 仅计算内容子节点 |
+| 21 | getDayNoteCountsForMonth 无内容日 | 0-count 日不出现在 Map 中 |
 
 ### 1.62 反向链接查询与计数
 

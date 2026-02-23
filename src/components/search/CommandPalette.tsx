@@ -68,14 +68,21 @@ export function CommandPalette() {
   // All registered commands
   const commands = useMemo(() => getAllCommands(ctx), [ctx]);
 
+  // Container IDs to exclude from recent nodes (they appear in the containers section)
+  const containerIdSet = useMemo(
+    () => new Set<string>(COMMAND_PALETTE_QUICK_CONTAINERS.map((c) => c.id)),
+    [],
+  );
+
   // Recent nodes from panel history (deduplicated, most recent first, max 5)
+  // Excludes container nodes since they already appear in the Suggestions group.
   const recentNodes = useMemo(() => {
     const seen = new Set<string>();
     const items: PaletteItem[] = [];
     // Walk backwards from current index to find recent unique nodes
     for (let i = panelIndex; i >= 0 && items.length < 5; i--) {
       const id = panelHistory[i];
-      if (!id || seen.has(id)) continue;
+      if (!id || seen.has(id) || containerIdSet.has(id)) continue;
       seen.add(id);
       const node = loroDoc.toNodexNode(id);
       if (!node) continue;
@@ -104,16 +111,18 @@ export function CommandPalette() {
     })),
   [navigateTo, closeSearch]);
 
-  // Command items for Commands group
+  // Command items for Commands group (excludes containers, which are in Suggestions)
   const commandItems: PaletteItem[] = useMemo(() =>
-    commands.map((cmd) => ({
-      id: cmd.id,
-      label: cmd.label,
-      icon: cmd.icon,
-      type: cmd.type,
-      subtitle: cmd.shortcut,
-      action: () => cmd.action(ctx),
-    })),
+    commands
+      .filter((cmd) => cmd.type === 'command')
+      .map((cmd) => ({
+        id: cmd.id,
+        label: cmd.label,
+        icon: cmd.icon,
+        type: cmd.type,
+        subtitle: cmd.shortcut,
+        action: () => cmd.action(ctx),
+      })),
   [commands, ctx]);
 
   // Fuzzy search results (nodes + commands mixed, sorted by score)

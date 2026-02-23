@@ -821,6 +821,40 @@ Mock: pending-queue (dequeue/remove/count), sync-protocol (push/pull/sha256Hex/A
 
 ---
 
+### 1.517 Sync E2E（真实 HTTP + D1 + R2 + Loro CRDT）
+
+**测试文件**: `tests/vitest/sync-e2e.test.ts`
+
+**前置条件**:
+
+```bash
+cd server
+npm run db:migrate:local   # 初始化 D1 表
+npm run db:seed:e2e        # 种入 E2E 测试凭证
+npm run dev                # 启动 wrangler dev (localhost:8787)
+```
+
+如果 `wrangler dev` 未运行，整个 suite 自动 skip（不报错）。
+
+**覆盖点（10 个 case，全真实 HTTP 请求 + Loro SDK）**:
+
+| # | 名称 | 验证点 |
+|---|------|--------|
+| 1 | Push single update | LoroDoc → export update → pushUpdate → seq > 0 |
+| 2 | Push dedup | 同一 updateHash push 两次 → 第二次 `deduped: true`，同一 seq |
+| 3 | Pull after push | Device A push → Device B pull → 收到 update，base64 解码后长度正确 |
+| 4 | Echo filtering | Device A push → Device A pull → updates 为空 |
+| 5 | Multi-device CRDT round-trip | A 创建 LoroTree 节点 → push → B pull + import → B 的 tree 包含相同节点 |
+| 6 | Cursor advancement | Pull 后拿到 nextCursorSeq → 再 pull 同一 cursor → 返回空 |
+| 7 | Pagination | Push 多条 → pull → hasMore=false + latestSeq 正确 |
+| 8 | Auth failure | invalid token → 401 |
+| 9 | Hash mismatch | 故意传错 updateHash → 400 |
+| 10 | Concurrent push ordering | Push 5 条 → pull → seq 严格递增 |
+
+**架构**: 不 mock 任何模块，直接用 Loro SDK 创建 LoroDoc/LoroTree 节点，导出 update bytes，通过 HTTP push/pull 到运行中的 `wrangler dev`。每个 test 使用唯一 `workspaceId`（`ws_e2e_{nanoid}`）隔离。
+
+---
+
 ### 1.52 LoroText Bridge（TextMark / InlineRef 双向桥接）
 
 **测试文件**: `tests/vitest/loro-text-bridge.test.ts`

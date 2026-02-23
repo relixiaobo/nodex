@@ -44,6 +44,7 @@ type StateListener = (state: SyncState) => void;
 export class SyncManager {
   private intervalId: ReturnType<typeof setInterval> | null = null;
   private isSyncing = false;
+  private nudgePending = false;
   private workspaceId: string | null = null;
   private accessToken: string | null = null;
   private deviceId: string | null = null;
@@ -130,6 +131,7 @@ export class SyncManager {
     }
 
     this.isSyncing = true;
+    this.nudgePending = false;
     this.updateState({ status: 'syncing' });
 
     try {
@@ -154,11 +156,20 @@ export class SyncManager {
       }
     } finally {
       this.isSyncing = false;
+      // If nudge arrived while syncing, run another cycle immediately
+      if (this.nudgePending) {
+        this.nudgePending = false;
+        void this.syncOnce();
+      }
     }
   }
 
   /** Trigger sync immediately (called when local updates are enqueued). */
   nudge(): void {
+    if (this.isSyncing) {
+      this.nudgePending = true;
+      return;
+    }
     void this.syncOnce();
   }
 

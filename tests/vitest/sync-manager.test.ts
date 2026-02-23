@@ -237,7 +237,11 @@ describe('SyncManager', () => {
       await mgr.start('ws_1', 'tok_1', 'dev_1');
       await flushAsync();
 
-      vi.clearAllMocks();
+      // Reset call counts but re-apply default return values
+      mockOpenDB.mockImplementation(() => Promise.resolve(makeFakeDB()));
+      mockGetPendingCount.mockResolvedValue(0);
+      mockPullUpdates.mockResolvedValue({ type: 'incremental', updates: [], latestSeq: 0, nextCursorSeq: 0, hasMore: false });
+      mockPushUpdate.mockClear();
 
       await mgr.start('ws_2', 'tok_2', 'dev_2');
       await flushAsync();
@@ -524,7 +528,10 @@ describe('SyncManager', () => {
       await mgr.start('ws_1', 'tok_1', 'dev_1');
       await flushAsync();
 
-      vi.clearAllMocks();
+      // Reset counts, re-apply mocks for the interval-triggered cycle
+      mockPullUpdates.mockClear();
+      mockPullUpdates.mockResolvedValue({ type: 'incremental', updates: [], latestSeq: 0, nextCursorSeq: 0, hasMore: false });
+      mockGetPendingCount.mockResolvedValue(0);
 
       // Advance 30s
       await vi.advanceTimersByTimeAsync(30_000);
@@ -537,7 +544,10 @@ describe('SyncManager', () => {
       await mgr.start('ws_1', 'tok_1', 'dev_1');
       await flushAsync();
 
-      vi.clearAllMocks();
+      // Reset counts, re-apply mocks
+      mockPullUpdates.mockClear();
+      mockPullUpdates.mockResolvedValue({ type: 'incremental', updates: [], latestSeq: 0, nextCursorSeq: 0, hasMore: false });
+      mockGetPendingCount.mockResolvedValue(0);
 
       mgr.nudge();
       await flushAsync();
@@ -545,7 +555,7 @@ describe('SyncManager', () => {
       expect(mockPullUpdates).toHaveBeenCalledTimes(1);
     });
 
-    it('concurrent syncOnce calls are deduplicated (isSyncing guard)', async () => {
+    it('nudge during sync sets nudgePending and triggers follow-up cycle', async () => {
       // Make pull slow
       mockPullUpdates.mockImplementation(
         () => new Promise((resolve) => setTimeout(() => resolve({
@@ -560,15 +570,15 @@ describe('SyncManager', () => {
       await mgr.start('ws_1', 'tok_1', 'dev_1');
       // Don't flush — syncOnce is still in-flight
 
-      // Nudge while syncing — should be skipped
+      // Nudge while syncing — should be deferred, not dropped
       mgr.nudge();
-      mgr.nudge();
+      mgr.nudge(); // second nudge collapses into same flag
 
-      await vi.advanceTimersByTimeAsync(200);
+      await vi.advanceTimersByTimeAsync(300);
       await flushAsync();
 
-      // Only 1 pull call (from the initial syncOnce in start)
-      expect(mockPullUpdates).toHaveBeenCalledTimes(1);
+      // 2 pull calls: initial syncOnce + 1 follow-up from nudgePending
+      expect(mockPullUpdates).toHaveBeenCalledTimes(2);
     });
   });
 

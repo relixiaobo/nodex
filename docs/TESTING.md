@@ -347,6 +347,19 @@ npm run test:run
 4. `addUnnamedFieldToNode(nodeId)` — 返回 `{ fieldEntryId, fieldDefId }` 结构
 5. `replaceFieldDef(nodeId, feId, oldFdId, newFdId)` — 直接写入 fieldDefId（Loro 无 owner 校验）
 6. Workspace 容器节点不可移动/不可入 Trash（move/indent/up/down/trash guard）
+7. Workspace home node / container node 的 `setNodeName` / `updateNodeDescription` 受系统锁定保护（no-op）
+
+### 1.11.1 系统节点能力规则（home/container/general）
+
+**测试文件**: `tests/vitest/node-capabilities.test.ts`
+
+**覆盖点**:
+
+1. 当前 workspace home 节点识别（`ws_default`）→ `workspaceHome`
+2. 容器节点识别（`LIBRARY/INBOX/...`）→ `container`
+3. 普通内容节点识别（如 `note_1`）→ `general`
+4. `workspaceHome/container` 的能力收敛为 `不可编辑/不可移动/不可删除`
+5. `general` 节点能力保持 `可编辑/可移动/可删除`
 
 ### 1.12 Trash 语义（TagDef / AttrDef）
 

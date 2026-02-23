@@ -46,6 +46,10 @@ let currentWorkspaceId: string | null = null;
 /** 全局变更订阅回调 */
 const subscribers = new Set<() => void>();
 
+export function getCurrentWorkspaceId(): string | null {
+  return currentWorkspaceId;
+}
+
 // ============================================================
 // ② Fine-grained subscriptions — per-node 订阅内部状态
 // ============================================================

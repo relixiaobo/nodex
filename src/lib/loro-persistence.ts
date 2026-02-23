@@ -5,9 +5,11 @@
  * Phase 0 扩展：SnapshotRecord 格式（snapshot + peerIdStr + versionVector + savedAt）
  */
 
-const DB_NAME = 'nodex';
-const STORE_NAME = 'loro_snapshots';
-const DB_VERSION = 1;
+export const DB_NAME = 'nodex';
+export const STORE_NAME = 'loro_snapshots';
+export const PENDING_STORE = 'pending_updates';
+export const CURSOR_STORE = 'sync_cursors';
+const DB_VERSION = 2;
 
 /**
  * 持久化记录格式（Phase 0+）。
@@ -35,7 +37,8 @@ function isSnapshotRecord(value: unknown): value is SnapshotRecord {
   );
 }
 
-function openDB(): Promise<IDBDatabase> {
+/** Shared DB opener — also used by pending-queue.ts and sync-manager.ts. */
+export function openDB(): Promise<IDBDatabase> {
   if (dbPromise) return dbPromise;
   dbPromise = new Promise((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, DB_VERSION);
@@ -43,6 +46,14 @@ function openDB(): Promise<IDBDatabase> {
       const db = (e.target as IDBOpenDBRequest).result;
       if (!db.objectStoreNames.contains(STORE_NAME)) {
         db.createObjectStore(STORE_NAME);
+      }
+      // v2: pending updates queue + sync cursors
+      if (!db.objectStoreNames.contains(PENDING_STORE)) {
+        const store = db.createObjectStore(PENDING_STORE, { keyPath: 'id' });
+        store.createIndex('by_workspace', 'workspaceId', { unique: false });
+      }
+      if (!db.objectStoreNames.contains(CURSOR_STORE)) {
+        db.createObjectStore(CURSOR_STORE);
       }
     };
     req.onsuccess = (e) => resolve((e.target as IDBOpenDBRequest).result);

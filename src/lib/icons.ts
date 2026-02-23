@@ -102,3 +102,12 @@ export {
   SquareUser,
   UserPen,
 } from 'lucide-react';
+
+// ─── Sync Status ────────────────────────────────────────────────────────────
+
+export {
+  Cloud,
+  CloudOff,
+  AlertCircle,
+  Loader2,
+} from 'lucide-react';

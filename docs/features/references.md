@@ -165,6 +165,7 @@
 | 2026-02-23 | buildBacklinkCountMap 也跳过 fieldEntry 内的树引用 | PR review: badge 计数必须与展开后 section 一致，不能双重计数 |
 | 2026-02-23 | computeBacklinks 添加 (version, nodeId) 缓存 | PR review: Zustand selector 每次 _version 变化触发，缓存避免冗余全量扫描 |
 | 2026-02-23 | buildBacklinkCountMap 预计算 trash set（BFS from TRASH root） | PR review: 替代逐节点 isInTrash() parent chain walk，O(T) 预计算 vs O(N×D) 逐条 |
+| 2026-02-23 | Reference bullet/drillDown 导航目标改为 `referenceTargetId ?? nodeId` | 修复：点击 reference 行 bullet 错误传入壳节点 ID 导致空白 NodePanel |
 
 ## 当前状态
 

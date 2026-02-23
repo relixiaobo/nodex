@@ -29,27 +29,13 @@ _(空)_
 |-------|---------|------|-------------|
 | nodex-cc | Sync 增量同步（Cloudflare-only）— Step 0 起 | `cc/sync-phase1` | `docs/plans/sync-incremental-impl.md`, `server/*` |
 | nodex-cc-2 | _(idle)_ | — | — |
-| nodex-codex | 空白 NodePanel 导航问题排查（reference / system tag / dangling IDs） | `codex/reference-bullet-nodepanel-empty` | `src/components/outliner/OutlinerItem.tsx`, `src/components/tags/TagBadge.tsx`, `src/stores/ui-store.ts`, `src/components/panel/NodePanel.tsx`, `tests/vitest/outliner-item-reference-navigation.test.ts`, `tests/vitest/tag-badge-navigation.test.ts`, `tests/vitest/ui-store.test.ts`, `docs/TESTING.md`, `docs/TASKS.md` |
+| nodex-codex | _(idle)_ | — | — |
 
 ---
 
 ## 进行中
 
-### 空白 NodePanel 导航问题排查（reference / system tag / dangling IDs）
-> 复现并定位：点击 reference node 的 bullet、系统标签（如 `#day`）或其他无 backing node 的动态入口后，NodePanel 打开的页面为空。
-> **Owner**: nodex-codex | **Branch**: `codex/reference-bullet-nodepanel-empty` | **Files**: `src/components/outliner/OutlinerItem.tsx`, `src/components/tags/TagBadge.tsx`, `src/stores/ui-store.ts`, `src/components/panel/NodePanel.tsx`, `tests/vitest/outliner-item-reference-navigation.test.ts`, `tests/vitest/tag-badge-navigation.test.ts`, `tests/vitest/ui-store.test.ts`, `docs/TESTING.md`, `docs/TASKS.md`
-
-- [x] 复现问题并定位触发链路（reference bullet → panel navigation）
-- [x] 确认 root cause（引用节点 ID / 面板页面栈 / selector 上下文）
-- [x] 修复并补充回归测试（如涉及 `src/` 行为变更）
-
-**迭代日志**
-- [2026-02-22 nodex-codex] 领取任务，基于 `origin/main` 新建 `codex/reference-bullet-nodepanel-empty`，准备排查 reference node bullet 打开空白 NodePanel 的问题。
-- [2026-02-22 nodex-codex] 定位根因：`OutlinerItem` 的 reference 行 bullet/drillDown 导航错误传入引用壳节点 `nodeId`，`NodePanel` 打开空壳页；修复为 `referenceTargetId ?? nodeId`，并新增 Vitest 覆盖 `resolvePanelNavigationNodeId()`。
-- [2026-02-22 nodex-codex] 追加排查 `#day` 空白页：`TagBadge` 对系统标签 `sys:day` 仅做显示名兜底，但仍允许 `navigateTo(tagId)`，导致打开无 backing node 的空白 Panel；计划改为禁用无 backing node 标签导航。
-- [2026-02-22 nodex-codex] 已实现 `TagBadge` 导航守卫：仅当标签有 backing node 时允许点击进入 panel，并隐藏无 backing node 标签的 Configure 菜单项；新增 Vitest 覆盖 `canNavigateToTagNode()`。
-- [2026-02-22 nodex-codex] 统一收口类似问题：在 `ui-store.navigateTo/replacePanel` 增加 backing node 校验（无效 ID no-op），并在 `NodePanel` 增加 missing-node 兜底视图，避免历史中的旧无效 ID 导致空白页；补 `ui-store.test.ts` 回归用例。
-- [2026-02-22 nodex-codex] 根据 PR #81 review 修复：`hasBackingNode()` 对未初始化 LoroDoc 场景改为 fail-open（避免 `ui-store-history-guards` 测试抛错），并修正 `docs/TESTING.md` 重复编号。
+_(空)_
 
 ---
 
@@ -278,6 +264,7 @@ _(空)_
 
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
+| 2026-02-23 | 空白 NodePanel 导航修复 — reference bullet 导航到目标节点 + 系统标签导航守卫 + ui-store backing node 校验 + NodePanel 兜底视图 | nodex-codex | #81 |
 | 2026-02-23 | References 增强 (#19) — 反向链接 section（Mentioned in + Appears as [Field] in 分组）+ 引用计数 badge + 11 Vitest 用例 + 计数去重/缓存/trash set 性能修复 | nodex-cc-2 | #76 |
 | 2026-02-22 | Sync 增量同步计划 Review — 补 sync_updates 表、修正 seq hole/cursor 语义/checkpoint 持久化/RLS 边界 | nodex-codex | #79 |
 | 2026-02-22 | Sync Phase 0 实现复审 + 修复（workspace ID 并发竞态、SnapshotRecord 校验加固、测试真实持久化路径、VV 增量断言修正） | nodex-codex | #78 |

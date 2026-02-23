@@ -682,6 +682,29 @@ describe('SyncManager', () => {
       const pendingState = states.find((s) => s.pendingCount === 5);
       expect(pendingState).toBeTruthy();
     });
+
+    it('supports multiple listeners and unsubscribe', async () => {
+      const l1: string[] = [];
+      const l2: string[] = [];
+
+      const unsub1 = mgr.onStateChange((s) => l1.push(s.status));
+      mgr.onStateChange((s) => l2.push(s.status));
+
+      await mgr.start('ws_1', 'tok_1', 'dev_1');
+      await flushAsync();
+
+      expect(l1.length).toBeGreaterThan(0);
+      expect(l2.length).toBeGreaterThan(0);
+
+      unsub1();
+      const l1CountAfterUnsub = l1.length;
+
+      mgr.nudge();
+      await flushAsync();
+
+      expect(l1.length).toBe(l1CountAfterUnsub);
+      expect(l2.length).toBeGreaterThan(l1CountAfterUnsub);
+    });
   });
 
   // ------------------------------------------------------------------

@@ -49,7 +49,7 @@ export class SyncManager {
   private accessToken: string | null = null;
   private deviceId: string | null = null;
   private lastSeq = 0;
-  private listener: StateListener | null = null;
+  private listeners = new Set<StateListener>();
   private visibilityHandler: (() => void) | null = null;
   private sessionToken = 0;
 
@@ -61,13 +61,18 @@ export class SyncManager {
   };
 
   /** Set a listener for state changes (used by sync-store). */
-  onStateChange(listener: StateListener): void {
-    this.listener = listener;
+  onStateChange(listener: StateListener): () => void {
+    this.listeners.add(listener);
+    return () => {
+      this.listeners.delete(listener);
+    };
   }
 
   private updateState(partial: Partial<SyncState>): void {
     this.state = { ...this.state, ...partial };
-    this.listener?.(this.state);
+    for (const listener of this.listeners) {
+      listener(this.state);
+    }
   }
 
   private isSessionCurrent(token: number): boolean {

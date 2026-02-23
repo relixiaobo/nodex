@@ -25,11 +25,10 @@ const JOURNAL_TAG_DEFS: ReadonlyArray<{
   id: string;
   name: string;
   defaultColor: 'gray';
-  defaultChildSupertag?: string;
 }> = [
   { id: SYSTEM_TAGS.DAY, name: 'day', defaultColor: 'gray' },
-  { id: SYSTEM_TAGS.WEEK, name: 'week', defaultColor: 'gray', defaultChildSupertag: SYSTEM_TAGS.DAY },
-  { id: SYSTEM_TAGS.YEAR, name: 'year', defaultColor: 'gray', defaultChildSupertag: SYSTEM_TAGS.WEEK },
+  { id: SYSTEM_TAGS.WEEK, name: 'week', defaultColor: 'gray' },
+  { id: SYSTEM_TAGS.YEAR, name: 'year', defaultColor: 'gray' },
 ] as const;
 
 /**
@@ -39,14 +38,13 @@ const JOURNAL_TAG_DEFS: ReadonlyArray<{
 export function ensureJournalTagDefs(): void {
   let changed = false;
   for (const def of JOURNAL_TAG_DEFS) {
-    const { id, name, defaultColor, defaultChildSupertag } = def;
+    const { id, name, defaultColor } = def;
     if (!loroDoc.hasNode(id)) {
       loroDoc.createNode(id, CONTAINER_IDS.SCHEMA);
       loroDoc.setNodeDataBatch(id, {
         type: 'tagDef',
         name,
         color: defaultColor,
-        ...(defaultChildSupertag ? { childSupertag: defaultChildSupertag } : {}),
       });
       changed = true;
       continue;
@@ -59,9 +57,6 @@ export function ensureJournalTagDefs(): void {
     if (node.type !== 'tagDef') patch.type = 'tagDef';
     if (!node.name) patch.name = name;
     if (!node.color) patch.color = defaultColor;
-    if (defaultChildSupertag && !node.childSupertag) {
-      patch.childSupertag = defaultChildSupertag;
-    }
     if (Object.keys(patch).length > 0) {
       loroDoc.setNodeDataBatch(id, patch);
       changed = true;

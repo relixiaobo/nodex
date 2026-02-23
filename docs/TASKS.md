@@ -53,6 +53,7 @@ _(空)_
 - [2026-02-23 nodex-codex] 抽出 `applyTagMutationsNoCommit()`（共享于 `node-store.applyTag` 与 `journal`）以避免 `journal` 走 store action 产生多次 commit；补 `journal.test.ts` 验证 `#day` 模板字段会在新建日节点上实例化。默认内容复制行为仍待单独确认/实现。
 - [2026-02-23 nodex-codex] 为 `applyTagMutationsNoCommit()` 补齐 default content shallow clone（仅当前 tagDef 顶层普通内容节点，`templateId` 标记来源，幂等去重）；新增 `node-store-tags-refs.test.ts` 通用回归与 `journal.test.ts` 的 `#day` default content 回归。
 - [2026-02-23 nodex-codex] 根据手动验收反馈补默认值：`ensureJournalTagDefs()` 现在回填 `year.childSupertag=week`、`week.childSupertag=day` 与默认 `color='gray'`（仅在缺省时，不覆盖用户自定义）；`resolveTagColor()` 对 `sys:day/week/year` 无显式颜色时灰色兜底，补 `journal.test.ts` + `tag-colors.test.ts` 回归。
+- [2026-02-23 nodex-codex] 与用户进一步确认后撤回 `year→week` / `week→day` 默认 `childSupertag`：日期标签不应预设用户在年/周节点下的内容类型（例如年计划/周计划）。保留 gray 默认色；`ensureJournalTagDefs()` 不再自动设置 `childSupertag`。
 
 ---
 

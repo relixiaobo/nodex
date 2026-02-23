@@ -262,13 +262,11 @@ describe('ensureJournalTagDefs', () => {
       type: 'tagDef',
       name: 'week',
       color: 'gray',
-      childSupertag: SYSTEM_TAGS.DAY,
     });
     expect(loroDoc.toNodexNode(SYSTEM_TAGS.YEAR)).toMatchObject({
       type: 'tagDef',
       name: 'year',
       color: 'gray',
-      childSupertag: SYSTEM_TAGS.WEEK,
     });
 
     expect(loroDoc.getParentId(SYSTEM_TAGS.DAY)).toBe(CONTAINER_IDS.SCHEMA);
@@ -294,11 +292,9 @@ describe('ensureJournalTagDefs', () => {
     ensureJournalTagDefs();
     loroDoc.setNodeDataBatch(SYSTEM_TAGS.WEEK, {
       color: 'violet',
-      childSupertag: 'tagDef_person',
     });
     loroDoc.setNodeDataBatch(SYSTEM_TAGS.YEAR, {
       color: '',
-      childSupertag: '',
     });
     loroDoc.commitDoc('user:test-customize-journal-tagdefs');
 
@@ -306,11 +302,9 @@ describe('ensureJournalTagDefs', () => {
 
     expect(loroDoc.toNodexNode(SYSTEM_TAGS.WEEK)).toMatchObject({
       color: 'violet',
-      childSupertag: 'tagDef_person',
     });
     expect(loroDoc.toNodexNode(SYSTEM_TAGS.YEAR)).toMatchObject({
       color: 'gray',
-      childSupertag: SYSTEM_TAGS.WEEK,
     });
   });
 });

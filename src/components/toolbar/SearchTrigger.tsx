@@ -11,7 +11,7 @@ export function SearchTrigger() {
   return (
     <button
       onClick={openSearch}
-      className="flex flex-1 max-w-[240px] items-center gap-2 rounded-md border border-border bg-background/50 px-2.5 py-1 text-xs text-foreground-tertiary transition-colors hover:bg-background hover:text-foreground-secondary"
+      className="flex flex-1 max-w-[240px] items-center gap-2 rounded-lg border border-border bg-background/50 px-2.5 py-1 text-xs text-foreground-tertiary transition-colors hover:bg-foreground/5 hover:text-foreground-secondary"
     >
       <span className="flex-1 text-left">Search...</span>
       <kbd className="inline-flex h-5 items-center rounded border border-border bg-background px-1.5 text-[10px] font-medium">

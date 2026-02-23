@@ -263,7 +263,7 @@ export function CommandPalette() {
 
       {/* Dialog */}
       <div
-        className="relative w-full max-w-md rounded-xl border border-border bg-popover shadow-2xl"
+        className="relative w-full max-w-md rounded-xl border border-border bg-popover shadow-xl"
         onKeyDown={handleKeyDown}
       >
         {/* Search bar */}
@@ -401,7 +401,7 @@ function PaletteRow({ item, selected, onSelect, onHover }: PaletteRowProps) {
       data-selected={selected}
       onClick={onSelect}
       onMouseMove={onHover}
-      className={`mx-1 flex h-10 cursor-pointer items-center gap-3 rounded-lg px-3 ${
+      className={`mx-1 flex h-10 cursor-pointer items-center gap-3 rounded-lg px-3 transition-colors ${
         selected ? 'bg-accent' : ''
       }`}
     >

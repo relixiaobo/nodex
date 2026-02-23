@@ -50,7 +50,7 @@ export function ToolbarUserMenu() {
       <button
         onClick={handleSignIn}
         disabled={signingIn}
-        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-accent text-foreground-secondary transition-colors hover:bg-accent/80 disabled:opacity-50"
+        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-foreground-secondary transition-colors hover:bg-foreground/5 disabled:opacity-50"
         title="Sign in with Google"
       >
         {signingIn ? (
@@ -69,7 +69,7 @@ export function ToolbarUserMenu() {
       {/* Avatar trigger */}
       <button
         onClick={() => setOpen((v) => !v)}
-        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full overflow-hidden"
+        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full overflow-hidden"
         aria-label={t('userMenu.ariaLabel')}
       >
         {authUser.avatarUrl ? (
@@ -88,27 +88,27 @@ export function ToolbarUserMenu() {
 
       {/* Dropdown */}
       {open && (
-        <div className="absolute right-0 top-full mt-1 w-52 rounded-md border border-border bg-popover py-1 shadow-md z-50">
+        <div className="absolute right-0 top-full mt-1 w-52 rounded-lg border border-border bg-popover p-1 shadow-lg z-50">
           {/* User info */}
-          <div className="px-3 py-2">
+          <div className="px-2 py-1.5">
             {authUser.name && (
-              <p className="truncate text-xs font-medium">{authUser.name}</p>
+              <p className="truncate text-sm font-medium">{authUser.name}</p>
             )}
             {authUser.email && (
-              <p className="truncate text-[11px] text-foreground-secondary">
+              <p className="truncate text-xs text-foreground-secondary">
                 {authUser.email}
               </p>
             )}
           </div>
 
-          <div className="mx-2 my-1 border-t border-border" />
+          <div className="mx-1 my-1 border-t border-border" />
 
           {/* Sign out */}
           <button
             onClick={handleSignOut}
-            className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-foreground transition-colors hover:bg-foreground/5"
+            className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-foreground transition-colors hover:bg-foreground/5"
           >
-            <LogOut size={13} className="shrink-0" />
+            <LogOut size={14} className="shrink-0" />
             {t('userMenu.signOut')}
           </button>
         </div>

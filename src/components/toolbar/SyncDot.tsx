@@ -5,11 +5,11 @@
 import { useSyncStore } from '../../stores/sync-store';
 
 const STATUS_CLASSES: Record<string, string> = {
-  synced: 'bg-green-500',
-  syncing: 'bg-blue-500 animate-pulse',
-  pending: 'bg-amber-500',
-  error: 'bg-red-500',
-  offline: 'bg-gray-400',
+  synced: 'bg-success',
+  syncing: 'bg-primary animate-pulse',
+  pending: 'bg-warning',
+  error: 'bg-destructive',
+  offline: 'bg-foreground-tertiary',
 };
 
 export function SyncDot() {

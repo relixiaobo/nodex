@@ -48,13 +48,16 @@ function seedBody(): void {
   // Skip if already seeded (avoid re-seeding on hot reload)
   if (loroDoc.getAllNodeIds().length > 10) return;
 
-  // ─── Workspace containers (root-level, no parent) ───
-  cn(CONTAINER_IDS.LIBRARY,  null, { name: 'Library' });
-  cn(CONTAINER_IDS.INBOX,    null, { name: 'Inbox' });
-  cn(CONTAINER_IDS.JOURNAL,  null, { name: 'Journal' });
-  cn(CONTAINER_IDS.SEARCHES, null, { name: 'Searches' });
-  cn(CONTAINER_IDS.TRASH,    null, { name: 'Trash' });
-  cn(CONTAINER_IDS.SCHEMA,   null, { name: 'Schema' });
+  // ─── Workspace home node (tree root) ───
+  cn(WS_ID, null, { name: 'Workspace' });
+
+  // ─── Workspace containers (children of workspace home) ───
+  cn(CONTAINER_IDS.LIBRARY,  WS_ID, { name: 'Library' });
+  cn(CONTAINER_IDS.INBOX,    WS_ID, { name: 'Inbox' });
+  cn(CONTAINER_IDS.JOURNAL,  WS_ID, { name: 'Journal' });
+  cn(CONTAINER_IDS.SEARCHES, WS_ID, { name: 'Searches' });
+  cn(CONTAINER_IDS.TRASH,    WS_ID, { name: 'Trash' });
+  cn(CONTAINER_IDS.SCHEMA,   WS_ID, { name: 'Schema' });
 
   // ═══════════════════════════════════════════════════════════════
   // TagDef: Task (showCheckbox, color, done-state mapping via direct props)

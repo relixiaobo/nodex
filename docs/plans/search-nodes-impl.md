@@ -1,240 +1,180 @@
-# Search Nodes 实施计划
+# Search Nodes Phase 1 实施计划
 
 > **Owner**: nodex-cc-2
 > **Branch**: `cc2/search-nodes`
 > **Spec**: `docs/features/search.md`
-> **Scope**: Phase 1 — 最小可用搜索节点（单标签搜索 + 结果展示）
 
 ---
 
-## 背景
+## 交付目标
 
-Search Node 是 Tana 的持久化动态查询功能。用户通过 `?` 创建搜索节点，选择目标标签后，系统自动查找所有匹配节点并展示。
-
-**关键上下文**：
-- 原 `search-service.ts`（Supabase 版）已随 Loro 迁移删除
-- 数据层现为纯客户端 Loro CRDT，搜索需基于内存遍历
-- 搜索节点的 `type: 'search'` 已在类型系统中定义
-- SEARCHES 容器已在 `system-node-registry.ts` 注册
-- Slash command `search_node` 已注册但 `enabled: false`
+用户通过 `?` 创建按标签搜索的节点，搜索结果在节点下方动态展示，支持完整交互（展开、编辑、查看字段）。
 
 ---
 
-## Phase 1 交付目标
+## 设计要点
 
-用户可以通过 `?` 创建一个按标签搜索的节点，搜索结果动态展示在节点下方。
+1. **查询配置 = 子节点树**：搜索节点的 children 是 `type: 'queryCondition'` 条件节点，不是搜索结果
+2. **搜索结果动态计算**：不存入 children，每次展开时由搜索引擎实时计算
+3. **结果用 OutlinerItem 渲染**：继承全部交互（展开/编辑/字段），仅 bullet 改为引用样式
+4. **创建搜索节点 = 创建 3 个节点**：SearchNode + AND root group + HAS_TAG condition
 
-**用户故事**：
-1. 在任意节点编辑器中输入 `?` → 弹出标签选择器
-2. 选择 `#task` → 在当前位置创建搜索节点 `🔍 task`
-3. 展开搜索节点 → 看到所有打了 `#task` 标签的节点（含子标签如 `#bug`）
-4. 新增一个 `#task` 节点 → 搜索结果自动更新
-5. 点击搜索结果 → navigateTo 原节点
+详见 `docs/features/search.md`。
 
 ---
 
 ## 实施步骤
 
-### Step 1: 搜索引擎 — `src/lib/search-engine.ts`
+### Step 1: 类型定义
 
-**新建文件**，实现基于 Loro 的内存搜索。
+**`src/types/node.ts`**：
+- `NodeType` 新增 `'queryCondition'`
+- `NodexNode` 新增属性：`queryLogic`, `queryOp`, `queryTargetTag`, `queryField`, `queryValue`
+
+**`src/lib/loro-doc.ts`**：
+- `toNodexNode()` 读取新属性
+- `createNode()` / `setNodeData()` 支持写入新属性
+
+**`src/hooks/use-node-search.ts`**：
+- `SKIP_DOC_TYPES` 加入 `'queryCondition'` 和 `'search'`
+
+验证：`npm run typecheck`
+
+---
+
+### Step 2: 搜索引擎
+
+**新建 `src/lib/search-engine.ts`**：
 
 ```typescript
-// 核心 API
-export function searchByTag(tagDefId: string): string[]
+export function executeSearch(searchNodeId: string): string[]
 export function collectTagHierarchy(tagDefId: string): Set<string>
 ```
 
-**`searchByTag(tagDefId)`**:
-1. 调用 `collectTagHierarchy(tagDefId)` 获取标签 + 所有子标签 ID
-2. 遍历 `loroDoc.getAllNodeIds()`
-3. 对每个节点调用 `loroDoc.getTags(id)`
-4. 过滤 `tags.some(t => tagIds.has(t))`
-5. 跳过结构类型（`fieldEntry`, `fieldDef`, `reference`, `search`）
-6. 跳过工作区容器和回收站内节点
-7. 返回匹配 ID 数组
+- `executeSearch`：从搜索节点 children 找到根条件组，遍历所有可搜索节点，递归评估条件树
+- `evaluateNode`：组节点按 `queryLogic`（AND/OR/NOT）递归，叶节点按 `queryOp` 判断
+- `collectTagHierarchy`：遍历所有 `type: 'tagDef'` 节点，递归 `extends` 链收集后代
+- `getAllSearchableNodes`：排除结构类型（`fieldEntry`, `fieldDef`, `reference`, `queryCondition`, `search`, `tagDef`）、工作区容器、回收站后代
 
-**`collectTagHierarchy(tagDefId)`**:
-1. 遍历所有 `type: 'tagDef'` 节点
-2. 检查每个 tagDef 的 `extends` 属性
-3. 递归收集以 `tagDefId` 为祖先的所有 tagDef ID
-4. 返回 `Set<string>` 包含 tagDefId 自身 + 所有后代
-
-**测试**: `tests/vitest/search-engine.test.ts`
+**新建 `tests/vitest/search-engine.test.ts`**：
 - 单标签匹配
-- 多态搜索（父标签 → 包含子标签实例）
-- 跳过结构类型 / 回收站
+- 多态搜索（父标签包含子标签实例）
+- AND/OR/NOT 逻辑评估（即使 Phase 1 只用 AND，引擎应完整支持）
+- 跳过结构类型和回收站
 - 空结果
-- 性能：1000 节点 <50ms
-
-**依赖**: 仅 `loroDoc`（无外部依赖）
+- `collectTagHierarchy` 递归正确性
 
 ---
 
-### Step 2: 搜索节点创建 — `node-store.ts`
+### Step 3: 搜索节点创建
 
-在 `node-store.ts` 中添加 `createSearchNode()`:
+**`src/stores/node-store.ts`** 新增 `createSearchNode()`：
 
 ```typescript
 createSearchNode(parentId: string, afterId: string | null, tagDefId: string): string {
-  // 1. 获取 tagDef 名称
   const tagDef = loroDoc.toNodexNode(tagDefId);
   const name = tagDef?.name ?? 'Search';
 
-  // 2. 创建节点
-  const id = createChild(parentId, afterId, {
-    name,
-    type: 'search',
-    tags: [tagDefId],  // Phase 1: tags 字段存搜索目标
-  });
+  // 1. 创建搜索节点
+  const searchId = createChild(parentId, afterId, { name, type: 'search' });
 
-  // 3. commitDoc
+  // 2. 创建 AND 根条件组
+  const groupId = createChild(searchId, null, { type: 'queryCondition', queryLogic: 'AND' });
+
+  // 3. 创建 HAS_TAG 条件
+  createChild(groupId, null, { type: 'queryCondition', queryOp: 'HAS_TAG', queryTargetTag: tagDefId });
+
   commitDoc('user:create-search');
-  return id;
+  return searchId;
 }
 ```
 
-**测试**: `tests/vitest/search-engine.test.ts`（扩展）
-- 创建搜索节点验证 type/tags/name
-
-**依赖**: Step 1
-
----
-
-### Step 3: `?` 触发 — 编辑器集成
-
-**3a. 启用 slash command**
-
-`src/lib/slash-commands.ts`:
-```typescript
-{
-  id: 'search_node',
-  name: 'Search node',
-  keywords: ['search', 'node', 'find', '?'],
-  enabled: true,  // ← 改为 true
-  // 删除 disabledHint
-}
-```
-
-**3b. 添加 `?` 触发符**
-
-在编辑器 intent 层（`NodeEditor.tsx` 或 `row-keyboard-intents.ts`）添加 `?` 字符触发：
-- 参考 `#` 触发 TagSelector 的实现模式
-- `?` 在行首或空格后输入时触发
-- 打开标签选择器（复用 `TagSelector` 或 `ReferenceSelector` 的 UI）
-- 选择标签后调用 `createSearchNode()`
-- 创建完成后焦点移到搜索节点
-
-**需要确认的实现细节**（开发时检查）：
-- `?` 触发是走 slash command 菜单（用户选 "Search node" 后再选标签），还是直接打开标签选择器？
-  - **建议**：直接打开标签选择器（与 `#` 直接触发一致），slash menu 中的 "Search node" 也触发同一流程
-- 标签选择器组件选哪个复用？检查 `TagSelector` vs `ReferenceSelector` 的 props 兼容性
-
-**依赖**: Step 2
+扩展 `tests/vitest/search-engine.test.ts`：
+- 创建后验证 3 节点结构正确
+- 执行搜索返回匹配结果
 
 ---
 
-### Step 4: OutlinerItem 搜索节点渲染
+### Step 4: `?` 触发
 
-**4a. BulletChevron 识别搜索节点**
+**`src/lib/slash-commands.ts`**：
+- `search_node` 改 `enabled: true`，删除 `disabledHint`
 
-搜索节点的 bullet 显示为**放大镜图标**（非普通圆点）：
+**编辑器集成**（参考 `#` 触发 TagSelector 的实现）：
+- `?` 在行首或空格后触发标签选择器
+- 选择标签后调用 `createSearchNode(parentId, afterId, tagDefId)`
+- 创建完成后删除 `?` 字符，焦点移到搜索节点
 
-```typescript
-// BulletChevron.tsx — 新增 isSearch prop
-if (isSearch) {
-  // 渲染 Search icon (lucide) 替代普通 bullet
-}
-```
-
-**4b. OutlinerItem 传递 isSearch**
-
-```typescript
-// OutlinerItem.tsx
-const isSearch = node?.type === 'search';
-// 传给 BulletChevron
-<BulletChevron isSearch={isSearch} ... />
-```
-
-**4c. 搜索节点的 name 渲染**
-
-- 搜索节点名称不可编辑（或可编辑用于重命名）
-- 名称旁可选显示目标标签 badge
-
-**依赖**: 无（可与 Step 1-3 并行）
+需要检查的实现细节：
+- 复用 TagSelector 还是 ReferenceSelector 的 UI？看哪个更适合"选择一个标签"的场景
+- `?` 是否也通过 slash menu 可触发？（建议：slash menu 的 "Search node" 条目也走同一流程）
 
 ---
 
-### Step 5: 搜索结果动态展示
+### Step 5: 搜索节点渲染
 
-**核心组件**: 在 OutlinerItem 中，当 `type === 'search'` 且节点展开时，渲染搜索结果而非 children。
+**`src/components/outliner/BulletChevron.tsx`**：
+- 新增 `isSearch?: boolean` prop
+- `isSearch` 时渲染 Search 图标（lucide）替代普通 bullet
 
-**5a. `useSearchResults` hook**
+**`src/components/outliner/OutlinerItem.tsx`**：
+- 识别 `node?.type === 'search'`，传 `isSearch` 给 BulletChevron
+- 搜索节点名称可编辑（允许重命名）
+
+---
+
+### Step 6: 搜索结果渲染
+
+**新建 `src/hooks/use-search-results.ts`**：
 
 ```typescript
-// src/hooks/use-search-results.ts
-export function useSearchResults(nodeId: string): string[] {
+export function useSearchResults(searchNodeId: string): string[] {
   const version = useNodeStore(s => s._version);
-  return useMemo(() => {
-    const node = loroDoc.toNodexNode(nodeId);
-    if (node?.type !== 'search') return [];
-    const targetTagId = node.tags?.[0]; // Phase 1: 第一个 tag 是搜索目标
-    if (!targetTagId) return [];
-    return searchByTag(targetTagId);
-  }, [nodeId, version]);
+  return useMemo(() => executeSearch(searchNodeId), [searchNodeId, version]);
 }
 ```
 
-**5b. OutlinerView / OutlinerItem 集成**
+**`src/components/outliner/OutlinerView.tsx`**：
+- 当父节点 `type === 'search'` 时，展开区域渲染搜索结果而非真实 children：
 
-搜索节点展开时：
-- 不渲染 `node.children`（普通 children）
-- 改为渲染 `useSearchResults()` 返回的节点列表
-- 每个结果节点使用引用 bullet 样式（同心圆 ⊙，复用 `BulletChevron.isReference`）
-- 结果节点显示 TagBadge
-- 点击结果节点 → `navigateTo(resultNodeId)`（zoom-in 到原节点）
+```typescript
+if (parentNode.type === 'search') {
+  const resultIds = useSearchResults(parentNodeId);
+  return resultIds.map(id =>
+    <OutlinerItem nodeId={id} isSearchResult depth={depth} />
+  );
+}
+```
 
-**5c. 结果为空时的占位**
+**`src/components/outliner/OutlinerItem.tsx`**：
+- 新增 `isSearchResult?: boolean` prop
+- 传给 BulletChevron 以显示引用 bullet 样式（⊙）
 
 搜索无结果时显示占位文本：`"No matching nodes"`
 
-**测试**: `tests/vitest/search-engine.test.ts`（扩展）
-- `useSearchResults` 返回正确的匹配列表
-- 节点变更后结果自动刷新（version 变化）
-
-**依赖**: Step 1, Step 4
-
 ---
 
-### Step 6: Seed Data + 集成验证
+### Step 7: Seed Data + 验证
 
-**6a. 添加搜索节点到种子数据**
-
-`src/entrypoints/test/seed-data.ts`:
-- 在 SEARCHES 容器下创建一个搜索节点（搜索 `#task`）
+**`src/entrypoints/test/seed-data.ts`**：
+- 在 SEARCHES 容器下创建 1 个搜索节点（搜索 `#task`）
+- 包含完整 3 节点结构（search + AND group + HAS_TAG condition）
 - 确保有 3-5 个 `#task` 节点作为搜索结果
 
-**6b. 集成验证**
-
-1. `npm run typecheck` — 无类型错误
-2. `npm run test:run` — 全量测试通过
-3. `npm run build` — 构建成功
-4. Standalone 环境手动验证：
-   - 搜索节点在侧栏 Searches 中可见
-   - 展开显示匹配的 task 节点
-   - 放大镜 bullet 正确渲染
-   - 结果实时更新（添加新 #task 节点后）
-
-**依赖**: Step 1-5 全部完成
+验证流程：
+1. `npm run typecheck`
+2. `npm run test:run`
+3. `npm run build`
+4. Standalone 环境视觉验证
 
 ---
 
-### Step 7: 文档同步
+### Step 8: 文档同步
 
-- 更新 `docs/features/search.md`（当前状态表）
-- 更新 `docs/TESTING.md`（新增测试覆盖）
-- 更新 `docs/TASKS.md`（勾选完成项）
-- 更新 `CLAUDE.md`（如有新文件/目录）
+- `docs/features/search.md` — 更新当前状态表
+- `docs/TESTING.md` — 新增测试覆盖映射
+- `docs/TASKS.md` — 勾选完成项
+- `CLAUDE.md` — 如有新目录/文件
 
 ---
 
@@ -242,48 +182,39 @@ export function useSearchResults(nodeId: string): string[] {
 
 | 操作 | 文件 | 说明 |
 |------|------|------|
-| **新建** | `src/lib/search-engine.ts` | 搜索引擎（searchByTag + collectTagHierarchy） |
-| **新建** | `src/hooks/use-search-results.ts` | 搜索结果 hook |
-| **新建** | `tests/vitest/search-engine.test.ts` | 搜索引擎测试 |
-| **修改** | `src/stores/node-store.ts` | 新增 `createSearchNode()` |
+| **新建** | `src/lib/search-engine.ts` | 搜索引擎（条件树递归评估 + 多态标签搜索） |
+| **新建** | `src/hooks/use-search-results.ts` | 搜索结果 React hook |
+| **新建** | `tests/vitest/search-engine.test.ts` | 搜索引擎 + 创建 + 条件评估测试 |
+| **修改** | `src/types/node.ts` | NodeType 加 `queryCondition` + 查询属性 |
+| **修改** | `src/lib/loro-doc.ts` | toNodexNode 读新属性 |
+| **修改** | `src/stores/node-store.ts` | `createSearchNode()` |
 | **修改** | `src/lib/slash-commands.ts` | 启用 `search_node` |
-| **修改** | `src/components/outliner/OutlinerItem.tsx` | 搜索节点渲染 + 结果展示 |
-| **修改** | `src/components/outliner/BulletChevron.tsx` | 搜索节点放大镜 bullet |
+| **修改** | `src/components/outliner/BulletChevron.tsx` | `isSearch` 放大镜 bullet |
+| **修改** | `src/components/outliner/OutlinerItem.tsx` | `isSearchResult` prop + 搜索节点识别 |
 | **修改** | `src/components/outliner/OutlinerView.tsx` | 搜索结果渲染分支 |
-| **修改** | `src/components/editor/NodeEditor.tsx` | `?` 触发处理 |
-| **修改** | `src/entrypoints/test/seed-data.ts` | 添加搜索节点种子数据 |
-| **修改** | `src/hooks/use-node-search.ts` | 搜索结果中跳过 `type: 'search'` |
+| **修改** | `src/hooks/use-node-search.ts` | SKIP_DOC_TYPES 加 `queryCondition`, `search` |
+| **修改** | `src/entrypoints/test/seed-data.ts` | 搜索节点种子数据 |
+| **修改** | 编辑器触发相关文件 | `?` 触发处理（具体文件开发时确认） |
 
 ### ⚠️ 高风险文件
 
 | 文件 | 风险 | 注意事项 |
 |------|------|---------|
-| `OutlinerItem.tsx` | 高 | 核心渲染组件，需在 TASKS.md 声明文件锁 |
-| `node-store.ts` | 高 | 状态管理核心，需声明文件锁 |
-| `BulletChevron.tsx` | 中 | 新增 prop，影响面小 |
-
----
-
-## 开放问题（开发时决策）
-
-| # | 问题 | 建议 | 决策时机 |
-|---|------|------|---------|
-| 1 | `?` 触发是走 slash menu 还是直接弹标签选择器？ | 直接弹标签选择器（与 `#` 行为一致） | Step 3 开始前 |
-| 2 | 搜索节点名称是否可编辑？ | 可编辑（允许用户重命名） | Step 4 |
-| 3 | 搜索结果的排序？ | 按 updatedAt 降序（最近修改在上） | Step 5 |
-| 4 | 搜索结果是否包含回收站内节点？ | 不包含（跳过 TRASH 容器后代） | Step 1 |
-| 5 | 搜索节点自身是否可拖拽/移动？ | 是，与普通节点一致 | Step 4 |
+| `OutlinerItem.tsx` | 高 | 核心渲染，需在 TASKS.md 声明文件锁 |
+| `node-store.ts` | 高 | 状态核心，需声明文件锁 |
+| `OutlinerView.tsx` | 中 | 渲染入口，搜索分支需隔离 |
 
 ---
 
 ## 验收标准
 
-- [ ] `?` 输入触发标签选择 → 创建搜索节点
+- [ ] `?` 输入触发标签选择 → 创建搜索节点（3 节点结构）
 - [ ] 搜索节点显示放大镜 bullet
-- [ ] 展开搜索节点 → 显示所有匹配标签的节点
+- [ ] 展开搜索节点 → 动态显示匹配标签的节点
 - [ ] 多态搜索：搜索父标签包含子标签实例
-- [ ] 结果为引用 bullet 样式，点击 navigateTo 原节点
-- [ ] 添加/删除/修改标签后，搜索结果自动刷新
+- [ ] 结果用 OutlinerItem 渲染：可展开、可编辑、可查看字段
+- [ ] 结果 bullet 为引用样式（⊙）
+- [ ] 节点变更后搜索结果自动刷新
 - [ ] 搜索无结果时显示占位文本
-- [ ] `npm run verify` 通过（typecheck + test-sync + test:run + build）
-- [ ] Standalone 环境下种子数据搜索节点正常工作
+- [ ] `npm run verify` 通过
+- [ ] Standalone 种子数据搜索节点正常工作

@@ -166,25 +166,24 @@ _(空)_
 - **Spec**: `docs/features/references.md`
 
 #### Search Nodes Phase 1 — 单标签搜索 (#23)
-> Phase 1: 最小可用搜索节点。`?` 触发 + 标签搜索引擎 + 搜索结果展示。
-> 原 search-service.ts（Supabase）已删除，需基于 Loro 内存查询重写。
+> 查询配置 = 子节点树（`type: 'queryCondition'`），搜索结果动态计算 + OutlinerItem 渲染（完整交互）。
 > **Owner**: nodex-cc-2 | **Branch**: `cc2/search-nodes`
 > **Spec**: `docs/features/search.md` | **Plan**: `docs/plans/search-nodes-impl.md`
 
-- [ ] Step 1: 搜索引擎 `search-engine.ts`（searchByTag + collectTagHierarchy + 多态搜索）
-- [ ] Step 2: `createSearchNode()` in node-store.ts
-- [ ] Step 3: `?` 触发（启用 slash command + 标签选择器）
-- [ ] Step 4: OutlinerItem 搜索节点渲染（放大镜 bullet）
-- [ ] Step 5: 搜索结果动态展示（useSearchResults hook + 引用 bullet）
-- [ ] Step 6: Seed data + 集成验证
-- [ ] Step 7: 文档同步
+- [ ] Step 1: 类型定义（`queryCondition` NodeType + 查询属性 + loro-doc 读写）
+- [ ] Step 2: 搜索引擎 `search-engine.ts`（条件树递归评估 + 多态标签搜索）
+- [ ] Step 3: `createSearchNode()` — 创建 3 节点（search + AND group + HAS_TAG）
+- [ ] Step 4: `?` 触发（启用 slash command + 标签选择器）
+- [ ] Step 5: 搜索节点渲染（BulletChevron 放大镜 bullet）
+- [ ] Step 6: 搜索结果渲染（useSearchResults hook + OutlinerView 搜索分支 + OutlinerItem isSearchResult）
+- [ ] Step 7: Seed data + 集成验证
+- [ ] Step 8: 文档同步
 
 **Phase 2 待办**（本次不做）：
-- [ ] Query Builder 面板（可折叠，条件编辑）
-- [ ] AND / OR / NOT 逻辑组合
-- [ ] 字段值过滤
+- [ ] Query Builder 面板（渲染/编辑条件子节点树）
+- [ ] AND / OR / NOT 逻辑组合 UI
+- [ ] 字段值过滤（FIELD_EQUALS / DEFINED / NOT_DEFINED）
 - [ ] TODO / DONE 关键词过滤
-- [ ] 搜索条件迁移到 Tuple 树
 - [ ] 搜索结果配合视图展示
 
 #### Table View (#24)

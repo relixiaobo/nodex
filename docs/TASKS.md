@@ -43,11 +43,12 @@ _(空)_
 - [x] 实现统一时间线（structural/nav/expand）并保留现有主干修复
 - [x] 修复 Loro pending write 导致的 redo 错位（含 detached guard）
 - [x] 补/改回归测试（键盘路由、timeline、pending write）
-- [ ] 关闭 PR #89 并在评论中链接替代 PR
+- [x] 关闭 PR #89 并在评论中链接替代 PR
 
 **迭代日志**
 - [2026-02-24 nodex-codex] 用户要求接管 PR #89。已确认 PR #89 净 diff 混入 sync/backlinks/reference-navigation 等无关回退，决定从 `origin/main` 新开分支重做 undo/redo 修复，避免继续在长期分支上清理历史包袱。
 - [2026-02-24 nodex-codex] 新建替代 Draft PR #90（`codex/undo-redo-pr89-takeover`）；实现 `undo-timeline` 索引层（structural/nav/expand）+ PM keymap fallback + `undoDoc/redoDoc` 前 `system:flush-before-undo`（经 `commitDoc` guard）；补 23 个 `undo-timeline` 用例并验证 `nav-undo-keyboard` / `ui-store` 相关用例通过。
+- [2026-02-24 nodex-codex] 已关闭 PR #89，并在关闭评论中标注由 #90 接管；后续 review 与修复集中在 #90，避免长期分支混入的无关回退继续干扰。
 
 ### Inline reference 内容节点误显示虚线 bullet（pending-conversion UI 误判）+ 移除 outliner 引用次数数字
 > 场景：同父节点已存在目标 child 时，`@` 会回退为 inline reference（普通内容节点 + inline ref），但该节点 bullet 仍显示虚线引用壳样式；同时用户希望移除 outliner 行尾显示的引用次数数字（backlink count badge），简化视觉层级。

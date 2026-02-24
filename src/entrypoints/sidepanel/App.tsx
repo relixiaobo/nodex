@@ -8,7 +8,7 @@ import { TopToolbar } from '../../components/toolbar/TopToolbar';
 import { PanelStack } from '../../components/panel/PanelStack';
 import { CommandPalette } from '../../components/search/CommandPalette';
 import { CONTAINER_IDS } from '../../types/index.js';
-import { initLoroDoc } from '../../lib/loro-doc.js';
+import { initLoroDoc, commitDoc } from '../../lib/loro-doc.js';
 import * as loroDoc from '../../lib/loro-doc.js';
 import { ensureWorkspaceHomeNode } from '../../lib/workspace-root.js';
 import { getOrCreateDefaultWorkspaceId } from '../../lib/workspace-id.js';
@@ -39,6 +39,11 @@ async function seedWorkspace(wsId: string): Promise<void> {
   }
 
   ensureJournalTagDefs();
+
+  // Flush all bootstrap ops under a system origin so they are excluded from
+  // the undo stack.  Without this, pending ops from container creation could
+  // leak into the first user-initiated commitUIMarker → commitDoc('user:ui').
+  commitDoc('system:bootstrap');
 }
 
 interface BootstrapResult {
@@ -51,7 +56,7 @@ function useBootstrap(skip: boolean): BootstrapResult {
   const setWorkspace = useWorkspaceStore((s) => s.setWorkspace);
   const setUser = useWorkspaceStore((s) => s.setUser);
   const panelHistory = useUIStore((s) => s.panelHistory);
-  const navigateTo = useUIStore((s) => s.navigateTo);
+  const replacePanel = useUIStore((s) => s.replacePanel);
 
   const initCalled = useRef(false);
 
@@ -100,11 +105,14 @@ function useBootstrap(skip: boolean): BootstrapResult {
       }
 
       // Navigate to Library if panel stack is empty or current panel node is invalid.
+      // Use replacePanel (not navigateTo) to avoid creating a Loro undo entry
+      // whose captured UI snapshot is the empty initial state — that would cause
+      // repeated Cmd+Z to restore a blank panel stack.
       const latestHistory = useUIStore.getState().panelHistory;
       const latestIndex = useUIStore.getState().panelIndex;
       const currentPanelId = latestHistory[latestIndex] ?? latestHistory[latestHistory.length - 1];
       if (latestHistory.length === 0 || (currentPanelId && !loroDoc.hasNode(currentPanelId))) {
-        navigateTo(CONTAINER_IDS.LIBRARY);
+        replacePanel(CONTAINER_IDS.LIBRARY);
       }
 
       setReady(true);

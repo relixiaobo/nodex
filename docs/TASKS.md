@@ -40,9 +40,9 @@ _(空)_
 > **Owner**: nodex-cc | **Branch**: `cc/undo-redo-fixes`
 > **Spec**: `docs/features/undo-redo.md`
 
-- [ ] Bug 1: 连续 ⌘Z 回退到空白状态（页面只剩 "Press ⌘K to search"）— 应在到达初始状态时停止回退，不能 undo 到空面板
-- [ ] Bug 2: 焦点不在 node 编辑器中时，⌘Z 无法撤回展开/收起操作（点击 chevron 或引导线后焦点丢失到 sink textarea，但 undo 未生效）
-- [ ] Bug 3: 点击节点 bullet 进入 NodePanel（zoom-in 导航）后，⌘Z 无法返回上一个面板 — 导航应通过 commitUIMarker 进入 undo 栈
+- [x] Bug 1: 连续 ⌘Z 回退到空白状态 — 根因：bootstrap `navigateTo` 创建 undo 条目，快照为空 panelHistory。修复：改用 `replacePanel` + `commitDoc('system:bootstrap')` + restore 防御空 panelHistory。
+- [ ] Bug 2: 焦点不在 node 编辑器中时，⌘Z 无法撤回展开/收起操作（点击 chevron 或引导线后焦点丢失到 sink textarea，但 undo 未生效）— Side Panel 实测正常，暂跳过
+- [x] Bug 3: 点击节点 bullet 进入 NodePanel 后 ⌘Z 无法返回 — 根因：`seedTestData` 异步路径未调 `clearUndoHistoryForTest()`，`applyTag` 内部 `commitDoc('user:implicit')` 污染 undo 栈。修复：补 `clearUndoHistoryForTest()` + seed 改用 `skipUndo/replacePanel`。
 
 ---
 

@@ -8,12 +8,14 @@ import { useEffect, useState } from 'react';
 import { useWorkspaceStore } from '../src/stores/workspace-store';
 import { useUIStore } from '../src/stores/ui-store';
 import { useNodeStore } from '../src/stores/node-store';
+import { useNavUndoKeyboard } from '../src/hooks/use-nav-undo-keyboard';
 import { useGlobalSelectionDismiss } from '../src/hooks/use-global-selection-dismiss.js';
 import { TopToolbar } from '../src/components/toolbar/TopToolbar';
 import { PanelStack } from '../src/components/panel/PanelStack';
 import { CommandPalette } from '../src/components/search/CommandPalette';
 import { CONTAINER_IDS } from '../src/types/index.js';
 import { seedTestData } from '../src/entrypoints/test/seed-data';
+import * as loroDoc from '../src/lib/loro-doc.js';
 
 /** Map port -> agent identity for visual differentiation */
 const AGENT_BY_PORT: Record<string, { name: string; color: string }> = {
@@ -31,23 +33,26 @@ function getAgentInfo() {
 function useTestBootstrap(): boolean {
   const [ready, setReady] = useState(false);
   const panelHistory = useUIStore((s) => s.panelHistory);
-  const navigateTo = useUIStore((s) => s.navigateTo);
+  const replacePanel = useUIStore((s) => s.replacePanel);
 
   useEffect(() => {
     async function init() {
       // Initialize LoroDoc + seed test data (async: loads IndexedDB snapshot if any)
       await seedTestData({ forceFresh: true });
 
-      // Navigate to Library if no panel open
+      // Navigate to Library if no panel open.
+      // Use replacePanel (not navigateTo) to avoid creating a Loro undo entry
+      // whose UI snapshot is the empty initial state (Bug 1 fix).
       if (panelHistory.length === 0) {
-        navigateTo(CONTAINER_IDS.LIBRARY);
+        replacePanel(CONTAINER_IDS.LIBRARY);
       }
 
-      // Expose stores on window for MCP/DevTools console testing
+      // Expose stores + loro-doc on window for MCP/DevTools console testing
       Object.assign(window, {
         __nodeStore: useNodeStore,
         __uiStore: useUIStore,
         __wsStore: useWorkspaceStore,
+        __loroDoc: loroDoc,
       });
 
       const agent = getAgentInfo();
@@ -65,6 +70,9 @@ function useTestBootstrap(): boolean {
 export function TestApp() {
   const ready = useTestBootstrap();
   const selectionDismissHandlers = useGlobalSelectionDismiss();
+
+  // Global Cmd+Z / Cmd+Shift+Z for unified Loro undo/redo (parity with App.tsx)
+  useNavUndoKeyboard();
 
   if (!ready) {
     return (

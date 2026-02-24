@@ -216,6 +216,9 @@ function handleUndo(e: KeyboardEvent) {
 | 2026-02-23 | **移除 ProseMirror History，文本 undo 由 Loro 接管** | ProseMirror History 是独立于 Loro 的第二个 undo 栈，阻碍统一 |
 | 2026-02-23 | **UI 状态通过 Loro marker commit + onPush/onPop 元数据实现** | 不污染数据模型，不自建 undo 栈，复用 Loro 基础设施 |
 | 2026-02-23 | **以 Workflowy 为标杆（非 Tana）** | Tana undo 弱于 Nodex 当前实现；Workflowy 是统一时间线的业界最佳实践 |
+| 2026-02-24 | **Bootstrap 用 replacePanel 不用 navigateTo** | navigateTo 会创建 Loro undo 条目，其快照为空 panelHistory → 连续 ⌘Z 导致白屏 |
+| 2026-02-24 | **restore 回调防御空 panelHistory** | 即使 undo 栈中泄露了空快照，也不实际应用 |
+| 2026-02-24 | **seedWorkspace 末尾 commitDoc('system:bootstrap')** | 防止容器创建 pending ops 泄入后续 user-origin commit |
 
 ## 参考
 

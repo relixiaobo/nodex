@@ -123,7 +123,26 @@ function focusTrailingInputForParent(parentId: string): boolean {
 }
 
 function focusUndoShortcutSink(): void {
-  const el = document.getElementById('undo-shortcut-sink');
+  let el = document.getElementById('undo-shortcut-sink');
+  if (!(el instanceof HTMLTextAreaElement)) {
+    const created = document.createElement('textarea');
+    created.id = 'undo-shortcut-sink';
+    created.dataset.undoShortcutSink = 'true';
+    created.tabIndex = -1;
+    created.readOnly = true;
+    created.setAttribute('aria-hidden', 'true');
+    created.style.position = 'fixed';
+    created.style.left = '0';
+    created.style.top = '0';
+    created.style.width = '1px';
+    created.style.height = '1px';
+    created.style.opacity = '0';
+    created.style.pointerEvents = 'none';
+    created.style.zIndex = '-1';
+    document.body.appendChild(created);
+    el = created;
+    console.debug('[undo-debug] focusUndoShortcutSink:created');
+  }
   if (!(el instanceof HTMLTextAreaElement)) {
     console.debug('[undo-debug] focusUndoShortcutSink:missing', {
       found: !!el,

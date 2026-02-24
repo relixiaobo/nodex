@@ -324,7 +324,7 @@ export const useUIStore = create<UIStore>()(
       searchOpen: false,
       searchQuery: '',
       openSearch: () => set({ searchOpen: true }),
-      closeSearch: () => set({ searchOpen: false, searchQuery: '' }),
+      closeSearch: () => set({ searchOpen: false }),
       setSearchQuery: (query) => set({ searchQuery: query }),
 
       // Drag and drop

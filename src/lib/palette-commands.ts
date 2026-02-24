@@ -22,15 +22,21 @@ import { COMMAND_PALETTE_QUICK_CONTAINERS } from './system-node-registry.js';
 import { ensureTodayNode } from './journal.js';
 import { t } from '../i18n/strings.js';
 
-export type PaletteItemType = 'node' | 'container' | 'command';
+export type PaletteItemType = 'node' | 'container' | 'command' | 'create';
 
 export interface PaletteItem {
   id: string;
   label: string;
-  icon: AppIcon;
+  icon?: AppIcon;
   type: PaletteItemType;
   subtitle?: string;
   score?: number;
+  /** Tag-derived bullet colors for node items (colored dot like outliner). */
+  bulletColors?: string[];
+  /** TagDef color — renders colored # hash instead of bullet. */
+  tagDefColor?: { text: string; bg: string };
+  /** Override the default TYPE_LABELS display (e.g. "Tag", "Field"). */
+  typeLabel?: string;
   action: () => void;
 }
 
@@ -113,8 +119,9 @@ export function getAllCommands(ctx: CommandContext): PaletteCommand[] {
 export function getActionLabel(type: PaletteItemType): string {
   switch (type) {
     case 'node': return 'Open';
-    case 'container': return 'Navigate';
+    case 'container': return 'Open';
     case 'command': return 'Run';
+    case 'create': return 'Create';
     default: return 'Open';
   }
 }

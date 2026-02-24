@@ -30,12 +30,17 @@ interface KbdProps {
 const MODIFIER_CHARS = new Set(['\u2318', '\u21E7', '\u2325', '\u2303']); // ⌘ ⇧ ⌥ ⌃
 
 /**
- * Per-glyph vertical offset corrections (in px).
- * Unicode modifier symbols have inconsistent baselines across fonts —
- * these nudges visually center each glyph within its cell.
+ * Per-glyph style adjustments.
+ * Modifier symbols are rendered lighter (font-normal) and slightly larger
+ * so their visual weight matches iconoir's thin 1.5px stroke style,
+ * while letter keys stay medium-weight for readability.
  */
-const GLYPH_Y_OFFSET: Record<string, number> = {
-  '\u21E7': -1, // ⇧ shift arrow sits too low
+const MODIFIER_STYLE = 'font-normal text-[12px] font-[system-ui]';
+const GLYPH_STYLE: Record<string, { y?: number; cls?: string }> = {
+  '\u2318': { cls: MODIFIER_STYLE },                  // ⌘ — system font, lighter, bigger
+  '\u21E7': { y: -0.5, cls: MODIFIER_STYLE },         // ⇧ — nudge up
+  '\u2325': { cls: MODIFIER_STYLE },                   // ⌥
+  '\u2303': { cls: MODIFIER_STYLE },                   // ⌃
 };
 
 function splitShortcut(shortcut: string): string[] {
@@ -58,7 +63,7 @@ function splitShortcut(shortcut: string): string[] {
   return parts;
 }
 
-const KBD_BASE = 'inline-flex h-5 min-w-5 items-center justify-center rounded-md bg-foreground/[0.06] px-1 text-[10px] font-medium text-foreground-tertiary';
+const KBD_BASE = 'inline-flex h-5 min-w-5 items-center justify-center rounded-md bg-foreground/[0.06] px-1 text-[11px] font-medium text-foreground-tertiary';
 
 export function Kbd({ keys, children, onClick, className = '' }: KbdProps) {
   const interactive = onClick ? 'cursor-pointer hover:bg-foreground/10 hover:text-foreground-secondary' : '';
@@ -72,12 +77,12 @@ export function Kbd({ keys, children, onClick, className = '' }: KbdProps) {
         className={`${KBD_BASE} gap-px ${interactive} ${className}`}
       >
         {parts.map((part, i) => {
-          const yOffset = GLYPH_Y_OFFSET[part];
+          const gs = GLYPH_STYLE[part];
           return (
             <span
               key={i}
-              className="inline-flex w-[1em] items-center justify-center"
-              style={yOffset ? { transform: `translateY(${yOffset}px)` } : undefined}
+              className={`inline-flex w-[1em] items-center justify-center ${gs?.cls ?? ''}`}
+              style={gs?.y ? { transform: `translateY(${gs.y}px)` } : undefined}
             >
               {part}
             </span>

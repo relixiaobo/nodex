@@ -5,7 +5,6 @@
  * To switch icon libraries, only change this file.
  *
  * Current library: lucide-react
- * Alternative: iconoir-react (map names manually)
  */
 
 // ─── Type ───────────────────────────────────────────────────────────────────

@@ -26,7 +26,7 @@
     "defuddle": "^0.6.6",
     "immer": "^10.1.1",
     "loro-crdt": "^1.10.6",
-    "lucide-react": "^0.563.0",
+    "lucide-react": "^0.575.0",
     "nanoid": "^5.1.6",
     "prosemirror-commands": "^1.7.1",
     "prosemirror-history": "^1.5.0",

@@ -144,7 +144,7 @@ src/
       CommandPalette.tsx   # ⌘K 命令面板 (Raycast 风格, fuzzy search + 命令注册表)
     toolbar/               # 顶栏 (替代已移除的 Sidebar)
       TopToolbar.tsx       # 顶栏布局 ([←][→] [🔍 Search ⌘K] [●🧑])
-      UndoRedoButtons.tsx  # Undo/Redo 占位 (待 #44 集成)
+      UndoRedoButtons.tsx  # Undo/Redo 按钮 (调用 Loro undoDoc/redoDoc)
       SearchTrigger.tsx    # 搜索触发器 (假输入框, 点击打开 CommandPalette)
       SyncDot.tsx          # 同步状态圆点
       ToolbarUserMenu.tsx  # 用户头像 + 下拉菜单
@@ -157,6 +157,7 @@ src/
   hooks/
     use-node.ts            # 订阅单节点 + 懒加载
     use-children.ts        # 订阅子节点列表 + 懒加载
+    use-nav-undo-keyboard.ts  # 全局 ⌘Z/⌘⇧Z 键盘处理 (非编辑态 → Loro undoDoc/redoDoc)
     use-realtime.ts        # Supabase Realtime 订阅
   stores/
     node-store.ts          # 归一化节点实体 (immer, 乐观更新, 含树操作)

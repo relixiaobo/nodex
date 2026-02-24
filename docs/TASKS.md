@@ -29,43 +29,11 @@ _(空)_
 |-------|---------|------|-------------|
 | nodex-cc | _(idle)_ | — | — |
 | nodex-cc-2 | _(idle)_ | — | — |
-| nodex-codex | 统一时间线 Undo/Redo (#44) — Loro-only 最终方案接管 | `codex/unified-undo-loro-only` | `src/lib/loro-doc.ts`, `src/components/editor/RichTextEditor.tsx`, `src/hooks/use-nav-undo-keyboard.ts`, `src/stores/ui-store.ts`, `src/components/outliner/OutlinerItem.tsx`, `src/components/editor/TrailingInput.tsx`, `tests/vitest/loro-undo.test.ts`, `docs/features/undo-redo.md`, `docs/TESTING.md`, `docs/TASKS.md` |
+| nodex-codex | _(idle)_ | — | — |
 
 ---
 
 ## 进行中
-
-### 统一时间线 Undo/Redo (#44) — Loro-only 最终方案接管
-> 背景：用户明确要求跳过过渡方案，直接彻底消除频繁 `Cmd+Z/Cmd+Shift+Z` 体感混乱。由 nodex-codex 接管 `#44`，从 `origin/main` 新分支实施 Loro-only 统一时间线（文本/结构/导航/展开折叠单一路径）。
-> **Owner**: nodex-codex | **Branch**: `codex/unified-undo-loro-only` | **Files**: `src/lib/loro-doc.ts`, `src/stores/node-store.ts`, `src/components/editor/RichTextEditor.tsx`, `src/hooks/use-nav-undo-keyboard.ts`, `src/stores/ui-store.ts`, `tests/vitest/*undo*.test.ts`, `docs/features/undo-redo.md`, `docs/TASKS.md`
-
-- [x] 从 `origin/main` 新建干净分支并创建最终方案 Draft PR
-- [x] 接管 `#44`（TASKS Owner/Branch 同步 + 旧分支状态冻结）
-- [x] 设计并实现 Loro-only 单一路径 undo/redo（移除 PM History 主导）
-- [x] 文本编辑实时进入 Loro UndoManager（mergeInterval 语义验证）
-- [x] 导航/展开折叠并入同一时间线（最终方案，不保留过渡双栈体感差异）
-- [ ] 全量回归与文档同步（`undo-redo.md` / `TESTING.md`）
-
-**迭代日志**
-- [2026-02-24 nodex-codex] 用户确认跳过过渡方案，直接实施 `#44` Loro-only 最终方案；计划保留 PR #90 作为 backup（Draft / do-not-merge），从 `origin/main` 新开干净分支重做。
-- [2026-02-24 nodex-codex] 已创建最终方案 Draft PR #91（`codex/unified-undo-loro-only`）；并在 #90 留言标注 backup/do-not-merge，避免过渡方案误合并。
-- [2026-02-24 nodex-codex] 已切换核心路径到 Loro-only：移除 `RichTextEditor` 的 `prosemirror-history`，编辑器 keymap 与全局非编辑态键盘入口统一调用 `undoDoc/redoDoc`；`ui-store` 通过 `commitUIMarker()` + UndoManager `onPush/onPop` 恢复导航/展开状态，并为程序性展开补 `skipUndo`；补 `loro-undo.test.ts` 覆盖导航/展开 UI marker undo/redo 与 `skipUndo`。
-- [2026-02-24 nodex-codex] 修复展开/收起后编辑器焦点丢失导致 `Cmd+Z` 无法立即撤销：在 chevron/缩进线 `pointerdown` 捕获结构操作前的焦点快照，`handleBlur` 跳过该场景的延迟清焦点，展开/收起后恢复原编辑器焦点（必要时 fallback）。已本地验证用户复现场景通过；`typecheck`/`build` 通过，`test:run` 仅剩无关失败 `tests/vitest/journal.test.ts`（既有失败）。 
-
-### PR #89 接管修复：Cmd+Z/Cmd+Shift+Z 混乱（统一时间线 + pending Loro flush）
-> 背景：PR #89（`cc2/references`）混入大量无关改动与主干回退，且多轮修复后仍存在 undo/redo 语义混乱。改为由 nodex-codex 从 `origin/main` 新开干净分支重做，仅保留 undo/redo 相关修复（统一时间线、expand/collapse undo、Loro pending write flush、防回归测试）。
-> **Owner**: nodex-codex | **Branch**: `codex/undo-redo-pr89-takeover` | **Files**: `src/lib/undo-timeline.ts`, `src/lib/loro-doc.ts`, `src/stores/ui-store.ts`, `src/hooks/use-nav-undo-keyboard.ts`, `src/components/editor/RichTextEditor.tsx`, `standalone/TestApp.tsx`, `tests/vitest/undo-timeline.test.ts`, `tests/vitest/nav-undo-keyboard.test.ts`, `docs/features/undo-redo.md`, `docs/TESTING.md`, `docs/TASKS.md` | **Status**: Backup Draft PR #90（do-not-merge，供回滚/对照）
-
-- [x] 从 `origin/main` 新建干净分支并创建替代 Draft PR
-- [x] 实现统一时间线（structural/nav/expand）并保留现有主干修复
-- [x] 修复 Loro pending write 导致的 redo 错位（含 detached guard）
-- [x] 补/改回归测试（键盘路由、timeline、pending write）
-- [x] 关闭 PR #89 并在评论中链接替代 PR
-
-**迭代日志**
-- [2026-02-24 nodex-codex] 用户要求接管 PR #89。已确认 PR #89 净 diff 混入 sync/backlinks/reference-navigation 等无关回退，决定从 `origin/main` 新开分支重做 undo/redo 修复，避免继续在长期分支上清理历史包袱。
-- [2026-02-24 nodex-codex] 新建替代 Draft PR #90（`codex/undo-redo-pr89-takeover`）；实现 `undo-timeline` 索引层（structural/nav/expand）+ PM keymap fallback + `undoDoc/redoDoc` 前 `system:flush-before-undo`（经 `commitDoc` guard）；补 23 个 `undo-timeline` 用例并验证 `nav-undo-keyboard` / `ui-store` 相关用例通过。
-- [2026-02-24 nodex-codex] 已关闭 PR #89，并在关闭评论中标注由 #90 接管；后续 review 与修复集中在 #90，避免长期分支混入的无关回退继续干扰。
 
 ### Inline reference 内容节点误显示虚线 bullet（pending-conversion UI 误判）+ 移除 outliner 引用次数数字
 > 场景：同父节点已存在目标 child 时，`@` 会回退为 inline reference（普通内容节点 + inline ref），但该节点 bullet 仍显示虚线引用壳样式；同时用户希望移除 outliner 行尾显示的引用次数数字（backlink count badge），简化视觉层级。
@@ -169,16 +137,13 @@ _(空)_
 
 #### 统一时间线 Undo/Redo (#44)
 > 目标：Workflowy 水平的统一 undo — ⌘Z 永远撤销「上一步」，覆盖所有用户操作。
-> 替换当前三栈 fallthrough（ProseMirror History → Loro UndoManager → navUndoStack）为 Loro UndoManager 单一时间线。
-> **Owner**: nodex-codex（2026-02-24 接管） | **Branch**: `codex/unified-undo-loro-only`
+> Loro UndoManager 单一时间线。核心路径已完成（PR #91）。
 > **Spec**: `docs/features/undo-redo.md` | **Plan**: `docs/plans/unified-undo.md` | **Research**: `docs/research/tana-undo-redo-analysis.md`
->
-> 已完成基础：结构操作撤销（Loro UndoManager）、文本撤销（ProseMirror History，待替换）、导航撤销（navUndoStack，待合入）
 
+- [x] Phase 2: ProseMirror → Loro 实时同步 + 移除 `prosemirror-history` ✓ PR #91
+- [x] Phase 3: UI 状态 marker commit（展开/折叠 + 导航进入 Loro undo 栈）✓ PR #91
+- [x] Phase 4: 统一 ⌘Z handler + 删除旧代码（navUndoStack / 三层 fallthrough / PM History）✓ PR #91
 - [ ] Phase 1: 补全 commitDoc() 覆盖（applyTag / removeTag / setFieldValue / toggleCheckbox 所有路径）
-- [ ] Phase 2: ProseMirror → Loro 实时同步 + 移除 `prosemirror-history` + UndoManager onPush/onPop 回调
-- [ ] Phase 3: UI 状态 marker commit（展开/折叠 + 导航进入 Loro undo 栈）
-- [ ] Phase 4: 统一 ⌘Z handler + 删除旧代码（navUndoStack / 三层 fallthrough / PM History）
 
 #### Side Panel 布局改造 — 移除 Sidebar + ⌘K 重设计
 > Phase 1/2/4 已完成（PR #88）。Phase 3（Undo/Redo 按钮集成）待 #44 完成后执行。
@@ -186,7 +151,7 @@ _(空)_
 
 - [x] Phase 1: 顶栏骨架 + 移除 Sidebar ✓ PR #88
 - [x] Phase 2: ⌘K 命令面板重写 ✓ PR #88
-- [ ] Phase 3: Undo/Redo 按钮集成（依赖 #44）
+- [ ] Phase 3: Undo/Redo 按钮集成（#44 核心已完成，可执行）
 - [x] Phase 4: 清理废弃文件 ✓ PR #88
 
 #### 节点选中 — 后续增强 (#47)
@@ -302,6 +267,7 @@ _(空)_
 
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
+| 2026-02-24 | 统一时间线 Undo/Redo — Loro-only 单一路径（PM History 移除 + UI marker commit + onPush/onPop 状态快照 + 焦点恢复 sink textarea） | nodex-codex | #91 |
 | 2026-02-24 | Side Panel 布局改造 Phase 1/2/4 — TopToolbar + ⌘K CommandPalette Raycast 风格重写 + Sidebar/SidebarNav/SyncStatusIndicator/UserMenu 移除 + Kbd 组件 + fuzzy-search + palette-commands | nodex-cc | #88 |
 | 2026-02-23 | Staging + Production 双环境部署 — D1/Worker/Secrets/Google OAuth + HTTPS cookie 前缀修复 | nodex | — |
 | 2026-02-23 | Inline ref fallback 虚线 bullet 修复 + outliner backlink count badge 移除 | nodex-codex | #87 |

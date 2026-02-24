@@ -960,6 +960,8 @@ npm run dev                # 启动 wrangler dev (localhost:8787)
 14. 程序性 `setExpanded(..., skipUndo=true)` 不创建 Loro undo step
 15. **Bug 1 回归**: `replacePanel` bootstrap + 多次 `navigateTo` → 连续 `undoDoc()` → panelHistory 不为空，停在初始面板
 16. **Bug 1 回归**: restore 回调接收空 panelHistory 快照时不应用（防御性守卫）
+17. **Bug 3 焦点**: 导航后 `ensureUndoFocusAfterNavigation()` 同步聚焦 sink — Chrome Side Panel 不拦截 ⌘Z
+18. **Bug 3 TrailingInput**: 无子节点 zoom-in → TrailingInput autoFocus → `Mod-z` keymap 触发 `undoDoc()`
 
 **设计要点**:
 - `seedTestDataSync` 在 `seedBody()` 后调用 `commitDoc('__seed__')`，被 UndoManager 的 `excludeOriginPrefixes` 过滤

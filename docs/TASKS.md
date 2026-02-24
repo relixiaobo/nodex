@@ -40,9 +40,9 @@ _(空)_
 > **Owner**: nodex-cc | **Branch**: `cc/undo-redo-fixes`
 > **Spec**: `docs/features/undo-redo.md`
 
-- [x] Bug 1: 连续 ⌘Z 回退到空白状态 — 根因：bootstrap `navigateTo` 创建 undo 条目，快照为空 panelHistory。修复：改用 `replacePanel` + `commitDoc('system:bootstrap')` + restore 防御空 panelHistory。
+- [x] Bug 1: 连续 ⌘Z 回退到空白状态 — 根因：bootstrap `navigateTo` 创建 undo 条目，快照为空 panelHistory。修复：改用 `replacePanel` + `commitDoc('system:bootstrap')` + restore 防御空 panelHistory。(PR #92)
 - [ ] Bug 2: 焦点不在 node 编辑器中时，⌘Z 无法撤回展开/收起操作（点击 chevron 或引导线后焦点丢失到 sink textarea，但 undo 未生效）— Side Panel 实测正常，暂跳过
-- [x] Bug 3: 点击节点 bullet 进入 NodePanel 后 ⌘Z 无法返回 — 根因：`seedTestData` 异步路径未调 `clearUndoHistoryForTest()`，`applyTag` 内部 `commitDoc('user:implicit')` 污染 undo 栈。修复：补 `clearUndoHistoryForTest()` + seed 改用 `skipUndo/replacePanel`。
+- [x] Bug 3: 点击节点 bullet 进入 NodePanel 后 ⌘Z 无法返回 — 根因：(a) seed 路径污染 undo 栈 (PR #92)；(b) 导航后焦点落到 body，Side Panel 拦截 ⌘Z；(c) 无子节点时 TrailingInput autoFocus 抢焦点但无 Mod-z 绑定。修复：提取 `focusUndoShortcutSink` 到 `src/lib/focus-utils.ts`，导航后同步聚焦 sink + TrailingInput 补 Mod-z keymap。
 
 ---
 
@@ -270,6 +270,7 @@ _(空)_
 
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
+| 2026-02-24 | Undo/Redo Bug 1+3 修复 — bootstrap replacePanel + seed clearUndoHistory + 导航后 sink 聚焦 + TrailingInput Mod-z | nodex-cc + nodex | #92 + main |
 | 2026-02-24 | 统一时间线 Undo/Redo — Loro-only 单一路径（PM History 移除 + UI marker commit + onPush/onPop 状态快照 + 焦点恢复 sink textarea） | nodex-codex | #91 |
 | 2026-02-24 | Side Panel 布局改造 Phase 1/2/4 — TopToolbar + ⌘K CommandPalette Raycast 风格重写 + Sidebar/SidebarNav/SyncStatusIndicator/UserMenu 移除 + Kbd 组件 + fuzzy-search + palette-commands | nodex-cc | #88 |
 | 2026-02-23 | Staging + Production 双环境部署 — D1/Worker/Secrets/Google OAuth + HTTPS cookie 前缀修复 | nodex | — |

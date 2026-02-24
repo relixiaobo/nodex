@@ -123,8 +123,6 @@ function focusTrailingInputForParent(parentId: string): boolean {
   return false;
 }
 
-// focusUndoShortcutSink imported from ../../lib/focus-utils.js
-
 function focusRowUndoTarget(row: HTMLElement | null): void {
   const editor = row?.querySelector<HTMLElement>('.ProseMirror');
   if (editor) {

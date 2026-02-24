@@ -56,7 +56,9 @@ export function useNavUndoKeyboard() {
       }
     }
 
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
+    // Capture phase so row-level / feature-specific document key handlers can't swallow
+    // Cmd+Z before unified undo gets a chance to run.
+    document.addEventListener('keydown', handler, true);
+    return () => document.removeEventListener('keydown', handler, true);
   }, []);
 }

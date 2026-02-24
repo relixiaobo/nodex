@@ -34,9 +34,14 @@ function captureCurrentPage(): WebClipCapturePayload {
 
 export default defineContentScript({
   matches: ['<all_urls>'],
+  registration: 'runtime',
   runAt: 'document_idle',
 
   main() {
+    // Guard: prevent duplicate listener when executeScript runs multiple times
+    if ((globalThis as any).__nodexCaptureInstalled) return;
+    (globalThis as any).__nodexCaptureInstalled = true;
+
     chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       if (message?.type !== WEBCLIP_CAPTURE_PAGE) return;
 

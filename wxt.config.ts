@@ -11,8 +11,9 @@ export default defineConfig({
     // Fixed dev extension ID — derived from the public key below.
     // Production ID will be assigned by Chrome Web Store.
     key: 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAtYC0NMuvk5vqBuUJkpg2TU0D3/MHDEZjSppYfA/+cz4dwneFh9BDiFxdoJNa/znyOxmza03rA5eXWdwPH1pW3VEA5vwlLQOEVyS2vnoqNzMnewfvzxT5YLIhlb/hSdA4FG0cvYpAWZSV0RcthyQgq4wJ1YEcB6LfkuBk/2AHeiir3n9R7h23Bn7xWVFzqgeT4CnFA3gOo3Q05/YWC9V7sS4QIndo8NF9B15lctbnCV7wpAs5QTCuIkM60eARZnJFc1DmmbldEbP06aEI4iPT7XVlLG6D+bMaf0R/uzi9A/4Juc6L6hs4qg12tga0R8poHUcRGd/EPF56soHxcU+4gQIDAQAB',
-    permissions: ['storage', 'unlimitedStorage', 'sidePanel', 'activeTab', 'identity'],
+    permissions: ['storage', 'unlimitedStorage', 'sidePanel', 'activeTab', 'identity', 'scripting'],
     host_permissions: [
+      '<all_urls>',                                               // executeScript on any tab
       'http://localhost:8787/*',                                  // local dev
       'https://nodex-sync-staging.getsoma.workers.dev/*',      // staging
       'https://nodex-sync.getsoma.workers.dev/*',              // production

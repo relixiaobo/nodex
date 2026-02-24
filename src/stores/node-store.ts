@@ -52,6 +52,8 @@ interface NodeStore {
   applyTag(nodeId: string, tagDefId: string): void;
   removeTag(nodeId: string, tagDefId: string): void;
   createTagDef(name: string, options?: { showCheckbox?: boolean; color?: string }): NodexNode;
+  /** Ensure node has all template fieldEntries + content clones for its tags. */
+  syncTemplateFields(nodeId: string): void;
 
   // ─── 字段操作 ───
 
@@ -218,6 +220,49 @@ export function applyTagMutationsNoCommit(nodeId: string, tagDefId: string): voi
   // 5. 传播 childSupertag
   const tagDef = loroDoc.toNodexNode(tagDefId);
   void tagDef; // childSupertag 仅在 createChild/createSibling 时处理
+}
+
+/**
+ * Ensure a node has all expected template fieldEntries and content clones
+ * for its current tags. This handles the case where fieldDefs or content
+ * were added to a tagDef AFTER the tag was already applied to the node.
+ *
+ * Returns true if any new items were created (caller should commitDoc).
+ */
+export function syncTemplateMutationsNoCommit(nodeId: string): boolean {
+  const node = loroDoc.toNodexNode(nodeId);
+  if (!node) return false;
+
+  let changed = false;
+  for (const tagDefId of node.tags) {
+    const extendsChain = getExtendsChain(tagDefId);
+
+    // Sync template fieldEntries
+    for (const chainTagId of extendsChain) {
+      const fieldDefs = getTemplateFieldDefs(chainTagId);
+      for (const fdId of fieldDefs) {
+        if (!findFieldEntry(nodeId, fdId)) {
+          const feId = nanoid();
+          loroDoc.createNode(feId, nodeId);
+          loroDoc.setNodeDataBatch(feId, {
+            type: 'fieldEntry',
+            fieldDefId: fdId,
+            templateId: fdId,
+          });
+          changed = true;
+        }
+      }
+    }
+
+    // Sync template content clones (only direct tag, not extends chain)
+    for (const templateNodeId of getTemplateContentNodes(tagDefId)) {
+      if (!findTemplateContentClone(nodeId, templateNodeId)) {
+        cloneTemplateContentNodeShallow(nodeId, templateNodeId);
+        changed = true;
+      }
+    }
+  }
+  return changed;
 }
 
 // ============================================================
@@ -538,6 +583,12 @@ export const useNodeStore = create<NodeStore>((set, get) => {
     applyTag: (nodeId, tagDefId) => {
       applyTagMutationsNoCommit(nodeId, tagDefId);
       loroDoc.commitDoc();
+    },
+
+    syncTemplateFields: (nodeId) => {
+      if (syncTemplateMutationsNoCommit(nodeId)) {
+        loroDoc.commitDoc();
+      }
     },
 
     removeTag: (nodeId, tagDefId) => {

@@ -426,6 +426,16 @@ export function OutlinerItem({
   useChildren(isExpanded && !isCyclicReferenceExpansion ? effectiveNodeId : null);
 
   const tagIds = useNodeTags(effectiveNodeId);
+  const syncTemplateFields = useNodeStore((s) => s.syncTemplateFields);
+
+  // Sync template fieldEntries/content for tagged nodes — handles the case
+  // where fieldDefs were added to tagDef Default content AFTER the tag was applied.
+  useEffect(() => {
+    if (tagIds.length > 0 && isExpanded) {
+      syncTemplateFields(effectiveNodeId);
+    }
+  }, [tagIds, isExpanded, effectiveNodeId, syncTemplateFields]);
+
   const fields = useNodeFields(effectiveNodeId);
   const parentFields = useNodeFields(parentId);
   const parentFieldVisibility = useMemo(() => {
@@ -505,6 +515,25 @@ export function OutlinerItem({
     })
   // eslint-disable-next-line react-hooks/exhaustive-deps
   ), [allChildIds, fieldMap, tagIds, _version]);
+
+  // Template content clone colors: content children with templateId get the owning tagDef's color.
+  // This ensures template-cloned content matches the supertag's bullet color.
+  const templateContentColors = useMemo(() => {
+    const map = new Map<string, string[]>();
+    const getNode = useNodeStore.getState().getNode;
+    for (const { id, type } of visibleChildren) {
+      if (type !== 'content') continue;
+      const child = getNode(id);
+      if (!child?.templateId) continue;
+      const ownerTagDefId = loroDoc.getParentId(child.templateId);
+      if (!ownerTagDefId) continue;
+      if (getNode(ownerTagDefId)?.type !== 'tagDef') continue;
+      const color = resolveTagColor(ownerTagDefId).text;
+      if (color) map.set(id, [color]);
+    }
+    return map;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visibleChildren, _version]);
 
   const childIds = useMemo(
     () => visibleChildren.filter((c) => c.type === 'content').map((c) => c.id),
@@ -2764,6 +2793,7 @@ export function OutlinerItem({
                 parentId={effectiveNodeId}
                 rootNodeId={rootNodeId}
                 referencePath={nextReferencePath}
+                bulletColors={templateContentColors.get(id)}
               />
             );
           })}

@@ -2,13 +2,15 @@ interface ContentDropdownState {
   referenceActive: boolean;
   hashTagActive: boolean;
   slashActive: boolean;
+  searchTriggerActive?: boolean;
 }
 
-type ContentDropdownKind = 'reference' | 'hashtag' | 'slash' | null;
+type ContentDropdownKind = 'reference' | 'hashtag' | 'slash' | 'search_trigger' | null;
 
 function resolveContentDropdownKind(state: ContentDropdownState): ContentDropdownKind {
   if (state.referenceActive) return 'reference';
   if (state.hashTagActive) return 'hashtag';
+  if (state.searchTriggerActive) return 'search_trigger';
   if (state.slashActive) return 'slash';
   return null;
 }
@@ -17,6 +19,7 @@ export type ContentRowEnterIntent =
   | 'reference_confirm'
   | 'hashtag_confirm'
   | 'slash_confirm'
+  | 'search_trigger_confirm'
   | 'create_or_split';
 
 export function resolveContentRowEnterIntent(
@@ -25,6 +28,7 @@ export function resolveContentRowEnterIntent(
   const kind = resolveContentDropdownKind(state);
   if (kind === 'reference') return 'reference_confirm';
   if (kind === 'hashtag') return 'hashtag_confirm';
+  if (kind === 'search_trigger') return 'search_trigger_confirm';
   if (kind === 'slash') return 'slash_confirm';
   return 'create_or_split';
 }
@@ -33,6 +37,7 @@ export type ContentRowArrowIntent =
   | 'reference_nav'
   | 'hashtag_nav'
   | 'slash_nav'
+  | 'search_trigger_nav'
   | 'navigate_outliner'
   | 'allow_default';
 
@@ -46,6 +51,7 @@ export function resolveContentRowArrowIntent(
   const kind = resolveContentDropdownKind(params);
   if (kind === 'reference') return 'reference_nav';
   if (kind === 'hashtag') return 'hashtag_nav';
+  if (kind === 'search_trigger') return 'search_trigger_nav';
   if (kind === 'slash') return 'slash_nav';
   if (params.isAtBoundary) return 'navigate_outliner';
   return 'allow_default';
@@ -55,6 +61,7 @@ export type ContentRowEscapeIntent =
   | 'reference_close'
   | 'hashtag_close'
   | 'slash_close'
+  | 'search_trigger_close'
   | 'select_current';
 
 export function resolveContentRowEscapeIntent(
@@ -63,6 +70,7 @@ export function resolveContentRowEscapeIntent(
   const kind = resolveContentDropdownKind(state);
   if (kind === 'reference') return 'reference_close';
   if (kind === 'hashtag') return 'hashtag_close';
+  if (kind === 'search_trigger') return 'search_trigger_close';
   if (kind === 'slash') return 'slash_close';
   return 'select_current';
 }

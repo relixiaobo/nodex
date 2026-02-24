@@ -35,6 +35,7 @@ interface TriggerRuntimeState {
   hashActive: boolean;
   referenceActive: boolean;
   slashActive: boolean;
+  searchTriggerActive: boolean;
   fieldFired: boolean;
 }
 
@@ -86,6 +87,15 @@ interface RichTextEditorProps {
   onSlashNavDown?: () => void;
   onSlashNavUp?: () => void;
   onSlashClose?: () => void;
+  /** `?` trigger for search node creation (opens tag selector) */
+  onSearchTrigger?: (query: string, from: number, to: number, anchor?: TriggerAnchorRect) => void;
+  onSearchTriggerDeactivate?: () => void;
+  searchTriggerActive?: boolean;
+  onSearchTriggerConfirm?: () => void;
+  onSearchTriggerNavDown?: () => void;
+  onSearchTriggerNavUp?: () => void;
+  onSearchTriggerCreate?: () => void;
+  onSearchTriggerClose?: () => void;
   onDescriptionEdit?: () => void;
   onToggleDone?: () => void;
   onEscapeSelect?: () => void;
@@ -140,6 +150,7 @@ export function RichTextEditor(props: RichTextEditorProps) {
     hashActive: false,
     referenceActive: false,
     slashActive: false,
+    searchTriggerActive: false,
     fieldFired: false,
   });
 
@@ -287,6 +298,18 @@ export function RichTextEditor(props: RichTextEditorProps) {
       stateRef.referenceActive = false;
     }
 
+    // `?` trigger for search node (like # for tags)
+    const searchMatch = textBefore.match(/\?([^\s?#@]*)$/u);
+    if (searchMatch && stateRef.hasUserEdited && (docChanged || stateRef.searchTriggerActive)) {
+      stateRef.searchTriggerActive = true;
+      const query = searchMatch[1];
+      const qStart = from - searchMatch[0].length;
+      propsRef.current.onSearchTrigger?.(query, qStart, from, getCaretAnchorRect(view, from));
+    } else {
+      if (stateRef.searchTriggerActive) propsRef.current.onSearchTriggerDeactivate?.();
+      stateRef.searchTriggerActive = false;
+    }
+
     const afterCursorText = $from.parent.textBetween(
       $from.parentOffset,
       $from.parent.content.size,
@@ -326,6 +349,7 @@ export function RichTextEditor(props: RichTextEditorProps) {
         referenceActive: propsRef.current.referenceActive ?? false,
         hashTagActive: propsRef.current.hashTagActive ?? false,
         slashActive: propsRef.current.slashActive ?? false,
+        searchTriggerActive: propsRef.current.searchTriggerActive ?? false,
       });
       if (intent === 'reference_confirm') {
         propsRef.current.onReferenceConfirm?.();
@@ -333,6 +357,10 @@ export function RichTextEditor(props: RichTextEditorProps) {
       }
       if (intent === 'hashtag_confirm') {
         propsRef.current.onHashTagConfirm?.();
+        return true;
+      }
+      if (intent === 'search_trigger_confirm') {
+        propsRef.current.onSearchTriggerConfirm?.();
         return true;
       }
       if (intent === 'slash_confirm') {
@@ -378,6 +406,7 @@ export function RichTextEditor(props: RichTextEditorProps) {
         referenceActive: propsRef.current.referenceActive ?? false,
         hashTagActive: propsRef.current.hashTagActive ?? false,
         slashActive: propsRef.current.slashActive ?? false,
+        searchTriggerActive: propsRef.current.searchTriggerActive ?? false,
         isEmpty,
         isAtStart: from <= 1 && to <= 1,
         isAtEnd,
@@ -403,6 +432,7 @@ export function RichTextEditor(props: RichTextEditorProps) {
         referenceActive: propsRef.current.referenceActive ?? false,
         hashTagActive: propsRef.current.hashTagActive ?? false,
         slashActive: propsRef.current.slashActive ?? false,
+        searchTriggerActive: propsRef.current.searchTriggerActive ?? false,
         isAtBoundary: from <= 1,
       });
       if (intent === 'reference_nav') {
@@ -411,6 +441,10 @@ export function RichTextEditor(props: RichTextEditorProps) {
       }
       if (intent === 'hashtag_nav') {
         propsRef.current.onHashTagNavUp?.();
+        return true;
+      }
+      if (intent === 'search_trigger_nav') {
+        propsRef.current.onSearchTriggerNavUp?.();
         return true;
       }
       if (intent === 'slash_nav') {
@@ -431,6 +465,7 @@ export function RichTextEditor(props: RichTextEditorProps) {
         referenceActive: propsRef.current.referenceActive ?? false,
         hashTagActive: propsRef.current.hashTagActive ?? false,
         slashActive: propsRef.current.slashActive ?? false,
+        searchTriggerActive: propsRef.current.searchTriggerActive ?? false,
         isAtBoundary: to >= endPos,
       });
       if (intent === 'reference_nav') {
@@ -439,6 +474,10 @@ export function RichTextEditor(props: RichTextEditorProps) {
       }
       if (intent === 'hashtag_nav') {
         propsRef.current.onHashTagNavDown?.();
+        return true;
+      }
+      if (intent === 'search_trigger_nav') {
+        propsRef.current.onSearchTriggerNavDown?.();
         return true;
       }
       if (intent === 'slash_nav') {
@@ -458,6 +497,7 @@ export function RichTextEditor(props: RichTextEditorProps) {
           referenceActive: propsRef.current.referenceActive ?? false,
           hashTagActive: propsRef.current.hashTagActive ?? false,
           slashActive: propsRef.current.slashActive ?? false,
+          searchTriggerActive: propsRef.current.searchTriggerActive ?? false,
         },
       );
       if (intent === 'reference_close') {
@@ -466,6 +506,10 @@ export function RichTextEditor(props: RichTextEditorProps) {
       }
       if (intent === 'hashtag_close') {
         propsRef.current.onHashTagClose?.();
+        return true;
+      }
+      if (intent === 'search_trigger_close') {
+        propsRef.current.onSearchTriggerClose?.();
         return true;
       }
       if (intent === 'slash_close') {
@@ -544,6 +588,7 @@ export function RichTextEditor(props: RichTextEditorProps) {
               referenceActive: propsRef.current.referenceActive ?? false,
               hashTagActive: propsRef.current.hashTagActive ?? false,
               slashActive: propsRef.current.slashActive ?? false,
+              searchTriggerActive: propsRef.current.searchTriggerActive ?? false,
             },
           );
           if (intent === 'reference_create') {
@@ -608,6 +653,7 @@ export function RichTextEditor(props: RichTextEditorProps) {
       hashActive: false,
       referenceActive: false,
       slashActive: false,
+      searchTriggerActive: false,
       fieldFired: false,
     };
 

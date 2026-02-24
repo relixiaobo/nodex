@@ -38,8 +38,9 @@ export type NodeType =
   | 'fieldDef'     // 字段定义
 
   // ── 查询与视图 ──
-  | 'viewDef'      // 视图配置节点（P3）
-  | 'search';      // Live Search / 动态查询节点（P3）
+  | 'viewDef'       // 视图配置节点（P3）
+  | 'search'        // Live Search / 动态查询节点
+  | 'queryCondition'; // 搜索条件节点（组 or 叶）
 
 /**
  * 视图模式枚举。
@@ -230,6 +231,23 @@ export interface NodexNode {
 
   /** Options from supertag 来源标签 ID（旧 SYS_A06） */
   sourceSupertag?: string;
+
+  // ─── queryCondition 专用 ───
+
+  /** 组节点：子条件的逻辑关系 */
+  queryLogic?: 'AND' | 'OR' | 'NOT';
+
+  /** 叶节点：操作符 */
+  queryOp?: string;
+
+  /** HAS_TAG 操作符的目标 tagDefId */
+  queryTargetTag?: string;
+
+  /** 字段条件的 attrDefId（Phase 2） */
+  queryField?: string;
+
+  /** 比较值（Phase 2） */
+  queryValue?: string;
 }
 
 // ============================================================

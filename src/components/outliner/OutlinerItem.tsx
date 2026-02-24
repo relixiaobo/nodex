@@ -441,6 +441,15 @@ export function OutlinerItem({
   const [slashAnchor, setSlashAnchor] = useState<TriggerAnchorRect | undefined>(undefined);
   const slashRangeRef = useRef<{ from: number; to: number }>({ from: 0, to: 0 });
 
+  // ? trigger state (search node — opens tag selector)
+  const [searchTagOpen, setSearchTagOpen] = useState(false);
+  const [searchTagQuery, setSearchTagQuery] = useState('');
+  const [searchTagSelectedIndex, setSearchTagSelectedIndex] = useState(0);
+  const [searchTagAnchor, setSearchTagAnchor] = useState<TriggerAnchorRect | undefined>(undefined);
+  const searchRangeRef = useRef<{ from: number; to: number }>({ from: 0, to: 0 });
+  const searchTagDropdownRef = useRef<TagDropdownHandle>(null);
+  const createSearchNode = useNodeStore((s) => s.createSearchNode);
+
   // > trigger (fire-once: instantly creates field)
   const addUnnamedFieldToNode = useNodeStore((s) => s.addUnnamedFieldToNode);
   const setEditingFieldName = useUIStore((s) => s.setEditingFieldName);
@@ -2025,6 +2034,79 @@ export function OutlinerItem({
     setHashTagAnchor(undefined);
   }, []);
 
+  // ─── ? search trigger handlers ───
+
+  const handleSearchTrigger = useCallback((query: string, from: number, to: number, anchor?: TriggerAnchorRect) => {
+    searchRangeRef.current = { from, to };
+    setSearchTagQuery(query);
+    setSearchTagSelectedIndex(0);
+    setSearchTagAnchor(anchor);
+    if (!searchTagOpen) setSearchTagOpen(true);
+  }, [searchTagOpen]);
+
+  const handleSearchTriggerDeactivate = useCallback(() => {
+    setSearchTagOpen(false);
+    setSearchTagQuery('');
+    setSearchTagSelectedIndex(0);
+    setSearchTagAnchor(undefined);
+  }, []);
+
+  const handleSearchTagSelect = useCallback(
+    (tagDefId: string) => {
+      // Delete the ?query text, then replace the current node with a search node
+      const ed = editorRef.current;
+      if (isEditorViewAlive(ed)) {
+        const { from, to } = searchRangeRef.current;
+        deleteEditorRange(ed, from, to);
+        const parsed = docToMarks(ed.state.doc);
+        updateNodeContent(nodeId, { name: parsed.text, marks: parsed.marks, inlineRefs: parsed.inlineRefs });
+      }
+
+      // Create search node at the same position as the current node
+      const actualParentId = loroDoc.getParentId(nodeId);
+      if (actualParentId) {
+        createSearchNode(actualParentId, nodeId, tagDefId);
+        // Delete the trigger node (now empty)
+        const currentName = loroDoc.toNodexNode(nodeId)?.name ?? '';
+        if (!currentName.trim()) {
+          trashNode(nodeId);
+        }
+      }
+
+      setSearchTagOpen(false);
+      setSearchTagQuery('');
+      setSearchTagSelectedIndex(0);
+      setSearchTagAnchor(undefined);
+    },
+    [nodeId, updateNodeContent, createSearchNode, trashNode],
+  );
+
+  const handleSearchTriggerConfirm = useCallback(() => {
+    const item = searchTagDropdownRef.current?.getSelectedItem();
+    if (!item) return;
+    if (item.type === 'existing') {
+      handleSearchTagSelect(item.id);
+    }
+  }, [handleSearchTagSelect]);
+
+  const handleSearchTriggerNavDown = useCallback(() => {
+    setSearchTagSelectedIndex((i) => {
+      const count = searchTagDropdownRef.current?.getItemCount() ?? 0;
+      return count > 0 ? Math.min(i + 1, count - 1) : 0;
+    });
+  }, []);
+
+  const handleSearchTriggerNavUp = useCallback(() => {
+    setSearchTagSelectedIndex((i) => Math.max(i - 1, 0));
+  }, []);
+
+  const handleSearchTriggerClose = useCallback(() => {
+    setSearchTagOpen(false);
+    setSearchTagQuery('');
+    setSearchTagSelectedIndex(0);
+    setSearchTagAnchor(undefined);
+  }, []);
+
   // ─── > field trigger (fire-once: instantly creates unnamed field) ───
 
   const handleFieldTriggerFire = useCallback(() => {
@@ -2247,6 +2329,12 @@ export function OutlinerItem({
       return;
     }
 
+    if (commandId === 'search_node') {
+      replaceSlashTriggerText('?');
+      closeSlashMenu();
+      return;
+    }
+
     if (commandId === 'clip_page') {
       replaceSlashTriggerText('');
       closeSlashMenu();
@@ -2426,7 +2514,7 @@ export function OutlinerItem({
   );
   // optionsPicker can open on selected (not focused) reference-like rows.
   // Keep row on top whenever any overlay is open, otherwise sibling rows may paint above it.
-  const hasOverlayOpen = (isFocused && (hashTagOpen || refOpen || slashOpen)) || optionsPickerOpen;
+  const hasOverlayOpen = (isFocused && (hashTagOpen || refOpen || slashOpen || searchTagOpen)) || optionsPickerOpen;
 
   return (
     <div role="treeitem" aria-expanded={isExpanded} className="relative">
@@ -2555,6 +2643,13 @@ export function OutlinerItem({
                 onSlashNavDown={handleSlashNavDown}
                 onSlashNavUp={handleSlashNavUp}
                 onSlashClose={closeSlashMenu}
+                onSearchTrigger={handleSearchTrigger}
+                onSearchTriggerDeactivate={handleSearchTriggerDeactivate}
+                searchTriggerActive={searchTagOpen}
+                onSearchTriggerConfirm={handleSearchTriggerConfirm}
+                onSearchTriggerNavDown={handleSearchTriggerNavDown}
+                onSearchTriggerNavUp={handleSearchTriggerNavUp}
+                onSearchTriggerClose={handleSearchTriggerClose}
                 onDescriptionEdit={handleDescriptionEdit}
                 onToggleDone={handleCycleCheckbox}
                 onEscapeSelect={handleEscapeSelect}
@@ -2597,6 +2692,18 @@ export function OutlinerItem({
               query={hashTagQuery}
               selectedIndex={hashTagSelectedIndex}
               anchor={hashTagAnchor}
+            />
+          )}
+          {searchTagOpen && isFocused && (
+            <TagSelector
+              ref={searchTagDropdownRef}
+              open={searchTagOpen}
+              onSelect={handleSearchTagSelect}
+              onCreateNew={() => {}}
+              existingTagIds={[]}
+              query={searchTagQuery}
+              selectedIndex={searchTagSelectedIndex}
+              anchor={searchTagAnchor}
             />
           )}
           {refOpen && isFocused && (

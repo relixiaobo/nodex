@@ -6,5 +6,5 @@ import type { NodeType } from '../types/index.js';
  * - reference nodes (type 'reference')
  */
 export function isOutlinerContentNodeType(type: NodeType | undefined): boolean {
-  return type === undefined || type === 'reference';
+  return type === undefined || type === 'reference' || type === 'search';
 }

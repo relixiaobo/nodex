@@ -41,9 +41,9 @@ export const SLASH_COMMANDS_BASELINE: readonly SlashCommandDefinition[] = [
   {
     id: 'search_node',
     name: 'Search node',
+    shortcutHint: '?',
     keywords: ['search', 'node', 'find', '?'],
-    enabled: false,
-    disabledHint: SLASH_DISABLED_HINT_SEARCH_NODE,
+    enabled: true,
   },
   {
     id: 'field',

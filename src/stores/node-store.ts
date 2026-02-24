@@ -86,6 +86,10 @@ interface NodeStore {
   addDoneMappingEntry(tagDefId: string, checked: boolean, fieldDefId: string, optionId: string): void;
   removeDoneMappingEntry(tagDefId: string, checked: boolean, index: number): void;
 
+  // ─── Search 操作 ───
+
+  createSearchNode(parentId: string, afterId: string | null, tagDefId: string): string;
+
   // ─── Reference 操作（新设计：独立 reference 树节点） ───
 
   addReference(parentId: string, targetNodeId: string, position?: number): string;
@@ -878,6 +882,40 @@ export const useNodeStore = create<NodeStore>((set, get) => {
 
       loroDoc.deleteNode(targetId);
       loroDoc.commitDoc();
+    },
+
+    // ─── Search 操作 ───
+
+    createSearchNode: (parentId, afterId, tagDefId) => {
+      if (!canMutate('createSearchNode')) return '';
+      const tagDef = loroDoc.toNodexNode(tagDefId);
+      const name = tagDef?.name ?? 'Search';
+
+      // Determine insert position
+      let insertIdx: number | undefined;
+      if (afterId) {
+        const siblings = loroDoc.getChildren(parentId);
+        const idx = siblings.indexOf(afterId);
+        if (idx >= 0) insertIdx = idx + 1;
+      }
+
+      // 1. Create search node
+      const searchId = nanoid();
+      loroDoc.createNode(searchId, parentId, insertIdx);
+      loroDoc.setNodeDataBatch(searchId, { type: 'search', name });
+
+      // 2. Create AND root condition group
+      const groupId = nanoid();
+      loroDoc.createNode(groupId, searchId);
+      loroDoc.setNodeDataBatch(groupId, { type: 'queryCondition', queryLogic: 'AND' });
+
+      // 3. Create HAS_TAG leaf condition
+      const condId = nanoid();
+      loroDoc.createNode(condId, groupId);
+      loroDoc.setNodeDataBatch(condId, { type: 'queryCondition', queryOp: 'HAS_TAG', queryTargetTag: tagDefId });
+
+      loroDoc.commitDoc('user:create-search');
+      return searchId;
     },
 
     // ─── Reference 操作 ───

@@ -652,6 +652,11 @@ export function toNodexNode(nodexId: string): NodexNode | null {
     minValue: data.get('minValue') as number | undefined,
     maxValue: data.get('maxValue') as number | undefined,
     sourceSupertag: data.get('sourceSupertag') as string | undefined,
+    queryLogic: data.get('queryLogic') as NodexNode['queryLogic'],
+    queryOp: data.get('queryOp') as string | undefined,
+    queryTargetTag: data.get('queryTargetTag') as string | undefined,
+    queryField: data.get('queryField') as string | undefined,
+    queryValue: data.get('queryValue') as string | undefined,
   };
   _nodeCache.set(nodexId, result);
   return result;

@@ -81,7 +81,7 @@ export function ToolbarUserMenu() {
       <button
         onClick={handleSignIn}
         disabled={signingIn}
-        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-foreground-secondary transition-colors hover:bg-foreground/5 disabled:opacity-50"
+        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-foreground-secondary transition-colors hover:bg-foreground/5 disabled:opacity-50"
         title="Sign in with Google"
       >
         {signingIn ? (
@@ -101,7 +101,7 @@ export function ToolbarUserMenu() {
       {/* Avatar trigger with sync badge */}
       <button
         onClick={() => setOpen((v) => !v)}
-        className="relative flex h-7 w-7 shrink-0 items-center justify-center rounded-full"
+        className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
         aria-label={t('userMenu.ariaLabel')}
       >
         {authUser.avatarUrl ? (
@@ -109,10 +109,10 @@ export function ToolbarUserMenu() {
             src={authUser.avatarUrl}
             alt=""
             referrerPolicy="no-referrer"
-            className="h-6 w-6 rounded-full object-cover"
+            className="h-7 w-7 rounded-full object-cover"
           />
         ) : (
-          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-accent text-[10px] font-medium text-accent-foreground">
+          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-accent text-[10px] font-medium text-accent-foreground">
             {initials}
           </span>
         )}

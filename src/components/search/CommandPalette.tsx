@@ -28,9 +28,25 @@ import {
   getActionLabel,
 } from '../../lib/palette-commands.js';
 import { COMMAND_PALETTE_QUICK_CONTAINERS } from '../../lib/system-node-registry.js';
-import { ensureTodayNode } from '../../lib/journal.js';
+import { ensureTodayNode, isDayNode } from '../../lib/journal.js';
+import { parseDayNodeName, parseYearNodeName, isToday } from '../../lib/date-utils.js';
 import { Kbd } from '../ui/Kbd';
 import { t } from '../../i18n/strings.js';
+
+/** Add "Today, " prefix for today's day node, matching NodeHeader behavior. */
+function resolveDayNodeDisplayName(id: string, name: string): string {
+  if (!isDayNode(id)) return name;
+  const weekId = loroDoc.getParentId(id);
+  if (!weekId) return name;
+  const yearId = loroDoc.getParentId(weekId);
+  if (!yearId) return name;
+  const yearNode = loroDoc.toNodexNode(yearId);
+  const year = yearNode?.name ? parseYearNodeName(yearNode.name) : null;
+  if (year === null) return name;
+  const date = parseDayNodeName(name, year);
+  if (date && isToday(date)) return t('common.todayPrefix', { name });
+  return name;
+}
 
 const CONTAINER_ICONS: Record<ContainerIconKey, AppIcon> = {
   library: Library,
@@ -136,7 +152,7 @@ export function CommandPalette() {
       const visuals = resolveNodeVisuals(id, node);
       items.push({
         id,
-        label: name,
+        label: resolveDayNodeDisplayName(id, name),
         ...visuals,
         action: () => { navigateTo(id); closeAndClear(); },
       });
@@ -191,7 +207,7 @@ export function CommandPalette() {
         const visuals = resolveNodeVisuals(id, node);
         results.push({
           id,
-          label: name,
+          label: resolveDayNodeDisplayName(id, name),
           ...visuals,
           score: match.score,
           action: () => { navigateTo(id); closeAndClear(); },
@@ -446,7 +462,7 @@ export function CommandPalette() {
           <div className="flex h-10 items-center justify-end border-t border-border px-3">
             <div className="flex items-center gap-1.5 text-xs text-foreground-tertiary">
               <span>{actionLabel}</span>
-              <Kbd>↵</Kbd>
+              <Kbd keys="↵" />
             </div>
           </div>
         )}

@@ -24,7 +24,7 @@ import {
   getActionLabel,
 } from '../../lib/palette-commands.js';
 import { COMMAND_PALETTE_QUICK_CONTAINERS } from '../../lib/system-node-registry.js';
-import { Kbd } from '../ui/Kbd';
+import { Kbd, KbdShortcut } from '../ui/Kbd';
 import { t } from '../../i18n/strings.js';
 
 const CONTAINER_ICONS: Record<string, AppIcon> = {
@@ -402,7 +402,7 @@ function PaletteRow({ item, selected, onSelect, onHover }: PaletteRowProps) {
       <Icon size={16} className="shrink-0 text-foreground-secondary" />
       <span className="flex-1 truncate text-xs text-foreground">{item.label}</span>
       {item.subtitle && (
-        <Kbd>{item.subtitle}</Kbd>
+        <KbdShortcut keys={item.subtitle} />
       )}
       <span className="shrink-0 text-[10px] text-foreground-tertiary">
         {TYPE_LABELS[item.type]}

@@ -20,6 +20,7 @@ import { useUIStore } from '../../stores/ui-store';
 import { getLastVisibleNode, isWorkspaceContainer } from '../../lib/tree-utils.js';
 import { isOptionsFieldType } from '../../lib/field-utils.js';
 import * as loroDoc from '../../lib/loro-doc.js';
+import { undoDoc, redoDoc } from '../../lib/loro-doc.js';
 import { getPrimaryShortcutKey } from '../../lib/shortcut-registry';
 import { isImeComposingEvent } from '../../lib/ime-keyboard.js';
 import {
@@ -346,6 +347,10 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
           }
           return false;
         },
+        // Undo/Redo — route to Loro UndoManager (same as RichTextEditor)
+        'Mod-z': () => { undoDoc(); return true; },
+        'Mod-y': () => { redoDoc(); return true; },
+        'Mod-Shift-z': () => { redoDoc(); return true; },
         [KEY_TRAILING_ESCAPE]: (_state, _dispatch, view) => {
           if (!view || isComposing(view)) return false;
           const ref = callbacksRef.current;

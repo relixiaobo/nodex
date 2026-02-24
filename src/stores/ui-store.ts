@@ -442,7 +442,14 @@ registerUndoUICallbacks({
     } satisfies UndoUISnapshotV1;
   },
   restore: (meta) => {
-    if (!isUndoUISnapshotV1(meta)) return;
+    if (!isUndoUISnapshotV1(meta)) {
+      if (import.meta.env.DEV) {
+        console.warn('[undo-ui] type guard failed, received:', meta);
+      }
+      return;
+    }
+    // Defensive: never restore an empty panel stack (bootstrap artifact).
+    if (meta.panelHistory.length === 0) return;
     useUIStore.setState({
       panelHistory: [...meta.panelHistory],
       panelIndex: meta.panelIndex,

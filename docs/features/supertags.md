@@ -441,6 +441,8 @@ tagDef_article
 | 2026-02-20 | 多标签 conic-gradient 饼图（等分色段），而非混色/叠加 | 最多 5 色，等分饼图在小 bullet（5px）上可清晰区分；叠加色会产生无意义混色 |
 | 2026-02-20 | ConfigOutliner ownerColor 始终传入（不再限定于有 Extend 关系时） | 所有模板项（自有 + 继承）都属于某个 tagDef，始终显示颜色更一致；之前的"无 Extend 不显色"逻辑是初始保守设计，已无必要 |
 | 2026-02-20 | 字段排序：supertag 字段按 tagIds 顺序排在最前，content 节点排在最后 | 与 Tana 一致：字段作为 supertag 的语义元数据，优先于用户自由内容显示 |
+| 2026-02-24 | syncTemplateFields 在渲染时 useEffect 触发（非 applyTag 后全量扫描） | 惰性同步：只在用户看到节点时补齐缺失模板项，避免全库扫描性能开销 |
+| 2026-02-24 | 模板内容克隆 bullet 颜色通过 templateId→parent→tagDef 链查找 | 内容克隆本身无 tag，需回溯 templateId 找到原始模板所属 tagDef 获取颜色 |
 
 ## 当前状态
 
@@ -458,7 +460,9 @@ tagDef_article
 - [x] Delete tag / Delete field 按钮（当前行为为 trashNode）
 - [ ] trashNode(tagDef) 级联清理（移除所有标签绑定与模板来源字段）
 - [ ] trashNode(attrDef) 级联清理（移除所有引用该字段的 tuple）
-- [x] applyTag 克隆 default content 中的普通节点（shallow clone, `_sourceId` 追踪来源）
+- [x] applyTag 克隆 default content 中的普通节点（shallow clone, `templateId` 追踪来源）
+- [x] syncTemplateFields — 后添加的 fieldDef/content 节点自动补齐（retroactive sync，渲染时触发）
+- [x] 模板内容克隆 bullet 颜色匹配所属 supertag（templateContentColors 查找 templateId → ownerTagDef → color）
 - [x] Show as Checkbox（toggle + done visual + Cmd+Enter）
 - [x] Done state mapping（checkbox ↔ Options 字段双向映射, NDX_A06）
 - [x] Default Child Supertag（tag_picker 配置 + createChild/createSibling 自动应用）

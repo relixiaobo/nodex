@@ -165,16 +165,27 @@ _(空)_
 - [ ] 所有引用（树引用 + 内联引用 + 字段值引用）更新为指向合并后的节点
 - **Spec**: `docs/features/references.md`
 
-#### Search Nodes / Live Queries (#23)
-> 执行顺序 ②（搜索条件 = Tuple 树，依赖 #22 的日期节点做日期操作符）
+#### Search Nodes Phase 1 — 单标签搜索 (#23)
+> Phase 1: 最小可用搜索节点。`?` 触发 + 标签搜索引擎 + 搜索结果展示。
+> 原 search-service.ts（Supabase）已删除，需基于 Loro 内存查询重写。
+> **Owner**: nodex-cc-2 | **Branch**: `cc2/search-nodes`
+> **Spec**: `docs/features/search.md` | **Plan**: `docs/plans/search-nodes-impl.md`
 
-- [ ] `?` 触发创建搜索节点（放大镜图标）
-- [ ] 基础搜索操作符（#tag / field 值 / 文本 / 日期）
-- [ ] 搜索结果实时更新（展开时执行）
+- [ ] Step 1: 搜索引擎 `search-engine.ts`（searchByTag + collectTagHierarchy + 多态搜索）
+- [ ] Step 2: `createSearchNode()` in node-store.ts
+- [ ] Step 3: `?` 触发（启用 slash command + 标签选择器）
+- [ ] Step 4: OutlinerItem 搜索节点渲染（放大镜 bullet）
+- [ ] Step 5: 搜索结果动态展示（useSearchResults hook + 引用 bullet）
+- [ ] Step 6: Seed data + 集成验证
+- [ ] Step 7: 文档同步
+
+**Phase 2 待办**（本次不做）：
+- [ ] Query Builder 面板（可折叠，条件编辑）
 - [ ] AND / OR / NOT 逻辑组合
-- [ ] 关键词操作符（TODO / DONE / OVERDUE / CREATED LAST X DAYS）
+- [ ] 字段值过滤
+- [ ] TODO / DONE 关键词过滤
+- [ ] 搜索条件迁移到 Tuple 树
 - [ ] 搜索结果配合视图展示
-- **Spec**: `docs/features/search.md`
 
 #### Table View (#24)
 > 执行顺序 ④（依赖 #25 的 Filter/Sort/Group 基础设施）

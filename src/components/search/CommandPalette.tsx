@@ -353,17 +353,19 @@ export function CommandPalette() {
 
   return (
     <div className="animate-palette-expand fixed inset-0 z-50 flex flex-col bg-background">
-      {/* Search header — replaces toolbar */}
-      <div className="flex h-11 shrink-0 items-center gap-2 border-b border-border bg-foreground/[0.04] px-3">
-        <input
-          ref={inputRef}
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder="Search nodes and commands..."
-          className="h-full flex-1 bg-transparent text-sm outline-none placeholder:text-foreground-tertiary"
-        />
-        <Kbd onClick={closeAndClear}>Esc</Kbd>
+      {/* Search header — same toolbar bg, white pill input matches SearchTrigger */}
+      <div className="flex h-11 shrink-0 items-center bg-foreground/[0.04] px-3">
+        <div className="flex flex-1 items-center gap-2 rounded-full bg-background px-3 py-1.5">
+          <input
+            ref={inputRef}
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="Search..."
+            className="flex-1 bg-transparent text-xs outline-none placeholder:text-foreground-tertiary"
+          />
+          <Kbd onClick={closeAndClear}>Esc</Kbd>
+        </div>
       </div>
 
       {/* Results area — fills remaining space */}

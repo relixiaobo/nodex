@@ -140,38 +140,15 @@ function focusUndoShortcutSink(): void {
     created.style.zIndex = '-1';
     document.body.appendChild(created);
     el = created;
-    console.debug('[undo-debug] focusUndoShortcutSink:created');
   }
-  if (!(el instanceof HTMLTextAreaElement)) {
-    console.debug('[undo-debug] focusUndoShortcutSink:missing', {
-      found: !!el,
-      nodeType: el?.nodeName ?? null,
-    });
-    return;
-  }
+  if (!(el instanceof HTMLTextAreaElement)) return;
   el.focus();
-  console.debug('[undo-debug] focusUndoShortcutSink', {
-    sinkConnected: el.isConnected,
-    sinkRect: {
-      x: el.getBoundingClientRect().x,
-      y: el.getBoundingClientRect().y,
-      w: el.getBoundingClientRect().width,
-      h: el.getBoundingClientRect().height,
-    },
-    activeTag: (document.activeElement as HTMLElement | null)?.tagName,
-    activeId: (document.activeElement as HTMLElement | null)?.id,
-    activeClassName: (document.activeElement as HTMLElement | null)?.className,
-  });
 }
 
 function focusRowUndoTarget(row: HTMLElement | null): void {
   const editor = row?.querySelector<HTMLElement>('.ProseMirror');
   if (editor) {
     editor.focus();
-    console.debug('[undo-debug] focusRowUndoTarget:editor', {
-      activeTag: (document.activeElement as HTMLElement | null)?.tagName,
-      activeClassName: (document.activeElement as HTMLElement | null)?.className,
-    });
     return;
   }
   focusUndoShortcutSink();
@@ -189,7 +166,6 @@ function captureStructuralToggleFocusSnapshot(): void {
   const state = useUIStore.getState();
   if (!state.focusedNodeId) {
     structuralToggleFocusSnapshot = null;
-    console.debug('[undo-debug] structuralToggleFocus:capture none');
     return;
   }
   structuralToggleFocusSnapshot = {
@@ -197,7 +173,6 @@ function captureStructuralToggleFocusSnapshot(): void {
     parentId: state.focusedParentId ?? null,
     expiresAt: Date.now() + 1000,
   };
-  console.debug('[undo-debug] structuralToggleFocus:capture', structuralToggleFocusSnapshot);
 }
 
 function peekStructuralToggleFocusSnapshot(): StructuralToggleFocusSnapshot | null {
@@ -218,11 +193,6 @@ function focusEditorForNodeId(nodeId: string): boolean {
   const editor = root?.querySelector<HTMLElement>('.ProseMirror');
   if (!editor) return false;
   editor.focus();
-  console.debug('[undo-debug] structuralToggleFocus:restoredEditor', {
-    nodeId,
-    activeTag: (document.activeElement as HTMLElement | null)?.tagName,
-    activeClassName: (document.activeElement as HTMLElement | null)?.className,
-  });
   return true;
 }
 
@@ -1340,10 +1310,6 @@ export function OutlinerItem({
       structuralFocusSnapshot.nodeId === nodeId &&
       (structuralFocusSnapshot.parentId === null || structuralFocusSnapshot.parentId === parentId)
     ) {
-      console.debug('[undo-debug] handleBlur:preserve-structural-toggle-focus', {
-        nodeId,
-        parentId,
-      });
       return;
     }
     // Delay clearing focus by one frame so click handlers on the next node run
@@ -1541,10 +1507,6 @@ export function OutlinerItem({
   }, [nodeId, parentId, isReference, isPendingConversion, isOptionsValueNode, setFocusedNode]);
 
   const handleToggle = useCallback(() => {
-    console.debug('[undo-debug] handleToggle activeElement', {
-      tag: (document.activeElement as HTMLElement | null)?.tagName,
-      className: (document.activeElement as HTMLElement | null)?.className,
-    });
     const ek = `${parentId}:${nodeId}`;
     const currentHasChildren = (useNodeStore.getState().getNode(nodeId)?.children ?? []).length > 0;
     const currentlyExpanded = useUIStore.getState().expandedNodes.has(ek);
@@ -1563,20 +1525,12 @@ export function OutlinerItem({
     if (!structuralFocusSnapshot || !focusEditorForNodeId(structuralFocusSnapshot.nodeId)) {
       focusRowUndoTarget(rowRef.current);
     }
-    console.debug('[undo-debug] handleToggle post-focus(sync)', {
-      tag: (document.activeElement as HTMLElement | null)?.tagName,
-      className: (document.activeElement as HTMLElement | null)?.className,
-    });
     requestAnimationFrame(() => {
       const snap = peekStructuralToggleFocusSnapshot();
       if (!snap || !focusEditorForNodeId(snap.nodeId)) {
         focusRowUndoTarget(rowRef.current);
       }
       clearStructuralToggleFocusSnapshot();
-      console.debug('[undo-debug] handleToggle post-focus(raf)', {
-        tag: (document.activeElement as HTMLElement | null)?.tagName,
-        className: (document.activeElement as HTMLElement | null)?.className,
-      });
     });
   }, [nodeId, parentId, toggleExpanded, setExpanded]);
 
@@ -1589,10 +1543,6 @@ export function OutlinerItem({
   }, [panelNavigationNodeId, navigateTo]);
 
   const handleIndentLineClick = useCallback(() => {
-    console.debug('[undo-debug] handleIndentLineClick activeElement', {
-      tag: (document.activeElement as HTMLElement | null)?.tagName,
-      className: (document.activeElement as HTMLElement | null)?.className,
-    });
     // Toggle expand/collapse all direct children (Tana indent guide line behavior)
     const currentChildIds = useNodeStore.getState().getNode(nodeId)?.children ?? [];
     if (currentChildIds.length === 0) return;
@@ -1617,20 +1567,12 @@ export function OutlinerItem({
     if (!structuralFocusSnapshot || !focusEditorForNodeId(structuralFocusSnapshot.nodeId)) {
       focusRowUndoTarget(rowRef.current);
     }
-    console.debug('[undo-debug] handleIndentLineClick post-focus(sync)', {
-      tag: (document.activeElement as HTMLElement | null)?.tagName,
-      className: (document.activeElement as HTMLElement | null)?.className,
-    });
     requestAnimationFrame(() => {
       const snap = peekStructuralToggleFocusSnapshot();
       if (!snap || !focusEditorForNodeId(snap.nodeId)) {
         focusRowUndoTarget(rowRef.current);
       }
       clearStructuralToggleFocusSnapshot();
-      console.debug('[undo-debug] handleIndentLineClick post-focus(raf)', {
-        tag: (document.activeElement as HTMLElement | null)?.tagName,
-        className: (document.activeElement as HTMLElement | null)?.className,
-      });
     });
   }, [nodeId]);
 

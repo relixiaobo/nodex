@@ -50,6 +50,7 @@ _(空)_
 - [2026-02-24 nodex-codex] 用户确认跳过过渡方案，直接实施 `#44` Loro-only 最终方案；计划保留 PR #90 作为 backup（Draft / do-not-merge），从 `origin/main` 新开干净分支重做。
 - [2026-02-24 nodex-codex] 已创建最终方案 Draft PR #91（`codex/unified-undo-loro-only`）；并在 #90 留言标注 backup/do-not-merge，避免过渡方案误合并。
 - [2026-02-24 nodex-codex] 已切换核心路径到 Loro-only：移除 `RichTextEditor` 的 `prosemirror-history`，编辑器 keymap 与全局非编辑态键盘入口统一调用 `undoDoc/redoDoc`；`ui-store` 通过 `commitUIMarker()` + UndoManager `onPush/onPop` 恢复导航/展开状态，并为程序性展开补 `skipUndo`；补 `loro-undo.test.ts` 覆盖导航/展开 UI marker undo/redo 与 `skipUndo`。
+- [2026-02-24 nodex-codex] 修复展开/收起后编辑器焦点丢失导致 `Cmd+Z` 无法立即撤销：在 chevron/缩进线 `pointerdown` 捕获结构操作前的焦点快照，`handleBlur` 跳过该场景的延迟清焦点，展开/收起后恢复原编辑器焦点（必要时 fallback）。已本地验证用户复现场景通过；`typecheck`/`build` 通过，`test:run` 仅剩无关失败 `tests/vitest/journal.test.ts`（既有失败）。 
 
 ### PR #89 接管修复：Cmd+Z/Cmd+Shift+Z 混乱（统一时间线 + pending Loro flush）
 > 背景：PR #89（`cc2/references`）混入大量无关改动与主干回退，且多轮修复后仍存在 undo/redo 语义混乱。改为由 nodex-codex 从 `origin/main` 新开干净分支重做，仅保留 undo/redo 相关修复（统一时间线、expand/collapse undo、Loro pending write flush、防回归测试）。

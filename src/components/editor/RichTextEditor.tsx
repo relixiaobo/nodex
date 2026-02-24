@@ -579,17 +579,14 @@ export function RichTextEditor(props: RichTextEditorProps) {
             }
           : {}),
         'Mod-z': () => {
-          console.debug('[undo-debug] editor-keymap undo');
           undoDoc();
           return true;
         },
         'Mod-y': () => {
-          console.debug('[undo-debug] editor-keymap redo');
           redoDoc();
           return true;
         },
         'Mod-Shift-z': () => {
-          console.debug('[undo-debug] editor-keymap redo');
           redoDoc();
           return true;
         },

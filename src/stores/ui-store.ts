@@ -242,19 +242,10 @@ export const useUIStore = create<UIStore>()(
       expandedNodes: new Set<string>(),
       toggleExpanded: (expandKey) =>
         set((s) => {
-          console.debug('[undo-debug] ui.toggleExpanded', {
-            expandKey,
-            before: s.expandedNodes.has(expandKey),
-          });
           commitUIMarker();
           const next = new Set(s.expandedNodes);
           if (next.has(expandKey)) next.delete(expandKey);
           else next.add(expandKey);
-          console.debug('[undo-debug] ui.toggleExpanded:after', {
-            expandKey,
-            after: next.has(expandKey),
-            size: next.size,
-          });
           return { expandedNodes: next };
         }),
       setExpanded: (expandKey, expanded, skipUndo) =>
@@ -262,15 +253,9 @@ export const useUIStore = create<UIStore>()(
           const next = new Set(s.expandedNodes);
           const had = next.has(expandKey);
           if (had === expanded) return {};
-          console.debug('[undo-debug] ui.setExpanded', { expandKey, had, expanded, skipUndo });
           if (!skipUndo) commitUIMarker();
           if (expanded) next.add(expandKey);
           else next.delete(expandKey);
-          console.debug('[undo-debug] ui.setExpanded:after', {
-            expandKey,
-            after: next.has(expandKey),
-            size: next.size,
-          });
           return { expandedNodes: next };
         }),
 
@@ -468,11 +453,6 @@ registerUndoUICallbacks({
   },
   restore: (meta) => {
     if (!isUndoUISnapshotV1(meta)) return;
-    console.debug('[undo-debug] ui.restore', {
-      panelIndex: meta.panelIndex,
-      panelHistory: meta.panelHistory,
-      expandedNodes: meta.expandedNodes,
-    });
     useUIStore.setState({
       panelHistory: [...meta.panelHistory],
       panelIndex: meta.panelIndex,

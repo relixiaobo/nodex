@@ -44,39 +44,15 @@ export function useNavUndoKeyboard() {
     const redoBindings = getShortcutKeys('global.nav_redo', ['Mod-Shift-z', 'Ctrl-Shift-z']);
 
     function handler(e: KeyboardEvent) {
-      if (e.metaKey || e.ctrlKey) {
-        const active = document.activeElement as HTMLElement | null;
-        console.debug('[undo-debug] raw-keydown', {
-          key: e.key,
-          metaKey: e.metaKey,
-          ctrlKey: e.ctrlKey,
-          shiftKey: e.shiftKey,
-          activeTag: active?.tagName,
-          activeClass: active?.className,
-        });
-      }
       const action = resolveNavUndoAction(e, undoBindings, redoBindings);
       if (!action) return;
-      const active = document.activeElement as HTMLElement | null;
-      console.debug('[undo-debug] nav-keydown', {
-        action,
-        key: e.key,
-        metaKey: e.metaKey,
-        ctrlKey: e.ctrlKey,
-        shiftKey: e.shiftKey,
-        activeTag: active?.tagName,
-        activeClass: active?.className,
-        focusedNodeId: useUIStore.getState().focusedNodeId,
-      });
 
       // Don't intercept while editing (or inside text inputs/contentEditable).
       if (!shouldHandleNavUndo(document.activeElement, useUIStore.getState().focusedNodeId)) {
-        console.debug('[undo-debug] nav-keydown:skip-editing');
         return;
       }
 
       e.preventDefault();
-      console.debug('[undo-debug] nav-keydown:dispatch', { action });
 
       if (action === 'redo') {
         redoDoc();
@@ -88,13 +64,6 @@ export function useNavUndoKeyboard() {
     function beforeInputHandler(e: InputEvent) {
       if (e.inputType !== 'historyUndo' && e.inputType !== 'historyRedo') return;
       const active = document.activeElement as HTMLElement | null;
-      console.debug('[undo-debug] raw-beforeinput', {
-        inputType: e.inputType,
-        activeTag: active?.tagName,
-        activeId: active?.id,
-        activeClass: active?.className,
-        focusedNodeId: useUIStore.getState().focusedNodeId,
-      });
 
       // In editor mode, keep relying on editor keymap path to avoid double-dispatch.
       // This fallback primarily targets the hidden sink textarea because macOS Side Panel
@@ -104,7 +73,6 @@ export function useNavUndoKeyboard() {
       }
 
       e.preventDefault();
-      console.debug('[undo-debug] beforeinput:dispatch', { action: e.inputType });
       if (e.inputType === 'historyRedo') {
         redoDoc();
       } else {

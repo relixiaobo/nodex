@@ -28,7 +28,7 @@ _(空)_
 | Agent | 当前任务 | 分支 | 修改中的文件 |
 |-------|---------|------|-------------|
 | nodex-cc | _(idle)_ | — | — |
-| nodex-cc-2 | _(idle)_ | — | — |
+| nodex-cc-2 | Search Nodes Phase 1 (#23) | `cc2/search-nodes` | `node.ts`, `loro-doc.ts`, `search-engine.ts`, `node-store.ts`, `OutlinerItem.tsx`, `OutlinerView.tsx` |
 | nodex-codex | _(idle)_ | — | — |
 
 ---

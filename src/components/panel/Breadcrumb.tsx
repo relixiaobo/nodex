@@ -104,7 +104,7 @@ export function Breadcrumb({ nodeId, showCurrentName }: BreadcrumbProps) {
     : [];
 
   return (
-    <div className="flex h-8 items-center gap-0.5 pl-[6px] pr-3 mt-1 text-xs text-foreground-secondary overflow-hidden">
+    <div className="flex h-8 items-center gap-0.5 pl-[6px] pr-3 mt-1 text-xs text-foreground-tertiary overflow-hidden">
       {/* ← button: navigate to parent, or disabled placeholder at root */}
       <button
         onClick={canGoUp ? handleGoUp : undefined}
@@ -134,7 +134,7 @@ export function Breadcrumb({ nodeId, showCurrentName }: BreadcrumbProps) {
           {/* Ellipsis for folded ancestors */}
           {needsFolding && (
             <>
-              <span className="shrink-0 text-foreground-tertiary mx-0.5">/</span>
+              <span className="shrink-0 text-foreground-tertiary/50 mx-0.5">/</span>
               <button
                 onClick={() => setExpanded(true)}
                 className="flex shrink-0 items-center justify-center rounded-md px-1 hover:text-foreground"
@@ -148,7 +148,7 @@ export function Breadcrumb({ nodeId, showCurrentName }: BreadcrumbProps) {
           {/* Visible ancestors */}
           {visibleAncestors.map((ancestor) => (
             <span key={ancestor.id} className="flex items-center shrink-0 min-w-0">
-              <span className="shrink-0 text-foreground-tertiary mx-0.5">/</span>
+              <span className="shrink-0 text-foreground-tertiary/50 mx-0.5">/</span>
               <button
                 onClick={() => {
                   if (ancestor.id === workspaceRootId) {
@@ -166,8 +166,8 @@ export function Breadcrumb({ nodeId, showCurrentName }: BreadcrumbProps) {
 
           {/* Conditional current node name (when title scrolled out of view) */}
           {showCurrentName && (
-            <span className="flex items-center shrink min-w-0 text-foreground-secondary">
-              <span className="shrink-0 text-foreground-tertiary mx-0.5">/</span>
+            <span className="flex items-center shrink min-w-0">
+              <span className="shrink-0 text-foreground-tertiary/50 mx-0.5">/</span>
               <BreadcrumbCurrentName nodeId={nodeId} />
             </span>
           )}
@@ -207,5 +207,5 @@ function BreadcrumbCurrentName({ nodeId }: { nodeId: string }) {
     return resolveBreadcrumbLabel(nodeId, clean);
   });
 
-  return <span className="truncate max-w-[100px] text-xs font-medium">{name}</span>;
+  return <span className="truncate max-w-[100px] text-xs text-foreground">{name}</span>;
 }

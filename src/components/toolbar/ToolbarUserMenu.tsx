@@ -1,20 +1,44 @@
 /**
- * Compact user avatar for the toolbar.
- * - Signed in: avatar circle, click opens dropdown with user info + sign out
+ * Compact user avatar for the toolbar with integrated sync status badge.
+ * - Signed in: avatar circle with sync dot badge, click opens dropdown
+ *   with user info + sync status + sign out
  * - Not signed in: generic user icon, click triggers Google sign-in
  */
 import { useState, useRef, useEffect } from 'react';
 import { LogOut, User } from '../../lib/icons.js';
 import { useWorkspaceStore } from '../../stores/workspace-store';
+import { useSyncStore } from '../../stores/sync-store';
 import { t } from '../../i18n/strings.js';
+
+const BADGE_CLASSES: Record<string, string> = {
+  synced: 'bg-success',
+  syncing: 'bg-primary animate-pulse',
+  pending: 'bg-warning',
+  error: 'bg-destructive',
+  offline: 'bg-foreground-tertiary',
+};
+
+const SYNC_LABELS: Record<string, string> = {
+  synced: 'Synced',
+  syncing: 'Syncing\u2026',
+  pending: 'Pending changes',
+  error: 'Sync error',
+  offline: 'Offline',
+};
 
 export function ToolbarUserMenu() {
   const authUser = useWorkspaceStore((s) => s.authUser);
   const signInWithGoogle = useWorkspaceStore((s) => s.signInWithGoogle);
   const signOut = useWorkspaceStore((s) => s.signOut);
+  const syncStatus = useSyncStore((s) => s.status);
+  const syncError = useSyncStore((s) => s.error);
+  const pendingCount = useSyncStore((s) => s.pendingCount);
   const [open, setOpen] = useState(false);
   const [signingIn, setSigningIn] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  const showSyncBadge = syncStatus !== 'local-only';
+  const badgeClass = BADGE_CLASSES[syncStatus] ?? 'bg-gray-400';
 
   // Close menu on outside click
   useEffect(() => {
@@ -44,7 +68,14 @@ export function ToolbarUserMenu() {
     await signOut();
   }
 
-  // Not signed in: show generic user icon
+  // Sync status detail line for dropdown
+  function syncDetail(): string | null {
+    if (syncStatus === 'error' && syncError) return syncError;
+    if (syncStatus === 'pending' && pendingCount > 0) return `${pendingCount} updates`;
+    return null;
+  }
+
+  // Not signed in: show generic user icon (no sync badge needed)
   if (!authUser) {
     return (
       <button
@@ -63,13 +94,14 @@ export function ToolbarUserMenu() {
   }
 
   const initials = getInitials(authUser.name ?? authUser.email ?? '?');
+  const detail = syncDetail();
 
   return (
     <div ref={menuRef} className="relative">
-      {/* Avatar trigger */}
+      {/* Avatar trigger with sync badge */}
       <button
         onClick={() => setOpen((v) => !v)}
-        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full overflow-hidden"
+        className="relative flex h-7 w-7 shrink-0 items-center justify-center rounded-full"
         aria-label={t('userMenu.ariaLabel')}
       >
         {authUser.avatarUrl ? (
@@ -83,6 +115,12 @@ export function ToolbarUserMenu() {
           <span className="flex h-6 w-6 items-center justify-center rounded-full bg-accent text-[10px] font-medium text-accent-foreground">
             {initials}
           </span>
+        )}
+        {/* Sync status badge */}
+        {showSyncBadge && (
+          <span
+            className={`absolute bottom-0 right-0 h-2 w-2 rounded-full ring-[1.5px] ring-background ${badgeClass}`}
+          />
         )}
       </button>
 
@@ -100,6 +138,26 @@ export function ToolbarUserMenu() {
               </p>
             )}
           </div>
+
+          {/* Sync status row */}
+          {showSyncBadge && (
+            <>
+              <div className="mx-1 my-1 border-t border-border" />
+              <div className="flex items-center gap-2 px-2 py-1.5">
+                <span className={`h-2 w-2 shrink-0 rounded-full ${badgeClass}`} />
+                <div className="min-w-0 flex-1">
+                  <span className="text-sm text-foreground-secondary">
+                    {SYNC_LABELS[syncStatus] ?? syncStatus}
+                  </span>
+                  {detail && (
+                    <span className="ml-1 text-xs text-foreground-tertiary">
+                      {detail}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
 
           <div className="mx-1 my-1 border-t border-border" />
 

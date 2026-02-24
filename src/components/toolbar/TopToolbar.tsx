@@ -1,15 +1,14 @@
 /**
  * Top toolbar — replaces the Sidebar as the primary navigation chrome.
  *
- * Layout: [←][→]  [🔍 Search...  ⌘K]  [●🧑‍]
+ * Layout: [←][→]  [🔍 Search...  ⌘K]  [👤]
  *
  * - Left: Undo/Redo buttons (placeholder, disabled until #44)
  * - Center: SearchTrigger (fake input, opens CommandPalette)
- * - Right: SyncDot + UserMenu avatar
+ * - Right: UserMenu avatar (with sync badge)
  */
 import { UndoRedoButtons } from './UndoRedoButtons';
 import { SearchTrigger } from './SearchTrigger';
-import { SyncDot } from './SyncDot';
 import { ToolbarUserMenu } from './ToolbarUserMenu';
 
 export function TopToolbar() {
@@ -21,11 +20,8 @@ export function TopToolbar() {
       {/* Center: Search trigger (fills available space, like Chrome omnibox) */}
       <SearchTrigger />
 
-      {/* Right: Sync dot + User avatar */}
-      <div className="flex items-center gap-2">
-        <SyncDot />
-        <ToolbarUserMenu />
-      </div>
+      {/* Right: User avatar (sync badge integrated) */}
+      <ToolbarUserMenu />
     </div>
   );
 }

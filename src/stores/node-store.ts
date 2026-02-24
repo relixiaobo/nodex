@@ -111,13 +111,35 @@ function findFieldEntry(nodeId: string, fieldDefId: string): string | null {
   return null;
 }
 
-/** 查找 tagDef 下的模板 fieldDef 列表 */
+/**
+ * 查找 tagDef 下的模板字段定义 ID 列表。
+ *
+ * 支持两种布局：
+ * 1. 直接 fieldDef 子节点（seed data 风格） → 返回该节点 ID 作为 fieldDefId
+ * 2. fieldEntry 子节点（UI 创建风格：fieldDef 在 SCHEMA，tagDef 下放 fieldEntry）
+ *    → 返回 fieldEntry.fieldDefId（实际 fieldDef 节点 ID）
+ *
+ * 返回值为去重后的 fieldDefId 数组。
+ */
 function getTemplateFieldDefs(tagDefId: string): string[] {
   const children = loroDoc.getChildren(tagDefId);
-  return children.filter(cid => {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const cid of children) {
     const c = loroDoc.toNodexNode(cid);
-    return c?.type === 'fieldDef';
-  });
+    if (!c) continue;
+    let fdId: string | undefined;
+    if (c.type === 'fieldDef') {
+      fdId = cid;
+    } else if (c.type === 'fieldEntry' && c.fieldDefId) {
+      fdId = c.fieldDefId;
+    }
+    if (fdId && !seen.has(fdId)) {
+      seen.add(fdId);
+      result.push(fdId);
+    }
+  }
+  return result;
 }
 
 /** 查找 tagDef 下的默认内容节点（仅顶层普通内容节点，不递归）。 */

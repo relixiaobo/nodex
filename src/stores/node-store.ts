@@ -111,32 +111,46 @@ function findFieldEntry(nodeId: string, fieldDefId: string): string | null {
   return null;
 }
 
+interface TemplateFieldRef {
+  /** The actual field definition ID (always the fieldDef node, may live in SCHEMA) */
+  fieldDefId: string;
+  /**
+   * The template origin node — the child of the tagDef that owns this template field.
+   * For seed-data layout: same as fieldDefId (the fieldDef IS under the tagDef).
+   * For UI layout: the fieldEntry node under the tagDef (its parent IS the tagDef).
+   *
+   * Used as templateId on instantiated fieldEntries so that
+   * getParentId(templateId) → tagDef (for icon color resolution).
+   */
+  templateOriginId: string;
+}
+
 /**
- * 查找 tagDef 下的模板字段定义 ID 列表。
+ * 查找 tagDef 下的模板字段定义列表。
  *
  * 支持两种布局：
- * 1. 直接 fieldDef 子节点（seed data 风格） → 返回该节点 ID 作为 fieldDefId
+ * 1. 直接 fieldDef 子节点（seed data 风格） → fieldDefId = templateOriginId = 该节点 ID
  * 2. fieldEntry 子节点（UI 创建风格：fieldDef 在 SCHEMA，tagDef 下放 fieldEntry）
- *    → 返回 fieldEntry.fieldDefId（实际 fieldDef 节点 ID）
+ *    → fieldDefId = fieldEntry.fieldDefId, templateOriginId = fieldEntry 节点 ID
  *
- * 返回值为去重后的 fieldDefId 数组。
+ * 返回值按 fieldDefId 去重。
  */
-function getTemplateFieldDefs(tagDefId: string): string[] {
+function getTemplateFieldDefs(tagDefId: string): TemplateFieldRef[] {
   const children = loroDoc.getChildren(tagDefId);
   const seen = new Set<string>();
-  const result: string[] = [];
+  const result: TemplateFieldRef[] = [];
   for (const cid of children) {
     const c = loroDoc.toNodexNode(cid);
     if (!c) continue;
-    let fdId: string | undefined;
+    let ref: TemplateFieldRef | undefined;
     if (c.type === 'fieldDef') {
-      fdId = cid;
+      ref = { fieldDefId: cid, templateOriginId: cid };
     } else if (c.type === 'fieldEntry' && c.fieldDefId) {
-      fdId = c.fieldDefId;
+      ref = { fieldDefId: c.fieldDefId, templateOriginId: cid };
     }
-    if (fdId && !seen.has(fdId)) {
-      seen.add(fdId);
-      result.push(fdId);
+    if (ref && !seen.has(ref.fieldDefId)) {
+      seen.add(ref.fieldDefId);
+      result.push(ref);
     }
   }
   return result;
@@ -219,15 +233,15 @@ export function applyTagMutationsNoCommit(nodeId: string, tagDefId: string): voi
 
   // 3. 为所有 fieldDef 创建 fieldEntry（若不存在）
   for (const chainTagId of extendsChain) {
-    const fieldDefs = getTemplateFieldDefs(chainTagId);
-    for (const fdId of fieldDefs) {
-      if (!findFieldEntry(nodeId, fdId)) {
+    const fieldRefs = getTemplateFieldDefs(chainTagId);
+    for (const ref of fieldRefs) {
+      if (!findFieldEntry(nodeId, ref.fieldDefId)) {
         const feId = nanoid();
         loroDoc.createNode(feId, nodeId);
         loroDoc.setNodeDataBatch(feId, {
           type: 'fieldEntry',
-          fieldDefId: fdId,
-          templateId: fdId,
+          fieldDefId: ref.fieldDefId,
+          templateId: ref.templateOriginId,
         });
       }
     }
@@ -261,15 +275,15 @@ export function syncTemplateMutationsNoCommit(nodeId: string): boolean {
 
     // Sync template fieldEntries
     for (const chainTagId of extendsChain) {
-      const fieldDefs = getTemplateFieldDefs(chainTagId);
-      for (const fdId of fieldDefs) {
-        if (!findFieldEntry(nodeId, fdId)) {
+      const fieldRefs = getTemplateFieldDefs(chainTagId);
+      for (const ref of fieldRefs) {
+        if (!findFieldEntry(nodeId, ref.fieldDefId)) {
           const feId = nanoid();
           loroDoc.createNode(feId, nodeId);
           loroDoc.setNodeDataBatch(feId, {
             type: 'fieldEntry',
-            fieldDefId: fdId,
-            templateId: fdId,
+            fieldDefId: ref.fieldDefId,
+            templateId: ref.templateOriginId,
           });
           changed = true;
         }
@@ -627,16 +641,14 @@ export const useNodeStore = create<NodeStore>((set, get) => {
       const requiredByRemaining = new Set<string>();
       for (const remainingTagId of remainingTags) {
         for (const chainTagId of getExtendsChain(remainingTagId)) {
-          const fieldDefs = getTemplateFieldDefs(chainTagId);
-          for (const fdId of fieldDefs) requiredByRemaining.add(fdId);
+          for (const ref of getTemplateFieldDefs(chainTagId)) requiredByRemaining.add(ref.fieldDefId);
         }
       }
 
       const fieldDefsFromRemovedTag = new Set<string>();
       const extendsChain = getExtendsChain(tagDefId);
       for (const chainTagId of extendsChain) {
-        const fieldDefs = getTemplateFieldDefs(chainTagId);
-        for (const fdId of fieldDefs) fieldDefsFromRemovedTag.add(fdId);
+        for (const ref of getTemplateFieldDefs(chainTagId)) fieldDefsFromRemovedTag.add(ref.fieldDefId);
       }
 
       for (const fdId of fieldDefsFromRemovedTag) {

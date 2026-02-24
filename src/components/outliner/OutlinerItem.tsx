@@ -122,6 +122,80 @@ function focusTrailingInputForParent(parentId: string): boolean {
   return false;
 }
 
+function focusUndoShortcutSink(): void {
+  let el = document.getElementById('undo-shortcut-sink');
+  if (!(el instanceof HTMLTextAreaElement)) {
+    const created = document.createElement('textarea');
+    created.id = 'undo-shortcut-sink';
+    created.dataset.undoShortcutSink = 'true';
+    created.tabIndex = -1;
+    created.readOnly = true;
+    created.style.position = 'fixed';
+    created.style.left = '0';
+    created.style.top = '0';
+    created.style.width = '1px';
+    created.style.height = '1px';
+    created.style.opacity = '0';
+    created.style.pointerEvents = 'none';
+    created.style.zIndex = '-1';
+    document.body.appendChild(created);
+    el = created;
+  }
+  if (!(el instanceof HTMLTextAreaElement)) return;
+  el.focus();
+}
+
+function focusRowUndoTarget(row: HTMLElement | null): void {
+  const editor = row?.querySelector<HTMLElement>('.ProseMirror');
+  if (editor) {
+    editor.focus();
+    return;
+  }
+  focusUndoShortcutSink();
+}
+
+type StructuralToggleFocusSnapshot = {
+  nodeId: string;
+  parentId: string | null;
+  expiresAt: number;
+};
+
+let structuralToggleFocusSnapshot: StructuralToggleFocusSnapshot | null = null;
+
+function captureStructuralToggleFocusSnapshot(): void {
+  const state = useUIStore.getState();
+  if (!state.focusedNodeId) {
+    structuralToggleFocusSnapshot = null;
+    return;
+  }
+  structuralToggleFocusSnapshot = {
+    nodeId: state.focusedNodeId,
+    parentId: state.focusedParentId ?? null,
+    expiresAt: Date.now() + 1000,
+  };
+}
+
+function peekStructuralToggleFocusSnapshot(): StructuralToggleFocusSnapshot | null {
+  if (!structuralToggleFocusSnapshot) return null;
+  if (Date.now() > structuralToggleFocusSnapshot.expiresAt) {
+    structuralToggleFocusSnapshot = null;
+    return null;
+  }
+  return structuralToggleFocusSnapshot;
+}
+
+function clearStructuralToggleFocusSnapshot(): void {
+  structuralToggleFocusSnapshot = null;
+}
+
+function focusEditorForNodeId(nodeId: string): boolean {
+  const root = document.querySelector<HTMLElement>(`[data-node-id="${nodeId}"]`);
+  const editor = root?.querySelector<HTMLElement>('.ProseMirror');
+  if (!editor) return false;
+  editor.focus();
+  return true;
+}
+
 function getTreeReferenceBlockMessage(reason: ReturnType<typeof getTreeReferenceBlockReason>): string {
   switch (reason) {
     case 'self_parent':
@@ -970,7 +1044,7 @@ export function OutlinerItem({
           const index = parent.children.indexOf(id);
           if (index <= 0) continue;
           const newParentId = parent.children[index - 1];
-          setExpanded(`${ownerId}:${newParentId}`, true);
+          setExpanded(`${ownerId}:${newParentId}`, true, true);
           indentNode(id);
         }
         clearSelection();
@@ -1237,6 +1311,14 @@ export function OutlinerItem({
     if (blurClearRafRef.current !== null) {
       cancelAnimationFrame(blurClearRafRef.current);
     }
+    const structuralFocusSnapshot = peekStructuralToggleFocusSnapshot();
+    if (
+      structuralFocusSnapshot &&
+      structuralFocusSnapshot.nodeId === nodeId &&
+      (structuralFocusSnapshot.parentId === null || structuralFocusSnapshot.parentId === parentId)
+    ) {
+      return;
+    }
     // Delay clearing focus by one frame so click handlers on the next node run
     // before the previous editor unmounts, preventing click-time layout shift.
     blurClearRafRef.current = requestAnimationFrame(() => {
@@ -1442,6 +1524,21 @@ export function OutlinerItem({
     } else {
       toggleExpanded(ek);
     }
+    const structuralFocusSnapshot = peekStructuralToggleFocusSnapshot();
+    if (structuralFocusSnapshot) {
+      useUIStore.getState().setFocusedNode(structuralFocusSnapshot.nodeId, structuralFocusSnapshot.parentId);
+    }
+    // Prefer restoring the previously focused editor (even if it is a different row).
+    if (!structuralFocusSnapshot || !focusEditorForNodeId(structuralFocusSnapshot.nodeId)) {
+      focusRowUndoTarget(rowRef.current);
+    }
+    requestAnimationFrame(() => {
+      const snap = peekStructuralToggleFocusSnapshot();
+      if (!snap || !focusEditorForNodeId(snap.nodeId)) {
+        focusRowUndoTarget(rowRef.current);
+      }
+      clearStructuralToggleFocusSnapshot();
+    });
   }, [nodeId, parentId, toggleExpanded, setExpanded]);
 
   const handleDrillDown = useCallback(() => {
@@ -1455,6 +1552,7 @@ export function OutlinerItem({
   const handleIndentLineClick = useCallback(() => {
     // Toggle expand/collapse all direct children (Tana indent guide line behavior)
     const currentChildIds = useNodeStore.getState().getNode(nodeId)?.children ?? [];
+    if (currentChildIds.length === 0) return;
     const expanded = useUIStore.getState().expandedNodes;
     // Check if any child is expanded (compound key: nodeId is parent of children)
     const anyChildExpanded = currentChildIds.some((cid) => expanded.has(`${nodeId}:${cid}`));
@@ -1467,7 +1565,22 @@ export function OutlinerItem({
         next.add(ck);
       }
     }
+    loroDoc.commitUIMarker();
     useUIStore.setState({ expandedNodes: next });
+    const structuralFocusSnapshot = peekStructuralToggleFocusSnapshot();
+    if (structuralFocusSnapshot) {
+      useUIStore.getState().setFocusedNode(structuralFocusSnapshot.nodeId, structuralFocusSnapshot.parentId);
+    }
+    if (!structuralFocusSnapshot || !focusEditorForNodeId(structuralFocusSnapshot.nodeId)) {
+      focusRowUndoTarget(rowRef.current);
+    }
+    requestAnimationFrame(() => {
+      const snap = peekStructuralToggleFocusSnapshot();
+      if (!snap || !focusEditorForNodeId(snap.nodeId)) {
+        focusRowUndoTarget(rowRef.current);
+      }
+      clearStructuralToggleFocusSnapshot();
+    });
   }, [nodeId]);
 
   // ─── Keyboard shortcut handlers ───
@@ -1521,7 +1634,7 @@ export function OutlinerItem({
     if (index <= 0) return; // Can't indent first child
 
     const newParentId = parent.children[index - 1];
-    setExpanded(`${ownerId}:${newParentId}`, true);
+    setExpanded(`${ownerId}:${newParentId}`, true, true);
     indentNode(nodeId);
     // Update focusedParentId so the node keeps focus under its new parent
     setFocusedNode(nodeId, newParentId);
@@ -2000,7 +2113,7 @@ export function OutlinerItem({
           const tempNodeId = startRefConversion(newRefId, parentId, insertPos);
           setPendingRefConversion({ tempNodeId, refNodeId, parentId });
           const gpId = loroDoc.getParentId(parentId);
-          if (gpId) setExpanded(`${gpId}:${parentId}`, true);
+          if (gpId) setExpanded(`${gpId}:${parentId}`, true, true);
           useUIStore.getState().setPendingInputChar(null);
           useUIStore.getState().setFocusClickCoords({
             nodeId: tempNodeId,
@@ -2273,7 +2386,7 @@ export function OutlinerItem({
       if (decision) {
         moveNodeTo(dragNodeId, decision.newParentId, decision.position);
         if (decision.expandKey) {
-          setExpanded(decision.expandKey, true);
+          setExpanded(decision.expandKey, true, true);
         }
       }
 
@@ -2325,6 +2438,7 @@ export function OutlinerItem({
       )}
       <div
         ref={rowRef}
+        tabIndex={-1}
         className={`group/row flex gap-1 min-h-7 items-start py-1 relative ${
           isDropTarget && dropPosition === 'inside'
             ? 'bg-primary/10 ring-1 ring-primary/30 rounded-sm'
@@ -2353,6 +2467,7 @@ export function OutlinerItem({
           isExpanded={isExpanded}
           onToggle={handleToggle}
           onDrillDown={handleDrillDown}
+          onTogglePointerDown={captureStructuralToggleFocusSnapshot}
         />
         <div className={`flex items-start gap-2 min-w-0 relative ${isSelectedRefClick ? 'node-selected-ref w-fit flex-none' : 'flex-1'}`}>
           <div className={deleteBlockedPulse ? 'node-delete-blocked-pulse' : ''}>
@@ -2562,7 +2677,21 @@ export function OutlinerItem({
           <button
             className="indent-line absolute top-0 bottom-0 z-10 flex justify-end cursor-pointer"
             style={{ left: depth * 28 + 17, width: 16 }}
-            onClick={handleIndentLineClick}
+            tabIndex={-1}
+            onPointerDown={(e) => {
+              captureStructuralToggleFocusSnapshot();
+              e.preventDefault();
+            }}
+            onMouseDown={(e) => {
+              // Keep focus on the editor/page instead of this button so Cmd+Z still reaches
+              // unified undo handlers immediately after expand/collapse clicks.
+              e.preventDefault();
+            }}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              handleIndentLineClick();
+            }}
             title={t('outliner.toggleChildren')}
           >
             <div className="indent-line-inner w-px h-full bg-border rounded-full" />

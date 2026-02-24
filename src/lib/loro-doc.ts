@@ -5,7 +5,7 @@
  * TreeID 在 loro-crdt 1.x 中为字符串 `"counter@peer"`，可直接用作 Map key。
  */
 
-import { LoroDoc, LoroList, LoroText, LoroMovableList, UndoManager, VersionVector, type TreeID, type PeerID } from 'loro-crdt';
+import { LoroDoc, LoroList, LoroText, LoroMovableList, UndoManager, VersionVector, type TreeID, type PeerID, type Value } from 'loro-crdt';
 import { nanoid } from 'nanoid';
 import type { NodexNode } from '../types/node.js';
 import { saveSnapshotRecord, loadSnapshotRecord } from './loro-persistence.js';
@@ -45,6 +45,35 @@ let currentWorkspaceId: string | null = null;
 
 /** 全局变更订阅回调 */
 const subscribers = new Set<() => void>();
+
+type UndoUIMeta = Value;
+let captureUndoUIMeta: (() => UndoUIMeta) | null = null;
+let restoreUndoUIMeta: ((meta: UndoUIMeta, isUndo: boolean) => void) | null = null;
+const redoRestoreUIMetaStack: UndoUIMeta[] = [];
+
+function bindUndoCallbacks(): void {
+  if (!undoManager) return;
+  if (captureUndoUIMeta) {
+    undoManager.setOnPush((isUndo, _counterRange, _event) => ({
+      value: captureUndoUIMeta?.() ?? null,
+      cursors: [],
+    }));
+  } else {
+    undoManager.setOnPush(undefined);
+  }
+  // Browser runtime behavior for onPop has shown inconsistencies vs Node test runtime.
+  // We restore UI snapshots manually in undoDoc()/redoDoc() using topUndoValue() + a local redo stack.
+  undoManager.setOnPop(undefined);
+}
+
+export function registerUndoUICallbacks(callbacks: {
+  capture: (() => UndoUIMeta) | null;
+  restore: ((meta: UndoUIMeta, isUndo: boolean) => void) | null;
+}): void {
+  captureUndoUIMeta = callbacks.capture;
+  restoreUndoUIMeta = callbacks.restore;
+  bindUndoCallbacks();
+}
 
 export function getCurrentWorkspaceId(): string | null {
   return currentWorkspaceId;
@@ -209,6 +238,7 @@ async function persistSnapshot(): Promise<void> {
 
 export async function initLoroDoc(workspaceId: string): Promise<void> {
   if (doc && currentWorkspaceId === workspaceId) return;
+  redoRestoreUIMetaStack.length = 0;
 
   if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
   // Clean up previous subscribeLocalUpdates hook (avoid duplicate registration on workspace switch)
@@ -240,6 +270,7 @@ export async function initLoroDoc(workspaceId: string): Promise<void> {
   }
 
   undoManager = new UndoManager(doc, { mergeInterval: 500, excludeOriginPrefixes: [...UNDO_EXCLUDED_ORIGIN_PREFIXES] });
+  bindUndoCallbacks();
 
   doc.subscribe(() => {
     notifySubscribers();
@@ -293,6 +324,7 @@ export function resetLoroDoc(): void {
 
   doc = null;
   undoManager = null;
+  redoRestoreUIMetaStack.length = 0;
   nodexToTree.clear();
   treeToNodex.clear();
   currentWorkspaceId = null;
@@ -303,6 +335,7 @@ export function resetLoroDoc(): void {
 
 /** 同步初始化（仅测试用，不加载快照） */
 export function initLoroDocForTest(workspaceId: string): void {
+  redoRestoreUIMetaStack.length = 0;
   doc = new LoroDoc();
   configureTextStyles(doc);
   currentWorkspaceId = workspaceId;
@@ -312,6 +345,7 @@ export function initLoroDocForTest(workspaceId: string): void {
   // mergeInterval=0 for deterministic tests; exclude '__seed__' and system origins
   // so seed/system commits are not tracked in the undo stack.
   undoManager = new UndoManager(doc, { mergeInterval: 0, excludeOriginPrefixes: [...UNDO_EXCLUDED_ORIGIN_PREFIXES] });
+  bindUndoCallbacks();
   doc.subscribe(() => notifySubscribers());
 }
 
@@ -321,7 +355,9 @@ export function initLoroDocForTest(workspaceId: string): void {
  */
 export function clearUndoHistoryForTest(): void {
   if (!doc) return;
+  redoRestoreUIMetaStack.length = 0;
   undoManager = new UndoManager(doc, { mergeInterval: 0, excludeOriginPrefixes: [...UNDO_EXCLUDED_ORIGIN_PREFIXES] });
+  bindUndoCallbacks();
 }
 
 /**
@@ -663,17 +699,57 @@ export function getLoroDoc(): LoroDoc {
 export function commitDoc(origin: string = DEFAULT_USER_COMMIT_ORIGIN): void {
   if (!doc) return;
   if (!canApplyMutation('commitDoc')) return;
+  if (!origin.startsWith('system:') && origin !== '__seed__') {
+    redoRestoreUIMetaStack.length = 0;
+  }
   doc.commit({ origin });
 }
 
+/**
+ * Create a Loro undo step for UI-only state changes (navigation / expand-collapse).
+ *
+ * We mutate an internal `_ui.seq` counter solely to produce an UndoManager entry.
+ * Actual UI state restore happens via UndoManager onPush/onPop callbacks.
+ */
+export function commitUIMarker(): void {
+  if (!doc) return;
+  if (!canApplyMutation('commitUIMarker')) return;
+  const uiMap = doc.getMap('_ui');
+  const current = uiMap.get('seq');
+  const next = typeof current === 'number' ? current + 1 : 1;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  uiMap.set('seq' as any, next as any);
+  commitDoc('user:ui');
+}
+
 export function undoDoc(): boolean {
+  commitDoc('system:flush-before-undo');
+  const undoValue = undoManager?.topUndoValue();
+  if (captureUndoUIMeta) {
+    redoRestoreUIMetaStack.push(captureUndoUIMeta() ?? null);
+  }
   const result = undoManager?.undo() ?? false;
+  if (!result && captureUndoUIMeta) {
+    // rollback local redo snapshot push
+    redoRestoreUIMetaStack.pop();
+  }
+  if (result && restoreUndoUIMeta) {
+    restoreUndoUIMeta((undoValue ?? null) as Value, true);
+  }
   if (result) rebuildMappings();
   return result;
 }
 
 export function redoDoc(): boolean {
+  commitDoc('system:flush-before-undo');
+  const redoMeta = redoRestoreUIMetaStack.length > 0 ? redoRestoreUIMetaStack[redoRestoreUIMetaStack.length - 1] : null;
   const result = undoManager?.redo() ?? false;
+  if (result && redoRestoreUIMetaStack.length > 0) {
+    redoRestoreUIMetaStack.pop();
+  }
+  if (result && restoreUndoUIMeta) {
+    restoreUndoUIMeta((redoMeta ?? null) as Value, false);
+  }
   if (result) rebuildMappings();
   return result;
 }

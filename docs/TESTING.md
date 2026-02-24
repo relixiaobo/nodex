@@ -1449,6 +1449,23 @@ createSibling 自动标签（2 cases）:
 - `buildBacklinkCountMap` 预计算 trash set（BFS from TRASH root），避免逐节点 `isInTrash()` parent chain walk
 - 已删除未使用的 `useBacklinkCountMap` hook（仅 `useBacklinkCount` 在 OutlinerItem 中使用）
 
+### 1.63 Template 应用与同步
+
+**测试文件**: `tests/vitest/template-apply.test.ts`
+
+**覆盖点**:
+
+| # | 场景 | 验证 |
+|---|------|------|
+| 1 | task_1 已有 fieldEntries | applyTag 为 tagDef_task 所有 fieldDef 创建 fieldEntry（status/priority/due/done_chk） |
+| 2 | computeNodeFields 返回模板 fieldEntries | fieldDefId 列表包含 4 个模板字段 |
+| 3 | buildVisibleChildrenRows 分类正确 | fieldEntry → 'field' 行 ≥ 4，content → 'content' 行 ≥ 2 |
+| 4 | 新节点 applyTag 创建 fieldEntries + content clones | 运行时 applyTag 效果验证 |
+| 5 | meeting tag 克隆 content + 创建 fieldEntries | 1 fieldEntry (Attendees) + 3 content clones (Agenda/Notes/Action Items) |
+| 6 | syncTemplateFields 补齐后添加的 fieldDef | tagDef 新增 fieldDef 后 sync 补创建 fieldEntry |
+| 7 | syncTemplateFields 补齐后添加的 content 节点 | tagDef 新增内容节点后 sync 创建 clone |
+| 8 | syncTemplateFields 幂等 | 重复调用不产生重复子节点 |
+
 ---
 
 ## Phase 2: 视觉检查点
@@ -1542,6 +1559,8 @@ createSibling 自动标签（2 cases）:
 | 1.53 | Test 入口 Bootstrap（防测试数据回流） | PASS/FAIL |
 | 1.54 | NodePanel Header 重设计（UIStore expandedHiddenFields + block 可见性 + 列对齐） | PASS/FAIL |
 | 1.55 | TrailingInput `@` 触发后光标定位回归 | PASS/FAIL |
+| 1.62 | 反向链接查询与计数 | PASS/FAIL |
+| 1.63 | Template 应用与同步 | PASS/FAIL |
 | 2 | 视觉渲染 | PASS/FAIL/SKIP |
 | 3 | 扩展构建 | PASS/FAIL |
 

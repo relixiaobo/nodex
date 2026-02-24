@@ -115,6 +115,7 @@ interface ChevronButtonProps {
   isExpanded: boolean;
   onToggle: () => void;
   onDrillDown: () => void;
+  onTogglePointerDown?: () => void;
 }
 
 /**
@@ -130,12 +131,14 @@ export function ChevronButton({
   isExpanded,
   onToggle,
   onDrillDown,
+  onTogglePointerDown,
 }: ChevronButtonProps) {
   return (
     <button
       className="flex shrink-0 h-[21px] w-[15px] items-center justify-center opacity-0 group-hover/row:opacity-100 pointer-events-none group-hover/row:pointer-events-auto transition-opacity"
       tabIndex={-1}
       onPointerDown={(e) => {
+        onTogglePointerDown?.();
         // Pointer events fire before mousedown; prevent focus theft here.
         e.preventDefault();
       }}

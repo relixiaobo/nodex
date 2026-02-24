@@ -177,6 +177,55 @@ function focusRowUndoTarget(row: HTMLElement | null): void {
   focusUndoShortcutSink();
 }
 
+type StructuralToggleFocusSnapshot = {
+  nodeId: string;
+  parentId: string | null;
+  expiresAt: number;
+};
+
+let structuralToggleFocusSnapshot: StructuralToggleFocusSnapshot | null = null;
+
+function captureStructuralToggleFocusSnapshot(): void {
+  const state = useUIStore.getState();
+  if (!state.focusedNodeId) {
+    structuralToggleFocusSnapshot = null;
+    console.debug('[undo-debug] structuralToggleFocus:capture none');
+    return;
+  }
+  structuralToggleFocusSnapshot = {
+    nodeId: state.focusedNodeId,
+    parentId: state.focusedParentId ?? null,
+    expiresAt: Date.now() + 1000,
+  };
+  console.debug('[undo-debug] structuralToggleFocus:capture', structuralToggleFocusSnapshot);
+}
+
+function peekStructuralToggleFocusSnapshot(): StructuralToggleFocusSnapshot | null {
+  if (!structuralToggleFocusSnapshot) return null;
+  if (Date.now() > structuralToggleFocusSnapshot.expiresAt) {
+    structuralToggleFocusSnapshot = null;
+    return null;
+  }
+  return structuralToggleFocusSnapshot;
+}
+
+function clearStructuralToggleFocusSnapshot(): void {
+  structuralToggleFocusSnapshot = null;
+}
+
+function focusEditorForNodeId(nodeId: string): boolean {
+  const root = document.querySelector<HTMLElement>(`[data-node-id="${nodeId}"]`);
+  const editor = root?.querySelector<HTMLElement>('.ProseMirror');
+  if (!editor) return false;
+  editor.focus();
+  console.debug('[undo-debug] structuralToggleFocus:restoredEditor', {
+    nodeId,
+    activeTag: (document.activeElement as HTMLElement | null)?.tagName,
+    activeClassName: (document.activeElement as HTMLElement | null)?.className,
+  });
+  return true;
+}
+
 function getTreeReferenceBlockMessage(reason: ReturnType<typeof getTreeReferenceBlockReason>): string {
   switch (reason) {
     case 'self_parent':
@@ -1285,6 +1334,18 @@ export function OutlinerItem({
     if (blurClearRafRef.current !== null) {
       cancelAnimationFrame(blurClearRafRef.current);
     }
+    const structuralFocusSnapshot = peekStructuralToggleFocusSnapshot();
+    if (
+      structuralFocusSnapshot &&
+      structuralFocusSnapshot.nodeId === nodeId &&
+      (structuralFocusSnapshot.parentId === null || structuralFocusSnapshot.parentId === parentId)
+    ) {
+      console.debug('[undo-debug] handleBlur:preserve-structural-toggle-focus', {
+        nodeId,
+        parentId,
+      });
+      return;
+    }
     // Delay clearing focus by one frame so click handlers on the next node run
     // before the previous editor unmounts, preventing click-time layout shift.
     blurClearRafRef.current = requestAnimationFrame(() => {
@@ -1494,15 +1555,24 @@ export function OutlinerItem({
     } else {
       toggleExpanded(ek);
     }
-    // Prefer focusing the row editor (known-good Cmd+Z path in Side Panel).
-    // Fallback to hidden sink if the row editor is not mounted/focusable.
-    focusRowUndoTarget(rowRef.current);
+    const structuralFocusSnapshot = peekStructuralToggleFocusSnapshot();
+    if (structuralFocusSnapshot) {
+      useUIStore.getState().setFocusedNode(structuralFocusSnapshot.nodeId, structuralFocusSnapshot.parentId);
+    }
+    // Prefer restoring the previously focused editor (even if it is a different row).
+    if (!structuralFocusSnapshot || !focusEditorForNodeId(structuralFocusSnapshot.nodeId)) {
+      focusRowUndoTarget(rowRef.current);
+    }
     console.debug('[undo-debug] handleToggle post-focus(sync)', {
       tag: (document.activeElement as HTMLElement | null)?.tagName,
       className: (document.activeElement as HTMLElement | null)?.className,
     });
     requestAnimationFrame(() => {
-      focusRowUndoTarget(rowRef.current);
+      const snap = peekStructuralToggleFocusSnapshot();
+      if (!snap || !focusEditorForNodeId(snap.nodeId)) {
+        focusRowUndoTarget(rowRef.current);
+      }
+      clearStructuralToggleFocusSnapshot();
       console.debug('[undo-debug] handleToggle post-focus(raf)', {
         tag: (document.activeElement as HTMLElement | null)?.tagName,
         className: (document.activeElement as HTMLElement | null)?.className,
@@ -1540,13 +1610,23 @@ export function OutlinerItem({
     }
     loroDoc.commitUIMarker();
     useUIStore.setState({ expandedNodes: next });
-    focusRowUndoTarget(rowRef.current);
+    const structuralFocusSnapshot = peekStructuralToggleFocusSnapshot();
+    if (structuralFocusSnapshot) {
+      useUIStore.getState().setFocusedNode(structuralFocusSnapshot.nodeId, structuralFocusSnapshot.parentId);
+    }
+    if (!structuralFocusSnapshot || !focusEditorForNodeId(structuralFocusSnapshot.nodeId)) {
+      focusRowUndoTarget(rowRef.current);
+    }
     console.debug('[undo-debug] handleIndentLineClick post-focus(sync)', {
       tag: (document.activeElement as HTMLElement | null)?.tagName,
       className: (document.activeElement as HTMLElement | null)?.className,
     });
     requestAnimationFrame(() => {
-      focusRowUndoTarget(rowRef.current);
+      const snap = peekStructuralToggleFocusSnapshot();
+      if (!snap || !focusEditorForNodeId(snap.nodeId)) {
+        focusRowUndoTarget(rowRef.current);
+      }
+      clearStructuralToggleFocusSnapshot();
       console.debug('[undo-debug] handleIndentLineClick post-focus(raf)', {
         tag: (document.activeElement as HTMLElement | null)?.tagName,
         className: (document.activeElement as HTMLElement | null)?.className,
@@ -2438,6 +2518,7 @@ export function OutlinerItem({
           isExpanded={isExpanded}
           onToggle={handleToggle}
           onDrillDown={handleDrillDown}
+          onTogglePointerDown={captureStructuralToggleFocusSnapshot}
         />
         <div className={`flex items-start gap-2 min-w-0 relative ${isSelectedRefClick ? 'node-selected-ref w-fit flex-none' : 'flex-1'}`}>
           <div className={deleteBlockedPulse ? 'node-delete-blocked-pulse' : ''}>
@@ -2649,6 +2730,7 @@ export function OutlinerItem({
             style={{ left: depth * 28 + 17, width: 16 }}
             tabIndex={-1}
             onPointerDown={(e) => {
+              captureStructuralToggleFocusSnapshot();
               e.preventDefault();
             }}
             onMouseDown={(e) => {

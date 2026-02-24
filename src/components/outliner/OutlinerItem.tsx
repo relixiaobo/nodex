@@ -1439,6 +1439,9 @@ export function OutlinerItem({
     } else {
       toggleExpanded(ek);
     }
+    requestAnimationFrame(() => {
+      rowRef.current?.focus();
+    });
   }, [nodeId, parentId, toggleExpanded, setExpanded]);
 
   const handleDrillDown = useCallback(() => {
@@ -1471,6 +1474,9 @@ export function OutlinerItem({
     }
     loroDoc.commitUIMarker();
     useUIStore.setState({ expandedNodes: next });
+    requestAnimationFrame(() => {
+      rowRef.current?.focus();
+    });
   }, [nodeId]);
 
   // ─── Keyboard shortcut handlers ───
@@ -2328,6 +2334,7 @@ export function OutlinerItem({
       )}
       <div
         ref={rowRef}
+        tabIndex={-1}
         className={`group/row flex gap-1 min-h-7 items-start py-1 relative ${
           isDropTarget && dropPosition === 'inside'
             ? 'bg-primary/10 ring-1 ring-primary/30 rounded-sm'

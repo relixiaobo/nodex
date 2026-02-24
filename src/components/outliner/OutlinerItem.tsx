@@ -1439,8 +1439,18 @@ export function OutlinerItem({
     } else {
       toggleExpanded(ek);
     }
+    // Restore a focusable target immediately so Cmd+Z stays in-page after clicking controls.
+    rowRef.current?.focus();
+    console.debug('[undo-debug] handleToggle post-focus(sync)', {
+      tag: (document.activeElement as HTMLElement | null)?.tagName,
+      className: (document.activeElement as HTMLElement | null)?.className,
+    });
     requestAnimationFrame(() => {
       rowRef.current?.focus();
+      console.debug('[undo-debug] handleToggle post-focus(raf)', {
+        tag: (document.activeElement as HTMLElement | null)?.tagName,
+        className: (document.activeElement as HTMLElement | null)?.className,
+      });
     });
   }, [nodeId, parentId, toggleExpanded, setExpanded]);
 
@@ -1474,8 +1484,17 @@ export function OutlinerItem({
     }
     loroDoc.commitUIMarker();
     useUIStore.setState({ expandedNodes: next });
+    rowRef.current?.focus();
+    console.debug('[undo-debug] handleIndentLineClick post-focus(sync)', {
+      tag: (document.activeElement as HTMLElement | null)?.tagName,
+      className: (document.activeElement as HTMLElement | null)?.className,
+    });
     requestAnimationFrame(() => {
       rowRef.current?.focus();
+      console.debug('[undo-debug] handleIndentLineClick post-focus(raf)', {
+        tag: (document.activeElement as HTMLElement | null)?.tagName,
+        className: (document.activeElement as HTMLElement | null)?.className,
+      });
     });
   }, [nodeId]);
 

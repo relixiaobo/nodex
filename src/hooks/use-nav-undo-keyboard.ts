@@ -41,6 +41,17 @@ export function useNavUndoKeyboard() {
     const redoBindings = getShortcutKeys('global.nav_redo', ['Mod-Shift-z', 'Ctrl-Shift-z']);
 
     function handler(e: KeyboardEvent) {
+      if (e.metaKey || e.ctrlKey) {
+        const active = document.activeElement as HTMLElement | null;
+        console.debug('[undo-debug] raw-keydown', {
+          key: e.key,
+          metaKey: e.metaKey,
+          ctrlKey: e.ctrlKey,
+          shiftKey: e.shiftKey,
+          activeTag: active?.tagName,
+          activeClass: active?.className,
+        });
+      }
       const action = resolveNavUndoAction(e, undoBindings, redoBindings);
       if (!action) return;
       const active = document.activeElement as HTMLElement | null;

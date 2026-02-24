@@ -12,7 +12,7 @@ export function SearchTrigger() {
   return (
     <button
       onClick={openSearch}
-      className="flex flex-1 items-center gap-2 rounded-xl bg-background px-3 py-1.5 text-xs text-foreground-tertiary transition-colors hover:bg-background/80 hover:text-foreground-secondary"
+      className="flex flex-1 items-center gap-2 rounded-full bg-background px-3 py-1.5 text-xs text-foreground-tertiary transition-colors hover:bg-background/80 hover:text-foreground-secondary"
     >
       <span className="flex-1 text-left">Search...</span>
       <Kbd keys={isMac ? '\u2318K' : 'Ctrl+K'} />

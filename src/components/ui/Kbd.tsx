@@ -29,6 +29,15 @@ interface KbdProps {
 /** Modifier symbols that are split into their own cell. */
 const MODIFIER_CHARS = new Set(['\u2318', '\u21E7', '\u2325', '\u2303']); // ⌘ ⇧ ⌥ ⌃
 
+/**
+ * Per-glyph vertical offset corrections (in px).
+ * Unicode modifier symbols have inconsistent baselines across fonts —
+ * these nudges visually center each glyph within its cell.
+ */
+const GLYPH_Y_OFFSET: Record<string, number> = {
+  '\u21E7': -1, // ⇧ shift arrow sits too low
+};
+
 function splitShortcut(shortcut: string): string[] {
   // "Ctrl+K" → ["Ctrl", "K"]
   if (shortcut.includes('+')) {
@@ -62,11 +71,18 @@ export function Kbd({ keys, children, onClick, className = '' }: KbdProps) {
         onClick={onClick}
         className={`${KBD_BASE} gap-px ${interactive} ${className}`}
       >
-        {parts.map((part, i) => (
-          <span key={i} className="inline-flex w-[1em] items-center justify-center">
-            {part}
-          </span>
-        ))}
+        {parts.map((part, i) => {
+          const yOffset = GLYPH_Y_OFFSET[part];
+          return (
+            <span
+              key={i}
+              className="inline-flex w-[1em] items-center justify-center"
+              style={yOffset ? { transform: `translateY(${yOffset}px)` } : undefined}
+            >
+              {part}
+            </span>
+          );
+        })}
       </kbd>
     );
   }

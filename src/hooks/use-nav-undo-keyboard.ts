@@ -15,7 +15,9 @@ export type NavUndoAction = 'undo' | 'redo' | null;
 
 export function shouldHandleNavUndo(activeElement: Element | null, focusedNodeId: string | null): boolean {
   // In editor mode, let the editor keymap handle undo/redo (it also uses Loro).
-  if (focusedNodeId) return false;
+  // Rely on actual DOM focus, not focusedNodeId store state, because clicking row controls
+  // (chevron/indent line/etc.) may keep focusedNodeId non-null while the editor lost focus.
+  void focusedNodeId;
   if (activeElement instanceof HTMLElement && activeElement.isContentEditable) return false;
   if (activeElement instanceof HTMLInputElement || activeElement instanceof HTMLTextAreaElement) return false;
   return true;

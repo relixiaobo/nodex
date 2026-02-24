@@ -3,7 +3,7 @@ import { EditorState, TextSelection, type Plugin } from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
 import { keymap } from 'prosemirror-keymap';
 import { baseKeymap, toggleMark } from 'prosemirror-commands';
-import { history, redo, undo } from 'prosemirror-history';
+import { commitDoc, redoDoc, undoDoc } from '../../lib/loro-doc.js';
 import { useNodeStore } from '../../stores/node-store.js';
 import { useUIStore } from '../../stores/ui-store.js';
 import { getPrimaryShortcutKey, getShortcutKeys } from '../../lib/shortcut-registry.js';
@@ -479,7 +479,6 @@ export function RichTextEditor(props: RichTextEditorProps) {
     };
 
     return [
-      history({ depth: 100 }),
       keymap({
         Enter: (_state, _dispatch, view) => {
           if (!view || isComposing(view)) return false;
@@ -575,9 +574,18 @@ export function RichTextEditor(props: RichTextEditorProps) {
               },
             }
           : {}),
-        'Mod-z': (state, dispatch) => undo(state, dispatch),
-        'Mod-y': (state, dispatch) => redo(state, dispatch),
-        'Mod-Shift-z': (state, dispatch) => redo(state, dispatch),
+        'Mod-z': () => {
+          undoDoc();
+          return true;
+        },
+        'Mod-y': () => {
+          redoDoc();
+          return true;
+        },
+        'Mod-Shift-z': () => {
+          redoDoc();
+          return true;
+        },
         'Mod-b': toggleMark(pmSchema.marks.bold),
         'Mod-i': toggleMark(pmSchema.marks.italic),
         'Mod-e': toggleMark(pmSchema.marks.code),
@@ -624,6 +632,12 @@ export function RichTextEditor(props: RichTextEditorProps) {
             marks: parsed.marks,
             inlineRefs: parsed.inlineRefs,
           });
+          commitDoc('user:text');
+          initialContentRef.current = {
+            text: parsed.text,
+            marks: parsed.marks,
+            inlineRefs: parsed.inlineRefs,
+          };
         }
 
         if (!isExternalSyncRef.current && !isComposing) {
@@ -673,6 +687,12 @@ export function RichTextEditor(props: RichTextEditorProps) {
             marks: parsed.marks,
             inlineRefs: parsed.inlineRefs,
           });
+          commitDoc('user:text');
+          initialContentRef.current = {
+            text: parsed.text,
+            marks: parsed.marks,
+            inlineRefs: parsed.inlineRefs,
+          };
           runTriggerDetection(view, true);
           return false;
         },

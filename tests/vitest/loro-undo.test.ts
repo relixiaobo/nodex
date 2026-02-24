@@ -20,6 +20,8 @@ import {
   setNodeData,
 } from '../../src/lib/loro-doc.js';
 import { useNodeStore } from '../../src/stores/node-store.js';
+import { useUIStore } from '../../src/stores/ui-store.js';
+import { CONTAINER_IDS } from '../../src/types/index.js';
 import { resetAndSeed } from './helpers/test-state.js';
 
 beforeEach(() => {
@@ -156,5 +158,49 @@ describe('多次操作的撤销栈深度', () => {
     // 执行新操作后 redo 栈应该被清空
     store.createChild('proj_1');
     expect(canRedoDoc()).toBe(false);
+  });
+});
+
+describe('UI marker → undoDoc/redoDoc', () => {
+  it('导航操作通过 Loro undo/redo 恢复 panel history', () => {
+    const ui = useUIStore.getState();
+    const before = {
+      panelHistory: [...useUIStore.getState().panelHistory],
+      panelIndex: useUIStore.getState().panelIndex,
+    };
+
+    ui.navigateTo('inbox_3');
+    expect(useUIStore.getState().panelHistory[useUIStore.getState().panelIndex]).toBe('inbox_3');
+
+    expect(undoDoc()).toBe(true);
+    expect(useUIStore.getState().panelHistory).toEqual(before.panelHistory);
+    expect(useUIStore.getState().panelIndex).toBe(before.panelIndex);
+
+    expect(redoDoc()).toBe(true);
+    expect(useUIStore.getState().panelHistory[useUIStore.getState().panelIndex]).toBe('inbox_3');
+  });
+
+  it('展开/折叠通过 Loro undo/redo 恢复 expandedNodes', () => {
+    const ui = useUIStore.getState();
+    const expandKey = `${CONTAINER_IDS.LIBRARY}:note_2`;
+
+    ui.setExpanded(expandKey, true);
+    expect(useUIStore.getState().expandedNodes.has(expandKey)).toBe(true);
+
+    expect(undoDoc()).toBe(true);
+    expect(useUIStore.getState().expandedNodes.has(expandKey)).toBe(false);
+
+    expect(redoDoc()).toBe(true);
+    expect(useUIStore.getState().expandedNodes.has(expandKey)).toBe(true);
+  });
+
+  it('程序性 setExpanded(skipUndo) 不创建 undo step', () => {
+    const ui = useUIStore.getState();
+    const expandKey = `${CONTAINER_IDS.LIBRARY}:note_2`;
+
+    expect(canUndoDoc()).toBe(false);
+    ui.setExpanded(expandKey, true, true);
+    expect(useUIStore.getState().expandedNodes.has(expandKey)).toBe(true);
+    expect(canUndoDoc()).toBe(false);
   });
 });

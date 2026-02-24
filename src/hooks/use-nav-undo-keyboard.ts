@@ -1,20 +1,20 @@
 /**
  * Global keyboard hook for navigation undo/redo.
  *
- * Cmd+Z → navUndo(), Cmd+Shift+Z → navRedo()
+ * Cmd+Z / Cmd+Shift+Z → Loro UndoManager (single timeline)
  *
- * Does NOT intercept when a contentEditable element is focused
- * (lets ProseMirror handle its own undo/redo).
+ * Does NOT intercept when a contentEditable element is focused;
+ * the editor keymap handles the same Loro undo/redo path.
  */
 import { useEffect } from 'react';
 import { useUIStore } from '../stores/ui-store';
 import { getShortcutKeys, matchesShortcutEvent } from '../lib/shortcut-registry';
-import { undoDoc, redoDoc, canUndoDoc, canRedoDoc } from '../lib/loro-doc.js';
+import { undoDoc, redoDoc } from '../lib/loro-doc.js';
 
 export type NavUndoAction = 'undo' | 'redo' | null;
 
 export function shouldHandleNavUndo(activeElement: Element | null, focusedNodeId: string | null): boolean {
-  // In editor mode, always let ProseMirror own undo/redo handling.
+  // In editor mode, let the editor keymap handle undo/redo (it also uses Loro).
   if (focusedNodeId) return false;
   if (activeElement instanceof HTMLElement && activeElement.isContentEditable) return false;
   if (activeElement instanceof HTMLInputElement || activeElement instanceof HTMLTextAreaElement) return false;
@@ -48,17 +48,9 @@ export function useNavUndoKeyboard() {
       e.preventDefault();
 
       if (action === 'redo') {
-        if (canRedoDoc()) {
-          redoDoc();
-        } else {
-          useUIStore.getState().navRedo();
-        }
+        redoDoc();
       } else {
-        if (canUndoDoc()) {
-          undoDoc();
-        } else {
-          useUIStore.getState().navUndo();
-        }
+        undoDoc();
       }
     }
 

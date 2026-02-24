@@ -195,10 +195,10 @@ function handleUndo(e: KeyboardEvent) {
 
 | Phase | 功能 | 说明 |
 |-------|------|------|
-| 1 | 补全 commitDoc() | tags / fields / checkbox 所有路径 |
-| 2 | ProseMirror → Loro 实时同步 | ✅ 已接入 `commitDoc('user:text')` + 移除 PM History（需继续回归） |
-| 3 | UI 状态 marker commit | ✅ 已接入导航/展开折叠 + `onPush/onPop` UI snapshot |
-| 4 | 统一 ⌘Z handler | 🟡 键盘入口已统一到 Loro；旧 `navUndoStack` 代码待清理 |
+| 1 | 补全 commitDoc() | tags / fields / checkbox 所有路径（待补全） |
+| 2 | ProseMirror → Loro 实时同步 | ✅ 已完成 PR #91 — `commitDoc('user:text')` + PM History 已移除 |
+| 3 | UI 状态 marker commit | ✅ 已完成 PR #91 — 导航/展开折叠 `commitUIMarker()` + `onPush/onPop` UI snapshot |
+| 4 | 统一 ⌘Z handler | ✅ 已完成 PR #91 — 编辑器 keymap + 全局非编辑态统一走 `undoDoc/redoDoc`；navUndoStack 已移除 |
 
 ## 决策记录
 

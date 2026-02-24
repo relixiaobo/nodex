@@ -1450,16 +1450,14 @@ export function OutlinerItem({
     } else {
       toggleExpanded(ek);
     }
-    // Restore an editable focus target immediately so Cmd+Z is dispatched to the page on macOS.
+    // Keep focus on the hidden editable sink so Cmd+Z is dispatched to page JS.
     focusUndoShortcutSink();
-    rowRef.current?.focus();
     console.debug('[undo-debug] handleToggle post-focus(sync)', {
       tag: (document.activeElement as HTMLElement | null)?.tagName,
       className: (document.activeElement as HTMLElement | null)?.className,
     });
     requestAnimationFrame(() => {
       focusUndoShortcutSink();
-      rowRef.current?.focus();
       console.debug('[undo-debug] handleToggle post-focus(raf)', {
         tag: (document.activeElement as HTMLElement | null)?.tagName,
         className: (document.activeElement as HTMLElement | null)?.className,
@@ -1498,14 +1496,12 @@ export function OutlinerItem({
     loroDoc.commitUIMarker();
     useUIStore.setState({ expandedNodes: next });
     focusUndoShortcutSink();
-    rowRef.current?.focus();
     console.debug('[undo-debug] handleIndentLineClick post-focus(sync)', {
       tag: (document.activeElement as HTMLElement | null)?.tagName,
       className: (document.activeElement as HTMLElement | null)?.className,
     });
     requestAnimationFrame(() => {
       focusUndoShortcutSink();
-      rowRef.current?.focus();
       console.debug('[undo-debug] handleIndentLineClick post-focus(raf)', {
         tag: (document.activeElement as HTMLElement | null)?.tagName,
         className: (document.activeElement as HTMLElement | null)?.className,

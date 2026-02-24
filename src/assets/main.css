@@ -243,6 +243,20 @@
   animation: node-delete-blocked-pulse 220ms ease-out;
 }
 
+/* Command palette expand animation — reveals from header downward */
+@keyframes palette-expand {
+  from {
+    clip-path: inset(0 0 calc(100% - 44px) 0);
+  }
+  to {
+    clip-path: inset(0);
+  }
+}
+
+.animate-palette-expand {
+  animation: palette-expand 200ms ease-out;
+}
+
 /* cmdk command palette styles */
 [cmdk-group-heading] {
   padding: 0.25rem 0.5rem;

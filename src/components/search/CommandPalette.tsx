@@ -14,7 +14,7 @@
  * Typing: single "Results" group with fuzzy-matched nodes + commands
  */
 import { useEffect, useCallback, useMemo, useState, useRef } from 'react';
-import { Library, Inbox, CalendarDays, Trash2, Search, Plus, X, type AppIcon } from '../../lib/icons.js';
+import { Library, Inbox, CalendarDays, Trash2, Search, Plus, type AppIcon } from '../../lib/icons.js';
 import { resolveTagColor } from '../../lib/tag-colors.js';
 import { resolveDataType, getFieldTypeIcon } from '../../lib/field-utils.js';
 import { isContainerNode } from '../../types/index.js';
@@ -352,15 +352,9 @@ export function CommandPalette() {
   let globalIdx = 0;
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-background">
+    <div className="animate-palette-expand fixed inset-0 z-50 flex flex-col bg-background">
       {/* Search header — replaces toolbar */}
-      <div className="flex h-11 shrink-0 items-center gap-2 border-b border-border bg-foreground/[0.04] px-2">
-        <button
-          onClick={closeAndClear}
-          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-foreground-secondary transition-colors hover:bg-foreground/10 hover:text-foreground"
-        >
-          <X size={16} strokeWidth={1.5} />
-        </button>
+      <div className="flex h-11 shrink-0 items-center gap-2 border-b border-border bg-foreground/[0.04] px-3">
         <input
           ref={inputRef}
           value={searchQuery}
@@ -369,7 +363,7 @@ export function CommandPalette() {
           placeholder="Search nodes and commands..."
           className="h-full flex-1 bg-transparent text-sm outline-none placeholder:text-foreground-tertiary"
         />
-        <Kbd>Esc</Kbd>
+        <Kbd onClick={closeAndClear}>Esc</Kbd>
       </div>
 
       {/* Results area — fills remaining space */}

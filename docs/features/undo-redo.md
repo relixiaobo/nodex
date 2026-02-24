@@ -219,6 +219,8 @@ function handleUndo(e: KeyboardEvent) {
 | 2026-02-24 | **Bootstrap 用 replacePanel 不用 navigateTo** | navigateTo 会创建 Loro undo 条目，其快照为空 panelHistory → 连续 ⌘Z 导致白屏 |
 | 2026-02-24 | **restore 回调防御空 panelHistory** | 即使 undo 栈中泄露了空快照，也不实际应用 |
 | 2026-02-24 | **seedWorkspace 末尾 commitDoc('system:bootstrap')** | 防止容器创建 pending ops 泄入后续 user-origin commit |
+| 2026-02-24 | **导航后同步聚焦 undo-shortcut-sink** | Chrome Side Panel 在 DOM 替换后焦点落到 body，浏览器拦截 ⌘Z 不传给 JS。提取 `focusUndoShortcutSink` 到 `src/lib/focus-utils.ts`，`ensureUndoFocusAfterNavigation()` 在所有导航路径（bullet zoom-in、面包屑、命令面板）同步聚焦 |
+| 2026-02-24 | **TrailingInput 补 Mod-z/Mod-Shift-z keymap** | 无子节点 zoom-in 时 TrailingInput autoFocus 抢焦点，全局 handler 跳过 contentEditable，但 TrailingInput 无 undo 绑定 → ⌘Z 被静默丢弃 |
 
 ## 参考
 

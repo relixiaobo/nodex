@@ -134,6 +134,11 @@ export function ChevronButton({
   return (
     <button
       className="flex shrink-0 h-[21px] w-[15px] items-center justify-center opacity-0 group-hover/row:opacity-100 pointer-events-none group-hover/row:pointer-events-auto transition-opacity"
+      onMouseDown={(e) => {
+        // Prevent focus from moving onto the button; otherwise Cmd+Z can be swallowed
+        // by the browser/native control path instead of reaching unified undo handlers.
+        e.preventDefault();
+      }}
       onClick={(e) => { e.stopPropagation(); onToggle(); }}
       onDoubleClick={(e) => { e.stopPropagation(); onDrillDown(); }}
       title={isExpanded ? 'Collapse' : 'Expand'}

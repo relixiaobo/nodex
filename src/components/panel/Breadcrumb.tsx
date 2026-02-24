@@ -109,7 +109,7 @@ export function Breadcrumb({ nodeId, showCurrentName }: BreadcrumbProps) {
       <button
         onClick={canGoUp ? handleGoUp : undefined}
         disabled={!canGoUp}
-        className="flex h-7 w-[15px] shrink-0 items-center justify-center rounded-md hover:bg-foreground/5 hover:text-foreground disabled:pointer-events-none disabled:opacity-30"
+        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md hover:text-foreground disabled:pointer-events-none disabled:opacity-30"
         title={canGoUp ? t('breadcrumb.goToParent') : undefined}
       >
         <ChevronLeft size={14} strokeWidth={1.5} />
@@ -124,7 +124,7 @@ export function Breadcrumb({ nodeId, showCurrentName }: BreadcrumbProps) {
           {!!wsId && (
             <button
               onClick={handleNavigateToWorkspaceRoot}
-              className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/15 text-[10px] font-semibold text-primary hover:bg-primary/25"
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/15 text-[10px] font-semibold text-primary hover:bg-primary/20"
               title={t('breadcrumb.goToWorkspaceRoot')}
             >
               {wsInitial}
@@ -137,7 +137,7 @@ export function Breadcrumb({ nodeId, showCurrentName }: BreadcrumbProps) {
               <span className="shrink-0 text-foreground-tertiary mx-0.5">/</span>
               <button
                 onClick={() => setExpanded(true)}
-                className="flex h-7 shrink-0 items-center justify-center rounded-md px-1 hover:bg-foreground/5 hover:text-foreground"
+                className="flex h-7 shrink-0 items-center justify-center rounded-md px-1 hover:text-foreground"
                 title={hiddenAncestors.map(a => a.name).join(' › ')}
               >
                 <MoreHorizontal size={14} />
@@ -157,7 +157,7 @@ export function Breadcrumb({ nodeId, showCurrentName }: BreadcrumbProps) {
                   }
                   navigateTo(ancestor.id);
                 }}
-                className="truncate max-w-[120px] rounded px-0.5 hover:bg-foreground/5 hover:text-foreground"
+                className="flex h-7 items-center truncate max-w-[120px] rounded px-0.5 hover:text-foreground"
               >
                 {resolveBreadcrumbLabel(ancestor.id, ancestor.name)}
               </button>

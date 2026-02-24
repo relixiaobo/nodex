@@ -13,7 +13,7 @@ import { ToolbarUserMenu } from './ToolbarUserMenu';
 
 export function TopToolbar() {
   return (
-    <div className="flex h-11 shrink-0 items-center gap-1 bg-foreground/[0.08] px-1">
+    <div className="flex h-11 shrink-0 items-center gap-1 bg-foreground/[0.08] px-1.5">
       {/* Left: Undo/Redo */}
       <UndoRedoButtons />
 

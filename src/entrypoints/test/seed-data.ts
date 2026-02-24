@@ -288,15 +288,17 @@ function seedBody(): void {
   // ═══════════════════════════════════════════════════════════════
   const uiStore = useUIStore.getState();
 
-  // Expand some nodes by default for testing
-  uiStore.setExpanded(`${CONTAINER_IDS.LIBRARY}:proj_1`, true);
-  uiStore.setExpanded('proj_1:task_1', true);
-  uiStore.setExpanded('proj_1:task_2', true);
-  uiStore.setExpanded(`${CONTAINER_IDS.LIBRARY}:note_rich`, true);
+  // Expand some nodes by default for testing (skipUndo=true to avoid
+  // creating undo entries during seed — Bug 1 fix)
+  uiStore.setExpanded(`${CONTAINER_IDS.LIBRARY}:proj_1`, true, true);
+  uiStore.setExpanded('proj_1:task_1', true, true);
+  uiStore.setExpanded('proj_1:task_2', true, true);
+  uiStore.setExpanded(`${CONTAINER_IDS.LIBRARY}:note_rich`, true, true);
 
-  // Navigate to Library
+  // Navigate to Library — use replacePanel (not navigateTo) to avoid
+  // creating a Loro undo entry whose UI snapshot is the empty initial state.
   if (uiStore.panelHistory.length === 0) {
-    uiStore.navigateTo(CONTAINER_IDS.LIBRARY);
+    uiStore.replacePanel(CONTAINER_IDS.LIBRARY);
   }
 }
 
@@ -331,6 +333,9 @@ export async function seedTestData(options?: { forceFresh?: boolean }): Promise<
 
   // Commit so Loro subscriptions fire and _version bumps for React
   commitDoc('__seed__');
+  // Some store actions (applyTag etc.) call commitDoc() internally without '__seed__' origin,
+  // creating stray undo entries.  Clear them so user starts with a clean undo history.
+  clearUndoHistoryForTest();
 }
 
 /** Sync seed for test environments (call after initLoroDocForTest). */

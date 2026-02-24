@@ -34,6 +34,7 @@ import { COMMAND_PALETTE_QUICK_CONTAINERS } from '../../lib/system-node-registry
 import { ensureTodayNode, isDayNode } from '../../lib/journal.js';
 import { parseDayNodeName, parseYearNodeName, isToday } from '../../lib/date-utils.js';
 
+import { ensureUndoFocusAfterNavigation } from '../../lib/focus-utils.js';
 import { t } from '../../i18n/strings.js';
 
 /** Add "Today, " prefix for today's day node, matching NodeHeader behavior. */
@@ -111,6 +112,7 @@ export function CommandPalette() {
   const closeAndClear = useCallback(() => {
     setSearchQuery('');
     closeSearch();
+    ensureUndoFocusAfterNavigation();
   }, [setSearchQuery, closeSearch]);
 
   // Build command context

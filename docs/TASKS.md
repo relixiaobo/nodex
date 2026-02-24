@@ -27,7 +27,7 @@ _(空)_
 
 | Agent | 当前任务 | 分支 | 修改中的文件 |
 |-------|---------|------|-------------|
-| nodex-cc | _(idle)_ | — | — |
+| nodex-cc | 布局 Phase 3 Undo/Redo 按钮集成 + #44 Phase 1 验证 | `cc/layout-undo-buttons` | `TopToolbar.tsx`, `UndoRedoButtons.tsx` |
 | nodex-cc-2 | Search Nodes Phase 1 (#23) | `cc2/search-nodes` | `node.ts`, `loro-doc.ts`, `search-engine.ts`, `node-store.ts`, `OutlinerItem.tsx`, `OutlinerView.tsx` |
 | nodex-codex | _(idle)_ | — | — |
 
@@ -35,14 +35,9 @@ _(空)_
 
 ## 进行中
 
-### Undo/Redo 行为修复（3 个 bug）
-> PR #91 合并后发现的 undo/redo 边界问题。
-> **Owner**: nodex-cc | **Branch**: `cc/undo-redo-fixes`
-> **Spec**: `docs/features/undo-redo.md`
-
-- [x] Bug 1: 连续 ⌘Z 回退到空白状态 — 根因：bootstrap `navigateTo` 创建 undo 条目，快照为空 panelHistory。修复：改用 `replacePanel` + `commitDoc('system:bootstrap')` + restore 防御空 panelHistory。(PR #92)
-- [ ] Bug 2: 焦点不在 node 编辑器中时，⌘Z 无法撤回展开/收起操作（点击 chevron 或引导线后焦点丢失到 sink textarea，但 undo 未生效）— Side Panel 实测正常，暂跳过
-- [x] Bug 3: 点击节点 bullet 进入 NodePanel 后 ⌘Z 无法返回 — 根因：(a) seed 路径污染 undo 栈 (PR #92)；(b) 导航后焦点落到 body，Side Panel 拦截 ⌘Z；(c) 无子节点时 TrailingInput autoFocus 抢焦点但无 Mod-z 绑定。修复：提取 `focusUndoShortcutSink` 到 `src/lib/focus-utils.ts`，导航后同步聚焦 sink + TrailingInput 补 Mod-z keymap。
+### Side Panel 布局 Phase 3 + Undo/Redo 验证
+> nodex-cc 负责两个子任务：① 布局 Phase 3 Undo/Redo 按钮集成到 TopToolbar ② 验证 #44 Phase 1 commitDoc() 覆盖
+> **Owner**: nodex-cc | **Branch**: `cc/layout-undo-buttons`
 
 ---
 
@@ -136,15 +131,16 @@ _(空)_
 - [x] Phase 2: ProseMirror → Loro 实时同步 + 移除 `prosemirror-history` ✓ PR #91
 - [x] Phase 3: UI 状态 marker commit（展开/折叠 + 导航进入 Loro undo 栈）✓ PR #91
 - [x] Phase 4: 统一 ⌘Z handler + 删除旧代码（navUndoStack / 三层 fallthrough / PM History）✓ PR #91
-- [ ] Phase 1: 补全 commitDoc() 覆盖（applyTag / removeTag / setFieldValue / toggleCheckbox 所有路径）
+- [ ] Phase 1: 补全 commitDoc() 覆盖 — **nodex 已验证：applyTag/removeTag/setFieldValue/toggleCheckboxField/toggleNodeDone/cycleNodeCheckbox 全部有 commitDoc()，请 nodex-cc 复查确认后勾选**
 
 #### Side Panel 布局改造 — 移除 Sidebar + ⌘K 重设计
 > Phase 1/2/4 已完成（PR #88）。Phase 3（Undo/Redo 按钮集成）待 #44 完成后执行。
+> **Owner**: nodex-cc | **Branch**: `cc/layout-undo-buttons`
 > **Plan**: `docs/plans/layout-renovation.md`
 
 - [x] Phase 1: 顶栏骨架 + 移除 Sidebar ✓ PR #88
 - [x] Phase 2: ⌘K 命令面板重写 ✓ PR #88
-- [ ] Phase 3: Undo/Redo 按钮集成（#44 核心已完成，可执行）
+- [ ] Phase 3: Undo/Redo 按钮集成 — **可执行**（#44 核心已完成）。把 `UndoRedoButtons.tsx` 集成到 `TopToolbar.tsx`，参考 `docs/plans/layout-renovation.md` Phase 3 设计
 - [x] Phase 4: 清理废弃文件 ✓ PR #88
 
 #### 节点选中 — 后续增强 (#47)

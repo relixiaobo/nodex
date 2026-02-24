@@ -1467,6 +1467,7 @@ createSibling 自动标签（2 cases）:
 | 8 | syncTemplateFields 幂等 | 重复调用不产生重复子节点 |
 | 9 | UI 创建的字段（addUnnamedFieldToNode）被 applyTag 应用 | fieldDef 在 SCHEMA + fieldEntry 在 tagDef 的布局正确匹配 |
 | 10 | syncTemplateFields 补齐 UI 创建的字段（事后添加） | tag 已应用后，tagDef 新增 fieldEntry 子节点，sync 正确补创建 |
+| 11 | buildFieldOwnerColors 解析 UI 创建字段的 tagDef 颜色 | templateId → getParentId → tagDef，每个 fieldEntry 都有 owner color |
 
 ---
 

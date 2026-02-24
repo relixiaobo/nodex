@@ -41,6 +41,7 @@ const GLYPH_STYLE: Record<string, { y?: number; cls?: string }> = {
   '\u21E7': { y: -0.5, cls: MODIFIER_STYLE },         // ⇧ — nudge up
   '\u2325': { cls: MODIFIER_STYLE },                   // ⌥
   '\u2303': { cls: MODIFIER_STYLE },                   // ⌃
+  '\u21B5': { y: -0.5, cls: MODIFIER_STYLE },         // ↵ — nudge up (renders low)
 };
 
 function splitShortcut(shortcut: string): string[] {

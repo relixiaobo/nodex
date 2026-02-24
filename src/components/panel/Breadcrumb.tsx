@@ -28,6 +28,7 @@ import { ensureWorkspaceHomeNode } from '../../lib/workspace-root.js';
 import * as loroDoc from '../../lib/loro-doc.js';
 import { isDayNode } from '../../lib/journal.js';
 import { parseDayNodeName, parseYearNodeName, isToday } from '../../lib/date-utils.js';
+import { ensureUndoFocusAfterNavigation } from '../../lib/focus-utils.js';
 import { t } from '../../i18n/strings.js';
 
 interface BreadcrumbProps {
@@ -79,7 +80,10 @@ export function Breadcrumb({ nodeId, showCurrentName }: BreadcrumbProps) {
   useEffect(() => setExpanded(false), [nodeId]);
 
   const handleGoUp = useCallback(() => {
-    if (parentId) navigateTo(parentId);
+    if (parentId) {
+      navigateTo(parentId);
+      ensureUndoFocusAfterNavigation();
+    }
   }, [parentId, navigateTo]);
 
   const handleNavigateToWorkspaceRoot = useCallback(() => {
@@ -87,6 +91,7 @@ export function Breadcrumb({ nodeId, showCurrentName }: BreadcrumbProps) {
       ensureWorkspaceHomeNode(wsId);
     }
     navigateTo(workspaceRootTargetId);
+    ensureUndoFocusAfterNavigation();
   }, [workspaceRootTargetId, navigateTo, wsId]);
 
   // Filter out workspace root from ancestors — [W] avatar already represents it
@@ -156,6 +161,7 @@ export function Breadcrumb({ nodeId, showCurrentName }: BreadcrumbProps) {
                     return;
                   }
                   navigateTo(ancestor.id);
+                  ensureUndoFocusAfterNavigation();
                 }}
                 className="truncate max-w-[120px] rounded px-0.5 hover:text-foreground"
               >

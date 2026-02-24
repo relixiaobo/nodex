@@ -77,6 +77,7 @@ import {
 import { dragState } from '../../hooks/use-drag-select';
 import { mergeRichTextPayload } from '../../lib/rich-text-merge.js';
 import { getTreeReferenceBlockReason, isReferenceDisplayCycle } from '../../lib/reference-rules.js';
+import { focusUndoShortcutSink, ensureUndoFocusAfterNavigation } from '../../lib/focus-utils.js';
 import { t } from '../../i18n/strings.js';
 
 const DESCRIPTION_SHORTCUT_KEYS = getShortcutKeys('editor.edit_description', ['Ctrl-i']);
@@ -122,29 +123,7 @@ function focusTrailingInputForParent(parentId: string): boolean {
   return false;
 }
 
-function focusUndoShortcutSink(): void {
-  let el = document.getElementById('undo-shortcut-sink');
-  if (!(el instanceof HTMLTextAreaElement)) {
-    const created = document.createElement('textarea');
-    created.id = 'undo-shortcut-sink';
-    created.dataset.undoShortcutSink = 'true';
-    created.tabIndex = -1;
-    created.readOnly = true;
-    created.style.position = 'fixed';
-    created.style.left = '0';
-    created.style.top = '0';
-    created.style.width = '1px';
-    created.style.height = '1px';
-    created.style.opacity = '0';
-    created.style.pointerEvents = 'none';
-    created.style.zIndex = '-1';
-    created.setAttribute('aria-hidden', 'true');
-    document.body.appendChild(created);
-    el = created;
-  }
-  if (!(el instanceof HTMLTextAreaElement)) return;
-  el.focus();
-}
+// focusUndoShortcutSink imported from ../../lib/focus-utils.js
 
 function focusRowUndoTarget(row: HTMLElement | null): void {
   const editor = row?.querySelector<HTMLElement>('.ProseMirror');
@@ -1548,6 +1527,7 @@ export function OutlinerItem({
 
   const handleBulletClick = useCallback(() => {
     navigateTo(panelNavigationNodeId);
+    ensureUndoFocusAfterNavigation();
   }, [panelNavigationNodeId, navigateTo]);
 
   const handleIndentLineClick = useCallback(() => {

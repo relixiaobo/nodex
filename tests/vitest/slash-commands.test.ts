@@ -27,16 +27,18 @@ describe('slash command helpers', () => {
     const fourth = getNextEnabledSlashIndex(filtered, third, 'down');
     const fifth = getNextEnabledSlashIndex(filtered, fourth, 'down');
     const sixth = getNextEnabledSlashIndex(filtered, fifth, 'down');
+    const seventh = getNextEnabledSlashIndex(filtered, sixth, 'down');
 
     expect(filtered[first]?.id).toBe('clip_page');
-    expect(filtered[second]?.id).toBe('field');
-    expect(filtered[third]?.id).toBe('reference');
-    expect(filtered[fourth]?.id).toBe('heading');
-    expect(filtered[fifth]?.id).toBe('checkbox');
-    expect(filtered[sixth]?.id).toBe('more_commands');
+    expect(filtered[second]?.id).toBe('search_node');
+    expect(filtered[third]?.id).toBe('field');
+    expect(filtered[fourth]?.id).toBe('reference');
+    expect(filtered[fifth]?.id).toBe('heading');
+    expect(filtered[sixth]?.id).toBe('checkbox');
+    expect(filtered[seventh]?.id).toBe('more_commands');
 
     // Clamp to boundaries.
-    expect(getNextEnabledSlashIndex(filtered, sixth, 'down')).toBe(sixth);
+    expect(getNextEnabledSlashIndex(filtered, seventh, 'down')).toBe(seventh);
     expect(getNextEnabledSlashIndex(filtered, first, 'up')).toBe(first);
   });
 

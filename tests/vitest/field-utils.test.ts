@@ -203,9 +203,6 @@ describe('resolveTaggedNodes', () => {
     const nodes = resolveTaggedNodes('tagDef_task');
     expect(nodes).not.toContain('idea_1');
     expect(nodes).not.toContain('note_2');
-    // task_2 and task_3 are NOT tagged with tagDef_task in seed data
-    expect(nodes).not.toContain('task_2');
-    expect(nodes).not.toContain('task_3');
   });
 
   it('returns empty for unknown tagDefId', () => {

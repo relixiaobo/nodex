@@ -129,11 +129,13 @@ function seedBody(): void {
   cn('subtask_1b', 'task_1', { name: 'Create database migration' });
 
   cn('task_2', 'proj_1', { name: 'Build the outliner UI' });
+  useNodeStore.getState().applyTag('task_2', 'tagDef_task');
   cn('subtask_2a', 'task_2', { name: 'Implement BulletChevron component' });
   cn('subtask_2b', 'task_2', { name: 'Add keyboard navigation' });
   cn('subtask_2c', 'task_2', { name: 'Implement drag and drop' });
 
   cn('task_3', 'proj_1', { name: 'Connect to Supabase' });
+  useNodeStore.getState().applyTag('task_3', 'tagDef_task');
 
   // ── Person node ──
   cn('person_1', CONTAINER_IDS.LIBRARY, { name: 'Alice Johnson' });
@@ -284,6 +286,14 @@ function seedBody(): void {
   cn('j_d14_3', day14agoId, { name: 'Fixed undo/redo edge case' });
 
   // ═══════════════════════════════════════════════════════════════
+  // Search nodes
+  // ═══════════════════════════════════════════════════════════════
+  // Search for #Task: search node + AND group + HAS_TAG condition
+  cn('search_tasks', CONTAINER_IDS.SEARCHES, { type: 'search', name: 'Task' });
+  cn('search_tasks_group', 'search_tasks', { type: 'queryCondition', queryLogic: 'AND' });
+  cn('search_tasks_cond', 'search_tasks_group', { type: 'queryCondition', queryOp: 'HAS_TAG', queryTargetTag: 'tagDef_task' });
+
+  // ═══════════════════════════════════════════════════════════════
   // UI State: navigation + expand defaults
   // ═══════════════════════════════════════════════════════════════
   const uiStore = useUIStore.getState();
@@ -293,6 +303,7 @@ function seedBody(): void {
   uiStore.setExpanded('proj_1:task_1', true);
   uiStore.setExpanded('proj_1:task_2', true);
   uiStore.setExpanded(`${CONTAINER_IDS.LIBRARY}:note_rich`, true);
+  uiStore.setExpanded(`${CONTAINER_IDS.SEARCHES}:search_tasks`, true);
 
   // Navigate to Library
   if (uiStore.panelHistory.length === 0) {

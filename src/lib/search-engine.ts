@@ -108,17 +108,11 @@ function isDescendantOf(tagDefId: string, ancestorId: string): boolean {
   return false;
 }
 
-// ── Trash subtree cache ──
-
-let _trashSetVersion = -1;
-let _trashDescendants: Set<string> | null = null;
-
+/**
+ * Collect all descendants of the TRASH container.
+ * No caching — called per-search which happens infrequently.
+ */
 function getTrashDescendants(): Set<string> {
-  // Simple version-based cache: rebuild when Loro data changes
-  const doc = loroDoc.getLoroDoc();
-  const version = doc.frontiers().length; // cheap proxy for "something changed"
-  if (_trashDescendants && _trashSetVersion === version) return _trashDescendants;
-
   const result = new Set<string>();
   const queue = loroDoc.getChildren(CONTAINER_IDS.TRASH);
   while (queue.length > 0) {
@@ -126,8 +120,6 @@ function getTrashDescendants(): Set<string> {
     result.add(id);
     queue.push(...loroDoc.getChildren(id));
   }
-  _trashDescendants = result;
-  _trashSetVersion = version;
   return result;
 }
 

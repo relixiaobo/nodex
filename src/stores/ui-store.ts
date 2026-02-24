@@ -12,6 +12,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { chromeLocalStorage } from '../lib/chrome-storage';
+import { commitUIMarker, registerUndoUICallbacks } from '../lib/loro-doc.js';
 import { useNodeStore } from './node-store';
 
 interface UIStore {
@@ -26,7 +27,7 @@ interface UIStore {
   // Expand/collapse (keys are compound: "parentId:nodeId" for per-instance state)
   expandedNodes: Set<string>;
   toggleExpanded(expandKey: string): void;
-  setExpanded(expandKey: string, expanded: boolean): void;
+  setExpanded(expandKey: string, expanded: boolean, skipUndo?: boolean): void;
 
   // Focus (parentId disambiguates reference nodes that appear in multiple places)
   // setFocusedNode also sets selection to the focused node (click-time selection pattern)
@@ -148,6 +149,7 @@ export const useUIStore = create<UIStore>()(
           const newHistory = s.panelHistory.slice(0, s.panelIndex + 1);
           if (newHistory[newHistory.length - 1] === nodeId) return {};
           // Push undo snapshot before modifying
+          commitUIMarker();
           const snapshot = { panelHistory: [...s.panelHistory], panelIndex: s.panelIndex };
           newHistory.push(nodeId);
           return {
@@ -167,6 +169,7 @@ export const useUIStore = create<UIStore>()(
       goBack: () =>
         set((s) => {
           if (s.panelIndex <= 0) return {};
+          commitUIMarker();
           const snapshot = { panelHistory: [...s.panelHistory], panelIndex: s.panelIndex };
           return {
             panelIndex: s.panelIndex - 1,
@@ -184,6 +187,7 @@ export const useUIStore = create<UIStore>()(
       goForward: () =>
         set((s) => {
           if (s.panelIndex >= s.panelHistory.length - 1) return {};
+          commitUIMarker();
           const snapshot = { panelHistory: [...s.panelHistory], panelIndex: s.panelIndex };
           return {
             panelIndex: s.panelIndex + 1,
@@ -232,14 +236,18 @@ export const useUIStore = create<UIStore>()(
       expandedNodes: new Set<string>(),
       toggleExpanded: (expandKey) =>
         set((s) => {
+          commitUIMarker();
           const next = new Set(s.expandedNodes);
           if (next.has(expandKey)) next.delete(expandKey);
           else next.add(expandKey);
           return { expandedNodes: next };
         }),
-      setExpanded: (expandKey, expanded) =>
+      setExpanded: (expandKey, expanded, skipUndo) =>
         set((s) => {
           const next = new Set(s.expandedNodes);
+          const had = next.has(expandKey);
+          if (had === expanded) return {};
+          if (!skipUndo) commitUIMarker();
           if (expanded) next.add(expandKey);
           else next.delete(expandKey);
           return { expandedNodes: next };
@@ -406,3 +414,39 @@ export const useUIStore = create<UIStore>()(
     },
   ),
 );
+
+interface UndoUISnapshotV1 {
+  v: 1;
+  panelHistory: string[];
+  panelIndex: number;
+  expandedNodes: string[];
+}
+
+function isUndoUISnapshotV1(value: unknown): value is UndoUISnapshotV1 {
+  if (!value || typeof value !== 'object') return false;
+  const v = value as Partial<UndoUISnapshotV1>;
+  return v.v === 1
+    && Array.isArray(v.panelHistory)
+    && typeof v.panelIndex === 'number'
+    && Array.isArray(v.expandedNodes);
+}
+
+registerUndoUICallbacks({
+  capture: () => {
+    const s = useUIStore.getState();
+    return {
+      v: 1,
+      panelHistory: [...s.panelHistory],
+      panelIndex: s.panelIndex,
+      expandedNodes: [...s.expandedNodes],
+    } satisfies UndoUISnapshotV1;
+  },
+  restore: (meta) => {
+    if (!isUndoUISnapshotV1(meta)) return;
+    useUIStore.setState({
+      panelHistory: [...meta.panelHistory],
+      panelIndex: meta.panelIndex,
+      expandedNodes: new Set(meta.expandedNodes),
+    });
+  },
+});

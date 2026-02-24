@@ -115,6 +115,7 @@ interface ChevronButtonProps {
   isExpanded: boolean;
   onToggle: () => void;
   onDrillDown: () => void;
+  onTogglePointerDown?: () => void;
 }
 
 /**
@@ -130,12 +131,32 @@ export function ChevronButton({
   isExpanded,
   onToggle,
   onDrillDown,
+  onTogglePointerDown,
 }: ChevronButtonProps) {
   return (
     <button
       className="flex shrink-0 h-[21px] w-[15px] items-center justify-center opacity-0 group-hover/row:opacity-100 pointer-events-none group-hover/row:pointer-events-auto transition-opacity"
-      onClick={(e) => { e.stopPropagation(); onToggle(); }}
-      onDoubleClick={(e) => { e.stopPropagation(); onDrillDown(); }}
+      tabIndex={-1}
+      onPointerDown={(e) => {
+        onTogglePointerDown?.();
+        // Pointer events fire before mousedown; prevent focus theft here.
+        e.preventDefault();
+      }}
+      onMouseDown={(e) => {
+        // Prevent focus from moving onto the button; otherwise Cmd+Z can be swallowed
+        // by the browser/native control path instead of reaching unified undo handlers.
+        e.preventDefault();
+      }}
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        onToggle();
+      }}
+      onDoubleClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        onDrillDown();
+      }}
       title={isExpanded ? 'Collapse' : 'Expand'}
     >
       <div

@@ -955,11 +955,15 @@ npm run dev                # 启动 wrangler dev (localhost:8787)
 9. 全部撤销后 `canRedoDoc()` 为 true
 10. 新操作清空 redo 栈
 11. `commitDoc('system:*')` 提交不进入 undo 栈（被 `excludeOriginPrefixes` 过滤）
+12. UI marker（`navigateTo`）可通过 `undoDoc()/redoDoc()` 恢复 `panelHistory/panelIndex`
+13. UI marker（`setExpanded/toggleExpanded`）可通过 `undoDoc()/redoDoc()` 恢复 `expandedNodes`
+14. 程序性 `setExpanded(..., skipUndo=true)` 不创建 Loro undo step
 
 **设计要点**:
 - `seedTestDataSync` 在 `seedBody()` 后调用 `commitDoc('__seed__')`，被 UndoManager 的 `excludeOriginPrefixes` 过滤
 - 生产与测试统一过滤前缀：`['__seed__', 'system:']`
 - node-store.ts 的 `createChild`、`moveNodeTo`、`trashNode`、`restoreNode`、`indent/outdent/moveUp/moveDown` 各自结尾调用 `commitDoc()` 记录撤销步骤
+- ui-store.ts 的导航/展开折叠通过 `commitUIMarker()` 生成 `_ui.seq` marker commit，UI 状态恢复由 UndoManager `onPop` 元数据回调完成
 - undo/redo 后调用 `rebuildMappings()` 重新同步 nodexToTree / treeToNodex（Loro undo/redo 可能产生新 TreeID）
 
 ### 1.35 节点搜索 SKIP_DOC_TYPES 过滤

@@ -166,7 +166,7 @@ function handleUndo(e: KeyboardEvent) {
 | 创建标签并应用到节点 | 一步操作。撤销时移除标签关系，tagDef 保留 |
 | 打字后立即展开节点（500ms 内） | 可能合并为一步（mergeInterval）。实际场景极少，合并效果正确 |
 | 展开/折叠夹在两次打字之间 | 三个独立 undo 步骤。用户需按三次 ⌘Z 回到最初状态（符合预期） |
-| 编辑器聚焦时按 ⌘Z | 全局 handler 拦截，flush 编辑器 pending → Loro undo |
+| 编辑器聚焦时按 ⌘Z | 编辑器 keymap 直接调用 `undoDoc()`（同一 Loro 时间线） |
 | 撤销导航 | 恢复之前的 panelHistory + panelIndex（通过 onPop） |
 | 多标签页/多窗口 | 每个 Side Panel 实例有独立的 UndoManager |
 
@@ -175,11 +175,11 @@ function handleUndo(e: KeyboardEvent) {
 | 层次 | 状态 | 说明 |
 |------|------|------|
 | 节点结构撤销 | ✅ 已实现 | Loro UndoManager，2026-02-20 |
-| 文本编辑撤销 | ⚠️ 过渡态 | ProseMirror History（独立栈），待迁移到 Loro |
+| 文本编辑撤销 | ✅ 已实现（进行中验证） | ProseMirror transaction 实时 `commitDoc('user:text')`，PM History 已移除 |
 | 标签/字段/checkbox 撤销 | ⚠️ 部分覆盖 | 部分路径缺 commitDoc()，待补全 |
-| 展开/折叠撤销 | ❌ 未实现 | 待 Loro marker commit |
-| 导航撤销 | ⚠️ 独立栈 | navUndoStack（待合入统一时间线） |
-| 统一时间线 | ❌ 未实现 | 当前仍是三栈 fallthrough |
+| 展开/折叠撤销 | ✅ 已实现（marker） | `commitUIMarker()` + UndoManager `onPop` 恢复 `expandedNodes` |
+| 导航撤销 | ✅ 已实现（marker） | `commitUIMarker()` + UndoManager `onPop` 恢复 `panelHistory/panelIndex` |
+| 统一时间线 | ✅ 核心路径已切换 | 编辑器 keymap 与全局非编辑态键盘入口都走 Loro UndoManager |
 
 ## 实现范围
 
@@ -196,9 +196,9 @@ function handleUndo(e: KeyboardEvent) {
 | Phase | 功能 | 说明 |
 |-------|------|------|
 | 1 | 补全 commitDoc() | tags / fields / checkbox 所有路径 |
-| 2 | ProseMirror → Loro 实时同步 | 替换 blur-only 同步 + 移除 PM History |
-| 3 | UI 状态 marker commit | 展开/折叠 + 导航 |
-| 4 | 统一 ⌘Z handler | 删除旧代码，单一入口 |
+| 2 | ProseMirror → Loro 实时同步 | ✅ 已接入 `commitDoc('user:text')` + 移除 PM History（需继续回归） |
+| 3 | UI 状态 marker commit | ✅ 已接入导航/展开折叠 + `onPush/onPop` UI snapshot |
+| 4 | 统一 ⌘Z handler | 🟡 键盘入口已统一到 Loro；旧 `navUndoStack` 代码待清理 |
 
 ## 决策记录
 

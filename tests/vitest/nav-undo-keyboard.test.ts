@@ -19,9 +19,21 @@ describe('nav undo keyboard guard', () => {
     expect(shouldHandleNavUndo(null, null)).toBe(true);
   });
 
-  it('rejects nav undo when a node editor is focused', () => {
+  it('allows global undo when focusedNodeId is set but DOM focus is not editor', () => {
     const plainDiv = document.createElement('div');
-    expect(shouldHandleNavUndo(plainDiv, 'node_1')).toBe(false);
-    expect(shouldHandleNavUndo(null, 'node_1')).toBe(false);
+    expect(shouldHandleNavUndo(plainDiv, 'node_1')).toBe(true);
+    expect(shouldHandleNavUndo(null, 'node_1')).toBe(true);
+  });
+
+  it('still rejects undo when actual DOM focus is contentEditable/input/textarea', () => {
+    const contentEditable = document.createElement('div');
+    Object.defineProperty(contentEditable, 'isContentEditable', { value: true });
+    expect(shouldHandleNavUndo(contentEditable, 'node_1')).toBe(false);
+
+    const input = document.createElement('input');
+    expect(shouldHandleNavUndo(input, 'node_1')).toBe(false);
+
+    const textarea = document.createElement('textarea');
+    expect(shouldHandleNavUndo(textarea, 'node_1')).toBe(false);
   });
 });

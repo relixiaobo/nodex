@@ -78,7 +78,7 @@ export function TestApp() {
 
   return (
     <div
-      className="flex h-screen w-full flex-col overflow-hidden bg-background text-foreground"
+      className="flex h-screen w-full flex-col overflow-hidden rounded-t-xl bg-background text-foreground"
       onPointerDownCapture={selectionDismissHandlers.onPointerDownCapture}
       onFocusCapture={selectionDismissHandlers.onFocusCapture}
     >

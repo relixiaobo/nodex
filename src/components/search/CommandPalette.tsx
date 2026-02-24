@@ -494,7 +494,7 @@ function PaletteRow({ item, selected, positionIndex, onSelect, onHover }: Palett
       onClick={onSelect}
       onMouseMove={onHover}
       className={`mx-1 flex h-8 cursor-pointer items-center gap-2 rounded-md px-2 transition-colors ${
-        selected ? 'bg-accent' : ''
+        selected ? 'bg-primary-muted' : ''
       }`}
     >
       {/* Icon: command/container use explicit icon; tagDef uses colored #; nodes use colored bullet */}

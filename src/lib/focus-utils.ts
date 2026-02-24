@@ -36,10 +36,19 @@ export function focusUndoShortcutSink(): void {
 }
 
 /**
- * Schedule a focus-to-sink check after React re-render.
- * Only steals focus if activeElement is <body> or null (i.e., nothing focused).
+ * Ensure the undo-shortcut-sink has focus after a panel navigation.
+ *
+ * Chrome Side Panel will revoke keyboard focus from the entire panel if no
+ * DOM element holds focus during a React re-render that replaces the tree.
+ * We focus the sink **synchronously** (before React unmounts the old panel)
+ * so the panel retains keyboard focus, then again in rAF as a safety net
+ * after the new panel renders.
  */
 export function ensureUndoFocusAfterNavigation(): void {
+  // Synchronous: keep the side panel keyboard-focused during DOM replacement.
+  // The sink lives on document.body outside React's root, so it survives re-renders.
+  focusUndoShortcutSink();
+  // Post-render backup: re-focus if something stole focus during render.
   requestAnimationFrame(() => {
     const active = document.activeElement;
     if (!active || active === document.body) {

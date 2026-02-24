@@ -29,13 +29,40 @@ _(空)_
 |-------|---------|------|-------------|
 | nodex-cc | _(idle)_ | — | — |
 | nodex-cc-2 | 统一时间线 Undo/Redo (#44) | cc2/unified-undo | `src/stores/node-store.ts`, `src/lib/loro-doc.ts`, `src/components/editor/RichTextEditor.tsx`, `src/stores/ui-store.ts` |
-| nodex-codex | _(idle)_ | — | — |
+| nodex-codex | PR #89 接管修复：Cmd+Z/Cmd+Shift+Z 混乱（统一时间线 + pending Loro flush） | `codex/undo-redo-pr89-takeover` | `src/lib/undo-timeline.ts`, `src/lib/loro-doc.ts`, `src/stores/ui-store.ts`, `src/hooks/use-nav-undo-keyboard.ts`, `src/components/editor/RichTextEditor.tsx`, `standalone/TestApp.tsx`, `tests/vitest/undo-timeline.test.ts`, `tests/vitest/nav-undo-keyboard.test.ts`, `docs/features/undo-redo.md`, `docs/TESTING.md`, `docs/TASKS.md` |
 
 ---
 
 ## 进行中
 
-_(空)_
+### PR #89 接管修复：Cmd+Z/Cmd+Shift+Z 混乱（统一时间线 + pending Loro flush）
+> 背景：PR #89（`cc2/references`）混入大量无关改动与主干回退，且多轮修复后仍存在 undo/redo 语义混乱。改为由 nodex-codex 从 `origin/main` 新开干净分支重做，仅保留 undo/redo 相关修复（统一时间线、expand/collapse undo、Loro pending write flush、防回归测试）。
+> **Owner**: nodex-codex | **Branch**: `codex/undo-redo-pr89-takeover` | **Files**: `src/lib/undo-timeline.ts`, `src/lib/loro-doc.ts`, `src/stores/ui-store.ts`, `src/hooks/use-nav-undo-keyboard.ts`, `src/components/editor/RichTextEditor.tsx`, `standalone/TestApp.tsx`, `tests/vitest/undo-timeline.test.ts`, `tests/vitest/nav-undo-keyboard.test.ts`, `docs/features/undo-redo.md`, `docs/TESTING.md`, `docs/TASKS.md`
+
+- [ ] 从 `origin/main` 新建干净分支并创建替代 Draft PR
+- [ ] 实现统一时间线（structural/nav/expand）并保留现有主干修复
+- [ ] 修复 Loro pending write 导致的 redo 错位（含 detached guard）
+- [ ] 补/改回归测试（键盘路由、timeline、pending write）
+- [ ] 关闭 PR #89 并在评论中链接替代 PR
+
+**迭代日志**
+- [2026-02-24 nodex-codex] 用户要求接管 PR #89。已确认 PR #89 净 diff 混入 sync/backlinks/reference-navigation 等无关回退，决定从 `origin/main` 新开分支重做 undo/redo 修复，避免继续在长期分支上清理历史包袱。
+
+### Inline reference 内容节点误显示虚线 bullet（pending-conversion UI 误判）+ 移除 outliner 引用次数数字
+> 场景：同父节点已存在目标 child 时，`@` 会回退为 inline reference（普通内容节点 + inline ref），但该节点 bullet 仍显示虚线引用壳样式；同时用户希望移除 outliner 行尾显示的引用次数数字（backlink count badge），简化视觉层级。
+> **Owner**: nodex-codex | **Branch**: `codex/inline-ref-bullet-style` | **Files**: `src/components/outliner/OutlinerItem.tsx`, `tests/vitest/outliner-item-reference-bullet.test.ts`, `tests/vitest/outliner-view-render.test.ts`, `docs/TESTING.md`, `docs/features/references.md`, `docs/TASKS.md`
+
+- [x] 定位虚线 bullet 样式触发条件（pending conversion / single-inline-ref fallback）
+- [x] 修复普通 inline reference 内容节点不再显示虚线 bullet
+- [x] 补回归测试（样式判定或状态判定）
+- [x] 移除 outliner 行尾引用次数数字（backlink count badge）
+
+**迭代日志**
+- [2026-02-23 nodex-codex] 用户反馈：同父已有 child 时 `@` 回退为 inline reference 内容节点，但 bullet 仍显示虚线；开始排查 `OutlinerItem` 的 pending-conversion 虚线样式判定逻辑。
+- [2026-02-23 nodex-codex] 确认根因：`OutlinerItem` 将 `hasSingleInlineRefAtomContent` 直接并入 `BulletChevron.isReference`，导致普通内容节点（仅含 inline ref atom）被误渲染为引用壳虚线 bullet；改为只看 `isReference/isPendingConversion/isOptionsValueNode`，并新增 `outliner-item-reference-bullet.test.ts` 锁定回归；`typecheck` / 全量 `test:run` / `build` 均通过。
+- [2026-02-23 nodex-codex] Follow-up（用户反馈样式复杂）：继续在同一分支/PR 上移除 Outliner 行尾 backlink count 数字，保留 backlinks 能力在面板中查看，简化行内视觉信息。
+- [2026-02-23 nodex-codex] 移除 `OutlinerItem` 的 backlink count badge 渲染与 `useBacklinkCount` 订阅（仅影响行内视觉，不影响 Backlinks 面板）；补 `outliner-view-render.test.ts` 断言不再输出 `title=\"N reference(s)\"`，并同步 `docs/TESTING.md` 覆盖说明。
+- [2026-02-23 nodex-codex] 处理 PR #87 review：更新 `docs/features/references.md` 移除过期的引用计数 badge 行为/状态/差异说明并记录“移除 badge”决策；补 `isOptionsValueNode=true` 的虚线 bullet 测试；将 `isReferenceLikeRow` 复用 `shouldRenderReferenceBulletStyle()` 消除重复变量。
 
 ---
 

@@ -357,8 +357,8 @@ export function CommandPalette() {
   return (
     <div className="animate-palette-expand fixed inset-0 z-50 flex flex-col bg-background">
       {/* Search header — same toolbar bg, white pill input matches SearchTrigger */}
-      <div className="flex h-11 shrink-0 items-center bg-foreground/[0.08] px-3">
-        <div className="flex flex-1 items-center gap-2 rounded-full bg-background px-3 py-1.5">
+      <div className="flex h-10 shrink-0 items-center bg-foreground/[0.08] px-3">
+        <div className="flex flex-1 items-center gap-2 rounded-full bg-background px-3 py-2">
           <input
             ref={inputRef}
             value={searchQuery}

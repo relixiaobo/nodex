@@ -6,54 +6,35 @@
  * - Subtle background for visual distinction from surrounding text
  * - Consistent sizing: h-5, min-w-5, text-[10px]
  * - Rounded-md to harmonize with both rounded and pill-shaped containers
+ * - Composite shortcuts (⌘⇧D): each symbol rendered in a fixed-width cell
+ *   so glyphs of different sizes align uniformly within one badge
  *
- * Two components:
- *   <Kbd>Esc</Kbd>           — single key badge (word or symbol)
- *   <KbdShortcut keys="⌘⇧D" /> — splits into individual key badges: ⌘ ⇧ D
+ * Usage:
+ *   <Kbd>Esc</Kbd>        — plain text badge
+ *   <Kbd>↵</Kbd>          — single symbol badge
+ *   <Kbd keys="⌘K" />     — composite: [⌘ K] with uniform internal spacing
+ *   <Kbd keys="⌘⇧D" />   — composite: [⌘ ⇧ D] uniform internal spacing
+ *   <Kbd keys="Ctrl+K" /> — composite: [Ctrl K]
  */
 
 interface KbdProps {
-  children: React.ReactNode;
+  /** Shortcut string to parse into uniformly-spaced segments. */
+  keys?: string;
+  /** Plain content (for words like "Esc", symbols like "↵"). */
+  children?: React.ReactNode;
   onClick?: () => void;
   className?: string;
 }
 
-const KBD_BASE = 'inline-flex h-5 min-w-5 items-center justify-center rounded-md bg-foreground/[0.06] px-1.5 text-[10px] font-medium text-foreground-tertiary';
-
-export function Kbd({ children, onClick, className = '' }: KbdProps) {
-  return (
-    <kbd
-      onClick={onClick}
-      className={`${KBD_BASE} ${onClick ? 'cursor-pointer hover:bg-foreground/10 hover:text-foreground-secondary' : ''} ${className}`}
-    >
-      {children}
-    </kbd>
-  );
-}
-
-/**
- * Render a shortcut string as a row of individual key badges.
- * Splits on known modifier symbols (⌘ ⇧ ⌥ ⌃) and treats the remainder as individual keys.
- *
- * Examples:
- *   "⌘K"   → [⌘] [K]
- *   "⌘⇧D"  → [⌘] [⇧] [D]
- *   "Ctrl+K" → [Ctrl] [K]
- */
-interface KbdShortcutProps {
-  keys: string;
-  className?: string;
-}
-
-/** Modifier symbols that should each become their own badge. */
+/** Modifier symbols that are split into their own cell. */
 const MODIFIER_CHARS = new Set(['\u2318', '\u21E7', '\u2325', '\u2303']); // ⌘ ⇧ ⌥ ⌃
 
 function splitShortcut(shortcut: string): string[] {
-  // Handle "Ctrl+K" style shortcuts
+  // "Ctrl+K" → ["Ctrl", "K"]
   if (shortcut.includes('+')) {
     return shortcut.split('+').map((s) => s.trim()).filter(Boolean);
   }
-  // Handle Unicode modifier sequences like "⌘⇧D"
+  // "⌘⇧D" → ["⌘", "⇧", "D"]
   const parts: string[] = [];
   let buf = '';
   for (const ch of shortcut) {
@@ -68,15 +49,35 @@ function splitShortcut(shortcut: string): string[] {
   return parts;
 }
 
-export function KbdShortcut({ keys, className = '' }: KbdShortcutProps) {
-  const parts = splitShortcut(keys);
+const KBD_BASE = 'inline-flex h-5 min-w-5 items-center justify-center rounded-md bg-foreground/[0.06] px-1 text-[10px] font-medium text-foreground-tertiary';
+
+export function Kbd({ keys, children, onClick, className = '' }: KbdProps) {
+  const interactive = onClick ? 'cursor-pointer hover:bg-foreground/10 hover:text-foreground-secondary' : '';
+
+  // Composite mode: parse shortcut string, render each segment in a fixed-width cell
+  if (keys) {
+    const parts = splitShortcut(keys);
+    return (
+      <kbd
+        onClick={onClick}
+        className={`${KBD_BASE} gap-px ${interactive} ${className}`}
+      >
+        {parts.map((part, i) => (
+          <span key={i} className="inline-flex w-[1em] items-center justify-center">
+            {part}
+          </span>
+        ))}
+      </kbd>
+    );
+  }
+
+  // Simple mode: render children as-is
   return (
-    <span className={`inline-flex items-center gap-0.5 ${className}`}>
-      {parts.map((part, i) => (
-        <kbd key={i} className={KBD_BASE}>
-          {part}
-        </kbd>
-      ))}
-    </span>
+    <kbd
+      onClick={onClick}
+      className={`${KBD_BASE} px-1.5 ${interactive} ${className}`}
+    >
+      {children}
+    </kbd>
   );
 }

@@ -2557,6 +2557,10 @@ export function OutlinerItem({
           <button
             className="indent-line absolute top-0 bottom-0 z-10 flex justify-end cursor-pointer"
             style={{ left: depth * 28 + 17, width: 16 }}
+            tabIndex={-1}
+            onPointerDown={(e) => {
+              e.preventDefault();
+            }}
             onMouseDown={(e) => {
               // Keep focus on the editor/page instead of this button so Cmd+Z still reaches
               // unified undo handlers immediately after expand/collapse clicks.

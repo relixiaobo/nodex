@@ -141,24 +141,31 @@ src/
     editor/                # 编辑器
       NodeEditor.tsx       # Per-Node TipTap 编辑器 (聚焦创建/失焦销毁 + 键盘快捷键)
     search/                # 搜索
-      CommandPalette.tsx   # Cmd+K 命令面板 (cmdk, 节点搜索 + 容器导航)
+      CommandPalette.tsx   # ⌘K 命令面板 (Raycast 风格, fuzzy search + 命令注册表)
+    toolbar/               # 顶栏 (替代已移除的 Sidebar)
+      TopToolbar.tsx       # 顶栏布局 ([←][→] [🔍 Search ⌘K] [●🧑])
+      UndoRedoButtons.tsx  # Undo/Redo 占位 (待 #44 集成)
+      SearchTrigger.tsx    # 搜索触发器 (假输入框, 点击打开 CommandPalette)
+      SyncDot.tsx          # 同步状态圆点
+      ToolbarUserMenu.tsx  # 用户头像 + 下拉菜单
     panel/                 # 面板系统
       PanelStack.tsx       # 面板栈导航 (push/pop/replace)
       NodePanel.tsx        # 节点面板 (Header + OutlinerView)
-      NodePanelHeader.tsx  # 面板头 (sidebar toggle + back + title)
-    sidebar/               # 侧栏
-      Sidebar.tsx          # 侧栏布局
-      SidebarNav.tsx       # 导航项 (Library/Inbox/Journal/Searches/Trash)
+      NodePanelHeader.tsx  # 面板头 (breadcrumb + title)
+    ui/                    # 通用 UI 组件
+      Kbd.tsx              # 键盘快捷键徽章 (⌘K / Esc / ⌘⇧D)
   hooks/
     use-node.ts            # 订阅单节点 + 懒加载
     use-children.ts        # 订阅子节点列表 + 懒加载
     use-realtime.ts        # Supabase Realtime 订阅
   stores/
     node-store.ts          # 归一化节点实体 (immer, 乐观更新, 含树操作)
-    ui-store.ts            # UI 状态 (面板栈/展开/焦点/侧栏, persist → chrome.storage)
+    ui-store.ts            # UI 状态 (面板栈/展开/焦点/搜索, persist → chrome.storage)
     workspace-store.ts     # 工作区 + 用户认证 (persist → chrome.storage)
   lib/
     chrome-storage.ts      # Zustand persist 适配器 (chrome.storage.local + Set 序列化)
+    fuzzy-search.ts        # 轻量 fuzzy search 评分器
+    palette-commands.ts    # ⌘K 命令注册表 (容器导航 + 系统命令)
     supabase.ts            # WXT 环境 Supabase 初始化 (VITE_* env vars)
     tree-utils.ts          # 树遍历工具 (flatten/navigate/parent/sibling)
   types/                   # 核心类型 (不变)

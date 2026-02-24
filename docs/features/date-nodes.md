@@ -84,7 +84,7 @@
 - 容器 `doc_type`: `journal`
 - 已在 `WORKSPACE_CONTAINERS.JOURNAL` 中定义
 - Tana 面包屑中显示为 **"Daily notes"**（非 "Journal"）
-- 侧栏当前显示 "Journal"（`SidebarNav.tsx`，CalendarDays 图标），实现时考虑改为 "Daily notes"
+- ⌘K 命令面板 Suggestions 中显示 "Journal"（CalendarDays 图标），实现时考虑改为 "Daily notes"
 
 ## 行为规格
 

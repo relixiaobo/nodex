@@ -27,7 +27,7 @@ _(空)_
 
 | Agent | 当前任务 | 分支 | 修改中的文件 |
 |-------|---------|------|-------------|
-| nodex-cc | Side Panel 布局改造 Phase 1-2 | `cc/layout-renovation` | `src/entrypoints/sidepanel/App.tsx`, `src/components/toolbar/*`, `src/components/search/CommandPalette.tsx`, `src/components/panel/Breadcrumb.tsx`, `src/stores/ui-store.ts` |
+| nodex-cc | _(idle)_ | — | — |
 | nodex-cc-2 | 统一时间线 Undo/Redo (#44) | cc2/unified-undo | `src/stores/node-store.ts`, `src/lib/loro-doc.ts`, `src/components/editor/RichTextEditor.tsx`, `src/stores/ui-store.ts` |
 | nodex-codex | _(idle)_ | — | — |
 
@@ -35,18 +35,7 @@ _(空)_
 
 ## 进行中
 
-### Side Panel 布局改造 — Phase 1-2-4（顶栏 + Sidebar 移除 + ⌘K 命令面板 + 清理）
-> 移除 Sidebar，用顶栏（Undo/Redo + 搜索触发器 + 用户头像/同步圆点）替代。⌘K 命令面板 Raycast 风格重设计。
-> **Owner**: nodex-cc | **Branch**: `cc/layout-renovation` | **PR**: #88
-> **Plan**: `docs/plans/layout-renovation.md`
->
-> **关键约束**:
-> - Phase 3（Undo/Redo 集成）依赖 #44，本 PR 仅放按钮占位
-
-- [x] Phase 1: TopToolbar 组件 + App.tsx 移除 Sidebar + Breadcrumb 精简
-- [x] Phase 2: ⌘K 命令面板重写（fuzzy search + 命令注册表 + Raycast 风格 UI）
-- [x] Phase 4: 清理废弃文件（Sidebar/SidebarNav/SyncStatusIndicator/UserMenu + ui-store sidebarOpen）
-- [x] UI 设计规范对齐 + 视觉微调
+_(空)_
 
 ---
 
@@ -146,13 +135,13 @@ _(空)_
 - [ ] Phase 4: 统一 ⌘Z handler + 删除旧代码（navUndoStack / 三层 fallthrough / PM History）
 
 #### Side Panel 布局改造 — 移除 Sidebar + ⌘K 重设计
-> Phase 1/2/4 已完成（PR #88）。Phase 3（Undo/Redo 集成）依赖 #44。
+> Phase 1/2/4 已完成（PR #88）。Phase 3（Undo/Redo 按钮集成）待 #44 完成后执行。
 > **Plan**: `docs/plans/layout-renovation.md`
 
-- [x] Phase 1: 顶栏骨架 + 移除 Sidebar
-- [x] Phase 2: ⌘K 命令面板重写
-- [ ] Phase 3: Undo/Redo 按钮集成（依赖 #44 详细设计）
-- [x] Phase 4: 清理废弃文件
+- [x] Phase 1: 顶栏骨架 + 移除 Sidebar ✓ PR #88
+- [x] Phase 2: ⌘K 命令面板重写 ✓ PR #88
+- [ ] Phase 3: Undo/Redo 按钮集成（依赖 #44）
+- [x] Phase 4: 清理废弃文件 ✓ PR #88
 
 #### 节点选中 — 后续增强 (#47)
 > Phase 1-3 已合并（PR #51）。PR #72 补充了字段行选中 + 全局选区清除。以下为未覆盖的后续项：
@@ -267,6 +256,7 @@ _(空)_
 
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
+| 2026-02-24 | Side Panel 布局改造 Phase 1/2/4 — TopToolbar + ⌘K CommandPalette Raycast 风格重写 + Sidebar/SidebarNav/SyncStatusIndicator/UserMenu 移除 + Kbd 组件 + fuzzy-search + palette-commands | nodex-cc | #88 |
 | 2026-02-23 | Staging + Production 双环境部署 — D1/Worker/Secrets/Google OAuth + HTTPS cookie 前缀修复 | nodex | — |
 | 2026-02-23 | Inline ref fallback 虚线 bullet 修复 + outliner backlink count badge 移除 | nodex-codex | #87 |
 | 2026-02-23 | Reference node Backspace 选中/删除流程修复（单 inline ref atom 行尾退格 → select_reference intent） | nodex-codex | #86 |

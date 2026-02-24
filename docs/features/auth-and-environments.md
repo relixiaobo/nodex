@@ -200,7 +200,7 @@ VITE_SUPABASE_ANON_KEY=your-staging-anon-key
 
 ```
 if (!isAuthenticated) → 显示 LoginScreen
-if (isAuthenticated)  → 显示正常 App（当前的 Sidebar + PanelStack）
+if (isAuthenticated)  → 显示正常 App（TopToolbar + PanelStack）
 ```
 
 ---

@@ -1445,6 +1445,34 @@ createSibling 自动标签（2 cases）:
 - `buildBacklinkCountMap` 预计算 trash set（BFS from TRASH root），避免逐节点 `isInTrash()` parent chain walk
 - 已删除未使用的 `useBacklinkCountMap` hook（仅 `useBacklinkCount` 在 OutlinerItem 中使用）
 
+### 1.63 Search Engine（条件树评估 + 多态标签搜索 + 搜索节点创建）
+
+**测试文件**: `tests/vitest/search-engine.test.ts`
+
+**覆盖点**:
+
+| # | 场景 | 验证 |
+|---|------|------|
+| 1 | collectTagHierarchy 包含自身 | hierarchy.has(tagDefId) |
+| 2 | collectTagHierarchy 包含子标签 | DevTask (extends Task) 在 Task 层级中 |
+| 3 | collectTagHierarchy 子不含父 | DevTask 层级不包含 Task |
+| 4 | getAllSearchableNodes 排除结构类型 | fieldEntry/fieldDef/tagDef/reference/queryCondition/search 不在结果中 |
+| 5 | getAllSearchableNodes 排除 trash | trash 节点及子代不在结果中 |
+| 6 | getAllSearchableNodes 包含普通节点 | task_1, note_1 在结果中 |
+| 7 | executeSearch HAS_TAG 匹配 | 搜索 #Task 找到 task_1/2/3 |
+| 8 | executeSearch 多态搜索 | DevTask 实例出现在 Task 搜索结果中 |
+| 9 | executeSearch 空条件 | 无条件返回空数组 |
+| 10 | executeSearch 排除搜索节点自身 | search_tasks 不在结果中 |
+| 11 | executeSearch 排除 queryCondition | 条件节点不在结果中 |
+| 12 | createSearchNode 3 节点结构 | search → AND group → HAS_TAG condition |
+| 13 | createSearchNode 结果正确 | 创建 Person 搜索返回 person_1 |
+
+**实现要点**:
+- 搜索引擎 `src/lib/search-engine.ts` 递归评估 queryCondition 子节点树
+- `collectTagHierarchy()` 沿 `extends` 链向下收集所有后代 tagDef
+- `getAllSearchableNodes()` BFS 遍历 TRASH 排除后代，无缓存
+- `useSearchResults` hook 通过 `_version` 订阅实时刷新
+
 ---
 
 ## Phase 2: 视觉检查点
@@ -1538,6 +1566,7 @@ createSibling 自动标签（2 cases）:
 | 1.53 | Test 入口 Bootstrap（防测试数据回流） | PASS/FAIL |
 | 1.54 | NodePanel Header 重设计（UIStore expandedHiddenFields + block 可见性 + 列对齐） | PASS/FAIL |
 | 1.55 | TrailingInput `@` 触发后光标定位回归 | PASS/FAIL |
+| 1.63 | Search Engine（条件树评估 + 多态标签 + 搜索节点创建） | PASS/FAIL |
 | 2 | 视觉渲染 | PASS/FAIL/SKIP |
 | 3 | 扩展构建 | PASS/FAIL |
 

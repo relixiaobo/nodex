@@ -170,14 +170,14 @@ _(空)_
 > **Owner**: nodex-cc-2 | **Branch**: `cc2/search-nodes`
 > **Spec**: `docs/features/search.md` | **Plan**: `docs/plans/search-nodes-impl.md`
 
-- [ ] Step 1: 类型定义（`queryCondition` NodeType + 查询属性 + loro-doc 读写）
-- [ ] Step 2: 搜索引擎 `search-engine.ts`（条件树递归评估 + 多态标签搜索）
-- [ ] Step 3: `createSearchNode()` — 创建 3 节点（search + AND group + HAS_TAG）
-- [ ] Step 4: `?` 触发（启用 slash command + 标签选择器）
-- [ ] Step 5: 搜索节点渲染（BulletChevron 放大镜 bullet）
-- [ ] Step 6: 搜索结果渲染（useSearchResults hook + OutlinerView 搜索分支 + OutlinerItem isSearchResult）
-- [ ] Step 7: Seed data + 集成验证
-- [ ] Step 8: 文档同步
+- [x] Step 1: 类型定义（`queryCondition` NodeType + 查询属性 + loro-doc 读写）
+- [x] Step 2: 搜索引擎 `search-engine.ts`（条件树递归评估 + 多态标签搜索）
+- [x] Step 3: `createSearchNode()` — 创建 3 节点（search + AND group + HAS_TAG）
+- [x] Step 4: `?` 触发（启用 slash command + 标签选择器）
+- [x] Step 5: 搜索节点渲染（BulletChevron 放大镜 bullet）
+- [x] Step 6: 搜索结果渲染（useSearchResults hook + SearchResultsChildren + OutlinerItem isSearchResult）
+- [x] Step 7: Seed data + Vitest 测试（13 tests）
+- [x] Step 8: 文档同步
 
 **Phase 2 待办**（本次不做）：
 - [ ] Query Builder 面板（渲染/编辑条件子节点树）

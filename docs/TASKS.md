@@ -35,6 +35,15 @@ _(空)_
 
 ## 进行中
 
+### Undo/Redo 行为修复（3 个 bug）
+> PR #91 合并后发现的 undo/redo 边界问题。
+> **Owner**: nodex-cc | **Branch**: `cc/undo-redo-fixes`
+> **Spec**: `docs/features/undo-redo.md`
+
+- [ ] Bug 1: 连续 ⌘Z 回退到空白状态（页面只剩 "Press ⌘K to search"）— 应在到达初始状态时停止回退，不能 undo 到空面板
+- [ ] Bug 2: 焦点不在 node 编辑器中时，⌘Z 无法撤回展开/收起操作（点击 chevron 或引导线后焦点丢失到 sink textarea，但 undo 未生效）
+- [ ] Bug 3: 点击节点 bullet 进入 NodePanel（zoom-in 导航）后，⌘Z 无法返回上一个面板 — 导航应通过 commitUIMarker 进入 undo 栈
+
 ### Inline reference 内容节点误显示虚线 bullet（pending-conversion UI 误判）+ 移除 outliner 引用次数数字
 > 场景：同父节点已存在目标 child 时，`@` 会回退为 inline reference（普通内容节点 + inline ref），但该节点 bullet 仍显示虚线引用壳样式；同时用户希望移除 outliner 行尾显示的引用次数数字（backlink count badge），简化视觉层级。
 > **Owner**: nodex-codex | **Branch**: `codex/inline-ref-bullet-style` | **Files**: `src/components/outliner/OutlinerItem.tsx`, `tests/vitest/outliner-item-reference-bullet.test.ts`, `tests/vitest/outliner-view-render.test.ts`, `docs/TESTING.md`, `docs/features/references.md`, `docs/TASKS.md`

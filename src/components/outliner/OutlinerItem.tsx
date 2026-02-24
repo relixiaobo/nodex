@@ -164,6 +164,19 @@ function focusUndoShortcutSink(): void {
   });
 }
 
+function focusRowUndoTarget(row: HTMLElement | null): void {
+  const editor = row?.querySelector<HTMLElement>('.ProseMirror');
+  if (editor) {
+    editor.focus();
+    console.debug('[undo-debug] focusRowUndoTarget:editor', {
+      activeTag: (document.activeElement as HTMLElement | null)?.tagName,
+      activeClassName: (document.activeElement as HTMLElement | null)?.className,
+    });
+    return;
+  }
+  focusUndoShortcutSink();
+}
+
 function getTreeReferenceBlockMessage(reason: ReturnType<typeof getTreeReferenceBlockReason>): string {
   switch (reason) {
     case 'self_parent':
@@ -1481,14 +1494,15 @@ export function OutlinerItem({
     } else {
       toggleExpanded(ek);
     }
-    // Keep focus on the hidden editable sink so Cmd+Z is dispatched to page JS.
-    focusUndoShortcutSink();
+    // Prefer focusing the row editor (known-good Cmd+Z path in Side Panel).
+    // Fallback to hidden sink if the row editor is not mounted/focusable.
+    focusRowUndoTarget(rowRef.current);
     console.debug('[undo-debug] handleToggle post-focus(sync)', {
       tag: (document.activeElement as HTMLElement | null)?.tagName,
       className: (document.activeElement as HTMLElement | null)?.className,
     });
     requestAnimationFrame(() => {
-      focusUndoShortcutSink();
+      focusRowUndoTarget(rowRef.current);
       console.debug('[undo-debug] handleToggle post-focus(raf)', {
         tag: (document.activeElement as HTMLElement | null)?.tagName,
         className: (document.activeElement as HTMLElement | null)?.className,
@@ -1526,13 +1540,13 @@ export function OutlinerItem({
     }
     loroDoc.commitUIMarker();
     useUIStore.setState({ expandedNodes: next });
-    focusUndoShortcutSink();
+    focusRowUndoTarget(rowRef.current);
     console.debug('[undo-debug] handleIndentLineClick post-focus(sync)', {
       tag: (document.activeElement as HTMLElement | null)?.tagName,
       className: (document.activeElement as HTMLElement | null)?.className,
     });
     requestAnimationFrame(() => {
-      focusUndoShortcutSink();
+      focusRowUndoTarget(rowRef.current);
       console.debug('[undo-debug] handleIndentLineClick post-focus(raf)', {
         tag: (document.activeElement as HTMLElement | null)?.tagName,
         className: (document.activeElement as HTMLElement | null)?.className,

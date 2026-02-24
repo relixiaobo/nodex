@@ -283,21 +283,24 @@ export function CommandPalette() {
     }
   }, [searchOpen]);
 
-  // Global Cmd+K shortcut
+  // Global Cmd+K toggle + Esc close (works even when input loses focus)
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault();
         if (searchOpen) {
-          closeSearch();
+          closeAndClear();
         } else {
           useUIStore.getState().openSearch();
         }
+      } else if (e.key === 'Escape' && searchOpen) {
+        e.preventDefault();
+        closeAndClear();
       }
     }
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [searchOpen, closeSearch]);
+  }, [searchOpen, closeAndClear]);
 
   // Keyboard navigation within the palette
   const handleKeyDown = useCallback(

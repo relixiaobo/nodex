@@ -520,9 +520,9 @@ function PaletteRow({ item, selected, positionIndex, onSelect, onHover }: Palett
       <span className="flex-1 truncate text-sm text-foreground">{item.label}</span>
       {/* Alfred-style shortcut: selected → ↵, others → ⌘N (up to 9) */}
       {selected ? (
-        <Kbd keys="↵" />
+        <span className="shrink-0 text-xs text-foreground-tertiary">{'\u21B5'}</span>
       ) : positionIndex < 9 ? (
-        <Kbd keys={`\u2318${positionIndex + 1}`} />
+        <span className="shrink-0 text-xs text-foreground-tertiary">{`\u2318${positionIndex + 1}`}</span>
       ) : null}
     </div>
   );

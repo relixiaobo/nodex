@@ -4,10 +4,10 @@
  * Cmd+Z → timeline-driven undo (structural or nav, in time order)
  * Cmd+Shift+Z → timeline-driven redo
  *
- * When a ProseMirror editor is focused, PM gets first crack at undo/redo.
- * If PM consumed the event (e.defaultPrevented), we stop. If PM had no
- * text history to undo (e.g. newly created empty node), we fall through
- * to the structural/nav timeline.
+ * When a ProseMirror editor is focused, the PM keymap handles Cmd+Z directly.
+ * If PM has text history, it undoes text. If not, PM's Mod-z binding calls
+ * performTimelineUndo() to fall through to structural/nav undo.
+ * This global handler only covers the non-editor case (body/selection mode).
  */
 import { useEffect } from 'react';
 import { useUIStore } from '../stores/ui-store';
@@ -25,11 +25,13 @@ import {
 export type NavUndoAction = 'undo' | 'redo' | null;
 
 /**
- * Returns false when the timeline handler must NOT run (text inputs).
- * For editor/contentEditable, the handler uses e.defaultPrevented to decide
- * whether PM already consumed the event — see handler() below.
+ * Returns false when the global timeline handler should NOT run:
+ * - Editor focused → PM keymap handles Cmd+Z and falls through to timeline internally
+ * - Text input/textarea → never intercept
  */
-export function shouldHandleNavUndo(activeElement: Element | null, _focusedNodeId: string | null): boolean {
+export function shouldHandleNavUndo(activeElement: Element | null, focusedNodeId: string | null): boolean {
+  if (focusedNodeId) return false;
+  if (activeElement instanceof HTMLElement && activeElement.isContentEditable) return false;
   if (activeElement instanceof HTMLInputElement || activeElement instanceof HTMLTextAreaElement) return false;
   return true;
 }
@@ -110,18 +112,10 @@ export function useNavUndoKeyboard() {
       const action = resolveNavUndoAction(e, undoBindings, redoBindings);
       if (!action) return;
 
-      const focusedNodeId = useUIStore.getState().focusedNodeId;
-      const activeEl = document.activeElement;
-
-      // Text inputs / textareas — never intercept.
-      if (activeEl instanceof HTMLInputElement || activeEl instanceof HTMLTextAreaElement) return;
-
-      // Editor focused: let ProseMirror handle first. If PM consumed the event
-      // (e.defaultPrevented), we're done. Otherwise fall through to timeline.
-      if (focusedNodeId || (activeEl instanceof HTMLElement && activeEl.isContentEditable)) {
-        if (e.defaultPrevented) return; // PM handled it (had text history)
-        // PM didn't handle — fall through to timeline undo/redo
-      }
+      // When editor is focused, PM's keymap handles Cmd+Z/Shift+Z directly
+      // and falls through to performTimelineUndo/Redo if PM has no text history.
+      // So we only handle the non-editor case here.
+      if (!shouldHandleNavUndo(document.activeElement, useUIStore.getState().focusedNodeId)) return;
 
       e.preventDefault();
 

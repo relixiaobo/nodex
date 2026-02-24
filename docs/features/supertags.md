@@ -443,6 +443,7 @@ tagDef_article
 | 2026-02-20 | 字段排序：supertag 字段按 tagIds 顺序排在最前，content 节点排在最后 | 与 Tana 一致：字段作为 supertag 的语义元数据，优先于用户自由内容显示 |
 | 2026-02-24 | syncTemplateFields 在渲染时 useEffect 触发（非 applyTag 后全量扫描） | 惰性同步：只在用户看到节点时补齐缺失模板项，避免全库扫描性能开销 |
 | 2026-02-24 | 模板内容克隆 bullet 颜色通过 templateId→parent→tagDef 链查找 | 内容克隆本身无 tag，需回溯 templateId 找到原始模板所属 tagDef 获取颜色 |
+| 2026-02-24 | getTemplateFieldDefs 同时匹配 fieldDef 子节点和 fieldEntry 子节点 | UI 路径（addUnnamedFieldToNode）把 fieldDef 放 SCHEMA、fieldEntry 放 tagDef 下；之前只匹配 fieldDef 导致 UI 创建的模板字段不被 applyTag 应用 |
 
 ## 当前状态
 

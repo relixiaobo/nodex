@@ -92,7 +92,9 @@ describe('ensureDateNode', () => {
     });
     loroDoc.commitDoc('system:test-seed-day-tagdef-field');
 
-    const dayId = ensureDateNode(new Date(2026, 1, 14));
+    // Use a date far from seed data's relative dates (seed creates -2/-5/-7/-10/-14 day offsets)
+    // to ensure ensureDateNode creates a NEW day node (not returns an existing one).
+    const dayId = ensureDateNode(new Date(2030, 6, 1));
     const dayChildren = loroDoc.getChildren(dayId);
     const fieldEntryId = dayChildren.find((id) => {
       const child = loroDoc.toNodexNode(id);

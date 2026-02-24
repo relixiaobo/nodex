@@ -144,6 +144,69 @@ describe('template application — applyTag creates fieldEntries', () => {
     const fields = computeNodeFields(getNode, getChildren, freshId);
     expect(fields.some(f => f.fieldDefId === 'attrDef_attendees')).toBe(true);
   });
+
+  it('UI-created fields (addUnnamedFieldToNode on tagDef) are applied by applyTag', () => {
+    // Simulate UI path: user creates a field in tagDef's Default content via ">"
+    // This creates fieldDef in SCHEMA + fieldEntry under tagDef (not a direct fieldDef child)
+    const store = useNodeStore.getState();
+    const tagDef = store.createTagDef('Invoice', { color: 'green' });
+
+    // addUnnamedFieldToNode puts fieldDef in SCHEMA, fieldEntry under tagDef
+    const { fieldDefId } = store.addUnnamedFieldToNode(tagDef.id);
+    store.renameFieldDef(fieldDefId, 'Amount');
+
+    // Verify tagDef has a fieldEntry child (not a fieldDef child)
+    const tagChildren = loroDoc.getChildren(tagDef.id);
+    const childTypes = tagChildren.map(cid => loroDoc.toNodexNode(cid)?.type);
+    expect(childTypes).toContain('fieldEntry');
+
+    // Now apply tag to a fresh node — the field should be propagated
+    const node = store.createChild('proj_1', undefined, { name: 'INV-001' });
+    store.applyTag(node.id, tagDef.id);
+
+    const nodeChildren = loroDoc.getChildren(node.id);
+    const nodeFieldEntries = nodeChildren.filter(cid => {
+      const n = loroDoc.toNodexNode(cid);
+      return n?.type === 'fieldEntry' && n.fieldDefId === fieldDefId;
+    });
+
+    expect(nodeFieldEntries.length).toBe(1);
+
+    // computeNodeFields should also return it
+    const fields = computeNodeFields(getNode, getChildren, node.id);
+    expect(fields.some(f => f.fieldDefId === fieldDefId)).toBe(true);
+  });
+
+  it('syncTemplateFields picks up UI-created fields added after tagging', () => {
+    const store = useNodeStore.getState();
+    const tagDef = store.createTagDef('Receipt', { color: 'orange' });
+
+    // Tag a node first (no template fields yet)
+    const node = store.createChild('proj_1', undefined, { name: 'REC-001' });
+    store.applyTag(node.id, tagDef.id);
+
+    // Now add a field via UI path (after tag was already applied)
+    const { fieldDefId } = store.addUnnamedFieldToNode(tagDef.id);
+    store.renameFieldDef(fieldDefId, 'Vendor');
+
+    // Field not yet on the node
+    let children = loroDoc.getChildren(node.id);
+    let hasField = children.some(cid => {
+      const n = loroDoc.toNodexNode(cid);
+      return n?.type === 'fieldEntry' && n.fieldDefId === fieldDefId;
+    });
+    expect(hasField).toBe(false);
+
+    // syncTemplateFields should detect the missing field and add it
+    store.syncTemplateFields(node.id);
+
+    children = loroDoc.getChildren(node.id);
+    hasField = children.some(cid => {
+      const n = loroDoc.toNodexNode(cid);
+      return n?.type === 'fieldEntry' && n.fieldDefId === fieldDefId;
+    });
+    expect(hasField).toBe(true);
+  });
 });
 
 describe('syncTemplateFields — retroactive template sync', () => {

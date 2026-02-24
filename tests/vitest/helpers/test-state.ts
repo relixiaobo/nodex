@@ -1,5 +1,6 @@
 import { seedTestDataSync } from '../../../src/entrypoints/test/seed-data.js';
 import { resetLoroDoc } from '../../../src/lib/loro-doc.js';
+import { resetTimeline } from '../../../src/lib/undo-timeline.js';
 import { useNodeStore } from '../../../src/stores/node-store.js';
 import { useUIStore } from '../../../src/stores/ui-store.js';
 import { useWorkspaceStore } from '../../../src/stores/workspace-store.js';
@@ -10,6 +11,7 @@ import { useWorkspaceStore } from '../../../src/stores/workspace-store.js';
  */
 export function resetStores(): void {
   resetLoroDoc();
+  resetTimeline();
   localStorage.clear();
 
   useNodeStore.setState({ _version: 0 });
@@ -42,6 +44,8 @@ export function resetStores(): void {
     expandedHiddenFields: new Set<string>(),
     navUndoStack: [],
     navRedoStack: [],
+    expandUndoStack: [],
+    expandRedoStack: [],
   });
 }
 

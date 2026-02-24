@@ -12,6 +12,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { chromeLocalStorage } from '../lib/chrome-storage';
+import { pushUndoEntry } from '../lib/undo-timeline.js';
 import { useNodeStore } from './node-store';
 
 interface UIStore {
@@ -26,7 +27,7 @@ interface UIStore {
   // Expand/collapse (keys are compound: "parentId:nodeId" for per-instance state)
   expandedNodes: Set<string>;
   toggleExpanded(expandKey: string): void;
-  setExpanded(expandKey: string, expanded: boolean): void;
+  setExpanded(expandKey: string, expanded: boolean, skipUndo?: boolean): void;
 
   // Focus (parentId disambiguates reference nodes that appear in multiple places)
   // setFocusedNode also sets selection to the focused node (click-time selection pattern)
@@ -107,6 +108,12 @@ interface UIStore {
   navRedoStack: Array<{ panelHistory: string[]; panelIndex: number }>;
   navUndo(): void;
   navRedo(): void;
+
+  // Expand/collapse undo/redo (session-only, not persisted)
+  expandUndoStack: Array<{ expandKey: string; wasExpanded: boolean }>;
+  expandRedoStack: Array<{ expandKey: string; wasExpanded: boolean }>;
+  expandUndo(): void;
+  expandRedo(): void;
 }
 
 export interface PersistedUIStoreState {
@@ -155,6 +162,7 @@ export const useUIStore = create<UIStore>()(
           if (newHistory[newHistory.length - 1] === nodeId) return {};
           // Push undo snapshot before modifying
           const snapshot = { panelHistory: [...s.panelHistory], panelIndex: s.panelIndex };
+          pushUndoEntry('nav');
           newHistory.push(nodeId);
           return {
             panelHistory: newHistory,
@@ -174,6 +182,7 @@ export const useUIStore = create<UIStore>()(
         set((s) => {
           if (s.panelIndex <= 0) return {};
           const snapshot = { panelHistory: [...s.panelHistory], panelIndex: s.panelIndex };
+          pushUndoEntry('nav');
           return {
             panelIndex: s.panelIndex - 1,
             navUndoStack: [...s.navUndoStack, snapshot],
@@ -191,6 +200,7 @@ export const useUIStore = create<UIStore>()(
         set((s) => {
           if (s.panelIndex >= s.panelHistory.length - 1) return {};
           const snapshot = { panelHistory: [...s.panelHistory], panelIndex: s.panelIndex };
+          pushUndoEntry('nav');
           return {
             panelIndex: s.panelIndex + 1,
             navUndoStack: [...s.navUndoStack, snapshot],
@@ -238,17 +248,31 @@ export const useUIStore = create<UIStore>()(
       expandedNodes: new Set<string>(),
       toggleExpanded: (expandKey) =>
         set((s) => {
+          const wasExpanded = s.expandedNodes.has(expandKey);
           const next = new Set(s.expandedNodes);
-          if (next.has(expandKey)) next.delete(expandKey);
+          if (wasExpanded) next.delete(expandKey);
           else next.add(expandKey);
-          return { expandedNodes: next };
+          pushUndoEntry('expand');
+          return {
+            expandedNodes: next,
+            expandUndoStack: [...s.expandUndoStack, { expandKey, wasExpanded }],
+            expandRedoStack: [],
+          };
         }),
-      setExpanded: (expandKey, expanded) =>
+      setExpanded: (expandKey, expanded, skipUndo) =>
         set((s) => {
+          const wasExpanded = s.expandedNodes.has(expandKey);
+          if (wasExpanded === expanded) return {};
           const next = new Set(s.expandedNodes);
           if (expanded) next.add(expandKey);
           else next.delete(expandKey);
-          return { expandedNodes: next };
+          if (skipUndo) return { expandedNodes: next };
+          pushUndoEntry('expand');
+          return {
+            expandedNodes: next,
+            expandUndoStack: [...s.expandUndoStack, { expandKey, wasExpanded }],
+            expandRedoStack: [],
+          };
         }),
 
       // Focus
@@ -405,6 +429,38 @@ export const useUIStore = create<UIStore>()(
             panelIndex: next.panelIndex,
             navUndoStack: [...s.navUndoStack, currentSnapshot],
             navRedoStack: s.navRedoStack.slice(0, -1),
+          };
+        }),
+
+      // Expand/collapse undo/redo (session-only)
+      expandUndoStack: [],
+      expandRedoStack: [],
+      expandUndo: () =>
+        set((s) => {
+          if (s.expandUndoStack.length === 0) return {};
+          const prev = s.expandUndoStack[s.expandUndoStack.length - 1];
+          const currentExpanded = s.expandedNodes.has(prev.expandKey);
+          const next = new Set(s.expandedNodes);
+          if (prev.wasExpanded) next.add(prev.expandKey);
+          else next.delete(prev.expandKey);
+          return {
+            expandedNodes: next,
+            expandUndoStack: s.expandUndoStack.slice(0, -1),
+            expandRedoStack: [...s.expandRedoStack, { expandKey: prev.expandKey, wasExpanded: currentExpanded }],
+          };
+        }),
+      expandRedo: () =>
+        set((s) => {
+          if (s.expandRedoStack.length === 0) return {};
+          const nextEntry = s.expandRedoStack[s.expandRedoStack.length - 1];
+          const currentExpanded = s.expandedNodes.has(nextEntry.expandKey);
+          const next = new Set(s.expandedNodes);
+          if (nextEntry.wasExpanded) next.add(nextEntry.expandKey);
+          else next.delete(nextEntry.expandKey);
+          return {
+            expandedNodes: next,
+            expandUndoStack: [...s.expandUndoStack, { expandKey: nextEntry.expandKey, wasExpanded: currentExpanded }],
+            expandRedoStack: s.expandRedoStack.slice(0, -1),
           };
         }),
     }),

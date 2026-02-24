@@ -175,11 +175,11 @@ function handleUndo(e: KeyboardEvent) {
 | 层次 | 状态 | 说明 |
 |------|------|------|
 | 节点结构撤销 | ✅ 已实现 | Loro UndoManager，2026-02-20 |
-| 文本编辑撤销 | ⚠️ 过渡态 | ProseMirror History（独立栈），待迁移到 Loro |
+| 文本编辑撤销 | ⚠️ 过渡态 | ProseMirror History（独立栈），编辑器内优先于 timeline |
 | 标签/字段/checkbox 撤销 | ⚠️ 部分覆盖 | 部分路径缺 commitDoc()，待补全 |
-| 展开/折叠撤销 | ❌ 未实现 | 待 Loro marker commit |
-| 导航撤销 | ⚠️ 独立栈 | navUndoStack（待合入统一时间线） |
-| 统一时间线 | ❌ 未实现 | 当前仍是三栈 fallthrough |
+| 展开/折叠撤销 | ✅ 已实现（过渡方案） | UI `expandUndoStack` + timeline 索引层 |
+| 导航撤销 | ✅ 已接入时间线（过渡方案） | `navUndoStack` 通过 timeline 按时间顺序调度 |
+| 统一时间线 | ⚠️ 部分实现 | `structural/nav/expand` 已统一；文本仍为 PM History |
 
 ## 实现范围
 
@@ -216,6 +216,8 @@ function handleUndo(e: KeyboardEvent) {
 | 2026-02-23 | **移除 ProseMirror History，文本 undo 由 Loro 接管** | ProseMirror History 是独立于 Loro 的第二个 undo 栈，阻碍统一 |
 | 2026-02-23 | **UI 状态通过 Loro marker commit + onPush/onPop 元数据实现** | 不污染数据模型，不自建 undo 栈，复用 Loro 基础设施 |
 | 2026-02-23 | **以 Workflowy 为标杆（非 Tana）** | Tana undo 弱于 Nodex 当前实现；Workflowy 是统一时间线的业界最佳实践 |
+| 2026-02-24 | **过渡方案：timeline 索引层统一 `structural/nav/expand`（保留 PM History）** | 先解决三栈 fallthrough 的时间顺序问题与用户体感混乱，避免在长期分支中一次性完成 Loro-only 大重构 |
+| 2026-02-24 | **undo/redo 前用 `system:` origin flush pending Loro writes** | 修复 PM 文本写入未 commit 时 `UndoManager.undo()` 自动 commit 造成的 redo 栈错位；`system:` 前缀不进入用户撤销栈 |
 
 ## 参考
 

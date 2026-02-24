@@ -147,7 +147,7 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
     // Create child and focus it (TrailingInput unmounts once there are children,
     // so we focus the new node to keep the cursor visible)
     const newNode = ref.createChild(ref.effectiveParentId, undefined, { name: rawText });
-    ref.setExpanded(ref.effectiveParentEK, true);
+    ref.setExpanded(ref.effectiveParentEK, true, true);
     ref.setFocusClickCoords({
       nodeId: newNode.id,
       parentId: ref.effectiveParentId,
@@ -198,9 +198,9 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
             setHasContent(false);
             const targetParentId = ref.effectiveParentId;
             ref.createChild(targetParentId, undefined, { name: rawText });
-            ref.setExpanded(ref.effectiveParentEK, true);
+            ref.setExpanded(ref.effectiveParentEK, true, true);
             const newNode = ref.createChild(targetParentId, undefined, { name: '' });
-            ref.setExpanded(ref.effectiveParentEK, true);
+            ref.setExpanded(ref.effectiveParentEK, true, true);
             ref.setFocusClickCoords({
               nodeId: newNode.id,
               parentId: targetParentId,
@@ -214,7 +214,7 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
           // Empty Enter → create empty child so user can keep creating nodes
           committingRef.current = true;
           const newEmptyNode = ref.createChild(ref.effectiveParentId, undefined, { name: '' });
-          ref.setExpanded(ref.effectiveParentEK, true);
+          ref.setExpanded(ref.effectiveParentEK, true, true);
           ref.setFocusClickCoords({
             nodeId: newEmptyNode.id,
             parentId: ref.effectiveParentId,
@@ -235,7 +235,7 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
           const lastSiblingId = siblings[siblings.length - 1];
           // Expand the last sibling (compound key: effectiveParentId is its parent context)
           const siblingEK = `${ref.effectiveParentId}:${lastSiblingId}`;
-          ref.setExpanded(siblingEK, true);
+          ref.setExpanded(siblingEK, true, true);
           // Track: new effectiveParentId is lastSiblingId, its expand key is siblingEK
           ref.setEffectiveParentEK(siblingEK);
           ref.setEffectiveParentId(lastSiblingId);
@@ -288,7 +288,7 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
           // collapse the parent and focus it
           if (intent === 'collapse_parent') {
             const expandKey = ref.effectiveParentEK;
-            if (expandKey) ref.setExpanded(expandKey, false);
+            if (expandKey) ref.setExpanded(expandKey, false, true);
             const gpId = loroDoc.getParentId(ref.effectiveParentId);
             if (gpId) ref.setFocusedNode(ref.effectiveParentId, gpId);
             return true;
@@ -414,7 +414,7 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
 
           ref.setTriggerHint(action.trigger);
           const triggerNode = ref.createChild(ref.effectiveParentId, undefined, { name: action.trigger });
-          ref.setExpanded(ref.effectiveParentEK, true);
+          ref.setExpanded(ref.effectiveParentEK, true, true);
           ref.setFocusClickCoords({
             nodeId: triggerNode.id,
             parentId: ref.effectiveParentId,

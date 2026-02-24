@@ -4,6 +4,7 @@ import { EditorView } from 'prosemirror-view';
 import { keymap } from 'prosemirror-keymap';
 import { baseKeymap, toggleMark } from 'prosemirror-commands';
 import { history, redo, undo } from 'prosemirror-history';
+import { performTimelineUndo, performTimelineRedo } from '../../hooks/use-nav-undo-keyboard.js';
 import { useNodeStore } from '../../stores/node-store.js';
 import { useUIStore } from '../../stores/ui-store.js';
 import { getPrimaryShortcutKey, getShortcutKeys } from '../../lib/shortcut-registry.js';
@@ -575,9 +576,21 @@ export function RichTextEditor(props: RichTextEditorProps) {
               },
             }
           : {}),
-        'Mod-z': (state, dispatch) => undo(state, dispatch),
-        'Mod-y': (state, dispatch) => redo(state, dispatch),
-        'Mod-Shift-z': (state, dispatch) => redo(state, dispatch),
+        'Mod-z': (state, dispatch) => {
+          if (undo(state, dispatch)) return true;
+          performTimelineUndo();
+          return true;
+        },
+        'Mod-y': (state, dispatch) => {
+          if (redo(state, dispatch)) return true;
+          performTimelineRedo();
+          return true;
+        },
+        'Mod-Shift-z': (state, dispatch) => {
+          if (redo(state, dispatch)) return true;
+          performTimelineRedo();
+          return true;
+        },
         'Mod-b': toggleMark(pmSchema.marks.bold),
         'Mod-i': toggleMark(pmSchema.marks.italic),
         'Mod-e': toggleMark(pmSchema.marks.code),

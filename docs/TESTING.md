@@ -459,7 +459,22 @@ npm run test:run
 **覆盖点**:
 
 1. contentEditable / input / textarea 焦点下不拦截
-2. 非编辑焦点与空 activeElement 下允许触发全局导航撤销/重做逻辑
+2. 非编辑焦点与空 activeElement 下允许触发全局撤销/重做逻辑
+3. `focusedNodeId` 存在时不拦截（编辑器内由 PM keymap 处理并负责 fallback）
+
+### 1.18.1 统一时间线 Undo/Redo（structural/nav/expand）
+
+**测试文件**: `tests/vitest/undo-timeline.test.ts`
+
+**覆盖点**:
+
+1. `undo-timeline` 纯数据结构（push/pop/reset、redo 清空语义）
+2. `navigateTo/goBack/goForward` 与 `commitDoc()` 推入 timeline 条目
+3. 交错操作按时间顺序 undo/redo（`S→N→S→N`、`S→E→N`）
+4. 展开/收起接入 timeline（含 `skipUndo` 程序性展开不入栈）
+5. Loro `mergeInterval` 导致 timeline 条目多于实际 undo 步骤时的跳过逻辑
+6. 新操作清空 redo timeline（structural / nav）
+7. pending Loro 文本写入存在时，undo/redo 仍正确（flush-before-undo 场景）
 
 ### 1.19 Selected Reference 快捷键解析
 

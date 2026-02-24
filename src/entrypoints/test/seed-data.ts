@@ -15,6 +15,7 @@
 import { initLoroDoc, initLoroDocForTest, commitDoc, clearUndoHistoryForTest } from '../../lib/loro-doc.js';
 import * as loroDoc from '../../lib/loro-doc.js';
 import { deleteSnapshot } from '../../lib/loro-persistence.js';
+import { resetTimeline } from '../../lib/undo-timeline.js';
 import { useNodeStore } from '../../stores/node-store';
 import { useUIStore } from '../../stores/ui-store';
 import { useWorkspaceStore } from '../../stores/workspace-store';
@@ -289,10 +290,10 @@ function seedBody(): void {
   const uiStore = useUIStore.getState();
 
   // Expand some nodes by default for testing
-  uiStore.setExpanded(`${CONTAINER_IDS.LIBRARY}:proj_1`, true);
-  uiStore.setExpanded('proj_1:task_1', true);
-  uiStore.setExpanded('proj_1:task_2', true);
-  uiStore.setExpanded(`${CONTAINER_IDS.LIBRARY}:note_rich`, true);
+  uiStore.setExpanded(`${CONTAINER_IDS.LIBRARY}:proj_1`, true, true);
+  uiStore.setExpanded('proj_1:task_1', true, true);
+  uiStore.setExpanded('proj_1:task_2', true, true);
+  uiStore.setExpanded(`${CONTAINER_IDS.LIBRARY}:note_rich`, true, true);
 
   // Navigate to Library
   if (uiStore.panelHistory.length === 0) {
@@ -331,6 +332,7 @@ export async function seedTestData(options?: { forceFresh?: boolean }): Promise<
 
   // Commit so Loro subscriptions fire and _version bumps for React
   commitDoc('__seed__');
+  resetTimeline();
 }
 
 /** Sync seed for test environments (call after initLoroDocForTest). */
@@ -349,4 +351,5 @@ export function seedTestDataSync(): void {
   // Some store actions (applyTag etc.) call commitDoc() internally without '__seed__' origin.
   // Reinitialize UndoManager to clear those intermediate entries.
   clearUndoHistoryForTest();
+  resetTimeline();
 }

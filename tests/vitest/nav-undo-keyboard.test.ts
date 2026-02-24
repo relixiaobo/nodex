@@ -19,7 +19,7 @@ describe('nav undo keyboard guard', () => {
     expect(shouldHandleNavUndo(null, null)).toBe(true);
   });
 
-  it('rejects nav undo when a node editor is focused', () => {
+  it('rejects when a node editor is focused (PM keymap handles fallthrough)', () => {
     const plainDiv = document.createElement('div');
     expect(shouldHandleNavUndo(plainDiv, 'node_1')).toBe(false);
     expect(shouldHandleNavUndo(null, 'node_1')).toBe(false);

@@ -1,4 +1,4 @@
-import { useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { useNode } from '../../hooks/use-node';
 import { useChildren } from '../../hooks/use-children';
 import { useNodeFields, type FieldEntry } from '../../hooks/use-node-fields';
@@ -44,6 +44,16 @@ export function OutlinerView({ rootNodeId, showTemplateTuples }: OutlinerViewPro
   const setFocusedNode = useUIStore((s) => s.setFocusedNode);
   const clearFocus = useUIStore((s) => s.clearFocus);
   const setEditingFieldName = useUIStore((s) => s.setEditingFieldName);
+
+  // Sync template fieldEntries/content for tagged nodes — handles the case
+  // where fieldDefs were added to tagDef Default content AFTER the tag was applied.
+  const syncTemplateFields = useNodeStore((s) => s.syncTemplateFields);
+  useEffect(() => {
+    if (node?.tags && node.tags.length > 0) {
+      syncTemplateFields(rootNodeId);
+    }
+  }, [node?.tags, rootNodeId, syncTemplateFields]);
+
   const fields = useNodeFields(rootNodeId);
 
   // Hidden field reveal state from UIStore (session-only, keyed by "panelNodeId:fieldEntryId")
@@ -99,6 +109,24 @@ export function OutlinerView({ rootNodeId, showTemplateTuples }: OutlinerViewPro
     return result;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allChildIds, fieldMap, _version, showTemplateTuples]);
+
+  // Template content clone colors: content children with templateId get the owning tagDef's color.
+  const templateContentColors = useMemo(() => {
+    const map = new Map<string, string[]>();
+    const getNode = useNodeStore.getState().getNode;
+    for (const { id, type } of visibleChildren) {
+      if (type !== 'content') continue;
+      const child = getNode(id);
+      if (!child?.templateId) continue;
+      const ownerTagDefId = loroDoc.getParentId(child.templateId);
+      if (!ownerTagDefId) continue;
+      if (getNode(ownerTagDefId)?.type !== 'tagDef') continue;
+      const color = resolveTagColor(ownerTagDefId).text;
+      if (color) map.set(id, [color]);
+    }
+    return map;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visibleChildren, _version]);
 
   /** Check if a hidden field has been temporarily revealed via UIStore */
   const isFieldRevealed = (fieldEntryId: string) =>
@@ -204,6 +232,7 @@ export function OutlinerView({ rootNodeId, showTemplateTuples }: OutlinerViewPro
             rootChildIds={dragSelectableRootIds}
             parentId={rootNodeId}
             rootNodeId={rootNodeId}
+            bulletColors={templateContentColors.get(id)}
           />
         );
       })}

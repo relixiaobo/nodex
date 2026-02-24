@@ -23,7 +23,18 @@ function getActiveTabId(): Promise<number> {
   });
 }
 
-function captureTabFromContentScript(tabId: number): Promise<WebClipCaptureResponse> {
+async function captureTabFromContentScript(tabId: number): Promise<WebClipCaptureResponse> {
+  // Inject content script on demand (includes Defuddle library)
+  try {
+    await chrome.scripting.executeScript({
+      target: { tabId },
+      files: ['/content-scripts/content.js'],
+    });
+  } catch {
+    return { ok: false, error: 'Cannot inject capture script into this page' };
+  }
+
+  // Send capture message after injection
   return new Promise((resolve, reject) => {
     chrome.tabs.sendMessage(tabId, { type: WEBCLIP_CAPTURE_PAGE }, (response?: WebClipCaptureResponse) => {
       if (chrome.runtime.lastError) {

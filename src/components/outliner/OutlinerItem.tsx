@@ -1425,6 +1425,10 @@ export function OutlinerItem({
   }, [nodeId, parentId, isReference, isPendingConversion, isOptionsValueNode, setFocusedNode]);
 
   const handleToggle = useCallback(() => {
+    console.debug('[undo-debug] handleToggle activeElement', {
+      tag: (document.activeElement as HTMLElement | null)?.tagName,
+      className: (document.activeElement as HTMLElement | null)?.className,
+    });
     const ek = `${parentId}:${nodeId}`;
     const currentHasChildren = (useNodeStore.getState().getNode(nodeId)?.children ?? []).length > 0;
     const currentlyExpanded = useUIStore.getState().expandedNodes.has(ek);
@@ -1446,6 +1450,10 @@ export function OutlinerItem({
   }, [panelNavigationNodeId, navigateTo]);
 
   const handleIndentLineClick = useCallback(() => {
+    console.debug('[undo-debug] handleIndentLineClick activeElement', {
+      tag: (document.activeElement as HTMLElement | null)?.tagName,
+      className: (document.activeElement as HTMLElement | null)?.className,
+    });
     // Toggle expand/collapse all direct children (Tana indent guide line behavior)
     const currentChildIds = useNodeStore.getState().getNode(nodeId)?.children ?? [];
     if (currentChildIds.length === 0) return;
@@ -2566,7 +2574,11 @@ export function OutlinerItem({
               // unified undo handlers immediately after expand/collapse clicks.
               e.preventDefault();
             }}
-            onClick={handleIndentLineClick}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              handleIndentLineClick();
+            }}
             title={t('outliner.toggleChildren')}
           >
             <div className="indent-line-inner w-px h-full bg-border rounded-full" />

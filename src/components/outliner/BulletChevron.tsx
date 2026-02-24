@@ -144,8 +144,16 @@ export function ChevronButton({
         // by the browser/native control path instead of reaching unified undo handlers.
         e.preventDefault();
       }}
-      onClick={(e) => { e.stopPropagation(); onToggle(); }}
-      onDoubleClick={(e) => { e.stopPropagation(); onDrillDown(); }}
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        onToggle();
+      }}
+      onDoubleClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        onDrillDown();
+      }}
       title={isExpanded ? 'Collapse' : 'Expand'}
     >
       <div

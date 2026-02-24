@@ -107,6 +107,19 @@ function seedBody(): void {
   cn('attrDef_branch', 'tagDef_dev_task', { type: 'fieldDef', name: 'Branch', fieldType: FIELD_TYPES.PLAIN });
 
   // ═══════════════════════════════════════════════════════════════
+  // TagDef: Meeting (with Default content / template)
+  // ═══════════════════════════════════════════════════════════════
+  cn('tagDef_meeting', CONTAINER_IDS.SCHEMA, {
+    type: 'tagDef', name: 'Meeting',
+    description: 'Tag for meetings — has template default content',
+  });
+  cn('attrDef_attendees', 'tagDef_meeting', { type: 'fieldDef', name: 'Attendees', fieldType: FIELD_TYPES.PLAIN });
+  // Default content (plain nodes under tagDef, no type)
+  cn('tpl_agenda',  'tagDef_meeting', { name: 'Agenda' });
+  cn('tpl_notes',   'tagDef_meeting', { name: 'Notes' });
+  cn('tpl_actions', 'tagDef_meeting', { name: 'Action Items' });
+
+  // ═══════════════════════════════════════════════════════════════
   // TagDef: WebClip
   // ═══════════════════════════════════════════════════════════════
   cn('tagDef_web_clip', CONTAINER_IDS.SCHEMA, { type: 'tagDef', name: 'web_clip' });
@@ -134,6 +147,10 @@ function seedBody(): void {
   cn('subtask_2c', 'task_2', { name: 'Implement drag and drop' });
 
   cn('task_3', 'proj_1', { name: 'Connect to Supabase' });
+
+  // ── Meeting node (tagged with Meeting → should get template content) ──
+  cn('meeting_1', 'proj_1', { name: 'Weekly sync' });
+  useNodeStore.getState().applyTag('meeting_1', 'tagDef_meeting');
 
   // ── Person node ──
   cn('person_1', CONTAINER_IDS.LIBRARY, { name: 'Alice Johnson' });

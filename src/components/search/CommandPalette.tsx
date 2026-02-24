@@ -1,16 +1,20 @@
 /**
- * ⌘K Command palette — Raycast-style unified search & command interface.
+ * ⌘K Command palette — full-screen takeover with Alfred-style shortcuts.
  *
- * Three-layer structure:
- * 1. Search bar (input + Esc badge)
- * 2. List area (Suggestions/Results groups, scrollable)
- * 3. Action bar (fixed bottom, dynamic label per selection type)
+ * Two-layer structure:
+ * 1. Search header (close button + input) — replaces toolbar
+ * 2. Results area (fills remaining space, scrollable)
+ *
+ * Alfred-style shortcuts:
+ * - Items 1-9 show ⌘1-⌘9 at the far right
+ * - The selected (highlighted) item shows ↵ instead
+ * - Pressing ⌘N executes that item directly
  *
  * Empty input: Suggestions (recent nodes + containers) + Commands
  * Typing: single "Results" group with fuzzy-matched nodes + commands
  */
 import { useEffect, useCallback, useMemo, useState, useRef } from 'react';
-import { Library, Inbox, CalendarDays, Trash2, Search, Plus, type AppIcon } from '../../lib/icons.js';
+import { Library, Inbox, CalendarDays, Trash2, Search, Plus, X, type AppIcon } from '../../lib/icons.js';
 import { resolveTagColor } from '../../lib/tag-colors.js';
 import { resolveDataType, getFieldTypeIcon } from '../../lib/field-utils.js';
 import { isContainerNode } from '../../types/index.js';
@@ -25,7 +29,6 @@ import {
   type PaletteItemType,
   type CommandContext,
   getAllCommands,
-  getActionLabel,
 } from '../../lib/palette-commands.js';
 import { COMMAND_PALETTE_QUICK_CONTAINERS } from '../../lib/system-node-registry.js';
 import { ensureTodayNode, isDayNode } from '../../lib/journal.js';
@@ -57,13 +60,6 @@ const CONTAINER_ICONS: Record<ContainerIconKey, AppIcon> = {
   schema: Library,
   clips: Library,
   stash: Library,
-};
-
-const TYPE_LABELS: Record<PaletteItemType, string> = {
-  node: 'Node',
-  container: 'Node',
-  command: 'Command',
-  create: 'New',
 };
 
 /** Resolve visual props for a node item based on its type. */
@@ -181,7 +177,6 @@ export function CommandPalette() {
         label: cmd.label,
         icon: cmd.icon,
         type: cmd.type,
-        subtitle: cmd.shortcut,
         action: () => cmd.action(ctx),
       })),
   [commands, ctx]);
@@ -232,7 +227,6 @@ export function CommandPalette() {
           label: cmd.label,
           icon: cmd.icon,
           type: cmd.type,
-          subtitle: cmd.shortcut,
           score: bestScore,
           action: () => cmd.action(ctx),
         });
@@ -245,7 +239,7 @@ export function CommandPalette() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [_version, searchQuery, commands, ctx, navigateTo, closeAndClear]);
 
-  // "Create in Today" item — shown at the end of search results when there's a query
+  // "Create in Today" item — shown at the start of search results when there's a query
   const createItem: PaletteItem | null = useMemo(() => {
     const q = searchQuery.trim();
     if (!q) return null;
@@ -255,7 +249,6 @@ export function CommandPalette() {
       icon: Plus,
       type: 'create' as PaletteItemType,
       typeLabel: 'New in Today',
-      subtitle: '\u2318\u21B5',
       action: () => {
         const todayId = ensureTodayNode();
         createChild(todayId, undefined, { name: q });
@@ -286,7 +279,6 @@ export function CommandPalette() {
   // Focus input when opened
   useEffect(() => {
     if (searchOpen) {
-      // Use requestAnimationFrame to ensure DOM is rendered before focusing
       requestAnimationFrame(() => inputRef.current?.focus());
     }
   }, [searchOpen]);
@@ -310,6 +302,16 @@ export function CommandPalette() {
   // Keyboard navigation within the palette
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
+      // ⌘1-⌘9 — execute item at that position (Alfred-style)
+      if ((e.metaKey || e.ctrlKey) && e.key >= '1' && e.key <= '9') {
+        e.preventDefault();
+        const itemIndex = parseInt(e.key) - 1;
+        if (itemIndex < allItems.length) {
+          allItems[itemIndex].action();
+        }
+        return;
+      }
+
       if (e.key === 'ArrowDown') {
         e.preventDefault();
         setSelectedIndex((i) => Math.min(i + 1, allItems.length - 1));
@@ -326,10 +328,10 @@ export function CommandPalette() {
         if (item) item.action();
       } else if (e.key === 'Escape') {
         e.preventDefault();
-        closeSearch();
+        closeAndClear();
       }
     },
-    [allItems, selectedIndex, closeSearch, createItem],
+    [allItems, selectedIndex, closeAndClear, createItem],
   );
 
   // Scroll selected item into view
@@ -345,126 +347,121 @@ export function CommandPalette() {
   if (!searchOpen) return null;
 
   const hasQuery = searchQuery.trim().length > 0;
-  const selectedItem = allItems[selectedIndex];
-  const actionLabel = selectedItem ? getActionLabel(selectedItem.type) : 'Open';
 
   // Track global index across groups for keyboard selection
   let globalIdx = 0;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center pt-[12%]">
-      {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/20" onClick={closeSearch} />
+    <div className="fixed inset-0 z-50 flex flex-col bg-background">
+      {/* Search header — replaces toolbar */}
+      <div className="flex h-11 shrink-0 items-center gap-2 border-b border-border bg-foreground/[0.04] px-2">
+        <button
+          onClick={closeAndClear}
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-foreground-secondary transition-colors hover:bg-foreground/10 hover:text-foreground"
+        >
+          <X size={16} strokeWidth={1.5} />
+        </button>
+        <input
+          ref={inputRef}
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder="Search nodes and commands..."
+          className="h-full flex-1 bg-transparent text-sm outline-none placeholder:text-foreground-tertiary"
+        />
+        <Kbd>Esc</Kbd>
+      </div>
 
-      {/* Dialog */}
-      <div
-        className="relative w-full max-w-md rounded-xl border border-border bg-popover shadow-xl"
-        onKeyDown={handleKeyDown}
-      >
-        {/* Search bar */}
-        <div className="flex items-center border-b border-border px-3">
-          <input
-            ref={inputRef}
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search nodes and commands..."
-            className="h-10 flex-1 bg-transparent text-sm outline-none placeholder:text-foreground-tertiary"
-          />
-        </div>
-
-        {/* List area */}
-        <div ref={listRef} className="h-72 overflow-y-auto py-1.5 pr-1.5">
-          {hasQuery ? (
-            // Search mode: Create + Results
-            <div>
-              {createItem && (
+      {/* Results area — fills remaining space */}
+      <div ref={listRef} className="flex-1 overflow-y-auto py-1.5">
+        {hasQuery ? (
+          // Search mode: Create + Results
+          <div>
+            {createItem && (() => {
+              const idx = globalIdx++;
+              return (
                 <PaletteRow
                   key={createItem.id}
                   item={createItem}
-                  selected={selectedIndex === 0}
+                  selected={selectedIndex === idx}
+                  positionIndex={idx}
                   onSelect={() => createItem.action()}
-                  onHover={() => setSelectedIndex(0)}
+                  onHover={() => setSelectedIndex(idx)}
                 />
-              )}
-              {searchResults.length > 0 && (
-                <>
-                  <GroupHeader label="Results" />
-                  {searchResults.map((item, i) => {
-                    const idx = createItem ? i + 1 : i;
-                    return (
-                      <PaletteRow
-                        key={item.id}
-                        item={item}
-                        selected={selectedIndex === idx}
-                        onSelect={() => item.action()}
-                        onHover={() => setSelectedIndex(idx)}
-                      />
-                    );
-                  })}
-                </>
-              )}
-            </div>
-          ) : (
-            // Default mode: Suggestions + Commands
-            <>
-              {(recentNodes.length > 0 || containerItems.length > 0) && (
-                <div>
-                  <GroupHeader label="Suggestions" />
-                  {recentNodes.map((item) => {
-                    const idx = globalIdx++;
-                    return (
-                      <PaletteRow
-                        key={item.id}
-                        item={item}
-                        selected={selectedIndex === idx}
-                        onSelect={() => item.action()}
-                        onHover={() => setSelectedIndex(idx)}
-                      />
-                    );
-                  })}
-                  {containerItems.map((item) => {
-                    const idx = globalIdx++;
-                    return (
-                      <PaletteRow
-                        key={item.id}
-                        item={item}
-                        selected={selectedIndex === idx}
-                        onSelect={() => item.action()}
-                        onHover={() => setSelectedIndex(idx)}
-                      />
-                    );
-                  })}
-                </div>
-              )}
-              {commandItems.length > 0 && (
-                <div>
-                  <GroupHeader label="Commands" />
-                  {commandItems.map((item) => {
-                    const idx = globalIdx++;
-                    return (
-                      <PaletteRow
-                        key={item.id}
-                        item={item}
-                        selected={selectedIndex === idx}
-                        onSelect={() => item.action()}
-                        onHover={() => setSelectedIndex(idx)}
-                      />
-                    );
-                  })}
-                </div>
-              )}
-            </>
-          )}
-        </div>
-
-        {/* Action bar */}
-        {allItems.length > 0 && (
-          <div className="flex h-10 items-center justify-end border-t border-border px-3">
-            <div className="flex items-center gap-1.5 text-xs text-foreground-tertiary">
-              <span>{actionLabel}</span>
-              <Kbd keys="↵" />
-            </div>
+              );
+            })()}
+            {searchResults.length > 0 && (
+              <>
+                <GroupHeader label="Results" />
+                {searchResults.map((item) => {
+                  const idx = globalIdx++;
+                  return (
+                    <PaletteRow
+                      key={item.id}
+                      item={item}
+                      selected={selectedIndex === idx}
+                      positionIndex={idx}
+                      onSelect={() => item.action()}
+                      onHover={() => setSelectedIndex(idx)}
+                    />
+                  );
+                })}
+              </>
+            )}
           </div>
+        ) : (
+          // Default mode: Suggestions + Commands
+          <>
+            {(recentNodes.length > 0 || containerItems.length > 0) && (
+              <div>
+                <GroupHeader label="Suggestions" />
+                {recentNodes.map((item) => {
+                  const idx = globalIdx++;
+                  return (
+                    <PaletteRow
+                      key={item.id}
+                      item={item}
+                      selected={selectedIndex === idx}
+                      positionIndex={idx}
+                      onSelect={() => item.action()}
+                      onHover={() => setSelectedIndex(idx)}
+                    />
+                  );
+                })}
+                {containerItems.map((item) => {
+                  const idx = globalIdx++;
+                  return (
+                    <PaletteRow
+                      key={item.id}
+                      item={item}
+                      selected={selectedIndex === idx}
+                      positionIndex={idx}
+                      onSelect={() => item.action()}
+                      onHover={() => setSelectedIndex(idx)}
+                    />
+                  );
+                })}
+              </div>
+            )}
+            {commandItems.length > 0 && (
+              <div>
+                <GroupHeader label="Commands" />
+                {commandItems.map((item) => {
+                  const idx = globalIdx++;
+                  return (
+                    <PaletteRow
+                      key={item.id}
+                      item={item}
+                      selected={selectedIndex === idx}
+                      positionIndex={idx}
+                      onSelect={() => item.action()}
+                      onHover={() => setSelectedIndex(idx)}
+                    />
+                  );
+                })}
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>
@@ -486,11 +483,13 @@ function GroupHeader({ label }: { label: string }) {
 interface PaletteRowProps {
   item: PaletteItem;
   selected: boolean;
+  /** 0-based flat index — used for Alfred-style ⌘1-⌘9 shortcuts. */
+  positionIndex: number;
   onSelect: () => void;
   onHover: () => void;
 }
 
-function PaletteRow({ item, selected, onSelect, onHover }: PaletteRowProps) {
+function PaletteRow({ item, selected, positionIndex, onSelect, onHover }: PaletteRowProps) {
   const Icon = item.icon;
 
   return (
@@ -523,12 +522,12 @@ function PaletteRow({ item, selected, onSelect, onHover }: PaletteRowProps) {
         </span>
       )}
       <span className="flex-1 truncate text-sm text-foreground">{item.label}</span>
-      {item.subtitle && (
-        <Kbd keys={item.subtitle} />
-      )}
-      <span className="shrink-0 text-xs text-foreground-tertiary">
-        {item.typeLabel ?? TYPE_LABELS[item.type]}
-      </span>
+      {/* Alfred-style shortcut: selected → ↵, others → ⌘N (up to 9) */}
+      {selected ? (
+        <Kbd keys="↵" />
+      ) : positionIndex < 9 ? (
+        <Kbd keys={`\u2318${positionIndex + 1}`} />
+      ) : null}
     </div>
   );
 }

@@ -51,6 +51,11 @@ let captureUndoUIMeta: (() => UndoUIMeta) | null = null;
 let restoreUndoUIMeta: ((meta: UndoUIMeta, isUndo: boolean) => void) | null = null;
 const redoRestoreUIMetaStack: UndoUIMeta[] = [];
 
+function undoDebug(...args: unknown[]): void {
+  // Temporary debug for unified undo rollout.
+  console.debug('[undo-debug]', ...args);
+}
+
 function bindUndoCallbacks(): void {
   if (!undoManager) return;
   if (captureUndoUIMeta) {
@@ -717,12 +722,19 @@ export function commitUIMarker(): void {
   const uiMap = doc.getMap('_ui');
   const current = uiMap.get('seq');
   const next = typeof current === 'number' ? current + 1 : 1;
+  undoDebug('commitUIMarker', { current, next, canUndo: undoManager?.canUndo(), canRedo: undoManager?.canRedo() });
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   uiMap.set('seq' as any, next as any);
   commitDoc('user:ui');
 }
 
 export function undoDoc(): boolean {
+  undoDebug('undoDoc:start', {
+    canUndo: undoManager?.canUndo(),
+    canRedo: undoManager?.canRedo(),
+    topUndoValue: undoManager?.topUndoValue(),
+    topRedoValue: undoManager?.topRedoValue(),
+  });
   commitDoc('system:flush-before-undo');
   const undoValue = undoManager?.topUndoValue();
   if (captureUndoUIMeta) {
@@ -734,13 +746,27 @@ export function undoDoc(): boolean {
     redoRestoreUIMetaStack.pop();
   }
   if (result && restoreUndoUIMeta) {
+    undoDebug('undoDoc:restoreUI', { undoValue });
     restoreUndoUIMeta((undoValue ?? null) as Value, true);
   }
   if (result) rebuildMappings();
+  undoDebug('undoDoc:end', {
+    result,
+    canUndo: undoManager?.canUndo(),
+    canRedo: undoManager?.canRedo(),
+    topUndoValue: undoManager?.topUndoValue(),
+    topRedoValue: undoManager?.topRedoValue(),
+  });
   return result;
 }
 
 export function redoDoc(): boolean {
+  undoDebug('redoDoc:start', {
+    canUndo: undoManager?.canUndo(),
+    canRedo: undoManager?.canRedo(),
+    topUndoValue: undoManager?.topUndoValue(),
+    topRedoValue: undoManager?.topRedoValue(),
+  });
   commitDoc('system:flush-before-undo');
   const redoMeta = redoRestoreUIMetaStack.length > 0 ? redoRestoreUIMetaStack[redoRestoreUIMetaStack.length - 1] : null;
   const result = undoManager?.redo() ?? false;
@@ -748,9 +774,17 @@ export function redoDoc(): boolean {
     redoRestoreUIMetaStack.pop();
   }
   if (result && restoreUndoUIMeta) {
+    undoDebug('redoDoc:restoreUI', { redoMeta });
     restoreUndoUIMeta((redoMeta ?? null) as Value, false);
   }
   if (result) rebuildMappings();
+  undoDebug('redoDoc:end', {
+    result,
+    canUndo: undoManager?.canUndo(),
+    canRedo: undoManager?.canRedo(),
+    topUndoValue: undoManager?.topUndoValue(),
+    topRedoValue: undoManager?.topRedoValue(),
+  });
   return result;
 }
 

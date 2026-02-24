@@ -43,11 +43,26 @@ export function useNavUndoKeyboard() {
     function handler(e: KeyboardEvent) {
       const action = resolveNavUndoAction(e, undoBindings, redoBindings);
       if (!action) return;
+      const active = document.activeElement as HTMLElement | null;
+      console.debug('[undo-debug] nav-keydown', {
+        action,
+        key: e.key,
+        metaKey: e.metaKey,
+        ctrlKey: e.ctrlKey,
+        shiftKey: e.shiftKey,
+        activeTag: active?.tagName,
+        activeClass: active?.className,
+        focusedNodeId: useUIStore.getState().focusedNodeId,
+      });
 
       // Don't intercept while editing (or inside text inputs/contentEditable).
-      if (!shouldHandleNavUndo(document.activeElement, useUIStore.getState().focusedNodeId)) return;
+      if (!shouldHandleNavUndo(document.activeElement, useUIStore.getState().focusedNodeId)) {
+        console.debug('[undo-debug] nav-keydown:skip-editing');
+        return;
+      }
 
       e.preventDefault();
+      console.debug('[undo-debug] nav-keydown:dispatch', { action });
 
       if (action === 'redo') {
         redoDoc();

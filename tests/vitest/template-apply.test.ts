@@ -6,8 +6,9 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useNodeStore } from '../../src/stores/node-store.js';
 import { computeNodeFields } from '../../src/hooks/use-node-fields.js';
-import { buildVisibleChildrenRows } from '../../src/components/outliner/OutlinerItem.js';
+import { buildVisibleChildrenRows, buildFieldOwnerColors } from '../../src/components/outliner/OutlinerItem.js';
 import * as loroDoc from '../../src/lib/loro-doc.js';
+import { resolveTagColor } from '../../src/lib/tag-colors.js';
 import { resetAndSeed } from './helpers/test-state.js';
 
 function getNode(id: string) {
@@ -152,7 +153,7 @@ describe('template application — applyTag creates fieldEntries', () => {
     const tagDef = store.createTagDef('Invoice', { color: 'green' });
 
     // addUnnamedFieldToNode puts fieldDef in SCHEMA, fieldEntry under tagDef
-    const { fieldDefId } = store.addUnnamedFieldToNode(tagDef.id);
+    const { fieldEntryId: tagFieldEntryId, fieldDefId } = store.addUnnamedFieldToNode(tagDef.id);
     store.renameFieldDef(fieldDefId, 'Amount');
 
     // Verify tagDef has a fieldEntry child (not a fieldDef child)
@@ -171,6 +172,12 @@ describe('template application — applyTag creates fieldEntries', () => {
     });
 
     expect(nodeFieldEntries.length).toBe(1);
+
+    // templateId should point to the tagDef's fieldEntry (not the fieldDef in SCHEMA),
+    // so that getParentId(templateId) → tagDef (for icon color resolution).
+    const fe = loroDoc.toNodexNode(nodeFieldEntries[0])!;
+    expect(fe.templateId).toBe(tagFieldEntryId);
+    expect(loroDoc.getParentId(fe.templateId!)).toBe(tagDef.id);
 
     // computeNodeFields should also return it
     const fields = computeNodeFields(getNode, getChildren, node.id);
@@ -206,6 +213,37 @@ describe('template application — applyTag creates fieldEntries', () => {
       return n?.type === 'fieldEntry' && n.fieldDefId === fieldDefId;
     });
     expect(hasField).toBe(true);
+  });
+
+  it('buildFieldOwnerColors resolves tagDef color for UI-created template fields', () => {
+    const store = useNodeStore.getState();
+    const tagDef = store.createTagDef('Bug', { color: 'red' });
+
+    // Add field via UI path
+    store.addUnnamedFieldToNode(tagDef.id);
+
+    // Tag a node
+    const node = store.createChild('proj_1', undefined, { name: 'BUG-001' });
+    store.applyTag(node.id, tagDef.id);
+
+    // Build fieldMap from node's fields
+    const fields = computeNodeFields(getNode, getChildren, node.id);
+    const fieldMap = new Map(
+      fields.map(f => [f.fieldEntryId, { fieldDefId: f.fieldDefId, templateId: f.templateId }]),
+    );
+
+    // buildFieldOwnerColors should find the tagDef as owner via templateId → parent
+    const colors = buildFieldOwnerColors(
+      fieldMap,
+      (id) => loroDoc.getParentId(id),
+      (id) => getNode(id)?.type,
+      (ownerId) => resolveTagColor(ownerId).text,
+    );
+
+    // Every field entry should have a color (= tagDef's color)
+    for (const [entryId] of fieldMap) {
+      expect(colors.has(entryId), `fieldEntry ${entryId} should have owner color`).toBe(true);
+    }
   });
 });
 

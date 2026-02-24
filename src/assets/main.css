@@ -246,7 +246,7 @@
 /* Command palette expand animation — reveals from header downward */
 @keyframes palette-expand {
   from {
-    clip-path: inset(0 0 calc(100% - 40px) 0);
+    clip-path: inset(0 0 calc(100% - 44px) 0);
   }
   to {
     clip-path: inset(0);

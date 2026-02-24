@@ -61,18 +61,9 @@ function bindUndoCallbacks(): void {
   } else {
     undoManager.setOnPush(undefined);
   }
-
-  if (restoreUndoUIMeta) {
-    undoManager.setOnPop((isUndo, value, _counterRange) => {
-      if (isUndo && captureUndoUIMeta) {
-        redoRestoreUIMetaStack.push(captureUndoUIMeta() ?? null);
-      }
-      const redoMeta = !isUndo ? redoRestoreUIMetaStack.pop() : undefined;
-      restoreUndoUIMeta?.(redoMeta ?? value?.value ?? null, isUndo);
-    });
-  } else {
-    undoManager.setOnPop(undefined);
-  }
+  // Browser runtime behavior for onPop has shown inconsistencies vs Node test runtime.
+  // We restore UI snapshots manually in undoDoc()/redoDoc() using topUndoValue() + a local redo stack.
+  undoManager.setOnPop(undefined);
 }
 
 export function registerUndoUICallbacks(callbacks: {
@@ -708,6 +699,9 @@ export function getLoroDoc(): LoroDoc {
 export function commitDoc(origin: string = DEFAULT_USER_COMMIT_ORIGIN): void {
   if (!doc) return;
   if (!canApplyMutation('commitDoc')) return;
+  if (!origin.startsWith('system:') && origin !== '__seed__') {
+    redoRestoreUIMetaStack.length = 0;
+  }
   doc.commit({ origin });
 }
 
@@ -730,14 +724,32 @@ export function commitUIMarker(): void {
 
 export function undoDoc(): boolean {
   commitDoc('system:flush-before-undo');
+  const undoValue = undoManager?.topUndoValue();
+  if (captureUndoUIMeta) {
+    redoRestoreUIMetaStack.push(captureUndoUIMeta() ?? null);
+  }
   const result = undoManager?.undo() ?? false;
+  if (!result && captureUndoUIMeta) {
+    // rollback local redo snapshot push
+    redoRestoreUIMetaStack.pop();
+  }
+  if (result && restoreUndoUIMeta) {
+    restoreUndoUIMeta((undoValue ?? null) as Value, true);
+  }
   if (result) rebuildMappings();
   return result;
 }
 
 export function redoDoc(): boolean {
   commitDoc('system:flush-before-undo');
+  const redoMeta = redoRestoreUIMetaStack.length > 0 ? redoRestoreUIMetaStack[redoRestoreUIMetaStack.length - 1] : null;
   const result = undoManager?.redo() ?? false;
+  if (result && redoRestoreUIMetaStack.length > 0) {
+    redoRestoreUIMetaStack.pop();
+  }
+  if (result && restoreUndoUIMeta) {
+    restoreUndoUIMeta((redoMeta ?? null) as Value, false);
+  }
   if (result) rebuildMappings();
   return result;
 }

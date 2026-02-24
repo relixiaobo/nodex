@@ -564,7 +564,7 @@ Chrome Side Panel 宽度范围：300px ~ 700px+。
 - `text-amber-500` → `text-warning`
 - `outline-border/60` → `outline-border-emphasis`
 - `text-destructive/50`/`/70`/`/80` → 语义 token
-- `bg-primary/10`（SidebarNav）→ `bg-primary-muted`
+- `bg-primary/10`（已移除的 SidebarNav）→ `bg-primary-muted`
 
 ### Phase 4: Dark Mode
 - 实现 `[data-theme="dark"]` 覆盖

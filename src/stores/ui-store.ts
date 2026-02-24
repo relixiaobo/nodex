@@ -26,7 +26,7 @@ interface UIStore {
   // Expand/collapse (keys are compound: "parentId:nodeId" for per-instance state)
   expandedNodes: Set<string>;
   toggleExpanded(expandKey: string): void;
-  setExpanded(expandKey: string, expanded: boolean): void;
+  setExpanded(expandKey: string, expanded: boolean, skipUndo?: boolean): void;
 
   // Focus (parentId disambiguates reference nodes that appear in multiple places)
   // setFocusedNode also sets selection to the focused node (click-time selection pattern)
@@ -107,6 +107,12 @@ interface UIStore {
   navRedoStack: Array<{ panelHistory: string[]; panelIndex: number }>;
   navUndo(): void;
   navRedo(): void;
+
+  // Expand/collapse undo/redo (session-only, not persisted)
+  expandUndoStack: Array<{ expandKey: string; wasExpanded: boolean }>;
+  expandRedoStack: Array<{ expandKey: string; wasExpanded: boolean }>;
+  expandUndo(): void;
+  expandRedo(): void;
 }
 
 export interface PersistedUIStoreState {
@@ -229,17 +235,31 @@ export const useUIStore = create<UIStore>()(
       expandedNodes: new Set<string>(),
       toggleExpanded: (expandKey) =>
         set((s) => {
+          const wasExpanded = s.expandedNodes.has(expandKey);
           const next = new Set(s.expandedNodes);
-          if (next.has(expandKey)) next.delete(expandKey);
+          if (wasExpanded) next.delete(expandKey);
           else next.add(expandKey);
-          return { expandedNodes: next };
+          pushUndoEntry('expand');
+          return {
+            expandedNodes: next,
+            expandUndoStack: [...s.expandUndoStack, { expandKey, wasExpanded }],
+            expandRedoStack: [],
+          };
         }),
-      setExpanded: (expandKey, expanded) =>
+      setExpanded: (expandKey, expanded, skipUndo) =>
         set((s) => {
+          const wasExpanded = s.expandedNodes.has(expandKey);
+          if (wasExpanded === expanded) return {};
           const next = new Set(s.expandedNodes);
           if (expanded) next.add(expandKey);
           else next.delete(expandKey);
-          return { expandedNodes: next };
+          if (skipUndo) return { expandedNodes: next };
+          pushUndoEntry('expand');
+          return {
+            expandedNodes: next,
+            expandUndoStack: [...s.expandUndoStack, { expandKey, wasExpanded }],
+            expandRedoStack: [],
+          };
         }),
 
       // Focus
@@ -396,6 +416,38 @@ export const useUIStore = create<UIStore>()(
             panelIndex: next.panelIndex,
             navUndoStack: [...s.navUndoStack, currentSnapshot],
             navRedoStack: s.navRedoStack.slice(0, -1),
+          };
+        }),
+
+      // Expand/collapse undo/redo (session-only)
+      expandUndoStack: [],
+      expandRedoStack: [],
+      expandUndo: () =>
+        set((s) => {
+          if (s.expandUndoStack.length === 0) return {};
+          const prev = s.expandUndoStack[s.expandUndoStack.length - 1];
+          const currentExpanded = s.expandedNodes.has(prev.expandKey);
+          const next = new Set(s.expandedNodes);
+          if (prev.wasExpanded) next.add(prev.expandKey);
+          else next.delete(prev.expandKey);
+          return {
+            expandedNodes: next,
+            expandUndoStack: s.expandUndoStack.slice(0, -1),
+            expandRedoStack: [...s.expandRedoStack, { expandKey: prev.expandKey, wasExpanded: currentExpanded }],
+          };
+        }),
+      expandRedo: () =>
+        set((s) => {
+          if (s.expandRedoStack.length === 0) return {};
+          const next_entry = s.expandRedoStack[s.expandRedoStack.length - 1];
+          const currentExpanded = s.expandedNodes.has(next_entry.expandKey);
+          const next = new Set(s.expandedNodes);
+          if (next_entry.wasExpanded) next.add(next_entry.expandKey);
+          else next.delete(next_entry.expandKey);
+          return {
+            expandedNodes: next,
+            expandUndoStack: [...s.expandUndoStack, { expandKey: next_entry.expandKey, wasExpanded: currentExpanded }],
+            expandRedoStack: s.expandRedoStack.slice(0, -1),
           };
         }),
     }),

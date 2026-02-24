@@ -60,7 +60,13 @@ export function performTimelineUndo(): boolean {
         pushRedoEntry('structural');
         return true;
       }
-      // Loro merged/exhausted this entry, skip to next
+      continue;
+    } else if (entry === 'expand') {
+      if (useUIStore.getState().expandUndoStack.length > 0) {
+        useUIStore.getState().expandUndo();
+        pushRedoEntry('expand');
+        return true;
+      }
       continue;
     } else {
       // 'nav'
@@ -69,7 +75,6 @@ export function performTimelineUndo(): boolean {
         pushRedoEntry('nav');
         return true;
       }
-      // nav stack exhausted, skip
       continue;
     }
   }
@@ -85,8 +90,14 @@ export function performTimelineRedo(): boolean {
     if (entry === 'structural') {
       if (canRedoDoc()) {
         redoDoc();
-        // Push back to undo without clearing redo (this is a restore operation)
         pushUndoEntry('structural', false);
+        return true;
+      }
+      continue;
+    } else if (entry === 'expand') {
+      if (useUIStore.getState().expandRedoStack.length > 0) {
+        useUIStore.getState().expandRedo();
+        pushUndoEntry('expand', false);
         return true;
       }
       continue;
@@ -115,7 +126,8 @@ export function useNavUndoKeyboard() {
       // When editor is focused, PM's keymap handles Cmd+Z/Shift+Z directly
       // and falls through to performTimelineUndo/Redo if PM has no text history.
       // So we only handle the non-editor case here.
-      if (!shouldHandleNavUndo(document.activeElement, useUIStore.getState().focusedNodeId)) return;
+      const focusedNodeId = useUIStore.getState().focusedNodeId;
+      if (!shouldHandleNavUndo(document.activeElement, focusedNodeId)) return;
 
       e.preventDefault();
 

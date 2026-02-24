@@ -44,6 +44,8 @@ export function resetStores(): void {
     expandedHiddenFields: new Set<string>(),
     navUndoStack: [],
     navRedoStack: [],
+    expandUndoStack: [],
+    expandRedoStack: [],
   });
 }
 

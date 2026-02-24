@@ -965,7 +965,7 @@ export function OutlinerItem({
           const index = parent.children.indexOf(id);
           if (index <= 0) continue;
           const newParentId = parent.children[index - 1];
-          setExpanded(`${ownerId}:${newParentId}`, true);
+          setExpanded(`${ownerId}:${newParentId}`, true, true);
           indentNode(id);
         }
         clearSelection();
@@ -1509,7 +1509,7 @@ export function OutlinerItem({
     if (index <= 0) return; // Can't indent first child
 
     const newParentId = parent.children[index - 1];
-    setExpanded(`${ownerId}:${newParentId}`, true);
+    setExpanded(`${ownerId}:${newParentId}`, true, true);
     indentNode(nodeId);
     // Update focusedParentId so the node keeps focus under its new parent
     setFocusedNode(nodeId, newParentId);
@@ -1952,7 +1952,7 @@ export function OutlinerItem({
           const tempNodeId = startRefConversion(newRefId, parentId, insertPos);
           setPendingRefConversion({ tempNodeId, refNodeId, parentId });
           const gpId = loroDoc.getParentId(parentId);
-          if (gpId) setExpanded(`${gpId}:${parentId}`, true);
+          if (gpId) setExpanded(`${gpId}:${parentId}`, true, true);
           useUIStore.getState().setPendingInputChar(null);
           useUIStore.getState().setFocusClickCoords({
             nodeId: tempNodeId,
@@ -2225,7 +2225,7 @@ export function OutlinerItem({
       if (decision) {
         moveNodeTo(dragNodeId, decision.newParentId, decision.position);
         if (decision.expandKey) {
-          setExpanded(decision.expandKey, true);
+          setExpanded(decision.expandKey, true, true);
         }
       }
 

@@ -650,12 +650,16 @@ export function commitDoc(origin: string = DEFAULT_USER_COMMIT_ORIGIN): void {
 }
 
 export function undoDoc(): boolean {
+  // Flush any uncommitted writes (e.g. PM text edits) with a system origin
+  // so Loro's auto-commit doesn't create a spurious undo step.
+  if (doc) doc.commit({ origin: 'system:flush-before-undo' });
   const result = undoManager?.undo() ?? false;
   if (result) rebuildMappings();
   return result;
 }
 
 export function redoDoc(): boolean {
+  if (doc) doc.commit({ origin: 'system:flush-before-undo' });
   const result = undoManager?.redo() ?? false;
   if (result) rebuildMappings();
   return result;

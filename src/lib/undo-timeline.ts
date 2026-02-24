@@ -7,7 +7,7 @@
  * 零外部导入，纯数据结构。
  */
 
-export type TimelineEntry = 'structural' | 'nav';
+export type TimelineEntry = 'structural' | 'nav' | 'expand';
 
 let undoStack: TimelineEntry[] = [];
 let redoStack: TimelineEntry[] = [];

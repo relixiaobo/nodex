@@ -829,12 +829,21 @@ subscribeLocalUpdates hook:
 9. Loro mergeInterval 跳过（timeline 有多个 structural 但 canUndoDoc 不够时跳过多余条目）
 10. 新操作清空统一时间线 redo
 11. redo→undo 往返循环稳定
+12. `toggleExpanded` / `setExpanded` 推入 'expand' 到时间线
+13. `setExpanded` no-op（状态不变）不推入时间线
+14. `expandUndo` 恢复展开状态，`expandRedo` 恢复收起状态
+15. expand undo/redo 通过 `performTimelineUndo/Redo` 正确分派
+16. 交错操作 S→E→N，undo 顺序应为 N→E→S
+17. `setExpanded(key, val, skipUndo=true)` 不推入时间线也不记录 expandUndoStack
+18. Loro auto-commit 干扰修复：`undoDoc` 在有未提交 PM 写入时正确撤销 structural 变更（flush with system origin）
+19. 多次 undo/redo 在有未提交写入时循环稳定
 
 **设计要点**:
-- `undo-timeline.ts` 零外部导入，纯数据结构
+- `undo-timeline.ts` 零外部导入，纯数据结构，`TimelineEntry = 'structural' | 'nav' | 'expand'`
 - `performTimelineUndo()` / `performTimelineRedo()` 循环 pop 直到找到可执行的条目或栈空
 - redo 恢复操作推入 undo 时使用 `clearRedo=false`，避免清空后续 redo 条目
 - 种子数据末尾调用 `resetTimeline()` 清除播种期间累积的时间线条目
+- `expandUndoStack` / `expandRedoStack` 存储 `{ expandKey, wasExpanded }` 快照，session-only 不持久化
 
 ### 1.35 节点搜索 SKIP_DOC_TYPES 过滤
 

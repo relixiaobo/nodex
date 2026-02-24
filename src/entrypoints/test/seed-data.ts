@@ -287,10 +287,10 @@ function seedBody(): void {
   const uiStore = useUIStore.getState();
 
   // Expand some nodes by default for testing
-  uiStore.setExpanded(`${CONTAINER_IDS.LIBRARY}:proj_1`, true);
-  uiStore.setExpanded('proj_1:task_1', true);
-  uiStore.setExpanded('proj_1:task_2', true);
-  uiStore.setExpanded(`${CONTAINER_IDS.LIBRARY}:note_rich`, true);
+  uiStore.setExpanded(`${CONTAINER_IDS.LIBRARY}:proj_1`, true, true);
+  uiStore.setExpanded('proj_1:task_1', true, true);
+  uiStore.setExpanded('proj_1:task_2', true, true);
+  uiStore.setExpanded(`${CONTAINER_IDS.LIBRARY}:note_rich`, true, true);
 
   // Navigate to Library
   if (uiStore.panelHistory.length === 0) {

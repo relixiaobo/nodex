@@ -27,7 +27,7 @@ _(空)_
 
 | Agent | 当前任务 | 分支 | 修改中的文件 |
 |-------|---------|------|-------------|
-| nodex-cc | _(idle)_ | — | — |
+| nodex-cc | Side Panel 布局改造 Phase 1-2 | `cc/layout-renovation` | `src/entrypoints/sidepanel/App.tsx`, `src/components/toolbar/*`, `src/components/search/CommandPalette.tsx`, `src/components/panel/Breadcrumb.tsx`, `src/stores/ui-store.ts` |
 | nodex-cc-2 | 统一时间线 Undo/Redo (#44) | cc2/unified-undo | `src/stores/node-store.ts`, `src/lib/loro-doc.ts`, `src/components/editor/RichTextEditor.tsx`, `src/stores/ui-store.ts` |
 | nodex-codex | _(idle)_ | — | — |
 
@@ -35,7 +35,18 @@ _(空)_
 
 ## 进行中
 
-_(空)_
+### Side Panel 布局改造 — Phase 1-2-4（顶栏 + Sidebar 移除 + ⌘K 命令面板 + 清理）
+> 移除 Sidebar，用顶栏（Undo/Redo + 搜索触发器 + 用户头像/同步圆点）替代。⌘K 命令面板 Raycast 风格重设计。
+> **Owner**: nodex-cc | **Branch**: `cc/layout-renovation` | **PR**: #88
+> **Plan**: `docs/plans/layout-renovation.md`
+>
+> **关键约束**:
+> - Phase 3（Undo/Redo 集成）依赖 #44，本 PR 仅放按钮占位
+
+- [x] Phase 1: TopToolbar 组件 + App.tsx 移除 Sidebar + Breadcrumb 精简
+- [x] Phase 2: ⌘K 命令面板重写（fuzzy search + 命令注册表 + Raycast 风格 UI）
+- [x] Phase 4: 清理废弃文件（Sidebar/SidebarNav/SyncStatusIndicator/UserMenu + ui-store sidebarOpen）
+- [x] UI 设计规范对齐 + 视觉微调
 
 ---
 
@@ -135,14 +146,13 @@ _(空)_
 - [ ] Phase 4: 统一 ⌘Z handler + 删除旧代码（navUndoStack / 三层 fallthrough / PM History）
 
 #### Side Panel 布局改造 — 移除 Sidebar + ⌘K 重设计
-> 移除 Sidebar，用顶栏（Undo/Redo + 搜索触发器 + 用户头像/同步圆点）替代。
-> ⌘K 命令面板 Raycast 风格重设计：fuzzy 搜索、混排结果 + 右侧类型标签、底部操作栏、命令注册表。
+> Phase 1/2/4 已完成（PR #88）。Phase 3（Undo/Redo 集成）依赖 #44。
 > **Plan**: `docs/plans/layout-renovation.md`
 
-- [ ] Phase 1: 顶栏骨架 + 移除 Sidebar（TopToolbar + SearchTrigger + SyncDot + ToolbarUserMenu + Breadcrumb 精简）
-- [ ] Phase 2: ⌘K 命令面板重写（fuzzy search + 命令注册表 + Suggestions/Commands 分组 + 底部 ActionBar）
+- [x] Phase 1: 顶栏骨架 + 移除 Sidebar
+- [x] Phase 2: ⌘K 命令面板重写
 - [ ] Phase 3: Undo/Redo 按钮集成（依赖 #44 详细设计）
-- [ ] Phase 4: 清理废弃文件（Sidebar/SidebarNav/SyncStatusIndicator/UserMenu）
+- [x] Phase 4: 清理废弃文件
 
 #### 节点选中 — 后续增强 (#47)
 > Phase 1-3 已合并（PR #51）。PR #72 补充了字段行选中 + 全局选区清除。以下为未覆盖的后续项：

@@ -35,7 +35,7 @@
 1. 已启动测试环境（见 `docs/TESTING.md`）：
    - `npm run dev:test`
    - `http://localhost:5199/standalone/index.html` 可访问
-2. 当前页面已完成初始加载，左侧可见 Sidebar，主区可见 Outliner。
+2. 当前页面已完成初始加载，顶栏可见（Undo/Redo + 搜索 + 用户头像），主区可见 Outliner。
 3. 使用测试 seed 数据（默认 `ws_default`）。
 4. 浏览器缩放比例为 100%，避免视觉误判。
 
@@ -43,15 +43,15 @@
 
 ## 2. P0 冒烟用例（每次提交必测）
 
-### UC-P0-001：容器导航可用（Sidebar + 面板切换）
+### UC-P0-001：容器导航可用（⌘K 命令面板）
 - 前提条件：
   1. 应用已加载。
 - 操作步骤：
-  1. 在 Sidebar 依次点击 `Library`、`Inbox`、`Journal`、`Trash`。
-  2. 观察主面板内容与高亮导航项。
+  1. 按 `⌘K` 打开命令面板，在 Suggestions 区依次选择 `Library`、`Inbox`、`Journal`、`Trash`。
+  2. 观察主面板内容切换。
 - 预期结果：
   1. 主面板切换到对应容器节点。
-  2. 当前容器按钮高亮正确。
+  2. 命令面板关闭后面包屑正确显示当前位置。
 - 执行结果：`[ ] PASS  [ ] FAIL  [ ] BLOCKED`
 
 ### UC-P0-002：基础编辑与节点创建（Enter / Backspace）

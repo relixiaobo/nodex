@@ -28,7 +28,6 @@ export function resetStores(): void {
     focusedParentId: null,
     selectedNodeId: null,
     selectedParentId: null,
-    sidebarOpen: true,
     searchOpen: false,
     searchQuery: '',
     dragNodeId: null,

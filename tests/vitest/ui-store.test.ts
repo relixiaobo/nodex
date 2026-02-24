@@ -53,12 +53,6 @@ describe('ui-store navigation and UI state', () => {
     ui.setFocusedNode(null);
     expect(useUIStore.getState().focusedNodeId).toBeNull();
 
-    const beforeSidebar = useUIStore.getState().sidebarOpen;
-    ui.toggleSidebar();
-    expect(useUIStore.getState().sidebarOpen).toBe(!beforeSidebar);
-    ui.toggleSidebar();
-    expect(useUIStore.getState().sidebarOpen).toBe(beforeSidebar);
-
     ui.openSearch();
     expect(useUIStore.getState().searchOpen).toBe(true);
     ui.closeSearch();

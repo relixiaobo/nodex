@@ -13,12 +13,15 @@
  *   ③ Supertag row (conditional: has tags, not a definition node)
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { GripVertical } from '../../lib/icons.js';
+import { GripVertical, Library, Inbox, CalendarDays, Trash2, Search, type AppIcon } from '../../lib/icons.js';
 import { useNode } from '../../hooks/use-node';
 import { useNodeStore } from '../../stores/node-store';
+import { useWorkspaceStore } from '../../stores/workspace-store';
 import { useNodeCheckbox } from '../../hooks/use-node-checkbox';
 import { resolveDataType, getFieldTypeIcon } from '../../lib/field-utils.js';
 import { resolveTagColor } from '../../lib/tag-colors.js';
+import { isContainerNode } from '../../types/index.js';
+import { getSystemContainerMeta, type ContainerIconKey } from '../../lib/system-node-registry.js';
 import { TagBar } from '../tags/TagBar';
 import { NodeDescription } from './NodeDescription';
 import { isDayNode } from '../../lib/journal.js';
@@ -26,6 +29,17 @@ import { parseDayNodeName, parseYearNodeName, isToday } from '../../lib/date-uti
 import { getNodeCapabilities } from '../../lib/node-capabilities.js';
 import * as loroDoc from '../../lib/loro-doc.js';
 import { t } from '../../i18n/strings.js';
+
+const CONTAINER_HEADER_ICONS: Record<ContainerIconKey, AppIcon> = {
+  library: Library,
+  inbox: Inbox,
+  journal: CalendarDays,
+  trash: Trash2,
+  search: Search,
+  schema: Library,
+  clips: Library,
+  stash: Library,
+};
 
 /** Depth-0 padding formula from OutlinerItem: depth * 28 + 6. Header is always depth 0. */
 const ROW_PADDING_LEFT = 6;
@@ -138,11 +152,28 @@ export function NodeHeader({ nodeId, onTitleRef }: NodeHeaderProps) {
     cycleNodeCheckbox(nodeId);
   }, [nodeId, cycleNodeCheckbox]);
 
+  // Workspace root detection — show [W] avatar in icon block
+  const wsId = useWorkspaceStore((s) => s.currentWorkspaceId);
+  const isWorkspaceRoot = !!wsId && nodeId === wsId;
+  const wsInitial = useNodeStore((s) => {
+    void s._version;
+    if (!isWorkspaceRoot || !wsId) return 'W';
+    const wsNode = loroDoc.toNodexNode(wsId);
+    const raw = wsNode?.name ?? '';
+    const clean = raw.replace(/<[^>]+>/g, '').trim();
+    return clean.charAt(0).toUpperCase() || 'W';
+  });
+
+  // Container icon lookup
+  const isContainer = isContainerNode(nodeId);
+  const containerMeta = isContainer ? getSystemContainerMeta(nodeId as any) : undefined;
+  const ContainerIcon = containerMeta ? CONTAINER_HEADER_ICONS[containerMeta.iconKey] : undefined;
+
   // Determine whether to show icon block (block ①)
-  const showIconBlock = isTagDef || isFieldDef;
+  const showIconBlock = isTagDef || isFieldDef || isWorkspaceRoot || isContainer;
 
   return (
-    <div className="pt-3 pb-1">
+    <div className="pt-1 pb-1">
       {/* ── Block ①: Icon (conditional) ── */}
       {showIconBlock && (
         <div className="mb-1" style={{ paddingLeft: COL_B_OFFSET }}>
@@ -164,6 +195,16 @@ export function NodeHeader({ nodeId, onTitleRef }: NodeHeaderProps) {
               <FieldIcon size={20} />
             </span>
           )}
+          {isWorkspaceRoot && (
+            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/15 text-sm font-semibold text-primary">
+              {wsInitial}
+            </span>
+          )}
+          {isContainer && ContainerIcon && (
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg text-foreground-tertiary">
+              <ContainerIcon size={20} />
+            </span>
+          )}
         </div>
       )}
 
@@ -174,7 +215,7 @@ export function NodeHeader({ nodeId, onTitleRef }: NodeHeaderProps) {
       >
         {/* Col A: Drag handle (same position as chevron) */}
         <span
-          className="flex shrink-0 h-7 w-[15px] items-center justify-center opacity-0 group-hover/header-row:opacity-40 hover:!opacity-100 cursor-grab transition-opacity"
+          className="flex shrink-0 h-8 w-[15px] items-center justify-center opacity-0 group-hover/header-row:opacity-40 hover:!opacity-100 cursor-grab transition-opacity"
           title={t('nodeHeader.dragToMove')}
         >
           <GripVertical size={12} />

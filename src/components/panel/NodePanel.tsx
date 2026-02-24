@@ -85,7 +85,7 @@ export function NodePanel({ nodeId }: NodePanelProps) {
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
       <NodePanelHeader nodeId={nodeId} showCurrentName={!titleVisible} />
-      <div ref={scrollRef} className="flex-1 overflow-y-auto">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto scroll-pb-[40vh]">
         {isTagDef && tagDefColor && (
           <div
             className="h-28 -mb-28 pointer-events-none"

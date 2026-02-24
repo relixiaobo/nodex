@@ -7,7 +7,7 @@ export function PanelStack() {
   if (!topNodeId) {
     return (
       <div className="flex flex-1 items-center justify-center text-muted-foreground text-sm">
-        Select a node from the sidebar
+        Press ⌘K to search
       </div>
     );
   }

@@ -1448,6 +1448,7 @@ export function OutlinerItem({
   const handleIndentLineClick = useCallback(() => {
     // Toggle expand/collapse all direct children (Tana indent guide line behavior)
     const currentChildIds = useNodeStore.getState().getNode(nodeId)?.children ?? [];
+    if (currentChildIds.length === 0) return;
     const expanded = useUIStore.getState().expandedNodes;
     // Check if any child is expanded (compound key: nodeId is parent of children)
     const anyChildExpanded = currentChildIds.some((cid) => expanded.has(`${nodeId}:${cid}`));
@@ -1460,6 +1461,7 @@ export function OutlinerItem({
         next.add(ck);
       }
     }
+    loroDoc.commitUIMarker();
     useUIStore.setState({ expandedNodes: next });
   }, [nodeId]);
 

@@ -28,6 +28,7 @@ const [KEY_EDITOR_EDIT_DESC_PRIMARY, KEY_EDITOR_EDIT_DESC_SECONDARY] = getShortc
   'editor.edit_description',
   ['Ctrl-i'],
 );
+const META_DEFER_LORO_TEXT_COMMIT = 'nodex:defer-loro-text-commit';
 
 interface TriggerRuntimeState {
   hasUserEdited: boolean;
@@ -358,6 +359,7 @@ export function RichTextEditor(props: RichTextEditorProps) {
       );
 
       const tr = view.state.tr.delete(from, docEnd);
+      tr.setMeta(META_DEFER_LORO_TEXT_COMMIT, true);
       view.dispatch(tr);
       saveContent();
       propsRef.current.onEnter(afterPayload);
@@ -486,11 +488,13 @@ export function RichTextEditor(props: RichTextEditorProps) {
         },
         Tab: (_state, _dispatch, view) => {
           if (isComposing(view)) return false;
+          saveContent();
           propsRef.current.onIndent();
           return true;
         },
         'Shift-Tab': (_state, _dispatch, view) => {
           if (isComposing(view)) return false;
+          saveContent();
           propsRef.current.onOutdent();
           return true;
         },
@@ -627,12 +631,15 @@ export function RichTextEditor(props: RichTextEditorProps) {
 
         if (tr.docChanged && !isExternalSyncRef.current && !isComposing) {
           const parsed = docToMarks(newState.doc);
+          const deferLoroCommit = tr.getMeta(META_DEFER_LORO_TEXT_COMMIT) === true;
           updateNodeContent(propsRef.current.nodeId, {
             name: parsed.text,
             marks: parsed.marks,
             inlineRefs: parsed.inlineRefs,
           });
-          commitDoc('user:text');
+          if (!deferLoroCommit) {
+            commitDoc('user:text');
+          }
           initialContentRef.current = {
             text: parsed.text,
             marks: parsed.marks,

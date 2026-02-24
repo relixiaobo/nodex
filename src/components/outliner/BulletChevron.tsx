@@ -18,6 +18,8 @@ interface BulletChevronProps {
   dimmed?: boolean;
   /** Reference node: show concentric circles (bullseye) bullet */
   isReference?: boolean;
+  /** Search node: show magnifying glass bullet */
+  isSearch?: boolean;
   /** TagDef color: renders colored circle with white # instead of plain dot */
   tagDefColor?: string;
   /** Supertag colors: tints/multi-colors the bullet dot based on applied supertags */
@@ -42,11 +44,39 @@ export function BulletChevron({
   onBulletClick,
   dimmed,
   isReference,
+  isSearch,
   tagDefColor,
   bulletColors,
   icon: Icon,
 }: BulletChevronProps) {
   const showOuterRing = hasChildren && !isExpanded;
+
+  // Search node bullet: magnifying glass icon
+  if (isSearch) {
+    return (
+      <span
+        role="button"
+        className="flex shrink-0 h-[21px] w-[15px] items-center justify-center cursor-pointer group/bullet"
+        onClick={onBulletClick}
+        title={t('outliner.zoomIn')}
+      >
+        <svg
+          width="12"
+          height="12"
+          viewBox="0 0 16 16"
+          className="text-foreground-secondary transition-transform group-hover/bullet:scale-110 group-active/bullet:scale-90"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <circle cx="7" cy="7" r="4.5" />
+          <path d="M10.5 10.5L14 14" />
+        </svg>
+      </span>
+    );
+  }
 
   // TagDef bullet: colored circle with white #
   if (tagDefColor) {

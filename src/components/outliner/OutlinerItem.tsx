@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, 
 import type { EditorView } from 'prosemirror-view';
 import { useNode } from '../../hooks/use-node';
 import { useChildren } from '../../hooks/use-children';
+import { useSearchResults } from '../../hooks/use-search-results';
 import { useNodeTags } from '../../hooks/use-node-tags';
 import { useNodeFields, type FieldEntry } from '../../hooks/use-node-fields';
 import { useNodeStore } from '../../stores/node-store';
@@ -99,6 +100,8 @@ interface OutlinerItemProps {
   bulletColors?: string[];
   /** Effective-node path in current display recursion (used to stop cyclic reference expansion). */
   referencePath?: readonly string[];
+  /** Render as a search result item (reference-style bullet, read-only parent relationship) */
+  isSearchResult?: boolean;
 }
 
 function getNodeTextLengthById(nodeId: string): number {
@@ -344,6 +347,7 @@ export function OutlinerItem({
   onNavigateOut,
   bulletColors,
   referencePath = EMPTY_REFERENCE_PATH,
+  isSearchResult,
 }: OutlinerItemProps) {
   const node = useNode(nodeId);
   const referenceTargetId = node?.type === 'reference' ? (node.targetId ?? null) : null;
@@ -543,7 +547,10 @@ export function OutlinerItem({
     [visibleChildren],
   );
   // For hasChildren: count non-hidden items (hidden-always fields don't count toward expand chevron)
-  const hasChildren = !isCyclicReferenceExpansion && visibleChildren.some((c) => !c.hidden);
+  // Search nodes always have "children" (dynamic search results)
+  const hasChildren = !isCyclicReferenceExpansion && (
+    node?.type === 'search' || visibleChildren.some((c) => !c.hidden)
+  );
   // All hidden fields (including ALWAYS): shown as compact pills, click to temporarily reveal
   const hiddenRevealableFields = useMemo(
     () => visibleChildren
@@ -578,6 +585,7 @@ export function OutlinerItem({
   const isReferenceAlias = !isReferenceNode && !!node && loroDoc.getParentId(nodeId) !== parentId;
   const isReference = isReferenceNode || isReferenceAlias;
   const isTagDef = effectiveNode?.type === 'tagDef';
+  const isSearchNode = node?.type === 'search';
   // Bullet colors: use prop override (template items) or derive from the node's own supertags
   const tagBulletColors = useMemo(
     () => tagIds.map((id) => resolveTagColor(id).text),
@@ -2564,7 +2572,8 @@ export function OutlinerItem({
               hasChildren={hasChildren}
               isExpanded={isExpanded}
               onBulletClick={handleBulletClick}
-              isReference={isReferenceLikeRow}
+              isReference={isReferenceLikeRow || !!isSearchResult}
+              isSearch={isSearchNode}
               tagDefColor={isTagDef ? resolveTagColor(nodeId).text : undefined}
               bulletColors={effectiveBulletColors}
               icon={structuralIcon}
@@ -2820,83 +2829,94 @@ export function OutlinerItem({
               ))}
             </div>
           )}
-          {/* Render children in natural order: fields as FieldRow, content as OutlinerItem */}
-          {visibleChildren.map(({ id, type, hidden }, i) => {
-            // Hidden fields: skip unless manually revealed via pill click
-            if (hidden && !revealedFieldIds.has(id)) return null;
-            return type === 'field' ? (
-              <div key={id} className="@container" style={{ paddingLeft: (depth + 1) * 28 + 6 + 15 + 4 }}>
-                <FieldRow
-                  nodeId={effectiveNodeId}
-                  {...toFieldRowEntryProps(fieldMap.get(id)!)}
-                  rootChildIds={rootChildIds}
-                  rootNodeId={rootNodeId}
-                  isLastInGroup={i === visibleChildren.length - 1 || visibleChildren[i + 1].type !== 'field'}
-                  ownerTagColor={fieldOwnerColors.get(id)}
-                  onNavigateOut={(direction) => {
-                    if (direction === 'up') {
-                      // Escape up from first field/value block → focus parent content node.
-                      useUIStore.getState().setFocusClickCoords({
-                        nodeId,
-                        parentId,
-                        textOffset: getNodeTextLengthById(nodeId),
-                      });
-                      setFocusedNode(nodeId, parentId);
-                    } else {
-                      // Escape down → focus next sibling item in this parent.
-                      let found = false;
-                      for (let j = i + 1; j < visibleChildren.length; j++) {
-                        const nextItem = visibleChildren[j];
-                        if (nextItem.hidden) continue;
-                        if (nextItem.type === 'field') {
-                          clearFocus();
-                          setEditingFieldName(nextItem.id);
-                          found = true;
-                          break;
-                        }
-                        if (nextItem.type === 'content') {
+          {/* Render children: search nodes show dynamic results, regular nodes show real children */}
+          {isSearchNode ? (
+            <SearchResultsChildren
+              searchNodeId={nodeId}
+              depth={depth}
+              rootChildIds={rootChildIds}
+              rootNodeId={rootNodeId}
+            />
+          ) : (
+            <>
+              {visibleChildren.map(({ id, type, hidden }, i) => {
+                // Hidden fields: skip unless manually revealed via pill click
+                if (hidden && !revealedFieldIds.has(id)) return null;
+                return type === 'field' ? (
+                  <div key={id} className="@container" style={{ paddingLeft: (depth + 1) * 28 + 6 + 15 + 4 }}>
+                    <FieldRow
+                      nodeId={effectiveNodeId}
+                      {...toFieldRowEntryProps(fieldMap.get(id)!)}
+                      rootChildIds={rootChildIds}
+                      rootNodeId={rootNodeId}
+                      isLastInGroup={i === visibleChildren.length - 1 || visibleChildren[i + 1].type !== 'field'}
+                      ownerTagColor={fieldOwnerColors.get(id)}
+                      onNavigateOut={(direction) => {
+                        if (direction === 'up') {
+                          // Escape up from first field/value block → focus parent content node.
                           useUIStore.getState().setFocusClickCoords({
-                            nodeId: nextItem.id,
-                            parentId: effectiveNodeId,
-                            textOffset: 0,
+                            nodeId,
+                            parentId,
+                            textOffset: getNodeTextLengthById(nodeId),
                           });
-                          setFocusedNode(nextItem.id, effectiveNodeId);
-                          found = true;
-                          break;
+                          setFocusedNode(nodeId, parentId);
+                        } else {
+                          // Escape down → focus next sibling item in this parent.
+                          let found = false;
+                          for (let j = i + 1; j < visibleChildren.length; j++) {
+                            const nextItem = visibleChildren[j];
+                            if (nextItem.hidden) continue;
+                            if (nextItem.type === 'field') {
+                              clearFocus();
+                              setEditingFieldName(nextItem.id);
+                              found = true;
+                              break;
+                            }
+                            if (nextItem.type === 'content') {
+                              useUIStore.getState().setFocusClickCoords({
+                                nodeId: nextItem.id,
+                                parentId: effectiveNodeId,
+                                textOffset: 0,
+                              });
+                              setFocusedNode(nextItem.id, effectiveNodeId);
+                              found = true;
+                              break;
+                            }
+                          }
+                          if (!found) {
+                            if (focusTrailingInputForParent(effectiveNodeId)) {
+                              return;
+                            }
+                            const fl = getFlattenedVisibleNodes(rootChildIds, useUIStore.getState().expandedNodes, rootNodeId);
+                            const nx = getNextVisibleNode(nodeId, parentId, fl);
+                            if (nx) {
+                              useUIStore.getState().setFocusClickCoords({
+                                nodeId: nx.nodeId,
+                                parentId: nx.parentId,
+                                textOffset: 0,
+                              });
+                              setFocusedNode(nx.nodeId, nx.parentId);
+                            }
+                          }
                         }
-                      }
-                      if (!found) {
-                        if (focusTrailingInputForParent(effectiveNodeId)) {
-                          return;
-                        }
-                        const fl = getFlattenedVisibleNodes(rootChildIds, useUIStore.getState().expandedNodes, rootNodeId);
-                        const nx = getNextVisibleNode(nodeId, parentId, fl);
-                        if (nx) {
-                          useUIStore.getState().setFocusClickCoords({
-                            nodeId: nx.nodeId,
-                            parentId: nx.parentId,
-                            textOffset: 0,
-                          });
-                          setFocusedNode(nx.nodeId, nx.parentId);
-                        }
-                      }
-                    }
-                  }}
-                />
-              </div>
-            ) : (
-              <OutlinerItem
-                key={id}
-                nodeId={id}
-                depth={depth + 1}
-                rootChildIds={rootChildIds}
-                parentId={effectiveNodeId}
-                rootNodeId={rootNodeId}
-                referencePath={nextReferencePath}
-              />
-            );
-          })}
-          {shouldShowTrailingInput && (
+                      }}
+                    />
+                  </div>
+                ) : (
+                  <OutlinerItem
+                    key={id}
+                    nodeId={id}
+                    depth={depth + 1}
+                    rootChildIds={rootChildIds}
+                    parentId={effectiveNodeId}
+                    rootNodeId={rootNodeId}
+                    referencePath={nextReferencePath}
+                  />
+                );
+              })}
+            </>
+          )}
+          {shouldShowTrailingInput && !isSearchNode && (
             <TrailingInput
               parentId={effectiveNodeId}
               depth={depth + 1}
@@ -2945,6 +2965,51 @@ export function OutlinerItem({
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * Renders dynamic search results as children of a search node.
+ * Uses useSearchResults hook to reactively compute matching nodes.
+ */
+function SearchResultsChildren({
+  searchNodeId,
+  depth,
+  rootChildIds,
+  rootNodeId,
+}: {
+  searchNodeId: string;
+  depth: number;
+  rootChildIds: string[];
+  rootNodeId: string;
+}) {
+  const resultIds = useSearchResults(searchNodeId);
+
+  if (resultIds.length === 0) {
+    return (
+      <div
+        className="h-7 flex items-center text-xs text-foreground-tertiary italic"
+        style={{ paddingLeft: (depth + 1) * 28 + 6 + 15 + 4 }}
+      >
+        No matching nodes
+      </div>
+    );
+  }
+
+  return (
+    <>
+      {resultIds.map((id) => (
+        <OutlinerItem
+          key={id}
+          nodeId={id}
+          depth={depth + 1}
+          rootChildIds={rootChildIds}
+          parentId={searchNodeId}
+          rootNodeId={rootNodeId}
+          isSearchResult
+        />
+      ))}
+    </>
   );
 }
 

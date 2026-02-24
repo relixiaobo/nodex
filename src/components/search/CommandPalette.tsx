@@ -24,6 +24,7 @@ import {
   getActionLabel,
 } from '../../lib/palette-commands.js';
 import { COMMAND_PALETTE_QUICK_CONTAINERS } from '../../lib/system-node-registry.js';
+import { Kbd } from '../ui/Kbd';
 import { t } from '../../i18n/strings.js';
 
 const CONTAINER_ICONS: Record<string, AppIcon> = {
@@ -275,12 +276,7 @@ export function CommandPalette() {
             placeholder="Search nodes and commands..."
             className="h-10 flex-1 bg-transparent text-sm outline-none placeholder:text-foreground-tertiary"
           />
-          <kbd
-            onClick={closeSearch}
-            className="ml-2 inline-flex h-5 cursor-pointer items-center rounded border border-border bg-background px-1.5 text-[10px] font-medium text-foreground-tertiary hover:text-foreground-secondary"
-          >
-            Esc
-          </kbd>
+          <Kbd onClick={closeSearch} className="ml-2">Esc</Kbd>
         </div>
 
         {/* List area */}
@@ -363,9 +359,7 @@ export function CommandPalette() {
           <div className="flex h-8 items-center justify-end border-t border-border px-2.5">
             <div className="flex items-center gap-1.5 text-[10px] text-foreground-secondary">
               <span>{actionLabel}</span>
-              <kbd className="inline-flex h-5 items-center rounded border border-border bg-background px-1.5 text-[10px] font-medium">
-                ↵
-              </kbd>
+              <Kbd>↵</Kbd>
             </div>
           </div>
         )}
@@ -408,7 +402,7 @@ function PaletteRow({ item, selected, onSelect, onHover }: PaletteRowProps) {
       <Icon size={16} className="shrink-0 text-foreground-secondary" />
       <span className="flex-1 truncate text-xs text-foreground">{item.label}</span>
       {item.subtitle && (
-        <span className="shrink-0 text-[10px] text-foreground-tertiary">{item.subtitle}</span>
+        <Kbd>{item.subtitle}</Kbd>
       )}
       <span className="shrink-0 text-[10px] text-foreground-tertiary">
         {TYPE_LABELS[item.type]}

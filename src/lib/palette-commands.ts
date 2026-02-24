@@ -16,8 +16,6 @@ import {
   CalendarDays,
   CalendarCheck,
   Trash2,
-  LogOut,
-  User,
 } from './icons.js';
 import { CONTAINER_IDS } from '../types/index.js';
 import { COMMAND_PALETTE_QUICK_CONTAINERS } from './system-node-registry.js';
@@ -97,30 +95,7 @@ export function getSystemCommands(): PaletteCommand[] {
         ctx.closeSearch();
       },
     },
-    {
-      id: 'cmd:signin',
-      label: 'Sign in with Google',
-      icon: User,
-      type: 'command',
-      keywords: ['login', 'auth', 'google', 'account'],
-      when: (ctx) => !ctx.isSignedIn,
-      action: (ctx) => {
-        ctx.closeSearch();
-        void ctx.signInWithGoogle();
-      },
-    },
-    {
-      id: 'cmd:signout',
-      label: 'Sign out',
-      icon: LogOut,
-      type: 'command',
-      keywords: ['logout', 'sign out', 'account'],
-      when: (ctx) => ctx.isSignedIn,
-      action: (ctx) => {
-        ctx.closeSearch();
-        void ctx.signOut();
-      },
-    },
+    // Sign in / Sign out: handled by ToolbarUserMenu avatar, not in command palette.
   ];
 }
 

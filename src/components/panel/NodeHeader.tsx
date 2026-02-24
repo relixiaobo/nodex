@@ -16,6 +16,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { GripVertical } from '../../lib/icons.js';
 import { useNode } from '../../hooks/use-node';
 import { useNodeStore } from '../../stores/node-store';
+import { useWorkspaceStore } from '../../stores/workspace-store';
 import { useNodeCheckbox } from '../../hooks/use-node-checkbox';
 import { resolveDataType, getFieldTypeIcon } from '../../lib/field-utils.js';
 import { resolveTagColor } from '../../lib/tag-colors.js';
@@ -138,8 +139,20 @@ export function NodeHeader({ nodeId, onTitleRef }: NodeHeaderProps) {
     cycleNodeCheckbox(nodeId);
   }, [nodeId, cycleNodeCheckbox]);
 
+  // Workspace root detection — show [W] avatar in icon block
+  const wsId = useWorkspaceStore((s) => s.currentWorkspaceId);
+  const isWorkspaceRoot = !!wsId && nodeId === wsId;
+  const wsInitial = useNodeStore((s) => {
+    void s._version;
+    if (!isWorkspaceRoot || !wsId) return 'W';
+    const wsNode = loroDoc.toNodexNode(wsId);
+    const raw = wsNode?.name ?? '';
+    const clean = raw.replace(/<[^>]+>/g, '').trim();
+    return clean.charAt(0).toUpperCase() || 'W';
+  });
+
   // Determine whether to show icon block (block ①)
-  const showIconBlock = isTagDef || isFieldDef;
+  const showIconBlock = isTagDef || isFieldDef || isWorkspaceRoot;
 
   return (
     <div className="pt-1 pb-1">
@@ -162,6 +175,11 @@ export function NodeHeader({ nodeId, onTitleRef }: NodeHeaderProps) {
           {isFieldDef && FieldIcon && (
             <span className="flex h-8 w-8 items-center justify-center rounded-lg text-foreground-tertiary">
               <FieldIcon size={20} />
+            </span>
+          )}
+          {isWorkspaceRoot && (
+            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/15 text-sm font-semibold text-primary">
+              {wsInitial}
             </span>
           )}
         </div>

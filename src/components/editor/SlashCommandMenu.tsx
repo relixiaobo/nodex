@@ -1,5 +1,6 @@
 import { useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
+import { Kbd } from '../ui/Kbd';
 import {
   AtSign,
   ChevronRight,
@@ -124,9 +125,7 @@ export function SlashCommandMenu({ open, commands, selectedIndex, onSelect, anch
             <Icon size={16} className="shrink-0 text-foreground-secondary" />
             <span className="truncate">{command.name}</span>
             {command.shortcutHint && (
-              <span className="ml-auto shrink-0 text-xs text-foreground-tertiary">
-                {command.shortcutHint}
-              </span>
+              <Kbd className="ml-auto">{command.shortcutHint}</Kbd>
             )}
           </button>
         );

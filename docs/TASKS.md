@@ -44,22 +44,6 @@ _(空)_
 - [ ] Bug 2: 焦点不在 node 编辑器中时，⌘Z 无法撤回展开/收起操作（点击 chevron 或引导线后焦点丢失到 sink textarea，但 undo 未生效）
 - [ ] Bug 3: 点击节点 bullet 进入 NodePanel（zoom-in 导航）后，⌘Z 无法返回上一个面板 — 导航应通过 commitUIMarker 进入 undo 栈
 
-### Inline reference 内容节点误显示虚线 bullet（pending-conversion UI 误判）+ 移除 outliner 引用次数数字
-> 场景：同父节点已存在目标 child 时，`@` 会回退为 inline reference（普通内容节点 + inline ref），但该节点 bullet 仍显示虚线引用壳样式；同时用户希望移除 outliner 行尾显示的引用次数数字（backlink count badge），简化视觉层级。
-> **Owner**: nodex-codex | **Branch**: `codex/inline-ref-bullet-style` | **Files**: `src/components/outliner/OutlinerItem.tsx`, `tests/vitest/outliner-item-reference-bullet.test.ts`, `tests/vitest/outliner-view-render.test.ts`, `docs/TESTING.md`, `docs/features/references.md`, `docs/TASKS.md`
-
-- [x] 定位虚线 bullet 样式触发条件（pending conversion / single-inline-ref fallback）
-- [x] 修复普通 inline reference 内容节点不再显示虚线 bullet
-- [x] 补回归测试（样式判定或状态判定）
-- [x] 移除 outliner 行尾引用次数数字（backlink count badge）
-
-**迭代日志**
-- [2026-02-23 nodex-codex] 用户反馈：同父已有 child 时 `@` 回退为 inline reference 内容节点，但 bullet 仍显示虚线；开始排查 `OutlinerItem` 的 pending-conversion 虚线样式判定逻辑。
-- [2026-02-23 nodex-codex] 确认根因：`OutlinerItem` 将 `hasSingleInlineRefAtomContent` 直接并入 `BulletChevron.isReference`，导致普通内容节点（仅含 inline ref atom）被误渲染为引用壳虚线 bullet；改为只看 `isReference/isPendingConversion/isOptionsValueNode`，并新增 `outliner-item-reference-bullet.test.ts` 锁定回归；`typecheck` / 全量 `test:run` / `build` 均通过。
-- [2026-02-23 nodex-codex] Follow-up（用户反馈样式复杂）：继续在同一分支/PR 上移除 Outliner 行尾 backlink count 数字，保留 backlinks 能力在面板中查看，简化行内视觉信息。
-- [2026-02-23 nodex-codex] 移除 `OutlinerItem` 的 backlink count badge 渲染与 `useBacklinkCount` 订阅（仅影响行内视觉，不影响 Backlinks 面板）；补 `outliner-view-render.test.ts` 断言不再输出 `title=\"N reference(s)\"`，并同步 `docs/TESTING.md` 覆盖说明。
-- [2026-02-23 nodex-codex] 处理 PR #87 review：更新 `docs/features/references.md` 移除过期的引用计数 badge 行为/状态/差异说明并记录“移除 badge”决策；补 `isOptionsValueNode=true` 的虚线 bullet 测试；将 `isReferenceLikeRow` 复用 `shouldRenderReferenceBulletStyle()` 消除重复变量。
-
 ---
 
 ## 待办

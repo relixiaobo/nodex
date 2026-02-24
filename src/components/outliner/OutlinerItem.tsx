@@ -124,13 +124,26 @@ function focusTrailingInputForParent(parentId: string): boolean {
 
 function focusUndoShortcutSink(): void {
   const el = document.getElementById('undo-shortcut-sink');
-  if (el instanceof HTMLTextAreaElement) {
-    el.focus();
-    console.debug('[undo-debug] focusUndoShortcutSink', {
-      tag: (document.activeElement as HTMLElement | null)?.tagName,
-      id: (document.activeElement as HTMLElement | null)?.id,
+  if (!(el instanceof HTMLTextAreaElement)) {
+    console.debug('[undo-debug] focusUndoShortcutSink:missing', {
+      found: !!el,
+      nodeType: el?.nodeName ?? null,
     });
+    return;
   }
+  el.focus();
+  console.debug('[undo-debug] focusUndoShortcutSink', {
+    sinkConnected: el.isConnected,
+    sinkRect: {
+      x: el.getBoundingClientRect().x,
+      y: el.getBoundingClientRect().y,
+      w: el.getBoundingClientRect().width,
+      h: el.getBoundingClientRect().height,
+    },
+    activeTag: (document.activeElement as HTMLElement | null)?.tagName,
+    activeId: (document.activeElement as HTMLElement | null)?.id,
+    activeClassName: (document.activeElement as HTMLElement | null)?.className,
+  });
 }
 
 function getTreeReferenceBlockMessage(reason: ReturnType<typeof getTreeReferenceBlockReason>): string {

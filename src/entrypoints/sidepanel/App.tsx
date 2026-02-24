@@ -155,6 +155,13 @@ export function App({ skipBootstrap = false }: AppProps) {
       {sidebarOpen && <Sidebar />}
       <PanelStack />
       <CommandPalette />
+      <textarea
+        id="undo-shortcut-sink"
+        data-undo-shortcut-sink="true"
+        aria-hidden="true"
+        tabIndex={-1}
+        className="fixed -left-[9999px] top-0 h-px w-px opacity-0 pointer-events-none"
+      />
       <Toaster
         position="bottom-center"
         toastOptions={{

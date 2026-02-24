@@ -18,6 +18,9 @@ export function shouldHandleNavUndo(activeElement: Element | null, focusedNodeId
   // Rely on actual DOM focus, not focusedNodeId store state, because clicking row controls
   // (chevron/indent line/etc.) may keep focusedNodeId non-null while the editor lost focus.
   void focusedNodeId;
+  if (activeElement instanceof HTMLTextAreaElement && activeElement.dataset.undoShortcutSink === 'true') {
+    return true;
+  }
   if (activeElement instanceof HTMLElement && activeElement.isContentEditable) return false;
   if (activeElement instanceof HTMLInputElement || activeElement instanceof HTMLTextAreaElement) return false;
   return true;

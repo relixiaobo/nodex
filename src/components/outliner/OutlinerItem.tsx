@@ -122,6 +122,17 @@ function focusTrailingInputForParent(parentId: string): boolean {
   return false;
 }
 
+function focusUndoShortcutSink(): void {
+  const el = document.getElementById('undo-shortcut-sink');
+  if (el instanceof HTMLTextAreaElement) {
+    el.focus();
+    console.debug('[undo-debug] focusUndoShortcutSink', {
+      tag: (document.activeElement as HTMLElement | null)?.tagName,
+      id: (document.activeElement as HTMLElement | null)?.id,
+    });
+  }
+}
+
 function getTreeReferenceBlockMessage(reason: ReturnType<typeof getTreeReferenceBlockReason>): string {
   switch (reason) {
     case 'self_parent':
@@ -1439,13 +1450,15 @@ export function OutlinerItem({
     } else {
       toggleExpanded(ek);
     }
-    // Restore a focusable target immediately so Cmd+Z stays in-page after clicking controls.
+    // Restore an editable focus target immediately so Cmd+Z is dispatched to the page on macOS.
+    focusUndoShortcutSink();
     rowRef.current?.focus();
     console.debug('[undo-debug] handleToggle post-focus(sync)', {
       tag: (document.activeElement as HTMLElement | null)?.tagName,
       className: (document.activeElement as HTMLElement | null)?.className,
     });
     requestAnimationFrame(() => {
+      focusUndoShortcutSink();
       rowRef.current?.focus();
       console.debug('[undo-debug] handleToggle post-focus(raf)', {
         tag: (document.activeElement as HTMLElement | null)?.tagName,
@@ -1484,12 +1497,14 @@ export function OutlinerItem({
     }
     loroDoc.commitUIMarker();
     useUIStore.setState({ expandedNodes: next });
+    focusUndoShortcutSink();
     rowRef.current?.focus();
     console.debug('[undo-debug] handleIndentLineClick post-focus(sync)', {
       tag: (document.activeElement as HTMLElement | null)?.tagName,
       className: (document.activeElement as HTMLElement | null)?.className,
     });
     requestAnimationFrame(() => {
+      focusUndoShortcutSink();
       rowRef.current?.focus();
       console.debug('[undo-debug] handleIndentLineClick post-focus(raf)', {
         tag: (document.activeElement as HTMLElement | null)?.tagName,

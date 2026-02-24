@@ -1,7 +1,7 @@
 /**
  * Breadcrumb navigation bar for zoomed-in node pages.
  *
- * Layout: [SidebarToggle] [← Parent] [W avatar] › ancestor1 › ancestor2 › ... › [currentName?] [Search]
+ * Layout: [← Parent] [W avatar] / ancestor1 / ancestor2 / ... / [currentName?]
  *
  * - Workspace root is represented by a circular avatar (first char of workspace name)
  * - ← button navigates to parent node (not history back)
@@ -17,7 +17,7 @@
  * [...] expands in-place (no navigation). Resets when nodeId changes.
  */
 import { useState, useEffect, useCallback } from 'react';
-import { PanelLeft, ChevronLeft, ChevronRight, Search, MoreHorizontal } from '../../lib/icons.js';
+import { ChevronLeft, MoreHorizontal } from '../../lib/icons.js';
 import { useUIStore } from '../../stores/ui-store';
 import { useNodeStore } from '../../stores/node-store';
 import { useWorkspaceStore } from '../../stores/workspace-store';
@@ -47,20 +47,17 @@ export function resolveWorkspaceRootTargetId(params: {
 
 export function Breadcrumb({ nodeId, showCurrentName }: BreadcrumbProps) {
   const navigateTo = useUIStore((s) => s.navigateTo);
-  const toggleSidebar = useUIStore((s) => s.toggleSidebar);
-  const openSearch = useUIStore((s) => s.openSearch);
 
   const { ancestors, workspaceRootId } = useAncestors(nodeId);
-  // isRootView: only true if there is an explicit workspace root node AND we're viewing it.
+  const wsId = useWorkspaceStore((s) => s.currentWorkspaceId);
+
+  // isRootView: true when viewing the workspace root node itself.
   // Container nodes (Library, Inbox, etc.) are NOT treated as root view — they still show
   // the workspace [W] avatar, just with no ancestor chain.
-  const isRootView = !!workspaceRootId && nodeId === workspaceRootId;
+  const isRootView = (!!workspaceRootId && nodeId === workspaceRootId) || (!!wsId && nodeId === wsId);
 
   // Get parent ID for ← button (navigate to first non-structural parent)
   const parentId = useNodeStore((s) => { void s._version; return getNavigableParentId(nodeId); });
-
-  // Workspace name for avatar
-  const wsId = useWorkspaceStore((s) => s.currentWorkspaceId);
   const workspaceRootTargetId = resolveWorkspaceRootTargetId({
     workspaceId: wsId,
     workspaceRootId,
@@ -92,36 +89,31 @@ export function Breadcrumb({ nodeId, showCurrentName }: BreadcrumbProps) {
     navigateTo(workspaceRootTargetId);
   }, [workspaceRootTargetId, navigateTo, wsId]);
 
+  // Filter out workspace root from ancestors — [W] avatar already represents it
+  const filteredAncestors = ancestors.filter(
+    (a) => a.id !== wsId && a.id !== workspaceRootId,
+  );
+
   // Determine which ancestors to show
-  const needsFolding = ancestors.length >= 3 && !expanded;
+  const needsFolding = filteredAncestors.length >= 3 && !expanded;
   const visibleAncestors = needsFolding
-    ? [ancestors[ancestors.length - 1]] // only the immediate parent
-    : ancestors;
+    ? [filteredAncestors[filteredAncestors.length - 1]] // only the immediate parent
+    : filteredAncestors;
   const hiddenAncestors = needsFolding
-    ? ancestors.slice(0, -1)
+    ? filteredAncestors.slice(0, -1)
     : [];
 
   return (
-    <div className="flex h-11 items-center gap-0.5 px-3 text-xs text-foreground-secondary overflow-hidden">
-      {/* Sidebar toggle */}
+    <div className="flex h-8 items-center gap-0.5 pl-[6px] pr-3 mt-1 text-xs text-foreground-secondary overflow-hidden">
+      {/* ← button: navigate to parent, or disabled placeholder at root */}
       <button
-        onClick={toggleSidebar}
-        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md hover:bg-foreground/5 hover:text-foreground"
-        title={t('breadcrumb.toggleSidebar')}
+        onClick={canGoUp ? handleGoUp : undefined}
+        disabled={!canGoUp}
+        className="flex h-7 w-[15px] shrink-0 items-center justify-center rounded-md hover:bg-foreground/5 hover:text-foreground disabled:pointer-events-none disabled:opacity-30"
+        title={canGoUp ? t('breadcrumb.goToParent') : undefined}
       >
-        <PanelLeft size={16} strokeWidth={1.5} />
+        <ChevronLeft size={14} strokeWidth={1.5} />
       </button>
-
-      {/* ← button: navigate to parent (hidden at root view) */}
-      {canGoUp && (
-        <button
-          onClick={handleGoUp}
-          className="flex h-7 w-6 shrink-0 items-center justify-center rounded-md hover:bg-foreground/5 hover:text-foreground"
-          title={t('breadcrumb.goToParent')}
-        >
-          <ChevronLeft size={16} strokeWidth={1.5} />
-        </button>
-      )}
 
       {/* Root view: only show toolbar (sidebar toggle + search), no breadcrumb content */}
       {!isRootView && (
@@ -142,7 +134,7 @@ export function Breadcrumb({ nodeId, showCurrentName }: BreadcrumbProps) {
           {/* Ellipsis for folded ancestors */}
           {needsFolding && (
             <>
-              <ChevronRight size={10} className="shrink-0 text-foreground-tertiary" />
+              <span className="shrink-0 text-foreground-tertiary mx-0.5">/</span>
               <button
                 onClick={() => setExpanded(true)}
                 className="flex h-7 shrink-0 items-center justify-center rounded-md px-1 hover:bg-foreground/5 hover:text-foreground"
@@ -156,7 +148,7 @@ export function Breadcrumb({ nodeId, showCurrentName }: BreadcrumbProps) {
           {/* Visible ancestors */}
           {visibleAncestors.map((ancestor) => (
             <span key={ancestor.id} className="flex items-center shrink-0 min-w-0">
-              <ChevronRight size={10} className="shrink-0 text-foreground-tertiary mx-0.5" />
+              <span className="shrink-0 text-foreground-tertiary mx-0.5">/</span>
               <button
                 onClick={() => {
                   if (ancestor.id === workspaceRootId) {
@@ -175,24 +167,13 @@ export function Breadcrumb({ nodeId, showCurrentName }: BreadcrumbProps) {
           {/* Conditional current node name (when title scrolled out of view) */}
           {showCurrentName && (
             <span className="flex items-center shrink min-w-0 text-foreground-secondary">
-              <ChevronRight size={10} className="shrink-0 text-foreground-tertiary mx-0.5" />
+              <span className="shrink-0 text-foreground-tertiary mx-0.5">/</span>
               <BreadcrumbCurrentName nodeId={nodeId} />
             </span>
           )}
         </>
       )}
 
-      {/* Spacer */}
-      <div className="flex-1" />
-
-      {/* Search button */}
-      <button
-        onClick={openSearch}
-        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md hover:bg-foreground/5 hover:text-foreground"
-        title={t('breadcrumb.search')}
-      >
-        <Search size={16} strokeWidth={1.5} />
-      </button>
     </div>
   );
 }

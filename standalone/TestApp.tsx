@@ -9,7 +9,7 @@ import { useWorkspaceStore } from '../src/stores/workspace-store';
 import { useUIStore } from '../src/stores/ui-store';
 import { useNodeStore } from '../src/stores/node-store';
 import { useGlobalSelectionDismiss } from '../src/hooks/use-global-selection-dismiss.js';
-import { Sidebar } from '../src/components/sidebar/Sidebar';
+import { TopToolbar } from '../src/components/toolbar/TopToolbar';
 import { PanelStack } from '../src/components/panel/PanelStack';
 import { CommandPalette } from '../src/components/search/CommandPalette';
 import { CONTAINER_IDS } from '../src/types/index.js';
@@ -63,7 +63,6 @@ function useTestBootstrap(): boolean {
 }
 
 export function TestApp() {
-  const sidebarOpen = useUIStore((s) => s.sidebarOpen);
   const ready = useTestBootstrap();
   const selectionDismissHandlers = useGlobalSelectionDismiss();
 
@@ -79,19 +78,23 @@ export function TestApp() {
 
   return (
     <div
-      className="flex h-screen w-full overflow-hidden bg-background text-foreground"
+      className="flex h-screen w-full flex-col overflow-hidden bg-background text-foreground"
       onPointerDownCapture={selectionDismissHandlers.onPointerDownCapture}
       onFocusCapture={selectionDismissHandlers.onFocusCapture}
     >
-      {sidebarOpen && <Sidebar />}
+      <TopToolbar />
       <PanelStack />
       <CommandPalette />
       {/* Agent badge — fixed top-right corner */}
       <div
         style={{
           position: 'fixed',
-          top: 6,
+          top: 50,
           right: 6,
+          maxWidth: 'calc(100vw - 80px)',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
           backgroundColor: agent.color,
           color: '#fff',
           fontSize: 11,

@@ -4,7 +4,7 @@ import { useUIStore } from '../../stores/ui-store';
 import { useNavUndoKeyboard } from '../../hooks/use-nav-undo-keyboard';
 import { useTodayShortcut } from '../../hooks/use-today-shortcut';
 import { useGlobalSelectionDismiss } from '../../hooks/use-global-selection-dismiss.js';
-import { Sidebar } from '../../components/sidebar/Sidebar';
+import { TopToolbar } from '../../components/toolbar/TopToolbar';
 import { PanelStack } from '../../components/panel/PanelStack';
 import { CommandPalette } from '../../components/search/CommandPalette';
 import { CONTAINER_IDS } from '../../types/index.js';
@@ -121,7 +121,6 @@ interface AppProps {
 }
 
 export function App({ skipBootstrap = false }: AppProps) {
-  const sidebarOpen = useUIStore((s) => s.sidebarOpen);
   const { ready } = useBootstrap(skipBootstrap);
   const selectionDismissHandlers = useGlobalSelectionDismiss();
 
@@ -148,11 +147,11 @@ export function App({ skipBootstrap = false }: AppProps) {
 
   return (
     <div
-      className="flex h-screen w-full overflow-hidden bg-background text-foreground"
+      className="flex h-screen w-full flex-col overflow-hidden bg-background text-foreground"
       onPointerDownCapture={selectionDismissHandlers.onPointerDownCapture}
       onFocusCapture={selectionDismissHandlers.onFocusCapture}
     >
-      {sidebarOpen && <Sidebar />}
+      <TopToolbar />
       <PanelStack />
       <CommandPalette />
       <Toaster

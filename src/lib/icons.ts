@@ -5,7 +5,6 @@
  * To switch icon libraries, only change this file.
  *
  * Current library: lucide-react
- * Alternative: iconoir-react (map names manually)
  */
 
 // ─── Type ───────────────────────────────────────────────────────────────────
@@ -103,6 +102,15 @@ export {
   UserPen,
 } from 'lucide-react';
 
+// ─── Undo/Redo ─────────────────────────────────────────────────────────────
+
+export {
+  Undo2,
+  Redo2,
+  ArrowLeft,
+  ArrowRight,
+} from 'lucide-react';
+
 // ─── Sync Status ────────────────────────────────────────────────────────────
 
 export {
@@ -110,4 +118,10 @@ export {
   CloudOff,
   AlertCircle,
   Loader2,
+} from 'lucide-react';
+
+// ─── Auth ───────────────────────────────────────────────────────────────────
+
+export {
+  User,
 } from 'lucide-react';

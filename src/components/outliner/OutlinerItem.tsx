@@ -1194,6 +1194,13 @@ export function OutlinerItem({
     setPendingRefConversion(null);
   }, [nodeId, revertRefConversion, setPendingRefConversion]);
 
+  // Scroll newly focused node into view (e.g. after Enter creates a node off-screen)
+  useEffect(() => {
+    if (isFocused && rowRef.current) {
+      rowRef.current.scrollIntoView({ block: 'nearest' });
+    }
+  }, [isFocused]);
+
   // Pending reference conversion must be finalized when focus transitions
   // from focused -> unfocused (including non-blur paths like Escape clearFocus).
   // Do NOT finalize on initial mount while still waiting for async focus handoff.

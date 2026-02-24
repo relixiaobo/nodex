@@ -85,9 +85,40 @@ export function useNavUndoKeyboard() {
       }
     }
 
+    function beforeInputHandler(e: InputEvent) {
+      if (e.inputType !== 'historyUndo' && e.inputType !== 'historyRedo') return;
+      const active = document.activeElement as HTMLElement | null;
+      console.debug('[undo-debug] raw-beforeinput', {
+        inputType: e.inputType,
+        activeTag: active?.tagName,
+        activeId: active?.id,
+        activeClass: active?.className,
+        focusedNodeId: useUIStore.getState().focusedNodeId,
+      });
+
+      // In editor mode, keep relying on editor keymap path to avoid double-dispatch.
+      // This fallback primarily targets the hidden sink textarea because macOS Side Panel
+      // may swallow Cmd+Z keydown on focused text controls.
+      if (!(active instanceof HTMLTextAreaElement && active.dataset.undoShortcutSink === 'true')) {
+        return;
+      }
+
+      e.preventDefault();
+      console.debug('[undo-debug] beforeinput:dispatch', { action: e.inputType });
+      if (e.inputType === 'historyRedo') {
+        redoDoc();
+      } else {
+        undoDoc();
+      }
+    }
+
     // Capture phase so row-level / feature-specific document key handlers can't swallow
     // Cmd+Z before unified undo gets a chance to run.
     window.addEventListener('keydown', handler, true);
-    return () => window.removeEventListener('keydown', handler, true);
+    document.addEventListener('beforeinput', beforeInputHandler, true);
+    return () => {
+      window.removeEventListener('keydown', handler, true);
+      document.removeEventListener('beforeinput', beforeInputHandler, true);
+    };
   }, []);
 }

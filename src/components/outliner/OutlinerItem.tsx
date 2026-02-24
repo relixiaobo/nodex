@@ -130,7 +130,6 @@ function focusUndoShortcutSink(): void {
     created.dataset.undoShortcutSink = 'true';
     created.tabIndex = -1;
     created.readOnly = true;
-    created.setAttribute('aria-hidden', 'true');
     created.style.position = 'fixed';
     created.style.left = '0';
     created.style.top = '0';

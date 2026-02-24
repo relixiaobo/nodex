@@ -33,7 +33,7 @@ import {
 import { COMMAND_PALETTE_QUICK_CONTAINERS } from '../../lib/system-node-registry.js';
 import { ensureTodayNode, isDayNode } from '../../lib/journal.js';
 import { parseDayNodeName, parseYearNodeName, isToday } from '../../lib/date-utils.js';
-import { Kbd } from '../ui/Kbd';
+
 import { t } from '../../i18n/strings.js';
 
 /** Add "Today, " prefix for today's day node, matching NodeHeader behavior. */
@@ -364,7 +364,12 @@ export function CommandPalette() {
             placeholder="Search..."
             className="flex-1 bg-transparent text-xs outline-none placeholder:text-foreground-tertiary"
           />
-          <Kbd onClick={closeAndClear}>Esc</Kbd>
+          <span
+            onClick={closeAndClear}
+            className="shrink-0 cursor-pointer text-xs text-foreground-tertiary hover:text-foreground-secondary"
+          >
+            Esc
+          </span>
         </div>
       </div>
 

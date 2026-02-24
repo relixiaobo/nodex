@@ -138,6 +138,7 @@ function focusUndoShortcutSink(): void {
     created.style.opacity = '0';
     created.style.pointerEvents = 'none';
     created.style.zIndex = '-1';
+    created.setAttribute('aria-hidden', 'true');
     document.body.appendChild(created);
     el = created;
   }

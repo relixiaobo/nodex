@@ -39,8 +39,8 @@ _(空)_
 > 背景：用户明确要求跳过过渡方案，直接彻底消除频繁 `Cmd+Z/Cmd+Shift+Z` 体感混乱。由 nodex-codex 接管 `#44`，从 `origin/main` 新分支实施 Loro-only 统一时间线（文本/结构/导航/展开折叠单一路径）。
 > **Owner**: nodex-codex | **Branch**: `codex/unified-undo-loro-only` | **Files**: `src/lib/loro-doc.ts`, `src/stores/node-store.ts`, `src/components/editor/RichTextEditor.tsx`, `src/hooks/use-nav-undo-keyboard.ts`, `src/stores/ui-store.ts`, `tests/vitest/*undo*.test.ts`, `docs/features/undo-redo.md`, `docs/TASKS.md`
 
-- [ ] 从 `origin/main` 新建干净分支并创建最终方案 Draft PR
-- [ ] 接管 `#44`（TASKS Owner/Branch 同步 + 旧分支状态冻结）
+- [x] 从 `origin/main` 新建干净分支并创建最终方案 Draft PR
+- [x] 接管 `#44`（TASKS Owner/Branch 同步 + 旧分支状态冻结）
 - [ ] 设计并实现 Loro-only 单一路径 undo/redo（移除 PM History 主导）
 - [ ] 文本编辑实时进入 Loro UndoManager（mergeInterval 语义验证）
 - [ ] 导航/展开折叠并入同一时间线（最终方案，不保留过渡双栈体感差异）
@@ -48,6 +48,7 @@ _(空)_
 
 **迭代日志**
 - [2026-02-24 nodex-codex] 用户确认跳过过渡方案，直接实施 `#44` Loro-only 最终方案；计划保留 PR #90 作为 backup（Draft / do-not-merge），从 `origin/main` 新开干净分支重做。
+- [2026-02-24 nodex-codex] 已创建最终方案 Draft PR #91（`codex/unified-undo-loro-only`）；并在 #90 留言标注 backup/do-not-merge，避免过渡方案误合并。
 
 ### PR #89 接管修复：Cmd+Z/Cmd+Shift+Z 混乱（统一时间线 + pending Loro flush）
 > 背景：PR #89（`cc2/references`）混入大量无关改动与主干回退，且多轮修复后仍存在 undo/redo 语义混乱。改为由 nodex-codex 从 `origin/main` 新开干净分支重做，仅保留 undo/redo 相关修复（统一时间线、expand/collapse undo、Loro pending write flush、防回归测试）。

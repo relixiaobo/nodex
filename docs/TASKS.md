@@ -138,7 +138,7 @@ _(无进行中任务)_
 
 - [x] TopToolbar 左右等距对齐及 Undo/Redo 简单箭头图标 ✓ antigravity
 - [x] Breadcrumb 标题滚动隐藏后追加到面包屑末尾规则恢复 ✓ antigravity
-- [x] PR #96 Review 反馈修复（TrailingInput 缩进/Breadcrumb 下拉/Undo 图标/tree-utils 逻辑） ✓ antigravity
+- [x] PR #96 Review 反馈修复（TrailingInput 缩进/Breadcrumb 下拉/tree-utils 逻辑，保留 Undo 为 Arrow 图标并清理无用 icon export） ✓ antigravity
 - [ ] _(等待 nodex 第二轮 PR review 反馈)_
 
 #### Supertags 完善 (#20)

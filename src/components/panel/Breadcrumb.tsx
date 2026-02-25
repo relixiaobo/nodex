@@ -16,7 +16,7 @@
  *
  * [...] expands in-place (no navigation). Resets when nodeId changes.
  */
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { ChevronLeft, MoreHorizontal } from '../../lib/icons.js';
 import { useUIStore } from '../../stores/ui-store';
 import { useNodeStore } from '../../stores/node-store';
@@ -53,6 +53,31 @@ export function Breadcrumb({ nodeId, showCurrentName, compact }: BreadcrumbProps
   const { ancestors, workspaceRootId } = useAncestors(nodeId);
   const wsId = useWorkspaceStore((s) => s.currentWorkspaceId);
 
+  // Ellipsis expansion state — reset when nodeId changes
+  const [expanded, setExpanded] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => setExpanded(false), [nodeId]);
+
+  // Close dropdown on outside click or Escape
+  useEffect(() => {
+    if (!expanded) return;
+    const handleClick = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setExpanded(false);
+      }
+    };
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setExpanded(false);
+    };
+    document.addEventListener('mousedown', handleClick);
+    document.addEventListener('keydown', handleKey);
+    return () => {
+      document.removeEventListener('mousedown', handleClick);
+      document.removeEventListener('keydown', handleKey);
+    };
+  }, [expanded]);
+
   // isRootView: true when viewing the workspace root node itself.
   // Container nodes (Library, Inbox, etc.) are NOT treated as root view — they still show
   // the workspace [W] avatar, just with no ancestor chain.
@@ -76,10 +101,6 @@ export function Breadcrumb({ nodeId, showCurrentName, compact }: BreadcrumbProps
   // Show ← when current node has a parent (not at workspace root)
   const canGoUp = !!parentId;
 
-  // Ellipsis expansion state — reset when nodeId changes
-  const [expanded, setExpanded] = useState(false);
-  useEffect(() => setExpanded(false), [nodeId]);
-
   const handleGoUp = useCallback(() => {
     if (parentId) {
       navigateTo(parentId);
@@ -101,7 +122,7 @@ export function Breadcrumb({ nodeId, showCurrentName, compact }: BreadcrumbProps
   );
 
   // Determine which ancestors to show
-  const needsFolding = filteredAncestors.length >= 3 && !expanded;
+  const needsFolding = filteredAncestors.length >= 3;
   const visibleAncestors = needsFolding
     ? [filteredAncestors[filteredAncestors.length - 1]] // only the immediate parent
     : filteredAncestors;
@@ -110,7 +131,7 @@ export function Breadcrumb({ nodeId, showCurrentName, compact }: BreadcrumbProps
     : [];
 
   return (
-    <div className={`flex items-center gap-1 pl-4 pr-3 text-[13px] text-foreground-tertiary overflow-hidden ${compact ? '' : 'h-8 mt-1'}`}>
+    <div className={`flex flex-1 min-w-0 items-center gap-1 pl-4 pr-3 text-[13px] text-foreground-tertiary ${compact ? '' : 'h-8 mt-1'}`}>
 
       {/* Root view: only show toolbar (sidebar toggle + search), no breadcrumb content */}
       {!isRootView && (
@@ -132,19 +153,45 @@ export function Breadcrumb({ nodeId, showCurrentName, compact }: BreadcrumbProps
           {needsFolding && (
             <>
               <span className="shrink-0 text-foreground-tertiary/50 mx-0.5">/</span>
-              <button
-                onClick={() => setExpanded(true)}
-                className="flex shrink-0 items-center justify-center rounded-md px-1 hover:text-foreground"
-                title={hiddenAncestors.map(a => a.name).join(' › ')}
-              >
-                <MoreHorizontal size={14} />
-              </button>
+              <div className="relative" ref={dropdownRef}>
+                <button
+                  onClick={() => setExpanded(!expanded)}
+                  className={`flex shrink-0 items-center justify-center rounded-md px-1 py-0.5 hover:bg-accent hover:text-foreground transition-colors ${expanded ? 'bg-accent text-accent-foreground' : ''}`}
+                  title={t('breadcrumb.showHiddenAncestors')}
+                >
+                  <MoreHorizontal size={14} />
+                </button>
+                {expanded && (
+                  <div className="absolute top-full left-0 mt-1 w-56 rounded-lg border border-border bg-popover p-1 text-popover-foreground z-50">
+                    <div className="flex flex-col max-h-64 overflow-y-auto">
+                      {hiddenAncestors.map((ancestor) => (
+                        <button
+                          key={ancestor.id}
+                          className="flex items-center w-full rounded-md px-2 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground text-left"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setExpanded(false);
+                            if (ancestor.id === workspaceRootId) {
+                              handleNavigateToWorkspaceRoot();
+                              return;
+                            }
+                            navigateTo(ancestor.id);
+                            ensureUndoFocusAfterNavigation();
+                          }}
+                        >
+                          <span className="truncate">{resolveBreadcrumbLabel(ancestor.id, ancestor.name)}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             </>
           )}
 
           {/* Visible ancestors */}
           {visibleAncestors.map((ancestor) => (
-            <span key={ancestor.id} className="flex items-center shrink-0 min-w-0">
+            <span key={ancestor.id} className="flex items-center shrink min-w-0">
               <span className="shrink-0 text-foreground-tertiary/50 mx-0.5">/</span>
               <button
                 onClick={() => {

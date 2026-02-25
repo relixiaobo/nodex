@@ -69,6 +69,7 @@ export const enMessages = {
   breadcrumb: {
     goToParent: 'Go to parent',
     goToWorkspaceRoot: 'Go to workspace root',
+    showHiddenAncestors: 'Show hidden ancestors',
   },
   nodeHeader: {
     dragToMove: 'Drag to move (right-click for menu)',

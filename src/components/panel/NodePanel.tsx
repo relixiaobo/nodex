@@ -56,7 +56,7 @@ export function NodePanel({ nodeId }: NodePanelProps) {
   });
 
   // IntersectionObserver: detect when title scrolls out of view
-  const [titleVisible, setTitleVisible] = useState(true);
+  const setPanelTitleVisible = useUIStore((s) => s.setPanelTitleVisible);
   const titleElRef = useRef<HTMLElement | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -69,12 +69,15 @@ export function NodePanel({ nodeId }: NodePanelProps) {
     const root = scrollRef.current;
     if (!el || !root) return;
     const observer = new IntersectionObserver(
-      ([entry]) => setTitleVisible(entry.isIntersecting),
+      ([entry]) => setPanelTitleVisible(entry.isIntersecting),
       { root, threshold: 0 },
     );
     observer.observe(el);
-    return () => observer.disconnect();
-  }, [nodeId]);
+    return () => {
+      observer.disconnect();
+      setPanelTitleVisible(true);
+    };
+  }, [nodeId, setPanelTitleVisible]);
 
   const handleDelete = useCallback(() => {
     if (isProtectedDateTagDef) return;

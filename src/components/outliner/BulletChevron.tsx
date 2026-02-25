@@ -166,7 +166,7 @@ export function ChevronButton({
           width="10"
           height="10"
           viewBox="0 0 12 12"
-          className="text-ink-secondary/60 hover:text-ink-primary transition-transform"
+          className="text-foreground-secondary/60 hover:text-foreground transition-transform"
         >
           <path
             d="M4.5 2.5L8 6L4.5 9.5"

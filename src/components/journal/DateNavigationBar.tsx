@@ -132,25 +132,25 @@ export function DateNavigationBar({ dayNodeId }: DateNavigationBarProps) {
   }, [navigateTo]);
 
   return (
-    <div className="relative my-1.5 text-[11px] text-ink-secondary flex items-center" style={{ paddingLeft: 32 }} ref={calendarRef}>
+    <div className="relative my-1.5 text-[11px] text-foreground-secondary flex items-center" style={{ paddingLeft: 32 }} ref={calendarRef}>
       <div className="inline-flex items-center gap-1">
         <button
           onClick={handlePrevDay}
-          className="flex h-6 w-6 items-center justify-center rounded-full text-ink-tertiary hover:bg-foreground/4 hover:text-ink-primary transition-all"
+          className="flex h-6 w-6 items-center justify-center rounded-full text-foreground-tertiary hover:bg-foreground/4 hover:text-foreground transition-all"
           title={t('dateNavigationBar.previousDay')}
         >
           <ChevronLeft size={13} strokeWidth={1.5} />
         </button>
         <button
           onClick={handleToday}
-          className="flex h-6 items-center px-2.5 rounded-full font-medium text-ink-tertiary hover:bg-foreground/4 hover:text-ink-primary transition-all"
+          className="flex h-6 items-center px-2.5 rounded-full font-medium text-foreground-tertiary hover:bg-foreground/4 hover:text-foreground transition-all"
           title={t('dateNavigationBar.goToToday')}
         >
           {t('dateNavigationBar.today')}
         </button>
         <button
           onClick={handleNextDay}
-          className="flex h-6 w-6 items-center justify-center rounded-full text-ink-tertiary hover:bg-foreground/4 hover:text-ink-primary transition-all"
+          className="flex h-6 w-6 items-center justify-center rounded-full text-foreground-tertiary hover:bg-foreground/4 hover:text-foreground transition-all"
           title={t('dateNavigationBar.nextDay')}
         >
           <ChevronRight size={13} strokeWidth={1.5} />
@@ -163,8 +163,8 @@ export function DateNavigationBar({ dayNodeId }: DateNavigationBarProps) {
       <button
         onClick={handleToggleCalendar}
         className={`ml-1.5 flex h-6 w-6 items-center justify-center rounded-full transition-all ${calendarOpen
-          ? 'bg-foreground/[0.08] text-ink-primary'
-          : 'text-ink-tertiary hover:bg-foreground/4 hover:text-ink-primary'
+          ? 'bg-foreground/[0.08] text-foreground'
+          : 'text-foreground-tertiary hover:bg-foreground/4 hover:text-foreground'
           }`}
         title={t('dateNavigationBar.pickDate')}
       >

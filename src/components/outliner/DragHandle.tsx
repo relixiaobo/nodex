@@ -11,7 +11,7 @@ export function DragHandle({ onDragStart }: DragHandleProps) {
       draggable
       onDragStart={onDragStart}
     >
-      <GripVertical size={12} className="text-ink-tertiary" />
+      <GripVertical size={12} className="text-foreground-tertiary" />
     </span>
   );
 }

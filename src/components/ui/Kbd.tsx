@@ -64,7 +64,7 @@ function splitShortcut(shortcut: string): string[] {
   return parts;
 }
 
-const KBD_BASE = 'inline-flex h-5 min-w-5 items-center justify-center rounded-md bg-foreground/[0.06] px-1 text-[11px] font-medium text-foreground-tertiary';
+const KBD_BASE = 'inline-flex h-5 min-w-5 items-center justify-center rounded-md bg-foreground/4 px-1 text-[11px] font-medium text-foreground-tertiary';
 
 export function Kbd({ keys, children, onClick, className = '' }: KbdProps) {
   const interactive = onClick ? 'cursor-pointer hover:bg-foreground/10 hover:text-foreground-secondary' : '';

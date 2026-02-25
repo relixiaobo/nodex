@@ -53,7 +53,7 @@ export function BulletChevron({
     return (
       <span
         role="button"
-        className="flex shrink-0 h-[21px] w-[15px] items-center justify-center cursor-pointer group/bullet"
+        className="flex shrink-0 h-6 w-[15px] items-center justify-center cursor-pointer group/bullet"
         onClick={onBulletClick}
         title={t('outliner.zoomIn')}
       >
@@ -73,7 +73,7 @@ export function BulletChevron({
     return (
       <span
         role="button"
-        className="flex shrink-0 h-[21px] w-[15px] items-center justify-center cursor-pointer group/bullet"
+        className="flex shrink-0 h-6 w-[15px] items-center justify-center cursor-pointer group/bullet"
         onClick={onBulletClick}
         title={t('outliner.zoomIn')}
       >
@@ -93,17 +93,16 @@ export function BulletChevron({
   return (
     <span
       role="button"
-      className="flex shrink-0 h-[21px] w-[15px] items-center justify-center cursor-pointer group/bullet"
+      className="flex shrink-0 h-6 w-[15px] items-center justify-center cursor-pointer group/bullet"
       onClick={onBulletClick}
       title={t('outliner.zoomIn')}
     >
       <div
-        className={`flex h-[15px] w-[15px] items-center justify-center rounded-full transition-colors group-active/bullet:scale-90 ${
-          isReference ? 'border border-dashed border-foreground/40' : ''
-        } ${showOuterRing ? 'bg-foreground/[0.08]' : ''}`}
+        className={`flex h-[15px] w-[15px] items-center justify-center rounded-full transition-colors group-active/bullet:scale-90 ${isReference ? 'border border-dashed border-foreground/40' : ''
+          } ${showOuterRing ? 'bg-foreground/[0.08]' : ''}`}
       >
         <div
-          className={`h-[5px] w-[5px] rounded-full transition-transform group-hover/bullet:scale-[1.375] ${!hasColors ? (dimmed ? 'bg-foreground/15' : 'bg-foreground/50') : ''}`}
+          className={`h-[5px] w-[5px] rounded-full transition-transform group-hover/bullet:scale-[1.375] ${!hasColors ? (dimmed ? 'bg-foreground/15' : 'bg-foreground/40') : ''}`}
           style={bulletStyle}
         />
       </div>
@@ -135,7 +134,7 @@ export function ChevronButton({
 }: ChevronButtonProps) {
   return (
     <button
-      className="flex shrink-0 h-[21px] w-[15px] items-center justify-center opacity-0 group-hover/row:opacity-100 pointer-events-none group-hover/row:pointer-events-auto transition-opacity"
+      className="flex shrink-0 h-6 w-[15px] items-center justify-center opacity-0 group-hover/row:opacity-100 pointer-events-none group-hover/row:pointer-events-auto transition-opacity focus:outline-none"
       tabIndex={-1}
       onPointerDown={(e) => {
         onTogglePointerDown?.();
@@ -160,15 +159,14 @@ export function ChevronButton({
       title={isExpanded ? 'Collapse' : 'Expand'}
     >
       <div
-        className={`flex h-[15px] w-[15px] items-center justify-center rounded-full bg-background outline outline-1 outline-border-emphasis hover:bg-foreground/[0.04] transition-colors ${
-          isExpanded ? '[&>svg]:rotate-90' : ''
-        }`}
+        className={`flex h-[15px] w-[15px] items-center justify-center rounded-full transition-colors ${isExpanded ? '[&>svg]:rotate-90' : ''
+          }`}
       >
         <svg
           width="10"
           height="10"
           viewBox="0 0 12 12"
-          className="text-foreground-secondary transition-transform"
+          className="text-foreground-secondary/60 hover:text-foreground transition-transform"
         >
           <path
             d="M4.5 2.5L8 6L4.5 9.5"

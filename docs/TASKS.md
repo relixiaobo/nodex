@@ -107,11 +107,11 @@ _(无进行中任务)_
 - [ ] 4.4 注意：不是所有 `text-sm` 都要改，Dropdown 项、字段标签、辅助信息保持 `text-sm`
 
 **Phase 5: 大纲几何（行高 + 容器）** — ⚠️ 高风险，OutlinerItem 是核心文件
-- [ ] 5.1 `h-7`(28px) → 24px：BulletChevron / DragHandle / OutlinerItem 行容器 / FieldRow / FieldValueOutliner / TrailingInput
-- [ ] 5.2 `min-h-7` → `min-h-6`：OutlinerItem / BacklinksSection / NodeHeader / OutlinerView
-- [ ] 5.3 不改的 h-7：DatePicker 按钮 / FloatingToolbar 按钮 / ToolbarUserMenu 头像
-- [ ] 5.4 按钮圆角 `rounded-md` → `rounded-full`（pill）
-- [ ] 5.5 新增 `--radius-pill: 9999px` 到 main.css @theme
+- [x] 5.1 `h-7`(28px) → 24px：BulletChevron / DragHandle / OutlinerItem 行容器 / FieldRow / FieldValueOutliner / TrailingInput
+- [x] 5.2 `min-h-7` → `min-h-6`：OutlinerItem / BacklinksSection / NodeHeader / OutlinerView
+- [x] 5.3 不改的 h-7：DatePicker 按钮 / FloatingToolbar 按钮 / ToolbarUserMenu 头像
+- [x] 5.4 按钮圆角 `rounded-md` → `rounded-full`（pill）
+- [x] 5.5 新增 `--radius-pill: 9999px` 到 main.css @theme
 
 **Phase 6: Tag Badge 重构（排印化）** — Tag 渲染方式变更
 - [ ] 6.1 `TagBadge.tsx`：移除 `bg-[var(--tag-bg)]`，保留 `color: var(--tag-text)`
@@ -119,6 +119,12 @@ _(无进行中任务)_
 - [ ] 6.3 `NodePicker.tsx:26,225`：tag badge 移除内联 bg
 - [ ] 6.4 Tag 文本前缀 `#` 添加（Ink-Tertiary 色）
 - [ ] 6.5 `tag-colors.ts` 简化：移除 `bg` 字段，只保留 `text` 色值
+
+**Phase 7: 隐形 UI 与全局顶栏重构 (Invisible UI & Unified Header)**
+- [x] 7.1 隐形大纲控件 (OutlinerItem, DragHandle, BulletChevron) 增加 `group-hover/row` 等透明度控制。
+- [x] 7.2 文本化标签排印 (TagBadge)，悬停下划线和绝对定位 `X` 覆盖 `#`。
+- [x] 7.3 日期导航极致压缩 (DateNavigationBar) (h-6, -mt-1, rounded-full)。
+- [x] 7.4 全局顶栏化繁为简：重构 `TopToolbar` 和 `NodePanel`，合并为单行绝对定位悬浮顶栏。
 
 **PR 策略**:
 - Phase 1-3 → 一个 PR（纯视觉变更，不改组件结构）

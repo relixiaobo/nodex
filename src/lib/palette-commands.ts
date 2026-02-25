@@ -34,7 +34,7 @@ export interface PaletteItem {
   /** Tag-derived bullet colors for node items (colored dot like outliner). */
   bulletColors?: string[];
   /** TagDef color — renders colored # hash instead of bullet. */
-  tagDefColor?: { text: string; bg: string };
+  tagDefColor?: { text: string };
   /** Override the default TYPE_LABELS display (e.g. "Tag", "Field"). */
   typeLabel?: string;
   action: () => void;

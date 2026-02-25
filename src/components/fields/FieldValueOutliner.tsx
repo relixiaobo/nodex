@@ -106,7 +106,7 @@ export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, configNo
       }
     }
     return result;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [childIds, fieldMap, _version]);
 
   const selectableChildIds = useMemo(
@@ -143,8 +143,8 @@ export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, configNo
     const label = isYes ? 'Yes' : 'No';
 
     return (
-      <div className="flex min-h-7 items-center gap-2 py-1" style={{ paddingLeft: FIELD_VALUE_INSET }}>
-        <BulletChevron hasChildren={false} isExpanded={false} onBulletClick={() => {}} />
+      <div className="flex min-h-6 items-start gap-2 py-1" style={{ paddingLeft: FIELD_VALUE_INSET }}>
+        <BulletChevron hasChildren={false} isExpanded={false} onBulletClick={() => { }} />
         <button
           onClick={() => {
             const newIsYes = !isYes;
@@ -157,19 +157,17 @@ export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, configNo
               if (parentId && fieldDefId) setFieldValue(parentId, fieldDefId, [newIsYes ? SYS_V.YES : SYS_V.NO]);
             }
           }}
-          className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-            isYes ? 'bg-primary' : 'bg-muted'
-          }`}
+          className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${isYes ? 'bg-primary' : 'bg-border hover:bg-foreground/20'
+            }`}
           role="switch"
           aria-checked={isYes}
         >
           <span
-            className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-background shadow-lg ring-0 transition-transform duration-200 ease-in-out ${
-              isYes ? 'translate-x-4' : 'translate-x-0'
-            }`}
+            className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-background shadow-sm ring-0 transition-transform duration-200 ease-in-out ${isYes ? 'translate-x-4' : 'translate-x-0'
+              }`}
           />
         </button>
-        <span className="text-sm leading-[21px] text-foreground select-none">{label}</span>
+        <span className="text-[15px] leading-6 text-foreground select-none">{label}</span>
       </div>
     );
   }
@@ -193,8 +191,8 @@ export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, configNo
     const isChecked = valueNode?.name === SYS_V.YES;
 
     return (
-      <div className="flex min-h-7 items-start gap-2 py-1" style={{ paddingLeft: FIELD_VALUE_INSET }}>
-        <BulletChevron hasChildren={false} isExpanded={false} onBulletClick={() => {}} />
+      <div className="flex min-h-6 items-start gap-2 py-1" style={{ paddingLeft: FIELD_VALUE_INSET }}>
+        <BulletChevron hasChildren={false} isExpanded={false} onBulletClick={() => { }} />
         <input
           type="checkbox"
           checked={isChecked}
@@ -235,8 +233,8 @@ export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, configNo
     const url = valueNode?.name ?? '';
 
     return (
-      <div className="flex min-h-7 items-start gap-2 py-1" style={{ paddingLeft: FIELD_VALUE_INSET }}>
-        <BulletChevron hasChildren={false} isExpanded={false} onBulletClick={() => {}} dimmed={!url} />
+      <div className="flex min-h-6 items-start gap-2 py-1" style={{ paddingLeft: FIELD_VALUE_INSET }}>
+        <BulletChevron hasChildren={false} isExpanded={false} onBulletClick={() => { }} dimmed={!url} />
         <div className="flex-1 min-w-0 flex items-center">
           {url ? (
             <a
@@ -244,13 +242,13 @@ export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, configNo
               target="_blank"
               rel="noopener noreferrer"
               title={url}
-              className="text-sm leading-[21px] text-primary underline truncate"
+              className="text-[15px] leading-6 text-primary underline truncate"
               onClick={(e) => e.stopPropagation()}
             >
               {url}
             </a>
           ) : (
-            <span className="text-sm leading-[21px] text-foreground-tertiary select-none">Empty</span>
+            <span className="text-[15px] leading-6 text-foreground-tertiary select-none">Empty</span>
           )}
         </div>
       </div>
@@ -264,20 +262,20 @@ export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, configNo
     const email = valueNode?.name ?? '';
 
     return (
-      <div className="flex min-h-7 items-start gap-2 py-1" style={{ paddingLeft: FIELD_VALUE_INSET }}>
-        <BulletChevron hasChildren={false} isExpanded={false} onBulletClick={() => {}} dimmed={!email} />
+      <div className="flex min-h-6 items-start gap-2 py-1" style={{ paddingLeft: FIELD_VALUE_INSET }}>
+        <BulletChevron hasChildren={false} isExpanded={false} onBulletClick={() => { }} dimmed={!email} />
         <div className="flex-1 min-w-0 flex items-center">
           {email ? (
             <a
               href={`mailto:${email}`}
               title={email}
-              className="text-sm leading-[21px] text-primary underline truncate"
+              className="text-[15px] leading-6 text-primary underline truncate"
               onClick={(e) => e.stopPropagation()}
             >
               {email}
             </a>
           ) : (
-            <span className="text-sm leading-[21px] text-foreground-tertiary select-none">Empty</span>
+            <span className="text-[15px] leading-6 text-foreground-tertiary select-none">Empty</span>
           )}
         </div>
       </div>
@@ -411,10 +409,10 @@ function DatePickerField({ value, onSelect }: { value: string; onSelect: (v: str
 
   return (
     <div className={`relative ${open ? 'isolate' : ''}`} style={open ? { zIndex: FIELD_OVERLAY_Z_INDEX } : undefined}>
-      <div className="flex min-h-7 items-start gap-2 py-1" style={{ paddingLeft: FIELD_VALUE_INSET }}>
-        <BulletChevron hasChildren={false} isExpanded={false} onBulletClick={() => {}} dimmed={!value} />
+      <div className="flex min-h-6 items-start gap-2 py-1" style={{ paddingLeft: FIELD_VALUE_INSET }}>
+        <BulletChevron hasChildren={false} isExpanded={false} onBulletClick={() => { }} dimmed={!value} />
         <div className="flex-1 min-w-0 flex items-center cursor-pointer" onClick={handleClick}>
-          <span className={`text-sm leading-[21px] select-none ${value ? '' : 'text-foreground-tertiary'}`}>
+          <span className={`text-[15px] leading-6 select-none ${value ? '' : 'text-foreground-tertiary'}`}>
             {value ? formatDateDisplay(value) : t('field.empty')}
           </span>
         </div>

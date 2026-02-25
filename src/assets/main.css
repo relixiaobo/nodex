@@ -2,44 +2,63 @@
 @source "../../src";
 
 @theme {
-  --color-primary: #8B5CF6;
-  --color-primary-hover: #7C3AED;
-  --color-primary-foreground: #ffffff;
-  --color-secondary: #f1f5f9;
-  --color-secondary-foreground: #0F0F12;
-  --color-muted: #f1f5f9;
-  --color-muted-foreground: #6B6B80;
-  --color-accent: #f1f5f9;
-  --color-accent-foreground: #0F0F12;
-  --color-destructive: #E11D48;
-  --color-destructive-foreground: #ffffff;
-  --color-border: rgba(0,0,0,0.08);
-  --color-input: rgba(0,0,0,0.08);
-  --color-ring: #8B5CF6;
-  --color-background: #FAFAFA;
-  --color-foreground: #0F0F12;
-  --color-card: #ffffff;
-  --color-card-foreground: #0F0F12;
-  --color-popover: #ffffff;
-  --color-popover-foreground: #0F0F12;
-  --color-primary-muted: rgba(139,92,246,0.08);
+  /* Light mode — Paper & Ink */
+  --color-background: #F5F4EE;
   --color-surface: #FFFFFF;
-  --color-surface-raised: #FFFFFF;
-  --color-surface-overlay: #FFFFFF;
-  --color-foreground-secondary: #6B6B80;
-  --color-foreground-tertiary: #A0A0B0;
-  --color-border-subtle: rgba(0,0,0,0.04);
-  --color-border-emphasis: rgba(0,0,0,0.15);
-  --color-warning: #D97706;
-  --color-success: #0D9488;
-  --color-selection: rgba(139,92,246,0.08);
-  --color-selection-row: #E8E0FA;
+  --color-foreground: #1A1A1A;
+  --color-foreground-secondary: #666666;
+  --color-foreground-tertiary: #999999;
+
+  /* Sage Green — Primary */
+  --color-primary: #5E8E65;
+  --color-primary-hover: #4D7A54;
+  --color-primary-muted: rgba(94, 142, 101, 0.08);
+  --color-primary-foreground: #FFFFFF;
+  --color-ring: #5E8E65;
+
+  /* Warm Amber — Secondary */
+  --color-secondary: #E1A15E;
+  --color-secondary-hover: #CC8D4E;
+  --color-secondary-muted: rgba(225, 161, 94, 0.12);
+  --color-secondary-foreground: #1A1A1A;
+
+  /* Brick Red — Destructive */
+  --color-destructive: #AA5048;
+  --color-destructive-hover: #8E3F38;
+  --color-destructive-muted: rgba(170, 80, 72, 0.08);
+  --color-destructive-foreground: #FFFFFF;
+
+  /* Borders */
+  --color-border: rgba(0, 0, 0, 0.10);
+  --color-border-subtle: rgba(0, 0, 0, 0.06);
+  --color-border-emphasis: rgba(0, 0, 0, 0.18);
+  --color-input: rgba(0, 0, 0, 0.10);
+
+  /* Functional */
+  --color-warning: #A07830;
+  --color-success: #5E8E65;
+  --color-info: #5A8AB5;
+  --color-selection: rgba(94, 142, 101, 0.07);
+  --color-selection-row: rgba(94, 142, 101, 0.15);
+
+  /* Preserved UI Tokens */
+  --color-muted: #F5F4EE;
+  --color-muted-foreground: #666666;
+  --color-accent: #f1f5f9;
+  --color-accent-foreground: #1A1A1A;
+  --color-card: #FFFFFF;
+  --color-card-foreground: #1A1A1A;
+  --color-popover: #FFFFFF;
+  --color-popover-foreground: #1A1A1A;
+
   --radius-xs: 0.125rem;
   --radius-sm: 0.25rem;
   --radius-md: 0.375rem;
   --radius-lg: 0.5rem;
   --radius-xl: 0.75rem;
   --radius-2xl: 1rem;
+  --radius-pill: 9999px;
+
   --font-sans: "Inter", system-ui, -apple-system, sans-serif;
   --font-mono: "JetBrains Mono", "Fira Code", monospace;
 }
@@ -58,14 +77,14 @@
   right: -6px;
   bottom: -1px;
   left: -6px;
-  border: 1px solid rgba(147, 197, 253, 0.95);
+  border: 1px solid rgba(94, 142, 101, 0.4);
   border-radius: 0.25rem;
-  background: rgba(147, 197, 253, 0.12);
+  background: rgba(94, 142, 101, 0.08);
   pointer-events: none;
   z-index: 0;
 }
 
-.node-selected-ref > * {
+.node-selected-ref>* {
   position: relative;
   z-index: 1;
 }
@@ -85,12 +104,13 @@
 
 .ProseMirror mark,
 .node-content mark {
-  background-color: rgba(250, 204, 21, 0.4);
+  background-color: rgba(200, 170, 80, 0.25);
   border-radius: 0.125rem;
   padding: 0.0625rem 0;
 }
 
 @media (prefers-color-scheme: dark) {
+
   .ProseMirror mark,
   .node-content mark {
     background-color: rgba(251, 191, 36, 0.2);
@@ -144,12 +164,12 @@
    has a rendering bug where the native caret is invisible inside inline marks
    (<code>, <mark>) when the contenteditable element has display:inline. */
 .editor-inline,
-.editor-inline > div {
+.editor-inline>div {
   display: inline;
 }
 
 .editor-inline .ProseMirror {
-  display: inline-block;
+  display: inline;
   caret-color: currentColor;
 }
 
@@ -157,7 +177,7 @@
    ProseMirror uses <br class="ProseMirror-trailingBreak"> for empty lines; when
    paragraph is inline this <br> introduces an extra visual line in our row layout. */
 .editor-inline .ProseMirror p {
-  display: inline-block;
+  display: inline;
   margin: 0;
   min-width: 1px;
   vertical-align: top;
@@ -165,20 +185,20 @@
 
 /* Generic paragraph rule: when paragraph has visible content, hide synthetic
    trailingBreak so inline editor row doesn't gain an extra visual line. */
-.editor-inline .ProseMirror p > br.ProseMirror-trailingBreak:not(:only-child) {
+.editor-inline .ProseMirror p>br.ProseMirror-trailingBreak:not(:only-child) {
   display: none;
 }
 
 /* Fallback for atom-ended paragraphs: hide trailingBreak that follows separator.
    This still applies even when we cannot detect inline ref via :has(). */
-.editor-inline .ProseMirror p > img.ProseMirror-separator + br.ProseMirror-trailingBreak {
+.editor-inline .ProseMirror p>img.ProseMirror-separator+br.ProseMirror-trailingBreak {
   display: none;
 }
 
 /* Inline-reference specific caret anchoring:
    keep ProseMirror separator in DOM (caret anchor), but make it zero-width/invisible;
    hide trailingBreak so no extra visual line appears. */
-.editor-inline .ProseMirror p:has([data-inlineref-node]) > img.ProseMirror-separator {
+.editor-inline .ProseMirror p:has([data-inlineref-node])>img.ProseMirror-separator {
   display: inline-block;
   width: 0;
   height: 0;
@@ -189,7 +209,7 @@
   overflow: hidden;
 }
 
-.editor-inline .ProseMirror p:has([data-inlineref-node]) > br.ProseMirror-trailingBreak {
+.editor-inline .ProseMirror p:has([data-inlineref-node])>br.ProseMirror-trailingBreak {
   display: none;
 }
 
@@ -204,16 +224,23 @@
 
 /* Keyboard navigation onto inline atom (ArrowLeft/ArrowRight) should be visible. */
 .editor-inline .ProseMirror [data-inlineref-node].ProseMirror-selectednode {
-  outline: 1px solid rgba(147, 197, 253, 0.95);
+  outline: 1px solid rgba(94, 142, 101, 0.4);
   border-radius: 0.25rem;
-  background: rgba(147, 197, 253, 0.12);
+  background: rgba(94, 142, 101, 0.08);
 }
 
 /* Ref conversion shimmer: keep the original timing/feel, but color source is
    now per-reference (supertag accent) + foreground (soft black in light theme). */
 @keyframes ref-conversion-shimmer {
-  0%, 100% { color: var(--ref-conversion-dark, var(--color-foreground)); }
-  35% { color: var(--inline-ref-accent, var(--ref-conversion-accent, var(--color-primary))); }
+
+  0%,
+  100% {
+    color: var(--ref-conversion-dark, var(--color-foreground));
+  }
+
+  35% {
+    color: var(--inline-ref-accent, var(--ref-conversion-accent, var(--color-primary)));
+  }
 }
 
 .ref-converting .ProseMirror [data-inlineref-node],
@@ -227,16 +254,30 @@
    Default 1px → hover 3px: 3× visible change, still thinner than 5px bullet dot.
    Button positioned LEFT of bullet center (justify-end) to avoid
    overlapping with child ChevronButton hover zone. */
-.indent-line:hover > .indent-line-inner {
+.indent-line:hover>.indent-line-inner {
   width: 3px;
 }
 
 @keyframes node-delete-blocked-pulse {
-  0% { transform: translateX(0); }
-  20% { transform: translateX(-2px); }
-  45% { transform: translateX(2px); }
-  70% { transform: translateX(-1px); }
-  100% { transform: translateX(0); }
+  0% {
+    transform: translateX(0);
+  }
+
+  20% {
+    transform: translateX(-2px);
+  }
+
+  45% {
+    transform: translateX(2px);
+  }
+
+  70% {
+    transform: translateX(-1px);
+  }
+
+  100% {
+    transform: translateX(0);
+  }
 }
 
 .node-delete-blocked-pulse {
@@ -248,6 +289,7 @@
   from {
     clip-path: inset(0 0 calc(100% - 44px) 0);
   }
+
   to {
     clip-path: inset(0);
   }

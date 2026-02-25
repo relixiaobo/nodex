@@ -3,7 +3,7 @@ import { Trash2 } from '../../lib/icons.js';
 import { useNode } from '../../hooks/use-node';
 import { useNodeStore } from '../../stores/node-store';
 import { useUIStore } from '../../stores/ui-store';
-import { NodePanelHeader } from './NodePanelHeader';
+
 import { NodeHeader } from './NodeHeader';
 import { OutlinerView } from '../outliner/OutlinerView';
 import { FieldList } from '../fields/FieldList';
@@ -84,8 +84,7 @@ export function NodePanel({ nodeId }: NodePanelProps) {
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
-      <NodePanelHeader nodeId={nodeId} showCurrentName={!titleVisible} />
-      <div ref={scrollRef} className="flex-1 overflow-y-auto scroll-pb-[40vh]">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto scroll-pb-[40vh] pt-12">
         {isTagDef && tagDefColor && (
           <div
             className="h-28 -mb-28 pointer-events-none"

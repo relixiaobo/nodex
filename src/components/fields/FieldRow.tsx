@@ -250,12 +250,12 @@ function ConfigNumberInput({ nodeId, configKey }: { nodeId: string; configKey: s
   }, [draft, nodeId, propName, setConfigValue]);
 
   return (
-    <div className="flex min-h-7 items-center gap-2 py-1" style={{ paddingLeft: FIELD_VALUE_INSET }}>
-      <BulletChevron hasChildren={false} isExpanded={false} onBulletClick={() => {}} />
+    <div className="flex min-h-6 items-center gap-2 py-1" style={{ paddingLeft: FIELD_VALUE_INSET }}>
+      <BulletChevron hasChildren={false} isExpanded={false} onBulletClick={() => { }} />
       <input
         type="text"
         inputMode="decimal"
-        className="h-[21px] min-w-[120px] bg-transparent p-0 text-sm leading-[21px] text-foreground outline-none placeholder:text-foreground-tertiary"
+        className="h-[24px] min-w-[120px] bg-transparent p-0 text-[15px] leading-6 text-foreground outline-none placeholder:text-foreground-tertiary"
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
         onBlur={commitDraft}
@@ -491,7 +491,7 @@ export function FieldRow({
       }
     }
     return result;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [_version, nodeId, siblingFieldIds]);
 
   const selectionRootChildIds = useMemo(
@@ -733,7 +733,7 @@ export function FieldRow({
     const displayText = valueName || '—';
     return (
       <div
-        className={`border-t ${isLastInGroup ? 'border-b' : ''} border-border-subtle flex flex-col @sm:flex-row @sm:items-start min-h-[28px]`}
+        className={`border-t ${isLastInGroup ? 'border-b' : ''} border-border-subtle flex flex-col @sm:flex-row @sm:items-start min-h-6`}
         data-field-row
         data-field-row-id={tupleId}
         data-node-id={tupleId}
@@ -741,12 +741,12 @@ export function FieldRow({
         data-row-kind="field"
         onClick={handleFieldRowClick}
       >
-        <div className="flex items-center gap-1 @sm:shrink-0 @sm:w-[130px] min-w-0 h-7 py-1">
+        <div className="flex items-center gap-1 @sm:shrink-0 @sm:w-[130px] min-w-0 min-h-6 py-1">
           <span className="shrink-0 w-[15px] flex items-center justify-center text-foreground-tertiary">
             {SysIcon && <SysIcon size={12} />}
           </span>
           <span
-            className="block text-sm leading-[22px] h-[22px] text-foreground-tertiary truncate cursor-default outline-none focus:ring-1 focus:ring-ring rounded-sm"
+            className="block text-[15px] leading-6 h-6 text-foreground-tertiary truncate cursor-default outline-none focus:ring-1 focus:ring-ring rounded-sm"
             tabIndex={0}
             title={attrDefName}
             onKeyDown={(e) => {
@@ -776,17 +776,17 @@ export function FieldRow({
             {attrDefName}
           </span>
         </div>
-        <div className="flex flex-1 min-w-0 items-center min-h-7 py-1" data-field-value>
+        <div className="flex flex-1 min-w-0 items-start min-h-6 py-1" data-field-value>
           {dataType === '__system_node__' && valueNodeId ? (
             <button
-              className="text-sm leading-[22px] text-foreground-tertiary hover:text-foreground-secondary cursor-pointer truncate"
+              className="text-[15px] leading-6 text-foreground-tertiary hover:text-foreground-secondary cursor-pointer truncate"
               onClick={() => navigateTo(valueNodeId)}
               title={`Navigate to ${displayText}`}
             >
               {displayText}
             </button>
           ) : (
-            <span className="text-sm leading-[22px] text-foreground-tertiary truncate">
+            <span className="text-[15px] leading-6 text-foreground-tertiary truncate">
               {displayText}
             </span>
           )}
@@ -813,7 +813,7 @@ export function FieldRow({
 
     return (
       <div
-        className={`border-t ${isLastInGroup ? 'border-b' : ''} border-border-subtle flex flex-col @sm:flex-row @sm:items-start min-h-[28px] py-1.5`}
+        className={`border-t ${isLastInGroup ? 'border-b' : ''} border-border-subtle flex flex-col @sm:flex-row @sm:items-start min-h-6 py-1`}
         data-field-row
         data-field-row-id={tupleId}
         data-node-id={tupleId}
@@ -822,7 +822,7 @@ export function FieldRow({
         onClick={handleFieldRowClick}
       >
         {/* Name column — icon + name + description */}
-        <div className="flex gap-1 @sm:shrink-0 @sm:w-[180px] min-w-0">
+        <div className="flex gap-1 @sm:shrink-0 @sm:w-[180px] min-w-0 min-h-6 py-1">
           {Icon ? (
             <span className="shrink-0 w-[15px] flex items-start justify-center text-foreground-tertiary mt-1">
               <Icon size={12} />
@@ -831,7 +831,7 @@ export function FieldRow({
             <span className="shrink-0 w-[15px]" />
           )}
           <div className="flex-1 min-w-0">
-            <span className="block text-sm font-medium leading-[22px] text-foreground">
+            <span className="block text-[15px] font-medium leading-6 text-foreground">
               {displayName}
             </span>
             {configDef?.description && (
@@ -842,12 +842,12 @@ export function FieldRow({
           </div>
         </div>
         {/* Value column — unified rendering */}
-        <div className="flex flex-1 min-w-0 items-start" data-field-value>
+        <div className="flex flex-1 min-w-0 items-start py-1" data-field-value>
           <div className="flex-1 min-w-0 min-h-[22px]">
             {renderSystemConfigValue(resolvedControl, systemConfigValueContext)}
           </div>
           {configNumberValidationWarning && (
-            <div className="flex items-center h-7 pr-1">
+            <div className="flex items-center h-6 pr-1">
               <ValidationWarning message={configNumberValidationWarning} />
             </div>
           )}
@@ -859,7 +859,7 @@ export function FieldRow({
   // ─── Path 3: Regular fields — editable name, FieldValueOutliner ───
   return (
     <div
-      className={`relative border-t ${isLastInGroup ? 'border-b' : ''} border-border-subtle flex flex-col @sm:flex-row @sm:items-start min-h-[28px]`}
+      className={`relative border-t ${isLastInGroup ? 'border-b' : ''} border-border-subtle flex flex-col @sm:flex-row @sm:items-start min-h-6`}
       data-field-row
       data-field-row-id={tupleId}
       data-node-id={tupleId}
@@ -871,7 +871,7 @@ export function FieldRow({
         <div className={FIELD_ROW_SELECTION_OVERLAY_CLASS} style={FIELD_ROW_SELECTION_OVERLAY_STYLE} />
       )}
       {/* Name column — aligned to first line of value */}
-      <div className="relative z-[1] flex items-center gap-1 @sm:shrink-0 @sm:w-[130px] min-w-0 h-7 py-1">
+      <div className="relative z-[1] flex items-center gap-1 @sm:shrink-0 @sm:w-[130px] min-w-0 min-h-6 py-1">
         <button
           className={`shrink-0 w-[15px] flex items-center justify-center transition-colors ${ownerTagColor ? '' : 'text-foreground-tertiary hover:text-foreground-secondary'}`}
           onClick={trashed || isVirtual ? undefined : () => navigateTo(attrDefId)}
@@ -903,7 +903,7 @@ export function FieldRow({
             />
           ) : (
             <span
-              className="block text-sm leading-[22px] h-[22px] text-foreground truncate"
+              className="block text-[15px] leading-6 h-6 text-foreground truncate"
               title={attrDefName}
             >
               {attrDefName}
@@ -922,7 +922,7 @@ export function FieldRow({
           )}
         </div>
         {validationWarning && (
-          <div className="flex items-center h-7 pr-1">
+          <div className="flex items-center h-6 pr-1">
             <ValidationWarning message={validationWarning} />
           </div>
         )}

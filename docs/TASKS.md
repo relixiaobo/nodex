@@ -27,7 +27,7 @@ _(空)_
 
 | Agent | 当前任务 | 分支 | 修改中的文件 |
 |-------|---------|------|-------------|
-| nodex-cc | 布局 Phase 3 Undo/Redo 按钮集成 + #44 Phase 1 验证 | `cc/layout-undo-buttons` | `TopToolbar.tsx`, `UndoRedoButtons.tsx` |
+| nodex-cc | _(idle)_ | — | — |
 | nodex-cc-2 | Search Nodes Phase 1 (#23) | `cc2/search-nodes` | `node.ts`, `loro-doc.ts`, `search-engine.ts`, `node-store.ts`, `OutlinerItem.tsx`, `OutlinerView.tsx` |
 | nodex-codex | _(idle)_ | — | — |
 | antigravity | _(idle — 待接 v5.0 UI 重构)_ | — | — |
@@ -36,9 +36,7 @@ _(空)_
 
 ## 进行中
 
-### Side Panel 布局 Phase 3 + Undo/Redo 验证
-> nodex-cc 负责两个子任务：① 布局 Phase 3 Undo/Redo 按钮集成到 TopToolbar ② 验证 #44 Phase 1 commitDoc() 覆盖
-> **Owner**: nodex-cc | **Branch**: `cc/layout-undo-buttons`
+_(无进行中任务)_
 
 ---
 
@@ -190,7 +188,7 @@ _(空)_
 - [x] Phase 2: ProseMirror → Loro 实时同步 + 移除 `prosemirror-history` ✓ PR #91
 - [x] Phase 3: UI 状态 marker commit（展开/折叠 + 导航进入 Loro undo 栈）✓ PR #91
 - [x] Phase 4: 统一 ⌘Z handler + 删除旧代码（navUndoStack / 三层 fallthrough / PM History）✓ PR #91
-- [ ] Phase 1: 补全 commitDoc() 覆盖 — **nodex 已验证：applyTag/removeTag/setFieldValue/toggleCheckboxField/toggleNodeDone/cycleNodeCheckbox 全部有 commitDoc()，请 nodex-cc 复查确认后勾选**
+- [x] Phase 1: 补全 commitDoc() 覆盖 ✓ nodex-cc 复查确认：node-store.ts 35 处 commitDoc()，覆盖全部树/标签/字段/checkbox/引用操作；文本编辑走 editor blur 路径（commitDoc('user:text')）
 
 #### Side Panel 布局改造 — 移除 Sidebar + ⌘K 重设计
 > Phase 1/2/4 已完成（PR #88）。Phase 3（Undo/Redo 按钮集成）待 #44 完成后执行。
@@ -199,7 +197,7 @@ _(空)_
 
 - [x] Phase 1: 顶栏骨架 + 移除 Sidebar ✓ PR #88
 - [x] Phase 2: ⌘K 命令面板重写 ✓ PR #88
-- [ ] Phase 3: Undo/Redo 按钮集成 — **可执行**（#44 核心已完成）。把 `UndoRedoButtons.tsx` 集成到 `TopToolbar.tsx`，参考 `docs/plans/layout-renovation.md` Phase 3 设计
+- [x] Phase 3: Undo/Redo 按钮集成 ✓ nodex-cc — UndoRedoButtons 接入 Loro undoDoc/redoDoc + canUndoDoc/canRedoDoc 响应式启禁用 + Undo2/Redo2 图标
 - [x] Phase 4: 清理废弃文件 ✓ PR #88
 
 #### 节点选中 — 后续增强 (#47)

@@ -43,8 +43,8 @@ const CONTAINER_HEADER_ICONS: Record<ContainerIconKey, AppIcon> = {
 
 /** Depth-0 padding formula from OutlinerItem: depth * 28 + 6. Header is always depth 0. */
 const ROW_PADDING_LEFT = 6;
-/** Col B offset: skip col A (15px) + gap-1 (4px). */
-const COL_B_OFFSET = ROW_PADDING_LEFT + 15 + 4;
+/** Alignment for tags, description, icon and title text to visually align with child bullets at 32px */
+const COL_B_OFFSET = 32;
 
 interface NodeHeaderProps {
   nodeId: string;
@@ -173,14 +173,13 @@ export function NodeHeader({ nodeId, onTitleRef }: NodeHeaderProps) {
   const showIconBlock = isTagDef || isFieldDef || isWorkspaceRoot || isContainer;
 
   return (
-    <div className="pt-1 pb-1">
+    <div className="pt-1">
       {/* ── Block ①: Icon (conditional) ── */}
       {showIconBlock && (
         <div className="mb-1" style={{ paddingLeft: COL_B_OFFSET }}>
           {isTagDef && tagDefColor && (
             <span
-              className="flex h-8 w-8 items-center justify-center rounded-lg"
-              style={{ backgroundColor: tagDefColor.bg }}
+              className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent/60"
             >
               <span
                 className="text-lg font-bold select-none"
@@ -191,7 +190,7 @@ export function NodeHeader({ nodeId, onTitleRef }: NodeHeaderProps) {
             </span>
           )}
           {isFieldDef && FieldIcon && (
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg text-foreground-tertiary">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent/60 text-foreground-tertiary">
               <FieldIcon size={20} />
             </span>
           )}
@@ -201,28 +200,38 @@ export function NodeHeader({ nodeId, onTitleRef }: NodeHeaderProps) {
             </span>
           )}
           {isContainer && ContainerIcon && (
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg text-foreground-tertiary">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent/60 text-foreground-tertiary">
               <ContainerIcon size={20} />
             </span>
           )}
         </div>
       )}
 
+      {/* ── Block ③: Supertag row (conditional) moved before name ── */}
+      {hasTags && !isDefinitionNode && (
+        <div className="mb-0.5" style={{ paddingLeft: COL_B_OFFSET }}>
+          <TagBar nodeId={nodeId} />
+        </div>
+      )}
+
       {/* ── Block ②: Name row (always) ── */}
       <div
-        className="group/header-row flex gap-1 min-h-7 items-start"
+        className="group/header-row flex min-h-6 items-start"
         style={{ paddingLeft: ROW_PADDING_LEFT }}
       >
         {/* Col A: Drag handle (same position as chevron) */}
         <span
-          className="flex shrink-0 h-8 w-[15px] items-center justify-center opacity-0 group-hover/header-row:opacity-40 hover:!opacity-100 cursor-grab transition-opacity"
+          className="flex shrink-0 h-8 w-[15px] mr-1 items-center justify-center opacity-0 group-hover/header-row:opacity-40 hover:!opacity-100 cursor-grab transition-opacity"
           title={t('nodeHeader.dragToMove')}
         >
           <GripVertical size={12} />
         </span>
 
-        {/* Inner container: col B + col C (matches OutlinerItem's flex gap-2) */}
-        <div className="flex items-start gap-2 flex-1 min-w-0">
+        {/* Inner container: col B + col C */}
+        <div
+          className="flex items-start flex-1 min-w-0"
+          style={{ paddingLeft: showCheckbox ? 0 : 7, gap: showCheckbox ? 8 : 0 }}
+        >
           {/* Col B: Checkbox (conditional, same position as bullet) */}
           {showCheckbox && (
             <span className="flex shrink-0 h-8 w-[15px] items-center justify-center">
@@ -240,7 +249,7 @@ export function NodeHeader({ nodeId, onTitleRef }: NodeHeaderProps) {
             ref={setRef}
             contentEditable={canEditNode && editing}
             suppressContentEditableWarning
-            className={`text-xl font-semibold leading-8 outline-none min-h-8 flex-1 ${canEditNode ? 'cursor-text' : 'cursor-default'} ${isDone ? 'text-foreground/50 line-through' : ''}`}
+            className={`text-xl font-semibold leading-8 outline-none min-h-8 flex-1 ${canEditNode ? 'cursor-text' : 'cursor-default'} ${isDone ? 'text-foreground/40 line-through' : ''}`}
             onClick={() => {
               if (!canEditNode) return;
               if (!editing) setEditing(true);
@@ -252,13 +261,6 @@ export function NodeHeader({ nodeId, onTitleRef }: NodeHeaderProps) {
           </h1>
         </div>
       </div>
-
-      {/* ── Block ③: Supertag row (conditional) ── */}
-      {hasTags && !isDefinitionNode && (
-        <div className="mt-0.5" style={{ paddingLeft: COL_B_OFFSET }}>
-          <TagBar nodeId={nodeId} />
-        </div>
-      )}
 
       {/* ── Description ── */}
       <div style={{ paddingLeft: COL_B_OFFSET }}>

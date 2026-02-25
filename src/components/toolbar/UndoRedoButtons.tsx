@@ -11,7 +11,7 @@ import { undoDoc, redoDoc, canUndoDoc, canRedoDoc } from '../../lib/loro-doc.js'
 import { useNodeStore } from '../../stores/node-store.js';
 
 const btnClass =
-  'flex h-8 w-8 items-center justify-center rounded-full text-foreground-tertiary transition-colors hover:bg-foreground/10 hover:text-foreground-secondary disabled:pointer-events-none disabled:opacity-50';
+  'flex h-7 w-7 items-center justify-center rounded-full text-foreground-tertiary transition-colors hover:bg-foreground/4 hover:text-foreground-secondary disabled:pointer-events-none disabled:opacity-40';
 
 export function UndoRedoButtons() {
   // Subscribe to _version so buttons re-evaluate after every Loro change
@@ -28,14 +28,14 @@ export function UndoRedoButtons() {
   const handleRedo = useCallback(redoDoc, []);
 
   return (
-    <div className="flex items-center gap-0.5">
+    <div className="flex items-center gap-1">
       <button
         disabled={!canUndo}
         onClick={handleUndo}
         className={btnClass}
         title="Undo (⌘Z)"
       >
-        <Undo2 size={16} strokeWidth={1.5} />
+        <Undo2 size={15} strokeWidth={1.5} />
       </button>
       <button
         disabled={!canRedo}
@@ -43,7 +43,7 @@ export function UndoRedoButtons() {
         className={btnClass}
         title="Redo (⌘⇧Z)"
       >
-        <Redo2 size={16} strokeWidth={1.5} />
+        <Redo2 size={15} strokeWidth={1.5} />
       </button>
     </div>
   );

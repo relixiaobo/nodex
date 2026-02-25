@@ -112,13 +112,13 @@ function MentionedInItem({ item }: { item: MentionedInRef }) {
       )}
       {/* Row: same structure as OutlinerItem depth-0 */}
       <div
-        className="mt-1 relative flex gap-1 min-h-7 items-start py-1 cursor-pointer"
+        className="mt-1 relative flex gap-1 min-h-6 items-start py-1 cursor-pointer"
         style={{ paddingLeft: ROW_PADDING_LEFT }}
         onClick={handleNavigate}
       >
         {/* Highlight overlay — same left offset as OutlinerItem selection: starts after chevron */}
         <div
-          className="absolute right-0 bg-foreground/5 border-l-2 border-primary/30 rounded-r-sm pointer-events-none group-hover/row:bg-foreground/8 transition-colors"
+          className="absolute right-0 bg-foreground/4 border-l-2 border-primary/30 rounded-r-sm pointer-events-none group-hover/row:bg-foreground/8 transition-colors"
           style={{ left: ROW_PADDING_LEFT + 15, top: 1, bottom: 1 }}
         />
         <ChevronButton
@@ -193,13 +193,13 @@ function FieldValueItem({ item }: { item: FieldValueRef }) {
 
   return (
     <div
-      className="group/row relative flex gap-1 min-h-7 items-start py-1 cursor-pointer"
+      className="group/row relative flex gap-1 min-h-6 items-start py-1 cursor-pointer"
       style={{ paddingLeft: ROW_PADDING_LEFT }}
       onClick={handleNavigate}
     >
       {/* Hover highlight — same left offset as OutlinerItem selection: starts after chevron */}
       <div
-        className="absolute right-0 rounded-sm pointer-events-none opacity-0 group-hover/row:opacity-100 bg-foreground/5 transition-opacity"
+        className="absolute right-0 rounded-sm pointer-events-none opacity-0 group-hover/row:opacity-100 bg-foreground/4 transition-opacity"
         style={{ left: ROW_PADDING_LEFT + 15, top: 1, bottom: 1 }}
       />
       <ChevronButton

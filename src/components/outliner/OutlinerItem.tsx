@@ -94,7 +94,7 @@ interface OutlinerItemProps {
   /** AttrDef ID — for Options field dropdown when clicking selected value */
   attrDefId?: string;
   /** Called when arrow navigation reaches a boundary (first/last node in scope).
-   *  Allows field-value OutlinerItems to escape to the parent outliner context. */
+   * Allows field-value OutlinerItems to escape to the parent outliner context. */
   onNavigateOut?: (direction: 'up' | 'down') => void;
   /** Override bullet colors (e.g. ownerColor for template items in config page). When omitted, colors derive from the node's own supertags. */
   bulletColors?: string[];
@@ -117,7 +117,7 @@ function focusTrailingInputForParent(parentId: string): boolean {
     if (root.dataset.trailingParentId !== parentId) continue;
     const editor = root.querySelector<HTMLElement>('.ProseMirror');
     if (!editor) continue;
-    editor.focus();
+    editor.focus({ preventScroll: true });
     return true;
   }
   return false;
@@ -126,7 +126,7 @@ function focusTrailingInputForParent(parentId: string): boolean {
 function focusRowUndoTarget(row: HTMLElement | null): void {
   const editor = row?.querySelector<HTMLElement>('.ProseMirror');
   if (editor) {
-    editor.focus();
+    editor.focus({ preventScroll: true });
     return;
   }
   focusUndoShortcutSink();
@@ -170,7 +170,7 @@ function focusEditorForNodeId(nodeId: string): boolean {
   const root = document.querySelector<HTMLElement>(`[data-node-id="${nodeId}"]`);
   const editor = root?.querySelector<HTMLElement>('.ProseMirror');
   if (!editor) return false;
-  editor.focus();
+  editor.focus({ preventScroll: true });
   return true;
 }
 
@@ -479,7 +479,7 @@ export function OutlinerItem({
       }
     }
     return result;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [_version, parentId, parentFieldVisibility]);
 
   // Build field lookup by tuple ID
@@ -513,7 +513,7 @@ export function OutlinerItem({
       getChildNodeType: (id) => useNodeStore.getState().getNode(id)?.type,
       isOutlinerContentType: isOutlinerContentNodeType,
     })
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   ), [allChildIds, fieldMap, tagIds, _version]);
 
   // Template content clone colors: content children with templateId get the owning tagDef's color.
@@ -532,7 +532,7 @@ export function OutlinerItem({
       if (color) map.set(id, [color]);
     }
     return map;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visibleChildren, _version]);
 
   const childIds = useMemo(
@@ -1090,7 +1090,7 @@ export function OutlinerItem({
         const latestUi = useUIStore.getState();
         const ids = [...latestUi.selectedNodeIds];
         // 3-state cycle per node: No → Undone → Done → No (manual)
-        //                         Undone → Done → Undone (tag-driven)
+        //             Undone → Done → Undone (tag-driven)
         for (const id of ids) {
           cycleNodeCheckbox(id);
         }
@@ -1335,7 +1335,7 @@ export function OutlinerItem({
       // old editor unmounts → onBlur fires → would wrongly reset to null.
       const state = useUIStore.getState();
       if (state.focusedNodeId === nodeId &&
-          (state.focusedParentId === null || state.focusedParentId === parentId)) {
+        (state.focusedParentId === null || state.focusedParentId === parentId)) {
         setFocusedNode(null);
       }
     });
@@ -1384,7 +1384,7 @@ export function OutlinerItem({
       return e.clientX <= rect.left + 2 ? 0 : textLength;
     })();
     // Use getRenderedTextRightEdge which walks actual text node Ranges for an
-    // accurate right edge.  The old getStaticNodeContentRightEdge queried the
+    // accurate right edge. The old getStaticNodeContentRightEdge queried the
     // .node-content <span>'s bounding rect which could report the container
     // width rather than the text width, causing first-click tail detection to
     // fail (cursor placed at offset 0 instead of end).
@@ -1397,7 +1397,7 @@ export function OutlinerItem({
       ? textLength
       : textRightEdge === null && forceEndWhenRightBlank
         ? textLength
-      : fallbackOffset;
+        : fallbackOffset;
     const resolvedOffset = offsetFromRightEdge === 0 && forceEndWhenFarRight
       ? textLength
       : offsetFromRightEdge;
@@ -2447,11 +2447,10 @@ export function OutlinerItem({
       <div
         ref={rowRef}
         tabIndex={-1}
-        className={`group/row flex gap-1 min-h-7 items-start py-1 relative ${
-          isDropTarget && dropPosition === 'inside'
-            ? 'bg-primary/10 ring-1 ring-primary/30 rounded-sm'
-            : ''
-        } ${isDragging ? 'opacity-40' : ''} ${hasOverlayOpen ? 'z-[80]' : ''}`}
+        className={`group/row flex gap-1 min-h-6 items-start py-1 relative ${isDropTarget && dropPosition === 'inside'
+          ? 'bg-primary/10 ring-1 ring-primary/30 rounded-sm'
+          : ''
+          } ${isDragging ? 'opacity-40' : ''} ${hasOverlayOpen ? 'z-[80]' : ''}`}
         style={{ paddingLeft: depth * 28 + 6 }}
         data-node-id={nodeId}
         data-parent-id={parentId}
@@ -2490,7 +2489,7 @@ export function OutlinerItem({
             />
           </div>
           {showCheckbox && (
-            <span className="flex shrink-0 h-[21px] w-[15px] items-center justify-center">
+            <span className="flex shrink-0 h-6 w-[15px] items-center justify-center">
               <input
                 type="checkbox"
                 checked={isDone}
@@ -2500,165 +2499,164 @@ export function OutlinerItem({
             </span>
           )}
           <div
-            className={`relative flex-1 min-w-0 ${isPendingConversion ? 'ref-converting' : ''} ${isDone ? 'text-foreground/50' : ''}`}
+            className={`relative flex-1 min-w-0 ${isPendingConversion ? 'ref-converting' : ''} ${isDone ? 'text-foreground/40' : ''}`}
             style={pendingConversionStyle}
           >
-          <div
-            ref={contentAreaRef}
-            className={`text-sm leading-[21px] ${!isCheckboxFieldType(fieldDataType) && !isFocused ? (isReferenceLikeRow ? 'cursor-default' : 'cursor-text') : ''}`}
-            onMouseDown={!isCheckboxFieldType(fieldDataType) ? (isFocused ? handleFocusedContentMouseDown : handleContentMouseDown) : undefined}
-            onClick={!isCheckboxFieldType(fieldDataType) && !isFocused ? handleContentClick : undefined}
-            onDoubleClick={!isCheckboxFieldType(fieldDataType) && !isFocused && isReference && !isOptionsValueNode ? handleContentDoubleClick : undefined}
-          >
-            {isCheckboxFieldType(fieldDataType) ? (
-              <input
-                type="checkbox"
-                checked={node.name === SYS_V.YES}
-                onChange={(e) => {
-                  setNodeName(nodeId, e.target.checked ? SYS_V.YES : SYS_V.NO);
-                }}
-                className="mt-[3px] h-3.5 w-3.5 rounded border-border accent-primary cursor-pointer"
-              />
-            ) : isFocused ? (
-              <RichTextEditor
-                nodeId={nodeId}
-                parentId={parentId}
-                initialText={nodeText}
-                initialMarks={nodeMarks}
-                initialInlineRefs={nodeInlineRefs}
-                onBlur={handleBlur}
-                onEnter={handleEnter}
-                onIndent={handleIndent}
-                onOutdent={handleOutdent}
-                onDelete={handleDelete}
-                onBackspaceAtStart={handleBackspaceAtStart}
-                onBackspaceAtEndSingleInlineRef={handleBackspaceAtEndSingleInlineRef}
-                onArrowUp={handleArrowUp}
-                onArrowDown={handleArrowDown}
-                onMoveUp={handleMoveUp}
-                onMoveDown={handleMoveDown}
-                onHashTag={handleHashTag}
-                onHashTagDeactivate={handleHashTagDeactivate}
-                hashTagActive={hashTagOpen}
-                onHashTagConfirm={handleHashTagConfirm}
-                onHashTagNavDown={handleHashTagNavDown}
-                onHashTagNavUp={handleHashTagNavUp}
-                onHashTagCreate={handleHashTagForceCreate}
-                onHashTagClose={handleHashTagClose}
-                onFieldTriggerFire={handleFieldTriggerFire}
-                editorRef={editorRef}
-                onReference={handleReference}
-                onReferenceDeactivate={handleReferenceDeactivate}
-                referenceActive={refOpen}
-                onReferenceConfirm={handleReferenceConfirm}
-                onReferenceNavDown={handleReferenceNavDown}
-                onReferenceNavUp={handleReferenceNavUp}
-                onReferenceCreate={handleReferenceForceCreate}
-                onReferenceClose={handleReferenceClose}
-                onSlashCommand={handleSlashCommand}
-                onSlashCommandDeactivate={handleSlashDeactivate}
-                slashActive={slashOpen}
-                onSlashConfirm={handleSlashConfirm}
-                onSlashNavDown={handleSlashNavDown}
-                onSlashNavUp={handleSlashNavUp}
-                onSlashClose={closeSlashMenu}
-                onDescriptionEdit={handleDescriptionEdit}
-                onToggleDone={handleCycleCheckbox}
-                onEscapeSelect={handleEscapeSelect}
-                onShiftArrow={handleShiftArrow}
-                onSelectAll={handleSelectAll}
-              />
-            ) : (
-              <span
-                className="node-content"
-                dangerouslySetInnerHTML={{ __html: nodeContentHtml || '&nbsp;' }}
+            <div
+              ref={contentAreaRef}
+              className={`text-[15px] leading-6 ${!isCheckboxFieldType(fieldDataType) && !isFocused ? (isReferenceLikeRow ? 'cursor-default' : 'cursor-text') : ''}`}
+              onMouseDown={!isCheckboxFieldType(fieldDataType) ? (isFocused ? handleFocusedContentMouseDown : handleContentMouseDown) : undefined}
+              onClick={!isCheckboxFieldType(fieldDataType) && !isFocused ? handleContentClick : undefined}
+              onDoubleClick={!isCheckboxFieldType(fieldDataType) && !isFocused && isReference && !isOptionsValueNode ? handleContentDoubleClick : undefined}
+            >
+              {isCheckboxFieldType(fieldDataType) ? (
+                <input
+                  type="checkbox"
+                  checked={node.name === SYS_V.YES}
+                  onChange={(e) => {
+                    setNodeName(nodeId, e.target.checked ? SYS_V.YES : SYS_V.NO);
+                  }}
+                  className="mt-[3px] h-3.5 w-3.5 rounded border-border accent-primary cursor-pointer"
+                />
+              ) : isFocused ? (
+                <RichTextEditor
+                  nodeId={nodeId}
+                  parentId={parentId}
+                  initialText={nodeText}
+                  initialMarks={nodeMarks}
+                  initialInlineRefs={nodeInlineRefs}
+                  onBlur={handleBlur}
+                  onEnter={handleEnter}
+                  onIndent={handleIndent}
+                  onOutdent={handleOutdent}
+                  onDelete={handleDelete}
+                  onBackspaceAtStart={handleBackspaceAtStart}
+                  onBackspaceAtEndSingleInlineRef={handleBackspaceAtEndSingleInlineRef}
+                  onArrowUp={handleArrowUp}
+                  onArrowDown={handleArrowDown}
+                  onMoveUp={handleMoveUp}
+                  onMoveDown={handleMoveDown}
+                  onHashTag={handleHashTag}
+                  onHashTagDeactivate={handleHashTagDeactivate}
+                  hashTagActive={hashTagOpen}
+                  onHashTagConfirm={handleHashTagConfirm}
+                  onHashTagNavDown={handleHashTagNavDown}
+                  onHashTagNavUp={handleHashTagNavUp}
+                  onHashTagCreate={handleHashTagForceCreate}
+                  onHashTagClose={handleHashTagClose}
+                  onFieldTriggerFire={handleFieldTriggerFire}
+                  editorRef={editorRef}
+                  onReference={handleReference}
+                  onReferenceDeactivate={handleReferenceDeactivate}
+                  referenceActive={refOpen}
+                  onReferenceConfirm={handleReferenceConfirm}
+                  onReferenceNavDown={handleReferenceNavDown}
+                  onReferenceNavUp={handleReferenceNavUp}
+                  onReferenceCreate={handleReferenceForceCreate}
+                  onReferenceClose={handleReferenceClose}
+                  onSlashCommand={handleSlashCommand}
+                  onSlashCommandDeactivate={handleSlashDeactivate}
+                  slashActive={slashOpen}
+                  onSlashConfirm={handleSlashConfirm}
+                  onSlashNavDown={handleSlashNavDown}
+                  onSlashNavUp={handleSlashNavUp}
+                  onSlashClose={closeSlashMenu}
+                  onDescriptionEdit={handleDescriptionEdit}
+                  onToggleDone={handleCycleCheckbox}
+                  onEscapeSelect={handleEscapeSelect}
+                  onShiftArrow={handleShiftArrow}
+                  onSelectAll={handleSelectAll}
+                />
+              ) : (
+                <span
+                  className="node-content"
+                  dangerouslySetInnerHTML={{ __html: nodeContentHtml || '&nbsp;' }}
+                />
+              )}
+              {hasTags && (
+                <span className="inline-flex align-middle ml-1.5" onClick={(e) => e.stopPropagation()}>
+                  <TagBar nodeId={effectiveNodeId} />
+                </span>
+              )}
+            </div>
+            {/* Description: gray text below name */}
+            {(description || editingDescription) && (
+              <div
+                ref={editingDescription ? descriptionRef : undefined}
+                contentEditable={editingDescription}
+                suppressContentEditableWarning
+                className={`text-xs leading-[15px] min-h-[15px] text-foreground-tertiary cursor-text ${editingDescription ? 'outline-none' : ''}`}
+                onMouseDown={!editingDescription ? handleDescriptionMouseDown : undefined}
+                onBlur={editingDescription ? handleDescriptionBlur : undefined}
+                onKeyDown={editingDescription ? handleDescriptionKeyDown : undefined}
+              >
+                {!editingDescription && description}
+              </div>
+            )}
+            {hashTagOpen && isFocused && (
+              <TagSelector
+                ref={tagDropdownRef}
+                open={hashTagOpen}
+                onSelect={handleHashTagSelect}
+                onCreateNew={handleHashTagCreateNew}
+                existingTagIds={tagIds}
+                query={hashTagQuery}
+                selectedIndex={hashTagSelectedIndex}
+                anchor={hashTagAnchor}
               />
             )}
-            {hasTags && (
-              <span className="inline-flex align-[0.125em] ml-1.5" onClick={(e) => e.stopPropagation()}>
-                <TagBar nodeId={effectiveNodeId} />
-              </span>
+            {refOpen && isFocused && (
+              <ReferenceSelector
+                ref={refDropdownRef}
+                open={refOpen}
+                onSelect={handleReferenceSelect}
+                onCreateNew={handleReferenceCreateNew}
+                query={refQuery}
+                selectedIndex={refSelectedIndex}
+                currentNodeId={nodeId}
+                treeReferenceParentId={refTreeContextParentId}
+                anchor={refAnchor}
+              />
+            )}
+            {slashOpen && isFocused && (
+              <SlashCommandMenu
+                open={slashOpen}
+                commands={filteredSlashCommands}
+                selectedIndex={slashSelectedIndex}
+                onSelect={executeSlashCommand}
+                anchor={slashAnchor}
+              />
             )}
           </div>
-          {/* Description: gray text below name */}
-          {(description || editingDescription) && (
+          {/* Options picker dropdown: shown when selecting an Options value row/reference */}
+          {optionsPickerOpen && allFieldOptions.length > 0 && (
             <div
-              ref={editingDescription ? descriptionRef : undefined}
-              contentEditable={editingDescription}
-              suppressContentEditableWarning
-              className={`text-xs leading-[15px] min-h-[15px] text-foreground-tertiary cursor-text ${editingDescription ? 'outline-none' : ''}`}
-              onMouseDown={!editingDescription ? handleDescriptionMouseDown : undefined}
-              onBlur={editingDescription ? handleDescriptionBlur : undefined}
-              onKeyDown={editingDescription ? handleDescriptionKeyDown : undefined}
+              className="absolute left-0 top-full mt-0.5 max-h-48 w-56 overflow-y-auto rounded-lg border border-border bg-surface p-1 "
+              style={{ zIndex: FIELD_OVERLAY_Z_INDEX }}
             >
-              {!editingDescription && description}
-            </div>
-          )}
-          {hashTagOpen && isFocused && (
-            <TagSelector
-              ref={tagDropdownRef}
-              open={hashTagOpen}
-              onSelect={handleHashTagSelect}
-              onCreateNew={handleHashTagCreateNew}
-              existingTagIds={tagIds}
-              query={hashTagQuery}
-              selectedIndex={hashTagSelectedIndex}
-              anchor={hashTagAnchor}
-            />
-          )}
-          {refOpen && isFocused && (
-            <ReferenceSelector
-              ref={refDropdownRef}
-              open={refOpen}
-              onSelect={handleReferenceSelect}
-              onCreateNew={handleReferenceCreateNew}
-              query={refQuery}
-              selectedIndex={refSelectedIndex}
-              currentNodeId={nodeId}
-              treeReferenceParentId={refTreeContextParentId}
-              anchor={refAnchor}
-            />
-          )}
-          {slashOpen && isFocused && (
-            <SlashCommandMenu
-              open={slashOpen}
-              commands={filteredSlashCommands}
-              selectedIndex={slashSelectedIndex}
-              onSelect={executeSlashCommand}
-              anchor={slashAnchor}
-            />
-          )}
-        </div>
-        {/* Options picker dropdown: shown when selecting an Options value row/reference */}
-        {optionsPickerOpen && allFieldOptions.length > 0 && (
-          <div
-            className="absolute left-0 top-full mt-0.5 max-h-48 w-56 overflow-y-auto rounded-lg border border-border bg-surface p-1 shadow-lg"
-            style={{ zIndex: FIELD_OVERLAY_Z_INDEX }}
-          >
-            {allFieldOptions.map((opt, i) => (
-              <div
-                key={opt.id}
-                className={`flex cursor-pointer items-center gap-2 rounded-md px-2 py-1 text-sm ${
-                  opt.id === selectedOptionId
+              {allFieldOptions.map((opt, i) => (
+                <div
+                  key={opt.id}
+                  className={`flex cursor-pointer items-center gap-2 rounded-md px-2 py-1 text-sm ${opt.id === selectedOptionId
                     ? 'bg-primary text-primary-foreground'
                     : i === optionsPickerIndex
                       ? 'bg-accent text-accent-foreground'
                       : 'text-popover-foreground hover:bg-accent/50'
-                }`}
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={() => {
-                  if (opt.id !== selectedOptionId) {
-                    selectFieldOption(parentId, opt.id, nodeId);
-                  }
-                  setSelectedNode(null);
-                }}
-              >
-                <span className="h-[5px] w-[5px] shrink-0 rounded-full bg-foreground/40" />
-                <span className="truncate">{opt.name}</span>
-              </div>
-            ))}
-          </div>
-        )}
+                    }`}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => {
+                    if (opt.id !== selectedOptionId) {
+                      selectFieldOption(parentId, opt.id, nodeId);
+                    }
+                    setSelectedNode(null);
+                  }}
+                >
+                  <span className="h-[5px] w-[5px] shrink-0 rounded-full bg-foreground/40" />
+                  <span className="truncate">{opt.name}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>{/* close selection/contents wrapper */}
       </div>
       {/* Drop indicator: after */}
@@ -2667,6 +2665,34 @@ export function OutlinerItem({
           className="h-0.5 bg-primary rounded-full"
           style={{ marginLeft: depth * 28 + 6 + 15 + 4 }}
         />
+      )}
+      {/* Indent guide line — moved to root relative container so it spans multi-line parent texts */}
+      {isExpanded && !isCyclicReferenceExpansion && (
+        <button
+          className="indent-line absolute bottom-0 z-10 cursor-pointer"
+          style={{ top: 24, left: depth * 28 + 17, width: 16 }}
+          tabIndex={-1}
+          onPointerDown={(e) => {
+            captureStructuralToggleFocusSnapshot();
+            e.preventDefault();
+          }}
+          onMouseDown={(e) => {
+            // Keep focus on the editor/page instead of this button so Cmd+Z still reaches
+            // unified undo handlers immediately after expand/collapse clicks.
+            e.preventDefault();
+          }}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            handleIndentLineClick();
+          }}
+          title={t('outliner.toggleChildren')}
+        >
+          <div
+            className="indent-line-inner absolute top-0 bottom-0 w-[1px] rounded-full bg-border-subtle group-hover/outliner-item:bg-border hover:!bg-border-emphasis transition-all duration-150"
+            style={{ left: 15.5, transform: 'translateX(-50%)' }}
+          />
+        </button>
       )}
       {isExpanded && !isCyclicReferenceExpansion && (
         <div className="relative" data-row-scope-parent-id={nodeId} ref={childrenScopeRef}>
@@ -2677,40 +2703,13 @@ export function OutlinerItem({
               style={{ left: depth * 28 + 6 + 15, top: -1, bottom: 1 }}
             />
           )}
-          {/* Indent guide line — 16px click area LEFT of bullet center.
-               Parent bullet center = depth*28 + 32.5.
-               Button right edge at depth*28+33 (1px gap to child ChevronButton at depth*28+34).
-               Visual line at right edge via justify-end, centered at ~32.5.
-               No overlap with child chevron/bullet hover zones. */}
-          <button
-            className="indent-line absolute top-0 bottom-0 z-10 flex justify-end cursor-pointer"
-            style={{ left: depth * 28 + 17, width: 16 }}
-            tabIndex={-1}
-            onPointerDown={(e) => {
-              captureStructuralToggleFocusSnapshot();
-              e.preventDefault();
-            }}
-            onMouseDown={(e) => {
-              // Keep focus on the editor/page instead of this button so Cmd+Z still reaches
-              // unified undo handlers immediately after expand/collapse clicks.
-              e.preventDefault();
-            }}
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              handleIndentLineClick();
-            }}
-            title={t('outliner.toggleChildren')}
-          >
-            <div className="indent-line-inner w-px h-full bg-border rounded-full" />
-          </button>
           {/* Hidden field pills: compact clickable chips to temporarily reveal hidden fields */}
           {hiddenRevealableFields.length > 0 && hiddenRevealableFields.some(f => !revealedFieldIds.has(f.id)) && (
-            <div className="flex flex-wrap gap-x-3 min-h-7 items-center" style={{ paddingLeft: (depth + 1) * 28 + 6 + 15 + 4 }}>
+            <div className="flex flex-wrap gap-x-3 min-h-6 items-center" style={{ paddingLeft: (depth + 1) * 28 + 6 + 15 + 4 }}>
               {hiddenRevealableFields.filter(f => !revealedFieldIds.has(f.id)).map(f => (
                 <button
                   key={f.id}
-                  className="flex items-center gap-0.5 h-7 text-xs text-foreground-tertiary hover:text-foreground-secondary transition-colors cursor-pointer"
+                  className="flex items-center gap-0.5 h-6 text-xs text-foreground-tertiary hover:text-foreground-secondary transition-colors cursor-pointer"
                   onClick={() => setRevealedFieldIds(prev => new Set(prev).add(f.id))}
                   title={t('outliner.showField', { name: f.name })}
                 >

@@ -34,6 +34,7 @@ import { t } from '../../i18n/strings.js';
 interface BreadcrumbProps {
   nodeId: string;
   showCurrentName?: boolean;
+  compact?: boolean;
 }
 
 export function resolveWorkspaceRootTargetId(params: {
@@ -46,7 +47,7 @@ export function resolveWorkspaceRootTargetId(params: {
   return CONTAINER_IDS.LIBRARY;
 }
 
-export function Breadcrumb({ nodeId, showCurrentName }: BreadcrumbProps) {
+export function Breadcrumb({ nodeId, showCurrentName, compact }: BreadcrumbProps) {
   const navigateTo = useUIStore((s) => s.navigateTo);
 
   const { ancestors, workspaceRootId } = useAncestors(nodeId);
@@ -109,16 +110,7 @@ export function Breadcrumb({ nodeId, showCurrentName }: BreadcrumbProps) {
     : [];
 
   return (
-    <div className="flex h-8 items-center gap-0.5 pl-[6px] pr-3 mt-1 text-xs text-foreground-tertiary overflow-hidden">
-      {/* ← button: navigate to parent, or disabled placeholder at root */}
-      <button
-        onClick={canGoUp ? handleGoUp : undefined}
-        disabled={!canGoUp}
-        className="flex h-5 w-[15px] shrink-0 items-center justify-center rounded-md hover:text-foreground disabled:pointer-events-none disabled:opacity-30"
-        title={canGoUp ? t('breadcrumb.goToParent') : undefined}
-      >
-        <ChevronLeft size={14} strokeWidth={1.5} />
-      </button>
+    <div className={`flex items-center gap-1 pl-4 pr-3 text-[13px] text-foreground-tertiary overflow-hidden ${compact ? '' : 'h-8 mt-1'}`}>
 
       {/* Root view: only show toolbar (sidebar toggle + search), no breadcrumb content */}
       {!isRootView && (
@@ -129,7 +121,7 @@ export function Breadcrumb({ nodeId, showCurrentName }: BreadcrumbProps) {
           {!!wsId && (
             <button
               onClick={handleNavigateToWorkspaceRoot}
-              className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/15 text-[10px] font-semibold text-primary hover:bg-primary/20"
+              className="flex h-5 w-5 shrink-0 items-center justify-center rounded-[4px] bg-primary/15 text-[11px] font-semibold text-primary hover:bg-primary/20"
               title={t('breadcrumb.goToWorkspaceRoot')}
             >
               {wsInitial}

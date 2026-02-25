@@ -51,8 +51,8 @@ export function FieldNameInput({
   // Filter suggestions: exclude current attrDefId, match by typed text
   const suggestions = value.trim()
     ? allFields.filter(
-        (f) => f.id !== attrDefId && f.name.toLowerCase().includes(value.toLowerCase()),
-      ).slice(0, 5)
+      (f) => f.id !== attrDefId && f.name.toLowerCase().includes(value.toLowerCase()),
+    ).slice(0, 5)
     : [];
 
   // Auto-focus + position cursor at click point (or end if no click offset)
@@ -200,11 +200,11 @@ export function FieldNameInput({
   );
 
   return (
-    <div ref={containerRef} className="relative h-[22px]">
+    <div ref={containerRef} className="relative h-6">
       <input
         ref={inputRef}
         type="text"
-        className="block w-full bg-transparent text-sm text-foreground outline-none border-0 py-0 px-0 m-0 h-[22px] leading-[22px]"
+        className="block w-full bg-transparent text-[15px] text-foreground outline-none border-0 py-0 px-0 m-0 h-6 leading-6"
         placeholder={t('field.fieldNamePlaceholder')}
         value={value}
         onChange={(e) => {
@@ -215,13 +215,12 @@ export function FieldNameInput({
         onKeyDown={handleKeyDown}
       />
       {suggestions.length > 0 && (
-        <div className="absolute left-0 top-full z-50 mt-0.5 w-[180px] bg-popover border border-border rounded-lg shadow-lg p-1 text-sm">
+        <div className="absolute left-0 top-full z-50 mt-0.5 w-[180px] bg-popover border border-border rounded-lg p-1 text-sm">
           {suggestions.map((s, i) => (
             <button
               key={s.id}
-              className={`w-full text-left rounded-md px-2 py-1 truncate ${
-                i === selectedIndex ? 'bg-accent text-accent-foreground' : 'text-foreground hover:bg-foreground/5'
-              }`}
+              className={`w-full text-left rounded-md px-2 py-1 truncate ${i === selectedIndex ? 'bg-accent text-accent-foreground' : 'text-foreground hover:bg-foreground/4'
+                }`}
               onMouseDown={(e) => {
                 e.preventDefault(); // prevent blur
                 selectSuggestion(s.id);

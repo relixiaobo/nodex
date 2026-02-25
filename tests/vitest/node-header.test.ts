@@ -84,7 +84,6 @@ describe('NodeHeader block visibility logic', () => {
       const color = resolveTagColor(TAG_DEF_TASK);
       expect(color).toBeDefined();
       expect(color.text).toBeTruthy();
-      expect(color.bg).toBeTruthy();
     });
 
     it('fieldDef nodes resolve a structural icon', () => {

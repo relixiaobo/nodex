@@ -1,7 +1,7 @@
 /**
  * Date navigation bar — shown below NodePanelHeader when viewing a day node.
  *
- * Layout: [<] [>]  Today  [Calendar icon → date picker popover]
+ * Layout: [<] [>] Today [Calendar icon → date picker popover]
  *
  * - < > buttons: navigate to previous/next day
  * - Today button: jump to today's day node
@@ -132,67 +132,64 @@ export function DateNavigationBar({ dayNodeId }: DateNavigationBarProps) {
   }, [navigateTo]);
 
   return (
-    <div className="relative py-1 text-xs text-foreground-secondary" style={{ paddingLeft: 25 }} ref={calendarRef}>
-      <div className="inline-flex items-center gap-1.5">
-        {/* Group 1: [<|>] */}
-        <div className="inline-flex items-center gap-px rounded-md overflow-hidden">
-          <button
-            onClick={handlePrevDay}
-            className="flex h-6 w-6 items-center justify-center bg-foreground/[0.05] hover:bg-foreground/[0.09] transition-colors"
-            title={t('dateNavigationBar.previousDay')}
-          >
-            <ChevronLeft size={13} strokeWidth={1.5} />
-          </button>
-          <button
-            onClick={handleNextDay}
-            className="flex h-6 w-6 items-center justify-center bg-foreground/[0.05] hover:bg-foreground/[0.09] transition-colors"
-            title={t('dateNavigationBar.nextDay')}
-          >
-            <ChevronRight size={13} strokeWidth={1.5} />
-          </button>
-        </div>
-
-        {/* Group 2: [Today|Calendar] */}
-        <div className="inline-flex items-center gap-px rounded-md overflow-hidden">
-          <button
-            onClick={handleToday}
-            className="flex h-6 items-center px-2 text-xs font-medium bg-foreground/[0.05] hover:bg-foreground/[0.09] transition-colors"
-            title={t('dateNavigationBar.goToToday')}
-          >
-            {t('dateNavigationBar.today')}
-          </button>
-          <button
-            onClick={handleToggleCalendar}
-            className={`flex h-6 w-6 items-center justify-center transition-colors ${
-              calendarOpen
-                ? 'bg-foreground/[0.12] text-foreground'
-                : 'bg-foreground/[0.05] hover:bg-foreground/[0.09]'
-            }`}
-            title={t('dateNavigationBar.pickDate')}
-          >
-            <Calendar size={12} />
-          </button>
-        </div>
+    <div className="relative my-1.5 text-[11px] text-foreground-secondary flex items-center" style={{ paddingLeft: 32 }} ref={calendarRef}>
+      <div className="inline-flex items-center gap-1">
+        <button
+          onClick={handlePrevDay}
+          className="flex h-6 w-6 items-center justify-center rounded-full text-foreground-tertiary hover:bg-foreground/4 hover:text-foreground transition-all"
+          title={t('dateNavigationBar.previousDay')}
+        >
+          <ChevronLeft size={13} strokeWidth={1.5} />
+        </button>
+        <button
+          onClick={handleToday}
+          className="flex h-6 items-center px-2.5 rounded-full font-medium text-foreground-tertiary hover:bg-foreground/4 hover:text-foreground transition-all"
+          title={t('dateNavigationBar.goToToday')}
+        >
+          {t('dateNavigationBar.today')}
+        </button>
+        <button
+          onClick={handleNextDay}
+          className="flex h-6 w-6 items-center justify-center rounded-full text-foreground-tertiary hover:bg-foreground/4 hover:text-foreground transition-all"
+          title={t('dateNavigationBar.nextDay')}
+        >
+          <ChevronRight size={13} strokeWidth={1.5} />
+        </button>
       </div>
 
+      {/* 细视觉分隔竖线 */}
+      <div className="ml-1.5 w-px h-2.5 bg-border-faint" />
+
+      <button
+        onClick={handleToggleCalendar}
+        className={`ml-1.5 flex h-6 w-6 items-center justify-center rounded-full transition-all ${calendarOpen
+          ? 'bg-foreground/[0.08] text-foreground'
+          : 'text-foreground-tertiary hover:bg-foreground/4 hover:text-foreground'
+          }`}
+        title={t('dateNavigationBar.pickDate')}
+      >
+        <Calendar size={13} strokeWidth={1.5} />
+      </button>
       {/* Calendar popover — left-aligned with bar padding, stays within panel */}
-      {calendarOpen && (
-        <div
-          className="absolute top-full z-50 mt-1 w-[252px] rounded-lg border border-border bg-popover shadow-lg p-3"
-          style={{ left: 25 }}
-          onMouseDown={(e) => e.stopPropagation()}
-        >
-          <CalendarGrid
-            viewYear={viewYear}
-            viewMonth={viewMonth}
-            onViewChange={(y, m) => { setViewYear(y); setViewMonth(m); }}
-            selectedDate={currentDateInfo?.dateStr ?? todayStr}
-            onSelectDate={handleCalendarSelect}
-            today={todayStr}
-            noteCountMap={noteCountMap}
-          />
-        </div>
-      )}
-    </div>
+      {
+        calendarOpen && (
+          <div
+            className="absolute top-full z-50 mt-1 w-[252px] rounded-lg border border-border bg-popover p-3"
+            style={{ left: 25 }}
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <CalendarGrid
+              viewYear={viewYear}
+              viewMonth={viewMonth}
+              onViewChange={(y, m) => { setViewYear(y); setViewMonth(m); }}
+              selectedDate={currentDateInfo?.dateStr ?? todayStr}
+              onSelectDate={handleCalendarSelect}
+              today={todayStr}
+              noteCountMap={noteCountMap}
+            />
+          </div>
+        )
+      }
+    </div >
   );
 }

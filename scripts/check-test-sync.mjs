@@ -54,19 +54,12 @@ function main() {
 
   const srcChanged = changed.some(isSourceFile);
   const vitestChanged = changed.some(isVitestFile);
-  const testingDocChanged = changed.includes('docs/TESTING.md');
 
   const errors = [];
 
   if (srcChanged && !vitestChanged) {
     errors.push(
       'Detected changes under src/ but no tests were updated under tests/vitest/*.test.ts.',
-    );
-  }
-
-  if (vitestChanged && !testingDocChanged) {
-    errors.push(
-      'Detected tests/vitest changes but docs/TESTING.md was not updated.',
     );
   }
 

@@ -74,6 +74,7 @@ function getEditorText(view: EditorView): string {
 
 export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fieldDataType, attrDefId, onNavigateOut }: TrailingInputProps) {
   const createChild = useNodeStore((s) => s.createChild);
+  const cycleNodeCheckbox = useNodeStore((s) => s.cycleNodeCheckbox);
   const addUnnamedFieldToNode = useNodeStore((s) => s.addUnnamedFieldToNode);
   const setExpanded = useUIStore((s) => s.setExpanded);
   const setFocusedNode = useUIStore((s) => s.setFocusedNode);
@@ -119,7 +120,7 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
   }, [isOptions, optionsOpen, optionsQuery, allOptions]);
 
   const callbacksRef = useRef({
-    createChild, addUnnamedFieldToNode, addReference, selectFieldOption,
+    createChild, cycleNodeCheckbox, addUnnamedFieldToNode, addReference, selectFieldOption,
     parentId, effectiveParentId, effectiveDepth, effectiveParentEK,
     setEffectiveParentId, setEffectiveDepth, setEffectiveParentEK,
     setExpanded, setFocusedNode, setFocusClickCoords, setEditingFieldName, setTriggerHint,
@@ -128,7 +129,7 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
     onNavigateOut,
   });
   callbacksRef.current = {
-    createChild, addUnnamedFieldToNode, addReference, selectFieldOption,
+    createChild, cycleNodeCheckbox, addUnnamedFieldToNode, addReference, selectFieldOption,
     parentId, effectiveParentId, effectiveDepth, effectiveParentEK,
     setEffectiveParentId, setEffectiveDepth, setEffectiveParentEK,
     setExpanded, setFocusedNode, setFocusClickCoords, setEditingFieldName, setTriggerHint,
@@ -347,6 +348,30 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
           }
           return false;
         },
+        // Cmd+Enter: commit text + toggle checkbox on the new node
+        'Mod-Enter': (_state, _dispatch, view) => {
+          if (!view || isComposing(view)) return false;
+          if (committingRef.current) return true;
+          const ref = callbacksRef.current;
+          const rawText = getEditorText(view);
+
+          committingRef.current = true;
+          resetEditorContent(view);
+          setHasContent(false);
+          ref.setOptionsOpen(false);
+
+          const newNode = ref.createChild(ref.effectiveParentId, undefined, { name: rawText });
+          ref.setExpanded(ref.effectiveParentEK, true, true);
+          ref.cycleNodeCheckbox(newNode.id);
+          ref.setFocusClickCoords({
+            nodeId: newNode.id,
+            parentId: ref.effectiveParentId,
+            textOffset: rawText.length,
+          });
+          ref.setFocusedNode(newNode.id, ref.effectiveParentId);
+          queueMicrotask(() => { committingRef.current = false; });
+          return true;
+        },
         // Undo/Redo — route to Loro UndoManager (same as RichTextEditor)
         'Mod-z': () => { undoDoc(); return true; },
         'Mod-y': () => { redoDoc(); return true; },
@@ -426,6 +451,20 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
             textOffset: action.textOffset,
           });
           ref.setFocusedNode(triggerNode.id, ref.effectiveParentId);
+
+          // Safety: clear stale triggerHint if not consumed within 2 frames.
+          // The hint is normally consumed by OutlinerItem's isFocused effect,
+          // but if the new node doesn't render/mount in time, we must not leave
+          // a stale hint that the next focused node would incorrectly pick up.
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              const store = useUIStore.getState();
+              if (store.triggerHint === action.trigger) {
+                store.setTriggerHint(null);
+              }
+            });
+          });
+
           queueMicrotask(() => { committingRef.current = false; });
           return;
         }

@@ -254,6 +254,23 @@ export function RichTextEditor(props: RichTextEditorProps) {
           setToolbarTick((value) => value + 1);
         }
       }
+
+      // --- Sync trigger state for TrailingInput-created trigger nodes ---
+      // When TrailingInput creates a node with # / @ / /, OutlinerItem opens the
+      // dropdown via triggerHint, but the editor's internal triggerStateRef hasn't
+      // been activated. Sync the flags here so deactivation and cmd+enter work.
+      // The full detection with anchor update runs from the useEffect fallback.
+      const ts = triggerStateRef.current;
+      if (
+        (propsRef.current.hashTagActive && !ts.hashActive) ||
+        (propsRef.current.referenceActive && !ts.referenceActive) ||
+        (propsRef.current.slashActive && !ts.slashActive)
+      ) {
+        ts.hasUserEdited = true;
+        if (propsRef.current.hashTagActive) ts.hashActive = true;
+        if (propsRef.current.referenceActive) ts.referenceActive = true;
+        if (propsRef.current.slashActive) ts.slashActive = true;
+      }
     });
   }, []);
 
@@ -272,7 +289,9 @@ export function RichTextEditor(props: RichTextEditorProps) {
       const hashStart = from - hashMatch[0].length;
       propsRef.current.onHashTag?.(query, hashStart, from, getCaretAnchorRect(view, from));
     } else {
-      if (stateRef.hashActive) propsRef.current.onHashTagDeactivate?.();
+      // Also deactivate if the dropdown is open via prop (triggerHint path) but
+      // the editor's internal state was never activated — prevents stale dropdown.
+      if (stateRef.hashActive || propsRef.current.hashTagActive) propsRef.current.onHashTagDeactivate?.();
       stateRef.hashActive = false;
     }
 
@@ -283,7 +302,7 @@ export function RichTextEditor(props: RichTextEditorProps) {
       const atStart = from - refMatch[0].length;
       propsRef.current.onReference?.(query, atStart, from, getCaretAnchorRect(view, from));
     } else {
-      if (stateRef.referenceActive) propsRef.current.onReferenceDeactivate?.();
+      if (stateRef.referenceActive || propsRef.current.referenceActive) propsRef.current.onReferenceDeactivate?.();
       stateRef.referenceActive = false;
     }
 
@@ -303,7 +322,7 @@ export function RichTextEditor(props: RichTextEditorProps) {
       const slashStart = from - (query.length + 1);
       propsRef.current.onSlashCommand?.(query, slashStart, from, getCaretAnchorRect(view, from));
     } else {
-      if (stateRef.slashActive) propsRef.current.onSlashCommandDeactivate?.();
+      if (stateRef.slashActive || propsRef.current.slashActive) propsRef.current.onSlashCommandDeactivate?.();
       stateRef.slashActive = false;
     }
 
@@ -316,6 +335,37 @@ export function RichTextEditor(props: RichTextEditorProps) {
       }
     }
   }, []);
+
+  // Sync trigger state when OutlinerItem opens a dropdown via triggerHint but
+  // the editor's internal state hasn't been activated (TrailingInput path).
+  // This is a fallback for timing cases where the rAF in syncInitialFocus
+  // fires before the trigger hint effect has propagated the prop change.
+  useEffect(() => {
+    const view = viewRef.current;
+    if (!view || view.isDestroyed) return;
+    const ts = triggerStateRef.current;
+    let synced = false;
+    if (props.hashTagActive && !ts.hashActive) {
+      ts.hasUserEdited = true;
+      ts.hashActive = true;
+      synced = true;
+    }
+    if (props.referenceActive && !ts.referenceActive) {
+      ts.hasUserEdited = true;
+      ts.referenceActive = true;
+      synced = true;
+    }
+    if (props.slashActive && !ts.slashActive) {
+      ts.hasUserEdited = true;
+      ts.slashActive = true;
+      synced = true;
+    }
+    // If cursor is placed and view has focus, run full detection to update
+    // the dropdown anchor position.
+    if (synced && view.hasFocus()) {
+      runTriggerDetection(view, true);
+    }
+  }, [props.hashTagActive, props.referenceActive, props.slashActive, runTriggerDetection]);
 
   const plugins = useMemo<Plugin[]>(() => {
     const isComposing = (view: EditorView | null | undefined): boolean =>

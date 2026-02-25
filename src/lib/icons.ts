@@ -105,8 +105,6 @@ export {
 // ─── Undo/Redo ─────────────────────────────────────────────────────────────
 
 export {
-  Undo2,
-  Redo2,
   ArrowLeft,
   ArrowRight,
 } from 'lucide-react';

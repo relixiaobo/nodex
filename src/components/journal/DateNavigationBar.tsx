@@ -132,7 +132,7 @@ export function DateNavigationBar({ dayNodeId }: DateNavigationBarProps) {
   }, [navigateTo]);
 
   return (
-    <div className="relative pt-0 pb-1 -mt-1 text-[11px] text-ink-secondary flex items-center" style={{ paddingLeft: 32 }} ref={calendarRef}>
+    <div className="relative my-1.5 text-[11px] text-ink-secondary flex items-center" style={{ paddingLeft: 32 }} ref={calendarRef}>
       <div className="inline-flex items-center gap-1">
         <button
           onClick={handlePrevDay}

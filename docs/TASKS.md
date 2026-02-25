@@ -109,11 +109,11 @@ _(空)_
 - [ ] 4.4 注意：不是所有 `text-sm` 都要改，Dropdown 项、字段标签、辅助信息保持 `text-sm`
 
 **Phase 5: 大纲几何（行高 + 容器）** — ⚠️ 高风险，OutlinerItem 是核心文件
-- [ ] 5.1 `h-7`(28px) → 24px：BulletChevron / DragHandle / OutlinerItem 行容器 / FieldRow / FieldValueOutliner / TrailingInput
-- [ ] 5.2 `min-h-7` → `min-h-6`：OutlinerItem / BacklinksSection / NodeHeader / OutlinerView
-- [ ] 5.3 不改的 h-7：DatePicker 按钮 / FloatingToolbar 按钮 / ToolbarUserMenu 头像
-- [ ] 5.4 按钮圆角 `rounded-md` → `rounded-full`（pill）
-- [ ] 5.5 新增 `--radius-pill: 9999px` 到 main.css @theme
+- [x] 5.1 `h-7`(28px) → 24px：BulletChevron / DragHandle / OutlinerItem 行容器 / FieldRow / FieldValueOutliner / TrailingInput
+- [x] 5.2 `min-h-7` → `min-h-6`：OutlinerItem / BacklinksSection / NodeHeader / OutlinerView
+- [x] 5.3 不改的 h-7：DatePicker 按钮 / FloatingToolbar 按钮 / ToolbarUserMenu 头像
+- [x] 5.4 按钮圆角 `rounded-md` → `rounded-full`（pill）
+- [x] 5.5 新增 `--radius-pill: 9999px` 到 main.css @theme
 
 **Phase 6: Tag Badge 重构（排印化）** — Tag 渲染方式变更
 - [ ] 6.1 `TagBadge.tsx`：移除 `bg-[var(--tag-bg)]`，保留 `color: var(--tag-text)`

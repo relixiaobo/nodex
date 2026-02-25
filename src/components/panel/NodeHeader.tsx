@@ -173,13 +173,13 @@ export function NodeHeader({ nodeId, onTitleRef }: NodeHeaderProps) {
   const showIconBlock = isTagDef || isFieldDef || isWorkspaceRoot || isContainer;
 
   return (
-    <div className="pt-1 pb-1">
+    <div className="pt-1">
       {/* ── Block ①: Icon (conditional) ── */}
       {showIconBlock && (
         <div className="mb-1" style={{ paddingLeft: COL_B_OFFSET }}>
           {isTagDef && tagDefColor && (
             <span
-              className="flex h-8 w-8 items-center justify-center rounded-lg"
+              className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent/60"
             >
               <span
                 className="text-lg font-bold select-none"
@@ -190,7 +190,7 @@ export function NodeHeader({ nodeId, onTitleRef }: NodeHeaderProps) {
             </span>
           )}
           {isFieldDef && FieldIcon && (
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg text-foreground-tertiary">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent/60 text-foreground-tertiary">
               <FieldIcon size={20} />
             </span>
           )}
@@ -200,7 +200,7 @@ export function NodeHeader({ nodeId, onTitleRef }: NodeHeaderProps) {
             </span>
           )}
           {isContainer && ContainerIcon && (
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg text-foreground-tertiary">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent/60 text-foreground-tertiary">
               <ContainerIcon size={20} />
             </span>
           )}

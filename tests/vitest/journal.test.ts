@@ -122,7 +122,7 @@ describe('ensureDateNode', () => {
     loroDoc.setNodeDataBatch('tpl_day_prompt_child', { name: 'Nested template item (not shallow-cloned)' });
     loroDoc.commitDoc('system:test-seed-day-default-content');
 
-    const dayId = ensureDateNode(new Date(2026, 1, 15));
+    const dayId = ensureDateNode(new Date(2030, 6, 2));
     const cloned = loroDoc.getChildren(dayId)
       .map((id) => loroDoc.toNodexNode(id))
       .find((n) => n?.templateId === templateNodeId);

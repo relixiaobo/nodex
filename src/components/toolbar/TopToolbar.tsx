@@ -26,12 +26,10 @@ export function TopToolbar() {
 
       {/* Region B: Global Tools (Undo/Redo, Search, User)
           - Right aligned */}
-      <div className="flex items-center gap-4 text-foreground-tertiary px-1">
+      <div className="flex items-center gap-1 text-foreground-tertiary px-1">
         <UndoRedoButtons />
-        <div className="flex items-center gap-1">
-          <SearchTrigger />
-          <ToolbarUserMenu />
-        </div>
+        <SearchTrigger />
+        <ToolbarUserMenu />
       </div>
     </div>
   );

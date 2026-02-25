@@ -6,7 +6,7 @@ import { ArrowLeft, ArrowRight } from '../../lib/icons.js';
 
 export function UndoRedoButtons() {
   return (
-    <div className="flex items-center gap-0.5">
+    <div className="flex items-center gap-1">
       <button
         disabled
         className="flex h-7 w-7 items-center justify-center rounded-full text-foreground-tertiary transition-colors hover:bg-foreground/4 hover:text-foreground-secondary disabled:pointer-events-none disabled:opacity-40"

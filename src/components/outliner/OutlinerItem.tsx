@@ -117,7 +117,7 @@ function focusTrailingInputForParent(parentId: string): boolean {
     if (root.dataset.trailingParentId !== parentId) continue;
     const editor = root.querySelector<HTMLElement>('.ProseMirror');
     if (!editor) continue;
-    editor.focus();
+    editor.focus({ preventScroll: true });
     return true;
   }
   return false;
@@ -126,7 +126,7 @@ function focusTrailingInputForParent(parentId: string): boolean {
 function focusRowUndoTarget(row: HTMLElement | null): void {
   const editor = row?.querySelector<HTMLElement>('.ProseMirror');
   if (editor) {
-    editor.focus();
+    editor.focus({ preventScroll: true });
     return;
   }
   focusUndoShortcutSink();
@@ -170,7 +170,7 @@ function focusEditorForNodeId(nodeId: string): boolean {
   const root = document.querySelector<HTMLElement>(`[data-node-id="${nodeId}"]`);
   const editor = root?.querySelector<HTMLElement>('.ProseMirror');
   if (!editor) return false;
-  editor.focus();
+  editor.focus({ preventScroll: true });
   return true;
 }
 
@@ -2489,7 +2489,7 @@ export function OutlinerItem({
             />
           </div>
           {showCheckbox && (
-            <span className="flex shrink-0 h-[18px] w-[15px] items-center justify-center">
+            <span className="flex shrink-0 h-6 w-[15px] items-center justify-center">
               <input
                 type="checkbox"
                 checked={isDone}
@@ -2574,7 +2574,7 @@ export function OutlinerItem({
                 />
               )}
               {hasTags && (
-                <span className="inline-flex align-baseline relative -top-[1.5px] ml-1.5" onClick={(e) => e.stopPropagation()}>
+                <span className="inline-flex align-middle ml-1.5" onClick={(e) => e.stopPropagation()}>
                   <TagBar nodeId={effectiveNodeId} />
                 </span>
               )}

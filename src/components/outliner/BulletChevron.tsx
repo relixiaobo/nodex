@@ -53,7 +53,7 @@ export function BulletChevron({
     return (
       <span
         role="button"
-        className="flex shrink-0 h-[18px] w-[15px] items-center justify-center cursor-pointer group/bullet"
+        className="flex shrink-0 h-6 w-[15px] items-center justify-center cursor-pointer group/bullet"
         onClick={onBulletClick}
         title={t('outliner.zoomIn')}
       >
@@ -73,7 +73,7 @@ export function BulletChevron({
     return (
       <span
         role="button"
-        className="flex shrink-0 h-[18px] w-[15px] items-center justify-center cursor-pointer group/bullet"
+        className="flex shrink-0 h-6 w-[15px] items-center justify-center cursor-pointer group/bullet"
         onClick={onBulletClick}
         title={t('outliner.zoomIn')}
       >
@@ -93,7 +93,7 @@ export function BulletChevron({
   return (
     <span
       role="button"
-      className="flex shrink-0 h-[18px] w-[15px] items-center justify-center cursor-pointer group/bullet"
+      className="flex shrink-0 h-6 w-[15px] items-center justify-center cursor-pointer group/bullet"
       onClick={onBulletClick}
       title={t('outliner.zoomIn')}
     >
@@ -134,7 +134,7 @@ export function ChevronButton({
 }: ChevronButtonProps) {
   return (
     <button
-      className="flex shrink-0 h-[18px] w-[15px] items-center justify-center opacity-0 group-hover/row:opacity-100 pointer-events-none group-hover/row:pointer-events-auto transition-opacity focus:outline-none"
+      className="flex shrink-0 h-6 w-[15px] items-center justify-center opacity-0 group-hover/row:opacity-100 pointer-events-none group-hover/row:pointer-events-auto transition-opacity focus:outline-none"
       tabIndex={-1}
       onPointerDown={(e) => {
         onTogglePointerDown?.();

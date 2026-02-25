@@ -27,6 +27,7 @@ _(空)_
 
 | Agent | 当前任务 | 分支 | 修改中的文件 |
 |-------|---------|------|-------------|
+| antigravity | v5.0 UI 重构 Phase 1 | cc/v5-ui-refactor | main.css, tag-colors.ts |
 | nodex-cc | 布局 Phase 3 Undo/Redo 按钮集成 + #44 Phase 1 验证 | `cc/layout-undo-buttons` | `TopToolbar.tsx`, `UndoRedoButtons.tsx` |
 | nodex-cc-2 | Search Nodes Phase 1 (#23) | `cc2/search-nodes` | `node.ts`, `loro-doc.ts`, `search-engine.ts`, `node-store.ts`, `OutlinerItem.tsx`, `OutlinerView.tsx` |
 | nodex-codex | _(idle)_ | — | — |

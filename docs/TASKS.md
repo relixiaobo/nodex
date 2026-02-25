@@ -31,7 +31,7 @@ _(空)_
 | nodex-cc | _(idle)_ | — | — |
 | nodex-cc-2 | Search Nodes Phase 1 (#23) | `cc2/search-nodes` | `node.ts`, `loro-doc.ts`, `search-engine.ts`, `node-store.ts`, `OutlinerItem.tsx`, `OutlinerView.tsx` |
 | nodex-codex | _(idle)_ | — | — |
-| antigravity | UI 细节打磨 | `anti/ui-polish` | _(按 PR review 反馈逐项修改)_ |
+| antigravity | UI 细节打磨 | `anti/ui-polish` | _(PR #96 已提交 Ready for Review)_ |
 
 ---
 
@@ -138,7 +138,8 @@ _(无进行中任务)_
 
 - [x] TopToolbar 左右等距对齐及 Undo/Redo 简单箭头图标 ✓ antigravity
 - [x] Breadcrumb 标题滚动隐藏后追加到面包屑末尾规则恢复 ✓ antigravity
-- [ ] _(等待 nodex PR review 反馈)_
+- [x] PR #96 Review 反馈修复（TrailingInput 缩进/Breadcrumb 下拉/Undo 图标/tree-utils 逻辑） ✓ antigravity
+- [ ] _(等待 nodex 第二轮 PR review 反馈)_
 
 #### Supertags 完善 (#20)
 > 基础已完成（#触发、标签应用/移除、配置页、模板字段、TagBadge 右键菜单）

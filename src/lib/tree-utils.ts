@@ -50,6 +50,18 @@ export function getAncestorChain(
     if (!parentId || visited.has(parentId)) break;
     visited.add(parentId);
 
+    // If parent is a container node, record as workspace root, add it to chain, and stop
+    if (isContainerNode(parentId)) {
+      workspaceRootId = parentId;
+      const containerNode = loroDoc.toNodexNode(parentId);
+      if (containerNode) {
+        const rawName = containerNode.name ?? '';
+        const displayName = rawName.trim() || parentId;
+        chain.push({ id: parentId, name: displayName });
+      }
+      break;
+    }
+
     const parentNode = loroDoc.toNodexNode(parentId);
     if (!parentNode) break;
 
@@ -65,13 +77,6 @@ export function getAncestorChain(
     chain.push({ id: parentId, name: displayName });
 
     currentId = parentId;
-  }
-
-  if (chain.length > 0) {
-    const topAncestorId = chain[chain.length - 1].id;
-    if (!loroDoc.getParentId(topAncestorId)) {
-      workspaceRootId = topAncestorId;
-    }
   }
 
   return { ancestors: chain.reverse(), workspaceRootId };

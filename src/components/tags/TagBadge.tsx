@@ -88,7 +88,7 @@ export function TagBadge({ tagDefId, onRemove, onNavigate }: TagBadgeProps) {
         className="inline-flex items-center text-xs font-medium leading-5 shrink-0 rounded bg-destructive/10 text-destructive px-1.5 gap-1"
         title={`Tag "${tagName}" has been deleted`}
       >
-        <span className="text-[11px] leading-none">#</span>
+        <span className="text-[11px] leading-none text-[#999999]">#</span>
         <span>{tagName}</span>
         <AlertTriangle size={11} className="text-warning" />
         <Trash2 size={11} />
@@ -100,18 +100,18 @@ export function TagBadge({ tagDefId, onRemove, onNavigate }: TagBadgeProps) {
     <>
       <span
         className="group/tag inline-flex items-center text-xs font-medium leading-5 shrink-0 cursor-default"
-        style={{ '--tag-bg': color.bg, color: color.text } as React.CSSProperties}
+        style={{ color: color.text }}
         onContextMenu={handleContextMenu}
       >
         {/* Close area: colored bg by default (unified pill), transparent on badge hover.
-            Grid stacks # and × in same cell → no size jump. */}
+      Grid stacks # and × in same cell → no size jump. */}
         <span
           className="inline-grid place-items-center w-4 self-stretch rounded-l bg-[var(--tag-bg)] transition-colors group-hover/tag:bg-transparent group-hover/tag:rounded-none hover:text-destructive"
           onClick={onRemove ? handleRemoveClick : undefined}
           title={onRemove ? 'Remove tag from item' : undefined}
           style={{ cursor: onRemove ? 'pointer' : undefined }}
         >
-          <span className="col-start-1 row-start-1 text-[11px] leading-none transition-opacity group-hover/tag:opacity-0">
+          <span className="col-start-1 row-start-1 text-[11px] leading-none transition-opacity group-hover/tag:opacity-0 text-[#999999]">
             #
           </span>
           {onRemove && (
@@ -124,9 +124,8 @@ export function TagBadge({ tagDefId, onRemove, onNavigate }: TagBadgeProps) {
         </span>
         {/* Tag name area: colored bg always, rounded-r by default → rounded on hover */}
         <span
-          className={`px-1.5 rounded-r bg-[var(--tag-bg)] transition-all group-hover/tag:rounded ${
-            canNavigate ? 'hover:bg-black/[0.06] cursor-pointer' : 'cursor-default'
-          }`}
+          className={`px-1.5 rounded-r bg-[var(--tag-bg)] transition-all group-hover/tag:rounded ${canNavigate ? 'hover:bg-foreground/4 cursor-pointer' : 'cursor-default'
+            }`}
           onClick={canNavigate ? handleNameClick : undefined}
         >
           {tagName}
@@ -175,7 +174,7 @@ const TagContextMenu = forwardRef<HTMLDivElement, TagContextMenuProps>(
     return (
       <div
         ref={ref}
-        className="fixed z-50 min-w-[180px] rounded-lg border border-border bg-popover py-1 shadow-lg text-sm text-popover-foreground"
+        className="fixed z-50 min-w-[180px] rounded-lg border border-border bg-popover py-1 text-sm text-popover-foreground"
         style={{ left: x, top: y }}
       >
         {onRemove && (

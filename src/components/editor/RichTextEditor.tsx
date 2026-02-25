@@ -857,7 +857,7 @@ export function RichTextEditor(props: RichTextEditorProps) {
   return (
     <div className="editor-inline">
       <FloatingToolbar view={viewRef.current} tick={toolbarTick} />
-      <div ref={mountRef} className="outline-none text-sm leading-[21px]" />
+      <div ref={mountRef} className="outline-none text-[15px] leading-6" />
     </div>
   );
 }

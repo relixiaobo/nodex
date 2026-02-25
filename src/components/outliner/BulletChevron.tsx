@@ -53,7 +53,7 @@ export function BulletChevron({
     return (
       <span
         role="button"
-        className="flex shrink-0 h-[21px] w-[15px] items-center justify-center cursor-pointer group/bullet"
+        className="flex shrink-0 h-[18px] w-[15px] items-center justify-center cursor-pointer group/bullet"
         onClick={onBulletClick}
         title={t('outliner.zoomIn')}
       >
@@ -73,7 +73,7 @@ export function BulletChevron({
     return (
       <span
         role="button"
-        className="flex shrink-0 h-[21px] w-[15px] items-center justify-center cursor-pointer group/bullet"
+        className="flex shrink-0 h-[18px] w-[15px] items-center justify-center cursor-pointer group/bullet"
         onClick={onBulletClick}
         title={t('outliner.zoomIn')}
       >
@@ -93,7 +93,7 @@ export function BulletChevron({
   return (
     <span
       role="button"
-      className="flex shrink-0 h-[21px] w-[15px] items-center justify-center cursor-pointer group/bullet"
+      className="flex shrink-0 h-[18px] w-[15px] items-center justify-center cursor-pointer group/bullet"
       onClick={onBulletClick}
       title={t('outliner.zoomIn')}
     >
@@ -103,7 +103,7 @@ export function BulletChevron({
         } ${showOuterRing ? 'bg-foreground/[0.08]' : ''}`}
       >
         <div
-          className={`h-[5px] w-[5px] rounded-full transition-transform group-hover/bullet:scale-[1.375] ${!hasColors ? (dimmed ? 'bg-foreground/15' : 'bg-foreground/50') : ''}`}
+          className={`h-[5px] w-[5px] rounded-full transition-transform group-hover/bullet:scale-[1.375] ${!hasColors ? (dimmed ? 'bg-foreground/15' : 'bg-foreground/40') : ''}`}
           style={bulletStyle}
         />
       </div>
@@ -135,7 +135,7 @@ export function ChevronButton({
 }: ChevronButtonProps) {
   return (
     <button
-      className="flex shrink-0 h-[21px] w-[15px] items-center justify-center opacity-0 group-hover/row:opacity-100 pointer-events-none group-hover/row:pointer-events-auto transition-opacity"
+      className="flex shrink-0 h-[18px] w-[15px] items-center justify-center opacity-0 group-hover/row:opacity-100 pointer-events-none group-hover/row:pointer-events-auto transition-opacity"
       tabIndex={-1}
       onPointerDown={(e) => {
         onTogglePointerDown?.();

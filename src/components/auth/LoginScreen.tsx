@@ -32,7 +32,7 @@ export function LoginScreen() {
       <button
         onClick={handleSignIn}
         disabled={loading}
-        className="flex w-full max-w-[240px] items-center justify-center gap-2 rounded-md border border-border bg-surface px-4 py-2 text-sm font-medium transition-colors hover:bg-foreground/5 disabled:cursor-not-allowed disabled:opacity-50"
+        className="flex w-full max-w-[240px] items-center justify-center gap-2 rounded-md border border-border bg-surface px-4 py-2 text-sm font-medium transition-colors hover:bg-foreground/4 disabled:cursor-not-allowed disabled:opacity-50"
       >
         {loading ? (
           <span className="h-4 w-4 animate-spin rounded-full border-2 border-foreground/30 border-t-foreground" />

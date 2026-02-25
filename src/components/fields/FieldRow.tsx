@@ -250,12 +250,12 @@ function ConfigNumberInput({ nodeId, configKey }: { nodeId: string; configKey: s
   }, [draft, nodeId, propName, setConfigValue]);
 
   return (
-    <div className="flex min-h-7 items-center gap-2 py-1" style={{ paddingLeft: FIELD_VALUE_INSET }}>
+    <div className="flex min-h-6 items-center gap-2 py-1" style={{ paddingLeft: FIELD_VALUE_INSET }}>
       <BulletChevron hasChildren={false} isExpanded={false} onBulletClick={() => {}} />
       <input
         type="text"
         inputMode="decimal"
-        className="h-[21px] min-w-[120px] bg-transparent p-0 text-sm leading-[21px] text-foreground outline-none placeholder:text-foreground-tertiary"
+        className="h-[18px] min-w-[120px] bg-transparent p-0 text-sm leading-[21px] text-foreground outline-none placeholder:text-foreground-tertiary"
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
         onBlur={commitDraft}
@@ -741,7 +741,7 @@ export function FieldRow({
         data-row-kind="field"
         onClick={handleFieldRowClick}
       >
-        <div className="flex items-center gap-1 @sm:shrink-0 @sm:w-[130px] min-w-0 h-7 py-1">
+        <div className="flex items-center gap-1 @sm:shrink-0 @sm:w-[130px] min-w-0 h-6 py-1">
           <span className="shrink-0 w-[15px] flex items-center justify-center text-foreground-tertiary">
             {SysIcon && <SysIcon size={12} />}
           </span>
@@ -776,7 +776,7 @@ export function FieldRow({
             {attrDefName}
           </span>
         </div>
-        <div className="flex flex-1 min-w-0 items-center min-h-7 py-1" data-field-value>
+        <div className="flex flex-1 min-w-0 items-center min-h-6 py-1" data-field-value>
           {dataType === '__system_node__' && valueNodeId ? (
             <button
               className="text-sm leading-[22px] text-foreground-tertiary hover:text-foreground-secondary cursor-pointer truncate"
@@ -847,7 +847,7 @@ export function FieldRow({
             {renderSystemConfigValue(resolvedControl, systemConfigValueContext)}
           </div>
           {configNumberValidationWarning && (
-            <div className="flex items-center h-7 pr-1">
+            <div className="flex items-center h-6 pr-1">
               <ValidationWarning message={configNumberValidationWarning} />
             </div>
           )}
@@ -871,7 +871,7 @@ export function FieldRow({
         <div className={FIELD_ROW_SELECTION_OVERLAY_CLASS} style={FIELD_ROW_SELECTION_OVERLAY_STYLE} />
       )}
       {/* Name column — aligned to first line of value */}
-      <div className="relative z-[1] flex items-center gap-1 @sm:shrink-0 @sm:w-[130px] min-w-0 h-7 py-1">
+      <div className="relative z-[1] flex items-center gap-1 @sm:shrink-0 @sm:w-[130px] min-w-0 h-6 py-1">
         <button
           className={`shrink-0 w-[15px] flex items-center justify-center transition-colors ${ownerTagColor ? '' : 'text-foreground-tertiary hover:text-foreground-secondary'}`}
           onClick={trashed || isVirtual ? undefined : () => navigateTo(attrDefId)}
@@ -922,7 +922,7 @@ export function FieldRow({
           )}
         </div>
         {validationWarning && (
-          <div className="flex items-center h-7 pr-1">
+          <div className="flex items-center h-6 pr-1">
             <ValidationWarning message={validationWarning} />
           </div>
         )}

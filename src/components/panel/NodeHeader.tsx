@@ -180,7 +180,6 @@ export function NodeHeader({ nodeId, onTitleRef }: NodeHeaderProps) {
           {isTagDef && tagDefColor && (
             <span
               className="flex h-8 w-8 items-center justify-center rounded-lg"
-              style={{ backgroundColor: tagDefColor.bg }}
             >
               <span
                 className="text-lg font-bold select-none"
@@ -210,7 +209,7 @@ export function NodeHeader({ nodeId, onTitleRef }: NodeHeaderProps) {
 
       {/* ── Block ②: Name row (always) ── */}
       <div
-        className="group/header-row flex gap-1 min-h-7 items-start"
+        className="group/header-row flex gap-1 min-h-6 items-start"
         style={{ paddingLeft: ROW_PADDING_LEFT }}
       >
         {/* Col A: Drag handle (same position as chevron) */}
@@ -240,7 +239,7 @@ export function NodeHeader({ nodeId, onTitleRef }: NodeHeaderProps) {
             ref={setRef}
             contentEditable={canEditNode && editing}
             suppressContentEditableWarning
-            className={`text-xl font-semibold leading-8 outline-none min-h-8 flex-1 ${canEditNode ? 'cursor-text' : 'cursor-default'} ${isDone ? 'text-foreground/50 line-through' : ''}`}
+            className={`text-xl font-semibold leading-8 outline-none min-h-8 flex-1 ${canEditNode ? 'cursor-text' : 'cursor-default'} ${isDone ? 'text-foreground/40 line-through' : ''}`}
             onClick={() => {
               if (!canEditNode) return;
               if (!editing) setEditing(true);

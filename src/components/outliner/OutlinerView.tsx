@@ -158,7 +158,7 @@ export function OutlinerView({ rootNodeId, showTemplateTuples }: OutlinerViewPro
     >
       {/* Hidden field placeholder rows: ⊕ FieldName, aligned to col B */}
       {hiddenRevealableFields.length > 0 && hiddenRevealableFields.some(f => !isFieldRevealed(f.id)) && (
-        <div className="flex flex-wrap gap-x-3 min-h-7 items-center" style={{ paddingLeft: 6 + 15 + 4 }}>
+        <div className="flex flex-wrap gap-x-3 min-h-6 items-center" style={{ paddingLeft: 6 + 15 + 4 }}>
           {hiddenRevealableFields.filter(f => !isFieldRevealed(f.id)).map(f => (
             <button
               key={f.id}

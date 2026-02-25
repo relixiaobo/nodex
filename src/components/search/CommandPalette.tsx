@@ -68,7 +68,7 @@ function resolveNodeVisuals(id: string, node: { type?: string; tags?: string[] }
   // TagDef → colored #
   if (node.type === 'tagDef') {
     const c = resolveTagColor(id);
-    return { tagDefColor: { text: c.text, bg: c.bg }, typeLabel: 'Tag', type: 'node' };
+    return { tagDefColor: { text: c.text }, typeLabel: 'Tag', type: 'node' };
   }
   // FieldDef → field-type icon
   if (node.type === 'fieldDef') {
@@ -156,7 +156,7 @@ export function CommandPalette() {
       });
     }
     return items;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [panelHistory, panelIndex, _version, navigateTo, closeAndClear]);
 
   // Container items for Suggestions
@@ -168,7 +168,7 @@ export function CommandPalette() {
       type: 'container' as PaletteItemType,
       action: () => { navigateTo(c.id); closeAndClear(); },
     })),
-  [navigateTo, closeAndClear]);
+    [navigateTo, closeAndClear]);
 
   // Command items for Commands group (excludes containers, which are in Suggestions)
   const commandItems: PaletteItem[] = useMemo(() =>
@@ -181,7 +181,7 @@ export function CommandPalette() {
         type: cmd.type,
         action: () => cmd.action(ctx),
       })),
-  [commands, ctx]);
+    [commands, ctx]);
 
   // Fuzzy search results (nodes + commands mixed, sorted by score)
   const searchResults = useMemo(() => {
@@ -238,7 +238,7 @@ export function CommandPalette() {
     // Sort by score descending
     results.sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
     return results;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [_version, searchQuery, commands, ctx, navigateTo, closeAndClear]);
 
   // "Create in Today" item — shown at the start of search results when there's a query
@@ -503,9 +503,8 @@ function PaletteRow({ item, selected, positionIndex, onSelect, onHover }: Palett
       data-selected={selected}
       onClick={onSelect}
       onMouseMove={onHover}
-      className={`mx-1 flex h-8 cursor-pointer items-center gap-2 rounded-md px-2 transition-colors ${
-        selected ? 'bg-primary-muted' : ''
-      }`}
+      className={`mx-1 flex h-8 cursor-pointer items-center gap-2 rounded-md px-2 transition-colors ${selected ? 'bg-primary-muted' : ''
+        }`}
     >
       {/* Icon: command/container use explicit icon; tagDef uses colored #; nodes use colored bullet */}
       {Icon ? (
@@ -513,9 +512,9 @@ function PaletteRow({ item, selected, positionIndex, onSelect, onHover }: Palett
       ) : item.tagDefColor ? (
         <span
           className="flex shrink-0 h-4 w-4 items-center justify-center rounded text-xs font-bold"
-          style={{ backgroundColor: item.tagDefColor.bg, color: item.tagDefColor.text }}
+          style={{ color: item.tagDefColor.text }}
         >
-          #
+          <span className="text-[#999999]">#</span>
         </span>
       ) : (
         <span className="flex shrink-0 h-4 w-4 items-center justify-center">

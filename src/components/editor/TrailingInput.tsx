@@ -571,7 +571,7 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
   <div
    data-trailing-parent-id={parentId}
    className="group/row flex min-h-6 items-start gap-2 py-1"
-   style={{ paddingLeft: effectiveDepth * 28 + 6 + 15 + 4 }}
+   style={{ paddingLeft: effectiveDepth * 22 + 6 + 15 + 4 }}
   >
    <BulletChevron
     hasChildren={false}

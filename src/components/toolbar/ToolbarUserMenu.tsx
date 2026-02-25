@@ -104,24 +104,26 @@ export function ToolbarUserMenu() {
                 className="relative flex h-7 w-7 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-foreground/4"
                 aria-label={t('userMenu.ariaLabel')}
             >
-                {authUser.avatarUrl ? (
-                    <img
-                        src={authUser.avatarUrl}
-                        alt=""
-                        referrerPolicy="no-referrer"
-                        className="h-5 w-5 rounded-full object-cover"
-                    />
-                ) : (
-                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-accent text-[8px] font-medium text-accent-foreground">
-                        {initials}
-                    </span>
-                )}
-                {/* Sync status badge */}
-                {showSyncBadge && (
-                    <span
-                        className={`absolute bottom-0 right-0 h-2 w-2 rounded-full ring-[1.5px] ring-background ${badgeClass}`}
-                    />
-                )}
+                <div className="relative flex items-center justify-center">
+                    {authUser.avatarUrl ? (
+                        <img
+                            src={authUser.avatarUrl}
+                            alt=""
+                            referrerPolicy="no-referrer"
+                            className="h-5 w-5 rounded-full object-cover"
+                        />
+                    ) : (
+                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-accent text-[8px] font-medium text-accent-foreground">
+                            {initials}
+                        </span>
+                    )}
+                    {/* Sync status badge */}
+                    {showSyncBadge && (
+                        <span
+                            className={`absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full ring-[1.5px] ring-background ${badgeClass}`}
+                        />
+                    )}
+                </div>
             </button>
 
             {/* Dropdown */}

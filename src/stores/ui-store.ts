@@ -104,6 +104,10 @@ interface UIStore {
   navRedoStack: Array<{ panelHistory: string[]; panelIndex: number }>;
   navUndo(): void;
   navRedo(): void;
+
+  // Panel title visibility (session-only, not persisted)
+  panelTitleVisible: boolean;
+  setPanelTitleVisible(visible: boolean): void;
 }
 
 export interface PersistedUIStoreState {
@@ -164,6 +168,7 @@ export const useUIStore = create<UIStore>()(
             selectionSource: null,
             selectedNodeIds: new Set(),
             selectionAnchorId: null,
+            panelTitleVisible: true,
           };
         }),
       goBack: () =>
@@ -182,6 +187,7 @@ export const useUIStore = create<UIStore>()(
             selectionSource: null,
             selectedNodeIds: new Set(),
             selectionAnchorId: null,
+            panelTitleVisible: true,
           };
         }),
       goForward: () =>
@@ -200,6 +206,7 @@ export const useUIStore = create<UIStore>()(
             selectionSource: null,
             selectedNodeIds: new Set(),
             selectionAnchorId: null,
+            panelTitleVisible: true,
           };
         }),
       replacePanel: (nodeId) =>
@@ -229,6 +236,7 @@ export const useUIStore = create<UIStore>()(
             selectionSource: null,
             selectedNodeIds: new Set(),
             selectionAnchorId: null,
+            panelTitleVisible: true,
           };
         }),
 
@@ -403,8 +411,13 @@ export const useUIStore = create<UIStore>()(
             panelIndex: next.panelIndex,
             navUndoStack: [...s.navUndoStack, currentSnapshot],
             navRedoStack: s.navRedoStack.slice(0, -1),
+            panelTitleVisible: true,
           };
         }),
+
+      // Panel title visibility
+      panelTitleVisible: true,
+      setPanelTitleVisible: (visible) => set({ panelTitleVisible: visible }),
     }),
     {
       name: 'nodex-ui',

@@ -159,17 +159,14 @@
 }
 
 /* Inline editor mode: tags follow right after text.
-   Outer wrappers + <p> become inline so text flows alongside tag badges.
-   .ProseMirror (contenteditable) uses inline-block — NOT inline — because Chrome
-   has a rendering bug where the native caret is invisible inside inline marks
-   (<code>, <mark>) when the contenteditable element has display:inline. */
+   Outer wrappers + <p> become inline so text flows alongside tag badges. */
 .editor-inline,
 .editor-inline>div {
   display: inline;
 }
 
 .editor-inline .ProseMirror {
-  display: inline-block;
+  display: inline;
   caret-color: currentColor;
 }
 
@@ -177,10 +174,8 @@
    ProseMirror uses <br class="ProseMirror-trailingBreak"> for empty lines; when
    paragraph is inline this <br> introduces an extra visual line in our row layout. */
 .editor-inline .ProseMirror p {
-  display: inline-block;
+  display: inline;
   margin: 0;
-  min-width: 1px;
-  vertical-align: top;
 }
 
 /* Generic paragraph rule: when paragraph has visible content, hide synthetic

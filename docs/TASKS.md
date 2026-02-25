@@ -122,6 +122,12 @@ _(空)_
 - [ ] 6.4 Tag 文本前缀 `#` 添加（Ink-Tertiary 色）
 - [ ] 6.5 `tag-colors.ts` 简化：移除 `bg` 字段，只保留 `text` 色值
 
+**Phase 7: 隐形 UI 与全局顶栏重构 (Invisible UI & Unified Header)**
+- [x] 7.1 隐形大纲控件 (OutlinerItem, DragHandle, BulletChevron) 增加 `group-hover/row` 等透明度控制。
+- [x] 7.2 文本化标签排印 (TagBadge)，悬停下划线和绝对定位 `X` 覆盖 `#`。
+- [x] 7.3 日期导航极致压缩 (DateNavigationBar) (h-6, -mt-1, rounded-full)。
+- [x] 7.4 全局顶栏化繁为简：重构 `TopToolbar` 和 `NodePanel`，合并为单行绝对定位悬浮顶栏。
+
 **PR 策略**:
 - Phase 1-3 → 一个 PR（纯视觉变更，不改组件结构）
 - Phase 4 → 单独 PR（字号变化需验证布局）

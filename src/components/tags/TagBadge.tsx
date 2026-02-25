@@ -99,32 +99,30 @@ export function TagBadge({ tagDefId, onRemove, onNavigate }: TagBadgeProps) {
   return (
     <>
       <span
-        className="group/tag inline-flex items-center text-xs font-medium leading-5 shrink-0 cursor-default"
+        className="group/tag inline-flex h-5 items-center font-sans text-[13px] font-medium tracking-tight shrink-0 cursor-default gap-0.5"
         style={{ color: color.text }}
         onContextMenu={handleContextMenu}
       >
-        {/* Close area: colored bg by default (unified pill), transparent on badge hover.
-      Grid stacks # and × in same cell → no size jump. */}
         <span
-          className="inline-grid place-items-center w-4 self-stretch rounded-l bg-[var(--tag-bg)] transition-colors group-hover/tag:bg-transparent group-hover/tag:rounded-none hover:text-destructive"
+          className="relative flex items-center justify-center w-3 h-full cursor-pointer hover:text-destructive transition-colors"
           onClick={onRemove ? handleRemoveClick : undefined}
           title={onRemove ? 'Remove tag from item' : undefined}
-          style={{ cursor: onRemove ? 'pointer' : undefined }}
         >
-          <span className="col-start-1 row-start-1 text-[11px] leading-none transition-opacity group-hover/tag:opacity-0 text-[#999999]">
+          <span className="text-[#999999] opacity-40 transition-opacity group-hover/tag:opacity-0">
             #
           </span>
           {onRemove && (
             <X
               size={11}
               strokeWidth={2.5}
-              className="col-start-1 row-start-1 opacity-0 transition-opacity group-hover/tag:opacity-100"
+              className="absolute inset-0 m-auto w-3 h-3 opacity-0 transition-opacity group-hover/tag:opacity-100"
             />
           )}
         </span>
-        {/* Tag name area: colored bg always, rounded-r by default → rounded on hover */}
         <span
-          className={`px-1.5 rounded-r bg-[var(--tag-bg)] transition-all group-hover/tag:rounded ${canNavigate ? 'hover:bg-foreground/4 cursor-pointer' : 'cursor-default'
+          className={`transition-all ${canNavigate
+            ? 'cursor-pointer hover:underline underline-offset-[3px] decoration-current/40 hover:decoration-current/80'
+            : 'cursor-default'
             }`}
           onClick={canNavigate ? handleNameClick : undefined}
         >
@@ -133,7 +131,8 @@ export function TagBadge({ tagDefId, onRemove, onNavigate }: TagBadgeProps) {
       </span>
 
       {/* Context menu */}
-      {menu &&
+      {
+        menu &&
         createPortal(
           <TagContextMenu
             ref={menuRef}
@@ -153,7 +152,8 @@ export function TagBadge({ tagDefId, onRemove, onNavigate }: TagBadgeProps) {
               : undefined}
           />,
           document.body,
-        )}
+        )
+      }
     </>
   );
 }

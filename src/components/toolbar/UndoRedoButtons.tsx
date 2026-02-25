@@ -6,7 +6,7 @@
  * re-evaluated whenever node-store _version changes.
  */
 import { useCallback } from 'react';
-import { ArrowLeft, ArrowRight } from '../../lib/icons.js';
+import { Undo, Redo } from '../../lib/icons.js';
 import { undoDoc, redoDoc, canUndoDoc, canRedoDoc } from '../../lib/loro-doc.js';
 import { useNodeStore } from '../../stores/node-store.js';
 
@@ -35,7 +35,7 @@ export function UndoRedoButtons() {
         className={btnClass}
         title="Undo (⌘Z)"
       >
-        <ArrowLeft size={16} strokeWidth={1.5} />
+        <Undo size={16} strokeWidth={1.5} />
       </button>
       <button
         disabled={!canRedo}
@@ -43,7 +43,7 @@ export function UndoRedoButtons() {
         className={btnClass}
         title="Redo (⌘⇧Z)"
       >
-        <ArrowRight size={16} strokeWidth={1.5} />
+        <Redo size={16} strokeWidth={1.5} />
       </button>
     </div>
   );

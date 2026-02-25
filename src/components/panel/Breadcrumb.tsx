@@ -162,12 +162,12 @@ export function Breadcrumb({ nodeId, showCurrentName, compact }: BreadcrumbProps
                   <MoreHorizontal size={14} />
                 </button>
                 {expanded && (
-                  <div className="absolute top-full left-0 mt-1 w-56 rounded-xl border border-border bg-popover p-1 text-popover-foreground shadow-lg z-50">
+                  <div className="absolute top-full left-0 mt-1 w-56 rounded-lg border border-border bg-popover p-1 text-popover-foreground z-50">
                     <div className="flex flex-col max-h-64 overflow-y-auto">
                       {hiddenAncestors.map((ancestor) => (
                         <button
                           key={ancestor.id}
-                          className="flex items-center w-full rounded-md px-2 py-1.5 text-[14px] hover:bg-accent hover:text-accent-foreground text-left"
+                          className="flex items-center w-full rounded-md px-2 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground text-left"
                           onClick={(e) => {
                             e.stopPropagation();
                             setExpanded(false);

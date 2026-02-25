@@ -31,7 +31,7 @@ _(空)_
 | nodex-cc | _(idle)_ | — | — |
 | nodex-cc-2 | Search Nodes Phase 1 (#23) | `cc2/search-nodes` | `node.ts`, `loro-doc.ts`, `search-engine.ts`, `node-store.ts`, `OutlinerItem.tsx`, `OutlinerView.tsx` |
 | nodex-codex | _(idle)_ | — | — |
-| antigravity | _(idle — 待接 v5.0 UI 重构)_ | — | — |
+| antigravity | UI 细节打磨 | `anti/ui-polish` | _(按 PR review 反馈逐项修改)_ |
 
 ---
 
@@ -131,6 +131,12 @@ _(无进行中任务)_
 - Phase 4 → 单独 PR（字号变化需验证布局）
 - Phase 5 → 单独 PR（高风险：行高变化影响拖拽/选中/缩进）
 - Phase 6 → 单独 PR（Tag 渲染方式变更）
+
+#### UI 细节打磨 — v5.0 后续微调
+> v5.0 重构后的视觉/交互小问题收集与修复。nodex 在 PR review 中逐条提反馈，antigravity 逐项修改。
+> **Owner**: antigravity | **Branch**: `anti/ui-polish`
+
+- [ ] _(等待 nodex PR review 反馈)_
 
 #### Supertags 完善 (#20)
 > 基础已完成（#触发、标签应用/移除、配置页、模板字段、TagBadge 右键菜单）

@@ -24,8 +24,8 @@ export function UndoRedoButtons() {
     return canRedoDoc();
   });
 
-  const handleUndo = useCallback(() => { undoDoc(); }, []);
-  const handleRedo = useCallback(() => { redoDoc(); }, []);
+  const handleUndo = useCallback(undoDoc, []);
+  const handleRedo = useCallback(redoDoc, []);
 
   return (
     <div className="flex items-center gap-0.5">

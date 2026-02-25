@@ -17,6 +17,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { ChevronRight, ChevronDown } from '../../lib/icons.js';
 import { useBacklinks } from '../../hooks/use-backlinks';
 import { useUIStore } from '../../stores/ui-store';
+import { useWorkspaceStore } from '../../stores/workspace-store';
 import { BulletChevron, ChevronButton } from '../outliner/BulletChevron';
 import { TagBadge } from '../tags/TagBadge';
 import type { MentionedInRef, FieldValueRef } from '../../lib/backlinks.js';
@@ -145,10 +146,14 @@ function MentionedInItem({ item }: { item: MentionedInRef }) {
 
 function BreadcrumbPath({ ancestors }: { ancestors: AncestorInfo[] }) {
   const navigateTo = useUIStore(s => s.navigateTo);
+  const wsId = useWorkspaceStore(s => s.currentWorkspaceId);
+  const filtered = ancestors.filter(a => a.id !== wsId);
+
+  if (filtered.length === 0) return null;
 
   return (
     <div className="flex items-center gap-0.5 text-xs text-foreground-tertiary overflow-hidden">
-      {ancestors.map((a, i) => (
+      {filtered.map((a, i) => (
         <span key={a.id} className="flex items-center gap-0.5 shrink min-w-0">
           {i > 0 && <span className="mx-0.5">/</span>}
           <button

@@ -136,6 +136,8 @@ _(无进行中任务)_
 > v5.0 重构后的视觉/交互小问题收集与修复。nodex 在 PR review 中逐条提反馈，antigravity 逐项修改。
 > **Owner**: antigravity | **Branch**: `anti/ui-polish`
 
+- [x] TopToolbar 左右等距对齐及 Undo/Redo 简单箭头图标 ✓ antigravity
+- [x] Breadcrumb 标题滚动隐藏后追加到面包屑末尾规则恢复 ✓ antigravity
 - [ ] _(等待 nodex PR review 反馈)_
 
 #### Supertags 完善 (#20)

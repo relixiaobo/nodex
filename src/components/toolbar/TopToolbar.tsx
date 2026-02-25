@@ -1,9 +1,9 @@
 /**
  * Top toolbar — replaces the Sidebar as the primary navigation chrome.
  *
- * Layout: [←][→]  [🔍 Search...  ⌘K]  [👤]
+ * Layout: [↶][↷]  [🔍 Search...  ⌘K]  [👤]
  *
- * - Left: Undo/Redo buttons (placeholder, disabled until #44)
+ * - Left: Undo/Redo buttons (wired to Loro UndoManager)
  * - Center: SearchTrigger (fake input, opens CommandPalette)
  * - Right: UserMenu avatar (with sync badge)
  */

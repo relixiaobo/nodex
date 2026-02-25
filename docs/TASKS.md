@@ -6,6 +6,7 @@
 > - 用户随手记录到「收件箱」，agent 启动时处理（归类到待办或直接处理）
 > - Dev agent 接到任务后，第一步编辑此文件（更新 Agent 状态 + 移动/创建任务到「进行中」）
 > - 任务完成后，nodex merge PR 时移动到「已完成」
+> - **禁止 Dev Agent 执行 `gh pr merge`** — 只有 nodex 有权合并 PR。Dev Agent 完成后 `gh pr ready` 标记即可
 >
 > **迭代日志规则**：
 > - 每个「进行中」任务带 `迭代日志` 字段（追加式，不删改历史条目）
@@ -27,8 +28,7 @@ _(空)_
 
 | Agent | 当前任务 | 分支 | 修改中的文件 |
 |-------|---------|------|-------------|
-| antigravity | v5.0 UI 重构 Phase 1 | cc/v5-ui-refactor | main.css, tag-colors.ts |
-| nodex-cc | 布局 Phase 3 Undo/Redo 按钮集成 + #44 Phase 1 验证 | `cc/layout-undo-buttons` | `TopToolbar.tsx`, `UndoRedoButtons.tsx` |
+| nodex-cc | _(idle)_ | — | — |
 | nodex-cc-2 | Search Nodes Phase 1 (#23) | `cc2/search-nodes` | `node.ts`, `loro-doc.ts`, `search-engine.ts`, `node-store.ts`, `OutlinerItem.tsx`, `OutlinerView.tsx` |
 | nodex-codex | _(idle)_ | — | — |
 | antigravity | _(idle — 待接 v5.0 UI 重构)_ | — | — |
@@ -37,9 +37,7 @@ _(空)_
 
 ## 进行中
 
-### Side Panel 布局 Phase 3 + Undo/Redo 验证
-> nodex-cc 负责两个子任务：① 布局 Phase 3 Undo/Redo 按钮集成到 TopToolbar ② 验证 #44 Phase 1 commitDoc() 覆盖
-> **Owner**: nodex-cc | **Branch**: `cc/layout-undo-buttons`
+_(无进行中任务)_
 
 ---
 
@@ -197,7 +195,7 @@ _(空)_
 - [x] Phase 2: ProseMirror → Loro 实时同步 + 移除 `prosemirror-history` ✓ PR #91
 - [x] Phase 3: UI 状态 marker commit（展开/折叠 + 导航进入 Loro undo 栈）✓ PR #91
 - [x] Phase 4: 统一 ⌘Z handler + 删除旧代码（navUndoStack / 三层 fallthrough / PM History）✓ PR #91
-- [ ] Phase 1: 补全 commitDoc() 覆盖 — **nodex 已验证：applyTag/removeTag/setFieldValue/toggleCheckboxField/toggleNodeDone/cycleNodeCheckbox 全部有 commitDoc()，请 nodex-cc 复查确认后勾选**
+- [x] Phase 1: 补全 commitDoc() 覆盖 ✓ nodex-cc 复查确认：node-store.ts 35 处 commitDoc()，覆盖全部树/标签/字段/checkbox/引用操作；文本编辑走 editor blur 路径（commitDoc('user:text')）
 
 #### Side Panel 布局改造 — 移除 Sidebar + ⌘K 重设计
 > Phase 1/2/4 已完成（PR #88）。Phase 3（Undo/Redo 按钮集成）待 #44 完成后执行。
@@ -206,7 +204,7 @@ _(空)_
 
 - [x] Phase 1: 顶栏骨架 + 移除 Sidebar ✓ PR #88
 - [x] Phase 2: ⌘K 命令面板重写 ✓ PR #88
-- [ ] Phase 3: Undo/Redo 按钮集成 — **可执行**（#44 核心已完成）。把 `UndoRedoButtons.tsx` 集成到 `TopToolbar.tsx`，参考 `docs/plans/layout-renovation.md` Phase 3 设计
+- [x] Phase 3: Undo/Redo 按钮集成 ✓ nodex-cc — UndoRedoButtons 接入 Loro undoDoc/redoDoc + canUndoDoc/canRedoDoc 响应式启禁用 + Undo2/Redo2 图标
 - [x] Phase 4: 清理废弃文件 ✓ PR #88
 
 #### 节点选中 — 后续增强 (#47)

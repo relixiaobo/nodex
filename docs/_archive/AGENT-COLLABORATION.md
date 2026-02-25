@@ -16,29 +16,26 @@
 
 ### 当前 Agent 清单
 
-| Agent ID | 工具 | 主要职责 | 次要职责 | 分支前缀 | Dev Server 端口 | Worktree 路径 |
-|----------|------|---------|---------|---------|----------------|--------------|
-| **nodex** | Claude Code (主会话) | Review PR、合并到 main、协调任务 | 小修复、紧急改动 | `main` 或临时分支 | `5199` | 主仓库 (`nodex/`) |
-| **nodex-codex** | Codex | 功能开发、提交 PR | Bug 修复 | `codex/<feature>` | `5200` | worktree (`nodex-codex/`) |
-| **nodex-cc** | Claude Code (独立会话) | 功能开发、提交 PR | Bug 修复 | `cc/<feature>` | `5201` | worktree (`nodex-cc/`) |
-| **nodex-cc-2** | Claude Code (独立会话) | 功能开发、提交 PR | Bug 修复 | `cc2/<feature>` | `5202` | worktree (`nodex-cc-2/`) |
+| Agent ID | 工具 | 主要职责 | 次要职责 | 分支前缀 | Worktree 路径 |
+|----------|------|---------|---------|---------|--------------|
+| **nodex** | Claude Code (主会话) | Review PR、合并到 main、视觉验证 | 小修复、紧急改动 | `main` 或临时分支 | 主仓库 (`nodex/`) |
+| **Dev Agent** | Claude Code (独立会话) | 功能开发、提交 PR | Bug 修复 | `cc/<feature>` 等 | worktree (`nodex-<name>/`) |
+
+> Dev Agent 按需创建：`git worktree add ../nodex-<name> -b <branch> origin/main`，在该目录启动 Claude Code 即可。
 
 ### Agent 自我识别
 
-所有 worktree 共享同一个 `.git` 仓库（`nodex/`），代码和文档通过 git 同步。每个 Agent 通过以下方式确认自己的身份：
+所有 worktree 共享同一个 `.git` 仓库（`nodex/`），代码和文档通过 git 同步。每个 Agent 通过 **Worktree 路径** 和 **Git 分支前缀** 确认自己的身份。
 
-| 识别依据 | nodex | nodex-codex | nodex-cc | nodex-cc-2 |
-|---------|-----------|-------------|----------|------------|
-| Worktree 路径 | `nodex`（主仓库） | `nodex-codex` | `nodex-cc` | `nodex-cc-2` |
-| Dev Server 端口 | `5199` | `5200` | `5201` | `5202` |
-| Git 分支 | `main` | `codex/*` | `cc/*` | `cc2/*` |
+### 验证分工
 
-### 端口分配规则
+| 验证类型 | 谁做 | 怎么做 |
+|---------|------|--------|
+| `typecheck` / `vitest` / `build` | Dev Agent | 提 PR 前自验 |
+| Chrome 扩展视觉验证 | nodex（主 Agent） | `npm run dev` → Chrome 加载 `.output/chrome-mv3-dev` |
+| 用户验收 | 用户 | `gh pr checkout <number>` → `npm run dev` → Chrome Side Panel 实测 |
 
-- **主仓库 (nodex)**: `http://localhost:5199`（默认，CLAUDE.md 中已配置）
-- **Agent worktree**: 通过 `PORT=<port> npm run dev:test` 启动，避免端口冲突
-- 端口范围 `5199-5210`，每个 Agent 固定一个端口
-- MCP 工具（chrome-devtools）连接对应端口的 standalone 测试环境
+> Dev Agent **不需要**跑 dev server 或做视觉验证。
 
 ---
 
@@ -88,7 +85,7 @@ gh pr create --draft --title "[WIP] feat: ..." --body "ref: <任务名>"
 
 **如果用户没明确任务名**：先 `Read docs/TASKS.md` 查看待办列表，与用户确认后标记。
 
-### 2.3 开发 Agent 工作流（nodex-codex / nodex-cc / nodex-cc-2）
+### 2.3 开发 Agent 工作流
 
 ```
 接到任务 → 更新 TASKS.md + Draft PR（§2.2）→ 开发 → 自检 → 标记 Ready → 等待 review
@@ -97,10 +94,15 @@ gh pr create --draft --title "[WIP] feat: ..." --body "ref: <任务名>"
 1. §2.2 的标记步骤已包含创建分支和 Draft PR
 2. 在 `docs/TASKS.md` 的任务条目 Files 字段**声明将修改的热点文件**（见 §5 文件锁）
 3. 开发过程中定期 push **到自己的分支**，保持 Draft PR 可见
-4. 完成后：
-   - 按 PR template checklist 逐项自检
+4. 自验清单（提 PR 前必须通过）：
+   - `npm run typecheck` — 类型检查
+   - `npm run check:test-sync` — 测试同步检查
+   - `npx vitest run` — 单元测试
+   - `npm run build` — 生产构建
+5. 完成后：
    - 将 PR 从 Draft 转为 Ready：`gh pr ready`
    - **不需要通知用户或 nodex**，nodex 通过 `gh pr list` 发现待审 PR
+   - **不需要跑 dev server 或做视觉验证**，视觉验证由 nodex 或用户完成
 
 #### ⛔ 禁止直接 push main（硬性规则）
 
@@ -127,7 +129,7 @@ Dev Agent（nodex-codex / nodex-cc / nodex-cc-2）**绝对不能**直接向 `mai
 ### 2.4 Review Agent 工作流（nodex）
 
 ```
-检查 Ready PR → Review PR → 留 comment / 合并 → 后续修正
+检查 Ready PR → 视觉验证 → Review PR → 留 comment / 合并 → 后续修正
 ```
 
 1. Session 开始时检查 Ready 状态的 PR：
@@ -135,11 +137,17 @@ Dev Agent（nodex-codex / nodex-cc / nodex-cc-2）**绝对不能**直接向 `mai
    gh pr list --state open  # 查看所有 open PR，跳过 Draft 状态的
    ```
 2. **只 review Ready 状态的 PR**，Draft PR 代表开发中，不做 review
-3. Review 内容：代码质量、测试覆盖、文档同步、设计系统合规、**是否有不当的 entities 全量订阅等性能问题**
-4. **Review 意见直接写在 PR comment 中**（不通过用户转达）
+3. **视觉验证**（nodex 独有职责）：
+   ```bash
+   gh pr checkout <number>   # 切到 PR 分支
+   npm run dev               # Chrome 加载 .output/chrome-mv3-dev 实测
+   git checkout main         # 测试完切回
+   ```
+4. Review 内容：代码质量、测试覆盖、文档同步、设计系统合规、视觉效果、**是否有不当的 entities 全量订阅等性能问题**
+5. **Review 意见直接写在 PR comment 中**（不通过用户转达）
    - 需要修改：在 PR 留 comment，dev agent 下次 session 会看到
    - 可以合并：直接合并，做必要的后续修正（如设计系统微调）
-5. 也可直接在 main 上做小修复或紧急改动
+6. 也可直接在 main 上做小修复或紧急改动
 
 ### 2.5 常量/类型协调
 
@@ -328,9 +336,17 @@ gh pr list --state open --json number,title,files --jq '.[] | "\(.number) \(.tit
 ```
 ~/Documents/Coding/
 ├── nodex/          ← 主仓库 (.git 在此)，nodex agent，分支 main
-├── nodex-cc/       ← worktree，nodex-cc agent，空闲时在 cc/idle
-├── nodex-cc-2/     ← worktree，nodex-cc-2 agent，空闲时在 cc2/idle
-└── nodex-codex/    ← worktree，nodex-codex agent，空闲时在 codex/idle
+└── nodex-<name>/   ← worktree，Dev Agent，按需创建
+```
+
+### 创建新 Dev Agent
+
+```bash
+# 在主仓库执行
+git worktree add ../nodex-<name> -b <branch> origin/main
+cd ../nodex-<name>
+npm install          # 每个 worktree 需独立安装依赖
+claude               # 启动 Claude Code，自动读取 CLAUDE.md
 ```
 
 ### 关键特性
@@ -338,7 +354,7 @@ gh pr list --state open --json number,title,files --jq '.[] | "\(.number) \(.tit
 - **fetch 一次 = 全局更新**：任意 worktree 执行 `git fetch origin`，所有 worktree 立即可见
 - **分支互斥**：同一分支不能在两个 worktree 同时检出（git 自动阻止），天然防冲突
 - **node_modules 独立**：每个 worktree 需各自 `npm install`（.git 共享，node_modules 不共享）
-- **idle 分支**：Agent 空闲时停在 `cc/idle`、`cc2/idle`、`codex/idle`（"停车位"）
+- **轻量级**：worktree 只是工作目录 + 指向主仓库 `.git` 的链接，不会完整复制仓库
 
 ### 常用操作
 
@@ -346,17 +362,11 @@ gh pr list --state open --json number,title,files --jq '.[] | "\(.number) \(.tit
 # 查看所有 worktree
 git worktree list
 
-# 在 worktree 中开始新任务（与之前相同）
-cd ~/Documents/Coding/nodex-cc
+# 在 worktree 中开始新任务
+cd ~/Documents/Coding/nodex-<name>
 git checkout -b cc/<feature> origin/main
 
-# 任务完成后回到 idle
-git checkout cc/idle
-
-# 添加新 worktree
-git worktree add -b <branch> <path> main
-
-# 移除 worktree
+# 移除 worktree（任务完成后清理）
 git worktree remove <path>
 
 # 清理已删除 worktree 的残留引用
@@ -366,7 +376,7 @@ git worktree prune
 ### 注意事项
 
 - 不要在 worktree 中 checkout 另一个 worktree 正在使用的分支（git 会报错）
-- Claude Code 的项目记忆按路径索引（`~/.claude/projects/-Users-...-nodex-cc/`），路径不变所以记忆保留
+- Claude Code 的项目记忆按路径索引（`~/.claude/projects/-Users-...-nodex-<name>/`），路径不变所以记忆保留
 - 主仓库 `nodex/` 的 `.git/worktrees/` 目录存储 worktree 元数据，不要手动删除
 - **worktree 脏文件陷阱**：`git pull/merge` 只更新 committed history，不覆盖工作区的未提交修改。当其他 Agent 在 main 上更新了共享文档（如 TASKS.md），你的 worktree pull 后会显示 "Already up to date"，但文件内容仍是旧的。**解决**：pull 前先 `git stash`（见 §2.1 启动协议）
 
@@ -400,5 +410,5 @@ CLAUDE.md 的"多 Agent 协作规则"段引用本文件：
 详细协作规范见 `docs/AGENT-COLLABORATION.md`。
 ```
 
-CLAUDE.md 保留 Git 分支规范和 dev server 端口等快速参考信息，
+CLAUDE.md 保留 Git 分支规范和验证分工等快速参考信息，
 本文件承载完整的协作流程和模板。

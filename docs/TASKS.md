@@ -30,6 +30,7 @@ _(空)_
 | nodex-cc | 布局 Phase 3 Undo/Redo 按钮集成 + #44 Phase 1 验证 | `cc/layout-undo-buttons` | `TopToolbar.tsx`, `UndoRedoButtons.tsx` |
 | nodex-cc-2 | Search Nodes Phase 1 (#23) | `cc2/search-nodes` | `node.ts`, `loro-doc.ts`, `search-engine.ts`, `node-store.ts`, `OutlinerItem.tsx`, `OutlinerView.tsx` |
 | nodex-codex | _(idle)_ | — | — |
+| antigravity | _(idle — 待接 v5.0 UI 重构)_ | — | — |
 
 ---
 
@@ -67,6 +68,64 @@ _(空)_
 - [ ] Production 部署（等 Chrome Web Store 发布后配置）
 
 ### P2
+
+#### v5.0 UI 重构 — Clean Paper & Invisible Outline
+> 设计系统从 v1.0（Liquid Glass + 荧光紫）迁移到 v5.0（Clean Paper + 隐形大纲）。
+> 三功能色：Sage Green `#5E8E65` / Warm Amber `#E1A15E` / Brick Red `#AA5048`。
+> **Owner**: antigravity | **Spec**: `docs/design-system.md`（已更新至 v5.0）
+>
+> 分 6 个 Phase，按依赖顺序执行。每个 Phase 完成后跑 `typecheck` → `vitest` → `build`。
+
+**Phase 1: Token 迁移（main.css）** — 一切的基础，完成后 ~70% UI 自动跟随变色
+- [ ] 1.1 Background `#FAFAFA` → `#F5F4EE`
+- [ ] 1.2 Foreground 三级：`#0F0F12` → `#1A1A1A`、`#6B6B80` → `#666666`、`#A0A0B0` → `#999999`
+- [ ] 1.3 Primary 全家族：`#8B5CF6` → `#5E8E65`（hover/muted/ring 同步）
+- [ ] 1.4 新增 Secondary 全家族：`#E1A15E` / `#CC8D4E` / `rgba(225,161,94,0.12)` / `#1A1A1A`
+- [ ] 1.5 Destructive：`#E11D48` → `#AA5048`，新增 hover `#8E3F38` / muted `rgba(170,80,72,0.08)`
+- [ ] 1.6 Warning `#D97706` → `#A07830`、Success `#0D9488` → `#5E8E65`、新增 Info `#5A8AB5`
+- [ ] 1.7 Border 三级：`0.04` → `0.06`、`0.08` → `0.10`、`0.15` → `0.18`
+- [ ] 1.8 Selection：`rgba(139,92,246,0.08)` → `rgba(94,142,101,0.07)`、`#E8E0FA` → `rgba(94,142,101,0.15)`
+- [ ] 1.9 清理废弃 token（muted/card/popover/surface-raised/surface-overlay）
+- [ ] 1.10 统一 opacity 写法（~47 处 `foreground/5`/`/[0.05]`/`/[0.06]` → 统一为 `foreground/4`）
+
+**Phase 2: 内联硬编码色值** — 绕过 CSS 变量的颜色引用（6-8 个文件）
+- [ ] 2.1 `tag-colors.ts`：整套 Tag 10 色替换为 v5.0 低饱和色板（纯文本色，移除 bg 值）
+- [ ] 2.2 `DatePicker.tsx`：`rgba(139,92,246,...)` 热力图色阶 → 基于 `#5E8E65` 的新色阶
+- [ ] 2.3 `DatePicker.tsx`：`TEAL_SOLID` / `PURPLE_SOLID` 常量 → v5.0 功能色
+- [ ] 2.4 `main.css`：mark 高亮 `rgba(250,204,21,0.4)` → `rgba(200,170,80,0.25)`
+- [ ] 2.5 `main.css`：inline ref 选中态蓝色 `rgba(147,197,253,...)` → primary green
+- [ ] 2.6 `TagBadge.tsx:128`：`hover:bg-black/[0.06]` → `hover:bg-foreground/[0.06]`
+
+**Phase 3: 阴影移除（零 Z 深度）** — 13+ 处浮层组件
+- [ ] 3.1 移除所有 `shadow-lg`（TagSelector / SlashCommandMenu / TagBadge / TrailingInput / FloatingToolbar / FieldNameInput / ToolbarUserMenu / ReferenceSelector / DatePicker / NodePicker / OutlinerItem / FieldValueOutliner / DateNavigationBar）
+- [ ] 3.2 移除 `App.tsx:175` 内联 `boxShadow`
+- [ ] 3.3 确认所有浮层已有 `border-border`，缺的补上
+
+**Phase 4: 排版更新** — 字号 + 字重变化（影响布局，需仔细验证）
+- [ ] 4.1 大纲正文 `text-sm` → `text-base`（仅 OutlinerItem 节点正文 / NodeEditor / TrailingInput）
+- [ ] 4.2 `font-bold` → `font-medium`（NodeHeader 标题 / Breadcrumb / LoginScreen logo）
+- [ ] 4.3 `font-semibold` → `font-medium`（NodeHeader 编辑器 / 面板标题）
+- [ ] 4.4 注意：不是所有 `text-sm` 都要改，Dropdown 项、字段标签、辅助信息保持 `text-sm`
+
+**Phase 5: 大纲几何（行高 + 容器）** — ⚠️ 高风险，OutlinerItem 是核心文件
+- [ ] 5.1 `h-7`(28px) → 24px：BulletChevron / DragHandle / OutlinerItem 行容器 / FieldRow / FieldValueOutliner / TrailingInput
+- [ ] 5.2 `min-h-7` → `min-h-6`：OutlinerItem / BacklinksSection / NodeHeader / OutlinerView
+- [ ] 5.3 不改的 h-7：DatePicker 按钮 / FloatingToolbar 按钮 / ToolbarUserMenu 头像
+- [ ] 5.4 按钮圆角 `rounded-md` → `rounded-full`（pill）
+- [ ] 5.5 新增 `--radius-pill: 9999px` 到 main.css @theme
+
+**Phase 6: Tag Badge 重构（排印化）** — Tag 渲染方式变更
+- [ ] 6.1 `TagBadge.tsx`：移除 `bg-[var(--tag-bg)]`，保留 `color: var(--tag-text)`
+- [ ] 6.2 `BulletChevron.tsx:62`：tag badge 移除内联 `backgroundColor`
+- [ ] 6.3 `NodePicker.tsx:26,225`：tag badge 移除内联 bg
+- [ ] 6.4 Tag 文本前缀 `#` 添加（Ink-Tertiary 色）
+- [ ] 6.5 `tag-colors.ts` 简化：移除 `bg` 字段，只保留 `text` 色值
+
+**PR 策略**:
+- Phase 1-3 → 一个 PR（纯视觉变更，不改组件结构）
+- Phase 4 → 单独 PR（字号变化需验证布局）
+- Phase 5 → 单独 PR（高风险：行高变化影响拖拽/选中/缩进）
+- Phase 6 → 单独 PR（Tag 渲染方式变更）
 
 #### Supertags 完善 (#20)
 > 基础已完成（#触发、标签应用/移除、配置页、模板字段、TagBadge 右键菜单）

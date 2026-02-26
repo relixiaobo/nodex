@@ -11,17 +11,29 @@ describe('trailing input update action resolver', () => {
     expect(resolveTrailingRowUpdateAction({ text: '#', isOptionsField: false })).toEqual({
       type: 'create_trigger_node',
       trigger: '#',
+      matchText: '#',
       textOffset: 1,
     });
     expect(resolveTrailingRowUpdateAction({ text: '@', isOptionsField: false })).toEqual({
       type: 'create_trigger_node',
       trigger: '@',
+      matchText: '@',
       textOffset: 1,
     });
     expect(resolveTrailingRowUpdateAction({ text: '/', isOptionsField: false })).toEqual({
       type: 'create_trigger_node',
       trigger: '/',
+      matchText: '/',
       textOffset: 1,
+    });
+  });
+
+  it('maps trailing "#", "@", "/" to trigger-node actions when preceded by text', () => {
+    expect(resolveTrailingRowUpdateAction({ text: 'hello#', isOptionsField: false })).toEqual({
+      type: 'create_trigger_node',
+      trigger: '#',
+      matchText: 'hello#',
+      textOffset: 6,
     });
   });
 

@@ -132,7 +132,7 @@ export function DateNavigationBar({ dayNodeId }: DateNavigationBarProps) {
   }, [navigateTo]);
 
   return (
-    <div className="relative my-1.5 text-[11px] text-foreground-secondary flex items-center" style={{ paddingLeft: 32 }} ref={calendarRef}>
+    <div className="relative my-1.5 pl-4 text-[11px] text-foreground-secondary flex items-center" ref={calendarRef}>
       <div className="inline-flex items-center gap-1">
         <button
           onClick={handlePrevDay}
@@ -175,7 +175,7 @@ export function DateNavigationBar({ dayNodeId }: DateNavigationBarProps) {
         calendarOpen && (
           <div
             className="absolute top-full z-50 mt-1 w-[252px] rounded-lg border border-border bg-popover p-3"
-            style={{ left: 25 }}
+            style={{ left: 16 }}
             onMouseDown={(e) => e.stopPropagation()}
           >
             <CalendarGrid

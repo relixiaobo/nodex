@@ -33,7 +33,7 @@ vi.mock('prosemirror-view', async () => {
       this.dispatchTransaction(tr);
     }
 
-    focus() {}
+    focus() { }
 
     hasFocus() {
       return true;
@@ -118,7 +118,7 @@ describe('TrailingInput trigger focus regression', () => {
     const newNodeId = ui.focusedNodeId;
     expect(newNodeId).toBeTruthy();
     expect(ui.focusedParentId).toBe(parentId);
-    expect(ui.triggerHint).toBe('@');
+    expect(ui.triggerHint?.char).toBe('@');
     expect(ui.focusClickCoords).toEqual({
       nodeId: newNodeId,
       parentId,

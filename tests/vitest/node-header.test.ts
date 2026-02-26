@@ -140,22 +140,3 @@ describe('NodeHeader block visibility logic', () => {
   });
 });
 
-// ─── Column alignment constants ─────────────────────────────────────────────
-
-describe('NodeHeader column alignment', () => {
-  it('depth-0 paddingLeft matches OutlinerItem formula (6px)', () => {
-    // OutlinerItem: paddingLeft = depth * 28 + 6
-    // NodeHeader ROW_PADDING_LEFT = 6 (depth 0)
-    expect(0 * 28 + 6).toBe(6);
-  });
-
-  it('col B offset = 6 + 15 + 4 = 25px', () => {
-    // paddingLeft(6) + chevron/dragHandle(15) + gap-1(4) = 25
-    expect(6 + 15 + 4).toBe(25);
-  });
-
-  it('drop indicator offset in OutlinerItem = depth * 28 + 6 + 15 (21 at depth 0)', () => {
-    // Drop line marginLeft aligns with bullet (after chevron)
-    expect(0 * 28 + 6 + 15).toBe(21);
-  });
-});

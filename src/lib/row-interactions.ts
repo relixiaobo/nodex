@@ -205,7 +205,7 @@ export function resolveTrailingRowEnterIntent(
 export type TrailingRowUpdateAction =
   | { type: 'none' }
   | { type: 'create_field' }
-  | { type: 'create_trigger_node'; trigger: '#' | '@' | '/'; textOffset: number }
+  | { type: 'create_trigger_node'; trigger: '#' | '@' | '/'; matchText: string; textOffset: number }
   | { type: 'open_options'; query: string }
   | { type: 'close_options' };
 
@@ -220,8 +220,13 @@ export function resolveTrailingRowUpdateAction(
   const { text, isOptionsField } = params;
 
   if (text === '>') return { type: 'create_field' };
-  if (text === '#' || text === '@' || text === '/') {
-    return { type: 'create_trigger_node', trigger: text, textOffset: text.length };
+
+  // Detect trigger characters even if preceded by text.
+  // The hashtag/mention must be at the end of the input to trigger node creation immediately.
+  const triggerMatch = text.match(/(#|@|\/)$/);
+  if (triggerMatch) {
+    const trigger = triggerMatch[1] as '#' | '@' | '/';
+    return { type: 'create_trigger_node', trigger, matchText: text, textOffset: text.length };
   }
 
   if (isOptionsField) {

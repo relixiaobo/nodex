@@ -63,6 +63,17 @@
   --font-mono: "JetBrains Mono", "Fira Code", monospace;
 }
 
+/* Paper Shadow — five-layer stacked paper effect for all floating surfaces.
+   Replaces border-based popover styling with warm, physical paper depth. */
+.shadow-paper {
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.015),
+    0 -1px 2px rgba(255, 255, 255, 0.6),
+    0 2px 5px -1px rgba(0, 0, 0, 0.05),
+    0 6px 10px -3px rgba(0, 0, 0, 0.03),
+    0 12px 20px -4px rgba(0, 0, 0, 0.04);
+}
+
 /* Reference single-click selection: compact frame rendered as overlay.
    Important: use pseudo-element instead of border/padding on layout box,
    so selected/unselected states keep identical row height (no visual jump). */
@@ -328,8 +339,8 @@
 }
 
 [cmdk-item][data-selected="true"] {
-  background-color: var(--color-accent);
-  color: var(--color-accent-foreground);
+  background-color: var(--color-primary-muted);
+  color: var(--color-foreground);
 }
 
 [cmdk-separator] {

@@ -2627,7 +2627,7 @@ export function OutlinerItem({
           {/* Options picker dropdown: shown when selecting an Options value row/reference */}
           {optionsPickerOpen && allFieldOptions.length > 0 && (
             <div
-              className="absolute left-0 top-full mt-0.5 max-h-48 w-56 overflow-y-auto rounded-lg border border-border bg-surface p-1 "
+              className="absolute left-0 top-full mt-0.5 max-h-48 w-56 overflow-y-auto rounded-lg bg-background shadow-paper p-1"
               style={{ zIndex: FIELD_OVERLAY_Z_INDEX }}
             >
               {allFieldOptions.map((opt, i) => (
@@ -2636,8 +2636,8 @@ export function OutlinerItem({
                   className={`flex cursor-pointer items-center gap-2 rounded-md px-2 py-1 text-sm ${opt.id === selectedOptionId
                     ? 'bg-primary text-primary-foreground'
                     : i === optionsPickerIndex
-                      ? 'bg-accent text-accent-foreground'
-                      : 'text-popover-foreground hover:bg-accent/50'
+                      ? 'bg-primary-muted text-foreground'
+                      : 'text-foreground hover:bg-foreground/4'
                     }`}
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => {

@@ -391,7 +391,7 @@ export function FloatingToolbar({ view, tick = 0 }: FloatingToolbarProps) {
  return createPortal(
   <div
    data-testid="floating-toolbar"
-   className="fixed z-50 flex items-center gap-0.5 rounded-lg border border-border bg-popover p-1 "
+   className="fixed z-50 flex items-center gap-0.5 rounded-lg bg-background shadow-paper p-1"
    style={{
     top: toolbarPositionStyle.top,
     left: toolbarPositionStyle.left,

@@ -172,7 +172,7 @@ export function NodeHeader({ nodeId, onTitleRef }: NodeHeaderProps) {
         <div className="mb-1">
           {isTagDef && tagDefColor && (
             <span
-              className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent/60"
+              className="flex h-8 w-8 items-center justify-center rounded-lg bg-foreground/[0.06]"
             >
               <span
                 className="text-lg font-bold select-none"
@@ -183,7 +183,7 @@ export function NodeHeader({ nodeId, onTitleRef }: NodeHeaderProps) {
             </span>
           )}
           {isFieldDef && FieldIcon && (
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent/60 text-foreground-tertiary">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-foreground/[0.06] text-foreground-tertiary">
               <FieldIcon size={20} />
             </span>
           )}
@@ -193,7 +193,7 @@ export function NodeHeader({ nodeId, onTitleRef }: NodeHeaderProps) {
             </span>
           )}
           {isContainer && ContainerIcon && (
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent/60 text-foreground-tertiary">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-foreground/[0.06] text-foreground-tertiary">
               <ContainerIcon size={20} />
             </span>
           )}

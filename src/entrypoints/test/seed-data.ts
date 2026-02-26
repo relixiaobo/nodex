@@ -63,7 +63,7 @@ function seedBody(): void {
   // TagDef: Task (showCheckbox, color, done-state mapping via direct props)
   // ═══════════════════════════════════════════════════════════════
   cn('tagDef_task', CONTAINER_IDS.SCHEMA, {
-    type: 'tagDef', name: 'Task', showCheckbox: true, color: 'emerald',
+    type: 'tagDef', name: 'Task', showCheckbox: true, color: 'green',
   });
 
   // FieldDef: Status (OPTIONS)

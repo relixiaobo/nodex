@@ -14,21 +14,21 @@ export interface TagColor {
 }
 
 export const TAG_COLORS: TagColor[] = [
-  { text: '#7B6B8D' }, // 0: Faded Violet
-  { text: '#9B6E6E' }, // 1: Brick Rose
-  { text: '#5E7A92' }, // 2: Slate Blue
-  { text: '#697A4D' }, // 3: Olive
-  { text: '#8A7142' }, // 4: Ochre
-  { text: '#515C96' }, // 5: Deep Indigo
-  { text: '#8E5E70' }, // 6: Smoke Rose
-  { text: '#4D7A7A' }, // 7: Dark Teal
-  { text: '#8E6242' }, // 8: Rust Orange
-  { text: '#616161' }, // 9: Charcoal
+  { text: '#A6535B' }, // 0: Vintage Red
+  { text: '#BA6C43' }, // 1: Terracotta
+  { text: '#9B7C38' }, // 2: Antique Gold
+  { text: '#608A55' }, // 3: Moss Green
+  { text: '#40857A' }, // 4: Verdigris
+  { text: '#4B7C9E' }, // 5: Denim Blue
+  { text: '#6064A6' }, // 6: Muted Indigo
+  { text: '#8E5B8E' }, // 7: Dusty Plum
+  { text: '#8A6754' }, // 8: Cocoa Brown
+  { text: '#788691' }, // 9: Soft Slate
 ];
 
 /** Gray color for system tags (SYS_T*) and user-selectable gray swatch. */
 export const TAG_COLOR_GRAY: TagColor = {
-  text: '#999999',
+  text: '#788691',
 };
 
 /** Inline ref default color (matches current link-like green theme token). */
@@ -39,17 +39,35 @@ export const INLINE_REF_FALLBACK_TEXT_COLOR = 'var(--color-primary)';
  * Stored in SYS_A11 config via AssociatedData.
  */
 export const TAG_COLOR_MAP: Record<string, TagColor> = {
-  violet: TAG_COLORS[0],
-  pink: TAG_COLORS[1],
-  cyan: TAG_COLORS[3],
-  emerald: TAG_COLORS[4],
-  amber: TAG_COLORS[5],
-  rose: TAG_COLORS[6],
-  blue: TAG_COLORS[7],
-  teal: TAG_COLORS[8],
-  orange: TAG_COLORS[9],
+  red: TAG_COLORS[0],
+  orange: TAG_COLORS[1],
+  amber: TAG_COLORS[2],
+  green: TAG_COLORS[3],
+  teal: TAG_COLORS[4],
+  blue: TAG_COLORS[5],
+  indigo: TAG_COLORS[6],
+  violet: TAG_COLORS[7],
+  brown: TAG_COLORS[8],
   gray: TAG_COLOR_GRAY,
+  // Legacy aliases (pre-v5 keys stored in DB)
+  pink: TAG_COLORS[0],     // → red
+  rose: TAG_COLORS[7],     // → violet
+  cyan: TAG_COLORS[4],     // → teal
+  emerald: TAG_COLORS[3],  // → green
 };
+
+/** Map legacy color keys to canonical names so the swatch picker highlights correctly. */
+const LEGACY_KEY_MAP: Record<string, string> = {
+  pink: 'red',
+  rose: 'violet',
+  cyan: 'teal',
+  emerald: 'green',
+};
+
+/** Normalize a stored color key to its canonical name. */
+export function normalizeColorKey(key: string): string {
+  return LEGACY_KEY_MAP[key] ?? key;
+}
 
 const JOURNAL_TAG_IDS = new Set<string>([
   SYSTEM_TAGS.DAY,
@@ -62,27 +80,54 @@ const JOURNAL_TAG_IDS = new Set<string>([
  * Order matches the visual layout (warm → cool → neutral).
  */
 export const SWATCH_OPTIONS: Array<{ key: string; color: TagColor; name: string }> = [
-  { key: 'rose', color: TAG_COLOR_MAP.rose, name: 'Rose' },
-  { key: 'pink', color: TAG_COLOR_MAP.pink, name: 'Pink' },
+  { key: 'red', color: TAG_COLOR_MAP.red, name: 'Red' },
   { key: 'orange', color: TAG_COLOR_MAP.orange, name: 'Orange' },
   { key: 'amber', color: TAG_COLOR_MAP.amber, name: 'Amber' },
-  { key: 'emerald', color: TAG_COLOR_MAP.emerald, name: 'Emerald' },
+  { key: 'green', color: TAG_COLOR_MAP.green, name: 'Green' },
   { key: 'teal', color: TAG_COLOR_MAP.teal, name: 'Teal' },
-  { key: 'cyan', color: TAG_COLOR_MAP.cyan, name: 'Cyan' },
   { key: 'blue', color: TAG_COLOR_MAP.blue, name: 'Blue' },
+  { key: 'indigo', color: TAG_COLOR_MAP.indigo, name: 'Indigo' },
   { key: 'violet', color: TAG_COLOR_MAP.violet, name: 'Violet' },
+  { key: 'brown', color: TAG_COLOR_MAP.brown, name: 'Brown' },
   { key: 'gray', color: TAG_COLOR_MAP.gray, name: 'Gray' },
 ];
 
 /**
- * Hash-based color fallback. Always returns a color from the 10-color palette.
+ * Colors eligible for automatic hash-based assignment (excludes Soft Slate).
+ * Soft Slate (#788691) is only available via explicit user selection in the color picker.
+ */
+const AUTO_ASSIGN_COLORS = TAG_COLORS.slice(0, 9);
+
+/** Color keys in round-robin order (excludes gray). */
+const AUTO_ASSIGN_KEYS = SWATCH_OPTIONS.slice(0, 9).map((s) => s.key);
+
+/**
+ * Pick a color key by round-robin index (e.g. existing tagDef count).
+ * Guarantees all 9 colors appear before repeating.
+ */
+export function nextAutoColorKey(index: number): string {
+  return AUTO_ASSIGN_KEYS[index % AUTO_ASSIGN_KEYS.length];
+}
+
+/**
+ * Hash-based color fallback. Returns a color from the first 9 palette entries
+ * (Soft Slate excluded — only assignable manually).
+ *
+ * Uses MurmurHash3 finalizer for better avalanche → more uniform distribution
+ * across 9 buckets (the old Java hashCode % 9 had visible clustering).
  */
 export function getTagColor(tagDefId: string): TagColor {
-  let hash = 0;
+  let h = 0;
   for (let i = 0; i < tagDefId.length; i++) {
-    hash = ((hash << 5) - hash + tagDefId.charCodeAt(i)) | 0;
+    h = Math.imul(h ^ tagDefId.charCodeAt(i), 0x5bd1e995);
   }
-  return TAG_COLORS[Math.abs(hash) % TAG_COLORS.length];
+  // MurmurHash3 32-bit finalizer
+  h ^= h >>> 16;
+  h = Math.imul(h, 0x85ebca6b);
+  h ^= h >>> 13;
+  h = Math.imul(h, 0xc2b2ae35);
+  h ^= h >>> 16;
+  return AUTO_ASSIGN_COLORS[(h >>> 0) % AUTO_ASSIGN_COLORS.length];
 }
 
 /**

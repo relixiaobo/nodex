@@ -8,7 +8,7 @@
  */
 import { useCallback } from 'react';
 import { useNodeStore } from '../../stores/node-store';
-import { SWATCH_OPTIONS } from '../../lib/tag-colors.js';
+import { SWATCH_OPTIONS, normalizeColorKey, resolveTagColor } from '../../lib/tag-colors.js';
 import { BulletChevron } from '../outliner/BulletChevron';
 import * as loroDoc from '../../lib/loro-doc.js';
 import { FIELD_VALUE_INSET } from './field-layout.js';
@@ -23,28 +23,47 @@ export function ColorSwatchPicker({ tupleId, configNodeId }: ColorSwatchPickerPr
   const setConfigValue = useNodeStore((s) => s.setConfigValue);
   const isVirtual = tupleId.startsWith('__virtual_');
 
-  // Read current color key.
-  // For virtual config entries: read from tagDef.color attribute directly.
-  // For real fieldEntry: read from fieldEntry.children[0].
-  const selectedKey = useNodeStore((s) => {
+  // Whether this tagDef has an explicitly stored color (vs hash-assigned).
+  const hasExplicitColor = useNodeStore((s) => {
     void s._version;
     if (isVirtual && configNodeId) {
-      return loroDoc.toNodexNode(configNodeId)?.color ?? undefined;
+      return !!loroDoc.toNodexNode(configNodeId)?.color;
     }
     const tuple = s.getNode(tupleId);
-    return tuple?.children?.[0] || undefined;
+    return !!(tuple?.children?.[0]);
+  });
+
+  // Resolved color key: explicit → normalized, or hash fallback → matched swatch key.
+  // Must return a primitive (string | undefined) to avoid Zustand infinite re-render.
+  const selectedKey = useNodeStore((s) => {
+    void s._version;
+    let raw: string | undefined;
+    if (isVirtual && configNodeId) {
+      raw = loroDoc.toNodexNode(configNodeId)?.color ?? undefined;
+    } else {
+      const tuple = s.getNode(tupleId);
+      raw = tuple?.children?.[0] || undefined;
+    }
+    if (raw) return normalizeColorKey(raw);
+    // No explicit color → match the hash-assigned color to a swatch
+    if (configNodeId) {
+      const effective = resolveTagColor(configNodeId);
+      const match = SWATCH_OPTIONS.find((sw) => sw.color.text === effective.text);
+      return match?.key;
+    }
+    return undefined;
   });
 
   const handleSelect = useCallback(
     (key: string) => {
       if (isVirtual && configNodeId) {
-        // Write directly to tagDef.color node attribute
-        const newColor = key === selectedKey ? '' : key;
+        // Toggle off only if clicking an already explicitly-stored color.
+        // Clicking the hash-assigned swatch writes it explicitly.
+        const newColor = (key === selectedKey && hasExplicitColor) ? '' : key;
         setConfigValue(configNodeId, 'color', newColor || null);
       }
-      // Non-virtual path is not currently used in new Loro model
     },
-    [isVirtual, configNodeId, selectedKey, setConfigValue],
+    [isVirtual, configNodeId, selectedKey, hasExplicitColor, setConfigValue],
   );
 
   return (

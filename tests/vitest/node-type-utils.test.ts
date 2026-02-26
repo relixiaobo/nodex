@@ -9,9 +9,14 @@ describe('isOutlinerContentNodeType', () => {
     expect(isOutlinerContentNodeType('reference')).toBe(true);
   });
 
+  it('treats search nodes as renderable content', () => {
+    expect(isOutlinerContentNodeType('search')).toBe(true);
+  });
+
   it('filters structural schema/field nodes from content rows', () => {
     expect(isOutlinerContentNodeType('fieldEntry')).toBe(false);
     expect(isOutlinerContentNodeType('tagDef')).toBe(false);
     expect(isOutlinerContentNodeType('fieldDef')).toBe(false);
+    expect(isOutlinerContentNodeType('queryCondition')).toBe(false);
   });
 });

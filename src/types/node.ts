@@ -38,8 +38,9 @@ export type NodeType =
   | 'fieldDef'     // 字段定义
 
   // ── 查询与视图 ──
-  | 'viewDef'      // 视图配置节点（P3）
-  | 'search';      // Live Search / 动态查询节点（P3）
+  | 'viewDef'          // 视图配置节点（P3）
+  | 'search'           // Live Search / 动态查询节点
+  | 'queryCondition';  // 查询条件节点（search node 子节点）
 
 /**
  * 视图模式枚举。
@@ -50,6 +51,62 @@ export type ViewMode =
   | 'tiles'           // 瓦片布局
   | 'cards'           // 卡片布局
   | 'navigationList'; // 简单列表导航
+
+// ============================================================
+// QueryOp — 搜索条件操作符（上线后只加不改）
+// ============================================================
+
+/**
+ * 查询条件操作符。
+ *
+ * 持久化为字符串存储在 Loro 中，上线后只加不改（rename 需迁移）。
+ * 未实现的操作符在搜索引擎中必须显式返回 "not supported"，禁止静默忽略。
+ *
+ * @see docs/plans/search-node-design.md § 2.3
+ */
+export type QueryOp =
+  // Phase 1: Tag + Checkbox
+  | 'HAS_TAG'
+  | 'TODO'               // 有 checkbox（无论勾选与否）
+  | 'DONE'               // completedAt != null
+  | 'NOT_DONE'           // showCheckbox && !completedAt
+
+  // Phase 2: Field conditions
+  | 'FIELD_IS'           // 字段值匹配任一条件值（多子节点 = OR）
+  | 'FIELD_IS_NOT'       // 字段值不匹配所有条件值
+  | 'IS_EMPTY'           // 字段无值（= Not Set）
+  | 'IS_NOT_EMPTY'       // 字段有值（= Set）
+  | 'FIELD_CONTAINS'     // 文本子串匹配（第一个子节点 name 为搜索词）
+  | 'LT'                 // 小于（数字/日期）
+  | 'GT'                 // 大于（数字/日期）
+
+  // Phase 2: Time conditions
+  | 'CREATED_LAST_DAYS'  // createdAt 在 N 天内
+  | 'EDITED_LAST_DAYS'   // updatedAt 在 N 天内
+  | 'DONE_LAST_DAYS'     // completedAt 在 N 天内
+
+  // Phase 2: Content & Relationship
+  | 'HAS_FIELD'          // 含有任意字段
+  | 'LINKS_TO'           // 有 inline ref 或 tree ref 指向目标节点
+  | 'STRING_MATCH'       // 节点名称文本匹配
+  | 'REGEXP_MATCH'       // 节点名称正则匹配
+
+  // Phase 3: Relationships & Type
+  | 'CHILD_OF'           // 指定节点的直接子节点
+  | 'IS_TYPE'            // 节点类型检查（tagDef, fieldDef, search 等）
+  | 'FOR_DATE'           // 含有指向特定日期节点的引用
+  | 'FOR_RELATIVE_DATE'  // 含有相对日期引用（today, yesterday, next week 等）
+
+  // Phase 3: Scope
+  | 'PARENTS_DESCENDANTS'     // 搜索节点父节点的所有后代
+  | 'IN_LIBRARY'              // Library 容器的直接子节点
+  | 'ON_DAY_NODE'             // 日历日节点的直接子节点
+
+  // Future（依赖未实现的功能）
+  | 'EDITED_BY'          // 依赖 Sync Phase 2 Loro PeerID → userId 映射
+  | 'OWNED_BY'           // 依赖 ownerId 概念恢复（当前已消除）
+  | 'OVERDUE'            // !completedAt && dueDate < today
+  | 'HAS_MEDIA';         // 依赖媒体功能
 
 // ============================================================
 // 富文本类型（Phase 2 升级为 LoroText，Phase 1 沿用）
@@ -230,6 +287,25 @@ export interface NodexNode {
 
   /** Options from supertag 来源标签 ID（旧 SYS_A06） */
   sourceSupertag?: string;
+
+  // ─── queryCondition 专用 ───
+
+  /** 查询逻辑类型（仅 group 节点，与 queryOp 互斥） */
+  queryLogic?: 'AND' | 'OR' | 'NOT';
+
+  /** 查询操作符（仅 leaf 节点，与 queryLogic 互斥） */
+  queryOp?: QueryOp;
+
+  /** HAS_TAG 条件的目标标签定义 ID */
+  queryTagDefId?: string;
+
+  /** 字段条件指向的 fieldDef 节点 ID */
+  queryFieldDefId?: string;
+
+  // ─── search 专用 ───
+
+  /** search node 上次执行完整 diff 的时间戳 (ms) */
+  lastRefreshedAt?: number;
 }
 
 // ============================================================

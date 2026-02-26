@@ -618,13 +618,13 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
                 <div ref={mountRef} className="outline-none text-[15px] leading-6" />
                 {optionsOpen && filteredOptions.length > 0 && (
                     <div
-                        className="absolute left-0 top-full mt-0.5 max-h-48 w-56 overflow-y-auto rounded-lg border border-border bg-surface p-1 "
+                        className="absolute left-0 top-full mt-0.5 max-h-48 w-56 overflow-y-auto rounded-lg bg-background shadow-paper p-1"
                         style={{ zIndex: FIELD_OVERLAY_Z_INDEX }}
                     >
                         {filteredOptions.map((opt, i) => (
                             <div
                                 key={opt.id}
-                                className={`flex cursor-pointer items-center gap-2 rounded-md px-2 py-1 text-sm ${i === optionsIndex ? 'bg-accent text-accent-foreground' : 'text-popover-foreground hover:bg-accent/50'}`}
+                                className={`flex cursor-pointer items-center gap-2 rounded-md px-2 py-1 text-sm ${i === optionsIndex ? 'bg-primary-muted text-foreground' : 'text-foreground hover:bg-foreground/4'}`}
                                 onMouseDown={(e) => e.preventDefault()}
                                 onClick={() => handleOptionClick(opt.id)}
                             >

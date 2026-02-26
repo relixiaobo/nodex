@@ -113,7 +113,7 @@ export function ToolbarUserMenu() {
                             className="h-5 w-5 rounded-full object-cover"
                         />
                     ) : (
-                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-accent text-[8px] font-medium text-accent-foreground">
+                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-foreground/[0.06] text-[8px] font-medium text-foreground">
                             {initials}
                         </span>
                     )}
@@ -128,7 +128,7 @@ export function ToolbarUserMenu() {
 
             {/* Dropdown */}
             {open && (
-                <div className="absolute right-0 top-full mt-1 w-52 rounded-lg border border-border bg-popover p-1 z-50">
+                <div className="absolute right-0 top-full mt-1 w-52 rounded-lg bg-background shadow-paper p-1 z-50">
                     {/* User info */}
                     <div className="px-2 py-1.5">
                         {authUser.name && (

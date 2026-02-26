@@ -535,12 +535,30 @@ queryCondition 节点在 `node-capabilities.ts` 中需限制：
 
 ## 八、与其他功能的关系
 
+### 8.1 Search Query vs View Toolbar（正交关系）
+
+Search Node 的 queryCondition 和 View Toolbar 的 Filter/Sort/Group 是**两个独立系统**，解决不同问题：
+
+| | Search Query（查询） | View Toolbar（视图） |
+|---|---|---|
+| **回答的问题** | 哪些节点是这个集合的成员？ | 成员如何展示？ |
+| **适用范围** | 仅 search node | **所有节点**（content、search、container） |
+| **数据存储** | queryCondition 子节点树 | ViewDef Tuple (SYS_A16/18/19/20) |
+| **影响** | 增删 children（物化 reference） | 不改变 children，只改变显示顺序/可见性 |
+| **UI 入口** | 条件芯片条（Section 5.2） | View Toolbar（右键菜单 → "Show view toolbar"） |
+
+**对于 Search Node**：两者叠加使用。queryCondition 定义成员集合，View Toolbar 进一步控制展示（如"搜索结果按 priority 排序，隐藏已完成的"）。
+
+**对于普通节点**：只有 View Toolbar。children 是手动添加的，View Toolbar 控制排列和过滤。
+
+### 8.2 功能关系表
+
 | 功能 | 与 Search Node 的关系 |
 |------|----------------------|
 | **标签页** | = 内置 HAS_TAG 条件的 search node。点击标签就创建 |
-| **Filter/Sort/Group (#25)** | 搜索结果的视图配置，共享工具栏 UI |
-| **Table View (#24)** | 搜索结果可以表格视图展示 |
-| **Views 系统** | search node 的 viewDef 配置决定结果展示方式 |
+| **View Toolbar (#25)** | 正交系统。Search Node 的查询决定成员，View Toolbar 决定展示。Search Node 和普通节点共享同一套 View Toolbar |
+| **Table View (#24)** | 搜索结果可以表格视图展示（viewMode = 'table'） |
+| **Views 系统** | search node 的 viewDef 配置决定结果展示方式（与普通节点的 viewDef 机制相同） |
 | **References / Backlinks** | 物化引用天然出现在反向链接中 |
 | **Undo/Redo** | 用户手动 reference 操作进入 undo 栈；search refresh 产生的系统 reference 变更不进入 undo（`system:refresh` origin，见 5.8） |
 

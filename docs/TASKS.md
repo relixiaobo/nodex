@@ -49,8 +49,19 @@ _(无进行中任务)_
 > Steps 0-9 + Staging 已完成。**Plan**: `docs/plans/sync-incremental-impl.md`
 
 - [ ] Production 部署（Cloudflare Workers + D1 + R2 + Google OAuth）
-- [ ] Chrome Web Store 发布
 - [ ] Step 10: Compaction（上线后尽快完成）
+
+#### Chrome Web Store 上架准备
+
+- [ ] **扩展图标** — 16/32/48/128px PNG（manifest `icons` 字段）
+- [ ] **商店图标** — 128x128 PNG（商店页面展示）
+- [ ] **商店截图** — 1-5 张（1280x800，展示 Side Panel 使用场景）
+- [ ] **商店描述** — 详细功能介绍（最长 16,000 字符）
+- [ ] **隐私政策页面** — 说明数据收集/存储/同步方式（`<all_urls>` + `identity` + `storage` 审核必须）
+- [ ] **产品展示页** — 静态落地页（产品介绍 + 截图 + 安装链接 + 隐私政策），可托管在 Cloudflare Pages 或 GitHub Pages
+- [ ] **Production build 清理** — 移除 manifest `key` 字段 + 移除 `host_permissions` 中的 localhost 地址
+- [ ] **开发者账号** — Chrome Web Store 注册（$5）
+- [ ] `npm run zip` → 上传发布
 
 ---
 

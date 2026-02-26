@@ -29,7 +29,7 @@ _(空)_
 | Agent | 当前任务 | 分支 | 修改中的文件 |
 |-------|---------|------|-------------|
 | nodex-codex | _(idle)_ | — | — |
-| antigravity | UI 细节打磨 | `anti/ui-polish` | _(等待第二轮 review 反馈)_ |
+| antigravity | _(idle)_ | — | — |
 
 ---
 
@@ -78,15 +78,9 @@ _(无进行中任务)_
 > - Phase 6: Tag Badge 排印化 ✓ — 纯文本着色，无背景 badge
 > - Phase 7: 隐形 UI + 顶栏重构 ✓ — group-hover 控件 + 文本化标签 + 全局顶栏
 
-#### UI 细节打磨 — v5.0 后续微调
-> v5.0 重构后的视觉/交互小问题收集与修复。nodex 在 PR review 中逐条提反馈，antigravity 逐项修改。
+#### UI 细节打磨 — v5.0 后续微调 ✅
+> v5.0 重构后的视觉/交互小问题收集与修复。全部完成。
 > **Owner**: antigravity | **Branch**: `anti/ui-polish`
-
-- [x] TopToolbar 左右等距对齐及 Undo/Redo 简单箭头图标 ✓ antigravity
-- [x] Breadcrumb 标题滚动隐藏后追加到面包屑末尾规则恢复 ✓ antigravity
-- [x] PR #96 Review 反馈修复（TrailingInput 缩进/Breadcrumb 下拉/tree-utils 逻辑，保留 Undo 为 Arrow 图标并清理无用 icon export） ✓ antigravity
-- [x] PR #97 修复（移除废弃对齐测试修复 check:test-sync，添加伪元素解决空节点光标不可见） ✓ antigravity
-- [ ] _(等待 nodex 第二轮 PR review 反馈)_
 
 #### Supertags 完善 (#20)
 > 基础已完成（#触发、标签应用/移除、配置页、模板字段、TagBadge 右键菜单）
@@ -273,8 +267,8 @@ _(无进行中任务)_
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
 | 2026-02-26 | Search Node Step 0 数据模型锁定 — `queryCondition` NodeType + `QueryOp`(32 op) + query 属性 + Loro 读写 + `isOutlinerContentNodeType('search')` + 6 Vitest | nodex | main |
+| 2026-02-26 | UI 细节打磨全部完成 — TopToolbar 对齐 + Breadcrumb 滚动规则 + TrailingInput 缩进 + 空节点光标 + 第二轮 review | antigravity | #96 #97 |
 | 2026-02-26 | v5.0 UI 重构全量完成 — Phase 1-7（Token 迁移 + 硬编码色值 + 阴影移除 + 排版 15px/24px + 大纲几何 + Tag 排印化 + 隐形 UI + 顶栏重构） | antigravity | #93 #96 |
-| 2026-02-26 | UI 细节打磨 — TopToolbar 对齐 + Breadcrumb 滚动规则 + TrailingInput 缩进 + 空节点光标 | antigravity | #96 #97 |
 | 2026-02-24 | 统一时间线 Undo/Redo (#44) 全量完成 — Phase 1-4（commitDoc 覆盖 + PM→Loro 同步 + UI marker commit + 统一 ⌘Z handler） | nodex-codex + nodex-cc | #91 #92 |
 | 2026-02-24 | Side Panel 布局改造 全量完成 — Phase 1-4（TopToolbar + ⌘K 重写 + Undo/Redo 按钮 + 清理废弃文件） | nodex-cc | #88 |
 | 2026-02-24 | Undo/Redo Bug 1+3 修复 — bootstrap replacePanel + seed clearUndoHistory + 导航后 sink 聚焦 + TrailingInput Mod-z | nodex-cc + nodex | #92 + main |

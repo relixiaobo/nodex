@@ -1216,23 +1216,25 @@ export function OutlinerItem({
   useEffect(() => {
     if (!isFocused) return;
     const hint = useUIStore.getState().triggerHint;
-    if (!hint) return;
+    if (!hint || hint.nodeId !== nodeId) return;
     useUIStore.getState().setTriggerHint(null);
 
-    if (hint === '#') {
+    // To prevent infinite re-trigger loops from focus churn in isolated test cases or DevTools,
+    // ensure we don't spam-open dropdowns if the selection is already completely matching.
+    if (hint.char === '#') {
       // The editor content is '#' — set range to cover it
       setHashTagQuery('');
       setHashTagSelectedIndex(0);
       setHashTagAnchor(undefined);
       hashRangeRef.current = { from: 1, to: 2 }; // position of '#' in ProseMirror doc
       setHashTagOpen(true);
-    } else if (hint === '@') {
+    } else if (hint.char === '@') {
       setRefQuery('');
       setRefSelectedIndex(0);
       setRefAnchor(undefined);
       refRangeRef.current = { from: 1, to: 2 };
       setRefOpen(true);
-    } else if (hint === '/') {
+    } else if (hint.char === '/') {
       setSlashQuery('');
       setSlashAnchor(undefined);
       slashRangeRef.current = { from: 1, to: 2 };
@@ -1893,6 +1895,8 @@ export function OutlinerItem({
 
     if (focusTrailingInputForParent(parentId)) {
       return;
+    } else if (focusTrailingInputForParent(rootNodeId)) {
+      return;
     } else if (onNavigateOut) {
       onNavigateOut('down');
     }
@@ -2059,8 +2063,8 @@ export function OutlinerItem({
     setRefQuery(query);
     setRefSelectedIndex(0);
     setRefAnchor(anchor);
-    if (!refOpen) setRefOpen(true);
-  }, [refOpen, parentId]);
+    setRefOpen(true);
+  }, [parentId]);
 
   const handleReferenceDeactivate = useCallback(() => {
     setRefOpen(false);
@@ -2570,11 +2574,11 @@ export function OutlinerItem({
               ) : (
                 <span
                   className="node-content"
-                  dangerouslySetInnerHTML={{ __html: nodeContentHtml || '&nbsp;' }}
+                  dangerouslySetInnerHTML={{ __html: nodeContentHtml || '&#8203;' }}
                 />
               )}
               {hasTags && (
-                <span className="inline-flex align-middle ml-1.5" onClick={(e) => e.stopPropagation()}>
+                <span className="inline-flex align-baseline ml-1.5" onClick={(e) => e.stopPropagation()}>
                   <TagBar nodeId={effectiveNodeId} />
                 </span>
               )}
@@ -2777,6 +2781,10 @@ export function OutlinerItem({
                             textOffset: 0,
                           });
                           setFocusedNode(nx.nodeId, nx.parentId);
+                          return;
+                        }
+                        if (focusTrailingInputForParent(rootNodeId)) {
+                          return;
                         }
                       }
                     }
@@ -2804,20 +2812,35 @@ export function OutlinerItem({
               parentExpandKey={expandKey}
               onNavigateOut={(direction) => {
                 if (direction === 'up') {
-                  if (lastRenderableChild) {
-                    if (lastRenderableChild.type === 'field') {
-                      clearFocus();
-                      setEditingFieldName(lastRenderableChild.id);
-                      return;
-                    }
+                  const fl = getFlattenedVisibleNodes(
+                    rootChildIds,
+                    useUIStore.getState().expandedNodes,
+                    rootNodeId,
+                  );
+                  // Find the true previous visible node prior to our parent
+                  // By finding our parent's index and taking the node *right after* its descendants ends?
+                  // Actually, TrailingInput resides exactly AT THE END of its 'effectiveNodeId''s scope.
+                  // So we just need to find the node whose 'expanded content' ends exactly here,
+                  // or more simply, we find the node that appears exactly BEFORE the next sibling of 'effectiveNodeId'.
+                  // Which is equivalent to taking the last node in the flattened list if we just build a flattened list for 'effectiveNodeId'.
+                  const parentChildren = useNodeStore.getState().getNode(effectiveNodeId)?.children ?? [];
+                  const parentFl = getFlattenedVisibleNodes(
+                    parentChildren,
+                    useUIStore.getState().expandedNodes,
+                    effectiveNodeId,
+                  );
+                  if (parentFl.length > 0) {
+                    const lastNode = parentFl[parentFl.length - 1];
                     useUIStore.getState().setFocusClickCoords({
-                      nodeId: lastRenderableChild.id,
-                      parentId: effectiveNodeId,
-                      textOffset: (useNodeStore.getState().getNode(lastRenderableChild.id)?.name ?? '').length,
+                      nodeId: lastNode.nodeId,
+                      parentId: lastNode.parentId,
+                      textOffset: getNodeTextLengthById(lastNode.nodeId),
                     });
-                    setFocusedNode(lastRenderableChild.id, effectiveNodeId);
+                    setFocusedNode(lastNode.nodeId, lastNode.parentId);
                     return;
                   }
+
+                  // If `effectiveNodeId` has no visible children, focus the parent itself.
                   useUIStore.getState().setFocusClickCoords({
                     nodeId,
                     parentId,

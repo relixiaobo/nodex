@@ -146,6 +146,7 @@ describe('row interaction intents', () => {
     ).toEqual({
       type: 'create_trigger_node',
       trigger: '@',
+      matchText: '@',
       textOffset: 1,
     });
 

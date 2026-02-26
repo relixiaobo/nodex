@@ -252,6 +252,10 @@ export function RichTextEditor(props: RichTextEditorProps) {
           tr.setSelection(TextSelection.create(tr.doc, nextPos));
           view.dispatch(tr);
           setToolbarTick((value) => value + 1);
+          // Mark as user edited so trigger detection (#, @, /) activates correctly
+          // on the very first character typed after refocusing an empty node.
+          triggerStateRef.current.hasUserEdited = true;
+          runTriggerDetection(view, true);
         }
       }
 
@@ -622,11 +626,11 @@ export function RichTextEditor(props: RichTextEditorProps) {
         },
         ...(KEY_EDITOR_EDIT_DESC_SECONDARY
           ? {
-              [KEY_EDITOR_EDIT_DESC_SECONDARY]: () => {
-                propsRef.current.onDescriptionEdit?.();
-                return true;
-              },
-            }
+            [KEY_EDITOR_EDIT_DESC_SECONDARY]: () => {
+              propsRef.current.onDescriptionEdit?.();
+              return true;
+            },
+          }
           : {}),
         'Mod-z': () => {
           undoDoc();

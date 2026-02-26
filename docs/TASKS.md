@@ -41,133 +41,50 @@ _(无进行中任务)_
 
 ## 待办
 
-### P1
+### v0.1 — 首次上线（Chrome Web Store 发布）
 
-#### Sync 增量同步（Phase 1-2 合并实施）— Cloudflare-only 全栈
-> Phase 0 客户端预留已完成（PR #75 + #77 + #78）。基础设施：**Cloudflare-only**（Workers + R2 + D1 + Better Auth），完全消除 Supabase 依赖。
-> 跳过纯备份（Phase 1），直接实现多端增量同步（Phase 2）。
-> **Owner**: nodex-cc
-> **Plan**: `docs/plans/sync-incremental-impl.md` | **Arch**: `docs/plans/sync-architecture.md` | **Auth**: `docs/plans/auth-cloudflare-only.md`
->
-> **当前状态**: Steps 0-9 完成，Staging 部署完成，Compaction 待做
+> **上线门槛**：用户可以日常使用的最小完整产品。已有功能（大纲编辑、Supertags、Fields、Date 节点、Web Clipping 基础、Undo/Redo、⌘K 搜索）+ Sync = v0.1。
 
-- [x] **Review**: nodex-codex review 实施计划（含 7 个开放问题） ✓ nodex-codex（2026-02-22）
-- [x] **修订**: Postgres → D1 迁移 + Auth 评估 ✓ nodex-codex（2026-02-22）
-- [x] **修订**: Cloudflare-only 全栈（Auth PoC 纳入 Step 0） ✓ nodex（2026-02-23）
-- [x] Step 0-5: Auth + Sync Server 全链路 ✓ nodex-cc PR #80（2026-02-23）
-- [x] Step 6: 客户端 Pending Queue（IndexedDB 队列） ✓ nodex-cc PR #83（2026-02-23）
-- [x] Step 7: 客户端 Sync Manager（push/pull 循环 + retry/backoff） ✓ nodex-cc PR #83（2026-02-23）
-- [x] Step 8: 客户端 Sync 状态 UI（SyncStatusIndicator） ✓ nodex-cc PR #83（2026-02-23）
-- [x] Step 9: 端到端测试 ✓ nodex（2026-02-23）— `tests/vitest/sync-e2e.test.ts` 10 cases
-- [x] Staging + Production 双环境部署 ✓ nodex（2026-02-23）— D1 + Worker + Secrets + Google OAuth
-- [x] HTTPS cookie 前缀修复（`__Secure-` prefix） ✓ nodex（2026-02-23）
-- [ ] Step 10: Compaction（延后到上线后）
-- [ ] Production 部署（等 Chrome Web Store 发布后配置）
+#### Sync Production 部署
+> Steps 0-9 + Staging 已完成。**Plan**: `docs/plans/sync-incremental-impl.md`
 
-### P2
+- [ ] Production 部署（Cloudflare Workers + D1 + R2 + Google OAuth）
+- [ ] Chrome Web Store 发布
+- [ ] Step 10: Compaction（上线后尽快完成）
 
-#### v5.0 UI 重构 — Clean Paper & Invisible Outline ✅
-> 设计系统从 v1.0（Liquid Glass + 荧光紫）迁移到 v5.0（Clean Paper + 隐形大纲）。全 7 个 Phase 已完成。
-> **Owner**: antigravity | **Spec**: `docs/design-system.md`（v5.0）
->
-> - Phase 1: Token 迁移 ✓ — 全套 CSS 变量已迁移（绿/琥珀/砖红）
-> - Phase 2: 硬编码色值 ✓ — tag-colors/DatePicker/TagBadge/main.css
-> - Phase 3: 阴影移除 ✓ — 全局 0 处 shadow-lg
-> - Phase 4: 排版更新 ✓ — 正文 text-[15px]/leading-6，标题 font-semibold/bold
-> - Phase 5: 大纲几何 ✓ — 行高 24px + pill 圆角
-> - Phase 6: Tag Badge 排印化 ✓ — 纯文本着色，无背景 badge
-> - Phase 7: 隐形 UI + 顶栏重构 ✓ — group-hover 控件 + 文本化标签 + 全局顶栏
+---
 
-#### UI 细节打磨 — v5.0 后续微调 ✅
-> v5.0 重构后的视觉/交互小问题收集与修复。全部完成。
-> **Owner**: antigravity | **Branch**: `anti/ui-polish`
+### P1 — 核心差异化（上线后第一优先级）
 
-#### Supertags 完善 (#20)
-> 基础已完成（#触发、标签应用/移除、配置页、模板字段、TagBadge 右键菜单）
-> 已完成子项：Show as Checkbox、标签继承/Extend Phase 1、applyTag 复制 default content、Color 继承
+#### 上下文感知 Sidebar — 浏览器原生知识助手
+> **Nodex 最核心的差异化功能**。Tana/Notion/Obsidian 做不到——因为它们不在浏览器里。
+> 用户浏览网页时，侧边栏自动显示与当前页面相关的笔记，实现”阅读 ↔ 知识”双向连接。
 
-- [x] Done state mapping — checkbox ↔ Options 字段值双向映射 ✓ PR #54
-- [x] 统一 config field 架构（系统配置字段与用户字段共享数据模型） ✓ PR #54
-- [x] BOOLEAN 数据类型 + toggle switch ✓ PR #54
-- [x] Default Child Supertag（新增子节点自动继承指定标签）✓ nodex-cc-2
-- [x] Color Swatch Selector（10 色预置色板 + ColorSwatchPicker + resolveTagColor）✓ nodex-cc-2
-- [ ] Pinned fields（置顶显示 + filter 优先）
-- [ ] Optional fields（建议按钮 + 自动降级）
-- [ ] Convert to supertag（普通节点快捷转 tagDef）
-- [ ] 批量标签操作（多选 add/remove）
-- [ ] Title expression（`${field name}` 动态标题）
-- [ ] 标签页（= Search Nodes L0 入口，点击 supertag → 创建/导航 search node，见 #23）
-- **Spec**: `docs/features/supertags.md`
+- [ ] **Phase 1: URL 匹配** — 检测当前标签页 URL，匹配已有 web_clip 的 Source URL 字段，显示”你之前记过这个网页”
+- [ ] **Phase 2: 内容相似度** — 提取当前网页关键词/实体，与笔记内容做模糊匹配，显示相关笔记列表
+- [ ] **Phase 3: 标签关联** — 当前网页内容 → AI 推断相关标签 → 显示同标签下的笔记
+- [ ] **Phase 4: 主动建议** — “你可能想把这段内容加到 XXX 笔记中” / “这个页面提到了你的 #project 笔记”
+- [ ] Content Script 增强：网页内高亮已剪藏内容、锚点引用
 
-#### Fields 全类型 (#21)
-> 基础已完成（>触发、字段名编辑+自动完成、交错渲染、字段值编辑器、配置页）
-> 已完成子项：Options 下拉、Date 选择器、Number/URL/Email 输入、Checkbox、字段隐藏规则、Required 字段、Number Min/Max、值验证、系统字段(8/12)
+#### 网页剪藏增强 (#30)
+> 浏览器产品的核心价值。基础版已完成，需升级为智能剪藏。
 
-- [x] Options from Supertag（特定标签的节点作为选项源）✓ PR #54 + nodex-cc-2
-- [ ] AttrDef "Used in" 计算字段
-- [ ] Auto-initialize（6 种策略）
-- [ ] Pinned fields
-- [ ] Merge fields
-- **Spec**: `docs/features/fields.md`
-
-#### Date 节点 & 日记 (#22)
-> 执行顺序 ①（"一切皆节点"系列首项，后续 Search/Views 依赖日期节点）
-> Phase 1 已完成 (PR #73): Year→Week→Day 层级 + Today 入口 + DateNavigationBar + 日历选择器
-
-- [x] 年/周/日节点层级（自动生成，ISO 8601 周 + 降序排列） ✓ PR #73
-- [x] Today 快捷入口（侧栏按钮 + 快捷键 Cmd+Shift+D） ✓ PR #73
-- [x] DateNavigationBar（< > Today + Calendar popover） ✓ PR #73
-- [x] 面包屑/标题 "Today" 前缀 ✓ PR #73
-- [x] `@today`/`@tomorrow`/`@yesterday` 日期快捷引用 ✓ main + PR #72
-- [ ] 自然语言日期解析扩展（@next Monday / @November / @last week）
-- [ ] 日记模板（#day supertag 配置）
-- [ ] 日期字段链接到日节点
-- **Spec**: `docs/features/date-nodes.md`
-
-#### 网页剪藏 (#30)
-> 已完成：消息类型定义、Content Script 提取（defuddle）、Background 中转、`/clip` slash command 全链路、`#web_clip` tagDef + Source URL attrDef 惰性创建、V2 正文→子节点、Vitest 55 cases
-> **Owner**: nodex-cc-2 | **Branch**: cc2/web-clipping
-
-- [x] 将捕获数据保存为节点 ✓ `/clip` + `applyWebClipToNode`
-- [x] 自动打 web_clip 标签 ✓ `applyTag(tagDef_web_clip)`
-- [x] Source URL 字段写入 ✓ `setFieldValue(sourceUrlAttrDefId, url)`
-- [x] 剪藏结果 Toast 反馈（成功/失败提示）✓ sonner toast
+- [x] 基础剪藏链路 ✓（消息/提取/保存/标签/URL/Toast/正文→子节点）
 - [ ] 一键保存到 Inbox / Today / 指定节点（UI 入口 + 目标选择）
-- [x] 保留源 URL 引用（URL 字段值渲染为可点击链接）✓ FieldValueOutliner URL/Email 早返回
-- [x] 正文内容转子节点（V2）✓ `parseHtmlToNodes()` + `createContentNodes()` heading-based 层级树
+- [ ] **AI 智能剪藏** — 自动打标签、提取结构化信息（作者/日期/关键词）、推荐关联到已有笔记
+- [ ] 选中文本剪藏（Content Script 右键菜单 / 浮动按钮 → 剪藏选中段落）
+- [ ] 剪藏模板 — 不同网站类型（文章/产品/视频/论文）使用不同 Supertag 模板
 - **Spec**: `docs/features/web-clipping.md`
 
-#### NodePanel Title 交互补全
-> NodePanel 标题编辑器（NodeHeader）不支持 `@`/`#` 触发器和 `Cmd+Enter` checkbox 切换，与正文编辑器行为不一致。
+#### AI Chat & 网页辅助 (#29 + #31)
+> 浏览器 + AI = Nodex 的第二个差异化维度。不只是聊天框，而是理解上下文的知识助手。
 
-- [ ] 标题编辑器支持 `@` 触发 ReferenceSelector（插入 inline reference）
-- [ ] 标题编辑器支持 `#` 触发 TagSelector（应用 supertag）
-- [ ] 标题编辑器支持 `Cmd+Enter` 切换 checkbox 状态
+- [ ] **AI Chat 基础** — Side Panel 内嵌对话界面，可引用笔记节点作为上下文
+- [ ] **网页问答** — 选中网页内容 → 在侧边栏中提问/总结/翻译（Content Script + Side Panel 联动）
+- [ ] **笔记问答** — 基于全部笔记回答问题（RAG / 全文搜索 + LLM）
+- [ ] **AI 辅助组织** — 自动打标签建议、推荐关联笔记、内容分类
 
-#### Shift+Arrow 连续多选中断问题
-> 按住 Shift+↑/↓ 连续选中节点时，遇到虚拟空白节点（TrailingInput）或 field 节点会中断选区，无法继续向上/下扩展。
-
-- [ ] 排查 Shift+↑/↓ 遍历逻辑对 TrailingInput 虚拟节点的处理（应跳过）
-- [ ] 排查 Shift+↑/↓ 遍历逻辑对 field tuple 节点的处理（应纳入或跳过，保持连续）
-- [ ] 补 Vitest 回归用例（含 trailing input + field row 场景）
-
-#### 节点选中 — 后续增强 (#47)
-> Phase 1-3 已合并（PR #51）。PR #72 补充了字段行选中 + 全局选区清除。以下为未覆盖的后续项：
-
-- [x] 字段行统一选中（pointer-intent + Cmd/Shift+Click） ✓ PR #72
-- [x] 全局 pointerdown 选区清除（outliner 外点击自动清空） ✓ PR #72
-- [ ] Cmd+Shift+D 批量复制
-- [ ] 拖动选择优化（跨面板边界防护）
-- **Spec**: `docs/features/node-selection.md`
-
-### P3
-
-#### 合并节点（Merge Nodes）
-> 从 References 增强 (#19) 拆出的独立任务
-
-- [ ] 选中多个重复节点 → 合并为一个（保留第一个，合并 children/tags）
-- [ ] 所有引用（树引用 + 内联引用 + 字段值引用）更新为指向合并后的节点
-- **Spec**: `docs/features/references.md`
+### P2 — 知识管理核心能力
 
 #### Search Nodes (#23)
 > 规则驱动的动态集合。物化 reference 结果 + queryCondition 子节点树。
@@ -175,95 +92,127 @@ _(无进行中任务)_
 >
 > Step 0 已完成（数据模型锁定），Step 1-3 上线后一个 PR 交付。
 
-- [x] Step 0: 数据模型锁定 — `queryCondition` NodeType + `QueryOp`(32 op) + query 属性 + Loro 读写 + `isOutlinerContentNodeType('search')` ✓ nodex（2026-02-26）
+- [x] Step 0: 数据模型锁定 ✓ nodex（2026-02-26）
 - [ ] Step 1: 搜索引擎核心 — `search-engine.ts`（条件树递归 + 候选集排除 + HAS_TAG/TODO/DONE/NOT_DONE）
 - [ ] Step 2: L0 点击标签创建 — TagBadge click → `createSearchNode(tagDefId)` + 去重导航
 - [ ] Step 3: 结果渲染 — BulletChevron 放大镜 + OutlinerView 搜索分支 + 芯片条（只读）+ 手动排序 + TrailingInput（HAS_TAG 自动打标签）
 - [ ] Step 4: L1 字段过滤 UI — 芯片条增删改 + FIELD_IS/时间条件 + 计数提示
 - [ ] Step 5: L2 AI 自然语言 — tool call 创建 queryCondition 树
 
-#### Table View (#24)
-> 依赖 View Toolbar (#25) 的 Filter/Sort/Group 基础设施
+#### AI Chat & 网页辅助 (#29 + #31)
+> 浏览器 + AI = Nodex 的第二个差异化维度。不只是聊天框，而是理解上下文的知识助手。
 
-- [ ] 表格视图（行=节点，列=字段）
-- [ ] 列宽调整、列拖拽排序
-- [ ] 列计算（Sum / Avg / Median / Min / Max / Count）
-- [ ] 单元格内直接编辑字段值
-- **Spec**: `docs/features/views.md`
+- [ ] **AI Chat 基础** — Side Panel 内嵌对话界面，可引用笔记节点作为上下文
+- [ ] **网页问答** — 选中网页内容 → 在侧边栏中提问/总结/翻译（Content Script + Side Panel 联动）
+- [ ] **笔记问答** — 基于全部笔记回答问题（RAG / 全文搜索 + LLM）
+- [ ] **AI 辅助组织** — 自动打标签建议、推荐关联笔记、内容分类
+
+#### Supertags 完善 (#20)
+> 基础已完成（#触发、标签应用/移除、配置页、模板字段、TagBadge 右键菜单）
+
+- [ ] 标签页（= Search Nodes L0 入口，点击 supertag → 创建/导航 search node，见 #23）
+- [ ] Convert to supertag（普通节点快捷转 tagDef）
+- [ ] Pinned fields（置顶显示 + filter 优先）
+- [ ] Optional fields（建议按钮 + 自动降级）
+- [ ] 批量标签操作（多选 add/remove）
+- [ ] Title expression（`${field name}` 动态标题）
+- **Spec**: `docs/features/supertags.md`
+
+#### Fields 全类型 (#21)
+> 基础已完成（Options/Date/Number/URL/Email/Checkbox/隐藏/Required/Min-Max/验证/系统字段）
+
+- [ ] AttrDef “Used in” 计算字段
+- [ ] Auto-initialize（6 种策略）
+- [ ] Pinned fields
+- [ ] Merge fields
+- **Spec**: `docs/features/fields.md`
+
+#### Date 节点 & 日记 (#22)
+> Phase 1 已完成 (PR #73): Year→Week→Day 层级 + Today 入口 + DateNavigationBar + 日历选择器
+
+- [ ] 自然语言日期解析扩展（@next Monday / @November / @last week）
+- [ ] 日记模板（#day supertag 配置）
+- [ ] 日期字段链接到日节点
+- **Spec**: `docs/features/date-nodes.md`
 
 #### View Toolbar — Filter / Sort / Group (#25)
-> **通用节点功能**：任意节点的 children 展示控制（不仅限于搜索结果或特定视图类型）。
-> 在 Tana 中 = 右键菜单 "Show view toolbar"，适用于所有节点（content、search、container）。
-> 与 Search Nodes (#23) **正交**：Search 定义成员集合（queryCondition），View Toolbar 定义展示方式（ViewDef Tuple）。
+> **通用节点功能**：任意节点的 children 展示控制。与 Search Nodes 正交。
 > **Design**: `docs/plans/view-toolbar-design.md`（待创建）| **Archived Spec**: `docs/_archive/features/views.md`
 
-- [ ] Per-node view toolbar UI（Search 🔍 / Display / Group by / Sort by / Filter by 图标栏）
-- [ ] 右键菜单 "Show view toolbar" 入口 + "Filter by" / "Sort by" / "Group by" 快捷入口
+- [ ] Per-node view toolbar UI（Sort by / Filter by / Group by 图标栏）
+- [ ] 右键菜单 “Show view toolbar” 入口
 - [ ] Sort by：单字段排序（升序/降序）→ 多级排序
 - [ ] Filter by：按字段值/标签/checkbox 状态过滤 children
-- [ ] Group by：按字段值分组（Outline 视图下显示为折叠分组标题）
-- [ ] ViewDef Tuple 持久化（SYS_A16/18/19/20），视图切换时自动保存/恢复
-- [ ] Supertag 模板继承默认 ViewDef
+- [ ] Group by：按字段值分组
+- [ ] ViewDef Tuple 持久化（SYS_A16/18/19/20）
 
-#### Cards View (#26)
-> 依赖 View Toolbar (#25) 的 Filter/Sort/Group 基础设施
+### P3 — 编辑器增强 & 交互完善
 
-- [ ] 卡片视图
-- [ ] 卡片间拖拽更新字段值
-- [ ] Banner 图片显示
-- **Spec**: `docs/features/views.md`
+#### NodePanel Title 交互补全
+- [ ] 标题编辑器支持 `@` 触发 ReferenceSelector（插入 inline reference）
+- [ ] 标题编辑器支持 `#` 触发 TagSelector（应用 supertag）
+- [ ] 标题编辑器支持 `Cmd+Enter` 切换 checkbox 状态
 
-#### Calendar View (#27)
-> 依赖 Date 节点 (#22) + View Toolbar (#25)
+#### Shift+Arrow 连续多选中断问题
+- [ ] 排查 Shift+↑/↓ 遍历逻辑对 TrailingInput 虚拟节点的处理（应跳过）
+- [ ] 排查 Shift+↑/↓ 遍历逻辑对 field tuple 节点的处理（应纳入或跳过，保持连续）
+- [ ] 补 Vitest 回归用例（含 trailing input + field row 场景）
 
-- [ ] 日历视图（按日期字段排列节点）
-- [ ] 日/周/月粒度切换
-- [ ] 拖拽未排期节点到日历添加日期
-- **Spec**: `docs/features/views.md`
+#### 节点选中 — 后续增强 (#47)
+- [ ] Cmd+Shift+D 批量复制
+- [ ] 拖动选择优化（跨面板边界防护）
+- **Spec**: `docs/features/node-selection.md`
 
-#### List & Tabs View (#28)
-> 依赖 View Toolbar (#25)
+#### 合并节点（Merge Nodes）
+- [ ] 选中多个重复节点 → 合并为一个（保留第一个，合并 children/tags）
+- [ ] 所有引用更新为指向合并后的节点
+- **Spec**: `docs/features/references.md`
 
-- [ ] List 视图（左侧列表 + 右侧详情双面板）
-- [ ] Tabs 视图（顶部 tab 切换内容）
-- **Spec**: `docs/features/views.md`
-
-#### 性能基线测量
-> 已延迟：等数据模型简化完成后再测量（原始目的"编辑器迁移对比"已过期，重构后重新建立基线更有意义）
-> **产出**: `docs/research/performance-baseline.md`
-
-#### Floating Toolbar (#46)
-> Phase 1 已完成（PR #55）：BubbleMenu + 7 格式按钮 + Link 原地编辑 + Heading mark
-
-- [x] TipTap BubbleMenu 集成 ✓ PR #55
-- [x] 格式按钮（Bold / Italic / Code / Highlight / Strikethrough / Heading） ✓ PR #55
-- [x] Link 编辑弹窗 ✓ PR #55
-- [x] **BUG: BubbleMenu 无限渲染循环 — 选中文字后浮动工具栏不出现** ✓ PR #57
-  - 根因：BubbleMenu 插件内部 transaction/updateOptions 与外部显示门控逻辑互相反馈
-  - 已修复：移除 BubbleMenu，改为自管理 Portal 浮层（selection/focus/mouseup 驱动 + `coordsAtPos` 定位）
+#### Floating Toolbar 后续 (#46)
 - [ ] @ Reference 按钮
 - [ ] # Tag 按钮
 - **Spec**: `docs/features/floating-toolbar.md`
 
 #### Slash Command — 后续命令点亮 (#48)
-> 基线已合并（PR #42）。已完成：SlashCommandExtension + 菜单 UI + Field / Reference / Checkbox / More commands
-
-- [x] Heading（文本格式 mark） ✓ PR #55
 - [ ] Paste（剪贴板内容类型判断）
-- [ ] Search node（依赖 Search Node UI #23）
+- [ ] Search node（依赖 #23）
 - [ ] Image / file（依赖上传与存储）
 - [ ] Checklist（批量 checkbox）
-- [ ] Start live transcription（语音转写）
 - **Spec**: `docs/features/slash-command.md`
 
 #### Editor 粘贴增强（结构化粘贴）
-> 来源：Editor 迁移验收备注（Phase 2.9），本轮先保持当前纯文本粘贴行为
+- [ ] 多行纯文本粘贴：按行拆分为多个节点
+- [ ] Markdown 列表粘贴：根据缩进重建节点树
+- [ ] 富文本粘贴：保留基础结构语义
+- [ ] 与撤销/重做集成
+- **Spec**: `docs/features/editor-migration.md`
 
-- [ ] 多行纯文本粘贴：按行拆分为多个节点（而不是单节点空格拼接）
-- [ ] Markdown 列表粘贴：根据缩进/列表层级重建节点树
-- [ ] 富文本粘贴：保留基础结构语义（段落/列表/强调）并映射到 `text + marks + inlineRefs`
-- [ ] 与撤销/重做集成：一次粘贴可完整撤销
-- **Spec**: `docs/features/editor-migration.md`（待补充“结构化粘贴”小节）
+#### 性能基线测量
+> **产出**: `docs/research/performance-baseline.md`
+
+#### AI Command Nodes (#32) & AI 字段增强 (#33)
+> AI 深度集成：Command Node（prompt/参数/输出全部是节点）、字段自动填充、AI 生成选项
+- [ ] Command Node 数据模型 + 执行引擎
+- [ ] AI 字段自动填充（基于上下文推断字段值）
+
+### 暂缓 — 需要独立窗口 / Web 版后再考虑
+
+> 以下视图类型在 Chrome Side Panel（300-700px）中体验受限。待支持独立窗口或 Web 版后重新评估。
+
+#### Table View (#24)
+- [ ] 表格视图（行=节点，列=字段）
+- [ ] 列宽调整、列拖拽排序
+- [ ] 列计算（Sum / Avg / Median / Min / Max / Count）
+- **Spec**: `docs/_archive/features/views.md`
+
+#### Cards View (#26)
+- [ ] 卡片视图 + 拖拽更新字段值 + Banner 图片
+
+#### Calendar View (#27)
+- [ ] 日历视图 + 日/周/月切换 + 拖拽排期
+
+#### List & Tabs View (#28)
+- [ ] List 视图（双面板）+ Tabs 视图
 
 ---
 
@@ -332,5 +281,5 @@ _(无进行中任务)_
 
 ### 已关闭的远期/非开发任务
 
-以下 issue 在 #29-40 范围内已关闭，属远期规划或非当前迭代范围：
-AI Chat (#29)、AI 网页辅助 (#31)、AI Command Nodes (#32)、AI 字段增强 (#33)、Supabase 实时同步 (#34)、离线模式增强 (#35)、导入/导出 (#36)、Command Nodes (#37)、Title Expressions (#38)、Publishing (#39)、Input API (#40)。
+以下 issue 属远期规划或非当前迭代范围：
+Supabase 实时同步 (#34，已被 Cloudflare Sync 取代)、离线模式增强 (#35)、导入/导出 (#36)、Command Nodes (#37)、Title Expressions (#38)、Publishing (#39)、Input API (#40)。

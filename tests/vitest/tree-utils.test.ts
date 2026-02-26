@@ -5,6 +5,7 @@ import {
   getNavigableParentId,
   getNextVisibleNode,
   getNodeIndex,
+  getNodeTextLengthById,
   getParentId,
   getPreviousSiblingId,
   getPreviousVisibleNode,
@@ -101,6 +102,22 @@ describe('tree-utils', () => {
     expect(getParentId('c2a')).toBe('c2');
     expect(getPreviousSiblingId('c2')).toBe('fieldEntry');
     expect(getNodeIndex('c2')).toBe(2);
+  });
+
+  it('getNodeTextLengthById returns name length or 0 for missing nodes', () => {
+    createNode('n1', null);
+    setNodeDataBatch('n1', { name: 'hello' });
+    expect(getNodeTextLengthById('n1')).toBe(5);
+
+    // Reference node returns target name length
+    createNode('target1', null);
+    setNodeDataBatch('target1', { name: 'world!' });
+    createNode('ref1', null);
+    setNodeDataBatch('ref1', { type: 'reference', targetId: 'target1' });
+    expect(getNodeTextLengthById('ref1')).toBe(6);
+
+    // Missing node returns 0
+    expect(getNodeTextLengthById('nonexistent')).toBe(0);
   });
 
   it('validates inline-ref-only content with explicit inlineRefs', () => {

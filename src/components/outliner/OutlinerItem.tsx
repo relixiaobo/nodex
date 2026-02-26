@@ -43,6 +43,7 @@ import {
   getPreviousVisibleNode,
   getNextVisibleNode,
   isOnlyInlineRef,
+  getNodeTextLengthById,
 } from '../../lib/tree-utils';
 import { resolveDropHoverPosition } from '../../lib/drag-drop-position';
 import { resolveDropMove } from '../../lib/drag-drop';
@@ -100,15 +101,6 @@ interface OutlinerItemProps {
   bulletColors?: string[];
   /** Effective-node path in current display recursion (used to stop cyclic reference expansion). */
   referencePath?: readonly string[];
-}
-
-function getNodeTextLengthById(nodeId: string): number {
-  const node = loroDoc.toNodexNode(nodeId);
-  if (!node) return 0;
-  if (node.type === 'reference' && node.targetId) {
-    return (loroDoc.toNodexNode(node.targetId)?.name ?? '').length;
-  }
-  return (node.name ?? '').length;
 }
 
 function focusTrailingInputForParent(parentId: string): boolean {

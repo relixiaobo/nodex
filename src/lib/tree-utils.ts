@@ -256,3 +256,16 @@ export function getNodeIndex(nodeId: string): number {
   const siblings = loroDoc.getChildren(parentId);
   return siblings.indexOf(nodeId);
 }
+
+/**
+ * Get the text length of a node by ID.
+ * For reference nodes, returns the length of the target node's name.
+ */
+export function getNodeTextLengthById(nodeId: string): number {
+  const node = loroDoc.toNodexNode(nodeId);
+  if (!node) return 0;
+  if (node.type === 'reference' && node.targetId) {
+    return (loroDoc.toNodexNode(node.targetId)?.name ?? '').length;
+  }
+  return (node.name ?? '').length;
+}

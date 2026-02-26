@@ -183,7 +183,7 @@ _(无进行中任务)_
 - [ ] Step 5: L2 AI 自然语言 — tool call 创建 queryCondition 树
 
 #### Table View (#24)
-> 执行顺序 ④（依赖 #25 的 Filter/Sort/Group 基础设施）
+> 依赖 View Toolbar (#25) 的 Filter/Sort/Group 基础设施
 
 - [ ] 表格视图（行=节点，列=字段）
 - [ ] 列宽调整、列拖拽排序
@@ -191,17 +191,22 @@ _(无进行中任务)_
 - [ ] 单元格内直接编辑字段值
 - **Spec**: `docs/features/views.md`
 
-#### Filter / Group / Sort 工具栏 (#25)
-> 执行顺序 ③（视图基础设施，Filter/Sort/Group = ViewDef 的 Tuple，所有视图共用）
+#### View Toolbar — Filter / Sort / Group (#25)
+> **通用节点功能**：任意节点的 children 展示控制（不仅限于搜索结果或特定视图类型）。
+> 在 Tana 中 = 右键菜单 "Show view toolbar"，适用于所有节点（content、search、container）。
+> 与 Search Nodes (#23) **正交**：Search 定义成员集合（queryCondition），View Toolbar 定义展示方式（ViewDef Tuple）。
+> **Design**: `docs/plans/view-toolbar-design.md`（待创建）| **Archived Spec**: `docs/_archive/features/views.md`
 
-- [ ] 通用视图工具栏（适用于所有视图）
-- [ ] 按字段值过滤
-- [ ] 按字段值分组（Outline / Cards / List 视图）
-- [ ] 多级排序（升序/降序、堆叠排序条件）
-- **Spec**: `docs/features/views.md`
+- [ ] Per-node view toolbar UI（Search 🔍 / Display / Group by / Sort by / Filter by 图标栏）
+- [ ] 右键菜单 "Show view toolbar" 入口 + "Filter by" / "Sort by" / "Group by" 快捷入口
+- [ ] Sort by：单字段排序（升序/降序）→ 多级排序
+- [ ] Filter by：按字段值/标签/checkbox 状态过滤 children
+- [ ] Group by：按字段值分组（Outline 视图下显示为折叠分组标题）
+- [ ] ViewDef Tuple 持久化（SYS_A16/18/19/20），视图切换时自动保存/恢复
+- [ ] Supertag 模板继承默认 ViewDef
 
 #### Cards View (#26)
-> 执行顺序 ⑤（依赖 #25 的 Filter/Sort/Group 基础设施）
+> 依赖 View Toolbar (#25) 的 Filter/Sort/Group 基础设施
 
 - [ ] 卡片视图
 - [ ] 卡片间拖拽更新字段值
@@ -209,7 +214,7 @@ _(无进行中任务)_
 - **Spec**: `docs/features/views.md`
 
 #### Calendar View (#27)
-> 执行顺序 ⑥（依赖 #22 的日期节点 + #25 的视图基础设施）
+> 依赖 Date 节点 (#22) + View Toolbar (#25)
 
 - [ ] 日历视图（按日期字段排列节点）
 - [ ] 日/周/月粒度切换
@@ -217,7 +222,7 @@ _(无进行中任务)_
 - **Spec**: `docs/features/views.md`
 
 #### List & Tabs View (#28)
-> 执行顺序 ⑦（依赖 #25 的视图基础设施）
+> 依赖 View Toolbar (#25)
 
 - [ ] List 视图（左侧列表 + 右侧详情双面板）
 - [ ] Tabs 视图（顶部 tab 切换内容）

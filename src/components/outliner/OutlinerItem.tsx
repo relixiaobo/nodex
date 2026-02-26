@@ -1893,6 +1893,8 @@ export function OutlinerItem({
 
     if (focusTrailingInputForParent(parentId)) {
       return;
+    } else if (focusTrailingInputForParent(rootNodeId)) {
+      return;
     } else if (onNavigateOut) {
       onNavigateOut('down');
     }
@@ -2777,6 +2779,10 @@ export function OutlinerItem({
                             textOffset: 0,
                           });
                           setFocusedNode(nx.nodeId, nx.parentId);
+                          return;
+                        }
+                        if (focusTrailingInputForParent(rootNodeId)) {
+                          return;
                         }
                       }
                     }

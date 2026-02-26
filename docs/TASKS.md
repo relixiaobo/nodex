@@ -31,7 +31,7 @@ _(空)_
 | nodex-cc | _(idle)_ | — | — |
 | nodex-cc-2 | Search Nodes Phase 1 (#23) | `cc2/search-nodes` | `node.ts`, `loro-doc.ts`, `search-engine.ts`, `node-store.ts`, `OutlinerItem.tsx`, `OutlinerView.tsx` |
 | nodex-codex | _(idle)_ | — | — |
-| antigravity | UI 细节打磨 | `anti/ui-polish` | _(PR #96 已提交 Ready for Review)_ |
+| antigravity | UI 细节打磨 | `anti/ui-polish` | _(等待第二轮 review 反馈)_ |
 
 ---
 
@@ -68,69 +68,17 @@ _(无进行中任务)_
 
 ### P2
 
-#### v5.0 UI 重构 — Clean Paper & Invisible Outline
-> 设计系统从 v1.0（Liquid Glass + 荧光紫）迁移到 v5.0（Clean Paper + 隐形大纲）。
-> 三功能色：Sage Green `#5E8E65` / Warm Amber `#E1A15E` / Brick Red `#AA5048`。
-> **Owner**: antigravity | **Spec**: `docs/design-system.md`（已更新至 v5.0）
+#### v5.0 UI 重构 — Clean Paper & Invisible Outline ✅
+> 设计系统从 v1.0（Liquid Glass + 荧光紫）迁移到 v5.0（Clean Paper + 隐形大纲）。全 7 个 Phase 已完成。
+> **Owner**: antigravity | **Spec**: `docs/design-system.md`（v5.0）
 >
-> 分 6 个 Phase，按依赖顺序执行。每个 Phase 完成后跑 `typecheck` → `vitest` → `build`。
-
-**Phase 1: Token 迁移（main.css）** — 一切的基础，完成后 ~70% UI 自动跟随变色
-- [ ] 1.1 Background `#FAFAFA` → `#F5F4EE`
-- [ ] 1.2 Foreground 三级：`#0F0F12` → `#1A1A1A`、`#6B6B80` → `#666666`、`#A0A0B0` → `#999999`
-- [ ] 1.3 Primary 全家族：`#8B5CF6` → `#5E8E65`（hover/muted/ring 同步）
-- [ ] 1.4 新增 Secondary 全家族：`#E1A15E` / `#CC8D4E` / `rgba(225,161,94,0.12)` / `#1A1A1A`
-- [ ] 1.5 Destructive：`#E11D48` → `#AA5048`，新增 hover `#8E3F38` / muted `rgba(170,80,72,0.08)`
-- [ ] 1.6 Warning `#D97706` → `#A07830`、Success `#0D9488` → `#5E8E65`、新增 Info `#5A8AB5`
-- [ ] 1.7 Border 三级：`0.04` → `0.06`、`0.08` → `0.10`、`0.15` → `0.18`
-- [ ] 1.8 Selection：`rgba(139,92,246,0.08)` → `rgba(94,142,101,0.07)`、`#E8E0FA` → `rgba(94,142,101,0.15)`
-- [ ] 1.9 清理废弃 token（muted/card/popover/surface-raised/surface-overlay）
-- [ ] 1.10 统一 opacity 写法（~47 处 `foreground/5`/`/[0.05]`/`/[0.06]` → 统一为 `foreground/4`）
-
-**Phase 2: 内联硬编码色值** — 绕过 CSS 变量的颜色引用（6-8 个文件）
-- [ ] 2.1 `tag-colors.ts`：整套 Tag 10 色替换为 v5.0 低饱和色板（纯文本色，移除 bg 值）
-- [ ] 2.2 `DatePicker.tsx`：`rgba(139,92,246,...)` 热力图色阶 → 基于 `#5E8E65` 的新色阶
-- [ ] 2.3 `DatePicker.tsx`：`TEAL_SOLID` / `PURPLE_SOLID` 常量 → v5.0 功能色
-- [ ] 2.4 `main.css`：mark 高亮 `rgba(250,204,21,0.4)` → `rgba(200,170,80,0.25)`
-- [ ] 2.5 `main.css`：inline ref 选中态蓝色 `rgba(147,197,253,...)` → primary green
-- [ ] 2.6 `TagBadge.tsx:128`：`hover:bg-black/[0.06]` → `hover:bg-foreground/[0.06]`
-
-**Phase 3: 阴影移除（零 Z 深度）** — 13+ 处浮层组件
-- [ ] 3.1 移除所有 `shadow-lg`（TagSelector / SlashCommandMenu / TagBadge / TrailingInput / FloatingToolbar / FieldNameInput / ToolbarUserMenu / ReferenceSelector / DatePicker / NodePicker / OutlinerItem / FieldValueOutliner / DateNavigationBar）
-- [ ] 3.2 移除 `App.tsx:175` 内联 `boxShadow`
-- [ ] 3.3 确认所有浮层已有 `border-border`，缺的补上
-
-**Phase 4: 排版更新** — 字号 + 字重变化（影响布局，需仔细验证）
-- [ ] 4.1 大纲正文 `text-sm` → `text-base`（仅 OutlinerItem 节点正文 / NodeEditor / TrailingInput）
-- [ ] 4.2 `font-bold` → `font-medium`（NodeHeader 标题 / Breadcrumb / LoginScreen logo）
-- [ ] 4.3 `font-semibold` → `font-medium`（NodeHeader 编辑器 / 面板标题）
-- [ ] 4.4 注意：不是所有 `text-sm` 都要改，Dropdown 项、字段标签、辅助信息保持 `text-sm`
-
-**Phase 5: 大纲几何（行高 + 容器）** — ⚠️ 高风险，OutlinerItem 是核心文件
-- [x] 5.1 `h-7`(28px) → 24px：BulletChevron / DragHandle / OutlinerItem 行容器 / FieldRow / FieldValueOutliner / TrailingInput
-- [x] 5.2 `min-h-7` → `min-h-6`：OutlinerItem / BacklinksSection / NodeHeader / OutlinerView
-- [x] 5.3 不改的 h-7：DatePicker 按钮 / FloatingToolbar 按钮 / ToolbarUserMenu 头像
-- [x] 5.4 按钮圆角 `rounded-md` → `rounded-full`（pill）
-- [x] 5.5 新增 `--radius-pill: 9999px` 到 main.css @theme
-
-**Phase 6: Tag Badge 重构（排印化）** — Tag 渲染方式变更
-- [ ] 6.1 `TagBadge.tsx`：移除 `bg-[var(--tag-bg)]`，保留 `color: var(--tag-text)`
-- [ ] 6.2 `BulletChevron.tsx:62`：tag badge 移除内联 `backgroundColor`
-- [ ] 6.3 `NodePicker.tsx:26,225`：tag badge 移除内联 bg
-- [ ] 6.4 Tag 文本前缀 `#` 添加（Ink-Tertiary 色）
-- [ ] 6.5 `tag-colors.ts` 简化：移除 `bg` 字段，只保留 `text` 色值
-
-**Phase 7: 隐形 UI 与全局顶栏重构 (Invisible UI & Unified Header)**
-- [x] 7.1 隐形大纲控件 (OutlinerItem, DragHandle, BulletChevron) 增加 `group-hover/row` 等透明度控制。
-- [x] 7.2 文本化标签排印 (TagBadge)，悬停下划线和绝对定位 `X` 覆盖 `#`。
-- [x] 7.3 日期导航极致压缩 (DateNavigationBar) (h-6, -mt-1, rounded-full)。
-- [x] 7.4 全局顶栏化繁为简：重构 `TopToolbar` 和 `NodePanel`，合并为单行绝对定位悬浮顶栏。
-
-**PR 策略**:
-- Phase 1-3 → 一个 PR（纯视觉变更，不改组件结构）
-- Phase 4 → 单独 PR（字号变化需验证布局）
-- Phase 5 → 单独 PR（高风险：行高变化影响拖拽/选中/缩进）
-- Phase 6 → 单独 PR（Tag 渲染方式变更）
+> - Phase 1: Token 迁移 ✓ — 全套 CSS 变量已迁移（绿/琥珀/砖红）
+> - Phase 2: 硬编码色值 ✓ — tag-colors/DatePicker/TagBadge/main.css
+> - Phase 3: 阴影移除 ✓ — 全局 0 处 shadow-lg
+> - Phase 4: 排版更新 ✓ — 正文 text-[15px]/leading-6，标题 font-semibold/bold
+> - Phase 5: 大纲几何 ✓ — 行高 24px + pill 圆角
+> - Phase 6: Tag Badge 排印化 ✓ — 纯文本着色，无背景 badge
+> - Phase 7: 隐形 UI + 顶栏重构 ✓ — group-hover 控件 + 文本化标签 + 全局顶栏
 
 #### UI 细节打磨 — v5.0 后续微调
 > v5.0 重构后的视觉/交互小问题收集与修复。nodex 在 PR review 中逐条提反馈，antigravity 逐项修改。
@@ -197,25 +145,19 @@ _(无进行中任务)_
 - [x] 正文内容转子节点（V2）✓ `parseHtmlToNodes()` + `createContentNodes()` heading-based 层级树
 - **Spec**: `docs/features/web-clipping.md`
 
-#### 统一时间线 Undo/Redo (#44)
-> 目标：Workflowy 水平的统一 undo — ⌘Z 永远撤销「上一步」，覆盖所有用户操作。
-> Loro UndoManager 单一时间线。核心路径已完成（PR #91）。
-> **Spec**: `docs/features/undo-redo.md` | **Plan**: `docs/plans/unified-undo.md` | **Research**: `docs/research/tana-undo-redo-analysis.md`
+#### NodePanel Title 交互补全
+> NodePanel 标题编辑器（NodeHeader）不支持 `@`/`#` 触发器和 `Cmd+Enter` checkbox 切换，与正文编辑器行为不一致。
 
-- [x] Phase 2: ProseMirror → Loro 实时同步 + 移除 `prosemirror-history` ✓ PR #91
-- [x] Phase 3: UI 状态 marker commit（展开/折叠 + 导航进入 Loro undo 栈）✓ PR #91
-- [x] Phase 4: 统一 ⌘Z handler + 删除旧代码（navUndoStack / 三层 fallthrough / PM History）✓ PR #91
-- [x] Phase 1: 补全 commitDoc() 覆盖 ✓ nodex-cc 复查确认：node-store.ts 35 处 commitDoc()，覆盖全部树/标签/字段/checkbox/引用操作；文本编辑走 editor blur 路径（commitDoc('user:text')）
+- [ ] 标题编辑器支持 `@` 触发 ReferenceSelector（插入 inline reference）
+- [ ] 标题编辑器支持 `#` 触发 TagSelector（应用 supertag）
+- [ ] 标题编辑器支持 `Cmd+Enter` 切换 checkbox 状态
 
-#### Side Panel 布局改造 — 移除 Sidebar + ⌘K 重设计
-> Phase 1/2/4 已完成（PR #88）。Phase 3（Undo/Redo 按钮集成）待 #44 完成后执行。
-> **Owner**: nodex-cc | **Branch**: `cc/layout-undo-buttons`
-> **Plan**: `docs/plans/layout-renovation.md`
+#### Shift+Arrow 连续多选中断问题
+> 按住 Shift+↑/↓ 连续选中节点时，遇到虚拟空白节点（TrailingInput）或 field 节点会中断选区，无法继续向上/下扩展。
 
-- [x] Phase 1: 顶栏骨架 + 移除 Sidebar ✓ PR #88
-- [x] Phase 2: ⌘K 命令面板重写 ✓ PR #88
-- [x] Phase 3: Undo/Redo 按钮集成 ✓ nodex-cc — UndoRedoButtons 接入 Loro undoDoc/redoDoc + canUndoDoc/canRedoDoc 响应式启禁用 + Undo2/Redo2 图标
-- [x] Phase 4: 清理废弃文件 ✓ PR #88
+- [ ] 排查 Shift+↑/↓ 遍历逻辑对 TrailingInput 虚拟节点的处理（应跳过）
+- [ ] 排查 Shift+↑/↓ 遍历逻辑对 field tuple 节点的处理（应纳入或跳过，保持连续）
+- [ ] 补 Vitest 回归用例（含 trailing input + field row 场景）
 
 #### 节点选中 — 后续增强 (#47)
 > Phase 1-3 已合并（PR #51）。PR #72 补充了字段行选中 + 全局选区清除。以下为未覆盖的后续项：
@@ -340,9 +282,11 @@ _(无进行中任务)_
 
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
+| 2026-02-26 | v5.0 UI 重构全量完成 — Phase 1-7（Token 迁移 + 硬编码色值 + 阴影移除 + 排版 15px/24px + 大纲几何 + Tag 排印化 + 隐形 UI + 顶栏重构） | antigravity | #93 #96 |
+| 2026-02-26 | UI 细节打磨 — TopToolbar 对齐 + Breadcrumb 滚动规则 + TrailingInput 缩进 + 空节点光标 | antigravity | #96 #97 |
+| 2026-02-24 | 统一时间线 Undo/Redo (#44) 全量完成 — Phase 1-4（commitDoc 覆盖 + PM→Loro 同步 + UI marker commit + 统一 ⌘Z handler） | nodex-codex + nodex-cc | #91 #92 |
+| 2026-02-24 | Side Panel 布局改造 全量完成 — Phase 1-4（TopToolbar + ⌘K 重写 + Undo/Redo 按钮 + 清理废弃文件） | nodex-cc | #88 |
 | 2026-02-24 | Undo/Redo Bug 1+3 修复 — bootstrap replacePanel + seed clearUndoHistory + 导航后 sink 聚焦 + TrailingInput Mod-z | nodex-cc + nodex | #92 + main |
-| 2026-02-24 | 统一时间线 Undo/Redo — Loro-only 单一路径（PM History 移除 + UI marker commit + onPush/onPop 状态快照 + 焦点恢复 sink textarea） | nodex-codex | #91 |
-| 2026-02-24 | Side Panel 布局改造 Phase 1/2/4 — TopToolbar + ⌘K CommandPalette Raycast 风格重写 + Sidebar/SidebarNav/SyncStatusIndicator/UserMenu 移除 + Kbd 组件 + fuzzy-search + palette-commands | nodex-cc | #88 |
 | 2026-02-23 | Staging + Production 双环境部署 — D1/Worker/Secrets/Google OAuth + HTTPS cookie 前缀修复 | nodex | — |
 | 2026-02-23 | Inline ref fallback 虚线 bullet 修复 + outliner backlink count badge 移除 | nodex-codex | #87 |
 | 2026-02-23 | Reference node Backspace 选中/删除流程修复（单 inline ref atom 行尾退格 → select_reference intent） | nodex-codex | #86 |

@@ -1216,23 +1216,25 @@ export function OutlinerItem({
   useEffect(() => {
     if (!isFocused) return;
     const hint = useUIStore.getState().triggerHint;
-    if (!hint) return;
+    if (!hint || hint.nodeId !== nodeId) return;
     useUIStore.getState().setTriggerHint(null);
 
-    if (hint === '#') {
+    // To prevent infinite re-trigger loops from focus churn in isolated test cases or DevTools,
+    // ensure we don't spam-open dropdowns if the selection is already completely matching.
+    if (hint.char === '#') {
       // The editor content is '#' — set range to cover it
       setHashTagQuery('');
       setHashTagSelectedIndex(0);
       setHashTagAnchor(undefined);
       hashRangeRef.current = { from: 1, to: 2 }; // position of '#' in ProseMirror doc
       setHashTagOpen(true);
-    } else if (hint === '@') {
+    } else if (hint.char === '@') {
       setRefQuery('');
       setRefSelectedIndex(0);
       setRefAnchor(undefined);
       refRangeRef.current = { from: 1, to: 2 };
       setRefOpen(true);
-    } else if (hint === '/') {
+    } else if (hint.char === '/') {
       setSlashQuery('');
       setSlashAnchor(undefined);
       slashRangeRef.current = { from: 1, to: 2 };

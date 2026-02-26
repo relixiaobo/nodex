@@ -456,8 +456,8 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
                     setHasContent(false);
                     ref.setOptionsOpen(false);
 
-                    ref.setTriggerHint(action.trigger);
                     const triggerNode = ref.createChild(ref.effectiveParentId, undefined, { name: action.matchText });
+                    ref.setTriggerHint({ char: action.trigger, nodeId: triggerNode.id });
                     ref.setExpanded(ref.effectiveParentEK, true, true);
                     ref.setFocusClickCoords({
                         nodeId: triggerNode.id,
@@ -465,19 +465,6 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
                         textOffset: action.textOffset,
                     });
                     ref.setFocusedNode(triggerNode.id, ref.effectiveParentId);
-
-                    // Safety: clear stale triggerHint if not consumed within 2 frames.
-                    // The hint is normally consumed by OutlinerItem's isFocused effect,
-                    // but if the new node doesn't render/mount in time, we must not leave
-                    // a stale hint that the next focused node would incorrectly pick up.
-                    requestAnimationFrame(() => {
-                        requestAnimationFrame(() => {
-                            const store = useUIStore.getState();
-                            if (store.triggerHint === action.trigger) {
-                                store.setTriggerHint(null);
-                            }
-                        });
-                    });
 
                     queueMicrotask(() => { committingRef.current = false; });
                     return;

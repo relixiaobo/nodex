@@ -74,8 +74,8 @@ interface UIStore {
 
   // Trigger hint: set by TrailingInput when creating a node with trigger char (#/@/)
   // OutlinerItem reads & clears this to open the appropriate dropdown on mount
-  triggerHint: '#' | '@' | '/' | null;
-  setTriggerHint(hint: '#' | '@' | '/' | null): void;
+  triggerHint: { char: '#' | '@' | '/'; nodeId: string } | null;
+  setTriggerHint(hint: { char: '#' | '@' | '/'; nodeId: string } | null): void;
 
   // Text offset for cursor positioning (consumed by matching RichTextEditor on mount)
   focusClickCoords: { nodeId: string; parentId: string | null; textOffset: number } | null;

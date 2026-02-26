@@ -8,7 +8,7 @@
 import {
   type AppIcon,
   AlignLeft, Building2, Calendar, CalendarCheck, CalendarClock, CalendarPlus,
-  CheckSquare, ChevronDown, FileText, Hash, Link, List, ListTree, Mail,
+  CheckSquare, ChevronDown, FileText, Hash, Link, List, ListTree, Mail, Palette,
   Play, Asterisk, EyeOff, Settings2, SquareUser, Sparkles, Tag, ToggleLeft, UserPen,
 } from './icons.js';
 import { SYS_A, SYS_D, SYS_V, FIELD_TYPES } from '../types/index.js';
@@ -165,6 +165,9 @@ export function getFieldTypeIcon(dataType: string): AppIcon {
     case SYS_D.BOOLEAN:
     case FIELD_TYPES.BOOLEAN:
       return ToggleLeft;
+    case SYS_D.COLOR:
+    case FIELD_TYPES.COLOR:
+      return Palette;
     default:
       return AlignLeft;
   }

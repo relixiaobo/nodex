@@ -56,6 +56,7 @@ export {
 
 export {
   CheckSquare,
+  Palette,
   ToggleLeft,
   EyeOff,
   Play,

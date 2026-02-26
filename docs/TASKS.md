@@ -28,6 +28,7 @@ _(空)_
 
 | Agent | 当前任务 | 分支 | 修改中的文件 |
 |-------|---------|------|-------------|
+| nodex-cc | UI 设计系统合规优化 | cc/ui-design-compliance | 见 PR body |
 | nodex-codex | _(idle)_ | — | — |
 | antigravity | _(idle)_ | — | — |
 
@@ -35,7 +36,12 @@ _(空)_
 
 ## 进行中
 
-_(无进行中任务)_
+### UI 设计系统合规优化（Paper-on-Paper + Hover Token 统一）
+> **Agent**: nodex-cc | **Branch**: `cc/ui-design-compliance` | **PR**: TBD
+>
+> 全局审计 + 修复所有浮层/hover 组件，使其符合 v5.0 更新后的设计系统（Paper Shadow + bg-foreground/4 hover）。
+>
+> 详细 checklist 见 PR description。
 
 ---
 

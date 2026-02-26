@@ -17,7 +17,7 @@ import { baseKeymap } from 'prosemirror-commands';
 import { EditorView } from 'prosemirror-view';
 import { useNodeStore } from '../../stores/node-store';
 import { useUIStore } from '../../stores/ui-store';
-import { getLastVisibleNode, isWorkspaceContainer } from '../../lib/tree-utils.js';
+import { getLastVisibleNode, isWorkspaceContainer, getNodeTextLengthById } from '../../lib/tree-utils.js';
 import { isOptionsFieldType } from '../../lib/field-utils.js';
 import * as loroDoc from '../../lib/loro-doc.js';
 import { undoDoc, redoDoc } from '../../lib/loro-doc.js';
@@ -36,16 +36,6 @@ import { BulletChevron } from '../outliner/BulletChevron';
 import { FIELD_OVERLAY_Z_INDEX } from '../fields/field-layout.js';
 import { pmSchema } from './pm-schema.js';
 import { marksToDoc } from '../../lib/pm-doc-utils.js';
-
-function getNodeTextLengthById(nodeId: string): number {
-    const node = loroDoc.toNodexNode(nodeId);
-    if (!node) return 0;
-    if (node.type === 'reference' && node.targetId) {
-        return (loroDoc.toNodexNode(node.targetId)?.name ?? '').length;
-    }
-    return (node.name ?? '').length;
-}
-
 
 const KEY_TRAILING_ENTER = getPrimaryShortcutKey('trailing.enter', 'Enter');
 const KEY_TRAILING_INDENT = getPrimaryShortcutKey('trailing.indent_depth', 'Tab');

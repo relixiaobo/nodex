@@ -13,16 +13,7 @@ import { TrailingInput } from '../editor/TrailingInput';
 import { SYS_V } from '../../types/index.js';
 import { resolveTagColor } from '../../lib/tag-colors.js';
 import { useDragSelect } from '../../hooks/use-drag-select.js';
-import { getFlattenedVisibleNodes } from '../../lib/tree-utils.js';
-
-function getNodeTextLengthById(nodeId: string): number {
-  const node = loroDoc.toNodexNode(nodeId);
-  if (!node) return 0;
-  if (node.type === 'reference' && node.targetId) {
-    return (loroDoc.toNodexNode(node.targetId)?.name ?? '').length;
-  }
-  return (node.name ?? '').length;
-}
+import { getFlattenedVisibleNodes, getNodeTextLengthById } from '../../lib/tree-utils.js';
 
 interface OutlinerViewProps {
   rootNodeId: string;
@@ -252,7 +243,6 @@ export function OutlinerView({ rootNodeId, showTemplateTuples }: OutlinerViewPro
         autoFocus={visibleChildren.length === 0}
         parentExpandKey={`${loroDoc.getParentId(rootNodeId) ?? ''}:${rootNodeId}`}
         onNavigateOut={(direction) => {
-          if (direction !== 'up') return;
           if (direction !== 'up') return;
           const fl = getFlattenedVisibleNodes(
             dragSelectableRootIds,

@@ -174,7 +174,7 @@ export function DateNavigationBar({ dayNodeId }: DateNavigationBarProps) {
       {
         calendarOpen && (
           <div
-            className="absolute top-full z-50 mt-1 w-[252px] rounded-lg border border-border bg-popover p-3"
+            className="absolute top-full z-50 mt-1 w-[252px] rounded-lg bg-background shadow-paper p-3"
             style={{ left: 16 }}
             onMouseDown={(e) => e.stopPropagation()}
           >

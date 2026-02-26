@@ -113,7 +113,7 @@ export const TagSelector = forwardRef<TagDropdownHandle, TagSelectorProps>(
   const menu = (
    <div
     ref={listRef}
-    className="z-[1000] w-56 max-h-52 overflow-y-auto rounded-lg border border-border bg-popover/100 p-1"
+    className="z-[1000] w-56 max-h-52 overflow-y-auto rounded-lg bg-background shadow-paper p-1"
     style={dropStyle}
     onMouseDown={(e) => e.preventDefault()}
    >
@@ -125,7 +125,7 @@ export const TagSelector = forwardRef<TagDropdownHandle, TagSelectorProps>(
       key={tag.id}
       data-tag-item
       className={`flex w-full items-center gap-1.5 rounded-md px-2 py-1 text-sm text-foreground transition-colors text-left ${
-       i === boundedIndex ? 'bg-accent' : 'hover:bg-foreground/4'
+       i === boundedIndex ? 'bg-primary-muted' : 'hover:bg-foreground/4'
       }`}
       onMouseDown={(e) => {
        e.preventDefault();
@@ -143,7 +143,7 @@ export const TagSelector = forwardRef<TagDropdownHandle, TagSelectorProps>(
       <button
        data-tag-item
        className={`flex w-full items-center gap-1.5 rounded-md px-2 py-1 text-sm text-foreground transition-colors text-left ${
-        boundedIndex === filteredTags.length ? 'bg-accent' : 'hover:bg-foreground/4'
+        boundedIndex === filteredTags.length ? 'bg-primary-muted' : 'hover:bg-foreground/4'
        }`}
        onMouseDown={(e) => {
         e.preventDefault();

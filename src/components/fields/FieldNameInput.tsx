@@ -215,11 +215,11 @@ export function FieldNameInput({
         onKeyDown={handleKeyDown}
       />
       {suggestions.length > 0 && (
-        <div className="absolute left-0 top-full z-50 mt-0.5 w-[180px] bg-popover border border-border rounded-lg p-1 text-sm">
+        <div className="absolute left-0 top-full z-50 mt-0.5 w-[180px] bg-background shadow-paper rounded-lg p-1 text-sm">
           {suggestions.map((s, i) => (
             <button
               key={s.id}
-              className={`w-full text-left rounded-md px-2 py-1 truncate ${i === selectedIndex ? 'bg-accent text-accent-foreground' : 'text-foreground hover:bg-foreground/4'
+              className={`w-full text-left rounded-md px-2 py-1 truncate ${i === selectedIndex ? 'bg-primary-muted text-foreground' : 'text-foreground hover:bg-foreground/4'
                 }`}
               onMouseDown={(e) => {
                 e.preventDefault(); // prevent blur

@@ -174,33 +174,33 @@ const TagContextMenu = forwardRef<HTMLDivElement, TagContextMenuProps>(
     return (
       <div
         ref={ref}
-        className="fixed z-50 min-w-[180px] rounded-lg border border-border bg-popover py-1 text-sm text-popover-foreground"
+        className="fixed z-50 min-w-[180px] rounded-lg bg-background shadow-paper py-1 text-sm text-foreground"
         style={{ left: x, top: y }}
       >
         {onRemove && (
           <button
-            className="flex w-full items-center gap-2 px-3 py-1.5 hover:bg-accent transition-colors text-left"
+            className="flex w-full items-center gap-2 px-3 py-1.5 hover:bg-foreground/4 transition-colors text-left"
             onClick={onRemove}
           >
-            <XCircle size={14} className="text-muted-foreground" />
+            <XCircle size={14} className="text-foreground-secondary" />
             Remove tag
           </button>
         )}
         <button
-          className="flex w-full items-center gap-2 px-3 py-1.5 hover:bg-accent transition-colors text-left"
+          className="flex w-full items-center gap-2 px-3 py-1.5 hover:bg-foreground/4 transition-colors text-left"
           onClick={onSearch}
         >
-          <Hash size={14} className="text-muted-foreground" />
+          <Hash size={14} className="text-foreground-secondary" />
           Everything tagged #{tagName}
         </button>
         {onRemove && onConfigure && (
           <>
             <div className="my-1 h-px bg-border" />
             <button
-              className="flex w-full items-center gap-2 px-3 py-1.5 hover:bg-accent transition-colors text-left"
+              className="flex w-full items-center gap-2 px-3 py-1.5 hover:bg-foreground/4 transition-colors text-left"
               onClick={onConfigure}
             >
-              <Settings size={14} className="text-muted-foreground" />
+              <Settings size={14} className="text-foreground-secondary" />
               Configure tag
             </button>
           </>

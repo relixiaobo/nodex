@@ -355,7 +355,7 @@ export function DatePicker({ value, onSelect, onClose }: DatePickerProps) {
  return (
   <div
    ref={containerRef}
-   className="absolute isolate left-0 top-full mt-1 w-full min-w-[248px] max-w-[280px] overflow-hidden rounded-lg border border-border bg-surface p-3"
+   className="absolute isolate left-0 top-full mt-1 w-full min-w-[248px] max-w-[280px] overflow-hidden rounded-lg bg-background shadow-paper p-3"
    style={{ zIndex: FIELD_OVERLAY_Z_INDEX }}
    onMouseDown={(e) => e.stopPropagation()}
   >

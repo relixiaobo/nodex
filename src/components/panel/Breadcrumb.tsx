@@ -156,18 +156,18 @@ export function Breadcrumb({ nodeId, showCurrentName, compact }: BreadcrumbProps
               <div className="relative" ref={dropdownRef}>
                 <button
                   onClick={() => setExpanded(!expanded)}
-                  className={`flex shrink-0 items-center justify-center rounded-md px-1 py-0.5 hover:bg-accent hover:text-foreground transition-colors ${expanded ? 'bg-accent text-accent-foreground' : ''}`}
+                  className={`flex shrink-0 items-center justify-center rounded-md px-1 py-0.5 hover:bg-foreground/4 hover:text-foreground transition-colors ${expanded ? 'bg-foreground/8 text-foreground' : ''}`}
                   title={t('breadcrumb.showHiddenAncestors')}
                 >
                   <MoreHorizontal size={14} />
                 </button>
                 {expanded && (
-                  <div className="absolute top-full left-0 mt-1 w-56 rounded-lg border border-border bg-popover p-1 text-popover-foreground z-50">
+                  <div className="absolute top-full left-0 mt-1 w-56 rounded-lg bg-background p-1 shadow-[0_0_0_1px_rgba(0,0,0,0.015),0_-1px_2px_rgba(255,255,255,0.6),0_2px_5px_-1px_rgba(0,0,0,0.05),0_6px_10px_-3px_rgba(0,0,0,0.03),0_12px_20px_-4px_rgba(0,0,0,0.04)] z-50">
                     <div className="flex flex-col max-h-64 overflow-y-auto">
                       {hiddenAncestors.map((ancestor) => (
                         <button
                           key={ancestor.id}
-                          className="flex items-center w-full rounded-md px-2 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground text-left"
+                          className="flex items-center w-full rounded-md px-2 py-1 text-sm hover:bg-foreground/4 text-left"
                           onClick={(e) => {
                             e.stopPropagation();
                             setExpanded(false);

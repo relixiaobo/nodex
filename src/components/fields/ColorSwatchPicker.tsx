@@ -67,21 +67,20 @@ export function ColorSwatchPicker({ tupleId, configNodeId }: ColorSwatchPickerPr
   );
 
   return (
-    <div className="flex min-h-7 items-center gap-2 py-1.5" style={{ paddingLeft: FIELD_VALUE_INSET }}>
+    <div className="flex min-h-6 items-center gap-1.5 py-1" style={{ paddingLeft: FIELD_VALUE_INSET }}>
       <BulletChevron hasChildren={false} isExpanded={false} onBulletClick={() => {}} />
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-1.5">
         {SWATCH_OPTIONS.map((swatch) => {
           const isSelected = swatch.key === selectedKey;
-          // Tana-style: selected swatch has a same-color ring with white gap
           return (
             <button
               key={swatch.key}
               onClick={() => handleSelect(swatch.key)}
-              className="h-6 w-6 rounded-full transition-transform hover:scale-110 active:scale-90"
+              className="h-4 w-4 rounded-full transition-transform hover:scale-110 active:scale-90"
               style={{
                 backgroundColor: swatch.color.text,
                 boxShadow: isSelected
-                  ? `0 0 0 2px var(--background, #fff), 0 0 0 4px ${swatch.color.text}`
+                  ? `0 0 0 1.5px var(--background, #fff), 0 0 0 3px ${swatch.color.text}`
                   : undefined,
               }}
               title={swatch.name}

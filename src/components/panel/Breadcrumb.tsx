@@ -78,10 +78,9 @@ export function Breadcrumb({ nodeId, showCurrentName, compact }: BreadcrumbProps
     };
   }, [expanded]);
 
-  // isRootView: true when viewing the workspace root node itself.
-  // Container nodes (Library, Inbox, etc.) are NOT treated as root view — they still show
-  // the workspace [W] avatar, just with no ancestor chain.
-  const isRootView = (!!workspaceRootId && nodeId === workspaceRootId) || (!!wsId && nodeId === wsId);
+  // isRootView: true only when viewing the workspace node itself.
+  // Container nodes (Library, Inbox, etc.) are NOT root view — they show [W] + their own content.
+  const isRootView = !!wsId && nodeId === wsId;
 
   // Get parent ID for ← button (navigate to first non-structural parent)
   const parentId = useNodeStore((s) => { void s._version; return getNavigableParentId(nodeId); });
@@ -116,9 +115,10 @@ export function Breadcrumb({ nodeId, showCurrentName, compact }: BreadcrumbProps
     ensureUndoFocusAfterNavigation();
   }, [workspaceRootTargetId, navigateTo, wsId]);
 
-  // Filter out workspace root from ancestors — [W] avatar already represents it
+  // Filter out workspace node — [W] avatar already represents it.
+  // Container nodes (Library, Inbox, etc.) are kept as meaningful navigation levels.
   const filteredAncestors = ancestors.filter(
-    (a) => a.id !== wsId && a.id !== workspaceRootId,
+    (a) => a.id !== wsId,
   );
 
   // Determine which ancestors to show
@@ -171,10 +171,6 @@ export function Breadcrumb({ nodeId, showCurrentName, compact }: BreadcrumbProps
                           onClick={(e) => {
                             e.stopPropagation();
                             setExpanded(false);
-                            if (ancestor.id === workspaceRootId) {
-                              handleNavigateToWorkspaceRoot();
-                              return;
-                            }
                             navigateTo(ancestor.id);
                             ensureUndoFocusAfterNavigation();
                           }}
@@ -195,10 +191,6 @@ export function Breadcrumb({ nodeId, showCurrentName, compact }: BreadcrumbProps
               <span className="shrink-0 text-foreground-tertiary/50 mx-0.5">/</span>
               <button
                 onClick={() => {
-                  if (ancestor.id === workspaceRootId) {
-                    handleNavigateToWorkspaceRoot();
-                    return;
-                  }
                   navigateTo(ancestor.id);
                   ensureUndoFocusAfterNavigation();
                 }}

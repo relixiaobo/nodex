@@ -2570,11 +2570,11 @@ export function OutlinerItem({
               ) : (
                 <span
                   className="node-content"
-                  dangerouslySetInnerHTML={{ __html: nodeContentHtml || '&nbsp;' }}
+                  dangerouslySetInnerHTML={{ __html: nodeContentHtml || '&#8203;' }}
                 />
               )}
               {hasTags && (
-                <span className="inline-flex align-middle ml-1.5" onClick={(e) => e.stopPropagation()}>
+                <span className="inline-flex align-baseline ml-1.5" onClick={(e) => e.stopPropagation()}>
                   <TagBar nodeId={effectiveNodeId} />
                 </span>
               )}

@@ -1,11 +1,8 @@
 /**
  * NodeHeader — unified "node identity" area for NodePanel.
  *
- * Replaces PanelTitle.tsx with a 3-column layout that aligns vertically
- * with OutlinerView items below:
- *   Col A (15px): drag handle — aligns with chevron
- *   Col B (15px): checkbox / icon — aligns with bullet
- *   Col C (flex): node name / tags — aligns with text
+ * Content (icon, tags, title, description) aligns to the panel left edge
+ * (px-4 = 16px), flush with the panel margin.
  *
  * Three conditional blocks:
  *   ① Icon row (conditional: tagDef or fieldDef)
@@ -13,7 +10,7 @@
  *   ③ Supertag row (conditional: has tags, not a definition node)
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { GripVertical, Library, Inbox, CalendarDays, Trash2, Search, type AppIcon } from '../../lib/icons.js';
+import { Library, Inbox, CalendarDays, Trash2, Search, type AppIcon } from '../../lib/icons.js';
 import { useNode } from '../../hooks/use-node';
 import { useNodeStore } from '../../stores/node-store';
 import { useWorkspaceStore } from '../../stores/workspace-store';
@@ -41,10 +38,6 @@ const CONTAINER_HEADER_ICONS: Record<ContainerIconKey, AppIcon> = {
   stash: Library,
 };
 
-/** Depth-0 padding formula from OutlinerItem: depth * 28 + 6. Header is always depth 0. */
-const ROW_PADDING_LEFT = 6;
-/** Alignment for tags, description, icon and title text to visually align with child bullets at 32px */
-const COL_B_OFFSET = 32;
 
 interface NodeHeaderProps {
   nodeId: string;
@@ -173,10 +166,10 @@ export function NodeHeader({ nodeId, onTitleRef }: NodeHeaderProps) {
   const showIconBlock = isTagDef || isFieldDef || isWorkspaceRoot || isContainer;
 
   return (
-    <div className="pt-1">
+    <div className="pt-1 px-4">
       {/* ── Block ①: Icon (conditional) ── */}
       {showIconBlock && (
-        <div className="mb-1" style={{ paddingLeft: COL_B_OFFSET }}>
+        <div className="mb-1">
           {isTagDef && tagDefColor && (
             <span
               className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent/60"
@@ -209,28 +202,19 @@ export function NodeHeader({ nodeId, onTitleRef }: NodeHeaderProps) {
 
       {/* ── Block ③: Supertag row (conditional) moved before name ── */}
       {hasTags && !isDefinitionNode && (
-        <div className="mb-0.5" style={{ paddingLeft: COL_B_OFFSET }}>
+        <div className="mb-0.5">
           <TagBar nodeId={nodeId} />
         </div>
       )}
 
       {/* ── Block ②: Name row (always) ── */}
       <div
-        className="group/header-row flex min-h-6 items-start"
-        style={{ paddingLeft: ROW_PADDING_LEFT }}
+        className="flex min-h-6 items-start"
       >
-        {/* Col A: Drag handle (same position as chevron) */}
-        <span
-          className="flex shrink-0 h-8 w-[15px] mr-1 items-center justify-center opacity-0 group-hover/header-row:opacity-40 hover:!opacity-100 cursor-grab transition-opacity"
-          title={t('nodeHeader.dragToMove')}
-        >
-          <GripVertical size={12} />
-        </span>
-
         {/* Inner container: col B + col C */}
         <div
           className="flex items-start flex-1 min-w-0"
-          style={{ paddingLeft: showCheckbox ? 0 : 7, gap: showCheckbox ? 8 : 0 }}
+          style={{ gap: showCheckbox ? 8 : 0 }}
         >
           {/* Col B: Checkbox (conditional, same position as bullet) */}
           {showCheckbox && (
@@ -263,7 +247,7 @@ export function NodeHeader({ nodeId, onTitleRef }: NodeHeaderProps) {
       </div>
 
       {/* ── Description ── */}
-      <div style={{ paddingLeft: COL_B_OFFSET }}>
+      <div>
         <NodeDescription nodeId={nodeId} editable={canEditNode} />
       </div>
     </div>

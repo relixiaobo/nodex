@@ -13,6 +13,16 @@ import { TrailingInput } from '../editor/TrailingInput';
 import { SYS_V } from '../../types/index.js';
 import { resolveTagColor } from '../../lib/tag-colors.js';
 import { useDragSelect } from '../../hooks/use-drag-select.js';
+import { getFlattenedVisibleNodes } from '../../lib/tree-utils.js';
+
+function getNodeTextLengthById(nodeId: string): number {
+  const node = loroDoc.toNodexNode(nodeId);
+  if (!node) return 0;
+  if (node.type === 'reference' && node.targetId) {
+    return (loroDoc.toNodexNode(node.targetId)?.name ?? '').length;
+  }
+  return (node.name ?? '').length;
+}
 
 interface OutlinerViewProps {
   rootNodeId: string;
@@ -107,7 +117,7 @@ export function OutlinerView({ rootNodeId, showTemplateTuples }: OutlinerViewPro
       }
     }
     return result;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allChildIds, fieldMap, _version, showTemplateTuples]);
 
   // Template content clone colors: content children with templateId get the owning tagDef's color.
@@ -125,7 +135,7 @@ export function OutlinerView({ rootNodeId, showTemplateTuples }: OutlinerViewPro
       if (color) map.set(id, [color]);
     }
     return map;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visibleChildren, _version]);
 
   /** Check if a hidden field has been temporarily revealed via UIStore */
@@ -243,20 +253,20 @@ export function OutlinerView({ rootNodeId, showTemplateTuples }: OutlinerViewPro
         parentExpandKey={`${loroDoc.getParentId(rootNodeId) ?? ''}:${rootNodeId}`}
         onNavigateOut={(direction) => {
           if (direction !== 'up') return;
-          for (let j = visibleChildren.length - 1; j >= 0; j--) {
-            const last = visibleChildren[j];
-            if (last.hidden && !isFieldRevealed(last.id)) continue;
-            if (last.type === 'field') {
-              clearFocus();
-              setEditingFieldName(last.id);
-              return;
-            }
+          if (direction !== 'up') return;
+          const fl = getFlattenedVisibleNodes(
+            dragSelectableRootIds,
+            useUIStore.getState().expandedNodes,
+            rootNodeId,
+          );
+          if (fl.length > 0) {
+            const lastNode = fl[fl.length - 1];
             useUIStore.getState().setFocusClickCoords({
-              nodeId: last.id,
-              parentId: rootNodeId,
-              textOffset: (useNodeStore.getState().getNode(last.id)?.name ?? '').length,
+              nodeId: lastNode.nodeId,
+              parentId: lastNode.parentId,
+              textOffset: getNodeTextLengthById(lastNode.nodeId),
             });
-            setFocusedNode(last.id, rootNodeId);
+            setFocusedNode(lastNode.nodeId, lastNode.parentId);
             return;
           }
         }}

@@ -2810,20 +2810,35 @@ export function OutlinerItem({
               parentExpandKey={expandKey}
               onNavigateOut={(direction) => {
                 if (direction === 'up') {
-                  if (lastRenderableChild) {
-                    if (lastRenderableChild.type === 'field') {
-                      clearFocus();
-                      setEditingFieldName(lastRenderableChild.id);
-                      return;
-                    }
+                  const fl = getFlattenedVisibleNodes(
+                    rootChildIds,
+                    useUIStore.getState().expandedNodes,
+                    rootNodeId,
+                  );
+                  // Find the true previous visible node prior to our parent
+                  // By finding our parent's index and taking the node *right after* its descendants ends?
+                  // Actually, TrailingInput resides exactly AT THE END of its 'effectiveNodeId''s scope.
+                  // So we just need to find the node whose 'expanded content' ends exactly here,
+                  // or more simply, we find the node that appears exactly BEFORE the next sibling of 'effectiveNodeId'.
+                  // Which is equivalent to taking the last node in the flattened list if we just build a flattened list for 'effectiveNodeId'.
+                  const parentChildren = useNodeStore.getState().getNode(effectiveNodeId)?.children ?? [];
+                  const parentFl = getFlattenedVisibleNodes(
+                    parentChildren,
+                    useUIStore.getState().expandedNodes,
+                    effectiveNodeId,
+                  );
+                  if (parentFl.length > 0) {
+                    const lastNode = parentFl[parentFl.length - 1];
                     useUIStore.getState().setFocusClickCoords({
-                      nodeId: lastRenderableChild.id,
-                      parentId: effectiveNodeId,
-                      textOffset: (useNodeStore.getState().getNode(lastRenderableChild.id)?.name ?? '').length,
+                      nodeId: lastNode.nodeId,
+                      parentId: lastNode.parentId,
+                      textOffset: getNodeTextLengthById(lastNode.nodeId),
                     });
-                    setFocusedNode(lastRenderableChild.id, effectiveNodeId);
+                    setFocusedNode(lastNode.nodeId, lastNode.parentId);
                     return;
                   }
+
+                  // If `effectiveNodeId` has no visible children, focus the parent itself.
                   useUIStore.getState().setFocusClickCoords({
                     nodeId,
                     parentId,

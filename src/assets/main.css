@@ -183,7 +183,15 @@
   vertical-align: top;
 }
 
-/* Force empty inline paragraphs to have height so Chrome renders the caret */
+/* Force empty inline paragraphs to have height so Chrome renders the caret.
+   When pressing Enter, a new node has a <br> as its only child. We must switch
+   to inline-block so the caret is actually drawn. As soon as text is typed,
+   it reverts to display: inline so tags don't wrap. */
+.editor-inline .ProseMirror p:empty,
+.editor-inline .ProseMirror p:has(> br.ProseMirror-trailingBreak:only-child) {
+  display: inline-block;
+}
+
 .editor-inline .ProseMirror p::after {
   content: "\200B";
 }

@@ -226,6 +226,24 @@ export function RichTextEditor(props: RichTextEditorProps) {
       }
       if (!view.hasFocus()) return;
 
+      // --- Sync trigger state for TrailingInput-created trigger nodes ---
+      // When TrailingInput creates a node with # / @ / /, OutlinerItem opens the
+      // dropdown via triggerHint, but the editor's internal triggerStateRef hasn't
+      // been activated. Sync the flags here BEFORE cursor restoration so that the
+      // dispatchTransaction → runTriggerDetection call sees the correct state and
+      // doesn't deactivate the dropdown that triggerHint just opened.
+      const ts = triggerStateRef.current;
+      if (
+        (propsRef.current.hashTagActive && !ts.hashActive) ||
+        (propsRef.current.referenceActive && !ts.referenceActive) ||
+        (propsRef.current.slashActive && !ts.slashActive)
+      ) {
+        ts.hasUserEdited = true;
+        if (propsRef.current.hashTagActive) ts.hashActive = true;
+        if (propsRef.current.referenceActive) ts.referenceActive = true;
+        if (propsRef.current.slashActive) ts.slashActive = true;
+      }
+
       // Restore click-based cursor position.
       const ci = useUIStore.getState().focusClickCoords;
       if (ci && ci.nodeId === propsRef.current.nodeId && ci.parentId === propsRef.current.parentId) {
@@ -257,23 +275,6 @@ export function RichTextEditor(props: RichTextEditorProps) {
           triggerStateRef.current.hasUserEdited = true;
           runTriggerDetection(view, true);
         }
-      }
-
-      // --- Sync trigger state for TrailingInput-created trigger nodes ---
-      // When TrailingInput creates a node with # / @ / /, OutlinerItem opens the
-      // dropdown via triggerHint, but the editor's internal triggerStateRef hasn't
-      // been activated. Sync the flags here so deactivation and cmd+enter work.
-      // The full detection with anchor update runs from the useEffect fallback.
-      const ts = triggerStateRef.current;
-      if (
-        (propsRef.current.hashTagActive && !ts.hashActive) ||
-        (propsRef.current.referenceActive && !ts.referenceActive) ||
-        (propsRef.current.slashActive && !ts.slashActive)
-      ) {
-        ts.hasUserEdited = true;
-        if (propsRef.current.hashTagActive) ts.hashActive = true;
-        if (propsRef.current.referenceActive) ts.referenceActive = true;
-        if (propsRef.current.slashActive) ts.slashActive = true;
       }
     });
   }, []);
@@ -364,10 +365,16 @@ export function RichTextEditor(props: RichTextEditorProps) {
       ts.slashActive = true;
       synced = true;
     }
-    // If cursor is placed and view has focus, run full detection to update
-    // the dropdown anchor position.
+    // Run full detection to update the dropdown anchor position, but only if
+    // the cursor position has been finalized (no pending focusClickCoords).
+    // If a cursor restoration is pending, the rAF callback will handle
+    // detection after positioning — running it here with the cursor at
+    // position 0 would incorrectly deactivate the dropdown.
     if (synced && view.hasFocus()) {
-      runTriggerDetection(view, true);
+      const pendingCoords = useUIStore.getState().focusClickCoords;
+      if (!pendingCoords) {
+        runTriggerDetection(view, true);
+      }
     }
   }, [props.hashTagActive, props.referenceActive, props.slashActive, runTriggerDetection]);
 

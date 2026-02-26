@@ -1941,8 +1941,8 @@ export function OutlinerItem({
     setHashTagQuery(query);
     setHashTagSelectedIndex(0);
     setHashTagAnchor(anchor);
-    if (!hashTagOpen) setHashTagOpen(true);
-  }, [hashTagOpen, nodeId]);
+    setHashTagOpen(true);
+  }, [nodeId]);
 
   const handleHashTagDeactivate = useCallback(() => {
     setHashTagOpen(false);

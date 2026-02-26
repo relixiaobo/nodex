@@ -289,7 +289,7 @@ export function NodePicker({
    {/* Dropdown — shown below the value */}
    {open && (
     <div
-     className="absolute top-full mt-0.5 w-56 max-h-52 overflow-y-auto rounded-lg border border-border bg-surface p-1"
+     className="absolute top-full mt-0.5 w-56 max-h-52 overflow-y-auto rounded-lg bg-background shadow-paper p-1"
      style={{ left: insetLeft, zIndex: FIELD_OVERLAY_Z_INDEX }}
      onMouseDown={(e) => e.preventDefault()}
     >
@@ -300,7 +300,7 @@ export function NodePicker({
         <button
          key={opt.id}
          className={`flex w-full items-start gap-2 rounded-md px-2 py-1 min-h-7 text-left transition-colors ${
-          i === hoverIndex ? 'bg-accent' : 'hover:bg-foreground/4'
+          i === hoverIndex ? 'bg-primary-muted' : 'hover:bg-foreground/4'
          }`}
          onMouseDown={(e) => e.preventDefault()}
          onClick={() => handleSelect(opt.id)}
@@ -322,7 +322,7 @@ export function NodePicker({
      ) : allowCreate && inputValue.trim() ? (
       <div>
        <button
-        className="flex w-full items-start gap-2 rounded-md px-2 py-1 min-h-7 text-left bg-accent text-foreground"
+        className="flex w-full items-start gap-2 rounded-md px-2 py-1 min-h-7 text-left bg-foreground/4 text-foreground"
         onMouseDown={(e) => e.preventDefault()}
         onClick={() => handleCreate(inputValue.trim())}
        >

@@ -90,7 +90,7 @@ export function SlashCommandMenu({ open, commands, selectedIndex, onSelect, anch
  const menu = (
   <div
    ref={listRef}
-   className="z-[1000] w-60 max-h-80 overflow-y-auto rounded-lg border border-border bg-popover/100 p-1 "
+   className="z-[1000] w-60 max-h-80 overflow-y-auto rounded-lg bg-background shadow-paper p-1"
    style={dropStyle}
    onMouseDown={(e) => e.preventDefault()}
   >
@@ -112,7 +112,7 @@ export function SlashCommandMenu({ open, commands, selectedIndex, onSelect, anch
        isDisabled
         ? 'cursor-not-allowed text-foreground-tertiary opacity-50'
         : isActive
-         ? 'bg-accent text-accent-foreground'
+         ? 'bg-primary-muted text-foreground'
          : 'text-foreground hover:bg-foreground/4'
       }`}
       onMouseDown={(e) => {

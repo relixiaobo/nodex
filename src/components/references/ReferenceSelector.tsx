@@ -287,7 +287,7 @@ export const ReferenceSelector = forwardRef<ReferenceDropdownHandle, ReferenceSe
   const menu = (
    <div
     ref={listRef}
-    className="z-[1000] w-64 max-h-60 overflow-y-auto rounded-lg border border-border bg-popover/100 p-1"
+    className="z-[1000] w-64 max-h-60 overflow-y-auto rounded-lg bg-background shadow-paper p-1"
     style={dropStyle}
     onMouseDown={(e) => e.preventDefault()}
    >
@@ -301,7 +301,7 @@ export const ReferenceSelector = forwardRef<ReferenceDropdownHandle, ReferenceSe
         key={dm.keyword}
         data-ref-item
         className={`flex w-full items-center gap-1.5 rounded-md px-2 py-1 text-left transition-colors ${
-         i === boundedIndex ? 'bg-accent' : 'hover:bg-foreground/4'
+         i === boundedIndex ? 'bg-primary-muted' : 'hover:bg-foreground/4'
         }`}
         onMouseDown={(e) => {
          e.preventDefault();
@@ -341,7 +341,7 @@ export const ReferenceSelector = forwardRef<ReferenceDropdownHandle, ReferenceSe
       aria-disabled={!!itemDisabledReasons.get(item.id)}
       title={itemDisabledReasons.get(item.id) ?? undefined}
       className={`flex w-full flex-col items-start rounded-md px-2 py-1 text-left transition-colors ${
-       dateMatches.length + i === boundedIndex ? 'bg-accent' : 'hover:bg-foreground/4'
+       dateMatches.length + i === boundedIndex ? 'bg-primary-muted' : 'hover:bg-foreground/4'
       } ${
        itemDisabledReasons.get(item.id) ? 'opacity-50 cursor-not-allowed' : ''
       }`}
@@ -380,7 +380,7 @@ export const ReferenceSelector = forwardRef<ReferenceDropdownHandle, ReferenceSe
       <button
        data-ref-item
        className={`flex w-full items-center gap-1.5 rounded-md px-2 py-1 text-sm text-foreground transition-colors text-left ${
-        boundedIndex === dateMatches.length + items.length ? 'bg-accent' : 'hover:bg-foreground/4'
+        boundedIndex === dateMatches.length + items.length ? 'bg-primary-muted' : 'hover:bg-foreground/4'
        }`}
        onMouseDown={(e) => {
         e.preventDefault();

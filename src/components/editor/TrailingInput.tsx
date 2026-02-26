@@ -483,19 +483,63 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
                 }
             },
             handleDOMEvents: {
-                keydown: (_view, event) => {
+                keydown: (view, event) => {
                     const keyboardEvent = event as KeyboardEvent;
                     if (isImeComposingEvent(keyboardEvent)) {
                         isComposingRef.current = true;
+                        return false;
                     }
+
+                    // For non-IME regular characters, trigger immediate eager conversion to Real Node.
+                    if (
+                        !keyboardEvent.ctrlKey &&
+                        !keyboardEvent.altKey &&
+                        !keyboardEvent.metaKey &&
+                        keyboardEvent.key.length === 1 &&
+                        (!view.state.doc.textContent || view.state.doc.textContent.length === 0)
+                    ) {
+                        const ref = callbacksRef.current;
+                        const char = keyboardEvent.key;
+
+                        // Only eager convert if it's not a trigger character that has special meaning
+                        if (char !== '>' && char !== '#' && char !== '@' && char !== '/') {
+                            keyboardEvent.preventDefault();
+                            committingRef.current = true;
+                            resetEditorContent(view);
+                            setHasContent(false);
+
+                            const newEmptyNode = ref.createChild(ref.effectiveParentId, undefined, { name: '' });
+                            ref.setExpanded(ref.effectiveParentEK, true, true);
+
+                            useUIStore.getState().setPendingInputChar({
+                                char,
+                                nodeId: newEmptyNode.id,
+                                parentId: ref.effectiveParentId,
+                            });
+
+                            ref.setFocusedNode(newEmptyNode.id, ref.effectiveParentId);
+                            queueMicrotask(() => { committingRef.current = false; });
+                            return true;
+                        }
+                    }
+
                     return false;
                 },
                 compositionstart: () => {
                     isComposingRef.current = true;
                     return false;
                 },
-                compositionend: () => {
+                compositionend: (view) => {
                     isComposingRef.current = false;
+                    // When IME finishes, grab the text and trigger an immediate commit
+                    // to eager-convert the node
+                    queueMicrotask(() => {
+                        if (committingRef.current || !viewRef.current) return;
+                        const text = viewRef.current.state.doc.textContent;
+                        if (text.length > 0) {
+                            commitContent(text, viewRef.current);
+                        }
+                    });
                     return false;
                 },
                 focus: () => {

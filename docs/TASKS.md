@@ -28,8 +28,6 @@ _(空)_
 
 | Agent | 当前任务 | 分支 | 修改中的文件 |
 |-------|---------|------|-------------|
-| nodex-cc | _(idle)_ | — | — |
-| nodex-cc-2 | Search Nodes Phase 1 (#23) | `cc2/search-nodes` | `node.ts`, `loro-doc.ts`, `search-engine.ts`, `node-store.ts`, `OutlinerItem.tsx`, `OutlinerView.tsx` |
 | nodex-codex | _(idle)_ | — | — |
 | antigravity | UI 细节打磨 | `anti/ui-polish` | _(等待第二轮 review 反馈)_ |
 
@@ -104,7 +102,7 @@ _(无进行中任务)_
 - [ ] Convert to supertag（普通节点快捷转 tagDef）
 - [ ] 批量标签操作（多选 add/remove）
 - [ ] Title expression（`${field name}` 动态标题）
-- [ ] 标签页（点击 supertag → 显示所有打该标签的节点列表/表格）
+- [ ] 标签页（= Search Nodes L0 入口，点击 supertag → 创建/导航 search node，见 #23）
 - **Spec**: `docs/features/supertags.md`
 
 #### Fields 全类型 (#21)
@@ -177,26 +175,18 @@ _(无进行中任务)_
 - [ ] 所有引用（树引用 + 内联引用 + 字段值引用）更新为指向合并后的节点
 - **Spec**: `docs/features/references.md`
 
-#### Search Nodes Phase 1 — 单标签搜索 (#23)
-> 查询配置 = 子节点树（`type: 'queryCondition'`），搜索结果动态计算 + OutlinerItem 渲染（完整交互）。
-> **Owner**: nodex-cc-2 | **Branch**: `cc2/search-nodes`
-> **Spec**: `docs/features/search.md` | **Plan**: `docs/plans/search-nodes-impl.md`
+#### Search Nodes (#23)
+> 规则驱动的动态集合。物化 reference 结果 + queryCondition 子节点树。
+> **Design**: `docs/plans/search-node-design.md`（唯一设计来源）
+>
+> Step 0 已完成（数据模型锁定），Step 1-3 上线后一个 PR 交付。
 
-- [ ] Step 1: 类型定义（`queryCondition` NodeType + 查询属性 + loro-doc 读写）
-- [ ] Step 2: 搜索引擎 `search-engine.ts`（条件树递归评估 + 多态标签搜索）
-- [ ] Step 3: `createSearchNode()` — 创建 3 节点（search + AND group + HAS_TAG）
-- [ ] Step 4: `?` 触发（启用 slash command + 标签选择器）
-- [ ] Step 5: 搜索节点渲染（BulletChevron 放大镜 bullet）
-- [ ] Step 6: 搜索结果渲染（useSearchResults hook + OutlinerView 搜索分支 + OutlinerItem isSearchResult）
-- [ ] Step 7: Seed data + 集成验证
-- [ ] Step 8: 文档同步
-
-**Phase 2 待办**（本次不做）：
-- [ ] Query Builder 面板（渲染/编辑条件子节点树）
-- [ ] AND / OR / NOT 逻辑组合 UI
-- [ ] 字段值过滤（FIELD_EQUALS / DEFINED / NOT_DEFINED）
-- [ ] TODO / DONE 关键词过滤
-- [ ] 搜索结果配合视图展示
+- [x] Step 0: 数据模型锁定 — `queryCondition` NodeType + `QueryOp`(32 op) + query 属性 + Loro 读写 + `isOutlinerContentNodeType('search')` ✓ nodex（2026-02-26）
+- [ ] Step 1: 搜索引擎核心 — `search-engine.ts`（条件树递归 + 候选集排除 + HAS_TAG/TODO/DONE/NOT_DONE）
+- [ ] Step 2: L0 点击标签创建 — TagBadge click → `createSearchNode(tagDefId)` + 去重导航
+- [ ] Step 3: 结果渲染 — BulletChevron 放大镜 + OutlinerView 搜索分支 + 芯片条（只读）+ 手动排序 + TrailingInput（HAS_TAG 自动打标签）
+- [ ] Step 4: L1 字段过滤 UI — 芯片条增删改 + FIELD_IS/时间条件 + 计数提示
+- [ ] Step 5: L2 AI 自然语言 — tool call 创建 queryCondition 树
 
 #### Table View (#24)
 > 执行顺序 ④（依赖 #25 的 Filter/Sort/Group 基础设施）
@@ -282,6 +272,7 @@ _(无进行中任务)_
 
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
+| 2026-02-26 | Search Node Step 0 数据模型锁定 — `queryCondition` NodeType + `QueryOp`(32 op) + query 属性 + Loro 读写 + `isOutlinerContentNodeType('search')` + 6 Vitest | nodex | main |
 | 2026-02-26 | v5.0 UI 重构全量完成 — Phase 1-7（Token 迁移 + 硬编码色值 + 阴影移除 + 排版 15px/24px + 大纲几何 + Tag 排印化 + 隐形 UI + 顶栏重构） | antigravity | #93 #96 |
 | 2026-02-26 | UI 细节打磨 — TopToolbar 对齐 + Breadcrumb 滚动规则 + TrailingInput 缩进 + 空节点光标 | antigravity | #96 #97 |
 | 2026-02-24 | 统一时间线 Undo/Redo (#44) 全量完成 — Phase 1-4（commitDoc 覆盖 + PM→Loro 同步 + UI marker commit + 统一 ⌘Z handler） | nodex-codex + nodex-cc | #91 #92 |

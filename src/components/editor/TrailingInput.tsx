@@ -443,7 +443,7 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
                     ref.setOptionsOpen(false);
 
                     ref.setTriggerHint(action.trigger);
-                    const triggerNode = ref.createChild(ref.effectiveParentId, undefined, { name: action.trigger });
+                    const triggerNode = ref.createChild(ref.effectiveParentId, undefined, { name: action.matchText });
                     ref.setExpanded(ref.effectiveParentEK, true, true);
                     ref.setFocusClickCoords({
                         nodeId: triggerNode.id,

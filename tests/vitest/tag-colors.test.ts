@@ -63,9 +63,9 @@ describe('resolveTagColor', () => {
     expect(color).toEqual(getTagColor('tagDef_dev_task'));
   });
 
-  it('reads pre-configured emerald for tagDef_task from seed', () => {
-    // tagDef_task has color: 'emerald' in seed
-    expect(resolveTagColor('tagDef_task')).toEqual(TAG_COLOR_MAP.emerald);
+  it('reads pre-configured green for tagDef_task from seed', () => {
+    // tagDef_task has color: 'green' in seed
+    expect(resolveTagColor('tagDef_task')).toEqual(TAG_COLOR_MAP.green);
   });
 
   it('reads configured color value via setConfigValue', () => {

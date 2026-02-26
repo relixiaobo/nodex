@@ -15,6 +15,7 @@ import { getNodeCapabilities } from '../lib/node-capabilities.js';
 import * as loroDoc from '../lib/loro-doc.js';
 import { getTreeReferenceBlockReason } from '../lib/reference-rules.js';
 import { resolveCheckboxClick, resolveCmdEnterCycle, resolveForwardDoneMapping, resolveReverseDoneMapping } from '../lib/checkbox-utils.js';
+import { nextAutoColorKey } from '../lib/tag-colors.js';
 
 // ============================================================
 // Store 接口
@@ -661,13 +662,18 @@ export const useNodeStore = create<NodeStore>((set, get) => {
 
     createTagDef: (name, options = {}) => {
       if (!canMutate('createTagDef')) return detachedNodeFallback(CONTAINER_IDS.SCHEMA);
+      // Auto-assign color by round-robin if not explicitly provided.
+      const color = options.color ?? nextAutoColorKey(
+        loroDoc.getChildren(CONTAINER_IDS.SCHEMA)
+          .filter((cid) => loroDoc.toNodexNode(cid)?.type === 'tagDef').length,
+      );
       const id = nanoid();
       loroDoc.createNode(id, CONTAINER_IDS.SCHEMA);
       loroDoc.setNodeDataBatch(id, {
         type: 'tagDef',
         name,
+        color,
         ...(options.showCheckbox !== undefined && { showCheckbox: options.showCheckbox }),
-        ...(options.color !== undefined && { color: options.color }),
       });
       loroDoc.commitDoc();
       return loroDoc.toNodexNode(id)!;

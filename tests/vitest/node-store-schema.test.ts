@@ -33,9 +33,9 @@ describe('createTagDef', () => {
   });
 
   it('sets color when option provided', () => {
-    const created = useNodeStore.getState().createTagDef('Colored Tag', { color: 'emerald' });
+    const created = useNodeStore.getState().createTagDef('Colored Tag', { color: 'green' });
     const tagDef = loroDoc.toNodexNode(created.id)!;
-    expect(tagDef.color).toBe('emerald');
+    expect(tagDef.color).toBe('green');
   });
 
   it('no SYS_T01 meta bindings (no meta/tuples)', () => {

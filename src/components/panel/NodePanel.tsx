@@ -108,13 +108,15 @@ export function NodePanel({ nodeId }: NodePanelProps) {
         {!isDefinitionNode && <OutlinerView rootNodeId={nodeId} />}
         {!isDefinitionNode && <BacklinksSection nodeId={nodeId} />}
         {isDefinitionNode && !isProtectedDateTagDef && (
-          <div className="mt-4 ml-4 px-2 pb-4">
+          <div className="ml-4 px-2 pb-4 border-t border-border-subtle">
             <button
               onClick={handleDelete}
-              className="flex items-center gap-2 text-sm text-foreground-secondary hover:text-destructive transition-colors"
+              className="flex items-center gap-1 min-h-6 py-1 text-foreground-secondary hover:text-destructive transition-colors"
             >
-              <Trash2 size={14} />
-              <span>{isFieldDef ? 'Delete field' : 'Delete tag'}</span>
+              <span className="shrink-0 w-[15px] flex items-center justify-center">
+                <Trash2 size={12} />
+              </span>
+              <span className="text-[15px] leading-6">{isFieldDef ? 'Delete field' : 'Delete tag'}</span>
             </button>
           </div>
         )}

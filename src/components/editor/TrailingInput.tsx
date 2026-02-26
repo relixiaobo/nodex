@@ -37,6 +37,15 @@ import { FIELD_OVERLAY_Z_INDEX } from '../fields/field-layout.js';
 import { pmSchema } from './pm-schema.js';
 import { marksToDoc } from '../../lib/pm-doc-utils.js';
 
+function getNodeTextLengthById(nodeId: string): number {
+    const node = loroDoc.toNodexNode(nodeId);
+    if (!node) return 0;
+    if (node.type === 'reference' && node.targetId) {
+        return (loroDoc.toNodexNode(node.targetId)?.name ?? '').length;
+    }
+    return (node.name ?? '').length;
+}
+
 
 const KEY_TRAILING_ENTER = getPrimaryShortcutKey('trailing.enter', 'Enter');
 const KEY_TRAILING_INDENT = getPrimaryShortcutKey('trailing.indent_depth', 'Tab');
@@ -296,8 +305,13 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
                         return true;
                     }
 
-                    // Focus the last visible node above this TrailingInput.
+                    // Focus the last visible node above this TrailingInput at the end of its text.
                     if (intent === 'focus_last_visible' && target) {
+                        useUIStore.getState().setFocusClickCoords({
+                            nodeId: target.nodeId,
+                            parentId: target.parentId,
+                            textOffset: getNodeTextLengthById(target.nodeId),
+                        });
                         ref.setFocusedNode(target.nodeId, target.parentId);
                     }
                     return true;

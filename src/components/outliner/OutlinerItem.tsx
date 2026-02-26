@@ -2063,8 +2063,8 @@ export function OutlinerItem({
     setRefQuery(query);
     setRefSelectedIndex(0);
     setRefAnchor(anchor);
-    if (!refOpen) setRefOpen(true);
-  }, [refOpen, parentId]);
+    setRefOpen(true);
+  }, [parentId]);
 
   const handleReferenceDeactivate = useCallback(() => {
     setRefOpen(false);

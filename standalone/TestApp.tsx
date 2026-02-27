@@ -55,7 +55,7 @@ function useTestBootstrap(): boolean {
       });
 
       const agent = getAgentInfo();
-      document.title = `Nodex [${agent.name}] (Loro local)`;
+      document.title = `soma [${agent.name}] (Loro local)`;
 
       setReady(true);
     }

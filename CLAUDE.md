@@ -1,10 +1,10 @@
-# Nodex
+# soma
 
 Chrome Side Panel 云端知识管理工具，忠实复刻 Tana 核心功能。
 
 ## 项目概述
 
-Nodex 让用户在浏览网页时，通过 Chrome Side Panel 记录和组织信息，与历史笔记协同阅读，并提供 AI 辅助功能（聊天、网页操作等）。
+soma 让用户在浏览网页时，通过 Chrome Side Panel 记录和组织信息，与历史笔记协同阅读，并提供 AI 辅助功能（聊天、网页操作等）。
 
 **核心设计原则**：基于 Tana 的 "Everything is a Node" 数据模型，保留 Tuple 核心抽象，简化掉 Firebase 时代的 Metanode 和 AssociatedData 间接层。
 
@@ -181,7 +181,7 @@ docs/                      # TASKS.md + design-system.md + research/
 
 ### 一切皆节点
 
-单表 `nodes` 存储所有类型。`doc_type` 列区分节点类型（22 种 + 1 Nodex 新增）。无 `doc_type` 的是普通内容节点（占 46.6%）。
+单表 `nodes` 存储所有类型。`doc_type` 列区分节点类型（22 种 + 1 soma 新增）。无 `doc_type` 的是普通内容节点（占 46.6%）。
 
 ### 配置页面 = 系统标签模板（核心设计模式）
 

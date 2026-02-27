@@ -46,6 +46,7 @@ _(无)_
 - [x] **点击 node 文本中的链接未打开标签页** — 静态内容 + 编辑器 mousedown 双重拦截，单击 chrome.tabs.create 打开
 - [x] **节点内拖选文本误触发节点选中** — use-drag-select 尊重浏览器活跃文本选区
 - [x] **粘贴/剪藏内容中的 #、@ 不应触发下拉菜单** — paste transaction setMeta 跳过 trigger 检测
+- [ ] **Field value 验证错误 icon 未垂直居中** — number 等字段输入非法值时，右侧 ⚠ 图标未与行内容垂直居中
 
 ### v0.1 — 首次上线（Chrome Web Store 发布）
 
@@ -75,7 +76,7 @@ _(无)_
 ### P1 — 核心差异化（上线后第一优先级）
 
 #### 上下文感知 Sidebar — 浏览器原生知识助手
-> **Nodex 最核心的差异化功能**。Tana/Notion/Obsidian 做不到——因为它们不在浏览器里。
+> **soma 最核心的差异化功能**。Tana/Notion/Obsidian 做不到——因为它们不在浏览器里。
 > 用户浏览网页时，侧边栏自动显示与当前页面相关的笔记，实现”阅读 ↔ 知识”双向连接。
 
 - [ ] **Phase 1: URL 匹配** — 检测当前标签页 URL，匹配已有 web_clip 的 Source URL 字段，显示”你之前记过这个网页”
@@ -88,6 +89,7 @@ _(无)_
 > 浏览器产品的核心价值。基础版已完成，需升级为智能剪藏。
 
 - [x] 基础剪藏链路 ✓（消息/提取/保存/标签/URL/Toast/正文→子节点）
+- [ ] **Clip Page Toast 优化** — 成功时不提示，仅失败时提示；提示改为顶部轻量样式（非底部）
 - [ ] 一键保存到 Inbox / Today / 指定节点（UI 入口 + 目标选择）
 - [ ] **AI 智能剪藏** — 自动打标签、提取结构化信息（作者/日期/关键词）、推荐关联到已有笔记
 - [ ] 选中文本剪藏（Content Script 右键菜单 / 浮动按钮 → 剪藏选中段落）
@@ -96,7 +98,7 @@ _(无)_
 - **Spec**: `docs/features/web-clipping.md`
 
 #### AI Chat & 网页辅助 (#29 + #31)
-> 浏览器 + AI = Nodex 的第二个差异化维度。不只是聊天框，而是理解上下文的知识助手。
+> 浏览器 + AI = soma 的第二个差异化维度。不只是聊天框，而是理解上下文的知识助手。
 
 - [ ] **AI Chat 基础** — Side Panel 内嵌对话界面，可引用笔记节点作为上下文
 - [ ] **网页问答** — 选中网页内容 → 在侧边栏中提问/总结/翻译（Content Script + Side Panel 联动）
@@ -119,7 +121,7 @@ _(无)_
 - [ ] Step 5: L2 AI 自然语言 — tool call 创建 queryCondition 树
 
 #### AI Chat & 网页辅助 (#29 + #31)
-> 浏览器 + AI = Nodex 的第二个差异化维度。不只是聊天框，而是理解上下文的知识助手。
+> 浏览器 + AI = soma 的第二个差异化维度。不只是聊天框，而是理解上下文的知识助手。
 
 - [ ] **AI Chat 基础** — Side Panel 内嵌对话界面，可引用笔记节点作为上下文
 - [ ] **网页问答** — 选中网页内容 → 在侧边栏中提问/总结/翻译（Content Script + Side Panel 联动）
@@ -166,6 +168,12 @@ _(无)_
 - [ ] Group by：按字段值分组
 - [ ] ViewDef Tuple 持久化（SYS_A16/18/19/20）
 
+#### Trash 彻底删除
+- [ ] **支持在 Trash 中永久删除节点** — Trash 内的节点可彻底删除（从数据中移除），提供确认交互
+
+#### 图片节点支持
+- [ ] **支持图片 node** — 节点可嵌入/展示图片（上传、粘贴、拖拽），需要存储方案（R2）
+
 ### P3 — 编辑器增强 & 交互完善
 
 #### 空内容节点 "Untitled" 占位 + Tag 间距优化
@@ -192,8 +200,8 @@ _(无)_
 - **Spec**: `docs/features/references.md`
 
 #### Floating Toolbar 后续 (#46)
-- [ ] @ Reference 按钮
-- [ ] # Tag 按钮
+- [ ] **@ Reference 按钮** — 选中文本 → 点击 Floating Toolbar `@ Reference` → 打开 ReferenceSelector（搜索已有节点 / 创建新节点）→ 选中文本替换为所选节点的 inline reference
+- [ ] **# Tag 按钮** — 选中文本 → 点击 Floating Toolbar `# Tag` → 打开 TagSelector → 选择 supertag → 选中文本提取为新节点（存入 Library，文本作为节点名 + 应用所选 supertag）→ 原位替换为该节点的 inline reference
 - **Spec**: `docs/features/floating-toolbar.md`
 
 #### Slash Command — 后续命令点亮 (#48)

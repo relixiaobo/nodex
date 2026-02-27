@@ -121,4 +121,52 @@ describe('drag-drop decision helper', () => {
       expandKey: 'proj_1:task_2',
     });
   });
+
+  it('resolves drops on nodes inside a field tuple (field value context)', () => {
+    // Drop "before" a value node inside a field tuple — parent is the tuple
+    expect(resolveDropMove({
+      dragNodeId: 'content_node_3',
+      targetNodeId: 'value_node_1',
+      targetParentId: 'field_tuple_1',
+      targetParentKey: 'field_tuple_1:value_node_1',
+      siblingIndex: 0,
+      dropPosition: 'before',
+      targetHasChildren: false,
+      targetIsExpanded: false,
+    })).toEqual({
+      newParentId: 'field_tuple_1',
+      position: 0,
+    });
+
+    // Drop "after" a value node inside a field tuple
+    expect(resolveDropMove({
+      dragNodeId: 'content_node_3',
+      targetNodeId: 'value_node_1',
+      targetParentId: 'field_tuple_1',
+      targetParentKey: 'field_tuple_1:value_node_1',
+      siblingIndex: 0,
+      dropPosition: 'after',
+      targetHasChildren: false,
+      targetIsExpanded: false,
+    })).toEqual({
+      newParentId: 'field_tuple_1',
+      position: 1,
+    });
+
+    // Drop "inside" a value node inside a field tuple (nesting)
+    expect(resolveDropMove({
+      dragNodeId: 'content_node_3',
+      targetNodeId: 'value_node_1',
+      targetParentId: 'field_tuple_1',
+      targetParentKey: 'field_tuple_1:value_node_1',
+      siblingIndex: 0,
+      dropPosition: 'inside',
+      targetHasChildren: false,
+      targetIsExpanded: false,
+    })).toEqual({
+      newParentId: 'value_node_1',
+      position: 0,
+      expandKey: 'field_tuple_1:value_node_1',
+    });
+  });
 });

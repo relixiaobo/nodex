@@ -2362,6 +2362,7 @@ export function OutlinerItem({
   const handleDrop = useCallback(
     (e: DragEvent) => {
       e.preventDefault();
+      e.stopPropagation();
       if (!dragNodeId || dragNodeId === nodeId) {
         setDrag(null);
         return;

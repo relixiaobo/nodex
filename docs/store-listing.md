@@ -1,14 +1,14 @@
 # Chrome Web Store Listing
 
 ## Extension Name
-Nodex
+soma
 
 ## Short Description (132 chars max)
 Cloud knowledge management in Chrome Side Panel. Outline notes, tag & organize, sync across devices.
 
 ## Detailed Description
 
-Nodex is a knowledge management tool that lives in your Chrome Side Panel. Capture ideas, organize projects, and build your personal knowledge base — all without leaving the browser.
+soma is a knowledge management tool that lives in your Chrome Side Panel. Capture ideas, organize projects, and build your personal knowledge base — all without leaving the browser.
 
 **Outline your thoughts**
 Structure notes with a powerful nested outliner. Expand, collapse, drag to reorder, and navigate entirely from the keyboard.
@@ -26,7 +26,7 @@ Your notes sync automatically to the cloud. Edit offline — changes merge seaml
 Bold, italic, code, highlights, and internal links between notes. A full-featured writing experience in your side panel.
 
 **Always within reach**
-Click the Nodex icon on any webpage to open your notes alongside what you're reading. No tab-switching needed.
+Click the soma icon on any webpage to open your notes alongside what you're reading. No tab-switching needed.
 
 ---
 

@@ -567,7 +567,7 @@ export interface SystemFieldDef {
   icon: AppIcon;
 }
 
-/** 8 system fields available for Nodex. */
+/** 8 system fields available for soma. */
 export const SYSTEM_FIELDS: SystemFieldDef[] = [
   { key: 'NDX_SYS_DESCRIPTION', name: 'Node description', source: 'description', dataType: '__system_text__', icon: FileText },
   { key: 'NDX_SYS_CREATED', name: 'Created time', source: 'createdAt', dataType: '__system_date__', icon: CalendarPlus },

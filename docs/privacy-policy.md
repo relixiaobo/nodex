@@ -1,22 +1,22 @@
-# Nodex Privacy Policy
+# soma Privacy Policy
 
 *Last updated: February 27, 2026*
 
-## What is Nodex
+## What is soma
 
-Nodex is a Chrome extension that provides knowledge management in the Chrome Side Panel. It lets you create, organize, and sync notes while browsing the web.
+soma is a Chrome extension that provides knowledge management in the Chrome Side Panel. It lets you create, organize, and sync notes while browsing the web.
 
 ## Data We Collect
 
 **Account information**: When you sign in with Google, we receive your name and email address to create your account.
 
-**Notes and content**: The notes, tags, and other content you create within Nodex are stored to provide the service.
+**Notes and content**: The notes, tags, and other content you create within soma are stored to provide the service.
 
-**Web page content**: When you use the web clipping feature, Nodex captures content from the current webpage that you choose to save.
+**Web page content**: When you use the web clipping feature, soma captures content from the current webpage that you choose to save.
 
 ## How We Use Your Data
 
-Your data is used solely to provide and improve the Nodex service:
+Your data is used solely to provide and improve the soma service:
 - Authenticate your account
 - Store and sync your notes across devices
 - Enable web clipping when you request it

@@ -22,7 +22,7 @@ export function LoginScreen() {
     <div className="flex h-screen flex-col items-center justify-center gap-6 bg-background px-6 text-foreground">
       {/* Logo / wordmark */}
       <div className="flex flex-col items-center gap-1">
-        <span className="text-2xl font-bold tracking-tight">Nodex</span>
+        <span className="text-2xl font-bold tracking-tight">soma</span>
         <span className="text-xs text-foreground-secondary">
           Cloud knowledge in your side panel
         </span>

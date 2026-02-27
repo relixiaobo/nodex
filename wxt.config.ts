@@ -11,7 +11,7 @@ const isPreview = mode === 'preview';    // npm run build:preview
 const iconDir = isPreview ? 'icon-preview' : isStore ? 'icon' : 'icon-dev';
 
 // Manifest name: visually distinguish environments
-const name = isPreview ? 'Nodex Preview' : isStore ? 'Nodex' : 'Nodex Dev';
+const name = isPreview ? 'soma Preview' : isStore ? 'soma' : 'soma Dev';
 
 export default defineConfig({
   srcDir: 'src',
@@ -52,7 +52,7 @@ export default defineConfig({
       default_path: 'sidepanel.html',
     },
     action: {
-      default_title: 'Open Nodex',
+      default_title: 'Open soma',
     },
   },
   vite: () => ({

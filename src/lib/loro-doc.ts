@@ -1,7 +1,7 @@
 /**
  * Loro 文档管理器 — 全局单例
  *
- * 封装 LoroDoc + LoroTree 操作，维护 Nodex ID ↔ Loro TreeID 双向映射。
+ * 封装 LoroDoc + LoroTree 操作，维护 soma ID ↔ Loro TreeID 双向映射。
  * TreeID 在 loro-crdt 1.x 中为字符串 `"counter@peer"`，可直接用作 Map key。
  */
 
@@ -34,10 +34,10 @@ const RICH_TEXT_STYLE_CONFIG = {
 let doc: LoroDoc | null = null;
 let undoManager: UndoManager | null = null;
 
-/** Nodex ID → Loro TreeID（字符串） */
+/** soma ID → Loro TreeID（字符串） */
 const nodexToTree = new Map<string, TreeID>();
 
-/** Loro TreeID → Nodex ID */
+/** Loro TreeID → soma ID */
 const treeToNodex = new Map<TreeID, string>();
 
 /** 当前工作区 ID */

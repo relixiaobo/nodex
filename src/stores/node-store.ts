@@ -1,5 +1,5 @@
 /**
- * Nodex 节点 Store — Loro 迁移后新版本
+ * soma 节点 Store — Loro 迁移后新版本
  *
  * 薄 Zustand wrapper，底层数据全部存在 LoroDoc 中。
  * - 不持有 entities 数据（getNode/getChildren 实时从 Loro 读取）

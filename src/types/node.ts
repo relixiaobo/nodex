@@ -1,5 +1,5 @@
 /**
- * Nodex 核心节点类型定义 — Loro 迁移后新版本
+ * soma 核心节点类型定义 — Loro 迁移后新版本
  *
  * 核心变化：
  * - 消除 props 包装层（所有属性直接在 NodexNode 顶层）
@@ -147,7 +147,7 @@ export interface DoneMappingEntry {
 // ============================================================
 
 /**
- * Nodex 核心节点 —— "一切皆节点"。
+ * soma 核心节点 —— "一切皆节点"。
  *
  * 与旧接口相比：
  * - 扁平化：消除 props 包装层
@@ -224,7 +224,7 @@ export interface NodexNode {
   /** 搜索上下文节点 ID（旧 props.searchContextNode） */
   searchContext?: string;
 
-  // ─── Nodex 扩展 ───
+  // ─── soma 扩展 ───
 
   /** AI 生成摘要 */
   aiSummary?: string;

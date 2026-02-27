@@ -34,8 +34,8 @@ export const FIELD_TYPES = {
   URL: 'url',
   EMAIL: 'email',
   OPTIONS: 'options',
-  BOOLEAN: 'boolean',    // Nodex 扩展
-  COLOR: 'color',        // Nodex 扩展
+  BOOLEAN: 'boolean',    // soma 扩展
+  COLOR: 'color',        // soma 扩展
 } as const;
 
 export type FieldType = typeof FIELD_TYPES[keyof typeof FIELD_TYPES];
@@ -149,7 +149,7 @@ export const SYS_A = {
   PROMOTE_FOR: 'SYS_A251',
   SPEAKER: 'SYS_A252',
 
-  // ─── Nodex 自定义属性 ───
+  // ─── soma 自定义属性 ───
   HIDE_FIELD: 'NDX_A01',
   AUTO_INITIALIZE: 'NDX_A02',
   MIN_VALUE: 'NDX_A03',

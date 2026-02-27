@@ -40,6 +40,13 @@ _(无)_
 
 ## 待办
 
+### Bug 修复（待修）
+
+- [ ] **日期 NodePanel 输入 date field 白屏** — 在日期节点面板下输入 date 类型的 field node 会导致白屏崩溃
+- [ ] **点击 node 文本中的链接未打开标签页** — 编辑器内的超链接点击无反应，应在新标签页中打开
+- [ ] **节点内拖选文本误触发节点选中** — 在编辑器内按住鼠标拖动选中文本时，容易误触发整个节点变为选中状态（蓝色高亮），应优先响应文本选择而非节点框选
+- [ ] **粘贴/剪藏内容中的 #、@ 不应触发下拉菜单** — 通过粘贴或 Clip Page 导入的内容含 `#`、`@` 等符号时，不应触发 TagSelector / ReferenceSelector 下拉交互（仅手动输入时触发）
+
 ### v0.1 — 首次上线（Chrome Web Store 发布）
 
 > **上线门槛**：用户可以日常使用的最小完整产品。已有功能（大纲编辑、Supertags、Fields、Date 节点、Web Clipping 基础、Undo/Redo、⌘K 搜索）+ Sync = v0.1。
@@ -60,6 +67,7 @@ _(无)_
 - [ ] **产品展示页** — 静态落地页（产品介绍 + 截图 + 安装链接 + 隐私政策），可托管在 Cloudflare Pages 或 GitHub Pages
 - [x] **Production build 清理** — 三环境分离（Store 无 key 无 localhost，Preview/Dev 各自独立 key + icon）
 - [ ] **开发者账号** — Chrome Web Store 注册（$5）
+- [ ] **新用户引导数据** — 准备一批引导用的种子数据，帮助新用户了解操作方式和功能
 - [ ] `npm run zip` → 上传发布
 
 ---
@@ -83,6 +91,7 @@ _(无)_
 - [ ] 一键保存到 Inbox / Today / 指定节点（UI 入口 + 目标选择）
 - [ ] **AI 智能剪藏** — 自动打标签、提取结构化信息（作者/日期/关键词）、推荐关联到已有笔记
 - [ ] 选中文本剪藏（Content Script 右键菜单 / 浮动按钮 → 剪藏选中段落）
+- [ ] **Twitter/X 剪藏支持** — Clip Page 目前不支持抓取 Twitter/X 内容，需适配其特殊 DOM 结构
 - [ ] 剪藏模板 — 不同网站类型（文章/产品/视频/论文）使用不同 Supertag 模板
 - **Spec**: `docs/features/web-clipping.md`
 
@@ -131,6 +140,7 @@ _(无)_
 #### Fields 全类型 (#21)
 > 基础已完成（Options/Date/Number/URL/Email/Checkbox/隐藏/Required/Min-Max/验证/系统字段）
 
+- [ ] **同一节点下重复 field node 去重** — 同一个 node 下不允许出现相同的 field node；若选中了重复的 field，只保留最早的那个
 - [ ] AttrDef “Used in” 计算字段
 - [ ] Auto-initialize（6 种策略）
 - [ ] Pinned fields
@@ -157,6 +167,9 @@ _(无)_
 - [ ] ViewDef Tuple 持久化（SYS_A16/18/19/20）
 
 ### P3 — 编辑器增强 & 交互完善
+
+#### 空内容节点 "Untitled" 占位 + Tag 间距优化
+- [ ] 节点无文本内容只有 #tag 时，tag 前显示 "Untitled" 占位文本（参考 Tana），避免 tag 紧贴 bullet
 
 #### NodePanel Title 交互补全
 - [ ] 标题编辑器支持 `@` 触发 ReferenceSelector（插入 inline reference）

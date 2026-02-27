@@ -114,7 +114,7 @@ export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, configNo
     [visibleChildren],
   );
 
-  // --- Special control early returns (Boolean, Checkbox, Date) ---
+  // --- ALL hooks must be declared before any early returns (React rules of hooks) ---
   const toggleCheckboxField = useNodeStore((s) => s.toggleCheckboxField);
   const setFieldValue = useNodeStore((s) => s.setFieldValue);
   const clearFieldValue = useNodeStore((s) => s.clearFieldValue);
@@ -122,6 +122,63 @@ export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, configNo
   const setFocusedNode = useUIStore((s) => s.setFocusedNode);
   const clearFocus = useUIStore((s) => s.clearFocus);
   const setEditingFieldName = useUIStore((s) => s.setEditingFieldName);
+
+  // Drop zone hooks (must be before early returns)
+  const moveNodeTo = useNodeStore((s) => s.moveNodeTo);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [isDragOver, setIsDragOver] = useState(false);
+
+  const handleContainerDragOver = useCallback((e: React.DragEvent) => {
+    const dragId = useUIStore.getState().dragNodeId;
+    if (!dragId) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setIsDragOver(true);
+  }, []);
+
+  const handleContainerDragLeave = useCallback((e: React.DragEvent) => {
+    if (containerRef.current && !containerRef.current.contains(e.relatedTarget as Node)) {
+      setIsDragOver(false);
+    }
+  }, []);
+
+  const handleContainerDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    const dragId = useUIStore.getState().dragNodeId;
+    if (!dragId) return;
+    moveNodeTo(dragId, tupleId);
+    useUIStore.getState().setDrag(null);
+  }, [tupleId, moveNodeTo]);
+
+  const firstIsField = visibleChildren.length > 0 && visibleChildren[0].type === 'field';
+  const lastIsField = visibleChildren.length > 0 && visibleChildren[visibleChildren.length - 1].type === 'field';
+  const showTrailingInput = shouldShowFieldValueTrailingInput(visibleChildren);
+
+  const handleTrailingNavigateOut = useCallback((direction: 'up' | 'down') => {
+    if (direction === 'up') {
+      const last = visibleChildren[visibleChildren.length - 1];
+      if (!last) {
+        onNavigateOut?.('up');
+        return;
+      }
+      if (last.type === 'field') {
+        clearFocus();
+        setEditingFieldName(last.id);
+        return;
+      }
+      useUIStore.getState().setFocusClickCoords({
+        nodeId: last.id,
+        parentId: tupleId,
+        textOffset: (useNodeStore.getState().getNode(last.id)?.name ?? '').length,
+      });
+      setFocusedNode(last.id, tupleId);
+      return;
+    }
+    onNavigateOut?.('down');
+  }, [visibleChildren, onNavigateOut, clearFocus, setEditingFieldName, tupleId, setFocusedNode]);
+
+  // --- Special control early returns (Boolean, Checkbox, Date) ---
 
   // --- BOOLEAN: Yes/No toggle switch ---
   // For virtual config entries: read from node attribute directly.
@@ -281,66 +338,6 @@ export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, configNo
       </div>
     );
   }
-
-  // --- Drop zone for dragging nodes into field values ---
-  const moveNodeTo = useNodeStore((s) => s.moveNodeTo);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [isDragOver, setIsDragOver] = useState(false);
-
-  const handleContainerDragOver = useCallback((e: React.DragEvent) => {
-    const dragId = useUIStore.getState().dragNodeId;
-    if (!dragId) return;
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-    setIsDragOver(true);
-  }, []);
-
-  const handleContainerDragLeave = useCallback((e: React.DragEvent) => {
-    // Only clear when leaving the container entirely (not entering a child)
-    if (containerRef.current && !containerRef.current.contains(e.relatedTarget as Node)) {
-      setIsDragOver(false);
-    }
-  }, []);
-
-  const handleContainerDrop = useCallback((e: React.DragEvent) => {
-    // If an inner OutlinerItem already handled the drop (via stopPropagation), this won't fire.
-    e.preventDefault();
-    setIsDragOver(false);
-    const dragId = useUIStore.getState().dragNodeId;
-    if (!dragId) return;
-    // Append dragged node to end of this tuple's children
-    moveNodeTo(dragId, tupleId);
-    useUIStore.getState().setDrag(null);
-  }, [tupleId, moveNodeTo]);
-
-  // Prevent border stacking: when nested FieldRows are first/last, add padding
-  // so their border-t/border-b doesn't visually coincide with the parent FieldRow's borders
-  const firstIsField = visibleChildren.length > 0 && visibleChildren[0].type === 'field';
-  const lastIsField = visibleChildren.length > 0 && visibleChildren[visibleChildren.length - 1].type === 'field';
-  const showTrailingInput = shouldShowFieldValueTrailingInput(visibleChildren);
-
-  const handleTrailingNavigateOut = useCallback((direction: 'up' | 'down') => {
-    if (direction === 'up') {
-      const last = visibleChildren[visibleChildren.length - 1];
-      if (!last) {
-        onNavigateOut?.('up');
-        return;
-      }
-      if (last.type === 'field') {
-        clearFocus();
-        setEditingFieldName(last.id);
-        return;
-      }
-      useUIStore.getState().setFocusClickCoords({
-        nodeId: last.id,
-        parentId: tupleId,
-        textOffset: (useNodeStore.getState().getNode(last.id)?.name ?? '').length,
-      });
-      setFocusedNode(last.id, tupleId);
-      return;
-    }
-    onNavigateOut?.('down');
-  }, [visibleChildren, onNavigateOut, clearFocus, setEditingFieldName, tupleId, setFocusedNode]);
 
   const dragActive = isDragOver && useUIStore.getState().dragNodeId != null;
 

@@ -7,6 +7,7 @@
     "dev": "wxt",
     "dev:firefox": "wxt --browser firefox",
     "build": "wxt build",
+    "build:preview": "wxt build --mode preview",
     "build:firefox": "wxt build --browser firefox",
     "zip": "wxt zip",
     "zip:firefox": "wxt zip --browser firefox",

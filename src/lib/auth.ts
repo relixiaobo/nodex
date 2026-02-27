@@ -40,7 +40,9 @@ function getSyncApiUrl(): string {
  */
 export async function signInWithGoogle(): Promise<AuthUser> {
   const apiUrl = getSyncApiUrl();
-  const extensionRedirect = `${apiUrl}/auth/extension-redirect`;
+  // Pass our extension ID so the server redirects back to the correct extension
+  const extId = chrome.runtime.id;
+  const extensionRedirect = `${apiUrl}/auth/extension-redirect?ext_id=${extId}`;
 
   // Step 1: POST to Better Auth to get the Google OAuth URL
   // (Better Auth stores PKCE state in DB and returns the Google redirect URL)

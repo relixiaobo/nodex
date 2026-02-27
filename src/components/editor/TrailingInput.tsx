@@ -481,6 +481,42 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
                 }
             },
             handleDOMEvents: {
+                paste: (_view, event) => {
+                    const clipboardEvent = event as ClipboardEvent;
+                    clipboardEvent.preventDefault();
+                    const text = clipboardEvent.clipboardData?.getData('text/plain') ?? '';
+                    if (!text.trim()) return true;
+
+                    const ref = callbacksRef.current;
+                    if (committingRef.current) return true;
+                    committingRef.current = true;
+
+                    const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
+                    if (lines.length === 0) { committingRef.current = false; return true; }
+
+                    // Create first child from first line
+                    resetEditorContent(_view);
+                    setHasContent(false);
+                    const firstNode = createInContext(ref, ref.effectiveParentId, { name: lines[0] });
+                    ref.setExpanded(ref.effectiveParentEK, true, true);
+
+                    // Create siblings for remaining lines
+                    let lastId = firstNode.id;
+                    if (lines.length > 1) {
+                        const createSiblingNodesFromPaste = useNodeStore.getState().createSiblingNodesFromPaste;
+                        const result = createSiblingNodesFromPaste(firstNode.id, lines.slice(1));
+                        if (result) lastId = result;
+                    }
+
+                    ref.setFocusClickCoords({
+                        nodeId: lastId,
+                        parentId: ref.effectiveParentId,
+                        textOffset: lines[lines.length - 1].length,
+                    });
+                    ref.setFocusedNode(lastId, ref.effectiveParentId);
+                    queueMicrotask(() => { committingRef.current = false; });
+                    return true;
+                },
                 // Prevent ProseMirror from handling drag-over / drop when
                 // a custom outliner drag is in progress (dragNodeId set).
                 // Returning true tells ProseMirror to skip its own handling,

@@ -109,6 +109,7 @@ interface RichTextEditorProps {
   onEscapeSelect?: () => void;
   onShiftArrow?: (direction: 'up' | 'down') => void;
   onSelectAll?: () => void;
+  onPasteMultiLine?: (lines: string[]) => void;
 }
 
 export interface EditorContentPayload {
@@ -735,24 +736,31 @@ export function RichTextEditor(props: RichTextEditorProps) {
       handlePaste: (view, event) => {
         event.preventDefault();
         const text = event.clipboardData?.getData('text/plain') ?? '';
-        const normalized = text.replace(/[\r\n]+/g, ' ').trim();
-        if (!normalized) return true;
+        if (!text.trim()) return true;
 
         const { from, to } = view.state.selection;
         const hasSelection = from !== to;
         const isPlainPaste = pasteShiftRef.current;
         pasteShiftRef.current = false; // Reset after reading
 
-        // Smart paste: ⌘V with a URL → apply as link
-        if (!isPlainPaste && isLikelyUrl(normalized)) {
+        // ⌘⇧V (plain paste): always flatten multi-line to single line
+        if (isPlainPaste) {
+          const normalized = text.replace(/[\r\n]+/g, ' ').trim();
+          const tr = view.state.tr.insertText(normalized, from, to);
+          tr.setMeta('nodex:isPaste', true);
+          view.dispatch(tr);
+          return true;
+        }
+
+        // ⌘V (smart paste): check for URL first (single-line only)
+        const normalized = text.replace(/[\r\n]+/g, ' ').trim();
+        if (isLikelyUrl(normalized)) {
           if (hasSelection) {
-            // Wrap selected text with the pasted URL as link
             let tr = view.state.tr.addMark(from, to, pmSchema.marks.link.create({ href: normalized }));
             tr = tr.setSelection(TextSelection.create(tr.doc, to));
             tr.setMeta('nodex:isPaste', true);
             view.dispatch(tr);
           } else {
-            // Insert URL text with link mark applied
             const linkMark = pmSchema.marks.link.create({ href: normalized });
             const textNode = pmSchema.text(normalized, [linkMark]);
             let tr = view.state.tr.insert(from, textNode);
@@ -760,13 +768,28 @@ export function RichTextEditor(props: RichTextEditorProps) {
             tr.setMeta('nodex:isPaste', true);
             view.dispatch(tr);
           }
-        } else {
-          // Plain paste (⌘⇧V) or non-URL content
-          const tr = view.state.tr.insertText(normalized, from, to);
-          tr.setMeta('nodex:isPaste', true);
-          view.dispatch(tr);
+          return true;
         }
 
+        // ⌘V with multi-line text: split into sibling nodes
+        const lines = text.split(/\r?\n/);
+        if (lines.length > 1 && propsRef.current.onPasteMultiLine) {
+          const firstLine = lines[0].trim();
+          if (firstLine) {
+            const tr = view.state.tr.insertText(firstLine, from, to);
+            tr.setMeta('nodex:isPaste', true);
+            tr.setMeta(META_DEFER_LORO_TEXT_COMMIT, true);
+            view.dispatch(tr);
+          }
+          saveContent();
+          propsRef.current.onPasteMultiLine(lines.slice(1));
+          return true;
+        }
+
+        // Single-line non-URL: plain insert
+        const tr = view.state.tr.insertText(normalized, from, to);
+        tr.setMeta('nodex:isPaste', true);
+        view.dispatch(tr);
         return true;
       },
       handleDOMEvents: {

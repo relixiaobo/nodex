@@ -20,7 +20,9 @@
 
 用户随手记录，agent 启动时处理（归类到待办或进行中，处理完从此处删除）。
 
-_(空)_
+1. **Field name 中鼠标拖选无法选中节点** — 鼠标在 field node 的 field name 区域按住左键上下拖动时，无法触发大纲的节点拖选（单个或多个节点选中）。鼠标拖选被 field name 的文本选中行为吞掉了。
+
+2. **Field name 聚焦不应触发字段选择下拉框** — 当 field name 已有文本时，点击将光标插入其中不应立即弹出字段选择下拉框。下拉框只应在用户开始输入时触发，不能仅通过聚焦触发。
 
 ---
 
@@ -28,20 +30,18 @@ _(空)_
 
 | Agent | 当前任务 | 分支 | 修改中的文件 |
 |-------|---------|------|-------------|
-| nodex-cc | UI 设计系统合规优化 | cc/ui-design-compliance | 见 PR body |
 | nodex-codex | _(idle)_ | — | — |
-| antigravity | _(idle)_ | — | — |
+| antigravity | UI 细节打磨 — 浮层/间距/色彩协调 | `cc/ui-polish-round2` | 见 PR #99 |
 
 ---
 
 ## 进行中
 
-### UI 设计系统合规优化（Paper-on-Paper + Hover Token 统一）
-> **Agent**: nodex-cc | **Branch**: `cc/ui-design-compliance` | **PR**: TBD
+### UI 细节打磨 — 浮层/间距/色彩协调
+> **Agent**: antigravity | **分支**: `cc/ui-polish-round2` | **PR**: #99
 >
-> 全局审计 + 修复所有浮层/hover 组件，使其符合 v5.0 更新后的设计系统（Paper Shadow + bg-foreground/4 hover）。
->
-> 详细 checklist 见 PR description。
+> 5 项 UI 打磨：日期选择器 + DateNavigationBar 间距 + 用户菜单浮层 + CommandPalette 对齐 + 容器图标底色。
+> 详细 checklist 见 PR #99 description。
 
 ---
 
@@ -237,6 +237,8 @@ _(空)_
 
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
+| 2026-02-27 | Radix Tooltip + 智能粘贴 + 链接 hover — 全图标 Tooltip（含快捷键）+ 移除 FloatingToolbar 链接按钮 + ⌘V 粘贴 URL 自动转链接 + ⌘⇧V 纯文本粘贴 + 链接 hover 显示地址 | nodex | main |
+| 2026-02-26 | UI 设计系统合规优化 — Paper Shadow 浮层 + hover/selected token 统一（16 文件） | nodex-cc | #98 |
 | 2026-02-26 | Search Node Step 0 数据模型锁定 — `queryCondition` NodeType + `QueryOp`(32 op) + query 属性 + Loro 读写 + `isOutlinerContentNodeType('search')` + 6 Vitest | nodex | main |
 | 2026-02-26 | UI 细节打磨全部完成 — TopToolbar 对齐 + Breadcrumb 滚动规则 + TrailingInput 缩进 + 空节点光标 + 第二轮 review | antigravity | #96 #97 |
 | 2026-02-26 | v5.0 UI 重构全量完成 — Phase 1-7（Token 迁移 + 硬编码色值 + 阴影移除 + 排版 15px/24px + 大纲几何 + Tag 排印化 + 隐形 UI + 顶栏重构） | antigravity | #93 #96 |

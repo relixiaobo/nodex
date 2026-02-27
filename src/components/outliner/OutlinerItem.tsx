@@ -2303,7 +2303,6 @@ export function OutlinerItem({
           setEditorPlainTextContent(ed, response.payload.title);
         }
 
-        toast.success('Page clipped', { description: response.payload.title });
       } catch (err) {
         toast.error('Clip failed', { description: err instanceof Error ? err.message : String(err) });
       }
@@ -2590,11 +2589,15 @@ export function OutlinerItem({
                   onSelectAll={handleSelectAll}
                   onPasteMultiLine={handlePasteMultiLine}
                 />
-              ) : (
+              ) : nodeContentHtml ? (
                 <span
                   className="node-content"
-                  dangerouslySetInnerHTML={{ __html: nodeContentHtml || '&#8203;' }}
+                  dangerouslySetInnerHTML={{ __html: nodeContentHtml }}
                 />
+              ) : hasTags ? (
+                <span className="node-content text-foreground-tertiary">Untitled</span>
+              ) : (
+                <span className="node-content">&#8203;</span>
               )}
               {hasTags && (
                 <span className="inline-flex align-baseline ml-1.5" onClick={(e) => e.stopPropagation()}>

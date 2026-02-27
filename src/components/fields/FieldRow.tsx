@@ -42,7 +42,6 @@ import { t } from '../../i18n/strings.js';
 import { NodePicker, type NodePickerOption } from './NodePicker';
 import { DoneMappingEntries } from './DoneMappingEntries';
 import { BulletChevron } from '../outliner/BulletChevron';
-import { DragHandle } from '../outliner/DragHandle';
 import { FIELD_VALUE_INSET } from './field-layout.js';
 import { dragState } from '../../hooks/use-drag-select.js';
 import { getFlattenedVisibleNodes } from '../../lib/tree-utils.js';
@@ -952,7 +951,7 @@ export function FieldRow({
       )}
       <div
         ref={rowRef}
-        className={`group/row relative border-t ${isLastInGroup ? 'border-b' : ''} border-border-subtle flex flex-col @sm:flex-row @sm:items-start min-h-6 has-[.field-overlay-open]:z-[80] ${isDropTarget && dropPosition === 'inside' ? 'bg-primary/10 ring-1 ring-primary/30 rounded-sm' : ''} ${isDragging ? 'opacity-40' : ''}`}
+        className={`relative border-t ${isLastInGroup ? 'border-b' : ''} border-border-subtle flex flex-col @sm:flex-row @sm:items-start min-h-6 has-[.field-overlay-open]:z-[80] ${isDropTarget && dropPosition === 'inside' ? 'bg-primary/10 ring-1 ring-primary/30 rounded-sm' : ''} ${isDragging ? 'opacity-40' : ''}`}
         data-field-row
         data-field-row-id={tupleId}
         data-node-id={tupleId}
@@ -967,19 +966,16 @@ export function FieldRow({
         {isFieldSelected && (
           <div className={FIELD_ROW_SELECTION_OVERLAY_CLASS} style={FIELD_ROW_SELECTION_OVERLAY_STYLE} />
         )}
-        {/* Drag handle: positioned to the left of the name column, visible on row hover */}
-        {!isVirtual && !isSystemField && !isSystemConfig && (
-          <div className="absolute top-0 bottom-0 flex items-center" style={{ left: -20 }}>
-            <DragHandle onDragStart={handleDragStart} />
-          </div>
-        )}
       {/* Name column — aligned to first line of value */}
       <div className="relative z-[1] flex items-center gap-1 @sm:shrink-0 @sm:w-[130px] min-w-0 min-h-6 py-1">
+        {/* Field icon is the drag handle for reorder */}
         <button
-          className={`shrink-0 w-[15px] flex items-center justify-center transition-colors ${ownerTagColor ? '' : 'text-foreground-tertiary hover:text-foreground-secondary'}`}
+          className={`shrink-0 w-[15px] flex items-center justify-center transition-colors ${!isVirtual && !isSystemField && !isSystemConfig ? 'cursor-grab active:cursor-grabbing' : ''} ${ownerTagColor ? '' : 'text-foreground-tertiary hover:text-foreground-secondary'}`}
           onClick={trashed || isVirtual ? undefined : () => navigateTo(attrDefId)}
           title={trashed || isVirtual ? undefined : 'Configure field'}
           style={trashed || isVirtual ? { cursor: 'default' } : ownerTagColor ? { color: ownerTagColor } : undefined}
+          draggable={!isVirtual && !isSystemField && !isSystemConfig}
+          onDragStart={!isVirtual && !isSystemField && !isSystemConfig ? handleDragStart : undefined}
         >
           {Icon && <Icon size={12} />}
         </button>

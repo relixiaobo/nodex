@@ -101,6 +101,7 @@ export {
   Building2,
   SquareUser,
   UserPen,
+  RotateCcw,
 } from 'lucide-react';
 
 // ─── Undo/Redo ─────────────────────────────────────────────────────────────

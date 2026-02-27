@@ -30,7 +30,7 @@ _(空)_
 |-------|------|------|
 | nodex | Options 验证 + Untitled 占位 + Clip Toast | 🔄 进行中 |
 | field-cascade | Field / Default Content 删除联动 | 🔄 进行中 |
-| research | Highlight + Comment 研究 | 🔄 进行中 |
+| research | Highlight + Comment 研究 | ✅ 完成 |
 
 ---
 
@@ -103,9 +103,9 @@ _(见 Agent 状态表)_
 
 #### 网页高亮 & 批注（Highlight + Comment）
 > 与 Clip Page 联动，参考 Readwise Reader 交互。高亮和批注以节点形式存在于 soma 数据模型中。
-> **Research**: `docs/research/highlight-comment-design.md`（待产出）
+> **Research**: `docs/research/highlight-comment-design.md`
 
-- [ ] **研究：数据模型 + 交互设计** — 高亮/批注如何建模为节点（锚点定位、与 clip node 关系、Readwise Reader 参考）
+- [x] **研究：数据模型 + 交互设计** — 高亮/批注如何建模为节点（锚点定位、与 clip node 关系、Readwise Reader 参考）✅（2026-02-27）
 - [ ] Phase 1: 网页高亮（Content Script 选中文本 → 创建 highlight 节点 → 关联到 clip node）
 - [ ] Phase 2: 批注（highlight 节点可挂 children 作为 comment）
 - [ ] Phase 3: 回显（再次访问已高亮页面时，Content Script 渲染已有高亮）

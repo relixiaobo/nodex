@@ -2,6 +2,7 @@ import { FIELD_TYPES, SYS_D } from '../../src/types/index.js';
 import {
   VALIDATED_FIELD_TYPES,
   validateFieldValue,
+  ValidationWarning,
 } from '../../src/components/fields/field-validation.js';
 
 describe('field-validation', () => {
@@ -42,5 +43,13 @@ describe('field-validation', () => {
   it('returns null for unsupported field types', () => {
     expect(validateFieldValue(SYS_D.PLAIN, 'anything')).toBeNull();
     expect(validateFieldValue('UNKNOWN_TYPE', 'anything')).toBeNull();
+  });
+
+  it('ValidationWarning span includes flex items-center for vertical centering', () => {
+    const result = ValidationWarning({ message: 'test warning' });
+    expect(result).toBeTruthy();
+    expect(result.props.className).toContain('flex');
+    expect(result.props.className).toContain('items-center');
+    expect(result.props.title).toBe('test warning');
   });
 });

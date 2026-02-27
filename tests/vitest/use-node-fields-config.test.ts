@@ -54,3 +54,21 @@ describe('computeNodeFields config controls', () => {
     expect(byKey.get(SYS_A.MAX_VALUE)?.dataType).toBe(FIELD_TYPES.NUMBER);
   });
 });
+
+describe('computeNodeFields dedup', () => {
+  beforeEach(() => {
+    resetAndSeed();
+  });
+
+  it('deduplicates fieldEntry nodes with the same fieldDefId, keeping the first', () => {
+    const store = useNodeStore.getState();
+
+    store.addFieldToNode('task_1', 'attrDef_status');
+    const dupe = store.createChild('task_1', undefined, { type: 'fieldEntry', fieldDefId: 'attrDef_status' } as never);
+
+    const fields = computeNodeFields(store.getNode, store.getChildren, 'task_1');
+    const statusEntries = fields.filter(f => f.fieldDefId === 'attrDef_status');
+    expect(statusEntries.length).toBe(1);
+    expect(statusEntries[0].fieldEntryId).not.toBe(dupe.id);
+  });
+});

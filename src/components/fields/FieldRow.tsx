@@ -933,7 +933,7 @@ export function FieldRow({
             {renderSystemConfigValue(resolvedControl, systemConfigValueContext)}
           </div>
           {configNumberValidationWarning && (
-            <div className="flex items-center h-6 pr-1">
+            <div className="flex items-center min-h-6 py-1 pr-1">
               <ValidationWarning message={configNumberValidationWarning} />
             </div>
           )}
@@ -1021,7 +1021,7 @@ export function FieldRow({
           )}
         </div>
         {validationWarning && (
-          <div className="flex items-center h-6 pr-1">
+          <div className="flex items-center min-h-6 py-1 pr-1">
             <ValidationWarning message={validationWarning} />
           </div>
         )}

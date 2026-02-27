@@ -64,11 +64,16 @@ export function computeNodeFields(
   const isTagDef = node.type === 'tagDef';
 
   const fields: FieldEntry[] = [];
+  // Track seen fieldDefIds to dedup — keep only the first fieldEntry per fieldDefId
+  const seenFieldDefIds = new Set<string>();
 
   for (const child of getChildren(nodeId)) {
     if (child.type !== 'fieldEntry' || !child.fieldDefId) continue;
 
     const keyId = child.fieldDefId;
+    // Dedup: skip duplicate fieldEntry nodes with the same fieldDefId
+    if (seenFieldDefIds.has(keyId)) continue;
+    seenFieldDefIds.add(keyId);
 
     // System fields: read-only, auto-derived from node metadata
     const sysDef = SYSTEM_FIELD_MAP.get(keyId);

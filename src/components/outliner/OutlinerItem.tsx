@@ -356,7 +356,6 @@ export function OutlinerItem({
   const setDropTarget = useUIStore((s) => s.setDropTarget);
 
   const createSibling = useNodeStore((s) => s.createSibling);
-  const createSiblingNodesFromPaste = useNodeStore((s) => s.createSiblingNodesFromPaste);
   const createChild = useNodeStore((s) => s.createChild);
   const indentNode = useNodeStore((s) => s.indentNode);
   const outdentNode = useNodeStore((s) => s.outdentNode);
@@ -1633,14 +1632,6 @@ export function OutlinerItem({
     [nodeId, parentId, fieldDataType, onNavigateOut, createSibling, createChild, setFocusedNode],
   );
 
-  const handlePasteMultiLine = useCallback(
-    (lines: string[]) => {
-      const lastId = createSiblingNodesFromPaste(nodeId, lines);
-      if (lastId) setFocusedNode(lastId, parentId);
-    },
-    [nodeId, parentId, createSiblingNodesFromPaste, setFocusedNode],
-  );
-
   const handleIndent = useCallback(() => {
     // References cannot be indented (would cause ownership conflicts)
     if (loroDoc.getParentId(nodeId) !== parentId) return;
@@ -2588,7 +2579,6 @@ export function OutlinerItem({
                   onEscapeSelect={handleEscapeSelect}
                   onShiftArrow={handleShiftArrow}
                   onSelectAll={handleSelectAll}
-                  onPasteMultiLine={handlePasteMultiLine}
                 />
               ) : (
                 <span

@@ -87,8 +87,8 @@ gh pr create --draft --title "[WIP] feat: ..." --body "ref: <任务名>"
 | **UI 组件** | shadcn/ui | 基于 Radix UI，Tailwind 原生支持 |
 | **编辑器** | TipTap (ProseMirror) | Schema-driven 树模型，内置大纲操作 |
 | **状态管理** | Zustand | 4KB，支持 persist + immer 中间件 |
-| **后端** | Supabase (PostgreSQL) | Realtime、RLS、pgvector |
-| **同步** | Supabase Realtime + Zustand persist | 乐观更新 + chrome.storage 缓存 |
+| **后端** | Cloudflare Workers + D1 + R2 | Better Auth + Google OAuth |
+| **同步** | Loro CRDT + Cloudflare Sync | 乐观更新 + chrome.storage 缓存 |
 | **构建** | Vite (via WXT) | 快速 HMR，tree-shaking |
 | **ID 生成** | nanoid | 21 字符, URL-safe |
 
@@ -145,7 +145,6 @@ src/
     use-node.ts            # 订阅单节点 + 懒加载
     use-children.ts        # 订阅子节点列表 + 懒加载
     use-nav-undo-keyboard.ts  # 全局 ⌘Z/⌘⇧Z 键盘处理 (非编辑态 → Loro undoDoc/redoDoc)
-    use-realtime.ts        # Supabase Realtime 订阅
   stores/
     node-store.ts          # 归一化节点实体 (immer, 乐观更新, 含树操作)
     ui-store.ts            # UI 状态 (面板栈/展开/焦点/搜索, persist → chrome.storage)
@@ -154,24 +153,15 @@ src/
     chrome-storage.ts      # Zustand persist 适配器 (chrome.storage.local + Set 序列化)
     fuzzy-search.ts        # 轻量 fuzzy search 评分器
     palette-commands.ts    # ⌘K 命令注册表 (容器导航 + 系统命令)
-    supabase.ts            # WXT 环境 Supabase 初始化 (VITE_* env vars)
     tree-utils.ts          # 树遍历工具 (flatten/navigate/parent/sibling)
   types/                   # 核心类型 (不变)
     node.ts                # NodexNode, DocType, NodeProps, WORKSPACE_CONTAINERS
     system-nodes.ts        # SYS_A*(60+), SYS_D*(12), SYS_V*(22+), SYS_T*(25+)
     index.ts               # 统一导出
-  services/                # 数据服务层 (不变)
-    supabase.ts            # 客户端单例
-    node-service.ts        # CRUD + 树操作 + 批量 + rowToNode/NodeRow
-    tag-service.ts         # 标签应用 (meta+Tuple)
-    field-service.ts       # 字段值 (Tuple.children 直接存值)
-    search-service.ts      # 搜索 + 反向引用
+  services/                # 数据服务层
     tana-import.ts         # Tana JSON 导入
     index.ts               # 统一导出
   env.d.ts                 # 自定义 VITE_* 环境变量类型声明
-supabase/
-  migrations/
-    001_create_nodes.sql   # DB Schema (单表 nodes + 辅助表)
 docs/                      # TASKS.md + design-system.md + research/
 .github/                   # PR 模板
 ```
@@ -234,14 +224,11 @@ ContentNode
 
 详细设计见 `docs/_archive/features/data-model.md` § 设计守则。
 
-## 数据库设计要点
+## 数据存储
 
-- **单表 `nodes`**: 所有 Tana props 平铺为 PostgreSQL 列（snake_case）
-- **`children TEXT[]`**: 有序子节点列表，GIN 索引
-- **`meta TEXT[]`**: 元信息 Tuple ID 列表，GIN 索引
-- **乐观锁**: `version` 列，每次更新 +1，updateNode 先读后写验证
-- **RLS**: 基于 `workspace_members` 表的工作区级别行级安全
-- **Realtime**: `nodes` 表已加入 `supabase_realtime` publication
+- **本地**: Loro CRDT document，持久化到 chrome.storage + IndexedDB
+- **远端**: Cloudflare D1 (metadata) + R2 (Loro snapshots/updates)
+- **同步**: SyncManager push/pull Loro updates，30s 定期 + nudge
 
 ## 代码约定
 
@@ -270,24 +257,6 @@ ContentNode
 - Props 更新用 `Partial<NodeProps>`，不要求 `created`
 - 节点创建用 `CreateNodeInput`，更新用 `UpdateNodeInput`
 - 系统常量统一从 `src/types/index.js` 导入 (`SYS_A`, `SYS_D`, `SYS_V`, `SYS_T`)
-
-### 数据库列名映射
-
-| TypeScript (camelCase) | PostgreSQL (snake_case) |
-|------------------------|-------------------------|
-| `workspaceId` | `workspace_id` |
-| `props._docType` | `doc_type` |
-| `props._ownerId` | `owner_id` |
-| `meta` | `meta` |
-| `props._sourceId` | `source_id` |
-| `props._flags` | `flags` |
-| `props._done` | `done` |
-| `touchCounts` | `touch_counts` |
-| `modifiedTs` | `modified_ts` |
-| `updatedAt` | `updated_at` |
-| `createdBy` | `created_by` |
-
-转换函数：`rowToNode()` / `nodeToRow()`（在 `node-service.ts` 中）。
 
 ### 关键 SYS_A* 常量速查
 
@@ -366,7 +335,7 @@ npm run dev          # 主仓库启动，输出到 .output/chrome-mv3-dev/
 npm run dev:test   # 启动 http://localhost:5199/standalone/index.html
 ```
 
-- `standalone/TestApp.tsx` 跳过 Supabase 初始化，纯离线模式
+- `standalone/TestApp.tsx` 纯离线模式（跳过 Auth + Sync）
 - 种子数据 68 个节点（`src/entrypoints/test/seed-data.ts`，含 Schema + TagDef + AttrDef）
 - **Store 全局访问**：`window.__nodeStore` / `window.__uiStore` / `window.__wsStore`
 

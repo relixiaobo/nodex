@@ -30,12 +30,20 @@
 
 | Agent | 当前任务 | 分支 | 修改中的文件 |
 |-------|---------|------|-------------|
-| nodex-codex | _(idle)_ | — | — |
+| nodex-cc | ⌘K 搜索算法优化 | `cc/search-optimization` | 见 PR #100 |
 | antigravity | UI 细节打磨 — 浮层/间距/色彩协调 | `cc/ui-polish-round2` | 见 PR #99 |
 
 ---
 
 ## 进行中
+
+### ⌘K 搜索算法优化 — 分词子串 + uFuzzy 兜底
+> **Agent**: nodex-cc | **分支**: `cc/search-optimization` | **PR**: #100
+>
+> 当前 fuzzy-search.ts 使用字符子序列匹配，导致 "today" 误匹配 "Next meeting on Friday"。
+> 替换为分词子串匹配为主 + uFuzzy 兜底的混合方案。
+> 调研文档：`docs/research/search-algorithm-research.md`
+> 详细 checklist 见 PR #100 description。
 
 ### UI 细节打磨 — 浮层/间距/色彩协调
 > **Agent**: antigravity | **分支**: `cc/ui-polish-round2` | **PR**: #99
@@ -191,18 +199,35 @@
 - **Spec**: `docs/features/floating-toolbar.md`
 
 #### Slash Command — 后续命令点亮 (#48)
-- [ ] Paste（剪贴板内容类型判断）
+- [ ] Paste（依赖 Editor 粘贴增强 Phase 1-3，提供手动选择粘贴模式的入口）
 - [ ] Search node（依赖 #23）
 - [ ] Image / file（依赖上传与存储）
 - [ ] Checklist（批量 checkbox）
 - **Spec**: `docs/features/slash-command.md`
 
-#### Editor 粘贴增强（结构化粘贴）
-- [ ] 多行纯文本粘贴：按行拆分为多个节点
-- [ ] Markdown 列表粘贴：根据缩进重建节点树
-- [ ] 富文本粘贴：保留基础结构语义
-- [ ] 与撤销/重做集成
-- **Spec**: `docs/features/editor-migration.md`
+#### Editor 粘贴增强（⌘V 智能 / ⌘⇧V 纯文本）
+> **双模式语义**：
+> - **⌘V（智能粘贴）**：理解内容，做最合理的处理 — URL→链接、多行→拆节点、HTML→保留 marks、Markdown→重建树
+> - **⌘⇧V（纯文本粘贴）**：去掉一切智能，只给纯文字，塞进当前节点（多行压成一行，丢弃格式）
+>
+> **行为矩阵**：
+>
+> | 剪贴板内容 | ⌘V | ⌘⇧V |
+> |------------|-----|------|
+> | 单行纯文本 | 插入原文 ✅ | 插入原文 ✅ |
+> | 单行 URL | 自动转链接 ✅ | 插入原文 ✅ |
+> | 多行纯文本 | 首行插入当前节点，后续行创建兄弟节点 | 合并为一行插入 |
+> | Markdown 列表 | 按缩进重建节点树 | 合并为一行插入 |
+> | 单行富文本 (HTML) | 保留 bold/italic/code/link marks | 纯文本，丢弃格式 |
+> | 多行富文本 (HTML) | 按段落拆节点 + 保留 marks | 合并为一行纯文本 |
+>
+> **实现位置**: `RichTextEditor.tsx` handlePaste
+
+- [x] Phase 0: 单行 URL 智能粘贴 + ⌘⇧V 纯文本 ✅（2026-02-27）
+- [ ] Phase 1: 多行拆分为节点 — ⌘V 多行文本按行拆分为兄弟节点；⌘⇧V 多行压成一行
+- [ ] Phase 2: 富文本保留格式 — ⌘V 读 `text/html`，映射 `<strong>/<em>/<code>/<a>` 到 PM marks；⌘⇧V 只读 `text/plain`
+- [ ] Phase 3: Markdown 结构化 — ⌘V 检测 `- ` / `* ` / `1. ` + 缩进，按层级创建父子节点树
+- [ ] Phase 4: 撤销/重做集成 — 多节点创建包装为单次 Loro commit，⌘Z 一步撤回
 
 #### 性能基线测量
 > **产出**: `docs/research/performance-baseline.md`

@@ -130,23 +130,39 @@ export function ToolbarUserMenu() {
             {open && (
                 <div className="absolute right-0 top-full mt-1 w-52 rounded-lg bg-background shadow-paper p-1 z-50">
                     {/* User info */}
-                    <div className="px-2 py-1.5">
-                        {authUser.name && (
-                            <p className="truncate text-sm font-medium">{authUser.name}</p>
-                        )}
-                        {authUser.email && (
-                            <p className="truncate text-xs text-foreground-secondary">
-                                {authUser.email}
-                            </p>
-                        )}
+                    <div className="flex items-start gap-2.5 px-2 py-1.5">
+                        <div className="flex w-4 shrink-0 items-center justify-center mt-0.5">
+                            {authUser.avatarUrl ? (
+                                <img
+                                    src={authUser.avatarUrl}
+                                    alt=""
+                                    referrerPolicy="no-referrer"
+                                    className="h-4 w-4 rounded-full object-cover"
+                                />
+                            ) : (
+                                <User size={14} strokeWidth={1.5} className="text-foreground-tertiary" />
+                            )}
+                        </div>
+                        <div className="flex flex-col min-w-0 flex-1">
+                            {authUser.name && (
+                                <p className="truncate text-sm font-medium text-foreground">{authUser.name}</p>
+                            )}
+                            {authUser.email && (
+                                <p className="truncate text-xs text-foreground-tertiary">
+                                    {authUser.email}
+                                </p>
+                            )}
+                        </div>
                     </div>
 
                     {/* Sync status row */}
                     {showSyncBadge && (
                         <>
-                            <div className="mx-1 my-1 border-t border-border" />
-                            <div className="flex items-center gap-2 px-2 py-1.5">
-                                <span className={`h-2 w-2 shrink-0 rounded-full ${badgeClass}`} />
+                            <div className="mx-1 my-1 border-t border-border-subtle" />
+                            <div className="flex items-center gap-2.5 px-2 py-1.5">
+                                <div className="flex w-4 shrink-0 items-center justify-center">
+                                    <span className={`h-2 w-2 rounded-full ${badgeClass}`} />
+                                </div>
                                 <div className="min-w-0 flex-1">
                                     <span className="text-sm text-foreground-secondary">
                                         {SYNC_LABELS[syncStatus] ?? syncStatus}
@@ -161,14 +177,16 @@ export function ToolbarUserMenu() {
                         </>
                     )}
 
-                    <div className="mx-1 my-1 border-t border-border" />
+                    <div className="mx-1 my-1 border-t border-border-subtle" />
 
                     {/* Sign out */}
                     <button
                         onClick={handleSignOut}
-                        className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-foreground transition-colors hover:bg-foreground/4"
+                        className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-sm text-foreground-secondary transition-colors hover:bg-foreground/4 hover:text-foreground"
                     >
-                        <LogOut size={14} className="shrink-0" />
+                        <div className="flex w-4 shrink-0 items-center justify-center text-foreground-tertiary">
+                            <LogOut size={14} strokeWidth={1.5} />
+                        </div>
                         {t('userMenu.signOut')}
                     </button>
                 </div>

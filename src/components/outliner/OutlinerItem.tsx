@@ -2432,7 +2432,7 @@ export function OutlinerItem({
   const hasOverlayOpen = (isFocused && (hashTagOpen || refOpen || slashOpen)) || optionsPickerOpen;
 
   return (
-    <div role="treeitem" aria-expanded={isExpanded} className="relative">
+    <div role="treeitem" aria-expanded={isExpanded} className={`relative ${hasOverlayOpen ? 'field-overlay-open z-[80]' : 'has-[.field-overlay-open]:z-[80]'}`}>
       {/* Drop indicator: before */}
       {isDropTarget && dropPosition === 'before' && (
         <div
@@ -2446,7 +2446,7 @@ export function OutlinerItem({
         className={`group/row flex gap-1 min-h-6 items-start py-1 relative ${isDropTarget && dropPosition === 'inside'
           ? 'bg-primary/10 ring-1 ring-primary/30 rounded-sm'
           : ''
-          } ${isDragging ? 'opacity-40' : ''} ${hasOverlayOpen ? 'z-[80]' : ''}`}
+          } ${isDragging ? 'opacity-40' : ''} ${hasOverlayOpen ? 'z-[80]' : 'has-[.field-overlay-open]:z-[80]'}`}
         style={{ paddingLeft: depth * 28 + 6 }}
         data-node-id={nodeId}
         data-parent-id={parentId}

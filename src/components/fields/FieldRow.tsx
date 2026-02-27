@@ -974,8 +974,8 @@ export function FieldRow({
           onClick={trashed || isVirtual ? undefined : () => navigateTo(attrDefId)}
           title={trashed || isVirtual ? undefined : 'Configure field'}
           style={trashed || isVirtual ? { cursor: 'default' } : ownerTagColor ? { color: ownerTagColor } : undefined}
-          draggable={!isVirtual && !isSystemField && !isSystemConfig}
-          onDragStart={!isVirtual && !isSystemField && !isSystemConfig ? handleDragStart : undefined}
+          draggable={!trashed && !isVirtual && !isSystemField && !isSystemConfig}
+          onDragStart={!trashed && !isVirtual && !isSystemField && !isSystemConfig ? handleDragStart : undefined}
         >
           {Icon && <Icon size={12} />}
         </button>
@@ -1002,11 +1002,11 @@ export function FieldRow({
             />
           ) : (
             <span
-              className="block text-[15px] leading-6 h-6 text-foreground truncate"
-              title={attrDefName}
+              className={`block text-[15px] leading-6 h-6 truncate ${trashed ? 'text-foreground-tertiary line-through' : 'text-foreground'}`}
+              title={trashed ? `Field "${attrDefName}" has been deleted` : attrDefName}
             >
               {attrDefName}
-              {isRequired && isEmpty && <span className="text-destructive ml-0.5">*</span>}
+              {isRequired && isEmpty && !trashed && <span className="text-destructive ml-0.5">*</span>}
             </span>
           )}
         </div>

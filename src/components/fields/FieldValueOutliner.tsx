@@ -14,7 +14,7 @@ import { useMemo, useState, useCallback, useRef } from 'react';
 import { useNodeStore } from '../../stores/node-store';
 import { useChildren } from '../../hooks/use-children';
 import { useNodeFields, type FieldEntry } from '../../hooks/use-node-fields';
-import { useWorkspaceTags } from '../../hooks/use-workspace-tags';
+import { useFieldOptions } from '../../hooks/use-field-options.js';
 import { OutlinerItem } from '../outliner/OutlinerItem';
 import { TrailingInput } from '../editor/TrailingInput';
 import { FieldRow } from './FieldRow';
@@ -234,10 +234,10 @@ export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, configNo
     return <ColorSwatchPicker tupleId={tupleId} configNodeId={configNodeId} />;
   }
 
-  // --- OPTIONS_FROM_SUPERTAG: single-select supertag picker ---
-  if (isOptionsFromSupertagFieldType(fieldDataType)) {
+  // --- OPTIONS_FROM_SUPERTAG: single-select tagged-node picker ---
+  if (isOptionsFromSupertagFieldType(fieldDataType) && attrDefId) {
     return (
-      <SupertagPickerField tupleId={tupleId} />
+      <TaggedNodePickerField tupleId={tupleId} attrDefId={attrDefId} />
     );
   }
 
@@ -389,21 +389,21 @@ export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, configNo
   );
 }
 
-/** Single-select supertag picker for OPTIONS_FROM_SUPERTAG config fields. */
-function SupertagPickerField({ tupleId }: { tupleId: string }) {
-  const tags = useWorkspaceTags();
+/** Single-select tagged-node picker for OPTIONS_FROM_SUPERTAG value fields.
+ *  Shows all nodes tagged with the source supertag as selectable options. */
+function TaggedNodePickerField({ tupleId, attrDefId }: { tupleId: string; attrDefId: string }) {
+  const fieldOptions = useFieldOptions(attrDefId);
   const setFieldValue = useNodeStore((s) => s.setFieldValue);
   const clearFieldValue = useNodeStore((s) => s.clearFieldValue);
 
-  // Read selected supertagId from value node name.
   const selectedId = useNodeStore((s) => {
     void s._version;
     return resolveSupertagPickerSelectedId(tupleId, s.getNode);
   });
 
   const options: NodePickerOption[] = useMemo(
-    () => tags.map((t) => ({ id: t.id, name: t.name, isTagDef: true })),
-    [tags],
+    () => fieldOptions.map((o) => ({ id: o.id, name: o.name })),
+    [fieldOptions],
   );
 
   const handleSelect = useCallback(
@@ -427,7 +427,7 @@ function SupertagPickerField({ tupleId }: { tupleId: string }) {
       selectedId={selectedId}
       onSelect={handleSelect}
       onClear={handleClear}
-      placeholder={t('field.selectSupertag')}
+      placeholder={t('field.selectValue')}
       isReference
     />
   );

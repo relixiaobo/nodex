@@ -45,7 +45,7 @@ _(见 Agent 状态表)_
 - [x] **节点内拖选文本误触发节点选中** — use-drag-select 尊重浏览器活跃文本选区
 - [x] **粘贴/剪藏内容中的 #、@ 不应触发下拉菜单** — paste transaction setMeta 跳过 trigger 检测
 - [x] **Field value 验证错误 icon 未垂直居中** — number 等字段输入非法值时，右侧 ⚠ 图标未与行内容垂直居中 ✅（2026-02-27）
-- [x] **Options from Supertags 值语义** — 已验证：当前实现正确，`resolveTaggedNodes()` 返回打了指定 supertag 的节点 ✅（2026-02-27）
+- [x] **Options from Supertags 值选择器** — 后端 `resolveTaggedNodes()` 正确，但 UI 选择器用错了组件（显示所有 supertag 而非 tagged nodes）。修复：新增 `TaggedNodePickerField` 使用 `useFieldOptions` ✅（2026-02-28）
 
 ### v0.1 — 首次上线（Chrome Web Store 发布）
 

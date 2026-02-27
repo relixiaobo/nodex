@@ -35,7 +35,6 @@ interface NodeStore {
 
   createChild(parentId: string, index?: number, data?: Partial<NodexNode>): NodexNode;
   createSibling(siblingId: string, data?: Partial<NodexNode>): NodexNode;
-  createSiblingNodesFromPaste(afterNodeId: string, lines: string[]): string | null;
   moveNodeTo(nodeId: string, newParentId: string, index?: number): void;
   indentNode(nodeId: string): void;
   outdentNode(nodeId: string): void;
@@ -43,6 +42,8 @@ interface NodeStore {
   moveNodeDown(nodeId: string): void;
   trashNode(nodeId: string): void;
   restoreNode(nodeId: string): void;
+  hardDeleteNode(nodeId: string): void;
+  emptyTrash(): void;
 
   // ─── 内容编辑（同步） ───
 
@@ -496,26 +497,6 @@ export const useNodeStore = create<NodeStore>((set, get) => {
       return get().createChild(parentId, insertAt, data);
     },
 
-    createSiblingNodesFromPaste: (afterNodeId, lines) => {
-      if (!canMutate('createSiblingNodesFromPaste')) return null;
-      const parentId = loroDoc.getParentId(afterNodeId);
-      if (!parentId) return null;
-      const nonEmptyLines = lines.filter((l) => l.trim().length > 0);
-      if (nonEmptyLines.length === 0) return null;
-      const siblings = loroDoc.getChildren(parentId);
-      const baseIdx = siblings.indexOf(afterNodeId);
-      const startAt = baseIdx >= 0 ? baseIdx + 1 : siblings.length;
-      let lastId: string | null = null;
-      for (let i = 0; i < nonEmptyLines.length; i++) {
-        const id = nanoid();
-        loroDoc.createNode(id, parentId, startAt + i);
-        loroDoc.setNodeRichTextContent(id, nonEmptyLines[i]);
-        lastId = id;
-      }
-      loroDoc.commitDoc();
-      return lastId;
-    },
-
     moveNodeTo: (nodeId, newParentId, index) => {
       if (!getNodeCapabilities(nodeId).canMove) return;
       // Guard: no self-move
@@ -625,6 +606,23 @@ export const useNodeStore = create<NodeStore>((set, get) => {
 
       loroDoc.deleteNodeData(nodeId, '_trashedFrom');
       loroDoc.deleteNodeData(nodeId, '_trashedIndex');
+      loroDoc.commitDoc();
+    },
+
+    hardDeleteNode: (nodeId: string) => {
+      const parentId = loroDoc.getParentId(nodeId);
+      if (parentId !== CONTAINER_IDS.TRASH) return;
+      if (isWorkspaceContainer(nodeId)) return;
+      loroDoc.deleteNode(nodeId);
+      loroDoc.commitDoc();
+    },
+
+    emptyTrash: () => {
+      const trashChildren = loroDoc.getChildren(CONTAINER_IDS.TRASH);
+      if (trashChildren.length === 0) return;
+      for (let i = trashChildren.length - 1; i >= 0; i--) {
+        loroDoc.deleteNode(trashChildren[i]);
+      }
       loroDoc.commitDoc();
     },
 
@@ -910,9 +908,17 @@ export const useNodeStore = create<NodeStore>((set, get) => {
     },
 
     replaceFieldDef: (nodeId, fieldEntryId, oldFieldDefId, newFieldDefId) => {
+      // Dedup: if the target fieldDef already has a fieldEntry on this node,
+      // remove the current (placeholder) entry instead of creating a duplicate.
+      const existing = findFieldEntry(nodeId, newFieldDefId);
+      if (existing && existing !== fieldEntryId) {
+        loroDoc.deleteNode(fieldEntryId);
+        loroDoc.commitDoc();
+        return;
+      }
       loroDoc.setNodeData(fieldEntryId, 'fieldDefId', newFieldDefId);
       loroDoc.commitDoc();
-      void nodeId; void oldFieldDefId; // suppress lint
+      void oldFieldDefId; // suppress lint
     },
 
     // ─── Checkbox 操作 ───

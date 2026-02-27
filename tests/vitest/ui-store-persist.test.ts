@@ -20,6 +20,7 @@ describe('ui-store persistence helpers', () => {
       panelIndex: 1,
       expandedNodes: expanded,
       viewMode: 'cards',
+      paletteUsage: undefined,
     });
   });
 

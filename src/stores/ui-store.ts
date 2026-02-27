@@ -108,6 +108,10 @@ interface UIStore {
   // Panel title visibility (session-only, not persisted)
   panelTitleVisible: boolean;
   setPanelTitleVisible(visible: boolean): void;
+
+  // ⌘K palette usage tracking (persisted)
+  paletteUsage: Record<string, { count: number; lastUsedAt: number }>;
+  trackPaletteUsage(itemId: string): void;
 }
 
 export interface PersistedUIStoreState {
@@ -115,6 +119,7 @@ export interface PersistedUIStoreState {
   panelIndex: number;
   expandedNodes: Set<string>;
   viewMode: 'list' | 'table' | 'tiles' | 'cards';
+  paletteUsage: Record<string, { count: number; lastUsedAt: number }>;
 }
 
 /** Stable selector for the current (top) node ID. */
@@ -127,6 +132,7 @@ export function partializeUIStore(state: UIStore): PersistedUIStoreState {
     panelIndex: state.panelIndex,
     expandedNodes: state.expandedNodes,
     viewMode: state.viewMode,
+    paletteUsage: state.paletteUsage,
   };
 }
 
@@ -418,6 +424,22 @@ export const useUIStore = create<UIStore>()(
       // Panel title visibility
       panelTitleVisible: true,
       setPanelTitleVisible: (visible) => set({ panelTitleVisible: visible }),
+
+      // ⌘K palette usage tracking
+      paletteUsage: {},
+      trackPaletteUsage: (itemId) =>
+        set((s) => {
+          const prev = s.paletteUsage[itemId];
+          return {
+            paletteUsage: {
+              ...s.paletteUsage,
+              [itemId]: {
+                count: (prev?.count ?? 0) + 1,
+                lastUsedAt: Date.now(),
+              },
+            },
+          };
+        }),
     }),
     {
       name: 'nodex-ui',

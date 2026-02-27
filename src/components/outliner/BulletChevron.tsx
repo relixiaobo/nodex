@@ -1,5 +1,6 @@
 import type { AppIcon } from '../../lib/icons.js';
 import { t } from '../../i18n/strings.js';
+import { Tooltip } from '../ui/Tooltip';
 
 /** Build inline style for a multi-color conic-gradient or solid bullet. */
 function buildBulletStyle(colors: string[]): React.CSSProperties {
@@ -51,19 +52,20 @@ export function BulletChevron({
   // TagDef bullet: colored circle with white #
   if (tagDefColor) {
     return (
-      <span
-        role="button"
-        className="flex shrink-0 h-6 w-[15px] items-center justify-center cursor-pointer group/bullet"
-        onClick={onBulletClick}
-        title={t('outliner.zoomIn')}
-      >
-        <div
-          className="flex h-[15px] w-[15px] items-center justify-center rounded-full transition-transform group-hover/bullet:scale-110 group-active/bullet:scale-90"
-          style={{ backgroundColor: tagDefColor }}
+      <Tooltip label={t('outliner.zoomIn')}>
+        <span
+          role="button"
+          className="flex shrink-0 h-6 w-[15px] items-center justify-center cursor-pointer group/bullet"
+          onClick={onBulletClick}
         >
-          <span className="text-[9px] font-bold leading-none text-white select-none">#</span>
-        </div>
-      </span>
+          <div
+            className="flex h-[15px] w-[15px] items-center justify-center rounded-full transition-transform group-hover/bullet:scale-110 group-active/bullet:scale-90"
+            style={{ backgroundColor: tagDefColor }}
+          >
+            <span className="text-[9px] font-bold leading-none text-white select-none">#</span>
+          </div>
+        </span>
+      </Tooltip>
     );
   }
 
@@ -71,18 +73,19 @@ export function BulletChevron({
   if (Icon) {
     const iconColor = bulletColors?.[0] ?? 'var(--color-foreground-secondary)';
     return (
-      <span
-        role="button"
-        className="flex shrink-0 h-6 w-[15px] items-center justify-center cursor-pointer group/bullet"
-        onClick={onBulletClick}
-        title={t('outliner.zoomIn')}
-      >
-        <Icon
-          size={12}
-          className="transition-transform group-hover/bullet:scale-110 group-active/bullet:scale-90"
-          style={{ color: iconColor }}
-        />
-      </span>
+      <Tooltip label={t('outliner.zoomIn')}>
+        <span
+          role="button"
+          className="flex shrink-0 h-6 w-[15px] items-center justify-center cursor-pointer group/bullet"
+          onClick={onBulletClick}
+        >
+          <Icon
+            size={12}
+            className="transition-transform group-hover/bullet:scale-110 group-active/bullet:scale-90"
+            style={{ color: iconColor }}
+          />
+        </span>
+      </Tooltip>
     );
   }
 
@@ -91,22 +94,23 @@ export function BulletChevron({
   const bulletStyle = hasColors ? buildBulletStyle(bulletColors!) : undefined;
 
   return (
-    <span
-      role="button"
-      className="flex shrink-0 h-6 w-[15px] items-center justify-center cursor-pointer group/bullet"
-      onClick={onBulletClick}
-      title={t('outliner.zoomIn')}
-    >
-      <div
-        className={`flex h-[15px] w-[15px] items-center justify-center rounded-full transition-colors group-active/bullet:scale-90 ${isReference ? 'border border-dashed border-foreground/40' : ''
-          } ${showOuterRing ? 'bg-foreground/[0.08]' : ''}`}
+    <Tooltip label={t('outliner.zoomIn')}>
+      <span
+        role="button"
+        className="flex shrink-0 h-6 w-[15px] items-center justify-center cursor-pointer group/bullet"
+        onClick={onBulletClick}
       >
         <div
-          className={`h-[5px] w-[5px] rounded-full transition-transform group-hover/bullet:scale-[1.375] ${!hasColors ? (dimmed ? 'bg-foreground/15' : 'bg-foreground/40') : ''}`}
-          style={bulletStyle}
-        />
-      </div>
-    </span>
+          className={`flex h-[15px] w-[15px] items-center justify-center rounded-full transition-colors group-active/bullet:scale-90 ${isReference ? 'border border-dashed border-foreground/40' : ''
+            } ${showOuterRing ? 'bg-foreground/[0.08]' : ''}`}
+        >
+          <div
+            className={`h-[5px] w-[5px] rounded-full transition-transform group-hover/bullet:scale-[1.375] ${!hasColors ? (dimmed ? 'bg-foreground/15' : 'bg-foreground/40') : ''}`}
+            style={bulletStyle}
+          />
+        </div>
+      </span>
+    </Tooltip>
   );
 }
 
@@ -133,51 +137,52 @@ export function ChevronButton({
   onTogglePointerDown,
 }: ChevronButtonProps) {
   return (
-    <button
-      className="flex shrink-0 h-6 w-[15px] items-center justify-center opacity-0 group-hover/row:opacity-100 pointer-events-none group-hover/row:pointer-events-auto transition-opacity focus:outline-none"
-      tabIndex={-1}
-      onPointerDown={(e) => {
-        onTogglePointerDown?.();
-        // Pointer events fire before mousedown; prevent focus theft here.
-        e.preventDefault();
-      }}
-      onMouseDown={(e) => {
-        // Prevent focus from moving onto the button; otherwise Cmd+Z can be swallowed
-        // by the browser/native control path instead of reaching unified undo handlers.
-        e.preventDefault();
-      }}
-      onClick={(e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        onToggle();
-      }}
-      onDoubleClick={(e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        onDrillDown();
-      }}
-      title={isExpanded ? 'Collapse' : 'Expand'}
-    >
-      <div
-        className={`flex h-[15px] w-[15px] items-center justify-center rounded-full transition-colors ${isExpanded ? '[&>svg]:rotate-90' : ''
-          }`}
+    <Tooltip label={isExpanded ? 'Collapse' : 'Expand'}>
+      <button
+        className="flex shrink-0 h-6 w-[15px] items-center justify-center opacity-0 group-hover/row:opacity-100 pointer-events-none group-hover/row:pointer-events-auto transition-opacity focus:outline-none"
+        tabIndex={-1}
+        onPointerDown={(e) => {
+          onTogglePointerDown?.();
+          // Pointer events fire before mousedown; prevent focus theft here.
+          e.preventDefault();
+        }}
+        onMouseDown={(e) => {
+          // Prevent focus from moving onto the button; otherwise Cmd+Z can be swallowed
+          // by the browser/native control path instead of reaching unified undo handlers.
+          e.preventDefault();
+        }}
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          onToggle();
+        }}
+        onDoubleClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          onDrillDown();
+        }}
       >
-        <svg
-          width="10"
-          height="10"
-          viewBox="0 0 12 12"
-          className="text-foreground-secondary/60 hover:text-foreground transition-transform"
+        <div
+          className={`flex h-[15px] w-[15px] items-center justify-center rounded-full transition-colors ${isExpanded ? '[&>svg]:rotate-90' : ''
+            }`}
         >
-          <path
-            d="M4.5 2.5L8 6L4.5 9.5"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      </div>
-    </button>
+          <svg
+            width="10"
+            height="10"
+            viewBox="0 0 12 12"
+            className="text-foreground-secondary/60 hover:text-foreground transition-transform"
+          >
+            <path
+              d="M4.5 2.5L8 6L4.5 9.5"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </div>
+      </button>
+    </Tooltip>
   );
 }

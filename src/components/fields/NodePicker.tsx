@@ -14,6 +14,7 @@ import { useState, useRef, useEffect, useCallback, useMemo, memo } from 'react';
 import { BulletChevron } from '../outliner/BulletChevron';
 import { resolveTagColor } from '../../lib/tag-colors.js';
 import { useNodeStore } from '../../stores/node-store';
+import { useNodeTags } from '../../hooks/use-node-tags.js';
 import { FIELD_OVERLAY_Z_INDEX, FIELD_VALUE_INSET } from './field-layout.js';
 import { t } from '../../i18n/strings.js';
 
@@ -81,6 +82,9 @@ export function NodePicker({
     void s._version;
     return selectedOption?.isTagDef ? resolveTagColor(selectedOption.id).text : undefined;
   });
+
+  // Tags on the selected reference node (for OPTIONS_FROM_SUPERTAG display)
+  const selectedNodeTags = useNodeTags(isReference && selectedId ? selectedId : '');
 
   // Show all options when: textSelected (reference just opened), empty input,
   // or input matches selectedName exactly (non-reference just opened, not yet typed)
@@ -231,9 +235,17 @@ export function NodePicker({
                   </span>
                 )}
               </span>
-              <span className="text-sm leading-[21px] text-foreground pr-1">
+              <span className="text-sm leading-[21px] text-foreground">
                 {textSelected ? selectedName : inputValue}
               </span>
+              {textSelected && selectedNodeTags.length > 0 && (
+                <span className="inline-flex items-center gap-1 shrink-0">
+                  {selectedNodeTags.map((tagId) => (
+                    <ReadOnlyTagLabel key={tagId} tagDefId={tagId} />
+                  ))}
+                </span>
+              )}
+              <span className="w-1 shrink-0" />
             </span>
             {/* Hidden input for keyboard capture */}
             <input
@@ -272,15 +284,24 @@ export function NodePicker({
                 className="flex-1 min-w-0 bg-transparent text-sm leading-[21px] text-foreground outline-none"
               />
             ) : (
-              <span
-                className={
-                  selectedName
-                    ? 'text-sm leading-[21px] text-foreground'
-                    : 'text-sm leading-[21px] text-foreground-tertiary select-none group-hover/picker:text-foreground-secondary transition-colors'
-                }
-              >
-                {selectedName ?? placeholder}
-              </span>
+              <>
+                <span
+                  className={
+                    selectedName
+                      ? 'text-sm leading-[21px] text-foreground'
+                      : 'text-sm leading-[21px] text-foreground-tertiary select-none group-hover/picker:text-foreground-secondary transition-colors'
+                  }
+                >
+                  {selectedName ?? placeholder}
+                </span>
+                {selectedName && selectedNodeTags.length > 0 && (
+                  <span className="inline-flex items-center gap-1 shrink-0 ml-1">
+                    {selectedNodeTags.map((tagId) => (
+                      <ReadOnlyTagLabel key={tagId} tagDefId={tagId} />
+                    ))}
+                  </span>
+                )}
+              </>
             )}
           </div>
         )}
@@ -339,3 +360,19 @@ export function NodePicker({
     </div>
   );
 }
+
+/** Read-only tag label: shows `#tagName` in tag color, no interactions. */
+const ReadOnlyTagLabel = memo(function ReadOnlyTagLabel({ tagDefId }: { tagDefId: string }) {
+  const tagName = useNodeStore((s) => { void s._version; return s.getNode(tagDefId)?.name ?? ''; });
+  const color = useNodeStore((s) => { void s._version; return resolveTagColor(tagDefId).text; });
+  if (!tagName) return null;
+  return (
+    <span
+      className="inline-flex items-center text-[13px] font-medium tracking-tight shrink-0 cursor-default"
+      style={{ color }}
+    >
+      <span className="text-[#999999] opacity-40">#</span>
+      {tagName}
+    </span>
+  );
+});

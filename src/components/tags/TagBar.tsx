@@ -24,6 +24,25 @@ export function TagBar({ nodeId }: TagBarProps) {
     [nodeId, removeTag],
   );
 
+  const handleSearch = useCallback(
+    (tagDefId: string) => {
+      // Create or find existing search node for this tag, then navigate to it
+      const searchNodeId = useNodeStore.getState().createSearchNode(tagDefId);
+      if (searchNodeId) {
+        navigateTo(searchNodeId);
+      }
+    },
+    [navigateTo],
+  );
+
+  const handleConfigure = useCallback(
+    (tagDefId: string) => {
+      // Navigate to the tagDef config page
+      navigateTo(tagDefId);
+    },
+    [navigateTo],
+  );
+
   if (tagIds.length === 0) return null;
 
   return (
@@ -33,7 +52,8 @@ export function TagBar({ nodeId }: TagBarProps) {
           key={tagId}
           tagDefId={tagId}
           onRemove={() => handleRemove(tagId)}
-          onNavigate={() => navigateTo(tagId)}
+          onSearch={() => handleSearch(tagId)}
+          onNavigate={() => handleConfigure(tagId)}
         />
       ))}
     </span>

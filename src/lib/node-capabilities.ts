@@ -35,6 +35,17 @@ export function getNodeCapabilities(nodeId: string): NodeCapabilities {
     };
   }
 
+  // queryCondition nodes are internal structure — not user-editable/movable/deletable
+  const node = loroDoc.toNodexNode(nodeId);
+  if (node?.type === 'queryCondition') {
+    return {
+      role: 'general',
+      canEditNode: false,
+      canMove: false,
+      canDelete: false,
+    };
+  }
+
   return {
     role: 'general',
     canEditNode: true,

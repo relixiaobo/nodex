@@ -9,6 +9,7 @@ import { LogOut, User } from '../../lib/icons.js';
 import { useWorkspaceStore } from '../../stores/workspace-store';
 import { useSyncStore } from '../../stores/sync-store';
 import { t } from '../../i18n/strings.js';
+import { Tooltip } from '../ui/Tooltip';
 
 const BADGE_CLASSES: Record<string, string> = {
     synced: 'bg-success',
@@ -78,18 +79,19 @@ export function ToolbarUserMenu() {
     // Not signed in: show generic user icon (no sync badge needed)
     if (!authUser) {
         return (
-            <button
-                onClick={handleSignIn}
-                disabled={signingIn}
-                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-foreground-tertiary transition-colors hover:bg-foreground/4 hover:text-foreground-secondary disabled:opacity-50"
-                title="Sign in with Google"
-            >
-                {signingIn ? (
-                    <span className="h-3 w-3 animate-spin rounded-full border-[1.5px] border-foreground/30 border-t-foreground" />
-                ) : (
-                    <User size={15} strokeWidth={1.5} />
-                )}
-            </button>
+            <Tooltip label={t('toolbar.signIn')}>
+                <button
+                    onClick={handleSignIn}
+                    disabled={signingIn}
+                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-foreground-tertiary transition-colors hover:bg-foreground/4 hover:text-foreground-secondary disabled:opacity-50"
+                >
+                    {signingIn ? (
+                        <span className="h-3 w-3 animate-spin rounded-full border-[1.5px] border-foreground/30 border-t-foreground" />
+                    ) : (
+                        <User size={15} strokeWidth={1.5} />
+                    )}
+                </button>
+            </Tooltip>
         );
     }
 

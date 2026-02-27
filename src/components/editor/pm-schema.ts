@@ -89,7 +89,7 @@ export const pmSchema = new Schema({
         },
       }],
       toDOM(node) {
-        return ['a', { href: node.attrs.href }, 0];
+        return ['a', { href: node.attrs.href, title: node.attrs.href }, 0];
       },
     },
   },

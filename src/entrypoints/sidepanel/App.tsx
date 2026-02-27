@@ -16,6 +16,7 @@ import { findUnexpectedShortcutConflicts } from '../../lib/shortcut-registry.js'
 import { ensureJournalTagDefs } from '../../lib/journal.js';
 import { BOOTSTRAP_CONTAINER_DEFS } from '../../lib/system-node-registry.js';
 import { Toaster } from 'sonner';
+import { TooltipProvider } from '../../components/ui/Tooltip';
 
 /**
  * Bootstrap workspace containers in LoroDoc.
@@ -154,28 +155,30 @@ export function App({ skipBootstrap = false }: AppProps) {
  }
 
  return (
-  <div
-   className="flex h-screen w-full flex-col overflow-hidden bg-background text-foreground"
-   onPointerDownCapture={selectionDismissHandlers.onPointerDownCapture}
-   onFocusCapture={selectionDismissHandlers.onFocusCapture}
-  >
-   <TopToolbar />
-   <PanelStack />
-   <CommandPalette />
-   <Toaster
-    position="bottom-center"
-    toastOptions={{
-     style: {
-      fontFamily: 'var(--font-sans)',
-      fontSize: '13px',
-      borderRadius: 'var(--radius-lg)',
-      border: '1px solid var(--color-border)',
-      background: 'var(--color-surface)',
-      color: 'var(--color-foreground)',
-      boxShadow: 'none',
-     },
-    }}
-   />
-  </div>
+  <TooltipProvider>
+   <div
+    className="flex h-screen w-full flex-col overflow-hidden bg-background text-foreground"
+    onPointerDownCapture={selectionDismissHandlers.onPointerDownCapture}
+    onFocusCapture={selectionDismissHandlers.onFocusCapture}
+   >
+    <TopToolbar />
+    <PanelStack />
+    <CommandPalette />
+    <Toaster
+     position="bottom-center"
+     toastOptions={{
+      style: {
+       fontFamily: 'var(--font-sans)',
+       fontSize: '13px',
+       borderRadius: 'var(--radius-lg)',
+       border: '1px solid var(--color-border)',
+       background: 'var(--color-surface)',
+       color: 'var(--color-foreground)',
+       boxShadow: 'none',
+      },
+     }}
+    />
+   </div>
+  </TooltipProvider>
  );
 }

@@ -28,19 +28,13 @@
 
 | Agent | 当前任务 | 分支 | 修改中的文件 |
 |-------|---------|------|-------------|
-| tag-search | Supertag 搜索结果页 | `cc/tag-search` | TagBadge, SearchResultPanel 相关 |
+_(无活跃 agent)_
 
 ---
 
 ## 进行中
 
-### 点击 Supertag 进入搜索结果页（#6）
-> **Agent**: tag-search | **分支**: `cc/tag-search` | **PR**: #102
->
-> 点击 TagBadge 从进入 supertag 配置页改为进入搜索结果页（显示所有被打标签的节点）。
-> 可独立于完整 Search Nodes 实现——先用内存过滤 + 简单结果列表。
->
-> 详细 checklist 见 PR description。
+_(无)_
 
 ---
 
@@ -109,9 +103,9 @@
 > Step 0 已完成（数据模型锁定），Step 1-3 上线后一个 PR 交付。
 
 - [x] Step 0: 数据模型锁定 ✓ nodex（2026-02-26）
-- [ ] Step 1: 搜索引擎核心 — `search-engine.ts`（条件树递归 + 候选集排除 + HAS_TAG/TODO/DONE/NOT_DONE）
-- [ ] Step 2: L0 点击标签创建 — TagBadge click → `createSearchNode(tagDefId)` + 去重导航
-- [ ] Step 3: 结果渲染 — BulletChevron 放大镜 + OutlinerView 搜索分支 + 芯片条（只读）+ 手动排序 + TrailingInput（HAS_TAG 自动打标签）
+- [x] Step 1: 搜索引擎核心 ✓ tag-search（2026-02-27）— `search-engine.ts`（条件树递归 + 候选集排除 + HAS_TAG/TODO/DONE/NOT_DONE + 24 test）
+- [x] Step 2: L0 点击标签创建 ✓ tag-search（2026-02-27）— TagBadge click → `createSearchNode(tagDefId)` + 去重导航 + 结果物化 + auto-refresh
+- [ ] Step 3: 结果渲染增强 — 芯片条（只读）+ 手动排序 + TrailingInput（HAS_TAG 自动打标签）
 - [ ] Step 4: L1 字段过滤 UI — 芯片条增删改 + FIELD_IS/时间条件 + 计数提示
 - [ ] Step 5: L2 AI 自然语言 — tool call 创建 queryCondition 树
 
@@ -253,6 +247,7 @@
 
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
+| 2026-02-27 | 点击 Supertag 进入搜索结果页 — Search Nodes L0（搜索引擎 + 结果物化 + TagBadge 导航 + 24 test） | tag-search | #102 |
 | 2026-02-27 | Field Node 交互四连修 — 拖选/下拉触发/确认/拖动（4 bug + 14 test） | field-fix | #101 |
 | 2026-02-27 | 默认进入 Today 节点面板 — App.tsx replacePanel(ensureTodayNode()) | nodex | main |
 | 2026-02-27 | ⌘K 搜索引擎切换 uFuzzy — CJK + 拼写容错 + 消除散乱匹配，55k 节点 <5ms | nodex-codex | #100 |

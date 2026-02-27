@@ -57,6 +57,7 @@ interface TrailingInputProps {
     attrDefId?: string;
     /** Called when arrow navigation reaches a boundary (e.g. escaping field values) */
     onNavigateOut?: (direction: 'up' | 'down') => void;
+    isSearchContext?: boolean;
 }
 
 function resetEditorContent(view: EditorView) {
@@ -71,8 +72,9 @@ function getEditorText(view: EditorView): string {
     return view.state.doc.textContent;
 }
 
-export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fieldDataType, attrDefId, onNavigateOut }: TrailingInputProps) {
+export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fieldDataType, attrDefId, onNavigateOut, isSearchContext }: TrailingInputProps) {
     const createChild = useNodeStore((s) => s.createChild);
+    const createNodeInSearchContext = useNodeStore((s) => s.createNodeInSearchContext);
     const cycleNodeCheckbox = useNodeStore((s) => s.cycleNodeCheckbox);
     const addUnnamedFieldToNode = useNodeStore((s) => s.addUnnamedFieldToNode);
     const setExpanded = useUIStore((s) => s.setExpanded);
@@ -119,22 +121,27 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
     }, [isOptions, optionsOpen, optionsQuery, allOptions]);
 
     const callbacksRef = useRef({
-        createChild, cycleNodeCheckbox, addUnnamedFieldToNode, addReference, selectFieldOption,
+        createChild, createNodeInSearchContext, cycleNodeCheckbox, addUnnamedFieldToNode, addReference, selectFieldOption,
         parentId, effectiveParentId, effectiveDepth, effectiveParentEK,
         setEffectiveParentId, setEffectiveDepth, setEffectiveParentEK,
         setExpanded, setFocusedNode, setFocusClickCoords, setEditingFieldName, setTriggerHint,
         isOptions, optionsOpen, filteredOptions, optionsIndex,
         setOptionsOpen, setOptionsQuery, setOptionsIndex,
-        onNavigateOut,
+        onNavigateOut, isSearchContext,
     });
     callbacksRef.current = {
-        createChild, cycleNodeCheckbox, addUnnamedFieldToNode, addReference, selectFieldOption,
+        createChild, createNodeInSearchContext, cycleNodeCheckbox, addUnnamedFieldToNode, addReference, selectFieldOption,
         parentId, effectiveParentId, effectiveDepth, effectiveParentEK,
         setEffectiveParentId, setEffectiveDepth, setEffectiveParentEK,
         setExpanded, setFocusedNode, setFocusClickCoords, setEditingFieldName, setTriggerHint,
         isOptions, optionsOpen, filteredOptions, optionsIndex,
         setOptionsOpen, setOptionsQuery, setOptionsIndex,
-        onNavigateOut,
+        onNavigateOut, isSearchContext,
+    };
+
+    const createInContext = (ref: typeof callbacksRef.current, parentIdArg: string, data?: Partial<import('../../types/index.js').NodexNode>) => {
+        if (ref.isSearchContext) return ref.createNodeInSearchContext(parentIdArg, data);
+        return ref.createChild(parentIdArg, undefined, data);
     };
 
     const commitContent = useCallback((rawText: string, view: EditorView) => {
@@ -147,7 +154,7 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
 
         // Create child and focus it (TrailingInput unmounts once there are children,
         // so we focus the new node to keep the cursor visible)
-        const newNode = ref.createChild(ref.effectiveParentId, undefined, { name: rawText });
+        const newNode = createInContext(ref, ref.effectiveParentId, { name: rawText });
         ref.setExpanded(ref.effectiveParentEK, true, true);
         ref.setFocusClickCoords({
             nodeId: newNode.id,
@@ -198,9 +205,9 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
                         resetEditorContent(view);
                         setHasContent(false);
                         const targetParentId = ref.effectiveParentId;
-                        ref.createChild(targetParentId, undefined, { name: rawText });
+                        createInContext(ref, targetParentId, { name: rawText });
                         ref.setExpanded(ref.effectiveParentEK, true, true);
-                        const newNode = ref.createChild(targetParentId, undefined, { name: '' });
+                        const newNode = createInContext(ref, targetParentId, { name: '' });
                         ref.setExpanded(ref.effectiveParentEK, true, true);
                         ref.setFocusClickCoords({
                             nodeId: newNode.id,
@@ -214,7 +221,7 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
 
                     // Empty Enter → create empty child so user can keep creating nodes
                     committingRef.current = true;
-                    const newEmptyNode = ref.createChild(ref.effectiveParentId, undefined, { name: '' });
+                    const newEmptyNode = createInContext(ref, ref.effectiveParentId, { name: '' });
                     ref.setExpanded(ref.effectiveParentEK, true, true);
                     ref.setFocusClickCoords({
                         nodeId: newEmptyNode.id,
@@ -364,7 +371,7 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
                     setHasContent(false);
                     ref.setOptionsOpen(false);
 
-                    const newNode = ref.createChild(ref.effectiveParentId, undefined, { name: rawText });
+                    const newNode = createInContext(ref, ref.effectiveParentId, { name: rawText });
                     ref.setExpanded(ref.effectiveParentEK, true, true);
                     ref.cycleNodeCheckbox(newNode.id);
                     ref.setFocusClickCoords({
@@ -446,7 +453,7 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
                     setHasContent(false);
                     ref.setOptionsOpen(false);
 
-                    const triggerNode = ref.createChild(ref.effectiveParentId, undefined, { name: action.matchText });
+                    const triggerNode = createInContext(ref, ref.effectiveParentId, { name: action.matchText });
                     ref.setTriggerHint({ char: action.trigger, nodeId: triggerNode.id });
                     ref.setExpanded(ref.effectiveParentEK, true, true);
                     ref.setFocusClickCoords({
@@ -511,7 +518,7 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
                             resetEditorContent(view);
                             setHasContent(false);
 
-                            const newEmptyNode = ref.createChild(ref.effectiveParentId, undefined, { name: '' });
+                            const newEmptyNode = createInContext(ref, ref.effectiveParentId, { name: '' });
                             ref.setExpanded(ref.effectiveParentEK, true, true);
 
                             useUIStore.getState().setPendingInputChar({

@@ -813,7 +813,7 @@ export function FieldRow({
 
     return (
       <div
-        className={`border-t ${isLastInGroup ? 'border-b' : ''} border-border-subtle flex flex-col @sm:flex-row @sm:items-start min-h-6 py-1`}
+        className={`border-t ${isLastInGroup ? 'border-b' : ''} border-border-subtle flex flex-col @sm:flex-row @sm:items-start min-h-6 py-1 relative has-[.field-overlay-open]:z-[80]`}
         data-field-row
         data-field-row-id={tupleId}
         data-node-id={tupleId}
@@ -859,7 +859,7 @@ export function FieldRow({
   // ─── Path 3: Regular fields — editable name, FieldValueOutliner ───
   return (
     <div
-      className={`relative border-t ${isLastInGroup ? 'border-b' : ''} border-border-subtle flex flex-col @sm:flex-row @sm:items-start min-h-6`}
+      className={`relative border-t ${isLastInGroup ? 'border-b' : ''} border-border-subtle flex flex-col @sm:flex-row @sm:items-start min-h-6 has-[.field-overlay-open]:z-[80]`}
       data-field-row
       data-field-row-id={tupleId}
       data-node-id={tupleId}

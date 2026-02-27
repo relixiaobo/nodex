@@ -36,6 +36,7 @@ import { parseDayNodeName, parseYearNodeName, isToday } from '../../lib/date-uti
 
 import { ensureUndoFocusAfterNavigation } from '../../lib/focus-utils.js';
 import { t } from '../../i18n/strings.js';
+import { Kbd } from '../ui/Kbd';
 
 /** Add "Today, " prefix for today's day node, matching NodeHeader behavior. */
 function resolveDayNodeDisplayName(id: string, name: string): string {
@@ -357,118 +358,124 @@ export function CommandPalette() {
   let globalIdx = 0;
 
   return (
-    <div className="animate-palette-expand fixed inset-0 z-50 flex flex-col bg-background">
-      {/* Search header — same toolbar bg, white pill input matches SearchTrigger */}
-      <div className="flex h-11 shrink-0 items-center bg-foreground/[0.08] px-1.5">
-        <div className="flex flex-1 items-center gap-2 rounded-full bg-background px-3 py-2">
-          <input
-            ref={inputRef}
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Search..."
-            className="flex-1 bg-transparent text-xs outline-none placeholder:text-foreground-tertiary"
-          />
-          <span
-            onClick={closeAndClear}
-            className="shrink-0 cursor-pointer text-xs text-foreground-tertiary hover:text-foreground-secondary"
-          >
-            Esc
-          </span>
-        </div>
-      </div>
-
-      {/* Results area — fills remaining space */}
-      <div ref={listRef} className="flex-1 overflow-y-auto py-1.5">
-        {hasQuery ? (
-          // Search mode: Create + Results
-          <div>
-            {createItem && (() => {
-              const idx = globalIdx++;
-              return (
-                <PaletteRow
-                  key={createItem.id}
-                  item={createItem}
-                  selected={selectedIndex === idx}
-                  positionIndex={idx}
-                  onSelect={() => createItem.action()}
-                  onHover={() => setSelectedIndex(idx)}
-                />
-              );
-            })()}
-            {searchResults.length > 0 && (
-              <>
-                <GroupHeader label="Results" />
-                {searchResults.map((item) => {
-                  const idx = globalIdx++;
-                  return (
-                    <PaletteRow
-                      key={item.id}
-                      item={item}
-                      selected={selectedIndex === idx}
-                      positionIndex={idx}
-                      onSelect={() => item.action()}
-                      onHover={() => setSelectedIndex(idx)}
-                    />
-                  );
-                })}
-              </>
-            )}
+    <div
+      className="fixed inset-0 z-50 flex justify-center bg-foreground/[0.08] p-2 sm:p-4 pt-[8vh] sm:pt-[12vh]"
+      onPointerDown={closeAndClear}
+    >
+      <div
+        className="animate-palette-expand flex flex-col w-full max-w-[600px] h-fit max-h-[80vh] rounded-xl bg-background shadow-paper border border-border-subtle overflow-hidden"
+        onPointerDown={(e) => e.stopPropagation()}
+      >
+        {/* Search header — 48px to match TopToolbar */}
+        <div className="flex h-12 shrink-0 items-center px-4 border-b border-border-subtle bg-background">
+          <div className="flex flex-1 items-center gap-2.5">
+            <Search size={16} className="text-foreground-tertiary shrink-0" />
+            <input
+              ref={inputRef}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Search..."
+              className="flex-1 bg-transparent text-sm outline-none placeholder:text-foreground-tertiary"
+            />
+            <span className="shrink-0 cursor-pointer" onClick={closeAndClear}>
+              <Kbd>Esc</Kbd>
+            </span>
           </div>
-        ) : (
-          // Default mode: Suggestions + Commands
-          <>
-            {(recentNodes.length > 0 || containerItems.length > 0) && (
-              <div>
-                <GroupHeader label="Suggestions" />
-                {recentNodes.map((item) => {
-                  const idx = globalIdx++;
-                  return (
-                    <PaletteRow
-                      key={item.id}
-                      item={item}
-                      selected={selectedIndex === idx}
-                      positionIndex={idx}
-                      onSelect={() => item.action()}
-                      onHover={() => setSelectedIndex(idx)}
-                    />
-                  );
-                })}
-                {containerItems.map((item) => {
-                  const idx = globalIdx++;
-                  return (
-                    <PaletteRow
-                      key={item.id}
-                      item={item}
-                      selected={selectedIndex === idx}
-                      positionIndex={idx}
-                      onSelect={() => item.action()}
-                      onHover={() => setSelectedIndex(idx)}
-                    />
-                  );
-                })}
-              </div>
-            )}
-            {commandItems.length > 0 && (
-              <div>
-                <GroupHeader label="Commands" />
-                {commandItems.map((item) => {
-                  const idx = globalIdx++;
-                  return (
-                    <PaletteRow
-                      key={item.id}
-                      item={item}
-                      selected={selectedIndex === idx}
-                      positionIndex={idx}
-                      onSelect={() => item.action()}
-                      onHover={() => setSelectedIndex(idx)}
-                    />
-                  );
-                })}
-              </div>
-            )}
-          </>
-        )}
+        </div>
+
+        {/* Results area — fills remaining space */}
+        <div ref={listRef} className="flex-1 overflow-y-auto py-1.5">
+          {hasQuery ? (
+            // Search mode: Create + Results
+            <div>
+              {createItem && (() => {
+                const idx = globalIdx++;
+                return (
+                  <PaletteRow
+                    key={createItem.id}
+                    item={createItem}
+                    selected={selectedIndex === idx}
+                    positionIndex={idx}
+                    onSelect={() => createItem.action()}
+                    onHover={() => setSelectedIndex(idx)}
+                  />
+                );
+              })()}
+              {searchResults.length > 0 && (
+                <>
+                  <GroupHeader label="Results" />
+                  {searchResults.map((item) => {
+                    const idx = globalIdx++;
+                    return (
+                      <PaletteRow
+                        key={item.id}
+                        item={item}
+                        selected={selectedIndex === idx}
+                        positionIndex={idx}
+                        onSelect={() => item.action()}
+                        onHover={() => setSelectedIndex(idx)}
+                      />
+                    );
+                  })}
+                </>
+              )}
+            </div>
+          ) : (
+            // Default mode: Suggestions + Commands
+            <>
+              {(recentNodes.length > 0 || containerItems.length > 0) && (
+                <div>
+                  <GroupHeader label="Suggestions" />
+                  {recentNodes.map((item) => {
+                    const idx = globalIdx++;
+                    return (
+                      <PaletteRow
+                        key={item.id}
+                        item={item}
+                        selected={selectedIndex === idx}
+                        positionIndex={idx}
+                        onSelect={() => item.action()}
+                        onHover={() => setSelectedIndex(idx)}
+                      />
+                    );
+                  })}
+                  {containerItems.map((item) => {
+                    const idx = globalIdx++;
+                    return (
+                      <PaletteRow
+                        key={item.id}
+                        item={item}
+                        selected={selectedIndex === idx}
+                        positionIndex={idx}
+                        onSelect={() => item.action()}
+                        onHover={() => setSelectedIndex(idx)}
+                      />
+                    );
+                  })}
+                </div>
+              )}
+              {commandItems.length > 0 && (
+                <div>
+                  <GroupHeader label="Commands" />
+                  {commandItems.map((item) => {
+                    const idx = globalIdx++;
+                    return (
+                      <PaletteRow
+                        key={item.id}
+                        item={item}
+                        selected={selectedIndex === idx}
+                        positionIndex={idx}
+                        onSelect={() => item.action()}
+                        onHover={() => setSelectedIndex(idx)}
+                      />
+                    );
+                  })}
+                </div>
+              )}
+            </>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -480,7 +487,7 @@ export function CommandPalette() {
 
 function GroupHeader({ label }: { label: string }) {
   return (
-    <div className="px-3 py-1.5 text-xs font-medium text-foreground-tertiary">
+    <div className="px-4 py-1.5 text-xs font-medium text-foreground-tertiary">
       {label}
     </div>
   );
@@ -503,12 +510,12 @@ function PaletteRow({ item, selected, positionIndex, onSelect, onHover }: Palett
       data-selected={selected}
       onClick={onSelect}
       onMouseMove={onHover}
-      className={`mx-1 flex h-8 cursor-pointer items-center gap-2 rounded-md px-2 transition-colors ${selected ? 'bg-primary-muted' : ''
+      className={`mx-2 flex h-8 cursor-pointer items-center gap-2.5 rounded-md px-2 transition-colors ${selected ? 'bg-primary-muted' : ''
         }`}
     >
       {/* Icon: command/container use explicit icon; tagDef uses colored #; nodes use colored bullet */}
       {Icon ? (
-        <Icon size={16} className="shrink-0 text-foreground-secondary" />
+        <Icon size={16} strokeWidth={1.5} className="shrink-0 text-foreground-secondary" />
       ) : item.tagDefColor ? (
         <span
           className="flex shrink-0 h-4 w-4 items-center justify-center rounded text-xs font-bold"
@@ -526,12 +533,12 @@ function PaletteRow({ item, selected, positionIndex, onSelect, onHover }: Palett
           />
         </span>
       )}
-      <span className="flex-1 truncate text-sm text-foreground">{item.label}</span>
+      <span className="flex-1 truncate text-[13px] text-foreground">{item.label}</span>
       {/* Alfred-style shortcut: selected → ↵, others → ⌘N (up to 9) */}
       {selected ? (
-        <span className="shrink-0 text-xs text-foreground-tertiary">{'\u21B5'}</span>
+        <Kbd>↵</Kbd>
       ) : positionIndex < 9 ? (
-        <span className="shrink-0 text-xs text-foreground-tertiary">{`\u2318${positionIndex + 1}`}</span>
+        <Kbd>{`⌘${positionIndex + 1}`}</Kbd>
       ) : null}
     </div>
   );

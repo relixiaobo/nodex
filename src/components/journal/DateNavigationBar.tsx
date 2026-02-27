@@ -134,7 +134,7 @@ export function DateNavigationBar({ dayNodeId }: DateNavigationBarProps) {
 
   return (
     <div className="relative my-1.5 pl-4 text-[11px] text-foreground-secondary flex items-center" ref={calendarRef}>
-      <div className="inline-flex items-center gap-1">
+      <div className="inline-flex items-center gap-0.5">
         <Tooltip label={t('dateNavigationBar.previousDay')}>
           <button
             onClick={handlePrevDay}
@@ -146,7 +146,7 @@ export function DateNavigationBar({ dayNodeId }: DateNavigationBarProps) {
         <Tooltip label={t('dateNavigationBar.goToToday')} shortcut="⌘⇧D">
           <button
             onClick={handleToday}
-            className="flex h-6 items-center px-2.5 rounded-full font-medium text-foreground-tertiary hover:bg-foreground/4 hover:text-foreground transition-all"
+            className="flex h-6 items-center px-1.5 rounded-full font-medium text-foreground-tertiary hover:bg-foreground/4 hover:text-foreground transition-all"
           >
             {t('dateNavigationBar.today')}
           </button>
@@ -162,12 +162,12 @@ export function DateNavigationBar({ dayNodeId }: DateNavigationBarProps) {
       </div>
 
       {/* 细视觉分隔竖线 */}
-      <div className="ml-1.5 w-px h-2.5 bg-border-faint" />
+      <div className="ml-1 w-px h-2.5 bg-border-subtle" />
 
       <Tooltip label={t('dateNavigationBar.pickDate')}>
         <button
           onClick={handleToggleCalendar}
-          className={`ml-1.5 flex h-6 w-6 items-center justify-center rounded-full transition-all ${calendarOpen
+          className={`ml-1 flex h-6 w-6 items-center justify-center rounded-full transition-all ${calendarOpen
             ? 'bg-foreground/[0.08] text-foreground'
             : 'text-foreground-tertiary hover:bg-foreground/4 hover:text-foreground'
             }`}
@@ -179,7 +179,7 @@ export function DateNavigationBar({ dayNodeId }: DateNavigationBarProps) {
       {
         calendarOpen && (
           <div
-            className="absolute top-full z-50 mt-1 w-[252px] rounded-lg bg-background shadow-paper p-3"
+            className="absolute top-full z-50 mt-1 w-[244px] rounded-lg bg-background shadow-paper p-3"
             style={{ left: 16 }}
             onMouseDown={(e) => e.stopPropagation()}
           >

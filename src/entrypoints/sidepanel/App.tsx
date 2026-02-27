@@ -13,7 +13,7 @@ import * as loroDoc from '../../lib/loro-doc.js';
 import { ensureWorkspaceHomeNode } from '../../lib/workspace-root.js';
 import { getOrCreateDefaultWorkspaceId } from '../../lib/workspace-id.js';
 import { findUnexpectedShortcutConflicts } from '../../lib/shortcut-registry.js';
-import { ensureJournalTagDefs } from '../../lib/journal.js';
+import { ensureJournalTagDefs, ensureTodayNode } from '../../lib/journal.js';
 import { BOOTSTRAP_CONTAINER_DEFS } from '../../lib/system-node-registry.js';
 import { Toaster } from 'sonner';
 import { TooltipProvider } from '../../components/ui/Tooltip';
@@ -105,7 +105,7 @@ function useBootstrap(skip: boolean): BootstrapResult {
     });
    }
 
-   // Navigate to Library if panel stack is empty or current panel node is invalid.
+   // Navigate to Today if panel stack is empty or current panel node is invalid.
    // Use replacePanel (not navigateTo) to avoid creating a Loro undo entry
    // whose captured UI snapshot is the empty initial state — that would cause
    // repeated Cmd+Z to restore a blank panel stack.
@@ -113,7 +113,7 @@ function useBootstrap(skip: boolean): BootstrapResult {
    const latestIndex = useUIStore.getState().panelIndex;
    const currentPanelId = latestHistory[latestIndex] ?? latestHistory[latestHistory.length - 1];
    if (latestHistory.length === 0 || (currentPanelId && !loroDoc.hasNode(currentPanelId))) {
-    replacePanel(CONTAINER_IDS.LIBRARY);
+    replacePanel(ensureTodayNode());
    }
 
    setReady(true);

@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef, forwardRef } from 'react';
-import { X, XCircle, Hash, Settings, Trash2, AlertTriangle } from '../../lib/icons.js';
+import { X, XCircle, Hash, Settings, Trash2, AlertTriangle, Search } from '../../lib/icons.js';
 import { createPortal } from 'react-dom';
 import { useNodeStore } from '../../stores/node-store';
 import { resolveTagColor } from '../../lib/tag-colors.js';
@@ -9,7 +9,9 @@ import { CONTAINER_IDS } from '../../types/index.js';
 interface TagBadgeProps {
   tagDefId: string;
   onRemove?: () => void;
-  /** Placeholder: navigate to supertag search node */
+  /** Navigate to search results for this tag (click on tag name) */
+  onSearch?: () => void;
+  /** Navigate to supertag config page (right-click "Configure tag") */
   onNavigate?: () => void;
 }
 
@@ -17,7 +19,7 @@ export function canNavigateToTagNode(hasBackingNode: boolean): boolean {
   return hasBackingNode;
 }
 
-export function TagBadge({ tagDefId, onRemove, onNavigate }: TagBadgeProps) {
+export function TagBadge({ tagDefId, onRemove, onSearch, onNavigate }: TagBadgeProps) {
   const hasBackingNode = useNodeStore((s) => {
     void s._version;
     return !!s.getNode(tagDefId);
@@ -32,7 +34,9 @@ export function TagBadge({ tagDefId, onRemove, onNavigate }: TagBadgeProps) {
   });
   const isTrashed = useNodeStore((s) => { void s._version; return loroDoc.getParentId(tagDefId) === CONTAINER_IDS.TRASH; });
   const color = useNodeStore((s) => { void s._version; return resolveTagColor(tagDefId); });
-  const canNavigate = !!onNavigate && canNavigateToTagNode(hasBackingNode);
+  // Tag name click navigates to search results (primary action)
+  const canSearch = !!onSearch && canNavigateToTagNode(hasBackingNode);
+  const canConfigure = !!onNavigate && canNavigateToTagNode(hasBackingNode);
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -74,11 +78,11 @@ export function TagBadge({ tagDefId, onRemove, onNavigate }: TagBadgeProps) {
 
   const handleNameClick = useCallback(
     (e: React.MouseEvent) => {
-      if (!canNavigate) return;
+      if (!canSearch) return;
       e.stopPropagation();
-      onNavigate?.();
+      onSearch?.();
     },
-    [canNavigate, onNavigate],
+    [canSearch, onSearch],
   );
 
   // Trashed tagDef: show warning style instead of normal badge
@@ -120,11 +124,11 @@ export function TagBadge({ tagDefId, onRemove, onNavigate }: TagBadgeProps) {
           )}
         </span>
         <span
-          className={`transition-all ${canNavigate
+          className={`transition-all ${canSearch
             ? 'cursor-pointer hover:underline underline-offset-[3px] decoration-current/40 hover:decoration-current/80'
             : 'cursor-default'
             }`}
-          onClick={canNavigate ? handleNameClick : undefined}
+          onClick={canSearch ? handleNameClick : undefined}
         >
           {tagName}
         </span>
@@ -140,11 +144,13 @@ export function TagBadge({ tagDefId, onRemove, onNavigate }: TagBadgeProps) {
             y={menu.y}
             tagName={tagName}
             onRemove={onRemove ? () => { onRemove(); setMenu(null); } : undefined}
-            onSearch={() => {
-              // TODO: navigate to "Everything tagged #tagName"
-              setMenu(null);
-            }}
-            onConfigure={canNavigate
+            onSearch={canSearch
+              ? () => {
+                onSearch?.();
+                setMenu(null);
+              }
+              : undefined}
+            onConfigure={canConfigure
               ? () => {
                 onNavigate?.();
                 setMenu(null);
@@ -165,7 +171,7 @@ interface TagContextMenuProps {
   y: number;
   tagName: string;
   onRemove?: () => void;
-  onSearch: () => void;
+  onSearch?: () => void;
   onConfigure?: () => void;
 }
 
@@ -186,16 +192,18 @@ const TagContextMenu = forwardRef<HTMLDivElement, TagContextMenuProps>(
             Remove tag
           </button>
         )}
-        <button
-          className="flex w-full items-center gap-2 px-3 py-1.5 hover:bg-foreground/4 transition-colors text-left"
-          onClick={onSearch}
-        >
-          <Hash size={14} className="text-foreground-secondary" />
-          Everything tagged #{tagName}
-        </button>
-        {onRemove && onConfigure && (
+        {onSearch && (
+          <button
+            className="flex w-full items-center gap-2 px-3 py-1.5 hover:bg-foreground/4 transition-colors text-left"
+            onClick={onSearch}
+          >
+            <Search size={14} className="text-foreground-secondary" />
+            Everything tagged #{tagName}
+          </button>
+        )}
+        {onConfigure && (
           <>
-            <div className="my-1 h-px bg-border" />
+            {(onRemove || onSearch) && <div className="my-1 h-px bg-border" />}
             <button
               className="flex w-full items-center gap-2 px-3 py-1.5 hover:bg-foreground/4 transition-colors text-left"
               onClick={onConfigure}

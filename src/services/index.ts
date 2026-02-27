@@ -1,5 +1,3 @@
-export { initSupabase, getSupabase } from './supabase.js';
-
 export {
   importTanaExport,
   validateTanaExport,

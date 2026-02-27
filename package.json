@@ -23,7 +23,6 @@
   "dependencies": {
     "@leeoniya/ufuzzy": "^1.0.19",
     "@radix-ui/react-tooltip": "^1.2.8",
-    "@supabase/supabase-js": "^2.95.3",
     "cmdk": "^1.1.1",
     "defuddle": "^0.6.6",
     "immer": "^10.1.1",

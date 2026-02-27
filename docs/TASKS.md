@@ -31,7 +31,7 @@
 | Agent | 当前任务 | 分支 | 修改中的文件 |
 |-------|---------|------|-------------|
 | nodex-cc | ⌘K 搜索算法优化 | `cc/search-optimization` | 见 PR #100 |
-| antigravity | UI 细节打磨 — 浮层/间距/色彩协调 | `cc/ui-polish-round2` | 见 PR #99 |
+| antigravity | _(idle)_ | — | — |
 
 ---
 
@@ -44,12 +44,6 @@
 > 替换为分词子串匹配为主 + uFuzzy 兜底的混合方案。
 > 调研文档：`docs/research/search-algorithm-research.md`
 > 详细 checklist 见 PR #100 description。
-
-### UI 细节打磨 — 浮层/间距/色彩协调
-> **Agent**: antigravity | **分支**: `cc/ui-polish-round2` | **PR**: #99
->
-> 5 项 UI 打磨：日期选择器 + DateNavigationBar 间距 + 用户菜单浮层 + CommandPalette 对齐 + 容器图标底色。
-> 详细 checklist 见 PR #99 description。
 
 ---
 
@@ -262,6 +256,7 @@
 
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
+| 2026-02-27 | UI 细节打磨 — 浮层/间距/色彩协调（日期选择器 + 用户菜单 + CommandPalette 居中浮层 + 容器图标 mix-blend-multiply + z-index 穿模修复） | antigravity | #99 |
 | 2026-02-27 | Radix Tooltip + 智能粘贴 + 链接 hover — 全图标 Tooltip（含快捷键）+ 移除 FloatingToolbar 链接按钮 + ⌘V 粘贴 URL 自动转链接 + ⌘⇧V 纯文本粘贴 + 链接 hover 显示地址 | nodex | main |
 | 2026-02-26 | UI 设计系统合规优化 — Paper Shadow 浮层 + hover/selected token 统一（16 文件） | nodex-cc | #98 |
 | 2026-02-26 | Search Node Step 0 数据模型锁定 — `queryCondition` NodeType + `QueryOp`(32 op) + query 属性 + Loro 读写 + `isOutlinerContentNodeType('search')` + 6 Vitest | nodex | main |

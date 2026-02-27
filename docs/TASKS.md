@@ -20,13 +20,7 @@
 
 用户随手记录，agent 启动时处理（归类到待办或进行中，处理完从此处删除）。
 
-1. **Field name 中鼠标拖选无法选中节点** — 鼠标在 field node 的 field name 区域按住左键上下拖动时，无法触发大纲的节点拖选（单个或多个节点选中）。鼠标拖选被 field name 的文本选中行为吞掉了。
-
-2. **Field name 聚焦不应触发字段选择下拉框** — 当 field name 已有文本时，点击将光标插入其中不应立即弹出字段选择下拉框。下拉框只应在用户开始输入时触发，不能仅通过聚焦触发。
-
-3. **⌘K 常用搜索/命令应排前** — 用户经常使用的搜索结果和命令应该在搜索列表中排在靠前的位置（频率/最近使用加权）。
-
-4. ~~**默认进入 Today 节点面板**~~ — ✅ 已完成（App.tsx `replacePanel(ensureTodayNode())`）
+1. **⌘K 常用搜索/命令应排前** — 用户经常使用的搜索结果和命令应该在搜索列表中排在靠前的位置（频率/最近使用加权）。
 
 ---
 
@@ -34,23 +28,11 @@
 
 | Agent | 当前任务 | 分支 | 修改中的文件 |
 |-------|---------|------|-------------|
-| field-fix | Field Node 交互四连修 | `cc/field-fix` | OutlinerItem.tsx, FieldNameEditor 相关 |
 | tag-search | Supertag 搜索结果页 | `cc/tag-search` | TagBadge, SearchResultPanel 相关 |
 
 ---
 
 ## 进行中
-
-### Field Node 交互四连修（#1 #2 #5 #7）
-> **Agent**: field-fix | **分支**: `cc/field-fix` | **PR**: #101
->
-> 修复 field node（tuple 行）的四个交互 bug：
-> 1. Field name 中鼠标拖选无法选中节点（事件被文本选中吞掉）
-> 2. Field name 聚焦不应触发字段选择下拉框（已有文本时点击不应弹下拉）
-> 3. Field name 下拉选择无法通过 Enter/点击应用
-> 4. Field node 无法通过 bullet 拖动移动位置
->
-> 详细 checklist 见 PR description。
 
 ### 点击 Supertag 进入搜索结果页（#6）
 > **Agent**: tag-search | **分支**: `cc/tag-search` | **PR**: #102
@@ -271,6 +253,8 @@
 
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
+| 2026-02-27 | Field Node 交互四连修 — 拖选/下拉触发/确认/拖动（4 bug + 14 test） | field-fix | #101 |
+| 2026-02-27 | 默认进入 Today 节点面板 — App.tsx replacePanel(ensureTodayNode()) | nodex | main |
 | 2026-02-27 | ⌘K 搜索引擎切换 uFuzzy — CJK + 拼写容错 + 消除散乱匹配，55k 节点 <5ms | nodex-codex | #100 |
 | 2026-02-27 | Radix Tooltip + 智能粘贴 + 链接 hover — 全图标 Tooltip（含快捷键）+ 移除 FloatingToolbar 链接按钮 + ⌘V 粘贴 URL 自动转链接 + ⌘⇧V 纯文本粘贴 + 链接 hover 显示地址 | nodex | main |
 | 2026-02-26 | UI 设计系统合规优化 — Paper Shadow 浮层 + hover/selected token 统一（16 文件） | nodex-cc | #98 |

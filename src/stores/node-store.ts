@@ -35,6 +35,7 @@ interface NodeStore {
 
   createChild(parentId: string, index?: number, data?: Partial<NodexNode>): NodexNode;
   createSibling(siblingId: string, data?: Partial<NodexNode>): NodexNode;
+  createSiblingNodesFromPaste(afterNodeId: string, lines: string[]): string | null;
   moveNodeTo(nodeId: string, newParentId: string, index?: number): void;
   indentNode(nodeId: string): void;
   outdentNode(nodeId: string): void;
@@ -493,6 +494,26 @@ export const useNodeStore = create<NodeStore>((set, get) => {
       const insertAt = idx >= 0 ? idx + 1 : siblings.length;
 
       return get().createChild(parentId, insertAt, data);
+    },
+
+    createSiblingNodesFromPaste: (afterNodeId, lines) => {
+      if (!canMutate('createSiblingNodesFromPaste')) return null;
+      const parentId = loroDoc.getParentId(afterNodeId);
+      if (!parentId) return null;
+      const nonEmptyLines = lines.filter((l) => l.trim().length > 0);
+      if (nonEmptyLines.length === 0) return null;
+      const siblings = loroDoc.getChildren(parentId);
+      const baseIdx = siblings.indexOf(afterNodeId);
+      const startAt = baseIdx >= 0 ? baseIdx + 1 : siblings.length;
+      let lastId: string | null = null;
+      for (let i = 0; i < nonEmptyLines.length; i++) {
+        const id = nanoid();
+        loroDoc.createNode(id, parentId, startAt + i);
+        loroDoc.setNodeRichTextContent(id, nonEmptyLines[i]);
+        lastId = id;
+      }
+      loroDoc.commitDoc();
+      return lastId;
     },
 
     moveNodeTo: (nodeId, newParentId, index) => {

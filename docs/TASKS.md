@@ -26,13 +26,17 @@ _(空)_
 
 ## Agent 状态
 
-_(无活跃 Agent)_
+| Agent | 任务 | 状态 |
+|-------|------|------|
+| nodex | Options 验证 + Untitled 占位 + Clip Toast | 🔄 进行中 |
+| field-cascade | Field / Default Content 删除联动 | 🔄 进行中 |
+| research | Highlight + Comment 研究 | 🔄 进行中 |
 
 ---
 
 ## 进行中
 
-_(空)_
+_(见 Agent 状态表)_
 
 ---
 
@@ -45,6 +49,7 @@ _(空)_
 - [x] **节点内拖选文本误触发节点选中** — use-drag-select 尊重浏览器活跃文本选区
 - [x] **粘贴/剪藏内容中的 #、@ 不应触发下拉菜单** — paste transaction setMeta 跳过 trigger 检测
 - [x] **Field value 验证错误 icon 未垂直居中** — number 等字段输入非法值时，右侧 ⚠ 图标未与行内容垂直居中 ✅（2026-02-27）
+- [ ] **Options from Supertags 值语义** — "Options from supertag X" 的候选值应该是所有打了 supertag X 的节点（tagged nodes），而非 supertag X 本身的选项。需验证当前实现是否正确
 
 ### v0.1 — 首次上线（Chrome Web Store 发布）
 
@@ -53,21 +58,22 @@ _(空)_
 #### Sync Production 部署
 > Steps 0-9 + Staging 已完成。**Plan**: `docs/plans/sync-incremental-impl.md`
 
-- [ ] Production 部署（Cloudflare Workers + D1 + R2 + Google OAuth）
+- [x] Production 部署（Cloudflare Workers + D1 + R2 + Google OAuth）✅（2026-02-27）
 - [ ] Step 10: Compaction（上线后尽快完成）
 
 #### Chrome Web Store 上架准备
 
-- [ ] **扩展图标** — 16/32/48/128px PNG（manifest `icons` 字段）
-- [ ] **商店图标** — 128x128 PNG（商店页面展示）
-- [ ] **商店截图** — 1-5 张（1280x800，展示 Side Panel 使用场景）
-- [ ] **商店描述** — 详细功能介绍（最长 16,000 字符）
-- [ ] **隐私政策页面** — 说明数据收集/存储/同步方式（`<all_urls>` + `identity` + `storage` 审核必须）
+- [x] **扩展图标** — 16/32/48/128px PNG（`public/icon/` + preview/dev 变体）✅
+- [x] **商店图标** — 128x128 PNG ✅
+- [x] **商店截图** — 3 张 1280×800（`docs/store-screenshots/store-01~03.png`）✅
+- [x] **商店描述** — `docs/store-listing.md`（含权限说明 + 数据披露）✅
+- [x] **隐私政策页面** — `docs/privacy-policy.md` + Worker `/privacy` 端点 ✅
+- [x] **Nodex → soma 改名** — 用户可见名称全部更新 ✅（215acdb）
 - [ ] **产品展示页** — 静态落地页（产品介绍 + 截图 + 安装链接 + 隐私政策），可托管在 Cloudflare Pages 或 GitHub Pages
-- [x] **Production build 清理** — 三环境分离（Store 无 key 无 localhost，Preview/Dev 各自独立 key + icon）
-- [ ] **开发者账号** — Chrome Web Store 注册（$5）
+- [x] **Production build 清理** — 三环境分离（Store 无 key 无 localhost，Preview/Dev 各自独立 key + icon）✅
+- [x] **开发者账号** — Chrome Web Store 注册（$5）✅ 已提交审核
 - [ ] **新用户引导数据** — 准备一批引导用的种子数据，帮助新用户了解操作方式和功能
-- [ ] `npm run zip` → 上传发布
+- [x] `npm run zip` → 上传发布 ✅ 首版已提交，正式上线前会再提交一版
 
 ---
 
@@ -94,6 +100,15 @@ _(空)_
 - [ ] **Twitter/X 剪藏支持** — Clip Page 目前不支持抓取 Twitter/X 内容，需适配其特殊 DOM 结构
 - [ ] 剪藏模板 — 不同网站类型（文章/产品/视频/论文）使用不同 Supertag 模板
 - **Spec**: `docs/features/web-clipping.md`
+
+#### 网页高亮 & 批注（Highlight + Comment）
+> 与 Clip Page 联动，参考 Readwise Reader 交互。高亮和批注以节点形式存在于 soma 数据模型中。
+> **Research**: `docs/research/highlight-comment-design.md`（待产出）
+
+- [ ] **研究：数据模型 + 交互设计** — 高亮/批注如何建模为节点（锚点定位、与 clip node 关系、Readwise Reader 参考）
+- [ ] Phase 1: 网页高亮（Content Script 选中文本 → 创建 highlight 节点 → 关联到 clip node）
+- [ ] Phase 2: 批注（highlight 节点可挂 children 作为 comment）
+- [ ] Phase 3: 回显（再次访问已高亮页面时，Content Script 渲染已有高亮）
 
 #### AI Chat & 网页辅助 (#29 + #31)
 > 浏览器 + AI = soma 的第二个差异化维度。不只是聊天框，而是理解上下文的知识助手。
@@ -129,7 +144,7 @@ _(空)_
 #### Supertags 完善 (#20)
 > 基础已完成（#触发、标签应用/移除、配置页、模板字段、TagBadge 右键菜单）
 
-- [ ] 标签页（= Search Nodes L0 入口，点击 supertag → 创建/导航 search node，见 #23）
+- [x] 标签页（= Search Nodes L0 入口，点击 supertag → 创建/导航 search node，见 #23）✅（1c6f865）
 - [ ] Convert to supertag（普通节点快捷转 tagDef）
 - [ ] Pinned fields（置顶显示 + filter 优先）
 - [ ] Optional fields（建议按钮 + 自动降级）
@@ -141,6 +156,7 @@ _(空)_
 > 基础已完成（Options/Date/Number/URL/Email/Checkbox/隐藏/Required/Min-Max/验证/系统字段）
 
 - [x] **同一节点下重复 field node 去重** — 同一个 node 下不允许出现相同的 field node；若选中了重复的 field，只保留最早的那个
+- [ ] **Field / Default Content 删除联动** — 两个场景：a) 删除 supertag default content（模板字段/内容）时，无自定义值的节点删除对应项，有自定义值的脱离模板保留；b) 删除 field 定义（attrDef）本身时，已设值的节点保留 value，field name 显示”已删除”状态（灰色/删除线）
 - [ ] AttrDef “Used in” 计算字段
 - [ ] Auto-initialize（6 种策略）
 - [ ] Pinned fields

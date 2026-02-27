@@ -30,6 +30,7 @@ import { isDayNode } from '../../lib/journal.js';
 import { parseDayNodeName, parseYearNodeName, isToday } from '../../lib/date-utils.js';
 import { ensureUndoFocusAfterNavigation } from '../../lib/focus-utils.js';
 import { t } from '../../i18n/strings.js';
+import { Tooltip } from '../ui/Tooltip';
 
 interface BreadcrumbProps {
   nodeId: string;
@@ -140,13 +141,14 @@ export function Breadcrumb({ nodeId, showCurrentName, compact }: BreadcrumbProps
               For container nodes (Library, Inbox…) workspaceRootId is null because they
               have no parent; we still show [W] to indicate workspace context. */}
           {!!wsId && (
-            <button
-              onClick={handleNavigateToWorkspaceRoot}
-              className="flex h-5 w-5 shrink-0 items-center justify-center rounded-[4px] bg-primary/15 text-[11px] font-semibold text-primary hover:bg-primary/20"
-              title={t('breadcrumb.goToWorkspaceRoot')}
-            >
-              {wsInitial}
-            </button>
+            <Tooltip label={t('breadcrumb.goToWorkspaceRoot')}>
+              <button
+                onClick={handleNavigateToWorkspaceRoot}
+                className="flex h-5 w-5 shrink-0 items-center justify-center rounded-[4px] bg-primary/15 text-[11px] font-semibold text-primary hover:bg-primary/20"
+              >
+                {wsInitial}
+              </button>
+            </Tooltip>
           )}
 
           {/* Ellipsis for folded ancestors */}
@@ -154,13 +156,14 @@ export function Breadcrumb({ nodeId, showCurrentName, compact }: BreadcrumbProps
             <>
               <span className="shrink-0 text-foreground-tertiary/50 mx-0.5">/</span>
               <div className="relative" ref={dropdownRef}>
-                <button
-                  onClick={() => setExpanded(!expanded)}
-                  className={`flex shrink-0 items-center justify-center rounded-md px-1 py-0.5 hover:bg-foreground/4 hover:text-foreground transition-colors ${expanded ? 'bg-foreground/8 text-foreground' : ''}`}
-                  title={t('breadcrumb.showHiddenAncestors')}
-                >
-                  <MoreHorizontal size={14} />
-                </button>
+                <Tooltip label={t('breadcrumb.showHiddenAncestors')}>
+                  <button
+                    onClick={() => setExpanded(!expanded)}
+                    className={`flex shrink-0 items-center justify-center rounded-md px-1 py-0.5 hover:bg-foreground/4 hover:text-foreground transition-colors ${expanded ? 'bg-foreground/8 text-foreground' : ''}`}
+                  >
+                    <MoreHorizontal size={14} />
+                  </button>
+                </Tooltip>
                 {expanded && (
                   <div className="absolute top-full left-0 mt-1 w-56 rounded-lg bg-background p-1 shadow-[0_0_0_1px_rgba(0,0,0,0.015),0_-1px_2px_rgba(255,255,255,0.6),0_2px_5px_-1px_rgba(0,0,0,0.05),0_6px_10px_-3px_rgba(0,0,0,0.03),0_12px_20px_-4px_rgba(0,0,0,0.04)] z-50">
                     <div className="flex flex-col max-h-64 overflow-y-auto">

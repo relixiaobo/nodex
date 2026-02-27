@@ -9,6 +9,8 @@ import { useCallback } from 'react';
 import { ArrowLeft, ArrowRight } from '../../lib/icons.js';
 import { undoDoc, redoDoc, canUndoDoc, canRedoDoc } from '../../lib/loro-doc.js';
 import { useNodeStore } from '../../stores/node-store.js';
+import { Tooltip } from '../ui/Tooltip';
+import { t } from '../../i18n/strings.js';
 
 const btnClass =
   'flex h-7 w-7 items-center justify-center rounded-full text-foreground-tertiary transition-colors hover:bg-foreground/4 hover:text-foreground-secondary disabled:pointer-events-none disabled:opacity-40';
@@ -29,22 +31,24 @@ export function UndoRedoButtons() {
 
   return (
     <div className="flex items-center gap-1">
-      <button
-        disabled={!canUndo}
-        onClick={handleUndo}
-        className={btnClass}
-        title="Undo (⌘Z)"
-      >
-        <ArrowLeft size={16} strokeWidth={1.5} />
-      </button>
-      <button
-        disabled={!canRedo}
-        onClick={handleRedo}
-        className={btnClass}
-        title="Redo (⌘⇧Z)"
-      >
-        <ArrowRight size={16} strokeWidth={1.5} />
-      </button>
+      <Tooltip label={t('toolbar.undo')} shortcut="⌘Z">
+        <button
+          disabled={!canUndo}
+          onClick={handleUndo}
+          className={btnClass}
+        >
+          <ArrowLeft size={16} strokeWidth={1.5} />
+        </button>
+      </Tooltip>
+      <Tooltip label={t('toolbar.redo')} shortcut="⌘⇧Z">
+        <button
+          disabled={!canRedo}
+          onClick={handleRedo}
+          className={btnClass}
+        >
+          <ArrowRight size={16} strokeWidth={1.5} />
+        </button>
+      </Tooltip>
     </div>
   );
 }

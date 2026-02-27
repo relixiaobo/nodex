@@ -103,18 +103,20 @@ export const enMessages = {
     signOut: 'Sign out',
     avatarAlt: 'avatar',
   },
+  toolbar: {
+    undo: 'Undo',
+    redo: 'Redo',
+    search: 'Search',
+    signIn: 'Sign in with Google',
+    dragToMove: 'Drag to move',
+  },
   floatingToolbar: {
-    linkPlaceholder: 'https://example.com',
-    applyLink: 'Apply link',
-    cancel: 'Cancel',
-    removeLink: 'Remove link',
     bold: 'Bold',
     italic: 'Italic',
     strikethrough: 'Strikethrough',
     code: 'Code',
     highlight: 'Highlight',
     heading: 'Heading',
-    link: 'Link',
   },
 } as const;
 

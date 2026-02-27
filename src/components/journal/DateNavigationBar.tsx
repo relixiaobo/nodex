@@ -16,6 +16,7 @@ import { parseDayNodeName, parseYearNodeName } from '../../lib/date-utils.js';
 import * as loroDoc from '../../lib/loro-doc.js';
 import { CalendarGrid } from '../fields/DatePicker.js';
 import { t } from '../../i18n/strings.js';
+import { Tooltip } from '../ui/Tooltip';
 
 interface DateNavigationBarProps {
   dayNodeId: string;
@@ -134,42 +135,46 @@ export function DateNavigationBar({ dayNodeId }: DateNavigationBarProps) {
   return (
     <div className="relative my-1.5 pl-4 text-[11px] text-foreground-secondary flex items-center" ref={calendarRef}>
       <div className="inline-flex items-center gap-1">
-        <button
-          onClick={handlePrevDay}
-          className="flex h-6 w-6 items-center justify-center rounded-full text-foreground-tertiary hover:bg-foreground/4 hover:text-foreground transition-all"
-          title={t('dateNavigationBar.previousDay')}
-        >
-          <ChevronLeft size={13} strokeWidth={1.5} />
-        </button>
-        <button
-          onClick={handleToday}
-          className="flex h-6 items-center px-2.5 rounded-full font-medium text-foreground-tertiary hover:bg-foreground/4 hover:text-foreground transition-all"
-          title={t('dateNavigationBar.goToToday')}
-        >
-          {t('dateNavigationBar.today')}
-        </button>
-        <button
-          onClick={handleNextDay}
-          className="flex h-6 w-6 items-center justify-center rounded-full text-foreground-tertiary hover:bg-foreground/4 hover:text-foreground transition-all"
-          title={t('dateNavigationBar.nextDay')}
-        >
-          <ChevronRight size={13} strokeWidth={1.5} />
-        </button>
+        <Tooltip label={t('dateNavigationBar.previousDay')}>
+          <button
+            onClick={handlePrevDay}
+            className="flex h-6 w-6 items-center justify-center rounded-full text-foreground-tertiary hover:bg-foreground/4 hover:text-foreground transition-all"
+          >
+            <ChevronLeft size={13} strokeWidth={1.5} />
+          </button>
+        </Tooltip>
+        <Tooltip label={t('dateNavigationBar.goToToday')} shortcut="⌘⇧D">
+          <button
+            onClick={handleToday}
+            className="flex h-6 items-center px-2.5 rounded-full font-medium text-foreground-tertiary hover:bg-foreground/4 hover:text-foreground transition-all"
+          >
+            {t('dateNavigationBar.today')}
+          </button>
+        </Tooltip>
+        <Tooltip label={t('dateNavigationBar.nextDay')}>
+          <button
+            onClick={handleNextDay}
+            className="flex h-6 w-6 items-center justify-center rounded-full text-foreground-tertiary hover:bg-foreground/4 hover:text-foreground transition-all"
+          >
+            <ChevronRight size={13} strokeWidth={1.5} />
+          </button>
+        </Tooltip>
       </div>
 
       {/* 细视觉分隔竖线 */}
       <div className="ml-1.5 w-px h-2.5 bg-border-faint" />
 
-      <button
-        onClick={handleToggleCalendar}
-        className={`ml-1.5 flex h-6 w-6 items-center justify-center rounded-full transition-all ${calendarOpen
-          ? 'bg-foreground/[0.08] text-foreground'
-          : 'text-foreground-tertiary hover:bg-foreground/4 hover:text-foreground'
-          }`}
-        title={t('dateNavigationBar.pickDate')}
-      >
-        <Calendar size={13} strokeWidth={1.5} />
-      </button>
+      <Tooltip label={t('dateNavigationBar.pickDate')}>
+        <button
+          onClick={handleToggleCalendar}
+          className={`ml-1.5 flex h-6 w-6 items-center justify-center rounded-full transition-all ${calendarOpen
+            ? 'bg-foreground/[0.08] text-foreground'
+            : 'text-foreground-tertiary hover:bg-foreground/4 hover:text-foreground'
+            }`}
+        >
+          <Calendar size={13} strokeWidth={1.5} />
+        </button>
+      </Tooltip>
       {/* Calendar popover — left-aligned with bar padding, stays within panel */}
       {
         calendarOpen && (

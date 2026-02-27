@@ -1,9 +1,10 @@
+import type { DragEvent } from 'react';
 import { GripVertical } from '../../lib/icons.js';
 import { Tooltip } from '../ui/Tooltip';
 import { t } from '../../i18n/strings.js';
 
 interface DragHandleProps {
-  onDragStart: () => void;
+  onDragStart: (e: DragEvent) => void;
 }
 
 export function DragHandle({ onDragStart }: DragHandleProps) {

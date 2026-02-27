@@ -112,11 +112,16 @@ export function getNavigableParentId(nodeId: string): string | null {
  * Get the visible flattened list of node IDs for the outliner.
  * Only includes nodes whose ancestors are all expanded.
  * Each item includes parentId for reference node disambiguation.
+ *
+ * @param getVisualChildIds Optional callback to get visual-order children
+ *   (e.g. template fields first) instead of data-order `node.children`.
+ *   Falls back to `node.children` when not provided.
  */
 export function getFlattenedVisibleNodes(
   rootChildIds: string[],
   expandedNodes: Set<string>,
   rootParentId: string = '',
+  getVisualChildIds?: (nodeId: string) => string[],
 ): Array<{ nodeId: string; depth: number; parentId: string }> {
   const result: Array<{ nodeId: string; depth: number; parentId: string }> = [];
 
@@ -131,7 +136,10 @@ export function getFlattenedVisibleNodes(
         expandedNodes.has(`${currentParentId}:${childId}`) &&
         node.children.length > 0
       ) {
-        traverse(node.children, depth + 1, childId);
+        const nextChildIds = getVisualChildIds
+          ? getVisualChildIds(childId)
+          : node.children;
+        traverse(nextChildIds, depth + 1, childId);
       }
     }
   }

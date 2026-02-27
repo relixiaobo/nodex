@@ -733,66 +733,67 @@ export function RichTextEditor(props: RichTextEditorProps) {
           runTriggerDetection(view, tr.docChanged);
         }
       },
-      handlePaste: (view, event) => {
-        event.preventDefault();
-        const text = event.clipboardData?.getData('text/plain') ?? '';
-        if (!text.trim()) return true;
+      handleDOMEvents: {
+        paste: (view, event) => {
+          const clipboardEvent = event as ClipboardEvent;
+          clipboardEvent.preventDefault();
+          const text = clipboardEvent.clipboardData?.getData('text/plain') ?? '';
+          if (!text.trim()) return true;
 
-        const { from, to } = view.state.selection;
-        const hasSelection = from !== to;
-        const isPlainPaste = pasteShiftRef.current;
-        pasteShiftRef.current = false; // Reset after reading
+          const { from, to } = view.state.selection;
+          const hasSelection = from !== to;
+          const isPlainPaste = pasteShiftRef.current;
+          pasteShiftRef.current = false; // Reset after reading
 
-        // ⌘⇧V (plain paste): always flatten multi-line to single line
-        if (isPlainPaste) {
+          // ⌘⇧V (plain paste): always flatten multi-line to single line
+          if (isPlainPaste) {
+            const normalized = text.replace(/[\r\n]+/g, ' ').trim();
+            const tr = view.state.tr.insertText(normalized, from, to);
+            tr.setMeta('nodex:isPaste', true);
+            view.dispatch(tr);
+            return true;
+          }
+
+          // ⌘V (smart paste): check for URL first (single-line only)
           const normalized = text.replace(/[\r\n]+/g, ' ').trim();
+          if (isLikelyUrl(normalized)) {
+            if (hasSelection) {
+              let tr = view.state.tr.addMark(from, to, pmSchema.marks.link.create({ href: normalized }));
+              tr = tr.setSelection(TextSelection.create(tr.doc, to));
+              tr.setMeta('nodex:isPaste', true);
+              view.dispatch(tr);
+            } else {
+              const linkMark = pmSchema.marks.link.create({ href: normalized });
+              const textNode = pmSchema.text(normalized, [linkMark]);
+              let tr = view.state.tr.insert(from, textNode);
+              tr = tr.setSelection(TextSelection.create(tr.doc, from + normalized.length));
+              tr.setMeta('nodex:isPaste', true);
+              view.dispatch(tr);
+            }
+            return true;
+          }
+
+          // ⌘V with multi-line text: split into sibling nodes
+          const lines = text.split(/\r?\n/);
+          if (lines.length > 1 && propsRef.current.onPasteMultiLine) {
+            const firstLine = lines[0].trim();
+            if (firstLine) {
+              const tr = view.state.tr.insertText(firstLine, from, to);
+              tr.setMeta('nodex:isPaste', true);
+              tr.setMeta(META_DEFER_LORO_TEXT_COMMIT, true);
+              view.dispatch(tr);
+            }
+            saveContent();
+            propsRef.current.onPasteMultiLine(lines.slice(1));
+            return true;
+          }
+
+          // Single-line non-URL: plain insert
           const tr = view.state.tr.insertText(normalized, from, to);
           tr.setMeta('nodex:isPaste', true);
           view.dispatch(tr);
           return true;
-        }
-
-        // ⌘V (smart paste): check for URL first (single-line only)
-        const normalized = text.replace(/[\r\n]+/g, ' ').trim();
-        if (isLikelyUrl(normalized)) {
-          if (hasSelection) {
-            let tr = view.state.tr.addMark(from, to, pmSchema.marks.link.create({ href: normalized }));
-            tr = tr.setSelection(TextSelection.create(tr.doc, to));
-            tr.setMeta('nodex:isPaste', true);
-            view.dispatch(tr);
-          } else {
-            const linkMark = pmSchema.marks.link.create({ href: normalized });
-            const textNode = pmSchema.text(normalized, [linkMark]);
-            let tr = view.state.tr.insert(from, textNode);
-            tr = tr.setSelection(TextSelection.create(tr.doc, from + normalized.length));
-            tr.setMeta('nodex:isPaste', true);
-            view.dispatch(tr);
-          }
-          return true;
-        }
-
-        // ⌘V with multi-line text: split into sibling nodes
-        const lines = text.split(/\r?\n/);
-        if (lines.length > 1 && propsRef.current.onPasteMultiLine) {
-          const firstLine = lines[0].trim();
-          if (firstLine) {
-            const tr = view.state.tr.insertText(firstLine, from, to);
-            tr.setMeta('nodex:isPaste', true);
-            tr.setMeta(META_DEFER_LORO_TEXT_COMMIT, true);
-            view.dispatch(tr);
-          }
-          saveContent();
-          propsRef.current.onPasteMultiLine(lines.slice(1));
-          return true;
-        }
-
-        // Single-line non-URL: plain insert
-        const tr = view.state.tr.insertText(normalized, from, to);
-        tr.setMeta('nodex:isPaste', true);
-        view.dispatch(tr);
-        return true;
-      },
-      handleDOMEvents: {
+        },
         keydown: (_view, event) => {
           const keyboardEvent = event as KeyboardEvent;
           // Track Shift state for paste: Cmd+V vs Cmd+Shift+V

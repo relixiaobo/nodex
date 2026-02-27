@@ -46,12 +46,14 @@ function getNodeFromPoint(x: number, y: number): { nodeId: string; parentId: str
   return { nodeId, parentId };
 }
 
-/** Check if an element is inside a text-editable area (editor or content span). */
+/** Check if an element is inside a text-editable area (editor, content span, or input). */
 function isTextArea(el: EventTarget | null): boolean {
   if (!el || !(el instanceof HTMLElement)) return false;
   if (el.closest('.editor-inline')) return true;
   if (el.closest('.node-content')) return true;
   if (el.closest('[contenteditable]')) return true;
+  // Field name <input> elements are also text areas for drag-select purposes
+  if (el instanceof HTMLInputElement || el.closest('input')) return true;
   return false;
 }
 
@@ -94,9 +96,11 @@ export function useDragSelect({ containerRef, rootChildIds, rootNodeId }: UseDra
     const container = containerRef.current;
     if (!container || !container.contains(e.target as Node)) return;
 
-    // Don't start drag select on buttons, inputs, or interactive elements
+    // Don't start drag select on buttons or interactive elements.
+    // Note: <input> is NOT excluded — field name inputs participate in drag-select
+    // via the text-area start logic (same as contenteditable editors).
     const target = e.target as HTMLElement;
-    if (target.closest('button, input, [role="button"]')) return;
+    if (target.closest('button, [role="button"]')) return;
 
     const nodeInfo = getNodeFromPoint(e.clientX, e.clientY);
     if (!nodeInfo) return;

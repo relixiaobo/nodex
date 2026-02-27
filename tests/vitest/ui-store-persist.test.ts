@@ -21,6 +21,7 @@ describe('ui-store persistence helpers', () => {
       expandedNodes: expanded,
       viewMode: 'cards',
       paletteUsage: undefined,
+      lastVisitDate: undefined,
     });
   });
 

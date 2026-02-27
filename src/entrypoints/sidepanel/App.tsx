@@ -105,14 +105,21 @@ function useBootstrap(skip: boolean): BootstrapResult {
     });
    }
 
-   // Navigate to Today if panel stack is empty or current panel node is invalid.
+   // Navigate to Today on first visit of the day, otherwise restore last panel.
    // Use replacePanel (not navigateTo) to avoid creating a Loro undo entry
    // whose captured UI snapshot is the empty initial state — that would cause
    // repeated Cmd+Z to restore a blank panel stack.
    const latestHistory = useUIStore.getState().panelHistory;
    const latestIndex = useUIStore.getState().panelIndex;
    const currentPanelId = latestHistory[latestIndex] ?? latestHistory[latestHistory.length - 1];
-   if (latestHistory.length === 0 || (currentPanelId && !loroDoc.hasNode(currentPanelId))) {
+   const todayStr = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+   const lastVisitDate = useUIStore.getState().lastVisitDate;
+   const isFirstVisitOfDay = lastVisitDate !== todayStr;
+   useUIStore.getState().setLastVisitDate(todayStr);
+
+   if (latestHistory.length === 0
+    || (currentPanelId && !loroDoc.hasNode(currentPanelId))
+    || isFirstVisitOfDay) {
     replacePanel(ensureTodayNode());
    }
 

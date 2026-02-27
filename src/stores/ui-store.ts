@@ -112,6 +112,10 @@ interface UIStore {
   // ⌘K palette usage tracking (persisted)
   paletteUsage: Record<string, { count: number; lastUsedAt: number }>;
   trackPaletteUsage(itemId: string): void;
+
+  // Last visit date (YYYY-MM-DD string, persisted) — used to determine "first visit of the day"
+  lastVisitDate: string | null;
+  setLastVisitDate(date: string): void;
 }
 
 export interface PersistedUIStoreState {
@@ -120,6 +124,7 @@ export interface PersistedUIStoreState {
   expandedNodes: Set<string>;
   viewMode: 'list' | 'table' | 'tiles' | 'cards';
   paletteUsage: Record<string, { count: number; lastUsedAt: number }>;
+  lastVisitDate: string | null;
 }
 
 /** Stable selector for the current (top) node ID. */
@@ -133,6 +138,7 @@ export function partializeUIStore(state: UIStore): PersistedUIStoreState {
     expandedNodes: state.expandedNodes,
     viewMode: state.viewMode,
     paletteUsage: state.paletteUsage,
+    lastVisitDate: state.lastVisitDate,
   };
 }
 
@@ -440,6 +446,10 @@ export const useUIStore = create<UIStore>()(
             },
           };
         }),
+
+      // Last visit date
+      lastVisitDate: null,
+      setLastVisitDate: (date) => set({ lastVisitDate: date }),
     }),
     {
       name: 'nodex-ui',

@@ -146,7 +146,7 @@ function seedBody(): void {
   cn('subtask_2b', 'task_2', { name: 'Add keyboard navigation' });
   cn('subtask_2c', 'task_2', { name: 'Implement drag and drop' });
 
-  cn('task_3', 'proj_1', { name: 'Connect to Supabase' });
+  cn('task_3', 'proj_1', { name: 'Set up Cloudflare Sync' });
 
   // ── Meeting node (tagged with Meeting → should get template content) ──
   cn('meeting_1', 'proj_1', { name: 'Weekly sync' });

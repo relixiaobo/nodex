@@ -2,7 +2,7 @@
  * Workspace & user authentication store.
  *
  * Persisted to chrome.storage.local.
- * Auth backed by Better Auth (via Worker API) — no Supabase dependency.
+ * Auth backed by Better Auth (via Worker API).
  */
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
@@ -120,7 +120,6 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
           set({ userId: null, isAuthenticated: false, authUser: null });
         }
 
-        // No real-time subscription for Better Auth (unlike Supabase).
         // Auth state is validated on startup; 401 responses during API calls
         // will trigger re-auth as needed.
         return () => {};

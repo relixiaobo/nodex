@@ -1,8 +1,7 @@
 /**
- * Standalone test App — Loro Phase 1 (local-only, no Supabase).
+ * Standalone test App — local-only mode.
  *
  * Initializes LoroDoc, seeds test data, and renders the outliner.
- * Append ?offline=true to skip Supabase even if env vars are present (legacy).
  */
 import { useEffect, useState } from 'react';
 import { useWorkspaceStore } from '../src/stores/workspace-store';

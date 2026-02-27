@@ -1,6 +1,5 @@
 /**
  * Loro model: LoroDoc is the single source of truth.
- * Supabase Realtime echo protection (_pendingChildrenOps) is removed.
  * This file tests that LoroDoc operations are atomic and consistent.
  */
 import { useNodeStore } from '../../src/stores/node-store.js';

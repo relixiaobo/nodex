@@ -40,7 +40,7 @@ describe('workspace-store auth and persistence', () => {
       isAuthenticated: true,
     });
 
-    // Only currentWorkspaceId is persisted (auth state derived from Supabase session)
+    // Only currentWorkspaceId is persisted (auth state is transient)
     const persisted = localStorage.getItem('nodex-workspace');
     expect(persisted).not.toBeNull();
     const parsed = JSON.parse(persisted as string);
@@ -68,7 +68,7 @@ describe('workspace-store auth and persistence', () => {
     const persisted = localStorage.getItem('nodex-workspace');
     expect(persisted).not.toBeNull();
     const parsed = JSON.parse(persisted as string);
-    // Only workspace preference is persisted; auth state comes from Supabase session
+    // Only workspace preference is persisted; auth state is transient
     expect(parsed.state.currentWorkspaceId).toBe('ws_1');
     expect(parsed.state.userId).toBeUndefined();
     expect(parsed.state.isAuthenticated).toBeUndefined();

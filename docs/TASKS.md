@@ -93,7 +93,7 @@ _(见 Agent 状态表)_
 > 浏览器产品的核心价值。基础版已完成，需升级为智能剪藏。
 
 - [x] 基础剪藏链路 ✓（消息/提取/保存/标签/URL/Toast/正文→子节点）
-- [ ] **Clip Page Toast 优化** — 成功时不提示，仅失败时提示；提示改为顶部轻量样式（非底部）
+- [x] **Clip Page Toast 优化** — 成功时静默，仅失败时提示 ✅（2026-02-27）
 - [ ] 一键保存到 Inbox / Today / 指定节点（UI 入口 + 目标选择）
 - [ ] **AI 智能剪藏** — 自动打标签、提取结构化信息（作者/日期/关键词）、推荐关联到已有笔记
 - [ ] 选中文本剪藏（Content Script 右键菜单 / 浮动按钮 → 剪藏选中段落）
@@ -192,7 +192,7 @@ _(见 Agent 状态表)_
 ### P3 — 编辑器增强 & 交互完善
 
 #### 空内容节点 "Untitled" 占位 + Tag 间距优化
-- [ ] 节点无文本内容只有 #tag 时，tag 前显示 "Untitled" 占位文本（参考 Tana），避免 tag 紧贴 bullet
+- [x] 节点无文本内容只有 #tag 时，tag 前显示 "Untitled" 占位文本（参考 Tana），避免 tag 紧贴 bullet ✅（2026-02-27）
 
 #### NodePanel Title 交互补全
 - [ ] 标题编辑器支持 `@` 触发 ReferenceSelector（插入 inline reference）

@@ -285,6 +285,15 @@ export function CommandPalette() {
     };
   }, [searchQuery, createChild, navigateTo, closeAndClear]);
 
+  // Default mode: sort containers + commands by usage boost so frequently used items rank higher.
+  const sortedDefaultItems = useMemo(() => {
+    const suggestions = [...recentNodes, ...containerItems];
+    const commands = [...commandItems];
+    // Sort commands by usage boost (most used first), stable order for equal boost
+    commands.sort((a, b) => getUsageBoost(b.id) - getUsageBoost(a.id));
+    return { suggestions, commands };
+  }, [recentNodes, containerItems, commandItems, getUsageBoost]);
+
   // Flat list of all visible items (for keyboard navigation)
   const allItems: PaletteItem[] = useMemo(() => {
     if (searchQuery.trim()) {
@@ -293,8 +302,8 @@ export function CommandPalette() {
       items.push(...searchResults);
       return items;
     }
-    return [...recentNodes, ...containerItems, ...commandItems];
-  }, [searchQuery, searchResults, createItem, recentNodes, containerItems, commandItems]);
+    return [...sortedDefaultItems.suggestions, ...sortedDefaultItems.commands];
+  }, [searchQuery, searchResults, createItem, sortedDefaultItems]);
 
   // Reset selection when items change
   // When searching with results, skip createItem (index 0) and select first result
@@ -446,25 +455,12 @@ export function CommandPalette() {
               )}
             </div>
           ) : (
-            // Default mode: Suggestions + Commands
+            // Default mode: Suggestions + Commands (sorted by usage)
             <>
-              {(recentNodes.length > 0 || containerItems.length > 0) && (
+              {sortedDefaultItems.suggestions.length > 0 && (
                 <div>
                   <GroupHeader label="Suggestions" />
-                  {recentNodes.map((item) => {
-                    const idx = globalIdx++;
-                    return (
-                      <PaletteRow
-                        key={item.id}
-                        item={item}
-                        selected={selectedIndex === idx}
-                        positionIndex={idx}
-                        onSelect={() => item.action()}
-                        onHover={() => setSelectedIndex(idx)}
-                      />
-                    );
-                  })}
-                  {containerItems.map((item) => {
+                  {sortedDefaultItems.suggestions.map((item) => {
                     const idx = globalIdx++;
                     return (
                       <PaletteRow
@@ -479,10 +475,10 @@ export function CommandPalette() {
                   })}
                 </div>
               )}
-              {commandItems.length > 0 && (
+              {sortedDefaultItems.commands.length > 0 && (
                 <div>
                   <GroupHeader label="Commands" />
-                  {commandItems.map((item) => {
+                  {sortedDefaultItems.commands.map((item) => {
                     const idx = globalIdx++;
                     return (
                       <PaletteRow

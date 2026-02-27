@@ -166,6 +166,10 @@ export function useDragSelect({ containerRef, rootChildIds, rootNodeId }: UseDra
         hoverNode.nodeId,
         flatList,
       );
+      // Always include the drag-start node in selection — visual rendering order
+      // (fields first, then content) may differ from data order in the flat list,
+      // causing the anchor to fall outside the computed range.
+      range.add(s.startNodeId!);
       useUIStore.getState().setSelectedNodes(range, s.startNodeId);
     };
 

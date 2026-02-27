@@ -58,7 +58,7 @@ _(无)_
 - [ ] **商店描述** — 详细功能介绍（最长 16,000 字符）
 - [ ] **隐私政策页面** — 说明数据收集/存储/同步方式（`<all_urls>` + `identity` + `storage` 审核必须）
 - [ ] **产品展示页** — 静态落地页（产品介绍 + 截图 + 安装链接 + 隐私政策），可托管在 Cloudflare Pages 或 GitHub Pages
-- [ ] **Production build 清理** — 移除 manifest `key` 字段 + 移除 `host_permissions` 中的 localhost 地址
+- [x] **Production build 清理** — 三环境分离（Store 无 key 无 localhost，Preview/Dev 各自独立 key + icon）
 - [ ] **开发者账号** — Chrome Web Store 注册（$5）
 - [ ] `npm run zip` → 上传发布
 

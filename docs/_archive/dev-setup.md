@@ -1,6 +1,6 @@
 # Nodex 开发环境凭据（本文件已 .gitignore，不会同步到 GitHub）
 
-> 最后更新：2026-02-27
+> 最后更新：2026-02-28
 
 ---
 
@@ -77,7 +77,7 @@
 | 项目 | 值 |
 |------|-----|
 | URL | https://nodex-sync.getsoma.workers.dev |
-| 状态 | 未部署（wrangler.toml 已配置，secrets 未设置） |
+| 状态 | 已部署 |
 
 ### Google OAuth Client (Production 专用)
 
@@ -96,8 +96,8 @@
 | GOOGLE_CLIENT_SECRET | 已设置 |
 | BETTER_AUTH_SECRET | 已设置 (d777e3bbc1bdf9cdf5ddbceadb0ac72003158ab2cd6edb2ff73f0a38cd179cd7) |
 | CHROME_EXTENSION_ID | 已设置 (joabcnflpakkpkalkphcdkdbfkcfhlpa) |
-| DEV_EXTENSION_ID | 待设置 (gkpgogocbjejpildfebpklkldhogdfkp) — Dev builds |
-| PREVIEW_EXTENSION_ID | 待设置 (andlcnfkdjeebjfdjangcnjaicfapmni) — Preview builds |
+| DEV_EXTENSION_ID | 已设置 (gkpgogocbjejpildfebpklkldhogdfkp) — Dev builds |
+| PREVIEW_EXTENSION_ID | 已设置 (andlcnfkdjeebjfdjangcnjaicfapmni) — Preview builds |
 
 ---
 

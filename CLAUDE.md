@@ -97,11 +97,22 @@ gh pr create --draft --title "[WIP] feat: ..." --body "ref: <任务名>"
 ## 常用命令
 
 ```bash
-npm run dev          # WXT 开发模式 (自动加载扩展到 Chrome，HMR)
-npm run build        # WXT 生产构建 → .output/chrome-mv3/
-npm run zip          # 打包为 .zip (用于发布)
-npm run typecheck    # TypeScript 类型检查 (tsc --noEmit)
+npm run dev            # WXT Dev 模式 → .output/chrome-mv3-dev/ (HMR, staging API)
+npm run build:preview  # Preview 构建 → .output/chrome-mv3-preview/ (production API, dev key)
+npm run build          # Store 构建 → .output/chrome-mv3/ (production API, 无 dev key)
+npm run zip            # 打包 Store 构建为 .zip (用于发布)
+npm run typecheck      # TypeScript 类型检查 (tsc --noEmit)
 ```
+
+### 三环境分离
+
+| 环境 | 命令 | 输出目录 | Backend | Extension ID | 图标 |
+|------|------|---------|---------|-------------|------|
+| Store | `npm run zip` | `.output/chrome-mv3/` | production | 商店分配 `joabcnfl…` | 原版 |
+| Preview | `npm run build:preview` | `.output/chrome-mv3-preview/` | production | `andlcnfk…` | 蓝点 |
+| Dev | `npm run dev` | `.output/chrome-mv3-dev/` | staging | `gkpgogoc…` | 橙点 |
+
+三个环境各有独立 extension key，可同时加载到 Chrome 中共存。图标右下角的彩色圆点区分当前版本。
 
 ## 项目结构
 
@@ -319,13 +330,19 @@ ContentNode
 
 ### Chrome 扩展测试环境
 
-nodex 和用户通过 Chrome 直接加载 `.output/chrome-mv3-dev` 进行视觉验证：
+nodex 和用户通过 Chrome 直接加载解压扩展进行视觉验证：
 
 ```bash
-npm run dev          # 主仓库启动，输出到 .output/chrome-mv3-dev/
+# Dev — HMR 热重载，连接 staging API
+npm run dev
 # Chrome → 扩展管理 → 加载已解压的扩展 → 选择 .output/chrome-mv3-dev
-# 代码更新后扩展自动热重载
+
+# Preview — 连接 production API，用于发布前验证
+npm run build:preview
+# Chrome → 扩展管理 → 加载已解压的扩展 → 选择 .output/chrome-mv3-preview
 ```
+
+Dev 和 Preview 可同时加载（不同 extension ID），通过工具栏图标颜色区分。
 
 **测试 PR 分支**：`gh pr checkout <number>` → `npm run dev` → Chrome 中直接看效果
 

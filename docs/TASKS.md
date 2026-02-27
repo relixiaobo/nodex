@@ -44,7 +44,7 @@ _(空)_
 - [x] **点击 node 文本中的链接未打开标签页** — 静态内容 + 编辑器 mousedown 双重拦截，单击 chrome.tabs.create 打开
 - [x] **节点内拖选文本误触发节点选中** — use-drag-select 尊重浏览器活跃文本选区
 - [x] **粘贴/剪藏内容中的 #、@ 不应触发下拉菜单** — paste transaction setMeta 跳过 trigger 检测
-- [x] **Field value 验证错误 icon 未垂直居中** — number 等字段输入非法值时，右侧 ⚠ 图标未与行内容垂直居中
+- [x] **Field value 验证错误 icon 未垂直居中** — number 等字段输入非法值时，右侧 ⚠ 图标未与行内容垂直居中 ✅（2026-02-27）
 
 ### v0.1 — 首次上线（Chrome Web Store 发布）
 
@@ -229,7 +229,7 @@ _(空)_
 > **实现位置**: `RichTextEditor.tsx` handlePaste
 
 - [x] Phase 0: 单行 URL 智能粘贴 + ⌘⇧V 纯文本 ✅（2026-02-27）
-- [x] Phase 1: 多行拆分为节点 — ⌘V 多行文本按行拆分为兄弟节点；⌘⇧V 多行压成一行 ✅（2026-02-27）
+- [x] Phase 1: 多行拆分为节点 — ⌘V 多行文本按行拆分为兄弟节点；⌘⇧V 多行压成一行；TrailingInput 虚拟节点粘贴支持 ✅（2026-02-27）
 - [ ] Phase 2: 富文本保留格式 — ⌘V 读 `text/html`，映射 `<strong>/<em>/<code>/<a>` 到 PM marks；⌘⇧V 只读 `text/plain`
 - [ ] Phase 3: Markdown 结构化 — ⌘V 检测 `- ` / `* ` / `1. ` + 缩进，按层级创建父子节点树
 - [ ] Phase 4: 撤销/重做集成 — 多节点创建包装为单次 Loro commit，⌘Z 一步撤回
@@ -271,6 +271,7 @@ _(空)_
 | 2026-02-27 | Field ⚠ icon 垂直居中 + 同节点重复 field 去重（store dedup + render dedup）+ 3 test | field-fixes | #104 |
 | 2026-02-27 | Editor Paste Phase 1 — ⌘V 多行拆分为兄弟节点 + 6 test | paste-phase1 | #105 |
 | 2026-02-27 | Trash 彻底删除 — Restore / Delete permanently / Empty Trash（两步确认）+ 10 test | trash-delete | #106 |
+| 2026-02-27 | 粘贴多行 + 验证 icon 修复 — TrailingInput 虚拟节点粘贴多行支持 + RichTextEditor paste 移至 handleDOMEvents + FieldRow ⚠ icon 垂直居中（h-8 匹配 OutlinerItem 行高） | nodex | main |
 | 2026-02-27 | Bug 四连修 — 日期字段白屏（hooks 违规）+ 链接单击打开 + 拖选文本不误触 + 粘贴不触发 #@ | nodex | main |
 | 2026-02-27 | ⌘K 常用搜索/命令排前 — paletteUsage 持久化（频率 log + 7天时效衰减，max 25 分加权）+ 9 test | nodex | main |
 | 2026-02-27 | 点击 Supertag 进入搜索结果页 — Search Nodes L0（搜索引擎 + 结果物化 + TagBadge 导航 + 24 test） | tag-search | #102 |

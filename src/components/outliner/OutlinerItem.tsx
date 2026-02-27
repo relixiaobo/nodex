@@ -1341,6 +1341,9 @@ export function OutlinerItem({
   const handleContentMouseDown = useCallback((e: React.MouseEvent) => {
     if (isCheckboxFieldType(fieldDataType)) return;
     const target = e.target as HTMLElement;
+    // Skip for hyperlinks — handleContentClick will open in new tab
+    const anchorEl = target.closest('a[href]') as HTMLAnchorElement | null;
+    if (anchorEl && !anchorEl.hasAttribute('data-inlineref-node')) return;
     const refEl = target.closest('[data-inlineref-node]') as HTMLElement | null;
     if (refEl) return;
 
@@ -1469,8 +1472,18 @@ export function OutlinerItem({
     // Drag-select just ended → suppress this click
     if (dragState.justDragged) return;
 
-    // Intercept clicks on inline references (blue links in static display)
+    // Intercept clicks on hyperlinks in static display → open in new tab
     const target = e.target as HTMLElement;
+    const anchorEl = target.closest('a[href]') as HTMLAnchorElement | null;
+    if (anchorEl && !anchorEl.hasAttribute('data-inlineref-node')) {
+      const href = anchorEl.getAttribute('href');
+      if (href) {
+        e.preventDefault();
+        e.stopPropagation();
+        chrome.tabs.create({ url: href });
+        return;
+      }
+    }
     const refEl = target.closest('[data-inlineref-node]') as HTMLElement;
     if (refEl && !isReferenceLikeRow) {
       e.stopPropagation();

@@ -132,7 +132,10 @@ export function useDragSelect({ containerRef, rootChildIds, rootNodeId }: UseDra
             // Still on same node: check if cursor is still on text area
             const hoverEl = document.elementFromPoint(me.clientX, me.clientY);
             if (isTextArea(hoverEl)) return; // Let browser handle text selection
-            // Moved to non-text area (padding etc.) → fall through to activate
+            // Even if cursor moved to non-text area (padding), if browser already
+            // has an active text selection, respect it instead of activating drag-select
+            const sel = window.getSelection();
+            if (sel && !sel.isCollapsed) return;
           }
           // Different node or non-text area → activate drag-select
         }

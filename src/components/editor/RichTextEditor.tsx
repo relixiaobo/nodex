@@ -728,7 +728,7 @@ export function RichTextEditor(props: RichTextEditorProps) {
           };
         }
 
-        if (!isExternalSyncRef.current && !isComposing) {
+        if (!isExternalSyncRef.current && !isComposing && tr.getMeta('nodex:isPaste') !== true) {
           runTriggerDetection(view, tr.docChanged);
         }
       },
@@ -749,6 +749,7 @@ export function RichTextEditor(props: RichTextEditorProps) {
             // Wrap selected text with the pasted URL as link
             let tr = view.state.tr.addMark(from, to, pmSchema.marks.link.create({ href: normalized }));
             tr = tr.setSelection(TextSelection.create(tr.doc, to));
+            tr.setMeta('nodex:isPaste', true);
             view.dispatch(tr);
           } else {
             // Insert URL text with link mark applied
@@ -756,11 +757,14 @@ export function RichTextEditor(props: RichTextEditorProps) {
             const textNode = pmSchema.text(normalized, [linkMark]);
             let tr = view.state.tr.insert(from, textNode);
             tr = tr.setSelection(TextSelection.create(tr.doc, from + normalized.length));
+            tr.setMeta('nodex:isPaste', true);
             view.dispatch(tr);
           }
         } else {
           // Plain paste (⌘⇧V) or non-URL content
-          view.dispatch(view.state.tr.insertText(normalized, from, to));
+          const tr = view.state.tr.insertText(normalized, from, to);
+          tr.setMeta('nodex:isPaste', true);
+          view.dispatch(tr);
         }
 
         return true;
@@ -816,6 +820,19 @@ export function RichTextEditor(props: RichTextEditorProps) {
         mousedown: (view, event) => {
           const mouseEvent = event as MouseEvent;
           if (mouseEvent.button !== 0) return false;
+
+          // Link click: open in new tab immediately (before ProseMirror places cursor)
+          const target = mouseEvent.target as HTMLElement;
+          const anchor = target.tagName === 'A' ? target : target.closest('a');
+          if (anchor) {
+            const href = (anchor as HTMLAnchorElement).getAttribute('href');
+            if (href) {
+              mouseEvent.preventDefault();
+              chrome.tabs.create({ url: href });
+              return true;
+            }
+          }
+
           if (mouseEvent.altKey || mouseEvent.ctrlKey || mouseEvent.metaKey || mouseEvent.shiftKey) return false;
           if (mouseEvent.detail !== 1) return false;
 

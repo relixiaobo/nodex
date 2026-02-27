@@ -202,6 +202,147 @@ function getTemplateContentNodes(tagDefId: string): string[] {
   });
 }
 
+// ============================================================
+// 辅助：Field / Default Content 删除联动
+// ============================================================
+
+/**
+ * Check if a fieldEntry has any user-provided value content.
+ * A fieldEntry is "empty" when it has no children (value nodes).
+ */
+function fieldEntryHasValue(fieldEntryId: string): boolean {
+  return loroDoc.getChildren(fieldEntryId).length > 0;
+}
+
+/**
+ * Check if a content clone has been modified from its template.
+ * Returns true if the user has customized the clone (different name, has children, etc.)
+ */
+function contentCloneHasCustomValue(cloneId: string, templateNodeId: string): boolean {
+  const clone = loroDoc.toNodexNode(cloneId);
+  const template = loroDoc.toNodexNode(templateNodeId);
+  if (!clone) return false;
+  if (!template) return true; // template gone, treat as customized to preserve
+
+  // If clone has children, it's been customized
+  if (loroDoc.getChildren(cloneId).length > 0) return true;
+
+  // If name differs from template, it's been customized
+  if ((clone.name ?? '') !== (template.name ?? '')) return true;
+
+  // If description differs, it's been customized
+  if ((clone.description ?? '') !== (template.description ?? '')) return true;
+
+  return false;
+}
+
+/**
+ * Find all nodes tagged with a specific tagDefId.
+ * Iterates all known nodes and checks their tags array.
+ */
+function findNodesWithTag(tagDefId: string): string[] {
+  const result: string[] = [];
+  for (const id of loroDoc.getAllNodeIds()) {
+    const node = loroDoc.toNodexNode(id);
+    if (!node) continue;
+    if (node.tags.includes(tagDefId)) result.push(id);
+  }
+  return result;
+}
+
+/**
+ * Cascade deletion of a template field from a tagDef.
+ * When a fieldDef or fieldEntry (template field) under a tagDef is removed,
+ * cascade to all tagged nodes:
+ * - No custom value → delete the instantiated fieldEntry
+ * - Has custom value → detach from template (clear templateId)
+ *
+ * @param tagDefId The tagDef that owns the template
+ * @param templateOriginId The ID of the template item being deleted (fieldDef or fieldEntry under tagDef)
+ * @param fieldDefId The fieldDef ID referenced by the template field
+ */
+function cascadeTemplateFieldDeletion(tagDefId: string, templateOriginId: string, fieldDefId: string): void {
+  const taggedNodeIds = findNodesWithTag(tagDefId);
+
+  for (const nodeId of taggedNodeIds) {
+    const children = loroDoc.getChildren(nodeId);
+    for (const cid of children) {
+      const child = loroDoc.toNodexNode(cid);
+      if (!child) continue;
+      if (child.type !== 'fieldEntry') continue;
+      if (child.fieldDefId !== fieldDefId) continue;
+
+      // Check if this fieldEntry came from the template
+      if (child.templateId === templateOriginId) {
+        if (fieldEntryHasValue(cid)) {
+          // Has custom value → detach from template
+          loroDoc.deleteNodeData(cid, 'templateId');
+        } else {
+          // No custom value → delete the fieldEntry
+          loroDoc.deleteNode(cid);
+        }
+      }
+    }
+  }
+}
+
+/**
+ * Cascade deletion of a template content node from a tagDef.
+ * When a plain content node under a tagDef is removed,
+ * cascade to all tagged nodes:
+ * - No custom value → delete the content clone
+ * - Has custom value → detach from template (clear templateId)
+ *
+ * @param tagDefId The tagDef that owns the template
+ * @param templateNodeId The ID of the content node being deleted from the tagDef
+ */
+function cascadeTemplateContentDeletion(tagDefId: string, templateNodeId: string): void {
+  const taggedNodeIds = findNodesWithTag(tagDefId);
+
+  for (const nodeId of taggedNodeIds) {
+    const children = loroDoc.getChildren(nodeId);
+    for (const cid of children) {
+      const child = loroDoc.toNodexNode(cid);
+      if (!child) continue;
+      if (child.templateId !== templateNodeId) continue;
+
+      if (contentCloneHasCustomValue(cid, templateNodeId)) {
+        // Has custom value → detach from template
+        loroDoc.deleteNodeData(cid, 'templateId');
+      } else {
+        // No custom value → delete the clone
+        loroDoc.deleteNode(cid);
+      }
+    }
+  }
+}
+
+/**
+ * When a fieldDef is hard-deleted, clean up empty fieldEntries across all nodes.
+ * - FieldEntries with values: keep them (orphaned but data preserved)
+ * - FieldEntries without values: delete them (no useful data)
+ */
+function cascadeFieldDefDeletion(fieldDefId: string): void {
+  for (const id of loroDoc.getAllNodeIds()) {
+    const node = loroDoc.toNodexNode(id);
+    if (!node) continue;
+
+    const children = loroDoc.getChildren(id);
+    for (const cid of children) {
+      const child = loroDoc.toNodexNode(cid);
+      if (!child) continue;
+      if (child.type !== 'fieldEntry') continue;
+      if (child.fieldDefId !== fieldDefId) continue;
+
+      if (!fieldEntryHasValue(cid)) {
+        // No value → clean up
+        loroDoc.deleteNode(cid);
+      }
+      // Has value → keep as orphaned field (will show "deleted" state in UI)
+    }
+  }
+}
+
 function findTemplateContentClone(nodeId: string, templateNodeId: string): string | null {
   const children = loroDoc.getChildren(nodeId);
   for (const cid of children) {
@@ -615,6 +756,24 @@ export const useNodeStore = create<NodeStore>((set, get) => {
       const siblings = parentId ? loroDoc.getChildren(parentId) : [];
       const index = siblings.indexOf(nodeId);
 
+      // ─── Scenario A: Cascade template field/content deletion ───
+      // When deleting a child of a tagDef, cascade to all tagged nodes.
+      if (parentId) {
+        const parentNode = loroDoc.toNodexNode(parentId);
+        if (parentNode?.type === 'tagDef') {
+          if (node?.type === 'fieldDef') {
+            // Direct fieldDef child of tagDef (seed-data layout)
+            cascadeTemplateFieldDeletion(parentId, nodeId, nodeId);
+          } else if (node?.type === 'fieldEntry' && node.fieldDefId) {
+            // fieldEntry child of tagDef (UI layout)
+            cascadeTemplateFieldDeletion(parentId, nodeId, node.fieldDefId);
+          } else if (node && !node.type) {
+            // Plain content node (default content)
+            cascadeTemplateContentDeletion(parentId, nodeId);
+          }
+        }
+      }
+
       // 记录来源以便恢复
       loroDoc.setNodeDataBatch(nodeId, {
         _trashedFrom: parentId,
@@ -647,6 +806,14 @@ export const useNodeStore = create<NodeStore>((set, get) => {
       const parentId = loroDoc.getParentId(nodeId);
       if (parentId !== CONTAINER_IDS.TRASH) return;
       if (isWorkspaceContainer(nodeId)) return;
+
+      // ─── Scenario B: Cascade fieldDef hard deletion ───
+      // When permanently deleting a fieldDef, clean up empty fieldEntries across all nodes.
+      const node = loroDoc.toNodexNode(nodeId);
+      if (node?.type === 'fieldDef') {
+        cascadeFieldDefDeletion(nodeId);
+      }
+
       loroDoc.deleteNode(nodeId);
       loroDoc.commitDoc();
     },

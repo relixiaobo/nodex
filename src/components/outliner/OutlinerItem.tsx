@@ -1270,10 +1270,23 @@ export function OutlinerItem({
     setPendingRefConversion(null);
   }, [nodeId, revertRefConversion, setPendingRefConversion]);
 
-  // Scroll newly focused node into view (e.g. after Enter creates a node off-screen)
+  // Scroll newly focused node into view (e.g. after Enter creates a node off-screen).
+  // We manually check visibility instead of using scrollIntoView, because
+  // CSS scroll-padding (scroll-pb-[40vh]) causes scrollIntoView to treat
+  // nodes in the bottom padding zone as "not visible" and scroll them up,
+  // even when the user just clicked on a clearly visible node.
   useEffect(() => {
     if (isFocused && rowRef.current) {
-      rowRef.current.scrollIntoView({ block: 'nearest' });
+      const row = rowRef.current;
+      const scrollParent = row.closest('.overflow-y-auto') as HTMLElement | null;
+      if (!scrollParent) return;
+      const rowRect = row.getBoundingClientRect();
+      const containerRect = scrollParent.getBoundingClientRect();
+      if (rowRect.top < containerRect.top) {
+        scrollParent.scrollTop += rowRect.top - containerRect.top;
+      } else if (rowRect.bottom > containerRect.bottom) {
+        scrollParent.scrollTop += rowRect.bottom - containerRect.bottom;
+      }
     }
   }, [isFocused]);
 

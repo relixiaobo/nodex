@@ -221,7 +221,9 @@ export function RichTextEditor(props: RichTextEditorProps) {
       // --- Enter-created editor ---
       // Known issue: CJK IME first-character disruption after Enter.
       // See docs/issues/editor-ime-enter-empty-node.md for details.
-      view.focus();
+      // Use preventScroll: OutlinerItem's useEffect handles scroll-into-view
+      // without being affected by CSS scroll-padding (scroll-pb-[40vh]).
+      view.dom.focus({ preventScroll: true });
       return;
     }
 
@@ -231,7 +233,7 @@ export function RichTextEditor(props: RichTextEditorProps) {
     // to avoid selectionToDOM() which would place the cursor at position 0
     // before we can restore the click-based offset.
     if (!view.hasFocus()) {
-      view.dom.focus();
+      view.dom.focus({ preventScroll: true });
     }
 
     if (focusRafRef.current !== null) {
@@ -242,8 +244,9 @@ export function RichTextEditor(props: RichTextEditorProps) {
       if (viewRef.current !== view) return;
 
       // Full PM focus (including selectionToDOM) now that browser has painted.
+      // Use preventScroll to avoid CSS scroll-padding (scroll-pb-[40vh]) interference.
       if (!view.hasFocus()) {
-        view.focus();
+        view.dom.focus({ preventScroll: true });
       }
       if (!view.hasFocus()) return;
 

@@ -1,112 +1,108 @@
 /**
- * Lightweight fuzzy search scorer.
+ * Fuzzy search powered by uFuzzy.
  *
- * Scoring heuristics:
- * - Consecutive character matches score higher than scattered matches
- * - Prefix matches get a bonus
- * - Exact case matches get a bonus
- * - Shorter targets score higher (more relevant)
+ * Supports CJK + Latin scripts, typo tolerance (1 edit per term),
+ * and multi-token queries (space-separated).
  *
- * Returns null if no match, or a score (higher = better match).
+ * "today" matches "Today's meeting" but NOT "Next meeting on Friday".
+ * "会议" matches "今天的会议记录".
+ * "tody" (typo) matches "Today's meeting".
  */
+import uFuzzy from '@leeoniya/ufuzzy';
 
 export interface FuzzyResult {
   score: number;
-  /** Matched character indices in the target string (for highlighting). */
-  indices: number[];
+  /** Highlight ranges as [start, end, start, end, ...] pairs. */
+  ranges: number[];
 }
 
+const uf = new uFuzzy({
+  unicode: true,
+  interSplit: '[\\s]+',  // split query on whitespace only (keeps CJK tokens intact)
+  interLft: 0,           // no left boundary required (CJK has no word boundaries)
+  interRgt: 0,           // no right boundary required
+  intraMode: 1,          // allow 1 typo per term (substitution/transposition/insertion/deletion)
+});
+
 /**
- * Score a query against a target string using fuzzy matching.
- * Returns null if the query doesn't match the target.
+ * Score a query against a single target string.
+ * Returns null if no match. Use fuzzySort() for batch operations.
  */
 export function fuzzyMatch(query: string, target: string): FuzzyResult | null {
-  if (!query) return { score: 0, indices: [] };
+  if (!query) return { score: 0, ranges: [] };
 
-  const queryLower = query.toLowerCase();
-  const targetLower = target.toLowerCase();
+  const [idxs, info, order] = uf.search([target], query);
+  if (!idxs || idxs.length === 0) return null;
 
-  // Quick check: all query chars must exist in target (in order)
-  let qi = 0;
-  for (let ti = 0; ti < targetLower.length && qi < queryLower.length; ti++) {
-    if (targetLower[ti] === queryLower[qi]) qi++;
-  }
-  if (qi < queryLower.length) return null;
-
-  // Score the match
-  let score = 0;
-  const indices: number[] = [];
-  let consecutiveBonus = 0;
-  let prevMatchIndex = -2; // -2 so first match at 0 doesn't count as consecutive
-
-  qi = 0;
-  for (let ti = 0; ti < target.length && qi < queryLower.length; ti++) {
-    if (targetLower[ti] === queryLower[qi]) {
-      indices.push(ti);
-
-      // Base match score
-      score += 1;
-
-      // Consecutive match bonus (grows with streak length)
-      if (ti === prevMatchIndex + 1) {
-        consecutiveBonus += 2;
-        score += consecutiveBonus;
-      } else {
-        consecutiveBonus = 0;
-      }
-
-      // Prefix bonus: first char matches first char of target
-      if (ti === 0 && qi === 0) {
-        score += 5;
-      }
-
-      // Word boundary bonus: match at start of word
-      if (ti > 0 && /[\s_\-./]/.test(target[ti - 1])) {
-        score += 3;
-      }
-
-      // Exact case bonus
-      if (target[ti] === query[qi]) {
-        score += 0.5;
-      }
-
-      prevMatchIndex = ti;
-      qi++;
-    }
+  if (info && order && order.length > 0) {
+    const oi = order[0];
+    return {
+      score: scoreFromInfo(info, oi, target.length),
+      ranges: info.ranges[oi] ?? [],
+    };
   }
 
-  // Length penalty: prefer shorter targets (more specific matches)
-  score -= target.length * 0.1;
-
-  return { score, indices };
+  // Filtered but not scored (shouldn't happen for single item, but handle gracefully)
+  return { score: 1, ranges: [] };
 }
 
 /**
- * Sort items by fuzzy match score against a query.
- * Returns only matching items, sorted by descending score.
+ * Batch fuzzy search: filter, score, and sort items by match quality.
+ * Returns top `limit` matching items, already sorted best-first.
  */
 export function fuzzySort<T>(
   items: T[],
   query: string,
   getText: (item: T) => string,
   limit = 20,
-): Array<T & { _fuzzyScore: number; _fuzzyIndices: number[] }> {
+): Array<T & { _fuzzyScore: number; _fuzzyRanges: number[] }> {
   if (!query.trim()) return [];
 
-  const results: Array<T & { _fuzzyScore: number; _fuzzyIndices: number[] }> = [];
+  const haystack = items.map(getText);
+  const [idxs, info, order] = uf.search(haystack, query);
+  if (!idxs || idxs.length === 0) return [];
 
-  for (const item of items) {
-    const text = getText(item);
-    const match = fuzzyMatch(query, text);
-    if (match) {
+  const results: Array<T & { _fuzzyScore: number; _fuzzyRanges: number[] }> = [];
+
+  if (info && order && order.length > 0) {
+    // Ranked results — take top `limit` from sorted order
+    const count = Math.min(order.length, limit);
+    for (let i = 0; i < count; i++) {
+      const oi = order[i];
+      const itemIdx = info.idx[oi];
       results.push({
-        ...item,
-        _fuzzyScore: match.score,
-        _fuzzyIndices: match.indices,
+        ...items[itemIdx],
+        _fuzzyScore: scoreFromInfo(info, oi, haystack[itemIdx].length),
+        _fuzzyRanges: info.ranges[oi] ?? [],
+      });
+    }
+  } else {
+    // Too many matches to rank — return first `limit` unscored
+    const count = Math.min(idxs.length, limit);
+    for (let i = 0; i < count; i++) {
+      results.push({
+        ...items[idxs[i]],
+        _fuzzyScore: 1,
+        _fuzzyRanges: [],
       });
     }
   }
 
-  results.sort((a, b) => b._fuzzyScore - a._fuzzyScore);
-  return results.slice(0, limit);
+  return results;
+}
+
+/** Derive a numeric score from uFuzzy info for cross-set comparison. */
+function scoreFromInfo(info: uFuzzy.Info, oi: number, targetLen: number): number {
+  const chars = info.chars[oi] ?? 0;
+  const start = info.start[oi] ?? 0;
+  const interIns = info.interIns[oi] ?? 0;
+  const intraIns = info.intraIns[oi] ?? 0;
+
+  return (
+    chars * 10 +
+    (start === 0 ? 20 : 0) -
+    interIns * 2 -
+    intraIns * 5 -
+    targetLen * 0.1
+  );
 }

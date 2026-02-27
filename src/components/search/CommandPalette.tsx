@@ -23,7 +23,7 @@ import { useUIStore } from '../../stores/ui-store';
 import { useNodeStore } from '../../stores/node-store';
 import { useWorkspaceStore } from '../../stores/workspace-store';
 import * as loroDoc from '../../lib/loro-doc.js';
-import { fuzzyMatch } from '../../lib/fuzzy-search.js';
+import { fuzzyMatch, fuzzySort } from '../../lib/fuzzy-search.js';
 import {
   type PaletteItem,
   type PaletteItemType,
@@ -184,6 +184,21 @@ export function CommandPalette() {
       })),
     [commands, ctx]);
 
+  // Cache searchable nodes (rebuild only when node data changes, not per keystroke)
+  const searchableNodes = useMemo(() => {
+    const items: Array<{ id: string; name: string }> = [];
+    for (const id of loroDoc.getAllNodeIds()) {
+      if (containerIdSet.has(id)) continue;
+      const node = loroDoc.toNodexNode(id);
+      if (!node) continue;
+      const name = (node.name ?? '').replace(/<[^>]+>/g, '').trim();
+      if (!name) continue;
+      items.push({ id, name });
+    }
+    return items;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [_version, containerIdSet]);
+
   // Fuzzy search results (nodes + commands mixed, sorted by score)
   const searchResults = useMemo(() => {
     const q = searchQuery.trim();
@@ -191,30 +206,22 @@ export function CommandPalette() {
 
     const results: PaletteItem[] = [];
 
-    // Search nodes (skip containers — they're covered by command search)
-    let nodeCount = 0;
-    for (const id of loroDoc.getAllNodeIds()) {
-      if (nodeCount >= 20) break;
-      if (containerIdSet.has(id)) continue;
-      const node = loroDoc.toNodexNode(id);
+    // Batch search nodes via uFuzzy (all nodes scored & sorted, top 20)
+    const nodeMatches = fuzzySort(searchableNodes, q, (item) => item.name, 20);
+    for (const match of nodeMatches) {
+      const node = loroDoc.toNodexNode(match.id);
       if (!node) continue;
-      const name = (node.name ?? '').replace(/<[^>]+>/g, '').trim();
-      if (!name) continue;
-      const match = fuzzyMatch(q, name);
-      if (match) {
-        const visuals = resolveNodeVisuals(id, node);
-        results.push({
-          id,
-          label: resolveDayNodeDisplayName(id, name),
-          ...visuals,
-          score: match.score,
-          action: () => { navigateTo(id); closeAndClear(); },
-        });
-        nodeCount++;
-      }
+      const visuals = resolveNodeVisuals(match.id, node);
+      results.push({
+        id: match.id,
+        label: resolveDayNodeDisplayName(match.id, match.name),
+        ...visuals,
+        score: match._fuzzyScore,
+        action: () => { navigateTo(match.id); closeAndClear(); },
+      });
     }
 
-    // Search commands
+    // Search commands (small set, per-item is fine)
     for (const cmd of commands) {
       const targets = [cmd.label, ...(cmd.keywords ?? [])];
       let bestScore: number | null = null;
@@ -236,11 +243,11 @@ export function CommandPalette() {
       }
     }
 
-    // Sort by score descending
+    // Sort by score descending (merges node + command results)
     results.sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
     return results;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [_version, searchQuery, commands, ctx, navigateTo, closeAndClear]);
+  }, [searchQuery, searchableNodes, commands, ctx, navigateTo, closeAndClear]);
 
   // "Create in Today" item — shown at the start of search results when there's a query
   const createItem: PaletteItem | null = useMemo(() => {

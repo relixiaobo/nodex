@@ -263,4 +263,24 @@ describe('replaceFieldDef', () => {
     const fe = loroDoc.toNodexNode(fieldEntryId)!;
     expect(fe.fieldDefId).toBe('attrDef_status');
   });
+
+  it('dedup: removes placeholder when target fieldDef already exists on node', () => {
+    useNodeStore.getState().addFieldToNode('note_2', 'attrDef_status');
+    const existingFe = findFieldEntry('note_2', 'attrDef_status');
+    expect(existingFe).toBeTruthy();
+
+    const { fieldEntryId: placeholderFe, fieldDefId: placeholderFd } = useNodeStore.getState().addUnnamedFieldToNode('note_2');
+    expect(loroDoc.getChildren('note_2')).toContain(placeholderFe);
+
+    useNodeStore.getState().replaceFieldDef('note_2', placeholderFe, placeholderFd, 'attrDef_status');
+
+    expect(loroDoc.hasNode(placeholderFe)).toBe(false);
+    expect(findFieldEntry('note_2', 'attrDef_status')).toBe(existingFe);
+
+    const entries = loroDoc.getChildren('note_2').filter(cid => {
+      const n = loroDoc.toNodexNode(cid);
+      return n?.type === 'fieldEntry' && n.fieldDefId === 'attrDef_status';
+    });
+    expect(entries.length).toBe(1);
+  });
 });

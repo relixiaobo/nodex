@@ -889,9 +889,17 @@ export const useNodeStore = create<NodeStore>((set, get) => {
     },
 
     replaceFieldDef: (nodeId, fieldEntryId, oldFieldDefId, newFieldDefId) => {
+      // Dedup: if the target fieldDef already has a fieldEntry on this node,
+      // remove the current (placeholder) entry instead of creating a duplicate.
+      const existing = findFieldEntry(nodeId, newFieldDefId);
+      if (existing && existing !== fieldEntryId) {
+        loroDoc.deleteNode(fieldEntryId);
+        loroDoc.commitDoc();
+        return;
+      }
       loroDoc.setNodeData(fieldEntryId, 'fieldDefId', newFieldDefId);
       loroDoc.commitDoc();
-      void nodeId; void oldFieldDefId; // suppress lint
+      void oldFieldDefId; // suppress lint
     },
 
     // ─── Checkbox 操作 ───

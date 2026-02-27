@@ -43,7 +43,7 @@ export function validateFieldValue(
 
 export function ValidationWarning({ message }: { message: string }) {
   return (
-    <span className="shrink-0 cursor-default" title={message}>
+    <span className="shrink-0 cursor-default flex items-center" title={message}>
       <CircleAlert size={14} className="text-warning" />
     </span>
   );

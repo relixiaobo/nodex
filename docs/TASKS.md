@@ -26,11 +26,7 @@ _(空)_
 
 ## Agent 状态
 
-| Agent | 任务 | 状态 |
-|-------|------|------|
-| nodex | Options 验证 + Untitled 占位 + Clip Toast | 🔄 进行中 |
-| field-cascade | Field / Default Content 删除联动 | 🔄 进行中 |
-| research | Highlight + Comment 研究 | ✅ 完成 |
+_(无活跃 Agent)_
 
 ---
 
@@ -156,7 +152,7 @@ _(见 Agent 状态表)_
 > 基础已完成（Options/Date/Number/URL/Email/Checkbox/隐藏/Required/Min-Max/验证/系统字段）
 
 - [x] **同一节点下重复 field node 去重** — 同一个 node 下不允许出现相同的 field node；若选中了重复的 field，只保留最早的那个
-- [ ] **Field / Default Content 删除联动** — 两个场景：a) 删除 supertag default content（模板字段/内容）时，无自定义值的节点删除对应项，有自定义值的脱离模板保留；b) 删除 field 定义（attrDef）本身时，已设值的节点保留 value，field name 显示”已删除”状态（灰色/删除线）
+- [x] **Field / Default Content 删除联动** — 场景 A: 删除模板字段联动清理/脱离；场景 B: 删除 attrDef 保留有值 field + 灰色删除线 ✅（2026-02-27, PR #107, 14 test）
 - [ ] AttrDef “Used in” 计算字段
 - [ ] Auto-initialize（6 种策略）
 - [ ] Pinned fields
@@ -283,6 +279,9 @@ _(见 Agent 状态表)_
 
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
+| 2026-02-27 | Field / Default Content 删除联动 — 模板字段删除联动清理 + attrDef 删除灰色删除线 + 14 test | field-cascade | #107 |
+| 2026-02-27 | Highlight + Comment 研究 — 竞品分析 + 数据模型 + 锚点策略 + 3-Phase 实现方案 | research | main |
+| 2026-02-27 | Options 语义验证 + Untitled 占位 + Clip Toast 静默 — 3 个小修复 | nodex | main |
 | 2026-02-27 | Search Nodes Step 3 — SearchChipBar（只读芯片条）+ TrailingInput 自动打标签 + queryCondition 过滤 + 12 test | search-step3 | #103 |
 | 2026-02-27 | Field ⚠ icon 垂直居中 + 同节点重复 field 去重（store dedup + render dedup）+ 3 test | field-fixes | #104 |
 | 2026-02-27 | Editor Paste Phase 1 — ⌘V 多行拆分为兄弟节点 + 6 test | paste-phase1 | #105 |

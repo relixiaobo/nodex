@@ -105,6 +105,9 @@ export function CommandPalette() {
   const signInWithGoogle = useWorkspaceStore((s) => s.signInWithGoogle);
   const signOutFn = useWorkspaceStore((s) => s.signOut);
 
+  const paletteUsage = useUIStore((s) => s.paletteUsage);
+  const trackPaletteUsage = useUIStore((s) => s.trackPaletteUsage);
+
   const [selectedIndex, setSelectedIndex] = useState(0);
   const listRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -153,7 +156,7 @@ export function CommandPalette() {
         id,
         label: resolveDayNodeDisplayName(id, name),
         ...visuals,
-        action: () => { navigateTo(id); closeAndClear(); },
+        action: () => { trackPaletteUsage(id); navigateTo(id); closeAndClear(); },
       });
     }
     return items;
@@ -167,9 +170,9 @@ export function CommandPalette() {
       label: t(c.labelKey),
       icon: CONTAINER_ICONS[c.iconKey] ?? Library,
       type: 'container' as PaletteItemType,
-      action: () => { navigateTo(c.id); closeAndClear(); },
+      action: () => { trackPaletteUsage(c.id); navigateTo(c.id); closeAndClear(); },
     })),
-    [navigateTo, closeAndClear]);
+    [navigateTo, closeAndClear, trackPaletteUsage]);
 
   // Command items for Commands group (excludes containers, which are in Suggestions)
   const commandItems: PaletteItem[] = useMemo(() =>
@@ -180,9 +183,9 @@ export function CommandPalette() {
         label: cmd.label,
         icon: cmd.icon,
         type: cmd.type,
-        action: () => cmd.action(ctx),
+        action: () => { trackPaletteUsage(cmd.id); cmd.action(ctx); },
       })),
-    [commands, ctx]);
+    [commands, ctx, trackPaletteUsage]);
 
   // Cache searchable nodes (rebuild only when node data changes, not per keystroke)
   const searchableNodes = useMemo(() => {
@@ -199,7 +202,21 @@ export function CommandPalette() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [_version, containerIdSet]);
 
-  // Fuzzy search results (nodes + commands mixed, sorted by score)
+  // Usage boost: frequent + recent items get a score bonus.
+  // Max boost = 15 (count) + 10 (recency) = 25 points.
+  const getUsageBoost = useCallback((itemId: string) => {
+    const usage = paletteUsage[itemId];
+    if (!usage) return 0;
+    // Frequency: log scale, capped at 15 points (≈ 7+ uses)
+    const freqBoost = Math.min(Math.log2(usage.count + 1) * 5, 15);
+    // Recency: decays over 7 days, max 10 points
+    const ageMs = Date.now() - usage.lastUsedAt;
+    const ageDays = ageMs / (1000 * 60 * 60 * 24);
+    const recencyBoost = Math.max(10 - ageDays * (10 / 7), 0);
+    return freqBoost + recencyBoost;
+  }, [paletteUsage]);
+
+  // Fuzzy search results (nodes + commands mixed, sorted by score + usage boost)
   const searchResults = useMemo(() => {
     const q = searchQuery.trim();
     if (!q) return [];
@@ -216,8 +233,8 @@ export function CommandPalette() {
         id: match.id,
         label: resolveDayNodeDisplayName(match.id, match.name),
         ...visuals,
-        score: match._fuzzyScore,
-        action: () => { navigateTo(match.id); closeAndClear(); },
+        score: (match._fuzzyScore ?? 0) + getUsageBoost(match.id),
+        action: () => { trackPaletteUsage(match.id); navigateTo(match.id); closeAndClear(); },
       });
     }
 
@@ -237,17 +254,17 @@ export function CommandPalette() {
           label: cmd.label,
           icon: cmd.icon,
           type: cmd.type,
-          score: bestScore,
-          action: () => cmd.action(ctx),
+          score: bestScore + getUsageBoost(cmd.id),
+          action: () => { trackPaletteUsage(cmd.id); cmd.action(ctx); },
         });
       }
     }
 
-    // Sort by score descending (merges node + command results)
+    // Sort by score descending (merges node + command results, boosted by usage)
     results.sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
     return results;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchQuery, searchableNodes, commands, ctx, navigateTo, closeAndClear]);
+  }, [searchQuery, searchableNodes, commands, ctx, navigateTo, closeAndClear, getUsageBoost, trackPaletteUsage]);
 
   // "Create in Today" item — shown at the start of search results when there's a query
   const createItem: PaletteItem | null = useMemo(() => {

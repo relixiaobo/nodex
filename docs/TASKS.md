@@ -20,7 +20,7 @@
 
 用户随手记录，agent 启动时处理（归类到待办或进行中，处理完从此处删除）。
 
-1. **⌘K 常用搜索/命令应排前** — 用户经常使用的搜索结果和命令应该在搜索列表中排在靠前的位置（频率/最近使用加权）。
+_(空)_
 
 ---
 
@@ -247,6 +247,7 @@ _(无)_
 
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
+| 2026-02-27 | ⌘K 常用搜索/命令排前 — paletteUsage 持久化（频率 log + 7天时效衰减，max 25 分加权）+ 9 test | nodex | main |
 | 2026-02-27 | 点击 Supertag 进入搜索结果页 — Search Nodes L0（搜索引擎 + 结果物化 + TagBadge 导航 + 24 test） | tag-search | #102 |
 | 2026-02-27 | Field Node 交互四连修 — 拖选/下拉触发/确认/拖动（4 bug + 14 test） | field-fix | #101 |
 | 2026-02-27 | 默认进入 Today 节点面板 — App.tsx replacePanel(ensureTodayNode()) | nodex | main |

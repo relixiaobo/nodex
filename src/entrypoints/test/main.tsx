@@ -3,7 +3,7 @@
  *
  * Opens in a regular browser tab (chrome-extension://[id]/test.html).
  * Pre-seeds sample data so you can immediately test outliner interactions
- * without needing Supabase connected.
+ * without needing a backend connected.
  */
 import React from 'react';
 import ReactDOM from 'react-dom/client';

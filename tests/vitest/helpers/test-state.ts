@@ -6,7 +6,6 @@ import { useWorkspaceStore } from '../../../src/stores/workspace-store.js';
 
 /**
  * Reset all in-memory stores and LoroDoc to a clean baseline before each test.
- * Supabase disconnected for deterministic offline tests.
  */
 export function resetStores(): void {
   resetLoroDoc();

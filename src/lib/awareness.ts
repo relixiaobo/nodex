@@ -2,7 +2,7 @@
  * ⑦ Awareness — 实时在线状态协议
  *
  * 纯内存模块，管理多用户实时状态（光标、选区、用户信息）。
- * 仅做 API 层，网络传输（WebSocket / Supabase Realtime）由外层处理。
+ * 仅做 API 层，网络传输（WebSocket）由外层处理。
  *
  * 使用方式：
  * 1. 初始化本地用户：setLocalUser({ id, name, color })

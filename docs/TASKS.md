@@ -26,21 +26,13 @@ _(空)_
 
 ## Agent 状态
 
-| Agent | 当前任务 | 分支 | 修改中的文件 |
-|-------|---------|------|-------------|
-| search-step3 | Search Nodes Step 3 | cc/search-step3 | OutlinerView, OutlinerItem, search-engine, node-store |
-| field-fixes | Field bug + dedup | cc/field-fixes | field-validation, FieldRow, node-store |
-| paste-phase1 | Editor Paste Phase 1 | cc/paste-phase1 | RichTextEditor |
-| trash-delete | Trash 彻底删除 | cc/trash-delete | node-store, OutlinerItem, NodePanel |
+_(无活跃 Agent)_
 
 ---
 
 ## 进行中
 
-- **Search Nodes Step 3** — 结果渲染增强：芯片条（只读）+ TrailingInput 自动打标签 `[search-step3]`
-- **Field bug + dedup** — ⚠ icon 垂直居中 + 同节点重复 field 去重 `[field-fixes]`
-- **Editor Paste Phase 1** — ⌘V 多行拆分为兄弟节点 `[paste-phase1]`
-- **Trash 彻底删除** — Trash 内节点支持永久删除 `[trash-delete]`
+_(空)_
 
 ---
 
@@ -52,7 +44,7 @@ _(空)_
 - [x] **点击 node 文本中的链接未打开标签页** — 静态内容 + 编辑器 mousedown 双重拦截，单击 chrome.tabs.create 打开
 - [x] **节点内拖选文本误触发节点选中** — use-drag-select 尊重浏览器活跃文本选区
 - [x] **粘贴/剪藏内容中的 #、@ 不应触发下拉菜单** — paste transaction setMeta 跳过 trigger 检测
-- [ ] **Field value 验证错误 icon 未垂直居中** — number 等字段输入非法值时，右侧 ⚠ 图标未与行内容垂直居中
+- [x] **Field value 验证错误 icon 未垂直居中** — number 等字段输入非法值时，右侧 ⚠ 图标未与行内容垂直居中
 
 ### v0.1 — 首次上线（Chrome Web Store 发布）
 
@@ -122,7 +114,7 @@ _(空)_
 - [x] Step 0: 数据模型锁定 ✓ nodex（2026-02-26）
 - [x] Step 1: 搜索引擎核心 ✓ tag-search（2026-02-27）— `search-engine.ts`（条件树递归 + 候选集排除 + HAS_TAG/TODO/DONE/NOT_DONE + 24 test）
 - [x] Step 2: L0 点击标签创建 ✓ tag-search（2026-02-27）— TagBadge click → `createSearchNode(tagDefId)` + 去重导航 + 结果物化 + auto-refresh
-- [ ] Step 3: 结果渲染增强 — 芯片条（只读）+ 手动排序 + TrailingInput（HAS_TAG 自动打标签）
+- [x] Step 3: 结果渲染增强 — 芯片条（只读）+ TrailingInput（HAS_TAG 自动打标签）
 - [ ] Step 4: L1 字段过滤 UI — 芯片条增删改 + FIELD_IS/时间条件 + 计数提示
 - [ ] Step 5: L2 AI 自然语言 — tool call 创建 queryCondition 树
 
@@ -148,7 +140,7 @@ _(空)_
 #### Fields 全类型 (#21)
 > 基础已完成（Options/Date/Number/URL/Email/Checkbox/隐藏/Required/Min-Max/验证/系统字段）
 
-- [ ] **同一节点下重复 field node 去重** — 同一个 node 下不允许出现相同的 field node；若选中了重复的 field，只保留最早的那个
+- [x] **同一节点下重复 field node 去重** — 同一个 node 下不允许出现相同的 field node；若选中了重复的 field，只保留最早的那个
 - [ ] AttrDef “Used in” 计算字段
 - [ ] Auto-initialize（6 种策略）
 - [ ] Pinned fields
@@ -175,7 +167,8 @@ _(空)_
 - [ ] ViewDef Tuple 持久化（SYS_A16/18/19/20）
 
 #### Trash 彻底删除
-- [ ] **支持在 Trash 中永久删除节点** — Trash 内的节点可彻底删除（从数据中移除），提供确认交互
+- [x] **支持在 Trash 中永久删除节点** — Trash 内的节点可彻底删除（从数据中移除），提供确认交互 ✅（2026-02-27）
+- [ ] **Trash 交互优化** — 待讨论：批量选中删除、Trash 列表右键菜单（Restore/Delete）、自动清理策略（如 30 天自动删除）、Empty Trash 按钮位置优化
 
 #### 图片节点支持
 - [ ] **支持图片 node** — 节点可嵌入/展示图片（上传、粘贴、拖拽），需要存储方案（R2）
@@ -236,7 +229,7 @@ _(空)_
 > **实现位置**: `RichTextEditor.tsx` handlePaste
 
 - [x] Phase 0: 单行 URL 智能粘贴 + ⌘⇧V 纯文本 ✅（2026-02-27）
-- [ ] Phase 1: 多行拆分为节点 — ⌘V 多行文本按行拆分为兄弟节点；⌘⇧V 多行压成一行
+- [x] Phase 1: 多行拆分为节点 — ⌘V 多行文本按行拆分为兄弟节点；⌘⇧V 多行压成一行 ✅（2026-02-27）
 - [ ] Phase 2: 富文本保留格式 — ⌘V 读 `text/html`，映射 `<strong>/<em>/<code>/<a>` 到 PM marks；⌘⇧V 只读 `text/plain`
 - [ ] Phase 3: Markdown 结构化 — ⌘V 检测 `- ` / `* ` / `1. ` + 缩进，按层级创建父子节点树
 - [ ] Phase 4: 撤销/重做集成 — 多节点创建包装为单次 Loro commit，⌘Z 一步撤回
@@ -274,6 +267,10 @@ _(空)_
 
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
+| 2026-02-27 | Search Nodes Step 3 — SearchChipBar（只读芯片条）+ TrailingInput 自动打标签 + queryCondition 过滤 + 12 test | search-step3 | #103 |
+| 2026-02-27 | Field ⚠ icon 垂直居中 + 同节点重复 field 去重（store dedup + render dedup）+ 3 test | field-fixes | #104 |
+| 2026-02-27 | Editor Paste Phase 1 — ⌘V 多行拆分为兄弟节点 + 6 test | paste-phase1 | #105 |
+| 2026-02-27 | Trash 彻底删除 — Restore / Delete permanently / Empty Trash（两步确认）+ 10 test | trash-delete | #106 |
 | 2026-02-27 | Bug 四连修 — 日期字段白屏（hooks 违规）+ 链接单击打开 + 拖选文本不误触 + 粘贴不触发 #@ | nodex | main |
 | 2026-02-27 | ⌘K 常用搜索/命令排前 — paletteUsage 持久化（频率 log + 7天时效衰减，max 25 分加权）+ 9 test | nodex | main |
 | 2026-02-27 | 点击 Supertag 进入搜索结果页 — Search Nodes L0（搜索引擎 + 结果物化 + TagBadge 导航 + 24 test） | tag-search | #102 |

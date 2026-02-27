@@ -42,10 +42,10 @@ _(无)_
 
 ### Bug 修复（待修）
 
-- [ ] **日期 NodePanel 输入 date field 白屏** — 在日期节点面板下输入 date 类型的 field node 会导致白屏崩溃
-- [ ] **点击 node 文本中的链接未打开标签页** — 编辑器内的超链接点击无反应，应在新标签页中打开
-- [ ] **节点内拖选文本误触发节点选中** — 在编辑器内按住鼠标拖动选中文本时，容易误触发整个节点变为选中状态（蓝色高亮），应优先响应文本选择而非节点框选
-- [ ] **粘贴/剪藏内容中的 #、@ 不应触发下拉菜单** — 通过粘贴或 Clip Page 导入的内容含 `#`、`@` 等符号时，不应触发 TagSelector / ReferenceSelector 下拉交互（仅手动输入时触发）
+- [x] **日期 NodePanel 输入 date field 白屏** — FieldValueOutliner hooks 违规修复（hooks 移到 early return 前）
+- [x] **点击 node 文本中的链接未打开标签页** — 静态内容 + 编辑器 mousedown 双重拦截，单击 chrome.tabs.create 打开
+- [x] **节点内拖选文本误触发节点选中** — use-drag-select 尊重浏览器活跃文本选区
+- [x] **粘贴/剪藏内容中的 #、@ 不应触发下拉菜单** — paste transaction setMeta 跳过 trigger 检测
 
 ### v0.1 — 首次上线（Chrome Web Store 发布）
 
@@ -260,6 +260,7 @@ _(无)_
 
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
+| 2026-02-27 | Bug 四连修 — 日期字段白屏（hooks 违规）+ 链接单击打开 + 拖选文本不误触 + 粘贴不触发 #@ | nodex | main |
 | 2026-02-27 | ⌘K 常用搜索/命令排前 — paletteUsage 持久化（频率 log + 7天时效衰减，max 25 分加权）+ 9 test | nodex | main |
 | 2026-02-27 | 点击 Supertag 进入搜索结果页 — Search Nodes L0（搜索引擎 + 结果物化 + TagBadge 导航 + 24 test） | tag-search | #102 |
 | 2026-02-27 | Field Node 交互四连修 — 拖选/下拉触发/确认/拖动（4 bug + 14 test） | field-fix | #101 |

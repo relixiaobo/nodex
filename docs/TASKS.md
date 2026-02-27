@@ -42,7 +42,7 @@
 ## 进行中
 
 ### Field Node 交互四连修（#1 #2 #5 #7）
-> **Agent**: field-fix | **分支**: `cc/field-fix` | **PR**: TBD
+> **Agent**: field-fix | **分支**: `cc/field-fix` | **PR**: #101
 >
 > 修复 field node（tuple 行）的四个交互 bug：
 > 1. Field name 中鼠标拖选无法选中节点（事件被文本选中吞掉）
@@ -53,7 +53,7 @@
 > 详细 checklist 见 PR description。
 
 ### 点击 Supertag 进入搜索结果页（#6）
-> **Agent**: tag-search | **分支**: `cc/tag-search` | **PR**: TBD
+> **Agent**: tag-search | **分支**: `cc/tag-search` | **PR**: #102
 >
 > 点击 TagBadge 从进入 supertag 配置页改为进入搜索结果页（显示所有被打标签的节点）。
 > 可独立于完整 Search Nodes 实现——先用内存过滤 + 简单结果列表。

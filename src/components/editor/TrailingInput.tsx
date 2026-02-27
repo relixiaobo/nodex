@@ -474,6 +474,18 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
                 }
             },
             handleDOMEvents: {
+                // Prevent ProseMirror from handling drag-over / drop when
+                // a custom outliner drag is in progress (dragNodeId set).
+                // Returning true tells ProseMirror to skip its own handling,
+                // and the events bubble up to FieldValueOutliner container.
+                dragover: () => {
+                    if (useUIStore.getState().dragNodeId) return true;
+                    return false;
+                },
+                drop: () => {
+                    if (useUIStore.getState().dragNodeId) return true;
+                    return false;
+                },
                 keydown: (view, event) => {
                     const keyboardEvent = event as KeyboardEvent;
                     if (isImeComposingEvent(keyboardEvent)) {

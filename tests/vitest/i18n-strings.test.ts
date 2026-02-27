@@ -18,7 +18,7 @@ describe('i18n strings', () => {
     expect(t('field.fieldNamePlaceholder')).toBe('Field name...');
     expect(t('sidebar.nav.dailyNotes')).toBe('Daily notes');
     expect(t('userMenu.signOut')).toBe('Sign out');
-    expect(t('floatingToolbar.link')).toBe('Link');
+    expect(t('floatingToolbar.bold')).toBe('Bold');
   });
 
   it('falls back to key when message is missing', () => {

@@ -21,6 +21,24 @@ import { isOnlyInlineRef } from '../../lib/tree-utils.js';
 import { pmSchema } from './pm-schema.js';
 import { FloatingToolbar } from './FloatingToolbar.js';
 
+/**
+ * Detect whether a string looks like a URL for smart paste.
+ * Matches http(s) URLs and common bare domains (e.g. "example.com/path").
+ */
+function isLikelyUrl(text: string): boolean {
+  // Must be a single "word" — no spaces (a pasted URL won't contain spaces)
+  if (/\s/.test(text)) return false;
+  // Explicit protocol
+  if (/^https?:\/\//i.test(text)) {
+    try { new URL(text); return true; } catch { return false; }
+  }
+  // Bare domain: word.tld with optional path (e.g. "github.com/user/repo")
+  if (/^[\w-]+\.[\w-]+/.test(text)) {
+    try { new URL(`https://${text}`); return true; } catch { return false; }
+  }
+  return false;
+}
+
 const KEY_EDITOR_DROPDOWN_FORCE_CREATE = getPrimaryShortcutKey('editor.dropdown_force_create', 'Mod-Enter');
 const KEY_EDITOR_MOVE_UP = getPrimaryShortcutKey('editor.move_up', 'Mod-Shift-ArrowUp');
 const KEY_EDITOR_MOVE_DOWN = getPrimaryShortcutKey('editor.move_down', 'Mod-Shift-ArrowDown');
@@ -135,6 +153,8 @@ export function RichTextEditor(props: RichTextEditorProps) {
   const savedRef = useRef(false);
   const isExternalSyncRef = useRef(false);
   const isComposingRef = useRef(false);
+  /** Tracks whether Shift was held during the most recent paste-triggering Cmd/Ctrl+V keystroke. */
+  const pasteShiftRef = useRef(false);
   const triggerStateRef = useRef<TriggerRuntimeState>({
     hasUserEdited: false,
     hashActive: false,
@@ -715,14 +735,43 @@ export function RichTextEditor(props: RichTextEditorProps) {
       handlePaste: (view, event) => {
         event.preventDefault();
         const text = event.clipboardData?.getData('text/plain') ?? '';
-        const normalized = text.replace(/[\r\n]+/g, ' ');
+        const normalized = text.replace(/[\r\n]+/g, ' ').trim();
+        if (!normalized) return true;
+
         const { from, to } = view.state.selection;
-        view.dispatch(view.state.tr.insertText(normalized, from, to));
+        const hasSelection = from !== to;
+        const isPlainPaste = pasteShiftRef.current;
+        pasteShiftRef.current = false; // Reset after reading
+
+        // Smart paste: ⌘V with a URL → apply as link
+        if (!isPlainPaste && isLikelyUrl(normalized)) {
+          if (hasSelection) {
+            // Wrap selected text with the pasted URL as link
+            let tr = view.state.tr.addMark(from, to, pmSchema.marks.link.create({ href: normalized }));
+            tr = tr.setSelection(TextSelection.create(tr.doc, to));
+            view.dispatch(tr);
+          } else {
+            // Insert URL text with link mark applied
+            const linkMark = pmSchema.marks.link.create({ href: normalized });
+            const textNode = pmSchema.text(normalized, [linkMark]);
+            let tr = view.state.tr.insert(from, textNode);
+            tr = tr.setSelection(TextSelection.create(tr.doc, from + normalized.length));
+            view.dispatch(tr);
+          }
+        } else {
+          // Plain paste (⌘⇧V) or non-URL content
+          view.dispatch(view.state.tr.insertText(normalized, from, to));
+        }
+
         return true;
       },
       handleDOMEvents: {
         keydown: (_view, event) => {
           const keyboardEvent = event as KeyboardEvent;
+          // Track Shift state for paste: Cmd+V vs Cmd+Shift+V
+          if (keyboardEvent.key.toLowerCase() === 'v' && (keyboardEvent.metaKey || keyboardEvent.ctrlKey)) {
+            pasteShiftRef.current = keyboardEvent.shiftKey;
+          }
           if (isImeComposingEvent(keyboardEvent)) {
             isComposingRef.current = true;
             const pendingInput = useUIStore.getState().pendingInputChar;

@@ -21,7 +21,6 @@
     "postinstall": "wxt prepare"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.95.3",
     "cmdk": "^1.1.1",
     "defuddle": "^0.6.6",
     "immer": "^10.1.1",

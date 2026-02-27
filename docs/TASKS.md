@@ -37,13 +37,16 @@
 
 ## 进行中
 
-### ⌘K 搜索算法优化 — 分词子串 + uFuzzy 兜底
-> **Agent**: nodex-cc | **分支**: `cc/search-optimization` | **PR**: #100
+### ⌘K 搜索算法优化 — uFuzzy 替换自研子序列匹配
+> **Agent**: nodex-cc | **分支**: `cc/search-optimization` | **PR**: #100 (**Ready for review**)
 >
-> 当前 fuzzy-search.ts 使用字符子序列匹配，导致 "today" 误匹配 "Next meeting on Friday"。
-> 替换为分词子串匹配为主 + uFuzzy 兜底的混合方案。
+> 用 uFuzzy（CJK 配置）替换自研 fuzzy-search.ts。散乱误匹配消除、CJK 全语言支持、拼写容错、55k 节点 <5ms。
 > 调研文档：`docs/research/search-algorithm-research.md`
 > 详细 checklist 见 PR #100 description。
+>
+> **迭代日志**:
+> - [2026-02-27 nodex-codex] 调研 12 个 JS fuzzy 库 + 5 个产品搜索实现。发现 uFuzzy 配置 `interSplit:'[\\s]+'` + `interLft:0` + `interRgt:0` 可解决 CJK 问题（之前调研结论"CJK 完全失败"是默认配置的问题）。实测 55k 节点全管线 <5ms。用 uFuzzy 替换整个 fuzzy-search.ts，CommandPalette 改为 batch fuzzySort + 缓存 searchableNodes。21 测试全过，PR ready。
+
 
 ---
 
@@ -256,7 +259,6 @@
 
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
-| 2026-02-27 | UI 细节打磨 — 浮层/间距/色彩协调（日期选择器 + 用户菜单 + CommandPalette 居中浮层 + 容器图标 mix-blend-multiply + z-index 穿模修复） | antigravity | #99 |
 | 2026-02-27 | Radix Tooltip + 智能粘贴 + 链接 hover — 全图标 Tooltip（含快捷键）+ 移除 FloatingToolbar 链接按钮 + ⌘V 粘贴 URL 自动转链接 + ⌘⇧V 纯文本粘贴 + 链接 hover 显示地址 | nodex | main |
 | 2026-02-26 | UI 设计系统合规优化 — Paper Shadow 浮层 + hover/selected token 统一（16 文件） | nodex-cc | #98 |
 | 2026-02-26 | Search Node Step 0 数据模型锁定 — `queryCondition` NodeType + `QueryOp`(32 op) + query 属性 + Loro 读写 + `isOutlinerContentNodeType('search')` + 6 Vitest | nodex | main |

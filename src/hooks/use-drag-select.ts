@@ -72,7 +72,8 @@ export function useDragSelect({ containerRef, rootChildIds, rootNodeId }: UseDra
   const listenersRef = useRef<{
     move: ((e: MouseEvent) => void) | null;
     up: (() => void) | null;
-  }>({ move: null, up: null });
+    dragstart: ((e: Event) => void) | null;
+  }>({ move: null, up: null, dragstart: null });
 
   const cleanup = useCallback(() => {
     stateRef.current.isDragging = false;
@@ -86,6 +87,10 @@ export function useDragSelect({ containerRef, rootChildIds, rootNodeId }: UseDra
       document.removeEventListener('mouseup', listenersRef.current.up);
       listenersRef.current.up = null;
     }
+    if (listenersRef.current.dragstart) {
+      document.removeEventListener('dragstart', listenersRef.current.dragstart, true);
+      listenersRef.current.dragstart = null;
+    }
   }, [containerRef]);
 
   const handleMouseDown = useCallback((e: MouseEvent) => {
@@ -96,11 +101,12 @@ export function useDragSelect({ containerRef, rootChildIds, rootNodeId }: UseDra
     const container = containerRef.current;
     if (!container || !container.contains(e.target as Node)) return;
 
-    // Don't start drag select on buttons or interactive elements.
+    // Don't start drag select on buttons, interactive elements, or drag handles.
+    // Drag handles are [draggable] spans without [data-node-id] (e.g. DragHandle.tsx).
     // Note: <input> is NOT excluded — field name inputs participate in drag-select
     // via the text-area start logic (same as contenteditable editors).
     const target = e.target as HTMLElement;
-    if (target.closest('button, [role="button"]')) return;
+    if (target.closest('button, [role="button"], [draggable]:not([data-node-id])')) return;
 
     const nodeInfo = getNodeFromPoint(e.clientX, e.clientY);
     if (!nodeInfo) return;
@@ -111,6 +117,14 @@ export function useDragSelect({ containerRef, rootChildIds, rootNodeId }: UseDra
     state.startNodeId = nodeInfo.nodeId;
     state.startedOnText = isTextArea(e.target);
     state.isDragging = false;
+
+    // Block native drag (field rows have draggable=true for reordering) to ensure
+    // all mousemove events reach our drag-select handler. Without this, the browser
+    // fires dragstart after ~4px of movement, stealing mousemove events and causing
+    // the field row to enter native drag mode (opacity-40 + ghost image).
+    const onDocDragStart = (de: Event) => { de.preventDefault(); };
+    listenersRef.current.dragstart = onDocDragStart;
+    document.addEventListener('dragstart', onDocDragStart, true);
 
     // Register dynamic document listeners for this drag session
     const onDocMouseMove = (me: MouseEvent) => {
@@ -141,6 +155,10 @@ export function useDragSelect({ containerRef, rootChildIds, rootNodeId }: UseDra
         s.isDragging = true;
         window.getSelection()?.removeAllRanges();
         containerRef.current?.classList.add('select-none');
+
+        // Clear field editing state so the selection overlay renders correctly
+        // (FieldRow's isFieldSelected requires !isEditing).
+        useUIStore.getState().setEditingFieldName(null);
 
         // Select start node as anchor + clear focus (unmount any editor).
         // setSelectedNodes clears focusedNodeId/focusedParentId.

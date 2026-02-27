@@ -37,6 +37,8 @@ export function FieldNameInput({
 }: FieldNameInputProps) {
   const [value, setValue] = useState(currentName === t('common.untitled') ? '' : currentName);
   const [selectedIndex, setSelectedIndex] = useState(0);
+  // Track whether the user has actively typed — prevents dropdown on focus alone.
+  const [isTyping, setIsTyping] = useState(currentName === t('common.untitled') || !currentName);
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const confirmedRef = useRef(false);
@@ -48,8 +50,9 @@ export function FieldNameInput({
   const setEditingFieldName = useUIStore((s) => s.setEditingFieldName);
   const setSelectedNode = useUIStore((s) => s.setSelectedNode);
 
-  // Filter suggestions: exclude current attrDefId, match by typed text
-  const suggestions = value.trim()
+  // Filter suggestions: exclude current attrDefId, match by typed text.
+  // Only show suggestions when the user has actively typed (not on mere focus).
+  const suggestions = isTyping && value.trim()
     ? allFields.filter(
       (f) => f.id !== attrDefId && f.name.toLowerCase().includes(value.toLowerCase()),
     ).slice(0, 5)
@@ -138,9 +141,12 @@ export function FieldNameInput({
     (e: KeyboardEvent) => {
       if (e.key === 'Enter') {
         e.preventDefault();
-        // Enter on field name always means:
-        // confirm name (reuse exact-match attrDef if needed) + create content node below.
-        // Suggestion selection remains available via click.
+        // When a suggestion is highlighted in the dropdown, Enter applies that suggestion.
+        if (suggestions.length > 0 && selectedIndex >= 0 && selectedIndex < suggestions.length) {
+          selectSuggestion(suggestions[selectedIndex].id);
+          return;
+        }
+        // Otherwise: confirm name (reuse exact-match attrDef if needed) + create content node below.
         confirm();
         onEnterConfirm?.();
       } else if (e.key === 'Tab') {
@@ -190,7 +196,9 @@ export function FieldNameInput({
       onNavigateRow,
       onIndentRow,
       onOutdentRow,
-      suggestions.length,
+      suggestions,
+      selectedIndex,
+      selectSuggestion,
       setEditingFieldName,
       value,
       nodeId,
@@ -210,6 +218,7 @@ export function FieldNameInput({
         onChange={(e) => {
           setValue(e.target.value);
           setSelectedIndex(0);
+          if (!isTyping) setIsTyping(true);
         }}
         onBlur={() => confirm()}
         onKeyDown={handleKeyDown}

@@ -12,7 +12,7 @@
  *        [description]     • value node 2
  * ──────────────────────────────────────
  */
-import { useCallback, useRef, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
+import { useCallback, useRef, useEffect, useMemo, useState, type CSSProperties, type DragEvent, type ReactNode } from 'react';
 import { Trash2 } from '../../lib/icons.js';
 import { useNodeFields } from '../../hooks/use-node-fields';
 import { useNodeStore } from '../../stores/node-store';
@@ -52,6 +52,8 @@ import {
   toggleNodeInSelection,
 } from '../../lib/selection-utils.js';
 import { resolveRowPointerSelectAction } from '../../lib/row-pointer-selection.js';
+import { resolveDropHoverPosition } from '../../lib/drag-drop-position.js';
+import { resolveDropMove } from '../../lib/drag-drop.js';
 
 function focusTrailingInputForParent(parentId: string): boolean {
   const roots = document.querySelectorAll<HTMLElement>('[data-trailing-parent-id]');
@@ -412,6 +414,15 @@ export function FieldRow({
   const _version = useNodeStore((s) => s._version);
   const siblingFields = useNodeFields(nodeId);
   const clickOffsetXRef = useRef<number | undefined>(undefined);
+  const rowRef = useRef<HTMLDivElement>(null);
+
+  // Drag state for field row reordering
+  const dragNodeId = useUIStore((s) => s.dragNodeId);
+  const dropTargetId = useUIStore((s) => s.dropTargetId);
+  const dropPosition = useUIStore((s) => s.dropPosition);
+  const setDrag = useUIStore((s) => s.setDrag);
+  const setDropTarget = useUIStore((s) => s.setDropTarget);
+  const moveNodeTo = useNodeStore((s) => s.moveNodeTo);
 
   const isSystemField = dataType === '__system_date__' || dataType === '__system_text__' || dataType === '__system_node__';
   const isOutliner = dataType === '__outliner__';
@@ -651,6 +662,81 @@ export function FieldRow({
     setSelectedNodes(filtered, anchor);
   }, [getSelectionFlatList, setSelectedNodes]);
 
+  // ─── Drag handlers for field row reordering ───
+
+  const isDropTarget = dropTargetId === tupleId;
+  const isDragging = dragNodeId === tupleId;
+
+  const handleDragStart = useCallback(
+    (e: DragEvent) => {
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', tupleId);
+      setDrag(tupleId);
+    },
+    [tupleId, setDrag],
+  );
+
+  const handleDragOver = useCallback(
+    (e: DragEvent) => {
+      if (!dragNodeId || dragNodeId === tupleId) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+
+      const rect = rowRef.current?.getBoundingClientRect();
+      if (!rect) return;
+
+      const position = resolveDropHoverPosition({
+        offsetY: e.clientY - rect.top,
+        rowHeight: rect.height,
+      });
+      setDropTarget(tupleId, position);
+    },
+    [tupleId, dragNodeId, setDropTarget],
+  );
+
+  const handleDragLeave = useCallback(() => {
+    if (dropTargetId === tupleId) {
+      setDropTarget(null, null);
+    }
+  }, [tupleId, dropTargetId, setDropTarget]);
+
+  const handleDrop = useCallback(
+    (e: DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (!dragNodeId || dragNodeId === tupleId) {
+        setDrag(null);
+        return;
+      }
+
+      const dropParentId = nodeId;
+      const dropParent = useNodeStore.getState().getNode(dropParentId);
+      const siblingIndex = dropParent?.children?.indexOf(tupleId) ?? 0;
+
+      const decision = resolveDropMove({
+        dragNodeId,
+        targetNodeId: tupleId,
+        targetParentId: dropParentId,
+        targetParentKey: `${nodeId}:${tupleId}`,
+        siblingIndex,
+        dropPosition,
+        targetHasChildren: false,
+        targetIsExpanded: false,
+      });
+
+      if (decision) {
+        moveNodeTo(dragNodeId, decision.newParentId, decision.position);
+      }
+
+      setDrag(null);
+    },
+    [dragNodeId, tupleId, nodeId, dropPosition, moveNodeTo, setDrag],
+  );
+
+  const handleDragEnd = useCallback(() => {
+    setDrag(null);
+  }, [setDrag]);
+
   const handleFieldRowClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     const target = e.target instanceof HTMLElement ? e.target : null;
     const action = resolveFieldRowSelectAction({
@@ -858,18 +944,30 @@ export function FieldRow({
 
   // ─── Path 3: Regular fields — editable name, FieldValueOutliner ───
   return (
-    <div
-      className={`relative border-t ${isLastInGroup ? 'border-b' : ''} border-border-subtle flex flex-col @sm:flex-row @sm:items-start min-h-6 has-[.field-overlay-open]:z-[80]`}
-      data-field-row
-      data-field-row-id={tupleId}
-      data-node-id={tupleId}
-      data-parent-id={nodeId}
-      data-row-kind="field"
-      onClick={handleFieldRowClick}
-    >
-      {isFieldSelected && (
-        <div className={FIELD_ROW_SELECTION_OVERLAY_CLASS} style={FIELD_ROW_SELECTION_OVERLAY_STYLE} />
+    <div className={`relative ${isDropTarget && dropPosition === 'before' ? '' : ''}`}>
+      {/* Drop indicator: before */}
+      {isDropTarget && dropPosition === 'before' && (
+        <div className="h-0.5 bg-primary rounded-full" />
       )}
+      <div
+        ref={rowRef}
+        className={`relative border-t ${isLastInGroup ? 'border-b' : ''} border-border-subtle flex flex-col @sm:flex-row @sm:items-start min-h-6 has-[.field-overlay-open]:z-[80] ${isDropTarget && dropPosition === 'inside' ? 'bg-primary/10 ring-1 ring-primary/30 rounded-sm' : ''} ${isDragging ? 'opacity-40' : ''}`}
+        data-field-row
+        data-field-row-id={tupleId}
+        data-node-id={tupleId}
+        data-parent-id={nodeId}
+        data-row-kind="field"
+        draggable={!isEditing && !isVirtual && !isSystemField && !isSystemConfig}
+        onDragStart={handleDragStart}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+        onDragEnd={handleDragEnd}
+        onClick={handleFieldRowClick}
+      >
+        {isFieldSelected && (
+          <div className={FIELD_ROW_SELECTION_OVERLAY_CLASS} style={FIELD_ROW_SELECTION_OVERLAY_STYLE} />
+        )}
       {/* Name column — aligned to first line of value */}
       <div className="relative z-[1] flex items-center gap-1 @sm:shrink-0 @sm:w-[130px] min-w-0 min-h-6 py-1">
         <button
@@ -927,6 +1025,11 @@ export function FieldRow({
           </div>
         )}
       </div>
+      </div>
+      {/* Drop indicator: after */}
+      {isDropTarget && dropPosition === 'after' && (
+        <div className="h-0.5 bg-primary rounded-full" />
+      )}
     </div>
   );
 }

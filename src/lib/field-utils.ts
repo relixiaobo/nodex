@@ -9,7 +9,7 @@ import {
   type AppIcon,
   AlignLeft, Building2, Calendar, CalendarCheck, CalendarClock, CalendarPlus,
   CheckSquare, ChevronDown, FileText, Hash, Link, List, ListTree, Mail, Palette,
-  Play, Asterisk, EyeOff, Settings2, SquareUser, Sparkles, Tag, ToggleLeft, UserPen,
+  Play, Asterisk, EyeOff, Search, Settings2, SquareUser, Sparkles, Tag, ToggleLeft, UserPen,
 } from './icons.js';
 import { SYS_A, SYS_D, SYS_V, FIELD_TYPES } from '../types/index.js';
 import type { NodexNode } from '../types/index.js';
@@ -181,6 +181,9 @@ export function getFieldTypeIcon(dataType: string): AppIcon {
 export function resolveNodeStructuralIcon(node: NodexNode): AppIcon | null {
   if (node.type === 'fieldDef') {
     return getFieldTypeIcon(node.fieldType ?? FIELD_TYPES.PLAIN);
+  }
+  if (node.type === 'search') {
+    return Search;
   }
   return null;
 }

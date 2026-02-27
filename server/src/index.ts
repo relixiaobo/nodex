@@ -24,11 +24,19 @@ const app = new Hono<{ Bindings: Env }>();
 
 app.use('*', async (c, next) => {
   const devOrigin = c.env.DEV_ORIGIN ?? 'http://localhost:5199';
+  const origins = [
+    `chrome-extension://${c.env.CHROME_EXTENSION_ID}`,
+    devOrigin,
+  ];
+  // Dev and Preview builds have their own keys → different extension IDs
+  if (c.env.DEV_EXTENSION_ID) {
+    origins.push(`chrome-extension://${c.env.DEV_EXTENSION_ID}`);
+  }
+  if (c.env.PREVIEW_EXTENSION_ID) {
+    origins.push(`chrome-extension://${c.env.PREVIEW_EXTENSION_ID}`);
+  }
   const corsMiddleware = cors({
-    origin: [
-      `chrome-extension://${c.env.CHROME_EXTENSION_ID}`,
-      devOrigin,
-    ],
+    origin: origins,
     allowHeaders: ['Content-Type', 'Authorization'],
     allowMethods: ['POST', 'GET', 'OPTIONS'],
     credentials: true,
@@ -61,7 +69,19 @@ app.on(['POST', 'GET'], '/api/auth/**', async (c) => {
 // ---------------------------------------------------------------------------
 
 app.get('/auth/extension-redirect', async (c) => {
-  const extId = c.env.CHROME_EXTENSION_ID;
+  // Determine which extension initiated the login.
+  // The client passes its extension ID as ?ext_id=... on the callbackURL.
+  // Fall back to the Store extension ID if not provided (backwards compat).
+  const allowedIds = new Set([
+    c.env.CHROME_EXTENSION_ID,
+    c.env.DEV_EXTENSION_ID,
+    c.env.PREVIEW_EXTENSION_ID,
+  ].filter(Boolean));
+
+  const requestedId = c.req.query('ext_id');
+  const extId = requestedId && allowedIds.has(requestedId)
+    ? requestedId
+    : c.env.CHROME_EXTENSION_ID;
   const extRedirectBase = `https://${extId}.chromiumapp.org/`;
 
   // Read the session token from Better Auth's cookie.

@@ -96,6 +96,8 @@
 | GOOGLE_CLIENT_SECRET | 已设置 |
 | BETTER_AUTH_SECRET | 已设置 (d777e3bbc1bdf9cdf5ddbceadb0ac72003158ab2cd6edb2ff73f0a38cd179cd7) |
 | CHROME_EXTENSION_ID | 已设置 (joabcnflpakkpkalkphcdkdbfkcfhlpa) |
+| DEV_EXTENSION_ID | 待设置 (gkpgogocbjejpildfebpklkldhogdfkp) — Dev builds |
+| PREVIEW_EXTENSION_ID | 待设置 (andlcnfkdjeebjfdjangcnjaicfapmni) — Preview builds |
 
 ---
 
@@ -103,8 +105,9 @@
 
 | 环境 | ID | 来源 |
 |------|-----|------|
-| Dev (本地) | gkpgogocbjejpildfebpklkldhogdfkp | wxt.config.ts 中的 key 推导 |
-| Production | joabcnflpakkpkalkphcdkdbfkcfhlpa | Chrome Web Store 分配 |
+| Dev | gkpgogocbjejpildfebpklkldhogdfkp | wxt.config.ts dev key 推导 |
+| Preview | andlcnfkdjeebjfdjangcnjaicfapmni | wxt.config.ts preview key 推导 |
+| Store (Production) | joabcnflpakkpkalkphcdkdbfkcfhlpa | Chrome Web Store 分配 |
 
 ---
 

@@ -35,9 +35,11 @@ export function createAuth(env: Env) {
       },
     },
 
-    // Allow requests from the Chrome Extension origin
+    // Allow requests from all Chrome Extension origins (Store + Preview + Dev)
     trustedOrigins: [
       `chrome-extension://${env.CHROME_EXTENSION_ID}`,
+      ...(env.DEV_EXTENSION_ID ? [`chrome-extension://${env.DEV_EXTENSION_ID}`] : []),
+      ...(env.PREVIEW_EXTENSION_ID ? [`chrome-extension://${env.PREVIEW_EXTENSION_ID}`] : []),
     ],
 
     // Bearer plugin: allows Authorization header instead of cookies.

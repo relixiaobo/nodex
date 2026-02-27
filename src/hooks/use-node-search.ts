@@ -20,7 +20,7 @@ export interface NodeSearchResult {
 
 /** Structural node types to skip in search results (not meaningful as search targets). */
 const SKIP_DOC_TYPES = new Set<string>([
-  'fieldEntry', 'fieldDef', 'tagDef', 'reference',
+  'fieldEntry', 'fieldDef', 'tagDef', 'reference', 'queryCondition',
 ]);
 const MAX_RESULTS = 15;
 // Bound broad queries so large workspaces don't scan all nodes on every keystroke.

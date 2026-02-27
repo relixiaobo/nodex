@@ -2,6 +2,7 @@ import * as loroDoc from '../../src/lib/loro-doc.js';
 import { useNodeStore } from '../../src/stores/node-store.js';
 import { CONTAINER_IDS } from '../../src/types/index.js';
 import { findNodesByTag, runSearch, evaluateCondition } from '../../src/lib/search-engine.js';
+import { getNodeCapabilities } from '../../src/lib/node-capabilities.js';
 import type { NodexNode } from '../../src/types/node.js';
 import { resetAndSeed } from './helpers/test-state.js';
 
@@ -278,6 +279,137 @@ describe('search-engine', () => {
 
       // task_1 is not done, so NOT(DONE) should be true
       expect(evaluateCondition(candidate, notGroup)).toBe(true);
+    });
+  });
+
+  describe('node-store createSearchNode', () => {
+    it('creates a search node with queryCondition tree under SEARCHES', () => {
+      const store = useNodeStore.getState();
+      const searchId = store.createSearchNode('tagDef_task');
+      expect(searchId).toBeTruthy();
+
+      const searchNode = loroDoc.toNodexNode(searchId);
+      expect(searchNode).not.toBeNull();
+      expect(searchNode!.type).toBe('search');
+      expect(searchNode!.name).toBe('Task'); // tagDef_task name
+
+      // Should be under SEARCHES container
+      const parentId = loroDoc.getParentId(searchId);
+      expect(parentId).toBe(CONTAINER_IDS.SEARCHES);
+
+      // Should have an AND group with HAS_TAG leaf
+      const children = searchNode!.children;
+      const conditions = children
+        .map((id) => loroDoc.toNodexNode(id))
+        .filter((n) => n?.type === 'queryCondition');
+      expect(conditions.length).toBe(1);
+      expect(conditions[0]!.queryLogic).toBe('AND');
+
+      const leafIds = conditions[0]!.children;
+      expect(leafIds.length).toBe(1);
+      const leaf = loroDoc.toNodexNode(leafIds[0]);
+      expect(leaf!.queryOp).toBe('HAS_TAG');
+      expect(leaf!.queryTagDefId).toBe('tagDef_task');
+    });
+
+    it('materializes reference children for matching nodes', () => {
+      const store = useNodeStore.getState();
+      const searchId = store.createSearchNode('tagDef_task');
+
+      const searchNode = loroDoc.toNodexNode(searchId);
+      const refChildren = searchNode!.children.filter((id) => {
+        const n = loroDoc.toNodexNode(id);
+        return n?.type === 'reference';
+      });
+
+      // task_1 is tagged with tagDef_task in seed data
+      expect(refChildren.length).toBeGreaterThan(0);
+      const targetIds = refChildren.map((id) => loroDoc.toNodexNode(id)!.targetId);
+      expect(targetIds).toContain('task_1');
+    });
+
+    it('de-duplicates: returns existing search node for same tag', () => {
+      const store = useNodeStore.getState();
+      const id1 = store.createSearchNode('tagDef_task');
+      const id2 = store.createSearchNode('tagDef_task');
+      expect(id1).toBe(id2);
+    });
+
+    it('creates separate search nodes for different tags', () => {
+      const store = useNodeStore.getState();
+      const id1 = store.createSearchNode('tagDef_task');
+      const id2 = store.createSearchNode('tagDef_meeting');
+      expect(id1).not.toBe(id2);
+    });
+  });
+
+  describe('node-store refreshSearchResults', () => {
+    it('adds new matches and removes stale references', () => {
+      const store = useNodeStore.getState();
+      const searchId = store.createSearchNode('tagDef_task');
+
+      // Apply tag to a new node after initial search
+      store.applyTag('task_2', 'tagDef_task');
+      store.refreshSearchResults(searchId);
+
+      const searchNode = loroDoc.toNodexNode(searchId);
+      const targetIds = searchNode!.children
+        .map((id) => loroDoc.toNodexNode(id))
+        .filter((n) => n?.type === 'reference')
+        .map((n) => n!.targetId);
+
+      // task_2 should now be in results
+      expect(targetIds).toContain('task_2');
+    });
+
+    it('removes references for nodes that no longer match', () => {
+      const store = useNodeStore.getState();
+      // Tag task_2 as well so we have multiple results
+      store.applyTag('task_2', 'tagDef_task');
+      const searchId = store.createSearchNode('tagDef_task');
+
+      // Remove tag from task_1
+      store.removeTag('task_1', 'tagDef_task');
+      store.refreshSearchResults(searchId);
+
+      const searchNode = loroDoc.toNodexNode(searchId);
+      const targetIds = searchNode!.children
+        .map((id) => loroDoc.toNodexNode(id))
+        .filter((n) => n?.type === 'reference')
+        .map((n) => n!.targetId);
+
+      // task_1 should no longer be in results
+      expect(targetIds).not.toContain('task_1');
+      // task_2 should still be there
+      expect(targetIds).toContain('task_2');
+    });
+
+    it('updates lastRefreshedAt timestamp', () => {
+      const store = useNodeStore.getState();
+      const searchId = store.createSearchNode('tagDef_task');
+
+      const before = loroDoc.toNodexNode(searchId)!.lastRefreshedAt;
+      expect(before).toBeGreaterThan(0);
+    });
+  });
+
+  describe('node-capabilities for queryCondition', () => {
+    it('queryCondition nodes cannot be edited, moved, or deleted', () => {
+      const store = useNodeStore.getState();
+      const searchId = store.createSearchNode('tagDef_task');
+      const searchNode = loroDoc.toNodexNode(searchId)!;
+
+      // Find the AND group queryCondition
+      const conditionId = searchNode.children.find((id) => {
+        const n = loroDoc.toNodexNode(id);
+        return n?.type === 'queryCondition';
+      });
+      expect(conditionId).toBeTruthy();
+
+      const caps = getNodeCapabilities(conditionId!);
+      expect(caps.canEditNode).toBe(false);
+      expect(caps.canMove).toBe(false);
+      expect(caps.canDelete).toBe(false);
     });
   });
 });

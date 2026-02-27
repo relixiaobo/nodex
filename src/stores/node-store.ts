@@ -16,6 +16,7 @@ import * as loroDoc from '../lib/loro-doc.js';
 import { getTreeReferenceBlockReason } from '../lib/reference-rules.js';
 import { resolveCheckboxClick, resolveCmdEnterCycle, resolveForwardDoneMapping, resolveReverseDoneMapping } from '../lib/checkbox-utils.js';
 import { nextAutoColorKey } from '../lib/tag-colors.js';
+import { runSearch } from '../lib/search-engine.js';
 
 // ============================================================
 // Store 接口
@@ -95,6 +96,25 @@ interface NodeStore {
   removeReference(refNodeId: string): void;
   startRefConversion(refNodeId: string, parentId: string, position: number): string;
   revertRefConversion(tempNodeId: string, targetNodeId: string, parentId: string): void;
+
+  // ─── Search Node 操作 ───
+
+  /**
+   * Create or navigate to a search node for the given tagDefId.
+   * If a search node for the same tag already exists in SEARCHES, returns its ID.
+   * Otherwise creates a new search node with an AND group + HAS_TAG condition,
+   * runs the initial search, and materializes results as reference children.
+   * @returns The search node ID
+   */
+  createSearchNode(tagDefId: string): string;
+
+  /**
+   * Refresh search results for a search node.
+   * Runs the query, diffs against existing reference children,
+   * adds new matches and removes stale ones.
+   * Uses 'system:refresh' commit origin (excluded from undo stack).
+   */
+  refreshSearchResults(searchNodeId: string): void;
 }
 
 // ============================================================
@@ -1046,6 +1066,127 @@ export const useNodeStore = create<NodeStore>((set, get) => {
 
       get().addReference(parentId, targetNodeId, position >= 0 ? position : undefined);
       // addReference already calls commitDoc
+    },
+
+    // ─── Search Node 操作 ───
+
+    createSearchNode: (tagDefId) => {
+      if (!canMutate('createSearchNode')) return '';
+
+      // De-duplication: check if a search node for this tag already exists in SEARCHES
+      const searchesChildren = loroDoc.getChildren(CONTAINER_IDS.SEARCHES);
+      for (const childId of searchesChildren) {
+        const child = loroDoc.toNodexNode(childId);
+        if (child?.type !== 'search') continue;
+        // Check if it's a single-tag search node for the same tagDefId
+        const conditions = child.children
+          .map((id) => loroDoc.toNodexNode(id))
+          .filter((n) => n?.type === 'queryCondition');
+        if (conditions.length === 1) {
+          const rootCond = conditions[0]!;
+          if (rootCond.queryLogic === 'AND') {
+            const leafIds = rootCond.children;
+            if (leafIds.length === 1) {
+              const leaf = loroDoc.toNodexNode(leafIds[0]);
+              if (leaf?.queryOp === 'HAS_TAG' && leaf.queryTagDefId === tagDefId) {
+                // Found existing search node for same tag — refresh and return
+                get().refreshSearchResults(childId);
+                return childId;
+              }
+            }
+          }
+        }
+      }
+
+      // Create new search node
+      const tagDef = loroDoc.toNodexNode(tagDefId);
+      const searchName = tagDef?.name ?? 'Search';
+
+      const searchId = nanoid();
+      loroDoc.createNode(searchId, CONTAINER_IDS.SEARCHES);
+      loroDoc.setNodeDataBatch(searchId, {
+        type: 'search',
+        name: searchName,
+      });
+
+      // Create AND group (root condition, per design: always wrap in AND)
+      const andGroupId = nanoid();
+      loroDoc.createNode(andGroupId, searchId);
+      loroDoc.setNodeDataBatch(andGroupId, {
+        type: 'queryCondition',
+        queryLogic: 'AND',
+      });
+
+      // Create HAS_TAG leaf condition
+      const condId = nanoid();
+      loroDoc.createNode(condId, andGroupId);
+      loroDoc.setNodeDataBatch(condId, {
+        type: 'queryCondition',
+        queryOp: 'HAS_TAG',
+        queryTagDefId: tagDefId,
+      });
+
+      loroDoc.commitDoc('system:refresh');
+
+      // Run initial search and materialize results
+      get().refreshSearchResults(searchId);
+
+      return searchId;
+    },
+
+    refreshSearchResults: (searchNodeId) => {
+      if (!canMutate('refreshSearchResults')) return;
+
+      const searchNode = loroDoc.toNodexNode(searchNodeId);
+      if (!searchNode || searchNode.type !== 'search') return;
+
+      // Run the search query
+      const matchedIds = runSearch(searchNodeId);
+
+      // Read existing reference children
+      const existingRefs = new Map<string, string>(); // targetId → refNodeId
+      for (const childId of searchNode.children) {
+        const child = loroDoc.toNodexNode(childId);
+        if (child?.type === 'reference' && child.targetId) {
+          existingRefs.set(child.targetId, childId);
+        }
+      }
+
+      // Determine additions and removals
+      const toAdd = new Set<string>();
+      for (const id of matchedIds) {
+        if (!existingRefs.has(id)) {
+          toAdd.add(id);
+        }
+      }
+
+      const toRemove: string[] = [];
+      for (const [targetId, refNodeId] of existingRefs) {
+        if (!matchedIds.has(targetId)) {
+          toRemove.push(refNodeId);
+        }
+      }
+
+      // Apply changes: remove stale references
+      for (const refNodeId of toRemove) {
+        loroDoc.deleteNode(refNodeId);
+      }
+
+      // Apply changes: add new references
+      for (const targetId of toAdd) {
+        const refId = nanoid();
+        loroDoc.createNode(refId, searchNodeId);
+        loroDoc.setNodeDataBatch(refId, {
+          type: 'reference',
+          targetId,
+        });
+      }
+
+      // Update lastRefreshedAt
+      loroDoc.setNodeData(searchNodeId, 'lastRefreshedAt', Date.now());
+
+      // Single commit with system:refresh origin (excluded from undo stack)
+      loroDoc.commitDoc('system:refresh');
     },
   };
 });

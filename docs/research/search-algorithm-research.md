@@ -19,7 +19,8 @@
 | 当前 fuzzy-search.ts | ❌ 散乱匹配 | 无感知 | ❌ | ~10ms | 0 | 否 |
 | fzf (JS port) | ⚠️ 匹配但低分 | 未验证 | ✅ | ~30ms | ~5KB | 否 |
 | Fuse.js | ⚠️ 不直觉 | 部分 | ✅ | **~200ms 慢** | ~6.5KB | 否 |
-| **uFuzzy** | ✅ | **❌ 完全不工作** | ✅ | ~5ms | ~3KB | 否 |
+| **uFuzzy（默认配置）** | ✅ | **❌ 完全不工作** | ✅ | ~5ms | ~3KB | 否 |
+| **uFuzzy（CJK 配置）** | ✅ | **✅ 完全工作** | ✅ | ~5ms | ~3KB | 否 |
 | FlexSearch | ✅ | ✅ 原生 | ❌ | ~1ms | 4.5-16KB | **是** |
 | MiniSearch | ✅ | 弱 | ✅ | ~5ms | ~5.8KB | **是** |
 | 分词子串匹配 | ✅ | ✅ | ❌ | ~10ms | 0 | 否 |
@@ -56,30 +57,9 @@
 | `today 会议`（混合语言）| ⚠️ 忽略中文 | ✅ | ✅ |
 | `tody`（拼写错误）| ✅ | ❌ | ✅ fuzzy 兜底 |
 
-## 推荐方案
+## 初始推荐：混合方案
 
-**分词子串匹配为主 + uFuzzy 兜底**
-
-```
-Phase 1: 分词子串匹配（所有语言通用）
-  query 按空格拆词 → 每个词在 target 中做 includes()
-  "today" ⊂ "Today's meeting" ✅
-  "会议"  ⊂ "今天的会议记录" ✅
-  "today 会议" → 两个词都命中 ✅
-
-Phase 2: 结果不足时 + 查询是纯拉丁字符 → uFuzzy 补充
-  "tody" → substring 零结果 → uFuzzy 找到 "Today" ✅
-```
-
-### 排序权重（待实现）
-
-子串匹配只提供"匹配/不匹配"的二元结果，排序需要额外评分：
-
-1. **精确匹配** > 包含匹配（"today" == "today" 优于 "today" ⊂ "Go to today"）
-2. **词首匹配** > 词中匹配（"meet" 在 "Meeting" 词首 优于 "meet" 在 "I'll meet you"）
-3. **目标越短越好**（更精准的节点标题）
-4. **最近使用/修改**加分（已有 recency 逻辑保留）
-5. **所有 query token 命中率**（全部命中 > 部分命中）
+调研阶段推荐 **分词子串匹配为主 + uFuzzy 兜底**（因为当时认为 uFuzzy 不支持 CJK）。
 
 ### 不推荐的方案
 
@@ -88,12 +68,43 @@ Phase 2: 结果不足时 + 查询是纯拉丁字符 → uFuzzy 补充
 - **fzf JS port**：仍返回散乱匹配（只是低分），且停止维护（2023）
 - **继续修补当前 fuzzy-search.ts**：子序列匹配的根本模型不适合知识管理搜索
 
+## 最终方案：纯 uFuzzy（CJK 配置）
+
+> 调研后发现 uFuzzy **默认配置** CJK 失败，但配置 `interSplit` + `interLft` + `interRgt` 后 CJK 完全工作。
+> 混合方案不再需要，直接用 uFuzzy 统一处理所有语言。
+
+```ts
+const uf = new uFuzzy({
+  unicode: true,
+  interSplit: '[\\s]+',  // 按空白分词（CJK token 保持完整）
+  interLft: 0,           // 无左词界要求（CJK 无词边界）
+  interRgt: 0,           // 无右词界要求
+  intraMode: 1,          // 每 term 允许 1 个拼写错误
+});
+```
+
+**关键发现**：uFuzzy 默认的 `interSplit` 使用拉丁词界正则，CJK 字符被当作分隔符吞掉。改为 `'[\\s]+'`（纯空白分割）后，CJK 字符被正确保留在 token 中。
+
+**最终实测结果**：
+
+| 查询 | uFuzzy（CJK 配置） |
+|------|:---:|
+| `today`（不匹配 Friday）| ✅ |
+| `meet fri`（多词）| ✅ |
+| `今天` | ✅ |
+| `会议` | ✅ |
+| `会`（单字匹配多个）| ✅ |
+| `设计` | ✅ |
+| `today 会议`（混合语言）| ✅ |
+| `tody`（拼写错误）| ✅ |
+
+**性能（55k 节点）**：所有查询 <5ms。
+
 ## 涉及文件
 
-- `src/lib/fuzzy-search.ts` — 当前算法，需重写
-- `src/components/search/CommandPalette.tsx` — 搜索调用方，需适配新 API
-- `src/lib/palette-commands.ts` — 命令搜索，可能也用 fuzzyMatch
-- `tests/vitest/` — 需补搜索相关测试
+- `src/lib/fuzzy-search.ts` — 完全重写为 uFuzzy 封装
+- `src/components/search/CommandPalette.tsx` — 改为 batch `fuzzySort()` + `searchableNodes` 缓存
+- `tests/vitest/fuzzy-search.test.ts` — 21 测试覆盖 CJK/typo/scattered/multi-token/highlight/scoring
 
 ## 参考资料
 

@@ -40,11 +40,14 @@
 ### UI 细节打磨 — 浮层/间距/色彩协调
 > **Agent**: antigravity | **分支**: `cc/ui-polish-round2` | **PR**: TBD
 
-- [ ] **1. 日期选择器视觉优化** — CalendarGrid 日历弹窗 + DatePicker 字段弹窗整体打磨（间距、圆角、排版与 Paper 设计系统对齐）
-- [ ] **2. DateNavigationBar 间距收紧** — 日期面板标题下方的 `< Today > 📅` 导航条左右间距松散，需要收紧到与大纲内容对齐
-- [ ] **3. 用户菜单浮层优化** — 点击头像后的下拉菜单视觉优化（间距、排版、分隔线）
-- [ ] **4. CommandPalette (⌘K) 全面对齐** — 左右 padding 与 NodePanel 匹配；搜索框高度与搜索按钮匹配；头部高度与 TopToolbar 对齐；整体间距统一
-- [ ] **5. 容器图标底色协调** — NodePanel 头部的容器图标（Inbox/Library 等）底色在暖纸色背景下不协调，需调整为融入背景的色调
+- [x] **1. 日期选择器视觉优化** — CalendarGrid 日历弹窗 + DatePicker 字段弹窗整体打磨（间距、圆角、排版与 Paper 设计系统对齐，解决靠近屏幕边缘时的溢出）
+- [x] **2. DateNavigationBar 间距收紧** — 日期面板标题下方的 `< Today > 📅` 导航条左右间距收紧到与内容对齐
+- [x] **3. 用户菜单浮层优化** — 点击头像后的下拉菜单视觉优化（排版统一、图标对齐等）
+- [x] **4. CommandPalette (⌘K) 全面对齐** — 左右 padding 与 NodePanel 匹配；搜索框与容器居中；结果列表与大纲视觉一致
+- [x] **5. 容器图标底色协调** — NodePanel 头部图标的底色调和为融入暖纸背景
+- [ ] **6. 浮层穿模修复** — 解决弹出层被下方原生或定位元素 (如 checkbox、bullet) 遮挡的问题
+  - [x] DatePicker 防穿模修复：通过 `has-[.field-overlay-open]` 强制提权 (`z-[80]`) 解决
+  - [ ] OptionsPicker 类型穿模问题（目前仍未彻底解决，需要留待后续排查）
 
 ---
 

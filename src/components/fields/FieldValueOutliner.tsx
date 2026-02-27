@@ -318,7 +318,7 @@ export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, configNo
     >
       {visibleChildren.map(({ id, type }, i) =>
         type === 'field' ? (
-          <div key={id} className="@container" style={{ paddingLeft: 6 + 15 + 4 }}>
+          <div key={id} className="@container relative has-[.field-overlay-open]:z-[80]" style={{ paddingLeft: 6 + 15 + 4 }}>
             <FieldRow
               nodeId={tupleId}
               {...toFieldRowEntryProps(fieldMap.get(id)!)}
@@ -408,7 +408,7 @@ function DatePickerField({ value, onSelect }: { value: string; onSelect: (v: str
   }, []);
 
   return (
-    <div className={`relative ${open ? 'isolate' : ''}`} style={open ? { zIndex: FIELD_OVERLAY_Z_INDEX } : undefined}>
+    <div className={`relative ${open ? 'isolate field-overlay-open' : ''}`} style={open ? { zIndex: FIELD_OVERLAY_Z_INDEX } : undefined}>
       <div className="flex min-h-6 items-start gap-2 py-1" style={{ paddingLeft: FIELD_VALUE_INSET }}>
         <BulletChevron hasChildren={false} isExpanded={false} onBulletClick={() => { }} dimmed={!value} />
         <div className="flex-1 min-w-0 flex items-center cursor-pointer" onClick={handleClick}>

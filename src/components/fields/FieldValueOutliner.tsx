@@ -10,7 +10,7 @@
  * Used for Plain and Options field types. fieldDataType and attrDefId are
  * passed through for future type-specific rendering (e.g., option autocomplete).
  */
-import { useMemo, useState, useCallback } from 'react';
+import { useMemo, useState, useCallback, useRef } from 'react';
 import { useNodeStore } from '../../stores/node-store';
 import { useChildren } from '../../hooks/use-children';
 import { useNodeFields, type FieldEntry } from '../../hooks/use-node-fields';
@@ -282,6 +282,37 @@ export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, configNo
     );
   }
 
+  // --- Drop zone for dragging nodes into field values ---
+  const moveNodeTo = useNodeStore((s) => s.moveNodeTo);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [isDragOver, setIsDragOver] = useState(false);
+
+  const handleContainerDragOver = useCallback((e: React.DragEvent) => {
+    const dragId = useUIStore.getState().dragNodeId;
+    if (!dragId) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setIsDragOver(true);
+  }, []);
+
+  const handleContainerDragLeave = useCallback((e: React.DragEvent) => {
+    // Only clear when leaving the container entirely (not entering a child)
+    if (containerRef.current && !containerRef.current.contains(e.relatedTarget as Node)) {
+      setIsDragOver(false);
+    }
+  }, []);
+
+  const handleContainerDrop = useCallback((e: React.DragEvent) => {
+    // If an inner OutlinerItem already handled the drop (via stopPropagation), this won't fire.
+    e.preventDefault();
+    setIsDragOver(false);
+    const dragId = useUIStore.getState().dragNodeId;
+    if (!dragId) return;
+    // Append dragged node to end of this tuple's children
+    moveNodeTo(dragId, tupleId);
+    useUIStore.getState().setDrag(null);
+  }, [tupleId, moveNodeTo]);
+
   // Prevent border stacking: when nested FieldRows are first/last, add padding
   // so their border-t/border-b doesn't visually coincide with the parent FieldRow's borders
   const firstIsField = visibleChildren.length > 0 && visibleChildren[0].type === 'field';
@@ -311,10 +342,16 @@ export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, configNo
     onNavigateOut?.('down');
   }, [visibleChildren, onNavigateOut, clearFocus, setEditingFieldName, tupleId, setFocusedNode]);
 
+  const dragActive = isDragOver && useUIStore.getState().dragNodeId != null;
+
   return (
     <div
-      className={`min-h-[22px]${firstIsField ? ' pt-1' : ''}${lastIsField ? ' pb-1' : ''}`}
+      ref={containerRef}
+      className={`min-h-[22px]${firstIsField ? ' pt-1' : ''}${lastIsField ? ' pb-1' : ''}${dragActive ? ' ring-1 ring-primary/30 bg-primary/5 rounded-sm' : ''}`}
       data-row-scope-parent-id={tupleId}
+      onDragOver={handleContainerDragOver}
+      onDragLeave={handleContainerDragLeave}
+      onDrop={handleContainerDrop}
     >
       {visibleChildren.map(({ id, type }, i) =>
         type === 'field' ? (

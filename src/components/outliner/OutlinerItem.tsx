@@ -10,6 +10,7 @@ import * as loroDoc from '../../lib/loro-doc.js';
 import { CONTAINER_IDS } from '../../types/index.js';
 import type { NodeType } from '../../types/index.js';
 import { BulletChevron, ChevronButton } from './BulletChevron';
+import { DragHandle } from './DragHandle';
 import { RichTextEditor, type EditorContentPayload, type TriggerAnchorRect } from '../editor/RichTextEditor';
 import { SlashCommandMenu } from '../editor/SlashCommandMenu';
 import { TrailingInput } from '../editor/TrailingInput';
@@ -2451,9 +2452,7 @@ export function OutlinerItem({
         style={{ paddingLeft: depth * 28 + 6 }}
         data-node-id={nodeId}
         data-parent-id={parentId}
-        draggable={!isFocused}
         onMouseDownCapture={isFocused ? handleFocusedRowMouseDownCapture : undefined}
-        onDragStart={handleDragStart}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
@@ -2466,6 +2465,10 @@ export function OutlinerItem({
             style={{ left: depth * 28 + 6 + 15, top: 1, bottom: 1 }}
           />
         )}
+        {/* Drag handle: absolute-positioned in indent padding, visible on row hover */}
+        <div className="absolute top-0 bottom-0 flex items-center" style={{ left: Math.max(depth * 28 + 6 - 20, 0) }}>
+          <DragHandle onDragStart={handleDragStart} />
+        </div>
         {/* Chevron: 15px zone, visible on row hover only */}
         <ChevronButton
           isExpanded={isExpanded}

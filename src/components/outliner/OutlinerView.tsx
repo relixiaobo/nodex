@@ -2,15 +2,15 @@ import { useEffect, useMemo, useRef } from 'react';
 import { useNode } from '../../hooks/use-node';
 import { useChildren } from '../../hooks/use-children';
 import { useNodeFields, type FieldEntry } from '../../hooks/use-node-fields';
+import { useNodeTags } from '../../hooks/use-node-tags';
 import { useNodeStore } from '../../stores/node-store';
 import { useUIStore } from '../../stores/ui-store';
 import * as loroDoc from '../../lib/loro-doc.js';
 import { isOutlinerContentNodeType } from '../../lib/node-type-utils.js';
-import { OutlinerItem, buildFieldOwnerColors } from './OutlinerItem';
+import { OutlinerItem, buildFieldOwnerColors, buildVisibleChildrenRows } from './OutlinerItem';
 import { FieldRow } from '../fields/FieldRow';
 import { toFieldRowEntryProps } from '../fields/field-row-props.js';
 import { TrailingInput } from '../editor/TrailingInput';
-import { SYS_V } from '../../types/index.js';
 import { resolveTagColor } from '../../lib/tag-colors.js';
 import { useDragSelect } from '../../hooks/use-drag-select.js';
 import { getFlattenedVisibleNodes, getNodeTextLengthById } from '../../lib/tree-utils.js';
@@ -65,17 +65,22 @@ export function OutlinerView({ rootNodeId, showTemplateTuples }: OutlinerViewPro
   }, [isSearchNode, rootNodeId, refreshSearchResults]);
 
   const fields = useNodeFields(rootNodeId);
+  const tagIds = useNodeTags(rootNodeId);
 
   // Hidden field reveal state from UIStore (session-only, keyed by "panelNodeId:fieldEntryId")
   const expandedHiddenFields = useUIStore((s) => s.expandedHiddenFields);
   const toggleHiddenField = useUIStore((s) => s.toggleHiddenField);
 
   // Build field lookup by tuple ID (same pattern as OutlinerItem)
+  // When showTemplateTuples: exclude config fields (handled by FieldList above)
   const fieldMap = useMemo(() => {
     const m = new Map<string, FieldEntry>();
-    for (const f of fields) m.set(f.fieldEntryId, f);
+    for (const f of fields) {
+      if (showTemplateTuples && f.dataType.startsWith('__')) continue;
+      m.set(f.fieldEntryId, f);
+    }
     return m;
-  }, [fields]);
+  }, [fields, showTemplateTuples]);
 
   const fieldOwnerColors = useMemo(() => (
     buildFieldOwnerColors(
@@ -86,39 +91,20 @@ export function OutlinerView({ rootNodeId, showTemplateTuples }: OutlinerViewPro
     )
   ), [fieldMap]);
 
-  // Classify each child: field tuple → 'field', regular node → 'content', else skip
-  // Also evaluate hide-field rules for field entries
-  const visibleChildren = useMemo(() => {
-    const result: { id: string; type: 'field' | 'content'; hidden?: boolean }[] = [];
-    for (const cid of allChildIds) {
-      const fieldEntry = fieldMap.get(cid);
-      if (fieldEntry) {
-        // When showTemplateTuples: skip config fields (handled by FieldList above)
-        if (showTemplateTuples && fieldEntry.dataType.startsWith('__')) continue;
-        // Evaluate hide-field condition
-        let hidden = false;
-        switch (fieldEntry.hideMode) {
-          case SYS_V.ALWAYS:
-            hidden = true;
-            break;
-          case SYS_V.WHEN_EMPTY:
-            hidden = !!fieldEntry.isEmpty;
-            break;
-          case SYS_V.WHEN_NOT_EMPTY:
-            hidden = !fieldEntry.isEmpty;
-            break;
-          // WHEN_VALUE_IS_DEFAULT: needs "default" concept — skip for now
-          // NEVER: default, not hidden
-        }
-        result.push({ id: cid, type: 'field', hidden });
-      } else {
-        const nodeType = useNodeStore.getState().getNode(cid)?.type;
-        if (isOutlinerContentNodeType(nodeType)) result.push({ id: cid, type: 'content' });
-      }
-    }
-    return result;
+  // Classify children with unified ordering: template fields first (grouped by tag),
+  // then remaining children in data order — same logic as OutlinerItem.
+  const visibleChildren = useMemo(() => (
+    buildVisibleChildrenRows({
+      allChildIds,
+      fieldMap,
+      tagIds,
+      getFieldDefOwnerId: (fieldDefId) => loroDoc.getParentId(fieldDefId),
+      getNodeType: (id) => useNodeStore.getState().getNode(id)?.type,
+      getChildNodeType: (id) => useNodeStore.getState().getNode(id)?.type,
+      isOutlinerContentType: isOutlinerContentNodeType,
+    })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allChildIds, fieldMap, _version, showTemplateTuples]);
+  ), [allChildIds, fieldMap, tagIds, _version]);
 
   // Template content clone colors: content children with templateId get the owning tagDef's color.
   const templateContentColors = useMemo(() => {

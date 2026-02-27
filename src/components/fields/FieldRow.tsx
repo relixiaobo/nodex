@@ -42,6 +42,7 @@ import { t } from '../../i18n/strings.js';
 import { NodePicker, type NodePickerOption } from './NodePicker';
 import { DoneMappingEntries } from './DoneMappingEntries';
 import { BulletChevron } from '../outliner/BulletChevron';
+import { DragHandle } from '../outliner/DragHandle';
 import { FIELD_VALUE_INSET } from './field-layout.js';
 import { dragState } from '../../hooks/use-drag-select.js';
 import { getFlattenedVisibleNodes } from '../../lib/tree-utils.js';
@@ -951,14 +952,12 @@ export function FieldRow({
       )}
       <div
         ref={rowRef}
-        className={`relative border-t ${isLastInGroup ? 'border-b' : ''} border-border-subtle flex flex-col @sm:flex-row @sm:items-start min-h-6 has-[.field-overlay-open]:z-[80] ${isDropTarget && dropPosition === 'inside' ? 'bg-primary/10 ring-1 ring-primary/30 rounded-sm' : ''} ${isDragging ? 'opacity-40' : ''}`}
+        className={`group/row relative border-t ${isLastInGroup ? 'border-b' : ''} border-border-subtle flex flex-col @sm:flex-row @sm:items-start min-h-6 has-[.field-overlay-open]:z-[80] ${isDropTarget && dropPosition === 'inside' ? 'bg-primary/10 ring-1 ring-primary/30 rounded-sm' : ''} ${isDragging ? 'opacity-40' : ''}`}
         data-field-row
         data-field-row-id={tupleId}
         data-node-id={tupleId}
         data-parent-id={nodeId}
         data-row-kind="field"
-        draggable={!isEditing && !isVirtual && !isSystemField && !isSystemConfig}
-        onDragStart={handleDragStart}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
@@ -967,6 +966,12 @@ export function FieldRow({
       >
         {isFieldSelected && (
           <div className={FIELD_ROW_SELECTION_OVERLAY_CLASS} style={FIELD_ROW_SELECTION_OVERLAY_STYLE} />
+        )}
+        {/* Drag handle: positioned to the left of the name column, visible on row hover */}
+        {!isVirtual && !isSystemField && !isSystemConfig && (
+          <div className="absolute top-0 bottom-0 flex items-center" style={{ left: -20 }}>
+            <DragHandle onDragStart={handleDragStart} />
+          </div>
         )}
       {/* Name column — aligned to first line of value */}
       <div className="relative z-[1] flex items-center gap-1 @sm:shrink-0 @sm:w-[130px] min-w-0 min-h-6 py-1">

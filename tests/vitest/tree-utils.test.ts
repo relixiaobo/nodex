@@ -81,6 +81,28 @@ describe('tree-utils', () => {
     expect(getNextVisibleNode('a1', 'a', flat)).toEqual({ nodeId: 'a1c', parentId: 'a1' });
   });
 
+  it('uses getVisualChildIds callback for custom child ordering', () => {
+    // Build: root → [a]; a → [c1, c2, c3] (data order)
+    createNode('root', null);
+    createNode('a', 'root');
+    createNode('c1', 'a');
+    createNode('c2', 'a');
+    createNode('c3', 'a');
+
+    const expanded = new Set<string>(['root:a']);
+
+    // Without callback: data order
+    const flatDefault = getFlattenedVisibleNodes(['a'], expanded, 'root');
+    expect(flatDefault.map((x) => x.nodeId)).toEqual(['a', 'c1', 'c2', 'c3']);
+
+    // With callback: reversed visual order for node 'a'
+    const flatCustom = getFlattenedVisibleNodes(['a'], expanded, 'root', (nodeId) => {
+      if (nodeId === 'a') return ['c3', 'c1', 'c2']; // custom order
+      return []; // fallback
+    });
+    expect(flatCustom.map((x) => x.nodeId)).toEqual(['a', 'c3', 'c1', 'c2']);
+  });
+
   it('finds last visible node and sibling/index helpers', () => {
     // Build: p → [c1, fieldEntry, c2]; c2 → [c2a]
     createNode('p', null);

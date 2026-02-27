@@ -28,13 +28,19 @@ _(空)_
 
 | Agent | 当前任务 | 分支 | 修改中的文件 |
 |-------|---------|------|-------------|
-_(无活跃 agent)_
+| search-step3 | Search Nodes Step 3 | cc/search-step3 | OutlinerView, OutlinerItem, search-engine, node-store |
+| field-fixes | Field bug + dedup | cc/field-fixes | field-validation, FieldRow, node-store |
+| paste-phase1 | Editor Paste Phase 1 | cc/paste-phase1 | RichTextEditor |
+| trash-delete | Trash 彻底删除 | cc/trash-delete | node-store, OutlinerItem, NodePanel |
 
 ---
 
 ## 进行中
 
-_(无)_
+- **Search Nodes Step 3** — 结果渲染增强：芯片条（只读）+ TrailingInput 自动打标签 `[search-step3]`
+- **Field bug + dedup** — ⚠ icon 垂直居中 + 同节点重复 field 去重 `[field-fixes]`
+- **Editor Paste Phase 1** — ⌘V 多行拆分为兄弟节点 `[paste-phase1]`
+- **Trash 彻底删除** — Trash 内节点支持永久删除 `[trash-delete]`
 
 ---
 

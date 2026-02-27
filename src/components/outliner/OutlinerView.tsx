@@ -55,6 +55,15 @@ export function OutlinerView({ rootNodeId, showTemplateTuples }: OutlinerViewPro
     }
   }, [node?.tags, rootNodeId, syncTemplateFields]);
 
+  // Auto-refresh search results when a search node panel is opened
+  const isSearchNode = node?.type === 'search';
+  const refreshSearchResults = useNodeStore((s) => s.refreshSearchResults);
+  useEffect(() => {
+    if (isSearchNode) {
+      refreshSearchResults(rootNodeId);
+    }
+  }, [isSearchNode, rootNodeId, refreshSearchResults]);
+
   const fields = useNodeFields(rootNodeId);
 
   // Hidden field reveal state from UIStore (session-only, keyed by "panelNodeId:fieldEntryId")
@@ -237,10 +246,16 @@ export function OutlinerView({ rootNodeId, showTemplateTuples }: OutlinerViewPro
           />
         );
       })}
+      {/* Empty state for search nodes */}
+      {isSearchNode && visibleChildren.length === 0 && (
+        <div className="px-4 py-3 text-sm text-foreground-tertiary" style={{ paddingLeft: 6 + 15 + 4 }}>
+          No matching nodes found.
+        </div>
+      )}
       <TrailingInput
         parentId={rootNodeId}
         depth={0}
-        autoFocus={visibleChildren.length === 0}
+        autoFocus={!isSearchNode && visibleChildren.length === 0}
         parentExpandKey={`${loroDoc.getParentId(rootNodeId) ?? ''}:${rootNodeId}`}
         onNavigateOut={(direction) => {
           if (direction !== 'up') return;

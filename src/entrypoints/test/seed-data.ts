@@ -301,6 +301,14 @@ function seedBody(): void {
   cn('j_d14_3', day14agoId, { name: 'Fixed undo/redo edge case' });
 
   // ═══════════════════════════════════════════════════════════════
+  // Search node: "Task" tag search (queryCondition tree + auto-materialized results)
+  // ═══════════════════════════════════════════════════════════════
+  cn('search_task', CONTAINER_IDS.SEARCHES, { type: 'search', name: 'Task' });
+  cn('search_task_and', 'search_task', { type: 'queryCondition', queryLogic: 'AND' });
+  cn('search_task_cond', 'search_task_and', { type: 'queryCondition', queryOp: 'HAS_TAG', queryTagDefId: 'tagDef_task' });
+  // Results are auto-materialized on panel open via refreshSearchResults
+
+  // ═══════════════════════════════════════════════════════════════
   // UI State: navigation + expand defaults
   // ═══════════════════════════════════════════════════════════════
   const uiStore = useUIStore.getState();

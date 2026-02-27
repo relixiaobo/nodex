@@ -243,6 +243,7 @@ export function OutlinerView({ rootNodeId, showTemplateTuples }: OutlinerViewPro
         depth={0}
         autoFocus={!isSearchNode && visibleChildren.length === 0}
         parentExpandKey={`${loroDoc.getParentId(rootNodeId) ?? ''}:${rootNodeId}`}
+        isSearchContext={isSearchNode}
         onNavigateOut={(direction) => {
           if (direction !== 'up') return;
           const fl = getFlattenedVisibleNodes(

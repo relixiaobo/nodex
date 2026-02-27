@@ -14,6 +14,7 @@ import { isDayNode } from '../../lib/journal.js';
 import { isJournalSystemTagId } from '../../types/index.js';
 import { DateNavigationBar } from '../journal/DateNavigationBar';
 import { BacklinksSection } from './BacklinksSection';
+import { SearchChipBar } from '../search/SearchChipBar';
 
 interface NodePanelProps {
   nodeId: string;
@@ -146,6 +147,7 @@ export function NodePanel({ nodeId }: NodePanelProps) {
             <FieldList nodeId={nodeId} />
           </div>
         )}
+        {!isDefinitionNode && node?.type === 'search' && <SearchChipBar searchNodeId={nodeId} />}
         {!isDefinitionNode && <OutlinerView rootNodeId={nodeId} />}
         {!isDefinitionNode && <BacklinksSection nodeId={nodeId} />}
 

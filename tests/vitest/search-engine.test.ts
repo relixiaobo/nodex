@@ -3,6 +3,8 @@ import { useNodeStore } from '../../src/stores/node-store.js';
 import { CONTAINER_IDS } from '../../src/types/index.js';
 import { findNodesByTag, runSearch, evaluateCondition } from '../../src/lib/search-engine.js';
 import { getNodeCapabilities } from '../../src/lib/node-capabilities.js';
+import { isOutlinerContentNodeType } from '../../src/lib/node-type-utils.js';
+import { collectChipEntries, getChipTextForCondition } from '../../src/components/search/SearchChipBar.js';
 import type { NodexNode } from '../../src/types/node.js';
 import { resetAndSeed } from './helpers/test-state.js';
 
@@ -412,4 +414,107 @@ describe('search-engine', () => {
       expect(caps.canDelete).toBe(false);
     });
   });
+
+  describe('SearchChipBar chip text mapping', () => {
+    it('maps HAS_TAG to #tagName', () => {
+      const store = useNodeStore.getState();
+      const searchId = store.createSearchNode('tagDef_task');
+      const chips = collectChipEntries(searchId);
+      expect(chips.length).toBeGreaterThan(0);
+      expect(chips[0].text).toBe('#Task');
+    });
+
+    it('maps NOT_DONE to 未完成', () => {
+      const condId = loroDoc.createNode(undefined, CONTAINER_IDS.SEARCHES);
+      loroDoc.setNodeDataBatch(condId, { type: 'queryCondition', queryOp: 'NOT_DONE' });
+      loroDoc.commitDoc('__seed__');
+      const cond = loroDoc.toNodexNode(condId)!;
+      expect(getChipTextForCondition(cond)).toBe('未完成');
+    });
+
+    it('maps DONE to 已完成', () => {
+      const condId = loroDoc.createNode(undefined, CONTAINER_IDS.SEARCHES);
+      loroDoc.setNodeDataBatch(condId, { type: 'queryCondition', queryOp: 'DONE' });
+      loroDoc.commitDoc('__seed__');
+      const cond = loroDoc.toNodexNode(condId)!;
+      expect(getChipTextForCondition(cond)).toBe('已完成');
+    });
+
+    it('maps TODO to 有 checkbox', () => {
+      const condId = loroDoc.createNode(undefined, CONTAINER_IDS.SEARCHES);
+      loroDoc.setNodeDataBatch(condId, { type: 'queryCondition', queryOp: 'TODO' });
+      loroDoc.commitDoc('__seed__');
+      const cond = loroDoc.toNodexNode(condId)!;
+      expect(getChipTextForCondition(cond)).toBe('有 checkbox');
+    });
+
+    it('maps NOT group to 排除: prefix', () => {
+      const notGroupId = loroDoc.createNode(undefined, CONTAINER_IDS.SEARCHES);
+      loroDoc.setNodeDataBatch(notGroupId, { type: 'queryCondition', queryLogic: 'NOT' });
+      const leafId = loroDoc.createNode(undefined, notGroupId);
+      loroDoc.setNodeDataBatch(leafId, { type: 'queryCondition', queryOp: 'DONE' });
+      loroDoc.commitDoc('__seed__');
+      const notGroup = loroDoc.toNodexNode(notGroupId)!;
+      expect(getChipTextForCondition(notGroup)).toBe('排除: 已完成');
+    });
+  });
+
+  describe('createNodeInSearchContext', () => {
+    it('creates node in LIBRARY with auto-applied tag', () => {
+      const store = useNodeStore.getState();
+      const searchId = store.createSearchNode('tagDef_task');
+      const newNode = store.createNodeInSearchContext(searchId, { name: 'Test item' });
+      expect(newNode).not.toBeNull();
+      expect(newNode.name).toBe('Test item');
+      expect(newNode.tags).toContain('tagDef_task');
+      const parentId = loroDoc.getParentId(newNode.id);
+      expect(parentId).toBe(CONTAINER_IDS.LIBRARY);
+    });
+
+    it('creates reference child in search node', () => {
+      const store = useNodeStore.getState();
+      const searchId = store.createSearchNode('tagDef_task');
+      const newNode = store.createNodeInSearchContext(searchId, { name: 'Ref test' });
+      const searchNode = loroDoc.toNodexNode(searchId)!;
+      const refChildren = searchNode.children
+        .map((id) => loroDoc.toNodexNode(id))
+        .filter((n) => n?.type === 'reference');
+      const targetIds = refChildren.map((n) => n!.targetId);
+      expect(targetIds).toContain(newNode.id);
+    });
+
+    it('skips NOT group tags when auto-applying', () => {
+      const searchId = loroDoc.createNode(undefined, CONTAINER_IDS.SEARCHES);
+      loroDoc.setNodeDataBatch(searchId, { type: 'search', name: 'Complex' });
+      const andGroupId = loroDoc.createNode(undefined, searchId);
+      loroDoc.setNodeDataBatch(andGroupId, { type: 'queryCondition', queryLogic: 'AND' });
+      const tagCondId = loroDoc.createNode(undefined, andGroupId);
+      loroDoc.setNodeDataBatch(tagCondId, { type: 'queryCondition', queryOp: 'HAS_TAG', queryTagDefId: 'tagDef_task' });
+      const notGroupId = loroDoc.createNode(undefined, andGroupId);
+      loroDoc.setNodeDataBatch(notGroupId, { type: 'queryCondition', queryLogic: 'NOT' });
+      const negatedCondId = loroDoc.createNode(undefined, notGroupId);
+      loroDoc.setNodeDataBatch(negatedCondId, { type: 'queryCondition', queryOp: 'HAS_TAG', queryTagDefId: 'tagDef_meeting' });
+      loroDoc.commitDoc('__seed__');
+      const store = useNodeStore.getState();
+      const newNode = store.createNodeInSearchContext(searchId, { name: 'NOT test' });
+      expect(newNode.tags).toContain('tagDef_task');
+      expect(newNode.tags).not.toContain('tagDef_meeting');
+    });
+  });
+
+  describe('queryCondition filtering in OutlinerView', () => {
+    it('isOutlinerContentNodeType excludes queryCondition', () => {
+      expect(isOutlinerContentNodeType('queryCondition')).toBe(false);
+    });
+    it('isOutlinerContentNodeType includes undefined (normal content)', () => {
+      expect(isOutlinerContentNodeType(undefined)).toBe(true);
+    });
+    it('isOutlinerContentNodeType excludes fieldEntry', () => {
+      expect(isOutlinerContentNodeType('fieldEntry')).toBe(false);
+    });
+    it('isOutlinerContentNodeType includes reference', () => {
+      expect(isOutlinerContentNodeType('reference')).toBe(true);
+    });
+  });
+
 });

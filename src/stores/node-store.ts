@@ -119,11 +119,23 @@ interface NodeStore {
    * Uses 'system:refresh' commit origin (excluded from undo stack).
    */
   refreshSearchResults(searchNodeId: string): void;
+  createNodeInSearchContext(searchNodeId: string, data?: Partial<NodexNode>): NodexNode;
 }
 
 // ============================================================
 // 辅助：找到 fieldEntry 节点
 // ============================================================
+
+function extractHasTagIds(searchNode: NodexNode): string[] {
+  const tagDefIds: string[] = [];
+  const conditions = searchNode.children.map((id) => loroDoc.toNodexNode(id)).filter((n): n is NodexNode => n !== null && n.type === 'queryCondition');
+  function walk(cond: NodexNode): void {
+    if (cond.queryLogic) { if (cond.queryLogic === 'NOT') return; for (const childId of cond.children) { const child = loroDoc.toNodexNode(childId); if (child?.type === 'queryCondition') walk(child); } }
+    else if (cond.queryOp === 'HAS_TAG' && cond.queryTagDefId) { tagDefIds.push(cond.queryTagDefId); }
+  }
+  for (const cond of conditions) walk(cond);
+  return tagDefIds;
+}
 
 function findFieldEntry(nodeId: string, fieldDefId: string): string | null {
   const children = loroDoc.getChildren(nodeId);
@@ -1236,6 +1248,26 @@ export const useNodeStore = create<NodeStore>((set, get) => {
 
       // Single commit with system:refresh origin (excluded from undo stack)
       loroDoc.commitDoc('system:refresh');
+    },
+
+    createNodeInSearchContext: (searchNodeId, data) => {
+      if (!canMutate('createNodeInSearchContext')) return { id: '', name: '', children: [], tags: [] } as unknown as NodexNode;
+      const searchNode = loroDoc.toNodexNode(searchNodeId);
+      if (!searchNode || searchNode.type !== 'search') return get().createChild(searchNodeId, undefined, data);
+      const nodeId = nanoid();
+      loroDoc.createNode(nodeId, CONTAINER_IDS.LIBRARY);
+      const now = Date.now();
+      loroDoc.setNodeDataBatch(nodeId, { ...data, createdAt: now, updatedAt: now });
+      const tagDefIds = extractHasTagIds(searchNode);
+      for (const tagDefId of tagDefIds) loroDoc.addTag(nodeId, tagDefId);
+      loroDoc.commitDoc();
+      if (tagDefIds.length > 0) get().syncTemplateFields(nodeId);
+      const refId = nanoid();
+      loroDoc.createNode(refId, searchNodeId);
+      loroDoc.setNodeDataBatch(refId, { type: 'reference', targetId: nodeId });
+      loroDoc.commitDoc();
+      set({ _version: get()._version + 1 });
+      return loroDoc.toNodexNode(nodeId)!;
     },
   };
 });

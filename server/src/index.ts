@@ -181,7 +181,7 @@ app.get('/privacy', (c) => {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Nodex Privacy Policy</title>
+  <title>soma Privacy Policy</title>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 640px; margin: 40px auto; padding: 0 20px; color: #333; line-height: 1.6; }
     h1 { font-size: 24px; }
@@ -190,19 +190,19 @@ app.get('/privacy', (c) => {
   </style>
 </head>
 <body>
-  <h1>Nodex Privacy Policy</h1>
+  <h1>soma Privacy Policy</h1>
   <p><em>Last updated: February 27, 2026</em></p>
 
-  <h2>What is Nodex</h2>
-  <p>Nodex is a Chrome extension that provides knowledge management in the Chrome Side Panel. It lets you create, organize, and sync notes while browsing the web.</p>
+  <h2>What is soma</h2>
+  <p>soma is a Chrome extension that provides knowledge management in the Chrome Side Panel. It lets you create, organize, and sync notes while browsing the web.</p>
 
   <h2>Data We Collect</h2>
   <p><strong>Account information</strong>: When you sign in with Google, we receive your name and email address to create your account.</p>
-  <p><strong>Notes and content</strong>: The notes, tags, and other content you create within Nodex are stored to provide the service.</p>
-  <p><strong>Web page content</strong>: When you use the web clipping feature, Nodex captures content from the current webpage that you choose to save.</p>
+  <p><strong>Notes and content</strong>: The notes, tags, and other content you create within soma are stored to provide the service.</p>
+  <p><strong>Web page content</strong>: When you use the web clipping feature, soma captures content from the current webpage that you choose to save.</p>
 
   <h2>How We Use Your Data</h2>
-  <p>Your data is used solely to provide and improve the Nodex service: authenticate your account, store and sync your notes across devices, and enable web clipping when you request it.</p>
+  <p>Your data is used solely to provide and improve the soma service: authenticate your account, store and sync your notes across devices, and enable web clipping when you request it.</p>
   <p>We do <strong>not</strong> use your data for advertising, analytics, or any purpose unrelated to the core service.</p>
 
   <h2>Data Storage</h2>

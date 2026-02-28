@@ -47,6 +47,7 @@ _(见 Agent 状态表)_
 - [x] **Field value 验证错误 icon 未垂直居中** — number 等字段输入非法值时，右侧 ⚠ 图标未与行内容垂直居中 ✅（2026-02-27）
 - [x] **Options from Supertags 值选择器** — 后端 `resolveTaggedNodes()` 正确，但 UI 选择器用错了组件（显示所有 supertag 而非 tagged nodes）。修复：新增 `TaggedNodePickerField` 使用 `useFieldOptions` ✅（2026-02-28）
 - [x] **Reference node 在 field value 中不显示 tag** — NodePicker 选中值只显示名称，缺少原节点的 supertag 标记。修复：NodePicker 添加 `ReadOnlyTagLabel` 渲染引用节点的 tags ✅（2026-02-28）
+- [x] **ConfigOutliner/FieldValueOutliner 需双击才能编辑** — 嵌套 useDragSelect（子容器在父 OutlinerView 内）双重激活，清除 focus + justDragged 抑制 click。修复：data-drag-select-scope 属性标记作用域，父级跳过嵌套子级的事件 ✅（2026-02-28）
 
 ### v0.1 — 首次上线（Chrome Web Store 发布）
 
@@ -226,7 +227,7 @@ _(见 Agent 状态表)_
 #### 粘贴系统重做
 > 当前粘贴只读 `text/plain`，不认 HTML 格式、Markdown 层级、`#tag` / `field:: value` 语法。
 > 统一为解析管线：剪贴板 → `paste-parser.ts`（纯函数）→ `ParsedContentNode[]` → store 创建节点。
-> **Plan**: `.claude/plans/scalable-launching-milner.md`
+> **Plan**: `docs/plans/paste-system-redesign.md`
 >
 > | 剪贴板内容 | ⌘V | ⌘⇧V |
 > |------------|-----|------|
@@ -275,6 +276,7 @@ _(见 Agent 状态表)_
 
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
+| 2026-02-28 | Unified OutlinerRow — 统一行交互架构（OutlinerRow 提取 + FieldRow 委托 + 共享导航工具），消除 content/field 行交互不一致 + 16 test | nodex | main |
 | 2026-02-28 | Outliner 行渲染收敛 — row-model.ts + RowHost.tsx 共享行派生/渲染，迁移 4 个 outliner 组件 + 2 test 文件 | codex | #108 |
 | 2026-02-27 | Field / Default Content 删除联动 — 模板字段删除联动清理 + attrDef 删除灰色删除线 + 14 test | field-cascade | #107 |
 | 2026-02-27 | Highlight + Comment 研究 — 竞品分析 + 数据模型 + 锚点策略 + 3-Phase 实现方案 | research | main |

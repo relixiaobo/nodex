@@ -292,7 +292,7 @@ interface SystemConfigValueContext {
 type SystemConfigValueRenderer = (context: SystemConfigValueContext) => ReactNode;
 
 const SYSTEM_CONFIG_VALUE_RENDERERS: Partial<Record<ConfigFieldDef['control'], SystemConfigValueRenderer>> = {
-  outliner: ({ nodeId }) => <ConfigOutliner nodeId={nodeId} />,
+  outliner: ({ nodeId, onNavigateOut }) => <ConfigOutliner nodeId={nodeId} onNavigateOut={onNavigateOut} />,
   color_picker: ({ tupleId, attrDefId, nodeId, isVirtual, onNavigateOut }) => (
     <FieldValueOutliner
       tupleId={tupleId}
@@ -1015,7 +1015,7 @@ export function FieldRow({
       <div className="relative z-[1] flex flex-1 min-w-0 items-start" data-field-value>
         <div className="flex-1 min-w-0">
           {isOutliner ? (
-            <ConfigOutliner nodeId={nodeId} />
+            <ConfigOutliner nodeId={nodeId} onNavigateOut={onNavigateOut} />
           ) : (
             <FieldValueOutliner tupleId={tupleId} fieldDataType={dataType} attrDefId={attrDefId} onNavigateOut={onNavigateOut} />
           )}

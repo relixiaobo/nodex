@@ -363,6 +363,33 @@ export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, configNo
               rootChildIds={selectableChildIds}
               rootNodeId={tupleId}
               isLastInGroup={i === rows.length - 1 || rows[i + 1].type !== 'field'}
+              onNavigateOut={(direction) => {
+                if (direction === 'up') {
+                  for (let j = i - 1; j >= 0; j--) {
+                    const prev = rows[j];
+                    if (prev.type === 'field') {
+                      clearFocus();
+                      setEditingFieldName(prev.id);
+                      return;
+                    }
+                    setFocusedNode(prev.id, tupleId);
+                    return;
+                  }
+                  onNavigateOut?.('up');
+                  return;
+                }
+                for (let j = i + 1; j < rows.length; j++) {
+                  const next = rows[j];
+                  if (next.type === 'field') {
+                    clearFocus();
+                    setEditingFieldName(next.id);
+                    return;
+                  }
+                  setFocusedNode(next.id, tupleId);
+                  return;
+                }
+                onNavigateOut?.('down');
+              }}
             />
           </div>
         )}

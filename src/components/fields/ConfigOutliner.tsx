@@ -205,6 +205,33 @@ export function ConfigOutliner({ nodeId, onNavigateOut }: ConfigOutlinerProps) {
                 rootNodeId={nodeId}
                 isLastInGroup={i === rows.length - 1 || rows[i + 1].type !== 'field'}
                 ownerTagColor={ownerColor}
+                onNavigateOut={(direction) => {
+                  if (direction === 'up') {
+                    for (let j = i - 1; j >= 0; j--) {
+                      const prev = rows[j];
+                      if (prev.type === 'field') {
+                        clearFocus();
+                        setEditingFieldName(prev.id);
+                        return;
+                      }
+                      setFocusedNode(prev.id, nodeId);
+                      return;
+                    }
+                    onNavigateOut?.('up');
+                    return;
+                  }
+                  for (let j = i + 1; j < rows.length; j++) {
+                    const next = rows[j];
+                    if (next.type === 'field') {
+                      clearFocus();
+                      setEditingFieldName(next.id);
+                      return;
+                    }
+                    setFocusedNode(next.id, nodeId);
+                    return;
+                  }
+                  onNavigateOut?.('down');
+                }}
               />
             </div>
           );

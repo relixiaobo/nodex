@@ -3,7 +3,7 @@ import type { HighlightCreatePayload, HighlightRestorePayload } from './highligh
 import {
   createCommentNode,
   createHighlightNode,
-  getClipFieldDefId,
+  getSourceFieldDefId,
   getHighlightsForClip,
   type HighlightNodeStore,
 } from './highlight-service.js';

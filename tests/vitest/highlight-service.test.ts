@@ -2,7 +2,7 @@
  * highlight-service — #highlight and #comment system tag CRUD tests.
  *
  * Simplified model:
- * - One template field: "Clip" (options_from_supertag → #web_clip)
+ * - One template field: "Source" (options_from_supertag → #source)
  * - Anchor data stored in node description (JSON)
  * - Highlight color = tagDef color (no per-node color)
  */
@@ -17,7 +17,7 @@ import {
   createHighlightNode,
   getHighlightsForClip,
   createCommentNode,
-  getClipFieldDefId,
+  getSourceFieldDefId,
   _resetHighlightCache,
   type HighlightNodeStore,
 } from '../../src/lib/highlight-service.js';
@@ -43,7 +43,7 @@ describe('ensureHighlightTagDef', () => {
     expect(tagDef!.name).toBe('highlight');
   });
 
-  it('creates 1 fieldDef (Clip) under tagDef', () => {
+  it('creates 1 fieldDef (Source) under tagDef', () => {
     const store = getStore();
     ensureHighlightTagDef(store);
 
@@ -55,27 +55,27 @@ describe('ensureHighlightTagDef', () => {
     expect(fieldDefs).toHaveLength(1);
   });
 
-  it('creates Clip field as options_from_supertag type', () => {
+  it('creates Source field as options_from_supertag type', () => {
     const store = getStore();
     ensureHighlightTagDef(store);
 
-    const clipFd = loroDoc.toNodexNode(getClipFieldDefId());
-    expect(clipFd).toBeDefined();
-    expect(clipFd!.name).toBe('Clip');
-    expect(clipFd!.fieldType).toBe(FIELD_TYPES.OPTIONS_FROM_SUPERTAG);
+    const sourceFd = loroDoc.toNodexNode(getSourceFieldDefId());
+    expect(sourceFd).toBeDefined();
+    expect(sourceFd!.name).toBe('Source');
+    expect(sourceFd!.fieldType).toBe(FIELD_TYPES.OPTIONS_FROM_SUPERTAG);
   });
 
-  it('sets sourceSupertag on Clip field to #web_clip tagDef', () => {
+  it('sets sourceSupertag on Source field to #source tagDef', () => {
     const store = getStore();
     ensureHighlightTagDef(store);
 
-    const clipFd = loroDoc.toNodexNode(getClipFieldDefId());
-    expect(clipFd!.sourceSupertag).toBeDefined();
+    const sourceFd = loroDoc.toNodexNode(getSourceFieldDefId());
+    expect(sourceFd!.sourceSupertag).toBeDefined();
 
-    // sourceSupertag should point to #web_clip tagDef
-    const sourceTagDef = loroDoc.toNodexNode(clipFd!.sourceSupertag!);
+    // sourceSupertag should point to #source tagDef
+    const sourceTagDef = loroDoc.toNodexNode(sourceFd!.sourceSupertag!);
     expect(sourceTagDef).toBeDefined();
-    expect(sourceTagDef!.name).toBe('web_clip');
+    expect(sourceTagDef!.name).toBe('source');
   });
 
   it('is idempotent — calling twice does not duplicate', () => {
@@ -177,7 +177,7 @@ describe('createHighlightNode', () => {
     expect(saved!.tags).toContain(SYS_T.HIGHLIGHT);
   });
 
-  it('sets Clip field via setOptionsFieldValue when clipNodeId is provided', () => {
+  it('sets Source field via setOptionsFieldValue when clipNodeId is provided', () => {
     const store = getStore();
     const node = createHighlightNode({
       store,
@@ -185,12 +185,12 @@ describe('createHighlightNode', () => {
       clipNodeId: 'webclip_1',
     });
 
-    // Verify the Clip fieldEntry exists with a value child referencing the clip
+    // Verify the Source fieldEntry exists with a value child referencing the clip
     const children = loroDoc.getChildren(node.id);
-    const clipFieldDefId = getClipFieldDefId();
+    const sourceFieldDefId = getSourceFieldDefId();
     const fieldEntry = children.find(cid => {
       const n = loroDoc.toNodexNode(cid);
-      return n?.type === 'fieldEntry' && n.fieldDefId === clipFieldDefId;
+      return n?.type === 'fieldEntry' && n.fieldDefId === sourceFieldDefId;
     });
     expect(fieldEntry).toBeDefined();
   });
@@ -208,19 +208,19 @@ describe('createHighlightNode', () => {
     expect(saved!.description).toBe(anchorJson);
   });
 
-  it('skips Clip field when clipNodeId not provided', () => {
+  it('skips Source field when clipNodeId not provided', () => {
     const store = getStore();
     const node = createHighlightNode({
       store,
       selectedText: 'test',
     });
 
-    // No Clip fieldEntry should be explicitly set
+    // No Source fieldEntry should be explicitly set
     const children = loroDoc.getChildren(node.id);
-    const clipFieldDefId = getClipFieldDefId();
+    const sourceFieldDefId = getSourceFieldDefId();
     const fieldEntries = children.filter(cid => {
       const n = loroDoc.toNodexNode(cid);
-      return n?.type === 'fieldEntry' && n.fieldDefId === clipFieldDefId;
+      return n?.type === 'fieldEntry' && n.fieldDefId === sourceFieldDefId;
     });
     // May have an empty fieldEntry from applyTag template sync, but no value children
     for (const feId of fieldEntries) {

@@ -1,7 +1,7 @@
 /**
  * Web Clip service — orchestrates saving a web clip as a node.
  *
- * Creates a node in Inbox, tags it with #web_clip, and writes the Source URL field.
+ * Creates a node in Inbox, tags it with #source, and writes the Source URL field.
  */
 import type { NodexNode } from '../types/index.js';
 import { SYS_D, CONTAINER_IDS } from '../types/index.js';
@@ -64,7 +64,7 @@ export function findTemplateAttrDef(
 }
 
 /**
- * Save a web clip as a node in Inbox with #web_clip tag and Source URL field.
+ * Save a web clip as a node in Inbox with #source tag and Source URL field.
  *
  * @returns The ID of the newly created clip node.
  */
@@ -77,10 +77,10 @@ export async function saveWebClip(
 ): Promise<string> {
   const targetParentId = parentId ?? CONTAINER_IDS.INBOX;
 
-  // 1. Find or create #web_clip tagDef
-  let tagDef = findTagDefByName(null, CONTAINER_IDS.SCHEMA, 'web_clip');
+  // 1. Find or create #source tagDef
+  let tagDef = findTagDefByName(null, CONTAINER_IDS.SCHEMA, 'source');
   if (!tagDef) {
-    tagDef = store.createTagDef('web_clip');
+    tagDef = store.createTagDef('source');
   }
 
   // 2. Ensure tagDef has a "Source URL" template field (type URL)
@@ -92,7 +92,7 @@ export async function saveWebClip(
   // 3. Create the clip node under parent (defaults to Inbox)
   const clipNode = store.createChild(targetParentId, undefined, { name: payload.title });
 
-  // 4. Apply #web_clip tag
+  // 4. Apply #source tag
   store.applyTag(clipNode.id, tagDef.id);
 
   // 5. Write Source URL field value
@@ -151,7 +151,7 @@ export function normalizeUrl(url: string): string {
 }
 
 /**
- * Find a #web_clip node by its Source URL field value.
+ * Find a #source node by its Source URL field value.
  * Searches CLIPS, INBOX, and LIBRARY containers.
  *
  * @returns The node ID of the matching clip node, or null if not found.
@@ -159,8 +159,8 @@ export function normalizeUrl(url: string): string {
 export function findClipNodeByUrl(url: string): string | null {
   const normalizedUrl = normalizeUrl(url);
 
-  // Find the web_clip tagDef and its Source URL fieldDef
-  const tagDef = findTagDefByName(null, CONTAINER_IDS.SCHEMA, 'web_clip');
+  // Find the #source tagDef and its Source URL fieldDef
+  const tagDef = findTagDefByName(null, CONTAINER_IDS.SCHEMA, 'source');
   if (!tagDef) return null;
 
   const sourceUrlFieldDef = findTemplateAttrDef(null, tagDef.id, 'Source URL');
@@ -218,10 +218,10 @@ export async function createLightweightClip(
   pageTitle: string,
   store: WebClipNodeStore,
 ): Promise<string> {
-  // 1. Find or create #web_clip tagDef
-  let tagDef = findTagDefByName(null, CONTAINER_IDS.SCHEMA, 'web_clip');
+  // 1. Find or create #source tagDef
+  let tagDef = findTagDefByName(null, CONTAINER_IDS.SCHEMA, 'source');
   if (!tagDef) {
-    tagDef = store.createTagDef('web_clip');
+    tagDef = store.createTagDef('source');
   }
 
   // 2. Ensure Source URL field exists
@@ -233,7 +233,7 @@ export async function createLightweightClip(
   // 3. Create clip node in INBOX (same default as saveWebClip)
   const clipNode = store.createChild(CONTAINER_IDS.INBOX, undefined, { name: pageTitle });
 
-  // 4. Apply #web_clip tag
+  // 4. Apply #source tag
   store.applyTag(clipNode.id, tagDef.id);
 
   // 5. Write Source URL field value
@@ -252,10 +252,10 @@ export async function applyWebClipToNode(
   _workspaceId?: string,
   _userId?: string,
 ): Promise<void> {
-  // 1. Find or create #web_clip tagDef
-  let tagDef = findTagDefByName(null, CONTAINER_IDS.SCHEMA, 'web_clip');
+  // 1. Find or create #source tagDef
+  let tagDef = findTagDefByName(null, CONTAINER_IDS.SCHEMA, 'source');
   if (!tagDef) {
-    tagDef = store.createTagDef('web_clip');
+    tagDef = store.createTagDef('source');
   }
 
   // 2. Ensure tagDef has a "Source URL" template field (type URL)
@@ -267,7 +267,7 @@ export async function applyWebClipToNode(
   // 3. Rename node to page title
   store.setNodeName(nodeId, payload.title);
 
-  // 4. Apply #web_clip tag
+  // 4. Apply #source tag
   store.applyTag(nodeId, tagDef.id);
 
   // 5. Write Source URL field value

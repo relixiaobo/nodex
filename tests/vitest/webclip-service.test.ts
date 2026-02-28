@@ -2,7 +2,7 @@
  * webclip-service — Loro model.
  * findTagDefByName: searches CONTAINER_IDS.SCHEMA children (ignores _entities/_schemaId args).
  * findTemplateAttrDef: searches tagDef's fieldDef children by name.
- * saveWebClip: creates clip node in INBOX, applies #web_clip tag, writes Source URL field.
+ * saveWebClip: creates clip node in INBOX, applies #source tag, writes Source URL field.
  * applyWebClipToNode: applies web clip data to an existing node in-place.
  */
 import { describe, it, expect, beforeEach } from 'vitest';
@@ -42,16 +42,16 @@ describe('findTagDefByName', () => {
   });
 
   it('finds existing tagDef by name (case-insensitive)', () => {
-    const result = findTagDefByName({}, CONTAINER_IDS.SCHEMA, 'web_clip');
+    const result = findTagDefByName({}, CONTAINER_IDS.SCHEMA, 'source');
     expect(result).toBeDefined();
-    expect(result!.id).toBe('tagDef_web_clip');
+    expect(result!.id).toBe('tagDef_source');
     expect(result!.type).toBe('tagDef');
   });
 
   it('finds tagDef with different casing', () => {
-    const result = findTagDefByName({}, CONTAINER_IDS.SCHEMA, 'Web_Clip');
+    const result = findTagDefByName({}, CONTAINER_IDS.SCHEMA, 'Source');
     expect(result).toBeDefined();
-    expect(result!.id).toBe('tagDef_web_clip');
+    expect(result!.id).toBe('tagDef_source');
   });
 
   it('returns undefined for non-existent tagDef name', () => {
@@ -62,9 +62,9 @@ describe('findTagDefByName', () => {
   it('ignores _schemaId arg — always reads from CONTAINER_IDS.SCHEMA', () => {
     // New Loro model ignores _schemaId and reads from loroDoc directly.
     // So even a "wrong" schemaId still finds the tagDef in the real SCHEMA.
-    const result = findTagDefByName({}, 'ws_missing_SCHEMA', 'web_clip');
+    const result = findTagDefByName({}, 'ws_missing_SCHEMA', 'source');
     expect(result).toBeDefined();
-    expect(result!.id).toBe('tagDef_web_clip');
+    expect(result!.id).toBe('tagDef_source');
   });
 });
 
@@ -74,20 +74,20 @@ describe('findTemplateAttrDef', () => {
   });
 
   it('finds template fieldDef by name within tagDef', () => {
-    const result = findTemplateAttrDef({}, 'tagDef_web_clip', 'Source URL');
+    const result = findTemplateAttrDef({}, 'tagDef_source', 'Source URL');
     expect(result).toBeDefined();
     expect(result!.id).toBe('attrDef_source_url');
     expect(result!.type).toBe('fieldDef');
   });
 
   it('finds fieldDef case-insensitively', () => {
-    const result = findTemplateAttrDef({}, 'tagDef_web_clip', 'source url');
+    const result = findTemplateAttrDef({}, 'tagDef_source', 'source url');
     expect(result).toBeDefined();
     expect(result!.id).toBe('attrDef_source_url');
   });
 
   it('returns undefined for non-existent field name', () => {
-    const result = findTemplateAttrDef({}, 'tagDef_web_clip', 'Nonexistent');
+    const result = findTemplateAttrDef({}, 'tagDef_source', 'Nonexistent');
     expect(result).toBeUndefined();
   });
 
@@ -97,7 +97,7 @@ describe('findTemplateAttrDef', () => {
   });
 
   it('Source URL attrDef has fieldType = URL', () => {
-    const result = findTemplateAttrDef({}, 'tagDef_web_clip', 'Source URL');
+    const result = findTemplateAttrDef({}, 'tagDef_source', 'Source URL');
     expect(result).toBeDefined();
     expect(result!.fieldType).toBe('url');
   });
@@ -144,14 +144,14 @@ describe('saveWebClip', () => {
     expect(loroDoc.getChildren(CONTAINER_IDS.INBOX)).not.toContain(clipId);
   });
 
-  it('tags node with #web_clip (reuses existing tagDef)', async () => {
+  it('tags node with #source (reuses existing tagDef)', async () => {
     const store = useNodeStore.getState();
     const payload = makePayload();
 
     const clipId = await saveWebClip(payload, store);
 
     const node = loroDoc.toNodexNode(clipId);
-    expect(node!.tags).toContain('tagDef_web_clip');
+    expect(node!.tags).toContain('tagDef_source');
   });
 
   it('writes Source URL field value', async () => {
@@ -160,8 +160,8 @@ describe('saveWebClip', () => {
 
     const clipId = await saveWebClip(payload, store);
 
-    // Find the source URL fieldDef within tagDef_web_clip
-    const sourceUrlFd = findTemplateAttrDef({}, 'tagDef_web_clip', 'Source URL')!;
+    // Find the source URL fieldDef within tagDef_source
+    const sourceUrlFd = findTemplateAttrDef({}, 'tagDef_source', 'Source URL')!;
     expect(sourceUrlFd).toBeDefined();
 
     const feId = findFieldEntry(clipId, sourceUrlFd.id);
@@ -190,8 +190,8 @@ describe('saveWebClip', () => {
   });
 
   it('creates tagDef if not yet in schema', async () => {
-    // Move seed tagDef_web_clip to TRASH so findTagDefByName returns undefined
-    loroDoc.moveNode('tagDef_web_clip', CONTAINER_IDS.TRASH);
+    // Move seed tagDef_source to TRASH so findTagDefByName returns undefined
+    loroDoc.moveNode('tagDef_source', CONTAINER_IDS.TRASH);
 
     const store = useNodeStore.getState();
     const payload = makePayload();
@@ -200,8 +200,8 @@ describe('saveWebClip', () => {
 
     expect(loroDoc.hasNode(clipId)).toBe(true);
 
-    // A new tagDef named 'web_clip' should exist in SCHEMA
-    const newTagDef = findTagDefByName({}, CONTAINER_IDS.SCHEMA, 'web_clip');
+    // A new tagDef named 'source' should exist in SCHEMA
+    const newTagDef = findTagDefByName({}, CONTAINER_IDS.SCHEMA, 'source');
     expect(newTagDef).toBeDefined();
     expect(newTagDef!.type).toBe('tagDef');
   });
@@ -214,11 +214,11 @@ describe('saveWebClip', () => {
     await saveWebClip(payload1, store);
     await saveWebClip(payload2, store);
 
-    // Count how many tagDefs named 'web_clip' exist in SCHEMA
+    // Count how many tagDefs named 'source' exist in SCHEMA
     const schemaChildren = loroDoc.getChildren(CONTAINER_IDS.SCHEMA);
     const webClipDefs = schemaChildren.filter(cid => {
       const n = loroDoc.toNodexNode(cid);
-      return n?.type === 'tagDef' && n.name?.toLowerCase() === 'web_clip';
+      return n?.type === 'tagDef' && n.name?.toLowerCase() === 'source';
     });
     expect(webClipDefs).toHaveLength(1);
   });
@@ -293,14 +293,14 @@ describe('applyWebClipToNode', () => {
     expect(node!.name).toBe('Clipped Page Title');
   });
 
-  it('applies #web_clip tag to existing node', async () => {
+  it('applies #source tag to existing node', async () => {
     const store = useNodeStore.getState();
     const payload = makePayload();
 
     await applyWebClipToNode('idea_1', payload, store);
 
     const node = loroDoc.toNodexNode('idea_1');
-    expect(node!.tags).toContain('tagDef_web_clip');
+    expect(node!.tags).toContain('tagDef_source');
   });
 
   it('writes Source URL field value to existing node', async () => {
@@ -309,7 +309,7 @@ describe('applyWebClipToNode', () => {
 
     await applyWebClipToNode('idea_1', payload, store);
 
-    const sourceUrlFd = findTemplateAttrDef({}, 'tagDef_web_clip', 'Source URL')!;
+    const sourceUrlFd = findTemplateAttrDef({}, 'tagDef_source', 'Source URL')!;
     const feId = findFieldEntry('idea_1', sourceUrlFd.id);
     expect(feId).toBeDefined();
     expect(getFirstFieldValue(feId!)).toBe('https://example.com/clipped');
@@ -515,7 +515,7 @@ describe('createLightweightClip', () => {
     expect(node!.name).toBe('My Page Title');
   });
 
-  it('applies #web_clip tag', async () => {
+  it('applies #source tag', async () => {
     const store = useNodeStore.getState();
     const clipId = await createLightweightClip(
       'https://example.com/page',
@@ -524,7 +524,7 @@ describe('createLightweightClip', () => {
     );
 
     const node = loroDoc.toNodexNode(clipId);
-    expect(node!.tags).toContain('tagDef_web_clip');
+    expect(node!.tags).toContain('tagDef_source');
   });
 
   it('writes Source URL field', async () => {
@@ -535,7 +535,7 @@ describe('createLightweightClip', () => {
       store,
     );
 
-    const sourceUrlFd = findTemplateAttrDef({}, 'tagDef_web_clip', 'Source URL')!;
+    const sourceUrlFd = findTemplateAttrDef({}, 'tagDef_source', 'Source URL')!;
     expect(sourceUrlFd).toBeDefined();
 
     const feId = findFieldEntry(clipId, sourceUrlFd.id);

@@ -120,10 +120,10 @@ function seedBody(): void {
   cn('tpl_actions', 'tagDef_meeting', { name: 'Action Items' });
 
   // ═══════════════════════════════════════════════════════════════
-  // TagDef: WebClip
+  // TagDef: Source (web clips, articles, etc.)
   // ═══════════════════════════════════════════════════════════════
-  cn('tagDef_web_clip', CONTAINER_IDS.SCHEMA, { type: 'tagDef', name: 'web_clip' });
-  cn('attrDef_source_url', 'tagDef_web_clip', { type: 'fieldDef', name: 'Source URL', fieldType: FIELD_TYPES.URL });
+  cn('tagDef_source', CONTAINER_IDS.SCHEMA, { type: 'tagDef', name: 'source' });
+  cn('attrDef_source_url', 'tagDef_source', { type: 'fieldDef', name: 'Source URL', fieldType: FIELD_TYPES.URL });
 
   // ═══════════════════════════════════════════════════════════════
   // Library content
@@ -211,7 +211,7 @@ function seedBody(): void {
     name: 'Example Article — Medium',
     description: 'A sample web clip to demonstrate the clipping feature',
   });
-  useNodeStore.getState().applyTag('webclip_1', 'tagDef_web_clip');
+  useNodeStore.getState().applyTag('webclip_1', 'tagDef_source');
   // Set Source URL value: create a value node under the fieldEntry
   const wcFeId = loroDoc.getChildren('webclip_1')
     .find((c) => {

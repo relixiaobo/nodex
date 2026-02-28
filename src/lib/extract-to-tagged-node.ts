@@ -4,7 +4,7 @@
  * Takes the current selection, creates a Library node with the selected tag,
  * and replaces the selection with an inline reference.
  *
- * For #highlight tags, sets the Clip field to the nearest #web_clip ancestor.
+ * For #highlight tags, sets the Source field to the nearest #source ancestor.
  */
 import type { EditorView } from 'prosemirror-view';
 import type { NodexNode, InlineRefEntry } from '../types/index.js';
@@ -28,17 +28,17 @@ export interface ExtractResult {
 }
 
 /**
- * Resolve the nearest ancestor (including self) tagged with #web_clip.
+ * Resolve the nearest ancestor (including self) tagged with #source.
  * Falls back to the current node when no clip ancestor exists.
  */
 export function resolveClipNodeIdForHighlight(nodeId: string): string {
-  const webClipTagDef = findTagDefByName(null, CONTAINER_IDS.SCHEMA, 'web_clip');
-  if (!webClipTagDef) return nodeId;
+  const sourceTagDef = findTagDefByName(null, CONTAINER_IDS.SCHEMA, 'source');
+  if (!sourceTagDef) return nodeId;
 
   let currentId: string | null = nodeId;
   while (currentId) {
     const node = loroDoc.toNodexNode(currentId);
-    if (node?.tags.includes(webClipTagDef.id)) {
+    if (node?.tags.includes(sourceTagDef.id)) {
       return currentId;
     }
     currentId = loroDoc.getParentId(currentId);
@@ -70,7 +70,7 @@ export function extractToTaggedNode(
   const selectedText = view.state.doc.textBetween(from, to);
   if (!selectedText.trim()) return null;
 
-  // 1. Resolve clip page context for #highlight Clip field
+  // 1. Resolve clip page context for #highlight Source field
   const clipPageId = resolveClipNodeIdForHighlight(nodeId);
 
   // 2. Create the Library node based on tag type

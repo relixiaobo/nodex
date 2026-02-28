@@ -2,7 +2,7 @@
  * Highlight service — orchestrates #highlight and #comment system tags.
  *
  * Simplified model:
- * - One template field: "Clip" (options_from_supertag → #web_clip)
+ * - One template field: "Source" (options_from_supertag → #source)
  * - Anchor data stored in node description (JSON)
  * - Highlight color = tagDef color (no per-node color)
  */
@@ -21,14 +21,14 @@ export interface HighlightNodeStore extends WebClipNodeStore {
 // Internal constants
 // ============================================================
 
-const FIELD_CLIP = 'Clip';
+const FIELD_SOURCE = 'Source';
 
 // ============================================================
 // TagDef initialization
 // ============================================================
 
 /** Cached fieldDef ID after initialization */
-let _clipFieldDefId: string | null = null;
+let _sourceFieldDefId: string | null = null;
 
 /**
  * Find a fieldDef by name within a tagDef's children.
@@ -47,7 +47,8 @@ function findFieldDefByName_(tagDefId: string, name: string): NodexNode | undefi
 
 /**
  * Create/find #highlight tagDef with fixed ID SYS_T200.
- * Creates 1 template field: Clip (options_from_supertag → #web_clip).
+ * Creates 1 template field: Source (options_from_supertag → #source).
+ * Migrates legacy fields (Anchor, Color, Page URL) and renames Clip → Source.
  */
 export function ensureHighlightTagDef(store: HighlightNodeStore): void {
   // Create tagDef if needed
@@ -63,25 +64,25 @@ export function ensureHighlightTagDef(store: HighlightNodeStore): void {
     tagDef = loroDoc.toNodexNode(SYS_T.HIGHLIGHT);
   }
 
-  // Ensure #web_clip tagDef exists (needed for options_from_supertag source)
-  let webClipTagDef = findTagDefByName(null, CONTAINER_IDS.SCHEMA, 'web_clip');
-  if (!webClipTagDef) {
-    webClipTagDef = store.createTagDef('web_clip');
+  // Ensure #source tagDef exists (needed for options_from_supertag source)
+  let sourceTagDef = findTagDefByName(null, CONTAINER_IDS.SCHEMA, 'source');
+  if (!sourceTagDef) {
+    sourceTagDef = store.createTagDef('source');
   }
 
-  // Ensure Clip field (options_from_supertag → #web_clip)
-  let clipFd = findFieldDefByName_(SYS_T.HIGHLIGHT, FIELD_CLIP);
-  if (!clipFd) {
-    clipFd = store.createFieldDef(FIELD_CLIP, FIELD_TYPES.OPTIONS_FROM_SUPERTAG, SYS_T.HIGHLIGHT);
-    // Set the source supertag so the picker shows #web_clip nodes
-    loroDoc.setNodeDataBatch(clipFd.id, { sourceSupertag: webClipTagDef.id });
+  // Ensure Source field (options_from_supertag → #source)
+  let sourceFd = findFieldDefByName_(SYS_T.HIGHLIGHT, FIELD_SOURCE);
+  if (!sourceFd) {
+    sourceFd = store.createFieldDef(FIELD_SOURCE, FIELD_TYPES.OPTIONS_FROM_SUPERTAG, SYS_T.HIGHLIGHT);
+    // Set the source supertag so the picker shows #source nodes
+    loroDoc.setNodeDataBatch(sourceFd.id, { sourceSupertag: sourceTagDef.id });
     loroDoc.commitDoc();
-  } else if (!loroDoc.toNodexNode(clipFd.id)?.sourceSupertag) {
+  } else if (!loroDoc.toNodexNode(sourceFd.id)?.sourceSupertag) {
     // Backfill sourceSupertag if missing (e.g., after migration)
-    loroDoc.setNodeDataBatch(clipFd.id, { sourceSupertag: webClipTagDef.id });
+    loroDoc.setNodeDataBatch(sourceFd.id, { sourceSupertag: sourceTagDef.id });
     loroDoc.commitDoc();
   }
-  _clipFieldDefId = clipFd.id;
+  _sourceFieldDefId = sourceFd.id;
 }
 
 /**
@@ -104,9 +105,9 @@ export function ensureCommentTagDef(_store: HighlightNodeStore): void {
 // Getters for cached field IDs
 // ============================================================
 
-export function getClipFieldDefId(): string {
-  if (!_clipFieldDefId) throw new Error('#highlight tagDef not initialized. Call ensureHighlightTagDef() first.');
-  return _clipFieldDefId;
+export function getSourceFieldDefId(): string {
+  if (!_sourceFieldDefId) throw new Error('#highlight tagDef not initialized. Call ensureHighlightTagDef() first.');
+  return _sourceFieldDefId;
 }
 
 // ============================================================
@@ -136,9 +137,9 @@ export function createHighlightNode(params: CreateHighlightParams): NodexNode {
   // 2. Apply #highlight tag
   store.applyTag(node.id, SYS_T.HIGHLIGHT);
 
-  // 3. Set Clip field (reference to web_clip node)
+  // 3. Set Source field (reference to #source node)
   if (clipNodeId) {
-    store.setOptionsFieldValue(node.id, getClipFieldDefId(), clipNodeId);
+    store.setOptionsFieldValue(node.id, getSourceFieldDefId(), clipNodeId);
   }
 
   // 4. Store anchor data in description (internal, not user-visible in normal view)
@@ -150,11 +151,11 @@ export function createHighlightNode(params: CreateHighlightParams): NodexNode {
 }
 
 /**
- * Find all #highlight nodes in LIBRARY whose Clip field references the given clipNodeId.
+ * Find all #highlight nodes in LIBRARY whose Source field references the given clipNodeId.
  */
 export function getHighlightsForClip(clipNodeId: string): NodexNode[] {
-  const clipFieldDefId = _clipFieldDefId;
-  if (!clipFieldDefId) return [];
+  const sourceFieldDefId = _sourceFieldDefId;
+  if (!sourceFieldDefId) return [];
 
   const libraryChildren = loroDoc.getChildren(CONTAINER_IDS.LIBRARY);
   const results: NodexNode[] = [];
@@ -163,9 +164,9 @@ export function getHighlightsForClip(clipNodeId: string): NodexNode[] {
     const child = loroDoc.toNodexNode(childId);
     if (!child || !child.tags.includes(SYS_T.HIGHLIGHT)) continue;
 
-    // Check Clip field value (options type → targetId reference)
-    const clipRef = getOptionsFieldTargetId(childId, clipFieldDefId);
-    if (clipRef === clipNodeId) {
+    // Check Source field value (options type → targetId reference)
+    const sourceRef = getOptionsFieldTargetId(childId, sourceFieldDefId);
+    if (sourceRef === clipNodeId) {
       results.push(child);
     }
   }
@@ -210,5 +211,5 @@ function getOptionsFieldTargetId(nodeId: string, fieldDefId: string): string | u
  * Reset cached field IDs (for testing).
  */
 export function _resetHighlightCache(): void {
-  _clipFieldDefId = null;
+  _sourceFieldDefId = null;
 }

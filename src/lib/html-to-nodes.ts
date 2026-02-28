@@ -317,6 +317,15 @@ export function parseHtmlToNodes(
         continue;
       }
 
+      // Inline wrapper with block children (e.g. Google Docs'
+      // <b style="font-weight:normal"> around <p> tags): recurse.
+      const hasBlockChild = Array.from(childEl.children).some(isBlockElement);
+      if (hasBlockChild) {
+        flushInlineFragments(inlineFragments, container);
+        processFlowChildren(childEl);
+        continue;
+      }
+
       inlineFragments.push(childEl.outerHTML);
     }
 

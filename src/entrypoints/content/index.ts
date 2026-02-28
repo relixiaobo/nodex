@@ -49,8 +49,11 @@ export default defineContentScript({
 
   main() {
     // Guard: prevent duplicate listener when executeScript runs multiple times
-    if ((globalThis as any).__nodexCaptureInstalled) return;
-    (globalThis as any).__nodexCaptureInstalled = true;
+    // within the SAME extension session. After extension reload, chrome.runtime.id
+    // changes, so we must re-register listeners for the new context.
+    const extId = chrome.runtime?.id;
+    if ((globalThis as any).__nodexCaptureExtId === extId) return;
+    (globalThis as any).__nodexCaptureExtId = extId;
 
     // Initialize highlight selection listener and custom elements
     initHighlight();

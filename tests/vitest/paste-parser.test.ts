@@ -34,6 +34,45 @@ describe('paste-parser', () => {
     expect(parsed).toBeNull();
   });
 
+  it('parses mixed markdown document with heading sections + lists + tables', () => {
+    const nodes = parseMultiLinePaste([
+      '# soma',
+      'Chrome Side Panel 云端知识管理工具。',
+      '## 项目概述',
+      '支持结构化记录。',
+      '## 沟通约定',
+      '| 用户说 | Claude 应做 |',
+      '|--------|------------|',
+      '| \"实现 X\" | 直接写代码 |',
+      '- 规则 A',
+      '  - 规则 A.1',
+    ].join('\n'));
+
+    expect(nodes).toHaveLength(1);
+    expect(nodes[0].name).toBe('soma');
+    expect(nodes[0].children.some((n) => n.name === 'Chrome Side Panel 云端知识管理工具。')).toBe(true);
+
+    const overview = nodes[0].children.find((n) => n.name === '项目概述');
+    expect(overview).toBeTruthy();
+    expect(overview?.children.map((n) => n.name)).toContain('支持结构化记录。');
+
+    const convention = nodes[0].children.find((n) => n.name === '沟通约定');
+    expect(convention).toBeTruthy();
+    expect(convention?.children.map((n) => n.name)).toContain('用户说 | Claude 应做');
+    expect(convention?.children.map((n) => n.name)).toContain('"实现 X" | 直接写代码');
+
+    const ruleA = convention?.children.find((n) => n.name === '规则 A');
+    expect(ruleA).toBeTruthy();
+    expect(ruleA?.children.map((n) => n.name)).toEqual(['规则 A.1']);
+  });
+
+  it('strips inline markdown markers from plain markdown lines', () => {
+    const nodes = parseMultiLinePaste('**核心设计原则**：保持简单。');
+    expect(nodes).toHaveLength(1);
+    expect(nodes[0].name).toBe('核心设计原则：保持简单。');
+    expect(nodes[0].marks.some((m) => m.type === 'bold')).toBe(true);
+  });
+
   it('parses HTML paragraphs and keeps marks', () => {
     const nodes = parseHtmlBlocks('<p>Hello <strong>World</strong></p><p>Next</p>');
     expect(nodes.map((n) => n.name)).toEqual(['Hello World', 'Next']);

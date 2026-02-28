@@ -13,6 +13,9 @@ export type ParsedPasteNode = ParsedContentNode & {
 };
 
 const LIST_LINE_RE = /^(\s*)(?:[-*+]|\d+\.)\s+(.+)$/;
+const HEADING_RE = /^\s{0,3}(#{1,6})\s+(.+)$/;
+const TABLE_ROW_RE = /^\s*\|.*\|\s*$/;
+const TABLE_SEPARATOR_RE = /^\s*\|?\s*:?-{3,}:?\s*(?:\|\s*:?-{3,}:?\s*)+\|?\s*$/;
 const TAG_RE = /(^|\s)#([A-Za-z0-9][\w-]*)/g;
 const FIELD_RE = /(^|\s)([A-Za-z0-9][\w-]*)::\s*([^#\n]+?)(?=(?:\s+[A-Za-z0-9][\w-]*::)|\s+#|$)/g;
 
@@ -25,7 +28,7 @@ export function parseMultiLinePaste(plain: string, html?: string): ParsedPasteNo
   }
 
   const lines = rawPlain.split(/\r?\n/);
-  const markdownNodes = parseMarkdownList(lines);
+  const markdownNodes = parseMarkdownDocument(lines) ?? parseMarkdownList(lines);
   if (markdownNodes && markdownNodes.length > 0) {
     return markdownNodes;
   }
@@ -82,6 +85,107 @@ export function parseMarkdownList(lines: string[]): ParsedPasteNode[] | null {
   return roots;
 }
 
+function parseMarkdownDocument(lines: string[]): ParsedPasteNode[] | null {
+  const normalized = lines.map((line) => line.replace(/\r/g, ''));
+  if (!looksLikeMarkdown(normalized)) return null;
+
+  const roots: ParsedPasteNode[] = [];
+  const headingStack: Array<{ level: number; node: ParsedPasteNode }> = [];
+  const listStack: Array<{ level: number; node: ParsedPasteNode }> = [];
+
+  const appendToCurrentSection = (node: ParsedPasteNode): void => {
+    if (listStack.length > 0) {
+      listStack[listStack.length - 1].node.children.push(node);
+      return;
+    }
+    if (headingStack.length > 0) {
+      headingStack[headingStack.length - 1].node.children.push(node);
+      return;
+    }
+    roots.push(node);
+  };
+
+  for (const rawLine of normalized) {
+    if (!rawLine.trim()) {
+      listStack.length = 0;
+      continue;
+    }
+
+    const headingMatch = rawLine.match(HEADING_RE);
+    if (headingMatch) {
+      listStack.length = 0;
+      const level = headingMatch[1].length;
+      const content = headingMatch[2].trim();
+      if (!content) continue;
+      while (headingStack.length > 0 && headingStack[headingStack.length - 1].level >= level) {
+        headingStack.pop();
+      }
+      const headingNode = createMarkdownNode(content, true);
+      if (headingStack.length === 0) {
+        roots.push(headingNode);
+      } else {
+        headingStack[headingStack.length - 1].node.children.push(headingNode);
+      }
+      headingStack.push({ level, node: headingNode });
+      continue;
+    }
+
+    if (TABLE_ROW_RE.test(rawLine)) {
+      listStack.length = 0;
+      if (TABLE_SEPARATOR_RE.test(rawLine)) continue;
+      const tableText = rawLine
+        .trim()
+        .replace(/^\|/, '')
+        .replace(/\|$/, '')
+        .split('|')
+        .map((cell) => cell.trim())
+        .filter((cell) => cell.length > 0)
+        .join(' | ');
+      if (!tableText) continue;
+      appendToCurrentSection(createMarkdownNode(tableText));
+      continue;
+    }
+
+    const listMatch = rawLine.match(LIST_LINE_RE);
+    if (listMatch) {
+      const rawLevel = indentToLevel(listMatch[1]);
+      const content = listMatch[2].trim();
+      if (!content) continue;
+
+      let level = rawLevel;
+      if (listStack.length > 0) {
+        const prevLevel = listStack[listStack.length - 1].level;
+        if (level > prevLevel + 1) level = prevLevel + 1;
+      } else {
+        level = 0;
+      }
+
+      while (listStack.length > 0 && listStack[listStack.length - 1].level >= level) {
+        listStack.pop();
+      }
+
+      const listNode = createMarkdownNode(content);
+      if (listStack.length === 0) {
+        if (headingStack.length > 0) {
+          headingStack[headingStack.length - 1].node.children.push(listNode);
+        } else {
+          roots.push(listNode);
+        }
+      } else {
+        listStack[listStack.length - 1].node.children.push(listNode);
+      }
+      listStack.push({ level, node: listNode });
+      continue;
+    }
+
+    listStack.length = 0;
+    appendToCurrentSection(createMarkdownNode(rawLine.trim()));
+  }
+
+  const meaningful = roots.filter(isMeaningfulNode);
+  return meaningful.length > 0 ? meaningful : null;
+}
+
 export function parseHtmlBlocks(html: string): ParsedPasteNode[] {
   if (!html || !html.trim()) return [];
 
@@ -134,6 +238,24 @@ function createPlainNode(text: string): ParsedPasteNode {
     name: text,
     marks: [],
     inlineRefs: [],
+    children: [],
+  });
+}
+
+function createMarkdownNode(content: string, asHeading = false): ParsedPasteNode {
+  const inline = parseInlineMarkdown(content);
+  const marks = [...inline.marks];
+  if (asHeading && inline.text.length > 0) {
+    marks.push({
+      start: 0,
+      end: inline.text.length,
+      type: 'headingMark',
+    });
+  }
+  return enrichNodeMetadata({
+    name: inline.text,
+    marks,
+    inlineRefs: inline.inlineRefs,
     children: [],
   });
 }
@@ -211,6 +333,38 @@ function dedupeCaseInsensitive(values: string[]): string[] {
   return result;
 }
 
+function parseInlineMarkdown(content: string): {
+  text: string;
+  marks: ParsedContentNode['marks'];
+  inlineRefs: ParsedContentNode['inlineRefs'];
+} {
+  const escaped = escapeHtml(content);
+  const withLinks = escaped.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2">$1</a>');
+  const withCode = withLinks.replace(/`([^`]+)`/g, '<code>$1</code>');
+  const withBold = withCode
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/__([^_]+)__/g, '<strong>$1</strong>');
+  const withItalic = withBold
+    .replace(/(^|[^*])\*([^*]+)\*/g, '$1<em>$2</em>')
+    .replace(/(^|[^_])_([^_]+)_/g, '$1<em>$2</em>');
+  const withStrike = withItalic.replace(/~~([^~]+)~~/g, '<s>$1</s>');
+  return htmlToMarks(withStrike);
+}
+
+function looksLikeMarkdown(lines: string[]): boolean {
+  let hintCount = 0;
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    if (HEADING_RE.test(trimmed)) hintCount += 1;
+    else if (LIST_LINE_RE.test(line)) hintCount += 1;
+    else if (TABLE_ROW_RE.test(line)) hintCount += 1;
+    else if (/(\*\*[^*]+\*\*)|(`[^`]+`)|(\[[^\]]+\]\(https?:\/\/[^\s)]+\))/.test(trimmed)) hintCount += 1;
+    if (hintCount >= 1) return true;
+  }
+  return false;
+}
+
 function shouldPreferHtml(html: string, plain: string): boolean {
   const trimmed = html.trim();
   if (!trimmed) return false;
@@ -239,6 +393,15 @@ function indentToLevel(indent: string): number {
   }
 
   return tabs + Math.floor(spaces / 2);
+}
+
+function escapeHtml(text: string): string {
+  return text
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll('\'', '&#39;');
 }
 
 function isMeaningfulNode(node: ParsedPasteNode): boolean {

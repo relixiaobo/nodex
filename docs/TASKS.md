@@ -44,6 +44,7 @@ _(空)_
 - 迭代日志：
   - [2026-02-28 codex] 基于 `origin/main@41f1d78` 建立分支 `codex/paste-phase2-richtext`，按 TASKS 的 Phase 2 规格开工；发现引用计划 `.claude/plans/scalable-launching-milner.md` 在仓库缺失，暂以 `docs/TASKS.md` 为执行基线。
   - [2026-02-28 codex] 完成 Phase 2 实现：新增 `paste-parser.ts`（plain/html/markdown + `#tag` / `field::value` 识别）、store `createSiblingNodesFromPaste` 树结构/marks/tag/field 支持、接入 RichTextEditor/TrailingInput/OutlinerItem；新增 `paste-parser.test.ts` 并升级 `paste-multi-line.test.ts`；本地验证全通过（`typecheck`/`check:test-sync`/`test:run`/`build`）。
+  - [2026-02-28 codex] 根据真实粘贴反馈修复 mixed markdown 文档解析：`parseMultiLinePaste` 支持标题层级（`#`）、列表层级、表格行清洗与基础 inline markdown 去噪，避免长文档粘贴退化为逐行平铺；新增对应 Vitest 回归。
 
 ---
 

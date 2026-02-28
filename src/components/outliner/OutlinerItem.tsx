@@ -47,17 +47,7 @@ import {
 import { resolveDropHoverPosition } from '../../lib/drag-drop-position';
 import { resolveDropMove } from '../../lib/drag-drop';
 import { resolveSelectedReferenceShortcut } from '../../lib/selected-reference-shortcuts';
-import { resolveSelectionKeyboardAction } from '../../lib/selection-keyboard';
 import { resolveRowPointerSelectAction } from '../../lib/row-pointer-selection';
-import {
-  toggleNodeInSelection,
-  computeRangeSelection,
-  filterToRootLevel,
-  getFirstSelectedInOrder,
-  getSelectionBounds,
-  getEffectiveSelectionBounds,
-  getSelectedIdsInOrder,
-} from '../../lib/selection-utils';
 import {
   filterSlashCommands,
   getFirstEnabledSlashIndex,
@@ -80,6 +70,7 @@ import { getTreeReferenceBlockReason, isReferenceDisplayCycle } from '../../lib/
 import { focusUndoShortcutSink, ensureUndoFocusAfterNavigation } from '../../lib/focus-utils.js';
 import { t } from '../../i18n/strings.js';
 import { RowHost } from './RowHost.js';
+import { OutlinerRow, useRowSelectionState, useRowPointerHandlers } from './OutlinerRow.js';
 import {
   buildFieldOwnerColors,
   buildVisibleChildrenRows,
@@ -231,22 +222,21 @@ export function OutlinerItem({
   const focusedNodeId = useUIStore((s) => s.focusedNodeId);
   const focusedParentId = useUIStore((s) => s.focusedParentId);
   const setFocusedNode = useUIStore((s) => s.setFocusedNode);
-  const selectedNodeId = useUIStore((s) => s.selectedNodeId);
-  const selectedParentId = useUIStore((s) => s.selectedParentId);
   const selectionSource = useUIStore((s) => s.selectionSource);
   const setSelectedNode = useUIStore((s) => s.setSelectedNode);
-  // Derive booleans from Set to avoid Zustand infinite re-render (Set creates new reference each time)
-  const isInSelectedSet = useUIStore((s) => s.selectedNodeIds.has(nodeId));
-  const isMultiSelected = useUIStore((s) => s.selectedNodeIds.size > 1);
-  const isSelectionAnchor = useUIStore((s) => s.selectionAnchorId === nodeId);
   const setSelectedNodes = useUIStore((s) => s.setSelectedNodes);
   const clearSelection = useUIStore((s) => s.clearSelection);
+  // Unified selection state from OutlinerRow
+  const { isSelected: isRowSelected, isMultiSelected, isSelectionAnchor } =
+    useRowSelectionState(nodeId, parentId);
   const clearFocus = useUIStore((s) => s.clearFocus);
   const toggleExpanded = useUIStore((s) => s.toggleExpanded);
   const setExpanded = useUIStore((s) => s.setExpanded);
   const navigateTo = useUIStore((s) => s.navigateTo);
   const openSearch = useUIStore((s) => s.openSearch);
   const expandedNodes = useUIStore((s) => s.expandedNodes);
+  // Unified pointer handlers from OutlinerRow
+  const { handleCmdClick, handleShiftClick } = useRowPointerHandlers(nodeId, parentId, rootChildIds, rootNodeId);
 
   const dragNodeId = useUIStore((s) => s.dragNodeId);
   const dropTargetId = useUIStore((s) => s.dropTargetId);
@@ -482,13 +472,8 @@ export function OutlinerItem({
   const pendingConversionRefTargetId = useUIStore((s) =>
     s.pendingRefConversion?.tempNodeId === nodeId ? s.pendingRefConversion.refNodeId : null,
   );
-  // Multi-select: check derived boolean. For single-select with parent disambiguation (reference nodes),
-  // also check selectedParentId to support the same node appearing in multiple places.
-  const isSelected = isInSelectedSet && (
-    isMultiSelected ||
-    selectedParentId === null ||
-    selectedParentId === parentId
-  );
+  // Selection derived from unified useRowSelectionState
+  const isSelected = isRowSelected;
   const isSelectedGlobal = isSelected && !isFocused && (
     selectionSource === 'global' || !isReference || isMultiSelected
   );
@@ -542,34 +527,6 @@ export function OutlinerItem({
   const handleCycleCheckbox = useCallback(() => {
     cycleNodeCheckbox(effectiveNodeId);
   }, [effectiveNodeId, cycleNodeCheckbox]);
-
-  // Cmd+Click: toggle node in multi-selection
-  const handleCmdClick = useCallback(() => {
-    const state = useUIStore.getState();
-    const newSelection = toggleNodeInSelection(nodeId, state.selectedNodeIds);
-    // If anchor was deselected, pick another selected node
-    let newAnchor = state.selectionAnchorId;
-    if (newAnchor && !newSelection.has(newAnchor)) {
-      newAnchor = newSelection.size > 0 ? [...newSelection][0] : null;
-    }
-    if (!newAnchor && newSelection.has(nodeId)) {
-      newAnchor = nodeId;
-    }
-    setSelectedNodes(newSelection, newAnchor);
-  }, [nodeId, setSelectedNodes]);
-
-  // Shift+Click: range select from anchor to this node
-  const handleShiftClick = useCallback(() => {
-    const state = useUIStore.getState();
-    const anchor = state.selectionAnchorId;
-    if (!anchor) {
-      setSelectedNode(nodeId, parentId);
-      return;
-    }
-    const flatList = getFlattenedVisibleNodes(rootChildIds, state.expandedNodes, rootNodeId);
-    const range = computeRangeSelection(anchor, nodeId, flatList);
-    setSelectedNodes(range, anchor);
-  }, [nodeId, parentId, rootChildIds, rootNodeId, setSelectedNode, setSelectedNodes]);
 
   // Escape in editor (no dropdown) → clear focus, keep selection (set at click time)
   const handleEscapeSelect = useCallback(() => {
@@ -768,342 +725,92 @@ export function OutlinerItem({
     return () => document.removeEventListener('pointerdown', handler, true);
   }, [optionsPickerOpen]);
 
-  // Unified keyboard handler for selected nodes (both reference and non-reference).
-  // Reference-specific actions (delete ref, convert to inline) are checked first;
-  // general selection actions (↑/↓ navigate, Shift+↑/↓ extend, Enter edit, Cmd+A,
-  // printable char, Esc clear) handle the rest.
-  // For multi-select, only the anchor node handles keyboard events to avoid duplicates.
+  // Reference-specific keyboard handler — passed to OutlinerRow as onSelectionKeydown.
+  // Handles reference deletion, conversion, and options picker navigation.
+  // Returns true if the event was consumed.
   const setPendingInputChar = useUIStore((s) => s.setPendingInputChar);
-  useEffect(() => {
-    if (!isSelected || isFocused) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // If ProseMirror already handled this key (e.g. Escape in editor
-      // called clearFocus() synchronously before this handler runs), skip it.
-      // Without this, the same Escape event that transitions edit→selected
-      // would also immediately clear the selection.
-      if (e.defaultPrevented) return;
+  const handleReferenceSelectionKeydown = useCallback((e: KeyboardEvent): boolean => {
+    const uiState = useUIStore.getState();
+    if (!(isReference || isOptionsValueNode) || uiState.selectedNodeIds.size > 1) {
+      return false;
+    }
+    const refAction = resolveSelectedReferenceShortcut(e, optionsPickerOpen);
+    if (!refAction) return false;
 
-      const active = document.activeElement;
-      if (
-        active instanceof HTMLInputElement ||
-        active instanceof HTMLTextAreaElement ||
-        (active instanceof HTMLElement && active.isContentEditable)
-      ) {
-        return;
+    if (refAction === 'delete') {
+      if (!isReferenceNode) return true;
+      e.preventDefault();
+      removeReference(nodeId);
+      clearSelection();
+      return true;
+    }
+    if (refAction === 'convert_printable') {
+      if (!isReferenceNode) return true;
+      e.preventDefault();
+      const getNode = useNodeStore.getState().getNode;
+      const parent = getNode(parentId);
+      const pos = parent?.children?.indexOf(nodeId) ?? -1;
+      if (pos < 0) return true;
+      const revertTargetId = getNode(nodeId)?.targetId;
+      if (!revertTargetId) return true;
+      const tempNodeId = startRefConversion(nodeId, parentId, pos);
+      setPendingRefConversion({ tempNodeId, refNodeId: revertTargetId, parentId });
+      setPendingInputChar({ char: e.key, nodeId: tempNodeId, parentId });
+      clearSelection();
+      useUIStore.getState().setFocusClickCoords({
+        nodeId: tempNodeId,
+        parentId,
+        textOffset: 1,
+      });
+      setFocusedNode(tempNodeId, parentId);
+      return true;
+    }
+    if (refAction === 'convert_arrow_right') {
+      if (!isReferenceNode) return true;
+      e.preventDefault();
+      const getNode = useNodeStore.getState().getNode;
+      const parent = getNode(parentId);
+      const pos = parent?.children?.indexOf(nodeId) ?? -1;
+      if (pos < 0) return true;
+      const revertTargetId = getNode(nodeId)?.targetId;
+      if (!revertTargetId) return true;
+      const tempNodeId = startRefConversion(nodeId, parentId, pos);
+      setPendingRefConversion({ tempNodeId, refNodeId: revertTargetId, parentId });
+      clearSelection();
+      useUIStore.getState().setFocusClickCoords({
+        nodeId: tempNodeId,
+        parentId,
+        textOffset: 1,
+      });
+      setTimeout(() => setFocusedNode(tempNodeId, parentId), 0);
+      return true;
+    }
+    if (refAction === 'options_down' && allFieldOptions.length > 0) {
+      e.preventDefault();
+      setOptionsPickerIndex((i) => Math.min(i + 1, allFieldOptions.length - 1));
+      return true;
+    }
+    if (refAction === 'options_up' && allFieldOptions.length > 0) {
+      e.preventDefault();
+      setOptionsPickerIndex((i) => Math.max(i - 1, 0));
+      return true;
+    }
+    if (refAction === 'options_confirm' && allFieldOptions.length > 0) {
+      e.preventDefault();
+      const opt = allFieldOptions[optionsPickerIndex];
+      if (opt) {
+        selectFieldOption(parentId, opt.id, nodeId);
       }
-
-      const uiState = useUIStore.getState();
-      if (uiState.focusedNodeId) return;
-
-      // For multi-select, only the anchor node processes keyboard events
-      if (uiState.selectedNodeIds.size > 1 && !isSelectionAnchor) {
-        return;
-      }
-
-      // 1. Reference-specific actions (only for single-selected reference nodes)
-      if ((isReference || isOptionsValueNode) && uiState.selectedNodeIds.size <= 1) {
-        const refAction = resolveSelectedReferenceShortcut(e, optionsPickerOpen);
-        if (refAction) {
-          if (refAction === 'delete') {
-            // Delete shortcut only removes concrete reference entries.
-            // Reference-like aliases are display contexts, not removable nodes.
-            if (!isReferenceNode) return;
-            e.preventDefault();
-            removeReference(nodeId);
-            clearSelection();
-            return;
-          }
-          if (refAction === 'convert_printable') {
-            if (!isReferenceNode) return;
-            e.preventDefault();
-            const getNode = useNodeStore.getState().getNode;
-            const parent = getNode(parentId);
-            const pos = parent?.children?.indexOf(nodeId) ?? -1;
-            if (pos < 0) return;
-            const revertTargetId = getNode(nodeId)?.targetId;
-            if (!revertTargetId) return;
-            const tempNodeId = startRefConversion(nodeId, parentId, pos);
-            setPendingRefConversion({ tempNodeId, refNodeId: revertTargetId, parentId });
-            setPendingInputChar({ char: e.key, nodeId: tempNodeId, parentId });
-            clearSelection();
-            useUIStore.getState().setFocusClickCoords({
-              nodeId: tempNodeId,
-              parentId,
-              textOffset: 1,
-            });
-            setFocusedNode(tempNodeId, parentId);
-            return;
-          }
-          if (refAction === 'convert_arrow_right') {
-            if (!isReferenceNode) return;
-            e.preventDefault();
-            const getNode = useNodeStore.getState().getNode;
-            const parent = getNode(parentId);
-            const pos = parent?.children?.indexOf(nodeId) ?? -1;
-            if (pos < 0) return;
-            const revertTargetId = getNode(nodeId)?.targetId;
-            if (!revertTargetId) return;
-            const tempNodeId = startRefConversion(nodeId, parentId, pos);
-            setPendingRefConversion({ tempNodeId, refNodeId: revertTargetId, parentId });
-            clearSelection();
-            useUIStore.getState().setFocusClickCoords({
-              nodeId: tempNodeId,
-              parentId,
-              textOffset: 1,
-            });
-            setTimeout(() => setFocusedNode(tempNodeId, parentId), 0);
-            return;
-          }
-          if (refAction === 'options_down' && allFieldOptions.length > 0) {
-            e.preventDefault();
-            setOptionsPickerIndex((i) => Math.min(i + 1, allFieldOptions.length - 1));
-            return;
-          }
-          if (refAction === 'options_up' && allFieldOptions.length > 0) {
-            e.preventDefault();
-            setOptionsPickerIndex((i) => Math.max(i - 1, 0));
-            return;
-          }
-          if (refAction === 'options_confirm' && allFieldOptions.length > 0) {
-            e.preventDefault();
-            const opt = allFieldOptions[optionsPickerIndex];
-            if (opt) {
-              selectFieldOption(parentId, opt.id, nodeId);
-            }
-            clearSelection();
-            return;
-          }
-          if (refAction === 'escape') {
-            e.preventDefault();
-            clearSelection();
-            return;
-          }
-          return; // Reference handler consumed the event
-        }
-      }
-
-      // 2. General selection mode actions (all node types, including multi-select)
-      const selAction = resolveSelectionKeyboardAction(e);
-      if (!selAction) return;
-
-      if (selAction === 'clear_selection') {
-        e.preventDefault();
-        // Second Escape: re-enter edit mode on the same node so the cursor
-        // returns to its original position (matching Tana behavior).
-        clearSelection();
-        setFocusedNode(nodeId, parentId);
-        return;
-      }
-
-      if (selAction === 'select_all') {
-        e.preventDefault();
-        // Select all top-level content children of root
-        const getNode = useNodeStore.getState().getNode;
-        const rootNode = getNode(rootNodeId);
-        const topLevelIds = (rootNode?.children ?? []).filter(
-          (cid) => !getNode(cid)?.type,
-        );
-        if (topLevelIds.length > 0) {
-          setSelectedNodes(new Set(topLevelIds), topLevelIds[0]);
-        }
-        return;
-      }
-
-      // ─── Batch operations (Phase 3) ───
-
-      if (selAction === 'batch_delete') {
-        e.preventDefault();
-        const latestUi = useUIStore.getState();
-        const flatList = getFlattenedVisibleNodes(rootChildIds, latestUi.expandedNodes, rootNodeId);
-        const bounds = getSelectionBounds(latestUi.selectedNodeIds, flatList);
-        const prev = bounds ? getPreviousVisibleNode(bounds.first.nodeId, bounds.first.parentId, flatList) : null;
-        const orderedIds = getSelectedIdsInOrder(latestUi.selectedNodeIds, flatList);
-        // Bottom-up: avoid index shift when deleting upper nodes first
-        for (let i = orderedIds.length - 1; i >= 0; i--) {
-          trashNode(orderedIds[i]);
-        }
-        clearSelection();
-        if (prev) {
-          setFocusedNode(prev.nodeId, prev.parentId);
-        }
-        return;
-      }
-
-      if (selAction === 'batch_indent') {
-        e.preventDefault();
-        const latestUi = useUIStore.getState();
-        const flatList = getFlattenedVisibleNodes(rootChildIds, latestUi.expandedNodes, rootNodeId);
-        const orderedIds = getSelectedIdsInOrder(latestUi.selectedNodeIds, flatList);
-        // Top-down: upper nodes indent first so lower ones follow into the same parent
-        for (const id of orderedIds) {
-          const getNode = useNodeStore.getState().getNode;
-          const currentNode = getNode(id);
-          if (!currentNode) continue;
-          const ownerId = loroDoc.getParentId(id);
-          if (!ownerId) continue;
-          const parent = getNode(ownerId);
-          if (!parent?.children) continue;
-          const index = parent.children.indexOf(id);
-          if (index <= 0) continue;
-          const newParentId = parent.children[index - 1];
-          setExpanded(`${ownerId}:${newParentId}`, true, true);
-          indentNode(id);
-        }
-        clearSelection();
-        return;
-      }
-
-      if (selAction === 'batch_outdent') {
-        e.preventDefault();
-        const latestUi = useUIStore.getState();
-        const flatList = getFlattenedVisibleNodes(rootChildIds, latestUi.expandedNodes, rootNodeId);
-        const orderedIds = getSelectedIdsInOrder(latestUi.selectedNodeIds, flatList);
-        // Bottom-up: lower nodes outdent first to avoid parent relationship issues
-        for (let i = orderedIds.length - 1; i >= 0; i--) {
-          outdentNode(orderedIds[i]);
-        }
-        clearSelection();
-        return;
-      }
-
-      if (selAction === 'batch_duplicate') {
-        e.preventDefault();
-        const latestUi = useUIStore.getState();
-        const flatList = getFlattenedVisibleNodes(rootChildIds, latestUi.expandedNodes, rootNodeId);
-        const orderedIds = getSelectedIdsInOrder(latestUi.selectedNodeIds, flatList);
-        // Bottom-up: insert positions stay correct when lower nodes duplicate first
-        for (let i = orderedIds.length - 1; i >= 0; i--) {
-          const name = useNodeStore.getState().getNode(orderedIds[i])?.name ?? '';
-          createSibling(orderedIds[i], { name });
-        }
-        clearSelection();
-        return;
-      }
-
-      if (selAction === 'batch_checkbox') {
-        e.preventDefault();
-        const latestUi = useUIStore.getState();
-        const ids = [...latestUi.selectedNodeIds];
-        // 3-state cycle per node: No → Undone → Done → No (manual)
-        //             Undone → Done → Undone (tag-driven)
-        for (const id of ids) {
-          cycleNodeCheckbox(id);
-        }
-        // Keep selection (don't clear)
-        return;
-      }
-
-      if (selAction === 'extend_up' || selAction === 'extend_down') {
-        e.preventDefault();
-        const latestUi = useUIStore.getState();
-        const flatList = getFlattenedVisibleNodes(rootChildIds, latestUi.expandedNodes, rootNodeId);
-
-        const anchor = latestUi.selectionAnchorId;
-        if (!anchor) return;
-
-        const anchorIdx = flatList.findIndex((n) => n.nodeId === anchor);
-        if (anchorIdx < 0) return;
-
-        // Use effective bounds that include implicitly selected descendants.
-        // Without this, selecting a parent with expanded children would get
-        // stuck: filterToRootLevel removes children, so bounds.last = parent,
-        // and the extent can never move past the children.
-        const effectiveBounds = getEffectiveSelectionBounds(latestUi.selectedNodeIds, flatList);
-        if (!effectiveBounds) return;
-
-        const { firstIdx, lastIdx } = effectiveBounds;
-
-        // Determine current extent: the end of the range that is NOT the anchor
-        let extentIdx: number;
-        if (anchorIdx <= firstIdx) {
-          extentIdx = lastIdx;
-        } else if (anchorIdx >= lastIdx) {
-          extentIdx = firstIdx;
-        } else {
-          extentIdx = selAction === 'extend_down' ? lastIdx : firstIdx;
-        }
-
-        // Move extent by one
-        const newExtentIdx = selAction === 'extend_up'
-          ? Math.max(0, extentIdx - 1)
-          : Math.min(flatList.length - 1, extentIdx + 1);
-
-        // Compute new range from anchor to new extent
-        const start = Math.min(anchorIdx, newExtentIdx);
-        const end = Math.max(anchorIdx, newExtentIdx);
-        const rangeIds = new Set<string>();
-        for (let i = start; i <= end; i++) {
-          rangeIds.add(flatList[i].nodeId);
-        }
-        const filtered = filterToRootLevel(rangeIds, undefined, flatList);
-        setSelectedNodes(filtered, anchor);
-        return;
-      }
-
-      // For navigate/enter/type: use fresh state for multi-select bounds
-      const latestUi = useUIStore.getState();
-      const flatList = getFlattenedVisibleNodes(rootChildIds, latestUi.expandedNodes, rootNodeId);
-
-      if (selAction === 'navigate_up') {
-        e.preventDefault();
-        const bounds = getSelectionBounds(latestUi.selectedNodeIds, flatList);
-        if (!bounds) return;
-        const prev = getPreviousVisibleNode(bounds.first.nodeId, bounds.first.parentId, flatList);
-        if (prev) {
-          clearSelection();
-          // ↑ → cursor at text end
-          useUIStore.getState().setFocusClickCoords({
-            nodeId: prev.nodeId,
-            parentId: prev.parentId,
-            textOffset: getNodeTextLengthById(prev.nodeId),
-          });
-          setFocusedNode(prev.nodeId, prev.parentId);
-        }
-        return;
-      }
-
-      if (selAction === 'navigate_down') {
-        e.preventDefault();
-        const bounds = getSelectionBounds(latestUi.selectedNodeIds, flatList);
-        if (!bounds) return;
-        const next = getNextVisibleNode(bounds.last.nodeId, bounds.last.parentId, flatList);
-        if (next) {
-          clearSelection();
-          // ↓ → cursor at text start (textOffset 0)
-          useUIStore.getState().setFocusClickCoords({ nodeId: next.nodeId, parentId: next.parentId, textOffset: 0 });
-          setFocusedNode(next.nodeId, next.parentId);
-        }
-        return;
-      }
-
-      if (selAction === 'enter_edit' || selAction === 'type_char') {
-        const first = getFirstSelectedInOrder(latestUi.selectedNodeIds, flatList);
-        if (!first) return;
-        const editAtEnd = getNodeTextLengthById(first.nodeId);
-        if (selAction === 'enter_edit') {
-          e.preventDefault();
-        }
-        if (selAction === 'type_char') {
-          const isAsciiLetter = /^[a-zA-Z]$/.test(e.key);
-          if (!isAsciiLetter) {
-            e.preventDefault();
-            setPendingInputChar({ char: e.key, nodeId: first.nodeId, parentId: first.parentId });
-          }
-        }
-        clearSelection();
-        // typing in selected mode should append at end of the first selected node
-        useUIStore.getState().setFocusClickCoords({
-          nodeId: first.nodeId,
-          parentId: first.parentId,
-          textOffset: editAtEnd,
-        });
-        setFocusedNode(first.nodeId, first.parentId);
-        return;
-      }
-    };
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isSelected, isFocused, isReference, isOptionsValueNode, isSelectionAnchor, optionsPickerOpen, allFieldOptions, optionsPickerIndex, parentId, nodeId, rootNodeId, rootChildIds, expandedNodes, removeReference, selectFieldOption, setSelectedNode, setSelectedNodes, clearSelection, setFocusedNode, startRefConversion, setPendingRefConversion, setPendingInputChar]);
+      clearSelection();
+      return true;
+    }
+    if (refAction === 'escape') {
+      e.preventDefault();
+      clearSelection();
+      return true;
+    }
+    return true; // Reference handler consumed the event
+  }, [isReference, isOptionsValueNode, isReferenceNode, optionsPickerOpen, allFieldOptions, optionsPickerIndex, parentId, nodeId, removeReference, selectFieldOption, clearSelection, setFocusedNode, startRefConversion, setPendingRefConversion, setPendingInputChar]);
 
   // When TrailingInput creates a node with #/@/, it sets triggerHint so we
   // can immediately open the dropdown (extensions don't fire on mount because
@@ -2369,6 +2076,19 @@ export function OutlinerItem({
   const hasOverlayOpen = (isFocused && (hashTagOpen || refOpen || slashOpen)) || optionsPickerOpen;
 
   return (
+    <OutlinerRow
+      config={{
+        rowId: nodeId,
+        parentId,
+        rootChildIds,
+        rootNodeId,
+        isEditing: isFocused,
+        enterEdit: () => setFocusedNode(nodeId, parentId),
+        exitEdit: () => clearFocus(),
+        rowKind: 'content',
+        onSelectionKeydown: handleReferenceSelectionKeydown,
+      }}
+    >
     <div role="treeitem" aria-expanded={isExpanded} className={`relative ${hasOverlayOpen ? 'field-overlay-open z-[80]' : 'has-[.field-overlay-open]:z-[80]'}`}>
       {/* Drop indicator: before */}
       {isDropTarget && dropPosition === 'before' && (
@@ -2805,6 +2525,7 @@ export function OutlinerItem({
         </div>
       )}
     </div>
+    </OutlinerRow>
   );
 }
 

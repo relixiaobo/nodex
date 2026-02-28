@@ -18,28 +18,38 @@ import { useNodeFields, type FieldEntry } from '../../hooks/use-node-fields';
 import { resolveDataType, getExtendsChain } from '../../lib/field-utils.js';
 import { resolveTagColor } from '../../lib/tag-colors.js';
 import { OutlinerItem } from '../outliner/OutlinerItem';
+import { RowHost } from '../outliner/RowHost.js';
 import { TrailingInput } from '../editor/TrailingInput';
 import { FieldRow } from './FieldRow';
 import { toFieldRowEntryProps } from './field-row-props.js';
 import * as loroDoc from '../../lib/loro-doc.js';
+import { shouldShowTrailingInput } from '../outliner/row-model.js';
 
 interface ConfigOutlinerProps {
   nodeId: string;
 }
 
-interface MergedItem {
-  id: string;
-  type: 'field' | 'content';
-  ownerTagDefId: string;
-  /** For fields: resolved FieldEntry data */
-  fieldEntry?: FieldEntry;
-}
+type MergedItem =
+  | {
+    id: string;
+    type: 'field';
+    hidden?: boolean;
+    ownerTagDefId: string;
+    /** For fields: resolved FieldEntry data */
+    fieldEntry: FieldEntry;
+  }
+  | {
+    id: string;
+    type: 'content';
+    hidden?: boolean;
+    ownerTagDefId: string;
+    fieldEntry?: undefined;
+  };
 
 export function shouldShowConfigTrailingInput(
   items: Array<{ type: 'field' | 'content' }>,
 ): boolean {
-  if (items.length === 0) return true;
-  return items[items.length - 1]?.type === 'field';
+  return shouldShowTrailingInput(items);
 }
 
 export function ConfigOutliner({ nodeId }: ConfigOutlinerProps) {
@@ -157,33 +167,38 @@ export function ConfigOutliner({ nodeId }: ConfigOutlinerProps) {
 
   return (
     <div className={`min-h-[22px]${firstIsField ? ' pt-1' : ''}${lastIsField ? ' pb-1' : ''}`}>
-      {mergedItems.map(({ id, type, ownerTagDefId, fieldEntry }, i) => {
-        // Color from owning tagDef — always tint fieldDef icons to match the supertag's color
-        const ownerColor = resolveTagColor(ownerTagDefId).text;
-
-        return type === 'field' && fieldEntry ? (
-          <div key={id} className="@container" style={{ paddingLeft: 6 + 15 + 4 }}>
-            <FieldRow
-              nodeId={ownerTagDefId}
-              {...toFieldRowEntryProps(fieldEntry)}
+      <RowHost
+        rows={mergedItems}
+        renderField={(row, i, rows) => {
+          const ownerColor = resolveTagColor(row.ownerTagDefId).text;
+          if (!row.fieldEntry) return null;
+          return (
+            <div className="@container" style={{ paddingLeft: 6 + 15 + 4 }}>
+              <FieldRow
+                nodeId={row.ownerTagDefId}
+                {...toFieldRowEntryProps(row.fieldEntry)}
+                rootChildIds={selectableRootIds}
+                rootNodeId={nodeId}
+                isLastInGroup={i === rows.length - 1 || rows[i + 1].type !== 'field'}
+                ownerTagColor={ownerColor}
+              />
+            </div>
+          );
+        }}
+        renderContent={(row) => {
+          const ownerColor = resolveTagColor(row.ownerTagDefId).text;
+          return (
+            <OutlinerItem
+              nodeId={row.id}
+              depth={0}
               rootChildIds={selectableRootIds}
+              parentId={row.ownerTagDefId}
               rootNodeId={nodeId}
-              isLastInGroup={i === mergedItems.length - 1 || mergedItems[i + 1].type !== 'field'}
-              ownerTagColor={ownerColor}
+              bulletColors={ownerColor ? [ownerColor] : undefined}
             />
-          </div>
-        ) : (
-          <OutlinerItem
-            key={id}
-            nodeId={id}
-            depth={0}
-            rootChildIds={selectableRootIds}
-            parentId={ownerTagDefId}
-            rootNodeId={nodeId}
-            bulletColors={ownerColor ? [ownerColor] : undefined}
-          />
-        );
-      })}
+          );
+        }}
+      />
       {showTrailingInput && (
         <TrailingInput
           parentId={nodeId}

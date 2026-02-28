@@ -28,7 +28,7 @@ _(空)_
 
 | Agent | 分支 | 任务 | 状态 | 更新时间 |
 |------|------|------|------|---------|
-| codex | `codex/outliner-rowhost-convergence` | Outliner 行渲染收敛（RowModel + RowHost） | 进行中 | 2026-02-28 |
+| codex | `codex/outliner-rowhost-convergence` | Outliner 行渲染收敛（RowModel + RowHost） | 待 nodex review（PR #108） | 2026-02-28 |
 
 ---
 
@@ -36,16 +36,17 @@ _(空)_
 
 ### Outliner 行渲染收敛（RowModel + RowHost）
 
-- [ ] Phase 1: 抽取统一 `RowItem` 模型与派生函数（field/content/hidden 排序规则一致）
-- [ ] Phase 2: 先接入 `FieldValueOutliner` + `ConfigOutliner` 验证 RowHost 接口
-- [ ] Phase 3: 接入 `OutlinerView` + `OutlinerItem`（保留原有键盘/引用/拖拽行为）
-- [ ] Phase 4: 补 Vitest 回归（隐藏字段、trailing input、field/content 混排导航）
-- [ ] Phase 5: 执行 `typecheck` → `check:test-sync` → `test:run` → `build`
+- [x] Phase 1: 抽取统一 `RowItem` 模型与派生函数（field/content/hidden 排序规则一致）
+- [x] Phase 2: 先接入 `FieldValueOutliner` + `ConfigOutliner` 验证 RowHost 接口
+- [x] Phase 3: 接入 `OutlinerView` + `OutlinerItem`（保留原有键盘/引用/拖拽行为）
+- [x] Phase 4: 补 Vitest 回归（隐藏字段、trailing input、field/content 混排导航）
+- [x] Phase 5: 执行 `typecheck` → `check:test-sync` → `test:run` → `build`
 
 文件锁：`src/components/outliner/OutlinerItem.tsx`（高风险文件，当前仅 codex 修改）
 
 迭代日志：
 - [2026-02-28 codex] 任务认领。基于最新 `origin/main` 创建分支，计划先统一行模型与行宿主，再按 low-risk → high-risk 顺序迁移 4 个 outliner 壳组件。
+- [2026-02-28 codex] 完成实现：新增 `row-model.ts` + `RowHost.tsx`，迁移 `FieldValueOutliner`/`ConfigOutliner`/`OutlinerView`/`OutlinerItem` 到共享行遍历；新增 `row-model.test.ts` 与 `row-host.test.ts`；`npm run verify` 通过。已提 PR #108 等待 nodex review。
 
 ---
 

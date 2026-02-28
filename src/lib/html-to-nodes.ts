@@ -270,14 +270,66 @@ export function parseHtmlToNodes(
     return true;
   }
 
+  function flushInlineFragments(inlineFragments: string[], contextEl: Element): void {
+    if (inlineFragments.length === 0) return;
+    const inlineHtml = inlineFragments.join('');
+    inlineFragments.length = 0;
+
+    const inline = htmlToMarks(inlineHtml);
+    const trimmed = trimContent(inline.text, inline.marks, inline.inlineRefs);
+    if (!trimmed.text) return;
+
+    if (inferParagraphLists) {
+      const listLike = stripListMarker(trimmed, extractIndentPx(contextEl));
+      if (listLike) {
+        appendListLikeParagraph(listLike);
+        return;
+      }
+    }
+
+    resetListContext();
+    appendParagraphNode(trimmed);
+  }
+
+  function processFlowChildren(container: Element): void {
+    const inlineFragments: string[] = [];
+    for (const child of Array.from(container.childNodes)) {
+      if (truncated) break;
+      if (child.nodeType === Node.TEXT_NODE) {
+        const text = child.textContent ?? '';
+        if (text.trim()) inlineFragments.push(escapeHtmlText(text));
+        continue;
+      }
+      if (child.nodeType !== Node.ELEMENT_NODE) continue;
+
+      const childEl = child as Element;
+      const childTag = childEl.tagName.toLowerCase();
+      if (isSkippableNonContentTag(childTag)) continue;
+
+      if (childTag === 'br') {
+        flushInlineFragments(inlineFragments, container);
+        continue;
+      }
+
+      if (isBlockElement(childEl)) {
+        flushInlineFragments(inlineFragments, container);
+        processBlock(childEl);
+        continue;
+      }
+
+      inlineFragments.push(childEl.outerHTML);
+    }
+
+    flushInlineFragments(inlineFragments, container);
+  }
+
   /** Process a single block element. */
   function processBlock(el: Element): void {
     if (truncated) return;
     const tag = el.tagName.toLowerCase();
 
     // Skip non-content tags and media placeholders
-    if (tag === 'style' || tag === 'script' || tag === 'noscript' || tag === 'template') return;
-    if (tag === 'meta' || tag === 'link' || tag === 'head' || tag === 'title') return;
+    if (isSkippableNonContentTag(tag)) return;
 
     // Skip hr, figure/img
     if (!includeH1 && tag === 'h1') return;
@@ -337,9 +389,7 @@ export function parseHtmlToNodes(
         return;
       }
       resetListContext();
-      for (const child of Array.from(el.children)) {
-        processBlock(child);
-      }
+      processFlowChildren(el);
       return;
     }
 
@@ -349,9 +399,7 @@ export function parseHtmlToNodes(
       const hasBlockChild = Array.from(el.children).some(isBlockElement);
       if (hasBlockChild) {
         resetListContext();
-        for (const child of Array.from(el.children)) {
-          processBlock(child);
-        }
+        processFlowChildren(el);
         return;
       }
 
@@ -519,10 +567,7 @@ export function parseHtmlToNodes(
   }
 
   // Process all top-level children of body
-  for (const child of Array.from(body.children)) {
-    if (truncated) break;
-    processBlock(child);
-  }
+  processFlowChildren(body);
 
   // If truncated, append a notice node
   if (truncated && canCreate()) {
@@ -610,6 +655,19 @@ function isBlockElement(el: Element): boolean {
   ].includes(tag);
   if (semanticBlock) return true;
   return isStyledBlockElement(el);
+}
+
+function isSkippableNonContentTag(tag: string): boolean {
+  return (
+    tag === 'style'
+    || tag === 'script'
+    || tag === 'noscript'
+    || tag === 'template'
+    || tag === 'meta'
+    || tag === 'link'
+    || tag === 'head'
+    || tag === 'title'
+  );
 }
 
 function ensureHeadingMark(marks: TextMark[], textLength: number): TextMark[] {
@@ -715,6 +773,15 @@ function parseCssLengthToPx(input?: string | null): number {
     default:
       return value;
   }
+}
+
+function escapeHtmlText(text: string): string {
+  return text
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll('\'', '&#39;');
 }
 
 function isStyledBlockElement(el: Element): boolean {

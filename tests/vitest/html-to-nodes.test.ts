@@ -94,6 +94,31 @@ describe('parseHtmlToNodes', () => {
     );
   });
 
+  it('merges top-level inline sibling fragments into one paragraph node', () => {
+    const html = [
+      '<span>The word </span>',
+      '<i>emoji</i>',
+      '<span> comes from Japanese </span>',
+      '<span>e</span>',
+      '<span> (絵; \'picture\') + </span>',
+      '<i>moji</i>',
+      '<span> (文字; \'character\').</span>',
+      '<sup>[3]</sup>',
+    ].join('');
+    const { nodes } = parseHtmlToNodes(html);
+    expect(nodes).toHaveLength(1);
+    expect(nodes[0].name).toContain('The word emoji comes from Japanese');
+    expect(nodes[0].name).toContain('moji');
+    expect(nodes[0].name).toContain('[3]');
+    expect(nodes[0].marks.some((m) => m.type === 'italic')).toBe(true);
+  });
+
+  it('splits inline flows by br into multiple nodes', () => {
+    const html = '<span>Line A</span><br><span>Line B</span>';
+    const { nodes } = parseHtmlToNodes(html);
+    expect(nodes.map((n) => n.name)).toEqual(['Line A', 'Line B']);
+  });
+
   // ── Heading hierarchy ──
 
   it('h2 creates section parent with subsequent p as children', () => {

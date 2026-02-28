@@ -52,6 +52,7 @@ _(空)_
   - [2026-02-28 codex] 针对 Google Docs/网页复制继续收敛：进一步改为“有 HTML 且非 markdown-shell 时一律优先 HTML”，避免强 markdown plain 覆盖富文本；并在 HTML 解析新增两类兜底（`inferParagraphLists`：支持 Docs 段落式 bullet+margin 缩进推断父子层级；`inferStyledHeadings`：支持按 inline font-size 推断标题分段），补齐 parser/html-to-nodes 回归测试。
   - [2026-02-28 codex] 继续修复 Google Docs 粘贴层级丢失：定位到 Docs 样式常放在 `<style> + class`（非 inline style），导致前序“样式推断”失效；新增 class-style 内联化（解析 `<style>` 的 `.class { ... }` 并写回元素 `style`）后再走 heading/list 推断与 mark 提取，修复 class-based 富文本/层级解析，并补齐相关回归测试。
   - [2026-02-28 codex] 修复 Google Sheets 粘贴产生 `<!--td {...}-->` 垃圾行：HTML parser 在结构遍历阶段显式跳过 `style/script/meta/link/head/title/template` 等非内容标签；并补充 style-comment 回归测试，确保表格粘贴只保留数据行。
+  - [2026-02-28 codex] 修复 Wikipedia 粘贴“一句被拆成多节点”问题：HTML 解析改为容器内 flow 模式（合并连续 inline sibling，遇到 block 或 `<br>` 再切分），避免 `span/sup/i/a` 并列结构被逐元素建节点；并补充 inline-flow 合并/按 `<br>` 分割回归测试。
 
 ---
 

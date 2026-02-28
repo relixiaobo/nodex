@@ -4,7 +4,7 @@
  *
  * Shared between TagBadge, BulletChevron, and NodePicker.
  */
-import { SYS_A, SYSTEM_TAGS } from '../types/index.js';
+import { SYS_A, SYS_T, SYSTEM_TAGS } from '../types/index.js';
 import type { NodexNode } from '../types/index.js';
 import { resolveConfigValue } from './field-utils.js';
 import * as loroDoc from './loro-doc.js';
@@ -204,7 +204,7 @@ export function resolveHighlightBulletColor(nodeId: string): string | null {
   } catch {
     return null; // LoroDoc not initialized yet
   }
-  if (!node || !node.tags.includes('SYS_T200')) return null;
+  if (!node || !node.tags.includes(SYS_T.HIGHLIGHT)) return null;
 
   // Find Color fieldEntry
   const children = loroDoc.getChildren(nodeId);

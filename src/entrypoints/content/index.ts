@@ -4,6 +4,16 @@ import {
   type WebClipCapturePayload,
   type WebClipCaptureResponse,
 } from '../../lib/webclip-messaging.js';
+import {
+  HIGHLIGHT_RESTORE,
+  HIGHLIGHT_REMOVE,
+  HIGHLIGHT_SCROLL_TO,
+  type HighlightRestorePayload,
+  type HighlightRemovePayload,
+  type HighlightScrollToPayload,
+} from '../../lib/highlight-messaging.js';
+import { initHighlight, removeHighlightRendering, scrollToHighlight } from './highlight.js';
+import { restoreHighlights } from './highlight-restore.js';
 
 function captureCurrentPage(): WebClipCapturePayload {
   const url = location.href;
@@ -42,22 +52,50 @@ export default defineContentScript({
     if ((globalThis as any).__nodexCaptureInstalled) return;
     (globalThis as any).__nodexCaptureInstalled = true;
 
-    chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-      if (message?.type !== WEBCLIP_CAPTURE_PAGE) return;
+    // Initialize highlight selection listener and custom elements
+    initHighlight();
 
-      try {
-        const payload = captureCurrentPage();
-        const response: WebClipCaptureResponse = { ok: true, payload };
-        sendResponse(response);
-      } catch (err) {
-        const response: WebClipCaptureResponse = {
-          ok: false,
-          error: err instanceof Error ? err.message : String(err),
-        };
-        sendResponse(response);
+    // Message listener for both webclip capture and highlight commands
+    chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+      // ── WebClip Capture ──
+      if (message?.type === WEBCLIP_CAPTURE_PAGE) {
+        try {
+          const payload = captureCurrentPage();
+          const response: WebClipCaptureResponse = { ok: true, payload };
+          sendResponse(response);
+        } catch (err) {
+          const response: WebClipCaptureResponse = {
+            ok: false,
+            error: err instanceof Error ? err.message : String(err),
+          };
+          sendResponse(response);
+        }
+        return true;
       }
 
-      return true;
+      // ── Highlight Restore (Side Panel -> Content Script) ──
+      if (message?.type === HIGHLIGHT_RESTORE) {
+        const payload = message.payload as HighlightRestorePayload;
+        restoreHighlights(payload);
+        sendResponse({ ok: true });
+        return true;
+      }
+
+      // ── Highlight Remove (Side Panel -> Content Script) ──
+      if (message?.type === HIGHLIGHT_REMOVE) {
+        const payload = message.payload as HighlightRemovePayload;
+        removeHighlightRendering(payload.id);
+        sendResponse({ ok: true });
+        return true;
+      }
+
+      // ── Highlight Scroll To (Side Panel -> Content Script) ──
+      if (message?.type === HIGHLIGHT_SCROLL_TO) {
+        const payload = message.payload as HighlightScrollToPayload;
+        scrollToHighlight(payload.id);
+        sendResponse({ ok: true });
+        return true;
+      }
     });
   },
 });

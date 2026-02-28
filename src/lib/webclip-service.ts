@@ -114,6 +114,134 @@ export async function saveWebClip(
   return clipNode.id;
 }
 
+// ── URL Normalization & Clip Node Lookup ──
+
+/**
+ * Normalize a URL for comparison.
+ * Strips fragment, trailing slash, www prefix, and upgrades http to https.
+ */
+export function normalizeUrl(url: string): string {
+  try {
+    const parsed = new URL(url);
+
+    // http -> https
+    if (parsed.protocol === 'http:') {
+      parsed.protocol = 'https:';
+    }
+
+    // Remove fragment
+    parsed.hash = '';
+
+    // Remove trailing slash (but keep root /)
+    let pathname = parsed.pathname;
+    if (pathname.length > 1 && pathname.endsWith('/')) {
+      pathname = pathname.slice(0, -1);
+    }
+
+    // Remove www. prefix
+    let hostname = parsed.hostname;
+    if (hostname.startsWith('www.')) {
+      hostname = hostname.slice(4);
+    }
+
+    return `${parsed.protocol}//${hostname}${pathname}${parsed.search}`;
+  } catch {
+    return url;
+  }
+}
+
+/**
+ * Find a #web_clip node by its Source URL field value.
+ * Searches CLIPS, INBOX, and LIBRARY containers.
+ *
+ * @returns The node ID of the matching clip node, or null if not found.
+ */
+export function findClipNodeByUrl(url: string): string | null {
+  const normalizedUrl = normalizeUrl(url);
+
+  // Find the web_clip tagDef and its Source URL fieldDef
+  const tagDef = findTagDefByName(null, CONTAINER_IDS.SCHEMA, 'web_clip');
+  if (!tagDef) return null;
+
+  const sourceUrlFieldDef = findTemplateAttrDef(null, tagDef.id, 'Source URL');
+  if (!sourceUrlFieldDef) return null;
+
+  // Search through CLIPS, INBOX, and LIBRARY containers
+  const containers = [CONTAINER_IDS.CLIPS, CONTAINER_IDS.INBOX, CONTAINER_IDS.LIBRARY];
+
+  for (const containerId of containers) {
+    const children = loroDoc.getChildren(containerId);
+
+    for (const childId of children) {
+      const node = loroDoc.toNodexNode(childId);
+      if (!node || !node.tags?.includes(tagDef.id)) continue;
+
+      // Check Source URL field value
+      const fieldEntryId = findFieldEntryForNode(childId, sourceUrlFieldDef.id);
+      if (!fieldEntryId) continue;
+
+      const fieldChildren = loroDoc.getChildren(fieldEntryId);
+      if (fieldChildren.length === 0) continue;
+
+      const valueNode = loroDoc.toNodexNode(fieldChildren[0]);
+      if (valueNode?.name && normalizeUrl(valueNode.name) === normalizedUrl) {
+        return childId;
+      }
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Find a fieldEntry child node by its fieldDefId.
+ */
+function findFieldEntryForNode(nodeId: string, fieldDefId: string): string | undefined {
+  const children = loroDoc.getChildren(nodeId);
+  for (const childId of children) {
+    const child = loroDoc.toNodexNode(childId);
+    if (child?.type === 'fieldEntry' && child.fieldDefId === fieldDefId) {
+      return childId;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Create a lightweight clip node (URL + Title only, no content parsing).
+ * Used when a highlight is created on a page that hasn't been clipped yet.
+ *
+ * @returns The ID of the newly created clip node.
+ */
+export async function createLightweightClip(
+  pageUrl: string,
+  pageTitle: string,
+  store: WebClipNodeStore,
+): Promise<string> {
+  // 1. Find or create #web_clip tagDef
+  let tagDef = findTagDefByName(null, CONTAINER_IDS.SCHEMA, 'web_clip');
+  if (!tagDef) {
+    tagDef = store.createTagDef('web_clip');
+  }
+
+  // 2. Ensure Source URL field exists
+  let sourceUrlFieldDef = findTemplateAttrDef(null, tagDef.id, 'Source URL');
+  if (!sourceUrlFieldDef) {
+    sourceUrlFieldDef = store.createFieldDef('Source URL', SYS_D.URL, tagDef.id);
+  }
+
+  // 3. Create clip node in CLIPS container
+  const clipNode = store.createChild(CONTAINER_IDS.CLIPS, undefined, { name: pageTitle });
+
+  // 4. Apply #web_clip tag
+  store.applyTag(clipNode.id, tagDef.id);
+
+  // 5. Write Source URL field value
+  store.setFieldValue(clipNode.id, sourceUrlFieldDef.id, [pageUrl]);
+
+  return clipNode.id;
+}
+
 /**
  * Apply web clip data to an existing node in-place.
  */

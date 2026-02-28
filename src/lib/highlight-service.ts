@@ -45,8 +45,7 @@ function findFieldDefByName_(tagDefId: string, name: string): NodexNode | undefi
 
 /**
  * Create/find #highlight tagDef with fixed ID SYS_T200.
- * Creates 1 template field: Source (options_from_supertag → #source).
- * Migrates legacy fields (Anchor, Color, Page URL) and renames Clip → Source.
+ * Creates 1 template field: Source (options_from_supertag → #source, auto-init from ancestor).
  */
 export function ensureHighlightTagDef(store: HighlightNodeStore): void {
   // Create tagDef if needed
@@ -72,7 +71,12 @@ export function ensureHighlightTagDef(store: HighlightNodeStore): void {
   let sourceFd = findFieldDefByName_(SYS_T.HIGHLIGHT, FIELD_SOURCE);
   if (!sourceFd) {
     sourceFd = store.createFieldDef(FIELD_SOURCE, FIELD_TYPES.OPTIONS_FROM_SUPERTAG, SYS_T.HIGHLIGHT);
-    // Set the source supertag so the picker shows #source nodes
+  }
+
+  // Always ensure sourceSupertag + autoInitialize are set
+  const currentFd = loroDoc.toNodexNode(sourceFd.id);
+  if (currentFd?.sourceSupertag !== sourceTagDef.id
+    || currentFd?.autoInitialize !== AUTO_INIT_STRATEGY.ANCESTOR_SUPERTAG_REF) {
     loroDoc.setNodeDataBatch(sourceFd.id, {
       sourceSupertag: sourceTagDef.id,
       autoInitialize: AUTO_INIT_STRATEGY.ANCESTOR_SUPERTAG_REF,

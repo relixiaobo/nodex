@@ -9,6 +9,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNode } from '../../hooks/use-node';
 import { useNodeStore } from '../../stores/node-store';
+import { SYS_T } from '../../types/index.js';
 
 interface NodeDescriptionProps {
   nodeId: string;
@@ -99,6 +100,8 @@ export function NodeDescription({ nodeId, editable = true }: NodeDescriptionProp
     [description],
   );
 
+  // Hide description for #highlight nodes (stores internal anchor JSON, not user content)
+  if (node?.tags.includes(SYS_T.HIGHLIGHT)) return null;
   if (!description && !editing) return null;
 
   return (

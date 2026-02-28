@@ -176,6 +176,11 @@ export function App({ skipBootstrap = false }: AppProps) {
    sendResponse: (response?: unknown) => void,
   ): boolean | void => {
    if (message?.type === HIGHLIGHT_CREATE) {
+    // In Chrome MV3, content script sendMessage reaches both background AND
+    // side panel. Background forwards with _tabId added. Skip the direct
+    // content-script message to avoid creating duplicate highlights.
+    if (!message._tabId) return false;
+
     const payload = message.payload as HighlightCreatePayload | undefined;
     if (!payload) {
       sendResponse({ ok: false, error: 'Missing highlight payload' });

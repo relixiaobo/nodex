@@ -7,7 +7,7 @@ import { useNodeFields, type FieldEntry } from '../../hooks/use-node-fields';
 import { useNodeStore } from '../../stores/node-store';
 import { useUIStore } from '../../stores/ui-store';
 import * as loroDoc from '../../lib/loro-doc.js';
-import { CONTAINER_IDS } from '../../types/index.js';
+import { CONTAINER_IDS, SYS_T } from '../../types/index.js';
 import { BulletChevron, ChevronButton } from './BulletChevron';
 import { RichTextEditor, type EditorContentPayload, type TriggerAnchorRect } from '../editor/RichTextEditor';
 import { SlashCommandMenu } from '../editor/SlashCommandMenu';
@@ -2242,8 +2242,8 @@ export function OutlinerItem({
                 </span>
               )}
             </div>
-            {/* Description: gray text below name */}
-            {(description || editingDescription) && (
+            {/* Description: gray text below name (hidden for #highlight — stores anchor JSON internally) */}
+            {(description || editingDescription) && !tagIds.includes(SYS_T.HIGHLIGHT) && (
               <div
                 ref={editingDescription ? descriptionRef : undefined}
                 contentEditable={editingDescription}

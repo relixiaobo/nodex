@@ -171,6 +171,30 @@ describe('paste-parser', () => {
     expect(nodes[1].marks.some((m) => m.type === 'link')).toBe(true);
   });
 
+  it('prefers markdown over style-only html from code editors (e.g. VS Code)', () => {
+    const plain = [
+      '# Heading',
+      '- Item **bold**',
+      '  - Sub item',
+      '',
+      '```ts',
+      'const x = 1;',
+      '```',
+    ].join('\n');
+    // VS Code wraps clipboard in styled divs for syntax highlighting — no
+    // genuine content formatting (bold/italic/links/semantic structure).
+    const html = '<div style="color: #cccccc; background-color: #1e1e1e; font-family: Menlo"><div><span style="color: #569cd6"># Heading</span></div><div><span>- Item **bold**</span></div></div>';
+
+    const nodes = parseMultiLinePaste(plain, html);
+    // Should use markdown parser, preserving hierarchy + code block
+    expect(nodes).toHaveLength(1);
+    expect(nodes[0].name).toBe('Heading');
+    expect(nodes[0].children.length).toBeGreaterThan(0);
+    const codeBlock = nodes[0].children.find((n) => n.type === 'codeBlock');
+    expect(codeBlock).toBeTruthy();
+    expect(codeBlock!.name).toBe('const x = 1;');
+  });
+
   it('prefers html blocks over markdown list when clipboard includes html paragraphs', () => {
     const plain = [
       '- Parent',

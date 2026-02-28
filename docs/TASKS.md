@@ -28,8 +28,8 @@ _(空)_
 
 | Agent | 分支 | 任务 | 锁定文件 | 状态 |
 |---|---|---|---|---|
-| Agent A | cc/highlight-editor | Phase 1: # Tag 浮动工具栏 + highlight-service | FloatingToolbar.tsx, RichTextEditor.tsx, OutlinerItem.tsx | PR Ready (#111) |
-| Agent B | cc/highlight-webpage | Phase 2-3: Content Script 高亮 + 回显 | content/index.ts, background/index.ts, webclip-service.ts | 待启动 |
+| Agent A | cc/highlight-editor | Phase 1: # Tag 浮动工具栏 + highlight-service | — | ✅ Merged (#111) |
+| Agent B | cc/highlight-webpage | Phase 2-3: Content Script 高亮 + 回显 | — | ✅ Merged (#112) |
 
 ---
 
@@ -113,8 +113,9 @@ _(空)_
 - [x] **研究：数据模型 + 交互设计** ✅（2026-02-27）
 - [x] **技术方案** — `docs/plans/highlight-annotation-system.md` ✅（2026-02-28）
 - [x] **Phase 1: # Tag 浮动工具栏**（`cc/highlight-editor`）— 系统标签初始化 + highlight-service CRUD + FloatingToolbar `# Tag` 按钮 + Tag 选择器 + PM 选区→inline ref 替换 + highlight bullet 颜色 + #comment 子节点 ✅（2026-02-28, PR #111）
-- [ ] **Phase 2: Content Script 网页高亮**（`cc/highlight-webpage`）— anchor-utils + messaging 协议 + Shadow DOM 网页工具栏 + 选中→高亮 DOM 渲染 + Background 路由 + URL clip 查找/自动创建
-- [ ] **Phase 3: 回显 + 双向联动**（`cc/highlight-webpage`）— URL 变更检测 + 四步锚点还原 + 无法定位标记 + Side Panel ↔ CS 双向滚动
+- [x] **Phase 2: Content Script 网页高亮**（`cc/highlight-webpage`）— anchor-utils + messaging 协议 + Shadow DOM 网页工具栏 + 选中→高亮 DOM 渲染 + Background 路由 + URL clip 查找/自动创建 ✅（2026-02-28, PR #112）
+- [x] **Phase 3: 回显 + 双向联动**（`cc/highlight-webpage`）— URL 变更检测 + 四步锚点还原 + 无法定位标记 + Side Panel ↔ CS 双向滚动 ✅（2026-02-28, PR #112）
+- [ ] **Review: 整体代码审查** — codex 审查 PR #111 + #112 全部代码（数据模型一致性、消息路由正确性、anchor 还原健壮性、测试覆盖完整性）
 
 #### AI Chat & 网页辅助 (#29 + #31)
 > 浏览器 + AI = soma 的第二个差异化维度。不只是聊天框，而是理解上下文的知识助手。
@@ -288,6 +289,8 @@ _(空)_
 
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
+| 2026-02-28 | Highlight 系统 Phase 1 — highlight-service CRUD + TagSelectorPopover + FloatingToolbar # Tag + PM 选区→inline ref + highlight bullet 颜色 + 25 test | Agent A | #111 |
+| 2026-02-28 | Highlight 系统 Phase 2-3 — anchor-utils + messaging 协议 + Shadow DOM 网页工具栏 + `<soma-hl>` DOM 渲染 + 4-step 锚点还原 + URL clip 查找 + Background 路由 + 87 test | Agent B | #112 |
 | 2026-02-28 | Paste Pipeline 重设计 — 统一 markdown/HTML 解析 + codeBlock 一等节点 + Google Docs/Sheets/Wikipedia 硬化 + paste debug 开关 + 6 test files | codex | #110 |
 | 2026-02-28 | 模板字段默认值克隆 — applyTag 克隆 template fieldEntry 默认值，syncTemplateFields 不克隆（只影响新实例）+ 4 test | nodex | main |
 | 2026-02-28 | Unified OutlinerRow — 统一行交互架构（OutlinerRow 提取 + FieldRow 委托 + 共享导航工具），消除 content/field 行交互不一致 + 16 test | nodex | main |

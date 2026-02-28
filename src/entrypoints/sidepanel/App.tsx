@@ -8,6 +8,7 @@ import { useGlobalSelectionDismiss } from '../../hooks/use-global-selection-dism
 import { TopToolbar } from '../../components/toolbar/TopToolbar';
 import { PanelStack } from '../../components/panel/PanelStack';
 import { CommandPalette } from '../../components/search/CommandPalette';
+import { BatchTagSelector } from '../../components/tags/BatchTagSelector';
 import { CONTAINER_IDS } from '../../types/index.js';
 import { initLoroDoc, commitDoc } from '../../lib/loro-doc.js';
 import * as loroDoc from '../../lib/loro-doc.js';
@@ -314,6 +315,7 @@ export function App({ skipBootstrap = false }: AppProps) {
     <TopToolbar />
     <PanelStack />
     <CommandPalette />
+    <BatchTagSelector />
     <Toaster
      position="bottom-center"
      toastOptions={{

@@ -71,6 +71,10 @@ interface NodeStore {
 
   applyTag(nodeId: string, tagDefId: string): void;
   removeTag(nodeId: string, tagDefId: string): void;
+  /** Batch-apply a tag to multiple nodes. Single commitDoc for undo. */
+  batchApplyTag(nodeIds: string[], tagDefId: string): void;
+  /** Batch-remove a tag from multiple nodes. Single commitDoc for undo. */
+  batchRemoveTag(nodeIds: string[], tagDefId: string): void;
   createTagDef(name: string, options?: { showCheckbox?: boolean; color?: string }): NodexNode;
   /** Ensure node has all template fieldEntries + content clones for its tags. */
   syncTemplateFields(nodeId: string): void;
@@ -1145,6 +1149,43 @@ export const useNodeStore = create<NodeStore>((set, get) => {
         if (requiredByRemaining.has(fdId)) continue;
         const feId = findFieldEntry(nodeId, fdId);
         if (feId) loroDoc.deleteNode(feId);
+      }
+      loroDoc.commitDoc();
+    },
+
+    batchApplyTag: (nodeIds, tagDefId) => {
+      for (const nodeId of nodeIds) {
+        applyTagMutationsNoCommit(nodeId, tagDefId);
+      }
+      loroDoc.commitDoc();
+    },
+
+    batchRemoveTag: (nodeIds, tagDefId) => {
+      for (const nodeId of nodeIds) {
+        const node = loroDoc.toNodexNode(nodeId);
+        const hadTag = node?.tags.includes(tagDefId) ?? false;
+        loroDoc.removeTag(nodeId, tagDefId);
+        if (!hadTag) continue;
+
+        const remainingTags = loroDoc.toNodexNode(nodeId)?.tags ?? [];
+        const requiredByRemaining = new Set<string>();
+        for (const remainingTagId of remainingTags) {
+          for (const chainTagId of getExtendsChain(remainingTagId)) {
+            for (const ref of getTemplateFieldDefs(chainTagId)) requiredByRemaining.add(ref.fieldDefId);
+          }
+        }
+
+        const fieldDefsFromRemovedTag = new Set<string>();
+        const extendsChain = getExtendsChain(tagDefId);
+        for (const chainTagId of extendsChain) {
+          for (const ref of getTemplateFieldDefs(chainTagId)) fieldDefsFromRemovedTag.add(ref.fieldDefId);
+        }
+
+        for (const fdId of fieldDefsFromRemovedTag) {
+          if (requiredByRemaining.has(fdId)) continue;
+          const feId = findFieldEntry(nodeId, fdId);
+          if (feId) loroDoc.deleteNode(feId);
+        }
       }
       loroDoc.commitDoc();
     },

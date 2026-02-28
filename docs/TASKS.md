@@ -26,13 +26,34 @@ _(空)_
 
 ## Agent 状态
 
-_(无活跃 Agent)_
+| Agent | 分支 | 任务 | 锁定文件 | 状态 |
+|---|---|---|---|---|
+| codex | `codex/paste-code-block-node` | Paste Phase 3（Code Block Node） | `src/stores/node-store.ts`, `src/components/outliner/OutlinerItem.tsx`, `src/types/node.ts`, `src/lib/paste-parser.ts` | 待 nodex review（PR #110） |
 
 ---
 
 ## 进行中
 
-_(见 Agent 状态表)_
+### Paste Phase 3（Code Block Node）
+
+- [x] 基于 `origin/main` 建分支并迁移 Paste Phase 2 代码基线
+- [x] 引入 `codeBlock` 一等节点类型（`NodeType` + `codeLanguage`）
+- [x] 粘贴解析支持 fenced code 与 HTML `<pre><code>` 产出 codeBlock 节点
+- [x] store 粘贴创建链路支持持久化 `type/codeLanguage`
+- [x] Outliner 渲染支持 code block（图标 + 样式 + 编辑态禁用 #/@/slash 触发）
+- [x] Vitest 覆盖（parser/store/node-type/html-to-nodes）
+- [x] 自测通过：`typecheck` → `check:test-sync` → `test:run` → `build`
+- 迭代日志：
+  - [2026-02-28 codex] 基于 `origin/main@444aa10` 新建分支 `codex/paste-code-block-node`，迁移 Paste Phase 2 提交作为基线，避免旧分支与主线分叉导致的上下文偏差。
+  - [2026-02-28 codex] 完成 code block 一等节点落地：新增 `codeBlock` 类型与 `codeLanguage` 属性；`paste-parser` 增加 fenced code / `<pre><code>` 识别；`createSiblingNodesFromPaste` 与 `createChild` 支持 typed rich text；Outliner 增加 code block 视觉与触发器隔离；补齐回归测试并全量通过。
+  - [2026-02-28 codex] 修复真实 Markdown 粘贴失败场景：新增 bullet-wrapped clipboard 文本归一化（`• ` 前缀去壳）、增强 Markdown 优先判定、过滤水平分割线（`---/***/___`）、flat 行内 markdown 去噪；并补齐首节点 children 落库链路（RichTextEditor/TrailingInput + store `createChildNodesFromPaste`），避免层级在第一行丢失。
+  - [2026-02-28 codex] 按用户反馈新增“粘贴调试开关”：`localStorage['soma:paste-debug']=1` 或 `window.__SOMA_PASTE_DEBUG=true`。在 RichTextEditor/TrailingInput 与 parser 三层输出剪贴板 raw、解析决策路径、节点摘要，便于定位 Markdown 被 html 包裹或入口分流错误。
+  - [2026-02-28 codex] 修复 Notion/Google Docs/网页富文本粘贴保真问题：`paste-parser` 调整 HTML/Markdown 优先级（rich HTML 优先，仅对 markdown-shell HTML 保留 markdown 优先）；`htmlToMarks` 增加 style-based mark 识别（font-weight/font-style/text-decoration/background）；paste 场景 HTML 解析启用 `includeH1` 并为 heading 写入 `headingMark`，补齐对应回归测试。
+  - [2026-02-28 codex] 针对 Google Docs/网页复制继续收敛：进一步改为“有 HTML 且非 markdown-shell 时一律优先 HTML”，避免强 markdown plain 覆盖富文本；并在 HTML 解析新增两类兜底（`inferParagraphLists`：支持 Docs 段落式 bullet+margin 缩进推断父子层级；`inferStyledHeadings`：支持按 inline font-size 推断标题分段），补齐 parser/html-to-nodes 回归测试。
+  - [2026-02-28 codex] 继续修复 Google Docs 粘贴层级丢失：定位到 Docs 样式常放在 `<style> + class`（非 inline style），导致前序“样式推断”失效；新增 class-style 内联化（解析 `<style>` 的 `.class { ... }` 并写回元素 `style`）后再走 heading/list 推断与 mark 提取，修复 class-based 富文本/层级解析，并补齐相关回归测试。
+  - [2026-02-28 codex] 修复 Google Sheets 粘贴产生 `<!--td {...}-->` 垃圾行：HTML parser 在结构遍历阶段显式跳过 `style/script/meta/link/head/title/template` 等非内容标签；并补充 style-comment 回归测试，确保表格粘贴只保留数据行。
+  - [2026-02-28 codex] 修复 Wikipedia 粘贴“一句被拆成多节点”问题：HTML 解析改为容器内 flow 模式（合并连续 inline sibling，遇到 block 或 `<br>` 再切分），避免 `span/sup/i/a` 并列结构被逐元素建节点；并补充 inline-flow 合并/按 `<br>` 分割回归测试。
+  - [2026-02-28 codex] 修复粘贴后“整段浅色高亮”误触发：定位为 style-based mark 规则把来源 `background-color` 映射为 `highlight`；现改为仅保留语义 `<mark>` 触发高亮，停止将普通背景色自动转为 highlight，并补充回归测试防止回归。
 
 ---
 
@@ -242,7 +263,8 @@ _(见 Agent 状态表)_
 
 - [x] Phase 0: 单行 URL 智能粘贴 + ⌘⇧V 纯文本 ✅（2026-02-27）
 - [x] Phase 1: 多行拆分为节点 ✅（2026-02-27）
-- [ ] Phase 2: 粘贴系统重做 — `paste-parser.ts` 纯函数解析（Markdown 层级 + HTML marks + `#tag` / `field:: value` 识别）+ store `createSiblingNodesFromPaste` 支持树结构 + marks + tag/field 应用 + 接入 RichTextEditor / TrailingInput / OutlinerItem
+- [x] Phase 2: 粘贴系统重做 — `paste-parser.ts` 纯函数解析（Markdown 层级 + HTML marks + `#tag` / `field:: value` 识别）+ store `createSiblingNodesFromPaste` 支持树结构 + marks + tag/field 应用 + 接入 RichTextEditor / TrailingInput / OutlinerItem ✅（2026-02-28，PR #109）
+- [x] Phase 3: Code Block 一等节点（`codeBlock` + `codeLanguage`，支持 fenced code / `<pre><code>` 粘贴）✅（2026-02-28，PR #110）
 
 #### 性能基线测量
 > **产出**: `docs/research/performance-baseline.md`

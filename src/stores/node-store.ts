@@ -17,6 +17,7 @@ import { getTreeReferenceBlockReason } from '../lib/reference-rules.js';
 import { resolveCheckboxClick, resolveCmdEnterCycle, resolveForwardDoneMapping, resolveReverseDoneMapping } from '../lib/checkbox-utils.js';
 import { nextAutoColorKey } from '../lib/tag-colors.js';
 import { runSearch } from '../lib/search-engine.js';
+import type { ParsedPasteNode } from '../lib/paste-parser.js';
 
 // ============================================================
 // Store 接口
@@ -35,8 +36,18 @@ interface NodeStore {
 
   createChild(parentId: string, index?: number, data?: Partial<NodexNode>): NodexNode;
   createSibling(siblingId: string, data?: Partial<NodexNode>): NodexNode;
-  /** Batch-create sibling nodes from pasted lines. Returns last created node ID (or null if no nodes created). Single commitDoc for undo. */
-  createSiblingNodesFromPaste(afterNodeId: string, lines: string[]): string | null;
+  /** Batch-create sibling nodes from parsed paste nodes. Returns last created top-level node ID (or null). Single commitDoc for undo. */
+  createSiblingNodesFromPaste(
+    afterNodeId: string,
+    nodes: ParsedPasteNode[],
+    options?: { commit?: boolean },
+  ): string | null;
+  /** Batch-create child nodes from parsed paste nodes. Returns last created top-level node ID (or null). */
+  createChildNodesFromPaste(
+    parentNodeId: string,
+    nodes: ParsedPasteNode[],
+    options?: { commit?: boolean },
+  ): string | null;
   moveNodeTo(nodeId: string, newParentId: string, index?: number): void;
   indentNode(nodeId: string): void;
   outdentNode(nodeId: string): void;
@@ -52,6 +63,7 @@ interface NodeStore {
   setNodeName(id: string, name: string): void;
   updateNodeContent(id: string, data: { name?: string; marks?: TextMark[]; inlineRefs?: InlineRefEntry[] }): void;
   updateNodeDescription(id: string, description: string): void;
+  applyParsedPasteMetadata(nodeId: string, node: ParsedPasteNode, options?: { commit?: boolean }): void;
 
   // ─── 标签操作 ───
 
@@ -148,6 +160,124 @@ function findFieldEntry(nodeId: string, fieldDefId: string): string | null {
   return null;
 }
 
+function normalizeLookupName(name: string): string {
+  return name.trim().toLowerCase();
+}
+
+function findTagDefIdByName(name: string): string | null {
+  const lookup = normalizeLookupName(name);
+  if (!lookup) return null;
+  const schemaChildren = loroDoc.getChildren(CONTAINER_IDS.SCHEMA);
+  for (const childId of schemaChildren) {
+    const child = loroDoc.toNodexNode(childId);
+    if (child?.type !== 'tagDef') continue;
+    if (normalizeLookupName(child.name ?? '') === lookup) return childId;
+  }
+  return null;
+}
+
+function ensureTagDefByNameNoCommit(name: string): string {
+  const normalized = name.trim();
+  if (!normalized) return '';
+  const existing = findTagDefIdByName(normalized);
+  if (existing) return existing;
+
+  const id = nanoid();
+  const schemaTagCount = loroDoc
+    .getChildren(CONTAINER_IDS.SCHEMA)
+    .filter((cid) => loroDoc.toNodexNode(cid)?.type === 'tagDef')
+    .length;
+
+  loroDoc.createNode(id, CONTAINER_IDS.SCHEMA);
+  loroDoc.setNodeDataBatch(id, {
+    type: 'tagDef',
+    name: normalized,
+    color: nextAutoColorKey(schemaTagCount),
+  });
+  return id;
+}
+
+function findFieldDefIdByName(fieldName: string, preferredTagIds: string[] = []): string | null {
+  const lookup = normalizeLookupName(fieldName);
+  if (!lookup) return null;
+
+  // First try template field defs owned by preferred tags.
+  for (const tagId of preferredTagIds) {
+    const refs = getTemplateFieldDefs(tagId);
+    for (const ref of refs) {
+      const fieldDef = loroDoc.toNodexNode(ref.fieldDefId);
+      if (fieldDef?.type !== 'fieldDef') continue;
+      if (normalizeLookupName(fieldDef.name ?? '') === lookup) return ref.fieldDefId;
+    }
+  }
+
+  // Fallback to global lookup.
+  for (const id of loroDoc.getAllNodeIds()) {
+    const node = loroDoc.toNodexNode(id);
+    if (node?.type !== 'fieldDef') continue;
+    if (normalizeLookupName(node.name ?? '') === lookup) return id;
+  }
+  return null;
+}
+
+function ensureFieldDefByNameNoCommit(fieldName: string, preferredTagIds: string[] = []): string {
+  const normalized = fieldName.trim();
+  if (!normalized) return '';
+  const existing = findFieldDefIdByName(normalized, preferredTagIds);
+  if (existing) return existing;
+
+  const ownerId = preferredTagIds[0] ?? CONTAINER_IDS.SCHEMA;
+  const id = nanoid();
+  loroDoc.createNode(id, ownerId);
+  loroDoc.setNodeDataBatch(id, {
+    type: 'fieldDef',
+    name: normalized,
+    fieldType: 'plain',
+    cardinality: 'single',
+    nullable: true,
+  });
+  return id;
+}
+
+function setFieldValueNoCommit(nodeId: string, fieldDefId: string, value: string): void {
+  const normalized = value.trim();
+  let fieldEntryId = findFieldEntry(nodeId, fieldDefId);
+  if (!fieldEntryId) {
+    fieldEntryId = nanoid();
+    loroDoc.createNode(fieldEntryId, nodeId);
+    loroDoc.setNodeDataBatch(fieldEntryId, { type: 'fieldEntry', fieldDefId });
+  }
+
+  const oldChildren = loroDoc.getChildren(fieldEntryId);
+  for (const oldId of oldChildren) {
+    loroDoc.deleteNode(oldId);
+  }
+
+  if (!normalized) return;
+  const valueNodeId = nanoid();
+  loroDoc.createNode(valueNodeId, fieldEntryId);
+  loroDoc.setNodeData(valueNodeId, 'name', normalized);
+}
+
+function applyParsedPasteMetadataMutationsNoCommit(nodeId: string, node: ParsedPasteNode): void {
+  const preferredTagIds: string[] = [];
+  for (const tagName of node.tags ?? []) {
+    const tagDefId = ensureTagDefByNameNoCommit(tagName);
+    if (!tagDefId) continue;
+    preferredTagIds.push(tagDefId);
+    applyTagMutationsNoCommit(nodeId, tagDefId);
+  }
+
+  const nodeTagIds = loroDoc.toNodexNode(nodeId)?.tags ?? [];
+  const lookupTagIds = [...preferredTagIds, ...nodeTagIds];
+
+  for (const field of node.fields ?? []) {
+    const fieldDefId = ensureFieldDefByNameNoCommit(field.name, lookupTagIds);
+    if (!fieldDefId) continue;
+    setFieldValueNoCommit(nodeId, fieldDefId, field.value);
+  }
+}
+
 interface TemplateFieldRef {
   /** The actual field definition ID (always the fieldDef node, may live in SCHEMA) */
   fieldDefId: string;
@@ -198,7 +328,7 @@ function getTemplateContentNodes(tagDefId: string): string[] {
   const children = loroDoc.getChildren(tagDefId);
   return children.filter((cid) => {
     const c = loroDoc.toNodexNode(cid);
-    return !!c && !c.type;
+    return !!c && (c.type === undefined || c.type === 'codeBlock');
   });
 }
 
@@ -356,12 +486,14 @@ function cloneTemplateContentNodeShallow(parentId: string, templateNodeId: strin
   if (findTemplateContentClone(parentId, templateNodeId)) return;
 
   const template = loroDoc.toNodexNode(templateNodeId);
-  if (!template || template.type) return;
+  if (!template || (template.type !== undefined && template.type !== 'codeBlock')) return;
 
   const clonedId = nanoid();
   loroDoc.createNode(clonedId, parentId);
   loroDoc.setNodeDataBatch(clonedId, {
     templateId: templateNodeId,
+    ...(template.type !== undefined && { type: template.type }),
+    ...(template.codeLanguage !== undefined && { codeLanguage: template.codeLanguage }),
     ...(template.description !== undefined && { description: template.description }),
     ...(template.viewMode !== undefined && { viewMode: template.viewMode }),
     ...(template.editMode !== undefined && { editMode: template.editMode }),
@@ -602,6 +734,51 @@ export const useNodeStore = create<NodeStore>((set, get) => {
     }
   }
 
+  function isMeaningfulParsedPasteNode(item: ParsedPasteNode): boolean {
+    const hasName = item.type === 'codeBlock'
+      ? item.name.length > 0
+      : item.name.trim().length > 0;
+    return (
+      hasName
+      || item.children.length > 0
+      || (item.tags?.length ?? 0) > 0
+      || (item.fields?.length ?? 0) > 0
+    );
+  }
+
+  function createParsedNodesNoCommit(
+    parentNodeId: string,
+    items: ParsedPasteNode[],
+    startIndex?: number,
+  ): string | null {
+    const filtered = items.filter(isMeaningfulParsedPasteNode);
+    if (filtered.length === 0) return null;
+
+    const persistParsedNodeType = (nodeId: string, item: ParsedPasteNode): void => {
+      if (!item.type && !item.codeLanguage) return;
+      const batch: Record<string, unknown> = {};
+      if (item.type) batch.type = item.type;
+      if (item.codeLanguage) batch.codeLanguage = item.codeLanguage;
+      loroDoc.setNodeDataBatch(nodeId, batch);
+    };
+
+    let lastId: string | null = null;
+    for (let i = 0; i < filtered.length; i++) {
+      const item = filtered[i];
+      const index = startIndex !== undefined ? startIndex + i : undefined;
+      const id = nanoid();
+      loroDoc.createNode(id, parentNodeId, index);
+      persistParsedNodeType(id, item);
+      loroDoc.setNodeRichTextContent(id, item.name, item.marks ?? [], item.inlineRefs ?? []);
+      applyParsedPasteMetadataMutationsNoCommit(id, item);
+      if (item.children.length > 0) {
+        createParsedNodesNoCommit(id, item.children);
+      }
+      lastId = id;
+    }
+    return lastId;
+  }
+
   return {
     _version: 0,
 
@@ -633,7 +810,8 @@ export const useNodeStore = create<NodeStore>((set, get) => {
         const { type, name, description, marks, inlineRefs, ...rest } = data;
         const batch: Record<string, unknown> = {};
         if (type !== undefined) batch.type = type;
-        const shouldPersistLegacyName = type !== undefined && name !== undefined && marks === undefined && inlineRefs === undefined;
+        const supportsRichText = type === undefined || type === 'codeBlock';
+        const shouldPersistLegacyName = !supportsRichText && name !== undefined && marks === undefined && inlineRefs === undefined;
         if (shouldPersistLegacyName) batch.name = name;
         if (description !== undefined) batch.description = description;
         Object.assign(batch, rest);
@@ -641,7 +819,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
           loroDoc.setNodeDataBatch(id, batch);
         }
 
-        const shouldWriteRichText = type === undefined && (name !== undefined || marks !== undefined || inlineRefs !== undefined);
+        const shouldWriteRichText = supportsRichText && (name !== undefined || marks !== undefined || inlineRefs !== undefined);
         if (shouldWriteRichText) {
           loroDoc.setNodeRichTextContent(
             id,
@@ -678,23 +856,35 @@ export const useNodeStore = create<NodeStore>((set, get) => {
       return get().createChild(parentId, insertAt, data);
     },
 
-    createSiblingNodesFromPaste: (afterNodeId, lines) => {
+    createSiblingNodesFromPaste: (afterNodeId, nodes, options) => {
       if (!canMutate('createSiblingNodesFromPaste')) return null;
       const parentId = loroDoc.getParentId(afterNodeId);
       if (!parentId) return null;
-      const nonEmptyLines = lines.filter((l) => l.trim().length > 0);
-      if (nonEmptyLines.length === 0) return null;
+
       const siblings = loroDoc.getChildren(parentId);
       const baseIdx = siblings.indexOf(afterNodeId);
       const startAt = baseIdx >= 0 ? baseIdx + 1 : siblings.length;
-      let lastId: string | null = null;
-      for (let i = 0; i < nonEmptyLines.length; i++) {
-        const id = nanoid();
-        loroDoc.createNode(id, parentId, startAt + i);
-        loroDoc.setNodeRichTextContent(id, nonEmptyLines[i]);
-        lastId = id;
+
+      const lastId = createParsedNodesNoCommit(parentId, nodes, startAt);
+      if (!lastId) return null;
+      if (options?.commit ?? true) {
+        loroDoc.commitDoc();
       }
-      loroDoc.commitDoc();
+      return lastId;
+    },
+
+    createChildNodesFromPaste: (parentNodeId, nodes, options) => {
+      if (!canMutate('createChildNodesFromPaste')) return null;
+      if (!loroDoc.hasNode(parentNodeId)) return null;
+
+      const children = loroDoc.getChildren(parentNodeId);
+      const startAt = children.length;
+      const lastId = createParsedNodesNoCommit(parentNodeId, nodes, startAt);
+      if (!lastId) return null;
+
+      if (options?.commit ?? true) {
+        loroDoc.commitDoc();
+      }
       return lastId;
     },
 
@@ -793,7 +983,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
           } else if (node?.type === 'fieldEntry' && node.fieldDefId) {
             // fieldEntry child of tagDef (UI layout)
             cascadeTemplateFieldDeletion(parentId, nodeId, node.fieldDefId);
-          } else if (node && !node.type) {
+          } else if (node && (node.type === undefined || node.type === 'codeBlock')) {
             // Plain content node (default content)
             cascadeTemplateContentDeletion(parentId, nodeId);
           }
@@ -879,6 +1069,13 @@ export const useNodeStore = create<NodeStore>((set, get) => {
     updateNodeDescription: (id, description) => {
       if (!getNodeCapabilities(id).canEditNode) return;
       loroDoc.setNodeData(id, 'description', description || undefined);
+    },
+
+    applyParsedPasteMetadata: (nodeId, node, options) => {
+      applyParsedPasteMetadataMutationsNoCommit(nodeId, node);
+      if (options?.commit !== false) {
+        loroDoc.commitDoc();
+      }
     },
 
     // ─── 标签操作 ───

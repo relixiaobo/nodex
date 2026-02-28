@@ -160,6 +160,29 @@
   margin: 0;
 }
 
+.code-block-row .editor-inline,
+.code-block-row .editor-inline > div {
+  display: block;
+}
+
+.code-block-row .ProseMirror,
+.code-block-content {
+  display: block;
+  white-space: pre-wrap;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.5;
+  border: 1px solid var(--color-border);
+  border-radius: 0.375rem;
+  background: var(--color-muted);
+  padding: 0.375rem 0.5rem;
+}
+
+.code-block-row .ProseMirror p {
+  display: block;
+  margin: 0;
+}
+
 /* ProseMirror editor-only styles */
 .ProseMirror {
   outline: none;

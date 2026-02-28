@@ -33,6 +33,12 @@ describe('editor-marks', () => {
     ]));
   });
 
+  it('does not infer highlight mark from generic background-color style', () => {
+    const { text, marks } = htmlToMarks('<span style="background-color:#f8f9fa">Styled</span>');
+    expect(text).toBe('Styled');
+    expect(marks.some((m) => m.type === 'highlight')).toBe(false);
+  });
+
   it('parses inline refs into replacement chars and entries', () => {
     const parsed = htmlToMarks('See <span data-inlineref-node="node_1">Ref</span> now');
     expect(parsed.text).toBe('See \uFFFC now');

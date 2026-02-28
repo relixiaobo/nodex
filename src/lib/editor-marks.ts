@@ -107,12 +107,6 @@ function isBoldStyle(fontWeight: string): boolean {
   return Number.isFinite(numeric) && numeric >= 600;
 }
 
-function isHighlightedStyle(backgroundColor: string): boolean {
-  const normalized = backgroundColor.trim().toLowerCase();
-  if (!normalized) return false;
-  return normalized !== 'transparent' && normalized !== 'initial' && normalized !== 'inherit' && normalized !== 'none';
-}
-
 function getElementStyleMarks(el: Element): ActiveMark[] {
   if (!(el instanceof HTMLElement)) return [];
 
@@ -126,9 +120,6 @@ function getElementStyleMarks(el: Element): ActiveMark[] {
   const textDecoration = `${el.style.textDecoration} ${el.style.textDecorationLine}`.toLowerCase();
   if (textDecoration.includes('line-through')) {
     marks.push({ type: 'strike' });
-  }
-  if (isHighlightedStyle(el.style.backgroundColor)) {
-    marks.push({ type: 'highlight' });
   }
   return marks;
 }

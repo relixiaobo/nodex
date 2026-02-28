@@ -53,6 +53,7 @@ _(空)_
   - [2026-02-28 codex] 继续修复 Google Docs 粘贴层级丢失：定位到 Docs 样式常放在 `<style> + class`（非 inline style），导致前序“样式推断”失效；新增 class-style 内联化（解析 `<style>` 的 `.class { ... }` 并写回元素 `style`）后再走 heading/list 推断与 mark 提取，修复 class-based 富文本/层级解析，并补齐相关回归测试。
   - [2026-02-28 codex] 修复 Google Sheets 粘贴产生 `<!--td {...}-->` 垃圾行：HTML parser 在结构遍历阶段显式跳过 `style/script/meta/link/head/title/template` 等非内容标签；并补充 style-comment 回归测试，确保表格粘贴只保留数据行。
   - [2026-02-28 codex] 修复 Wikipedia 粘贴“一句被拆成多节点”问题：HTML 解析改为容器内 flow 模式（合并连续 inline sibling，遇到 block 或 `<br>` 再切分），避免 `span/sup/i/a` 并列结构被逐元素建节点；并补充 inline-flow 合并/按 `<br>` 分割回归测试。
+  - [2026-02-28 codex] 修复粘贴后“整段浅色高亮”误触发：定位为 style-based mark 规则把来源 `background-color` 映射为 `highlight`；现改为仅保留语义 `<mark>` 触发高亮，停止将普通背景色自动转为 highlight，并补充回归测试防止回归。
 
 ---
 

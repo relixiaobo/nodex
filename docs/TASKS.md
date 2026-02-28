@@ -115,7 +115,7 @@ _(空)_
 - [x] **Phase 1: # Tag 浮动工具栏**（`cc/highlight-editor`）— 系统标签初始化 + highlight-service CRUD + FloatingToolbar `# Tag` 按钮 + Tag 选择器 + PM 选区→inline ref 替换 + highlight bullet 颜色 + #comment 子节点 ✅（2026-02-28, PR #111）
 - [x] **Phase 2: Content Script 网页高亮**（`cc/highlight-webpage`）— anchor-utils + messaging 协议 + Shadow DOM 网页工具栏 + 选中→高亮 DOM 渲染 + Background 路由 + URL clip 查找/自动创建 ✅（2026-02-28, PR #112）
 - [x] **Phase 3: 回显 + 双向联动**（`cc/highlight-webpage`）— URL 变更检测 + 四步锚点还原 + 无法定位标记 + Side Panel ↔ CS 双向滚动 ✅（2026-02-28, PR #112）
-- [ ] **Review: 整体代码审查** — codex 审查 PR #111 + #112 全部代码（数据模型一致性、消息路由正确性、anchor 还原健壮性、测试覆盖完整性）
+- [ ] **Review: 整体代码审查** — codex 审查 PR #111 + #112 全部代码（数据模型一致性、消息路由正确性、anchor 还原健壮性、测试覆盖完整性）→ PR #113
 
 #### AI Chat & 网页辅助 (#29 + #31)
 > 浏览器 + AI = soma 的第二个差异化维度。不只是聊天框，而是理解上下文的知识助手。

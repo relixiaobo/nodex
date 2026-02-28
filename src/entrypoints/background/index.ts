@@ -135,6 +135,9 @@ export default defineBackground(() => {
     // forward to the Side Panel (another extension page) via runtime.sendMessage.
     if (type === HIGHLIGHT_CREATE) {
       const tabId = sender.tab?.id;
+      // Only forward messages that originate from a content script tab.
+      // This prevents background self-forward loops.
+      if (!tabId) return false;
       // Forward augmented message to Side Panel and relay its response back to CS
       chrome.runtime.sendMessage(
         { ...message, _tabId: tabId },
@@ -151,6 +154,7 @@ export default defineBackground(() => {
 
     // ── Highlight Click: Content Script -> BG -> Side Panel ──
     if (type === HIGHLIGHT_CLICK) {
+      if (!sender.tab?.id) return false;
       chrome.runtime.sendMessage(message).catch(() => {});
       sendResponse({ ok: true });
       return true;
@@ -158,6 +162,7 @@ export default defineBackground(() => {
 
     // ── Highlight Unresolvable: Content Script -> BG -> Side Panel ──
     if (type === HIGHLIGHT_UNRESOLVABLE) {
+      if (!sender.tab?.id) return false;
       chrome.runtime.sendMessage(message).catch(() => {});
       sendResponse({ ok: true });
       return true;

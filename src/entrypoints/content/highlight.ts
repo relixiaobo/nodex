@@ -80,6 +80,17 @@ interface TextNodeSegment {
  * Handles cross-element selections by iterating through text nodes.
  */
 function getTextNodesInRange(range: Range): TextNodeSegment[] {
+  if (
+    range.startContainer === range.endContainer
+    && range.startContainer.nodeType === Node.TEXT_NODE
+  ) {
+    return [{
+      node: range.startContainer as Text,
+      startOffset: range.startOffset,
+      endOffset: range.endOffset,
+    }];
+  }
+
   const segments: TextNodeSegment[] = [];
   const walker = document.createTreeWalker(
     range.commonAncestorContainer,

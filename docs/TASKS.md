@@ -49,6 +49,7 @@ _(空)_
   - [2026-02-28 codex] 修复真实 Markdown 粘贴失败场景：新增 bullet-wrapped clipboard 文本归一化（`• ` 前缀去壳）、增强 Markdown 优先判定、过滤水平分割线（`---/***/___`）、flat 行内 markdown 去噪；并补齐首节点 children 落库链路（RichTextEditor/TrailingInput + store `createChildNodesFromPaste`），避免层级在第一行丢失。
   - [2026-02-28 codex] 按用户反馈新增“粘贴调试开关”：`localStorage['soma:paste-debug']=1` 或 `window.__SOMA_PASTE_DEBUG=true`。在 RichTextEditor/TrailingInput 与 parser 三层输出剪贴板 raw、解析决策路径、节点摘要，便于定位 Markdown 被 html 包裹或入口分流错误。
   - [2026-02-28 codex] 修复 Notion/Google Docs/网页富文本粘贴保真问题：`paste-parser` 调整 HTML/Markdown 优先级（rich HTML 优先，仅对 markdown-shell HTML 保留 markdown 优先）；`htmlToMarks` 增加 style-based mark 识别（font-weight/font-style/text-decoration/background）；paste 场景 HTML 解析启用 `includeH1` 并为 heading 写入 `headingMark`，补齐对应回归测试。
+  - [2026-02-28 codex] 针对 Google Docs/网页复制继续收敛：进一步改为“有 HTML 且非 markdown-shell 时一律优先 HTML”，避免强 markdown plain 覆盖富文本；并在 HTML 解析新增两类兜底（`inferParagraphLists`：支持 Docs 段落式 bullet+margin 缩进推断父子层级；`inferStyledHeadings`：支持按 inline font-size 推断标题分段），补齐 parser/html-to-nodes 回归测试。
 
 ---
 

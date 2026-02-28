@@ -303,7 +303,12 @@ export function parseHtmlBlocks(html: string): ParsedPasteNode[] {
     }
   }
 
-  const parsed = parseHtmlToNodes(html, { maxNodes: 500, includeH1: true });
+  const parsed = parseHtmlToNodes(html, {
+    maxNodes: 500,
+    includeH1: true,
+    inferStyledHeadings: true,
+    inferParagraphLists: true,
+  });
   if (parsed.nodes.length > 0) {
     return parsed.nodes
       .map(enrichNodeMetadata)
@@ -516,15 +521,7 @@ function shouldPreferMarkdown(
   if (!htmlAnalysis.hasHtml) return true;
   if (!htmlAnalysis.hasText) return true;
   if (htmlAnalysis.isLikelyMarkdownShell) return true;
-
-  const hasRichHtml =
-    htmlAnalysis.hasInlineFormatting
-    || htmlAnalysis.hasStyledFormatting
-    || htmlAnalysis.hasSemanticStructure;
-  if (hasRichHtml) return false;
-
-  // If HTML only adds thin wrapper tags, markdown generally preserves user intent better.
-  return true;
+  return false;
 }
 
 function hasStrongMarkdownSignals(text: string): boolean {

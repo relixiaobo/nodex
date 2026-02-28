@@ -144,6 +144,15 @@ describe('parseHtmlToNodes', () => {
     expect(nodes[0].children[0].name).toBe('Content');
   });
 
+  it('infers styled paragraph heading sections when enabled', () => {
+    const html = '<p><span style="font-size:26pt;font-weight:700">Skills</span></p><p>Detail line</p>';
+    const { nodes } = parseHtmlToNodes(html, { inferStyledHeadings: true });
+    expect(nodes).toHaveLength(1);
+    expect(nodes[0].name).toBe('Skills');
+    expect(nodes[0].marks.some((m) => m.type === 'headingMark')).toBe(true);
+    expect(nodes[0].children.map((n) => n.name)).toEqual(['Detail line']);
+  });
+
   // ── Lists ──
 
   it('flat list items', () => {
@@ -179,6 +188,17 @@ describe('parseHtmlToNodes', () => {
     const { nodes } = parseHtmlToNodes(html);
     expect(nodes).toHaveLength(2);
     expect(nodes[0].name).toBe('Step 1');
+  });
+
+  it('infers paragraph bullet hierarchy when enabled', () => {
+    const html = [
+      '<p style="margin-left:0pt">• Parent</p>',
+      '<p style="margin-left:36pt">• Child</p>',
+      '<p style="margin-left:0pt">• Sibling</p>',
+    ].join('');
+    const { nodes } = parseHtmlToNodes(html, { inferParagraphLists: true });
+    expect(nodes.map((n) => n.name)).toEqual(['Parent', 'Sibling']);
+    expect(nodes[0].children.map((n) => n.name)).toEqual(['Child']);
   });
 
   // ── Blockquote ──

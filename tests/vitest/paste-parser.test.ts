@@ -171,6 +171,30 @@ describe('paste-parser', () => {
     expect(nodes[1].marks.some((m) => m.type === 'link')).toBe(true);
   });
 
+  it('prefers html blocks over markdown list when clipboard includes html paragraphs', () => {
+    const plain = [
+      '- Parent',
+      '  - Child',
+    ].join('\n');
+    const html = '<p>Parent</p><p>Child</p>';
+    const nodes = parseMultiLinePaste(plain, html);
+    expect(nodes.map((n) => n.name)).toEqual(['Parent', 'Child']);
+    expect(nodes.every((n) => n.children.length === 0)).toBe(true);
+  });
+
+  it('parses html paragraph bullets into hierarchy for docs-like clipboard html', () => {
+    const html = [
+      '<p style="font-size:26pt;font-weight:700">Experience</p>',
+      '<p style="margin-left:0pt">• Parent</p>',
+      '<p style="margin-left:36pt">• Child</p>',
+    ].join('');
+    const nodes = parseHtmlBlocks(html);
+    expect(nodes).toHaveLength(1);
+    expect(nodes[0].name).toBe('Experience');
+    expect(nodes[0].children.map((n) => n.name)).toEqual(['Parent']);
+    expect(nodes[0].children[0].children.map((n) => n.name)).toEqual(['Child']);
+  });
+
   it('normalizes bullet-wrapped markdown lines from clipboard shells', () => {
     const plain = [
       '• ### Standalone 测试环境',

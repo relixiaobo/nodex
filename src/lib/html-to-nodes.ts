@@ -44,6 +44,8 @@ export interface HtmlToNodesResult {
 // ============================================================
 
 const DEFAULT_MAX_NODES = 200;
+const LIST_INDENT_STEP_PX = 24;
+const LIST_MARKER_RE = /^\s*(?:[•◦▪‣·●○■\-*+]|\d+[.)])\s+(.+)$/;
 
 // ============================================================
 // parseHtmlToNodes — pure function
@@ -58,7 +60,12 @@ const DEFAULT_MAX_NODES = 200;
  */
 export function parseHtmlToNodes(
   html: string,
-  options?: { maxNodes?: number; includeH1?: boolean },
+  options?: {
+    maxNodes?: number;
+    includeH1?: boolean;
+    inferStyledHeadings?: boolean;
+    inferParagraphLists?: boolean;
+  },
 ): HtmlToNodesResult {
   if (!html || !html.trim()) {
     return { nodes: [], truncated: false };
@@ -66,6 +73,8 @@ export function parseHtmlToNodes(
 
   const maxNodes = options?.maxNodes ?? DEFAULT_MAX_NODES;
   const includeH1 = options?.includeH1 ?? false;
+  const inferStyledHeadings = options?.inferStyledHeadings ?? false;
+  const inferParagraphLists = options?.inferParagraphLists ?? false;
   let nodeCount = 0;
   let truncated = false;
 
@@ -161,11 +170,103 @@ export function parseHtmlToNodes(
     node: ParsedContentNode;
   }
   const headingStack: HeadingFrame[] = [];
+  interface ListFrame {
+    level: number;
+    node: ParsedContentNode;
+  }
+  const listStack: ListFrame[] = [];
+  let listBaseIndentPx: number | null = null;
 
-  /** Get the current insertion target (deepest heading section or top-level). */
-  function getCurrentTarget(): ParsedContentNode[] {
+  /** Get target by heading sections only (ignoring list continuation). */
+  function getSectionTarget(): ParsedContentNode[] {
     if (headingStack.length === 0) return result;
     return headingStack[headingStack.length - 1].node.children;
+  }
+
+  /** Get insertion target (deepest list item first, then heading section, then top-level). */
+  function getCurrentTarget(): ParsedContentNode[] {
+    if (listStack.length > 0) return listStack[listStack.length - 1].node.children;
+    return getSectionTarget();
+  }
+
+  function resetListContext(): void {
+    listStack.length = 0;
+    listBaseIndentPx = null;
+  }
+
+  function appendHeadingNode(
+    level: number,
+    content: { text: string; marks: TextMark[]; inlineRefs: InlineRefEntry[] },
+  ): void {
+    while (headingStack.length > 0 && headingStack[headingStack.length - 1].level >= level) {
+      headingStack.pop();
+    }
+    const headingMarks = ensureHeadingMark(content.marks, content.text.length);
+    const node = makeNode(content.text, headingMarks, content.inlineRefs);
+    if (!node) return;
+    getSectionTarget().push(node);
+    headingStack.push({ level, node });
+  }
+
+  function appendParagraphNode(
+    content: { text: string; marks: TextMark[]; inlineRefs: InlineRefEntry[] },
+  ): void {
+    const node = makeNode(content.text, content.marks, content.inlineRefs);
+    if (node) getSectionTarget().push(node);
+  }
+
+  function appendListLikeParagraph(
+    content: { text: string; marks: TextMark[]; inlineRefs: InlineRefEntry[]; indentPx: number },
+  ): boolean {
+    let level = 0;
+    if (listBaseIndentPx === null) {
+      listBaseIndentPx = content.indentPx;
+    } else {
+      level = Math.max(0, Math.round((content.indentPx - listBaseIndentPx) / LIST_INDENT_STEP_PX));
+      if (listStack.length > 0) {
+        const prevLevel = listStack[listStack.length - 1].level;
+        if (level > prevLevel + 1) level = prevLevel + 1;
+      }
+    }
+
+    while (listStack.length > 0 && listStack[listStack.length - 1].level >= level) {
+      listStack.pop();
+    }
+
+    const node = makeNode(content.text, content.marks, content.inlineRefs);
+    if (!node) return true;
+    if (listStack.length > 0) {
+      listStack[listStack.length - 1].node.children.push(node);
+    } else {
+      getSectionTarget().push(node);
+    }
+    listStack.push({ level, node });
+    return true;
+  }
+
+  function processParagraphLike(el: Element): boolean {
+    const raw = extractContent(el);
+    const trimmed = trimContent(raw.text, raw.marks, raw.inlineRefs);
+    if (!trimmed.text) return false;
+
+    if (inferParagraphLists) {
+      const listLike = stripListMarker(trimmed, extractIndentPx(el));
+      if (listLike) {
+        return appendListLikeParagraph(listLike);
+      }
+    }
+
+    resetListContext();
+    if (inferStyledHeadings) {
+      const inferredLevel = inferHeadingLevelFromInlineStyle(el, trimmed.text, trimmed.marks);
+      if (inferredLevel !== null) {
+        appendHeadingNode(inferredLevel, trimmed);
+        return true;
+      }
+    }
+
+    appendParagraphNode(trimmed);
+    return true;
   }
 
   /** Process a single block element. */
@@ -180,64 +281,57 @@ export function parseHtmlToNodes(
 
     // Headings h1–h6: create section parent
     if (/^h[1-6]$/.test(tag)) {
+      resetListContext();
       const level = parseInt(tag[1], 10);
-      // Pop heading stack until we find a lower level (higher priority heading)
-      while (headingStack.length > 0 && headingStack[headingStack.length - 1].level >= level) {
-        headingStack.pop();
-      }
       const { text, marks, inlineRefs } = extractContent(el);
       const trimmed = trimContent(text, marks, inlineRefs);
       if (!trimmed.text) return;
-      const headingMarks: TextMark[] = [
-        ...trimmed.marks,
-        {
-          start: 0,
-          end: trimmed.text.length,
-          type: 'headingMark',
-        },
-      ];
-      const node = makeNode(trimmed.text, headingMarks, trimmed.inlineRefs);
-      if (!node) return;
-      getCurrentTarget().push(node);
-      headingStack.push({ level, node });
+      appendHeadingNode(level, trimmed);
       return;
     }
 
     // Paragraph
     if (tag === 'p') {
-      const { text, marks, inlineRefs } = extractContent(el);
-      if (!text.trim()) return;
-      const node = makeNode(text, marks, inlineRefs);
-      if (node) getCurrentTarget().push(node);
+      processParagraphLike(el);
       return;
     }
 
     // Lists: transparent container, process <li> children
     if (tag === 'ul' || tag === 'ol') {
-      processListItems(el, getCurrentTarget());
+      resetListContext();
+      processListItems(el, getSectionTarget());
       return;
     }
 
     // Blockquote: parent node with recursive children
     if (tag === 'blockquote') {
+      resetListContext();
       processBlockquote(el);
       return;
     }
 
     // Pre/code: single code node
     if (tag === 'pre') {
+      resetListContext();
       processPreBlock(el);
       return;
     }
 
     // Table: each <tr> becomes a node
     if (tag === 'table') {
+      resetListContext();
       processTable(el);
       return;
     }
 
-    // Div: transparent container, recurse into children
+    // Div-like containers: treat inline-only blocks as paragraph-like, else recurse.
     if (tag === 'div' || tag === 'section' || tag === 'article' || tag === 'main' || tag === 'aside' || tag === 'header' || tag === 'footer' || tag === 'nav') {
+      const hasBlockChild = Array.from(el.children).some(isBlockElement);
+      if (!hasBlockChild) {
+        processParagraphLike(el);
+        return;
+      }
+      resetListContext();
       for (const child of Array.from(el.children)) {
         processBlock(child);
       }
@@ -248,9 +342,10 @@ export function parseHtmlToNodes(
     const text = el.textContent?.trim();
     if (text) {
       const { text: t, marks, inlineRefs } = extractTextContent(el);
-      if (t.trim()) {
-        const node = makeNode(t, marks, inlineRefs);
-        if (node) getCurrentTarget().push(node);
+      const trimmed = trimContent(t, marks, inlineRefs);
+      if (trimmed.text) {
+        resetListContext();
+        appendParagraphNode(trimmed);
       }
     }
   }
@@ -484,6 +579,111 @@ function isBlockElement(el: Element): boolean {
     'section', 'article', 'main', 'aside', 'header', 'footer', 'nav',
     'figure', 'hr',
   ].includes(tag);
+}
+
+function ensureHeadingMark(marks: TextMark[], textLength: number): TextMark[] {
+  const hasFullHeadingMark = marks.some((m) => m.type === 'headingMark' && m.start <= 0 && m.end >= textLength);
+  if (hasFullHeadingMark || textLength <= 0) return marks;
+  return [
+    ...marks,
+    {
+      start: 0,
+      end: textLength,
+      type: 'headingMark',
+    },
+  ];
+}
+
+function stripListMarker(
+  content: { text: string; marks: TextMark[]; inlineRefs: InlineRefEntry[] },
+  indentPx: number,
+): { text: string; marks: TextMark[]; inlineRefs: InlineRefEntry[]; indentPx: number } | null {
+  const match = content.text.match(LIST_MARKER_RE);
+  if (!match) return null;
+  const body = match[1]?.trim() ?? '';
+  if (!body) return null;
+
+  const prefixLength = content.text.length - body.length;
+  const adjustedMarks = content.marks
+    .map((m) => ({
+      ...m,
+      start: Math.max(0, m.start - prefixLength),
+      end: Math.max(0, m.end - prefixLength),
+    }))
+    .filter((m) => m.end > m.start);
+  const adjustedRefs = content.inlineRefs
+    .map((r) => ({ ...r, offset: r.offset - prefixLength }))
+    .filter((r) => r.offset >= 0 && r.offset < body.length);
+
+  return {
+    text: body,
+    marks: adjustedMarks,
+    inlineRefs: adjustedRefs,
+    indentPx,
+  };
+}
+
+function inferHeadingLevelFromInlineStyle(
+  el: Element,
+  text: string,
+  marks: TextMark[],
+): number | null {
+  if (text.length === 0 || text.length > 96) return null;
+  if (LIST_MARKER_RE.test(text)) return null;
+
+  const maxFontPx = getMaxInlineFontSizePx(el);
+  const fullLineBold = isFullLineBold(text.length, marks);
+
+  if (maxFontPx >= 30) return 1;
+  if (maxFontPx >= 24) return 2;
+  if (maxFontPx >= 20) return 3;
+  if (maxFontPx >= 17 && fullLineBold) return 4;
+  return null;
+}
+
+function getMaxInlineFontSizePx(root: Element): number {
+  const elements = [root, ...Array.from(root.querySelectorAll('*'))];
+  let max = 0;
+  for (const el of elements) {
+    if (!(el instanceof HTMLElement)) continue;
+    const px = parseCssLengthToPx(el.style.fontSize);
+    if (px > max) max = px;
+  }
+  return max;
+}
+
+function isFullLineBold(textLength: number, marks: TextMark[]): boolean {
+  return marks.some((m) => m.type === 'bold' && m.start <= 0 && m.end >= textLength);
+}
+
+function extractIndentPx(el: Element): number {
+  if (!(el instanceof HTMLElement)) return 0;
+  const style = el.style;
+  const marginLeft = parseCssLengthToPx(style.marginLeft || style.marginInlineStart);
+  const paddingLeft = parseCssLengthToPx(style.paddingLeft || style.paddingInlineStart);
+  const textIndent = Math.max(0, parseCssLengthToPx(style.textIndent));
+  return Math.max(0, marginLeft + paddingLeft + textIndent);
+}
+
+function parseCssLengthToPx(input?: string | null): number {
+  if (!input) return 0;
+  const raw = input.trim().toLowerCase();
+  if (!raw) return 0;
+  const match = raw.match(/^(-?\d+(?:\.\d+)?)(px|pt|rem|em)?$/);
+  if (!match) return 0;
+  const value = Number.parseFloat(match[1]);
+  if (!Number.isFinite(value)) return 0;
+  const unit = match[2] ?? 'px';
+  switch (unit) {
+    case 'pt':
+      return value * (4 / 3);
+    case 'rem':
+    case 'em':
+      return value * 16;
+    case 'px':
+    default:
+      return value;
+  }
 }
 
 function extractCodeLanguage(el: Element): string | undefined {

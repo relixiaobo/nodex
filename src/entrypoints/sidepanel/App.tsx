@@ -16,7 +16,7 @@ import { ensureWorkspaceHomeNode } from '../../lib/workspace-root.js';
 import { getOrCreateDefaultWorkspaceId } from '../../lib/workspace-id.js';
 import { findUnexpectedShortcutConflicts } from '../../lib/shortcut-registry.js';
 import { ensureJournalTagDefs, ensureTodayNode } from '../../lib/journal.js';
-import { ensureHighlightTagDef, ensureCommentTagDef, type HighlightNodeStore } from '../../lib/highlight-service.js';
+import { ensureHighlightTagDef, ensureNoteTagDef, type HighlightNodeStore } from '../../lib/highlight-service.js';
 import {
   createHighlightFromPayload,
   buildHighlightRestorePayload,
@@ -71,7 +71,7 @@ async function seedWorkspace(wsId: string): Promise<void> {
  // Ensure #highlight and #comment system tags exist
  const store = useNodeStore.getState() as HighlightNodeStore;
  ensureHighlightTagDef(store);
- ensureCommentTagDef(store);
+ ensureNoteTagDef(store);
 
  // Flush all bootstrap ops under a system origin so they are excluded from
  // the undo stack. Without this, pending ops from container creation could
@@ -196,7 +196,7 @@ export function App({ skipBootstrap = false }: AppProps) {
       try {
         const store = useNodeStore.getState() as HighlightNodeStore;
         ensureHighlightTagDef(store);
-        ensureCommentTagDef(store);
+        ensureNoteTagDef(store);
         const result = await createHighlightFromPayload(payload, store);
         sendResponse({ ok: true, nodeId: result.highlightNodeId, clipNodeId: result.clipNodeId });
       } catch (err) {
@@ -280,12 +280,12 @@ export function App({ skipBootstrap = false }: AppProps) {
     }
 
     const store = useNodeStore.getState() as HighlightNodeStore;
-    ensureCommentTagDef(store);
+    ensureNoteTagDef(store);
     const result = upsertHighlightNote(store, payload.id, payload.noteText);
     sendResponse({
       ok: true,
       updated: !!result,
-      commentNodeId: result?.commentNodeId,
+      noteNodeId: result?.noteNodeId,
       created: result?.created ?? false,
     });
     return true;

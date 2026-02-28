@@ -141,7 +141,7 @@ export function resolveTagColor(
   tagDefId: string,
 ): TagColor {
   // System tags always gray — except highlight/comment which have user-visible colors
-  if (tagDefId.startsWith('SYS_T') && tagDefId !== SYS_T.HIGHLIGHT && tagDefId !== SYS_T.COMMENT) {
+  if (tagDefId.startsWith('SYS_T') && tagDefId !== SYS_T.HIGHLIGHT && tagDefId !== SYS_T.NOTE) {
     return TAG_COLOR_GRAY;
   }
 

@@ -4,7 +4,7 @@ import { resetAndSeed } from './helpers/test-state.js';
 import { CONTAINER_IDS, SYS_T } from '../../src/types/index.js';
 import {
   ensureHighlightTagDef,
-  ensureCommentTagDef,
+  ensureNoteTagDef,
   type HighlightNodeStore,
 } from '../../src/lib/highlight-service.js';
 import { findClipNodeByUrl } from '../../src/lib/webclip-service.js';
@@ -43,7 +43,7 @@ describe('highlight-sidepanel', () => {
     resetAndSeed();
     const store = getStore();
     ensureHighlightTagDef(store);
-    ensureCommentTagDef(store);
+    ensureNoteTagDef(store);
   });
 
   it('creates highlight as child of existing clip node', async () => {
@@ -80,17 +80,17 @@ describe('highlight-sidepanel', () => {
     expect(loroDoc.getParentId(result.highlightNodeId)).toBe(result.clipNodeId);
   });
 
-  it('creates an empty #comment child when withNote is true', async () => {
+  it('creates an empty #note child when withNote is true', async () => {
     const store = getStore();
     const result = await createHighlightFromPayload(makePayload({ withNote: true }), store);
 
     const children = store.getChildren(result.highlightNodeId);
-    const comment = children.find((n) => n.tags.includes(SYS_T.COMMENT));
+    const comment = children.find((n) => n.tags.includes(SYS_T.NOTE));
     expect(comment).toBeDefined();
     expect(comment!.name).toBe('');
   });
 
-  it('creates #comment child with note text when noteText is provided', async () => {
+  it('creates #note child with note text when noteText is provided', async () => {
     const store = getStore();
     const result = await createHighlightFromPayload(
       makePayload({ withNote: true, noteText: 'captured note' }),
@@ -98,7 +98,7 @@ describe('highlight-sidepanel', () => {
     );
 
     const children = store.getChildren(result.highlightNodeId);
-    const comment = children.find((n) => n.tags.includes(SYS_T.COMMENT));
+    const comment = children.find((n) => n.tags.includes(SYS_T.NOTE));
     expect(comment).toBeDefined();
     expect(comment!.name).toBe('captured note');
   });
@@ -126,7 +126,7 @@ describe('highlight-sidepanel', () => {
     expect(item!.hasComment).toBe(false);
   });
 
-  it('sets hasComment=true in restore payload when highlight has #comment child', async () => {
+  it('sets hasComment=true in restore payload when highlight has #note child', async () => {
     const store = getStore();
     const result = await createHighlightFromPayload(makePayload(), store);
     upsertHighlightNote(store, result.highlightNodeId, 'note');
@@ -136,7 +136,7 @@ describe('highlight-sidepanel', () => {
     expect(item?.hasComment).toBe(true);
   });
 
-  it('upserts note by updating existing #comment child instead of duplicating', async () => {
+  it('upserts note by updating existing #note child instead of duplicating', async () => {
     const store = getStore();
     const result = await createHighlightFromPayload(makePayload({ noteText: 'first' }), store);
 
@@ -145,7 +145,7 @@ describe('highlight-sidepanel', () => {
 
     const comments = store
       .getChildren(result.highlightNodeId)
-      .filter((n) => n.tags.includes(SYS_T.COMMENT));
+      .filter((n) => n.tags.includes(SYS_T.NOTE));
     expect(comments).toHaveLength(1);
     expect(comments[0].name).toBe('second');
   });

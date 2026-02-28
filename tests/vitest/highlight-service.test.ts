@@ -1,5 +1,5 @@
 /**
- * highlight-service — #highlight and #comment system tag CRUD tests.
+ * highlight-service — #highlight and #note system tag CRUD tests.
  *
  * New model:
  * - Highlights are children of clip page nodes
@@ -14,10 +14,10 @@ import * as loroDoc from '../../src/lib/loro-doc.js';
 import { CONTAINER_IDS, SYS_T, FIELD_TYPES, AUTO_INIT_STRATEGY } from '../../src/types/index.js';
 import {
   ensureHighlightTagDef,
-  ensureCommentTagDef,
+  ensureNoteTagDef,
   createHighlightNode,
   getHighlightsForClip,
-  createCommentNode,
+  createNoteNode,
   getSourceFieldDefId,
   _resetHighlightCache,
   type HighlightNodeStore,
@@ -102,27 +102,27 @@ describe('ensureHighlightTagDef', () => {
   });
 });
 
-describe('ensureCommentTagDef', () => {
+describe('ensureNoteTagDef', () => {
   beforeEach(() => {
     _resetHighlightCache();
     resetAndSeed();
   });
 
-  it('creates #comment tagDef with fixed ID SYS_T201', () => {
+  it('creates #note tagDef with fixed ID SYS_T201', () => {
     const store = getStore();
-    ensureCommentTagDef(store);
+    ensureNoteTagDef(store);
 
-    const tagDef = loroDoc.toNodexNode(SYS_T.COMMENT);
+    const tagDef = loroDoc.toNodexNode(SYS_T.NOTE);
     expect(tagDef).toBeDefined();
     expect(tagDef!.type).toBe('tagDef');
-    expect(tagDef!.name).toBe('comment');
+    expect(tagDef!.name).toBe('note');
   });
 
-  it('creates no fieldDefs under comment tagDef', () => {
+  it('creates no fieldDefs under note tagDef', () => {
     const store = getStore();
-    ensureCommentTagDef(store);
+    ensureNoteTagDef(store);
 
-    const children = loroDoc.getChildren(SYS_T.COMMENT);
+    const children = loroDoc.getChildren(SYS_T.NOTE);
     const fieldDefs = children.filter(cid => {
       const n = loroDoc.toNodexNode(cid);
       return n?.type === 'fieldDef';
@@ -132,15 +132,15 @@ describe('ensureCommentTagDef', () => {
 
   it('is idempotent', () => {
     const store = getStore();
-    ensureCommentTagDef(store);
-    ensureCommentTagDef(store);
+    ensureNoteTagDef(store);
+    ensureNoteTagDef(store);
 
-    const tagDef = loroDoc.toNodexNode(SYS_T.COMMENT);
+    const tagDef = loroDoc.toNodexNode(SYS_T.NOTE);
     expect(tagDef).toBeDefined();
 
     const schemaChildren = loroDoc.getChildren(CONTAINER_IDS.SCHEMA);
-    const commentDefs = schemaChildren.filter(cid => cid === SYS_T.COMMENT);
-    expect(commentDefs).toHaveLength(1);
+    const noteDefs = schemaChildren.filter(cid => cid === SYS_T.NOTE);
+    expect(noteDefs).toHaveLength(1);
   });
 });
 
@@ -150,7 +150,7 @@ describe('createHighlightNode', () => {
     resetAndSeed();
     const store = getStore();
     ensureHighlightTagDef(store);
-    ensureCommentTagDef(store);
+    ensureNoteTagDef(store);
   });
 
   it('creates node as child of clip page', () => {
@@ -234,7 +234,7 @@ describe('getHighlightsForClip', () => {
     resetAndSeed();
     const store = getStore();
     ensureHighlightTagDef(store);
-    ensureCommentTagDef(store);
+    ensureNoteTagDef(store);
   });
 
   it('returns empty array when no highlights exist', () => {
@@ -285,13 +285,13 @@ describe('getHighlightsForClip', () => {
 
 });
 
-describe('createCommentNode', () => {
+describe('createNoteNode', () => {
   beforeEach(() => {
     _resetHighlightCache();
     resetAndSeed();
     const store = getStore();
     ensureHighlightTagDef(store);
-    ensureCommentTagDef(store);
+    ensureNoteTagDef(store);
   });
 
   it('creates child node under highlight', () => {
@@ -302,11 +302,11 @@ describe('createCommentNode', () => {
       clipNodeId: 'webclip_1',
     });
 
-    const comment = createCommentNode(store, highlight.id, 'my comment');
-    expect(loroDoc.getParentId(comment.id)).toBe(highlight.id);
+    const note = createNoteNode(store, highlight.id, 'my note');
+    expect(loroDoc.getParentId(note.id)).toBe(highlight.id);
   });
 
-  it('sets comment text as node name', () => {
+  it('sets note text as node name', () => {
     const store = getStore();
     const highlight = createHighlightNode({
       store,
@@ -314,12 +314,12 @@ describe('createCommentNode', () => {
       clipNodeId: 'webclip_1',
     });
 
-    const comment = createCommentNode(store, highlight.id, 'my comment');
-    const saved = loroDoc.toNodexNode(comment.id);
-    expect(saved!.name).toBe('my comment');
+    const note = createNoteNode(store, highlight.id, 'my note');
+    const saved = loroDoc.toNodexNode(note.id);
+    expect(saved!.name).toBe('my note');
   });
 
-  it('applies #comment tag', () => {
+  it('applies #note tag', () => {
     const store = getStore();
     const highlight = createHighlightNode({
       store,
@@ -327,8 +327,8 @@ describe('createCommentNode', () => {
       clipNodeId: 'webclip_1',
     });
 
-    const comment = createCommentNode(store, highlight.id, 'my comment');
-    const saved = loroDoc.toNodexNode(comment.id);
-    expect(saved!.tags).toContain(SYS_T.COMMENT);
+    const note = createNoteNode(store, highlight.id, 'my note');
+    const saved = loroDoc.toNodexNode(note.id);
+    expect(saved!.tags).toContain(SYS_T.NOTE);
   });
 });

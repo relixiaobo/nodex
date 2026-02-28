@@ -1,7 +1,7 @@
 import { deserializeAnchor, serializeAnchor } from './highlight-anchor.js';
 import type { HighlightCreatePayload, HighlightRestorePayload } from './highlight-messaging.js';
 import {
-  createCommentNode,
+  createNoteNode,
   createHighlightNode,
   getHighlightsForClip,
   type HighlightNodeStore,
@@ -17,7 +17,7 @@ export interface CreateHighlightFromPayloadResult {
 }
 
 export interface UpsertHighlightNoteResult {
-  commentNodeId: string;
+  noteNodeId: string;
   created: boolean;
 }
 
@@ -95,9 +95,9 @@ export async function createHighlightFromPayload(
 
   const noteText = payload.noteText?.trim();
   if (noteText) {
-    createCommentNode(store, highlight.id, noteText);
+    createNoteNode(store, highlight.id, noteText);
   } else if (payload.withNote) {
-    createCommentNode(store, highlight.id, '');
+    createNoteNode(store, highlight.id, '');
   }
 
   return {
@@ -116,7 +116,7 @@ export function upsertHighlightNote(
 
   const existing = store
     .getChildren(highlightNodeId)
-    .find((child) => child.tags.includes(SYS_T.COMMENT));
+    .find((child) => child.tags.includes(SYS_T.NOTE));
 
   if (existing) {
     if (existing.name !== trimmed) {
@@ -129,14 +129,14 @@ export function upsertHighlightNote(
       loroDoc.commitDoc();
     }
     return {
-      commentNodeId: existing.id,
+      noteNodeId: existing.id,
       created: false,
     };
   }
 
-  const created = createCommentNode(store, highlightNodeId, trimmed);
+  const created = createNoteNode(store, highlightNodeId, trimmed);
   return {
-    commentNodeId: created.id,
+    noteNodeId: created.id,
     created: true,
   };
 }
@@ -161,7 +161,7 @@ export function buildHighlightRestorePayload(clipNodeId: string): HighlightResto
         id: node.id,
         anchor: parsedAnchor,
         color: tagColor,
-        hasComment: hasCommentChild(node.id),
+        hasComment: hasNoteChild(node.id),
       });
     } catch {
       // Ignore invalid anchors and keep restoring other highlights.
@@ -172,11 +172,11 @@ export function buildHighlightRestorePayload(clipNodeId: string): HighlightResto
   return { highlights: items };
 }
 
-function hasCommentChild(highlightNodeId: string): boolean {
+function hasNoteChild(highlightNodeId: string): boolean {
   const children = loroDoc.getChildren(highlightNodeId);
   for (const childId of children) {
     const child = loroDoc.toNodexNode(childId);
-    if (child?.tags.includes(SYS_T.COMMENT)) return true;
+    if (child?.tags.includes(SYS_T.NOTE)) return true;
   }
   return false;
 }

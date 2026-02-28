@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useNode } from '../../hooks/use-node';
 import { useChildren } from '../../hooks/use-children';
 import { useNodeFields, type FieldEntry } from '../../hooks/use-node-fields';
@@ -21,6 +21,7 @@ import {
   getDragSelectableRowIds,
   type OutlinerRowItem,
 } from './row-model.js';
+import { navigateToSiblingRow } from '../../lib/outliner-navigation.js';
 
 interface OutlinerViewProps {
   rootNodeId: string;
@@ -146,6 +147,19 @@ export function OutlinerView({ rootNodeId, showTemplateTuples }: OutlinerViewPro
   const containerRef = useRef<HTMLDivElement>(null);
   useDragSelect({ containerRef, rootChildIds: dragSelectableRootIds, rootNodeId });
 
+  const navToField = useCallback((fieldId: string) => {
+    clearFocus();
+    setEditingFieldName(fieldId);
+  }, [clearFocus, setEditingFieldName]);
+
+  const navToContent = useCallback((id: string, parentId: string, textOffset: number) => {
+    const offset = textOffset === Infinity
+      ? (useNodeStore.getState().getNode(id)?.name ?? '').length
+      : textOffset;
+    useUIStore.getState().setFocusClickCoords({ nodeId: id, parentId, textOffset: offset });
+    setFocusedNode(id, parentId);
+  }, [setFocusedNode]);
+
   return (
     <div
       ref={containerRef}
@@ -181,44 +195,14 @@ export function OutlinerView({ rootNodeId, showTemplateTuples }: OutlinerViewPro
               rootNodeId={rootNodeId}
               isLastInGroup={i === rows.length - 1 || rows[i + 1].type !== 'field'}
               ownerTagColor={fieldOwnerColors.get(row.id)}
-              onNavigateOut={(direction) => {
-                if (direction === 'up') {
-                  for (let j = i - 1; j >= 0; j--) {
-                    const prev = rows[j];
-                    if (prev.hidden) continue;
-                    if (prev.type === 'field') {
-                      clearFocus();
-                      setEditingFieldName(prev.id);
-                      return;
-                    }
-                    useUIStore.getState().setFocusClickCoords({
-                      nodeId: prev.id,
-                      parentId: rootNodeId,
-                      textOffset: (useNodeStore.getState().getNode(prev.id)?.name ?? '').length,
-                    });
-                    setFocusedNode(prev.id, rootNodeId);
-                    return;
-                  }
-                  return;
-                }
-
-                for (let j = i + 1; j < rows.length; j++) {
-                  const next = rows[j];
-                  if (next.hidden) continue;
-                  if (next.type === 'field') {
-                    clearFocus();
-                    setEditingFieldName(next.id);
-                    return;
-                  }
-                  useUIStore.getState().setFocusClickCoords({
-                    nodeId: next.id,
-                    parentId: rootNodeId,
-                    textOffset: 0,
-                  });
-                  setFocusedNode(next.id, rootNodeId);
-                  return;
-                }
-              }}
+              onNavigateOut={(direction) => navigateToSiblingRow({
+                rows,
+                currentIndex: i,
+                direction,
+                parentId: rootNodeId,
+                onField: navToField,
+                onContent: navToContent,
+              })}
             />
           </div>
         )}

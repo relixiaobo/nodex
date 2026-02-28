@@ -26,6 +26,7 @@ import { FieldRow } from './FieldRow';
 import { toFieldRowEntryProps } from './field-row-props.js';
 import * as loroDoc from '../../lib/loro-doc.js';
 import { shouldShowTrailingInput } from '../outliner/row-model.js';
+import { navigateToSiblingRow } from '../../lib/outliner-navigation.js';
 
 interface ConfigOutlinerProps {
   nodeId: string;
@@ -176,23 +177,27 @@ export function ConfigOutliner({ nodeId, onNavigateOut }: ConfigOutlinerProps) {
   const lastIsField = mergedItems.length > 0 && mergedItems[mergedItems.length - 1].type === 'field';
   const showTrailingInput = shouldShowConfigTrailingInput(mergedItems);
 
+  const navToField = useCallback((fieldId: string) => {
+    clearFocus();
+    setEditingFieldName(fieldId);
+  }, [clearFocus, setEditingFieldName]);
+
+  const navToContent = useCallback((id: string, parentId: string) => {
+    setFocusedNode(id, parentId);
+  }, [setFocusedNode]);
+
   const handleTrailingNavigateOut = useCallback((direction: 'up' | 'down') => {
-    if (direction === 'up') {
-      const last = mergedItems[mergedItems.length - 1];
-      if (!last) {
-        onNavigateOut?.('up');
-        return;
-      }
-      if (last.type === 'field') {
-        clearFocus();
-        setEditingFieldName(last.id);
-        return;
-      }
-      setFocusedNode(last.id, nodeId);
-      return;
-    }
-    onNavigateOut?.('down');
-  }, [mergedItems, onNavigateOut, clearFocus, setEditingFieldName, nodeId, setFocusedNode]);
+    // TrailingInput is conceptually at index = mergedItems.length
+    navigateToSiblingRow({
+      rows: mergedItems,
+      currentIndex: mergedItems.length,
+      direction,
+      parentId: nodeId,
+      onField: navToField,
+      onContent: navToContent,
+      onEscape: onNavigateOut,
+    });
+  }, [mergedItems, nodeId, navToField, navToContent, onNavigateOut]);
 
   return (
     <div ref={containerRef} className={`min-h-[22px]${firstIsField ? ' pt-1' : ''}${lastIsField ? ' pb-1' : ''}`}>
@@ -210,33 +215,15 @@ export function ConfigOutliner({ nodeId, onNavigateOut }: ConfigOutlinerProps) {
                 rootNodeId={nodeId}
                 isLastInGroup={i === rows.length - 1 || rows[i + 1].type !== 'field'}
                 ownerTagColor={ownerColor}
-                onNavigateOut={(direction) => {
-                  if (direction === 'up') {
-                    for (let j = i - 1; j >= 0; j--) {
-                      const prev = rows[j];
-                      if (prev.type === 'field') {
-                        clearFocus();
-                        setEditingFieldName(prev.id);
-                        return;
-                      }
-                      setFocusedNode(prev.id, nodeId);
-                      return;
-                    }
-                    onNavigateOut?.('up');
-                    return;
-                  }
-                  for (let j = i + 1; j < rows.length; j++) {
-                    const next = rows[j];
-                    if (next.type === 'field') {
-                      clearFocus();
-                      setEditingFieldName(next.id);
-                      return;
-                    }
-                    setFocusedNode(next.id, nodeId);
-                    return;
-                  }
-                  onNavigateOut?.('down');
-                }}
+                onNavigateOut={(direction) => navigateToSiblingRow({
+                  rows,
+                  currentIndex: i,
+                  direction,
+                  parentId: nodeId,
+                  onField: navToField,
+                  onContent: navToContent,
+                  onEscape: onNavigateOut,
+                })}
               />
             </div>
           );

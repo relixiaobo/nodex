@@ -43,6 +43,7 @@ import { t } from '../../i18n/strings.js';
 import { FIELD_OVERLAY_Z_INDEX, FIELD_VALUE_INSET } from './field-layout.js';
 import { shouldShowTrailingInput, type OutlinerRowItem } from '../outliner/row-model.js';
 import { useDragSelect } from '../../hooks/use-drag-select.js';
+import { navigateToSiblingRow } from '../../lib/outliner-navigation.js';
 
 interface FieldValueOutlinerProps {
   tupleId: string;
@@ -162,28 +163,30 @@ export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, configNo
   const lastIsField = visibleChildren.length > 0 && visibleChildren[visibleChildren.length - 1].type === 'field';
   const showTrailingInput = shouldShowFieldValueTrailingInput(visibleChildren);
 
+  const navToField = useCallback((fieldId: string) => {
+    clearFocus();
+    setEditingFieldName(fieldId);
+  }, [clearFocus, setEditingFieldName]);
+
+  const navToContent = useCallback((id: string, parentId: string, textOffset: number) => {
+    const offset = textOffset === Infinity
+      ? (useNodeStore.getState().getNode(id)?.name ?? '').length
+      : textOffset;
+    useUIStore.getState().setFocusClickCoords({ nodeId: id, parentId, textOffset: offset });
+    setFocusedNode(id, parentId);
+  }, [setFocusedNode]);
+
   const handleTrailingNavigateOut = useCallback((direction: 'up' | 'down') => {
-    if (direction === 'up') {
-      const last = visibleChildren[visibleChildren.length - 1];
-      if (!last) {
-        onNavigateOut?.('up');
-        return;
-      }
-      if (last.type === 'field') {
-        clearFocus();
-        setEditingFieldName(last.id);
-        return;
-      }
-      useUIStore.getState().setFocusClickCoords({
-        nodeId: last.id,
-        parentId: tupleId,
-        textOffset: (useNodeStore.getState().getNode(last.id)?.name ?? '').length,
-      });
-      setFocusedNode(last.id, tupleId);
-      return;
-    }
-    onNavigateOut?.('down');
-  }, [visibleChildren, onNavigateOut, clearFocus, setEditingFieldName, tupleId, setFocusedNode]);
+    navigateToSiblingRow({
+      rows: visibleChildren,
+      currentIndex: visibleChildren.length,
+      direction,
+      parentId: tupleId,
+      onField: navToField,
+      onContent: navToContent,
+      onEscape: onNavigateOut,
+    });
+  }, [visibleChildren, tupleId, navToField, navToContent, onNavigateOut]);
 
   // --- Special control early returns (Boolean, Checkbox, Date) ---
 
@@ -367,33 +370,15 @@ export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, configNo
               rootChildIds={selectableChildIds}
               rootNodeId={tupleId}
               isLastInGroup={i === rows.length - 1 || rows[i + 1].type !== 'field'}
-              onNavigateOut={(direction) => {
-                if (direction === 'up') {
-                  for (let j = i - 1; j >= 0; j--) {
-                    const prev = rows[j];
-                    if (prev.type === 'field') {
-                      clearFocus();
-                      setEditingFieldName(prev.id);
-                      return;
-                    }
-                    setFocusedNode(prev.id, tupleId);
-                    return;
-                  }
-                  onNavigateOut?.('up');
-                  return;
-                }
-                for (let j = i + 1; j < rows.length; j++) {
-                  const next = rows[j];
-                  if (next.type === 'field') {
-                    clearFocus();
-                    setEditingFieldName(next.id);
-                    return;
-                  }
-                  setFocusedNode(next.id, tupleId);
-                  return;
-                }
-                onNavigateOut?.('down');
-              }}
+              onNavigateOut={(direction) => navigateToSiblingRow({
+                rows,
+                currentIndex: i,
+                direction,
+                parentId: tupleId,
+                onField: navToField,
+                onContent: navToContent,
+                onEscape: onNavigateOut,
+              })}
             />
           </div>
         )}

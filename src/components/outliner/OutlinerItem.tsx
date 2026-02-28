@@ -8,7 +8,6 @@ import { useNodeStore } from '../../stores/node-store';
 import { useUIStore } from '../../stores/ui-store';
 import * as loroDoc from '../../lib/loro-doc.js';
 import { CONTAINER_IDS } from '../../types/index.js';
-import type { NodeType } from '../../types/index.js';
 import { BulletChevron, ChevronButton } from './BulletChevron';
 import { RichTextEditor, type EditorContentPayload, type TriggerAnchorRect } from '../editor/RichTextEditor';
 import { SlashCommandMenu } from '../editor/SlashCommandMenu';
@@ -80,6 +79,14 @@ import { mergeRichTextPayload } from '../../lib/rich-text-merge.js';
 import { getTreeReferenceBlockReason, isReferenceDisplayCycle } from '../../lib/reference-rules.js';
 import { focusUndoShortcutSink, ensureUndoFocusAfterNavigation } from '../../lib/focus-utils.js';
 import { t } from '../../i18n/strings.js';
+import { RowHost } from './RowHost.js';
+import {
+  buildFieldOwnerColors,
+  buildVisibleChildrenRows,
+  isHiddenFieldRow,
+  shouldShowTrailingInput,
+  type OutlinerRowItem,
+} from './row-model.js';
 
 const DESCRIPTION_SHORTCUT_KEYS = getShortcutKeys('editor.edit_description', ['Ctrl-i']);
 const EMPTY_REFERENCE_PATH: readonly string[] = [];
@@ -179,24 +186,8 @@ function getTreeReferenceBlockMessage(reason: ReturnType<typeof getTreeReference
   }
 }
 
-export interface OutlinerVisibleChild {
-  id: string;
-  type: 'field' | 'content';
-  hidden?: boolean;
-}
-
-export function isHiddenFieldRow(hideMode: string | undefined, isEmpty: boolean | undefined): boolean {
-  switch (hideMode) {
-    case SYS_V.ALWAYS:
-      return true;
-    case SYS_V.WHEN_EMPTY:
-      return !!isEmpty;
-    case SYS_V.WHEN_NOT_EMPTY:
-      return !isEmpty;
-    default:
-      return false;
-  }
-}
+export type OutlinerVisibleChild = OutlinerRowItem;
+export { buildFieldOwnerColors, buildVisibleChildrenRows, isHiddenFieldRow };
 
 export function resolvePanelNavigationNodeId(nodeId: string, referenceTargetId: string | null): string {
   return referenceTargetId ?? nodeId;
@@ -208,98 +199,6 @@ export function shouldRenderReferenceBulletStyle(params: {
   isOptionsValueNode: boolean;
 }): boolean {
   return params.isReference || params.isPendingConversion || params.isOptionsValueNode;
-}
-
-export function buildFieldOwnerColors(
-  fieldMap: Map<string, Pick<FieldEntry, 'fieldDefId' | 'templateId'>>,
-  getFieldDefOwnerId: (fieldDefId: string) => string | null,
-  getNodeType: (nodeId: string) => string | undefined,
-  resolveOwnerColor: (ownerTagDefId: string) => string,
-): Map<string, string> {
-  const result = new Map<string, string>();
-  for (const [entryId, entry] of fieldMap) {
-    const ownerLookupIds = [entry.fieldDefId];
-    if (entry.templateId && entry.templateId !== entry.fieldDefId) {
-      ownerLookupIds.unshift(entry.templateId);
-    }
-    let ownerTagDefId: string | null = null;
-    for (const lookupId of ownerLookupIds) {
-      const ownerId = getFieldDefOwnerId(lookupId);
-      if (!ownerId) continue;
-      if (getNodeType(ownerId) !== 'tagDef') continue;
-      ownerTagDefId = ownerId;
-      break;
-    }
-    if (!ownerTagDefId) continue;
-    result.set(entryId, resolveOwnerColor(ownerTagDefId));
-  }
-  return result;
-}
-
-export function buildVisibleChildrenRows(params: {
-  allChildIds: string[];
-  fieldMap: Map<string, Pick<FieldEntry, 'fieldDefId' | 'templateId' | 'hideMode' | 'isEmpty'>>;
-  tagIds: string[];
-  getFieldDefOwnerId: (fieldDefId: string) => string | null;
-  getNodeType: (nodeId: string) => string | undefined;
-  getChildNodeType: (childId: string) => NodeType | undefined;
-  isOutlinerContentType: (nodeType: NodeType | undefined) => boolean;
-}): OutlinerVisibleChild[] {
-  const {
-    allChildIds,
-    fieldMap,
-    tagIds,
-    getFieldDefOwnerId,
-    getNodeType,
-    getChildNodeType,
-    isOutlinerContentType,
-  } = params;
-
-  const tagIdSet = new Set(tagIds);
-  const templateFieldsByTagDef = new Map<string, OutlinerVisibleChild[]>();
-  const remainingItems: OutlinerVisibleChild[] = [];
-
-  for (const cid of allChildIds) {
-    const fieldEntry = fieldMap.get(cid);
-    if (fieldEntry) {
-      const child: OutlinerVisibleChild = {
-        id: cid,
-        type: 'field',
-        hidden: isHiddenFieldRow(fieldEntry.hideMode, fieldEntry.isEmpty),
-      };
-      const ownerTagDefId = fieldEntry.templateId
-        ? getFieldDefOwnerId(fieldEntry.templateId)
-        : getFieldDefOwnerId(fieldEntry.fieldDefId);
-      const isTemplateField = !!fieldEntry.templateId
-        && ownerTagDefId !== null
-        && getNodeType(ownerTagDefId) === 'tagDef'
-        && tagIdSet.has(ownerTagDefId);
-      if (isTemplateField && ownerTagDefId) {
-        let bucket = templateFieldsByTagDef.get(ownerTagDefId);
-        if (!bucket) {
-          bucket = [];
-          templateFieldsByTagDef.set(ownerTagDefId, bucket);
-        }
-        bucket.push(child);
-      } else {
-        remainingItems.push(child);
-      }
-      continue;
-    }
-
-    const childType = getChildNodeType(cid);
-    if (isOutlinerContentType(childType)) {
-      remainingItems.push({ id: cid, type: 'content' });
-    }
-  }
-
-  const result: OutlinerVisibleChild[] = [];
-  for (const tagId of tagIds) {
-    const bucket = templateFieldsByTagDef.get(tagId);
-    if (bucket) result.push(...bucket);
-  }
-  result.push(...remainingItems);
-  return result;
 }
 
 export function OutlinerItem({
@@ -559,7 +458,10 @@ export function OutlinerItem({
     }
     return null;
   }, [visibleChildren, revealedFieldIds]);
-  const shouldShowTrailingInput = !lastRenderableChild || lastRenderableChild.type === 'field';
+  const showTrailingInputRow = useMemo(
+    () => shouldShowTrailingInput(visibleChildren.filter((c) => !c.hidden || revealedFieldIds.has(c.id))),
+    [visibleChildren, revealedFieldIds],
+  );
   const isFocused = focusedNodeId === nodeId &&
     (focusedParentId === null || focusedParentId === parentId);
   const hasTags = tagIds.length > 0;
@@ -1892,7 +1794,7 @@ export function OutlinerItem({
         setFocusedNode(firstRenderableChild.id, nodeId);
         return;
       }
-      if (shouldShowTrailingInput && focusTrailingInputForParent(nodeId)) {
+      if (showTrailingInputRow && focusTrailingInputForParent(nodeId)) {
         return;
       }
     }
@@ -1927,7 +1829,7 @@ export function OutlinerItem({
     } else if (onNavigateOut) {
       onNavigateOut('down');
     }
-  }, [nodeId, parentId, rootNodeId, rootChildIds, expandedNodes, isExpanded, shouldShowTrailingInput, firstRenderableChild, setFocusedNode, onNavigateOut, renderableSiblings, clearFocus, setEditingFieldName]);
+  }, [nodeId, parentId, rootNodeId, rootChildIds, expandedNodes, isExpanded, showTrailingInputRow, firstRenderableChild, setFocusedNode, onNavigateOut, renderableSiblings, clearFocus, setEditingFieldName]);
 
   const handleMoveUp = useCallback(() => {
     const ed = editorRef.current;
@@ -2759,18 +2661,18 @@ export function OutlinerItem({
             </div>
           )}
           {/* Render children in natural order: fields as FieldRow, content as OutlinerItem */}
-          {visibleChildren.map(({ id, type, hidden }, i) => {
-            // Hidden fields: skip unless manually revealed via pill click
-            if (hidden && !revealedFieldIds.has(id)) return null;
-            return type === 'field' ? (
-              <div key={id} className="@container" style={{ paddingLeft: (depth + 1) * 28 + 6 + 15 + 4 }}>
+          <RowHost
+            rows={visibleChildren}
+            isRowVisible={(row) => !row.hidden || revealedFieldIds.has(row.id)}
+            renderField={(row, i, rows) => (
+              <div className="@container" style={{ paddingLeft: (depth + 1) * 28 + 6 + 15 + 4 }}>
                 <FieldRow
                   nodeId={effectiveNodeId}
-                  {...toFieldRowEntryProps(fieldMap.get(id)!)}
+                  {...toFieldRowEntryProps(fieldMap.get(row.id)!)}
                   rootChildIds={rootChildIds}
                   rootNodeId={rootNodeId}
-                  isLastInGroup={i === visibleChildren.length - 1 || visibleChildren[i + 1].type !== 'field'}
-                  ownerTagColor={fieldOwnerColors.get(id)}
+                  isLastInGroup={i === rows.length - 1 || rows[i + 1].type !== 'field'}
+                  ownerTagColor={fieldOwnerColors.get(row.id)}
                   onNavigateOut={(direction) => {
                     if (direction === 'up') {
                       // Escape up from first field/value block → focus parent content node.
@@ -2783,8 +2685,8 @@ export function OutlinerItem({
                     } else {
                       // Escape down → focus next sibling item in this parent.
                       let found = false;
-                      for (let j = i + 1; j < visibleChildren.length; j++) {
-                        const nextItem = visibleChildren[j];
+                      for (let j = i + 1; j < rows.length; j++) {
+                        const nextItem = rows[j];
                         if (nextItem.hidden) continue;
                         if (nextItem.type === 'field') {
                           clearFocus();
@@ -2826,20 +2728,20 @@ export function OutlinerItem({
                   }}
                 />
               </div>
-            ) : (
+            )}
+            renderContent={(row) => (
               <OutlinerItem
-                key={id}
-                nodeId={id}
+                nodeId={row.id}
                 depth={depth + 1}
                 rootChildIds={rootChildIds}
                 parentId={effectiveNodeId}
                 rootNodeId={rootNodeId}
                 referencePath={nextReferencePath}
-                bulletColors={templateContentColors.get(id)}
+                bulletColors={templateContentColors.get(row.id)}
               />
-            );
-          })}
-          {shouldShowTrailingInput && (
+            )}
+          />
+          {showTrailingInputRow && (
             <TrailingInput
               parentId={effectiveNodeId}
               depth={depth + 1}

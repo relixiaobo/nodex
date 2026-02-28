@@ -26,13 +26,23 @@ _(空)_
 
 ## Agent 状态
 
-_(无活跃 Agent)_
+| Agent | 分支 | 任务 | 锁定文件 | 状态 |
+|---|---|---|---|---|
+| codex | `codex/paste-phase2-richtext` | Paste Phase 2（粘贴系统重做） | `src/stores/node-store.ts`, `src/components/outliner/OutlinerItem.tsx`, `src/components/editor/RichTextEditor.tsx` | 进行中 |
 
 ---
 
 ## 进行中
 
-_(见 Agent 状态表)_
+### Paste Phase 2（粘贴系统重做）
+
+- [ ] `paste-parser.ts` 纯函数解析（Markdown 层级 + HTML marks + `#tag` / `field:: value`）
+- [ ] store `createSiblingNodesFromPaste` 支持树结构 + marks + tag/field 应用（单次 commit）
+- [ ] 接入 `RichTextEditor` / `TrailingInput` / `OutlinerItem`
+- [ ] 补齐 Vitest（parser + store paste 回归）
+- [ ] 本地验证：`typecheck` → `check:test-sync` → `test:run` → `build`
+- 迭代日志：
+  - [2026-02-28 codex] 基于 `origin/main@41f1d78` 建立分支 `codex/paste-phase2-richtext`，按 TASKS 的 Phase 2 规格开工；发现引用计划 `.claude/plans/scalable-launching-milner.md` 在仓库缺失，暂以 `docs/TASKS.md` 为执行基线。
 
 ---
 

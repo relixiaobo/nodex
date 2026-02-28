@@ -28,7 +28,7 @@ _(空)_
 
 | Agent | 分支 | 任务 | 锁定文件 | 状态 |
 |---|---|---|---|---|
-| codex | cc/highlight-polish | Highlight 下一轮优化 | content/index.ts, content/highlight*.ts, background/index.ts | 待评审 |
+| _(空)_ | | | | |
 
 ---
 

@@ -28,7 +28,7 @@ _(空)_
 
 | Agent | 分支 | 任务 | 锁定文件 | 状态 |
 |---|---|---|---|---|
-| Agent A | cc/highlight-editor | Phase 1: # Tag 浮动工具栏 + highlight-service | FloatingToolbar.tsx, RichTextEditor.tsx, OutlinerItem.tsx | 待启动 |
+| Agent A | cc/highlight-editor | Phase 1: # Tag 浮动工具栏 + highlight-service | FloatingToolbar.tsx, RichTextEditor.tsx, OutlinerItem.tsx | PR Ready (#111) |
 | Agent B | cc/highlight-webpage | Phase 2-3: Content Script 高亮 + 回显 | content/index.ts, background/index.ts, webclip-service.ts | 待启动 |
 
 ---
@@ -112,7 +112,7 @@ _(空)_
 
 - [x] **研究：数据模型 + 交互设计** ✅（2026-02-27）
 - [x] **技术方案** — `docs/plans/highlight-annotation-system.md` ✅（2026-02-28）
-- [ ] **Phase 1: # Tag 浮动工具栏**（`cc/highlight-editor`）— 系统标签初始化 + highlight-service CRUD + FloatingToolbar `# Tag` 按钮 + Tag 选择器 + PM 选区→inline ref 替换 + highlight bullet 颜色 + #comment 子节点
+- [x] **Phase 1: # Tag 浮动工具栏**（`cc/highlight-editor`）— 系统标签初始化 + highlight-service CRUD + FloatingToolbar `# Tag` 按钮 + Tag 选择器 + PM 选区→inline ref 替换 + highlight bullet 颜色 + #comment 子节点 ✅（2026-02-28, PR #111）
 - [ ] **Phase 2: Content Script 网页高亮**（`cc/highlight-webpage`）— anchor-utils + messaging 协议 + Shadow DOM 网页工具栏 + 选中→高亮 DOM 渲染 + Background 路由 + URL clip 查找/自动创建
 - [ ] **Phase 3: 回显 + 双向联动**（`cc/highlight-webpage`）— URL 变更检测 + 四步锚点还原 + 无法定位标记 + Side Panel ↔ CS 双向滚动
 
@@ -223,7 +223,7 @@ _(空)_
 
 #### Floating Toolbar 后续 (#46)
 - [ ] **@ Reference 按钮** — 选中文本 → 点击 Floating Toolbar `@ Reference` → 打开 ReferenceSelector（搜索已有节点 / 创建新节点）→ 选中文本替换为所选节点的 inline reference
-- [ ] **# Tag 按钮** — 选中文本 → 点击 Floating Toolbar `# Tag` → 打开 TagSelector → 选择 supertag → 选中文本提取为新节点（存入 Library，文本作为节点名 + 应用所选 supertag）→ 原位替换为该节点的 inline reference
+- [x] **# Tag 按钮** — 选中文本 → 点击 Floating Toolbar `# Tag` → 打开 TagSelector → 选择 supertag → 选中文本提取为新节点（存入 Library，文本作为节点名 + 应用所选 supertag）→ 原位替换为该节点的 inline reference ✅（2026-02-28, PR #111）
 - **Spec**: `docs/features/floating-toolbar.md`
 
 #### Slash Command — 后续命令点亮 (#48)

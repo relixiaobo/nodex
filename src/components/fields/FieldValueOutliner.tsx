@@ -71,7 +71,8 @@ export function resolveSupertagPickerSelectedId(
   const valueNodeId = tuple?.children?.[0];
   if (!valueNodeId) return undefined;
   const valueNode = getNode(valueNodeId);
-  return valueNode?.name || undefined;
+  // Reference values use targetId; legacy text values use name
+  return valueNode?.targetId || valueNode?.name || undefined;
 }
 
 export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, configNodeId, onNavigateOut }: FieldValueOutlinerProps) {

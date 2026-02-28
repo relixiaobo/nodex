@@ -162,6 +162,33 @@ export const SYS_A = {
 export type SystemAttribute = typeof SYS_A[keyof typeof SYS_A];
 
 // ============================================================
+// AUTO_INIT_STRATEGY —— 字段自动初始化策略
+// ============================================================
+
+/**
+ * Strategies for auto-initializing field values when a tag is applied.
+ * Multiple strategies can be enabled simultaneously; they are evaluated
+ * in priority order (highest first). First non-null result wins.
+ */
+export const AUTO_INIT_STRATEGY = {
+  /** Fill with today's date (ISO string). Date fields only. */
+  CURRENT_DATE: 'current_date',
+  /** Fill with the date from the nearest Day node ancestor. Date fields only. */
+  ANCESTOR_DAY_NODE: 'ancestor_day_node',
+  /** Copy value from the nearest ancestor that has the same field. All field types. */
+  ANCESTOR_FIELD_VALUE: 'ancestor_field_value',
+} as const;
+
+export type AutoInitStrategy = typeof AUTO_INIT_STRATEGY[keyof typeof AUTO_INIT_STRATEGY];
+
+/** Priority order: first match wins. */
+export const AUTO_INIT_PRIORITY: AutoInitStrategy[] = [
+  AUTO_INIT_STRATEGY.CURRENT_DATE,
+  AUTO_INIT_STRATEGY.ANCESTOR_DAY_NODE,
+  AUTO_INIT_STRATEGY.ANCESTOR_FIELD_VALUE,
+];
+
+// ============================================================
 // SYS_D* —— 字段数据类型（保留，用于过渡）
 // ============================================================
 

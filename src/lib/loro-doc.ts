@@ -648,7 +648,7 @@ export function toNodexNode(nodexId: string): NodexNode | null {
     cardinality: data.get('cardinality') as 'single' | 'list' | undefined,
     nullable: data.get('nullable') as boolean | undefined,
     hideField: data.get('hideField') as string | undefined,
-    autoInitialize: data.get('autoInitialize') as boolean | undefined,
+    autoInitialize: data.get('autoInitialize') as string | undefined,
     autocollectOptions: data.get('autocollectOptions') as boolean | undefined,
     minValue: data.get('minValue') as number | undefined,
     maxValue: data.get('maxValue') as number | undefined,

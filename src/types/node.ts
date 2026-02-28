@@ -279,8 +279,8 @@ export interface NodexNode {
   /** 隐藏字段条件（旧 NDX_A01） */
   hideField?: string;
 
-  /** 自动初始化（旧 NDX_A03） */
-  autoInitialize?: boolean;
+  /** 自动初始化策略（逗号分隔，如 "current_date,ancestor_field_value"） */
+  autoInitialize?: string;
 
   /** 自动收集选项（旧 SYS_A44） */
   autocollectOptions?: boolean;

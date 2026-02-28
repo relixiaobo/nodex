@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useWorkspaceStore } from '../../stores/workspace-store';
+import { useNodeStore } from '../../stores/node-store';
 import { useUIStore } from '../../stores/ui-store';
 import { useNavUndoKeyboard } from '../../hooks/use-nav-undo-keyboard';
 import { useTodayShortcut } from '../../hooks/use-today-shortcut';
@@ -14,6 +15,7 @@ import { ensureWorkspaceHomeNode } from '../../lib/workspace-root.js';
 import { getOrCreateDefaultWorkspaceId } from '../../lib/workspace-id.js';
 import { findUnexpectedShortcutConflicts } from '../../lib/shortcut-registry.js';
 import { ensureJournalTagDefs, ensureTodayNode } from '../../lib/journal.js';
+import { ensureHighlightTagDef, ensureCommentTagDef, type HighlightNodeStore } from '../../lib/highlight-service.js';
 import { BOOTSTRAP_CONTAINER_DEFS } from '../../lib/system-node-registry.js';
 import { Toaster } from 'sonner';
 import { TooltipProvider } from '../../components/ui/Tooltip';
@@ -40,6 +42,11 @@ async function seedWorkspace(wsId: string): Promise<void> {
  }
 
  ensureJournalTagDefs();
+
+ // Ensure #highlight and #comment system tags exist
+ const store = useNodeStore.getState() as HighlightNodeStore;
+ ensureHighlightTagDef(store);
+ ensureCommentTagDef(store);
 
  // Flush all bootstrap ops under a system origin so they are excluded from
  // the undo stack. Without this, pending ops from container creation could

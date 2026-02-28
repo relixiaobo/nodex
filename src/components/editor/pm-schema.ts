@@ -1,5 +1,5 @@
 import { Schema } from 'prosemirror-model';
-import { resolveInlineReferenceTextColor } from '../../lib/tag-colors.js';
+import { resolveHighlightBulletColor, resolveInlineReferenceTextColor } from '../../lib/tag-colors.js';
 
 export const pmSchema = new Schema({
   nodes: {
@@ -22,11 +22,13 @@ export const pmSchema = new Schema({
       },
       toDOM(node) {
         const refColor = resolveInlineReferenceTextColor(node.attrs.targetNodeId);
+        const highlightColor = resolveHighlightBulletColor(node.attrs.targetNodeId);
+        const bgStyle = highlightColor ? `background:${highlightColor}20;` : '';
         return ['span', {
-          class: 'inline-ref',
+          class: `inline-ref${highlightColor ? ' inline-ref-highlight' : ''}`,
           'data-inlineref-node': node.attrs.targetNodeId,
           contenteditable: 'false',
-          style: `color:${refColor};--inline-ref-accent:${refColor}`,
+          style: `color:${refColor};--inline-ref-accent:${refColor};${bgStyle}`,
         }, node.attrs.displayName || '...'];
       },
       parseDOM: [{

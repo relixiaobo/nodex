@@ -20,7 +20,7 @@ import { FIELD_OVERLAY_Z_INDEX } from '../fields/field-layout.js';
 import { toFieldRowEntryProps } from '../fields/field-row-props.js';
 import { SYS_V } from '../../types/index.js';
 import { useFieldOptions } from '../../hooks/use-field-options.js';
-import { resolveInlineReferenceTextColor, resolveTagColor } from '../../lib/tag-colors.js';
+import { resolveHighlightBulletColor, resolveInlineReferenceTextColor, resolveTagColor } from '../../lib/tag-colors.js';
 import {
   isCheckboxFieldType,
   isOptionsFieldType,
@@ -466,7 +466,14 @@ export function OutlinerItem({
     () => tagIds.map((id) => resolveTagColor(id).text),
     [tagIds],
   );
-  const effectiveBulletColors = bulletColors ?? tagBulletColors;
+  // Override bullet color for #highlight nodes: use Color field value
+  const highlightBulletColor = useMemo(
+    () => resolveHighlightBulletColor(effectiveNodeId),
+    [effectiveNodeId],
+  );
+  const effectiveBulletColors = highlightBulletColor
+    ? [highlightBulletColor]
+    : (bulletColors ?? tagBulletColors);
   // Structural icon: fieldDef nodes show the field type icon instead of a dot
   const structuralIcon = node ? resolveNodeStructuralIcon(node) : null;
   const isPendingConversion = useUIStore((s) => s.pendingRefConversion?.tempNodeId === nodeId);

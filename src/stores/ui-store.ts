@@ -57,6 +57,11 @@ interface UIStore {
   closeSearch(): void;
   setSearchQuery(query: string): void;
 
+  // Batch tag selector
+  batchTagSelectorOpen: boolean;
+  openBatchTagSelector(): void;
+  closeBatchTagSelector(): void;
+
   // Drag and drop
   dragNodeId: string | null;
   dropTargetId: string | null;
@@ -347,6 +352,11 @@ export const useUIStore = create<UIStore>()(
         selectedNodeIds: new Set(),
         selectionAnchorId: null,
       }),
+
+      // Batch tag selector
+      batchTagSelectorOpen: false,
+      openBatchTagSelector: () => set({ batchTagSelectorOpen: true }),
+      closeBatchTagSelector: () => set({ batchTagSelectorOpen: false }),
 
       // Search
       searchOpen: false,

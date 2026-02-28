@@ -268,6 +268,12 @@ export function OutlinerRow({ config, children }: OutlinerRowProps) {
         return;
       }
 
+      if (selAction === 'batch_apply_tag') {
+        e.preventDefault();
+        useUIStore.getState().openBatchTagSelector();
+        return;
+      }
+
       if (selAction === 'batch_checkbox') {
         e.preventDefault();
         const latestUi = useUIStore.getState();

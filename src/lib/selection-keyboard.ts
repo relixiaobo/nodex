@@ -22,7 +22,8 @@ export type SelectionKeyboardAction =
   | 'batch_indent'     // Tab → indent all selected nodes
   | 'batch_outdent'    // Shift+Tab → outdent all selected nodes
   | 'batch_duplicate'  // Cmd+Shift+D → duplicate all selected nodes
-  | 'batch_checkbox';  // Cmd+Enter → toggle checkbox on all selected nodes
+  | 'batch_checkbox'   // Cmd+Enter → toggle checkbox on all selected nodes
+  | 'batch_apply_tag'; // # → open tag selector for all selected nodes
 
 export function resolveSelectionKeyboardAction(
   e: KeyboardEvent,
@@ -83,6 +84,11 @@ export function resolveSelectionKeyboardAction(
   // Tab: batch indent
   if (e.key === 'Tab' && !e.shiftKey && !e.metaKey && !e.ctrlKey && !e.altKey) {
     return 'batch_indent';
+  }
+
+  // # (Shift+3): batch apply tag
+  if (e.key === '#' && !e.metaKey && !e.ctrlKey && !e.altKey) {
+    return 'batch_apply_tag';
   }
 
   // Printable character: single char, no modifier keys (except Shift for uppercase)

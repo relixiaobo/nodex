@@ -110,6 +110,11 @@ describe('resolveSelectionKeyboardAction', () => {
     expect(resolveSelectionKeyboardAction(keyEvent('Enter', { ctrlKey: true }))).toBe('batch_checkbox');
   });
 
+  it('returns batch_apply_tag for # key', () => {
+    expect(resolveSelectionKeyboardAction(keyEvent('#', { shiftKey: true }))).toBe('batch_apply_tag');
+    expect(resolveSelectionKeyboardAction(keyEvent('#'))).toBe('batch_apply_tag');
+  });
+
   it('returns null for Arrow with Cmd modifier', () => {
     expect(resolveSelectionKeyboardAction(keyEvent('ArrowUp', { metaKey: true }))).toBeNull();
     expect(resolveSelectionKeyboardAction(keyEvent('ArrowDown', { ctrlKey: true }))).toBeNull();

@@ -12,6 +12,7 @@ import { useGlobalSelectionDismiss } from '../src/hooks/use-global-selection-dis
 import { TopToolbar } from '../src/components/toolbar/TopToolbar';
 import { PanelStack } from '../src/components/panel/PanelStack';
 import { CommandPalette } from '../src/components/search/CommandPalette';
+import { BatchTagSelector } from '../src/components/tags/BatchTagSelector';
 import { CONTAINER_IDS } from '../src/types/index.js';
 import { seedTestData } from '../src/entrypoints/test/seed-data';
 import * as loroDoc from '../src/lib/loro-doc.js';
@@ -92,6 +93,7 @@ export function TestApp() {
       <TopToolbar />
       <PanelStack />
       <CommandPalette />
+      <BatchTagSelector />
       {/* Agent badge — fixed top-right corner */}
       <div
         style={{

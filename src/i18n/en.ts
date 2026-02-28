@@ -30,6 +30,10 @@ export const enMessages = {
       noTagsAvailable: 'No tags available',
       create: 'Create "{name}"',
     },
+    batch: {
+      title: 'Apply tag to {count} nodes',
+      placeholder: 'Search or create tag...',
+    },
   },
   slash: {
     menu: {

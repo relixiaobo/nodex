@@ -111,6 +111,7 @@ export function BatchTagSelector() {
 
   return createPortal(
     <div
+      data-preserve-selection
       className="fixed inset-0 z-[1000] flex items-start justify-center pt-[20%]"
       onMouseDown={(e) => {
         // Close when clicking backdrop
@@ -120,7 +121,7 @@ export function BatchTagSelector() {
         }
       }}
     >
-      <div className="w-64 rounded-lg bg-background shadow-paper border border-border overflow-hidden">
+      <div data-preserve-selection className="w-64 rounded-lg bg-background shadow-paper border border-border overflow-hidden">
         <div className="px-3 py-2 border-b border-border">
           <div className="text-xs text-foreground-secondary mb-1">
             {t('tag.batch.title', { count: String(nodeCount) })}

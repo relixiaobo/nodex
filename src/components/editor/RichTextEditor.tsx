@@ -20,6 +20,9 @@ import { docToMarks, marksToDoc } from '../../lib/pm-doc-utils.js';
 import { isOnlyInlineRef } from '../../lib/tree-utils.js';
 import { pmSchema } from './pm-schema.js';
 import { FloatingToolbar } from './FloatingToolbar.js';
+import { TagSelectorPopover, type TagSelectorResult } from './TagSelectorPopover.js';
+import { extractToTaggedNode } from '../../lib/extract-to-tagged-node.js';
+import type { HighlightNodeStore } from '../../lib/highlight-service.js';
 import { parseMultiLinePaste, type ParsedPasteNode } from '../../lib/paste-parser.js';
 import { logPasteDebug, previewMultiline, summarizePasteNodes } from '../../lib/paste-debug.js';
 
@@ -1010,9 +1013,73 @@ export function RichTextEditor(props: RichTextEditorProps) {
     };
   }, [props.initialInlineRefs, props.initialMarks, props.initialText]);
 
+  // ─── # Tag selector state ───
+  const [tagSelectorOpen, setTagSelectorOpen] = useState(false);
+  const [tagSelectorAnchor, setTagSelectorAnchor] = useState({ top: 0, left: 0 });
+
+  const handleTagClick = useCallback(() => {
+    const view = viewRef.current;
+    if (!view) return;
+
+    // Get toolbar position from the selection to anchor the popover
+    const { from, to } = view.state.selection;
+    if (from === to) return;
+
+    try {
+      const coords = view.coordsAtPos(from);
+      setTagSelectorAnchor({ top: coords.top, left: coords.left });
+    } catch {
+      setTagSelectorAnchor({ top: 0, left: 0 });
+    }
+    setTagSelectorOpen(true);
+  }, []);
+
+  const handleTagSelect = useCallback((result: TagSelectorResult) => {
+    setTagSelectorOpen(false);
+    const view = viewRef.current;
+    if (!view) return;
+
+    const store = useNodeStore.getState() as HighlightNodeStore;
+    const extractResult = extractToTaggedNode(
+      view,
+      result.tagDefId,
+      propsRef.current.nodeId,
+      store,
+      initialContentRef.current.inlineRefs,
+    );
+
+    if (extractResult) {
+      // Persist the updated content (text with \uFFFC + inline refs)
+      updateNodeContent(propsRef.current.nodeId, {
+        name: extractResult.newText,
+        inlineRefs: extractResult.newInlineRefs,
+      });
+      commitDoc('user:text');
+      initialContentRef.current = {
+        text: extractResult.newText,
+        marks: initialContentRef.current.marks,
+        inlineRefs: extractResult.newInlineRefs,
+      };
+      setToolbarTick(v => v + 1);
+    }
+  }, [updateNodeContent]);
+
+  const handleTagSelectorClose = useCallback(() => {
+    setTagSelectorOpen(false);
+    viewRef.current?.focus();
+  }, []);
+
   return (
     <div className="editor-inline">
-      <FloatingToolbar view={viewRef.current} tick={toolbarTick} />
+      <FloatingToolbar view={viewRef.current} tick={toolbarTick} onTagClick={handleTagClick} />
+      {tagSelectorOpen && (
+        <TagSelectorPopover
+          anchorTop={tagSelectorAnchor.top}
+          anchorLeft={tagSelectorAnchor.left}
+          onSelect={handleTagSelect}
+          onClose={handleTagSelectorClose}
+        />
+      )}
       <div ref={mountRef} className="outline-none text-[15px] leading-6" />
     </div>
   );

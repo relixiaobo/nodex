@@ -28,7 +28,8 @@ _(空)_
 
 | Agent | 分支 | 任务 | 锁定文件 | 状态 |
 |---|---|---|---|---|
-| _(无活跃 agent)_ | | | | |
+| Agent A | cc/highlight-editor | Phase 1: # Tag 浮动工具栏 + highlight-service | FloatingToolbar.tsx, RichTextEditor.tsx, OutlinerItem.tsx | 待启动 |
+| Agent B | cc/highlight-webpage | Phase 2-3: Content Script 高亮 + 回显 | content/index.ts, background/index.ts, webclip-service.ts | 待启动 |
 
 ---
 
@@ -102,13 +103,18 @@ _(空)_
 - **Spec**: `docs/features/web-clipping.md`
 
 #### 网页高亮 & 批注（Highlight + Comment）
-> 与 Clip Page 联动，参考 Readwise Reader 交互。高亮和批注以节点形式存在于 soma 数据模型中。
-> **Research**: `docs/research/highlight-comment-design.md`
+> `#highlight` / `#comment` 内置系统标签。高亮存入 Library，clip page 内通过 inline reference 关联。
+> **Plan**: `docs/plans/highlight-annotation-system.md` | **Research**: `docs/research/highlight-comment-design.md`
+>
+> 两条并行 PR：
+> - `cc/highlight-editor`（Agent A）— Side Panel / 编辑器侧：系统标签初始化 + highlight-service + # Tag 浮动工具栏 + inline ref 替换 + highlight bullet 渲染
+> - `cc/highlight-webpage`（Agent B）— Content Script / 背景侧：锚点计算 + 网页浮动工具栏 + 高亮 DOM 渲染 + URL clip 查找 + 回显系统
 
-- [x] **研究：数据模型 + 交互设计** — 高亮/批注如何建模为节点（锚点定位、与 clip node 关系、Readwise Reader 参考）✅（2026-02-27）
-- [ ] Phase 1: 网页高亮（Content Script 选中文本 → 创建 highlight 节点 → 关联到 clip node）
-- [ ] Phase 2: 批注（highlight 节点可挂 children 作为 comment）
-- [ ] Phase 3: 回显（再次访问已高亮页面时，Content Script 渲染已有高亮）
+- [x] **研究：数据模型 + 交互设计** ✅（2026-02-27）
+- [x] **技术方案** — `docs/plans/highlight-annotation-system.md` ✅（2026-02-28）
+- [ ] **Phase 1: # Tag 浮动工具栏**（`cc/highlight-editor`）— 系统标签初始化 + highlight-service CRUD + FloatingToolbar `# Tag` 按钮 + Tag 选择器 + PM 选区→inline ref 替换 + highlight bullet 颜色 + #comment 子节点
+- [ ] **Phase 2: Content Script 网页高亮**（`cc/highlight-webpage`）— anchor-utils + messaging 协议 + Shadow DOM 网页工具栏 + 选中→高亮 DOM 渲染 + Background 路由 + URL clip 查找/自动创建
+- [ ] **Phase 3: 回显 + 双向联动**（`cc/highlight-webpage`）— URL 变更检测 + 四步锚点还原 + 无法定位标记 + Side Panel ↔ CS 双向滚动
 
 #### AI Chat & 网页辅助 (#29 + #31)
 > 浏览器 + AI = soma 的第二个差异化维度。不只是聊天框，而是理解上下文的知识助手。

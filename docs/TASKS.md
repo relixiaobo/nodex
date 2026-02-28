@@ -223,29 +223,24 @@ _(见 Agent 状态表)_
 - [ ] Checklist（批量 checkbox）
 - **Spec**: `docs/features/slash-command.md`
 
-#### Editor 粘贴增强（⌘V 智能 / ⌘⇧V 纯文本）
-> **双模式语义**：
-> - **⌘V（智能粘贴）**：理解内容，做最合理的处理 — URL→链接、多行→拆节点、HTML→保留 marks、Markdown→重建树
-> - **⌘⇧V（纯文本粘贴）**：去掉一切智能，只给纯文字，塞进当前节点（多行压成一行，丢弃格式）
->
-> **行为矩阵**：
+#### 粘贴系统重做
+> 当前粘贴只读 `text/plain`，不认 HTML 格式、Markdown 层级、`#tag` / `field:: value` 语法。
+> 统一为解析管线：剪贴板 → `paste-parser.ts`（纯函数）→ `ParsedContentNode[]` → store 创建节点。
+> **Plan**: `.claude/plans/scalable-launching-milner.md`
 >
 > | 剪贴板内容 | ⌘V | ⌘⇧V |
 > |------------|-----|------|
 > | 单行纯文本 | 插入原文 ✅ | 插入原文 ✅ |
 > | 单行 URL | 自动转链接 ✅ | 插入原文 ✅ |
-> | 多行纯文本 | 首行插入当前节点，后续行创建兄弟节点 | 合并为一行插入 |
-> | Markdown 列表 | 按缩进重建节点树 | 合并为一行插入 |
-> | 单行富文本 (HTML) | 保留 bold/italic/code/link marks | 纯文本，丢弃格式 |
-> | 多行富文本 (HTML) | 按段落拆节点 + 保留 marks | 合并为一行纯文本 |
->
-> **实现位置**: `RichTextEditor.tsx` handlePaste
+> | 多行纯文本 | 每行一个节点 ✅ | 合并为一行 ✅ |
+> | Markdown 列表 | 按缩进重建节点树 | 合并为一行 |
+> | 富文本 (HTML) | 保留 marks + 按段落拆节点 | 纯文本 |
+> | 含 `#tag` 文本 | 识别并应用 supertag | 纯文本 |
+> | 含 `field:: value` | 识别并创建 field tuple | 纯文本 |
 
 - [x] Phase 0: 单行 URL 智能粘贴 + ⌘⇧V 纯文本 ✅（2026-02-27）
-- [x] Phase 1: 多行拆分为节点 — ⌘V 多行文本按行拆分为兄弟节点；⌘⇧V 多行压成一行；TrailingInput 虚拟节点粘贴支持 ✅（2026-02-27）
-- [ ] Phase 2: 富文本保留格式 — ⌘V 读 `text/html`，映射 `<strong>/<em>/<code>/<a>` 到 PM marks；⌘⇧V 只读 `text/plain`
-- [ ] Phase 3: Markdown 结构化 — ⌘V 检测 `- ` / `* ` / `1. ` + 缩进，按层级创建父子节点树
-- [ ] Phase 4: 撤销/重做集成 — 多节点创建包装为单次 Loro commit，⌘Z 一步撤回
+- [x] Phase 1: 多行拆分为节点 ✅（2026-02-27）
+- [ ] Phase 2: 粘贴系统重做 — `paste-parser.ts` 纯函数解析（Markdown 层级 + HTML marks + `#tag` / `field:: value` 识别）+ store `createSiblingNodesFromPaste` 支持树结构 + marks + tag/field 应用 + 接入 RichTextEditor / TrailingInput / OutlinerItem
 
 #### 性能基线测量
 > **产出**: `docs/research/performance-baseline.md`

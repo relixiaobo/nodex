@@ -37,6 +37,7 @@ import { FIELD_OVERLAY_Z_INDEX } from '../fields/field-layout.js';
 import { pmSchema } from './pm-schema.js';
 import { marksToDoc } from '../../lib/pm-doc-utils.js';
 import { parseMultiLinePaste } from '../../lib/paste-parser.js';
+import { logPasteDebug, previewMultiline, summarizePasteNodes } from '../../lib/paste-debug.js';
 
 const KEY_TRAILING_ENTER = getPrimaryShortcutKey('trailing.enter', 'Enter');
 const KEY_TRAILING_INDENT = getPrimaryShortcutKey('trailing.indent_depth', 'Tab');
@@ -490,6 +491,11 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
                     clipboardEvent.preventDefault();
                     const plain = clipboardEvent.clipboardData?.getData('text/plain') ?? '';
                     const html = clipboardEvent.clipboardData?.getData('text/html') ?? '';
+                    logPasteDebug('TrailingInput.paste:raw', {
+                        clipboardTypes: clipboardEvent.clipboardData ? Array.from(clipboardEvent.clipboardData.types ?? []) : [],
+                        plainPreview: previewMultiline(plain),
+                        htmlPreview: previewMultiline((html ?? '').replace(/\s+/g, ' ').trim(), 8),
+                    });
                     if (!plain.trim() && !html.trim()) return true;
 
                     const ref = callbacksRef.current;
@@ -502,6 +508,10 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
                         || (node.tags?.length ?? 0) > 0
                         || (node.fields?.length ?? 0) > 0,
                     );
+                    logPasteDebug('TrailingInput.paste:parsed', {
+                        parsedCount: nodes.length,
+                        parsed: summarizePasteNodes(nodes),
+                    });
                     if (nodes.length === 0) { committingRef.current = false; return true; }
 
                     // Create first child from first line

@@ -1,6 +1,7 @@
 import type { ParsedContentNode } from './html-to-nodes.js';
 import { parseHtmlToNodes } from './html-to-nodes.js';
 import { htmlToMarks } from './editor-marks.js';
+import { logPasteDebug, previewMultiline, summarizePasteNodes } from './paste-debug.js';
 
 export interface ParsedPasteField {
   name: string;
@@ -27,21 +28,50 @@ export function parseMultiLinePaste(plain: string, html?: string): ParsedPasteNo
   const lines = normalizedPlain.split(/\r?\n/);
   const markdownNodes = parseMarkdownDocument(lines) ?? parseMarkdownList(lines);
   const hasMarkdownNodes = !!markdownNodes && markdownNodes.length > 0;
+  const debugBase = {
+    plainPreview: previewMultiline(rawPlain),
+    normalizedPlainPreview: previewMultiline(normalizedPlain),
+    htmlPreview: previewMultiline((html ?? '').replace(/\s+/g, ' ').trim(), 8),
+    hasMarkdownNodes,
+  };
 
   if (hasMarkdownNodes && shouldPreferMarkdown(normalizedPlain, html)) {
+    logPasteDebug('parseMultiLinePaste: markdown', {
+      ...debugBase,
+      reason: 'strong-markdown-signals',
+      nodes: summarizePasteNodes(markdownNodes!),
+    });
     return markdownNodes!;
   }
 
   if (html && shouldPreferHtml(html, normalizedPlain)) {
     const htmlNodes = parseHtmlBlocks(html);
-    if (htmlNodes.length > 0) return htmlNodes;
+    if (htmlNodes.length > 0) {
+      logPasteDebug('parseMultiLinePaste: html', {
+        ...debugBase,
+        reason: 'prefer-html',
+        nodes: summarizePasteNodes(htmlNodes),
+      });
+      return htmlNodes;
+    }
   }
 
   if (hasMarkdownNodes) {
+    logPasteDebug('parseMultiLinePaste: markdown-fallback', {
+      ...debugBase,
+      reason: 'html-not-selected',
+      nodes: summarizePasteNodes(markdownNodes!),
+    });
     return markdownNodes;
   }
 
-  return parseFlatLines(lines);
+  const flat = parseFlatLines(lines);
+  logPasteDebug('parseMultiLinePaste: flat', {
+    ...debugBase,
+    reason: 'no-markdown-or-html-structure',
+    nodes: summarizePasteNodes(flat),
+  });
+  return flat;
 }
 
 export function parseMarkdownList(lines: string[]): ParsedPasteNode[] | null {

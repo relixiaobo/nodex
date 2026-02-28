@@ -21,6 +21,7 @@ import { isOnlyInlineRef } from '../../lib/tree-utils.js';
 import { pmSchema } from './pm-schema.js';
 import { FloatingToolbar } from './FloatingToolbar.js';
 import { parseMultiLinePaste, type ParsedPasteNode } from '../../lib/paste-parser.js';
+import { logPasteDebug, previewMultiline, summarizePasteNodes } from '../../lib/paste-debug.js';
 
 /**
  * Detect whether a string looks like a URL for smart paste.
@@ -745,6 +746,12 @@ export function RichTextEditor(props: RichTextEditorProps) {
           clipboardEvent.preventDefault();
           const plain = clipboardEvent.clipboardData?.getData('text/plain') ?? '';
           const html = clipboardEvent.clipboardData?.getData('text/html') ?? '';
+          logPasteDebug('RichTextEditor.paste:raw', {
+            mode: pasteShiftRef.current ? 'plain' : 'smart',
+            clipboardTypes: clipboardEvent.clipboardData ? Array.from(clipboardEvent.clipboardData.types ?? []) : [],
+            plainPreview: previewMultiline(plain),
+            htmlPreview: previewMultiline((html ?? '').replace(/\s+/g, ' ').trim(), 8),
+          });
           if (!plain.trim() && !html.trim()) return true;
 
           const { from, to } = view.state.selection;
@@ -790,6 +797,10 @@ export function RichTextEditor(props: RichTextEditorProps) {
             || (node.tags?.length ?? 0) > 0
             || (node.fields?.length ?? 0) > 0,
           );
+          logPasteDebug('RichTextEditor.paste:parsed', {
+            parsedCount: parsedNodes.length,
+            parsed: summarizePasteNodes(parsedNodes),
+          });
           if (parsedNodes.length === 0) return true;
 
           const firstNode = parsedNodes[0];

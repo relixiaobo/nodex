@@ -11,8 +11,10 @@ import { showToolbar, hideToolbar } from './highlight-toolbar.js';
 import {
   HIGHLIGHT_CREATE,
   HIGHLIGHT_CLICK,
+  HIGHLIGHT_CHECK_URL_REQUEST,
   type HighlightCreatePayload,
   type HighlightClickPayload,
+  type HighlightCheckUrlRequestPayload,
 } from '../../lib/highlight-messaging.js';
 import { WEBCLIP_CAPTURE_ACTIVE_TAB } from '../../lib/webclip-messaging.js';
 
@@ -25,6 +27,7 @@ export const DEFAULT_HIGHLIGHT_BG = 'rgba(155, 124, 56, 0.3)';
 
 let currentRange: Range | null = null;
 let initialized = false;
+let lastKnownUrl = '';
 
 // ── Custom Element Registration ──
 
@@ -192,6 +195,20 @@ export function removeHighlightRendering(highlightId: string): void {
   });
 }
 
+/**
+ * Remove all rendered webpage highlights.
+ */
+export function clearAllHighlightRenderings(): void {
+  const renderedIds = new Set<string>();
+  document.querySelectorAll('soma-hl[data-highlight-id]').forEach((el) => {
+    const id = el.getAttribute('data-highlight-id');
+    if (id) renderedIds.add(id);
+  });
+  for (const id of renderedIds) {
+    removeHighlightRendering(id);
+  }
+}
+
 // ── Flash Animation ──
 
 /**
@@ -258,16 +275,62 @@ function isValidSelection(selection: Selection): boolean {
  * Handle text selection — show floating toolbar on valid selection.
  */
 function handleSelectionChange(): void {
-  const selection = window.getSelection();
-  if (!selection || !isValidSelection(selection)) {
+  try {
+    const selection = window.getSelection();
+    if (!selection || !isValidSelection(selection)) {
+      hideToolbar();
+      currentRange = null;
+      return;
+    }
+
+    currentRange = selection.getRangeAt(0).cloneRange();
+    const rect = currentRange.getBoundingClientRect();
+    showToolbar(rect, handleToolbarAction);
+  } catch (err) {
     hideToolbar();
     currentRange = null;
-    return;
+    console.error('[soma] Failed to handle text selection:', err);
   }
+}
 
-  currentRange = selection.getRangeAt(0).cloneRange();
-  const rect = currentRange.getBoundingClientRect();
-  showToolbar(rect, handleToolbarAction);
+function requestHighlightCheckForCurrentUrl(): void {
+  const payload: HighlightCheckUrlRequestPayload = {
+    url: location.href,
+  };
+  chrome.runtime.sendMessage({
+    type: HIGHLIGHT_CHECK_URL_REQUEST,
+    payload,
+  }).catch(() => {});
+}
+
+function handleUrlChangeIfNeeded(): void {
+  if (location.href === lastKnownUrl) return;
+  lastKnownUrl = location.href;
+  clearAllHighlightRenderings();
+  hideToolbar();
+  currentRange = null;
+  requestHighlightCheckForCurrentUrl();
+}
+
+function setupSpaUrlChangeDetection(): void {
+  const patchHistoryMethod = (method: 'pushState' | 'replaceState') => {
+    const original = history[method];
+    const wrapped: typeof history.pushState = function (
+      this: History,
+      ...args: Parameters<History['pushState']>
+    ) {
+      const result = original.apply(this, args);
+      queueMicrotask(handleUrlChangeIfNeeded);
+      return result;
+    };
+    history[method] = wrapped;
+  };
+
+  patchHistoryMethod('pushState');
+  patchHistoryMethod('replaceState');
+
+  window.addEventListener('popstate', handleUrlChangeIfNeeded);
+  window.addEventListener('hashchange', handleUrlChangeIfNeeded);
 }
 
 // ── Toolbar Action Handling ──
@@ -358,10 +421,11 @@ function createHighlight(range: Range, withNote: boolean): void {
 export function initHighlight(): void {
   if (initialized) return;
   initialized = true;
+  lastKnownUrl = location.href;
 
   ensureCustomElement();
 
-  // Debounced mouseup/touchend → check selection
+  // Debounced selection events → check selection
   let selectionTimeout: ReturnType<typeof setTimeout> | null = null;
 
   const onSelectionEvent = () => {
@@ -371,6 +435,7 @@ export function initHighlight(): void {
 
   document.addEventListener('mouseup', onSelectionEvent);
   document.addEventListener('touchend', onSelectionEvent);
+  document.addEventListener('selectionchange', onSelectionEvent);
 
   // Dismiss toolbar on scroll/resize
   const dismissToolbar = () => {
@@ -378,4 +443,6 @@ export function initHighlight(): void {
   };
   window.addEventListener('scroll', dismissToolbar, { passive: true });
   window.addEventListener('resize', dismissToolbar, { passive: true });
+
+  setupSpaUrlChangeDetection();
 }

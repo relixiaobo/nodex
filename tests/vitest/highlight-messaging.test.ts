@@ -10,6 +10,7 @@ import {
   HIGHLIGHT_SCROLL_TO,
   HIGHLIGHT_CLICK,
   HIGHLIGHT_CHECK_URL,
+  HIGHLIGHT_CHECK_URL_REQUEST,
   HIGHLIGHT_UNRESOLVABLE,
 } from '../../src/lib/highlight-messaging.js';
 import type {
@@ -19,6 +20,7 @@ import type {
   HighlightScrollToPayload,
   HighlightClickPayload,
   HighlightCheckUrlPayload,
+  HighlightCheckUrlRequestPayload,
   HighlightUnresolvablePayload,
   HighlightMessage,
 } from '../../src/lib/highlight-messaging.js';
@@ -55,6 +57,10 @@ describe('message type constants', () => {
     expect(HIGHLIGHT_CHECK_URL).toBe('highlight:check-url');
   });
 
+  it('HIGHLIGHT_CHECK_URL_REQUEST is "highlight:check-url-request"', () => {
+    expect(HIGHLIGHT_CHECK_URL_REQUEST).toBe('highlight:check-url-request');
+  });
+
   it('HIGHLIGHT_UNRESOLVABLE is "highlight:unresolvable"', () => {
     expect(HIGHLIGHT_UNRESOLVABLE).toBe('highlight:unresolvable');
   });
@@ -67,6 +73,7 @@ describe('message type constants', () => {
       HIGHLIGHT_SCROLL_TO,
       HIGHLIGHT_CLICK,
       HIGHLIGHT_CHECK_URL,
+      HIGHLIGHT_CHECK_URL_REQUEST,
       HIGHLIGHT_UNRESOLVABLE,
     ];
     for (const t of types) {
@@ -82,6 +89,7 @@ describe('message type constants', () => {
       HIGHLIGHT_SCROLL_TO,
       HIGHLIGHT_CLICK,
       HIGHLIGHT_CHECK_URL,
+      HIGHLIGHT_CHECK_URL_REQUEST,
       HIGHLIGHT_UNRESOLVABLE,
     ];
     const uniqueSet = new Set(types);
@@ -176,6 +184,13 @@ describe('payload types', () => {
     };
     expect(payload.url).toBe('https://example.com/page');
     expect(payload.tabId).toBe(42);
+  });
+
+  it('HighlightCheckUrlRequestPayload has url', () => {
+    const payload: HighlightCheckUrlRequestPayload = {
+      url: 'https://example.com/spa',
+    };
+    expect(payload.url).toBe('https://example.com/spa');
   });
 
   it('HighlightUnresolvablePayload has ids array', () => {
@@ -310,5 +325,13 @@ describe('HighlightMessage type', () => {
       payload: { url: 'https://example.com', tabId: 1 },
     };
     expect(msg.type).toBe(HIGHLIGHT_CHECK_URL);
+  });
+
+  it('can construct a check-url-request message', () => {
+    const msg: HighlightMessage = {
+      type: HIGHLIGHT_CHECK_URL_REQUEST,
+      payload: { url: 'https://example.com/spa' },
+    };
+    expect(msg.type).toBe(HIGHLIGHT_CHECK_URL_REQUEST);
   });
 });

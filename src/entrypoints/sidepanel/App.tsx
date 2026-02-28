@@ -16,20 +16,27 @@ import { getOrCreateDefaultWorkspaceId } from '../../lib/workspace-id.js';
 import { findUnexpectedShortcutConflicts } from '../../lib/shortcut-registry.js';
 import { ensureJournalTagDefs, ensureTodayNode } from '../../lib/journal.js';
 import { ensureHighlightTagDef, ensureCommentTagDef, type HighlightNodeStore } from '../../lib/highlight-service.js';
-import { createHighlightFromPayload, buildHighlightRestorePayload } from '../../lib/highlight-sidepanel.js';
+import {
+  createHighlightFromPayload,
+  buildHighlightRestorePayload,
+  collectHighlightNodeIdsInLibrary,
+  getRemovedHighlightIds,
+} from '../../lib/highlight-sidepanel.js';
 import { findClipNodeByUrl } from '../../lib/webclip-service.js';
 import {
   HIGHLIGHT_CREATE,
   HIGHLIGHT_CLICK,
   HIGHLIGHT_CHECK_URL,
   HIGHLIGHT_RESTORE,
+  HIGHLIGHT_REMOVE,
   HIGHLIGHT_UNRESOLVABLE,
   type HighlightCreatePayload,
   type HighlightClickPayload,
   type HighlightCheckUrlPayload,
+  type HighlightUnresolvablePayload,
 } from '../../lib/highlight-messaging.js';
 import { BOOTSTRAP_CONTAINER_DEFS } from '../../lib/system-node-registry.js';
-import { Toaster } from 'sonner';
+import { Toaster, toast } from 'sonner';
 import { TooltipProvider } from '../../components/ui/Tooltip';
 
 /**
@@ -236,6 +243,15 @@ export function App({ skipBootstrap = false }: AppProps) {
    }
 
    if (message?.type === HIGHLIGHT_UNRESOLVABLE) {
+    const payload = message.payload as HighlightUnresolvablePayload | undefined;
+    const count = payload?.ids?.length ?? 0;
+    if (count > 0) {
+      toast.warning(
+        count === 1
+          ? '1 个高亮无法在当前页面定位'
+          : `${count} 个高亮无法在当前页面定位`,
+      );
+    }
     sendResponse({ ok: true });
     return true;
    }
@@ -245,6 +261,26 @@ export function App({ skipBootstrap = false }: AppProps) {
   return () => {
     chrome.runtime.onMessage.removeListener(onHighlightMessage);
   };
+ }, []);
+
+ useEffect(() => {
+  if (!chrome?.runtime?.sendMessage) return;
+
+  let previousIds = collectHighlightNodeIdsInLibrary();
+
+  return loroDoc.subscribe(() => {
+    const nextIds = collectHighlightNodeIdsInLibrary();
+    const removedIds = getRemovedHighlightIds(previousIds, nextIds);
+    previousIds = nextIds;
+    if (removedIds.length === 0) return;
+
+    for (const id of removedIds) {
+      chrome.runtime.sendMessage({
+        type: HIGHLIGHT_REMOVE,
+        payload: { id },
+      }).catch(() => {});
+    }
+  });
  }, []);
 
  useEffect(() => {

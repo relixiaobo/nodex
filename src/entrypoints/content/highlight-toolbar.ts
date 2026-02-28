@@ -195,20 +195,25 @@ export function showToolbar(
   selectionRect: DOMRect,
   callback: ToolbarActionCallback,
 ): void {
-  ensureToolbarElement();
-  actionCallback = callback;
+  try {
+    ensureToolbarElement();
+    actionCallback = callback;
 
-  // Create or reuse toolbar element
-  if (!toolbarElement) {
-    toolbarElement = document.createElement('soma-toolbar');
-    document.body.appendChild(toolbarElement);
+    // Create or reuse toolbar element
+    if (!toolbarElement) {
+      toolbarElement = document.createElement('soma-toolbar');
+      const container = document.body ?? document.documentElement;
+      container.appendChild(toolbarElement);
+    }
+
+    const pos = getToolbarPosition(selectionRect);
+    toolbarElement.style.top = `${pos.top}px`;
+    toolbarElement.style.left = `${pos.left}px`;
+    toolbarElement.style.transform = 'translateX(-50%)';
+    toolbarElement.style.display = 'block';
+  } catch (err) {
+    console.error('[soma] Failed to show highlight toolbar:', err);
   }
-
-  const pos = getToolbarPosition(selectionRect);
-  toolbarElement.style.top = `${pos.top}px`;
-  toolbarElement.style.left = `${pos.left}px`;
-  toolbarElement.style.transform = 'translateX(-50%)';
-  toolbarElement.style.display = 'block';
 }
 
 /**

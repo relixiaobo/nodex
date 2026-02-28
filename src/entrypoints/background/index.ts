@@ -44,20 +44,23 @@ async function captureTabFromContentScript(tabId: number): Promise<WebClipCaptur
     return { ok: false, error: 'Cannot inject capture script into this page' };
   }
 
-  // Send capture message after injection
-  return new Promise((resolve, reject) => {
-    chrome.tabs.sendMessage(tabId, { type: WEBCLIP_CAPTURE_PAGE }, (response?: WebClipCaptureResponse) => {
-      if (chrome.runtime.lastError) {
-        reject(new Error(chrome.runtime.lastError.message));
-        return;
-      }
-      if (!response) {
-        reject(new Error('No response from content script'));
-        return;
-      }
-      resolve(response);
+  // Send capture message after injection.
+  // executeScript resolves when the file is injected, but main() may not have
+  // registered listeners yet. Retry once after a short delay on connection error.
+  for (let attempt = 0; attempt < 2; attempt++) {
+    if (attempt > 0) await new Promise((r) => setTimeout(r, 150));
+    const result = await new Promise<WebClipCaptureResponse | null>((resolve) => {
+      chrome.tabs.sendMessage(tabId, { type: WEBCLIP_CAPTURE_PAGE }, (response?: WebClipCaptureResponse) => {
+        if (chrome.runtime.lastError) {
+          resolve(null);
+          return;
+        }
+        resolve(response ?? null);
+      });
     });
-  });
+    if (result) return result;
+  }
+  return { ok: false, error: 'Content script did not respond after injection' };
 }
 
 /**
@@ -78,17 +81,23 @@ async function ensureContentScript(tabId: number): Promise<boolean> {
 
 /**
  * Forward a message from Side Panel to a specific tab's Content Script.
+ * Retries once after a short delay if the connection fails (race with injection).
  */
-function forwardToTab(tabId: number, message: unknown): Promise<unknown> {
-  return new Promise((resolve) => {
-    chrome.tabs.sendMessage(tabId, message, (response) => {
-      if (chrome.runtime.lastError) {
-        resolve({ ok: false, error: chrome.runtime.lastError.message });
-        return;
-      }
-      resolve(response);
+async function forwardToTab(tabId: number, message: unknown): Promise<unknown> {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    if (attempt > 0) await new Promise((r) => setTimeout(r, 150));
+    const result = await new Promise<unknown>((resolve) => {
+      chrome.tabs.sendMessage(tabId, message, (response) => {
+        if (chrome.runtime.lastError) {
+          resolve(null);
+          return;
+        }
+        resolve(response);
+      });
     });
-  });
+    if (result !== null) return result;
+  }
+  return { ok: false, error: 'Content script did not respond' };
 }
 
 /**

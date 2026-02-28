@@ -246,6 +246,8 @@ _(空)_
 - [x] Phase 1: 多行拆分为节点 ✅（2026-02-27）
 - [x] Phase 2: 粘贴系统重做 — `paste-parser.ts` 纯函数解析（Markdown 层级 + HTML marks + `#tag` / `field:: value` 识别）+ store `createSiblingNodesFromPaste` 支持树结构 + marks + tag/field 应用 + 接入 RichTextEditor / TrailingInput / OutlinerItem ✅（2026-02-28，PR #109）
 - [x] Phase 3: Code Block 一等节点（`codeBlock` + `codeLanguage`，支持 fenced code / `<pre><code>` 粘贴）✅（2026-02-28，PR #110）
+- [x] Hotfix: VS Code styled HTML 不再覆盖 markdown 解析（`shouldPreferHtml` 区分 genuine rich content vs style-only）✅（2026-02-28）
+- [x] Hotfix: Google Docs `<b>` wrapper 递归解析（`processFlowChildren` 识别含 block 子元素的 inline wrapper）✅（2026-02-28）
 
 #### 性能基线测量
 > **产出**: `docs/research/performance-baseline.md`

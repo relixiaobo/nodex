@@ -322,3 +322,130 @@ describe('syncTemplateFields — retroactive template sync', () => {
     expect(afterChildren.length).toBe(initialCount);
   });
 });
+
+describe('template field default values — cloneTemplateFieldValues', () => {
+  beforeEach(() => {
+    resetAndSeed();
+  });
+
+  it('applyTag clones default field values from template fieldEntry', () => {
+    const store = useNodeStore.getState();
+
+    // Create a tagDef with a fieldEntry that has a default value child
+    const tagDef = store.createTagDef('Project', { color: 'green' });
+    const { fieldEntryId, fieldDefId } = store.addUnnamedFieldToNode(tagDef.id);
+    store.renameFieldDef(fieldDefId, 'Status');
+
+    // Add a default value node under the template fieldEntry
+    const defaultValue = store.createChild(fieldEntryId, undefined, { name: 'todo' });
+
+    // Verify template fieldEntry has the value child
+    const templateChildren = loroDoc.getChildren(fieldEntryId);
+    expect(templateChildren).toContain(defaultValue.id);
+
+    // Apply tag to a fresh node
+    const node = store.createChild('proj_1', undefined, { name: 'My Project' });
+    store.applyTag(node.id, tagDef.id);
+
+    // Find the new fieldEntry on the node
+    const nodeChildren = loroDoc.getChildren(node.id);
+    const nodeFieldEntry = nodeChildren.find(cid => {
+      const n = loroDoc.toNodexNode(cid);
+      return n?.type === 'fieldEntry' && n.fieldDefId === fieldDefId;
+    });
+    expect(nodeFieldEntry).toBeTruthy();
+
+    // The new fieldEntry should have a cloned value child
+    const feChildren = loroDoc.getChildren(nodeFieldEntry!);
+    expect(feChildren.length).toBe(1);
+    const clonedValue = loroDoc.toNodexNode(feChildren[0]);
+    expect(clonedValue).toBeTruthy();
+    expect(clonedValue!.name).toBe('todo');
+    // Cloned value should be a NEW node (different ID from template)
+    expect(feChildren[0]).not.toBe(defaultValue.id);
+  });
+
+  it('applyTag skips value cloning for fieldDef templates', () => {
+    // fieldDef-style templates (seed data) have option definitions as children, not values
+    const store = useNodeStore.getState();
+    const node = store.createChild('proj_1', undefined, { name: 'Task Node' });
+    store.applyTag(node.id, 'tagDef_task');
+
+    // attrDef_status is a fieldDef under tagDef_task with options as children (opt_todo, etc.)
+    // Those should NOT be cloned as field values
+    const nodeChildren = loroDoc.getChildren(node.id);
+    const statusEntry = nodeChildren.find(cid => {
+      const n = loroDoc.toNodexNode(cid);
+      return n?.type === 'fieldEntry' && n.fieldDefId === 'attrDef_status';
+    });
+    expect(statusEntry).toBeTruthy();
+
+    // The fieldEntry should have NO children (fieldDef children = option defs, not cloned)
+    const feChildren = loroDoc.getChildren(statusEntry!);
+    expect(feChildren.length).toBe(0);
+  });
+
+  it('syncTemplateFields does NOT clone default values (only applyTag does)', () => {
+    const store = useNodeStore.getState();
+
+    // Create tagDef and tag a node first (no fields yet)
+    const tagDef = store.createTagDef('Ticket', { color: 'blue' });
+    const node = store.createChild('proj_1', undefined, { name: 'TKT-001' });
+    store.applyTag(node.id, tagDef.id);
+
+    // Now add a field with a default value to the tagDef
+    const { fieldEntryId, fieldDefId } = store.addUnnamedFieldToNode(tagDef.id);
+    store.renameFieldDef(fieldDefId, 'Priority');
+    store.createChild(fieldEntryId, undefined, { name: 'medium' });
+
+    // Field not yet on the node
+    let nodeChildren = loroDoc.getChildren(node.id);
+    let hasField = nodeChildren.some(cid => {
+      const n = loroDoc.toNodexNode(cid);
+      return n?.type === 'fieldEntry' && n.fieldDefId === fieldDefId;
+    });
+    expect(hasField).toBe(false);
+
+    // syncTemplateFields should create the fieldEntry but WITHOUT cloning default values
+    store.syncTemplateFields(node.id);
+
+    nodeChildren = loroDoc.getChildren(node.id);
+    const fieldEntry = nodeChildren.find(cid => {
+      const n = loroDoc.toNodexNode(cid);
+      return n?.type === 'fieldEntry' && n.fieldDefId === fieldDefId;
+    });
+    expect(fieldEntry).toBeTruthy();
+
+    // The fieldEntry should be empty — default values only apply at applyTag time
+    const feChildren = loroDoc.getChildren(fieldEntry!);
+    expect(feChildren.length).toBe(0);
+  });
+
+  it('clones targetId for option-type default values', () => {
+    const store = useNodeStore.getState();
+
+    const tagDef = store.createTagDef('Status Tag', { color: 'orange' });
+    const { fieldEntryId, fieldDefId } = store.addUnnamedFieldToNode(tagDef.id);
+    store.renameFieldDef(fieldDefId, 'State');
+
+    // Add a default value with targetId (like an options reference)
+    const defaultRef = store.createChild(fieldEntryId, undefined, {});
+    loroDoc.setNodeData(defaultRef.id, 'targetId', 'opt_todo');
+    loroDoc.commitDoc();
+
+    // Apply tag
+    const node = store.createChild('proj_1', undefined, { name: 'Test' });
+    store.applyTag(node.id, tagDef.id);
+
+    // Find cloned value
+    const nodeChildren = loroDoc.getChildren(node.id);
+    const fe = nodeChildren.find(cid => {
+      const n = loroDoc.toNodexNode(cid);
+      return n?.type === 'fieldEntry' && n.fieldDefId === fieldDefId;
+    });
+    const feChildren = loroDoc.getChildren(fe!);
+    expect(feChildren.length).toBe(1);
+    const cloned = loroDoc.toNodexNode(feChildren[0]);
+    expect(cloned?.targetId).toBe('opt_todo');
+  });
+});

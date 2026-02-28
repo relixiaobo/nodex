@@ -76,6 +76,19 @@ gh pr create --draft --title "[WIP] feat: ..." --body "ref: <任务名>"
 - 每完成一个有意义的功能点或修复后应**主动 git commit**
 - Commit message 简要关联任务名称，如 `feat: node selection phase 1 — escape to select mode`
 
+### 架构决策：补丁 vs 重构
+
+**当你在给第二个组件补同样的能力时，停下来重新审视架构，不要继续打补丁。**
+
+决策三问：
+1. **是通用需求还是特例？** — 只有一个组件需要 → 补丁；多个组件都需要 → 进入第 2 步
+2. **区别在哪一层？** — 行为不同 → 各自实现；只是渲染/布局不同 → 提取交互层，渲染通过 delegate/children 注入
+3. **接口是否清晰？** — 能用一个 config 对象描述所有变化点 → 好抽象，做；需要大量 if/else 判断调用方 → 过早抽象，等第三个案例
+
+**案例**：OutlinerItem 和 FieldRow 各自实现 selection/keyboard/pointer 逻辑，FieldRow 持续缺失能力（batch delete、justDragged、Shift+Arrow）。本质是"行为相同但渲染不同"→ 提取 `OutlinerRow`（统一交互）+ `RowInteractionConfig`（delegate 差异点），两个组件各自只保留渲染逻辑。
+
+**实施原则**：按依赖方向分步——先提取被依赖的新抽象，再让消费者逐个迁移，每步 typecheck → test → build 卡点。
+
 ## 技术栈
 
 | 层面 | 选择 | 说明 |

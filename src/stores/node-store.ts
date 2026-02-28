@@ -17,6 +17,8 @@ import { getTreeReferenceBlockReason } from '../lib/reference-rules.js';
 import { resolveCheckboxClick, resolveCmdEnterCycle, resolveForwardDoneMapping, resolveReverseDoneMapping } from '../lib/checkbox-utils.js';
 import { nextAutoColorKey } from '../lib/tag-colors.js';
 import { runSearch } from '../lib/search-engine.js';
+import { resolveAutoInitValue } from '../lib/field-auto-init.js';
+import type { AutoInitStrategy } from '../types/index.js';
 import type { ParsedPasteNode } from '../lib/paste-parser.js';
 
 // ============================================================
@@ -585,13 +587,33 @@ export function applyTagMutationsNoCommit(nodeId: string, tagDefId: string): voi
     }
   }
 
-  // 4. 克隆默认内容（仅当前 tagDef 的顶层普通内容节点，shallow clone）
+  // 4. Auto-initialize: fill empty fields that have autoInitialize strategy configured
+  for (const chainTagId of extendsChain) {
+    const fieldRefs = getTemplateFieldDefs(chainTagId);
+    for (const ref of fieldRefs) {
+      const feId = findFieldEntry(nodeId, ref.fieldDefId);
+      if (!feId || fieldEntryHasValue(feId)) continue;
+
+      const fieldDef = loroDoc.toNodexNode(ref.fieldDefId);
+      const strategy = fieldDef?.autoInitialize as AutoInitStrategy | undefined;
+      if (!strategy) continue;
+
+      const value = resolveAutoInitValue(nodeId, ref.fieldDefId, strategy);
+      if (value) {
+        const valueNodeId = nanoid();
+        loroDoc.createNode(valueNodeId, feId);
+        loroDoc.setNodeData(valueNodeId, 'name', value);
+      }
+    }
+  }
+
+  // 5. 克隆默认内容（仅当前 tagDef 的顶层普通内容节点，shallow clone）
   // 注：继承链上的 default content 自动传播仍属于 Extend Phase 2（未实现）。
   for (const templateNodeId of getTemplateContentNodes(tagDefId)) {
     cloneTemplateContentNodeShallow(nodeId, templateNodeId);
   }
 
-  // 5. 传播 childSupertag
+  // 6. 传播 childSupertag
   const tagDef = loroDoc.toNodexNode(tagDefId);
   void tagDef; // childSupertag 仅在 createChild/createSibling 时处理
 }

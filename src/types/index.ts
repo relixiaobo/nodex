@@ -26,6 +26,8 @@ export {
   SYS_T,
   FIELD_TYPES,
   SYSTEM_TAGS,
+  AUTO_INIT_STRATEGY,
+  AUTO_INIT_PRIORITY,
   isJournalSystemTagId,
 } from './system-nodes.js';
 
@@ -36,4 +38,5 @@ export type {
   SystemTag,
   SystemTagId,
   FieldType,
+  AutoInitStrategy,
 } from './system-nodes.js';

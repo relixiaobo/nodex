@@ -11,7 +11,7 @@ import {
   CheckSquare, ChevronDown, FileText, Hash, Link, List, ListTree, Mail, Palette,
   Play, Asterisk, EyeOff, Search, Settings2, SquareUser, Sparkles, Tag, ToggleLeft, UserPen, Code2,
 } from './icons.js';
-import { SYS_A, SYS_D, SYS_V, FIELD_TYPES } from '../types/index.js';
+import { SYS_A, SYS_D, SYS_V, FIELD_TYPES, AUTO_INIT_STRATEGY } from '../types/index.js';
 import type { NodexNode } from '../types/index.js';
 import * as loroDoc from './loro-doc.js';
 
@@ -362,11 +362,17 @@ export const ATTRDEF_CONFIG_FIELDS: ConfigFieldDef[] = [
   {
     key: SYS_A.AUTO_INITIALIZE,
     name: 'Auto-initialize',
-    control: 'toggle',
+    control: 'select',
     icon: Play,
-    defaultValue: SYS_V.NO,
+    defaultValue: '',
     appliesTo: '*',
-    description: 'to value from ancestor with this field',
+    description: 'Automatically fill value when tag is applied',
+    options: [
+      { value: '', label: 'Off' },
+      { value: AUTO_INIT_STRATEGY.ANCESTOR_FIELD_VALUE, label: 'From ancestor field' },
+      { value: AUTO_INIT_STRATEGY.CURRENT_DATE, label: 'Current date' },
+      { value: AUTO_INIT_STRATEGY.ANCESTOR_DAY_NODE, label: 'From day node ancestor' },
+    ],
   },
   {
     key: SYS_A.NULLABLE,

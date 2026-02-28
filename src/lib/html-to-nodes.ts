@@ -117,7 +117,7 @@ export function parseHtmlToNodes(
     // If the element has only inline children, use innerHTML
     const hasBlockChild = Array.from(el.children).some(isBlockElement);
     if (!hasBlockChild) {
-      return htmlToMarks(el.innerHTML);
+      return htmlToMarks(el.outerHTML);
     }
     // If it has block children, just use textContent as fallback
     return { text: el.textContent?.trim() ?? '', marks: [], inlineRefs: [] };
@@ -154,6 +154,7 @@ export function parseHtmlToNodes(
   // Parse the HTML
   const parser = new DOMParser();
   const doc = parser.parseFromString(html, 'text/html');
+  inlineClassStylesFromStyleTags(doc);
   const body = doc.body;
 
   if (!body) {
@@ -684,6 +685,86 @@ function parseCssLengthToPx(input?: string | null): number {
     default:
       return value;
   }
+}
+
+type CssDeclarations = Record<string, string>;
+
+function inlineClassStylesFromStyleTags(doc: Document): void {
+  const styleRules = extractClassStyleRules(doc);
+  if (styleRules.size === 0) return;
+
+  const elements = Array.from(doc.body?.querySelectorAll('[class]') ?? []);
+  for (const el of elements) {
+    const classAttr = el.getAttribute('class') ?? '';
+    const classNames = classAttr.split(/\s+/).map((c) => c.trim()).filter(Boolean);
+    if (classNames.length === 0) continue;
+
+    const merged: CssDeclarations = {};
+    for (const className of classNames) {
+      const rule = styleRules.get(className);
+      if (rule) Object.assign(merged, rule);
+    }
+    if (Object.keys(merged).length === 0) continue;
+
+    const inline = parseCssDeclarations(el.getAttribute('style') ?? '');
+    Object.assign(merged, inline);
+    el.setAttribute('style', serializeCssDeclarations(merged));
+  }
+}
+
+function extractClassStyleRules(doc: Document): Map<string, CssDeclarations> {
+  const styleNodes = Array.from(doc.querySelectorAll('style'));
+  if (styleNodes.length === 0) return new Map();
+
+  const rules = new Map<string, CssDeclarations>();
+  for (const styleNode of styleNodes) {
+    const css = (styleNode.textContent ?? '').replace(/\/\*[\s\S]*?\*\//g, '');
+    const re = /([^{}]+)\{([^{}]+)\}/g;
+    let match: RegExpExecArray | null;
+    while ((match = re.exec(css)) !== null) {
+      const selectors = match[1]
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
+      const decls = parseCssDeclarations(match[2]);
+      if (Object.keys(decls).length === 0) continue;
+
+      for (const selector of selectors) {
+        const classMatch = selector.match(/^\.(?<name>[A-Za-z0-9_-]+)$/);
+        const className = classMatch?.groups?.name;
+        if (!className) continue;
+        const prev = rules.get(className) ?? {};
+        rules.set(className, { ...prev, ...decls });
+      }
+    }
+  }
+  return rules;
+}
+
+function parseCssDeclarations(block: string): CssDeclarations {
+  const entries = block
+    .split(';')
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  const out: CssDeclarations = {};
+  for (const entry of entries) {
+    const idx = entry.indexOf(':');
+    if (idx <= 0) continue;
+    const key = entry.slice(0, idx).trim().toLowerCase();
+    let value = entry.slice(idx + 1).trim();
+    if (!key || !value) continue;
+    value = value.replace(/!important/gi, '').trim();
+    if (!value) continue;
+    out[key] = value;
+  }
+  return out;
+}
+
+function serializeCssDeclarations(decls: CssDeclarations): string {
+  return Object.entries(decls)
+    .map(([k, v]) => `${k}: ${v}`)
+    .join('; ');
 }
 
 function extractCodeLanguage(el: Element): string | undefined {

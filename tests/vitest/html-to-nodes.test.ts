@@ -59,6 +59,20 @@ describe('parseHtmlToNodes', () => {
     );
   });
 
+  it('preserves class-based bold/italic marks from clipboard style blocks', () => {
+    const html = [
+      '<style>.bi{font-weight:700;font-style:italic;}</style>',
+      '<p><span class="bi">Styled</span> text</p>',
+    ].join('');
+    const { nodes } = parseHtmlToNodes(html);
+    expect(nodes).toHaveLength(1);
+    expect(nodes[0].name).toBe('Styled text');
+    expect(nodes[0].marks).toEqual(expect.arrayContaining([
+      expect.objectContaining({ type: 'bold', start: 0, end: 6 }),
+      expect.objectContaining({ type: 'italic', start: 0, end: 6 }),
+    ]));
+  });
+
   it('preserves link mark with href', () => {
     const { nodes } = parseHtmlToNodes('<p>Visit <a href="https://example.com">here</a></p>');
     expect(nodes).toHaveLength(1);
@@ -199,6 +213,29 @@ describe('parseHtmlToNodes', () => {
     const { nodes } = parseHtmlToNodes(html, { inferParagraphLists: true });
     expect(nodes.map((n) => n.name)).toEqual(['Parent', 'Sibling']);
     expect(nodes[0].children.map((n) => n.name)).toEqual(['Child']);
+  });
+
+  it('infers hierarchy from class-based styles in clipboard html', () => {
+    const html = [
+      '<style>',
+      '.h{font-size:26pt;font-weight:700;}',
+      '.l0{margin-left:0pt;}',
+      '.l1{margin-left:36pt;}',
+      '</style>',
+      '<p class="h">Experience</p>',
+      '<p class="l0">• Parent</p>',
+      '<p class="l1">• Child</p>',
+    ].join('');
+
+    const { nodes } = parseHtmlToNodes(html, {
+      inferStyledHeadings: true,
+      inferParagraphLists: true,
+    });
+
+    expect(nodes).toHaveLength(1);
+    expect(nodes[0].name).toBe('Experience');
+    expect(nodes[0].children.map((n) => n.name)).toEqual(['Parent']);
+    expect(nodes[0].children[0].children.map((n) => n.name)).toEqual(['Child']);
   });
 
   // ── Blockquote ──

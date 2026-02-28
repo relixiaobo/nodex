@@ -195,6 +195,29 @@ describe('paste-parser', () => {
     expect(nodes[0].children[0].children.map((n) => n.name)).toEqual(['Child']);
   });
 
+  it('parses class-styled docs html into heading + hierarchy', () => {
+    const html = [
+      '<style>',
+      '.h{font-size:26pt;font-weight:700;}',
+      '.l0{margin-left:0pt;}',
+      '.l1{margin-left:36pt;}',
+      '.bi{font-weight:700;font-style:italic;}',
+      '</style>',
+      '<p class="h">Experience</p>',
+      '<p class="l0"><span class="bi">• Parent</span></p>',
+      '<p class="l1">• Child</p>',
+    ].join('');
+
+    const nodes = parseHtmlBlocks(html);
+    expect(nodes).toHaveLength(1);
+    expect(nodes[0].name).toBe('Experience');
+    expect(nodes[0].children).toHaveLength(1);
+    expect(nodes[0].children[0].name).toBe('Parent');
+    expect(nodes[0].children[0].marks.some((m) => m.type === 'bold')).toBe(true);
+    expect(nodes[0].children[0].marks.some((m) => m.type === 'italic')).toBe(true);
+    expect(nodes[0].children[0].children.map((n) => n.name)).toEqual(['Child']);
+  });
+
   it('normalizes bullet-wrapped markdown lines from clipboard shells', () => {
     const plain = [
       '• ### Standalone 测试环境',

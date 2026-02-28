@@ -284,25 +284,6 @@ function parseMarkdownDocument(lines: string[]): ParsedPasteNode[] | null {
 export function parseHtmlBlocks(html: string): ParsedPasteNode[] {
   if (!html || !html.trim()) return [];
 
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(html, 'text/html');
-  const body = doc.body;
-  const hasBlock = !!body?.querySelector('p,div,br,ul,ol,li,blockquote,pre,table,h1,h2,h3,h4,h5,h6');
-
-  // Inline-only HTML (e.g. <strong>Bold</strong>) should preserve marks.
-  if (body && !hasBlock) {
-    const inline = htmlToMarks(body.innerHTML);
-    const text = inline.text.trim();
-    if (text) {
-      return [enrichNodeMetadata({
-        name: text,
-        marks: inline.marks,
-        inlineRefs: inline.inlineRefs,
-        children: [],
-      })].filter(isMeaningfulNode);
-    }
-  }
-
   const parsed = parseHtmlToNodes(html, {
     maxNodes: 500,
     includeH1: true,
@@ -315,6 +296,7 @@ export function parseHtmlBlocks(html: string): ParsedPasteNode[] {
       .filter(isMeaningfulNode);
   }
 
+  // Final fallback: flatten inline formatting into one node.
   const inline = htmlToMarks(html);
   const text = inline.text.trim();
   if (!text) return [];

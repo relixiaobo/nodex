@@ -35,7 +35,6 @@ export interface HighlightCreatePayload {
   selectedText: string;
   pageUrl: string;
   pageTitle: string;
-  color?: string;
   /** If true, Side Panel should focus on note input after creation */
   withNote?: boolean;
 }

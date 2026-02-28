@@ -21,7 +21,7 @@ describe('content highlight rendering', () => {
     const textNode = document.querySelector('#content')!.firstChild as Text;
     const range = createRangeForText(textNode, 0, 5);
 
-    renderHighlight(range, 'hl_1', 'yellow');
+    renderHighlight(range, 'hl_1');
 
     const highlights = document.querySelectorAll('soma-hl[data-highlight-id="hl_1"]');
     expect(highlights).toHaveLength(1);
@@ -33,10 +33,22 @@ describe('content highlight rendering', () => {
     const textNode = document.querySelector('#content')!.firstChild as Text;
     const range = createRangeForText(textNode, 0, 5);
 
-    renderHighlight(range, 'hl_2', 'yellow');
+    renderHighlight(range, 'hl_2');
     removeHighlightRendering('hl_2');
 
     expect(document.querySelectorAll('soma-hl')).toHaveLength(0);
     expect(document.querySelector('#content')!.textContent).toBe('hello world');
+  });
+
+  it('renders highlight with custom CSS background color', () => {
+    document.body.innerHTML = '<p id="content">hello world</p>';
+    const textNode = document.querySelector('#content')!.firstChild as Text;
+    const range = createRangeForText(textNode, 0, 5);
+
+    renderHighlight(range, 'hl_3', 'rgba(155, 124, 56, 0.3)');
+
+    const highlights = document.querySelectorAll('soma-hl[data-highlight-id="hl_3"]');
+    expect(highlights).toHaveLength(1);
+    expect((highlights[0] as HTMLElement).style.backgroundColor).toBe('rgba(155, 124, 56, 0.3)');
   });
 });

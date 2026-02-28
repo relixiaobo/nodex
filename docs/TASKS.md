@@ -28,8 +28,7 @@ _(空)_
 
 | Agent | 分支 | 任务 | 锁定文件 | 状态 |
 |---|---|---|---|---|
-| Agent A | cc/highlight-editor | Phase 1: # Tag 浮动工具栏 + highlight-service | — | ✅ Merged (#111) |
-| Agent B | cc/highlight-webpage | Phase 2-3: Content Script 高亮 + 回显 | — | ✅ Merged (#112) |
+_(无活跃 agent)_
 
 ---
 
@@ -116,6 +115,8 @@ _(空)_
 - [x] **Phase 2: Content Script 网页高亮**（`cc/highlight-webpage`）— anchor-utils + messaging 协议 + Shadow DOM 网页工具栏 + 选中→高亮 DOM 渲染 + Background 路由 + URL clip 查找/自动创建 ✅（2026-02-28, PR #112）
 - [x] **Phase 3: 回显 + 双向联动**（`cc/highlight-webpage`）— URL 变更检测 + 四步锚点还原 + 无法定位标记 + Side Panel ↔ CS 双向滚动 ✅（2026-02-28, PR #112）
 - [x] **Review: 整体代码审查** — codex 审查 PR #111 + #112 全部代码（数据模型一致性、消息路由正确性、anchor 还原健壮性、测试覆盖完整性）✅（2026-02-28, PR #113）
+- [x] **数据模型简化** — 4 个模板字段（Source/Anchor/Color/Page URL）→ 1 个 Clip 字段（options_from_supertag → #web_clip）+ anchor 存 description + 颜色使用 tagDef 自身颜色 ✅（2026-02-28）
+- [ ] **网页浮动工具栏不出现** — Content Script 注入后，网页侧选中文本未显示浮动工具栏（待排查）
 
 #### AI Chat & 网页辅助 (#29 + #31)
 > 浏览器 + AI = soma 的第二个差异化维度。不只是聊天框，而是理解上下文的知识助手。
@@ -289,6 +290,7 @@ _(空)_
 
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
+| 2026-02-28 | Highlight 系统 Review — BG loop guard + SP listener + highlight-sidepanel 模块 + clipPageId 树遍历修复 + 9 test | codex | #113 |
 | 2026-02-28 | Highlight 系统 Phase 1 — highlight-service CRUD + TagSelectorPopover + FloatingToolbar # Tag + PM 选区→inline ref + highlight bullet 颜色 + 25 test | Agent A | #111 |
 | 2026-02-28 | Highlight 系统 Phase 2-3 — anchor-utils + messaging 协议 + Shadow DOM 网页工具栏 + `<soma-hl>` DOM 渲染 + 4-step 锚点还原 + URL clip 查找 + Background 路由 + 87 test | Agent B | #112 |
 | 2026-02-28 | Paste Pipeline 重设计 — 统一 markdown/HTML 解析 + codeBlock 一等节点 + Google Docs/Sheets/Wikipedia 硬化 + paste debug 开关 + 6 test files | codex | #110 |

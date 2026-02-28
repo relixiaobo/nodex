@@ -17,9 +17,12 @@ describe('isOutlinerContentNodeType', () => {
     expect(isOutlinerContentNodeType('codeBlock')).toBe(true);
   });
 
-  it('filters structural schema/field nodes from content rows', () => {
+  it('treats tagDef as renderable content (Schema container)', () => {
+    expect(isOutlinerContentNodeType('tagDef')).toBe(true);
+  });
+
+  it('filters structural/internal nodes from content rows', () => {
     expect(isOutlinerContentNodeType('fieldEntry')).toBe(false);
-    expect(isOutlinerContentNodeType('tagDef')).toBe(false);
     expect(isOutlinerContentNodeType('fieldDef')).toBe(false);
     expect(isOutlinerContentNodeType('queryCondition')).toBe(false);
   });

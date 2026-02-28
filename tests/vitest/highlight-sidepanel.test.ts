@@ -5,14 +5,12 @@ import { CONTAINER_IDS, SYS_T } from '../../src/types/index.js';
 import {
   ensureHighlightTagDef,
   ensureCommentTagDef,
-  getSourceFieldDefId,
   type HighlightNodeStore,
 } from '../../src/lib/highlight-service.js';
 import { findClipNodeByUrl } from '../../src/lib/webclip-service.js';
 import {
   createHighlightFromPayload,
   buildHighlightRestorePayload,
-  getPlainFieldValue,
 } from '../../src/lib/highlight-sidepanel.js';
 import type { HighlightCreatePayload } from '../../src/lib/highlight-messaging.js';
 import * as loroDoc from '../../src/lib/loro-doc.js';
@@ -26,7 +24,6 @@ function makePayload(overrides?: Partial<HighlightCreatePayload>): HighlightCrea
     selectedText: 'highlighted text',
     pageUrl: 'https://medium.com/example-article',
     pageTitle: 'Example Article — Medium',
-    color: 'yellow',
     anchor: {
       version: 1,
       exact: 'highlighted text',
@@ -54,9 +51,6 @@ describe('highlight-sidepanel', () => {
     const node = store.getNode(result.highlightNodeId);
     expect(node).not.toBeNull();
     expect(node!.tags).toContain(SYS_T.HIGHLIGHT);
-
-    const sourceValue = getPlainFieldValue(result.highlightNodeId, getSourceFieldDefId());
-    expect(sourceValue).toBe('webclip_1');
   });
 
   it('creates lightweight clip when URL has no existing clip node', async () => {
@@ -74,7 +68,6 @@ describe('highlight-sidepanel', () => {
     expect(clipNode!.tags).toContain('tagDef_web_clip');
     expect(loroDoc.getParentId(result.clipNodeId)).toBe(CONTAINER_IDS.INBOX);
     expect(findClipNodeByUrl('https://example.com/new-highlight')).toBe(result.clipNodeId);
-    expect(clipNode!.id).not.toBe('webclip_1');
   });
 
   it('creates an empty #comment child when withNote is true', async () => {
@@ -87,14 +80,25 @@ describe('highlight-sidepanel', () => {
     expect(comment!.name).toBe('');
   });
 
-  it('builds restore payload from highlight nodes with parsed anchor and color', async () => {
+  it('stores anchor data in node description', async () => {
     const store = getStore();
-    const result = await createHighlightFromPayload(makePayload({ color: 'green' }), store);
+    const result = await createHighlightFromPayload(makePayload(), store);
+
+    const node = loroDoc.toNodexNode(result.highlightNodeId);
+    expect(node!.description).toBeDefined();
+    const parsed = JSON.parse(node!.description!);
+    expect(parsed.exact).toBe('highlighted text');
+  });
+
+  it('builds restore payload with parsed anchor and tagDef color', async () => {
+    const store = getStore();
+    const result = await createHighlightFromPayload(makePayload(), store);
 
     const payload = buildHighlightRestorePayload(result.clipNodeId);
     const item = payload.highlights.find((h) => h.id === result.highlightNodeId);
     expect(item).toBeDefined();
-    expect(item!.color).toBe('green');
+    // Color is derived from tagDef, should be an rgba string
+    expect(item!.color).toMatch(/^rgba\(/);
     expect(item!.anchor.exact).toBe('highlighted text');
   });
 });

@@ -140,8 +140,10 @@ export function getTagColor(tagDefId: string): TagColor {
 export function resolveTagColor(
   tagDefId: string,
 ): TagColor {
-  // System tags always gray
-  if (tagDefId.startsWith('SYS_T')) return TAG_COLOR_GRAY;
+  // System tags always gray — except highlight/comment which have user-visible colors
+  if (tagDefId.startsWith('SYS_T') && tagDefId !== SYS_T.HIGHLIGHT && tagDefId !== SYS_T.COMMENT) {
+    return TAG_COLOR_GRAY;
+  }
 
   // Check configured color via loroDoc
   const tagDef = loroDoc.toNodexNode(tagDefId);
@@ -176,72 +178,11 @@ export function resolveNodeBulletColors(nodeId: string): string[] {
  * - If referenced node has at least one supertag, use the first supertag color.
  * - Otherwise fall back to the current inline-ref theme color (purple token).
  */
-// ============================================================
-// Highlight color mapping (Color field value → CSS color)
-// ============================================================
-
-/**
- * Highlight-specific CSS colors for the 5 color options.
- * These are saturated/visible colors for bullet dots and inline ref backgrounds.
- */
-export const HIGHLIGHT_CSS_COLORS: Record<string, string> = {
-  yellow: '#E6C84D',
-  green: '#5CA45C',
-  blue: '#4A8FD4',
-  pink: '#D46A8C',
-  purple: '#8B6FAE',
-};
-
-/**
- * Resolve bullet color for a #highlight node from its Color field value.
- * Returns null if the node is not a highlight or Color field is not set.
- * Safe to call before LoroDoc is initialized (returns null).
- */
-export function resolveHighlightBulletColor(nodeId: string): string | null {
-  let node;
-  try {
-    node = loroDoc.toNodexNode(nodeId);
-  } catch {
-    return null; // LoroDoc not initialized yet
-  }
-  if (!node || !node.tags.includes(SYS_T.HIGHLIGHT)) return null;
-
-  // Find Color fieldEntry
-  const children = loroDoc.getChildren(nodeId);
-  for (const childId of children) {
-    const child = loroDoc.toNodexNode(childId);
-    if (child?.type !== 'fieldEntry') continue;
-
-    // Check if this fieldEntry's fieldDef is named "Color" and is an options type
-    const fieldDef = child.fieldDefId ? loroDoc.toNodexNode(child.fieldDefId) : null;
-    if (!fieldDef || fieldDef.name?.toLowerCase() !== 'color') continue;
-
-    // Get the option value: fieldEntry -> value child -> targetId -> option node -> name
-    const valueChildren = loroDoc.getChildren(childId);
-    if (valueChildren.length === 0) continue;
-
-    const valueNode = loroDoc.toNodexNode(valueChildren[0]);
-    if (!valueNode?.targetId) continue;
-
-    const optionNode = loroDoc.toNodexNode(valueNode.targetId);
-    if (!optionNode?.name) continue;
-
-    const colorName = optionNode.name.toLowerCase();
-    return HIGHLIGHT_CSS_COLORS[colorName] ?? null;
-  }
-
-  return null;
-}
-
 export function resolveInlineReferenceTextColor(targetNodeId: string): string {
   if (!targetNodeId) return INLINE_REF_FALLBACK_TEXT_COLOR;
   try {
     const node = loroDoc.toNodexNode(targetNodeId);
     if (!node) return INLINE_REF_FALLBACK_TEXT_COLOR;
-
-    // For #highlight nodes, use highlight-specific color
-    const highlightColor = resolveHighlightBulletColor(targetNodeId);
-    if (highlightColor) return highlightColor;
 
     const firstTagId = node.tags?.[0];
     if (!firstTagId) return INLINE_REF_FALLBACK_TEXT_COLOR;

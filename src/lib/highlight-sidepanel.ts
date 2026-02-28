@@ -3,53 +3,18 @@ import type { HighlightCreatePayload, HighlightRestorePayload } from './highligh
 import {
   createCommentNode,
   createHighlightNode,
-  DEFAULT_HIGHLIGHT_COLOR,
-  getAnchorFieldDefId,
-  getColorFieldDefId,
+  getClipFieldDefId,
   getHighlightsForClip,
-  HIGHLIGHT_COLORS,
-  type HighlightColor,
   type HighlightNodeStore,
 } from './highlight-service.js';
 import { createLightweightClip, findClipNodeByUrl } from './webclip-service.js';
+import { resolveTagColor } from './tag-colors.js';
+import { SYS_T } from '../types/index.js';
 import * as loroDoc from './loro-doc.js';
 
 export interface CreateHighlightFromPayloadResult {
   highlightNodeId: string;
   clipNodeId: string;
-}
-
-function isHighlightColor(color: string): color is HighlightColor {
-  return (HIGHLIGHT_COLORS as readonly string[]).includes(color);
-}
-
-function findFieldEntry(nodeId: string, fieldDefId: string): string | null {
-  const children = loroDoc.getChildren(nodeId);
-  for (const childId of children) {
-    const child = loroDoc.toNodexNode(childId);
-    if (child?.type === 'fieldEntry' && child.fieldDefId === fieldDefId) {
-      return childId;
-    }
-  }
-  return null;
-}
-
-export function getPlainFieldValue(nodeId: string, fieldDefId: string): string | null {
-  const entryId = findFieldEntry(nodeId, fieldDefId);
-  if (!entryId) return null;
-  const valueChildren = loroDoc.getChildren(entryId);
-  if (valueChildren.length === 0) return null;
-  return loroDoc.toNodexNode(valueChildren[0])?.name ?? null;
-}
-
-export function getOptionsFieldLabel(nodeId: string, fieldDefId: string): string | null {
-  const entryId = findFieldEntry(nodeId, fieldDefId);
-  if (!entryId) return null;
-  const valueChildren = loroDoc.getChildren(entryId);
-  if (valueChildren.length === 0) return null;
-  const valueNode = loroDoc.toNodexNode(valueChildren[0]);
-  if (!valueNode?.targetId) return null;
-  return loroDoc.toNodexNode(valueNode.targetId)?.name ?? null;
 }
 
 export async function findOrCreateClipNodeForUrl(
@@ -67,17 +32,12 @@ export async function createHighlightFromPayload(
   store: HighlightNodeStore,
 ): Promise<CreateHighlightFromPayloadResult> {
   const clipNodeId = await findOrCreateClipNodeForUrl(payload.pageUrl, payload.pageTitle, store);
-  const color = payload.color && isHighlightColor(payload.color)
-    ? payload.color
-    : DEFAULT_HIGHLIGHT_COLOR;
 
   const highlight = createHighlightNode({
     store,
     selectedText: payload.selectedText,
     clipNodeId,
-    color,
     anchor: serializeAnchor(payload.anchor),
-    pageUrl: payload.pageUrl,
   });
 
   if (payload.withNote) {
@@ -90,28 +50,37 @@ export async function createHighlightFromPayload(
   };
 }
 
+/**
+ * Convert a hex color to a semi-transparent rgba suitable for highlight backgrounds.
+ */
+function hexToHighlightBg(hex: string): string {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r}, ${g}, ${b}, 0.3)`;
+}
+
 export function buildHighlightRestorePayload(clipNodeId: string): HighlightRestorePayload {
   const items: HighlightRestorePayload['highlights'] = [];
-  const anchorFieldDefId = getAnchorFieldDefId();
-  const colorFieldDefId = getColorFieldDefId();
   const highlights = getHighlightsForClip(clipNodeId);
 
+  // All highlights share the tagDef's color
+  const tagColor = resolveTagColor(SYS_T.HIGHLIGHT).text;
+  const bgColor = hexToHighlightBg(tagColor);
+
   for (const node of highlights) {
-    const anchorRaw = getPlainFieldValue(node.id, anchorFieldDefId);
+    // Anchor stored in node description
+    const anchorRaw = loroDoc.toNodexNode(node.id)?.description;
     if (!anchorRaw) continue;
 
     try {
       const parsedAnchor = deserializeAnchor(anchorRaw);
       if (!parsedAnchor) continue;
-      const colorLabel = getOptionsFieldLabel(node.id, colorFieldDefId);
-      const color = colorLabel && isHighlightColor(colorLabel)
-        ? colorLabel
-        : DEFAULT_HIGHLIGHT_COLOR;
 
       items.push({
         id: node.id,
         anchor: parsedAnchor,
-        color,
+        color: bgColor,
       });
     } catch {
       // Ignore invalid anchors and keep restoring other highlights.

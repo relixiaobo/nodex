@@ -4,7 +4,7 @@
  * Takes the current selection, creates a Library node with the selected tag,
  * and replaces the selection with an inline reference.
  *
- * For #highlight tags, also fills Source/Color fields automatically.
+ * For #highlight tags, sets the Clip field to the nearest #web_clip ancestor.
  */
 import type { EditorView } from 'prosemirror-view';
 import type { NodexNode, InlineRefEntry } from '../types/index.js';
@@ -14,7 +14,6 @@ import { docToMarks } from './pm-doc-utils.js';
 import * as loroDoc from './loro-doc.js';
 import {
   createHighlightNode,
-  DEFAULT_HIGHLIGHT_COLOR,
   type HighlightNodeStore,
 } from './highlight-service.js';
 import { findTagDefByName } from './webclip-service.js';
@@ -71,7 +70,7 @@ export function extractToTaggedNode(
   const selectedText = view.state.doc.textBetween(from, to);
   if (!selectedText.trim()) return null;
 
-  // 1. Resolve clip page context for #highlight Source field
+  // 1. Resolve clip page context for #highlight Clip field
   const clipPageId = resolveClipNodeIdForHighlight(nodeId);
 
   // 2. Create the Library node based on tag type
@@ -83,7 +82,6 @@ export function extractToTaggedNode(
       store,
       selectedText,
       clipNodeId: clipPageId,
-      color: DEFAULT_HIGHLIGHT_COLOR,
     });
   } else {
     // Generic tag: create in LIBRARY and apply tag

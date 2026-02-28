@@ -57,6 +57,8 @@ function isTextArea(el: EventTarget | null): boolean {
   return false;
 }
 
+const DRAG_SELECT_SCOPE_ATTR = 'data-drag-select-scope';
+
 export function useDragSelect({ containerRef, rootChildIds, rootNodeId }: UseDragSelectOptions) {
   const contextRef = useRef({ rootChildIds, rootNodeId });
   contextRef.current = { rootChildIds, rootNodeId };
@@ -73,6 +75,13 @@ export function useDragSelect({ containerRef, rootChildIds, rootNodeId }: UseDra
     move: ((e: MouseEvent) => void) | null;
     up: (() => void) | null;
   }>({ move: null, up: null });
+
+  // Mark container as a drag-select scope so nested instances can be detected
+  useEffect(() => {
+    const el = containerRef.current;
+    if (el) el.setAttribute(DRAG_SELECT_SCOPE_ATTR, '');
+    return () => { if (el) el.removeAttribute(DRAG_SELECT_SCOPE_ATTR); };
+  }, [containerRef]);
 
   const cleanup = useCallback(() => {
     stateRef.current.isDragging = false;
@@ -96,10 +105,16 @@ export function useDragSelect({ containerRef, rootChildIds, rootNodeId }: UseDra
     const container = containerRef.current;
     if (!container || !container.contains(e.target as Node)) return;
 
+    // If the click target is inside a NESTED drag-select scope (e.g. ConfigOutliner
+    // inside OutlinerView), let the inner scope handle it. This prevents double
+    // drag-select activation that clears focus and suppresses clicks.
+    const target = e.target as HTMLElement;
+    const closestScope = target.closest(`[${DRAG_SELECT_SCOPE_ATTR}]`);
+    if (closestScope && closestScope !== container) return;
+
     // Don't start drag select on buttons, interactive elements, or drag handles.
     // Note: <input> is NOT excluded — field name inputs participate in drag-select
     // via the text-area start logic (same as contenteditable editors).
-    const target = e.target as HTMLElement;
     if (target.closest('button, [role="button"], [draggable]')) return;
 
     const nodeInfo = getNodeFromPoint(e.clientX, e.clientY);

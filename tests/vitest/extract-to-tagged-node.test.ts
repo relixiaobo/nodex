@@ -17,9 +17,9 @@ describe('resolveClipNodeIdForHighlight', () => {
     expect(resolveClipNodeIdForHighlight('wc1_p1')).toBe('webclip_1');
   });
 
-  it('falls back to current node when no clip ancestor exists', () => {
+  it('returns null when no clip ancestor exists', () => {
     const store = useNodeStore.getState();
     const plainNode = store.createChild(CONTAINER_IDS.LIBRARY, undefined, { name: 'plain node' });
-    expect(resolveClipNodeIdForHighlight(plainNode.id)).toBe(plainNode.id);
+    expect(resolveClipNodeIdForHighlight(plainNode.id)).toBeNull();
   });
 });

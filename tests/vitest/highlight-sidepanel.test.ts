@@ -12,7 +12,7 @@ import {
   createHighlightFromPayload,
   buildHighlightRestorePayload,
   findOrCreateClipNodeForUrl,
-  collectHighlightNodeIdsInLibrary,
+  collectAllHighlightNodeIds,
   getRemovedHighlightIds,
 } from '../../src/lib/highlight-sidepanel.js';
 import type { HighlightCreatePayload } from '../../src/lib/highlight-messaging.js';
@@ -45,11 +45,14 @@ describe('highlight-sidepanel', () => {
     ensureCommentTagDef(store);
   });
 
-  it('creates highlight linked to existing clip node when URL already exists', async () => {
+  it('creates highlight as child of existing clip node', async () => {
     const store = getStore();
     const result = await createHighlightFromPayload(makePayload(), store);
 
     expect(result.clipNodeId).toBe('webclip_1');
+
+    // Highlight should be child of clip page
+    expect(loroDoc.getParentId(result.highlightNodeId)).toBe('webclip_1');
 
     const node = store.getNode(result.highlightNodeId);
     expect(node).not.toBeNull();
@@ -71,6 +74,9 @@ describe('highlight-sidepanel', () => {
     expect(clipNode!.tags).toContain('tagDef_source');
     expect(loroDoc.getParentId(result.clipNodeId)).toBe(CONTAINER_IDS.INBOX);
     expect(findClipNodeByUrl('https://example.com/new-highlight')).toBe(result.clipNodeId);
+
+    // Highlight should be child of the new clip page
+    expect(loroDoc.getParentId(result.highlightNodeId)).toBe(result.clipNodeId);
   });
 
   it('creates an empty #comment child when withNote is true', async () => {
@@ -118,17 +124,37 @@ describe('highlight-sidepanel', () => {
     expect(clipIdA).toBe(clipIdB);
   });
 
-  it('collects library highlight IDs and detects removed IDs', async () => {
+  it('collectAllHighlightNodeIds finds highlights under clip pages (new model)', async () => {
     const store = getStore();
     const first = await createHighlightFromPayload(makePayload({ selectedText: 'first' }), store);
     const second = await createHighlightFromPayload(makePayload({ selectedText: 'second' }), store);
 
-    const before = collectHighlightNodeIdsInLibrary();
+    const ids = collectAllHighlightNodeIds();
+    expect(ids.has(first.highlightNodeId)).toBe(true);
+    expect(ids.has(second.highlightNodeId)).toBe(true);
+  });
+
+  it('collectAllHighlightNodeIds finds legacy highlights in LIBRARY top level', () => {
+    const store = getStore();
+    // Simulate legacy highlight at LIBRARY top level
+    const legacyNode = store.createChild(CONTAINER_IDS.LIBRARY, undefined, { name: 'legacy' });
+    store.applyTag(legacyNode.id, SYS_T.HIGHLIGHT);
+
+    const ids = collectAllHighlightNodeIds();
+    expect(ids.has(legacyNode.id)).toBe(true);
+  });
+
+  it('detects removed highlight IDs', async () => {
+    const store = getStore();
+    const first = await createHighlightFromPayload(makePayload({ selectedText: 'first' }), store);
+    const second = await createHighlightFromPayload(makePayload({ selectedText: 'second' }), store);
+
+    const before = collectAllHighlightNodeIds();
     expect(before.has(first.highlightNodeId)).toBe(true);
     expect(before.has(second.highlightNodeId)).toBe(true);
 
     loroDoc.moveNode(first.highlightNodeId, CONTAINER_IDS.TRASH);
-    const after = collectHighlightNodeIdsInLibrary();
+    const after = collectAllHighlightNodeIds();
     const removed = getRemovedHighlightIds(before, after);
 
     expect(removed).toContain(first.highlightNodeId);

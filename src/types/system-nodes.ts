@@ -171,6 +171,8 @@ export type SystemAttribute = typeof SYS_A[keyof typeof SYS_A];
  * in priority order (highest first). First non-null result wins.
  */
 export const AUTO_INIT_STRATEGY = {
+  /** Reference the nearest ancestor tagged with the field's sourceSupertag. */
+  ANCESTOR_SUPERTAG_REF: 'ancestor_supertag_ref',
   /** Fill with today's date (ISO string). Date fields only. */
   CURRENT_DATE: 'current_date',
   /** Fill with the date from the nearest Day node ancestor. Date fields only. */
@@ -181,8 +183,9 @@ export const AUTO_INIT_STRATEGY = {
 
 export type AutoInitStrategy = typeof AUTO_INIT_STRATEGY[keyof typeof AUTO_INIT_STRATEGY];
 
-/** Priority order: first match wins. */
+/** Priority order: first match wins. Reference types first. */
 export const AUTO_INIT_PRIORITY: AutoInitStrategy[] = [
+  AUTO_INIT_STRATEGY.ANCESTOR_SUPERTAG_REF,
   AUTO_INIT_STRATEGY.CURRENT_DATE,
   AUTO_INIT_STRATEGY.ANCESTOR_DAY_NODE,
   AUTO_INIT_STRATEGY.ANCESTOR_FIELD_VALUE,

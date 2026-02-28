@@ -20,7 +20,7 @@ import { ensureHighlightTagDef, ensureCommentTagDef, type HighlightNodeStore } f
 import {
   createHighlightFromPayload,
   buildHighlightRestorePayload,
-  collectHighlightNodeIdsInLibrary,
+  collectAllHighlightNodeIds,
   getRemovedHighlightIds,
 } from '../../lib/highlight-sidepanel.js';
 import { findClipNodeByUrl } from '../../lib/webclip-service.js';
@@ -267,10 +267,10 @@ export function App({ skipBootstrap = false }: AppProps) {
  useEffect(() => {
   if (!chrome?.runtime?.sendMessage) return;
 
-  let previousIds = collectHighlightNodeIdsInLibrary();
+  let previousIds = collectAllHighlightNodeIds();
 
   return loroDoc.subscribe(() => {
-    const nextIds = collectHighlightNodeIdsInLibrary();
+    const nextIds = collectAllHighlightNodeIds();
     const removedIds = getRemovedHighlightIds(previousIds, nextIds);
     previousIds = nextIds;
     if (removedIds.length === 0) return;

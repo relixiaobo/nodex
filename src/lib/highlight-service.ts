@@ -15,6 +15,7 @@ import { findTagDefByName } from './webclip-service.js';
 /** Extended store interface for options field support. */
 export interface HighlightNodeStore extends WebClipNodeStore {
   setOptionsFieldValue(nodeId: string, fieldDefId: string, optionNodeId: string): void;
+  addReference(parentId: string, targetNodeId: string, position?: number): string;
 }
 
 // ============================================================

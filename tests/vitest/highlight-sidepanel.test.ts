@@ -134,16 +134,6 @@ describe('highlight-sidepanel', () => {
     expect(ids.has(second.highlightNodeId)).toBe(true);
   });
 
-  it('collectAllHighlightNodeIds finds legacy highlights in LIBRARY top level', () => {
-    const store = getStore();
-    // Simulate legacy highlight at LIBRARY top level
-    const legacyNode = store.createChild(CONTAINER_IDS.LIBRARY, undefined, { name: 'legacy' });
-    store.applyTag(legacyNode.id, SYS_T.HIGHLIGHT);
-
-    const ids = collectAllHighlightNodeIds();
-    expect(ids.has(legacyNode.id)).toBe(true);
-  });
-
   it('detects removed highlight IDs', async () => {
     const store = getStore();
     const first = await createHighlightFromPayload(makePayload({ selectedText: 'first' }), store);

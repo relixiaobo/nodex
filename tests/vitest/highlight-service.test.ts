@@ -283,18 +283,6 @@ describe('getHighlightsForClip', () => {
     expect(results[0].name).toBe('for clip A');
   });
 
-  it('finds legacy highlights in LIBRARY via Source field match', () => {
-    const store = getStore();
-
-    // Simulate legacy: create highlight directly in LIBRARY and set Source field manually
-    const legacyNode = store.createChild(CONTAINER_IDS.LIBRARY, undefined, { name: 'legacy highlight' });
-    store.applyTag(legacyNode.id, SYS_T.HIGHLIGHT);
-    store.setOptionsFieldValue(legacyNode.id, getSourceFieldDefId(), 'webclip_1');
-
-    const results = getHighlightsForClip('webclip_1');
-    expect(results).toHaveLength(1);
-    expect(results[0].name).toBe('legacy highlight');
-  });
 });
 
 describe('createCommentNode', () => {

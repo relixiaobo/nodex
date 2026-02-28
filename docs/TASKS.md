@@ -28,7 +28,7 @@ _(空)_
 
 | Agent | 分支 | 任务 | 锁定文件 | 状态 |
 |---|---|---|---|---|
-| codex | `codex/paste-phase2-richtext` | Paste Phase 2（粘贴系统重做） | `src/stores/node-store.ts`, `src/components/outliner/OutlinerItem.tsx`, `src/components/editor/RichTextEditor.tsx` | 进行中 |
+| codex | `codex/paste-phase2-richtext` | Paste Phase 2（粘贴系统重做） | `src/stores/node-store.ts`, `src/components/outliner/OutlinerItem.tsx`, `src/components/editor/RichTextEditor.tsx` | 待 nodex review（PR #109） |
 
 ---
 
@@ -36,13 +36,14 @@ _(空)_
 
 ### Paste Phase 2（粘贴系统重做）
 
-- [ ] `paste-parser.ts` 纯函数解析（Markdown 层级 + HTML marks + `#tag` / `field:: value`）
-- [ ] store `createSiblingNodesFromPaste` 支持树结构 + marks + tag/field 应用（单次 commit）
-- [ ] 接入 `RichTextEditor` / `TrailingInput` / `OutlinerItem`
-- [ ] 补齐 Vitest（parser + store paste 回归）
-- [ ] 本地验证：`typecheck` → `check:test-sync` → `test:run` → `build`
+- [x] `paste-parser.ts` 纯函数解析（Markdown 层级 + HTML marks + `#tag` / `field:: value`）
+- [x] store `createSiblingNodesFromPaste` 支持树结构 + marks + tag/field 应用（单次 commit）
+- [x] 接入 `RichTextEditor` / `TrailingInput` / `OutlinerItem`
+- [x] 补齐 Vitest（parser + store paste 回归）
+- [x] 本地验证：`typecheck` → `check:test-sync` → `test:run` → `build`
 - 迭代日志：
   - [2026-02-28 codex] 基于 `origin/main@41f1d78` 建立分支 `codex/paste-phase2-richtext`，按 TASKS 的 Phase 2 规格开工；发现引用计划 `.claude/plans/scalable-launching-milner.md` 在仓库缺失，暂以 `docs/TASKS.md` 为执行基线。
+  - [2026-02-28 codex] 完成 Phase 2 实现：新增 `paste-parser.ts`（plain/html/markdown + `#tag` / `field::value` 识别）、store `createSiblingNodesFromPaste` 树结构/marks/tag/field 支持、接入 RichTextEditor/TrailingInput/OutlinerItem；新增 `paste-parser.test.ts` 并升级 `paste-multi-line.test.ts`；本地验证全通过（`typecheck`/`check:test-sync`/`test:run`/`build`）。
 
 ---
 
@@ -250,7 +251,7 @@ _(空)_
 
 - [x] Phase 0: 单行 URL 智能粘贴 + ⌘⇧V 纯文本 ✅（2026-02-27）
 - [x] Phase 1: 多行拆分为节点 ✅（2026-02-27）
-- [ ] Phase 2: 粘贴系统重做 — `paste-parser.ts` 纯函数解析（Markdown 层级 + HTML marks + `#tag` / `field:: value` 识别）+ store `createSiblingNodesFromPaste` 支持树结构 + marks + tag/field 应用 + 接入 RichTextEditor / TrailingInput / OutlinerItem
+- [x] Phase 2: 粘贴系统重做 — `paste-parser.ts` 纯函数解析（Markdown 层级 + HTML marks + `#tag` / `field:: value` 识别）+ store `createSiblingNodesFromPaste` 支持树结构 + marks + tag/field 应用 + 接入 RichTextEditor / TrailingInput / OutlinerItem ✅（2026-02-28，PR #109）
 
 #### 性能基线测量
 > **产出**: `docs/research/performance-baseline.md`

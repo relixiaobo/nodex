@@ -78,6 +78,7 @@ import { dragState } from '../../hooks/use-drag-select';
 import { mergeRichTextPayload } from '../../lib/rich-text-merge.js';
 import { getTreeReferenceBlockReason, isReferenceDisplayCycle } from '../../lib/reference-rules.js';
 import { focusUndoShortcutSink, ensureUndoFocusAfterNavigation } from '../../lib/focus-utils.js';
+import type { ParsedPasteNode } from '../../lib/paste-parser.js';
 import { t } from '../../i18n/strings.js';
 import { RowHost } from './RowHost.js';
 import {
@@ -1549,8 +1550,8 @@ export function OutlinerItem({
   );
 
   const handlePasteMultiLine = useCallback(
-    (lines: string[]) => {
-      const lastId = createSiblingNodesFromPaste(nodeId, lines);
+    (nodes: ParsedPasteNode[]) => {
+      const lastId = createSiblingNodesFromPaste(nodeId, nodes);
       if (lastId) setFocusedNode(lastId, parentId);
     },
     [nodeId, parentId, createSiblingNodesFromPaste, setFocusedNode],

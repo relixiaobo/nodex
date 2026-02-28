@@ -280,7 +280,7 @@ export const SYS_T = {
 
   // ─── soma 内置标签 ───
   HIGHLIGHT: 'SYS_T200',
-  COMMENT: 'SYS_T201',
+  NOTE: 'SYS_T201',
 } as const;
 
 export type SystemTag = typeof SYS_T[keyof typeof SYS_T];

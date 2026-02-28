@@ -87,16 +87,16 @@ export function ensureHighlightTagDef(store: HighlightNodeStore): void {
 }
 
 /**
- * Create/find #comment tagDef with fixed ID SYS_T201 (no template fields).
+ * Create/find #note tagDef with fixed ID SYS_T201 (no template fields).
  */
-export function ensureCommentTagDef(_store: HighlightNodeStore): void {
-  const tagDef = loroDoc.toNodexNode(SYS_T.COMMENT);
+export function ensureNoteTagDef(_store: HighlightNodeStore): void {
+  const tagDef = loroDoc.toNodexNode(SYS_T.NOTE);
   if (tagDef) return;
 
-  loroDoc.createNode(SYS_T.COMMENT, CONTAINER_IDS.SCHEMA);
-  loroDoc.setNodeDataBatch(SYS_T.COMMENT, {
+  loroDoc.createNode(SYS_T.NOTE, CONTAINER_IDS.SCHEMA);
+  loroDoc.setNodeDataBatch(SYS_T.NOTE, {
     type: 'tagDef',
-    name: 'comment',
+    name: 'note',
     color: 'blue',
   });
   loroDoc.commitDoc();
@@ -164,12 +164,12 @@ export function getHighlightsForClip(clipNodeId: string): NodexNode[] {
 }
 
 /**
- * Create a comment child node under a highlight node.
- * Applies #comment tag.
+ * Create a note child node under a highlight node.
+ * Applies #note tag.
  */
-export function createCommentNode(store: HighlightNodeStore, highlightId: string, text: string): NodexNode {
+export function createNoteNode(store: HighlightNodeStore, highlightId: string, text: string): NodexNode {
   const node = store.createChild(highlightId, undefined, { name: text });
-  store.applyTag(node.id, SYS_T.COMMENT);
+  store.applyTag(node.id, SYS_T.NOTE);
   return loroDoc.toNodexNode(node.id)!;
 }
 

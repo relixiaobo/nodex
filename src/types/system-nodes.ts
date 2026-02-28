@@ -247,6 +247,10 @@ export const SYS_T = {
   WEEK: 'SYS_T125',
   YEAR: 'SYS_T126',
   MIME_TYPE: 'SYS_T157',
+
+  // ─── soma 内置标签 ───
+  HIGHLIGHT: 'SYS_T200',
+  COMMENT: 'SYS_T201',
 } as const;
 
 export type SystemTag = typeof SYS_T[keyof typeof SYS_T];

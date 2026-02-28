@@ -11,14 +11,13 @@ import type { NodexNode, InlineRefEntry } from '../types/index.js';
 import { CONTAINER_IDS, SYS_T } from '../types/index.js';
 import { pmSchema } from '../components/editor/pm-schema.js';
 import { docToMarks } from './pm-doc-utils.js';
+import * as loroDoc from './loro-doc.js';
 import {
   createHighlightNode,
-  getSourceFieldDefId,
-  getColorFieldDefId,
-  getColorOptionId,
   DEFAULT_HIGHLIGHT_COLOR,
   type HighlightNodeStore,
 } from './highlight-service.js';
+import { findTagDefByName } from './webclip-service.js';
 
 export interface ExtractResult {
   /** The newly created Library node. */
@@ -27,6 +26,26 @@ export interface ExtractResult {
   newText: string;
   /** Updated inline refs. */
   newInlineRefs: InlineRefEntry[];
+}
+
+/**
+ * Resolve the nearest ancestor (including self) tagged with #web_clip.
+ * Falls back to the current node when no clip ancestor exists.
+ */
+export function resolveClipNodeIdForHighlight(nodeId: string): string {
+  const webClipTagDef = findTagDefByName(null, CONTAINER_IDS.SCHEMA, 'web_clip');
+  if (!webClipTagDef) return nodeId;
+
+  let currentId: string | null = nodeId;
+  while (currentId) {
+    const node = loroDoc.toNodexNode(currentId);
+    if (node?.tags.includes(webClipTagDef.id)) {
+      return currentId;
+    }
+    currentId = loroDoc.getParentId(currentId);
+  }
+
+  return nodeId;
 }
 
 /**
@@ -52,9 +71,8 @@ export function extractToTaggedNode(
   const selectedText = view.state.doc.textBetween(from, to);
   if (!selectedText.trim()) return null;
 
-  // 1. Find the clip page ID (walk up the tree to find the nearest ancestor with #web_clip tag)
-  // For now, use the direct parent or current node context
-  const clipPageId = nodeId;
+  // 1. Resolve clip page context for #highlight Source field
+  const clipPageId = resolveClipNodeIdForHighlight(nodeId);
 
   // 2. Create the Library node based on tag type
   let newNode: NodexNode;

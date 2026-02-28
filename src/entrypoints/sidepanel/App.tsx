@@ -16,6 +16,18 @@ import { getOrCreateDefaultWorkspaceId } from '../../lib/workspace-id.js';
 import { findUnexpectedShortcutConflicts } from '../../lib/shortcut-registry.js';
 import { ensureJournalTagDefs, ensureTodayNode } from '../../lib/journal.js';
 import { ensureHighlightTagDef, ensureCommentTagDef, type HighlightNodeStore } from '../../lib/highlight-service.js';
+import { createHighlightFromPayload, buildHighlightRestorePayload } from '../../lib/highlight-sidepanel.js';
+import { findClipNodeByUrl } from '../../lib/webclip-service.js';
+import {
+  HIGHLIGHT_CREATE,
+  HIGHLIGHT_CLICK,
+  HIGHLIGHT_CHECK_URL,
+  HIGHLIGHT_RESTORE,
+  HIGHLIGHT_UNRESOLVABLE,
+  type HighlightCreatePayload,
+  type HighlightClickPayload,
+  type HighlightCheckUrlPayload,
+} from '../../lib/highlight-messaging.js';
 import { BOOTSTRAP_CONTAINER_DEFS } from '../../lib/system-node-registry.js';
 import { Toaster } from 'sonner';
 import { TooltipProvider } from '../../components/ui/Tooltip';
@@ -146,6 +158,94 @@ interface AppProps {
 export function App({ skipBootstrap = false }: AppProps) {
  const { ready } = useBootstrap(skipBootstrap);
  const selectionDismissHandlers = useGlobalSelectionDismiss();
+
+ useEffect(() => {
+  if (!chrome?.runtime?.onMessage) return;
+
+  const onHighlightMessage = (
+   message: { type?: string; payload?: unknown; _tabId?: number },
+   _sender: chrome.runtime.MessageSender,
+   sendResponse: (response?: unknown) => void,
+  ): boolean | void => {
+   if (message?.type === HIGHLIGHT_CREATE) {
+    const payload = message.payload as HighlightCreatePayload | undefined;
+    if (!payload) {
+      sendResponse({ ok: false, error: 'Missing highlight payload' });
+      return true;
+    }
+
+    (async () => {
+      try {
+        const store = useNodeStore.getState() as HighlightNodeStore;
+        ensureHighlightTagDef(store);
+        ensureCommentTagDef(store);
+        const result = await createHighlightFromPayload(payload, store);
+        sendResponse({ ok: true, nodeId: result.highlightNodeId, clipNodeId: result.clipNodeId });
+      } catch (err) {
+        const error = err instanceof Error ? err.message : String(err);
+        sendResponse({ ok: false, error });
+      }
+    })();
+    return true;
+   }
+
+   if (message?.type === HIGHLIGHT_CHECK_URL) {
+    const payload = message.payload as HighlightCheckUrlPayload | undefined;
+    if (!payload?.url || !payload.tabId) {
+      sendResponse({ ok: false, error: 'Invalid check-url payload' });
+      return true;
+    }
+
+    const store = useNodeStore.getState() as HighlightNodeStore;
+    ensureHighlightTagDef(store);
+
+    const clipNodeId = findClipNodeByUrl(payload.url);
+    if (!clipNodeId) {
+      sendResponse({ ok: true, restored: 0 });
+      return true;
+    }
+
+    const restorePayload = buildHighlightRestorePayload(clipNodeId);
+    if (restorePayload.highlights.length === 0) {
+      sendResponse({ ok: true, restored: 0 });
+      return true;
+    }
+
+    chrome.runtime.sendMessage({
+      type: HIGHLIGHT_RESTORE,
+      payload: restorePayload,
+      _tabId: payload.tabId,
+    }).then(() => {
+      sendResponse({ ok: true, restored: restorePayload.highlights.length });
+    }).catch((err: unknown) => {
+      const error = err instanceof Error ? err.message : String(err);
+      sendResponse({ ok: false, error });
+    });
+    return true;
+   }
+
+   if (message?.type === HIGHLIGHT_CLICK) {
+    const payload = message.payload as HighlightClickPayload | undefined;
+    if (payload?.id) {
+      const ui = useUIStore.getState();
+      ui.navigateTo(payload.id);
+      ui.setSelectedNode(payload.id);
+    }
+    sendResponse({ ok: true });
+    return true;
+   }
+
+   if (message?.type === HIGHLIGHT_UNRESOLVABLE) {
+    sendResponse({ ok: true });
+    return true;
+   }
+  };
+
+  chrome.runtime.onMessage.addListener(onHighlightMessage);
+  return () => {
+    chrome.runtime.onMessage.removeListener(onHighlightMessage);
+  };
+ }, []);
 
  useEffect(() => {
   if (!import.meta.env.DEV) return;

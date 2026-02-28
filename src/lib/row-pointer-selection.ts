@@ -18,7 +18,9 @@ export function resolveRowPointerSelectAction(params: {
 }
 
 export function shouldClearSelectionOnPointerDown(target: HTMLElement | null): boolean {
-  void target;
+  // Keep selection when interacting with a batch-action popup (e.g. BatchTagSelector).
+  if (target?.closest('[data-preserve-selection]')) return false;
+
   // Unmodified pointer interactions should always exit multi-selection mode.
   return true;
 }
@@ -31,5 +33,10 @@ function isOutlinerRowTarget(target: HTMLElement | null): boolean {
 export function shouldClearSelectionOnFocusIn(target: HTMLElement | null): boolean {
   // Keep selection while focus remains inside a concrete outliner row/editor.
   // Clear when focus moves to any non-row surface (sidebar, toolbar, blank chrome, etc.).
-  return !isOutlinerRowTarget(target);
+  if (isOutlinerRowTarget(target)) return false;
+
+  // Keep selection when focus moves into a batch-action popup (e.g. BatchTagSelector).
+  if (target?.closest('[data-preserve-selection]')) return false;
+
+  return true;
 }

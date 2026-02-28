@@ -154,8 +154,7 @@ export function getFieldTypeIcon(dataType: string): AppIcon {
       return List;
     case SYS_D.NUMBER:
     case FIELD_TYPES.NUMBER:
-    case SYS_D.INTEGER:
-    case FIELD_TYPES.INTEGER:
+    case SYS_D.INTEGER:  // legacy Tana import
       return Hash;
     case SYS_D.URL:
     case FIELD_TYPES.URL:
@@ -235,7 +234,7 @@ export const FIELD_TYPE_LIST: Array<{ value: string; label: string }> = [
 
 /** Get a human-readable label for a field type constant. */
 export function getFieldTypeLabel(dataType: string): string {
-  if (dataType === SYS_D.INTEGER || dataType === FIELD_TYPES.INTEGER) return 'Number';
+  if (dataType === SYS_D.INTEGER) return 'Number';  // legacy Tana import
   return FIELD_TYPE_LIST.find((t) => t.value === dataType)?.label ?? 'Plain';
 }
 
@@ -285,9 +284,8 @@ export function isNumberLikeFieldType(dataType: string | undefined): boolean {
   if (!dataType) return false;
   return (
     dataType === FIELD_TYPES.NUMBER ||
-    dataType === FIELD_TYPES.INTEGER ||
     dataType === SYS_D.NUMBER ||
-    dataType === SYS_D.INTEGER
+    dataType === SYS_D.INTEGER  // legacy Tana import
   );
 }
 
@@ -400,7 +398,7 @@ export const ATTRDEF_CONFIG_FIELDS: ConfigFieldDef[] = [
     control: 'number_input',
     icon: Hash,
     defaultValue: '',
-    appliesTo: [FIELD_TYPES.NUMBER, FIELD_TYPES.INTEGER],
+    appliesTo: [FIELD_TYPES.NUMBER],
     description: 'Warn when value is below this number',
   },
   {
@@ -409,7 +407,7 @@ export const ATTRDEF_CONFIG_FIELDS: ConfigFieldDef[] = [
     control: 'number_input',
     icon: Hash,
     defaultValue: '',
-    appliesTo: [FIELD_TYPES.NUMBER, FIELD_TYPES.INTEGER],
+    appliesTo: [FIELD_TYPES.NUMBER],
     description: 'Warn when value exceeds this number',
   },
 ];

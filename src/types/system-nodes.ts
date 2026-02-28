@@ -24,7 +24,6 @@ export const SYS_ENUMS_ROOT = 'SYS_V00';
  */
 export const FIELD_TYPES = {
   CHECKBOX: 'checkbox',
-  INTEGER: 'integer',
   DATE: 'date',
   OPTIONS_FROM_SUPERTAG: 'options_from_supertag',
   PLAIN: 'plain',
@@ -168,6 +167,7 @@ export type SystemAttribute = typeof SYS_A[keyof typeof SYS_A];
 
 export const SYS_D = {
   CHECKBOX: 'SYS_D01',
+  /** @deprecated Use SYS_D.NUMBER instead. Kept for legacy Tana import data. */
   INTEGER: 'SYS_D02',
   DATE: 'SYS_D03',
   OPTIONS_FROM_SUPERTAG: 'SYS_D05',

@@ -61,12 +61,20 @@ export default defineContentScript({
       notifyContentScriptReady();
       return;
     }
+
+    // Initialize highlight selection listener and custom elements.
+    // Non-fatal: some pages break customElements (set it to null),
+    // but webclip capture must still work.
+    try {
+      initHighlight();
+    } catch {
+      // Highlight toolbar won't work on this page, but clip capture will.
+    }
+
+    // Set guard AFTER listener registration — if initHighlight crashes,
+    // we still want the onMessage listener to be registered.
     (globalThis as any).__nodexCaptureExtId = extId;
 
-    // Initialize highlight selection listener and custom elements
-    initHighlight();
-
-    // Message listener for both webclip capture and highlight commands
     chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       // ── WebClip Capture ──
       if (message?.type === WEBCLIP_CAPTURE_PAGE) {

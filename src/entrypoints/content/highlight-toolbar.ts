@@ -94,6 +94,7 @@ const ICON_CLIP = `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="cur
 // ── Custom Element Registration ──
 
 function ensureToolbarElement(): void {
+  if (!customElements) return; // Some pages override customElements to null
   if (customElements.get('soma-toolbar')) return;
 
   class SomaToolbar extends HTMLElement {

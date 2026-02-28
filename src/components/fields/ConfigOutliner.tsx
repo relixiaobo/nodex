@@ -11,9 +11,10 @@
  * Skips config tuples (SYS_A* keys) which are handled by FieldList.
  * Same mixed field/content pattern as FieldValueOutliner.
  */
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useChildren } from '../../hooks/use-children';
 import { useNodeStore } from '../../stores/node-store';
+import { useUIStore } from '../../stores/ui-store';
 import { useNodeFields, type FieldEntry } from '../../hooks/use-node-fields';
 import { resolveDataType, getExtendsChain } from '../../lib/field-utils.js';
 import { resolveTagColor } from '../../lib/tag-colors.js';
@@ -27,6 +28,7 @@ import { shouldShowTrailingInput } from '../outliner/row-model.js';
 
 interface ConfigOutlinerProps {
   nodeId: string;
+  onNavigateOut?: (direction: 'up' | 'down') => void;
 }
 
 type MergedItem =
@@ -52,7 +54,7 @@ export function shouldShowConfigTrailingInput(
   return shouldShowTrailingInput(items);
 }
 
-export function ConfigOutliner({ nodeId }: ConfigOutlinerProps) {
+export function ConfigOutliner({ nodeId, onNavigateOut }: ConfigOutlinerProps) {
   useChildren(nodeId);
 
   const _version = useNodeStore((s) => s._version);
@@ -160,10 +162,32 @@ export function ConfigOutliner({ nodeId }: ConfigOutlinerProps) {
     [mergedItems],
   );
 
+  const setFocusedNode = useUIStore((s) => s.setFocusedNode);
+  const clearFocus = useUIStore((s) => s.clearFocus);
+  const setEditingFieldName = useUIStore((s) => s.setEditingFieldName);
+
   // Prevent border stacking: when nested FieldRows are first/last, add padding
   const firstIsField = mergedItems.length > 0 && mergedItems[0].type === 'field';
   const lastIsField = mergedItems.length > 0 && mergedItems[mergedItems.length - 1].type === 'field';
   const showTrailingInput = shouldShowConfigTrailingInput(mergedItems);
+
+  const handleTrailingNavigateOut = useCallback((direction: 'up' | 'down') => {
+    if (direction === 'up') {
+      const last = mergedItems[mergedItems.length - 1];
+      if (!last) {
+        onNavigateOut?.('up');
+        return;
+      }
+      if (last.type === 'field') {
+        clearFocus();
+        setEditingFieldName(last.id);
+        return;
+      }
+      setFocusedNode(last.id, nodeId);
+      return;
+    }
+    onNavigateOut?.('down');
+  }, [mergedItems, onNavigateOut, clearFocus, setEditingFieldName, nodeId, setFocusedNode]);
 
   return (
     <div className={`min-h-[22px]${firstIsField ? ' pt-1' : ''}${lastIsField ? ' pb-1' : ''}`}>
@@ -192,9 +216,10 @@ export function ConfigOutliner({ nodeId }: ConfigOutlinerProps) {
               nodeId={row.id}
               depth={0}
               rootChildIds={selectableRootIds}
-              parentId={row.ownerTagDefId}
+              parentId={nodeId}
               rootNodeId={nodeId}
               bulletColors={ownerColor ? [ownerColor] : undefined}
+              onNavigateOut={onNavigateOut}
             />
           );
         }}
@@ -204,6 +229,7 @@ export function ConfigOutliner({ nodeId }: ConfigOutlinerProps) {
           parentId={nodeId}
           depth={0}
           parentExpandKey={`${ownerId}:${nodeId}`}
+          onNavigateOut={handleTrailingNavigateOut}
         />
       )}
     </div>

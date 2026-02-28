@@ -133,6 +133,7 @@ export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, configNo
     const dragId = useUIStore.getState().dragNodeId;
     if (!dragId) return;
     e.preventDefault();
+    e.stopPropagation();
     e.dataTransfer.dropEffect = 'move';
     setIsDragOver(true);
   }, []);
@@ -145,6 +146,7 @@ export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, configNo
 
   const handleContainerDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
+    e.stopPropagation();
     setIsDragOver(false);
     const dragId = useUIStore.getState().dragNodeId;
     if (!dragId) return;

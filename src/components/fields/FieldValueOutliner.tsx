@@ -42,6 +42,7 @@ import * as loroDoc from '../../lib/loro-doc.js';
 import { t } from '../../i18n/strings.js';
 import { FIELD_OVERLAY_Z_INDEX, FIELD_VALUE_INSET } from './field-layout.js';
 import { shouldShowTrailingInput, type OutlinerRowItem } from '../outliner/row-model.js';
+import { useDragSelect } from '../../hooks/use-drag-select.js';
 
 interface FieldValueOutlinerProps {
   tupleId: string;
@@ -128,6 +129,9 @@ export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, configNo
   const moveNodeTo = useNodeStore((s) => s.moveNodeTo);
   const containerRef = useRef<HTMLDivElement>(null);
   const [isDragOver, setIsDragOver] = useState(false);
+
+  // Drag select: document-level mouse tracking for multi-node selection
+  useDragSelect({ containerRef, rootChildIds: selectableChildIds, rootNodeId: tupleId });
 
   const handleContainerDragOver = useCallback((e: React.DragEvent) => {
     const dragId = useUIStore.getState().dragNodeId;

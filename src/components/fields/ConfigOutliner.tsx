@@ -11,10 +11,11 @@
  * Skips config tuples (SYS_A* keys) which are handled by FieldList.
  * Same mixed field/content pattern as FieldValueOutliner.
  */
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useRef } from 'react';
 import { useChildren } from '../../hooks/use-children';
 import { useNodeStore } from '../../stores/node-store';
 import { useUIStore } from '../../stores/ui-store';
+import { useDragSelect } from '../../hooks/use-drag-select.js';
 import { useNodeFields, type FieldEntry } from '../../hooks/use-node-fields';
 import { resolveDataType, getExtendsChain } from '../../lib/field-utils.js';
 import { resolveTagColor } from '../../lib/tag-colors.js';
@@ -162,6 +163,10 @@ export function ConfigOutliner({ nodeId, onNavigateOut }: ConfigOutlinerProps) {
     [mergedItems],
   );
 
+  // Drag select: document-level mouse tracking for multi-node selection
+  const containerRef = useRef<HTMLDivElement>(null);
+  useDragSelect({ containerRef, rootChildIds: selectableRootIds, rootNodeId: nodeId });
+
   const setFocusedNode = useUIStore((s) => s.setFocusedNode);
   const clearFocus = useUIStore((s) => s.clearFocus);
   const setEditingFieldName = useUIStore((s) => s.setEditingFieldName);
@@ -190,7 +195,7 @@ export function ConfigOutliner({ nodeId, onNavigateOut }: ConfigOutlinerProps) {
   }, [mergedItems, onNavigateOut, clearFocus, setEditingFieldName, nodeId, setFocusedNode]);
 
   return (
-    <div className={`min-h-[22px]${firstIsField ? ' pt-1' : ''}${lastIsField ? ' pb-1' : ''}`}>
+    <div ref={containerRef} className={`min-h-[22px]${firstIsField ? ' pt-1' : ''}${lastIsField ? ' pb-1' : ''}`}>
       <RowHost
         rows={mergedItems}
         renderField={(row, i, rows) => {

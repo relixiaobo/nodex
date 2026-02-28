@@ -342,10 +342,34 @@ export function parseHtmlToNodes(
     // Fallback: treat as text content if it has meaningful text
     const text = el.textContent?.trim();
     if (text) {
+      const hasBlockChild = Array.from(el.children).some(isBlockElement);
+      if (hasBlockChild) {
+        resetListContext();
+        for (const child of Array.from(el.children)) {
+          processBlock(child);
+        }
+        return;
+      }
+
       const { text: t, marks, inlineRefs } = extractTextContent(el);
       const trimmed = trimContent(t, marks, inlineRefs);
       if (trimmed.text) {
+        if (inferParagraphLists) {
+          const listLike = stripListMarker(trimmed, extractIndentPx(el));
+          if (listLike) {
+            appendListLikeParagraph(listLike);
+            return;
+          }
+        }
+
         resetListContext();
+        if (inferStyledHeadings) {
+          const inferredLevel = inferHeadingLevelFromInlineStyle(el, trimmed.text, trimmed.marks);
+          if (inferredLevel !== null) {
+            appendHeadingNode(inferredLevel, trimmed);
+            return;
+          }
+        }
         appendParagraphNode(trimmed);
       }
     }
@@ -574,12 +598,14 @@ export function createContentNodes(
 /** Check if an element is a block-level element. */
 function isBlockElement(el: Element): boolean {
   const tag = el.tagName.toLowerCase();
-  return [
+  const semanticBlock = [
     'p', 'div', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
     'ul', 'ol', 'li', 'blockquote', 'pre', 'table',
     'section', 'article', 'main', 'aside', 'header', 'footer', 'nav',
     'figure', 'hr',
   ].includes(tag);
+  if (semanticBlock) return true;
+  return isStyledBlockElement(el);
 }
 
 function ensureHeadingMark(marks: TextMark[], textLength: number): TextMark[] {
@@ -685,6 +711,16 @@ function parseCssLengthToPx(input?: string | null): number {
     default:
       return value;
   }
+}
+
+function isStyledBlockElement(el: Element): boolean {
+  if (!(el instanceof HTMLElement)) return false;
+  const display = (el.style.display ?? '').trim().toLowerCase();
+  if (display === 'block' || display === 'list-item' || display === 'table' || display === 'flex' || display === 'grid') {
+    return true;
+  }
+  const indentPx = extractIndentPx(el);
+  return indentPx > 0;
 }
 
 type CssDeclarations = Record<string, string>;

@@ -238,6 +238,12 @@ describe('parseHtmlToNodes', () => {
     expect(nodes[0].children[0].children.map((n) => n.name)).toEqual(['Child']);
   });
 
+  it('splits styled block descendants into separate nodes', () => {
+    const html = '<div><span style="display:block">Line A</span><span style="display:block">Line B</span></div>';
+    const { nodes } = parseHtmlToNodes(html, { inferStyledHeadings: true, inferParagraphLists: true });
+    expect(nodes.map((n) => n.name)).toEqual(['Line A', 'Line B']);
+  });
+
   // ── Blockquote ──
 
   it('blockquote with paragraphs creates parent with children', () => {

@@ -61,36 +61,93 @@ function escapeHtml(text: string): string {
     .replaceAll('\'', '&#39;');
 }
 
-function getElementMark(el: Element): ActiveMark | null {
+function getElementTagMarks(el: Element): ActiveMark[] {
+  const marks: ActiveMark[] = [];
   const tag = el.tagName.toLowerCase();
   switch (tag) {
     case 'strong':
     case 'b':
-      return { type: 'bold' };
+      marks.push({ type: 'bold' });
+      break;
     case 'em':
     case 'i':
-      return { type: 'italic' };
+      marks.push({ type: 'italic' });
+      break;
     case 's':
     case 'strike':
     case 'del':
-      return { type: 'strike' };
+      marks.push({ type: 'strike' });
+      break;
     case 'code':
-      return { type: 'code' };
+      marks.push({ type: 'code' });
+      break;
     case 'mark':
-      return { type: 'highlight' };
+      marks.push({ type: 'highlight' });
+      break;
     case 'a': {
       const href = (el as HTMLAnchorElement).getAttribute('href') ?? '';
-      return { type: 'link', attrs: { href } };
+      marks.push({ type: 'link', attrs: { href } });
+      break;
     }
     case 'span': {
       if (el.getAttribute('data-heading-mark') === 'true') {
-        return { type: 'headingMark' };
+        marks.push({ type: 'headingMark' });
       }
-      return null;
+      break;
     }
-    default:
-      return null;
   }
+  return marks;
+}
+
+function isBoldStyle(fontWeight: string): boolean {
+  const normalized = fontWeight.trim().toLowerCase();
+  if (!normalized) return false;
+  if (normalized === 'bold' || normalized === 'bolder') return true;
+  const numeric = Number.parseInt(normalized, 10);
+  return Number.isFinite(numeric) && numeric >= 600;
+}
+
+function isHighlightedStyle(backgroundColor: string): boolean {
+  const normalized = backgroundColor.trim().toLowerCase();
+  if (!normalized) return false;
+  return normalized !== 'transparent' && normalized !== 'initial' && normalized !== 'inherit' && normalized !== 'none';
+}
+
+function getElementStyleMarks(el: Element): ActiveMark[] {
+  if (!(el instanceof HTMLElement)) return [];
+
+  const marks: ActiveMark[] = [];
+  if (isBoldStyle(el.style.fontWeight)) {
+    marks.push({ type: 'bold' });
+  }
+  if (/(italic|oblique)/i.test(el.style.fontStyle)) {
+    marks.push({ type: 'italic' });
+  }
+  const textDecoration = `${el.style.textDecoration} ${el.style.textDecorationLine}`.toLowerCase();
+  if (textDecoration.includes('line-through')) {
+    marks.push({ type: 'strike' });
+  }
+  if (isHighlightedStyle(el.style.backgroundColor)) {
+    marks.push({ type: 'highlight' });
+  }
+  return marks;
+}
+
+function getElementMarks(el: Element): ActiveMark[] {
+  const marks: ActiveMark[] = [];
+  const seen = new Set<string>();
+
+  const add = (mark: ActiveMark): void => {
+    const key = `${mark.type}:${JSON.stringify(normalizeAttrs(mark.attrs) ?? {})}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    marks.push(mark);
+  };
+
+  for (const mark of getElementTagMarks(el)) add(mark);
+  for (const mark of getElementStyleMarks(el)) add(mark);
+
+  return marks;
 }
 
 export function mergeAdjacentMarks(marks: TextMark[]): TextMark[] {
@@ -174,8 +231,8 @@ export function htmlToMarks(html: string): {
       return;
     }
 
-    const mark = getElementMark(el);
-    const nextMarks = mark ? [...activeMarks, mark] : activeMarks;
+    const marks = getElementMarks(el);
+    const nextMarks = marks.length > 0 ? [...activeMarks, ...marks] : activeMarks;
     for (const child of Array.from(el.childNodes)) {
       walk(child, nextMarks);
     }

@@ -58,13 +58,14 @@ const DEFAULT_MAX_NODES = 200;
  */
 export function parseHtmlToNodes(
   html: string,
-  options?: { maxNodes?: number },
+  options?: { maxNodes?: number; includeH1?: boolean },
 ): HtmlToNodesResult {
   if (!html || !html.trim()) {
     return { nodes: [], truncated: false };
   }
 
   const maxNodes = options?.maxNodes ?? DEFAULT_MAX_NODES;
+  const includeH1 = options?.includeH1 ?? false;
   let nodeCount = 0;
   let truncated = false;
 
@@ -113,6 +114,34 @@ export function parseHtmlToNodes(
     return { text: el.textContent?.trim() ?? '', marks: [], inlineRefs: [] };
   }
 
+  function trimContent(
+    text: string,
+    marks: TextMark[],
+    inlineRefs: InlineRefEntry[],
+  ): { text: string; marks: TextMark[]; inlineRefs: InlineRefEntry[] } {
+    const trimmed = text.trim();
+    if (!trimmed) return { text: '', marks: [], inlineRefs: [] };
+
+    const leading = text.length - text.trimStart().length;
+    const maxLen = trimmed.length;
+
+    const adjustedMarks = marks
+      .map((m) => ({
+        ...m,
+        start: Math.max(0, Math.min(maxLen, m.start - leading)),
+        end: Math.max(0, Math.min(maxLen, m.end - leading)),
+      }))
+      .filter((m) => m.end > m.start);
+    const adjustedRefs = inlineRefs
+      .map((r) => ({
+        ...r,
+        offset: r.offset - leading,
+      }))
+      .filter((r) => r.offset >= 0 && r.offset < maxLen);
+
+    return { text: trimmed, marks: adjustedMarks, inlineRefs: adjustedRefs };
+  }
+
   // Parse the HTML
   const parser = new DOMParser();
   const doc = parser.parseFromString(html, 'text/html');
@@ -144,20 +173,30 @@ export function parseHtmlToNodes(
     if (truncated) return;
     const tag = el.tagName.toLowerCase();
 
-    // Skip h1 (duplicates clip title), hr, figure/img
-    if (tag === 'h1' || tag === 'hr') return;
+    // Skip hr, figure/img
+    if (!includeH1 && tag === 'h1') return;
+    if (tag === 'hr') return;
     if (tag === 'figure' || tag === 'img' || tag === 'picture' || tag === 'video' || tag === 'audio' || tag === 'iframe') return;
 
-    // Headings h2–h6: create section parent
-    if (/^h[2-6]$/.test(tag)) {
+    // Headings h1–h6: create section parent
+    if (/^h[1-6]$/.test(tag)) {
       const level = parseInt(tag[1], 10);
       // Pop heading stack until we find a lower level (higher priority heading)
       while (headingStack.length > 0 && headingStack[headingStack.length - 1].level >= level) {
         headingStack.pop();
       }
       const { text, marks, inlineRefs } = extractContent(el);
-      if (!text.trim()) return;
-      const node = makeNode(text, marks, inlineRefs);
+      const trimmed = trimContent(text, marks, inlineRefs);
+      if (!trimmed.text) return;
+      const headingMarks: TextMark[] = [
+        ...trimmed.marks,
+        {
+          start: 0,
+          end: trimmed.text.length,
+          type: 'headingMark',
+        },
+      ];
+      const node = makeNode(trimmed.text, headingMarks, trimmed.inlineRefs);
       if (!node) return;
       getCurrentTarget().push(node);
       headingStack.push({ level, node });

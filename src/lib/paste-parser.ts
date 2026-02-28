@@ -22,10 +22,24 @@ const TABLE_SEPARATOR_RE = /^\s*\|?\s*:?-{3,}:?\s*(?:\|\s*:?-{3,}:?\s*)+\|?\s*$/
 const TAG_RE = /(^|\s)#([A-Za-z0-9][\w-]*)/g;
 const FIELD_RE = /(^|\s)([A-Za-z0-9][\w-]*)::\s*([^#\n]+?)(?=(?:\s+[A-Za-z0-9][\w-]*::)|\s+#|$)/g;
 
+interface ClipboardHtmlAnalysis {
+  hasHtml: boolean;
+  hasText: boolean;
+  hasBlockLike: boolean;
+  hasInlineFormatting: boolean;
+  hasStyledFormatting: boolean;
+  hasSemanticStructure: boolean;
+  hasListStructure: boolean;
+  isLikelyMarkdownShell: boolean;
+  normalizedText: string;
+}
+
 export function parseMultiLinePaste(plain: string, html?: string): ParsedPasteNode[] {
   const rawPlain = plain ?? '';
   const normalizedPlain = normalizeClipboardPlain(rawPlain);
   const lines = normalizedPlain.split(/\r?\n/);
+  const strongMarkdownSignals = hasStrongMarkdownSignals(normalizedPlain);
+  const htmlAnalysis = analyzeClipboardHtml(html);
   const markdownNodes = parseMarkdownDocument(lines) ?? parseMarkdownList(lines);
   const hasMarkdownNodes = !!markdownNodes && markdownNodes.length > 0;
   const debugBase = {
@@ -33,9 +47,18 @@ export function parseMultiLinePaste(plain: string, html?: string): ParsedPasteNo
     normalizedPlainPreview: previewMultiline(normalizedPlain),
     htmlPreview: previewMultiline((html ?? '').replace(/\s+/g, ' ').trim(), 8),
     hasMarkdownNodes,
+    strongMarkdownSignals,
+    htmlSignals: {
+      hasBlockLike: htmlAnalysis.hasBlockLike,
+      hasInlineFormatting: htmlAnalysis.hasInlineFormatting,
+      hasStyledFormatting: htmlAnalysis.hasStyledFormatting,
+      hasSemanticStructure: htmlAnalysis.hasSemanticStructure,
+      hasListStructure: htmlAnalysis.hasListStructure,
+      isLikelyMarkdownShell: htmlAnalysis.isLikelyMarkdownShell,
+    },
   };
 
-  if (hasMarkdownNodes && shouldPreferMarkdown(normalizedPlain, html)) {
+  if (hasMarkdownNodes && shouldPreferMarkdown(strongMarkdownSignals, htmlAnalysis)) {
     logPasteDebug('parseMultiLinePaste: markdown', {
       ...debugBase,
       reason: 'strong-markdown-signals',
@@ -44,8 +67,8 @@ export function parseMultiLinePaste(plain: string, html?: string): ParsedPasteNo
     return markdownNodes!;
   }
 
-  if (html && shouldPreferHtml(html, normalizedPlain)) {
-    const htmlNodes = parseHtmlBlocks(html);
+  if (htmlAnalysis.hasHtml && shouldPreferHtml(htmlAnalysis, normalizedPlain, strongMarkdownSignals)) {
+    const htmlNodes = parseHtmlBlocks(html ?? '');
     if (htmlNodes.length > 0) {
       logPasteDebug('parseMultiLinePaste: html', {
         ...debugBase,
@@ -280,7 +303,7 @@ export function parseHtmlBlocks(html: string): ParsedPasteNode[] {
     }
   }
 
-  const parsed = parseHtmlToNodes(html, { maxNodes: 500 });
+  const parsed = parseHtmlToNodes(html, { maxNodes: 500, includeH1: true });
   if (parsed.nodes.length > 0) {
     return parsed.nodes
       .map(enrichNodeMetadata)
@@ -466,27 +489,42 @@ function looksLikeMarkdown(lines: string[]): boolean {
   return false;
 }
 
-function shouldPreferHtml(html: string, plain: string): boolean {
-  const trimmed = html.trim();
-  if (!trimmed) return false;
+function shouldPreferHtml(
+  htmlAnalysis: ClipboardHtmlAnalysis,
+  plain: string,
+  hasStrongMarkdown: boolean,
+): boolean {
+  if (!htmlAnalysis.hasHtml || !htmlAnalysis.hasText) return false;
 
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(trimmed, 'text/html');
-  const body = doc.body;
-  if (!body || !(body.textContent ?? '').trim()) return false;
+  const hasRichHtml =
+    htmlAnalysis.hasInlineFormatting
+    || htmlAnalysis.hasStyledFormatting
+    || htmlAnalysis.hasSemanticStructure;
+  if (hasRichHtml) return true;
 
-  const hasBlockLike = !!body.querySelector('p,div,br,ul,ol,li,blockquote,pre,table,h1,h2,h3,h4,h5,h6');
-  const hasInlineFormatting = !!body.querySelector('strong,b,em,i,s,strike,del,code,a,mark');
-  if (hasBlockLike || hasInlineFormatting) return true;
+  if (!hasStrongMarkdown && htmlAnalysis.hasBlockLike) return true;
 
-  const htmlText = (body.textContent ?? '').replace(/\s+/g, ' ').trim();
   const plainText = plain.replace(/\s+/g, ' ').trim();
-  return htmlText.length > 0 && htmlText !== plainText;
+  return htmlAnalysis.normalizedText.length > 0 && htmlAnalysis.normalizedText !== plainText;
 }
 
-function shouldPreferMarkdown(plain: string, html?: string): boolean {
-  if (!html?.trim()) return true;
-  return hasStrongMarkdownSignals(plain);
+function shouldPreferMarkdown(
+  hasStrongMarkdown: boolean,
+  htmlAnalysis: ClipboardHtmlAnalysis,
+): boolean {
+  if (!hasStrongMarkdown) return false;
+  if (!htmlAnalysis.hasHtml) return true;
+  if (!htmlAnalysis.hasText) return true;
+  if (htmlAnalysis.isLikelyMarkdownShell) return true;
+
+  const hasRichHtml =
+    htmlAnalysis.hasInlineFormatting
+    || htmlAnalysis.hasStyledFormatting
+    || htmlAnalysis.hasSemanticStructure;
+  if (hasRichHtml) return false;
+
+  // If HTML only adds thin wrapper tags, markdown generally preserves user intent better.
+  return true;
 }
 
 function hasStrongMarkdownSignals(text: string): boolean {
@@ -502,6 +540,49 @@ function hasStrongMarkdownSignals(text: string): boolean {
     if (listLikeCount >= 2) return true;
   }
   return false;
+}
+
+function analyzeClipboardHtml(html?: string): ClipboardHtmlAnalysis {
+  const trimmed = html?.trim() ?? '';
+  if (!trimmed) {
+    return {
+      hasHtml: false,
+      hasText: false,
+      hasBlockLike: false,
+      hasInlineFormatting: false,
+      hasStyledFormatting: false,
+      hasSemanticStructure: false,
+      hasListStructure: false,
+      isLikelyMarkdownShell: false,
+      normalizedText: '',
+    };
+  }
+
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(trimmed, 'text/html');
+  const body = doc.body;
+  const normalizedText = (body?.textContent ?? '').replace(/\s+/g, ' ').trim();
+  const hasText = normalizedText.length > 0;
+  const hasBlockLike = !!body?.querySelector('p,div,br,ul,ol,li,blockquote,pre,table,h1,h2,h3,h4,h5,h6');
+  const hasInlineFormatting = !!body?.querySelector('strong,b,em,i,s,strike,del,code,a,mark');
+  const hasStyledFormatting = !!body?.querySelector(
+    '[style*="font-weight"],[style*="font-style"],[style*="text-decoration"],[style*="background"],[style*="font-family"]',
+  );
+  const hasSemanticStructure = !!body?.querySelector('pre,table,blockquote,h1,h2,h3,h4,h5,h6');
+  const hasListStructure = !!body?.querySelector('ul,ol,li');
+  const isLikelyMarkdownShell = hasListStructure && !hasInlineFormatting && !hasStyledFormatting && !hasSemanticStructure;
+
+  return {
+    hasHtml: true,
+    hasText,
+    hasBlockLike,
+    hasInlineFormatting,
+    hasStyledFormatting,
+    hasSemanticStructure,
+    hasListStructure,
+    isLikelyMarkdownShell,
+    normalizedText,
+  };
 }
 
 function indentToLevel(indent: string): number {

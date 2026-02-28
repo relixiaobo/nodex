@@ -134,6 +134,16 @@ describe('parseHtmlToNodes', () => {
     expect(nodes[0].name).toBe('Content');
   });
 
+  it('includeH1 option keeps h1 as heading section', () => {
+    const html = '<h1>Title</h1><p>Content</p>';
+    const { nodes } = parseHtmlToNodes(html, { includeH1: true });
+    expect(nodes).toHaveLength(1);
+    expect(nodes[0].name).toBe('Title');
+    expect(nodes[0].marks.some((m) => m.type === 'headingMark')).toBe(true);
+    expect(nodes[0].children).toHaveLength(1);
+    expect(nodes[0].children[0].name).toBe('Content');
+  });
+
   // ── Lists ──
 
   it('flat list items', () => {

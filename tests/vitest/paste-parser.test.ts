@@ -117,6 +117,14 @@ describe('paste-parser', () => {
     expect(nodes[0].children.map((n) => n.name)).toEqual(['Sub A']);
   });
 
+  it('keeps h1 as heading section for paste html', () => {
+    const nodes = parseHtmlBlocks('<h1>Main title</h1><p>Paragraph</p>');
+    expect(nodes).toHaveLength(1);
+    expect(nodes[0].name).toBe('Main title');
+    expect(nodes[0].marks.some((m) => m.type === 'headingMark')).toBe(true);
+    expect(nodes[0].children.map((n) => n.name)).toEqual(['Paragraph']);
+  });
+
   it('parses HTML pre/code block as codeBlock node', () => {
     const nodes = parseHtmlBlocks('<pre><code class="language-js">console.log(1)</code></pre>');
     expect(nodes).toHaveLength(1);
@@ -141,6 +149,26 @@ describe('paste-parser', () => {
     expect(nodes[0].children).toHaveLength(1);
     expect(nodes[0].children[0].type).toBe('codeBlock');
     expect(nodes[0].children[0].name).toBe('npm run dev:test');
+  });
+
+  it('prefers html parser when html contains rich formatting from clipboard', () => {
+    const plain = [
+      '- Bold item',
+      '- Link item',
+    ].join('\n');
+    const html = [
+      '<ul>',
+      '  <li><span style="font-weight:700">Bold item</span></li>',
+      '  <li><a href="https://example.com">Link item</a></li>',
+      '</ul>',
+    ].join('');
+
+    const nodes = parseMultiLinePaste(plain, html);
+    expect(nodes).toHaveLength(2);
+    expect(nodes[0].name).toBe('Bold item');
+    expect(nodes[0].marks.some((m) => m.type === 'bold')).toBe(true);
+    expect(nodes[1].name).toBe('Link item');
+    expect(nodes[1].marks.some((m) => m.type === 'link')).toBe(true);
   });
 
   it('normalizes bullet-wrapped markdown lines from clipboard shells', () => {

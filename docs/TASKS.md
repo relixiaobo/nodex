@@ -118,6 +118,7 @@ _(空)_
 - [x] **数据模型简化** — 4 个模板字段（Source/Anchor/Color/Page URL）→ 1 个 Clip 字段（options_from_supertag → #web_clip）+ anchor 存 description + 颜色使用 tagDef 自身颜色 ✅（2026-02-28）
 - [x] **重命名 #web_clip → #source** — 标签名、字段名（Clip→Source）、导出函数名全部统一 ✅（2026-02-28）
 - [x] **Highlight 下一轮优化**（`cc/highlight-polish`, PR #114）— Clip Page 失效 + 网页工具栏不出现 + 删除不清理 DOM + SPA 导航残留 + anchor 无法还原无反馈 + 多 tab 竞态去重 ✅（2026-02-28）
+- [ ] **Highlight 交互重设计 — Readwise 风格**（`cc/highlight-readwise-ux`）— 参考 Readwise Reader 重做网页高亮交互
 
 #### AI Chat & 网页辅助 (#29 + #31)
 > 浏览器 + AI = soma 的第二个差异化维度。不只是聊天框，而是理解上下文的知识助手。

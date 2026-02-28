@@ -636,6 +636,7 @@ export function toNodexNode(nodexId: string): NodexNode | null {
     searchContext: data.get('searchContext') as string | undefined,
     aiSummary: data.get('aiSummary') as string | undefined,
     sourceUrl: data.get('sourceUrl') as string | undefined,
+    codeLanguage: data.get('codeLanguage') as string | undefined,
     targetId: data.get('targetId') as string | undefined,
     fieldDefId: data.get('fieldDefId') as string | undefined,
     showCheckbox: data.get('showCheckbox') as boolean | undefined,

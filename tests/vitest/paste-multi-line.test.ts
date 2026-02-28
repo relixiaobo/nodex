@@ -126,6 +126,25 @@ describe('createSiblingNodesFromPaste — parsed paste nodes', () => {
     expect(loroDoc.toNodexNode(valueNodeId)?.name).toBe('High');
   });
 
+  it('persists code block node type and language', () => {
+    const store = useNodeStore.getState();
+    const parentId = loroDoc.getParentId('subtask_1a')!;
+
+    store.createSiblingNodesFromPaste('subtask_1a', [
+      node('const x = 1;', {
+        type: 'codeBlock',
+        codeLanguage: 'ts',
+      }),
+    ]);
+
+    const children = loroDoc.getChildren(parentId);
+    const idx = children.indexOf('subtask_1a');
+    const created = loroDoc.toNodexNode(children[idx + 1]);
+    expect(created?.type).toBe('codeBlock');
+    expect(created?.codeLanguage).toBe('ts');
+    expect(created?.name).toBe('const x = 1;');
+  });
+
   it('preserves tree invariants after parsed paste', () => {
     const store = useNodeStore.getState();
     store.createSiblingNodesFromPaste('subtask_1a', [

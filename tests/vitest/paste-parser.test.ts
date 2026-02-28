@@ -73,6 +73,38 @@ describe('paste-parser', () => {
     expect(nodes[0].marks.some((m) => m.type === 'bold')).toBe(true);
   });
 
+  it('parses fenced markdown code block as codeBlock node', () => {
+    const nodes = parseMultiLinePaste([
+      '```ts',
+      'const answer = 42;',
+      'console.log(answer);',
+      '```',
+    ].join('\n'));
+
+    expect(nodes).toHaveLength(1);
+    expect(nodes[0].type).toBe('codeBlock');
+    expect(nodes[0].codeLanguage).toBe('ts');
+    expect(nodes[0].name).toBe('const answer = 42;\nconsole.log(answer);');
+    expect(nodes[0].marks).toEqual([]);
+  });
+
+  it('parses fenced code block under heading section', () => {
+    const nodes = parseMultiLinePaste([
+      '## 示例',
+      '```css',
+      '.card {',
+      '  color: red;',
+      '}',
+      '```',
+    ].join('\n'));
+
+    expect(nodes).toHaveLength(1);
+    expect(nodes[0].name).toBe('示例');
+    expect(nodes[0].children).toHaveLength(1);
+    expect(nodes[0].children[0].type).toBe('codeBlock');
+    expect(nodes[0].children[0].codeLanguage).toBe('css');
+  });
+
   it('parses HTML paragraphs and keeps marks', () => {
     const nodes = parseHtmlBlocks('<p>Hello <strong>World</strong></p><p>Next</p>');
     expect(nodes.map((n) => n.name)).toEqual(['Hello World', 'Next']);
@@ -83,6 +115,15 @@ describe('paste-parser', () => {
     const nodes = parseHtmlBlocks('<ul><li>Item 1<ul><li>Sub A</li></ul></li><li>Item 2</li></ul>');
     expect(nodes.map((n) => n.name)).toEqual(['Item 1', 'Item 2']);
     expect(nodes[0].children.map((n) => n.name)).toEqual(['Sub A']);
+  });
+
+  it('parses HTML pre/code block as codeBlock node', () => {
+    const nodes = parseHtmlBlocks('<pre><code class="language-js">console.log(1)</code></pre>');
+    expect(nodes).toHaveLength(1);
+    expect(nodes[0].type).toBe('codeBlock');
+    expect(nodes[0].codeLanguage).toBe('js');
+    expect(nodes[0].name).toBe('console.log(1)');
+    expect(nodes[0].marks).toEqual([]);
   });
 
   it('parses single-line HTML with inline formatting', () => {

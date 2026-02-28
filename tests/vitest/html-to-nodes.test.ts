@@ -193,16 +193,13 @@ describe('parseHtmlToNodes', () => {
 
   // ── Code blocks ──
 
-  it('pre > code block becomes code-marked node', () => {
+  it('pre > code block becomes codeBlock node with language', () => {
     const html = '<pre><code>const x = 42;\nconsole.log(x);</code></pre>';
     const { nodes } = parseHtmlToNodes(html);
     expect(nodes).toHaveLength(1);
     expect(nodes[0].name).toContain('const x = 42;');
-    expect(nodes[0].marks).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ type: 'code' }),
-      ]),
-    );
+    expect(nodes[0].type).toBe('codeBlock');
+    expect(nodes[0].marks).toEqual([]);
   });
 
   it('pre without code child still works', () => {
@@ -210,6 +207,7 @@ describe('parseHtmlToNodes', () => {
     const { nodes } = parseHtmlToNodes(html);
     expect(nodes).toHaveLength(1);
     expect(nodes[0].name).toBe('plain preformatted text');
+    expect(nodes[0].type).toBe('codeBlock');
   });
 
   // ── Skipped elements ──
@@ -384,6 +382,26 @@ describe('createContentNodes', () => {
         expect.objectContaining({ type: 'bold', start: 0, end: 4 }),
       ]),
     );
+  });
+
+  it('persists codeBlock type metadata when creating nodes', () => {
+    const parentId = 'inbox_1';
+    const nodes = [
+      {
+        name: 'console.log("hello")',
+        marks: [],
+        inlineRefs: [],
+        children: [],
+        type: 'codeBlock' as const,
+        codeLanguage: 'javascript',
+      },
+    ];
+
+    const ids = createContentNodes(parentId, nodes);
+    const created = loroDoc.toNodexNode(ids[0]);
+    expect(created?.type).toBe('codeBlock');
+    expect(created?.codeLanguage).toBe('javascript');
+    expect(created?.name).toBe('console.log("hello")');
   });
 
   it('empty nodes array returns empty ids', () => {

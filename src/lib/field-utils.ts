@@ -9,7 +9,7 @@ import {
   type AppIcon,
   AlignLeft, Building2, Calendar, CalendarCheck, CalendarClock, CalendarPlus,
   CheckSquare, ChevronDown, FileText, Hash, Link, List, ListTree, Mail, Palette,
-  Play, Asterisk, EyeOff, Search, Settings2, SquareUser, Sparkles, Tag, ToggleLeft, UserPen,
+  Play, Asterisk, EyeOff, Search, Settings2, SquareUser, Sparkles, Tag, ToggleLeft, UserPen, Code2,
 } from './icons.js';
 import { SYS_A, SYS_D, SYS_V, FIELD_TYPES } from '../types/index.js';
 import type { NodexNode } from '../types/index.js';
@@ -93,7 +93,8 @@ export function resolveTaggedNodes(tagDefId: string): string[] {
   const result: string[] = [];
   for (const id of loroDoc.getAllNodeIds()) {
     const node = loroDoc.toNodexNode(id);
-    if (!node || node.type) continue; // skip structural nodes
+    if (!node) continue;
+    if (node.type && node.type !== 'codeBlock') continue; // skip structural/schema nodes
     if (node.tags.includes(tagDefId)) result.push(id);
   }
   return result;
@@ -184,6 +185,9 @@ export function resolveNodeStructuralIcon(node: NodexNode): AppIcon | null {
   }
   if (node.type === 'search') {
     return Search;
+  }
+  if (node.type === 'codeBlock') {
+    return Code2;
   }
   return null;
 }

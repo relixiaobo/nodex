@@ -2067,6 +2067,7 @@ export function OutlinerItem({
   const nodeDisplayText = isOptionsValueNode ? (selectedOptionName || nodeText) : nodeText;
   const nodeMarks = effectiveNode?.marks ?? [];
   const nodeInlineRefs = effectiveNode?.inlineRefs ?? [];
+  const isCodeBlock = effectiveNode?.type === 'codeBlock';
   const nodeContentHtml = marksToHtml(
     nodeDisplayText,
     isOptionsValueNode ? [] : nodeMarks,
@@ -2156,12 +2157,12 @@ export function OutlinerItem({
             </span>
           )}
           <div
-            className={`relative flex-1 min-w-0 ${isPendingConversion ? 'ref-converting' : ''} ${isDone ? 'text-foreground/40' : ''}`}
+            className={`relative flex-1 min-w-0 ${isPendingConversion ? 'ref-converting' : ''} ${isDone ? 'text-foreground/40' : ''} ${isCodeBlock ? 'code-block-row' : ''}`}
             style={pendingConversionStyle}
           >
             <div
               ref={contentAreaRef}
-              className={`text-[15px] leading-6 ${!isCheckboxFieldType(fieldDataType) && !isFocused ? (isReferenceLikeRow ? 'cursor-default' : 'cursor-text') : ''}`}
+              className={`text-[15px] leading-6 ${isCodeBlock ? 'code-block-container' : ''} ${!isCheckboxFieldType(fieldDataType) && !isFocused ? (isReferenceLikeRow ? 'cursor-default' : 'cursor-text') : ''}`}
               onMouseDown={!isCheckboxFieldType(fieldDataType) ? (isFocused ? handleFocusedContentMouseDown : handleContentMouseDown) : undefined}
               onClick={!isCheckboxFieldType(fieldDataType) && !isFocused ? handleContentClick : undefined}
               onDoubleClick={!isCheckboxFieldType(fieldDataType) && !isFocused && isReference && !isOptionsValueNode ? handleContentDoubleClick : undefined}
@@ -2193,31 +2194,31 @@ export function OutlinerItem({
                   onArrowDown={handleArrowDown}
                   onMoveUp={handleMoveUp}
                   onMoveDown={handleMoveDown}
-                  onHashTag={handleHashTag}
-                  onHashTagDeactivate={handleHashTagDeactivate}
+                  onHashTag={isCodeBlock ? undefined : handleHashTag}
+                  onHashTagDeactivate={isCodeBlock ? undefined : handleHashTagDeactivate}
                   hashTagActive={hashTagOpen}
-                  onHashTagConfirm={handleHashTagConfirm}
-                  onHashTagNavDown={handleHashTagNavDown}
-                  onHashTagNavUp={handleHashTagNavUp}
-                  onHashTagCreate={handleHashTagForceCreate}
-                  onHashTagClose={handleHashTagClose}
-                  onFieldTriggerFire={handleFieldTriggerFire}
+                  onHashTagConfirm={isCodeBlock ? undefined : handleHashTagConfirm}
+                  onHashTagNavDown={isCodeBlock ? undefined : handleHashTagNavDown}
+                  onHashTagNavUp={isCodeBlock ? undefined : handleHashTagNavUp}
+                  onHashTagCreate={isCodeBlock ? undefined : handleHashTagForceCreate}
+                  onHashTagClose={isCodeBlock ? undefined : handleHashTagClose}
+                  onFieldTriggerFire={isCodeBlock ? undefined : handleFieldTriggerFire}
                   editorRef={editorRef}
-                  onReference={handleReference}
-                  onReferenceDeactivate={handleReferenceDeactivate}
+                  onReference={isCodeBlock ? undefined : handleReference}
+                  onReferenceDeactivate={isCodeBlock ? undefined : handleReferenceDeactivate}
                   referenceActive={refOpen}
-                  onReferenceConfirm={handleReferenceConfirm}
-                  onReferenceNavDown={handleReferenceNavDown}
-                  onReferenceNavUp={handleReferenceNavUp}
-                  onReferenceCreate={handleReferenceForceCreate}
-                  onReferenceClose={handleReferenceClose}
-                  onSlashCommand={handleSlashCommand}
-                  onSlashCommandDeactivate={handleSlashDeactivate}
+                  onReferenceConfirm={isCodeBlock ? undefined : handleReferenceConfirm}
+                  onReferenceNavDown={isCodeBlock ? undefined : handleReferenceNavDown}
+                  onReferenceNavUp={isCodeBlock ? undefined : handleReferenceNavUp}
+                  onReferenceCreate={isCodeBlock ? undefined : handleReferenceForceCreate}
+                  onReferenceClose={isCodeBlock ? undefined : handleReferenceClose}
+                  onSlashCommand={isCodeBlock ? undefined : handleSlashCommand}
+                  onSlashCommandDeactivate={isCodeBlock ? undefined : handleSlashDeactivate}
                   slashActive={slashOpen}
-                  onSlashConfirm={handleSlashConfirm}
-                  onSlashNavDown={handleSlashNavDown}
-                  onSlashNavUp={handleSlashNavUp}
-                  onSlashClose={closeSlashMenu}
+                  onSlashConfirm={isCodeBlock ? undefined : handleSlashConfirm}
+                  onSlashNavDown={isCodeBlock ? undefined : handleSlashNavDown}
+                  onSlashNavUp={isCodeBlock ? undefined : handleSlashNavUp}
+                  onSlashClose={isCodeBlock ? undefined : closeSlashMenu}
                   onDescriptionEdit={handleDescriptionEdit}
                   onToggleDone={handleCycleCheckbox}
                   onEscapeSelect={handleEscapeSelect}
@@ -2227,7 +2228,7 @@ export function OutlinerItem({
                 />
               ) : nodeContentHtml ? (
                 <span
-                  className="node-content"
+                  className={`node-content ${isCodeBlock ? 'code-block-content' : ''}`}
                   dangerouslySetInnerHTML={{ __html: nodeContentHtml }}
                 />
               ) : hasTags ? (

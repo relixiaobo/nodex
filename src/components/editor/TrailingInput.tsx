@@ -510,6 +510,8 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
                         name: firstParsed.name,
                         marks: firstParsed.marks,
                         inlineRefs: firstParsed.inlineRefs,
+                        type: firstParsed.type,
+                        codeLanguage: firstParsed.codeLanguage,
                     });
                     ref.setExpanded(ref.effectiveParentEK, true, true);
                     ref.applyParsedPasteMetadata(firstNode.id, firstParsed, { commit: false });

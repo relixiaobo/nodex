@@ -14,6 +14,7 @@ export type ParsedPasteNode = ParsedContentNode & {
 
 const LIST_LINE_RE = /^(\s*)(?:[-*+]|\d+\.)\s+(.+)$/;
 const HEADING_RE = /^\s{0,3}(#{1,6})\s+(.+)$/;
+const FENCED_CODE_RE = /^\s*(```+|~~~+)\s*([A-Za-z0-9_+-]*)\s*$/;
 const TABLE_ROW_RE = /^\s*\|.*\|\s*$/;
 const TABLE_SEPARATOR_RE = /^\s*\|?\s*:?-{3,}:?\s*(?:\|\s*:?-{3,}:?\s*)+\|?\s*$/;
 const TAG_RE = /(^|\s)#([A-Za-z0-9][\w-]*)/g;
@@ -92,6 +93,7 @@ function parseMarkdownDocument(lines: string[]): ParsedPasteNode[] | null {
   const roots: ParsedPasteNode[] = [];
   const headingStack: Array<{ level: number; node: ParsedPasteNode }> = [];
   const listStack: Array<{ level: number; node: ParsedPasteNode }> = [];
+  let codeFenceState: { token: string; language?: string; lines: string[] } | null = null;
 
   const appendToCurrentSection = (node: ParsedPasteNode): void => {
     if (listStack.length > 0) {
@@ -105,7 +107,33 @@ function parseMarkdownDocument(lines: string[]): ParsedPasteNode[] | null {
     roots.push(node);
   };
 
+  const flushCodeFence = (): void => {
+    if (!codeFenceState) return;
+    appendToCurrentSection(createCodeBlockNode(codeFenceState.lines.join('\n'), codeFenceState.language));
+    codeFenceState = null;
+  };
+
   for (const rawLine of normalized) {
+    const fenceMatch = rawLine.match(FENCED_CODE_RE);
+    if (codeFenceState) {
+      if (fenceMatch && isFenceTerminator(codeFenceState.token, fenceMatch[1])) {
+        flushCodeFence();
+      } else {
+        codeFenceState.lines.push(rawLine);
+      }
+      continue;
+    }
+
+    if (fenceMatch) {
+      listStack.length = 0;
+      codeFenceState = {
+        token: fenceMatch[1],
+        language: normalizeCodeLanguage(fenceMatch[2]),
+        lines: [],
+      };
+      continue;
+    }
+
     if (!rawLine.trim()) {
       listStack.length = 0;
       continue;
@@ -181,6 +209,8 @@ function parseMarkdownDocument(lines: string[]): ParsedPasteNode[] | null {
     listStack.length = 0;
     appendToCurrentSection(createMarkdownNode(rawLine.trim()));
   }
+
+  flushCodeFence();
 
   const meaningful = roots.filter(isMeaningfulNode);
   return meaningful.length > 0 ? meaningful : null;
@@ -265,6 +295,17 @@ function enrichNodeMetadata(node: ParsedContentNode): ParsedPasteNode {
     .map(enrichNodeMetadata)
     .filter(isMeaningfulNode);
 
+  if (node.type === 'codeBlock') {
+    return {
+      name: node.name,
+      marks: [],
+      inlineRefs: [],
+      children,
+      type: 'codeBlock',
+      ...(node.codeLanguage ? { codeLanguage: node.codeLanguage } : {}),
+    };
+  }
+
   // Keep existing mark offsets safe: only strip tag/field tokens when the node
   // has plain text content (no marks / inline refs).
   if ((node.marks?.length ?? 0) > 0 || (node.inlineRefs?.length ?? 0) > 0) {
@@ -273,6 +314,8 @@ function enrichNodeMetadata(node: ParsedContentNode): ParsedPasteNode {
       marks: node.marks,
       inlineRefs: node.inlineRefs,
       children,
+      ...(node.type ? { type: node.type } : {}),
+      ...(node.codeLanguage ? { codeLanguage: node.codeLanguage } : {}),
     };
   }
 
@@ -282,6 +325,8 @@ function enrichNodeMetadata(node: ParsedContentNode): ParsedPasteNode {
     marks: node.marks,
     inlineRefs: node.inlineRefs,
     children,
+    ...(node.type ? { type: node.type } : {}),
+    ...(node.codeLanguage ? { codeLanguage: node.codeLanguage } : {}),
     ...(extracted.tags.length > 0 ? { tags: extracted.tags } : {}),
     ...(extracted.fields.length > 0 ? { fields: extracted.fields } : {}),
   };
@@ -351,6 +396,17 @@ function parseInlineMarkdown(content: string): {
   return htmlToMarks(withStrike);
 }
 
+function createCodeBlockNode(content: string, language?: string): ParsedPasteNode {
+  return {
+    name: content,
+    marks: [],
+    inlineRefs: [],
+    children: [],
+    type: 'codeBlock',
+    ...(language ? { codeLanguage: language } : {}),
+  };
+}
+
 function looksLikeMarkdown(lines: string[]): boolean {
   let hintCount = 0;
   for (const line of lines) {
@@ -358,6 +414,7 @@ function looksLikeMarkdown(lines: string[]): boolean {
     if (!trimmed) continue;
     if (HEADING_RE.test(trimmed)) hintCount += 1;
     else if (LIST_LINE_RE.test(line)) hintCount += 1;
+    else if (FENCED_CODE_RE.test(line)) hintCount += 1;
     else if (TABLE_ROW_RE.test(line)) hintCount += 1;
     else if (/(\*\*[^*]+\*\*)|(`[^`]+`)|(\[[^\]]+\]\(https?:\/\/[^\s)]+\))/.test(trimmed)) hintCount += 1;
     if (hintCount >= 1) return true;
@@ -404,9 +461,18 @@ function escapeHtml(text: string): string {
     .replaceAll('\'', '&#39;');
 }
 
+function isFenceTerminator(openToken: string, closeToken: string): boolean {
+  return closeToken[0] === openToken[0] && closeToken.length >= openToken.length;
+}
+
+function normalizeCodeLanguage(raw?: string): string | undefined {
+  const normalized = raw?.trim().toLowerCase();
+  return normalized ? normalized : undefined;
+}
+
 function isMeaningfulNode(node: ParsedPasteNode): boolean {
   return (
-    node.name.trim().length > 0
+    (node.type === 'codeBlock' ? node.name.length > 0 : node.name.trim().length > 0)
     || node.children.length > 0
     || (node.tags?.length ?? 0) > 0
     || (node.fields?.length ?? 0) > 0

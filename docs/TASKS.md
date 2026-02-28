@@ -26,13 +26,26 @@ _(空)_
 
 ## Agent 状态
 
-_(无活跃 Agent)_
+| Agent | 分支 | 任务 | 锁定文件 | 状态 |
+|---|---|---|---|---|
+| codex | `codex/paste-code-block-node` | Paste Phase 3（Code Block Node） | `src/stores/node-store.ts`, `src/components/outliner/OutlinerItem.tsx`, `src/types/node.ts`, `src/lib/paste-parser.ts` | 开发完成，待 nodex review |
 
 ---
 
 ## 进行中
 
-_(见 Agent 状态表)_
+### Paste Phase 3（Code Block Node）
+
+- [x] 基于 `origin/main` 建分支并迁移 Paste Phase 2 代码基线
+- [x] 引入 `codeBlock` 一等节点类型（`NodeType` + `codeLanguage`）
+- [x] 粘贴解析支持 fenced code 与 HTML `<pre><code>` 产出 codeBlock 节点
+- [x] store 粘贴创建链路支持持久化 `type/codeLanguage`
+- [x] Outliner 渲染支持 code block（图标 + 样式 + 编辑态禁用 #/@/slash 触发）
+- [x] Vitest 覆盖（parser/store/node-type/html-to-nodes）
+- [x] 自测通过：`typecheck` → `check:test-sync` → `test:run` → `build`
+- 迭代日志：
+  - [2026-02-28 codex] 基于 `origin/main@444aa10` 新建分支 `codex/paste-code-block-node`，迁移 Paste Phase 2 提交作为基线，避免旧分支与主线分叉导致的上下文偏差。
+  - [2026-02-28 codex] 完成 code block 一等节点落地：新增 `codeBlock` 类型与 `codeLanguage` 属性；`paste-parser` 增加 fenced code / `<pre><code>` 识别；`createSiblingNodesFromPaste` 与 `createChild` 支持 typed rich text；Outliner 增加 code block 视觉与触发器隔离；补齐回归测试并全量通过。
 
 ---
 
@@ -242,7 +255,8 @@ _(见 Agent 状态表)_
 
 - [x] Phase 0: 单行 URL 智能粘贴 + ⌘⇧V 纯文本 ✅（2026-02-27）
 - [x] Phase 1: 多行拆分为节点 ✅（2026-02-27）
-- [ ] Phase 2: 粘贴系统重做 — `paste-parser.ts` 纯函数解析（Markdown 层级 + HTML marks + `#tag` / `field:: value` 识别）+ store `createSiblingNodesFromPaste` 支持树结构 + marks + tag/field 应用 + 接入 RichTextEditor / TrailingInput / OutlinerItem
+- [x] Phase 2: 粘贴系统重做 — `paste-parser.ts` 纯函数解析（Markdown 层级 + HTML marks + `#tag` / `field:: value` 识别）+ store `createSiblingNodesFromPaste` 支持树结构 + marks + tag/field 应用 + 接入 RichTextEditor / TrailingInput / OutlinerItem ✅（2026-02-28，PR #109）
+- [x] Phase 3: Code Block 一等节点（`codeBlock` + `codeLanguage`，支持 fenced code / `<pre><code>` 粘贴）✅（2026-02-28，待 PR）
 
 #### 性能基线测量
 > **产出**: `docs/research/performance-baseline.md`

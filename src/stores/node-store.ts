@@ -318,7 +318,7 @@ function getTemplateContentNodes(tagDefId: string): string[] {
   const children = loroDoc.getChildren(tagDefId);
   return children.filter((cid) => {
     const c = loroDoc.toNodexNode(cid);
-    return !!c && !c.type;
+    return !!c && (c.type === undefined || c.type === 'codeBlock');
   });
 }
 
@@ -476,12 +476,14 @@ function cloneTemplateContentNodeShallow(parentId: string, templateNodeId: strin
   if (findTemplateContentClone(parentId, templateNodeId)) return;
 
   const template = loroDoc.toNodexNode(templateNodeId);
-  if (!template || template.type) return;
+  if (!template || (template.type !== undefined && template.type !== 'codeBlock')) return;
 
   const clonedId = nanoid();
   loroDoc.createNode(clonedId, parentId);
   loroDoc.setNodeDataBatch(clonedId, {
     templateId: templateNodeId,
+    ...(template.type !== undefined && { type: template.type }),
+    ...(template.codeLanguage !== undefined && { codeLanguage: template.codeLanguage }),
     ...(template.description !== undefined && { description: template.description }),
     ...(template.viewMode !== undefined && { viewMode: template.viewMode }),
     ...(template.editMode !== undefined && { editMode: template.editMode }),
@@ -753,7 +755,8 @@ export const useNodeStore = create<NodeStore>((set, get) => {
         const { type, name, description, marks, inlineRefs, ...rest } = data;
         const batch: Record<string, unknown> = {};
         if (type !== undefined) batch.type = type;
-        const shouldPersistLegacyName = type !== undefined && name !== undefined && marks === undefined && inlineRefs === undefined;
+        const supportsRichText = type === undefined || type === 'codeBlock';
+        const shouldPersistLegacyName = !supportsRichText && name !== undefined && marks === undefined && inlineRefs === undefined;
         if (shouldPersistLegacyName) batch.name = name;
         if (description !== undefined) batch.description = description;
         Object.assign(batch, rest);
@@ -761,7 +764,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
           loroDoc.setNodeDataBatch(id, batch);
         }
 
-        const shouldWriteRichText = type === undefined && (name !== undefined || marks !== undefined || inlineRefs !== undefined);
+        const shouldWriteRichText = supportsRichText && (name !== undefined || marks !== undefined || inlineRefs !== undefined);
         if (shouldWriteRichText) {
           loroDoc.setNodeRichTextContent(
             id,
@@ -814,6 +817,13 @@ export const useNodeStore = create<NodeStore>((set, get) => {
       const siblings = loroDoc.getChildren(parentId);
       const baseIdx = siblings.indexOf(afterNodeId);
       const startAt = baseIdx >= 0 ? baseIdx + 1 : siblings.length;
+      const persistParsedNodeType = (nodeId: string, item: ParsedPasteNode): void => {
+        if (!item.type && !item.codeLanguage) return;
+        const batch: Record<string, unknown> = {};
+        if (item.type) batch.type = item.type;
+        if (item.codeLanguage) batch.codeLanguage = item.codeLanguage;
+        loroDoc.setNodeDataBatch(nodeId, batch);
+      };
 
       const createRecursive = (parentNodeId: string, items: ParsedPasteNode[], startIndex?: number): void => {
         for (let i = 0; i < items.length; i++) {
@@ -828,6 +838,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
           const index = startIndex !== undefined ? startIndex + i : undefined;
           const id = nanoid();
           loroDoc.createNode(id, parentNodeId, index);
+          persistParsedNodeType(id, item);
           loroDoc.setNodeRichTextContent(id, item.name, item.marks ?? [], item.inlineRefs ?? []);
           applyParsedPasteMetadataMutationsNoCommit(id, item);
           if (item.children.length > 0) {
@@ -841,6 +852,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
         const item = filteredTopLevel[i];
         const id = nanoid();
         loroDoc.createNode(id, parentId, startAt + i);
+        persistParsedNodeType(id, item);
         loroDoc.setNodeRichTextContent(id, item.name, item.marks ?? [], item.inlineRefs ?? []);
         applyParsedPasteMetadataMutationsNoCommit(id, item);
         if (item.children.length > 0) {
@@ -947,7 +959,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
           } else if (node?.type === 'fieldEntry' && node.fieldDefId) {
             // fieldEntry child of tagDef (UI layout)
             cascadeTemplateFieldDeletion(parentId, nodeId, node.fieldDefId);
-          } else if (node && !node.type) {
+          } else if (node && (node.type === undefined || node.type === 'codeBlock')) {
             // Plain content node (default content)
             cascadeTemplateContentDeletion(parentId, nodeId);
           }

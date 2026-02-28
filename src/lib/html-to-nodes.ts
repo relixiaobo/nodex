@@ -26,6 +26,10 @@ export interface ParsedContentNode {
   inlineRefs: InlineRefEntry[];
   /** Child nodes (heading sections, list items, blockquote children) */
   children: ParsedContentNode[];
+  /** Optional structural type for special block rendering. */
+  type?: 'codeBlock';
+  /** Optional language hint for code blocks (e.g. "ts", "python"). */
+  codeLanguage?: string;
 }
 
 export interface HtmlToNodesResult {
@@ -79,10 +83,18 @@ export function parseHtmlToNodes(
     marks: TextMark[] = [],
     inlineRefs: InlineRefEntry[] = [],
     children: ParsedContentNode[] = [],
+    options?: { type?: ParsedContentNode['type']; codeLanguage?: string },
   ): ParsedContentNode | null {
     if (!canCreate()) return null;
     nodeCount++;
-    return { name, marks, inlineRefs, children };
+    return {
+      name,
+      marks,
+      inlineRefs,
+      children,
+      ...(options?.type ? { type: options.type } : {}),
+      ...(options?.codeLanguage ? { codeLanguage: options.codeLanguage } : {}),
+    };
   }
 
   /** Extract text + marks from an element's innerHTML using htmlToMarks. */
@@ -320,7 +332,11 @@ export function parseHtmlToNodes(
     const codeEl = el.querySelector('code');
     const text = (codeEl ?? el).textContent ?? '';
     if (!text.trim()) return;
-    const node = makeNode(text, [{ start: 0, end: text.length, type: 'code' }]);
+    const codeLanguage = extractCodeLanguage(codeEl ?? el);
+    const node = makeNode(text, [], [], [], {
+      type: 'codeBlock',
+      codeLanguage,
+    });
     if (node) getCurrentTarget().push(node);
   }
 
@@ -391,6 +407,13 @@ export function createContentNodes(
         topIds.push(nodeId);
       }
 
+      if (item.type || item.codeLanguage) {
+        const batch: Record<string, unknown> = {};
+        if (item.type) batch.type = item.type;
+        if (item.codeLanguage) batch.codeLanguage = item.codeLanguage;
+        loroDoc.setNodeDataBatch(nodeId, batch);
+      }
+
       // Set content
       if (item.name || item.marks.length > 0 || item.inlineRefs.length > 0) {
         loroDoc.setNodeRichTextContent(nodeId, item.name, item.marks, item.inlineRefs);
@@ -422,4 +445,15 @@ function isBlockElement(el: Element): boolean {
     'section', 'article', 'main', 'aside', 'header', 'footer', 'nav',
     'figure', 'hr',
   ].includes(tag);
+}
+
+function extractCodeLanguage(el: Element): string | undefined {
+  const direct = el.getAttribute('data-language') ?? el.getAttribute('data-lang');
+  if (direct?.trim()) return direct.trim().toLowerCase();
+
+  const className = el.getAttribute('class') ?? '';
+  const match = className.match(/(?:^|\s)(?:language|lang)-([A-Za-z0-9_+-]+)(?:\s|$)/);
+  if (match?.[1]) return match[1].toLowerCase();
+
+  return undefined;
 }

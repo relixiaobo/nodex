@@ -1,8 +1,10 @@
 /**
- * Floating highlight toolbar — Shadow DOM isolated custom element.
+ * Floating highlight toolbar — Shadow DOM isolated element.
  *
  * Displays 3 action buttons (Highlight / Note / Clip) near the user's
- * text selection. Uses Closed Shadow DOM to prevent style leaking.
+ * text selection. Uses Closed Shadow DOM on a regular <div> to prevent
+ * style leaking. Does NOT use Custom Elements API (unavailable in
+ * Chrome content script isolated world).
  */
 
 // ── Types ──
@@ -11,7 +13,8 @@ export type ToolbarActionCallback = (action: string) => void;
 
 // ── State ──
 
-let toolbarElement: HTMLElement | null = null;
+let toolbarElement: HTMLDivElement | null = null;
+let shadowRoot: ShadowRoot | null = null;
 let actionCallback: ToolbarActionCallback | null = null;
 
 // ── Styles ──
@@ -91,70 +94,59 @@ const ICON_HIGHLIGHT = `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke
 const ICON_NOTE = `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>`;
 const ICON_CLIP = `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></svg>`;
 
-// ── Custom Element Registration ──
-
-function ensureToolbarElement(): void {
-  if (!window.customElements) return;
-  if (window.customElements.get('soma-toolbar')) return;
-
-  class SomaToolbar extends HTMLElement {
-    shadow: ShadowRoot;
-
-    constructor() {
-      super();
-      this.shadow = this.attachShadow({ mode: 'closed' });
-
-      const style = document.createElement('style');
-      style.textContent = TOOLBAR_STYLES;
-
-      const bar = document.createElement('div');
-      bar.className = 'soma-floating-bar';
-
-      // Highlight button
-      const highlightBtn = createButton('highlight', ICON_HIGHLIGHT, 'Highlight');
-      // Note button
-      const noteBtn = createButton('note', ICON_NOTE, 'Note');
-      // Clip button
-      const clipBtn = createButton('clip', ICON_CLIP, 'Clip');
-
-      bar.appendChild(highlightBtn);
-      bar.appendChild(noteBtn);
-
-      const divider = document.createElement('span');
-      divider.className = 'divider';
-      bar.appendChild(divider);
-
-      bar.appendChild(clipBtn);
-
-      this.shadow.appendChild(style);
-      this.shadow.appendChild(bar);
-
-      // Handle clicks
-      bar.addEventListener('mousedown', (e) => {
-        // Prevent selection from being cleared before we process the action
-        e.preventDefault();
-        e.stopPropagation();
-      });
-
-      bar.addEventListener('click', (e) => {
-        const target = (e.target as Element).closest('button');
-        if (!target) return;
-        const action = target.getAttribute('data-action');
-        if (action && actionCallback) {
-          actionCallback(action);
-        }
-      });
-    }
-  }
-
-  window.customElements.define('soma-toolbar', SomaToolbar);
-}
+// ── Toolbar Construction ──
 
 function createButton(action: string, iconSvg: string, label: string): HTMLButtonElement {
   const btn = document.createElement('button');
   btn.setAttribute('data-action', action);
   btn.innerHTML = `${iconSvg}<span>${label}</span>`;
   return btn;
+}
+
+/**
+ * Build the toolbar DOM: a regular <div> with a closed Shadow DOM.
+ * No Custom Elements API needed.
+ */
+function buildToolbar(): void {
+  toolbarElement = document.createElement('div');
+  // Prevent page styles from leaking via closed Shadow DOM
+  shadowRoot = toolbarElement.attachShadow({ mode: 'closed' });
+
+  const style = document.createElement('style');
+  style.textContent = TOOLBAR_STYLES;
+
+  const bar = document.createElement('div');
+  bar.className = 'soma-floating-bar';
+
+  bar.appendChild(createButton('highlight', ICON_HIGHLIGHT, 'Highlight'));
+  bar.appendChild(createButton('note', ICON_NOTE, 'Note'));
+
+  const divider = document.createElement('span');
+  divider.className = 'divider';
+  bar.appendChild(divider);
+
+  bar.appendChild(createButton('clip', ICON_CLIP, 'Clip'));
+
+  shadowRoot.appendChild(style);
+  shadowRoot.appendChild(bar);
+
+  // Prevent selection from being cleared before we process the action
+  bar.addEventListener('mousedown', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+  });
+
+  bar.addEventListener('click', (e) => {
+    const target = (e.target as Element).closest('button');
+    if (!target) return;
+    const action = target.getAttribute('data-action');
+    if (action && actionCallback) {
+      actionCallback(action);
+    }
+  });
+
+  const container = document.body ?? document.documentElement;
+  container.appendChild(toolbarElement);
 }
 
 // ── Toolbar Positioning ──
@@ -197,23 +189,21 @@ export function showToolbar(
   callback: ToolbarActionCallback,
 ): void {
   try {
-    ensureToolbarElement();
     actionCallback = callback;
 
-    // Create or reuse toolbar element
     if (!toolbarElement) {
-      toolbarElement = document.createElement('soma-toolbar');
-      const container = document.body ?? document.documentElement;
-      container.appendChild(toolbarElement);
+      buildToolbar();
     }
 
     const pos = getToolbarPosition(selectionRect);
-    toolbarElement.style.top = `${pos.top}px`;
-    toolbarElement.style.left = `${pos.left}px`;
-    toolbarElement.style.transform = 'translateX(-50%)';
-    toolbarElement.style.display = 'block';
+    toolbarElement!.style.position = 'fixed';
+    toolbarElement!.style.zIndex = '2147483647';
+    toolbarElement!.style.top = `${pos.top}px`;
+    toolbarElement!.style.left = `${pos.left}px`;
+    toolbarElement!.style.transform = 'translateX(-50%)';
+    toolbarElement!.style.display = 'block';
   } catch (err) {
-    console.error('[soma] Failed to show highlight toolbar:', err);
+    console.error('[soma:hl] showToolbar error:', err);
   }
 }
 

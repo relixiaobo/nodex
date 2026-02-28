@@ -3,7 +3,7 @@
  * and click handling for webpage highlights.
  *
  * Listens for text selection → shows floating toolbar → on confirm,
- * wraps text in <soma-hl> custom elements and sends create message
+ * wraps text in <soma-hl> elements (plain DOM, no Custom Elements API) and sends create message
  * to the Side Panel via background.
  */
 import { computeAnchor } from './anchor-utils.js';
@@ -29,39 +29,33 @@ let currentRange: Range | null = null;
 let initialized = false;
 let lastKnownUrl = '';
 
-// ── Custom Element Registration ──
+// ── Highlight Click Delegation ──
+
+let clickDelegationInstalled = false;
 
 /**
- * Register <soma-hl> custom element if not already defined.
- * Uses inline styles only — no Shadow DOM needed for simple highlighting.
+ * Install a single document-level click handler for all <soma-hl> elements.
+ * Uses event delegation instead of Custom Elements API (unavailable in
+ * Chrome content script isolated world).
  */
-function ensureCustomElement(): void {
-  if (!window.customElements) return;
-  if (window.customElements.get('soma-hl')) return;
+function ensureClickDelegation(): void {
+  if (clickDelegationInstalled) return;
+  clickDelegationInstalled = true;
 
-  class SomaHighlight extends HTMLElement {
-    constructor() {
-      super();
-      // Inline element — should not break text flow
-      this.style.display = 'inline';
-      this.style.cursor = 'pointer';
-      this.style.borderRadius = '2px';
+  document.addEventListener('click', (e) => {
+    const target = (e.target as Element).closest?.('soma-hl[data-highlight-id]');
+    if (!target) return;
 
-      this.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const highlightId = this.getAttribute('data-highlight-id');
-        if (!highlightId) return;
+    e.stopPropagation();
+    const highlightId = target.getAttribute('data-highlight-id');
+    if (!highlightId) return;
 
-        const msg: { type: typeof HIGHLIGHT_CLICK; payload: HighlightClickPayload } = {
-          type: HIGHLIGHT_CLICK,
-          payload: { id: highlightId },
-        };
-        chrome.runtime.sendMessage(msg);
-      });
-    }
-  }
-
-  window.customElements.define('soma-hl', SomaHighlight);
+    const msg: { type: typeof HIGHLIGHT_CLICK; payload: HighlightClickPayload } = {
+      type: HIGHLIGHT_CLICK,
+      payload: { id: highlightId },
+    };
+    chrome.runtime.sendMessage(msg);
+  });
 }
 
 // ── Text Node Iteration for Cross-Element Wrapping ──
@@ -147,7 +141,7 @@ export function renderHighlight(
   highlightId: string,
   bgColor: string = DEFAULT_HIGHLIGHT_BG,
 ): void {
-  ensureCustomElement();
+  ensureClickDelegation();
   const segments = getTextNodesInRange(range);
 
   // Process segments in reverse to maintain valid offsets
@@ -162,6 +156,9 @@ export function renderHighlight(
 
     const highlightEl = document.createElement('soma-hl');
     highlightEl.setAttribute('data-highlight-id', highlightId);
+    highlightEl.style.display = 'inline';
+    highlightEl.style.cursor = 'pointer';
+    highlightEl.style.borderRadius = '2px';
     highlightEl.style.backgroundColor = bgColor;
 
     try {
@@ -424,7 +421,7 @@ export function initHighlight(): void {
   initialized = true;
   lastKnownUrl = location.href;
 
-  ensureCustomElement();
+  ensureClickDelegation();
 
   // Debounced selection events → check selection
   let selectionTimeout: ReturnType<typeof setTimeout> | null = null;

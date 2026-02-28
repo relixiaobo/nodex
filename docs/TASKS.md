@@ -118,7 +118,7 @@ _(空)_
 - [x] **数据模型简化** — 4 个模板字段（Source/Anchor/Color/Page URL）→ 1 个 Clip 字段（options_from_supertag → #web_clip）+ anchor 存 description + 颜色使用 tagDef 自身颜色 ✅（2026-02-28）
 - [x] **重命名 #web_clip → #source** — 标签名、字段名（Clip→Source）、导出函数名全部统一 ✅（2026-02-28）
 - [x] **Highlight 下一轮优化**（`cc/highlight-polish`, PR #114）— Clip Page 失效 + 网页工具栏不出现 + 删除不清理 DOM + SPA 导航残留 + anchor 无法还原无反馈 + 多 tab 竞态去重 ✅（2026-02-28）
-- [x] **Highlight 数据模型重构** — highlight 改为 clip page 子节点 + `ancestor_supertag_ref` auto-init 策略（Source 字段自动引用祖先 #source 节点）+ backward compat + 18 test ✅（2026-03-01）
+- [x] **Highlight 数据模型重构** — highlight 改为 clip page 子节点 + `ancestor_supertag_ref` auto-init 策略（Source 字段自动引用祖先 #source 节点）+ 去重复创建 + anchor JSON 隐藏 + options picker targetId 读取修复 + reference tag inline 对齐 + 18 test ✅（2026-03-01）
 
 #### AI Chat & 网页辅助 (#29 + #31)
 > 浏览器 + AI = soma 的第二个差异化维度。不只是聊天框，而是理解上下文的知识助手。
@@ -292,7 +292,7 @@ _(空)_
 
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
-| 2026-03-01 | Highlight 数据模型重构 — highlight 改为 clip page 子节点 + `ancestor_supertag_ref` auto-init 策略 + backward compat + 18 test | nodex | main |
+| 2026-03-01 | Highlight 数据模型重构 — highlight 改为 clip page 子节点 + `ancestor_supertag_ref` auto-init + 去重复创建 + anchor JSON 隐藏 + options picker targetId 修复 + reference tag inline 对齐 | nodex | main |
 | 2026-03-01 | Field & Supertag 功能补全 — Integer 清理 + Merge Fields + Auto-initialize（3 策略）+ 批量标签操作（BatchTagSelector + `#` 快捷键）+ 22 test | nodex | main |
 | 2026-02-28 | Highlight 系统 Review — BG loop guard + SP listener + highlight-sidepanel 模块 + clipPageId 树遍历修复 + 9 test | codex | #113 |
 | 2026-02-28 | Highlight 系统 Phase 1 — highlight-service CRUD + TagSelectorPopover + FloatingToolbar # Tag + PM 选区→inline ref + highlight bullet 颜色 + 25 test | Agent A | #111 |

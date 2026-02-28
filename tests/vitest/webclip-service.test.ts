@@ -13,6 +13,9 @@ import {
   findTemplateAttrDef,
   saveWebClip,
   applyWebClipToNode,
+  normalizeUrl,
+  findClipNodeByUrl,
+  createLightweightClip,
   type WebClipCapturePayload,
 } from '../../src/lib/webclip-service.js';
 import * as loroDoc from '../../src/lib/loro-doc.js';
@@ -369,5 +372,203 @@ describe('applyWebClipToNode', () => {
     }
     // Plus new content nodes
     expect(childrenAfter.length).toBeGreaterThan(childrenBefore.length);
+  });
+});
+
+// ── URL Normalization ──
+
+describe('normalizeUrl', () => {
+  it('removes fragment hash', () => {
+    expect(normalizeUrl('https://example.com/page#section')).toBe(
+      'https://example.com/page',
+    );
+  });
+
+  it('removes trailing slash', () => {
+    expect(normalizeUrl('https://example.com/page/')).toBe(
+      'https://example.com/page',
+    );
+  });
+
+  it('keeps root slash', () => {
+    expect(normalizeUrl('https://example.com/')).toBe(
+      'https://example.com/',
+    );
+  });
+
+  it('upgrades http to https', () => {
+    expect(normalizeUrl('http://example.com/page')).toBe(
+      'https://example.com/page',
+    );
+  });
+
+  it('removes www prefix', () => {
+    expect(normalizeUrl('https://www.example.com/page')).toBe(
+      'https://example.com/page',
+    );
+  });
+
+  it('preserves query parameters', () => {
+    expect(normalizeUrl('https://example.com/page?a=1&b=2')).toBe(
+      'https://example.com/page?a=1&b=2',
+    );
+  });
+
+  it('handles all transformations together', () => {
+    expect(normalizeUrl('http://www.example.com/page/#section')).toBe(
+      'https://example.com/page',
+    );
+  });
+
+  it('returns original for invalid URLs', () => {
+    expect(normalizeUrl('not a url')).toBe('not a url');
+  });
+});
+
+// ── findClipNodeByUrl ──
+
+describe('findClipNodeByUrl', () => {
+  beforeEach(() => {
+    resetAndSeed();
+  });
+
+  it('returns null when no clip nodes exist for URL', () => {
+    const result = findClipNodeByUrl('https://nonexistent.com/page');
+    expect(result).toBeNull();
+  });
+
+  it('finds clip node by exact URL match', async () => {
+    const store = useNodeStore.getState();
+    const payload: WebClipCapturePayload = {
+      url: 'https://example.com/article',
+      title: 'Test Article',
+      selectionText: '',
+      pageText: '<p>Content</p>',
+      capturedAt: Date.now(),
+    };
+    const clipId = await saveWebClip(payload, store);
+
+    const found = findClipNodeByUrl('https://example.com/article');
+    expect(found).toBe(clipId);
+  });
+
+  it('finds clip node with URL normalization (http vs https)', async () => {
+    const store = useNodeStore.getState();
+    const payload: WebClipCapturePayload = {
+      url: 'https://example.com/article',
+      title: 'Test Article',
+      selectionText: '',
+      pageText: '<p>Content</p>',
+      capturedAt: Date.now(),
+    };
+    const clipId = await saveWebClip(payload, store);
+
+    // Search with http:// — should match the https:// clip
+    const found = findClipNodeByUrl('http://example.com/article');
+    expect(found).toBe(clipId);
+  });
+
+  it('finds clip node ignoring fragment', async () => {
+    const store = useNodeStore.getState();
+    const payload: WebClipCapturePayload = {
+      url: 'https://example.com/article',
+      title: 'Test Article',
+      selectionText: '',
+      pageText: '<p>Content</p>',
+      capturedAt: Date.now(),
+    };
+    const clipId = await saveWebClip(payload, store);
+
+    const found = findClipNodeByUrl('https://example.com/article#section');
+    expect(found).toBe(clipId);
+  });
+});
+
+// ── createLightweightClip ──
+
+describe('createLightweightClip', () => {
+  beforeEach(() => {
+    resetAndSeed();
+  });
+
+  it('creates a clip node in INBOX container', async () => {
+    const store = useNodeStore.getState();
+    const clipId = await createLightweightClip(
+      'https://example.com/page',
+      'Page Title',
+      store,
+    );
+
+    expect(loroDoc.hasNode(clipId)).toBe(true);
+    expect(loroDoc.getParentId(clipId)).toBe(CONTAINER_IDS.INBOX);
+  });
+
+  it('sets the node name to page title', async () => {
+    const store = useNodeStore.getState();
+    const clipId = await createLightweightClip(
+      'https://example.com/page',
+      'My Page Title',
+      store,
+    );
+
+    const node = loroDoc.toNodexNode(clipId);
+    expect(node!.name).toBe('My Page Title');
+  });
+
+  it('applies #web_clip tag', async () => {
+    const store = useNodeStore.getState();
+    const clipId = await createLightweightClip(
+      'https://example.com/page',
+      'Page Title',
+      store,
+    );
+
+    const node = loroDoc.toNodexNode(clipId);
+    expect(node!.tags).toContain('tagDef_web_clip');
+  });
+
+  it('writes Source URL field', async () => {
+    const store = useNodeStore.getState();
+    const clipId = await createLightweightClip(
+      'https://example.com/test-page',
+      'Test Page',
+      store,
+    );
+
+    const sourceUrlFd = findTemplateAttrDef({}, 'tagDef_web_clip', 'Source URL')!;
+    expect(sourceUrlFd).toBeDefined();
+
+    const feId = findFieldEntry(clipId, sourceUrlFd.id);
+    expect(feId).toBeDefined();
+    expect(getFirstFieldValue(feId!)).toBe('https://example.com/test-page');
+  });
+
+  it('does not create content children (lightweight)', async () => {
+    const store = useNodeStore.getState();
+    const clipId = await createLightweightClip(
+      'https://example.com/page',
+      'Page Title',
+      store,
+    );
+
+    const children = loroDoc.getChildren(clipId);
+    // Only fieldEntry children from tag template, no content nodes
+    const contentChildren = children.filter(cid => {
+      const n = loroDoc.toNodexNode(cid);
+      return n?.type === undefined;
+    });
+    expect(contentChildren).toHaveLength(0);
+  });
+
+  it('is findable by findClipNodeByUrl after creation', async () => {
+    const store = useNodeStore.getState();
+    const clipId = await createLightweightClip(
+      'https://example.com/findme',
+      'Findable Page',
+      store,
+    );
+
+    const found = findClipNodeByUrl('https://example.com/findme');
+    expect(found).toBe(clipId);
   });
 });

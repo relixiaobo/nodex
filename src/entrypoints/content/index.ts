@@ -44,6 +44,7 @@ function captureCurrentPage(): WebClipCapturePayload {
 
 export default defineContentScript({
   matches: ['https://*/*', 'http://*/*'],
+  registration: 'runtime',
   runAt: 'document_idle',
 
   main() {

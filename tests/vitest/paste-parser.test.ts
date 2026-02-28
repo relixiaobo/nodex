@@ -126,6 +126,23 @@ describe('paste-parser', () => {
     expect(nodes[0].marks).toEqual([]);
   });
 
+  it('prefers markdown parser when clipboard html is list-wrapped markdown-like text', () => {
+    const plain = [
+      '### Standalone 测试环境',
+      '```bash',
+      'npm run dev:test',
+      '```',
+    ].join('\n');
+    const html = '<ul><li>### Standalone 测试环境</li><li>```bash</li><li>npm run dev:test</li><li>```</li></ul>';
+
+    const nodes = parseMultiLinePaste(plain, html);
+    expect(nodes).toHaveLength(1);
+    expect(nodes[0].name).toBe('Standalone 测试环境');
+    expect(nodes[0].children).toHaveLength(1);
+    expect(nodes[0].children[0].type).toBe('codeBlock');
+    expect(nodes[0].children[0].name).toBe('npm run dev:test');
+  });
+
   it('parses single-line HTML with inline formatting', () => {
     const nodes = parseMultiLinePaste('Bold', '<strong>Bold</strong>');
     expect(nodes).toHaveLength(1);

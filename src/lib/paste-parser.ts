@@ -22,15 +22,20 @@ const FIELD_RE = /(^|\s)([A-Za-z0-9][\w-]*)::\s*([^#\n]+?)(?=(?:\s+[A-Za-z0-9][\
 
 export function parseMultiLinePaste(plain: string, html?: string): ParsedPasteNode[] {
   const rawPlain = plain ?? '';
+  const lines = rawPlain.split(/\r?\n/);
+  const markdownNodes = parseMarkdownDocument(lines) ?? parseMarkdownList(lines);
+  const hasMarkdownNodes = !!markdownNodes && markdownNodes.length > 0;
+
+  if (hasMarkdownNodes && shouldPreferMarkdown(rawPlain, html)) {
+    return markdownNodes!;
+  }
 
   if (html && shouldPreferHtml(html, rawPlain)) {
     const htmlNodes = parseHtmlBlocks(html);
     if (htmlNodes.length > 0) return htmlNodes;
   }
 
-  const lines = rawPlain.split(/\r?\n/);
-  const markdownNodes = parseMarkdownDocument(lines) ?? parseMarkdownList(lines);
-  if (markdownNodes && markdownNodes.length > 0) {
+  if (hasMarkdownNodes) {
     return markdownNodes;
   }
 
@@ -438,6 +443,24 @@ function shouldPreferHtml(html: string, plain: string): boolean {
   const htmlText = (body.textContent ?? '').replace(/\s+/g, ' ').trim();
   const plainText = plain.replace(/\s+/g, ' ').trim();
   return htmlText.length > 0 && htmlText !== plainText;
+}
+
+function shouldPreferMarkdown(plain: string, html?: string): boolean {
+  if (!html?.trim()) return true;
+  return hasStrongMarkdownSignals(plain);
+}
+
+function hasStrongMarkdownSignals(text: string): boolean {
+  const lines = text.split(/\r?\n/);
+  let listLikeCount = 0;
+  for (const line of lines) {
+    if (FENCED_CODE_RE.test(line)) return true;
+    if (HEADING_RE.test(line.trim())) return true;
+    if (TABLE_SEPARATOR_RE.test(line) || TABLE_ROW_RE.test(line)) return true;
+    if (/^\s*(?:[-*+]|\d+\.)\s+\S/.test(line)) listLikeCount += 1;
+    if (listLikeCount >= 2) return true;
+  }
+  return false;
 }
 
 function indentToLevel(indent: string): number {

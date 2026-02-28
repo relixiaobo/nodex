@@ -7,8 +7,9 @@
  */
 import { useMemo, useEffect, useLayoutEffect, useRef, useState, forwardRef, useImperativeHandle } from 'react';
 import { createPortal } from 'react-dom';
-import { Hash, Plus } from '../../lib/icons.js';
+import { Plus } from '../../lib/icons.js';
 import { useWorkspaceTags } from '../../hooks/use-workspace-tags';
+import { resolveTagColor } from '../../lib/tag-colors.js';
 import { t } from '../../i18n/strings.js';
 
 export interface TagDropdownHandle {
@@ -133,7 +134,10 @@ export const TagSelector = forwardRef<TagDropdownHandle, TagSelectorProps>(
        onSelect(tag.id);
       }}
      >
-      <Hash size={14} className="text-foreground-secondary shrink-0" />
+      <span
+       className="inline-block h-2 w-2 shrink-0 rounded-full"
+       style={{ backgroundColor: resolveTagColor(tag.id).text }}
+      />
       {tag.name}
      </button>
     ))}

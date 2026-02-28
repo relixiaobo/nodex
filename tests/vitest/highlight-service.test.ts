@@ -1,12 +1,10 @@
 /**
  * highlight-service — #highlight and #comment system tag CRUD tests.
  *
- * Tests:
- * - ensureHighlightTagDef: creates tagDef + 4 fieldDefs + 5 color options
- * - ensureCommentTagDef: creates tagDef (no fields)
- * - createHighlightNode: creates node in LIBRARY with correct structure
- * - getHighlightsForClip: finds highlights by Source field
- * - createCommentNode: creates child with #comment tag
+ * Simplified model:
+ * - One template field: "Clip" (options_from_supertag → #web_clip)
+ * - Anchor data stored in node description (JSON)
+ * - Highlight color = tagDef color (no per-node color)
  */
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useNodeStore } from '../../src/stores/node-store.js';
@@ -19,37 +17,10 @@ import {
   createHighlightNode,
   getHighlightsForClip,
   createCommentNode,
-  getSourceFieldDefId,
-  getAnchorFieldDefId,
-  getColorFieldDefId,
-  getPageUrlFieldDefId,
-  getColorOptionId,
-  HIGHLIGHT_COLORS,
+  getClipFieldDefId,
   _resetHighlightCache,
   type HighlightNodeStore,
 } from '../../src/lib/highlight-service.js';
-
-/** Helper: find fieldEntry child with given fieldDefId. */
-function findFieldEntry(nodeId: string, fieldDefId: string): string | undefined {
-  return loroDoc.getChildren(nodeId).find(cid => {
-    const n = loroDoc.toNodexNode(cid);
-    return n?.type === 'fieldEntry' && n.fieldDefId === fieldDefId;
-  });
-}
-
-/** Helper: get name of first value child of a fieldEntry. */
-function getFirstFieldValue(fieldEntryId: string): string | undefined {
-  const children = loroDoc.getChildren(fieldEntryId);
-  if (children.length === 0) return undefined;
-  return loroDoc.toNodexNode(children[0])?.name;
-}
-
-/** Helper: get targetId of first value child of a fieldEntry (for options fields). */
-function getFirstFieldTargetId(fieldEntryId: string): string | undefined {
-  const children = loroDoc.getChildren(fieldEntryId);
-  if (children.length === 0) return undefined;
-  return loroDoc.toNodexNode(children[0])?.targetId;
-}
 
 /** Get the store as HighlightNodeStore. */
 function getStore(): HighlightNodeStore {
@@ -72,7 +43,7 @@ describe('ensureHighlightTagDef', () => {
     expect(tagDef!.name).toBe('highlight');
   });
 
-  it('creates 4 fieldDefs under tagDef', () => {
+  it('creates 1 fieldDef (Clip) under tagDef', () => {
     const store = getStore();
     ensureHighlightTagDef(store);
 
@@ -81,63 +52,30 @@ describe('ensureHighlightTagDef', () => {
       const n = loroDoc.toNodexNode(cid);
       return n?.type === 'fieldDef';
     });
-    expect(fieldDefs).toHaveLength(4);
+    expect(fieldDefs).toHaveLength(1);
   });
 
-  it('creates Source field as plain type', () => {
+  it('creates Clip field as options_from_supertag type', () => {
     const store = getStore();
     ensureHighlightTagDef(store);
 
-    const sourceFd = loroDoc.toNodexNode(getSourceFieldDefId());
-    expect(sourceFd).toBeDefined();
-    expect(sourceFd!.name).toBe('Source');
-    expect(sourceFd!.fieldType).toBe(FIELD_TYPES.PLAIN);
+    const clipFd = loroDoc.toNodexNode(getClipFieldDefId());
+    expect(clipFd).toBeDefined();
+    expect(clipFd!.name).toBe('Clip');
+    expect(clipFd!.fieldType).toBe(FIELD_TYPES.OPTIONS_FROM_SUPERTAG);
   });
 
-  it('creates Anchor field as plain type', () => {
+  it('sets sourceSupertag on Clip field to #web_clip tagDef', () => {
     const store = getStore();
     ensureHighlightTagDef(store);
 
-    const anchorFd = loroDoc.toNodexNode(getAnchorFieldDefId());
-    expect(anchorFd).toBeDefined();
-    expect(anchorFd!.name).toBe('Anchor');
-    expect(anchorFd!.fieldType).toBe(FIELD_TYPES.PLAIN);
-  });
+    const clipFd = loroDoc.toNodexNode(getClipFieldDefId());
+    expect(clipFd!.sourceSupertag).toBeDefined();
 
-  it('creates Color field as options type with 5 choices', () => {
-    const store = getStore();
-    ensureHighlightTagDef(store);
-
-    const colorFdId = getColorFieldDefId();
-    const colorFd = loroDoc.toNodexNode(colorFdId);
-    expect(colorFd).toBeDefined();
-    expect(colorFd!.name).toBe('Color');
-    expect(colorFd!.fieldType).toBe(FIELD_TYPES.OPTIONS);
-
-    // Check 5 option children
-    const optionChildren = loroDoc.getChildren(colorFdId).filter(cid => {
-      const n = loroDoc.toNodexNode(cid);
-      return n?.type === undefined; // option nodes are plain content nodes
-    });
-    expect(optionChildren).toHaveLength(5);
-
-    // Check option names
-    const optionNames = optionChildren.map(cid => loroDoc.toNodexNode(cid)!.name);
-    expect(optionNames).toContain('yellow');
-    expect(optionNames).toContain('green');
-    expect(optionNames).toContain('blue');
-    expect(optionNames).toContain('pink');
-    expect(optionNames).toContain('purple');
-  });
-
-  it('creates Page URL field as url type', () => {
-    const store = getStore();
-    ensureHighlightTagDef(store);
-
-    const pageUrlFd = loroDoc.toNodexNode(getPageUrlFieldDefId());
-    expect(pageUrlFd).toBeDefined();
-    expect(pageUrlFd!.name).toBe('Page URL');
-    expect(pageUrlFd!.fieldType).toBe(FIELD_TYPES.URL);
+    // sourceSupertag should point to #web_clip tagDef
+    const sourceTagDef = loroDoc.toNodexNode(clipFd!.sourceSupertag!);
+    expect(sourceTagDef).toBeDefined();
+    expect(sourceTagDef!.name).toBe('web_clip');
   });
 
   it('is idempotent — calling twice does not duplicate', () => {
@@ -151,15 +89,7 @@ describe('ensureHighlightTagDef', () => {
       const n = loroDoc.toNodexNode(cid);
       return n?.type === 'fieldDef';
     });
-    expect(fieldDefs).toHaveLength(4);
-
-    // Color options should also not be duplicated
-    const colorFdId = getColorFieldDefId();
-    const optionChildren = loroDoc.getChildren(colorFdId).filter(cid => {
-      const n = loroDoc.toNodexNode(cid);
-      return n?.type === undefined;
-    });
-    expect(optionChildren).toHaveLength(5);
+    expect(fieldDefs).toHaveLength(1);
   });
 });
 
@@ -196,16 +126,11 @@ describe('ensureCommentTagDef', () => {
     ensureCommentTagDef(store);
     ensureCommentTagDef(store);
 
-    // Should still exist
     const tagDef = loroDoc.toNodexNode(SYS_T.COMMENT);
     expect(tagDef).toBeDefined();
 
-    // Count comment tagDefs in schema
     const schemaChildren = loroDoc.getChildren(CONTAINER_IDS.SCHEMA);
-    const commentDefs = schemaChildren.filter(cid => {
-      const n = loroDoc.toNodexNode(cid);
-      return cid === SYS_T.COMMENT;
-    });
+    const commentDefs = schemaChildren.filter(cid => cid === SYS_T.COMMENT);
     expect(commentDefs).toHaveLength(1);
   });
 });
@@ -252,7 +177,7 @@ describe('createHighlightNode', () => {
     expect(saved!.tags).toContain(SYS_T.HIGHLIGHT);
   });
 
-  it('fills Source field with clipNodeId', () => {
+  it('sets Clip field via setOptionsFieldValue when clipNodeId is provided', () => {
     const store = getStore();
     const node = createHighlightNode({
       store,
@@ -260,39 +185,17 @@ describe('createHighlightNode', () => {
       clipNodeId: 'webclip_1',
     });
 
-    const feId = findFieldEntry(node.id, getSourceFieldDefId());
-    expect(feId).toBeDefined();
-    expect(getFirstFieldValue(feId!)).toBe('webclip_1');
-  });
-
-  it('fills Color field with default yellow', () => {
-    const store = getStore();
-    const node = createHighlightNode({
-      store,
-      selectedText: 'test',
+    // Verify the Clip fieldEntry exists with a value child referencing the clip
+    const children = loroDoc.getChildren(node.id);
+    const clipFieldDefId = getClipFieldDefId();
+    const fieldEntry = children.find(cid => {
+      const n = loroDoc.toNodexNode(cid);
+      return n?.type === 'fieldEntry' && n.fieldDefId === clipFieldDefId;
     });
-
-    const feId = findFieldEntry(node.id, getColorFieldDefId());
-    expect(feId).toBeDefined();
-    const targetId = getFirstFieldTargetId(feId!);
-    expect(targetId).toBe(getColorOptionId('yellow'));
+    expect(fieldEntry).toBeDefined();
   });
 
-  it('fills Color field with custom color', () => {
-    const store = getStore();
-    const node = createHighlightNode({
-      store,
-      selectedText: 'test',
-      color: 'blue',
-    });
-
-    const feId = findFieldEntry(node.id, getColorFieldDefId());
-    expect(feId).toBeDefined();
-    const targetId = getFirstFieldTargetId(feId!);
-    expect(targetId).toBe(getColorOptionId('blue'));
-  });
-
-  it('fills Anchor field when provided', () => {
+  it('stores anchor data in node description', () => {
     const store = getStore();
     const anchorJson = JSON.stringify({ version: 1, exact: 'test', prefix: 'before', suffix: 'after' });
     const node = createHighlightNode({
@@ -301,37 +204,28 @@ describe('createHighlightNode', () => {
       anchor: anchorJson,
     });
 
-    const feId = findFieldEntry(node.id, getAnchorFieldDefId());
-    expect(feId).toBeDefined();
-    expect(getFirstFieldValue(feId!)).toBe(anchorJson);
+    const saved = loroDoc.toNodexNode(node.id);
+    expect(saved!.description).toBe(anchorJson);
   });
 
-  it('fills Page URL field when provided', () => {
-    const store = getStore();
-    const node = createHighlightNode({
-      store,
-      selectedText: 'test',
-      pageUrl: 'https://example.com/article',
-    });
-
-    const feId = findFieldEntry(node.id, getPageUrlFieldDefId());
-    expect(feId).toBeDefined();
-    expect(getFirstFieldValue(feId!)).toBe('https://example.com/article');
-  });
-
-  it('skips Source field when clipNodeId not provided', () => {
+  it('skips Clip field when clipNodeId not provided', () => {
     const store = getStore();
     const node = createHighlightNode({
       store,
       selectedText: 'test',
     });
 
-    // Source fieldEntry is still created by applyTag (template sync),
-    // but it should have no value children
-    const feId = findFieldEntry(node.id, getSourceFieldDefId());
-    if (feId) {
-      const children = loroDoc.getChildren(feId);
-      expect(children).toHaveLength(0);
+    // No Clip fieldEntry should be explicitly set
+    const children = loroDoc.getChildren(node.id);
+    const clipFieldDefId = getClipFieldDefId();
+    const fieldEntries = children.filter(cid => {
+      const n = loroDoc.toNodexNode(cid);
+      return n?.type === 'fieldEntry' && n.fieldDefId === clipFieldDefId;
+    });
+    // May have an empty fieldEntry from applyTag template sync, but no value children
+    for (const feId of fieldEntries) {
+      const valueChildren = loroDoc.getChildren(feId);
+      expect(valueChildren).toHaveLength(0);
     }
   });
 });

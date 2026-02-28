@@ -16,17 +16,10 @@ import {
 } from '../../lib/highlight-messaging.js';
 import { WEBCLIP_CAPTURE_ACTIVE_TAB } from '../../lib/webclip-messaging.js';
 
-// ── Highlight Color Map ──
+// ── Default Highlight Color (matches #highlight tagDef amber) ──
 
-export const HIGHLIGHT_COLORS: Record<string, string> = {
-  yellow: 'rgba(255, 235, 59, 0.35)',
-  green: 'rgba(129, 199, 132, 0.35)',
-  blue: 'rgba(100, 181, 246, 0.35)',
-  pink: 'rgba(244, 143, 177, 0.35)',
-  purple: 'rgba(186, 104, 200, 0.35)',
-};
-
-export const DEFAULT_HIGHLIGHT_COLOR = 'yellow';
+/** Semi-transparent amber for highlight background rendering. */
+export const DEFAULT_HIGHLIGHT_BG = 'rgba(155, 124, 56, 0.3)';
 
 // ── State ──
 
@@ -148,11 +141,9 @@ function getTextNodesInRange(range: Range): TextNodeSegment[] {
 export function renderHighlight(
   range: Range,
   highlightId: string,
-  color: string = DEFAULT_HIGHLIGHT_COLOR,
+  bgColor: string = DEFAULT_HIGHLIGHT_BG,
 ): void {
   ensureCustomElement();
-
-  const bgColor = HIGHLIGHT_COLORS[color] ?? HIGHLIGHT_COLORS[DEFAULT_HIGHLIGHT_COLOR];
   const segments = getTextNodesInRange(range);
 
   // Process segments in reverse to maintain valid offsets
@@ -315,14 +306,13 @@ function handleToolbarAction(action: string): void {
 function createHighlight(range: Range, withNote: boolean): void {
   const anchor = computeAnchor(range);
   const selectedText = range.toString();
-  const color = DEFAULT_HIGHLIGHT_COLOR;
 
   // Generate a temporary ID for immediate rendering
   // The Side Panel will assign the real node ID and send it back
   const tempId = `temp_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
 
   // Render highlight immediately for instant visual feedback
-  renderHighlight(range, tempId, color);
+  renderHighlight(range, tempId);
 
   // Send create message to Side Panel via background
   const payload: HighlightCreatePayload = {
@@ -330,7 +320,6 @@ function createHighlight(range: Range, withNote: boolean): void {
     selectedText,
     pageUrl: location.href,
     pageTitle: document.title,
-    color,
     withNote,
   };
 

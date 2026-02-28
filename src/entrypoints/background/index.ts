@@ -221,11 +221,14 @@ export default defineBackground(() => {
     }
   });
 
-  // ── URL Change Listener — trigger highlight echo check ──
+  // ── URL Change Listener — inject content script + trigger highlight echo check ──
   chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
     // Only react to completed navigation with a valid URL
     if (changeInfo.status !== 'complete') return;
     if (!isInjectableUrl(tab.url)) return;
+
+    // Inject content script so selection toolbar is available immediately
+    ensureContentScript(tabId);
 
     // Send CHECK_URL to Side Panel so it can look up highlights for this URL
     const payload: HighlightCheckUrlPayload = {

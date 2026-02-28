@@ -111,11 +111,10 @@ describe('payload types', () => {
     expect(payload.selectedText).toBe('test text');
     expect(payload.pageUrl).toBe('https://example.com');
     expect(payload.pageTitle).toBe('Example Page');
-    expect(payload.color).toBeUndefined();
     expect(payload.withNote).toBeUndefined();
   });
 
-  it('HighlightCreatePayload supports optional fields', () => {
+  it('HighlightCreatePayload supports optional withNote', () => {
     const anchor: HighlightAnchor = {
       version: 1,
       exact: 'text',
@@ -128,11 +127,9 @@ describe('payload types', () => {
       selectedText: 'text',
       pageUrl: 'https://example.com',
       pageTitle: 'Page',
-      color: 'green',
       withNote: true,
     };
 
-    expect(payload.color).toBe('green');
     expect(payload.withNote).toBe(true);
   });
 

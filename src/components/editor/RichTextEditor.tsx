@@ -944,6 +944,10 @@ export function RichTextEditor(props: RichTextEditorProps) {
         blur: () => {
           isComposingRef.current = false;
           setToolbarTick((value) => value + 1);
+          // When TagSelectorPopover is open, its input steals focus.
+          // Skip the blur callback to prevent the editor from unmounting
+          // (which would destroy the popover before the user can interact).
+          if (tagSelectorOpenRef.current) return false;
           saveContent();
           propsRef.current.onBlur();
           return false;
@@ -1015,6 +1019,8 @@ export function RichTextEditor(props: RichTextEditorProps) {
 
   // ─── # Tag selector state ───
   const [tagSelectorOpen, setTagSelectorOpen] = useState(false);
+  const tagSelectorOpenRef = useRef(false);
+  tagSelectorOpenRef.current = tagSelectorOpen;
   const [tagSelectorAnchor, setTagSelectorAnchor] = useState({ top: 0, left: 0 });
 
   const handleTagClick = useCallback(() => {

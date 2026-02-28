@@ -22,18 +22,23 @@ import {
   buildHighlightRestorePayload,
   collectAllHighlightNodeIds,
   getRemovedHighlightIds,
+  upsertHighlightNote,
 } from '../../lib/highlight-sidepanel.js';
 import { findClipNodeByUrl } from '../../lib/webclip-service.js';
 import {
   HIGHLIGHT_CREATE,
+  HIGHLIGHT_DELETE,
   HIGHLIGHT_CLICK,
   HIGHLIGHT_CHECK_URL,
+  HIGHLIGHT_NOTE_UPSERT,
   HIGHLIGHT_RESTORE,
   HIGHLIGHT_REMOVE,
   HIGHLIGHT_UNRESOLVABLE,
   type HighlightCreatePayload,
+  type HighlightDeletePayload,
   type HighlightClickPayload,
   type HighlightCheckUrlPayload,
+  type HighlightNoteUpsertPayload,
   type HighlightUnresolvablePayload,
 } from '../../lib/highlight-messaging.js';
 import { BOOTSTRAP_CONTAINER_DEFS } from '../../lib/system-node-registry.js';
@@ -245,6 +250,44 @@ export function App({ skipBootstrap = false }: AppProps) {
       ui.setSelectedNode(payload.id);
     }
     sendResponse({ ok: true });
+    return true;
+   }
+
+   if (message?.type === HIGHLIGHT_DELETE) {
+    const payload = message.payload as HighlightDeletePayload | undefined;
+    if (!payload?.id) {
+      sendResponse({ ok: false, error: 'Missing highlight id for delete' });
+      return true;
+    }
+
+    const store = useNodeStore.getState();
+    const target = store.getNode(payload.id);
+    if (!target) {
+      sendResponse({ ok: true, deleted: false });
+      return true;
+    }
+
+    store.trashNode(payload.id);
+    sendResponse({ ok: true, deleted: true });
+    return true;
+   }
+
+   if (message?.type === HIGHLIGHT_NOTE_UPSERT) {
+    const payload = message.payload as HighlightNoteUpsertPayload | undefined;
+    if (!payload?.id || typeof payload.noteText !== 'string') {
+      sendResponse({ ok: false, error: 'Invalid highlight note payload' });
+      return true;
+    }
+
+    const store = useNodeStore.getState() as HighlightNodeStore;
+    ensureCommentTagDef(store);
+    const result = upsertHighlightNote(store, payload.id, payload.noteText);
+    sendResponse({
+      ok: true,
+      updated: !!result,
+      commentNodeId: result?.commentNodeId,
+      created: result?.created ?? false,
+    });
     return true;
    }
 

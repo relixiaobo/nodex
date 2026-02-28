@@ -7,8 +7,10 @@ import {
   HIGHLIGHT_CREATE,
   HIGHLIGHT_RESTORE,
   HIGHLIGHT_REMOVE,
+  HIGHLIGHT_DELETE,
   HIGHLIGHT_SCROLL_TO,
   HIGHLIGHT_CLICK,
+  HIGHLIGHT_NOTE_UPSERT,
   HIGHLIGHT_CHECK_URL,
   HIGHLIGHT_CHECK_URL_REQUEST,
   HIGHLIGHT_UNRESOLVABLE,
@@ -17,8 +19,10 @@ import type {
   HighlightCreatePayload,
   HighlightRestorePayload,
   HighlightRemovePayload,
+  HighlightDeletePayload,
   HighlightScrollToPayload,
   HighlightClickPayload,
+  HighlightNoteUpsertPayload,
   HighlightCheckUrlPayload,
   HighlightCheckUrlRequestPayload,
   HighlightUnresolvablePayload,
@@ -49,8 +53,16 @@ describe('message type constants', () => {
     expect(HIGHLIGHT_SCROLL_TO).toBe('highlight:scroll-to');
   });
 
+  it('HIGHLIGHT_DELETE is "highlight:delete"', () => {
+    expect(HIGHLIGHT_DELETE).toBe('highlight:delete');
+  });
+
   it('HIGHLIGHT_CLICK is "highlight:click"', () => {
     expect(HIGHLIGHT_CLICK).toBe('highlight:click');
+  });
+
+  it('HIGHLIGHT_NOTE_UPSERT is "highlight:note-upsert"', () => {
+    expect(HIGHLIGHT_NOTE_UPSERT).toBe('highlight:note-upsert');
   });
 
   it('HIGHLIGHT_CHECK_URL is "highlight:check-url"', () => {
@@ -70,8 +82,10 @@ describe('message type constants', () => {
       HIGHLIGHT_CREATE,
       HIGHLIGHT_RESTORE,
       HIGHLIGHT_REMOVE,
+      HIGHLIGHT_DELETE,
       HIGHLIGHT_SCROLL_TO,
       HIGHLIGHT_CLICK,
+      HIGHLIGHT_NOTE_UPSERT,
       HIGHLIGHT_CHECK_URL,
       HIGHLIGHT_CHECK_URL_REQUEST,
       HIGHLIGHT_UNRESOLVABLE,
@@ -86,8 +100,10 @@ describe('message type constants', () => {
       HIGHLIGHT_CREATE,
       HIGHLIGHT_RESTORE,
       HIGHLIGHT_REMOVE,
+      HIGHLIGHT_DELETE,
       HIGHLIGHT_SCROLL_TO,
       HIGHLIGHT_CLICK,
+      HIGHLIGHT_NOTE_UPSERT,
       HIGHLIGHT_CHECK_URL,
       HIGHLIGHT_CHECK_URL_REQUEST,
       HIGHLIGHT_UNRESOLVABLE,
@@ -141,6 +157,26 @@ describe('payload types', () => {
     expect(payload.withNote).toBe(true);
   });
 
+  it('HighlightCreatePayload supports optional noteText', () => {
+    const anchor: HighlightAnchor = {
+      version: 1,
+      exact: 'text',
+      prefix: '',
+      suffix: '',
+    };
+
+    const payload: HighlightCreatePayload = {
+      anchor,
+      selectedText: 'text',
+      pageUrl: 'https://example.com',
+      pageTitle: 'Page',
+      withNote: true,
+      noteText: 'my inline note',
+    };
+
+    expect(payload.noteText).toBe('my inline note');
+  });
+
   it('HighlightRestorePayload holds array of highlights', () => {
     const payload: HighlightRestorePayload = {
       highlights: [
@@ -167,6 +203,11 @@ describe('payload types', () => {
     expect(payload.id).toBe('node-123');
   });
 
+  it('HighlightDeletePayload has id', () => {
+    const payload: HighlightDeletePayload = { id: 'node-001' };
+    expect(payload.id).toBe('node-001');
+  });
+
   it('HighlightScrollToPayload has id', () => {
     const payload: HighlightScrollToPayload = { id: 'node-456' };
     expect(payload.id).toBe('node-456');
@@ -175,6 +216,15 @@ describe('payload types', () => {
   it('HighlightClickPayload has id', () => {
     const payload: HighlightClickPayload = { id: 'node-789' };
     expect(payload.id).toBe('node-789');
+  });
+
+  it('HighlightNoteUpsertPayload has id and noteText', () => {
+    const payload: HighlightNoteUpsertPayload = {
+      id: 'node-789',
+      noteText: 'note',
+    };
+    expect(payload.id).toBe('node-789');
+    expect(payload.noteText).toBe('note');
   });
 
   it('HighlightCheckUrlPayload has url and tabId', () => {

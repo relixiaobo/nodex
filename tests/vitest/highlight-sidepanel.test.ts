@@ -65,7 +65,7 @@ describe('highlight-sidepanel', () => {
 
     const clipNode = store.getNode(result.clipNodeId);
     expect(clipNode).not.toBeNull();
-    expect(clipNode!.tags).toContain('tagDef_web_clip');
+    expect(clipNode!.tags).toContain('tagDef_source');
     expect(loroDoc.getParentId(result.clipNodeId)).toBe(CONTAINER_IDS.INBOX);
     expect(findClipNodeByUrl('https://example.com/new-highlight')).toBe(result.clipNodeId);
   });

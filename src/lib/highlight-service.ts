@@ -12,10 +12,8 @@ import * as loroDoc from './loro-doc.js';
 import type { WebClipNodeStore } from './webclip-service.js';
 import { findTagDefByName } from './webclip-service.js';
 
-/** Extended store interface for options field support. */
-export interface HighlightNodeStore extends WebClipNodeStore {
-  setOptionsFieldValue(nodeId: string, fieldDefId: string, optionNodeId: string): void;
-}
+/** Extended store interface for highlight operations. */
+export interface HighlightNodeStore extends WebClipNodeStore {}
 
 // ============================================================
 // Internal constants
@@ -80,18 +78,6 @@ export function ensureHighlightTagDef(store: HighlightNodeStore): void {
       autoInitialize: AUTO_INIT_STRATEGY.ANCESTOR_SUPERTAG_REF,
     });
     loroDoc.commitDoc();
-  } else {
-    // Backfill sourceSupertag and autoInitialize if missing (e.g., after migration)
-    const currentFd = loroDoc.toNodexNode(sourceFd.id);
-    const needsUpdate = !currentFd?.sourceSupertag
-      || currentFd?.autoInitialize !== AUTO_INIT_STRATEGY.ANCESTOR_SUPERTAG_REF;
-    if (needsUpdate) {
-      loroDoc.setNodeDataBatch(sourceFd.id, {
-        sourceSupertag: sourceTagDef.id,
-        autoInitialize: AUTO_INIT_STRATEGY.ANCESTOR_SUPERTAG_REF,
-      });
-      loroDoc.commitDoc();
-    }
   }
   _sourceFieldDefId = sourceFd.id;
 }
@@ -160,39 +146,16 @@ export function createHighlightNode(params: CreateHighlightParams): NodexNode {
 
 /**
  * Find all #highlight nodes for a given clip page.
- * New model: highlights are direct children of the clip node.
- * Backward compat: also scans LIBRARY top-level for legacy highlights with Source field match.
+ * Highlights are direct children of the clip node.
  */
 export function getHighlightsForClip(clipNodeId: string): NodexNode[] {
   const results: NodexNode[] = [];
-  const seen = new Set<string>();
-
-  // 1. New model: direct children of clipNodeId
   const clipChildren = loroDoc.getChildren(clipNodeId);
   for (const childId of clipChildren) {
     const child = loroDoc.toNodexNode(childId);
     if (!child || !child.tags.includes(SYS_T.HIGHLIGHT)) continue;
     results.push(child);
-    seen.add(childId);
   }
-
-  // 2. Backward compat: legacy highlights at LIBRARY top level with Source field match
-  const sourceFieldDefId = _sourceFieldDefId;
-  if (sourceFieldDefId) {
-    const libraryChildren = loroDoc.getChildren(CONTAINER_IDS.LIBRARY);
-    for (const childId of libraryChildren) {
-      if (seen.has(childId)) continue;
-      const child = loroDoc.toNodexNode(childId);
-      if (!child || !child.tags.includes(SYS_T.HIGHLIGHT)) continue;
-
-      const sourceRef = getOptionsFieldTargetId(childId, sourceFieldDefId);
-      if (sourceRef === clipNodeId) {
-        results.push(child);
-        seen.add(childId);
-      }
-    }
-  }
-
   return results;
 }
 
@@ -204,29 +167,6 @@ export function createCommentNode(store: HighlightNodeStore, highlightId: string
   const node = store.createChild(highlightId, undefined, { name: text });
   store.applyTag(node.id, SYS_T.COMMENT);
   return loroDoc.toNodexNode(node.id)!;
-}
-
-// ============================================================
-// Internal helpers
-// ============================================================
-
-/**
- * Get the targetId of an options field value (the referenced node ID).
- */
-function getOptionsFieldTargetId(nodeId: string, fieldDefId: string): string | undefined {
-  const children = loroDoc.getChildren(nodeId);
-  for (const childId of children) {
-    const child = loroDoc.toNodexNode(childId);
-    if (child?.type === 'fieldEntry' && child.fieldDefId === fieldDefId) {
-      const valueChildren = loroDoc.getChildren(childId);
-      if (valueChildren.length > 0) {
-        const valueNode = loroDoc.toNodexNode(valueChildren[0]);
-        return valueNode?.targetId ?? valueNode?.name;
-      }
-      return undefined;
-    }
-  }
-  return undefined;
 }
 
 /**

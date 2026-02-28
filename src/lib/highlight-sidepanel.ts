@@ -20,9 +20,7 @@ const pendingClipCreationByUrl = new Map<string, Promise<string>>();
 
 /**
  * Collect all highlight node IDs.
- * Two-level traversal across LIBRARY, INBOX, and CLIPS:
- * 1. Legacy: highlights directly in LIBRARY (old model)
- * 2. New: highlights as children of clip pages (in any container)
+ * Highlights live as children of clip pages in LIBRARY, INBOX, or CLIPS.
  */
 export function collectAllHighlightNodeIds(): Set<string> {
   const ids = new Set<string>();
@@ -31,16 +29,6 @@ export function collectAllHighlightNodeIds(): Set<string> {
   for (const containerId of containers) {
     const children = loroDoc.getChildren(containerId);
     for (const childId of children) {
-      const node = loroDoc.toNodexNode(childId);
-      if (!node) continue;
-
-      // Direct highlight in container (legacy model)
-      if (node.tags.includes(SYS_T.HIGHLIGHT)) {
-        ids.add(childId);
-        continue;
-      }
-
-      // Clip page children may be highlights (new model)
       const grandChildren = loroDoc.getChildren(childId);
       for (const gcId of grandChildren) {
         const gc = loroDoc.toNodexNode(gcId);

@@ -231,7 +231,13 @@ export function resolveInlineReferenceTextColor(targetNodeId: string): string {
   if (!targetNodeId) return INLINE_REF_FALLBACK_TEXT_COLOR;
   try {
     const node = loroDoc.toNodexNode(targetNodeId);
-    const firstTagId = node?.tags?.[0];
+    if (!node) return INLINE_REF_FALLBACK_TEXT_COLOR;
+
+    // For #highlight nodes, use highlight-specific color
+    const highlightColor = resolveHighlightBulletColor(targetNodeId);
+    if (highlightColor) return highlightColor;
+
+    const firstTagId = node.tags?.[0];
     if (!firstTagId) return INLINE_REF_FALLBACK_TEXT_COLOR;
     return resolveTagColor(firstTagId).text;
   } catch {

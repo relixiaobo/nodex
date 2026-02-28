@@ -16,6 +16,7 @@ import { useChildren } from '../../hooks/use-children';
 import { useNodeFields, type FieldEntry } from '../../hooks/use-node-fields';
 import { useFieldOptions } from '../../hooks/use-field-options.js';
 import { OutlinerItem } from '../outliner/OutlinerItem';
+import { RowHost } from '../outliner/RowHost.js';
 import { TrailingInput } from '../editor/TrailingInput';
 import { FieldRow } from './FieldRow';
 import { toFieldRowEntryProps } from './field-row-props.js';
@@ -40,6 +41,7 @@ import { useUIStore } from '../../stores/ui-store.js';
 import * as loroDoc from '../../lib/loro-doc.js';
 import { t } from '../../i18n/strings.js';
 import { FIELD_OVERLAY_Z_INDEX, FIELD_VALUE_INSET } from './field-layout.js';
+import { shouldShowTrailingInput, type OutlinerRowItem } from '../outliner/row-model.js';
 
 interface FieldValueOutlinerProps {
   tupleId: string;
@@ -56,8 +58,7 @@ interface FieldValueOutlinerProps {
 export function shouldShowFieldValueTrailingInput(
   items: Array<{ type: 'field' | 'content' }>,
 ): boolean {
-  if (items.length === 0) return true;
-  return items[items.length - 1]?.type === 'field';
+  return shouldShowTrailingInput(items);
 }
 
 export function resolveSupertagPickerSelectedId(
@@ -95,7 +96,7 @@ export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, configNo
 
   // Separate children into fields and content (same logic as OutlinerItem)
   const visibleChildren = useMemo(() => {
-    const result: { id: string; type: 'field' | 'content' }[] = [];
+    const result: OutlinerRowItem[] = [];
     for (const cid of childIds) {
       if (fieldMap.has(cid)) {
         result.push({ id: cid, type: 'field' });
@@ -350,21 +351,22 @@ export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, configNo
       onDragLeave={handleContainerDragLeave}
       onDrop={handleContainerDrop}
     >
-      {visibleChildren.map(({ id, type }, i) =>
-        type === 'field' ? (
-          <div key={id} className="@container relative has-[.field-overlay-open]:z-[80]" style={{ paddingLeft: 6 + 15 + 4 }}>
+      <RowHost
+        rows={visibleChildren}
+        renderField={(row, i, rows) => (
+          <div className="@container relative has-[.field-overlay-open]:z-[80]" style={{ paddingLeft: 6 + 15 + 4 }}>
             <FieldRow
               nodeId={tupleId}
-              {...toFieldRowEntryProps(fieldMap.get(id)!)}
+              {...toFieldRowEntryProps(fieldMap.get(row.id)!)}
               rootChildIds={selectableChildIds}
               rootNodeId={tupleId}
-              isLastInGroup={i === visibleChildren.length - 1 || visibleChildren[i + 1].type !== 'field'}
+              isLastInGroup={i === rows.length - 1 || rows[i + 1].type !== 'field'}
             />
           </div>
-        ) : (
+        )}
+        renderContent={(row) => (
           <OutlinerItem
-            key={id}
-            nodeId={id}
+            nodeId={row.id}
             depth={0}
             rootChildIds={selectableChildIds}
             parentId={tupleId}
@@ -373,8 +375,8 @@ export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, configNo
             attrDefId={attrDefId}
             onNavigateOut={onNavigateOut}
           />
-        ),
-      )}
+        )}
+      />
       {showTrailingInput && (
         <TrailingInput
           parentId={tupleId}

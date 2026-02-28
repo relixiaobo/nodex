@@ -421,6 +421,96 @@ describe('template field default values — cloneTemplateFieldValues', () => {
     expect(feChildren.length).toBe(0);
   });
 
+  it('merges default value into existing empty field when applying second tag', () => {
+    const store = useNodeStore.getState();
+
+    // Create two tags sharing the same fieldDef (via fieldEntry templates)
+    const tagA = store.createTagDef('TagA', { color: 'red' });
+    const tagB = store.createTagDef('TagB', { color: 'blue' });
+    const fieldDef = store.createFieldDef('Shared Field', 'plain', tagA.id);
+
+    // TagA has a fieldEntry pointing to the fieldDef (but no default value)
+    const { fieldEntryId: feA } = store.addUnnamedFieldToNode(tagA.id);
+    // Redirect feA to point to the existing fieldDef
+    loroDoc.setNodeData(feA, 'fieldDefId', fieldDef.id);
+    loroDoc.commitDoc();
+
+    // TagB also has a fieldEntry for the same fieldDef, but WITH a default value
+    const feB = loroDoc.createNode(undefined as unknown as string, tagB.id);
+    const feBId = (() => {
+      const children = loroDoc.getChildren(tagB.id);
+      return children[children.length - 1];
+    })();
+    loroDoc.setNodeDataBatch(feBId, { type: 'fieldEntry', fieldDefId: fieldDef.id });
+    const defaultVal = store.createChild(feBId, undefined, { name: 'default-from-B' });
+    loroDoc.commitDoc();
+
+    // Apply TagA first (field created but empty)
+    const node = store.createChild('proj_1', undefined, { name: 'Merge test' });
+    store.applyTag(node.id, tagA.id);
+
+    // Verify field exists but is empty
+    const nodeChildren1 = loroDoc.getChildren(node.id);
+    const feNode1 = nodeChildren1.find(cid => {
+      const n = loroDoc.toNodexNode(cid);
+      return n?.type === 'fieldEntry' && n.fieldDefId === fieldDef.id;
+    });
+    expect(feNode1).toBeTruthy();
+    expect(loroDoc.getChildren(feNode1!).length).toBe(0);
+
+    // Apply TagB — should merge default value into existing empty field
+    store.applyTag(node.id, tagB.id);
+
+    // Now the field should have the merged default value
+    const feChildren = loroDoc.getChildren(feNode1!);
+    expect(feChildren.length).toBe(1);
+    expect(loroDoc.toNodexNode(feChildren[0])?.name).toBe('default-from-B');
+  });
+
+  it('does NOT overwrite existing field value when applying second tag', () => {
+    const store = useNodeStore.getState();
+
+    // Create tagDef with a shared fieldDef that has a default value
+    const tagA = store.createTagDef('TagA2', { color: 'red' });
+    const { fieldEntryId: feA, fieldDefId } = store.addUnnamedFieldToNode(tagA.id);
+    store.renameFieldDef(fieldDefId, 'Priority');
+
+    // Set default value on TagA's template
+    store.createChild(feA, undefined, { name: 'high' });
+
+    // Apply TagA — creates field with default 'high'
+    const node = store.createChild('proj_1', undefined, { name: 'Keep value test' });
+    store.applyTag(node.id, tagA.id);
+
+    // Find fieldEntry and verify it has the value
+    const nodeChildren = loroDoc.getChildren(node.id);
+    const feNode = nodeChildren.find(cid => {
+      const n = loroDoc.toNodexNode(cid);
+      return n?.type === 'fieldEntry' && n.fieldDefId === fieldDefId;
+    });
+    expect(feNode).toBeTruthy();
+    const feValsBefore = loroDoc.getChildren(feNode!);
+    expect(feValsBefore.length).toBe(1);
+    expect(loroDoc.toNodexNode(feValsBefore[0])?.name).toBe('high');
+
+    // Create TagB with a different default for the same field
+    const tagB = store.createTagDef('TagB2', { color: 'blue' });
+    const feBId = (() => {
+      const id = store.createChild(tagB.id).id;
+      loroDoc.setNodeDataBatch(id, { type: 'fieldEntry', fieldDefId });
+      store.createChild(id, undefined, { name: 'low' });
+      loroDoc.commitDoc();
+      return id;
+    })();
+
+    // Apply TagB — should NOT overwrite existing 'high' value
+    store.applyTag(node.id, tagB.id);
+
+    const feValsAfter = loroDoc.getChildren(feNode!);
+    expect(feValsAfter.length).toBe(1);
+    expect(loroDoc.toNodexNode(feValsAfter[0])?.name).toBe('high');
+  });
+
   it('clones targetId for option-type default values', () => {
     const store = useNodeStore.getState();
 

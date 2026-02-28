@@ -564,11 +564,12 @@ export function applyTagMutationsNoCommit(nodeId: string, tagDefId: string): voi
   // 2. 处理 extends 链（继承父标签的 fieldDefs）
   const extendsChain = getExtendsChain(tagDefId);
 
-  // 3. 为所有 fieldDef 创建 fieldEntry（若不存在）
+  // 3. 为所有 fieldDef 创建 fieldEntry（若不存在），或合并默认值到已存在的空字段
   for (const chainTagId of extendsChain) {
     const fieldRefs = getTemplateFieldDefs(chainTagId);
     for (const ref of fieldRefs) {
-      if (!findFieldEntry(nodeId, ref.fieldDefId)) {
+      const existingFeId = findFieldEntry(nodeId, ref.fieldDefId);
+      if (!existingFeId) {
         const feId = nanoid();
         loroDoc.createNode(feId, nodeId);
         loroDoc.setNodeDataBatch(feId, {
@@ -577,6 +578,9 @@ export function applyTagMutationsNoCommit(nodeId: string, tagDefId: string): voi
           templateId: ref.templateOriginId,
         });
         cloneTemplateFieldValues(feId, ref.templateOriginId);
+      } else if (!fieldEntryHasValue(existingFeId)) {
+        // Merge: existing field is empty, fill with new tag's template default values
+        cloneTemplateFieldValues(existingFeId, ref.templateOriginId);
       }
     }
   }

@@ -20,6 +20,7 @@ import { docToMarks, marksToDoc } from '../../lib/pm-doc-utils.js';
 import { isOnlyInlineRef } from '../../lib/tree-utils.js';
 import { pmSchema } from './pm-schema.js';
 import { FloatingToolbar } from './FloatingToolbar.js';
+import { parseMultiLinePaste, type ParsedPasteNode } from '../../lib/paste-parser.js';
 
 /**
  * Detect whether a string looks like a URL for smart paste.
@@ -109,7 +110,7 @@ interface RichTextEditorProps {
   onEscapeSelect?: () => void;
   onShiftArrow?: (direction: 'up' | 'down') => void;
   onSelectAll?: () => void;
-  onPasteMultiLine?: (lines: string[]) => void;
+  onPasteMultiLine?: (nodes: ParsedPasteNode[]) => void;
 }
 
 export interface EditorContentPayload {
@@ -177,6 +178,7 @@ export function RichTextEditor(props: RichTextEditorProps) {
   });
 
   const updateNodeContent = useNodeStore((s) => s.updateNodeContent);
+  const applyParsedPasteMetadata = useNodeStore((s) => s.applyParsedPasteMetadata);
 
   const saveContent = useCallback(() => {
     const view = viewRef.current;
@@ -740,8 +742,9 @@ export function RichTextEditor(props: RichTextEditorProps) {
         paste: (view, event) => {
           const clipboardEvent = event as ClipboardEvent;
           clipboardEvent.preventDefault();
-          const text = clipboardEvent.clipboardData?.getData('text/plain') ?? '';
-          if (!text.trim()) return true;
+          const plain = clipboardEvent.clipboardData?.getData('text/plain') ?? '';
+          const html = clipboardEvent.clipboardData?.getData('text/html') ?? '';
+          if (!plain.trim() && !html.trim()) return true;
 
           const { from, to } = view.state.selection;
           const hasSelection = from !== to;
@@ -750,7 +753,7 @@ export function RichTextEditor(props: RichTextEditorProps) {
 
           // ⌘⇧V (plain paste): always flatten multi-line to single line
           if (isPlainPaste) {
-            const normalized = text.replace(/[\r\n]+/g, ' ').trim();
+            const normalized = plain.replace(/[\r\n]+/g, ' ').trim();
             const tr = view.state.tr.insertText(normalized, from, to);
             tr.setMeta('nodex:isPaste', true);
             view.dispatch(tr);
@@ -758,8 +761,12 @@ export function RichTextEditor(props: RichTextEditorProps) {
           }
 
           // ⌘V (smart paste): check for URL first (single-line only)
-          const normalized = text.replace(/[\r\n]+/g, ' ').trim();
-          if (isLikelyUrl(normalized)) {
+          const normalized = plain.replace(/[\r\n]+/g, ' ').trim();
+          const nonEmptyLines = plain
+            .split(/\r?\n/)
+            .map((line) => line.trim())
+            .filter((line) => line.length > 0);
+          if (nonEmptyLines.length === 1 && isLikelyUrl(normalized)) {
             if (hasSelection) {
               let tr = view.state.tr.addMark(from, to, pmSchema.marks.link.create({ href: normalized }));
               tr = tr.setSelection(TextSelection.create(tr.doc, to));
@@ -776,25 +783,54 @@ export function RichTextEditor(props: RichTextEditorProps) {
             return true;
           }
 
-          // ⌘V with multi-line text: split into sibling nodes
-          const lines = text.split(/\r?\n/);
-          if (lines.length > 1 && propsRef.current.onPasteMultiLine) {
-            const firstLine = lines[0].trim();
-            if (firstLine) {
-              const tr = view.state.tr.insertText(firstLine, from, to);
-              tr.setMeta('nodex:isPaste', true);
-              tr.setMeta(META_DEFER_LORO_TEXT_COMMIT, true);
-              view.dispatch(tr);
-            }
-            saveContent();
-            propsRef.current.onPasteMultiLine(lines.slice(1));
+          const parsedNodes = parseMultiLinePaste(plain, html).filter((node) =>
+            node.name.trim().length > 0
+            || node.children.length > 0
+            || (node.tags?.length ?? 0) > 0
+            || (node.fields?.length ?? 0) > 0,
+          );
+          if (parsedNodes.length === 0) return true;
+
+          const firstNode = parsedNodes[0];
+          const restNodes = parsedNodes.slice(1);
+          const hasMetadata = (firstNode.tags?.length ?? 0) > 0 || (firstNode.fields?.length ?? 0) > 0;
+          const shouldDeferCommit = restNodes.length > 0 || hasMetadata;
+
+          if (restNodes.length > 0 && !propsRef.current.onPasteMultiLine) {
+            const fallback = parsedNodes.map((node) => node.name).filter(Boolean).join(' ');
+            const tr = view.state.tr.insertText(fallback, from, to);
+            tr.setMeta('nodex:isPaste', true);
+            view.dispatch(tr);
             return true;
           }
 
-          // Single-line non-URL: plain insert
-          const tr = view.state.tr.insertText(normalized, from, to);
+          const firstDoc = marksToDoc(firstNode.name, firstNode.marks ?? [], firstNode.inlineRefs ?? []);
+          const paragraph = firstDoc.firstChild;
+          let tr = view.state.tr;
+          if (paragraph && paragraph.content.size > 0) {
+            tr = tr.replaceWith(from, to, paragraph.content);
+            const cursorPos = Math.min(tr.doc.content.size, from + paragraph.content.size);
+            tr = tr.setSelection(TextSelection.create(tr.doc, cursorPos));
+          } else {
+            tr = tr.insertText(firstNode.name, from, to);
+          }
           tr.setMeta('nodex:isPaste', true);
+          if (shouldDeferCommit) {
+            tr.setMeta(META_DEFER_LORO_TEXT_COMMIT, true);
+          }
           view.dispatch(tr);
+
+          if (!shouldDeferCommit) return true;
+
+          saveContent();
+          if (hasMetadata) {
+            applyParsedPasteMetadata(propsRef.current.nodeId, firstNode, { commit: false });
+          }
+          if (restNodes.length > 0 && propsRef.current.onPasteMultiLine) {
+            propsRef.current.onPasteMultiLine(restNodes);
+          } else if (hasMetadata) {
+            commitDoc('user:paste');
+          }
           return true;
         },
         keydown: (_view, event) => {

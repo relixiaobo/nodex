@@ -36,6 +36,7 @@ import { BulletChevron } from '../outliner/BulletChevron';
 import { FIELD_OVERLAY_Z_INDEX } from '../fields/field-layout.js';
 import { pmSchema } from './pm-schema.js';
 import { marksToDoc } from '../../lib/pm-doc-utils.js';
+import { parseMultiLinePaste } from '../../lib/paste-parser.js';
 
 const KEY_TRAILING_ENTER = getPrimaryShortcutKey('trailing.enter', 'Enter');
 const KEY_TRAILING_INDENT = getPrimaryShortcutKey('trailing.indent_depth', 'Tab');
@@ -108,6 +109,7 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
     const allOptions = useFieldOptions(isOptions ? (attrDefId ?? '') : '');
     const addReference = useNodeStore((s) => s.addReference);
     const selectFieldOption = useNodeStore((s) => s.selectFieldOption);
+    const applyParsedPasteMetadata = useNodeStore((s) => s.applyParsedPasteMetadata);
 
     const [optionsOpen, setOptionsOpen] = useState(false);
     const [optionsQuery, setOptionsQuery] = useState('');
@@ -121,7 +123,7 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
     }, [isOptions, optionsOpen, optionsQuery, allOptions]);
 
     const callbacksRef = useRef({
-        createChild, createNodeInSearchContext, cycleNodeCheckbox, addUnnamedFieldToNode, addReference, selectFieldOption,
+        createChild, createNodeInSearchContext, cycleNodeCheckbox, addUnnamedFieldToNode, addReference, selectFieldOption, applyParsedPasteMetadata,
         parentId, effectiveParentId, effectiveDepth, effectiveParentEK,
         setEffectiveParentId, setEffectiveDepth, setEffectiveParentEK,
         setExpanded, setFocusedNode, setFocusClickCoords, setEditingFieldName, setTriggerHint,
@@ -130,7 +132,7 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
         onNavigateOut, isSearchContext,
     });
     callbacksRef.current = {
-        createChild, createNodeInSearchContext, cycleNodeCheckbox, addUnnamedFieldToNode, addReference, selectFieldOption,
+        createChild, createNodeInSearchContext, cycleNodeCheckbox, addUnnamedFieldToNode, addReference, selectFieldOption, applyParsedPasteMetadata,
         parentId, effectiveParentId, effectiveDepth, effectiveParentEK,
         setEffectiveParentId, setEffectiveDepth, setEffectiveParentEK,
         setExpanded, setFocusedNode, setFocusClickCoords, setEditingFieldName, setTriggerHint,
@@ -484,34 +486,48 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
                 paste: (_view, event) => {
                     const clipboardEvent = event as ClipboardEvent;
                     clipboardEvent.preventDefault();
-                    const text = clipboardEvent.clipboardData?.getData('text/plain') ?? '';
-                    if (!text.trim()) return true;
+                    const plain = clipboardEvent.clipboardData?.getData('text/plain') ?? '';
+                    const html = clipboardEvent.clipboardData?.getData('text/html') ?? '';
+                    if (!plain.trim() && !html.trim()) return true;
 
                     const ref = callbacksRef.current;
                     if (committingRef.current) return true;
                     committingRef.current = true;
 
-                    const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
-                    if (lines.length === 0) { committingRef.current = false; return true; }
+                    const nodes = parseMultiLinePaste(plain, html).filter((node) =>
+                        node.name.trim().length > 0
+                        || node.children.length > 0
+                        || (node.tags?.length ?? 0) > 0
+                        || (node.fields?.length ?? 0) > 0,
+                    );
+                    if (nodes.length === 0) { committingRef.current = false; return true; }
 
                     // Create first child from first line
                     resetEditorContent(_view);
                     setHasContent(false);
-                    const firstNode = createInContext(ref, ref.effectiveParentId, { name: lines[0] });
+                    const firstParsed = nodes[0];
+                    const firstNode = createInContext(ref, ref.effectiveParentId, {
+                        name: firstParsed.name,
+                        marks: firstParsed.marks,
+                        inlineRefs: firstParsed.inlineRefs,
+                    });
                     ref.setExpanded(ref.effectiveParentEK, true, true);
+                    ref.applyParsedPasteMetadata(firstNode.id, firstParsed, { commit: false });
 
                     // Create siblings for remaining lines
                     let lastId = firstNode.id;
-                    if (lines.length > 1) {
+                    if (nodes.length > 1) {
                         const createSiblingNodesFromPaste = useNodeStore.getState().createSiblingNodesFromPaste;
-                        const result = createSiblingNodesFromPaste(firstNode.id, lines.slice(1));
+                        const result = createSiblingNodesFromPaste(firstNode.id, nodes.slice(1));
                         if (result) lastId = result;
+                    } else {
+                        loroDoc.commitDoc();
                     }
 
                     ref.setFocusClickCoords({
                         nodeId: lastId,
                         parentId: ref.effectiveParentId,
-                        textOffset: lines[lines.length - 1].length,
+                        textOffset: nodes[nodes.length - 1].name.length,
                     });
                     ref.setFocusedNode(lastId, ref.effectiveParentId);
                     queueMicrotask(() => { committingRef.current = false; });

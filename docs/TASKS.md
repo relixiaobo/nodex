@@ -26,7 +26,9 @@ _(空)_
 
 ## Agent 状态
 
-_(无活跃 Agent)_
+| Agent | 任务 | 分支 | PR |
+|-------|------|------|----|
+| codex | Outliner 渲染核心收敛 (RowHost) | `codex/outliner-rowhost-convergence` | #108 (Draft) |
 
 ---
 
@@ -46,6 +48,7 @@ _(见 Agent 状态表)_
 - [x] **粘贴/剪藏内容中的 #、@ 不应触发下拉菜单** — paste transaction setMeta 跳过 trigger 检测
 - [x] **Field value 验证错误 icon 未垂直居中** — number 等字段输入非法值时，右侧 ⚠ 图标未与行内容垂直居中 ✅（2026-02-27）
 - [x] **Options from Supertags 值选择器** — 后端 `resolveTaggedNodes()` 正确，但 UI 选择器用错了组件（显示所有 supertag 而非 tagged nodes）。修复：新增 `TaggedNodePickerField` 使用 `useFieldOptions` ✅（2026-02-28）
+- [x] **Reference node 在 field value 中不显示 tag** — NodePicker 选中值只显示名称，缺少原节点的 supertag 标记。修复：NodePicker 添加 `ReadOnlyTagLabel` 渲染引用节点的 tags ✅（2026-02-28）
 
 ### v0.1 — 首次上线（Chrome Web Store 发布）
 
@@ -61,7 +64,7 @@ _(见 Agent 状态表)_
 
 - [x] **扩展图标** — 16/32/48/128px PNG（`public/icon/` + preview/dev 变体）✅
 - [x] **商店图标** — 128x128 PNG ✅
-- [x] **商店截图** — 3 张 1280×800（`docs/store-screenshots/store-01~03.png`）✅
+- [x] **商店截图** — 6 张 1280×800（`docs/store-screenshots/`）✅
 - [x] **商店描述** — `docs/store-listing.md`（含权限说明 + 数据披露）✅
 - [x] **隐私政策页面** — `docs/privacy-policy.md` + Worker `/privacy` 端点 ✅
 - [x] **Nodex → soma 改名** — 用户可见名称全部更新 ✅（215acdb）
@@ -196,9 +199,9 @@ _(见 Agent 状态表)_
 - [ ] 标题编辑器支持 `Cmd+Enter` 切换 checkbox 状态
 
 #### Shift+Arrow 连续多选中断问题
-- [ ] 排查 Shift+↑/↓ 遍历逻辑对 TrailingInput 虚拟节点的处理（应跳过）
-- [ ] 排查 Shift+↑/↓ 遍历逻辑对 field tuple 节点的处理（应纳入或跳过，保持连续）
-- [ ] 补 Vitest 回归用例（含 trailing input + field row 场景）
+- [x] 排查 Shift+↑/↓ 遍历逻辑对 TrailingInput 虚拟节点的处理（应跳过）✅（2026-02-28）
+- [x] 排查 Shift+↑/↓ 遍历逻辑对 field tuple 节点的处理（应纳入或跳过，保持连续）✅（2026-02-28）
+- [x] 补 Vitest 回归用例（含 trailing input + field row 场景）✅（2026-02-28）
 
 #### 节点选中 — 后续增强 (#47)
 - [ ] Cmd+Shift+D 批量复制

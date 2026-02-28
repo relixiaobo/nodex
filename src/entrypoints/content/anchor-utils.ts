@@ -74,13 +74,25 @@ function getTextNodeIndex(textNode: Node): number {
 // ── CSS Selector Generation ──
 
 /**
+ * Escape a string for use in a CSS selector.
+ * Uses CSS.escape when available, falls back to manual escaping.
+ */
+function escapeCssId(id: string): string {
+  if (typeof CSS !== 'undefined' && typeof CSS.escape === 'function') {
+    return CSS.escape(id);
+  }
+  // Fallback: escape special CSS characters
+  return id.replace(/([^\w-])/g, '\\$1');
+}
+
+/**
  * Generate a CSS selector for an element.
  * Prioritizes id, then builds a path using tag names and nth-child.
  */
 export function getCssSelector(element: Element): string {
   // ID shortcut
   if (element.id) {
-    return `#${CSS.escape(element.id)}`;
+    return `#${escapeCssId(element.id)}`;
   }
 
   const parts: string[] = [];
@@ -89,7 +101,7 @@ export function getCssSelector(element: Element): string {
   while (current && current !== document.documentElement) {
     // If we find an ancestor with id, use it as the base
     if (current.id) {
-      parts.unshift(`#${CSS.escape(current.id)}`);
+      parts.unshift(`#${escapeCssId(current.id)}`);
       break;
     }
 

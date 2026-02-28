@@ -230,8 +230,8 @@ export async function createLightweightClip(
     sourceUrlFieldDef = store.createFieldDef('Source URL', SYS_D.URL, tagDef.id);
   }
 
-  // 3. Create clip node in CLIPS container
-  const clipNode = store.createChild(CONTAINER_IDS.CLIPS, undefined, { name: pageTitle });
+  // 3. Create clip node in INBOX (same default as saveWebClip)
+  const clipNode = store.createChild(CONTAINER_IDS.INBOX, undefined, { name: pageTitle });
 
   // 4. Apply #web_clip tag
   store.applyTag(clipNode.id, tagDef.id);

@@ -284,7 +284,7 @@ export function NodePicker({
                 className="flex-1 min-w-0 bg-transparent text-sm leading-[21px] text-foreground outline-none"
               />
             ) : (
-              <>
+              <span className="flex-1 min-w-0">
                 <span
                   className={
                     selectedName
@@ -295,13 +295,13 @@ export function NodePicker({
                   {selectedName ?? placeholder}
                 </span>
                 {selectedName && selectedNodeTags.length > 0 && (
-                  <span className="inline-flex items-center gap-1 shrink-0 ml-1">
+                  <span className="inline-flex items-baseline gap-1 ml-1.5">
                     {selectedNodeTags.map((tagId) => (
                       <ReadOnlyTagLabel key={tagId} tagDefId={tagId} />
                     ))}
                   </span>
                 )}
-              </>
+              </span>
             )}
           </div>
         )}

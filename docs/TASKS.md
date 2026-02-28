@@ -155,6 +155,7 @@ _(见 Agent 状态表)_
 
 - [x] **同一节点下重复 field node 去重** — 同一个 node 下不允许出现相同的 field node；若选中了重复的 field，只保留最早的那个
 - [x] **Field / Default Content 删除联动** — 场景 A: 删除模板字段联动清理/脱离；场景 B: 删除 attrDef 保留有值 field + 灰色删除线 ✅（2026-02-27, PR #107, 14 test）
+- [x] **模板字段默认值克隆** — applyTag 时克隆 template fieldEntry 的默认值子节点（name/targetId）；syncTemplateFields 不克隆（只影响新打标签的 node）+ 4 test ✅（2026-02-28）
 - [ ] AttrDef “Used in” 计算字段
 - [ ] Auto-initialize（6 种策略）
 - [ ] Pinned fields
@@ -276,6 +277,7 @@ _(见 Agent 状态表)_
 
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
+| 2026-02-28 | 模板字段默认值克隆 — applyTag 克隆 template fieldEntry 默认值，syncTemplateFields 不克隆（只影响新实例）+ 4 test | nodex | main |
 | 2026-02-28 | Unified OutlinerRow — 统一行交互架构（OutlinerRow 提取 + FieldRow 委托 + 共享导航工具），消除 content/field 行交互不一致 + 16 test | nodex | main |
 | 2026-02-28 | Outliner 行渲染收敛 — row-model.ts + RowHost.tsx 共享行派生/渲染，迁移 4 个 outliner 组件 + 2 test 文件 | codex | #108 |
 | 2026-02-27 | Field / Default Content 删除联动 — 模板字段删除联动清理 + attrDef 删除灰色删除线 + 14 test | field-cascade | #107 |

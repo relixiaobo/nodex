@@ -299,6 +299,18 @@ describe('parseHtmlToNodes', () => {
     expect(nodes).toHaveLength(2);
   });
 
+  it('style/script metadata tags are skipped from output nodes', () => {
+    const html = [
+      '<style><!--td {border:1px solid;}br {mso-data-placement:same-cell;}--></style>',
+      '<script>console.log("ignore")</script>',
+      '<meta charset="utf-8">',
+      '<p>Before</p>',
+      '<p>After</p>',
+    ].join('');
+    const { nodes } = parseHtmlToNodes(html, { inferStyledHeadings: true, inferParagraphLists: true });
+    expect(nodes.map((n) => n.name)).toEqual(['Before', 'After']);
+  });
+
   // ── Table ──
 
   it('table rows become pipe-joined nodes', () => {

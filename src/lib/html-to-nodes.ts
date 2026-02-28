@@ -275,6 +275,10 @@ export function parseHtmlToNodes(
     if (truncated) return;
     const tag = el.tagName.toLowerCase();
 
+    // Skip non-content tags and media placeholders
+    if (tag === 'style' || tag === 'script' || tag === 'noscript' || tag === 'template') return;
+    if (tag === 'meta' || tag === 'link' || tag === 'head' || tag === 'title') return;
+
     // Skip hr, figure/img
     if (!includeH1 && tag === 'h1') return;
     if (tag === 'hr') return;

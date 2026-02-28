@@ -14,6 +14,7 @@ import {
   type HighlightCreatePayload,
   type HighlightClickPayload,
 } from '../../lib/highlight-messaging.js';
+import { WEBCLIP_CAPTURE_ACTIVE_TAB } from '../../lib/webclip-messaging.js';
 
 // ── Highlight Color Map ──
 
@@ -286,7 +287,7 @@ function handleToolbarAction(action: string): void {
       break;
     case 'clip':
       // Delegate to existing webclip capture
-      chrome.runtime.sendMessage({ type: 'webclip:capture-active-tab' });
+      chrome.runtime.sendMessage({ type: WEBCLIP_CAPTURE_ACTIVE_TAB });
       break;
   }
 

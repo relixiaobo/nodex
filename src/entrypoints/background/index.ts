@@ -131,32 +131,34 @@ export default defineBackground(() => {
     }
 
     // ── Highlight Create: Content Script -> BG -> Side Panel ──
-    // The CS sends HIGHLIGHT_CREATE; we forward to Side Panel.
-    // In MV3, Side Panel is a separate context reachable via runtime.sendMessage.
-    // Since BG receives from CS, and Side Panel also listens on runtime.onMessage,
-    // we just need the Side Panel to listen for this type directly.
-    // The message already goes through runtime, so no extra routing needed here.
-    // But we do need to note the sender tab ID for the Side Panel to respond back.
+    // In MV3, the background intercepts CS messages. We must explicitly
+    // forward to the Side Panel (another extension page) via runtime.sendMessage.
     if (type === HIGHLIGHT_CREATE) {
-      // Augment payload with tab info so Side Panel knows which tab to respond to
       const tabId = sender.tab?.id;
-      const augmented = { ...message, _tabId: tabId };
-      // Forward to all extension pages (Side Panel will pick it up)
-      // Side Panel listens on chrome.runtime.onMessage directly
-      // Since CS -> runtime already reaches SP, we just pass through
-      sendResponse({ ok: true, received: true });
+      // Forward augmented message to Side Panel and relay its response back to CS
+      chrome.runtime.sendMessage(
+        { ...message, _tabId: tabId },
+        (spResponse) => {
+          if (chrome.runtime.lastError) {
+            sendResponse({ ok: false, error: chrome.runtime.lastError.message });
+            return;
+          }
+          sendResponse(spResponse ?? { ok: true });
+        },
+      );
       return true;
     }
 
-    // ── Highlight Click: Content Script -> Side Panel ──
+    // ── Highlight Click: Content Script -> BG -> Side Panel ──
     if (type === HIGHLIGHT_CLICK) {
-      // Same pattern — CS message already reaches SP via runtime
+      chrome.runtime.sendMessage(message).catch(() => {});
       sendResponse({ ok: true });
       return true;
     }
 
-    // ── Highlight Unresolvable: Content Script -> Side Panel ──
+    // ── Highlight Unresolvable: Content Script -> BG -> Side Panel ──
     if (type === HIGHLIGHT_UNRESOLVABLE) {
+      chrome.runtime.sendMessage(message).catch(() => {});
       sendResponse({ ok: true });
       return true;
     }

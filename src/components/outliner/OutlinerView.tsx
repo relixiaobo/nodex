@@ -7,13 +7,20 @@ import { useNodeStore } from '../../stores/node-store';
 import { useUIStore } from '../../stores/ui-store';
 import * as loroDoc from '../../lib/loro-doc.js';
 import { isOutlinerContentNodeType } from '../../lib/node-type-utils.js';
-import { OutlinerItem, buildFieldOwnerColors, buildVisibleChildrenRows } from './OutlinerItem';
+import { OutlinerItem } from './OutlinerItem';
+import { RowHost } from './RowHost.js';
 import { FieldRow } from '../fields/FieldRow';
 import { toFieldRowEntryProps } from '../fields/field-row-props.js';
 import { TrailingInput } from '../editor/TrailingInput';
 import { resolveTagColor } from '../../lib/tag-colors.js';
 import { useDragSelect } from '../../hooks/use-drag-select.js';
 import { getFlattenedVisibleNodes, getNodeTextLengthById } from '../../lib/tree-utils.js';
+import {
+  buildFieldOwnerColors,
+  buildVisibleChildrenRows,
+  getDragSelectableRowIds,
+  type OutlinerRowItem,
+} from './row-model.js';
 
 interface OutlinerViewProps {
   rootNodeId: string;
@@ -21,19 +28,13 @@ interface OutlinerViewProps {
   showTemplateTuples?: boolean;
 }
 
-export interface OutlinerVisibleChildRow {
-  id: string;
-  type: 'field' | 'content';
-  hidden?: boolean;
-}
+export type OutlinerVisibleChildRow = OutlinerRowItem;
 
 export function getDragSelectableRootIds(
   rows: OutlinerVisibleChildRow[],
   isFieldRevealed: (fieldEntryId: string) => boolean,
 ): string[] {
-  return rows
-    .filter((row) => !row.hidden || isFieldRevealed(row.id))
-    .map((row) => row.id);
+  return getDragSelectableRowIds(rows, isFieldRevealed);
 }
 
 export function OutlinerView({ rootNodeId, showTemplateTuples }: OutlinerViewProps) {
@@ -168,22 +169,22 @@ export function OutlinerView({ rootNodeId, showTemplateTuples }: OutlinerViewPro
           ))}
         </div>
       )}
-      {visibleChildren.map(({ id, type, hidden }, i) => {
-        // Hidden fields: skip unless manually revealed via UIStore toggle
-        if (hidden && !isFieldRevealed(id)) return null;
-        return type === 'field' ? (
-          <div key={id} className="@container" style={{ paddingLeft: 6 + 15 + 4 }}>
+      <RowHost
+        rows={visibleChildren}
+        isRowVisible={(row) => !row.hidden || isFieldRevealed(row.id)}
+        renderField={(row, i, rows) => (
+          <div className="@container" style={{ paddingLeft: 6 + 15 + 4 }}>
             <FieldRow
               nodeId={rootNodeId}
-              {...toFieldRowEntryProps(fieldMap.get(id)!)}
+              {...toFieldRowEntryProps(fieldMap.get(row.id)!)}
               rootChildIds={dragSelectableRootIds}
               rootNodeId={rootNodeId}
-              isLastInGroup={i === visibleChildren.length - 1 || visibleChildren[i + 1].type !== 'field'}
-              ownerTagColor={fieldOwnerColors.get(id)}
+              isLastInGroup={i === rows.length - 1 || rows[i + 1].type !== 'field'}
+              ownerTagColor={fieldOwnerColors.get(row.id)}
               onNavigateOut={(direction) => {
                 if (direction === 'up') {
                   for (let j = i - 1; j >= 0; j--) {
-                    const prev = visibleChildren[j];
+                    const prev = rows[j];
                     if (prev.hidden) continue;
                     if (prev.type === 'field') {
                       clearFocus();
@@ -201,8 +202,8 @@ export function OutlinerView({ rootNodeId, showTemplateTuples }: OutlinerViewPro
                   return;
                 }
 
-                for (let j = i + 1; j < visibleChildren.length; j++) {
-                  const next = visibleChildren[j];
+                for (let j = i + 1; j < rows.length; j++) {
+                  const next = rows[j];
                   if (next.hidden) continue;
                   if (next.type === 'field') {
                     clearFocus();
@@ -220,18 +221,18 @@ export function OutlinerView({ rootNodeId, showTemplateTuples }: OutlinerViewPro
               }}
             />
           </div>
-        ) : (
+        )}
+        renderContent={(row) => (
           <OutlinerItem
-            key={id}
-            nodeId={id}
+            nodeId={row.id}
             depth={0}
             rootChildIds={dragSelectableRootIds}
             parentId={rootNodeId}
             rootNodeId={rootNodeId}
-            bulletColors={templateContentColors.get(id)}
+            bulletColors={templateContentColors.get(row.id)}
           />
-        );
-      })}
+        )}
+      />
       {/* Empty state for search nodes */}
       {isSearchNode && visibleChildren.length === 0 && (
         <div className="px-4 py-3 text-sm text-foreground-tertiary" style={{ paddingLeft: 6 + 15 + 4 }}>

@@ -26,9 +26,7 @@ _(空)_
 
 ## Agent 状态
 
-| Agent | 任务 | 分支 | PR |
-|-------|------|------|----|
-| codex | Outliner 渲染核心收敛 (RowHost) | `codex/outliner-rowhost-convergence` | #108 (Draft) |
+_(无活跃 Agent)_
 
 ---
 
@@ -282,6 +280,7 @@ _(见 Agent 状态表)_
 
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
+| 2026-02-28 | Outliner 行渲染收敛 — row-model.ts + RowHost.tsx 共享行派生/渲染，迁移 4 个 outliner 组件 + 2 test 文件 | codex | #108 |
 | 2026-02-27 | Field / Default Content 删除联动 — 模板字段删除联动清理 + attrDef 删除灰色删除线 + 14 test | field-cascade | #107 |
 | 2026-02-27 | Highlight + Comment 研究 — 竞品分析 + 数据模型 + 锚点策略 + 3-Phase 实现方案 | research | main |
 | 2026-02-27 | Options 语义验证 + Untitled 占位 + Clip Toast 静默 — 3 个小修复 | nodex | main |

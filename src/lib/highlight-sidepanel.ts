@@ -7,9 +7,9 @@ import {
   getHighlightsForClip,
   type HighlightNodeStore,
 } from './highlight-service.js';
-import { createLightweightClip, findClipNodeByUrl } from './webclip-service.js';
+import { createLightweightClip, findClipNodeByUrl, normalizeUrl } from './webclip-service.js';
 import { resolveTagColor } from './tag-colors.js';
-import { SYS_T } from '../types/index.js';
+import { CONTAINER_IDS, SYS_T } from '../types/index.js';
 import * as loroDoc from './loro-doc.js';
 
 export interface CreateHighlightFromPayloadResult {
@@ -17,14 +17,52 @@ export interface CreateHighlightFromPayloadResult {
   clipNodeId: string;
 }
 
+const pendingClipCreationByUrl = new Map<string, Promise<string>>();
+
+export function collectHighlightNodeIdsInLibrary(): Set<string> {
+  const ids = new Set<string>();
+  const children = loroDoc.getChildren(CONTAINER_IDS.LIBRARY);
+  for (const childId of children) {
+    const node = loroDoc.toNodexNode(childId);
+    if (node?.tags.includes(SYS_T.HIGHLIGHT)) {
+      ids.add(childId);
+    }
+  }
+  return ids;
+}
+
+export function getRemovedHighlightIds(
+  previousIds: Set<string>,
+  nextIds: Set<string>,
+): string[] {
+  const removed: string[] = [];
+  for (const id of previousIds) {
+    if (!nextIds.has(id)) removed.push(id);
+  }
+  return removed;
+}
+
 export async function findOrCreateClipNodeForUrl(
   url: string,
   title: string,
   store: HighlightNodeStore,
 ): Promise<string> {
-  const existing = findClipNodeByUrl(url);
-  if (existing) return existing;
-  return createLightweightClip(url, title, store);
+  const normalized = normalizeUrl(url);
+  const pending = pendingClipCreationByUrl.get(normalized);
+  if (pending) return pending;
+
+  const task = (async () => {
+    const existing = findClipNodeByUrl(url);
+    if (existing) return existing;
+    return createLightweightClip(url, title, store);
+  })();
+
+  pendingClipCreationByUrl.set(normalized, task);
+  try {
+    return await task;
+  } finally {
+    pendingClipCreationByUrl.delete(normalized);
+  }
 }
 
 export async function createHighlightFromPayload(

@@ -1,6 +1,7 @@
 import {
   WEBCLIP_CAPTURE_ACTIVE_TAB,
   WEBCLIP_CAPTURE_PAGE,
+  CONTENT_SCRIPT_READY,
   type WebClipCaptureResponse,
 } from '../../lib/webclip-messaging.js';
 import {
@@ -11,8 +12,50 @@ import {
   HIGHLIGHT_REMOVE,
   HIGHLIGHT_SCROLL_TO,
   HIGHLIGHT_CHECK_URL,
+  HIGHLIGHT_CHECK_URL_REQUEST,
   type HighlightCheckUrlPayload,
+  type HighlightCheckUrlRequestPayload,
 } from '../../lib/highlight-messaging.js';
+
+const CONTENT_SCRIPT_READY_TIMEOUT_MS = 1200;
+const MESSAGE_RETRY_DELAY_MS = 150;
+const MESSAGE_RETRY_TIMES = 2;
+
+const contentScriptReadyWaiters = new Map<number, Set<(ready: boolean) => void>>();
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function resolveReadyWaiters(tabId: number, ready: boolean): void {
+  const waiters = contentScriptReadyWaiters.get(tabId);
+  if (!waiters) return;
+  contentScriptReadyWaiters.delete(tabId);
+  for (const waiter of waiters) waiter(ready);
+}
+
+function waitForContentScriptReady(tabId: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    const waiters = contentScriptReadyWaiters.get(tabId) ?? new Set<(ready: boolean) => void>();
+    const onReady = (ready: boolean) => {
+      clearTimeout(timeoutId);
+      resolve(ready);
+    };
+
+    waiters.add(onReady);
+    contentScriptReadyWaiters.set(tabId, waiters);
+
+    const timeoutId = setTimeout(() => {
+      const activeWaiters = contentScriptReadyWaiters.get(tabId);
+      if (!activeWaiters) return;
+      activeWaiters.delete(onReady);
+      if (activeWaiters.size === 0) {
+        contentScriptReadyWaiters.delete(tabId);
+      }
+      resolve(false);
+    }, CONTENT_SCRIPT_READY_TIMEOUT_MS);
+  });
+}
 
 function getActiveTabId(): Promise<number> {
   return new Promise((resolve, reject) => {
@@ -33,70 +76,69 @@ function getActiveTabId(): Promise<number> {
   });
 }
 
-async function captureTabFromContentScript(tabId: number): Promise<WebClipCaptureResponse> {
-  // Inject content script on demand (includes Defuddle library)
+async function resolveTargetTabId(requestedTabId?: number): Promise<number> {
+  if (requestedTabId) return requestedTabId;
+  return getActiveTabId();
+}
+
+/**
+ * Inject content script and wait for its explicit ready signal.
+ */
+async function ensureContentScript(tabId: number): Promise<boolean> {
+  const readyPromise = waitForContentScriptReady(tabId);
   try {
     await chrome.scripting.executeScript({
       target: { tabId },
       files: ['/content-scripts/content.js'],
     });
   } catch {
-    return { ok: false, error: 'Cannot inject capture script into this page' };
+    resolveReadyWaiters(tabId, false);
+    return false;
   }
+  return readyPromise;
+}
 
-  // Send capture message after injection.
-  // executeScript resolves when the file is injected, but main() may not have
-  // registered listeners yet. Retry once after a short delay on connection error.
-  for (let attempt = 0; attempt < 2; attempt++) {
-    if (attempt > 0) await new Promise((r) => setTimeout(r, 150));
-    const result = await new Promise<WebClipCaptureResponse | null>((resolve) => {
-      chrome.tabs.sendMessage(tabId, { type: WEBCLIP_CAPTURE_PAGE }, (response?: WebClipCaptureResponse) => {
+async function sendMessageToTab<T>(tabId: number, message: unknown): Promise<T | null> {
+  for (let attempt = 0; attempt < MESSAGE_RETRY_TIMES; attempt++) {
+    if (attempt > 0) await delay(MESSAGE_RETRY_DELAY_MS);
+    const response = await new Promise<T | null>((resolve) => {
+      chrome.tabs.sendMessage(tabId, message, (result?: T) => {
         if (chrome.runtime.lastError) {
           resolve(null);
           return;
         }
-        resolve(response ?? null);
+        resolve(result ?? null);
       });
     });
-    if (result) return result;
+    if (response !== null) return response;
   }
-  return { ok: false, error: 'Content script did not respond after injection' };
+  return null;
 }
 
-/**
- * Inject content script into a tab if not already injected.
- * Returns true if injection succeeded (or was already present).
- */
-async function ensureContentScript(tabId: number): Promise<boolean> {
-  try {
-    await chrome.scripting.executeScript({
-      target: { tabId },
-      files: ['/content-scripts/content.js'],
-    });
-    return true;
-  } catch {
-    return false;
+async function captureTabFromContentScript(tabId: number): Promise<WebClipCaptureResponse> {
+  const ready = await ensureContentScript(tabId);
+  if (!ready) {
+    return { ok: false, error: 'Content script initialization timed out' };
   }
+
+  const result = await sendMessageToTab<WebClipCaptureResponse>(tabId, {
+    type: WEBCLIP_CAPTURE_PAGE,
+  });
+  if (result) return result;
+  return { ok: false, error: 'Content script did not respond after initialization' };
 }
 
 /**
  * Forward a message from Side Panel to a specific tab's Content Script.
- * Retries once after a short delay if the connection fails (race with injection).
  */
 async function forwardToTab(tabId: number, message: unknown): Promise<unknown> {
-  for (let attempt = 0; attempt < 2; attempt++) {
-    if (attempt > 0) await new Promise((r) => setTimeout(r, 150));
-    const result = await new Promise<unknown>((resolve) => {
-      chrome.tabs.sendMessage(tabId, message, (response) => {
-        if (chrome.runtime.lastError) {
-          resolve(null);
-          return;
-        }
-        resolve(response);
-      });
-    });
-    if (result !== null) return result;
+  const ready = await ensureContentScript(tabId);
+  if (!ready) {
+    return { ok: false, error: 'Content script initialization timed out' };
   }
+
+  const result = await sendMessageToTab<unknown>(tabId, message);
+  if (result !== null) return result;
   return { ok: false, error: 'Content script did not respond' };
 }
 
@@ -107,6 +149,15 @@ async function forwardToTab(tabId: number, message: unknown): Promise<unknown> {
 function isInjectableUrl(url: string | undefined): boolean {
   if (!url) return false;
   return url.startsWith('http://') || url.startsWith('https://');
+}
+
+function forwardHighlightCheck(payload: HighlightCheckUrlPayload): void {
+  chrome.runtime.sendMessage({
+    type: HIGHLIGHT_CHECK_URL,
+    payload,
+  }).catch(() => {
+    // Side Panel may not be open — silently ignore
+  });
 }
 
 export default defineBackground(() => {
@@ -123,6 +174,16 @@ export default defineBackground(() => {
   // ── Message Router ──
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     const type = message?.type;
+
+    // ── Content Script Ready: CS -> BG ──
+    if (type === CONTENT_SCRIPT_READY) {
+      const tabId = sender.tab?.id;
+      if (tabId) {
+        resolveReadyWaiters(tabId, true);
+      }
+      sendResponse({ ok: true });
+      return true;
+    }
 
     // ── WebClip: Side Panel -> BG -> Content Script ──
     if (type === WEBCLIP_CAPTURE_ACTIVE_TAB) {
@@ -177,54 +238,69 @@ export default defineBackground(() => {
       return true;
     }
 
-    // ── Highlight Restore: Side Panel -> BG -> Content Script ──
-    if (type === HIGHLIGHT_RESTORE) {
-      const tabId = message._tabId;
-      if (!tabId) {
-        sendResponse({ ok: false, error: 'No tab ID specified' });
+    // ── Highlight URL Change: Content Script -> BG -> Side Panel ──
+    if (type === HIGHLIGHT_CHECK_URL_REQUEST) {
+      const tabId = sender.tab?.id;
+      const payload = message.payload as HighlightCheckUrlRequestPayload | undefined;
+      if (!tabId || !payload?.url) {
+        sendResponse({ ok: false, error: 'Invalid check-url-request payload' });
         return true;
       }
+      forwardHighlightCheck({ url: payload.url, tabId });
+      sendResponse({ ok: true });
+      return true;
+    }
+
+    // ── Highlight Restore: Side Panel -> BG -> Content Script ──
+    if (type === HIGHLIGHT_RESTORE) {
       (async () => {
-        await ensureContentScript(tabId);
-        const result = await forwardToTab(tabId, {
-          type: HIGHLIGHT_RESTORE,
-          payload: message.payload,
-        });
-        sendResponse(result);
+        try {
+          const tabId = await resolveTargetTabId(message._tabId);
+          const result = await forwardToTab(tabId, {
+            type: HIGHLIGHT_RESTORE,
+            payload: message.payload,
+          });
+          sendResponse(result);
+        } catch (err) {
+          const error = err instanceof Error ? err.message : String(err);
+          sendResponse({ ok: false, error });
+        }
       })();
       return true;
     }
 
     // ── Highlight Remove: Side Panel -> BG -> Content Script ──
     if (type === HIGHLIGHT_REMOVE) {
-      const tabId = message._tabId;
-      if (!tabId) {
-        sendResponse({ ok: false, error: 'No tab ID specified' });
-        return true;
-      }
       (async () => {
-        const result = await forwardToTab(tabId, {
-          type: HIGHLIGHT_REMOVE,
-          payload: message.payload,
-        });
-        sendResponse(result);
+        try {
+          const tabId = await resolveTargetTabId(message._tabId);
+          const result = await forwardToTab(tabId, {
+            type: HIGHLIGHT_REMOVE,
+            payload: message.payload,
+          });
+          sendResponse(result);
+        } catch (err) {
+          const error = err instanceof Error ? err.message : String(err);
+          sendResponse({ ok: false, error });
+        }
       })();
       return true;
     }
 
     // ── Highlight Scroll To: Side Panel -> BG -> Content Script ──
     if (type === HIGHLIGHT_SCROLL_TO) {
-      const tabId = message._tabId;
-      if (!tabId) {
-        sendResponse({ ok: false, error: 'No tab ID specified' });
-        return true;
-      }
       (async () => {
-        const result = await forwardToTab(tabId, {
-          type: HIGHLIGHT_SCROLL_TO,
-          payload: message.payload,
-        });
-        sendResponse(result);
+        try {
+          const tabId = await resolveTargetTabId(message._tabId);
+          const result = await forwardToTab(tabId, {
+            type: HIGHLIGHT_SCROLL_TO,
+            payload: message.payload,
+          });
+          sendResponse(result);
+        } catch (err) {
+          const error = err instanceof Error ? err.message : String(err);
+          sendResponse({ ok: false, error });
+        }
       })();
       return true;
     }
@@ -232,24 +308,26 @@ export default defineBackground(() => {
 
   // ── URL Change Listener — inject content script + trigger highlight echo check ──
   chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+    if (changeInfo.status === 'loading') {
+      resolveReadyWaiters(tabId, false);
+      return;
+    }
+
     // Only react to completed navigation with a valid URL
     if (changeInfo.status !== 'complete') return;
     if (!isInjectableUrl(tab.url)) return;
 
     // Inject content script so selection toolbar is available immediately
-    ensureContentScript(tabId);
+    void ensureContentScript(tabId);
 
     // Send CHECK_URL to Side Panel so it can look up highlights for this URL
-    const payload: HighlightCheckUrlPayload = {
+    forwardHighlightCheck({
       url: tab.url!,
       tabId,
-    };
-
-    chrome.runtime.sendMessage({
-      type: HIGHLIGHT_CHECK_URL,
-      payload,
-    }).catch(() => {
-      // Side Panel may not be open — silently ignore
     });
+  });
+
+  chrome.tabs.onRemoved.addListener((tabId) => {
+    resolveReadyWaiters(tabId, false);
   });
 });

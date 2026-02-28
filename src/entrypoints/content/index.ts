@@ -1,6 +1,7 @@
 import Defuddle from 'defuddle';
 import {
   WEBCLIP_CAPTURE_PAGE,
+  CONTENT_SCRIPT_READY,
   type WebClipCapturePayload,
   type WebClipCaptureResponse,
 } from '../../lib/webclip-messaging.js';
@@ -14,6 +15,10 @@ import {
 } from '../../lib/highlight-messaging.js';
 import { initHighlight, removeHighlightRendering, scrollToHighlight } from './highlight.js';
 import { restoreHighlights } from './highlight-restore.js';
+
+function notifyContentScriptReady(): void {
+  chrome.runtime.sendMessage({ type: CONTENT_SCRIPT_READY }).catch(() => {});
+}
 
 function captureCurrentPage(): WebClipCapturePayload {
   const url = location.href;
@@ -52,13 +57,24 @@ export default defineContentScript({
     // within the SAME extension session. After extension reload, chrome.runtime.id
     // changes, so we must re-register listeners for the new context.
     const extId = chrome.runtime?.id;
-    if ((globalThis as any).__nodexCaptureExtId === extId) return;
+    if ((globalThis as any).__nodexCaptureExtId === extId) {
+      notifyContentScriptReady();
+      return;
+    }
+
+    // Initialize highlight selection listener and custom elements.
+    // Non-fatal: some pages break customElements (set it to null),
+    // but webclip capture must still work.
+    try {
+      initHighlight();
+    } catch {
+      // Highlight toolbar won't work on this page, but clip capture will.
+    }
+
+    // Set guard AFTER listener registration — if initHighlight crashes,
+    // we still want the onMessage listener to be registered.
     (globalThis as any).__nodexCaptureExtId = extId;
 
-    // Initialize highlight selection listener and custom elements
-    initHighlight();
-
-    // Message listener for both webclip capture and highlight commands
     chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       // ── WebClip Capture ──
       if (message?.type === WEBCLIP_CAPTURE_PAGE) {
@@ -100,5 +116,7 @@ export default defineContentScript({
         return true;
       }
     });
+
+    notifyContentScriptReady();
   },
 });

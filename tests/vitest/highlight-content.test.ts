@@ -1,5 +1,9 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { renderHighlight, removeHighlightRendering } from '../../src/entrypoints/content/highlight.js';
+import {
+  renderHighlight,
+  removeHighlightRendering,
+  clearAllHighlightRenderings,
+} from '../../src/entrypoints/content/highlight.js';
 
 function createRangeForText(node: Text, start: number, end: number): Range {
   const range = document.createRange();
@@ -50,5 +54,25 @@ describe('content highlight rendering', () => {
     const highlights = document.querySelectorAll('soma-hl[data-highlight-id="hl_3"]');
     expect(highlights).toHaveLength(1);
     expect((highlights[0] as HTMLElement).style.backgroundColor).toBe('rgba(155, 124, 56, 0.3)');
+  });
+
+  it('clears all rendered highlights on the page', () => {
+    document.body.innerHTML = '<p id="a">hello world</p><p id="b">another line</p>';
+    const textNodeA = document.querySelector('#a')!.firstChild as Text;
+    const textNodeB = document.querySelector('#b')!.firstChild as Text;
+
+    const rangeA = createRangeForText(textNodeA, 0, 5);
+    renderHighlight(rangeA, 'hl_a');
+
+    const rangeB = createRangeForText(textNodeB, 0, 7);
+    renderHighlight(rangeB, 'hl_b');
+
+    expect(document.querySelectorAll('soma-hl')).toHaveLength(2);
+
+    clearAllHighlightRenderings();
+
+    expect(document.querySelectorAll('soma-hl')).toHaveLength(0);
+    expect(document.querySelector('#a')!.textContent).toBe('hello world');
+    expect(document.querySelector('#b')!.textContent).toBe('another line');
   });
 });

@@ -28,7 +28,7 @@ _(空)_
 
 | Agent | 分支 | 任务 | 锁定文件 | 状态 |
 |---|---|---|---|---|
-_(无活跃 agent)_
+| codex | cc/highlight-polish | Highlight 下一轮优化 | content/index.ts, content/highlight*.ts, background/index.ts | 待评审 |
 
 ---
 
@@ -116,7 +116,8 @@ _(空)_
 - [x] **Phase 3: 回显 + 双向联动**（`cc/highlight-webpage`）— URL 变更检测 + 四步锚点还原 + 无法定位标记 + Side Panel ↔ CS 双向滚动 ✅（2026-02-28, PR #112）
 - [x] **Review: 整体代码审查** — codex 审查 PR #111 + #112 全部代码（数据模型一致性、消息路由正确性、anchor 还原健壮性、测试覆盖完整性）✅（2026-02-28, PR #113）
 - [x] **数据模型简化** — 4 个模板字段（Source/Anchor/Color/Page URL）→ 1 个 Clip 字段（options_from_supertag → #web_clip）+ anchor 存 description + 颜色使用 tagDef 自身颜色 ✅（2026-02-28）
-- [ ] **网页浮动工具栏不出现** — Content Script 注入后，网页侧选中文本未显示浮动工具栏（待排查）
+- [x] **重命名 #web_clip → #source** — 标签名、字段名（Clip→Source）、导出函数名全部统一 ✅（2026-02-28）
+- [x] **Highlight 下一轮优化**（`cc/highlight-polish`, PR #114）— Clip Page 失效 + 网页工具栏不出现 + 删除不清理 DOM + SPA 导航残留 + anchor 无法还原无反馈 + 多 tab 竞态去重 ✅（2026-02-28）
 
 #### AI Chat & 网页辅助 (#29 + #31)
 > 浏览器 + AI = soma 的第二个差异化维度。不只是聊天框，而是理解上下文的知识助手。

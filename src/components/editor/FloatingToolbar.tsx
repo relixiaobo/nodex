@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { toggleMark } from 'prosemirror-commands';
 import { TextSelection } from 'prosemirror-state';
 import type { EditorView } from 'prosemirror-view';
-import { Bold, Code2, Heading, Highlighter, Italic, Strikethrough } from '../../lib/icons.js';
+import { Bold, Code2, Hash, Heading, Highlighter, Italic, Strikethrough } from '../../lib/icons.js';
 import { pmSchema } from './pm-schema.js';
 import { t } from '../../i18n/strings.js';
 import { Tooltip } from '../ui/Tooltip';
@@ -11,6 +11,8 @@ import { Tooltip } from '../ui/Tooltip';
 interface FloatingToolbarProps {
  view?: EditorView | null;
  tick?: number;
+ /** Called when user clicks # Tag button. Parent handles tag selection. */
+ onTagClick?: () => void;
 }
 
 interface ToolbarPosition {
@@ -105,7 +107,7 @@ function toggleMarkInView(view: EditorView, markName: keyof typeof pmSchema.mark
  view.focus();
 }
 
-export function FloatingToolbar({ view, tick = 0 }: FloatingToolbarProps) {
+export function FloatingToolbar({ view, tick = 0, onTagClick }: FloatingToolbarProps) {
  const [renderTick, setRenderTick] = useState(0);
  const [toolbarPosition, setToolbarPosition] = useState<ToolbarPosition>({ show: false, top: 0, left: 0 });
  const pointerSelectingRef = useRef(false);
@@ -325,6 +327,17 @@ export function FloatingToolbar({ view, tick = 0 }: FloatingToolbarProps) {
      onClick={() => toggleNamedMark('headingMark')}
     >
      <Heading size={14} />
+    </ToolbarButton>
+
+    {/* Separator */}
+    <div className="mx-0.5 h-4 w-px bg-foreground/10" />
+
+    {/* # Tag — extract selection to tagged Library node */}
+    <ToolbarButton
+     title={t('floatingToolbar.tag')}
+     onClick={() => onTagClick?.()}
+    >
+     <Hash size={14} />
     </ToolbarButton>
    </div>
   </div>,

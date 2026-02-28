@@ -117,6 +117,7 @@ export const enMessages = {
     code: 'Code',
     highlight: 'Highlight',
     heading: 'Heading',
+    tag: 'Tag',
   },
 } as const;
 

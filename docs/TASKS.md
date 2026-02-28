@@ -28,7 +28,7 @@ _(空)_
 
 | Agent | 分支 | 任务 | 锁定文件 | 状态 |
 |---|---|---|---|---|
-| codex | `codex/paste-code-block-node` | Paste Phase 3（Code Block Node） | `src/stores/node-store.ts`, `src/components/outliner/OutlinerItem.tsx`, `src/types/node.ts`, `src/lib/paste-parser.ts` | 开发完成，待 nodex review |
+| codex | `codex/paste-code-block-node` | Paste Phase 3（Code Block Node） | `src/stores/node-store.ts`, `src/components/outliner/OutlinerItem.tsx`, `src/types/node.ts`, `src/lib/paste-parser.ts` | 待 nodex review（PR #110） |
 
 ---
 
@@ -256,7 +256,7 @@ _(空)_
 - [x] Phase 0: 单行 URL 智能粘贴 + ⌘⇧V 纯文本 ✅（2026-02-27）
 - [x] Phase 1: 多行拆分为节点 ✅（2026-02-27）
 - [x] Phase 2: 粘贴系统重做 — `paste-parser.ts` 纯函数解析（Markdown 层级 + HTML marks + `#tag` / `field:: value` 识别）+ store `createSiblingNodesFromPaste` 支持树结构 + marks + tag/field 应用 + 接入 RichTextEditor / TrailingInput / OutlinerItem ✅（2026-02-28，PR #109）
-- [x] Phase 3: Code Block 一等节点（`codeBlock` + `codeLanguage`，支持 fenced code / `<pre><code>` 粘贴）✅（2026-02-28，待 PR）
+- [x] Phase 3: Code Block 一等节点（`codeBlock` + `codeLanguage`，支持 fenced code / `<pre><code>` 粘贴）✅（2026-02-28，PR #110）
 
 #### 性能基线测量
 > **产出**: `docs/research/performance-baseline.md`

@@ -355,6 +355,25 @@ describe('parseHtmlToNodes', () => {
     expect(nodes[0].name).toBe('Inside div');
   });
 
+  // ── Inline wrapper with block children (Google Docs) ──
+
+  it('recurses into inline wrapper that contains block children (Google Docs <b> wrapper)', () => {
+    // Google Docs wraps clipboard HTML in <b style="font-weight:normal">
+    const html = [
+      '<meta charset="utf-8">',
+      '<b style="font-weight:normal" id="docs-internal-guid-abc">',
+      '<p dir="ltr" style="font-size:26pt;font-weight:700"><span>Experience</span></p>',
+      '<p dir="ltr"><span style="font-weight:700">Company Name</span><span> – </span><span style="font-style:italic">Job Title</span></p>',
+      '<ul><li dir="ltr"><span>Did some things</span></li></ul>',
+      '</b>',
+    ].join('');
+    const { nodes } = parseHtmlToNodes(html, { inferStyledHeadings: true, inferParagraphLists: true });
+    expect(nodes.length).toBeGreaterThanOrEqual(1);
+    // "Experience" should be a heading, not concatenated with Company Name
+    expect(nodes[0].name).toBe('Experience');
+    expect(nodes[0].children.length).toBeGreaterThan(0);
+  });
+
   // ── maxNodes truncation ──
 
   it('respects maxNodes limit', () => {

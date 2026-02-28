@@ -24,6 +24,9 @@ export const HIGHLIGHT_CLICK = 'highlight:click' as const;
 /** Background -> Side Panel: check if current URL has highlight data */
 export const HIGHLIGHT_CHECK_URL = 'highlight:check-url' as const;
 
+/** Content Script -> Background: URL changed in SPA, request check + restore */
+export const HIGHLIGHT_CHECK_URL_REQUEST = 'highlight:check-url-request' as const;
+
 /** Content Script -> Side Panel: report highlights that could not be restored */
 export const HIGHLIGHT_UNRESOLVABLE = 'highlight:unresolvable' as const;
 
@@ -75,6 +78,11 @@ export interface HighlightCheckUrlPayload {
   tabId: number;
 }
 
+/** CS -> BG: URL changed, ask Background to trigger check-url flow */
+export interface HighlightCheckUrlRequestPayload {
+  url: string;
+}
+
 /** CS -> SP: Highlights that could not be restored */
 export interface HighlightUnresolvablePayload {
   /** soma node IDs that could not be located on the page */
@@ -90,4 +98,5 @@ export type HighlightMessage =
   | { type: typeof HIGHLIGHT_SCROLL_TO; payload: HighlightScrollToPayload }
   | { type: typeof HIGHLIGHT_CLICK; payload: HighlightClickPayload }
   | { type: typeof HIGHLIGHT_CHECK_URL; payload: HighlightCheckUrlPayload }
+  | { type: typeof HIGHLIGHT_CHECK_URL_REQUEST; payload: HighlightCheckUrlRequestPayload }
   | { type: typeof HIGHLIGHT_UNRESOLVABLE; payload: HighlightUnresolvablePayload };

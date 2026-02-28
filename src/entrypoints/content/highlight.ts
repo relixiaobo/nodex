@@ -3,7 +3,7 @@
  * and click handling for webpage highlights.
  *
  * Listens for text selection → shows floating toolbar → on confirm,
- * wraps text in <soma-hl> custom elements and sends create message
+ * wraps text in <soma-hl> elements (plain DOM, no Custom Elements API) and sends create message
  * to the Side Panel via background.
  */
 import { computeAnchor } from './anchor-utils.js';
@@ -11,8 +11,10 @@ import { showToolbar, hideToolbar } from './highlight-toolbar.js';
 import {
   HIGHLIGHT_CREATE,
   HIGHLIGHT_CLICK,
+  HIGHLIGHT_CHECK_URL_REQUEST,
   type HighlightCreatePayload,
   type HighlightClickPayload,
+  type HighlightCheckUrlRequestPayload,
 } from '../../lib/highlight-messaging.js';
 import { WEBCLIP_CAPTURE_ACTIVE_TAB } from '../../lib/webclip-messaging.js';
 
@@ -25,39 +27,35 @@ export const DEFAULT_HIGHLIGHT_BG = 'rgba(155, 124, 56, 0.3)';
 
 let currentRange: Range | null = null;
 let initialized = false;
+let lastKnownUrl = '';
 
-// ── Custom Element Registration ──
+// ── Highlight Click Delegation ──
+
+let clickDelegationInstalled = false;
 
 /**
- * Register <soma-hl> custom element if not already defined.
- * Uses inline styles only — no Shadow DOM needed for simple highlighting.
+ * Install a single document-level click handler for all <soma-hl> elements.
+ * Uses event delegation instead of Custom Elements API (unavailable in
+ * Chrome content script isolated world).
  */
-function ensureCustomElement(): void {
-  if (customElements.get('soma-hl')) return;
+function ensureClickDelegation(): void {
+  if (clickDelegationInstalled) return;
+  clickDelegationInstalled = true;
 
-  class SomaHighlight extends HTMLElement {
-    constructor() {
-      super();
-      // Inline element — should not break text flow
-      this.style.display = 'inline';
-      this.style.cursor = 'pointer';
-      this.style.borderRadius = '2px';
+  document.addEventListener('click', (e) => {
+    const target = (e.target as Element).closest?.('soma-hl[data-highlight-id]');
+    if (!target) return;
 
-      this.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const highlightId = this.getAttribute('data-highlight-id');
-        if (!highlightId) return;
+    e.stopPropagation();
+    const highlightId = target.getAttribute('data-highlight-id');
+    if (!highlightId) return;
 
-        const msg: { type: typeof HIGHLIGHT_CLICK; payload: HighlightClickPayload } = {
-          type: HIGHLIGHT_CLICK,
-          payload: { id: highlightId },
-        };
-        chrome.runtime.sendMessage(msg);
-      });
-    }
-  }
-
-  customElements.define('soma-hl', SomaHighlight);
+    const msg: { type: typeof HIGHLIGHT_CLICK; payload: HighlightClickPayload } = {
+      type: HIGHLIGHT_CLICK,
+      payload: { id: highlightId },
+    };
+    chrome.runtime.sendMessage(msg);
+  });
 }
 
 // ── Text Node Iteration for Cross-Element Wrapping ──
@@ -143,7 +141,7 @@ export function renderHighlight(
   highlightId: string,
   bgColor: string = DEFAULT_HIGHLIGHT_BG,
 ): void {
-  ensureCustomElement();
+  ensureClickDelegation();
   const segments = getTextNodesInRange(range);
 
   // Process segments in reverse to maintain valid offsets
@@ -158,6 +156,9 @@ export function renderHighlight(
 
     const highlightEl = document.createElement('soma-hl');
     highlightEl.setAttribute('data-highlight-id', highlightId);
+    highlightEl.style.display = 'inline';
+    highlightEl.style.cursor = 'pointer';
+    highlightEl.style.borderRadius = '2px';
     highlightEl.style.backgroundColor = bgColor;
 
     try {
@@ -190,6 +191,20 @@ export function removeHighlightRendering(highlightId: string): void {
     // Normalize to merge adjacent text nodes
     parent.normalize();
   });
+}
+
+/**
+ * Remove all rendered webpage highlights.
+ */
+export function clearAllHighlightRenderings(): void {
+  const renderedIds = new Set<string>();
+  document.querySelectorAll('soma-hl[data-highlight-id]').forEach((el) => {
+    const id = el.getAttribute('data-highlight-id');
+    if (id) renderedIds.add(id);
+  });
+  for (const id of renderedIds) {
+    removeHighlightRendering(id);
+  }
 }
 
 // ── Flash Animation ──
@@ -258,16 +273,62 @@ function isValidSelection(selection: Selection): boolean {
  * Handle text selection — show floating toolbar on valid selection.
  */
 function handleSelectionChange(): void {
-  const selection = window.getSelection();
-  if (!selection || !isValidSelection(selection)) {
+  try {
+    const selection = window.getSelection();
+    if (!selection || !isValidSelection(selection)) {
+      hideToolbar();
+      currentRange = null;
+      return;
+    }
+
+    currentRange = selection.getRangeAt(0).cloneRange();
+    const rect = currentRange.getBoundingClientRect();
+    showToolbar(rect, handleToolbarAction);
+  } catch (err) {
     hideToolbar();
     currentRange = null;
-    return;
+    console.error('[soma] Failed to handle text selection:', err);
   }
+}
 
-  currentRange = selection.getRangeAt(0).cloneRange();
-  const rect = currentRange.getBoundingClientRect();
-  showToolbar(rect, handleToolbarAction);
+function requestHighlightCheckForCurrentUrl(): void {
+  const payload: HighlightCheckUrlRequestPayload = {
+    url: location.href,
+  };
+  chrome.runtime.sendMessage({
+    type: HIGHLIGHT_CHECK_URL_REQUEST,
+    payload,
+  }).catch(() => {});
+}
+
+function handleUrlChangeIfNeeded(): void {
+  if (location.href === lastKnownUrl) return;
+  lastKnownUrl = location.href;
+  clearAllHighlightRenderings();
+  hideToolbar();
+  currentRange = null;
+  requestHighlightCheckForCurrentUrl();
+}
+
+function setupSpaUrlChangeDetection(): void {
+  const patchHistoryMethod = (method: 'pushState' | 'replaceState') => {
+    const original = history[method];
+    const wrapped: typeof history.pushState = function (
+      this: History,
+      ...args: Parameters<History['pushState']>
+    ) {
+      const result = original.apply(this, args);
+      queueMicrotask(handleUrlChangeIfNeeded);
+      return result;
+    };
+    history[method] = wrapped;
+  };
+
+  patchHistoryMethod('pushState');
+  patchHistoryMethod('replaceState');
+
+  window.addEventListener('popstate', handleUrlChangeIfNeeded);
+  window.addEventListener('hashchange', handleUrlChangeIfNeeded);
 }
 
 // ── Toolbar Action Handling ──
@@ -358,10 +419,11 @@ function createHighlight(range: Range, withNote: boolean): void {
 export function initHighlight(): void {
   if (initialized) return;
   initialized = true;
+  lastKnownUrl = location.href;
 
-  ensureCustomElement();
+  ensureClickDelegation();
 
-  // Debounced mouseup/touchend → check selection
+  // Debounced selection events → check selection
   let selectionTimeout: ReturnType<typeof setTimeout> | null = null;
 
   const onSelectionEvent = () => {
@@ -371,6 +433,7 @@ export function initHighlight(): void {
 
   document.addEventListener('mouseup', onSelectionEvent);
   document.addEventListener('touchend', onSelectionEvent);
+  document.addEventListener('selectionchange', onSelectionEvent);
 
   // Dismiss toolbar on scroll/resize
   const dismissToolbar = () => {
@@ -378,4 +441,6 @@ export function initHighlight(): void {
   };
   window.addEventListener('scroll', dismissToolbar, { passive: true });
   window.addEventListener('resize', dismissToolbar, { passive: true });
+
+  setupSpaUrlChangeDetection();
 }

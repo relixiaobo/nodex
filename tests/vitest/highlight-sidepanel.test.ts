@@ -11,6 +11,9 @@ import { findClipNodeByUrl } from '../../src/lib/webclip-service.js';
 import {
   createHighlightFromPayload,
   buildHighlightRestorePayload,
+  findOrCreateClipNodeForUrl,
+  collectHighlightNodeIdsInLibrary,
+  getRemovedHighlightIds,
 } from '../../src/lib/highlight-sidepanel.js';
 import type { HighlightCreatePayload } from '../../src/lib/highlight-messaging.js';
 import * as loroDoc from '../../src/lib/loro-doc.js';
@@ -100,5 +103,35 @@ describe('highlight-sidepanel', () => {
     // Color is derived from tagDef, should be an rgba string
     expect(item!.color).toMatch(/^rgba\(/);
     expect(item!.anchor.exact).toBe('highlighted text');
+  });
+
+  it('deduplicates concurrent clip creation for the same normalized URL', async () => {
+    const store = getStore();
+    const urlA = 'https://www.example.com/path/';
+    const urlB = 'http://example.com/path';
+
+    const [clipIdA, clipIdB] = await Promise.all([
+      findOrCreateClipNodeForUrl(urlA, 'Example A', store),
+      findOrCreateClipNodeForUrl(urlB, 'Example B', store),
+    ]);
+
+    expect(clipIdA).toBe(clipIdB);
+  });
+
+  it('collects library highlight IDs and detects removed IDs', async () => {
+    const store = getStore();
+    const first = await createHighlightFromPayload(makePayload({ selectedText: 'first' }), store);
+    const second = await createHighlightFromPayload(makePayload({ selectedText: 'second' }), store);
+
+    const before = collectHighlightNodeIdsInLibrary();
+    expect(before.has(first.highlightNodeId)).toBe(true);
+    expect(before.has(second.highlightNodeId)).toBe(true);
+
+    loroDoc.moveNode(first.highlightNodeId, CONTAINER_IDS.TRASH);
+    const after = collectHighlightNodeIdsInLibrary();
+    const removed = getRemovedHighlightIds(before, after);
+
+    expect(removed).toContain(first.highlightNodeId);
+    expect(removed).not.toContain(second.highlightNodeId);
   });
 });

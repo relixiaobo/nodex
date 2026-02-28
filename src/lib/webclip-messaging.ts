@@ -1,5 +1,6 @@
 export const WEBCLIP_CAPTURE_ACTIVE_TAB = 'webclip:capture-active-tab' as const;
 export const WEBCLIP_CAPTURE_PAGE = 'webclip:capture-page' as const;
+export const CONTENT_SCRIPT_READY = 'content-script:ready' as const;
 
 export interface WebClipCapturePayload {
   url: string;
@@ -16,4 +17,3 @@ export interface WebClipCapturePayload {
 export type WebClipCaptureResponse =
   | { ok: true; payload: WebClipCapturePayload }
   | { ok: false; error: string };
-

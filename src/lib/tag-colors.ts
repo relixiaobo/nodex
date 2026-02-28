@@ -195,9 +195,15 @@ export const HIGHLIGHT_CSS_COLORS: Record<string, string> = {
 /**
  * Resolve bullet color for a #highlight node from its Color field value.
  * Returns null if the node is not a highlight or Color field is not set.
+ * Safe to call before LoroDoc is initialized (returns null).
  */
 export function resolveHighlightBulletColor(nodeId: string): string | null {
-  const node = loroDoc.toNodexNode(nodeId);
+  let node;
+  try {
+    node = loroDoc.toNodexNode(nodeId);
+  } catch {
+    return null; // LoroDoc not initialized yet
+  }
   if (!node || !node.tags.includes('SYS_T200')) return null;
 
   // Find Color fieldEntry

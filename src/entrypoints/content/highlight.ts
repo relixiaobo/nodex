@@ -36,8 +36,8 @@ let lastKnownUrl = '';
  * Uses inline styles only — no Shadow DOM needed for simple highlighting.
  */
 function ensureCustomElement(): void {
-  if (!customElements) return; // Some pages override customElements to null
-  if (customElements.get('soma-hl')) return;
+  if (!window.customElements) return;
+  if (window.customElements.get('soma-hl')) return;
 
   class SomaHighlight extends HTMLElement {
     constructor() {
@@ -61,7 +61,7 @@ function ensureCustomElement(): void {
     }
   }
 
-  customElements.define('soma-hl', SomaHighlight);
+  window.customElements.define('soma-hl', SomaHighlight);
 }
 
 // ── Text Node Iteration for Cross-Element Wrapping ──

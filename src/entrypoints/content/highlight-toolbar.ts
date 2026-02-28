@@ -94,8 +94,8 @@ const ICON_CLIP = `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="cur
 // ── Custom Element Registration ──
 
 function ensureToolbarElement(): void {
-  if (!customElements) return; // Some pages override customElements to null
-  if (customElements.get('soma-toolbar')) return;
+  if (!window.customElements) return;
+  if (window.customElements.get('soma-toolbar')) return;
 
   class SomaToolbar extends HTMLElement {
     shadow: ShadowRoot;
@@ -147,7 +147,7 @@ function ensureToolbarElement(): void {
     }
   }
 
-  customElements.define('soma-toolbar', SomaToolbar);
+  window.customElements.define('soma-toolbar', SomaToolbar);
 }
 
 function createButton(action: string, iconSvg: string, label: string): HTMLButtonElement {

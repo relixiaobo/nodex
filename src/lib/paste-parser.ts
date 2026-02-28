@@ -483,13 +483,26 @@ function shouldPreferHtml(
 ): boolean {
   if (!htmlAnalysis.hasHtml || !htmlAnalysis.hasText) return false;
 
-  const hasRichHtml =
+  // "Genuine rich content" = inline formatting (bold/italic/links) or
+  // semantic structure (headings/tables/pre/blockquote).  Mere styled
+  // formatting (font colours from code editors) does NOT count — the
+  // markdown parser handles those sources much better.
+  const hasGenuineRichContent =
     htmlAnalysis.hasInlineFormatting
-    || htmlAnalysis.hasStyledFormatting
     || htmlAnalysis.hasSemanticStructure;
-  if (hasRichHtml) return true;
+  if (hasGenuineRichContent) return true;
+
+  // Style-only HTML (e.g. VS Code syntax highlighting) should not
+  // override strong markdown signals.
+  if (htmlAnalysis.hasStyledFormatting && !hasStrongMarkdown) return true;
 
   if (!hasStrongMarkdown && htmlAnalysis.hasBlockLike) return true;
+
+  // Code-editor clipboard: has styled formatting (font colours / syntax
+  // highlighting) but no genuine rich content.  When the plain text also
+  // has strong markdown signals, the markdown parser is strictly better —
+  // skip the text-comparison fallback entirely.
+  if (hasStrongMarkdown && htmlAnalysis.hasStyledFormatting) return false;
 
   const plainText = plain.replace(/\s+/g, ' ').trim();
   return htmlAnalysis.normalizedText.length > 0 && htmlAnalysis.normalizedText !== plainText;

@@ -8,21 +8,20 @@ import {
 describe('field-validation', () => {
   it('exposes validated field type set', () => {
     expect(VALIDATED_FIELD_TYPES.has(SYS_D.NUMBER)).toBe(true);
-    expect(VALIDATED_FIELD_TYPES.has(SYS_D.INTEGER)).toBe(true);
+    expect(VALIDATED_FIELD_TYPES.has(SYS_D.INTEGER)).toBe(true); // legacy Tana import
     expect(VALIDATED_FIELD_TYPES.has(SYS_D.URL)).toBe(true);
     expect(VALIDATED_FIELD_TYPES.has(SYS_D.EMAIL)).toBe(true);
     expect(VALIDATED_FIELD_TYPES.has(FIELD_TYPES.NUMBER)).toBe(true);
-    expect(VALIDATED_FIELD_TYPES.has(FIELD_TYPES.INTEGER)).toBe(true);
     expect(VALIDATED_FIELD_TYPES.has(FIELD_TYPES.URL)).toBe(true);
     expect(VALIDATED_FIELD_TYPES.has(FIELD_TYPES.EMAIL)).toBe(true);
     expect(VALIDATED_FIELD_TYPES.has(SYS_D.PLAIN)).toBe(false);
   });
 
-  it('validates number/integer with min/max bounds', () => {
+  it('validates number with min/max bounds', () => {
     expect(validateFieldValue(SYS_D.NUMBER, '')).toBeNull();
     expect(validateFieldValue(SYS_D.NUMBER, 'abc')).toBe('Value should be a number');
     expect(validateFieldValue(SYS_D.NUMBER, '12')).toBeNull();
-    expect(validateFieldValue(SYS_D.INTEGER, '12.5')).toBeNull(); // current behavior: numeric-only check
+    expect(validateFieldValue(SYS_D.INTEGER, '12.5')).toBeNull(); // legacy Tana import still works
 
     expect(validateFieldValue(SYS_D.NUMBER, '2', { min: 3 })).toBe('Value should be ≥ 3');
     expect(validateFieldValue(SYS_D.NUMBER, '9', { max: 8 })).toBe('Value should be ≤ 8');

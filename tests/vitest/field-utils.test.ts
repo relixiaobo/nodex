@@ -251,7 +251,7 @@ describe('getFieldTypeLabel / getFieldTypeIcon / isPlainFieldType', () => {
     expect(isDateFieldType(FIELD_TYPES.DATE)).toBe(true);
     expect(isDateFieldType(SYS_D.DATE)).toBe(true);
     expect(isNumberLikeFieldType(FIELD_TYPES.NUMBER)).toBe(true);
-    expect(isNumberLikeFieldType(SYS_D.INTEGER)).toBe(true);
+    expect(isNumberLikeFieldType(SYS_D.INTEGER)).toBe(true); // legacy Tana import
     expect(isUrlFieldType(FIELD_TYPES.URL)).toBe(true);
     expect(isUrlFieldType(SYS_D.URL)).toBe(true);
     expect(isEmailFieldType(FIELD_TYPES.EMAIL)).toBe(true);

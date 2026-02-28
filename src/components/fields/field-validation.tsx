@@ -16,7 +16,7 @@ import {
 /** Field data types that have value validation */
 export const VALIDATED_FIELD_TYPES: Set<string> = new Set([
   SYS_D.NUMBER, SYS_D.INTEGER, SYS_D.URL, SYS_D.EMAIL,
-  FIELD_TYPES.NUMBER, FIELD_TYPES.INTEGER, FIELD_TYPES.URL, FIELD_TYPES.EMAIL,
+  FIELD_TYPES.NUMBER, FIELD_TYPES.URL, FIELD_TYPES.EMAIL,
 ]);
 
 export function validateFieldValue(

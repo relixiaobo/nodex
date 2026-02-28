@@ -384,6 +384,29 @@ function cloneTemplateContentNodeShallow(parentId: string, templateNodeId: strin
   }
 }
 
+/**
+ * Clone default field values from a template fieldEntry into a newly created fieldEntry.
+ * Only clones from fieldEntry templates (not fieldDef, whose children are option definitions).
+ */
+function cloneTemplateFieldValues(newFieldEntryId: string, templateOriginId: string): void {
+  const origin = loroDoc.toNodexNode(templateOriginId);
+  if (!origin || origin.type !== 'fieldEntry') return;
+
+  const templateChildren = loroDoc.getChildren(templateOriginId);
+  for (const tChildId of templateChildren) {
+    const tChild = loroDoc.toNodexNode(tChildId);
+    if (!tChild) continue;
+    const clonedId = nanoid();
+    loroDoc.createNode(clonedId, newFieldEntryId);
+    const batch: Record<string, unknown> = {};
+    if (tChild.type !== undefined) batch.type = tChild.type;
+    if (tChild.name !== undefined) batch.name = tChild.name;
+    if (tChild.targetId !== undefined) batch.targetId = tChild.targetId;
+    if (tChild.fieldDefId !== undefined) batch.fieldDefId = tChild.fieldDefId;
+    if (Object.keys(batch).length > 0) loroDoc.setNodeDataBatch(clonedId, batch);
+  }
+}
+
 /** 递归获取 tagDef 的 extends 链（包含自身） */
 function getExtendsChain(tagDefId: string, visited = new Set<string>()): string[] {
   if (visited.has(tagDefId)) return [];
@@ -421,6 +444,7 @@ export function applyTagMutationsNoCommit(nodeId: string, tagDefId: string): voi
           fieldDefId: ref.fieldDefId,
           templateId: ref.templateOriginId,
         });
+        cloneTemplateFieldValues(feId, ref.templateOriginId);
       }
     }
   }
@@ -463,6 +487,8 @@ export function syncTemplateMutationsNoCommit(nodeId: string): boolean {
             fieldDefId: ref.fieldDefId,
             templateId: ref.templateOriginId,
           });
+          // Note: no cloneTemplateFieldValues here — default values only apply
+          // at applyTag time, not retroactively via syncTemplateFields.
           changed = true;
         }
       }

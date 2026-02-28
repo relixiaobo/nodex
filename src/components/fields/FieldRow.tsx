@@ -44,16 +44,10 @@ import { DoneMappingEntries } from './DoneMappingEntries';
 import { BulletChevron } from '../outliner/BulletChevron';
 import { FIELD_VALUE_INSET } from './field-layout.js';
 import { dragState } from '../../hooks/use-drag-select.js';
-import { getFlattenedVisibleNodes } from '../../lib/tree-utils.js';
-import {
-  computeRangeSelection,
-  filterToRootLevel,
-  getEffectiveSelectionBounds,
-  toggleNodeInSelection,
-} from '../../lib/selection-utils.js';
 import { resolveRowPointerSelectAction } from '../../lib/row-pointer-selection.js';
 import { resolveDropHoverPosition } from '../../lib/drag-drop-position.js';
 import { resolveDropMove } from '../../lib/drag-drop.js';
+import { OutlinerRow, useRowSelectionState, useRowPointerHandlers } from '../outliner/OutlinerRow.js';
 
 function focusTrailingInputForParent(parentId: string): boolean {
   const roots = document.querySelectorAll<HTMLElement>('[data-trailing-parent-id]');
@@ -401,13 +395,13 @@ export function FieldRow({
   const editingFieldNameId = useUIStore((s) => s.editingFieldNameId);
   const setEditingFieldName = useUIStore((s) => s.setEditingFieldName);
   const setFocusedNode = useUIStore((s) => s.setFocusedNode);
-  const setSelectedNode = useUIStore((s) => s.setSelectedNode);
-  const setSelectedNodes = useUIStore((s) => s.setSelectedNodes);
   const clearFocus = useUIStore((s) => s.clearFocus);
-  // Derive boolean from Set to avoid Zustand infinite re-render (Set creates new reference each time)
-  const isTupleInSelectedSet = useUIStore((s) => s.selectedNodeIds.has(tupleId));
-  const focusedNodeId = useUIStore((s) => s.focusedNodeId);
   const clearSelection = useUIStore((s) => s.clearSelection);
+  // Unified selection state + pointer handlers from OutlinerRow
+  const { isSelected: isFieldSelected } = useRowSelectionState(tupleId, nodeId);
+  const { handleCmdClick, handleShiftClick } = useRowPointerHandlers(
+    tupleId, nodeId, rootChildIds ?? [], rootNodeId ?? nodeId,
+  );
   const createChild = useNodeStore((s) => s.createChild);
   const moveFieldEntry = useNodeStore((s) => s.moveFieldEntry);
   const removeField = useNodeStore((s) => s.removeField);
@@ -428,7 +422,6 @@ export function FieldRow({
   const isOutliner = dataType === '__outliner__';
   const isVirtual = tupleId.startsWith('__virtual_');
   const isEditing = editingFieldNameId === tupleId;
-  const isFieldSelected = isTupleInSelectedSet && !focusedNodeId && !isEditing;
 
   // Config metadata for system config fields (icon, description)
   const configDef = configKey
@@ -504,17 +497,6 @@ export function FieldRow({
     return result;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [_version, nodeId, siblingFieldIds]);
-
-  const selectionRootChildIds = useMemo(
-    () => (rootChildIds && rootChildIds.length > 0
-      ? rootChildIds
-      : renderableSiblings.map((item) => item.id)),
-    [rootChildIds, renderableSiblings],
-  );
-  const selectionRootId = rootNodeId ?? nodeId;
-  const getSelectionFlatList = useCallback((expandedNodes: Set<string>) => (
-    getFlattenedVisibleNodes(selectionRootChildIds, expandedNodes, selectionRootId)
-  ), [selectionRootChildIds, selectionRootId]);
 
   const moveToSibling = useCallback((direction: 'up' | 'down') => {
     const index = renderableSiblings.findIndex((item) => item.type === 'field' && item.id === tupleId);
@@ -601,66 +583,25 @@ export function FieldRow({
     setEditingFieldName(tupleId);
   }, [tupleId, setEditingFieldName]);
 
-  const handleCmdClick = useCallback(() => {
-    const state = useUIStore.getState();
-    const newSelection = toggleNodeInSelection(tupleId, state.selectedNodeIds);
-    let newAnchor = state.selectionAnchorId;
-    if (newAnchor && !newSelection.has(newAnchor)) {
-      newAnchor = newSelection.size > 0 ? [...newSelection][0] : null;
+  // Field-specific keyboard pre-processing for selection mode:
+  // ArrowUp/Down navigates between sibling rows (field→field or field→content)
+  const handleFieldSelectionKeydown = useCallback((e: KeyboardEvent): boolean => {
+    if (!e.shiftKey && !e.metaKey && !e.ctrlKey && !e.altKey) {
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        clearSelection();
+        moveToSibling('up');
+        return true;
+      }
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        clearSelection();
+        moveToSibling('down');
+        return true;
+      }
     }
-    if (!newAnchor && newSelection.has(tupleId)) {
-      newAnchor = tupleId;
-    }
-    setSelectedNodes(newSelection, newAnchor);
-  }, [tupleId, setSelectedNodes]);
-
-  const handleShiftClick = useCallback(() => {
-    const state = useUIStore.getState();
-    const anchor = state.selectionAnchorId;
-    if (!anchor) {
-      setSelectedNode(tupleId, nodeId, 'global');
-      return;
-    }
-    const flatList = getSelectionFlatList(state.expandedNodes);
-    const range = computeRangeSelection(anchor, tupleId, flatList);
-    setSelectedNodes(range, anchor);
-  }, [tupleId, nodeId, setSelectedNode, setSelectedNodes, getSelectionFlatList]);
-
-  const extendSelectionFromAnchor = useCallback((direction: 'up' | 'down') => {
-    const state = useUIStore.getState();
-    const anchor = state.selectionAnchorId;
-    if (!anchor) return;
-
-    const flatList = getSelectionFlatList(state.expandedNodes);
-    const anchorIdx = flatList.findIndex((item) => item.nodeId === anchor);
-    if (anchorIdx < 0) return;
-
-    const effectiveBounds = getEffectiveSelectionBounds(state.selectedNodeIds, flatList);
-    if (!effectiveBounds) return;
-
-    const { firstIdx, lastIdx } = effectiveBounds;
-    let extentIdx: number;
-    if (anchorIdx <= firstIdx) {
-      extentIdx = lastIdx;
-    } else if (anchorIdx >= lastIdx) {
-      extentIdx = firstIdx;
-    } else {
-      extentIdx = direction === 'down' ? lastIdx : firstIdx;
-    }
-
-    const newExtentIdx = direction === 'up'
-      ? Math.max(0, extentIdx - 1)
-      : Math.min(flatList.length - 1, extentIdx + 1);
-
-    const start = Math.min(anchorIdx, newExtentIdx);
-    const end = Math.max(anchorIdx, newExtentIdx);
-    const rangeIds = new Set<string>();
-    for (let i = start; i <= end; i++) {
-      rangeIds.add(flatList[i].nodeId);
-    }
-    const filtered = filterToRootLevel(rangeIds, undefined, flatList);
-    setSelectedNodes(filtered, anchor);
-  }, [getSelectionFlatList, setSelectedNodes]);
+    return false;
+  }, [clearSelection, moveToSibling]);
 
   // ─── Drag handlers for field row reordering ───
 
@@ -777,40 +718,6 @@ export function FieldRow({
     isSystemConfig,
     isSystemField,
   ]);
-
-  // Keyboard handler for field-selected state: Escape clears, Enter re-edits
-  useEffect(() => {
-    if (!isFieldSelected) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.defaultPrevented) return;
-      if (e.shiftKey && !e.metaKey && !e.ctrlKey && !e.altKey && e.key === 'ArrowUp') {
-        e.preventDefault();
-        extendSelectionFromAnchor('up');
-      } else if (e.shiftKey && !e.metaKey && !e.ctrlKey && !e.altKey && e.key === 'ArrowDown') {
-        e.preventDefault();
-        extendSelectionFromAnchor('down');
-      } else if (!e.metaKey && !e.ctrlKey && !e.altKey && e.key === 'Escape') {
-        e.preventDefault();
-        // Second Escape: re-enter field name editing so cursor returns
-        clearSelection();
-        setEditingFieldName(tupleId);
-      } else if (!e.shiftKey && !e.metaKey && !e.ctrlKey && !e.altKey && e.key === 'Enter') {
-        e.preventDefault();
-        clearSelection();
-        setEditingFieldName(tupleId);
-      } else if (!e.shiftKey && !e.metaKey && !e.ctrlKey && !e.altKey && e.key === 'ArrowUp') {
-        e.preventDefault();
-        clearSelection();
-        moveToSibling('up');
-      } else if (!e.shiftKey && !e.metaKey && !e.ctrlKey && !e.altKey && e.key === 'ArrowDown') {
-        e.preventDefault();
-        clearSelection();
-        moveToSibling('down');
-      }
-    };
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isFieldSelected, tupleId, clearSelection, setEditingFieldName, moveToSibling, extendSelectionFromAnchor]);
 
   // ─── Path 1: System metadata fields (NDX_SYS_*) — read-only ───
   if (isSystemField) {
@@ -944,6 +851,20 @@ export function FieldRow({
 
   // ─── Path 3: Regular fields — editable name, FieldValueOutliner ───
   return (
+    <OutlinerRow
+      config={{
+        rowId: tupleId,
+        parentId: nodeId,
+        rootChildIds: rootChildIds ?? renderableSiblings.map((item) => item.id),
+        rootNodeId: rootNodeId ?? nodeId,
+        isEditing,
+        enterEdit: () => setEditingFieldName(tupleId),
+        exitEdit: () => setEditingFieldName(null),
+        rowKind: 'field',
+        onSelectionKeydown: handleFieldSelectionKeydown,
+        onBatchDelete: (id) => removeField(nodeId, id),
+      }}
+    >
     <div className={`relative ${isDropTarget && dropPosition === 'before' ? '' : ''}`}>
       {/* Drop indicator: before */}
       {isDropTarget && dropPosition === 'before' && (
@@ -1032,5 +953,6 @@ export function FieldRow({
         <div className="h-0.5 bg-primary rounded-full" />
       )}
     </div>
+    </OutlinerRow>
   );
 }

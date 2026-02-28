@@ -13,6 +13,10 @@ describe('isOutlinerContentNodeType', () => {
     expect(isOutlinerContentNodeType('search')).toBe(true);
   });
 
+  it('treats codeBlock nodes as renderable content', () => {
+    expect(isOutlinerContentNodeType('codeBlock')).toBe(true);
+  });
+
   it('filters structural schema/field nodes from content rows', () => {
     expect(isOutlinerContentNodeType('fieldEntry')).toBe(false);
     expect(isOutlinerContentNodeType('tagDef')).toBe(false);

@@ -32,6 +32,7 @@ export type NodeType =
   // ── 核心结构类型 ──
   | 'fieldEntry'   // 字段实例：children = 值节点列表，fieldDefId 指向定义
   | 'reference'    // 引用节点：targetId 指向被引用节点（LoroTree 单亲约束）
+  | 'codeBlock'    // 代码块节点：name 保存代码正文，codeLanguage 可选语言标记
 
   // ── 定义类型（Schema 层）──
   | 'tagDef'       // Supertag 定义
@@ -231,6 +232,11 @@ export interface NodexNode {
 
   /** 来源 URL（网页剪藏） */
   sourceUrl?: string;
+
+  // ─── codeBlock 专用 ───
+
+  /** 代码块语言（如：ts、python、css） */
+  codeLanguage?: string;
 
   // ─── Reference 专用 ───
 

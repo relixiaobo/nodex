@@ -21,6 +21,24 @@ describe('editor-marks', () => {
     ]));
   });
 
+  it('parses style-based marks from rich clipboard html', () => {
+    const { text, marks } = htmlToMarks(
+      '<span style="font-weight:700;font-style:italic;text-decoration:line-through">Styled</span>',
+    );
+    expect(text).toBe('Styled');
+    expect(marks).toEqual(expect.arrayContaining([
+      { start: 0, end: 6, type: 'bold' },
+      { start: 0, end: 6, type: 'italic' },
+      { start: 0, end: 6, type: 'strike' },
+    ]));
+  });
+
+  it('does not infer highlight mark from generic background-color style', () => {
+    const { text, marks } = htmlToMarks('<span style="background-color:#f8f9fa">Styled</span>');
+    expect(text).toBe('Styled');
+    expect(marks.some((m) => m.type === 'highlight')).toBe(false);
+  });
+
   it('parses inline refs into replacement chars and entries', () => {
     const parsed = htmlToMarks('See <span data-inlineref-node="node_1">Ref</span> now');
     expect(parsed.text).toBe('See \uFFFC now');

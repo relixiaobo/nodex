@@ -59,6 +59,20 @@ describe('parseHtmlToNodes', () => {
     );
   });
 
+  it('preserves class-based bold/italic marks from clipboard style blocks', () => {
+    const html = [
+      '<style>.bi{font-weight:700;font-style:italic;}</style>',
+      '<p><span class="bi">Styled</span> text</p>',
+    ].join('');
+    const { nodes } = parseHtmlToNodes(html);
+    expect(nodes).toHaveLength(1);
+    expect(nodes[0].name).toBe('Styled text');
+    expect(nodes[0].marks).toEqual(expect.arrayContaining([
+      expect.objectContaining({ type: 'bold', start: 0, end: 6 }),
+      expect.objectContaining({ type: 'italic', start: 0, end: 6 }),
+    ]));
+  });
+
   it('preserves link mark with href', () => {
     const { nodes } = parseHtmlToNodes('<p>Visit <a href="https://example.com">here</a></p>');
     expect(nodes).toHaveLength(1);
@@ -78,6 +92,31 @@ describe('parseHtmlToNodes', () => {
         expect.objectContaining({ type: 'code' }),
       ]),
     );
+  });
+
+  it('merges top-level inline sibling fragments into one paragraph node', () => {
+    const html = [
+      '<span>The word </span>',
+      '<i>emoji</i>',
+      '<span> comes from Japanese </span>',
+      '<span>e</span>',
+      '<span> (絵; \'picture\') + </span>',
+      '<i>moji</i>',
+      '<span> (文字; \'character\').</span>',
+      '<sup>[3]</sup>',
+    ].join('');
+    const { nodes } = parseHtmlToNodes(html);
+    expect(nodes).toHaveLength(1);
+    expect(nodes[0].name).toContain('The word emoji comes from Japanese');
+    expect(nodes[0].name).toContain('moji');
+    expect(nodes[0].name).toContain('[3]');
+    expect(nodes[0].marks.some((m) => m.type === 'italic')).toBe(true);
+  });
+
+  it('splits inline flows by br into multiple nodes', () => {
+    const html = '<span>Line A</span><br><span>Line B</span>';
+    const { nodes } = parseHtmlToNodes(html);
+    expect(nodes.map((n) => n.name)).toEqual(['Line A', 'Line B']);
   });
 
   // ── Heading hierarchy ──
@@ -134,6 +173,25 @@ describe('parseHtmlToNodes', () => {
     expect(nodes[0].name).toBe('Content');
   });
 
+  it('includeH1 option keeps h1 as heading section', () => {
+    const html = '<h1>Title</h1><p>Content</p>';
+    const { nodes } = parseHtmlToNodes(html, { includeH1: true });
+    expect(nodes).toHaveLength(1);
+    expect(nodes[0].name).toBe('Title');
+    expect(nodes[0].marks.some((m) => m.type === 'headingMark')).toBe(true);
+    expect(nodes[0].children).toHaveLength(1);
+    expect(nodes[0].children[0].name).toBe('Content');
+  });
+
+  it('infers styled paragraph heading sections when enabled', () => {
+    const html = '<p><span style="font-size:26pt;font-weight:700">Skills</span></p><p>Detail line</p>';
+    const { nodes } = parseHtmlToNodes(html, { inferStyledHeadings: true });
+    expect(nodes).toHaveLength(1);
+    expect(nodes[0].name).toBe('Skills');
+    expect(nodes[0].marks.some((m) => m.type === 'headingMark')).toBe(true);
+    expect(nodes[0].children.map((n) => n.name)).toEqual(['Detail line']);
+  });
+
   // ── Lists ──
 
   it('flat list items', () => {
@@ -171,6 +229,46 @@ describe('parseHtmlToNodes', () => {
     expect(nodes[0].name).toBe('Step 1');
   });
 
+  it('infers paragraph bullet hierarchy when enabled', () => {
+    const html = [
+      '<p style="margin-left:0pt">• Parent</p>',
+      '<p style="margin-left:36pt">• Child</p>',
+      '<p style="margin-left:0pt">• Sibling</p>',
+    ].join('');
+    const { nodes } = parseHtmlToNodes(html, { inferParagraphLists: true });
+    expect(nodes.map((n) => n.name)).toEqual(['Parent', 'Sibling']);
+    expect(nodes[0].children.map((n) => n.name)).toEqual(['Child']);
+  });
+
+  it('infers hierarchy from class-based styles in clipboard html', () => {
+    const html = [
+      '<style>',
+      '.h{font-size:26pt;font-weight:700;}',
+      '.l0{margin-left:0pt;}',
+      '.l1{margin-left:36pt;}',
+      '</style>',
+      '<p class="h">Experience</p>',
+      '<p class="l0">• Parent</p>',
+      '<p class="l1">• Child</p>',
+    ].join('');
+
+    const { nodes } = parseHtmlToNodes(html, {
+      inferStyledHeadings: true,
+      inferParagraphLists: true,
+    });
+
+    expect(nodes).toHaveLength(1);
+    expect(nodes[0].name).toBe('Experience');
+    expect(nodes[0].children.map((n) => n.name)).toEqual(['Parent']);
+    expect(nodes[0].children[0].children.map((n) => n.name)).toEqual(['Child']);
+  });
+
+  it('splits styled block descendants into separate nodes', () => {
+    const html = '<div><span style="display:block">Line A</span><span style="display:block">Line B</span></div>';
+    const { nodes } = parseHtmlToNodes(html, { inferStyledHeadings: true, inferParagraphLists: true });
+    expect(nodes.map((n) => n.name)).toEqual(['Line A', 'Line B']);
+  });
+
   // ── Blockquote ──
 
   it('blockquote with paragraphs creates parent with children', () => {
@@ -193,16 +291,13 @@ describe('parseHtmlToNodes', () => {
 
   // ── Code blocks ──
 
-  it('pre > code block becomes code-marked node', () => {
+  it('pre > code block becomes codeBlock node with language', () => {
     const html = '<pre><code>const x = 42;\nconsole.log(x);</code></pre>';
     const { nodes } = parseHtmlToNodes(html);
     expect(nodes).toHaveLength(1);
     expect(nodes[0].name).toContain('const x = 42;');
-    expect(nodes[0].marks).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ type: 'code' }),
-      ]),
-    );
+    expect(nodes[0].type).toBe('codeBlock');
+    expect(nodes[0].marks).toEqual([]);
   });
 
   it('pre without code child still works', () => {
@@ -210,6 +305,7 @@ describe('parseHtmlToNodes', () => {
     const { nodes } = parseHtmlToNodes(html);
     expect(nodes).toHaveLength(1);
     expect(nodes[0].name).toBe('plain preformatted text');
+    expect(nodes[0].type).toBe('codeBlock');
   });
 
   // ── Skipped elements ──
@@ -226,6 +322,18 @@ describe('parseHtmlToNodes', () => {
     const html = '<p>Before</p><hr><p>After</p>';
     const { nodes } = parseHtmlToNodes(html);
     expect(nodes).toHaveLength(2);
+  });
+
+  it('style/script metadata tags are skipped from output nodes', () => {
+    const html = [
+      '<style><!--td {border:1px solid;}br {mso-data-placement:same-cell;}--></style>',
+      '<script>console.log("ignore")</script>',
+      '<meta charset="utf-8">',
+      '<p>Before</p>',
+      '<p>After</p>',
+    ].join('');
+    const { nodes } = parseHtmlToNodes(html, { inferStyledHeadings: true, inferParagraphLists: true });
+    expect(nodes.map((n) => n.name)).toEqual(['Before', 'After']);
   });
 
   // ── Table ──
@@ -384,6 +492,26 @@ describe('createContentNodes', () => {
         expect.objectContaining({ type: 'bold', start: 0, end: 4 }),
       ]),
     );
+  });
+
+  it('persists codeBlock type metadata when creating nodes', () => {
+    const parentId = 'inbox_1';
+    const nodes = [
+      {
+        name: 'console.log("hello")',
+        marks: [],
+        inlineRefs: [],
+        children: [],
+        type: 'codeBlock' as const,
+        codeLanguage: 'javascript',
+      },
+    ];
+
+    const ids = createContentNodes(parentId, nodes);
+    const created = loroDoc.toNodexNode(ids[0]);
+    expect(created?.type).toBe('codeBlock');
+    expect(created?.codeLanguage).toBe('javascript');
+    expect(created?.name).toBe('console.log("hello")');
   });
 
   it('empty nodes array returns empty ids', () => {

@@ -7,27 +7,41 @@
 import { AUTO_INIT_STRATEGY, type AutoInitStrategy } from '../types/index.js';
 import * as loroDoc from './loro-doc.js';
 
+// ─── Structured result type ───
+
+export type AutoInitResult =
+  | { kind: 'text'; value: string }
+  | { kind: 'reference'; targetId: string };
+
 /**
  * Resolve the auto-init value for a field based on the configured strategy.
- * Returns a string value to set as the field's text content, or null if
- * the strategy can't produce a value (e.g., no ancestor found).
+ * Returns a structured result or null if the strategy can't produce a value.
  */
 export function resolveAutoInitValue(
   nodeId: string,
   fieldDefId: string,
   strategy: AutoInitStrategy,
-): string | null {
+): AutoInitResult | null {
   switch (strategy) {
+    case AUTO_INIT_STRATEGY.ANCESTOR_SUPERTAG_REF:
+      return resolveAncestorSupertagRef(nodeId, fieldDefId);
     case AUTO_INIT_STRATEGY.CURRENT_DATE:
-      return resolveCurrentDate();
+      return wrapText(resolveCurrentDate());
     case AUTO_INIT_STRATEGY.ANCESTOR_DAY_NODE:
-      return resolveAncestorDayNode(nodeId);
+      return wrapText(resolveAncestorDayNode(nodeId));
     case AUTO_INIT_STRATEGY.ANCESTOR_FIELD_VALUE:
-      return resolveAncestorFieldValue(nodeId, fieldDefId);
+      return wrapText(resolveAncestorFieldValue(nodeId, fieldDefId));
     default:
       return null;
   }
 }
+
+/** Wrap a nullable string as a text result. */
+function wrapText(value: string | null): AutoInitResult | null {
+  return value ? { kind: 'text', value } : null;
+}
+
+// ─── Strategy resolvers ───
 
 /** Return today's date as ISO date string (YYYY-MM-DD). */
 function resolveCurrentDate(): string {
@@ -85,6 +99,33 @@ function resolveAncestorFieldValue(nodeId: string, fieldDefId: string): string |
         // For option references, return targetId
         if (firstValue?.targetId) return firstValue.targetId;
       }
+    }
+
+    current = loroDoc.getParentId(current);
+  }
+
+  return null;
+}
+
+/**
+ * Walk up the parent chain to find the nearest ancestor tagged with
+ * the fieldDef's sourceSupertag. Returns a reference result.
+ */
+function resolveAncestorSupertagRef(nodeId: string, fieldDefId: string): AutoInitResult | null {
+  const fieldDef = loroDoc.toNodexNode(fieldDefId);
+  const targetTagDefId = fieldDef?.sourceSupertag;
+  if (!targetTagDefId) return null;
+
+  const visited = new Set<string>();
+  let current = loroDoc.getParentId(nodeId);
+
+  while (current && !visited.has(current)) {
+    visited.add(current);
+    const node = loroDoc.toNodexNode(current);
+    if (!node) break;
+
+    if (node.tags.includes(targetTagDefId)) {
+      return { kind: 'reference', targetId: current };
     }
 
     current = loroDoc.getParentId(current);

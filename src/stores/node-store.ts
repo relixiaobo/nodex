@@ -602,11 +602,15 @@ export function applyTagMutationsNoCommit(nodeId: string, tagDefId: string): voi
       const strategy = fieldDef?.autoInitialize as AutoInitStrategy | undefined;
       if (!strategy) continue;
 
-      const value = resolveAutoInitValue(nodeId, ref.fieldDefId, strategy);
-      if (value) {
+      const result = resolveAutoInitValue(nodeId, ref.fieldDefId, strategy);
+      if (result) {
         const valueNodeId = nanoid();
         loroDoc.createNode(valueNodeId, feId);
-        loroDoc.setNodeData(valueNodeId, 'name', value);
+        if (result.kind === 'reference') {
+          loroDoc.setNodeData(valueNodeId, 'targetId', result.targetId);
+        } else {
+          loroDoc.setNodeData(valueNodeId, 'name', result.value);
+        }
       }
     }
   }

@@ -369,6 +369,7 @@ export const ATTRDEF_CONFIG_FIELDS: ConfigFieldDef[] = [
     description: 'Automatically fill value when tag is applied',
     options: [
       { value: '', label: 'Off' },
+      { value: AUTO_INIT_STRATEGY.ANCESTOR_SUPERTAG_REF, label: 'From tagged ancestor' },
       { value: AUTO_INIT_STRATEGY.ANCESTOR_FIELD_VALUE, label: 'From ancestor field' },
       { value: AUTO_INIT_STRATEGY.CURRENT_DATE, label: 'Current date' },
       { value: AUTO_INIT_STRATEGY.ANCESTOR_DAY_NODE, label: 'From day node ancestor' },

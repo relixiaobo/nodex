@@ -118,6 +118,7 @@ _(空)_
 - [x] **数据模型简化** — 4 个模板字段（Source/Anchor/Color/Page URL）→ 1 个 Clip 字段（options_from_supertag → #web_clip）+ anchor 存 description + 颜色使用 tagDef 自身颜色 ✅（2026-02-28）
 - [x] **重命名 #web_clip → #source** — 标签名、字段名（Clip→Source）、导出函数名全部统一 ✅（2026-02-28）
 - [x] **Highlight 下一轮优化**（`cc/highlight-polish`, PR #114）— Clip Page 失效 + 网页工具栏不出现 + 删除不清理 DOM + SPA 导航残留 + anchor 无法还原无反馈 + 多 tab 竞态去重 ✅（2026-02-28）
+- [x] **Highlight 数据模型重构** — highlight 改为 clip page 子节点 + `ancestor_supertag_ref` auto-init 策略（Source 字段自动引用祖先 #source 节点）+ backward compat + 18 test ✅（2026-03-01）
 
 #### AI Chat & 网页辅助 (#29 + #31)
 > 浏览器 + AI = soma 的第二个差异化维度。不只是聊天框，而是理解上下文的知识助手。
@@ -157,7 +158,7 @@ _(空)_
 - [ ] Convert to supertag（普通节点快捷转 tagDef）
 - [ ] Pinned fields（置顶显示 + filter 优先）
 - [ ] Optional fields（建议按钮 + 自动降级）
-- [ ] 批量标签操作（多选 add/remove）
+- [x] 批量标签操作（多选 add/remove）— `#` 键触发 BatchTagSelector + batchApplyTag/batchRemoveTag ✅（2026-03-01）
 - [ ] Title expression（`${field name}` 动态标题）
 - **Spec**: `docs/features/supertags.md`
 
@@ -168,9 +169,9 @@ _(空)_
 - [x] **Field / Default Content 删除联动** — 场景 A: 删除模板字段联动清理/脱离；场景 B: 删除 attrDef 保留有值 field + 灰色删除线 ✅（2026-02-27, PR #107, 14 test）
 - [x] **模板字段默认值克隆** — applyTag 时克隆 template fieldEntry 的默认值子节点（name/targetId）；syncTemplateFields 不克隆（只影响新打标签的 node）+ 4 test ✅（2026-02-28）
 - [ ] AttrDef “Used in” 计算字段
-- [ ] Auto-initialize（6 种策略）
+- [x] Auto-initialize（4 种策略：ancestor_supertag_ref / current_date / ancestor_day_node / ancestor_field_value）✅（2026-03-01）
 - [ ] Pinned fields
-- [ ] Merge fields
+- [x] Merge fields — applyTag 时合并模板默认值到已有空字段 ✅（2026-03-01）
 - **Spec**: `docs/features/fields.md`
 
 #### Date 节点 & 日记 (#22)
@@ -291,6 +292,8 @@ _(空)_
 
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
+| 2026-03-01 | Highlight 数据模型重构 — highlight 改为 clip page 子节点 + `ancestor_supertag_ref` auto-init 策略 + backward compat + 18 test | nodex | main |
+| 2026-03-01 | Field & Supertag 功能补全 — Integer 清理 + Merge Fields + Auto-initialize（3 策略）+ 批量标签操作（BatchTagSelector + `#` 快捷键）+ 22 test | nodex | main |
 | 2026-02-28 | Highlight 系统 Review — BG loop guard + SP listener + highlight-sidepanel 模块 + clipPageId 树遍历修复 + 9 test | codex | #113 |
 | 2026-02-28 | Highlight 系统 Phase 1 — highlight-service CRUD + TagSelectorPopover + FloatingToolbar # Tag + PM 选区→inline ref + highlight bullet 颜色 + 25 test | Agent A | #111 |
 | 2026-02-28 | Highlight 系统 Phase 2-3 — anchor-utils + messaging 协议 + Shadow DOM 网页工具栏 + `<soma-hl>` DOM 渲染 + 4-step 锚点还原 + URL clip 查找 + Background 路由 + 87 test | Agent B | #112 |

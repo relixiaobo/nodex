@@ -29,11 +29,11 @@ export interface ExtractResult {
 
 /**
  * Resolve the nearest ancestor (including self) tagged with #source.
- * Falls back to the current node when no clip ancestor exists.
+ * Returns null when no clip ancestor exists.
  */
-export function resolveClipNodeIdForHighlight(nodeId: string): string {
+export function resolveClipNodeIdForHighlight(nodeId: string): string | null {
   const sourceTagDef = findTagDefByName(null, CONTAINER_IDS.SCHEMA, 'source');
-  if (!sourceTagDef) return nodeId;
+  if (!sourceTagDef) return null;
 
   let currentId: string | null = nodeId;
   while (currentId) {
@@ -44,7 +44,7 @@ export function resolveClipNodeIdForHighlight(nodeId: string): string {
     currentId = loroDoc.getParentId(currentId);
   }
 
-  return nodeId;
+  return null;
 }
 
 /**
@@ -76,15 +76,15 @@ export function extractToTaggedNode(
   // 2. Create the Library node based on tag type
   let newNode: NodexNode;
 
-  if (tagDefId === SYS_T.HIGHLIGHT) {
-    // Use highlight-service for #highlight with automatic field population
+  if (tagDefId === SYS_T.HIGHLIGHT && clipPageId) {
+    // Use highlight-service for #highlight as child of clip page
     newNode = createHighlightNode({
       store,
       selectedText,
       clipNodeId: clipPageId,
     });
   } else {
-    // Generic tag: create in LIBRARY and apply tag
+    // Generic tag or no clip ancestor: create in LIBRARY and apply tag
     newNode = store.createChild(CONTAINER_IDS.LIBRARY, undefined, { name: selectedText });
     store.applyTag(newNode.id, tagDefId);
   }

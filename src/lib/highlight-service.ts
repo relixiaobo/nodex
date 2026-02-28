@@ -6,7 +6,7 @@
  * - Anchor data stored in node description (JSON)
  * - Highlight color = tagDef color (no per-node color)
  */
-import { CONTAINER_IDS, SYS_T, FIELD_TYPES } from '../types/index.js';
+import { CONTAINER_IDS, SYS_T, FIELD_TYPES, AUTO_INIT_STRATEGY } from '../types/index.js';
 import type { NodexNode } from '../types/index.js';
 import * as loroDoc from './loro-doc.js';
 import type { WebClipNodeStore } from './webclip-service.js';
@@ -75,12 +75,23 @@ export function ensureHighlightTagDef(store: HighlightNodeStore): void {
   if (!sourceFd) {
     sourceFd = store.createFieldDef(FIELD_SOURCE, FIELD_TYPES.OPTIONS_FROM_SUPERTAG, SYS_T.HIGHLIGHT);
     // Set the source supertag so the picker shows #source nodes
-    loroDoc.setNodeDataBatch(sourceFd.id, { sourceSupertag: sourceTagDef.id });
+    loroDoc.setNodeDataBatch(sourceFd.id, {
+      sourceSupertag: sourceTagDef.id,
+      autoInitialize: AUTO_INIT_STRATEGY.ANCESTOR_SUPERTAG_REF,
+    });
     loroDoc.commitDoc();
-  } else if (!loroDoc.toNodexNode(sourceFd.id)?.sourceSupertag) {
-    // Backfill sourceSupertag if missing (e.g., after migration)
-    loroDoc.setNodeDataBatch(sourceFd.id, { sourceSupertag: sourceTagDef.id });
-    loroDoc.commitDoc();
+  } else {
+    // Backfill sourceSupertag and autoInitialize if missing (e.g., after migration)
+    const currentFd = loroDoc.toNodexNode(sourceFd.id);
+    const needsUpdate = !currentFd?.sourceSupertag
+      || currentFd?.autoInitialize !== AUTO_INIT_STRATEGY.ANCESTOR_SUPERTAG_REF;
+    if (needsUpdate) {
+      loroDoc.setNodeDataBatch(sourceFd.id, {
+        sourceSupertag: sourceTagDef.id,
+        autoInitialize: AUTO_INIT_STRATEGY.ANCESTOR_SUPERTAG_REF,
+      });
+      loroDoc.commitDoc();
+    }
   }
   _sourceFieldDefId = sourceFd.id;
 }
@@ -117,32 +128,29 @@ export function getSourceFieldDefId(): string {
 export interface CreateHighlightParams {
   store: HighlightNodeStore;
   selectedText: string;
-  clipNodeId?: string;
+  /** Parent clip page node ID. Highlight is created as child of this node. */
+  clipNodeId: string;
   /** JSON-serialized anchor data (stored in node description). */
   anchor?: string;
 }
 
 /**
- * Create a highlight node in LIBRARY container.
- * Applies #highlight tag, sets Clip field, stores anchor in description.
+ * Create a highlight node as a child of the clip page node.
+ * Applies #highlight tag (Source field auto-filled by ancestor_supertag_ref).
+ * Stores anchor in description.
  *
  * @returns The created highlight node.
  */
 export function createHighlightNode(params: CreateHighlightParams): NodexNode {
   const { store, selectedText, clipNodeId, anchor } = params;
 
-  // 1. Create node in LIBRARY
-  const node = store.createChild(CONTAINER_IDS.LIBRARY, undefined, { name: selectedText });
+  // 1. Create node as child of clip page (auto-init fills Source field)
+  const node = store.createChild(clipNodeId, undefined, { name: selectedText });
 
-  // 2. Apply #highlight tag
+  // 2. Apply #highlight tag — auto-init resolves Source from #source ancestor
   store.applyTag(node.id, SYS_T.HIGHLIGHT);
 
-  // 3. Set Source field (reference to #source node)
-  if (clipNodeId) {
-    store.setOptionsFieldValue(node.id, getSourceFieldDefId(), clipNodeId);
-  }
-
-  // 4. Store anchor data in description (internal, not user-visible in normal view)
+  // 3. Store anchor data in description (internal, not user-visible in normal view)
   if (anchor) {
     store.updateNodeDescription(node.id, anchor);
   }
@@ -151,23 +159,37 @@ export function createHighlightNode(params: CreateHighlightParams): NodexNode {
 }
 
 /**
- * Find all #highlight nodes in LIBRARY whose Source field references the given clipNodeId.
+ * Find all #highlight nodes for a given clip page.
+ * New model: highlights are direct children of the clip node.
+ * Backward compat: also scans LIBRARY top-level for legacy highlights with Source field match.
  */
 export function getHighlightsForClip(clipNodeId: string): NodexNode[] {
-  const sourceFieldDefId = _sourceFieldDefId;
-  if (!sourceFieldDefId) return [];
-
-  const libraryChildren = loroDoc.getChildren(CONTAINER_IDS.LIBRARY);
   const results: NodexNode[] = [];
+  const seen = new Set<string>();
 
-  for (const childId of libraryChildren) {
+  // 1. New model: direct children of clipNodeId
+  const clipChildren = loroDoc.getChildren(clipNodeId);
+  for (const childId of clipChildren) {
     const child = loroDoc.toNodexNode(childId);
     if (!child || !child.tags.includes(SYS_T.HIGHLIGHT)) continue;
+    results.push(child);
+    seen.add(childId);
+  }
 
-    // Check Source field value (options type → targetId reference)
-    const sourceRef = getOptionsFieldTargetId(childId, sourceFieldDefId);
-    if (sourceRef === clipNodeId) {
-      results.push(child);
+  // 2. Backward compat: legacy highlights at LIBRARY top level with Source field match
+  const sourceFieldDefId = _sourceFieldDefId;
+  if (sourceFieldDefId) {
+    const libraryChildren = loroDoc.getChildren(CONTAINER_IDS.LIBRARY);
+    for (const childId of libraryChildren) {
+      if (seen.has(childId)) continue;
+      const child = loroDoc.toNodexNode(childId);
+      if (!child || !child.tags.includes(SYS_T.HIGHLIGHT)) continue;
+
+      const sourceRef = getOptionsFieldTargetId(childId, sourceFieldDefId);
+      if (sourceRef === clipNodeId) {
+        results.push(child);
+        seen.add(childId);
+      }
     }
   }
 

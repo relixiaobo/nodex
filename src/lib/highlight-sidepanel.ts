@@ -3,7 +3,6 @@ import type { HighlightCreatePayload, HighlightRestorePayload } from './highligh
 import {
   createCommentNode,
   createHighlightNode,
-  getSourceFieldDefId,
   getHighlightsForClip,
   type HighlightNodeStore,
 } from './highlight-service.js';
@@ -19,13 +18,36 @@ export interface CreateHighlightFromPayloadResult {
 
 const pendingClipCreationByUrl = new Map<string, Promise<string>>();
 
-export function collectHighlightNodeIdsInLibrary(): Set<string> {
+/**
+ * Collect all highlight node IDs.
+ * Two-level traversal across LIBRARY, INBOX, and CLIPS:
+ * 1. Legacy: highlights directly in LIBRARY (old model)
+ * 2. New: highlights as children of clip pages (in any container)
+ */
+export function collectAllHighlightNodeIds(): Set<string> {
   const ids = new Set<string>();
-  const children = loroDoc.getChildren(CONTAINER_IDS.LIBRARY);
-  for (const childId of children) {
-    const node = loroDoc.toNodexNode(childId);
-    if (node?.tags.includes(SYS_T.HIGHLIGHT)) {
-      ids.add(childId);
+  const containers = [CONTAINER_IDS.LIBRARY, CONTAINER_IDS.INBOX, CONTAINER_IDS.CLIPS];
+
+  for (const containerId of containers) {
+    const children = loroDoc.getChildren(containerId);
+    for (const childId of children) {
+      const node = loroDoc.toNodexNode(childId);
+      if (!node) continue;
+
+      // Direct highlight in container (legacy model)
+      if (node.tags.includes(SYS_T.HIGHLIGHT)) {
+        ids.add(childId);
+        continue;
+      }
+
+      // Clip page children may be highlights (new model)
+      const grandChildren = loroDoc.getChildren(childId);
+      for (const gcId of grandChildren) {
+        const gc = loroDoc.toNodexNode(gcId);
+        if (gc?.tags.includes(SYS_T.HIGHLIGHT)) {
+          ids.add(gcId);
+        }
+      }
     }
   }
   return ids;

@@ -5,8 +5,9 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { useNodeStore } from '../../src/stores/node-store.js';
 import * as loroDoc from '../../src/lib/loro-doc.js';
-import { AUTO_INIT_STRATEGY } from '../../src/types/index.js';
+import { AUTO_INIT_STRATEGY, FIELD_TYPES } from '../../src/types/index.js';
 import { resolveAutoInitValue } from '../../src/lib/field-auto-init.js';
+import type { AutoInitResult } from '../../src/lib/field-auto-init.js';
 import { resetAndSeed } from './helpers/test-state.js';
 
 function findFieldEntry(nodeId: string, fieldDefId: string): string | null {
@@ -23,12 +24,12 @@ describe('resolveAutoInitValue — pure strategy functions', () => {
     resetAndSeed();
   });
 
-  it('current_date returns today in ISO format', () => {
+  it('current_date returns text result with today in ISO format', () => {
     const result = resolveAutoInitValue('task_1', 'attrDef_due', AUTO_INIT_STRATEGY.CURRENT_DATE);
-    expect(result).toMatch(/^\d{4}-\d{2}-\d{2}$/);
-    // Should be today's date
+    expect(result).not.toBeNull();
+    expect(result!.kind).toBe('text');
     const today = new Date().toISOString().slice(0, 10);
-    expect(result).toBe(today);
+    expect((result as Extract<AutoInitResult, { kind: 'text' }>).value).toBe(today);
   });
 
   it('ancestor_day_node returns null when no day node in ancestry', () => {
@@ -37,7 +38,7 @@ describe('resolveAutoInitValue — pure strategy functions', () => {
     expect(result).toBeNull();
   });
 
-  it('ancestor_day_node returns date from day node ancestor', () => {
+  it('ancestor_day_node returns text result with date from day node ancestor', () => {
     const store = useNodeStore.getState();
     // Create a day node and put a child under it
     const dayNode = store.createChild('proj_1', undefined, { name: '2026-03-01' });
@@ -47,10 +48,12 @@ describe('resolveAutoInitValue — pure strategy functions', () => {
     const childNode = store.createChild(dayNode.id, undefined, { name: 'Meeting notes' });
 
     const result = resolveAutoInitValue(childNode.id, 'attrDef_due', AUTO_INIT_STRATEGY.ANCESTOR_DAY_NODE);
-    expect(result).toBe('2026-03-01');
+    expect(result).not.toBeNull();
+    expect(result!.kind).toBe('text');
+    expect((result as Extract<AutoInitResult, { kind: 'text' }>).value).toBe('2026-03-01');
   });
 
-  it('ancestor_field_value returns value from ancestor field', () => {
+  it('ancestor_field_value returns text result with value from ancestor field', () => {
     const store = useNodeStore.getState();
 
     // Create a parent with a Status field value
@@ -65,13 +68,62 @@ describe('resolveAutoInitValue — pure strategy functions', () => {
 
     // Resolve: child should inherit parent's Status
     const result = resolveAutoInitValue(child.id, 'attrDef_status', AUTO_INIT_STRATEGY.ANCESTOR_FIELD_VALUE);
-    expect(result).toBe('opt_in_progress');
+    expect(result).not.toBeNull();
+    expect(result!.kind).toBe('text');
+    expect((result as Extract<AutoInitResult, { kind: 'text' }>).value).toBe('opt_in_progress');
   });
 
   it('ancestor_field_value returns null when no ancestor has the field', () => {
     const store = useNodeStore.getState();
     const node = store.createChild('proj_1', undefined, { name: 'Orphan' });
     const result = resolveAutoInitValue(node.id, 'attrDef_status', AUTO_INIT_STRATEGY.ANCESTOR_FIELD_VALUE);
+    expect(result).toBeNull();
+  });
+
+  it('ancestor_supertag_ref returns reference result when tagged ancestor exists', () => {
+    const store = useNodeStore.getState();
+
+    // Create a fieldDef with sourceSupertag pointing to tagDef_source
+    const tagDef = store.createTagDef('RefTag', { color: 'green' });
+    const fieldDef = store.createFieldDef('Source', FIELD_TYPES.OPTIONS_FROM_SUPERTAG, tagDef.id);
+    loroDoc.setNodeDataBatch(fieldDef.id, { sourceSupertag: 'tagDef_source' });
+    loroDoc.commitDoc();
+
+    // webclip_1 is already tagged with #source in seed data
+    // Create a child node under webclip_1
+    const child = store.createChild('webclip_1', undefined, { name: 'child node' });
+
+    const result = resolveAutoInitValue(child.id, fieldDef.id, AUTO_INIT_STRATEGY.ANCESTOR_SUPERTAG_REF);
+    expect(result).not.toBeNull();
+    expect(result!.kind).toBe('reference');
+    expect((result as Extract<AutoInitResult, { kind: 'reference' }>).targetId).toBe('webclip_1');
+  });
+
+  it('ancestor_supertag_ref returns null when no tagged ancestor exists', () => {
+    const store = useNodeStore.getState();
+
+    const tagDef = store.createTagDef('RefTag2', { color: 'blue' });
+    const fieldDef = store.createFieldDef('Source', FIELD_TYPES.OPTIONS_FROM_SUPERTAG, tagDef.id);
+    loroDoc.setNodeDataBatch(fieldDef.id, { sourceSupertag: 'tagDef_source' });
+    loroDoc.commitDoc();
+
+    // proj_1 is NOT tagged with #source
+    const child = store.createChild('proj_1', undefined, { name: 'orphan' });
+
+    const result = resolveAutoInitValue(child.id, fieldDef.id, AUTO_INIT_STRATEGY.ANCESTOR_SUPERTAG_REF);
+    expect(result).toBeNull();
+  });
+
+  it('ancestor_supertag_ref returns null when fieldDef has no sourceSupertag', () => {
+    const store = useNodeStore.getState();
+
+    const tagDef = store.createTagDef('NoSrcTag', { color: 'red' });
+    const fieldDef = store.createFieldDef('Ref', FIELD_TYPES.PLAIN, tagDef.id);
+    // No sourceSupertag set
+
+    const child = store.createChild('webclip_1', undefined, { name: 'test' });
+
+    const result = resolveAutoInitValue(child.id, fieldDef.id, AUTO_INIT_STRATEGY.ANCESTOR_SUPERTAG_REF);
     expect(result).toBeNull();
   });
 });
@@ -129,6 +181,34 @@ describe('applyTag with autoInitialize — integration', () => {
     const feChildren = loroDoc.getChildren(feId!);
     expect(feChildren.length).toBe(1);
     expect(loroDoc.toNodexNode(feChildren[0])?.name).toBe('high');
+  });
+
+  it('auto-fills reference from ancestor_supertag_ref strategy', () => {
+    const store = useNodeStore.getState();
+
+    // Create tag with options_from_supertag field + ancestor_supertag_ref
+    const tagDef = store.createTagDef('RefAutoTag', { color: 'amber' });
+    const fieldDef = store.createFieldDef('Source', FIELD_TYPES.OPTIONS_FROM_SUPERTAG, tagDef.id);
+    loroDoc.setNodeDataBatch(fieldDef.id, {
+      sourceSupertag: 'tagDef_source',
+      autoInitialize: AUTO_INIT_STRATEGY.ANCESTOR_SUPERTAG_REF,
+    });
+    loroDoc.commitDoc();
+
+    // Create node under webclip_1 (tagged with #source) and apply tag
+    const child = store.createChild('webclip_1', undefined, { name: 'Ref test' });
+    store.applyTag(child.id, tagDef.id);
+
+    const feId = findFieldEntry(child.id, fieldDef.id);
+    expect(feId).toBeTruthy();
+
+    const feChildren = loroDoc.getChildren(feId!);
+    expect(feChildren.length).toBe(1);
+
+    const valueNode = loroDoc.toNodexNode(feChildren[0]);
+    // Should be a reference (targetId), not text (name)
+    expect(valueNode?.targetId).toBe('webclip_1');
+    expect(valueNode?.name).toBeFalsy();
   });
 
   it('does not auto-fill when field already has a value from template defaults', () => {

@@ -179,6 +179,7 @@ export function RichTextEditor(props: RichTextEditorProps) {
 
   const updateNodeContent = useNodeStore((s) => s.updateNodeContent);
   const applyParsedPasteMetadata = useNodeStore((s) => s.applyParsedPasteMetadata);
+  const createChildNodesFromPaste = useNodeStore((s) => s.createChildNodesFromPaste);
 
   const saveContent = useCallback(() => {
     const view = viewRef.current;
@@ -794,7 +795,8 @@ export function RichTextEditor(props: RichTextEditorProps) {
           const firstNode = parsedNodes[0];
           const restNodes = parsedNodes.slice(1);
           const hasMetadata = (firstNode.tags?.length ?? 0) > 0 || (firstNode.fields?.length ?? 0) > 0;
-          const shouldDeferCommit = restNodes.length > 0 || hasMetadata;
+          const hasChildren = firstNode.children.length > 0;
+          const shouldDeferCommit = restNodes.length > 0 || hasMetadata || hasChildren;
 
           if (restNodes.length > 0 && !propsRef.current.onPasteMultiLine) {
             const fallback = parsedNodes.map((node) => node.name).filter(Boolean).join(' ');
@@ -826,9 +828,12 @@ export function RichTextEditor(props: RichTextEditorProps) {
           if (hasMetadata) {
             applyParsedPasteMetadata(propsRef.current.nodeId, firstNode, { commit: false });
           }
+          if (hasChildren) {
+            createChildNodesFromPaste(propsRef.current.nodeId, firstNode.children, { commit: false });
+          }
           if (restNodes.length > 0 && propsRef.current.onPasteMultiLine) {
             propsRef.current.onPasteMultiLine(restNodes);
-          } else if (hasMetadata) {
+          } else if (hasMetadata || hasChildren) {
             commitDoc('user:paste');
           }
           return true;

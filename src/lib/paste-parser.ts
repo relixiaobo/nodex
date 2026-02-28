@@ -15,6 +15,7 @@ export type ParsedPasteNode = ParsedContentNode & {
 const LIST_LINE_RE = /^(\s*)(?:[-*+]|\d+\.)\s+(.+)$/;
 const HEADING_RE = /^\s{0,3}(#{1,6})\s+(.+)$/;
 const FENCED_CODE_RE = /^\s*(```+|~~~+)\s*([A-Za-z0-9_+-]*)\s*$/;
+const HORIZONTAL_RULE_RE = /^\s{0,3}(?:-{3,}|\*{3,}|_{3,})\s*$/;
 const TABLE_ROW_RE = /^\s*\|.*\|\s*$/;
 const TABLE_SEPARATOR_RE = /^\s*\|?\s*:?-{3,}:?\s*(?:\|\s*:?-{3,}:?\s*)+\|?\s*$/;
 const TAG_RE = /(^|\s)#([A-Za-z0-9][\w-]*)/g;
@@ -22,15 +23,16 @@ const FIELD_RE = /(^|\s)([A-Za-z0-9][\w-]*)::\s*([^#\n]+?)(?=(?:\s+[A-Za-z0-9][\
 
 export function parseMultiLinePaste(plain: string, html?: string): ParsedPasteNode[] {
   const rawPlain = plain ?? '';
-  const lines = rawPlain.split(/\r?\n/);
+  const normalizedPlain = normalizeClipboardPlain(rawPlain);
+  const lines = normalizedPlain.split(/\r?\n/);
   const markdownNodes = parseMarkdownDocument(lines) ?? parseMarkdownList(lines);
   const hasMarkdownNodes = !!markdownNodes && markdownNodes.length > 0;
 
-  if (hasMarkdownNodes && shouldPreferMarkdown(rawPlain, html)) {
+  if (hasMarkdownNodes && shouldPreferMarkdown(normalizedPlain, html)) {
     return markdownNodes!;
   }
 
-  if (html && shouldPreferHtml(html, rawPlain)) {
+  if (html && shouldPreferHtml(html, normalizedPlain)) {
     const htmlNodes = parseHtmlBlocks(html);
     if (htmlNodes.length > 0) return htmlNodes;
   }
@@ -78,7 +80,7 @@ export function parseMarkdownList(lines: string[]): ParsedPasteNode[] | null {
       stack.pop();
     }
 
-    const node = createPlainNode(item.content);
+    const node = createMarkdownNode(item.content);
     if (stack.length === 0) {
       roots.push(node);
     } else {
@@ -140,6 +142,11 @@ function parseMarkdownDocument(lines: string[]): ParsedPasteNode[] | null {
     }
 
     if (!rawLine.trim()) {
+      listStack.length = 0;
+      continue;
+    }
+
+    if (isHorizontalRuleLine(rawLine)) {
       listStack.length = 0;
       continue;
     }
@@ -265,7 +272,8 @@ function parseFlatLines(lines: string[]): ParsedPasteNode[] {
   return lines
     .map((line) => line.trim())
     .filter((line) => line.length > 0)
-    .map(createPlainNode);
+    .filter((line) => !isHorizontalRuleLine(line))
+    .map((line) => (hasInlineMarkdownSyntax(line) ? createMarkdownNode(line) : createPlainNode(line)));
 }
 
 function createPlainNode(text: string): ParsedPasteNode {
@@ -420,8 +428,9 @@ function looksLikeMarkdown(lines: string[]): boolean {
     if (HEADING_RE.test(trimmed)) hintCount += 1;
     else if (LIST_LINE_RE.test(line)) hintCount += 1;
     else if (FENCED_CODE_RE.test(line)) hintCount += 1;
+    else if (HORIZONTAL_RULE_RE.test(line)) hintCount += 1;
     else if (TABLE_ROW_RE.test(line)) hintCount += 1;
-    else if (/(\*\*[^*]+\*\*)|(`[^`]+`)|(\[[^\]]+\]\(https?:\/\/[^\s)]+\))/.test(trimmed)) hintCount += 1;
+    else if (hasInlineMarkdownSyntax(trimmed)) hintCount += 1;
     if (hintCount >= 1) return true;
   }
   return false;
@@ -456,8 +465,10 @@ function hasStrongMarkdownSignals(text: string): boolean {
   for (const line of lines) {
     if (FENCED_CODE_RE.test(line)) return true;
     if (HEADING_RE.test(line.trim())) return true;
+    if (HORIZONTAL_RULE_RE.test(line)) return true;
     if (TABLE_SEPARATOR_RE.test(line) || TABLE_ROW_RE.test(line)) return true;
     if (/^\s*(?:[-*+]|\d+\.)\s+\S/.test(line)) listLikeCount += 1;
+    if (hasInlineMarkdownSyntax(line)) return true;
     if (listLikeCount >= 2) return true;
   }
   return false;
@@ -491,6 +502,29 @@ function isFenceTerminator(openToken: string, closeToken: string): boolean {
 function normalizeCodeLanguage(raw?: string): string | undefined {
   const normalized = raw?.trim().toLowerCase();
   return normalized ? normalized : undefined;
+}
+
+function hasInlineMarkdownSyntax(line: string): boolean {
+  return /(\*\*[^*]+\*\*)|(__[^_]+__)|(\*[^*\n]+\*)|(_[^_\n]+_)|(~~[^~]+~~)|(`[^`]+`)|(\[[^\]]+\]\(https?:\/\/[^\s)]+\))/.test(line);
+}
+
+function isHorizontalRuleLine(line: string): boolean {
+  return HORIZONTAL_RULE_RE.test(line.trim());
+}
+
+function normalizeClipboardPlain(raw: string): string {
+  const lines = raw.split(/\r?\n/).map((line) => line.replace(/\r/g, ''));
+  const nonEmpty = lines.filter((line) => line.trim().length > 0);
+  if (nonEmpty.length < 2) return lines.join('\n');
+
+  const bulletWrappedCount = nonEmpty.filter((line) => /^\s*[•◦▪‣·]\s+/.test(line)).length;
+  if (bulletWrappedCount / nonEmpty.length < 0.6) {
+    return lines.join('\n');
+  }
+
+  return lines
+    .map((line) => line.replace(/^(\s*)[•◦▪‣·]\s+/, '$1'))
+    .join('\n');
 }
 
 function isMeaningfulNode(node: ParsedPasteNode): boolean {

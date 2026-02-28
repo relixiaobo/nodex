@@ -143,6 +143,28 @@ describe('paste-parser', () => {
     expect(nodes[0].children[0].name).toBe('npm run dev:test');
   });
 
+  it('normalizes bullet-wrapped markdown lines from clipboard shells', () => {
+    const plain = [
+      '• ### Standalone 测试环境',
+      '• ```bash',
+      '• npm run dev:test',
+      '• ```',
+      '• **加粗** 和 *斜体*',
+      '• ---',
+    ].join('\n');
+
+    const nodes = parseMultiLinePaste(plain, '<ul><li>dummy</li></ul>');
+    expect(nodes).toHaveLength(1);
+    expect(nodes[0].name).toBe('Standalone 测试环境');
+    expect(nodes[0].children[0].type).toBe('codeBlock');
+    expect(nodes[0].children[0].name).toBe('npm run dev:test');
+    const richLine = nodes[0].children.find((n) => n.type !== 'codeBlock');
+    expect(richLine?.name).toBe('加粗 和 斜体');
+    expect(richLine?.marks.some((m) => m.type === 'bold')).toBe(true);
+    expect(richLine?.marks.some((m) => m.type === 'italic')).toBe(true);
+    expect(nodes[0].children.some((n) => n.name === '---')).toBe(false);
+  });
+
   it('parses single-line HTML with inline formatting', () => {
     const nodes = parseMultiLinePaste('Bold', '<strong>Bold</strong>');
     expect(nodes).toHaveLength(1);

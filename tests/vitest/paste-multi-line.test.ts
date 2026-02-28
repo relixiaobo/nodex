@@ -156,4 +156,25 @@ describe('createSiblingNodesFromPaste — parsed paste nodes', () => {
     const errors = collectNodeGraphErrors();
     expect(errors).toEqual([]);
   });
+
+  it('creates child nodes from parsed paste for first-line hierarchy handoff', () => {
+    const store = useNodeStore.getState();
+    const lastId = store.createChildNodesFromPaste('subtask_1a', [
+      node('Child heading', {
+        children: [
+          node('Nested 1'),
+          node('Nested 2'),
+        ],
+      }),
+    ]);
+
+    expect(lastId).toBeTruthy();
+    const children = loroDoc.getChildren('subtask_1a');
+    const createdId = children[children.length - 1];
+    const created = loroDoc.toNodexNode(createdId);
+    expect(created?.name).toBe('Child heading');
+
+    const nested = loroDoc.getChildren(createdId).map((id) => loroDoc.toNodexNode(id)?.name);
+    expect(nested).toEqual(['Nested 1', 'Nested 2']);
+  });
 });

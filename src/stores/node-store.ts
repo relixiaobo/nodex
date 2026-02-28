@@ -37,7 +37,17 @@ interface NodeStore {
   createChild(parentId: string, index?: number, data?: Partial<NodexNode>): NodexNode;
   createSibling(siblingId: string, data?: Partial<NodexNode>): NodexNode;
   /** Batch-create sibling nodes from parsed paste nodes. Returns last created top-level node ID (or null). Single commitDoc for undo. */
-  createSiblingNodesFromPaste(afterNodeId: string, nodes: ParsedPasteNode[]): string | null;
+  createSiblingNodesFromPaste(
+    afterNodeId: string,
+    nodes: ParsedPasteNode[],
+    options?: { commit?: boolean },
+  ): string | null;
+  /** Batch-create child nodes from parsed paste nodes. Returns last created top-level node ID (or null). */
+  createChildNodesFromPaste(
+    parentNodeId: string,
+    nodes: ParsedPasteNode[],
+    options?: { commit?: boolean },
+  ): string | null;
   moveNodeTo(nodeId: string, newParentId: string, index?: number): void;
   indentNode(nodeId: string): void;
   outdentNode(nodeId: string): void;
@@ -724,6 +734,51 @@ export const useNodeStore = create<NodeStore>((set, get) => {
     }
   }
 
+  function isMeaningfulParsedPasteNode(item: ParsedPasteNode): boolean {
+    const hasName = item.type === 'codeBlock'
+      ? item.name.length > 0
+      : item.name.trim().length > 0;
+    return (
+      hasName
+      || item.children.length > 0
+      || (item.tags?.length ?? 0) > 0
+      || (item.fields?.length ?? 0) > 0
+    );
+  }
+
+  function createParsedNodesNoCommit(
+    parentNodeId: string,
+    items: ParsedPasteNode[],
+    startIndex?: number,
+  ): string | null {
+    const filtered = items.filter(isMeaningfulParsedPasteNode);
+    if (filtered.length === 0) return null;
+
+    const persistParsedNodeType = (nodeId: string, item: ParsedPasteNode): void => {
+      if (!item.type && !item.codeLanguage) return;
+      const batch: Record<string, unknown> = {};
+      if (item.type) batch.type = item.type;
+      if (item.codeLanguage) batch.codeLanguage = item.codeLanguage;
+      loroDoc.setNodeDataBatch(nodeId, batch);
+    };
+
+    let lastId: string | null = null;
+    for (let i = 0; i < filtered.length; i++) {
+      const item = filtered[i];
+      const index = startIndex !== undefined ? startIndex + i : undefined;
+      const id = nanoid();
+      loroDoc.createNode(id, parentNodeId, index);
+      persistParsedNodeType(id, item);
+      loroDoc.setNodeRichTextContent(id, item.name, item.marks ?? [], item.inlineRefs ?? []);
+      applyParsedPasteMetadataMutationsNoCommit(id, item);
+      if (item.children.length > 0) {
+        createParsedNodesNoCommit(id, item.children);
+      }
+      lastId = id;
+    }
+    return lastId;
+  }
+
   return {
     _version: 0,
 
@@ -801,66 +856,35 @@ export const useNodeStore = create<NodeStore>((set, get) => {
       return get().createChild(parentId, insertAt, data);
     },
 
-    createSiblingNodesFromPaste: (afterNodeId, nodes) => {
+    createSiblingNodesFromPaste: (afterNodeId, nodes, options) => {
       if (!canMutate('createSiblingNodesFromPaste')) return null;
       const parentId = loroDoc.getParentId(afterNodeId);
       if (!parentId) return null;
 
-      const filteredTopLevel = nodes.filter((node) =>
-        node.name.trim().length > 0
-          || node.children.length > 0
-          || (node.tags?.length ?? 0) > 0
-          || (node.fields?.length ?? 0) > 0,
-      );
-      if (filteredTopLevel.length === 0) return null;
-
       const siblings = loroDoc.getChildren(parentId);
       const baseIdx = siblings.indexOf(afterNodeId);
       const startAt = baseIdx >= 0 ? baseIdx + 1 : siblings.length;
-      const persistParsedNodeType = (nodeId: string, item: ParsedPasteNode): void => {
-        if (!item.type && !item.codeLanguage) return;
-        const batch: Record<string, unknown> = {};
-        if (item.type) batch.type = item.type;
-        if (item.codeLanguage) batch.codeLanguage = item.codeLanguage;
-        loroDoc.setNodeDataBatch(nodeId, batch);
-      };
 
-      const createRecursive = (parentNodeId: string, items: ParsedPasteNode[], startIndex?: number): void => {
-        for (let i = 0; i < items.length; i++) {
-          const item = items[i];
-          const isMeaningful =
-            item.name.trim().length > 0
-            || item.children.length > 0
-            || (item.tags?.length ?? 0) > 0
-            || (item.fields?.length ?? 0) > 0;
-          if (!isMeaningful) continue;
-
-          const index = startIndex !== undefined ? startIndex + i : undefined;
-          const id = nanoid();
-          loroDoc.createNode(id, parentNodeId, index);
-          persistParsedNodeType(id, item);
-          loroDoc.setNodeRichTextContent(id, item.name, item.marks ?? [], item.inlineRefs ?? []);
-          applyParsedPasteMetadataMutationsNoCommit(id, item);
-          if (item.children.length > 0) {
-            createRecursive(id, item.children);
-          }
-        }
-      };
-
-      let lastId: string | null = null;
-      for (let i = 0; i < filteredTopLevel.length; i++) {
-        const item = filteredTopLevel[i];
-        const id = nanoid();
-        loroDoc.createNode(id, parentId, startAt + i);
-        persistParsedNodeType(id, item);
-        loroDoc.setNodeRichTextContent(id, item.name, item.marks ?? [], item.inlineRefs ?? []);
-        applyParsedPasteMetadataMutationsNoCommit(id, item);
-        if (item.children.length > 0) {
-          createRecursive(id, item.children);
-        }
-        lastId = id;
+      const lastId = createParsedNodesNoCommit(parentId, nodes, startAt);
+      if (!lastId) return null;
+      if (options?.commit ?? true) {
+        loroDoc.commitDoc();
       }
-      loroDoc.commitDoc();
+      return lastId;
+    },
+
+    createChildNodesFromPaste: (parentNodeId, nodes, options) => {
+      if (!canMutate('createChildNodesFromPaste')) return null;
+      if (!loroDoc.hasNode(parentNodeId)) return null;
+
+      const children = loroDoc.getChildren(parentNodeId);
+      const startAt = children.length;
+      const lastId = createParsedNodesNoCommit(parentNodeId, nodes, startAt);
+      if (!lastId) return null;
+
+      if (options?.commit ?? true) {
+        loroDoc.commitDoc();
+      }
       return lastId;
     },
 

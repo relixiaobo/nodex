@@ -20,7 +20,7 @@ import { useUIStore } from '../../stores/ui-store';
 import { getLastVisibleNode, isWorkspaceContainer, getNodeTextLengthById } from '../../lib/tree-utils.js';
 import { isOptionsFieldType } from '../../lib/field-utils.js';
 import * as loroDoc from '../../lib/loro-doc.js';
-import { undoDoc, redoDoc } from '../../lib/loro-doc.js';
+import { undoDoc, redoDoc, commitDoc } from '../../lib/loro-doc.js';
 import { getPrimaryShortcutKey } from '../../lib/shortcut-registry';
 import { isImeComposingEvent } from '../../lib/ime-keyboard.js';
 import {
@@ -110,6 +110,8 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
     const addReference = useNodeStore((s) => s.addReference);
     const selectFieldOption = useNodeStore((s) => s.selectFieldOption);
     const applyParsedPasteMetadata = useNodeStore((s) => s.applyParsedPasteMetadata);
+    const createSiblingNodesFromPaste = useNodeStore((s) => s.createSiblingNodesFromPaste);
+    const createChildNodesFromPaste = useNodeStore((s) => s.createChildNodesFromPaste);
 
     const [optionsOpen, setOptionsOpen] = useState(false);
     const [optionsQuery, setOptionsQuery] = useState('');
@@ -123,7 +125,7 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
     }, [isOptions, optionsOpen, optionsQuery, allOptions]);
 
     const callbacksRef = useRef({
-        createChild, createNodeInSearchContext, cycleNodeCheckbox, addUnnamedFieldToNode, addReference, selectFieldOption, applyParsedPasteMetadata,
+        createChild, createNodeInSearchContext, cycleNodeCheckbox, addUnnamedFieldToNode, addReference, selectFieldOption, applyParsedPasteMetadata, createSiblingNodesFromPaste, createChildNodesFromPaste,
         parentId, effectiveParentId, effectiveDepth, effectiveParentEK,
         setEffectiveParentId, setEffectiveDepth, setEffectiveParentEK,
         setExpanded, setFocusedNode, setFocusClickCoords, setEditingFieldName, setTriggerHint,
@@ -132,7 +134,7 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
         onNavigateOut, isSearchContext,
     });
     callbacksRef.current = {
-        createChild, createNodeInSearchContext, cycleNodeCheckbox, addUnnamedFieldToNode, addReference, selectFieldOption, applyParsedPasteMetadata,
+        createChild, createNodeInSearchContext, cycleNodeCheckbox, addUnnamedFieldToNode, addReference, selectFieldOption, applyParsedPasteMetadata, createSiblingNodesFromPaste, createChildNodesFromPaste,
         parentId, effectiveParentId, effectiveDepth, effectiveParentEK,
         setEffectiveParentId, setEffectiveDepth, setEffectiveParentEK,
         setExpanded, setFocusedNode, setFocusClickCoords, setEditingFieldName, setTriggerHint,
@@ -515,16 +517,17 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
                     });
                     ref.setExpanded(ref.effectiveParentEK, true, true);
                     ref.applyParsedPasteMetadata(firstNode.id, firstParsed, { commit: false });
+                    if (firstParsed.children.length > 0) {
+                        ref.createChildNodesFromPaste(firstNode.id, firstParsed.children, { commit: false });
+                    }
 
                     // Create siblings for remaining lines
                     let lastId = firstNode.id;
                     if (nodes.length > 1) {
-                        const createSiblingNodesFromPaste = useNodeStore.getState().createSiblingNodesFromPaste;
-                        const result = createSiblingNodesFromPaste(firstNode.id, nodes.slice(1));
+                        const result = ref.createSiblingNodesFromPaste(firstNode.id, nodes.slice(1), { commit: false });
                         if (result) lastId = result;
-                    } else {
-                        loroDoc.commitDoc();
                     }
+                    commitDoc('user:paste');
 
                     ref.setFocusClickCoords({
                         nodeId: lastId,

@@ -49,11 +49,13 @@ describe('content highlight rendering', () => {
     const textNode = document.querySelector('#content')!.firstChild as Text;
     const range = createRangeForText(textNode, 0, 5);
 
-    renderHighlight(range, 'hl_3', 'rgba(155, 124, 56, 0.3)');
+    renderHighlight(range, 'hl_3', '#9B7C38');
 
     const highlights = document.querySelectorAll('soma-hl[data-highlight-id="hl_3"]');
     expect(highlights).toHaveLength(1);
-    expect((highlights[0] as HTMLElement).style.backgroundColor).toBe('rgba(155, 124, 56, 0.3)');
+    const style = (highlights[0] as HTMLElement).style;
+    expect(style.backgroundColor).toBe('rgba(155, 124, 56, 0.22)');
+    expect(style.borderBottom).toContain('2px solid');
   });
 
   it('clears all rendered highlights on the page', () => {
@@ -74,5 +76,19 @@ describe('content highlight rendering', () => {
     expect(document.querySelectorAll('soma-hl')).toHaveLength(0);
     expect(document.querySelector('#a')!.textContent).toBe('hello world');
     expect(document.querySelector('#b')!.textContent).toBe('another line');
+  });
+
+  it('renders comment badge when hasComment option is true', () => {
+    document.body.innerHTML = '<p id="content">hello world</p>';
+    const textNode = document.querySelector('#content')!.firstChild as Text;
+    const range = createRangeForText(textNode, 0, 5);
+
+    renderHighlight(range, 'hl_comment', 'rgba(155, 124, 56, 0.3)', { hasComment: true });
+
+    const icon = document.querySelector(
+      'soma-hl[data-highlight-id=\"hl_comment\"] [data-soma-note-icon=\"true\"]',
+    );
+    expect(icon).toBeTruthy();
+    expect(icon!.textContent).toBe('🗨');
   });
 });

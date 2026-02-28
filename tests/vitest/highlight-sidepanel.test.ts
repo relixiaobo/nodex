@@ -14,6 +14,7 @@ import {
   findOrCreateClipNodeForUrl,
   collectHighlightNodeIdsInLibrary,
   getRemovedHighlightIds,
+  upsertHighlightNote,
 } from '../../src/lib/highlight-sidepanel.js';
 import type { HighlightCreatePayload } from '../../src/lib/highlight-messaging.js';
 import * as loroDoc from '../../src/lib/loro-doc.js';
@@ -83,6 +84,30 @@ describe('highlight-sidepanel', () => {
     expect(comment!.name).toBe('');
   });
 
+  it('creates #comment child with note text when noteText is provided', async () => {
+    const store = getStore();
+    const result = await createHighlightFromPayload(
+      makePayload({ withNote: true, noteText: 'captured note' }),
+      store,
+    );
+
+    const children = store.getChildren(result.highlightNodeId);
+    const comment = children.find((n) => n.tags.includes(SYS_T.COMMENT));
+    expect(comment).toBeDefined();
+    expect(comment!.name).toBe('captured note');
+  });
+
+  it('creates inline reference from clip node to highlight node', async () => {
+    const store = getStore();
+    const result = await createHighlightFromPayload(makePayload(), store);
+
+    const clipChildren = store.getChildren(result.clipNodeId);
+    const ref = clipChildren.find(
+      (n) => n.type === 'reference' && n.targetId === result.highlightNodeId,
+    );
+    expect(ref).toBeDefined();
+  });
+
   it('stores anchor data in node description', async () => {
     const store = getStore();
     const result = await createHighlightFromPayload(makePayload(), store);
@@ -100,9 +125,34 @@ describe('highlight-sidepanel', () => {
     const payload = buildHighlightRestorePayload(result.clipNodeId);
     const item = payload.highlights.find((h) => h.id === result.highlightNodeId);
     expect(item).toBeDefined();
-    // Color is derived from tagDef, should be an rgba string
-    expect(item!.color).toMatch(/^rgba\(/);
+    // Color is derived from tagDef and passed as the base highlight color
+    expect(item!.color).toBe('#9B7C38');
     expect(item!.anchor.exact).toBe('highlighted text');
+    expect(item!.hasComment).toBe(false);
+  });
+
+  it('sets hasComment=true in restore payload when highlight has #comment child', async () => {
+    const store = getStore();
+    const result = await createHighlightFromPayload(makePayload(), store);
+    upsertHighlightNote(store, result.highlightNodeId, 'note');
+
+    const payload = buildHighlightRestorePayload(result.clipNodeId);
+    const item = payload.highlights.find((h) => h.id === result.highlightNodeId);
+    expect(item?.hasComment).toBe(true);
+  });
+
+  it('upserts note by updating existing #comment child instead of duplicating', async () => {
+    const store = getStore();
+    const result = await createHighlightFromPayload(makePayload({ noteText: 'first' }), store);
+
+    const first = upsertHighlightNote(store, result.highlightNodeId, 'second');
+    expect(first?.created).toBe(false);
+
+    const comments = store
+      .getChildren(result.highlightNodeId)
+      .filter((n) => n.tags.includes(SYS_T.COMMENT));
+    expect(comments).toHaveLength(1);
+    expect(comments[0].name).toBe('second');
   });
 
   it('deduplicates concurrent clip creation for the same normalized URL', async () => {

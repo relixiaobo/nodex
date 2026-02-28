@@ -17,6 +17,11 @@ export interface CreateHighlightFromPayloadResult {
   clipNodeId: string;
 }
 
+export interface UpsertHighlightNoteResult {
+  commentNodeId: string;
+  created: boolean;
+}
+
 const pendingClipCreationByUrl = new Map<string, Promise<string>>();
 
 export function collectHighlightNodeIdsInLibrary(): Set<string> {
@@ -78,7 +83,14 @@ export async function createHighlightFromPayload(
     anchor: serializeAnchor(payload.anchor),
   });
 
-  if (payload.withNote) {
+  if (!hasReferenceToTarget(store, clipNodeId, highlight.id)) {
+    store.addReference(clipNodeId, highlight.id);
+  }
+
+  const noteText = payload.noteText?.trim();
+  if (noteText) {
+    createCommentNode(store, highlight.id, noteText);
+  } else if (payload.withNote) {
     createCommentNode(store, highlight.id, '');
   }
 
@@ -88,14 +100,39 @@ export async function createHighlightFromPayload(
   };
 }
 
-/**
- * Convert a hex color to a semi-transparent rgba suitable for highlight backgrounds.
- */
-function hexToHighlightBg(hex: string): string {
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
-  return `rgba(${r}, ${g}, ${b}, 0.3)`;
+export function upsertHighlightNote(
+  store: HighlightNodeStore,
+  highlightNodeId: string,
+  noteText: string,
+): UpsertHighlightNoteResult | null {
+  const trimmed = noteText.trim();
+  if (!trimmed) return null;
+
+  const existing = store
+    .getChildren(highlightNodeId)
+    .find((child) => child.tags.includes(SYS_T.COMMENT));
+
+  if (existing) {
+    if (existing.name !== trimmed) {
+      loroDoc.setNodeRichTextContent(
+        existing.id,
+        trimmed,
+        existing.marks ?? [],
+        existing.inlineRefs ?? [],
+      );
+      loroDoc.commitDoc();
+    }
+    return {
+      commentNodeId: existing.id,
+      created: false,
+    };
+  }
+
+  const created = createCommentNode(store, highlightNodeId, trimmed);
+  return {
+    commentNodeId: created.id,
+    created: true,
+  };
 }
 
 export function buildHighlightRestorePayload(clipNodeId: string): HighlightRestorePayload {
@@ -104,7 +141,6 @@ export function buildHighlightRestorePayload(clipNodeId: string): HighlightResto
 
   // All highlights share the tagDef's color
   const tagColor = resolveTagColor(SYS_T.HIGHLIGHT).text;
-  const bgColor = hexToHighlightBg(tagColor);
 
   for (const node of highlights) {
     // Anchor stored in node description
@@ -118,7 +154,8 @@ export function buildHighlightRestorePayload(clipNodeId: string): HighlightResto
       items.push({
         id: node.id,
         anchor: parsedAnchor,
-        color: bgColor,
+        color: tagColor,
+        hasComment: hasCommentChild(node.id),
       });
     } catch {
       // Ignore invalid anchors and keep restoring other highlights.
@@ -127,4 +164,18 @@ export function buildHighlightRestorePayload(clipNodeId: string): HighlightResto
   }
 
   return { highlights: items };
+}
+
+function hasReferenceToTarget(store: HighlightNodeStore, parentId: string, targetNodeId: string): boolean {
+  const children = store.getChildren(parentId);
+  return children.some((child) => child.type === 'reference' && child.targetId === targetNodeId);
+}
+
+function hasCommentChild(highlightNodeId: string): boolean {
+  const children = loroDoc.getChildren(highlightNodeId);
+  for (const childId of children) {
+    const child = loroDoc.toNodexNode(childId);
+    if (child?.tags.includes(SYS_T.COMMENT)) return true;
+  }
+  return false;
 }

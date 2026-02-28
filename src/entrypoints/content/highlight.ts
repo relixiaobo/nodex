@@ -2,32 +2,63 @@
  * Content Script highlight core — selection listener, DOM rendering,
  * and click handling for webpage highlights.
  *
- * Listens for text selection → shows floating toolbar → on confirm,
- * wraps text in <soma-hl> elements (plain DOM, no Custom Elements API) and sends create message
- * to the Side Panel via background.
+ * Selection flow:
+ * - valid text selection => show floating icon toolbar
+ * - click Highlight => render + persist highlight
+ * - click Note => render highlight, open inline note popover, then persist
+ *
+ * Existing highlight flow:
+ * - click <soma-hl> => show contextual toolbar (delete / add note)
  */
 import { computeAnchor } from './anchor-utils.js';
-import { showToolbar, hideToolbar } from './highlight-toolbar.js';
+import {
+  showToolbar,
+  hideToolbar,
+  showHighlightActionsToolbar,
+  hideHighlightActionsToolbar,
+  showNotePopover,
+  hideNotePopover,
+  hideAllHighlightOverlays,
+  isHighlightOverlayHost,
+  type ToolbarAction,
+} from './highlight-toolbar.js';
 import {
   HIGHLIGHT_CREATE,
   HIGHLIGHT_CLICK,
+  HIGHLIGHT_DELETE,
+  HIGHLIGHT_NOTE_UPSERT,
   HIGHLIGHT_CHECK_URL_REQUEST,
   type HighlightCreatePayload,
   type HighlightClickPayload,
+  type HighlightDeletePayload,
+  type HighlightNoteUpsertPayload,
   type HighlightCheckUrlRequestPayload,
 } from '../../lib/highlight-messaging.js';
 import { WEBCLIP_CAPTURE_ACTIVE_TAB } from '../../lib/webclip-messaging.js';
 
-// ── Default Highlight Color (matches #highlight tagDef amber) ──
+// ── Default Highlight Color (matches design-system Antique Gold) ──
 
-/** Semi-transparent amber for highlight background rendering. */
-export const DEFAULT_HIGHLIGHT_BG = 'rgba(155, 124, 56, 0.3)';
+/** Antique Gold (#9B7C38) for webpage highlight underline + tint. */
+export const DEFAULT_HIGHLIGHT_BG = '#9B7C38';
+
+const COMMENT_ICON_SELECTOR = '[data-soma-note-icon="true"]';
+
+interface HighlightRenderOptions {
+  hasComment?: boolean;
+}
+
+interface HighlightDraft {
+  tempId: string;
+  payloadBase: Omit<HighlightCreatePayload, 'withNote' | 'noteText'>;
+}
 
 // ── State ──
 
 let currentRange: Range | null = null;
 let initialized = false;
 let lastKnownUrl = '';
+let pendingNoteDraft: HighlightDraft | null = null;
+let pendingExistingHighlightNoteId: string | null = null;
 
 // ── Highlight Click Delegation ──
 
@@ -43,18 +74,35 @@ function ensureClickDelegation(): void {
   clickDelegationInstalled = true;
 
   document.addEventListener('click', (e) => {
-    const target = (e.target as Element).closest?.('soma-hl[data-highlight-id]');
-    if (!target) return;
+    const targetElement = e.target as Element | null;
+    const highlightElement = targetElement?.closest?.('soma-hl[data-highlight-id]') as HTMLElement | null;
+    if (!highlightElement) return;
 
+    e.preventDefault();
     e.stopPropagation();
-    const highlightId = target.getAttribute('data-highlight-id');
+
+    const highlightId = highlightElement.getAttribute('data-highlight-id');
     if (!highlightId) return;
 
-    const msg: { type: typeof HIGHLIGHT_CLICK; payload: HighlightClickPayload } = {
-      type: HIGHLIGHT_CLICK,
-      payload: { id: highlightId },
-    };
-    chrome.runtime.sendMessage(msg);
+    if (targetElement?.closest(COMMENT_ICON_SELECTOR)) {
+      const msg: { type: typeof HIGHLIGHT_CLICK; payload: HighlightClickPayload } = {
+        type: HIGHLIGHT_CLICK,
+        payload: { id: highlightId },
+      };
+      chrome.runtime.sendMessage(msg);
+      hideHighlightActionsToolbar();
+      return;
+    }
+
+    const rect = highlightElement.getBoundingClientRect();
+    showHighlightActionsToolbar(rect, {
+      onDelete: () => {
+        deleteHighlight(highlightId);
+      },
+      onAddNote: () => {
+        showNotePopoverForExistingHighlight(highlightId, rect);
+      },
+    });
   });
 }
 
@@ -139,7 +187,8 @@ function getTextNodesInRange(range: Range): TextNodeSegment[] {
 export function renderHighlight(
   range: Range,
   highlightId: string,
-  bgColor: string = DEFAULT_HIGHLIGHT_BG,
+  highlightColor: string = DEFAULT_HIGHLIGHT_BG,
+  options: HighlightRenderOptions = {},
 ): void {
   ensureClickDelegation();
   const segments = getTextNodesInRange(range);
@@ -158,8 +207,11 @@ export function renderHighlight(
     highlightEl.setAttribute('data-highlight-id', highlightId);
     highlightEl.style.display = 'inline';
     highlightEl.style.cursor = 'pointer';
-    highlightEl.style.borderRadius = '2px';
-    highlightEl.style.backgroundColor = bgColor;
+    // Readwise-like style: transparent tint + solid bottom underline.
+    highlightEl.style.borderRadius = '0';
+    highlightEl.style.paddingBottom = '1px';
+    highlightEl.style.backgroundColor = toHighlightFillColor(highlightColor);
+    highlightEl.style.borderBottom = `2px solid ${toHighlightLineColor(highlightColor)}`;
 
     try {
       wrappedRange.surroundContents(highlightEl);
@@ -171,6 +223,49 @@ export function renderHighlight(
       wrappedRange.insertNode(highlightEl);
     }
   }
+
+  if (options.hasComment) {
+    renderCommentBadge(highlightId);
+  }
+}
+
+function toHighlightLineColor(color: string): string {
+  if (color.startsWith('#')) return color;
+
+  const rgbMatch = color.match(/^rgba?\(([^)]+)\)$/i);
+  if (!rgbMatch) return DEFAULT_HIGHLIGHT_BG;
+
+  const parts = rgbMatch[1]
+    .split(',')
+    .map((part) => Number(part.trim()))
+    .slice(0, 3);
+  if (parts.length < 3 || parts.some((v) => Number.isNaN(v))) {
+    return DEFAULT_HIGHLIGHT_BG;
+  }
+  return `rgb(${parts[0]}, ${parts[1]}, ${parts[2]})`;
+}
+
+function toHighlightFillColor(color: string): string {
+  const lineColor = toHighlightLineColor(color);
+  if (lineColor.startsWith('#')) {
+    const hex = lineColor.slice(1);
+    if (hex.length === 6) {
+      const r = Number.parseInt(hex.slice(0, 2), 16);
+      const g = Number.parseInt(hex.slice(2, 4), 16);
+      const b = Number.parseInt(hex.slice(4, 6), 16);
+      return `rgba(${r}, ${g}, ${b}, 0.22)`;
+    }
+  }
+
+  const rgbMatch = lineColor.match(/^rgb\(([^)]+)\)$/i);
+  if (rgbMatch) {
+    const parts = rgbMatch[1].split(',').map((part) => Number(part.trim()));
+    if (parts.length >= 3 && !parts.slice(0, 3).some((v) => Number.isNaN(v))) {
+      return `rgba(${parts[0]}, ${parts[1]}, ${parts[2]}, 0.22)`;
+    }
+  }
+
+  return 'rgba(155, 124, 56, 0.22)';
 }
 
 /**
@@ -205,6 +300,39 @@ export function clearAllHighlightRenderings(): void {
   for (const id of renderedIds) {
     removeHighlightRendering(id);
   }
+}
+
+function renderCommentBadge(highlightId: string): void {
+  const elements = Array.from(
+    document.querySelectorAll(`soma-hl[data-highlight-id="${highlightId}"]`),
+  ) as HTMLElement[];
+  if (elements.length === 0) return;
+
+  for (const el of elements) {
+    el.querySelectorAll(COMMENT_ICON_SELECTOR).forEach((icon) => icon.remove());
+  }
+
+  const last = elements[elements.length - 1];
+  const icon = document.createElement('span');
+  icon.setAttribute('data-soma-note-icon', 'true');
+  icon.textContent = '🗨';
+  icon.style.display = 'inline-block';
+  icon.style.marginLeft = '4px';
+  icon.style.fontSize = '11px';
+  icon.style.lineHeight = '1';
+  icon.style.verticalAlign = 'text-top';
+  icon.style.cursor = 'pointer';
+  icon.title = 'Open note';
+  last.appendChild(icon);
+}
+
+function replaceRenderedHighlightId(oldId: string, newId: string): void {
+  const elements = document.querySelectorAll(
+    `soma-hl[data-highlight-id="${oldId}"]`,
+  );
+  elements.forEach((el) => {
+    el.setAttribute('data-highlight-id', newId);
+  });
 }
 
 // ── Flash Animation ──
@@ -263,7 +391,7 @@ function isValidSelection(selection: Selection): boolean {
       anchorNode.nodeType === Node.ELEMENT_NODE
         ? (anchorNode as Element)
         : anchorNode.parentElement;
-    if (ancestor?.closest('soma-toolbar, soma-hl')) return false;
+    if (ancestor?.closest('[data-soma-highlight-overlay="true"], soma-hl')) return false;
   }
 
   return true;
@@ -284,6 +412,7 @@ function handleSelectionChange(): void {
     currentRange = selection.getRangeAt(0).cloneRange();
     const rect = currentRange.getBoundingClientRect();
     showToolbar(rect, handleToolbarAction);
+    hideHighlightActionsToolbar();
   } catch (err) {
     hideToolbar();
     currentRange = null;
@@ -305,7 +434,7 @@ function handleUrlChangeIfNeeded(): void {
   if (location.href === lastKnownUrl) return;
   lastKnownUrl = location.href;
   clearAllHighlightRenderings();
-  hideToolbar();
+  hideAllHighlightOverlays();
   currentRange = null;
   requestHighlightCheckForCurrentUrl();
 }
@@ -336,21 +465,28 @@ function setupSpaUrlChangeDetection(): void {
 /**
  * Handle actions from the floating toolbar.
  */
-function handleToolbarAction(action: string): void {
+function handleToolbarAction(action: ToolbarAction): void {
   if (!currentRange) return;
 
+  const range = currentRange.cloneRange();
   const selection = window.getSelection();
 
   switch (action) {
     case 'highlight':
-      createHighlight(currentRange, false);
+      createHighlight(range);
       break;
     case 'note':
-      createHighlight(currentRange, true);
+      createHighlightWithNote(range);
+      break;
+    case 'more':
+      // Reserved for future action menu.
       break;
     case 'clip':
       // Delegate to existing webclip capture
       chrome.runtime.sendMessage({ type: WEBCLIP_CAPTURE_ACTIVE_TAB });
+      break;
+    case 'tag':
+      // Reserved for future tag assignment workflow.
       break;
   }
 
@@ -361,27 +497,75 @@ function handleToolbarAction(action: string): void {
 }
 
 /**
- * Create a highlight from the current range.
- * Computes anchor, renders DOM highlight, and sends message to Side Panel.
+ * Create a persisted highlight from range (immediate create flow).
  */
-function createHighlight(range: Range, withNote: boolean): void {
+function createHighlight(range: Range): void {
+  const draft = createHighlightDraft(range);
+  persistHighlightDraft(draft, { withNote: false });
+}
+
+/**
+ * Create temporary highlight and collect note input before persistence.
+ */
+function createHighlightWithNote(range: Range): void {
+  const draft = createHighlightDraft(range);
+  const rect = range.getBoundingClientRect();
+  pendingNoteDraft = draft;
+  pendingExistingHighlightNoteId = null;
+
+  showNotePopover(
+    rect,
+    {
+      onSave: (text) => {
+        const noteText = text.trim();
+        pendingNoteDraft = null;
+        persistHighlightDraft(draft, {
+          withNote: noteText.length > 0,
+          noteText: noteText.length > 0 ? noteText : undefined,
+        });
+      },
+      onCancel: () => {
+        pendingNoteDraft = null;
+        persistHighlightDraft(draft, { withNote: false });
+      },
+    },
+    {
+      placeholder: 'Add a note...',
+    },
+  );
+}
+
+function createHighlightDraft(range: Range): HighlightDraft {
   const anchor = computeAnchor(range);
   const selectedText = range.toString();
 
   // Generate a temporary ID for immediate rendering
-  // The Side Panel will assign the real node ID and send it back
+  // Side Panel will assign the real node ID and send it back.
   const tempId = `temp_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
 
-  // Render highlight immediately for instant visual feedback
   renderHighlight(range, tempId);
 
-  // Send create message to Side Panel via background
+  return {
+    tempId,
+    payloadBase: {
+      anchor,
+      selectedText,
+      pageUrl: location.href,
+      pageTitle: document.title,
+    },
+  };
+}
+
+function persistHighlightDraft(
+  draft: HighlightDraft,
+  options: { withNote: boolean; noteText?: string },
+): void {
+  const noteText = options.noteText?.trim();
+
   const payload: HighlightCreatePayload = {
-    anchor,
-    selectedText,
-    pageUrl: location.href,
-    pageTitle: document.title,
-    withNote,
+    ...draft.payloadBase,
+    withNote: options.withNote,
+    noteText: noteText || undefined,
   };
 
   const msg: { type: typeof HIGHLIGHT_CREATE; payload: HighlightCreatePayload } = {
@@ -389,24 +573,95 @@ function createHighlight(range: Range, withNote: boolean): void {
     payload,
   };
 
-  chrome.runtime.sendMessage(msg, (response) => {
+  chrome.runtime.sendMessage(msg, (response?: { nodeId?: string }) => {
     if (chrome.runtime.lastError) {
-      // If message fails, remove the temporary highlight
-      removeHighlightRendering(tempId);
+      // If message fails, remove the temporary highlight.
+      removeHighlightRendering(draft.tempId);
       console.warn('[soma] Failed to create highlight:', chrome.runtime.lastError.message);
       return;
     }
 
-    // Replace temp ID with real node ID from response
-    if (response?.nodeId) {
-      const elements = document.querySelectorAll(
-        `soma-hl[data-highlight-id="${tempId}"]`,
-      );
-      elements.forEach((el) => {
-        el.setAttribute('data-highlight-id', response.nodeId);
-      });
+    const finalId = response?.nodeId;
+    if (finalId) {
+      replaceRenderedHighlightId(draft.tempId, finalId);
+      if (noteText) {
+        renderCommentBadge(finalId);
+      }
+      return;
+    }
+
+    if (noteText) {
+      renderCommentBadge(draft.tempId);
     }
   });
+}
+
+function showNotePopoverForExistingHighlight(highlightId: string, rect: DOMRect): void {
+  pendingExistingHighlightNoteId = highlightId;
+  pendingNoteDraft = null;
+  showNotePopover(
+    rect,
+    {
+      onSave: (text) => {
+        const noteText = text.trim();
+        if (!noteText) return;
+        pendingExistingHighlightNoteId = null;
+
+        const payload: HighlightNoteUpsertPayload = {
+          id: highlightId,
+          noteText,
+        };
+        chrome.runtime.sendMessage({
+          type: HIGHLIGHT_NOTE_UPSERT,
+          payload,
+        }, () => {
+          if (chrome.runtime.lastError) {
+            console.warn('[soma] Failed to upsert highlight note:', chrome.runtime.lastError.message);
+            return;
+          }
+          renderCommentBadge(highlightId);
+        });
+      },
+      onCancel: () => {
+        pendingExistingHighlightNoteId = null;
+        hideHighlightActionsToolbar();
+      },
+    },
+    {
+      placeholder: 'Add a note...',
+    },
+  );
+}
+
+function deleteHighlight(highlightId: string): void {
+  removeHighlightRendering(highlightId);
+
+  const payload: HighlightDeletePayload = { id: highlightId };
+  chrome.runtime.sendMessage({
+    type: HIGHLIGHT_DELETE,
+    payload,
+  }, () => {
+    if (chrome.runtime.lastError) {
+      console.warn('[soma] Failed to delete highlight:', chrome.runtime.lastError.message);
+    }
+  });
+}
+
+function handleGlobalPointerDown(e: PointerEvent): void {
+  const target = e.target;
+
+  if (isHighlightOverlayHost(target)) return;
+  if (target instanceof Element && target.closest('soma-hl[data-highlight-id]')) return;
+
+  if (pendingNoteDraft) {
+    const draft = pendingNoteDraft;
+    pendingNoteDraft = null;
+    persistHighlightDraft(draft, { withNote: false });
+  }
+  pendingExistingHighlightNoteId = null;
+
+  hideHighlightActionsToolbar();
+  hideNotePopover();
 }
 
 // ── Initialization ──
@@ -423,7 +678,7 @@ export function initHighlight(): void {
 
   ensureClickDelegation();
 
-  // Debounced selection events → check selection
+  // Debounced selection events => check selection
   let selectionTimeout: ReturnType<typeof setTimeout> | null = null;
 
   const onSelectionEvent = () => {
@@ -435,12 +690,14 @@ export function initHighlight(): void {
   document.addEventListener('touchend', onSelectionEvent);
   document.addEventListener('selectionchange', onSelectionEvent);
 
-  // Dismiss toolbar on scroll/resize
-  const dismissToolbar = () => {
-    hideToolbar();
+  // Dismiss overlays on scroll/resize
+  const dismissOverlays = () => {
+    hideAllHighlightOverlays();
   };
-  window.addEventListener('scroll', dismissToolbar, { passive: true });
-  window.addEventListener('resize', dismissToolbar, { passive: true });
+  window.addEventListener('scroll', dismissOverlays, { passive: true });
+  window.addEventListener('resize', dismissOverlays, { passive: true });
+
+  document.addEventListener('pointerdown', handleGlobalPointerDown, true);
 
   setupSpaUrlChangeDetection();
 }

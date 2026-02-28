@@ -6,7 +6,9 @@ import {
 } from '../../lib/webclip-messaging.js';
 import {
   HIGHLIGHT_CREATE,
+  HIGHLIGHT_DELETE,
   HIGHLIGHT_CLICK,
+  HIGHLIGHT_NOTE_UPSERT,
   HIGHLIGHT_UNRESOLVABLE,
   HIGHLIGHT_RESTORE,
   HIGHLIGHT_REMOVE,
@@ -209,6 +211,23 @@ export default defineBackground(() => {
       // This prevents background self-forward loops.
       if (!tabId) return false;
       // Forward augmented message to Side Panel and relay its response back to CS
+      chrome.runtime.sendMessage(
+        { ...message, _tabId: tabId },
+        (spResponse) => {
+          if (chrome.runtime.lastError) {
+            sendResponse({ ok: false, error: chrome.runtime.lastError.message });
+            return;
+          }
+          sendResponse(spResponse ?? { ok: true });
+        },
+      );
+      return true;
+    }
+
+    // ── Highlight Delete / Note Upsert: Content Script -> BG -> Side Panel ──
+    if (type === HIGHLIGHT_DELETE || type === HIGHLIGHT_NOTE_UPSERT) {
+      const tabId = sender.tab?.id;
+      if (!tabId) return false;
       chrome.runtime.sendMessage(
         { ...message, _tabId: tabId },
         (spResponse) => {

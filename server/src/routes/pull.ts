@@ -18,7 +18,7 @@ import { uint8ToBase64 } from '../lib/protocol.js';
 import { getUpdate, getSnapshot } from '../lib/r2.js';
 import { getWorkspace, getUpdatesAfter, updateDevicePullCursor } from '../lib/db.js';
 
-const PAGE_LIMIT = 500;
+const PAGE_LIMIT = 200;
 
 export async function handlePull(
   c: Context<{ Bindings: Env; Variables: AuthVariables }>,
@@ -82,7 +82,7 @@ export async function handlePull(
   const needsSnapshot = snapshotSeq > 0 && (lastSeq === 0 || lastSeq < snapshotSeq);
 
   if (needsSnapshot && snapshotKey) {
-    const snapshotBytes = await getSnapshot(bucket, workspaceId);
+    const snapshotBytes = await getSnapshot(bucket, snapshotKey);
 
     if (snapshotBytes) {
       // Get updates after snapshot

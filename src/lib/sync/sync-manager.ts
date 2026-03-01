@@ -326,7 +326,7 @@ async function loadCursor(workspaceId: string): Promise<number> {
 async function saveCursor(workspaceId: string, lastSeq: number): Promise<void> {
   try {
     const db = await openDB();
-    return new Promise((resolve, reject) => {
+    await new Promise<void>((resolve, reject) => {
       const tx = db.transaction(CURSOR_STORE, 'readwrite');
       const store = tx.objectStore(CURSOR_STORE);
       const req = store.put({ lastSeq, savedAt: Date.now() }, workspaceId);

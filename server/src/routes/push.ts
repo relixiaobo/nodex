@@ -100,11 +100,11 @@ export async function handlePush(
     );
 
     // 8. Trigger compaction in the background if needed (non-blocking).
-    // Use returned `seq` as latestSeq; `ws.snapshot_seq` from the earlier read
-    // is still valid since only compaction updates it (and compaction is serialized).
+    // workspace snapshot metadata from step 4 may be stale; compactWorkspace()
+    // has DB-side concurrency guards to avoid stale snapshot regressions.
     if (shouldCompact(seq, ws.snapshot_seq)) {
       c.executionCtx.waitUntil(
-        compactWorkspace(db, bucket, workspaceId, seq, ws.snapshot_seq)
+        compactWorkspace(db, bucket, workspaceId, seq, ws.snapshot_seq, ws.snapshot_key)
           .catch(err => console.error('[compaction] failed:', err))
       );
     }

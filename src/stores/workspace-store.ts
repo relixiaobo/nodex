@@ -89,19 +89,29 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
       },
 
       signInWithGoogle: async () => {
+        syncDiagLog('workspace.signInWithGoogle.start');
         const { signInWithGoogle: authSignIn } = await import('../lib/auth.js');
-        const user = await authSignIn();
-        // TODO: currentWorkspaceId = user.id assumes single workspace per user.
-        // When multi-workspace is needed, derive from a workspace list instead.
-        set({
-          userId: user.id,
-          currentWorkspaceId: user.id,
-          isAuthenticated: true,
-          authUser: user,
-        });
+        try {
+          const user = await authSignIn();
+          syncDiagLog('workspace.signInWithGoogle.success', { userId: user.id });
+          // TODO: currentWorkspaceId = user.id assumes single workspace per user.
+          // When multi-workspace is needed, derive from a workspace list instead.
+          set({
+            userId: user.id,
+            currentWorkspaceId: user.id,
+            isAuthenticated: true,
+            authUser: user,
+          });
 
-        // Start sync after sign-in
-        void startSyncIfReady();
+          // Start sync after sign-in
+          void startSyncIfReady();
+        } catch (err) {
+          syncDiagLog('workspace.signInWithGoogle.error', {
+            errorName: err instanceof Error ? err.name : 'UnknownError',
+            errorMessage: err instanceof Error ? err.message : String(err),
+          });
+          throw err;
+        }
       },
 
       signOut: async () => {

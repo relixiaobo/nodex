@@ -57,8 +57,9 @@ export function ToolbarUserMenu() {
         setSigningIn(true);
         try {
             await signInWithGoogle();
-        } catch {
-            // Error handled by workspace store
+        } catch (err) {
+            // Surface sign-in failures in devtools; otherwise it looks like no-op.
+            console.error('[auth] sign-in failed:', err);
         } finally {
             setSigningIn(false);
         }

@@ -163,3 +163,4 @@ signInWithGoogle():
 
 1. **P0**: 问题一 — pull 不返回数据的 root cause（用户数据丢失风险）
 2. **P1**: 问题二 — 匿名→登录数据迁移（影响新用户体验）
+# Sync Data Recovery — codex task

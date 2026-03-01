@@ -125,6 +125,40 @@ export class SyncManager {
     }
   }
 
+  /**
+   * Wait for the first sync cycle to complete (or timeout).
+   * Used during bootstrap when no local snapshot exists — the app waits for
+   * server data to be pulled before rendering the UI.
+   */
+  waitForFirstSync(timeoutMs = 15_000): Promise<void> {
+    return new Promise((resolve) => {
+      const { status } = this.state;
+      // Already completed a sync or not started — resolve immediately
+      if (status === 'synced' && this.state.lastSyncedAt !== null) {
+        resolve();
+        return;
+      }
+      if (status === 'local-only') {
+        resolve(); // No sync configured, don't block
+        return;
+      }
+
+      const timer = setTimeout(() => {
+        unsub();
+        console.warn('[sync] waitForFirstSync timed out after', timeoutMs, 'ms');
+        resolve(); // Don't block forever
+      }, timeoutMs);
+
+      const unsub = this.onStateChange((s) => {
+        if (s.status === 'synced' || s.status === 'error') {
+          clearTimeout(timer);
+          unsub();
+          resolve();
+        }
+      });
+    });
+  }
+
   /** Stop sync loop. Call on sign-out or workspace switch. */
   stop(): void {
     this.sessionToken += 1;

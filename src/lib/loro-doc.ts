@@ -236,8 +236,8 @@ async function persistSnapshot(): Promise<void> {
 // 初始化
 // ============================================================
 
-export async function initLoroDoc(workspaceId: string): Promise<void> {
-  if (doc && currentWorkspaceId === workspaceId) return;
+export async function initLoroDoc(workspaceId: string): Promise<{ hadSnapshot: boolean }> {
+  if (doc && currentWorkspaceId === workspaceId) return { hadSnapshot: true };
   redoRestoreUIMetaStack.length = 0;
 
   if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
@@ -250,9 +250,11 @@ export async function initLoroDoc(workspaceId: string): Promise<void> {
   // 切换工作区时清除上一个工作区的 awareness 状态，避免跨工作区泄露
   resetAwareness();
 
+  let hadSnapshot = false;
   try {
     const saved = await loadSnapshotRecord(workspaceId);
     if (saved?.snapshot) {
+      hadSnapshot = true;
       // PeerID restore order is critical: setPeerId BEFORE import (doc must have no oplog)
       if (saved.peerIdStr) {
         try {
@@ -307,6 +309,8 @@ export async function initLoroDoc(workspaceId: string): Promise<void> {
     }, { signal });
     window.addEventListener('beforeunload', () => void persistSnapshot(), { once: true, signal });
   }
+
+  return { hadSnapshot };
 }
 
 /** 重置（仅测试用） */

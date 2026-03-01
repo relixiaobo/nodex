@@ -100,6 +100,10 @@ describe('workspace-store auth and persistence', () => {
     }));
     vi.doMock('../../src/lib/loro-doc.js', () => ({
       getPeerIdStr: vi.fn().mockReturnValue('peer_1'),
+      getLoroDoc: vi.fn().mockReturnValue({ export: vi.fn().mockReturnValue(new Uint8Array(0)) }),
+    }));
+    vi.doMock('../../src/lib/sync/pending-queue.js', () => ({
+      enqueuePendingUpdate: vi.fn().mockResolvedValue(undefined),
     }));
 
     // Call the actual store action (dynamic import will use our mock)
@@ -119,6 +123,10 @@ describe('workspace-store auth and persistence', () => {
     }));
     vi.doMock('../../src/lib/loro-doc.js', () => ({
       getPeerIdStr: vi.fn().mockReturnValue('peer_1'),
+      getLoroDoc: vi.fn().mockReturnValue({ export: vi.fn().mockReturnValue(new Uint8Array(0)) }),
+    }));
+    vi.doMock('../../src/lib/sync/pending-queue.js', () => ({
+      enqueuePendingUpdate: vi.fn().mockResolvedValue(undefined),
     }));
 
     await expect(useWorkspaceStore.getState().signInWithGoogle()).rejects.toThrow('Auth cancelled');

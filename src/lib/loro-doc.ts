@@ -687,6 +687,11 @@ export function importUpdates(data: Uint8Array): void {
   if (!doc) throw new Error('[loro-doc] LoroDoc 未初始化');
   doc.import(data);
   rebuildMappings();
+  // Notify AFTER rebuildMappings so React reads correct nodexToTree mappings.
+  // doc.subscribe() fires during doc.import() — before rebuildMappings — so
+  // React's useSyncExternalStore sees stale mappings (new nodes not yet mapped)
+  // and skips re-render. This explicit notification ensures the UI updates.
+  notifySubscribers();
 }
 
 // ============================================================

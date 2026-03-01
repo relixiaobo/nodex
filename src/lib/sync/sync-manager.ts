@@ -130,7 +130,7 @@ export class SyncManager {
    * Used during bootstrap when no local snapshot exists — the app waits for
    * server data to be pulled before rendering the UI.
    */
-  waitForFirstSync(timeoutMs = 15_000): Promise<void> {
+  waitForFirstSync(timeoutMs = 60_000): Promise<void> {
     return new Promise((resolve) => {
       const { status } = this.state;
       // Already completed a sync or not started — resolve immediately
@@ -197,15 +197,18 @@ export class SyncManager {
     this.updateState({ status: 'syncing' });
 
     try {
+      console.log('[sync] syncOnce: push start');
       await this.push(workspaceId, accessToken, deviceId, sessionToken);
-      if (!this.isSessionCurrent(sessionToken)) return;
+      if (!this.isSessionCurrent(sessionToken)) { console.warn('[sync] session changed after push'); return; }
 
+      console.log('[sync] syncOnce: pull start, lastSeq:', this.lastSeq);
       await this.pull(workspaceId, accessToken, deviceId, sessionToken);
-      if (!this.isSessionCurrent(sessionToken)) return;
+      if (!this.isSessionCurrent(sessionToken)) { console.warn('[sync] session changed after pull'); return; }
 
       const pending = await getPendingCount(workspaceId);
       if (!this.isSessionCurrent(sessionToken)) return;
 
+      console.log('[sync] syncOnce: complete, pending:', pending);
       this.updateState({
         status: pending > 0 ? 'pending' : 'synced',
         lastSyncedAt: Date.now(),
@@ -213,13 +216,13 @@ export class SyncManager {
         error: null,
       });
     } catch (err: unknown) {
+      console.error('[sync] syncOnce error:', err);
       if (!this.isSessionCurrent(sessionToken)) return;
       if (err instanceof AuthError) {
         this.updateState({ status: 'error', error: 'Session expired — please sign in again' });
         this.stop();
       } else {
         const msg = err instanceof Error ? err.message : 'Unknown sync error';
-        console.error('[sync] error:', msg);
         this.updateState({ status: 'error', error: msg });
       }
     } finally {
@@ -302,9 +305,12 @@ export class SyncManager {
       });
       if (!this.isSessionCurrent(sessionToken)) return;
 
+      console.log('[sync] pull response:', response.type, 'updates:', response.updates.length, 'hasMore:', response.hasMore, 'nextSeq:', response.nextCursorSeq);
+
       // Import snapshot if provided
       if (response.type === 'snapshot' && response.snapshot) {
         const snapshotBytes = base64ToUint8(response.snapshot);
+        console.log('[sync] importing snapshot, bytes:', snapshotBytes.length);
         importUpdates(snapshotBytes);
       }
 

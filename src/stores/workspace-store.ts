@@ -53,13 +53,15 @@ async function startSyncIfReady(): Promise<void> {
     // CRDT import is idempotent, so re-pushing known operations is safe.
     const doc = getLoroDoc();
     const fullUpdate = doc.export({ mode: 'update' });
+    console.log('[sync] startSyncIfReady: fullUpdate bytes:', fullUpdate.length, 'wsId:', currentWorkspaceId);
     if (fullUpdate.length > 0) {
       await enqueuePendingUpdate(currentWorkspaceId, fullUpdate);
     }
 
     await syncManager.start(currentWorkspaceId, token, deviceId);
-  } catch {
-    // loro-doc may not be initialized yet — sync will start after initLoroDoc
+    console.log('[sync] startSyncIfReady: syncManager started, status:', syncManager.getState().status);
+  } catch (err) {
+    console.error('[sync] startSyncIfReady failed:', err);
   }
 }
 

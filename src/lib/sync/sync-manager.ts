@@ -24,7 +24,7 @@ import {
   sha256Hex,
   AuthError,
 } from './sync-protocol.js';
-import { importUpdates, getVersionVector, saveNow } from '../loro-doc.js';
+import { importUpdatesBatch, getVersionVector, saveNow } from '../loro-doc.js';
 import { openDB, CURSOR_STORE } from '../loro-persistence.js';
 
 const SYNC_INTERVAL_MS = 30_000;
@@ -125,40 +125,6 @@ export class SyncManager {
     }
   }
 
-  /**
-   * Wait for the first sync cycle to complete (or timeout).
-   * Used during bootstrap when no local snapshot exists — the app waits for
-   * server data to be pulled before rendering the UI.
-   */
-  waitForFirstSync(timeoutMs = 60_000): Promise<void> {
-    return new Promise((resolve) => {
-      const { status } = this.state;
-      // Already completed a sync or not started — resolve immediately
-      if (status === 'synced' && this.state.lastSyncedAt !== null) {
-        resolve();
-        return;
-      }
-      if (status === 'local-only') {
-        resolve(); // No sync configured, don't block
-        return;
-      }
-
-      const timer = setTimeout(() => {
-        unsub();
-        console.warn('[sync] waitForFirstSync timed out after', timeoutMs, 'ms');
-        resolve(); // Don't block forever
-      }, timeoutMs);
-
-      const unsub = this.onStateChange((s) => {
-        if (s.status === 'synced' || s.status === 'error') {
-          clearTimeout(timer);
-          unsub();
-          resolve();
-        }
-      });
-    });
-  }
-
   /** Stop sync loop. Call on sign-out or workspace switch. */
   stop(): void {
     this.sessionToken += 1;
@@ -197,18 +163,15 @@ export class SyncManager {
     this.updateState({ status: 'syncing' });
 
     try {
-      console.log('[sync] syncOnce: push start');
       await this.push(workspaceId, accessToken, deviceId, sessionToken);
       if (!this.isSessionCurrent(sessionToken)) { console.warn('[sync] session changed after push'); return; }
 
-      console.log('[sync] syncOnce: pull start, lastSeq:', this.lastSeq);
       await this.pull(workspaceId, accessToken, deviceId, sessionToken);
       if (!this.isSessionCurrent(sessionToken)) { console.warn('[sync] session changed after pull'); return; }
 
       const pending = await getPendingCount(workspaceId);
       if (!this.isSessionCurrent(sessionToken)) return;
 
-      console.log('[sync] syncOnce: complete, pending:', pending);
       this.updateState({
         status: pending > 0 ? 'pending' : 'synced',
         lastSyncedAt: Date.now(),
@@ -305,19 +268,20 @@ export class SyncManager {
       });
       if (!this.isSessionCurrent(sessionToken)) return;
 
-      console.log('[sync] pull response:', response.type, 'updates:', response.updates.length, 'hasMore:', response.hasMore, 'nextSeq:', response.nextCursorSeq);
+      // Batch-import all updates for this response (rebuild mappings + notify once)
+      const bytesToImport: Uint8Array[] = [];
 
-      // Import snapshot if provided
       if (response.type === 'snapshot' && response.snapshot) {
         const snapshotBytes = base64ToUint8(response.snapshot);
-        console.log('[sync] importing snapshot, bytes:', snapshotBytes.length);
-        importUpdates(snapshotBytes);
+        bytesToImport.push(snapshotBytes);
       }
 
-      // Import incremental updates
       for (const entry of response.updates) {
-        const bytes = base64ToUint8(entry.data);
-        importUpdates(bytes);
+        bytesToImport.push(base64ToUint8(entry.data));
+      }
+
+      if (bytesToImport.length > 0) {
+        importUpdatesBatch(bytesToImport);
       }
 
       // Advance cursor (must use server's nextCursorSeq, not our own calculation)

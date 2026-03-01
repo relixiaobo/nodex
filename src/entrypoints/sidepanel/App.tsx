@@ -9,7 +9,6 @@ import { TopToolbar } from '../../components/toolbar/TopToolbar';
 import { PanelStack } from '../../components/panel/PanelStack';
 import { CommandPalette } from '../../components/search/CommandPalette';
 import { BatchTagSelector } from '../../components/tags/BatchTagSelector';
-import { CONTAINER_IDS } from '../../types/index.js';
 import { initLoroDoc, commitDoc } from '../../lib/loro-doc.js';
 import * as loroDoc from '../../lib/loro-doc.js';
 import { ensureWorkspaceHomeNode } from '../../lib/workspace-root.js';
@@ -46,37 +45,33 @@ import { Toaster, toast } from 'sonner';
 import { TooltipProvider } from '../../components/ui/Tooltip';
 
 /**
- * Bootstrap workspace containers in LoroDoc.
- * Creates fixed container nodes if they don't exist.
+ * Ensure workspace containers, journal tags, and system tags exist.
+ * Called during bootstrap AND after background sync pulls server data.
  */
-async function seedWorkspace(wsId: string): Promise<{ hadSnapshot: boolean }> {
- const { hadSnapshot } = await initLoroDoc(wsId);
+function ensureContainers(wsId: string): void {
  ensureWorkspaceHomeNode(wsId);
-
- // Create container nodes as children of the workspace home node.
- // Existing containers created before this change may still be root-level —
- // move them under the workspace node for consistency.
  for (const { id, name } of BOOTSTRAP_CONTAINER_DEFS) {
   if (!loroDoc.hasNode(id)) {
    loroDoc.createNode(id, wsId);
    loroDoc.setNodeRichTextContent(id, name, [], []);
   } else if (loroDoc.getParentId(id) === null) {
-   // Migrate: container was root-level, move under workspace node
    loroDoc.moveNode(id, wsId);
   }
  }
-
  ensureJournalTagDefs();
-
- // Ensure #highlight and #comment system tags exist
  const store = useNodeStore.getState() as HighlightNodeStore;
  ensureHighlightTagDef(store);
  ensureNoteTagDef(store);
-
- // Flush all bootstrap ops under a system origin so they are excluded from
- // the undo stack. Without this, pending ops from container creation could
- // leak into the first user-initiated commitUIMarker → commitDoc('user:ui').
  commitDoc('system:bootstrap');
+}
+
+/**
+ * Bootstrap workspace containers in LoroDoc.
+ * Creates fixed container nodes if they don't exist.
+ */
+async function seedWorkspace(wsId: string): Promise<{ hadSnapshot: boolean }> {
+ const { hadSnapshot } = await initLoroDoc(wsId);
+ ensureContainers(wsId);
  return { hadSnapshot };
 }
 
@@ -86,10 +81,8 @@ interface BootstrapResult {
 
 function useBootstrap(skip: boolean): BootstrapResult {
  const [ready, setReady] = useState(skip);
- const wsId = useWorkspaceStore((s) => s.currentWorkspaceId);
  const setWorkspace = useWorkspaceStore((s) => s.setWorkspace);
  const setUser = useWorkspaceStore((s) => s.setUser);
- const panelHistory = useUIStore((s) => s.panelHistory);
  const replacePanel = useUIStore((s) => s.replacePanel);
 
  const initCalled = useRef(false);
@@ -127,31 +120,10 @@ function useBootstrap(skip: boolean): BootstrapResult {
    // Restore auth session from stored Bearer token (validates against server).
    // Must run after initLoroDoc so getPeerIdStr() is available for sync start.
    const { initAuth } = useWorkspaceStore.getState();
-   if (hadSnapshot) {
-    // Normal startup: local data exists, sync in background
-    void initAuth();
-   } else {
-    // No local snapshot — must recover data from server before rendering.
-    // Await auth + first sync cycle so user sees their data, not an empty workspace.
-    await initAuth();
-    if (useWorkspaceStore.getState().isAuthenticated) {
-     const { syncManager } = await import('../../lib/sync/sync-manager.js');
-     await syncManager.waitForFirstSync();
-     // Re-seed containers after pull (server data may have different structure)
-     ensureWorkspaceHomeNode(currentWsId);
-     for (const { id, name } of BOOTSTRAP_CONTAINER_DEFS) {
-      if (!loroDoc.hasNode(id)) {
-       loroDoc.createNode(id, currentWsId);
-       loroDoc.setNodeRichTextContent(id, name, [], []);
-      }
-     }
-     ensureJournalTagDefs();
-     const store = useNodeStore.getState() as HighlightNodeStore;
-     ensureHighlightTagDef(store);
-     ensureNoteTagDef(store);
-     commitDoc('system:bootstrap');
-    }
-   }
+   // Both paths: start auth + sync in background, never block UI rendering.
+   // When sync pulls data, importUpdatesBatch() → notifySubscribers() triggers
+   // React re-render via node-store's _version increment.
+   void initAuth();
 
    // Wait for UIStore persist hydration before checking panel validity
    // (persist.getItem is async, so the initial render may have stale default state)
@@ -180,6 +152,18 @@ function useBootstrap(skip: boolean): BootstrapResult {
    }
 
    setReady(true);
+
+   // If no local snapshot existed, watch for sync completion in background.
+   // When pull finishes, re-seed containers in case server data has different structure.
+   if (!hadSnapshot && useWorkspaceStore.getState().isAuthenticated) {
+    const { syncManager } = await import('../../lib/sync/sync-manager.js');
+    const unsub = syncManager.onStateChange((state) => {
+     if (state.status === 'synced' && state.lastSyncedAt !== null) {
+      unsub();
+      ensureContainers(currentWsId);
+     }
+    });
+   }
   }
 
   init();

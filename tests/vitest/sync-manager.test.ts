@@ -52,12 +52,12 @@ vi.mock('../../src/lib/sync/sync-protocol.js', () => ({
   },
 }));
 
-const mockImportUpdates = vi.fn();
+const mockImportUpdatesBatch = vi.fn();
 const mockGetVersionVector = vi.fn();
 const mockSaveNow = vi.fn();
 
 vi.mock('../../src/lib/loro-doc.js', () => ({
-  importUpdates: (...args: unknown[]) => mockImportUpdates(...args),
+  importUpdatesBatch: (...args: unknown[]) => mockImportUpdatesBatch(...args),
   getVersionVector: () => mockGetVersionVector(),
   saveNow: () => mockSaveNow(),
 }));
@@ -150,7 +150,7 @@ describe('SyncManager', () => {
     mockGetVersionVector.mockReturnValue({ encode: () => new Uint8Array([1, 2]) });
     mockSaveNow.mockResolvedValue(undefined);
     mockSha256Hex.mockResolvedValue('fakehash0123456789abcdef');
-    mockImportUpdates.mockReset();
+    mockImportUpdatesBatch.mockReset();
 
     // Defaults: empty queue, no pending, empty pull response
     mockDequeuePendingUpdates.mockResolvedValue([]);
@@ -390,7 +390,8 @@ describe('SyncManager', () => {
       await mgr.start('ws_1', 'tok_1', 'dev_1');
       await flushAsync();
 
-      expect(mockImportUpdates).toHaveBeenCalledWith(new Uint8Array([40, 50, 60]));
+      // importUpdatesBatch called with array containing the single update
+      expect(mockImportUpdatesBatch).toHaveBeenCalledWith([new Uint8Array([40, 50, 60])]);
       expect(mockSaveNow).toHaveBeenCalled();
     });
 
@@ -412,10 +413,12 @@ describe('SyncManager', () => {
       await mgr.start('ws_1', 'tok_1', 'dev_1');
       await flushAsync();
 
-      // Snapshot imported first, then incremental
-      expect(mockImportUpdates).toHaveBeenCalledTimes(2);
-      expect(mockImportUpdates).toHaveBeenCalledWith(new Uint8Array([100, 101]));
-      expect(mockImportUpdates).toHaveBeenCalledWith(new Uint8Array([200, 201]));
+      // Snapshot + incremental imported together as a single batch
+      expect(mockImportUpdatesBatch).toHaveBeenCalledTimes(1);
+      expect(mockImportUpdatesBatch).toHaveBeenCalledWith([
+        new Uint8Array([100, 101]),
+        new Uint8Array([200, 201]),
+      ]);
     });
 
     it('handles paginated pull (hasMore = true)', async () => {
@@ -442,7 +445,8 @@ describe('SyncManager', () => {
       await flushAsync();
 
       expect(mockPullUpdates).toHaveBeenCalledTimes(2);
-      expect(mockImportUpdates).toHaveBeenCalledTimes(2);
+      // Each page triggers one importUpdatesBatch call
+      expect(mockImportUpdatesBatch).toHaveBeenCalledTimes(2);
       // Second pull should use nextCursorSeq=1 from first response
       expect(mockPullUpdates).toHaveBeenNthCalledWith(2, 'tok_1', expect.objectContaining({
         lastSeq: 1,

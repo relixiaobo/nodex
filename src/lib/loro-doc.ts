@@ -694,6 +694,20 @@ export function importUpdates(data: Uint8Array): void {
   notifySubscribers();
 }
 
+/**
+ * Batch-import multiple update byte arrays into the document.
+ * Rebuilds mappings and notifies subscribers ONCE after all imports,
+ * instead of per-update — O(n) vs O(n²) for large pull batches.
+ */
+export function importUpdatesBatch(updates: Uint8Array[]): void {
+  if (!doc) throw new Error('[loro-doc] LoroDoc 未初始化');
+  for (const data of updates) {
+    doc.import(data);
+  }
+  rebuildMappings();
+  notifySubscribers();
+}
+
 // ============================================================
 // 事件订阅
 // ============================================================

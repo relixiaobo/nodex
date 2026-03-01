@@ -13,6 +13,7 @@ import { resetAwareness } from './awareness.js';
 import { readRichTextFromLoroText, writeRichTextToLoroText } from './loro-text-bridge.js';
 import { enqueuePendingUpdate } from './sync/pending-queue.js';
 import { syncManager } from './sync/sync-manager.js';
+import { syncDiagLog } from './sync/diagnostics.js';
 
 export const DEFAULT_USER_COMMIT_ORIGIN = 'user:implicit';
 const UNDO_EXCLUDED_ORIGIN_PREFIXES = ['__seed__', 'system:'] as const;
@@ -685,8 +686,20 @@ export function exportSnapshot(): Uint8Array {
 
 export function importUpdates(data: Uint8Array): void {
   if (!doc) throw new Error('[loro-doc] LoroDoc 未初始化');
+  const beforeCount = nodexToTree.size;
+  syncDiagLog('loro.importUpdates.begin', {
+    workspaceId: currentWorkspaceId,
+    bytes: data.length,
+    nodeCountBefore: beforeCount,
+  });
   doc.import(data);
   rebuildMappings();
+  syncDiagLog('loro.importUpdates.done', {
+    workspaceId: currentWorkspaceId,
+    bytes: data.length,
+    nodeCountAfter: nodexToTree.size,
+    delta: nodexToTree.size - beforeCount,
+  });
 }
 
 // ============================================================

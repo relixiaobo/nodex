@@ -9,6 +9,7 @@ import { persist } from 'zustand/middleware';
 import { chromeLocalStorage } from '../lib/chrome-storage';
 import type { AuthUser } from '../lib/auth.js';
 import { syncManager } from '../lib/sync/sync-manager.js';
+import { syncDiagLog } from '../lib/sync/diagnostics.js';
 
 interface WorkspaceStore {
   currentWorkspaceId: string | null;
@@ -35,17 +36,32 @@ interface WorkspaceStore {
 /** Start sync if signed in with a workspace. */
 async function startSyncIfReady(): Promise<void> {
   const { currentWorkspaceId, isAuthenticated } = useWorkspaceStore.getState();
-  if (!isAuthenticated || !currentWorkspaceId) return;
+  syncDiagLog('workspace.startSyncIfReady.enter', { isAuthenticated, currentWorkspaceId });
+  if (!isAuthenticated || !currentWorkspaceId) {
+    syncDiagLog('workspace.startSyncIfReady.skip', {
+      reason: !isAuthenticated ? 'unauthenticated' : 'missing_workspace',
+    });
+    return;
+  }
 
   const { getStoredToken } = await import('../lib/auth.js');
   const { getPeerIdStr } = await import('../lib/loro-doc.js');
   const token = await getStoredToken();
+  syncDiagLog('workspace.startSyncIfReady.token', { hasToken: !!token });
   if (!token) return;
 
   try {
     const deviceId = getPeerIdStr();
+    syncDiagLog('workspace.startSyncIfReady.start', {
+      workspaceId: currentWorkspaceId,
+      deviceId,
+    });
     await syncManager.start(currentWorkspaceId, token, deviceId);
+    syncDiagLog('workspace.startSyncIfReady.started', { workspaceId: currentWorkspaceId });
   } catch {
+    syncDiagLog('workspace.startSyncIfReady.error', {
+      message: 'syncManager.start failed before Loro init or due to runtime error',
+    });
     // loro-doc may not be initialized yet — sync will start after initLoroDoc
   }
 }
@@ -105,8 +121,13 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
 
         // Restore session from stored Bearer token (validated against server)
         const user = await getCurrentUser();
+        syncDiagLog('workspace.initAuth.user', { userId: user?.id ?? null });
         if (user) {
           const currentWsId = useWorkspaceStore.getState().currentWorkspaceId;
+          syncDiagLog('workspace.initAuth.setAuthenticated', {
+            persistedWorkspaceId: currentWsId ?? null,
+            fallbackWorkspaceId: user.id,
+          });
           set({
             userId: user.id,
             currentWorkspaceId: currentWsId ?? user.id,

@@ -26,6 +26,7 @@ import {
 } from './sync-protocol.js';
 import { importUpdates, getVersionVector, saveNow } from '../loro-doc.js';
 import { openDB, CURSOR_STORE } from '../loro-persistence.js';
+import { syncDiagLog } from './diagnostics.js';
 
 const SYNC_INTERVAL_MS = 30_000;
 const MAX_PUSH_PER_CYCLE = 20;
@@ -95,12 +96,15 @@ export class SyncManager {
     this.workspaceId = workspaceId;
     this.accessToken = accessToken;
     this.deviceId = deviceId;
+    syncDiagLog('sync.start', { workspaceId, deviceId });
 
     // Restore cursor from IndexedDB
     this.lastSeq = await loadCursor(workspaceId);
+    syncDiagLog('sync.start.cursorLoaded', { workspaceId, lastSeq: this.lastSeq });
     if (!this.isSessionCurrent(sessionToken) || this.workspaceId !== workspaceId) return;
 
     const pending = await getPendingCount(workspaceId);
+    syncDiagLog('sync.start.pendingLoaded', { workspaceId, pending });
     if (!this.isSessionCurrent(sessionToken) || this.workspaceId !== workspaceId) return;
 
     this.updateState({
@@ -191,6 +195,12 @@ export class SyncManager {
     const workspaceId = this.workspaceId;
     const accessToken = this.accessToken;
     const deviceId = this.deviceId;
+    syncDiagLog('sync.syncOnce.begin', {
+      workspaceId,
+      deviceId,
+      lastSeq: this.lastSeq,
+      status: this.state.status,
+    });
 
     this.isSyncing = true;
     this.nudgePending = false;
@@ -214,6 +224,11 @@ export class SyncManager {
       });
     } catch (err) {
       if (!this.isSessionCurrent(sessionToken)) return;
+      syncDiagLog('sync.syncOnce.error', {
+        workspaceId,
+        errorName: err instanceof Error ? err.name : 'UnknownError',
+        errorMessage: err instanceof Error ? err.message : String(err),
+      });
       if (err instanceof AuthError) {
         this.updateState({ status: 'error', error: 'Session expired — please sign in again' });
         this.stop();
@@ -291,9 +306,12 @@ export class SyncManager {
   ): Promise<void> {
     let hasMore = true;
     let cursor = this.lastSeq;
+    let importedUpdateCount = 0;
+    let importedBytes = 0;
 
     while (hasMore) {
       if (!this.isSessionCurrent(sessionToken)) return;
+      syncDiagLog('sync.pull.request', { workspaceId, deviceId, lastSeq: cursor });
 
       const response = await pullUpdates(accessToken, {
         workspaceId,
@@ -301,23 +319,54 @@ export class SyncManager {
         lastSeq: cursor,
       });
       if (!this.isSessionCurrent(sessionToken)) return;
+      syncDiagLog('sync.pull.response', {
+        workspaceId,
+        requestedLastSeq: cursor,
+        type: response.type,
+        latestSeq: response.latestSeq,
+        nextCursorSeq: response.nextCursorSeq,
+        hasMore: response.hasMore,
+        updateCount: response.updates.length,
+        hasSnapshot: response.type === 'snapshot' && !!response.snapshot,
+      });
 
       // Import snapshot if provided
       if (response.type === 'snapshot' && response.snapshot) {
         const snapshotBytes = base64ToUint8(response.snapshot);
+        syncDiagLog('sync.pull.import.snapshot', {
+          workspaceId,
+          bytes: snapshotBytes.length,
+        });
         importUpdates(snapshotBytes);
+        importedUpdateCount += 1;
+        importedBytes += snapshotBytes.length;
       }
 
       // Import incremental updates
       for (const entry of response.updates) {
         const bytes = base64ToUint8(entry.data);
+        syncDiagLog('sync.pull.import.incremental', {
+          workspaceId,
+          seq: entry.seq,
+          fromDeviceId: entry.deviceId,
+          bytes: bytes.length,
+        });
         importUpdates(bytes);
+        importedUpdateCount += 1;
+        importedBytes += bytes.length;
       }
 
       // Advance cursor (must use server's nextCursorSeq, not our own calculation)
       cursor = response.nextCursorSeq;
       hasMore = response.hasMore;
     }
+    syncDiagLog('sync.pull.done', {
+      workspaceId,
+      prevLastSeq: this.lastSeq,
+      finalCursor: cursor,
+      importedUpdateCount,
+      importedBytes,
+    });
 
     if (!this.isSessionCurrent(sessionToken)) return;
 
@@ -326,6 +375,7 @@ export class SyncManager {
       this.lastSeq = cursor;
       await saveNow();
       if (!this.isSessionCurrent(sessionToken)) return;
+      syncDiagLog('sync.pull.persistCursor', { workspaceId, cursor });
       await saveCursor(workspaceId, cursor);
     }
   }

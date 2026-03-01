@@ -55,8 +55,12 @@ export async function compactWorkspace(
 
   // 2. Import all updates in (snapshotSeq, latestSeq]
   const updates = await getUpdatesInRange(db, workspaceId, snapshotSeq, latestSeq);
-  if (updates.length === 0) {
-    return;
+  const expectedUpdates = latestSeq - snapshotSeq;
+  if (updates.length !== expectedUpdates) {
+    throw new Error(
+      `[compaction] ${workspaceId}: expected ${expectedUpdates} updates in ` +
+      `(${snapshotSeq}, ${latestSeq}] but found ${updates.length}`,
+    );
   }
 
   for (const update of updates) {
@@ -84,6 +88,7 @@ export async function compactWorkspace(
     latestSeq,
     nextSnapshotKey,
     snapshot.length,
+    snapshotSeq,
   );
 
   if (!metadataUpdated) {

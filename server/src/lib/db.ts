@@ -167,6 +167,8 @@ export async function getUpdatesInRange(
 
 /**
  * Update snapshot metadata iff current snapshot is behind the target snapshot seq.
+ * Uses compare-and-swap on snapshot_seq (`baseSnapshotSeq`) so concurrent
+ * compactions that started from older metadata cannot overwrite newer snapshots.
  * Returns true when metadata is updated, false when another compaction already
  * wrote an equal/newer snapshot.
  */
@@ -176,12 +178,24 @@ export async function updateSnapshotMetaIfBehind(
   snapshotSeq: number,
   snapshotKey: string,
   snapshotSize: number,
+  baseSnapshotSeq: number,
 ): Promise<boolean> {
   const result = await db.prepare(
     `UPDATE sync_workspaces
      SET snapshot_seq = ?, snapshot_key = ?, snapshot_size = ?, updated_at = datetime('now')
-     WHERE workspace_id = ? AND snapshot_seq < ? AND latest_seq >= ?`
-  ).bind(snapshotSeq, snapshotKey, snapshotSize, workspaceId, snapshotSeq, snapshotSeq).run();
+     WHERE workspace_id = ?
+       AND snapshot_seq = ?
+       AND snapshot_seq < ?
+       AND latest_seq >= ?`
+  ).bind(
+    snapshotSeq,
+    snapshotKey,
+    snapshotSize,
+    workspaceId,
+    baseSnapshotSeq,
+    snapshotSeq,
+    snapshotSeq,
+  ).run();
 
   return (result.meta?.changes ?? 0) > 0;
 }

@@ -40,3 +40,14 @@ export async function getSnapshot(
   const buf = await obj.arrayBuffer();
   return new Uint8Array(buf);
 }
+
+/** Write a compacted snapshot blob to R2. Returns the R2 key. */
+export async function putSnapshot(
+  bucket: R2Bucket,
+  workspaceId: string,
+  data: Uint8Array,
+): Promise<string> {
+  const key = `${workspaceId}/snapshot.bin`;
+  await bucket.put(key, data);
+  return key;
+}

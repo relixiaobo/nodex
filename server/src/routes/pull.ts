@@ -18,7 +18,7 @@ import { uint8ToBase64 } from '../lib/protocol.js';
 import { getUpdate, getSnapshot } from '../lib/r2.js';
 import { getWorkspace, getUpdatesAfter, updateDevicePullCursor } from '../lib/db.js';
 
-const PAGE_LIMIT = 50;
+const PAGE_LIMIT = 500;
 
 export async function handlePull(
   c: Context<{ Bindings: Env; Variables: AuthVariables }>,

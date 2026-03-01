@@ -24,6 +24,7 @@ import {
   findUpdateByHash,
   allocateSeqAndInsert,
 } from '../lib/db.js';
+import { shouldCompact, compactWorkspace } from '../lib/compaction.js';
 
 const MAX_UPDATE_SIZE = 50 * 1024 * 1024; // 50 MB
 
@@ -98,7 +99,17 @@ export async function handlePush(
       db, workspaceId, deviceId, userId, updateHash, r2Key, updateBytes.length,
     );
 
-    // 8. Return success
+    // 8. Trigger compaction in the background if needed (non-blocking).
+    // Use returned `seq` as latestSeq; `ws.snapshot_seq` from the earlier read
+    // is still valid since only compaction updates it (and compaction is serialized).
+    if (shouldCompact(seq, ws.snapshot_seq)) {
+      c.executionCtx.waitUntil(
+        compactWorkspace(db, bucket, workspaceId, seq, ws.snapshot_seq)
+          .catch(err => console.error('[compaction] failed:', err))
+      );
+    }
+
+    // 9. Return success
     return c.json({
       seq,
       deduped: false,

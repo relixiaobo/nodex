@@ -99,11 +99,21 @@ describe('workspace-store auth and persistence', () => {
       getStoredToken: vi.fn().mockResolvedValue(null),
     }));
     vi.doMock('../../src/lib/loro-doc.js', () => ({
+      initLoroDoc: vi.fn().mockResolvedValue({ hadSnapshot: false }),
       getPeerIdStr: vi.fn().mockReturnValue('peer_1'),
       getLoroDoc: vi.fn().mockReturnValue({ export: vi.fn().mockReturnValue(new Uint8Array(0)) }),
     }));
     vi.doMock('../../src/lib/sync/pending-queue.js', () => ({
       enqueuePendingUpdate: vi.fn().mockResolvedValue(undefined),
+    }));
+    vi.doMock('../../src/lib/bootstrap-containers.js', () => ({
+      ensureContainers: vi.fn(),
+    }));
+    vi.doMock('../../src/lib/journal.js', () => ({
+      ensureTodayNode: vi.fn().mockReturnValue('today_node'),
+    }));
+    vi.doMock('../../src/stores/ui-store.js', () => ({
+      useUIStore: { getState: vi.fn().mockReturnValue({ replacePanel: vi.fn() }) },
     }));
 
     // Call the actual store action (dynamic import will use our mock)
@@ -122,11 +132,21 @@ describe('workspace-store auth and persistence', () => {
       getStoredToken: vi.fn().mockResolvedValue(null),
     }));
     vi.doMock('../../src/lib/loro-doc.js', () => ({
+      initLoroDoc: vi.fn().mockResolvedValue({ hadSnapshot: false }),
       getPeerIdStr: vi.fn().mockReturnValue('peer_1'),
       getLoroDoc: vi.fn().mockReturnValue({ export: vi.fn().mockReturnValue(new Uint8Array(0)) }),
     }));
     vi.doMock('../../src/lib/sync/pending-queue.js', () => ({
       enqueuePendingUpdate: vi.fn().mockResolvedValue(undefined),
+    }));
+    vi.doMock('../../src/lib/bootstrap-containers.js', () => ({
+      ensureContainers: vi.fn(),
+    }));
+    vi.doMock('../../src/lib/journal.js', () => ({
+      ensureTodayNode: vi.fn().mockReturnValue('today_node'),
+    }));
+    vi.doMock('../../src/stores/ui-store.js', () => ({
+      useUIStore: { getState: vi.fn().mockReturnValue({ replacePanel: vi.fn() }) },
     }));
 
     await expect(useWorkspaceStore.getState().signInWithGoogle()).rejects.toThrow('Auth cancelled');

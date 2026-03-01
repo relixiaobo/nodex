@@ -9,12 +9,11 @@ import { TopToolbar } from '../../components/toolbar/TopToolbar';
 import { PanelStack } from '../../components/panel/PanelStack';
 import { CommandPalette } from '../../components/search/CommandPalette';
 import { BatchTagSelector } from '../../components/tags/BatchTagSelector';
-import { initLoroDoc, commitDoc } from '../../lib/loro-doc.js';
+import { initLoroDoc } from '../../lib/loro-doc.js';
 import * as loroDoc from '../../lib/loro-doc.js';
-import { ensureWorkspaceHomeNode } from '../../lib/workspace-root.js';
 import { getOrCreateDefaultWorkspaceId } from '../../lib/workspace-id.js';
 import { findUnexpectedShortcutConflicts } from '../../lib/shortcut-registry.js';
-import { ensureJournalTagDefs, ensureTodayNode } from '../../lib/journal.js';
+import { ensureTodayNode } from '../../lib/journal.js';
 import { ensureHighlightTagDef, ensureNoteTagDef, type HighlightNodeStore } from '../../lib/highlight-service.js';
 import {
   createHighlightFromPayload,
@@ -40,30 +39,9 @@ import {
   type HighlightNoteUpsertPayload,
   type HighlightUnresolvablePayload,
 } from '../../lib/highlight-messaging.js';
-import { BOOTSTRAP_CONTAINER_DEFS } from '../../lib/system-node-registry.js';
+import { ensureContainers } from '../../lib/bootstrap-containers.js';
 import { Toaster, toast } from 'sonner';
 import { TooltipProvider } from '../../components/ui/Tooltip';
-
-/**
- * Ensure workspace containers, journal tags, and system tags exist.
- * Called during bootstrap AND after background sync pulls server data.
- */
-function ensureContainers(wsId: string): void {
- ensureWorkspaceHomeNode(wsId);
- for (const { id, name } of BOOTSTRAP_CONTAINER_DEFS) {
-  if (!loroDoc.hasNode(id)) {
-   loroDoc.createNode(id, wsId);
-   loroDoc.setNodeRichTextContent(id, name, [], []);
-  } else if (loroDoc.getParentId(id) === null) {
-   loroDoc.moveNode(id, wsId);
-  }
- }
- ensureJournalTagDefs();
- const store = useNodeStore.getState() as HighlightNodeStore;
- ensureHighlightTagDef(store);
- ensureNoteTagDef(store);
- commitDoc('system:bootstrap');
-}
 
 /**
  * Bootstrap workspace containers in LoroDoc.
@@ -160,7 +138,10 @@ function useBootstrap(skip: boolean): BootstrapResult {
     const unsub = syncManager.onStateChange((state) => {
      if (state.status === 'synced' && state.lastSyncedAt !== null) {
       unsub();
-      ensureContainers(currentWsId);
+      // Read current workspace ID dynamically — may have changed after sign-in
+      // (bootstrap captures randomUUID, but sign-in transitions to user.id)
+      const wsNow = useWorkspaceStore.getState().currentWorkspaceId;
+      if (wsNow) ensureContainers(wsNow);
      }
     });
    }

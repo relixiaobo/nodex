@@ -6,10 +6,12 @@ describe('sync diagnostics logger', () => {
 
   beforeEach(() => {
     delete g.__NODEX_SYNC_DIAG__;
+    localStorage.removeItem('__NODEX_SYNC_DIAG__');
   });
 
   afterEach(() => {
     delete g.__NODEX_SYNC_DIAG__;
+    localStorage.removeItem('__NODEX_SYNC_DIAG__');
   });
 
   it('is disabled by default', () => {
@@ -27,5 +29,11 @@ describe('sync diagnostics logger', () => {
 
     expect(logSpy).toHaveBeenCalledWith('[sync:diag] event-1', { a: 1 });
     logSpy.mockRestore();
+  });
+
+  it('supports persistent localStorage flag', () => {
+    expect(isSyncDiagEnabled()).toBe(false);
+    localStorage.setItem('__NODEX_SYNC_DIAG__', 'true');
+    expect(isSyncDiagEnabled()).toBe(true);
   });
 });

@@ -28,13 +28,17 @@ _(空)_
 
 | Agent | 分支 | 任务 | 锁定文件 | 状态 |
 |---|---|---|---|---|
-| _(空)_ | | | | |
+| codex | `codex/review-sync-architecture` | Sync 架构 Review (#117) | — | 待派发 |
 
 ---
 
 ## 进行中
 
-_(空)_
+### Review: Sync 架构全面审查
+> **Branch**: `codex/review-sync-architecture` | **PR**: #117
+>
+> 审查范围：6 个 commit (`66f62d1..57e21ce`)，涵盖客户端 sync 修复 + 服务端 Loro snapshot compaction。
+> Codex 审查后在分支上提交修复，nodex review + merge。
 
 ---
 
@@ -61,7 +65,7 @@ _(空)_
 > Steps 0-9 + Staging 已完成。**Plan**: `docs/plans/sync-incremental-impl.md`
 
 - [x] Production 部署（Cloudflare Workers + D1 + R2 + Google OAuth）✅（2026-02-27）
-- [ ] Step 10: Compaction（上线后尽快完成）
+- [x] Step 10: Compaction — 服务端 Loro WASM snapshot 合并 + 客户端 batch import + progressive rendering ✅（2026-03-01）
 
 #### Chrome Web Store 上架准备
 

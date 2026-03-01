@@ -114,8 +114,10 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
             authUser: user,
           });
 
-          // Start sync after auth restoration
-          void startSyncIfReady();
+          // Start sync after auth restoration.
+          // Awaited so callers of initAuth() can rely on sync being started
+          // before proceeding (e.g., waitForFirstSync in bootstrap recovery).
+          await startSyncIfReady();
         } else {
           set({ userId: null, isAuthenticated: false, authUser: null });
         }

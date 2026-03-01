@@ -49,8 +49,8 @@ import { TooltipProvider } from '../../components/ui/Tooltip';
  * Bootstrap workspace containers in LoroDoc.
  * Creates fixed container nodes if they don't exist.
  */
-async function seedWorkspace(wsId: string): Promise<void> {
- await initLoroDoc(wsId);
+async function seedWorkspace(wsId: string): Promise<{ hadSnapshot: boolean }> {
+ const { hadSnapshot } = await initLoroDoc(wsId);
  ensureWorkspaceHomeNode(wsId);
 
  // Create container nodes as children of the workspace home node.
@@ -77,6 +77,7 @@ async function seedWorkspace(wsId: string): Promise<void> {
  // the undo stack. Without this, pending ops from container creation could
  // leak into the first user-initiated commitUIMarker → commitDoc('user:ui').
  commitDoc('system:bootstrap');
+ return { hadSnapshot };
 }
 
 interface BootstrapResult {
@@ -121,13 +122,36 @@ function useBootstrap(skip: boolean): BootstrapResult {
    }
 
    // Bootstrap LoroDoc + seed containers
-   await seedWorkspace(currentWsId);
+   const { hadSnapshot } = await seedWorkspace(currentWsId);
 
    // Restore auth session from stored Bearer token (validates against server).
    // Must run after initLoroDoc so getPeerIdStr() is available for sync start.
-   // Fire-and-forget: UI renders immediately, auth + sync restore in background.
    const { initAuth } = useWorkspaceStore.getState();
-   void initAuth();
+   if (hadSnapshot) {
+    // Normal startup: local data exists, sync in background
+    void initAuth();
+   } else {
+    // No local snapshot — must recover data from server before rendering.
+    // Await auth + first sync cycle so user sees their data, not an empty workspace.
+    await initAuth();
+    if (useWorkspaceStore.getState().isAuthenticated) {
+     const { syncManager } = await import('../../lib/sync/sync-manager.js');
+     await syncManager.waitForFirstSync();
+     // Re-seed containers after pull (server data may have different structure)
+     ensureWorkspaceHomeNode(currentWsId);
+     for (const { id, name } of BOOTSTRAP_CONTAINER_DEFS) {
+      if (!loroDoc.hasNode(id)) {
+       loroDoc.createNode(id, currentWsId);
+       loroDoc.setNodeRichTextContent(id, name, [], []);
+      }
+     }
+     ensureJournalTagDefs();
+     const store = useNodeStore.getState() as HighlightNodeStore;
+     ensureHighlightTagDef(store);
+     ensureNoteTagDef(store);
+     commitDoc('system:bootstrap');
+    }
+   }
 
    // Wait for UIStore persist hydration before checking panel validity
    // (persist.getItem is async, so the initial render may have stale default state)

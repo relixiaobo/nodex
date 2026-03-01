@@ -105,6 +105,50 @@ function makeFakeDB() {
   };
 }
 
+function makeFailingWriteDB(error: Error) {
+  return {
+    transaction: (_storeName: string, mode?: string) => {
+      const tx = {
+        oncomplete: null as ((e: Event) => void) | null,
+        onerror: null as ((e: Event) => void) | null,
+        onabort: null as ((e: Event) => void) | null,
+        objectStore: (_name: string) => store,
+      };
+      const store = {
+        get: (key: string) => {
+          const req = {
+            onsuccess: null as ((e: Event) => void) | null,
+            onerror: null as ((e: Event) => void) | null,
+            result: undefined as unknown,
+          };
+          queueMicrotask(() => {
+            req.result = cursorStore.get(key);
+            req.onsuccess?.({ target: req } as unknown as Event);
+          });
+          return req;
+        },
+        put: (_value: unknown, _key: string) => {
+          const req = {
+            onsuccess: null as ((e: Event) => void) | null,
+            onerror: null as ((e: Event) => void) | null,
+          };
+          queueMicrotask(() => {
+            req.onerror?.({ target: { error } } as unknown as Event);
+            tx.onerror?.({ target: { error } } as unknown as Event);
+          });
+          return req;
+        },
+      };
+
+      if (mode === 'readonly') {
+        return makeFakeDB().transaction(_storeName, mode);
+      }
+
+      return tx;
+    },
+  };
+}
+
 const mockOpenDB = vi.fn(() => Promise.resolve(makeFakeDB()));
 
 vi.mock('../../src/lib/loro-persistence.js', () => ({
@@ -504,6 +548,33 @@ describe('SyncManager', () => {
       expect(mockPullUpdates).toHaveBeenCalledWith('tok_1', expect.objectContaining({
         lastSeq: 10,
       }));
+    });
+
+    it('cursor write failure does not fail sync cycle', async () => {
+      const b64 = btoa(String.fromCharCode(1));
+      const idbError = new Error('IDB write failed');
+      mockPullUpdates.mockResolvedValue({
+        type: 'incremental',
+        updates: [{ seq: 5, data: b64, deviceId: 'o' }],
+        latestSeq: 5,
+        nextCursorSeq: 5,
+        hasMore: false,
+      });
+
+      mockOpenDB
+        .mockResolvedValueOnce(makeFakeDB()) // loadCursor
+        .mockResolvedValueOnce(makeFailingWriteDB(idbError)); // saveCursor
+
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      await mgr.start('ws_1', 'tok_1', 'dev_1');
+      await flushAsync();
+
+      expect(mockImportUpdatesBatch).toHaveBeenCalled();
+      expect(mockSaveNow).toHaveBeenCalled();
+      expect(mgr.getState().status).toBe('synced');
+      expect(warnSpy).toHaveBeenCalledWith('[sync] Failed to save cursor:', idbError);
+      warnSpy.mockRestore();
     });
   });
 

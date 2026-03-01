@@ -28,17 +28,20 @@ _(空)_
 
 | Agent | 分支 | 任务 | 锁定文件 | 状态 |
 |---|---|---|---|---|
-| codex | `codex/review-sync-architecture` | Sync 架构 Review (#117) | — | 待派发 |
+| _(空)_ | | | | |
 
 ---
 
 ## 进行中
 
-### Review: Sync 架构全面审查
-> **Branch**: `codex/review-sync-architecture` | **PR**: #117
->
-> 审查范围：6 个 commit (`66f62d1..57e21ce`)，涵盖客户端 sync 修复 + 服务端 Loro snapshot compaction。
-> Codex 审查后在分支上提交修复，nodex review + merge。
+_(空)_
+
+---
+
+## 已完成
+
+### Review: Sync 架构全面审查 ✅（2026-03-01, PR #117）
+> 审查范围：6 个 commit（客户端 sync 修复 + 服务端 Loro snapshot compaction）。补充修复：compaction CAS 元数据更新 + update 区间完整性校验 + `saveCursor` 异步失败捕获。
 
 ---
 

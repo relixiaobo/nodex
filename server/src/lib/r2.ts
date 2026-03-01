@@ -2,8 +2,8 @@
  * R2 storage helpers for sync blobs.
  *
  * Key layout:
- *   {workspaceId}/snapshot.bin                — latest compacted snapshot
- *   {workspaceId}/updates/{updateHash}.bin    — individual update blobs
+ *   {workspaceId}/updates/{updateHash}.bin     — individual update blobs
+ *   {workspaceId}/snapshots/{snapshotSeq}.bin  — compacted snapshots (versioned)
  */
 
 /** Write an update blob to R2. Returns the R2 key. */
@@ -29,25 +29,25 @@ export async function getUpdate(
   return new Uint8Array(buf);
 }
 
-/** Read the snapshot blob from R2. Returns null if not found. */
+/** Read a snapshot blob by snapshot key. Returns null if not found. */
 export async function getSnapshot(
   bucket: R2Bucket,
-  workspaceId: string,
+  snapshotKey: string,
 ): Promise<Uint8Array | null> {
-  const key = `${workspaceId}/snapshot.bin`;
-  const obj = await bucket.get(key);
+  const obj = await bucket.get(snapshotKey);
   if (!obj) return null;
   const buf = await obj.arrayBuffer();
   return new Uint8Array(buf);
 }
 
-/** Write a compacted snapshot blob to R2. Returns the R2 key. */
+/** Write a compacted snapshot blob to R2. Returns the versioned snapshot key. */
 export async function putSnapshot(
   bucket: R2Bucket,
   workspaceId: string,
+  snapshotSeq: number,
   data: Uint8Array,
 ): Promise<string> {
-  const key = `${workspaceId}/snapshot.bin`;
+  const key = `${workspaceId}/snapshots/${snapshotSeq}.bin`;
   await bucket.put(key, data);
   return key;
 }

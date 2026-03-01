@@ -149,31 +149,41 @@ export async function getUpdatesAfter(
 // Compaction queries
 // ---------------------------------------------------------------------------
 
-/** Update snapshot metadata in sync_workspaces after compaction. */
-export async function updateSnapshotMeta(
+/**
+ * Get update rows in (afterSeq, upToSeq], ordered by seq.
+ * Used by compaction to build a deterministic snapshot target.
+ */
+export async function getUpdatesInRange(
+  db: D1Database,
+  workspaceId: string,
+  afterSeq: number,
+  upToSeq: number,
+): Promise<SyncUpdateRow[]> {
+  const result = await db.prepare(
+    'SELECT * FROM sync_updates WHERE workspace_id = ? AND seq > ? AND seq <= ? ORDER BY seq ASC'
+  ).bind(workspaceId, afterSeq, upToSeq).all<SyncUpdateRow>();
+  return result.results;
+}
+
+/**
+ * Update snapshot metadata iff current snapshot is behind the target snapshot seq.
+ * Returns true when metadata is updated, false when another compaction already
+ * wrote an equal/newer snapshot.
+ */
+export async function updateSnapshotMetaIfBehind(
   db: D1Database,
   workspaceId: string,
   snapshotSeq: number,
   snapshotKey: string,
   snapshotSize: number,
-): Promise<void> {
-  await db.prepare(
+): Promise<boolean> {
+  const result = await db.prepare(
     `UPDATE sync_workspaces
      SET snapshot_seq = ?, snapshot_key = ?, snapshot_size = ?, updated_at = datetime('now')
-     WHERE workspace_id = ?`
-  ).bind(snapshotSeq, snapshotKey, snapshotSize, workspaceId).run();
-}
+     WHERE workspace_id = ? AND snapshot_seq < ? AND latest_seq >= ?`
+  ).bind(snapshotSeq, snapshotKey, snapshotSize, workspaceId, snapshotSeq, snapshotSeq).run();
 
-/** Get all update rows after a given seq (for compaction to read blobs). */
-export async function getAllUpdatesAfter(
-  db: D1Database,
-  workspaceId: string,
-  afterSeq: number,
-): Promise<SyncUpdateRow[]> {
-  const result = await db.prepare(
-    'SELECT * FROM sync_updates WHERE workspace_id = ? AND seq > ? ORDER BY seq ASC'
-  ).bind(workspaceId, afterSeq).all<SyncUpdateRow>();
-  return result.results;
+  return (result.meta?.changes ?? 0) > 0;
 }
 
 /** Delete update rows up to a given seq (garbage collection after compaction). */

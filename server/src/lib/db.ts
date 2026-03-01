@@ -145,6 +145,52 @@ export async function getUpdatesAfter(
   return result.results;
 }
 
+// ---------------------------------------------------------------------------
+// Compaction queries
+// ---------------------------------------------------------------------------
+
+/** Update snapshot metadata in sync_workspaces after compaction. */
+export async function updateSnapshotMeta(
+  db: D1Database,
+  workspaceId: string,
+  snapshotSeq: number,
+  snapshotKey: string,
+  snapshotSize: number,
+): Promise<void> {
+  await db.prepare(
+    `UPDATE sync_workspaces
+     SET snapshot_seq = ?, snapshot_key = ?, snapshot_size = ?, updated_at = datetime('now')
+     WHERE workspace_id = ?`
+  ).bind(snapshotSeq, snapshotKey, snapshotSize, workspaceId).run();
+}
+
+/** Get all update rows after a given seq (for compaction to read blobs). */
+export async function getAllUpdatesAfter(
+  db: D1Database,
+  workspaceId: string,
+  afterSeq: number,
+): Promise<SyncUpdateRow[]> {
+  const result = await db.prepare(
+    'SELECT * FROM sync_updates WHERE workspace_id = ? AND seq > ? ORDER BY seq ASC'
+  ).bind(workspaceId, afterSeq).all<SyncUpdateRow>();
+  return result.results;
+}
+
+/** Delete update rows up to a given seq (garbage collection after compaction). */
+export async function deleteUpdatesUpTo(
+  db: D1Database,
+  workspaceId: string,
+  upToSeq: number,
+): Promise<void> {
+  await db.prepare(
+    'DELETE FROM sync_updates WHERE workspace_id = ? AND seq <= ?'
+  ).bind(workspaceId, upToSeq).run();
+}
+
+// ---------------------------------------------------------------------------
+// Device cursor queries
+// ---------------------------------------------------------------------------
+
 /** Update device pull cursor. */
 export async function updateDevicePullCursor(
   db: D1Database,

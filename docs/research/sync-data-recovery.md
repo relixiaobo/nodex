@@ -74,6 +74,40 @@ await syncManager.start(currentWorkspaceId, token, deviceId);
 - CRDT 导入幂等 → 重复推送安全
 - 首次 `syncOnce()` push 阶段会发送此全量更新
 
+### Root Cause #2：Pull 完成后 UI 不更新（ab4714b）
+
+修复推送后验证恢复流程，发现 pull 成功导入所有 2698 条更新，但 UI 始终显示空白。
+
+#### 原因
+
+`importUpdates()` 中的通知时序错误：
+
+```typescript
+export function importUpdates(data: Uint8Array): void {
+  doc.import(data);       // 1. 触发 doc.subscribe() → notifySubscribers()（映射未重建）
+  rebuildMappings();       // 2. 重建映射，但不再通知
+}
+```
+
+`doc.subscribe()` 回调在 `doc.import()` 内部同步触发，此时 `rebuildMappings()` 尚未执行。
+React 的 `useSyncExternalStore` 在 subscriber 回调中立即调用 `getSnapshot()` → 读取旧的 `nodexToTree` 映射 → 新节点返回 null（与之前相同）→ 跳过 re-render。
+
+`rebuildMappings()` 之后映射正确了，但没有第二次通知 → UI 卡在旧状态。
+
+#### 修复
+
+在 `importUpdates()` 末尾显式调用 `notifySubscribers()`：
+
+```typescript
+export function importUpdates(data: Uint8Array): void {
+  doc.import(data);
+  rebuildMappings();
+  notifySubscribers(); // ← 映射正确后通知 React
+}
+```
+
+同时将 `waitForFirstSync` 超时从 15s 增加到 60s（2698 条 × 50/批 = 54 次 HTTP ≈ 17s）。
+
 ---
 
 ## 问题二：匿名使用 → 登录后本地数据丢失
@@ -154,5 +188,5 @@ signInWithGoogle():
 
 ## 优先级
 
-1. ~~**P0**: 问题一 — pull 不返回数据的 root cause（用户数据丢失风险）~~ ✅ 已解决（2026-03-01）
+1. ~~**P0**: 问题一 — 数据恢复~~ ✅ 已解决（push 全量导出 66f62d1 + pull 后 UI 通知 ab4714b）
 2. **P1**: 问题二 — 匿名→登录数据迁移（影响新用户体验）

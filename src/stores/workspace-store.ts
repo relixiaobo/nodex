@@ -38,12 +38,25 @@ async function startSyncIfReady(): Promise<void> {
   if (!isAuthenticated || !currentWorkspaceId) return;
 
   const { getStoredToken } = await import('../lib/auth.js');
-  const { getPeerIdStr } = await import('../lib/loro-doc.js');
+  const { getPeerIdStr, getLoroDoc } = await import('../lib/loro-doc.js');
+  const { enqueuePendingUpdate } = await import('../lib/sync/pending-queue.js');
   const token = await getStoredToken();
   if (!token) return;
 
   try {
     const deviceId = getPeerIdStr();
+
+    // Enqueue a full document state export BEFORE starting the sync loop.
+    // Operations committed while sync was inactive (status = 'local-only')
+    // — such as tree node creation during bootstrap — are discarded by
+    // subscribeLocalUpdates. This full export ensures they reach the server.
+    // CRDT import is idempotent, so re-pushing known operations is safe.
+    const doc = getLoroDoc();
+    const fullUpdate = doc.export({ mode: 'update' });
+    if (fullUpdate.length > 0) {
+      await enqueuePendingUpdate(currentWorkspaceId, fullUpdate);
+    }
+
     await syncManager.start(currentWorkspaceId, token, deviceId);
   } catch {
     // loro-doc may not be initialized yet — sync will start after initLoroDoc
@@ -119,6 +132,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
           // before proceeding (e.g., waitForFirstSync in bootstrap recovery).
           await startSyncIfReady();
         } else {
+          console.warn('[bootstrap] initAuth: no user found, sync will not start');
           set({ userId: null, isAuthenticated: false, authUser: null });
         }
 

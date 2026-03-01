@@ -30,56 +30,49 @@ initLoroDoc() → hadSnapshot?
 - `src/stores/workspace-store.ts` — `initAuth()` 内部 await `startSyncIfReady()`
 - `src/entrypoints/sidepanel/App.tsx` — Bootstrap 分支逻辑
 
-### 未解决：pull 为什么不返回数据？
+### Root Cause（已解决，2026-03-01）
 
-尽管架构修改后 bootstrap 正确等待 sync，但 pull 仍然没有恢复数据。需要排查：
+**问题不在 pull 侧，而在 push 侧 — 本地操作在推送前就已丢失。**
 
-1. **Auth token 是否有效** — `initAuth()` → `getCurrentUser()` 是否返回 user？
-   - 如果返回 null → sync 不启动 → 没有 pull
-   - 调试方法：在 `initAuth` 添加 console.log
+#### 诊断过程
 
-2. **Pull 请求是否发出** — Network 面板是否有 pull 请求？
-   - 如果没有 → `startSyncIfReady()` 未执行或抛错
-   - `syncManager.start()` 内部 `void this.syncOnce()` 也是 fire-and-forget
+1. **Pull 侧分析**：服务端返回 2514 条增量更新，全部为 `type: 'incremental'`（无 snapshot）。导入后 tree 节点数始终为 0（seed 容器除外）。
+2. **Byte 验证**：创建空白 LoroDoc 导入 pull bytes → 0 节点。Hex header `6c 6f 72 6f`（"loro"）= 合法格式，但内容不含树操作。
+3. **Push 侧验证（关键突破）**：在 `subscribeLocalUpdates` 回调中验证捕获的 bytes → 31 次捕获全部 `testNodes=0`。**bytes 在源头就不含树操作。**
+4. **Vitest 对照**：独立测试确认 Loro API 工作正常（`subscribeLocalUpdates` → `import` → 树节点正确重建）。
 
-3. **Pull 响应是否包含数据** — 检查 response body
-   - `response.type` 是 `'snapshot'` 还是 `'incremental'`？
-   - `response.updates` 数组是否为空？
-   - `response.snapshot` 是否存在？
+#### Root Cause
 
-4. **importUpdates 是否成功** — 数据导入后 `rebuildMappings()` 节点数是多少？
-   - `console.log('[sync] importUpdates, nodes after:', nodexToTree.size)`
-
-5. **dbPromise 缓存失效** — 删除 IndexedDB 时 panel 还开着
-   - `openDB()` 缓存了旧连接 → `persistSnapshot()` 静默失败
-   - 关闭 panel 时 `beforeunload` → `persistSnapshot()` → 写入失效的 DB 连接
-   - 重启后新 `openDB()` 创建新库 → 空的
-
-### 建议调试方案
-
-在关键路径添加 console.log（临时，解决后删除）：
+`loro-doc.ts` 的 `subscribeLocalUpdates` 回调有一个状态门控：
 
 ```typescript
-// workspace-store.ts initAuth
-console.log('[bootstrap] initAuth: user=', user?.id, 'wsId=', currentWsId);
-
-// sync-manager.ts start()
-console.log('[sync] start: wsId=', workspaceId, 'lastSeq=', this.lastSeq);
-
-// sync-manager.ts pull()
-console.log('[sync] pull response:', {
-  type: response.type,
-  hasSnapshot: !!response.snapshot,
-  updateCount: response.updates.length,
-  nextCursorSeq: response.nextCursorSeq,
-});
-
-// sync-manager.ts syncOnce() catch
-console.error('[sync] syncOnce error:', err);
-
-// loro-doc.ts importUpdates()
-console.log('[sync] importUpdates, nodes after rebuild:', nodexToTree.size);
+if (syncManager.getState().status === 'local-only') return; // ← 丢弃！
 ```
+
+Bootstrap 时序竞态：
+1. `seedWorkspace()` → `commitDoc('system:bootstrap')` → `subscribeLocalUpdates` 触发 → status = `'local-only'` → **bytes 丢弃**
+2. `void initAuth()` — fire-and-forget，异步执行
+3. `setReady(true)` → UI 渲染 → 用户创建节点 → `commitDoc()` → `subscribeLocalUpdates` 触发 → status 仍为 `'local-only'` → **bytes 丢弃**
+4. `initAuth()` 最终完成 → `syncManager.start()` → status 变为 `'synced'`
+5. 此后新操作被捕获，但**树创建操作**已在步骤 1-3 中被丢弃
+6. 服务端只收到文本编辑操作（无树结构）→ pull 回来 0 节点
+
+#### 修复
+
+在 `startSyncIfReady()` 中，`syncManager.start()` 之前导出完整文档状态并入队：
+
+```typescript
+const doc = getLoroDoc();
+const fullUpdate = doc.export({ mode: 'update' });
+if (fullUpdate.length > 0) {
+  await enqueuePendingUpdate(currentWorkspaceId, fullUpdate);
+}
+await syncManager.start(currentWorkspaceId, token, deviceId);
+```
+
+- `doc.export({ mode: 'update' })` 包含所有已提交操作（含被丢弃的树创建）
+- CRDT 导入幂等 → 重复推送安全
+- 首次 `syncOnce()` push 阶段会发送此全量更新
 
 ---
 
@@ -161,5 +154,5 @@ signInWithGoogle():
 
 ## 优先级
 
-1. **P0**: 问题一 — pull 不返回数据的 root cause（用户数据丢失风险）
+1. ~~**P0**: 问题一 — pull 不返回数据的 root cause（用户数据丢失风险）~~ ✅ 已解决（2026-03-01）
 2. **P1**: 问题二 — 匿名→登录数据迁移（影响新用户体验）

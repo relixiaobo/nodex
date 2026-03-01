@@ -212,7 +212,7 @@ export class SyncManager {
         pendingCount: pending,
         error: null,
       });
-    } catch (err) {
+    } catch (err: unknown) {
       if (!this.isSessionCurrent(sessionToken)) return;
       if (err instanceof AuthError) {
         this.updateState({ status: 'error', error: 'Session expired — please sign in again' });

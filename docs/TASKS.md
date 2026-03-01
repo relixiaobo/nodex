@@ -42,7 +42,7 @@ _(空)_
 
 ### Bug 修复（待修）
 
-- [ ] **Sync 数据恢复失败 — 删除本地 IndexedDB 后无法从服务端恢复数据** — pull 请求发出但数据未恢复，root cause 待排查。架构层已修复（bootstrap 无快照时阻塞等待 sync, b4122a6），底层 pull 问题未解决。**Research**: `docs/research/sync-data-recovery.md`
+- [x] **Sync 数据恢复失败 — 删除本地 IndexedDB 后无法从服务端恢复数据** — **Root cause**: `subscribeLocalUpdates` 丢弃 `status='local-only'` 时的 bytes，bootstrap 阶段（树创建）操作在 sync 启动前提交→永久丢失→服务端只有文本操作无树结构。**Fix**: sync 启动前 `doc.export({ mode: 'update' })` 全量入队，确保所有本地操作推送到服务端（CRDT 幂等安全）✅（2026-03-01）。**Research**: `docs/research/sync-data-recovery.md`
 - [ ] **匿名→登录数据丢失 — workspace ID 切换导致本地节点变孤儿** — 未登录用户 `ws_xxx` 写的数据，登录后 workspace 切为 `user.id`，容器节点 ID 前缀不匹配，旧数据静默丢失。需要一次性迁移逻辑。**Research**: `docs/research/sync-data-recovery.md`
 - [x] **日期 NodePanel 输入 date field 白屏** — FieldValueOutliner hooks 违规修复（hooks 移到 early return 前）
 - [x] **点击 node 文本中的链接未打开标签页** — 静态内容 + 编辑器 mousedown 双重拦截，单击 chrome.tabs.create 打开
@@ -296,6 +296,7 @@ _(空)_
 
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
+| 2026-03-01 | Sync 数据恢复修复 — `subscribeLocalUpdates` 丢弃 local-only 阶段 bytes 的时序竞态，sync 启动前全量 export 入队确保树操作不丢失 | nodex | main |
 | 2026-03-01 | Highlight 交互重设计（Readwise 风格）— 图标化网页工具栏 + Note 内联输入 + 高亮点击二次工具栏 + 评论图标 + DS 视觉收敛 + 11 test | codex | #115 |
 | 2026-03-01 | Highlight 数据模型重构 — highlight 改为 clip page 子节点 + `ancestor_supertag_ref` auto-init + 去重复创建 + anchor JSON 隐藏 + options picker targetId 修复 + reference tag inline 对齐 | nodex | main |
 | 2026-03-01 | Field & Supertag 功能补全 — Integer 清理 + Merge Fields + Auto-initialize（3 策略）+ 批量标签操作（BatchTagSelector + `#` 快捷键）+ 22 test | nodex | main |

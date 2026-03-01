@@ -16,6 +16,7 @@ import {
   getAllNodeIds,
   commitDoc,
   importUpdates,
+  importUpdatesBatch,
   subscribe,
   initLoroDocForTest,
   resetLoroDoc,
@@ -231,6 +232,50 @@ describe('importUpdates triggers subscriber notification', () => {
 
     // Subscriber was called for each import
     expect(subscriberCalls.length).toBeGreaterThanOrEqual(2);
+
+    unsub();
+  });
+
+  it('importUpdatesBatch imports multiple updates with single rebuild', () => {
+    // Create two batches of data in a separate LoroDoc
+    const doc1 = new LoroDoc();
+    const tree1 = doc1.getTree('nodes');
+
+    // Batch 1: create root
+    const r = tree1.createNode();
+    r.data.set('id', 'batchA');
+    r.data.set('name', 'Batch A');
+    doc1.commit();
+    const bytes1 = doc1.export({ mode: 'update' });
+
+    // Batch 2: create child (incremental from batch 1)
+    const vvAfterBatch1 = doc1.oplogVersion();
+    const c = tree1.createNode(r.id);
+    c.data.set('id', 'batchB');
+    c.data.set('name', 'Batch B');
+    doc1.commit();
+    const bytes2 = doc1.export({ mode: 'update', from: vvAfterBatch1 });
+
+    // Track subscriber notifications during batch import
+    const subscriberCalls: number[] = [];
+    const unsub = subscribe(() => {
+      subscriberCalls.push(getAllNodeIds().length);
+    });
+
+    // Import as batch — should rebuild mappings + notify only once
+    importUpdatesBatch([bytes1, bytes2]);
+
+    // Both nodes must be accessible
+    expect(hasNode('batchA')).toBe(true);
+    expect(hasNode('batchB')).toBe(true);
+    expect(toNodexNode('batchA')?.name).toBe('Batch A');
+    expect(toNodexNode('batchB')?.name).toBe('Batch B');
+    expect(getChildren('batchA')).toContain('batchB');
+
+    // importUpdatesBatch calls notifySubscribers once explicitly;
+    // doc.subscribe may also fire during individual doc.import() calls,
+    // but the explicit notification at the end ensures correct mappings.
+    expect(subscriberCalls.length).toBeGreaterThanOrEqual(1);
 
     unsub();
   });

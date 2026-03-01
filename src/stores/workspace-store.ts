@@ -53,13 +53,11 @@ async function startSyncIfReady(): Promise<void> {
     // CRDT import is idempotent, so re-pushing known operations is safe.
     const doc = getLoroDoc();
     const fullUpdate = doc.export({ mode: 'update' });
-    console.log('[sync] startSyncIfReady: fullUpdate bytes:', fullUpdate.length, 'wsId:', currentWorkspaceId);
     if (fullUpdate.length > 0) {
       await enqueuePendingUpdate(currentWorkspaceId, fullUpdate);
     }
 
     await syncManager.start(currentWorkspaceId, token, deviceId);
-    console.log('[sync] startSyncIfReady: syncManager started, status:', syncManager.getState().status);
   } catch (err) {
     console.error('[sync] startSyncIfReady failed:', err);
   }
@@ -130,8 +128,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
           });
 
           // Start sync after auth restoration.
-          // Awaited so callers of initAuth() can rely on sync being started
-          // before proceeding (e.g., waitForFirstSync in bootstrap recovery).
+          // Awaited so sync is active before initAuth() resolves.
           await startSyncIfReady();
         } else {
           console.warn('[bootstrap] initAuth: no user found, sync will not start');

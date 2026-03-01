@@ -88,6 +88,9 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
       signInWithGoogle: async () => {
         const { signInWithGoogle: authSignIn } = await import('../lib/auth.js');
         const user = await authSignIn();
+
+        const prevWsId = useWorkspaceStore.getState().currentWorkspaceId;
+
         // TODO: currentWorkspaceId = user.id assumes single workspace per user.
         // When multi-workspace is needed, derive from a workspace list instead.
         set({
@@ -96,6 +99,22 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
           isAuthenticated: true,
           authUser: user,
         });
+
+        // On fresh install, bootstrap initialized LoroDoc with a random UUID.
+        // After sign-in the workspace must be user.id — reinitialize LoroDoc
+        // so persistence key, container nodes, and sync all use the correct ID.
+        if (prevWsId !== user.id) {
+          const { initLoroDoc } = await import('../lib/loro-doc.js');
+          await initLoroDoc(user.id);
+
+          const { ensureContainers } = await import('../lib/bootstrap-containers.js');
+          ensureContainers(user.id);
+
+          // Navigate UI to Today under the correct workspace
+          const { ensureTodayNode } = await import('../lib/journal.js');
+          const { useUIStore } = await import('./ui-store.js');
+          useUIStore.getState().replacePanel(ensureTodayNode());
+        }
 
         // Start sync after sign-in
         void startSyncIfReady();

@@ -117,8 +117,14 @@ interface TextNodeSegment {
 /**
  * Get all text node segments within a Range.
  * Handles cross-element selections by iterating through text nodes.
+ *
+ * Uses Range.intersectsNode() instead of direct container comparison,
+ * which correctly handles ranges where startContainer or endContainer
+ * is an Element (e.g., double-click paragraph selection where the browser
+ * sets endContainer to the <p> element rather than a text node).
  */
 function getTextNodesInRange(range: Range): TextNodeSegment[] {
+  // Simple case: selection within a single text node
   if (
     range.startContainer === range.endContainer
     && range.startContainer.nodeType === Node.TEXT_NODE
@@ -137,39 +143,18 @@ function getTextNodesInRange(range: Range): TextNodeSegment[] {
   );
 
   let node = walker.nextNode() as Text | null;
-  let foundStart = false;
 
   while (node) {
-    if (node === range.startContainer) {
-      foundStart = true;
-      if (node === range.endContainer) {
-        // Selection within a single text node
-        segments.push({
-          node,
-          startOffset: range.startOffset,
-          endOffset: range.endOffset,
-        });
-        break;
+    // Only include text nodes that actually intersect the range.
+    // Previous code compared node identity against range.startContainer / endContainer,
+    // which failed when those containers were Elements (not Text nodes).
+    if (range.intersectsNode(node)) {
+      const startOffset = (node === range.startContainer) ? range.startOffset : 0;
+      const endOffset = (node === range.endContainer) ? range.endOffset : node.length;
+
+      if (startOffset < endOffset) {
+        segments.push({ node, startOffset, endOffset });
       }
-      segments.push({
-        node,
-        startOffset: range.startOffset,
-        endOffset: node.length,
-      });
-    } else if (foundStart) {
-      if (node === range.endContainer) {
-        segments.push({
-          node,
-          startOffset: 0,
-          endOffset: range.endOffset,
-        });
-        break;
-      }
-      segments.push({
-        node,
-        startOffset: 0,
-        endOffset: node.length,
-      });
     }
 
     node = walker.nextNode() as Text | null;
@@ -384,21 +369,92 @@ function isValidSelection(selection: Selection): boolean {
   const text = selection.toString().trim();
   if (!text) return false;
 
-  // Don't highlight inside our own injected elements
+  // Don't highlight inside our own injected toolbar overlays
   const anchorNode = selection.anchorNode;
   if (anchorNode) {
     const ancestor =
       anchorNode.nodeType === Node.ELEMENT_NODE
         ? (anchorNode as Element)
         : anchorNode.parentElement;
-    if (ancestor?.closest('[data-soma-highlight-overlay="true"], soma-hl')) return false;
+    if (ancestor?.closest('[data-soma-highlight-overlay="true"]')) return false;
+    // Note: selections inside <soma-hl> are allowed — handleSelectionChange
+    // detects overlap and shows the highlight actions toolbar instead.
   }
 
   return true;
 }
 
 /**
+ * Check if the entire selection range falls within a single existing highlight.
+ * Returns the highlight ID if so, null otherwise.
+ *
+ * Handles two cases:
+ * ① Both endpoints are text nodes inside the same <soma-hl> (normal click-drag)
+ * ② One or both endpoints are Element nodes (double-click paragraph selection)
+ *    — the browser may set endContainer to <p> instead of a text node inside
+ *    <soma-hl>, so closest() going upward won't find it. Fallback: check if
+ *    all intersecting <soma-hl> elements share the same ID and their combined
+ *    text matches the selection text.
+ */
+export function findOverlappingHighlightId(range: Range): string | null {
+  const startNode = range.startContainer;
+  const endNode = range.endContainer;
+
+  // ① Quick path: both endpoints inside the same <soma-hl>
+  const startElement = startNode.nodeType === Node.TEXT_NODE
+    ? startNode.parentElement
+    : startNode as Element;
+  const endElement = endNode.nodeType === Node.TEXT_NODE
+    ? endNode.parentElement
+    : endNode as Element;
+
+  const startHL = startElement?.closest('soma-hl[data-highlight-id]');
+  const endHL = endElement?.closest('soma-hl[data-highlight-id]');
+
+  if (startHL && endHL) {
+    const startId = startHL.getAttribute('data-highlight-id');
+    const endId = endHL.getAttribute('data-highlight-id');
+    if (startId && startId === endId) return startId;
+  }
+
+  // ② Fallback: collect all <soma-hl> elements intersecting the range.
+  //    If they all belong to one highlight and cover the entire selection text,
+  //    it's a full overlap (e.g. double-click on a highlighted paragraph).
+  const ancestor = range.commonAncestorContainer;
+  const container = ancestor.nodeType === Node.ELEMENT_NODE
+    ? ancestor as Element
+    : ancestor.parentElement;
+  if (!container) return null;
+
+  const highlightEls = container.querySelectorAll('soma-hl[data-highlight-id]');
+  const ids = new Set<string>();
+  const parts: string[] = [];
+
+  for (const hl of highlightEls) {
+    if (range.intersectsNode(hl)) {
+      const id = hl.getAttribute('data-highlight-id');
+      if (id) {
+        ids.add(id);
+        parts.push(hl.textContent ?? '');
+      }
+    }
+  }
+
+  if (ids.size !== 1) return null;
+
+  const hlText = parts.join('').trim();
+  const selText = range.toString().trim();
+  if (selText && selText === hlText) return [...ids][0];
+
+  return null;
+}
+
+/**
  * Handle text selection — show floating toolbar on valid selection.
+ *
+ * If the selection is entirely within an existing highlight, shows the
+ * highlight actions toolbar (delete / add note) instead of the creation
+ * toolbar, preventing duplicate highlights on the same text.
  */
 function handleSelectionChange(): void {
   try {
@@ -409,8 +465,27 @@ function handleSelectionChange(): void {
       return;
     }
 
-    currentRange = selection.getRangeAt(0).cloneRange();
-    const rect = currentRange.getBoundingClientRect();
+    const range = selection.getRangeAt(0).cloneRange();
+    const rect = range.getBoundingClientRect();
+
+    // Check if selection falls entirely within an existing highlight
+    const existingId = findOverlappingHighlightId(range);
+    if (existingId) {
+      // Show highlight actions (delete / add note) instead of creation toolbar
+      currentRange = null;
+      hideToolbar();
+      showHighlightActionsToolbar(rect, {
+        onDelete: () => {
+          deleteHighlight(existingId);
+        },
+        onAddNote: () => {
+          showNotePopoverForExistingHighlight(existingId, rect);
+        },
+      });
+      return;
+    }
+
+    currentRange = range;
     showToolbar(rect, handleToolbarAction);
     hideHighlightActionsToolbar();
   } catch (err) {

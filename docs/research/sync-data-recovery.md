@@ -1,4 +1,4 @@
-# Sync 数据恢复 & 匿名登录迁移（Root Cause + 方案）
+# Sync 数据恢复 & 匿名登录迁移（诊断优先版）
 
 > 日期: 2026-03-01
 > 分支: `cc/sync-data-recovery`
@@ -22,89 +22,58 @@
 
 这一步解决的是“启动时序”，不是“pull 数据正确性”。
 
-### Root Cause（已确认）
+### Root Cause 状态
 
-#### RC-1: 恢复路径把“sync 结束”当成“数据已恢复”
+**当前还不能下最终 root cause 结论，必须先诊断。**
 
-当前恢复路径只看 `SyncManager` 状态（`synced/error`），没有验证“是否真的导入了远端数据”。
+已确认事实：
+- 架构时序问题已在 `b4122a6` 修复（无快照时会阻塞等待首轮 sync）
+- 但实际仍会出现恢复后空白 workspace
 
-`pull` 存在一种静默失败形态：
+待验证候选原因（按优先级）：
+1. `initAuth/startSyncIfReady` 没真正拉起 sync（auth/token/调用链断裂）
+2. pull 请求发出但响应数据为空（服务端确实没数据或游标不对）
+3. pull 有数据但 `importUpdates` 异常或未生效
+4. 游标推进与导入结果不一致（同步看似成功但数据未进入文档）
 
-- 服务端返回 `latestSeq > lastSeq`
-- 但客户端实际导入条数为 0（例如：回声过滤后为空、R2 缺 blob、或游标不一致）
-- 客户端仍推进 `cursor = nextCursorSeq`，并保存快照/游标
-- 最终状态是 `synced`，但文档仍为空
+说明：此前“回声过滤导致恢复失败”仅作为低优先候选，不作为当前主因。
 
-结果：恢复流程误判成功，用户看到空白 workspace。
+### 诊断执行顺序（先做）
 
-#### RC-2: 缺少恢复期关键可观测性，定位成本高
+先不做抽象，先加 5 个临时日志，复现一次，拿证据：
 
-当前日志无法直接回答以下关键问题：
+1. `workspace-store.ts / initAuth`  
+   输出：`user?.id`、`currentWorkspaceId`、`hasToken`
+2. `workspace-store.ts / startSyncIfReady`  
+   输出：是否进入 `syncManager.start`、`workspaceId`、`deviceId`
+3. `sync-manager.ts / start + pull`  
+   输出：`lastSeq`、pull 请求参数、响应 `type/latestSeq/nextCursorSeq/updates.length`
+4. `loro-doc.ts / importUpdates`  
+   输出：导入前后节点数、异常栈（若抛错）
+5. `sync-manager.ts / pull 结束`  
+   输出：是否保存 snapshot、是否保存 cursor、新 cursor 值
 
-- pull 是否真正发出
-- 响应里 `latestSeq / nextCursorSeq / updates.length` 是多少
-- 客户端实际 `importUpdates` 成功次数/字节数
-- `waitForFirstSync` 结束时是“导入成功”还是“空同步”
+复现流程：
+1. 有数据账号下确保服务端已有历史更新
+2. 删除本地 IndexedDB 后重启 Side Panel
+3. 抓一轮完整日志，确认断点层级（auth / pull / import / cursor）
 
-因此问题会表现为“看起来同步了，但数据没回来”。
+### 修复策略（诊断后决策）
 
-### 复现步骤（可稳定）
+Phase 1 只做“最小修复”，不预设大抽象：
 
-#### 复现 A（恢复误判）
+- 如果是 auth/token 问题：修 `initAuth/startSyncIfReady` 调用链
+- 如果是 pull 返回空：修请求参数/游标来源/workspace 绑定
+- 如果是 import 失败：修 `importUpdates` 异常处理与导入顺序
+- 如果是 cursor 误推进：修 `pull` 内 cursor 保存时机
 
-1. 准备一个服务端 `latestSeq > 0` 的 workspace
-2. 让客户端从 `lastSeq=0` 发起 pull
-3. 构造返回使客户端 `updates.length = 0`（例如回声过滤后为空）
-4. 观察客户端状态变为 `synced`，但节点数不变（仍为空）
-
-#### 复现 B（快照缺失 + 恢复流程）
-
-1. 让本地 `hadSnapshot=false` 启动恢复路径
-2. pull 返回后未导入任何更新
-3. `waitForFirstSync` 仍 resolve，UI 渲染空 workspace
-
-### 最佳修复方案
-
-#### 方案核心
-
-把恢复流程从“状态驱动”升级为“结果驱动”：
-
-- **必须有恢复证据**（snapshot 导入或 incremental 导入）才算恢复成功
-- 否则标记为恢复失败并保留可重试状态，不推进恢复游标
-
-#### 客户端改动（建议）
-
-1. `sync-manager.ts`
-- 为每轮 `syncOnce/pull` 生成 `SyncCycleReport`：
-  - `requestedLastSeq`
-  - `responseLatestSeq`
-  - `responseNextCursorSeq`
-  - `importedUpdateCount`
-  - `importedBytes`
-  - `hadSnapshotPayload`
-- 恢复模式下新增判定：
-  - `responseLatestSeq > requestedLastSeq` 且 `importedUpdateCount === 0` → 视为失败，不写入新 cursor，状态置 `error`（可重试）
-
-2. `App.tsx`（bootstrap）
-- `waitForFirstSync()` 不仅等待状态，还要读取首次同步报告
-- 仅当报告满足“有恢复证据”或“服务端确实空 workspace（latestSeq=0）”时继续渲染
-
-3. `sync-protocol.ts` + 服务端 pull 协议（可选但强烈建议）
-- pull 响应补充诊断字段（仅 debug/内部）：
-  - `filteredEchoCount`
-  - `missingBlobCount`
-- 用于快速区分“服务端有数据但客户端收不到”与“服务端确实无数据”
-
-4. `loro-persistence.ts`
-- `openDB()` 增强自愈：连接 `onclose/onversionchange` 时重置 `dbPromise`
-- 避免 IndexedDB 被手动删除/升级后复用失效连接
+仅当 Phase 1 证据显示“恢复成功判定长期易回归”时，再在 Phase 2 引入轻量结果报告机制（而不是先建完整框架）。
 
 ### 验收标准
 
-- 无本地快照时：
-  - 若服务端有数据，首次恢复后节点数 > 0
-  - 若服务端无数据，正常进入空 workspace（但报告明确 `latestSeq=0`）
-- 不再出现“状态 synced 但文档为空且 cursor 已前进”的静默失败
+- 无本地快照 + 服务端有数据：恢复后节点数 > 0
+- 无本地快照 + 服务端无数据：正常进入空 workspace（非假恢复）
+- 日志可明确定位每次恢复失败发生在哪一层
 
 ---
 
@@ -149,7 +118,8 @@
 2. 若 `oldWsId !== newWsId`，执行迁移（新增 `workspace-migration.ts`）
 - 确保当前 LoroDoc 处于 `oldWsId`
 - 在文档内创建/确保 `newWsId` 根节点
-- 将容器节点（`CONTAINER_IDS.*`）及必要根子节点挂到 `newWsId` 下
+- **明确采用方案 B（正确）**：创建新 workspace 对应容器，把旧容器的 `children` 搬到新容器，再删除旧容器
+- **禁止方案 A（错误）**：直接 move 旧容器节点本身（会保留旧 ID 前缀，后续查找错配）
 - 清理旧根节点（若空）
 - `commitDoc('system:workspace-id-migration')`
 - 导出当前快照并保存到 `newWsId` 的 snapshot key
@@ -171,8 +141,8 @@
 - `src/stores/workspace-store.ts`（登录流程改造，串行化迁移）
 - `src/lib/loro-doc.ts`（必要的 workspace 迁移辅助 API）
 - `src/lib/loro-persistence.ts`（snapshot/cursor/pending 清理与重命名支持）
-- `src/lib/sync/sync-manager.ts`（恢复报告 + 恢复成功判定）
-- `src/entrypoints/sidepanel/App.tsx`（恢复渲染门槛）
+- `src/lib/sync/sync-manager.ts`（先加诊断日志，再按 root cause 最小修复）
+- `src/entrypoints/sidepanel/App.tsx`（若命中恢复判定问题，再做最小调整）
 - `tests/vitest/sync-manager.test.ts`
 - `tests/vitest/workspace-store.test.ts`
 - （如新增）`tests/vitest/workspace-migration.test.ts`
@@ -187,7 +157,6 @@
 
 ## 分阶段实施建议
 
-1. **Phase 1（先做）**：P0 可观测性 + 恢复成功判定（阻断静默失败）
-2. **Phase 2**：P1 原子迁移（登录切换无数据丢失）
-3. **Phase 3**：清理 debug 日志 + 回归测试 + 端到端验证
-
+1. **Phase 1（先做）**：P0 加日志 + 复现 + 定位 + 最小修复
+2. **Phase 2**：P1 原子迁移（明确“新容器 + 搬 children”）
+3. **Phase 3**：清理 debug 日志 + 回归测试 + 可选的 `openDB` 自愈补强

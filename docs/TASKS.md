@@ -43,7 +43,7 @@ _(空)_
 ### Review: Sync 架构全面审查 ✅（2026-03-01）
 > **Branch**: `codex/review-sync-architecture` | **PR**: #117（Ready for review）
 >
-> 审查范围：6 个 commit（客户端 sync 修复 + 服务端 Loro snapshot compaction）。本轮补充修复：compaction compare-and-swap 元数据更新 + update 区间完整性校验，避免并发 compaction 产生不完整 snapshot。
+> 审查范围：6 个 commit（客户端 sync 修复 + 服务端 Loro snapshot compaction）。本轮补充修复：compaction compare-and-swap 元数据更新 + update 区间完整性校验；客户端 `saveCursor` 异步失败捕获修复（避免单次 IndexedDB 写失败将 sync 状态打成 error）。
 
 ---
 

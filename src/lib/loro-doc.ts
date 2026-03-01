@@ -79,6 +79,20 @@ export function getCurrentWorkspaceId(): string | null {
   return currentWorkspaceId;
 }
 
+/**
+ * Update the persistence key without reinitializing LoroDoc.
+ *
+ * Called after sign-in when workspace ID transitions from a bootstrap random UUID
+ * to the authenticated user.id. This ensures persistSnapshot() saves under the
+ * correct IndexedDB key so data survives across sessions.
+ *
+ * Does NOT reinitialize the LoroDoc — existing in-memory data (containers, nodes)
+ * remains intact. Sync will import server data into the same doc instance.
+ */
+export function setCurrentWorkspaceId(workspaceId: string): void {
+  currentWorkspaceId = workspaceId;
+}
+
 // ============================================================
 // ② Fine-grained subscriptions — per-node 订阅内部状态
 // ============================================================

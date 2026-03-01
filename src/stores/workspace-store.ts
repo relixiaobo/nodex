@@ -101,11 +101,14 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
         });
 
         // On fresh install, bootstrap initialized LoroDoc with a random UUID.
-        // After sign-in the workspace must be user.id — reinitialize LoroDoc
-        // so persistence key, container nodes, and sync all use the correct ID.
+        // After sign-in the workspace must be user.id — update the persistence
+        // key so future saves go to the correct IndexedDB entry.
+        // Unlike initLoroDoc(), setCurrentWorkspaceId() does NOT destroy the
+        // in-memory doc, so existing nodes remain valid and React won't crash
+        // during intermediate re-renders.
         if (prevWsId !== user.id) {
-          const { initLoroDoc } = await import('../lib/loro-doc.js');
-          await initLoroDoc(user.id);
+          const { setCurrentWorkspaceId } = await import('../lib/loro-doc.js');
+          setCurrentWorkspaceId(user.id);
 
           const { ensureContainers } = await import('../lib/bootstrap-containers.js');
           ensureContainers(user.id);

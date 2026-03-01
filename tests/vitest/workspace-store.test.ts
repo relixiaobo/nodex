@@ -99,7 +99,7 @@ describe('workspace-store auth and persistence', () => {
       getStoredToken: vi.fn().mockResolvedValue(null),
     }));
     vi.doMock('../../src/lib/loro-doc.js', () => ({
-      initLoroDoc: vi.fn().mockResolvedValue({ hadSnapshot: false }),
+      setCurrentWorkspaceId: vi.fn(),
       getPeerIdStr: vi.fn().mockReturnValue('peer_1'),
       getLoroDoc: vi.fn().mockReturnValue({ export: vi.fn().mockReturnValue(new Uint8Array(0)) }),
     }));
@@ -132,7 +132,7 @@ describe('workspace-store auth and persistence', () => {
       getStoredToken: vi.fn().mockResolvedValue(null),
     }));
     vi.doMock('../../src/lib/loro-doc.js', () => ({
-      initLoroDoc: vi.fn().mockResolvedValue({ hadSnapshot: false }),
+      setCurrentWorkspaceId: vi.fn(),
       getPeerIdStr: vi.fn().mockReturnValue('peer_1'),
       getLoroDoc: vi.fn().mockReturnValue({ export: vi.fn().mockReturnValue(new Uint8Array(0)) }),
     }));

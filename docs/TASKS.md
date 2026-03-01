@@ -28,7 +28,7 @@ _(空)_
 
 | Agent | 分支 | 任务 | 锁定文件 | 状态 |
 |---|---|---|---|---|
-| codex | `codex/review-sync-architecture` | Sync 架构 Review | — | 待 nodex review |
+| _(空)_ | | | | |
 
 ---
 
@@ -40,10 +40,8 @@ _(空)_
 
 ## 已完成
 
-### Review: Sync 架构全面审查 ✅（2026-03-01）
-> **Branch**: `codex/review-sync-architecture` | **PR**: #117（Ready for review）
->
-> 审查范围：6 个 commit（客户端 sync 修复 + 服务端 Loro snapshot compaction）。本轮补充修复：compaction compare-and-swap 元数据更新 + update 区间完整性校验；客户端 `saveCursor` 异步失败捕获修复（避免单次 IndexedDB 写失败将 sync 状态打成 error）。
+### Review: Sync 架构全面审查 ✅（2026-03-01, PR #117）
+> 审查范围：6 个 commit（客户端 sync 修复 + 服务端 Loro snapshot compaction）。补充修复：compaction CAS 元数据更新 + update 区间完整性校验 + `saveCursor` 异步失败捕获。
 
 ---
 

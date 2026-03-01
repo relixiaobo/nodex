@@ -81,6 +81,13 @@ export async function handlePull(
   // 4. Needs snapshot? (first sync or client is behind snapshot)
   const needsSnapshot = snapshotSeq > 0 && (lastSeq === 0 || lastSeq < snapshotSeq);
 
+  if (needsSnapshot && !snapshotKey) {
+    console.error(
+      `[pull] ${workspaceId}: snapshot_seq=${snapshotSeq} but snapshot_key is null`,
+    );
+    return c.json({ error: 'Snapshot metadata inconsistency — please contact support' }, 500);
+  }
+
   if (needsSnapshot && snapshotKey) {
     const snapshotBytes = await getSnapshot(bucket, snapshotKey);
 
@@ -105,7 +112,14 @@ export async function handlePull(
         hasMore: rows.length >= PAGE_LIMIT,
       } satisfies PullResponse);
     }
-    // Snapshot key exists but R2 blob missing — fall through to incremental
+    // Snapshot key exists but R2 blob missing — data loss detected.
+    // Compaction has already deleted update rows <= snapshotSeq from D1,
+    // so falling through to incremental would silently return incomplete data.
+    console.error(
+      `[pull] ${workspaceId}: snapshot blob missing at key=${snapshotKey}, ` +
+      `snapshot_seq=${snapshotSeq}. Client will receive incomplete data.`,
+    );
+    return c.json({ error: 'Snapshot blob missing — please contact support' }, 500);
   }
 
   // 5. Incremental updates

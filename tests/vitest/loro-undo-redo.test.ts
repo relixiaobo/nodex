@@ -1,5 +1,5 @@
 /**
- * UndoRedoButtons integration tests.
+ * Loro undo/redo integration tests.
  *
  * Verifies that:
  * - canUndoDoc / canRedoDoc correctly reflect state after store mutations
@@ -20,7 +20,7 @@ beforeEach(() => {
   resetAndSeed();
 });
 
-describe('UndoRedoButtons — canUndo/canRedo state', () => {
+describe('Loro undo/redo — canUndo/canRedo state', () => {
   it('initially both false after seed', () => {
     expect(canUndoDoc()).toBe(false);
     expect(canRedoDoc()).toBe(false);

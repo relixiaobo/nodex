@@ -108,8 +108,8 @@ export const enMessages = {
     avatarAlt: 'avatar',
   },
   toolbar: {
-    undo: 'Undo',
-    redo: 'Redo',
+    back: 'Back',
+    forward: 'Forward',
     search: 'Search',
     signIn: 'Sign in with Google',
     dragToMove: 'Drag to move',

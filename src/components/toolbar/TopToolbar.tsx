@@ -1,13 +1,13 @@
 /**
  * Top toolbar — replaces the Sidebar as the primary navigation chrome.
  *
- * Layout: [↶][↷]  [🔍 Search...  ⌘K]  [👤]
+ * Layout: [←][→]  [🔍 Search...  ⌘K]  [👤]
  *
- * - Left: Undo/Redo buttons (wired to Loro UndoManager)
+ * - Left: Back/Forward navigation (panel history)
  * - Center: SearchTrigger (fake input, opens CommandPalette)
  * - Right: UserMenu avatar (with sync badge)
  */
-import { UndoRedoButtons } from './UndoRedoButtons';
+import { NavButtons } from './NavButtons';
 import { SearchTrigger } from './SearchTrigger';
 import { ToolbarUserMenu } from './ToolbarUserMenu';
 import { Breadcrumb } from '../panel/Breadcrumb';
@@ -25,10 +25,10 @@ export function TopToolbar() {
         {currentNodeId && <Breadcrumb nodeId={currentNodeId} showCurrentName={!panelTitleVisible} compact />}
       </div>
 
-      {/* Region B: Global Tools (Undo/Redo, Search, User)
+      {/* Region B: Global Tools (Back/Forward, Search, User)
           - Right aligned */}
       <div className="flex shrink-0 items-center gap-1 text-foreground-tertiary">
-        <UndoRedoButtons />
+        <NavButtons />
         <SearchTrigger />
         <ToolbarUserMenu />
       </div>

@@ -1,11 +1,26 @@
 /**
- * Minimal reproduction: does subscribeLocalUpdates → import work for LoroTree?
+ * Sync roundtrip tests:
  *
- * This test verifies that bytes from subscribeLocalUpdates can reconstruct
- * tree nodes when imported into a fresh LoroDoc.
+ * 1. Low-level: subscribeLocalUpdates → import works for LoroTree (raw Loro API)
+ * 2. Data recovery: importUpdates() triggers subscriber notification so UI reflects
+ *    recovered data (regression test for ab4714b)
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { LoroDoc } from 'loro-crdt';
+import {
+  createNode,
+  setNodeData,
+  getChildren,
+  toNodexNode,
+  hasNode,
+  getAllNodeIds,
+  commitDoc,
+  importUpdates,
+  subscribe,
+  initLoroDocForTest,
+  resetLoroDoc,
+  getLoroDoc,
+} from '../../src/lib/loro-doc.js';
 
 describe('Loro sync roundtrip', () => {
   it('subscribeLocalUpdates captures tree node creation', () => {
@@ -100,5 +115,123 @@ describe('Loro sync roundtrip', () => {
     }
 
     expect(nodes2.length).toBe(2);
+  });
+});
+
+// ============================================================
+// Data recovery regression: importUpdates() must notify subscribers
+// (regression test for ab4714b)
+// ============================================================
+
+describe('importUpdates triggers subscriber notification', () => {
+  beforeEach(() => {
+    resetLoroDoc();
+    initLoroDocForTest('test-ws');
+  });
+
+  it('subscriber fires after importUpdates with new nodes', () => {
+    // Phase 1: Create nodes and export full state
+    const root = createNode('root', null);
+    setNodeData(root, 'name', 'Root Node');
+    const child = createNode('child', root);
+    setNodeData(child, 'name', 'Child Node');
+    commitDoc();
+
+    const doc = getLoroDoc();
+    const updateBytes = doc.export({ mode: 'update' });
+
+    // Phase 2: Reset to empty doc (simulates IndexedDB deletion + restart)
+    resetLoroDoc();
+    initLoroDocForTest('test-ws');
+
+    expect(hasNode('root')).toBe(false);
+    expect(hasNode('child')).toBe(false);
+
+    // Phase 3: Import the exported bytes (simulates pull from server)
+    const subscriberFn = vi.fn();
+    const unsub = subscribe(subscriberFn);
+
+    importUpdates(updateBytes);
+
+    // Subscriber must have been called AFTER mappings are rebuilt
+    expect(subscriberFn).toHaveBeenCalled();
+
+    // Nodes must be accessible via the module API
+    expect(hasNode('root')).toBe(true);
+    expect(hasNode('child')).toBe(true);
+    expect(toNodexNode('root')?.name).toBe('Root Node');
+    expect(toNodexNode('child')?.name).toBe('Child Node');
+    expect(getChildren('root')).toContain('child');
+
+    unsub();
+  });
+
+  it('subscriber sees correct data (not stale mappings)', () => {
+    // Create initial state and export
+    createNode('nodeA', null);
+    setNodeData('nodeA', 'name', 'Alpha');
+    commitDoc();
+    const bytes = getLoroDoc().export({ mode: 'update' });
+
+    // Reset
+    resetLoroDoc();
+    initLoroDocForTest('test-ws');
+
+    // Track what the subscriber sees when called
+    let subscriberSawNode = false;
+    const unsub = subscribe(() => {
+      // This callback runs during importUpdates.
+      // With the fix, at least the LAST call has correct mappings.
+      if (hasNode('nodeA')) {
+        subscriberSawNode = true;
+      }
+    });
+
+    importUpdates(bytes);
+
+    // The explicit notifySubscribers() after rebuildMappings must ensure
+    // the subscriber sees the node on its final invocation
+    expect(subscriberSawNode).toBe(true);
+    expect(toNodexNode('nodeA')?.name).toBe('Alpha');
+
+    unsub();
+  });
+
+  it('multiple sequential imports accumulate nodes correctly', () => {
+    // Simulate pull: server sends updates in batches
+    // Batch 1: create root
+    const doc1 = new LoroDoc();
+    const tree1 = doc1.getTree('nodes');
+    const r = tree1.createNode();
+    r.data.set('id', 'server-root');
+    r.data.set('name', 'Server Root');
+    doc1.commit();
+    const bytes1 = doc1.export({ mode: 'update' });
+
+    // Batch 2: create child (from same doc, export incremental)
+    const vvAfterBatch1 = doc1.oplogVersion();
+    const c = tree1.createNode(r.id);
+    c.data.set('id', 'server-child');
+    c.data.set('name', 'Server Child');
+    doc1.commit();
+    const bytes2 = doc1.export({ mode: 'update', from: vvAfterBatch1 });
+
+    // Import into our module doc
+    const subscriberCalls: number[] = [];
+    const unsub = subscribe(() => {
+      subscriberCalls.push(getAllNodeIds().length);
+    });
+
+    importUpdates(bytes1);
+    expect(hasNode('server-root')).toBe(true);
+
+    importUpdates(bytes2);
+    expect(hasNode('server-child')).toBe(true);
+    expect(getChildren('server-root')).toContain('server-child');
+
+    // Subscriber was called for each import
+    expect(subscriberCalls.length).toBeGreaterThanOrEqual(2);
+
+    unsub();
   });
 });

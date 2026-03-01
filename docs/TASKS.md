@@ -42,6 +42,8 @@ _(空)_
 
 ### Bug 修复（待修）
 
+- [ ] **Sync 数据恢复失败 — 删除本地 IndexedDB 后无法从服务端恢复数据** — pull 请求发出但数据未恢复，root cause 待排查。架构层已修复（bootstrap 无快照时阻塞等待 sync, b4122a6），底层 pull 问题未解决。**Research**: `docs/research/sync-data-recovery.md`
+- [ ] **匿名→登录数据丢失 — workspace ID 切换导致本地节点变孤儿** — 未登录用户 `ws_xxx` 写的数据，登录后 workspace 切为 `user.id`，容器节点 ID 前缀不匹配，旧数据静默丢失。需要一次性迁移逻辑。**Research**: `docs/research/sync-data-recovery.md`
 - [x] **日期 NodePanel 输入 date field 白屏** — FieldValueOutliner hooks 违规修复（hooks 移到 early return 前）
 - [x] **点击 node 文本中的链接未打开标签页** — 静态内容 + 编辑器 mousedown 双重拦截，单击 chrome.tabs.create 打开
 - [x] **节点内拖选文本误触发节点选中** — use-drag-select 尊重浏览器活跃文本选区
@@ -120,6 +122,7 @@ _(空)_
 - [x] **Highlight 下一轮优化**（`cc/highlight-polish`, PR #114）— Clip Page 失效 + 网页工具栏不出现 + 删除不清理 DOM + SPA 导航残留 + anchor 无法还原无反馈 + 多 tab 竞态去重 ✅（2026-02-28）
 - [x] **Highlight 数据模型重构** — highlight 改为 clip page 子节点 + `ancestor_supertag_ref` auto-init 策略（Source 字段自动引用祖先 #source 节点）+ 去重复创建 + anchor JSON 隐藏 + options picker targetId 读取修复 + reference tag inline 对齐 + 18 test ✅（2026-03-01）
 - [x] **Highlight 交互重设计 — Readwise 风格**（`cc/highlight-readwise-ux`, PR #115）— 图标化网页工具栏 + Note 内联输入 + 高亮点击二次工具栏 + 评论图标 + DS 视觉收敛 + 11 test ✅（2026-03-01）
+- [x] **Highlight 双击高亮范围过大 + 重复高亮防护** — `getTextNodesInRange` 改用 `intersectsNode`（修复 Element endContainer）+ `findOverlappingHighlightId` 重叠检测（选中已高亮文本→显示 Delete 工具栏）+ 7 test ✅（2026-03-01）
 
 #### AI Chat & 网页辅助 (#29 + #31)
 > 浏览器 + AI = soma 的第二个差异化维度。不只是聊天框，而是理解上下文的知识助手。

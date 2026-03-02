@@ -43,6 +43,9 @@ const treeToNodex = new Map<TreeID, string>();
 /** 当前工作区 ID */
 let currentWorkspaceId: string | null = null;
 
+/** Whether the current doc was loaded from an IndexedDB snapshot (vs fresh/empty). */
+let _hadSnapshot = false;
+
 /** 全局变更订阅回调 */
 const subscribers = new Set<() => void>();
 
@@ -91,6 +94,15 @@ export function getCurrentWorkspaceId(): string | null {
  */
 export function setCurrentWorkspaceId(workspaceId: string): void {
   currentWorkspaceId = workspaceId;
+}
+
+/**
+ * Whether the current LoroDoc was loaded from an IndexedDB snapshot.
+ * Returns false when the doc was freshly created (no local data).
+ * Used by initAuth to decide whether bootstrap journal cleanup is needed.
+ */
+export function wasLoadedFromSnapshot(): boolean {
+  return _hadSnapshot;
 }
 
 // ============================================================
@@ -212,6 +224,62 @@ function rebuildMappings(): void {
   reattachNodeSubs();
 }
 
+/**
+ * Fix duplicate container mappings after CRDT merge.
+ *
+ * When multiple devices independently create container nodes (JOURNAL, LIBRARY, etc.)
+ * with the same fixed string ID, rebuildMappings (which uses "last wins") may pick
+ * the empty bootstrap container instead of the server's container with actual data.
+ *
+ * This function checks all container IDs and swaps the mapping to the tree node
+ * with more children when duplicates exist. Called after importUpdatesBatch.
+ */
+function fixDuplicateContainerMappings(): void {
+  if (!doc) return;
+  const tree = getTree();
+
+  // Build a reverse index: nodexId → all TreeIDs that have this storedId
+  const idToTreeIds = new Map<string, TreeID[]>();
+  for (const node of tree.nodes()) {
+    const storedId = node.data.get('id') as string | undefined;
+    if (!storedId) continue;
+    let arr = idToTreeIds.get(storedId);
+    if (!arr) {
+      arr = [];
+      idToTreeIds.set(storedId, arr);
+    }
+    arr.push(node.id);
+  }
+
+  // For any nodexId with multiple tree nodes, pick the one with most children
+  let changed = false;
+  for (const [storedId, treeIds] of idToTreeIds) {
+    if (treeIds.length <= 1) continue;
+
+    let bestId = treeIds[0];
+    let bestCount = tree.getNodeByID(bestId)?.children()?.length ?? 0;
+    for (let i = 1; i < treeIds.length; i++) {
+      const count = tree.getNodeByID(treeIds[i])?.children()?.length ?? 0;
+      if (count > bestCount) {
+        bestId = treeIds[i];
+        bestCount = count;
+      }
+    }
+
+    const currentMapped = nodexToTree.get(storedId);
+    if (currentMapped !== bestId) {
+      if (currentMapped) treeToNodex.delete(currentMapped);
+      registerMapping(storedId, bestId);
+      changed = true;
+    }
+  }
+
+  if (changed) {
+    invalidateCache();
+    reattachNodeSubs();
+  }
+}
+
 // ============================================================
 // 通知 + 持久化
 // ============================================================
@@ -264,11 +332,13 @@ export async function initLoroDoc(workspaceId: string): Promise<{ hadSnapshot: b
   // 切换工作区时清除上一个工作区的 awareness 状态，避免跨工作区泄露
   resetAwareness();
 
+  _hadSnapshot = false;
   let hadSnapshot = false;
   try {
     const saved = await loadSnapshotRecord(workspaceId);
     if (saved?.snapshot) {
       hadSnapshot = true;
+      _hadSnapshot = true;
       // PeerID restore order is critical: setPeerId BEFORE import (doc must have no oplog)
       if (saved.peerIdStr) {
         try {
@@ -346,6 +416,7 @@ export function resetLoroDoc(): void {
   nodexToTree.clear();
   treeToNodex.clear();
   currentWorkspaceId = null;
+  _hadSnapshot = false;
   detachedMutationWarnings.clear();
   invalidateCache();
   if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
@@ -719,6 +790,9 @@ export function importUpdatesBatch(updates: Uint8Array[]): void {
     doc.import(data);
   }
   rebuildMappings();
+  // After CRDT merge, duplicate container nodes may exist. Fix mappings
+  // so the container with actual data wins (not the empty bootstrap one).
+  fixDuplicateContainerMappings();
   notifySubscribers();
 }
 

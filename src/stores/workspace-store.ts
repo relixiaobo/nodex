@@ -113,33 +113,14 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
           const { ensureContainers } = await import('../lib/bootstrap-containers.js');
           ensureContainers(user.id);
 
-          // Clear bootstrap journal hierarchy BEFORE sync to prevent duplicates.
-          // App.tsx bootstrap called ensureTodayNode() → created Year/Week/Day
-          // nodes with random IDs under JOURNAL. If server data also has journal
-          // nodes (from a previous session), CRDT merge would produce two sets
-          // of identically-named nodes. findChildByName returns the first match,
-          // which may be the empty bootstrap set → user sees no recovered data.
-          // Deleting them here ensures the fullUpdate export won't contain them,
-          // and sync pull will import ONLY the server's journal hierarchy.
-          const { CONTAINER_IDS } = await import('../types/index.js');
-          const { useUIStore } = await import('./ui-store.js');
-
-          // Navigate to a safe panel BEFORE deleting journal nodes.
-          // The current panel likely points to a bootstrap today node; deleting it
-          // while the panel is rendering it would cause a white screen / crash.
-          useUIStore.getState().replacePanel(CONTAINER_IDS.LIBRARY);
-
-          const journalChildren = loroDocMod.getChildren(CONTAINER_IDS.JOURNAL);
-          for (const cid of journalChildren) {
-            loroDocMod.deleteNode(cid);
-          }
-          loroDocMod.commitDoc('system:clear-bootstrap-journal');
-
           // Defer Today navigation until AFTER first sync completes.
-          // ensureTodayNode() uses findChildByName to locate existing journal
-          // entries. After clearing bootstrap nodes above, the server's journal
-          // hierarchy (imported via sync pull) will be the only set present.
+          // Bootstrap created journal nodes with random IDs under JOURNAL.
+          // After sync, fixDuplicateContainerMappings() resolves which JOURNAL
+          // tree node to use (server's, with actual data). We then navigate to
+          // the server's today node. The bootstrap journal nodes become orphaned
+          // (harmless — under the non-mapped JOURNAL tree node).
           const { ensureTodayNode } = await import('../lib/journal.js');
+          const { useUIStore } = await import('./ui-store.js');
           const unsub = syncManager.onStateChange((state) => {
             if (state.lastSyncedAt !== null || state.status === 'error') {
               unsub();
@@ -180,33 +161,21 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
           });
 
           // If the LoroDoc was freshly created (no IndexedDB snapshot), bootstrap
-          // may have created journal Year/Week/Day nodes that conflict with server
-          // data after CRDT merge — same issue as signInWithGoogle.
-          // Clear bootstrap journal children and defer Today navigation until sync.
+          // created journal nodes that will conflict with server data after CRDT
+          // merge. fixDuplicateContainerMappings() handles container-level dedup.
+          // Defer Today navigation until sync completes so we navigate to the
+          // server's today node (with actual data) rather than the empty bootstrap one.
           const loroDocMod = await import('../lib/loro-doc.js');
           if (!loroDocMod.wasLoadedFromSnapshot()) {
-            const { CONTAINER_IDS } = await import('../types/index.js');
-            const journalChildren = loroDocMod.getChildren(CONTAINER_IDS.JOURNAL);
-            if (journalChildren.length > 0) {
-              const { useUIStore } = await import('./ui-store.js');
-              // Navigate to a safe panel BEFORE deleting journal nodes.
-              useUIStore.getState().replacePanel(CONTAINER_IDS.LIBRARY);
-
-              for (const cid of journalChildren) {
-                loroDocMod.deleteNode(cid);
+            const { ensureTodayNode } = await import('../lib/journal.js');
+            const { useUIStore } = await import('./ui-store.js');
+            const unsub = syncManager.onStateChange((state) => {
+              if (state.lastSyncedAt !== null || state.status === 'error') {
+                unsub();
+                const todayId = ensureTodayNode();
+                useUIStore.getState().replacePanel(todayId);
               }
-              loroDocMod.commitDoc('system:clear-bootstrap-journal');
-
-              // Defer Today navigation until AFTER first sync completes.
-              const { ensureTodayNode } = await import('../lib/journal.js');
-              const unsub = syncManager.onStateChange((state) => {
-                if (state.lastSyncedAt !== null || state.status === 'error') {
-                  unsub();
-                  const todayId = ensureTodayNode();
-                  useUIStore.getState().replacePanel(todayId);
-                }
-              });
-            }
+            });
           }
 
           // Start sync after auth restoration.

@@ -4,6 +4,7 @@ vi.mock('../../src/lib/sync/sync-manager.js', () => ({
     start: vi.fn().mockResolvedValue(undefined),
     stop: vi.fn(),
     getState: vi.fn().mockReturnValue({ status: 'local-only' }),
+    onStateChange: vi.fn().mockReturnValue(() => {}),
   },
 }));
 
@@ -100,14 +101,21 @@ describe('workspace-store auth and persistence', () => {
     }));
     vi.doMock('../../src/lib/loro-doc.js', () => ({
       setCurrentWorkspaceId: vi.fn(),
+      wasLoadedFromSnapshot: vi.fn().mockReturnValue(false),
       getPeerIdStr: vi.fn().mockReturnValue('peer_1'),
       getLoroDoc: vi.fn().mockReturnValue({ export: vi.fn().mockReturnValue(new Uint8Array(0)) }),
+      getChildren: vi.fn().mockReturnValue([]),
+      deleteNode: vi.fn(),
+      commitDoc: vi.fn(),
     }));
     vi.doMock('../../src/lib/sync/pending-queue.js', () => ({
       enqueuePendingUpdate: vi.fn().mockResolvedValue(undefined),
     }));
     vi.doMock('../../src/lib/bootstrap-containers.js', () => ({
       ensureContainers: vi.fn(),
+    }));
+    vi.doMock('../../src/types/index.js', () => ({
+      CONTAINER_IDS: { JOURNAL: 'test_JOURNAL' },
     }));
     vi.doMock('../../src/lib/journal.js', () => ({
       ensureTodayNode: vi.fn().mockReturnValue('today_node'),
@@ -133,14 +141,21 @@ describe('workspace-store auth and persistence', () => {
     }));
     vi.doMock('../../src/lib/loro-doc.js', () => ({
       setCurrentWorkspaceId: vi.fn(),
+      wasLoadedFromSnapshot: vi.fn().mockReturnValue(false),
       getPeerIdStr: vi.fn().mockReturnValue('peer_1'),
       getLoroDoc: vi.fn().mockReturnValue({ export: vi.fn().mockReturnValue(new Uint8Array(0)) }),
+      getChildren: vi.fn().mockReturnValue([]),
+      deleteNode: vi.fn(),
+      commitDoc: vi.fn(),
     }));
     vi.doMock('../../src/lib/sync/pending-queue.js', () => ({
       enqueuePendingUpdate: vi.fn().mockResolvedValue(undefined),
     }));
     vi.doMock('../../src/lib/bootstrap-containers.js', () => ({
       ensureContainers: vi.fn(),
+    }));
+    vi.doMock('../../src/types/index.js', () => ({
+      CONTAINER_IDS: { JOURNAL: 'test_JOURNAL' },
     }));
     vi.doMock('../../src/lib/journal.js', () => ({
       ensureTodayNode: vi.fn().mockReturnValue('today_node'),
@@ -155,5 +170,76 @@ describe('workspace-store auth and persistence', () => {
     const state = useWorkspaceStore.getState();
     expect(state.isAuthenticated).toBe(false);
     expect(state.authUser).toBeNull();
+  });
+
+  it('initAuth clears bootstrap journal when no local snapshot', async () => {
+    const mockUser = { id: 'auth_user', email: 'a@example.com', name: 'Auth User' };
+    vi.doMock('../../src/lib/auth.js', () => ({
+      getCurrentUser: vi.fn().mockResolvedValue(mockUser),
+      getStoredToken: vi.fn().mockResolvedValue('token_abc'),
+    }));
+    const mockDeleteNode = vi.fn();
+    const mockCommitDoc = vi.fn();
+    vi.doMock('../../src/lib/loro-doc.js', () => ({
+      wasLoadedFromSnapshot: vi.fn().mockReturnValue(false),
+      getPeerIdStr: vi.fn().mockReturnValue('peer_1'),
+      getLoroDoc: vi.fn().mockReturnValue({ export: vi.fn().mockReturnValue(new Uint8Array(0)) }),
+      getChildren: vi.fn().mockReturnValue(['year_2026', 'year_2025']),
+      deleteNode: mockDeleteNode,
+      commitDoc: mockCommitDoc,
+    }));
+    vi.doMock('../../src/lib/sync/pending-queue.js', () => ({
+      enqueuePendingUpdate: vi.fn().mockResolvedValue(undefined),
+    }));
+    vi.doMock('../../src/types/index.js', () => ({
+      CONTAINER_IDS: { JOURNAL: 'test_JOURNAL' },
+    }));
+    vi.doMock('../../src/lib/journal.js', () => ({
+      ensureTodayNode: vi.fn().mockReturnValue('today_node'),
+    }));
+    vi.doMock('../../src/stores/ui-store.js', () => ({
+      useUIStore: { getState: vi.fn().mockReturnValue({ replacePanel: vi.fn() }) },
+    }));
+
+    await useWorkspaceStore.getState().initAuth();
+
+    const state = useWorkspaceStore.getState();
+    expect(state.isAuthenticated).toBe(true);
+    expect(state.userId).toBe('auth_user');
+
+    // Should have cleared bootstrap journal children
+    expect(mockDeleteNode).toHaveBeenCalledWith('year_2026');
+    expect(mockDeleteNode).toHaveBeenCalledWith('year_2025');
+    expect(mockCommitDoc).toHaveBeenCalledWith('system:clear-bootstrap-journal');
+  });
+
+  it('initAuth skips journal cleanup when snapshot exists', async () => {
+    const mockUser = { id: 'auth_user', email: 'a@example.com', name: 'Auth User' };
+    vi.doMock('../../src/lib/auth.js', () => ({
+      getCurrentUser: vi.fn().mockResolvedValue(mockUser),
+      getStoredToken: vi.fn().mockResolvedValue('token_abc'),
+    }));
+    const mockDeleteNode = vi.fn();
+    vi.doMock('../../src/lib/loro-doc.js', () => ({
+      wasLoadedFromSnapshot: vi.fn().mockReturnValue(true),
+      getPeerIdStr: vi.fn().mockReturnValue('peer_1'),
+      getLoroDoc: vi.fn().mockReturnValue({ export: vi.fn().mockReturnValue(new Uint8Array(0)) }),
+      getChildren: vi.fn().mockReturnValue(['year_2026']),
+      deleteNode: mockDeleteNode,
+      commitDoc: vi.fn(),
+    }));
+    vi.doMock('../../src/lib/sync/pending-queue.js', () => ({
+      enqueuePendingUpdate: vi.fn().mockResolvedValue(undefined),
+    }));
+    vi.doMock('../../src/types/index.js', () => ({
+      CONTAINER_IDS: { JOURNAL: 'test_JOURNAL' },
+    }));
+
+    await useWorkspaceStore.getState().initAuth();
+
+    const state = useWorkspaceStore.getState();
+    expect(state.isAuthenticated).toBe(true);
+    // Should NOT have deleted any journal children (snapshot exists)
+    expect(mockDeleteNode).not.toHaveBeenCalled();
   });
 });

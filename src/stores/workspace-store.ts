@@ -135,7 +135,13 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
       },
 
       signOut: async () => {
+        const wsId = useWorkspaceStore.getState().currentWorkspaceId;
         syncManager.stop();
+        // Clear pending updates to avoid leaking stale data on re-sign-in
+        if (wsId) {
+          const { clearPendingUpdates } = await import('../lib/sync/pending-queue.js');
+          await clearPendingUpdates(wsId).catch(() => {});
+        }
         const { signOut: authSignOut } = await import('../lib/auth.js');
         await authSignOut();
         set({

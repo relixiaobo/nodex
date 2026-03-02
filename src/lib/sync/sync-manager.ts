@@ -257,8 +257,11 @@ export class SyncManager {
   ): Promise<void> {
     let hasMore = true;
     let cursor = this.lastSeq;
+    const MAX_PULL_PAGES = 50; // Safety limit: 50 pages × 200 updates = 10,000 max
+    let pages = 0;
 
-    while (hasMore) {
+    while (hasMore && pages < MAX_PULL_PAGES) {
+      pages++;
       if (!this.isSessionCurrent(sessionToken)) return;
 
       const response = await pullUpdates(accessToken, {

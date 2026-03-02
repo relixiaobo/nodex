@@ -86,22 +86,32 @@ function createFakeIndexedDB(): {
         createIndex: () => ({}),
       } as unknown as IDBObjectStore;
     },
-    transaction: (storeName: string) => ({
-      objectStore: (name: string) => {
-        const target = ensureStore(name || storeName);
-        return {
-          put: (value: unknown, key: string) => createAsyncRequest(() => {
-            target.set(key, value);
-            return key;
-          }),
-          get: (key: string) => createAsyncRequest(() => target.get(key)),
-          delete: (key: string) => createAsyncRequest(() => {
-            target.delete(key);
-            return undefined;
-          }),
-        } as unknown as IDBObjectStore;
-      },
-    }),
+    transaction: (storeName: string) => {
+      const tx = {
+        oncomplete: null as ((e: Event) => void) | null,
+        onerror: null as ((e: Event) => void) | null,
+        onabort: null as ((e: Event) => void) | null,
+        objectStore: (name: string) => {
+          const target = ensureStore(name || storeName);
+          return {
+            put: (value: unknown, key: string) => createAsyncRequest(() => {
+              target.set(key, value);
+              return key;
+            }),
+            get: (key: string) => createAsyncRequest(() => target.get(key)),
+            delete: (key: string) => createAsyncRequest(() => {
+              target.delete(key);
+              return undefined;
+            }),
+          } as unknown as IDBObjectStore;
+        },
+      };
+      // Fire oncomplete asynchronously after all microtasks from put/get/delete
+      queueMicrotask(() => queueMicrotask(() => {
+        tx.oncomplete?.({ target: tx } as unknown as Event);
+      }));
+      return tx as unknown as IDBTransaction;
+    },
   } as unknown as IDBDatabase;
 
   const indexedDB = {

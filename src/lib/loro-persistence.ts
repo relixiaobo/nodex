@@ -74,9 +74,10 @@ export async function saveSnapshotRecord(workspaceId: string, record: SnapshotRe
   return new Promise((resolve, reject) => {
     const tx = db.transaction(STORE_NAME, 'readwrite');
     const store = tx.objectStore(STORE_NAME);
-    const req = store.put(record, workspaceId);
-    req.onsuccess = () => resolve();
-    req.onerror = (e) => reject((e.target as IDBRequest).error);
+    store.put(record, workspaceId);
+    tx.oncomplete = () => resolve();
+    tx.onerror = (e) => reject((e.target as IDBTransaction).error);
+    tx.onabort = (e) => reject((e.target as IDBTransaction).error);
   });
 }
 

@@ -19,7 +19,7 @@ describe('system node registry', () => {
     expect(BOOTSTRAP_CONTAINER_DEFS).toEqual([
       { id: CONTAINER_IDS.LIBRARY, name: 'Library' },
       { id: CONTAINER_IDS.INBOX, name: 'Inbox' },
-      { id: CONTAINER_IDS.JOURNAL, name: 'Journal' },
+      { id: CONTAINER_IDS.JOURNAL, name: 'Daily notes' },
       { id: CONTAINER_IDS.SEARCHES, name: 'Searches' },
       { id: CONTAINER_IDS.TRASH, name: 'Trash' },
       { id: CONTAINER_IDS.SCHEMA, name: 'Schema' },

@@ -54,7 +54,7 @@ function seedBody(): void {
   // ─── Workspace containers (children of workspace home) ───
   cn(CONTAINER_IDS.LIBRARY,  WS_ID, { name: 'Library' });
   cn(CONTAINER_IDS.INBOX,    WS_ID, { name: 'Inbox' });
-  cn(CONTAINER_IDS.JOURNAL,  WS_ID, { name: 'Journal' });
+  cn(CONTAINER_IDS.JOURNAL,  WS_ID, { name: 'Daily notes' });
   cn(CONTAINER_IDS.SEARCHES, WS_ID, { name: 'Searches' });
   cn(CONTAINER_IDS.TRASH,    WS_ID, { name: 'Trash' });
   cn(CONTAINER_IDS.SCHEMA,   WS_ID, { name: 'Schema' });

@@ -595,20 +595,10 @@ export const SYSTEM_FIELD_MAP = new Map(SYSTEM_FIELDS.map(f => [f.key, f]));
 export const SYSTEM_FIELD_ENTRIES: Array<{ id: string; name: string; dataType: string }> =
   SYSTEM_FIELDS.map(f => ({ id: f.key, name: f.name, dataType: f.dataType }));
 
-const systemDateFormatter = new Intl.DateTimeFormat('en', {
-  month: 'short',
-  day: 'numeric',
-  year: 'numeric',
-  hour: 'numeric',
-  minute: '2-digit',
-  hour12: true,
-});
+import { formatSmartTimestamp } from './format-timestamp.js';
 
-/** Format a millisecond timestamp to human-readable date string. */
-export function formatTimestamp(ms: number | undefined): string {
-  if (!ms) return '';
-  return systemDateFormatter.format(new Date(ms));
-}
+/** Format a millisecond timestamp to human-readable smart date string. */
+export const formatTimestamp = formatSmartTimestamp;
 
 /**
  * Resolve the display value for a system field on a given node.

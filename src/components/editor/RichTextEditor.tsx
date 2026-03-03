@@ -3,7 +3,7 @@ import { EditorState, TextSelection, type Plugin } from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
 import { keymap } from 'prosemirror-keymap';
 import { baseKeymap, toggleMark } from 'prosemirror-commands';
-import { commitDoc, redoDoc, undoDoc } from '../../lib/loro-doc.js';
+import { commitDoc, redoDoc, undoDoc, hasNode as loroHasNode } from '../../lib/loro-doc.js';
 import { useNodeStore } from '../../stores/node-store.js';
 import { useUIStore } from '../../stores/ui-store.js';
 import { getPrimaryShortcutKey, getShortcutKeys } from '../../lib/shortcut-registry.js';
@@ -25,6 +25,7 @@ import { extractToTaggedNode } from '../../lib/extract-to-tagged-node.js';
 import type { HighlightNodeStore } from '../../lib/highlight-service.js';
 import { parseMultiLinePaste, type ParsedPasteNode } from '../../lib/paste-parser.js';
 import { logPasteDebug, previewMultiline, summarizePasteNodes } from '../../lib/paste-debug.js';
+import { parseNodeLinkFromHtml } from '../../lib/node-clipboard.js';
 
 /**
  * Detect whether a string looks like a URL for smart paste.
@@ -771,7 +772,20 @@ export function RichTextEditor(props: RichTextEditorProps) {
             return true;
           }
 
-          // ⌘V (smart paste): check for URL first (single-line only)
+          // ⌘V (smart paste): check for soma node link first
+          const nodeLinkId = parseNodeLinkFromHtml(html);
+          if (nodeLinkId && loroHasNode(nodeLinkId)) {
+            const { nodeId: curNodeId, parentId: curParentId } = propsRef.current;
+            const store = useNodeStore.getState();
+            // Insert reference as next sibling of current node
+            const siblings = store.getChildren(curParentId);
+            const curIdx = siblings.findIndex((c) => c.id === curNodeId);
+            const insertPos = curIdx >= 0 ? curIdx + 1 : undefined;
+            store.addReference(curParentId, nodeLinkId, insertPos);
+            return true;
+          }
+
+          // Check for URL (single-line only)
           const normalized = plain.replace(/[\r\n]+/g, ' ').trim();
           const nonEmptyLines = plain
             .split(/\r?\n/)

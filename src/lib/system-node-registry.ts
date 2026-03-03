@@ -37,7 +37,7 @@ export const SYSTEM_CONTAINER_REGISTRY: SystemContainerMeta[] = [
   },
   {
     id: CONTAINER_IDS.JOURNAL,
-    defaultName: 'Journal',
+    defaultName: 'Daily notes',
     iconKey: 'journal',
     seedInWorkspace: true,
     sidebar: { labelKey: 'sidebar.nav.dailyNotes', showTodayShortcut: true },

@@ -48,7 +48,7 @@ export const enMessages = {
       groupNodes: 'Nodes',
       containerLibrary: 'Library',
       containerInbox: 'Inbox',
-      containerJournal: 'Journal',
+      containerJournal: 'Daily notes',
       containerTrash: 'Trash',
       untitled: 'Untitled',
     },

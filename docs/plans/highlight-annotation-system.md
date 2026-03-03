@@ -238,12 +238,14 @@ Clip page 中的 inline ref 渲染为带颜色标记的文本：
 
 ```typescript
 /**
- * 在 CLIPS + INBOX + LIBRARY 容器中查找已有的 #web_clip 节点。
+ * 在 CLIPS + INBOX + LIBRARY 容器及 JOURNAL 日节点中查找已有的 #source 节点。
  * 匹配规则：Source URL 字段值 = 给定 URL（规范化后比较）。
+ * 注：新创建的 clip 默认存入 today 日节点（非 INBOX）。
  */
 function findClipNodeByUrl(url: string): string | null {
   const normalizedUrl = normalizeUrl(url);  // 去 fragment, 去 trailing slash, etc.
 
+  // 搜索 flat 容器 + JOURNAL 日节点（Year → Week → Day → clip）
   for (const containerId of [CONTAINER_IDS.CLIPS, CONTAINER_IDS.INBOX, CONTAINER_IDS.LIBRARY]) {
     const children = loroDoc.getChildren(containerId);
     for (const childId of children) {

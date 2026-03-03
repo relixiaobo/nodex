@@ -241,9 +241,9 @@ interface HighlightAnchor {
 
 ```typescript
 function findClipNodeForUrl(url: string): string | null {
-  // 遍历 CLIPS 和 INBOX 容器的子节点
-  // 找到 tags 包含 web_clip tagDefId 且 Source URL 字段值 = url 的节点
-  // 返回 node.id 或 null
+  // 遍历 CLIPS、INBOX、LIBRARY 容器 + JOURNAL 日节点（Year→Week→Day→clip）
+  // 找到 tags 包含 #source tagDefId 且 Source URL 字段值 = url 的节点
+  // 返回 node.id 或 null（新 clip 默认存入 today 日节点）
 }
 ```
 

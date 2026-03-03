@@ -9,21 +9,28 @@
  *   ② Name row (always)
  *   ③ Supertag row (conditional: has tags, not a definition node)
  */
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
+import type { EditorView } from 'prosemirror-view';
 import { Library, Inbox, CalendarDays, Trash2, Search, Settings, type AppIcon } from '../../lib/icons.js';
 import { useNode } from '../../hooks/use-node';
+import { useNodeTags } from '../../hooks/use-node-tags';
 import { useNodeStore } from '../../stores/node-store';
 import { useWorkspaceStore } from '../../stores/workspace-store';
 import { useNodeCheckbox } from '../../hooks/use-node-checkbox';
+import { useEditorTriggers, buildTriggerEditorProps } from '../../hooks/use-editor-triggers.js';
 import { resolveDataType, getFieldTypeIcon } from '../../lib/field-utils.js';
 import { resolveTagColor } from '../../lib/tag-colors.js';
 import { isContainerNode } from '../../types/index.js';
 import { getSystemContainerMeta, type ContainerIconKey } from '../../lib/system-node-registry.js';
 import { TagBar } from '../tags/TagBar';
+import { RichTextEditor } from '../editor/RichTextEditor';
+import { TriggerDropdowns } from '../editor/TriggerDropdowns';
 import { NodeDescription } from './NodeDescription';
 import { isDayNode } from '../../lib/journal.js';
 import { parseDayNodeName, parseYearNodeName, isToday } from '../../lib/date-utils.js';
 import { getNodeCapabilities } from '../../lib/node-capabilities.js';
+import { docToMarks } from '../../lib/pm-doc-utils.js';
+import { marksToHtml } from '../../lib/editor-marks.js';
 import * as loroDoc from '../../lib/loro-doc.js';
 import { t } from '../../i18n/strings.js';
 
@@ -39,6 +46,9 @@ const CONTAINER_HEADER_ICONS: Record<ContainerIconKey, AppIcon> = {
   settings: Settings,
 };
 
+// No-ops for outliner navigation callbacks that don't apply to NodeHeader
+const noop = () => {};
+const noopDelete = (): boolean => false;
 
 interface NodeHeaderProps {
   nodeId: string;
@@ -47,7 +57,7 @@ interface NodeHeaderProps {
 
 export function NodeHeader({ nodeId, onTitleRef }: NodeHeaderProps) {
   const node = useNode(nodeId);
-  const setNodeName = useNodeStore((s) => s.setNodeName);
+  const updateNodeContent = useNodeStore((s) => s.updateNodeContent);
 
   const isFieldDef = node?.type === 'fieldDef';
   const isTagDef = node?.type === 'tagDef';
@@ -72,10 +82,13 @@ export function NodeHeader({ nodeId, onTitleRef }: NodeHeaderProps) {
   const FieldIcon = isFieldDef ? getFieldTypeIcon(dataType) : null;
 
   // Has supertags (for block ③)
-  const hasTags = (node?.tags ?? []).length > 0;
+  const tagIds = useNodeTags(nodeId);
+  const hasTags = tagIds.length > 0;
 
-  // Title editing — day nodes show "Today, " prefix when viewing today
+  // Title — day nodes show "Today, " prefix when viewing today
   const rawName = node?.name ?? '';
+  const rawMarks = node?.marks ?? [];
+  const rawInlineRefs = node?.inlineRefs ?? [];
   const isTodayNode = useNodeStore((s) => {
     void s._version;
     if (!isDayNode(nodeId)) return false;
@@ -91,60 +104,53 @@ export function NodeHeader({ nodeId, onTitleRef }: NodeHeaderProps) {
   });
   const displayName = isTodayNode ? t('common.todayPrefix', { name: rawName }) : rawName;
   const [editing, setEditing] = useState(false);
-  const titleRef = useRef<HTMLHeadingElement>(null);
+  const editorRef = useRef<EditorView | null>(null);
+  const titleWrapperRef = useRef<HTMLDivElement>(null);
 
-  // Sync ref callback for IntersectionObserver
-  const setRef = useCallback(
-    (el: HTMLHeadingElement | null) => {
-      (titleRef as React.MutableRefObject<HTMLHeadingElement | null>).current = el;
-      onTitleRef?.(el);
-    },
-    [onTitleRef],
-  );
+  const handleCheckboxChange = useCallback(() => {
+    cycleNodeCheckbox(nodeId);
+  }, [nodeId, cycleNodeCheckbox]);
 
-  // When entering edit mode, set content and focus (use rawName, not displayName with "Today, " prefix)
-  useEffect(() => {
-    if (editing && titleRef.current) {
-      titleRef.current.textContent = rawName;
-      const range = document.createRange();
-      const sel = window.getSelection();
-      range.selectNodeContents(titleRef.current);
-      range.collapse(false);
-      sel?.removeAllRanges();
-      sel?.addRange(range);
-    }
-  }, [editing, rawName]);
+  // Trigger system for # @ / in header editor
+  const triggers = useEditorTriggers({
+    nodeId,
+    parentId: null,
+    editorRef,
+    tagIds,
+    isActive: editing,
+    enableFieldTrigger: false,
+    enableTreeReference: false,
+    onCycleCheckbox: handleCheckboxChange,
+  });
 
   const handleBlur = useCallback(() => {
     if (!canEditNode) {
       setEditing(false);
       return;
     }
-    if (!titleRef.current) return;
-    const newName = titleRef.current.textContent?.trim() ?? '';
-    if (newName !== rawName) {
-      setNodeName(nodeId, newName);
-    }
-    setEditing(false);
-  }, [canEditNode, nodeId, rawName, setNodeName]);
-
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        titleRef.current?.blur();
-      } else if (e.key === 'Escape') {
-        e.preventDefault();
-        if (titleRef.current) titleRef.current.textContent = rawName;
-        setEditing(false);
+    // Extract content from ProseMirror editor
+    const ed = editorRef.current;
+    if (ed && !ed.isDestroyed) {
+      const parsed = docToMarks(ed.state.doc);
+      const nameChanged = parsed.text !== rawName;
+      const marksChanged = JSON.stringify(parsed.marks) !== JSON.stringify(rawMarks);
+      const refsChanged = JSON.stringify(parsed.inlineRefs) !== JSON.stringify(rawInlineRefs);
+      if (nameChanged || marksChanged || refsChanged) {
+        updateNodeContent(nodeId, {
+          name: parsed.text,
+          marks: parsed.marks,
+          inlineRefs: parsed.inlineRefs,
+        });
       }
-    },
-    [rawName],
-  );
+    }
+    triggers.resetAll();
+    setEditing(false);
+  }, [canEditNode, nodeId, rawName, rawMarks, rawInlineRefs, updateNodeContent, triggers]);
 
-  const handleCheckboxChange = useCallback(() => {
-    cycleNodeCheckbox(nodeId);
-  }, [nodeId, cycleNodeCheckbox]);
+  const handleEnter = useCallback(() => {
+    // Single-line header: Enter = blur
+    editorRef.current?.dom?.blur();
+  }, []);
 
   // Workspace root detection — show [W] avatar in icon block
   const wsId = useWorkspaceStore((s) => s.currentWorkspaceId);
@@ -165,6 +171,9 @@ export function NodeHeader({ nodeId, onTitleRef }: NodeHeaderProps) {
 
   // Determine whether to show icon block (block ①)
   const showIconBlock = isTagDef || isFieldDef || isWorkspaceRoot || isContainer;
+
+  // Static display HTML for non-editing state
+  const displayHtml = marksToHtml(displayName, rawMarks, rawInlineRefs);
 
   return (
     <div className="pt-1 px-4">
@@ -230,20 +239,55 @@ export function NodeHeader({ nodeId, onTitleRef }: NodeHeaderProps) {
           )}
 
           {/* Col C: Editable name */}
-          <h1
-            ref={setRef}
-            contentEditable={canEditNode && editing}
-            suppressContentEditableWarning
-            className={`text-xl font-semibold leading-8 outline-none min-h-8 flex-1 ${canEditNode ? 'cursor-text' : 'cursor-default'} ${isDone ? 'text-foreground/40 line-through' : ''}`}
+          <div
+            ref={(el) => {
+              (titleWrapperRef as React.MutableRefObject<HTMLDivElement | null>).current = el;
+              onTitleRef?.(el);
+            }}
+            className={`relative text-xl font-semibold leading-8 outline-none min-h-8 flex-1 ${canEditNode ? 'cursor-text' : 'cursor-default'} ${isDone ? 'text-foreground/40 line-through' : ''}`}
             onClick={() => {
               if (!canEditNode) return;
               if (!editing) setEditing(true);
             }}
-            onBlur={handleBlur}
-            onKeyDown={editing ? handleKeyDown : undefined}
           >
-            {!editing && (displayName || <span className="text-foreground-tertiary">{t('common.untitled')}</span>)}
-          </h1>
+            {editing ? (
+              <>
+                <RichTextEditor
+                  nodeId={nodeId}
+                  parentId={nodeId}
+                  initialText={rawName}
+                  initialMarks={rawMarks}
+                  initialInlineRefs={rawInlineRefs}
+                  readOnly={!canEditNode}
+                  onBlur={handleBlur}
+                  onEnter={handleEnter}
+                  onIndent={noop}
+                  onOutdent={noop}
+                  onDelete={noopDelete}
+                  onArrowUp={noop}
+                  onArrowDown={noop}
+                  onMoveUp={noop}
+                  onMoveDown={noop}
+                  {...buildTriggerEditorProps(triggers)}
+                  editorRef={editorRef}
+                  onToggleDone={handleCheckboxChange}
+                />
+                <TriggerDropdowns
+                  triggers={triggers}
+                  nodeId={nodeId}
+                  tagIds={tagIds}
+                  visible={editing}
+                />
+              </>
+            ) : displayHtml ? (
+              <span
+                className="node-content"
+                dangerouslySetInnerHTML={{ __html: displayHtml }}
+              />
+            ) : (
+              <span className="text-foreground-tertiary">{t('common.untitled')}</span>
+            )}
+          </div>
         </div>
       </div>
 

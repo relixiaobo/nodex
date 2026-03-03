@@ -71,6 +71,8 @@ export interface TriggerAnchorRect {
 interface RichTextEditorProps {
   nodeId: string;
   parentId: string;
+  /** When editing a reference, the target node whose content is displayed/edited. */
+  contentNodeId?: string;
   initialText: string;
   initialMarks: TextMark[];
   initialInlineRefs: InlineRefEntry[];
@@ -117,6 +119,8 @@ interface RichTextEditorProps {
   onShiftArrow?: (direction: 'up' | 'down') => void;
   onSelectAll?: () => void;
   onPasteMultiLine?: (nodes: ParsedPasteNode[]) => void;
+  /** Extra classes for the ProseMirror mount div (overrides default text-[15px] leading-6). */
+  mountClassName?: string;
 }
 
 export interface EditorContentPayload {
@@ -206,7 +210,7 @@ export function RichTextEditor(props: RichTextEditorProps) {
     );
 
     if (changed) {
-      updateNodeContent(propsRef.current.nodeId, {
+      updateNodeContent(propsRef.current.contentNodeId ?? propsRef.current.nodeId, {
         name: parsed.text,
         marks: parsed.marks,
         inlineRefs: parsed.inlineRefs,
@@ -497,7 +501,7 @@ export function RichTextEditor(props: RichTextEditorProps) {
         saveContent();
         return propsRef.current.onBackspaceAtStart?.() ?? false;
       }
-      updateNodeContent(propsRef.current.nodeId, { name: '', marks: [], inlineRefs: [] });
+      updateNodeContent(propsRef.current.contentNodeId ?? propsRef.current.nodeId, { name: '', marks: [], inlineRefs: [] });
       saveContent();
       return propsRef.current.onDelete();
     };
@@ -768,7 +772,7 @@ export function RichTextEditor(props: RichTextEditorProps) {
         if (tr.docChanged && !isExternalSyncRef.current && !isComposing) {
           const parsed = docToMarks(newState.doc);
           const deferLoroCommit = tr.getMeta(META_DEFER_LORO_TEXT_COMMIT) === true;
-          updateNodeContent(propsRef.current.nodeId, {
+          updateNodeContent(propsRef.current.contentNodeId ?? propsRef.current.nodeId, {
             name: parsed.text,
             marks: parsed.marks,
             inlineRefs: parsed.inlineRefs,
@@ -947,7 +951,7 @@ export function RichTextEditor(props: RichTextEditorProps) {
         compositionend: (view) => {
           isComposingRef.current = false;
           const parsed = docToMarks(view.state.doc);
-          updateNodeContent(propsRef.current.nodeId, {
+          updateNodeContent(propsRef.current.contentNodeId ?? propsRef.current.nodeId, {
             name: parsed.text,
             marks: parsed.marks,
             inlineRefs: parsed.inlineRefs,
@@ -1118,7 +1122,7 @@ export function RichTextEditor(props: RichTextEditorProps) {
 
     if (extractResult) {
       // Persist the updated content (text with \uFFFC + inline refs)
-      updateNodeContent(propsRef.current.nodeId, {
+      updateNodeContent(propsRef.current.contentNodeId ?? propsRef.current.nodeId, {
         name: extractResult.newText,
         inlineRefs: extractResult.newInlineRefs,
       });
@@ -1148,7 +1152,7 @@ export function RichTextEditor(props: RichTextEditorProps) {
           onClose={handleTagSelectorClose}
         />
       )}
-      <div ref={mountRef} className={`outline-none text-[15px] leading-6${props.readOnly ? ' tw-text-muted-foreground/60' : ''}`} />
+      <div ref={mountRef} className={`outline-none ${props.mountClassName ?? 'text-[15px] leading-6'}${props.readOnly ? ' tw-text-muted-foreground/60' : ''}`} />
     </div>
   );
 }

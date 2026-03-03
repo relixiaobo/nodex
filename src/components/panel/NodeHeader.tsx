@@ -15,6 +15,7 @@ import { Library, Inbox, CalendarDays, Trash2, Search, Settings, type AppIcon } 
 import { useNode } from '../../hooks/use-node';
 import { useNodeTags } from '../../hooks/use-node-tags';
 import { useNodeStore } from '../../stores/node-store';
+import { useUIStore } from '../../stores/ui-store';
 import { useWorkspaceStore } from '../../stores/workspace-store';
 import { useNodeCheckbox } from '../../hooks/use-node-checkbox';
 import { useEditorTriggers, buildTriggerEditorProps } from '../../hooks/use-editor-triggers.js';
@@ -31,6 +32,8 @@ import { parseDayNodeName, parseYearNodeName, isToday } from '../../lib/date-uti
 import { getNodeCapabilities } from '../../lib/node-capabilities.js';
 import { docToMarks } from '../../lib/pm-doc-utils.js';
 import { marksToHtml } from '../../lib/editor-marks.js';
+import { getTextOffsetFromPoint, getRenderedTextRightEdge } from '../../lib/dom-caret-utils.js';
+import { getNodeTextLengthById } from '../../lib/tree-utils.js';
 import * as loroDoc from '../../lib/loro-doc.js';
 import { t } from '../../i18n/strings.js';
 
@@ -152,6 +155,31 @@ export function NodeHeader({ nodeId, onTitleRef }: NodeHeaderProps) {
     editorRef.current?.dom?.blur();
   }, []);
 
+  // Click-to-edit: record text offset on mousedown so RichTextEditor can
+  // restore the caret at the correct position when it mounts.
+  const handleTitleMouseDown = useCallback((e: React.MouseEvent) => {
+    if (!canEditNode || e.button !== 0) return;
+    if (editing) return; // already editing — let ProseMirror handle clicks
+
+    const container = e.currentTarget as HTMLElement;
+    const textOffset = getTextOffsetFromPoint(container, e.clientX, e.clientY);
+    const textLength = getNodeTextLengthById(nodeId);
+    const textRightEdge = getRenderedTextRightEdge(container);
+    const rect = container.getBoundingClientRect();
+
+    // If click is past the text's right edge → place caret at end
+    const pastTextEnd = textRightEdge !== null && e.clientX > textRightEdge + 1;
+    const pastContainerMid = textLength > 0 && e.clientX >= rect.left + rect.width * 0.66;
+    const resolvedOffset = pastTextEnd
+      ? textLength
+      : textOffset ?? (pastContainerMid ? textLength : 0);
+
+    // parentId = nodeId because RichTextEditor receives parentId={nodeId}
+    useUIStore.getState().setFocusClickCoords({ nodeId, parentId: nodeId, textOffset: resolvedOffset });
+    e.preventDefault();
+    setEditing(true);
+  }, [canEditNode, editing, nodeId]);
+
   // Workspace root detection — show [W] avatar in icon block
   const wsId = useWorkspaceStore((s) => s.currentWorkspaceId);
   const isWorkspaceRoot = !!wsId && nodeId === wsId;
@@ -228,12 +256,12 @@ export function NodeHeader({ nodeId, onTitleRef }: NodeHeaderProps) {
         >
           {/* Col B: Checkbox (conditional, same position as bullet) */}
           {showCheckbox && (
-            <span className="flex shrink-0 h-8 w-[15px] items-center justify-center">
+            <span className="flex shrink-0 h-8 w-5 items-center justify-center">
               <input
                 type="checkbox"
                 checked={isDone}
                 onChange={handleCheckboxChange}
-                className="h-4 w-4 rounded border-border accent-primary cursor-pointer"
+                className="h-5 w-5 appearance-none rounded border border-border bg-transparent checked:border-primary checked:bg-primary checked:bg-[url('data:image/svg+xml,%3Csvg%20viewBox%3D%220%200%2016%2016%22%20fill%3D%22white%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cpath%20d%3D%22M12.207%204.793a1%201%200%20010%201.414l-5%205a1%201%200%2001-1.414%200l-2-2a1%201%200%20011.414-1.414L6.5%209.086l4.293-4.293a1%201%200%20011.414%200z%22%2F%3E%3C%2Fsvg%3E')] bg-[length:16px_16px] bg-center bg-no-repeat cursor-pointer"
               />
             </span>
           )}
@@ -244,11 +272,8 @@ export function NodeHeader({ nodeId, onTitleRef }: NodeHeaderProps) {
               (titleWrapperRef as React.MutableRefObject<HTMLDivElement | null>).current = el;
               onTitleRef?.(el);
             }}
-            className={`relative text-xl font-semibold leading-8 outline-none min-h-8 flex-1 ${canEditNode ? 'cursor-text' : 'cursor-default'} ${isDone ? 'text-foreground/40 line-through' : ''}`}
-            onClick={() => {
-              if (!canEditNode) return;
-              if (!editing) setEditing(true);
-            }}
+            className={`relative text-xl font-semibold leading-8 outline-none min-h-8 flex-1 ${canEditNode ? 'cursor-text' : 'cursor-default'} ${isDone ? 'text-foreground/40' : ''}`}
+            onMouseDown={handleTitleMouseDown}
           >
             {editing ? (
               <>
@@ -259,6 +284,7 @@ export function NodeHeader({ nodeId, onTitleRef }: NodeHeaderProps) {
                   initialMarks={rawMarks}
                   initialInlineRefs={rawInlineRefs}
                   readOnly={!canEditNode}
+                  mountClassName="text-xl font-semibold leading-8"
                   onBlur={handleBlur}
                   onEnter={handleEnter}
                   onIndent={noop}

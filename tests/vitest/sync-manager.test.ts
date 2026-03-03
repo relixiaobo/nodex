@@ -52,14 +52,18 @@ vi.mock('../../src/lib/sync/sync-protocol.js', () => ({
   },
 }));
 
-const mockImportUpdatesBatch = vi.fn();
+const mockImportUpdatesBatch = vi.fn().mockReturnValue({ imported: 1, skipped: 0, poisoned: false });
 const mockGetVersionVector = vi.fn();
 const mockSaveNow = vi.fn();
+const mockSaveNowRecovery = vi.fn();
+const mockIsWasmPoisoned = vi.fn().mockReturnValue(false);
 
 vi.mock('../../src/lib/loro-doc.js', () => ({
   importUpdatesBatch: (...args: unknown[]) => mockImportUpdatesBatch(...args),
   getVersionVector: () => mockGetVersionVector(),
   saveNow: () => mockSaveNow(),
+  saveNowRecovery: () => mockSaveNowRecovery(),
+  isWasmPoisoned: () => mockIsWasmPoisoned(),
 }));
 
 // Fake cursor store for IndexedDB cursor persistence
@@ -193,8 +197,11 @@ describe('SyncManager', () => {
     mockOpenDB.mockImplementation(() => Promise.resolve(makeFakeDB()));
     mockGetVersionVector.mockReturnValue({ encode: () => new Uint8Array([1, 2]) });
     mockSaveNow.mockResolvedValue(undefined);
+    mockSaveNowRecovery.mockResolvedValue(undefined);
     mockSha256Hex.mockResolvedValue('fakehash0123456789abcdef');
     mockImportUpdatesBatch.mockReset();
+    mockImportUpdatesBatch.mockReturnValue({ imported: 1, skipped: 0, poisoned: false });
+    mockIsWasmPoisoned.mockReturnValue(false);
 
     // Defaults: empty queue, no pending, empty pull response
     mockDequeuePendingUpdates.mockResolvedValue([]);

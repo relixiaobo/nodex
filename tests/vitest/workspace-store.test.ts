@@ -116,6 +116,9 @@ describe('workspace-store auth and persistence', () => {
     vi.doMock('../../src/stores/ui-store.js', () => ({
       useUIStore: { getState: vi.fn().mockReturnValue({ replacePanel: vi.fn() }) },
     }));
+    vi.doMock('../../src/lib/loro-persistence.js', () => ({
+      deleteSnapshot: vi.fn().mockResolvedValue(undefined),
+    }));
 
     // Call the actual store action (dynamic import will use our mock)
     await useWorkspaceStore.getState().signInWithGoogle();
@@ -149,6 +152,9 @@ describe('workspace-store auth and persistence', () => {
     vi.doMock('../../src/stores/ui-store.js', () => ({
       useUIStore: { getState: vi.fn().mockReturnValue({ replacePanel: vi.fn() }) },
     }));
+    vi.doMock('../../src/lib/loro-persistence.js', () => ({
+      deleteSnapshot: vi.fn().mockResolvedValue(undefined),
+    }));
 
     await expect(useWorkspaceStore.getState().signInWithGoogle()).rejects.toThrow('Auth cancelled');
 
@@ -156,6 +162,46 @@ describe('workspace-store auth and persistence', () => {
     const state = useWorkspaceStore.getState();
     expect(state.isAuthenticated).toBe(false);
     expect(state.authUser).toBeNull();
+  });
+
+  it('signInWithGoogle cleans up orphaned anonymous snapshot', async () => {
+    const mockUser = { id: 'guser_2', email: 'g2@example.com', name: 'Google User 2' };
+    vi.doMock('../../src/lib/auth.js', () => ({
+      signInWithGoogle: vi.fn().mockResolvedValue(mockUser),
+      getStoredToken: vi.fn().mockResolvedValue(null),
+    }));
+    vi.doMock('../../src/lib/loro-doc.js', () => ({
+      setCurrentWorkspaceId: vi.fn(),
+      getPeerIdStr: vi.fn().mockReturnValue('peer_1'),
+      getLoroDoc: vi.fn().mockReturnValue({ export: vi.fn().mockReturnValue(new Uint8Array(0)) }),
+    }));
+    vi.doMock('../../src/lib/sync/pending-queue.js', () => ({
+      enqueuePendingUpdate: vi.fn().mockResolvedValue(undefined),
+    }));
+    vi.doMock('../../src/lib/bootstrap-containers.js', () => ({
+      ensureContainers: vi.fn(),
+    }));
+    vi.doMock('../../src/lib/journal.js', () => ({
+      ensureTodayNode: vi.fn().mockReturnValue('today_node'),
+    }));
+    vi.doMock('../../src/stores/ui-store.js', () => ({
+      useUIStore: { getState: vi.fn().mockReturnValue({ replacePanel: vi.fn() }) },
+    }));
+    const mockDeleteSnapshot = vi.fn().mockResolvedValue(undefined);
+    vi.doMock('../../src/lib/loro-persistence.js', () => ({
+      deleteSnapshot: mockDeleteSnapshot,
+    }));
+
+    // Simulate anonymous session with a random workspace ID
+    useWorkspaceStore.setState({ currentWorkspaceId: 'ws_anon_random' });
+
+    await useWorkspaceStore.getState().signInWithGoogle();
+
+    // Old anonymous snapshot should be cleaned up
+    expect(mockDeleteSnapshot).toHaveBeenCalledWith('ws_anon_random');
+
+    const state = useWorkspaceStore.getState();
+    expect(state.currentWorkspaceId).toBe('guser_2');
   });
 
   it('initAuth defers today navigation when no local snapshot', async () => {

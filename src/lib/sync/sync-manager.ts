@@ -24,7 +24,7 @@ import {
   sha256Hex,
   AuthError,
 } from './sync-protocol.js';
-import { importUpdatesBatch, getVersionVector, saveNow } from '../loro-doc.js';
+import { importUpdatesBatch, getVersionVector, saveNow, saveNowRecovery, isWasmPoisoned } from '../loro-doc.js';
 import { openDB, CURSOR_STORE } from '../loro-persistence.js';
 
 const SYNC_INTERVAL_MS = 30_000;
@@ -169,6 +169,14 @@ export class SyncManager {
       const caughtUp = await this.pull(workspaceId, accessToken, deviceId, sessionToken);
       if (!this.isSessionCurrent(sessionToken)) { console.warn('[sync] session changed after pull'); return; }
 
+      // If WASM was poisoned during pull, stop sync permanently.
+      // pull() already tried to save what was imported and advanced the cursor.
+      if (isWasmPoisoned()) {
+        this.updateState({ status: 'error', error: 'Data engine error — please reload' });
+        this.stop();
+        return;
+      }
+
       const pending = await getPendingCount(workspaceId);
       if (!this.isSessionCurrent(sessionToken)) return;
 
@@ -189,6 +197,10 @@ export class SyncManager {
       if (!this.isSessionCurrent(sessionToken)) return;
       if (err instanceof AuthError) {
         this.updateState({ status: 'error', error: 'Session expired — please sign in again' });
+        this.stop();
+      } else if (err instanceof WebAssembly.RuntimeError) {
+        // WASM engine is poisoned — stop sync permanently (only page reload can recover)
+        this.updateState({ status: 'error', error: 'Data engine error — please reload' });
         this.stop();
       } else {
         const msg = err instanceof Error ? err.message : 'Unknown sync error';
@@ -291,7 +303,32 @@ export class SyncManager {
       }
 
       if (bytesToImport.length > 0) {
-        importUpdatesBatch(bytesToImport);
+        console.log(
+          `[sync] pull page ${pages}: importing ${bytesToImport.length} chunks`,
+          `(type=${response.type}, updates=${response.updates.length}, cursor=${cursor})`,
+        );
+        const result = importUpdatesBatch(bytesToImport);
+
+        if (result.skipped > 0) {
+          console.warn(`[sync] Skipped ${result.skipped} corrupt chunks (imported ${result.imported})`);
+        }
+
+        if (result.poisoned) {
+          // WASM is poisoned — try to save what was imported before the failure.
+          // saveNowRecovery bypasses the _wasmPoisoned guard since the data from
+          // successfully imported chunks may still be exportable.
+          if (result.imported > 0) {
+            try { await saveNowRecovery(); } catch (e) {
+              console.warn('[sync] Recovery save failed (WASM too damaged):', e);
+            }
+          }
+          // Advance cursor past this entire batch to avoid re-importing the
+          // same corrupt data on next sync. The user loses data in the skipped
+          // chunks but the app remains functional after reload.
+          cursor = response.nextCursorSeq;
+          hasMore = false; // Exit pull loop
+          break;
+        }
       }
 
       // Advance cursor (must use server's nextCursorSeq, not our own calculation)
@@ -301,11 +338,15 @@ export class SyncManager {
 
     if (!this.isSessionCurrent(sessionToken)) return false;
 
-    // Persist: save snapshot + cursor atomically
+    // Persist: save snapshot + cursor atomically.
+    // In the poisoned recovery path, saveNowRecovery() was already called above,
+    // but we still need to persist the cursor to skip past corrupt chunks on reload.
     if (cursor > this.lastSeq) {
       this.lastSeq = cursor;
-      await saveNow();
-      if (!this.isSessionCurrent(sessionToken)) return false;
+      if (!isWasmPoisoned()) {
+        await saveNow();
+        if (!this.isSessionCurrent(sessionToken)) return false;
+      }
       await saveCursor(workspaceId, cursor);
     }
 

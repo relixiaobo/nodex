@@ -15,7 +15,7 @@ import {
   collectAllHighlightNodeIds,
   getRemovedHighlightIds,
   saveHighlightNotes,
-  getHighlightNoteTexts,
+  getHighlightNoteEntries,
 } from '../../src/lib/highlight-sidepanel.js';
 import type { HighlightCreatePayload } from '../../src/lib/highlight-messaging.js';
 import * as loroDoc from '../../src/lib/loro-doc.js';
@@ -82,27 +82,38 @@ describe('highlight-sidepanel', () => {
     expect(loroDoc.getParentId(result.highlightNodeId)).toBe(result.clipNodeId);
   });
 
-  it('creates an empty #note child when withNote is true', async () => {
-    const store = getStore();
-    const result = await createHighlightFromPayload(makePayload({ withNote: true }), store);
-
-    const children = store.getChildren(result.highlightNodeId);
-    const comment = children.find((n) => n.tags.includes(SYS_T.NOTE));
-    expect(comment).toBeDefined();
-    expect(comment!.name).toBe('');
-  });
-
-  it('creates #note child with note text when noteText is provided', async () => {
+  it('creates #note children from noteEntries', async () => {
     const store = getStore();
     const result = await createHighlightFromPayload(
-      makePayload({ withNote: true, noteText: 'captured note' }),
+      makePayload({ noteEntries: [{ text: 'captured note', depth: 0 }] }),
       store,
     );
 
-    const children = store.getChildren(result.highlightNodeId);
-    const comment = children.find((n) => n.tags.includes(SYS_T.NOTE));
-    expect(comment).toBeDefined();
-    expect(comment!.name).toBe('captured note');
+    const entries = getHighlightNoteEntries(result.highlightNodeId);
+    expect(entries).toHaveLength(1);
+    expect(entries[0].text).toBe('captured note');
+    expect(entries[0].depth).toBe(0);
+  });
+
+  it('creates nested #note children from noteEntries with depth', async () => {
+    const store = getStore();
+    const result = await createHighlightFromPayload(
+      makePayload({
+        noteEntries: [
+          { text: 'parent', depth: 0 },
+          { text: 'child', depth: 1 },
+          { text: 'grandchild', depth: 2 },
+        ],
+      }),
+      store,
+    );
+
+    const entries = getHighlightNoteEntries(result.highlightNodeId);
+    expect(entries).toEqual([
+      { text: 'parent', depth: 0 },
+      { text: 'child', depth: 1 },
+      { text: 'grandchild', depth: 2 },
+    ]);
   });
 
   it('stores anchor data in node description', async () => {
@@ -131,49 +142,91 @@ describe('highlight-sidepanel', () => {
   it('sets hasComment=true in restore payload when highlight has #note child', async () => {
     const store = getStore();
     const result = await createHighlightFromPayload(makePayload(), store);
-    saveHighlightNotes(store, result.highlightNodeId, ['note']);
+    saveHighlightNotes(store, result.highlightNodeId, [{ text: 'note', depth: 0 }]);
 
     const payload = buildHighlightRestorePayload(result.clipNodeId);
     const item = payload.highlights.find((h) => h.id === result.highlightNodeId);
     expect(item?.hasComment).toBe(true);
   });
 
-  it('batch saves notes: updates existing, creates new, deletes excess', async () => {
+  it('batch saves notes: deletes existing and rebuilds from entries', async () => {
     const store = getStore();
-    const result = await createHighlightFromPayload(makePayload({ noteText: 'first' }), store);
+    const result = await createHighlightFromPayload(
+      makePayload({ noteEntries: [{ text: 'first', depth: 0 }] }),
+      store,
+    );
 
-    // Update the existing note and add a second
-    const saveResult = saveHighlightNotes(store, result.highlightNodeId, ['updated', 'second']);
-    expect(saveResult.kept).toBe(1);
-    expect(saveResult.created).toBe(1);
-    expect(saveResult.deleted).toBe(0);
-
-    const texts = getHighlightNoteTexts(result.highlightNodeId);
-    expect(texts).toEqual(['updated', 'second']);
-  });
-
-  it('batch save filters empty strings and deletes excess notes', async () => {
-    const store = getStore();
-    const result = await createHighlightFromPayload(makePayload({ noteText: 'first' }), store);
-    // Add a second note so we have 2 existing notes
-    saveHighlightNotes(store, result.highlightNodeId, ['first', 'second']);
-
-    // Save with only 1 non-empty text + empties → filters empties, deletes excess node
-    const saveResult = saveHighlightNotes(store, result.highlightNodeId, ['kept', '', '']);
-    expect(saveResult.kept).toBe(1);
+    // Replace with two flat notes
+    const saveResult = saveHighlightNotes(store, result.highlightNodeId, [
+      { text: 'updated', depth: 0 },
+      { text: 'second', depth: 0 },
+    ]);
+    expect(saveResult.created).toBe(2);
     expect(saveResult.deleted).toBe(1);
 
-    const texts = getHighlightNoteTexts(result.highlightNodeId);
-    expect(texts).toEqual(['kept']);
+    const entries = getHighlightNoteEntries(result.highlightNodeId);
+    expect(entries).toEqual([
+      { text: 'updated', depth: 0 },
+      { text: 'second', depth: 0 },
+    ]);
   });
 
-  it('getHighlightNoteTexts returns all #note child texts in order', async () => {
+  it('batch save filters empty strings', async () => {
+    const store = getStore();
+    const result = await createHighlightFromPayload(
+      makePayload({ noteEntries: [{ text: 'first', depth: 0 }, { text: 'second', depth: 0 }] }),
+      store,
+    );
+
+    // Save with only 1 non-empty text + empties → filters empties
+    const saveResult = saveHighlightNotes(store, result.highlightNodeId, [
+      { text: 'kept', depth: 0 },
+      { text: '', depth: 0 },
+      { text: '  ', depth: 0 },
+    ]);
+    expect(saveResult.created).toBe(1);
+    expect(saveResult.deleted).toBe(2);
+
+    const entries = getHighlightNoteEntries(result.highlightNodeId);
+    expect(entries).toEqual([{ text: 'kept', depth: 0 }]);
+  });
+
+  it('getHighlightNoteEntries returns all #note entries in DFS order', async () => {
     const store = getStore();
     const result = await createHighlightFromPayload(makePayload(), store);
-    saveHighlightNotes(store, result.highlightNodeId, ['alpha', 'beta', 'gamma']);
+    saveHighlightNotes(store, result.highlightNodeId, [
+      { text: 'alpha', depth: 0 },
+      { text: 'beta', depth: 0 },
+      { text: 'gamma', depth: 0 },
+    ]);
 
-    const texts = getHighlightNoteTexts(result.highlightNodeId);
-    expect(texts).toEqual(['alpha', 'beta', 'gamma']);
+    const entries = getHighlightNoteEntries(result.highlightNodeId);
+    expect(entries).toEqual([
+      { text: 'alpha', depth: 0 },
+      { text: 'beta', depth: 0 },
+      { text: 'gamma', depth: 0 },
+    ]);
+  });
+
+  it('saves and reads nested note tree with correct depths', async () => {
+    const store = getStore();
+    const result = await createHighlightFromPayload(makePayload(), store);
+    saveHighlightNotes(store, result.highlightNodeId, [
+      { text: 'root 1', depth: 0 },
+      { text: 'child 1.1', depth: 1 },
+      { text: 'child 1.2', depth: 1 },
+      { text: 'grandchild 1.2.1', depth: 2 },
+      { text: 'root 2', depth: 0 },
+    ]);
+
+    const entries = getHighlightNoteEntries(result.highlightNodeId);
+    expect(entries).toEqual([
+      { text: 'root 1', depth: 0 },
+      { text: 'child 1.1', depth: 1 },
+      { text: 'child 1.2', depth: 1 },
+      { text: 'grandchild 1.2.1', depth: 2 },
+      { text: 'root 2', depth: 0 },
+    ]);
   });
 
   it('deduplicates concurrent clip creation for the same normalized URL', async () => {

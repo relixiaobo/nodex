@@ -27,6 +27,7 @@ import type {
   HighlightCheckUrlRequestPayload,
   HighlightUnresolvablePayload,
   HighlightMessage,
+  NoteEntry,
 } from '../../src/lib/highlight-messaging.js';
 import {
   serializeAnchor,
@@ -135,10 +136,10 @@ describe('payload types', () => {
     expect(payload.selectedText).toBe('test text');
     expect(payload.pageUrl).toBe('https://example.com');
     expect(payload.pageTitle).toBe('Example Page');
-    expect(payload.withNote).toBeUndefined();
+    expect(payload.noteEntries).toBeUndefined();
   });
 
-  it('HighlightCreatePayload supports optional withNote', () => {
+  it('HighlightCreatePayload supports optional noteEntries', () => {
     const anchor: HighlightAnchor = {
       version: 1,
       exact: 'text',
@@ -146,35 +147,22 @@ describe('payload types', () => {
       suffix: '',
     };
 
-    const payload: HighlightCreatePayload = {
-      anchor,
-      selectedText: 'text',
-      pageUrl: 'https://example.com',
-      pageTitle: 'Page',
-      withNote: true,
-    };
-
-    expect(payload.withNote).toBe(true);
-  });
-
-  it('HighlightCreatePayload supports optional noteText', () => {
-    const anchor: HighlightAnchor = {
-      version: 1,
-      exact: 'text',
-      prefix: '',
-      suffix: '',
-    };
+    const entries: NoteEntry[] = [
+      { text: 'parent note', depth: 0 },
+      { text: 'child note', depth: 1 },
+    ];
 
     const payload: HighlightCreatePayload = {
       anchor,
       selectedText: 'text',
       pageUrl: 'https://example.com',
       pageTitle: 'Page',
-      withNote: true,
-      noteText: 'my inline note',
+      noteEntries: entries,
     };
 
-    expect(payload.noteText).toBe('my inline note');
+    expect(payload.noteEntries).toHaveLength(2);
+    expect(payload.noteEntries![0].text).toBe('parent note');
+    expect(payload.noteEntries![1].depth).toBe(1);
   });
 
   it('HighlightRestorePayload holds array of highlights', () => {
@@ -218,13 +206,18 @@ describe('payload types', () => {
     expect(payload.id).toBe('node-789');
   });
 
-  it('HighlightNotesSavePayload has id and noteTexts', () => {
+  it('HighlightNotesSavePayload has id and noteEntries', () => {
     const payload: HighlightNotesSavePayload = {
       id: 'node-789',
-      noteTexts: ['note 1', 'note 2'],
+      noteEntries: [
+        { text: 'note 1', depth: 0 },
+        { text: 'note 2', depth: 1 },
+      ],
     };
     expect(payload.id).toBe('node-789');
-    expect(payload.noteTexts).toEqual(['note 1', 'note 2']);
+    expect(payload.noteEntries).toHaveLength(2);
+    expect(payload.noteEntries[0].text).toBe('note 1');
+    expect(payload.noteEntries[1].depth).toBe(1);
   });
 
   it('HighlightCheckUrlPayload has url and tabId', () => {

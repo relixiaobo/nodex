@@ -1,5 +1,5 @@
 import { deserializeAnchor, serializeAnchor } from './highlight-anchor.js';
-import type { HighlightCreatePayload, HighlightRestorePayload } from './highlight-messaging.js';
+import type { HighlightCreatePayload, HighlightRestorePayload, NoteEntry } from './highlight-messaging.js';
 import {
   createNoteNode,
   createHighlightNode,
@@ -114,11 +114,8 @@ export async function createHighlightFromPayload(
     anchor: serializeAnchor(payload.anchor),
   });
 
-  const noteText = payload.noteText?.trim();
-  if (noteText) {
-    createNoteNode(store, highlight.id, noteText);
-  } else if (payload.withNote) {
-    createNoteNode(store, highlight.id, '');
+  if (payload.noteEntries && payload.noteEntries.length > 0) {
+    saveHighlightNotes(store, highlight.id, payload.noteEntries);
   }
 
   return {
@@ -128,66 +125,66 @@ export async function createHighlightFromPayload(
 }
 
 /**
+ * Recursively collect all #note descendant IDs under a parent (DFS).
+ */
+function collectAllNoteDescendants(parentId: string): string[] {
+  const result: string[] = [];
+  const childIds = loroDoc.getChildren(parentId);
+  for (const childId of childIds) {
+    const child = loroDoc.toNodexNode(childId);
+    if (child?.tags.includes(SYS_T.NOTE)) {
+      result.push(childId);
+      result.push(...collectAllNoteDescendants(childId));
+    }
+  }
+  return result;
+}
+
+/**
  * Batch save notes for a highlight.
- * Aligns incoming texts with existing #note children by index:
- * - matching index → update text if changed
- * - extra texts → create new #note nodes
- * - extra existing nodes → delete
- * Empty strings are filtered out before processing.
+ * Accepts structured NoteEntry[] with depth for nested note trees.
+ * Deletes all existing #note descendants then rebuilds the tree.
+ * Empty texts are filtered out before processing.
  */
 export function saveHighlightNotes(
   store: HighlightNodeStore,
   highlightNodeId: string,
-  texts: string[],
+  entries: NoteEntry[],
 ): SaveHighlightNotesResult {
-  const nonEmpty = texts.map((t) => t.trim()).filter(Boolean);
+  const nonEmpty = entries.filter((e) => e.text.trim());
 
-  // Gather existing #note children in order
-  const existingNotes: { id: string; name: string }[] = [];
-  const childIds = loroDoc.getChildren(highlightNodeId);
-  for (const childId of childIds) {
-    const child = loroDoc.toNodexNode(childId);
-    if (child?.tags.includes(SYS_T.NOTE)) {
-      existingNotes.push({ id: child.id, name: child.name ?? '' });
-    }
+  // Delete all existing #note descendants (move to trash)
+  const existingIds = collectAllNoteDescendants(highlightNodeId);
+  let deleted = existingIds.length;
+  for (const id of existingIds) {
+    loroDoc.moveNode(id, CONTAINER_IDS.TRASH);
   }
 
-  let kept = 0;
+  // Rebuild nested tree using a depth → parent stack
+  // parentStack[depth] = nodeId that is the parent at that depth level
+  const parentStack: string[] = [highlightNodeId];
   let created = 0;
-  let deleted = 0;
 
-  // Update or create
-  for (let i = 0; i < nonEmpty.length; i++) {
-    if (i < existingNotes.length) {
-      // Update existing node if text changed
-      if (existingNotes[i].name !== nonEmpty[i]) {
-        const existing = loroDoc.toNodexNode(existingNotes[i].id);
-        loroDoc.setNodeRichTextContent(
-          existingNotes[i].id,
-          nonEmpty[i],
-          existing?.marks ?? [],
-          existing?.inlineRefs ?? [],
-        );
-      }
-      kept++;
-    } else {
-      // Create new note node
-      createNoteNode(store, highlightNodeId, nonEmpty[i]);
-      created++;
-    }
+  for (const entry of nonEmpty) {
+    const depth = Math.max(0, entry.depth);
+    // Ensure parent exists at this depth (clamp to available depth)
+    const parentIdx = Math.min(depth, parentStack.length - 1);
+    const parentId = parentStack[parentIdx];
+
+    const noteNode = createNoteNode(store, parentId, entry.text.trim());
+    created++;
+
+    // Set this node as potential parent for the next depth level
+    parentStack[depth + 1] = noteNode.id;
+    // Trim stack to prevent stale deeper parents
+    parentStack.length = depth + 2;
   }
 
-  // Delete excess existing notes (move to trash)
-  for (let i = nonEmpty.length; i < existingNotes.length; i++) {
-    loroDoc.moveNode(existingNotes[i].id, CONTAINER_IDS.TRASH);
-    deleted++;
-  }
-
-  if (kept > 0 || created > 0 || deleted > 0) {
+  if (created > 0 || deleted > 0) {
     loroDoc.commitDoc();
   }
 
-  return { kept, created, deleted };
+  return { kept: 0, created, deleted };
 }
 
 export function buildHighlightRestorePayload(clipNodeId: string): HighlightRestorePayload {
@@ -231,15 +228,21 @@ function hasNoteChild(highlightNodeId: string): boolean {
   return false;
 }
 
-/** Return all note texts for a highlight (from #note-tagged children). */
-export function getHighlightNoteTexts(highlightNodeId: string): string[] {
-  const texts: string[] = [];
-  const children = loroDoc.getChildren(highlightNodeId);
-  for (const childId of children) {
-    const child = loroDoc.toNodexNode(childId);
-    if (child?.tags.includes(SYS_T.NOTE)) {
-      texts.push(child.name ?? '');
+/** Return all note entries for a highlight (DFS over #note subtree). */
+export function getHighlightNoteEntries(highlightNodeId: string): NoteEntry[] {
+  const entries: NoteEntry[] = [];
+
+  function walk(parentId: string, depth: number): void {
+    const childIds = loroDoc.getChildren(parentId);
+    for (const childId of childIds) {
+      const child = loroDoc.toNodexNode(childId);
+      if (child?.tags.includes(SYS_T.NOTE)) {
+        entries.push({ text: child.name ?? '', depth });
+        walk(childId, depth + 1);
+      }
     }
   }
-  return texts;
+
+  walk(highlightNodeId, 0);
+  return entries;
 }

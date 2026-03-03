@@ -21,7 +21,7 @@ import {
   collectAllHighlightNodeIds,
   getRemovedHighlightIds,
   saveHighlightNotes,
-  getHighlightNoteTexts,
+  getHighlightNoteEntries,
 } from '../../lib/highlight-sidepanel.js';
 import { findClipNodeByUrl } from '../../lib/webclip-service.js';
 import {
@@ -307,14 +307,14 @@ export function App({ skipBootstrap = false }: AppProps) {
 
    if (message?.type === HIGHLIGHT_NOTES_SAVE) {
     const payload = message.payload as HighlightNotesSavePayload | undefined;
-    if (!payload?.id || !Array.isArray(payload.noteTexts)) {
+    if (!payload?.id || !Array.isArray(payload.noteEntries)) {
       sendResponse({ ok: false, error: 'Invalid highlight notes save payload' });
       return true;
     }
 
     const store = useNodeStore.getState() as HighlightNodeStore;
     ensureNoteTagDef(store);
-    const result = saveHighlightNotes(store, payload.id, payload.noteTexts);
+    const result = saveHighlightNotes(store, payload.id, payload.noteEntries);
     sendResponse({ ok: true, ...result });
     return true;
    }
@@ -325,8 +325,8 @@ export function App({ skipBootstrap = false }: AppProps) {
       sendResponse({ ok: false, error: 'Invalid highlight note get payload' });
       return true;
     }
-    const noteTexts = getHighlightNoteTexts(payload.id);
-    sendResponse({ ok: true, noteTexts });
+    const noteEntries = getHighlightNoteEntries(payload.id);
+    sendResponse({ ok: true, noteEntries });
     return true;
    }
 

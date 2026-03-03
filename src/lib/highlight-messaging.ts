@@ -39,6 +39,15 @@ export const HIGHLIGHT_CHECK_URL_REQUEST = 'highlight:check-url-request' as cons
 /** Content Script -> Side Panel: report highlights that could not be restored */
 export const HIGHLIGHT_UNRESOLVABLE = 'highlight:unresolvable' as const;
 
+// ── Shared Types ──
+
+/** A single note entry with nesting depth for hierarchical note structures. */
+export interface NoteEntry {
+  text: string;
+  /** 0 = highlight direct child, 1 = sub-note, 2 = sub-sub-note, etc. */
+  depth: number;
+}
+
 // ── Payload Types ──
 
 /** CS -> SP: Create a new highlight */
@@ -47,10 +56,8 @@ export interface HighlightCreatePayload {
   selectedText: string;
   pageUrl: string;
   pageTitle: string;
-  /** If true, Side Panel should focus on note input after creation */
-  withNote?: boolean;
-  /** Optional note text saved under the created highlight as #comment child */
-  noteText?: string;
+  /** Structured note entries to create under the highlight */
+  noteEntries?: NoteEntry[];
 }
 
 /** SP -> CS: Restore highlights on the page */
@@ -95,8 +102,8 @@ export interface HighlightClickPayload {
 export interface HighlightNotesSavePayload {
   /** soma node ID of the highlight */
   id: string;
-  /** All note texts; empty strings are filtered out before saving */
-  noteTexts: string[];
+  /** Structured note entries with nesting depth */
+  noteEntries: NoteEntry[];
 }
 
 /** CS -> SP: Get existing note texts for a highlight */

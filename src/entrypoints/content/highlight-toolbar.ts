@@ -19,13 +19,18 @@ export interface HighlightActionsCallbacks {
   onAddNote: () => void;
 }
 
+export interface NoteEntry {
+  text: string;
+  depth: number;
+}
+
 export interface NotePopoverCallbacks {
-  onSave: (texts: string[]) => void;
+  onSave: (entries: NoteEntry[]) => void;
   onCancel: () => void;
 }
 
 export interface NotePopoverOptions {
-  initialTexts?: string[];
+  initialEntries?: NoteEntry[];
   placeholder?: string;
 }
 
@@ -476,9 +481,11 @@ export function hideHighlightActionsToolbar(): void {
 
 // ── Note List Helpers ──
 
-function createNoteItem(text: string, placeholder: string): HTMLDivElement {
+function createNoteItem(text: string, placeholder: string, depth: number = 0): HTMLDivElement {
   const item = document.createElement('div');
   item.className = 'soma-note-item';
+  item.setAttribute('data-depth', String(depth));
+  item.style.paddingLeft = `${depth * 28 + 6}px`;
 
   const bullet = document.createElement('span');
   bullet.className = 'soma-note-bullet';
@@ -494,14 +501,27 @@ function createNoteItem(text: string, placeholder: string): HTMLDivElement {
   return item;
 }
 
-function collectNoteTexts(): string[] {
+function getItemDepth(item: HTMLDivElement): number {
+  return Number.parseInt(item.getAttribute('data-depth') ?? '0', 10);
+}
+
+function setItemDepth(item: HTMLDivElement, depth: number): void {
+  item.setAttribute('data-depth', String(depth));
+  item.style.paddingLeft = `${depth * 28 + 6}px`;
+}
+
+function collectNoteEntries(): NoteEntry[] {
   if (!notePopoverListElement) return [];
-  const items = notePopoverListElement.querySelectorAll('.soma-note-editor');
-  const texts: string[] = [];
-  items.forEach((el) => {
-    texts.push((el as HTMLElement).textContent ?? '');
+  const items = notePopoverListElement.querySelectorAll('.soma-note-item') as NodeListOf<HTMLDivElement>;
+  const entries: NoteEntry[] = [];
+  items.forEach((item) => {
+    const editor = item.querySelector('.soma-note-editor') as HTMLElement | null;
+    entries.push({
+      text: editor?.textContent ?? '',
+      depth: getItemDepth(item),
+    });
   });
-  return texts;
+  return entries;
 }
 
 function getNoteItems(): HTMLDivElement[] {
@@ -589,7 +609,7 @@ function buildNotePopover(): void {
     }
 
     if (action === 'save') {
-      notePopoverCallbacks.onSave(collectNoteTexts());
+      notePopoverCallbacks.onSave(collectNoteEntries());
       hideNotePopover();
     }
   });
@@ -601,7 +621,7 @@ function buildNotePopover(): void {
     // Cmd/Ctrl+Enter → Save
     if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
       e.preventDefault();
-      notePopoverCallbacks.onSave(collectNoteTexts());
+      notePopoverCallbacks.onSave(collectNoteEntries());
       hideNotePopover();
       return;
     }
@@ -622,10 +642,35 @@ function buildNotePopover(): void {
     const items = getNoteItems();
     const idx = items.indexOf(currentItem);
 
-    // Enter → Insert new item below
+    // Tab → Indent (increase depth)
+    if (e.key === 'Tab' && !e.shiftKey) {
+      e.preventDefault();
+      const currentDepth = getItemDepth(currentItem);
+      // First item cannot be indented; depth cannot exceed previous item's depth + 1
+      if (idx > 0) {
+        const prevDepth = getItemDepth(items[idx - 1]);
+        if (currentDepth < prevDepth + 1) {
+          setItemDepth(currentItem, currentDepth + 1);
+        }
+      }
+      return;
+    }
+
+    // Shift+Tab → Outdent (decrease depth)
+    if (e.key === 'Tab' && e.shiftKey) {
+      e.preventDefault();
+      const currentDepth = getItemDepth(currentItem);
+      if (currentDepth > 0) {
+        setItemDepth(currentItem, currentDepth - 1);
+      }
+      return;
+    }
+
+    // Enter → Insert new item below (inherits current depth)
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      const newItem = createNoteItem('', activeEditor.getAttribute('data-placeholder') ?? '');
+      const currentDepth = getItemDepth(currentItem);
+      const newItem = createNoteItem('', activeEditor.getAttribute('data-placeholder') ?? '', currentDepth);
       currentItem.after(newItem);
       const newEditor = newItem.querySelector('.soma-note-editor') as HTMLElement;
       focusEditorAtStart(newEditor);
@@ -714,18 +759,22 @@ export function showNotePopover(
     // Clear existing items
     notePopoverListElement!.innerHTML = '';
 
-    // Populate from initialTexts (default: one empty item)
-    const textsToRender = options.initialTexts?.length ? options.initialTexts : [''];
-    for (const text of textsToRender) {
-      notePopoverListElement!.appendChild(createNoteItem(text, placeholder));
+    // Populate from initialEntries (default: one empty item at depth 0)
+    const entriesToRender: NoteEntry[] = options.initialEntries?.length
+      ? options.initialEntries
+      : [{ text: '', depth: 0 }];
+    for (const entry of entriesToRender) {
+      notePopoverListElement!.appendChild(createNoteItem(entry.text, placeholder, entry.depth));
     }
 
-    // Focus the last item's editor at end
-    const allItems = getNoteItems();
-    if (allItems.length > 0) {
-      const lastEditor = allItems[allItems.length - 1].querySelector('.soma-note-editor') as HTMLElement;
-      focusEditorAtEnd(lastEditor);
-    }
+    // Focus the first item's editor at start (use rAF to ensure Shadow DOM rendered)
+    requestAnimationFrame(() => {
+      const allItems = getNoteItems();
+      if (allItems.length > 0) {
+        const firstEditor = allItems[0].querySelector('.soma-note-editor') as HTMLElement;
+        focusEditorAtStart(firstEditor);
+      }
+    });
   } catch (err) {
     console.error('[soma:hl] showNotePopover error:', err);
   }

@@ -18,6 +18,7 @@ import {
 } from '../../src/lib/highlight-sidepanel.js';
 import type { HighlightCreatePayload } from '../../src/lib/highlight-messaging.js';
 import * as loroDoc from '../../src/lib/loro-doc.js';
+import { ensureTodayNode } from '../../src/lib/journal.js';
 
 function getStore(): HighlightNodeStore {
   return useNodeStore.getState() as HighlightNodeStore;
@@ -73,7 +74,7 @@ describe('highlight-sidepanel', () => {
     const clipNode = store.getNode(result.clipNodeId);
     expect(clipNode).not.toBeNull();
     expect(clipNode!.tags).toContain(SYS_T.SOURCE);
-    expect(loroDoc.getParentId(result.clipNodeId)).toBe(CONTAINER_IDS.INBOX);
+    expect(loroDoc.getParentId(result.clipNodeId)).toBe(ensureTodayNode());
     expect(findClipNodeByUrl('https://example.com/new-highlight')).toBe(result.clipNodeId);
 
     // Highlight should be child of the new clip page

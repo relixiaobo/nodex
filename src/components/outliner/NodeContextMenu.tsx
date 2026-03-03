@@ -360,6 +360,8 @@ const MOVE_TARGETS: Array<{ id: string; label: string; icon: LucideIcon }> = [
   { id: CONTAINER_IDS.JOURNAL, label: 'Daily notes', icon: CalendarDays },
 ];
 
+type FlyoutSide = 'right' | 'left' | 'below';
+
 function MoveToSubmenu({
   currentContainerId,
   onSelect,
@@ -381,19 +383,49 @@ function MoveToSubmenu({
 
   useEffect(() => () => clearTimeout(timerRef.current), []);
 
-  // Compute flyout position: prefer right, fall back to left
-  const flyoutStyle = useMemo(() => {
-    if (!rowRef.current) return { top: 0, left: '100%' as string | number };
+  // Compute flyout position: prefer right → left → below (for narrow side panels)
+  const flyoutPlacement = useMemo((): { side: FlyoutSide; style: React.CSSProperties } => {
+    if (!rowRef.current) return { side: 'right', style: { top: 0, left: '100%' } };
     const rect = rowRef.current.getBoundingClientRect();
     const subWidth = 180;
-    const fitsRight = rect.right + subWidth <= window.innerWidth;
-    return {
-      top: 0,
-      ...(fitsRight ? { left: '100%' } : { right: '100%' }),
-    };
+    if (rect.right + subWidth <= window.innerWidth) {
+      return { side: 'right', style: { top: 0, left: '100%' } };
+    }
+    if (rect.left - subWidth >= 0) {
+      return { side: 'left', style: { top: 0, right: '100%' } };
+    }
+    // Neither side fits (narrow panel) — show inline below the trigger
+    return { side: 'below', style: {} };
   }, [open]); // recalc when open changes
 
   const targets = MOVE_TARGETS.filter((t) => t.id !== currentContainerId);
+
+  // Inline below mode: render targets directly under the trigger, no floating panel
+  if (open && flyoutPlacement.side === 'below') {
+    return (
+      <div ref={rowRef} onMouseEnter={showSub} onMouseLeave={hideSub}>
+        <button
+          className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-sm text-foreground-secondary transition-colors text-left hover:bg-foreground/4 hover:text-foreground"
+          onClick={() => setOpen(false)}
+        >
+          <div className="flex w-4 shrink-0 items-center justify-center text-foreground-tertiary">
+            <ChevronLeft size={14} strokeWidth={1.5} />
+          </div>
+          <span className="flex-1 font-medium">Move to</span>
+        </button>
+        <div className="pl-4">
+          {targets.map((target) => (
+            <MenuItem
+              key={target.id}
+              icon={target.icon}
+              label={target.label}
+              onClick={() => onSelect(target.id)}
+            />
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -414,11 +446,11 @@ function MoveToSubmenu({
         <ChevronRight size={14} strokeWidth={1.5} className="text-foreground-tertiary" />
       </button>
 
-      {/* Flyout submenu */}
+      {/* Flyout submenu (side positioning) */}
       {open && (
         <div
           className="absolute z-50 min-w-[160px] rounded-lg bg-background shadow-paper p-1"
-          style={flyoutStyle}
+          style={flyoutPlacement.style}
         >
           {targets.map((target) => (
             <MenuItem

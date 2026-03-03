@@ -321,7 +321,7 @@ function fixDuplicateContainerMappings(): boolean {
       }
     }
 
-    // Move children from loser tree nodes to the winner
+    // Move children from loser tree nodes to the winner, then neutralize losers
     for (const loserId of treeIds) {
       if (loserId === bestId) continue;
       const loserNode = tree.getNodeByID(loserId);
@@ -335,6 +335,10 @@ function fixDuplicateContainerMappings(): boolean {
           console.warn(`[loro-doc] Failed to move child from duplicate ${storedId}:`, e);
         }
       }
+      // Clear the storedId on the loser so future rebuildMappings() calls
+      // don't flip the mapping back to this empty shell.
+      loserNode.data.set('id', '');
+      treeToNodex.delete(loserId);
     }
 
     const currentMapped = nodexToTree.get(storedId);
@@ -355,6 +359,114 @@ function fixDuplicateContainerMappings(): boolean {
   }
 
   return childrenMoved > 0;
+}
+
+/**
+ * Deduplicate journal hierarchy nodes by name after CRDT merge.
+ *
+ * Container nodes (JOURNAL, LIBRARY, etc.) have fixed storedIds and are handled
+ * by fixDuplicateContainerMappings. But journal date hierarchy nodes (year, week,
+ * day) are created with random nanoid IDs. When two sessions independently create
+ * "2026" → "Week 10" → "Today, Tue, Mar 3", the CRDT merge produces two parallel
+ * sub-trees with different storedIds but identical names.
+ *
+ * This function walks JOURNAL → year → week → day, merges children of same-name
+ * siblings into the one with the most children, and moves the empty shell to TRASH.
+ *
+ * Returns true if any tree mutations were made.
+ */
+function deduplicateJournalHierarchy(): boolean {
+  if (!doc) return false;
+
+  const journalTreeId = nodexToTree.get('JOURNAL');
+  const trashTreeId = nodexToTree.get('TRASH');
+  if (!journalTreeId || !trashTreeId) return false;
+
+  const tree = getTree();
+  let totalMerged = 0;
+
+  /**
+   * For a given parent, find children with the same name and merge them.
+   * Returns the number of merge operations performed.
+   */
+  function deduplicateChildren(parentTreeId: TreeID): number {
+    const parentNode = tree.getNodeByID(parentTreeId);
+    if (!parentNode) return 0;
+
+    const children = parentNode.children() ?? [];
+    if (children.length <= 1) return 0;
+
+    // Group children by name
+    const byName = new Map<string, TreeID[]>();
+    for (const child of children) {
+      if (isDeletedTreeNode(child)) continue;
+      const name = child.data.get('name') as string | undefined;
+      if (!name) continue;
+      let arr = byName.get(name);
+      if (!arr) { arr = []; byName.set(name, arr); }
+      arr.push(child.id);
+    }
+
+    let merged = 0;
+    for (const [, treeIds] of byName) {
+      if (treeIds.length <= 1) continue;
+
+      // Pick winner: most children
+      let bestId = treeIds[0];
+      let bestCount = tree.getNodeByID(bestId)?.children()?.length ?? 0;
+      for (let i = 1; i < treeIds.length; i++) {
+        const count = tree.getNodeByID(treeIds[i])?.children()?.length ?? 0;
+        if (count > bestCount) {
+          bestId = treeIds[i];
+          bestCount = count;
+        }
+      }
+
+      // Move children from losers to winner, then move loser to TRASH
+      for (const loserId of treeIds) {
+        if (loserId === bestId) continue;
+        const loserNode = tree.getNodeByID(loserId);
+        if (!loserNode) continue;
+        const loserChildren = loserNode.children() ?? [];
+        for (const child of loserChildren) {
+          try { tree.move(child.id, bestId); } catch { /* skip */ }
+        }
+        // Move the empty shell to TRASH so it doesn't appear in search
+        try { tree.move(loserId, trashTreeId); } catch { /* skip */ }
+        merged++;
+      }
+    }
+    return merged;
+  }
+
+  // Level 1: year nodes under JOURNAL
+  totalMerged += deduplicateChildren(journalTreeId);
+  invalidateCache(); // Refresh after moves
+
+  // Level 2: week nodes under each year
+  const journalNode = tree.getNodeByID(journalTreeId);
+  for (const yearNode of journalNode?.children() ?? []) {
+    if (isDeletedTreeNode(yearNode)) continue;
+    totalMerged += deduplicateChildren(yearNode.id);
+  }
+  invalidateCache();
+
+  // Level 3: day nodes under each week (re-read years after potential merges)
+  for (const yearNode of journalNode?.children() ?? []) {
+    if (isDeletedTreeNode(yearNode)) continue;
+    for (const weekNode of yearNode.children() ?? []) {
+      if (isDeletedTreeNode(weekNode)) continue;
+      totalMerged += deduplicateChildren(weekNode.id);
+    }
+  }
+
+  if (totalMerged > 0) {
+    console.log(`[loro-doc] Deduplicated ${totalMerged} journal hierarchy nodes by name`);
+    invalidateCache();
+    rebuildMappings();
+  }
+
+  return totalMerged > 0;
 }
 
 // ============================================================
@@ -935,15 +1047,16 @@ export function importUpdatesBatch(updates: Uint8Array[]): ImportBatchResult {
   // Rebuild mappings for whatever was successfully imported
   if (imported > 0 && !_wasmPoisoned) {
     rebuildMappings();
-    const merged = fixDuplicateContainerMappings();
-    // If children were moved between duplicate tree nodes, commit + enqueue
-    // so the merge is persisted locally and pushed to the server.
-    if (merged) {
+    const containersMerged = fixDuplicateContainerMappings();
+    const journalMerged = !_wasmPoisoned && deduplicateJournalHierarchy();
+    // If tree mutations were made, commit + enqueue so the merge is persisted
+    // locally and pushed to the server.
+    if (containersMerged || journalMerged) {
       try {
         doc.commit({ origin: 'system:merge-duplicates' });
       } catch (e) {
         if (e instanceof WebAssembly.RuntimeError) {
-          markWasmPoisoned('fixDuplicateContainerMappings:commit', e);
+          markWasmPoisoned('merge-duplicates:commit', e);
         } else {
           console.warn('[loro-doc] Failed to commit duplicate merge:', e);
         }

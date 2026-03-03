@@ -155,6 +155,90 @@ describe('importUpdatesBatch merges duplicate container children', () => {
   });
 });
 
+describe('importUpdatesBatch deduplicates journal hierarchy by name', () => {
+  beforeEach(initDoc);
+
+  it('merges duplicate day nodes with same name under same week', () => {
+    // Session 1: JOURNAL → "2026" → "Week 10" → "Tue, Mar 3" with children
+    const doc1 = new LoroDoc();
+    const tree1 = doc1.getTree('nodes');
+    tree1.enableFractionalIndex(0);
+
+    const root1 = tree1.createNode();
+    root1.data.set('id', 'user_123');
+    const journal1 = tree1.createNode(root1.id);
+    journal1.data.set('id', 'JOURNAL');
+    const trash1 = tree1.createNode(root1.id);
+    trash1.data.set('id', 'TRASH');
+    const year1 = tree1.createNode(journal1.id);
+    year1.data.set('id', 'year_session1');
+    year1.data.set('name', '2026');
+    const week1 = tree1.createNode(year1.id);
+    week1.data.set('id', 'week_session1');
+    week1.data.set('name', 'Week 10');
+    const day1 = tree1.createNode(week1.id);
+    day1.data.set('id', 'day_session1');
+    day1.data.set('name', 'Tue, Mar 3');
+    // Day node has children (user notes from session 1)
+    const note1 = tree1.createNode(day1.id);
+    note1.data.set('id', 'note_anon1');
+    note1.data.set('name', '匿名登录第一次');
+    const note2 = tree1.createNode(day1.id);
+    note2.data.set('id', 'note_google1');
+    note2.data.set('name', 'Google 登录第一次');
+    doc1.commit();
+
+    // Session 2 (local): same hierarchy with different nanoid IDs
+    const localRoot = createNode('user_123', null);
+    const localJournal = createNode('JOURNAL', localRoot);
+    const localTrash = createNode('TRASH', localRoot);
+    const localYear = createNode(undefined, localJournal);
+    setNodeData(localYear, 'name', '2026');
+    const localWeek = createNode(undefined, localYear);
+    setNodeData(localWeek, 'name', 'Week 10');
+    const localDay = createNode(undefined, localWeek);
+    setNodeData(localDay, 'name', 'Tue, Mar 3');
+    const localNote = createNode(undefined, localDay);
+    setNodeData(localNote, 'name', '匿名登录第二次');
+    commitDoc();
+
+    // Import session 1's data
+    const update1 = doc1.export({ mode: 'update' });
+    const result = importUpdatesBatch([update1]);
+
+    expect(result.imported).toBe(1);
+    expect(result.poisoned).toBe(false);
+
+    // After dedup: JOURNAL should have only ONE "2026" year
+    const journalChildren = getChildren('JOURNAL');
+    const yearNames = journalChildren.map(id => {
+      const n = toNodexNode(id);
+      return n?.name;
+    }).filter(Boolean);
+    expect(yearNames.filter(n => n === '2026').length).toBe(1);
+
+    // The surviving year should have only ONE "Week 10"
+    const yearId = journalChildren.find(id => toNodexNode(id)?.name === '2026')!;
+    const weekChildren = getChildren(yearId);
+    const weekNames = weekChildren.map(id => toNodexNode(id)?.name).filter(Boolean);
+    expect(weekNames.filter(n => n === 'Week 10').length).toBe(1);
+
+    // The surviving week should have only ONE "Tue, Mar 3"
+    const weekId = weekChildren.find(id => toNodexNode(id)?.name === 'Week 10')!;
+    const dayChildren = getChildren(weekId);
+    const dayNames = dayChildren.map(id => toNodexNode(id)?.name).filter(Boolean);
+    expect(dayNames.filter(n => n === 'Tue, Mar 3').length).toBe(1);
+
+    // The surviving day should have ALL notes from both sessions
+    const dayId = dayChildren.find(id => toNodexNode(id)?.name === 'Tue, Mar 3')!;
+    const noteChildren = getChildren(dayId);
+    const noteNames = noteChildren.map(id => toNodexNode(id)?.name).filter(Boolean);
+    expect(noteNames).toContain('匿名登录第一次');
+    expect(noteNames).toContain('Google 登录第一次');
+    expect(noteNames).toContain('匿名登录第二次');
+  });
+});
+
 // ============================================================
 // ② Fine-grained subscriptions
 // ============================================================

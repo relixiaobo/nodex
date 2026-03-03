@@ -74,6 +74,7 @@ interface RichTextEditorProps {
   initialText: string;
   initialMarks: TextMark[];
   initialInlineRefs: InlineRefEntry[];
+  readOnly?: boolean;
   onBlur: () => void;
   onEnter: (afterContent?: EditorContentPayload) => void;
   onIndent: () => void;
@@ -172,6 +173,9 @@ export function RichTextEditor(props: RichTextEditorProps) {
 
   const propsRef = useRef(props);
   propsRef.current = props;
+
+  const readOnlyRef = useRef(props.readOnly ?? false);
+  readOnlyRef.current = props.readOnly ?? false;
 
   // Capture content baseline at editor creation time for change detection.
   // NOT updated by re-renders from updateNodeContent (typing) — only updated
@@ -291,7 +295,8 @@ export function RichTextEditor(props: RichTextEditorProps) {
       }
 
       // Insert pending character (selection-mode type-to-edit).
-      const pi = useUIStore.getState().pendingInputChar;
+      // Skip in readOnly mode — system nodes don't accept text input.
+      const pi = !readOnlyRef.current ? useUIStore.getState().pendingInputChar : null;
       if (pi && pi.nodeId === propsRef.current.nodeId && pi.parentId === propsRef.current.parentId) {
         useUIStore.getState().setPendingInputChar(null);
         if (!view.composing) {
@@ -415,6 +420,12 @@ export function RichTextEditor(props: RichTextEditorProps) {
       !!view && (view.composing || isComposingRef.current);
 
     const handleEnter = (view: EditorView) => {
+      // readOnly: create empty sibling without splitting content
+      if (readOnlyRef.current) {
+        propsRef.current.onEnter();
+        return true;
+      }
+
       const intent = resolveNodeEditorEnterIntent({
         referenceActive: propsRef.current.referenceActive ?? false,
         hashTagActive: propsRef.current.hashTagActive ?? false,
@@ -460,6 +471,7 @@ export function RichTextEditor(props: RichTextEditorProps) {
     };
 
     const handleBackspace = (view: EditorView) => {
+      if (readOnlyRef.current) return true; // consume, do nothing
       const parsed = docToMarks(view.state.doc);
       const isEmpty = parsed.text.replace(/\u200B/g, '').trim().length === 0;
       const { from, to } = view.state.selection;
@@ -580,12 +592,14 @@ export function RichTextEditor(props: RichTextEditorProps) {
           return handleEnter(view);
         },
         Tab: (_state, _dispatch, view) => {
+          if (readOnlyRef.current) return true;
           if (isComposing(view)) return false;
           saveContent();
           propsRef.current.onIndent();
           return true;
         },
         'Shift-Tab': (_state, _dispatch, view) => {
+          if (readOnlyRef.current) return true;
           if (isComposing(view)) return false;
           saveContent();
           propsRef.current.onOutdent();
@@ -631,6 +645,7 @@ export function RichTextEditor(props: RichTextEditorProps) {
           return false;
         },
         [KEY_EDITOR_DROPDOWN_FORCE_CREATE]: (_state, _dispatch, view) => {
+          if (readOnlyRef.current) return true;
           if (isComposing(view)) return false;
           const intent = resolveNodeEditorForceCreateIntent(
             {
@@ -652,20 +667,24 @@ export function RichTextEditor(props: RichTextEditorProps) {
           return true;
         },
         [KEY_EDITOR_MOVE_UP]: () => {
+          if (readOnlyRef.current) return true;
           propsRef.current.onMoveUp();
           return true;
         },
         [KEY_EDITOR_MOVE_DOWN]: () => {
+          if (readOnlyRef.current) return true;
           propsRef.current.onMoveDown();
           return true;
         },
         [KEY_EDITOR_EDIT_DESC_PRIMARY]: () => {
+          if (readOnlyRef.current) return true;
           propsRef.current.onDescriptionEdit?.();
           return true;
         },
         ...(KEY_EDITOR_EDIT_DESC_SECONDARY
           ? {
             [KEY_EDITOR_EDIT_DESC_SECONDARY]: () => {
+              if (readOnlyRef.current) return true;
               propsRef.current.onDescriptionEdit?.();
               return true;
             },
@@ -683,11 +702,31 @@ export function RichTextEditor(props: RichTextEditorProps) {
           redoDoc();
           return true;
         },
-        'Mod-b': toggleMark(pmSchema.marks.bold),
-        'Mod-i': toggleMark(pmSchema.marks.italic),
-        'Mod-e': toggleMark(pmSchema.marks.code),
-        'Mod-Shift-s': toggleMark(pmSchema.marks.strike),
-        'Mod-Shift-h': toggleMark(pmSchema.marks.highlight),
+        'Mod-b': (_state, dispatch, _view) => {
+          if (readOnlyRef.current) return true;
+          if (dispatch) return toggleMark(pmSchema.marks.bold)(_state, dispatch, _view);
+          return false;
+        },
+        'Mod-i': (_state, dispatch, _view) => {
+          if (readOnlyRef.current) return true;
+          if (dispatch) return toggleMark(pmSchema.marks.italic)(_state, dispatch, _view);
+          return false;
+        },
+        'Mod-e': (_state, dispatch, _view) => {
+          if (readOnlyRef.current) return true;
+          if (dispatch) return toggleMark(pmSchema.marks.code)(_state, dispatch, _view);
+          return false;
+        },
+        'Mod-Shift-s': (_state, dispatch, _view) => {
+          if (readOnlyRef.current) return true;
+          if (dispatch) return toggleMark(pmSchema.marks.strike)(_state, dispatch, _view);
+          return false;
+        },
+        'Mod-Shift-h': (_state, dispatch, _view) => {
+          if (readOnlyRef.current) return true;
+          if (dispatch) return toggleMark(pmSchema.marks.highlight)(_state, dispatch, _view);
+          return false;
+        },
       }),
       keymap(baseKeymap),
     ];
@@ -717,6 +756,10 @@ export function RichTextEditor(props: RichTextEditorProps) {
     const view = new EditorView(mountRef.current, {
       state,
       dispatchTransaction: (tr) => {
+        // In readOnly mode, silently reject document mutations (typing, paste, etc.)
+        // but still allow selection-only transactions (cursor placement, arrow nav).
+        if (readOnlyRef.current && tr.docChanged) return;
+
         const newState = view.state.apply(tr);
         view.updateState(newState);
         setToolbarTick((value) => value + 1);
@@ -745,7 +788,12 @@ export function RichTextEditor(props: RichTextEditorProps) {
         }
       },
       handleDOMEvents: {
-        paste: (view, event) => {
+        paste: (_view, event) => {
+          if (readOnlyRef.current) {
+            event.preventDefault();
+            return true;
+          }
+          const view = _view;
           const clipboardEvent = event as ClipboardEvent;
           clipboardEvent.preventDefault();
           const plain = clipboardEvent.clipboardData?.getData('text/plain') ?? '';
@@ -1091,7 +1139,7 @@ export function RichTextEditor(props: RichTextEditorProps) {
 
   return (
     <div className="editor-inline">
-      <FloatingToolbar view={viewRef.current} tick={toolbarTick} onTagClick={handleTagClick} />
+      {!props.readOnly && <FloatingToolbar view={viewRef.current} tick={toolbarTick} onTagClick={handleTagClick} />}
       {tagSelectorOpen && (
         <TagSelectorPopover
           anchorTop={tagSelectorAnchor.top}
@@ -1100,7 +1148,7 @@ export function RichTextEditor(props: RichTextEditorProps) {
           onClose={handleTagSelectorClose}
         />
       )}
-      <div ref={mountRef} className="outline-none text-[15px] leading-6" />
+      <div ref={mountRef} className={`outline-none text-[15px] leading-6${props.readOnly ? ' tw-text-muted-foreground/60' : ''}`} />
     </div>
   );
 }

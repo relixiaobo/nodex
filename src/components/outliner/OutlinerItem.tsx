@@ -70,6 +70,7 @@ import { getTreeReferenceBlockReason, isReferenceDisplayCycle } from '../../lib/
 import { focusUndoShortcutSink, ensureUndoFocusAfterNavigation } from '../../lib/focus-utils.js';
 import type { ParsedPasteNode } from '../../lib/paste-parser.js';
 import { t } from '../../i18n/strings.js';
+import { getNodeCapabilities } from '../../lib/node-capabilities.js';
 import { RowHost } from './RowHost.js';
 import { OutlinerRow, useRowSelectionState, useRowPointerHandlers } from './OutlinerRow.js';
 import { NodeContextMenuPortal } from './NodeContextMenu.js';
@@ -258,6 +259,8 @@ export function OutlinerItem({
   const toggleNodeDone = useNodeStore((s) => s.toggleNodeDone);
   const cycleNodeCheckbox = useNodeStore((s) => s.cycleNodeCheckbox);
   const _version = useNodeStore((s) => s._version);
+
+  const canEditNode = useMemo(() => getNodeCapabilities(nodeId).canEditNode, [nodeId]);
 
   const rowRef = useRef<HTMLDivElement>(null);
   const contentAreaRef = useRef<HTMLDivElement>(null);
@@ -620,11 +623,12 @@ export function OutlinerItem({
   }, [nodeId, description, updateNodeDescription]);
 
   const handleDescriptionMouseDown = useCallback((e: React.MouseEvent) => {
+    if (!canEditNode) return;
     e.preventDefault(); // Prevent native focus churn
     captureNameEditorOffset();
     descClickCoordsRef.current = { x: e.clientX, y: e.clientY };
     setEditingDescription(true);
-  }, [captureNameEditorOffset]);
+  }, [canEditNode, captureNameEditorOffset]);
 
   const handleDescriptionBlur = useCallback(() => {
     commitDescriptionDraft();
@@ -706,6 +710,7 @@ export function OutlinerItem({
   }, [editingDescription, description]);
 
   const handleDescriptionEdit = useCallback(() => {
+    if (!canEditNode) return;
     setEditingDescription((prev) => {
       if (!prev) {
         captureNameEditorOffset();
@@ -713,7 +718,7 @@ export function OutlinerItem({
       }
       return !prev;
     });
-  }, [captureNameEditorOffset]);
+  }, [canEditNode, captureNameEditorOffset]);
 
   // Open options picker when selected Options value row/reference is selected
   useEffect(() => {
@@ -2201,6 +2206,7 @@ export function OutlinerItem({
                   initialText={nodeText}
                   initialMarks={nodeMarks}
                   initialInlineRefs={nodeInlineRefs}
+                  readOnly={!canEditNode}
                   onBlur={handleBlur}
                   onEnter={handleEnter}
                   onIndent={handleIndent}

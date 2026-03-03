@@ -1,5 +1,6 @@
 import { isOutlinerContentNodeType } from './node-type-utils.js';
 import type { NodeType } from '../types/index.js';
+import { t } from '../i18n/strings.js';
 
 export type TreeReferenceBlockReason =
   | 'missing_parent'
@@ -87,4 +88,17 @@ export function isReferenceDisplayCycle(
   ancestorEffectiveNodeIds: readonly string[],
 ): boolean {
   return ancestorEffectiveNodeIds.includes(effectiveNodeId);
+}
+
+export function getTreeReferenceBlockMessage(reason: TreeReferenceBlockReason | null): string {
+  switch (reason) {
+    case 'self_parent':
+      return t('reference.blocked.selfChild');
+    case 'would_create_display_cycle':
+      return t('reference.blocked.cycle');
+    case 'missing_parent':
+    case 'missing_target':
+    default:
+      return t('reference.blocked.unavailable');
+  }
 }

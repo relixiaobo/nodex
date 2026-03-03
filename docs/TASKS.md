@@ -205,6 +205,7 @@ _(全部已修复)_
 
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
+| 2026-03-03 | 系统节点只读编辑器 — 容器/workspace home/queryCondition 节点聚焦后文本变灰、输入无效，光标仍可插入（导航用） | nodex | main |
 | 2026-03-03 | 节点右键菜单扩展 — Copy node link（粘贴为 reference）、Duplicate（深拷贝）、Move to（hover flyout 子菜单）、Add tag（搜索+创建）、Add checkbox（动态标签）、Add description + Journal→Daily notes 全局重命名 + 菜单视觉对齐 ToolbarUserMenu 风格 | nodex | main |
 | 2026-03-03 | Web Clip 默认保存到 Today — 高亮/评论/剪藏的 #source 节点默认存入当天日记（非 Inbox）+ findClipNodeByUrl 搜索扩展到 JOURNAL 日节点 | nodex | main |
 | 2026-03-03 | 匿名→登录数据丢失修复 — `bootstrap-containers.ts` reparent 条件改为 `!== wsId` + `workspace-store.ts` 登录后 deferred 迁移 + 孤儿 snapshot 清理 + WASM poison recovery | nodex | main |

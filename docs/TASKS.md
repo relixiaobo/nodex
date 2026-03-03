@@ -49,40 +49,20 @@ _(空)_
 
 ### Bug 修复（待修）
 
-- [x] **Sync 数据恢复失败 — 删除本地 IndexedDB 后无法从服务端恢复数据** — **Root cause**: `subscribeLocalUpdates` 丢弃 `status='local-only'` 时的 bytes，bootstrap 阶段（树创建）操作在 sync 启动前提交→永久丢失→服务端只有文本操作无树结构。**Fix**: sync 启动前 `doc.export({ mode: 'update' })` 全量入队，确保所有本地操作推送到服务端（CRDT 幂等安全）✅（2026-03-01）。**Research**: `docs/research/sync-data-recovery.md`
-- [ ] **匿名→登录数据丢失 — workspace ID 切换导致本地节点变孤儿** — 未登录用户 `ws_xxx` 写的数据，登录后 workspace 切为 `user.id`，容器节点 ID 前缀不匹配，旧数据静默丢失。需要一次性迁移逻辑。**Research**: `docs/research/sync-data-recovery.md`
-- [x] **日期 NodePanel 输入 date field 白屏** — FieldValueOutliner hooks 违规修复（hooks 移到 early return 前）
-- [x] **点击 node 文本中的链接未打开标签页** — 静态内容 + 编辑器 mousedown 双重拦截，单击 chrome.tabs.create 打开
-- [x] **节点内拖选文本误触发节点选中** — use-drag-select 尊重浏览器活跃文本选区
-- [x] **粘贴/剪藏内容中的 #、@ 不应触发下拉菜单** — paste transaction setMeta 跳过 trigger 检测
-- [x] **Field value 验证错误 icon 未垂直居中** — number 等字段输入非法值时，右侧 ⚠ 图标未与行内容垂直居中 ✅（2026-02-27）
-- [x] **Options from Supertags 值选择器** — 后端 `resolveTaggedNodes()` 正确，但 UI 选择器用错了组件（显示所有 supertag 而非 tagged nodes）。修复：新增 `TaggedNodePickerField` 使用 `useFieldOptions` ✅（2026-02-28）
-- [x] **Reference node 在 field value 中不显示 tag** — NodePicker 选中值只显示名称，缺少原节点的 supertag 标记。修复：NodePicker 添加 `ReadOnlyTagLabel` 渲染引用节点的 tags ✅（2026-02-28）
-- [x] **ConfigOutliner/FieldValueOutliner 需双击才能编辑** — 嵌套 useDragSelect（子容器在父 OutlinerView 内）双重激活，清除 focus + justDragged 抑制 click。修复：data-drag-select-scope 属性标记作用域，父级跳过嵌套子级的事件 ✅（2026-02-28）
+_(全部已修复)_
 
 ### v0.1 — 首次上线（Chrome Web Store 发布）
 
 > **上线门槛**：用户可以日常使用的最小完整产品。已有功能（大纲编辑、Supertags、Fields、Date 节点、Web Clipping 基础、Undo/Redo、⌘K 搜索）+ Sync = v0.1。
 
-#### Sync Production 部署
-> Steps 0-9 + Staging 已完成。**Plan**: `docs/plans/sync-incremental-impl.md`
-
-- [x] Production 部署（Cloudflare Workers + D1 + R2 + Google OAuth）✅（2026-02-27）
-- [x] Step 10: Compaction — 服务端 Loro WASM snapshot 合并 + 客户端 batch import + progressive rendering ✅（2026-03-01）
+#### Sync Production 部署 ✅（已完成）
+> Steps 0-10 + Staging + Production 全部完成。**Plan**: `docs/plans/sync-incremental-impl.md`
 
 #### Chrome Web Store 上架准备
 
-- [x] **扩展图标** — 16/32/48/128px PNG（`public/icon/` + preview/dev 变体）✅
-- [x] **商店图标** — 128x128 PNG ✅
-- [x] **商店截图** — 6 张 1280×800（`docs/store-screenshots/`）✅
-- [x] **商店描述** — `docs/store-listing.md`（含权限说明 + 数据披露）✅
-- [x] **隐私政策页面** — `docs/privacy-policy.md` + Worker `/privacy` 端点 ✅
-- [x] **Nodex → soma 改名** — 用户可见名称全部更新 ✅（215acdb）
+- [x] 扩展图标 + 商店图标 + 商店截图 + 商店描述 + 隐私政策 + 改名 + Production build + 开发者账号 + 首版提交 ✅
 - [ ] **产品展示页** — 静态落地页（产品介绍 + 截图 + 安装链接 + 隐私政策），可托管在 Cloudflare Pages 或 GitHub Pages
-- [x] **Production build 清理** — 三环境分离（Store 无 key 无 localhost，Preview/Dev 各自独立 key + icon）✅
-- [x] **开发者账号** — Chrome Web Store 注册（$5）✅ 已提交审核
 - [ ] **新用户引导数据** — 准备一批引导用的种子数据，帮助新用户了解操作方式和功能
-- [x] `npm run zip` → 上传发布 ✅ 首版已提交，正式上线前会再提交一版
 
 ---
 
@@ -99,38 +79,16 @@ _(空)_
 - [ ] Content Script 增强：网页内高亮已剪藏内容、锚点引用
 
 #### 网页剪藏增强 (#30)
-> 浏览器产品的核心价值。基础版已完成，需升级为智能剪藏。
+> 基础版已完成（消息/提取/保存/标签/URL/Toast/正文→子节点 + 默认保存到 Today）。需升级为智能剪藏。
 
-- [x] 基础剪藏链路 ✓（消息/提取/保存/标签/URL/Toast/正文→子节点）
-- [x] **Clip Page Toast 优化** — 成功时静默，仅失败时提示 ✅（2026-02-27）
-- [x] 默认保存到 Today（高亮/评论/剪藏的 #source 节点默认存入当天日记） ✅（2026-03-03）
 - [ ] 保存目标选择 UI — 允许用户选择保存到 Inbox / Today / 指定节点（UI 入口 + 目标选择器）
 - [ ] **AI 智能剪藏** — 自动打标签、提取结构化信息（作者/日期/关键词）、推荐关联到已有笔记
 - [ ] 选中文本剪藏（Content Script 右键菜单 / 浮动按钮 → 剪藏选中段落）
 - [ ] **Twitter/X 剪藏支持** — Clip Page 目前不支持抓取 Twitter/X 内容，需适配其特殊 DOM 结构
 - [ ] 剪藏模板 — 不同网站类型（文章/产品/视频/论文）使用不同 Supertag 模板
-- **Spec**: `docs/features/web-clipping.md`
 
-#### 网页高亮 & 批注（Highlight + Comment）
-> `#highlight` / `#comment` 内置系统标签。高亮存入 Library，clip page 内通过 inline reference 关联。
-> **Plan**: `docs/plans/highlight-annotation-system.md` | **Research**: `docs/research/highlight-comment-design.md`
->
-> 两条并行 PR：
-> - `cc/highlight-editor`（Agent A）— Side Panel / 编辑器侧：系统标签初始化 + highlight-service + # Tag 浮动工具栏 + inline ref 替换 + highlight bullet 渲染
-> - `cc/highlight-webpage`（Agent B）— Content Script / 背景侧：锚点计算 + 网页浮动工具栏 + 高亮 DOM 渲染 + URL clip 查找 + 回显系统
-
-- [x] **研究：数据模型 + 交互设计** ✅（2026-02-27）
-- [x] **技术方案** — `docs/plans/highlight-annotation-system.md` ✅（2026-02-28）
-- [x] **Phase 1: # Tag 浮动工具栏**（`cc/highlight-editor`）— 系统标签初始化 + highlight-service CRUD + FloatingToolbar `# Tag` 按钮 + Tag 选择器 + PM 选区→inline ref 替换 + highlight bullet 颜色 + #comment 子节点 ✅（2026-02-28, PR #111）
-- [x] **Phase 2: Content Script 网页高亮**（`cc/highlight-webpage`）— anchor-utils + messaging 协议 + Shadow DOM 网页工具栏 + 选中→高亮 DOM 渲染 + Background 路由 + URL clip 查找/自动创建 ✅（2026-02-28, PR #112）
-- [x] **Phase 3: 回显 + 双向联动**（`cc/highlight-webpage`）— URL 变更检测 + 四步锚点还原 + 无法定位标记 + Side Panel ↔ CS 双向滚动 ✅（2026-02-28, PR #112）
-- [x] **Review: 整体代码审查** — codex 审查 PR #111 + #112 全部代码（数据模型一致性、消息路由正确性、anchor 还原健壮性、测试覆盖完整性）✅（2026-02-28, PR #113）
-- [x] **数据模型简化** — 4 个模板字段（Source/Anchor/Color/Page URL）→ 1 个 Clip 字段（options_from_supertag → #web_clip）+ anchor 存 description + 颜色使用 tagDef 自身颜色 ✅（2026-02-28）
-- [x] **重命名 #web_clip → #source** — 标签名、字段名（Clip→Source）、导出函数名全部统一 ✅（2026-02-28）
-- [x] **Highlight 下一轮优化**（`cc/highlight-polish`, PR #114）— Clip Page 失效 + 网页工具栏不出现 + 删除不清理 DOM + SPA 导航残留 + anchor 无法还原无反馈 + 多 tab 竞态去重 ✅（2026-02-28）
-- [x] **Highlight 数据模型重构** — highlight 改为 clip page 子节点 + `ancestor_supertag_ref` auto-init 策略（Source 字段自动引用祖先 #source 节点）+ 去重复创建 + anchor JSON 隐藏 + options picker targetId 读取修复 + reference tag inline 对齐 + 18 test ✅（2026-03-01）
-- [x] **Highlight 交互重设计 — Readwise 风格**（`cc/highlight-readwise-ux`, PR #115）— 图标化网页工具栏 + Note 内联输入 + 高亮点击二次工具栏 + 评论图标 + DS 视觉收敛 + 11 test ✅（2026-03-01）
-- [x] **Highlight 双击高亮范围过大 + 重复高亮防护** — `getTextNodesInRange` 改用 `intersectsNode`（修复 Element endContainer）+ `findOverlappingHighlightId` 重叠检测（选中已高亮文本→显示 Delete 工具栏）+ 7 test ✅（2026-03-01）
+#### 网页高亮 & 批注 ✅（已完成）
+> 全部 Phase 完成。**Plan**: `docs/plans/highlight-annotation-system.md` | **Research**: `docs/research/highlight-comment-design.md`
 
 #### AI Chat & 网页辅助 (#29 + #31)
 > 浏览器 + AI = soma 的第二个差异化维度。不只是聊天框，而是理解上下文的知识助手。
@@ -143,48 +101,24 @@ _(空)_
 ### P2 — 知识管理核心能力
 
 #### Search Nodes (#23)
-> 规则驱动的动态集合。物化 reference 结果 + queryCondition 子节点树。
-> **Design**: `docs/plans/search-node-design.md`（唯一设计来源）
->
-> Step 0 已完成（数据模型锁定），Step 1-3 上线后一个 PR 交付。
+> Step 0-3 已完成（数据模型 + 搜索引擎 + L0 标签搜索 + 芯片条渲染）。**Design**: `docs/plans/search-node-design.md`
 
-- [x] Step 0: 数据模型锁定 ✓ nodex（2026-02-26）
-- [x] Step 1: 搜索引擎核心 ✓ tag-search（2026-02-27）— `search-engine.ts`（条件树递归 + 候选集排除 + HAS_TAG/TODO/DONE/NOT_DONE + 24 test）
-- [x] Step 2: L0 点击标签创建 ✓ tag-search（2026-02-27）— TagBadge click → `createSearchNode(tagDefId)` + 去重导航 + 结果物化 + auto-refresh
-- [x] Step 3: 结果渲染增强 — 芯片条（只读）+ TrailingInput（HAS_TAG 自动打标签）
 - [ ] Step 4: L1 字段过滤 UI — 芯片条增删改 + FIELD_IS/时间条件 + 计数提示
 - [ ] Step 5: L2 AI 自然语言 — tool call 创建 queryCondition 树
 
-#### AI Chat & 网页辅助 (#29 + #31)
-> 浏览器 + AI = soma 的第二个差异化维度。不只是聊天框，而是理解上下文的知识助手。
-
-- [ ] **AI Chat 基础** — Side Panel 内嵌对话界面，可引用笔记节点作为上下文
-- [ ] **网页问答** — 选中网页内容 → 在侧边栏中提问/总结/翻译（Content Script + Side Panel 联动）
-- [ ] **笔记问答** — 基于全部笔记回答问题（RAG / 全文搜索 + LLM）
-- [ ] **AI 辅助组织** — 自动打标签建议、推荐关联笔记、内容分类
-
 #### Supertags 完善 (#20)
-> 基础已完成（#触发、标签应用/移除、配置页、模板字段、TagBadge 右键菜单）
+> 基础已完成（#触发、应用/移除、配置页、模板字段、标签页搜索、批量标签操作）
 
-- [x] 标签页（= Search Nodes L0 入口，点击 supertag → 创建/导航 search node，见 #23）✅（1c6f865）
 - [ ] Convert to supertag（普通节点快捷转 tagDef）
 - [ ] Pinned fields（置顶显示 + filter 优先）
 - [ ] Optional fields（建议按钮 + 自动降级）
-- [x] 批量标签操作（多选 add/remove）— `#` 键触发 BatchTagSelector + batchApplyTag/batchRemoveTag ✅（2026-03-01）
 - [ ] Title expression（`${field name}` 动态标题）
-- **Spec**: `docs/features/supertags.md`
 
 #### Fields 全类型 (#21)
-> 基础已完成（Options/Date/Number/URL/Email/Checkbox/隐藏/Required/Min-Max/验证/系统字段）
+> 基础已完成（Options/Date/Number/URL/Email/Checkbox/隐藏/Required/Min-Max/验证/系统字段/去重/删除联动/默认值克隆/Auto-init/Merge）
 
-- [x] **同一节点下重复 field node 去重** — 同一个 node 下不允许出现相同的 field node；若选中了重复的 field，只保留最早的那个
-- [x] **Field / Default Content 删除联动** — 场景 A: 删除模板字段联动清理/脱离；场景 B: 删除 attrDef 保留有值 field + 灰色删除线 ✅（2026-02-27, PR #107, 14 test）
-- [x] **模板字段默认值克隆** — applyTag 时克隆 template fieldEntry 的默认值子节点（name/targetId）；syncTemplateFields 不克隆（只影响新打标签的 node）+ 4 test ✅（2026-02-28）
 - [ ] AttrDef “Used in” 计算字段
-- [x] Auto-initialize（4 种策略：ancestor_supertag_ref / current_date / ancestor_day_node / ancestor_field_value）✅（2026-03-01）
 - [ ] Pinned fields
-- [x] Merge fields — applyTag 时合并模板默认值到已有空字段 ✅（2026-03-01）
-- **Spec**: `docs/features/fields.md`
 
 #### Date 节点 & 日记 (#22)
 > Phase 1 已完成 (PR #73): Year→Week→Day 层级 + Today 入口 + DateNavigationBar + 日历选择器
@@ -205,27 +139,18 @@ _(空)_
 - [ ] Group by：按字段值分组
 - [ ] ViewDef Tuple 持久化（SYS_A16/18/19/20）
 
-#### Trash 彻底删除
-- [x] **支持在 Trash 中永久删除节点** — Trash 内的节点可彻底删除（从数据中移除），提供确认交互 ✅（2026-02-27）
-- [ ] **Trash 交互优化** — 待讨论：批量选中删除、Trash 列表右键菜单（Restore/Delete）、自动清理策略（如 30 天自动删除）、Empty Trash 按钮位置优化
+#### Trash 交互优化
+- [ ] 批量选中删除、右键菜单（Restore/Delete）、自动清理策略（30 天）、Empty Trash 位置优化
 
 #### 图片节点支持
 - [ ] **支持图片 node** — 节点可嵌入/展示图片（上传、粘贴、拖拽），需要存储方案（R2）
 
 ### P3 — 编辑器增强 & 交互完善
 
-#### 空内容节点 "Untitled" 占位 + Tag 间距优化
-- [x] 节点无文本内容只有 #tag 时，tag 前显示 "Untitled" 占位文本（参考 Tana），避免 tag 紧贴 bullet ✅（2026-02-27）
-
 #### NodePanel Title 交互补全
 - [ ] 标题编辑器支持 `@` 触发 ReferenceSelector（插入 inline reference）
 - [ ] 标题编辑器支持 `#` 触发 TagSelector（应用 supertag）
 - [ ] 标题编辑器支持 `Cmd+Enter` 切换 checkbox 状态
-
-#### Shift+Arrow 连续多选中断问题
-- [x] 排查 Shift+↑/↓ 遍历逻辑对 TrailingInput 虚拟节点的处理（应跳过）✅（2026-02-28）
-- [x] 排查 Shift+↑/↓ 遍历逻辑对 field tuple 节点的处理（应纳入或跳过，保持连续）✅（2026-02-28）
-- [x] 补 Vitest 回归用例（含 trailing input + field row 场景）✅（2026-02-28）
 
 #### 节点选中 — 后续增强 (#47)
 - [ ] Cmd+Shift+D 批量复制
@@ -238,9 +163,7 @@ _(空)_
 - **Spec**: `docs/features/references.md`
 
 #### Floating Toolbar 后续 (#46)
-- [ ] **@ Reference 按钮** — 选中文本 → 点击 Floating Toolbar `@ Reference` → 打开 ReferenceSelector（搜索已有节点 / 创建新节点）→ 选中文本替换为所选节点的 inline reference
-- [x] **# Tag 按钮** — 选中文本 → 点击 Floating Toolbar `# Tag` → 打开 TagSelector → 选择 supertag → 选中文本提取为新节点（存入 Library，文本作为节点名 + 应用所选 supertag）→ 原位替换为该节点的 inline reference ✅（2026-02-28, PR #111）
-- **Spec**: `docs/features/floating-toolbar.md`
+- [ ] **@ Reference 按钮** — 选中文本 → 点击 `@ Reference` → ReferenceSelector → 替换为 inline reference
 
 #### Slash Command — 后续命令点亮 (#48)
 - [ ] Paste（依赖 Editor 粘贴增强 Phase 1-3，提供手动选择粘贴模式的入口）
@@ -248,28 +171,6 @@ _(空)_
 - [ ] Image / file（依赖上传与存储）
 - [ ] Checklist（批量 checkbox）
 - **Spec**: `docs/features/slash-command.md`
-
-#### 粘贴系统重做
-> 当前粘贴只读 `text/plain`，不认 HTML 格式、Markdown 层级、`#tag` / `field:: value` 语法。
-> 统一为解析管线：剪贴板 → `paste-parser.ts`（纯函数）→ `ParsedContentNode[]` → store 创建节点。
-> **Plan**: `docs/plans/paste-system-redesign.md`
->
-> | 剪贴板内容 | ⌘V | ⌘⇧V |
-> |------------|-----|------|
-> | 单行纯文本 | 插入原文 ✅ | 插入原文 ✅ |
-> | 单行 URL | 自动转链接 ✅ | 插入原文 ✅ |
-> | 多行纯文本 | 每行一个节点 ✅ | 合并为一行 ✅ |
-> | Markdown 列表 | 按缩进重建节点树 | 合并为一行 |
-> | 富文本 (HTML) | 保留 marks + 按段落拆节点 | 纯文本 |
-> | 含 `#tag` 文本 | 识别并应用 supertag | 纯文本 |
-> | 含 `field:: value` | 识别并创建 field tuple | 纯文本 |
-
-- [x] Phase 0: 单行 URL 智能粘贴 + ⌘⇧V 纯文本 ✅（2026-02-27）
-- [x] Phase 1: 多行拆分为节点 ✅（2026-02-27）
-- [x] Phase 2: 粘贴系统重做 — `paste-parser.ts` 纯函数解析（Markdown 层级 + HTML marks + `#tag` / `field:: value` 识别）+ store `createSiblingNodesFromPaste` 支持树结构 + marks + tag/field 应用 + 接入 RichTextEditor / TrailingInput / OutlinerItem ✅（2026-02-28，PR #109）
-- [x] Phase 3: Code Block 一等节点（`codeBlock` + `codeLanguage`，支持 fenced code / `<pre><code>` 粘贴）✅（2026-02-28，PR #110）
-- [x] Hotfix: VS Code styled HTML 不再覆盖 markdown 解析（`shouldPreferHtml` 区分 genuine rich content vs style-only）✅（2026-02-28）
-- [x] Hotfix: Google Docs `<b>` wrapper 递归解析（`processFlowChildren` 识别含 block 子元素的 inline wrapper）✅（2026-02-28）
 
 #### 性能基线测量
 > **产出**: `docs/research/performance-baseline.md`
@@ -305,6 +206,7 @@ _(空)_
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
 | 2026-03-03 | Web Clip 默认保存到 Today — 高亮/评论/剪藏的 #source 节点默认存入当天日记（非 Inbox）+ findClipNodeByUrl 搜索扩展到 JOURNAL 日节点 | nodex | main |
+| 2026-03-03 | 匿名→登录数据丢失修复 — `bootstrap-containers.ts` reparent 条件改为 `!== wsId` + `workspace-store.ts` 登录后 deferred 迁移 + 孤儿 snapshot 清理 + WASM poison recovery | nodex | main |
 | 2026-03-01 | Sync 数据恢复修复 — `subscribeLocalUpdates` 丢弃 local-only 阶段 bytes 的时序竞态，sync 启动前全量 export 入队确保树操作不丢失 | nodex | main |
 | 2026-03-01 | Highlight 交互重设计（Readwise 风格）— 图标化网页工具栏 + Note 内联输入 + 高亮点击二次工具栏 + 评论图标 + DS 视觉收敛 + 11 test | codex | #115 |
 | 2026-03-01 | Highlight 数据模型重构 — highlight 改为 clip page 子节点 + `ancestor_supertag_ref` auto-init + 去重复创建 + anchor JSON 隐藏 + options picker targetId 修复 + reference tag inline 对齐 | nodex | main |

@@ -20,7 +20,8 @@ import {
   buildHighlightRestorePayload,
   collectAllHighlightNodeIds,
   getRemovedHighlightIds,
-  upsertHighlightNote,
+  saveHighlightNotes,
+  getHighlightNoteTexts,
 } from '../../lib/highlight-sidepanel.js';
 import { findClipNodeByUrl } from '../../lib/webclip-service.js';
 import {
@@ -28,7 +29,8 @@ import {
   HIGHLIGHT_DELETE,
   HIGHLIGHT_CLICK,
   HIGHLIGHT_CHECK_URL,
-  HIGHLIGHT_NOTE_UPSERT,
+  HIGHLIGHT_NOTES_SAVE,
+  HIGHLIGHT_NOTE_GET,
   HIGHLIGHT_RESTORE,
   HIGHLIGHT_REMOVE,
   HIGHLIGHT_UNRESOLVABLE,
@@ -36,7 +38,8 @@ import {
   type HighlightDeletePayload,
   type HighlightClickPayload,
   type HighlightCheckUrlPayload,
-  type HighlightNoteUpsertPayload,
+  type HighlightNotesSavePayload,
+  type HighlightNoteGetPayload,
   type HighlightUnresolvablePayload,
 } from '../../lib/highlight-messaging.js';
 import { ensureContainers } from '../../lib/bootstrap-containers.js';
@@ -302,22 +305,28 @@ export function App({ skipBootstrap = false }: AppProps) {
     return true;
    }
 
-   if (message?.type === HIGHLIGHT_NOTE_UPSERT) {
-    const payload = message.payload as HighlightNoteUpsertPayload | undefined;
-    if (!payload?.id || typeof payload.noteText !== 'string') {
-      sendResponse({ ok: false, error: 'Invalid highlight note payload' });
+   if (message?.type === HIGHLIGHT_NOTES_SAVE) {
+    const payload = message.payload as HighlightNotesSavePayload | undefined;
+    if (!payload?.id || !Array.isArray(payload.noteTexts)) {
+      sendResponse({ ok: false, error: 'Invalid highlight notes save payload' });
       return true;
     }
 
     const store = useNodeStore.getState() as HighlightNodeStore;
     ensureNoteTagDef(store);
-    const result = upsertHighlightNote(store, payload.id, payload.noteText);
-    sendResponse({
-      ok: true,
-      updated: !!result,
-      noteNodeId: result?.noteNodeId,
-      created: result?.created ?? false,
-    });
+    const result = saveHighlightNotes(store, payload.id, payload.noteTexts);
+    sendResponse({ ok: true, ...result });
+    return true;
+   }
+
+   if (message?.type === HIGHLIGHT_NOTE_GET) {
+    const payload = message.payload as HighlightNoteGetPayload | undefined;
+    if (!payload?.id) {
+      sendResponse({ ok: false, error: 'Invalid highlight note get payload' });
+      return true;
+    }
+    const noteTexts = getHighlightNoteTexts(payload.id);
+    sendResponse({ ok: true, noteTexts });
     return true;
    }
 

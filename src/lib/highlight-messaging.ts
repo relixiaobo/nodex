@@ -24,8 +24,11 @@ export const HIGHLIGHT_SCROLL_TO = 'highlight:scroll-to' as const;
 /** Content Script -> Side Panel: user clicked a highlight on the page */
 export const HIGHLIGHT_CLICK = 'highlight:click' as const;
 
-/** Content Script -> Side Panel: add/update note text for a highlight */
-export const HIGHLIGHT_NOTE_UPSERT = 'highlight:note-upsert' as const;
+/** Content Script -> Side Panel: batch save notes for a highlight */
+export const HIGHLIGHT_NOTES_SAVE = 'highlight:notes-save' as const;
+
+/** Content Script -> Side Panel: get existing note texts for a highlight */
+export const HIGHLIGHT_NOTE_GET = 'highlight:note-get' as const;
 
 /** Background -> Side Panel: check if current URL has highlight data */
 export const HIGHLIGHT_CHECK_URL = 'highlight:check-url' as const;
@@ -88,12 +91,18 @@ export interface HighlightClickPayload {
   id: string;
 }
 
-/** CS -> SP: Add/update note text for highlight's #comment child */
-export interface HighlightNoteUpsertPayload {
+/** CS -> SP: Batch save notes for a highlight (replaces old single-note upsert) */
+export interface HighlightNotesSavePayload {
   /** soma node ID of the highlight */
   id: string;
-  /** note content; empty string is ignored */
-  noteText: string;
+  /** All note texts; empty strings are filtered out before saving */
+  noteTexts: string[];
+}
+
+/** CS -> SP: Get existing note texts for a highlight */
+export interface HighlightNoteGetPayload {
+  /** soma node ID of the highlight */
+  id: string;
 }
 
 /** BG -> SP: Check if URL has highlight data */
@@ -122,7 +131,8 @@ export type HighlightMessage =
   | { type: typeof HIGHLIGHT_DELETE; payload: HighlightDeletePayload }
   | { type: typeof HIGHLIGHT_SCROLL_TO; payload: HighlightScrollToPayload }
   | { type: typeof HIGHLIGHT_CLICK; payload: HighlightClickPayload }
-  | { type: typeof HIGHLIGHT_NOTE_UPSERT; payload: HighlightNoteUpsertPayload }
+  | { type: typeof HIGHLIGHT_NOTES_SAVE; payload: HighlightNotesSavePayload }
+  | { type: typeof HIGHLIGHT_NOTE_GET; payload: HighlightNoteGetPayload }
   | { type: typeof HIGHLIGHT_CHECK_URL; payload: HighlightCheckUrlPayload }
   | { type: typeof HIGHLIGHT_CHECK_URL_REQUEST; payload: HighlightCheckUrlRequestPayload }
   | { type: typeof HIGHLIGHT_UNRESOLVABLE; payload: HighlightUnresolvablePayload };

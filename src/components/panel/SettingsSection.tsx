@@ -7,7 +7,7 @@
  * Values are read/written via ui-store (persisted to chrome.storage).
  */
 import { useCallback } from 'react';
-import { Highlighter } from '../../lib/icons.js';
+import { ToggleLeft } from '../../lib/icons.js';
 import { useUIStore } from '../../stores/ui-store.js';
 import { BulletChevron } from '../outliner/BulletChevron.js';
 import { FIELD_VALUE_INSET } from '../fields/field-layout.js';
@@ -51,7 +51,7 @@ export function SettingsSection() {
         {/* Name column — icon + name + description */}
         <div className="flex gap-1 @sm:shrink-0 @sm:w-[180px] min-w-0 min-h-6 py-1">
           <span className="shrink-0 w-[15px] flex items-start justify-center text-foreground-tertiary mt-1.5">
-            <Highlighter size={12} />
+            <ToggleLeft size={12} />
           </span>
           <div className="flex-1 min-w-0">
             <span className="block text-[15px] font-medium leading-6 text-foreground">

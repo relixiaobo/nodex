@@ -8,7 +8,8 @@ import {
   HIGHLIGHT_CREATE,
   HIGHLIGHT_DELETE,
   HIGHLIGHT_CLICK,
-  HIGHLIGHT_NOTE_UPSERT,
+  HIGHLIGHT_NOTES_SAVE,
+  HIGHLIGHT_NOTE_GET,
   HIGHLIGHT_UNRESOLVABLE,
   HIGHLIGHT_RESTORE,
   HIGHLIGHT_REMOVE,
@@ -224,8 +225,8 @@ export default defineBackground(() => {
       return true;
     }
 
-    // ── Highlight Delete / Note Upsert: Content Script -> BG -> Side Panel ──
-    if (type === HIGHLIGHT_DELETE || type === HIGHLIGHT_NOTE_UPSERT) {
+    // ── Highlight Delete / Notes Save / Note Get: Content Script -> BG -> Side Panel ──
+    if (type === HIGHLIGHT_DELETE || type === HIGHLIGHT_NOTES_SAVE || type === HIGHLIGHT_NOTE_GET) {
       const tabId = sender.tab?.id;
       if (!tabId) return false;
       chrome.runtime.sendMessage(

@@ -14,7 +14,8 @@ import {
   findOrCreateClipNodeForUrl,
   collectAllHighlightNodeIds,
   getRemovedHighlightIds,
-  upsertHighlightNote,
+  saveHighlightNotes,
+  getHighlightNoteTexts,
 } from '../../src/lib/highlight-sidepanel.js';
 import type { HighlightCreatePayload } from '../../src/lib/highlight-messaging.js';
 import * as loroDoc from '../../src/lib/loro-doc.js';
@@ -130,25 +131,49 @@ describe('highlight-sidepanel', () => {
   it('sets hasComment=true in restore payload when highlight has #note child', async () => {
     const store = getStore();
     const result = await createHighlightFromPayload(makePayload(), store);
-    upsertHighlightNote(store, result.highlightNodeId, 'note');
+    saveHighlightNotes(store, result.highlightNodeId, ['note']);
 
     const payload = buildHighlightRestorePayload(result.clipNodeId);
     const item = payload.highlights.find((h) => h.id === result.highlightNodeId);
     expect(item?.hasComment).toBe(true);
   });
 
-  it('upserts note by updating existing #note child instead of duplicating', async () => {
+  it('batch saves notes: updates existing, creates new, deletes excess', async () => {
     const store = getStore();
     const result = await createHighlightFromPayload(makePayload({ noteText: 'first' }), store);
 
-    const first = upsertHighlightNote(store, result.highlightNodeId, 'second');
-    expect(first?.created).toBe(false);
+    // Update the existing note and add a second
+    const saveResult = saveHighlightNotes(store, result.highlightNodeId, ['updated', 'second']);
+    expect(saveResult.kept).toBe(1);
+    expect(saveResult.created).toBe(1);
+    expect(saveResult.deleted).toBe(0);
 
-    const comments = store
-      .getChildren(result.highlightNodeId)
-      .filter((n) => n.tags.includes(SYS_T.NOTE));
-    expect(comments).toHaveLength(1);
-    expect(comments[0].name).toBe('second');
+    const texts = getHighlightNoteTexts(result.highlightNodeId);
+    expect(texts).toEqual(['updated', 'second']);
+  });
+
+  it('batch save filters empty strings and deletes excess notes', async () => {
+    const store = getStore();
+    const result = await createHighlightFromPayload(makePayload({ noteText: 'first' }), store);
+    // Add a second note so we have 2 existing notes
+    saveHighlightNotes(store, result.highlightNodeId, ['first', 'second']);
+
+    // Save with only 1 non-empty text + empties → filters empties, deletes excess node
+    const saveResult = saveHighlightNotes(store, result.highlightNodeId, ['kept', '', '']);
+    expect(saveResult.kept).toBe(1);
+    expect(saveResult.deleted).toBe(1);
+
+    const texts = getHighlightNoteTexts(result.highlightNodeId);
+    expect(texts).toEqual(['kept']);
+  });
+
+  it('getHighlightNoteTexts returns all #note child texts in order', async () => {
+    const store = getStore();
+    const result = await createHighlightFromPayload(makePayload(), store);
+    saveHighlightNotes(store, result.highlightNodeId, ['alpha', 'beta', 'gamma']);
+
+    const texts = getHighlightNoteTexts(result.highlightNodeId);
+    expect(texts).toEqual(['alpha', 'beta', 'gamma']);
   });
 
   it('deduplicates concurrent clip creation for the same normalized URL', async () => {

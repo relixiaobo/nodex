@@ -10,7 +10,7 @@ import {
   HIGHLIGHT_DELETE,
   HIGHLIGHT_SCROLL_TO,
   HIGHLIGHT_CLICK,
-  HIGHLIGHT_NOTE_UPSERT,
+  HIGHLIGHT_NOTES_SAVE,
   HIGHLIGHT_CHECK_URL,
   HIGHLIGHT_CHECK_URL_REQUEST,
   HIGHLIGHT_UNRESOLVABLE,
@@ -22,7 +22,7 @@ import type {
   HighlightDeletePayload,
   HighlightScrollToPayload,
   HighlightClickPayload,
-  HighlightNoteUpsertPayload,
+  HighlightNotesSavePayload,
   HighlightCheckUrlPayload,
   HighlightCheckUrlRequestPayload,
   HighlightUnresolvablePayload,
@@ -61,8 +61,8 @@ describe('message type constants', () => {
     expect(HIGHLIGHT_CLICK).toBe('highlight:click');
   });
 
-  it('HIGHLIGHT_NOTE_UPSERT is "highlight:note-upsert"', () => {
-    expect(HIGHLIGHT_NOTE_UPSERT).toBe('highlight:note-upsert');
+  it('HIGHLIGHT_NOTES_SAVE is "highlight:notes-save"', () => {
+    expect(HIGHLIGHT_NOTES_SAVE).toBe('highlight:notes-save');
   });
 
   it('HIGHLIGHT_CHECK_URL is "highlight:check-url"', () => {
@@ -85,7 +85,7 @@ describe('message type constants', () => {
       HIGHLIGHT_DELETE,
       HIGHLIGHT_SCROLL_TO,
       HIGHLIGHT_CLICK,
-      HIGHLIGHT_NOTE_UPSERT,
+      HIGHLIGHT_NOTES_SAVE,
       HIGHLIGHT_CHECK_URL,
       HIGHLIGHT_CHECK_URL_REQUEST,
       HIGHLIGHT_UNRESOLVABLE,
@@ -103,7 +103,7 @@ describe('message type constants', () => {
       HIGHLIGHT_DELETE,
       HIGHLIGHT_SCROLL_TO,
       HIGHLIGHT_CLICK,
-      HIGHLIGHT_NOTE_UPSERT,
+      HIGHLIGHT_NOTES_SAVE,
       HIGHLIGHT_CHECK_URL,
       HIGHLIGHT_CHECK_URL_REQUEST,
       HIGHLIGHT_UNRESOLVABLE,
@@ -218,13 +218,13 @@ describe('payload types', () => {
     expect(payload.id).toBe('node-789');
   });
 
-  it('HighlightNoteUpsertPayload has id and noteText', () => {
-    const payload: HighlightNoteUpsertPayload = {
+  it('HighlightNotesSavePayload has id and noteTexts', () => {
+    const payload: HighlightNotesSavePayload = {
       id: 'node-789',
-      noteText: 'note',
+      noteTexts: ['note 1', 'note 2'],
     };
     expect(payload.id).toBe('node-789');
-    expect(payload.noteText).toBe('note');
+    expect(payload.noteTexts).toEqual(['note 1', 'note 2']);
   });
 
   it('HighlightCheckUrlPayload has url and tabId', () => {

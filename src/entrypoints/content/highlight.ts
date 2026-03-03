@@ -26,12 +26,14 @@ import {
   HIGHLIGHT_CREATE,
   HIGHLIGHT_CLICK,
   HIGHLIGHT_DELETE,
-  HIGHLIGHT_NOTE_UPSERT,
+  HIGHLIGHT_NOTES_SAVE,
+  HIGHLIGHT_NOTE_GET,
   HIGHLIGHT_CHECK_URL_REQUEST,
   type HighlightCreatePayload,
   type HighlightClickPayload,
   type HighlightDeletePayload,
-  type HighlightNoteUpsertPayload,
+  type HighlightNotesSavePayload,
+  type HighlightNoteGetPayload,
   type HighlightCheckUrlRequestPayload,
 } from '../../lib/highlight-messaging.js';
 import { WEBCLIP_CAPTURE_ACTIVE_TAB } from '../../lib/webclip-messaging.js';
@@ -553,15 +555,9 @@ function handleToolbarAction(action: ToolbarAction): void {
     case 'note':
       createHighlightWithNote(range);
       break;
-    case 'more':
-      // Reserved for future action menu.
-      break;
     case 'clip':
       // Delegate to existing webclip capture
       chrome.runtime.sendMessage({ type: WEBCLIP_CAPTURE_ACTIVE_TAB });
-      break;
-    case 'tag':
-      // Reserved for future tag assignment workflow.
       break;
   }
 
@@ -591,12 +587,14 @@ function createHighlightWithNote(range: Range): void {
   showNotePopover(
     rect,
     {
-      onSave: (text) => {
-        const noteText = text.trim();
+      onSave: (texts) => {
+        const nonEmpty = texts.filter((t) => t.trim());
         pendingNoteDraft = null;
+        // Use first non-empty text as the inline noteText for the create payload
+        const firstNote = nonEmpty[0]?.trim();
         persistHighlightDraft(draft, {
-          withNote: noteText.length > 0,
-          noteText: noteText.length > 0 ? noteText : undefined,
+          withNote: nonEmpty.length > 0,
+          noteText: firstNote || undefined,
         });
       },
       onCancel: () => {
@@ -606,6 +604,7 @@ function createHighlightWithNote(range: Range): void {
     },
     {
       placeholder: 'Add a note...',
+      initialTexts: [''],
     },
   );
 }
@@ -674,36 +673,50 @@ function persistHighlightDraft(
 function showNotePopoverForExistingHighlight(highlightId: string, rect: DOMRect): void {
   pendingExistingHighlightNoteId = highlightId;
   pendingNoteDraft = null;
-  showNotePopover(
-    rect,
-    {
-      onSave: (text) => {
-        const noteText = text.trim();
-        if (!noteText) return;
-        pendingExistingHighlightNoteId = null;
 
-        const payload: HighlightNoteUpsertPayload = {
-          id: highlightId,
-          noteText,
-        };
-        chrome.runtime.sendMessage({
-          type: HIGHLIGHT_NOTE_UPSERT,
-          payload,
-        }, () => {
-          if (chrome.runtime.lastError) {
-            console.warn('[soma] Failed to upsert highlight note:', chrome.runtime.lastError.message);
-            return;
-          }
-          renderCommentBadge(highlightId);
-        });
-      },
-      onCancel: () => {
-        pendingExistingHighlightNoteId = null;
-        hideHighlightActionsToolbar();
-      },
-    },
-    {
-      placeholder: 'Add a note...',
+  // Fetch existing note texts before opening the popover
+  const getPayload: HighlightNoteGetPayload = { id: highlightId };
+  chrome.runtime.sendMessage(
+    { type: HIGHLIGHT_NOTE_GET, payload: getPayload },
+    (response) => {
+      const existingTexts: string[] = response?.noteTexts ?? [];
+      // Always show at least one empty item for input
+      const initialTexts = existingTexts.length > 0 ? existingTexts : [''];
+
+      showNotePopover(
+        rect,
+        {
+          onSave: (texts) => {
+            const nonEmpty = texts.filter((t) => t.trim());
+            pendingExistingHighlightNoteId = null;
+
+            const payload: HighlightNotesSavePayload = {
+              id: highlightId,
+              noteTexts: nonEmpty,
+            };
+            chrome.runtime.sendMessage({
+              type: HIGHLIGHT_NOTES_SAVE,
+              payload,
+            }, () => {
+              if (chrome.runtime.lastError) {
+                console.warn('[soma] Failed to save highlight notes:', chrome.runtime.lastError.message);
+                return;
+              }
+              if (nonEmpty.length > 0) {
+                renderCommentBadge(highlightId);
+              }
+            });
+          },
+          onCancel: () => {
+            pendingExistingHighlightNoteId = null;
+            hideHighlightActionsToolbar();
+          },
+        },
+        {
+          placeholder: 'Add a note...',
+          initialTexts,
+        },
+      );
     },
   );
 }

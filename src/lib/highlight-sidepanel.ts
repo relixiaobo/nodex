@@ -16,9 +16,10 @@ export interface CreateHighlightFromPayloadResult {
   clipNodeId: string;
 }
 
-export interface UpsertHighlightNoteResult {
-  noteNodeId: string;
-  created: boolean;
+export interface SaveHighlightNotesResult {
+  kept: number;
+  created: number;
+  deleted: number;
 }
 
 const pendingClipCreationByUrl = new Map<string, Promise<string>>();
@@ -126,39 +127,67 @@ export async function createHighlightFromPayload(
   };
 }
 
-export function upsertHighlightNote(
+/**
+ * Batch save notes for a highlight.
+ * Aligns incoming texts with existing #note children by index:
+ * - matching index → update text if changed
+ * - extra texts → create new #note nodes
+ * - extra existing nodes → delete
+ * Empty strings are filtered out before processing.
+ */
+export function saveHighlightNotes(
   store: HighlightNodeStore,
   highlightNodeId: string,
-  noteText: string,
-): UpsertHighlightNoteResult | null {
-  const trimmed = noteText.trim();
-  if (!trimmed) return null;
+  texts: string[],
+): SaveHighlightNotesResult {
+  const nonEmpty = texts.map((t) => t.trim()).filter(Boolean);
 
-  const existing = store
-    .getChildren(highlightNodeId)
-    .find((child) => child.tags.includes(SYS_T.NOTE));
-
-  if (existing) {
-    if (existing.name !== trimmed) {
-      loroDoc.setNodeRichTextContent(
-        existing.id,
-        trimmed,
-        existing.marks ?? [],
-        existing.inlineRefs ?? [],
-      );
-      loroDoc.commitDoc();
+  // Gather existing #note children in order
+  const existingNotes: { id: string; name: string }[] = [];
+  const childIds = loroDoc.getChildren(highlightNodeId);
+  for (const childId of childIds) {
+    const child = loroDoc.toNodexNode(childId);
+    if (child?.tags.includes(SYS_T.NOTE)) {
+      existingNotes.push({ id: child.id, name: child.name ?? '' });
     }
-    return {
-      noteNodeId: existing.id,
-      created: false,
-    };
   }
 
-  const created = createNoteNode(store, highlightNodeId, trimmed);
-  return {
-    noteNodeId: created.id,
-    created: true,
-  };
+  let kept = 0;
+  let created = 0;
+  let deleted = 0;
+
+  // Update or create
+  for (let i = 0; i < nonEmpty.length; i++) {
+    if (i < existingNotes.length) {
+      // Update existing node if text changed
+      if (existingNotes[i].name !== nonEmpty[i]) {
+        const existing = loroDoc.toNodexNode(existingNotes[i].id);
+        loroDoc.setNodeRichTextContent(
+          existingNotes[i].id,
+          nonEmpty[i],
+          existing?.marks ?? [],
+          existing?.inlineRefs ?? [],
+        );
+      }
+      kept++;
+    } else {
+      // Create new note node
+      createNoteNode(store, highlightNodeId, nonEmpty[i]);
+      created++;
+    }
+  }
+
+  // Delete excess existing notes (move to trash)
+  for (let i = nonEmpty.length; i < existingNotes.length; i++) {
+    loroDoc.moveNode(existingNotes[i].id, CONTAINER_IDS.TRASH);
+    deleted++;
+  }
+
+  if (kept > 0 || created > 0 || deleted > 0) {
+    loroDoc.commitDoc();
+  }
+
+  return { kept, created, deleted };
 }
 
 export function buildHighlightRestorePayload(clipNodeId: string): HighlightRestorePayload {
@@ -196,7 +225,21 @@ function hasNoteChild(highlightNodeId: string): boolean {
   const children = loroDoc.getChildren(highlightNodeId);
   for (const childId of children) {
     const child = loroDoc.toNodexNode(childId);
-    if (child?.tags.includes(SYS_T.NOTE)) return true;
+    // Skip template-generated fieldEntry nodes — only count user content nodes
+    if (child && child.type !== 'fieldEntry') return true;
   }
   return false;
+}
+
+/** Return all note texts for a highlight (from #note-tagged children). */
+export function getHighlightNoteTexts(highlightNodeId: string): string[] {
+  const texts: string[] = [];
+  const children = loroDoc.getChildren(highlightNodeId);
+  for (const childId of children) {
+    const child = loroDoc.toNodexNode(childId);
+    if (child?.tags.includes(SYS_T.NOTE)) {
+      texts.push(child.name ?? '');
+    }
+  }
+  return texts;
 }

@@ -11,7 +11,7 @@
 
 // ── Types ──
 
-export type ToolbarAction = 'highlight' | 'note' | 'tag' | 'more' | 'clip';
+export type ToolbarAction = 'highlight' | 'note' | 'clip';
 export type ToolbarActionCallback = (action: ToolbarAction) => void;
 
 export interface HighlightActionsCallbacks {
@@ -20,12 +20,12 @@ export interface HighlightActionsCallbacks {
 }
 
 export interface NotePopoverCallbacks {
-  onSave: (text: string) => void;
+  onSave: (texts: string[]) => void;
   onCancel: () => void;
 }
 
 export interface NotePopoverOptions {
-  initialText?: string;
+  initialTexts?: string[];
   placeholder?: string;
 }
 
@@ -43,7 +43,7 @@ let highlightActionsCallbacks: HighlightActionsCallbacks | null = null;
 
 let notePopoverElement: HTMLDivElement | null = null;
 let notePopoverShadowRoot: ShadowRoot | null = null;
-let notePopoverTextarea: HTMLTextAreaElement | null = null;
+let notePopoverListElement: HTMLDivElement | null = null;
 let notePopoverCallbacks: NotePopoverCallbacks | null = null;
 
 // ── Shared Styles ──
@@ -127,11 +127,23 @@ ${HOST_STYLE}
 .soma-highlight-actions {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px;
+  gap: 4px;
+  padding: 4px;
   background: #F5F4EE;
   border-radius: 8px;
   ${PAPER_SHADOW}
+  animation: soma-toolbar-in 0.12s ease-out;
+}
+
+@keyframes soma-toolbar-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 button {
@@ -139,12 +151,11 @@ button {
   box-sizing: border-box;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 8px;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
   border-radius: 7px;
   color: #1A1A1A;
-  font-size: 12px;
-  font-weight: 500;
   cursor: pointer;
   transition: background 0.15s ease-out, color 0.15s ease-out;
 }
@@ -166,8 +177,8 @@ button[data-action='delete']:hover {
 }
 
 .icon {
-  width: 14px;
-  height: 14px;
+  width: 15px;
+  height: 15px;
   flex-shrink: 0;
 }
 `;
@@ -186,30 +197,53 @@ ${HOST_STYLE}
   ${PAPER_SHADOW}
 }
 
-textarea {
-  all: unset;
-  box-sizing: border-box;
-  min-height: 86px;
-  max-height: 180px;
-  width: 100%;
-  overflow: auto;
-  border-radius: 8px;
-  padding: 8px 9px;
-  background: #FFFFFF;
-  border: 1px solid rgba(0, 0, 0, 0.1);
+.soma-note-list {
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.soma-note-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 4px 6px;
+  min-height: 24px;
+}
+
+.soma-note-bullet {
+  flex-shrink: 0;
+  width: 15px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+}
+
+.soma-note-bullet::after {
+  content: '';
+  display: block;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: rgba(26, 26, 26, 0.40);
+}
+
+.soma-note-editor {
+  flex: 1;
+  min-height: 24px;
+  outline: none;
   color: #1A1A1A;
-  font-size: 13px;
-  line-height: 20px;
-  transition: border-color 0.15s ease-out, box-shadow 0.15s ease-out;
+  font-size: 15px;
+  line-height: 24px;
+  word-break: break-word;
+  white-space: pre-wrap;
 }
 
-textarea:focus {
-  border-color: rgba(0, 0, 0, 0.18);
-  box-shadow: 0 0 0 2px rgba(94, 142, 101, 0.2);
-}
-
-textarea::placeholder {
+.soma-note-editor:empty::before {
+  content: attr(data-placeholder);
   color: #999999;
+  pointer-events: none;
 }
 
 .actions {
@@ -253,9 +287,7 @@ button[data-action='save']:hover {
 
 const ICON_HIGHLIGHT = `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 11-6 6v3h9l3-3"/><path d="m22 12-4.6 4.6a2 2 0 0 1-2.8 0l-5.2-5.2a2 2 0 0 1 0-2.8L14 4"/></svg>`;
 const ICON_NOTE = `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>`;
-const ICON_TAG = `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41 11 3H4v7l9.59 9.59a2 2 0 0 0 2.82 0l4.18-4.18a2 2 0 0 0 0-2.82Z"/><path d="M7 7h.01"/></svg>`;
-const ICON_MORE = `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>`;
-const ICON_DELETE = `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"/><path d="M19 6l-1 14a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1L5 6"/></svg>`;
+const ICON_HIGHLIGHT_OFF = `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 11-6 6v3h9l3-3"/><path d="m22 12-4.6 4.6a2 2 0 0 1-2.8 0l-5.2-5.2a2 2 0 0 1 0-2.8L14 4"/><line x1="2" y1="2" x2="22" y2="22"/></svg>`;
 
 // ── Helpers ──
 
@@ -283,13 +315,6 @@ function createIconButton(action: string, icon: string, label: string): HTMLButt
   btn.setAttribute('title', label);
   btn.setAttribute('aria-label', label);
   btn.innerHTML = icon;
-  return btn;
-}
-
-function createLabeledButton(action: string, icon: string, label: string): HTMLButtonElement {
-  const btn = document.createElement('button');
-  btn.setAttribute('data-action', action);
-  btn.innerHTML = `${icon}<span>${label}</span>`;
   return btn;
 }
 
@@ -337,8 +362,6 @@ function buildSelectionToolbar(): void {
   bar.className = 'soma-floating-bar';
   bar.appendChild(createIconButton('highlight', ICON_HIGHLIGHT, 'Highlight'));
   bar.appendChild(createIconButton('note', ICON_NOTE, 'Note'));
-  bar.appendChild(createIconButton('tag', ICON_TAG, 'Tag'));
-  bar.appendChild(createIconButton('more', ICON_MORE, 'More'));
 
   root.appendChild(createStyle(FLOATING_BAR_STYLE));
   root.appendChild(bar);
@@ -393,8 +416,8 @@ function buildHighlightActionsToolbar(): void {
 
   const bar = document.createElement('div');
   bar.className = 'soma-highlight-actions';
-  bar.appendChild(createLabeledButton('delete', ICON_DELETE, 'Delete'));
-  bar.appendChild(createLabeledButton('add-note', ICON_NOTE, 'Add note'));
+  bar.appendChild(createIconButton('delete', ICON_HIGHLIGHT_OFF, 'Remove highlight'));
+  bar.appendChild(createIconButton('add-note', ICON_NOTE, 'Add note'));
 
   root.appendChild(createStyle(ACTIONS_BAR_STYLE));
   root.appendChild(bar);
@@ -451,6 +474,73 @@ export function hideHighlightActionsToolbar(): void {
 
 // ── Note Popover ──
 
+// ── Note List Helpers ──
+
+function createNoteItem(text: string, placeholder: string): HTMLDivElement {
+  const item = document.createElement('div');
+  item.className = 'soma-note-item';
+
+  const bullet = document.createElement('span');
+  bullet.className = 'soma-note-bullet';
+
+  const editor = document.createElement('div');
+  editor.className = 'soma-note-editor';
+  editor.setAttribute('contenteditable', 'true');
+  editor.setAttribute('data-placeholder', placeholder);
+  if (text) editor.textContent = text;
+
+  item.appendChild(bullet);
+  item.appendChild(editor);
+  return item;
+}
+
+function collectNoteTexts(): string[] {
+  if (!notePopoverListElement) return [];
+  const items = notePopoverListElement.querySelectorAll('.soma-note-editor');
+  const texts: string[] = [];
+  items.forEach((el) => {
+    texts.push((el as HTMLElement).textContent ?? '');
+  });
+  return texts;
+}
+
+function getNoteItems(): HTMLDivElement[] {
+  if (!notePopoverListElement) return [];
+  return Array.from(notePopoverListElement.querySelectorAll('.soma-note-item')) as HTMLDivElement[];
+}
+
+function focusEditorAtEnd(editor: HTMLElement): void {
+  editor.focus();
+  const sel = window.getSelection();
+  if (!sel) return;
+  const range = document.createRange();
+  range.selectNodeContents(editor);
+  range.collapse(false);
+  sel.removeAllRanges();
+  sel.addRange(range);
+}
+
+function focusEditorAtStart(editor: HTMLElement): void {
+  editor.focus();
+  const sel = window.getSelection();
+  if (!sel) return;
+  const range = document.createRange();
+  range.selectNodeContents(editor);
+  range.collapse(true);
+  sel.removeAllRanges();
+  sel.addRange(range);
+}
+
+function getCursorOffset(editor: HTMLElement): number {
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0) return -1;
+  const range = sel.getRangeAt(0);
+  const preRange = document.createRange();
+  preRange.selectNodeContents(editor);
+  preRange.setEnd(range.startContainer, range.startOffset);
+  return preRange.toString().length;
+}
+
 function buildNotePopover(): void {
   const { host, root } = createShadowHost();
   notePopoverElement = host;
@@ -459,8 +549,9 @@ function buildNotePopover(): void {
   const popover = document.createElement('div');
   popover.className = 'soma-note-popover';
 
-  const textarea = document.createElement('textarea');
-  notePopoverTextarea = textarea;
+  const noteList = document.createElement('div');
+  noteList.className = 'soma-note-list';
+  notePopoverListElement = noteList;
 
   const actions = document.createElement('div');
   actions.className = 'actions';
@@ -476,7 +567,7 @@ function buildNotePopover(): void {
   actions.appendChild(cancelButton);
   actions.appendChild(saveButton);
 
-  popover.appendChild(textarea);
+  popover.appendChild(noteList);
   popover.appendChild(actions);
 
   root.appendChild(createStyle(NOTE_POPOVER_STYLE));
@@ -498,14 +589,24 @@ function buildNotePopover(): void {
     }
 
     if (action === 'save') {
-      notePopoverCallbacks.onSave(notePopoverTextarea?.value ?? '');
+      notePopoverCallbacks.onSave(collectNoteTexts());
       hideNotePopover();
     }
   });
 
-  popover.addEventListener('keydown', (e) => {
+  // Keyboard handling for the note list (Enter, Backspace, ArrowUp/Down, Cmd+Enter, Escape)
+  noteList.addEventListener('keydown', (e) => {
     if (!notePopoverCallbacks) return;
 
+    // Cmd/Ctrl+Enter → Save
+    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+      e.preventDefault();
+      notePopoverCallbacks.onSave(collectNoteTexts());
+      hideNotePopover();
+      return;
+    }
+
+    // Escape → Cancel
     if (e.key === 'Escape') {
       e.preventDefault();
       notePopoverCallbacks.onCancel();
@@ -513,10 +614,76 @@ function buildNotePopover(): void {
       return;
     }
 
-    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+    const activeEditor = notePopoverShadowRoot?.activeElement as HTMLElement | null;
+    if (!activeEditor?.classList.contains('soma-note-editor')) return;
+    const currentItem = activeEditor.closest('.soma-note-item') as HTMLDivElement | null;
+    if (!currentItem) return;
+
+    const items = getNoteItems();
+    const idx = items.indexOf(currentItem);
+
+    // Enter → Insert new item below
+    if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      notePopoverCallbacks.onSave(notePopoverTextarea?.value ?? '');
-      hideNotePopover();
+      const newItem = createNoteItem('', activeEditor.getAttribute('data-placeholder') ?? '');
+      currentItem.after(newItem);
+      const newEditor = newItem.querySelector('.soma-note-editor') as HTMLElement;
+      focusEditorAtStart(newEditor);
+      return;
+    }
+
+    // Backspace on empty item → remove and focus previous
+    if (e.key === 'Backspace') {
+      const text = activeEditor.textContent ?? '';
+      const offset = getCursorOffset(activeEditor);
+      if (text === '' && items.length > 1) {
+        e.preventDefault();
+        const prevIdx = Math.max(0, idx - 1);
+        const prevEditor = items[prevIdx].querySelector('.soma-note-editor') as HTMLElement;
+        currentItem.remove();
+        focusEditorAtEnd(prevEditor);
+        return;
+      }
+      // Backspace at beginning of non-empty item → merge with previous
+      if (offset === 0 && idx > 0) {
+        e.preventDefault();
+        const prevEditor = items[idx - 1].querySelector('.soma-note-editor') as HTMLElement;
+        const prevText = prevEditor.textContent ?? '';
+        prevEditor.textContent = prevText + text;
+        currentItem.remove();
+        // Place cursor at merge point
+        prevEditor.focus();
+        const sel = window.getSelection();
+        if (sel && prevEditor.firstChild) {
+          const range = document.createRange();
+          range.setStart(prevEditor.firstChild, prevText.length);
+          range.collapse(true);
+          sel.removeAllRanges();
+          sel.addRange(range);
+        }
+        return;
+      }
+    }
+
+    // ArrowUp at beginning → focus previous item end
+    if (e.key === 'ArrowUp' && idx > 0) {
+      const offset = getCursorOffset(activeEditor);
+      if (offset === 0) {
+        e.preventDefault();
+        const prevEditor = items[idx - 1].querySelector('.soma-note-editor') as HTMLElement;
+        focusEditorAtEnd(prevEditor);
+      }
+    }
+
+    // ArrowDown at end → focus next item start
+    if (e.key === 'ArrowDown' && idx < items.length - 1) {
+      const offset = getCursorOffset(activeEditor);
+      const textLen = (activeEditor.textContent ?? '').length;
+      if (offset === textLen) {
+        e.preventDefault();
+        const nextEditor = items[idx + 1].querySelector('.soma-note-editor') as HTMLElement;
+        focusEditorAtStart(nextEditor);
+      }
     }
   });
 
@@ -530,7 +697,7 @@ export function showNotePopover(
 ): void {
   try {
     notePopoverCallbacks = callbacks;
-    if (!notePopoverElement || !notePopoverShadowRoot || !notePopoverTextarea) {
+    if (!notePopoverElement || !notePopoverShadowRoot || !notePopoverListElement) {
       buildNotePopover();
     }
 
@@ -542,13 +709,23 @@ export function showNotePopover(
     notePopoverElement!.style.transform = 'translateX(-50%)';
     notePopoverElement!.style.display = 'block';
 
-    notePopoverTextarea!.placeholder = options.placeholder ?? 'Add a note...';
-    notePopoverTextarea!.value = options.initialText ?? '';
-    notePopoverTextarea!.focus();
-    notePopoverTextarea!.setSelectionRange(
-      notePopoverTextarea!.value.length,
-      notePopoverTextarea!.value.length,
-    );
+    const placeholder = options.placeholder ?? 'Add a note...';
+
+    // Clear existing items
+    notePopoverListElement!.innerHTML = '';
+
+    // Populate from initialTexts (default: one empty item)
+    const textsToRender = options.initialTexts?.length ? options.initialTexts : [''];
+    for (const text of textsToRender) {
+      notePopoverListElement!.appendChild(createNoteItem(text, placeholder));
+    }
+
+    // Focus the last item's editor at end
+    const allItems = getNoteItems();
+    if (allItems.length > 0) {
+      const lastEditor = allItems[allItems.length - 1].querySelector('.soma-note-editor') as HTMLElement;
+      focusEditorAtEnd(lastEditor);
+    }
   } catch (err) {
     console.error('[soma:hl] showNotePopover error:', err);
   }

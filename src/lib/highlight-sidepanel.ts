@@ -24,25 +24,45 @@ export interface UpsertHighlightNoteResult {
 const pendingClipCreationByUrl = new Map<string, Promise<string>>();
 
 /**
- * Collect all highlight node IDs.
- * Highlights live as children of clip pages in LIBRARY, INBOX, or CLIPS.
+ * Collect highlight IDs from direct children of a container (container → clip → highlight).
  */
-export function collectAllHighlightNodeIds(): Set<string> {
-  const ids = new Set<string>();
-  const containers = [CONTAINER_IDS.LIBRARY, CONTAINER_IDS.INBOX, CONTAINER_IDS.CLIPS];
-
-  for (const containerId of containers) {
-    const children = loroDoc.getChildren(containerId);
-    for (const childId of children) {
-      const grandChildren = loroDoc.getChildren(childId);
-      for (const gcId of grandChildren) {
-        const gc = loroDoc.toNodexNode(gcId);
-        if (gc?.tags.includes(SYS_T.HIGHLIGHT)) {
-          ids.add(gcId);
-        }
+function collectHighlightsFromFlatContainer(containerId: string, ids: Set<string>): void {
+  const children = loroDoc.getChildren(containerId);
+  for (const childId of children) {
+    const grandChildren = loroDoc.getChildren(childId);
+    for (const gcId of grandChildren) {
+      const gc = loroDoc.toNodexNode(gcId);
+      if (gc?.tags.includes(SYS_T.HIGHLIGHT)) {
+        ids.add(gcId);
       }
     }
   }
+}
+
+/**
+ * Collect all highlight node IDs.
+ * Highlights live as children of clip pages in LIBRARY, INBOX, CLIPS, or JOURNAL day nodes.
+ */
+export function collectAllHighlightNodeIds(): Set<string> {
+  const ids = new Set<string>();
+
+  // Flat containers: container → clip → highlight
+  for (const containerId of [CONTAINER_IDS.LIBRARY, CONTAINER_IDS.INBOX, CONTAINER_IDS.CLIPS]) {
+    collectHighlightsFromFlatContainer(containerId, ids);
+  }
+
+  // Journal: Year → Week → Day → clip → highlight
+  const yearIds = loroDoc.getChildren(CONTAINER_IDS.JOURNAL);
+  for (const yearId of yearIds) {
+    const weekIds = loroDoc.getChildren(yearId);
+    for (const weekId of weekIds) {
+      const dayIds = loroDoc.getChildren(weekId);
+      for (const dayId of dayIds) {
+        collectHighlightsFromFlatContainer(dayId, ids);
+      }
+    }
+  }
+
   return ids;
 }
 

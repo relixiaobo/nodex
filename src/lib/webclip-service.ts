@@ -1,13 +1,14 @@
 /**
  * Web Clip service — orchestrates saving a web clip as a node.
  *
- * Creates a node in Inbox, tags it with #source, and writes the Source URL field.
+ * Creates a node under today's journal day, tags it with #source, and writes the Source URL field.
  */
 import type { NodexNode } from '../types/index.js';
 import { CONTAINER_IDS, SYS_T, NDX_F, FIELD_TYPES } from '../types/index.js';
 import type { WebClipCapturePayload } from './webclip-messaging.js';
 import * as loroDoc from './loro-doc.js';
 import { parseHtmlToNodes, createContentNodes } from './html-to-nodes.js';
+import { ensureTodayNode } from './journal.js';
 
 // Re-export for convenience
 export type { WebClipCapturePayload };
@@ -102,7 +103,7 @@ export function ensureSourceUrlFieldDef(): NodexNode {
 }
 
 /**
- * Save a web clip as a node in Inbox with #source tag and Source URL field.
+ * Save a web clip as a node under today's journal day with #source tag and Source URL field.
  *
  * @returns The ID of the newly created clip node.
  */
@@ -113,13 +114,13 @@ export async function saveWebClip(
   _userId?: string,
   parentId?: string,
 ): Promise<string> {
-  const targetParentId = parentId ?? CONTAINER_IDS.INBOX;
+  const targetParentId = parentId ?? ensureTodayNode();
 
   // 1. Ensure #source tagDef + Source URL fieldDef (fixed IDs)
   const tagDef = ensureSourceTagDef();
   const sourceUrlFieldDef = ensureSourceUrlFieldDef();
 
-  // 2. Create the clip node under parent (defaults to Inbox)
+  // 2. Create the clip node under parent (defaults to today's journal day)
   const clipNode = store.createChild(targetParentId, undefined, { name: payload.title });
 
   // 3. Apply #source tag
@@ -181,8 +182,30 @@ export function normalizeUrl(url: string): string {
 }
 
 /**
+ * Check if a node is a #source clip matching the given normalized URL.
+ */
+function isMatchingClipNode(
+  nodeId: string,
+  tagDefId: string,
+  fieldDefId: string,
+  normalizedUrl: string,
+): boolean {
+  const node = loroDoc.toNodexNode(nodeId);
+  if (!node || !node.tags?.includes(tagDefId)) return false;
+
+  const fieldEntryId = findFieldEntryForNode(nodeId, fieldDefId);
+  if (!fieldEntryId) return false;
+
+  const fieldChildren = loroDoc.getChildren(fieldEntryId);
+  if (fieldChildren.length === 0) return false;
+
+  const valueNode = loroDoc.toNodexNode(fieldChildren[0]);
+  return !!(valueNode?.name && normalizeUrl(valueNode.name) === normalizedUrl);
+}
+
+/**
  * Find a #source node by its Source URL field value.
- * Searches CLIPS, INBOX, and LIBRARY containers.
+ * Searches CLIPS, INBOX, LIBRARY containers and JOURNAL day nodes.
  *
  * @returns The node ID of the matching clip node, or null if not found.
  */
@@ -196,26 +219,31 @@ export function findClipNodeByUrl(url: string): string | null {
   const sourceUrlFieldDef = findTemplateAttrDef(null, tagDef.id, 'Source URL');
   if (!sourceUrlFieldDef) return null;
 
-  // Search through CLIPS, INBOX, and LIBRARY containers
+  // Search through flat containers: CLIPS, INBOX, LIBRARY
   const containers = [CONTAINER_IDS.CLIPS, CONTAINER_IDS.INBOX, CONTAINER_IDS.LIBRARY];
 
   for (const containerId of containers) {
     const children = loroDoc.getChildren(containerId);
-
     for (const childId of children) {
-      const node = loroDoc.toNodexNode(childId);
-      if (!node || !node.tags?.includes(tagDef.id)) continue;
-
-      // Check Source URL field value
-      const fieldEntryId = findFieldEntryForNode(childId, sourceUrlFieldDef.id);
-      if (!fieldEntryId) continue;
-
-      const fieldChildren = loroDoc.getChildren(fieldEntryId);
-      if (fieldChildren.length === 0) continue;
-
-      const valueNode = loroDoc.toNodexNode(fieldChildren[0]);
-      if (valueNode?.name && normalizeUrl(valueNode.name) === normalizedUrl) {
+      if (isMatchingClipNode(childId, tagDef.id, sourceUrlFieldDef.id, normalizedUrl)) {
         return childId;
+      }
+    }
+  }
+
+  // Search JOURNAL day nodes (Year → Week → Day → clip)
+  const yearIds = loroDoc.getChildren(CONTAINER_IDS.JOURNAL);
+  for (const yearId of yearIds) {
+    const weekIds = loroDoc.getChildren(yearId);
+    for (const weekId of weekIds) {
+      const dayIds = loroDoc.getChildren(weekId);
+      for (const dayId of dayIds) {
+        const clipIds = loroDoc.getChildren(dayId);
+        for (const clipId of clipIds) {
+          if (isMatchingClipNode(clipId, tagDef.id, sourceUrlFieldDef.id, normalizedUrl)) {
+            return clipId;
+          }
+        }
       }
     }
   }
@@ -252,8 +280,8 @@ export async function createLightweightClip(
   const tagDef = ensureSourceTagDef();
   const sourceUrlFieldDef = ensureSourceUrlFieldDef();
 
-  // 2. Create clip node in INBOX (same default as saveWebClip)
-  const clipNode = store.createChild(CONTAINER_IDS.INBOX, undefined, { name: pageTitle });
+  // 2. Create clip node under today's journal day (same default as saveWebClip)
+  const clipNode = store.createChild(ensureTodayNode(), undefined, { name: pageTitle });
 
   // 3. Apply #source tag
   store.applyTag(clipNode.id, tagDef.id);

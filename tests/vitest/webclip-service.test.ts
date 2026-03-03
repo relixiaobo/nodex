@@ -20,6 +20,7 @@ import {
 } from '../../src/lib/webclip-service.js';
 import * as loroDoc from '../../src/lib/loro-doc.js';
 import { CONTAINER_IDS, SYS_T, NDX_F } from '../../src/types/index.js';
+import { ensureTodayNode } from '../../src/lib/journal.js';
 
 /** Helper: find fieldEntry child with given fieldDefId. */
 function findFieldEntry(nodeId: string, fieldDefId: string): string | undefined {
@@ -117,17 +118,18 @@ describe('saveWebClip', () => {
     ...overrides,
   });
 
-  it('creates node in INBOX with title (default parentId)', async () => {
+  it('creates node under today journal day with title (default parentId)', async () => {
     const store = useNodeStore.getState();
     const payload = makePayload();
 
     const clipId = await saveWebClip(payload, store);
+    const todayId = ensureTodayNode();
 
     const node = loroDoc.toNodexNode(clipId);
     expect(node).toBeDefined();
     expect(node!.name).toBe('Test Article');
-    expect(loroDoc.getParentId(clipId)).toBe(CONTAINER_IDS.INBOX);
-    expect(loroDoc.getChildren(CONTAINER_IDS.INBOX)).toContain(clipId);
+    expect(loroDoc.getParentId(clipId)).toBe(todayId);
+    expect(loroDoc.getChildren(todayId)).toContain(clipId);
   });
 
   it('creates node under custom parentId when provided', async () => {
@@ -141,7 +143,7 @@ describe('saveWebClip', () => {
     expect(node!.name).toBe('Custom Parent Clip');
     expect(loroDoc.getParentId(clipId)).toBe('proj_1');
     expect(loroDoc.getChildren('proj_1')).toContain(clipId);
-    expect(loroDoc.getChildren(CONTAINER_IDS.INBOX)).not.toContain(clipId);
+    expect(loroDoc.getChildren(ensureTodayNode())).not.toContain(clipId);
   });
 
   it('tags node with #source (reuses existing tagDef)', async () => {
@@ -493,7 +495,7 @@ describe('createLightweightClip', () => {
     resetAndSeed();
   });
 
-  it('creates a clip node in INBOX container', async () => {
+  it('creates a clip node under today journal day', async () => {
     const store = useNodeStore.getState();
     const clipId = await createLightweightClip(
       'https://example.com/page',
@@ -502,7 +504,7 @@ describe('createLightweightClip', () => {
     );
 
     expect(loroDoc.hasNode(clipId)).toBe(true);
-    expect(loroDoc.getParentId(clipId)).toBe(CONTAINER_IDS.INBOX);
+    expect(loroDoc.getParentId(clipId)).toBe(ensureTodayNode());
   });
 
   it('sets the node name to page title', async () => {

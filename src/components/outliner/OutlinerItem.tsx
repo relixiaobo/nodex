@@ -49,6 +49,7 @@ import { dragState } from '../../hooks/use-drag-select';
 import { mergeRichTextPayload } from '../../lib/rich-text-merge.js';
 import { isReferenceDisplayCycle } from '../../lib/reference-rules.js';
 import { focusUndoShortcutSink, ensureUndoFocusAfterNavigation } from '../../lib/focus-utils.js';
+import { getTextOffsetFromPoint, getRenderedTextRightEdge } from '../../lib/dom-caret-utils.js';
 import type { ParsedPasteNode } from '../../lib/paste-parser.js';
 import { t } from '../../i18n/strings.js';
 import { getNodeCapabilities } from '../../lib/node-capabilities.js';
@@ -1677,7 +1678,7 @@ export function OutlinerItem({
                 type="checkbox"
                 checked={isDone}
                 onChange={handleCheckboxToggle}
-                className="h-3.5 w-3.5 rounded border-border accent-primary cursor-pointer"
+                className="h-3.5 w-3.5 appearance-none rounded border border-border bg-transparent checked:border-primary checked:bg-primary checked:bg-[url('data:image/svg+xml,%3Csvg%20viewBox%3D%220%200%2016%2016%22%20fill%3D%22white%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cpath%20d%3D%22M12.207%204.793a1%201%200%20010%201.414l-5%205a1%201%200%2001-1.414%200l-2-2a1%201%200%20011.414-1.414L6.5%209.086l4.293-4.293a1%201%200%20011.414%200z%22%2F%3E%3C%2Fsvg%3E')] bg-[length:12px_12px] bg-center bg-no-repeat cursor-pointer"
               />
             </span>
           )}
@@ -1699,12 +1700,13 @@ export function OutlinerItem({
                   onChange={(e) => {
                     setNodeName(nodeId, e.target.checked ? SYS_V.YES : SYS_V.NO);
                   }}
-                  className="mt-[3px] h-3.5 w-3.5 rounded border-border accent-primary cursor-pointer"
+                  className="mt-[3px] h-3.5 w-3.5 appearance-none rounded border border-border bg-transparent checked:border-primary checked:bg-primary checked:bg-[url('data:image/svg+xml,%3Csvg%20viewBox%3D%220%200%2016%2016%22%20fill%3D%22white%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cpath%20d%3D%22M12.207%204.793a1%201%200%20010%201.414l-5%205a1%201%200%2001-1.414%200l-2-2a1%201%200%20011.414-1.414L6.5%209.086l4.293-4.293a1%201%200%20011.414%200z%22%2F%3E%3C%2Fsvg%3E')] bg-[length:12px_12px] bg-center bg-no-repeat cursor-pointer"
                 />
               ) : isFocused ? (
                 <RichTextEditor
                   nodeId={nodeId}
                   parentId={parentId}
+                  contentNodeId={referenceTargetId ?? undefined}
                   initialText={nodeText}
                   initialMarks={nodeMarks}
                   initialInlineRefs={nodeInlineRefs}
@@ -1827,7 +1829,11 @@ export function OutlinerItem({
           title={t('outliner.toggleChildren')}
         >
           <div
-            className="indent-line-inner absolute top-0 bottom-0 w-[1px] rounded-full bg-border-subtle group-hover/outliner-item:bg-border hover:!bg-border-emphasis transition-all duration-150"
+            className={`indent-line-inner absolute top-0 bottom-0 transition-all duration-150 ${
+              isReference
+                ? 'w-0 border-l border-dashed border-border-subtle group-hover/outliner-item:border-border hover:!border-border-emphasis'
+                : 'w-[1px] rounded-full bg-border-subtle group-hover/outliner-item:bg-border hover:!bg-border-emphasis'
+            }`}
             style={{ left: 15.5, transform: 'translateX(-50%)' }}
           />
         </button>
@@ -2013,93 +2019,3 @@ export function OutlinerItem({
   );
 }
 
-function getTextOffsetFromPoint(container: HTMLElement, clientX: number, clientY: number): number | null {
-  const doc = container.ownerDocument;
-  const docWithCaret = doc as Document & {
-    caretPositionFromPoint?: (x: number, y: number) => CaretPosition | null;
-    caretRangeFromPoint?: (x: number, y: number) => Range | null;
-  };
-
-  let startContainer: Node | null = null;
-  let startOffset = 0;
-
-  try {
-    const pos = docWithCaret.caretPositionFromPoint?.(clientX, clientY);
-    if (pos) {
-      startContainer = pos.offsetNode;
-      startOffset = pos.offset;
-    } else {
-      const range = docWithCaret.caretRangeFromPoint?.(clientX, clientY);
-      if (range) {
-        startContainer = range.startContainer;
-        startOffset = range.startOffset;
-      }
-    }
-  } catch {
-    return null;
-  }
-
-  if (!startContainer || !container.contains(startContainer)) {
-    return null;
-  }
-
-  try {
-    const preRange = doc.createRange();
-    preRange.setStart(container, 0);
-    preRange.setEnd(startContainer, startOffset);
-    return preRange.toString().length;
-  } catch {
-    return null;
-  }
-}
-
-function getRenderedTextRightEdge(container: HTMLElement): number | null {
-  const doc = container.ownerDocument;
-  try {
-    let maxRight = -Infinity;
-    const walker = doc.createTreeWalker(
-      container,
-      NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT,
-      {
-        acceptNode: (node) => {
-          if (node.nodeType === Node.TEXT_NODE) {
-            return (node.textContent ?? '').length > 0
-              ? NodeFilter.FILTER_ACCEPT
-              : NodeFilter.FILTER_REJECT;
-          }
-          const el = node as HTMLElement;
-          if (el === container) return NodeFilter.FILTER_SKIP;
-          // Inline reference chips should count as visible text width.
-          if (el.matches('[data-inlineref-node], .inline-ref, .inline-reference')) {
-            return NodeFilter.FILTER_ACCEPT;
-          }
-          return NodeFilter.FILTER_SKIP;
-        },
-      },
-    );
-
-    let node: Node | null = walker.nextNode();
-    while (node) {
-      if (node.nodeType === Node.TEXT_NODE) {
-        const range = doc.createRange();
-        range.selectNodeContents(node);
-        const rects = Array.from(range.getClientRects());
-        for (const rect of rects) {
-          if (rect.width > 0 || rect.height > 0) {
-            maxRight = Math.max(maxRight, rect.right);
-          }
-        }
-      } else if (node instanceof HTMLElement) {
-        const rect = node.getBoundingClientRect();
-        if (rect.width > 0 || rect.height > 0) {
-          maxRight = Math.max(maxRight, rect.right);
-        }
-      }
-      node = walker.nextNode();
-    }
-
-    return Number.isFinite(maxRight) ? maxRight : null;
-  } catch {
-    return null;
-  }
-}

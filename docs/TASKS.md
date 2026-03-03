@@ -147,10 +147,10 @@ _(全部已修复)_
 
 ### P3 — 编辑器增强 & 交互完善
 
-#### NodePanel Title 交互补全
-- [ ] 标题编辑器支持 `@` 触发 ReferenceSelector（插入 inline reference）
-- [ ] 标题编辑器支持 `#` 触发 TagSelector（应用 supertag）
-- [ ] 标题编辑器支持 `Cmd+Enter` 切换 checkbox 状态
+#### NodePanel Title 交互补全 ✅（已完成）
+- [x] 标题编辑器支持 `@` 触发 ReferenceSelector（插入 inline reference）
+- [x] 标题编辑器支持 `#` 触发 TagSelector（应用 supertag）
+- [x] 标题编辑器支持 `Cmd+Enter` 切换 checkbox 状态
 
 #### 节点选中 — 后续增强 (#47)
 - [ ] Cmd+Shift+D 批量复制
@@ -205,6 +205,7 @@ _(全部已修复)_
 
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
+| 2026-03-03 | NodeHeader 富文本编辑 + Reference 编辑修复 — trigger 系统提取为 useEditorTriggers hook + NodeHeader 升级 RichTextEditor（#/@/Cmd+Enter）+ header 聚焦不跳大小 + 点击定位光标 + checkbox 透明背景 + reference 编辑写入目标节点 + reference 展开虚线引导线 + dom-caret-utils 共享模块 | nodex | main |
 | 2026-03-03 | 系统节点只读编辑器 — 容器/workspace home/queryCondition 节点聚焦后文本变灰、输入无效，光标仍可插入（导航用） | nodex | main |
 | 2026-03-03 | 节点右键菜单扩展 — Copy node link（粘贴为 reference）、Duplicate（深拷贝）、Move to（hover flyout 子菜单）、Add tag（搜索+创建）、Add checkbox（动态标签）、Add description + Journal→Daily notes 全局重命名 + 菜单视觉对齐 ToolbarUserMenu 风格 | nodex | main |
 | 2026-03-03 | Web Clip 默认保存到 Today — 高亮/评论/剪藏的 #source 节点默认存入当天日记（非 Inbox）+ findClipNodeByUrl 搜索扩展到 JOURNAL 日节点 | nodex | main |

@@ -219,7 +219,25 @@ function canApplyMutation(action: string): boolean {
 // 映射维护
 // ============================================================
 
+/**
+ * Loro's internal DELETED_ROOT TreeID — nodes moved here by tree.delete() or undo.
+ * `tree.nodes()` still iterates them, so we must filter explicitly.
+ */
+const DELETED_ROOT_ID = '2147483647@18446744073709551615' as TreeID;
+
+function isDeletedTreeNode(node: { parent(): { id: TreeID } | undefined }): boolean {
+  return node.parent()?.id === DELETED_ROOT_ID;
+}
+
 function registerMapping(nodexId: string, treeId: TreeID): void {
+  // Clean up stale reverse mapping when a storedId is remapped to a different tree node.
+  // Without this, rebuildMappings leaves orphan entries in treeToNodex when two alive
+  // tree nodes share the same storedId (e.g., CRDT merge creating duplicate containers),
+  // causing getChildren() to return the same storedId multiple times.
+  const oldTreeId = nodexToTree.get(nodexId);
+  if (oldTreeId && oldTreeId !== treeId) {
+    treeToNodex.delete(oldTreeId);
+  }
   nodexToTree.set(nodexId, treeId);
   treeToNodex.set(treeId, nodexId);
 }
@@ -239,6 +257,11 @@ function rebuildMappings(): void {
   invalidateCache();
   const tree = getTree();
   for (const node of tree.nodes()) {
+    // Skip deleted tree nodes — Loro's tree.nodes() includes nodes moved to
+    // DELETED_ROOT by tree.delete() or UndoManager.undo(). After redo, both
+    // the old (deleted) and new (alive) tree nodes coexist with the same
+    // storedId, so we must skip deleted ones to avoid mapping conflicts.
+    if (isDeletedTreeNode(node)) continue;
     const storedId = node.data.get('id') as string | undefined;
     if (storedId) {
       registerMapping(storedId, node.id);
@@ -267,9 +290,10 @@ function fixDuplicateContainerMappings(): boolean {
   if (!doc) return false;
   const tree = getTree();
 
-  // Build a reverse index: nodexId → all TreeIDs that have this storedId
+  // Build a reverse index: nodexId → all alive TreeIDs that have this storedId
   const idToTreeIds = new Map<string, TreeID[]>();
   for (const node of tree.nodes()) {
+    if (isDeletedTreeNode(node)) continue;
     const storedId = node.data.get('id') as string | undefined;
     if (!storedId) continue;
     let arr = idToTreeIds.get(storedId);

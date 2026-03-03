@@ -265,7 +265,7 @@ describe('getHighlightsForClip', () => {
 
     // Create a second clip page
     const clip2 = store.createChild(CONTAINER_IDS.INBOX, undefined, { name: 'Clip 2' });
-    store.applyTag(clip2.id, 'tagDef_source');
+    store.applyTag(clip2.id, SYS_T.SOURCE);
 
     createHighlightNode({
       store,

@@ -4,7 +4,7 @@
  * Creates a node in Inbox, tags it with #source, and writes the Source URL field.
  */
 import type { NodexNode } from '../types/index.js';
-import { SYS_D, CONTAINER_IDS } from '../types/index.js';
+import { CONTAINER_IDS, SYS_T, NDX_F, FIELD_TYPES } from '../types/index.js';
 import type { WebClipCapturePayload } from './webclip-messaging.js';
 import * as loroDoc from './loro-doc.js';
 import { parseHtmlToNodes, createContentNodes } from './html-to-nodes.js';
@@ -63,6 +63,44 @@ export function findTemplateAttrDef(
   return undefined;
 }
 
+// ============================================================
+// Ensure functions (fixed IDs to prevent CRDT duplication)
+// ============================================================
+
+/**
+ * Ensure #source tagDef exists with fixed ID SYS_T202.
+ * Used by both webclip-service and highlight-service.
+ */
+export function ensureSourceTagDef(): NodexNode {
+  let td = loroDoc.toNodexNode(SYS_T.SOURCE);
+  if (!td) {
+    loroDoc.createNode(SYS_T.SOURCE, CONTAINER_IDS.SCHEMA);
+    loroDoc.setNodeDataBatch(SYS_T.SOURCE, { type: 'tagDef', name: 'source', color: 'sage' });
+    loroDoc.commitDoc();
+    td = loroDoc.toNodexNode(SYS_T.SOURCE)!;
+  }
+  return td;
+}
+
+/**
+ * Ensure "Source URL" fieldDef exists with fixed ID NDX_F01 under #source tagDef.
+ */
+export function ensureSourceUrlFieldDef(): NodexNode {
+  ensureSourceTagDef();
+  let fd = loroDoc.toNodexNode(NDX_F.SOURCE_URL);
+  if (!fd) {
+    loroDoc.createNode(NDX_F.SOURCE_URL, SYS_T.SOURCE);
+    loroDoc.setNodeDataBatch(NDX_F.SOURCE_URL, {
+      type: 'fieldDef',
+      name: 'Source URL',
+      fieldType: FIELD_TYPES.URL,
+    });
+    loroDoc.commitDoc();
+    fd = loroDoc.toNodexNode(NDX_F.SOURCE_URL)!;
+  }
+  return fd;
+}
+
 /**
  * Save a web clip as a node in Inbox with #source tag and Source URL field.
  *
@@ -77,25 +115,17 @@ export async function saveWebClip(
 ): Promise<string> {
   const targetParentId = parentId ?? CONTAINER_IDS.INBOX;
 
-  // 1. Find or create #source tagDef
-  let tagDef = findTagDefByName(null, CONTAINER_IDS.SCHEMA, 'source');
-  if (!tagDef) {
-    tagDef = store.createTagDef('source');
-  }
+  // 1. Ensure #source tagDef + Source URL fieldDef (fixed IDs)
+  const tagDef = ensureSourceTagDef();
+  const sourceUrlFieldDef = ensureSourceUrlFieldDef();
 
-  // 2. Ensure tagDef has a "Source URL" template field (type URL)
-  let sourceUrlFieldDef = findTemplateAttrDef(null, tagDef.id, 'Source URL');
-  if (!sourceUrlFieldDef) {
-    sourceUrlFieldDef = store.createFieldDef('Source URL', SYS_D.URL, tagDef.id);
-  }
-
-  // 3. Create the clip node under parent (defaults to Inbox)
+  // 2. Create the clip node under parent (defaults to Inbox)
   const clipNode = store.createChild(targetParentId, undefined, { name: payload.title });
 
-  // 4. Apply #source tag
+  // 3. Apply #source tag
   store.applyTag(clipNode.id, tagDef.id);
 
-  // 5. Write Source URL field value
+  // 4. Write Source URL field value
   store.setFieldValue(clipNode.id, sourceUrlFieldDef.id, [payload.url]);
 
   // 6. Set description if available
@@ -159,8 +189,8 @@ export function normalizeUrl(url: string): string {
 export function findClipNodeByUrl(url: string): string | null {
   const normalizedUrl = normalizeUrl(url);
 
-  // Find the #source tagDef and its Source URL fieldDef
-  const tagDef = findTagDefByName(null, CONTAINER_IDS.SCHEMA, 'source');
+  // Find the #source tagDef and its Source URL fieldDef (use fixed IDs)
+  const tagDef = loroDoc.toNodexNode(SYS_T.SOURCE);
   if (!tagDef) return null;
 
   const sourceUrlFieldDef = findTemplateAttrDef(null, tagDef.id, 'Source URL');
@@ -218,25 +248,17 @@ export async function createLightweightClip(
   pageTitle: string,
   store: WebClipNodeStore,
 ): Promise<string> {
-  // 1. Find or create #source tagDef
-  let tagDef = findTagDefByName(null, CONTAINER_IDS.SCHEMA, 'source');
-  if (!tagDef) {
-    tagDef = store.createTagDef('source');
-  }
+  // 1. Ensure #source tagDef + Source URL fieldDef (fixed IDs)
+  const tagDef = ensureSourceTagDef();
+  const sourceUrlFieldDef = ensureSourceUrlFieldDef();
 
-  // 2. Ensure Source URL field exists
-  let sourceUrlFieldDef = findTemplateAttrDef(null, tagDef.id, 'Source URL');
-  if (!sourceUrlFieldDef) {
-    sourceUrlFieldDef = store.createFieldDef('Source URL', SYS_D.URL, tagDef.id);
-  }
-
-  // 3. Create clip node in INBOX (same default as saveWebClip)
+  // 2. Create clip node in INBOX (same default as saveWebClip)
   const clipNode = store.createChild(CONTAINER_IDS.INBOX, undefined, { name: pageTitle });
 
-  // 4. Apply #source tag
+  // 3. Apply #source tag
   store.applyTag(clipNode.id, tagDef.id);
 
-  // 5. Write Source URL field value
+  // 4. Write Source URL field value
   store.setFieldValue(clipNode.id, sourceUrlFieldDef.id, [pageUrl]);
 
   return clipNode.id;
@@ -252,25 +274,17 @@ export async function applyWebClipToNode(
   _workspaceId?: string,
   _userId?: string,
 ): Promise<void> {
-  // 1. Find or create #source tagDef
-  let tagDef = findTagDefByName(null, CONTAINER_IDS.SCHEMA, 'source');
-  if (!tagDef) {
-    tagDef = store.createTagDef('source');
-  }
+  // 1. Ensure #source tagDef + Source URL fieldDef (fixed IDs)
+  const tagDef = ensureSourceTagDef();
+  const sourceUrlFieldDef = ensureSourceUrlFieldDef();
 
-  // 2. Ensure tagDef has a "Source URL" template field (type URL)
-  let sourceUrlFieldDef = findTemplateAttrDef(null, tagDef.id, 'Source URL');
-  if (!sourceUrlFieldDef) {
-    sourceUrlFieldDef = store.createFieldDef('Source URL', SYS_D.URL, tagDef.id);
-  }
-
-  // 3. Rename node to page title
+  // 2. Rename node to page title
   store.setNodeName(nodeId, payload.title);
 
-  // 4. Apply #source tag
+  // 3. Apply #source tag
   store.applyTag(nodeId, tagDef.id);
 
-  // 5. Write Source URL field value
+  // 4. Write Source URL field value
   store.setFieldValue(nodeId, sourceUrlFieldDef.id, [payload.url]);
 
   // 6. Set description if available

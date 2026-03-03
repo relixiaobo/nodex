@@ -6,48 +6,57 @@
  * - Anchor data stored in node description (JSON)
  * - Highlight color = tagDef color (no per-node color)
  */
-import { CONTAINER_IDS, SYS_T, FIELD_TYPES, AUTO_INIT_STRATEGY } from '../types/index.js';
+import { CONTAINER_IDS, SYS_T, NDX_F, FIELD_TYPES, AUTO_INIT_STRATEGY } from '../types/index.js';
 import type { NodexNode } from '../types/index.js';
 import * as loroDoc from './loro-doc.js';
 import type { WebClipNodeStore } from './webclip-service.js';
-import { findTagDefByName } from './webclip-service.js';
+import { ensureSourceTagDef } from './webclip-service.js';
 
 /** Extended store interface for highlight operations. */
 export interface HighlightNodeStore extends WebClipNodeStore {}
 
 // ============================================================
-// Internal constants
-// ============================================================
-
-const FIELD_SOURCE = 'Source';
-
-// ============================================================
-// TagDef initialization
+// TagDef / FieldDef ensure functions (fixed IDs to prevent CRDT duplication)
 // ============================================================
 
 /** Cached fieldDef ID after initialization */
 let _sourceFieldDefId: string | null = null;
 
 /**
- * Find a fieldDef by name within a tagDef's children.
+ * Ensure "Source" fieldDef exists with fixed ID NDX_F02 under #highlight tagDef.
+ * Type: options_from_supertag → #source, auto-init from ancestor.
  */
-function findFieldDefByName_(tagDefId: string, name: string): NodexNode | undefined {
-  const children = loroDoc.getChildren(tagDefId);
-  const lowerName = name.toLowerCase();
-  for (const childId of children) {
-    const child = loroDoc.toNodexNode(childId);
-    if (child?.type === 'fieldDef' && child.name?.toLowerCase() === lowerName) {
-      return child;
-    }
+export function ensureHighlightSourceFieldDef(): NodexNode {
+  const sourceTagDef = ensureSourceTagDef();
+  let fd = loroDoc.toNodexNode(NDX_F.HIGHLIGHT_SOURCE);
+  if (!fd) {
+    loroDoc.createNode(NDX_F.HIGHLIGHT_SOURCE, SYS_T.HIGHLIGHT);
+    loroDoc.setNodeDataBatch(NDX_F.HIGHLIGHT_SOURCE, {
+      type: 'fieldDef',
+      name: 'Source',
+      fieldType: FIELD_TYPES.OPTIONS_FROM_SUPERTAG,
+    });
+    loroDoc.commitDoc();
+    fd = loroDoc.toNodexNode(NDX_F.HIGHLIGHT_SOURCE)!;
   }
-  return undefined;
+  // Always ensure sourceSupertag + autoInitialize are set
+  if (fd.sourceSupertag !== sourceTagDef.id
+    || fd.autoInitialize !== AUTO_INIT_STRATEGY.ANCESTOR_SUPERTAG_REF) {
+    loroDoc.setNodeDataBatch(NDX_F.HIGHLIGHT_SOURCE, {
+      sourceSupertag: sourceTagDef.id,
+      autoInitialize: AUTO_INIT_STRATEGY.ANCESTOR_SUPERTAG_REF,
+    });
+    loroDoc.commitDoc();
+    fd = loroDoc.toNodexNode(NDX_F.HIGHLIGHT_SOURCE)!;
+  }
+  return fd;
 }
 
 /**
  * Create/find #highlight tagDef with fixed ID SYS_T200.
  * Creates 1 template field: Source (options_from_supertag → #source, auto-init from ancestor).
  */
-export function ensureHighlightTagDef(store: HighlightNodeStore): void {
+export function ensureHighlightTagDef(_store: HighlightNodeStore): void {
   // Create tagDef if needed
   let tagDef = loroDoc.toNodexNode(SYS_T.HIGHLIGHT);
   if (!tagDef) {
@@ -61,28 +70,8 @@ export function ensureHighlightTagDef(store: HighlightNodeStore): void {
     tagDef = loroDoc.toNodexNode(SYS_T.HIGHLIGHT);
   }
 
-  // Ensure #source tagDef exists (needed for options_from_supertag source)
-  let sourceTagDef = findTagDefByName(null, CONTAINER_IDS.SCHEMA, 'source');
-  if (!sourceTagDef) {
-    sourceTagDef = store.createTagDef('source');
-  }
-
-  // Ensure Source field (options_from_supertag → #source)
-  let sourceFd = findFieldDefByName_(SYS_T.HIGHLIGHT, FIELD_SOURCE);
-  if (!sourceFd) {
-    sourceFd = store.createFieldDef(FIELD_SOURCE, FIELD_TYPES.OPTIONS_FROM_SUPERTAG, SYS_T.HIGHLIGHT);
-  }
-
-  // Always ensure sourceSupertag + autoInitialize are set
-  const currentFd = loroDoc.toNodexNode(sourceFd.id);
-  if (currentFd?.sourceSupertag !== sourceTagDef.id
-    || currentFd?.autoInitialize !== AUTO_INIT_STRATEGY.ANCESTOR_SUPERTAG_REF) {
-    loroDoc.setNodeDataBatch(sourceFd.id, {
-      sourceSupertag: sourceTagDef.id,
-      autoInitialize: AUTO_INIT_STRATEGY.ANCESTOR_SUPERTAG_REF,
-    });
-    loroDoc.commitDoc();
-  }
+  // Ensure #source and Source field (with fixed IDs)
+  const sourceFd = ensureHighlightSourceFieldDef();
   _sourceFieldDefId = sourceFd.id;
 }
 

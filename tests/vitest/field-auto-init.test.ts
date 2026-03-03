@@ -5,7 +5,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { useNodeStore } from '../../src/stores/node-store.js';
 import * as loroDoc from '../../src/lib/loro-doc.js';
-import { AUTO_INIT_STRATEGY, FIELD_TYPES } from '../../src/types/index.js';
+import { AUTO_INIT_STRATEGY, FIELD_TYPES, SYS_T } from '../../src/types/index.js';
 import { resolveAutoInitValue } from '../../src/lib/field-auto-init.js';
 import type { AutoInitResult } from '../../src/lib/field-auto-init.js';
 import { resetAndSeed } from './helpers/test-state.js';
@@ -86,7 +86,7 @@ describe('resolveAutoInitValue — pure strategy functions', () => {
     // Create a fieldDef with sourceSupertag pointing to tagDef_source
     const tagDef = store.createTagDef('RefTag', { color: 'green' });
     const fieldDef = store.createFieldDef('Source', FIELD_TYPES.OPTIONS_FROM_SUPERTAG, tagDef.id);
-    loroDoc.setNodeDataBatch(fieldDef.id, { sourceSupertag: 'tagDef_source' });
+    loroDoc.setNodeDataBatch(fieldDef.id, { sourceSupertag: SYS_T.SOURCE });
     loroDoc.commitDoc();
 
     // webclip_1 is already tagged with #source in seed data
@@ -104,7 +104,7 @@ describe('resolveAutoInitValue — pure strategy functions', () => {
 
     const tagDef = store.createTagDef('RefTag2', { color: 'blue' });
     const fieldDef = store.createFieldDef('Source', FIELD_TYPES.OPTIONS_FROM_SUPERTAG, tagDef.id);
-    loroDoc.setNodeDataBatch(fieldDef.id, { sourceSupertag: 'tagDef_source' });
+    loroDoc.setNodeDataBatch(fieldDef.id, { sourceSupertag: SYS_T.SOURCE });
     loroDoc.commitDoc();
 
     // proj_1 is NOT tagged with #source
@@ -190,7 +190,7 @@ describe('applyTag with autoInitialize — integration', () => {
     const tagDef = store.createTagDef('RefAutoTag', { color: 'amber' });
     const fieldDef = store.createFieldDef('Source', FIELD_TYPES.OPTIONS_FROM_SUPERTAG, tagDef.id);
     loroDoc.setNodeDataBatch(fieldDef.id, {
-      sourceSupertag: 'tagDef_source',
+      sourceSupertag: SYS_T.SOURCE,
       autoInitialize: AUTO_INIT_STRATEGY.ANCESTOR_SUPERTAG_REF,
     });
     loroDoc.commitDoc();

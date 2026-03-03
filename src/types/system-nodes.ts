@@ -281,6 +281,20 @@ export const SYS_T = {
   // ─── soma 内置标签 ───
   HIGHLIGHT: 'SYS_T200',
   NOTE: 'SYS_T201',
+  SOURCE: 'SYS_T202',
 } as const;
 
 export type SystemTag = typeof SYS_T[keyof typeof SYS_T];
+
+// ============================================================
+// NDX_F* —— soma 固定 FieldDef ID（防止 CRDT 合并时重复创建）
+// ============================================================
+
+export const NDX_F = {
+  /** Source URL fieldDef (child of #source tagDef) */
+  SOURCE_URL: 'NDX_F01',
+  /** Source fieldDef (child of #highlight tagDef, options_from_supertag → #source) */
+  HIGHLIGHT_SOURCE: 'NDX_F02',
+} as const;
+
+export type NdxFieldDef = typeof NDX_F[keyof typeof NDX_F];

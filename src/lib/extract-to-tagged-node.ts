@@ -16,7 +16,6 @@ import {
   createHighlightNode,
   type HighlightNodeStore,
 } from './highlight-service.js';
-import { findTagDefByName } from './webclip-service.js';
 
 export interface ExtractResult {
   /** The newly created Library node. */
@@ -32,13 +31,13 @@ export interface ExtractResult {
  * Returns null when no clip ancestor exists.
  */
 export function resolveClipNodeIdForHighlight(nodeId: string): string | null {
-  const sourceTagDef = findTagDefByName(null, CONTAINER_IDS.SCHEMA, 'source');
-  if (!sourceTagDef) return null;
+  // Use fixed ID directly — no need to search by name
+  if (!loroDoc.toNodexNode(SYS_T.SOURCE)) return null;
 
   let currentId: string | null = nodeId;
   while (currentId) {
     const node = loroDoc.toNodexNode(currentId);
-    if (node?.tags.includes(sourceTagDef.id)) {
+    if (node?.tags.includes(SYS_T.SOURCE)) {
       return currentId;
     }
     currentId = loroDoc.getParentId(currentId);

@@ -10,7 +10,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { resetAndSeed } from './helpers/test-state.js';
 import { isUrlFieldType, isEmailFieldType } from '../../src/lib/field-utils.js';
-import { FIELD_TYPES, SYS_D } from '../../src/types/index.js';
+import { FIELD_TYPES, SYS_D, NDX_F } from '../../src/types/index.js';
 import * as loroDoc from '../../src/lib/loro-doc.js';
 
 describe('isUrlFieldType', () => {
@@ -51,7 +51,7 @@ describe('Seed data URL/Email fieldDef types', () => {
   });
 
   it('Source URL fieldDef has fieldType = url', () => {
-    const node = loroDoc.toNodexNode('attrDef_source_url');
+    const node = loroDoc.toNodexNode(NDX_F.SOURCE_URL);
     expect(node).toBeDefined();
     expect(node!.fieldType).toBe(FIELD_TYPES.URL);
   });

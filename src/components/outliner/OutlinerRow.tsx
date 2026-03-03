@@ -27,6 +27,7 @@ import {
   getSelectedIdsInOrder,
 } from '../../lib/selection-utils.js';
 import { resolveSelectionKeyboardAction } from '../../lib/selection-keyboard.js';
+import { copyNodesToClipboard, cutNodesToClipboard } from '../../lib/node-clipboard.js';
 
 // ── Public types ──
 
@@ -271,6 +272,30 @@ export function OutlinerRow({ config, children }: OutlinerRowProps) {
       if (selAction === 'batch_apply_tag') {
         e.preventDefault();
         useUIStore.getState().openBatchTagSelector();
+        return;
+      }
+
+      if (selAction === 'batch_copy') {
+        e.preventDefault();
+        const latestUi = useUIStore.getState();
+        const flatList = getFlattenedVisibleNodes(rootChildIds, latestUi.expandedNodes, rootNodeId);
+        const orderedIds = getSelectedIdsInOrder(latestUi.selectedNodeIds, flatList);
+        void copyNodesToClipboard(orderedIds);
+        return;
+      }
+
+      if (selAction === 'batch_cut') {
+        e.preventDefault();
+        const latestUi = useUIStore.getState();
+        const flatList = getFlattenedVisibleNodes(rootChildIds, latestUi.expandedNodes, rootNodeId);
+        const bounds = getSelectionBounds(latestUi.selectedNodeIds, flatList);
+        const prev = bounds ? getPreviousVisibleNode(bounds.first.nodeId, bounds.first.parentId, flatList) : null;
+        const orderedIds = getSelectedIdsInOrder(latestUi.selectedNodeIds, flatList);
+        void cutNodesToClipboard(orderedIds);
+        clearSelection();
+        if (prev) {
+          setFocusedNode(prev.nodeId, prev.parentId);
+        }
         return;
       }
 

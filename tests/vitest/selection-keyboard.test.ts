@@ -55,9 +55,19 @@ describe('resolveSelectionKeyboardAction', () => {
     expect(resolveSelectionKeyboardAction(keyEvent('a', { ctrlKey: true }))).toBe('select_all');
   });
 
-  it('returns null for Cmd/Ctrl+key (non-a)', () => {
+  it('returns null for Cmd/Ctrl+key (non-a/c/x)', () => {
     expect(resolveSelectionKeyboardAction(keyEvent('b', { metaKey: true }))).toBeNull();
-    expect(resolveSelectionKeyboardAction(keyEvent('c', { ctrlKey: true }))).toBeNull();
+    expect(resolveSelectionKeyboardAction(keyEvent('z', { ctrlKey: true }))).toBeNull();
+  });
+
+  it('returns batch_copy for Cmd+C / Ctrl+C', () => {
+    expect(resolveSelectionKeyboardAction(keyEvent('c', { metaKey: true }))).toBe('batch_copy');
+    expect(resolveSelectionKeyboardAction(keyEvent('c', { ctrlKey: true }))).toBe('batch_copy');
+  });
+
+  it('returns batch_cut for Cmd+X / Ctrl+X', () => {
+    expect(resolveSelectionKeyboardAction(keyEvent('x', { metaKey: true }))).toBe('batch_cut');
+    expect(resolveSelectionKeyboardAction(keyEvent('x', { ctrlKey: true }))).toBe('batch_cut');
   });
 
   it('returns null for Alt+key', () => {

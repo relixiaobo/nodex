@@ -10,7 +10,7 @@
  *   ③ Supertag row (conditional: has tags, not a definition node)
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Library, Inbox, CalendarDays, Trash2, Search, type AppIcon } from '../../lib/icons.js';
+import { Library, Inbox, CalendarDays, Trash2, Search, Settings, type AppIcon } from '../../lib/icons.js';
 import { useNode } from '../../hooks/use-node';
 import { useNodeStore } from '../../stores/node-store';
 import { useWorkspaceStore } from '../../stores/workspace-store';
@@ -36,6 +36,7 @@ const CONTAINER_HEADER_ICONS: Record<ContainerIconKey, AppIcon> = {
   schema: Library,
   clips: Library,
   stash: Library,
+  settings: Settings,
 };
 
 

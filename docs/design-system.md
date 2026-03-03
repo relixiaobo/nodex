@@ -450,7 +450,7 @@ Meeting notes  #project-alpha  #design
 ```
 ┌─────────────────────────────┐  ← radius-container (8px), p-1 (4px), shadow-paper
 │ ┌─────────────────────────┐ │
-│ │  Item text              │ │  ← px-2, py-1
+│ │ 🔧 Item text            │ │  ← gap-2.5, px-2 py-1.5, rounded-md
 │ └─────────────────────────┘ │
 │ ┌─────────────────────────┐ │
 │ │  Selected item ████████ │ │  ← bg: primary-muted (keyboard nav)
@@ -459,11 +459,13 @@ Meeting notes  #project-alpha  #design
 ```
 
 - 容器：`rounded-lg bg-background shadow-paper p-1`（纸叠阴影，无 border）
-- 项：`px-2 py-1 text-base`
+- 项：`gap-2.5 rounded-md px-2 py-1.5 text-sm text-foreground-secondary`
+- 项图标：`size={14} strokeWidth={1.5}` 在 `w-4` 固定宽度容器内，`text-foreground-tertiary`
+- 项 hover：`hover:bg-foreground/4 hover:text-foreground`
 - 选中项（当前值）：`bg-primary text-primary-foreground`
 - 高亮项（键盘导航）：`bg-primary-muted`
-- 鼠标 hover 项：`hover:bg-foreground/4`
 - 分隔线：`h-px bg-border-subtle mx-1 my-1`
+- 参考实现：`ToolbarUserMenu.tsx`、`NodeContextMenu.tsx`
 
 ### 按钮
 

@@ -59,6 +59,8 @@ interface NodeStore {
   restoreNode(nodeId: string): void;
   hardDeleteNode(nodeId: string): void;
   emptyTrash(): void;
+  /** Deep-duplicate a node and all its descendants, inserting as next sibling. */
+  duplicateNode(nodeId: string): NodexNode | null;
 
   // ─── 内容编辑（同步） ───
 
@@ -1075,6 +1077,68 @@ export const useNodeStore = create<NodeStore>((set, get) => {
         loroDoc.deleteNode(trashChildren[i]);
       }
       loroDoc.commitDoc();
+    },
+
+    duplicateNode: (nodeId) => {
+      const parentId = loroDoc.getParentId(nodeId);
+      if (!parentId) return null;
+
+      const siblings = loroDoc.getChildren(parentId);
+      const idx = siblings.indexOf(nodeId);
+      const insertAt = idx >= 0 ? idx + 1 : siblings.length;
+
+      // Deep-clone helper: recursively copy a node and its descendants.
+      // Returns the new node's ID.
+      function deepClone(srcId: string, destParentId: string, destIndex?: number): string {
+        const src = loroDoc.toNodexNode(srcId);
+        const newId = nanoid();
+        loroDoc.createNode(newId, destParentId, destIndex);
+
+        if (src) {
+          // Copy core data fields
+          const batch: Record<string, unknown> = {};
+          if (src.name !== undefined) batch.name = src.name;
+          if (src.description !== undefined) batch.description = src.description;
+          if (src.type !== undefined) batch.type = src.type;
+          if (src.fieldDefId !== undefined) batch.fieldDefId = src.fieldDefId;
+          if (src.targetId !== undefined) batch.targetId = src.targetId;
+          if (src.color !== undefined) batch.color = src.color;
+          if (src.showCheckbox !== undefined) batch.showCheckbox = src.showCheckbox;
+          if (src.completedAt !== undefined) batch.completedAt = src.completedAt;
+          if (src.templateId !== undefined) batch.templateId = src.templateId;
+
+          if (Object.keys(batch).length > 0) {
+            loroDoc.setNodeDataBatch(newId, batch);
+          }
+
+          // Copy rich text (marks + inlineRefs)
+          if (src.name && (src.marks?.length || src.inlineRefs?.length)) {
+            loroDoc.setNodeRichTextContent(
+              newId,
+              src.name,
+              src.marks ?? [],
+              src.inlineRefs ?? [],
+            );
+          }
+
+          // Copy tags (stored as LoroList, not children)
+          for (const tagId of src.tags) {
+            loroDoc.addTag(newId, tagId);
+          }
+        }
+
+        // Clone children (order preserved)
+        const childIds = loroDoc.getChildren(srcId);
+        for (const childId of childIds) {
+          deepClone(childId, newId);
+        }
+
+        return newId;
+      }
+
+      const newId = deepClone(nodeId, parentId, insertAt);
+      loroDoc.commitDoc();
+      return loroDoc.toNodexNode(newId);
     },
 
     // ─── 内容编辑 ───

@@ -4,11 +4,13 @@
  * Displays below TagBar as gray small text.
  * MouseDown to edit (contentEditable), blur/Enter to save, Escape to cancel.
  * Cursor placed at click position via caretPositionFromPoint.
- * When empty and not editing, renders nothing.
+ * When empty and not editing, renders nothing — unless triggered externally
+ * via ui-store.editingDescriptionNodeId (set by context menu "Add description").
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNode } from '../../hooks/use-node';
 import { useNodeStore } from '../../stores/node-store';
+import { useUIStore } from '../../stores/ui-store';
 import { SYS_T } from '../../types/index.js';
 
 interface NodeDescriptionProps {
@@ -24,6 +26,15 @@ export function NodeDescription({ nodeId, editable = true }: NodeDescriptionProp
   const [editing, setEditing] = useState(false);
   const descRef = useRef<HTMLDivElement>(null);
   const clickCoordsRef = useRef<{ x: number; y: number } | null>(null);
+
+  // External trigger: context menu "Add description" sets editingDescriptionNodeId
+  const editingDescriptionNodeId = useUIStore((s) => s.editingDescriptionNodeId);
+  useEffect(() => {
+    if (editingDescriptionNodeId === nodeId && editable) {
+      setEditing(true);
+      useUIStore.getState().setEditingDescription(null);
+    }
+  }, [editingDescriptionNodeId, nodeId, editable]);
 
   useEffect(() => {
     if (editing && descRef.current) {

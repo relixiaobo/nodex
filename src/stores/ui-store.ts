@@ -125,6 +125,10 @@ interface UIStore {
   // Settings: highlight/comment feature toggle (persisted)
   highlightEnabled: boolean;
   setHighlightEnabled(enabled: boolean): void;
+
+  // Description editing trigger (session-only, not persisted)
+  editingDescriptionNodeId: string | null;
+  setEditingDescription(nodeId: string | null): void;
 }
 
 export interface PersistedUIStoreState {
@@ -470,6 +474,10 @@ export const useUIStore = create<UIStore>()(
       // Settings: highlight/comment feature toggle
       highlightEnabled: true,
       setHighlightEnabled: (enabled) => set({ highlightEnabled: enabled }),
+
+      // Description editing trigger (session-only)
+      editingDescriptionNodeId: null,
+      setEditingDescription: (nodeId) => set({ editingDescriptionNodeId: nodeId }),
     }),
     {
       name: 'nodex-ui',

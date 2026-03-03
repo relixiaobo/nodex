@@ -75,6 +75,16 @@ export {
   Asterisk,
 } from 'lucide-react';
 
+// ─── Context Menu ────────────────────────────────────────────────────────────
+
+export {
+  PanelRight,
+  Copy,
+  CopyPlus,
+  MoveRight,
+  Type,
+} from 'lucide-react';
+
 // ─── Slash Command ───────────────────────────────────────────────────────────
 
 export {

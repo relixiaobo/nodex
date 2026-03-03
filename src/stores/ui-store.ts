@@ -121,6 +121,10 @@ interface UIStore {
   // Last visit date (YYYY-MM-DD string, persisted) — used to determine "first visit of the day"
   lastVisitDate: string | null;
   setLastVisitDate(date: string): void;
+
+  // Settings: highlight/comment feature toggle (persisted)
+  highlightEnabled: boolean;
+  setHighlightEnabled(enabled: boolean): void;
 }
 
 export interface PersistedUIStoreState {
@@ -130,6 +134,7 @@ export interface PersistedUIStoreState {
   viewMode: 'list' | 'table' | 'tiles' | 'cards';
   paletteUsage: Record<string, { count: number; lastUsedAt: number }>;
   lastVisitDate: string | null;
+  highlightEnabled: boolean;
 }
 
 /** Stable selector for the current (top) node ID. */
@@ -144,6 +149,7 @@ export function partializeUIStore(state: UIStore): PersistedUIStoreState {
     viewMode: state.viewMode,
     paletteUsage: state.paletteUsage,
     lastVisitDate: state.lastVisitDate,
+    highlightEnabled: state.highlightEnabled,
   };
 }
 
@@ -460,6 +466,10 @@ export const useUIStore = create<UIStore>()(
       // Last visit date
       lastVisitDate: null,
       setLastVisitDate: (date) => set({ lastVisitDate: date }),
+
+      // Settings: highlight/comment feature toggle
+      highlightEnabled: true,
+      setHighlightEnabled: (enabled) => set({ highlightEnabled: enabled }),
     }),
     {
       name: 'nodex-ui',

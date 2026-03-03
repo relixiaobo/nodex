@@ -23,7 +23,9 @@ export type SelectionKeyboardAction =
   | 'batch_outdent'    // Shift+Tab → outdent all selected nodes
   | 'batch_duplicate'  // Cmd+Shift+D → duplicate all selected nodes
   | 'batch_checkbox'   // Cmd+Enter → toggle checkbox on all selected nodes
-  | 'batch_apply_tag'; // # → open tag selector for all selected nodes
+  | 'batch_apply_tag'  // # → open tag selector for all selected nodes
+  | 'batch_copy'       // Cmd+C → copy all selected nodes to clipboard
+  | 'batch_cut';       // Cmd+X → cut all selected nodes to clipboard
 
 export function resolveSelectionKeyboardAction(
   e: KeyboardEvent,
@@ -53,6 +55,16 @@ export function resolveSelectionKeyboardAction(
   // Cmd+Shift+D / Ctrl+Shift+D: batch duplicate
   if ((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === 'd' || e.key === 'D') && !e.altKey) {
     return 'batch_duplicate';
+  }
+
+  // Cmd+C / Ctrl+C: batch copy
+  if ((e.metaKey || e.ctrlKey) && e.key === 'c' && !e.shiftKey && !e.altKey) {
+    return 'batch_copy';
+  }
+
+  // Cmd+X / Ctrl+X: batch cut
+  if ((e.metaKey || e.ctrlKey) && e.key === 'x' && !e.shiftKey && !e.altKey) {
+    return 'batch_cut';
   }
 
   if (e.key === 'ArrowUp' && !e.shiftKey && !e.metaKey && !e.ctrlKey && !e.altKey) {

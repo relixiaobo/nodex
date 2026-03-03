@@ -328,6 +328,7 @@ export const CONTAINER_IDS = {
   SCHEMA: 'SCHEMA',
   CLIPS: 'CLIPS',
   STASH: 'STASH',
+  SETTINGS: 'SETTINGS',
 } as const;
 
 export type ContainerId = typeof CONTAINER_IDS[keyof typeof CONTAINER_IDS];

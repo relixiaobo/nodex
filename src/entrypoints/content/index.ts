@@ -65,11 +65,25 @@ export default defineContentScript({
     // Initialize highlight selection listener and custom elements.
     // Non-fatal: some pages break customElements (set it to null),
     // but webclip capture must still work.
-    try {
-      initHighlight();
-    } catch {
-      // Highlight toolbar won't work on this page, but clip capture will.
-    }
+    // Check highlightEnabled setting from chrome.storage (shared with sidepanel ui-store).
+    chrome.storage.local.get('nodex-ui').then((stored) => {
+      const uiState = stored?.['nodex-ui']?.state;
+      const highlightEnabled = uiState?.highlightEnabled ?? true;
+      if (highlightEnabled) {
+        try {
+          initHighlight();
+        } catch {
+          // Highlight toolbar won't work on this page, but clip capture will.
+        }
+      }
+    }).catch(() => {
+      // Fallback: initialize highlight if storage read fails
+      try {
+        initHighlight();
+      } catch {
+        // Highlight toolbar won't work on this page, but clip capture will.
+      }
+    });
 
     // Set guard AFTER listener registration — if initHighlight crashes,
     // we still want the onMessage listener to be registered.

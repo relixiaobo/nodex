@@ -72,6 +72,7 @@ import type { ParsedPasteNode } from '../../lib/paste-parser.js';
 import { t } from '../../i18n/strings.js';
 import { RowHost } from './RowHost.js';
 import { OutlinerRow, useRowSelectionState, useRowPointerHandlers } from './OutlinerRow.js';
+import { NodeContextMenuPortal } from './NodeContextMenu.js';
 import {
   buildFieldOwnerColors,
   buildVisibleChildrenRows,
@@ -560,6 +561,15 @@ export function OutlinerItem({
   // Pending click coordinates for description cursor placement
   const descClickCoordsRef = useRef<{ x: number; y: number } | null>(null);
   const descriptionReturnOffsetRef = useRef<number | null>(null);
+
+  // ── Context menu ──
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setContextMenu({ x: e.clientX, y: e.clientY });
+  }, []);
+  const closeContextMenu = useCallback(() => setContextMenu(null), []);
 
   const triggerDeleteBlockedPulse = useCallback(() => {
     if (deleteBlockedPulseTimeoutRef.current !== null) {
@@ -2078,6 +2088,7 @@ export function OutlinerItem({
   const hasOverlayOpen = (isFocused && (hashTagOpen || refOpen || slashOpen)) || optionsPickerOpen;
 
   return (
+    <>
     <OutlinerRow
       config={{
         rowId: nodeId,
@@ -2114,6 +2125,7 @@ export function OutlinerItem({
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
         onDragEnd={handleDragEnd}
+        onContextMenu={handleContextMenu}
       >
         {/* Per-row selection highlight: global selection mode only (Esc/drag/multi-select). */}
         {showRowHighlight && (
@@ -2528,6 +2540,13 @@ export function OutlinerItem({
       )}
     </div>
     </OutlinerRow>
+    {contextMenu && (
+      <NodeContextMenuPortal
+        menu={{ x: contextMenu.x, y: contextMenu.y, nodeId }}
+        onClose={closeContextMenu}
+      />
+    )}
+    </>
   );
 }
 

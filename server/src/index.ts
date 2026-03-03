@@ -168,7 +168,11 @@ app.get('/api/session', async (c) => {
 // ---------------------------------------------------------------------------
 
 app.get('/health', (c) => {
-  return c.json({ ok: true, service: 'nodex-sync' });
+  return c.json({
+    ok: true,
+    service: 'nodex-sync',
+    version: typeof __GIT_COMMIT__ !== 'undefined' ? __GIT_COMMIT__ : 'unknown',
+  });
 });
 
 // ---------------------------------------------------------------------------

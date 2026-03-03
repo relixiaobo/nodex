@@ -103,7 +103,8 @@ _(空)_
 
 - [x] 基础剪藏链路 ✓（消息/提取/保存/标签/URL/Toast/正文→子节点）
 - [x] **Clip Page Toast 优化** — 成功时静默，仅失败时提示 ✅（2026-02-27）
-- [ ] 一键保存到 Inbox / Today / 指定节点（UI 入口 + 目标选择）
+- [x] 默认保存到 Today（高亮/评论/剪藏的 #source 节点默认存入当天日记） ✅（2026-03-03）
+- [ ] 保存目标选择 UI — 允许用户选择保存到 Inbox / Today / 指定节点（UI 入口 + 目标选择器）
 - [ ] **AI 智能剪藏** — 自动打标签、提取结构化信息（作者/日期/关键词）、推荐关联到已有笔记
 - [ ] 选中文本剪藏（Content Script 右键菜单 / 浮动按钮 → 剪藏选中段落）
 - [ ] **Twitter/X 剪藏支持** — Clip Page 目前不支持抓取 Twitter/X 内容，需适配其特殊 DOM 结构
@@ -303,6 +304,7 @@ _(空)_
 
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
+| 2026-03-03 | Web Clip 默认保存到 Today — 高亮/评论/剪藏的 #source 节点默认存入当天日记（非 Inbox）+ findClipNodeByUrl 搜索扩展到 JOURNAL 日节点 | nodex | main |
 | 2026-03-01 | Sync 数据恢复修复 — `subscribeLocalUpdates` 丢弃 local-only 阶段 bytes 的时序竞态，sync 启动前全量 export 入队确保树操作不丢失 | nodex | main |
 | 2026-03-01 | Highlight 交互重设计（Readwise 风格）— 图标化网页工具栏 + Note 内联输入 + 高亮点击二次工具栏 + 评论图标 + DS 视觉收敛 + 11 test | codex | #115 |
 | 2026-03-01 | Highlight 数据模型重构 — highlight 改为 clip page 子节点 + `ancestor_supertag_ref` auto-init + 去重复创建 + anchor JSON 隐藏 + options picker targetId 修复 + reference tag inline 对齐 | nodex | main |

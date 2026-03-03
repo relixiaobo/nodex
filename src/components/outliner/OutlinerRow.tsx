@@ -280,7 +280,7 @@ export function OutlinerRow({ config, children }: OutlinerRowProps) {
         const latestUi = useUIStore.getState();
         const flatList = getFlattenedVisibleNodes(rootChildIds, latestUi.expandedNodes, rootNodeId);
         const orderedIds = getSelectedIdsInOrder(latestUi.selectedNodeIds, flatList);
-        void copyNodesToClipboard(orderedIds);
+        copyNodesToClipboard(orderedIds);
         return;
       }
 
@@ -291,7 +291,7 @@ export function OutlinerRow({ config, children }: OutlinerRowProps) {
         const bounds = getSelectionBounds(latestUi.selectedNodeIds, flatList);
         const prev = bounds ? getPreviousVisibleNode(bounds.first.nodeId, bounds.first.parentId, flatList) : null;
         const orderedIds = getSelectedIdsInOrder(latestUi.selectedNodeIds, flatList);
-        void cutNodesToClipboard(orderedIds);
+        cutNodesToClipboard(orderedIds);
         clearSelection();
         if (prev) {
           setFocusedNode(prev.nodeId, prev.parentId);

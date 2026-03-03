@@ -567,8 +567,14 @@ export function OutlinerItem({
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    // Select the node (without entering edit mode) when right-clicking
+    const ui = useUIStore.getState();
+    if (!ui.selectedNodeIds.has(nodeId)) {
+      ui.clearFocus();
+      ui.setSelectedNodes(new Set([nodeId]), nodeId);
+    }
     setContextMenu({ x: e.clientX, y: e.clientY });
-  }, []);
+  }, [nodeId]);
   const closeContextMenu = useCallback(() => setContextMenu(null), []);
 
   const triggerDeleteBlockedPulse = useCallback(() => {

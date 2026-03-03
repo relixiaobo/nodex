@@ -6,7 +6,6 @@
  */
 import { useEffect, useRef, forwardRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { useUIStore } from '../../stores/ui-store.js';
 import { useNodeStore } from '../../stores/node-store.js';
 import * as loroDoc from '../../lib/loro-doc.js';
 import { copyNodesToClipboard, cutNodesToClipboard } from '../../lib/node-clipboard.js';
@@ -106,12 +105,12 @@ const NodeContextMenuContent = forwardRef<HTMLDivElement, NodeContextMenuContent
     const top = y + menuHeight > window.innerHeight ? y - menuHeight : y;
 
     const handleCopy = useCallback(() => {
-      void copyNodesToClipboard([nodeId]);
+      copyNodesToClipboard([nodeId]);
       onClose();
     }, [nodeId, onClose]);
 
     const handleCut = useCallback(() => {
-      void cutNodesToClipboard([nodeId]);
+      cutNodesToClipboard([nodeId]);
       onClose();
     }, [nodeId, onClose]);
 
@@ -155,20 +154,12 @@ const NodeContextMenuContent = forwardRef<HTMLDivElement, NodeContextMenuContent
         <div className="mx-2 my-1 border-t border-border-subtle" />
 
         {/* Timestamps */}
-        <div className="px-3 py-1.5 text-xs text-foreground-tertiary select-none space-y-1">
+        <div className="px-3 py-1.5 text-xs text-foreground-tertiary select-none space-y-0.5">
           {changed && (
-            <div>
-              <span>Changed: {changed.date}</span>
-              <br />
-              <span className="ml-[1ch]">at {changed.time}</span>
-            </div>
+            <div>Changed {changed.date}, {changed.time}</div>
           )}
           {created && (
-            <div>
-              <span>Created: {created.date}</span>
-              <br />
-              <span className="ml-[1ch]">at {created.time}</span>
-            </div>
+            <div>Created {created.date}, {created.time}</div>
           )}
         </div>
       </div>

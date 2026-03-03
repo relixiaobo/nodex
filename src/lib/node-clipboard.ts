@@ -6,7 +6,6 @@
  */
 
 import * as loroDoc from './loro-doc.js';
-import { CONTAINER_IDS } from '../types/index.js';
 import { useNodeStore } from '../stores/node-store.js';
 
 /**
@@ -44,21 +43,46 @@ export function serializeNodesToMarkdown(nodeIds: string[]): string {
 }
 
 /**
+ * Write text to the system clipboard.
+ * Uses async Clipboard API with a synchronous fallback for Chrome extension contexts
+ * where the async API may be restricted.
+ */
+function writeToClipboard(text: string): void {
+  if (navigator.clipboard?.writeText) {
+    navigator.clipboard.writeText(text).catch(() => {
+      clipboardFallback(text);
+    });
+  } else {
+    clipboardFallback(text);
+  }
+}
+
+function clipboardFallback(text: string): void {
+  const textarea = document.createElement('textarea');
+  textarea.value = text;
+  textarea.style.cssText = 'position:fixed;opacity:0;pointer-events:none';
+  document.body.appendChild(textarea);
+  textarea.select();
+  document.execCommand('copy');
+  document.body.removeChild(textarea);
+}
+
+/**
  * Copy selected nodes to the system clipboard as Markdown text.
  */
-export async function copyNodesToClipboard(nodeIds: string[]): Promise<void> {
+export function copyNodesToClipboard(nodeIds: string[]): void {
   if (nodeIds.length === 0) return;
   const markdown = serializeNodesToMarkdown(nodeIds);
   if (!markdown) return;
-  await navigator.clipboard.writeText(markdown);
+  writeToClipboard(markdown);
 }
 
 /**
  * Cut selected nodes: copy to clipboard then move to Trash.
  */
-export async function cutNodesToClipboard(nodeIds: string[]): Promise<void> {
+export function cutNodesToClipboard(nodeIds: string[]): void {
   if (nodeIds.length === 0) return;
-  await copyNodesToClipboard(nodeIds);
+  copyNodesToClipboard(nodeIds);
 
   const { trashNode } = useNodeStore.getState();
   // Trash bottom-up to avoid index shift

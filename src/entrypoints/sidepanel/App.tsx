@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { Component, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useWorkspaceStore } from '../../stores/workspace-store';
 import { useNodeStore } from '../../stores/node-store';
 import { useUIStore } from '../../stores/ui-store';
@@ -42,6 +42,42 @@ import {
 import { ensureContainers } from '../../lib/bootstrap-containers.js';
 import { Toaster, toast } from 'sonner';
 import { TooltipProvider } from '../../components/ui/Tooltip';
+
+// ─── Error Boundary ───
+// Prevents white screen — catches render errors and shows a recovery UI.
+
+interface ErrorBoundaryProps { children: ReactNode }
+interface ErrorBoundaryState { error: Error | null }
+
+class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  state: ErrorBoundaryState = { error: null };
+  static getDerivedStateFromError(error: Error) { return { error }; }
+  componentDidCatch(error: Error) {
+    console.error('[App] Render error caught by ErrorBoundary:', error);
+  }
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="flex h-screen flex-col items-center justify-center gap-3 p-6 text-center text-sm text-foreground">
+          <p className="text-muted-foreground">Something went wrong.</p>
+          <button
+            type="button"
+            onClick={() => this.setState({ error: null })}
+            className="text-primary hover:underline"
+          >
+            Try again
+          </button>
+          {import.meta.env.DEV && (
+            <pre className="mt-2 max-w-full overflow-auto rounded bg-muted p-2 text-xs text-destructive">
+              {this.state.error.message}
+            </pre>
+          )}
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 /**
  * Bootstrap workspace containers in LoroDoc.
@@ -138,10 +174,14 @@ function useBootstrap(skip: boolean): BootstrapResult {
     const unsub = syncManager.onStateChange((state) => {
      if (state.status === 'synced' && state.lastSyncedAt !== null) {
       unsub();
+      // If WASM is poisoned, don't attempt LoroDoc operations
+      if (loroDoc.isWasmPoisoned()) return;
       // Read current workspace ID dynamically — may have changed after sign-in
       // (bootstrap captures randomUUID, but sign-in transitions to user.id)
       const wsNow = useWorkspaceStore.getState().currentWorkspaceId;
       if (wsNow) ensureContainers(wsNow);
+     } else if (state.status === 'error') {
+      unsub();
      }
     });
    }
@@ -162,6 +202,7 @@ export function App({ skipBootstrap = false }: AppProps) {
  const selectionDismissHandlers = useGlobalSelectionDismiss();
 
  useEffect(() => {
+  if (!ready) return;
   if (!chrome?.runtime?.onMessage) return;
 
   const onHighlightMessage = (
@@ -299,9 +340,10 @@ export function App({ skipBootstrap = false }: AppProps) {
   return () => {
     chrome.runtime.onMessage.removeListener(onHighlightMessage);
   };
- }, []);
+ }, [ready]);
 
  useEffect(() => {
+  if (!ready) return;
   if (!chrome?.runtime?.sendMessage) return;
 
   let previousIds = collectAllHighlightNodeIds();
@@ -319,7 +361,7 @@ export function App({ skipBootstrap = false }: AppProps) {
       }).catch(() => {});
     }
   });
- }, []);
+ }, [ready]);
 
  useEffect(() => {
   if (!import.meta.env.DEV) return;
@@ -343,31 +385,33 @@ export function App({ skipBootstrap = false }: AppProps) {
  }
 
  return (
-  <TooltipProvider>
-   <div
-    className="flex h-screen w-full flex-col overflow-hidden bg-background text-foreground"
-    onPointerDownCapture={selectionDismissHandlers.onPointerDownCapture}
-    onFocusCapture={selectionDismissHandlers.onFocusCapture}
-   >
-    <TopToolbar />
-    <PanelStack />
-    <CommandPalette />
-    <BatchTagSelector />
-    <Toaster
-     position="bottom-center"
-     toastOptions={{
-      style: {
-       fontFamily: 'var(--font-sans)',
-       fontSize: '13px',
-       borderRadius: 'var(--radius-lg)',
-       border: '1px solid var(--color-border)',
-       background: 'var(--color-surface)',
-       color: 'var(--color-foreground)',
-       boxShadow: 'none',
-      },
-     }}
-    />
-   </div>
-  </TooltipProvider>
+  <ErrorBoundary>
+   <TooltipProvider>
+    <div
+     className="flex h-screen w-full flex-col overflow-hidden bg-background text-foreground"
+     onPointerDownCapture={selectionDismissHandlers.onPointerDownCapture}
+     onFocusCapture={selectionDismissHandlers.onFocusCapture}
+    >
+     <TopToolbar />
+     <PanelStack />
+     <CommandPalette />
+     <BatchTagSelector />
+     <Toaster
+      position="bottom-center"
+      toastOptions={{
+       style: {
+        fontFamily: 'var(--font-sans)',
+        fontSize: '13px',
+        borderRadius: 'var(--radius-lg)',
+        border: '1px solid var(--color-border)',
+        background: 'var(--color-surface)',
+        color: 'var(--color-foreground)',
+        boxShadow: 'none',
+       },
+      }}
+     />
+    </div>
+   </TooltipProvider>
+  </ErrorBoundary>
  );
 }

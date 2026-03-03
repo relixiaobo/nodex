@@ -18,7 +18,7 @@ export function ensureContainers(wsId: string): void {
     if (!loroDoc.hasNode(id)) {
       loroDoc.createNode(id, wsId);
       loroDoc.setNodeRichTextContent(id, name, [], []);
-    } else if (loroDoc.getParentId(id) === null) {
+    } else if (loroDoc.getParentId(id) !== wsId) {
       loroDoc.moveNode(id, wsId);
     }
   }

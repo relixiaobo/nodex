@@ -181,7 +181,31 @@ function configureTextStyles(target: LoroDoc): void {
   target.configTextStyle(RICH_TEXT_STYLE_CONFIG);
 }
 
+/**
+ * Set when a Loro WASM RuntimeError is caught.
+ * Once poisoned, ALL Loro operations are skipped to prevent cascading panics.
+ * Only a full page reload can recover from this state.
+ */
+let _wasmPoisoned = false;
+
+/** Check if the WASM engine has been poisoned by a previous error. */
+export function isWasmPoisoned(): boolean {
+  return _wasmPoisoned;
+}
+
+function markWasmPoisoned(source: string, err: unknown): void {
+  if (_wasmPoisoned) return; // Already logged
+  _wasmPoisoned = true;
+  console.error(`[loro-doc] WASM engine failed in ${source} — further mutations disabled until reload:`, err);
+  // Unsubscribe subscribeLocalUpdates to prevent Loro handler dispatch
+  // (handler.rs) from attempting callback on poisoned WASM during doc.commit()
+  if (unsubLocalUpdates) { unsubLocalUpdates(); unsubLocalUpdates = null; }
+  // Cancel any pending save — persistSnapshot would fail on poisoned WASM
+  if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
+}
+
 function canApplyMutation(action: string): boolean {
+  if (_wasmPoisoned) return false;
   if (!doc) throw new Error('[loro-doc] LoroDoc 未初始化，请先调用 initLoroDoc()');
   if (!doc.isDetached()) return true;
   if (!detachedMutationWarnings.has(action)) {
@@ -284,19 +308,30 @@ function fixDuplicateContainerMappings(): void {
 // 通知 + 持久化
 // ============================================================
 
+/**
+ * Immediately notify all subscribers (invalidate cache + call callbacks).
+ * Called explicitly from every doc-modifying exit point (commitDoc, importUpdates,
+ * undoDoc, redoDoc, etc.) instead of from doc.subscribe() — which would trigger
+ * a re-entrant WASM lock panic inside Loro's event handler dispatch.
+ */
 function notifySubscribers(): void {
   invalidateCache();
   for (const cb of subscribers) cb();
 }
 
 function scheduleSave(): void {
-  if (!currentWorkspaceId) return;
+  if (!currentWorkspaceId || _wasmPoisoned) return;
   if (saveTimer) clearTimeout(saveTimer);
   saveTimer = setTimeout(() => { void persistSnapshot(); }, 1500);
 }
 
-async function persistSnapshot(): Promise<void> {
+/**
+ * @param recoveryMode When true, attempt save even if WASM is poisoned.
+ *   Used by sync recovery to save partially-imported data before reload.
+ */
+async function persistSnapshot(recoveryMode = false): Promise<void> {
   if (!doc || !currentWorkspaceId) return;
+  if (_wasmPoisoned && !recoveryMode) return;
   try {
     // Commit pending changes so subscribeLocalUpdates fires
     // (produces update bytes for the sync pending queue).
@@ -358,10 +393,12 @@ export async function initLoroDoc(workspaceId: string): Promise<{ hadSnapshot: b
   undoManager = new UndoManager(doc, { mergeInterval: 500, excludeOriginPrefixes: [...UNDO_EXCLUDED_ORIGIN_PREFIXES] });
   bindUndoCallbacks();
 
-  doc.subscribe(() => {
-    notifySubscribers();
-    scheduleSave();
-  });
+  // NOTE: We intentionally do NOT register doc.subscribe() here.
+  // Loro's internal event handler dispatch (handler.rs) acquires a lock during
+  // doc.commit() / doc.import(). If doc.subscribe() is registered, Loro's own
+  // handler code tries to re-acquire that lock → WASM panic (unreachable at
+  // lock.rs:144). Instead, we call invalidateCache/scheduleSave/notifySubscribers
+  // explicitly from every doc-modifying exit point (commitDoc, undoDoc, etc.).
 
   // Capture local mutations → pending queue for sync.
   // Only enqueues when user is signed in (syncManager.getState().status !== 'local-only').
@@ -417,6 +454,7 @@ export function resetLoroDoc(): void {
   treeToNodex.clear();
   currentWorkspaceId = null;
   _hadSnapshot = false;
+  _wasmPoisoned = false;
   detachedMutationWarnings.clear();
   invalidateCache();
   if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
@@ -435,7 +473,7 @@ export function initLoroDocForTest(workspaceId: string): void {
   // so seed/system commits are not tracked in the undo stack.
   undoManager = new UndoManager(doc, { mergeInterval: 0, excludeOriginPrefixes: [...UNDO_EXCLUDED_ORIGIN_PREFIXES] });
   bindUndoCallbacks();
-  doc.subscribe(() => notifySubscribers());
+  // No doc.subscribe() — explicit notifications from commitDoc/import/undo/redo
 }
 
 /**
@@ -516,6 +554,7 @@ export function deleteNode(nodexId: string): void {
 // ============================================================
 
 export function getNodeData(nodexId: string): Record<string, unknown> | null {
+  if (_wasmPoisoned) return null;
   const tree = getTree();
   const treeId = nodexToTree.get(nodexId);
   if (!treeId) return null;
@@ -620,6 +659,7 @@ export function removeTag(nodexId: string, tagDefId: string): void {
 }
 
 export function getTags(nodexId: string): string[] {
+  if (_wasmPoisoned) return [];
   const tags = getTagsContainer(nodexId);
   if (!tags) return [];
   return [...new Set(tags.toArray() as string[])];
@@ -632,6 +672,7 @@ export function getTags(nodexId: string): string[] {
 const EMPTY_CHILDREN: string[] = [];
 
 export function getChildren(parentNodexId: string): string[] {
+  if (_wasmPoisoned) return EMPTY_CHILDREN;
   checkCache();
   const cached = _childrenCache.get(parentNodexId);
   if (cached !== undefined) return cached;
@@ -649,6 +690,7 @@ export function getChildren(parentNodexId: string): string[] {
 }
 
 export function getParentId(nodexId: string): string | null {
+  if (_wasmPoisoned) return null;
   const tree = getTree();
   const treeId = nodexToTree.get(nodexId);
   if (!treeId) return null;
@@ -668,6 +710,7 @@ export function getAllNodeIds(): string[] {
 }
 
 export function getRootNodeIds(): string[] {
+  if (_wasmPoisoned) return [];
   const tree = getTree();
   return tree.roots()
     .map(n => treeToNodex.get(n.id))
@@ -679,6 +722,7 @@ export function getRootNodeIds(): string[] {
 // ============================================================
 
 export function toNodexNode(nodexId: string): NodexNode | null {
+  if (_wasmPoisoned) return null;
   checkCache();
   const cached = _nodeCache.get(nodexId);
   if (cached !== undefined) return cached;
@@ -763,6 +807,16 @@ export async function saveNow(): Promise<void> {
   await persistSnapshot();
 }
 
+/**
+ * Attempt to save a snapshot even if WASM is poisoned.
+ * Used by sync recovery to persist partially-imported data so it survives reload.
+ * May fail if WASM is too damaged for doc.export() — caller should catch.
+ */
+export async function saveNowRecovery(): Promise<void> {
+  if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
+  await persistSnapshot(true);
+}
+
 export function exportSnapshot(): Uint8Array {
   if (!doc) throw new Error('[loro-doc] LoroDoc 未初始化');
   return doc.export({ mode: 'snapshot' });
@@ -770,30 +824,70 @@ export function exportSnapshot(): Uint8Array {
 
 export function importUpdates(data: Uint8Array): void {
   if (!doc) throw new Error('[loro-doc] LoroDoc 未初始化');
-  doc.import(data);
+  try {
+    doc.import(data);
+  } catch (e) {
+    if (e instanceof WebAssembly.RuntimeError) markWasmPoisoned('importUpdates', e);
+    throw e;
+  }
   rebuildMappings();
-  // Notify AFTER rebuildMappings so React reads correct nodexToTree mappings.
-  // doc.subscribe() fires during doc.import() — before rebuildMappings — so
-  // React's useSyncExternalStore sees stale mappings (new nodes not yet mapped)
-  // and skips re-render. This explicit notification ensures the UI updates.
+  scheduleSave();
   notifySubscribers();
+}
+
+/** Result of a resilient batch import. */
+export interface ImportBatchResult {
+  /** Number of chunks successfully imported. */
+  imported: number;
+  /** Number of chunks skipped due to errors. */
+  skipped: number;
+  /** Whether the WASM engine is poisoned (no further ops possible). */
+  poisoned: boolean;
 }
 
 /**
  * Batch-import multiple update byte arrays into the document.
- * Rebuilds mappings and notifies subscribers ONCE after all imports,
- * instead of per-update — O(n) vs O(n²) for large pull batches.
+ *
+ * Resilient: imports each chunk individually. If a chunk fails:
+ * - RuntimeError (WASM panic): marks WASM as poisoned, stops importing.
+ * - Other errors: skips the corrupt chunk, continues with the rest.
+ *
+ * After importing, rebuilds mappings and notifies subscribers for whatever
+ * was successfully imported. Does NOT throw — callers inspect the result.
  */
-export function importUpdatesBatch(updates: Uint8Array[]): void {
+export function importUpdatesBatch(updates: Uint8Array[]): ImportBatchResult {
   if (!doc) throw new Error('[loro-doc] LoroDoc 未初始化');
-  for (const data of updates) {
-    doc.import(data);
+  let imported = 0;
+  let skipped = 0;
+
+  for (let i = 0; i < updates.length; i++) {
+    try {
+      doc.import(updates[i]);
+      imported++;
+    } catch (e) {
+      skipped++;
+      if (e instanceof WebAssembly.RuntimeError) {
+        console.error(
+          `[loro-doc] WASM panic during import chunk ${i + 1}/${updates.length}`,
+          `(sizes: ${updates.map(u => u.byteLength).join(', ')} bytes)`,
+        );
+        markWasmPoisoned('importUpdatesBatch', e);
+        break; // Can't continue after WASM panic
+      }
+      // Non-fatal import error (e.g. duplicate/corrupt update) — skip and continue
+      console.warn(`[loro-doc] Skipping corrupt import chunk ${i + 1}/${updates.length}:`, e);
+    }
   }
-  rebuildMappings();
-  // After CRDT merge, duplicate container nodes may exist. Fix mappings
-  // so the container with actual data wins (not the empty bootstrap one).
-  fixDuplicateContainerMappings();
-  notifySubscribers();
+
+  // Rebuild mappings for whatever was successfully imported
+  if (imported > 0 && !_wasmPoisoned) {
+    rebuildMappings();
+    fixDuplicateContainerMappings();
+    scheduleSave();
+    notifySubscribers();
+  }
+
+  return { imported, skipped, poisoned: _wasmPoisoned };
 }
 
 // ============================================================
@@ -821,7 +915,19 @@ export function commitDoc(origin: string = DEFAULT_USER_COMMIT_ORIGIN): void {
   if (!origin.startsWith('system:') && origin !== '__seed__') {
     redoRestoreUIMetaStack.length = 0;
   }
-  doc.commit({ origin });
+  try {
+    doc.commit({ origin });
+  } catch (e) {
+    if (e instanceof WebAssembly.RuntimeError) {
+      markWasmPoisoned('commitDoc', e);
+      return;
+    }
+    throw e;
+  }
+  // Explicit notification — replaces doc.subscribe() which caused WASM re-entrant lock panic.
+  // Safe to call synchronously here: doc.commit() has returned, no Loro lock is held.
+  scheduleSave();
+  notifySubscribers();
 }
 
 /**
@@ -855,7 +961,11 @@ export function undoDoc(): boolean {
   if (result && restoreUndoUIMeta) {
     restoreUndoUIMeta((undoValue ?? null) as Value, true);
   }
-  if (result) rebuildMappings();
+  if (result) {
+    rebuildMappings();
+    scheduleSave();
+    notifySubscribers();
+  }
   return result;
 }
 
@@ -869,7 +979,11 @@ export function redoDoc(): boolean {
   if (result && restoreUndoUIMeta) {
     restoreUndoUIMeta((redoMeta ?? null) as Value, false);
   }
-  if (result) rebuildMappings();
+  if (result) {
+    rebuildMappings();
+    scheduleSave();
+    notifySubscribers();
+  }
   return result;
 }
 
@@ -1014,6 +1128,7 @@ export function checkout(frontiers: Array<{ peer: PeerID; counter: number }>): v
   if (!doc) throw new Error('[loro-doc] LoroDoc 未初始化');
   doc.checkout(frontiers);
   rebuildMappings();
+  notifySubscribers();
 }
 
 /**
@@ -1024,6 +1139,7 @@ export function checkoutToLatest(): void {
   doc.checkoutToLatest();
   detachedMutationWarnings.clear();
   rebuildMappings();
+  notifySubscribers();
 }
 
 /**
@@ -1054,6 +1170,7 @@ export function getCurrentFrontiers(): Array<{ peer: PeerID; counter: number }> 
  * 此 API 为 Phase 2 ProseMirror↔Loro 同步预留基础设施。
  */
 export function getNodeText(nodexId: string): LoroText | null {
+  if (_wasmPoisoned) return null;
   const treeId = nodexToTree.get(nodexId);
   if (!treeId) return null;
   const node = getTree().getNodeByID(treeId);
@@ -1151,6 +1268,8 @@ export function forkDoc(): DocFork {
         doc.import(delta);
         lastMergedVV = forkedDoc.oplogVersion();
         rebuildMappings();
+        scheduleSave();
+        notifySubscribers();
       }
     },
   };

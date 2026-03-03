@@ -44,6 +44,7 @@ import {
   moveNode,
   addTag,
   getTags,
+  getParentId,
   commitDoc,
   initLoroDocForTest,
   resetLoroDoc,
@@ -72,6 +73,34 @@ function initDoc() {
   resetLoroDoc();
   initLoroDocForTest('test-ws');
 }
+
+// ============================================================
+// moveNode across roots — container migration scenario
+// ============================================================
+
+describe('moveNode across roots', () => {
+  beforeEach(initDoc);
+
+  it('moves children from one root to another', () => {
+    // Simulates ensureContainers migrating containers from ws_xxx → user.id
+    const rootA = createNode('ws_anon', null);
+    const child1 = createNode('LIBRARY', rootA);
+    const child2 = createNode('JOURNAL', rootA);
+    commitDoc();
+
+    const rootB = createNode('user_123', null);
+    commitDoc();
+
+    moveNode('LIBRARY', 'user_123');
+    moveNode('JOURNAL', 'user_123');
+    commitDoc();
+
+    expect(getChildren('user_123')).toEqual(['LIBRARY', 'JOURNAL']);
+    expect(getChildren('ws_anon')).toEqual([]);
+    expect(getParentId('LIBRARY')).toBe('user_123');
+    expect(getParentId('JOURNAL')).toBe('user_123');
+  });
+});
 
 // ============================================================
 // ② Fine-grained subscriptions

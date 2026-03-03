@@ -9,6 +9,7 @@ import { persist } from 'zustand/middleware';
 import { chromeLocalStorage } from '../lib/chrome-storage';
 import type { AuthUser } from '../lib/auth.js';
 import { syncManager } from '../lib/sync/sync-manager.js';
+import { isWasmPoisoned } from '../lib/loro-doc.js';
 
 interface WorkspaceStore {
   currentWorkspaceId: string | null;
@@ -91,6 +92,22 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
 
         const prevWsId = useWorkspaceStore.getState().currentWorkspaceId;
 
+        // Update persistence key so saves go under the correct IndexedDB key.
+        // Do NOT call ensureContainers() here — tree move operations before sync
+        // cause a Loro WASM panic when server data is imported (conflicting tree
+        // operations trigger option.rs:2175 unwrap). ensureContainers is deferred
+        // until after sync completes.
+        if (prevWsId !== user.id) {
+          const loroDocMod = await import('../lib/loro-doc.js');
+          loroDocMod.setCurrentWorkspaceId(user.id);
+
+          // Clean up orphaned snapshot from anonymous session
+          if (prevWsId) {
+            const { deleteSnapshot } = await import('../lib/loro-persistence.js');
+            await deleteSnapshot(prevWsId).catch(() => {});
+          }
+        }
+
         // TODO: currentWorkspaceId = user.id assumes single workspace per user.
         // When multi-workspace is needed, derive from a workspace list instead.
         set({
@@ -100,25 +117,11 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
           authUser: user,
         });
 
-        // On fresh install, bootstrap initialized LoroDoc with a random UUID.
-        // After sign-in the workspace must be user.id — update the persistence
-        // key so future saves go to the correct IndexedDB entry.
-        // Unlike initLoroDoc(), setCurrentWorkspaceId() does NOT destroy the
-        // in-memory doc, so existing nodes remain valid and React won't crash
-        // during intermediate re-renders.
         if (prevWsId !== user.id) {
-          const loroDocMod = await import('../lib/loro-doc.js');
-          loroDocMod.setCurrentWorkspaceId(user.id);
-
+          // Defer container migration + Today navigation until AFTER first sync.
+          // ensureContainers() MUST run after importUpdatesBatch so that local
+          // tree move operations don't conflict with server CRDT data during merge.
           const { ensureContainers } = await import('../lib/bootstrap-containers.js');
-          ensureContainers(user.id);
-
-          // Defer Today navigation until AFTER first sync fully catches up.
-          // Bootstrap created journal nodes with random IDs under JOURNAL.
-          // After sync, fixDuplicateContainerMappings() resolves which JOURNAL
-          // tree node to use (server's, with actual data). We then navigate to
-          // the server's today node. The bootstrap journal nodes become orphaned
-          // (harmless — under the non-mapped JOURNAL tree node).
           const { ensureTodayNode } = await import('../lib/journal.js');
           const { useUIStore } = await import('./ui-store.js');
           const targetWsId = user.id;
@@ -128,10 +131,28 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
               unsub();
               return;
             }
-            if (state.status === 'synced' || state.status === 'error') {
+            if (state.status === 'synced') {
               unsub();
-              const todayId = ensureTodayNode();
-              useUIStore.getState().replacePanel(todayId);
+              try {
+                ensureContainers(targetWsId);
+                const todayId = ensureTodayNode();
+                useUIStore.getState().replacePanel(todayId);
+              } catch (e) {
+                console.warn('[workspace-store] post-sync setup failed:', e);
+              }
+            } else if (state.status === 'error') {
+              unsub();
+              // If WASM is poisoned, don't attempt any LoroDoc operations —
+              // they will panic. Recovery requires a page reload.
+              if (isWasmPoisoned()) return;
+              // Sync failed for non-fatal reason — try ensureContainers for offline functionality
+              try {
+                ensureContainers(targetWsId);
+                const todayId = ensureTodayNode();
+                useUIStore.getState().replacePanel(todayId);
+              } catch (e) {
+                console.warn('[workspace-store] post-error setup failed:', e);
+              }
             }
           });
         }
@@ -188,10 +209,17 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
                 unsub();
                 return;
               }
-              if (state.status === 'synced' || state.status === 'error') {
+              if (state.status === 'synced') {
                 unsub();
-                const todayId = ensureTodayNode();
-                useUIStore.getState().replacePanel(todayId);
+                try {
+                  const todayId = ensureTodayNode();
+                  useUIStore.getState().replacePanel(todayId);
+                } catch (e) {
+                  console.warn('[workspace-store] deferred today navigation failed:', e);
+                }
+              } else if (state.status === 'error') {
+                // Sync failed — don't try to create journal nodes (WASM may be poisoned)
+                unsub();
               }
             });
           }

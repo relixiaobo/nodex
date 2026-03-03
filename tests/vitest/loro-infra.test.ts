@@ -20,6 +20,7 @@ import {
   getVersionVector,
   exportFrom,
   importUpdates,
+  importUpdatesBatch,
   // ④ Time Travel
   getVersionHistory,
   checkout,
@@ -99,6 +100,58 @@ describe('moveNode across roots', () => {
     expect(getChildren('ws_anon')).toEqual([]);
     expect(getParentId('LIBRARY')).toBe('user_123');
     expect(getParentId('JOURNAL')).toBe('user_123');
+  });
+});
+
+// ============================================================
+// fixDuplicateContainerMappings — merge children from duplicates
+// ============================================================
+
+describe('importUpdatesBatch merges duplicate container children', () => {
+  beforeEach(initDoc);
+
+  it('merges children from duplicate tree nodes with same storedId', () => {
+    // Session 1: create root + JOURNAL container with some children
+    // Must use the same tree name ('nodes') as loro-doc.ts getTree()
+    const doc1 = new LoroDoc();
+    const tree1 = doc1.getTree('nodes');
+    tree1.enableFractionalIndex(0);
+
+    const root1 = tree1.createNode();
+    root1.data.set('id', 'user_123');
+    const journal1 = tree1.createNode(root1.id);
+    journal1.data.set('id', 'JOURNAL');
+    const day1 = tree1.createNode(journal1.id);
+    day1.data.set('id', 'day_2026-03-01');
+    day1.data.set('name', 'March 1st');
+    const day2 = tree1.createNode(journal1.id);
+    day2.data.set('id', 'day_2026-03-02');
+    day2.data.set('name', 'March 2nd');
+    doc1.commit();
+
+    // Session 2 (local doc): create its own root + JOURNAL (same storedId but different TreeID)
+    const localRoot = createNode('user_123', null);
+    const localJournal = createNode('JOURNAL', localRoot);
+    const localDay = createNode('day_2026-03-03', localJournal);
+    setNodeData(localDay, 'name', 'March 3rd');
+    commitDoc();
+
+    // Verify local doc has one day under JOURNAL
+    expect(getChildren('JOURNAL')).toEqual(['day_2026-03-03']);
+
+    // Import session 1's data — creates duplicate JOURNAL tree nodes
+    const update1 = doc1.export({ mode: 'update' });
+    const result = importUpdatesBatch([update1]);
+
+    expect(result.imported).toBe(1);
+    expect(result.poisoned).toBe(false);
+
+    // After merge, JOURNAL should have children from BOTH sessions
+    const journalChildren = getChildren('JOURNAL');
+    expect(journalChildren).toContain('day_2026-03-01');
+    expect(journalChildren).toContain('day_2026-03-02');
+    expect(journalChildren).toContain('day_2026-03-03');
+    expect(journalChildren.length).toBe(3);
   });
 });
 

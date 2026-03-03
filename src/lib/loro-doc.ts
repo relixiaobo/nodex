@@ -255,11 +255,16 @@ function rebuildMappings(): void {
  * with the same fixed string ID, rebuildMappings (which uses "last wins") may pick
  * the empty bootstrap container instead of the server's container with actual data.
  *
- * This function checks all container IDs and swaps the mapping to the tree node
- * with more children when duplicates exist. Called after importUpdatesBatch.
+ * This function:
+ * 1. Picks the tree node with the most children as the "winner" for each duplicate ID.
+ * 2. Moves children from all "loser" tree nodes to the winner, so data from all
+ *    sessions is accessible under a single container.
+ *
+ * Called after importUpdatesBatch.
  */
-function fixDuplicateContainerMappings(): void {
-  if (!doc) return;
+/** Returns true if tree mutations were made (children moved between duplicates). */
+function fixDuplicateContainerMappings(): boolean {
+  if (!doc) return false;
   const tree = getTree();
 
   // Build a reverse index: nodexId → all TreeIDs that have this storedId
@@ -276,7 +281,9 @@ function fixDuplicateContainerMappings(): void {
   }
 
   // For any nodexId with multiple tree nodes, pick the one with most children
+  // and move children from losers to the winner.
   let changed = false;
+  let childrenMoved = 0;
   for (const [storedId, treeIds] of idToTreeIds) {
     if (treeIds.length <= 1) continue;
 
@@ -290,6 +297,22 @@ function fixDuplicateContainerMappings(): void {
       }
     }
 
+    // Move children from loser tree nodes to the winner
+    for (const loserId of treeIds) {
+      if (loserId === bestId) continue;
+      const loserNode = tree.getNodeByID(loserId);
+      if (!loserNode) continue;
+      const loserChildren = loserNode.children() ?? [];
+      for (const child of loserChildren) {
+        try {
+          tree.move(child.id, bestId);
+          childrenMoved++;
+        } catch (e) {
+          console.warn(`[loro-doc] Failed to move child from duplicate ${storedId}:`, e);
+        }
+      }
+    }
+
     const currentMapped = nodexToTree.get(storedId);
     if (currentMapped !== bestId) {
       if (currentMapped) treeToNodex.delete(currentMapped);
@@ -298,10 +321,16 @@ function fixDuplicateContainerMappings(): void {
     }
   }
 
-  if (changed) {
+  if (childrenMoved > 0) {
+    console.log(`[loro-doc] Merged ${childrenMoved} children from duplicate container tree nodes`);
+  }
+
+  if (changed || childrenMoved > 0) {
     invalidateCache();
     reattachNodeSubs();
   }
+
+  return childrenMoved > 0;
 }
 
 // ============================================================
@@ -882,7 +911,20 @@ export function importUpdatesBatch(updates: Uint8Array[]): ImportBatchResult {
   // Rebuild mappings for whatever was successfully imported
   if (imported > 0 && !_wasmPoisoned) {
     rebuildMappings();
-    fixDuplicateContainerMappings();
+    const merged = fixDuplicateContainerMappings();
+    // If children were moved between duplicate tree nodes, commit + enqueue
+    // so the merge is persisted locally and pushed to the server.
+    if (merged) {
+      try {
+        doc.commit({ origin: 'system:merge-duplicates' });
+      } catch (e) {
+        if (e instanceof WebAssembly.RuntimeError) {
+          markWasmPoisoned('fixDuplicateContainerMappings:commit', e);
+        } else {
+          console.warn('[loro-doc] Failed to commit duplicate merge:', e);
+        }
+      }
+    }
     scheduleSave();
     notifySubscribers();
   }

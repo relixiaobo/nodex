@@ -7,14 +7,13 @@ import { useNodeFields, type FieldEntry } from '../../hooks/use-node-fields';
 import { useNodeStore } from '../../stores/node-store';
 import { useUIStore } from '../../stores/ui-store';
 import * as loroDoc from '../../lib/loro-doc.js';
-import { CONTAINER_IDS, SYS_T } from '../../types/index.js';
+import { SYS_T } from '../../types/index.js';
 import { BulletChevron, ChevronButton } from './BulletChevron';
-import { RichTextEditor, type EditorContentPayload, type TriggerAnchorRect } from '../editor/RichTextEditor';
-import { SlashCommandMenu } from '../editor/SlashCommandMenu';
+import { RichTextEditor, type EditorContentPayload } from '../editor/RichTextEditor';
+import { TriggerDropdowns } from '../editor/TriggerDropdowns';
 import { TrailingInput } from '../editor/TrailingInput';
 import { TagBar } from '../tags/TagBar';
-import { TagSelector, type TagDropdownHandle } from '../tags/TagSelector';
-import { ReferenceSelector, type ReferenceDropdownHandle } from '../references/ReferenceSelector';
+import { useEditorTriggers, buildTriggerEditorProps } from '../../hooks/use-editor-triggers.js';
 import { FieldRow } from '../fields/FieldRow';
 import { FIELD_OVERLAY_Z_INDEX } from '../fields/field-layout.js';
 import { toFieldRowEntryProps } from '../fields/field-row-props.js';
@@ -28,14 +27,7 @@ import {
   resolveNodeStructuralIcon,
 } from '../../lib/field-utils.js';
 import { isOutlinerContentNodeType } from '../../lib/node-type-utils.js';
-import { applyWebClipToNode } from '../../lib/webclip-service.js';
-import { toast } from 'sonner';
 import { marksToHtml } from '../../lib/editor-marks.js';
-import { docToMarks } from '../../lib/pm-doc-utils.js';
-import {
-  WEBCLIP_CAPTURE_ACTIVE_TAB,
-  type WebClipCaptureResponse,
-} from '../../lib/webclip-messaging.js';
 import { useNodeCheckbox } from '../../hooks/use-node-checkbox.js';
 import {
   getFlattenedVisibleNodes,
@@ -48,25 +40,14 @@ import { resolveDropHoverPosition } from '../../lib/drag-drop-position';
 import { resolveDropMove } from '../../lib/drag-drop';
 import { resolveSelectedReferenceShortcut } from '../../lib/selected-reference-shortcuts';
 import { resolveRowPointerSelectAction } from '../../lib/row-pointer-selection';
-import {
-  filterSlashCommands,
-  getFirstEnabledSlashIndex,
-  getNextEnabledSlashIndex,
-  type SlashCommandId,
-} from '../../lib/slash-commands';
 import { getShortcutKeys, matchesShortcutEvent } from '../../lib/shortcut-registry.js';
 import {
-  deleteEditorRange,
   isEditorViewAlive,
-  replaceEditorRangeWithInlineRef,
-  replaceEditorRangeWithText,
-  setEditorPlainTextContent,
   setEditorSelection,
-  toggleHeadingMark,
 } from '../../lib/pm-editor-view.js';
 import { dragState } from '../../hooks/use-drag-select';
 import { mergeRichTextPayload } from '../../lib/rich-text-merge.js';
-import { getTreeReferenceBlockReason, isReferenceDisplayCycle } from '../../lib/reference-rules.js';
+import { isReferenceDisplayCycle } from '../../lib/reference-rules.js';
 import { focusUndoShortcutSink, ensureUndoFocusAfterNavigation } from '../../lib/focus-utils.js';
 import type { ParsedPasteNode } from '../../lib/paste-parser.js';
 import { t } from '../../i18n/strings.js';
@@ -167,19 +148,6 @@ function focusEditorForNodeId(nodeId: string): boolean {
   return true;
 }
 
-function getTreeReferenceBlockMessage(reason: ReturnType<typeof getTreeReferenceBlockReason>): string {
-  switch (reason) {
-    case 'self_parent':
-      return t('reference.blocked.selfChild');
-    case 'would_create_display_cycle':
-      return t('reference.blocked.cycle');
-    case 'missing_parent':
-    case 'missing_target':
-    default:
-      return t('reference.blocked.unavailable');
-  }
-}
-
 export type OutlinerVisibleChild = OutlinerRowItem;
 export { buildFieldOwnerColors, buildVisibleChildrenRows, isHiddenFieldRow };
 
@@ -270,43 +238,14 @@ export function OutlinerItem({
   const wasFocusedRef = useRef(false);
   const [deleteBlockedPulse, setDeleteBlockedPulse] = useState(false);
 
-  // # trigger state
-  const [hashTagOpen, setHashTagOpen] = useState(false);
-  const [hashTagQuery, setHashTagQuery] = useState('');
-  const [hashTagSelectedIndex, setHashTagSelectedIndex] = useState(0);
-  const [hashTagAnchor, setHashTagAnchor] = useState<TriggerAnchorRect | undefined>(undefined);
-  const hashRangeRef = useRef<{ from: number; to: number }>({ from: 0, to: 0 });
-  const tagDropdownRef = useRef<TagDropdownHandle>(null);
-  const applyTag = useNodeStore((s) => s.applyTag);
-  const createTagDef = useNodeStore((s) => s.createTagDef);
   const setNodeName = useNodeStore((s) => s.setNodeName);
   const updateNodeContent = useNodeStore((s) => s.updateNodeContent);
   const updateNodeDescription = useNodeStore((s) => s.updateNodeDescription);
   const removeReference = useNodeStore((s) => s.removeReference);
   const selectFieldOption = useNodeStore((s) => s.selectFieldOption);
   const startRefConversion = useNodeStore((s) => s.startRefConversion);
-  const addReference = useNodeStore((s) => s.addReference);
   const revertRefConversion = useNodeStore((s) => s.revertRefConversion);
   const setPendingRefConversion = useUIStore((s) => s.setPendingRefConversion);
-
-  // @ trigger state (reference)
-  const [refOpen, setRefOpen] = useState(false);
-  const [refQuery, setRefQuery] = useState('');
-  const [refSelectedIndex, setRefSelectedIndex] = useState(0);
-  const [refAnchor, setRefAnchor] = useState<TriggerAnchorRect | undefined>(undefined);
-  const [refTreeContextParentId, setRefTreeContextParentId] = useState<string | null>(null);
-  const refRangeRef = useRef<{ from: number; to: number }>({ from: 0, to: 0 });
-  const refDropdownRef = useRef<ReferenceDropdownHandle>(null);
-
-  // / trigger state (slash command)
-  const [slashOpen, setSlashOpen] = useState(false);
-  const [slashQuery, setSlashQuery] = useState('');
-  const [slashSelectedIndex, setSlashSelectedIndex] = useState(-1);
-  const [slashAnchor, setSlashAnchor] = useState<TriggerAnchorRect | undefined>(undefined);
-  const slashRangeRef = useRef<{ from: number; to: number }>({ from: 0, to: 0 });
-
-  // > trigger (fire-once: instantly creates field)
-  const addUnnamedFieldToNode = useNodeStore((s) => s.addUnnamedFieldToNode);
   const setEditingFieldName = useUIStore((s) => s.setEditingFieldName);
 
   // Lazy-load children when expanded
@@ -344,10 +283,6 @@ export function OutlinerItem({
     }
     return visibility;
   }, [parentFields]);
-  const filteredSlashCommands = useMemo(
-    () => filterSlashCommands(slashQuery),
-    [slashQuery],
-  );
 
   const allChildIds = effectiveNode?.children ?? [];
   const renderableSiblings = useMemo(() => {
@@ -532,6 +467,21 @@ export function OutlinerItem({
   const handleCycleCheckbox = useCallback(() => {
     cycleNodeCheckbox(effectiveNodeId);
   }, [effectiveNodeId, cycleNodeCheckbox]);
+
+  const isCodeBlock = effectiveNode?.type === 'codeBlock';
+
+  // ── Trigger system (shared hook) ──
+  const triggers = useEditorTriggers({
+    nodeId,
+    parentId,
+    editorRef,
+    tagIds,
+    isActive: isFocused,
+    disabled: isCodeBlock,
+    trashNode: trashNode,
+    onCycleCheckbox: handleCycleCheckbox,
+    onOpenSearch: openSearch,
+  });
 
   // Escape in editor (no dropdown) → clear focus, keep selection (set at click time)
   const handleEscapeSelect = useCallback(() => {
@@ -834,51 +784,6 @@ export function OutlinerItem({
     return true; // Reference handler consumed the event
   }, [isReference, isOptionsValueNode, isReferenceNode, optionsPickerOpen, allFieldOptions, optionsPickerIndex, parentId, nodeId, removeReference, selectFieldOption, clearSelection, setFocusedNode, startRefConversion, setPendingRefConversion, setPendingInputChar]);
 
-  // When TrailingInput creates a node with #/@/, it sets triggerHint so we
-  // can immediately open the dropdown (extensions don't fire on mount because
-  // there's no doc change). Read and clear the hint on focus.
-  useEffect(() => {
-    if (!isFocused) return;
-    const hint = useUIStore.getState().triggerHint;
-    if (!hint || hint.nodeId !== nodeId) return;
-    useUIStore.getState().setTriggerHint(null);
-
-    // To prevent infinite re-trigger loops from focus churn in isolated test cases or DevTools,
-    // ensure we don't spam-open dropdowns if the selection is already completely matching.
-    if (hint.char === '#') {
-      // The editor content is '#' — set range to cover it
-      setHashTagQuery('');
-      setHashTagSelectedIndex(0);
-      setHashTagAnchor(undefined);
-      hashRangeRef.current = { from: 1, to: 2 }; // position of '#' in ProseMirror doc
-      setHashTagOpen(true);
-    } else if (hint.char === '@') {
-      setRefQuery('');
-      setRefSelectedIndex(0);
-      setRefAnchor(undefined);
-      refRangeRef.current = { from: 1, to: 2 };
-      setRefOpen(true);
-    } else if (hint.char === '/') {
-      setSlashQuery('');
-      setSlashAnchor(undefined);
-      slashRangeRef.current = { from: 1, to: 2 };
-      setSlashOpen(true);
-    }
-  }, [isFocused]);
-
-  useEffect(() => {
-    if (!slashOpen) return;
-    if (filteredSlashCommands.length === 0) {
-      if (slashSelectedIndex !== -1) setSlashSelectedIndex(-1);
-      return;
-    }
-
-    const current = filteredSlashCommands[slashSelectedIndex];
-    if (slashSelectedIndex >= 0 && current?.enabled) return;
-
-    setSlashSelectedIndex(getFirstEnabledSlashIndex(filteredSlashCommands));
-  }, [slashOpen, filteredSlashCommands, slashSelectedIndex]);
-
   // ─── Basic handlers ───
 
   useEffect(() => {
@@ -935,21 +840,8 @@ export function OutlinerItem({
   }, [isFocused, finalizePendingRefConversion]);
 
   const handleBlur = useCallback(() => {
-    // Reset any open dropdown state so it doesn't persist across focus cycles.
-    // Without this, clicking away while dropdown is open → re-focusing the same
-    // node would show the dropdown again (hashTagOpen/refOpen were never reset).
-    setHashTagOpen(false);
-    setHashTagQuery('');
-    setHashTagSelectedIndex(0);
-    setHashTagAnchor(undefined);
-    setRefOpen(false);
-    setRefQuery('');
-    setRefSelectedIndex(0);
-    setRefAnchor(undefined);
-    setSlashOpen(false);
-    setSlashQuery('');
-    setSlashSelectedIndex(-1);
-    setSlashAnchor(undefined);
+    // Reset all trigger dropdowns
+    triggers.resetAll();
 
     // Check pending ref conversion: if this is a temp node, decide revert or keep.
     finalizePendingRefConversion();
@@ -1600,395 +1492,6 @@ export function OutlinerItem({
     });
   }, [nodeId, parentId, moveNodeDown]);
 
-  // ─── # trigger handlers ───
-
-  const handleHashTag = useCallback((query: string, from: number, to: number, anchor?: TriggerAnchorRect) => {
-    hashRangeRef.current = { from, to };
-    setHashTagQuery(query);
-    setHashTagSelectedIndex(0);
-    setHashTagAnchor(anchor);
-    setHashTagOpen(true);
-  }, [nodeId]);
-
-  const handleHashTagDeactivate = useCallback(() => {
-    setHashTagOpen(false);
-    setHashTagQuery('');
-    setHashTagSelectedIndex(0);
-    setHashTagAnchor(undefined);
-  }, [nodeId]);
-
-  /** Delete #query text from editor, save corrected content, refocus */
-  const cleanupHashTagText = useCallback(() => {
-    const ed = editorRef.current;
-    if (!isEditorViewAlive(ed)) return;
-
-    const { from, to } = hashRangeRef.current;
-    deleteEditorRange(ed, from, to);
-
-    const parsed = docToMarks(ed.state.doc);
-    updateNodeContent(nodeId, { name: parsed.text, marks: parsed.marks, inlineRefs: parsed.inlineRefs });
-  }, [nodeId, updateNodeContent]);
-
-  const handleHashTagSelect = useCallback(
-    (tagDefId: string) => {
-      cleanupHashTagText();
-      applyTag(nodeId, tagDefId);
-      setHashTagOpen(false);
-      setHashTagQuery('');
-      setHashTagSelectedIndex(0);
-      setHashTagAnchor(undefined);
-    },
-    [nodeId, applyTag, cleanupHashTagText],
-  );
-
-  const handleHashTagCreateNew = useCallback(
-    (name: string) => {
-      cleanupHashTagText();
-      const tagDef = createTagDef(name);
-      applyTag(nodeId, tagDef.id);
-      setHashTagOpen(false);
-      setHashTagQuery('');
-      setHashTagSelectedIndex(0);
-      setHashTagAnchor(undefined);
-    },
-    [nodeId, createTagDef, applyTag, cleanupHashTagText],
-  );
-
-  // Keyboard forwarding: confirm selected item in dropdown
-  const handleHashTagConfirm = useCallback(() => {
-    const item = tagDropdownRef.current?.getSelectedItem();
-    if (!item) return;
-    if (item.type === 'existing') {
-      handleHashTagSelect(item.id);
-    } else {
-      handleHashTagCreateNew(item.name);
-    }
-  }, [handleHashTagSelect, handleHashTagCreateNew]);
-
-  // Keyboard forwarding: navigate down in dropdown
-  const handleHashTagNavDown = useCallback(() => {
-    setHashTagSelectedIndex((i) => {
-      const count = tagDropdownRef.current?.getItemCount() ?? 0;
-      return count > 0 ? Math.min(i + 1, count - 1) : 0;
-    });
-  }, []);
-
-  // Keyboard forwarding: navigate up in dropdown
-  const handleHashTagNavUp = useCallback(() => {
-    setHashTagSelectedIndex((i) => Math.max(i - 1, 0));
-  }, []);
-
-  // Keyboard forwarding: Cmd+Enter → force create new tag
-  const handleHashTagForceCreate = useCallback(() => {
-    const query = hashTagQuery.trim();
-    if (query) {
-      handleHashTagCreateNew(query);
-    }
-  }, [hashTagQuery, handleHashTagCreateNew]);
-
-  // Keyboard forwarding: Escape → close dropdown
-  const handleHashTagClose = useCallback(() => {
-    setHashTagOpen(false);
-    setHashTagQuery('');
-    setHashTagSelectedIndex(0);
-    setHashTagAnchor(undefined);
-  }, []);
-
-  // ─── > field trigger (fire-once: instantly creates unnamed field) ───
-
-  const handleFieldTriggerFire = useCallback(() => {
-    const actualParentId = loroDoc.getParentId(nodeId);
-    if (!actualParentId) return;
-    const { fieldEntryId } = addUnnamedFieldToNode(actualParentId, nodeId);
-    trashNode(nodeId);
-    setEditingFieldName(fieldEntryId);
-  }, [nodeId, addUnnamedFieldToNode, trashNode, setEditingFieldName]);
-
-  // ─── @ reference trigger handlers ───
-
-  const handleReference = useCallback((query: string, from: number, to: number, anchor?: TriggerAnchorRect) => {
-    refRangeRef.current = { from, to };
-    const ed = editorRef.current;
-    if (isEditorViewAlive(ed)) {
-      const fullText = ed.state.doc.textContent;
-      const beforeAt = fullText.substring(0, from - 1);
-      const afterQuery = fullText.substring(to - 1);
-      const isEmptyAround = beforeAt.trim() === '' && afterQuery.trim() === '';
-      setRefTreeContextParentId(isEmptyAround ? parentId : null);
-    } else {
-      setRefTreeContextParentId(null);
-    }
-    setRefQuery(query);
-    setRefSelectedIndex(0);
-    setRefAnchor(anchor);
-    setRefOpen(true);
-  }, [parentId]);
-
-  const handleReferenceDeactivate = useCallback(() => {
-    setRefOpen(false);
-    setRefQuery('');
-    setRefSelectedIndex(0);
-    setRefAnchor(undefined);
-    setRefTreeContextParentId(null);
-  }, []);
-
-  const handleReferenceSelect = useCallback(
-    (refNodeId: string) => {
-      const ed = editorRef.current;
-      if (!isEditorViewAlive(ed)) return;
-
-      // Check if the entire editor content is just the @query (empty-node reference)
-      const fullText = ed.state.doc.textContent;
-      const { from, to } = refRangeRef.current;
-      // Text before the @ and after the query
-      const beforeAt = fullText.substring(0, from - 1);
-      const afterQuery = fullText.substring(to - 1);
-      const isEmptyAround = beforeAt.trim() === '' && afterQuery.trim() === '';
-
-      if (isEmptyAround) {
-        const parent = useNodeStore.getState().getNode(parentId);
-        const blockReason = getTreeReferenceBlockReason(parentId, refNodeId, {
-          hasNode: loroDoc.hasNode,
-          getNode: loroDoc.toNodexNode,
-          getChildren: loroDoc.getChildren,
-        });
-        if (blockReason) {
-          toast.warning(getTreeReferenceBlockMessage(blockReason));
-          return;
-        }
-        const alreadyChild = (parent?.children?.some((cid) => {
-          if (cid === refNodeId) return true;
-          const child = loroDoc.toNodexNode(cid);
-          return child?.type === 'reference' && child.targetId === refNodeId;
-        })) ?? false;
-
-        if (alreadyChild) {
-          // Target is already a child (owned or reference) — can't create duplicate reference.
-          // Tana behavior: insert inline ref instead, keeping this as a regular content node.
-          const refNode = loroDoc.toNodexNode(refNodeId);
-          const refName = (refNode?.name ?? '').trim() || 'Untitled';
-          replaceEditorRangeWithInlineRef(ed, from, to, refNodeId, refName);
-        } else {
-          // Empty node @: trash this node, create temp node in conversion mode
-          // Temp node has inline ref content — user sees reference bullet + cursor at end.
-          // Typing adds text → keeps as normal node; blur without typing → reverts to reference.
-          const pos = parent?.children?.indexOf(nodeId) ?? -1;
-          const insertPos = pos >= 0 ? pos : 0;
-          const newRefId = addReference(parentId, refNodeId, insertPos);
-          if (!newRefId) {
-            toast.warning(t('reference.blocked.createFallback'));
-            return;
-          }
-          trashNode(nodeId);
-          const tempNodeId = startRefConversion(newRefId, parentId, insertPos);
-          setPendingRefConversion({ tempNodeId, refNodeId, parentId });
-          const gpId = loroDoc.getParentId(parentId);
-          if (gpId) setExpanded(`${gpId}:${parentId}`, true, true);
-          useUIStore.getState().setPendingInputChar(null);
-          useUIStore.getState().setFocusClickCoords({
-            nodeId: tempNodeId,
-            parentId,
-            textOffset: 1,
-          });
-          setTimeout(() => setFocusedNode(tempNodeId, parentId), 0);
-        }
-      } else {
-        // Mid-text @: insert inline reference
-        const refNode = loroDoc.toNodexNode(refNodeId);
-        const refName = (refNode?.name ?? '').trim() || 'Untitled';
-        replaceEditorRangeWithInlineRef(ed, from, to, refNodeId, refName);
-      }
-
-      setRefOpen(false);
-      setRefQuery('');
-      setRefSelectedIndex(0);
-      setRefAnchor(undefined);
-      setRefTreeContextParentId(null);
-    },
-    [nodeId, parentId, addReference, trashNode, setExpanded, setFocusedNode, startRefConversion, setPendingRefConversion],
-  );
-
-  const handleReferenceCreateNew = useCallback(
-    (name: string) => {
-      const newNode = useNodeStore.getState().createChild(CONTAINER_IDS.LIBRARY, undefined, { name });
-      handleReferenceSelect(newNode.id);
-    },
-    [handleReferenceSelect],
-  );
-
-  const handleReferenceConfirm = useCallback(() => {
-    const item = refDropdownRef.current?.getSelectedItem();
-    if (!item) return;
-    if (item.type === 'existing') {
-      handleReferenceSelect(item.id);
-    } else {
-      handleReferenceCreateNew(item.name);
-    }
-  }, [handleReferenceSelect, handleReferenceCreateNew]);
-
-  const handleReferenceNavDown = useCallback(() => {
-    setRefSelectedIndex((i) => {
-      const count = refDropdownRef.current?.getItemCount() ?? 0;
-      return count > 0 ? Math.min(i + 1, count - 1) : 0;
-    });
-  }, []);
-
-  const handleReferenceNavUp = useCallback(() => {
-    setRefSelectedIndex((i) => Math.max(i - 1, 0));
-  }, []);
-
-  const handleReferenceForceCreate = useCallback(() => {
-    const query = refQuery.trim();
-    if (query) {
-      handleReferenceCreateNew(query);
-    }
-  }, [refQuery, handleReferenceCreateNew]);
-
-  const handleReferenceClose = useCallback(() => {
-    setRefOpen(false);
-    setRefQuery('');
-    setRefSelectedIndex(0);
-    setRefAnchor(undefined);
-  }, []);
-
-  // ─── / slash command handlers ───
-
-  const replaceSlashTriggerText = useCallback((replacement = '') => {
-    const ed = editorRef.current;
-    if (!isEditorViewAlive(ed)) return;
-    const { from, to } = slashRangeRef.current;
-    replaceEditorRangeWithText(ed, from, to, replacement);
-  }, []);
-
-  const closeSlashMenu = useCallback(() => {
-    setSlashOpen(false);
-    setSlashQuery('');
-    setSlashSelectedIndex(-1);
-    setSlashAnchor(undefined);
-  }, []);
-
-  const executeSlashCommand = useCallback(async (commandId: SlashCommandId) => {
-    if (commandId === 'field') {
-      replaceSlashTriggerText('>');
-      closeSlashMenu();
-      return;
-    }
-
-    if (commandId === 'reference') {
-      replaceSlashTriggerText('@');
-      closeSlashMenu();
-      return;
-    }
-
-    if (commandId === 'heading') {
-      replaceSlashTriggerText('');
-      const ed = editorRef.current;
-      if (isEditorViewAlive(ed)) {
-        const { from, to } = ed.state.selection;
-        const docEnd = ed.state.doc.content.size - 1;
-
-        if (from !== to) {
-          toggleHeadingMark(ed);
-        } else if (docEnd > 1) {
-          const cursorPos = Math.max(1, Math.min(from, docEnd));
-          setEditorSelection(ed, 1, docEnd);
-          toggleHeadingMark(ed);
-          setEditorSelection(ed, cursorPos, cursorPos);
-        } else {
-          toggleHeadingMark(ed);
-        }
-      }
-      closeSlashMenu();
-      return;
-    }
-
-    if (commandId === 'more_commands') {
-      replaceSlashTriggerText('');
-      closeSlashMenu();
-      openSearch();
-      return;
-    }
-
-    if (commandId === 'checkbox') {
-      replaceSlashTriggerText('');
-      handleCycleCheckbox();
-      closeSlashMenu();
-      return;
-    }
-
-    if (commandId === 'clip_page') {
-      replaceSlashTriggerText('');
-      closeSlashMenu();
-
-      const canUseRuntime =
-        typeof chrome !== 'undefined' &&
-        !!chrome.runtime &&
-        !!chrome.runtime.sendMessage;
-
-      if (!canUseRuntime) return;
-
-      try {
-        const response = await chrome.runtime.sendMessage({
-          type: WEBCLIP_CAPTURE_ACTIVE_TAB,
-        }) as WebClipCaptureResponse;
-
-        if (!response?.ok) {
-          toast.error('Clip failed', { description: response?.error ?? 'unknown error' });
-          return;
-        }
-
-        const store = useNodeStore.getState();
-        await applyWebClipToNode(nodeId, response.payload, store);
-
-        // Sync editor content with the new title so it's visible immediately
-        // (without this, the editor still shows empty until focus moves away)
-        const ed = editorRef.current;
-        if (isEditorViewAlive(ed) && response.payload.title) {
-          setEditorPlainTextContent(ed, response.payload.title);
-        }
-
-      } catch (err) {
-        toast.error('Clip failed', { description: err instanceof Error ? err.message : String(err) });
-      }
-    }
-  }, [replaceSlashTriggerText, closeSlashMenu, openSearch, handleCycleCheckbox, nodeId]);
-
-  const handleSlashCommand = useCallback((query: string, from: number, to: number, anchor?: TriggerAnchorRect) => {
-    slashRangeRef.current = { from, to };
-    setSlashQuery(query);
-    setSlashAnchor(anchor);
-    setSlashOpen(true);
-
-    // Slash command has its own menu; close other trigger dropdowns.
-    setHashTagOpen(false);
-    setHashTagQuery('');
-    setHashTagSelectedIndex(0);
-    setHashTagAnchor(undefined);
-    setRefOpen(false);
-    setRefQuery('');
-    setRefSelectedIndex(0);
-    setRefAnchor(undefined);
-  }, []);
-
-  const handleSlashDeactivate = useCallback(() => {
-    closeSlashMenu();
-  }, [closeSlashMenu]);
-
-  const handleSlashConfirm = useCallback(() => {
-    if (slashSelectedIndex < 0) return;
-    const selected = filteredSlashCommands[slashSelectedIndex];
-    if (!selected || !selected.enabled) return;
-    executeSlashCommand(selected.id);
-  }, [slashSelectedIndex, filteredSlashCommands, executeSlashCommand]);
-
-  const handleSlashNavDown = useCallback(() => {
-    setSlashSelectedIndex((i) => getNextEnabledSlashIndex(filteredSlashCommands, i, 'down'));
-  }, [filteredSlashCommands]);
-
-  const handleSlashNavUp = useCallback(() => {
-    setSlashSelectedIndex((i) => getNextEnabledSlashIndex(filteredSlashCommands, i, 'up'));
-  }, [filteredSlashCommands]);
-
   // ─── Drag and drop handlers ───
 
   const handleDragStart = useCallback(
@@ -2088,7 +1591,6 @@ export function OutlinerItem({
   const nodeDisplayText = isOptionsValueNode ? (selectedOptionName || nodeText) : nodeText;
   const nodeMarks = effectiveNode?.marks ?? [];
   const nodeInlineRefs = effectiveNode?.inlineRefs ?? [];
-  const isCodeBlock = effectiveNode?.type === 'codeBlock';
   const nodeContentHtml = marksToHtml(
     nodeDisplayText,
     isOptionsValueNode ? [] : nodeMarks,
@@ -2096,7 +1598,7 @@ export function OutlinerItem({
   );
   // optionsPicker can open on selected (not focused) reference-like rows.
   // Keep row on top whenever any overlay is open, otherwise sibling rows may paint above it.
-  const hasOverlayOpen = (isFocused && (hashTagOpen || refOpen || slashOpen)) || optionsPickerOpen;
+  const hasOverlayOpen = triggers.hasOverlayOpen || optionsPickerOpen;
 
   return (
     <>
@@ -2218,31 +1720,8 @@ export function OutlinerItem({
                   onArrowDown={handleArrowDown}
                   onMoveUp={handleMoveUp}
                   onMoveDown={handleMoveDown}
-                  onHashTag={isCodeBlock ? undefined : handleHashTag}
-                  onHashTagDeactivate={isCodeBlock ? undefined : handleHashTagDeactivate}
-                  hashTagActive={hashTagOpen}
-                  onHashTagConfirm={isCodeBlock ? undefined : handleHashTagConfirm}
-                  onHashTagNavDown={isCodeBlock ? undefined : handleHashTagNavDown}
-                  onHashTagNavUp={isCodeBlock ? undefined : handleHashTagNavUp}
-                  onHashTagCreate={isCodeBlock ? undefined : handleHashTagForceCreate}
-                  onHashTagClose={isCodeBlock ? undefined : handleHashTagClose}
-                  onFieldTriggerFire={isCodeBlock ? undefined : handleFieldTriggerFire}
+                  {...buildTriggerEditorProps(triggers)}
                   editorRef={editorRef}
-                  onReference={isCodeBlock ? undefined : handleReference}
-                  onReferenceDeactivate={isCodeBlock ? undefined : handleReferenceDeactivate}
-                  referenceActive={refOpen}
-                  onReferenceConfirm={isCodeBlock ? undefined : handleReferenceConfirm}
-                  onReferenceNavDown={isCodeBlock ? undefined : handleReferenceNavDown}
-                  onReferenceNavUp={isCodeBlock ? undefined : handleReferenceNavUp}
-                  onReferenceCreate={isCodeBlock ? undefined : handleReferenceForceCreate}
-                  onReferenceClose={isCodeBlock ? undefined : handleReferenceClose}
-                  onSlashCommand={isCodeBlock ? undefined : handleSlashCommand}
-                  onSlashCommandDeactivate={isCodeBlock ? undefined : handleSlashDeactivate}
-                  slashActive={slashOpen}
-                  onSlashConfirm={isCodeBlock ? undefined : handleSlashConfirm}
-                  onSlashNavDown={isCodeBlock ? undefined : handleSlashNavDown}
-                  onSlashNavUp={isCodeBlock ? undefined : handleSlashNavUp}
-                  onSlashClose={isCodeBlock ? undefined : closeSlashMenu}
                   onDescriptionEdit={handleDescriptionEdit}
                   onToggleDone={handleCycleCheckbox}
                   onEscapeSelect={handleEscapeSelect}
@@ -2280,40 +1759,12 @@ export function OutlinerItem({
                 {!editingDescription && description}
               </div>
             )}
-            {hashTagOpen && isFocused && (
-              <TagSelector
-                ref={tagDropdownRef}
-                open={hashTagOpen}
-                onSelect={handleHashTagSelect}
-                onCreateNew={handleHashTagCreateNew}
-                existingTagIds={tagIds}
-                query={hashTagQuery}
-                selectedIndex={hashTagSelectedIndex}
-                anchor={hashTagAnchor}
-              />
-            )}
-            {refOpen && isFocused && (
-              <ReferenceSelector
-                ref={refDropdownRef}
-                open={refOpen}
-                onSelect={handleReferenceSelect}
-                onCreateNew={handleReferenceCreateNew}
-                query={refQuery}
-                selectedIndex={refSelectedIndex}
-                currentNodeId={nodeId}
-                treeReferenceParentId={refTreeContextParentId}
-                anchor={refAnchor}
-              />
-            )}
-            {slashOpen && isFocused && (
-              <SlashCommandMenu
-                open={slashOpen}
-                commands={filteredSlashCommands}
-                selectedIndex={slashSelectedIndex}
-                onSelect={executeSlashCommand}
-                anchor={slashAnchor}
-              />
-            )}
+            <TriggerDropdowns
+              triggers={triggers}
+              nodeId={nodeId}
+              tagIds={tagIds}
+              visible={isFocused}
+            />
           </div>
           {/* Options picker dropdown: shown when selecting an Options value row/reference */}
           {optionsPickerOpen && allFieldOptions.length > 0 && (

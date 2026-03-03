@@ -166,18 +166,24 @@ export class SyncManager {
       await this.push(workspaceId, accessToken, deviceId, sessionToken);
       if (!this.isSessionCurrent(sessionToken)) { console.warn('[sync] session changed after push'); return; }
 
-      await this.pull(workspaceId, accessToken, deviceId, sessionToken);
+      const caughtUp = await this.pull(workspaceId, accessToken, deviceId, sessionToken);
       if (!this.isSessionCurrent(sessionToken)) { console.warn('[sync] session changed after pull'); return; }
 
       const pending = await getPendingCount(workspaceId);
       if (!this.isSessionCurrent(sessionToken)) return;
 
+      const fullySynced = pending === 0 && caughtUp;
       this.updateState({
-        status: pending > 0 ? 'pending' : 'synced',
+        status: fullySynced ? 'synced' : 'pending',
         lastSyncedAt: Date.now(),
         pendingCount: pending,
         error: null,
       });
+
+      // If pull didn't fully catch up, schedule another cycle immediately
+      if (!caughtUp) {
+        this.nudgePending = true;
+      }
     } catch (err: unknown) {
       console.error('[sync] syncOnce error:', err);
       if (!this.isSessionCurrent(sessionToken)) return;
@@ -249,12 +255,13 @@ export class SyncManager {
   // Pull: server → doc.import()
   // -------------------------------------------------------------------------
 
+  /** Returns true if fully caught up (no more pages to pull). */
   private async pull(
     workspaceId: string,
     accessToken: string,
     deviceId: string,
     sessionToken: number,
-  ): Promise<void> {
+  ): Promise<boolean> {
     let hasMore = true;
     let cursor = this.lastSeq;
     const MAX_PULL_PAGES = 50; // Safety limit: 50 pages × 200 updates = 10,000 max
@@ -262,14 +269,14 @@ export class SyncManager {
 
     while (hasMore && pages < MAX_PULL_PAGES) {
       pages++;
-      if (!this.isSessionCurrent(sessionToken)) return;
+      if (!this.isSessionCurrent(sessionToken)) return false;
 
       const response = await pullUpdates(accessToken, {
         workspaceId,
         deviceId,
         lastSeq: cursor,
       });
-      if (!this.isSessionCurrent(sessionToken)) return;
+      if (!this.isSessionCurrent(sessionToken)) return false;
 
       // Batch-import all updates for this response (rebuild mappings + notify once)
       const bytesToImport: Uint8Array[] = [];
@@ -292,15 +299,17 @@ export class SyncManager {
       hasMore = response.hasMore;
     }
 
-    if (!this.isSessionCurrent(sessionToken)) return;
+    if (!this.isSessionCurrent(sessionToken)) return false;
 
     // Persist: save snapshot + cursor atomically
     if (cursor > this.lastSeq) {
       this.lastSeq = cursor;
       await saveNow();
-      if (!this.isSessionCurrent(sessionToken)) return;
+      if (!this.isSessionCurrent(sessionToken)) return false;
       await saveCursor(workspaceId, cursor);
     }
+
+    return !hasMore;
   }
 }
 

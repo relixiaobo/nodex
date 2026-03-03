@@ -187,7 +187,7 @@ describe('workspace-store auth and persistence', () => {
     expect(state.userId).toBe('auth_user');
 
     // ensureTodayNode is NOT called immediately — deferred until sync completes
-    // (the onStateChange listener will call it when lastSyncedAt is set)
+    // (the onStateChange listener will call it when status becomes 'synced')
   });
 
   it('initAuth skips deferred navigation when snapshot exists', async () => {

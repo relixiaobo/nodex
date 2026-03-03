@@ -15,18 +15,12 @@ import { isJournalSystemTagId } from '../../types/index.js';
 import { DateNavigationBar } from '../journal/DateNavigationBar';
 import { BacklinksSection } from './BacklinksSection';
 import { SearchChipBar } from '../search/SearchChipBar';
-import { SettingsPanel } from './SettingsPanel';
 
 interface NodePanelProps {
   nodeId: string;
 }
 
 export function NodePanel({ nodeId }: NodePanelProps) {
-  // Settings container uses a dedicated panel with custom UI
-  if (nodeId === CONTAINER_IDS.SETTINGS) {
-    return <SettingsPanel />;
-  }
-
   const node = useNode(nodeId);
   const goBack = useUIStore((s) => s.goBack);
 

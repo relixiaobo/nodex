@@ -21,6 +21,7 @@ import {
   hideAllHighlightOverlays,
   isHighlightOverlayHost,
   type ToolbarAction,
+  type NoteEntry,
 } from './highlight-toolbar.js';
 import {
   HIGHLIGHT_CREATE,
@@ -51,7 +52,7 @@ interface HighlightRenderOptions {
 
 interface HighlightDraft {
   tempId: string;
-  payloadBase: Omit<HighlightCreatePayload, 'withNote' | 'noteText'>;
+  payloadBase: Omit<HighlightCreatePayload, 'noteEntries'>;
 }
 
 // ── State ──
@@ -572,7 +573,7 @@ function handleToolbarAction(action: ToolbarAction): void {
  */
 function createHighlight(range: Range): void {
   const draft = createHighlightDraft(range);
-  persistHighlightDraft(draft, { withNote: false });
+  persistHighlightDraft(draft);
 }
 
 /**
@@ -587,24 +588,19 @@ function createHighlightWithNote(range: Range): void {
   showNotePopover(
     rect,
     {
-      onSave: (texts) => {
-        const nonEmpty = texts.filter((t) => t.trim());
+      onSave: (entries) => {
+        const nonEmpty = entries.filter((e) => e.text.trim());
         pendingNoteDraft = null;
-        // Use first non-empty text as the inline noteText for the create payload
-        const firstNote = nonEmpty[0]?.trim();
-        persistHighlightDraft(draft, {
-          withNote: nonEmpty.length > 0,
-          noteText: firstNote || undefined,
-        });
+        persistHighlightDraft(draft, nonEmpty.length > 0 ? nonEmpty : undefined);
       },
       onCancel: () => {
         pendingNoteDraft = null;
-        persistHighlightDraft(draft, { withNote: false });
+        persistHighlightDraft(draft);
       },
     },
     {
       placeholder: 'Add a note...',
-      initialTexts: [''],
+      initialEntries: [{ text: '', depth: 0 }],
     },
   );
 }
@@ -632,14 +628,11 @@ function createHighlightDraft(range: Range): HighlightDraft {
 
 function persistHighlightDraft(
   draft: HighlightDraft,
-  options: { withNote: boolean; noteText?: string },
+  noteEntries?: NoteEntry[],
 ): void {
-  const noteText = options.noteText?.trim();
-
   const payload: HighlightCreatePayload = {
     ...draft.payloadBase,
-    withNote: options.withNote,
-    noteText: noteText || undefined,
+    noteEntries: noteEntries && noteEntries.length > 0 ? noteEntries : undefined,
   };
 
   const msg: { type: typeof HIGHLIGHT_CREATE; payload: HighlightCreatePayload } = {
@@ -649,7 +642,6 @@ function persistHighlightDraft(
 
   chrome.runtime.sendMessage(msg, (response?: { nodeId?: string }) => {
     if (chrome.runtime.lastError) {
-      // If message fails, remove the temporary highlight.
       removeHighlightRendering(draft.tempId);
       console.warn('[soma] Failed to create highlight:', chrome.runtime.lastError.message);
       return;
@@ -658,13 +650,13 @@ function persistHighlightDraft(
     const finalId = response?.nodeId;
     if (finalId) {
       replaceRenderedHighlightId(draft.tempId, finalId);
-      if (noteText) {
+      if (noteEntries && noteEntries.length > 0) {
         renderCommentBadge(finalId);
       }
       return;
     }
 
-    if (noteText) {
+    if (noteEntries && noteEntries.length > 0) {
       renderCommentBadge(draft.tempId);
     }
   });
@@ -674,25 +666,27 @@ function showNotePopoverForExistingHighlight(highlightId: string, rect: DOMRect)
   pendingExistingHighlightNoteId = highlightId;
   pendingNoteDraft = null;
 
-  // Fetch existing note texts before opening the popover
+  // Fetch existing note entries before opening the popover
   const getPayload: HighlightNoteGetPayload = { id: highlightId };
   chrome.runtime.sendMessage(
     { type: HIGHLIGHT_NOTE_GET, payload: getPayload },
     (response) => {
-      const existingTexts: string[] = response?.noteTexts ?? [];
+      const existingEntries: NoteEntry[] = response?.noteEntries ?? [];
       // Always show at least one empty item for input
-      const initialTexts = existingTexts.length > 0 ? existingTexts : [''];
+      const initialEntries: NoteEntry[] = existingEntries.length > 0
+        ? existingEntries
+        : [{ text: '', depth: 0 }];
 
       showNotePopover(
         rect,
         {
-          onSave: (texts) => {
-            const nonEmpty = texts.filter((t) => t.trim());
+          onSave: (entries) => {
+            const nonEmpty = entries.filter((e) => e.text.trim());
             pendingExistingHighlightNoteId = null;
 
             const payload: HighlightNotesSavePayload = {
               id: highlightId,
-              noteTexts: nonEmpty,
+              noteEntries: nonEmpty,
             };
             chrome.runtime.sendMessage({
               type: HIGHLIGHT_NOTES_SAVE,
@@ -714,7 +708,7 @@ function showNotePopoverForExistingHighlight(highlightId: string, rect: DOMRect)
         },
         {
           placeholder: 'Add a note...',
-          initialTexts,
+          initialEntries,
         },
       );
     },
@@ -744,7 +738,7 @@ function handleGlobalPointerDown(e: PointerEvent): void {
   if (pendingNoteDraft) {
     const draft = pendingNoteDraft;
     pendingNoteDraft = null;
-    persistHighlightDraft(draft, { withNote: false });
+    persistHighlightDraft(draft);
   }
   pendingExistingHighlightNoteId = null;
 

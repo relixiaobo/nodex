@@ -10,6 +10,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { useNodeStore } from '../../src/stores/node-store.js';
 import { resolveChildSupertags } from '../../src/lib/field-utils.js';
 import * as loroDoc from '../../src/lib/loro-doc.js';
+import { SYS_T } from '../../src/types/index.js';
 import { resetAndSeed } from './helpers/test-state.js';
 
 describe('Default Child Supertag', () => {
@@ -72,14 +73,14 @@ describe('Default Child Supertag', () => {
     it('applies multiple childSupertags when parent has multiple tags with different childSupertag values', () => {
       useNodeStore.getState().setConfigValue('tagDef_task', 'childSupertag', 'tagDef_person');
       useNodeStore.getState().applyTag('task_1', 'tagDef_dev_task');
-      useNodeStore.getState().setConfigValue('tagDef_dev_task', 'childSupertag', 'tagDef_source');
+      useNodeStore.getState().setConfigValue('tagDef_dev_task', 'childSupertag', SYS_T.SOURCE);
 
       const child = useNodeStore.getState().createChild('task_1', undefined, { name: 'Multi-tag child' });
 
       const childNode = loroDoc.toNodexNode(child.id)!;
       // Both childSupertags from task's two tags should be applied
       expect(childNode.tags).toContain('tagDef_person');
-      expect(childNode.tags).toContain('tagDef_source');
+      expect(childNode.tags).toContain(SYS_T.SOURCE);
     });
   });
 

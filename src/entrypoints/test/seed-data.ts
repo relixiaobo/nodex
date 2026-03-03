@@ -18,7 +18,7 @@ import { deleteSnapshot } from '../../lib/loro-persistence.js';
 import { useNodeStore } from '../../stores/node-store';
 import { useUIStore } from '../../stores/ui-store';
 import { useWorkspaceStore } from '../../stores/workspace-store';
-import { CONTAINER_IDS, FIELD_TYPES } from '../../types/index.js';
+import { CONTAINER_IDS, FIELD_TYPES, SYS_T, NDX_F } from '../../types/index.js';
 import type { InlineRefEntry, TextMark } from '../../types/index.js';
 import { ensureDateNode } from '../../lib/journal.js';
 
@@ -120,10 +120,10 @@ function seedBody(): void {
   cn('tpl_actions', 'tagDef_meeting', { name: 'Action Items' });
 
   // ═══════════════════════════════════════════════════════════════
-  // TagDef: Source (web clips, articles, etc.)
+  // TagDef: Source (web clips, articles, etc.) — fixed ID SYS_T202
   // ═══════════════════════════════════════════════════════════════
-  cn('tagDef_source', CONTAINER_IDS.SCHEMA, { type: 'tagDef', name: 'source' });
-  cn('attrDef_source_url', 'tagDef_source', { type: 'fieldDef', name: 'Source URL', fieldType: FIELD_TYPES.URL });
+  cn(SYS_T.SOURCE, CONTAINER_IDS.SCHEMA, { type: 'tagDef', name: 'source', color: 'sage' });
+  cn(NDX_F.SOURCE_URL, SYS_T.SOURCE, { type: 'fieldDef', name: 'Source URL', fieldType: FIELD_TYPES.URL });
 
   // ═══════════════════════════════════════════════════════════════
   // Library content
@@ -211,12 +211,12 @@ function seedBody(): void {
     name: 'Example Article — Medium',
     description: 'A sample web clip to demonstrate the clipping feature',
   });
-  useNodeStore.getState().applyTag('webclip_1', 'tagDef_source');
+  useNodeStore.getState().applyTag('webclip_1', SYS_T.SOURCE);
   // Set Source URL value: create a value node under the fieldEntry
   const wcFeId = loroDoc.getChildren('webclip_1')
     .find((c) => {
       const n = loroDoc.toNodexNode(c);
-      return n?.type === 'fieldEntry' && n.fieldDefId === 'attrDef_source_url';
+      return n?.type === 'fieldEntry' && n.fieldDefId === NDX_F.SOURCE_URL;
     });
   if (wcFeId) {
     cn('webclip1_val_url', wcFeId, { name: 'https://medium.com/example-article' });

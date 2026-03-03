@@ -469,6 +469,197 @@ function deduplicateJournalHierarchy(): boolean {
   return totalMerged > 0;
 }
 
+/**
+ * Deduplicate schema tagDefs and fieldDefs by name after CRDT merge.
+ *
+ * Handles two scenarios:
+ * 1. Old nanoid-based tagDef/fieldDef coexisting with new fixed-ID version (upgrade transition)
+ * 2. Two offline sessions independently creating same-name tagDef (e.g., both create #task)
+ *
+ * For tagDefs: groups SCHEMA children by (type, name), picks winner (fixed ID preferred,
+ * then most children), moves loser's children to winner, replaces tag references on all nodes,
+ * then trashes losers.
+ *
+ * For fieldDefs: within each tagDef, groups children by (type='fieldDef', name), picks winner,
+ * replaces fieldDefId references on all fieldEntry nodes, then trashes losers.
+ *
+ * Returns true if any tree mutations were made.
+ */
+function deduplicateSchemaTagDefs(): boolean {
+  if (!doc) return false;
+
+  const schemaTreeId = nodexToTree.get('SCHEMA');
+  const trashTreeId = nodexToTree.get('TRASH');
+  if (!schemaTreeId || !trashTreeId) return false;
+
+  const tree = getTree();
+  let totalMerged = 0;
+
+  /** Check if an ID is a fixed system/soma ID (preferred as winner). */
+  function isFixedId(id: string): boolean {
+    return id.startsWith('SYS_') || id.startsWith('NDX_');
+  }
+
+  /**
+   * Pick winner from duplicate IDs: prefer fixed ID, then most children.
+   */
+  function pickWinner(ids: string[]): string {
+    // First check for fixed ID
+    for (const id of ids) {
+      if (isFixedId(id)) return id;
+    }
+    // Fallback: most children
+    let bestId = ids[0];
+    let bestCount = tree.getNodeByID(nodexToTree.get(bestId)!)?.children()?.length ?? 0;
+    for (let i = 1; i < ids.length; i++) {
+      const count = tree.getNodeByID(nodexToTree.get(ids[i])!)?.children()?.length ?? 0;
+      if (count > bestCount) {
+        bestId = ids[i];
+        bestCount = count;
+      }
+    }
+    return bestId;
+  }
+
+  /**
+   * Replace all tag references from loserId to winnerId across all nodes.
+   */
+  function replaceTagReferences(loserId: string, winnerId: string): void {
+    for (const treeNode of tree.nodes()) {
+      if (isDeletedTreeNode(treeNode)) continue;
+      const tags = treeNode.data.getOrCreateContainer('tags', new LoroList()) as LoroList;
+      const arr = tags.toArray() as string[];
+      const idx = arr.indexOf(loserId);
+      if (idx === -1) continue;
+
+      // Remove loser
+      tags.delete(idx, 1);
+      // Add winner if not already present
+      const updated = tags.toArray() as string[];
+      if (!updated.includes(winnerId)) {
+        tags.insert(updated.length, winnerId);
+      }
+    }
+  }
+
+  /**
+   * Replace fieldDefId references on fieldEntry nodes from loserId to winnerId.
+   */
+  function replaceFieldDefReferences(loserId: string, winnerId: string): void {
+    for (const treeNode of tree.nodes()) {
+      if (isDeletedTreeNode(treeNode)) continue;
+      const type = treeNode.data.get('type') as string | undefined;
+      if (type !== 'fieldEntry') continue;
+      const fdId = treeNode.data.get('fieldDefId') as string | undefined;
+      if (fdId === loserId) {
+        treeNode.data.set('fieldDefId', winnerId);
+      }
+    }
+  }
+
+  // ── Step 1: Deduplicate tagDefs under SCHEMA ──
+  const schemaNode = tree.getNodeByID(schemaTreeId);
+  if (!schemaNode) return false;
+
+  const schemaChildren = schemaNode.children() ?? [];
+
+  // Group tagDef children by name
+  const tagDefsByName = new Map<string, string[]>();
+  for (const child of schemaChildren) {
+    if (isDeletedTreeNode(child)) continue;
+    const storedId = treeToNodex.get(child.id);
+    if (!storedId) continue;
+    const type = child.data.get('type') as string | undefined;
+    const name = child.data.get('name') as string | undefined;
+    if (type !== 'tagDef' || !name) continue;
+    const key = name.toLowerCase();
+    let arr = tagDefsByName.get(key);
+    if (!arr) { arr = []; tagDefsByName.set(key, arr); }
+    arr.push(storedId);
+  }
+
+  // Merge duplicate tagDefs
+  for (const [, ids] of tagDefsByName) {
+    if (ids.length <= 1) continue;
+
+    const winnerId = pickWinner(ids);
+
+    for (const loserId of ids) {
+      if (loserId === winnerId) continue;
+
+      // Move loser's children (fieldDefs etc.) to winner
+      const loserTreeId = nodexToTree.get(loserId);
+      const winnerTreeId = nodexToTree.get(winnerId);
+      if (!loserTreeId || !winnerTreeId) continue;
+
+      const loserNode = tree.getNodeByID(loserTreeId);
+      for (const child of loserNode?.children() ?? []) {
+        try { tree.move(child.id, winnerTreeId); } catch { /* skip */ }
+      }
+
+      // Replace tag references on all nodes
+      replaceTagReferences(loserId, winnerId);
+
+      // Move loser to TRASH
+      try { tree.move(loserTreeId, trashTreeId); } catch { /* skip */ }
+      totalMerged++;
+    }
+  }
+
+  // ── Step 2: Deduplicate fieldDefs within each tagDef ──
+  invalidateCache();
+
+  // Re-read schema children after potential moves
+  const updatedSchemaChildren = schemaNode.children() ?? [];
+  for (const tagDefNode of updatedSchemaChildren) {
+    if (isDeletedTreeNode(tagDefNode)) continue;
+    const tagDefType = tagDefNode.data.get('type') as string | undefined;
+    if (tagDefType !== 'tagDef') continue;
+
+    const fieldDefsByName = new Map<string, string[]>();
+    for (const child of tagDefNode.children() ?? []) {
+      if (isDeletedTreeNode(child)) continue;
+      const storedId = treeToNodex.get(child.id);
+      if (!storedId) continue;
+      const type = child.data.get('type') as string | undefined;
+      const name = child.data.get('name') as string | undefined;
+      if (type !== 'fieldDef' || !name) continue;
+      const key = name.toLowerCase();
+      let arr = fieldDefsByName.get(key);
+      if (!arr) { arr = []; fieldDefsByName.set(key, arr); }
+      arr.push(storedId);
+    }
+
+    for (const [, ids] of fieldDefsByName) {
+      if (ids.length <= 1) continue;
+
+      const winnerId = pickWinner(ids);
+
+      for (const loserId of ids) {
+        if (loserId === winnerId) continue;
+
+        // Replace fieldDefId references on fieldEntry nodes
+        replaceFieldDefReferences(loserId, winnerId);
+
+        // Move loser to TRASH
+        const loserTreeId = nodexToTree.get(loserId);
+        if (loserTreeId) {
+          try { tree.move(loserTreeId, trashTreeId); } catch { /* skip */ }
+        }
+        totalMerged++;
+      }
+    }
+  }
+
+  if (totalMerged > 0) {
+    console.log(`[loro-doc] Deduplicated ${totalMerged} schema tagDefs/fieldDefs by name`);
+    invalidateCache();
+    rebuildMappings();
+  }
+
+  return totalMerged > 0;
+}
+
 // ============================================================
 // 通知 + 持久化
 // ============================================================
@@ -1049,9 +1240,10 @@ export function importUpdatesBatch(updates: Uint8Array[]): ImportBatchResult {
     rebuildMappings();
     const containersMerged = fixDuplicateContainerMappings();
     const journalMerged = !_wasmPoisoned && deduplicateJournalHierarchy();
+    const schemaMerged = !_wasmPoisoned && deduplicateSchemaTagDefs();
     // If tree mutations were made, commit + enqueue so the merge is persisted
     // locally and pushed to the server.
-    if (containersMerged || journalMerged) {
+    if (containersMerged || journalMerged || schemaMerged) {
       try {
         doc.commit({ origin: 'system:merge-duplicates' });
       } catch (e) {

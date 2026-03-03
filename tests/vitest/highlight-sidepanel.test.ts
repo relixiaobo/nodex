@@ -72,7 +72,7 @@ describe('highlight-sidepanel', () => {
 
     const clipNode = store.getNode(result.clipNodeId);
     expect(clipNode).not.toBeNull();
-    expect(clipNode!.tags).toContain('tagDef_source');
+    expect(clipNode!.tags).toContain(SYS_T.SOURCE);
     expect(loroDoc.getParentId(result.clipNodeId)).toBe(CONTAINER_IDS.INBOX);
     expect(findClipNodeByUrl('https://example.com/new-highlight')).toBe(result.clipNodeId);
 

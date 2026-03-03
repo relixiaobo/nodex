@@ -240,6 +240,151 @@ describe('importUpdatesBatch deduplicates journal hierarchy by name', () => {
 });
 
 // ============================================================
+// importUpdatesBatch deduplicates schema tagDefs by name
+// ============================================================
+
+describe('importUpdatesBatch deduplicates schema tagDefs by name', () => {
+  beforeEach(initDoc);
+
+  it('merges duplicate tagDefs with same name, preferring fixed ID', () => {
+    // Session 1 (remote): create a #source tagDef with nanoid ID + fieldDef
+    const doc1 = new LoroDoc();
+    const tree1 = doc1.getTree('nodes');
+    tree1.enableFractionalIndex(0);
+
+    const root1 = tree1.createNode();
+    root1.data.set('id', 'user_123');
+    const schema1 = tree1.createNode(root1.id);
+    schema1.data.set('id', 'SCHEMA');
+    const trash1 = tree1.createNode(root1.id);
+    trash1.data.set('id', 'TRASH');
+    // Remote #source tagDef with nanoid
+    const sourceTag1 = tree1.createNode(schema1.id);
+    sourceTag1.data.set('id', 'nanoid_source_abc');
+    sourceTag1.data.set('type', 'tagDef');
+    sourceTag1.data.set('name', 'source');
+    // Remote Source URL fieldDef with nanoid
+    const urlField1 = tree1.createNode(sourceTag1.id);
+    urlField1.data.set('id', 'nanoid_url_def');
+    urlField1.data.set('type', 'fieldDef');
+    urlField1.data.set('name', 'Source URL');
+    urlField1.data.set('fieldType', 'url');
+    doc1.commit();
+
+    // Session 2 (local): create same tagDef with fixed ID SYS_T202
+    const localRoot = createNode('user_123', null);
+    const localSchema = createNode('SCHEMA', localRoot);
+    const localTrash = createNode('TRASH', localRoot);
+    const localSourceTag = createNode('SYS_T202', localSchema);
+    setNodeData(localSourceTag, 'type', 'tagDef');
+    setNodeData(localSourceTag, 'name', 'source');
+    const localUrlField = createNode('NDX_F01', localSourceTag);
+    setNodeData(localUrlField, 'type', 'fieldDef');
+    setNodeData(localUrlField, 'name', 'Source URL');
+    setNodeData(localUrlField, 'fieldType', 'url');
+    commitDoc();
+
+    // Create a node tagged with the remote nanoid tagDef won't work here
+    // because we can't add tags before import. Instead, create a node and
+    // tag it with the local fixed ID.
+    const testNode = createNode('test_node', localRoot);
+    addTag(testNode, 'SYS_T202');
+    commitDoc();
+
+    // Import remote session — creates duplicate #source tagDef
+    const update1 = doc1.export({ mode: 'update' });
+    const result = importUpdatesBatch([update1]);
+
+    expect(result.imported).toBe(1);
+    expect(result.poisoned).toBe(false);
+
+    // After dedup: only ONE #source tagDef should exist in SCHEMA
+    const schemaChildren = getChildren('SCHEMA');
+    const sourceDefs = schemaChildren.filter(id => {
+      const n = toNodexNode(id);
+      return n?.type === 'tagDef' && n.name?.toLowerCase() === 'source';
+    });
+    expect(sourceDefs).toHaveLength(1);
+
+    // The winner should be the fixed ID
+    expect(sourceDefs[0]).toBe('SYS_T202');
+
+    // The winner should have the Source URL fieldDef from both sessions
+    const winnerChildren = getChildren('SYS_T202');
+    const urlFields = winnerChildren.filter(id => {
+      const n = toNodexNode(id);
+      return n?.type === 'fieldDef' && n.name?.toLowerCase() === 'source url';
+    });
+    // After fieldDef dedup, only one Source URL should remain
+    expect(urlFields).toHaveLength(1);
+    // The winner fieldDef should be the fixed ID
+    expect(urlFields[0]).toBe('NDX_F01');
+  });
+
+  it('merges duplicate tagDefs choosing most-children winner when no fixed ID', () => {
+    // Session 1: create #task tagDef with 3 fieldDef children
+    const doc1 = new LoroDoc();
+    const tree1 = doc1.getTree('nodes');
+    tree1.enableFractionalIndex(0);
+
+    const root1 = tree1.createNode();
+    root1.data.set('id', 'user_123');
+    const schema1 = tree1.createNode(root1.id);
+    schema1.data.set('id', 'SCHEMA');
+    const trash1 = tree1.createNode(root1.id);
+    trash1.data.set('id', 'TRASH');
+    const taskTag1 = tree1.createNode(schema1.id);
+    taskTag1.data.set('id', 'task_session1');
+    taskTag1.data.set('type', 'tagDef');
+    taskTag1.data.set('name', 'task');
+    // 3 fieldDef children
+    for (let i = 0; i < 3; i++) {
+      const fd = tree1.createNode(taskTag1.id);
+      fd.data.set('id', `fd_s1_${i}`);
+      fd.data.set('type', 'fieldDef');
+      fd.data.set('name', `Field ${i}`);
+    }
+    doc1.commit();
+
+    // Session 2 (local): create #task tagDef with 1 fieldDef
+    const localRoot = createNode('user_123', null);
+    const localSchema = createNode('SCHEMA', localRoot);
+    const localTrash = createNode('TRASH', localRoot);
+    const localTaskTag = createNode('task_session2', localSchema);
+    setNodeData(localTaskTag, 'type', 'tagDef');
+    setNodeData(localTaskTag, 'name', 'task');
+    const localFd = createNode('fd_s2_0', localTaskTag);
+    setNodeData(localFd, 'type', 'fieldDef');
+    setNodeData(localFd, 'name', 'Local Field');
+    commitDoc();
+
+    // Import
+    const update1 = doc1.export({ mode: 'update' });
+    importUpdatesBatch([update1]);
+
+    // After dedup: only ONE #task tagDef in SCHEMA
+    const schemaChildren = getChildren('SCHEMA');
+    const taskDefs = schemaChildren.filter(id => {
+      const n = toNodexNode(id);
+      return n?.type === 'tagDef' && n.name?.toLowerCase() === 'task';
+    });
+    expect(taskDefs).toHaveLength(1);
+
+    // Winner should be session1's (3 children > 1 child)
+    expect(taskDefs[0]).toBe('task_session1');
+
+    // Winner should have ALL fieldDefs from both sessions
+    const winnerChildren = getChildren('task_session1');
+    const fieldDefs = winnerChildren.filter(id => {
+      const n = toNodexNode(id);
+      return n?.type === 'fieldDef';
+    });
+    // 3 from session1 + 1 from session2 = 4
+    expect(fieldDefs.length).toBe(4);
+  });
+});
+
+// ============================================================
 // ② Fine-grained subscriptions
 // ============================================================
 

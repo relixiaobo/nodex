@@ -113,7 +113,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
           const { ensureContainers } = await import('../lib/bootstrap-containers.js');
           ensureContainers(user.id);
 
-          // Defer Today navigation until AFTER first sync completes.
+          // Defer Today navigation until AFTER first sync fully catches up.
           // Bootstrap created journal nodes with random IDs under JOURNAL.
           // After sync, fixDuplicateContainerMappings() resolves which JOURNAL
           // tree node to use (server's, with actual data). We then navigate to
@@ -121,8 +121,14 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
           // (harmless — under the non-mapped JOURNAL tree node).
           const { ensureTodayNode } = await import('../lib/journal.js');
           const { useUIStore } = await import('./ui-store.js');
+          const targetWsId = user.id;
           const unsub = syncManager.onStateChange((state) => {
-            if (state.lastSyncedAt !== null || state.status === 'error') {
+            // Self-clean if workspace changed (sign-out or re-sign-in)
+            if (useWorkspaceStore.getState().currentWorkspaceId !== targetWsId) {
+              unsub();
+              return;
+            }
+            if (state.status === 'synced' || state.status === 'error') {
               unsub();
               const todayId = ensureTodayNode();
               useUIStore.getState().replacePanel(todayId);
@@ -169,14 +175,20 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
           // If the LoroDoc was freshly created (no IndexedDB snapshot), bootstrap
           // created journal nodes that will conflict with server data after CRDT
           // merge. fixDuplicateContainerMappings() handles container-level dedup.
-          // Defer Today navigation until sync completes so we navigate to the
-          // server's today node (with actual data) rather than the empty bootstrap one.
+          // Defer Today navigation until sync fully catches up so we navigate to
+          // the server's today node (with actual data) rather than the empty bootstrap one.
           const loroDocMod = await import('../lib/loro-doc.js');
           if (!loroDocMod.wasLoadedFromSnapshot()) {
             const { ensureTodayNode } = await import('../lib/journal.js');
             const { useUIStore } = await import('./ui-store.js');
+            const targetWsId = useWorkspaceStore.getState().currentWorkspaceId;
             const unsub = syncManager.onStateChange((state) => {
-              if (state.lastSyncedAt !== null || state.status === 'error') {
+              // Self-clean if workspace changed (sign-out or re-sign-in)
+              if (useWorkspaceStore.getState().currentWorkspaceId !== targetWsId) {
+                unsub();
+                return;
+              }
+              if (state.status === 'synced' || state.status === 'error') {
                 unsub();
                 const todayId = ensureTodayNode();
                 useUIStore.getState().replacePanel(todayId);

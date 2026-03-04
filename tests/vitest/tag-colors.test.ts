@@ -100,8 +100,8 @@ describe('resolveInlineReferenceTextColor', () => {
 });
 
 describe('SWATCH_OPTIONS', () => {
-  it('has exactly 10 entries', () => {
-    expect(SWATCH_OPTIONS).toHaveLength(10);
+  it('has exactly 11 entries', () => {
+    expect(SWATCH_OPTIONS).toHaveLength(11);
   });
 
   it('keys are all valid TAG_COLOR_MAP keys', () => {

@@ -64,10 +64,14 @@ export function ensureHighlightTagDef(_store: HighlightNodeStore): void {
     loroDoc.setNodeDataBatch(SYS_T.HIGHLIGHT, {
       type: 'tagDef',
       name: 'highlight',
-      color: 'amber',
+      color: 'yellow',
     });
     loroDoc.commitDoc();
     tagDef = loroDoc.toNodexNode(SYS_T.HIGHLIGHT);
+  } else if (tagDef.color === 'amber') {
+    // Migrate: amber → yellow (new dedicated highlight color)
+    loroDoc.setNodeData(SYS_T.HIGHLIGHT, 'color', 'yellow');
+    loroDoc.commitDoc();
   }
 
   // Ensure #source and Source field (with fixed IDs)

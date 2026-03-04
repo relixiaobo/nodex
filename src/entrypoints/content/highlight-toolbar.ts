@@ -45,8 +45,6 @@ let selectionActionCallback: ToolbarActionCallback | null = null;
 let highlightActionsElement: HTMLDivElement | null = null;
 let highlightActionsShadowRoot: ShadowRoot | null = null;
 let highlightActionsCallbacks: HighlightActionsCallbacks | null = null;
-let actionsHoverEnterCb: (() => void) | null = null;
-let actionsHoverLeaveCb: (() => void) | null = null;
 
 let notePopoverElement: HTMLDivElement | null = null;
 let notePopoverShadowRoot: ShadowRoot | null = null;
@@ -288,6 +286,14 @@ button[data-action='save'] {
 button[data-action='save']:hover {
   background: #4D7A54;
 }
+
+kbd {
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 400;
+  opacity: 0.7;
+  margin-left: 4px;
+}
 `;
 
 // ── SVG Icons ──
@@ -416,6 +422,21 @@ export function hideToolbar(): void {
 
 // ── Highlight Action Toolbar ──
 
+let hoverEnterCallback: (() => void) | null = null;
+let hoverLeaveCallback: (() => void) | null = null;
+
+/**
+ * Register callbacks for toolbar hover bridging.
+ * Called by highlight.ts to track when the mouse enters/leaves the toolbar.
+ */
+export function setHighlightActionsHoverCallbacks(
+  onEnter: () => void,
+  onLeave: () => void,
+): void {
+  hoverEnterCallback = onEnter;
+  hoverLeaveCallback = onLeave;
+}
+
 function buildHighlightActionsToolbar(): void {
   const { host, root } = createShadowHost();
   highlightActionsElement = host;
@@ -449,22 +470,15 @@ function buildHighlightActionsToolbar(): void {
     }
   });
 
-  host.addEventListener('mouseenter', () => actionsHoverEnterCb?.());
-  host.addEventListener('mouseleave', () => actionsHoverLeaveCb?.());
+  // Hover bridging: toolbar ↔ highlight
+  host.addEventListener('mouseenter', () => {
+    hoverEnterCallback?.();
+  });
+  host.addEventListener('mouseleave', () => {
+    hoverLeaveCallback?.();
+  });
 
   appendHostToPage(host);
-}
-
-/**
- * Register hover callbacks on the highlight actions toolbar host element.
- * Used by highlight.ts to coordinate hide-on-leave between <soma-hl> and the toolbar.
- */
-export function setHighlightActionsHoverCallbacks(
-  onEnter: () => void,
-  onLeave: () => void,
-): void {
-  actionsHoverEnterCb = onEnter;
-  actionsHoverLeaveCb = onLeave;
 }
 
 export function showHighlightActionsToolbar(
@@ -597,9 +611,10 @@ function buildNotePopover(): void {
   cancelButton.setAttribute('data-action', 'cancel');
   cancelButton.textContent = 'Cancel';
 
+  const isMac = /Mac|iPhone|iPad/.test(navigator.platform);
   const saveButton = document.createElement('button');
   saveButton.setAttribute('data-action', 'save');
-  saveButton.textContent = 'Save';
+  saveButton.innerHTML = `Save<kbd>${isMac ? '⌘' : 'Ctrl+'}↵</kbd>`;
 
   actions.appendChild(cancelButton);
   actions.appendChild(saveButton);

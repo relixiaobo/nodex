@@ -49,6 +49,107 @@ function extractDuration(schemaOrgData: unknown): string | undefined {
   return undefined;
 }
 
+// ── x.com / Twitter DOM extraction ──
+
+function isXDomain(): boolean {
+  const h = location.hostname.replace(/^www\./, '');
+  return h === 'x.com' || h === 'twitter.com';
+}
+
+/**
+ * Detect x.com "文章" (Articles) via the dedicated rich-text view container.
+ * Defuddle's x-article extractor uses the same selector.
+ */
+function isXArticlePage(): boolean {
+  return !!document.querySelector('[data-testid="twitterArticleRichTextView"]');
+}
+
+/**
+ * Extract x.com article title from the rich-text view heading or og:title.
+ */
+function extractXArticleTitle(): string | undefined {
+  // Article view has headings inside the rich-text container
+  const rtView = document.querySelector('[data-testid="twitterArticleRichTextView"]');
+  if (rtView) {
+    const h = rtView.querySelector('h1, h2, [role="heading"]');
+    if (h?.textContent?.trim()) return h.textContent.trim();
+  }
+  // Fallback: og:title for articles is usually the actual title
+  const ogTitle = document.querySelector('meta[property="og:title"]')?.getAttribute('content');
+  if (ogTitle && ogTitle.length > 10 && !ogTitle.startsWith('Thread by') && !/on X$/.test(ogTitle)) {
+    return ogTitle;
+  }
+  return undefined;
+}
+
+/**
+ * Extract the main tweet's text from x.com DOM using stable data-testid selectors.
+ * Only extracts the first (main) tweet, not replies.
+ */
+function extractXTweetText(): string | undefined {
+  // Scope to the main tweet (first article, not replies)
+  const mainTweet = document.querySelector('article[data-testid="tweet"]');
+  if (!mainTweet) return undefined;
+  const textEl = mainTweet.querySelector('[data-testid="tweetText"]');
+  if (!textEl) return undefined;
+  // Convert emoji <img> tags back to text
+  return nodeToText(textEl);
+}
+
+/** Convert a DOM node to text, restoring emoji img alt text. */
+function nodeToText(el: Element): string {
+  let text = '';
+  for (const child of el.childNodes) {
+    if (child.nodeType === Node.TEXT_NODE) {
+      text += child.textContent;
+    } else if (child.nodeType === Node.ELEMENT_NODE) {
+      const elem = child as Element;
+      if (elem.tagName === 'IMG' && elem.getAttribute('src')?.includes('/emoji/')) {
+        text += elem.getAttribute('alt') ?? '';
+      } else if (elem.tagName === 'BR') {
+        text += '\n';
+      } else {
+        text += nodeToText(elem);
+      }
+    }
+  }
+  return text;
+}
+
+/**
+ * Build HTML content from x.com tweet text and article elements.
+ * Fallback when Defuddle returns empty/minimal content.
+ */
+function extractXPageContent(): string {
+  // x.com article: extract from the rich-text view
+  const rtView = document.querySelector('[data-testid="twitterArticleRichTextView"]');
+  if (rtView) return rtView.innerHTML;
+
+  // Regular tweet/thread: extract all tweetText elements
+  const els = document.querySelectorAll('[data-testid="tweetText"]');
+  if (els.length === 0) return '';
+  return Array.from(els).map(el => `<p>${el.innerHTML}</p>`).join('\n');
+}
+
+/**
+ * Extract x.com author handle from the main tweet's User-Name element.
+ */
+function extractXAuthor(): string | undefined {
+  const mainTweet = document.querySelector('article[data-testid="tweet"]');
+  if (!mainTweet) return undefined;
+  const userNameEl = mainTweet.querySelector('[data-testid="User-Name"]');
+  if (!userNameEl) return undefined;
+  // The @handle is typically in the second link
+  const links = userNameEl.querySelectorAll('a[href*="/"]');
+  for (const link of links) {
+    const href = link.getAttribute('href');
+    if (href?.startsWith('/') && !href.includes('/status/')) {
+      return '@' + href.replace(/^\//, '');
+    }
+  }
+  return undefined;
+}
+
 function captureCurrentPage(): WebClipCapturePayload {
   const url = location.href;
   const selectionText = window.getSelection()?.toString() ?? '';
@@ -57,16 +158,47 @@ function captureCurrentPage(): WebClipCapturePayload {
     markdown: false,
     separateMarkdown: false,
   }).parse();
-  const title = extracted.title?.trim() || document.title?.trim() || location.hostname;
-  const pageText = extracted.content ?? '';
+  let title = extracted.title?.trim() || document.title?.trim() || location.hostname;
+  let pageText = extracted.content ?? '';
+  let description = extracted.description ?? undefined;
+
+  let isXArticle = false;
+
+  // ── x.com / Twitter enhancement ──
+  // Defuddle often fails on x.com SPA — use DOM extraction as fallback.
+  if (isXDomain()) {
+    // Detect x.com article (long-form post)
+    if (isXArticlePage()) {
+      const articleTitle = extractXArticleTitle();
+      if (articleTitle) title = articleTitle;
+      isXArticle = true;
+    }
+
+    // Use tweet text as description for title refinement
+    if (!description || description === title || description.startsWith('Thread by')) {
+      const tweetText = extractXTweetText();
+      if (tweetText) description = tweetText;
+    }
+
+    // Use DOM-extracted content if Defuddle returned empty/minimal content
+    if (!pageText || pageText.length < 50) {
+      const xContent = extractXPageContent();
+      if (xContent) pageText = xContent;
+    }
+  }
+
   if (!pageText) {
     throw new Error('Defuddle returned empty content');
   }
 
   const ogType = document.querySelector('meta[property="og:type"]')?.getAttribute('content') ?? undefined;
   const schemaOrgType = extractSchemaOrgType(extracted.schemaOrgData);
-  const hasArticleElement = !!document.querySelector('article');
+  // Exclude x.com from <article> detection — every tweet is wrapped in <article>
+  const hasArticleElement = !isXDomain() && !!document.querySelector('article');
   const duration = extractDuration(extracted.schemaOrgData);
+
+  // x.com author fallback: Defuddle often misses the author on SPA pages
+  const author = extracted.author ?? (isXDomain() ? extractXAuthor() : undefined) ?? undefined;
 
   return {
     url,
@@ -74,15 +206,16 @@ function captureCurrentPage(): WebClipCapturePayload {
     selectionText,
     pageText,
     capturedAt: Date.now(),
-    author: extracted.author ?? undefined,
+    author,
     published: extracted.published ?? undefined,
-    description: extracted.description ?? undefined,
+    description,
     siteName: extracted.site ?? undefined,
     duration: duration ?? undefined,
     extractorType: extracted.extractorType ?? undefined,
     ogType,
     schemaOrgType,
     hasArticleElement,
+    isXArticle,
   };
 }
 

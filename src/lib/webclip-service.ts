@@ -89,8 +89,9 @@ export function detectClipType(url: string, payload?: Partial<WebClipCapturePayl
       return 'video';
     }
     if (hostname === 'x.com' || hostname === 'twitter.com') {
-      // x.com articles: /username/articles/id
+      // x.com articles: /username/articles/id OR detected from DOM
       if (/\/articles\/\d/.test(parsed.pathname)) return 'article';
+      if (payload?.isXArticle) return 'article';
       return 'social';
     }
   } catch {

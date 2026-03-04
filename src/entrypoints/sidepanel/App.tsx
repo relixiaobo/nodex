@@ -25,6 +25,11 @@ import {
 } from '../../lib/highlight-sidepanel.js';
 import { findClipNodeByUrl } from '../../lib/webclip-service.js';
 import {
+  getAllPendingHighlights,
+  removePendingHighlights,
+  markPendingHighlightFailed,
+} from '../../lib/highlight-pending-queue.js';
+import {
   HIGHLIGHT_CREATE,
   HIGHLIGHT_DELETE,
   HIGHLIGHT_CLICK,
@@ -168,7 +173,52 @@ function useBootstrap(skip: boolean): BootstrapResult {
     replacePanel(ensureTodayNode());
    }
 
+   // ── Drain pending highlight queue ──
+   let pendingFailCount = 0;
+   try {
+    const pendingEntries = await getAllPendingHighlights();
+    if (pendingEntries.length > 0) {
+     const store = useNodeStore.getState() as HighlightNodeStore;
+     ensureHighlightTagDef(store);
+     ensureNoteTagDef(store);
+
+     const consumed: string[] = [];
+
+     for (const entry of pendingEntries) {
+      try {
+       await createHighlightFromPayload({
+        anchor: entry.anchor,
+        selectedText: entry.selectedText,
+        pageUrl: entry.pageUrl,
+        pageTitle: entry.pageTitle,
+        noteEntries: entry.noteEntries,
+       }, store);
+       consumed.push(entry.tempId);
+      } catch (err) {
+       pendingFailCount++;
+       const error = err instanceof Error ? err.message : String(err);
+       void markPendingHighlightFailed(entry.tempId, error);
+      }
+     }
+
+     if (consumed.length > 0) await removePendingHighlights(consumed);
+    }
+   } catch {
+    // Queue read failed — not critical, skip
+   }
+
    setReady(true);
+
+   if (pendingFailCount > 0) {
+    // Toast after ready so Toaster is mounted
+    setTimeout(() => {
+     toast.warning(
+      pendingFailCount === 1
+       ? '1 条离线高亮入库失败'
+       : `${pendingFailCount} 条离线高亮入库失败`,
+     );
+    }, 100);
+   }
 
    // If no local snapshot existed, watch for sync completion in background.
    // When pull finishes, re-seed containers in case server data has different structure.

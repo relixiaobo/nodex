@@ -165,6 +165,33 @@ describe('payload types', () => {
     expect(payload.noteEntries![1].depth).toBe(1);
   });
 
+  it('HighlightCreatePayload supports optional tempId', () => {
+    const anchor: HighlightAnchor = {
+      version: 1,
+      exact: 'text',
+      prefix: '',
+      suffix: '',
+    };
+
+    const withTempId: HighlightCreatePayload = {
+      anchor,
+      selectedText: 'text',
+      pageUrl: 'https://example.com',
+      pageTitle: 'Page',
+      tempId: 'temp_123_abc',
+    };
+
+    const withoutTempId: HighlightCreatePayload = {
+      anchor,
+      selectedText: 'text',
+      pageUrl: 'https://example.com',
+      pageTitle: 'Page',
+    };
+
+    expect(withTempId.tempId).toBe('temp_123_abc');
+    expect(withoutTempId.tempId).toBeUndefined();
+  });
+
   it('HighlightRestorePayload holds array of highlights', () => {
     const payload: HighlightRestorePayload = {
       highlights: [

@@ -16,9 +16,21 @@ import {
   HIGHLIGHT_SCROLL_TO,
   HIGHLIGHT_CHECK_URL,
   HIGHLIGHT_CHECK_URL_REQUEST,
+  type HighlightCreatePayload,
   type HighlightCheckUrlPayload,
   type HighlightCheckUrlRequestPayload,
+  type HighlightDeletePayload,
+  type HighlightNotesSavePayload,
+  type HighlightNoteGetPayload,
+  type HighlightRestorePayload,
 } from '../../lib/highlight-messaging.js';
+import {
+  enqueuePendingHighlight,
+  removePendingHighlight,
+  findPendingHighlight,
+  updatePendingHighlightNotes,
+  getPendingHighlightsForUrl,
+} from '../../lib/highlight-pending-queue.js';
 
 const CONTENT_SCRIPT_READY_TIMEOUT_MS = 1200;
 const MESSAGE_RETRY_DELAY_MS = 150;
@@ -154,12 +166,70 @@ function isInjectableUrl(url: string | undefined): boolean {
   return url.startsWith('http://') || url.startsWith('https://');
 }
 
-function forwardHighlightCheck(payload: HighlightCheckUrlPayload): void {
-  chrome.runtime.sendMessage({
-    type: HIGHLIGHT_CHECK_URL,
-    payload,
-  }).catch(() => {
-    // Side Panel may not be open — silently ignore
+/**
+ * Check if the Side Panel is currently open.
+ * Uses chrome.runtime.getContexts (MV3) to detect SIDE_PANEL contexts.
+ */
+async function isSidePanelOpen(): Promise<boolean> {
+  try {
+    const contexts = await chrome.runtime.getContexts({
+      contextTypes: ['SIDE_PANEL' as chrome.runtime.ContextType],
+    });
+    return contexts.length > 0;
+  } catch {
+    return false;
+  }
+}
+
+/** Whether an ID is a pending-queue temp ID (not a real node ID). */
+function isTempId(id: string): boolean {
+  return id.startsWith('temp_');
+}
+
+/**
+ * Forward a message to the Side Panel via runtime.sendMessage.
+ * Resolves with the SP's response, or rejects if SP is unreachable.
+ */
+function forwardToSidePanel(message: unknown): Promise<unknown> {
+  return new Promise((resolve, reject) => {
+    chrome.runtime.sendMessage(message, (response) => {
+      if (chrome.runtime.lastError) {
+        reject(new Error(chrome.runtime.lastError.message));
+        return;
+      }
+      resolve(response);
+    });
+  });
+}
+
+async function forwardHighlightCheck(payload: HighlightCheckUrlPayload): Promise<void> {
+  const spOpen = await isSidePanelOpen();
+
+  if (spOpen) {
+    // Online: forward to SP for LoroDoc lookup + restore
+    chrome.runtime.sendMessage({
+      type: HIGHLIGHT_CHECK_URL,
+      payload,
+    }).catch(() => {});
+    return;
+  }
+
+  // Offline: restore from pending queue
+  const pending = await getPendingHighlightsForUrl(payload.url);
+  if (pending.length === 0) return;
+
+  const restorePayload: HighlightRestorePayload = {
+    highlights: pending.map((e) => ({
+      id: e.tempId,
+      anchor: e.anchor,
+      color: '#9B7C38',
+      hasComment: !!(e.noteEntries && e.noteEntries.length > 0),
+    })),
+  };
+
+  await forwardToTab(payload.tabId, {
+    type: HIGHLIGHT_RESTORE,
+    payload: restorePayload,
   });
 }
 
@@ -203,15 +273,56 @@ export default defineBackground(() => {
       return true;
     }
 
-    // ── Highlight Create: Content Script -> BG -> Side Panel ──
-    // In MV3, the background intercepts CS messages. We must explicitly
-    // forward to the Side Panel (another extension page) via runtime.sendMessage.
+    // ── Highlight Create: Content Script -> BG -> Side Panel (with offline queue) ──
     if (type === HIGHLIGHT_CREATE) {
       const tabId = sender.tab?.id;
-      // Only forward messages that originate from a content script tab.
-      // This prevents background self-forward loops.
       if (!tabId) return false;
-      // Forward augmented message to Side Panel and relay its response back to CS
+
+      (async () => {
+        const spOpen = await isSidePanelOpen();
+
+        if (spOpen) {
+          try {
+            const spResponse = await forwardToSidePanel({ ...message, _tabId: tabId });
+            sendResponse(spResponse ?? { ok: true });
+            return;
+          } catch {
+            // SP disappeared mid-forward — fall through to queue
+          }
+        }
+
+        // Offline or forward failed → enqueue
+        const payload = message.payload as HighlightCreatePayload | undefined;
+        if (!payload) {
+          sendResponse({ ok: false, error: 'Missing highlight payload' });
+          return;
+        }
+
+        await enqueuePendingHighlight({
+          tempId: payload.tempId ?? `temp_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
+          anchor: payload.anchor,
+          selectedText: payload.selectedText,
+          pageUrl: payload.pageUrl,
+          pageTitle: payload.pageTitle,
+          noteEntries: payload.noteEntries,
+        });
+
+        sendResponse({ ok: true, queued: true });
+      })();
+      return true;
+    }
+
+    // ── Highlight Delete: CS -> BG (tempId → storage, else → SP) ──
+    if (type === HIGHLIGHT_DELETE) {
+      const tabId = sender.tab?.id;
+      if (!tabId) return false;
+      const payload = message.payload as HighlightDeletePayload | undefined;
+      if (payload?.id && isTempId(payload.id)) {
+        removePendingHighlight(payload.id).then(() => {
+          sendResponse({ ok: true, deleted: true });
+        });
+        return true;
+      }
       chrome.runtime.sendMessage(
         { ...message, _tabId: tabId },
         (spResponse) => {
@@ -225,10 +336,41 @@ export default defineBackground(() => {
       return true;
     }
 
-    // ── Highlight Delete / Notes Save / Note Get: Content Script -> BG -> Side Panel ──
-    if (type === HIGHLIGHT_DELETE || type === HIGHLIGHT_NOTES_SAVE || type === HIGHLIGHT_NOTE_GET) {
+    // ── Highlight Note Get: CS -> BG (tempId → storage, else → SP) ──
+    if (type === HIGHLIGHT_NOTE_GET) {
       const tabId = sender.tab?.id;
       if (!tabId) return false;
+      const payload = message.payload as HighlightNoteGetPayload | undefined;
+      if (payload?.id && isTempId(payload.id)) {
+        findPendingHighlight(payload.id).then((entry) => {
+          sendResponse({ ok: true, noteEntries: entry?.noteEntries ?? [] });
+        });
+        return true;
+      }
+      chrome.runtime.sendMessage(
+        { ...message, _tabId: tabId },
+        (spResponse) => {
+          if (chrome.runtime.lastError) {
+            sendResponse({ ok: false, error: chrome.runtime.lastError.message });
+            return;
+          }
+          sendResponse(spResponse ?? { ok: true });
+        },
+      );
+      return true;
+    }
+
+    // ── Highlight Notes Save: CS -> BG (tempId → storage, else → SP) ──
+    if (type === HIGHLIGHT_NOTES_SAVE) {
+      const tabId = sender.tab?.id;
+      if (!tabId) return false;
+      const payload = message.payload as HighlightNotesSavePayload | undefined;
+      if (payload?.id && isTempId(payload.id)) {
+        updatePendingHighlightNotes(payload.id, payload.noteEntries).then(() => {
+          sendResponse({ ok: true });
+        });
+        return true;
+      }
       chrome.runtime.sendMessage(
         { ...message, _tabId: tabId },
         (spResponse) => {
@@ -266,8 +408,9 @@ export default defineBackground(() => {
         sendResponse({ ok: false, error: 'Invalid check-url-request payload' });
         return true;
       }
-      forwardHighlightCheck({ url: payload.url, tabId });
-      sendResponse({ ok: true });
+      forwardHighlightCheck({ url: payload.url, tabId }).then(() => {
+        sendResponse({ ok: true });
+      });
       return true;
     }
 
@@ -340,8 +483,8 @@ export default defineBackground(() => {
     // Inject content script so selection toolbar is available immediately
     void ensureContentScript(tabId);
 
-    // Send CHECK_URL to Side Panel so it can look up highlights for this URL
-    forwardHighlightCheck({
+    // Send CHECK_URL to Side Panel (or restore from pending queue if offline)
+    void forwardHighlightCheck({
       url: tab.url!,
       tabId,
     });

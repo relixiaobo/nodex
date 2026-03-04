@@ -115,7 +115,7 @@
 
 .ProseMirror mark,
 .node-content mark {
-  background-color: rgba(253, 224, 71, 0.4);
+  background-color: rgba(247, 236, 139, 0.6);
   border-radius: 0.125rem;
   padding: 0.0625rem 0;
 }
@@ -124,7 +124,7 @@
 
   .ProseMirror mark,
   .node-content mark {
-    background-color: rgba(253, 224, 71, 0.3);
+    background-color: rgba(247, 236, 139, 0.4);
   }
 }
 

@@ -144,7 +144,7 @@ export function Breadcrumb({ nodeId, showCurrentName, compact }: BreadcrumbProps
             <Tooltip label={t('breadcrumb.goToWorkspaceRoot')}>
               <button
                 onClick={handleNavigateToWorkspaceRoot}
-                className="flex h-5 w-5 shrink-0 items-center justify-center rounded-[4px] bg-primary/15 text-[11px] font-semibold text-primary hover:bg-primary/20"
+                className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/15 text-[11px] font-semibold text-primary hover:bg-primary/20"
               >
                 {wsInitial}
               </button>

@@ -20,6 +20,7 @@ export {
   MoreHorizontal,
   PanelLeft,
   Search,
+  Command,
   Plus,
   X,
   Check,

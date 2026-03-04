@@ -249,41 +249,52 @@ function nodeToText(el: Element): string {
 }
 
 /**
- * Convert a tweetText element to clean inline HTML.
+ * Convert a tweetText element to clean HTML paragraphs.
  * x.com wraps @mentions in <DIV style="display:inline-flex"> containing <a> tags.
  * These DIVs are visually inline but our parser treats <div> as block-level,
  * causing unwanted line breaks. This function flattens them to inline <a> tags.
+ * Line breaks (<br>) split content into separate <p> elements so our parser
+ * creates separate nodes for each paragraph.
  */
-function tweetTextToInlineHtml(el: Element): string {
-  let html = '';
-  for (const child of el.childNodes) {
-    if (child.nodeType === Node.TEXT_NODE) {
-      html += child.textContent ?? '';
-    } else if (child.nodeType === Node.ELEMENT_NODE) {
-      const elem = child as Element;
-      if (elem.tagName === 'IMG' && elem.getAttribute('src')?.includes('/emoji/')) {
-        html += elem.getAttribute('alt') ?? '';
-      } else if (elem.tagName === 'BR') {
-        html += '<br>';
-      } else if (elem.tagName === 'A') {
-        html += elem.outerHTML;
-      } else if (elem.tagName === 'SPAN') {
-        html += tweetTextToInlineHtml(elem);
-      } else if (elem.tagName === 'DIV') {
-        // x.com wraps @mentions in DIV[display:inline-flex] > A
-        // Flatten: extract the <a> tag directly as inline content
-        const anchor = elem.querySelector('a');
-        if (anchor) {
-          html += anchor.outerHTML;
+function tweetTextToHtmlParagraphs(el: Element): string {
+  // First collect inline HTML, using a sentinel for line breaks
+  const BREAK = '\x00BR\x00';
+  function collect(node: Element): string {
+    let html = '';
+    for (const child of node.childNodes) {
+      if (child.nodeType === Node.TEXT_NODE) {
+        html += child.textContent ?? '';
+      } else if (child.nodeType === Node.ELEMENT_NODE) {
+        const elem = child as Element;
+        if (elem.tagName === 'IMG' && elem.getAttribute('src')?.includes('/emoji/')) {
+          html += elem.getAttribute('alt') ?? '';
+        } else if (elem.tagName === 'BR') {
+          html += BREAK;
+        } else if (elem.tagName === 'A') {
+          html += elem.outerHTML;
+        } else if (elem.tagName === 'SPAN') {
+          html += collect(elem);
+        } else if (elem.tagName === 'DIV') {
+          // x.com wraps @mentions in DIV[display:inline-flex] > A
+          const anchor = elem.querySelector('a');
+          if (anchor) {
+            html += anchor.outerHTML;
+          } else {
+            html += collect(elem);
+          }
         } else {
-          html += tweetTextToInlineHtml(elem);
+          html += collect(elem);
         }
-      } else {
-        html += tweetTextToInlineHtml(elem);
       }
     }
+    return html;
   }
-  return html;
+
+  const raw = collect(el);
+  // Split on line breaks and wrap each non-empty segment in <p>
+  const segments = raw.split(BREAK).filter((s) => s.trim());
+  if (segments.length === 0) return '';
+  return segments.map((s) => `<p>${s.trim()}</p>`).join('\n');
 }
 
 /**
@@ -353,9 +364,13 @@ function extractTweetAuthor(article: Element): string | undefined {
 function extractTweetArticleParts(article: Element, videoMp4Url?: string): string[] {
   const parts: string[] = [];
 
-  // Tweet text — flatten x.com's DIV-wrapped @mentions to inline <a> tags
+  // Tweet text — flatten x.com's DIV-wrapped @mentions to inline <a> tags,
+  // preserving line breaks as separate <p> elements
   const textEl = article.querySelector('[data-testid="tweetText"]');
-  if (textEl) parts.push(`<p>${tweetTextToInlineHtml(textEl)}</p>`);
+  if (textEl) {
+    const textHtml = tweetTextToHtmlParagraphs(textEl);
+    if (textHtml) parts.push(textHtml);
+  }
 
   // Tweet videos: check first — if video exists, skip tweetPhoto images
   // (x.com wraps video thumbnails inside tweetPhoto containers)

@@ -120,6 +120,56 @@ describe('computeBacklinks', () => {
     expect(names).toContain('Design the data model');
   });
 
+  it('excludes references from supertag search nodes', () => {
+    // Seed data has search_task (single-tag search for tagDef_task) in SEARCHES.
+    // Refresh it to materialize reference children pointing at task_1.
+    useNodeStore.getState().refreshSearchResults('search_task');
+    loroDoc.commitDoc();
+
+    // The search node should have created a reference to task_1
+    const searchNode = loroDoc.toNodexNode('search_task');
+    expect(searchNode?.type).toBe('search');
+    const hasRefToTask1 = searchNode!.children.some((childId) => {
+      const child = loroDoc.toNodexNode(childId);
+      return child?.type === 'reference' && child.targetId === 'task_1';
+    });
+    expect(hasRefToTask1).toBe(true);
+
+    // But task_1's backlinks should NOT include the search node reference
+    const result = computeBacklinks('task_1');
+    const fromSearch = result.mentionedIn.filter(
+      (r) => r.referencingNodeId === 'search_task',
+    );
+    expect(fromSearch).toHaveLength(0);
+  });
+
+  it('includes references from multi-condition search nodes', () => {
+    // Create a search node with multiple conditions (not a supertag search)
+    const store = useNodeStore.getState();
+    const searchId = 'search_complex';
+    loroDoc.createNode(searchId, CONTAINER_IDS.SEARCHES);
+    loroDoc.setNodeDataBatch(searchId, { type: 'search', name: 'Complex search' });
+    const andId = 'search_complex_and';
+    loroDoc.createNode(andId, searchId);
+    loroDoc.setNodeDataBatch(andId, { type: 'queryCondition', queryLogic: 'AND' });
+    // Two leaf conditions → not a supertag search
+    const cond1Id = 'search_complex_c1';
+    loroDoc.createNode(cond1Id, andId);
+    loroDoc.setNodeDataBatch(cond1Id, { type: 'queryCondition', queryOp: 'HAS_TAG', queryTagDefId: 'tagDef_task' });
+    const cond2Id = 'search_complex_c2';
+    loroDoc.createNode(cond2Id, andId);
+    loroDoc.setNodeDataBatch(cond2Id, { type: 'queryCondition', queryOp: 'HAS_TAG', queryTagDefId: 'tagDef_meeting' });
+    // Add a reference child manually
+    const refId = store.addReference(searchId, 'task_1');
+    loroDoc.commitDoc();
+
+    const result = computeBacklinks('task_1');
+    const fromSearch = result.mentionedIn.filter(
+      (r) => r.referencingNodeId === searchId,
+    );
+    expect(fromSearch).toHaveLength(1);
+  });
+
   it('field value refs grouped by fieldDefName', () => {
     // Set status for two different nodes
     useNodeStore.getState().setOptionsFieldValue('task_1', 'attrDef_status', 'opt_todo');

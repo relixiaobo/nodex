@@ -632,6 +632,7 @@ function persistHighlightDraft(
 ): void {
   const payload: HighlightCreatePayload = {
     ...draft.payloadBase,
+    tempId: draft.tempId,
     noteEntries: noteEntries && noteEntries.length > 0 ? noteEntries : undefined,
   };
 

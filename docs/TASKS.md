@@ -198,6 +198,7 @@ _(全部已修复)_
 
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
+| 2026-03-04 | 高亮 hover 工具栏重做 — 两层检测（fast path closest + slow path 膨胀 rect rAF）解决多行行间隙闪烁，click 透传让链接可点，250ms 延迟 + toolbar mouseenter 桥接防抖，Note popover Save 按钮显示 ⌘↵ 快捷键提示 | nodex | main |
 | 2026-03-04 | x.com clip 修复 + 高亮色系统统一 — x.com @mention 行内化 + profile 页标题提取 + tweet 换行保留 + 空标签节点占位符 + supertag search backlinks 过滤 + Soft Banana 高亮色（`rgba(247,236,139,0.6)` + `mix-blend-mode:multiply`）+ Harvest Yellow `#8B8422` 新增色板 + #highlight supertag 迁移 amber→yellow + 网页端高亮色同步 | nodex | main |
 | 2026-03-04 | Field 配置页打磨 — Auto-init 改为按类型 toggle 组（Date 3 项 / 其他 1 项）+ 多策略优先级 + 字段类型图标（下拉+bullet）+ FieldValueRow 共享布局 + 配置页对齐统一 + toggle 对齐修复 + Auto-collect 拆分 toggle+列表 + Tag 右键菜单样式 + Breadcrumb badge 圆形 + workspace home 可编辑 | nodex | main |
 | 2026-03-04 | Review: Sync 架构全面审查 — 6 commit 审查（客户端 sync + 服务端 Loro snapshot compaction）+ compaction CAS 修复 + update 区间校验 + saveCursor 异步捕获 | nodex | #117 |

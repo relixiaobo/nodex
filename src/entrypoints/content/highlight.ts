@@ -39,10 +39,13 @@ import {
 } from '../../lib/highlight-messaging.js';
 import { WEBCLIP_CAPTURE_ACTIVE_TAB } from '../../lib/webclip-messaging.js';
 
-// ── Default Highlight Color (matches design-system Antique Gold) ──
+// ── Default Highlight Color (Harvest Yellow from tag-colors palette) ──
 
-/** Antique Gold (#9B7C38) for webpage highlight underline + tint. */
-export const DEFAULT_HIGHLIGHT_BG = '#9B7C38';
+/** Harvest Yellow (#8B8422) for webpage highlight underline. */
+export const DEFAULT_HIGHLIGHT_BG = '#8B8422';
+
+/** Soft Banana fill for webpage highlight background (matches side-panel <mark>). */
+const HIGHLIGHT_FILL_COLOR = 'rgba(247, 236, 139, 0.6)';
 
 const COMMENT_ICON_SELECTOR = '[data-soma-note-icon="true"]';
 
@@ -233,27 +236,9 @@ function toHighlightLineColor(color: string): string {
   return `rgb(${parts[0]}, ${parts[1]}, ${parts[2]})`;
 }
 
-function toHighlightFillColor(color: string): string {
-  const lineColor = toHighlightLineColor(color);
-  if (lineColor.startsWith('#')) {
-    const hex = lineColor.slice(1);
-    if (hex.length === 6) {
-      const r = Number.parseInt(hex.slice(0, 2), 16);
-      const g = Number.parseInt(hex.slice(2, 4), 16);
-      const b = Number.parseInt(hex.slice(4, 6), 16);
-      return `rgba(${r}, ${g}, ${b}, 0.22)`;
-    }
-  }
-
-  const rgbMatch = lineColor.match(/^rgb\(([^)]+)\)$/i);
-  if (rgbMatch) {
-    const parts = rgbMatch[1].split(',').map((part) => Number(part.trim()));
-    if (parts.length >= 3 && !parts.slice(0, 3).some((v) => Number.isNaN(v))) {
-      return `rgba(${parts[0]}, ${parts[1]}, ${parts[2]}, 0.22)`;
-    }
-  }
-
-  return 'rgba(155, 124, 56, 0.22)';
+function toHighlightFillColor(_color: string): string {
+  // Fixed Soft Banana fill — consistent with side-panel <mark> styling.
+  return HIGHLIGHT_FILL_COLOR;
 }
 
 /**

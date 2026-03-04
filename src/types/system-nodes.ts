@@ -295,6 +295,27 @@ export const NDX_F = {
   SOURCE_URL: 'NDX_F01',
   /** Source fieldDef (child of #highlight tagDef, options_from_supertag → #source) */
   HIGHLIGHT_SOURCE: 'NDX_F02',
+  /** Author fieldDef (child of #source tagDef) */
+  AUTHOR: 'NDX_F03',
+  /** Published fieldDef (child of #source tagDef) */
+  PUBLISHED: 'NDX_F04',
+  /** Duration fieldDef (child of #video tagDef) */
+  DURATION: 'NDX_F05',
 } as const;
 
 export type NdxFieldDef = typeof NDX_F[keyof typeof NDX_F];
+
+// ============================================================
+// NDX_T* —— soma 剪藏类型标签（extends #source）
+// ============================================================
+
+export const NDX_T = {
+  /** #article tagDef — extends #source */
+  ARTICLE: 'NDX_T01',
+  /** #video tagDef — extends #source */
+  VIDEO: 'NDX_T02',
+  /** #social tagDef — extends #source */
+  SOCIAL: 'NDX_T03',
+} as const;
+
+export type NdxTag = typeof NDX_T[keyof typeof NDX_T];

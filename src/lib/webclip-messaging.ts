@@ -12,6 +12,16 @@ export interface WebClipCapturePayload {
   published?: string;
   description?: string;
   siteName?: string;
+  /** ISO 8601 or formatted duration (video only) */
+  duration?: string;
+  /** Defuddle extractor type (e.g. 'youtube', 'twitter') */
+  extractorType?: string;
+  /** og:type meta value */
+  ogType?: string;
+  /** Schema.org @type */
+  schemaOrgType?: string;
+  /** DOM contains an <article> element */
+  hasArticleElement?: boolean;
 }
 
 export type WebClipCaptureResponse =

@@ -2,8 +2,9 @@
  * webclip-service — Loro model.
  * findTagDefByName: searches CONTAINER_IDS.SCHEMA children (ignores _entities/_schemaId args).
  * findTemplateAttrDef: searches tagDef's fieldDef children by name.
- * saveWebClip: creates clip node in INBOX, applies #source tag, writes Source URL field.
+ * saveWebClip: creates clip node, applies type-specific tag, writes fields.
  * applyWebClipToNode: applies web clip data to an existing node in-place.
+ * detectClipType: detects clip type from URL and metadata.
  */
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useNodeStore } from '../../src/stores/node-store.js';
@@ -16,10 +17,12 @@ import {
   normalizeUrl,
   findClipNodeByUrl,
   createLightweightClip,
+  detectClipType,
+  formatIsoDuration,
   type WebClipCapturePayload,
 } from '../../src/lib/webclip-service.js';
 import * as loroDoc from '../../src/lib/loro-doc.js';
-import { CONTAINER_IDS, SYS_T, NDX_F } from '../../src/types/index.js';
+import { CONTAINER_IDS, SYS_T, NDX_F, NDX_T } from '../../src/types/index.js';
 import { ensureTodayNode } from '../../src/lib/journal.js';
 
 /** Helper: find fieldEntry child with given fieldDefId. */
@@ -104,6 +107,79 @@ describe('findTemplateAttrDef', () => {
   });
 });
 
+describe('detectClipType', () => {
+  it('detects YouTube URL as video', () => {
+    expect(detectClipType('https://www.youtube.com/watch?v=abc123')).toBe('video');
+    expect(detectClipType('https://youtube.com/watch?v=abc123')).toBe('video');
+    expect(detectClipType('https://youtu.be/abc123')).toBe('video');
+    expect(detectClipType('https://m.youtube.com/watch?v=abc123')).toBe('video');
+  });
+
+  it('detects X/Twitter URL as social', () => {
+    expect(detectClipType('https://x.com/user/status/123')).toBe('social');
+    expect(detectClipType('https://twitter.com/user/status/123')).toBe('social');
+  });
+
+  it('detects extractorType youtube as video', () => {
+    expect(detectClipType('https://example.com', { extractorType: 'youtube' })).toBe('video');
+  });
+
+  it('detects extractorType twitter as social', () => {
+    expect(detectClipType('https://example.com', { extractorType: 'twitter' })).toBe('social');
+  });
+
+  it('detects og:type article', () => {
+    expect(detectClipType('https://example.com', { ogType: 'article' })).toBe('article');
+  });
+
+  it('detects Schema.org Article types', () => {
+    expect(detectClipType('https://example.com', { schemaOrgType: 'Article' })).toBe('article');
+    expect(detectClipType('https://example.com', { schemaOrgType: 'BlogPosting' })).toBe('article');
+    expect(detectClipType('https://example.com', { schemaOrgType: 'NewsArticle' })).toBe('article');
+  });
+
+  it('detects <article> element as article fallback', () => {
+    expect(detectClipType('https://example.com', { hasArticleElement: true })).toBe('article');
+  });
+
+  it('URL domain takes priority over metadata', () => {
+    // YouTube URL should be video even if og:type says article
+    expect(detectClipType('https://youtube.com/watch?v=1', { ogType: 'article' })).toBe('video');
+  });
+
+  it('returns source for unknown URLs without metadata', () => {
+    expect(detectClipType('https://example.com')).toBe('source');
+    expect(detectClipType('https://example.com', {})).toBe('source');
+  });
+
+  it('handles invalid URLs gracefully', () => {
+    expect(detectClipType('not a url')).toBe('source');
+  });
+});
+
+describe('formatIsoDuration', () => {
+  it('formats hours, minutes, seconds', () => {
+    expect(formatIsoDuration('PT1H2M3S')).toBe('1:02:03');
+  });
+
+  it('formats minutes and seconds', () => {
+    expect(formatIsoDuration('PT12M34S')).toBe('12:34');
+  });
+
+  it('formats seconds only', () => {
+    expect(formatIsoDuration('PT45S')).toBe('0:45');
+  });
+
+  it('formats hours only', () => {
+    expect(formatIsoDuration('PT2H')).toBe('2:00:00');
+  });
+
+  it('returns original string for non-ISO format', () => {
+    expect(formatIsoDuration('12:34')).toBe('12:34');
+    expect(formatIsoDuration('invalid')).toBe('invalid');
+  });
+});
+
 describe('saveWebClip', () => {
   beforeEach(() => {
     resetAndSeed();
@@ -146,7 +222,7 @@ describe('saveWebClip', () => {
     expect(loroDoc.getChildren(ensureTodayNode())).not.toContain(clipId);
   });
 
-  it('tags node with #source (reuses existing tagDef)', async () => {
+  it('tags node with #source for generic URL (reuses existing tagDef)', async () => {
     const store = useNodeStore.getState();
     const payload = makePayload();
 
@@ -274,6 +350,152 @@ describe('saveWebClip', () => {
   });
 });
 
+// ── Clip templates ──
+
+describe('saveWebClip with templates', () => {
+  beforeEach(() => {
+    resetAndSeed();
+  });
+
+  const makePayload = (overrides?: Partial<WebClipCapturePayload>): WebClipCapturePayload => ({
+    url: 'https://example.com/page',
+    title: 'Test Page',
+    selectionText: '',
+    pageText: '<p>Content</p>',
+    capturedAt: Date.now(),
+    ...overrides,
+  });
+
+  it('YouTube URL → #video tag + Duration field', async () => {
+    const store = useNodeStore.getState();
+    const payload = makePayload({
+      url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+      title: 'Rick Astley — Never Gonna Give You Up',
+      duration: 'PT3M33S',
+      author: 'Rick Astley',
+    });
+
+    const clipId = await saveWebClip(payload, store);
+    const node = loroDoc.toNodexNode(clipId);
+
+    // Should have #video tag (not #source directly)
+    expect(node!.tags).toContain(NDX_T.VIDEO);
+    expect(node!.tags).not.toContain(SYS_T.SOURCE);
+
+    // Source URL field should be populated (inherited from #source via extends)
+    const urlFe = findFieldEntry(clipId, NDX_F.SOURCE_URL);
+    expect(urlFe).toBeDefined();
+    expect(getFirstFieldValue(urlFe!)).toBe('https://www.youtube.com/watch?v=dQw4w9WgXcQ');
+
+    // Duration field should be formatted
+    const durFe = findFieldEntry(clipId, NDX_F.DURATION);
+    expect(durFe).toBeDefined();
+    expect(getFirstFieldValue(durFe!)).toBe('3:33');
+
+    // Author field
+    const authorFe = findFieldEntry(clipId, NDX_F.AUTHOR);
+    expect(authorFe).toBeDefined();
+    expect(getFirstFieldValue(authorFe!)).toBe('Rick Astley');
+  });
+
+  it('X/Twitter URL → #social tag', async () => {
+    const store = useNodeStore.getState();
+    const payload = makePayload({
+      url: 'https://x.com/user/status/123456789',
+      title: 'A tweet',
+      author: '@user',
+    });
+
+    const clipId = await saveWebClip(payload, store);
+    const node = loroDoc.toNodexNode(clipId);
+
+    expect(node!.tags).toContain(NDX_T.SOCIAL);
+    expect(node!.tags).not.toContain(SYS_T.SOURCE);
+
+    // Author field
+    const authorFe = findFieldEntry(clipId, NDX_F.AUTHOR);
+    expect(authorFe).toBeDefined();
+    expect(getFirstFieldValue(authorFe!)).toBe('@user');
+  });
+
+  it('og:type=article → #article tag', async () => {
+    const store = useNodeStore.getState();
+    const payload = makePayload({
+      url: 'https://blog.example.com/post',
+      title: 'A Blog Post',
+      ogType: 'article',
+      author: 'Jane Doe',
+      published: '2026-03-01',
+    });
+
+    const clipId = await saveWebClip(payload, store);
+    const node = loroDoc.toNodexNode(clipId);
+
+    expect(node!.tags).toContain(NDX_T.ARTICLE);
+    expect(node!.tags).not.toContain(SYS_T.SOURCE);
+
+    // Author + Published fields
+    const authorFe = findFieldEntry(clipId, NDX_F.AUTHOR);
+    expect(authorFe).toBeDefined();
+    expect(getFirstFieldValue(authorFe!)).toBe('Jane Doe');
+
+    const pubFe = findFieldEntry(clipId, NDX_F.PUBLISHED);
+    expect(pubFe).toBeDefined();
+    expect(getFirstFieldValue(pubFe!)).toBe('2026-03-01');
+  });
+
+  it('generic URL → #source tag (backward compatible)', async () => {
+    const store = useNodeStore.getState();
+    const payload = makePayload({
+      url: 'https://example.com/generic-page',
+      title: 'Generic Page',
+    });
+
+    const clipId = await saveWebClip(payload, store);
+    const node = loroDoc.toNodexNode(clipId);
+
+    expect(node!.tags).toContain(SYS_T.SOURCE);
+    expect(node!.tags).not.toContain(NDX_T.ARTICLE);
+    expect(node!.tags).not.toContain(NDX_T.VIDEO);
+    expect(node!.tags).not.toContain(NDX_T.SOCIAL);
+  });
+
+  it('Author and Published fields filled when available', async () => {
+    const store = useNodeStore.getState();
+    const payload = makePayload({
+      author: 'Test Author',
+      published: '2026-01-15',
+    });
+
+    const clipId = await saveWebClip(payload, store);
+
+    const authorFe = findFieldEntry(clipId, NDX_F.AUTHOR);
+    expect(authorFe).toBeDefined();
+    expect(getFirstFieldValue(authorFe!)).toBe('Test Author');
+
+    const pubFe = findFieldEntry(clipId, NDX_F.PUBLISHED);
+    expect(pubFe).toBeDefined();
+    expect(getFirstFieldValue(pubFe!)).toBe('2026-01-15');
+  });
+
+  it('Author and Published fields omitted when not in payload', async () => {
+    const store = useNodeStore.getState();
+    const payload = makePayload({
+      author: undefined,
+      published: undefined,
+    });
+
+    const clipId = await saveWebClip(payload, store);
+
+    // FieldEntry should exist (created by applyTag template), but no value node
+    const authorFe = findFieldEntry(clipId, NDX_F.AUTHOR);
+    if (authorFe) {
+      const children = loroDoc.getChildren(authorFe);
+      expect(children).toHaveLength(0);
+    }
+  });
+});
+
 describe('applyWebClipToNode', () => {
   beforeEach(() => {
     resetAndSeed();
@@ -298,7 +520,7 @@ describe('applyWebClipToNode', () => {
     expect(node!.name).toBe('Clipped Page Title');
   });
 
-  it('applies #source tag to existing node', async () => {
+  it('applies #source tag to existing node (generic URL)', async () => {
     const store = useNodeStore.getState();
     const payload = makePayload();
 
@@ -306,6 +528,23 @@ describe('applyWebClipToNode', () => {
 
     const node = loroDoc.toNodexNode('idea_1');
     expect(node!.tags).toContain(SYS_T.SOURCE);
+  });
+
+  it('applies #video tag for YouTube URL', async () => {
+    const store = useNodeStore.getState();
+    const payload = makePayload({
+      url: 'https://youtube.com/watch?v=abc',
+      duration: 'PT10M5S',
+    });
+
+    await applyWebClipToNode('idea_1', payload, store);
+
+    const node = loroDoc.toNodexNode('idea_1');
+    expect(node!.tags).toContain(NDX_T.VIDEO);
+
+    const durFe = findFieldEntry('idea_1', NDX_F.DURATION);
+    expect(durFe).toBeDefined();
+    expect(getFirstFieldValue(durFe!)).toBe('10:05');
   });
 
   it('writes Source URL field value to existing node', async () => {
@@ -486,6 +725,24 @@ describe('findClipNodeByUrl', () => {
     const found = findClipNodeByUrl('https://example.com/article#section');
     expect(found).toBe(clipId);
   });
+
+  it('finds sub-typed clip nodes (#video, #social, #article)', async () => {
+    const store = useNodeStore.getState();
+
+    // Create a YouTube clip (gets #video tag)
+    const ytPayload: WebClipCapturePayload = {
+      url: 'https://youtube.com/watch?v=test',
+      title: 'YouTube Video',
+      selectionText: '',
+      pageText: '<p>Video content</p>',
+      capturedAt: Date.now(),
+    };
+    const ytClipId = await saveWebClip(ytPayload, store);
+
+    // Should be findable even though it has #video, not #source
+    const found = findClipNodeByUrl('https://youtube.com/watch?v=test');
+    expect(found).toBe(ytClipId);
+  });
 });
 
 // ── createLightweightClip ──
@@ -519,7 +776,7 @@ describe('createLightweightClip', () => {
     expect(node!.name).toBe('My Page Title');
   });
 
-  it('applies #source tag', async () => {
+  it('applies #source tag for generic URL', async () => {
     const store = useNodeStore.getState();
     const clipId = await createLightweightClip(
       'https://example.com/page',
@@ -529,6 +786,30 @@ describe('createLightweightClip', () => {
 
     const node = loroDoc.toNodexNode(clipId);
     expect(node!.tags).toContain(SYS_T.SOURCE);
+  });
+
+  it('applies #video tag for YouTube URL', async () => {
+    const store = useNodeStore.getState();
+    const clipId = await createLightweightClip(
+      'https://youtube.com/watch?v=abc',
+      'YouTube Video',
+      store,
+    );
+
+    const node = loroDoc.toNodexNode(clipId);
+    expect(node!.tags).toContain(NDX_T.VIDEO);
+  });
+
+  it('applies #social tag for X URL', async () => {
+    const store = useNodeStore.getState();
+    const clipId = await createLightweightClip(
+      'https://x.com/user/status/123',
+      'A Tweet',
+      store,
+    );
+
+    const node = loroDoc.toNodexNode(clipId);
+    expect(node!.tags).toContain(NDX_T.SOCIAL);
   });
 
   it('writes Source URL field', async () => {

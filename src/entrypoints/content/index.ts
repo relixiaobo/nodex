@@ -20,6 +20,35 @@ function notifyContentScriptReady(): void {
   chrome.runtime.sendMessage({ type: CONTENT_SCRIPT_READY }).catch(() => {});
 }
 
+function extractSchemaOrgType(schemaOrgData: unknown): string | undefined {
+  if (!schemaOrgData) return undefined;
+  if (Array.isArray(schemaOrgData)) {
+    for (const item of schemaOrgData) {
+      const t = (item as Record<string, unknown>)?.['@type'];
+      if (typeof t === 'string') return t;
+      if (Array.isArray(t) && typeof t[0] === 'string') return t[0];
+    }
+    return undefined;
+  }
+  const t = (schemaOrgData as Record<string, unknown>)?.['@type'];
+  if (typeof t === 'string') return t;
+  if (Array.isArray(t) && typeof t[0] === 'string') return t[0];
+  return undefined;
+}
+
+function extractDuration(schemaOrgData: unknown): string | undefined {
+  if (!schemaOrgData) return undefined;
+  const items = Array.isArray(schemaOrgData) ? schemaOrgData : [schemaOrgData];
+  for (const item of items) {
+    const d = (item as Record<string, unknown>)?.duration;
+    if (typeof d === 'string') return d;
+  }
+  // Fallback: meta[itemprop="duration"]
+  const meta = document.querySelector('meta[itemprop="duration"]');
+  if (meta) return meta.getAttribute('content') ?? undefined;
+  return undefined;
+}
+
 function captureCurrentPage(): WebClipCapturePayload {
   const url = location.href;
   const selectionText = window.getSelection()?.toString() ?? '';
@@ -34,6 +63,11 @@ function captureCurrentPage(): WebClipCapturePayload {
     throw new Error('Defuddle returned empty content');
   }
 
+  const ogType = document.querySelector('meta[property="og:type"]')?.getAttribute('content') ?? undefined;
+  const schemaOrgType = extractSchemaOrgType(extracted.schemaOrgData);
+  const hasArticleElement = !!document.querySelector('article');
+  const duration = extractDuration(extracted.schemaOrgData);
+
   return {
     url,
     title,
@@ -44,6 +78,11 @@ function captureCurrentPage(): WebClipCapturePayload {
     published: extracted.published ?? undefined,
     description: extracted.description ?? undefined,
     siteName: extracted.site ?? undefined,
+    duration: duration ?? undefined,
+    extractorType: extracted.extractorType ?? undefined,
+    ogType,
+    schemaOrgType,
+    hasArticleElement,
   };
 }
 

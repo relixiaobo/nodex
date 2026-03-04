@@ -18,7 +18,7 @@ import { deleteSnapshot } from '../../lib/loro-persistence.js';
 import { useNodeStore } from '../../stores/node-store';
 import { useUIStore } from '../../stores/ui-store';
 import { useWorkspaceStore } from '../../stores/workspace-store';
-import { CONTAINER_IDS, FIELD_TYPES, SYS_T, NDX_F } from '../../types/index.js';
+import { CONTAINER_IDS, FIELD_TYPES, SYS_T, NDX_F, NDX_T } from '../../types/index.js';
 import type { InlineRefEntry, TextMark } from '../../types/index.js';
 import { ensureDateNode } from '../../lib/journal.js';
 
@@ -124,6 +124,34 @@ function seedBody(): void {
   // ═══════════════════════════════════════════════════════════════
   cn(SYS_T.SOURCE, CONTAINER_IDS.SCHEMA, { type: 'tagDef', name: 'source', color: 'sage' });
   cn(NDX_F.SOURCE_URL, SYS_T.SOURCE, { type: 'fieldDef', name: 'Source URL', fieldType: FIELD_TYPES.URL });
+
+  // ═══════════════════════════════════════════════════════════════
+  // FieldDefs under #source: Author (NDX_F03), Published (NDX_F04)
+  // ═══════════════════════════════════════════════════════════════
+  cn(NDX_F.AUTHOR, SYS_T.SOURCE, { type: 'fieldDef', name: 'Author', fieldType: FIELD_TYPES.PLAIN });
+  cn(NDX_F.PUBLISHED, SYS_T.SOURCE, { type: 'fieldDef', name: 'Published', fieldType: FIELD_TYPES.DATE });
+
+  // ═══════════════════════════════════════════════════════════════
+  // TagDef: Article (extends Source) — NDX_T01
+  // ═══════════════════════════════════════════════════════════════
+  cn(NDX_T.ARTICLE, CONTAINER_IDS.SCHEMA, {
+    type: 'tagDef', name: 'article', color: 'slate', extends: SYS_T.SOURCE,
+  });
+
+  // ═══════════════════════════════════════════════════════════════
+  // TagDef: Video (extends Source) — NDX_T02 + Duration field
+  // ═══════════════════════════════════════════════════════════════
+  cn(NDX_T.VIDEO, CONTAINER_IDS.SCHEMA, {
+    type: 'tagDef', name: 'video', color: 'red', extends: SYS_T.SOURCE,
+  });
+  cn(NDX_F.DURATION, NDX_T.VIDEO, { type: 'fieldDef', name: 'Duration', fieldType: FIELD_TYPES.PLAIN });
+
+  // ═══════════════════════════════════════════════════════════════
+  // TagDef: Social (extends Source) — NDX_T03
+  // ═══════════════════════════════════════════════════════════════
+  cn(NDX_T.SOCIAL, CONTAINER_IDS.SCHEMA, {
+    type: 'tagDef', name: 'social', color: 'blue', extends: SYS_T.SOURCE,
+  });
 
   // ═══════════════════════════════════════════════════════════════
   // Library content

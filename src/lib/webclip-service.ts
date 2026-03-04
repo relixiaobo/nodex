@@ -1,10 +1,11 @@
 /**
  * Web Clip service — orchestrates saving a web clip as a node.
  *
- * Creates a node under today's journal day, tags it with #source, and writes the Source URL field.
+ * Creates a node under today's journal day, tags it with the appropriate
+ * clip type tag (#article / #video / #social / #source), and writes fields.
  */
 import type { NodexNode } from '../types/index.js';
-import { CONTAINER_IDS, SYS_T, NDX_F, FIELD_TYPES } from '../types/index.js';
+import { CONTAINER_IDS, SYS_T, NDX_F, NDX_T, FIELD_TYPES } from '../types/index.js';
 import type { WebClipCapturePayload } from './webclip-messaging.js';
 import * as loroDoc from './loro-doc.js';
 import { parseHtmlToNodes, createContentNodes } from './html-to-nodes.js';
@@ -65,6 +66,53 @@ export function findTemplateAttrDef(
 }
 
 // ============================================================
+// Clip type detection
+// ============================================================
+
+export type ClipType = 'article' | 'video' | 'social' | 'source';
+
+const ARTICLE_SCHEMA_TYPES = new Set([
+  'article', 'blogposting', 'newsarticle', 'technicalarticle',
+  'scholarlyarticle', 'reportagenewsarticle', 'analysisnewsarticle',
+]);
+
+/**
+ * Detect the clip type from URL and payload metadata.
+ * Priority: domain match > extractorType > og:type/Schema.org > fallback.
+ */
+export function detectClipType(url: string, payload?: Partial<WebClipCapturePayload>): ClipType {
+  // 1. URL domain match
+  try {
+    const hostname = new URL(url).hostname.replace(/^www\./, '');
+    if (hostname === 'youtube.com' || hostname === 'youtu.be' || hostname.endsWith('.youtube.com')) {
+      return 'video';
+    }
+    if (hostname === 'x.com' || hostname === 'twitter.com') {
+      return 'social';
+    }
+  } catch {
+    // invalid URL — continue to metadata checks
+  }
+
+  if (!payload) return 'source';
+
+  // 2. Defuddle extractorType
+  if (payload.extractorType === 'youtube') return 'video';
+  if (payload.extractorType === 'twitter') return 'social';
+
+  // 3. og:type / Schema.org @type → article
+  if (payload.ogType === 'article') return 'article';
+  if (payload.schemaOrgType && ARTICLE_SCHEMA_TYPES.has(payload.schemaOrgType.toLowerCase())) {
+    return 'article';
+  }
+
+  // 4. <article> element fallback
+  if (payload.hasArticleElement) return 'article';
+
+  return 'source';
+}
+
+// ============================================================
 // Ensure functions (fixed IDs to prevent CRDT duplication)
 // ============================================================
 
@@ -103,7 +151,213 @@ export function ensureSourceUrlFieldDef(): NodexNode {
 }
 
 /**
- * Save a web clip as a node under today's journal day with #source tag and Source URL field.
+ * Ensure "Author" fieldDef exists with fixed ID NDX_F03 under #source tagDef.
+ */
+export function ensureAuthorFieldDef(): NodexNode {
+  ensureSourceTagDef();
+  let fd = loroDoc.toNodexNode(NDX_F.AUTHOR);
+  if (!fd) {
+    loroDoc.createNode(NDX_F.AUTHOR, SYS_T.SOURCE);
+    loroDoc.setNodeDataBatch(NDX_F.AUTHOR, {
+      type: 'fieldDef',
+      name: 'Author',
+      fieldType: FIELD_TYPES.PLAIN,
+    });
+    loroDoc.commitDoc();
+    fd = loroDoc.toNodexNode(NDX_F.AUTHOR)!;
+  }
+  return fd;
+}
+
+/**
+ * Ensure "Published" fieldDef exists with fixed ID NDX_F04 under #source tagDef.
+ */
+export function ensurePublishedFieldDef(): NodexNode {
+  ensureSourceTagDef();
+  let fd = loroDoc.toNodexNode(NDX_F.PUBLISHED);
+  if (!fd) {
+    loroDoc.createNode(NDX_F.PUBLISHED, SYS_T.SOURCE);
+    loroDoc.setNodeDataBatch(NDX_F.PUBLISHED, {
+      type: 'fieldDef',
+      name: 'Published',
+      fieldType: FIELD_TYPES.DATE,
+    });
+    loroDoc.commitDoc();
+    fd = loroDoc.toNodexNode(NDX_F.PUBLISHED)!;
+  }
+  return fd;
+}
+
+/**
+ * Ensure #article tagDef exists with fixed ID NDX_T01, extends #source.
+ */
+export function ensureArticleTagDef(): NodexNode {
+  ensureSourceTagDef();
+  ensureSourceUrlFieldDef();
+  ensureAuthorFieldDef();
+  ensurePublishedFieldDef();
+  let td = loroDoc.toNodexNode(NDX_T.ARTICLE);
+  if (!td) {
+    loroDoc.createNode(NDX_T.ARTICLE, CONTAINER_IDS.SCHEMA);
+    loroDoc.setNodeDataBatch(NDX_T.ARTICLE, {
+      type: 'tagDef',
+      name: 'article',
+      color: 'slate',
+      extends: SYS_T.SOURCE,
+    });
+    loroDoc.commitDoc();
+    td = loroDoc.toNodexNode(NDX_T.ARTICLE)!;
+  }
+  return td;
+}
+
+/**
+ * Ensure "Duration" fieldDef exists with fixed ID NDX_F05 under #video tagDef.
+ */
+export function ensureDurationFieldDef(): NodexNode {
+  ensureVideoTagDef();
+  let fd = loroDoc.toNodexNode(NDX_F.DURATION);
+  if (!fd) {
+    loroDoc.createNode(NDX_F.DURATION, NDX_T.VIDEO);
+    loroDoc.setNodeDataBatch(NDX_F.DURATION, {
+      type: 'fieldDef',
+      name: 'Duration',
+      fieldType: FIELD_TYPES.PLAIN,
+    });
+    loroDoc.commitDoc();
+    fd = loroDoc.toNodexNode(NDX_F.DURATION)!;
+  }
+  return fd;
+}
+
+/**
+ * Ensure #video tagDef exists with fixed ID NDX_T02, extends #source.
+ */
+export function ensureVideoTagDef(): NodexNode {
+  ensureSourceTagDef();
+  ensureSourceUrlFieldDef();
+  ensureAuthorFieldDef();
+  ensurePublishedFieldDef();
+  let td = loroDoc.toNodexNode(NDX_T.VIDEO);
+  if (!td) {
+    loroDoc.createNode(NDX_T.VIDEO, CONTAINER_IDS.SCHEMA);
+    loroDoc.setNodeDataBatch(NDX_T.VIDEO, {
+      type: 'tagDef',
+      name: 'video',
+      color: 'red',
+      extends: SYS_T.SOURCE,
+    });
+    loroDoc.commitDoc();
+    td = loroDoc.toNodexNode(NDX_T.VIDEO)!;
+  }
+  return td;
+}
+
+/**
+ * Ensure #social tagDef exists with fixed ID NDX_T03, extends #source.
+ */
+export function ensureSocialTagDef(): NodexNode {
+  ensureSourceTagDef();
+  ensureSourceUrlFieldDef();
+  ensureAuthorFieldDef();
+  ensurePublishedFieldDef();
+  let td = loroDoc.toNodexNode(NDX_T.SOCIAL);
+  if (!td) {
+    loroDoc.createNode(NDX_T.SOCIAL, CONTAINER_IDS.SCHEMA);
+    loroDoc.setNodeDataBatch(NDX_T.SOCIAL, {
+      type: 'tagDef',
+      name: 'social',
+      color: 'blue',
+      extends: SYS_T.SOURCE,
+    });
+    loroDoc.commitDoc();
+    td = loroDoc.toNodexNode(NDX_T.SOCIAL)!;
+  }
+  return td;
+}
+
+/**
+ * Ensure all tag/field defs needed for a clip type exist.
+ * Returns the tagDefId to apply to the clip node.
+ */
+function ensureClipTypeDefs(clipType: ClipType): string {
+  switch (clipType) {
+    case 'article':
+      ensureArticleTagDef();
+      return NDX_T.ARTICLE;
+    case 'video':
+      ensureVideoTagDef();
+      ensureDurationFieldDef();
+      return NDX_T.VIDEO;
+    case 'social':
+      ensureSocialTagDef();
+      return NDX_T.SOCIAL;
+    case 'source':
+    default:
+      ensureSourceTagDef();
+      ensureSourceUrlFieldDef();
+      ensureAuthorFieldDef();
+      ensurePublishedFieldDef();
+      return SYS_T.SOURCE;
+  }
+}
+
+// ============================================================
+// ISO 8601 Duration formatting
+// ============================================================
+
+/**
+ * Format an ISO 8601 duration (e.g. "PT12M34S") to human-readable (e.g. "12:34").
+ * Returns the original string if parsing fails.
+ */
+export function formatIsoDuration(iso: string): string {
+  const match = /^PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$/i.exec(iso);
+  if (!match) return iso;
+  const h = parseInt(match[1] || '0', 10);
+  const m = parseInt(match[2] || '0', 10);
+  const s = parseInt(match[3] || '0', 10);
+  const parts: string[] = [];
+  if (h > 0) parts.push(String(h));
+  parts.push(h > 0 ? String(m).padStart(2, '0') : String(m));
+  parts.push(String(s).padStart(2, '0'));
+  return parts.join(':');
+}
+
+// ============================================================
+// Fill clip fields (shared logic)
+// ============================================================
+
+/**
+ * Fill Author, Published, and Duration fields on a clip node.
+ */
+function fillClipFields(
+  nodeId: string,
+  payload: WebClipCapturePayload,
+  clipType: ClipType,
+  store: WebClipNodeStore,
+): void {
+  // Author
+  if (payload.author) {
+    const authorFd = ensureAuthorFieldDef();
+    store.setFieldValue(nodeId, authorFd.id, [payload.author]);
+  }
+
+  // Published
+  if (payload.published) {
+    const publishedFd = ensurePublishedFieldDef();
+    store.setFieldValue(nodeId, publishedFd.id, [payload.published]);
+  }
+
+  // Duration (video only)
+  if (clipType === 'video' && payload.duration) {
+    const durationFd = ensureDurationFieldDef();
+    const formatted = formatIsoDuration(payload.duration);
+    store.setFieldValue(nodeId, durationFd.id, [formatted]);
+  }
+}
+
+/**
+ * Save a web clip as a node under today's journal day with appropriate type tag and fields.
  *
  * @returns The ID of the newly created clip node.
  */
@@ -116,18 +370,22 @@ export async function saveWebClip(
 ): Promise<string> {
   const targetParentId = parentId ?? ensureTodayNode();
 
-  // 1. Ensure #source tagDef + Source URL fieldDef (fixed IDs)
-  const tagDef = ensureSourceTagDef();
-  const sourceUrlFieldDef = ensureSourceUrlFieldDef();
+  // 1. Detect clip type and ensure tag/field defs
+  const clipType = detectClipType(payload.url, payload);
+  const tagDefId = ensureClipTypeDefs(clipType);
+  ensureSourceUrlFieldDef();
 
   // 2. Create the clip node under parent (defaults to today's journal day)
   const clipNode = store.createChild(targetParentId, undefined, { name: payload.title });
 
-  // 3. Apply #source tag
-  store.applyTag(clipNode.id, tagDef.id);
+  // 3. Apply the detected type tag (extends mechanism creates inherited field entries)
+  store.applyTag(clipNode.id, tagDefId);
 
   // 4. Write Source URL field value
-  store.setFieldValue(clipNode.id, sourceUrlFieldDef.id, [payload.url]);
+  store.setFieldValue(clipNode.id, NDX_F.SOURCE_URL, [payload.url]);
+
+  // 5. Fill Author, Published, Duration fields
+  fillClipFields(clipNode.id, payload, clipType, store);
 
   // 6. Set description if available
   if (payload.description) {
@@ -151,17 +409,24 @@ export async function saveWebClip(
 import { normalizeUrl } from './url-utils.js';
 export { normalizeUrl };
 
+/** All tag IDs in the #source family (source + subtypes). */
+const SOURCE_FAMILY_TAGS = new Set<string>([
+  SYS_T.SOURCE,
+  NDX_T.ARTICLE,
+  NDX_T.VIDEO,
+  NDX_T.SOCIAL,
+]);
+
 /**
- * Check if a node is a #source clip matching the given normalized URL.
+ * Check if a node is a #source-family clip matching the given normalized URL.
  */
 function isMatchingClipNode(
   nodeId: string,
-  tagDefId: string,
   fieldDefId: string,
   normalizedUrl: string,
 ): boolean {
   const node = loroDoc.toNodexNode(nodeId);
-  if (!node || !node.tags?.includes(tagDefId)) return false;
+  if (!node || !node.tags?.some(t => SOURCE_FAMILY_TAGS.has(t))) return false;
 
   const fieldEntryId = findFieldEntryForNode(nodeId, fieldDefId);
   if (!fieldEntryId) return false;
@@ -174,7 +439,7 @@ function isMatchingClipNode(
 }
 
 /**
- * Find a #source node by its Source URL field value.
+ * Find a #source-family node by its Source URL field value.
  * Searches CLIPS, INBOX, LIBRARY containers and JOURNAL day nodes.
  *
  * @returns The node ID of the matching clip node, or null if not found.
@@ -182,11 +447,8 @@ function isMatchingClipNode(
 export function findClipNodeByUrl(url: string): string | null {
   const normalizedUrl = normalizeUrl(url);
 
-  // Find the #source tagDef and its Source URL fieldDef (use fixed IDs)
-  const tagDef = loroDoc.toNodexNode(SYS_T.SOURCE);
-  if (!tagDef) return null;
-
-  const sourceUrlFieldDef = findTemplateAttrDef(null, tagDef.id, 'Source URL');
+  // Source URL fieldDef must exist
+  const sourceUrlFieldDef = loroDoc.toNodexNode(NDX_F.SOURCE_URL);
   if (!sourceUrlFieldDef) return null;
 
   // Search through flat containers: CLIPS, INBOX, LIBRARY
@@ -195,7 +457,7 @@ export function findClipNodeByUrl(url: string): string | null {
   for (const containerId of containers) {
     const children = loroDoc.getChildren(containerId);
     for (const childId of children) {
-      if (isMatchingClipNode(childId, tagDef.id, sourceUrlFieldDef.id, normalizedUrl)) {
+      if (isMatchingClipNode(childId, NDX_F.SOURCE_URL, normalizedUrl)) {
         return childId;
       }
     }
@@ -210,7 +472,7 @@ export function findClipNodeByUrl(url: string): string | null {
       for (const dayId of dayIds) {
         const clipIds = loroDoc.getChildren(dayId);
         for (const clipId of clipIds) {
-          if (isMatchingClipNode(clipId, tagDef.id, sourceUrlFieldDef.id, normalizedUrl)) {
+          if (isMatchingClipNode(clipId, NDX_F.SOURCE_URL, normalizedUrl)) {
             return clipId;
           }
         }
@@ -238,6 +500,7 @@ function findFieldEntryForNode(nodeId: string, fieldDefId: string): string | und
 /**
  * Create a lightweight clip node (URL + Title only, no content parsing).
  * Used when a highlight is created on a page that hasn't been clipped yet.
+ * Detects type from URL domain when possible.
  *
  * @returns The ID of the newly created clip node.
  */
@@ -246,18 +509,19 @@ export async function createLightweightClip(
   pageTitle: string,
   store: WebClipNodeStore,
 ): Promise<string> {
-  // 1. Ensure #source tagDef + Source URL fieldDef (fixed IDs)
-  const tagDef = ensureSourceTagDef();
-  const sourceUrlFieldDef = ensureSourceUrlFieldDef();
+  // Detect type from URL only (no metadata available for lightweight)
+  const clipType = detectClipType(pageUrl);
+  const tagDefId = ensureClipTypeDefs(clipType);
+  ensureSourceUrlFieldDef();
 
-  // 2. Create clip node under today's journal day (same default as saveWebClip)
+  // Create clip node under today's journal day
   const clipNode = store.createChild(ensureTodayNode(), undefined, { name: pageTitle });
 
-  // 3. Apply #source tag
-  store.applyTag(clipNode.id, tagDef.id);
+  // Apply the detected type tag
+  store.applyTag(clipNode.id, tagDefId);
 
-  // 4. Write Source URL field value
-  store.setFieldValue(clipNode.id, sourceUrlFieldDef.id, [pageUrl]);
+  // Write Source URL field value
+  store.setFieldValue(clipNode.id, NDX_F.SOURCE_URL, [pageUrl]);
 
   return clipNode.id;
 }
@@ -272,18 +536,22 @@ export async function applyWebClipToNode(
   _workspaceId?: string,
   _userId?: string,
 ): Promise<void> {
-  // 1. Ensure #source tagDef + Source URL fieldDef (fixed IDs)
-  const tagDef = ensureSourceTagDef();
-  const sourceUrlFieldDef = ensureSourceUrlFieldDef();
+  // 1. Detect clip type and ensure tag/field defs
+  const clipType = detectClipType(payload.url, payload);
+  const tagDefId = ensureClipTypeDefs(clipType);
+  ensureSourceUrlFieldDef();
 
   // 2. Rename node to page title
   store.setNodeName(nodeId, payload.title);
 
-  // 3. Apply #source tag
-  store.applyTag(nodeId, tagDef.id);
+  // 3. Apply the detected type tag
+  store.applyTag(nodeId, tagDefId);
 
   // 4. Write Source URL field value
-  store.setFieldValue(nodeId, sourceUrlFieldDef.id, [payload.url]);
+  store.setFieldValue(nodeId, NDX_F.SOURCE_URL, [payload.url]);
+
+  // 5. Fill Author, Published, Duration fields
+  fillClipFields(nodeId, payload, clipType, store);
 
   // 6. Set description if available
   if (payload.description) {

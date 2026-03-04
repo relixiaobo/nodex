@@ -77,8 +77,8 @@ _(全部已修复)_
 - [ ] 保存目标选择 UI — 允许用户选择保存到 Inbox / Today / 指定节点（UI 入口 + 目标选择器）
 - [ ] **AI 智能剪藏** — 自动打标签、提取结构化信息（作者/日期/关键词）、推荐关联到已有笔记
 - [ ] 选中文本剪藏（Content Script 右键菜单 / 浮动按钮 → 剪藏选中段落）
-- [ ] **Twitter/X 剪藏支持** — Clip Page 目前不支持抓取 Twitter/X 内容，需适配其特殊 DOM 结构
-- [ ] 剪藏模板 — 不同网站类型（文章/产品/视频/论文）使用不同 Supertag 模板
+- [x] **Twitter/X 剪藏支持** — 自动检测 x.com/twitter.com URL，应用 #social 标签（extends #source）
+- [x] 剪藏模板 — #article / #video / #social 三类子标签 extends #source，自动检测类型 + Author/Published/Duration 字段
 
 #### 网页高亮 & 批注 ✅（已完成）
 > 全部 Phase 完成 + 离线排队。**Plan**: `docs/plans/highlight-annotation-system.md` | **Research**: `docs/research/highlight-comment-design.md`

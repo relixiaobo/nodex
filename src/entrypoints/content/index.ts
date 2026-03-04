@@ -182,7 +182,7 @@ function captureCurrentPage(): WebClipCapturePayload {
       // Replace generic "Thread by @user" / "... on X" titles with actual tweet content
       if (tweetText && /Thread by|on X$|on Twitter$/i.test(title)) {
         const xAuthor = extractXAuthor();
-        const preview = tweetText.length > 100 ? tweetText.slice(0, 97) + '…' : tweetText;
+        const preview = tweetText.length > 30 ? tweetText.slice(0, 27) + '…' : tweetText;
         title = xAuthor ? `${xAuthor}: ${preview}` : preview;
       }
 
@@ -191,11 +191,9 @@ function captureCurrentPage(): WebClipCapturePayload {
         description = tweetText;
       }
 
-      // Fallback content when Defuddle fails
-      if (!pageText || pageText.length < 50) {
-        const xContent = extractXPageContent();
-        if (xContent) pageText = xContent;
-      }
+      // Always use DOM content for tweets — Defuddle includes metadata lines (author + date)
+      const xContent = extractXPageContent();
+      if (xContent) pageText = xContent;
     }
   }
 

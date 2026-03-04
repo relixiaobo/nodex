@@ -66,6 +66,7 @@ interface NodeStore {
   setNodeName(id: string, name: string): void;
   updateNodeContent(id: string, data: { name?: string; marks?: TextMark[]; inlineRefs?: InlineRefEntry[] }): void;
   updateNodeDescription(id: string, description: string): void;
+  setNodeCodeLanguage(nodeId: string, language: string): void;
   applyParsedPasteMetadata(nodeId: string, node: ParsedPasteNode, options?: { commit?: boolean }): void;
 
   // ─── 标签操作 ───
@@ -1164,6 +1165,11 @@ export const useNodeStore = create<NodeStore>((set, get) => {
     updateNodeDescription: (id, description) => {
       if (!getNodeCapabilities(id).canEditNode) return;
       loroDoc.setNodeData(id, 'description', description || undefined);
+    },
+
+    setNodeCodeLanguage: (nodeId, language) => {
+      loroDoc.setNodeDataBatch(nodeId, { codeLanguage: language || undefined });
+      loroDoc.commitDoc();
     },
 
     applyParsedPasteMetadata: (nodeId, node, options) => {

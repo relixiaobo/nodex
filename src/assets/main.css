@@ -161,27 +161,136 @@
   margin: 0;
 }
 
-.code-block-row .editor-inline,
-.code-block-row .editor-inline > div {
+/* ── Code Block: shared visual styles ── */
+.code-block-pre {
   display: block;
-}
-
-.code-block-row .ProseMirror,
-.code-block-content {
-  display: block;
-  white-space: pre-wrap;
+  white-space: pre;
+  overflow-x: auto;
   font-family: var(--font-mono);
   font-size: 13px;
   line-height: 1.5;
-  border: 1px solid var(--color-border);
-  border-radius: 0.375rem;
   background: var(--color-muted);
-  padding: 0.375rem 0.5rem;
+  padding: 0.5rem 0.75rem;
+  margin: 0;
+  border: none;
+  border-radius: 0;
+  tab-size: 2;
 }
 
-.code-block-row .ProseMirror p {
-  display: block;
+/* Thin scrollbar for code blocks */
+.code-block-pre::-webkit-scrollbar {
+  height: 4px;
+}
+
+.code-block-pre::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.code-block-pre::-webkit-scrollbar-thumb {
+  background: var(--color-border-emphasis);
+  border-radius: 2px;
+}
+
+/* Code block textarea overlay — transparent text over highlighted pre */
+.code-block-textarea {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  white-space: pre;
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.5;
+  padding: 0.5rem 0.75rem;
   margin: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: transparent;
+  caret-color: var(--color-foreground);
+  outline: none;
+  resize: none;
+  tab-size: 2;
+}
+
+/* Hide scrollbar on textarea — pre handles visual scroll */
+.code-block-textarea::-webkit-scrollbar {
+  display: none;
+}
+
+/* ── highlight.js token colors (soma design system) ── */
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-built_in,
+.hljs-name,
+.hljs-tag {
+  color: #8B5E3C;
+}
+
+.hljs-string,
+.hljs-title.class_.inherited__,
+.hljs-template-variable,
+.hljs-template-tag {
+  color: #5E8E65;
+}
+
+.hljs-comment,
+.hljs-quote {
+  color: #999999;
+  font-style: italic;
+}
+
+.hljs-number,
+.hljs-literal,
+.hljs-variable,
+.hljs-params {
+  color: #AA5048;
+}
+
+.hljs-type,
+.hljs-title,
+.hljs-title.class_,
+.hljs-title.function_ {
+  color: #5A8AB5;
+}
+
+.hljs-attr,
+.hljs-attribute,
+.hljs-symbol {
+  color: #A07830;
+}
+
+.hljs-meta,
+.hljs-selector-id,
+.hljs-selector-class,
+.hljs-selector-attr,
+.hljs-selector-pseudo {
+  color: #7A6B8A;
+}
+
+.hljs-regexp,
+.hljs-link {
+  color: #C07040;
+}
+
+.hljs-deletion {
+  color: #AA5048;
+  background-color: rgba(170, 80, 72, 0.08);
+}
+
+.hljs-addition {
+  color: #5E8E65;
+  background-color: rgba(94, 142, 101, 0.08);
+}
+
+.hljs-emphasis {
+  font-style: italic;
+}
+
+.hljs-strong {
+  font-weight: 700;
 }
 
 /* ProseMirror editor-only styles */

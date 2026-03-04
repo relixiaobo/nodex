@@ -20,7 +20,7 @@ export function getNodeCapabilities(nodeId: string): NodeCapabilities {
   if (isWorkspaceHomeNode(nodeId)) {
     return {
       role: 'workspaceHome',
-      canEditNode: false,
+      canEditNode: true,
       canMove: false,
       canDelete: false,
     };

@@ -180,35 +180,41 @@ const TagContextMenu = forwardRef<HTMLDivElement, TagContextMenuProps>(
     return (
       <div
         ref={ref}
-        className="fixed z-50 min-w-[180px] rounded-lg bg-background shadow-paper py-1 text-sm text-foreground"
+        className="fixed z-50 min-w-[180px] rounded-lg bg-background shadow-paper p-1 text-sm text-foreground"
         style={{ left: x, top: y }}
       >
         {onRemove && (
           <button
-            className="flex w-full items-center gap-2 px-3 py-1.5 hover:bg-foreground/4 transition-colors text-left"
+            className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-sm text-foreground-secondary hover:text-foreground hover:bg-foreground/4 transition-colors text-left"
             onClick={onRemove}
           >
-            <XCircle size={14} className="text-foreground-secondary" />
+            <div className="flex w-4 shrink-0 items-center justify-center text-foreground-tertiary">
+              <XCircle size={14} strokeWidth={1.5} />
+            </div>
             Remove tag
           </button>
         )}
         {onSearch && (
           <button
-            className="flex w-full items-center gap-2 px-3 py-1.5 hover:bg-foreground/4 transition-colors text-left"
+            className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-sm text-foreground-secondary hover:text-foreground hover:bg-foreground/4 transition-colors text-left"
             onClick={onSearch}
           >
-            <Search size={14} className="text-foreground-secondary" />
+            <div className="flex w-4 shrink-0 items-center justify-center text-foreground-tertiary">
+              <Search size={14} strokeWidth={1.5} />
+            </div>
             Everything tagged #{tagName}
           </button>
         )}
         {onConfigure && (
           <>
-            {(onRemove || onSearch) && <div className="my-1 h-px bg-border" />}
+            {(onRemove || onSearch) && <div className="mx-1 my-1 h-px bg-border-subtle" />}
             <button
-              className="flex w-full items-center gap-2 px-3 py-1.5 hover:bg-foreground/4 transition-colors text-left"
+              className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-sm text-foreground-secondary hover:text-foreground hover:bg-foreground/4 transition-colors text-left"
               onClick={onConfigure}
             >
-              <Settings size={14} className="text-foreground-secondary" />
+              <div className="flex w-4 shrink-0 items-center justify-center text-foreground-tertiary">
+                <Settings size={14} strokeWidth={1.5} />
+              </div>
               Configure tag
             </button>
           </>

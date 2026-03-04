@@ -6,7 +6,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { useNodeStore } from '../../src/stores/node-store.js';
 import * as loroDoc from '../../src/lib/loro-doc.js';
 import { AUTO_INIT_STRATEGY, FIELD_TYPES, SYS_T } from '../../src/types/index.js';
-import { resolveAutoInitValue } from '../../src/lib/field-auto-init.js';
+import { resolveAutoInitValue, parseAutoInitStrategies, serializeAutoInitStrategies, resolveAutoInit } from '../../src/lib/field-auto-init.js';
 import type { AutoInitResult } from '../../src/lib/field-auto-init.js';
 import { resetAndSeed } from './helpers/test-state.js';
 
@@ -260,5 +260,104 @@ describe('applyTag with autoInitialize — integration', () => {
     });
     expect(fe).toBeTruthy();
     expect(loroDoc.getChildren(fe!).length).toBe(0);
+  });
+
+  it('auto-fills with comma-separated multiple strategies (first match wins)', () => {
+    const store = useNodeStore.getState();
+
+    // Create a tag with a Date field, enable both current_date and ancestor_field_value
+    const tagDef = store.createTagDef('MultiTag', { color: 'purple' });
+    const fieldDef = store.createFieldDef('Date', 'date', tagDef.id);
+    loroDoc.setNodeData(
+      fieldDef.id,
+      'autoInitialize',
+      `${AUTO_INIT_STRATEGY.CURRENT_DATE},${AUTO_INIT_STRATEGY.ANCESTOR_FIELD_VALUE}`,
+    );
+    loroDoc.commitDoc();
+
+    // Apply tag — current_date has higher priority, so it should win
+    const node = store.createChild('proj_1', undefined, { name: 'Multi test' });
+    store.applyTag(node.id, tagDef.id);
+
+    const feId = findFieldEntry(node.id, fieldDef.id);
+    expect(feId).toBeTruthy();
+
+    const feChildren = loroDoc.getChildren(feId!);
+    expect(feChildren.length).toBe(1);
+
+    const valueNode = loroDoc.toNodexNode(feChildren[0]);
+    // current_date wins — should be today's ISO date
+    expect(valueNode?.name).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+});
+
+describe('parseAutoInitStrategies', () => {
+  it('returns empty array for undefined/empty', () => {
+    expect(parseAutoInitStrategies(undefined)).toEqual([]);
+    expect(parseAutoInitStrategies('')).toEqual([]);
+  });
+
+  it('parses single strategy (backward compat)', () => {
+    expect(parseAutoInitStrategies('current_date')).toEqual(['current_date']);
+  });
+
+  it('parses comma-separated strategies', () => {
+    expect(parseAutoInitStrategies('current_date,ancestor_field_value')).toEqual([
+      'current_date',
+      'ancestor_field_value',
+    ]);
+  });
+
+  it('filters out invalid strategy names', () => {
+    expect(parseAutoInitStrategies('current_date,invalid_strategy')).toEqual(['current_date']);
+  });
+
+  it('handles whitespace around commas', () => {
+    expect(parseAutoInitStrategies('current_date , ancestor_day_node')).toEqual([
+      'current_date',
+      'ancestor_day_node',
+    ]);
+  });
+});
+
+describe('serializeAutoInitStrategies', () => {
+  it('returns undefined for empty array', () => {
+    expect(serializeAutoInitStrategies([])).toBeUndefined();
+  });
+
+  it('joins strategies with comma', () => {
+    expect(serializeAutoInitStrategies(['current_date', 'ancestor_field_value'])).toBe(
+      'current_date,ancestor_field_value',
+    );
+  });
+});
+
+describe('resolveAutoInit — multi-strategy', () => {
+  beforeEach(() => {
+    resetAndSeed();
+  });
+
+  it('returns null for undefined/empty raw string', () => {
+    expect(resolveAutoInit('task_1', 'attrDef_due', undefined)).toBeNull();
+    expect(resolveAutoInit('task_1', 'attrDef_due', '')).toBeNull();
+  });
+
+  it('resolves single strategy (backward compat)', () => {
+    const result = resolveAutoInit('task_1', 'attrDef_due', AUTO_INIT_STRATEGY.CURRENT_DATE);
+    expect(result).not.toBeNull();
+    expect(result!.kind).toBe('text');
+  });
+
+  it('tries strategies in priority order, not string order', () => {
+    // ancestor_field_value listed first in string, but current_date has higher priority
+    const result = resolveAutoInit(
+      'task_1',
+      'attrDef_due',
+      `${AUTO_INIT_STRATEGY.ANCESTOR_FIELD_VALUE},${AUTO_INIT_STRATEGY.CURRENT_DATE}`,
+    );
+    expect(result).not.toBeNull();
+    // current_date has higher priority → should return today's date
+    const today = new Date().toISOString().slice(0, 10);
+    expect((result as Extract<AutoInitResult, { kind: 'text' }>).value).toBe(today);
   });
 });

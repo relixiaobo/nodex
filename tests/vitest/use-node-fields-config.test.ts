@@ -29,7 +29,7 @@ describe('computeNodeFields config controls', () => {
     const byKey = new Map(fields.map((f) => [f.fieldDefId, f]));
 
     expect(byKey.get(SYS_A.TYPE_CHOICE)?.configControl).toBe('type_choice');
-    expect(byKey.get(SYS_A.AUTOCOLLECT_OPTIONS)?.configControl).toBe('autocollect');
+    expect(byKey.get(SYS_A.AUTOCOLLECT_OPTIONS)?.configControl).toBe('toggle');
     expect(byKey.get(SYS_A.HIDE_FIELD)?.configControl).toBe('select');
   });
 

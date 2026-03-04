@@ -19,7 +19,7 @@ export function useHasFields(nodeId: string): boolean {
       const keyId = child.fieldDefId;
       // fieldDef nodes: config fieldEntries from SYS_T02 template count as fields
       if (isFieldDef && ATTRDEF_CONFIG_MAP.has(keyId)) return true;
-      if (!keyId.startsWith('SYS_') && !keyId.startsWith('NDX_') && state.getNode(keyId)?.type === 'fieldDef') {
+      if (!keyId.startsWith('SYS_') && !keyId.startsWith('NDX_A') && state.getNode(keyId)?.type === 'fieldDef') {
         return true;
       }
     }

@@ -5,14 +5,11 @@
  */
 import { useMemo } from 'react';
 import { useNodeStore } from '../../stores/node-store';
-import { BulletChevron } from '../outliner/BulletChevron';
-import { FIELD_VALUE_INSET } from './field-layout.js';
+import { FieldValueRow } from './FieldValueRow.js';
 
 interface AutoCollectSectionProps {
   fieldDefId: string;
 }
-
-const noop = () => {};
 
 export function AutoCollectSection({ fieldDefId }: AutoCollectSectionProps) {
   // Read option nodes directly from fieldDef.children.
@@ -38,41 +35,22 @@ export function AutoCollectSection({ fieldDefId }: AutoCollectSectionProps) {
 
   if (collectedValues.length === 0) {
     return (
-      <div
-        className="flex min-h-7 items-start gap-2 py-0.5"
-        style={{ paddingLeft: FIELD_VALUE_INSET }}
-      >
-        <BulletChevron
-          hasChildren={false}
-          isExpanded={false}
-          onBulletClick={noop}
-          dimmed
-        />
-        <span className="text-sm leading-[21px] text-foreground-tertiary select-none">
+      <FieldValueRow dimmed>
+        <span className="text-[15px] leading-6 text-foreground-tertiary select-none">
           Empty
         </span>
-      </div>
+      </FieldValueRow>
     );
   }
 
   return (
     <div className="min-h-[22px]">
       {collectedValues.map((item) => (
-        <div
-          key={item.id}
-          className="flex min-h-7 items-start gap-2 py-0.5"
-          style={{ paddingLeft: FIELD_VALUE_INSET }}
-        >
-          <BulletChevron
-            hasChildren={false}
-            isExpanded={false}
-            onBulletClick={noop}
-            isReference
-          />
-          <span className="text-sm leading-[21px] text-foreground">
+        <FieldValueRow key={item.id} isReference>
+          <span className="text-[15px] leading-6 text-foreground">
             {item.name}
           </span>
-        </div>
+        </FieldValueRow>
       ))}
     </div>
   );

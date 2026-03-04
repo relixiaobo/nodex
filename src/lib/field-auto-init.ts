@@ -4,8 +4,47 @@
  * When a tag is applied and a fieldDef has autoInitialize set to a strategy name,
  * these functions resolve the initial value for the field.
  */
-import { AUTO_INIT_STRATEGY, type AutoInitStrategy } from '../types/index.js';
+import { AUTO_INIT_STRATEGY, AUTO_INIT_PRIORITY, type AutoInitStrategy } from '../types/index.js';
 import * as loroDoc from './loro-doc.js';
+
+/**
+ * Parse the `autoInitialize` property into an array of enabled strategies.
+ * Handles both legacy single-strategy strings and comma-separated lists.
+ */
+export function parseAutoInitStrategies(raw: string | undefined): AutoInitStrategy[] {
+  if (!raw) return [];
+  const validValues = new Set<string>(Object.values(AUTO_INIT_STRATEGY));
+  return raw.split(',').map(s => s.trim()).filter(s => validValues.has(s)) as AutoInitStrategy[];
+}
+
+/**
+ * Serialize an array of strategies back to a comma-separated string.
+ * Returns undefined if empty (to clear the property).
+ */
+export function serializeAutoInitStrategies(strategies: AutoInitStrategy[]): string | undefined {
+  return strategies.length > 0 ? strategies.join(',') : undefined;
+}
+
+/**
+ * Resolve auto-init for a field by trying all enabled strategies in priority order.
+ * Returns the first non-null result.
+ */
+export function resolveAutoInit(
+  nodeId: string,
+  fieldDefId: string,
+  raw: string | undefined,
+): AutoInitResult | null {
+  const strategies = parseAutoInitStrategies(raw);
+  if (strategies.length === 0) return null;
+
+  // Try strategies in priority order (not in the order they appear in the string)
+  for (const s of AUTO_INIT_PRIORITY) {
+    if (!strategies.includes(s)) continue;
+    const result = resolveAutoInitValue(nodeId, fieldDefId, s);
+    if (result) return result;
+  }
+  return null;
+}
 
 // ─── Structured result type ───
 

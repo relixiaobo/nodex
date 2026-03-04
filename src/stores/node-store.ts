@@ -17,8 +17,7 @@ import { getTreeReferenceBlockReason } from '../lib/reference-rules.js';
 import { resolveCheckboxClick, resolveCmdEnterCycle, resolveForwardDoneMapping, resolveReverseDoneMapping } from '../lib/checkbox-utils.js';
 import { nextAutoColorKey } from '../lib/tag-colors.js';
 import { runSearch } from '../lib/search-engine.js';
-import { resolveAutoInitValue } from '../lib/field-auto-init.js';
-import type { AutoInitStrategy } from '../types/index.js';
+import { resolveAutoInit } from '../lib/field-auto-init.js';
 import type { ParsedPasteNode } from '../lib/paste-parser.js';
 
 // ============================================================
@@ -594,6 +593,7 @@ export function applyTagMutationsNoCommit(nodeId: string, tagDefId: string): voi
   }
 
   // 4. Auto-initialize: fill empty fields that have autoInitialize strategy configured
+  //    Supports comma-separated multiple strategies; tried in priority order.
   for (const chainTagId of extendsChain) {
     const fieldRefs = getTemplateFieldDefs(chainTagId);
     for (const ref of fieldRefs) {
@@ -601,10 +601,7 @@ export function applyTagMutationsNoCommit(nodeId: string, tagDefId: string): voi
       if (!feId || fieldEntryHasValue(feId)) continue;
 
       const fieldDef = loroDoc.toNodexNode(ref.fieldDefId);
-      const strategy = fieldDef?.autoInitialize as AutoInitStrategy | undefined;
-      if (!strategy) continue;
-
-      const result = resolveAutoInitValue(nodeId, ref.fieldDefId, strategy);
+      const result = resolveAutoInit(nodeId, ref.fieldDefId, fieldDef?.autoInitialize);
       if (result) {
         const valueNodeId = nanoid();
         loroDoc.createNode(valueNodeId, feId);

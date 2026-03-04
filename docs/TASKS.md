@@ -12,7 +12,7 @@
 > - 每个「进行中」任务带 `迭代日志` 字段（追加式，不删改历史条目）
 > - 格式：`[日期 agent-id] 摘要`
 > - 记录：尝试了什么、为什么失败、最终选择了什么方案、关键代码位置
-> - 通用经验教训（非任务特定的）沉淀到 `docs/LESSONS.md`
+> - 通用经验教训已吸收进 `CLAUDE.md`「关键陷阱」段
 
 ---
 
@@ -38,13 +38,6 @@ _(空)_
 
 ---
 
-## 已完成
-
-### Review: Sync 架构全面审查 ✅（2026-03-01, PR #117）
-> 审查范围：6 个 commit（客户端 sync 修复 + 服务端 Loro snapshot compaction）。补充修复：compaction CAS 元数据更新 + update 区间完整性校验 + `saveCursor` 异步失败捕获。
-
----
-
 ## 待办
 
 ### Bug 修复（待修）
@@ -56,7 +49,7 @@ _(全部已修复)_
 > **上线门槛**：用户可以日常使用的最小完整产品。已有功能（大纲编辑、Supertags、Fields、Date 节点、Web Clipping 基础、Undo/Redo、⌘K 搜索）+ Sync = v0.1。
 
 #### Sync Production 部署 ✅（已完成）
-> Steps 0-10 + Staging + Production 全部完成。**Plan**: `docs/plans/sync-incremental-impl.md`
+> Steps 0-10 + Staging + Production 全部完成。**Plan**: `docs/_archive/plans/sync-incremental-impl.md`
 
 #### Chrome Web Store 上架准备
 
@@ -116,7 +109,7 @@ _(全部已修复)_
 - [ ] Title expression（`${field name}` 动态标题）
 
 #### Fields 全类型 (#21)
-> 基础已完成（Options/Date/Number/URL/Email/Checkbox/隐藏/Required/Min-Max/验证/系统字段/去重/删除联动/默认值克隆/Auto-init/Merge）
+> 基础已完成（Options/Date/Number/URL/Email/Checkbox/隐藏/Required/Min-Max/验证/系统字段/去重/删除联动/默认值克隆/Auto-init 多策略/Merge/字段类型图标）
 
 - [ ] AttrDef “Used in” 计算字段
 - [ ] Pinned fields
@@ -127,11 +120,11 @@ _(全部已修复)_
 - [ ] 自然语言日期解析扩展（@next Monday / @November / @last week）
 - [ ] 日记模板（#day supertag 配置）
 - [ ] 日期字段链接到日节点
-- **Spec**: `docs/features/date-nodes.md`
+- **Spec**: `docs/_archive/features/date-nodes.md`
 
 #### View Toolbar — Filter / Sort / Group (#25)
 > **通用节点功能**：任意节点的 children 展示控制。与 Search Nodes 正交。
-> **Design**: `docs/plans/view-toolbar-design.md`（待创建）| **Archived Spec**: `docs/_archive/features/views.md`
+> **Archived Spec**: `docs/_archive/features/views.md`
 
 - [ ] Per-node view toolbar UI（Sort by / Filter by / Group by 图标栏）
 - [ ] 右键菜单 “Show view toolbar” 入口
@@ -156,12 +149,12 @@ _(全部已修复)_
 #### 节点选中 — 后续增强 (#47)
 - [ ] Cmd+Shift+D 批量复制
 - [ ] 拖动选择优化（跨面板边界防护）
-- **Spec**: `docs/features/node-selection.md`
+- **Spec**: `docs/_archive/features/node-selection.md`
 
 #### 合并节点（Merge Nodes）
 - [ ] 选中多个重复节点 → 合并为一个（保留第一个，合并 children/tags）
 - [ ] 所有引用更新为指向合并后的节点
-- **Spec**: `docs/features/references.md`
+- **Spec**: `docs/_archive/features/references.md`
 
 #### Floating Toolbar 后续 (#46)
 - [ ] **@ Reference 按钮** — 选中文本 → 点击 `@ Reference` → ReferenceSelector → 替换为 inline reference
@@ -171,10 +164,9 @@ _(全部已修复)_
 - [ ] Search node（依赖 #23）
 - [ ] Image / file（依赖上传与存储）
 - [ ] Checklist（批量 checkbox）
-- **Spec**: `docs/features/slash-command.md`
+- **Spec**: `docs/_archive/features/slash-command.md`
 
 #### 性能基线测量
-> **产出**: `docs/research/performance-baseline.md`
 
 #### AI Command Nodes (#32) & AI 字段增强 (#33)
 > AI 深度集成：Command Node（prompt/参数/输出全部是节点）、字段自动填充、AI 生成选项
@@ -206,6 +198,8 @@ _(全部已修复)_
 
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
+| 2026-03-04 | Field 配置页打磨 — Auto-init 改为按类型 toggle 组（Date 3 项 / 其他 1 项）+ 多策略优先级 + 字段类型图标（下拉+bullet）+ FieldValueRow 共享布局 + 配置页对齐统一 + toggle 对齐修复 + Auto-collect 拆分 toggle+列表 + Tag 右键菜单样式 + Breadcrumb badge 圆形 + workspace home 可编辑 | nodex | main |
+| 2026-03-04 | Review: Sync 架构全面审查 — 6 commit 审查（客户端 sync + 服务端 Loro snapshot compaction）+ compaction CAS 修复 + update 区间校验 + saveCursor 异步捕获 | nodex | #117 |
 | 2026-03-04 | 离线高亮排队 — SP 关闭时高亮暂存 chrome.storage.local（200 cap / 30d TTL），BG 检测 SP 状态路由 tempId，页面刷新恢复渲染，SP bootstrap 消费队列入 LoroDoc。提取 url-utils.ts 解 BG IIFE 构建问题 | nodex | main |
 | 2026-03-03 | NodeHeader 富文本编辑 + Reference 编辑修复 — trigger 系统提取为 useEditorTriggers hook + NodeHeader 升级 RichTextEditor（#/@/Cmd+Enter）+ header 聚焦不跳大小 + 点击定位光标 + checkbox 透明背景 + reference 编辑写入目标节点 + reference 展开虚线引导线 + dom-caret-utils 共享模块 | nodex | main |
 | 2026-03-03 | 系统节点只读编辑器 — 容器/workspace home/queryCondition 节点聚焦后文本变灰、输入无效，光标仍可插入（导航用） | nodex | main |

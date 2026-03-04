@@ -45,6 +45,8 @@ let selectionActionCallback: ToolbarActionCallback | null = null;
 let highlightActionsElement: HTMLDivElement | null = null;
 let highlightActionsShadowRoot: ShadowRoot | null = null;
 let highlightActionsCallbacks: HighlightActionsCallbacks | null = null;
+let actionsHoverEnterCb: (() => void) | null = null;
+let actionsHoverLeaveCb: (() => void) | null = null;
 
 let notePopoverElement: HTMLDivElement | null = null;
 let notePopoverShadowRoot: ShadowRoot | null = null;
@@ -447,7 +449,22 @@ function buildHighlightActionsToolbar(): void {
     }
   });
 
+  host.addEventListener('mouseenter', () => actionsHoverEnterCb?.());
+  host.addEventListener('mouseleave', () => actionsHoverLeaveCb?.());
+
   appendHostToPage(host);
+}
+
+/**
+ * Register hover callbacks on the highlight actions toolbar host element.
+ * Used by highlight.ts to coordinate hide-on-leave between <soma-hl> and the toolbar.
+ */
+export function setHighlightActionsHoverCallbacks(
+  onEnter: () => void,
+  onLeave: () => void,
+): void {
+  actionsHoverEnterCb = onEnter;
+  actionsHoverLeaveCb = onLeave;
 }
 
 export function showHighlightActionsToolbar(

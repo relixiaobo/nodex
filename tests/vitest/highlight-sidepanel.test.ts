@@ -134,7 +134,7 @@ describe('highlight-sidepanel', () => {
     const item = payload.highlights.find((h) => h.id === result.highlightNodeId);
     expect(item).toBeDefined();
     // Color is derived from tagDef and passed as the base highlight color
-    expect(item!.color).toBe('#9B7C38');
+    expect(item!.color).toBe('#8B8422');
     expect(item!.anchor.exact).toBe('highlighted text');
     expect(item!.hasComment).toBe(false);
   });

@@ -24,6 +24,7 @@ export const TAG_COLORS: TagColor[] = [
   { text: '#8E5B8E' }, // 7: Dusty Plum
   { text: '#8A6754' }, // 8: Cocoa Brown
   { text: '#788691' }, // 9: Soft Slate
+  { text: '#8B8422' }, // 10: Harvest Yellow
 ];
 
 /** Gray color for system tags (SYS_T*) and user-selectable gray swatch. */
@@ -42,6 +43,7 @@ export const TAG_COLOR_MAP: Record<string, TagColor> = {
   red: TAG_COLORS[0],
   orange: TAG_COLORS[1],
   amber: TAG_COLORS[2],
+  yellow: TAG_COLORS[10],
   green: TAG_COLORS[3],
   teal: TAG_COLORS[4],
   blue: TAG_COLORS[5],
@@ -76,13 +78,14 @@ const JOURNAL_TAG_IDS = new Set<string>([
 ]);
 
 /**
- * 10 swatch options for the color picker UI.
+ * 11 swatch options for the color picker UI.
  * Order matches the visual layout (warm → cool → neutral).
  */
 export const SWATCH_OPTIONS: Array<{ key: string; color: TagColor; name: string }> = [
   { key: 'red', color: TAG_COLOR_MAP.red, name: 'Red' },
   { key: 'orange', color: TAG_COLOR_MAP.orange, name: 'Orange' },
   { key: 'amber', color: TAG_COLOR_MAP.amber, name: 'Amber' },
+  { key: 'yellow', color: TAG_COLOR_MAP.yellow, name: 'Yellow' },
   { key: 'green', color: TAG_COLOR_MAP.green, name: 'Green' },
   { key: 'teal', color: TAG_COLOR_MAP.teal, name: 'Teal' },
   { key: 'blue', color: TAG_COLOR_MAP.blue, name: 'Blue' },
@@ -93,13 +96,13 @@ export const SWATCH_OPTIONS: Array<{ key: string; color: TagColor; name: string 
 ];
 
 /**
- * Colors eligible for automatic hash-based assignment (excludes Soft Slate).
+ * Colors eligible for automatic hash-based assignment (excludes Soft Slate/gray).
  * Soft Slate (#788691) is only available via explicit user selection in the color picker.
  */
-const AUTO_ASSIGN_COLORS = TAG_COLORS.slice(0, 9);
+const AUTO_ASSIGN_COLORS = TAG_COLORS.filter((c) => c !== TAG_COLOR_GRAY);
 
 /** Color keys in round-robin order (excludes gray). */
-const AUTO_ASSIGN_KEYS = SWATCH_OPTIONS.slice(0, 9).map((s) => s.key);
+const AUTO_ASSIGN_KEYS = SWATCH_OPTIONS.filter((s) => s.key !== 'gray').map((s) => s.key);
 
 /**
  * Pick a color key by round-robin index (e.g. existing tagDef count).
@@ -114,7 +117,7 @@ export function nextAutoColorKey(index: number): string {
  * (Soft Slate excluded — only assignable manually).
  *
  * Uses MurmurHash3 finalizer for better avalanche → more uniform distribution
- * across 9 buckets (the old Java hashCode % 9 had visible clustering).
+ * across 10 buckets (the old Java hashCode % 9 had visible clustering).
  */
 export function getTagColor(tagDefId: string): TagColor {
   let h = 0;

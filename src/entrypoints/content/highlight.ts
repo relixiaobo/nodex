@@ -8,7 +8,8 @@
  * - click Note => render highlight, open inline note popover, then persist
  *
  * Existing highlight flow:
- * - click <soma-hl> => show contextual toolbar (delete / add note)
+ * - hover <soma-hl> => show contextual toolbar (delete / add note)
+ * - links inside highlights remain clickable (no click interception)
  */
 import { computeAnchor } from './anchor-utils.js';
 import {
@@ -16,6 +17,7 @@ import {
   hideToolbar,
   showHighlightActionsToolbar,
   hideHighlightActionsToolbar,
+  setHighlightActionsHoverCallbacks,
   showNotePopover,
   hideNotePopover,
   hideAllHighlightOverlays,
@@ -66,49 +68,102 @@ let lastKnownUrl = '';
 let pendingNoteDraft: HighlightDraft | null = null;
 let pendingExistingHighlightNoteId: string | null = null;
 
-// ── Highlight Click Delegation ──
+// ── Highlight Hover Delegation ──
 
-let clickDelegationInstalled = false;
+let hoverDelegationInstalled = false;
+let hoverHideTimer: ReturnType<typeof setTimeout> | null = null;
+let currentHoveredHighlightId: string | null = null;
+
+function clearHoverHideTimer(): void {
+  if (hoverHideTimer) {
+    clearTimeout(hoverHideTimer);
+    hoverHideTimer = null;
+  }
+}
+
+function scheduleHoverHide(): void {
+  clearHoverHideTimer();
+  hoverHideTimer = setTimeout(() => {
+    hideHighlightActionsToolbar();
+    currentHoveredHighlightId = null;
+    hoverHideTimer = null;
+  }, 200);
+}
 
 /**
- * Install a single document-level click handler for all <soma-hl> elements.
- * Uses event delegation instead of Custom Elements API (unavailable in
- * Chrome content script isolated world).
+ * Install document-level hover + click handlers for all <soma-hl> elements.
+ * Hover shows the actions toolbar; click on comment icon navigates to note.
+ * Links inside highlights remain clickable (no preventDefault on click).
  */
-function ensureClickDelegation(): void {
-  if (clickDelegationInstalled) return;
-  clickDelegationInstalled = true;
+function ensureHoverDelegation(): void {
+  if (hoverDelegationInstalled) return;
+  hoverDelegationInstalled = true;
 
-  document.addEventListener('click', (e) => {
-    const targetElement = e.target as Element | null;
-    const highlightElement = targetElement?.closest?.('soma-hl[data-highlight-id]') as HTMLElement | null;
-    if (!highlightElement) return;
+  // Coordinate hover between <soma-hl> elements and the floating actions toolbar
+  setHighlightActionsHoverCallbacks(
+    () => clearHoverHideTimer(),
+    () => scheduleHoverHide(),
+  );
 
-    e.preventDefault();
-    e.stopPropagation();
+  // Show actions toolbar on hover
+  document.addEventListener('mouseover', (e) => {
+    const target = e.target as Element | null;
+    const hl = target?.closest?.('soma-hl[data-highlight-id]') as HTMLElement | null;
+    if (!hl) return;
 
-    const highlightId = highlightElement.getAttribute('data-highlight-id');
+    const highlightId = hl.getAttribute('data-highlight-id');
     if (!highlightId) return;
 
-    if (targetElement?.closest(COMMENT_ICON_SELECTOR)) {
-      const msg: { type: typeof HIGHLIGHT_CLICK; payload: HighlightClickPayload } = {
-        type: HIGHLIGHT_CLICK,
-        payload: { id: highlightId },
-      };
-      chrome.runtime.sendMessage(msg);
-      hideHighlightActionsToolbar();
-      return;
-    }
+    clearHoverHideTimer();
+    if (highlightId === currentHoveredHighlightId) return;
 
-    const rect = highlightElement.getBoundingClientRect();
+    currentHoveredHighlightId = highlightId;
+    const rect = hl.getBoundingClientRect();
     showHighlightActionsToolbar(rect, {
       onDelete: () => {
         deleteHighlight(highlightId);
+        currentHoveredHighlightId = null;
       },
       onAddNote: () => {
         showNotePopoverForExistingHighlight(highlightId, rect);
       },
     });
+  });
+
+  // Schedule hide when mouse leaves a highlight element
+  document.addEventListener('mouseout', (e) => {
+    const target = e.target as Element | null;
+    const hl = target?.closest?.('soma-hl[data-highlight-id]') as HTMLElement | null;
+    if (!hl) return;
+
+    const related = (e as MouseEvent).relatedTarget as Element | null;
+    // Still within the same highlight group — ignore
+    if (related?.closest?.('soma-hl[data-highlight-id]') === hl) return;
+
+    scheduleHoverHide();
+  });
+
+  // Click: only handle comment icon (navigate to note in side panel)
+  document.addEventListener('click', (e) => {
+    const target = e.target as Element | null;
+    const commentIcon = target?.closest?.(COMMENT_ICON_SELECTOR);
+    if (!commentIcon) return;
+
+    const hl = commentIcon.closest('soma-hl[data-highlight-id]') as HTMLElement | null;
+    if (!hl) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    const highlightId = hl.getAttribute('data-highlight-id');
+    if (!highlightId) return;
+
+    const msg: { type: typeof HIGHLIGHT_CLICK; payload: HighlightClickPayload } = {
+      type: HIGHLIGHT_CLICK,
+      payload: { id: highlightId },
+    };
+    chrome.runtime.sendMessage(msg);
+    hideHighlightActionsToolbar();
   });
 }
 
@@ -181,7 +236,7 @@ export function renderHighlight(
   highlightColor: string = DEFAULT_HIGHLIGHT_BG,
   options: HighlightRenderOptions = {},
 ): void {
-  ensureClickDelegation();
+  ensureHoverDelegation();
   const segments = getTextNodesInRange(range);
 
   // Process segments in reverse to maintain valid offsets
@@ -744,7 +799,7 @@ export function initHighlight(): void {
   initialized = true;
   lastKnownUrl = location.href;
 
-  ensureClickDelegation();
+  ensureHoverDelegation();
 
   // Debounced selection events => check selection
   let selectionTimeout: ReturnType<typeof setTimeout> | null = null;

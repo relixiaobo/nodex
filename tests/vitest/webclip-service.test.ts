@@ -19,6 +19,7 @@ import {
   createLightweightClip,
   detectClipType,
   formatIsoDuration,
+  refineClipTitle,
   type WebClipCapturePayload,
 } from '../../src/lib/webclip-service.js';
 import * as loroDoc from '../../src/lib/loro-doc.js';
@@ -120,6 +121,11 @@ describe('detectClipType', () => {
     expect(detectClipType('https://twitter.com/user/status/123')).toBe('social');
   });
 
+  it('detects x.com articles URL as article (not social)', () => {
+    expect(detectClipType('https://x.com/user/articles/1234567890')).toBe('article');
+    expect(detectClipType('https://twitter.com/user/articles/1234567890')).toBe('article');
+  });
+
   it('detects extractorType youtube as video', () => {
     expect(detectClipType('https://example.com', { extractorType: 'youtube' })).toBe('video');
   });
@@ -177,6 +183,60 @@ describe('formatIsoDuration', () => {
   it('returns original string for non-ISO format', () => {
     expect(formatIsoDuration('12:34')).toBe('12:34');
     expect(formatIsoDuration('invalid')).toBe('invalid');
+  });
+});
+
+describe('refineClipTitle', () => {
+  const makePayload = (overrides?: Partial<WebClipCapturePayload>): WebClipCapturePayload => ({
+    url: 'https://x.com/user/status/123',
+    title: 'Thread by @NotionHQ',
+    selectionText: '',
+    pageText: '<p>Not every task needs the same model.</p>',
+    capturedAt: Date.now(),
+    author: 'NotionHQ',
+    description: 'Not every task needs the same model. A quick summary doesn\'t need the same horsepower.',
+    ...overrides,
+  });
+
+  it('replaces generic social title with @author: description preview', () => {
+    const payload = makePayload();
+    const result = refineClipTitle(payload.title, payload, 'social');
+    expect(result).toBe('@NotionHQ: Not every task needs the same model. A quick summary doesn\'t need the same horsepower.');
+  });
+
+  it('strips leading @ from author if already present', () => {
+    const payload = makePayload({ author: '@NotionHQ' });
+    const result = refineClipTitle(payload.title, payload, 'social');
+    expect(result).toMatch(/^@NotionHQ: /);
+    // Should NOT be @@NotionHQ
+    expect(result).not.toMatch(/^@@/);
+  });
+
+  it('falls back to pageText when description is absent', () => {
+    const payload = makePayload({ description: undefined });
+    const result = refineClipTitle(payload.title, payload, 'social');
+    expect(result).toBe('@NotionHQ: Not every task needs the same model.');
+  });
+
+  it('truncates long text at word boundary', () => {
+    const longText = 'Word '.repeat(30); // 150 chars
+    const payload = makePayload({ description: longText.trim() });
+    const result = refineClipTitle(payload.title, payload, 'social');
+    expect(result.length).toBeLessThanOrEqual(120); // author + 100 + ellipsis
+    expect(result).toMatch(/…$/);
+  });
+
+  it('does not modify title for non-social types', () => {
+    const payload = makePayload();
+    expect(refineClipTitle('My Article', payload, 'article')).toBe('My Article');
+    expect(refineClipTitle('My Video', payload, 'video')).toBe('My Video');
+    expect(refineClipTitle('My Source', payload, 'source')).toBe('My Source');
+  });
+
+  it('keeps original title if no text preview available', () => {
+    const payload = makePayload({ description: undefined, pageText: '' });
+    const result = refineClipTitle('Thread by @user', payload, 'social');
+    expect(result).toBe('Thread by @user');
   });
 });
 
@@ -398,12 +458,13 @@ describe('saveWebClip with templates', () => {
     expect(getFirstFieldValue(authorFe!)).toBe('Rick Astley');
   });
 
-  it('X/Twitter URL → #social tag', async () => {
+  it('X/Twitter URL → #social tag + refined title', async () => {
     const store = useNodeStore.getState();
     const payload = makePayload({
       url: 'https://x.com/user/status/123456789',
-      title: 'A tweet',
+      title: 'Thread by @user',
       author: '@user',
+      description: 'Great thread about productivity tools',
     });
 
     const clipId = await saveWebClip(payload, store);
@@ -411,6 +472,9 @@ describe('saveWebClip with templates', () => {
 
     expect(node!.tags).toContain(NDX_T.SOCIAL);
     expect(node!.tags).not.toContain(SYS_T.SOURCE);
+
+    // Title should be refined from tweet description
+    expect(node!.name).toBe('@user: Great thread about productivity tools');
 
     // Author field
     const authorFe = findFieldEntry(clipId, NDX_F.AUTHOR);

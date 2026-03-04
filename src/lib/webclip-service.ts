@@ -83,11 +83,14 @@ const ARTICLE_SCHEMA_TYPES = new Set([
 export function detectClipType(url: string, payload?: Partial<WebClipCapturePayload>): ClipType {
   // 1. URL domain match
   try {
-    const hostname = new URL(url).hostname.replace(/^www\./, '');
+    const parsed = new URL(url);
+    const hostname = parsed.hostname.replace(/^www\./, '');
     if (hostname === 'youtube.com' || hostname === 'youtu.be' || hostname.endsWith('.youtube.com')) {
       return 'video';
     }
     if (hostname === 'x.com' || hostname === 'twitter.com') {
+      // x.com articles: /username/articles/id
+      if (/\/articles\/\d/.test(parsed.pathname)) return 'article';
       return 'social';
     }
   } catch {
@@ -324,6 +327,51 @@ export function formatIsoDuration(iso: string): string {
 }
 
 // ============================================================
+// Title refinement
+// ============================================================
+
+/**
+ * Refine clip title for social posts.
+ * Replaces generic titles like "Thread by @user" with actual post content preview.
+ */
+export function refineClipTitle(
+  title: string,
+  payload: WebClipCapturePayload,
+  clipType: ClipType,
+): string {
+  if (clipType !== 'social') return title;
+
+  // Extract a text preview from description or pageText
+  const preview = extractTextPreview(payload);
+  if (!preview) return title;
+
+  const author = payload.author ? `@${payload.author.replace(/^@/, '')}: ` : '';
+  return `${author}${preview}`;
+}
+
+/** Get a plain-text preview (≤100 chars) from payload. */
+function extractTextPreview(payload: WebClipCapturePayload): string | undefined {
+  // og:description usually has the tweet text
+  if (payload.description) {
+    return truncateText(payload.description, 100);
+  }
+  // Fallback: strip HTML tags from pageText
+  if (payload.pageText) {
+    const text = payload.pageText.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+    if (text) return truncateText(text, 100);
+  }
+  return undefined;
+}
+
+/** Truncate text to maxLen, breaking at word boundary. */
+function truncateText(text: string, maxLen: number): string {
+  const trimmed = text.trim();
+  if (trimmed.length <= maxLen) return trimmed;
+  const cut = trimmed.lastIndexOf(' ', maxLen);
+  return trimmed.slice(0, cut > 0 ? cut : maxLen) + '…';
+}
+
+// ============================================================
 // Fill clip fields (shared logic)
 // ============================================================
 
@@ -375,24 +423,27 @@ export async function saveWebClip(
   const tagDefId = ensureClipTypeDefs(clipType);
   ensureSourceUrlFieldDef();
 
-  // 2. Create the clip node under parent (defaults to today's journal day)
-  const clipNode = store.createChild(targetParentId, undefined, { name: payload.title });
+  // 2. Refine title for social posts (use tweet text instead of "Thread by @user")
+  const title = refineClipTitle(payload.title, payload, clipType);
 
-  // 3. Apply the detected type tag (extends mechanism creates inherited field entries)
+  // 3. Create the clip node under parent (defaults to today's journal day)
+  const clipNode = store.createChild(targetParentId, undefined, { name: title });
+
+  // 4. Apply the detected type tag (extends mechanism creates inherited field entries)
   store.applyTag(clipNode.id, tagDefId);
 
-  // 4. Write Source URL field value
+  // 5. Write Source URL field value
   store.setFieldValue(clipNode.id, NDX_F.SOURCE_URL, [payload.url]);
 
-  // 5. Fill Author, Published, Duration fields
+  // 6. Fill Author, Published, Duration fields
   fillClipFields(clipNode.id, payload, clipType, store);
 
-  // 6. Set description if available
+  // 7. Set description if available
   if (payload.description) {
     store.updateNodeDescription(clipNode.id, payload.description);
   }
 
-  // 7. Parse and create content child nodes from page HTML
+  // 8. Parse and create content child nodes from page HTML
   if (payload.pageText) {
     const { nodes } = parseHtmlToNodes(payload.pageText, { maxNodes: 200 });
     if (nodes.length > 0) {
@@ -541,8 +592,8 @@ export async function applyWebClipToNode(
   const tagDefId = ensureClipTypeDefs(clipType);
   ensureSourceUrlFieldDef();
 
-  // 2. Rename node to page title
-  store.setNodeName(nodeId, payload.title);
+  // 2. Rename node to refined title
+  store.setNodeName(nodeId, refineClipTitle(payload.title, payload, clipType));
 
   // 3. Apply the detected type tag
   store.applyTag(nodeId, tagDefId);

@@ -165,25 +165,37 @@ function captureCurrentPage(): WebClipCapturePayload {
   let isXArticle = false;
 
   // ── x.com / Twitter enhancement ──
-  // Defuddle often fails on x.com SPA — use DOM extraction as fallback.
+  // Defuddle often fails on x.com SPA — use DOM extraction as primary source.
   if (isXDomain()) {
-    // Detect x.com article (long-form post)
     if (isXArticlePage()) {
+      // x.com long-form article: always use DOM content
+      isXArticle = true;
       const articleTitle = extractXArticleTitle();
       if (articleTitle) title = articleTitle;
-      isXArticle = true;
-    }
-
-    // Use tweet text as description for title refinement
-    if (!description || description === title || description.startsWith('Thread by')) {
-      const tweetText = extractXTweetText();
-      if (tweetText) description = tweetText;
-    }
-
-    // Use DOM-extracted content if Defuddle returned empty/minimal content
-    if (!pageText || pageText.length < 50) {
+      // Always override pageText — Defuddle returns partial/broken content for x.com articles
       const xContent = extractXPageContent();
       if (xContent) pageText = xContent;
+    } else {
+      // Regular tweet/thread: refine title + fallback content
+      const tweetText = extractXTweetText();
+
+      // Replace generic "Thread by @user" / "... on X" titles with actual tweet content
+      if (tweetText && /Thread by|on X$|on Twitter$/i.test(title)) {
+        const xAuthor = extractXAuthor();
+        const preview = tweetText.length > 100 ? tweetText.slice(0, 97) + '…' : tweetText;
+        title = xAuthor ? `${xAuthor}: ${preview}` : preview;
+      }
+
+      // Use tweet text as description (for sidepanel display)
+      if (tweetText && (!description || description === title || description.startsWith('Thread by'))) {
+        description = tweetText;
+      }
+
+      // Fallback content when Defuddle fails
+      if (!pageText || pageText.length < 50) {
+        const xContent = extractXPageContent();
+        if (xContent) pageText = xContent;
+      }
     }
   }
 

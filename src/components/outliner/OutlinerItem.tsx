@@ -439,8 +439,8 @@ export function OutlinerItem({
     [tagIds],
   );
   const effectiveBulletColors = bulletColors ?? tagBulletColors;
-  // Structural icon: fieldDef nodes show the field type icon instead of a dot
-  const structuralIcon = node ? resolveNodeStructuralIcon(node) : null;
+  // Structural icon: fieldDef/search/codeBlock show type-specific icon instead of a dot
+  const structuralIcon = effectiveNode ? resolveNodeStructuralIcon(effectiveNode) : null;
   const isPendingConversion = useUIStore((s) => s.pendingRefConversion?.tempNodeId === nodeId);
   const pendingConversionRefTargetId = useUIStore((s) =>
     s.pendingRefConversion?.tempNodeId === nodeId ? s.pendingRefConversion.refNodeId : null,

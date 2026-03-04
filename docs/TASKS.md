@@ -88,7 +88,8 @@ _(全部已修复)_
 - [ ] 剪藏模板 — 不同网站类型（文章/产品/视频/论文）使用不同 Supertag 模板
 
 #### 网页高亮 & 批注 ✅（已完成）
-> 全部 Phase 完成。**Plan**: `docs/plans/highlight-annotation-system.md` | **Research**: `docs/research/highlight-comment-design.md`
+> 全部 Phase 完成 + 离线排队。**Plan**: `docs/plans/highlight-annotation-system.md` | **Research**: `docs/research/highlight-comment-design.md`
+> - [x] 离线排队 — SP 关闭时高亮暂存 chrome.storage.local，页面刷新恢复渲染，SP 打开后消费入库
 
 #### AI Chat & 网页辅助 (#29 + #31)
 > 浏览器 + AI = soma 的第二个差异化维度。不只是聊天框，而是理解上下文的知识助手。
@@ -205,6 +206,7 @@ _(全部已修复)_
 
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
+| 2026-03-04 | 离线高亮排队 — SP 关闭时高亮暂存 chrome.storage.local（200 cap / 30d TTL），BG 检测 SP 状态路由 tempId，页面刷新恢复渲染，SP bootstrap 消费队列入 LoroDoc。提取 url-utils.ts 解 BG IIFE 构建问题 | nodex | main |
 | 2026-03-03 | NodeHeader 富文本编辑 + Reference 编辑修复 — trigger 系统提取为 useEditorTriggers hook + NodeHeader 升级 RichTextEditor（#/@/Cmd+Enter）+ header 聚焦不跳大小 + 点击定位光标 + checkbox 透明背景 + reference 编辑写入目标节点 + reference 展开虚线引导线 + dom-caret-utils 共享模块 | nodex | main |
 | 2026-03-03 | 系统节点只读编辑器 — 容器/workspace home/queryCondition 节点聚焦后文本变灰、输入无效，光标仍可插入（导航用） | nodex | main |
 | 2026-03-03 | 节点右键菜单扩展 — Copy node link（粘贴为 reference）、Duplicate（深拷贝）、Move to（hover flyout 子菜单）、Add tag（搜索+创建）、Add checkbox（动态标签）、Add description + Journal→Daily notes 全局重命名 + 菜单视觉对齐 ToolbarUserMenu 风格 | nodex | main |

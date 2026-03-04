@@ -29,3 +29,14 @@ export interface WebClipCapturePayload {
 export type WebClipCaptureResponse =
   | { ok: true; payload: WebClipCapturePayload }
   | { ok: false; error: string };
+
+export const X_VIDEO_FETCH_URL = 'x-video:fetch-url' as const;
+
+export interface XVideoFetchPayload {
+  tweetId: string;
+}
+
+export interface XVideoFetchResponse {
+  mp4Url?: string;
+  posterUrl?: string;
+}

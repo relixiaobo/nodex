@@ -128,7 +128,7 @@ function seedBody(): void {
   // ═══════════════════════════════════════════════════════════════
   // FieldDefs under #source: Author (NDX_F03), Published (NDX_F04)
   // ═══════════════════════════════════════════════════════════════
-  cn(NDX_F.AUTHOR, SYS_T.SOURCE, { type: 'fieldDef', name: 'Author', fieldType: FIELD_TYPES.PLAIN });
+  cn(NDX_F.AUTHOR, SYS_T.SOURCE, { type: 'fieldDef', name: 'Author', fieldType: FIELD_TYPES.OPTIONS });
   cn(NDX_F.PUBLISHED, SYS_T.SOURCE, { type: 'fieldDef', name: 'Published', fieldType: FIELD_TYPES.DATE });
 
   // ═══════════════════════════════════════════════════════════════

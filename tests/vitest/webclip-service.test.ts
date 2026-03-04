@@ -23,7 +23,7 @@ import {
   type WebClipCapturePayload,
 } from '../../src/lib/webclip-service.js';
 import * as loroDoc from '../../src/lib/loro-doc.js';
-import { CONTAINER_IDS, SYS_T, NDX_F, NDX_T } from '../../src/types/index.js';
+import { CONTAINER_IDS, SYS_T, NDX_F, NDX_T, FIELD_TYPES } from '../../src/types/index.js';
 import { ensureTodayNode } from '../../src/lib/journal.js';
 
 /** Helper: find fieldEntry child with given fieldDefId. */
@@ -39,6 +39,22 @@ function getFirstFieldValue(fieldEntryId: string): string | undefined {
   const children = loroDoc.getChildren(fieldEntryId);
   if (children.length === 0) return undefined;
   return loroDoc.toNodexNode(children[0])?.name;
+}
+
+/** Helper: resolve OPTIONS field value — follows targetId to the option node. */
+function getFirstOptionValue(fieldEntryId: string): string | undefined {
+  const children = loroDoc.getChildren(fieldEntryId);
+  if (children.length === 0) return undefined;
+  const valNode = loroDoc.toNodexNode(children[0]);
+  if (!valNode?.targetId) return undefined;
+  return loroDoc.toNodexNode(valNode.targetId)?.name;
+}
+
+/** Helper: get the targetId (option node ID) from the first value child of a fieldEntry. */
+function getFirstOptionTargetId(fieldEntryId: string): string | undefined {
+  const children = loroDoc.getChildren(fieldEntryId);
+  if (children.length === 0) return undefined;
+  return loroDoc.toNodexNode(children[0])?.targetId;
 }
 
 describe('findTagDefByName', () => {
@@ -105,6 +121,12 @@ describe('findTemplateAttrDef', () => {
     const result = findTemplateAttrDef({}, SYS_T.SOURCE, 'Source URL');
     expect(result).toBeDefined();
     expect(result!.fieldType).toBe('url');
+  });
+
+  it('Author attrDef has fieldType = OPTIONS', () => {
+    const result = findTemplateAttrDef({}, SYS_T.SOURCE, 'Author');
+    expect(result).toBeDefined();
+    expect(result!.fieldType).toBe(FIELD_TYPES.OPTIONS);
   });
 });
 
@@ -452,10 +474,10 @@ describe('saveWebClip with templates', () => {
     expect(durFe).toBeDefined();
     expect(getFirstFieldValue(durFe!)).toBe('3:33');
 
-    // Author field
+    // Author field (OPTIONS — stored as option node reference)
     const authorFe = findFieldEntry(clipId, NDX_F.AUTHOR);
     expect(authorFe).toBeDefined();
-    expect(getFirstFieldValue(authorFe!)).toBe('Rick Astley');
+    expect(getFirstOptionValue(authorFe!)).toBe('Rick Astley');
   });
 
   it('X/Twitter URL → #social tag + refined title', async () => {
@@ -478,10 +500,10 @@ describe('saveWebClip with templates', () => {
     // Note: truncateText(desc, 30) → "Great thread about productivity…" but
     // word-boundary cut at pos 18 → "Great thread about…"
 
-    // Author field
+    // Author field (OPTIONS — stored as option node reference)
     const authorFe = findFieldEntry(clipId, NDX_F.AUTHOR);
     expect(authorFe).toBeDefined();
-    expect(getFirstFieldValue(authorFe!)).toBe('@user');
+    expect(getFirstOptionValue(authorFe!)).toBe('@user');
   });
 
   it('og:type=article → #article tag', async () => {
@@ -500,10 +522,10 @@ describe('saveWebClip with templates', () => {
     expect(node!.tags).toContain(NDX_T.ARTICLE);
     expect(node!.tags).not.toContain(SYS_T.SOURCE);
 
-    // Author + Published fields
+    // Author (OPTIONS) + Published fields
     const authorFe = findFieldEntry(clipId, NDX_F.AUTHOR);
     expect(authorFe).toBeDefined();
-    expect(getFirstFieldValue(authorFe!)).toBe('Jane Doe');
+    expect(getFirstOptionValue(authorFe!)).toBe('Jane Doe');
 
     const pubFe = findFieldEntry(clipId, NDX_F.PUBLISHED);
     expect(pubFe).toBeDefined();
@@ -537,11 +559,32 @@ describe('saveWebClip with templates', () => {
 
     const authorFe = findFieldEntry(clipId, NDX_F.AUTHOR);
     expect(authorFe).toBeDefined();
-    expect(getFirstFieldValue(authorFe!)).toBe('Test Author');
+    expect(getFirstOptionValue(authorFe!)).toBe('Test Author');
 
     const pubFe = findFieldEntry(clipId, NDX_F.PUBLISHED);
     expect(pubFe).toBeDefined();
     expect(getFirstFieldValue(pubFe!)).toBe('2026-01-15');
+  });
+
+  it('same author clipped twice reuses the same option node', async () => {
+    const store = useNodeStore.getState();
+    const payload1 = makePayload({ url: 'https://a.com', title: 'First', author: 'Shared Author' });
+    const payload2 = makePayload({ url: 'https://b.com', title: 'Second', author: 'Shared Author' });
+
+    const clipId1 = await saveWebClip(payload1, store);
+    const clipId2 = await saveWebClip(payload2, store);
+
+    const authorFe1 = findFieldEntry(clipId1, NDX_F.AUTHOR)!;
+    const authorFe2 = findFieldEntry(clipId2, NDX_F.AUTHOR)!;
+
+    // Both should point to the same option node
+    const optId1 = getFirstOptionTargetId(authorFe1);
+    const optId2 = getFirstOptionTargetId(authorFe2);
+    expect(optId1).toBeDefined();
+    expect(optId1).toBe(optId2);
+
+    // Option node name should be the author
+    expect(loroDoc.toNodexNode(optId1!)?.name).toBe('Shared Author');
   });
 
   it('Author and Published fields omitted when not in payload', async () => {

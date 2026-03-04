@@ -27,9 +27,21 @@ export interface ParsedContentNode {
   /** Child nodes (heading sections, list items, blockquote children) */
   children: ParsedContentNode[];
   /** Optional structural type for special block rendering. */
-  type?: 'codeBlock';
+  type?: 'codeBlock' | 'image' | 'embed';
   /** Optional language hint for code blocks (e.g. "ts", "python"). */
   codeLanguage?: string;
+  /** Media URL (image src or embed URL). */
+  mediaUrl?: string;
+  /** Image alt text. */
+  mediaAlt?: string;
+  /** Image width in pixels. */
+  imageWidth?: number;
+  /** Image height in pixels. */
+  imageHeight?: number;
+  /** Embed type (e.g. 'youtube'). */
+  embedType?: string;
+  /** Embed ID (e.g. YouTube video ID). */
+  embedId?: string;
 }
 
 export interface HtmlToNodesResult {
@@ -93,7 +105,16 @@ export function parseHtmlToNodes(
     marks: TextMark[] = [],
     inlineRefs: InlineRefEntry[] = [],
     children: ParsedContentNode[] = [],
-    options?: { type?: ParsedContentNode['type']; codeLanguage?: string },
+    options?: {
+      type?: ParsedContentNode['type'];
+      codeLanguage?: string;
+      mediaUrl?: string;
+      mediaAlt?: string;
+      imageWidth?: number;
+      imageHeight?: number;
+      embedType?: string;
+      embedId?: string;
+    },
   ): ParsedContentNode | null {
     if (!canCreate()) return null;
     nodeCount++;
@@ -104,6 +125,12 @@ export function parseHtmlToNodes(
       children,
       ...(options?.type ? { type: options.type } : {}),
       ...(options?.codeLanguage ? { codeLanguage: options.codeLanguage } : {}),
+      ...(options?.mediaUrl ? { mediaUrl: options.mediaUrl } : {}),
+      ...(options?.mediaAlt ? { mediaAlt: options.mediaAlt } : {}),
+      ...(options?.imageWidth ? { imageWidth: options.imageWidth } : {}),
+      ...(options?.imageHeight ? { imageHeight: options.imageHeight } : {}),
+      ...(options?.embedType ? { embedType: options.embedType } : {}),
+      ...(options?.embedId ? { embedId: options.embedId } : {}),
     };
   }
 
@@ -340,10 +367,17 @@ export function parseHtmlToNodes(
     // Skip non-content tags and media placeholders
     if (isSkippableNonContentTag(tag)) return;
 
-    // Skip hr, figure/img
+    // Skip hr, audio (not yet supported)
     if (!includeH1 && tag === 'h1') return;
     if (tag === 'hr') return;
-    if (tag === 'figure' || tag === 'img' || tag === 'picture' || tag === 'video' || tag === 'audio' || tag === 'iframe') return;
+    if (tag === 'audio') return;
+    if (tag === 'video') { processVideoElement(el); return; }
+
+    // Media elements: img, picture, figure, iframe
+    if (tag === 'img') { processImgElement(el); return; }
+    if (tag === 'picture') { processPictureElement(el); return; }
+    if (tag === 'figure') { processFigureElement(el); return; }
+    if (tag === 'iframe') { processIframeElement(el); return; }
 
     // Headings h1–h6: create section parent
     if (/^h[1-6]$/.test(tag)) {
@@ -560,6 +594,102 @@ export function parseHtmlToNodes(
     if (node) getCurrentTarget().push(node);
   }
 
+  /** Resolve an image src, skipping data: URIs and fixing protocol-relative URLs. */
+  function resolveImgSrc(src: string | null | undefined): string | null {
+    if (!src) return null;
+    const trimmed = src.trim();
+    if (!trimmed) return null;
+    if (trimmed.startsWith('data:')) return null;
+    if (trimmed.startsWith('//')) return `https:${trimmed}`;
+    return trimmed;
+  }
+
+  /** Process an <img> element into an image node. */
+  function processImgElement(el: Element): void {
+    const src = resolveImgSrc(el.getAttribute('src'));
+    if (!src) return;
+    const alt = el.getAttribute('alt')?.trim() || undefined;
+    const w = parseInt(el.getAttribute('width') ?? '', 10) || undefined;
+    const h = parseInt(el.getAttribute('height') ?? '', 10) || undefined;
+    const node = makeNode(alt ?? '', [], [], [], {
+      type: 'image',
+      mediaUrl: src,
+      mediaAlt: alt,
+      imageWidth: w,
+      imageHeight: h,
+    });
+    if (node) getCurrentTarget().push(node);
+  }
+
+  /** Process a <picture> element — find inner <img> and delegate. */
+  function processPictureElement(el: Element): void {
+    const img = el.querySelector('img');
+    if (img) processImgElement(img);
+  }
+
+  /** Process a <figure> element — find inner <img> + optional <figcaption>. */
+  function processFigureElement(el: Element): void {
+    const img = el.querySelector('img');
+    if (!img) return;
+    const src = resolveImgSrc(img.getAttribute('src'));
+    if (!src) return;
+    const figcaption = el.querySelector('figcaption');
+    const alt = figcaption?.textContent?.trim() || img.getAttribute('alt')?.trim() || undefined;
+    const w = parseInt(img.getAttribute('width') ?? '', 10) || undefined;
+    const h = parseInt(img.getAttribute('height') ?? '', 10) || undefined;
+    const node = makeNode(alt ?? '', [], [], [], {
+      type: 'image',
+      mediaUrl: src,
+      mediaAlt: alt,
+      imageWidth: w,
+      imageHeight: h,
+    });
+    if (node) getCurrentTarget().push(node);
+  }
+
+  /** Process an <iframe> element — currently skipped (YouTube embeds are
+   *  redundant with Source URL; no other iframe types supported). */
+  function processIframeElement(_el: Element): void {
+    // Intentionally skip — users access YouTube via Source URL link.
+  }
+
+  /** Process a <video> element — always create twitter-video embed when possible. */
+  function processVideoElement(el: Element): void {
+    const src = el.getAttribute('src');
+    const poster = el.getAttribute('poster')?.trim() || undefined;
+
+    // Direct mp4 link from video.twimg.com → playable embed
+    if (src) {
+      try {
+        const parsed = new URL(src);
+        if (parsed.hostname === 'video.twimg.com') {
+          const node = makeNode('', [], [], [], {
+            type: 'embed',
+            embedType: 'twitter-video',
+            mediaUrl: src,
+            mediaAlt: poster,
+          });
+          if (node) getCurrentTarget().push(node);
+          return;
+        }
+      } catch { /* invalid URL, fall through */ }
+    }
+
+    // No direct link but has poster → poster-only twitter-video embed
+    // (shows poster with play icon overlay, visually distinct from a plain image)
+    if (poster) {
+      const resolved = resolveImgSrc(poster);
+      if (resolved) {
+        const node = makeNode('', [], [], [], {
+          type: 'embed',
+          embedType: 'twitter-video',
+          mediaAlt: resolved,
+        });
+        if (node) getCurrentTarget().push(node);
+      }
+    }
+  }
+
   /** Process a <table> element. Each <tr> becomes a node with cells joined by |. */
   function processTable(el: Element): void {
     const rows = el.querySelectorAll('tr');
@@ -624,10 +754,16 @@ export function createContentNodes(
         topIds.push(nodeId);
       }
 
-      if (item.type || item.codeLanguage) {
+      if (item.type || item.codeLanguage || item.mediaUrl || item.embedType) {
         const batch: Record<string, unknown> = {};
         if (item.type) batch.type = item.type;
         if (item.codeLanguage) batch.codeLanguage = item.codeLanguage;
+        if (item.mediaUrl) batch.mediaUrl = item.mediaUrl;
+        if (item.mediaAlt) batch.mediaAlt = item.mediaAlt;
+        if (item.imageWidth) batch.imageWidth = item.imageWidth;
+        if (item.imageHeight) batch.imageHeight = item.imageHeight;
+        if (item.embedType) batch.embedType = item.embedType;
+        if (item.embedId) batch.embedId = item.embedId;
         loroDoc.setNodeDataBatch(nodeId, batch);
       }
 
@@ -660,7 +796,7 @@ function isBlockElement(el: Element): boolean {
     'p', 'div', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
     'ul', 'ol', 'li', 'blockquote', 'pre', 'table',
     'section', 'article', 'main', 'aside', 'header', 'footer', 'nav',
-    'figure', 'hr',
+    'figure', 'picture', 'img', 'video', 'audio', 'iframe', 'hr',
   ].includes(tag);
   if (semanticBlock) return true;
   return isStyledBlockElement(el);

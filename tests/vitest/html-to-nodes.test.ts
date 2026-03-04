@@ -310,12 +310,15 @@ describe('parseHtmlToNodes', () => {
 
   // ── Skipped elements ──
 
-  it('figure/img are skipped', () => {
+  it('figure/img are parsed as image nodes', () => {
     const html = '<p>Before</p><figure><img src="test.jpg"><figcaption>Caption</figcaption></figure><p>After</p>';
     const { nodes } = parseHtmlToNodes(html);
-    expect(nodes).toHaveLength(2);
+    expect(nodes).toHaveLength(3);
     expect(nodes[0].name).toBe('Before');
-    expect(nodes[1].name).toBe('After');
+    expect(nodes[1].type).toBe('image');
+    expect(nodes[1].mediaUrl).toBe('test.jpg');
+    expect(nodes[1].mediaAlt).toBe('Caption');
+    expect(nodes[2].name).toBe('After');
   });
 
   it('hr is skipped', () => {
@@ -536,5 +539,177 @@ describe('createContentNodes', () => {
   it('empty nodes array returns empty ids', () => {
     const ids = createContentNodes('inbox_1', []);
     expect(ids).toEqual([]);
+  });
+
+  it('persists image type metadata when creating nodes', () => {
+    const parentId = 'inbox_1';
+    const nodes = [
+      {
+        name: 'A photo',
+        marks: [],
+        inlineRefs: [],
+        children: [],
+        type: 'image' as const,
+        mediaUrl: 'https://example.com/photo.jpg',
+        mediaAlt: 'A photo',
+        imageWidth: 800,
+        imageHeight: 600,
+      },
+    ];
+
+    const ids = createContentNodes(parentId, nodes);
+    const created = loroDoc.toNodexNode(ids[0]);
+    expect(created?.type).toBe('image');
+    expect(created?.mediaUrl).toBe('https://example.com/photo.jpg');
+    expect(created?.mediaAlt).toBe('A photo');
+    expect(created?.imageWidth).toBe(800);
+    expect(created?.imageHeight).toBe(600);
+  });
+
+  it('persists embed type metadata when creating nodes', () => {
+    const parentId = 'inbox_1';
+    const nodes = [
+      {
+        name: '',
+        marks: [],
+        inlineRefs: [],
+        children: [],
+        type: 'embed' as const,
+        embedType: 'twitter-video',
+        mediaUrl: 'https://video.twimg.com/ext_tw_video/123/pu/vid/720x1280/abc.mp4',
+        mediaAlt: 'https://pbs.twimg.com/poster.jpg',
+      },
+    ];
+
+    const ids = createContentNodes(parentId, nodes);
+    const created = loroDoc.toNodexNode(ids[0]);
+    expect(created?.type).toBe('embed');
+    expect(created?.embedType).toBe('twitter-video');
+    expect(created?.mediaUrl).toBe('https://video.twimg.com/ext_tw_video/123/pu/vid/720x1280/abc.mp4');
+    expect(created?.mediaAlt).toBe('https://pbs.twimg.com/poster.jpg');
+  });
+});
+
+// ============================================================
+// parseHtmlToNodes — image and media tests
+// ============================================================
+
+describe('parseHtmlToNodes — images', () => {
+  it('parses <img> into image node', () => {
+    const html = '<p>Before</p><img src="https://example.com/photo.jpg" alt="A photo" width="800" height="600"><p>After</p>';
+    const { nodes } = parseHtmlToNodes(html);
+    expect(nodes).toHaveLength(3);
+    expect(nodes[1].type).toBe('image');
+    expect(nodes[1].mediaUrl).toBe('https://example.com/photo.jpg');
+    expect(nodes[1].mediaAlt).toBe('A photo');
+    expect(nodes[1].imageWidth).toBe(800);
+    expect(nodes[1].imageHeight).toBe(600);
+  });
+
+  it('skips <img> with data: URI', () => {
+    const html = '<img src="data:image/png;base64,iVBORw0KGgo=">';
+    const { nodes } = parseHtmlToNodes(html);
+    expect(nodes).toHaveLength(0);
+  });
+
+  it('skips <img> without src', () => {
+    const html = '<img alt="no source">';
+    const { nodes } = parseHtmlToNodes(html);
+    expect(nodes).toHaveLength(0);
+  });
+
+  it('fixes protocol-relative URL', () => {
+    const html = '<img src="//cdn.example.com/img.jpg">';
+    const { nodes } = parseHtmlToNodes(html);
+    expect(nodes).toHaveLength(1);
+    expect(nodes[0].mediaUrl).toBe('https://cdn.example.com/img.jpg');
+  });
+
+  it('parses <figure> with <img> and <figcaption>', () => {
+    const html = '<figure><img src="https://example.com/fig.jpg"><figcaption>Caption text</figcaption></figure>';
+    const { nodes } = parseHtmlToNodes(html);
+    expect(nodes).toHaveLength(1);
+    expect(nodes[0].type).toBe('image');
+    expect(nodes[0].mediaUrl).toBe('https://example.com/fig.jpg');
+    expect(nodes[0].mediaAlt).toBe('Caption text');
+  });
+
+  it('parses <picture> containing <img>', () => {
+    const html = '<picture><source srcset="large.webp"><img src="https://example.com/fallback.jpg" alt="pic"></picture>';
+    const { nodes } = parseHtmlToNodes(html);
+    expect(nodes).toHaveLength(1);
+    expect(nodes[0].type).toBe('image');
+    expect(nodes[0].mediaUrl).toBe('https://example.com/fallback.jpg');
+    expect(nodes[0].mediaAlt).toBe('pic');
+  });
+});
+
+describe('parseHtmlToNodes — iframes', () => {
+  it('skips YouTube iframe (users access via Source URL)', () => {
+    const html = '<iframe src="https://www.youtube.com/embed/dQw4w9WgXcQ"></iframe>';
+    const { nodes } = parseHtmlToNodes(html);
+    expect(nodes).toHaveLength(0);
+  });
+
+  it('skips non-YouTube iframe', () => {
+    const html = '<iframe src="https://example.com/embed"></iframe>';
+    const { nodes } = parseHtmlToNodes(html);
+    expect(nodes).toHaveLength(0);
+  });
+
+  it('skips iframe without src', () => {
+    const html = '<iframe></iframe>';
+    const { nodes } = parseHtmlToNodes(html);
+    expect(nodes).toHaveLength(0);
+  });
+
+  it('skips audio elements', () => {
+    const html = '<audio src="test.mp3"></audio>';
+    const { nodes } = parseHtmlToNodes(html);
+    expect(nodes).toHaveLength(0);
+  });
+});
+
+describe('parseHtmlToNodes — video elements', () => {
+  it('parses <video> with video.twimg.com src as twitter-video embed', () => {
+    const html = '<video src="https://video.twimg.com/ext_tw_video/123/pu/vid/720x1280/abc.mp4" poster="https://pbs.twimg.com/poster.jpg"></video>';
+    const { nodes } = parseHtmlToNodes(html);
+    expect(nodes).toHaveLength(1);
+    expect(nodes[0].type).toBe('embed');
+    expect(nodes[0].embedType).toBe('twitter-video');
+    expect(nodes[0].mediaUrl).toBe('https://video.twimg.com/ext_tw_video/123/pu/vid/720x1280/abc.mp4');
+    expect(nodes[0].mediaAlt).toBe('https://pbs.twimg.com/poster.jpg');
+  });
+
+  it('parses <video> with poster only (no src) as twitter-video embed', () => {
+    const html = '<video poster="https://pbs.twimg.com/poster.jpg"></video>';
+    const { nodes } = parseHtmlToNodes(html);
+    expect(nodes).toHaveLength(1);
+    expect(nodes[0].type).toBe('embed');
+    expect(nodes[0].embedType).toBe('twitter-video');
+    expect(nodes[0].mediaUrl).toBeUndefined();
+    expect(nodes[0].mediaAlt).toBe('https://pbs.twimg.com/poster.jpg');
+  });
+
+  it('skips <video> with non-twimg src (no poster)', () => {
+    const html = '<video src="https://example.com/video.mp4"></video>';
+    const { nodes } = parseHtmlToNodes(html);
+    expect(nodes).toHaveLength(0);
+  });
+
+  it('skips <video> with no src and no poster', () => {
+    const html = '<video></video>';
+    const { nodes } = parseHtmlToNodes(html);
+    expect(nodes).toHaveLength(0);
+  });
+
+  it('falls back to poster-only twitter-video for non-twimg src with poster', () => {
+    const html = '<video src="blob:https://x.com/abc123" poster="https://pbs.twimg.com/poster.jpg"></video>';
+    const { nodes } = parseHtmlToNodes(html);
+    expect(nodes).toHaveLength(1);
+    expect(nodes[0].type).toBe('embed');
+    expect(nodes[0].embedType).toBe('twitter-video');
+    expect(nodes[0].mediaUrl).toBeUndefined();
+    expect(nodes[0].mediaAlt).toBe('https://pbs.twimg.com/poster.jpg');
   });
 });

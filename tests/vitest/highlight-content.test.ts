@@ -55,7 +55,7 @@ describe('content highlight rendering', () => {
     const highlights = document.querySelectorAll('soma-hl[data-highlight-id="hl_3"]');
     expect(highlights).toHaveLength(1);
     const style = (highlights[0] as HTMLElement).style;
-    expect(style.backgroundColor).toBe('rgba(155, 124, 56, 0.22)');
+    expect(style.backgroundColor).toBe('rgba(247, 236, 139, 0.6)');
     expect(style.borderBottom).toContain('2px solid');
   });
 

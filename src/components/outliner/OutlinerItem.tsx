@@ -1693,7 +1693,7 @@ export function OutlinerItem({
           >
             <div
               ref={contentAreaRef}
-              className={`text-[15px] leading-6 ${isCodeBlock ? 'code-block-container' : ''} ${!isCheckboxFieldType(fieldDataType) && !isFocused ? (isReferenceLikeRow ? 'cursor-default' : 'cursor-text') : ''}`}
+              className={`text-[15px] leading-6 ${isCodeBlock ? 'code-block-container' : ''} ${!isCheckboxFieldType(fieldDataType) && !isFocused ? (isReferenceLikeRow ? 'cursor-default' : 'cursor-text') : ''} ${hasTags && !nodeText ? 'has-placeholder' : ''}`}
               onMouseDown={!isCheckboxFieldType(fieldDataType) ? (isFocused ? handleFocusedContentMouseDown : handleContentMouseDown) : undefined}
               onClick={!isCheckboxFieldType(fieldDataType) && !isFocused ? handleContentClick : undefined}
               onDoubleClick={!isCheckboxFieldType(fieldDataType) && !isFocused && isReference && !isOptionsValueNode ? handleContentDoubleClick : undefined}

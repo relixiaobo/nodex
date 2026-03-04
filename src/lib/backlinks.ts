@@ -13,6 +13,7 @@
 import * as loroDoc from './loro-doc.js';
 import { getAncestorChain, getNavigableParentId, type AncestorInfo } from './tree-utils.js';
 import { CONTAINER_IDS } from '../types/index.js';
+import type { NodexNode } from '../types/index.js';
 
 // ─── Types ───
 
@@ -39,6 +40,26 @@ export interface BacklinksResult {
 }
 
 // ─── Helpers ───
+
+/**
+ * Check if a node is a supertag search node — a search node created from a single tag.
+ * Structure: search → AND group (1 child) → HAS_TAG leaf (1 child).
+ * References from these nodes are excluded from backlinks to reduce noise.
+ */
+function isSupertagSearchNode(node: NodexNode): boolean {
+  if (node.type !== 'search') return false;
+  // Find queryCondition children (skip reference children which are search results)
+  const conditions = node.children
+    .map((id) => loroDoc.toNodexNode(id))
+    .filter((n): n is NodexNode => n !== null && n.type === 'queryCondition');
+  if (conditions.length !== 1) return false;
+  const rootCond = conditions[0];
+  if (rootCond.queryLogic !== 'AND') return false;
+  const leafIds = rootCond.children;
+  if (leafIds.length !== 1) return false;
+  const leaf = loroDoc.toNodexNode(leafIds[0]);
+  return leaf?.queryOp === 'HAS_TAG' && !!leaf.queryTagDefId;
+}
 
 /** Check if a node is inside the TRASH container (walks parent chain). */
 function isInTrash(nodeId: string): boolean {
@@ -113,6 +134,8 @@ export function computeBacklinks(targetNodeId: string, version?: number): Backli
       const contextNode = loroDoc.toNodexNode(contextId);
       // Skip if parent is a fieldEntry — handled by field value check (#3) below
       if (contextNode?.type === 'fieldEntry') continue;
+      // Skip references from supertag search nodes (single-tag searches) — too noisy
+      if (contextNode && isSupertagSearchNode(contextNode)) continue;
       const { ancestors } = getAncestorChain(contextId);
       mentionedIn.push({
         referencingNodeId: contextId,
@@ -220,11 +243,12 @@ export function buildBacklinkCountMap(version: number): Map<string, number> {
     if (!node) continue;
 
     // Tree reference — skip refs inside fieldEntry (counted by field value check below)
+    // and skip refs from supertag search nodes (single-tag searches)
     if (node.type === 'reference' && node.targetId) {
       const parentId = loroDoc.getParentId(id);
       if (parentId) {
         const parentNode = loroDoc.toNodexNode(parentId);
-        if (parentNode?.type !== 'fieldEntry') {
+        if (parentNode?.type !== 'fieldEntry' && !(parentNode && isSupertagSearchNode(parentNode))) {
           counts.set(node.targetId, (counts.get(node.targetId) ?? 0) + 1);
         }
       }

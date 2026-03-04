@@ -115,7 +115,7 @@
 
 .ProseMirror mark,
 .node-content mark {
-  background-color: rgba(200, 170, 80, 0.25);
+  background-color: rgba(253, 224, 71, 0.4);
   border-radius: 0.125rem;
   padding: 0.0625rem 0;
 }
@@ -124,7 +124,7 @@
 
   .ProseMirror mark,
   .node-content mark {
-    background-color: rgba(251, 191, 36, 0.2);
+    background-color: rgba(253, 224, 71, 0.3);
   }
 }
 
@@ -228,6 +228,15 @@
 
 .editor-inline .ProseMirror p::after {
   content: "\200B";
+}
+
+/* Placeholder for empty tagged nodes: show "Untitled" in the editor to match
+   the unfocused static text, preventing layout jump when focusing. */
+.has-placeholder .editor-inline .ProseMirror p:empty::before,
+.has-placeholder .editor-inline .ProseMirror p:has(> br.ProseMirror-trailingBreak:only-child)::before {
+  content: "Untitled";
+  color: var(--color-foreground-tertiary);
+  pointer-events: none;
 }
 
 /* Always hide trailingBreak in inline editor to prevent tag line-wrapping.

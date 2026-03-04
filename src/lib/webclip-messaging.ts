@@ -22,6 +22,8 @@ export interface WebClipCapturePayload {
   schemaOrgType?: string;
   /** DOM contains an <article> element */
   hasArticleElement?: boolean;
+  /** x.com long-form article detected (status URL but article DOM structure) */
+  isXArticle?: boolean;
 }
 
 export type WebClipCaptureResponse =

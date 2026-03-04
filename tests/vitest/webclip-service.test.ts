@@ -198,10 +198,10 @@ describe('refineClipTitle', () => {
     ...overrides,
   });
 
-  it('replaces generic social title with @author: description preview', () => {
+  it('replaces generic social title with @author: short preview (≤30 chars)', () => {
     const payload = makePayload();
     const result = refineClipTitle(payload.title, payload, 'social');
-    expect(result).toBe('@NotionHQ: Not every task needs the same model. A quick summary doesn\'t need the same horsepower.');
+    expect(result).toBe('@NotionHQ: Not every task needs the same…');
   });
 
   it('strips leading @ from author if already present', () => {
@@ -215,14 +215,14 @@ describe('refineClipTitle', () => {
   it('falls back to pageText when description is absent', () => {
     const payload = makePayload({ description: undefined });
     const result = refineClipTitle(payload.title, payload, 'social');
-    expect(result).toBe('@NotionHQ: Not every task needs the same model.');
+    expect(result).toBe('@NotionHQ: Not every task needs the same…');
   });
 
-  it('truncates long text at word boundary', () => {
+  it('truncates long text at word boundary within 30 chars', () => {
     const longText = 'Word '.repeat(30); // 150 chars
     const payload = makePayload({ description: longText.trim() });
     const result = refineClipTitle(payload.title, payload, 'social');
-    expect(result.length).toBeLessThanOrEqual(120); // author + 100 + ellipsis
+    expect(result.length).toBeLessThanOrEqual(50); // author + 30 + ellipsis
     expect(result).toMatch(/…$/);
   });
 
@@ -473,8 +473,10 @@ describe('saveWebClip with templates', () => {
     expect(node!.tags).toContain(NDX_T.SOCIAL);
     expect(node!.tags).not.toContain(SYS_T.SOURCE);
 
-    // Title should be refined from tweet description
-    expect(node!.name).toBe('@user: Great thread about productivity tools');
+    // Title should be refined from tweet description (≤30 char preview)
+    expect(node!.name).toBe('@user: Great thread about…');
+    // Note: truncateText(desc, 30) → "Great thread about productivity…" but
+    // word-boundary cut at pos 18 → "Great thread about…"
 
     // Author field
     const authorFe = findFieldEntry(clipId, NDX_F.AUTHOR);

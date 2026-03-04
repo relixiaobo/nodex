@@ -350,16 +350,16 @@ export function refineClipTitle(
   return `${author}${preview}`;
 }
 
-/** Get a plain-text preview (≤100 chars) from payload. */
+/** Get a plain-text preview (≤30 chars) from payload. */
 function extractTextPreview(payload: WebClipCapturePayload): string | undefined {
   // og:description usually has the tweet text
   if (payload.description) {
-    return truncateText(payload.description, 100);
+    return truncateText(payload.description, 30);
   }
   // Fallback: strip HTML tags from pageText
   if (payload.pageText) {
     const text = payload.pageText.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-    if (text) return truncateText(text, 100);
+    if (text) return truncateText(text, 30);
   }
   return undefined;
 }
@@ -439,8 +439,8 @@ export async function saveWebClip(
   // 6. Fill Author, Published, Duration fields
   fillClipFields(clipNode.id, payload, clipType, store);
 
-  // 7. Set description if available
-  if (payload.description) {
+  // 7. Set description if available (skip for social — body already has the tweet content)
+  if (payload.description && clipType !== 'social') {
     store.updateNodeDescription(clipNode.id, payload.description);
   }
 
@@ -605,8 +605,8 @@ export async function applyWebClipToNode(
   // 5. Fill Author, Published, Duration fields
   fillClipFields(nodeId, payload, clipType, store);
 
-  // 6. Set description if available
-  if (payload.description) {
+  // 6. Set description if available (skip for social — body already has the tweet content)
+  if (payload.description && clipType !== 'social') {
     store.updateNodeDescription(nodeId, payload.description);
   }
 

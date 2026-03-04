@@ -33,6 +33,8 @@ export type NodeType =
   | 'fieldEntry'   // 字段实例：children = 值节点列表，fieldDefId 指向定义
   | 'reference'    // 引用节点：targetId 指向被引用节点（LoroTree 单亲约束）
   | 'codeBlock'    // 代码块节点：name 保存代码正文，codeLanguage 可选语言标记
+  | 'image'        // 图片节点：mediaUrl = 图片 URL
+  | 'embed'        // 嵌入节点：embedType + embedId（如 YouTube 视频）
 
   // ── 定义类型（Schema 层）──
   | 'tagDef'       // Supertag 定义
@@ -221,6 +223,18 @@ export interface NodexNode {
 
   /** 图片高度 (px)（旧 props._imageHeight） */
   imageHeight?: number;
+
+  /** 媒体 URL（图片 src 或 embed URL） */
+  mediaUrl?: string;
+
+  /** 图片 alt 文本 */
+  mediaAlt?: string;
+
+  /** 嵌入类型（'youtube' | 'twitter' 等） */
+  embedType?: string;
+
+  /** 嵌入 ID（视频 ID / 推文 ID 等） */
+  embedId?: string;
 
   /** 搜索上下文节点 ID（旧 props.searchContextNode） */
   searchContext?: string;

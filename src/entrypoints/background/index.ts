@@ -2,7 +2,10 @@ import {
   WEBCLIP_CAPTURE_ACTIVE_TAB,
   WEBCLIP_CAPTURE_PAGE,
   CONTENT_SCRIPT_READY,
+  X_VIDEO_FETCH_URL,
   type WebClipCaptureResponse,
+  type XVideoFetchPayload,
+  type XVideoFetchResponse,
 } from '../../lib/webclip-messaging.js';
 import {
   HIGHLIGHT_CREATE,
@@ -233,6 +236,55 @@ async function forwardHighlightCheck(payload: HighlightCheckUrlPayload): Promise
   });
 }
 
+/**
+ * Generate syndication token for x.com tweet.
+ * Formula from Vercel's react-tweet library.
+ */
+function generateSyndicationToken(tweetId: string): string {
+  return ((Number(tweetId) / 1e15) * Math.PI).toString(36).replace(/(0+|\.)/g, '');
+}
+
+/**
+ * Fetch direct mp4 URL for an x.com video tweet via the Syndication API.
+ */
+async function fetchXVideoUrl(tweetId: string): Promise<XVideoFetchResponse> {
+  const token = generateSyndicationToken(tweetId);
+  const url = `https://cdn.syndication.twimg.com/tweet-result?id=${tweetId}&lang=en&token=${token}`;
+
+  const res = await fetch(url);
+  if (!res.ok) return {};
+
+  const data = await res.json();
+
+  // Find the highest-bitrate mp4 variant
+  const mediaDetails = data?.mediaDetails;
+  if (!Array.isArray(mediaDetails)) return {};
+
+  for (const media of mediaDetails) {
+    if (media.type !== 'video' && media.type !== 'animated_gif') continue;
+    const variants = media.video_info?.variants;
+    if (!Array.isArray(variants)) continue;
+
+    let bestMp4: { url: string; bitrate: number } | undefined;
+    for (const v of variants) {
+      if (v.content_type !== 'video/mp4') continue;
+      const bitrate = v.bitrate ?? 0;
+      if (!bestMp4 || bitrate > bestMp4.bitrate) {
+        bestMp4 = { url: v.url, bitrate };
+      }
+    }
+
+    if (bestMp4) {
+      return {
+        mp4Url: bestMp4.url,
+        posterUrl: media.media_url_https,
+      };
+    }
+  }
+
+  return {};
+}
+
 export default defineBackground(() => {
   // Open Side Panel when action button is clicked
   chrome.action.onClicked.addListener(async (tab) => {
@@ -255,6 +307,21 @@ export default defineBackground(() => {
         resolveReadyWaiters(tabId, true);
       }
       sendResponse({ ok: true });
+      return true;
+    }
+
+    // ── X Video URL Fetch: Content Script -> BG ──
+    if (type === X_VIDEO_FETCH_URL) {
+      const payload = message.payload as XVideoFetchPayload | undefined;
+      if (!payload?.tweetId) {
+        sendResponse({} as XVideoFetchResponse);
+        return true;
+      }
+      fetchXVideoUrl(payload.tweetId).then((result) => {
+        sendResponse(result);
+      }).catch(() => {
+        sendResponse({} as XVideoFetchResponse);
+      });
       return true;
     }
 

@@ -27,6 +27,8 @@ import {
   resolveNodeStructuralIcon,
 } from '../../lib/field-utils.js';
 import { isOutlinerContentNodeType } from '../../lib/node-type-utils.js';
+import { ImageNodeRenderer } from './ImageNodeRenderer';
+import { EmbedNodeRenderer } from './EmbedNodeRenderer';
 import { marksToHtml } from '../../lib/editor-marks.js';
 import { useNodeCheckbox } from '../../hooks/use-node-checkbox.js';
 import {
@@ -470,6 +472,9 @@ export function OutlinerItem({
   }, [effectiveNodeId, cycleNodeCheckbox]);
 
   const isCodeBlock = effectiveNode?.type === 'codeBlock';
+  const isImageNode = effectiveNode?.type === 'image';
+  const isEmbedNode = effectiveNode?.type === 'embed';
+  const isMediaNode = isImageNode || isEmbedNode;
 
   // ── Trigger system (shared hook) ──
   const triggers = useEditorTriggers({
@@ -478,7 +483,7 @@ export function OutlinerItem({
     editorRef,
     tagIds,
     isActive: isFocused,
-    disabled: isCodeBlock,
+    disabled: isCodeBlock || isMediaNode,
     trashNode: trashNode,
     onCycleCheckbox: handleCycleCheckbox,
     onOpenSearch: openSearch,
@@ -1693,7 +1698,20 @@ export function OutlinerItem({
               onClick={!isCheckboxFieldType(fieldDataType) && !isFocused ? handleContentClick : undefined}
               onDoubleClick={!isCheckboxFieldType(fieldDataType) && !isFocused && isReference && !isOptionsValueNode ? handleContentDoubleClick : undefined}
             >
-              {isCheckboxFieldType(fieldDataType) ? (
+              {isImageNode && effectiveNode?.mediaUrl ? (
+                <ImageNodeRenderer
+                  mediaUrl={effectiveNode.mediaUrl}
+                  mediaAlt={effectiveNode.mediaAlt}
+                  imageWidth={effectiveNode.imageWidth}
+                  imageHeight={effectiveNode.imageHeight}
+                />
+              ) : isEmbedNode ? (
+                <EmbedNodeRenderer
+                  embedType={effectiveNode?.embedType}
+                  mediaUrl={effectiveNode?.mediaUrl}
+                  mediaAlt={effectiveNode?.mediaAlt}
+                />
+              ) : isCheckboxFieldType(fieldDataType) ? (
                 <input
                   type="checkbox"
                   checked={node.name === SYS_V.YES}

@@ -43,10 +43,11 @@ export default defineConfig({
         'https://nodex-sync-staging.getsoma.workers.dev/*',      // staging
       ] : []),
       'https://nodex-sync.getsoma.workers.dev/*',              // production
+      'https://cdn.syndication.twimg.com/*',                    // x.com video syndication API
     ],
     // Chrome MV3 需要显式允许 WASM 执行（loro-crdt 依赖 WASM）
     content_security_policy: {
-      extension_pages: "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'",
+      extension_pages: "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; img-src 'self' https: data:",
     },
     side_panel: {
       default_path: 'sidepanel.html',

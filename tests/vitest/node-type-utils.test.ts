@@ -21,6 +21,14 @@ describe('isOutlinerContentNodeType', () => {
     expect(isOutlinerContentNodeType('tagDef')).toBe(true);
   });
 
+  it('treats image nodes as renderable content', () => {
+    expect(isOutlinerContentNodeType('image')).toBe(true);
+  });
+
+  it('treats embed nodes as renderable content', () => {
+    expect(isOutlinerContentNodeType('embed')).toBe(true);
+  });
+
   it('filters structural/internal nodes from content rows', () => {
     expect(isOutlinerContentNodeType('fieldEntry')).toBe(false);
     expect(isOutlinerContentNodeType('fieldDef')).toBe(false);

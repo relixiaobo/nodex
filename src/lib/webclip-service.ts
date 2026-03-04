@@ -10,6 +10,7 @@ import type { WebClipCapturePayload } from './webclip-messaging.js';
 import * as loroDoc from './loro-doc.js';
 import { parseHtmlToNodes, createContentNodes } from './html-to-nodes.js';
 import { ensureTodayNode } from './journal.js';
+import { resolveFieldOptions } from './field-utils.js';
 
 // Re-export for convenience
 export type { WebClipCapturePayload };
@@ -21,6 +22,8 @@ export interface WebClipNodeStore {
   createChild(parentId: string, index?: number, data?: Partial<NodexNode>): NodexNode;
   applyTag(nodeId: string, tagDefId: string): void;
   setFieldValue(nodeId: string, fieldDefId: string, values: string[]): void;
+  setOptionsFieldValue(nodeId: string, fieldDefId: string, optionNodeId: string): void;
+  autoCollectOption(nodeId: string, fieldDefId: string, name: string): string;
   setNodeName(id: string, name: string): void;
   updateNodeDescription(id: string, description: string): void;
   createTagDef(name: string, options?: { showCheckbox?: boolean; color?: string }): NodexNode;
@@ -156,6 +159,7 @@ export function ensureSourceUrlFieldDef(): NodexNode {
 
 /**
  * Ensure "Author" fieldDef exists with fixed ID NDX_F03 under #source tagDef.
+ * Uses OPTIONS type so same-name authors are deduplicated as option nodes.
  */
 export function ensureAuthorFieldDef(): NodexNode {
   ensureSourceTagDef();
@@ -165,8 +169,13 @@ export function ensureAuthorFieldDef(): NodexNode {
     loroDoc.setNodeDataBatch(NDX_F.AUTHOR, {
       type: 'fieldDef',
       name: 'Author',
-      fieldType: FIELD_TYPES.PLAIN,
+      fieldType: FIELD_TYPES.OPTIONS,
     });
+    loroDoc.commitDoc();
+    fd = loroDoc.toNodexNode(NDX_F.AUTHOR)!;
+  } else if (fd.fieldType === FIELD_TYPES.PLAIN) {
+    // Migrate existing PLAIN → OPTIONS
+    loroDoc.setNodeData(NDX_F.AUTHOR, 'fieldType', FIELD_TYPES.OPTIONS);
     loroDoc.commitDoc();
     fd = loroDoc.toNodexNode(NDX_F.AUTHOR)!;
   }
@@ -385,10 +394,19 @@ function fillClipFields(
   clipType: ClipType,
   store: WebClipNodeStore,
 ): void {
-  // Author
+  // Author (OPTIONS field — find-or-create option node for dedup)
   if (payload.author) {
     const authorFd = ensureAuthorFieldDef();
-    store.setFieldValue(nodeId, authorFd.id, [payload.author]);
+    const existingOptionIds = resolveFieldOptions(authorFd.id);
+    const existingOptionId = existingOptionIds.find((optId) => {
+      const opt = loroDoc.toNodexNode(optId);
+      return opt?.name === payload.author;
+    });
+    if (existingOptionId) {
+      store.setOptionsFieldValue(nodeId, authorFd.id, existingOptionId);
+    } else {
+      store.autoCollectOption(nodeId, authorFd.id, payload.author!);
+    }
   }
 
   // Published

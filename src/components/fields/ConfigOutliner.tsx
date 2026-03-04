@@ -102,7 +102,7 @@ export function ConfigOutliner({ nodeId, onNavigateOut }: ConfigOutlinerProps) {
         if (child.type === 'fieldEntry' && child.fieldDefId) {
           const keyId = child.fieldDefId;
           // Skip config fields (SYS_A*, NDX_A*)
-          if (keyId.startsWith('SYS_') || keyId.startsWith('NDX_')) continue;
+          if (keyId.startsWith('SYS_') || keyId.startsWith('NDX_A')) continue;
 
           const fieldDef = getNode(keyId);
           if (!fieldDef || fieldDef.type !== 'fieldDef') continue;

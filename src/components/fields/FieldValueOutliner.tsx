@@ -21,7 +21,7 @@ import { TrailingInput } from '../editor/TrailingInput';
 import { FieldRow } from './FieldRow';
 import { toFieldRowEntryProps } from './field-row-props.js';
 import { NodePicker, type NodePickerOption } from './NodePicker';
-import { BulletChevron } from '../outliner/BulletChevron';
+import { FieldValueRow } from './FieldValueRow.js';
 import { SYS_A, SYS_V } from '../../types';
 import {
   configKeyToPropName,
@@ -40,7 +40,7 @@ import { DatePicker, formatDateDisplay } from './DatePicker.js';
 import { useUIStore } from '../../stores/ui-store.js';
 import * as loroDoc from '../../lib/loro-doc.js';
 import { t } from '../../i18n/strings.js';
-import { FIELD_OVERLAY_Z_INDEX, FIELD_VALUE_INSET } from './field-layout.js';
+import { FIELD_OVERLAY_Z_INDEX } from './field-layout.js';
 import { shouldShowTrailingInput, type OutlinerRowItem } from '../outliner/row-model.js';
 import { useDragSelect } from '../../hooks/use-drag-select.js';
 import { navigateToSiblingRow } from '../../lib/outliner-navigation.js';
@@ -211,32 +211,33 @@ export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, configNo
     const label = isYes ? 'Yes' : 'No';
 
     return (
-      <div className="flex min-h-6 items-start gap-2 py-1" style={{ paddingLeft: FIELD_VALUE_INSET }}>
-        <BulletChevron hasChildren={false} isExpanded={false} onBulletClick={() => { }} />
-        <button
-          onClick={() => {
-            const newIsYes = !isYes;
-            if (isVirtualEntry && configNodeId && attrDefId) {
-              const propName = configKeyToPropName(attrDefId);
-              if (propName) setConfigValue(configNodeId, propName, newIsYes);
-            } else {
-              const parentId = loroDoc.getParentId(tupleId) ?? '';
-              const fieldDefId = loroDoc.toNodexNode(tupleId)?.fieldDefId ?? '';
-              if (parentId && fieldDefId) setFieldValue(parentId, fieldDefId, [newIsYes ? SYS_V.YES : SYS_V.NO]);
-            }
-          }}
-          className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${isYes ? 'bg-primary' : 'bg-border hover:bg-foreground/20'
-            }`}
-          role="switch"
-          aria-checked={isYes}
-        >
-          <span
-            className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-background shadow-sm ring-0 transition-transform duration-200 ease-in-out ${isYes ? 'translate-x-4' : 'translate-x-0'
+      <FieldValueRow>
+        <div className="flex items-start gap-2">
+          <button
+            onClick={() => {
+              const newIsYes = !isYes;
+              if (isVirtualEntry && configNodeId && attrDefId) {
+                const propName = configKeyToPropName(attrDefId);
+                if (propName) setConfigValue(configNodeId, propName, newIsYes);
+              } else {
+                const parentId = loroDoc.getParentId(tupleId) ?? '';
+                const fieldDefId = loroDoc.toNodexNode(tupleId)?.fieldDefId ?? '';
+                if (parentId && fieldDefId) setFieldValue(parentId, fieldDefId, [newIsYes ? SYS_V.YES : SYS_V.NO]);
+              }
+            }}
+            className={`relative mt-0.5 inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${isYes ? 'bg-primary' : 'bg-border hover:bg-foreground/20'
               }`}
-          />
-        </button>
-        <span className="text-[15px] leading-6 text-foreground select-none">{label}</span>
-      </div>
+            role="switch"
+            aria-checked={isYes}
+          >
+            <span
+              className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-background shadow-sm ring-0 transition-transform duration-200 ease-in-out ${isYes ? 'translate-x-4' : 'translate-x-0'
+                }`}
+            />
+          </button>
+          <span className="text-[15px] leading-6 text-foreground select-none">{label}</span>
+        </div>
+      </FieldValueRow>
     );
   }
 
@@ -259,15 +260,14 @@ export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, configNo
     const isChecked = valueNode?.name === SYS_V.YES;
 
     return (
-      <div className="flex min-h-6 items-start gap-2 py-1" style={{ paddingLeft: FIELD_VALUE_INSET }}>
-        <BulletChevron hasChildren={false} isExpanded={false} onBulletClick={() => { }} />
+      <FieldValueRow>
         <input
           type="checkbox"
           checked={isChecked}
           onChange={() => toggleCheckboxField(tupleId)}
           className="mt-[3px] h-3.5 w-3.5 rounded border-border accent-primary cursor-pointer"
         />
-      </div>
+      </FieldValueRow>
     );
   }
 
@@ -301,8 +301,7 @@ export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, configNo
     const url = valueNode?.name ?? '';
 
     return (
-      <div className="flex min-h-6 items-start gap-2 py-1" style={{ paddingLeft: FIELD_VALUE_INSET }}>
-        <BulletChevron hasChildren={false} isExpanded={false} onBulletClick={() => { }} dimmed={!url} />
+      <FieldValueRow dimmed={!url}>
         <div className="flex-1 min-w-0 flex items-center">
           {url ? (
             <a
@@ -319,7 +318,7 @@ export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, configNo
             <span className="text-[15px] leading-6 text-foreground-tertiary select-none">Empty</span>
           )}
         </div>
-      </div>
+      </FieldValueRow>
     );
   }
 
@@ -330,8 +329,7 @@ export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, configNo
     const email = valueNode?.name ?? '';
 
     return (
-      <div className="flex min-h-6 items-start gap-2 py-1" style={{ paddingLeft: FIELD_VALUE_INSET }}>
-        <BulletChevron hasChildren={false} isExpanded={false} onBulletClick={() => { }} dimmed={!email} />
+      <FieldValueRow dimmed={!email}>
         <div className="flex-1 min-w-0 flex items-center">
           {email ? (
             <a
@@ -346,7 +344,7 @@ export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, configNo
             <span className="text-[15px] leading-6 text-foreground-tertiary select-none">Empty</span>
           )}
         </div>
-      </div>
+      </FieldValueRow>
     );
   }
 
@@ -464,14 +462,13 @@ function DatePickerField({ value, onSelect }: { value: string; onSelect: (v: str
 
   return (
     <div className={`relative ${open ? 'isolate field-overlay-open' : ''}`} style={open ? { zIndex: FIELD_OVERLAY_Z_INDEX } : undefined}>
-      <div className="flex min-h-6 items-start gap-2 py-1" style={{ paddingLeft: FIELD_VALUE_INSET }}>
-        <BulletChevron hasChildren={false} isExpanded={false} onBulletClick={() => { }} dimmed={!value} />
+      <FieldValueRow dimmed={!value}>
         <div className="flex-1 min-w-0 flex items-center cursor-pointer" onClick={handleClick}>
           <span className={`text-[15px] leading-6 select-none ${value ? '' : 'text-foreground-tertiary'}`}>
             {value ? formatDateDisplay(value) : t('field.empty')}
           </span>
         </div>
-      </div>
+      </FieldValueRow>
       {open && (
         <DatePicker
           value={value}

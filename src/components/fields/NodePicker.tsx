@@ -12,11 +12,13 @@
  */
 import { useState, useRef, useEffect, useCallback, useMemo, memo } from 'react';
 import { BulletChevron } from '../outliner/BulletChevron';
+import { FieldValueRow } from './FieldValueRow.js';
 import { resolveTagColor } from '../../lib/tag-colors.js';
 import { useNodeStore } from '../../stores/node-store';
 import { useNodeTags } from '../../hooks/use-node-tags.js';
 import { FIELD_OVERLAY_Z_INDEX, FIELD_VALUE_INSET } from './field-layout.js';
 import { t } from '../../i18n/strings.js';
+import type { AppIcon } from '../../lib/icons.js';
 
 /** Memoized colored # bullet — subscribes only to the specific tagDef's color config. */
 const TagDefBullet = memo(function TagDefBullet({ tagDefId }: { tagDefId: string }) {
@@ -36,6 +38,8 @@ export interface NodePickerOption {
   name: string;
   /** When true, renders colored # bullet instead of plain dot */
   isTagDef?: boolean;
+  /** Optional icon to show instead of the default dot bullet */
+  icon?: AppIcon;
 }
 
 interface NodePickerProps {
@@ -215,13 +219,13 @@ export function NodePicker({
         {open && isReference && selectedName ? (
           /* Reference mode: outline wraps bullet+text */
           <div
-            className="flex min-h-7 items-start py-1"
+            className="flex min-h-6 items-start py-1"
             style={{ paddingLeft: insetLeft }}
           >
             {/* Outline wraps reference bullet + text together (like Tana) */}
             <span className="inline-flex items-center gap-2 rounded-sm outline outline-1 outline-primary/50">
               {/* Reference bullet dot (no chevron) — tagDef shows colored # */}
-              <span className="flex shrink-0 h-[21px] w-[15px] items-center justify-center">
+              <span className="flex shrink-0 h-6 w-[15px] items-center justify-center">
                 {selectedTagDefColor ? (
                   <span
                     className="flex h-[15px] w-[15px] items-center justify-center rounded-full"
@@ -235,7 +239,7 @@ export function NodePicker({
                   </span>
                 )}
               </span>
-              <span className="text-sm leading-[21px] text-foreground">
+              <span className="text-[15px] leading-6 text-foreground">
                 {textSelected ? selectedName : inputValue}
               </span>
               {textSelected && selectedNodeTags.length > 0 && (
@@ -260,19 +264,13 @@ export function NodePicker({
           </div>
         ) : (
           /* Non-reference mode or closed state */
-          <div
-            className="flex min-h-7 items-start gap-2 py-1"
-            style={{ paddingLeft: insetLeft }}
+          <FieldValueRow
+            dimmed={!selectedName}
+            isReference={selectedName ? isReference : undefined}
+            tagDefColor={selectedTagDefColor}
+            insetLeft={insetLeft}
+            icon={selectedOption?.icon}
           >
-            <BulletChevron
-              hasChildren={false}
-              isExpanded={false}
-              onBulletClick={noop}
-              {...(selectedName
-                ? (isReference ? { isReference: true } : {})
-                : { dimmed: true })}
-              tagDefColor={selectedTagDefColor}
-            />
             {open ? (
               /* Non-reference editing: plain input with cursor, like a normal node */
               <input
@@ -281,15 +279,15 @@ export function NodePicker({
                 value={inputValue}
                 onChange={handleInputChange}
                 onKeyDown={handleKeyDown}
-                className="flex-1 min-w-0 bg-transparent text-sm leading-[21px] text-foreground outline-none"
+                className="flex-1 min-w-0 bg-transparent text-[15px] leading-6 text-foreground outline-none"
               />
             ) : (
               <span className="flex-1 min-w-0">
                 <span
                   className={
                     selectedName
-                      ? 'text-sm leading-[21px] text-foreground'
-                      : 'text-sm leading-[21px] text-foreground-tertiary select-none group-hover/picker:text-foreground-secondary transition-colors'
+                      ? 'text-[15px] leading-6 text-foreground'
+                      : 'text-[15px] leading-6 text-foreground-tertiary select-none group-hover/picker:text-foreground-secondary transition-colors'
                   }
                 >
                   {selectedName ?? placeholder}
@@ -303,7 +301,7 @@ export function NodePicker({
                 )}
               </span>
             )}
-          </div>
+          </FieldValueRow>
         )}
       </div>
 
@@ -320,20 +318,22 @@ export function NodePicker({
               {filteredOptions.map((opt, i) => (
                 <button
                   key={opt.id}
-                  className={`flex w-full items-start gap-2 rounded-md px-2 py-1 min-h-7 text-left transition-colors ${i === hoverIndex ? 'bg-primary-muted' : 'hover:bg-foreground/4'
+                  className={`flex w-full items-start gap-2 rounded-md px-2 py-1 min-h-6 text-left transition-colors ${i === hoverIndex ? 'bg-primary-muted' : 'hover:bg-foreground/4'
                     }`}
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => handleSelect(opt.id)}
                   onMouseEnter={() => setHoverIndex(i)}
                 >
-                  <span className="flex shrink-0 w-[15px] h-[21px] items-center justify-center">
+                  <span className="flex shrink-0 w-[15px] h-6 items-center justify-center">
                     {opt.isTagDef ? (
                       <TagDefBullet tagDefId={opt.id} />
+                    ) : opt.icon ? (
+                      <opt.icon size={14} className="text-foreground/50" />
                     ) : (
                       <span className="block h-[5px] w-[5px] rounded-full bg-foreground/40" />
                     )}
                   </span>
-                  <span className="text-sm leading-[21px] text-foreground">
+                  <span className="text-[15px] leading-6 text-foreground">
                     {opt.name}
                   </span>
                 </button>
@@ -342,14 +342,14 @@ export function NodePicker({
           ) : allowCreate && inputValue.trim() ? (
             <div>
               <button
-                className="flex w-full items-start gap-2 rounded-md px-2 py-1 min-h-7 text-left bg-foreground/4 text-foreground"
+                className="flex w-full items-start gap-2 rounded-md px-2 py-1 min-h-6 text-left bg-foreground/4 text-foreground"
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => handleCreate(inputValue.trim())}
               >
-                <span className="flex shrink-0 w-[15px] h-[21px] items-center justify-center">
+                <span className="flex shrink-0 w-[15px] h-6 items-center justify-center">
                   <span className="block h-[5px] w-[5px] rounded-full bg-foreground/40" />
                 </span>
-                <span className="text-sm leading-[21px]">
+                <span className="text-[15px] leading-6">
                   {t('nodePicker.create', { name: inputValue.trim() })}
                 </span>
               </button>

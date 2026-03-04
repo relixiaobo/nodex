@@ -13,7 +13,7 @@
  * ──────────────────────────────────────
  */
 import { useCallback, useRef, useEffect, useMemo, useState, type CSSProperties, type DragEvent, type ReactNode } from 'react';
-import { Trash2 } from '../../lib/icons.js';
+import { Trash2, type AppIcon } from '../../lib/icons.js';
 import { useNodeFields } from '../../hooks/use-node-fields';
 import { useNodeStore } from '../../stores/node-store';
 import { useUIStore } from '../../stores/ui-store';
@@ -35,6 +35,7 @@ import { FieldValueOutliner } from './FieldValueOutliner';
 import { FieldNameInput } from './FieldNameInput';
 import { ConfigOutliner } from './ConfigOutliner';
 import { AutoCollectSection } from './AutoCollectSection';
+import { AutoInitGroup } from './AutoInitGroup';
 import { VALIDATED_FIELD_TYPES, validateFieldValue, ValidationWarning } from './field-validation';
 import { ATTRDEF_OUTLINER_FIELDS, TAGDEF_OUTLINER_FIELDS } from '../../lib/field-utils.js';
 import { FIELD_TYPES, SYS_A, SYS_D, SYS_V } from '../../types/index.js';
@@ -42,6 +43,7 @@ import { t } from '../../i18n/strings.js';
 import { NodePicker, type NodePickerOption } from './NodePicker';
 import { DoneMappingEntries } from './DoneMappingEntries';
 import { BulletChevron } from '../outliner/BulletChevron';
+import { FieldValueRow } from './FieldValueRow.js';
 import { FIELD_VALUE_INSET } from './field-layout.js';
 import { dragState } from '../../hooks/use-drag-select.js';
 import { resolveRowPointerSelectAction } from '../../lib/row-pointer-selection.js';
@@ -184,7 +186,7 @@ function ConfigSelectPicker({
 }: {
   nodeId: string;
   configKey: string;
-  options: Array<{ value: string; label: string }>;
+  options: Array<{ value: string; label: string; icon?: AppIcon }>;
   placeholder: string;
 }) {
   const setConfigValue = useNodeStore((s) => s.setConfigValue);
@@ -194,7 +196,7 @@ function ConfigSelectPicker({
     return node ? resolveConfigValue(node, configKey) : undefined;
   });
   const pickerOptions: NodePickerOption[] = useMemo(
-    () => options.map((o) => ({ id: o.value, name: o.label })),
+    () => options.map((o) => ({ id: o.value, name: o.label, icon: o.icon })),
     [options],
   );
 
@@ -246,12 +248,11 @@ function ConfigNumberInput({ nodeId, configKey }: { nodeId: string; configKey: s
   }, [draft, nodeId, propName, setConfigValue]);
 
   return (
-    <div className="flex min-h-6 items-center gap-2 py-1" style={{ paddingLeft: FIELD_VALUE_INSET }}>
-      <BulletChevron hasChildren={false} isExpanded={false} onBulletClick={() => { }} />
+    <FieldValueRow>
       <input
         type="text"
         inputMode="decimal"
-        className="h-[24px] min-w-[120px] bg-transparent p-0 text-[15px] leading-6 text-foreground outline-none placeholder:text-foreground-tertiary"
+        className="h-6 min-w-[120px] bg-transparent p-0 text-[15px] leading-6 text-foreground outline-none placeholder:text-foreground-tertiary"
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
         onBlur={commitDraft}
@@ -268,7 +269,7 @@ function ConfigNumberInput({ nodeId, configKey }: { nodeId: string; configKey: s
         }}
         placeholder={t('field.empty')}
       />
-    </div>
+    </FieldValueRow>
   );
 }
 
@@ -279,7 +280,6 @@ interface SystemConfigValueContext {
   dataType: string;
   isVirtual: boolean;
   onNavigateOut?: (direction: 'up' | 'down') => void;
-  isAutoCollectEnabled: boolean;
   configOptions?: Array<{ value: string; label: string }>;
 }
 
@@ -312,7 +312,7 @@ const SYSTEM_CONFIG_VALUE_RENDERERS: Partial<Record<ConfigFieldDef['control'], S
     <ConfigSelectPicker
       nodeId={nodeId}
       configKey={attrDefId}
-      options={FIELD_TYPE_LIST.map((f) => ({ value: f.value, label: f.label }))}
+      options={FIELD_TYPE_LIST.map((f) => ({ value: f.value, label: f.label, icon: getFieldTypeIcon(f.value) }))}
       placeholder={t('field.selectFieldType')}
     />
   ),
@@ -330,17 +330,11 @@ const SYSTEM_CONFIG_VALUE_RENDERERS: Partial<Record<ConfigFieldDef['control'], S
   number_input: ({ nodeId, attrDefId }) => (
     <ConfigNumberInput nodeId={nodeId} configKey={attrDefId} />
   ),
-  autocollect: ({ tupleId, attrDefId, nodeId, isVirtual, onNavigateOut, isAutoCollectEnabled }) => (
-    <>
-      <FieldValueOutliner
-        tupleId={tupleId}
-        fieldDataType={SYS_D.BOOLEAN}
-        attrDefId={attrDefId}
-        configNodeId={isVirtual ? nodeId : undefined}
-        onNavigateOut={onNavigateOut}
-      />
-      {isAutoCollectEnabled ? <AutoCollectSection fieldDefId={nodeId} /> : null}
-    </>
+  autocollect_list: ({ nodeId }) => (
+    <AutoCollectSection fieldDefId={nodeId} />
+  ),
+  auto_init_group: ({ nodeId }) => (
+    <AutoInitGroup fieldDefId={nodeId} />
   ),
 };
 
@@ -457,19 +451,11 @@ export function FieldRow({
     return validateFieldValue(FIELD_TYPES.NUMBER, String(raw));
   });
 
-  // Auto-collect count for SYS_A44 name display
-  const isAutoCollect = configKey === SYS_A.AUTOCOLLECT_OPTIONS;
-  const isAutoCollectEnabled = useNodeStore((s) => {
-    void s._version;
-    if (!isAutoCollect) return false;
-    const n = s.getNode(nodeId);
-    if (!n) return false;
-    const val = resolveConfigValue(n, attrDefId);
-    return val !== SYS_V.NO;
-  });
+  // Auto-collect count for "Collected values" list row name display
+  const isAutoCollectList = configKey === '__AUTOCOLLECT_LIST__';
   const autoCollectCount = useNodeStore((s) => {
     void s._version;
-    if (!isAutoCollect) return 0;
+    if (!isAutoCollectList) return 0;
     const fieldDef = s.getNode(nodeId);
     if (!fieldDef?.children) return 0;
     return fieldDef.children.reduce((count, cid) => {
@@ -734,7 +720,7 @@ export function FieldRow({
         data-row-kind="field"
         onClick={handleFieldRowClick}
       >
-        <div className="flex items-center gap-1 @sm:shrink-0 @sm:w-[130px] min-w-0 min-h-6 py-1">
+        <div className="flex items-center gap-1 @sm:shrink-0 @sm:w-[100px] min-w-0 min-h-6 py-1">
           <span className="shrink-0 w-[15px] flex items-center justify-center text-foreground-tertiary">
             {SysIcon && <SysIcon size={12} />}
           </span>
@@ -790,7 +776,7 @@ export function FieldRow({
 
   // ─── Path 2: System config fields — read-only name + description, unified value ───
   if (isSystemConfig) {
-    const displayName = isAutoCollect && autoCollectCount > 0
+    const displayName = isAutoCollectList && autoCollectCount > 0
       ? `${attrDefName} (${autoCollectCount})`
       : attrDefName;
     const systemConfigValueContext: SystemConfigValueContext = {
@@ -800,13 +786,12 @@ export function FieldRow({
       dataType,
       isVirtual,
       onNavigateOut,
-      isAutoCollectEnabled,
       configOptions: configDef?.options,
     };
 
     return (
       <div
-        className={`border-t ${isLastInGroup ? 'border-b' : ''} border-border-subtle flex flex-col @sm:flex-row @sm:items-start min-h-6 py-1 relative has-[.field-overlay-open]:z-[80]`}
+        className={`border-t ${isLastInGroup ? 'border-b' : ''} border-border-subtle flex flex-col @sm:flex-row @sm:items-start min-h-6 relative has-[.field-overlay-open]:z-[80]`}
         data-field-row
         data-field-row-id={tupleId}
         data-node-id={tupleId}
@@ -815,9 +800,9 @@ export function FieldRow({
         onClick={handleFieldRowClick}
       >
         {/* Name column — icon + name + description */}
-        <div className="flex gap-1 @sm:shrink-0 @sm:w-[180px] min-w-0 min-h-6 py-1">
+        <div className="flex items-start gap-1 @sm:shrink-0 @sm:w-[100px] min-w-0 min-h-6 py-1">
           {Icon ? (
-            <span className="shrink-0 w-[15px] flex items-start justify-center text-foreground-tertiary mt-1.5">
+            <span className="shrink-0 w-[15px] h-6 flex items-center justify-center text-foreground-tertiary">
               <Icon size={12} />
             </span>
           ) : (
@@ -835,8 +820,8 @@ export function FieldRow({
           </div>
         </div>
         {/* Value column — unified rendering */}
-        <div className="flex flex-1 min-w-0 items-start py-1" data-field-value>
-          <div className="flex-1 min-w-0 min-h-[22px]">
+        <div className="flex flex-1 min-w-0 items-start" data-field-value>
+          <div className="flex-1 min-w-0 min-h-6">
             {renderSystemConfigValue(resolvedControl, systemConfigValueContext)}
           </div>
           {configNumberValidationWarning && (
@@ -888,7 +873,7 @@ export function FieldRow({
           <div className={FIELD_ROW_SELECTION_OVERLAY_CLASS} style={FIELD_ROW_SELECTION_OVERLAY_STYLE} />
         )}
       {/* Name column — aligned to first line of value */}
-      <div className="relative z-[1] flex items-center gap-1 @sm:shrink-0 @sm:w-[130px] min-w-0 min-h-6 py-1">
+      <div className="relative z-[1] flex items-center gap-1 @sm:shrink-0 @sm:w-[100px] min-w-0 min-h-6 py-1">
         {/* Field icon is the drag handle for reorder */}
         <button
           className={`shrink-0 w-[15px] flex items-center justify-center transition-colors ${!isVirtual && !isSystemField && !isSystemConfig ? 'cursor-grab active:cursor-grabbing' : ''} ${ownerTagColor ? '' : 'text-foreground-tertiary hover:text-foreground-secondary'}`}

@@ -62,7 +62,7 @@ export function configKeyToPropName(configKey: string): string | undefined {
  * Check whether a node ID is a system config attrDef (SYS_A* or NDX_A*).
  */
 export function isSystemConfigField(keyId: string): boolean {
-  return keyId.startsWith('SYS_') || keyId.startsWith('NDX_');
+  return keyId.startsWith('SYS_') || keyId.startsWith('NDX_A');
 }
 
 /**
@@ -309,7 +309,7 @@ export function isSingleValueFieldType(dataType: string | undefined): boolean {
 export interface ConfigFieldDef {
   key: string;
   name: string;
-  control: 'type_choice' | 'toggle' | 'select' | 'outliner' | 'autocollect' | 'tag_picker' | 'color_picker' | 'number_input' | 'done_map_entries';
+  control: 'type_choice' | 'toggle' | 'select' | 'outliner' | 'autocollect' | 'autocollect_list' | 'tag_picker' | 'color_picker' | 'number_input' | 'done_map_entries' | 'auto_init_group';
   defaultValue: string;
   appliesTo: string[] | '*';
   icon?: AppIcon;
@@ -353,27 +353,27 @@ export const ATTRDEF_CONFIG_FIELDS: ConfigFieldDef[] = [
   {
     key: SYS_A.AUTOCOLLECT_OPTIONS,
     name: 'Auto-collect values',
-    control: 'autocollect',
+    control: 'toggle',
     icon: Sparkles,
     defaultValue: SYS_V.YES,
     appliesTo: [FIELD_TYPES.OPTIONS],
     description: 'Values created from field input',
   },
   {
+    key: '__AUTOCOLLECT_LIST__',
+    name: 'Collected values',
+    control: 'autocollect_list',
+    defaultValue: '',
+    appliesTo: [FIELD_TYPES.OPTIONS],
+  },
+  {
     key: SYS_A.AUTO_INITIALIZE,
     name: 'Auto-initialize',
-    control: 'select',
+    control: 'auto_init_group',
     icon: Play,
     defaultValue: '',
     appliesTo: '*',
     description: 'Automatically fill value when tag is applied',
-    options: [
-      { value: '', label: 'Off' },
-      { value: AUTO_INIT_STRATEGY.ANCESTOR_SUPERTAG_REF, label: 'From tagged ancestor' },
-      { value: AUTO_INIT_STRATEGY.ANCESTOR_FIELD_VALUE, label: 'From ancestor field' },
-      { value: AUTO_INIT_STRATEGY.CURRENT_DATE, label: 'Current date' },
-      { value: AUTO_INIT_STRATEGY.ANCESTOR_DAY_NODE, label: 'From day node ancestor' },
-    ],
   },
   {
     key: SYS_A.NULLABLE,

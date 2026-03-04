@@ -116,6 +116,7 @@
 .ProseMirror mark,
 .node-content mark {
   background-color: rgba(247, 236, 139, 0.6);
+  mix-blend-mode: multiply;
   border-radius: 0.125rem;
   padding: 0.0625rem 0;
 }

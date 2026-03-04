@@ -11,7 +11,7 @@
  */
 import { useCallback, useRef, useState } from 'react';
 import type { EditorView } from 'prosemirror-view';
-import { Library, Inbox, CalendarDays, Trash2, Search, Settings, type AppIcon } from '../../lib/icons.js';
+import { Library, Inbox, CalendarDays, Trash2, Search, Settings, Code2, type AppIcon } from '../../lib/icons.js';
 import { useNode } from '../../hooks/use-node';
 import { useNodeTags } from '../../hooks/use-node-tags';
 import { useNodeStore } from '../../stores/node-store';
@@ -64,6 +64,8 @@ export function NodeHeader({ nodeId, onTitleRef }: NodeHeaderProps) {
 
   const isFieldDef = node?.type === 'fieldDef';
   const isTagDef = node?.type === 'tagDef';
+  const isSearchNode = node?.type === 'search';
+  const isCodeBlock = node?.type === 'codeBlock';
   const isDefinitionNode = isFieldDef || isTagDef;
   const canEditNode = getNodeCapabilities(nodeId).canEditNode;
 
@@ -198,7 +200,7 @@ export function NodeHeader({ nodeId, onTitleRef }: NodeHeaderProps) {
   const ContainerIcon = containerMeta ? CONTAINER_HEADER_ICONS[containerMeta.iconKey] : undefined;
 
   // Determine whether to show icon block (block ①)
-  const showIconBlock = isTagDef || isFieldDef || isWorkspaceRoot || isContainer;
+  const showIconBlock = isTagDef || isFieldDef || isWorkspaceRoot || isContainer || isSearchNode || isCodeBlock;
 
   // Static display HTML for non-editing state
   const displayHtml = marksToHtml(displayName, rawMarks, rawInlineRefs);
@@ -233,6 +235,16 @@ export function NodeHeader({ nodeId, onTitleRef }: NodeHeaderProps) {
           {isContainer && ContainerIcon && (
             <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-foreground/[0.04] mix-blend-multiply text-foreground-tertiary">
               <ContainerIcon size={20} />
+            </span>
+          )}
+          {isSearchNode && (
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-foreground/[0.04] mix-blend-multiply text-foreground-tertiary">
+              <Search size={20} />
+            </span>
+          )}
+          {isCodeBlock && (
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-foreground/[0.04] mix-blend-multiply text-foreground-tertiary">
+              <Code2 size={20} />
             </span>
           )}
         </div>

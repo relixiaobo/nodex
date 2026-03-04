@@ -10,6 +10,7 @@ import * as loroDoc from '../../lib/loro-doc.js';
 import { SYS_T } from '../../types/index.js';
 import { BulletChevron, ChevronButton } from './BulletChevron';
 import { RichTextEditor, type EditorContentPayload } from '../editor/RichTextEditor';
+import { CodeBlockEditor } from '../editor/CodeBlockEditor';
 import { TriggerDropdowns } from '../editor/TriggerDropdowns';
 import { TrailingInput } from '../editor/TrailingInput';
 import { TagBar } from '../tags/TagBar';
@@ -68,6 +69,34 @@ import {
 
 const DESCRIPTION_SHORTCUT_KEYS = getShortcutKeys('editor.edit_description', ['Ctrl-i']);
 const EMPTY_REFERENCE_PATH: readonly string[] = [];
+
+/**
+ * Convert a click position (clientX/Y) on a code block `<pre>` to a plain-text
+ * character offset. Uses caretRangeFromPoint to find position within the
+ * highlighted <code> DOM, then walks text nodes to compute the offset into the
+ * raw source string.
+ */
+function getCodeBlockTextOffset(preEl: HTMLElement, rawText: string, clientX: number, clientY: number): number {
+  // Try caretRangeFromPoint (Chrome)
+  const range = document.caretRangeFromPoint(clientX, clientY);
+  if (!range) return rawText.length;
+
+  const codeEl = preEl.querySelector('code');
+  const container = codeEl ?? preEl;
+  if (!container.contains(range.startContainer)) return rawText.length;
+
+  // Walk text nodes in DOM order to sum up offset
+  const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
+  let charCount = 0;
+  let node: Text | null;
+  while ((node = walker.nextNode() as Text | null)) {
+    if (node === range.startContainer) {
+      return charCount + range.startOffset;
+    }
+    charCount += node.textContent?.length ?? 0;
+  }
+  return rawText.length;
+}
 
 interface OutlinerItemProps {
   nodeId: string;
@@ -236,6 +265,7 @@ export function OutlinerItem({
   const rowRef = useRef<HTMLDivElement>(null);
   const contentAreaRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<EditorView | null>(null);
+  const codeBlockPendingOffset = useRef<number | null>(null);
   const blurClearRafRef = useRef<number | null>(null);
   const deleteBlockedPulseTimeoutRef = useRef<number | null>(null);
   const wasFocusedRef = useRef(false);
@@ -1688,12 +1718,64 @@ export function OutlinerItem({
             </span>
           )}
           <div
-            className={`relative flex-1 min-w-0 ${isPendingConversion ? 'ref-converting' : ''} ${isDone ? 'text-foreground/40' : ''} ${isCodeBlock ? 'code-block-row' : ''}`}
+            className={`relative flex-1 min-w-0 ${isPendingConversion ? 'ref-converting' : ''} ${isDone ? 'text-foreground/40' : ''}`}
             style={pendingConversionStyle}
           >
+            {isCodeBlock ? (
+              <div
+                ref={contentAreaRef}
+                className="text-[15px] leading-6 cursor-text"
+                onMouseDown={(e) => {
+                  if (isFocused) return; // CodeBlockEditor manages its own clicks when focused
+                  // Multi-select modifiers
+                  const selectAction = resolveRowPointerSelectAction({
+                    justDragged: dragState.justDragged,
+                    metaKey: e.metaKey,
+                    ctrlKey: e.ctrlKey,
+                    shiftKey: e.shiftKey,
+                    allowSingle: false,
+                  });
+                  if (selectAction === 'toggle') { e.preventDefault(); handleCmdClick(); return; }
+                  if (selectAction === 'range') { e.preventDefault(); handleShiftClick(); return; }
+
+                  // Compute text offset from click position on <pre>
+                  const preEl = e.currentTarget.querySelector('pre');
+                  if (preEl) {
+                    const offset = getCodeBlockTextOffset(preEl, nodeText, e.clientX, e.clientY);
+                    codeBlockPendingOffset.current = offset;
+                  }
+                  e.preventDefault();
+                  useUIStore.getState().setFocusClickCoords({ nodeId, parentId, textOffset: 0 });
+                }}
+                onClick={!isFocused ? (e: React.MouseEvent) => {
+                  if (dragState.justDragged) return;
+                  setFocusedNode(nodeId, parentId);
+                } : undefined}
+              >
+                <CodeBlockEditor
+                  nodeId={nodeId}
+                  parentId={parentId}
+                  initialText={nodeText}
+                  codeLanguage={effectiveNode?.codeLanguage}
+                  isFocused={isFocused}
+                  readOnly={!canEditNode}
+                  pendingCursorOffset={codeBlockPendingOffset.current}
+                  onBlur={handleBlur}
+                  onEscapeSelect={handleEscapeSelect}
+                  onArrowUp={handleArrowUp}
+                  onArrowDown={handleArrowDown}
+                  onBackspaceAtStart={handleBackspaceAtStart}
+                  onDelete={handleDelete}
+                  onIndent={handleIndent}
+                  onOutdent={handleOutdent}
+                  onMoveUp={handleMoveUp}
+                  onMoveDown={handleMoveDown}
+                />
+              </div>
+            ) : (
             <div
               ref={contentAreaRef}
-              className={`text-[15px] leading-6 ${isCodeBlock ? 'code-block-container' : ''} ${!isCheckboxFieldType(fieldDataType) && !isFocused ? (isReferenceLikeRow ? 'cursor-default' : 'cursor-text') : ''} ${hasTags && !nodeText ? 'has-placeholder' : ''}`}
+              className={`text-[15px] leading-6 ${!isCheckboxFieldType(fieldDataType) && !isFocused ? (isReferenceLikeRow ? 'cursor-default' : 'cursor-text') : ''} ${hasTags && !nodeText ? 'has-placeholder' : ''}`}
               onMouseDown={!isCheckboxFieldType(fieldDataType) ? (isFocused ? handleFocusedContentMouseDown : handleContentMouseDown) : undefined}
               onClick={!isCheckboxFieldType(fieldDataType) && !isFocused ? handleContentClick : undefined}
               onDoubleClick={!isCheckboxFieldType(fieldDataType) && !isFocused && isReference && !isOptionsValueNode ? handleContentDoubleClick : undefined}
@@ -1751,7 +1833,7 @@ export function OutlinerItem({
                 />
               ) : nodeContentHtml ? (
                 <span
-                  className={`node-content ${isCodeBlock ? 'code-block-content' : ''}`}
+                  className="node-content"
                   dangerouslySetInnerHTML={{ __html: nodeContentHtml }}
                 />
               ) : hasTags ? (
@@ -1765,6 +1847,7 @@ export function OutlinerItem({
                 </span>
               )}
             </div>
+            )}
             {/* Description: gray text below name (hidden for #highlight — stores anchor JSON internally) */}
             {(description || editingDescription) && !tagIds.includes(SYS_T.HIGHLIGHT) && (
               <div

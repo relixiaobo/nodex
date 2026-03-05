@@ -42,7 +42,7 @@ export const enMessages = {
   },
   search: {
     commandPalette: {
-      placeholder: 'Search nodes...',
+      placeholder: 'Search for nodes and commands...',
       noResults: 'No results found.',
       groupSuggestions: 'Suggestions',
       groupCommands: 'Commands',

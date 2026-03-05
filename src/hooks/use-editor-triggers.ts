@@ -576,6 +576,9 @@ export function useEditorTriggers(config: EditorTriggerConfig): EditorTriggerSta
 
       if (!canUseRuntime) return;
 
+      const uiStore = useUIStore.getState();
+      uiStore.addLoadingNode(nodeId);
+
       try {
         const response = await chrome.runtime.sendMessage({
           type: WEBCLIP_CAPTURE_ACTIVE_TAB,
@@ -595,6 +598,8 @@ export function useEditorTriggers(config: EditorTriggerConfig): EditorTriggerSta
         }
       } catch (err) {
         toast.error('Clip failed', { description: err instanceof Error ? err.message : String(err) });
+      } finally {
+        uiStore.removeLoadingNode(nodeId);
       }
     }
   }, [replaceSlashTriggerText, closeSlashMenu, onOpenSearch, openSearch, onCycleCheckbox, nodeId, editorRef]);

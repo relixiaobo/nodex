@@ -56,6 +56,31 @@ describe('getSystemCommands', () => {
     expect(today!.shortcut).toBeTruthy();
   });
 
+  it('includes Go to Yesterday', () => {
+    const cmds = getSystemCommands();
+    const cmd = cmds.find((c) => c.id === 'cmd:yesterday');
+    expect(cmd).toBeDefined();
+    expect(cmd!.type).toBe('command');
+    expect(cmd!.keywords).toContain('yesterday');
+  });
+
+  it('includes New Node in Today', () => {
+    const cmds = getSystemCommands();
+    const cmd = cmds.find((c) => c.id === 'cmd:new-in-today');
+    expect(cmd).toBeDefined();
+    expect(cmd!.type).toBe('command');
+    expect(cmd!.keywords).toContain('create');
+  });
+
+  it('includes Clip Page to Today', () => {
+    const cmds = getSystemCommands();
+    const cmd = cmds.find((c) => c.id === 'cmd:clip-page');
+    expect(cmd).toBeDefined();
+    expect(cmd!.type).toBe('command');
+    expect(cmd!.keywords).toContain('clip');
+    expect(cmd!.keywords).toContain('page');
+  });
+
   it('does not include Sign in/out (handled by ToolbarUserMenu)', () => {
     const cmds = getSystemCommands();
     const ids = cmds.map((c) => c.id);
@@ -71,6 +96,9 @@ describe('getAllCommands', () => {
     const ids = all.map((c) => c.id);
     expect(ids).toContain('nav:LIBRARY');
     expect(ids).toContain('cmd:today');
+    expect(ids).toContain('cmd:yesterday');
+    expect(ids).toContain('cmd:new-in-today');
+    expect(ids).toContain('cmd:clip-page');
   });
 
   it('includes both containers and system commands', () => {

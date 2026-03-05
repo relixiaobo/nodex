@@ -98,8 +98,6 @@ export function CommandPalette() {
   const searchQuery = useUIStore((s) => s.searchQuery);
   const setSearchQuery = useUIStore((s) => s.setSearchQuery);
   const navigateTo = useUIStore((s) => s.navigateTo);
-  const panelHistory = useUIStore((s) => s.panelHistory);
-  const panelIndex = useUIStore((s) => s.panelIndex);
   const _version = useNodeStore((s) => s._version);
   const createChild = useNodeStore((s) => s.createChild);
   const authUser = useWorkspaceStore((s) => s.authUser);
@@ -138,33 +136,7 @@ export function CommandPalette() {
     [],
   );
 
-  // Recent nodes from panel history (deduplicated, most recent first, max 5)
-  // Excludes container nodes since they already appear in the Suggestions group.
-  const recentNodes = useMemo(() => {
-    const seen = new Set<string>();
-    const items: PaletteItem[] = [];
-    // Walk backwards from current index to find recent unique nodes
-    for (let i = panelIndex; i >= 0 && items.length < 5; i--) {
-      const id = panelHistory[i];
-      if (!id || seen.has(id) || containerIdSet.has(id)) continue;
-      seen.add(id);
-      const node = loroDoc.toNodexNode(id);
-      if (!node) continue;
-      const name = (node.name ?? '').replace(/<[^>]+>/g, '').trim();
-      if (!name) continue;
-      const visuals = resolveNodeVisuals(id, node);
-      items.push({
-        id,
-        label: resolveDayNodeDisplayName(id, name),
-        ...visuals,
-        action: () => { trackPaletteUsage(id); navigateTo(id); closeAndClear(); },
-      });
-    }
-    return items;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [panelHistory, panelIndex, _version, navigateTo, closeAndClear]);
-
-  // Container items for Suggestions
+  // Container items for Commands group
   const containerItems: PaletteItem[] = useMemo(() =>
     COMMAND_PALETTE_QUICK_CONTAINERS.map((c) => ({
       id: c.id,
@@ -175,7 +147,7 @@ export function CommandPalette() {
     })),
     [navigateTo, closeAndClear, trackPaletteUsage]);
 
-  // Command items for Commands group (excludes containers, which are in Suggestions)
+  // System command items (containers are added separately in sortedDefaultItems)
   const commandItems: PaletteItem[] = useMemo(() =>
     commands
       .filter((cmd) => cmd.type === 'command')
@@ -286,14 +258,56 @@ export function CommandPalette() {
     };
   }, [searchQuery, createChild, navigateTo, closeAndClear]);
 
-  // Default mode: sort containers + commands by usage boost so frequently used items rank higher.
+  // Default mode: Suggestions (behavior-driven) + Commands (fixed list)
   const sortedDefaultItems = useMemo(() => {
-    const suggestions = [...recentNodes, ...containerItems];
-    const commands = [...commandItems];
-    // Sort commands by usage boost (most used first), stable order for equal boost
-    commands.sort((a, b) => getUsageBoost(b.id) - getUsageBoost(a.id));
-    return { suggestions, commands };
-  }, [recentNodes, containerItems, commandItems, getUsageBoost]);
+    // Suggestions: purely behavior-driven — items from paletteUsage sorted by boost, max 5
+    const usageEntries = Object.keys(paletteUsage);
+    const suggestionItems: PaletteItem[] = [];
+    if (usageEntries.length > 0) {
+      const scored = usageEntries
+        .map((id) => ({ id, boost: getUsageBoost(id) }))
+        .filter((e) => e.boost > 0)
+        .sort((a, b) => b.boost - a.boost)
+        .slice(0, 5);
+
+      for (const { id } of scored) {
+        // Command or container?
+        const cmd = commands.find((c) => c.id === id);
+        if (cmd) {
+          suggestionItems.push({
+            id: cmd.id,
+            label: cmd.label,
+            icon: cmd.icon,
+            type: cmd.type,
+            action: () => { trackPaletteUsage(cmd.id); cmd.action(ctx); },
+          });
+          continue;
+        }
+        // Container?
+        const container = containerItems.find((c) => c.id === id);
+        if (container) {
+          suggestionItems.push({ ...container });
+          continue;
+        }
+        // Node?
+        const node = loroDoc.toNodexNode(id);
+        if (!node) continue;
+        const name = (node.name ?? '').replace(/<[^>]+>/g, '').trim();
+        if (!name) continue;
+        const visuals = resolveNodeVisuals(id, node);
+        suggestionItems.push({
+          id,
+          label: resolveDayNodeDisplayName(id, name),
+          ...visuals,
+          action: () => { trackPaletteUsage(id); navigateTo(id); closeAndClear(); },
+        });
+      }
+    }
+
+    // Commands: fixed list = containers + system commands
+    const cmdItems = [...containerItems, ...commandItems];
+    return { suggestions: suggestionItems, commands: cmdItems };
+  }, [paletteUsage, getUsageBoost, commands, containerItems, commandItems, ctx, trackPaletteUsage, navigateTo, closeAndClear]);
 
   // Flat list of all visible items (for keyboard navigation)
   const allItems: PaletteItem[] = useMemo(() => {
@@ -438,7 +452,7 @@ export function CommandPalette() {
               })()}
               {searchResults.length > 0 && (
                 <>
-                  <GroupHeader label="Results" />
+                  <GroupHeader label={t('search.commandPalette.groupResults')} />
                   {searchResults.map((item) => {
                     const idx = globalIdx++;
                     return (
@@ -460,7 +474,7 @@ export function CommandPalette() {
             <>
               {sortedDefaultItems.suggestions.length > 0 && (
                 <div>
-                  <GroupHeader label="Suggestions" />
+                  <GroupHeader label={t('search.commandPalette.groupSuggestions')} />
                   {sortedDefaultItems.suggestions.map((item) => {
                     const idx = globalIdx++;
                     return (
@@ -478,7 +492,7 @@ export function CommandPalette() {
               )}
               {sortedDefaultItems.commands.length > 0 && (
                 <div>
-                  <GroupHeader label="Commands" />
+                  <GroupHeader label={t('search.commandPalette.groupCommands')} />
                   {sortedDefaultItems.commands.map((item) => {
                     const idx = globalIdx++;
                     return (

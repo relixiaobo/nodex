@@ -150,6 +150,7 @@ _(空)_
 
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
+| 2026-03-05 | Google Docs 剪藏 + 两阶段 Loading UX — export HTML 抓取 + kix 列表嵌套 + 空 shell 占位 + pulse 动画 + 加载中禁止交互 | nodex | main |
 | 2026-03-05 | Options 字段 auto-collect 修复 — OutlinerItem blur/Enter 路径补 registerCollectedOption + autoCollected 标志位 + visibleWhen 条件 + 4 test | nodex | main |
 | 2026-03-04 | 高亮 hover 工具栏重做 — 两层检测 + click 透传 + 250ms 延迟防抖 + Note popover ⌘↵ 提示 | nodex | main |
 | 2026-03-04 | x.com clip 修复 + 高亮色系统统一 — Soft Banana 高亮色 + Harvest Yellow 色板 + #highlight 迁移 amber→yellow | nodex | main |

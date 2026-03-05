@@ -67,6 +67,7 @@ function TwitterVideoEmbed({ mediaUrl, poster }: { mediaUrl?: string; poster?: s
           src={poster}
           alt="Video thumbnail"
           loading="lazy"
+          referrerPolicy="no-referrer"
           className="w-full h-full object-contain"
         />
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">

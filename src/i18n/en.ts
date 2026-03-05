@@ -56,6 +56,7 @@ export const enMessages = {
       untitled: 'Untitled',
       typeLabelCommand: 'Command',
       typeLabelNavigate: 'Navigate',
+      typeLabelNewInToday: 'New in Today',
       cmdYesterday: 'Go to Yesterday',
       cmdClipPage: 'Clip Page to Today',
     },

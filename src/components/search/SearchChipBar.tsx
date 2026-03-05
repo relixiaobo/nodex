@@ -77,14 +77,19 @@ export function SearchChipBar({ searchNodeId }: SearchChipBarProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [node?.children, _version]);
   if (chips.length === 0) return null;
+
+  // For simple single-tag searches, the title already says "Everything tagged #X"
+  // so chips are redundant — only show result count.
+  const isSimpleSingleTag = chips.length === 1 && chips[0].text.startsWith('#');
+
   return (
     <div className="flex flex-wrap items-center gap-1.5 px-4 pb-2">
-      {chips.map((chip) => (
+      {!isSimpleSingleTag && chips.map((chip) => (
         <span key={chip.id} className="inline-flex items-center rounded-md bg-foreground/[0.06] px-2 py-0.5 text-xs text-foreground-secondary select-none">
           {chip.text}
         </span>
       ))}
-      <span className="text-xs text-foreground-tertiary ml-1">{resultCount} {resultCount === 1 ? 'result' : 'results'}</span>
+      <span className="text-xs text-foreground-tertiary">{resultCount} {resultCount === 1 ? 'result' : 'results'}</span>
     </div>
   );
 }

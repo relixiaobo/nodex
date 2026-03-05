@@ -331,7 +331,7 @@ function seedBody(): void {
   // ═══════════════════════════════════════════════════════════════
   // Search node: "Task" tag search (queryCondition tree + auto-materialized results)
   // ═══════════════════════════════════════════════════════════════
-  cn('search_task', CONTAINER_IDS.SEARCHES, { type: 'search', name: 'Task' });
+  cn('search_task', CONTAINER_IDS.SEARCHES, { type: 'search', name: 'Everything tagged #Task' });
   cn('search_task_and', 'search_task', { type: 'queryCondition', queryLogic: 'AND' });
   cn('search_task_cond', 'search_task_and', { type: 'queryCondition', queryOp: 'HAS_TAG', queryTagDefId: 'tagDef_task' });
   // Results are auto-materialized on panel open via refreshSearchResults

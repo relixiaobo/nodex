@@ -45,6 +45,7 @@ import {
   type HighlightUnresolvablePayload,
 } from '../../lib/highlight-messaging.js';
 import { ensureContainers } from '../../lib/bootstrap-containers.js';
+import { seedOnboardingData, isOnboardingSeeded } from '../../lib/onboarding-seed.js';
 import { Toaster, toast } from 'sonner';
 import { TooltipProvider } from '../../components/ui/Tooltip';
 
@@ -135,6 +136,11 @@ function useBootstrap(skip: boolean): BootstrapResult {
 
    // Bootstrap LoroDoc + seed containers
    const { hadSnapshot } = await seedWorkspace(currentWsId);
+
+   // Seed onboarding content for first-time users (no local snapshot = fresh workspace)
+   if (!hadSnapshot && !isOnboardingSeeded()) {
+    seedOnboardingData();
+   }
 
    // Restore auth session from stored Bearer token (validates against server).
    // Must run after initLoroDoc so getPeerIdStr() is available for sync start.

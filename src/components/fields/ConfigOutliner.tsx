@@ -141,16 +141,18 @@ export function ConfigOutliner({ nodeId, onNavigateOut }: ConfigOutlinerProps) {
           fieldEntry: fieldMap.get(cid)!,
         });
       } else {
-        const nodeType = getNode(cid)?.type;
+        const childNode = getNode(cid);
+        const nodeType = childNode?.type;
         // Include plain content nodes AND fieldDef children (template fields in new Loro model)
-        if (!nodeType || nodeType === 'fieldDef') {
+        // Exclude auto-collected option nodes (shown in AutoCollectSection instead)
+        if ((!nodeType || nodeType === 'fieldDef') && !childNode?.autoCollected) {
           items.push({
             id: cid,
             type: 'content',
             ownerTagDefId: nodeId,
           });
         }
-        // else skip: fieldEntry config items, reference, etc.
+        // else skip: fieldEntry config items, reference, autoCollected, etc.
       }
     }
 
@@ -229,7 +231,10 @@ export function ConfigOutliner({ nodeId, onNavigateOut }: ConfigOutlinerProps) {
           );
         }}
         renderContent={(row) => {
-          const ownerColor = resolveTagColor(row.ownerTagDefId).text;
+          // Only tint bullets for inherited items in tagDef configs (visual ancestry indicator).
+          // attrDef content (pre-determined options) should use default bullet color.
+          const isInherited = isTagDef && row.ownerTagDefId !== nodeId;
+          const ownerColor = isInherited ? resolveTagColor(row.ownerTagDefId).text : undefined;
           return (
             <OutlinerItem
               nodeId={row.id}

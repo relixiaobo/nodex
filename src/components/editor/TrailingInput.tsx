@@ -110,6 +110,7 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
     const allOptions = useFieldOptions(isOptions ? (attrDefId ?? '') : '');
     const addReference = useNodeStore((s) => s.addReference);
     const selectFieldOption = useNodeStore((s) => s.selectFieldOption);
+    const registerCollectedOption = useNodeStore((s) => s.registerCollectedOption);
     const applyParsedPasteMetadata = useNodeStore((s) => s.applyParsedPasteMetadata);
     const createSiblingNodesFromPaste = useNodeStore((s) => s.createSiblingNodesFromPaste);
     const createChildNodesFromPaste = useNodeStore((s) => s.createChildNodesFromPaste);
@@ -126,20 +127,20 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
     }, [isOptions, optionsOpen, optionsQuery, allOptions]);
 
     const callbacksRef = useRef({
-        createChild, createNodeInSearchContext, cycleNodeCheckbox, addUnnamedFieldToNode, addReference, selectFieldOption, applyParsedPasteMetadata, createSiblingNodesFromPaste, createChildNodesFromPaste,
+        createChild, createNodeInSearchContext, cycleNodeCheckbox, addUnnamedFieldToNode, addReference, selectFieldOption, registerCollectedOption, applyParsedPasteMetadata, createSiblingNodesFromPaste, createChildNodesFromPaste,
         parentId, effectiveParentId, effectiveDepth, effectiveParentEK,
         setEffectiveParentId, setEffectiveDepth, setEffectiveParentEK,
         setExpanded, setFocusedNode, setFocusClickCoords, setEditingFieldName, setTriggerHint,
-        isOptions, optionsOpen, filteredOptions, optionsIndex,
+        isOptions, attrDefId, optionsOpen, filteredOptions, optionsIndex,
         setOptionsOpen, setOptionsQuery, setOptionsIndex,
         onNavigateOut, isSearchContext,
     });
     callbacksRef.current = {
-        createChild, createNodeInSearchContext, cycleNodeCheckbox, addUnnamedFieldToNode, addReference, selectFieldOption, applyParsedPasteMetadata, createSiblingNodesFromPaste, createChildNodesFromPaste,
+        createChild, createNodeInSearchContext, cycleNodeCheckbox, addUnnamedFieldToNode, addReference, selectFieldOption, registerCollectedOption, applyParsedPasteMetadata, createSiblingNodesFromPaste, createChildNodesFromPaste,
         parentId, effectiveParentId, effectiveDepth, effectiveParentEK,
         setEffectiveParentId, setEffectiveDepth, setEffectiveParentEK,
         setExpanded, setFocusedNode, setFocusClickCoords, setEditingFieldName, setTriggerHint,
-        isOptions, optionsOpen, filteredOptions, optionsIndex,
+        isOptions, attrDefId, optionsOpen, filteredOptions, optionsIndex,
         setOptionsOpen, setOptionsQuery, setOptionsIndex,
         onNavigateOut, isSearchContext,
     };
@@ -160,6 +161,11 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
         // Create child and focus it (TrailingInput unmounts once there are children,
         // so we focus the new node to keep the cursor visible)
         const newNode = createInContext(ref, ref.effectiveParentId, { name: rawText });
+
+        // Options field: also register as auto-collected option under fieldDef
+        if (ref.isOptions && ref.attrDefId) {
+            ref.registerCollectedOption(ref.attrDefId, rawText.trim());
+        }
         ref.setExpanded(ref.effectiveParentEK, true, true);
         ref.setFocusClickCoords({
             nodeId: newNode.id,
@@ -209,8 +215,14 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
                         committingRef.current = true;
                         resetEditorContent(view);
                         setHasContent(false);
+
                         const targetParentId = ref.effectiveParentId;
                         createInContext(ref, targetParentId, { name: rawText });
+
+                        // Options field: also register as auto-collected option
+                        if (ref.isOptions && ref.attrDefId) {
+                            ref.registerCollectedOption(ref.attrDefId, rawText.trim());
+                        }
                         ref.setExpanded(ref.effectiveParentEK, true, true);
                         const newNode = createInContext(ref, targetParentId, { name: '' });
                         ref.setExpanded(ref.effectiveParentEK, true, true);

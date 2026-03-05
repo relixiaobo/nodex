@@ -48,7 +48,12 @@ function isVisibleWhenSatisfied(
   condition: NonNullable<ConfigFieldDef['visibleWhen']>,
   node: NodexNode,
 ): boolean {
-  const val = resolveConfigValue(node, condition.dependsOn);
+  let val = resolveConfigValue(node, condition.dependsOn);
+  // When the property isn't set, fall back to the dependent config field's default value
+  if (val === undefined) {
+    const depDef = ATTRDEF_CONFIG_MAP.get(condition.dependsOn) ?? TAGDEF_CONFIG_MAP.get(condition.dependsOn);
+    if (depDef) val = depDef.defaultValue || undefined;
+  }
   return val === condition.value;
 }
 

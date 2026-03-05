@@ -1,7 +1,9 @@
 /**
  * Auto-collect values outliner for OPTIONS-type attrDef config page.
  *
- * Renders option nodes under the fieldDef as reference bullets.
+ * Shows option nodes that were auto-collected from field usage,
+ * identified by the `autoCollected` flag set by autoCollectOption().
+ * Pre-determined options (manually added, no flag) are shown in ConfigOutliner.
  */
 import { useMemo } from 'react';
 import { useNodeStore } from '../../stores/node-store';
@@ -12,19 +14,17 @@ interface AutoCollectSectionProps {
 }
 
 export function AutoCollectSection({ fieldDefId }: AutoCollectSectionProps) {
-  // Read option nodes directly from fieldDef.children.
   const collectedJson = useNodeStore((s) => {
     void s._version;
     const fieldDef = s.getNode(fieldDefId);
     if (!fieldDef?.children || fieldDef.children.length === 0) return '[]';
-    const ids = fieldDef.children;
-    const items = ids
-      .map((id) => {
-        const node = s.getNode(id);
-        if (!node || node.type) return null;
-        return { id, name: node.name ?? '' };
-      })
-      .filter(Boolean);
+
+    // Only show children marked as auto-collected
+    const items = fieldDef.children
+      .map((id) => s.getNode(id))
+      .filter((n) => n && !n.type && n.autoCollected)
+      .map((n) => ({ id: n!.id, name: n!.name ?? '' }));
+
     return JSON.stringify(items);
   });
 

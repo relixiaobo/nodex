@@ -55,7 +55,6 @@ export const enMessages = {
       containerTrash: 'Trash',
       untitled: 'Untitled',
       cmdYesterday: 'Go to Yesterday',
-      cmdNewInToday: 'New Node in Today',
       cmdClipPage: 'Clip Page to Today',
     },
   },

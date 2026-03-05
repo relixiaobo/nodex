@@ -578,6 +578,7 @@ export function useEditorTriggers(config: EditorTriggerConfig): EditorTriggerSta
 
       const uiStore = useUIStore.getState();
       uiStore.addLoadingNode(nodeId);
+      uiStore.clearFocus();
 
       try {
         const response = await chrome.runtime.sendMessage({

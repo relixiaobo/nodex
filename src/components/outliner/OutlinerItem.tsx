@@ -922,6 +922,7 @@ export function OutlinerItem({
   // mode. Edit mode is deferred to click so drag-select can take over if the
   // user drags (mounting RichTextEditor on mousedown captures subsequent mouse events).
   const handleContentMouseDown = useCallback((e: React.MouseEvent) => {
+    if (isLoadingNode) { e.preventDefault(); return; }
     if (isCheckboxFieldType(fieldDataType)) return;
     const target = e.target as HTMLElement;
     // Skip for hyperlinks — handleContentClick will open in new tab
@@ -986,7 +987,7 @@ export function OutlinerItem({
     );
     // Prevent native selection/focus churn on the static HTML layer.
     e.preventDefault();
-  }, [isReferenceLikeRow, fieldDataType, nodeId, parentId, handleCmdClick, handleShiftClick]);
+  }, [isLoadingNode, isReferenceLikeRow, fieldDataType, nodeId, parentId, handleCmdClick, handleShiftClick]);
 
   // While editing, clicking the large blank area to the right of inline editor
   // should keep caret at end instead of blurring/re-entering at offset 0.
@@ -1052,6 +1053,7 @@ export function OutlinerItem({
   }, [isFocused, fieldDataType]);
 
   const handleContentClick = useCallback((e: React.MouseEvent) => {
+    if (isLoadingNode) return;
     // Drag-select just ended → suppress this click
     if (dragState.justDragged) return;
 
@@ -1094,7 +1096,7 @@ export function OutlinerItem({
     if (!isReferenceLikeRow) {
       setFocusedNode(nodeId, parentId);
     }
-  }, [nodeId, parentId, isReferenceLikeRow, isReference, setSelectedNode, setFocusedNode, navigateTo]);
+  }, [isLoadingNode, nodeId, parentId, isReferenceLikeRow, isReference, setSelectedNode, setFocusedNode, navigateTo]);
 
   const handleContentDoubleClick = useCallback((e: React.MouseEvent) => {
     // Double click on reference node → enter edit mode
@@ -1663,7 +1665,7 @@ export function OutlinerItem({
         rootChildIds,
         rootNodeId,
         isEditing: isFocused,
-        enterEdit: () => setFocusedNode(nodeId, parentId),
+        enterEdit: () => { if (!isLoadingNode) setFocusedNode(nodeId, parentId); },
         exitEdit: () => clearFocus(),
         rowKind: 'content',
         onSelectionKeydown: handleReferenceSelectionKeydown,
@@ -1711,9 +1713,9 @@ export function OutlinerItem({
         <div className={`flex items-start gap-2 min-w-0 relative ${isSelectedRefClick ? 'node-selected-ref w-fit flex-none' : 'flex-1'}`}>
           {/* Bullet is the drag handle for reorder */}
           <div
-            className={`cursor-grab active:cursor-grabbing ${deleteBlockedPulse ? 'node-delete-blocked-pulse' : ''}`}
-            draggable
-            onDragStart={handleDragStart}
+            className={`${isLoadingNode ? 'cursor-default' : 'cursor-grab active:cursor-grabbing'} ${deleteBlockedPulse ? 'node-delete-blocked-pulse' : ''}`}
+            draggable={!isLoadingNode}
+            onDragStart={isLoadingNode ? undefined : handleDragStart}
           >
             <BulletChevron
               hasChildren={hasChildren}
@@ -1794,7 +1796,7 @@ export function OutlinerItem({
             ) : (
             <div
               ref={contentAreaRef}
-              className={`text-[15px] leading-6 ${!isCheckboxFieldType(fieldDataType) && !isFocused ? (isReferenceLikeRow ? 'cursor-default' : 'cursor-text') : ''} ${hasTags && !nodeText ? 'has-placeholder' : ''}`}
+              className={`text-[15px] leading-6 ${isLoadingNode ? 'cursor-default' : !isCheckboxFieldType(fieldDataType) && !isFocused ? (isReferenceLikeRow ? 'cursor-default' : 'cursor-text') : ''} ${hasTags && !nodeText ? 'has-placeholder' : ''}`}
               onMouseDown={!isCheckboxFieldType(fieldDataType) ? (isFocused ? handleFocusedContentMouseDown : handleContentMouseDown) : undefined}
               onClick={!isCheckboxFieldType(fieldDataType) && !isFocused ? handleContentClick : undefined}
               onDoubleClick={!isCheckboxFieldType(fieldDataType) && !isFocused && isReference && !isOptionsValueNode ? handleContentDoubleClick : undefined}

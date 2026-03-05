@@ -1,12 +1,12 @@
 # Feature: 网页剪藏
 
-> Phase 5 | V2 正文内容转子节点 | 提取→落库→反馈→导航→正文大纲化 全链路可用
+> Phase 6 | Google Docs 支持 + 两阶段 Loading UX | 提取→落库→反馈→导航→正文大纲化→Canvas 页面→异步加载 全链路可用
 
 ## 概述
 
 Chrome Side Panel 的核心场景：用户浏览网页时，将内容剪藏为 Nodex 节点。剪藏结果是一个普通节点，通过 Supertag + Field 携带来源元数据，并支持 Read Later（正文大纲化）。
 
-## 当前实现状态（2026-02-21）
+## 当前实现状态（2026-03-05）
 
 - ✅ Side Panel -> Background -> Content Script 消息链路已打通
 - ✅ Content Script 已切换为 `defuddle` 提取，提取 title/url/content/author/published/description/siteName
@@ -24,6 +24,10 @@ Chrome Side Panel 的核心场景：用户浏览网页时，将内容剪藏为 N
 - ✅ sonner toast 反馈：成功 `toast.success('Page clipped')`、失败 `toast.error('Clip failed')`
 - ✅ URL 字段值渲染为蓝色可点击链接（`<a target="_blank">`），Email 字段值渲染为 `mailto:` 链接
 - ✅ **V2 正文内容转子节点**：`defuddle` 返回的 HTML 正文通过 `parseHtmlToNodes()` 解析为 heading-based 层级树，通过 `createContentNodes()` 批量创建为 Loro 子节点（29 test cases）
+- ✅ **Google Docs 剪藏**：Canvas 渲染的 Google Docs 通过 `/export?format=html` 抓取内容，`nestGoogleDocsLists()` 将 flat kix 列表转嵌套树（4 test cases）
+- ✅ **两阶段 Loading UX**：⌘K clip 立即创建空 shell 节点 + 导航到 Today → 异步抓取填充内容。bullet pulse 动画 + "Clipping…" 占位文本 + 加载中禁止交互（点击/编辑/拖拽）
+- ✅ `/clip_page` 斜杠命令也支持 loading 动画（当前节点 bullet pulse + clearFocus 禁止编辑）
+- ✅ 抓取失败时自动清理空 shell 节点（trashNode）
 
 ## 前因后果（决策演进）
 
@@ -204,3 +208,9 @@ V1 已确立此原则（Source URL = attrDef 字段）。V2 新增的元数据**
 | 2026-02-21 | 正文节点上限 200，超出截断 | 长文防爆，truncated flag 标记 |
 | 2026-02-21 | h1 跳过，figure/img/hr 跳过 | h1 与 clip title 重复；V1 不支持图片 |
 | 2026-02-21 | 复用 `htmlToMarks()` 提取行内格式 | bold/italic/strike/code/highlight/link marks 保留到子节点 |
+| 2026-03-05 | Google Docs 用 `/export?format=html` 抓取 | Canvas 渲染无 DOM 文本，`_docs_force_html_by_ext` 已废弃，export URL 用 session cookie 同源 fetch |
+| 2026-03-05 | `nestGoogleDocsLists()` 预处理 flat kix 列表 | Google Docs export 用 `lst-kix_*-N` CSS class 编码缩进层级，sibling `<ol>` 需转嵌套 `<ol>/<li>` |
+| 2026-03-05 | 两阶段 clip：shell → async fill | 长页面抓取耗时数秒，先占位再填充避免用户困惑 |
+| 2026-03-05 | Shell 节点空 name，不预填 tab.title | x.com 等站点有自定义标题提取，tab.title 不准确 |
+| 2026-03-05 | Loading 节点禁止交互 | 防止用户在 shell 上输入内容被后续 fill 覆盖 |
+| 2026-03-05 | 抓取失败时 trashNode 清理 shell | 不留空节点污染用户数据 |

@@ -16,7 +16,6 @@ import {
  type AppIcon,
 } from '../../lib/icons.js';
 import {
- SLASH_DISABLED_HINT_DEFAULT,
  type SlashCommandDefinition,
  type SlashCommandId,
 } from '../../lib/slash-commands.js';
@@ -100,29 +99,25 @@ export function SlashCommandMenu({ open, commands, selectedIndex, onSelect, anch
    {commands.map((command, index) => {
     const Icon = ICON_MAP[command.id];
     const isActive = index === selectedIndex;
-    const isDisabled = !command.enabled;
 
     return (
      <button
       key={command.id}
       type="button"
-      aria-disabled={isDisabled}
-      title={isDisabled ? command.disabledHint ?? SLASH_DISABLED_HINT_DEFAULT : undefined}
-      className={`flex w-full items-center gap-2 rounded-md px-2 py-1 text-left text-sm ${
-       isDisabled
-        ? 'cursor-not-allowed text-foreground-tertiary opacity-50'
-        : isActive
-         ? 'bg-primary-muted text-foreground'
-         : 'text-foreground hover:bg-foreground/4'
+      className={`flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-sm ${
+       isActive
+        ? 'bg-primary-muted text-foreground'
+        : 'text-foreground-secondary hover:text-foreground hover:bg-foreground/4'
       }`}
       onMouseDown={(e) => {
        e.preventDefault();
        e.stopPropagation();
-       if (isDisabled) return;
        onSelect(command.id);
       }}
      >
-      <Icon size={16} className="shrink-0 text-foreground-secondary" />
+      <div className="flex w-4 shrink-0 items-center justify-center text-foreground-tertiary">
+       <Icon size={14} strokeWidth={1.5} />
+      </div>
       <span className="truncate">{command.name}</span>
       {command.shortcutHint && (
        <Kbd keys={command.shortcutHint} className="ml-auto" />

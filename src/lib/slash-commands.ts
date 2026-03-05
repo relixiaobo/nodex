@@ -99,7 +99,7 @@ export const SLASH_COMMANDS_BASELINE: readonly SlashCommandDefinition[] = [
     name: 'More commands',
     shortcutHint: '⌘K',
     keywords: ['more', 'commands', 'command palette', 'cmdk', '⌘k'],
-    enabled: true,
+    enabled: false,
   },
 ] as const;
 
@@ -107,9 +107,11 @@ export function filterSlashCommands(
   query: string,
   commands: readonly SlashCommandDefinition[] = SLASH_COMMANDS_BASELINE,
 ): SlashCommandDefinition[] {
+  // Only show enabled commands (hide unimplemented features)
+  const visible = commands.filter((c) => c.enabled);
   const q = query.trim().toLowerCase();
-  if (!q) return [...commands];
-  return commands.filter((c) => {
+  if (!q) return [...visible];
+  return visible.filter((c) => {
     if (c.name.toLowerCase().includes(q)) return true;
     return c.keywords.some((k) => k.toLowerCase().includes(q));
   });

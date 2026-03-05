@@ -592,9 +592,9 @@ function PaletteRow({ item, selected, onSelect, onHover }: PaletteRowProps) {
           />
         </span>
       )}
-      <span className="flex-1 truncate text-[13px] text-foreground">{item.label}</span>
+      <span className="min-w-0 flex-1 truncate text-[13px] text-foreground">{item.label}</span>
       {item.typeLabel && (
-        <span className="shrink-0 text-xs text-foreground-tertiary">{item.typeLabel}</span>
+        <span className="w-[72px] shrink-0 text-right text-xs text-foreground-tertiary">{item.typeLabel}</span>
       )}
     </div>
   );

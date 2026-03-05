@@ -16,7 +16,7 @@ export function getChipTextForCondition(condition: NodexNode): string {
       .map((id) => loroDoc.toNodexNode(id))
       .filter((n): n is NodexNode => n !== null && n.type === 'queryCondition')
       .map((c) => getChipTextForCondition(c));
-    if (condition.queryLogic === 'NOT') return `排除: ${childTexts.join(', ')}`;
+    if (condition.queryLogic === 'NOT') return `Exclude: ${childTexts.join(', ')}`;
     return childTexts.join(condition.queryLogic === 'OR' ? ' | ' : ', ');
   }
   return getLeafChipText(condition);
@@ -32,9 +32,9 @@ function getLeafChipText(condition: NodexNode): string {
       const tagDef = loroDoc.toNodexNode(tagDefId);
       return `#${tagDef?.name?.replace(/<[^>]+>/g, '').trim() ?? tagDefId}`;
     }
-    case 'NOT_DONE': return '未完成';
-    case 'DONE': return '已完成';
-    case 'TODO': return '有 checkbox';
+    case 'NOT_DONE': return 'Not done';
+    case 'DONE': return 'Done';
+    case 'TODO': return 'Has checkbox';
     default: return op as string;
   }
 }
@@ -84,7 +84,7 @@ export function SearchChipBar({ searchNodeId }: SearchChipBarProps) {
           {chip.text}
         </span>
       ))}
-      <span className="text-xs text-foreground-tertiary ml-1">{resultCount} 条结果</span>
+      <span className="text-xs text-foreground-tertiary ml-1">{resultCount} {resultCount === 1 ? 'result' : 'results'}</span>
     </div>
   );
 }

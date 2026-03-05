@@ -3,6 +3,7 @@
  *
  * Renders per-type toggles:
  * - Date: 3 toggles (current date / ancestor day node / ancestor field value)
+ * - Options from supertag: 1 toggle (ancestor supertag ref)
  * - All others: 1 toggle (ancestor field value)
  *
  * All toggles read/write from the same `autoInitialize` property as
@@ -27,6 +28,10 @@ const DATE_TOGGLES: Array<{ strategy: AutoInitStrategy; label: string }> = [
   { strategy: AUTO_INIT_STRATEGY.ANCESTOR_FIELD_VALUE, label: 'to value from ancestor with this field' },
 ];
 
+const SUPERTAG_REF_TOGGLES: Array<{ strategy: AutoInitStrategy; label: string }> = [
+  { strategy: AUTO_INIT_STRATEGY.ANCESTOR_SUPERTAG_REF, label: 'to ancestor with this supertag' },
+];
+
 const DEFAULT_TOGGLES: Array<{ strategy: AutoInitStrategy; label: string }> = [
   { strategy: AUTO_INIT_STRATEGY.ANCESTOR_FIELD_VALUE, label: 'to value from ancestor with this field' },
 ];
@@ -44,7 +49,11 @@ export function AutoInitGroup({ fieldDefId }: AutoInitGroupProps) {
 
   const setConfigValue = useNodeStore((s) => s.setConfigValue);
   const enabled = parseAutoInitStrategies(rawAutoInit);
-  const toggles = dataType === FIELD_TYPES.DATE ? DATE_TOGGLES : DEFAULT_TOGGLES;
+  const toggles = dataType === FIELD_TYPES.DATE
+    ? DATE_TOGGLES
+    : dataType === FIELD_TYPES.OPTIONS_FROM_SUPERTAG
+      ? SUPERTAG_REF_TOGGLES
+      : DEFAULT_TOGGLES;
 
   const handleToggle = useCallback((strategy: AutoInitStrategy) => {
     const current = new Set(enabled);

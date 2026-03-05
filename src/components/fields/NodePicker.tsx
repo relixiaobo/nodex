@@ -10,7 +10,8 @@
  * ArrowUp/Down navigate, Enter selects, Escape closes, click outside closes.
  * Self-contained bullet layout (pl-6 + BulletChevron + gap-7.5px).
  */
-import { useState, useRef, useEffect, useCallback, useMemo, memo } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo, useLayoutEffect, memo } from 'react';
+import { createPortal } from 'react-dom';
 import { BulletChevron } from '../outliner/BulletChevron';
 import { FieldValueRow } from './FieldValueRow.js';
 import { resolveTagColor } from '../../lib/tag-colors.js';
@@ -73,6 +74,8 @@ export function NodePicker({
   const [hoverIndex, setHoverIndex] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number } | null>(null);
 
   const selectedOption = useMemo(() => {
     if (!selectedId) return undefined;
@@ -125,17 +128,41 @@ export function NodePicker({
     }
   }, [open, isReference, selectedName]);
 
-  // Close on click outside
+  // Close on click outside (check both trigger container and portal dropdown)
   useEffect(() => {
     if (!open) return;
     const handler = (e: PointerEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        closeDropdown();
-      }
+      const target = e.target as Node;
+      if (containerRef.current?.contains(target)) return;
+      if (dropdownRef.current?.contains(target)) return;
+      closeDropdown();
     };
     document.addEventListener('pointerdown', handler, true);
     return () => document.removeEventListener('pointerdown', handler, true);
   }, [open, closeDropdown]);
+
+  // Compute dropdown position when open (portal needs fixed coordinates)
+  useLayoutEffect(() => {
+    if (!open || !containerRef.current) {
+      setDropdownPos(null);
+      return;
+    }
+    const updatePos = () => {
+      const rect = containerRef.current?.getBoundingClientRect();
+      if (rect) {
+        setDropdownPos({ top: rect.bottom + 2, left: rect.left + insetLeft });
+      }
+    };
+    updatePos();
+    // Update on scroll (any ancestor) and resize
+    const scrollContainer = containerRef.current.closest('.overflow-y-auto, [style*="overflow"]');
+    scrollContainer?.addEventListener('scroll', updatePos, { passive: true });
+    window.addEventListener('resize', updatePos, { passive: true });
+    return () => {
+      scrollContainer?.removeEventListener('scroll', updatePos);
+      window.removeEventListener('resize', updatePos);
+    };
+  }, [open, insetLeft]);
 
   const handleSelect = useCallback(
     (optionId: string) => {
@@ -301,11 +328,12 @@ export function NodePicker({
         )}
       </div>
 
-      {/* Dropdown — shown below the value */}
-      {open && (
+      {/* Dropdown — rendered via portal to escape @container stacking contexts */}
+      {open && dropdownPos && createPortal(
         <div
-          className="absolute top-full mt-0.5 w-56 max-h-52 overflow-y-auto rounded-lg bg-background shadow-paper p-1"
-          style={{ left: insetLeft, zIndex: FIELD_OVERLAY_Z_INDEX }}
+          ref={dropdownRef}
+          className="w-56 max-h-52 overflow-y-auto rounded-lg bg-background shadow-paper p-1"
+          style={{ position: 'fixed', top: dropdownPos.top, left: dropdownPos.left, zIndex: FIELD_OVERLAY_Z_INDEX }}
           onMouseDown={(e) => e.preventDefault()}
         >
           {/* Option list — bullet + text per item */}
@@ -351,7 +379,8 @@ export function NodePicker({
               </button>
             </div>
           ) : null}
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );

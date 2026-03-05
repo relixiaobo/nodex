@@ -167,14 +167,14 @@ export function getAllCommands(ctx: CommandContext): PaletteCommand[] {
 }
 
 /**
- * Action bar label for a given item type.
+ * Action bar label for a given item type (Raycast-style: "Open Node", "Run Command").
  */
 export function getActionLabel(type: PaletteItemType): string {
   switch (type) {
-    case 'node': return 'Open';
-    case 'container': return 'Open';
-    case 'command': return 'Run';
-    case 'create': return 'Create';
-    default: return 'Open';
+    case 'node': return t('search.commandPalette.actionOpenNode');
+    case 'container': return t('search.commandPalette.actionOpenContainer');
+    case 'command': return t('search.commandPalette.actionRunCommand');
+    case 'create': return t('search.commandPalette.actionCreate');
+    default: return t('search.commandPalette.actionOpenNode');
   }
 }

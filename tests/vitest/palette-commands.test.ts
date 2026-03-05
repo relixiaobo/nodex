@@ -102,10 +102,10 @@ describe('getAllCommands', () => {
 });
 
 describe('getActionLabel', () => {
-  it('returns correct labels for each type', () => {
-    expect(getActionLabel('node')).toBe('Open');
-    expect(getActionLabel('container')).toBe('Open');
-    expect(getActionLabel('command')).toBe('Run');
-    expect(getActionLabel('create')).toBe('Create');
+  it('returns type-level labels (Raycast-style)', () => {
+    expect(getActionLabel('node')).toBe('Open Node');
+    expect(getActionLabel('container')).toBe('Open Container');
+    expect(getActionLabel('command')).toBe('Run Command');
+    expect(getActionLabel('create')).toBe('Create in Today');
   });
 });

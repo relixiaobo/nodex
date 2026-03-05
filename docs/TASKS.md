@@ -39,11 +39,8 @@ _(空)_
 > **上线门槛**：用户可以日常使用的最小完整产品。核心功能已就绪（大纲编辑、Supertags、Fields、Date 节点、Web Clipping、Highlight & 批注、Undo/Redo、⌘K 搜索、Sync）。
 
 - [ ] **产品展示页** — 静态落地页（产品介绍 + 截图 + 安装链接 + 隐私政策），可托管在 Cloudflare Pages 或 GitHub Pages
-- [ ] **新用户引导数据** — 准备一批引导用的种子数据，帮助新用户了解操作方式和功能
-- [ ] **About 面板** — 独立于用户内容的静态面板（入口：ToolbarUserMenu 下拉项 → push AboutPanel 到 PanelStack）
-  - 版本号（`chrome.runtime.getManifest().version`）
-  - 本地 Changelog（`changelog.ts` 随扩展打包，跟版本走）
-  - 反馈入口（Tally 表单外链）
+- [x] **新用户引导数据** — Today 下 4 段教程树 (Welcome/Article Clip/Tasks/Shortcuts) + #task schema + 9 tests
+- [x] **About 面板** — 版本号 + Changelog + Tally 反馈链接 + GitHub 链接，ToolbarUserMenu 入口
 
 ---
 
@@ -150,6 +147,8 @@ _(空)_
 
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
+| 2026-03-05 | About 面板 — 版本号 + Changelog + Tally 反馈 + GitHub 链接，ToolbarUserMenu 入口 | nodex | main |
+| 2026-03-05 | 新用户引导数据 — Welcome/Article Clip/Tasks/Shortcuts 4 段教程树 + #task schema + 9 tests | nodex | main |
 | 2026-03-05 | Google Docs 剪藏 + 两阶段 Loading UX — export HTML 抓取 + kix 列表嵌套 + 空 shell 占位 + pulse 动画 + 加载中禁止交互 | nodex | main |
 | 2026-03-05 | Options 字段 auto-collect 修复 — OutlinerItem blur/Enter 路径补 registerCollectedOption + autoCollected 标志位 + visibleWhen 条件 + 4 test | nodex | main |
 | 2026-03-04 | 高亮 hover 工具栏重做 — 两层检测 + click 透传 + 250ms 延迟防抖 + Note popover ⌘↵ 提示 | nodex | main |

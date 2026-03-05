@@ -436,7 +436,7 @@ export function CommandPalette() {
         </div>
 
         {/* Results area — fills remaining space */}
-        <div ref={listRef} className="flex-1 overflow-y-auto py-1.5">
+        <div ref={listRef} className="flex-1 overflow-y-auto py-1.5 [&::-webkit-scrollbar]:hidden">
           {hasQuery ? (
             // Search mode: Create + Results
             <div>

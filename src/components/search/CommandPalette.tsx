@@ -29,6 +29,7 @@ import {
   type PaletteItemType,
   type CommandContext,
   getAllCommands,
+  getActionLabel,
 } from '../../lib/palette-commands.js';
 import { COMMAND_PALETTE_QUICK_CONTAINERS } from '../../lib/system-node-registry.js';
 import { ensureTodayNode, isDayNode } from '../../lib/journal.js';
@@ -449,7 +450,7 @@ export function CommandPalette() {
                     key={createItem.id}
                     item={createItem}
                     selected={selectedIndex === idx}
-                    positionIndex={idx}
+
                     onSelect={() => createItem.action()}
                     onHover={() => setSelectedIndex(idx)}
                   />
@@ -465,7 +466,7 @@ export function CommandPalette() {
                         key={item.id}
                         item={item}
                         selected={selectedIndex === idx}
-                        positionIndex={idx}
+    
                         onSelect={() => item.action()}
                         onHover={() => setSelectedIndex(idx)}
                       />
@@ -487,7 +488,7 @@ export function CommandPalette() {
                         key={item.id}
                         item={item}
                         selected={selectedIndex === idx}
-                        positionIndex={idx}
+    
                         onSelect={() => item.action()}
                         onHover={() => setSelectedIndex(idx)}
                       />
@@ -505,7 +506,7 @@ export function CommandPalette() {
                         key={item.id}
                         item={item}
                         selected={selectedIndex === idx}
-                        positionIndex={idx}
+    
                         onSelect={() => item.action()}
                         onHover={() => setSelectedIndex(idx)}
                       />
@@ -516,6 +517,26 @@ export function CommandPalette() {
             </>
           )}
         </div>
+
+        {/* Action bar — Raycast-style bottom bar */}
+        {allItems.length > 0 && (() => {
+          const selected = allItems[selectedIndex];
+          if (!selected) return null;
+          const actionLabel = getActionLabel(selected.type);
+          return (
+            <div className="flex h-9 shrink-0 items-center gap-2 border-t border-border-subtle bg-background px-4">
+              <span className="text-xs text-foreground-secondary">{actionLabel}</span>
+              <Kbd>↵</Kbd>
+              {hasQuery && createItem && selected.id !== '__create__' && (
+                <>
+                  <span className="mx-1 h-3 w-px bg-border-subtle" />
+                  <span className="text-xs text-foreground-secondary">{t('search.commandPalette.typeLabelNewInToday')}</span>
+                  <Kbd>⌘↵</Kbd>
+                </>
+              )}
+            </div>
+          );
+        })()}
       </div>
     </div>
   );
@@ -536,13 +557,11 @@ function GroupHeader({ label }: { label: string }) {
 interface PaletteRowProps {
   item: PaletteItem;
   selected: boolean;
-  /** 0-based flat index — used for Alfred-style ⌘1-⌘9 shortcuts. */
-  positionIndex: number;
   onSelect: () => void;
   onHover: () => void;
 }
 
-function PaletteRow({ item, selected, positionIndex, onSelect, onHover }: PaletteRowProps) {
+function PaletteRow({ item, selected, onSelect, onHover }: PaletteRowProps) {
   const Icon = item.icon;
 
   return (
@@ -577,12 +596,6 @@ function PaletteRow({ item, selected, positionIndex, onSelect, onHover }: Palett
       {item.typeLabel && (
         <span className="shrink-0 text-xs text-foreground-tertiary">{item.typeLabel}</span>
       )}
-      {/* Alfred-style shortcut: selected → ↵, others → ⌘N (up to 9) */}
-      {selected ? (
-        <Kbd>↵</Kbd>
-      ) : positionIndex < 9 ? (
-        <Kbd>{`⌘${positionIndex + 1}`}</Kbd>
-      ) : null}
     </div>
   );
 }

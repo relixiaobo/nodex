@@ -293,7 +293,7 @@ describe('search-engine', () => {
       const searchNode = loroDoc.toNodexNode(searchId);
       expect(searchNode).not.toBeNull();
       expect(searchNode!.type).toBe('search');
-      expect(searchNode!.name).toBe('Task'); // tagDef_task name
+      expect(searchNode!.name).toBe('Everything tagged #Task');
 
       // Should be under SEARCHES container
       const parentId = loroDoc.getParentId(searchId);

@@ -1689,7 +1689,8 @@ export const useNodeStore = create<NodeStore>((set, get) => {
 
       // Create new search node
       const tagDef = loroDoc.toNodexNode(tagDefId);
-      const searchName = tagDef?.name ?? 'Search';
+      const tagLabel = tagDef?.name?.replace(/<[^>]+>/g, '').trim() ?? tagDefId;
+      const searchName = `Everything tagged #${tagLabel}`;
 
       const searchId = nanoid();
       loroDoc.createNode(searchId, CONTAINER_IDS.SEARCHES);

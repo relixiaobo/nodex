@@ -417,7 +417,7 @@ export function CommandPalette() {
       onPointerDown={closeAndClear}
     >
       <div
-        className="animate-palette-expand flex flex-col w-full max-w-[600px] h-fit max-h-[80vh] rounded-xl bg-background shadow-paper border border-border-subtle overflow-hidden"
+        className="animate-palette-expand flex flex-col w-full max-w-[600px] h-[min(480px,80vh)] rounded-xl bg-background shadow-paper border border-border-subtle overflow-hidden"
         onPointerDown={(e) => e.stopPropagation()}
       >
         {/* Search header — 48px to match TopToolbar */}

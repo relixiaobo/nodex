@@ -174,7 +174,7 @@ export function getActionLabel(type: PaletteItemType): string {
     case 'node': return t('search.commandPalette.actionOpenNode');
     case 'container': return t('search.commandPalette.actionOpenContainer');
     case 'command': return t('search.commandPalette.actionRunCommand');
-    case 'create': return t('search.commandPalette.actionCreate');
+    case 'create': return t('search.commandPalette.actionRunCommand');
     default: return t('search.commandPalette.actionOpenNode');
   }
 }

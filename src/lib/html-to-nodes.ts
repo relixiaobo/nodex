@@ -604,9 +604,54 @@ export function parseHtmlToNodes(
     return trimmed;
   }
 
+  /**
+   * Extract the largest URL from a srcset attribute.
+   * Handles URLs containing commas (e.g. Cloudinary/Substack CDN transforms)
+   * by matching the `<url> <descriptor>` pattern from right to left.
+   */
+  function extractLargestSrcsetUrl(srcset: string | null | undefined): string | null {
+    if (!srcset) return null;
+    // Match: URL (non-whitespace) followed by whitespace and a width descriptor (e.g. "1456w")
+    const entries: { url: string; w: number }[] = [];
+    const re = /(\S+)\s+(\d+)w/g;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(srcset)) !== null) {
+      const url = m[1];
+      const w = parseInt(m[2], 10);
+      if (url && !url.startsWith('data:') && w > 0) entries.push({ url, w });
+    }
+    if (entries.length === 0) return null;
+    entries.sort((a, b) => b.w - a.w);
+    const best = entries[0].url;
+    return best.startsWith('//') ? `https:${best}` : best;
+  }
+
+  /**
+   * Resolve the best image URL from an <img> element.
+   * Defuddle's picture rule can corrupt src by splitting Cloudinary URLs on commas.
+   * Falls back to the largest srcset URL when src looks incomplete.
+   */
+  function resolveImgUrl(el: Element): string | null {
+    const src = resolveImgSrc(el.getAttribute('src'));
+    // If src looks complete (has a path after the last /), use it directly
+    if (src) {
+      const afterLastSlash = src.split('/').pop() ?? '';
+      // A good URL has something meaningful after the last slash
+      // A truncated Cloudinary URL ends like "/fetch/$s_!eppK!" with no image path
+      if (afterLastSlash.length > 10 || /\.\w{2,5}(\?|$)/.test(afterLastSlash)) {
+        return src;
+      }
+    }
+    // src looks truncated — try srcset
+    const fromSrcset = extractLargestSrcsetUrl(el.getAttribute('srcset'));
+    if (fromSrcset) return fromSrcset;
+    // Fall back to original src even if truncated
+    return src;
+  }
+
   /** Process an <img> element into an image node. */
   function processImgElement(el: Element): void {
-    const src = resolveImgSrc(el.getAttribute('src'));
+    const src = resolveImgUrl(el);
     if (!src) return;
     const alt = el.getAttribute('alt')?.trim() || undefined;
     const w = parseInt(el.getAttribute('width') ?? '', 10) || undefined;
@@ -631,7 +676,7 @@ export function parseHtmlToNodes(
   function processFigureElement(el: Element): void {
     const img = el.querySelector('img');
     if (!img) return;
-    const src = resolveImgSrc(img.getAttribute('src'));
+    const src = resolveImgUrl(img);
     if (!src) return;
     const figcaption = el.querySelector('figcaption');
     const alt = figcaption?.textContent?.trim() || img.getAttribute('alt')?.trim() || undefined;

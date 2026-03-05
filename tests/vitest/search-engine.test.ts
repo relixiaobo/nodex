@@ -500,6 +500,23 @@ describe('search-engine', () => {
       expect(newNode.tags).toContain('tagDef_task');
       expect(newNode.tags).not.toContain('tagDef_meeting');
     });
+
+    it('single undo reverts entire createNodeInSearchContext', () => {
+      const store = useNodeStore.getState();
+      const searchId = store.createSearchNode('tagDef_task');
+      const searchBefore = loroDoc.toNodexNode(searchId)!;
+      const childrenBefore = searchBefore.children.length;
+
+      const newNode = store.createNodeInSearchContext(searchId, { name: 'Undo test' });
+      expect(loroDoc.hasNode(newNode.id)).toBe(true);
+
+      // Single undo should revert both the node creation and the reference
+      loroDoc.undoDoc();
+
+      const searchAfter = loroDoc.toNodexNode(searchId)!;
+      expect(searchAfter.children.length).toBe(childrenBefore);
+      expect(loroDoc.hasNode(newNode.id)).toBe(false);
+    });
   });
 
   describe('queryCondition filtering in OutlinerView', () => {

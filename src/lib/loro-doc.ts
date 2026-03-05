@@ -1143,6 +1143,7 @@ export function toNodexNode(nodexId: string): NodexNode | null {
     hideField: data.get('hideField') as string | undefined,
     autoInitialize: data.get('autoInitialize') as string | undefined,
     autocollectOptions: data.get('autocollectOptions') as boolean | undefined,
+    autoCollected: data.get('autoCollected') as boolean | undefined,
     minValue: data.get('minValue') as number | undefined,
     maxValue: data.get('maxValue') as number | undefined,
     sourceSupertag: data.get('sourceSupertag') as string | undefined,

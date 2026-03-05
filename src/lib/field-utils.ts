@@ -205,16 +205,18 @@ export function resolveFieldOptions(fieldDefId: string): string[] {
 
 /**
  * Resolve auto-collected option node IDs for an OPTIONS-type fieldDef.
- * In the new model, autocollect options are stored directly as children.
- * Returns them when fieldDef.autocollectOptions is true.
+ * Returns children marked with `autoCollected: true` when autocollect is enabled.
  */
 export function resolveAutoCollectedOptions(
   fieldDefId: string,
 ): string[] {
   const fieldDef = loroDoc.toNodexNode(fieldDefId);
   if (!fieldDef?.autocollectOptions) return [];
-  // Auto-collected options are also in children (same pool as pre-defined options)
-  return resolveFieldOptions(fieldDefId);
+  const children = loroDoc.getChildren(fieldDefId);
+  return children.filter((cid) => {
+    const child = loroDoc.toNodexNode(cid);
+    return child && child.autoCollected;
+  });
 }
 
 /**
@@ -365,6 +367,7 @@ export const ATTRDEF_CONFIG_FIELDS: ConfigFieldDef[] = [
     control: 'autocollect_list',
     defaultValue: '',
     appliesTo: [FIELD_TYPES.OPTIONS],
+    visibleWhen: { dependsOn: SYS_A.AUTOCOLLECT_OPTIONS, value: SYS_V.YES },
   },
   {
     key: SYS_A.AUTO_INITIALIZE,

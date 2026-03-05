@@ -451,17 +451,17 @@ export function FieldRow({
     return validateFieldValue(FIELD_TYPES.NUMBER, String(raw));
   });
 
-  // Auto-collect count for "Collected values" list row name display
+  // Auto-collect count for "Collected values" list row name display.
   const isAutoCollectList = configKey === '__AUTOCOLLECT_LIST__';
   const autoCollectCount = useNodeStore((s) => {
     void s._version;
     if (!isAutoCollectList) return 0;
     const fieldDef = s.getNode(nodeId);
     if (!fieldDef?.children) return 0;
-    return fieldDef.children.reduce((count, cid) => {
-      const child = s.getNode(cid);
-      return child && !child.type ? count + 1 : count;
-    }, 0);
+    return fieldDef.children.filter((id) => {
+      const n = s.getNode(id);
+      return n && !n.type && n.autoCollected;
+    }).length;
   });
 
   const siblingFieldIds = useMemo(

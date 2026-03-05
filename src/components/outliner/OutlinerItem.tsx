@@ -276,6 +276,7 @@ export function OutlinerItem({
   const updateNodeDescription = useNodeStore((s) => s.updateNodeDescription);
   const removeReference = useNodeStore((s) => s.removeReference);
   const selectFieldOption = useNodeStore((s) => s.selectFieldOption);
+  const registerCollectedOption = useNodeStore((s) => s.registerCollectedOption);
   const startRefConversion = useNodeStore((s) => s.startRefConversion);
   const revertRefConversion = useNodeStore((s) => s.revertRefConversion);
   const setPendingRefConversion = useUIStore((s) => s.setPendingRefConversion);
@@ -882,6 +883,14 @@ export function OutlinerItem({
     // Check pending ref conversion: if this is a temp node, decide revert or keep.
     finalizePendingRefConversion();
 
+    // Options field: register value as auto-collected option on blur
+    if (isOptionsField && attrDefId) {
+      const nodeName = useNodeStore.getState().getNode(nodeId)?.name;
+      if (nodeName?.trim()) {
+        registerCollectedOption(attrDefId, nodeName.trim());
+      }
+    }
+
     if (blurClearRafRef.current !== null) {
       cancelAnimationFrame(blurClearRafRef.current);
     }
@@ -906,7 +915,7 @@ export function OutlinerItem({
         setFocusedNode(null);
       }
     });
-  }, [nodeId, parentId, setFocusedNode, finalizePendingRefConversion]);
+  }, [nodeId, parentId, setFocusedNode, finalizePendingRefConversion, isOptionsField, attrDefId, registerCollectedOption]);
 
   // mousedown: record text offset for cursor placement, but DON'T enter edit
   // mode. Edit mode is deferred to click so drag-select can take over if the
@@ -1184,6 +1193,14 @@ export function OutlinerItem({
       const currentlyExpanded = useUIStore.getState().expandedNodes.has(`${parentId}:${nodeId}`);
       const currentHasChildren = (useNodeStore.getState().getNode(nodeId)?.children ?? []).length > 0;
 
+      // Options field: register current node's name as auto-collected option
+      if (isOptionsField && attrDefId) {
+        const currentName = useNodeStore.getState().getNode(nodeId)?.name;
+        if (currentName?.trim()) {
+          registerCollectedOption(attrDefId, currentName.trim());
+        }
+      }
+
       if (currentlyExpanded && currentHasChildren) {
         // Expanded with children → new node becomes first child (position 0)
         const newNode = createChild(nodeId, 0, {
@@ -1202,7 +1219,7 @@ export function OutlinerItem({
         setFocusedNode(newNode.id, parentId);
       }
     },
-    [nodeId, parentId, fieldDataType, onNavigateOut, createSibling, createChild, setFocusedNode],
+    [nodeId, parentId, fieldDataType, onNavigateOut, createSibling, createChild, setFocusedNode, isOptionsField, attrDefId, registerCollectedOption],
   );
 
   const handlePasteMultiLine = useCallback(

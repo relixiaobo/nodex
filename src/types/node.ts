@@ -299,6 +299,9 @@ export interface NodexNode {
   /** 自动收集选项（旧 SYS_A44） */
   autocollectOptions?: boolean;
 
+  /** 标记为自动收集的选项节点（由 autoCollectOption 创建，区别于预设选项） */
+  autoCollected?: boolean;
+
   /** Number 最小值（旧 NDX_A03） */
   minValue?: number;
 

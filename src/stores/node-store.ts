@@ -98,6 +98,8 @@ interface NodeStore {
   addFieldOption(fieldDefId: string, name: string): string;
   removeFieldOption(fieldDefId: string, optionId: string): void;
   autoCollectOption(nodeId: string, fieldDefId: string, name: string): string;
+  /** Register a name as an auto-collected option under fieldDef (no-op if already exists). */
+  registerCollectedOption(fieldDefId: string, name: string): void;
   toggleCheckboxField(fieldEntryId: string): void;
   /** 旧 replaceFieldAttrDef */
   replaceFieldDef(nodeId: string, fieldEntryId: string, oldFieldDefId: string, newFieldDefId: string): void;
@@ -1434,7 +1436,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
       // here and commit once at the end for atomicity.
       const optId = nanoid();
       loroDoc.createNode(optId, fieldDefId);
-      loroDoc.setNodeData(optId, 'name', name);
+      loroDoc.setNodeDataBatch(optId, { name, autoCollected: true });
 
       // 在 node 的 fieldEntry 中设置该选项
       let feId = findFieldEntry(nodeId, fieldDefId);
@@ -1451,6 +1453,22 @@ export const useNodeStore = create<NodeStore>((set, get) => {
       loroDoc.commitDoc();
 
       return optId;
+    },
+
+    registerCollectedOption: (fieldDefId, name) => {
+      if (!canMutate('registerCollectedOption')) return;
+      const trimmed = name.trim();
+      if (!trimmed) return;
+      // Check if option with same name already exists (pre-determined or collected)
+      const children = loroDoc.getChildren(fieldDefId);
+      for (const cid of children) {
+        const child = loroDoc.toNodexNode(cid);
+        if (child && child.name === trimmed) return; // Already exists
+      }
+      const optId = nanoid();
+      loroDoc.createNode(optId, fieldDefId);
+      loroDoc.setNodeDataBatch(optId, { name: trimmed, autoCollected: true });
+      loroDoc.commitDoc();
     },
 
     toggleCheckboxField: (fieldEntryId) => {
@@ -1789,8 +1807,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
       loroDoc.setNodeDataBatch(nodeId, { ...data, createdAt: now, updatedAt: now });
       const tagDefIds = extractHasTagIds(searchNode);
       for (const tagDefId of tagDefIds) loroDoc.addTag(nodeId, tagDefId);
-      loroDoc.commitDoc();
-      if (tagDefIds.length > 0) get().syncTemplateFields(nodeId);
+      if (tagDefIds.length > 0) syncTemplateMutationsNoCommit(nodeId);
       const refId = nanoid();
       loroDoc.createNode(refId, searchNodeId);
       loroDoc.setNodeDataBatch(refId, { type: 'reference', targetId: nodeId });

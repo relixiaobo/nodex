@@ -68,6 +68,7 @@ _(空)_
   - 后续按用户反馈扩展站点规则
 - [ ] 保存目标选择 UI — 允许用户选择保存到 Inbox / Today / 指定节点
 - [ ] **AI 智能剪藏** — 自动打标签、提取结构化信息、推荐关联到已有笔记
+- [ ] **AI 聊天记录剪藏** — 识别 ChatGPT / Claude / Gemini 页面，提取对话结构（问答轮次 → 节点树）
 - [ ] 选中文本剪藏（Content Script 右键菜单 / 浮动按钮 → 剪藏选中段落）
 
 #### AI Chat & 网页辅助 (#29 + #31)
@@ -126,6 +127,7 @@ _(空)_
 
 - [ ] 节点选中增强 (#47) — Cmd+Shift+D 批量复制、拖动选择优化
 - [ ] 合并节点 — 选中多个重复节点 → 合并为一个（保留第一个，合并 children/tags）
+- [ ] **数学公式渲染** — 支持 LaTeX/KaTeX 公式在节点中展示（行内 `$...$` + 块级 `$$...$$`）
 - [ ] Floating Toolbar: @ Reference 按钮
 - [ ] Slash Command 后续 (#48) — Paste / Search node / Image / Checklist
 - [ ] 性能基线测量

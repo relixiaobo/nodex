@@ -213,9 +213,9 @@ export function TagSelectorPopover({ anchorTop, anchorLeft, onSelect, onClose }:
             onMouseEnter={() => setSelectedIndex(index)}
           >
             <span
-              className="inline-block h-2 w-2 shrink-0 rounded-full"
-              style={{ backgroundColor: item.color.text }}
-            />
+              className="shrink-0 text-sm font-medium leading-none"
+              style={{ color: item.color.text }}
+            >#</span>
             <span className="truncate">{item.name}</span>
           </button>
         ))}

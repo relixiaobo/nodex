@@ -588,9 +588,9 @@ function AddTagView({
             }}
           >
             <span
-              className="inline-block h-2 w-2 shrink-0 rounded-full"
-              style={{ backgroundColor: resolveTagColor(tag.id).text }}
-            />
+              className="shrink-0 text-sm font-medium leading-none"
+              style={{ color: resolveTagColor(tag.id).text }}
+            >#</span>
             {tag.name}
           </button>
         ))}

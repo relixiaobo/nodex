@@ -436,7 +436,7 @@ export function CommandPalette() {
         </div>
 
         {/* Results area — fills remaining space */}
-        <div ref={listRef} className="flex-1 overflow-y-auto py-1.5 [&::-webkit-scrollbar]:hidden">
+        <div ref={listRef} className="flex-1 overflow-y-auto py-1.5">
           {hasQuery ? (
             // Search mode: Create + Results
             <div>
@@ -574,11 +574,9 @@ function PaletteRow({ item, selected, onSelect, onHover }: PaletteRowProps) {
         <Icon size={16} strokeWidth={1.5} className="shrink-0 text-foreground-secondary" />
       ) : item.tagDefColor ? (
         <span
-          className="flex shrink-0 h-4 w-4 items-center justify-center rounded text-xs font-bold"
+          className="flex shrink-0 h-4 w-4 items-center justify-center text-sm font-medium"
           style={{ color: item.tagDefColor.text }}
-        >
-          <span className="text-[#999999]">#</span>
-        </span>
+        >#</span>
       ) : (
         <span className="flex shrink-0 h-4 w-4 items-center justify-center">
           <span

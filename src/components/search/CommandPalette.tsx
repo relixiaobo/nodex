@@ -420,22 +420,19 @@ export function CommandPalette() {
         className="animate-palette-expand flex flex-col w-full max-w-[600px] h-[min(480px,80vh)] rounded-xl bg-background shadow-paper border border-border-subtle overflow-hidden"
         onPointerDown={(e) => e.stopPropagation()}
       >
-        {/* Search header — 48px to match TopToolbar */}
-        <div className="flex h-12 shrink-0 items-center px-4 border-b border-border-subtle bg-background">
-          <div className="flex flex-1 items-center gap-2.5">
-            <Search size={16} className="text-foreground-tertiary shrink-0" />
-            <input
-              ref={inputRef}
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="Search..."
-              className="flex-1 bg-transparent text-sm outline-none placeholder:text-foreground-tertiary"
-            />
-            <span className="shrink-0 cursor-pointer" onClick={closeAndClear}>
-              <Kbd>Esc</Kbd>
-            </span>
-          </div>
+        {/* Search header */}
+        <div className="flex h-12 shrink-0 items-center gap-2.5 border-b border-border-subtle bg-background px-4">
+          <input
+            ref={inputRef}
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder={t('search.commandPalette.placeholder')}
+            className="flex-1 bg-transparent text-sm outline-none placeholder:text-foreground-tertiary"
+          />
+          <span className="shrink-0 cursor-pointer" onClick={closeAndClear}>
+            <Kbd>Esc</Kbd>
+          </span>
         </div>
 
         {/* Results area — fills remaining space */}
@@ -594,7 +591,7 @@ function PaletteRow({ item, selected, onSelect, onHover }: PaletteRowProps) {
       )}
       <span className="min-w-0 flex-1 truncate text-[13px] text-foreground">{item.label}</span>
       {item.typeLabel && (
-        <span className="w-[72px] shrink-0 text-right text-xs text-foreground-tertiary">{item.typeLabel}</span>
+        <span className="shrink-0 text-xs text-foreground-tertiary">{item.typeLabel}</span>
       )}
     </div>
   );

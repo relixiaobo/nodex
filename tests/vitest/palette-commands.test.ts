@@ -106,6 +106,6 @@ describe('getActionLabel', () => {
     expect(getActionLabel('node')).toBe('Open Node');
     expect(getActionLabel('container')).toBe('Open Container');
     expect(getActionLabel('command')).toBe('Run Command');
-    expect(getActionLabel('create')).toBe('Create in Today');
+    expect(getActionLabel('create')).toBe('Run Command');
   });
 });

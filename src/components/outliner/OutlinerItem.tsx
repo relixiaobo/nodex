@@ -241,6 +241,7 @@ export function OutlinerItem({
   // Unified pointer handlers from OutlinerRow
   const { handleCmdClick, handleShiftClick } = useRowPointerHandlers(nodeId, parentId, rootChildIds, rootNodeId);
 
+  const isLoadingNode = useUIStore((s) => s.loadingNodeIds.has(nodeId));
   const dragNodeId = useUIStore((s) => s.dragNodeId);
   const dropTargetId = useUIStore((s) => s.dropTargetId);
   const dropPosition = useUIStore((s) => s.dropPosition);
@@ -1722,6 +1723,7 @@ export function OutlinerItem({
               tagDefColor={isTagDef ? resolveTagColor(nodeId).text : undefined}
               bulletColors={effectiveBulletColors}
               icon={structuralIcon}
+              isLoading={isLoadingNode}
             />
           </div>
           {showCheckbox && (

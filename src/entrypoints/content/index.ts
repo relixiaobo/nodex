@@ -475,6 +475,163 @@ function extractXAuthor(): string | undefined {
   return undefined;
 }
 
+// ── Google Docs content extraction ──
+
+function isGoogleDocsDomain(): boolean {
+  return location.hostname === 'docs.google.com';
+}
+
+/**
+ * Extract document title from Google Docs.
+ * Tries the in-page title input first, falls back to <title> minus suffix.
+ */
+function extractGoogleDocsTitle(): string | undefined {
+  const titleInput = document.querySelector<HTMLInputElement>('.docs-title-input');
+  if (titleInput?.value?.trim()) return titleInput.value.trim();
+  const pageTitle = document.title;
+  if (pageTitle.endsWith(' - Google Docs')) {
+    return pageTitle.slice(0, -' - Google Docs'.length).trim() || undefined;
+  }
+  return undefined;
+}
+
+/**
+ * Extract document ID from a Google Docs URL.
+ * Format: /document/d/{DOCUMENT_ID}/edit
+ */
+function extractGoogleDocsId(): string | undefined {
+  const match = location.pathname.match(/\/document\/d\/([a-zA-Z0-9_-]+)/);
+  return match?.[1];
+}
+
+/**
+ * Fetch Google Docs content via the export endpoint.
+ *
+ * Google Docs canvas rendering makes DOM extraction impossible.
+ * Instead, we fetch the HTML export of the document directly.
+ * Since this runs in a content script on docs.google.com, the fetch
+ * is same-origin and includes the user's Google session cookies.
+ *
+ * Post-processing: Google Docs exports flat sibling <ol> elements
+ * with CSS classes encoding indent level (lst-kix_*-0, lst-kix_*-1, etc.)
+ * instead of properly nested <ol>/<li>. We restructure these into
+ * nested lists so parseHtmlToNodes can build the correct hierarchy.
+ */
+async function fetchGoogleDocsContent(docId: string): Promise<string | undefined> {
+  try {
+    const res = await fetch(
+      `https://docs.google.com/document/d/${docId}/export?format=html`,
+      { credentials: 'include' },
+    );
+    if (!res.ok) return undefined;
+    const html = await res.text();
+    const bodyMatch = html.match(/<body[^>]*>([\s\S]*)<\/body>/i);
+    const bodyHtml = bodyMatch?.[1]?.trim();
+    if (!bodyHtml) return undefined;
+    return nestGoogleDocsLists(bodyHtml);
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Extract indent level from Google Docs list CSS class.
+ * Pattern: `lst-kix_XXXX-N` where N is the nesting level (0-based).
+ */
+function extractGDocsListLevel(el: Element): number {
+  const cls = el.getAttribute('class') ?? '';
+  const match = cls.match(/lst-kix_\w+-(\d+)/);
+  return match ? parseInt(match[1], 10) : 0;
+}
+
+interface GDocsListItem {
+  level: number;
+  html: string;
+  children: GDocsListItem[];
+}
+
+function renderNestedList(items: GDocsListItem[]): string {
+  if (items.length === 0) return '';
+  const parts: string[] = ['<ol>'];
+  for (const item of items) {
+    if (item.children.length > 0) {
+      parts.push(`<li>${item.html}`);
+      parts.push(renderNestedList(item.children));
+      parts.push('</li>');
+    } else {
+      parts.push(`<li>${item.html}</li>`);
+    }
+  }
+  parts.push('</ol>');
+  return parts.join('\n');
+}
+
+/**
+ * Convert Google Docs' flat list structure into properly nested <ol>/<li>.
+ *
+ * Google Docs export produces:
+ *   <ol class="lst-kix_abc-0"><li>Level 0</li></ol>
+ *   <ol class="lst-kix_abc-1"><li>Level 1</li></ol>
+ *   <ol class="lst-kix_abc-2"><li>Level 2a</li><li>Level 2b</li></ol>
+ *
+ * We restructure this into:
+ *   <ol><li>Level 0<ol><li>Level 1<ol><li>Level 2a</li><li>Level 2b</li></ol></li></ol></li></ol>
+ */
+function nestGoogleDocsLists(bodyHtml: string): string {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(`<html><body>${bodyHtml}</body></html>`, 'text/html');
+  const body = doc.body;
+  if (!body) return bodyHtml;
+
+  const output: string[] = [];
+  let pendingItems: GDocsListItem[] = [];
+  let itemStack: GDocsListItem[] = [];
+
+  function flushList(): void {
+    if (pendingItems.length > 0) {
+      output.push(renderNestedList(pendingItems));
+      pendingItems = [];
+      itemStack = [];
+    }
+  }
+
+  for (const child of Array.from(body.children)) {
+    const tag = child.tagName.toLowerCase();
+
+    // Check if it's a Google Docs kix list
+    const isKixList = (tag === 'ol' || tag === 'ul')
+      && /lst-kix_/.test(child.getAttribute('class') ?? '');
+
+    if (!isKixList) {
+      flushList();
+      output.push(child.outerHTML);
+      continue;
+    }
+
+    const level = extractGDocsListLevel(child);
+    for (const li of Array.from(child.children)) {
+      if (li.tagName.toLowerCase() !== 'li') continue;
+
+      const item: GDocsListItem = { level, html: li.innerHTML, children: [] };
+
+      // Pop stack to find the parent
+      while (itemStack.length > 0 && itemStack[itemStack.length - 1].level >= level) {
+        itemStack.pop();
+      }
+
+      if (itemStack.length > 0) {
+        itemStack[itemStack.length - 1].children.push(item);
+      } else {
+        pendingItems.push(item);
+      }
+      itemStack.push(item);
+    }
+  }
+
+  flushList();
+  return output.join('\n');
+}
+
 // ── GitHub DOM extraction ──
 
 function isGitHubDomain(): boolean {
@@ -504,7 +661,7 @@ async function captureCurrentPage(): Promise<WebClipCapturePayload> {
   }).parse();
   let title = extracted.title?.trim() || document.title?.trim() || location.hostname;
   let pageText = extracted.content ?? '';
-  let description = extracted.description ?? undefined;
+  let description: string | undefined = extracted.description ?? undefined;
 
   let isXArticle = false;
 
@@ -567,6 +724,22 @@ async function captureCurrentPage(): Promise<WebClipCapturePayload> {
   if (isGitHubDomain()) {
     const ghContent = extractGitHubContent();
     if (ghContent) pageText = ghContent;
+  }
+
+  // ── Google Docs enhancement ──
+  // Google Docs uses canvas rendering — DOM extraction is impossible.
+  // Fetch the HTML export of the document using the user's session cookies.
+  if (isGoogleDocsDomain()) {
+    const gdTitle = extractGoogleDocsTitle();
+    if (gdTitle) title = gdTitle;
+    const docId = extractGoogleDocsId();
+    if (docId) {
+      const gdContent = await fetchGoogleDocsContent(docId);
+      if (gdContent) {
+        pageText = gdContent;
+        description = undefined;
+      }
+    }
   }
 
   if (!pageText) {

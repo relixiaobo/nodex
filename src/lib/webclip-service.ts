@@ -424,6 +424,49 @@ function fillClipFields(
 }
 
 /**
+ * Create an empty placeholder node under today's journal (Phase 1 of two-phase clip).
+ * The node has no title and no tags — those will be filled asynchronously in Phase 2.
+ *
+ * @returns The ID of the shell node.
+ */
+export function createClipShell(store: WebClipNodeStore): string {
+  const todayId = ensureTodayNode();
+  const shell = store.createChild(todayId, undefined, { name: '' });
+  return shell.id;
+}
+
+/**
+ * Fill an existing shell node with web clip data (Phase 2 of two-phase clip).
+ * Delegates to the same logic as saveWebClip but targets an existing node.
+ */
+export async function fillClipShell(
+  nodeId: string,
+  payload: WebClipCapturePayload,
+  store: WebClipNodeStore,
+): Promise<void> {
+  const clipType = detectClipType(payload.url, payload);
+  const tagDefId = ensureClipTypeDefs(clipType);
+  ensureSourceUrlFieldDef();
+
+  const title = refineClipTitle(payload.title, payload, clipType);
+  store.setNodeName(nodeId, title);
+  store.applyTag(nodeId, tagDefId);
+  store.setFieldValue(nodeId, NDX_F.SOURCE_URL, [payload.url]);
+  fillClipFields(nodeId, payload, clipType, store);
+
+  if (payload.description && clipType !== 'social') {
+    store.updateNodeDescription(nodeId, payload.description);
+  }
+
+  if (payload.pageText) {
+    const { nodes } = parseHtmlToNodes(payload.pageText, { maxNodes: 200 });
+    if (nodes.length > 0) {
+      createContentNodes(nodeId, nodes);
+    }
+  }
+}
+
+/**
  * Save a web clip as a node under today's journal day with appropriate type tag and fields.
  *
  * @returns The ID of the newly created clip node.

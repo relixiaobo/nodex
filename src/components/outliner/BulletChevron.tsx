@@ -25,6 +25,8 @@ interface BulletChevronProps {
   bulletColors?: string[];
   /** Structural icon: renders a small icon instead of the dot (e.g. for fieldDef nodes) */
   icon?: AppIcon | null;
+  /** Loading state: pulse animation while content is being fetched */
+  isLoading?: boolean;
 }
 
 /**
@@ -46,8 +48,18 @@ export function BulletChevron({
   tagDefColor,
   bulletColors,
   icon: Icon,
+  isLoading,
 }: BulletChevronProps) {
   const showOuterRing = hasChildren && !isExpanded;
+
+  // Loading state: pulsing dot
+  if (isLoading) {
+    return (
+      <span className="flex shrink-0 h-6 w-[15px] items-center justify-center">
+        <div className="h-[5px] w-[5px] rounded-full bg-foreground/40 animate-pulse" />
+      </span>
+    );
+  }
 
   // TagDef bullet: colored circle with white #
   if (tagDefColor) {

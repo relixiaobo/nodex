@@ -129,6 +129,11 @@ interface UIStore {
   // Description editing trigger (session-only, not persisted)
   editingDescriptionNodeId: string | null;
   setEditingDescription(nodeId: string | null): void;
+
+  // Loading nodes (session-only): nodes whose content is being fetched asynchronously
+  loadingNodeIds: Set<string>;
+  addLoadingNode(nodeId: string): void;
+  removeLoadingNode(nodeId: string): void;
 }
 
 export interface PersistedUIStoreState {
@@ -478,6 +483,19 @@ export const useUIStore = create<UIStore>()(
       // Description editing trigger (session-only)
       editingDescriptionNodeId: null,
       setEditingDescription: (nodeId) => set({ editingDescriptionNodeId: nodeId }),
+
+      // Loading nodes (session-only)
+      loadingNodeIds: new Set<string>(),
+      addLoadingNode: (nodeId) => set((s) => {
+        const next = new Set(s.loadingNodeIds);
+        next.add(nodeId);
+        return { loadingNodeIds: next };
+      }),
+      removeLoadingNode: (nodeId) => set((s) => {
+        const next = new Set(s.loadingNodeIds);
+        next.delete(nodeId);
+        return { loadingNodeIds: next };
+      }),
     }),
     {
       name: 'nodex-ui',

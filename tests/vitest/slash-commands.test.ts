@@ -11,33 +11,30 @@ describe('slash command helpers', () => {
     expect(filterSlashCommands('mention').map((c) => c.id)).toEqual(['reference']);
     expect(filterSlashCommands('clip').map((c) => c.id)).toContain('clip_page');
     expect(filterSlashCommands('capture').map((c) => c.id)).toEqual(['clip_page']);
-    expect(filterSlashCommands('')).toHaveLength(SLASH_COMMANDS_BASELINE.length);
+  });
+
+  it('only returns enabled commands', () => {
+    const filtered = filterSlashCommands('');
+    const enabledBaseline = SLASH_COMMANDS_BASELINE.filter((c) => c.enabled);
+    expect(filtered).toHaveLength(enabledBaseline.length);
+    expect(filtered.every((c) => c.enabled)).toBe(true);
   });
 
   it('returns first enabled index', () => {
     const filtered = filterSlashCommands('');
-    expect(getFirstEnabledSlashIndex(filtered)).toBe(filtered.findIndex((c) => c.id === 'clip_page'));
+    expect(getFirstEnabledSlashIndex(filtered)).toBe(0);
+    expect(filtered[0]?.id).toBe('clip_page');
   });
 
-  it('moves selection only across enabled items', () => {
+  it('moves selection across all visible items', () => {
     const filtered = filterSlashCommands('');
-    const first = getFirstEnabledSlashIndex(filtered);
-    const second = getNextEnabledSlashIndex(filtered, first, 'down');
-    const third = getNextEnabledSlashIndex(filtered, second, 'down');
-    const fourth = getNextEnabledSlashIndex(filtered, third, 'down');
-    const fifth = getNextEnabledSlashIndex(filtered, fourth, 'down');
-    const sixth = getNextEnabledSlashIndex(filtered, fifth, 'down');
-
-    expect(filtered[first]?.id).toBe('clip_page');
-    expect(filtered[second]?.id).toBe('field');
-    expect(filtered[third]?.id).toBe('reference');
-    expect(filtered[fourth]?.id).toBe('heading');
-    expect(filtered[fifth]?.id).toBe('checkbox');
-    expect(filtered[sixth]?.id).toBe('more_commands');
+    const ids = filtered.map((c) => c.id);
+    expect(ids).toEqual(['clip_page', 'field', 'reference', 'heading', 'checkbox']);
 
     // Clamp to boundaries.
-    expect(getNextEnabledSlashIndex(filtered, sixth, 'down')).toBe(sixth);
-    expect(getNextEnabledSlashIndex(filtered, first, 'up')).toBe(first);
+    const last = filtered.length - 1;
+    expect(getNextEnabledSlashIndex(filtered, last, 'down')).toBe(last);
+    expect(getNextEnabledSlashIndex(filtered, 0, 'up')).toBe(0);
   });
 
   it('enables heading command', () => {

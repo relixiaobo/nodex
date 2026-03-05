@@ -301,6 +301,10 @@ export const NDX_F = {
   PUBLISHED: 'NDX_F04',
   /** Duration fieldDef (child of #video tagDef) */
   DURATION: 'NDX_F05',
+  /** Highlights fieldDef (child of #note tagDef, options_from_supertag → #highlight) */
+  NOTE_HIGHLIGHTS: 'NDX_F06',
+  /** Anchor fieldDef (child of #highlight tagDef, hidden plain field for anchor JSON) */
+  HIGHLIGHT_ANCHOR: 'NDX_F07',
 } as const;
 
 export type NdxFieldDef = typeof NDX_F[keyof typeof NDX_F];

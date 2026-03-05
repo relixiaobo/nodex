@@ -226,7 +226,7 @@ async function forwardHighlightCheck(payload: HighlightCheckUrlPayload): Promise
       id: e.tempId,
       anchor: e.anchor,
       color: '#9B7C38',
-      hasComment: !!(e.noteEntries && e.noteEntries.length > 0),
+      hasNote: !!(e.noteEntries && e.noteEntries.length > 0),
     })),
   };
 

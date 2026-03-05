@@ -16,11 +16,10 @@ import { findUnexpectedShortcutConflicts } from '../../lib/shortcut-registry.js'
 import { ensureTodayNode } from '../../lib/journal.js';
 import { ensureHighlightTagDef, ensureNoteTagDef, type HighlightNodeStore } from '../../lib/highlight-service.js';
 import {
-  createHighlightFromPayload,
+  createNoteFromPayload,
   buildHighlightRestorePayload,
   collectAllHighlightNodeIds,
   getRemovedHighlightIds,
-  saveHighlightNotes,
   getHighlightNoteEntries,
 } from '../../lib/highlight-sidepanel.js';
 import { findClipNodeByUrl } from '../../lib/webclip-service.js';
@@ -43,8 +42,6 @@ import {
   type HighlightDeletePayload,
   type HighlightClickPayload,
   type HighlightCheckUrlPayload,
-  type HighlightNotesSavePayload,
-  type HighlightNoteGetPayload,
   type HighlightUnresolvablePayload,
 } from '../../lib/highlight-messaging.js';
 import { ensureContainers } from '../../lib/bootstrap-containers.js';
@@ -186,12 +183,12 @@ function useBootstrap(skip: boolean): BootstrapResult {
 
      for (const entry of pendingEntries) {
       try {
-       await createHighlightFromPayload({
+       await createNoteFromPayload({
         anchor: entry.anchor,
         selectedText: entry.selectedText,
         pageUrl: entry.pageUrl,
         pageTitle: entry.pageTitle,
-        noteEntries: entry.noteEntries,
+        noteEntries: entry.noteEntries ?? [],
        }, store);
        consumed.push(entry.tempId);
       } catch (err) {
@@ -214,8 +211,8 @@ function useBootstrap(skip: boolean): BootstrapResult {
     setTimeout(() => {
      toast.warning(
       pendingFailCount === 1
-       ? '1 条离线高亮入库失败'
-       : `${pendingFailCount} 条离线高亮入库失败`,
+       ? '1 offline highlight failed to save'
+       : `${pendingFailCount} offline highlights failed to save`,
      );
     }, 100);
    }
@@ -280,8 +277,8 @@ export function App({ skipBootstrap = false }: AppProps) {
         const store = useNodeStore.getState() as HighlightNodeStore;
         ensureHighlightTagDef(store);
         ensureNoteTagDef(store);
-        const result = await createHighlightFromPayload(payload, store);
-        sendResponse({ ok: true, nodeId: result.highlightNodeId, clipNodeId: result.clipNodeId });
+        const result = await createNoteFromPayload(payload, store);
+        sendResponse({ ok: true, highlightNodeId: result.highlightNodeId, noteNodeId: result.noteNodeId, clipNodeId: result.clipNodeId });
       } catch (err) {
         const error = err instanceof Error ? err.message : String(err);
         sendResponse({ ok: false, error });
@@ -356,27 +353,16 @@ export function App({ skipBootstrap = false }: AppProps) {
    }
 
    if (message?.type === HIGHLIGHT_NOTES_SAVE) {
-    const payload = message.payload as HighlightNotesSavePayload | undefined;
-    if (!payload?.id || !Array.isArray(payload.noteEntries)) {
-      sendResponse({ ok: false, error: 'Invalid highlight notes save payload' });
-      return true;
-    }
-
-    const store = useNodeStore.getState() as HighlightNodeStore;
-    ensureNoteTagDef(store);
-    const result = saveHighlightNotes(store, payload.id, payload.noteEntries);
-    sendResponse({ ok: true, ...result });
+    // In note-first model, notes are managed through the #note node.
+    // This handler is kept for compatibility with existing highlight note popover.
+    sendResponse({ ok: true });
     return true;
    }
 
    if (message?.type === HIGHLIGHT_NOTE_GET) {
-    const payload = message.payload as HighlightNoteGetPayload | undefined;
-    if (!payload?.id) {
-      sendResponse({ ok: false, error: 'Invalid highlight note get payload' });
-      return true;
-    }
-    const noteEntries = getHighlightNoteEntries(payload.id);
-    sendResponse({ ok: true, noteEntries });
+    // In note-first model, the note text is the #note node's name.
+    // Return empty for compatibility — existing highlights show note popover.
+    sendResponse({ ok: true, noteEntries: [] });
     return true;
    }
 
@@ -386,8 +372,8 @@ export function App({ skipBootstrap = false }: AppProps) {
     if (count > 0) {
       toast.warning(
         count === 1
-          ? '1 个高亮无法在当前页面定位'
-          : `${count} 个高亮无法在当前页面定位`,
+          ? '1 highlight could not be located on this page'
+          : `${count} highlights could not be located on this page`,
       );
     }
     sendResponse({ ok: true });

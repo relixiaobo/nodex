@@ -1,20 +1,22 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useNodeStore } from '../../src/stores/node-store.js';
 import { resetAndSeed } from './helpers/test-state.js';
-import { CONTAINER_IDS, SYS_T } from '../../src/types/index.js';
+import { CONTAINER_IDS, SYS_T, NDX_F } from '../../src/types/index.js';
 import {
   ensureHighlightTagDef,
   ensureNoteTagDef,
+  getHighlightAnchor,
+  getHighlightsForNote,
+  getNotesForClip,
   type HighlightNodeStore,
 } from '../../src/lib/highlight-service.js';
 import { findClipNodeByUrl } from '../../src/lib/webclip-service.js';
 import {
-  createHighlightFromPayload,
+  createNoteFromPayload,
   buildHighlightRestorePayload,
   findOrCreateClipNodeForUrl,
   collectAllHighlightNodeIds,
   getRemovedHighlightIds,
-  saveHighlightNotes,
   getHighlightNoteEntries,
 } from '../../src/lib/highlight-sidepanel.js';
 import type { HighlightCreatePayload } from '../../src/lib/highlight-messaging.js';
@@ -36,11 +38,12 @@ function makePayload(overrides?: Partial<HighlightCreatePayload>): HighlightCrea
       prefix: 'before ',
       suffix: ' after',
     },
+    noteEntries: [{ text: 'my insight', depth: 0 }],
     ...overrides,
   };
 }
 
-describe('highlight-sidepanel', () => {
+describe('highlight-sidepanel (note-first model)', () => {
   beforeEach(() => {
     resetAndSeed();
     const store = getStore();
@@ -48,18 +51,35 @@ describe('highlight-sidepanel', () => {
     ensureNoteTagDef(store);
   });
 
-  it('creates highlight as child of existing clip node', async () => {
+  it('creates #note as child of existing clip node', async () => {
     const store = getStore();
-    const result = await createHighlightFromPayload(makePayload(), store);
+    const result = await createNoteFromPayload(makePayload(), store);
 
     expect(result.clipNodeId).toBe('webclip_1');
 
-    // Highlight should be child of clip page
-    expect(loroDoc.getParentId(result.highlightNodeId)).toBe('webclip_1');
+    // Note should be child of clip page
+    expect(loroDoc.getParentId(result.noteNodeId)).toBe('webclip_1');
 
-    const node = store.getNode(result.highlightNodeId);
-    expect(node).not.toBeNull();
-    expect(node!.tags).toContain(SYS_T.HIGHLIGHT);
+    const noteNode = store.getNode(result.noteNodeId);
+    expect(noteNode).not.toBeNull();
+    expect(noteNode!.tags).toContain(SYS_T.NOTE);
+    expect(noteNode!.name).toBe('my insight');
+  });
+
+  it('creates #highlight under note Highlights field', async () => {
+    const store = getStore();
+    const result = await createNoteFromPayload(makePayload(), store);
+
+    const hlNode = store.getNode(result.highlightNodeId);
+    expect(hlNode).not.toBeNull();
+    expect(hlNode!.tags).toContain(SYS_T.HIGHLIGHT);
+    expect(hlNode!.name).toBe('highlighted text');
+
+    // Highlight should be under a fieldEntry
+    const hlParentId = loroDoc.getParentId(result.highlightNodeId);
+    const hlParent = loroDoc.toNodexNode(hlParentId!);
+    expect(hlParent?.type).toBe('fieldEntry');
+    expect(hlParent?.fieldDefId).toBe(NDX_F.NOTE_HIGHLIGHTS);
   });
 
   it('creates lightweight clip when URL has no existing clip node', async () => {
@@ -69,7 +89,7 @@ describe('highlight-sidepanel', () => {
       pageTitle: 'Fresh page',
     });
 
-    const result = await createHighlightFromPayload(payload, store);
+    const result = await createNoteFromPayload(payload, store);
     expect(result.clipNodeId).not.toBe('webclip_1');
 
     const clipNode = store.getNode(result.clipNodeId);
@@ -78,155 +98,79 @@ describe('highlight-sidepanel', () => {
     expect(loroDoc.getParentId(result.clipNodeId)).toBe(ensureTodayNode());
     expect(findClipNodeByUrl('https://example.com/new-highlight')).toBe(result.clipNodeId);
 
-    // Highlight should be child of the new clip page
-    expect(loroDoc.getParentId(result.highlightNodeId)).toBe(result.clipNodeId);
+    // Note should be child of the new clip page
+    expect(loroDoc.getParentId(result.noteNodeId)).toBe(result.clipNodeId);
   });
 
-  it('creates #note children from noteEntries', async () => {
+  it('creates extra note entries as children of #note', async () => {
     const store = getStore();
-    const result = await createHighlightFromPayload(
-      makePayload({ noteEntries: [{ text: 'captured note', depth: 0 }] }),
-      store,
-    );
-
-    const entries = getHighlightNoteEntries(result.highlightNodeId);
-    expect(entries).toHaveLength(1);
-    expect(entries[0].text).toBe('captured note');
-    expect(entries[0].depth).toBe(0);
-  });
-
-  it('creates nested #note children from noteEntries with depth', async () => {
-    const store = getStore();
-    const result = await createHighlightFromPayload(
+    const result = await createNoteFromPayload(
       makePayload({
         noteEntries: [
-          { text: 'parent', depth: 0 },
-          { text: 'child', depth: 1 },
-          { text: 'grandchild', depth: 2 },
+          { text: 'main thought', depth: 0 },
+          { text: 'sub-thought', depth: 0 },
         ],
       }),
       store,
     );
 
-    const entries = getHighlightNoteEntries(result.highlightNodeId);
-    expect(entries).toEqual([
-      { text: 'parent', depth: 0 },
-      { text: 'child', depth: 1 },
-      { text: 'grandchild', depth: 2 },
-    ]);
+    const entries = getHighlightNoteEntries(result.noteNodeId);
+    expect(entries).toHaveLength(1);
+    expect(entries[0].text).toBe('sub-thought');
+    expect(entries[0].depth).toBe(0);
   });
 
-  it('stores anchor data in node description', async () => {
+  it('stores anchor data in hidden Anchor field', async () => {
     const store = getStore();
-    const result = await createHighlightFromPayload(makePayload(), store);
+    const result = await createNoteFromPayload(makePayload(), store);
 
-    const node = loroDoc.toNodexNode(result.highlightNodeId);
-    expect(node!.description).toBeDefined();
-    const parsed = JSON.parse(node!.description!);
+    const anchorRaw = getHighlightAnchor(result.highlightNodeId);
+    expect(anchorRaw).toBeDefined();
+    const parsed = JSON.parse(anchorRaw!);
     expect(parsed.exact).toBe('highlighted text');
   });
 
-  it('builds restore payload with parsed anchor and tagDef color', async () => {
+  it('builds restore payload from note-first structure', async () => {
     const store = getStore();
-    const result = await createHighlightFromPayload(makePayload(), store);
+    const result = await createNoteFromPayload(makePayload(), store);
 
     const payload = buildHighlightRestorePayload(result.clipNodeId);
     const item = payload.highlights.find((h) => h.id === result.highlightNodeId);
     expect(item).toBeDefined();
-    // Color is derived from tagDef and passed as the base highlight color
     expect(item!.color).toBe('#8B8422');
     expect(item!.anchor.exact).toBe('highlighted text');
-    expect(item!.hasComment).toBe(false);
+    expect(item!.hasNote).toBe(true); // note has text "my insight"
   });
 
-  it('sets hasComment=true in restore payload when highlight has #note child', async () => {
+  it('sets hasNote=false when note has no text', async () => {
     const store = getStore();
-    const result = await createHighlightFromPayload(makePayload(), store);
-    saveHighlightNotes(store, result.highlightNodeId, [{ text: 'note', depth: 0 }]);
+    const result = await createNoteFromPayload(
+      makePayload({ noteEntries: [{ text: '', depth: 0 }] }),
+      store,
+    );
 
     const payload = buildHighlightRestorePayload(result.clipNodeId);
     const item = payload.highlights.find((h) => h.id === result.highlightNodeId);
-    expect(item?.hasComment).toBe(true);
+    expect(item?.hasNote).toBe(false);
   });
 
-  it('batch saves notes: deletes existing and rebuilds from entries', async () => {
+  it('getHighlightNoteEntries returns non-fieldEntry children', async () => {
     const store = getStore();
-    const result = await createHighlightFromPayload(
-      makePayload({ noteEntries: [{ text: 'first', depth: 0 }] }),
+    const result = await createNoteFromPayload(
+      makePayload({
+        noteEntries: [
+          { text: 'main', depth: 0 },
+          { text: 'child1', depth: 0 },
+          { text: 'child2', depth: 0 },
+        ],
+      }),
       store,
     );
 
-    // Replace with two flat notes
-    const saveResult = saveHighlightNotes(store, result.highlightNodeId, [
-      { text: 'updated', depth: 0 },
-      { text: 'second', depth: 0 },
-    ]);
-    expect(saveResult.created).toBe(2);
-    expect(saveResult.deleted).toBe(1);
-
-    const entries = getHighlightNoteEntries(result.highlightNodeId);
-    expect(entries).toEqual([
-      { text: 'updated', depth: 0 },
-      { text: 'second', depth: 0 },
-    ]);
-  });
-
-  it('batch save filters empty strings', async () => {
-    const store = getStore();
-    const result = await createHighlightFromPayload(
-      makePayload({ noteEntries: [{ text: 'first', depth: 0 }, { text: 'second', depth: 0 }] }),
-      store,
-    );
-
-    // Save with only 1 non-empty text + empties → filters empties
-    const saveResult = saveHighlightNotes(store, result.highlightNodeId, [
-      { text: 'kept', depth: 0 },
-      { text: '', depth: 0 },
-      { text: '  ', depth: 0 },
-    ]);
-    expect(saveResult.created).toBe(1);
-    expect(saveResult.deleted).toBe(2);
-
-    const entries = getHighlightNoteEntries(result.highlightNodeId);
-    expect(entries).toEqual([{ text: 'kept', depth: 0 }]);
-  });
-
-  it('getHighlightNoteEntries returns all #note entries in DFS order', async () => {
-    const store = getStore();
-    const result = await createHighlightFromPayload(makePayload(), store);
-    saveHighlightNotes(store, result.highlightNodeId, [
-      { text: 'alpha', depth: 0 },
-      { text: 'beta', depth: 0 },
-      { text: 'gamma', depth: 0 },
-    ]);
-
-    const entries = getHighlightNoteEntries(result.highlightNodeId);
-    expect(entries).toEqual([
-      { text: 'alpha', depth: 0 },
-      { text: 'beta', depth: 0 },
-      { text: 'gamma', depth: 0 },
-    ]);
-  });
-
-  it('saves and reads nested note tree with correct depths', async () => {
-    const store = getStore();
-    const result = await createHighlightFromPayload(makePayload(), store);
-    saveHighlightNotes(store, result.highlightNodeId, [
-      { text: 'root 1', depth: 0 },
-      { text: 'child 1.1', depth: 1 },
-      { text: 'child 1.2', depth: 1 },
-      { text: 'grandchild 1.2.1', depth: 2 },
-      { text: 'root 2', depth: 0 },
-    ]);
-
-    const entries = getHighlightNoteEntries(result.highlightNodeId);
-    expect(entries).toEqual([
-      { text: 'root 1', depth: 0 },
-      { text: 'child 1.1', depth: 1 },
-      { text: 'child 1.2', depth: 1 },
-      { text: 'grandchild 1.2.1', depth: 2 },
-      { text: 'root 2', depth: 0 },
-    ]);
+    const entries = getHighlightNoteEntries(result.noteNodeId);
+    expect(entries).toHaveLength(2); // child1 + child2 (main is the note text)
+    expect(entries[0].text).toBe('child1');
+    expect(entries[1].text).toBe('child2');
   });
 
   it('deduplicates concurrent clip creation for the same normalized URL', async () => {
@@ -242,10 +186,10 @@ describe('highlight-sidepanel', () => {
     expect(clipIdA).toBe(clipIdB);
   });
 
-  it('collectAllHighlightNodeIds finds highlights under clip pages (new model)', async () => {
+  it('collectAllHighlightNodeIds finds highlights in note-first structure', async () => {
     const store = getStore();
-    const first = await createHighlightFromPayload(makePayload({ selectedText: 'first' }), store);
-    const second = await createHighlightFromPayload(makePayload({ selectedText: 'second' }), store);
+    const first = await createNoteFromPayload(makePayload({ selectedText: 'first' }), store);
+    const second = await createNoteFromPayload(makePayload({ selectedText: 'second' }), store);
 
     const ids = collectAllHighlightNodeIds();
     expect(ids.has(first.highlightNodeId)).toBe(true);
@@ -254,14 +198,15 @@ describe('highlight-sidepanel', () => {
 
   it('detects removed highlight IDs', async () => {
     const store = getStore();
-    const first = await createHighlightFromPayload(makePayload({ selectedText: 'first' }), store);
-    const second = await createHighlightFromPayload(makePayload({ selectedText: 'second' }), store);
+    const first = await createNoteFromPayload(makePayload({ selectedText: 'first' }), store);
+    const second = await createNoteFromPayload(makePayload({ selectedText: 'second' }), store);
 
     const before = collectAllHighlightNodeIds();
     expect(before.has(first.highlightNodeId)).toBe(true);
     expect(before.has(second.highlightNodeId)).toBe(true);
 
-    loroDoc.moveNode(first.highlightNodeId, CONTAINER_IDS.TRASH);
+    // Trash the note (which moves the whole subtree including highlight)
+    loroDoc.moveNode(first.noteNodeId, CONTAINER_IDS.TRASH);
     const after = collectAllHighlightNodeIds();
     const removed = getRemovedHighlightIds(before, after);
 

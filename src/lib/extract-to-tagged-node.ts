@@ -13,7 +13,7 @@ import { pmSchema } from '../components/editor/pm-schema.js';
 import { docToMarks } from './pm-doc-utils.js';
 import * as loroDoc from './loro-doc.js';
 import {
-  createHighlightNode,
+  createNoteWithHighlight,
   type HighlightNodeStore,
 } from './highlight-service.js';
 
@@ -76,12 +76,14 @@ export function extractToTaggedNode(
   let newNode: NodexNode;
 
   if (tagDefId === SYS_T.HIGHLIGHT && clipPageId) {
-    // Use highlight-service for #highlight as child of clip page
-    newNode = createHighlightNode({
+    // Note-first model: create #note with #highlight under clip page
+    const { noteNode } = createNoteWithHighlight({
       store,
+      noteText: selectedText,
       selectedText,
       clipNodeId: clipPageId,
     });
+    newNode = noteNode;
   } else {
     // Generic tag or no clip ancestor: create in LIBRARY and apply tag
     newNode = store.createChild(CONTAINER_IDS.LIBRARY, undefined, { name: selectedText });

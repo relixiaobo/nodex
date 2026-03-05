@@ -130,16 +130,17 @@ describe('payload types', () => {
       selectedText: 'test text',
       pageUrl: 'https://example.com',
       pageTitle: 'Example Page',
+      noteEntries: [{ text: 'my thought', depth: 0 }],
     };
 
     expect(payload.anchor.exact).toBe('test text');
     expect(payload.selectedText).toBe('test text');
     expect(payload.pageUrl).toBe('https://example.com');
     expect(payload.pageTitle).toBe('Example Page');
-    expect(payload.noteEntries).toBeUndefined();
+    expect(payload.noteEntries).toHaveLength(1);
   });
 
-  it('HighlightCreatePayload supports optional noteEntries', () => {
+  it('HighlightCreatePayload supports multiple noteEntries', () => {
     const anchor: HighlightAnchor = {
       version: 1,
       exact: 'text',
@@ -161,8 +162,8 @@ describe('payload types', () => {
     };
 
     expect(payload.noteEntries).toHaveLength(2);
-    expect(payload.noteEntries![0].text).toBe('parent note');
-    expect(payload.noteEntries![1].depth).toBe(1);
+    expect(payload.noteEntries[0].text).toBe('parent note');
+    expect(payload.noteEntries[1].depth).toBe(1);
   });
 
   it('HighlightCreatePayload supports optional tempId', () => {
@@ -178,6 +179,7 @@ describe('payload types', () => {
       selectedText: 'text',
       pageUrl: 'https://example.com',
       pageTitle: 'Page',
+      noteEntries: [{ text: 'thought', depth: 0 }],
       tempId: 'temp_123_abc',
     };
 
@@ -186,6 +188,7 @@ describe('payload types', () => {
       selectedText: 'text',
       pageUrl: 'https://example.com',
       pageTitle: 'Page',
+      noteEntries: [{ text: 'thought', depth: 0 }],
     };
 
     expect(withTempId.tempId).toBe('temp_123_abc');

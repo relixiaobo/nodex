@@ -760,6 +760,45 @@ function createHighlightWithNote(range: Range): void {
   );
 }
 
+/**
+ * Resolve per-post source URL and title from a selection range.
+ * On feed/timeline pages (e.g. X.com home), walks up from the selection
+ * to find the enclosing post and extracts its permalink.
+ * Falls back to the page-level URL and title.
+ */
+function resolvePostSource(range: Range): { url: string; title: string } {
+  const fallback = { url: location.href, title: document.title };
+
+  // X.com / Twitter: find the enclosing <article data-testid="tweet">
+  const host = location.hostname.replace(/^www\./, '');
+  if (host === 'x.com' || host === 'twitter.com') {
+    const container = range.commonAncestorContainer;
+    const el = container.nodeType === Node.ELEMENT_NODE
+      ? container as Element
+      : container.parentElement;
+    const article = el?.closest('article[data-testid="tweet"]');
+    if (article) {
+      // Find permalink: <a href="/user/status/123"> containing <time>
+      const timeLink = article.querySelector('a[href*="/status/"] time')?.parentElement as HTMLAnchorElement | null;
+      const href = timeLink?.getAttribute('href');
+      if (href?.includes('/status/')) {
+        const postUrl = `https://x.com${href}`;
+        // Build title: @author: text preview
+        const authorEl = article.querySelector('[data-testid="User-Name"]');
+        const handleLink = authorEl?.querySelector('a[href^="/"]');
+        const handle = handleLink?.getAttribute('href')?.replace(/^\//, '');
+        const textEl = article.querySelector('[data-testid="tweetText"]');
+        const text = textEl?.textContent?.trim() ?? '';
+        const preview = text.length > 40 ? text.slice(0, 37) + '…' : text;
+        const title = handle ? `@${handle}: ${preview}` : preview || document.title;
+        return { url: postUrl, title };
+      }
+    }
+  }
+
+  return fallback;
+}
+
 function createHighlightDraft(range: Range): HighlightDraft {
   const anchor = computeAnchor(range);
   const selectedText = range.toString();
@@ -770,13 +809,15 @@ function createHighlightDraft(range: Range): HighlightDraft {
 
   renderHighlight(range, tempId);
 
+  const source = resolvePostSource(range);
+
   return {
     tempId,
     payloadBase: {
       anchor,
       selectedText,
-      pageUrl: location.href,
-      pageTitle: document.title,
+      pageUrl: source.url,
+      pageTitle: source.title,
     },
   };
 }

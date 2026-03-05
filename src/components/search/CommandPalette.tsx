@@ -569,6 +569,9 @@ function PaletteRow({ item, selected, positionIndex, onSelect, onHover }: Palett
         </span>
       )}
       <span className="flex-1 truncate text-[13px] text-foreground">{item.label}</span>
+      {item.typeLabel && (
+        <span className="shrink-0 text-xs text-foreground-tertiary">{item.typeLabel}</span>
+      )}
       {/* Alfred-style shortcut: selected → ↵, others → ⌘N (up to 9) */}
       {selected ? (
         <Kbd>↵</Kbd>

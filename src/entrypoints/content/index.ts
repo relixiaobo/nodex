@@ -475,6 +475,25 @@ function extractXAuthor(): string | undefined {
   return undefined;
 }
 
+// ── GitHub DOM extraction ──
+
+function isGitHubDomain(): boolean {
+  const h = location.hostname.replace(/^www\./, '');
+  return h === 'github.com';
+}
+
+/**
+ * Extract README / wiki / issue / PR content from GitHub pages.
+ * GitHub renders Markdown inside `.markdown-body` elements which preserve
+ * full HTML structure (headings, code blocks, lists, tables, images).
+ */
+function extractGitHubContent(): string | undefined {
+  // README, wiki pages, issue/PR body
+  const markdownBody = document.querySelector('article.markdown-body, .markdown-body');
+  if (markdownBody) return markdownBody.innerHTML;
+  return undefined;
+}
+
 async function captureCurrentPage(): Promise<WebClipCapturePayload> {
   const url = location.href;
   const selectionText = window.getSelection()?.toString() ?? '';
@@ -540,6 +559,14 @@ async function captureCurrentPage(): Promise<WebClipCapturePayload> {
       const xContent = extractXPageContent(xVideoMp4Url);
       if (xContent) pageText = xContent;
     }
+  }
+
+  // ── GitHub enhancement ──
+  // Defuddle extracts the entire page (file tree, nav, etc.) on GitHub.
+  // Override with just the .markdown-body content which preserves HTML structure.
+  if (isGitHubDomain()) {
+    const ghContent = extractGitHubContent();
+    if (ghContent) pageText = ghContent;
   }
 
   if (!pageText) {

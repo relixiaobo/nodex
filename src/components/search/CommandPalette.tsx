@@ -90,7 +90,7 @@ function resolveNodeVisuals(id: string, node: { type?: string; tags?: string[] }
   const bulletColors = tagIds.length > 0
     ? tagIds.map((tid: string) => resolveTagColor(tid).text)
     : undefined;
-  return { bulletColors, type: 'node' };
+  return { bulletColors, typeLabel: 'Node', type: 'node' };
 }
 
 export function CommandPalette() {

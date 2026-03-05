@@ -22,7 +22,7 @@
  *   Changed ...
  *   Created ...
  */
-import { useEffect, useRef, forwardRef, useCallback, useState, useMemo } from 'react';
+import { useEffect, useLayoutEffect, useRef, forwardRef, useCallback, useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useNodeStore } from '../../stores/node-store.js';
 import { useUIStore } from '../../stores/ui-store.js';
@@ -149,11 +149,23 @@ const NodeContextMenuContent = forwardRef<HTMLDivElement, NodeContextMenuContent
     const node = useNodeStore((s) => { void s._version; return loroDoc.toNodexNode(nodeId); });
     const [mode, setMode] = useState<MenuMode>('main');
 
-    // Viewport boundary detection
-    const menuWidth = 260;
-    const menuHeight = 360;
-    const left = x + menuWidth > window.innerWidth ? x - menuWidth : x;
-    const top = y + menuHeight > window.innerHeight ? Math.max(4, y - menuHeight) : y;
+    // Measure actual menu size and clamp to viewport (before paint)
+    const innerRef = useRef<HTMLDivElement>(null);
+    const [pos, setPos] = useState({ left: x, top: y });
+
+    useLayoutEffect(() => {
+      const el = innerRef.current;
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      const pad = 4;
+      let newLeft = x;
+      let newTop = y;
+      if (newLeft + rect.width > vw - pad) newLeft = Math.max(pad, vw - rect.width - pad);
+      if (newTop + rect.height > vh - pad) newTop = Math.max(pad, vh - rect.height - pad);
+      if (newLeft !== pos.left || newTop !== pos.top) setPos({ left: newLeft, top: newTop });
+    }, [x, y, mode]); // re-measure when mode changes (add-tag has different height)
 
     const created = node?.createdAt ? formatSmartTimestamp(node.createdAt) : '';
     const changed = node?.updatedAt ? formatSmartTimestamp(node.updatedAt) : '';
@@ -239,11 +251,18 @@ const NodeContextMenuContent = forwardRef<HTMLDivElement, NodeContextMenuContent
       onClose();
     }, [nodeId, onClose]);
 
+    // Merge forwarded ref + innerRef for measurement
+    const setRefs = useCallback((el: HTMLDivElement | null) => {
+      (innerRef as React.MutableRefObject<HTMLDivElement | null>).current = el;
+      if (typeof ref === 'function') ref(el);
+      else if (ref) (ref as React.MutableRefObject<HTMLDivElement | null>).current = el;
+    }, [ref]);
+
     return (
       <div
-        ref={ref}
+        ref={setRefs}
         className="fixed z-50 min-w-[240px] rounded-lg bg-background shadow-paper p-1 text-foreground"
-        style={{ left, top }}
+        style={{ left: pos.left, top: pos.top }}
       >
         {mode === 'main' && (
           <MainMenu

@@ -518,49 +518,28 @@ export function CommandPalette() {
           )}
         </div>
 
-        {/* Action bar — Raycast-style bottom bar */}
+        {/* Action bar — Raycast-style bottom bar, right-aligned */}
         {allItems.length > 0 && (() => {
           const selected = allItems[selectedIndex];
           if (!selected) return null;
           return (
-            <div className="flex h-9 shrink-0 items-center border-t border-border-subtle bg-background px-4">
-              <div className="flex items-center gap-2">
+            <div className="flex h-9 shrink-0 items-center justify-end gap-3 border-t border-border-subtle bg-background px-4">
+              {hasQuery && createItem && selected.id !== '__create__' && (
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs text-foreground-tertiary">{t('search.commandPalette.actionCreate')}</span>
+                  <Kbd>⌘↵</Kbd>
+                </div>
+              )}
+              <div className="flex items-center gap-1.5">
                 <span className="text-xs text-foreground-secondary">{getActionLabel(selected.type)}</span>
                 <Kbd>↵</Kbd>
-                {hasQuery && createItem && selected.id !== '__create__' && (
-                  <>
-                    <span className="mx-1 h-3 w-px bg-border-subtle" />
-                    <span className="text-xs text-foreground-secondary">{t('search.commandPalette.typeLabelNewInToday')}</span>
-                    <Kbd>⌘↵</Kbd>
-                  </>
-                )}
               </div>
-              <div className="flex-1" />
-              <span className="text-xs text-foreground-tertiary">{getContextualHint(selected)}</span>
             </div>
           );
         })()}
       </div>
     </div>
   );
-}
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-/** Contextual hint for the right side of the action bar based on selected item. */
-function getContextualHint(item: PaletteItem): string {
-  switch (item.type) {
-    case 'create': return t('search.commandPalette.hintCreate');
-    case 'container': return t('search.commandPalette.hintContainer', { name: item.label });
-    case 'command': return item.label;
-    case 'node': {
-      if (item.typeLabel) return item.typeLabel; // "Tag", "Field"
-      return t('search.commandPalette.hintNode');
-    }
-    default: return '';
-  }
 }
 
 // ---------------------------------------------------------------------------

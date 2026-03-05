@@ -137,12 +137,10 @@ function useBootstrap(skip: boolean): BootstrapResult {
    // Bootstrap LoroDoc + seed containers
    const { hadSnapshot } = await seedWorkspace(currentWsId);
 
-   // Seed onboarding content for truly new users only:
-   // - No local snapshot (never used on this device)
-   // - No persisted auth session (not a returning user on a new device)
-   // - Sentinel node doesn't exist (not already seeded)
-   const isReturningUser = useWorkspaceStore.getState().isAuthenticated;
-   if (!hadSnapshot && !isReturningUser && !isOnboardingSeeded()) {
+   // Seed onboarding content for first-time users:
+   // - No local IndexedDB snapshot (never used on this device)
+   // - Sentinel node doesn't exist (not already seeded in this LoroDoc)
+   if (!hadSnapshot && !isOnboardingSeeded()) {
     seedOnboardingData();
    }
 

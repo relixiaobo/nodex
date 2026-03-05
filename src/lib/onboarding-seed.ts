@@ -71,23 +71,30 @@ function cn(
   }
 }
 
-/** Set an options field value on a node (creates fieldEntry + valueNode). */
-function setOptionField(nodeId: string, fieldDefId: string, optionNodeId: string): void {
+/** Find existing fieldEntry for a field on a node, or create one. */
+function findOrCreateFieldEntry(nodeId: string, fieldDefId: string): string {
+  const children = loroDoc.getChildren(nodeId);
+  for (const cid of children) {
+    const n = loroDoc.toNodexNode(cid);
+    if (n?.type === 'fieldEntry' && n.fieldDefId === fieldDefId) return cid;
+  }
   const feId = nanoid();
   loroDoc.createNode(feId, nodeId);
   loroDoc.setNodeDataBatch(feId, { type: 'fieldEntry', fieldDefId });
+  return feId;
+}
 
+/** Set an options field value on a node (reuses existing fieldEntry from applyTag). */
+function setOptionField(nodeId: string, fieldDefId: string, optionNodeId: string): void {
+  const feId = findOrCreateFieldEntry(nodeId, fieldDefId);
   const valId = nanoid();
   loroDoc.createNode(valId, feId);
   loroDoc.setNodeData(valId, 'targetId', optionNodeId);
 }
 
-/** Set a plain/URL field value on a node (creates fieldEntry + valueNode). */
+/** Set a plain/URL field value on a node (reuses existing fieldEntry from applyTag). */
 function setPlainField(nodeId: string, fieldDefId: string, value: string): void {
-  const feId = nanoid();
-  loroDoc.createNode(feId, nodeId);
-  loroDoc.setNodeDataBatch(feId, { type: 'fieldEntry', fieldDefId });
-
+  const feId = findOrCreateFieldEntry(nodeId, fieldDefId);
   const valId = nanoid();
   loroDoc.createNode(valId, feId);
   loroDoc.setNodeRichTextContent(valId, value, [], []);

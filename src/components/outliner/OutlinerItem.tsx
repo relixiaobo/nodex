@@ -1855,6 +1855,8 @@ export function OutlinerItem({
                   className="node-content"
                   dangerouslySetInnerHTML={{ __html: nodeContentHtml }}
                 />
+              ) : isLoadingNode ? (
+                <span className="node-content text-foreground-tertiary animate-pulse">Clipping…</span>
               ) : hasTags ? (
                 <span className="node-content text-foreground-tertiary">Untitled</span>
               ) : (

@@ -146,6 +146,7 @@ export function getSystemCommands(): PaletteCommand[] {
 
         const uiStore = useUIStore.getState();
         uiStore.addLoadingNode(shellId);
+        console.log('[clip] shell created, loading started:', shellId);
 
         // Phase 2: fetch content asynchronously and fill the shell
         try {
@@ -155,9 +156,14 @@ export function getSystemCommands(): PaletteCommand[] {
 
           if (response?.ok) {
             await fillClipShell(shellId, response.payload, store);
+            console.log('[clip] shell filled:', shellId);
+          } else {
+            console.warn('[clip] capture failed, removing empty shell');
+            store.trashNode(shellId);
           }
         } catch {
-          // Silently fail — chrome.runtime may not be available
+          console.warn('[clip] capture error, removing empty shell');
+          store.trashNode(shellId);
         } finally {
           uiStore.removeLoadingNode(shellId);
         }

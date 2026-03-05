@@ -14,13 +14,11 @@ import { useMemo, useState, useCallback, useRef } from 'react';
 import { useNodeStore } from '../../stores/node-store';
 import { useChildren } from '../../hooks/use-children';
 import { useNodeFields, type FieldEntry } from '../../hooks/use-node-fields';
-import { useFieldOptions } from '../../hooks/use-field-options.js';
 import { OutlinerItem } from '../outliner/OutlinerItem';
 import { RowHost } from '../outliner/RowHost.js';
 import { TrailingInput } from '../editor/TrailingInput';
 import { FieldRow } from './FieldRow';
 import { toFieldRowEntryProps } from './field-row-props.js';
-import { NodePicker, type NodePickerOption } from './NodePicker';
 import { FieldValueRow } from './FieldValueRow.js';
 import { SYS_A, SYS_V } from '../../types';
 import {
@@ -30,7 +28,6 @@ import {
   isColorFieldType,
   isDateFieldType,
   isEmailFieldType,
-  isOptionsFromSupertagFieldType,
   isUrlFieldType,
   resolveConfigValue,
 } from '../../lib/field-utils.js';
@@ -61,18 +58,6 @@ export function shouldShowFieldValueTrailingInput(
   items: Array<{ type: 'field' | 'content' }>,
 ): boolean {
   return shouldShowTrailingInput(items);
-}
-
-export function resolveSupertagPickerSelectedId(
-  tupleId: string,
-  getNode: (id: string) => { children?: string[]; name?: string; targetId?: string } | null,
-): string | undefined {
-  const tuple = getNode(tupleId);
-  const valueNodeId = tuple?.children?.[0];
-  if (!valueNodeId) return undefined;
-  const valueNode = getNode(valueNodeId);
-  // Reference values use targetId; legacy text values use name
-  return valueNode?.targetId || valueNode?.name || undefined;
 }
 
 export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, configNodeId, onNavigateOut }: FieldValueOutlinerProps) {
@@ -246,12 +231,9 @@ export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, configNo
     return <ColorSwatchPicker tupleId={tupleId} configNodeId={configNodeId} />;
   }
 
-  // --- OPTIONS_FROM_SUPERTAG: single-select tagged-node picker ---
-  if (isOptionsFromSupertagFieldType(fieldDataType) && attrDefId) {
-    return (
-      <TaggedNodePickerField tupleId={tupleId} attrDefId={attrDefId} />
-    );
-  }
+  // OPTIONS_FROM_SUPERTAG: render as standard outliner (same as Tana).
+  // Values are child nodes under the fieldEntry, displayed as outliner items.
+  // No special picker — autocomplete will be handled by TrailingInput.
 
   const isCheckbox = isCheckboxFieldType(fieldDataType);
   if (isCheckbox) {
@@ -410,48 +392,6 @@ export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, configNo
 
 /** Single-select tagged-node picker for OPTIONS_FROM_SUPERTAG value fields.
  *  Shows all nodes tagged with the source supertag as selectable options. */
-function TaggedNodePickerField({ tupleId, attrDefId }: { tupleId: string; attrDefId: string }) {
-  const fieldOptions = useFieldOptions(attrDefId);
-  const setFieldValue = useNodeStore((s) => s.setFieldValue);
-  const clearFieldValue = useNodeStore((s) => s.clearFieldValue);
-
-  const selectedId = useNodeStore((s) => {
-    void s._version;
-    return resolveSupertagPickerSelectedId(tupleId, s.getNode);
-  });
-
-  const options: NodePickerOption[] = useMemo(
-    () => fieldOptions.map((o) => ({ id: o.id, name: o.name })),
-    [fieldOptions],
-  );
-
-  const handleSelect = useCallback(
-    (id: string) => {
-      const parentId = loroDoc.getParentId(tupleId) ?? '';
-      const fieldDefId = loroDoc.toNodexNode(tupleId)?.fieldDefId ?? '';
-      if (parentId && fieldDefId) setFieldValue(parentId, fieldDefId, [id]);
-    },
-    [tupleId, setFieldValue],
-  );
-
-  const handleClear = useCallback(() => {
-    const parentId = loroDoc.getParentId(tupleId) ?? '';
-    const fieldDefId = loroDoc.toNodexNode(tupleId)?.fieldDefId ?? '';
-    if (parentId && fieldDefId) clearFieldValue(parentId, fieldDefId);
-  }, [tupleId, clearFieldValue]);
-
-  return (
-    <NodePicker
-      options={options}
-      selectedId={selectedId}
-      onSelect={handleSelect}
-      onClear={handleClear}
-      placeholder={t('field.selectValue')}
-      isReference
-    />
-  );
-}
-
 /** Click-to-pick date field with custom DatePicker popover. */
 function DatePickerField({ value, onSelect }: { value: string; onSelect: (v: string) => void }) {
   const [open, setOpen] = useState(false);

@@ -1,6 +1,5 @@
 import {
   shouldShowFieldValueTrailingInput,
-  resolveSupertagPickerSelectedId,
 } from '../../src/components/fields/FieldValueOutliner.js';
 
 describe('field value outliner trailing input visibility', () => {
@@ -24,27 +23,5 @@ describe('field value outliner trailing input visibility', () => {
         { type: 'content' },
       ]),
     ).toBe(false);
-  });
-});
-
-describe('resolveSupertagPickerSelectedId', () => {
-  it('returns selected supertag id from value node name', () => {
-    const nodes: Record<string, { children?: string[]; name?: string; targetId?: string }> = {
-      tuple_1: { children: ['value_1'] },
-      value_1: { name: 'tagDef_task' },
-    };
-    const getNode = (id: string) => nodes[id] ?? null;
-
-    expect(resolveSupertagPickerSelectedId('tuple_1', getNode)).toBe('tagDef_task');
-  });
-
-  it('returns targetId when value node has reference (auto-init)', () => {
-    const nodes: Record<string, { children?: string[]; name?: string; targetId?: string }> = {
-      tuple_1: { children: ['value_1'] },
-      value_1: { targetId: 'tagDef_person' },
-    };
-    const getNode = (id: string) => nodes[id] ?? null;
-
-    expect(resolveSupertagPickerSelectedId('tuple_1', getNode)).toBe('tagDef_person');
   });
 });

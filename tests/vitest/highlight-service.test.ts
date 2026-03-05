@@ -1,23 +1,26 @@
 /**
- * highlight-service — #highlight and #note system tag CRUD tests.
+ * highlight-service — Note-first #highlight and #note system tag tests.
  *
- * New model:
- * - Highlights are children of clip page nodes
- * - Source field auto-filled by ancestor_supertag_ref strategy
- * - Anchor data stored in node description (JSON)
- * - Highlight color = tagDef color (no per-node color)
+ * New model (v2):
+ * - #note is the primary node (child of clip page)
+ * - #highlight is a field value under #note's "Highlights" field
+ * - Anchor data stored in #highlight's hidden "Anchor" field
+ * - Source field stays on #highlight (auto-init from #source ancestor)
  */
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useNodeStore } from '../../src/stores/node-store.js';
 import { resetAndSeed } from './helpers/test-state.js';
 import * as loroDoc from '../../src/lib/loro-doc.js';
-import { CONTAINER_IDS, SYS_T, FIELD_TYPES, AUTO_INIT_STRATEGY } from '../../src/types/index.js';
+import { CONTAINER_IDS, SYS_T, SYS_V, NDX_F, FIELD_TYPES, AUTO_INIT_STRATEGY } from '../../src/types/index.js';
 import {
   ensureHighlightTagDef,
   ensureNoteTagDef,
-  createHighlightNode,
-  getHighlightsForClip,
-  createNoteNode,
+  ensureHighlightAnchorFieldDef,
+  ensureNoteHighlightsFieldDef,
+  createNoteWithHighlight,
+  getNotesForClip,
+  getHighlightsForNote,
+  getHighlightAnchor,
   getSourceFieldDefId,
   _resetHighlightCache,
   type HighlightNodeStore,
@@ -44,7 +47,7 @@ describe('ensureHighlightTagDef', () => {
     expect(tagDef!.name).toBe('highlight');
   });
 
-  it('creates 1 fieldDef (Source) under tagDef', () => {
+  it('creates 2 fieldDefs (Source + Anchor) under tagDef', () => {
     const store = getStore();
     ensureHighlightTagDef(store);
 
@@ -53,7 +56,7 @@ describe('ensureHighlightTagDef', () => {
       const n = loroDoc.toNodexNode(cid);
       return n?.type === 'fieldDef';
     });
-    expect(fieldDefs).toHaveLength(1);
+    expect(fieldDefs).toHaveLength(2);
   });
 
   it('creates Source field as options_from_supertag type', () => {
@@ -73,7 +76,6 @@ describe('ensureHighlightTagDef', () => {
     const sourceFd = loroDoc.toNodexNode(getSourceFieldDefId());
     expect(sourceFd!.sourceSupertag).toBeDefined();
 
-    // sourceSupertag should point to #source tagDef
     const sourceTagDef = loroDoc.toNodexNode(sourceFd!.sourceSupertag!);
     expect(sourceTagDef).toBeDefined();
     expect(sourceTagDef!.name).toBe('source');
@@ -87,6 +89,17 @@ describe('ensureHighlightTagDef', () => {
     expect(sourceFd!.autoInitialize).toBe(AUTO_INIT_STRATEGY.ANCESTOR_SUPERTAG_REF);
   });
 
+  it('creates Anchor hidden field (plain, hideField: ALWAYS)', () => {
+    const store = getStore();
+    ensureHighlightTagDef(store);
+
+    const anchorFd = loroDoc.toNodexNode(NDX_F.HIGHLIGHT_ANCHOR);
+    expect(anchorFd).toBeDefined();
+    expect(anchorFd!.name).toBe('Anchor');
+    expect(anchorFd!.fieldType).toBe(FIELD_TYPES.PLAIN);
+    expect(anchorFd!.hideField).toBe(SYS_V.ALWAYS);
+  });
+
   it('is idempotent — calling twice does not duplicate', () => {
     const store = getStore();
     ensureHighlightTagDef(store);
@@ -98,7 +111,7 @@ describe('ensureHighlightTagDef', () => {
       const n = loroDoc.toNodexNode(cid);
       return n?.type === 'fieldDef';
     });
-    expect(fieldDefs).toHaveLength(1);
+    expect(fieldDefs).toHaveLength(2); // Source + Anchor
   });
 });
 
@@ -118,16 +131,15 @@ describe('ensureNoteTagDef', () => {
     expect(tagDef!.name).toBe('note');
   });
 
-  it('creates no fieldDefs under note tagDef', () => {
+  it('creates Highlights template field (OPTIONS_FROM_SUPERTAG → #highlight)', () => {
     const store = getStore();
     ensureNoteTagDef(store);
 
-    const children = loroDoc.getChildren(SYS_T.NOTE);
-    const fieldDefs = children.filter(cid => {
-      const n = loroDoc.toNodexNode(cid);
-      return n?.type === 'fieldDef';
-    });
-    expect(fieldDefs).toHaveLength(0);
+    const hlFd = loroDoc.toNodexNode(NDX_F.NOTE_HIGHLIGHTS);
+    expect(hlFd).toBeDefined();
+    expect(hlFd!.name).toBe('Highlights');
+    expect(hlFd!.fieldType).toBe(FIELD_TYPES.OPTIONS_FROM_SUPERTAG);
+    expect(hlFd!.sourceSupertag).toBe(SYS_T.HIGHLIGHT);
   });
 
   it('is idempotent', () => {
@@ -144,7 +156,7 @@ describe('ensureNoteTagDef', () => {
   });
 });
 
-describe('createHighlightNode', () => {
+describe('createNoteWithHighlight', () => {
   beforeEach(() => {
     _resetHighlightCache();
     resetAndSeed();
@@ -153,82 +165,103 @@ describe('createHighlightNode', () => {
     ensureNoteTagDef(store);
   });
 
-  it('creates node as child of clip page', () => {
+  it('creates #note as child of clip page', () => {
     const store = getStore();
-    const node = createHighlightNode({
+    const { noteNode } = createNoteWithHighlight({
       store,
+      noteText: 'my insight',
       selectedText: 'highlighted text',
       clipNodeId: 'webclip_1',
     });
 
-    expect(loroDoc.getParentId(node.id)).toBe('webclip_1');
-    expect(loroDoc.getChildren('webclip_1')).toContain(node.id);
+    expect(loroDoc.getParentId(noteNode.id)).toBe('webclip_1');
+    expect(noteNode.tags).toContain(SYS_T.NOTE);
+    expect(noteNode.name).toBe('my insight');
   });
 
-  it('sets node name to selected text', () => {
+  it('creates #highlight under Highlights fieldEntry', () => {
     const store = getStore();
-    const node = createHighlightNode({
+    const { noteNode, highlightNode } = createNoteWithHighlight({
       store,
+      noteText: 'my insight',
       selectedText: 'highlighted text',
       clipNodeId: 'webclip_1',
     });
 
-    const saved = loroDoc.toNodexNode(node.id);
-    expect(saved!.name).toBe('highlighted text');
+    // highlightNode should be tagged with #highlight
+    expect(highlightNode.tags).toContain(SYS_T.HIGHLIGHT);
+    expect(highlightNode.name).toBe('highlighted text');
+
+    // Should be under a fieldEntry
+    const hlParentId = loroDoc.getParentId(highlightNode.id);
+    const hlParent = loroDoc.toNodexNode(hlParentId!);
+    expect(hlParent?.type).toBe('fieldEntry');
+    expect(hlParent?.fieldDefId).toBe(NDX_F.NOTE_HIGHLIGHTS);
   });
 
-  it('applies #highlight tag', () => {
+  it('auto-fills Source field on #highlight via ancestor_supertag_ref', () => {
     const store = getStore();
-    const node = createHighlightNode({
+    const { highlightNode } = createNoteWithHighlight({
       store,
-      selectedText: 'test',
+      noteText: 'insight',
+      selectedText: 'text',
       clipNodeId: 'webclip_1',
     });
 
-    const saved = loroDoc.toNodexNode(node.id);
-    expect(saved!.tags).toContain(SYS_T.HIGHLIGHT);
-  });
-
-  it('auto-fills Source field via ancestor_supertag_ref when under clip page', () => {
-    const store = getStore();
-    const node = createHighlightNode({
-      store,
-      selectedText: 'test',
-      clipNodeId: 'webclip_1',
-    });
-
-    // Verify the Source fieldEntry has a value child referencing the clip
-    const children = loroDoc.getChildren(node.id);
+    // Source fieldEntry should have a value referencing the clip page
+    const hlChildren = loroDoc.getChildren(highlightNode.id);
     const sourceFieldDefId = getSourceFieldDefId();
-    const fieldEntry = children.find(cid => {
+    const fieldEntry = hlChildren.find(cid => {
       const n = loroDoc.toNodexNode(cid);
       return n?.type === 'fieldEntry' && n.fieldDefId === sourceFieldDefId;
     });
     expect(fieldEntry).toBeDefined();
 
-    // Value node should have targetId (reference), not name (text)
     const feChildren = loroDoc.getChildren(fieldEntry!);
     expect(feChildren.length).toBe(1);
     const valueNode = loroDoc.toNodexNode(feChildren[0]);
     expect(valueNode?.targetId).toBe('webclip_1');
   });
 
-  it('stores anchor data in node description', () => {
+  it('stores anchor data in hidden Anchor field', () => {
     const store = getStore();
     const anchorJson = JSON.stringify({ version: 1, exact: 'test', prefix: 'before', suffix: 'after' });
-    const node = createHighlightNode({
+    const { highlightNode } = createNoteWithHighlight({
       store,
+      noteText: 'insight',
       selectedText: 'test',
       clipNodeId: 'webclip_1',
       anchor: anchorJson,
     });
 
-    const saved = loroDoc.toNodexNode(node.id);
-    expect(saved!.description).toBe(anchorJson);
+    const retrieved = getHighlightAnchor(highlightNode.id);
+    expect(retrieved).toBe(anchorJson);
+  });
+
+  it('creates extra note entries as children of #note', () => {
+    const store = getStore();
+    const { noteNode } = createNoteWithHighlight({
+      store,
+      noteText: 'main note',
+      selectedText: 'highlighted',
+      clipNodeId: 'webclip_1',
+      extraNoteEntries: [
+        { text: 'child 1', depth: 0 },
+        { text: 'child 2', depth: 0 },
+      ],
+    });
+
+    // Non-fieldEntry children of the note (both at depth 0 → direct children)
+    const children = loroDoc.getChildren(noteNode.id);
+    const contentChildren = children.filter(cid => {
+      const n = loroDoc.toNodexNode(cid);
+      return n && n.type !== 'fieldEntry';
+    });
+    expect(contentChildren).toHaveLength(2);
   });
 });
 
-describe('getHighlightsForClip', () => {
+describe('getNotesForClip', () => {
   beforeEach(() => {
     _resetHighlightCache();
     resetAndSeed();
@@ -237,55 +270,27 @@ describe('getHighlightsForClip', () => {
     ensureNoteTagDef(store);
   });
 
-  it('returns empty array when no highlights exist', () => {
-    expect(getHighlightsForClip('nonexistent_clip')).toEqual([]);
+  it('returns empty array when no notes exist', () => {
+    expect(getNotesForClip('nonexistent_clip')).toEqual([]);
   });
 
-  it('finds highlights that are children of the clip page', () => {
+  it('finds #note children of clip page', () => {
     const store = getStore();
-    createHighlightNode({
-      store,
-      selectedText: 'highlight 1',
-      clipNodeId: 'webclip_1',
+    createNoteWithHighlight({
+      store, noteText: 'note 1', selectedText: 'hl 1', clipNodeId: 'webclip_1',
     });
-    createHighlightNode({
-      store,
-      selectedText: 'highlight 2',
-      clipNodeId: 'webclip_1',
+    createNoteWithHighlight({
+      store, noteText: 'note 2', selectedText: 'hl 2', clipNodeId: 'webclip_1',
     });
 
-    const results = getHighlightsForClip('webclip_1');
+    const results = getNotesForClip('webclip_1');
     expect(results).toHaveLength(2);
-    expect(results.map(r => r.name)).toContain('highlight 1');
-    expect(results.map(r => r.name)).toContain('highlight 2');
+    expect(results.map(r => r.name)).toContain('note 1');
+    expect(results.map(r => r.name)).toContain('note 2');
   });
-
-  it('does not return highlights from different clips', () => {
-    const store = getStore();
-
-    // Create a second clip page
-    const clip2 = store.createChild(CONTAINER_IDS.INBOX, undefined, { name: 'Clip 2' });
-    store.applyTag(clip2.id, SYS_T.SOURCE);
-
-    createHighlightNode({
-      store,
-      selectedText: 'for clip A',
-      clipNodeId: 'webclip_1',
-    });
-    createHighlightNode({
-      store,
-      selectedText: 'for clip B',
-      clipNodeId: clip2.id,
-    });
-
-    const results = getHighlightsForClip('webclip_1');
-    expect(results).toHaveLength(1);
-    expect(results[0].name).toBe('for clip A');
-  });
-
 });
 
-describe('createNoteNode', () => {
+describe('getHighlightsForNote', () => {
   beforeEach(() => {
     _resetHighlightCache();
     resetAndSeed();
@@ -294,41 +299,15 @@ describe('createNoteNode', () => {
     ensureNoteTagDef(store);
   });
 
-  it('creates child node under highlight', () => {
+  it('returns highlights from note Highlights field', () => {
     const store = getStore();
-    const highlight = createHighlightNode({
-      store,
-      selectedText: 'test',
-      clipNodeId: 'webclip_1',
+    const { noteNode, highlightNode } = createNoteWithHighlight({
+      store, noteText: 'insight', selectedText: 'the text', clipNodeId: 'webclip_1',
     });
 
-    const note = createNoteNode(store, highlight.id, 'my note');
-    expect(loroDoc.getParentId(note.id)).toBe(highlight.id);
-  });
-
-  it('sets note text as node name', () => {
-    const store = getStore();
-    const highlight = createHighlightNode({
-      store,
-      selectedText: 'test',
-      clipNodeId: 'webclip_1',
-    });
-
-    const note = createNoteNode(store, highlight.id, 'my note');
-    const saved = loroDoc.toNodexNode(note.id);
-    expect(saved!.name).toBe('my note');
-  });
-
-  it('applies #note tag', () => {
-    const store = getStore();
-    const highlight = createHighlightNode({
-      store,
-      selectedText: 'test',
-      clipNodeId: 'webclip_1',
-    });
-
-    const note = createNoteNode(store, highlight.id, 'my note');
-    const saved = loroDoc.toNodexNode(note.id);
-    expect(saved!.tags).toContain(SYS_T.NOTE);
+    const highlights = getHighlightsForNote(noteNode.id);
+    expect(highlights).toHaveLength(1);
+    expect(highlights[0].id).toBe(highlightNode.id);
+    expect(highlights[0].name).toBe('the text');
   });
 });

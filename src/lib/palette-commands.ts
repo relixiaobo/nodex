@@ -25,8 +25,9 @@ import {
   WEBCLIP_CAPTURE_ACTIVE_TAB,
   type WebClipCaptureResponse,
 } from './webclip-messaging.js';
-import { saveWebClip } from './webclip-service.js';
+import { createClipShell, fillClipShell } from './webclip-service.js';
 import { useNodeStore } from '../stores/node-store.js';
+import { useUIStore } from '../stores/ui-store.js';
 import { t } from '../i18n/strings.js';
 
 export type PaletteItemType = 'node' | 'container' | 'command' | 'create';
@@ -137,20 +138,28 @@ export function getSystemCommands(): PaletteCommand[] {
 
         if (!canUseRuntime) return;
 
+        // Phase 1: create empty placeholder + navigate immediately
+        const store = useNodeStore.getState();
+        const shellId = createClipShell(store);
+        const todayId = ensureTodayNode();
+        ctx.navigateTo(todayId);
+
+        const uiStore = useUIStore.getState();
+        uiStore.addLoadingNode(shellId);
+
+        // Phase 2: fetch content asynchronously and fill the shell
         try {
           const response = await chrome.runtime.sendMessage({
             type: WEBCLIP_CAPTURE_ACTIVE_TAB,
           }) as WebClipCaptureResponse;
 
-          if (!response?.ok) return;
-
-          const store = useNodeStore.getState();
-          await saveWebClip(response.payload, store);
-
-          const todayId = ensureTodayNode();
-          ctx.navigateTo(todayId);
+          if (response?.ok) {
+            await fillClipShell(shellId, response.payload, store);
+          }
         } catch {
           // Silently fail — chrome.runtime may not be available
+        } finally {
+          uiStore.removeLoadingNode(shellId);
         }
       },
     },

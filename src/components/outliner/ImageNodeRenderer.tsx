@@ -32,6 +32,7 @@ export function ImageNodeRenderer({ mediaUrl, mediaAlt, imageWidth, imageHeight 
       src={mediaUrl}
       alt={mediaAlt ?? ''}
       loading="lazy"
+      referrerPolicy="no-referrer"
       onError={handleError}
       className="max-w-full rounded"
       style={{ aspectRatio }}

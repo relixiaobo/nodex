@@ -25,11 +25,9 @@ const TagDefBullet = memo(function TagDefBullet({ tagDefId }: { tagDefId: string
   const color = useNodeStore((s) => { void s._version; return resolveTagColor(tagDefId).text; });
   return (
     <span
-      className="flex h-[15px] w-[15px] items-center justify-center rounded-full"
-      style={{ backgroundColor: color }}
-    >
-      <span className="text-[9px] font-bold leading-none text-white select-none">#</span>
-    </span>
+      className="text-sm font-medium leading-none select-none"
+      style={{ color }}
+    >#</span>
   );
 });
 
@@ -228,11 +226,9 @@ export function NodePicker({
               <span className="flex shrink-0 h-6 w-[15px] items-center justify-center">
                 {selectedTagDefColor ? (
                   <span
-                    className="flex h-[15px] w-[15px] items-center justify-center rounded-full"
-                    style={{ backgroundColor: selectedTagDefColor }}
-                  >
-                    <span className="text-[9px] font-bold leading-none text-white select-none">#</span>
-                  </span>
+                    className="text-sm font-medium leading-none select-none"
+                    style={{ color: selectedTagDefColor }}
+                  >#</span>
                 ) : (
                   <span className="flex h-[15px] w-[15px] items-center justify-center rounded-full border border-dashed border-foreground/40">
                     <span className="block h-[5px] w-[5px] rounded-full bg-foreground/40" />
@@ -371,7 +367,7 @@ const ReadOnlyTagLabel = memo(function ReadOnlyTagLabel({ tagDefId }: { tagDefId
       className="inline-flex items-center text-[13px] font-medium tracking-tight shrink-0 cursor-default"
       style={{ color }}
     >
-      <span className="text-[#999999] opacity-40">#</span>
+      <span style={{ color }} className="opacity-40">#</span>
       {tagName}
     </span>
   );

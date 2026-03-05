@@ -185,19 +185,19 @@ describe('system root immutability', () => {
     expect(loroDoc.getChildren(CONTAINER_IDS.TRASH)).toEqual(trashBefore);
   });
 
-  it('setNodeName ignores workspace home and containers', () => {
+  it('setNodeName allows workspace home but ignores containers', () => {
     useNodeStore.getState().setNodeName('ws_default', 'Renamed Workspace');
     useNodeStore.getState().setNodeName(CONTAINER_IDS.INBOX, 'Renamed Inbox');
 
-    expect(loroDoc.toNodexNode('ws_default')?.name).toBe('Workspace');
+    expect(loroDoc.toNodexNode('ws_default')?.name).toBe('Renamed Workspace');
     expect(loroDoc.toNodexNode(CONTAINER_IDS.INBOX)?.name).toBe('Inbox');
   });
 
-  it('updateNodeDescription ignores workspace home and containers', () => {
+  it('updateNodeDescription allows workspace home but ignores containers', () => {
     useNodeStore.getState().updateNodeDescription('ws_default', 'root desc');
     useNodeStore.getState().updateNodeDescription(CONTAINER_IDS.LIBRARY, 'library desc');
 
-    expect(loroDoc.toNodexNode('ws_default')?.description).toBeUndefined();
+    expect(loroDoc.toNodexNode('ws_default')?.description).toBe('root desc');
     expect(loroDoc.toNodexNode(CONTAINER_IDS.LIBRARY)?.description).toBeUndefined();
   });
 });

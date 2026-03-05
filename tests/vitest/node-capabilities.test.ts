@@ -12,7 +12,7 @@ describe('node capabilities', () => {
     expect(isWorkspaceHomeNode('ws_default')).toBe(true);
     expect(getNodeCapabilities('ws_default')).toEqual({
       role: 'workspaceHome',
-      canEditNode: false,
+      canEditNode: true,
       canMove: false,
       canDelete: false,
     });

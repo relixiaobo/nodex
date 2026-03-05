@@ -64,14 +64,6 @@ describe('getSystemCommands', () => {
     expect(cmd!.keywords).toContain('yesterday');
   });
 
-  it('includes New Node in Today', () => {
-    const cmds = getSystemCommands();
-    const cmd = cmds.find((c) => c.id === 'cmd:new-in-today');
-    expect(cmd).toBeDefined();
-    expect(cmd!.type).toBe('command');
-    expect(cmd!.keywords).toContain('create');
-  });
-
   it('includes Clip Page to Today', () => {
     const cmds = getSystemCommands();
     const cmd = cmds.find((c) => c.id === 'cmd:clip-page');
@@ -97,7 +89,6 @@ describe('getAllCommands', () => {
     expect(ids).toContain('nav:LIBRARY');
     expect(ids).toContain('cmd:today');
     expect(ids).toContain('cmd:yesterday');
-    expect(ids).toContain('cmd:new-in-today');
     expect(ids).toContain('cmd:clip-page');
   });
 

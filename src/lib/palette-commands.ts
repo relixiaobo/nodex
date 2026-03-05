@@ -16,7 +16,6 @@ import {
   CalendarDays,
   CalendarCheck,
   Trash2,
-  Plus,
   Scissors,
 } from './icons.js';
 import { CONTAINER_IDS } from '../types/index.js';
@@ -119,19 +118,6 @@ export function getSystemCommands(): PaletteCommand[] {
         const todayId = ensureTodayNode();
         const yesterdayId = getAdjacentDayNodeId(todayId, -1);
         if (yesterdayId) ctx.navigateTo(yesterdayId);
-        ctx.closeSearch();
-      },
-    },
-    {
-      id: 'cmd:new-in-today',
-      label: 'New Node in Today',
-      icon: Plus,
-      type: 'command',
-      keywords: ['new', 'create', 'today', 'quick', 'capture'],
-      action: (ctx) => {
-        const todayId = ensureTodayNode();
-        useNodeStore.getState().createChild(todayId);
-        ctx.navigateTo(todayId);
         ctx.closeSearch();
       },
     },

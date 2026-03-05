@@ -143,6 +143,7 @@ export function CommandPalette() {
       label: t(c.labelKey),
       icon: CONTAINER_ICONS[c.iconKey] ?? Library,
       type: 'container' as PaletteItemType,
+      typeLabel: t('search.commandPalette.typeLabelNavigate'),
       action: () => { trackPaletteUsage(c.id); navigateTo(c.id); closeAndClear(); },
     })),
     [navigateTo, closeAndClear, trackPaletteUsage]);
@@ -156,6 +157,7 @@ export function CommandPalette() {
         label: cmd.label,
         icon: cmd.icon,
         type: cmd.type,
+        typeLabel: t('search.commandPalette.typeLabelCommand'),
         action: () => { trackPaletteUsage(cmd.id); cmd.action(ctx); },
       })),
     [commands, ctx, trackPaletteUsage]);
@@ -227,6 +229,9 @@ export function CommandPalette() {
           label: cmd.label,
           icon: cmd.icon,
           type: cmd.type,
+          typeLabel: cmd.type === 'command'
+            ? t('search.commandPalette.typeLabelCommand')
+            : t('search.commandPalette.typeLabelNavigate'),
           score: bestScore + getUsageBoost(cmd.id),
           action: () => { trackPaletteUsage(cmd.id); cmd.action(ctx); },
         });

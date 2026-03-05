@@ -54,6 +54,8 @@ export const enMessages = {
       containerJournal: 'Daily notes',
       containerTrash: 'Trash',
       untitled: 'Untitled',
+      typeLabelCommand: 'Command',
+      typeLabelNavigate: 'Navigate',
       cmdYesterday: 'Go to Yesterday',
       cmdClipPage: 'Clip Page to Today',
     },

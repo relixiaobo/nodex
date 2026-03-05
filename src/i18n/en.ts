@@ -44,6 +44,9 @@ export const enMessages = {
     commandPalette: {
       placeholder: 'Search nodes...',
       noResults: 'No results found.',
+      groupSuggestions: 'Suggestions',
+      groupCommands: 'Commands',
+      groupResults: 'Results',
       groupNavigate: 'Navigate',
       groupNodes: 'Nodes',
       containerLibrary: 'Library',
@@ -51,6 +54,9 @@ export const enMessages = {
       containerJournal: 'Daily notes',
       containerTrash: 'Trash',
       untitled: 'Untitled',
+      cmdYesterday: 'Go to Yesterday',
+      cmdNewInToday: 'New Node in Today',
+      cmdClipPage: 'Clip Page to Today',
     },
   },
   nodePicker: {

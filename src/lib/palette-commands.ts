@@ -16,10 +16,18 @@ import {
   CalendarDays,
   CalendarCheck,
   Trash2,
+  Plus,
+  Scissors,
 } from './icons.js';
 import { CONTAINER_IDS } from '../types/index.js';
 import { COMMAND_PALETTE_QUICK_CONTAINERS } from './system-node-registry.js';
-import { ensureTodayNode } from './journal.js';
+import { ensureTodayNode, getAdjacentDayNodeId } from './journal.js';
+import {
+  WEBCLIP_CAPTURE_ACTIVE_TAB,
+  type WebClipCaptureResponse,
+} from './webclip-messaging.js';
+import { saveWebClip } from './webclip-service.js';
+import { useNodeStore } from '../stores/node-store.js';
 import { t } from '../i18n/strings.js';
 
 export type PaletteItemType = 'node' | 'container' | 'command' | 'create';
@@ -99,6 +107,65 @@ export function getSystemCommands(): PaletteCommand[] {
         const dayId = ensureTodayNode();
         ctx.navigateTo(dayId);
         ctx.closeSearch();
+      },
+    },
+    {
+      id: 'cmd:yesterday',
+      label: 'Go to Yesterday',
+      icon: CalendarDays,
+      type: 'command',
+      keywords: ['yesterday', 'journal', 'day'],
+      action: (ctx) => {
+        const todayId = ensureTodayNode();
+        const yesterdayId = getAdjacentDayNodeId(todayId, -1);
+        if (yesterdayId) ctx.navigateTo(yesterdayId);
+        ctx.closeSearch();
+      },
+    },
+    {
+      id: 'cmd:new-in-today',
+      label: 'New Node in Today',
+      icon: Plus,
+      type: 'command',
+      keywords: ['new', 'create', 'today', 'quick', 'capture'],
+      action: (ctx) => {
+        const todayId = ensureTodayNode();
+        useNodeStore.getState().createChild(todayId);
+        ctx.navigateTo(todayId);
+        ctx.closeSearch();
+      },
+    },
+    {
+      id: 'cmd:clip-page',
+      label: 'Clip Page to Today',
+      icon: Scissors,
+      type: 'command',
+      keywords: ['clip', 'capture', 'save', 'page', 'web', 'today'],
+      action: async (ctx) => {
+        ctx.closeSearch();
+
+        const canUseRuntime =
+          typeof chrome !== 'undefined' &&
+          !!chrome.runtime &&
+          !!chrome.runtime.sendMessage;
+
+        if (!canUseRuntime) return;
+
+        try {
+          const response = await chrome.runtime.sendMessage({
+            type: WEBCLIP_CAPTURE_ACTIVE_TAB,
+          }) as WebClipCaptureResponse;
+
+          if (!response?.ok) return;
+
+          const store = useNodeStore.getState();
+          await saveWebClip(response.payload, store);
+
+          const todayId = ensureTodayNode();
+          ctx.navigateTo(todayId);
+        } catch {
+          // Silently fail — chrome.runtime may not be available
+        }
       },
     },
     // Sign in / Sign out: handled by ToolbarUserMenu avatar, not in command palette.

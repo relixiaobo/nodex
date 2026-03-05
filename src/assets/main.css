@@ -63,6 +63,11 @@
   --font-mono: "JetBrains Mono", "Fira Code", monospace;
 }
 
+/* ── Global: hide scrollbar, keep scroll (Chrome Side Panel = always WebKit) ── */
+::-webkit-scrollbar {
+  display: none;
+}
+
 /* Paper Shadow — five-layer stacked paper effect for all floating surfaces.
    Replaces border-based popover styling with warm, physical paper depth. */
 .shadow-paper {
@@ -177,19 +182,6 @@
   tab-size: 2;
 }
 
-/* Thin scrollbar for code blocks */
-.code-block-pre::-webkit-scrollbar {
-  height: 4px;
-}
-
-.code-block-pre::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.code-block-pre::-webkit-scrollbar-thumb {
-  background: var(--color-border-emphasis);
-  border-radius: 2px;
-}
 
 /* Code block textarea overlay — transparent text over highlighted pre */
 .code-block-textarea {
@@ -215,10 +207,7 @@
   tab-size: 2;
 }
 
-/* Hide scrollbar on textarea — pre handles visual scroll */
-.code-block-textarea::-webkit-scrollbar {
-  display: none;
-}
+
 
 /* ── highlight.js token colors (soma design system) ── */
 .hljs-keyword,

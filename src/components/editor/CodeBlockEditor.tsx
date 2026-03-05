@@ -5,7 +5,8 @@
  * When focused, a transparent `<textarea>` overlays for editing.
  * No DOM swap → no visual jump.
  */
-import { useCallback, useEffect, useRef, useState, useMemo } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { Check, ChevronDown, Copy } from 'lucide-react';
 import { highlightCode, detectLanguage, SUPPORTED_LANGUAGES } from '../../lib/code-highlight.js';
 import { useNodeStore } from '../../stores/node-store.js';
@@ -266,6 +267,16 @@ export function CodeBlockEditor({
     });
   }, [nodeId, findScrollAncestor]);
 
+  // Language dropdown portal position
+  const langButtonRef = useRef<HTMLButtonElement>(null);
+  const [langDropPos, setLangDropPos] = useState<{ top: number; left: number } | null>(null);
+
+  useLayoutEffect(() => {
+    if (!langOpen || !langButtonRef.current) return;
+    const rect = langButtonRef.current.getBoundingClientRect();
+    setLangDropPos({ top: rect.bottom + 2, left: rect.left });
+  }, [langOpen]);
+
   // Close language dropdown on outside click
   useEffect(() => {
     if (!langOpen) return;
@@ -291,7 +302,33 @@ export function CodeBlockEditor({
   })();
 
   return (
-    <div className="code-block-wrapper group/code relative overflow-hidden rounded-lg border border-border">
+    <div className="code-block-wrapper group/code rounded-lg border border-border overflow-hidden">
+      {/* Toolbar — top bar, padding matches pre's 0.75rem horizontal */}
+      <div className="flex items-center justify-between" style={{ padding: '0.25rem 0.75rem' }}>
+        {/* Language selector */}
+        <button
+          ref={langButtonRef}
+          type="button"
+          className="flex items-center gap-0.5 text-xs text-foreground-tertiary hover:text-foreground-secondary transition-colors"
+          onClick={(e) => { e.stopPropagation(); setLangOpen(!langOpen); }}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          {currentLangLabel}
+          <ChevronDown className="h-3 w-3" />
+        </button>
+
+        {/* Copy button */}
+        <button
+          type="button"
+          className="flex items-center justify-center rounded p-0.5 text-foreground-tertiary hover:text-foreground-secondary transition-colors"
+          onClick={(e) => { e.stopPropagation(); handleCopy(); }}
+          onMouseDown={(e) => e.stopPropagation()}
+          title="Copy code"
+        >
+          {copied ? <Check className="h-3.5 w-3.5 text-primary" /> : <Copy className="h-3.5 w-3.5" />}
+        </button>
+      </div>
+
       {/* Code area — pre + textarea overlay */}
       <div className="relative">
         <pre
@@ -319,52 +356,31 @@ export function CodeBlockEditor({
         )}
       </div>
 
-      {/* Toolbar — breathe-style: hidden by default, shown on hover/focus */}
-      <div className="absolute top-1 right-1 flex items-center gap-1 rounded-lg bg-background shadow-paper z-10">
-        {/* Language selector */}
-        <div ref={langDropdownRef} className="relative">
-          <button
-            type="button"
-            className="flex items-center gap-0.5 rounded px-1.5 py-1 text-sm text-foreground-secondary hover:text-foreground hover:bg-foreground/4 transition-colors"
-            onClick={(e) => { e.stopPropagation(); setLangOpen(!langOpen); }}
-            onMouseDown={(e) => e.stopPropagation()}
-          >
-            {currentLangLabel}
-            <ChevronDown className="h-3.5 w-3.5" />
-          </button>
-          {langOpen && (
-            <div
-              className="absolute right-0 top-full mt-0.5 z-50 max-h-60 w-36 overflow-y-auto rounded-lg bg-background shadow-paper p-1"
-              onMouseDown={(e) => e.stopPropagation()}
-            >
-              {SUPPORTED_LANGUAGES.map((lang) => (
-                <div
-                  key={lang.value}
-                  className={`cursor-pointer rounded-md px-2 py-1.5 text-sm ${
-                    (codeLanguage ?? '') === lang.value
-                      ? 'bg-primary text-primary-foreground'
-                      : 'text-foreground-secondary hover:bg-foreground/4 hover:text-foreground'
-                  }`}
-                  onClick={() => handleLanguageSelect(lang.value)}
-                >
-                  {lang.label}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Copy button */}
-        <button
-          type="button"
-          className="flex items-center justify-center rounded p-1 text-foreground-secondary hover:text-foreground hover:bg-foreground/4 transition-colors"
-          onClick={(e) => { e.stopPropagation(); handleCopy(); }}
+      {/* Language dropdown — portal to body so it's never clipped */}
+      {langOpen && createPortal(
+        <div
+          ref={langDropdownRef}
+          className="fixed z-[1000] max-h-60 w-36 overflow-y-auto rounded-lg bg-background shadow-paper p-1"
+          style={langDropPos ? { top: langDropPos.top, left: langDropPos.left } : { top: -9999, left: -9999 }}
           onMouseDown={(e) => e.stopPropagation()}
-          title="Copy code"
         >
-          {copied ? <Check className="h-3.5 w-3.5 text-primary" /> : <Copy className="h-3.5 w-3.5" />}
-        </button>
-      </div>
+          {SUPPORTED_LANGUAGES.map((lang) => (
+            <button
+              key={lang.value}
+              type="button"
+              className={`flex w-full items-center rounded-md px-2 py-1.5 text-left text-sm ${
+                (codeLanguage ?? '') === lang.value
+                  ? 'bg-primary-muted text-foreground'
+                  : 'text-foreground-secondary hover:bg-foreground/4 hover:text-foreground'
+              }`}
+              onClick={() => handleLanguageSelect(lang.value)}
+            >
+              {lang.label}
+            </button>
+          ))}
+        </div>,
+        document.body,
+      )}
     </div>
   );
 }

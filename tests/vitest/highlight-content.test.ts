@@ -79,12 +79,12 @@ describe('content highlight rendering', () => {
     expect(document.querySelector('#b')!.textContent).toBe('another line');
   });
 
-  it('renders comment badge when hasComment option is true', () => {
+  it('renders note badge when hasNote option is true', () => {
     document.body.innerHTML = '<p id="content">hello world</p>';
     const textNode = document.querySelector('#content')!.firstChild as Text;
     const range = createRangeForText(textNode, 0, 5);
 
-    renderHighlight(range, 'hl_comment', 'rgba(155, 124, 56, 0.3)', { hasComment: true });
+    renderHighlight(range, 'hl_comment', 'rgba(155, 124, 56, 0.3)', { hasNote: true });
 
     const icon = document.querySelector(
       'soma-hl[data-highlight-id=\"hl_comment\"] [data-soma-note-icon=\"true\"]',

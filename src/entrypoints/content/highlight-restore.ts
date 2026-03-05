@@ -284,7 +284,7 @@ export function restoreHighlights(payload: HighlightRestorePayload): void {
   for (const item of payload.highlights) {
     const range = restoreAnchor(item.anchor);
     if (range) {
-      renderHighlight(range, item.id, item.color, { hasComment: item.hasComment });
+      renderHighlight(range, item.id, item.color, { hasNote: item.hasNote });
     } else {
       unresolvable.push(item.id);
     }

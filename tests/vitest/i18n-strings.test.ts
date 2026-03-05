@@ -8,7 +8,7 @@ describe('i18n strings', () => {
     expect(t('reference.selector.shortcutToday')).toBe('Today');
     expect(t('reference.selector.noMatches')).toBe('No matches');
     expect(t('slash.menu.noResults')).toBe('No results');
-    expect(t('search.commandPalette.placeholder')).toBe('Search nodes...');
+    expect(t('search.commandPalette.placeholder')).toBe('Search for nodes and commands...');
     expect(t('tag.selector.noTagsAvailable')).toBe('No tags available');
     expect(t('dateNavigationBar.previousDay')).toBe('Previous day');
     expect(t('datePicker.clear')).toBe('Clear');

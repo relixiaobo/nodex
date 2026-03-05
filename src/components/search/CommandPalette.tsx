@@ -566,7 +566,7 @@ function PaletteRow({ item, selected, onSelect, onHover }: PaletteRowProps) {
       data-selected={selected}
       onClick={onSelect}
       onMouseMove={onHover}
-      className={`flex h-8 cursor-pointer items-center gap-2.5 px-4 transition-colors ${selected ? 'bg-primary-muted' : ''
+      className={`mx-2 flex h-8 cursor-pointer items-center gap-2.5 rounded-md px-2 transition-colors ${selected ? 'bg-primary-muted' : ''
         }`}
     >
       {/* Icon: command/container use explicit icon; tagDef uses colored #; nodes use colored bullet */}

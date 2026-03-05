@@ -421,7 +421,7 @@ export function CommandPalette() {
         onPointerDown={(e) => e.stopPropagation()}
       >
         {/* Search header */}
-        <div className="mx-2 flex h-12 shrink-0 items-center gap-2.5 border-b border-border-subtle bg-background px-2">
+        <div className="mx-2 flex h-10 shrink-0 items-center gap-2.5 border-b border-border-subtle bg-background px-2">
           <input
             ref={inputRef}
             value={searchQuery}
@@ -520,7 +520,7 @@ export function CommandPalette() {
           const selected = allItems[selectedIndex];
           if (!selected) return null;
           return (
-            <div className="mx-2 flex h-9 shrink-0 items-center justify-end gap-3 border-t border-border-subtle bg-background px-2">
+            <div className="mx-2 flex h-10 shrink-0 items-center justify-end gap-3 border-t border-border-subtle bg-background px-2">
               {hasQuery && createItem && selected.id !== '__create__' && (
                 <div className="flex items-center gap-1.5">
                   <span className="text-xs text-foreground-tertiary">{t('search.commandPalette.actionCreate')}</span>

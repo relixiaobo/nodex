@@ -1992,7 +1992,7 @@ export function OutlinerItem({
             rows={visibleChildren}
             isRowVisible={(row) => !row.hidden || revealedFieldIds.has(row.id)}
             renderField={(row, i, rows) => (
-              <div className="@container relative has-[.field-overlay-open]:z-[80]" style={{ paddingLeft: (depth + 1) * 28 + 6 + 15 + 4 }}>
+              <div className="@container" style={{ paddingLeft: (depth + 1) * 28 + 6 + 15 + 4 }}>
                 <FieldRow
                   nodeId={effectiveNodeId}
                   {...toFieldRowEntryProps(fieldMap.get(row.id)!)}

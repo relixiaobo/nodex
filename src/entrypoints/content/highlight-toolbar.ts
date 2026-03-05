@@ -11,7 +11,7 @@
 
 // ── Types ──
 
-export type ToolbarAction = 'highlight' | 'note' | 'clip';
+export type ToolbarAction = 'note' | 'clip';
 export type ToolbarActionCallback = (action: ToolbarAction) => void;
 
 export interface HighlightActionsCallbacks {
@@ -102,27 +102,34 @@ button {
   box-sizing: border-box;
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 30px;
-  border-radius: 7px;
+  gap: 4px;
+  height: 28px;
+  padding: 0 8px;
+  border-radius: 4px;
   color: #1A1A1A;
   cursor: pointer;
   transition: background 0.15s ease-out;
 }
 
 button:hover {
-  background: rgba(26, 26, 26, 0.06);
+  background: rgba(26, 26, 26, 0.04);
 }
 
 button:active {
-  background: rgba(26, 26, 26, 0.1);
+  background: rgba(26, 26, 26, 0.08);
 }
 
 .icon {
   width: 15px;
   height: 15px;
   flex-shrink: 0;
+}
+
+kbd {
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 400;
+  color: #999999;
 }
 `;
 
@@ -157,20 +164,20 @@ button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 30px;
-  height: 30px;
-  border-radius: 7px;
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
   color: #1A1A1A;
   cursor: pointer;
   transition: background 0.15s ease-out, color 0.15s ease-out;
 }
 
 button:hover {
-  background: rgba(26, 26, 26, 0.06);
+  background: rgba(26, 26, 26, 0.04);
 }
 
 button:active {
-  background: rgba(26, 26, 26, 0.1);
+  background: rgba(26, 26, 26, 0.08);
 }
 
 button[data-action='delete'] {
@@ -260,9 +267,9 @@ ${HOST_STYLE}
 button {
   all: unset;
   box-sizing: border-box;
-  height: 30px;
-  padding: 0 10px;
-  border-radius: 7px;
+  height: 28px;
+  padding: 0 8px;
+  border-radius: 9999px;
   font-size: 12px;
   font-weight: 500;
   cursor: pointer;
@@ -271,11 +278,11 @@ button {
 
 button[data-action='cancel'] {
   color: #666666;
-  background: rgba(26, 26, 26, 0.06);
+  background: rgba(26, 26, 26, 0.04);
 }
 
 button[data-action='cancel']:hover {
-  background: rgba(26, 26, 26, 0.1);
+  background: rgba(26, 26, 26, 0.08);
 }
 
 button[data-action='save'] {
@@ -283,8 +290,13 @@ button[data-action='save'] {
   background: #5E8E65;
 }
 
-button[data-action='save']:hover {
+button[data-action='save']:hover:not(:disabled) {
   background: #4D7A54;
+}
+
+button[data-action='save']:disabled {
+  opacity: 0.4;
+  cursor: default;
 }
 
 kbd {
@@ -299,7 +311,7 @@ kbd {
 // ── SVG Icons ──
 
 const ICON_HIGHLIGHT = `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 11-6 6v3h9l3-3"/><path d="m22 12-4.6 4.6a2 2 0 0 1-2.8 0l-5.2-5.2a2 2 0 0 1 0-2.8L14 4"/></svg>`;
-const ICON_NOTE = `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>`;
+const ICON_NOTE = `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.376 3.622a1 1 0 0 1 3.002 3.002L7.368 18.635a2 2 0 0 1-.855.506l-2.872.838a.5.5 0 0 1-.62-.62l.838-2.872a2 2 0 0 1 .506-.855z"/><path d="m15 5 3 3"/></svg>`;
 const ICON_HIGHLIGHT_OFF = `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 11-6 6v3h9l3-3"/><path d="m22 12-4.6 4.6a2 2 0 0 1-2.8 0l-5.2-5.2a2 2 0 0 1 0-2.8L14 4"/><line x1="2" y1="2" x2="22" y2="22"/></svg>`;
 
 // ── Helpers ──
@@ -325,7 +337,6 @@ function createStyle(styleText: string): HTMLStyleElement {
 function createIconButton(action: string, icon: string, label: string): HTMLButtonElement {
   const btn = document.createElement('button');
   btn.setAttribute('data-action', action);
-  btn.setAttribute('title', label);
   btn.setAttribute('aria-label', label);
   btn.innerHTML = icon;
   return btn;
@@ -371,10 +382,17 @@ function buildSelectionToolbar(): void {
   selectionToolbarElement = host;
   selectionShadowRoot = root;
 
+  const isMac = /Mac|iPhone|iPad/.test(navigator.platform);
+  const shortcutHint = isMac ? '⌘⇧H' : 'Ctrl+Shift+H';
+
   const bar = document.createElement('div');
   bar.className = 'soma-floating-bar';
-  bar.appendChild(createIconButton('highlight', ICON_HIGHLIGHT, 'Highlight'));
-  bar.appendChild(createIconButton('note', ICON_NOTE, 'Note'));
+
+  const noteBtn = createIconButton('note', ICON_NOTE, 'Note');
+  const kbd = document.createElement('kbd');
+  kbd.textContent = shortcutHint;
+  noteBtn.appendChild(kbd);
+  bar.appendChild(noteBtn);
 
   root.appendChild(createStyle(FLOATING_BAR_STYLE));
   root.appendChild(bar);
@@ -442,10 +460,13 @@ function buildHighlightActionsToolbar(): void {
   highlightActionsElement = host;
   highlightActionsShadowRoot = root;
 
+  const isMac = /Mac|iPhone|iPad/.test(navigator.platform);
+  const shortcutHint = isMac ? '⌘⇧H' : 'Ctrl+Shift+H';
+
   const bar = document.createElement('div');
   bar.className = 'soma-highlight-actions';
   bar.appendChild(createIconButton('delete', ICON_HIGHLIGHT_OFF, 'Remove highlight'));
-  bar.appendChild(createIconButton('add-note', ICON_NOTE, 'Add note'));
+  bar.appendChild(createIconButton('add-note', ICON_NOTE, `Add note (${shortcutHint})`));
 
   root.appendChild(createStyle(ACTIONS_BAR_STYLE));
   root.appendChild(bar);
@@ -555,6 +576,18 @@ function collectNoteEntries(): NoteEntry[] {
   return entries;
 }
 
+function hasNonEmptyNote(): boolean {
+  const entries = collectNoteEntries();
+  return entries.some((e) => e.text.trim().length > 0);
+}
+
+function updateSaveButtonState(): void {
+  if (!notePopoverShadowRoot) return;
+  const saveBtn = notePopoverShadowRoot.querySelector('button[data-action="save"]') as HTMLButtonElement | null;
+  if (!saveBtn) return;
+  saveBtn.disabled = !hasNonEmptyNote();
+}
+
 function getNoteItems(): HTMLDivElement[] {
   if (!notePopoverListElement) return [];
   return Array.from(notePopoverListElement.querySelectorAll('.soma-note-item')) as HTMLDivElement[];
@@ -641,18 +674,25 @@ function buildNotePopover(): void {
     }
 
     if (action === 'save') {
+      if (!hasNonEmptyNote()) return; // Guard: don't save empty notes
       notePopoverCallbacks.onSave(collectNoteEntries());
       hideNotePopover();
     }
+  });
+
+  // Track input changes to update Save button state
+  noteList.addEventListener('input', () => {
+    updateSaveButtonState();
   });
 
   // Keyboard handling for the note list (Enter, Backspace, ArrowUp/Down, Cmd+Enter, Escape)
   noteList.addEventListener('keydown', (e) => {
     if (!notePopoverCallbacks) return;
 
-    // Cmd/Ctrl+Enter → Save
+    // Cmd/Ctrl+Enter → Save (only if note has content)
     if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
       e.preventDefault();
+      if (!hasNonEmptyNote()) return;
       notePopoverCallbacks.onSave(collectNoteEntries());
       hideNotePopover();
       return;
@@ -706,6 +746,7 @@ function buildNotePopover(): void {
       currentItem.after(newItem);
       const newEditor = newItem.querySelector('.soma-note-editor') as HTMLElement;
       focusEditorAtStart(newEditor);
+      updateSaveButtonState();
       return;
     }
 
@@ -786,7 +827,7 @@ export function showNotePopover(
     notePopoverElement!.style.transform = 'translateX(-50%)';
     notePopoverElement!.style.display = 'block';
 
-    const placeholder = options.placeholder ?? 'Add a note...';
+    const placeholder = options.placeholder ?? 'Write your thoughts...';
 
     // Clear existing items
     notePopoverListElement!.innerHTML = '';
@@ -806,6 +847,7 @@ export function showNotePopover(
         const firstEditor = allItems[0].querySelector('.soma-note-editor') as HTMLElement;
         focusEditorAtStart(firstEditor);
       }
+      updateSaveButtonState();
     });
   } catch (err) {
     console.error('[soma:hl] showNotePopover error:', err);

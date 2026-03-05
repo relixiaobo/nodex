@@ -2,10 +2,11 @@
  * Content Script highlight core — selection listener, DOM rendering,
  * and hover handling for webpage highlights.
  *
- * Selection flow:
- * - valid text selection => show floating icon toolbar
- * - click Highlight => render + persist highlight
- * - click Note => render highlight, open inline note popover, then persist
+ * Note-first model:
+ * - valid text selection => show floating Note button
+ * - click Note => render highlight preview, open note popover
+ * - user writes note + saves => persist #note with #highlight
+ * - cancel/empty => discard highlight preview
  *
  * Existing highlight flow:
  * - hover <soma-hl> => show contextual toolbar (delete / add note)
@@ -50,10 +51,10 @@ export const DEFAULT_HIGHLIGHT_BG = '#8B8422';
 /** Soft Banana fill for webpage highlight background (matches side-panel <mark>). */
 const HIGHLIGHT_FILL_COLOR = 'rgba(247, 236, 139, 0.6)';
 
-const COMMENT_ICON_SELECTOR = '[data-soma-note-icon="true"]';
+const NOTE_ICON_SELECTOR = '[data-soma-note-icon="true"]';
 
 interface HighlightRenderOptions {
-  hasComment?: boolean;
+  hasNote?: boolean;
 }
 
 interface HighlightDraft {
@@ -68,6 +69,8 @@ let initialized = false;
 let lastKnownUrl = '';
 let pendingNoteDraft: HighlightDraft | null = null;
 let pendingExistingHighlightNoteId: string | null = null;
+/** Tracks highlight ID when user's selection overlaps an existing highlight. */
+let selectedExistingHighlightId: string | null = null;
 
 // ── Highlight Hover Delegation ──
 
@@ -246,7 +249,7 @@ function ensureHoverDelegation(): void {
   // Click handler — only intercept note icon clicks, let everything else through
   document.addEventListener('click', (e) => {
     const targetElement = e.target as Element | null;
-    if (!targetElement?.closest(COMMENT_ICON_SELECTOR)) return;
+    if (!targetElement?.closest(NOTE_ICON_SELECTOR)) return;
 
     const highlightElement = targetElement.closest('soma-hl[data-highlight-id]') as HTMLElement | null;
     if (!highlightElement) return;
@@ -383,8 +386,8 @@ export function renderHighlight(
     }
   }
 
-  if (options.hasComment) {
-    renderCommentBadge(highlightId);
+  if (options.hasNote) {
+    renderNoteBadge(highlightId);
   }
 }
 
@@ -443,14 +446,14 @@ export function clearAllHighlightRenderings(): void {
   }
 }
 
-function renderCommentBadge(highlightId: string): void {
+function renderNoteBadge(highlightId: string): void {
   const elements = Array.from(
     document.querySelectorAll(`soma-hl[data-highlight-id="${highlightId}"]`),
   ) as HTMLElement[];
   if (elements.length === 0) return;
 
   for (const el of elements) {
-    el.querySelectorAll(COMMENT_ICON_SELECTOR).forEach((icon) => icon.remove());
+    el.querySelectorAll(NOTE_ICON_SELECTOR).forEach((icon) => icon.remove());
   }
 
   const last = elements[elements.length - 1];
@@ -618,6 +621,7 @@ function handleSelectionChange(): void {
     if (!selection || !isValidSelection(selection)) {
       hideToolbar();
       currentRange = null;
+      selectedExistingHighlightId = null;
       return;
     }
 
@@ -629,6 +633,7 @@ function handleSelectionChange(): void {
     if (existingId) {
       // Show highlight actions (delete / add note) instead of creation toolbar
       currentRange = null;
+      selectedExistingHighlightId = existingId;
       hideToolbar();
       showHighlightActionsToolbar(rect, {
         onDelete: () => {
@@ -642,6 +647,7 @@ function handleSelectionChange(): void {
     }
 
     currentRange = range;
+    selectedExistingHighlightId = null;
     showToolbar(rect, handleToolbarAction);
     hideHighlightActionsToolbar();
   } catch (err) {
@@ -703,9 +709,6 @@ function handleToolbarAction(action: ToolbarAction): void {
   const selection = window.getSelection();
 
   switch (action) {
-    case 'highlight':
-      createHighlight(range);
-      break;
     case 'note':
       createHighlightWithNote(range);
       break;
@@ -722,15 +725,8 @@ function handleToolbarAction(action: ToolbarAction): void {
 }
 
 /**
- * Create a persisted highlight from range (immediate create flow).
- */
-function createHighlight(range: Range): void {
-  const draft = createHighlightDraft(range);
-  persistHighlightDraft(draft);
-}
-
-/**
  * Create temporary highlight and collect note input before persistence.
+ * Note-first model: user must write a note, highlight is persisted with the note.
  */
 function createHighlightWithNote(range: Range): void {
   const draft = createHighlightDraft(range);
@@ -744,15 +740,21 @@ function createHighlightWithNote(range: Range): void {
       onSave: (entries) => {
         const nonEmpty = entries.filter((e) => e.text.trim());
         pendingNoteDraft = null;
-        persistHighlightDraft(draft, nonEmpty.length > 0 ? nonEmpty : undefined);
+        if (nonEmpty.length > 0) {
+          persistHighlightDraft(draft, nonEmpty);
+        } else {
+          // No note content → discard the draft highlight rendering
+          removeHighlightRendering(draft.tempId);
+        }
       },
       onCancel: () => {
         pendingNoteDraft = null;
-        persistHighlightDraft(draft);
+        // Cancel → discard the draft highlight rendering (note-first: no note = no save)
+        removeHighlightRendering(draft.tempId);
       },
     },
     {
-      placeholder: 'Add a note...',
+      placeholder: 'Write your thoughts...',
       initialEntries: [{ text: '', depth: 0 }],
     },
   );
@@ -781,12 +783,12 @@ function createHighlightDraft(range: Range): HighlightDraft {
 
 function persistHighlightDraft(
   draft: HighlightDraft,
-  noteEntries?: NoteEntry[],
+  noteEntries: NoteEntry[],
 ): void {
   const payload: HighlightCreatePayload = {
     ...draft.payloadBase,
     tempId: draft.tempId,
-    noteEntries: noteEntries && noteEntries.length > 0 ? noteEntries : undefined,
+    noteEntries,
   };
 
   const msg: { type: typeof HIGHLIGHT_CREATE; payload: HighlightCreatePayload } = {
@@ -794,25 +796,21 @@ function persistHighlightDraft(
     payload,
   };
 
-  chrome.runtime.sendMessage(msg, (response?: { nodeId?: string }) => {
+  chrome.runtime.sendMessage(msg, (response?: { highlightNodeId?: string }) => {
     if (chrome.runtime.lastError) {
       removeHighlightRendering(draft.tempId);
       console.warn('[soma] Failed to create highlight:', chrome.runtime.lastError.message);
       return;
     }
 
-    const finalId = response?.nodeId;
+    const finalId = response?.highlightNodeId;
     if (finalId) {
       replaceRenderedHighlightId(draft.tempId, finalId);
-      if (noteEntries && noteEntries.length > 0) {
-        renderCommentBadge(finalId);
-      }
+      renderNoteBadge(finalId);
       return;
     }
 
-    if (noteEntries && noteEntries.length > 0) {
-      renderCommentBadge(draft.tempId);
-    }
+    renderNoteBadge(draft.tempId);
   });
 }
 
@@ -851,7 +849,7 @@ function showNotePopoverForExistingHighlight(highlightId: string, rect: DOMRect)
                 return;
               }
               if (nonEmpty.length > 0) {
-                renderCommentBadge(highlightId);
+                renderNoteBadge(highlightId);
               }
             });
           },
@@ -892,9 +890,11 @@ function handleGlobalPointerDown(e: PointerEvent): void {
   if (pendingNoteDraft) {
     const draft = pendingNoteDraft;
     pendingNoteDraft = null;
-    persistHighlightDraft(draft);
+    // Note-first: clicking outside without saving discards the draft
+    removeHighlightRendering(draft.tempId);
   }
   pendingExistingHighlightNoteId = null;
+  selectedExistingHighlightId = null;
 
   clearHoverState();
   hideNotePopover();
@@ -913,6 +913,36 @@ export function initHighlight(): void {
   lastKnownUrl = location.href;
 
   ensureHoverDelegation();
+
+  // Keyboard shortcut: Cmd/Ctrl+Shift+H to open note popover directly
+  document.addEventListener('keydown', (e) => {
+    if (!(e.metaKey || e.ctrlKey) || !e.shiftKey) return;
+    if (e.key !== 'H' && e.key !== 'h') return;
+
+    // Case 1: New text selection → create highlight with note
+    if (currentRange) {
+      e.preventDefault();
+      e.stopPropagation();
+      const range = currentRange;
+      window.getSelection()?.removeAllRanges();
+      hideToolbar();
+      currentRange = null;
+      createHighlightWithNote(range);
+      return;
+    }
+
+    // Case 2: Selection on existing highlight → open note for it
+    if (selectedExistingHighlightId) {
+      e.preventDefault();
+      e.stopPropagation();
+      const id = selectedExistingHighlightId;
+      const rect = computeGroupBoundingRect(id);
+      if (rect) {
+        hideHighlightActionsToolbar();
+        showNotePopoverForExistingHighlight(id, rect);
+      }
+    }
+  });
 
   // Debounced selection events => check selection
   let selectionTimeout: ReturnType<typeof setTimeout> | null = null;

@@ -1,7 +1,7 @@
 {
   "name": "soma",
   "version": "0.1.0",
-  "description": "Cloud knowledge management in Chrome Side Panel",
+  "description": "Think where you read — knowledge management in your browser side panel",
   "type": "module",
   "scripts": {
     "dev": "wxt",

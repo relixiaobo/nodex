@@ -4,11 +4,11 @@
 soma
 
 ## Short Description (132 chars max)
-Cloud knowledge management in Chrome Side Panel. Outline notes, tag & organize, sync across devices.
+Think where you read. Capture, organize, and resurface your notes — right in your browser side panel.
 
 ## Detailed Description
 
-soma is a knowledge management tool that lives in your Chrome Side Panel. Capture ideas, organize projects, and build your personal knowledge base — all without leaving the browser.
+**Think where you read.** soma is a knowledge management tool that lives in your browser side panel. Capture ideas while you browse, organize them into structured outlines, and let your notes find you when you need them — all without leaving the page.
 
 **Outline your thoughts**
 Structure notes with a powerful nested outliner. Expand, collapse, drag to reorder, and navigate entirely from the keyboard.
@@ -44,7 +44,7 @@ English
 All screenshots are 2560x1600 (Retina 2x), located in `docs/store-screenshots/`.
 
 ## Privacy Policy (single purpose description)
-Cloud knowledge management in Chrome Side Panel.
+Think where you read — knowledge management in your browser side panel.
 
 ## Permissions justification
 | Permission | Reason |

@@ -1,6 +1,8 @@
 # soma
 
-Chrome Side Panel 云端知识管理工具，忠实复刻 Tana 核心功能。
+> Think where you read.
+
+浏览器侧边栏知识管理工具，忠实复刻 Tana 核心功能。
 
 ## 项目概述
 

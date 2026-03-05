@@ -24,6 +24,7 @@ describe('system node registry', () => {
       { id: CONTAINER_IDS.TRASH, name: 'Trash' },
       { id: CONTAINER_IDS.SCHEMA, name: 'Schema' },
       { id: CONTAINER_IDS.SETTINGS, name: 'Settings' },
+      { id: CONTAINER_IDS.ABOUT, name: 'About' },
     ]);
   });
 

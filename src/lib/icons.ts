@@ -136,3 +136,11 @@ export {
 export {
   User,
 } from 'lucide-react';
+
+// ─── About & External ────────────────────────────────────────────────────────
+
+export {
+  Info,
+  ExternalLink,
+  MessageSquare,
+} from 'lucide-react';

@@ -2,7 +2,7 @@ import { CONTAINER_IDS } from '../types/index.js';
 import type { ContainerId } from '../types/index.js';
 import type { TranslationKey } from '../i18n/strings.js';
 
-export type ContainerIconKey = 'library' | 'inbox' | 'journal' | 'search' | 'trash' | 'schema' | 'clips' | 'stash' | 'settings';
+export type ContainerIconKey = 'library' | 'inbox' | 'journal' | 'search' | 'trash' | 'schema' | 'clips' | 'stash' | 'settings' | 'about';
 
 export interface SystemContainerMeta {
   id: ContainerId;
@@ -80,6 +80,12 @@ export const SYSTEM_CONTAINER_REGISTRY: SystemContainerMeta[] = [
     id: CONTAINER_IDS.SETTINGS,
     defaultName: 'Settings',
     iconKey: 'settings',
+    seedInWorkspace: true,
+  },
+  {
+    id: CONTAINER_IDS.ABOUT,
+    defaultName: 'About',
+    iconKey: 'about',
     seedInWorkspace: true,
   },
 ] as const;

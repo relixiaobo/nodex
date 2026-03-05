@@ -16,6 +16,7 @@ import { DateNavigationBar } from '../journal/DateNavigationBar';
 import { BacklinksSection } from './BacklinksSection';
 import { SearchChipBar } from '../search/SearchChipBar';
 import { SettingsSection } from './SettingsSection';
+import { AboutSection } from './AboutSection';
 
 interface NodePanelProps {
   nodeId: string;
@@ -49,6 +50,7 @@ export function NodePanel({ nodeId }: NodePanelProps) {
 
   const isTrashContainer = nodeId === CONTAINER_IDS.TRASH;
   const isSettingsContainer = nodeId === CONTAINER_IDS.SETTINGS;
+  const isAboutContainer = nodeId === CONTAINER_IDS.ABOUT;
 
   const isInTrash = useNodeStore((s) => {
     void s._version;
@@ -150,6 +152,7 @@ export function NodePanel({ nodeId }: NodePanelProps) {
           </div>
         )}
         {isSettingsContainer && <SettingsSection />}
+        {isAboutContainer && <AboutSection />}
         {!isDefinitionNode && node?.type === 'search' && <SearchChipBar searchNodeId={nodeId} />}
         {!isDefinitionNode && <OutlinerView rootNodeId={nodeId} />}
         {!isDefinitionNode && <BacklinksSection nodeId={nodeId} />}

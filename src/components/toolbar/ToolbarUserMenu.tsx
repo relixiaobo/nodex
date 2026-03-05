@@ -5,7 +5,7 @@
  * - Not signed in: generic user icon, click triggers Google sign-in
  */
 import { useState, useRef, useEffect } from 'react';
-import { LogOut, Settings, User } from '../../lib/icons.js';
+import { LogOut, Settings, Info, User } from '../../lib/icons.js';
 import { useWorkspaceStore } from '../../stores/workspace-store';
 import { useSyncStore } from '../../stores/sync-store';
 import { useUIStore } from '../../stores/ui-store';
@@ -195,6 +195,20 @@ export function ToolbarUserMenu() {
                             <Settings size={14} strokeWidth={1.5} />
                         </div>
                         Settings
+                    </button>
+
+                    {/* About */}
+                    <button
+                        onClick={() => {
+                            setOpen(false);
+                            useUIStore.getState().navigateTo(CONTAINER_IDS.ABOUT);
+                        }}
+                        className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-sm text-foreground-secondary transition-colors hover:bg-foreground/4 hover:text-foreground"
+                    >
+                        <div className="flex w-4 shrink-0 items-center justify-center text-foreground-tertiary">
+                            <Info size={14} strokeWidth={1.5} />
+                        </div>
+                        About
                     </button>
 
                     {/* Sign out */}

@@ -18,7 +18,7 @@ export default defineConfig({
   modules: ['@wxt-dev/module-react'],
   manifest: {
     name,
-    description: 'Cloud knowledge management in Chrome Side Panel',
+    description: 'Think where you read — knowledge management in your browser side panel',
     // Extension key — determines the extension ID Chrome assigns.
     // Store builds omit this; Chrome Web Store assigns the ID.
     // Preview and Dev each have their own key so they can coexist in Chrome.

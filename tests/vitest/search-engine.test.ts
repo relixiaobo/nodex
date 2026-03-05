@@ -424,38 +424,38 @@ describe('search-engine', () => {
       expect(chips[0].text).toBe('#Task');
     });
 
-    it('maps NOT_DONE to 未完成', () => {
+    it('maps NOT_DONE to Not done', () => {
       const condId = loroDoc.createNode(undefined, CONTAINER_IDS.SEARCHES);
       loroDoc.setNodeDataBatch(condId, { type: 'queryCondition', queryOp: 'NOT_DONE' });
       loroDoc.commitDoc('__seed__');
       const cond = loroDoc.toNodexNode(condId)!;
-      expect(getChipTextForCondition(cond)).toBe('未完成');
+      expect(getChipTextForCondition(cond)).toBe('Not done');
     });
 
-    it('maps DONE to 已完成', () => {
+    it('maps DONE to Done', () => {
       const condId = loroDoc.createNode(undefined, CONTAINER_IDS.SEARCHES);
       loroDoc.setNodeDataBatch(condId, { type: 'queryCondition', queryOp: 'DONE' });
       loroDoc.commitDoc('__seed__');
       const cond = loroDoc.toNodexNode(condId)!;
-      expect(getChipTextForCondition(cond)).toBe('已完成');
+      expect(getChipTextForCondition(cond)).toBe('Done');
     });
 
-    it('maps TODO to 有 checkbox', () => {
+    it('maps TODO to Has checkbox', () => {
       const condId = loroDoc.createNode(undefined, CONTAINER_IDS.SEARCHES);
       loroDoc.setNodeDataBatch(condId, { type: 'queryCondition', queryOp: 'TODO' });
       loroDoc.commitDoc('__seed__');
       const cond = loroDoc.toNodexNode(condId)!;
-      expect(getChipTextForCondition(cond)).toBe('有 checkbox');
+      expect(getChipTextForCondition(cond)).toBe('Has checkbox');
     });
 
-    it('maps NOT group to 排除: prefix', () => {
+    it('maps NOT group to Exclude: prefix', () => {
       const notGroupId = loroDoc.createNode(undefined, CONTAINER_IDS.SEARCHES);
       loroDoc.setNodeDataBatch(notGroupId, { type: 'queryCondition', queryLogic: 'NOT' });
       const leafId = loroDoc.createNode(undefined, notGroupId);
       loroDoc.setNodeDataBatch(leafId, { type: 'queryCondition', queryOp: 'DONE' });
       loroDoc.commitDoc('__seed__');
       const notGroup = loroDoc.toNodexNode(notGroupId)!;
-      expect(getChipTextForCondition(notGroup)).toBe('排除: 已完成');
+      expect(getChipTextForCondition(notGroup)).toBe('Exclude: Done');
     });
   });
 

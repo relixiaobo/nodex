@@ -112,12 +112,17 @@ export function CommandPalette() {
   const listRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // Close without clearing query (dismiss via Esc / backdrop / ⌘K)
+  const closePalette = useCallback(() => {
+    closeSearch();
+    ensureUndoFocusAfterNavigation();
+  }, [closeSearch]);
+
   // Close + clear query (used when an action is executed)
   const closeAndClear = useCallback(() => {
     setSearchQuery('');
-    closeSearch();
-    ensureUndoFocusAfterNavigation();
-  }, [setSearchQuery, closeSearch]);
+    closePalette();
+  }, [setSearchQuery, closePalette]);
 
   // Build command context
   const ctx: CommandContext = useMemo(() => ({
@@ -346,18 +351,18 @@ export function CommandPalette() {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault();
         if (searchOpen) {
-          closeAndClear();
+          closePalette();
         } else {
           useUIStore.getState().openSearch();
         }
       } else if (e.key === 'Escape' && searchOpen) {
         e.preventDefault();
-        closeAndClear();
+        closePalette();
       }
     }
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [searchOpen, closeAndClear]);
+  }, [searchOpen, closePalette]);
 
   // Keyboard navigation within the palette
   const handleKeyDown = useCallback(
@@ -388,10 +393,10 @@ export function CommandPalette() {
         if (item) item.action();
       } else if (e.key === 'Escape') {
         e.preventDefault();
-        closeAndClear();
+        closePalette();
       }
     },
-    [allItems, selectedIndex, closeAndClear, createItem],
+    [allItems, selectedIndex, closePalette, createItem],
   );
 
   // Scroll selected item into view
@@ -414,7 +419,7 @@ export function CommandPalette() {
   return (
     <div
       className="fixed inset-0 z-50 flex justify-center bg-foreground/[0.08] p-2 sm:p-4 pt-[8vh] sm:pt-[12vh]"
-      onPointerDown={closeAndClear}
+      onPointerDown={closePalette}
     >
       <div
         className="animate-palette-expand flex flex-col w-full max-w-[600px] h-[min(480px,80vh)] rounded-xl bg-background shadow-paper border border-border-subtle overflow-hidden"
@@ -430,7 +435,7 @@ export function CommandPalette() {
             placeholder={t('search.commandPalette.placeholder')}
             className="flex-1 bg-transparent text-sm outline-none placeholder:text-foreground-tertiary"
           />
-          <span className="shrink-0 cursor-pointer" onClick={closeAndClear}>
+          <span className="shrink-0 cursor-pointer" onClick={closePalette}>
             <Kbd>Esc</Kbd>
           </span>
         </div>

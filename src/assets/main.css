@@ -348,7 +348,7 @@
 :not(.has-placeholder) > .idle-hint:focus-within .ProseMirror p:empty::before,
 :not(.has-placeholder) > .idle-hint:focus-within .ProseMirror p:has(> br.ProseMirror-trailingBreak:only-child)::before {
   content: "Type here or '/' for commands";
-  color: var(--color-foreground-tertiary);
+  color: color-mix(in srgb, var(--color-foreground) 20%, transparent);
   pointer-events: none;
   opacity: 0;
   animation: idle-hint-fadein 0.3s ease 2s forwards;

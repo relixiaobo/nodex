@@ -1821,7 +1821,7 @@ export function OutlinerItem({
             ) : (
             <div
               ref={contentAreaRef}
-              className={`text-[15px] leading-6 ${isLoadingNode ? 'cursor-default' : !isCheckboxFieldType(fieldDataType) && !isFocused ? (isReferenceLikeRow ? 'cursor-default' : 'cursor-text') : ''} ${hasTags && !nodeText ? 'has-placeholder' : ''}`}
+              className={`text-[15px] leading-6 ${isLoadingNode ? 'cursor-default' : !isCheckboxFieldType(fieldDataType) && !isFocused ? (isReferenceLikeRow ? 'cursor-default' : 'cursor-text') : ''} ${hasTags && !nodeText ? 'has-placeholder' : ''} ${fieldDataType && !nodeText && !hasTags ? 'field-value-placeholder' : ''}`}
               onMouseDown={!isCheckboxFieldType(fieldDataType) ? (isFocused ? handleFocusedContentMouseDown : handleContentMouseDown) : undefined}
               onClick={!isCheckboxFieldType(fieldDataType) && !isFocused ? handleContentClick : undefined}
               onDoubleClick={!isCheckboxFieldType(fieldDataType) && !isFocused && isReference && !isOptionsValueNode ? handleContentDoubleClick : undefined}
@@ -1876,7 +1876,7 @@ export function OutlinerItem({
                   onShiftArrow={handleShiftArrow}
                   onSelectAll={handleSelectAll}
                   onPasteMultiLine={handlePasteMultiLine}
-                  showIdleHint
+                  showIdleHint={!fieldDataType}
                 />
               ) : nodeContentHtml ? (
                 <span
@@ -1887,6 +1887,8 @@ export function OutlinerItem({
                 <span className="node-content text-foreground-tertiary animate-pulse">Clipping…</span>
               ) : hasTags ? (
                 <span className="node-content text-foreground-tertiary">Untitled</span>
+              ) : fieldDataType ? (
+                <span className="node-content text-foreground/20">{t('field.emptyText')}</span>
               ) : (
                 <span className="node-content">&#8203;</span>
               )}

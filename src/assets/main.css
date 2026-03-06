@@ -338,6 +338,14 @@
   pointer-events: none;
 }
 
+/* Placeholder for empty field value nodes: show "Add text" immediately (no delay). */
+.field-value-placeholder .editor-inline .ProseMirror p:empty::before,
+.field-value-placeholder .editor-inline .ProseMirror p:has(> br.ProseMirror-trailingBreak:only-child)::before {
+  content: "Add text";
+  color: color-mix(in srgb, var(--color-foreground) 20%, transparent);
+  pointer-events: none;
+}
+
 /* Idle hint: fades in after 2s when an empty node is focused.
    Only applies when parent doesn't have has-placeholder (tagged empty nodes show "Untitled" instead). */
 @keyframes idle-hint-fadein {

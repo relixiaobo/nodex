@@ -23,6 +23,7 @@ import { isOptionsFieldType } from '../../lib/field-utils.js';
 import * as loroDoc from '../../lib/loro-doc.js';
 import { undoDoc, redoDoc, commitDoc } from '../../lib/loro-doc.js';
 import { getPrimaryShortcutKey } from '../../lib/shortcut-registry';
+import { t } from '../../i18n/strings.js';
 import { isImeComposingEvent } from '../../lib/ime-keyboard.js';
 import {
     resolveTrailingRowUpdateAction,
@@ -739,7 +740,11 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
                 dimmed={!hasContent}
             />
             <div ref={trailingWrapperRef} className="relative flex-1 min-w-0">
-                <div ref={mountRef} className={`${fieldDataType ? '' : 'idle-hint '}outline-none text-[15px] leading-6`} />
+                <div
+                    ref={mountRef}
+                    className={`${fieldDataType ? 'field-trailing' : 'idle-hint'} outline-none text-[15px] leading-6`}
+                    style={fieldDataType ? { '--field-hint': `"${isOptions ? t('field.selectOption') : t('field.emptyText')}"` } as React.CSSProperties : undefined}
+                />
                 {optionsOpen && filteredOptions.length > 0 && optionsDropdownPos && createPortal(
                     <div
                         ref={optionsDropdownRef}

@@ -298,7 +298,7 @@ export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, configNo
               {url}
             </a>
           ) : (
-            <span className="text-[15px] leading-6 text-foreground-tertiary select-none">Empty</span>
+            <span className="text-[15px] leading-6 text-foreground/20 select-none">{t('field.emptyUrl')}</span>
           )}
         </div>
       </FieldValueRow>
@@ -324,7 +324,7 @@ export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, configNo
               {email}
             </a>
           ) : (
-            <span className="text-[15px] leading-6 text-foreground-tertiary select-none">Empty</span>
+            <span className="text-[15px] leading-6 text-foreground/20 select-none">{t('field.emptyEmail')}</span>
           )}
         </div>
       </FieldValueRow>
@@ -428,8 +428,8 @@ function DatePickerField({ value, onSelect }: { value: string; onSelect: (v: str
     <div ref={triggerRef} className={`relative ${open ? 'isolate field-overlay-open' : ''}`}>
       <FieldValueRow dimmed={!value}>
         <div className="flex-1 min-w-0 flex items-center cursor-pointer" onClick={handleClick}>
-          <span className={`text-[15px] leading-6 select-none ${value ? '' : 'text-foreground-tertiary'}`}>
-            {value ? formatDateDisplay(value) : t('field.empty')}
+          <span className={`text-[15px] leading-6 select-none ${value ? '' : 'text-foreground/20'}`}>
+            {value ? formatDateDisplay(value) : t('field.emptyDate')}
           </span>
         </div>
       </FieldValueRow>

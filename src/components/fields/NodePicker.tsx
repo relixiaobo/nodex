@@ -63,7 +63,7 @@ export function NodePicker({
   onClear,
   allowCreate = false,
   onCreate,
-  placeholder = 'Select...',
+  placeholder = 'Select option',
   isReference = false,
   insetLeft = FIELD_VALUE_INSET,
 }: NodePickerProps) {
@@ -310,7 +310,7 @@ export function NodePicker({
                   className={
                     selectedName
                       ? 'text-[15px] leading-6 text-foreground'
-                      : 'text-[15px] leading-6 text-foreground-tertiary select-none group-hover/picker:text-foreground-secondary transition-colors'
+                      : 'text-[15px] leading-6 text-foreground/20 select-none group-hover/picker:text-foreground-secondary transition-colors'
                   }
                 >
                   {selectedName ?? placeholder}

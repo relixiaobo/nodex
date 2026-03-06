@@ -15,7 +15,7 @@ describe('i18n strings', () => {
     expect(t('nodeHeader.dragToMove')).toBe('Drag to move (right-click for menu)');
     expect(t('outliner.zoomIn')).toBe('Zoom in');
     expect(t('field.selectOption')).toBe('Select option');
-    expect(t('field.fieldNamePlaceholder')).toBe('Field name...');
+    expect(t('field.fieldNamePlaceholder')).toBe('Field name');
     expect(t('sidebar.nav.dailyNotes')).toBe('Daily notes');
     expect(t('userMenu.signOut')).toBe('Sign out');
     expect(t('floatingToolbar.bold')).toBe('Bold');

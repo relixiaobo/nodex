@@ -224,7 +224,7 @@ export function FieldNameInput({
       <input
         ref={inputRef}
         type="text"
-        className="block w-full bg-transparent text-[15px] text-foreground outline-none border-0 py-0 px-0 m-0 h-6 leading-6"
+        className="block w-full bg-transparent text-[15px] text-foreground outline-none border-0 py-0 px-0 m-0 h-6 leading-6 placeholder:text-foreground/20"
         placeholder={t('field.fieldNamePlaceholder')}
         value={value}
         onChange={(e) => {

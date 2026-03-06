@@ -10,7 +10,8 @@
  * Used for Plain and Options field types. fieldDataType and attrDefId are
  * passed through for future type-specific rendering (e.g., option autocomplete).
  */
-import { useMemo, useState, useCallback, useRef } from 'react';
+import { useMemo, useState, useCallback, useRef, useLayoutEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useNodeStore } from '../../stores/node-store';
 import { useChildren } from '../../hooks/use-children';
 import { useNodeFields, type FieldEntry } from '../../hooks/use-node-fields';
@@ -395,13 +396,36 @@ export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, configNo
 /** Click-to-pick date field with custom DatePicker popover. */
 function DatePickerField({ value, onSelect }: { value: string; onSelect: (v: string) => void }) {
   const [open, setOpen] = useState(false);
+  const triggerRef = useRef<HTMLDivElement>(null);
+  const [pickerPos, setPickerPos] = useState<{ top: number; left: number } | null>(null);
 
   const handleClick = useCallback(() => {
     setOpen((prev) => !prev);
   }, []);
 
+  useLayoutEffect(() => {
+    if (!open || !triggerRef.current) {
+      setPickerPos(null);
+      return;
+    }
+    const updatePos = () => {
+      const rect = triggerRef.current?.getBoundingClientRect();
+      if (rect) {
+        setPickerPos({ top: rect.bottom + 4, left: rect.left });
+      }
+    };
+    updatePos();
+    const scrollContainer = triggerRef.current.closest('.overflow-y-auto, [style*="overflow"]');
+    scrollContainer?.addEventListener('scroll', updatePos, { passive: true });
+    window.addEventListener('resize', updatePos, { passive: true });
+    return () => {
+      scrollContainer?.removeEventListener('scroll', updatePos);
+      window.removeEventListener('resize', updatePos);
+    };
+  }, [open]);
+
   return (
-    <div className={`relative ${open ? 'isolate field-overlay-open' : ''}`} style={open ? { zIndex: FIELD_OVERLAY_Z_INDEX } : undefined}>
+    <div ref={triggerRef} className={`relative ${open ? 'isolate field-overlay-open' : ''}`}>
       <FieldValueRow dimmed={!value}>
         <div className="flex-1 min-w-0 flex items-center cursor-pointer" onClick={handleClick}>
           <span className={`text-[15px] leading-6 select-none ${value ? '' : 'text-foreground-tertiary'}`}>
@@ -409,12 +433,15 @@ function DatePickerField({ value, onSelect }: { value: string; onSelect: (v: str
           </span>
         </div>
       </FieldValueRow>
-      {open && (
-        <DatePicker
-          value={value}
-          onSelect={onSelect}
-          onClose={() => setOpen(false)}
-        />
+      {open && pickerPos && createPortal(
+        <div style={{ position: 'fixed', top: pickerPos.top, left: pickerPos.left, zIndex: FIELD_OVERLAY_Z_INDEX }}>
+          <DatePicker
+            value={value}
+            onSelect={onSelect}
+            onClose={() => setOpen(false)}
+          />
+        </div>,
+        document.body,
       )}
     </div>
   );

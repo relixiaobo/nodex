@@ -6,7 +6,8 @@
  * - Tab → confirm + focus value area
  * - Escape → close editing, keep "Untitled"
  */
-import { useState, useRef, useEffect, useCallback, type KeyboardEvent } from 'react';
+import { useState, useRef, useEffect, useLayoutEffect, useCallback, type KeyboardEvent } from 'react';
+import { createPortal } from 'react-dom';
 import { useWorkspaceFields } from '../../hooks/use-workspace-fields';
 import { useNodeStore } from '../../stores/node-store';
 import { useUIStore } from '../../stores/ui-store';
@@ -207,6 +208,17 @@ export function FieldNameInput({
     ],
   );
 
+  const [suggestionsPos, setSuggestionsPos] = useState<{ top: number; left: number } | null>(null);
+
+  useLayoutEffect(() => {
+    if (suggestions.length === 0 || !containerRef.current) {
+      setSuggestionsPos(null);
+      return;
+    }
+    const rect = containerRef.current.getBoundingClientRect();
+    setSuggestionsPos({ top: rect.bottom + 2, left: rect.left });
+  }, [suggestions.length]);
+
   return (
     <div ref={containerRef} className="relative h-6">
       <input
@@ -223,8 +235,11 @@ export function FieldNameInput({
         onBlur={() => confirm()}
         onKeyDown={handleKeyDown}
       />
-      {suggestions.length > 0 && (
-        <div className="absolute left-0 top-full z-50 mt-0.5 w-[180px] bg-background shadow-paper rounded-lg p-1 text-sm">
+      {suggestions.length > 0 && suggestionsPos && createPortal(
+        <div
+          className="w-[180px] bg-background shadow-paper rounded-lg p-1 text-sm"
+          style={{ position: 'fixed', top: suggestionsPos.top, left: suggestionsPos.left, zIndex: 1200 }}
+        >
           {suggestions.map((s, i) => (
             <button
               key={s.id}
@@ -239,7 +254,8 @@ export function FieldNameInput({
               {s.name}
             </button>
           ))}
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );

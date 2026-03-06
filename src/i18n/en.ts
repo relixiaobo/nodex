@@ -96,6 +96,7 @@ export const enMessages = {
   },
   field: {
     empty: 'Empty',
+    emptyText: 'Add text',
     emptyUrl: 'Add URL',
     emptyEmail: 'Add email',
     emptyDate: 'Add date',

@@ -15,8 +15,7 @@ export type ToolbarAction = 'note' | 'clip';
 export type ToolbarActionCallback = (action: ToolbarAction) => void;
 
 export interface HighlightActionsCallbacks {
-  onDelete: () => void;
-  onAddNote: () => void;
+  onOpenNote: () => void;
 }
 
 export interface NoteEntry {
@@ -27,6 +26,7 @@ export interface NoteEntry {
 export interface NotePopoverCallbacks {
   onSave: (entries: NoteEntry[]) => void;
   onCancel: () => void;
+  onDelete?: () => void;
 }
 
 export interface NotePopoverOptions {
@@ -49,6 +49,7 @@ let highlightActionsCallbacks: HighlightActionsCallbacks | null = null;
 let notePopoverElement: HTMLDivElement | null = null;
 let notePopoverShadowRoot: ShadowRoot | null = null;
 let notePopoverListElement: HTMLDivElement | null = null;
+let notePopoverDeleteButton: HTMLButtonElement | null = null;
 let notePopoverCallbacks: NotePopoverCallbacks | null = null;
 
 // ── Shared Styles ──
@@ -139,7 +140,6 @@ ${HOST_STYLE}
 .soma-highlight-actions {
   display: flex;
   align-items: center;
-  gap: 4px;
   padding: 4px;
   background: #F5F4EE;
   border-radius: 8px;
@@ -169,7 +169,7 @@ button {
   border-radius: 4px;
   color: #1A1A1A;
   cursor: pointer;
-  transition: background 0.15s ease-out, color 0.15s ease-out;
+  transition: background 0.15s ease-out;
 }
 
 button:hover {
@@ -178,14 +178,6 @@ button:hover {
 
 button:active {
   background: rgba(26, 26, 26, 0.08);
-}
-
-button[data-action='delete'] {
-  color: #AA5048;
-}
-
-button[data-action='delete']:hover {
-  background: rgba(170, 80, 72, 0.08);
 }
 
 .icon {
@@ -299,6 +291,16 @@ button[data-action='save']:disabled {
   cursor: default;
 }
 
+button[data-action='delete'] {
+  color: #AA5048;
+  background: rgba(170, 80, 72, 0.06);
+  margin-right: auto;
+}
+
+button[data-action='delete']:hover {
+  background: rgba(170, 80, 72, 0.12);
+}
+
 kbd {
   font-family: inherit;
   font-size: 11px;
@@ -312,7 +314,7 @@ kbd {
 
 const ICON_HIGHLIGHT = `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 11-6 6v3h9l3-3"/><path d="m22 12-4.6 4.6a2 2 0 0 1-2.8 0l-5.2-5.2a2 2 0 0 1 0-2.8L14 4"/></svg>`;
 const ICON_NOTE = `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.376 3.622a1 1 0 0 1 3.002 3.002L7.368 18.635a2 2 0 0 1-.855.506l-2.872.838a.5.5 0 0 1-.62-.62l.838-2.872a2 2 0 0 1 .506-.855z"/><path d="m15 5 3 3"/></svg>`;
-const ICON_HIGHLIGHT_OFF = `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 11-6 6v3h9l3-3"/><path d="m22 12-4.6 4.6a2 2 0 0 1-2.8 0l-5.2-5.2a2 2 0 0 1 0-2.8L14 4"/><line x1="2" y1="2" x2="22" y2="22"/></svg>`;
+const ICON_COMMENT = `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg>`;
 
 // ── Helpers ──
 
@@ -460,13 +462,9 @@ function buildHighlightActionsToolbar(): void {
   highlightActionsElement = host;
   highlightActionsShadowRoot = root;
 
-  const isMac = /Mac|iPhone|iPad/.test(navigator.platform);
-  const shortcutHint = isMac ? '⌘⇧H' : 'Ctrl+Shift+H';
-
   const bar = document.createElement('div');
   bar.className = 'soma-highlight-actions';
-  bar.appendChild(createIconButton('delete', ICON_HIGHLIGHT_OFF, 'Remove highlight'));
-  bar.appendChild(createIconButton('add-note', ICON_NOTE, `Add note (${shortcutHint})`));
+  bar.appendChild(createIconButton('open-note', ICON_COMMENT, 'Open note'));
 
   root.appendChild(createStyle(ACTIONS_BAR_STYLE));
   root.appendChild(bar);
@@ -479,16 +477,8 @@ function buildHighlightActionsToolbar(): void {
   bar.addEventListener('click', (e) => {
     const target = (e.target as Element).closest('button');
     if (!target || !highlightActionsCallbacks) return;
-
-    const action = target.getAttribute('data-action');
-    if (action === 'delete') {
-      highlightActionsCallbacks.onDelete();
-      hideHighlightActionsToolbar();
-      return;
-    }
-    if (action === 'add-note') {
-      highlightActionsCallbacks.onAddNote();
-    }
+    highlightActionsCallbacks.onOpenNote();
+    hideHighlightActionsToolbar();
   });
 
   // Hover bridging: toolbar ↔ highlight
@@ -640,6 +630,12 @@ function buildNotePopover(): void {
   const actions = document.createElement('div');
   actions.className = 'actions';
 
+  const deleteButton = document.createElement('button');
+  deleteButton.setAttribute('data-action', 'delete');
+  deleteButton.textContent = 'Delete';
+  deleteButton.style.display = 'none';
+  notePopoverDeleteButton = deleteButton;
+
   const cancelButton = document.createElement('button');
   cancelButton.setAttribute('data-action', 'cancel');
   cancelButton.textContent = 'Cancel';
@@ -649,6 +645,7 @@ function buildNotePopover(): void {
   saveButton.setAttribute('data-action', 'save');
   saveButton.innerHTML = `Save<kbd>${isMac ? '⌘' : 'Ctrl+'}↵</kbd>`;
 
+  actions.appendChild(deleteButton);
   actions.appendChild(cancelButton);
   actions.appendChild(saveButton);
 
@@ -667,6 +664,11 @@ function buildNotePopover(): void {
     if (!target || !notePopoverCallbacks) return;
 
     const action = target.getAttribute('data-action');
+    if (action === 'delete') {
+      notePopoverCallbacks.onDelete?.();
+      hideNotePopover();
+      return;
+    }
     if (action === 'cancel') {
       notePopoverCallbacks.onCancel();
       hideNotePopover();
@@ -826,6 +828,11 @@ export function showNotePopover(
     notePopoverElement!.style.left = `${pos.left}px`;
     notePopoverElement!.style.transform = 'translateX(-50%)';
     notePopoverElement!.style.display = 'block';
+
+    // Toggle delete button visibility (only for existing highlights)
+    if (notePopoverDeleteButton) {
+      notePopoverDeleteButton.style.display = callbacks.onDelete ? '' : 'none';
+    }
 
     const placeholder = options.placeholder ?? 'Write your thoughts...';
 

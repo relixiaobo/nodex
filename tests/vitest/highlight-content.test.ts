@@ -5,6 +5,10 @@ import {
   clearAllHighlightRenderings,
   findOverlappingHighlightId,
 } from '../../src/entrypoints/content/highlight.js';
+import type {
+  HighlightActionsCallbacks,
+  NotePopoverCallbacks,
+} from '../../src/entrypoints/content/highlight-toolbar.js';
 
 function createRangeForText(node: Text, start: number, end: number): Range {
   const range = document.createRange();
@@ -209,5 +213,30 @@ describe('findOverlappingHighlightId', () => {
     range.setEnd(root, 2); // Covers both <p> elements
 
     expect(findOverlappingHighlightId(range)).toBe('xyz');
+  });
+});
+
+describe('highlight toolbar interfaces', () => {
+  it('HighlightActionsCallbacks has single onOpenNote callback', () => {
+    const cb: HighlightActionsCallbacks = { onOpenNote: () => {} };
+    expect(cb.onOpenNote).toBeTypeOf('function');
+    // Should NOT have onDelete or onAddNote (moved to NotePopoverCallbacks)
+    expect('onDelete' in cb).toBe(false);
+  });
+
+  it('NotePopoverCallbacks has optional onDelete', () => {
+    const cb: NotePopoverCallbacks = {
+      onSave: () => {},
+      onCancel: () => {},
+      onDelete: () => {},
+    };
+    expect(cb.onDelete).toBeTypeOf('function');
+
+    // onDelete is optional
+    const cbWithout: NotePopoverCallbacks = {
+      onSave: () => {},
+      onCancel: () => {},
+    };
+    expect(cbWithout.onDelete).toBeUndefined();
   });
 });

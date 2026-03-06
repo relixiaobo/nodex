@@ -347,7 +347,7 @@
 
 :not(.has-placeholder) > .idle-hint .ProseMirror p:empty::before,
 :not(.has-placeholder) > .idle-hint .ProseMirror p:has(> br.ProseMirror-trailingBreak:only-child)::before,
-.idle-hint > .ProseMirror p:has(> br.ProseMirror-trailingBreak:only-child)::before {
+.idle-hint:focus-within > .ProseMirror p:has(> br.ProseMirror-trailingBreak:only-child)::before {
   content: "Type here or '/' for commands";
   color: var(--color-foreground-tertiary);
   pointer-events: none;
@@ -356,7 +356,7 @@
 }
 
 /* Hide trailingBreak when idle hint is visible (TrailingInput doesn't use editor-inline) */
-.idle-hint > .ProseMirror p:has(> br.ProseMirror-trailingBreak:only-child) > br {
+.idle-hint:focus-within > .ProseMirror p:has(> br.ProseMirror-trailingBreak:only-child) > br {
   display: none;
 }
 

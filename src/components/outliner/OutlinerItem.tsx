@@ -1876,6 +1876,7 @@ export function OutlinerItem({
                   onShiftArrow={handleShiftArrow}
                   onSelectAll={handleSelectAll}
                   onPasteMultiLine={handlePasteMultiLine}
+                  showIdleHint
                 />
               ) : nodeContentHtml ? (
                 <span

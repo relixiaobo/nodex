@@ -121,6 +121,8 @@ interface RichTextEditorProps {
   onPasteMultiLine?: (nodes: ParsedPasteNode[]) => void;
   /** Extra classes for the ProseMirror mount div (overrides default text-[15px] leading-6). */
   mountClassName?: string;
+  /** Show delayed idle hint ("Type here or '/' for commands") when doc is empty. */
+  showIdleHint?: boolean;
 }
 
 export interface EditorContentPayload {
@@ -1142,7 +1144,7 @@ export function RichTextEditor(props: RichTextEditorProps) {
   }, []);
 
   return (
-    <div className="editor-inline">
+    <div className={`editor-inline${props.showIdleHint ? ' idle-hint' : ''}`}>
       {!props.readOnly && <FloatingToolbar view={viewRef.current} tick={toolbarTick} onTagClick={handleTagClick} />}
       {tagSelectorOpen && (
         <TagSelectorPopover

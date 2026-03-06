@@ -40,41 +40,42 @@ _(空)_
 
 - [ ] **产品展示页** — 静态落地页（产品介绍 + 截图 + 安装链接 + 隐私政策），可托管在 Cloudflare Pages 或 GitHub Pages
 - [x] **新用户引导数据** — Today 下 4 段教程树 (Welcome/Article Clip/Tasks/Shortcuts) + #task schema + 9 tests
-- [x] **About 面板** — 版本号 + Changelog + Tally 反馈链接 + GitHub 链接，ToolbarUserMenu 入口
+- [x] **About 面板** — 版本号 + Changelog + 反馈链接 + GitHub 链接，ToolbarUserMenu 入口（当前为 `app:about` 纯 UI 路由，多工作区上线后迁移为官方工作区节点）
+- [ ] **About 101 板块** — What's New 后新增 "101" 区块（默认收起），放置产品使用指南/教程文章
+
+---
+
+### Think 流程打磨
+
+> 减少从"我有一个想法"到"写下来了"之间的每一步摩擦。参见 `docs/product-philosophy.md` 方法论。
+
+- [x] **Today 为冷启动首屏** — 短暂关闭 side panel 后恢复上次位置；隔了较久（如新的一天）或首次使用时默认落在 Today（已有实现：App.tsx bootstrap 逻辑）
+- [x] **高亮 note placeholder 引导** — "What does this make you think?" 引导用户用自己的话写
 
 ---
 
 ### P1 — 核心差异化（上线后第一优先级）
 
-#### 上下文感知 Sidebar — 浏览器原生知识助手
-> soma 最核心的差异化功能。Tana/Notion/Obsidian 做不到——因为它们不在浏览器里。
+#### 上下文感知 Sidebar — 信息气味指示器
+> 不做 Push（主动弹内容），采用三层渐进披露：L1 低调 badge → L2 标题列表 → L3 导航到节点。详见 `docs/product-philosophy.md` § 上下文感知 Sidebar。
 
-- [ ] **Phase 1: URL 匹配** — 检测当前标签页 URL，匹配已有 web_clip 的 Source URL 字段
-- [ ] **Phase 2: 内容相似度** — 提取网页关键词/实体，与笔记内容模糊匹配
-- [ ] **Phase 3: 标签关联** — AI 推断相关标签 → 显示同标签下的笔记
-- [ ] **Phase 4: 主动建议** — "你可能想把这段内容加到 XXX 笔记中"
-- [ ] Content Script 增强：网页内高亮已剪藏内容、锚点引用
+- [ ] **v1: URL 精确匹配** — 当前页 URL 匹配已有 #source → 工具栏 badge 显示关联数
+- [ ] **v2: 关键词/语义匹配** — 扩展到同域名、主题相关的笔记匹配
+- [ ] **v3: 共读模式（远期）** — 用户主动激活，侧边栏持续展示与当前页相关的笔记
 
-#### 网页剪藏增强 (#30)
-> 基础版已完成（消息/提取/保存/标签/URL/Toast/正文→子节点 + 默认保存到 Today）。需升级为智能剪藏。
+#### 剪藏精简 — 元数据优先
+> **已决定**：clip 只创建 `#source` 元数据节点（URL、标题、来源），不存正文。正文抓取能力保留底层供 AI 按需使用（On-Demand Fetch via content script）。详见 `docs/product-philosophy.md` § 剪藏的边界。
 
-- [ ] **实体型剪藏** — URL 模式识别书影音等实体页面，创建 `#book`/`#movie` 等节点（仅提取元数据，不保存正文）
-  - 识别方式：域名 + URL 模式匹配（JSON-LD/OG 优先 → DOM 退化），不匹配的 fallback 到 `#source`
-  - 核心站点：豆瓣（读书/电影/音乐/游戏）、Goodreads、IMDb、Letterboxd、Spotify、Apple Music、Steam、小宇宙
-  - 预置 supertag + 字段定义（书名/作者/导演/艺人/年份/封面/评分等）
-  - 后续按用户反馈扩展站点规则
+- [x] **移除用户可见的正文抓取** — clip 流程不再将网页正文存为 #source 子节点（保留 content script 抓取能力供 AI 使用）
+- [ ] **选中文本剪藏 + 强制 note** — Content Script 右键菜单 / 浮动按钮 → 选中段落作为 highlight，强制用户写 note 才能保存
 - [ ] 保存目标选择 UI — 允许用户选择保存到 Inbox / Today / 指定节点
-- [ ] **AI 智能剪藏** — 自动打标签、提取结构化信息、推荐关联到已有笔记
-- [ ] **AI 聊天记录剪藏** — 识别 ChatGPT / Claude / Gemini 页面，提取对话结构（问答轮次 → 节点树）
-- [ ] 选中文本剪藏（Content Script 右键菜单 / 浮动按钮 → 剪藏选中段落）
 
-#### AI Chat & 网页辅助 (#29 + #31)
-> 浏览器 + AI = soma 的第二个差异化维度。
+#### AI — 照亮你的思考
+> AI 不替你思考，而是把你自己的思考照亮。详见 `docs/product-philosophy.md` § AI 照亮的时机。
 
-- [ ] **AI Chat 基础** — Side Panel 内嵌对话界面，可引用笔记节点作为上下文
-- [ ] **网页问答** — 选中网页内容 → 在侧边栏中提问/总结/翻译
-- [ ] **笔记问答** — 基于全部笔记回答问题（RAG / 全文搜索 + LLM）
-- [ ] **AI 辅助组织** — 自动打标签建议、推荐关联笔记、内容分类
+- [ ] **笔记问答** — 基于用户笔记回答问题（On-Demand Fetch + RAG）
+- [ ] **Spark Review** — AI 精选有隐藏关联的旧笔记并置呈现，用户主动进入
+- [ ] **AI 反思对话** — 苏格拉底式提问，引导用户发现跨主题脉络（远期）
 
 ---
 
@@ -132,6 +133,20 @@ _(空)_
 
 ---
 
+### P4 — 多工作区 & 协作
+
+#### 多工作区架构
+> 每个工作区 = 独立 LoroDoc，隔离存储/同步/权限。官方工作区是第一个用例。
+
+- [ ] **工作区模型** — Workspace 元数据（id、name、role、type）+ 切换器 UI
+- [ ] **独立 LoroDoc** — 每个工作区独立的 LoroDoc 实例，独立持久化和同步
+- [ ] **权限模型** — role: `owner` / `editor` / `viewer`，UI 层 + LoroDoc 层双重写保护
+- [ ] **官方工作区** — soma 维护的只读工作区（About / Changelog / Help Center / 设计哲学），预置或从服务端拉取
+- [ ] **跨工作区引用** — 节点可链接到其他工作区的节点（link，不复制数据）
+- [ ] **协作工作区** — 多用户共享工作区，基于 Loro CRDT 天然支持多人编辑
+
+---
+
 ### 暂缓 — 需要独立窗口 / Web 版后再考虑
 
 > 以下视图类型在 Chrome Side Panel（300-700px）中体验受限。
@@ -147,6 +162,7 @@ _(空)_
 
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
+| 2026-03-06 | About 分离为 app panel + Settings 数据迁移 — About 从节点→纯 UI 路由(`app:about`)；Settings highlightEnabled 从 ui-store→LoroDoc 字段 + chrome.storage 投影 | nodex | main |
 | 2026-03-05 | About 面板 — 版本号 + Changelog + Tally 反馈 + GitHub 链接，ToolbarUserMenu 入口 | nodex | main |
 | 2026-03-05 | 新用户引导数据 — Welcome/Article Clip/Tasks/Shortcuts 4 段教程树 + #task schema + 9 tests | nodex | main |
 | 2026-03-05 | Google Docs 剪藏 + 两阶段 Loading UX — export HTML 抓取 + kix 列表嵌套 + 空 shell 占位 + pulse 动画 + 加载中禁止交互 | nodex | main |

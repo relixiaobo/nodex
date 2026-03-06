@@ -386,39 +386,11 @@ describe('saveWebClip', () => {
     expect(webClipDefs).toHaveLength(1);
   });
 
-  it('creates content child nodes from pageText HTML', async () => {
+  it('does not create content child nodes from pageText (metadata-only clip)', async () => {
     const store = useNodeStore.getState();
     const payload = makePayload({
       pageText: '<h2>Intro</h2><p>First paragraph</p><p>Second paragraph</p>',
     });
-
-    const clipId = await saveWebClip(payload, store);
-
-    // Get all children — includes fieldEntry (from tag) + content nodes
-    const children = loroDoc.getChildren(clipId);
-    // Should have at least the fieldEntry + the content nodes
-    const contentChildren = children.filter(cid => {
-      const n = loroDoc.toNodexNode(cid);
-      return n?.type === undefined; // plain content nodes
-    });
-    expect(contentChildren.length).toBeGreaterThanOrEqual(1);
-
-    // "Intro" heading should exist with children
-    const introNode = contentChildren.find(cid => {
-      const n = loroDoc.toNodexNode(cid);
-      return n?.name === 'Intro';
-    });
-    expect(introNode).toBeDefined();
-
-    const introChildren = loroDoc.getChildren(introNode!);
-    expect(introChildren.length).toBe(2);
-    expect(loroDoc.toNodexNode(introChildren[0])?.name).toBe('First paragraph');
-    expect(loroDoc.toNodexNode(introChildren[1])?.name).toBe('Second paragraph');
-  });
-
-  it('skips content creation when pageText is empty', async () => {
-    const store = useNodeStore.getState();
-    const payload = makePayload({ pageText: '' });
 
     const clipId = await saveWebClip(payload, store);
 
@@ -688,42 +660,21 @@ describe('applyWebClipToNode', () => {
     expect(loroDoc.getParentId('idea_1')).toBe(parentBefore);
   });
 
-  it('creates content child nodes from pageText', async () => {
+  it('does not create content child nodes from pageText (metadata-only clip)', async () => {
     const store = useNodeStore.getState();
     const payload = makePayload({
       pageText: '<p>Content paragraph</p>',
     });
 
+    const childrenBefore = loroDoc.getChildren('idea_1');
     await applyWebClipToNode('idea_1', payload, store);
 
-    const children = loroDoc.getChildren('idea_1');
-    const contentChildren = children.filter(cid => {
+    const childrenAfter = loroDoc.getChildren('idea_1');
+    const contentChildren = childrenAfter.filter(cid => {
       const n = loroDoc.toNodexNode(cid);
       return n?.type === undefined && n?.name === 'Content paragraph';
     });
-    expect(contentChildren).toHaveLength(1);
-  });
-
-  it('preserves existing children when adding content nodes', async () => {
-    // idea_1 currently has no children, but idea_2 is a sibling
-    // Use inbox_3 which has children inbox_3a, inbox_3b
-    const childrenBefore = loroDoc.getChildren('inbox_3');
-    expect(childrenBefore.length).toBeGreaterThan(0);
-
-    const store = useNodeStore.getState();
-    const payload = makePayload({
-      pageText: '<p>New content</p>',
-    });
-
-    await applyWebClipToNode('inbox_3', payload, store);
-
-    const childrenAfter = loroDoc.getChildren('inbox_3');
-    // Original children should still be there
-    for (const oldChild of childrenBefore) {
-      expect(childrenAfter).toContain(oldChild);
-    }
-    // Plus new content nodes
-    expect(childrenAfter.length).toBeGreaterThan(childrenBefore.length);
+    expect(contentChildren).toHaveLength(0);
   });
 });
 

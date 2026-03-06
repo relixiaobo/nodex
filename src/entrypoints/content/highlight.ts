@@ -747,7 +747,7 @@ function createHighlightWithNote(range: Range): void {
       },
     },
     {
-      placeholder: 'Write your thoughts...',
+      placeholder: 'What does this make you think?',
       initialEntries: [{ text: '', depth: 0 }],
     },
   );
@@ -897,7 +897,7 @@ function showNotePopoverForExistingHighlight(highlightId: string, rect: DOMRect)
           },
         },
         {
-          placeholder: 'Add a note...',
+          placeholder: 'What does this make you think?',
           initialEntries,
         },
       );

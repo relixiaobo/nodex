@@ -834,7 +834,7 @@ export function showNotePopover(
       notePopoverDeleteButton.style.display = callbacks.onDelete ? '' : 'none';
     }
 
-    const placeholder = options.placeholder ?? 'Write your thoughts...';
+    const placeholder = options.placeholder ?? 'What does this make you think?';
 
     // Clear existing items
     notePopoverListElement!.innerHTML = '';

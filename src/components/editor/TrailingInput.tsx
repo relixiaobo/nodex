@@ -739,7 +739,7 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
                 dimmed={!hasContent}
             />
             <div ref={trailingWrapperRef} className="relative flex-1 min-w-0">
-                <div ref={mountRef} className="idle-hint outline-none text-[15px] leading-6" />
+                <div ref={mountRef} className={`${fieldDataType ? '' : 'idle-hint '}outline-none text-[15px] leading-6`} />
                 {optionsOpen && filteredOptions.length > 0 && optionsDropdownPos && createPortal(
                     <div
                         ref={optionsDropdownRef}

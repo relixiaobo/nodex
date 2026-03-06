@@ -78,26 +78,7 @@ export function ToolbarUserMenu() {
         return null;
     }
 
-    // Not signed in: show generic user icon (no sync badge needed)
-    if (!authUser) {
-        return (
-            <Tooltip label={t('toolbar.signIn')}>
-                <button
-                    onClick={handleSignIn}
-                    disabled={signingIn}
-                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-foreground-tertiary transition-colors hover:bg-foreground/4 hover:text-foreground-secondary disabled:opacity-50"
-                >
-                    {signingIn ? (
-                        <span className="h-3 w-3 animate-spin rounded-full border-[1.5px] border-foreground/30 border-t-foreground" />
-                    ) : (
-                        <User size={15} strokeWidth={1.5} />
-                    )}
-                </button>
-            </Tooltip>
-        );
-    }
-
-    const initials = getInitials(authUser.name ?? authUser.email ?? '?');
+    const initials = authUser ? getInitials(authUser.name ?? authUser.email ?? '?') : '';
     const detail = syncDetail();
 
     return (
@@ -109,17 +90,19 @@ export function ToolbarUserMenu() {
                 aria-label={t('userMenu.ariaLabel')}
             >
                 <div className="relative flex items-center justify-center">
-                    {authUser.avatarUrl ? (
+                    {authUser?.avatarUrl ? (
                         <img
                             src={authUser.avatarUrl}
                             alt=""
                             referrerPolicy="no-referrer"
                             className="h-5 w-5 rounded-full object-cover"
                         />
-                    ) : (
+                    ) : authUser ? (
                         <span className="flex h-5 w-5 items-center justify-center rounded-full bg-foreground/[0.06] text-[8px] font-medium text-foreground">
                             {initials}
                         </span>
+                    ) : (
+                        <User size={15} strokeWidth={1.5} className="text-foreground-tertiary" />
                     )}
                     {/* Sync status badge */}
                     {showSyncBadge && (
@@ -133,52 +116,68 @@ export function ToolbarUserMenu() {
             {/* Dropdown */}
             {open && (
                 <div className="absolute right-0 top-full mt-1 w-52 rounded-lg bg-background shadow-paper p-1 z-50">
-                    {/* User info */}
-                    <div className="flex items-start gap-2.5 px-2 py-1.5">
-                        <div className="flex w-4 shrink-0 items-center justify-center mt-0.5">
-                            {authUser.avatarUrl ? (
-                                <img
-                                    src={authUser.avatarUrl}
-                                    alt=""
-                                    referrerPolicy="no-referrer"
-                                    className="h-4 w-4 rounded-full object-cover"
-                                />
-                            ) : (
-                                <User size={14} strokeWidth={1.5} className="text-foreground-tertiary" />
-                            )}
-                        </div>
-                        <div className="flex flex-col min-w-0 flex-1">
-                            {authUser.name && (
-                                <p className="truncate text-sm font-medium text-foreground">{authUser.name}</p>
-                            )}
-                            {authUser.email && (
-                                <p className="truncate text-xs text-foreground-tertiary">
-                                    {authUser.email}
-                                </p>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* Sync status row */}
-                    {showSyncBadge && (
+                    {authUser ? (
                         <>
-                            <div className="mx-1 my-1 border-t border-border-subtle" />
-                            <div className="flex items-center gap-2.5 px-2 py-1.5">
-                                <div className="flex w-4 shrink-0 items-center justify-center">
-                                    <span className={`h-2 w-2 rounded-full ${badgeClass}`} />
+                            {/* User info */}
+                            <div className="flex items-start gap-2.5 px-2 py-1.5">
+                                <div className="flex w-4 shrink-0 items-center justify-center mt-0.5">
+                                    {authUser.avatarUrl ? (
+                                        <img
+                                            src={authUser.avatarUrl}
+                                            alt=""
+                                            referrerPolicy="no-referrer"
+                                            className="h-4 w-4 rounded-full object-cover"
+                                        />
+                                    ) : (
+                                        <User size={14} strokeWidth={1.5} className="text-foreground-tertiary" />
+                                    )}
                                 </div>
-                                <div className="min-w-0 flex-1">
-                                    <span className="text-sm text-foreground-secondary">
-                                        {SYNC_LABELS[syncStatus] ?? syncStatus}
-                                    </span>
-                                    {detail && (
-                                        <span className="ml-1 text-xs text-foreground-tertiary">
-                                            {detail}
-                                        </span>
+                                <div className="flex flex-col min-w-0 flex-1">
+                                    {authUser.name && (
+                                        <p className="truncate text-sm font-medium text-foreground">{authUser.name}</p>
+                                    )}
+                                    {authUser.email && (
+                                        <p className="truncate text-xs text-foreground-tertiary">
+                                            {authUser.email}
+                                        </p>
                                     )}
                                 </div>
                             </div>
+
+                            {/* Sync status row */}
+                            {showSyncBadge && (
+                                <>
+                                    <div className="mx-1 my-1 border-t border-border-subtle" />
+                                    <div className="flex items-center gap-2.5 px-2 py-1.5">
+                                        <div className="flex w-4 shrink-0 items-center justify-center">
+                                            <span className={`h-2 w-2 rounded-full ${badgeClass}`} />
+                                        </div>
+                                        <div className="min-w-0 flex-1">
+                                            <span className="text-sm text-foreground-secondary">
+                                                {SYNC_LABELS[syncStatus] ?? syncStatus}
+                                            </span>
+                                            {detail && (
+                                                <span className="ml-1 text-xs text-foreground-tertiary">
+                                                    {detail}
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+                                </>
+                            )}
                         </>
+                    ) : (
+                        /* Sign in */
+                        <button
+                            onClick={() => { setOpen(false); handleSignIn(); }}
+                            disabled={signingIn}
+                            className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-sm text-foreground-secondary transition-colors hover:bg-foreground/4 hover:text-foreground disabled:opacity-50"
+                        >
+                            <div className="flex w-4 shrink-0 items-center justify-center text-foreground-tertiary">
+                                <User size={14} strokeWidth={1.5} />
+                            </div>
+                            {signingIn ? 'Signing in\u2026' : t('toolbar.signIn')}
+                        </button>
                     )}
 
                     <div className="mx-1 my-1 border-t border-border-subtle" />
@@ -211,16 +210,18 @@ export function ToolbarUserMenu() {
                         About
                     </button>
 
-                    {/* Sign out */}
-                    <button
-                        onClick={handleSignOut}
-                        className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-sm text-foreground-secondary transition-colors hover:bg-foreground/4 hover:text-foreground"
-                    >
-                        <div className="flex w-4 shrink-0 items-center justify-center text-foreground-tertiary">
-                            <LogOut size={14} strokeWidth={1.5} />
-                        </div>
-                        {t('userMenu.signOut')}
-                    </button>
+                    {/* Sign out (only when signed in) */}
+                    {authUser && (
+                        <button
+                            onClick={handleSignOut}
+                            className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-sm text-foreground-secondary transition-colors hover:bg-foreground/4 hover:text-foreground"
+                        >
+                            <div className="flex w-4 shrink-0 items-center justify-center text-foreground-tertiary">
+                                <LogOut size={14} strokeWidth={1.5} />
+                            </div>
+                            {t('userMenu.signOut')}
+                        </button>
+                    )}
                 </div>
             )}
         </div>

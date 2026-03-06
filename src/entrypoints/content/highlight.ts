@@ -184,11 +184,7 @@ function showToolbarForHighlight(id: string): void {
   if (!hoverState.anchorRect) return;
 
   showHighlightActionsToolbar(hoverState.anchorRect, {
-    onDelete: () => {
-      deleteHighlight(id);
-      clearHoverState();
-    },
-    onAddNote: () => {
+    onOpenNote: () => {
       showNotePopoverForExistingHighlight(id, hoverState.anchorRect!);
       clearHoverState();
     },
@@ -636,10 +632,7 @@ function handleSelectionChange(): void {
       selectedExistingHighlightId = existingId;
       hideToolbar();
       showHighlightActionsToolbar(rect, {
-        onDelete: () => {
-          deleteHighlight(existingId);
-        },
-        onAddNote: () => {
+        onOpenNote: () => {
           showNotePopoverForExistingHighlight(existingId, rect);
         },
       });
@@ -729,8 +722,8 @@ function handleToolbarAction(action: ToolbarAction): void {
  * Note-first model: user must write a note, highlight is persisted with the note.
  */
 function createHighlightWithNote(range: Range): void {
+  const rect = range.getBoundingClientRect(); // Capture before DOM modification
   const draft = createHighlightDraft(range);
-  const rect = range.getBoundingClientRect();
   pendingNoteDraft = draft;
   pendingExistingHighlightNoteId = null;
 
@@ -897,6 +890,10 @@ function showNotePopoverForExistingHighlight(highlightId: string, rect: DOMRect)
           onCancel: () => {
             pendingExistingHighlightNoteId = null;
             hideHighlightActionsToolbar();
+          },
+          onDelete: () => {
+            pendingExistingHighlightNoteId = null;
+            deleteHighlight(highlightId);
           },
         },
         {

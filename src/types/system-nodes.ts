@@ -305,6 +305,8 @@ export const NDX_F = {
   NOTE_HIGHLIGHTS: 'NDX_F06',
   /** Anchor fieldDef (child of #highlight tagDef, hidden plain field for anchor JSON) */
   HIGHLIGHT_ANCHOR: 'NDX_F07',
+  /** Settings: Highlight & Comment toggle (boolean, on Settings container) */
+  SETTING_HIGHLIGHT_ENABLED: 'NDX_F10',
 } as const;
 
 export type NdxFieldDef = typeof NDX_F[keyof typeof NDX_F];

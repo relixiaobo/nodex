@@ -10,6 +10,7 @@
     "build:preview": "wxt build --mode preview",
     "build:firefox": "wxt build --browser firefox",
     "zip": "wxt zip",
+    "zip:preview": "wxt build --mode preview && cd .output/chrome-mv3-preview && zip -9 -r ../soma-$npm_package_version-preview.zip .",
     "zip:firefox": "wxt zip --browser firefox",
     "dev:test": "vite --config vite.config.standalone.ts",
     "test": "vitest",

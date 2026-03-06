@@ -1,89 +1,105 @@
-import { ExternalLink, MessageSquare } from '../../lib/icons.js';
-import { CHANGELOG } from '../../lib/changelog.js';
+import { useCallback, useState } from 'react';
+import { CHANGELOG, type ChangelogEntry } from '../../lib/changelog.js';
+import { BulletChevron, ChevronButton } from '../outliner/BulletChevron';
 
-function getExtensionVersion(): string {
-  try {
-    return chrome.runtime.getManifest().version;
-  } catch {
-    return CHANGELOG[0]?.version ?? '0.0.0';
-  }
+const noop = () => {};
+
+/** A static row — leaf node with no children. */
+function LeafRow({ children, className }: { children: React.ReactNode; className?: string }) {
+  return (
+    <div className="group/row flex gap-1 min-h-6 items-start py-1" style={{ paddingLeft: 6 }}>
+      <ChevronButton isExpanded={false} onToggle={noop} onDrillDown={noop} />
+      <div className="flex items-start gap-2 min-w-0 flex-1">
+        <BulletChevron hasChildren={false} isExpanded={false} onBulletClick={noop} />
+        <span className={`flex-1 min-w-0 text-[15px] leading-6 ${className ?? 'text-foreground-secondary'}`}>{children}</span>
+      </div>
+    </div>
+  );
 }
 
-function ExternalLinkRow({ href, icon: Icon, label }: { href: string; icon: typeof ExternalLink; label: string }) {
+/** A collapsible row — parent node with children. */
+function ParentRow({
+  text,
+  description,
+  expanded,
+  onToggle,
+  children,
+  isHeading,
+}: {
+  text: string;
+  description?: React.ReactNode;
+  expanded: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+  isHeading?: boolean;
+}) {
   return (
-    <a
-      href={href}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="flex items-center gap-2 py-1.5 text-[15px] leading-6 text-foreground-secondary transition-colors hover:text-foreground"
-    >
-      <span className="shrink-0 w-[15px] flex items-center justify-center text-foreground-tertiary">
-        <Icon size={12} />
-      </span>
-      <span>{label}</span>
-      <ExternalLink size={10} className="text-foreground-tertiary" />
-    </a>
+    <div>
+      <div className="group/row flex gap-1 min-h-6 items-start py-1" style={{ paddingLeft: 6 }}>
+        <ChevronButton isExpanded={expanded} onToggle={onToggle} onDrillDown={noop} />
+        <div className="flex items-start gap-2 min-w-0 flex-1">
+          <BulletChevron hasChildren isExpanded={expanded} onBulletClick={noop} />
+          <div className="flex-1 min-w-0">
+            <div className={isHeading ? 'text-[1.125em] font-bold leading-6 text-foreground' : 'text-[15px] leading-6 text-foreground'}>{text}</div>
+            {description && (
+              <div className="text-xs leading-[15px] text-foreground-tertiary">{description}</div>
+            )}
+          </div>
+        </div>
+      </div>
+      {expanded && <div style={{ paddingLeft: 28 }}>{children}</div>}
+    </div>
   );
 }
 
 export function AboutSection() {
-  const version = getExtensionVersion();
+  const [aboutExpanded, setAboutExpanded] = useState(true);
+  const [whatsNewExpanded, setWhatsNewExpanded] = useState(true);
 
   return (
-    <div className="ml-4 px-2 pb-4">
-      {/* Product identity */}
-      <div className="mb-3">
-        <div className="flex items-baseline gap-2">
-          <span className="text-[18px] font-semibold leading-7 text-foreground">soma</span>
-          <span className="rounded bg-foreground/[0.06] px-1.5 py-0.5 text-xs font-medium text-foreground-secondary">
-            v{version}
-          </span>
-        </div>
-        <p className="text-[13px] leading-5 text-foreground-tertiary">Think where you read</p>
-      </div>
+    <div className="flex flex-col pr-4 pb-4">
+      {/* About soma */}
+      <ParentRow
+        text="Think where you read"
+        description={<><em>"Words can be like X-rays if you use them properly."</em> — Huxley</>}
+        expanded={aboutExpanded}
+        onToggle={useCallback(() => setAboutExpanded((v) => !v), [])}
+        isHeading
+      >
+        <LeafRow>You read more than you realize. But most of it slips away — not because it wasn't good, but because you <strong className="font-semibold text-foreground">never stopped to put it in your own words</strong>.</LeafRow>
+        <LeafRow>One sentence is enough. A reaction, a doubt, a connection to something you already know. <strong className="font-semibold text-foreground">That's where understanding begins.</strong></LeafRow>
+        <LeafRow>Do this over weeks and months, and something shifts — your notes <strong className="font-semibold text-foreground">start connecting</strong>, patterns surface, and you begin to see <strong className="font-semibold text-foreground">what you actually think</strong>, not just what you've read.</LeafRow>
+      </ParentRow>
 
-      <div className="border-t border-border-subtle" />
-
-      {/* Changelog */}
-      <div className="mt-3">
-        {CHANGELOG.map((entry) => (
-          <div key={entry.version} className="mb-3">
-            <div className="flex items-baseline gap-2 mb-1">
-              <span className="text-[15px] font-medium leading-6 text-foreground">
-                {entry.version}
-              </span>
-              <span className="text-xs text-foreground-tertiary">{entry.date}</span>
-            </div>
-            <ul className="ml-[15px] pl-2">
-              {entry.items.map((item) => (
-                <li
-                  key={item}
-                  className="flex items-start gap-2 text-[15px] leading-6 text-foreground-secondary"
-                >
-                  <span className="mt-[10px] h-1 w-1 shrink-0 rounded-full bg-foreground-tertiary" />
-                  <span>{item}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
+      {/* What's New */}
+      <ParentRow
+        text="What's New"
+        expanded={whatsNewExpanded}
+        onToggle={useCallback(() => setWhatsNewExpanded((v) => !v), [])}
+        isHeading
+      >
+        {CHANGELOG.map((entry, i) => (
+          <VersionNode key={entry.version} entry={entry} defaultExpanded={i === 0} />
         ))}
-      </div>
-
-      <div className="border-t border-border-subtle" />
-
-      {/* Links */}
-      <div className="mt-2">
-        <ExternalLinkRow
-          href="https://tally.so/r/placeholder"
-          icon={MessageSquare}
-          label="Send Feedback"
-        />
-        <ExternalLinkRow
-          href="https://github.com/relixiaobo/nodex"
-          icon={ExternalLink}
-          label="GitHub"
-        />
-      </div>
+      </ParentRow>
     </div>
+  );
+}
+
+function VersionNode({ entry, defaultExpanded }: { entry: ChangelogEntry; defaultExpanded: boolean }) {
+  const [expanded, setExpanded] = useState(defaultExpanded);
+  const toggle = useCallback(() => setExpanded((v) => !v), []);
+
+  return (
+    <ParentRow
+      text={`${entry.version} — ${entry.summary}`}
+      description={entry.date}
+      expanded={expanded}
+      onToggle={toggle}
+    >
+      {entry.items.map((item) => (
+        <LeafRow key={item}>{item}</LeafRow>
+      ))}
+    </ParentRow>
   );
 }

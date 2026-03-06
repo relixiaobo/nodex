@@ -1,17 +1,16 @@
-import { CONTAINER_IDS } from '../../src/types/index.js';
+import { APP_PANELS, isAppPanel } from '../../src/types/index.js';
 import { CHANGELOG } from '../../src/lib/changelog.js';
 import { SYSTEM_CONTAINER_REGISTRY } from '../../src/lib/system-node-registry.js';
 
 describe('About panel', () => {
-  it('CONTAINER_IDS.ABOUT exists', () => {
-    expect(CONTAINER_IDS.ABOUT).toBe('ABOUT');
+  it('APP_PANELS.ABOUT is an app panel, not a node', () => {
+    expect(APP_PANELS.ABOUT).toBe('app:about');
+    expect(isAppPanel(APP_PANELS.ABOUT)).toBe(true);
   });
 
-  it('ABOUT container is registered in system-node-registry', () => {
-    const aboutEntry = SYSTEM_CONTAINER_REGISTRY.find((c) => c.id === CONTAINER_IDS.ABOUT);
-    expect(aboutEntry).toBeDefined();
-    expect(aboutEntry!.defaultName).toBe('About');
-    expect(aboutEntry!.seedInWorkspace).toBe(true);
+  it('ABOUT is not registered in system-node-registry', () => {
+    const aboutEntry = SYSTEM_CONTAINER_REGISTRY.find((c) => c.defaultName === 'About');
+    expect(aboutEntry).toBeUndefined();
   });
 
   it('changelog has at least one entry with valid structure', () => {

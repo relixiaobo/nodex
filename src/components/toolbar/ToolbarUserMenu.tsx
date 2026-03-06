@@ -4,14 +4,33 @@
  *  with user info + sync status + sign out
  * - Not signed in: generic user icon, click triggers Google sign-in
  */
-import { useState, useRef, useEffect } from 'react';
-import { LogOut, Settings, Info, User } from '../../lib/icons.js';
+import { useState, useRef, useEffect, useMemo } from 'react';
+import { LogOut, Settings, Info, User, MessageSquare, ExternalLink, Sparkles } from '../../lib/icons.js';
 import { useWorkspaceStore } from '../../stores/workspace-store';
 import { useSyncStore } from '../../stores/sync-store';
 import { useUIStore } from '../../stores/ui-store';
-import { CONTAINER_IDS } from '../../types/index.js';
+import { CONTAINER_IDS, APP_PANELS } from '../../types/index.js';
+import { CHANGELOG } from '../../lib/changelog.js';
 import { t } from '../../i18n/strings.js';
 import { Tooltip } from '../ui/Tooltip';
+
+const TALLY_FORM_ID = '0QMVD9';
+
+function parseBrowser(): string {
+    const ua = navigator.userAgent;
+    const chrome = ua.match(/Chrome\/([\d.]+)/);
+    const os = ua.includes('Mac') ? 'macOS' : ua.includes('Windows') ? 'Windows' : ua.includes('Linux') ? 'Linux' : 'Unknown';
+    return chrome ? `Chrome ${chrome[1]} · ${os}` : ua.slice(0, 80);
+}
+
+function buildFeedbackUrl(signedIn: boolean): string {
+    const params = new URLSearchParams({
+        version: CHANGELOG[0]?.version ?? 'unknown',
+        browser: parseBrowser(),
+        signed_in: signedIn ? 'yes' : 'no',
+    });
+    return `https://tally.so/r/${TALLY_FORM_ID}?${params.toString()}`;
+}
 
 const BADGE_CLASSES: Record<string, string> = {
     synced: 'bg-success',
@@ -80,6 +99,7 @@ export function ToolbarUserMenu() {
 
     const initials = authUser ? getInitials(authUser.name ?? authUser.email ?? '?') : '';
     const detail = syncDetail();
+    const feedbackUrl = useMemo(() => buildFeedbackUrl(!!authUser), [authUser]);
 
     return (
         <div ref={menuRef} className="relative">
@@ -182,6 +202,16 @@ export function ToolbarUserMenu() {
 
                     <div className="mx-1 my-1 border-t border-border-subtle" />
 
+                    {/* Early Access */}
+                    <div className="flex items-center gap-2.5 px-2 py-1.5">
+                        <div className="flex w-4 shrink-0 items-center justify-center text-foreground-tertiary">
+                            <Sparkles size={14} strokeWidth={1.5} />
+                        </div>
+                        <span className="text-sm text-foreground-secondary">Early Access · Free</span>
+                    </div>
+
+                    <div className="mx-1 my-1 border-t border-border-subtle" />
+
                     {/* Settings */}
                     <button
                         onClick={() => {
@@ -200,7 +230,7 @@ export function ToolbarUserMenu() {
                     <button
                         onClick={() => {
                             setOpen(false);
-                            useUIStore.getState().navigateTo(CONTAINER_IDS.ABOUT);
+                            useUIStore.getState().navigateTo(APP_PANELS.ABOUT);
                         }}
                         className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-sm text-foreground-secondary transition-colors hover:bg-foreground/4 hover:text-foreground"
                     >
@@ -209,6 +239,21 @@ export function ToolbarUserMenu() {
                         </div>
                         About
                     </button>
+
+                    {/* Send Feedback */}
+                    <a
+                        href={feedbackUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={() => setOpen(false)}
+                        className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-sm text-foreground-secondary transition-colors hover:bg-foreground/4 hover:text-foreground"
+                    >
+                        <div className="flex w-4 shrink-0 items-center justify-center text-foreground-tertiary">
+                            <MessageSquare size={14} strokeWidth={1.5} />
+                        </div>
+                        Send Feedback
+                        <ExternalLink size={10} className="ml-auto text-foreground-tertiary" />
+                    </a>
 
                     {/* Sign out (only when signed in) */}
                     {authUser && (

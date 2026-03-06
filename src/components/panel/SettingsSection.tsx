@@ -4,11 +4,15 @@
  * Mirrors the FieldRow system-config layout (Path 2) so that settings
  * rows look identical to supertag / field configure pages.
  *
- * Values are read/written via ui-store (persisted to chrome.storage).
+ * Values are read from LoroDoc (Settings node fields) and projected
+ * to chrome.storage for content script access.
  */
 import { useCallback } from 'react';
 import { ToggleLeft } from '../../lib/icons.js';
-import { useUIStore } from '../../stores/ui-store.js';
+import { useNodeStore } from '../../stores/node-store.js';
+import { CONTAINER_IDS } from '../../types/index.js';
+import { NDX_F, SYS_V } from '../../types/system-nodes.js';
+import { getHighlightEnabled, setHighlightEnabled } from '../../lib/settings-service.js';
 import { BulletChevron } from '../outliner/BulletChevron.js';
 import { FIELD_VALUE_INSET } from '../fields/field-layout.js';
 
@@ -37,12 +41,15 @@ function SettingsToggle({ checked, onChange }: { checked: boolean; onChange: () 
 // ── Settings section (FieldRow system-config layout) ──
 
 export function SettingsSection() {
-  const highlightEnabled = useUIStore((s) => s.highlightEnabled);
-  const setHighlightEnabled = useUIStore((s) => s.setHighlightEnabled);
+  // Subscribe to LoroDoc changes on the SETTINGS node so we re-render when field values change
+  const highlightEnabled = useNodeStore((s) => {
+    void s._version;
+    return getHighlightEnabled();
+  });
 
   const toggleHighlight = useCallback(() => {
     setHighlightEnabled(!highlightEnabled);
-  }, [highlightEnabled, setHighlightEnabled]);
+  }, [highlightEnabled]);
 
   return (
     <div className="@container mb-2 ml-4 ml-1 px-2">

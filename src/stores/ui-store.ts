@@ -122,10 +122,6 @@ interface UIStore {
   lastVisitDate: string | null;
   setLastVisitDate(date: string): void;
 
-  // Settings: highlight/comment feature toggle (persisted)
-  highlightEnabled: boolean;
-  setHighlightEnabled(enabled: boolean): void;
-
   // Description editing trigger (session-only, not persisted)
   editingDescriptionNodeId: string | null;
   setEditingDescription(nodeId: string | null): void;
@@ -143,7 +139,6 @@ export interface PersistedUIStoreState {
   viewMode: 'list' | 'table' | 'tiles' | 'cards';
   paletteUsage: Record<string, { count: number; lastUsedAt: number }>;
   lastVisitDate: string | null;
-  highlightEnabled: boolean;
 }
 
 /** Stable selector for the current (top) node ID. */
@@ -158,11 +153,12 @@ export function partializeUIStore(state: UIStore): PersistedUIStoreState {
     viewMode: state.viewMode,
     paletteUsage: state.paletteUsage,
     lastVisitDate: state.lastVisitDate,
-    highlightEnabled: state.highlightEnabled,
   };
 }
 
 function hasBackingNode(nodeId: string): boolean {
+  // App panels (app:about, etc.) are pure UI routes, not nodes
+  if (nodeId.startsWith('app:')) return true;
   try {
     return useNodeStore.getState().getNode(nodeId) !== null;
   } catch {
@@ -475,10 +471,6 @@ export const useUIStore = create<UIStore>()(
       // Last visit date
       lastVisitDate: null,
       setLastVisitDate: (date) => set({ lastVisitDate: date }),
-
-      // Settings: highlight/comment feature toggle
-      highlightEnabled: true,
-      setHighlightEnabled: (enabled) => set({ highlightEnabled: enabled }),
 
       // Description editing trigger (session-only)
       editingDescriptionNodeId: null,

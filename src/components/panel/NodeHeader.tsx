@@ -11,7 +11,7 @@
  */
 import { useCallback, useRef, useState } from 'react';
 import type { EditorView } from 'prosemirror-view';
-import { Library, Inbox, CalendarDays, Trash2, Search, Settings, Code2, Info, type AppIcon } from '../../lib/icons.js';
+import { Library, Inbox, CalendarDays, Trash2, Search, Settings, Code2, type AppIcon } from '../../lib/icons.js';
 import { useNode } from '../../hooks/use-node';
 import { useNodeTags } from '../../hooks/use-node-tags';
 import { useNodeStore } from '../../stores/node-store';
@@ -47,7 +47,6 @@ const CONTAINER_HEADER_ICONS: Record<ContainerIconKey, AppIcon> = {
   clips: Library,
   stash: Library,
   settings: Settings,
-  about: Info,
 };
 
 // No-ops for outliner navigation callbacks that don't apply to NodeHeader

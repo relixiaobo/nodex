@@ -11,6 +11,7 @@ import { BOOTSTRAP_CONTAINER_DEFS } from './system-node-registry.js';
 import { ensureJournalTagDefs } from './journal.js';
 import { ensureHighlightTagDef, ensureNoteTagDef, type HighlightNodeStore } from './highlight-service.js';
 import { useNodeStore } from '../stores/node-store.js';
+import { migrateFromUIStore } from './settings-service.js';
 
 export function ensureContainers(wsId: string): void {
   ensureWorkspaceHomeNode(wsId);
@@ -27,4 +28,7 @@ export function ensureContainers(wsId: string): void {
   ensureHighlightTagDef(store);
   ensureNoteTagDef(store);
   commitDoc('system:bootstrap');
+
+  // Migrate settings from ui-store to LoroDoc (idempotent)
+  void migrateFromUIStore();
 }

@@ -338,6 +338,22 @@
   pointer-events: none;
 }
 
+/* Idle hint: fades in after 2s when an empty node is focused.
+   Only applies when parent doesn't have has-placeholder (tagged empty nodes show "Untitled" instead). */
+@keyframes idle-hint-fadein {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+:not(.has-placeholder) > .idle-hint .ProseMirror p:empty::before,
+:not(.has-placeholder) > .idle-hint .ProseMirror p:has(> br.ProseMirror-trailingBreak:only-child)::before {
+  content: "Type here or '/' for commands";
+  color: var(--color-foreground-tertiary);
+  pointer-events: none;
+  opacity: 0;
+  animation: idle-hint-fadein 0.3s ease 2s forwards;
+}
+
 /* Always hide trailingBreak in inline editor to prevent tag line-wrapping.
    The inline <p> with min-width: 1px provides cursor anchor even in empty nodes. */
 .editor-inline .ProseMirror p>br.ProseMirror-trailingBreak {

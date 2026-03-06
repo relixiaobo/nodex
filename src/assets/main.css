@@ -346,12 +346,18 @@
 }
 
 :not(.has-placeholder) > .idle-hint .ProseMirror p:empty::before,
-:not(.has-placeholder) > .idle-hint .ProseMirror p:has(> br.ProseMirror-trailingBreak:only-child)::before {
+:not(.has-placeholder) > .idle-hint .ProseMirror p:has(> br.ProseMirror-trailingBreak:only-child)::before,
+.idle-hint > .ProseMirror p:has(> br.ProseMirror-trailingBreak:only-child)::before {
   content: "Type here or '/' for commands";
   color: var(--color-foreground-tertiary);
   pointer-events: none;
   opacity: 0;
   animation: idle-hint-fadein 0.3s ease 2s forwards;
+}
+
+/* Hide trailingBreak when idle hint is visible (TrailingInput doesn't use editor-inline) */
+.idle-hint > .ProseMirror p:has(> br.ProseMirror-trailingBreak:only-child) > br {
+  display: none;
 }
 
 /* Always hide trailingBreak in inline editor to prevent tag line-wrapping.

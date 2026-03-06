@@ -252,7 +252,7 @@ function ConfigNumberInput({ nodeId, configKey }: { nodeId: string; configKey: s
       <input
         type="text"
         inputMode="decimal"
-        className="h-6 min-w-[120px] bg-transparent p-0 text-[15px] leading-6 text-foreground outline-none placeholder:text-foreground-tertiary"
+        className="h-6 min-w-[120px] bg-transparent p-0 text-[15px] leading-6 text-foreground outline-none placeholder:text-foreground/20"
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
         onBlur={commitDraft}
@@ -267,7 +267,7 @@ function ConfigNumberInput({ nodeId, configKey }: { nodeId: string; configKey: s
             (e.currentTarget as HTMLInputElement).blur();
           }
         }}
-        placeholder={t('field.empty')}
+        placeholder={t('field.emptyNumber')}
       />
     </FieldValueRow>
   );

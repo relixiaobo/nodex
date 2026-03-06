@@ -40,7 +40,7 @@ describe('FieldRow config control resolution', () => {
     }));
 
     expect(html).toContain('type="text"');
-    expect(html).toContain('placeholder="Empty"');
+    expect(html).toContain('placeholder="Add number"');
   });
 
   it('shows validation warning for invalid number_input config value', () => {

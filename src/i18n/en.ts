@@ -96,6 +96,10 @@ export const enMessages = {
   },
   field: {
     empty: 'Empty',
+    emptyUrl: 'Add URL',
+    emptyEmail: 'Add email',
+    emptyDate: 'Add date',
+    emptyNumber: 'Add number',
     selectSupertag: 'Select supertag',
     selectFieldType: 'Select field type',
     selectValue: 'Select value',

@@ -345,9 +345,8 @@
   to { opacity: 1; }
 }
 
-:not(.has-placeholder) > .idle-hint .ProseMirror p:empty::before,
-:not(.has-placeholder) > .idle-hint .ProseMirror p:has(> br.ProseMirror-trailingBreak:only-child)::before,
-.idle-hint:focus-within > .ProseMirror p:has(> br.ProseMirror-trailingBreak:only-child)::before {
+:not(.has-placeholder) > .idle-hint:focus-within .ProseMirror p:empty::before,
+:not(.has-placeholder) > .idle-hint:focus-within .ProseMirror p:has(> br.ProseMirror-trailingBreak:only-child)::before {
   content: "Type here or '/' for commands";
   color: var(--color-foreground-tertiary);
   pointer-events: none;

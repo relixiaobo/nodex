@@ -908,10 +908,10 @@ export function FieldRow({
             />
           ) : (
             <span
-              className={`block text-[15px] leading-6 h-6 truncate ${trashed ? 'text-foreground-tertiary line-through' : attrDefName === t('common.untitled') ? 'text-foreground/20' : 'text-foreground'}`}
+              className={`block text-[15px] leading-6 h-6 truncate ${trashed ? 'text-foreground-tertiary line-through' : !attrDefName || attrDefName === t('common.untitled') ? 'text-foreground/20' : 'text-foreground'}`}
               title={trashed ? `Field "${attrDefName}" has been deleted` : attrDefName}
             >
-              {attrDefName === t('common.untitled') ? t('field.fieldNamePlaceholder') : attrDefName}
+              {!attrDefName || attrDefName === t('common.untitled') ? t('field.fieldNamePlaceholder') : attrDefName}
               {isRequired && isEmpty && !trashed && <span className="text-destructive ml-0.5">*</span>}
             </span>
           )}

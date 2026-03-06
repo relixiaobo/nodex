@@ -8,7 +8,6 @@ import type { NodexNode } from '../types/index.js';
 import { CONTAINER_IDS, SYS_T, NDX_F, NDX_T, FIELD_TYPES } from '../types/index.js';
 import type { WebClipCapturePayload } from './webclip-messaging.js';
 import * as loroDoc from './loro-doc.js';
-import { parseHtmlToNodes, createContentNodes } from './html-to-nodes.js';
 import { ensureTodayNode } from './journal.js';
 import { resolveFieldOptions } from './field-utils.js';
 
@@ -457,13 +456,6 @@ export async function fillClipShell(
   if (payload.description && clipType !== 'social') {
     store.updateNodeDescription(nodeId, payload.description);
   }
-
-  if (payload.pageText) {
-    const { nodes } = parseHtmlToNodes(payload.pageText, { maxNodes: 200 });
-    if (nodes.length > 0) {
-      createContentNodes(nodeId, nodes);
-    }
-  }
 }
 
 /**
@@ -503,14 +495,6 @@ export async function saveWebClip(
   // 7. Set description if available (skip for social — body already has the tweet content)
   if (payload.description && clipType !== 'social') {
     store.updateNodeDescription(clipNode.id, payload.description);
-  }
-
-  // 8. Parse and create content child nodes from page HTML
-  if (payload.pageText) {
-    const { nodes } = parseHtmlToNodes(payload.pageText, { maxNodes: 200 });
-    if (nodes.length > 0) {
-      createContentNodes(clipNode.id, nodes);
-    }
   }
 
   return clipNode.id;
@@ -669,13 +653,5 @@ export async function applyWebClipToNode(
   // 6. Set description if available (skip for social — body already has the tweet content)
   if (payload.description && clipType !== 'social') {
     store.updateNodeDescription(nodeId, payload.description);
-  }
-
-  // 7. Parse and create content child nodes from page HTML (appended after existing children)
-  if (payload.pageText) {
-    const { nodes } = parseHtmlToNodes(payload.pageText, { maxNodes: 200 });
-    if (nodes.length > 0) {
-      createContentNodes(nodeId, nodes);
-    }
   }
 }

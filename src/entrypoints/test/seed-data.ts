@@ -58,6 +58,7 @@ function seedBody(): void {
   cn(CONTAINER_IDS.SEARCHES, WS_ID, { name: 'Searches' });
   cn(CONTAINER_IDS.TRASH,    WS_ID, { name: 'Trash' });
   cn(CONTAINER_IDS.SCHEMA,   WS_ID, { name: 'Schema' });
+  cn(CONTAINER_IDS.SETTINGS, WS_ID, { name: 'Settings' });
 
   // ═══════════════════════════════════════════════════════════════
   // TagDef: Task (showCheckbox, color, done-state mapping via direct props)

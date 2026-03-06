@@ -346,10 +346,23 @@ export const CONTAINER_IDS = {
   CLIPS: 'CLIPS',
   STASH: 'STASH',
   SETTINGS: 'SETTINGS',
-  ABOUT: 'ABOUT',
 } as const;
 
 export type ContainerId = typeof CONTAINER_IDS[keyof typeof CONTAINER_IDS];
+
+// ── App Panel IDs (pure UI routes, not nodes) ──
+
+export const APP_PANELS = {
+  ABOUT: 'app:about',
+} as const;
+
+export type AppPanelId = typeof APP_PANELS[keyof typeof APP_PANELS];
+
+const APP_PANEL_VALUES = new Set<string>(Object.values(APP_PANELS));
+
+export function isAppPanel(panelId: string): panelId is AppPanelId {
+  return APP_PANEL_VALUES.has(panelId);
+}
 
 /**
  * 获取容器 ID（新版：直接返回固定常量，无需 workspaceId 参数）

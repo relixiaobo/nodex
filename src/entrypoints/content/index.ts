@@ -806,10 +806,13 @@ export default defineContentScript({
     // Initialize highlight selection listener and custom elements.
     // Non-fatal: some pages break customElements (set it to null),
     // but webclip capture must still work.
-    // Check highlightEnabled setting from chrome.storage (shared with sidepanel ui-store).
-    chrome.storage.local.get('nodex-ui').then((stored) => {
-      const uiState = stored?.['nodex-ui']?.state;
-      const highlightEnabled = uiState?.highlightEnabled ?? true;
+    // Check highlightEnabled setting from chrome.storage (projected from LoroDoc).
+    // Falls back to legacy ui-store location for migration period.
+    chrome.storage.local.get(['soma-settings', 'nodex-ui']).then((stored) => {
+      const settings = stored?.['soma-settings'];
+      const highlightEnabled = settings
+        ? (settings.highlightEnabled ?? true)
+        : (stored?.['nodex-ui']?.state?.highlightEnabled ?? true);
       if (highlightEnabled) {
         try {
           initHighlight();

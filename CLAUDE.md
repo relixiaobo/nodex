@@ -128,11 +128,11 @@ npm run typecheck      # TypeScript 类型检查 (tsc --noEmit)
 
 | 环境 | 命令 | 输出目录 | Backend | Extension ID | 图标 |
 |------|------|---------|---------|-------------|------|
-| Store | `npm run zip` | `.output/chrome-mv3/` | production | 商店分配 `joabcnfl…` | 原版 |
-| Preview | `npm run build:preview` | `.output/chrome-mv3-preview/` | production | `andlcnfk…` | 蓝点 |
-| Dev | `npm run dev` | `.output/chrome-mv3-dev/` | staging | `gkpgogoc…` | 橙点 |
+| Store | `npm run zip` | `.output/chrome-mv3/` | production | 商店分配 `joabcnfl…` | 圆角绿底暖纸色 S |
+| Preview | `npm run build:preview` | `.output/chrome-mv3-preview/` | production | `andlcnfk…` | + 蓝点 |
+| Dev | `npm run dev` | `.output/chrome-mv3-dev/` | staging | `gkpgogoc…` | + 橙点 |
 
-三个环境各有独立 extension key，可同时加载到 Chrome 中共存。图标右下角的彩色圆点区分当前版本。
+三个环境各有独立 extension key，可同时加载到 Chrome 中共存。图标右下角的彩色圆点区分当前版本。源文件 `docs/icon-drafts/soma-logo-final.png`（2048x2048），图标 `public/icon*/`（16/32/48/128px，圆角）。
 
 ## 项目结构
 
@@ -239,6 +239,18 @@ ContentNode
 ### 工作区容器命名
 
 容器节点 ID = `{workspaceId}_{SUFFIX}`，后缀见 `WORKSPACE_CONTAINERS` 常量。
+
+### 应用页面 vs 用户数据（铁律分离）
+
+> **判断标准**：用户清空所有数据后，这个页面还应不应该存在？如果"应该"→ 应用页面；如果"不应该"→ 用户数据。
+
+- **用户数据**（Library、Inbox、Journal、Trash、Schema、Settings 等）= 节点，存在 LoroDoc 中，可搜索、可同步
+- **应用页面**（About、Changelog、Feedback 等）= 纯 UI 路由（`app:` 前缀），不创建节点，不进入 LoroDoc，不可搜索
+- 应用页面可以复用 NodePanel 的布局样式，但数据层绝对不能共通
+
+面板栈 `panelHistory` 支持两种 ID：节点 ID（如 `ws123_LIBRARY`）和应用页面 ID（如 `app:about`）。
+
+**演进方向**：`app:about` 是临时方案。多工作区架构上线后，About/Changelog/Help 等内容迁移为"官方工作区"（soma 维护的只读工作区）的节点。官方工作区、个人工作区、协作工作区本质是同一个模型，区别在于 role（`owner`/`editor`/`viewer`）。每个工作区 = 独立 LoroDoc。
 
 ### "一切皆节点"设计守则（实现时必须遵守）
 

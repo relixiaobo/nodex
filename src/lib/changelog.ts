@@ -1,6 +1,7 @@
 export interface ChangelogEntry {
   version: string;
   date: string;
+  summary: string;
   items: string[];
 }
 
@@ -8,6 +9,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.1.0',
     date: '2026-03-05',
+    summary: 'Initial release',
     items: [
       'Write and organize your notes in a keyboard-friendly outliner',
       'Tag any node with supertags to add structure and fields',

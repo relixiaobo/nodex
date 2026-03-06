@@ -14,7 +14,7 @@
  * Typing: single "Results" group with fuzzy-matched nodes + commands
  */
 import { useEffect, useCallback, useMemo, useState, useRef } from 'react';
-import { Library, Inbox, CalendarDays, Trash2, Search, Settings, Info, Plus, type AppIcon } from '../../lib/icons.js';
+import { Library, Inbox, CalendarDays, Trash2, Search, Settings, Plus, type AppIcon } from '../../lib/icons.js';
 import { resolveTagColor } from '../../lib/tag-colors.js';
 import { resolveDataType, getFieldTypeIcon } from '../../lib/field-utils.js';
 import { isContainerNode } from '../../types/index.js';
@@ -64,7 +64,6 @@ const CONTAINER_ICONS: Record<ContainerIconKey, AppIcon> = {
   clips: Library,
   stash: Library,
   settings: Settings,
-  about: Info,
 };
 
 /** Resolve visual props for a node item based on its type. */

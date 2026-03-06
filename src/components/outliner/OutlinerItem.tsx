@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent } from 'react';
+import { createPortal } from 'react-dom';
 import type { EditorView } from 'prosemirror-view';
 import { useNode } from '../../hooks/use-node';
 import { useChildren } from '../../hooks/use-children';
@@ -461,6 +462,9 @@ export function OutlinerItem({
   const isOptionsField = isOptionsFieldType(fieldDataType);
   const [optionsPickerOpen, setOptionsPickerOpen] = useState(false);
   const [optionsPickerIndex, setOptionsPickerIndex] = useState(0);
+  const contentWrapperRef = useRef<HTMLDivElement>(null);
+  const optionsDropdownRef = useRef<HTMLDivElement>(null);
+  const [optionsDropdownPos, setOptionsDropdownPos] = useState<{ top: number; left: number } | null>(null);
   const allFieldOptions = useFieldOptions(isOptionsField && attrDefId ? attrDefId : '');
   const selectedOptionId = useMemo(() => {
     if (!isOptionsField || !effectiveNode) return undefined;
@@ -721,18 +725,39 @@ export function OutlinerItem({
   }, [isSelected, isReference, isOptionsField, isOptionsValueNode, allFieldOptions, selectedOptionId]);
 
   // Close options picker on outside pointer down (capture phase).
-  // This keeps behavior consistent with other popovers and avoids "stuck open" overlays.
+  // Check both row and portal dropdown refs.
   useEffect(() => {
     if (!optionsPickerOpen) return;
     const handler = (e: PointerEvent) => {
-      const row = rowRef.current;
-      if (!row) return;
-      if (!row.contains(e.target as Node)) {
-        setOptionsPickerOpen(false);
-      }
+      const target = e.target as Node;
+      if (rowRef.current?.contains(target)) return;
+      if (optionsDropdownRef.current?.contains(target)) return;
+      setOptionsPickerOpen(false);
     };
     document.addEventListener('pointerdown', handler, true);
     return () => document.removeEventListener('pointerdown', handler, true);
+  }, [optionsPickerOpen]);
+
+  // Compute dropdown position for the portal when options picker opens
+  useLayoutEffect(() => {
+    if (!optionsPickerOpen || !contentWrapperRef.current) {
+      setOptionsDropdownPos(null);
+      return;
+    }
+    const updatePos = () => {
+      const rect = contentWrapperRef.current?.getBoundingClientRect();
+      if (rect) {
+        setOptionsDropdownPos({ top: rect.bottom + 2, left: rect.left });
+      }
+    };
+    updatePos();
+    const scrollContainer = contentWrapperRef.current.closest('.overflow-y-auto, [style*="overflow"]');
+    scrollContainer?.addEventListener('scroll', updatePos, { passive: true });
+    window.addEventListener('resize', updatePos, { passive: true });
+    return () => {
+      scrollContainer?.removeEventListener('scroll', updatePos);
+      window.removeEventListener('resize', updatePos);
+    };
   }, [optionsPickerOpen]);
 
   // Reference-specific keyboard handler — passed to OutlinerRow as onSelectionKeydown.
@@ -1710,7 +1735,7 @@ export function OutlinerItem({
           onDrillDown={handleDrillDown}
           onTogglePointerDown={captureStructuralToggleFocusSnapshot}
         />
-        <div className={`flex items-start gap-2 min-w-0 relative ${isSelectedRefClick ? 'node-selected-ref w-fit flex-none' : 'flex-1'}`}>
+        <div ref={contentWrapperRef} className={`flex items-start gap-2 min-w-0 relative ${isSelectedRefClick ? 'node-selected-ref w-fit flex-none' : 'flex-1'}`}>
           {/* Bullet is the drag handle for reorder */}
           <div
             className={`${isLoadingNode ? 'cursor-default' : 'cursor-grab active:cursor-grabbing'} ${deleteBlockedPulse ? 'node-delete-blocked-pulse' : ''}`}
@@ -1892,11 +1917,13 @@ export function OutlinerItem({
               visible={isFocused}
             />
           </div>
-          {/* Options picker dropdown: shown when selecting an Options value row/reference */}
-          {optionsPickerOpen && allFieldOptions.length > 0 && (
+          {/* Options picker dropdown: rendered via portal to escape @container stacking contexts */}
+          {optionsPickerOpen && allFieldOptions.length > 0 && optionsDropdownPos && createPortal(
             <div
-              className="absolute left-0 top-full mt-0.5 max-h-48 w-56 overflow-y-auto rounded-lg bg-background shadow-paper p-1"
-              style={{ zIndex: FIELD_OVERLAY_Z_INDEX }}
+              ref={optionsDropdownRef}
+              className="max-h-48 w-56 overflow-y-auto rounded-lg bg-background shadow-paper p-1"
+              style={{ position: 'fixed', top: optionsDropdownPos.top, left: optionsDropdownPos.left, zIndex: FIELD_OVERLAY_Z_INDEX }}
+              onMouseDown={(e) => e.preventDefault()}
             >
               {allFieldOptions.map((opt, i) => (
                 <div
@@ -1919,7 +1946,8 @@ export function OutlinerItem({
                   <span className="truncate">{opt.name}</span>
                 </div>
               ))}
-            </div>
+            </div>,
+            document.body,
           )}
         </div>{/* close selection/contents wrapper */}
       </div>

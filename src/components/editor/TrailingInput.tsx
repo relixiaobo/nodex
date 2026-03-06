@@ -10,7 +10,8 @@
  * - Blur with content → create child (preserve user's work)
  * - Blur empty → no-op
  */
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { EditorState, TextSelection, type Plugin } from 'prosemirror-state';
 import { keymap } from 'prosemirror-keymap';
 import { baseKeymap } from 'prosemirror-commands';
@@ -118,6 +119,9 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
     const [optionsOpen, setOptionsOpen] = useState(false);
     const [optionsQuery, setOptionsQuery] = useState('');
     const [optionsIndex, setOptionsIndex] = useState(0);
+    const trailingWrapperRef = useRef<HTMLDivElement>(null);
+    const optionsDropdownRef = useRef<HTMLDivElement>(null);
+    const [optionsDropdownPos, setOptionsDropdownPos] = useState<{ top: number; left: number } | null>(null);
 
     const filteredOptions = useMemo(() => {
         if (!isOptions || !optionsOpen || allOptions.length === 0) return [];
@@ -682,6 +686,28 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
         }
     }, [autoFocus]);
 
+    // Compute dropdown position for the portal when options dropdown opens
+    useLayoutEffect(() => {
+        if (!optionsOpen || !trailingWrapperRef.current) {
+            setOptionsDropdownPos(null);
+            return;
+        }
+        const updatePos = () => {
+            const rect = trailingWrapperRef.current?.getBoundingClientRect();
+            if (rect) {
+                setOptionsDropdownPos({ top: rect.bottom + 2, left: rect.left });
+            }
+        };
+        updatePos();
+        const scrollContainer = trailingWrapperRef.current.closest('.overflow-y-auto, [style*="overflow"]');
+        scrollContainer?.addEventListener('scroll', updatePos, { passive: true });
+        window.addEventListener('resize', updatePos, { passive: true });
+        return () => {
+            scrollContainer?.removeEventListener('scroll', updatePos);
+            window.removeEventListener('resize', updatePos);
+        };
+    }, [optionsOpen]);
+
     // Handle option click from dropdown
     const handleOptionClick = useCallback((optionId: string) => {
         const ref = callbacksRef.current;
@@ -712,12 +738,14 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
                 onBulletClick={() => { }}
                 dimmed={!hasContent}
             />
-            <div className="relative flex-1 min-w-0">
+            <div ref={trailingWrapperRef} className="relative flex-1 min-w-0">
                 <div ref={mountRef} className="outline-none text-[15px] leading-6" />
-                {optionsOpen && filteredOptions.length > 0 && (
+                {optionsOpen && filteredOptions.length > 0 && optionsDropdownPos && createPortal(
                     <div
-                        className="absolute left-0 top-full mt-0.5 max-h-48 w-56 overflow-y-auto rounded-lg bg-background shadow-paper p-1"
-                        style={{ zIndex: FIELD_OVERLAY_Z_INDEX }}
+                        ref={optionsDropdownRef}
+                        className="max-h-48 w-56 overflow-y-auto rounded-lg bg-background shadow-paper p-1"
+                        style={{ position: 'fixed', top: optionsDropdownPos.top, left: optionsDropdownPos.left, zIndex: FIELD_OVERLAY_Z_INDEX }}
+                        onMouseDown={(e) => e.preventDefault()}
                     >
                         {filteredOptions.map((opt, i) => (
                             <div
@@ -730,7 +758,8 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
                                 <span className="truncate">{opt.name}</span>
                             </div>
                         ))}
-                    </div>
+                    </div>,
+                    document.body,
                 )}
             </div>
         </div>

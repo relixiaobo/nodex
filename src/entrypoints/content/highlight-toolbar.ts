@@ -266,20 +266,20 @@ button {
   align-items: center;
   height: 28px;
   padding: 0 8px;
-  border-radius: 9999px;
+  border-radius: 6px;
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
   transition: color 0.15s ease-out, background-color 0.15s ease-out;
 }
 
-button:hover {
-  background-color: rgba(26, 26, 26, 0.04);
-}
-
 button[data-action='save'] {
   color: #1A1A1A;
   gap: 6px;
+}
+
+button[data-action='save']:hover {
+  background-color: rgba(26, 26, 26, 0.04);
 }
 
 button[data-action='delete'] {
@@ -288,6 +288,7 @@ button[data-action='delete'] {
 
 button[data-action='delete']:hover {
   color: #AA5048;
+  background-color: rgba(170, 80, 72, 0.08);
 }
 
 kbd {

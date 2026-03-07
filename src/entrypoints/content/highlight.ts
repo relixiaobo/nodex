@@ -1,6 +1,6 @@
 /**
  * Content Script highlight core — selection listener, DOM rendering,
- * and hover handling for webpage highlights.
+ * and dot-based note interaction for webpage highlights.
  *
  * Zero-friction highlight model:
  * - valid text selection => show floating Highlight button
@@ -8,34 +8,29 @@
  * - user writes note + saves => wrap bare highlight with #note (via reference)
  * - cancel/empty note => highlight already saved, stays as bare #highlight
  *
- * Existing highlight flow:
- * - hover <soma-hl> => show contextual toolbar (delete / add note)
- * - clicks pass through to original elements (links, etc.)
- * - note icon click => open note in Side Panel
+ * Dot marker interaction:
+ * - all highlights show a small dot at the end (filled = has note, hollow = bare)
+ * - dot click => open note popover inline (add/edit/delete note)
+ * - highlight text clicks pass through to original elements (links, etc.)
  */
 import { computeAnchor } from './anchor-utils.js';
 import {
   showToolbar,
   hideToolbar,
-  showHighlightActionsToolbar,
-  hideHighlightActionsToolbar,
   showNotePopover,
   hideNotePopover,
   hideAllHighlightOverlays,
   isHighlightOverlayHost,
-  setHighlightActionsHoverCallbacks,
   type ToolbarAction,
   type NoteEntry,
 } from './highlight-toolbar.js';
 import {
   HIGHLIGHT_CREATE,
-  HIGHLIGHT_CLICK,
   HIGHLIGHT_DELETE,
   HIGHLIGHT_NOTES_SAVE,
   HIGHLIGHT_NOTE_GET,
   HIGHLIGHT_CHECK_URL_REQUEST,
   type HighlightCreatePayload,
-  type HighlightClickPayload,
   type HighlightDeletePayload,
   type HighlightNotesSavePayload,
   type HighlightNoteGetPayload,
@@ -51,7 +46,7 @@ export const DEFAULT_HIGHLIGHT_BG = '#8B8422';
 /** Soft Banana fill for webpage highlight background (matches side-panel <mark>). */
 const HIGHLIGHT_FILL_COLOR = 'rgba(247, 236, 139, 0.6)';
 
-const NOTE_ICON_SELECTOR = '[data-soma-note-icon="true"]';
+const DOT_SELECTOR = '[data-soma-dot]';
 
 interface HighlightRenderOptions {
   hasNote?: boolean;
@@ -74,51 +69,6 @@ let pendingExistingHighlightNoteId: string | null = null;
 /** Tracks highlight ID when user's selection overlaps an existing highlight. */
 let selectedExistingHighlightId: string | null = null;
 
-// ── Highlight Hover Delegation ──
-
-interface HighlightHoverState {
-  activeId: string | null;
-  cachedRects: DOMRect[] | null;
-  anchorRect: DOMRect | null;
-  hideTimer: ReturnType<typeof setTimeout> | null;
-  rafHandle: number | null;
-  overToolbar: boolean;
-}
-
-const hoverState: HighlightHoverState = {
-  activeId: null,
-  cachedRects: null,
-  anchorRect: null,
-  hideTimer: null,
-  rafHandle: null,
-  overToolbar: false,
-};
-
-let hoverDelegationInstalled = false;
-
-/** Rect expansion in px (top/bottom) for line-gap tolerance. */
-const RECT_EXPAND_Y = 4;
-
-/** Delay before hiding toolbar after mouse leaves highlight + toolbar. */
-const HIDE_DELAY_MS = 250;
-
-/**
- * Collect all client rects for a highlight ID, expanding each vertically
- * by RECT_EXPAND_Y to cover line gaps in multi-line inline elements.
- */
-function computeExpandedRects(id: string): DOMRect[] {
-  const elements = document.querySelectorAll(`soma-hl[data-highlight-id="${id}"]`);
-  const expanded: DOMRect[] = [];
-  for (const el of elements) {
-    const rects = el.getClientRects();
-    for (let i = 0; i < rects.length; i++) {
-      const r = rects[i];
-      expanded.push(new DOMRect(r.x, r.y - RECT_EXPAND_Y, r.width, r.height + RECT_EXPAND_Y * 2));
-    }
-  }
-  return expanded;
-}
-
 /**
  * Compute the bounding box of all elements with the given highlight ID.
  */
@@ -140,114 +90,21 @@ function computeGroupBoundingRect(id: string): DOMRect | null {
   return new DOMRect(minX, minY, maxX - minX, maxY - minY);
 }
 
-function pointInExpandedRects(x: number, y: number, rects: DOMRect[]): boolean {
-  for (let i = 0; i < rects.length; i++) {
-    const r = rects[i];
-    if (x >= r.x && x <= r.right && y >= r.y && y <= r.bottom) return true;
-  }
-  return false;
-}
+// ── Dot Click Delegation ──
 
-function cancelHoverHideTimer(): void {
-  if (hoverState.hideTimer !== null) {
-    clearTimeout(hoverState.hideTimer);
-    hoverState.hideTimer = null;
-  }
-}
-
-function clearHoverState(): void {
-  cancelHoverHideTimer();
-  if (hoverState.rafHandle !== null) {
-    cancelAnimationFrame(hoverState.rafHandle);
-    hoverState.rafHandle = null;
-  }
-  hoverState.activeId = null;
-  hoverState.cachedRects = null;
-  hoverState.anchorRect = null;
-  hoverState.overToolbar = false;
-  hideHighlightActionsToolbar();
-}
-
-function scheduleHoverHide(): void {
-  cancelHoverHideTimer();
-  hoverState.hideTimer = setTimeout(() => {
-    hoverState.hideTimer = null;
-    clearHoverState();
-  }, HIDE_DELAY_MS);
-}
-
-function showToolbarForHighlight(id: string): void {
-  cancelHoverHideTimer();
-  hoverState.activeId = id;
-  hoverState.cachedRects = computeExpandedRects(id);
-  hoverState.anchorRect = computeGroupBoundingRect(id);
-  hoverState.overToolbar = false;
-
-  if (!hoverState.anchorRect) return;
-
-  showHighlightActionsToolbar(hoverState.anchorRect, {
-    onOpenNote: () => {
-      showNotePopoverForExistingHighlight(id, hoverState.anchorRect!);
-      clearHoverState();
-    },
-  });
-}
-
-function onMouseMove(e: MouseEvent): void {
-  // Skip if note popover is open
-  if (pendingNoteDraft || pendingExistingHighlightNoteId) return;
-
-  const target = e.target as Element | null;
-
-  // Fast path: mouse is directly over a highlight element
-  const hlEl = target?.closest?.('soma-hl[data-highlight-id]') as HTMLElement | null;
-  if (hlEl) {
-    const id = hlEl.getAttribute('data-highlight-id');
-    if (!id) return;
-    if (id === hoverState.activeId) {
-      cancelHoverHideTimer();
-      return;
-    }
-    showToolbarForHighlight(id);
-    return;
-  }
-
-  // If no active highlight, nothing to do in slow path
-  if (!hoverState.activeId) return;
-
-  // Slow path: check expanded rects with rAF throttle
-  if (hoverState.rafHandle !== null) return;
-
-  const x = e.clientX;
-  const y = e.clientY;
-
-  hoverState.rafHandle = requestAnimationFrame(() => {
-    hoverState.rafHandle = null;
-    if (!hoverState.activeId || !hoverState.cachedRects) return;
-
-    if (pointInExpandedRects(x, y, hoverState.cachedRects)) {
-      cancelHoverHideTimer();
-    } else if (!hoverState.overToolbar) {
-      scheduleHoverHide();
-    }
-  });
-}
+let dotDelegationInstalled = false;
 
 /**
- * Install document-level hover tracking and click handler for highlights.
- * Hover triggers the actions toolbar; clicks pass through to original elements
- * (links, etc.) except for the note icon.
+ * Install document-level click handler for highlight dot markers.
+ * Dot click → open note popover; all other clicks pass through.
  */
-function ensureHoverDelegation(): void {
-  if (hoverDelegationInstalled) return;
-  hoverDelegationInstalled = true;
+function ensureDotDelegation(): void {
+  if (dotDelegationInstalled) return;
+  dotDelegationInstalled = true;
 
-  document.addEventListener('mousemove', onMouseMove, { passive: true });
-
-  // Click handler — only intercept note icon clicks, let everything else through
   document.addEventListener('click', (e) => {
     const targetElement = e.target as Element | null;
-    if (!targetElement?.closest(NOTE_ICON_SELECTOR)) return;
+    if (!targetElement?.closest(DOT_SELECTOR)) return;
 
     const highlightElement = targetElement.closest('soma-hl[data-highlight-id]') as HTMLElement | null;
     if (!highlightElement) return;
@@ -258,27 +115,9 @@ function ensureHoverDelegation(): void {
     const highlightId = highlightElement.getAttribute('data-highlight-id');
     if (!highlightId) return;
 
-    const msg: { type: typeof HIGHLIGHT_CLICK; payload: HighlightClickPayload } = {
-      type: HIGHLIGHT_CLICK,
-      payload: { id: highlightId },
-    };
-    chrome.runtime.sendMessage(msg);
-    clearHoverState();
+    const rect = highlightElement.getBoundingClientRect();
+    showNotePopoverForExistingHighlight(highlightId, rect);
   });
-
-  // Register toolbar hover bridging callbacks
-  setHighlightActionsHoverCallbacks(
-    () => {
-      // Mouse entered toolbar
-      hoverState.overToolbar = true;
-      cancelHoverHideTimer();
-    },
-    () => {
-      // Mouse left toolbar
-      hoverState.overToolbar = false;
-      scheduleHoverHide();
-    },
-  );
 }
 
 // ── Text Node Iteration for Cross-Element Wrapping ──
@@ -350,7 +189,7 @@ export function renderHighlight(
   highlightColor: string = DEFAULT_HIGHLIGHT_BG,
   options: HighlightRenderOptions = {},
 ): void {
-  ensureHoverDelegation();
+  ensureDotDelegation();
   const segments = getTextNodesInRange(range);
 
   // Process segments in reverse to maintain valid offsets
@@ -387,9 +226,7 @@ export function renderHighlight(
     }
   }
 
-  if (options.hasNote) {
-    renderNoteBadge(highlightId);
-  }
+  renderDot(highlightId, !!options.hasNote);
 }
 
 function toHighlightLineColor(color: string): string {
@@ -423,6 +260,8 @@ export function removeHighlightRendering(highlightId: string): void {
   elements.forEach((el) => {
     const parent = el.parentNode;
     if (!parent) return;
+    // Remove dot markers before unwrapping so they don't leak into the DOM
+    el.querySelectorAll(DOT_SELECTOR).forEach((dot) => dot.remove());
     // Move all children out of the highlight element
     while (el.firstChild) {
       parent.insertBefore(el.firstChild, el);
@@ -447,28 +286,45 @@ export function clearAllHighlightRenderings(): void {
   }
 }
 
-function renderNoteBadge(highlightId: string): void {
+/**
+ * Render (or update) the small dot marker at the end of a highlight.
+ * Filled dot = has note, hollow dot = bare highlight.
+ */
+function renderDot(highlightId: string, hasNote: boolean): void {
   const elements = Array.from(
     document.querySelectorAll(`soma-hl[data-highlight-id="${highlightId}"]`),
   ) as HTMLElement[];
   if (elements.length === 0) return;
 
+  // Remove existing dots
   for (const el of elements) {
-    el.querySelectorAll(NOTE_ICON_SELECTOR).forEach((icon) => icon.remove());
+    el.querySelectorAll(DOT_SELECTOR).forEach((dot) => dot.remove());
   }
 
   const last = elements[elements.length - 1];
-  const icon = document.createElement('span');
-  icon.setAttribute('data-soma-note-icon', 'true');
-  icon.textContent = '🗨';
-  icon.style.display = 'inline-block';
-  icon.style.marginLeft = '4px';
-  icon.style.fontSize = '11px';
-  icon.style.lineHeight = '1';
-  icon.style.verticalAlign = 'text-top';
-  icon.style.cursor = 'pointer';
-  icon.title = 'Open note';
-  last.appendChild(icon);
+  const dot = document.createElement('span');
+  dot.setAttribute('data-soma-dot', hasNote ? 'filled' : 'hollow');
+  dot.style.display = 'inline-block';
+  dot.style.width = '6px';
+  dot.style.height = '6px';
+  dot.style.marginLeft = '4px';
+  dot.style.borderRadius = '50%';
+  dot.style.verticalAlign = 'middle';
+  dot.style.cursor = 'pointer';
+  dot.style.transition = 'transform 0.15s ease, opacity 0.15s ease';
+  if (hasNote) {
+    dot.style.backgroundColor = DEFAULT_HIGHLIGHT_BG;
+  } else {
+    dot.style.backgroundColor = 'transparent';
+    dot.style.border = `1.5px solid ${DEFAULT_HIGHLIGHT_BG}`;
+  }
+  dot.title = hasNote ? 'View note' : 'Add note';
+
+  // Hover feedback
+  dot.addEventListener('mouseenter', () => { dot.style.transform = 'scale(1.4)'; });
+  dot.addEventListener('mouseleave', () => { dot.style.transform = 'scale(1)'; });
+
+  last.appendChild(dot);
 }
 
 function replaceRenderedHighlightId(oldId: string, newId: string): void {
@@ -632,22 +488,16 @@ function handleSelectionChange(): void {
     // Check if selection falls entirely within an existing highlight
     const existingId = findOverlappingHighlightId(range);
     if (existingId) {
-      // Show highlight actions (delete / add note) instead of creation toolbar
+      // Don't show creation toolbar for already-highlighted text
       currentRange = null;
       selectedExistingHighlightId = existingId;
       hideToolbar();
-      showHighlightActionsToolbar(rect, {
-        onOpenNote: () => {
-          showNotePopoverForExistingHighlight(existingId, rect);
-        },
-      });
       return;
     }
 
     currentRange = range;
     selectedExistingHighlightId = null;
     showToolbar(rect, handleToolbarAction);
-    hideHighlightActionsToolbar();
   } catch (err) {
     hideToolbar();
     currentRange = null;
@@ -869,7 +719,7 @@ function sendNotesForHighlight(draft: HighlightDraft, noteEntries: NoteEntry[]):
       console.warn('[soma] Failed to save notes for highlight:', chrome.runtime.lastError.message);
       return;
     }
-    renderNoteBadge(highlightId);
+    renderDot(highlightId, true);
   });
 }
 
@@ -907,14 +757,11 @@ function showNotePopoverForExistingHighlight(highlightId: string, rect: DOMRect)
                 console.warn('[soma] Failed to save highlight notes:', chrome.runtime.lastError.message);
                 return;
               }
-              if (nonEmpty.length > 0) {
-                renderNoteBadge(highlightId);
-              }
+              renderDot(highlightId, nonEmpty.length > 0);
             });
           },
           onCancel: () => {
             pendingExistingHighlightNoteId = null;
-            hideHighlightActionsToolbar();
           },
           onDelete: () => {
             pendingExistingHighlightNoteId = null;
@@ -956,7 +803,6 @@ function handleGlobalPointerDown(e: PointerEvent): void {
   pendingExistingHighlightNoteId = null;
   selectedExistingHighlightId = null;
 
-  clearHoverState();
   hideNotePopover();
 }
 
@@ -972,7 +818,7 @@ export function initHighlight(): void {
   initialized = true;
   lastKnownUrl = location.href;
 
-  ensureHoverDelegation();
+  ensureDotDelegation();
 
   // Keyboard shortcut: Cmd/Ctrl+Shift+H to open note popover directly
   document.addEventListener('keydown', (e) => {
@@ -998,7 +844,6 @@ export function initHighlight(): void {
       const id = selectedExistingHighlightId;
       const rect = computeGroupBoundingRect(id);
       if (rect) {
-        hideHighlightActionsToolbar();
         showNotePopoverForExistingHighlight(id, rect);
       }
     }
@@ -1018,7 +863,6 @@ export function initHighlight(): void {
 
   // Dismiss overlays on scroll/resize
   const dismissOverlays = () => {
-    clearHoverState();
     hideAllHighlightOverlays();
   };
   window.addEventListener('scroll', dismissOverlays, { passive: true });

@@ -337,6 +337,9 @@ export interface NodexNode {
 
   /** 排序方向 */
   sortDirection?: 'asc' | 'desc';
+
+  /** View toolbar visible (user toggled via context menu) */
+  toolbarVisible?: boolean;
 }
 
 // ============================================================

@@ -286,9 +286,15 @@ export function clearAllHighlightRenderings(): void {
   }
 }
 
+// Chat bubble SVGs (14×14) — filled for notes, outline for bare highlights
+const BUBBLE_FILLED_SVG = `<svg width="14" height="14" viewBox="0 0 24 24" fill="#8B8422" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C6.48 2 2 5.79 2 10.5c0 2.56 1.33 4.86 3.42 6.45L4 22l4.76-2.38c1.01.25 2.1.38 3.24.38 5.52 0 10-3.79 10-8.5S17.52 2 12 2z"/></svg>`;
+const BUBBLE_OUTLINE_SVG = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8B8422" stroke-width="2" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C6.48 2 2 5.79 2 10.5c0 2.56 1.33 4.86 3.42 6.45L4 22l4.76-2.38c1.01.25 2.1.38 3.24.38 5.52 0 10-3.79 10-8.5S17.52 2 12 2z"/></svg>`;
+const BUBBLE_FILLED_HOVER_SVG = `<svg width="14" height="14" viewBox="0 0 24 24" fill="#6B6510" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C6.48 2 2 5.79 2 10.5c0 2.56 1.33 4.86 3.42 6.45L4 22l4.76-2.38c1.01.25 2.1.38 3.24.38 5.52 0 10-3.79 10-8.5S17.52 2 12 2z"/></svg>`;
+const BUBBLE_OUTLINE_HOVER_SVG = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6B6510" stroke-width="2" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C6.48 2 2 5.79 2 10.5c0 2.56 1.33 4.86 3.42 6.45L4 22l4.76-2.38c1.01.25 2.1.38 3.24.38 5.52 0 10-3.79 10-8.5S17.52 2 12 2z"/></svg>`;
+
 /**
- * Render (or update) the small dot marker at the end of a highlight.
- * Filled dot = has note, hollow dot = bare highlight.
+ * Render (or update) the chat bubble marker at the end of a highlight.
+ * Filled bubble = has note, outline bubble = bare highlight.
  */
 function renderDot(highlightId: string, hasNote: boolean): void {
   const elements = Array.from(
@@ -296,35 +302,35 @@ function renderDot(highlightId: string, hasNote: boolean): void {
   ) as HTMLElement[];
   if (elements.length === 0) return;
 
-  // Remove existing dots
+  // Remove existing markers
   for (const el of elements) {
     el.querySelectorAll(DOT_SELECTOR).forEach((dot) => dot.remove());
   }
 
   const last = elements[elements.length - 1];
-  const dot = document.createElement('span');
-  dot.setAttribute('data-soma-dot', hasNote ? 'filled' : 'hollow');
-  dot.style.display = 'inline-block';
-  dot.style.width = '6px';
-  dot.style.height = '6px';
-  dot.style.marginLeft = '4px';
-  dot.style.borderRadius = '50%';
-  dot.style.verticalAlign = 'middle';
-  dot.style.cursor = 'pointer';
-  dot.style.transition = 'transform 0.15s ease, opacity 0.15s ease';
-  if (hasNote) {
-    dot.style.backgroundColor = DEFAULT_HIGHLIGHT_BG;
-  } else {
-    dot.style.backgroundColor = 'transparent';
-    dot.style.border = `1.5px solid ${DEFAULT_HIGHLIGHT_BG}`;
-  }
-  dot.title = hasNote ? 'View note' : 'Add note';
+  const marker = document.createElement('span');
+  marker.setAttribute('data-soma-dot', hasNote ? 'filled' : 'hollow');
+  marker.innerHTML = hasNote ? BUBBLE_FILLED_SVG : BUBBLE_OUTLINE_SVG;
+  marker.style.display = 'inline-flex';
+  marker.style.alignItems = 'center';
+  marker.style.marginLeft = '3px';
+  marker.style.verticalAlign = 'text-bottom';
+  marker.style.cursor = 'pointer';
+  marker.style.transition = 'transform 0.15s ease';
+  marker.title = hasNote ? 'View note' : 'Add note';
 
-  // Hover feedback
-  dot.addEventListener('mouseenter', () => { dot.style.transform = 'scale(1.4)'; });
-  dot.addEventListener('mouseleave', () => { dot.style.transform = 'scale(1)'; });
+  const normalSvg = hasNote ? BUBBLE_FILLED_SVG : BUBBLE_OUTLINE_SVG;
+  const hoverSvg = hasNote ? BUBBLE_FILLED_HOVER_SVG : BUBBLE_OUTLINE_HOVER_SVG;
+  marker.addEventListener('mouseenter', () => {
+    marker.innerHTML = hoverSvg;
+    marker.style.transform = 'scale(1.15)';
+  });
+  marker.addEventListener('mouseleave', () => {
+    marker.innerHTML = normalSvg;
+    marker.style.transform = 'scale(1)';
+  });
 
-  last.appendChild(dot);
+  last.appendChild(marker);
 }
 
 function replaceRenderedHighlightId(oldId: string, newId: string): void {

@@ -8,10 +8,10 @@
  * - user writes note + saves => wrap bare highlight with #note (via reference)
  * - cancel/empty note => highlight already saved, stays as bare #highlight
  *
- * Dot marker interaction:
- * - all highlights show a small dot at the end (filled = has note, hollow = bare)
- * - dot click => open note popover inline (add/edit/delete note)
- * - highlight text clicks pass through to original elements (links, etc.)
+ * Click interaction:
+ * - click highlight text => open note popover inline (add/edit/delete note)
+ * - if text is inside a link/button => click passes through to original element
+ * - dot marker at end: filled = has note, hollow = bare highlight
  */
 import { computeAnchor } from './anchor-utils.js';
 import {
@@ -90,24 +90,54 @@ function computeGroupBoundingRect(id: string): DOMRect | null {
   return new DOMRect(minX, minY, maxX - minX, maxY - minY);
 }
 
-// ── Dot Click Delegation ──
+// ── Highlight Click Delegation ──
 
-let dotDelegationInstalled = false;
+/** Interactive selectors — clicks on these pass through to the original element. */
+const INTERACTIVE_SELECTOR = 'a[href], button, input, select, textarea, [role="button"], [role="link"]';
+
+let clickDelegationInstalled = false;
 
 /**
- * Install document-level click handler for highlight dot markers.
- * Dot click → open note popover; all other clicks pass through.
+ * Install document-level click handler for highlight elements.
+ *
+ * - Click on dot marker → always open note popover
+ * - Click on highlight text → open note popover, UNLESS the click target
+ *   is inside an interactive element (link, button, etc.) — those pass through
  */
-function ensureDotDelegation(): void {
-  if (dotDelegationInstalled) return;
-  dotDelegationInstalled = true;
+function ensureClickDelegation(): void {
+  if (clickDelegationInstalled) return;
+  clickDelegationInstalled = true;
 
   document.addEventListener('click', (e) => {
     const targetElement = e.target as Element | null;
-    if (!targetElement?.closest(DOT_SELECTOR)) return;
+    if (!targetElement) return;
 
+    // ① Dot marker click — always open popover
+    if (targetElement.closest(DOT_SELECTOR)) {
+      const highlightElement = targetElement.closest('soma-hl[data-highlight-id]') as HTMLElement | null;
+      if (!highlightElement) return;
+
+      e.preventDefault();
+      e.stopPropagation();
+
+      const highlightId = highlightElement.getAttribute('data-highlight-id');
+      if (!highlightId) return;
+
+      const rect = computeGroupBoundingRect(highlightId) ?? highlightElement.getBoundingClientRect();
+      showNotePopoverForExistingHighlight(highlightId, rect);
+      return;
+    }
+
+    // ② Highlight text click — open popover unless inside an interactive element
     const highlightElement = targetElement.closest('soma-hl[data-highlight-id]') as HTMLElement | null;
     if (!highlightElement) return;
+
+    // Let interactive elements (links, buttons) work normally
+    if (targetElement.closest(INTERACTIVE_SELECTOR)) return;
+
+    // Ignore if user is making a text selection (not a plain click)
+    const selection = window.getSelection();
+    if (selection && !selection.isCollapsed && selection.toString().trim()) return;
 
     e.preventDefault();
     e.stopPropagation();
@@ -115,7 +145,7 @@ function ensureDotDelegation(): void {
     const highlightId = highlightElement.getAttribute('data-highlight-id');
     if (!highlightId) return;
 
-    const rect = highlightElement.getBoundingClientRect();
+    const rect = computeGroupBoundingRect(highlightId) ?? highlightElement.getBoundingClientRect();
     showNotePopoverForExistingHighlight(highlightId, rect);
   });
 }
@@ -189,7 +219,7 @@ export function renderHighlight(
   highlightColor: string = DEFAULT_HIGHLIGHT_BG,
   options: HighlightRenderOptions = {},
 ): void {
-  ensureDotDelegation();
+  ensureClickDelegation();
   const segments = getTextNodesInRange(range);
 
   // Process segments in reverse to maintain valid offsets
@@ -208,7 +238,7 @@ export function renderHighlight(
     const highlightEl = document.createElement('soma-hl');
     highlightEl.setAttribute('data-highlight-id', highlightId);
     highlightEl.style.display = 'inline';
-    highlightEl.style.cursor = 'default';
+    highlightEl.style.cursor = 'pointer';
     // Readwise-like style: transparent tint + solid bottom underline.
     highlightEl.style.borderRadius = '0';
     highlightEl.style.paddingBottom = '1px';
@@ -824,7 +854,7 @@ export function initHighlight(): void {
   initialized = true;
   lastKnownUrl = location.href;
 
-  ensureDotDelegation();
+  ensureClickDelegation();
 
   // Keyboard shortcut: Cmd/Ctrl+Shift+H to open note popover directly
   document.addEventListener('keydown', (e) => {

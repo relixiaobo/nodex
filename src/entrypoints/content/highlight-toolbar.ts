@@ -282,11 +282,11 @@ button[data-action='save']:hover {
 }
 
 button[data-action='delete'] {
-  color: #AA5048;
+  color: #999999;
 }
 
 button[data-action='delete']:hover {
-  color: #8B3E37;
+  color: #AA5048;
 }
 
 kbd {

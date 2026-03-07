@@ -251,20 +251,16 @@ const NodeContextMenuContent = forwardRef<HTMLDivElement, NodeContextMenuContent
       onClose();
     }, [nodeId, onClose]);
 
-    // Sort by: applies to the parent node of the right-clicked node
-    const parentId = useMemo(() => loroDoc.getParentId(nodeId), [nodeId]);
-
+    // Sort by: applies to the right-clicked node itself (sorts its children)
     const handleSort = useCallback((field: string, direction: 'asc' | 'desc') => {
-      if (!parentId) return;
-      useNodeStore.getState().setSortConfig(parentId, field, direction);
+      useNodeStore.getState().setSortConfig(nodeId, field, direction);
       onClose();
-    }, [parentId, onClose]);
+    }, [nodeId, onClose]);
 
     const handleClearSort = useCallback(() => {
-      if (!parentId) return;
-      useNodeStore.getState().clearSort(parentId);
+      useNodeStore.getState().clearSort(nodeId);
       onClose();
-    }, [parentId, onClose]);
+    }, [nodeId, onClose]);
 
     // Merge forwarded ref + innerRef for measurement
     const setRefs = useCallback((el: HTMLDivElement | null) => {
@@ -295,7 +291,7 @@ const NodeContextMenuContent = forwardRef<HTMLDivElement, NodeContextMenuContent
             hasDescription={hasDescription}
             changed={changed}
             created={created}
-            parentId={parentId}
+            sortTargetId={nodeId}
             onSort={handleSort}
             onClearSort={handleClearSort}
           />
@@ -330,7 +326,7 @@ function MainMenu({
   hasDescription,
   changed,
   created,
-  parentId,
+  sortTargetId,
   onSort,
   onClearSort,
 }: {
@@ -348,7 +344,7 @@ function MainMenu({
   hasDescription: boolean;
   changed: string;
   created: string;
-  parentId: string | null;
+  sortTargetId: string;
   onSort: (field: string, direction: 'asc' | 'desc') => void;
   onClearSort: () => void;
 }) {
@@ -377,12 +373,8 @@ function MainMenu({
       />
 
       {/* Sort by */}
-      {parentId && (
-        <>
-          <MenuSeparator />
-          <SortBySubmenu parentId={parentId} onSort={onSort} onClearSort={onClearSort} />
-        </>
-      )}
+      <MenuSeparator />
+      <SortBySubmenu parentId={sortTargetId} onSort={onSort} onClearSort={onClearSort} />
 
       <MenuSeparator />
 

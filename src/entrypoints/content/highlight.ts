@@ -314,7 +314,7 @@ function renderDot(highlightId: string, hasNote: boolean): void {
   marker.style.display = 'inline-flex';
   marker.style.alignItems = 'center';
   marker.style.marginLeft = '3px';
-  marker.style.verticalAlign = 'text-bottom';
+  marker.style.verticalAlign = 'middle';
   marker.style.cursor = 'pointer';
   marker.style.transition = 'transform 0.15s ease';
   marker.title = hasNote ? 'View note' : 'Add note';

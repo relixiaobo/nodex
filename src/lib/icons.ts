@@ -145,6 +145,7 @@ export {
   Group,
   ArrowUp,
   ArrowDown,
+  CircleMinus,
 } from 'lucide-react';
 
 // ─── About & External ────────────────────────────────────────────────────────

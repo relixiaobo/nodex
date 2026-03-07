@@ -194,7 +194,7 @@ ${HOST_STYLE}
   width: min(340px, calc(100vw - 24px));
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 4px;
   padding: 10px;
   background: #F5F4EE;
   border-radius: 8px;
@@ -202,7 +202,8 @@ ${HOST_STYLE}
 }
 
 .soma-note-list {
-  max-height: 200px;
+  min-height: 120px;
+  max-height: 240px;
   overflow-y: auto;
 }
 
@@ -210,7 +211,7 @@ ${HOST_STYLE}
   display: flex;
   align-items: flex-start;
   gap: 8px;
-  padding: 4px 6px;
+  padding: 0 6px;
   min-height: 24px;
 }
 
@@ -253,60 +254,56 @@ ${HOST_STYLE}
 .actions {
   display: flex;
   justify-content: flex-end;
+  align-items: center;
   gap: 8px;
+  padding-top: 4px;
 }
 
 button {
   all: unset;
   box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
   height: 28px;
-  padding: 0 8px;
-  border-radius: 9999px;
+  padding: 0 4px;
   font-size: 12px;
   font-weight: 500;
   cursor: pointer;
-  transition: background 0.15s ease-out, color 0.15s ease-out;
-}
-
-button[data-action='cancel'] {
-  color: #666666;
-  background: rgba(26, 26, 26, 0.04);
-}
-
-button[data-action='cancel']:hover {
-  background: rgba(26, 26, 26, 0.08);
+  transition: color 0.15s ease-out;
 }
 
 button[data-action='save'] {
-  color: #FFFFFF;
-  background: #5E8E65;
+  color: #5E8E65;
+  gap: 6px;
 }
 
-button[data-action='save']:hover:not(:disabled) {
-  background: #4D7A54;
-}
-
-button[data-action='save']:disabled {
-  opacity: 0.4;
-  cursor: default;
+button[data-action='save']:hover {
+  color: #4D7A54;
 }
 
 button[data-action='delete'] {
   color: #AA5048;
-  background: rgba(170, 80, 72, 0.06);
-  margin-right: auto;
 }
 
 button[data-action='delete']:hover {
-  background: rgba(170, 80, 72, 0.12);
+  color: #8B3E37;
 }
 
 kbd {
+  display: inline-flex;
+  height: 20px;
+  min-width: 20px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.04);
+  border: none;
   font-family: inherit;
   font-size: 11px;
-  font-weight: 400;
-  opacity: 0.7;
-  margin-left: 4px;
+  font-weight: 500;
+  color: #999999;
+  gap: 1px;
 }
 `;
 
@@ -390,11 +387,11 @@ function buildSelectionToolbar(): void {
   const bar = document.createElement('div');
   bar.className = 'soma-floating-bar';
 
-  const noteBtn = createIconButton('note', ICON_NOTE, 'Note');
+  const highlightBtn = createIconButton('note', ICON_HIGHLIGHT, 'Highlight');
   const kbd = document.createElement('kbd');
   kbd.textContent = shortcutHint;
-  noteBtn.appendChild(kbd);
-  bar.appendChild(noteBtn);
+  highlightBtn.appendChild(kbd);
+  bar.appendChild(highlightBtn);
 
   root.appendChild(createStyle(FLOATING_BAR_STYLE));
   root.appendChild(bar);
@@ -572,10 +569,7 @@ function hasNonEmptyNote(): boolean {
 }
 
 function updateSaveButtonState(): void {
-  if (!notePopoverShadowRoot) return;
-  const saveBtn = notePopoverShadowRoot.querySelector('button[data-action="save"]') as HTMLButtonElement | null;
-  if (!saveBtn) return;
-  saveBtn.disabled = !hasNonEmptyNote();
+  // Save is always enabled — empty note = close popover (highlight already saved)
 }
 
 function getNoteItems(): HTMLDivElement[] {
@@ -583,9 +577,24 @@ function getNoteItems(): HTMLDivElement[] {
   return Array.from(notePopoverListElement.querySelectorAll('.soma-note-item')) as HTMLDivElement[];
 }
 
+/**
+ * Get the Selection for an element inside a Shadow DOM.
+ * Closed shadow roots retarget nodes in window.getSelection(), so we
+ * need to read from the shadow root directly (Chrome-specific).
+ */
+function getSelectionForElement(el: HTMLElement): Selection | null {
+  const root = el.getRootNode();
+  if (root instanceof ShadowRoot) {
+    // Chrome supports getSelection() on ShadowRoot
+    const shadowSel = (root as unknown as { getSelection(): Selection | null }).getSelection();
+    if (shadowSel) return shadowSel;
+  }
+  return window.getSelection();
+}
+
 function focusEditorAtEnd(editor: HTMLElement): void {
   editor.focus();
-  const sel = window.getSelection();
+  const sel = getSelectionForElement(editor);
   if (!sel) return;
   const range = document.createRange();
   range.selectNodeContents(editor);
@@ -596,7 +605,7 @@ function focusEditorAtEnd(editor: HTMLElement): void {
 
 function focusEditorAtStart(editor: HTMLElement): void {
   editor.focus();
-  const sel = window.getSelection();
+  const sel = getSelectionForElement(editor);
   if (!sel) return;
   const range = document.createRange();
   range.selectNodeContents(editor);
@@ -606,7 +615,7 @@ function focusEditorAtStart(editor: HTMLElement): void {
 }
 
 function getCursorOffset(editor: HTMLElement): number {
-  const sel = window.getSelection();
+  const sel = getSelectionForElement(editor);
   if (!sel || sel.rangeCount === 0) return -1;
   const range = sel.getRangeAt(0);
   const preRange = document.createRange();
@@ -636,17 +645,16 @@ function buildNotePopover(): void {
   deleteButton.style.display = 'none';
   notePopoverDeleteButton = deleteButton;
 
-  const cancelButton = document.createElement('button');
-  cancelButton.setAttribute('data-action', 'cancel');
-  cancelButton.textContent = 'Cancel';
-
   const isMac = /Mac|iPhone|iPad/.test(navigator.platform);
   const saveButton = document.createElement('button');
   saveButton.setAttribute('data-action', 'save');
-  saveButton.innerHTML = `Save<kbd>${isMac ? '⌘' : 'Ctrl+'}↵</kbd>`;
+  const saveLabel = document.createTextNode('Save');
+  const saveKbd = document.createElement('kbd');
+  saveKbd.textContent = isMac ? '⌘↵' : 'Ctrl↵';
+  saveButton.appendChild(saveLabel);
+  saveButton.appendChild(saveKbd);
 
   actions.appendChild(deleteButton);
-  actions.appendChild(cancelButton);
   actions.appendChild(saveButton);
 
   popover.appendChild(noteList);
@@ -669,14 +677,7 @@ function buildNotePopover(): void {
       hideNotePopover();
       return;
     }
-    if (action === 'cancel') {
-      notePopoverCallbacks.onCancel();
-      hideNotePopover();
-      return;
-    }
-
     if (action === 'save') {
-      if (!hasNonEmptyNote()) return; // Guard: don't save empty notes
       notePopoverCallbacks.onSave(collectNoteEntries());
       hideNotePopover();
     }
@@ -691,10 +692,9 @@ function buildNotePopover(): void {
   noteList.addEventListener('keydown', (e) => {
     if (!notePopoverCallbacks) return;
 
-    // Cmd/Ctrl+Enter → Save (only if note has content)
+    // Cmd/Ctrl+Enter → Save
     if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
       e.preventDefault();
-      if (!hasNonEmptyNote()) return;
       notePopoverCallbacks.onSave(collectNoteEntries());
       hideNotePopover();
       return;
@@ -740,11 +740,20 @@ function buildNotePopover(): void {
       return;
     }
 
-    // Enter → Insert new item below (inherits current depth)
+    // Enter → split node at cursor: text before stays, text after moves to new sibling
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
+      const fullText = activeEditor.textContent ?? '';
+      const offset = getCursorOffset(activeEditor);
+      const textBefore = fullText.slice(0, offset);
+      const textAfter = fullText.slice(offset);
+
+      // Update current node to keep only text before cursor
+      activeEditor.textContent = textBefore;
+
+      // Create new sibling with text after cursor
       const currentDepth = getItemDepth(currentItem);
-      const newItem = createNoteItem('', activeEditor.getAttribute('data-placeholder') ?? '', currentDepth);
+      const newItem = createNoteItem(textAfter, activeEditor.getAttribute('data-placeholder') ?? '', currentDepth);
       currentItem.after(newItem);
       const newEditor = newItem.querySelector('.soma-note-editor') as HTMLElement;
       focusEditorAtStart(newEditor);
@@ -752,31 +761,44 @@ function buildNotePopover(): void {
       return;
     }
 
-    // Backspace on empty item → remove and focus previous
+    // Backspace handling
     if (e.key === 'Backspace') {
       const text = activeEditor.textContent ?? '';
       const offset = getCursorOffset(activeEditor);
+
+      // Empty item with siblings → remove and focus adjacent
       if (text === '' && items.length > 1) {
         e.preventDefault();
-        const prevIdx = Math.max(0, idx - 1);
-        const prevEditor = items[prevIdx].querySelector('.soma-note-editor') as HTMLElement;
+        // Focus next item if first, otherwise previous
+        const targetIdx = idx > 0 ? idx - 1 : 1;
+        const targetEditor = items[targetIdx].querySelector('.soma-note-editor') as HTMLElement;
         currentItem.remove();
-        focusEditorAtEnd(prevEditor);
+        if (idx > 0) {
+          focusEditorAtEnd(targetEditor);
+        } else {
+          focusEditorAtStart(targetEditor);
+        }
         return;
       }
-      // Backspace at beginning of non-empty item → merge with previous
+
+      // Cursor at beginning of non-empty item → merge into previous
       if (offset === 0 && idx > 0) {
         e.preventDefault();
         const prevEditor = items[idx - 1].querySelector('.soma-note-editor') as HTMLElement;
         const prevText = prevEditor.textContent ?? '';
+        const mergePoint = prevText.length;
         prevEditor.textContent = prevText + text;
         currentItem.remove();
         // Place cursor at merge point
         prevEditor.focus();
-        const sel = window.getSelection();
-        if (sel && prevEditor.firstChild) {
+        const sel = getSelectionForElement(prevEditor);
+        if (sel) {
           const range = document.createRange();
-          range.setStart(prevEditor.firstChild, prevText.length);
+          if (prevEditor.firstChild) {
+            range.setStart(prevEditor.firstChild, mergePoint);
+          } else {
+            range.setStart(prevEditor, 0);
+          }
           range.collapse(true);
           sel.removeAllRanges();
           sel.addRange(range);
@@ -847,12 +869,12 @@ export function showNotePopover(
       notePopoverListElement!.appendChild(createNoteItem(entry.text, placeholder, entry.depth));
     }
 
-    // Focus the first item's editor at start (use rAF to ensure Shadow DOM rendered)
+    // Focus the last item's editor at end (use rAF to ensure Shadow DOM rendered)
     requestAnimationFrame(() => {
       const allItems = getNoteItems();
       if (allItems.length > 0) {
-        const firstEditor = allItems[0].querySelector('.soma-note-editor') as HTMLElement;
-        focusEditorAtStart(firstEditor);
+        const lastEditor = allItems[allItems.length - 1].querySelector('.soma-note-editor') as HTMLElement;
+        focusEditorAtEnd(lastEditor);
       }
       updateSaveButtonState();
     });

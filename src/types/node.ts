@@ -329,6 +329,14 @@ export interface NodexNode {
 
   /** search node 上次执行完整 diff 的时间戳 (ms) */
   lastRefreshedAt?: number;
+
+  // ─── viewDef 专用 ───
+
+  /** 排序字段：'name' | 'createdAt' | fieldDefId */
+  sortField?: string;
+
+  /** 排序方向 */
+  sortDirection?: 'asc' | 'desc';
 }
 
 // ============================================================

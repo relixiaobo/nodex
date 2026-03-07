@@ -36,41 +36,72 @@ _(空)_
 
 ### v0.1 — Chrome Web Store 上架
 
-> **上线门槛**：用户可以日常使用的最小完整产品。核心功能已就绪（大纲编辑、Supertags、Fields、Date 节点、Web Clipping、Highlight & 批注、Undo/Redo、⌘K 搜索、Sync）。
+> **方法论**：本次上线聚焦 **Think → Connect** 闭环。Think 已基本完成（高亮、笔记、剪藏、Today 首屏），重点打磨 Connect 体验（搜索、视图、标签、字段）。Compound（上下文感知、AI）上线后根据用户反馈再定优先级。详见 `docs/product-philosophy.md`。
+
+#### 上架准备
 
 - [ ] **产品展示页** — 静态落地页（产品介绍 + 截图 + 安装链接 + 隐私政策），可托管在 Cloudflare Pages 或 GitHub Pages
-- [x] **新用户引导数据** — Today 下 4 段教程树 (Welcome/Article Clip/Tasks/Shortcuts) + #task schema + 9 tests
-- [x] **About 面板** — 版本号 + Changelog + 反馈链接 + GitHub 链接，ToolbarUserMenu 入口（当前为 `app:about` 纯 UI 路由，多工作区上线后迁移为官方工作区节点）
 - [ ] **About 101 板块** — What's New 后新增 "101" 区块（默认收起），放置产品使用指南/教程文章
 
+#### Connect — 主战场
+
+> Connect 的核心动作是**将相关节点聚到一起，观察和发现结构**（归纳法）。标签和链接在 Think 阶段已经完成了"标记关系"的工作，Connect 阶段需要好的"观察工具"来揭示结构。详见 `docs/research/102-connect-mechanisms-research.md`。
+>
+> 优先级按"降低发现和聚集摩擦"排序：
+
+##### 1. View Toolbar — Filter / Sort / Group (#25)
+
+> **L0 标签聚集的最后一公里**。用户能打标签、能搜索，但结果是一个平铺列表，无法 filter/sort/group。没有视图工具栏，标签和字段只是装饰。
+
+- [x] Per-node view toolbar UI（Sort / Filter / Group 图标栏）
+- [x] Sort by：单级排序（Name / Created / 标签字段 + asc/desc）
+- [x] ViewDef 节点持久化（type='viewDef' + sortField/sortDirection 直接属性）
+- [x] 右键菜单 "Sort by" 子菜单
+- [ ] Filter by：按字段值/标签/checkbox 状态过滤
+- [ ] Group by：按字段值分组
+
+##### 2. Search Node 字段过滤 (#23)
+
+> **L2 查询聚集增强**。Search Node 目前只支持标签搜索，无法表达"所有 #insight 且 source 包含 'AI'"这样的条件。字段过滤让声明式聚集真正可用。
+
+- [ ] Step 4: L1 字段过滤 UI — 芯片条增删改 + FIELD_IS/时间条件 + 计数提示
+- [ ] Step 5: L2 AI 自然语言 — tool call 创建 queryCondition 树
+
+##### 3. Supertags 完善 (#20)
+
+> 降低打标签的摩擦 + 提升标签节点的可读性。
+
+- [ ] Convert to supertag — 普通节点快捷转 tagDef
+- [ ] Title expression — `${field name}` 动态标题
+- [ ] Pinned fields — 置顶显示 + filter 优先
+- [ ] Optional fields — 建议按钮 + 自动降级
+
+##### 4. 其他 Connect 基础设施
+
+- [ ] AttrDef "Used in" 计算字段 (#21)
+- [ ] Pinned fields (#21)
+- [ ] 自然语言日期解析（@next Monday / @November / @last week）(#22)
+- [ ] 日记模板（#day supertag 配置）(#22)
+- [ ] 日期字段链接到日节点 (#22)
+- [ ] Trash 交互优化 — 批量选中删除、右键菜单、自动清理策略（30 天）
+- [ ] 图片节点支持 — 节点嵌入/展示图片（上传、粘贴、拖拽），存储走 R2
+
 ---
 
-### Think 流程打磨
+### 上线后 — Compound & AI
 
-> 减少从"我有一个想法"到"写下来了"之间的每一步摩擦。参见 `docs/product-philosophy.md` 方法论。
+> 笔记积累到一定量后才有价值。上线后根据用户使用数据和反馈决定优先级。详见 `docs/product-philosophy.md` § Compound。
 
-- [x] **Today 为冷启动首屏** — 短暂关闭 side panel 后恢复上次位置；隔了较久（如新的一天）或首次使用时默认落在 Today（已有实现：App.tsx bootstrap 逻辑）
-- [x] **高亮 note placeholder 引导** — "What does this make you think?" 引导用户用自己的话写
+#### 上下文感知 Sidebar
 
----
+> 三层渐进披露：L1 低调 badge → L2 标题列表 → L3 导航到节点。从 URL 精确匹配起步，精确率 > 召回率。
 
-### P1 — 核心差异化（上线后第一优先级）
-
-#### 上下文感知 Sidebar — 信息气味指示器
-> 不做 Push（主动弹内容），采用三层渐进披露：L1 低调 badge → L2 标题列表 → L3 导航到节点。详见 `docs/product-philosophy.md` § 上下文感知 Sidebar。
-
-- [ ] **v1: URL 精确匹配** — 当前页 URL 匹配已有 #source → 工具栏 badge 显示关联数
-- [ ] **v2: 关键词/语义匹配** — 扩展到同域名、主题相关的笔记匹配
-- [ ] **v3: 共读模式（远期）** — 用户主动激活，侧边栏持续展示与当前页相关的笔记
-
-#### 剪藏精简 — 元数据优先
-> **已决定**：clip 只创建 `#source` 元数据节点（URL、标题、来源），不存正文。正文抓取能力保留底层供 AI 按需使用（On-Demand Fetch via content script）。详见 `docs/product-philosophy.md` § 剪藏的边界。
-
-- [x] **移除用户可见的正文抓取** — clip 流程不再将网页正文存为 #source 子节点（保留 content script 抓取能力供 AI 使用）
-- [ ] **选中文本剪藏 + 强制 note** — Content Script 右键菜单 / 浮动按钮 → 选中段落作为 highlight，强制用户写 note 才能保存
-- [ ] 保存目标选择 UI — 允许用户选择保存到 Inbox / Today / 指定节点
+- [ ] v1: URL 精确匹配 — 当前页 URL 匹配已有 #source → 工具栏 badge 显示关联数
+- [ ] v2: 关键词/语义匹配 — 扩展到同域名、主题相关的笔记匹配
+- [ ] v3: 共读模式（远期）— 用户主动激活，侧边栏持续展示与当前页相关的笔记
 
 #### AI — 照亮你的思考
+
 > AI 不替你思考，而是把你自己的思考照亮。详见 `docs/product-philosophy.md` § AI 照亮的时机。
 
 - [ ] **笔记问答** — 基于用户笔记回答问题（On-Demand Fetch + RAG）
@@ -79,49 +110,7 @@ _(空)_
 
 ---
 
-### P2 — 知识管理核心能力
-
-#### Search Nodes (#23)
-> Step 0-3 已完成（数据模型 + 搜索引擎 + L0 标签搜索 + 芯片条渲染）。**Design**: `docs/plans/search-node-design.md`
-
-- [ ] Step 4: L1 字段过滤 UI — 芯片条增删改 + FIELD_IS/时间条件 + 计数提示
-- [ ] Step 5: L2 AI 自然语言 — tool call 创建 queryCondition 树
-
-#### Supertags 完善 (#20)
-> 基础已完成（#触发、应用/移除、配置页、模板字段、标签页搜索、批量标签操作）
-
-- [ ] Convert to supertag（普通节点快捷转 tagDef）
-- [ ] Pinned fields（置顶显示 + filter 优先）
-- [ ] Optional fields（建议按钮 + 自动降级）
-- [ ] Title expression（`${field name}` 动态标题）
-
-#### Fields 全类型 (#21)
-> 基础已完成（Options/Date/Number/URL/Email/Checkbox/隐藏/Required/Min-Max/验证/系统字段/去重/删除联动/默认值克隆/Auto-init/Merge/字段类型图标/Auto-collect options）
-
-- [ ] AttrDef "Used in" 计算字段
-- [ ] Pinned fields
-
-#### Date 节点 & 日记 (#22)
-> Phase 1 已完成 (PR #73): Year→Week→Day 层级 + Today 入口 + DateNavigationBar + 日历选择器
-
-- [ ] 自然语言日期解析扩展（@next Monday / @November / @last week）
-- [ ] 日记模板（#day supertag 配置）
-- [ ] 日期字段链接到日节点
-
-#### View Toolbar — Filter / Sort / Group (#25)
-- [ ] Per-node view toolbar UI（Sort by / Filter by / Group by 图标栏）
-- [ ] Sort by：单/多级排序
-- [ ] Filter by：按字段值/标签/checkbox 状态过滤
-- [ ] Group by：按字段值分组
-- [ ] ViewDef Tuple 持久化（SYS_A16/18/19/20）
-
-#### 其他
-- [ ] Trash 交互优化 — 批量选中删除、右键菜单、自动清理策略（30 天）
-- [ ] 图片节点支持 — 节点嵌入/展示图片（上传、粘贴、拖拽），存储走 R2
-
----
-
-### P3 — 编辑器增强 & 交互完善
+### 编辑器增强 & 交互完善
 
 - [ ] 节点选中增强 (#47) — Cmd+Shift+D 批量复制、拖动选择优化
 - [ ] 合并节点 — 选中多个重复节点 → 合并为一个（保留第一个，合并 children/tags）
@@ -133,9 +122,8 @@ _(空)_
 
 ---
 
-### P4 — 多工作区 & 协作
+### 多工作区 & 协作
 
-#### 多工作区架构
 > 每个工作区 = 独立 LoroDoc，隔离存储/同步/权限。官方工作区是第一个用例。
 
 - [ ] **工作区模型** — Workspace 元数据（id、name、role、type）+ 切换器 UI
@@ -162,12 +150,14 @@ _(空)_
 
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
+| 2026-03-07 | 高亮点击呼出笔记 — 点击高亮文本打开笔记浮窗，链接/按钮放行原生行为 | nodex | main |
+| 2026-03-07 | 高亮交互清理 — 移除 HIGHLIGHT_CLICK 死代码 + updateSaveButtonState no-op | nodex | main |
 | 2026-03-06 | About 分离为 app panel + Settings 数据迁移 — About 从节点→纯 UI 路由(`app:about`)；Settings highlightEnabled 从 ui-store→LoroDoc 字段 + chrome.storage 投影 | nodex | main |
 | 2026-03-05 | About 面板 — 版本号 + Changelog + Tally 反馈 + GitHub 链接，ToolbarUserMenu 入口 | nodex | main |
 | 2026-03-05 | 新用户引导数据 — Welcome/Article Clip/Tasks/Shortcuts 4 段教程树 + #task schema + 9 tests | nodex | main |
 | 2026-03-05 | Google Docs 剪藏 + 两阶段 Loading UX — export HTML 抓取 + kix 列表嵌套 + 空 shell 占位 + pulse 动画 + 加载中禁止交互 | nodex | main |
 | 2026-03-05 | Options 字段 auto-collect 修复 — OutlinerItem blur/Enter 路径补 registerCollectedOption + autoCollected 标志位 + visibleWhen 条件 + 4 test | nodex | main |
-| 2026-03-04 | 高亮 hover 工具栏重做 — 两层检测 + click 透传 + 250ms 延迟防抖 + Note popover ⌘↵ 提示 | nodex | main |
+| 2026-03-04 | 高亮交互重设计 — chat bubble 标记 + 点击呼出笔记浮窗 + IME 修复 + 设计规范对齐 | nodex | main |
 | 2026-03-04 | x.com clip 修复 + 高亮色系统统一 — Soft Banana 高亮色 + Harvest Yellow 色板 + #highlight 迁移 amber→yellow | nodex | main |
 | 2026-03-04 | Field 配置页打磨 — Auto-init toggle 组 + 字段类型图标 + FieldValueRow 共享布局 + 配置页对齐统一 | nodex | main |
 | 2026-03-04 | Review: Sync 架构全面审查 — 6 commit + compaction CAS 修复 + update 区间校验 | nodex | #117 |

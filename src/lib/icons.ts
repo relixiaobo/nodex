@@ -137,6 +137,16 @@ export {
   User,
 } from 'lucide-react';
 
+// ─── View Toolbar ───────────────────────────────────────────────────────────
+
+export {
+  ArrowUpDown,
+  ListFilter,
+  Group,
+  ArrowUp,
+  ArrowDown,
+} from 'lucide-react';
+
 // ─── About & External ────────────────────────────────────────────────────────
 
 export {

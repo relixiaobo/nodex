@@ -142,6 +142,15 @@ interface NodeStore {
    */
   refreshSearchResults(searchNodeId: string): void;
   createNodeInSearchContext(searchNodeId: string, data?: Partial<NodexNode>): NodexNode;
+
+  // ─── View 操作 ───
+
+  /** Get the viewDef child node ID for a parent, or null if none exists. */
+  getViewDefId(parentId: string): string | null;
+  /** Set sort config on a parent node's viewDef (creates viewDef if needed). */
+  setSortConfig(parentId: string, field: string, direction: 'asc' | 'desc'): void;
+  /** Clear sort config (removes sortField/sortDirection from viewDef). */
+  clearSort(parentId: string): void;
 }
 
 // ============================================================
@@ -1795,6 +1804,40 @@ export const useNodeStore = create<NodeStore>((set, get) => {
 
       // Single commit with system:refresh origin (excluded from undo stack)
       loroDoc.commitDoc('system:refresh');
+    },
+
+    // ─── View 操作 ───
+
+    getViewDefId: (parentId) => {
+      const children = loroDoc.getChildren(parentId);
+      for (const childId of children) {
+        const child = loroDoc.toNodexNode(childId);
+        if (child?.type === 'viewDef') return childId;
+      }
+      return null;
+    },
+
+    setSortConfig: (parentId, field, direction) => {
+      if (!canMutate('setSortConfig')) return;
+      let viewDefId = get().getViewDefId(parentId);
+      if (!viewDefId) {
+        viewDefId = nanoid();
+        loroDoc.createNode(viewDefId, parentId, 0);
+        loroDoc.setNodeDataBatch(viewDefId, { type: 'viewDef' });
+      }
+      loroDoc.setNodeDataBatch(viewDefId, { sortField: field, sortDirection: direction });
+      loroDoc.commitDoc();
+      set({ _version: get()._version + 1 });
+    },
+
+    clearSort: (parentId) => {
+      if (!canMutate('clearSort')) return;
+      const viewDefId = get().getViewDefId(parentId);
+      if (!viewDefId) return;
+      loroDoc.deleteNodeData(viewDefId, 'sortField');
+      loroDoc.deleteNodeData(viewDefId, 'sortDirection');
+      loroDoc.commitDoc();
+      set({ _version: get()._version + 1 });
     },
 
     createNodeInSearchContext: (searchNodeId, data) => {

@@ -22,6 +22,8 @@ import {
   type OutlinerRowItem,
 } from './row-model.js';
 import { navigateToSiblingRow } from '../../lib/outliner-navigation.js';
+import { ViewToolbar } from './ViewToolbar.js';
+import { compareNodes, type SortConfig } from '../../lib/sort-utils.js';
 
 interface OutlinerViewProps {
   rootNodeId: string;
@@ -93,10 +95,20 @@ export function OutlinerView({ rootNodeId, showTemplateTuples }: OutlinerViewPro
     )
   ), [fieldMap]);
 
+  // Read sort config from viewDef child (if any)
+  const sortConfig = useMemo((): SortConfig | null => {
+    const viewDefId = useNodeStore.getState().getViewDefId(rootNodeId);
+    if (!viewDefId) return null;
+    const viewDef = useNodeStore.getState().getNode(viewDefId);
+    if (!viewDef?.sortField) return null;
+    return { field: viewDef.sortField, direction: viewDef.sortDirection ?? 'asc' };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rootNodeId, _version]);
+
   // Classify children with unified ordering: template fields first (grouped by tag),
   // then remaining children in data order — same logic as OutlinerItem.
-  const visibleChildren = useMemo(() => (
-    buildVisibleChildrenRows({
+  const visibleChildren = useMemo(() => {
+    const rows = buildVisibleChildrenRows({
       allChildIds,
       fieldMap,
       tagIds,
@@ -104,9 +116,22 @@ export function OutlinerView({ rootNodeId, showTemplateTuples }: OutlinerViewPro
       getNodeType: (id) => useNodeStore.getState().getNode(id)?.type,
       getChildNodeType: (id) => useNodeStore.getState().getNode(id)?.type,
       isOutlinerContentType: isOutlinerContentNodeType,
-    })
+    });
+    // Apply sort to content rows only (field rows keep their position)
+    if (!sortConfig) return rows;
+    const fieldRows = rows.filter((r) => r.type === 'field');
+    const contentRows = rows.filter((r) => r.type === 'content');
+    const getNode = useNodeStore.getState().getNode;
+    contentRows.sort((a, b) => {
+      const nodeA = getNode(a.id);
+      const nodeB = getNode(b.id);
+      if (!nodeA || !nodeB) return 0;
+      return compareNodes(nodeA, nodeB, sortConfig, getNode);
+    });
+    return [...fieldRows, ...contentRows];
+  }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  ), [allChildIds, fieldMap, tagIds, _version]);
+  , [allChildIds, fieldMap, tagIds, sortConfig, _version]);
 
   // Template content clone colors: content children with templateId get the owning tagDef's color.
   const templateContentColors = useMemo(() => {
@@ -167,6 +192,7 @@ export function OutlinerView({ rootNodeId, showTemplateTuples }: OutlinerViewPro
       role="tree"
       data-row-scope-parent-id={rootNodeId}
     >
+      <ViewToolbar nodeId={rootNodeId} />
       {/* Hidden field placeholder rows: ⊕ FieldName, aligned to col B */}
       {hiddenRevealableFields.length > 0 && hiddenRevealableFields.some(f => !isFieldRevealed(f.id)) && (
         <div className="flex flex-wrap gap-x-3 min-h-6 items-center" style={{ paddingLeft: 6 + 15 + 4 }}>

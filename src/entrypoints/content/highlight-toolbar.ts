@@ -694,6 +694,9 @@ function buildNotePopover(): void {
   noteList.addEventListener('keydown', (e) => {
     if (!notePopoverCallbacks) return;
 
+    // Skip all key handling during IME composition (e.g. Chinese/Japanese input)
+    if (e.isComposing) return;
+
     // Cmd/Ctrl+Enter → Save
     if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
       e.preventDefault();

@@ -1154,6 +1154,9 @@ export function toNodexNode(nodexId: string): NodexNode | null {
     queryFieldDefId: data.get('queryFieldDefId') as string | undefined,
     // search-specific
     lastRefreshedAt: data.get('lastRefreshedAt') as number | undefined,
+    // viewDef-specific
+    sortField: data.get('sortField') as string | undefined,
+    sortDirection: data.get('sortDirection') as NodexNode['sortDirection'],
   };
   _nodeCache.set(nodexId, result);
   return result;

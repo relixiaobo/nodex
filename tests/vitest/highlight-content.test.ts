@@ -83,18 +83,30 @@ describe('content highlight rendering', () => {
     expect(document.querySelector('#b')!.textContent).toBe('another line');
   });
 
-  it('renders note badge when hasNote option is true', () => {
+  it('renders filled dot when hasNote option is true', () => {
     document.body.innerHTML = '<p id="content">hello world</p>';
     const textNode = document.querySelector('#content')!.firstChild as Text;
     const range = createRangeForText(textNode, 0, 5);
 
     renderHighlight(range, 'hl_comment', 'rgba(155, 124, 56, 0.3)', { hasNote: true });
 
-    const icon = document.querySelector(
-      'soma-hl[data-highlight-id=\"hl_comment\"] [data-soma-note-icon=\"true\"]',
+    const dot = document.querySelector(
+      'soma-hl[data-highlight-id="hl_comment"] [data-soma-dot="filled"]',
     );
-    expect(icon).toBeTruthy();
-    expect(icon!.textContent).toBe('🗨');
+    expect(dot).toBeTruthy();
+  });
+
+  it('renders hollow dot when hasNote option is false', () => {
+    document.body.innerHTML = '<p id="content">hello world</p>';
+    const textNode = document.querySelector('#content')!.firstChild as Text;
+    const range = createRangeForText(textNode, 0, 5);
+
+    renderHighlight(range, 'hl_bare');
+
+    const dot = document.querySelector(
+      'soma-hl[data-highlight-id="hl_bare"] [data-soma-dot="hollow"]',
+    );
+    expect(dot).toBeTruthy();
   });
 
   it('renders highlight correctly when range endContainer is an Element (double-click selection)', () => {

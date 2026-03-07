@@ -153,6 +153,26 @@ interface NodeStore {
   clearSort(parentId: string): void;
   /** Toggle view toolbar visibility on a node. */
   toggleToolbar(nodeId: string): void;
+
+  // ─── Filter 操作 ───
+
+  /** Get all filter conditions from a node's viewDef. */
+  getFilters(parentId: string): Array<{ id: string; field: string; op: 'all' | 'any'; values: string[] }>;
+  /** Add a filter condition to a node's viewDef (creates viewDef if needed). */
+  addFilter(parentId: string, field: string, op: 'all' | 'any', values: string[]): string;
+  /** Update filter values on an existing filter node. */
+  updateFilterValues(filterNodeId: string, values: string[]): void;
+  /** Remove a filter condition node. */
+  removeFilter(filterNodeId: string): void;
+  /** Remove all filter conditions from a node's viewDef. */
+  clearAllFilters(parentId: string): void;
+
+  // ─── Group 操作 ───
+
+  /** Set group field on a node's viewDef (creates viewDef if needed). */
+  setGroupField(parentId: string, field: string): void;
+  /** Clear group config. */
+  clearGroup(parentId: string): void;
 }
 
 // ============================================================
@@ -1854,6 +1874,90 @@ export const useNodeStore = create<NodeStore>((set, get) => {
         const current = viewDef?.toolbarVisible ?? false;
         loroDoc.setNodeDataBatch(viewDefId, { toolbarVisible: !current });
       }
+      loroDoc.commitDoc();
+      set({ _version: get()._version + 1 });
+    },
+
+    // ─── Filter 操作 ───
+
+    getFilters: (parentId) => {
+      const viewDefId = get().getViewDefId(parentId);
+      if (!viewDefId) return [];
+      const children = loroDoc.getChildren(viewDefId);
+      const filters: Array<{ id: string; field: string; op: 'all' | 'any'; values: string[] }> = [];
+      for (const childId of children) {
+        const child = loroDoc.toNodexNode(childId);
+        if (child?.filterField) {
+          filters.push({
+            id: childId,
+            field: child.filterField,
+            op: child.filterOp ?? (child.filterField === 'tags' ? 'all' : 'any'),
+            values: child.filterValues ?? [],
+          });
+        }
+      }
+      return filters;
+    },
+
+    addFilter: (parentId, field, op, values) => {
+      if (!canMutate('addFilter')) return '';
+      let viewDefId = get().getViewDefId(parentId);
+      if (!viewDefId) {
+        viewDefId = nanoid();
+        loroDoc.createNode(viewDefId, parentId, 0);
+        loroDoc.setNodeDataBatch(viewDefId, { type: 'viewDef' });
+      }
+      const filterNodeId = nanoid();
+      loroDoc.createNode(filterNodeId, viewDefId);
+      loroDoc.setNodeDataBatch(filterNodeId, { filterField: field, filterOp: op, filterValues: values });
+      loroDoc.commitDoc();
+      set({ _version: get()._version + 1 });
+      return filterNodeId;
+    },
+
+    updateFilterValues: (filterNodeId, values) => {
+      if (!canMutate('updateFilterValues')) return;
+      loroDoc.setNodeDataBatch(filterNodeId, { filterValues: values });
+      loroDoc.commitDoc();
+      set({ _version: get()._version + 1 });
+    },
+
+    removeFilter: (filterNodeId) => {
+      if (!canMutate('removeFilter')) return;
+      loroDoc.deleteNode(filterNodeId);
+      loroDoc.commitDoc();
+      set({ _version: get()._version + 1 });
+    },
+
+    clearAllFilters: (parentId) => {
+      if (!canMutate('clearAllFilters')) return;
+      const filters = get().getFilters(parentId);
+      if (filters.length === 0) return;
+      for (const f of filters) loroDoc.deleteNode(f.id);
+      loroDoc.commitDoc();
+      set({ _version: get()._version + 1 });
+    },
+
+    // ─── Group 操作 ───
+
+    setGroupField: (parentId, field) => {
+      if (!canMutate('setGroupField')) return;
+      let viewDefId = get().getViewDefId(parentId);
+      if (!viewDefId) {
+        viewDefId = nanoid();
+        loroDoc.createNode(viewDefId, parentId, 0);
+        loroDoc.setNodeDataBatch(viewDefId, { type: 'viewDef' });
+      }
+      loroDoc.setNodeDataBatch(viewDefId, { groupField: field });
+      loroDoc.commitDoc();
+      set({ _version: get()._version + 1 });
+    },
+
+    clearGroup: (parentId) => {
+      if (!canMutate('clearGroup')) return;
+      const viewDefId = get().getViewDefId(parentId);
+      if (!viewDefId) return;
+      loroDoc.deleteNodeData(viewDefId, 'groupField');
       loroDoc.commitDoc();
       set({ _version: get()._version + 1 });
     },

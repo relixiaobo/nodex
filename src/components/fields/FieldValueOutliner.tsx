@@ -39,7 +39,7 @@ import { useUIStore } from '../../stores/ui-store.js';
 import * as loroDoc from '../../lib/loro-doc.js';
 import { t } from '../../i18n/strings.js';
 import { FIELD_OVERLAY_Z_INDEX } from './field-layout.js';
-import { shouldShowTrailingInput, type OutlinerRowItem } from '../outliner/row-model.js';
+import { shouldShowTrailingInput, type OutlinerRowItem, type OutlinerRowType } from '../outliner/row-model.js';
 import { useDragSelect } from '../../hooks/use-drag-select.js';
 import { navigateToSiblingRow } from '../../lib/outliner-navigation.js';
 
@@ -56,9 +56,9 @@ interface FieldValueOutlinerProps {
 }
 
 export function shouldShowFieldValueTrailingInput(
-  items: Array<{ type: 'field' | 'content' }>,
+  items: Array<{ type: string }>,
 ): boolean {
-  return shouldShowTrailingInput(items);
+  return shouldShowTrailingInput(items as Array<{ type: OutlinerRowType }>);
 }
 
 export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, configNodeId, onNavigateOut }: FieldValueOutlinerProps) {

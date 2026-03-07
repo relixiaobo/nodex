@@ -60,6 +60,9 @@ import { getNodeCapabilities } from '../../lib/node-capabilities.js';
 import { RowHost } from './RowHost.js';
 import { ViewToolbar } from './ViewToolbar.js';
 import { compareNodes, type SortConfig } from '../../lib/sort-utils.js';
+import { buildBacklinkCountMap } from '../../lib/backlinks.js';
+import { matchesAllFilters, type FilterCondition } from '../../lib/filter-utils.js';
+import { groupNodes } from '../../lib/group-utils.js';
 import { OutlinerRow, useRowSelectionState, useRowPointerHandlers } from './OutlinerRow.js';
 import { NodeContextMenuPortal } from './NodeContextMenu.js';
 import {
@@ -360,19 +363,26 @@ export function OutlinerItem({
     )
   ), [fieldMap]);
 
-  // Read sort config from viewDef child (if any)
-  const sortConfig = useMemo((): SortConfig | null => {
-    const vdId = useNodeStore.getState().getViewDefId(effectiveNodeId);
-    if (!vdId) return null;
-    const vd = useNodeStore.getState().getNode(vdId);
-    if (!vd?.sortField) return null;
-    return { field: vd.sortField, direction: vd.sortDirection ?? 'asc' };
+  // Read view config from viewDef child (sort, filter, group)
+  const viewConfig = useMemo(() => {
+    const store = useNodeStore.getState();
+    const vdId = store.getViewDefId(effectiveNodeId);
+    if (!vdId) return { sort: null as SortConfig | null, filters: [] as FilterCondition[], groupField: null as string | null };
+    const vd = store.getNode(vdId);
+    const sort: SortConfig | null = vd?.sortField
+      ? { field: vd.sortField, direction: vd.sortDirection ?? 'asc' }
+      : null;
+    const filters = store.getFilters(effectiveNodeId).map((f) => ({
+      field: f.field,
+      op: f.op,
+      values: f.values,
+    }));
+    const groupField = vd?.groupField ?? null;
+    return { sort, filters, groupField };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [effectiveNodeId, _version]);
 
-  // Classify children for render order:
-  // 1) template fields pinned on top, grouped by current supertag order,
-  // 2) all remaining children (manual fields + content) keep original sibling order.
+  // Classify children for render order + apply filter → group → sort pipeline
   const visibleChildren = useMemo(() => {
     const rows = buildVisibleChildrenRows({
       allChildIds,
@@ -383,20 +393,56 @@ export function OutlinerItem({
       getChildNodeType: (id) => useNodeStore.getState().getNode(id)?.type,
       isOutlinerContentType: isOutlinerContentNodeType,
     });
-    if (!sortConfig) return rows;
     const fieldRows = rows.filter((r) => r.type === 'field');
-    const contentRows = rows.filter((r) => r.type === 'content');
+    let contentRows = rows.filter((r) => r.type === 'content');
     const getNode = useNodeStore.getState().getNode;
-    contentRows.sort((a, b) => {
-      const nodeA = getNode(a.id);
-      const nodeB = getNode(b.id);
-      if (!nodeA || !nodeB) return 0;
-      return compareNodes(nodeA, nodeB, sortConfig, getNode);
-    });
+    const { sort, filters, groupField } = viewConfig;
+
+    // 1. Filter
+    if (filters.length > 0) {
+      contentRows = contentRows.filter((r) => {
+        const node = getNode(r.id);
+        return node ? matchesAllFilters(node, filters, getNode) : false;
+      });
+    }
+
+    // 2. Group + Sort
+    if (groupField) {
+      const contentIds = contentRows.map((r) => r.id);
+      const groups = groupNodes(contentIds, groupField, getNode);
+      const result: OutlinerRowItem[] = [...fieldRows];
+      const backlinkCounts = sort?.field === 'refCount' ? buildBacklinkCountMap(_version) : undefined;
+      for (const group of groups) {
+        result.push({ id: `__group__${group.key}`, type: 'groupHeader', label: group.label });
+        let groupItems: OutlinerRowItem[] = group.ids.map((id) => ({ id, type: 'content' as const }));
+        if (sort) {
+          groupItems.sort((a, b) => {
+            const nodeA = getNode(a.id);
+            const nodeB = getNode(b.id);
+            if (!nodeA || !nodeB) return 0;
+            return compareNodes(nodeA, nodeB, sort, getNode, backlinkCounts);
+          });
+        }
+        result.push(...groupItems);
+      }
+      return result;
+    }
+
+    // 3. Sort only (no group)
+    if (sort) {
+      const backlinkCounts = sort.field === 'refCount' ? buildBacklinkCountMap(_version) : undefined;
+      contentRows.sort((a, b) => {
+        const nodeA = getNode(a.id);
+        const nodeB = getNode(b.id);
+        if (!nodeA || !nodeB) return 0;
+        return compareNodes(nodeA, nodeB, sort, getNode, backlinkCounts);
+      });
+    }
+
     return [...fieldRows, ...contentRows];
   }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  , [allChildIds, fieldMap, tagIds, sortConfig, _version]);
+  , [allChildIds, fieldMap, tagIds, viewConfig, _version]);
 
   // Template content clone colors: content children with templateId get the owning tagDef's color.
   // This ensures template-cloned content matches the supertag's bullet color.
@@ -2122,6 +2168,14 @@ export function OutlinerItem({
                 referencePath={nextReferencePath}
                 bulletColors={templateContentColors.get(row.id)}
               />
+            )}
+            renderGroupHeader={(row) => (
+              <div
+                className="flex items-center h-7 text-sm font-semibold text-foreground mt-2 first:mt-0"
+                style={{ paddingLeft: (depth + 1) * 28 + 6 + 15 + 4 }}
+              >
+                {row.label}
+              </div>
             )}
           />
           {showTrailingInputRow && (

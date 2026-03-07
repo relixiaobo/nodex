@@ -340,6 +340,20 @@ export interface NodexNode {
 
   /** View toolbar visible (user toggled via context menu) */
   toolbarVisible?: boolean;
+
+  /** Group field: 'tags' | 'done' | 'createdAt' | 'updatedAt' | fieldDefId */
+  groupField?: string;
+
+  // ─── Filter 条件节点专用（ViewDef 子节点，通过 filterField 识别） ───
+
+  /** Filter target field: 'tags' | 'done' | fieldDefId */
+  filterField?: string;
+
+  /** Filter logic within values: 'all' (AND) or 'any' (OR). Default varies by field. */
+  filterOp?: 'all' | 'any';
+
+  /** Selected filter values (tagDefIds, 'true'/'false', option names, etc.) */
+  filterValues?: string[];
 }
 
 // ============================================================

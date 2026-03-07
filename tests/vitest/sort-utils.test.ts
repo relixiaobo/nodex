@@ -85,6 +85,72 @@ describe('compareNodes', () => {
     expect(compareNodes(a, b, config, getNodeFn)).toBeGreaterThan(0); // Zebra > Alpha
   });
 
+  it('sorts by updatedAt ascending', () => {
+    const a = makeNode({ updatedAt: 500 });
+    const b = makeNode({ updatedAt: 900 });
+    const config: SortConfig = { field: 'updatedAt', direction: 'asc' };
+    expect(compareNodes(a, b, config, getNode)).toBeLessThan(0);
+  });
+
+  it('sorts by updatedAt descending', () => {
+    const a = makeNode({ updatedAt: 500 });
+    const b = makeNode({ updatedAt: 900 });
+    const config: SortConfig = { field: 'updatedAt', direction: 'desc' };
+    expect(compareNodes(a, b, config, getNode)).toBeGreaterThan(0);
+  });
+
+  it('sorts by done: not-done before done in asc', () => {
+    const a = makeNode({ completedAt: 1234 });
+    const b = makeNode({});
+    const config: SortConfig = { field: 'done', direction: 'asc' };
+    expect(compareNodes(a, b, config, getNode)).toBeGreaterThan(0); // done after not-done
+  });
+
+  it('sorts by done: done before not-done in desc', () => {
+    const a = makeNode({ completedAt: 1234 });
+    const b = makeNode({});
+    const config: SortConfig = { field: 'done', direction: 'desc' };
+    expect(compareNodes(a, b, config, getNode)).toBeLessThan(0); // done first
+  });
+
+  it('sorts by doneTime ascending (no completedAt sorts last)', () => {
+    const a = makeNode({ completedAt: 100 });
+    const b = makeNode({}); // no completedAt → Infinity
+    const config: SortConfig = { field: 'doneTime', direction: 'asc' };
+    expect(compareNodes(a, b, config, getNode)).toBeLessThan(0); // 100 < Infinity
+  });
+
+  it('sorts by doneTime descending', () => {
+    const a = makeNode({ completedAt: 100 });
+    const b = makeNode({ completedAt: 300 });
+    const config: SortConfig = { field: 'doneTime', direction: 'desc' };
+    expect(compareNodes(a, b, config, getNode)).toBeGreaterThan(0); // 300 > 100, desc reverses
+  });
+
+  it('sorts by refCount ascending', () => {
+    const a = makeNode({ id: 'a' });
+    const b = makeNode({ id: 'b' });
+    const backlinkCounts = new Map([['a', 2], ['b', 5]]);
+    const config: SortConfig = { field: 'refCount', direction: 'asc' };
+    expect(compareNodes(a, b, config, getNode, backlinkCounts)).toBeLessThan(0); // 2 < 5
+  });
+
+  it('sorts by refCount descending', () => {
+    const a = makeNode({ id: 'a' });
+    const b = makeNode({ id: 'b' });
+    const backlinkCounts = new Map([['a', 2], ['b', 5]]);
+    const config: SortConfig = { field: 'refCount', direction: 'desc' };
+    expect(compareNodes(a, b, config, getNode, backlinkCounts)).toBeGreaterThan(0); // 5 > 2, desc reverses
+  });
+
+  it('sorts by refCount treats missing counts as 0', () => {
+    const a = makeNode({ id: 'a' });
+    const b = makeNode({ id: 'b' });
+    const backlinkCounts = new Map([['b', 3]]);
+    const config: SortConfig = { field: 'refCount', direction: 'asc' };
+    expect(compareNodes(a, b, config, getNode, backlinkCounts)).toBeLessThan(0); // 0 < 3
+  });
+
   it('sorts nodes without the field value to the end', () => {
     const fieldDefId = 'fd1';
     const a = makeNode({ id: 'a', children: [] }); // no fieldEntry

@@ -6,6 +6,7 @@ interface RowHostProps<Row extends OutlinerRowItem> {
   isRowVisible?: (row: Row) => boolean;
   renderField: (row: Extract<Row, { type: 'field' }>, index: number, rows: Row[]) => ReactNode;
   renderContent: (row: Extract<Row, { type: 'content' }>, index: number, rows: Row[]) => ReactNode;
+  renderGroupHeader?: (row: Extract<Row, { type: 'groupHeader' }>) => ReactNode;
 }
 
 export function RowHost<Row extends OutlinerRowItem>({
@@ -13,14 +14,17 @@ export function RowHost<Row extends OutlinerRowItem>({
   isRowVisible = (row) => !row.hidden,
   renderField,
   renderContent,
+  renderGroupHeader,
 }: RowHostProps<Row>) {
   return rows.map((row, index) => {
     if (!isRowVisible(row)) return null;
     return (
       <Fragment key={row.id}>
-        {row.type === 'field'
-          ? renderField(row as Extract<Row, { type: 'field' }>, index, rows)
-          : renderContent(row as Extract<Row, { type: 'content' }>, index, rows)}
+        {row.type === 'groupHeader'
+          ? renderGroupHeader?.(row as Extract<Row, { type: 'groupHeader' }>)
+          : row.type === 'field'
+            ? renderField(row as Extract<Row, { type: 'field' }>, index, rows)
+            : renderContent(row as Extract<Row, { type: 'content' }>, index, rows)}
       </Fragment>
     );
   });

@@ -3,7 +3,7 @@
  */
 import type { NodexNode } from '../types/node.js';
 
-export type SortField = 'name' | 'createdAt' | string; // string = fieldDefId
+export type SortField = 'name' | 'createdAt' | 'updatedAt' | 'done' | 'doneTime' | 'refCount' | string;
 export type SortDirection = 'asc' | 'desc';
 
 export interface SortConfig {
@@ -36,12 +36,15 @@ function getFieldSortValue(
 /**
  * Compare two nodes by the given sort config.
  * Returns negative if a < b, positive if a > b, 0 if equal.
+ *
+ * @param backlinkCounts Optional map of nodeId → backlink count (for 'refCount' sort).
  */
 export function compareNodes(
   a: NodexNode,
   b: NodexNode,
   config: SortConfig,
   getNode: (id: string) => NodexNode | null,
+  backlinkCounts?: Map<string, number>,
 ): number {
   const dir = config.direction === 'desc' ? -1 : 1;
 
@@ -53,6 +56,23 @@ export function compareNodes(
     case 'createdAt':
       cmp = a.createdAt - b.createdAt;
       break;
+    case 'updatedAt':
+      cmp = a.updatedAt - b.updatedAt;
+      break;
+    case 'done':
+      // Done nodes sort after not-done (asc: not-done first, done last)
+      cmp = (a.completedAt ? 1 : 0) - (b.completedAt ? 1 : 0);
+      break;
+    case 'doneTime':
+      // Nodes without completedAt sort to end (use Infinity so they appear last in asc)
+      cmp = (a.completedAt ?? Infinity) - (b.completedAt ?? Infinity);
+      break;
+    case 'refCount': {
+      const ca = backlinkCounts?.get(a.id) ?? 0;
+      const cb = backlinkCounts?.get(b.id) ?? 0;
+      cmp = ca - cb;
+      break;
+    }
     default: {
       // Sort by field value (fieldDefId)
       const va = getFieldSortValue(a, config.field, getNode);
@@ -72,11 +92,12 @@ export function sortNodeIds(
   ids: string[],
   config: SortConfig,
   getNode: (id: string) => NodexNode | null,
+  backlinkCounts?: Map<string, number>,
 ): string[] {
   return [...ids].sort((aId, bId) => {
     const a = getNode(aId);
     const b = getNode(bId);
     if (!a || !b) return 0;
-    return compareNodes(a, b, config, getNode);
+    return compareNodes(a, b, config, getNode, backlinkCounts);
   });
 }

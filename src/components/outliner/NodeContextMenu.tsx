@@ -38,7 +38,7 @@ import { Kbd } from '../ui/Kbd.js';
 import {
   Link, Copy, Scissors, CopyPlus, MoveRight,
   Hash, CheckSquare, Type, Trash2, ChevronLeft, ChevronRight,
-  Plus, Inbox, Library, CalendarDays, ArrowUpDown, ArrowUp, ArrowDown, X,
+  Plus, Inbox, Library, CalendarDays, ArrowUpDown,
 } from '../../lib/icons.js';
 import type { LucideIcon } from 'lucide-react';
 
@@ -251,14 +251,23 @@ const NodeContextMenuContent = forwardRef<HTMLDivElement, NodeContextMenuContent
       onClose();
     }, [nodeId, onClose]);
 
-    // Sort by: applies to the right-clicked node itself (sorts its children)
-    const handleSort = useCallback((field: string, direction: 'asc' | 'desc') => {
-      useNodeStore.getState().setSortConfig(nodeId, field, direction);
-      onClose();
-    }, [nodeId, onClose]);
+    // View toolbar toggle
+    const toolbarVisible = useMemo(() => {
+      const viewDefId = useNodeStore.getState().getViewDefId(nodeId);
+      if (!viewDefId) return false;
+      const viewDef = useNodeStore.getState().getNode(viewDefId);
+      return viewDef?.toolbarVisible ?? false;
+    }, [nodeId]);
 
-    const handleClearSort = useCallback(() => {
-      useNodeStore.getState().clearSort(nodeId);
+    const hasActiveSort = useMemo(() => {
+      const viewDefId = useNodeStore.getState().getViewDefId(nodeId);
+      if (!viewDefId) return false;
+      const viewDef = useNodeStore.getState().getNode(viewDefId);
+      return !!viewDef?.sortField;
+    }, [nodeId]);
+
+    const handleToggleToolbar = useCallback(() => {
+      useNodeStore.getState().toggleToolbar(nodeId);
       onClose();
     }, [nodeId, onClose]);
 
@@ -291,9 +300,8 @@ const NodeContextMenuContent = forwardRef<HTMLDivElement, NodeContextMenuContent
             hasDescription={hasDescription}
             changed={changed}
             created={created}
-            sortTargetId={nodeId}
-            onSort={handleSort}
-            onClearSort={handleClearSort}
+            toolbarVisible={toolbarVisible || hasActiveSort}
+            onToggleToolbar={handleToggleToolbar}
           />
         )}
         {mode === 'add-tag' && (
@@ -326,9 +334,8 @@ function MainMenu({
   hasDescription,
   changed,
   created,
-  sortTargetId,
-  onSort,
-  onClearSort,
+  toolbarVisible,
+  onToggleToolbar,
 }: {
   onCopyLink: () => void;
   onCopy: () => void;
@@ -344,9 +351,8 @@ function MainMenu({
   hasDescription: boolean;
   changed: string;
   created: string;
-  sortTargetId: string;
-  onSort: (field: string, direction: 'asc' | 'desc') => void;
-  onClearSort: () => void;
+  toolbarVisible: boolean;
+  onToggleToolbar: () => void;
 }) {
   return (
     <>
@@ -372,9 +378,12 @@ function MainMenu({
         onClick={onAddDescription}
       />
 
-      {/* Sort by */}
-      <MenuSeparator />
-      <SortBySubmenu parentId={sortTargetId} onSort={onSort} onClearSort={onClearSort} />
+      {/* View toolbar toggle */}
+      <MenuItem
+        icon={ArrowUpDown}
+        label={toolbarVisible ? 'Hide view toolbar' : 'Show view toolbar'}
+        onClick={onToggleToolbar}
+      />
 
       <MenuSeparator />
 
@@ -504,200 +513,6 @@ function MoveToSubmenu({
             />
           ))}
         </div>
-      )}
-    </div>
-  );
-}
-
-// ── Sort by hover submenu ──
-
-const SORT_BUILTIN: Array<{ id: string; label: string }> = [
-  { id: 'name', label: 'Name' },
-  { id: 'createdAt', label: 'Created' },
-];
-
-function SortBySubmenu({
-  parentId,
-  onSort,
-  onClearSort,
-}: {
-  parentId: string;
-  onSort: (field: string, direction: 'asc' | 'desc') => void;
-  onClearSort: () => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const rowRef = useRef<HTMLDivElement>(null);
-  const timerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
-
-  const showSub = () => { clearTimeout(timerRef.current); setOpen(true); };
-  const hideSub = () => { timerRef.current = setTimeout(() => setOpen(false), 120); };
-  useEffect(() => () => clearTimeout(timerRef.current), []);
-
-  // Current sort config
-  const currentSort = useMemo(() => {
-    const viewDefId = useNodeStore.getState().getViewDefId(parentId);
-    if (!viewDefId) return null;
-    const viewDef = useNodeStore.getState().getNode(viewDefId);
-    if (!viewDef?.sortField) return null;
-    return { field: viewDef.sortField, direction: (viewDef.sortDirection ?? 'asc') as 'asc' | 'desc' };
-  }, [parentId]);
-
-  // Tag field defs
-  const tagFields = useMemo(() => {
-    const parentNode = loroDoc.toNodexNode(parentId);
-    if (!parentNode) return [];
-    const fields: Array<{ id: string; name: string }> = [];
-    const seen = new Set<string>();
-    for (const tagId of parentNode.tags) {
-      const tagDef = loroDoc.toNodexNode(tagId);
-      if (!tagDef) continue;
-      for (const childId of tagDef.children) {
-        const child = loroDoc.toNodexNode(childId);
-        if (child?.type !== 'fieldDef' || seen.has(childId)) continue;
-        seen.add(childId);
-        fields.push({ id: childId, name: child.name ?? '' });
-      }
-    }
-    return fields;
-  }, [parentId]);
-
-  const allFields = [...SORT_BUILTIN, ...tagFields];
-
-  const handleSelect = useCallback((fieldId: string) => {
-    if (currentSort?.field === fieldId) {
-      // Toggle direction
-      onSort(fieldId, currentSort.direction === 'asc' ? 'desc' : 'asc');
-    } else {
-      onSort(fieldId, 'asc');
-    }
-  }, [currentSort, onSort]);
-
-  // Flyout placement (reuse MoveToSubmenu logic)
-  const flyoutPlacement = useMemo((): { side: 'right' | 'left' | 'below'; style: React.CSSProperties } => {
-    if (!rowRef.current) return { side: 'right', style: { top: 0, left: '100%' } };
-    const rect = rowRef.current.getBoundingClientRect();
-    const subWidth = 180;
-    if (rect.right + subWidth <= window.innerWidth) {
-      return { side: 'right', style: { top: 0, left: '100%' } };
-    }
-    if (rect.left - subWidth >= 0) {
-      return { side: 'left', style: { top: 0, right: '100%' } };
-    }
-    return { side: 'below', style: {} };
-  }, [open]);
-
-  // Inline below mode
-  if (open && flyoutPlacement.side === 'below') {
-    return (
-      <div ref={rowRef} onMouseEnter={showSub} onMouseLeave={hideSub}>
-        <button
-          className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-sm text-foreground-secondary transition-colors text-left hover:bg-foreground/4 hover:text-foreground"
-          onClick={() => setOpen(false)}
-        >
-          <div className="flex w-4 shrink-0 items-center justify-center text-foreground-tertiary">
-            <ChevronLeft size={14} strokeWidth={1.5} />
-          </div>
-          <span className="flex-1 font-medium">Sort by</span>
-        </button>
-        <SortSubmenuContent
-          fields={allFields}
-          currentSort={currentSort}
-          onSelect={handleSelect}
-          onClear={currentSort ? onClearSort : undefined}
-          inline
-        />
-      </div>
-    );
-  }
-
-  return (
-    <div
-      ref={rowRef}
-      className="relative"
-      onMouseEnter={showSub}
-      onMouseLeave={hideSub}
-    >
-      <button
-        className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-sm text-foreground-secondary transition-colors text-left hover:bg-foreground/4 hover:text-foreground"
-        onClick={() => setOpen((v) => !v)}
-      >
-        <div className="flex w-4 shrink-0 items-center justify-center text-foreground-tertiary">
-          <ArrowUpDown size={14} strokeWidth={1.5} />
-        </div>
-        <span className="flex-1">Sort by</span>
-        {currentSort && (
-          <span className="text-xs text-primary mr-1">
-            {SORT_BUILTIN.find((f) => f.id === currentSort.field)?.label ?? '...'}
-          </span>
-        )}
-        <ChevronRight size={14} strokeWidth={1.5} className="text-foreground-tertiary" />
-      </button>
-
-      {open && (
-        <div
-          className="absolute z-50 min-w-[160px] rounded-lg bg-background shadow-paper p-1"
-          style={flyoutPlacement.style}
-        >
-          <SortSubmenuContent
-            fields={allFields}
-            currentSort={currentSort}
-            onSelect={handleSelect}
-            onClear={currentSort ? onClearSort : undefined}
-          />
-        </div>
-      )}
-    </div>
-  );
-}
-
-function SortSubmenuContent({
-  fields,
-  currentSort,
-  onSelect,
-  onClear,
-  inline,
-}: {
-  fields: Array<{ id: string; label?: string; name?: string }>;
-  currentSort: { field: string; direction: 'asc' | 'desc' } | null;
-  onSelect: (fieldId: string) => void;
-  onClear?: () => void;
-  inline?: boolean;
-}) {
-  return (
-    <div className={inline ? 'pl-4' : ''}>
-      {fields.map((f) => {
-        const label = f.label ?? f.name ?? '';
-        const active = currentSort?.field === f.id;
-        return (
-          <button
-            key={f.id}
-            className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors text-left ${
-              active
-                ? 'text-primary bg-primary-muted'
-                : 'text-foreground-secondary hover:bg-foreground/4 hover:text-foreground'
-            }`}
-            onClick={() => onSelect(f.id)}
-          >
-            <span className="flex-1">{label}</span>
-            {active && currentSort && (
-              currentSort.direction === 'asc'
-                ? <ArrowUp size={12} strokeWidth={2} className="text-primary" />
-                : <ArrowDown size={12} strokeWidth={2} className="text-primary" />
-            )}
-          </button>
-        );
-      })}
-      {onClear && (
-        <>
-          <div className="mx-1 my-0.5 h-px bg-border-subtle" />
-          <button
-            className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-destructive transition-colors hover:bg-foreground/4"
-            onClick={onClear}
-          >
-            <X size={14} strokeWidth={1.5} />
-            Remove sort
-          </button>
-        </>
       )}
     </div>
   );

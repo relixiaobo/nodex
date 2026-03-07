@@ -151,6 +151,8 @@ interface NodeStore {
   setSortConfig(parentId: string, field: string, direction: 'asc' | 'desc'): void;
   /** Clear sort config (removes sortField/sortDirection from viewDef). */
   clearSort(parentId: string): void;
+  /** Toggle view toolbar visibility on a node. */
+  toggleToolbar(nodeId: string): void;
 }
 
 // ============================================================
@@ -1836,6 +1838,22 @@ export const useNodeStore = create<NodeStore>((set, get) => {
       if (!viewDefId) return;
       loroDoc.deleteNodeData(viewDefId, 'sortField');
       loroDoc.deleteNodeData(viewDefId, 'sortDirection');
+      loroDoc.commitDoc();
+      set({ _version: get()._version + 1 });
+    },
+
+    toggleToolbar: (nodeId) => {
+      if (!canMutate('toggleToolbar')) return;
+      let viewDefId = get().getViewDefId(nodeId);
+      if (!viewDefId) {
+        viewDefId = nanoid();
+        loroDoc.createNode(viewDefId, nodeId, 0);
+        loroDoc.setNodeDataBatch(viewDefId, { type: 'viewDef', toolbarVisible: true });
+      } else {
+        const viewDef = loroDoc.toNodexNode(viewDefId);
+        const current = viewDef?.toolbarVisible ?? false;
+        loroDoc.setNodeDataBatch(viewDefId, { toolbarVisible: !current });
+      }
       loroDoc.commitDoc();
       set({ _version: get()._version + 1 });
     },

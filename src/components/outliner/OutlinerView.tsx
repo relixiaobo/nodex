@@ -192,7 +192,7 @@ export function OutlinerView({ rootNodeId, showTemplateTuples }: OutlinerViewPro
       role="tree"
       data-row-scope-parent-id={rootNodeId}
     >
-      <ViewToolbar nodeId={rootNodeId} />
+      <ViewToolbar nodeId={rootNodeId} depth={0} />
       {/* Hidden field placeholder rows: ⊕ FieldName, aligned to col B */}
       {hiddenRevealableFields.length > 0 && hiddenRevealableFields.some(f => !isFieldRevealed(f.id)) && (
         <div className="flex flex-wrap gap-x-3 min-h-6 items-center" style={{ paddingLeft: 6 + 15 + 4 }}>

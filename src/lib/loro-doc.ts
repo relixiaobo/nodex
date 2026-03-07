@@ -1157,6 +1157,7 @@ export function toNodexNode(nodexId: string): NodexNode | null {
     // viewDef-specific
     sortField: data.get('sortField') as string | undefined,
     sortDirection: data.get('sortDirection') as NodexNode['sortDirection'],
+    toolbarVisible: data.get('toolbarVisible') as boolean | undefined,
   };
   _nodeCache.set(nodexId, result);
   return result;

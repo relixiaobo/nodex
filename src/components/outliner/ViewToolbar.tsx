@@ -2,7 +2,8 @@
  * View Toolbar — Sort / Filter / Group controls for outliner views.
  *
  * Phase 1: Sort is functional; Filter and Group are disabled placeholders.
- * Toolbar auto-shows when any config is active (no separate visibility toggle).
+ * Shows on hover when no config is active; always visible when sort is set.
+ * Rendered between a node's title and its children (inside OutlinerItem or OutlinerView).
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -21,9 +22,11 @@ const BUILTIN_FIELDS: Array<{ id: string; label: string }> = [
 
 interface ViewToolbarProps {
   nodeId: string;
+  /** Indentation depth (0 for root OutlinerView) */
+  depth: number;
 }
 
-export function ViewToolbar({ nodeId }: ViewToolbarProps) {
+export function ViewToolbar({ nodeId, depth }: ViewToolbarProps) {
   const _version = useNodeStore((s) => s._version);
   const viewDefId = useNodeStore((s) => {
     void s._version;
@@ -38,17 +41,28 @@ export function ViewToolbar({ nodeId }: ViewToolbarProps) {
 
   const sortField = viewDef?.sortField ?? null;
   const sortDirection = (viewDef?.sortDirection ?? 'asc') as SortDirection;
+  const toolbarVisible = viewDef?.toolbarVisible ?? false;
+  const hasActiveConfig = !!sortField;
 
-  // No active config → no toolbar
-  if (!sortField) return null;
+  // Only render when toolbar is toggled on or has active config
+  if (!toolbarVisible && !hasActiveConfig) return null;
+
+  const leftPad = depth * 28 + 6 + 15 + 4;
 
   return (
-    <div className="flex items-center gap-0.5 px-4 pb-1 pt-0.5" style={{ paddingLeft: 6 + 15 + 4 }}>
-      <SortButton
-        nodeId={nodeId}
-        sortField={sortField}
-        sortDirection={sortDirection}
-      />
+    <div
+      className="flex items-center gap-0.5 h-6"
+      style={{ paddingLeft: leftPad }}
+    >
+      {sortField ? (
+        <SortButton
+          nodeId={nodeId}
+          sortField={sortField}
+          sortDirection={sortDirection}
+        />
+      ) : (
+        <SortTriggerButton nodeId={nodeId} />
+      )}
       <ToolbarIconButton
         icon={ListFilter}
         label="Filter"
@@ -65,7 +79,37 @@ export function ViewToolbar({ nodeId }: ViewToolbarProps) {
   );
 }
 
-// ── Sort button with dropdown ──
+// ── Sort trigger button (no active sort) ──
+
+function SortTriggerButton({ nodeId }: { nodeId: string }) {
+  const [open, setOpen] = useState(false);
+  const btnRef = useRef<HTMLButtonElement>(null);
+
+  return (
+    <>
+      <button
+        ref={btnRef}
+        className="flex items-center gap-1 h-5 px-1 rounded text-[11px] text-foreground-tertiary hover:text-foreground-secondary hover:bg-foreground/4 transition-colors cursor-pointer"
+        onClick={() => setOpen((v) => !v)}
+        title="Sort"
+      >
+        <ArrowUpDown size={11} strokeWidth={1.5} />
+        <span>Sort</span>
+      </button>
+      {open && (
+        <SortDropdown
+          nodeId={nodeId}
+          sortField={null}
+          sortDirection="asc"
+          anchorRef={btnRef}
+          onClose={() => setOpen(false)}
+        />
+      )}
+    </>
+  );
+}
+
+// ── Sort button with active indicator ──
 
 function SortButton({
   nodeId,
@@ -86,13 +130,13 @@ function SortButton({
     <>
       <button
         ref={btnRef}
-        className="flex items-center gap-1 h-6 px-1.5 rounded text-xs text-primary hover:bg-primary-muted transition-colors cursor-pointer"
+        className="flex items-center gap-1 h-5 px-1 rounded text-[11px] text-primary hover:bg-primary-muted transition-colors cursor-pointer"
         onClick={() => setOpen((v) => !v)}
         title="Sort"
       >
-        <ArrowUpDown size={12} strokeWidth={1.5} />
+        <ArrowUpDown size={11} strokeWidth={1.5} />
         <span className="max-w-[100px] truncate">{fieldLabel}</span>
-        <DirIcon size={10} strokeWidth={2} />
+        <DirIcon size={9} strokeWidth={2} />
       </button>
       {open && (
         <SortDropdown
@@ -117,7 +161,7 @@ function SortDropdown({
   onClose,
 }: {
   nodeId: string;
-  sortField: string;
+  sortField: string | null;
   sortDirection: SortDirection;
   anchorRef: React.RefObject<HTMLButtonElement | null>;
   onClose: () => void;
@@ -197,14 +241,18 @@ function SortDropdown({
           ))}
         </>
       )}
-      <div className="mx-1 my-1 h-px bg-border-subtle" />
-      <button
-        className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-destructive transition-colors hover:bg-foreground/4"
-        onClick={handleRemove}
-      >
-        <X size={14} strokeWidth={1.5} />
-        Remove sort
-      </button>
+      {sortField && (
+        <>
+          <div className="mx-1 my-1 h-px bg-border-subtle" />
+          <button
+            className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-destructive transition-colors hover:bg-foreground/4"
+            onClick={handleRemove}
+          >
+            <X size={14} strokeWidth={1.5} />
+            Remove sort
+          </button>
+        </>
+      )}
     </div>,
     document.body,
   );
@@ -255,7 +303,7 @@ function ToolbarIconButton({
 }) {
   return (
     <button
-      className={`flex items-center gap-1 h-6 px-1.5 rounded text-xs transition-colors ${
+      className={`flex items-center gap-1 h-5 px-1 rounded text-[11px] transition-colors ${
         disabled
           ? 'text-foreground-tertiary cursor-not-allowed opacity-50'
           : 'text-foreground-secondary hover:bg-foreground/4 hover:text-foreground cursor-pointer'
@@ -263,7 +311,7 @@ function ToolbarIconButton({
       disabled={disabled}
       title={tooltip ?? label}
     >
-      <Icon size={12} strokeWidth={1.5} />
+      <Icon size={11} strokeWidth={1.5} />
       <span>{label}</span>
     </button>
   );

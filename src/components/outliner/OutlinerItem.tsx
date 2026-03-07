@@ -58,6 +58,8 @@ import type { ParsedPasteNode } from '../../lib/paste-parser.js';
 import { t } from '../../i18n/strings.js';
 import { getNodeCapabilities } from '../../lib/node-capabilities.js';
 import { RowHost } from './RowHost.js';
+import { ViewToolbar } from './ViewToolbar.js';
+import { compareNodes, type SortConfig } from '../../lib/sort-utils.js';
 import { OutlinerRow, useRowSelectionState, useRowPointerHandlers } from './OutlinerRow.js';
 import { NodeContextMenuPortal } from './NodeContextMenu.js';
 import {
@@ -358,11 +360,21 @@ export function OutlinerItem({
     )
   ), [fieldMap]);
 
+  // Read sort config from viewDef child (if any)
+  const sortConfig = useMemo((): SortConfig | null => {
+    const vdId = useNodeStore.getState().getViewDefId(effectiveNodeId);
+    if (!vdId) return null;
+    const vd = useNodeStore.getState().getNode(vdId);
+    if (!vd?.sortField) return null;
+    return { field: vd.sortField, direction: vd.sortDirection ?? 'asc' };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [effectiveNodeId, _version]);
+
   // Classify children for render order:
   // 1) template fields pinned on top, grouped by current supertag order,
   // 2) all remaining children (manual fields + content) keep original sibling order.
-  const visibleChildren = useMemo(() => (
-    buildVisibleChildrenRows({
+  const visibleChildren = useMemo(() => {
+    const rows = buildVisibleChildrenRows({
       allChildIds,
       fieldMap,
       tagIds,
@@ -370,9 +382,21 @@ export function OutlinerItem({
       getNodeType: (id) => useNodeStore.getState().getNode(id)?.type,
       getChildNodeType: (id) => useNodeStore.getState().getNode(id)?.type,
       isOutlinerContentType: isOutlinerContentNodeType,
-    })
+    });
+    if (!sortConfig) return rows;
+    const fieldRows = rows.filter((r) => r.type === 'field');
+    const contentRows = rows.filter((r) => r.type === 'content');
+    const getNode = useNodeStore.getState().getNode;
+    contentRows.sort((a, b) => {
+      const nodeA = getNode(a.id);
+      const nodeB = getNode(b.id);
+      if (!nodeA || !nodeB) return 0;
+      return compareNodes(nodeA, nodeB, sortConfig, getNode);
+    });
+    return [...fieldRows, ...contentRows];
+  }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  ), [allChildIds, fieldMap, tagIds, _version]);
+  , [allChildIds, fieldMap, tagIds, sortConfig, _version]);
 
   // Template content clone colors: content children with templateId get the owning tagDef's color.
   // This ensures template-cloned content matches the supertag's bullet color.
@@ -2002,6 +2026,7 @@ export function OutlinerItem({
               style={{ left: depth * 28 + 6 + 15, top: -1, bottom: 1 }}
             />
           )}
+          <ViewToolbar nodeId={effectiveNodeId} depth={depth + 1} />
           {/* Hidden field pills: compact clickable chips to temporarily reveal hidden fields */}
           {hiddenRevealableFields.length > 0 && hiddenRevealableFields.some(f => !revealedFieldIds.has(f.id)) && (
             <div className="flex flex-wrap gap-x-3 min-h-6 items-center" style={{ paddingLeft: (depth + 1) * 28 + 6 + 15 + 4 }}>

@@ -21,9 +21,6 @@ export const HIGHLIGHT_DELETE = 'highlight:delete' as const;
 /** Side Panel -> Content Script: scroll to a specific highlight and flash */
 export const HIGHLIGHT_SCROLL_TO = 'highlight:scroll-to' as const;
 
-/** Content Script -> Side Panel: user clicked a highlight on the page */
-export const HIGHLIGHT_CLICK = 'highlight:click' as const;
-
 /** Content Script -> Side Panel: batch save notes for a highlight */
 export const HIGHLIGHT_NOTES_SAVE = 'highlight:notes-save' as const;
 
@@ -94,12 +91,6 @@ export interface HighlightScrollToPayload {
   id: string;
 }
 
-/** CS -> SP: User clicked a highlight on the page */
-export interface HighlightClickPayload {
-  /** soma node ID of the clicked highlight */
-  id: string;
-}
-
 /** CS -> SP: Batch save notes for a highlight (replaces old single-note upsert) */
 export interface HighlightNotesSavePayload {
   /** soma node ID of the highlight */
@@ -139,7 +130,6 @@ export type HighlightMessage =
   | { type: typeof HIGHLIGHT_REMOVE; payload: HighlightRemovePayload }
   | { type: typeof HIGHLIGHT_DELETE; payload: HighlightDeletePayload }
   | { type: typeof HIGHLIGHT_SCROLL_TO; payload: HighlightScrollToPayload }
-  | { type: typeof HIGHLIGHT_CLICK; payload: HighlightClickPayload }
   | { type: typeof HIGHLIGHT_NOTES_SAVE; payload: HighlightNotesSavePayload }
   | { type: typeof HIGHLIGHT_NOTE_GET; payload: HighlightNoteGetPayload }
   | { type: typeof HIGHLIGHT_CHECK_URL; payload: HighlightCheckUrlPayload }

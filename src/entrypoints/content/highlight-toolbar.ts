@@ -428,10 +428,6 @@ function hasNonEmptyNote(): boolean {
   return entries.some((e) => e.text.trim().length > 0);
 }
 
-function updateSaveButtonState(): void {
-  // Save is always enabled — empty note = close popover (highlight already saved)
-}
-
 function getNoteItems(): HTMLDivElement[] {
   if (!notePopoverListElement) return [];
   return Array.from(notePopoverListElement.querySelectorAll('.soma-note-item')) as HTMLDivElement[];
@@ -543,11 +539,6 @@ function buildNotePopover(): void {
     }
   });
 
-  // Track input changes to update Save button state
-  noteList.addEventListener('input', () => {
-    updateSaveButtonState();
-  });
-
   // Keyboard handling for the note list (Enter, Backspace, ArrowUp/Down, Cmd+Enter, Escape)
   noteList.addEventListener('keydown', (e) => {
     if (!notePopoverCallbacks) return;
@@ -620,7 +611,6 @@ function buildNotePopover(): void {
       currentItem.after(newItem);
       const newEditor = newItem.querySelector('.soma-note-editor') as HTMLElement;
       focusEditorAtStart(newEditor);
-      updateSaveButtonState();
       return;
     }
 
@@ -739,7 +729,6 @@ export function showNotePopover(
         const lastEditor = allItems[allItems.length - 1].querySelector('.soma-note-editor') as HTMLElement;
         focusEditorAtEnd(lastEditor);
       }
-      updateSaveButtonState();
     });
   } catch (err) {
     console.error('[soma:hl] showNotePopover error:', err);

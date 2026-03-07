@@ -32,7 +32,6 @@ import {
 import {
   HIGHLIGHT_CREATE,
   HIGHLIGHT_DELETE,
-  HIGHLIGHT_CLICK,
   HIGHLIGHT_CHECK_URL,
   HIGHLIGHT_NOTES_SAVE,
   HIGHLIGHT_NOTE_GET,
@@ -41,7 +40,6 @@ import {
   HIGHLIGHT_UNRESOLVABLE,
   type HighlightCreatePayload,
   type HighlightDeletePayload,
-  type HighlightClickPayload,
   type HighlightCheckUrlPayload,
   type HighlightNotesSavePayload,
   type HighlightNoteGetPayload,
@@ -322,17 +320,6 @@ export function App({ skipBootstrap = false }: AppProps) {
       const error = err instanceof Error ? err.message : String(err);
       sendResponse({ ok: false, error });
     });
-    return true;
-   }
-
-   if (message?.type === HIGHLIGHT_CLICK) {
-    const payload = message.payload as HighlightClickPayload | undefined;
-    if (payload?.id) {
-      const ui = useUIStore.getState();
-      ui.navigateTo(payload.id);
-      ui.setSelectedNode(payload.id);
-    }
-    sendResponse({ ok: true });
     return true;
    }
 

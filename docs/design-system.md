@@ -486,20 +486,19 @@ Meeting notes  #project-alpha  #design
 
 统一组件：`src/components/ui/Kbd.tsx`
 
-机械键帽风格：
+无边框标签风格（避免容器内"盒中盒"视觉噪音）：
 
 | 属性 | 值 |
 |------|------|
-| 背景 | `rgba(0,0,0,0.04)` |
-| 边框 | `1px solid rgba(0,0,0,0.08)` |
-| 底边框 | `2px solid rgba(0,0,0,0.12)`（模拟键帽厚度） |
-| 圆角 | 4px |
+| 背景 | `bg-foreground/4` |
+| 边框 | 无 |
+| 圆角 | 6px (`rounded-md`) |
 | 高度 | 20px (`h-5`) |
 | 最小宽度 | 20px (`min-w-5`) |
-| 内边距 | `px-1.5` |
-| 字号 | `text-[10px]` |
+| 内边距 | `px-1` |
+| 字号 | `text-[11px]` |
 | 字重 | `font-medium` (500) |
-| 文本色 | Ink-Secondary (`--foreground-secondary`) |
+| 文本色 | `text-foreground-tertiary` |
 | 可点击 hover | `bg-foreground/8 text-foreground` |
 
 使用场景：

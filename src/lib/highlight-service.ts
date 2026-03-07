@@ -1,10 +1,10 @@
 /**
- * Highlight service — Note-first data model.
+ * Highlight service — data model.
  *
- * New model (v2):
- * - #note is the primary node (child of clip page)
- * - #highlight is a field value under #note's "Highlights" field
- * - Anchor data stored in #highlight's hidden "Anchor" field (not description)
+ * - #highlight is always a direct child of clip page
+ * - When user adds note, #note is created as sibling with a
+ *   reference node in its Highlights fieldEntry pointing to the #highlight
+ * - Anchor data stored in #highlight's hidden "Anchor" field
  * - Source field stays on #highlight (auto-init from #source ancestor)
  */
 import { nanoid } from 'nanoid';
@@ -160,42 +160,86 @@ export function getSourceFieldDefId(): string {
 }
 
 // ============================================================
-// Note-first CRUD operations
+// CRUD operations
 // ============================================================
 
-export interface CreateNoteWithHighlightParams {
+// ── Create bare highlight ──
+
+export interface CreateHighlightOnlyParams {
   store: HighlightNodeStore;
-  /** User's own thought — the note text. */
-  noteText: string;
   /** The highlighted/selected text from the webpage. */
   selectedText: string;
   /** Parent clip page node ID. */
   clipNodeId: string;
   /** JSON-serialized anchor data (stored in Anchor hidden field). */
   anchor?: string;
+}
+
+/**
+ * Create a bare #highlight node as direct child of clip page (no #note).
+ *
+ * Data structure created:
+ * ```
+ * clipPage #source
+ *   └── selectedText #highlight        ← direct child of clip
+ *       ├── Source (fieldEntry) → clipPage  ← auto-init
+ *       └── Anchor (fieldEntry) = anchorJSON ← hidden
+ * ```
+ */
+export function createHighlightOnly(params: CreateHighlightOnlyParams): {
+  highlightNode: NodexNode;
+} {
+  const { store, selectedText, clipNodeId, anchor } = params;
+
+  // 1. Create #highlight node as direct child of clip page
+  const hlNode = store.createChild(clipNodeId, undefined, { name: selectedText });
+
+  // 2. Apply #highlight tag — triggers Source auto-init + Anchor fieldEntry
+  store.applyTag(hlNode.id, SYS_T.HIGHLIGHT);
+
+  // 3. Store anchor data in the hidden Anchor field
+  if (anchor) {
+    store.setFieldValue(hlNode.id, NDX_F.HIGHLIGHT_ANCHOR, [anchor]);
+  }
+
+  return {
+    highlightNode: loroDoc.toNodexNode(hlNode.id)!,
+  };
+}
+
+// ── Add note to existing highlight ──
+
+export interface AddNoteForHighlightParams {
+  store: HighlightNodeStore;
+  /** ID of the existing bare #highlight node. */
+  highlightNodeId: string;
+  /** Parent clip page node ID. */
+  clipNodeId: string;
+  /** User's own thought — the note text. */
+  noteText: string;
   /** Additional child note entries (depth 0 = direct children of #note). */
   extraNoteEntries?: Array<{ text: string; depth: number }>;
 }
 
 /**
- * Create a #note node as child of clip page, with a #highlight value in its Highlights field.
+ * Add a #note for an existing bare #highlight.
+ * The #highlight stays in place; #note is created as a sibling with a
+ * reference to the highlight in its Highlights field.
  *
  * Data structure created:
  * ```
  * clipPage #source
- *   └── noteText #note              ← primary: user's thought
- *       ├── Highlights (fieldEntry)  ← template field from #note tagDef
- *       │   └── selectedText #highlight  ← field value node
- *       │       ├── Source (fieldEntry) → clipPage  ← auto-init
- *       │       └── Anchor (fieldEntry) = anchorJSON ← hidden
- *       └── extra children           ← user's further notes
+ *   ├── selectedText #highlight       ← stays here, untouched
+ *   └── noteText #note                ← new sibling
+ *       ├── Highlights (fieldEntry)
+ *       │   └── ref → #highlight      ← reference node (targetId)
+ *       └── extra children
  * ```
  */
-export function createNoteWithHighlight(params: CreateNoteWithHighlightParams): {
+export function addNoteForHighlight(params: AddNoteForHighlightParams): {
   noteNode: NodexNode;
-  highlightNode: NodexNode;
 } {
-  const { store, noteText, selectedText, clipNodeId, anchor, extraNoteEntries } = params;
+  const { store, highlightNodeId, clipNodeId, noteText, extraNoteEntries } = params;
 
   // 1. Create #note node as child of clip page
   const noteNode = store.createChild(clipNodeId, undefined, { name: noteText });
@@ -206,25 +250,19 @@ export function createNoteWithHighlight(params: CreateNoteWithHighlightParams): 
   // 3. Find the Highlights fieldEntry (created by applyTag template)
   let highlightsFeId = findFieldEntry(noteNode.id, NDX_F.NOTE_HIGHLIGHTS);
   if (!highlightsFeId) {
-    // Fallback: create fieldEntry manually if template didn't create it
     highlightsFeId = nanoid();
     loroDoc.createNode(highlightsFeId, noteNode.id);
     loroDoc.setNodeDataBatch(highlightsFeId, { type: 'fieldEntry', fieldDefId: NDX_F.NOTE_HIGHLIGHTS });
     loroDoc.commitDoc();
   }
 
-  // 4. Create #highlight node as value under Highlights fieldEntry
-  const hlNode = store.createChild(highlightsFeId, undefined, { name: selectedText });
+  // 4. Create reference node pointing to the existing #highlight
+  const refId = nanoid();
+  loroDoc.createNode(refId, highlightsFeId);
+  loroDoc.setNodeDataBatch(refId, { type: 'reference', targetId: highlightNodeId });
+  loroDoc.commitDoc();
 
-  // 5. Apply #highlight tag — triggers Source auto-init + Anchor fieldEntry
-  store.applyTag(hlNode.id, SYS_T.HIGHLIGHT);
-
-  // 6. Store anchor data in the hidden Anchor field
-  if (anchor) {
-    store.setFieldValue(hlNode.id, NDX_F.HIGHLIGHT_ANCHOR, [anchor]);
-  }
-
-  // 7. Create extra note children under #note
+  // 5. Create extra note children under #note
   if (extraNoteEntries && extraNoteEntries.length > 0) {
     const parentStack: string[] = [noteNode.id];
     for (const entry of extraNoteEntries) {
@@ -239,7 +277,6 @@ export function createNoteWithHighlight(params: CreateNoteWithHighlightParams): 
 
   return {
     noteNode: loroDoc.toNodexNode(noteNode.id)!,
-    highlightNode: loroDoc.toNodexNode(hlNode.id)!,
   };
 }
 
@@ -271,15 +308,36 @@ export function getNotesForClip(clipNodeId: string): NodexNode[] {
 
 /**
  * Get highlight nodes from a #note's Highlights field.
+ * Resolves reference nodes to the actual #highlight they point to.
  */
 export function getHighlightsForNote(noteNodeId: string): NodexNode[] {
   const feId = findFieldEntry(noteNodeId, NDX_F.NOTE_HIGHLIGHTS);
   if (!feId) return [];
   const results: NodexNode[] = [];
-  const feChildren = loroDoc.getChildren(feId);
-  for (const cid of feChildren) {
+  for (const cid of loroDoc.getChildren(feId)) {
     const node = loroDoc.toNodexNode(cid);
-    if (node?.tags.includes(SYS_T.HIGHLIGHT)) results.push(node);
+    if (!node) continue;
+    if (node.type === 'reference' && node.targetId) {
+      const target = loroDoc.toNodexNode(node.targetId);
+      if (target?.tags.includes(SYS_T.HIGHLIGHT)) {
+        results.push(target);
+      }
+    }
+  }
+  return results;
+}
+
+/**
+ * Get bare #highlight nodes that are direct children of a clip page (no #note wrapper).
+ */
+export function getBareHighlightsForClip(clipNodeId: string): NodexNode[] {
+  const results: NodexNode[] = [];
+  const clipChildren = loroDoc.getChildren(clipNodeId);
+  for (const childId of clipChildren) {
+    const child = loroDoc.toNodexNode(childId);
+    if (child?.tags.includes(SYS_T.HIGHLIGHT)) {
+      results.push(child);
+    }
   }
   return results;
 }
@@ -294,6 +352,23 @@ export function getHighlightAnchor(highlightNodeId: string): string | null {
   if (feChildren.length === 0) return null;
   const valueNode = loroDoc.toNodexNode(feChildren[0]);
   return valueNode?.name ?? null;
+}
+
+/**
+ * Find all #note nodes associated with a #highlight (via Highlights field reference).
+ * A highlight can have multiple notes (multiple perspectives/thoughts).
+ */
+export function findNotesForHighlight(highlightNodeId: string): NodexNode[] {
+  const parentId = loroDoc.getParentId(highlightNodeId);
+  if (!parentId) return [];
+  const results: NodexNode[] = [];
+  for (const note of getNotesForClip(parentId)) {
+    const highlights = getHighlightsForNote(note.id);
+    if (highlights.some(hl => hl.id === highlightNodeId)) {
+      results.push(note);
+    }
+  }
+  return results;
 }
 
 /**

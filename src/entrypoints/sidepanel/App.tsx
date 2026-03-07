@@ -16,11 +16,12 @@ import { findUnexpectedShortcutConflicts } from '../../lib/shortcut-registry.js'
 import { ensureTodayNode } from '../../lib/journal.js';
 import { ensureHighlightTagDef, ensureNoteTagDef, type HighlightNodeStore } from '../../lib/highlight-service.js';
 import {
-  createNoteFromPayload,
+  createHighlightFromPayload,
+  saveNotesForHighlight,
   buildHighlightRestorePayload,
   collectAllHighlightNodeIds,
   getRemovedHighlightIds,
-  getHighlightNoteEntries,
+  findNoteEntriesForHighlight,
 } from '../../lib/highlight-sidepanel.js';
 import { findClipNodeByUrl } from '../../lib/webclip-service.js';
 import {
@@ -42,6 +43,8 @@ import {
   type HighlightDeletePayload,
   type HighlightClickPayload,
   type HighlightCheckUrlPayload,
+  type HighlightNotesSavePayload,
+  type HighlightNoteGetPayload,
   type HighlightUnresolvablePayload,
 } from '../../lib/highlight-messaging.js';
 import { ensureContainers } from '../../lib/bootstrap-containers.js';
@@ -183,7 +186,7 @@ function useBootstrap(skip: boolean): BootstrapResult {
 
      for (const entry of pendingEntries) {
       try {
-       await createNoteFromPayload({
+       await createHighlightFromPayload({
         anchor: entry.anchor,
         selectedText: entry.selectedText,
         pageUrl: entry.pageUrl,
@@ -277,7 +280,7 @@ export function App({ skipBootstrap = false }: AppProps) {
         const store = useNodeStore.getState() as HighlightNodeStore;
         ensureHighlightTagDef(store);
         ensureNoteTagDef(store);
-        const result = await createNoteFromPayload(payload, store);
+        const result = await createHighlightFromPayload(payload, store);
         sendResponse({ ok: true, highlightNodeId: result.highlightNodeId, noteNodeId: result.noteNodeId, clipNodeId: result.clipNodeId });
       } catch (err) {
         const error = err instanceof Error ? err.message : String(err);
@@ -334,6 +337,8 @@ export function App({ skipBootstrap = false }: AppProps) {
    }
 
    if (message?.type === HIGHLIGHT_DELETE) {
+    if (!message._tabId) return false;
+
     const payload = message.payload as HighlightDeletePayload | undefined;
     if (!payload?.id) {
       sendResponse({ ok: false, error: 'Missing highlight id for delete' });
@@ -353,16 +358,40 @@ export function App({ skipBootstrap = false }: AppProps) {
    }
 
    if (message?.type === HIGHLIGHT_NOTES_SAVE) {
-    // In note-first model, notes are managed through the #note node.
-    // This handler is kept for compatibility with existing highlight note popover.
-    sendResponse({ ok: true });
+    if (!message._tabId) return false;
+
+    const payload = message.payload as HighlightNotesSavePayload | undefined;
+    if (!payload?.id || !payload.noteEntries?.length) {
+      sendResponse({ ok: true });
+      return true;
+    }
+
+    const store = useNodeStore.getState() as HighlightNodeStore;
+    const target = store.getNode(payload.id);
+    if (!target) {
+      sendResponse({ ok: false, error: 'Highlight node not found' });
+      return true;
+    }
+
+    const clipNodeId = loroDoc.getParentId(payload.id);
+    if (!clipNodeId) {
+      sendResponse({ ok: false, error: 'Highlight has no parent clip' });
+      return true;
+    }
+
+    // Sync notes: split by depth-0 boundaries, update/create/delete as needed
+    ensureNoteTagDef(store);
+    const { noteNodeIds } = saveNotesForHighlight(payload.id, clipNodeId, payload.noteEntries, store);
+    sendResponse({ ok: true, noteNodeIds });
     return true;
    }
 
    if (message?.type === HIGHLIGHT_NOTE_GET) {
-    // In note-first model, the note text is the #note node's name.
-    // Return empty for compatibility — existing highlights show note popover.
-    sendResponse({ ok: true, noteEntries: [] });
+    if (!message._tabId) return false;
+
+    const payload = message.payload as HighlightNoteGetPayload | undefined;
+    const entries = payload?.id ? findNoteEntriesForHighlight(payload.id) : [];
+    sendResponse({ ok: true, noteEntries: entries });
     return true;
    }
 

@@ -2,11 +2,11 @@
  * Content Script highlight core — selection listener, DOM rendering,
  * and hover handling for webpage highlights.
  *
- * Note-first model:
- * - valid text selection => show floating Note button
- * - click Note => render highlight preview, open note popover
- * - user writes note + saves => persist #note with #highlight
- * - cancel/empty => discard highlight preview
+ * Zero-friction highlight model:
+ * - valid text selection => show floating Highlight button
+ * - click button => immediately save bare #highlight + open optional note popover
+ * - user writes note + saves => wrap bare highlight with #note (via reference)
+ * - cancel/empty note => highlight already saved, stays as bare #highlight
  *
  * Existing highlight flow:
  * - hover <soma-hl> => show contextual toolbar (delete / add note)
@@ -60,6 +60,8 @@ interface HighlightRenderOptions {
 interface HighlightDraft {
   tempId: string;
   payloadBase: Omit<HighlightCreatePayload, 'noteEntries'>;
+  /** Real highlight node ID, assigned after SP responds. */
+  finalId?: string;
 }
 
 // ── State ──
@@ -354,8 +356,11 @@ export function renderHighlight(
   // Process segments in reverse to maintain valid offsets
   for (let i = segments.length - 1; i >= 0; i--) {
     const seg = segments[i];
-    // Skip empty segments
+    // Skip empty or whitespace-only segments (e.g., "\n" between <p> tags
+    // included by double-click paragraph selection)
     if (seg.startOffset === seg.endOffset) continue;
+    const segText = seg.node.textContent?.slice(seg.startOffset, seg.endOffset);
+    if (!segText || !segText.trim()) continue;
 
     const wrappedRange = document.createRange();
     wrappedRange.setStart(seg.node, seg.startOffset);
@@ -703,7 +708,7 @@ function handleToolbarAction(action: ToolbarAction): void {
 
   switch (action) {
     case 'note':
-      createHighlightWithNote(range);
+      createHighlight(range);
       break;
     case 'clip':
       // Delegate to existing webclip capture
@@ -718,15 +723,20 @@ function handleToolbarAction(action: ToolbarAction): void {
 }
 
 /**
- * Create temporary highlight and collect note input before persistence.
- * Note-first model: user must write a note, highlight is persisted with the note.
+ * Create highlight immediately and show optional note popover.
+ * Highlight is saved as soon as the user clicks the toolbar button.
+ * Note popover opens but is not required — Cancel leaves the highlight saved.
  */
-function createHighlightWithNote(range: Range): void {
+function createHighlight(range: Range): void {
   const rect = range.getBoundingClientRect(); // Capture before DOM modification
   const draft = createHighlightDraft(range);
   pendingNoteDraft = draft;
   pendingExistingHighlightNoteId = null;
 
+  // ① Immediately save bare #highlight (no noteEntries)
+  persistHighlightImmediate(draft);
+
+  // ② Show optional note popover
   showNotePopover(
     rect,
     {
@@ -734,16 +744,14 @@ function createHighlightWithNote(range: Range): void {
         const nonEmpty = entries.filter((e) => e.text.trim());
         pendingNoteDraft = null;
         if (nonEmpty.length > 0) {
-          persistHighlightDraft(draft, nonEmpty);
-        } else {
-          // No note content → discard the draft highlight rendering
-          removeHighlightRendering(draft.tempId);
+          // Wrap the bare highlight in a #note
+          sendNotesForHighlight(draft, nonEmpty);
         }
+        // Empty note → just close popover, highlight already saved
       },
       onCancel: () => {
         pendingNoteDraft = null;
-        // Cancel → discard the draft highlight rendering (note-first: no note = no save)
-        removeHighlightRendering(draft.tempId);
+        // Cancel → highlight already saved, nothing to undo
       },
     },
     {
@@ -815,14 +823,14 @@ function createHighlightDraft(range: Range): HighlightDraft {
   };
 }
 
-function persistHighlightDraft(
-  draft: HighlightDraft,
-  noteEntries: NoteEntry[],
-): void {
+/**
+ * Immediately save bare #highlight (no note). Updates draft.finalId on success.
+ */
+function persistHighlightImmediate(draft: HighlightDraft): void {
   const payload: HighlightCreatePayload = {
     ...draft.payloadBase,
     tempId: draft.tempId,
-    noteEntries,
+    // No noteEntries → bare #highlight
   };
 
   const msg: { type: typeof HIGHLIGHT_CREATE; payload: HighlightCreatePayload } = {
@@ -840,11 +848,28 @@ function persistHighlightDraft(
     const finalId = response?.highlightNodeId;
     if (finalId) {
       replaceRenderedHighlightId(draft.tempId, finalId);
-      renderNoteBadge(finalId);
+      draft.finalId = finalId;
+    }
+  });
+}
+
+/**
+ * Send note entries to wrap a bare highlight in a #note (via HIGHLIGHT_NOTES_SAVE).
+ * If the real highlight ID hasn't arrived yet, falls back to sending with tempId
+ * (background will queue it for the pending highlight).
+ */
+function sendNotesForHighlight(draft: HighlightDraft, noteEntries: NoteEntry[]): void {
+  const highlightId = draft.finalId ?? draft.tempId;
+
+  chrome.runtime.sendMessage({
+    type: HIGHLIGHT_NOTES_SAVE,
+    payload: { id: highlightId, noteEntries },
+  }, () => {
+    if (chrome.runtime.lastError) {
+      console.warn('[soma] Failed to save notes for highlight:', chrome.runtime.lastError.message);
       return;
     }
-
-    renderNoteBadge(draft.tempId);
+    renderNoteBadge(highlightId);
   });
 }
 
@@ -925,12 +950,9 @@ function handleGlobalPointerDown(e: PointerEvent): void {
   if (isHighlightOverlayHost(target)) return;
   if (target instanceof Element && target.closest('soma-hl[data-highlight-id]')) return;
 
-  if (pendingNoteDraft) {
-    const draft = pendingNoteDraft;
-    pendingNoteDraft = null;
-    // Note-first: clicking outside without saving discards the draft
-    removeHighlightRendering(draft.tempId);
-  }
+  // Clicking outside closes the note popover but does NOT remove the highlight
+  // (highlight is already saved as bare #highlight).
+  pendingNoteDraft = null;
   pendingExistingHighlightNoteId = null;
   selectedExistingHighlightId = null;
 
@@ -957,7 +979,7 @@ export function initHighlight(): void {
     if (!(e.metaKey || e.ctrlKey) || !e.shiftKey) return;
     if (e.key !== 'H' && e.key !== 'h') return;
 
-    // Case 1: New text selection → create highlight with note
+    // Case 1: New text selection → create highlight (with optional note popover)
     if (currentRange) {
       e.preventDefault();
       e.stopPropagation();
@@ -965,7 +987,7 @@ export function initHighlight(): void {
       window.getSelection()?.removeAllRanges();
       hideToolbar();
       currentRange = null;
-      createHighlightWithNote(range);
+      createHighlight(range);
       return;
     }
 

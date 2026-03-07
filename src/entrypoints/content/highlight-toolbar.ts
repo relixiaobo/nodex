@@ -2,9 +2,8 @@
  * Floating highlight overlays — Shadow DOM isolated UI elements.
  *
  * Provides:
- * 1) Selection toolbar (icon-only)
- * 2) Highlight action toolbar (delete / add note)
- * 3) Note popover (textarea + Cancel/Save)
+ * 1) Selection toolbar (icon-only, shows on text selection)
+ * 2) Note popover (outliner-style multi-node editor + Delete/Save)
  *
  * Uses plain DOM + Shadow DOM only (no Custom Elements API).
  */
@@ -13,10 +12,6 @@
 
 export type ToolbarAction = 'note' | 'clip';
 export type ToolbarActionCallback = (action: ToolbarAction) => void;
-
-export interface HighlightActionsCallbacks {
-  onOpenNote: () => void;
-}
 
 export interface NoteEntry {
   text: string;
@@ -41,10 +36,6 @@ const OVERLAY_ATTR = 'data-soma-highlight-overlay';
 let selectionToolbarElement: HTMLDivElement | null = null;
 let selectionShadowRoot: ShadowRoot | null = null;
 let selectionActionCallback: ToolbarActionCallback | null = null;
-
-let highlightActionsElement: HTMLDivElement | null = null;
-let highlightActionsShadowRoot: ShadowRoot | null = null;
-let highlightActionsCallbacks: HighlightActionsCallbacks | null = null;
 
 let notePopoverElement: HTMLDivElement | null = null;
 let notePopoverShadowRoot: ShadowRoot | null = null;
@@ -131,59 +122,6 @@ kbd {
   font-size: 11px;
   font-weight: 400;
   color: #999999;
-}
-`;
-
-const ACTIONS_BAR_STYLE = `
-${HOST_STYLE}
-
-.soma-highlight-actions {
-  display: flex;
-  align-items: center;
-  padding: 4px;
-  background: #FFFFFF;
-  border-radius: 8px;
-  ${PAPER_SHADOW}
-  animation: soma-toolbar-in 0.12s ease-out;
-}
-
-@keyframes soma-toolbar-in {
-  from {
-    opacity: 0;
-    transform: translateY(4px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-button {
-  all: unset;
-  box-sizing: border-box;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 4px;
-  color: #1A1A1A;
-  cursor: pointer;
-  transition: background 0.15s ease-out;
-}
-
-button:hover {
-  background: rgba(26, 26, 26, 0.04);
-}
-
-button:active {
-  background: rgba(26, 26, 26, 0.08);
-}
-
-.icon {
-  width: 15px;
-  height: 15px;
-  flex-shrink: 0;
 }
 `;
 
@@ -312,8 +250,7 @@ kbd {
 // ── SVG Icons ──
 
 const ICON_HIGHLIGHT = `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 11-6 6v3h9l3-3"/><path d="m22 12-4.6 4.6a2 2 0 0 1-2.8 0l-5.2-5.2a2 2 0 0 1 0-2.8L14 4"/></svg>`;
-const ICON_NOTE = `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.376 3.622a1 1 0 0 1 3.002 3.002L7.368 18.635a2 2 0 0 1-.855.506l-2.872.838a.5.5 0 0 1-.62-.62l.838-2.872a2 2 0 0 1 .506-.855z"/><path d="m15 5 3 3"/></svg>`;
-const ICON_COMMENT = `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg>`;
+
 
 // ── Helpers ──
 
@@ -437,85 +374,6 @@ export function showToolbar(selectionRect: DOMRect, callback: ToolbarActionCallb
 export function hideToolbar(): void {
   if (selectionToolbarElement) selectionToolbarElement.style.display = 'none';
   selectionActionCallback = null;
-}
-
-// ── Highlight Action Toolbar ──
-
-let hoverEnterCallback: (() => void) | null = null;
-let hoverLeaveCallback: (() => void) | null = null;
-
-/**
- * Register callbacks for toolbar hover bridging.
- * Called by highlight.ts to track when the mouse enters/leaves the toolbar.
- */
-export function setHighlightActionsHoverCallbacks(
-  onEnter: () => void,
-  onLeave: () => void,
-): void {
-  hoverEnterCallback = onEnter;
-  hoverLeaveCallback = onLeave;
-}
-
-function buildHighlightActionsToolbar(): void {
-  const { host, root } = createShadowHost();
-  highlightActionsElement = host;
-  highlightActionsShadowRoot = root;
-
-  const bar = document.createElement('div');
-  bar.className = 'soma-highlight-actions';
-  bar.appendChild(createIconButton('open-note', ICON_COMMENT, 'Open note'));
-
-  root.appendChild(createStyle(ACTIONS_BAR_STYLE));
-  root.appendChild(bar);
-
-  bar.addEventListener('mousedown', (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-  });
-
-  bar.addEventListener('click', (e) => {
-    const target = (e.target as Element).closest('button');
-    if (!target || !highlightActionsCallbacks) return;
-    highlightActionsCallbacks.onOpenNote();
-    hideHighlightActionsToolbar();
-  });
-
-  // Hover bridging: toolbar ↔ highlight
-  host.addEventListener('mouseenter', () => {
-    hoverEnterCallback?.();
-  });
-  host.addEventListener('mouseleave', () => {
-    hoverLeaveCallback?.();
-  });
-
-  appendHostToPage(host);
-}
-
-export function showHighlightActionsToolbar(
-  anchorRect: DOMRect,
-  callbacks: HighlightActionsCallbacks,
-): void {
-  try {
-    highlightActionsCallbacks = callbacks;
-    if (!highlightActionsElement || !highlightActionsShadowRoot) {
-      buildHighlightActionsToolbar();
-    }
-
-    const pos = getFloatingPosition(anchorRect);
-    highlightActionsElement!.style.position = 'fixed';
-    highlightActionsElement!.style.zIndex = '2147483647';
-    highlightActionsElement!.style.top = `${pos.top}px`;
-    highlightActionsElement!.style.left = `${pos.left}px`;
-    highlightActionsElement!.style.transform = 'translateX(-50%)';
-    highlightActionsElement!.style.display = 'block';
-  } catch (err) {
-    console.error('[soma:hl] showHighlightActionsToolbar error:', err);
-  }
-}
-
-export function hideHighlightActionsToolbar(): void {
-  if (highlightActionsElement) highlightActionsElement.style.display = 'none';
-  highlightActionsCallbacks = null;
 }
 
 // ── Note Popover ──
@@ -897,7 +755,6 @@ export function hideNotePopover(): void {
 
 export function hideAllHighlightOverlays(): void {
   hideToolbar();
-  hideHighlightActionsToolbar();
   hideNotePopover();
 }
 
@@ -905,7 +762,6 @@ export function isHighlightOverlayHost(target: EventTarget | null): boolean {
   if (!(target instanceof Node)) return false;
 
   if (selectionToolbarElement?.contains(target)) return true;
-  if (highlightActionsElement?.contains(target)) return true;
   if (notePopoverElement?.contains(target)) return true;
 
   return false;

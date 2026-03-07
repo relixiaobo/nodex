@@ -208,7 +208,7 @@ export function renderHighlight(
     const highlightEl = document.createElement('soma-hl');
     highlightEl.setAttribute('data-highlight-id', highlightId);
     highlightEl.style.display = 'inline';
-    highlightEl.style.cursor = 'pointer';
+    highlightEl.style.cursor = 'default';
     // Readwise-like style: transparent tint + solid bottom underline.
     highlightEl.style.borderRadius = '0';
     highlightEl.style.paddingBottom = '1px';
@@ -400,7 +400,7 @@ function isValidSelection(selection: Selection): boolean {
         : anchorNode.parentElement;
     if (ancestor?.closest('[data-soma-highlight-overlay="true"]')) return false;
     // Note: selections inside <soma-hl> are allowed — handleSelectionChange
-    // detects overlap and shows the highlight actions toolbar instead.
+    // detects overlap and suppresses the creation toolbar.
   }
 
   return true;

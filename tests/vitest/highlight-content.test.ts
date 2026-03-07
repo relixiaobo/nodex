@@ -6,7 +6,6 @@ import {
   findOverlappingHighlightId,
 } from '../../src/entrypoints/content/highlight.js';
 import type {
-  HighlightActionsCallbacks,
   NotePopoverCallbacks,
 } from '../../src/entrypoints/content/highlight-toolbar.js';
 
@@ -231,13 +230,6 @@ describe('findOverlappingHighlightId', () => {
 });
 
 describe('highlight toolbar interfaces', () => {
-  it('HighlightActionsCallbacks has single onOpenNote callback', () => {
-    const cb: HighlightActionsCallbacks = { onOpenNote: () => {} };
-    expect(cb.onOpenNote).toBeTypeOf('function');
-    // Should NOT have onDelete or onAddNote (moved to NotePopoverCallbacks)
-    expect('onDelete' in cb).toBe(false);
-  });
-
   it('NotePopoverCallbacks has optional onDelete', () => {
     const cb: NotePopoverCallbacks = {
       onSave: () => {},

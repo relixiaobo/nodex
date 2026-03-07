@@ -81,7 +81,7 @@ ${HOST_STYLE}
   align-items: center;
   gap: 4px;
   padding: 4px;
-  background: #F5F4EE;
+  background: #FFFFFF;
   border-radius: 8px;
   ${PAPER_SHADOW}
   animation: soma-toolbar-in 0.12s ease-out;
@@ -106,7 +106,7 @@ button {
   gap: 4px;
   height: 28px;
   padding: 0 8px;
-  border-radius: 4px;
+  border-radius: 9999px;
   color: #1A1A1A;
   cursor: pointer;
   transition: background 0.15s ease-out;
@@ -141,7 +141,7 @@ ${HOST_STYLE}
   display: flex;
   align-items: center;
   padding: 4px;
-  background: #F5F4EE;
+  background: #FFFFFF;
   border-radius: 8px;
   ${PAPER_SHADOW}
   animation: soma-toolbar-in 0.12s ease-out;
@@ -196,7 +196,7 @@ ${HOST_STYLE}
   flex-direction: column;
   gap: 4px;
   padding: 10px;
-  background: #F5F4EE;
+  background: #FFFFFF;
   border-radius: 8px;
   ${PAPER_SHADOW}
 }
@@ -231,7 +231,7 @@ ${HOST_STYLE}
   width: 5px;
   height: 5px;
   border-radius: 50%;
-  background: rgba(26, 26, 26, 0.40);
+  background: rgba(26, 26, 26, 0.50);
 }
 
 .soma-note-editor {
@@ -266,19 +266,19 @@ button {
   align-items: center;
   height: 28px;
   padding: 0 8px;
-  border-radius: 6px;
-  font-size: 12px;
+  border-radius: 9999px;
+  font-size: 13px;
   font-weight: 500;
   cursor: pointer;
   transition: color 0.15s ease-out, background-color 0.15s ease-out;
 }
 
 button:hover {
-  background-color: rgba(0, 0, 0, 0.06);
+  background-color: rgba(26, 26, 26, 0.04);
 }
 
 button[data-action='save'] {
-  color: #333333;
+  color: #1A1A1A;
   gap: 6px;
 }
 

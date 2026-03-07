@@ -265,20 +265,21 @@ button {
   display: inline-flex;
   align-items: center;
   height: 28px;
-  padding: 0 4px;
+  padding: 0 8px;
+  border-radius: 6px;
   font-size: 12px;
   font-weight: 500;
   cursor: pointer;
-  transition: color 0.15s ease-out;
+  transition: color 0.15s ease-out, background-color 0.15s ease-out;
+}
+
+button:hover {
+  background-color: rgba(0, 0, 0, 0.06);
 }
 
 button[data-action='save'] {
-  color: #5E8E65;
+  color: #333333;
   gap: 6px;
-}
-
-button[data-action='save']:hover {
-  color: #4D7A54;
 }
 
 button[data-action='delete'] {

@@ -8,7 +8,7 @@
 
 export interface NavigableRow {
   id: string;
-  type: 'field' | 'content';
+  type: 'field' | 'content' | 'groupHeader';
   hidden?: boolean;
 }
 
@@ -35,7 +35,7 @@ export function navigateToSiblingRow(params: {
   if (direction === 'up') {
     for (let j = currentIndex - 1; j >= 0; j--) {
       const prev = rows[j];
-      if (prev.hidden) continue;
+      if (prev.hidden || prev.type === 'groupHeader') continue;
       if (prev.type === 'field') {
         onField(prev.id);
         return true;
@@ -47,7 +47,7 @@ export function navigateToSiblingRow(params: {
   } else {
     for (let j = currentIndex + 1; j < rows.length; j++) {
       const next = rows[j];
-      if (next.hidden) continue;
+      if (next.hidden || next.type === 'groupHeader') continue;
       if (next.type === 'field') {
         onField(next.id);
         return true;

@@ -1158,6 +1158,11 @@ export function toNodexNode(nodexId: string): NodexNode | null {
     sortField: data.get('sortField') as string | undefined,
     sortDirection: data.get('sortDirection') as NodexNode['sortDirection'],
     toolbarVisible: data.get('toolbarVisible') as boolean | undefined,
+    groupField: data.get('groupField') as string | undefined,
+    // Filter condition node properties (ViewDef children)
+    filterField: data.get('filterField') as string | undefined,
+    filterOp: data.get('filterOp') as NodexNode['filterOp'],
+    filterValues: data.get('filterValues') as string[] | undefined,
   };
   _nodeCache.set(nodexId, result);
   return result;

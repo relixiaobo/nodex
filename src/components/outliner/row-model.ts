@@ -2,7 +2,7 @@ import type { NodeType } from '../../types/index.js';
 import { SYS_V } from '../../types/index.js';
 import type { FieldEntry } from '../../hooks/use-node-fields';
 
-export type OutlinerRowType = 'field' | 'content';
+export type OutlinerRowType = 'field' | 'content' | 'groupHeader';
 
 export type OutlinerRowItem =
   | {
@@ -18,6 +18,12 @@ export type OutlinerRowItem =
     hidden?: boolean;
     ownerTagDefId?: string;
     fieldEntry?: FieldEntry;
+  }
+  | {
+    id: string;
+    type: 'groupHeader';
+    label: string;
+    hidden?: boolean;
   };
 
 export function isHiddenFieldRow(hideMode: string | undefined, isEmpty: boolean | undefined): boolean {
@@ -137,6 +143,6 @@ export function getDragSelectableRowIds(
   isFieldRevealed: (fieldEntryId: string) => boolean,
 ): string[] {
   return rows
-    .filter((row) => !row.hidden || isFieldRevealed(row.id))
+    .filter((row) => row.type !== 'groupHeader' && (!row.hidden || isFieldRevealed(row.id)))
     .map((row) => row.id);
 }

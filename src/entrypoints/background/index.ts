@@ -10,7 +10,6 @@ import {
 import {
   HIGHLIGHT_CREATE,
   HIGHLIGHT_DELETE,
-  HIGHLIGHT_CLICK,
   HIGHLIGHT_NOTES_SAVE,
   HIGHLIGHT_NOTE_GET,
   HIGHLIGHT_UNRESOLVABLE,
@@ -448,14 +447,6 @@ export default defineBackground(() => {
           sendResponse(spResponse ?? { ok: true });
         },
       );
-      return true;
-    }
-
-    // ── Highlight Click: Content Script -> BG -> Side Panel ──
-    if (type === HIGHLIGHT_CLICK) {
-      if (!sender.tab?.id) return false;
-      chrome.runtime.sendMessage(message).catch(() => {});
-      sendResponse({ ok: true });
       return true;
     }
 

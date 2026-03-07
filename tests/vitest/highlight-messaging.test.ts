@@ -9,7 +9,6 @@ import {
   HIGHLIGHT_REMOVE,
   HIGHLIGHT_DELETE,
   HIGHLIGHT_SCROLL_TO,
-  HIGHLIGHT_CLICK,
   HIGHLIGHT_NOTES_SAVE,
   HIGHLIGHT_CHECK_URL,
   HIGHLIGHT_CHECK_URL_REQUEST,
@@ -21,7 +20,6 @@ import type {
   HighlightRemovePayload,
   HighlightDeletePayload,
   HighlightScrollToPayload,
-  HighlightClickPayload,
   HighlightNotesSavePayload,
   HighlightCheckUrlPayload,
   HighlightCheckUrlRequestPayload,
@@ -58,10 +56,6 @@ describe('message type constants', () => {
     expect(HIGHLIGHT_DELETE).toBe('highlight:delete');
   });
 
-  it('HIGHLIGHT_CLICK is "highlight:click"', () => {
-    expect(HIGHLIGHT_CLICK).toBe('highlight:click');
-  });
-
   it('HIGHLIGHT_NOTES_SAVE is "highlight:notes-save"', () => {
     expect(HIGHLIGHT_NOTES_SAVE).toBe('highlight:notes-save');
   });
@@ -85,7 +79,7 @@ describe('message type constants', () => {
       HIGHLIGHT_REMOVE,
       HIGHLIGHT_DELETE,
       HIGHLIGHT_SCROLL_TO,
-      HIGHLIGHT_CLICK,
+
       HIGHLIGHT_NOTES_SAVE,
       HIGHLIGHT_CHECK_URL,
       HIGHLIGHT_CHECK_URL_REQUEST,
@@ -103,7 +97,7 @@ describe('message type constants', () => {
       HIGHLIGHT_REMOVE,
       HIGHLIGHT_DELETE,
       HIGHLIGHT_SCROLL_TO,
-      HIGHLIGHT_CLICK,
+
       HIGHLIGHT_NOTES_SAVE,
       HIGHLIGHT_CHECK_URL,
       HIGHLIGHT_CHECK_URL_REQUEST,
@@ -229,11 +223,6 @@ describe('payload types', () => {
   it('HighlightScrollToPayload has id', () => {
     const payload: HighlightScrollToPayload = { id: 'node-456' };
     expect(payload.id).toBe('node-456');
-  });
-
-  it('HighlightClickPayload has id', () => {
-    const payload: HighlightClickPayload = { id: 'node-789' };
-    expect(payload.id).toBe('node-789');
   });
 
   it('HighlightNotesSavePayload has id and noteEntries', () => {

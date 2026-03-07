@@ -251,25 +251,30 @@ const NodeContextMenuContent = forwardRef<HTMLDivElement, NodeContextMenuContent
       onClose();
     }, [nodeId, onClose]);
 
-    // View toolbar toggle
+    // View toolbar toggle — applies to the parent (whose children are displayed)
+    const parentId = useMemo(() => loroDoc.getParentId(nodeId), [nodeId]);
+
     const toolbarVisible = useMemo(() => {
-      const viewDefId = useNodeStore.getState().getViewDefId(nodeId);
+      if (!parentId) return false;
+      const viewDefId = useNodeStore.getState().getViewDefId(parentId);
       if (!viewDefId) return false;
       const viewDef = useNodeStore.getState().getNode(viewDefId);
       return viewDef?.toolbarVisible ?? false;
-    }, [nodeId]);
+    }, [parentId]);
 
     const hasActiveSort = useMemo(() => {
-      const viewDefId = useNodeStore.getState().getViewDefId(nodeId);
+      if (!parentId) return false;
+      const viewDefId = useNodeStore.getState().getViewDefId(parentId);
       if (!viewDefId) return false;
       const viewDef = useNodeStore.getState().getNode(viewDefId);
       return !!viewDef?.sortField;
-    }, [nodeId]);
+    }, [parentId]);
 
     const handleToggleToolbar = useCallback(() => {
-      useNodeStore.getState().toggleToolbar(nodeId);
+      if (!parentId) return;
+      useNodeStore.getState().toggleToolbar(parentId);
       onClose();
-    }, [nodeId, onClose]);
+    }, [parentId, onClose]);
 
     // Merge forwarded ref + innerRef for measurement
     const setRefs = useCallback((el: HTMLDivElement | null) => {

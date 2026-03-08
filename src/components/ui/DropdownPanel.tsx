@@ -123,7 +123,7 @@ export function DropdownPanel({
       style={style}
     >
       {title && (
-        <div className="px-3 pt-2.5 pb-1.5 text-xs font-medium text-foreground-secondary">
+        <div className="px-2 pt-2 pb-1 text-xs font-medium text-foreground-secondary">
           {title}
         </div>
       )}

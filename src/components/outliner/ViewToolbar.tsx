@@ -784,7 +784,7 @@ function useDropdownDismiss(
   }, [menuRef, anchorRef, onClose, enabled]);
 }
 
-/** Position dropdown below anchor element. Recomputes when `active` changes to true. */
+/** Position dropdown below anchor element, clamped to viewport edges. */
 function useDropdownPosition(anchorRef: React.RefObject<HTMLElement | null>, active = true) {
   const [pos, setPos] = useState({ top: 0, left: 0 });
   useEffect(() => {
@@ -792,7 +792,10 @@ function useDropdownPosition(anchorRef: React.RefObject<HTMLElement | null>, act
     const anchor = anchorRef.current;
     if (!anchor) return;
     const rect = anchor.getBoundingClientRect();
-    setPos({ top: rect.bottom + 4, left: rect.left });
+    const dropdownWidth = 260;
+    const margin = 8;
+    const left = Math.min(rect.left, window.innerWidth - dropdownWidth - margin);
+    setPos({ top: rect.bottom + 4, left: Math.max(margin, left) });
   }, [anchorRef, active]);
   return pos;
 }

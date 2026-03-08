@@ -11,7 +11,7 @@
  */
 import { useCallback, useRef, useState } from 'react';
 import type { EditorView } from 'prosemirror-view';
-import { Library, Inbox, CalendarDays, Trash2, Search, Settings, Code2, SlidersHorizontal, type AppIcon } from '../../lib/icons.js';
+import { Library, Inbox, CalendarDays, Trash2, Search, Settings, Code2, Settings2, type AppIcon } from '../../lib/icons.js';
 import { useNode } from '../../hooks/use-node';
 import { useNodeTags } from '../../hooks/use-node-tags';
 import { useNodeStore } from '../../stores/node-store';
@@ -365,7 +365,7 @@ function ViewToolbarToggle({ nodeId }: { nodeId: string }) {
       onClick={(e) => { e.stopPropagation(); toggleToolbar(nodeId); }}
       title={toolbarVisible ? 'Hide view toolbar' : 'Show view toolbar'}
     >
-      <SlidersHorizontal size={14} strokeWidth={1.5} />
+      <Settings2 size={14} strokeWidth={1.5} />
     </button>
   );
 }

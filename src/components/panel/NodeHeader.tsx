@@ -11,7 +11,7 @@
  */
 import { useCallback, useRef, useState } from 'react';
 import type { EditorView } from 'prosemirror-view';
-import { Library, Inbox, CalendarDays, Trash2, Search, Settings, Code2, type AppIcon } from '../../lib/icons.js';
+import { Library, Inbox, CalendarDays, Trash2, Search, Settings, Code2, SlidersHorizontal, type AppIcon } from '../../lib/icons.js';
 import { useNode } from '../../hooks/use-node';
 import { useNodeTags } from '../../hooks/use-node-tags';
 import { useNodeStore } from '../../stores/node-store';
@@ -252,8 +252,11 @@ export function NodeHeader({ nodeId, onTitleRef }: NodeHeaderProps) {
 
       {/* ── Block ③: Supertag row (conditional) moved before name ── */}
       {hasTags && !isDefinitionNode && (
-        <div className="mb-0.5">
-          <TagBar nodeId={nodeId} />
+        <div className="mb-0.5 flex items-center">
+          <div className="flex-1 min-w-0">
+            <TagBar nodeId={nodeId} />
+          </div>
+          <ViewToolbarToggle nodeId={nodeId} />
         </div>
       )}
 
@@ -327,6 +330,10 @@ export function NodeHeader({ nodeId, onTitleRef }: NodeHeaderProps) {
             )}
           </div>
         </div>
+        {/* View toolbar toggle — on title row when no tags */}
+        {!hasTags && !isDefinitionNode && (
+          <ViewToolbarToggle nodeId={nodeId} />
+        )}
       </div>
 
       {/* ── Description ── */}
@@ -334,5 +341,31 @@ export function NodeHeader({ nodeId, onTitleRef }: NodeHeaderProps) {
         <NodeDescription nodeId={nodeId} editable={canEditNode} />
       </div>
     </div>
+  );
+}
+
+// ── View Toolbar Toggle (inline icon) ──
+
+function ViewToolbarToggle({ nodeId }: { nodeId: string }) {
+  const toolbarVisible = useNodeStore((s) => {
+    void s._version;
+    const viewDefId = s.getViewDefId(nodeId);
+    if (!viewDefId) return false;
+    return s.getNode(viewDefId)?.toolbarVisible ?? false;
+  });
+  const toggleToolbar = useNodeStore((s) => s.toggleToolbar);
+
+  return (
+    <button
+      className={`flex shrink-0 items-center justify-center h-7 w-7 rounded transition-colors cursor-pointer ${
+        toolbarVisible
+          ? 'text-primary hover:bg-primary-muted'
+          : 'text-foreground-tertiary hover:text-foreground-secondary hover:bg-foreground/4'
+      }`}
+      onClick={(e) => { e.stopPropagation(); toggleToolbar(nodeId); }}
+      title={toolbarVisible ? 'Hide view toolbar' : 'Show view toolbar'}
+    >
+      <SlidersHorizontal size={14} strokeWidth={1.5} />
+    </button>
   );
 }

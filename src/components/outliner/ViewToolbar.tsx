@@ -482,7 +482,7 @@ function FilterDropdown({
   const [expandedFilterId, setExpandedFilterId] = useState<string | null>(null);
 
   const handleAddField = useCallback((fieldId: string) => {
-    const op = fieldId === 'tags' ? 'all' as const : 'any' as const;
+    const op = 'any' as const;
     const filterId = useNodeStore.getState().addFilter(nodeId, fieldId, op, []);
     setAddPickerOpen(false);
     // Auto-expand the newly created filter

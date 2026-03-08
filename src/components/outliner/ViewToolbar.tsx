@@ -165,7 +165,8 @@ export function ViewToolbar({ nodeId, depth }: ViewToolbarProps) {
 
   if (!toolbarVisible) return null;
 
-  const leftPad = depth * 28 + 6 + 15 + 4;
+  // Align with NodeHeader title (px-4 = 16px at depth 0)
+  const leftPad = depth === 0 ? 16 : depth * 28 + 6 + 15 + 4;
 
   return (
     <div

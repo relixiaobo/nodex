@@ -207,7 +207,7 @@ export function NodeHeader({ nodeId, onTitleRef }: NodeHeaderProps) {
   const displayHtml = marksToHtml(displayName, rawMarks, rawInlineRefs);
 
   return (
-    <div className="pt-1 px-4">
+    <div className="pt-1 pb-1 px-4">
       {/* ── Block ①: Icon (conditional) ── */}
       {showIconBlock && (
         <div className="mb-1">

@@ -785,8 +785,9 @@ function useDropdownDismiss(
 }
 
 /**
- * Position dropdown below anchor, clamped to all viewport edges.
- * Returns { top, left, maxWidth, maxHeight } for the dropdown container.
+ * Position dropdown near anchor, preferring below-left.
+ * Repositions before resizing: shift left if overflows right, flip above if overflows bottom.
+ * Only applies maxHeight as last resort when neither direction has enough space.
  */
 function useDropdownPosition(anchorRef: React.RefObject<HTMLElement | null>, active = true) {
   const [layout, setLayout] = useState({ top: 0, left: 0, maxWidth: 260, maxHeight: 400 });
@@ -795,16 +796,37 @@ function useDropdownPosition(anchorRef: React.RefObject<HTMLElement | null>, act
     const anchor = anchorRef.current;
     if (!anchor) return;
     const rect = anchor.getBoundingClientRect();
+    const gap = 4;
     const margin = 8;
     const vw = window.innerWidth;
     const vh = window.innerHeight;
+    const dropW = 260;
 
-    const maxWidth = vw - margin * 2;
-    const top = rect.bottom + 4;
-    const left = Math.max(margin, Math.min(rect.left, vw - Math.min(260, maxWidth) - margin));
-    const maxHeight = vh - top - margin;
+    // Horizontal: prefer left-aligned, shift left if overflows right
+    const left = Math.max(margin, Math.min(rect.left, vw - dropW - margin));
 
-    setLayout({ top, left, maxWidth, maxHeight });
+    // Vertical: prefer below, flip above if not enough space below
+    const spaceBelow = vh - rect.bottom - gap;
+    const spaceAbove = rect.top - gap;
+    let top: number;
+    let maxHeight: number;
+
+    if (spaceBelow >= 200) {
+      // Enough space below
+      top = rect.bottom + gap;
+      maxHeight = spaceBelow - margin;
+    } else if (spaceAbove > spaceBelow) {
+      // Flip above — we don't know exact dropdown height, so use auto positioning
+      // Set a max and let CSS handle it; top is computed as "above anchor"
+      maxHeight = spaceAbove - margin;
+      top = Math.max(margin, rect.top - gap - Math.min(maxHeight, 400));
+    } else {
+      // Neither direction great, use below with scroll
+      top = rect.bottom + gap;
+      maxHeight = spaceBelow - margin;
+    }
+
+    setLayout({ top, left, maxWidth: vw - margin * 2, maxHeight: Math.max(maxHeight, 100) });
   }, [anchorRef, active]);
   return layout;
 }

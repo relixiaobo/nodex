@@ -34,16 +34,27 @@ describe('groupNodes', () => {
       expect(result[1].ids).toEqual(['b']);
     });
 
-    it('node with multiple tags appears in multiple groups', () => {
-      const nodes: Record<string, NodexNode> = {
-        a: makeNode({ id: 'a', tags: ['t1', 't2'] }),
+    it('node with multiple tags uses combination key (not duplicated)', () => {
+      const tagNodes: Record<string, NodexNode> = {
+        t1: makeNode({ id: 't1', name: 'Alpha' }),
+        t2: makeNode({ id: 't2', name: 'Beta' }),
       };
-      const getNode = (id: string) => nodes[id] ?? null;
-      const result = groupNodes(['a'], 'tags', getNode);
+      const nodes: Record<string, NodexNode> = {
+        a: makeNode({ id: 'a', tags: ['t2', 't1'] }),
+        b: makeNode({ id: 'b', tags: ['t1'] }),
+      };
+      const getNode = (id: string) => nodes[id] ?? tagNodes[id] ?? null;
+      const result = groupNodes(['a', 'b'], 'tags', getNode);
 
+      // 'a' has both tags → combination group "Alpha, Beta"
+      // 'b' has only t1 → group "Alpha"
       expect(result.length).toBe(2);
-      expect(result[0].ids).toContain('a');
-      expect(result[1].ids).toContain('a');
+      const comboGroup = result.find((g) => g.label === 'Alpha, Beta');
+      const singleGroup = result.find((g) => g.label === 'Alpha');
+      expect(comboGroup).toBeDefined();
+      expect(comboGroup!.ids).toEqual(['a']);
+      expect(singleGroup).toBeDefined();
+      expect(singleGroup!.ids).toEqual(['b']);
     });
 
     it('nodes without tags go to (Empty) group', () => {

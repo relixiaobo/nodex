@@ -246,7 +246,17 @@ function SortControl({
 
 // ── Sort dropdown (multi-sort) ──
 
-type SortView = 'list' | 'fieldPicker';
+/** Pick the next default field not already used by existing rules. */
+function pickDefaultSortField(
+  usedFields: string[],
+  allFields: Array<{ id: string }>,
+): string {
+  const used = new Set(usedFields);
+  for (const f of allFields) {
+    if (!used.has(f.id)) return f.id;
+  }
+  return 'name'; // fallback
+}
 
 function SortDropdown({
   nodeId,
@@ -260,8 +270,7 @@ function SortDropdown({
   const _version = useNodeStore((s) => s._version);
   const sortRules = useMemo(() => useNodeStore.getState().getSortRules(nodeId), [nodeId, _version]);
 
-  const [view, setView] = useState<SortView>(sortRules.length > 0 ? 'list' : 'fieldPicker');
-  // Track which rule is being edited (for field picker replacement)
+  // Track which rule is showing its field picker (inline replacement)
   const [editingRuleId, setEditingRuleId] = useState<string | null>(null);
 
   const tagFields = useTagFieldDefs(nodeId);
@@ -270,23 +279,22 @@ function SortDropdown({
     ...tagFields.map((f) => ({ id: f.id, label: f.name || 'Untitled', section: 'Tag fields' })),
   ], [tagFields]);
 
-  // Sync view state when all rules removed externally
+  // Auto-create first rule if opening with none (Tana behavior)
+  const didAutoCreate = useRef(false);
   useEffect(() => {
-    if (sortRules.length === 0 && view === 'list') setView('fieldPicker');
-  }, [sortRules.length, view]);
+    if (sortRules.length === 0 && !didAutoCreate.current) {
+      didAutoCreate.current = true;
+      const field = pickDefaultSortField([], allFields);
+      useNodeStore.getState().addSortRule(nodeId, field, 'asc');
+    }
+  }, [sortRules.length, nodeId, allFields]);
 
   const handleSelectField = useCallback((fieldId: string) => {
-    if (editingRuleId) {
-      // Update existing rule's field
-      const rule = sortRules.find((r) => r.id === editingRuleId);
-      useNodeStore.getState().updateSortRule(editingRuleId, fieldId, rule?.direction ?? 'asc');
-      setEditingRuleId(null);
-    } else {
-      // Add new sort rule
-      useNodeStore.getState().addSortRule(nodeId, fieldId, 'asc');
-    }
-    setView('list');
-  }, [nodeId, editingRuleId, sortRules]);
+    if (!editingRuleId) return;
+    const rule = sortRules.find((r) => r.id === editingRuleId);
+    useNodeStore.getState().updateSortRule(editingRuleId, fieldId, rule?.direction ?? 'asc');
+    setEditingRuleId(null);
+  }, [editingRuleId, sortRules]);
 
   const handleToggleDirection = useCallback((ruleId: string) => {
     const rule = sortRules.find((r) => r.id === ruleId);
@@ -297,61 +305,69 @@ function SortDropdown({
 
   const handleRemoveRule = useCallback((ruleId: string) => {
     useNodeStore.getState().removeSortRule(ruleId);
-  }, []);
+    if (editingRuleId === ruleId) setEditingRuleId(null);
+  }, [editingRuleId]);
 
   const handleResetAll = useCallback(() => {
     useNodeStore.getState().clearAllSortRules(nodeId);
     onClose();
   }, [nodeId, onClose]);
 
-  const handleOpenFieldPicker = useCallback((ruleId: string) => {
-    setEditingRuleId(ruleId);
-    setView('fieldPicker');
-  }, []);
-
   const handleAddSort = useCallback(() => {
-    setEditingRuleId(null);
-    setView('fieldPicker');
-  }, []);
+    const usedFields = sortRules.map((r) => r.field);
+    const field = pickDefaultSortField(usedFields, allFields);
+    useNodeStore.getState().addSortRule(nodeId, field, 'asc');
+  }, [nodeId, sortRules, allFields]);
 
   return (
     <DropdownPanel anchorRef={anchorRef} onClose={onClose} title="Sort by">
-      {view === 'list' && sortRules.length > 0 ? (
+      {editingRuleId ? (
+        <>
+          <div className="px-1.5 pb-1">
+            <button
+              className="flex items-center gap-1 w-full rounded-md px-1.5 py-1 mb-1 text-xs text-foreground-tertiary hover:text-foreground-secondary hover:bg-foreground/4 transition-colors cursor-pointer"
+              onClick={() => setEditingRuleId(null)}
+            >
+              <ChevronDown size={10} strokeWidth={2} className="rotate-90" />
+              Back
+            </button>
+          </div>
+          <SectionedFieldList fields={allFields} onSelect={handleSelectField} selectedId={sortRules.find((r) => r.id === editingRuleId)?.field} />
+        </>
+      ) : sortRules.length > 0 ? (
         <>
           <div className="mx-1.5 mb-1 flex flex-col gap-1">
-            {sortRules.map((rule) => (
+            {sortRules.map((rule, i) => (
               <SortConfigRow
                 key={rule.id}
+                label={i === 0 ? 'Sort by' : 'then by'}
                 sortField={rule.field}
                 sortDirection={rule.direction}
                 allFields={allFields}
-                onOpenFieldPicker={() => handleOpenFieldPicker(rule.id)}
+                onOpenFieldPicker={() => setEditingRuleId(rule.id)}
                 onToggleDirection={() => handleToggleDirection(rule.id)}
                 onRemove={() => handleRemoveRule(rule.id)}
               />
             ))}
           </div>
           <div className="mx-1.5 my-0.5 h-px bg-border-subtle" />
-          <div className="px-1.5 pb-1.5 pt-0.5 flex flex-col gap-0.5">
+          <div className="px-1.5 pb-1.5 pt-0.5 flex items-center gap-2">
             <button
-              className="flex items-center gap-1.5 w-full rounded-md px-1.5 py-1 text-xs text-foreground-secondary hover:bg-foreground/4 transition-colors cursor-pointer"
+              className="flex items-center gap-1.5 rounded-md px-1.5 py-1 text-xs text-foreground-secondary hover:bg-foreground/4 transition-colors cursor-pointer"
               onClick={handleAddSort}
             >
               <Plus size={12} strokeWidth={1.5} />
               Add sort
             </button>
             <button
-              className="flex items-center gap-1.5 w-full rounded-md px-1.5 py-1 text-xs text-destructive hover:bg-foreground/4 transition-colors cursor-pointer"
+              className="flex items-center gap-1.5 rounded-md px-1.5 py-1 text-xs text-destructive hover:bg-foreground/4 transition-colors cursor-pointer"
               onClick={handleResetAll}
             >
-              <X size={12} strokeWidth={1.5} />
               Reset
             </button>
           </div>
         </>
-      ) : (
-        <SectionedFieldList fields={allFields} onSelect={handleSelectField} />
-      )}
+      ) : null}
     </DropdownPanel>
   );
 }
@@ -359,6 +375,7 @@ function SortDropdown({
 // ── Sort config row: [field ▾] [direction ▾] [⊖] ──
 
 function SortConfigRow({
+  label,
   sortField,
   sortDirection,
   allFields,
@@ -366,6 +383,7 @@ function SortConfigRow({
   onToggleDirection,
   onRemove,
 }: {
+  label: string;
   sortField: string;
   sortDirection: SortDirection;
   allFields: Array<{ id: string; label: string; section: string }>;
@@ -374,9 +392,11 @@ function SortConfigRow({
   onRemove: () => void;
 }) {
   const fieldLabel = allFields.find((f) => f.id === sortField)?.label ?? 'Field';
+  const DirIcon = sortDirection === 'asc' ? ArrowUp : ArrowDown;
 
   return (
     <div className="flex items-center gap-1">
+      <span className="text-[11px] text-foreground-tertiary w-[52px] shrink-0 text-right pr-1">{label}</span>
       <button
         className="flex items-center gap-1 flex-1 min-w-0 h-7 px-2 rounded-md text-xs bg-foreground/[0.04] hover:bg-foreground/[0.07] transition-colors cursor-pointer"
         onClick={onOpenFieldPicker}
@@ -385,11 +405,12 @@ function SortConfigRow({
         <ChevronDown size={10} strokeWidth={2} className="text-foreground-tertiary shrink-0" />
       </button>
       <button
-        className="flex items-center gap-1 h-7 px-2 rounded-md text-xs bg-foreground/[0.04] hover:bg-foreground/[0.07] transition-colors cursor-pointer whitespace-nowrap"
+        className="flex items-center gap-1 h-7 px-1.5 rounded-md text-xs bg-foreground/[0.04] hover:bg-foreground/[0.07] transition-colors cursor-pointer whitespace-nowrap"
         onClick={onToggleDirection}
+        title={sortDirection === 'asc' ? 'Ascending' : 'Descending'}
       >
+        <DirIcon size={12} strokeWidth={1.5} />
         <span>{sortDirection === 'asc' ? 'Ascending' : 'Descending'}</span>
-        <ChevronDown size={10} strokeWidth={2} className="text-foreground-tertiary shrink-0" />
       </button>
       <button
         className="flex items-center justify-center h-7 w-7 rounded-md text-foreground-tertiary hover:text-destructive hover:bg-foreground/[0.04] transition-colors cursor-pointer shrink-0"

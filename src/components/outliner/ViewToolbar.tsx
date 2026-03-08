@@ -170,7 +170,7 @@ export function ViewToolbar({ nodeId, depth }: ViewToolbarProps) {
 
   return (
     <div
-      className="flex items-center gap-1 h-6"
+      className="flex items-center gap-1 h-6 mb-1"
       style={{ paddingLeft: leftPad }}
     >
       <SortControl nodeId={nodeId} sortRuleCount={sortRuleCount} />

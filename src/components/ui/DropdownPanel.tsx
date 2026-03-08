@@ -35,9 +35,12 @@ export function DropdownPanel({
   // ── Dismiss on outside click / Escape ──
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
+      const target = e.target as Node;
       if (
-        menuRef.current && !menuRef.current.contains(e.target as Node) &&
-        anchorRef.current && !anchorRef.current.contains(e.target as Node)
+        menuRef.current && !menuRef.current.contains(target) &&
+        anchorRef.current && !anchorRef.current.contains(target) &&
+        // Don't close if click is inside a nested dropdown panel
+        !(target instanceof HTMLElement && target.closest('[data-dropdown-panel]'))
       ) {
         onClose();
       }
@@ -115,6 +118,7 @@ export function DropdownPanel({
   return createPortal(
     <div
       ref={menuRef}
+      data-dropdown-panel
       className="fixed z-50 rounded-lg bg-background shadow-paper text-foreground overflow-y-auto"
       style={style}
     >

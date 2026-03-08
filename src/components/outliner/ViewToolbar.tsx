@@ -212,8 +212,8 @@ function SortDropdown({
   return createPortal(
     <div
       ref={menuRef}
-      className="fixed z-50 w-[260px] rounded-lg bg-background shadow-paper text-foreground"
-      style={{ top: pos.top, left: pos.left }}
+      className="fixed z-50 w-[260px] rounded-lg bg-background shadow-paper text-foreground overflow-y-auto"
+      style={{ top: pos.top, left: pos.left, maxWidth: pos.maxWidth, maxHeight: pos.maxHeight }}
     >
       {/* Title */}
       <div className="px-3 pt-2.5 pb-1.5 text-xs font-medium text-foreground-secondary">
@@ -447,8 +447,8 @@ function FilterDropdown({
   return createPortal(
     <div
       ref={menuRef}
-      className="fixed z-50 w-[260px] rounded-lg bg-background shadow-paper text-foreground"
-      style={{ top: pos.top, left: pos.left }}
+      className="fixed z-50 w-[260px] rounded-lg bg-background shadow-paper text-foreground overflow-y-auto"
+      style={{ top: pos.top, left: pos.left, maxWidth: pos.maxWidth, maxHeight: pos.maxHeight }}
     >
       <div className="px-3 pt-2.5 pb-1.5 text-xs font-medium text-foreground-secondary">
         Filter by
@@ -704,8 +704,8 @@ function GroupDropdown({
   return createPortal(
     <div
       ref={menuRef}
-      className="fixed z-50 w-[260px] rounded-lg bg-background shadow-paper text-foreground"
-      style={{ top: pos.top, left: pos.left }}
+      className="fixed z-50 w-[260px] rounded-lg bg-background shadow-paper text-foreground overflow-y-auto"
+      style={{ top: pos.top, left: pos.left, maxWidth: pos.maxWidth, maxHeight: pos.maxHeight }}
     >
       <div className="px-3 pt-2.5 pb-1.5 text-xs font-medium text-foreground-secondary">
         Group by
@@ -784,20 +784,29 @@ function useDropdownDismiss(
   }, [menuRef, anchorRef, onClose, enabled]);
 }
 
-/** Position dropdown below anchor element, clamped to viewport edges. */
+/**
+ * Position dropdown below anchor, clamped to all viewport edges.
+ * Returns { top, left, maxWidth, maxHeight } for the dropdown container.
+ */
 function useDropdownPosition(anchorRef: React.RefObject<HTMLElement | null>, active = true) {
-  const [pos, setPos] = useState({ top: 0, left: 0 });
+  const [layout, setLayout] = useState({ top: 0, left: 0, maxWidth: 260, maxHeight: 400 });
   useEffect(() => {
     if (!active) return;
     const anchor = anchorRef.current;
     if (!anchor) return;
     const rect = anchor.getBoundingClientRect();
-    const dropdownWidth = 260;
     const margin = 8;
-    const left = Math.min(rect.left, window.innerWidth - dropdownWidth - margin);
-    setPos({ top: rect.bottom + 4, left: Math.max(margin, left) });
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+
+    const maxWidth = vw - margin * 2;
+    const top = rect.bottom + 4;
+    const left = Math.max(margin, Math.min(rect.left, vw - Math.min(260, maxWidth) - margin));
+    const maxHeight = vh - top - margin;
+
+    setLayout({ top, left, maxWidth, maxHeight });
   }, [anchorRef, active]);
-  return pos;
+  return layout;
 }
 
 /** Get the display label for a sort field. */

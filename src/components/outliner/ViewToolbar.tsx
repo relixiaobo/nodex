@@ -61,7 +61,7 @@ const ToolbarPill = forwardRef<
   return (
     <button
       ref={ref}
-      className={`flex items-center gap-1 h-5 px-1 rounded text-[11px] transition-colors cursor-pointer ${
+      className={`flex items-center gap-1 h-6 px-1.5 rounded-full text-xs transition-colors cursor-pointer ${
         active
           ? 'text-primary hover:bg-primary-muted'
           : 'text-foreground-tertiary hover:text-foreground-secondary hover:bg-foreground/4'
@@ -69,9 +69,9 @@ const ToolbarPill = forwardRef<
       onClick={onClick}
       title={title}
     >
-      <Icon size={11} strokeWidth={1.5} />
+      <Icon size={12} strokeWidth={1.5} />
       {children ?? <span>{label}</span>}
-      {badge && <span className="text-[10px] text-primary">{badge}</span>}
+      {badge && <span className="text-xs text-primary">{badge}</span>}
     </button>
   );
 });
@@ -100,17 +100,17 @@ function SectionedFieldList({
   }, [fields]);
 
   return (
-    <div className="px-1.5 pb-1.5">
+    <div className="px-1 pb-1">
       {sections.map(([section, items], i) => (
         <div key={section}>
           {i > 0 && <div className="mx-1 my-1 h-px bg-border-subtle" />}
-          <div className="px-1.5 pt-1.5 pb-0.5 text-[10px] font-medium text-foreground-tertiary uppercase tracking-wider">
+          <div className="px-2 pt-1.5 pb-0.5 text-xs font-medium text-foreground-tertiary uppercase tracking-wider">
             {section}
           </div>
           {items.map((f) => (
             <button
               key={f.id}
-              className="flex items-center gap-2 w-full rounded-md px-1.5 py-1.5 text-xs text-foreground-secondary hover:bg-foreground/4 hover:text-foreground transition-colors text-left cursor-pointer"
+              className="flex items-center gap-2.5 w-full rounded-md px-2 py-1.5 text-sm text-foreground-secondary hover:bg-foreground/4 hover:text-foreground transition-colors text-left cursor-pointer"
               onClick={() => onSelect(f.id)}
             >
               {selectedId !== undefined && (
@@ -169,7 +169,7 @@ export function ViewToolbar({ nodeId, depth }: ViewToolbarProps) {
 
   return (
     <div
-      className="flex items-center gap-0.5 h-6"
+      className="flex items-center gap-1 h-6"
       style={{ paddingLeft: leftPad }}
     >
       <SortControl nodeId={nodeId} sortRuleCount={sortRuleCount} />
@@ -332,17 +332,17 @@ function SortDropdown({
           />
         ))}
       </div>
-      <div className="mx-1.5 my-0.5 h-px bg-border-subtle" />
-      <div className="px-1.5 pb-1.5 pt-0.5 flex items-center gap-2">
+      <div className="mx-1 my-1 h-px bg-border-subtle" />
+      <div className="px-1 pb-1 flex items-center gap-2">
         <button
-          className="flex items-center gap-1.5 rounded-md px-1.5 py-1 text-xs text-foreground-secondary hover:bg-foreground/4 transition-colors cursor-pointer"
+          className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm text-foreground-secondary hover:bg-foreground/4 transition-colors cursor-pointer"
           onClick={handleAddSort}
         >
-          <Plus size={12} strokeWidth={1.5} />
+          <Plus size={14} strokeWidth={1.5} />
           Add sort
         </button>
         <button
-          className="flex items-center gap-1.5 rounded-md px-1.5 py-1 text-xs text-destructive hover:bg-foreground/4 transition-colors cursor-pointer"
+          className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm text-destructive hover:bg-foreground/4 transition-colors cursor-pointer"
           onClick={handleResetAll}
         >
           Reset
@@ -390,7 +390,7 @@ function SortConfigRow({
       <span className="text-[11px] text-foreground-tertiary w-[52px] shrink-0 text-right pr-1">{label}</span>
       <button
         ref={fieldBtnRef}
-        className="flex items-center gap-1 flex-1 min-w-0 h-7 px-2 rounded-md text-xs bg-foreground/[0.04] hover:bg-foreground/[0.07] transition-colors cursor-pointer"
+        className="flex items-center gap-1 flex-1 min-w-0 h-7 px-2 rounded-md text-xs bg-foreground/4 hover:bg-foreground/6 transition-colors cursor-pointer"
         onClick={() => setPickerOpen((v) => !v)}
       >
         <span className="truncate flex-1 text-left">{fieldLabel}</span>
@@ -402,7 +402,7 @@ function SortConfigRow({
         </DropdownPanel>
       )}
       <button
-        className="flex items-center gap-1 h-7 px-1.5 rounded-md text-xs bg-foreground/[0.04] hover:bg-foreground/[0.07] transition-colors cursor-pointer whitespace-nowrap"
+        className="flex items-center gap-1 h-7 px-1.5 rounded-md text-xs bg-foreground/4 hover:bg-foreground/6 transition-colors cursor-pointer whitespace-nowrap"
         onClick={onToggleDirection}
         title={sortDirection === 'asc' ? 'Ascending' : 'Descending'}
       >
@@ -410,7 +410,7 @@ function SortConfigRow({
         <span>{sortDirection === 'asc' ? 'Ascending' : 'Descending'}</span>
       </button>
       <button
-        className="flex items-center justify-center h-7 w-7 rounded-md text-foreground-tertiary hover:text-destructive hover:bg-foreground/[0.04] transition-colors cursor-pointer shrink-0"
+        className="flex items-center justify-center h-7 w-7 rounded-md text-foreground-tertiary hover:text-destructive hover:bg-foreground/4 transition-colors cursor-pointer shrink-0"
         onClick={onRemove}
         title="Remove sort"
       >
@@ -521,20 +521,20 @@ function FilterDropdown({
               />
             ))}
           </div>
-          <div className="mx-1.5 my-0.5 h-px bg-border-subtle" />
-          <div className="px-1.5 pb-1.5 pt-0.5 flex flex-col gap-0.5">
+          <div className="mx-1 my-1 h-px bg-border-subtle" />
+          <div className="px-1 pb-1 flex flex-col gap-0.5">
             <button
-              className="flex items-center gap-1.5 w-full rounded-md px-1.5 py-1 text-xs text-foreground-secondary hover:bg-foreground/4 transition-colors cursor-pointer"
+              className="flex items-center gap-1.5 w-full rounded-md px-2 py-1.5 text-sm text-foreground-secondary hover:bg-foreground/4 transition-colors cursor-pointer"
               onClick={() => setView('fieldPicker')}
             >
-              <Plus size={12} strokeWidth={1.5} />
+              <Plus size={14} strokeWidth={1.5} />
               Add filter
             </button>
             <button
-              className="flex items-center gap-1.5 w-full rounded-md px-1.5 py-1 text-xs text-destructive hover:bg-foreground/4 transition-colors cursor-pointer"
+              className="flex items-center gap-1.5 w-full rounded-md px-2 py-1.5 text-sm text-destructive hover:bg-foreground/4 transition-colors cursor-pointer"
               onClick={handleResetAll}
             >
-              <X size={12} strokeWidth={1.5} />
+              <X size={14} strokeWidth={1.5} />
               Reset
             </button>
           </div>
@@ -563,7 +563,7 @@ function FilterConfigRow({
   return (
     <div className="flex items-center gap-1">
       <button
-        className="flex items-center gap-1 flex-1 min-w-0 h-7 px-2 rounded-md text-xs bg-foreground/[0.04] hover:bg-foreground/[0.07] transition-colors cursor-pointer"
+        className="flex items-center gap-1 flex-1 min-w-0 h-7 px-2 rounded-md text-xs bg-foreground/4 hover:bg-foreground/6 transition-colors cursor-pointer"
         onClick={onEdit}
       >
         <span className="truncate flex-1 text-left">{fieldLabel}</span>
@@ -573,7 +573,7 @@ function FilterConfigRow({
         <ChevronDown size={10} strokeWidth={2} className="text-foreground-tertiary shrink-0" />
       </button>
       <button
-        className="flex items-center justify-center h-7 w-7 rounded-md text-foreground-tertiary hover:text-destructive hover:bg-foreground/[0.04] transition-colors cursor-pointer shrink-0"
+        className="flex items-center justify-center h-7 w-7 rounded-md text-foreground-tertiary hover:text-destructive hover:bg-foreground/4 transition-colors cursor-pointer shrink-0"
         onClick={onRemove}
         title="Remove filter"
       >
@@ -614,23 +614,23 @@ function FilterValuePicker({
   if (!filter) return null;
 
   return (
-    <div className="px-1.5 pb-1.5">
+    <div className="px-1 pb-1">
       <button
-        className="flex items-center gap-1 w-full rounded-md px-1.5 py-1 mb-1 text-xs text-foreground-tertiary hover:text-foreground-secondary hover:bg-foreground/4 transition-colors cursor-pointer"
+        className="flex items-center gap-1.5 w-full rounded-md px-2 py-1.5 mb-1 text-sm text-foreground-tertiary hover:text-foreground-secondary hover:bg-foreground/4 transition-colors cursor-pointer"
         onClick={onBack}
       >
         <ChevronDown size={10} strokeWidth={2} className="rotate-90" />
         Back
       </button>
       {availableValues.length === 0 ? (
-        <div className="px-1.5 py-2 text-xs text-foreground-tertiary">No values found</div>
+        <div className="px-2 py-2 text-sm text-foreground-tertiary">No values found</div>
       ) : (
         availableValues.map((v) => {
           const selected = filter.values.includes(v.id);
           return (
             <button
               key={v.id}
-              className="flex items-center gap-2 w-full rounded-md px-1.5 py-1.5 text-xs text-foreground-secondary hover:bg-foreground/4 hover:text-foreground transition-colors text-left cursor-pointer"
+              className="flex items-center gap-2.5 w-full rounded-md px-2 py-1.5 text-sm text-foreground-secondary hover:bg-foreground/4 hover:text-foreground transition-colors text-left cursor-pointer"
               onClick={() => toggleValue(v.id)}
             >
               <span className={`flex items-center justify-center w-4 h-4 rounded border ${
@@ -724,13 +724,13 @@ function GroupDropdown({
         selectedId={groupField}
       />
       {groupField && (
-        <div className="px-1.5 pb-1.5">
-          <div className="mx-1 mb-1 h-px bg-border-subtle" />
+        <div className="px-1 pb-1">
+          <div className="mx-1 my-1 h-px bg-border-subtle" />
           <button
-            className="flex items-center gap-1.5 w-full rounded-md px-1.5 py-1 text-xs text-destructive hover:bg-foreground/4 transition-colors cursor-pointer"
+            className="flex items-center gap-1.5 w-full rounded-md px-2 py-1.5 text-sm text-destructive hover:bg-foreground/4 transition-colors cursor-pointer"
             onClick={() => { useNodeStore.getState().clearGroup(nodeId); onClose(); }}
           >
-            <X size={12} strokeWidth={1.5} />
+            <X size={14} strokeWidth={1.5} />
             Reset
           </button>
         </div>

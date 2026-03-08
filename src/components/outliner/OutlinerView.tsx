@@ -23,10 +23,7 @@ import {
 } from './row-model.js';
 import { navigateToSiblingRow } from '../../lib/outliner-navigation.js';
 import { ViewToolbar } from './ViewToolbar.js';
-import { compareNodes, type SortConfig } from '../../lib/sort-utils.js';
-import { buildBacklinkCountMap } from '../../lib/backlinks.js';
-import { matchesAllFilters, type FilterCondition } from '../../lib/filter-utils.js';
-import { groupNodes } from '../../lib/group-utils.js';
+import { readViewConfig, applyViewPipeline } from '../../lib/view-pipeline.js';
 
 interface OutlinerViewProps {
   rootNodeId: string;
@@ -101,25 +98,11 @@ export function OutlinerView({ rootNodeId, showTemplateTuples }: OutlinerViewPro
   // Read view config from viewDef child (sort, filter, group)
   const viewConfig = useMemo(() => {
     const store = useNodeStore.getState();
-    const viewDefId = store.getViewDefId(rootNodeId);
-    if (!viewDefId) return { sort: null as SortConfig | null, filters: [] as FilterCondition[], groupField: null as string | null };
-    const viewDef = store.getNode(viewDefId);
-    const sort: SortConfig | null = viewDef?.sortField
-      ? { field: viewDef.sortField, direction: viewDef.sortDirection ?? 'asc' }
-      : null;
-    const filters = store.getFilters(rootNodeId).map((f) => ({
-      field: f.field,
-      op: f.op,
-      values: f.values,
-    }));
-    const groupField = viewDef?.groupField ?? null;
-    return { sort, filters, groupField };
+    return readViewConfig(rootNodeId, store.getViewDefId, store.getNode, store.getFilters);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rootNodeId, _version]);
 
-  // Classify children with unified ordering: template fields first (grouped by tag),
-  // then remaining children in data order — same logic as OutlinerItem.
-  // Pipeline: build rows → filter content → group → sort(within group) → render
+  // Classify children → apply filter → group → sort pipeline
   const visibleChildren = useMemo(() => {
     const rows = buildVisibleChildrenRows({
       allChildIds,
@@ -130,56 +113,9 @@ export function OutlinerView({ rootNodeId, showTemplateTuples }: OutlinerViewPro
       getChildNodeType: (id) => useNodeStore.getState().getNode(id)?.type,
       isOutlinerContentType: isOutlinerContentNodeType,
     });
-    const fieldRows = rows.filter((r) => r.type === 'field');
-    let contentRows = rows.filter((r) => r.type === 'content');
-    const getNode = useNodeStore.getState().getNode;
-    const { sort, filters, groupField } = viewConfig;
-
-    // 1. Filter
-    if (filters.length > 0) {
-      contentRows = contentRows.filter((r) => {
-        const node = getNode(r.id);
-        return node ? matchesAllFilters(node, filters, getNode) : false;
-      });
-    }
-
-    // 2. Group + Sort
-    if (groupField) {
-      const contentIds = contentRows.map((r) => r.id);
-      const groups = groupNodes(contentIds, groupField, getNode);
-      const result: OutlinerRowItem[] = [...fieldRows];
-      const backlinkCounts = sort?.field === 'refCount' ? buildBacklinkCountMap(_version) : undefined;
-      for (const group of groups) {
-        result.push({ id: `__group__${group.key}`, type: 'groupHeader', label: group.label });
-        let groupItems: OutlinerRowItem[] = group.ids.map((id) => ({ id, type: 'content' as const }));
-        if (sort) {
-          groupItems.sort((a, b) => {
-            const nodeA = getNode(a.id);
-            const nodeB = getNode(b.id);
-            if (!nodeA || !nodeB) return 0;
-            return compareNodes(nodeA, nodeB, sort, getNode, backlinkCounts);
-          });
-        }
-        result.push(...groupItems);
-      }
-      return result;
-    }
-
-    // 3. Sort only (no group)
-    if (sort) {
-      const backlinkCounts = sort.field === 'refCount' ? buildBacklinkCountMap(_version) : undefined;
-      contentRows.sort((a, b) => {
-        const nodeA = getNode(a.id);
-        const nodeB = getNode(b.id);
-        if (!nodeA || !nodeB) return 0;
-        return compareNodes(nodeA, nodeB, sort, getNode, backlinkCounts);
-      });
-    }
-
-    return [...fieldRows, ...contentRows];
-  }
+    return applyViewPipeline(rows, viewConfig, useNodeStore.getState().getNode, _version);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  , [allChildIds, fieldMap, tagIds, viewConfig, _version]);
+  }, [allChildIds, fieldMap, tagIds, viewConfig, _version]);
 
   // Template content clone colors: content children with templateId get the owning tagDef's color.
   const templateContentColors = useMemo(() => {

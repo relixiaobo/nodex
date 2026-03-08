@@ -5,7 +5,6 @@
  * Rendered between a node's title and its children (inside OutlinerItem or OutlinerView).
  */
 import { forwardRef, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
 import {
   ArrowUpDown, ListFilter, Group,
   ArrowUp, ArrowDown, ChevronDown, CircleMinus, Plus, X, Check,
@@ -14,10 +13,12 @@ import { useNodeStore } from '../../stores/node-store.js';
 import { useNodeTags } from '../../hooks/use-node-tags.js';
 import * as loroDoc from '../../lib/loro-doc.js';
 import type { SortDirection } from '../../lib/sort-utils.js';
+import { DropdownPanel } from '../ui/DropdownPanel.js';
+import type { LucideIcon } from 'lucide-react';
 
-// ── Built-in sort fields ──
+// ── Built-in field lists ──
 
-const BUILTIN_FIELDS: Array<{ id: string; label: string }> = [
+const BUILTIN_SORT_FIELDS: Array<{ id: string; label: string }> = [
   { id: 'name', label: 'Name' },
   { id: 'createdAt', label: 'Created' },
   { id: 'updatedAt', label: 'Last edited' },
@@ -25,6 +26,111 @@ const BUILTIN_FIELDS: Array<{ id: string; label: string }> = [
   { id: 'doneTime', label: 'Done time' },
   { id: 'refCount', label: 'References' },
 ];
+
+const BUILTIN_FILTER_FIELDS: Array<{ id: string; label: string }> = [
+  { id: 'tags', label: 'Tags' },
+  { id: 'done', label: 'Checked state' },
+];
+
+const BUILTIN_GROUP_FIELDS: Array<{ id: string; label: string }> = [
+  { id: 'tags', label: 'Tags' },
+  { id: 'done', label: 'Done' },
+  { id: 'createdAt', label: 'Created time' },
+  { id: 'updatedAt', label: 'Last edited time' },
+];
+
+// ════════════════════════════════════════════════════════════════
+// Shared primitives
+// ════════════════════════════════════════════════════════════════
+
+// ── ToolbarPill: unified trigger button for Sort / Filter / Group ──
+
+const ToolbarPill = forwardRef<
+  HTMLButtonElement,
+  {
+    icon: LucideIcon;
+    label: string;
+    active?: boolean;
+    badge?: string;
+    onClick: () => void;
+    title?: string;
+    children?: React.ReactNode;
+  }
+>(function ToolbarPill({ icon: Icon, label, active, badge, onClick, title, children }, ref) {
+  return (
+    <button
+      ref={ref}
+      className={`flex items-center gap-1 h-5 px-1 rounded text-[11px] transition-colors cursor-pointer ${
+        active
+          ? 'text-primary hover:bg-primary-muted'
+          : 'text-foreground-tertiary hover:text-foreground-secondary hover:bg-foreground/4'
+      }`}
+      onClick={onClick}
+      title={title}
+    >
+      <Icon size={11} strokeWidth={1.5} />
+      {children ?? <span>{label}</span>}
+      {badge && <span className="text-[10px] text-primary">{badge}</span>}
+    </button>
+  );
+});
+
+// ── SectionedFieldList: grouped field picker (Sort / Filter / Group) ──
+
+type SectionedField = { id: string; label: string; section: string };
+
+function SectionedFieldList({
+  fields,
+  onSelect,
+  selectedId,
+}: {
+  fields: SectionedField[];
+  onSelect: (fieldId: string) => void;
+  selectedId?: string | null;
+}) {
+  const sections = useMemo(() => {
+    const map = new Map<string, Array<{ id: string; label: string }>>();
+    for (const f of fields) {
+      const arr = map.get(f.section) ?? [];
+      arr.push(f);
+      map.set(f.section, arr);
+    }
+    return [...map.entries()];
+  }, [fields]);
+
+  return (
+    <div className="px-1.5 pb-1.5">
+      {sections.map(([section, items], i) => (
+        <div key={section}>
+          {i > 0 && <div className="mx-1 my-1 h-px bg-border-subtle" />}
+          <div className="px-1.5 pt-1.5 pb-0.5 text-[10px] font-medium text-foreground-tertiary uppercase tracking-wider">
+            {section}
+          </div>
+          {items.map((f) => (
+            <button
+              key={f.id}
+              className="flex items-center gap-2 w-full rounded-md px-1.5 py-1.5 text-xs text-foreground-secondary hover:bg-foreground/4 hover:text-foreground transition-colors text-left cursor-pointer"
+              onClick={() => onSelect(f.id)}
+            >
+              {selectedId !== undefined && (
+                <span className={`w-3 h-3 rounded-full border shrink-0 ${
+                  selectedId === f.id
+                    ? 'border-primary bg-primary'
+                    : 'border-foreground/20'
+                }`} />
+              )}
+              {f.label}
+            </button>
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════
+// ViewToolbar (main export)
+// ════════════════════════════════════════════════════════════════
 
 interface ViewToolbarProps {
   nodeId: string;
@@ -90,15 +196,28 @@ function SortControl({
   const [open, setOpen] = useState(false);
   const btnRef = useRef<HTMLButtonElement>(null);
   const onClose = useCallback(() => setOpen(false), []);
+  const fieldLabel = useSortFieldLabel(sortField);
+  const DirIcon = sortDirection === 'asc' ? ArrowUp : ArrowDown;
 
   return (
     <>
-      <SortTriggerButton
+      <ToolbarPill
         ref={btnRef}
-        sortField={sortField}
-        sortDirection={sortDirection}
+        icon={ArrowUpDown}
+        label="Sort"
+        active={!!sortField}
         onClick={() => setOpen((v) => !v)}
-      />
+        title="Sort"
+      >
+        {sortField ? (
+          <>
+            <span className="max-w-[100px] truncate">{fieldLabel}</span>
+            <DirIcon size={9} strokeWidth={2} />
+          </>
+        ) : (
+          <span>Sort</span>
+        )}
+      </ToolbarPill>
       {open && (
         <SortDropdown
           nodeId={nodeId}
@@ -111,43 +230,6 @@ function SortControl({
     </>
   );
 }
-
-// ── Sort trigger button (toolbar pill) ──
-
-const SortTriggerButton = forwardRef<
-  HTMLButtonElement,
-  {
-    sortField: string | null;
-    sortDirection: SortDirection;
-    onClick: () => void;
-  }
->(function SortTriggerButton({ sortField, sortDirection, onClick }, ref) {
-  const fieldLabel = useSortFieldLabel(sortField);
-  const DirIcon = sortDirection === 'asc' ? ArrowUp : ArrowDown;
-
-  return (
-    <button
-      ref={ref}
-      className={`flex items-center gap-1 h-5 px-1 rounded text-[11px] transition-colors cursor-pointer ${
-        sortField
-          ? 'text-primary hover:bg-primary-muted'
-          : 'text-foreground-tertiary hover:text-foreground-secondary hover:bg-foreground/4'
-      }`}
-      onClick={onClick}
-      title="Sort"
-    >
-      <ArrowUpDown size={11} strokeWidth={1.5} />
-      {sortField ? (
-        <>
-          <span className="max-w-[100px] truncate">{fieldLabel}</span>
-          <DirIcon size={9} strokeWidth={2} />
-        </>
-      ) : (
-        <span>Sort</span>
-      )}
-    </button>
-  );
-});
 
 // ── Sort dropdown ──
 
@@ -166,31 +248,20 @@ function SortDropdown({
   anchorRef: React.RefObject<HTMLButtonElement | null>;
   onClose: () => void;
 }) {
-  const menuRef = useRef<HTMLDivElement>(null);
-  // When sort active → show config; when user picks a field → switch to config;
-  // when user clicks field name in config → switch to fieldPicker to change field.
   const [view, setView] = useState<SortView>(sortField ? 'config' : 'fieldPicker');
 
   const tagFields = useTagFieldDefs(nodeId);
   const allFields = useMemo(() => [
-    ...BUILTIN_FIELDS.map((f) => ({ ...f, section: 'System fields' })),
+    ...BUILTIN_SORT_FIELDS.map((f) => ({ ...f, section: 'System fields' })),
     ...tagFields.map((f) => ({ id: f.id, label: f.name || 'Untitled', section: 'Tag fields' })),
   ], [tagFields]);
 
-  useDropdownDismiss(menuRef, anchorRef, onClose);
-  const pos = useDropdownPosition(anchorRef);
-
-  // Sync view state when sortField changes externally (e.g., sort removed from elsewhere)
+  // Sync view state when sortField removed externally
   useEffect(() => {
-    if (sortField && view === 'fieldPicker') {
-      // Don't auto-switch to config — user may be actively picking a new field
-    } else if (!sortField && view === 'config') {
-      setView('fieldPicker');
-    }
+    if (!sortField && view === 'config') setView('fieldPicker');
   }, [sortField, view]);
 
   const handleSelectField = useCallback((fieldId: string) => {
-    // Read the latest direction from the store (not stale closure)
     const store = useNodeStore.getState();
     const vdId = store.getViewDefId(nodeId);
     const currentDir = vdId ? (store.getNode(vdId)?.sortDirection ?? 'asc') : 'asc';
@@ -209,20 +280,10 @@ function SortDropdown({
     onClose();
   }, [nodeId, onClose]);
 
-  return createPortal(
-    <div
-      ref={menuRef}
-      className="fixed z-50 w-[260px] rounded-lg bg-background shadow-paper text-foreground overflow-y-auto"
-      style={{ top: pos.top, left: pos.left, maxWidth: pos.maxWidth, maxHeight: pos.maxHeight }}
-    >
-      {/* Title */}
-      <div className="px-3 pt-2.5 pb-1.5 text-xs font-medium text-foreground-secondary">
-        Sort by
-      </div>
-
+  return (
+    <DropdownPanel anchorRef={anchorRef} onClose={onClose} title="Sort by">
       {view === 'config' && sortField ? (
         <>
-          {/* Active sort row */}
           <div className="mx-1.5 mb-1">
             <SortConfigRow
               sortField={sortField}
@@ -233,7 +294,6 @@ function SortDropdown({
               onRemove={handleRemove}
             />
           </div>
-          {/* Footer */}
           <div className="mx-1.5 my-0.5 h-px bg-border-subtle" />
           <div className="px-1.5 pb-1.5 pt-0.5 flex flex-col gap-0.5">
             <button
@@ -253,13 +313,9 @@ function SortDropdown({
           </div>
         </>
       ) : (
-        <SortFieldPicker
-          allFields={allFields}
-          onSelect={handleSelectField}
-        />
+        <SectionedFieldList fields={allFields} onSelect={handleSelectField} />
       )}
-    </div>,
-    document.body,
+    </DropdownPanel>
   );
 }
 
@@ -284,7 +340,6 @@ function SortConfigRow({
 
   return (
     <div className="flex items-center gap-1">
-      {/* Field picker trigger */}
       <button
         className="flex items-center gap-1 flex-1 min-w-0 h-7 px-2 rounded-md text-xs bg-foreground/[0.04] hover:bg-foreground/[0.07] transition-colors cursor-pointer"
         onClick={onOpenFieldPicker}
@@ -292,7 +347,6 @@ function SortConfigRow({
         <span className="truncate flex-1 text-left">{fieldLabel}</span>
         <ChevronDown size={10} strokeWidth={2} className="text-foreground-tertiary shrink-0" />
       </button>
-      {/* Direction toggle */}
       <button
         className="flex items-center gap-1 h-7 px-2 rounded-md text-xs bg-foreground/[0.04] hover:bg-foreground/[0.07] transition-colors cursor-pointer whitespace-nowrap"
         onClick={onToggleDirection}
@@ -300,7 +354,6 @@ function SortConfigRow({
         <span>{sortDirection === 'asc' ? 'Ascending' : 'Descending'}</span>
         <ChevronDown size={10} strokeWidth={2} className="text-foreground-tertiary shrink-0" />
       </button>
-      {/* Remove */}
       <button
         className="flex items-center justify-center h-7 w-7 rounded-md text-foreground-tertiary hover:text-destructive hover:bg-foreground/[0.04] transition-colors cursor-pointer shrink-0"
         onClick={onRemove}
@@ -312,83 +365,26 @@ function SortConfigRow({
   );
 }
 
-// ── Sort field picker (grouped by section) ──
-
-function SortFieldPicker({
-  allFields,
-  onSelect,
-}: {
-  allFields: Array<{ id: string; label: string; section: string }>;
-  onSelect: (fieldId: string) => void;
-}) {
-  const sections = useMemo(() => {
-    const map = new Map<string, Array<{ id: string; label: string }>>();
-    for (const f of allFields) {
-      const arr = map.get(f.section) ?? [];
-      arr.push(f);
-      map.set(f.section, arr);
-    }
-    return [...map.entries()];
-  }, [allFields]);
-
-  return (
-    <div className="px-1.5 pb-1.5">
-      {sections.map(([section, fields], i) => (
-        <div key={section}>
-          {i > 0 && <div className="mx-1 my-1 h-px bg-border-subtle" />}
-          <div className="px-1.5 pt-1.5 pb-0.5 text-[10px] font-medium text-foreground-tertiary uppercase tracking-wider">
-            {section}
-          </div>
-          {fields.map((f) => (
-            <button
-              key={f.id}
-              className="flex w-full items-center rounded-md px-1.5 py-1.5 text-xs text-foreground-secondary hover:bg-foreground/4 hover:text-foreground transition-colors text-left cursor-pointer"
-              onClick={() => onSelect(f.id)}
-            >
-              {f.label}
-            </button>
-          ))}
-        </div>
-      ))}
-    </div>
-  );
-}
-
 // ════════════════════════════════════════════════════════════════
 // Filter Control
 // ════════════════════════════════════════════════════════════════
-
-// Built-in filter fields
-const BUILTIN_FILTER_FIELDS: Array<{ id: string; label: string }> = [
-  { id: 'tags', label: 'Tags' },
-  { id: 'done', label: 'Checked state' },
-];
 
 function FilterControl({ nodeId, filterCount }: { nodeId: string; filterCount: number }) {
   const [open, setOpen] = useState(false);
   const btnRef = useRef<HTMLButtonElement>(null);
   const onClose = useCallback(() => setOpen(false), []);
 
-  const hasActive = filterCount > 0;
-
   return (
     <>
-      <button
+      <ToolbarPill
         ref={btnRef}
-        className={`flex items-center gap-1 h-5 px-1 rounded text-[11px] transition-colors cursor-pointer ${
-          hasActive
-            ? 'text-primary hover:bg-primary-muted'
-            : 'text-foreground-tertiary hover:text-foreground-secondary hover:bg-foreground/4'
-        }`}
+        icon={ListFilter}
+        label="Filter"
+        active={filterCount > 0}
+        badge={filterCount > 0 ? `(${filterCount})` : undefined}
         onClick={() => setOpen((v) => !v)}
         title="Filter"
-      >
-        <ListFilter size={11} strokeWidth={1.5} />
-        <span>Filter</span>
-        {hasActive && (
-          <span className="text-[10px] text-primary">({filterCount})</span>
-        )}
-      </button>
+      />
       {open && (
         <FilterDropdown nodeId={nodeId} anchorRef={btnRef} onClose={onClose} />
       )}
@@ -407,7 +403,6 @@ function FilterDropdown({
   anchorRef: React.RefObject<HTMLButtonElement | null>;
   onClose: () => void;
 }) {
-  const menuRef = useRef<HTMLDivElement>(null);
   const _version = useNodeStore((s) => s._version);
   const filters = useMemo(() => useNodeStore.getState().getFilters(nodeId), [nodeId, _version]);
   const tagFields = useTagFieldDefs(nodeId);
@@ -419,9 +414,6 @@ function FilterDropdown({
 
   const [view, setView] = useState<FilterView>(filters.length > 0 ? 'list' : 'fieldPicker');
   const [editingFilterId, setEditingFilterId] = useState<string | null>(null);
-
-  useDropdownDismiss(menuRef, anchorRef, onClose);
-  const pos = useDropdownPosition(anchorRef);
 
   const handleAddField = useCallback((fieldId: string) => {
     const op = fieldId === 'tags' ? 'all' as const : 'any' as const;
@@ -439,21 +431,13 @@ function FilterDropdown({
     onClose();
   }, [nodeId, onClose]);
 
-  // Sync view when filters change
+  // Sync view when filters removed
   useEffect(() => {
     if (filters.length === 0 && view === 'list') setView('fieldPicker');
   }, [filters.length, view]);
 
-  return createPortal(
-    <div
-      ref={menuRef}
-      className="fixed z-50 w-[260px] rounded-lg bg-background shadow-paper text-foreground overflow-y-auto"
-      style={{ top: pos.top, left: pos.left, maxWidth: pos.maxWidth, maxHeight: pos.maxHeight }}
-    >
-      <div className="px-3 pt-2.5 pb-1.5 text-xs font-medium text-foreground-secondary">
-        Filter by
-      </div>
-
+  return (
+    <DropdownPanel anchorRef={anchorRef} onClose={onClose} title="Filter by">
       {view === 'valuePicker' && editingFilterId ? (
         <FilterValuePicker
           filterId={editingFilterId}
@@ -492,13 +476,9 @@ function FilterDropdown({
           </div>
         </>
       ) : (
-        <FieldPickerList
-          allFields={allFilterFields}
-          onSelect={handleAddField}
-        />
+        <SectionedFieldList fields={allFilterFields} onSelect={handleAddField} />
       )}
-    </div>,
-    document.body,
+    </DropdownPanel>
   );
 }
 
@@ -607,58 +587,34 @@ function FilterValuePicker({
 // Group Control
 // ════════════════════════════════════════════════════════════════
 
-const BUILTIN_GROUP_FIELDS: Array<{ id: string; label: string }> = [
-  { id: 'tags', label: 'Tags' },
-  { id: 'done', label: 'Done' },
-  { id: 'createdAt', label: 'Created time' },
-  { id: 'updatedAt', label: 'Last edited time' },
-];
-
 function GroupControl({ nodeId, groupField }: { nodeId: string; groupField: string | null }) {
   const [open, setOpen] = useState(false);
   const btnRef = useRef<HTMLButtonElement>(null);
   const onClose = useCallback(() => setOpen(false), []);
+  const fieldLabel = useGroupFieldLabel(groupField);
 
   return (
     <>
-      <GroupTriggerButton
+      <ToolbarPill
         ref={btnRef}
-        groupField={groupField}
+        icon={Group}
+        label="Group"
+        active={!!groupField}
         onClick={() => setOpen((v) => !v)}
-      />
+        title="Group"
+      >
+        {groupField ? (
+          <span className="max-w-[100px] truncate">{fieldLabel}</span>
+        ) : (
+          <span>Group</span>
+        )}
+      </ToolbarPill>
       {open && (
         <GroupDropdown nodeId={nodeId} groupField={groupField} anchorRef={btnRef} onClose={onClose} />
       )}
     </>
   );
 }
-
-const GroupTriggerButton = forwardRef<
-  HTMLButtonElement,
-  { groupField: string | null; onClick: () => void }
->(function GroupTriggerButton({ groupField, onClick }, ref) {
-  const fieldLabel = useGroupFieldLabel(groupField);
-
-  return (
-    <button
-      ref={ref}
-      className={`flex items-center gap-1 h-5 px-1 rounded text-[11px] transition-colors cursor-pointer ${
-        groupField
-          ? 'text-primary hover:bg-primary-muted'
-          : 'text-foreground-tertiary hover:text-foreground-secondary hover:bg-foreground/4'
-      }`}
-      onClick={onClick}
-      title="Group"
-    >
-      <Group size={11} strokeWidth={1.5} />
-      {groupField ? (
-        <span className="max-w-[100px] truncate">{fieldLabel}</span>
-      ) : (
-        <span>Group</span>
-      )}
-    </button>
-  );
-});
 
 function GroupDropdown({
   nodeId,
@@ -671,16 +627,12 @@ function GroupDropdown({
   anchorRef: React.RefObject<HTMLButtonElement | null>;
   onClose: () => void;
 }) {
-  const menuRef = useRef<HTMLDivElement>(null);
   const tagFields = useTagFieldDefs(nodeId);
 
   const allFields = useMemo(() => [
     ...tagFields.map((f) => ({ id: f.id, label: f.name || 'Untitled', section: 'User-defined fields' })),
     ...BUILTIN_GROUP_FIELDS.map((f) => ({ ...f, section: 'System fields' })),
   ], [tagFields]);
-
-  useDropdownDismiss(menuRef, anchorRef, onClose);
-  const pos = useDropdownPosition(anchorRef);
 
   const handleSelect = useCallback((fieldId: string) => {
     if (fieldId === groupField) {
@@ -691,63 +643,26 @@ function GroupDropdown({
     onClose();
   }, [nodeId, groupField, onClose]);
 
-  const sections = useMemo(() => {
-    const map = new Map<string, Array<{ id: string; label: string }>>();
-    for (const f of allFields) {
-      const arr = map.get(f.section) ?? [];
-      arr.push(f);
-      map.set(f.section, arr);
-    }
-    return [...map.entries()];
-  }, [allFields]);
-
-  return createPortal(
-    <div
-      ref={menuRef}
-      className="fixed z-50 w-[260px] rounded-lg bg-background shadow-paper text-foreground overflow-y-auto"
-      style={{ top: pos.top, left: pos.left, maxWidth: pos.maxWidth, maxHeight: pos.maxHeight }}
-    >
-      <div className="px-3 pt-2.5 pb-1.5 text-xs font-medium text-foreground-secondary">
-        Group by
-      </div>
-      <div className="px-1.5 pb-1.5">
-        {sections.map(([section, fields], i) => (
-          <div key={section}>
-            {i > 0 && <div className="mx-1 my-1 h-px bg-border-subtle" />}
-            <div className="px-1.5 pt-1.5 pb-0.5 text-[10px] font-medium text-foreground-tertiary uppercase tracking-wider">
-              {section}
-            </div>
-            {fields.map((f) => (
-              <button
-                key={f.id}
-                className="flex items-center gap-2 w-full rounded-md px-1.5 py-1.5 text-xs text-foreground-secondary hover:bg-foreground/4 hover:text-foreground transition-colors text-left cursor-pointer"
-                onClick={() => handleSelect(f.id)}
-              >
-                <span className={`w-3 h-3 rounded-full border ${
-                  groupField === f.id
-                    ? 'border-primary bg-primary'
-                    : 'border-foreground/20'
-                }`} />
-                {f.label}
-              </button>
-            ))}
-          </div>
-        ))}
-        {groupField && (
-          <>
-            <div className="mx-1 my-1 h-px bg-border-subtle" />
-            <button
-              className="flex items-center gap-1.5 w-full rounded-md px-1.5 py-1 text-xs text-destructive hover:bg-foreground/4 transition-colors cursor-pointer"
-              onClick={() => { useNodeStore.getState().clearGroup(nodeId); onClose(); }}
-            >
-              <X size={12} strokeWidth={1.5} />
-              Reset
-            </button>
-          </>
-        )}
-      </div>
-    </div>,
-    document.body,
+  return (
+    <DropdownPanel anchorRef={anchorRef} onClose={onClose} title="Group by">
+      <SectionedFieldList
+        fields={allFields}
+        onSelect={handleSelect}
+        selectedId={groupField}
+      />
+      {groupField && (
+        <div className="px-1.5 pb-1.5">
+          <div className="mx-1 mb-1 h-px bg-border-subtle" />
+          <button
+            className="flex items-center gap-1.5 w-full rounded-md px-1.5 py-1 text-xs text-destructive hover:bg-foreground/4 transition-colors cursor-pointer"
+            onClick={() => { useNodeStore.getState().clearGroup(nodeId); onClose(); }}
+          >
+            <X size={12} strokeWidth={1.5} />
+            Reset
+          </button>
+        </div>
+      )}
+    </DropdownPanel>
   );
 }
 
@@ -755,89 +670,13 @@ function GroupDropdown({
 // Shared hooks
 // ════════════════════════════════════════════════════════════════
 
-/** Close dropdown on outside click or Escape. Only active when `enabled` is true. */
-function useDropdownDismiss(
-  menuRef: React.RefObject<HTMLDivElement | null>,
-  anchorRef: React.RefObject<HTMLElement | null>,
-  onClose: () => void,
-  enabled = true,
-) {
-  useEffect(() => {
-    if (!enabled) return;
-    const handleClick = (e: MouseEvent) => {
-      if (
-        menuRef.current && !menuRef.current.contains(e.target as Node) &&
-        anchorRef.current && !anchorRef.current.contains(e.target as Node)
-      ) {
-        onClose();
-      }
-    };
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    document.addEventListener('mousedown', handleClick);
-    document.addEventListener('keydown', handleKey);
-    return () => {
-      document.removeEventListener('mousedown', handleClick);
-      document.removeEventListener('keydown', handleKey);
-    };
-  }, [menuRef, anchorRef, onClose, enabled]);
-}
-
-/**
- * Position dropdown near anchor, preferring below-left.
- * Repositions before resizing: shift left if overflows right, flip above if overflows bottom.
- * Only applies maxHeight as last resort when neither direction has enough space.
- */
-function useDropdownPosition(anchorRef: React.RefObject<HTMLElement | null>, active = true) {
-  const [layout, setLayout] = useState({ top: 0, left: 0, maxWidth: 260, maxHeight: 400 });
-  useEffect(() => {
-    if (!active) return;
-    const anchor = anchorRef.current;
-    if (!anchor) return;
-    const rect = anchor.getBoundingClientRect();
-    const gap = 4;
-    const margin = 8;
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
-    const dropW = 260;
-
-    // Horizontal: prefer left-aligned, shift left if overflows right
-    const left = Math.max(margin, Math.min(rect.left, vw - dropW - margin));
-
-    // Vertical: prefer below, flip above if not enough space below
-    const spaceBelow = vh - rect.bottom - gap;
-    const spaceAbove = rect.top - gap;
-    let top: number;
-    let maxHeight: number;
-
-    if (spaceBelow >= 200) {
-      // Enough space below
-      top = rect.bottom + gap;
-      maxHeight = spaceBelow - margin;
-    } else if (spaceAbove > spaceBelow) {
-      // Flip above — we don't know exact dropdown height, so use auto positioning
-      // Set a max and let CSS handle it; top is computed as "above anchor"
-      maxHeight = spaceAbove - margin;
-      top = Math.max(margin, rect.top - gap - Math.min(maxHeight, 400));
-    } else {
-      // Neither direction great, use below with scroll
-      top = rect.bottom + gap;
-      maxHeight = spaceBelow - margin;
-    }
-
-    setLayout({ top, left, maxWidth: vw - margin * 2, maxHeight: Math.max(maxHeight, 100) });
-  }, [anchorRef, active]);
-  return layout;
-}
-
 /** Get the display label for a sort field. */
 function useSortFieldLabel(sortField: string | null): string {
   const _version = useNodeStore((s) => s._version);
 
   return useMemo(() => {
     if (!sortField) return 'Sort';
-    const builtin = BUILTIN_FIELDS.find((f) => f.id === sortField);
+    const builtin = BUILTIN_SORT_FIELDS.find((f) => f.id === sortField);
     if (builtin) return builtin.label;
     const fieldDef = loroDoc.toNodexNode(sortField);
     return fieldDef?.name || 'Field';
@@ -943,46 +782,4 @@ function useFilterFieldValues(nodeId: string, filterField: string): Array<{ id: 
       .sort(([, a], [, b]) => a.localeCompare(b))
       .map(([id, label]) => ({ id, label }));
   }, [nodeId, filterField, _version]);
-}
-
-// ── Shared field picker list (used by Sort and Filter) ──
-
-function FieldPickerList({
-  allFields,
-  onSelect,
-}: {
-  allFields: Array<{ id: string; label: string; section: string }>;
-  onSelect: (fieldId: string) => void;
-}) {
-  const sections = useMemo(() => {
-    const map = new Map<string, Array<{ id: string; label: string }>>();
-    for (const f of allFields) {
-      const arr = map.get(f.section) ?? [];
-      arr.push(f);
-      map.set(f.section, arr);
-    }
-    return [...map.entries()];
-  }, [allFields]);
-
-  return (
-    <div className="px-1.5 pb-1.5">
-      {sections.map(([section, fields], i) => (
-        <div key={section}>
-          {i > 0 && <div className="mx-1 my-1 h-px bg-border-subtle" />}
-          <div className="px-1.5 pt-1.5 pb-0.5 text-[10px] font-medium text-foreground-tertiary uppercase tracking-wider">
-            {section}
-          </div>
-          {fields.map((f) => (
-            <button
-              key={f.id}
-              className="flex w-full items-center rounded-md px-1.5 py-1.5 text-xs text-foreground-secondary hover:bg-foreground/4 hover:text-foreground transition-colors text-left cursor-pointer"
-              onClick={() => onSelect(f.id)}
-            >
-              {f.label}
-            </button>
-          ))}
-        </div>
-      ))}
-    </div>
-  );
 }

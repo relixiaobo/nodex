@@ -57,8 +57,8 @@ _(空)_
 - [x] Sort by：单级排序（Name / Created / 标签字段 + asc/desc）
 - [x] ViewDef 节点持久化（type='viewDef' + sortField/sortDirection 直接属性）
 - [x] 右键菜单 "Sort by" 子菜单
-- [ ] Filter by：按字段值/标签/checkbox 状态过滤
-- [ ] Group by：按字段值分组
+- [x] Filter by：按字段值/标签/checkbox 状态过滤
+- [x] Group by：按字段值分组
 
 ##### 2. Search Node 字段过滤 (#23)
 

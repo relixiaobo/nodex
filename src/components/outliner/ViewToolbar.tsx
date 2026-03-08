@@ -457,8 +457,6 @@ function FilterControl({ nodeId, filterCount }: { nodeId: string; filterCount: n
   );
 }
 
-type FilterView = 'list' | 'fieldPicker' | 'valuePicker';
-
 function FilterDropdown({
   nodeId,
   anchorRef,
@@ -477,121 +475,141 @@ function FilterDropdown({
     ...tagFields.map((f) => ({ id: f.id, label: f.name || 'Untitled', section: 'Tag fields' })),
   ], [tagFields]);
 
-  const [view, setView] = useState<FilterView>(filters.length > 0 ? 'list' : 'fieldPicker');
-  const [editingFilterId, setEditingFilterId] = useState<string | null>(null);
+  const [addPickerOpen, setAddPickerOpen] = useState(false);
+  const addBtnRef = useRef<HTMLButtonElement>(null);
+
+  // Track which filter row is expanded (accordion — only one at a time)
+  const [expandedFilterId, setExpandedFilterId] = useState<string | null>(null);
 
   const handleAddField = useCallback((fieldId: string) => {
     const op = fieldId === 'tags' ? 'all' as const : 'any' as const;
     const filterId = useNodeStore.getState().addFilter(nodeId, fieldId, op, []);
-    setEditingFilterId(filterId);
-    setView('valuePicker');
+    setAddPickerOpen(false);
+    // Auto-expand the newly created filter
+    setExpandedFilterId(filterId);
   }, [nodeId]);
 
   const handleRemoveFilter = useCallback((filterId: string) => {
     useNodeStore.getState().removeFilter(filterId);
-  }, []);
+    if (expandedFilterId === filterId) setExpandedFilterId(null);
+  }, [expandedFilterId]);
 
   const handleResetAll = useCallback(() => {
     useNodeStore.getState().clearAllFilters(nodeId);
     onClose();
   }, [nodeId, onClose]);
 
-  // Sync view when filters removed
-  useEffect(() => {
-    if (filters.length === 0 && view === 'list') setView('fieldPicker');
-  }, [filters.length, view]);
+  const toggleExpand = useCallback((filterId: string) => {
+    setExpandedFilterId((prev) => prev === filterId ? null : filterId);
+  }, []);
+
+  // When no filters exist, show field list directly
+  if (filters.length === 0) {
+    return (
+      <DropdownPanel anchorRef={anchorRef} onClose={onClose} title="Filter by">
+        <SectionedFieldList fields={allFilterFields} onSelect={handleAddField} />
+      </DropdownPanel>
+    );
+  }
 
   return (
     <DropdownPanel anchorRef={anchorRef} onClose={onClose} title="Filter by">
-      {view === 'valuePicker' && editingFilterId ? (
-        <FilterValuePicker
-          filterId={editingFilterId}
-          nodeId={nodeId}
-          onBack={() => setView(filters.length > 0 ? 'list' : 'fieldPicker')}
-        />
-      ) : view === 'list' && filters.length > 0 ? (
-        <>
-          <div className="mx-1.5 mb-1 flex flex-col gap-1">
-            {filters.map((f) => (
-              <FilterConfigRow
-                key={f.id}
-                filter={f}
-                allFields={allFilterFields}
-                onEdit={() => { setEditingFilterId(f.id); setView('valuePicker'); }}
-                onRemove={() => handleRemoveFilter(f.id)}
-              />
-            ))}
-          </div>
-          <div className="mx-1 my-1 h-px bg-border-subtle" />
-          <div className="px-1 pb-1 flex flex-col gap-0.5">
-            <button
-              className="flex items-center gap-1.5 w-full rounded-md px-2 py-1.5 text-sm text-foreground-secondary hover:bg-foreground/4 transition-colors cursor-pointer"
-              onClick={() => setView('fieldPicker')}
-            >
-              <Plus size={14} strokeWidth={1.5} />
-              Add filter
-            </button>
-            <button
-              className="flex items-center gap-1.5 w-full rounded-md px-2 py-1.5 text-sm text-destructive hover:bg-foreground/4 transition-colors cursor-pointer"
-              onClick={handleResetAll}
-            >
-              <X size={14} strokeWidth={1.5} />
-              Reset
-            </button>
-          </div>
-        </>
-      ) : (
-        <SectionedFieldList fields={allFilterFields} onSelect={handleAddField} />
-      )}
+      <div className="mx-1 mb-1 flex flex-col gap-0.5">
+        {filters.map((f) => (
+          <FilterAccordionRow
+            key={f.id}
+            filter={f}
+            nodeId={nodeId}
+            allFields={allFilterFields}
+            expanded={expandedFilterId === f.id}
+            onToggle={() => toggleExpand(f.id)}
+            onRemove={() => handleRemoveFilter(f.id)}
+          />
+        ))}
+      </div>
+      <div className="mx-1 my-1 h-px bg-border-subtle" />
+      <div className="px-1 pb-1 flex flex-col gap-0.5">
+        <button
+          ref={addBtnRef}
+          className="flex items-center gap-1.5 w-full rounded-md px-2 py-1.5 text-sm text-foreground-secondary hover:bg-foreground/4 transition-colors cursor-pointer"
+          onClick={() => setAddPickerOpen((v) => !v)}
+        >
+          <Plus size={14} strokeWidth={1.5} />
+          Add filter
+        </button>
+        {addPickerOpen && (
+          <DropdownPanel anchorRef={addBtnRef} onClose={() => setAddPickerOpen(false)} width={200}>
+            <SectionedFieldList fields={allFilterFields} onSelect={handleAddField} />
+          </DropdownPanel>
+        )}
+        <button
+          className="flex items-center gap-1.5 w-full rounded-md px-2 py-1.5 text-sm text-destructive hover:bg-foreground/4 transition-colors cursor-pointer"
+          onClick={handleResetAll}
+        >
+          <X size={14} strokeWidth={1.5} />
+          Reset
+        </button>
+      </div>
     </DropdownPanel>
   );
 }
 
-function FilterConfigRow({
+// ── Filter accordion row: header + inline-expanded value checkboxes ──
+
+function FilterAccordionRow({
   filter,
+  nodeId,
   allFields,
-  onEdit,
+  expanded,
+  onToggle,
   onRemove,
 }: {
   filter: { id: string; field: string; op: 'all' | 'any'; values: string[] };
+  nodeId: string;
   allFields: Array<{ id: string; label: string; section: string }>;
-  onEdit: () => void;
+  expanded: boolean;
+  onToggle: () => void;
   onRemove: () => void;
 }) {
   const fieldLabel = allFields.find((f) => f.id === filter.field)?.label ?? filter.field;
   const valueCount = filter.values.length;
 
   return (
-    <div className="flex items-center gap-1">
-      <button
-        className="flex items-center gap-1 flex-1 min-w-0 h-7 px-2 rounded-md text-xs bg-foreground/4 hover:bg-foreground/6 transition-colors cursor-pointer"
-        onClick={onEdit}
-      >
-        <span className="truncate flex-1 text-left">{fieldLabel}</span>
-        <span className="text-foreground-tertiary shrink-0">
-          {valueCount > 0 ? `(${valueCount})` : '(any)'}
-        </span>
-        <ChevronDown size={10} strokeWidth={2} className="text-foreground-tertiary shrink-0" />
-      </button>
-      <button
-        className="flex items-center justify-center h-7 w-7 rounded-md text-foreground-tertiary hover:text-destructive hover:bg-foreground/4 transition-colors cursor-pointer shrink-0"
-        onClick={onRemove}
-        title="Remove filter"
-      >
-        <CircleMinus size={14} strokeWidth={1.5} />
-      </button>
+    <div className="rounded-md">
+      {/* Header row */}
+      <div className="flex items-center gap-1">
+        <button
+          className={`flex items-center gap-1 flex-1 min-w-0 h-7 px-2 rounded-md text-xs transition-colors cursor-pointer ${expanded ? 'bg-foreground/6' : 'bg-foreground/4 hover:bg-foreground/6'}`}
+          onClick={onToggle}
+        >
+          <ChevronDown size={10} strokeWidth={2} className={`text-foreground-tertiary shrink-0 transition-transform ${expanded ? '' : '-rotate-90'}`} />
+          <span className="truncate flex-1 text-left">{fieldLabel}</span>
+          <span className="text-foreground-tertiary shrink-0">
+            {valueCount > 0 ? `(${valueCount})` : '(any)'}
+          </span>
+        </button>
+        <button
+          className="flex items-center justify-center h-7 w-7 rounded-md text-foreground-tertiary hover:text-destructive hover:bg-foreground/4 transition-colors cursor-pointer shrink-0"
+          onClick={onRemove}
+          title="Remove filter"
+        >
+          <CircleMinus size={14} strokeWidth={1.5} />
+        </button>
+      </div>
+      {/* Expanded value list */}
+      {expanded && (
+        <FilterValueList filterId={filter.id} nodeId={nodeId} />
+      )}
     </div>
   );
 }
 
-function FilterValuePicker({
+function FilterValueList({
   filterId,
   nodeId,
-  onBack,
 }: {
   filterId: string;
   nodeId: string;
-  onBack: () => void;
 }) {
   const _version = useNodeStore((s) => s._version);
   const filter = useMemo(() => {
@@ -615,16 +633,9 @@ function FilterValuePicker({
   if (!filter) return null;
 
   return (
-    <div className="px-1 pb-1">
-      <button
-        className="flex items-center gap-1.5 w-full rounded-md px-2 py-1.5 mb-1 text-sm text-foreground-tertiary hover:text-foreground-secondary hover:bg-foreground/4 transition-colors cursor-pointer"
-        onClick={onBack}
-      >
-        <ChevronDown size={10} strokeWidth={2} className="rotate-90" />
-        Back
-      </button>
+    <div className="ml-1 mt-0.5">
       {availableValues.length === 0 ? (
-        <div className="px-2 py-2 text-sm text-foreground-tertiary">No values found</div>
+        <div className="px-2 py-1.5 text-sm text-foreground-tertiary">No values found</div>
       ) : (
         availableValues.map((v) => {
           const selected = filter.values.includes(v.id);

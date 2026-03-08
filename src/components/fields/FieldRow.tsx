@@ -720,7 +720,7 @@ export function FieldRow({
         data-row-kind="field"
         onClick={handleFieldRowClick}
       >
-        <div className="flex items-center gap-1 @sm:shrink-0 @sm:w-[100px] min-w-0 min-h-6 py-1">
+        <div className="flex items-center gap-1 @sm:shrink-0 @sm:w-[100px] min-w-0 min-h-6">
           <span className="shrink-0 w-[15px] flex items-center justify-center text-foreground-tertiary">
             {SysIcon && <SysIcon size={12} />}
           </span>
@@ -755,7 +755,7 @@ export function FieldRow({
             {attrDefName}
           </span>
         </div>
-        <div className="flex flex-1 min-w-0 items-start min-h-6 py-1" data-field-value>
+        <div className="flex flex-1 min-w-0 items-start min-h-6" data-field-value>
           {dataType === '__system_node__' && valueNodeId ? (
             <button
               className="text-[15px] leading-6 text-foreground-tertiary hover:text-foreground-secondary cursor-pointer truncate"
@@ -800,7 +800,7 @@ export function FieldRow({
         onClick={handleFieldRowClick}
       >
         {/* Name column — icon + name + description */}
-        <div className="flex items-start gap-1 @sm:shrink-0 @sm:w-[100px] min-w-0 min-h-6 py-1">
+        <div className="flex items-start gap-1 @sm:shrink-0 @sm:w-[100px] min-w-0 min-h-6">
           {Icon ? (
             <span className="shrink-0 w-[15px] h-6 flex items-center justify-center text-foreground-tertiary">
               <Icon size={12} />
@@ -873,7 +873,7 @@ export function FieldRow({
           <div className={FIELD_ROW_SELECTION_OVERLAY_CLASS} style={FIELD_ROW_SELECTION_OVERLAY_STYLE} />
         )}
       {/* Name column — aligned to first line of value */}
-      <div className="relative z-[1] flex items-center gap-1 @sm:shrink-0 @sm:w-[100px] min-w-0 min-h-6 py-1">
+      <div className="relative z-[1] flex items-center gap-1 @sm:shrink-0 @sm:w-[100px] min-w-0 min-h-6">
         {/* Field icon is the drag handle for reorder */}
         <button
           className={`shrink-0 w-[15px] flex items-center justify-center transition-colors ${!isVirtual && !isSystemField && !isSystemConfig ? 'cursor-grab active:cursor-grabbing' : ''} ${ownerTagColor ? '' : 'text-foreground-tertiary hover:text-foreground-secondary'}`}

@@ -39,7 +39,7 @@ export function FieldValueRow({
 }: FieldValueRowProps) {
   return (
     <div
-      className="flex min-h-6 items-start gap-2 py-1"
+      className="flex min-h-6 items-start gap-2"
       style={{ paddingLeft: insetLeft }}
     >
       <BulletChevron

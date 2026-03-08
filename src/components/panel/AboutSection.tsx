@@ -7,7 +7,7 @@ const noop = () => {};
 /** A static row — leaf node with no children. */
 function LeafRow({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
-    <div className="group/row flex gap-1 min-h-6 items-start py-1" style={{ paddingLeft: 6 }}>
+    <div className="group/row flex gap-1 min-h-6 items-start" style={{ paddingLeft: 6 }}>
       <ChevronButton isExpanded={false} onToggle={noop} onDrillDown={noop} />
       <div className="flex items-start gap-2 min-w-0 flex-1">
         <BulletChevron hasChildren={false} isExpanded={false} onBulletClick={noop} />
@@ -35,7 +35,7 @@ function ParentRow({
 }) {
   return (
     <div>
-      <div className="group/row flex gap-1 min-h-6 items-start py-1" style={{ paddingLeft: 6 }}>
+      <div className="group/row flex gap-1 min-h-6 items-start" style={{ paddingLeft: 6 }}>
         <ChevronButton isExpanded={expanded} onToggle={onToggle} onDrillDown={noop} />
         <div className="flex items-start gap-2 min-w-0 flex-1">
           <BulletChevron hasChildren isExpanded={expanded} onBulletClick={noop} />

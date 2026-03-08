@@ -113,7 +113,7 @@ function MentionedInItem({ item }: { item: MentionedInRef }) {
       )}
       {/* Row: same structure as OutlinerItem depth-0 */}
       <div
-        className="mt-1 relative flex gap-1 min-h-6 items-start py-1 cursor-pointer"
+        className="mt-1 relative flex gap-1 min-h-6 items-start cursor-pointer"
         style={{ paddingLeft: ROW_PADDING_LEFT }}
         onClick={handleNavigate}
       >
@@ -198,7 +198,7 @@ function FieldValueItem({ item }: { item: FieldValueRef }) {
 
   return (
     <div
-      className="group/row relative flex gap-1 min-h-6 items-start py-1 cursor-pointer"
+      className="group/row relative flex gap-1 min-h-6 items-start cursor-pointer"
       style={{ paddingLeft: ROW_PADDING_LEFT }}
       onClick={handleNavigate}
     >

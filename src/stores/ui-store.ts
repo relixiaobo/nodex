@@ -130,6 +130,10 @@ interface UIStore {
   loadingNodeIds: Set<string>;
   addLoadingNode(nodeId: string): void;
   removeLoadingNode(nodeId: string): void;
+
+  // Auto-open toolbar dropdown (session-only): set by context menu, consumed by ViewToolbar
+  autoOpenToolbarDropdown: { nodeId: string; section: 'sort' | 'filter' | 'group' } | null;
+  setAutoOpenToolbarDropdown(payload: { nodeId: string; section: 'sort' | 'filter' | 'group' } | null): void;
 }
 
 export interface PersistedUIStoreState {
@@ -488,6 +492,10 @@ export const useUIStore = create<UIStore>()(
         next.delete(nodeId);
         return { loadingNodeIds: next };
       }),
+
+      // Auto-open toolbar dropdown (session-only)
+      autoOpenToolbarDropdown: null,
+      setAutoOpenToolbarDropdown: (payload) => set({ autoOpenToolbarDropdown: payload }),
     }),
     {
       name: 'nodex-ui',

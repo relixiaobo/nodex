@@ -121,6 +121,7 @@ export function NodeDescription({ nodeId, editable = true }: NodeDescriptionProp
       contentEditable={editing}
       suppressContentEditableWarning
       className={`text-xs leading-[15px] min-h-[15px] text-foreground-tertiary mt-1 ${editable ? 'cursor-text' : 'cursor-default'} ${editing ? 'outline-none' : ''}`}
+      data-placeholder={editing ? 'Add description' : undefined}
       onMouseDown={editable && !editing ? handleMouseDown : undefined}
       onBlur={editing ? handleBlur : undefined}
       onKeyDown={editing ? handleKeyDown : undefined}

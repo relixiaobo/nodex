@@ -6,19 +6,22 @@
  */
 import type { NodexNode } from '../types/node.js';
 import type { OutlinerRowItem } from '../components/outliner/row-model.js';
-import { compareNodes, type SortConfig } from './sort-utils.js';
+import { compareNodesByRules, type SortConfig } from './sort-utils.js';
 import { matchesAllFilters, type FilterCondition } from './filter-utils.js';
 import { groupNodes } from './group-utils.js';
 import { buildBacklinkCountMap } from './backlinks.js';
 
 export interface ViewConfig {
-  sort: SortConfig | null;
+  sortRules: SortConfig[];
   filters: FilterCondition[];
   groupField: string | null;
 }
 
 /**
  * Read view config (sort/filter/group) from a node's ViewDef child.
+ *
+ * Sort rules: reads sortRule child nodes first, then falls back to legacy
+ * sortField/sortDirection properties on the viewDef itself.
  *
  * @param parentId  The outliner parent node ID
  * @param getViewDefId  Resolve viewDef child ID
@@ -32,18 +35,52 @@ export function readViewConfig(
   getFilters: (id: string) => Array<{ field: string; op: 'all' | 'any'; values: string[] }>,
 ): ViewConfig {
   const viewDefId = getViewDefId(parentId);
-  if (!viewDefId) return { sort: null, filters: [], groupField: null };
+  if (!viewDefId) return { sortRules: [], filters: [], groupField: null };
   const viewDef = getNode(viewDefId);
-  const sort: SortConfig | null = viewDef?.sortField
-    ? { field: viewDef.sortField, direction: viewDef.sortDirection ?? 'asc' }
-    : null;
+
+  // Read sort rules from child nodes
+  const sortRules: SortConfig[] = [];
+  if (viewDef) {
+    for (const childId of viewDef.children) {
+      const child = getNode(childId);
+      if (child?.type === 'sortRule' && child.sortField) {
+        sortRules.push({
+          field: child.sortField,
+          direction: (child.sortDirection as 'asc' | 'desc') ?? 'asc',
+        });
+      }
+    }
+  }
+
+  // Legacy fallback: single sortField/sortDirection on viewDef
+  if (sortRules.length === 0 && viewDef?.sortField) {
+    sortRules.push({
+      field: viewDef.sortField,
+      direction: (viewDef.sortDirection as 'asc' | 'desc') ?? 'asc',
+    });
+  }
+
   const filters: FilterCondition[] = getFilters(parentId).map((f) => ({
     field: f.field,
     op: f.op,
     values: f.values,
   }));
   const groupField = viewDef?.groupField ?? null;
-  return { sort, filters, groupField };
+  return { sortRules, filters, groupField };
+}
+
+/**
+ * Resolve a node through references: if the node is a reference node,
+ * return the target node; otherwise return the node itself.
+ */
+function resolveNode(
+  node: NodexNode,
+  getNode: (id: string) => NodexNode | null,
+): NodexNode {
+  if (node.type === 'reference' && node.targetId) {
+    return getNode(node.targetId) ?? node;
+  }
+  return node;
 }
 
 /**
@@ -60,47 +97,49 @@ export function applyViewPipeline(
 ): OutlinerRowItem[] {
   const fieldRows = rows.filter((r) => r.type === 'field');
   let contentRows = rows.filter((r) => r.type === 'content');
-  const { sort, filters, groupField } = config;
+  const { sortRules, filters, groupField } = config;
+
+  // Reference-aware node accessor: resolves reference → target transparently.
+  const getEffectiveNode = (id: string): NodexNode | null => {
+    const raw = getNode(id);
+    return raw ? resolveNode(raw, getNode) : null;
+  };
 
   // 1. Filter
   if (filters.length > 0) {
     contentRows = contentRows.filter((r) => {
-      const node = getNode(r.id);
-      return node ? matchesAllFilters(node, filters, getNode) : false;
+      const node = getEffectiveNode(r.id);
+      return node ? matchesAllFilters(node, filters, getEffectiveNode) : false;
     });
   }
+
+  // Sort comparator using multi-sort rules
+  const needsRefCount = sortRules.some((r) => r.field === 'refCount');
+  const backlinkCounts = needsRefCount ? buildBacklinkCountMap(version) : undefined;
+  const sortFn = (a: OutlinerRowItem, b: OutlinerRowItem) => {
+    const nodeA = getEffectiveNode(a.id);
+    const nodeB = getEffectiveNode(b.id);
+    if (!nodeA || !nodeB) return 0;
+    return compareNodesByRules(nodeA, nodeB, sortRules, getEffectiveNode, backlinkCounts);
+  };
 
   // 2. Group + Sort
   if (groupField) {
     const contentIds = contentRows.map((r) => r.id);
-    const groups = groupNodes(contentIds, groupField, getNode);
+    const groups = groupNodes(contentIds, groupField, getEffectiveNode);
     const result: OutlinerRowItem[] = [...fieldRows];
-    const backlinkCounts = sort?.field === 'refCount' ? buildBacklinkCountMap(version) : undefined;
     for (const group of groups) {
       result.push({ id: `__group__${group.key}`, type: 'groupHeader', label: group.label });
       const groupItems: OutlinerRowItem[] = group.ids.map((id) => ({ id, type: 'content' as const }));
-      if (sort) {
-        groupItems.sort((a, b) => {
-          const nodeA = getNode(a.id);
-          const nodeB = getNode(b.id);
-          if (!nodeA || !nodeB) return 0;
-          return compareNodes(nodeA, nodeB, sort, getNode, backlinkCounts);
-        });
-      }
+      if (sortRules.length > 0) groupItems.sort(sortFn);
       result.push(...groupItems);
     }
     return result;
   }
 
   // 3. Sort only (no group)
-  if (sort) {
-    const backlinkCounts = sort.field === 'refCount' ? buildBacklinkCountMap(version) : undefined;
-    contentRows.sort((a, b) => {
-      const nodeA = getNode(a.id);
-      const nodeB = getNode(b.id);
-      if (!nodeA || !nodeB) return 0;
-      return compareNodes(nodeA, nodeB, sort, getNode, backlinkCounts);
-    });
+  if (sortRules.length > 0) {
+    contentRows.sort(sortFn);
   }
 
   return [...fieldRows, ...contentRows];

@@ -38,7 +38,7 @@ import { Kbd } from '../ui/Kbd.js';
 import {
   Link, Copy, Scissors, CopyPlus, MoveRight,
   Hash, CheckSquare, Type, Trash2, ChevronLeft, ChevronRight,
-  Plus, Inbox, Library, CalendarDays, ArrowUpDown,
+  Plus, Inbox, Library, CalendarDays, ArrowUpDown, ListFilter, Group,
 } from '../../lib/icons.js';
 import type { LucideIcon } from 'lucide-react';
 
@@ -48,6 +48,8 @@ export interface ContextMenuState {
   x: number;
   y: number;
   nodeId: string;
+  /** Node whose view config (sort/filter/group) is affected. Defaults to nodeId. */
+  viewNodeId?: string;
 }
 
 // ── Sub-view modes ──
@@ -87,6 +89,7 @@ export function NodeContextMenuPortal({ menu, onClose }: NodeContextMenuPortalPr
       x={menu.x}
       y={menu.y}
       nodeId={menu.nodeId}
+      viewNodeId={menu.viewNodeId ?? menu.nodeId}
       onClose={onClose}
     />,
     document.body,
@@ -141,11 +144,13 @@ interface NodeContextMenuContentProps {
   x: number;
   y: number;
   nodeId: string;
+  /** Node whose view config is affected (sort/filter/group/toolbar). */
+  viewNodeId: string;
   onClose: () => void;
 }
 
 const NodeContextMenuContent = forwardRef<HTMLDivElement, NodeContextMenuContentProps>(
-  function NodeContextMenuContent({ x, y, nodeId, onClose }, ref) {
+  function NodeContextMenuContent({ x, y, nodeId, viewNodeId, onClose }, ref) {
     const node = useNodeStore((s) => { void s._version; return loroDoc.toNodexNode(nodeId); });
     const [mode, setMode] = useState<MenuMode>('main');
 
@@ -251,18 +256,37 @@ const NodeContextMenuContent = forwardRef<HTMLDivElement, NodeContextMenuContent
       onClose();
     }, [nodeId, onClose]);
 
-    // View toolbar toggle — applies to the right-clicked node itself (controls its children's view)
+    // View toolbar toggle — applies to viewNodeId (controls its children's view)
     const toolbarVisible = useMemo(() => {
-      const viewDefId = useNodeStore.getState().getViewDefId(nodeId);
+      const viewDefId = useNodeStore.getState().getViewDefId(viewNodeId);
       if (!viewDefId) return false;
       const viewDef = useNodeStore.getState().getNode(viewDefId);
       return viewDef?.toolbarVisible ?? false;
-    }, [nodeId]);
+    }, [viewNodeId]);
 
     const handleToggleToolbar = useCallback(() => {
-      useNodeStore.getState().toggleToolbar(nodeId);
+      useNodeStore.getState().toggleToolbar(viewNodeId);
       onClose();
-    }, [nodeId, onClose]);
+    }, [viewNodeId, onClose]);
+
+    const handleOpenSort = useCallback(() => {
+      // Ensure toolbar is visible, then auto-open Sort dropdown
+      if (!toolbarVisible) useNodeStore.getState().toggleToolbar(viewNodeId);
+      useUIStore.getState().setAutoOpenToolbarDropdown({ nodeId: viewNodeId, section: 'sort' });
+      onClose();
+    }, [viewNodeId, toolbarVisible, onClose]);
+
+    const handleOpenFilter = useCallback(() => {
+      if (!toolbarVisible) useNodeStore.getState().toggleToolbar(viewNodeId);
+      useUIStore.getState().setAutoOpenToolbarDropdown({ nodeId: viewNodeId, section: 'filter' });
+      onClose();
+    }, [viewNodeId, toolbarVisible, onClose]);
+
+    const handleOpenGroup = useCallback(() => {
+      if (!toolbarVisible) useNodeStore.getState().toggleToolbar(viewNodeId);
+      useUIStore.getState().setAutoOpenToolbarDropdown({ nodeId: viewNodeId, section: 'group' });
+      onClose();
+    }, [viewNodeId, toolbarVisible, onClose]);
 
     // Merge forwarded ref + innerRef for measurement
     const setRefs = useCallback((el: HTMLDivElement | null) => {
@@ -295,6 +319,9 @@ const NodeContextMenuContent = forwardRef<HTMLDivElement, NodeContextMenuContent
             created={created}
             toolbarVisible={toolbarVisible}
             onToggleToolbar={handleToggleToolbar}
+            onOpenSort={handleOpenSort}
+            onOpenFilter={handleOpenFilter}
+            onOpenGroup={handleOpenGroup}
           />
         )}
         {mode === 'add-tag' && (
@@ -329,6 +356,9 @@ function MainMenu({
   created,
   toolbarVisible,
   onToggleToolbar,
+  onOpenSort,
+  onOpenFilter,
+  onOpenGroup,
 }: {
   onCopyLink: () => void;
   onCopy: () => void;
@@ -346,9 +376,24 @@ function MainMenu({
   created: string;
   toolbarVisible: boolean;
   onToggleToolbar: () => void;
+  onOpenSort: () => void;
+  onOpenFilter: () => void;
+  onOpenGroup: () => void;
 }) {
   return (
     <>
+      {/* View section */}
+      <MenuItem
+        icon={ArrowUpDown}
+        label={toolbarVisible ? 'Hide view toolbar' : 'Show view toolbar'}
+        onClick={onToggleToolbar}
+      />
+      <MenuItem icon={ArrowUpDown} label="Sort by" onClick={onOpenSort} />
+      <MenuItem icon={ListFilter} label="Filter by" onClick={onOpenFilter} />
+      <MenuItem icon={Group} label="Group by" onClick={onOpenGroup} />
+
+      <MenuSeparator />
+
       {/* Link */}
       <MenuItem icon={Link} label="Copy node link" onClick={onCopyLink} />
 
@@ -369,13 +414,6 @@ function MainMenu({
         icon={Type}
         label={hasDescription ? 'Edit description' : 'Add description'}
         onClick={onAddDescription}
-      />
-
-      {/* View toolbar toggle */}
-      <MenuItem
-        icon={ArrowUpDown}
-        label={toolbarVisible ? 'Hide view toolbar' : 'Show view toolbar'}
-        onClick={onToggleToolbar}
       />
 
       <MenuSeparator />
@@ -405,8 +443,6 @@ const MOVE_TARGETS: Array<{ id: string; label: string; icon: LucideIcon }> = [
   { id: CONTAINER_IDS.JOURNAL, label: 'Daily notes', icon: CalendarDays },
 ];
 
-type FlyoutSide = 'right' | 'left' | 'below';
-
 function MoveToSubmenu({
   currentContainerId,
   onSelect,
@@ -428,49 +464,26 @@ function MoveToSubmenu({
 
   useEffect(() => () => clearTimeout(timerRef.current), []);
 
-  // Compute flyout position: prefer right → left → below (for narrow side panels)
-  const flyoutPlacement = useMemo((): { side: FlyoutSide; style: React.CSSProperties } => {
-    if (!rowRef.current) return { side: 'right', style: { top: 0, left: '100%' } };
+  // Compute flyout position: prefer right, then left, then clamp to left edge
+  const flyoutStyle = useMemo((): React.CSSProperties => {
+    if (!rowRef.current) return { top: 0, left: '100%' };
     const rect = rowRef.current.getBoundingClientRect();
     const subWidth = 180;
-    if (rect.right + subWidth <= window.innerWidth) {
-      return { side: 'right', style: { top: 0, left: '100%' } };
+    const margin = 4;
+    const vw = window.innerWidth;
+    // Right side fits
+    if (rect.right + subWidth + margin <= vw) {
+      return { top: 0, left: '100%' };
     }
-    if (rect.left - subWidth >= 0) {
-      return { side: 'left', style: { top: 0, right: '100%' } };
+    // Left side fits
+    if (rect.left - subWidth - margin >= 0) {
+      return { top: 0, right: '100%' };
     }
-    // Neither side fits (narrow panel) — show inline below the trigger
-    return { side: 'below', style: {} };
+    // Neither fits — pin to left edge of viewport, aligned with row top
+    return { top: rect.top, left: margin, position: 'fixed' };
   }, [open]); // recalc when open changes
 
   const targets = MOVE_TARGETS.filter((t) => t.id !== currentContainerId);
-
-  // Inline below mode: render targets directly under the trigger, no floating panel
-  if (open && flyoutPlacement.side === 'below') {
-    return (
-      <div ref={rowRef} onMouseEnter={showSub} onMouseLeave={hideSub}>
-        <button
-          className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-sm text-foreground-secondary transition-colors text-left hover:bg-foreground/4 hover:text-foreground"
-          onClick={() => setOpen(false)}
-        >
-          <div className="flex w-4 shrink-0 items-center justify-center text-foreground-tertiary">
-            <ChevronLeft size={14} strokeWidth={1.5} />
-          </div>
-          <span className="flex-1 font-medium">Move to</span>
-        </button>
-        <div className="pl-4">
-          {targets.map((target) => (
-            <MenuItem
-              key={target.id}
-              icon={target.icon}
-              label={target.label}
-              onClick={() => onSelect(target.id)}
-            />
-          ))}
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div
@@ -479,7 +492,6 @@ function MoveToSubmenu({
       onMouseEnter={showSub}
       onMouseLeave={hideSub}
     >
-      {/* Trigger row — same style as MenuItem */}
       <button
         className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-sm text-foreground-secondary transition-colors text-left hover:bg-foreground/4 hover:text-foreground"
         onClick={() => setOpen((v) => !v)}
@@ -491,11 +503,12 @@ function MoveToSubmenu({
         <ChevronRight size={14} strokeWidth={1.5} className="text-foreground-tertiary" />
       </button>
 
-      {/* Flyout submenu (side positioning) */}
       {open && (
         <div
           className="absolute z-50 min-w-[160px] rounded-lg bg-background shadow-paper p-1"
-          style={flyoutPlacement.style}
+          style={flyoutStyle}
+          onMouseEnter={showSub}
+          onMouseLeave={hideSub}
         >
           {targets.map((target) => (
             <MenuItem

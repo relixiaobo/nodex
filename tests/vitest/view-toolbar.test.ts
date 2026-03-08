@@ -45,6 +45,18 @@ vi.mock('../../src/lib/loro-doc.js', () => ({
     keys.add(key);
     mockDeletedKeys.set(id, keys);
   },
+  deleteNode: (id: string) => {
+    mockNodes.delete(id);
+    // Remove from parent's children list
+    for (const [parentId, children] of mockChildren.entries()) {
+      const idx = children.indexOf(id);
+      if (idx !== -1) {
+        children.splice(idx, 1);
+        mockChildren.set(parentId, children);
+        break;
+      }
+    }
+  },
   commitDoc: vi.fn(),
 }));
 
@@ -87,8 +99,8 @@ describe('getViewDefId', () => {
   });
 });
 
-describe('setSortConfig', () => {
-  it('creates a viewDef node when none exists', () => {
+describe('setSortConfig (creates sortRule child nodes)', () => {
+  it('creates a viewDef and sortRule node when none exists', () => {
     useNodeStore.getState().setSortConfig('parent', 'name', 'asc');
 
     // A viewDef child should have been created
@@ -97,13 +109,18 @@ describe('setSortConfig', () => {
 
     const viewDef = mockNodes.get(viewDefId!);
     expect(viewDef?.type).toBe('viewDef');
-    expect(viewDef?.sortField).toBe('name');
-    expect(viewDef?.sortDirection).toBe('asc');
+
+    // sortRule should be a child of viewDef
+    const rules = useNodeStore.getState().getSortRules('parent');
+    expect(rules).toHaveLength(1);
+    expect(rules[0].field).toBe('name');
+    expect(rules[0].direction).toBe('asc');
   });
 
-  it('reuses existing viewDef node', () => {
+  it('reuses existing viewDef node and creates sortRule child', () => {
     const existingViewDefId = 'vd_existing';
     mockNodes.set(existingViewDefId, { id: existingViewDefId, type: 'viewDef' });
+    mockChildren.set(existingViewDefId, []);
     mockChildren.set('parent', [existingViewDefId, 'c1', 'c2']);
 
     useNodeStore.getState().setSortConfig('parent', 'createdAt', 'desc');
@@ -114,15 +131,59 @@ describe('setSortConfig', () => {
     expect(viewDefChildren).toHaveLength(1);
     expect(viewDefChildren[0]).toBe(existingViewDefId);
 
-    const viewDef = mockNodes.get(existingViewDefId);
-    expect(viewDef?.sortField).toBe('createdAt');
-    expect(viewDef?.sortDirection).toBe('desc');
+    // Sort rule should be a child of viewDef
+    const rules = useNodeStore.getState().getSortRules('parent');
+    expect(rules).toHaveLength(1);
+    expect(rules[0].field).toBe('createdAt');
+    expect(rules[0].direction).toBe('desc');
   });
 });
 
-describe('clearSort', () => {
-  it('deletes sortField and sortDirection from viewDef', () => {
-    // First set up a viewDef with sort config
+describe('addSortRule / removeSortRule / updateSortRule', () => {
+  it('adds multiple sort rules', () => {
+    useNodeStore.getState().addSortRule('parent', 'name', 'asc');
+    useNodeStore.getState().addSortRule('parent', 'createdAt', 'desc');
+
+    const rules = useNodeStore.getState().getSortRules('parent');
+    expect(rules).toHaveLength(2);
+    // Mock createNode prepends, so order is reversed
+    const fields = rules.map((r) => r.field);
+    expect(fields).toContain('name');
+    expect(fields).toContain('createdAt');
+  });
+
+  it('updates a sort rule', () => {
+    useNodeStore.getState().addSortRule('parent', 'name', 'asc');
+    const rules = useNodeStore.getState().getSortRules('parent');
+    expect(rules).toHaveLength(1);
+
+    useNodeStore.getState().updateSortRule(rules[0].id, 'updatedAt', 'desc');
+    const updated = useNodeStore.getState().getSortRules('parent');
+    expect(updated[0].field).toBe('updatedAt');
+    expect(updated[0].direction).toBe('desc');
+  });
+
+  it('removes a single sort rule', () => {
+    useNodeStore.getState().addSortRule('parent', 'name', 'asc');
+    useNodeStore.getState().addSortRule('parent', 'createdAt', 'desc');
+
+    const rules = useNodeStore.getState().getSortRules('parent');
+    expect(rules).toHaveLength(2);
+
+    // Remove the first rule, one should remain
+    const removedField = rules[0].field;
+    const keptField = rules[1].field;
+    useNodeStore.getState().removeSortRule(rules[0].id);
+    const remaining = useNodeStore.getState().getSortRules('parent');
+    expect(remaining).toHaveLength(1);
+    expect(remaining[0].field).toBe(keptField);
+    expect(remaining[0].field).not.toBe(removedField);
+  });
+});
+
+describe('clearAllSortRules', () => {
+  it('removes all sortRule children and legacy props', () => {
+    // Set up a viewDef with legacy props + a sortRule child
     const viewDefId = 'vd1';
     mockNodes.set(viewDefId, {
       id: viewDefId,
@@ -130,11 +191,18 @@ describe('clearSort', () => {
       sortField: 'name',
       sortDirection: 'asc',
     });
+    mockChildren.set(viewDefId, []);
     mockChildren.set('parent', [viewDefId, 'c1', 'c2']);
 
-    useNodeStore.getState().clearSort('parent');
+    // Add a sortRule child
+    useNodeStore.getState().addSortRule('parent', 'createdAt', 'desc');
+    expect(useNodeStore.getState().getSortRules('parent')).toHaveLength(1);
 
-    // Both keys should have been deleted
+    useNodeStore.getState().clearAllSortRules('parent');
+
+    // sortRule children should be removed
+    expect(useNodeStore.getState().getSortRules('parent')).toHaveLength(0);
+    // Legacy props should be deleted
     const deletedKeys = mockDeletedKeys.get(viewDefId);
     expect(deletedKeys?.has('sortField')).toBe(true);
     expect(deletedKeys?.has('sortDirection')).toBe(true);
@@ -142,7 +210,7 @@ describe('clearSort', () => {
 
   it('no-ops when no viewDef exists', () => {
     // Should not throw
-    useNodeStore.getState().clearSort('parent');
+    useNodeStore.getState().clearAllSortRules('parent');
     expect(mockDeletedKeys.size).toBe(0);
   });
 });

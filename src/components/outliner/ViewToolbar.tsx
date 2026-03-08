@@ -10,6 +10,7 @@ import {
   ArrowUp, ArrowDown, ChevronDown, CircleMinus, Plus, X, Check,
 } from '../../lib/icons.js';
 import { useNodeStore } from '../../stores/node-store.js';
+import { useUIStore } from '../../stores/ui-store.js';
 import { useNodeTags } from '../../hooks/use-node-tags.js';
 import * as loroDoc from '../../lib/loro-doc.js';
 import type { SortDirection } from '../../lib/sort-utils.js';
@@ -150,11 +151,13 @@ export function ViewToolbar({ nodeId, depth }: ViewToolbarProps) {
     return s.getNode(viewDefId);
   });
 
-  const sortField = viewDef?.sortField ?? null;
-  const sortDirection = (viewDef?.sortDirection ?? 'asc') as SortDirection;
   const groupField = viewDef?.groupField ?? null;
   const toolbarVisible = viewDef?.toolbarVisible ?? false;
 
+  const sortRuleCount = useNodeStore((s) => {
+    void s._version;
+    return s.getSortRules(nodeId).length;
+  });
   const filterCount = useNodeStore((s) => {
     void s._version;
     return s.getFilters(nodeId).length;
@@ -169,11 +172,7 @@ export function ViewToolbar({ nodeId, depth }: ViewToolbarProps) {
       className="flex items-center gap-0.5 h-6"
       style={{ paddingLeft: leftPad }}
     >
-      <SortControl
-        nodeId={nodeId}
-        sortField={sortField}
-        sortDirection={sortDirection}
-      />
+      <SortControl nodeId={nodeId} sortRuleCount={sortRuleCount} />
       <FilterControl nodeId={nodeId} filterCount={filterCount} />
       <GroupControl nodeId={nodeId} groupField={groupField} />
     </div>
@@ -186,18 +185,33 @@ export function ViewToolbar({ nodeId, depth }: ViewToolbarProps) {
 
 function SortControl({
   nodeId,
-  sortField,
-  sortDirection,
+  sortRuleCount,
 }: {
   nodeId: string;
-  sortField: string | null;
-  sortDirection: SortDirection;
+  sortRuleCount: number;
 }) {
   const [open, setOpen] = useState(false);
   const btnRef = useRef<HTMLButtonElement>(null);
   const onClose = useCallback(() => setOpen(false), []);
-  const fieldLabel = useSortFieldLabel(sortField);
-  const DirIcon = sortDirection === 'asc' ? ArrowUp : ArrowDown;
+
+  // Auto-open from context menu (subscribe to store changes)
+  const autoOpen = useUIStore((s) => s.autoOpenToolbarDropdown);
+  useEffect(() => {
+    if (autoOpen?.nodeId === nodeId && autoOpen.section === 'sort') {
+      setOpen(true);
+      useUIStore.getState().setAutoOpenToolbarDropdown(null);
+    }
+  }, [autoOpen, nodeId]);
+
+  // Read first sort rule for pill display
+  const _version = useNodeStore((s) => s._version);
+  const firstRule = useMemo(() => {
+    const rules = useNodeStore.getState().getSortRules(nodeId);
+    return rules[0] ?? null;
+  }, [nodeId, _version]);
+
+  const fieldLabel = useSortFieldLabel(firstRule?.field ?? null);
+  const DirIcon = (firstRule?.direction ?? 'asc') === 'asc' ? ArrowUp : ArrowDown;
 
   return (
     <>
@@ -205,14 +219,15 @@ function SortControl({
         ref={btnRef}
         icon={ArrowUpDown}
         label="Sort"
-        active={!!sortField}
+        active={sortRuleCount > 0}
         onClick={() => setOpen((v) => !v)}
         title="Sort"
       >
-        {sortField ? (
+        {firstRule ? (
           <>
             <span className="max-w-[100px] truncate">{fieldLabel}</span>
             <DirIcon size={9} strokeWidth={2} />
+            {sortRuleCount > 1 && <span className="text-[10px]">+{sortRuleCount - 1}</span>}
           </>
         ) : (
           <span>Sort</span>
@@ -221,8 +236,6 @@ function SortControl({
       {open && (
         <SortDropdown
           nodeId={nodeId}
-          sortField={sortField}
-          sortDirection={sortDirection}
           anchorRef={btnRef}
           onClose={onClose}
         />
@@ -231,24 +244,25 @@ function SortControl({
   );
 }
 
-// ── Sort dropdown ──
+// ── Sort dropdown (multi-sort) ──
 
-type SortView = 'config' | 'fieldPicker';
+type SortView = 'list' | 'fieldPicker';
 
 function SortDropdown({
   nodeId,
-  sortField,
-  sortDirection,
   anchorRef,
   onClose,
 }: {
   nodeId: string;
-  sortField: string | null;
-  sortDirection: SortDirection;
   anchorRef: React.RefObject<HTMLButtonElement | null>;
   onClose: () => void;
 }) {
-  const [view, setView] = useState<SortView>(sortField ? 'config' : 'fieldPicker');
+  const _version = useNodeStore((s) => s._version);
+  const sortRules = useMemo(() => useNodeStore.getState().getSortRules(nodeId), [nodeId, _version]);
+
+  const [view, setView] = useState<SortView>(sortRules.length > 0 ? 'list' : 'fieldPicker');
+  // Track which rule is being edited (for field picker replacement)
+  const [editingRuleId, setEditingRuleId] = useState<string | null>(null);
 
   const tagFields = useTagFieldDefs(nodeId);
   const allFields = useMemo(() => [
@@ -256,56 +270,79 @@ function SortDropdown({
     ...tagFields.map((f) => ({ id: f.id, label: f.name || 'Untitled', section: 'Tag fields' })),
   ], [tagFields]);
 
-  // Sync view state when sortField removed externally
+  // Sync view state when all rules removed externally
   useEffect(() => {
-    if (!sortField && view === 'config') setView('fieldPicker');
-  }, [sortField, view]);
+    if (sortRules.length === 0 && view === 'list') setView('fieldPicker');
+  }, [sortRules.length, view]);
 
   const handleSelectField = useCallback((fieldId: string) => {
-    const store = useNodeStore.getState();
-    const vdId = store.getViewDefId(nodeId);
-    const currentDir = vdId ? (store.getNode(vdId)?.sortDirection ?? 'asc') : 'asc';
-    store.setSortConfig(nodeId, fieldId, currentDir as SortDirection);
-    setView('config');
-  }, [nodeId]);
+    if (editingRuleId) {
+      // Update existing rule's field
+      const rule = sortRules.find((r) => r.id === editingRuleId);
+      useNodeStore.getState().updateSortRule(editingRuleId, fieldId, rule?.direction ?? 'asc');
+      setEditingRuleId(null);
+    } else {
+      // Add new sort rule
+      useNodeStore.getState().addSortRule(nodeId, fieldId, 'asc');
+    }
+    setView('list');
+  }, [nodeId, editingRuleId, sortRules]);
 
-  const handleToggleDirection = useCallback(() => {
-    if (!sortField) return;
-    const next: SortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
-    useNodeStore.getState().setSortConfig(nodeId, sortField, next);
-  }, [nodeId, sortField, sortDirection]);
+  const handleToggleDirection = useCallback((ruleId: string) => {
+    const rule = sortRules.find((r) => r.id === ruleId);
+    if (!rule) return;
+    const next: SortDirection = rule.direction === 'asc' ? 'desc' : 'asc';
+    useNodeStore.getState().updateSortRule(ruleId, rule.field, next);
+  }, [sortRules]);
 
-  const handleRemove = useCallback(() => {
-    useNodeStore.getState().clearSort(nodeId);
+  const handleRemoveRule = useCallback((ruleId: string) => {
+    useNodeStore.getState().removeSortRule(ruleId);
+  }, []);
+
+  const handleResetAll = useCallback(() => {
+    useNodeStore.getState().clearAllSortRules(nodeId);
     onClose();
   }, [nodeId, onClose]);
 
+  const handleOpenFieldPicker = useCallback((ruleId: string) => {
+    setEditingRuleId(ruleId);
+    setView('fieldPicker');
+  }, []);
+
+  const handleAddSort = useCallback(() => {
+    setEditingRuleId(null);
+    setView('fieldPicker');
+  }, []);
+
   return (
     <DropdownPanel anchorRef={anchorRef} onClose={onClose} title="Sort by">
-      {view === 'config' && sortField ? (
+      {view === 'list' && sortRules.length > 0 ? (
         <>
-          <div className="mx-1.5 mb-1">
-            <SortConfigRow
-              sortField={sortField}
-              sortDirection={sortDirection}
-              allFields={allFields}
-              onOpenFieldPicker={() => setView('fieldPicker')}
-              onToggleDirection={handleToggleDirection}
-              onRemove={handleRemove}
-            />
+          <div className="mx-1.5 mb-1 flex flex-col gap-1">
+            {sortRules.map((rule) => (
+              <SortConfigRow
+                key={rule.id}
+                sortField={rule.field}
+                sortDirection={rule.direction}
+                allFields={allFields}
+                onOpenFieldPicker={() => handleOpenFieldPicker(rule.id)}
+                onToggleDirection={() => handleToggleDirection(rule.id)}
+                onRemove={() => handleRemoveRule(rule.id)}
+              />
+            ))}
           </div>
           <div className="mx-1.5 my-0.5 h-px bg-border-subtle" />
           <div className="px-1.5 pb-1.5 pt-0.5 flex flex-col gap-0.5">
             <button
-              className="flex items-center gap-1.5 w-full rounded-md px-1.5 py-1 text-xs text-foreground-tertiary cursor-not-allowed"
-              disabled
+              className="flex items-center gap-1.5 w-full rounded-md px-1.5 py-1 text-xs text-foreground-secondary hover:bg-foreground/4 transition-colors cursor-pointer"
+              onClick={handleAddSort}
             >
               <Plus size={12} strokeWidth={1.5} />
               Add sort
             </button>
             <button
               className="flex items-center gap-1.5 w-full rounded-md px-1.5 py-1 text-xs text-destructive hover:bg-foreground/4 transition-colors cursor-pointer"
-              onClick={handleRemove}
+              onClick={handleResetAll}
             >
               <X size={12} strokeWidth={1.5} />
               Reset
@@ -373,6 +410,15 @@ function FilterControl({ nodeId, filterCount }: { nodeId: string; filterCount: n
   const [open, setOpen] = useState(false);
   const btnRef = useRef<HTMLButtonElement>(null);
   const onClose = useCallback(() => setOpen(false), []);
+
+  // Auto-open from context menu (subscribe to store changes)
+  const autoOpen = useUIStore((s) => s.autoOpenToolbarDropdown);
+  useEffect(() => {
+    if (autoOpen?.nodeId === nodeId && autoOpen.section === 'filter') {
+      setOpen(true);
+      useUIStore.getState().setAutoOpenToolbarDropdown(null);
+    }
+  }, [autoOpen, nodeId]);
 
   return (
     <>
@@ -591,6 +637,15 @@ function GroupControl({ nodeId, groupField }: { nodeId: string; groupField: stri
   const [open, setOpen] = useState(false);
   const btnRef = useRef<HTMLButtonElement>(null);
   const onClose = useCallback(() => setOpen(false), []);
+
+  // Auto-open from context menu (subscribe to store changes)
+  const autoOpen = useUIStore((s) => s.autoOpenToolbarDropdown);
+  useEffect(() => {
+    if (autoOpen?.nodeId === nodeId && autoOpen.section === 'group') {
+      setOpen(true);
+      useUIStore.getState().setAutoOpenToolbarDropdown(null);
+    }
+  }, [autoOpen, nodeId]);
   const fieldLabel = useGroupFieldLabel(groupField);
 
   return (

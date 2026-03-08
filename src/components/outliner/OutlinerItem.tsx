@@ -2183,7 +2183,7 @@ export function OutlinerItem({
     </OutlinerRow>
     {contextMenu && (
       <NodeContextMenuPortal
-        menu={{ x: contextMenu.x, y: contextMenu.y, nodeId }}
+        menu={{ x: contextMenu.x, y: contextMenu.y, nodeId, viewNodeId: parentId }}
         onClose={closeContextMenu}
       />
     )}

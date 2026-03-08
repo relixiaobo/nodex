@@ -28,7 +28,7 @@ function fieldRow(id: string): OutlinerRowItem {
 describe('applyViewPipeline', () => {
   it('passes through rows when no config is active', () => {
     const rows: OutlinerRowItem[] = [fieldRow('f1'), contentRow('a'), contentRow('b')];
-    const config: ViewConfig = { sort: null, filters: [], groupField: null };
+    const config: ViewConfig = { sortRules: [], filters: [], groupField: null };
     const result = applyViewPipeline(rows, config, () => null, 0);
     expect(result).toEqual(rows);
   });
@@ -41,7 +41,7 @@ describe('applyViewPipeline', () => {
     const getNode = (id: string) => nodes[id] ?? null;
     const rows: OutlinerRowItem[] = [fieldRow('f1'), contentRow('a'), contentRow('b')];
     const config: ViewConfig = {
-      sort: null,
+      sortRules: [],
       filters: [{ field: 'tags', op: 'any', values: ['t1'] }],
       groupField: null,
     };
@@ -57,7 +57,7 @@ describe('applyViewPipeline', () => {
     const getNode = (id: string) => nodes[id] ?? null;
     const rows: OutlinerRowItem[] = [contentRow('a'), contentRow('b')];
     const config: ViewConfig = {
-      sort: { field: 'name', direction: 'asc' },
+      sortRules: [{ field: 'name', direction: 'asc' }],
       filters: [],
       groupField: null,
     };
@@ -75,7 +75,7 @@ describe('applyViewPipeline', () => {
     const getNode = (id: string) => nodes[id] ?? null;
     const rows: OutlinerRowItem[] = [contentRow('a'), contentRow('b')];
     const config: ViewConfig = {
-      sort: null,
+      sortRules: [],
       filters: [],
       groupField: 'tags',
     };
@@ -96,13 +96,51 @@ describe('applyViewPipeline', () => {
     const getNode = (id: string) => nodes[id] ?? null;
     const rows: OutlinerRowItem[] = [contentRow('a'), contentRow('b')];
     const config: ViewConfig = {
-      sort: { field: 'name', direction: 'asc' },
+      sortRules: [{ field: 'name', direction: 'asc' }],
       filters: [],
       groupField: 'tags',
     };
     const result = applyViewPipeline(rows, config, getNode, 0);
     const contentIds = result.filter((r) => r.type === 'content').map((r) => r.id);
     expect(contentIds).toEqual(['b', 'a']); // Apple before Zebra
+  });
+
+  it('sorts reference nodes by their target name', () => {
+    const nodes: Record<string, NodexNode> = {
+      ref1: makeNode({ id: 'ref1', type: 'reference', targetId: 'target1' }),
+      ref2: makeNode({ id: 'ref2', type: 'reference', targetId: 'target2' }),
+      target1: makeNode({ id: 'target1', name: 'Banana' }),
+      target2: makeNode({ id: 'target2', name: 'Apple' }),
+    };
+    const getNode = (id: string) => nodes[id] ?? null;
+    const rows: OutlinerRowItem[] = [contentRow('ref1'), contentRow('ref2')];
+    const config: ViewConfig = {
+      sortRules: [{ field: 'name', direction: 'asc' }],
+      filters: [],
+      groupField: null,
+    };
+    const result = applyViewPipeline(rows, config, getNode, 0);
+    // ref2 → Apple should come before ref1 → Banana
+    expect(result.map((r) => r.id)).toEqual(['ref2', 'ref1']);
+  });
+
+  it('sorts reference nodes by name descending', () => {
+    const nodes: Record<string, NodexNode> = {
+      ref1: makeNode({ id: 'ref1', type: 'reference', targetId: 'target1' }),
+      ref2: makeNode({ id: 'ref2', type: 'reference', targetId: 'target2' }),
+      target1: makeNode({ id: 'target1', name: 'Banana' }),
+      target2: makeNode({ id: 'target2', name: 'Apple' }),
+    };
+    const getNode = (id: string) => nodes[id] ?? null;
+    const rows: OutlinerRowItem[] = [contentRow('ref1'), contentRow('ref2')];
+    const config: ViewConfig = {
+      sortRules: [{ field: 'name', direction: 'desc' }],
+      filters: [],
+      groupField: null,
+    };
+    const result = applyViewPipeline(rows, config, getNode, 0);
+    // Banana before Apple in desc
+    expect(result.map((r) => r.id)).toEqual(['ref1', 'ref2']);
   });
 
   it('filter + group + sort combined', () => {
@@ -115,7 +153,7 @@ describe('applyViewPipeline', () => {
     const getNode = (id: string) => nodes[id] ?? null;
     const rows: OutlinerRowItem[] = [contentRow('a'), contentRow('b'), contentRow('c')];
     const config: ViewConfig = {
-      sort: { field: 'name', direction: 'asc' },
+      sortRules: [{ field: 'name', direction: 'asc' }],
       filters: [{ field: 'done', op: 'any', values: ['false'] }],
       groupField: 'tags',
     };
@@ -123,6 +161,29 @@ describe('applyViewPipeline', () => {
     // 'a' is filtered out (done), remaining: b (Apple) and c (Mango), sorted
     const contentIds = result.filter((r) => r.type === 'content').map((r) => r.id);
     expect(contentIds).toEqual(['b', 'c']);
+  });
+
+  it('multi-sort: primary by done, secondary by name', () => {
+    const nodes: Record<string, NodexNode> = {
+      a: makeNode({ id: 'a', name: 'Banana' }),
+      b: makeNode({ id: 'b', name: 'Apple', completedAt: 100 }),
+      c: makeNode({ id: 'c', name: 'Cherry', completedAt: 200 }),
+      d: makeNode({ id: 'd', name: 'Date' }),
+    };
+    const getNode = (id: string) => nodes[id] ?? null;
+    const rows: OutlinerRowItem[] = [contentRow('a'), contentRow('b'), contentRow('c'), contentRow('d')];
+    const config: ViewConfig = {
+      sortRules: [
+        { field: 'done', direction: 'asc' },   // not-done first
+        { field: 'name', direction: 'asc' },   // then by name
+      ],
+      filters: [],
+      groupField: null,
+    };
+    const result = applyViewPipeline(rows, config, getNode, 0);
+    // Not-done (a=Banana, d=Date) sorted by name → Banana, Date
+    // Done (b=Apple, c=Cherry) sorted by name → Apple, Cherry
+    expect(result.map((r) => r.id)).toEqual(['a', 'd', 'b', 'c']);
   });
 });
 
@@ -134,12 +195,13 @@ describe('readViewConfig', () => {
       () => null,
       () => [],
     );
-    expect(config).toEqual({ sort: null, filters: [], groupField: null });
+    expect(config).toEqual({ sortRules: [], filters: [], groupField: null });
   });
 
-  it('reads sort, filters, and groupField from viewDef', () => {
+  it('reads legacy sortField/sortDirection from viewDef as fallback', () => {
     const viewDef = makeNode({
       id: 'vd1',
+      children: [],
       sortField: 'name',
       sortDirection: 'desc',
       groupField: 'tags',
@@ -150,8 +212,48 @@ describe('readViewConfig', () => {
       (id) => (id === 'vd1' ? viewDef : null),
       () => [{ field: 'done', op: 'any' as const, values: ['true'] }],
     );
-    expect(config.sort).toEqual({ field: 'name', direction: 'desc' });
+    expect(config.sortRules).toEqual([{ field: 'name', direction: 'desc' }]);
     expect(config.filters).toEqual([{ field: 'done', op: 'any', values: ['true'] }]);
     expect(config.groupField).toBe('tags');
+  });
+
+  it('reads sortRule child nodes from viewDef', () => {
+    const rule1 = makeNode({ id: 'sr1', type: 'sortRule', sortField: 'name', sortDirection: 'asc' });
+    const rule2 = makeNode({ id: 'sr2', type: 'sortRule', sortField: 'createdAt', sortDirection: 'desc' });
+    const viewDef = makeNode({
+      id: 'vd1',
+      children: ['sr1', 'sr2'],
+      groupField: null,
+    });
+    const nodes: Record<string, NodexNode> = { vd1: viewDef, sr1: rule1, sr2: rule2 };
+    const config = readViewConfig(
+      'parent',
+      () => 'vd1',
+      (id) => nodes[id] ?? null,
+      () => [],
+    );
+    expect(config.sortRules).toEqual([
+      { field: 'name', direction: 'asc' },
+      { field: 'createdAt', direction: 'desc' },
+    ]);
+  });
+
+  it('prefers sortRule children over legacy sortField', () => {
+    const rule1 = makeNode({ id: 'sr1', type: 'sortRule', sortField: 'updatedAt', sortDirection: 'desc' });
+    const viewDef = makeNode({
+      id: 'vd1',
+      children: ['sr1'],
+      sortField: 'name',
+      sortDirection: 'asc',
+    });
+    const nodes: Record<string, NodexNode> = { vd1: viewDef, sr1: rule1 };
+    const config = readViewConfig(
+      'parent',
+      () => 'vd1',
+      (id) => nodes[id] ?? null,
+      () => [],
+    );
+    // Should use sortRule child, not legacy props
+    expect(config.sortRules).toEqual([{ field: 'updatedAt', direction: 'desc' }]);
   });
 });

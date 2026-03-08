@@ -42,6 +42,7 @@ export type NodeType =
 
   // ── 查询与视图 ──
   | 'viewDef'          // 视图配置节点（P3）
+  | 'sortRule'         // 排序规则节点（viewDef 子节点，sortField + sortDirection）
   | 'search'           // Live Search / 动态查询节点
   | 'queryCondition';  // 查询条件节点（search node 子节点）
 

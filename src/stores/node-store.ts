@@ -147,9 +147,19 @@ interface NodeStore {
 
   /** Get the viewDef child node ID for a parent, or null if none exists. */
   getViewDefId(parentId: string): string | null;
-  /** Set sort config on a parent node's viewDef (creates viewDef if needed). */
+  /** Get all sort rules from a node's viewDef (sortRule child nodes). */
+  getSortRules(parentId: string): Array<{ id: string; field: string; direction: 'asc' | 'desc' }>;
+  /** Add a sort rule to a node's viewDef (creates viewDef if needed). Returns the new sortRule node ID. */
+  addSortRule(parentId: string, field: string, direction: 'asc' | 'desc'): string;
+  /** Update an existing sort rule's field and/or direction. */
+  updateSortRule(ruleId: string, field: string, direction: 'asc' | 'desc'): void;
+  /** Remove a single sort rule node. */
+  removeSortRule(ruleId: string): void;
+  /** Remove all sort rules from a node's viewDef + legacy sortField/sortDirection. */
+  clearAllSortRules(parentId: string): void;
+  /** @deprecated Use addSortRule. Sets legacy sort config on viewDef (kept for backward compat). */
   setSortConfig(parentId: string, field: string, direction: 'asc' | 'desc'): void;
-  /** Clear sort config (removes sortField/sortDirection from viewDef). */
+  /** @deprecated Use clearAllSortRules. */
   clearSort(parentId: string): void;
   /** Toggle view toolbar visibility on a node. */
   toggleToolbar(nodeId: string): void;
@@ -1839,27 +1849,109 @@ export const useNodeStore = create<NodeStore>((set, get) => {
       return null;
     },
 
-    setSortConfig: (parentId, field, direction) => {
-      if (!canMutate('setSortConfig')) return;
+    getSortRules: (parentId) => {
+      const viewDefId = get().getViewDefId(parentId);
+      if (!viewDefId) return [];
+      const children = loroDoc.getChildren(viewDefId);
+      const rules: Array<{ id: string; field: string; direction: 'asc' | 'desc' }> = [];
+      for (const childId of children) {
+        const child = loroDoc.toNodexNode(childId);
+        if (child?.type === 'sortRule' && child.sortField) {
+          rules.push({
+            id: childId,
+            field: child.sortField,
+            direction: (child.sortDirection as 'asc' | 'desc') ?? 'asc',
+          });
+        }
+      }
+      return rules;
+    },
+
+    addSortRule: (parentId, field, direction) => {
+      if (!canMutate('addSortRule')) return '';
       let viewDefId = get().getViewDefId(parentId);
       if (!viewDefId) {
         viewDefId = nanoid();
         loroDoc.createNode(viewDefId, parentId, 0);
         loroDoc.setNodeDataBatch(viewDefId, { type: 'viewDef' });
       }
-      loroDoc.setNodeDataBatch(viewDefId, { sortField: field, sortDirection: direction });
+      const ruleId = nanoid();
+      loroDoc.createNode(ruleId, viewDefId);
+      loroDoc.setNodeDataBatch(ruleId, { type: 'sortRule', sortField: field, sortDirection: direction });
+      loroDoc.commitDoc();
+      set({ _version: get()._version + 1 });
+      return ruleId;
+    },
+
+    updateSortRule: (ruleId, field, direction) => {
+      if (!canMutate('updateSortRule')) return;
+      loroDoc.setNodeDataBatch(ruleId, { sortField: field, sortDirection: direction });
+      loroDoc.commitDoc();
+      set({ _version: get()._version + 1 });
+    },
+
+    removeSortRule: (ruleId) => {
+      if (!canMutate('removeSortRule')) return;
+      loroDoc.deleteNode(ruleId);
+      loroDoc.commitDoc();
+      set({ _version: get()._version + 1 });
+    },
+
+    clearAllSortRules: (parentId) => {
+      if (!canMutate('clearAllSortRules')) return;
+      const rules = get().getSortRules(parentId);
+      const viewDefId = get().getViewDefId(parentId);
+      for (const r of rules) loroDoc.deleteNode(r.id);
+      // Also clean up legacy properties
+      if (viewDefId) {
+        const viewDef = loroDoc.toNodexNode(viewDefId);
+        if (viewDef?.sortField) {
+          loroDoc.deleteNodeData(viewDefId, 'sortField');
+          loroDoc.deleteNodeData(viewDefId, 'sortDirection');
+        }
+      }
+      if (rules.length > 0 || viewDefId) {
+        loroDoc.commitDoc();
+        set({ _version: get()._version + 1 });
+      }
+    },
+
+    setSortConfig: (parentId, field, direction) => {
+      if (!canMutate('setSortConfig')) return;
+      // Legacy: now creates a sortRule child node instead of setting properties on viewDef
+      // First clear existing rules, then add the new one
+      const existing = get().getSortRules(parentId);
+      if (existing.length === 1 && existing[0].field === field) {
+        // Just update direction on existing single rule
+        loroDoc.setNodeDataBatch(existing[0].id, { sortDirection: direction });
+        loroDoc.commitDoc();
+        set({ _version: get()._version + 1 });
+        return;
+      }
+      // Clear all and add fresh
+      for (const r of existing) loroDoc.deleteNode(r.id);
+      let viewDefId = get().getViewDefId(parentId);
+      if (!viewDefId) {
+        viewDefId = nanoid();
+        loroDoc.createNode(viewDefId, parentId, 0);
+        loroDoc.setNodeDataBatch(viewDefId, { type: 'viewDef' });
+      }
+      // Clean legacy properties
+      const viewDef = loroDoc.toNodexNode(viewDefId);
+      if (viewDef?.sortField) {
+        loroDoc.deleteNodeData(viewDefId, 'sortField');
+        loroDoc.deleteNodeData(viewDefId, 'sortDirection');
+      }
+      const ruleId = nanoid();
+      loroDoc.createNode(ruleId, viewDefId);
+      loroDoc.setNodeDataBatch(ruleId, { type: 'sortRule', sortField: field, sortDirection: direction });
       loroDoc.commitDoc();
       set({ _version: get()._version + 1 });
     },
 
     clearSort: (parentId) => {
       if (!canMutate('clearSort')) return;
-      const viewDefId = get().getViewDefId(parentId);
-      if (!viewDefId) return;
-      loroDoc.deleteNodeData(viewDefId, 'sortField');
-      loroDoc.deleteNodeData(viewDefId, 'sortDirection');
-      loroDoc.commitDoc();
-      set({ _version: get()._version + 1 });
+      get().clearAllSortRules(parentId);
     },
 
     toggleToolbar: (nodeId) => {

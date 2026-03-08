@@ -11,7 +11,7 @@
  */
 import { useCallback, useRef, useState } from 'react';
 import type { EditorView } from 'prosemirror-view';
-import { Library, Inbox, CalendarDays, Trash2, Search, Settings, Code2, Settings2, type AppIcon } from '../../lib/icons.js';
+import { Library, Inbox, CalendarDays, Trash2, Search, Settings, Code2, MoreHorizontal, type AppIcon } from '../../lib/icons.js';
 import { useNode } from '../../hooks/use-node';
 import { useNodeTags } from '../../hooks/use-node-tags';
 import { useNodeStore } from '../../stores/node-store';
@@ -36,6 +36,7 @@ import { getTextOffsetFromPoint, getRenderedTextRightEdge } from '../../lib/dom-
 import { getNodeTextLengthById } from '../../lib/tree-utils.js';
 import * as loroDoc from '../../lib/loro-doc.js';
 import { t } from '../../i18n/strings.js';
+import { NodeContextMenuPortal } from '../outliner/NodeContextMenu.js';
 
 const CONTAINER_HEADER_ICONS: Record<ContainerIconKey, AppIcon> = {
   library: Library,
@@ -256,7 +257,7 @@ export function NodeHeader({ nodeId, onTitleRef }: NodeHeaderProps) {
           <div className="flex-1 min-w-0">
             <TagBar nodeId={nodeId} />
           </div>
-          <ViewToolbarToggle nodeId={nodeId} />
+          <NodeMoreButton nodeId={nodeId} />
         </div>
       )}
 
@@ -332,7 +333,7 @@ export function NodeHeader({ nodeId, onTitleRef }: NodeHeaderProps) {
         </div>
         {/* View toolbar toggle — on title row when no tags */}
         {!hasTags && !isDefinitionNode && (
-          <ViewToolbarToggle nodeId={nodeId} />
+          <NodeMoreButton nodeId={nodeId} />
         )}
       </div>
 
@@ -344,28 +345,34 @@ export function NodeHeader({ nodeId, onTitleRef }: NodeHeaderProps) {
   );
 }
 
-// ── View Toolbar Toggle (inline icon) ──
+// ── Node More Button (⋯ opens context menu) ──
 
-function ViewToolbarToggle({ nodeId }: { nodeId: string }) {
-  const toolbarVisible = useNodeStore((s) => {
-    void s._version;
-    const viewDefId = s.getViewDefId(nodeId);
-    if (!viewDefId) return false;
-    return s.getNode(viewDefId)?.toolbarVisible ?? false;
-  });
-  const toggleToolbar = useNodeStore((s) => s.toggleToolbar);
+function NodeMoreButton({ nodeId }: { nodeId: string }) {
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
+  const closeContextMenu = useCallback(() => setContextMenu(null), []);
+
+  const handleClick = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    // Position menu below the button
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    setContextMenu({ x: rect.left, y: rect.bottom + 4 });
+  }, []);
 
   return (
-    <button
-      className={`flex shrink-0 items-center justify-center h-7 w-7 rounded transition-colors cursor-pointer ${
-        toolbarVisible
-          ? 'text-primary hover:bg-primary-muted'
-          : 'text-foreground-tertiary hover:text-foreground-secondary hover:bg-foreground/4'
-      }`}
-      onClick={(e) => { e.stopPropagation(); toggleToolbar(nodeId); }}
-      title={toolbarVisible ? 'Hide view toolbar' : 'Show view toolbar'}
-    >
-      <Settings2 size={14} strokeWidth={1.5} />
-    </button>
+    <>
+      <button
+        className="flex shrink-0 items-center justify-center h-7 w-7 rounded transition-colors cursor-pointer text-foreground-tertiary hover:text-foreground-secondary hover:bg-foreground/4"
+        onClick={handleClick}
+        title="More actions"
+      >
+        <MoreHorizontal size={14} strokeWidth={1.5} />
+      </button>
+      {contextMenu && (
+        <NodeContextMenuPortal
+          menu={{ x: contextMenu.x, y: contextMenu.y, nodeId, viewNodeId: nodeId }}
+          onClose={closeContextMenu}
+        />
+      )}
+    </>
   );
 }

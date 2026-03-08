@@ -85,6 +85,24 @@ export function compareNodes(
 }
 
 /**
+ * Compare two nodes by multiple sort rules (multi-sort).
+ * Rules are applied in order; the first non-zero comparison wins.
+ */
+export function compareNodesByRules(
+  a: NodexNode,
+  b: NodexNode,
+  rules: SortConfig[],
+  getNode: (id: string) => NodexNode | null,
+  backlinkCounts?: Map<string, number>,
+): number {
+  for (const rule of rules) {
+    const cmp = compareNodes(a, b, rule, getNode, backlinkCounts);
+    if (cmp !== 0) return cmp;
+  }
+  return 0;
+}
+
+/**
  * Sort an array of node IDs by the given config.
  * Returns a new sorted array (does not mutate input).
  */

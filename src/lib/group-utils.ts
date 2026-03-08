@@ -2,7 +2,8 @@
  * Group utilities for View Toolbar — group outliner children by field.
  *
  * Supports grouping by: tags, done, createdAt, updatedAt, fieldDefId.
- * A node can appear in multiple groups (e.g., Tags with multiple tags).
+ * Multi-value fields (tags, options) use combination keys:
+ *   node with #note + #day → group "day, note" (alphabetically sorted).
  * Groups are sorted alphabetically by label. Items within groups keep
  * their original order (sort is applied separately).
  */
@@ -71,10 +72,13 @@ function getGroupValues(
   switch (groupField) {
     case 'tags': {
       if (node.tags.length === 0) return [];
-      return node.tags.map((tagId) => {
-        const tagDef = getNode(tagId);
-        return { key: tagId, label: tagDef?.name ?? tagId };
-      });
+      // Combination key: sort tag names alphabetically, join with ", "
+      const tagEntries = node.tags
+        .map((tagId) => ({ id: tagId, name: getNode(tagId)?.name ?? tagId }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+      const key = tagEntries.map((t) => t.id).join('+');
+      const label = tagEntries.map((t) => t.name).join(', ');
+      return [{ key, label }];
     }
     case 'done': {
       const isDone = node.completedAt != null;
@@ -100,7 +104,7 @@ function dateGroupValue(ts: number): { key: string; label: string } {
   return { key, label: key };
 }
 
-/** Get group values from a field entry. */
+/** Get group values from a field entry — combination key for multi-value fields. */
 function getFieldGroupValues(
   node: NodexNode,
   fieldDefId: string,
@@ -109,18 +113,23 @@ function getFieldGroupValues(
   for (const childId of node.children) {
     const child = getNode(childId);
     if (child?.type === 'fieldEntry' && child.fieldDefId === fieldDefId) {
-      const values: Array<{ key: string; label: string }> = [];
+      const entries: Array<{ key: string; label: string }> = [];
       for (const valId of child.children) {
         const valNode = getNode(valId);
         if (!valNode) continue;
         if (valNode.targetId) {
           const target = getNode(valNode.targetId);
-          values.push({ key: valNode.targetId, label: target?.name ?? valNode.name ?? valId });
+          entries.push({ key: valNode.targetId, label: target?.name ?? valNode.name ?? valId });
         } else {
-          values.push({ key: valId, label: valNode.name ?? valId });
+          entries.push({ key: valId, label: valNode.name ?? valId });
         }
       }
-      return values;
+      if (entries.length === 0) return [];
+      // Combination key: sort alphabetically, join
+      entries.sort((a, b) => a.label.localeCompare(b.label));
+      const key = entries.map((e) => e.key).join('+');
+      const label = entries.map((e) => e.label).join(', ');
+      return [{ key, label }];
     }
   }
   return [];

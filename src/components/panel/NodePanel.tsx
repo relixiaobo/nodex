@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Trash2, RotateCcw, SlidersHorizontal } from '../../lib/icons.js';
+import { Trash2, RotateCcw } from '../../lib/icons.js';
 import { useNode } from '../../hooks/use-node';
 import { useNodeStore } from '../../stores/node-store';
 import { useUIStore } from '../../stores/ui-store';
@@ -151,7 +151,6 @@ export function NodePanel({ nodeId }: NodePanelProps) {
         )}
         {isSettingsContainer && <SettingsSection />}
         {!isDefinitionNode && node?.type === 'search' && <SearchChipBar searchNodeId={nodeId} />}
-        {!isDefinitionNode && <ViewToolbarToggle nodeId={nodeId} />}
         {!isDefinitionNode && <OutlinerView rootNodeId={nodeId} />}
         {!isDefinitionNode && <BacklinksSection nodeId={nodeId} />}
 
@@ -216,30 +215,3 @@ export function NodePanel({ nodeId }: NodePanelProps) {
   );
 }
 
-// ── View Toolbar Toggle ──
-
-function ViewToolbarToggle({ nodeId }: { nodeId: string }) {
-  const toolbarVisible = useNodeStore((s) => {
-    void s._version;
-    const viewDefId = s.getViewDefId(nodeId);
-    if (!viewDefId) return false;
-    return s.getNode(viewDefId)?.toolbarVisible ?? false;
-  });
-  const toggleToolbar = useNodeStore((s) => s.toggleToolbar);
-
-  return (
-    <div className="flex items-center h-7 border-t border-border-subtle mx-4">
-      <button
-        className={`flex items-center gap-1 h-5 px-1 rounded text-[11px] transition-colors cursor-pointer ${
-          toolbarVisible
-            ? 'text-primary hover:bg-primary-muted'
-            : 'text-foreground-tertiary hover:text-foreground-secondary hover:bg-foreground/4'
-        }`}
-        onClick={() => toggleToolbar(nodeId)}
-        title={toolbarVisible ? 'Hide view toolbar' : 'Show view toolbar'}
-      >
-        <SlidersHorizontal size={11} strokeWidth={1.5} />
-      </button>
-    </div>
-  );
-}

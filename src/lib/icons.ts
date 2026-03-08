@@ -146,6 +146,7 @@ export {
   ArrowUp,
   ArrowDown,
   CircleMinus,
+  SlidersHorizontal,
 } from 'lucide-react';
 
 // ─── About & External ────────────────────────────────────────────────────────

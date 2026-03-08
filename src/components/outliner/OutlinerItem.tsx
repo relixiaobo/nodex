@@ -1715,7 +1715,7 @@ export function OutlinerItem({
       <div
         ref={rowRef}
         tabIndex={-1}
-        className={`group/row flex gap-1 min-h-6 items-start py-1 relative ${isDropTarget && dropPosition === 'inside'
+        className={`group/row flex gap-1 min-h-6 items-start relative ${isDropTarget && dropPosition === 'inside'
           ? 'bg-primary/10 ring-1 ring-primary/30 rounded-sm'
           : ''
           } ${isDragging ? 'opacity-40' : ''} ${hasOverlayOpen ? 'z-[80]' : 'has-[.field-overlay-open]:z-[80]'}`}

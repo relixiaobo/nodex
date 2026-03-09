@@ -160,6 +160,14 @@ export function useDragSelect({ containerRef, rootChildIds, rootNodeId }: UseDra
         window.getSelection()?.removeAllRanges();
         containerRef.current?.classList.add('select-none');
 
+        // Blur active element synchronously BEFORE updating state.
+        // Without this, React's batched re-render may unmount a focused editor
+        // AFTER the drag completes, firing a focusin on <body> that triggers
+        // useGlobalSelectionDismiss to clear the selection we just set.
+        if (document.activeElement instanceof HTMLElement && document.activeElement !== document.body) {
+          document.activeElement.blur();
+        }
+
         // Clear field editing state so the selection overlay renders correctly
         // (FieldRow's isFieldSelected requires !isEditing).
         useUIStore.getState().setEditingFieldName(null);

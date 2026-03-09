@@ -7,17 +7,21 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '0.1.0',
-    date: '2026-03-05',
-    summary: 'Initial release',
+    version: '0.1.1',
+    // 按产品支柱排列: Think → Connect → Everywhere
+    date: '2026-03-09',
+    summary: 'Think where you read',
     items: [
-      'Write and organize your notes in a keyboard-friendly outliner',
-      'Tag any node with supertags to add structure and fields',
-      'Clip web pages into your notes while browsing',
-      'Highlight and annotate text on any website',
-      'Keep a daily journal with a calendar heatmap overview',
-      'Find anything instantly with ⌘K quick search',
-      'Sync your notes across devices',
+      // Think — think where you read
+      'Highlight any passage and write a note right where you read',
+      'Clip web pages into structured notes while browsing',
+      'A keyboard-first outliner that thinks in structure',
+      // Connect — discover patterns
+      'Supertags turn notes into structured data with typed fields',
+      'Sort, filter, and group to surface what matters',
+      '@ references and # tags to connect ideas across notes',
+      // Everywhere
+      'Cloud sync — your notes follow you across devices',
     ],
   },
 ];

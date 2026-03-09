@@ -26,7 +26,7 @@ function ParentRow({
   children,
   isHeading,
 }: {
-  text: string;
+  text: React.ReactNode;
   description?: React.ReactNode;
   expanded: boolean;
   onToggle: () => void;
@@ -92,7 +92,7 @@ function VersionNode({ entry, defaultExpanded }: { entry: ChangelogEntry; defaul
 
   return (
     <ParentRow
-      text={`${entry.version} — ${entry.summary}`}
+      text={<><strong className="font-semibold">{entry.version}</strong>: {entry.summary}</>}
       description={entry.date}
       expanded={expanded}
       onToggle={toggle}

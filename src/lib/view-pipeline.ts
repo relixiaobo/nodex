@@ -95,9 +95,24 @@ export function applyViewPipeline(
   getNode: (id: string) => NodexNode | null,
   version: number,
 ): OutlinerRowItem[] {
-  const fieldRows = rows.filter((r) => r.type === 'field');
-  let contentRows = rows.filter((r) => r.type === 'content');
   const { sortRules, filters, groupField } = config;
+
+  // No view features active → preserve natural order from buildVisibleChildrenRows
+  // (template fields already at front, non-template fields interleaved with content)
+  if (sortRules.length === 0 && filters.length === 0 && !groupField) {
+    return rows;
+  }
+
+  // Split: template field prefix (consecutive fields at the start) vs remaining
+  let templateEnd = 0;
+  while (templateEnd < rows.length && rows[templateEnd].type === 'field') {
+    templateEnd++;
+  }
+  const templateFields = rows.slice(0, templateEnd);
+  const remaining = rows.slice(templateEnd);
+
+  // Extract content rows from remaining for filter/sort/group
+  let contentRows = remaining.filter((r) => r.type === 'content');
 
   // Reference-aware node accessor: resolves reference → target transparently.
   const getEffectiveNode = (id: string): NodexNode | null => {
@@ -107,10 +122,12 @@ export function applyViewPipeline(
 
   // 1. Filter
   if (filters.length > 0) {
-    contentRows = contentRows.filter((r) => {
+    const kept = new Set(contentRows.filter((r) => {
       const node = getEffectiveNode(r.id);
       return node ? matchesAllFilters(node, filters, getEffectiveNode) : false;
-    });
+    }).map((r) => r.id));
+    // Remove filtered-out content from remaining, keep non-template fields in place
+    contentRows = contentRows.filter((r) => kept.has(r.id));
   }
 
   // Sort comparator using multi-sort rules
@@ -123,11 +140,14 @@ export function applyViewPipeline(
     return compareNodesByRules(nodeA, nodeB, sortRules, getEffectiveNode, backlinkCounts);
   };
 
+  // Non-template field rows from remaining (preserve their positions later)
+  const inlineFieldRows = remaining.filter((r) => r.type === 'field');
+
   // 2. Group + Sort
   if (groupField) {
     const contentIds = contentRows.map((r) => r.id);
     const groups = groupNodes(contentIds, groupField, getEffectiveNode);
-    const result: OutlinerRowItem[] = [...fieldRows];
+    const result: OutlinerRowItem[] = [...templateFields, ...inlineFieldRows];
     for (const group of groups) {
       result.push({ id: `__group__${group.key}`, type: 'groupHeader', label: group.label });
       const groupItems: OutlinerRowItem[] = group.ids.map((id) => ({ id, type: 'content' as const }));
@@ -142,5 +162,5 @@ export function applyViewPipeline(
     contentRows.sort(sortFn);
   }
 
-  return [...fieldRows, ...contentRows];
+  return [...templateFields, ...inlineFieldRows, ...contentRows];
 }

@@ -1417,12 +1417,14 @@ export const useNodeStore = create<NodeStore>((set, get) => {
         nullable: true,
       });
 
-      // 确定插入位置
-      let insertIdx: number | undefined;
+      // 确定插入位置：afterChildId 之后，或末尾
+      const siblings = loroDoc.getChildren(nodeId);
+      let insertIdx: number;
       if (afterChildId) {
-        const siblings = loroDoc.getChildren(nodeId);
         const idx = siblings.indexOf(afterChildId);
-        if (idx >= 0) insertIdx = idx + 1;
+        insertIdx = idx >= 0 ? idx + 1 : siblings.length;
+      } else {
+        insertIdx = siblings.length;
       }
 
       const feId = nanoid();

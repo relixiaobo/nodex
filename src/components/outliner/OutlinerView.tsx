@@ -172,7 +172,7 @@ export function OutlinerView({ rootNodeId, showTemplateTuples }: OutlinerViewPro
   return (
     <div
       ref={containerRef}
-      className="flex flex-col pr-4"
+      className="flex flex-col gap-1.5 pr-4"
       role="tree"
       data-row-scope-parent-id={rootNodeId}
     >

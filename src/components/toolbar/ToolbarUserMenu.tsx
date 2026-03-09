@@ -6,6 +6,7 @@
  */
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { LogOut, Settings, Info, User, MessageSquare, ExternalLink, Sparkles } from '../../lib/icons.js';
+import { GoogleIcon } from '../ui/GoogleIcon.js';
 import { useWorkspaceStore } from '../../stores/workspace-store';
 import { useSyncStore } from '../../stores/sync-store';
 import { useUIStore } from '../../stores/ui-store';
@@ -136,6 +137,7 @@ export function ToolbarUserMenu() {
             {/* Dropdown */}
             {open && (
                 <div className="absolute right-0 top-full mt-1 w-52 rounded-lg bg-background shadow-paper p-1 z-50">
+                    {/* ── Account section ── */}
                     {authUser ? (
                         <>
                             {/* User info */}
@@ -164,37 +166,33 @@ export function ToolbarUserMenu() {
                                 </div>
                             </div>
 
-                            {/* Sync status row */}
+                            {/* Sync status (same group, no divider) */}
                             {showSyncBadge && (
-                                <>
-                                    <div className="mx-1 my-1 border-t border-border-subtle" />
-                                    <div className="flex items-center gap-2.5 px-2 py-1.5">
-                                        <div className="flex w-4 shrink-0 items-center justify-center">
-                                            <span className={`h-2 w-2 rounded-full ${badgeClass}`} />
-                                        </div>
-                                        <div className="min-w-0 flex-1">
-                                            <span className="text-sm text-foreground-secondary">
-                                                {SYNC_LABELS[syncStatus] ?? syncStatus}
-                                            </span>
-                                            {detail && (
-                                                <span className="ml-1 text-xs text-foreground-tertiary">
-                                                    {detail}
-                                                </span>
-                                            )}
-                                        </div>
+                                <div className="flex items-center gap-2.5 px-2 py-1">
+                                    <div className="flex w-4 shrink-0 items-center justify-center">
+                                        <span className={`h-2 w-2 rounded-full ${badgeClass}`} />
                                     </div>
-                                </>
+                                    <div className="min-w-0 flex-1">
+                                        <span className="text-xs text-foreground-tertiary">
+                                            {SYNC_LABELS[syncStatus] ?? syncStatus}
+                                        </span>
+                                        {detail && (
+                                            <span className="ml-1 text-xs text-foreground-tertiary">
+                                                · {detail}
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
                             )}
                         </>
                     ) : (
-                        /* Sign in */
                         <button
                             onClick={() => { setOpen(false); handleSignIn(); }}
                             disabled={signingIn}
                             className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-sm text-foreground-secondary transition-colors hover:bg-foreground/4 hover:text-foreground disabled:opacity-50"
                         >
-                            <div className="flex w-4 shrink-0 items-center justify-center text-foreground-tertiary">
-                                <User size={14} strokeWidth={1.5} />
+                            <div className="flex w-4 shrink-0 items-center justify-center">
+                                <GoogleIcon size={14} />
                             </div>
                             {signingIn ? 'Signing in\u2026' : t('toolbar.signIn')}
                         </button>
@@ -202,17 +200,7 @@ export function ToolbarUserMenu() {
 
                     <div className="mx-1 my-1 border-t border-border-subtle" />
 
-                    {/* Early Access */}
-                    <div className="flex items-center gap-2.5 px-2 py-1.5">
-                        <div className="flex w-4 shrink-0 items-center justify-center text-foreground-tertiary">
-                            <Sparkles size={14} strokeWidth={1.5} />
-                        </div>
-                        <span className="text-sm text-foreground-secondary">Early Access · Free</span>
-                    </div>
-
-                    <div className="mx-1 my-1 border-t border-border-subtle" />
-
-                    {/* Settings */}
+                    {/* ── Navigation group ── */}
                     <button
                         onClick={() => {
                             setOpen(false);
@@ -226,7 +214,6 @@ export function ToolbarUserMenu() {
                         Settings
                     </button>
 
-                    {/* About */}
                     <button
                         onClick={() => {
                             setOpen(false);
@@ -240,7 +227,6 @@ export function ToolbarUserMenu() {
                         About
                     </button>
 
-                    {/* Send Feedback */}
                     <a
                         href={feedbackUrl}
                         target="_blank"
@@ -251,12 +237,14 @@ export function ToolbarUserMenu() {
                         <div className="flex w-4 shrink-0 items-center justify-center text-foreground-tertiary">
                             <MessageSquare size={14} strokeWidth={1.5} />
                         </div>
-                        Send Feedback
+                        Feedback
                         <ExternalLink size={10} className="ml-auto text-foreground-tertiary" />
                     </a>
 
-                    {/* Sign out (only when signed in) */}
-                    {authUser && (
+                    <div className="mx-1 my-1 border-t border-border-subtle" />
+
+                    {/* ── Footer section ── */}
+                    {authUser ? (
                         <button
                             onClick={handleSignOut}
                             className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-sm text-foreground-secondary transition-colors hover:bg-foreground/4 hover:text-foreground"
@@ -266,6 +254,13 @@ export function ToolbarUserMenu() {
                             </div>
                             {t('userMenu.signOut')}
                         </button>
+                    ) : (
+                        <div className="flex items-center gap-2.5 px-2 py-1.5">
+                            <div className="flex w-4 shrink-0 items-center justify-center text-foreground-tertiary">
+                                <Sparkles size={14} strokeWidth={1.5} />
+                            </div>
+                            <span className="text-xs text-foreground-tertiary">Early Access · Free</span>
+                        </div>
                     )}
                 </div>
             )}

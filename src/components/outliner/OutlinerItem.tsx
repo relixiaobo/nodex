@@ -1704,7 +1704,7 @@ export function OutlinerItem({
         onSelectionKeydown: handleReferenceSelectionKeydown,
       }}
     >
-    <div role="treeitem" aria-expanded={isExpanded} className={`relative ${hasOverlayOpen ? 'field-overlay-open z-[80]' : 'has-[.field-overlay-open]:z-[80]'}`}>
+    <div role="treeitem" aria-expanded={isExpanded} className={`relative flex flex-col gap-1.5 ${hasOverlayOpen ? 'field-overlay-open z-[80]' : 'has-[.field-overlay-open]:z-[80]'}`}>
       {/* Drop indicator: before */}
       {isDropTarget && dropPosition === 'before' && (
         <div
@@ -2002,7 +2002,7 @@ export function OutlinerItem({
         </button>
       )}
       {isExpanded && !isCyclicReferenceExpansion && (
-        <div className="relative" data-row-scope-parent-id={nodeId} ref={childrenScopeRef}>
+        <div className="relative flex flex-col gap-1.5" data-row-scope-parent-id={nodeId} ref={childrenScopeRef}>
           {/* Selection subtree mask: children area, connects to parent row above (global selection only). */}
           {isSelectedGlobal && (
             <div

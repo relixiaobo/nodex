@@ -1225,7 +1225,10 @@ export const useNodeStore = create<NodeStore>((set, get) => {
     // ─── 标签操作 ───
 
     applyTag: (nodeId, tagDefId) => {
-      applyTagMutationsNoCommit(nodeId, tagDefId);
+      // Resolve reference → target so tags land on the content node
+      const raw = loroDoc.toNodexNode(nodeId);
+      const effectiveId = raw?.type === 'reference' && raw.targetId ? raw.targetId : nodeId;
+      applyTagMutationsNoCommit(effectiveId, tagDefId);
       loroDoc.commitDoc();
     },
 
@@ -1236,16 +1239,19 @@ export const useNodeStore = create<NodeStore>((set, get) => {
     },
 
     removeTag: (nodeId, tagDefId) => {
-      const node = loroDoc.toNodexNode(nodeId);
+      // Resolve reference → target
+      const rawRef = loroDoc.toNodexNode(nodeId);
+      const effectiveId = rawRef?.type === 'reference' && rawRef.targetId ? rawRef.targetId : nodeId;
+      const node = loroDoc.toNodexNode(effectiveId);
       const hadTag = node?.tags.includes(tagDefId) ?? false;
-      loroDoc.removeTag(nodeId, tagDefId);
+      loroDoc.removeTag(effectiveId, tagDefId);
       if (!hadTag) {
         loroDoc.commitDoc();
         return;
       }
 
       // 移除「仅由被移除标签贡献」的 fieldEntry，保留仍被其他标签需要的字段。
-      const remainingTags = loroDoc.toNodexNode(nodeId)?.tags ?? [];
+      const remainingTags = loroDoc.toNodexNode(effectiveId)?.tags ?? [];
       const requiredByRemaining = new Set<string>();
       for (const remainingTagId of remainingTags) {
         for (const chainTagId of getExtendsChain(remainingTagId)) {
@@ -1261,7 +1267,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
 
       for (const fdId of fieldDefsFromRemovedTag) {
         if (requiredByRemaining.has(fdId)) continue;
-        const feId = findFieldEntry(nodeId, fdId);
+        const feId = findFieldEntry(effectiveId, fdId);
         if (feId) loroDoc.deleteNode(feId);
       }
       loroDoc.commitDoc();
@@ -1269,19 +1275,25 @@ export const useNodeStore = create<NodeStore>((set, get) => {
 
     batchApplyTag: (nodeIds, tagDefId) => {
       for (const nodeId of nodeIds) {
-        applyTagMutationsNoCommit(nodeId, tagDefId);
+        // Resolve reference → target
+        const raw = loroDoc.toNodexNode(nodeId);
+        const effectiveId = raw?.type === 'reference' && raw.targetId ? raw.targetId : nodeId;
+        applyTagMutationsNoCommit(effectiveId, tagDefId);
       }
       loroDoc.commitDoc();
     },
 
     batchRemoveTag: (nodeIds, tagDefId) => {
       for (const nodeId of nodeIds) {
-        const node = loroDoc.toNodexNode(nodeId);
+        // Resolve reference → target
+        const rawRef = loroDoc.toNodexNode(nodeId);
+        const effectiveId = rawRef?.type === 'reference' && rawRef.targetId ? rawRef.targetId : nodeId;
+        const node = loroDoc.toNodexNode(effectiveId);
         const hadTag = node?.tags.includes(tagDefId) ?? false;
-        loroDoc.removeTag(nodeId, tagDefId);
+        loroDoc.removeTag(effectiveId, tagDefId);
         if (!hadTag) continue;
 
-        const remainingTags = loroDoc.toNodexNode(nodeId)?.tags ?? [];
+        const remainingTags = loroDoc.toNodexNode(effectiveId)?.tags ?? [];
         const requiredByRemaining = new Set<string>();
         for (const remainingTagId of remainingTags) {
           for (const chainTagId of getExtendsChain(remainingTagId)) {
@@ -1297,7 +1309,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
 
         for (const fdId of fieldDefsFromRemovedTag) {
           if (requiredByRemaining.has(fdId)) continue;
-          const feId = findFieldEntry(nodeId, fdId);
+          const feId = findFieldEntry(effectiveId, fdId);
           if (feId) loroDoc.deleteNode(feId);
         }
       }

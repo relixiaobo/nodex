@@ -18,11 +18,11 @@ describe('breadcrumb workspace root target', () => {
     expect(target).toBe(CONTAINER_IDS.JOURNAL);
   });
 
-  it('falls back to LIBRARY when neither workspaceId nor workspaceRootId is usable', () => {
+  it('falls back to JOURNAL when neither workspaceId nor workspaceRootId is usable', () => {
     const target = resolveWorkspaceRootTargetId({
       workspaceId: null,
       workspaceRootId: null,
     });
-    expect(target).toBe(CONTAINER_IDS.LIBRARY);
+    expect(target).toBe(CONTAINER_IDS.JOURNAL);
   });
 });

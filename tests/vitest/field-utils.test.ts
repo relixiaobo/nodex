@@ -219,6 +219,7 @@ describe('getFieldTypeLabel / getFieldTypeIcon / isPlainFieldType', () => {
     expect(getFieldTypeLabel(FIELD_TYPES.PLAIN)).toBeTruthy();
     expect(getFieldTypeLabel(FIELD_TYPES.OPTIONS)).toBeTruthy();
     expect(getFieldTypeLabel(FIELD_TYPES.DATE)).toBeTruthy();
+    expect(getFieldTypeLabel(FIELD_TYPES.BOOLEAN)).toBe('Boolean');
   });
 
   it('getFieldTypeIcon returns an icon component for known types', () => {

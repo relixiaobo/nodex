@@ -9,7 +9,7 @@
 import { useMemo } from 'react';
 import { useNodeStore } from '../stores/node-store';
 import {
-  resolveDataType, resolveHideField, resolveRequired, resolveConfigValue,
+  resolveDataType, resolveHideField, resolveRequired, resolveConfigValueWithDefault,
   isSystemConfigField, ATTRDEF_CONFIG_MAP, ATTRDEF_CONFIG_FIELDS,
   TAGDEF_CONFIG_MAP, TAGDEF_CONFIG_FIELDS,
   SYSTEM_FIELD_MAP, resolveSystemFieldValue, type ConfigFieldDef,
@@ -48,13 +48,7 @@ function isVisibleWhenSatisfied(
   condition: NonNullable<ConfigFieldDef['visibleWhen']>,
   node: NodexNode,
 ): boolean {
-  let val = resolveConfigValue(node, condition.dependsOn);
-  // When the property isn't set, fall back to the dependent config field's default value
-  if (val === undefined) {
-    const depDef = ATTRDEF_CONFIG_MAP.get(condition.dependsOn) ?? TAGDEF_CONFIG_MAP.get(condition.dependsOn);
-    if (depDef) val = depDef.defaultValue || undefined;
-  }
-  return val === condition.value;
+  return resolveConfigValueWithDefault(node, condition.dependsOn) === condition.value;
 }
 
 export function computeNodeFields(

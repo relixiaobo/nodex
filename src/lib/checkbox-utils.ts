@@ -189,14 +189,14 @@ function readDoneMappingEntries(
   checked: boolean,
 ): Array<{ fieldDefId: string; optionId: string }> {
   const mappingFieldId = checked ? SYS_A.DONE_MAP_CHECKED : SYS_A.DONE_MAP_UNCHECKED;
-  const tupleId = loroDoc.getChildren(tagDefId).find((cid) => {
+  const fieldEntryId = loroDoc.getChildren(tagDefId).find((cid) => {
     const child = loroDoc.toNodexNode(cid);
     return child?.type === 'fieldEntry' && child.fieldDefId === mappingFieldId;
   });
-  if (!tupleId) return [];
+  if (!fieldEntryId) return [];
 
   const result: Array<{ fieldDefId: string; optionId: string }> = [];
-  for (const mappingEntryId of loroDoc.getChildren(tupleId)) {
+  for (const mappingEntryId of loroDoc.getChildren(fieldEntryId)) {
     const mappingEntry = loroDoc.toNodexNode(mappingEntryId);
     if (!mappingEntry || mappingEntry.type !== 'fieldEntry' || !mappingEntry.fieldDefId) continue;
 

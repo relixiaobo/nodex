@@ -6,8 +6,8 @@
  *
  * New model (Loro Phase 1):
  * - Flat NodexNode: no `props` wrapper
- * - NodeType: 'fieldEntry' (was 'tuple'), 'fieldDef' (was 'attrDef')
- * - Tags: direct node.tags array (no meta tuples)
+ * - NodeType: 'fieldEntry', 'fieldDef'
+ * - Tags: direct node.tags array (no meta indirection)
  * - TagDef config: direct properties (showCheckbox, color, etc.)
  * - FieldDef config: direct properties (fieldType, minValue, etc.)
  * - Container IDs: fixed (CONTAINER_IDS.*)
@@ -18,9 +18,10 @@ import { deleteSnapshot } from '../../lib/loro-persistence.js';
 import { useNodeStore } from '../../stores/node-store';
 import { useUIStore } from '../../stores/ui-store';
 import { useWorkspaceStore } from '../../stores/workspace-store';
-import { CONTAINER_IDS, FIELD_TYPES, SYS_T, NDX_F, NDX_T } from '../../types/index.js';
+import { CONTAINER_IDS, FIELD_TYPES, SYS_T, NDX_F, NDX_T, SYS_V } from '../../types/index.js';
 import type { InlineRefEntry, TextMark } from '../../types/index.js';
 import { ensureDateNode } from '../../lib/journal.js';
+import { SYSTEM_SCHEMA_NODE_IDS } from '../../lib/system-schema-presets.js';
 
 const WS_ID = 'ws_default';
 
@@ -51,14 +52,38 @@ function seedBody(): void {
   // ─── Workspace home node (tree root) ───
   cn(WS_ID, null, { name: 'Workspace' });
 
-  // ─── Workspace containers (children of workspace home) ───
+  // ─── Well-known top-level nodes (legacy Library/Inbox preserved for migration coverage) ───
   cn(CONTAINER_IDS.LIBRARY,  WS_ID, { name: 'Library' });
   cn(CONTAINER_IDS.INBOX,    WS_ID, { name: 'Inbox' });
-  cn(CONTAINER_IDS.JOURNAL,  WS_ID, { name: 'Daily notes' });
+  cn(CONTAINER_IDS.JOURNAL,  WS_ID, { name: 'Daily notes', locked: true });
   cn(CONTAINER_IDS.SEARCHES, WS_ID, { name: 'Searches' });
-  cn(CONTAINER_IDS.TRASH,    WS_ID, { name: 'Trash' });
-  cn(CONTAINER_IDS.SCHEMA,   WS_ID, { name: 'Schema' });
-  cn(CONTAINER_IDS.SETTINGS, WS_ID, { name: 'Settings' });
+  cn(CONTAINER_IDS.TRASH,    WS_ID, { name: 'Trash', locked: true });
+  cn(CONTAINER_IDS.SCHEMA,   WS_ID, { name: 'Schema', locked: true });
+  cn(CONTAINER_IDS.SETTINGS, WS_ID, { name: 'Settings', locked: true });
+
+  // ─── Fixed system schema for workspace settings ───
+  cn(NDX_T.WORKSPACE_SETTINGS, CONTAINER_IDS.SCHEMA, {
+    type: 'tagDef',
+    name: 'Workspace settings',
+    description: 'System schema for workspace-level settings',
+    locked: true,
+  });
+  cn(NDX_F.SETTING_HIGHLIGHT_ENABLED, NDX_T.WORKSPACE_SETTINGS, {
+    type: 'fieldDef',
+    name: 'Highlight & Comment',
+    fieldType: FIELD_TYPES.BOOLEAN,
+    description: 'Show floating toolbar when selecting text on web pages',
+    locked: true,
+    nullable: true,
+    cardinality: 'single',
+  });
+  cn(SYSTEM_SCHEMA_NODE_IDS.SETTINGS_HIGHLIGHT_FIELD_ENTRY, CONTAINER_IDS.SETTINGS, {
+    type: 'fieldEntry',
+    fieldDefId: NDX_F.SETTING_HIGHLIGHT_ENABLED,
+  });
+  cn(SYSTEM_SCHEMA_NODE_IDS.SETTINGS_HIGHLIGHT_VALUE, SYSTEM_SCHEMA_NODE_IDS.SETTINGS_HIGHLIGHT_FIELD_ENTRY, {
+    name: SYS_V.YES,
+  });
 
   // ═══════════════════════════════════════════════════════════════
   // TagDef: Task (showCheckbox, color, done-state mapping via direct props)

@@ -4,7 +4,7 @@ import type { ConfigFieldDef } from '../../lib/field-utils.js';
 export interface FieldRowEntryProps {
   attrDefId: string;
   attrDefName: string;
-  tupleId: string;
+  fieldEntryId: string;
   valueNodeId?: string;
   valueName?: string;
   dataType: string;
@@ -20,7 +20,7 @@ export function toFieldRowEntryProps(field: FieldEntry): FieldRowEntryProps {
   return {
     attrDefId: field.fieldDefId,
     attrDefName: field.attrDefName,
-    tupleId: field.fieldEntryId,
+    fieldEntryId: field.fieldEntryId,
     valueNodeId: field.valueNodeId,
     valueName: field.valueName,
     dataType: field.dataType,

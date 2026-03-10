@@ -45,6 +45,7 @@ export function ensureJournalTagDefs(): void {
         type: 'tagDef',
         name,
         color: defaultColor,
+        locked: true,
       });
       changed = true;
       continue;
@@ -57,6 +58,7 @@ export function ensureJournalTagDefs(): void {
     if (node.type !== 'tagDef') patch.type = 'tagDef';
     if (!node.name) patch.name = name;
     if (!node.color) patch.color = defaultColor;
+    if (node.locked !== true) patch.locked = true;
     if (Object.keys(patch).length > 0) {
       loroDoc.setNodeDataBatch(id, patch);
       changed = true;

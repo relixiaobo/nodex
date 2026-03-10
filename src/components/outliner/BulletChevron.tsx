@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import type { AppIcon } from '../../lib/icons.js';
 import { t } from '../../i18n/strings.js';
 import { Tooltip } from '../ui/Tooltip';
@@ -27,6 +28,24 @@ interface BulletChevronProps {
   icon?: AppIcon | null;
   /** Loading state: pulse animation while content is being fetched */
   isLoading?: boolean;
+  /** Disable button semantics/cursor for purely decorative bullets */
+  interactive?: boolean;
+  /** Override tooltip label; defaults to "Zoom in" for interactive bullets */
+  tooltipLabel?: string;
+}
+
+function maybeWrapWithTooltip({
+  interactive,
+  tooltipLabel,
+  content,
+}: {
+  interactive: boolean;
+  tooltipLabel?: string;
+  content: ReactNode;
+}) {
+  const label = tooltipLabel ?? (interactive ? t('outliner.zoomIn') : undefined);
+  if (!label) return content;
+  return <Tooltip label={label}>{content}</Tooltip>;
 }
 
 /**
@@ -49,35 +68,52 @@ export function BulletChevron({
   bulletColors,
   icon: Icon,
   isLoading,
+  interactive = true,
+  tooltipLabel,
 }: BulletChevronProps) {
   const showOuterRing = hasChildren && !isExpanded;
+  const wrapperClass = `flex shrink-0 h-6 w-[15px] items-center justify-center group/bullet ${interactive ? 'cursor-pointer' : 'cursor-default'}`;
 
   // Loading state: pulsing dot
   if (isLoading) {
     return (
-      <span className="flex shrink-0 h-6 w-[15px] items-center justify-center">
-        <div className="h-[5px] w-[5px] rounded-full bg-foreground/40 animate-pulse" />
-      </span>
+      maybeWrapWithTooltip({
+        interactive,
+        tooltipLabel,
+        content: (
+          <span
+            role={interactive ? 'button' : undefined}
+            className={wrapperClass}
+            onClick={interactive ? onBulletClick : undefined}
+          >
+            <div className="h-[5px] w-[5px] rounded-full bg-foreground/40 animate-pulse" />
+          </span>
+        ),
+      })
     );
   }
 
   // TagDef bullet: colored circle with white #
   if (tagDefColor) {
     return (
-      <Tooltip label={t('outliner.zoomIn')}>
-        <span
-          role="button"
-          className="flex shrink-0 h-6 w-[15px] items-center justify-center cursor-pointer group/bullet"
-          onClick={onBulletClick}
-        >
-          <div
-            className="flex h-[15px] w-[15px] items-center justify-center rounded-full transition-transform group-hover/bullet:scale-110 group-active/bullet:scale-90"
-            style={{ backgroundColor: tagDefColor }}
+      maybeWrapWithTooltip({
+        interactive,
+        tooltipLabel,
+        content: (
+          <span
+            role={interactive ? 'button' : undefined}
+            className={wrapperClass}
+            onClick={interactive ? onBulletClick : undefined}
           >
-            <span className="text-[9px] font-bold leading-none text-white select-none">#</span>
-          </div>
-        </span>
-      </Tooltip>
+            <div
+              className="flex h-[15px] w-[15px] items-center justify-center rounded-full transition-transform group-hover/bullet:scale-110 group-active/bullet:scale-90"
+              style={{ backgroundColor: tagDefColor }}
+            >
+              <span className="text-[9px] font-bold leading-none text-white select-none">#</span>
+            </div>
+          </span>
+        ),
+      })
     );
   }
 
@@ -85,19 +121,23 @@ export function BulletChevron({
   if (Icon) {
     const iconColor = bulletColors?.[0] ?? 'var(--color-foreground-secondary)';
     return (
-      <Tooltip label={t('outliner.zoomIn')}>
-        <span
-          role="button"
-          className="flex shrink-0 h-6 w-[15px] items-center justify-center cursor-pointer group/bullet"
-          onClick={onBulletClick}
-        >
-          <Icon
-            size={12}
-            className="transition-transform group-hover/bullet:scale-110 group-active/bullet:scale-90"
-            style={{ color: iconColor }}
-          />
-        </span>
-      </Tooltip>
+      maybeWrapWithTooltip({
+        interactive,
+        tooltipLabel,
+        content: (
+          <span
+            role={interactive ? 'button' : undefined}
+            className={wrapperClass}
+            onClick={interactive ? onBulletClick : undefined}
+          >
+            <Icon
+              size={12}
+              className="transition-transform group-hover/bullet:scale-110 group-active/bullet:scale-90"
+              style={{ color: iconColor }}
+            />
+          </span>
+        ),
+      })
     );
   }
 
@@ -106,23 +146,27 @@ export function BulletChevron({
   const bulletStyle = hasColors ? buildBulletStyle(bulletColors!) : undefined;
 
   return (
-    <Tooltip label={t('outliner.zoomIn')}>
-      <span
-        role="button"
-        className="flex shrink-0 h-6 w-[15px] items-center justify-center cursor-pointer group/bullet"
-        onClick={onBulletClick}
-      >
-        <div
-          className={`flex h-[15px] w-[15px] items-center justify-center rounded-full transition-colors group-active/bullet:scale-90 ${isReference ? 'border border-dashed border-foreground/40' : ''
-            } ${showOuterRing ? 'bg-foreground/[0.08]' : ''}`}
+    maybeWrapWithTooltip({
+      interactive,
+      tooltipLabel,
+      content: (
+        <span
+          role={interactive ? 'button' : undefined}
+          className={wrapperClass}
+          onClick={interactive ? onBulletClick : undefined}
         >
           <div
-            className={`h-[5px] w-[5px] rounded-full transition-transform group-hover/bullet:scale-[1.375] ${!hasColors ? (dimmed ? 'bg-foreground/15' : 'bg-foreground/40') : ''}`}
-            style={bulletStyle}
-          />
-        </div>
-      </span>
-    </Tooltip>
+            className={`flex h-[15px] w-[15px] items-center justify-center rounded-full transition-colors group-active/bullet:scale-90 ${isReference ? 'border border-dashed border-foreground/40' : ''
+              } ${showOuterRing ? 'bg-foreground/[0.08]' : ''}`}
+          >
+            <div
+              className={`h-[5px] w-[5px] rounded-full transition-transform group-hover/bullet:scale-[1.375] ${!hasColors ? (dimmed ? 'bg-foreground/15' : 'bg-foreground/40') : ''}`}
+              style={bulletStyle}
+            />
+          </div>
+        </span>
+      ),
+    })
   );
 }
 

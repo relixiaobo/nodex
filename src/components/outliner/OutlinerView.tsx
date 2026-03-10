@@ -24,11 +24,12 @@ import {
 import { navigateToSiblingRow } from '../../lib/outliner-navigation.js';
 import { ViewToolbar } from './ViewToolbar.js';
 import { readViewConfig, applyViewPipeline } from '../../lib/view-pipeline.js';
+import { canCreateChildrenUnder } from '../../lib/node-capabilities.js';
 
 interface OutlinerViewProps {
   rootNodeId: string;
-  /** When true, show tuple children whose key is an attrDef (tagDef template fields). */
-  showTemplateTuples?: boolean;
+  /** When true, show template fieldEntry children for tagDef nodes. */
+  showTemplateFields?: boolean;
 }
 
 export type OutlinerVisibleChildRow = OutlinerRowItem;
@@ -40,7 +41,7 @@ export function getDragSelectableRootIds(
   return getDragSelectableRowIds(rows, isFieldRevealed);
 }
 
-export function OutlinerView({ rootNodeId, showTemplateTuples }: OutlinerViewProps) {
+export function OutlinerView({ rootNodeId, showTemplateFields }: OutlinerViewProps) {
   const node = useNode(rootNodeId);
   useChildren(rootNodeId);
 
@@ -70,21 +71,25 @@ export function OutlinerView({ rootNodeId, showTemplateTuples }: OutlinerViewPro
 
   const fields = useNodeFields(rootNodeId);
   const tagIds = useNodeTags(rootNodeId);
+  const canCreateRootChildren = useNodeStore((s) => {
+    void s._version;
+    return canCreateChildrenUnder(rootNodeId);
+  });
 
   // Hidden field reveal state from UIStore (session-only, keyed by "panelNodeId:fieldEntryId")
   const expandedHiddenFields = useUIStore((s) => s.expandedHiddenFields);
   const toggleHiddenField = useUIStore((s) => s.toggleHiddenField);
 
-  // Build field lookup by tuple ID (same pattern as OutlinerItem)
-  // When showTemplateTuples: exclude config fields (handled by FieldList above)
+  // Build field lookup by fieldEntry ID (same pattern as OutlinerItem)
+  // When showTemplateFields: exclude config fields (handled by FieldList above)
   const fieldMap = useMemo(() => {
     const m = new Map<string, FieldEntry>();
     for (const f of fields) {
-      if (showTemplateTuples && f.dataType.startsWith('__')) continue;
+      if (showTemplateFields && f.dataType.startsWith('__')) continue;
       m.set(f.fieldEntryId, f);
     }
     return m;
-  }, [fields, showTemplateTuples]);
+  }, [fields, showTemplateFields]);
 
   const fieldOwnerColors = useMemo(() => (
     buildFieldOwnerColors(
@@ -241,31 +246,33 @@ export function OutlinerView({ rootNodeId, showTemplateTuples }: OutlinerViewPro
           No matching nodes found.
         </div>
       )}
-      <TrailingInput
-        parentId={rootNodeId}
-        depth={0}
-        autoFocus={!isSearchNode && visibleChildren.length === 0}
-        parentExpandKey={`${loroDoc.getParentId(rootNodeId) ?? ''}:${rootNodeId}`}
-        isSearchContext={isSearchNode}
-        onNavigateOut={(direction) => {
-          if (direction !== 'up') return;
-          const fl = getFlattenedVisibleNodes(
-            dragSelectableRootIds,
-            useUIStore.getState().expandedNodes,
-            rootNodeId,
-          );
-          if (fl.length > 0) {
-            const lastNode = fl[fl.length - 1];
-            useUIStore.getState().setFocusClickCoords({
-              nodeId: lastNode.nodeId,
-              parentId: lastNode.parentId,
-              textOffset: getNodeTextLengthById(lastNode.nodeId),
-            });
-            setFocusedNode(lastNode.nodeId, lastNode.parentId);
-            return;
-          }
-        }}
-      />
+      {canCreateRootChildren && (
+        <TrailingInput
+          parentId={rootNodeId}
+          depth={0}
+          autoFocus={!isSearchNode && visibleChildren.length === 0}
+          parentExpandKey={`${loroDoc.getParentId(rootNodeId) ?? ''}:${rootNodeId}`}
+          isSearchContext={isSearchNode}
+          onNavigateOut={(direction) => {
+            if (direction !== 'up') return;
+            const fl = getFlattenedVisibleNodes(
+              dragSelectableRootIds,
+              useUIStore.getState().expandedNodes,
+              rootNodeId,
+            );
+            if (fl.length > 0) {
+              const lastNode = fl[fl.length - 1];
+              useUIStore.getState().setFocusClickCoords({
+                nodeId: lastNode.nodeId,
+                parentId: lastNode.parentId,
+                textOffset: getNodeTextLengthById(lastNode.nodeId),
+              });
+              setFocusedNode(lastNode.nodeId, lastNode.parentId);
+              return;
+            }
+          }}
+        />
+      )}
     </div>
   );
 }

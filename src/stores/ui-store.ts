@@ -75,7 +75,7 @@ interface UIStore {
 
   // Field name editing (transient, not persisted)
   editingFieldNameId: string | null;
-  setEditingFieldName(tupleId: string | null): void;
+  setEditingFieldName(fieldEntryId: string | null): void;
 
   // Trigger hint: set by TrailingInput when creating a node with trigger char (#/@/)
   // OutlinerItem reads & clears this to open the appropriate dropdown on mount
@@ -393,7 +393,7 @@ export const useUIStore = create<UIStore>()(
 
       // Field name editing
       editingFieldNameId: null,
-      setEditingFieldName: (tupleId) => set({ editingFieldNameId: tupleId }),
+      setEditingFieldName: (fieldEntryId) => set({ editingFieldNameId: fieldEntryId }),
 
       // Trigger hint
       triggerHint: null,

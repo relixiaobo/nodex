@@ -29,6 +29,7 @@ import {
   FIELD_TYPE_LIST,
   configKeyToPropName,
   resolveConfigValue,
+  resolveConfigValueWithDefault,
   type ConfigFieldDef,
 } from '../../lib/field-utils.js';
 import { FieldValueOutliner } from './FieldValueOutliner';
@@ -50,6 +51,7 @@ import { resolveRowPointerSelectAction } from '../../lib/row-pointer-selection.j
 import { resolveDropHoverPosition } from '../../lib/drag-drop-position.js';
 import { resolveDropMove } from '../../lib/drag-drop.js';
 import { OutlinerRow, useRowSelectionState, useRowPointerHandlers } from '../outliner/OutlinerRow.js';
+import { canCreateChildrenUnder, getNodeCapabilities } from '../../lib/node-capabilities.js';
 
 function focusTrailingInputForParent(parentId: string): boolean {
   const roots = document.querySelectorAll<HTMLElement>('[data-trailing-parent-id]');
@@ -67,7 +69,7 @@ interface FieldRowProps {
   nodeId: string;
   attrDefId: string;
   attrDefName: string;
-  tupleId: string;
+  fieldEntryId: string;
   valueNodeId?: string;
   valueName?: string;
   dataType: string;
@@ -99,6 +101,52 @@ export const FIELD_ROW_SELECTION_OVERLAY_CLASS =
 // Align with OutlinerItem row highlight left edge. FieldRow wrapper starts 4px to the right
 // (chevron-bullet gap), so the selection mask compensates with left: -4.
 export const FIELD_ROW_SELECTION_OVERLAY_STYLE: CSSProperties = { left: -4, top: 1, bottom: 1 };
+const FIELD_ROW_LAYOUT_CLASS =
+  'grid grid-cols-1 gap-y-1.5 py-1 @md:grid-cols-[clamp(10rem,32%,15rem)_minmax(0,1fr)] @md:gap-x-3 @md:gap-y-0';
+const FIELD_ROW_NAME_COLUMN_CLASS = 'relative z-[1] flex items-start gap-2 min-w-0';
+const FIELD_ROW_VALUE_COLUMN_CLASS = 'relative z-[1] flex min-w-0 items-start';
+const FIELD_ROW_ICON_CLASS = 'shrink-0 w-[15px] h-6 self-start flex items-center justify-center';
+const noopBulletClick = () => {};
+
+function FieldLeadingBullet({
+  icon,
+  color,
+  interactive = true,
+  tooltipLabel,
+  draggable = false,
+  onDragStart,
+  onClick,
+}: {
+  icon: AppIcon | null;
+  color?: string;
+  interactive?: boolean;
+  tooltipLabel?: string;
+  draggable?: boolean;
+  onDragStart?: (event: DragEvent) => void;
+  onClick?: () => void;
+}) {
+  if (!icon) {
+    return <span className={FIELD_ROW_ICON_CLASS} />;
+  }
+
+  return (
+    <div
+      className={draggable ? 'cursor-grab active:cursor-grabbing' : undefined}
+      draggable={draggable}
+      onDragStart={draggable ? onDragStart : undefined}
+    >
+      <BulletChevron
+        hasChildren={false}
+        isExpanded={false}
+        onBulletClick={interactive && onClick ? onClick : noopBulletClick}
+        interactive={interactive}
+        tooltipLabel={tooltipLabel}
+        icon={icon}
+        bulletColors={color ? [color] : undefined}
+      />
+    </div>
+  );
+}
 
 export function isFieldRowInteractiveTarget(target: HTMLElement | null): boolean {
   if (!target) return true;
@@ -148,7 +196,7 @@ function ConfigTagPicker({ nodeId, configKey, placeholder }: { nodeId: string; c
   const selectedId = useNodeStore((s) => {
     void s._version;
     const node = s.getNode(nodeId);
-    return node ? resolveConfigValue(node, configKey) : undefined;
+    return resolveConfigValueWithDefault(node, configKey);
   });
 
   const options: NodePickerOption[] = useMemo(
@@ -193,7 +241,7 @@ function ConfigSelectPicker({
   const selectedId = useNodeStore((s) => {
     void s._version;
     const node = s.getNode(nodeId);
-    return node ? resolveConfigValue(node, configKey) : undefined;
+    return resolveConfigValueWithDefault(node, configKey);
   });
   const pickerOptions: NodePickerOption[] = useMemo(
     () => options.map((o) => ({ id: o.value, name: o.label, icon: o.icon })),
@@ -226,7 +274,7 @@ function ConfigNumberInput({ nodeId, configKey }: { nodeId: string; configKey: s
   const value = useNodeStore((s) => {
     void s._version;
     const node = s.getNode(nodeId);
-    return node ? resolveConfigValue(node, configKey) : undefined;
+    return resolveConfigValueWithDefault(node, configKey);
   });
   const propName = configKeyToPropName(configKey);
   const valueText = value === undefined || value === null ? '' : String(value);
@@ -276,7 +324,7 @@ function ConfigNumberInput({ nodeId, configKey }: { nodeId: string; configKey: s
 interface SystemConfigValueContext {
   nodeId: string;
   attrDefId: string;
-  tupleId: string;
+  fieldEntryId: string;
   dataType: string;
   isVirtual: boolean;
   onNavigateOut?: (direction: 'up' | 'down') => void;
@@ -287,18 +335,18 @@ type SystemConfigValueRenderer = (context: SystemConfigValueContext) => ReactNod
 
 const SYSTEM_CONFIG_VALUE_RENDERERS: Partial<Record<ConfigFieldDef['control'], SystemConfigValueRenderer>> = {
   outliner: ({ nodeId, onNavigateOut }) => <ConfigOutliner nodeId={nodeId} onNavigateOut={onNavigateOut} />,
-  color_picker: ({ tupleId, attrDefId, nodeId, isVirtual, onNavigateOut }) => (
+  color_picker: ({ fieldEntryId, attrDefId, nodeId, isVirtual, onNavigateOut }) => (
     <FieldValueOutliner
-      tupleId={tupleId}
+      fieldEntryId={fieldEntryId}
       fieldDataType={SYS_D.COLOR}
       attrDefId={attrDefId}
       configNodeId={isVirtual ? nodeId : undefined}
       onNavigateOut={onNavigateOut}
     />
   ),
-  toggle: ({ tupleId, attrDefId, nodeId, isVirtual, onNavigateOut }) => (
+  toggle: ({ fieldEntryId, attrDefId, nodeId, isVirtual, onNavigateOut }) => (
     <FieldValueOutliner
-      tupleId={tupleId}
+      fieldEntryId={fieldEntryId}
       fieldDataType={SYS_D.BOOLEAN}
       attrDefId={attrDefId}
       configNodeId={isVirtual ? nodeId : undefined}
@@ -341,7 +389,7 @@ const SYSTEM_CONFIG_VALUE_RENDERERS: Partial<Record<ConfigFieldDef['control'], S
 function renderDefaultSystemConfigValue(context: SystemConfigValueContext): ReactNode {
   return (
     <FieldValueOutliner
-      tupleId={context.tupleId}
+      fieldEntryId={context.fieldEntryId}
       fieldDataType={context.dataType}
       attrDefId={context.attrDefId}
       configNodeId={context.isVirtual ? context.nodeId : undefined}
@@ -369,7 +417,7 @@ export function FieldRow({
   nodeId,
   attrDefId,
   attrDefName,
-  tupleId,
+  fieldEntryId,
   valueNodeId,
   valueName,
   dataType,
@@ -392,9 +440,9 @@ export function FieldRow({
   const clearFocus = useUIStore((s) => s.clearFocus);
   const clearSelection = useUIStore((s) => s.clearSelection);
   // Unified selection state + pointer handlers from OutlinerRow
-  const { isSelected: isFieldSelected } = useRowSelectionState(tupleId, nodeId);
+  const { isSelected: isFieldSelected } = useRowSelectionState(fieldEntryId, nodeId);
   const { handleCmdClick, handleShiftClick } = useRowPointerHandlers(
-    tupleId, nodeId, rootChildIds ?? [], rootNodeId ?? nodeId,
+    fieldEntryId, nodeId, rootChildIds ?? [], rootNodeId ?? nodeId,
   );
   const createChild = useNodeStore((s) => s.createChild);
   const moveFieldEntry = useNodeStore((s) => s.moveFieldEntry);
@@ -414,8 +462,8 @@ export function FieldRow({
 
   const isSystemField = dataType === '__system_date__' || dataType === '__system_text__' || dataType === '__system_node__';
   const isOutliner = dataType === '__outliner__';
-  const isVirtual = tupleId.startsWith('__virtual_');
-  const isEditing = editingFieldNameId === tupleId;
+  const isVirtual = fieldEntryId.startsWith('__virtual_');
+  const isEditing = editingFieldNameId === fieldEntryId;
 
   // Config metadata for system config fields (icon, description)
   const configDef = configKey
@@ -423,16 +471,30 @@ export function FieldRow({
     : undefined;
   const resolvedControl = configControl ?? configDef?.control;
   const Icon = getFieldTypeIcon(dataType);
+  const fieldDescription = useNodeStore((s) => {
+    void s._version;
+    const fieldDef = attrDefId ? s.getNode(attrDefId) : null;
+    return fieldDef?.type === 'fieldDef' ? fieldDef.description : undefined;
+  });
+  const canEditFieldDefinition = useNodeStore((s) => {
+    void s._version;
+    const fieldDef = attrDefId ? s.getNode(attrDefId) : null;
+    return fieldDef?.type === 'fieldDef' ? getNodeCapabilities(attrDefId).canEditNode : false;
+  });
+  const canManageFieldStructure = useNodeStore((s) => {
+    void s._version;
+    return canCreateChildrenUnder(nodeId);
+  });
 
   // Validation: read first value child of fieldEntry to check value
   const validationWarning = useNodeStore((s) => {
     void s._version;
     if (!VALIDATED_FIELD_TYPES.has(dataType)) return null;
-    const tuple = s.getNode(tupleId);
-    if (!tuple?.children || tuple.children.length === 0) return null;
+    const fieldEntry = s.getNode(fieldEntryId);
+    if (!fieldEntry?.children || fieldEntry.children.length === 0) return null;
     const min = resolveMinValue(attrDefId);
     const max = resolveMaxValue(attrDefId);
-    for (const cid of tuple.children) {
+    for (const cid of fieldEntry.children) {
       const child = s.getNode(cid);
       if (child && !child.type && child.name) {
         return validateFieldValue(dataType, child.name, { min, max });
@@ -485,7 +547,7 @@ export function FieldRow({
   }, [_version, nodeId, siblingFieldIds]);
 
   const moveToSibling = useCallback((direction: 'up' | 'down') => {
-    const index = renderableSiblings.findIndex((item) => item.type === 'field' && item.id === tupleId);
+    const index = renderableSiblings.findIndex((item) => item.type === 'field' && item.id === fieldEntryId);
     if (index < 0) return false;
     const targetIndex = direction === 'up' ? index - 1 : index + 1;
     if (targetIndex >= 0 && targetIndex < renderableSiblings.length) {
@@ -513,27 +575,29 @@ export function FieldRow({
       return true;
     }
     return false;
-  }, [renderableSiblings, tupleId, clearFocus, setEditingFieldName, nodeId, setFocusedNode, onNavigateOut]);
+  }, [renderableSiblings, fieldEntryId, clearFocus, setEditingFieldName, nodeId, setFocusedNode, onNavigateOut]);
 
   const handleIndentField = useCallback(() => {
-    const index = renderableSiblings.findIndex((item) => item.type === 'field' && item.id === tupleId);
+    if (!canManageFieldStructure) return;
+    const index = renderableSiblings.findIndex((item) => item.type === 'field' && item.id === fieldEntryId);
     if (index <= 0) return;
 
     const prev = renderableSiblings[index - 1];
     if (!prev) return;
 
     if (prev.type === 'field') {
-      // Move this tuple under the previous field's tuple directly
-      void moveFieldEntry(nodeId, tupleId, prev.id);
+      // Move this field entry under the previous field entry directly
+      void moveFieldEntry(nodeId, fieldEntryId, prev.id);
       return;
     }
 
     if (prev.type === 'content') {
-      void moveFieldEntry(nodeId, tupleId, prev.id);
+      void moveFieldEntry(nodeId, fieldEntryId, prev.id);
     }
-  }, [tupleId, renderableSiblings, nodeId, moveFieldEntry]);
+  }, [canManageFieldStructure, fieldEntryId, renderableSiblings, nodeId, moveFieldEntry]);
 
   const handleOutdentField = useCallback(() => {
+    if (!canManageFieldStructure) return;
     const grandparentId = loroDoc.getParentId(nodeId);
     if (!grandparentId) return;
     const grandparent = useNodeStore.getState().getNode(grandparentId);
@@ -542,32 +606,34 @@ export function FieldRow({
     let insertAt = grandparent.children.length;
     const parentIndex = grandparent.children.indexOf(nodeId);
     if (parentIndex >= 0) insertAt = parentIndex + 1;
-    void moveFieldEntry(nodeId, tupleId, grandparentId, insertAt);
-  }, [tupleId, nodeId, moveFieldEntry]);
+    void moveFieldEntry(nodeId, fieldEntryId, grandparentId, insertAt);
+  }, [canManageFieldStructure, fieldEntryId, nodeId, moveFieldEntry]);
 
   const handleEnterConfirm = useCallback(() => {
+    if (!canManageFieldStructure) return;
     let insertParentId = nodeId;
     const parent = useNodeStore.getState().getNode(insertParentId);
-    if (!parent?.children?.includes(tupleId)) {
-      // Fallback: find the parent that contains this tupleId via loroDoc
-      const actualParentId = loroDoc.getParentId(tupleId);
+    if (!parent?.children?.includes(fieldEntryId)) {
+      // Fallback: find the parent that contains this fieldEntryId via loroDoc
+      const actualParentId = loroDoc.getParentId(fieldEntryId);
       if (actualParentId) insertParentId = actualParentId;
     }
 
     const actualParent = useNodeStore.getState().getNode(insertParentId);
-    const tupleIdx = actualParent?.children?.indexOf(tupleId) ?? -1;
-    const position = tupleIdx >= 0 ? tupleIdx + 1 : undefined;
+    const fieldEntryIdx = actualParent?.children?.indexOf(fieldEntryId) ?? -1;
+    const position = fieldEntryIdx >= 0 ? fieldEntryIdx + 1 : undefined;
 
     const newNode = createChild(insertParentId, position);
     setFocusedNode(newNode.id, insertParentId);
-  }, [tupleId, nodeId, createChild, setFocusedNode]);
+  }, [canManageFieldStructure, fieldEntryId, nodeId, createChild, setFocusedNode]);
 
   const handleNameDoubleClick = useCallback((e: React.MouseEvent<HTMLElement>) => {
+    if (!canEditFieldDefinition || !canManageFieldStructure) return;
     e.stopPropagation();
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
     clickOffsetXRef.current = e.clientX - rect.left;
-    setEditingFieldName(tupleId);
-  }, [tupleId, setEditingFieldName]);
+    setEditingFieldName(fieldEntryId);
+  }, [canEditFieldDefinition, canManageFieldStructure, fieldEntryId, setEditingFieldName]);
 
   // Field-specific keyboard pre-processing for selection mode:
   // ArrowUp/Down navigates between sibling rows (field→field or field→content)
@@ -591,21 +657,21 @@ export function FieldRow({
 
   // ─── Drag handlers for field row reordering ───
 
-  const isDropTarget = dropTargetId === tupleId;
-  const isDragging = dragNodeId === tupleId;
+  const isDropTarget = dropTargetId === fieldEntryId;
+  const isDragging = dragNodeId === fieldEntryId;
 
   const handleDragStart = useCallback(
     (e: DragEvent) => {
       e.dataTransfer.effectAllowed = 'move';
-      e.dataTransfer.setData('text/plain', tupleId);
-      setDrag(tupleId);
+      e.dataTransfer.setData('text/plain', fieldEntryId);
+      setDrag(fieldEntryId);
     },
-    [tupleId, setDrag],
+    [fieldEntryId, setDrag],
   );
 
   const handleDragOver = useCallback(
     (e: DragEvent) => {
-      if (!dragNodeId || dragNodeId === tupleId) return;
+      if (!dragNodeId || dragNodeId === fieldEntryId) return;
       e.preventDefault();
       e.dataTransfer.dropEffect = 'move';
 
@@ -616,35 +682,35 @@ export function FieldRow({
         offsetY: e.clientY - rect.top,
         rowHeight: rect.height,
       });
-      setDropTarget(tupleId, position);
+      setDropTarget(fieldEntryId, position);
     },
-    [tupleId, dragNodeId, setDropTarget],
+    [fieldEntryId, dragNodeId, setDropTarget],
   );
 
   const handleDragLeave = useCallback(() => {
-    if (dropTargetId === tupleId) {
+    if (dropTargetId === fieldEntryId) {
       setDropTarget(null, null);
     }
-  }, [tupleId, dropTargetId, setDropTarget]);
+  }, [fieldEntryId, dropTargetId, setDropTarget]);
 
   const handleDrop = useCallback(
     (e: DragEvent) => {
       e.preventDefault();
       e.stopPropagation();
-      if (!dragNodeId || dragNodeId === tupleId) {
+      if (!dragNodeId || dragNodeId === fieldEntryId) {
         setDrag(null);
         return;
       }
 
       const dropParentId = nodeId;
       const dropParent = useNodeStore.getState().getNode(dropParentId);
-      const siblingIndex = dropParent?.children?.indexOf(tupleId) ?? 0;
+      const siblingIndex = dropParent?.children?.indexOf(fieldEntryId) ?? 0;
 
       const decision = resolveDropMove({
         dragNodeId,
-        targetNodeId: tupleId,
+        targetNodeId: fieldEntryId,
         targetParentId: dropParentId,
-        targetParentKey: `${nodeId}:${tupleId}`,
+        targetParentKey: `${nodeId}:${fieldEntryId}`,
         siblingIndex,
         dropPosition,
         targetHasChildren: false,
@@ -657,7 +723,7 @@ export function FieldRow({
 
       setDrag(null);
     },
-    [dragNodeId, tupleId, nodeId, dropPosition, moveNodeTo, setDrag],
+    [dragNodeId, fieldEntryId, nodeId, dropPosition, moveNodeTo, setDrag],
   );
 
   const handleDragEnd = useCallback(() => {
@@ -688,13 +754,13 @@ export function FieldRow({
     }
     // Plain click on non-interactive name area enters field-name editing.
     // Selection is handled only by modifier/range/drag flows, same as content rows.
-    if (!trashed && !isVirtual && !isSystemConfig && !isSystemField) {
+    if (!trashed && !isVirtual && !isSystemConfig && !isSystemField && canEditFieldDefinition && canManageFieldStructure) {
       clearSelection();
-      setEditingFieldName(tupleId);
+      setEditingFieldName(fieldEntryId);
     }
   }, [
     isEditing,
-    tupleId,
+    fieldEntryId,
     clearSelection,
     setEditingFieldName,
     handleCmdClick,
@@ -703,6 +769,8 @@ export function FieldRow({
     isVirtual,
     isSystemConfig,
     isSystemField,
+    canEditFieldDefinition,
+    canManageFieldStructure,
   ]);
 
   // ─── Path 1: System metadata fields (NDX_SYS_*) — read-only ───
@@ -712,18 +780,16 @@ export function FieldRow({
     const displayText = valueName || '—';
     return (
       <div
-        className={`border-t ${isLastInGroup ? 'border-b' : ''} border-border-subtle flex flex-col @sm:flex-row @sm:items-start min-h-6`}
+        className={`border-t ${isLastInGroup ? 'border-b' : ''} border-border-subtle min-h-6 ${FIELD_ROW_LAYOUT_CLASS}`}
         data-field-row
-        data-field-row-id={tupleId}
-        data-node-id={tupleId}
+        data-field-row-id={fieldEntryId}
+        data-node-id={fieldEntryId}
         data-parent-id={nodeId}
         data-row-kind="field"
         onClick={handleFieldRowClick}
       >
-        <div className="flex items-center gap-1 @sm:shrink-0 @sm:w-[100px] min-w-0 min-h-6">
-          <span className="shrink-0 w-[15px] flex items-center justify-center text-foreground-tertiary">
-            {SysIcon && <SysIcon size={12} />}
-          </span>
+        <div className={FIELD_ROW_NAME_COLUMN_CLASS}>
+          <FieldLeadingBullet icon={SysIcon ?? null} interactive={false} />
           <span
             className="block text-[15px] leading-6 h-6 text-foreground-tertiary truncate cursor-default outline-none focus:ring-1 focus:ring-ring rounded-sm"
             tabIndex={0}
@@ -734,7 +800,7 @@ export function FieldRow({
                 handleEnterConfirm();
               } else if (e.key === 'Backspace') {
                 e.preventDefault();
-                removeField(nodeId, tupleId);
+                removeField(nodeId, fieldEntryId);
               } else if (e.key === 'Escape') {
                 (e.target as HTMLElement).blur();
               } else if (e.key === 'ArrowUp') {
@@ -755,7 +821,7 @@ export function FieldRow({
             {attrDefName}
           </span>
         </div>
-        <div className="flex flex-1 min-w-0 items-start min-h-6" data-field-value>
+        <div className={FIELD_ROW_VALUE_COLUMN_CLASS} data-field-value>
           {dataType === '__system_node__' && valueNodeId ? (
             <button
               className="text-[15px] leading-6 text-foreground-tertiary hover:text-foreground-secondary cursor-pointer truncate"
@@ -782,7 +848,7 @@ export function FieldRow({
     const systemConfigValueContext: SystemConfigValueContext = {
       nodeId,
       attrDefId,
-      tupleId,
+      fieldEntryId,
       dataType,
       isVirtual,
       onNavigateOut,
@@ -791,23 +857,20 @@ export function FieldRow({
 
     return (
       <div
-        className={`border-t ${isLastInGroup ? 'border-b' : ''} border-border-subtle flex flex-col @sm:flex-row @sm:items-start min-h-6 relative has-[.field-overlay-open]:z-[80]`}
+        className={`border-t ${isLastInGroup ? 'border-b' : ''} border-border-subtle min-h-6 relative has-[.field-overlay-open]:z-[80] ${FIELD_ROW_LAYOUT_CLASS}`}
         data-field-row
-        data-field-row-id={tupleId}
-        data-node-id={tupleId}
+        data-field-row-id={fieldEntryId}
+        data-node-id={fieldEntryId}
         data-parent-id={nodeId}
         data-row-kind="field"
         onClick={handleFieldRowClick}
       >
         {/* Name column — icon + name + description */}
-        <div className="flex items-start gap-1 @sm:shrink-0 @sm:w-[100px] min-w-0 min-h-6">
-          {Icon ? (
-            <span className="shrink-0 w-[15px] h-6 flex items-center justify-center text-foreground-tertiary">
-              <Icon size={12} />
-            </span>
-          ) : (
-            <span className="shrink-0 w-[15px]" />
-          )}
+        <div className={FIELD_ROW_NAME_COLUMN_CLASS}>
+          <FieldLeadingBullet
+            icon={Icon}
+            interactive={false}
+          />
           <div className="flex-1 min-w-0">
             <span className="block text-[15px] font-medium leading-6 text-foreground">
               {displayName}
@@ -820,7 +883,7 @@ export function FieldRow({
           </div>
         </div>
         {/* Value column — unified rendering */}
-        <div className="flex flex-1 min-w-0 items-start" data-field-value>
+        <div className={FIELD_ROW_VALUE_COLUMN_CLASS} data-field-value>
           <div className="flex-1 min-w-0 min-h-6">
             {renderSystemConfigValue(resolvedControl, systemConfigValueContext)}
           </div>
@@ -838,29 +901,29 @@ export function FieldRow({
   return (
     <OutlinerRow
       config={{
-        rowId: tupleId,
+        rowId: fieldEntryId,
         parentId: nodeId,
         rootChildIds: rootChildIds ?? renderableSiblings.map((item) => item.id),
         rootNodeId: rootNodeId ?? nodeId,
         isEditing,
-        enterEdit: () => setEditingFieldName(tupleId),
+        enterEdit: () => setEditingFieldName(fieldEntryId),
         exitEdit: () => setEditingFieldName(null),
         rowKind: 'field',
         onSelectionKeydown: handleFieldSelectionKeydown,
         onBatchDelete: (id) => removeField(nodeId, id),
       }}
     >
-    <div className={`relative ${isDropTarget && dropPosition === 'before' ? '' : ''}`}>
+      <div className={`relative ${isDropTarget && dropPosition === 'before' ? '' : ''}`}>
       {/* Drop indicator: before */}
       {isDropTarget && dropPosition === 'before' && (
         <div className="h-0.5 bg-primary rounded-full" />
       )}
       <div
         ref={rowRef}
-        className={`relative border-t ${isLastInGroup ? 'border-b' : ''} border-border-subtle flex flex-col @sm:flex-row @sm:items-start min-h-6 has-[.field-overlay-open]:z-[80] ${isDropTarget && dropPosition === 'inside' ? 'bg-primary/10 ring-1 ring-primary/30 rounded-sm' : ''} ${isDragging ? 'opacity-40' : ''}`}
+        className={`relative border-t ${isLastInGroup ? 'border-b' : ''} border-border-subtle min-h-6 has-[.field-overlay-open]:z-[80] ${FIELD_ROW_LAYOUT_CLASS} ${isDropTarget && dropPosition === 'inside' ? 'bg-primary/10 ring-1 ring-primary/30 rounded-sm' : ''} ${isDragging ? 'opacity-40' : ''}`}
         data-field-row
-        data-field-row-id={tupleId}
-        data-node-id={tupleId}
+        data-field-row-id={fieldEntryId}
+        data-node-id={fieldEntryId}
         data-parent-id={nodeId}
         data-row-kind="field"
         onDragOver={handleDragOver}
@@ -873,21 +936,20 @@ export function FieldRow({
           <div className={FIELD_ROW_SELECTION_OVERLAY_CLASS} style={FIELD_ROW_SELECTION_OVERLAY_STYLE} />
         )}
       {/* Name column — aligned to first line of value */}
-      <div className="relative z-[1] flex items-center gap-1 @sm:shrink-0 @sm:w-[100px] min-w-0 min-h-6">
+      <div className={FIELD_ROW_NAME_COLUMN_CLASS}>
         {/* Field icon is the drag handle for reorder */}
-        <button
-          className={`shrink-0 w-[15px] flex items-center justify-center transition-colors ${!isVirtual && !isSystemField && !isSystemConfig ? 'cursor-grab active:cursor-grabbing' : ''} ${ownerTagColor ? '' : 'text-foreground-tertiary hover:text-foreground-secondary'}`}
-          onClick={trashed || isVirtual ? undefined : () => navigateTo(attrDefId)}
-          title={trashed || isVirtual ? undefined : 'Configure field'}
-          style={trashed || isVirtual ? { cursor: 'default' } : ownerTagColor ? { color: ownerTagColor } : undefined}
-          draggable={!trashed && !isVirtual && !isSystemField && !isSystemConfig}
-          onDragStart={!trashed && !isVirtual && !isSystemField && !isSystemConfig ? handleDragStart : undefined}
-        >
-          {Icon && <Icon size={12} />}
-        </button>
+        <FieldLeadingBullet
+          icon={Icon}
+          color={ownerTagColor}
+          interactive={!trashed && !isVirtual}
+          tooltipLabel={!trashed && !isVirtual ? t('field.configureField') : undefined}
+          draggable={canEditFieldDefinition && canManageFieldStructure && !trashed && !isVirtual && !isSystemField && !isSystemConfig}
+          onDragStart={handleDragStart}
+          onClick={!trashed && !isVirtual ? () => navigateTo(attrDefId) : undefined}
+        />
         <div
-          className={`flex-1 min-w-0 flex items-center gap-0.5${!trashed && !isVirtual && !isEditing ? ' cursor-text' : ''}`}
-          onDoubleClick={!trashed && !isVirtual && !isEditing ? handleNameDoubleClick : undefined}
+          className={`flex-1 min-w-0 flex items-start gap-0.5${!trashed && !isVirtual && !isEditing && canEditFieldDefinition && canManageFieldStructure ? ' cursor-text' : ''}`}
+          onDoubleClick={!trashed && !isVirtual && !isEditing && canEditFieldDefinition && canManageFieldStructure ? handleNameDoubleClick : undefined}
         >
           {trashed && (
             <span title={`Field "${attrDefName}" has been deleted`}>
@@ -896,7 +958,7 @@ export function FieldRow({
           )}
           {isEditing ? (
             <FieldNameInput
-              tupleId={tupleId}
+              fieldEntryId={fieldEntryId}
               nodeId={nodeId}
               attrDefId={attrDefId}
               currentName={attrDefName}
@@ -907,23 +969,30 @@ export function FieldRow({
               clickOffsetX={clickOffsetXRef.current}
             />
           ) : (
-            <span
-              className={`block text-[15px] leading-6 h-6 truncate ${trashed ? 'text-foreground-tertiary line-through' : !attrDefName || attrDefName === t('common.untitled') ? 'text-foreground/20' : 'text-foreground'}`}
-              title={trashed ? `Field "${attrDefName}" has been deleted` : attrDefName}
-            >
-              {!attrDefName || attrDefName === t('common.untitled') ? t('field.fieldNamePlaceholder') : attrDefName}
-              {isRequired && isEmpty && !trashed && <span className="text-destructive ml-0.5">*</span>}
-            </span>
+            <div className="min-w-0">
+              <span
+                className={`block text-[15px] leading-6 min-h-6 truncate ${trashed ? 'text-foreground-tertiary line-through' : !attrDefName || attrDefName === t('common.untitled') ? 'text-foreground/20' : 'text-foreground'}`}
+                title={trashed ? `Field "${attrDefName}" has been deleted` : attrDefName}
+              >
+                {!attrDefName || attrDefName === t('common.untitled') ? t('field.fieldNamePlaceholder') : attrDefName}
+                {isRequired && isEmpty && !trashed && <span className="text-destructive ml-0.5">*</span>}
+              </span>
+              {fieldDescription && (
+                <span className="block text-xs leading-tight text-foreground-tertiary mt-0.5">
+                  {fieldDescription}
+                </span>
+              )}
+            </div>
           )}
         </div>
       </div>
       {/* Value column */}
-      <div className="relative z-[1] flex flex-1 min-w-0 items-start" data-field-value>
+      <div className={FIELD_ROW_VALUE_COLUMN_CLASS} data-field-value>
         <div className="flex-1 min-w-0">
           {isOutliner ? (
             <ConfigOutliner nodeId={nodeId} onNavigateOut={onNavigateOut} />
           ) : (
-            <FieldValueOutliner tupleId={tupleId} fieldDataType={dataType} attrDefId={attrDefId} onNavigateOut={onNavigateOut} />
+            <FieldValueOutliner fieldEntryId={fieldEntryId} fieldDataType={dataType} attrDefId={attrDefId} onNavigateOut={onNavigateOut} />
           )}
         </div>
         {validationWarning && (

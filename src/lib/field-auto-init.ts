@@ -4,7 +4,7 @@
  * When a tag is applied and a fieldDef has autoInitialize set to a strategy name,
  * these functions resolve the initial value for the field.
  */
-import { AUTO_INIT_STRATEGY, AUTO_INIT_PRIORITY, type AutoInitStrategy } from '../types/index.js';
+import { AUTO_INIT_STRATEGY, AUTO_INIT_PRIORITY, SYSTEM_TAGS, type AutoInitStrategy } from '../types/index.js';
 import * as loroDoc from './loro-doc.js';
 
 /**
@@ -101,8 +101,8 @@ function resolveAncestorDayNode(nodeId: string): string | null {
     const node = loroDoc.toNodexNode(current);
     if (!node) break;
 
-    // Day nodes are tagged with sys:day and have a date-like name (YYYY-MM-DD)
-    if (node.tags.includes('sys:day') && node.name) {
+    // Day nodes are tagged with SYSTEM_TAGS.DAY and have a date-like name.
+    if (node.tags.includes(SYSTEM_TAGS.DAY) && node.name) {
       return node.name;
     }
 

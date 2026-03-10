@@ -48,7 +48,7 @@ describe('Step 0: loro-crdt 基础验证', () => {
     expect(childNode!.parent()?.id).toEqual(root.id);
   });
 
-  it('LoroList 作为 tags 容器（替代 meta Tuple）', () => {
+  it('LoroList 作为 tags 容器（替代旧 meta 链）', () => {
     const doc = new LoroDoc();
     const tree = doc.getTree('nodes');
 

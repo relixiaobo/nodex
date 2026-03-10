@@ -32,7 +32,7 @@ import { copyNodesToClipboard, cutNodesToClipboard } from '../../lib/node-clipbo
 // ── Public types ──
 
 export interface RowInteractionConfig {
-  /** Unique ID for this row: nodeId for content, tupleId for field */
+  /** Unique ID for this row: nodeId for content, fieldEntryId for field */
   rowId: string;
   /** Parent node ID */
   parentId: string;

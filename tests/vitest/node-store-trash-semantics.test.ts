@@ -9,6 +9,7 @@ import { useNodeStore } from '../../src/stores/node-store.js';
 import * as loroDoc from '../../src/lib/loro-doc.js';
 import { CONTAINER_IDS } from '../../src/types/index.js';
 import { SYSTEM_TAGS } from '../../src/types/system-nodes.js';
+import { ensureJournalTagDefs } from '../../src/lib/journal.js';
 import { collectNodeGraphErrors } from './helpers/invariants.js';
 import { resetAndSeed } from './helpers/test-state.js';
 
@@ -34,10 +35,16 @@ describe('trashNode', () => {
     expect(loroDoc.getChildren(CONTAINER_IDS.TRASH)).toContain('tagDef_task');
   });
 
-  it('does not trash protected date tagDefs (sys:day/week/year)', () => {
+  it('does not trash locked journal system tagDefs (sys:day/week/year)', () => {
+    ensureJournalTagDefs();
+
     const beforeDayParent = loroDoc.getParentId(SYSTEM_TAGS.DAY);
     const beforeWeekParent = loroDoc.getParentId(SYSTEM_TAGS.WEEK);
     const beforeYearParent = loroDoc.getParentId(SYSTEM_TAGS.YEAR);
+
+    expect(loroDoc.toNodexNode(SYSTEM_TAGS.DAY)?.locked).toBe(true);
+    expect(loroDoc.toNodexNode(SYSTEM_TAGS.WEEK)?.locked).toBe(true);
+    expect(loroDoc.toNodexNode(SYSTEM_TAGS.YEAR)?.locked).toBe(true);
 
     useNodeStore.getState().trashNode(SYSTEM_TAGS.DAY);
     useNodeStore.getState().trashNode(SYSTEM_TAGS.WEEK);

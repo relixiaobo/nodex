@@ -13,7 +13,8 @@ import { AtSign, Calendar, Plus } from '../../lib/icons.js';
 import { useNodeSearch, type NodeSearchResult } from '../../hooks/use-node-search';
 import { useUIStore } from '../../stores/ui-store';
 import { useNodeStore } from '../../stores/node-store';
-import { isWorkspaceContainer } from '../../lib/tree-utils.js';
+import { isLockedNode, isWorkspaceHomeNode } from '../../lib/node-capabilities.js';
+import { getSystemNodePreset } from '../../lib/system-node-presets.js';
 import * as loroDoc from '../../lib/loro-doc.js';
 import { ensureDateNode } from '../../lib/journal.js';
 import { formatDayName } from '../../lib/date-utils.js';
@@ -81,7 +82,8 @@ function normalizeRecentNode(
  currentNodeId: string,
 ): NodeSearchResult | null {
  if (id === currentNodeId) return null;
- if (isWorkspaceContainer(id)) return null;
+ if (getSystemNodePreset(id)) return null;
+ if (isWorkspaceHomeNode(id) || isLockedNode(id)) return null;
  const node = loroDoc.toNodexNode(id);
  if (!node) return null;
  if (node.type && SKIP_RECENT_DOC_TYPES.has(node.type)) return null;

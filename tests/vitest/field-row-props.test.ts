@@ -16,7 +16,7 @@ describe('toFieldRowEntryProps', () => {
     expect(toFieldRowEntryProps(entry)).toEqual({
       attrDefId: 'SYS_A.EXTENDS',
       attrDefName: 'Extend from',
-      tupleId: '__virtual_SYS_A.EXTENDS__',
+      fieldEntryId: '__virtual_SYS_A.EXTENDS__',
       valueNodeId: undefined,
       valueName: undefined,
       dataType: 'plain',

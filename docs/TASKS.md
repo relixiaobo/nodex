@@ -22,13 +22,13 @@ _(空)_
 
 | Agent | 分支 | 任务 | 锁定文件 | 状态 |
 |---|---|---|---|---|
-| codex | `codex/unify-scattered-patterns` | 统一散落的复用模式 | `src/stores/node-store.ts`, `src/components/outliner/OutlinerItem.tsx`, `src/components/fields/FieldRow.tsx`, `src/lib/node-capabilities.ts` | 进行中 |
+| _(空)_ | | | | |
 
 ---
 
 ## 进行中
 
-- [ ] **统一散落的复用模式** — 三个 Phase：(1) Reference 解析收拢为 `resolveEffectiveId()`；(2) DnD handler 提取为 `useDragDropRow()` hook；(3) 散落的 isInTrash 判断迁移到 capability 体系
+_(空)_
 
 ---
 
@@ -150,6 +150,7 @@ _(空)_
 
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
+| 2026-03-11 | 统一散落的复用模式 — resolveEffectiveId() + useDragDropRow() hook + isNodeInTrash() + SYSTEM_NODE_IDS 重命名 | codex | #120 |
 | 2026-03-10 | 消除 Container Node 概念 — Container 变为普通 node + locked；Settings 改为标准节点页面 | codex | #119 |
 | 2026-03-07 | 高亮点击呼出笔记 — 点击高亮文本打开笔记浮窗，链接/按钮放行原生行为 | nodex | main |
 | 2026-03-07 | 高亮交互清理 — 移除 HIGHLIGHT_CLICK 死代码 + updateSaveButtonState no-op | nodex | main |

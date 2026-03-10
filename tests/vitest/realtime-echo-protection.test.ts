@@ -4,7 +4,7 @@
  */
 import { useNodeStore } from '../../src/stores/node-store.js';
 import * as loroDoc from '../../src/lib/loro-doc.js';
-import { CONTAINER_IDS } from '../../src/types/index.js';
+import { SYSTEM_NODE_IDS } from '../../src/types/index.js';
 import { resetAndSeed } from './helpers/test-state.js';
 
 describe('LoroDoc provides atomic tree consistency (replaces Realtime echo protection)', () => {
@@ -35,7 +35,7 @@ describe('LoroDoc provides atomic tree consistency (replaces Realtime echo prote
     expect(updatedParent).not.toContain(nodeId);
 
     // Node is now in TRASH
-    expect(loroDoc.getParentId(nodeId)).toBe(CONTAINER_IDS.TRASH);
+    expect(loroDoc.getParentId(nodeId)).toBe(SYSTEM_NODE_IDS.TRASH);
   });
 
   it('LoroDoc state is consistent after multiple operations', () => {

@@ -8,7 +8,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Hash } from '../../lib/icons.js';
-import { CONTAINER_IDS, SYS_T } from '../../types/index.js';
+import { SYSTEM_NODE_IDS, SYS_T } from '../../types/index.js';
 import type { NodexNode } from '../../types/index.js';
 import * as loroDoc from '../../lib/loro-doc.js';
 import { fuzzyMatch } from '../../lib/fuzzy-search.js';
@@ -35,7 +35,7 @@ interface TagItem {
 }
 
 function getTagDefs(): TagItem[] {
-  const schemaChildren = loroDoc.getChildren(CONTAINER_IDS.SCHEMA);
+  const schemaChildren = loroDoc.getChildren(SYSTEM_NODE_IDS.SCHEMA);
   const items: TagItem[] = [];
 
   for (const childId of schemaChildren) {

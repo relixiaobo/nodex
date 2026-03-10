@@ -1,5 +1,5 @@
 import { useUIStore } from '../../src/stores/ui-store.js';
-import { CONTAINER_IDS } from '../../src/types/index.js';
+import { SYSTEM_NODE_IDS } from '../../src/types/index.js';
 import { resetAndSeed } from './helpers/test-state.js';
 
 describe('ui-store navigation and UI state', () => {
@@ -16,7 +16,7 @@ describe('ui-store navigation and UI state', () => {
 
     ui.goBack();
     state = useUIStore.getState();
-    expect(state.panelHistory[state.panelIndex]).toBe(CONTAINER_IDS.LIBRARY);
+    expect(state.panelHistory[state.panelIndex]).toBe(SYSTEM_NODE_IDS.LIBRARY);
 
     ui.goForward();
     state = useUIStore.getState();
@@ -37,16 +37,16 @@ describe('ui-store navigation and UI state', () => {
     expect(state.panelHistory).toEqual(beforeInvalidNavigate.panelHistory);
     expect(state.panelIndex).toBe(beforeInvalidNavigate.panelIndex);
 
-    ui.setExpanded(`${CONTAINER_IDS.LIBRARY}:note_2`, true);
-    expect(useUIStore.getState().expandedNodes.has(`${CONTAINER_IDS.LIBRARY}:note_2`)).toBe(true);
+    ui.setExpanded(`${SYSTEM_NODE_IDS.LIBRARY}:note_2`, true);
+    expect(useUIStore.getState().expandedNodes.has(`${SYSTEM_NODE_IDS.LIBRARY}:note_2`)).toBe(true);
 
-    ui.setExpanded(`${CONTAINER_IDS.LIBRARY}:note_2`, false);
-    expect(useUIStore.getState().expandedNodes.has(`${CONTAINER_IDS.LIBRARY}:note_2`)).toBe(false);
+    ui.setExpanded(`${SYSTEM_NODE_IDS.LIBRARY}:note_2`, false);
+    expect(useUIStore.getState().expandedNodes.has(`${SYSTEM_NODE_IDS.LIBRARY}:note_2`)).toBe(false);
 
-    ui.toggleExpanded(`${CONTAINER_IDS.LIBRARY}:note_2`);
-    expect(useUIStore.getState().expandedNodes.has(`${CONTAINER_IDS.LIBRARY}:note_2`)).toBe(true);
-    ui.toggleExpanded(`${CONTAINER_IDS.LIBRARY}:note_2`);
-    expect(useUIStore.getState().expandedNodes.has(`${CONTAINER_IDS.LIBRARY}:note_2`)).toBe(false);
+    ui.toggleExpanded(`${SYSTEM_NODE_IDS.LIBRARY}:note_2`);
+    expect(useUIStore.getState().expandedNodes.has(`${SYSTEM_NODE_IDS.LIBRARY}:note_2`)).toBe(true);
+    ui.toggleExpanded(`${SYSTEM_NODE_IDS.LIBRARY}:note_2`);
+    expect(useUIStore.getState().expandedNodes.has(`${SYSTEM_NODE_IDS.LIBRARY}:note_2`)).toBe(false);
 
     ui.setFocusedNode('subtask_1a');
     expect(useUIStore.getState().focusedNodeId).toBe('subtask_1a');

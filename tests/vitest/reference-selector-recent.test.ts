@@ -11,7 +11,7 @@ import {
   getReferenceCandidateDisabledReason,
   matchDateShortcuts,
 } from '../../src/components/references/ReferenceSelector.js';
-import { CONTAINER_IDS } from '../../src/types/index.js';
+import { SYSTEM_NODE_IDS } from '../../src/types/index.js';
 
 function createNamedNode(id: string, name: string, updatedAt: number, type?: string) {
   createNode(id, null);
@@ -25,7 +25,7 @@ describe('collectRecentReferenceNodes', () => {
   });
 
   it('fills empty-query recent list with globally recently edited nodes', () => {
-    createNamedNode(CONTAINER_IDS.LIBRARY, 'Library', 1000);
+    createNamedNode(SYSTEM_NODE_IDS.LIBRARY, 'Library', 1000);
     createNamedNode('current', 'Current', 900);
     createNamedNode('n_old', 'Older Note', 1100);
     createNamedNode('n_new', 'New Note', 1800);
@@ -34,7 +34,7 @@ describe('collectRecentReferenceNodes', () => {
 
     const recent = collectRecentReferenceNodes({
       currentNodeId: 'current',
-      panelHistory: [CONTAINER_IDS.LIBRARY],
+      panelHistory: [SYSTEM_NODE_IDS.LIBRARY],
       panelIndex: 0,
       limit: 5,
     });
@@ -43,7 +43,7 @@ describe('collectRecentReferenceNodes', () => {
   });
 
   it('prefers navigation history order before fallback candidates', () => {
-    createNamedNode(CONTAINER_IDS.LIBRARY, 'Library', 1000);
+    createNamedNode(SYSTEM_NODE_IDS.LIBRARY, 'Library', 1000);
     createNamedNode('current', 'Current', 900);
     createNamedNode('h_1', 'History One', 1200);
     createNamedNode('h_2', 'History Two', 1150);
@@ -52,7 +52,7 @@ describe('collectRecentReferenceNodes', () => {
 
     const recent = collectRecentReferenceNodes({
       currentNodeId: 'current',
-      panelHistory: [CONTAINER_IDS.LIBRARY, 'h_1', 'h_2'],
+      panelHistory: [SYSTEM_NODE_IDS.LIBRARY, 'h_1', 'h_2'],
       panelIndex: 2,
       limit: 3,
     });
@@ -61,7 +61,7 @@ describe('collectRecentReferenceNodes', () => {
   });
 
   it('deduplicates history and fallback nodes', () => {
-    createNamedNode(CONTAINER_IDS.LIBRARY, 'Library', 1000);
+    createNamedNode(SYSTEM_NODE_IDS.LIBRARY, 'Library', 1000);
     createNamedNode('current', 'Current', 900);
     createNamedNode('dup_1', 'Duplicated', 2200);
     createNamedNode('n_1', 'Another', 2100);
@@ -69,7 +69,7 @@ describe('collectRecentReferenceNodes', () => {
 
     const recent = collectRecentReferenceNodes({
       currentNodeId: 'current',
-      panelHistory: [CONTAINER_IDS.LIBRARY, 'dup_1'],
+      panelHistory: [SYSTEM_NODE_IDS.LIBRARY, 'dup_1'],
       panelIndex: 1,
       limit: 3,
     });

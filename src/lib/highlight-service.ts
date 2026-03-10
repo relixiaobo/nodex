@@ -8,7 +8,7 @@
  * - Source field stays on #highlight (auto-init from #source ancestor)
  */
 import { nanoid } from 'nanoid';
-import { CONTAINER_IDS, SYS_T, SYS_V, NDX_F, FIELD_TYPES, AUTO_INIT_STRATEGY } from '../types/index.js';
+import { SYSTEM_NODE_IDS, SYS_T, SYS_V, NDX_F, FIELD_TYPES, AUTO_INIT_STRATEGY } from '../types/index.js';
 import type { NodexNode } from '../types/index.js';
 import * as loroDoc from './loro-doc.js';
 import type { WebClipNodeStore } from './webclip-service.js';
@@ -109,7 +109,7 @@ export function ensureHighlightTagDef(_store: HighlightNodeStore): void {
   // Create tagDef if needed
   let tagDef = loroDoc.toNodexNode(SYS_T.HIGHLIGHT);
   if (!tagDef) {
-    loroDoc.createNode(SYS_T.HIGHLIGHT, CONTAINER_IDS.SCHEMA);
+    loroDoc.createNode(SYS_T.HIGHLIGHT, SYSTEM_NODE_IDS.SCHEMA);
     loroDoc.setNodeDataBatch(SYS_T.HIGHLIGHT, {
       type: 'tagDef',
       name: 'highlight',
@@ -138,7 +138,7 @@ export function ensureHighlightTagDef(_store: HighlightNodeStore): void {
 export function ensureNoteTagDef(_store: HighlightNodeStore): void {
   const tagDef = loroDoc.toNodexNode(SYS_T.NOTE);
   if (!tagDef) {
-    loroDoc.createNode(SYS_T.NOTE, CONTAINER_IDS.SCHEMA);
+    loroDoc.createNode(SYS_T.NOTE, SYSTEM_NODE_IDS.SCHEMA);
     loroDoc.setNodeDataBatch(SYS_T.NOTE, {
       type: 'tagDef',
       name: 'note',

@@ -12,7 +12,7 @@ export type {
 } from './node.js';
 
 export {
-  CONTAINER_IDS,
+  SYSTEM_NODE_IDS,
   APP_PANELS,
   isAppPanel,
 } from './node.js';

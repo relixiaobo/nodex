@@ -9,7 +9,7 @@
 import { create } from 'zustand';
 import { nanoid } from 'nanoid';
 import type { NodexNode, TextMark, InlineRefEntry, FieldType } from '../types/index.js';
-import { CONTAINER_IDS, SYS_A, SYS_V } from '../types/index.js';
+import { SYSTEM_NODE_IDS, SYS_A, SYS_V } from '../types/index.js';
 import {
   canCreateChildrenUnder,
   canEditFieldEntryValue,
@@ -224,7 +224,7 @@ function normalizeLookupName(name: string): string {
 function findTagDefIdByName(name: string): string | null {
   const lookup = normalizeLookupName(name);
   if (!lookup) return null;
-  const schemaChildren = loroDoc.getChildren(CONTAINER_IDS.SCHEMA);
+  const schemaChildren = loroDoc.getChildren(SYSTEM_NODE_IDS.SCHEMA);
   for (const childId of schemaChildren) {
     const child = loroDoc.toNodexNode(childId);
     if (child?.type !== 'tagDef') continue;
@@ -241,11 +241,11 @@ function ensureTagDefByNameNoCommit(name: string): string {
 
   const id = nanoid();
   const schemaTagCount = loroDoc
-    .getChildren(CONTAINER_IDS.SCHEMA)
+    .getChildren(SYSTEM_NODE_IDS.SCHEMA)
     .filter((cid) => loroDoc.toNodexNode(cid)?.type === 'tagDef')
     .length;
 
-  loroDoc.createNode(id, CONTAINER_IDS.SCHEMA);
+  loroDoc.createNode(id, SYSTEM_NODE_IDS.SCHEMA);
   loroDoc.setNodeDataBatch(id, {
     type: 'tagDef',
     name: normalized,
@@ -283,7 +283,7 @@ function ensureFieldDefByNameNoCommit(fieldName: string, preferredTagIds: string
   const existing = findFieldDefIdByName(normalized, preferredTagIds);
   if (existing) return existing;
 
-  const ownerId = preferredTagIds[0] ?? CONTAINER_IDS.SCHEMA;
+  const ownerId = preferredTagIds[0] ?? SYSTEM_NODE_IDS.SCHEMA;
   const id = nanoid();
   loroDoc.createNode(id, ownerId);
   loroDoc.setNodeDataBatch(id, {
@@ -1096,7 +1096,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
         _trashedIndex: index >= 0 ? index : undefined,
       });
 
-      loroDoc.moveNode(nodeId, CONTAINER_IDS.TRASH);
+      loroDoc.moveNode(nodeId, SYSTEM_NODE_IDS.TRASH);
       loroDoc.commitDoc();
     },
 
@@ -1109,7 +1109,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
       if (from && loroDoc.hasNode(from)) {
         loroDoc.moveNode(nodeId, from, fromIndex);
       } else {
-        const fallbackParentId = resolvePreferredTopLevelParentId(CONTAINER_IDS.LIBRARY);
+        const fallbackParentId = resolvePreferredTopLevelParentId(SYSTEM_NODE_IDS.LIBRARY);
         if (!fallbackParentId) return;
         loroDoc.moveNode(nodeId, fallbackParentId);
       }
@@ -1121,7 +1121,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
 
     hardDeleteNode: (nodeId: string) => {
       const parentId = loroDoc.getParentId(nodeId);
-      if (parentId !== CONTAINER_IDS.TRASH) return;
+      if (parentId !== SYSTEM_NODE_IDS.TRASH) return;
       if (!getNodeCapabilities(nodeId).canDelete) return;
 
       // ─── Scenario B: Cascade fieldDef hard deletion ───
@@ -1136,7 +1136,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
     },
 
     emptyTrash: () => {
-      const trashChildren = loroDoc.getChildren(CONTAINER_IDS.TRASH);
+      const trashChildren = loroDoc.getChildren(SYSTEM_NODE_IDS.TRASH);
       if (trashChildren.length === 0) return;
       for (let i = trashChildren.length - 1; i >= 0; i--) {
         loroDoc.deleteNode(trashChildren[i]);
@@ -1345,15 +1345,15 @@ export const useNodeStore = create<NodeStore>((set, get) => {
     },
 
     createTagDef: (name, options = {}) => {
-      if (!canMutate('createTagDef')) return detachedNodeFallback(CONTAINER_IDS.SCHEMA);
-      if (!canEditStructure(CONTAINER_IDS.SCHEMA)) return detachedNodeFallback(CONTAINER_IDS.SCHEMA);
+      if (!canMutate('createTagDef')) return detachedNodeFallback(SYSTEM_NODE_IDS.SCHEMA);
+      if (!canEditStructure(SYSTEM_NODE_IDS.SCHEMA)) return detachedNodeFallback(SYSTEM_NODE_IDS.SCHEMA);
       // Auto-assign color by round-robin if not explicitly provided.
       const color = options.color ?? nextAutoColorKey(
-        loroDoc.getChildren(CONTAINER_IDS.SCHEMA)
+        loroDoc.getChildren(SYSTEM_NODE_IDS.SCHEMA)
           .filter((cid) => loroDoc.toNodexNode(cid)?.type === 'tagDef').length,
       );
       const id = nanoid();
-      loroDoc.createNode(id, CONTAINER_IDS.SCHEMA);
+      loroDoc.createNode(id, SYSTEM_NODE_IDS.SCHEMA);
       loroDoc.setNodeDataBatch(id, {
         type: 'tagDef',
         name,
@@ -1456,7 +1456,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
       if (!canEditStructure(nodeId)) return { fieldEntryId: '', fieldDefId: '' };
       // 创建临时 fieldDef（placeholder）
       const fdId = nanoid();
-      loroDoc.createNode(fdId, CONTAINER_IDS.SCHEMA);
+      loroDoc.createNode(fdId, SYSTEM_NODE_IDS.SCHEMA);
       loroDoc.setNodeDataBatch(fdId, {
         type: 'fieldDef',
         name: '',
@@ -1785,7 +1785,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
 
     createSearchNode: (tagDefId) => {
       if (!canMutate('createSearchNode')) return '';
-      const searchRootId = resolvePreferredTopLevelParentId(CONTAINER_IDS.SEARCHES);
+      const searchRootId = resolvePreferredTopLevelParentId(SYSTEM_NODE_IDS.SEARCHES);
       if (!searchRootId) return '';
 
       // De-duplication: check if a search node for this tag already exists in the preferred top-level parent
@@ -2126,7 +2126,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
       const searchNode = loroDoc.toNodexNode(searchNodeId);
       if (!searchNode || searchNode.type !== 'search') return get().createChild(searchNodeId, undefined, data);
       const nodeId = nanoid();
-      const preferredParentId = resolvePreferredTopLevelParentId(CONTAINER_IDS.LIBRARY);
+      const preferredParentId = resolvePreferredTopLevelParentId(SYSTEM_NODE_IDS.LIBRARY);
       if (!preferredParentId) return { id: '', name: '', children: [], tags: [] } as unknown as NodexNode;
       loroDoc.createNode(nodeId, preferredParentId);
       const now = Date.now();

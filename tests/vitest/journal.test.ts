@@ -7,7 +7,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { seedTestDataSync } from '../../src/entrypoints/test/seed-data.js';
 import * as loroDoc from '../../src/lib/loro-doc.js';
 import { TAG_COLOR_MAP, resolveTagColor } from '../../src/lib/tag-colors.js';
-import { CONTAINER_IDS, FIELD_TYPES } from '../../src/types/index.js';
+import { SYSTEM_NODE_IDS, FIELD_TYPES } from '../../src/types/index.js';
 import { SYSTEM_TAGS } from '../../src/types/system-nodes.js';
 import {
   ensureJournalTagDefs,
@@ -60,7 +60,7 @@ describe('ensureDateNode', () => {
 
     // Year is under JOURNAL
     const journalId = loroDoc.getParentId(yearId!);
-    expect(journalId).toBe(CONTAINER_IDS.JOURNAL);
+    expect(journalId).toBe(SYSTEM_NODE_IDS.JOURNAL);
 
     // Journal tagDefs are materialized as normal tagDef nodes in Schema
     expect(loroDoc.toNodexNode(SYSTEM_TAGS.DAY)).toMatchObject({
@@ -68,7 +68,7 @@ describe('ensureDateNode', () => {
       type: 'tagDef',
       name: 'day',
     });
-    expect(loroDoc.getParentId(SYSTEM_TAGS.DAY)).toBe(CONTAINER_IDS.SCHEMA);
+    expect(loroDoc.getParentId(SYSTEM_TAGS.DAY)).toBe(SYSTEM_NODE_IDS.SCHEMA);
   });
 
   it('is idempotent — second call returns same ID', () => {
@@ -184,7 +184,7 @@ describe('ensureDateNode', () => {
     ensureDateNode(new Date(2026, 1, 14)); // 2026
     ensureDateNode(new Date(2024, 0, 1));  // 2024
 
-    const journalChildren = loroDoc.getChildren(CONTAINER_IDS.JOURNAL);
+    const journalChildren = loroDoc.getChildren(SYSTEM_NODE_IDS.JOURNAL);
     // Filter out old seed data (journal_1) — look for year-named nodes
     const yearNames = journalChildren
       .map(id => loroDoc.toNodexNode(id)?.name)
@@ -201,7 +201,7 @@ describe('ensureDateNode', () => {
     ensureDateNode(new Date(2026, 1, 14)); // Week 07
 
     // Find 2026 year node
-    const journalChildren = loroDoc.getChildren(CONTAINER_IDS.JOURNAL);
+    const journalChildren = loroDoc.getChildren(SYSTEM_NODE_IDS.JOURNAL);
     const yearId = journalChildren.find(id => loroDoc.toNodexNode(id)?.name === '2026');
     expect(yearId).toBeTruthy();
 
@@ -227,7 +227,7 @@ describe('ensureDateNode', () => {
     ensureDateNode(new Date(2026, 1, 11)); // Wed
 
     // Find the week node
-    const journalChildren = loroDoc.getChildren(CONTAINER_IDS.JOURNAL);
+    const journalChildren = loroDoc.getChildren(SYSTEM_NODE_IDS.JOURNAL);
     const yearId = journalChildren.find(id => loroDoc.toNodexNode(id)?.name === '2026')!;
     const yearChildren = loroDoc.getChildren(yearId);
     const weekId = yearChildren.find(id => loroDoc.toNodexNode(id)?.name === 'Week 07')!;
@@ -274,9 +274,9 @@ describe('ensureJournalTagDefs', () => {
       locked: true,
     });
 
-    expect(loroDoc.getParentId(SYSTEM_TAGS.DAY)).toBe(CONTAINER_IDS.SCHEMA);
-    expect(loroDoc.getParentId(SYSTEM_TAGS.WEEK)).toBe(CONTAINER_IDS.SCHEMA);
-    expect(loroDoc.getParentId(SYSTEM_TAGS.YEAR)).toBe(CONTAINER_IDS.SCHEMA);
+    expect(loroDoc.getParentId(SYSTEM_TAGS.DAY)).toBe(SYSTEM_NODE_IDS.SCHEMA);
+    expect(loroDoc.getParentId(SYSTEM_TAGS.WEEK)).toBe(SYSTEM_NODE_IDS.SCHEMA);
+    expect(loroDoc.getParentId(SYSTEM_TAGS.YEAR)).toBe(SYSTEM_NODE_IDS.SCHEMA);
 
     expect(resolveTagColor(SYSTEM_TAGS.DAY)).toEqual(TAG_COLOR_MAP.gray);
     expect(resolveTagColor(SYSTEM_TAGS.WEEK)).toEqual(TAG_COLOR_MAP.gray);
@@ -287,7 +287,7 @@ describe('ensureJournalTagDefs', () => {
     ensureJournalTagDefs();
     ensureJournalTagDefs();
 
-    const schemaChildren = loroDoc.getChildren(CONTAINER_IDS.SCHEMA);
+    const schemaChildren = loroDoc.getChildren(SYSTEM_NODE_IDS.SCHEMA);
     expect(schemaChildren.filter((id) => id === SYSTEM_TAGS.DAY)).toHaveLength(1);
     expect(schemaChildren.filter((id) => id === SYSTEM_TAGS.WEEK)).toHaveLength(1);
     expect(schemaChildren.filter((id) => id === SYSTEM_TAGS.YEAR)).toHaveLength(1);
@@ -357,7 +357,7 @@ describe('getAdjacentDayNodeId', () => {
   });
 
   it('returns null for non-day node', () => {
-    const result = getAdjacentDayNodeId(CONTAINER_IDS.LIBRARY, 1);
+    const result = getAdjacentDayNodeId(SYSTEM_NODE_IDS.LIBRARY, 1);
     expect(result).toBeNull();
   });
 });
@@ -369,7 +369,7 @@ describe('isDayNode', () => {
   });
 
   it('returns false for a non-day node', () => {
-    expect(isDayNode(CONTAINER_IDS.LIBRARY)).toBe(false);
+    expect(isDayNode(SYSTEM_NODE_IDS.LIBRARY)).toBe(false);
   });
 
   it('returns false for a week node', () => {
@@ -403,11 +403,11 @@ describe('isYearNode', () => {
 
 describe('isJournalNode', () => {
   it('returns true for JOURNAL container', () => {
-    expect(isJournalNode(CONTAINER_IDS.JOURNAL)).toBe(true);
+    expect(isJournalNode(SYSTEM_NODE_IDS.JOURNAL)).toBe(true);
   });
 
   it('returns false for other containers', () => {
-    expect(isJournalNode(CONTAINER_IDS.LIBRARY)).toBe(false);
+    expect(isJournalNode(SYSTEM_NODE_IDS.LIBRARY)).toBe(false);
   });
 });
 

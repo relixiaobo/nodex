@@ -6,7 +6,7 @@ export const WORKSPACE_HOME_NAME = 'Workspace';
  * Ensure the current workspace has a dedicated root/home node.
  *
  * Existing workspaces created before workspace-root support may only have
- * container roots (LIBRARY/INBOX/...). This helper backfills a workspace node
+ * legacy top-level system nodes (LIBRARY/INBOX/...). This helper backfills a workspace node
  * so breadcrumb avatar/root navigation always has a concrete target.
  */
 export function ensureWorkspaceHomeNode(workspaceId: string | null): string | null {

@@ -1,11 +1,11 @@
 /**
  * Settings service — LoroDoc as source of truth + chrome.storage projection.
  *
- * Settings are stored as field entries on the SETTINGS container node.
+ * Settings are stored as field entries on the SETTINGS system node.
  * Changes are projected to chrome.storage['soma-settings'] so that
  * content scripts (which cannot access LoroDoc) can read them.
  */
-import { CONTAINER_IDS } from '../types/index.js';
+import { SYSTEM_NODE_IDS } from '../types/index.js';
 import { NDX_F, SYS_V } from '../types/system-nodes.js';
 import * as loroDoc from './loro-doc.js';
 import { useNodeStore } from '../stores/node-store.js';
@@ -26,7 +26,7 @@ const DEFAULTS: SettingsSnapshot = {
 // ── Read ────────────────────────────────────────────────
 
 export function getHighlightEnabled(): boolean {
-  const children = loroDoc.getChildren(CONTAINER_IDS.SETTINGS);
+  const children = loroDoc.getChildren(SYSTEM_NODE_IDS.SETTINGS);
   for (const cid of children) {
     const node = loroDoc.toNodexNode(cid);
     if (node?.type === 'fieldEntry' && node.fieldDefId === NDX_F.SETTING_HIGHLIGHT_ENABLED) {
@@ -44,7 +44,7 @@ export function getHighlightEnabled(): boolean {
 export function setHighlightEnabled(enabled: boolean): void {
   const value = enabled ? SYS_V.YES : SYS_V.NO;
   useNodeStore.getState().setFieldValue(
-    CONTAINER_IDS.SETTINGS,
+    SYSTEM_NODE_IDS.SETTINGS,
     NDX_F.SETTING_HIGHLIGHT_ENABLED,
     [value],
   );

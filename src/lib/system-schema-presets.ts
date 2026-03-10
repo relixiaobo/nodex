@@ -1,4 +1,4 @@
-import { CONTAINER_IDS, FIELD_TYPES, NDX_F, NDX_T, SYS_V } from '../types/index.js';
+import { SYSTEM_NODE_IDS, FIELD_TYPES, NDX_F, NDX_T, SYS_V } from '../types/index.js';
 import * as loroDoc from './loro-doc.js';
 
 export const SYSTEM_SCHEMA_NODE_IDS = {
@@ -16,7 +16,7 @@ interface FixedSchemaNodePreset {
 const SYSTEM_SCHEMA_NODE_PRESETS: ReadonlyArray<FixedSchemaNodePreset> = [
   {
     id: NDX_T.WORKSPACE_SETTINGS,
-    parentId: CONTAINER_IDS.SCHEMA,
+    parentId: SYSTEM_NODE_IDS.SCHEMA,
     name: 'Workspace settings',
     data: {
       type: 'tagDef',
@@ -39,7 +39,7 @@ const SYSTEM_SCHEMA_NODE_PRESETS: ReadonlyArray<FixedSchemaNodePreset> = [
   },
   {
     id: SYSTEM_SCHEMA_NODE_IDS.SETTINGS_HIGHLIGHT_FIELD_ENTRY,
-    parentId: CONTAINER_IDS.SETTINGS,
+    parentId: SYSTEM_NODE_IDS.SETTINGS,
     data: {
       type: 'fieldEntry',
       fieldDefId: NDX_F.SETTING_HIGHLIGHT_ENABLED,

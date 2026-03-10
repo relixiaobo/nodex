@@ -3,7 +3,7 @@ import { Trash2, RotateCcw } from '../../lib/icons.js';
 import { useNode } from '../../hooks/use-node';
 import { useNodeStore } from '../../stores/node-store';
 import { useUIStore } from '../../stores/ui-store';
-import { CONTAINER_IDS } from '../../types/index.js';
+import { SYSTEM_NODE_IDS } from '../../types/index.js';
 import * as loroDoc from '../../lib/loro-doc.js';
 
 import { NodeHeader } from './NodeHeader';
@@ -45,7 +45,7 @@ export function NodePanel({ nodeId }: NodePanelProps) {
   const isTagDef = node?.type === 'tagDef';
   const isDefinitionNode = isFieldDef || isTagDef;
 
-  const isTrashContainer = nodeId === CONTAINER_IDS.TRASH;
+  const isTrashContainer = nodeId === SYSTEM_NODE_IDS.TRASH;
   const canDeleteNode = getNodeCapabilities(nodeId).canDelete;
 
   const isInTrash = useNodeStore((s) => {
@@ -56,7 +56,7 @@ export function NodePanel({ nodeId }: NodePanelProps) {
   const trashChildCount = useNodeStore((s) => {
     if (!isTrashContainer) return 0;
     void s._version;
-    return loroDoc.getChildren(CONTAINER_IDS.TRASH).length;
+    return loroDoc.getChildren(SYSTEM_NODE_IDS.TRASH).length;
   });
 
   const showDateNav = useNodeStore((s) => {

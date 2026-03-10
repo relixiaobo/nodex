@@ -94,29 +94,31 @@ export function TestApp() {
       <PanelStack />
       <CommandPalette />
       <BatchTagSelector />
-      {/* Agent badge — fixed top-right corner */}
-      <div
-        style={{
-          position: 'fixed',
-          top: 50,
-          right: 6,
-          maxWidth: 'calc(100vw - 80px)',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap',
-          backgroundColor: agent.color,
-          color: '#fff',
-          fontSize: 11,
-          fontWeight: 600,
-          padding: '2px 8px',
-          borderRadius: 4,
-          zIndex: 9999,
-          opacity: 0.85,
-          pointerEvents: 'none',
-        }}
-      >
-        {agent.name}
-      </div>
+      {/* Agent badge — only shown with ?badge query param (for multi-agent debugging) */}
+      {new URLSearchParams(window.location.search).has('badge') && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 50,
+            right: 6,
+            maxWidth: 'calc(100vw - 80px)',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+            backgroundColor: agent.color,
+            color: '#fff',
+            fontSize: 11,
+            fontWeight: 600,
+            padding: '2px 8px',
+            borderRadius: 4,
+            zIndex: 9999,
+            opacity: 0.85,
+            pointerEvents: 'none',
+          }}
+        >
+          {agent.name}
+        </div>
+      )}
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import { useCallback, type DragEvent, type RefObject } from 'react';
+import * as loroDoc from '../lib/loro-doc.js';
 import { useNodeStore } from '../stores/node-store.js';
 import { useUIStore } from '../stores/ui-store.js';
 import { resolveDropHoverPosition } from '../lib/drag-drop-position.js';
@@ -88,13 +89,14 @@ export function useDragDropRow({
       return;
     }
 
-    const dropParent = useNodeStore.getState().getNode(parentId);
+    const liveParentId = loroDoc.getParentId(nodeId) ?? parentId;
+    const dropParent = liveParentId ? useNodeStore.getState().getNode(liveParentId) : null;
     const siblingIndex = dropParent?.children?.indexOf(nodeId) ?? 0;
     const decision = resolveDropMove({
       dragNodeId: activeDragId,
       targetNodeId: nodeId,
-      targetParentId: parentId,
-      targetParentKey: `${parentId}:${nodeId}`,
+      targetParentId: liveParentId,
+      targetParentKey: `${liveParentId}:${nodeId}`,
       siblingIndex,
       dropPosition: currentDropPosition,
       targetHasChildren,

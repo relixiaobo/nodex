@@ -245,9 +245,9 @@ export function OutlinerItem({
   const { handleCmdClick, handleShiftClick } = useRowPointerHandlers(nodeId, parentId, rootChildIds, rootNodeId);
 
   const isLoadingNode = useUIStore((s) => s.loadingNodeIds.has(nodeId));
-  const dragNodeId = useUIStore((s) => s.dragNodeId);
-  const dropTargetId = useUIStore((s) => s.dropTargetId);
-  const dropPosition = useUIStore((s) => s.dropPosition);
+  const isDragging = useUIStore((s) => s.dragNodeId === nodeId);
+  const isDropTarget = useUIStore((s) => s.dropTargetId === nodeId);
+  const dropPosition = useUIStore((s) => s.dropTargetId === nodeId ? s.dropPosition : null);
   const setDrag = useUIStore((s) => s.setDrag);
   const setDropTarget = useUIStore((s) => s.setDropTarget);
 
@@ -1587,6 +1587,11 @@ export function OutlinerItem({
     (e: DragEvent) => {
       e.dataTransfer.effectAllowed = 'move';
       e.dataTransfer.setData('text/plain', nodeId);
+      // Use the entire row as drag image instead of just the bullet
+      if (rowRef.current) {
+        const rect = rowRef.current.getBoundingClientRect();
+        e.dataTransfer.setDragImage(rowRef.current, e.clientX - rect.left, e.clientY - rect.top);
+      }
       setDrag(nodeId);
     },
     [nodeId, setDrag],
@@ -1594,7 +1599,8 @@ export function OutlinerItem({
 
   const handleDragOver = useCallback(
     (e: DragEvent) => {
-      if (!dragNodeId || dragNodeId === nodeId) return;
+      const activeDragId = useUIStore.getState().dragNodeId;
+      if (!activeDragId || activeDragId === nodeId) return;
       e.preventDefault();
       e.dataTransfer.dropEffect = 'move';
 
@@ -1607,20 +1613,23 @@ export function OutlinerItem({
       });
       setDropTarget(nodeId, position);
     },
-    [nodeId, dragNodeId, setDropTarget],
+    [nodeId, setDropTarget],
   );
 
-  const handleDragLeave = useCallback(() => {
-    if (dropTargetId === nodeId) {
+  const handleDragLeave = useCallback((e: DragEvent) => {
+    const related = e.relatedTarget as Node | null;
+    if (related && rowRef.current?.contains(related)) return;
+    if (useUIStore.getState().dropTargetId === nodeId) {
       setDropTarget(null, null);
     }
-  }, [nodeId, dropTargetId, setDropTarget]);
+  }, [nodeId, setDropTarget]);
 
   const handleDrop = useCallback(
     (e: DragEvent) => {
       e.preventDefault();
       e.stopPropagation();
-      if (!dragNodeId || dragNodeId === nodeId) {
+      const { dragNodeId: activeDragId, dropPosition: currentDropPos } = useUIStore.getState();
+      if (!activeDragId || activeDragId === nodeId) {
         setDrag(null);
         return;
       }
@@ -1635,18 +1644,18 @@ export function OutlinerItem({
       const siblingIndex = dropParent?.children?.indexOf(nodeId) ?? 0;
 
       const decision = resolveDropMove({
-        dragNodeId,
+        dragNodeId: activeDragId,
         targetNodeId: nodeId,
         targetParentId: dropParentId,
         targetParentKey: `${parentId}:${nodeId}`,
         siblingIndex,
-        dropPosition,
+        dropPosition: currentDropPos,
         targetHasChildren: hasChildren,
         targetIsExpanded: isExpanded,
       });
 
       if (decision) {
-        moveNodeTo(dragNodeId, decision.newParentId, decision.position);
+        moveNodeTo(activeDragId, decision.newParentId, decision.position);
         if (decision.expandKey) {
           setExpanded(decision.expandKey, true, true);
         }
@@ -1654,7 +1663,7 @@ export function OutlinerItem({
 
       setDrag(null);
     },
-    [dragNodeId, nodeId, parentId, dropPosition, hasChildren, isExpanded, moveNodeTo, setExpanded, setDrag],
+    [nodeId, parentId, hasChildren, isExpanded, moveNodeTo, setExpanded, setDrag],
   );
 
   const handleDragEnd = useCallback(() => {
@@ -1674,8 +1683,6 @@ export function OutlinerItem({
     );
   }
 
-  const isDropTarget = dropTargetId === nodeId;
-  const isDragging = dragNodeId === nodeId;
   const nodeText = effectiveNode?.name ?? '';
   const nodeDisplayText = isOptionsValueNode ? (selectedOptionName || nodeText) : nodeText;
   const nodeMarks = effectiveNode?.marks ?? [];
@@ -1705,13 +1712,6 @@ export function OutlinerItem({
       }}
     >
     <div role="treeitem" aria-expanded={isExpanded} className={`relative flex flex-col gap-1.5 ${hasOverlayOpen ? 'field-overlay-open z-[80]' : 'has-[.field-overlay-open]:z-[80]'}`}>
-      {/* Drop indicator: before */}
-      {isDropTarget && dropPosition === 'before' && (
-        <div
-          className="h-0.5 bg-primary rounded-full"
-          style={{ marginLeft: depth * 28 + 6 + 15 }}
-        />
-      )}
       <div
         ref={rowRef}
         tabIndex={-1}
@@ -1729,6 +1729,13 @@ export function OutlinerItem({
         onDragEnd={handleDragEnd}
         onContextMenu={handleContextMenu}
       >
+        {/* Drop indicator: before — absolutely positioned to avoid layout shift */}
+        {isDropTarget && dropPosition === 'before' && (
+          <div
+            className="absolute -top-[1px] right-0 h-0.5 bg-primary rounded-full pointer-events-none z-10"
+            style={{ left: depth * 28 + 6 + 15 }}
+          />
+        )}
         {/* Per-row selection highlight: global selection mode only (Esc/drag/multi-select). */}
         {showRowHighlight && (
           <div
@@ -1961,14 +1968,14 @@ export function OutlinerItem({
             document.body,
           )}
         </div>{/* close selection/contents wrapper */}
+        {/* Drop indicator: after — absolutely positioned to avoid layout shift */}
+        {isDropTarget && dropPosition === 'after' && (
+          <div
+            className="absolute -bottom-[1px] right-0 h-0.5 bg-primary rounded-full pointer-events-none z-10"
+            style={{ left: depth * 28 + 6 + 15 + 4 }}
+          />
+        )}
       </div>
-      {/* Drop indicator: after */}
-      {isDropTarget && dropPosition === 'after' && (
-        <div
-          className="h-0.5 bg-primary rounded-full"
-          style={{ marginLeft: depth * 28 + 6 + 15 + 4 }}
-        />
-      )}
       {/* Indent guide line — moved to root relative container so it spans multi-line parent texts */}
       {isExpanded && !isCyclicReferenceExpansion && (
         <button

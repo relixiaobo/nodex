@@ -1,5 +1,6 @@
 import * as loroDoc from './loro-doc.js';
 import { getSystemNodePreset } from './system-node-presets.js';
+import { CONTAINER_IDS } from '../types/index.js';
 
 export type SystemNodeRole = 'workspaceHome' | 'system';
 export type NodeRole = SystemNodeRole | 'general';
@@ -22,6 +23,20 @@ export function isLockedNode(nodeId: string): boolean {
   const preset = getSystemNodePreset(nodeId);
   if (preset?.locked) return true;
   return loroDoc.toNodexNode(nodeId)?.locked === true;
+}
+
+export function isNodeInTrash(nodeId: string): boolean {
+  let cursor: string | null = nodeId;
+  const visited = new Set<string>();
+
+  while (cursor) {
+    if (cursor === CONTAINER_IDS.TRASH) return true;
+    if (visited.has(cursor)) return false;
+    visited.add(cursor);
+    cursor = loroDoc.getParentId(cursor);
+  }
+
+  return false;
 }
 
 function resolveFieldValueOwnerId(nodeId: string): string | null {

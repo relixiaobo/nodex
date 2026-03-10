@@ -13,7 +13,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { useNodeStore } from '../../src/stores/node-store.js';
 import { resetAndSeed } from './helpers/test-state.js';
 import * as loroDoc from '../../src/lib/loro-doc.js';
-import { CONTAINER_IDS, SYS_T, SYS_V, NDX_F, FIELD_TYPES, AUTO_INIT_STRATEGY } from '../../src/types/index.js';
+import { SYSTEM_NODE_IDS, SYS_T, SYS_V, NDX_F, FIELD_TYPES, AUTO_INIT_STRATEGY } from '../../src/types/index.js';
 import {
   ensureHighlightTagDef,
   ensureNoteTagDef,
@@ -155,7 +155,7 @@ describe('ensureNoteTagDef', () => {
     const tagDef = loroDoc.toNodexNode(SYS_T.NOTE);
     expect(tagDef).toBeDefined();
 
-    const schemaChildren = loroDoc.getChildren(CONTAINER_IDS.SCHEMA);
+    const schemaChildren = loroDoc.getChildren(SYSTEM_NODE_IDS.SCHEMA);
     const noteDefs = schemaChildren.filter(cid => cid === SYS_T.NOTE);
     expect(noteDefs).toHaveLength(1);
   });
@@ -212,6 +212,29 @@ describe('getHighlightsForNote', () => {
     expect(highlights).toHaveLength(1);
     expect(highlights[0].id).toBe(highlightNode.id);
     expect(highlights[0].name).toBe('bare text');
+  });
+
+  it('ignores non-reference children inside the Highlights field', () => {
+    const store = getStore();
+    const { highlightNode } = createHighlightOnly({
+      store, selectedText: 'bare text', clipNodeId: 'webclip_1',
+    });
+    const { noteNode } = addNoteForHighlight({
+      store, highlightNodeId: highlightNode.id, clipNodeId: 'webclip_1', noteText: 'my thought',
+    });
+
+    const highlightsFieldEntryId = loroDoc.getChildren(noteNode.id).find((childId) => {
+      const child = loroDoc.toNodexNode(childId);
+      return child?.type === 'fieldEntry' && child.fieldDefId === NDX_F.NOTE_HIGHLIGHTS;
+    });
+    expect(highlightsFieldEntryId).toBeDefined();
+
+    const directHighlight = store.createChild(highlightsFieldEntryId!, undefined, { name: 'direct child highlight' });
+    store.applyTag(directHighlight.id, SYS_T.HIGHLIGHT);
+
+    const highlights = getHighlightsForNote(noteNode.id);
+    expect(highlights).toHaveLength(1);
+    expect(highlights[0].id).toBe(highlightNode.id);
   });
 });
 

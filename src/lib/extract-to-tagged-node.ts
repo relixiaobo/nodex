@@ -8,7 +8,7 @@
  */
 import type { EditorView } from 'prosemirror-view';
 import type { NodexNode, InlineRefEntry } from '../types/index.js';
-import { CONTAINER_IDS, SYS_T } from '../types/index.js';
+import { SYSTEM_NODE_IDS, SYS_T } from '../types/index.js';
 import { pmSchema } from '../components/editor/pm-schema.js';
 import { docToMarks } from './pm-doc-utils.js';
 import * as loroDoc from './loro-doc.js';
@@ -86,7 +86,7 @@ export function extractToTaggedNode(
     newNode = highlightNode;
   } else {
     // Generic tag or no clip ancestor: create in LIBRARY and apply tag
-    const parentId = resolvePreferredTopLevelParentId(CONTAINER_IDS.LIBRARY);
+    const parentId = resolvePreferredTopLevelParentId(SYSTEM_NODE_IDS.LIBRARY);
     if (!parentId) return null;
     newNode = store.createChild(parentId, undefined, { name: selectedText });
     store.applyTag(newNode.id, tagDefId);

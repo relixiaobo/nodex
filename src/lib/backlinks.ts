@@ -12,8 +12,9 @@
 
 import * as loroDoc from './loro-doc.js';
 import { getAncestorChain, getNavigableParentId, type AncestorInfo } from './tree-utils.js';
-import { CONTAINER_IDS } from '../types/index.js';
+import { SYSTEM_NODE_IDS } from '../types/index.js';
 import type { NodexNode } from '../types/index.js';
+import { isNodeInTrash } from './node-capabilities.js';
 
 // ─── Types ───
 
@@ -61,23 +62,10 @@ function isSupertagSearchNode(node: NodexNode): boolean {
   return leaf?.queryOp === 'HAS_TAG' && !!leaf.queryTagDefId;
 }
 
-/** Check if a node is inside the TRASH container (walks parent chain). */
-function isInTrash(nodeId: string): boolean {
-  let currentId: string | null = nodeId;
-  const visited = new Set<string>();
-  while (currentId) {
-    if (currentId === CONTAINER_IDS.TRASH) return true;
-    if (visited.has(currentId)) return false;
-    visited.add(currentId);
-    currentId = loroDoc.getParentId(currentId);
-  }
-  return false;
-}
-
 /** Pre-compute the set of all node IDs inside TRASH (single walk from TRASH root). */
 function buildTrashSet(): Set<string> {
   const trashSet = new Set<string>();
-  const trashNode = loroDoc.toNodexNode(CONTAINER_IDS.TRASH);
+  const trashNode = loroDoc.toNodexNode(SYSTEM_NODE_IDS.TRASH);
   if (!trashNode) return trashSet;
   const queue = [...trashNode.children];
   while (queue.length > 0) {
@@ -127,7 +115,7 @@ export function computeBacklinks(targetNodeId: string, version?: number): Backli
 
     // 1. Tree reference: reference node pointing at target
     if (node.type === 'reference' && node.targetId === targetNodeId) {
-      if (isInTrash(id)) continue;
+      if (isNodeInTrash(id)) continue;
       // Context node is the reference's parent (the meaningful container)
       const contextId = loroDoc.getParentId(id);
       if (!contextId) continue;
@@ -152,7 +140,7 @@ export function computeBacklinks(targetNodeId: string, version?: number): Backli
     if (node.inlineRefs && node.inlineRefs.length > 0) {
       const hasInlineRef = node.inlineRefs.some(r => r.targetNodeId === targetNodeId);
       if (hasInlineRef) {
-        if (isInTrash(id)) continue;
+        if (isNodeInTrash(id)) continue;
         const { ancestors } = getAncestorChain(id);
         mentionedIn.push({
           referencingNodeId: id,
@@ -176,7 +164,7 @@ export function computeBacklinks(targetNodeId: string, version?: number): Backli
       });
 
       if (referencesTarget) {
-        if (isInTrash(id)) continue;
+        if (isNodeInTrash(id)) continue;
         // Find the owner content node (navigable parent of this fieldEntry)
         const ownerId = getNavigableParentId(id);
         if (!ownerId) continue;

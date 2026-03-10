@@ -45,7 +45,7 @@ import {
   type HighlightNoteGetPayload,
   type HighlightUnresolvablePayload,
 } from '../../lib/highlight-messaging.js';
-import { ensureContainers } from '../../lib/bootstrap-containers.js';
+import { ensureSystemNodes } from '../../lib/bootstrap-system-nodes.js';
 import { Toaster, toast } from 'sonner';
 import { TooltipProvider } from '../../components/ui/Tooltip';
 
@@ -86,12 +86,12 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
 }
 
 /**
- * Bootstrap workspace containers in LoroDoc.
- * Creates fixed container nodes if they don't exist.
+ * Bootstrap workspace system nodes in LoroDoc.
+ * Creates fixed singleton nodes if they don't exist.
  */
 async function seedWorkspace(wsId: string): Promise<{ hadSnapshot: boolean }> {
  const { hadSnapshot } = await initLoroDoc(wsId);
- ensureContainers(wsId);
+ ensureSystemNodes(wsId);
  return { hadSnapshot };
 }
 
@@ -134,7 +134,7 @@ function useBootstrap(skip: boolean): BootstrapResult {
     setUser('user_default');
    }
 
-   // Bootstrap LoroDoc + seed containers
+   // Bootstrap LoroDoc + seed fixed system nodes
    const { hadSnapshot } = await seedWorkspace(currentWsId);
 
    // Restore auth session from stored Bearer token (validates against server).
@@ -219,7 +219,7 @@ function useBootstrap(skip: boolean): BootstrapResult {
    }
 
    // If no local snapshot existed, watch for sync completion in background.
-   // When pull finishes, re-seed containers in case server data has different structure.
+   // When pull finishes, re-seed fixed system nodes in case server data differs.
    if (!hadSnapshot && useWorkspaceStore.getState().isAuthenticated) {
     const { syncManager } = await import('../../lib/sync/sync-manager.js');
     const unsub = syncManager.onStateChange((state) => {
@@ -230,7 +230,7 @@ function useBootstrap(skip: boolean): BootstrapResult {
       // Read current workspace ID dynamically — may have changed after sign-in
       // (bootstrap captures randomUUID, but sign-in transitions to user.id)
       const wsNow = useWorkspaceStore.getState().currentWorkspaceId;
-      if (wsNow) ensureContainers(wsNow);
+      if (wsNow) ensureSystemNodes(wsNow);
      } else if (state.status === 'error') {
       unsub();
      }

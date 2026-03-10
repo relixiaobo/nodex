@@ -222,6 +222,9 @@ export interface NodexNode {
   /** Locked system node flag (mapped from SYS_A.LOCKED semantics). */
   locked?: boolean;
 
+  /** One-time bootstrap/migration version recorded on the workspace home node. */
+  systemBootstrapVersion?: number;
+
   /** 图片宽度 (px)（旧 props._imageWidth） */
   imageWidth?: number;
 
@@ -361,11 +364,11 @@ export interface NodexNode {
 }
 
 // ============================================================
-// 工作区容器（固定 ID，无 workspaceId 前缀）
+// 固定系统节点（固定 ID，无 workspaceId 前缀）
 // ============================================================
 
-/** 工作区容器专用 ID。 */
-export const CONTAINER_IDS = {
+/** 工作区内的固定系统节点 ID。 */
+export const SYSTEM_NODE_IDS = {
   LIBRARY: 'LIBRARY',
   INBOX: 'INBOX',
   JOURNAL: 'JOURNAL',

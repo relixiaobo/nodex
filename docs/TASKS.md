@@ -22,13 +22,13 @@ _(空)_
 
 | Agent | 分支 | 任务 | 锁定文件 | 状态 |
 |---|---|---|---|---|
-| _(空)_ | | | | |
+| codex | `codex/unify-scattered-patterns` | 统一散落的复用模式 | `src/stores/node-store.ts`, `src/components/outliner/OutlinerItem.tsx`, `src/components/fields/FieldRow.tsx`, `src/lib/node-capabilities.ts` | 进行中 |
 
 ---
 
 ## 进行中
 
-_(空)_
+- [ ] **统一散落的复用模式** — 三个 Phase：(1) Reference 解析收拢为 `resolveEffectiveId()`；(2) DnD handler 提取为 `useDragDropRow()` hook；(3) 散落的 isInTrash 判断迁移到 capability 体系
 
 ---
 

@@ -13,7 +13,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { useNodeStore } from '../../src/stores/node-store.js';
 import { computeNodeFields } from '../../src/hooks/use-node-fields.js';
 import * as loroDoc from '../../src/lib/loro-doc.js';
-import { CONTAINER_IDS } from '../../src/types/index.js';
+import { SYSTEM_NODE_IDS } from '../../src/types/index.js';
 import { resetAndSeed } from './helpers/test-state.js';
 
 function getNode(id: string) {
@@ -374,6 +374,6 @@ describe('emptyTrash cascade', () => {
     useNodeStore.getState().emptyTrash();
 
     expect(loroDoc.hasNode('attrDef_due')).toBe(false);
-    expect(loroDoc.getChildren(CONTAINER_IDS.TRASH).length).toBe(0);
+    expect(loroDoc.getChildren(SYSTEM_NODE_IDS.TRASH).length).toBe(0);
   });
 });

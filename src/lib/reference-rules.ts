@@ -1,4 +1,4 @@
-import { isOutlinerContentNodeType } from './node-type-utils.js';
+import { isOutlinerContentNodeType, resolveEffectiveId } from './node-type-utils.js';
 import type { NodeType } from '../types/index.js';
 import { t } from '../i18n/strings.js';
 
@@ -35,7 +35,7 @@ function canReachInDisplayGraph(
 
       let nextEffectiveId: string | null = null;
       if (child.type === 'reference' && child.targetId) {
-        nextEffectiveId = child.targetId;
+        nextEffectiveId = resolveEffectiveId(childId, opts.getNode);
       } else if (isOutlinerContentNodeType(child.type)) {
         nextEffectiveId = childId;
       }
@@ -60,11 +60,7 @@ export function getTreeReferenceBlockReason(
 ): TreeReferenceBlockReason | null {
   if (!parentId || !opts.hasNode(parentId)) return 'missing_parent';
   if (!targetNodeId || !opts.hasNode(targetNodeId)) return 'missing_target';
-  const rawTargetNode = opts.getNode(targetNodeId);
-  const effectiveTargetId =
-    rawTargetNode?.type === 'reference' && rawTargetNode.targetId
-      ? rawTargetNode.targetId
-      : targetNodeId;
+  const effectiveTargetId = resolveEffectiveId(targetNodeId, opts.getNode);
   if (!effectiveTargetId || !opts.hasNode(effectiveTargetId)) return 'missing_target';
   if (parentId === effectiveTargetId) return 'self_parent';
   if (canReachInDisplayGraph(effectiveTargetId, parentId, opts)) return 'would_create_display_cycle';

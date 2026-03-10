@@ -3,7 +3,7 @@ import { Trash2, RotateCcw } from '../../lib/icons.js';
 import { useNode } from '../../hooks/use-node';
 import { useNodeStore } from '../../stores/node-store';
 import { useUIStore } from '../../stores/ui-store';
-import { CONTAINER_IDS } from '../../types/index.js';
+import { SYSTEM_NODE_IDS } from '../../types/index.js';
 import * as loroDoc from '../../lib/loro-doc.js';
 
 import { NodeHeader } from './NodeHeader';
@@ -14,7 +14,7 @@ import { isDayNode } from '../../lib/journal.js';
 import { DateNavigationBar } from '../journal/DateNavigationBar';
 import { BacklinksSection } from './BacklinksSection';
 import { SearchChipBar } from '../search/SearchChipBar';
-import { getNodeCapabilities } from '../../lib/node-capabilities.js';
+import { getNodeCapabilities, isNodeInTrash } from '../../lib/node-capabilities.js';
 
 interface NodePanelProps {
   nodeId: string;
@@ -45,18 +45,18 @@ export function NodePanel({ nodeId }: NodePanelProps) {
   const isTagDef = node?.type === 'tagDef';
   const isDefinitionNode = isFieldDef || isTagDef;
 
-  const isTrashContainer = nodeId === CONTAINER_IDS.TRASH;
+  const isTrashContainer = nodeId === SYSTEM_NODE_IDS.TRASH;
   const canDeleteNode = getNodeCapabilities(nodeId).canDelete;
 
   const isInTrash = useNodeStore((s) => {
     void s._version;
-    return loroDoc.getParentId(nodeId) === CONTAINER_IDS.TRASH;
+    return isNodeInTrash(nodeId);
   });
 
   const trashChildCount = useNodeStore((s) => {
     if (!isTrashContainer) return 0;
     void s._version;
-    return loroDoc.getChildren(CONTAINER_IDS.TRASH).length;
+    return loroDoc.getChildren(SYSTEM_NODE_IDS.TRASH).length;
   });
 
   const showDateNav = useNodeStore((s) => {

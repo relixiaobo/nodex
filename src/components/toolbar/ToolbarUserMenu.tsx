@@ -10,7 +10,7 @@ import { GoogleIcon } from '../ui/GoogleIcon.js';
 import { useWorkspaceStore } from '../../stores/workspace-store';
 import { useSyncStore } from '../../stores/sync-store';
 import { useUIStore } from '../../stores/ui-store';
-import { CONTAINER_IDS, APP_PANELS } from '../../types/index.js';
+import { SYSTEM_NODE_IDS, APP_PANELS } from '../../types/index.js';
 import { CHANGELOG } from '../../lib/changelog.js';
 import { t } from '../../i18n/strings.js';
 import { Tooltip } from '../ui/Tooltip';
@@ -204,7 +204,7 @@ export function ToolbarUserMenu() {
                     <button
                         onClick={() => {
                             setOpen(false);
-                            useUIStore.getState().navigateTo(CONTAINER_IDS.SETTINGS);
+                            useUIStore.getState().navigateTo(SYSTEM_NODE_IDS.SETTINGS);
                         }}
                         className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-sm text-foreground-secondary transition-colors hover:bg-foreground/4 hover:text-foreground"
                     >

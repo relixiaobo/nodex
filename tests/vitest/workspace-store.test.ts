@@ -107,8 +107,8 @@ describe('workspace-store auth and persistence', () => {
     vi.doMock('../../src/lib/sync/pending-queue.js', () => ({
       enqueuePendingUpdate: vi.fn().mockResolvedValue(undefined),
     }));
-    vi.doMock('../../src/lib/bootstrap-containers.js', () => ({
-      ensureContainers: vi.fn(),
+    vi.doMock('../../src/lib/bootstrap-system-nodes.js', () => ({
+      ensureSystemNodes: vi.fn(),
     }));
     vi.doMock('../../src/lib/journal.js', () => ({
       ensureTodayNode: vi.fn().mockReturnValue('today_node'),
@@ -143,8 +143,8 @@ describe('workspace-store auth and persistence', () => {
     vi.doMock('../../src/lib/sync/pending-queue.js', () => ({
       enqueuePendingUpdate: vi.fn().mockResolvedValue(undefined),
     }));
-    vi.doMock('../../src/lib/bootstrap-containers.js', () => ({
-      ensureContainers: vi.fn(),
+    vi.doMock('../../src/lib/bootstrap-system-nodes.js', () => ({
+      ensureSystemNodes: vi.fn(),
     }));
     vi.doMock('../../src/lib/journal.js', () => ({
       ensureTodayNode: vi.fn().mockReturnValue('today_node'),
@@ -178,8 +178,8 @@ describe('workspace-store auth and persistence', () => {
     vi.doMock('../../src/lib/sync/pending-queue.js', () => ({
       enqueuePendingUpdate: vi.fn().mockResolvedValue(undefined),
     }));
-    vi.doMock('../../src/lib/bootstrap-containers.js', () => ({
-      ensureContainers: vi.fn(),
+    vi.doMock('../../src/lib/bootstrap-system-nodes.js', () => ({
+      ensureSystemNodes: vi.fn(),
     }));
     vi.doMock('../../src/lib/journal.js', () => ({
       ensureTodayNode: vi.fn().mockReturnValue('today_node'),

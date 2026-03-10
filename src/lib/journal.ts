@@ -2,11 +2,11 @@
  * Journal / date node management.
  *
  * Core function: ensureDateNode — lazily creates the Year → Week → Day
- * hierarchy under CONTAINER_IDS.JOURNAL.
+ * hierarchy under SYSTEM_NODE_IDS.JOURNAL.
  *
  * Depends on: loro-doc.ts (tree ops), date-utils.ts (pure date helpers).
  */
-import { CONTAINER_IDS } from '../types/index.js';
+import { SYSTEM_NODE_IDS } from '../types/index.js';
 import { SYSTEM_TAGS } from '../types/system-nodes.js';
 import { applyTagMutationsNoCommit } from '../stores/node-store.js';
 import * as loroDoc from './loro-doc.js';
@@ -40,7 +40,7 @@ export function ensureJournalTagDefs(): void {
   for (const def of JOURNAL_TAG_DEFS) {
     const { id, name, defaultColor } = def;
     if (!loroDoc.hasNode(id)) {
-      loroDoc.createNode(id, CONTAINER_IDS.SCHEMA);
+      loroDoc.createNode(id, SYSTEM_NODE_IDS.SCHEMA);
       loroDoc.setNodeDataBatch(id, {
         type: 'tagDef',
         name,
@@ -130,12 +130,12 @@ function findOrCreateChild(
 
 /**
  * Ensure a day node exists for the given date and return its ID.
- * Creates Year → Week → Day hierarchy under JOURNAL container as needed.
+ * Creates Year → Week → Day hierarchy under the JOURNAL system node as needed.
  * Nodes are sorted in descending order (newest first).
  */
 export function ensureDateNode(date: Date): string {
   ensureJournalTagDefs();
-  const journalId = CONTAINER_IDS.JOURNAL;
+  const journalId = SYSTEM_NODE_IDS.JOURNAL;
 
   // Year node
   const { year, week } = getISOWeekNumber(date);
@@ -200,7 +200,7 @@ export function getAdjacentDayNodeId(currentDayNodeId: string, offset: number): 
  * Only counts user content children (excludes fieldEntry nodes).
  */
 export function getDayNoteCountsForMonth(year: number, month: number): Map<string, number> {
-  const journalId = CONTAINER_IDS.JOURNAL;
+  const journalId = SYSTEM_NODE_IDS.JOURNAL;
   const result = new Map<string, number>();
 
   // Scan all year nodes under JOURNAL
@@ -275,8 +275,8 @@ export function isYearNode(nodeId: string): boolean {
 }
 
 /**
- * Check if a node is the JOURNAL container.
+ * Check if a node is the JOURNAL system node.
  */
 export function isJournalNode(nodeId: string): boolean {
-  return nodeId === CONTAINER_IDS.JOURNAL;
+  return nodeId === SYSTEM_NODE_IDS.JOURNAL;
 }

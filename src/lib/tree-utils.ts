@@ -4,7 +4,7 @@
  * Uses LoroDoc as the source of truth. All node lookups go through loroDoc.toNodexNode().
  */
 import type { NodexNode } from '../types/index.js';
-import { isOutlinerContentNodeType } from './node-type-utils.js';
+import { isOutlinerContentNodeType, resolveEffectiveId } from './node-type-utils.js';
 import * as loroDoc from './loro-doc.js';
 
 // ─── Structural node detection ───
@@ -256,10 +256,6 @@ export function getNodeIndex(nodeId: string): number {
  * For reference nodes, returns the length of the target node's name.
  */
 export function getNodeTextLengthById(nodeId: string): number {
-  const node = loroDoc.toNodexNode(nodeId);
-  if (!node) return 0;
-  if (node.type === 'reference' && node.targetId) {
-    return (loroDoc.toNodexNode(node.targetId)?.name ?? '').length;
-  }
-  return (node.name ?? '').length;
+  const effectiveId = resolveEffectiveId(nodeId);
+  return (loroDoc.toNodexNode(effectiveId)?.name ?? '').length;
 }

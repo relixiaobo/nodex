@@ -41,6 +41,17 @@ describe('reference-rules', () => {
     expect(getTreeReferenceBlockReason('B', 'A', g)).toBe('would_create_display_cycle');
   });
 
+  it('resolves reference targets before cycle validation', () => {
+    const g = buildGraph({
+      A: { id: 'A', children: ['rAB'] },
+      B: { id: 'B', children: [] },
+      rAB: { id: 'rAB', type: 'reference', targetId: 'B' },
+      rBA: { id: 'rBA', type: 'reference', targetId: 'A' },
+    });
+
+    expect(getTreeReferenceBlockReason('B', 'rBA', g)).toBe('would_create_display_cycle');
+  });
+
   it('detects repeated effective node in render path as display cycle', () => {
     expect(isReferenceDisplayCycle('A', ['root', 'A'])).toBe(true);
     expect(isReferenceDisplayCycle('B', ['root', 'A'])).toBe(false);

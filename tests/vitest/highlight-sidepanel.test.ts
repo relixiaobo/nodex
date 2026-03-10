@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useNodeStore } from '../../src/stores/node-store.js';
 import { resetAndSeed } from './helpers/test-state.js';
-import { CONTAINER_IDS, SYS_T, NDX_F } from '../../src/types/index.js';
+import { SYSTEM_NODE_IDS, SYS_T, NDX_F } from '../../src/types/index.js';
 import {
   ensureHighlightTagDef,
   ensureNoteTagDef,
@@ -218,7 +218,7 @@ describe('highlight-sidepanel (unified Path B model)', () => {
     expect(before.has(second.highlightNodeId)).toBe(true);
 
     // Trash the highlight (direct child of clip, no note reference to keep it alive)
-    loroDoc.moveNode(first.highlightNodeId, CONTAINER_IDS.TRASH);
+    loroDoc.moveNode(first.highlightNodeId, SYSTEM_NODE_IDS.TRASH);
     const after = collectAllHighlightNodeIds();
     const removed = getRemovedHighlightIds(before, after);
 

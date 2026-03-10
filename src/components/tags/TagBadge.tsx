@@ -3,8 +3,7 @@ import { X, XCircle, Hash, Settings, Trash2, AlertTriangle, Search } from '../..
 import { createPortal } from 'react-dom';
 import { useNodeStore } from '../../stores/node-store';
 import { resolveTagColor } from '../../lib/tag-colors.js';
-import * as loroDoc from '../../lib/loro-doc.js';
-import { CONTAINER_IDS } from '../../types/index.js';
+import { isNodeInTrash } from '../../lib/node-capabilities.js';
 
 interface TagBadgeProps {
   tagDefId: string;
@@ -32,7 +31,7 @@ export function TagBadge({ tagDefId, onRemove, onSearch, onNavigate }: TagBadgeP
     if (tagDefId.startsWith('sys:')) return tagDefId.slice(4);
     return 'Untitled';
   });
-  const isTrashed = useNodeStore((s) => { void s._version; return loroDoc.getParentId(tagDefId) === CONTAINER_IDS.TRASH; });
+  const isTrashed = useNodeStore((s) => { void s._version; return isNodeInTrash(tagDefId); });
   const color = useNodeStore((s) => { void s._version; return resolveTagColor(tagDefId); });
   // Tag name click navigates to search results (primary action)
   const canSearch = !!onSearch && canNavigateToTagNode(hasBackingNode);

@@ -1,4 +1,4 @@
-import { CONTAINER_IDS, SYSTEM_TAGS } from '../types/index.js';
+import { SYSTEM_NODE_IDS, SYSTEM_TAGS } from '../types/index.js';
 import * as loroDoc from './loro-doc.js';
 
 export type SystemNodeIconKey =
@@ -25,15 +25,15 @@ export interface SystemNodePreset {
 }
 
 export const SYSTEM_NODE_PRESETS: ReadonlyArray<SystemNodePreset> = [
-  { id: CONTAINER_IDS.LIBRARY, defaultName: 'Library', iconKey: 'library', bootstrap: false, locked: false, canEditStructure: true, canEditFieldValues: true, quickNav: false, paletteSearchable: true },
-  { id: CONTAINER_IDS.INBOX, defaultName: 'Inbox', iconKey: 'inbox', bootstrap: false, locked: false, canEditStructure: true, canEditFieldValues: true, quickNav: false, paletteSearchable: true },
-  { id: CONTAINER_IDS.JOURNAL, defaultName: 'Daily notes', iconKey: 'journal', bootstrap: true, locked: true, canEditStructure: false, canEditFieldValues: false, quickNav: true, paletteSearchable: true },
-  { id: CONTAINER_IDS.SEARCHES, defaultName: 'Searches', iconKey: 'search', bootstrap: false, locked: false, canEditStructure: true, canEditFieldValues: true, quickNav: false, paletteSearchable: true },
-  { id: CONTAINER_IDS.TRASH, defaultName: 'Trash', iconKey: 'trash', bootstrap: true, locked: true, canEditStructure: false, canEditFieldValues: false, quickNav: true, paletteSearchable: true },
-  { id: CONTAINER_IDS.SCHEMA, defaultName: 'Schema', iconKey: 'schema', bootstrap: true, locked: true, canEditStructure: true, canEditFieldValues: false, quickNav: false, paletteSearchable: true },
-  { id: CONTAINER_IDS.CLIPS, defaultName: 'Clips', iconKey: 'clips', bootstrap: false, locked: false, canEditStructure: true, canEditFieldValues: true, quickNav: false, paletteSearchable: true },
-  { id: CONTAINER_IDS.STASH, defaultName: 'Stash', iconKey: 'stash', bootstrap: false, locked: false, canEditStructure: true, canEditFieldValues: true, quickNav: false, paletteSearchable: true },
-  { id: CONTAINER_IDS.SETTINGS, defaultName: 'Settings', iconKey: 'settings', bootstrap: true, locked: true, canEditStructure: false, canEditFieldValues: true, quickNav: false, paletteSearchable: true },
+  { id: SYSTEM_NODE_IDS.LIBRARY, defaultName: 'Library', iconKey: 'library', bootstrap: false, locked: false, canEditStructure: true, canEditFieldValues: true, quickNav: false, paletteSearchable: true },
+  { id: SYSTEM_NODE_IDS.INBOX, defaultName: 'Inbox', iconKey: 'inbox', bootstrap: false, locked: false, canEditStructure: true, canEditFieldValues: true, quickNav: false, paletteSearchable: true },
+  { id: SYSTEM_NODE_IDS.JOURNAL, defaultName: 'Daily notes', iconKey: 'journal', bootstrap: true, locked: true, canEditStructure: false, canEditFieldValues: false, quickNav: true, paletteSearchable: true },
+  { id: SYSTEM_NODE_IDS.SEARCHES, defaultName: 'Searches', iconKey: 'search', bootstrap: false, locked: false, canEditStructure: true, canEditFieldValues: true, quickNav: false, paletteSearchable: true },
+  { id: SYSTEM_NODE_IDS.TRASH, defaultName: 'Trash', iconKey: 'trash', bootstrap: true, locked: true, canEditStructure: false, canEditFieldValues: false, quickNav: true, paletteSearchable: true },
+  { id: SYSTEM_NODE_IDS.SCHEMA, defaultName: 'Schema', iconKey: 'schema', bootstrap: true, locked: true, canEditStructure: true, canEditFieldValues: false, quickNav: false, paletteSearchable: true },
+  { id: SYSTEM_NODE_IDS.CLIPS, defaultName: 'Clips', iconKey: 'clips', bootstrap: false, locked: false, canEditStructure: true, canEditFieldValues: true, quickNav: false, paletteSearchable: true },
+  { id: SYSTEM_NODE_IDS.STASH, defaultName: 'Stash', iconKey: 'stash', bootstrap: false, locked: false, canEditStructure: true, canEditFieldValues: true, quickNav: false, paletteSearchable: true },
+  { id: SYSTEM_NODE_IDS.SETTINGS, defaultName: 'Settings', iconKey: 'settings', bootstrap: true, locked: true, canEditStructure: false, canEditFieldValues: true, quickNav: false, paletteSearchable: true },
   { id: SYSTEM_TAGS.DAY, defaultName: 'day', iconKey: 'journal', bootstrap: false, locked: true, canEditStructure: true, canEditFieldValues: true, quickNav: false, paletteSearchable: false },
   { id: SYSTEM_TAGS.WEEK, defaultName: 'week', iconKey: 'journal', bootstrap: false, locked: true, canEditStructure: true, canEditFieldValues: true, quickNav: false, paletteSearchable: false },
   { id: SYSTEM_TAGS.YEAR, defaultName: 'year', iconKey: 'journal', bootstrap: false, locked: true, canEditStructure: true, canEditFieldValues: true, quickNav: false, paletteSearchable: false },

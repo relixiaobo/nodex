@@ -133,6 +133,39 @@ function seedBody(): void {
   cn(NDX_F.PUBLISHED, SYS_T.SOURCE, { type: 'fieldDef', name: 'Published', fieldType: FIELD_TYPES.DATE });
 
   // ═══════════════════════════════════════════════════════════════
+  // TagDef: Book (extends Source)
+  // ═══════════════════════════════════════════════════════════════
+  cn('tagDef_book', CONTAINER_IDS.SCHEMA, {
+    type: 'tagDef', name: 'book', color: 'brown', extends: SYS_T.SOURCE,
+  });
+
+  // ── Store image tags (simple, no field inheritance — for clean screenshots) ──
+  cn('tagDef_si_article', CONTAINER_IDS.SCHEMA, { type: 'tagDef', name: 'article', color: 'blue' });
+  cn('tagDef_si_book', CONTAINER_IDS.SCHEMA, { type: 'tagDef', name: 'book', color: 'brown' });
+  cn('tagDef_si_method', CONTAINER_IDS.SCHEMA, { type: 'tagDef', name: 'method', color: 'blue' });
+
+  // ═══════════════════════════════════════════════════════════════
+  // TagDef: Insight (standalone tag for key insights)
+  // ═══════════════════════════════════════════════════════════════
+  cn('tagDef_insight', CONTAINER_IDS.SCHEMA, {
+    type: 'tagDef', name: 'insight', color: 'green',
+  });
+
+  // ═══════════════════════════════════════════════════════════════
+  // TagDef: Mental Model (concept tag)
+  // ═══════════════════════════════════════════════════════════════
+  cn('tagDef_mental_model', CONTAINER_IDS.SCHEMA, {
+    type: 'tagDef', name: 'mental-model', color: 'indigo',
+  });
+
+  // ═══════════════════════════════════════════════════════════════
+  // TagDef: Project
+  // ═══════════════════════════════════════════════════════════════
+  cn('tagDef_project', CONTAINER_IDS.SCHEMA, {
+    type: 'tagDef', name: 'project', color: 'orange',
+  });
+
+  // ═══════════════════════════════════════════════════════════════
   // TagDef: Article (extends Source) — NDX_T01
   // ═══════════════════════════════════════════════════════════════
   cn(NDX_T.ARTICLE, CONTAINER_IDS.SCHEMA, {
@@ -194,6 +227,73 @@ function seedBody(): void {
   cn('note_2', CONTAINER_IDS.LIBRARY, { name: 'Quick ideas' });
   cn('idea_1', 'note_2', { name: 'Try using virtual scrolling for large lists' });
   cn('idea_2', 'note_2', { name: 'Add dark mode support' });
+
+  // ═══════════════════════════════════════════════════════════════
+  // Store image content: Library > Reading Notes (Scene 4 — Clean Paper)
+  // ═══════════════════════════════════════════════════════════════
+  cn('si_reading_notes', CONTAINER_IDS.LIBRARY, { name: 'Reading Notes' });
+
+  // 1. The Art of Deep Reading #article (expanded, with children)
+  cn('si_deep_reading', 'si_reading_notes', { name: 'The Art of Deep Reading' });
+  useNodeStore.getState().applyTag('si_deep_reading', 'tagDef_si_article');
+  cn('si_dr_1', 'si_deep_reading', { name: 'Understanding = pausing to articulate in your own words' });
+  useNodeStore.getState().applyTag('si_dr_1', 'tagDef_insight');
+  cn('si_dr_2', 'si_deep_reading', { name: 'Writing forces clarity that reading alone never achieves' });
+  cn('si_dr_3', 'si_deep_reading', { name: 'The most effective readers are writers — not by profession, but by habit' });
+
+  // 2. Second-Order Thinking #mental-model (collapsed)
+  cn('si_sot', 'si_reading_notes', { name: 'Second-Order Thinking' });
+  useNodeStore.getState().applyTag('si_sot', 'tagDef_mental_model');
+
+  // 3. Finish chapter 3 of Thinking, Fast and Slow #book (done checkbox)
+  cn('si_tfs', 'si_reading_notes', { name: 'Finish chapter 3 of Thinking, Fast and Slow' });
+  useNodeStore.getState().applyTag('si_tfs', 'tagDef_si_book');
+  useNodeStore.getState().applyTag('si_tfs', 'tagDef_task');
+  loroDoc.setNodeDataBatch('si_tfs', { done: Date.now() });
+
+  // 4. Write weekly review — connect last 5 articles #project (unchecked)
+  cn('si_weekly', 'si_reading_notes', { name: 'Write weekly review — connect last 5 articles' });
+  useNodeStore.getState().applyTag('si_weekly', 'tagDef_project');
+  useNodeStore.getState().applyTag('si_weekly', 'tagDef_task');
+
+  // 5. Slow is Smooth, Smooth is Fast #insight
+  cn('si_slow', 'si_reading_notes', { name: 'Slow is Smooth, Smooth is Fast' });
+  useNodeStore.getState().applyTag('si_slow', 'tagDef_insight');
+
+  // 6. Why Leaders Are Slow Thinkers #article
+  cn('si_leaders', 'si_reading_notes', { name: 'Why Leaders Are Slow Thinkers' });
+  useNodeStore.getState().applyTag('si_leaders', 'tagDef_si_article');
+
+  // 7. Meeting with @Sarah about research direction #meeting
+  cn('si_meeting_sarah', 'si_reading_notes', { name: 'Meeting with Sarah about research direction' });
+  useNodeStore.getState().applyTag('si_meeting_sarah', 'tagDef_meeting');
+
+  // ═══════════════════════════════════════════════════════════════
+  // Store image content: Library > Mental Models (Scene 2 — Connect)
+  // ═══════════════════════════════════════════════════════════════
+  cn('si_mental_models', CONTAINER_IDS.LIBRARY, { name: 'Mental Models' });
+
+  // Second-Order Thinking #mental-model (with children)
+  cn('si_mm_sot', 'si_mental_models', { name: 'Second-Order Thinking' });
+  useNodeStore.getState().applyTag('si_mm_sot', 'tagDef_mental_model');
+  cn('si_mm_sot_1', 'si_mm_sot', { name: 'Always ask "And then what?" — first reaction is usually wrong' });
+  useNodeStore.getState().applyTag('si_mm_sot_1', 'tagDef_insight');
+  cn('si_mm_sot_2', 'si_mm_sot', { name: 'Not about prediction, but considering the range of possible outcomes' });
+
+  // Inversion #mental-model
+  cn('si_mm_inv', 'si_mental_models', { name: 'Inversion' });
+  useNodeStore.getState().applyTag('si_mm_inv', 'tagDef_mental_model');
+  cn('si_mm_inv_1', 'si_mm_inv', {
+    name: 'Instead of "how to succeed" → ask "what would guarantee failure" and avoid it',
+  });
+
+  // Design Thinking for Engineers #project (with inline ref)
+  cn('si_mm_dte', 'si_mental_models', { name: 'Design Thinking for Engineers' });
+  useNodeStore.getState().applyTag('si_mm_dte', 'tagDef_project');
+  cn('si_mm_dte_1', 'si_mm_dte', {
+    name: 'Apply \uFFFC to feature scoping',
+    inlineRefs: [{ offset: 6, targetNodeId: 'si_mm_sot', displayName: 'Second-Order Thinking' }],
+  });
 
   // ── Rich text test nodes ──
   cn('note_rich', CONTAINER_IDS.LIBRARY, { name: 'Rich text formatting tests' });
@@ -274,10 +374,34 @@ function seedBody(): void {
   const todayDayId = ensureDateNode(today);
   const yesterdayDayId = ensureDateNode(yesterday);
 
-  // Today's notes (3 notes → heatmap tier 2: bg-primary/15)
-  cn('j_today_1', todayDayId, { name: 'Started working on the outliner component' });
-  cn('j_today_2', todayDayId, { name: 'Fixed a bug in the drag and drop handler' });
-  cn('j_today_3', todayDayId, { name: 'Learned about TipTap keyboard shortcuts' });
+  // Today's notes — store image content (Scenes 1, 3, 5)
+
+  // Scene 5: How to Do Great Work (Paul Graham) #article
+  cn('j_pg', todayDayId, { name: 'How to Do Great Work' });
+  useNodeStore.getState().applyTag('j_pg', 'tagDef_si_article');
+  cn('j_pg_1', 'j_pg', { name: 'Four steps: choose, learn, notice gaps, explore' });
+  cn('j_pg_2', 'j_pg', { name: 'Great work needs 3 qualities: natural aptitude, deep interest, and scope for greatness' });
+  useNodeStore.getState().applyTag('j_pg_2', 'tagDef_insight');
+
+  // Scene 1: The Art of Deep Reading notes
+  cn('j_deep', todayDayId, { name: 'The Art of Deep Reading' });
+  useNodeStore.getState().applyTag('j_deep', 'tagDef_si_article');
+  cn('j_deep_1', 'j_deep', { name: 'Understanding emerges through writing' });
+  useNodeStore.getState().applyTag('j_deep_1', 'tagDef_insight');
+  cn('j_deep_2', 'j_deep', { name: 'Knowledge compounds over time' });
+  cn('j_deep_2a', 'j_deep_2', { name: 'Each note makes past notes more valuable' });
+  cn('j_deep_3', 'j_deep', { name: 'Capture at the point of reading' });
+  useNodeStore.getState().applyTag('j_deep_3', 'tagDef_si_method');
+
+  // Scene 3: Why Leaders Are Slow Thinkers #article
+  cn('j_leaders', todayDayId, { name: 'Why Leaders Are Slow Thinkers' });
+  useNodeStore.getState().applyTag('j_leaders', 'tagDef_si_article');
+  cn('j_leaders_1', 'j_leaders', { name: 'The gap between stimulus and response — same pattern as deep reading and second-order thinking' });
+
+  // Range by David Epstein #book
+  cn('j_range', todayDayId, { name: 'Range by David Epstein' });
+  useNodeStore.getState().applyTag('j_range', 'tagDef_si_book');
+  cn('j_range_1', 'j_range', { name: 'Generalists triumph in a specialized world — try many things first' });
 
   // Yesterday's notes (2 notes → heatmap tier 1: bg-primary/8)
   cn('j_yest_1', yesterdayDayId, { name: 'Reviewed PR for data model migration' });
@@ -348,6 +472,17 @@ function seedBody(): void {
   uiStore.setExpanded('proj_1:task_1', true, true);
   uiStore.setExpanded('proj_1:task_2', true, true);
   uiStore.setExpanded(`${CONTAINER_IDS.LIBRARY}:note_rich`, true, true);
+
+  // Store image nodes: expand article nodes with children
+  uiStore.setExpanded('si_reading_notes:si_deep_reading', true, true);
+  uiStore.setExpanded('si_mental_models:si_mm_sot', true, true);
+  uiStore.setExpanded('si_mental_models:si_mm_inv', true, true);
+  uiStore.setExpanded('si_mental_models:si_mm_dte', true, true);
+  uiStore.setExpanded(`${todayDayId}:j_pg`, true, true);
+  uiStore.setExpanded(`${todayDayId}:j_deep`, true, true);
+  uiStore.setExpanded('j_deep_2:j_deep_2a', true, true);
+  uiStore.setExpanded(`${todayDayId}:j_leaders`, true, true);
+  uiStore.setExpanded(`${todayDayId}:j_range`, true, true);
 
   // Navigate to Library — use replacePanel (not navigateTo) to avoid
   // creating a Loro undo entry whose UI snapshot is the empty initial state.

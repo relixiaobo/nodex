@@ -20,15 +20,15 @@ export default defineConfig({
     name,
     description: 'Think where you read — knowledge management in your browser side panel',
     // Extension key — determines the extension ID Chrome assigns.
-    // Store builds omit this; Chrome Web Store assigns the ID.
-    // Preview and Dev each have their own key so they can coexist in Chrome.
-    //   Dev     → gkpgogocbjejpildfebpklkldhogdfkp
+    // All three environments have their own key so they can coexist in Chrome.
+    //   Store   → joabcnflpakkpkalkphcdkdbfkcfhlpa
     //   Preview → andlcnfkdjeebjfdjangcnjaicfapmni
-    ...(!isStore && {
-      key: isPreview
+    //   Dev     → gkpgogocbjejpildfebpklkldhogdfkp
+    key: isStore
+      ? 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAlUCbj/m/+elw/o2ZjqlI0ctw5hklYQXEdqwp9x34tshVvI9KsotdMT7uoTQ7kiEdGbdWyy2V/dWo+P7HGMQFopklNhyTFg1ABD3pIz6Lqh2U/ZfBrUiAetUBy01ov5T9uo3GmbNWRjqBBaWa9/QerOge72w4Nv/eRETIQbQXt0NSKKqIQWISsXrfGnszC++41r7h2u+MTxMrDm+91L8C3nM5Pbtorxk8heaGpcCmiln/WDFfoy7wiEZyccXzxday+hx/Ybl/UknISzQRGmZzrar8ze1vPoSX07SL45jc5jdCFyJXPPamEyVcXBlFO6UZufFxI/XT+YD0oCq4uemL9wIDAQAB'
+      : isPreview
         ? 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAqR1gWzl6llxj2hMyQxDma8WT5zY6iGWkpXD75Y+hIE74lKTpbbNxNa2Z1O9cDURCXllePF0+QThnJIWVaawoclRqILhuf0AeVyr7tUL7AJ9n+o17Qk2YZAdoIahCk9SxevMQI4DDHuVzvNEbcpGwuadopzY0syDbQYpjLgf7V1J0zaHVh+gY2l4TxJWHeU+d23bOvG2Qdj41LMj+kEnAiFbFF+YFOlyb+hcd79ZFRv6SmBZQBd0uKBWB8f2hBQAAexQ0FaOLC5UtVOOhCredcwMdlP5oppYq2zdILG+YiWKMw0Qp9NIxBPAj1sJfJsfyc5y1XBdgtf6Do0FNYcb8qwIDAQAB'
         : 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAtYC0NMuvk5vqBuUJkpg2TU0D3/MHDEZjSppYfA/+cz4dwneFh9BDiFxdoJNa/znyOxmza03rA5eXWdwPH1pW3VEA5vwlLQOEVyS2vnoqNzMnewfvzxT5YLIhlb/hSdA4FG0cvYpAWZSV0RcthyQgq4wJ1YEcB6LfkuBk/2AHeiir3n9R7h23Bn7xWVFzqgeT4CnFA3gOo3Q05/YWC9V7sS4QIndo8NF9B15lctbnCV7wpAs5QTCuIkM60eARZnJFc1DmmbldEbP06aEI4iPT7XVlLG6D+bMaf0R/uzi9A/4Juc6L6hs4qg12tga0R8poHUcRGd/EPF56soHxcU+4gQIDAQAB',
-    }),
     icons: {
       '16':  `${iconDir}/16.png`,
       '32':  `${iconDir}/32.png`,

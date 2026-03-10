@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1280, height=800">
+<title>Screenshot 3 — Connect</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    width: 1280px; height: 800px;
+    background: #F5F4EE;
+    font-family: 'Inter', system-ui, sans-serif;
+    overflow: hidden;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 44px;
+  }
+
+  /* Caption */
+  .caption-group { text-align: center; }
+  .caption {
+    font-size: 36px; font-weight: 600; color: #1A1A1A;
+    letter-spacing: -1px; line-height: 1.3;
+  }
+  .caption em { font-style: normal; color: #5E8E65; }
+  .caption-sub {
+    font-size: 18px; color: #666; margin-top: 8px;
+    letter-spacing: -0.2px;
+  }
+
+  /* Central node tree */
+  .tree-card {
+    width: 720px; padding: 36px 40px 44px;
+    background: #fff; border-radius: 16px;
+    box-shadow: 0 0 0 1px rgba(0,0,0,0.05), 0 4px 16px rgba(0,0,0,0.05);
+    position: relative;
+  }
+
+  /* Nodes */
+  .node-list { display: flex; flex-direction: column; gap: 4px; }
+  .node {
+    display: flex; gap: 6px; align-items: flex-start;
+    min-height: 28px; padding-left: 2px;
+  }
+  .node-i1 { padding-left: 32px; }
+  .node-i2 { padding-left: 62px; }
+
+  .chevron {
+    width: 15px; height: 28px; display: flex; align-items: center;
+    justify-content: center; flex-shrink: 0;
+  }
+  .chevron-down svg { opacity: 0.4; }
+  .chevron-hidden { opacity: 0; }
+
+  .bcol {
+    width: 15px; height: 28px; display: flex; align-items: center;
+    justify-content: center; flex-shrink: 0;
+  }
+  .bullet { width: 5px; height: 5px; border-radius: 50%; background: rgba(26,26,26,0.35); }
+  .bullet-parent {
+    width: 15px; height: 15px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  /* Tag-colored bullets */
+  .bp-article { background: rgba(75,124,158,0.12); }
+  .bp-article .bullet { background: #4B7C9E; }
+  .bp-concept { background: rgba(96,100,166,0.12); }
+  .bp-concept .bullet { background: #6064A6; }
+  .bp-insight { background: rgba(96,138,85,0.12); }
+  .bp-insight .bullet { background: #608A55; }
+  .b-article { background: #4B7C9E; }
+  .b-insight { background: #608A55; }
+  .b-concept { background: #6064A6; }
+
+  .nc { flex: 1; min-width: 0; }
+  .nt-line { font-size: 15px; line-height: 28px; color: #1A1A1A; }
+
+  /* Tags */
+  .tag {
+    display: inline-flex; align-items: center; height: 20px;
+    font-size: 13px; font-weight: 500; margin-left: 6px; gap: 2px;
+    vertical-align: baseline;
+  }
+  .tag-hash { color: rgba(153,153,153,0.4); }
+  .tag-article .tag-name { color: #4B7C9E; }
+  .tag-concept .tag-name { color: #6064A6; }
+  .tag-insight .tag-name { color: #608A55; }
+
+  /* References */
+  .ref { color: #5E8E65; font-weight: 500; }
+
+  /* Indent lines */
+  .indent-group { position: relative; }
+  .indent-group > .indent-line {
+    position: absolute; left: 9.5px; top: 0; bottom: 8px;
+    width: 1px; background: rgba(0,0,0,0.06);
+  }
+  .indent-group-i1 { padding-left: 32px; }
+  .indent-group-i1 > .indent-line { left: 39.5px; }
+
+  /* Connection annotation lines */
+  .conn-line {
+    position: absolute;
+    border: 1.5px dashed rgba(94,142,101,0.35);
+    border-radius: 8px; pointer-events: none;
+  }
+  .conn-1 {
+    right: -24px; top: 72px; width: 60px; height: 200px;
+    border-left: none; border-bottom: none;
+    border-top-right-radius: 12px;
+  }
+  .conn-dot {
+    position: absolute; width: 7px; height: 7px;
+    border-radius: 50%; background: #5E8E65;
+  }
+  .conn-dot-1 { right: -28px; top: 69px; }
+  .conn-dot-2 { right: -28px; top: 268px; }
+
+  /* Side annotations */
+  .annotation {
+    position: absolute; font-size: 11px; font-weight: 500;
+    color: #5E8E65; letter-spacing: 0.3px;
+    writing-mode: vertical-rl; text-orientation: mixed;
+  }
+  .anno-right { right: -76px; top: 140px; }
+</style>
+</head>
+<body>
+  <div class="caption-group">
+    <div class="caption">Organize your notes.<br><em>Discover what you actually think.</em></div>
+    <div class="caption-sub">Tags, references, hierarchy — every action is a thinking action.</div>
+  </div>
+
+  <div class="tree-card">
+    <!-- Root: Reading Notes -->
+    <div class="node-list">
+      <!-- The Art of Deep Reading -->
+      <div class="node">
+        <div class="chevron chevron-down">
+          <svg width="10" height="10" viewBox="0 0 12 12"><path d="M4.5 2.5L8 6L4.5 9.5" fill="none" stroke="rgba(26,26,26,0.4)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" transform="rotate(90 6 6)"/></svg>
+        </div>
+        <div class="bcol"><div class="bullet-parent bp-article"><div class="bullet"></div></div></div>
+        <div class="nc">
+          <div class="nt-line">The Art of Deep Reading<span class="tag tag-article"><span class="tag-hash">#</span><span class="tag-name">article</span></span></div>
+        </div>
+      </div>
+      <!-- Children of Deep Reading -->
+      <div class="indent-group">
+        <div class="indent-line" style="left: 39.5px; top: 0; bottom: 6px;"></div>
+        <div class="node node-i1">
+          <div class="chevron chevron-hidden"></div>
+          <div class="bcol"><div class="bullet b-insight"></div></div>
+          <div class="nc">
+            <div class="nt-line">Understanding = articulating in your own words<span class="tag tag-insight"><span class="tag-hash">#</span><span class="tag-name">insight</span></span></div>
+          </div>
+        </div>
+        <div class="node node-i1">
+          <div class="chevron chevron-hidden"></div>
+          <div class="bcol"><div class="bullet"></div></div>
+          <div class="nc">
+            <div class="nt-line">Writing forces clarity — the Feynman method</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Second-Order Thinking -->
+      <div class="node" style="margin-top: 4px;">
+        <div class="chevron chevron-down">
+          <svg width="10" height="10" viewBox="0 0 12 12"><path d="M4.5 2.5L8 6L4.5 9.5" fill="none" stroke="rgba(26,26,26,0.4)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" transform="rotate(90 6 6)"/></svg>
+        </div>
+        <div class="bcol"><div class="bullet-parent bp-concept"><div class="bullet"></div></div></div>
+        <div class="nc">
+          <div class="nt-line">Second-Order Thinking<span class="tag tag-concept"><span class="tag-hash">#</span><span class="tag-name">mental-model</span></span></div>
+        </div>
+      </div>
+      <!-- Children -->
+      <div class="indent-group">
+        <div class="indent-line" style="left: 39.5px; top: 0; bottom: 6px;"></div>
+        <div class="node node-i1">
+          <div class="chevron chevron-hidden"></div>
+          <div class="bcol"><div class="bullet"></div></div>
+          <div class="nc">
+            <div class="nt-line">Always ask "And then what?" — first reaction is usually wrong</div>
+          </div>
+        </div>
+        <div class="node node-i1">
+          <div class="chevron chevron-hidden"></div>
+          <div class="bcol"><div class="bullet"></div></div>
+          <div class="nc">
+            <div class="nt-line">Apply <span class="ref">@Second-Order Thinking</span> to feature scoping</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Inversion -->
+      <div class="node" style="margin-top: 4px;">
+        <div class="chevron chevron-hidden"></div>
+        <div class="bcol"><div class="bullet-parent bp-concept"><div class="bullet"></div></div></div>
+        <div class="nc">
+          <div class="nt-line">Inversion<span class="tag tag-concept"><span class="tag-hash">#</span><span class="tag-name">mental-model</span></span></div>
+        </div>
+      </div>
+
+      <!-- Why Leaders Are Slow Thinkers -->
+      <div class="node" style="margin-top: 4px;">
+        <div class="chevron chevron-down">
+          <svg width="10" height="10" viewBox="0 0 12 12"><path d="M4.5 2.5L8 6L4.5 9.5" fill="none" stroke="rgba(26,26,26,0.4)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" transform="rotate(90 6 6)"/></svg>
+        </div>
+        <div class="bcol"><div class="bullet-parent bp-article"><div class="bullet"></div></div></div>
+        <div class="nc">
+          <div class="nt-line">Why Leaders Are Slow Thinkers<span class="tag tag-article"><span class="tag-hash">#</span><span class="tag-name">article</span></span></div>
+        </div>
+      </div>
+      <div class="indent-group">
+        <div class="indent-line" style="left: 39.5px; top: 0; bottom: 6px;"></div>
+        <div class="node node-i1">
+          <div class="chevron chevron-hidden"></div>
+          <div class="bcol"><div class="bullet b-insight"></div></div>
+          <div class="nc">
+            <div class="nt-line">The gap between stimulus and response — same pattern as <span class="ref">@Deep Reading</span><span class="tag tag-insight"><span class="tag-hash">#</span><span class="tag-name">insight</span></span></div>
+          </div>
+        </div>
+        <div class="node node-i1">
+          <div class="chevron chevron-hidden"></div>
+          <div class="bcol"><div class="bullet"></div></div>
+          <div class="nc">
+            <div class="nt-line">Slow thinking ≠ slow decision. It's <span class="ref">@Second-Order Thinking</span> in practice</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

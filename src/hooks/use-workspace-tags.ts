@@ -16,7 +16,7 @@ export function useWorkspaceTags(): Array<{ id: string; name: string }> {
     const tags: Array<{ id: string; name: string }> = [];
     for (const id of loroDoc.getAllNodeIds()) {
       const node = loroDoc.toNodexNode(id);
-      if (node?.type === 'tagDef') {
+      if (node?.type === 'tagDef' && node.locked !== true) {
         tags.push({ id, name: node.name ?? 'Untitled' });
       }
     }

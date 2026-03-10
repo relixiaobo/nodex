@@ -17,7 +17,7 @@ interface DoneMappingEntriesProps {
 
 export function DoneMappingEntries({ tagDefId, mappingKey }: DoneMappingEntriesProps) {
   const addFieldToNode = useNodeStore((s) => s.addFieldToNode);
-  const tupleId = useNodeStore((s) => {
+  const fieldEntryId = useNodeStore((s) => {
     void s._version;
     const tagDef = s.getNode(tagDefId);
     if (!tagDef?.children?.length) return null;
@@ -32,14 +32,14 @@ export function DoneMappingEntries({ tagDefId, mappingKey }: DoneMappingEntriesP
   const hasAttemptedCreate = useRef(false);
 
   useEffect(() => {
-    if (tupleId || hasAttemptedCreate.current) return;
+    if (fieldEntryId || hasAttemptedCreate.current) return;
     hasAttemptedCreate.current = true;
     addFieldToNode(tagDefId, mappingKey);
-  }, [tupleId, addFieldToNode, tagDefId, mappingKey]);
+  }, [fieldEntryId, addFieldToNode, tagDefId, mappingKey]);
 
-  if (!tupleId) return null;
+  if (!fieldEntryId) return null;
 
   return (
-    <FieldValueOutliner tupleId={tupleId} attrDefId={mappingKey} />
+    <FieldValueOutliner fieldEntryId={fieldEntryId} attrDefId={mappingKey} />
   );
 }

@@ -3,17 +3,9 @@
  *
  * Uses LoroDoc as the source of truth. All node lookups go through loroDoc.toNodexNode().
  */
-import { isContainerNode } from '../types/index.js';
 import type { NodexNode } from '../types/index.js';
 import { isOutlinerContentNodeType } from './node-type-utils.js';
 import * as loroDoc from './loro-doc.js';
-
-// ─── Container / root detection ───
-
-/** Check if a node ID is a workspace container (LIBRARY, INBOX, etc.). */
-export function isWorkspaceContainer(nodeId: string): boolean {
-  return isContainerNode(nodeId);
-}
 
 // ─── Structural node detection ───
 
@@ -50,24 +42,17 @@ export function getAncestorChain(
     if (!parentId || visited.has(parentId)) break;
     visited.add(parentId);
 
-    // If parent is a container node, record as workspace root, add it to chain, and stop
-    if (isContainerNode(parentId)) {
-      workspaceRootId = parentId;
-      const containerNode = loroDoc.toNodexNode(parentId);
-      if (containerNode) {
-        const rawName = containerNode.name ?? '';
-        const displayName = rawName.trim() || parentId;
-        chain.push({ id: parentId, name: displayName });
-      }
-      break;
-    }
-
     const parentNode = loroDoc.toNodexNode(parentId);
     if (!parentNode) break;
+    const isWorkspaceRoot = loroDoc.getParentId(parentId) === null;
+    if (isWorkspaceRoot) {
+      workspaceRootId = parentId;
+    }
 
     // Skip structural nodes — continue walking up
     if (isStructuralNode(parentNode)) {
       currentId = parentId;
+      if (isWorkspaceRoot) break;
       continue;
     }
 
@@ -77,6 +62,7 @@ export function getAncestorChain(
     chain.push({ id: parentId, name: displayName });
 
     currentId = parentId;
+    if (isWorkspaceRoot) break;
   }
 
   return { ancestors: chain.reverse(), workspaceRootId };

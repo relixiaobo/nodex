@@ -1,7 +1,7 @@
 /**
  * Options field value picker — thin wrapper around NodePicker.
  *
- * Connects field-specific data (useFieldOptions, tuple, store actions)
+ * Connects field-specific data (useFieldOptions, field entry, store actions)
  * to the generic NodePicker combobox interaction.
  *
  * - allowCreate: true (auto-collect new option values)
@@ -18,7 +18,7 @@ import { t } from '../../i18n/strings.js';
 interface OptionsPickerProps {
   nodeId: string;
   attrDefId: string;
-  tupleId?: string;
+  fieldEntryId?: string;
 }
 
 export function isAutoCollectCreationEnabled(fieldDef: NodexNode | null | undefined): boolean {
@@ -26,7 +26,7 @@ export function isAutoCollectCreationEnabled(fieldDef: NodexNode | null | undefi
   return fieldDef?.autocollectOptions !== false;
 }
 
-export function OptionsPicker({ nodeId, attrDefId, tupleId }: OptionsPickerProps) {
+export function OptionsPicker({ nodeId, attrDefId, fieldEntryId }: OptionsPickerProps) {
   const options = useFieldOptions(attrDefId);
   const setOptionsFieldValue = useNodeStore((s) => s.setOptionsFieldValue);
   const autoCollectOption = useNodeStore((s) => s.autoCollectOption);
@@ -38,12 +38,12 @@ export function OptionsPicker({ nodeId, attrDefId, tupleId }: OptionsPickerProps
   });
 
   // Load current selection from fieldEntry.children (new model: no key prefix)
-  useChildren(tupleId ?? '');
+  useChildren(fieldEntryId ?? '');
   const selectedId = useNodeStore((s) => {
     void s._version;
-    if (!tupleId) return undefined;
-    const tuple = s.getNode(tupleId);
-    const valueNodeId = tuple?.children?.[0];
+    if (!fieldEntryId) return undefined;
+    const fieldEntry = s.getNode(fieldEntryId);
+    const valueNodeId = fieldEntry?.children?.[0];
     if (!valueNodeId) return undefined;
     const valueNode = s.getNode(valueNodeId);
     const targetId = valueNode?.targetId;

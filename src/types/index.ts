@@ -5,7 +5,6 @@ export type {
   InlineRefEntry,
   DoneMappingEntry,
   NodexNode,
-  ContainerId,
   AppPanelId,
   Editor,
   CreateNodeInput,
@@ -16,8 +15,6 @@ export {
   CONTAINER_IDS,
   APP_PANELS,
   isAppPanel,
-  getContainerId,
-  isContainerNode,
 } from './node.js';
 
 export {

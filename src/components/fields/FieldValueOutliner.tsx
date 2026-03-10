@@ -1,10 +1,10 @@
 /**
  * Mini outliner for field values (all types that store values as nodes).
  *
- * Uses the field Tuple as the root. Values are stored in tuple.children[1:]
- * (children[0] is the key/attrDefId). Value nodes are rendered with full
+ * Uses the field entry as the root. Values are stored in fieldEntry.children.
+ * Value nodes are rendered with full
  * OutlinerItem capabilities (Enter, Tab, children, etc.).
- * Field tuples are rendered as FieldRow (same as OutlinerItem).
+ * Field entries are rendered as FieldRow (same as OutlinerItem).
  * Shows a TrailingInput when empty or at the end.
  *
  * Used for Plain and Options field types. fieldDataType and attrDefId are
@@ -30,7 +30,7 @@ import {
   isDateFieldType,
   isEmailFieldType,
   isUrlFieldType,
-  resolveConfigValue,
+  resolveConfigValueWithDefault,
 } from '../../lib/field-utils.js';
 import { isOutlinerContentNodeType } from '../../lib/node-type-utils.js';
 import { ColorSwatchPicker } from './ColorSwatchPicker';
@@ -42,9 +42,10 @@ import { FIELD_OVERLAY_Z_INDEX } from './field-layout.js';
 import { shouldShowTrailingInput, type OutlinerRowItem, type OutlinerRowType } from '../outliner/row-model.js';
 import { useDragSelect } from '../../hooks/use-drag-select.js';
 import { navigateToSiblingRow } from '../../lib/outliner-navigation.js';
+import { canCreateChildrenUnder, canEditFieldEntryValue, getNodeCapabilities } from '../../lib/node-capabilities.js';
 
 interface FieldValueOutlinerProps {
-  tupleId: string;
+  fieldEntryId: string;
   /** Field data type (e.g., SYS_D.OPTIONS) — for future type-specific value rendering */
   fieldDataType?: string;
   /** AttrDef ID — for future option autocomplete */
@@ -61,13 +62,13 @@ export function shouldShowFieldValueTrailingInput(
   return shouldShowTrailingInput(items as Array<{ type: OutlinerRowType }>);
 }
 
-export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, configNodeId, onNavigateOut }: FieldValueOutlinerProps) {
-  useChildren(tupleId);
+export function FieldValueOutliner({ fieldEntryId, fieldDataType, attrDefId, configNodeId, onNavigateOut }: FieldValueOutlinerProps) {
+  useChildren(fieldEntryId);
 
   // Values are fieldEntry.children (no key prefix in new model)
   const childIdsJson = useNodeStore((s) => {
     void s._version;
-    const t = s.getNode(tupleId);
+    const t = s.getNode(fieldEntryId);
     const c = t?.children ?? [];
     return JSON.stringify(c);
   });
@@ -75,8 +76,8 @@ export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, configNo
 
   const _version = useNodeStore((s) => s._version);
 
-  // Detect fields on the Tuple (created via > trigger inside field values)
-  const fields = useNodeFields(tupleId);
+  // Detect nested field entries created via > inside field values
+  const fields = useNodeFields(fieldEntryId);
   const fieldMap = useMemo(() => {
     const m = new Map<string, FieldEntry>();
     for (const f of fields) m.set(f.fieldEntryId, f);
@@ -112,6 +113,17 @@ export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, configNo
   const setFocusedNode = useUIStore((s) => s.setFocusedNode);
   const clearFocus = useUIStore((s) => s.clearFocus);
   const setEditingFieldName = useUIStore((s) => s.setEditingFieldName);
+  const canEditValues = useNodeStore((s) => {
+    void s._version;
+    if (configNodeId && fieldEntryId.startsWith('__virtual_')) {
+      return getNodeCapabilities(configNodeId).canEditFieldValues;
+    }
+    return canEditFieldEntryValue(fieldEntryId);
+  });
+  const canCreateValueChildren = useNodeStore((s) => {
+    void s._version;
+    return canCreateChildrenUnder(fieldEntryId);
+  });
 
   // Drop zone hooks (must be before early returns)
   const moveNodeTo = useNodeStore((s) => s.moveNodeTo);
@@ -119,16 +131,17 @@ export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, configNo
   const [isDragOver, setIsDragOver] = useState(false);
 
   // Drag select: document-level mouse tracking for multi-node selection
-  useDragSelect({ containerRef, rootChildIds: selectableChildIds, rootNodeId: tupleId });
+  useDragSelect({ containerRef, rootChildIds: selectableChildIds, rootNodeId: fieldEntryId });
 
   const handleContainerDragOver = useCallback((e: React.DragEvent) => {
+    if (!canCreateValueChildren) return;
     const dragId = useUIStore.getState().dragNodeId;
     if (!dragId) return;
     e.preventDefault();
     e.stopPropagation();
     e.dataTransfer.dropEffect = 'move';
     setIsDragOver(true);
-  }, []);
+  }, [canCreateValueChildren]);
 
   const handleContainerDragLeave = useCallback((e: React.DragEvent) => {
     if (containerRef.current && !containerRef.current.contains(e.relatedTarget as Node)) {
@@ -137,18 +150,19 @@ export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, configNo
   }, []);
 
   const handleContainerDrop = useCallback((e: React.DragEvent) => {
+    if (!canCreateValueChildren) return;
     e.preventDefault();
     e.stopPropagation();
     setIsDragOver(false);
     const dragId = useUIStore.getState().dragNodeId;
     if (!dragId) return;
-    moveNodeTo(dragId, tupleId);
+    moveNodeTo(dragId, fieldEntryId);
     useUIStore.getState().setDrag(null);
-  }, [tupleId, moveNodeTo]);
+  }, [canCreateValueChildren, fieldEntryId, moveNodeTo]);
 
   const firstIsField = visibleChildren.length > 0 && visibleChildren[0].type === 'field';
   const lastIsField = visibleChildren.length > 0 && visibleChildren[visibleChildren.length - 1].type === 'field';
-  const showTrailingInput = shouldShowFieldValueTrailingInput(visibleChildren);
+  const showTrailingInput = canCreateValueChildren && shouldShowFieldValueTrailingInput(visibleChildren);
 
   const navToField = useCallback((fieldId: string) => {
     clearFocus();
@@ -168,60 +182,61 @@ export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, configNo
       rows: visibleChildren,
       currentIndex: visibleChildren.length,
       direction,
-      parentId: tupleId,
+      parentId: fieldEntryId,
       onField: navToField,
       onContent: navToContent,
       onEscape: onNavigateOut,
     });
-  }, [visibleChildren, tupleId, navToField, navToContent, onNavigateOut]);
+  }, [visibleChildren, fieldEntryId, navToField, navToContent, onNavigateOut]);
 
   // --- Special control early returns (Boolean, Checkbox, Date) ---
 
   // --- BOOLEAN: Yes/No toggle switch ---
   // For virtual config entries: read from node attribute directly.
-  // For real fieldEntry: reads value from tuple.children[0] (SYS_V.YES or SYS_V.NO).
+  // For real fieldEntry: reads value from fieldEntry.children[0] (SYS_V.YES or SYS_V.NO).
   const isBoolean = isBooleanFieldType(fieldDataType);
   if (isBoolean) {
-    const isVirtualEntry = tupleId.startsWith('__virtual_');
+    const isVirtualEntry = fieldEntryId.startsWith('__virtual_');
     let isYes: boolean;
     if (isVirtualEntry && configNodeId && attrDefId) {
       const configNode = loroDoc.toNodexNode(configNodeId);
-      const val = configNode ? resolveConfigValue(configNode, attrDefId) : undefined;
-      isYes = val === undefined
-        ? attrDefId === SYS_A.AUTOCOLLECT_OPTIONS
-        : val === SYS_V.YES;
+      const val = resolveConfigValueWithDefault(configNode, attrDefId);
+      isYes = val === SYS_V.YES;
     } else {
-      const currentValue = selectableChildIds[0];
+      const currentValue = selectableChildIds[0]
+        ? useNodeStore.getState().getNode(selectableChildIds[0])?.name
+        : undefined;
       isYes = currentValue === SYS_V.YES;
     }
-    const label = isYes ? 'Yes' : 'No';
 
     return (
       <FieldValueRow>
-        <div className="flex items-start gap-2">
+        <div className="flex min-h-6 items-center">
           <button
             onClick={() => {
+              if (!canEditValues) return;
               const newIsYes = !isYes;
               if (isVirtualEntry && configNodeId && attrDefId) {
                 const propName = configKeyToPropName(attrDefId);
                 if (propName) setConfigValue(configNodeId, propName, newIsYes);
               } else {
-                const parentId = loroDoc.getParentId(tupleId) ?? '';
-                const fieldDefId = loroDoc.toNodexNode(tupleId)?.fieldDefId ?? '';
+                const parentId = loroDoc.getParentId(fieldEntryId) ?? '';
+                const fieldDefId = loroDoc.toNodexNode(fieldEntryId)?.fieldDefId ?? '';
                 if (parentId && fieldDefId) setFieldValue(parentId, fieldDefId, [newIsYes ? SYS_V.YES : SYS_V.NO]);
               }
             }}
-            className={`relative mt-0.5 inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${isYes ? 'bg-primary' : 'bg-border hover:bg-foreground/20'
+            className={`relative inline-flex h-5 w-9 shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${canEditValues ? 'cursor-pointer' : 'cursor-default opacity-60'} ${isYes ? 'bg-primary' : 'bg-border hover:bg-foreground/20'
               }`}
             role="switch"
             aria-checked={isYes}
+            aria-label="Toggle value"
+            disabled={!canEditValues}
           >
             <span
               className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-background shadow-sm ring-0 transition-transform duration-200 ease-in-out ${isYes ? 'translate-x-4' : 'translate-x-0'
                 }`}
             />
           </button>
-          <span className="text-[15px] leading-6 text-foreground select-none">{label}</span>
         </div>
       </FieldValueRow>
     );
@@ -229,7 +244,7 @@ export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, configNo
 
   // --- COLOR: swatch selector ---
   if (isColorFieldType(fieldDataType)) {
-    return <ColorSwatchPicker tupleId={tupleId} configNodeId={configNodeId} />;
+    return <ColorSwatchPicker fieldEntryId={fieldEntryId} configNodeId={configNodeId} />;
   }
 
   // OPTIONS_FROM_SUPERTAG: render as standard outliner (same as Tana).
@@ -247,8 +262,9 @@ export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, configNo
         <input
           type="checkbox"
           checked={isChecked}
-          onChange={() => toggleCheckboxField(tupleId)}
-          className="mt-[3px] h-3.5 w-3.5 rounded border-border accent-primary cursor-pointer"
+          onChange={() => toggleCheckboxField(fieldEntryId)}
+          disabled={!canEditValues}
+          className={`mt-[3px] h-3.5 w-3.5 rounded border-border accent-primary ${canEditValues ? 'cursor-pointer' : 'cursor-default opacity-60'}`}
         />
       </FieldValueRow>
     );
@@ -263,9 +279,10 @@ export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, configNo
     return (
       <DatePickerField
         value={currentValue}
+        disabled={!canEditValues}
         onSelect={(v) => {
-          const parentId = loroDoc.getParentId(tupleId) ?? '';
-          const fieldDefId = loroDoc.toNodexNode(tupleId)?.fieldDefId ?? '';
+          const parentId = loroDoc.getParentId(fieldEntryId) ?? '';
+          const fieldDefId = loroDoc.toNodexNode(fieldEntryId)?.fieldDefId ?? '';
           if (!parentId || !fieldDefId) return;
           if (v === '') {
             clearFieldValue(parentId, fieldDefId);
@@ -337,7 +354,7 @@ export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, configNo
     <div
       ref={containerRef}
       className={`min-h-[22px]${firstIsField ? ' pt-1' : ''}${lastIsField ? ' pb-1' : ''}${dragActive ? ' ring-1 ring-primary/30 bg-primary/5 rounded-sm' : ''}`}
-      data-row-scope-parent-id={tupleId}
+      data-row-scope-parent-id={fieldEntryId}
       onDragOver={handleContainerDragOver}
       onDragLeave={handleContainerDragLeave}
       onDrop={handleContainerDrop}
@@ -347,16 +364,16 @@ export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, configNo
         renderField={(row, i, rows) => (
           <div className="@container relative has-[.field-overlay-open]:z-[80]" style={{ paddingLeft: 6 + 15 + 4 }}>
             <FieldRow
-              nodeId={tupleId}
+              nodeId={fieldEntryId}
               {...toFieldRowEntryProps(fieldMap.get(row.id)!)}
               rootChildIds={selectableChildIds}
-              rootNodeId={tupleId}
+              rootNodeId={fieldEntryId}
               isLastInGroup={i === rows.length - 1 || rows[i + 1].type !== 'field'}
               onNavigateOut={(direction) => navigateToSiblingRow({
                 rows,
                 currentIndex: i,
                 direction,
-                parentId: tupleId,
+                parentId: fieldEntryId,
                 onField: navToField,
                 onContent: navToContent,
                 onEscape: onNavigateOut,
@@ -369,8 +386,8 @@ export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, configNo
             nodeId={row.id}
             depth={0}
             rootChildIds={selectableChildIds}
-            parentId={tupleId}
-            rootNodeId={tupleId}
+            parentId={fieldEntryId}
+            rootNodeId={fieldEntryId}
             fieldDataType={fieldDataType}
             attrDefId={attrDefId}
             onNavigateOut={onNavigateOut}
@@ -379,9 +396,9 @@ export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, configNo
       />
       {showTrailingInput && (
         <TrailingInput
-          parentId={tupleId}
+          parentId={fieldEntryId}
           depth={0}
-          parentExpandKey={`${loroDoc.getParentId(tupleId) ?? ''}:${tupleId}`}
+          parentExpandKey={`${loroDoc.getParentId(fieldEntryId) ?? ''}:${fieldEntryId}`}
           fieldDataType={fieldDataType}
           attrDefId={attrDefId}
           onNavigateOut={handleTrailingNavigateOut}
@@ -394,14 +411,15 @@ export function FieldValueOutliner({ tupleId, fieldDataType, attrDefId, configNo
 /** Single-select tagged-node picker for OPTIONS_FROM_SUPERTAG value fields.
  *  Shows all nodes tagged with the source supertag as selectable options. */
 /** Click-to-pick date field with custom DatePicker popover. */
-function DatePickerField({ value, onSelect }: { value: string; onSelect: (v: string) => void }) {
+function DatePickerField({ value, onSelect, disabled = false }: { value: string; onSelect: (v: string) => void; disabled?: boolean }) {
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLDivElement>(null);
   const [pickerPos, setPickerPos] = useState<{ top: number; left: number } | null>(null);
 
   const handleClick = useCallback(() => {
+    if (disabled) return;
     setOpen((prev) => !prev);
-  }, []);
+  }, [disabled]);
 
   useLayoutEffect(() => {
     if (!open || !triggerRef.current) {
@@ -427,7 +445,7 @@ function DatePickerField({ value, onSelect }: { value: string; onSelect: (v: str
   return (
     <div ref={triggerRef} className={`relative ${open ? 'isolate field-overlay-open' : ''}`}>
       <FieldValueRow dimmed={!value}>
-        <div className="flex-1 min-w-0 flex items-center cursor-pointer" onClick={handleClick}>
+        <div className={`flex-1 min-w-0 flex items-center ${disabled ? 'cursor-default' : 'cursor-pointer'}`} onClick={handleClick}>
           <span className={`text-[15px] leading-6 select-none ${value ? '' : 'text-foreground/20'}`}>
             {value ? formatDateDisplay(value) : t('field.emptyDate')}
           </span>

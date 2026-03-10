@@ -5,21 +5,16 @@
  * - label: display name
  * - icon key: maps to lucide icon
  * - shortcut: optional keyboard shortcut display
- * - type: 'container' or 'command' (affects action bar label)
+ * - type: 'node' or 'command' (affects action bar label)
  * - action: callback executed on select
  * - when: optional visibility predicate
  */
 import type { AppIcon } from './icons.js';
 import {
-  Library,
-  Inbox,
   CalendarDays,
   CalendarCheck,
-  Trash2,
   Scissors,
 } from './icons.js';
-import { CONTAINER_IDS } from '../types/index.js';
-import { COMMAND_PALETTE_QUICK_CONTAINERS } from './system-node-registry.js';
 import { ensureTodayNode, getAdjacentDayNodeId } from './journal.js';
 import {
   WEBCLIP_CAPTURE_ACTIVE_TAB,
@@ -30,7 +25,7 @@ import { useNodeStore } from '../stores/node-store.js';
 import { useUIStore } from '../stores/ui-store.js';
 import { t } from '../i18n/strings.js';
 
-export type PaletteItemType = 'node' | 'container' | 'command' | 'create';
+export type PaletteItemType = 'node' | 'command' | 'create';
 
 export interface PaletteItem {
   id: string;
@@ -65,30 +60,6 @@ export interface CommandContext {
   isSignedIn: boolean;
   signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
-}
-
-const CONTAINER_ICONS: Record<string, AppIcon> = {
-  library: Library,
-  inbox: Inbox,
-  journal: CalendarDays,
-  trash: Trash2,
-};
-
-/**
- * Build container navigation commands from the registry.
- */
-export function getContainerCommands(): PaletteCommand[] {
-  return COMMAND_PALETTE_QUICK_CONTAINERS.map((c) => ({
-    id: `nav:${c.id}`,
-    label: t(c.labelKey),
-    icon: CONTAINER_ICONS[c.iconKey] ?? Library,
-    type: 'container' as const,
-    keywords: [c.iconKey, 'go', 'navigate'],
-    action: (ctx: CommandContext) => {
-      ctx.navigateTo(c.id);
-      ctx.closeSearch();
-    },
-  }));
 }
 
 /**
@@ -177,8 +148,7 @@ export function getSystemCommands(): PaletteCommand[] {
  * Get all registered commands (containers + system).
  */
 export function getAllCommands(ctx: CommandContext): PaletteCommand[] {
-  const all = [...getContainerCommands(), ...getSystemCommands()];
-  return all.filter((cmd) => !cmd.when || cmd.when(ctx));
+  return getSystemCommands().filter((cmd) => !cmd.when || cmd.when(ctx));
 }
 
 /**
@@ -187,7 +157,6 @@ export function getAllCommands(ctx: CommandContext): PaletteCommand[] {
 export function getActionLabel(type: PaletteItemType): string {
   switch (type) {
     case 'node': return t('search.commandPalette.actionOpenNode');
-    case 'container': return t('search.commandPalette.actionOpenContainer');
     case 'command': return t('search.commandPalette.actionRunCommand');
     case 'create': return t('search.commandPalette.actionRunCommand');
     default: return t('search.commandPalette.actionOpenNode');

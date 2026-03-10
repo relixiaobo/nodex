@@ -18,8 +18,9 @@ import { baseKeymap } from 'prosemirror-commands';
 import { EditorView } from 'prosemirror-view';
 import { useNodeStore } from '../../stores/node-store';
 import { useUIStore } from '../../stores/ui-store';
-import { getLastVisibleNode, isWorkspaceContainer, getNodeTextLengthById } from '../../lib/tree-utils.js';
+import { getLastVisibleNode, getNodeTextLengthById } from '../../lib/tree-utils.js';
 import { isOptionsFieldType } from '../../lib/field-utils.js';
+import { isLockedNode } from '../../lib/node-capabilities.js';
 import * as loroDoc from '../../lib/loro-doc.js';
 import { undoDoc, redoDoc, commitDoc } from '../../lib/loro-doc.js';
 import { getPrimaryShortcutKey } from '../../lib/shortcut-registry';
@@ -277,12 +278,12 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
                     // Outdent: move effective parent up one level
                     const ref = callbacksRef.current;
 
-                    // Can't go above workspace containers or depth 0
+                    // Can't go above locked system roots or depth 0
                     if (ref.effectiveDepth <= 0) return true;
-                    if (isWorkspaceContainer(ref.effectiveParentId)) return true;
+                    if (isLockedNode(ref.effectiveParentId)) return true;
 
                     const grandparentId = loroDoc.getParentId(ref.effectiveParentId);
-                    if (!grandparentId || isWorkspaceContainer(grandparentId)) return true;
+                    if (!grandparentId || isLockedNode(grandparentId)) return true;
 
                     // Compute expand key for grandparent (best-effort via parent chain)
                     const ggpId = loroDoc.getParentId(grandparentId) ?? '';

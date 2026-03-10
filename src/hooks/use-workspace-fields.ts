@@ -17,7 +17,7 @@ export function useWorkspaceFields(): Array<{ id: string; name: string; dataType
     const fields: Array<{ id: string; name: string; dataType: string }> = [];
     for (const id of loroDoc.getAllNodeIds()) {
       const node = loroDoc.toNodexNode(id);
-      if (node?.type === 'fieldDef') {
+      if (node?.type === 'fieldDef' && node.locked !== true) {
         fields.push({
           id,
           name: node.name ?? 'Untitled',

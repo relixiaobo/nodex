@@ -2,7 +2,7 @@
  * Shared field utilities: data type resolution and icon mapping.
  *
  * Loro 迁移后：
- * - 所有 config 值从 NodexNode 直接属性读取（无 Tuple 间接层）
+ * - 所有 config 值从 NodexNode 直接属性读取（无旧配置中间层）
  * - entities 参数已移除，改用 loroDoc 全局访问
  */
 import {
@@ -19,6 +19,7 @@ import * as loroDoc from './loro-doc.js';
 
 /** Mapping from SYS_A* config keys to flat NodexNode property names. */
 const SYS_A_TO_PROP: Partial<Record<string, keyof NodexNode>> = {
+  [SYS_A.LOCKED]:            'locked',
   [SYS_A.SHOW_CHECKBOX]:     'showCheckbox',
   [SYS_A.CHILD_SUPERTAG]:    'childSupertag',
   [SYS_A.COLOR]:             'color',
@@ -48,6 +49,23 @@ export function resolveConfigValue(
   if (val === undefined || val === null) return undefined;
   if (typeof val === 'boolean') return val ? SYS_V.YES : SYS_V.NO;
   return String(val);
+}
+
+/**
+ * Resolve a config value, falling back to the registry default when the node
+ * does not have an explicit persisted value.
+ */
+export function resolveConfigValueWithDefault(
+  node: NodexNode | null | undefined,
+  configKey: string,
+): string | undefined {
+  if (!node) return undefined;
+  const explicitValue = resolveConfigValue(node, configKey);
+  if (explicitValue !== undefined) return explicitValue;
+
+  const configDef = ATTRDEF_CONFIG_MAP.get(configKey) ?? TAGDEF_CONFIG_MAP.get(configKey);
+  if (!configDef) return undefined;
+  return configDef.defaultValue || undefined;
 }
 
 /**
@@ -221,7 +239,7 @@ export function resolveAutoCollectedOptions(
 
 /**
  * Ordered list of field types for the type selector UI.
- * Matches Tana's dropdown order exactly.
+ * Matches Tana's dropdown order, with soma extensions appended.
  */
 export const FIELD_TYPE_LIST: Array<{ value: string; label: string }> = [
   { value: FIELD_TYPES.PLAIN, label: 'Plain' },
@@ -232,6 +250,7 @@ export const FIELD_TYPE_LIST: Array<{ value: string; label: string }> = [
   { value: FIELD_TYPES.URL, label: 'URL' },
   { value: FIELD_TYPES.EMAIL, label: 'Email' },
   { value: FIELD_TYPES.CHECKBOX, label: 'Checkbox' },
+  { value: FIELD_TYPES.BOOLEAN, label: 'Boolean' },
 ];
 
 /** Get a human-readable label for a field type constant. */
@@ -429,7 +448,7 @@ export const ATTRDEF_CONFIG_MAP = new Map(
     .map(f => [f.key, f]),
 );
 
-/** Outliner-type config fields (virtual entries — no backing tuple). */
+/** Outliner-type config fields (virtual entries — no backing fieldEntry node). */
 export const ATTRDEF_OUTLINER_FIELDS = ATTRDEF_CONFIG_FIELDS.filter(f => f.control === 'outliner');
 
 // ─── TagDef (SYS_T01) config field registry ───
@@ -520,7 +539,7 @@ export const TAGDEF_CONFIG_MAP = new Map(
     .map(f => [f.key, f]),
 );
 
-/** Outliner-type config fields for tagDef (virtual entries — no backing tuple). */
+/** Outliner-type config fields for tagDef (virtual entries — no backing fieldEntry node). */
 export const TAGDEF_OUTLINER_FIELDS = TAGDEF_CONFIG_FIELDS.filter(f => f.control === 'outliner');
 
 /**

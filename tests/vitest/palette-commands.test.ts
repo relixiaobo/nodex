@@ -3,7 +3,6 @@
  */
 import { describe, it, expect, vi } from 'vitest';
 import {
-  getContainerCommands,
   getSystemCommands,
   getAllCommands,
   getActionLabel,
@@ -20,32 +19,6 @@ function mockContext(overrides: Partial<CommandContext> = {}): CommandContext {
     ...overrides,
   };
 }
-
-describe('getContainerCommands', () => {
-  it('returns at least Library, Inbox, Journal, Trash', () => {
-    const cmds = getContainerCommands();
-    const ids = cmds.map((c) => c.id);
-    expect(ids).toContain('nav:LIBRARY');
-    expect(ids).toContain('nav:INBOX');
-    expect(ids).toContain('nav:JOURNAL');
-    expect(ids).toContain('nav:TRASH');
-  });
-
-  it('all have type "container"', () => {
-    const cmds = getContainerCommands();
-    for (const cmd of cmds) {
-      expect(cmd.type).toBe('container');
-    }
-  });
-
-  it('action calls navigateTo + closeSearch', () => {
-    const ctx = mockContext();
-    const cmds = getContainerCommands();
-    cmds[0].action(ctx);
-    expect(ctx.navigateTo).toHaveBeenCalled();
-    expect(ctx.closeSearch).toHaveBeenCalled();
-  });
-});
 
 describe('getSystemCommands', () => {
   it('includes Go to Today', () => {
@@ -82,29 +55,27 @@ describe('getSystemCommands', () => {
 });
 
 describe('getAllCommands', () => {
-  it('includes containers and system commands', () => {
+  it('includes system commands', () => {
     const ctx = mockContext();
     const all = getAllCommands(ctx);
     const ids = all.map((c) => c.id);
-    expect(ids).toContain('nav:LIBRARY');
     expect(ids).toContain('cmd:today');
     expect(ids).toContain('cmd:yesterday');
     expect(ids).toContain('cmd:clip-page');
   });
 
-  it('includes both containers and system commands', () => {
+  it('only includes command-type entries', () => {
     const ctx = mockContext();
     const all = getAllCommands(ctx);
     const types = new Set(all.map((c) => c.type));
-    expect(types.has('container')).toBe(true);
     expect(types.has('command')).toBe(true);
+    expect(types.size).toBe(1);
   });
 });
 
 describe('getActionLabel', () => {
   it('returns type-level labels (Raycast-style)', () => {
     expect(getActionLabel('node')).toBe('Open Node');
-    expect(getActionLabel('container')).toBe('Open Container');
     expect(getActionLabel('command')).toBe('Run Command');
     expect(getActionLabel('create')).toBe('Run Command');
   });

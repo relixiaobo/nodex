@@ -3,10 +3,10 @@
  *
  * 核心变化：
  * - 消除 props 包装层（所有属性直接在 NodexNode 顶层）
- * - 消除 meta Tuple 间接层（tags 直接是 string[]）
+ * - 消除 meta 间接层（tags 直接是 string[]）
  * - 消除 workspaceId per-node（一个 LoroDoc = 一个工作区）
  * - 消除 version / createdBy / updatedBy（Loro 版本向量 + Phase 2 PeerID）
- * - DocType → NodeType（'tuple'→'fieldEntry'，'attrDef'→'fieldDef'，新增'reference'）
+ * - DocType → NodeType（fieldEntry / fieldDef / reference 等结构类型）
  */
 
 // ============================================================
@@ -156,7 +156,7 @@ export interface DoneMappingEntry {
  * 与旧接口相比：
  * - 扁平化：消除 props 包装层
  * - 去 _ 前缀：所有属性直接命名
- * - 消除间接层：meta Tuple → 直接 tags 属性
+ * - 消除间接层：meta → 直接 tags 属性
  * - 语义化：_done → completedAt, _sourceId → templateId
  * - 消除：workspaceId, version, createdBy, updatedBy, meta, touchCounts, modifiedTs
  */
@@ -180,7 +180,7 @@ export interface NodexNode {
   /** 有序子节点 ID 列表（LoroTree children 衍生） */
   children: string[];
 
-  /** 已应用的标签定义 ID 列表（替代 meta→TagTuple 链） */
+  /** 已应用的标签定义 ID 列表（替代旧 meta 标签链） */
   tags: string[];
 
   // ─── 时间戳（统一 *At 后缀） ───
@@ -218,6 +218,9 @@ export interface NodexNode {
 
   /** 位标志（旧 props._flags） */
   flags?: number;
+
+  /** Locked system node flag (mapped from SYS_A.LOCKED semantics). */
+  locked?: boolean;
 
   /** 图片宽度 (px)（旧 props._imageWidth） */
   imageWidth?: number;
@@ -260,27 +263,27 @@ export interface NodexNode {
 
   // ─── fieldEntry 专用 ───
 
-  /** 字段定义 ID（仅 type='fieldEntry' 时有值，旧 Tuple.children[0]） */
+  /** 字段定义 ID（仅 type='fieldEntry' 时有值） */
   fieldDefId?: string;
 
-  // ─── tagDef 专用（直接属性，旧为 config Tuple 间接存储） ───
+  // ─── tagDef 专用（直接属性） ───
 
-  /** 是否显示 checkbox（旧 [SYS_A55, SYS_V03] config tuple） */
+  /** 是否显示 checkbox */
   showCheckbox?: boolean;
 
-  /** 默认子标签 ID（旧 [SYS_A14, tagDefId] config tuple） */
+  /** 默认子标签 ID */
   childSupertag?: string;
 
-  /** 节点颜色（旧 [SYS_A11, value] config tuple） */
+  /** 节点颜色 */
   color?: string;
 
-  /** 继承自的父标签 ID（旧 NDX_A05 config tuple） */
+  /** 继承自的父标签 ID */
   extends?: string;
 
-  /** Done-State Mapping 开关（旧 NDX_A06 config tuple） */
+  /** Done-State Mapping 开关 */
   doneStateEnabled?: boolean;
 
-  // ─── fieldDef 专用（直接属性，旧为 config Tuple 间接存储） ───
+  // ─── fieldDef 专用（直接属性） ───
 
   /** 字段数据类型（旧 [SYS_A02, SYS_D*]，现用可读字符串） */
   fieldType?: string;
@@ -374,8 +377,6 @@ export const CONTAINER_IDS = {
   SETTINGS: 'SETTINGS',
 } as const;
 
-export type ContainerId = typeof CONTAINER_IDS[keyof typeof CONTAINER_IDS];
-
 // ── App Panel IDs (pure UI routes, not nodes) ──
 
 export const APP_PANELS = {
@@ -388,20 +389,6 @@ const APP_PANEL_VALUES = new Set<string>(Object.values(APP_PANELS));
 
 export function isAppPanel(panelId: string): panelId is AppPanelId {
   return APP_PANEL_VALUES.has(panelId);
-}
-
-/**
- * 获取容器 ID（新版：直接返回固定常量，无需 workspaceId 参数）
- */
-export function getContainerId(containerId: ContainerId): string {
-  return containerId;
-}
-
-/**
- * 判断一个节点 ID 是否是工作区容器
- */
-export function isContainerNode(nodeId: string): boolean {
-  return Object.values(CONTAINER_IDS).includes(nodeId as ContainerId);
 }
 
 // ============================================================

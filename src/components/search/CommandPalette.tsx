@@ -17,8 +17,13 @@ import { useEffect, useCallback, useMemo, useState, useRef } from 'react';
 import { Library, Inbox, CalendarDays, Trash2, Search, Settings, Plus, type AppIcon } from '../../lib/icons.js';
 import { resolveTagColor } from '../../lib/tag-colors.js';
 import { resolveDataType, getFieldTypeIcon } from '../../lib/field-utils.js';
-import { isContainerNode } from '../../types/index.js';
-import { getSystemContainerMeta, type ContainerIconKey } from '../../lib/system-node-registry.js';
+import { isLockedNode, isWorkspaceHomeNode } from '../../lib/node-capabilities.js';
+import {
+  getSystemNodePreset,
+  isPaletteSearchableSystemNode,
+  QUICK_NAV_SYSTEM_NODES,
+  type SystemNodeIconKey,
+} from '../../lib/system-node-presets.js';
 import { useUIStore } from '../../stores/ui-store';
 import { useNodeStore } from '../../stores/node-store';
 import { useWorkspaceStore } from '../../stores/workspace-store';
@@ -31,7 +36,6 @@ import {
   getAllCommands,
   getActionLabel,
 } from '../../lib/palette-commands.js';
-import { COMMAND_PALETTE_QUICK_CONTAINERS } from '../../lib/system-node-registry.js';
 import { ensureTodayNode, isDayNode } from '../../lib/journal.js';
 import { parseDayNodeName, parseYearNodeName, isToday } from '../../lib/date-utils.js';
 
@@ -54,7 +58,7 @@ function resolveDayNodeDisplayName(id: string, name: string): string {
   return name;
 }
 
-const CONTAINER_ICONS: Record<ContainerIconKey, AppIcon> = {
+const SYSTEM_NODE_ICONS: Record<SystemNodeIconKey, AppIcon> = {
   library: Library,
   inbox: Inbox,
   journal: CalendarDays,
@@ -79,11 +83,9 @@ function resolveNodeVisuals(id: string, node: { type?: string; tags?: string[] }
     const FieldIcon = getFieldTypeIcon(dt);
     return { icon: FieldIcon, typeLabel: 'Field', type: 'node' };
   }
-  // Container → container icon
-  if (isContainerNode(id)) {
-    const meta = getSystemContainerMeta(id as any);
-    const ContIcon = meta ? CONTAINER_ICONS[meta.iconKey] : Library;
-    return { icon: ContIcon, type: 'container' };
+  const preset = getSystemNodePreset(id);
+  if (preset) {
+    return { icon: SYSTEM_NODE_ICONS[preset.iconKey] ?? Library, type: 'node' };
   }
   // Regular node → tag-derived bullet colors
   const tagIds = node.tags ?? [];
@@ -137,20 +139,19 @@ export function CommandPalette() {
   const commands = useMemo(() => getAllCommands(ctx), [ctx]);
 
   // Container IDs to exclude from recent nodes (they appear in the containers section)
-  const containerIdSet = useMemo(
-    () => new Set<string>(COMMAND_PALETTE_QUICK_CONTAINERS.map((c) => c.id)),
+  const quickNavIdSet = useMemo(
+    () => new Set<string>(QUICK_NAV_SYSTEM_NODES.map((node) => node.id)),
     [],
   );
 
-  // Container items for Commands group
-  const containerItems: PaletteItem[] = useMemo(() =>
-    COMMAND_PALETTE_QUICK_CONTAINERS.map((c) => ({
-      id: c.id,
-      label: t(c.labelKey),
-      icon: CONTAINER_ICONS[c.iconKey] ?? Library,
-      type: 'container' as PaletteItemType,
+  const quickNavItems: PaletteItem[] = useMemo(() =>
+    QUICK_NAV_SYSTEM_NODES.map((node) => ({
+      id: node.id,
+      label: node.defaultName,
+      icon: SYSTEM_NODE_ICONS[node.iconKey] ?? Library,
+      type: 'node' as PaletteItemType,
       typeLabel: t('search.commandPalette.typeLabelNavigate'),
-      action: () => { trackPaletteUsage(c.id); navigateTo(c.id); closeAndClear(); },
+      action: () => { trackPaletteUsage(node.id); navigateTo(node.id); closeAndClear(); },
     })),
     [navigateTo, closeAndClear, trackPaletteUsage]);
 
@@ -172,7 +173,8 @@ export function CommandPalette() {
   const searchableNodes = useMemo(() => {
     const items: Array<{ id: string; name: string }> = [];
     for (const id of loroDoc.getAllNodeIds()) {
-      if (containerIdSet.has(id)) continue;
+      if (quickNavIdSet.has(id) || isWorkspaceHomeNode(id)) continue;
+      if (isLockedNode(id) && !isPaletteSearchableSystemNode(id)) continue;
       const node = loroDoc.toNodexNode(id);
       if (!node) continue;
       const name = (node.name ?? '').replace(/<[^>]+>/g, '').trim();
@@ -181,7 +183,7 @@ export function CommandPalette() {
     }
     return items;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [_version, containerIdSet]);
+  }, [_version, quickNavIdSet]);
 
   // Usage boost: frequent + recent items get a score bonus.
   // Max boost = 15 (count) + 10 (recency) = 25 points.
@@ -282,7 +284,7 @@ export function CommandPalette() {
         .slice(0, 5);
 
       for (const { id } of scored) {
-        // Command or container?
+        // Command or quick-nav item?
         const cmd = commands.find((c) => c.id === id);
         if (cmd) {
           suggestionItems.push({
@@ -294,13 +296,13 @@ export function CommandPalette() {
           });
           continue;
         }
-        // Container?
-        const container = containerItems.find((c) => c.id === id);
-        if (container) {
-          suggestionItems.push({ ...container });
+        const quickNavItem = quickNavItems.find((item) => item.id === id);
+        if (quickNavItem) {
+          suggestionItems.push({ ...quickNavItem });
           continue;
         }
         // Node?
+        if (isWorkspaceHomeNode(id) || isLockedNode(id)) continue;
         const node = loroDoc.toNodexNode(id);
         if (!node) continue;
         const name = (node.name ?? '').replace(/<[^>]+>/g, '').trim();
@@ -315,10 +317,9 @@ export function CommandPalette() {
       }
     }
 
-    // Commands: fixed list = containers + system commands
-    const cmdItems = [...containerItems, ...commandItems];
+    const cmdItems = [...quickNavItems, ...commandItems];
     return { suggestions: suggestionItems, commands: cmdItems };
-  }, [paletteUsage, getUsageBoost, commands, containerItems, commandItems, ctx, trackPaletteUsage, navigateTo, closeAndClear]);
+  }, [paletteUsage, getUsageBoost, commands, quickNavItems, commandItems, ctx, trackPaletteUsage, navigateTo, closeAndClear]);
 
   // Flat list of all visible items (for keyboard navigation)
   const allItems: PaletteItem[] = useMemo(() => {

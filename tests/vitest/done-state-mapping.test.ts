@@ -173,13 +173,13 @@ describe('Store: addDoneMappingEntry / removeDoneMappingEntry', () => {
     const store = useNodeStore.getState();
     store.addDoneMappingEntry('tagDef_task', true, 'attrDef_status', 'opt_done');
 
-    const checkedTupleId = loroDoc.getChildren('tagDef_task').find((cid) => {
+    const checkedFieldEntryId = loroDoc.getChildren('tagDef_task').find((cid) => {
       const node = loroDoc.toNodexNode(cid);
       return node?.type === 'fieldEntry' && node.fieldDefId === SYS_A.DONE_MAP_CHECKED;
     });
-    expect(checkedTupleId).toBeTruthy();
+    expect(checkedFieldEntryId).toBeTruthy();
 
-    const mappingEntryId = loroDoc.getChildren(checkedTupleId!).find((cid) => {
+    const mappingEntryId = loroDoc.getChildren(checkedFieldEntryId!).find((cid) => {
       const node = loroDoc.toNodexNode(cid);
       return node?.type === 'fieldEntry' && node.fieldDefId === 'attrDef_status';
     });
@@ -210,17 +210,17 @@ describe('Store: addDoneMappingEntry / removeDoneMappingEntry', () => {
     store.addDoneMappingEntry('tagDef_task', true, 'attrDef_status', 'opt_done');
     store.addDoneMappingEntry('tagDef_task', true, 'attrDef_status', 'opt_in_progress');
 
-    const checkedTupleId = loroDoc.getChildren('tagDef_task').find((cid) => {
+    const checkedFieldEntryId = loroDoc.getChildren('tagDef_task').find((cid) => {
       const node = loroDoc.toNodexNode(cid);
       return node?.type === 'fieldEntry' && node.fieldDefId === SYS_A.DONE_MAP_CHECKED;
     });
-    expect(checkedTupleId).toBeTruthy();
+    expect(checkedFieldEntryId).toBeTruthy();
 
     // Non-fieldEntry child mixed into the container
-    loroDoc.createNode('done_map_noise_content', checkedTupleId!);
+    loroDoc.createNode('done_map_noise_content', checkedFieldEntryId!);
     loroDoc.setNodeData('done_map_noise_content', 'name', 'noise');
     // Malformed fieldEntry without targetId value
-    loroDoc.createNode('done_map_noise_entry', checkedTupleId!);
+    loroDoc.createNode('done_map_noise_entry', checkedFieldEntryId!);
     loroDoc.setNodeDataBatch('done_map_noise_entry', { type: 'fieldEntry', fieldDefId: 'attrDef_status' });
     loroDoc.createNode('done_map_noise_value', 'done_map_noise_entry');
     loroDoc.setNodeData('done_map_noise_value', 'name', 'legacy-no-target');

@@ -9,8 +9,11 @@ import { CONTAINER_IDS } from '../types/index.js';
 import { NDX_F, SYS_V } from '../types/system-nodes.js';
 import * as loroDoc from './loro-doc.js';
 import { useNodeStore } from '../stores/node-store.js';
+import { SYSTEM_SCHEMA_NODE_IDS } from './system-schema-presets.js';
 
 const STORAGE_KEY = 'soma-settings';
+let settingsProjectionStarted = false;
+let lastProjectedSnapshotJson: string | null = null;
 
 export interface SettingsSnapshot {
   highlightEnabled: boolean;
@@ -58,6 +61,9 @@ export function getSettingsSnapshot(): SettingsSnapshot {
 
 export async function projectToStorage(): Promise<void> {
   const snapshot = getSettingsSnapshot();
+  const snapshotJson = JSON.stringify(snapshot);
+  if (snapshotJson === lastProjectedSnapshotJson) return;
+  lastProjectedSnapshotJson = snapshotJson;
   try {
     await chrome.storage.local.set({ [STORAGE_KEY]: snapshot });
   } catch {
@@ -65,34 +71,43 @@ export async function projectToStorage(): Promise<void> {
   }
 }
 
+export function startSettingsProjection(): void {
+  if (settingsProjectionStarted) return;
+  settingsProjectionStarted = true;
+  void projectToStorage();
+  loroDoc.subscribe(() => {
+    void projectToStorage();
+  });
+}
+
 // ── Migration from ui-store ─────────────────────────────
 
 export async function migrateFromUIStore(): Promise<void> {
-  // Check if the setting already exists in LoroDoc
-  const children = loroDoc.getChildren(CONTAINER_IDS.SETTINGS);
-  const alreadyMigrated = children.some((cid) => {
-    const node = loroDoc.toNodexNode(cid);
-    return node?.type === 'fieldEntry' && node.fieldDefId === NDX_F.SETTING_HIGHLIGHT_ENABLED;
-  });
-
-  if (alreadyMigrated) {
-    // Just project current value to chrome.storage
-    await projectToStorage();
-    return;
-  }
-
   // Read old value from ui-store in chrome.storage
-  let oldValue = DEFAULTS.highlightEnabled;
+  let storedLegacyValue: boolean | null = null;
   try {
     const stored = await chrome.storage.local.get('nodex-ui');
     const uiState = stored?.['nodex-ui']?.state;
     if (uiState && typeof uiState.highlightEnabled === 'boolean') {
-      oldValue = uiState.highlightEnabled;
+      storedLegacyValue = uiState.highlightEnabled;
     }
   } catch {
     // Fallback to default
   }
 
-  // Write to LoroDoc
-  setHighlightEnabled(oldValue);
+  const settingFieldEntry = loroDoc.toNodexNode(SYSTEM_SCHEMA_NODE_IDS.SETTINGS_HIGHLIGHT_FIELD_ENTRY);
+  const currentValueIds = settingFieldEntry?.children ?? [];
+  const hasUserValue = currentValueIds.length > 0
+    && !(
+      currentValueIds.length === 1
+      && currentValueIds[0] === SYSTEM_SCHEMA_NODE_IDS.SETTINGS_HIGHLIGHT_VALUE
+      && loroDoc.toNodexNode(SYSTEM_SCHEMA_NODE_IDS.SETTINGS_HIGHLIGHT_VALUE)?.name === SYS_V.YES
+    );
+
+  if (!hasUserValue && storedLegacyValue !== null) {
+    setHighlightEnabled(storedLegacyValue);
+    return;
+  }
+
+  await projectToStorage();
 }

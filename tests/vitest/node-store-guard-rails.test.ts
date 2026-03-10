@@ -1,7 +1,7 @@
 /**
  * node-store guard rails — Loro model.
  * In the Loro migration, validation is simplified:
- * - setConfigValue: directly sets config, no tuple indirection
+ * - setConfigValue: directly sets config, no extra config-node indirection
  * - addFieldOption: creates option under fieldDef (no validation on wrong target)
  * - removeFieldOption: just deletes (no ownership check)
  * - replaceFieldDef: just sets fieldDefId (no ownership validation)
@@ -12,6 +12,7 @@ import { collectNodeGraphErrors } from './helpers/invariants.js';
 import * as loroDoc from '../../src/lib/loro-doc.js';
 import { CONTAINER_IDS } from '../../src/types/index.js';
 import { resetAndSeed } from './helpers/test-state.js';
+import { NDX_F, SYS_V } from '../../src/types/index.js';
 
 describe('setConfigValue', () => {
   beforeEach(() => {
@@ -137,29 +138,100 @@ describe('replaceFieldDef', () => {
   });
 });
 
-describe('workspace container immutability', () => {
+describe('legacy top-level nodes remain mutable', () => {
   beforeEach(() => {
     resetAndSeed();
   });
 
-  it('moveNodeTo does not move workspace containers', () => {
-    const originalParent = loroDoc.getParentId('INBOX');
+  it('moveNodeTo can move legacy Inbox', () => {
     useNodeStore.getState().moveNodeTo('INBOX', 'proj_1', 0);
-    expect(loroDoc.getParentId('INBOX')).toBe(originalParent);
-    expect(loroDoc.getChildren('proj_1')).not.toContain('INBOX');
+    expect(loroDoc.getParentId('INBOX')).toBe('proj_1');
+    expect(loroDoc.getChildren('proj_1')).toContain('INBOX');
   });
 
-  it('trashNode ignores workspace containers', () => {
-    const originalParent = loroDoc.getParentId('INBOX');
-    const trashChildrenBefore = loroDoc.getChildren('TRASH');
+  it('trashNode can trash legacy Inbox', () => {
     useNodeStore.getState().trashNode('INBOX');
-    expect(loroDoc.getParentId('INBOX')).toBe(originalParent);
-    expect(loroDoc.getChildren('TRASH')).toEqual(trashChildrenBefore);
+    expect(loroDoc.getParentId('INBOX')).toBe(CONTAINER_IDS.TRASH);
+    expect(loroDoc.getChildren(CONTAINER_IDS.TRASH)).toContain('INBOX');
   });
 
-  it('indent/move up/down are no-op for workspace containers', () => {
+  it('rename and description updates work for legacy Library/Inbox', () => {
+    useNodeStore.getState().setNodeName(CONTAINER_IDS.INBOX, 'Renamed Inbox');
+    useNodeStore.getState().updateNodeDescription(CONTAINER_IDS.LIBRARY, 'library desc');
+
+    expect(loroDoc.toNodexNode(CONTAINER_IDS.INBOX)?.name).toBe('Renamed Inbox');
+    expect(loroDoc.toNodexNode(CONTAINER_IDS.LIBRARY)?.description).toBe('library desc');
+  });
+});
+
+describe('locked system nodes remain immutable', () => {
+  beforeEach(() => {
+    resetAndSeed();
+  });
+
+  it('moveNodeTo does not move locked settings node', () => {
+    const originalParent = loroDoc.getParentId(CONTAINER_IDS.SETTINGS);
+    useNodeStore.getState().moveNodeTo(CONTAINER_IDS.SETTINGS, 'proj_1', 0);
+    expect(loroDoc.getParentId(CONTAINER_IDS.SETTINGS)).toBe(originalParent);
+    expect(loroDoc.getChildren('proj_1')).not.toContain(CONTAINER_IDS.SETTINGS);
+  });
+
+  it('trashNode ignores locked settings node', () => {
+    const originalParent = loroDoc.getParentId(CONTAINER_IDS.SETTINGS);
+    const trashChildrenBefore = loroDoc.getChildren(CONTAINER_IDS.TRASH);
+    useNodeStore.getState().trashNode(CONTAINER_IDS.SETTINGS);
+    expect(loroDoc.getParentId(CONTAINER_IDS.SETTINGS)).toBe(originalParent);
+    expect(loroDoc.getChildren(CONTAINER_IDS.TRASH)).toEqual(trashChildrenBefore);
+  });
+
+  it('indent/move up/down are no-op for locked settings node', () => {
+    const originalParent = loroDoc.getParentId(CONTAINER_IDS.SETTINGS);
+    expect(() => useNodeStore.getState().indentNode(CONTAINER_IDS.SETTINGS)).not.toThrow();
+    expect(() => useNodeStore.getState().moveNodeUp(CONTAINER_IDS.SETTINGS)).not.toThrow();
+    expect(() => useNodeStore.getState().moveNodeDown(CONTAINER_IDS.SETTINGS)).not.toThrow();
+    expect(loroDoc.getParentId(CONTAINER_IDS.SETTINGS)).toBe(originalParent);
+  });
+
+  it('setNodeName and updateNodeDescription ignore locked settings node', () => {
+    useNodeStore.getState().setNodeName(CONTAINER_IDS.SETTINGS, 'Renamed Settings');
+    useNodeStore.getState().updateNodeDescription(CONTAINER_IDS.SETTINGS, 'settings desc');
+
+    expect(loroDoc.toNodexNode(CONTAINER_IDS.SETTINGS)?.name).toBe('Settings');
+    expect(loroDoc.toNodexNode(CONTAINER_IDS.SETTINGS)?.description).toBeUndefined();
+  });
+
+  it('allows Settings field values but blocks Settings structure edits', () => {
+    useNodeStore.getState().setFieldValue(CONTAINER_IDS.SETTINGS, NDX_F.SETTING_HIGHLIGHT_ENABLED, [SYS_V.NO]);
+
+    const highlightFieldEntryId = (loroDoc.getChildren(CONTAINER_IDS.SETTINGS) ?? []).find((childId) =>
+      loroDoc.toNodexNode(childId)?.fieldDefId === NDX_F.SETTING_HIGHLIGHT_ENABLED,
+    );
+    expect(highlightFieldEntryId).toBeTruthy();
+    expect(loroDoc.toNodexNode(loroDoc.getChildren(highlightFieldEntryId!)[0])?.name).toBe(SYS_V.NO);
+
+    const beforeChildren = loroDoc.getChildren(CONTAINER_IDS.SETTINGS).slice();
+    useNodeStore.getState().createChild(CONTAINER_IDS.SETTINGS, undefined, { name: 'forbidden child' });
+    useNodeStore.getState().addUnnamedFieldToNode(CONTAINER_IDS.SETTINGS);
+    expect(loroDoc.getChildren(CONTAINER_IDS.SETTINGS)).toEqual(beforeChildren);
+  });
+
+  it('keeps locked Settings field definitions immutable', () => {
+    useNodeStore.getState().renameFieldDef(NDX_F.SETTING_HIGHLIGHT_ENABLED, 'Renamed setting');
+    useNodeStore.getState().changeFieldType(NDX_F.SETTING_HIGHLIGHT_ENABLED, 'plain');
+
+    const fieldDef = loroDoc.toNodexNode(NDX_F.SETTING_HIGHLIGHT_ENABLED);
+    expect(fieldDef?.name).toBe('Highlight & Comment');
+    expect(fieldDef?.fieldType).toBe('boolean');
+  });
+});
+
+describe('legacy top-level reordering behavior', () => {
+  beforeEach(() => {
+    resetAndSeed();
+  });
+
+  it('indent/move up/down remain safe for Inbox node', () => {
     const originalParent = loroDoc.getParentId('INBOX');
-    expect(() => useNodeStore.getState().indentNode('INBOX')).not.toThrow();
     expect(() => useNodeStore.getState().moveNodeUp('INBOX')).not.toThrow();
     expect(() => useNodeStore.getState().moveNodeDown('INBOX')).not.toThrow();
     expect(loroDoc.getParentId('INBOX')).toBe(originalParent);
@@ -185,20 +257,20 @@ describe('system root immutability', () => {
     expect(loroDoc.getChildren(CONTAINER_IDS.TRASH)).toEqual(trashBefore);
   });
 
-  it('setNodeName allows workspace home but ignores containers', () => {
+  it('setNodeName allows workspace home but locked system nodes stay unchanged', () => {
     useNodeStore.getState().setNodeName('ws_default', 'Renamed Workspace');
-    useNodeStore.getState().setNodeName(CONTAINER_IDS.INBOX, 'Renamed Inbox');
+    useNodeStore.getState().setNodeName(CONTAINER_IDS.SETTINGS, 'Renamed Settings');
 
     expect(loroDoc.toNodexNode('ws_default')?.name).toBe('Renamed Workspace');
-    expect(loroDoc.toNodexNode(CONTAINER_IDS.INBOX)?.name).toBe('Inbox');
+    expect(loroDoc.toNodexNode(CONTAINER_IDS.SETTINGS)?.name).toBe('Settings');
   });
 
-  it('updateNodeDescription allows workspace home but ignores containers', () => {
+  it('updateNodeDescription allows workspace home but locked system nodes stay unchanged', () => {
     useNodeStore.getState().updateNodeDescription('ws_default', 'root desc');
-    useNodeStore.getState().updateNodeDescription(CONTAINER_IDS.LIBRARY, 'library desc');
+    useNodeStore.getState().updateNodeDescription(CONTAINER_IDS.SETTINGS, 'settings desc');
 
     expect(loroDoc.toNodexNode('ws_default')?.description).toBe('root desc');
-    expect(loroDoc.toNodexNode(CONTAINER_IDS.LIBRARY)?.description).toBeUndefined();
+    expect(loroDoc.toNodexNode(CONTAINER_IDS.SETTINGS)?.description).toBeUndefined();
   });
 });
 

@@ -1,9 +1,10 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   canCreateChildrenUnder,
   canEditFieldEntryValue,
   getNodeCapabilities,
   isLockedNode,
+  isNodeInTrash,
   isWorkspaceHomeNode,
 } from '../../src/lib/node-capabilities.js';
 import { CONTAINER_IDS } from '../../src/types/index.js';
@@ -11,6 +12,8 @@ import { resetAndSeed } from './helpers/test-state.js';
 import { SYSTEM_SCHEMA_NODE_IDS } from '../../src/lib/system-schema-presets.js';
 import { ensureJournalTagDefs } from '../../src/lib/journal.js';
 import { SYSTEM_TAGS } from '../../src/types/system-nodes.js';
+import * as loroDoc from '../../src/lib/loro-doc.js';
+import { useNodeStore } from '../../src/stores/node-store.js';
 
 describe('node capabilities', () => {
   beforeEach(() => {
@@ -91,5 +94,26 @@ describe('node capabilities', () => {
       canMove: false,
       canDelete: false,
     });
+  });
+
+  it('detects direct and nested nodes inside Trash via parent-chain walk', () => {
+    useNodeStore.getState().trashNode('task_1');
+
+    expect(isNodeInTrash('task_1')).toBe(true);
+    expect(isNodeInTrash('subtask_1a')).toBe(true);
+    expect(isNodeInTrash('note_2')).toBe(false);
+  });
+
+  it('fails closed on parent cycles instead of looping forever', () => {
+    const realGetParentId = loroDoc.getParentId;
+    const cycleSpy = vi.spyOn(loroDoc, 'getParentId').mockImplementation((nodeId) => {
+      if (nodeId === 'loop_a') return 'loop_b';
+      if (nodeId === 'loop_b') return 'loop_a';
+      return realGetParentId(nodeId);
+    });
+
+    expect(isNodeInTrash('loop_a')).toBe(false);
+
+    cycleSpy.mockRestore();
   });
 });

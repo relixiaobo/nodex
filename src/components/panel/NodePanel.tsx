@@ -14,7 +14,7 @@ import { isDayNode } from '../../lib/journal.js';
 import { DateNavigationBar } from '../journal/DateNavigationBar';
 import { BacklinksSection } from './BacklinksSection';
 import { SearchChipBar } from '../search/SearchChipBar';
-import { getNodeCapabilities } from '../../lib/node-capabilities.js';
+import { getNodeCapabilities, isNodeInTrash } from '../../lib/node-capabilities.js';
 
 interface NodePanelProps {
   nodeId: string;
@@ -50,7 +50,7 @@ export function NodePanel({ nodeId }: NodePanelProps) {
 
   const isInTrash = useNodeStore((s) => {
     void s._version;
-    return loroDoc.getParentId(nodeId) === CONTAINER_IDS.TRASH;
+    return isNodeInTrash(nodeId);
   });
 
   const trashChildCount = useNodeStore((s) => {

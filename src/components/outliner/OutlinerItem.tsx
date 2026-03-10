@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
 import type { EditorView } from 'prosemirror-view';
 import { useNode } from '../../hooks/use-node';
@@ -40,8 +40,6 @@ import {
   isOnlyInlineRef,
   getNodeTextLengthById,
 } from '../../lib/tree-utils';
-import { resolveDropHoverPosition } from '../../lib/drag-drop-position';
-import { resolveDropMove } from '../../lib/drag-drop';
 import { resolveSelectedReferenceShortcut } from '../../lib/selected-reference-shortcuts';
 import { resolveRowPointerSelectAction } from '../../lib/row-pointer-selection';
 import { getShortcutKeys, matchesShortcutEvent } from '../../lib/shortcut-registry.js';
@@ -62,6 +60,7 @@ import { ViewToolbar } from './ViewToolbar.js';
 import { readViewConfig, applyViewPipeline } from '../../lib/view-pipeline.js';
 import { OutlinerRow, useRowSelectionState, useRowPointerHandlers } from './OutlinerRow.js';
 import { NodeContextMenuPortal } from './NodeContextMenu.js';
+import { useDragDropRow } from '../../hooks/use-drag-drop-row.js';
 import {
   buildFieldOwnerColors,
   buildVisibleChildrenRows,
@@ -245,11 +244,6 @@ export function OutlinerItem({
   const { handleCmdClick, handleShiftClick } = useRowPointerHandlers(nodeId, parentId, rootChildIds, rootNodeId);
 
   const isLoadingNode = useUIStore((s) => s.loadingNodeIds.has(nodeId));
-  const isDragging = useUIStore((s) => s.dragNodeId === nodeId);
-  const isDropTarget = useUIStore((s) => s.dropTargetId === nodeId);
-  const dropPosition = useUIStore((s) => s.dropTargetId === nodeId ? s.dropPosition : null);
-  const setDrag = useUIStore((s) => s.setDrag);
-  const setDropTarget = useUIStore((s) => s.setDropTarget);
 
   const createSibling = useNodeStore((s) => s.createSibling);
   const createSiblingNodesFromPaste = useNodeStore((s) => s.createSiblingNodesFromPaste);
@@ -258,7 +252,6 @@ export function OutlinerItem({
   const outdentNode = useNodeStore((s) => s.outdentNode);
   const moveNodeUp = useNodeStore((s) => s.moveNodeUp);
   const moveNodeDown = useNodeStore((s) => s.moveNodeDown);
-  const moveNodeTo = useNodeStore((s) => s.moveNodeTo);
   const trashNode = useNodeStore((s) => s.trashNode);
   const toggleNodeDone = useNodeStore((s) => s.toggleNodeDone);
   const cycleNodeCheckbox = useNodeStore((s) => s.cycleNodeCheckbox);
@@ -1581,94 +1574,18 @@ export function OutlinerItem({
     });
   }, [nodeId, parentId, moveNodeDown]);
 
-  // ─── Drag and drop handlers ───
-
-  const handleDragStart = useCallback(
-    (e: DragEvent) => {
-      e.dataTransfer.effectAllowed = 'move';
-      e.dataTransfer.setData('text/plain', nodeId);
-      // Use the entire row as drag image instead of just the bullet
-      if (rowRef.current) {
-        const rect = rowRef.current.getBoundingClientRect();
-        e.dataTransfer.setDragImage(rowRef.current, e.clientX - rect.left, e.clientY - rect.top);
-      }
-      setDrag(nodeId);
+  const { isDragging, isDropTarget, dropPosition, dragHandlers } = useDragDropRow({
+    nodeId,
+    parentId,
+    rowRef,
+    targetHasChildren: hasChildren,
+    targetIsExpanded: isExpanded,
+    onInsideDropExpand: (expandKey) => setExpanded(expandKey, true, true),
+    onDragStart: (event, rowElement) => {
+      const rect = rowElement.getBoundingClientRect();
+      event.dataTransfer.setDragImage(rowElement, event.clientX - rect.left, event.clientY - rect.top);
     },
-    [nodeId, setDrag],
-  );
-
-  const handleDragOver = useCallback(
-    (e: DragEvent) => {
-      const activeDragId = useUIStore.getState().dragNodeId;
-      if (!activeDragId || activeDragId === nodeId) return;
-      e.preventDefault();
-      e.dataTransfer.dropEffect = 'move';
-
-      const rect = rowRef.current?.getBoundingClientRect();
-      if (!rect) return;
-
-      const position = resolveDropHoverPosition({
-        offsetY: e.clientY - rect.top,
-        rowHeight: rect.height,
-      });
-      setDropTarget(nodeId, position);
-    },
-    [nodeId, setDropTarget],
-  );
-
-  const handleDragLeave = useCallback((e: DragEvent) => {
-    const related = e.relatedTarget as Node | null;
-    if (related && rowRef.current?.contains(related)) return;
-    if (useUIStore.getState().dropTargetId === nodeId) {
-      setDropTarget(null, null);
-    }
-  }, [nodeId, setDropTarget]);
-
-  const handleDrop = useCallback(
-    (e: DragEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      const { dragNodeId: activeDragId, dropPosition: currentDropPos } = useUIStore.getState();
-      if (!activeDragId || activeDragId === nodeId) {
-        setDrag(null);
-        return;
-      }
-
-      const dropParentId = loroDoc.getParentId(nodeId);
-      if (!dropParentId) {
-        setDrag(null);
-        return;
-      }
-
-      const dropParent = useNodeStore.getState().getNode(dropParentId);
-      const siblingIndex = dropParent?.children?.indexOf(nodeId) ?? 0;
-
-      const decision = resolveDropMove({
-        dragNodeId: activeDragId,
-        targetNodeId: nodeId,
-        targetParentId: dropParentId,
-        targetParentKey: `${parentId}:${nodeId}`,
-        siblingIndex,
-        dropPosition: currentDropPos,
-        targetHasChildren: hasChildren,
-        targetIsExpanded: isExpanded,
-      });
-
-      if (decision) {
-        moveNodeTo(activeDragId, decision.newParentId, decision.position);
-        if (decision.expandKey) {
-          setExpanded(decision.expandKey, true, true);
-        }
-      }
-
-      setDrag(null);
-    },
-    [nodeId, parentId, hasChildren, isExpanded, moveNodeTo, setExpanded, setDrag],
-  );
-
-  const handleDragEnd = useCallback(() => {
-    setDrag(null);
-  }, [setDrag]);
+  });
 
   // ─── Render ───
 
@@ -1723,10 +1640,10 @@ export function OutlinerItem({
         data-node-id={nodeId}
         data-parent-id={parentId}
         onMouseDownCapture={isFocused ? handleFocusedRowMouseDownCapture : undefined}
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
-        onDragEnd={handleDragEnd}
+        onDragOver={dragHandlers.onDragOver}
+        onDragLeave={dragHandlers.onDragLeave}
+        onDrop={dragHandlers.onDrop}
+        onDragEnd={dragHandlers.onDragEnd}
         onContextMenu={handleContextMenu}
       >
         {/* Drop indicator: before — absolutely positioned to avoid layout shift */}
@@ -1755,7 +1672,7 @@ export function OutlinerItem({
           <div
             className={`${isLoadingNode ? 'cursor-default' : 'cursor-grab active:cursor-grabbing'} ${deleteBlockedPulse ? 'node-delete-blocked-pulse' : ''}`}
             draggable={!isLoadingNode}
-            onDragStart={isLoadingNode ? undefined : handleDragStart}
+            onDragStart={isLoadingNode ? undefined : dragHandlers.onDragStart}
           >
             <BulletChevron
               hasChildren={hasChildren}

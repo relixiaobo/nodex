@@ -17,7 +17,7 @@ import {
   getAllNodeIds,
   toNodexNode,
 } from '../../src/lib/loro-doc.js';
-import { isWorkspaceContainer } from '../../src/lib/tree-utils.js';
+import { isLockedNode, isWorkspaceHomeNode } from '../../src/lib/node-capabilities.js';
 import { CONTAINER_IDS } from '../../src/types/index.js';
 
 /** Structural NodeTypes excluded from search (mirrors use-node-search.ts). */
@@ -35,8 +35,7 @@ function searchNodes(query: string, excludeId?: string) {
     if (id === excludeId) continue;
     const node = toNodexNode(id);
     if (!node) continue;
-    // Workspace containers are excluded by ID, not by type
-    if (isWorkspaceContainer(id)) continue;
+    if (isWorkspaceHomeNode(id) || isLockedNode(id)) continue;
     if (node.type && SKIP_DOC_TYPES.has(node.type)) continue;
     const plainText = (node.name ?? '').replace(/<[^>]+>/g, '').trim();
     if (!plainText) continue;
@@ -69,10 +68,8 @@ beforeEach(() => {
   createNode('fe1', null); setNodeDataBatch('fe1', { name: 'field entry',  type: 'fieldEntry' });
   createNode('ref1', null); setNodeDataBatch('ref1', { name: 'ref data',   type: 'reference' });
 
-  // Workspace container — must be filtered out by isWorkspaceContainer()
-  // Container nodes are identified by their fixed IDs, not by a 'type' field.
-  createNode(CONTAINER_IDS.LIBRARY, null);
-  setNodeDataBatch(CONTAINER_IDS.LIBRARY, { name: 'Library' });
+  createNode(CONTAINER_IDS.SETTINGS, null);
+  setNodeDataBatch(CONTAINER_IDS.SETTINGS, { name: 'Settings', locked: true });
 
   commitDoc('__seed__');
 });
@@ -108,9 +105,8 @@ describe('node search SKIP_DOC_TYPES filter', () => {
     expect(searchNodes('ref').map(r => r.id)).not.toContain('ref1');
   });
 
-  it('filters out workspace container nodes (by ID, not by type)', () => {
-    // CONTAINER_IDS.LIBRARY is excluded via isWorkspaceContainer(), not by node.type
-    expect(searchNodes('Library').map(r => r.id)).not.toContain(CONTAINER_IDS.LIBRARY);
+  it('filters out locked system nodes', () => {
+    expect(searchNodes('Settings').map(r => r.id)).not.toContain(CONTAINER_IDS.SETTINGS);
   });
 
   it('returns empty for blank query', () => {

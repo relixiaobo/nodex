@@ -105,9 +105,9 @@ describe('RowInteractionConfig interface', () => {
 
   it('field row config uses field-specific values', () => {
     const config = {
-      rowId: 'tuple-123',
+      rowId: 'field-entry-123',
       parentId: 'owner-node',
-      rootChildIds: ['tuple-123', 'tuple-456'],
+      rootChildIds: ['field-entry-123', 'field-entry-456'],
       rootNodeId: 'root',
       isEditing: true,
       enterEdit: vi.fn(),

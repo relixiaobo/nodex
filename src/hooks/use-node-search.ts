@@ -9,7 +9,8 @@
 import { useMemo } from 'react';
 import { useNodeStore } from '../stores/node-store';
 import * as loroDoc from '../lib/loro-doc.js';
-import { isWorkspaceContainer } from '../lib/tree-utils.js';
+import { isLockedNode, isWorkspaceHomeNode } from '../lib/node-capabilities.js';
+import { getSystemNodePreset } from '../lib/system-node-presets.js';
 
 export interface NodeSearchResult {
   id: string;
@@ -42,8 +43,7 @@ export function useNodeSearch(query: string, excludeId?: string): NodeSearchResu
       const node = loroDoc.toNodexNode(id);
       if (!node) continue;
 
-      // Skip workspace containers (LIBRARY, INBOX, etc.) and structural node types
-      if (isWorkspaceContainer(id)) continue;
+      if (getSystemNodePreset(id) || isWorkspaceHomeNode(id) || isLockedNode(id)) continue;
       if (node.type && SKIP_DOC_TYPES.has(node.type)) continue;
 
       // Skip nodes with no name

@@ -23,12 +23,13 @@ describe('node-store edge cases', () => {
     expect(collectNodeGraphErrors()).toEqual([]);
   });
 
-  it('outdent top-level node is a no-op', () => {
+  it('outdent top-level legacy Library child moves it to workspace root', () => {
     const beforeParent = loroDoc.getParentId('proj_1');
     useNodeStore.getState().outdentNode('proj_1');
     const afterParent = loroDoc.getParentId('proj_1');
 
-    expect(afterParent).toBe(beforeParent);
+    expect(beforeParent).toBe('LIBRARY');
+    expect(afterParent).toBe('ws_default');
     expect(collectNodeGraphErrors()).toEqual([]);
   });
 });

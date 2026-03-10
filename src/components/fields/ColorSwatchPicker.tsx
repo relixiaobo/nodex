@@ -14,14 +14,14 @@ import * as loroDoc from '../../lib/loro-doc.js';
 import { FIELD_VALUE_INSET } from './field-layout.js';
 
 interface ColorSwatchPickerProps {
-  tupleId: string;
+  fieldEntryId: string;
   /** For virtual config entries: parent tagDef/fieldDef node ID to resolve color from */
   configNodeId?: string;
 }
 
-export function ColorSwatchPicker({ tupleId, configNodeId }: ColorSwatchPickerProps) {
+export function ColorSwatchPicker({ fieldEntryId, configNodeId }: ColorSwatchPickerProps) {
   const setConfigValue = useNodeStore((s) => s.setConfigValue);
-  const isVirtual = tupleId.startsWith('__virtual_');
+  const isVirtual = fieldEntryId.startsWith('__virtual_');
 
   // Whether this tagDef has an explicitly stored color (vs hash-assigned).
   const hasExplicitColor = useNodeStore((s) => {
@@ -29,8 +29,8 @@ export function ColorSwatchPicker({ tupleId, configNodeId }: ColorSwatchPickerPr
     if (isVirtual && configNodeId) {
       return !!loroDoc.toNodexNode(configNodeId)?.color;
     }
-    const tuple = s.getNode(tupleId);
-    return !!(tuple?.children?.[0]);
+    const fieldEntry = s.getNode(fieldEntryId);
+    return !!(fieldEntry?.children?.[0]);
   });
 
   // Resolved color key: explicit → normalized, or hash fallback → matched swatch key.
@@ -41,8 +41,8 @@ export function ColorSwatchPicker({ tupleId, configNodeId }: ColorSwatchPickerPr
     if (isVirtual && configNodeId) {
       raw = loroDoc.toNodexNode(configNodeId)?.color ?? undefined;
     } else {
-      const tuple = s.getNode(tupleId);
-      raw = tuple?.children?.[0] || undefined;
+      const fieldEntry = s.getNode(fieldEntryId);
+      raw = fieldEntry?.children?.[0] || undefined;
     }
     if (raw) return normalizeColorKey(raw);
     // No explicit color → match the hash-assigned color to a swatch

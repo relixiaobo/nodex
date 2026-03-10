@@ -259,16 +259,19 @@ describe('ensureJournalTagDefs', () => {
       type: 'tagDef',
       name: 'day',
       color: 'gray',
+      locked: true,
     });
     expect(loroDoc.toNodexNode(SYSTEM_TAGS.WEEK)).toMatchObject({
       type: 'tagDef',
       name: 'week',
       color: 'gray',
+      locked: true,
     });
     expect(loroDoc.toNodexNode(SYSTEM_TAGS.YEAR)).toMatchObject({
       type: 'tagDef',
       name: 'year',
       color: 'gray',
+      locked: true,
     });
 
     expect(loroDoc.getParentId(SYSTEM_TAGS.DAY)).toBe(CONTAINER_IDS.SCHEMA);

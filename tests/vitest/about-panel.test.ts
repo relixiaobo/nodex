@@ -1,6 +1,6 @@
 import { APP_PANELS, isAppPanel } from '../../src/types/index.js';
 import { CHANGELOG } from '../../src/lib/changelog.js';
-import { SYSTEM_CONTAINER_REGISTRY } from '../../src/lib/system-node-registry.js';
+import { SYSTEM_NODE_PRESETS } from '../../src/lib/system-node-presets.js';
 
 describe('About panel', () => {
   it('APP_PANELS.ABOUT is an app panel, not a node', () => {
@@ -8,8 +8,8 @@ describe('About panel', () => {
     expect(isAppPanel(APP_PANELS.ABOUT)).toBe(true);
   });
 
-  it('ABOUT is not registered in system-node-registry', () => {
-    const aboutEntry = SYSTEM_CONTAINER_REGISTRY.find((c) => c.defaultName === 'About');
+  it('ABOUT is not registered in system node presets', () => {
+    const aboutEntry = SYSTEM_NODE_PRESETS.find((c) => c.defaultName === 'About');
     expect(aboutEntry).toBeUndefined();
   });
 

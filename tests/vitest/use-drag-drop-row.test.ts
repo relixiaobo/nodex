@@ -3,6 +3,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { flushSync } from 'react-dom';
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { useDragDropRow } from '../../src/hooks/use-drag-drop-row.js';
+import { useNodeStore } from '../../src/stores/node-store.js';
 import { useUIStore } from '../../src/stores/ui-store.js';
 import { resetAndSeed } from './helpers/test-state.js';
 import * as loroDoc from '../../src/lib/loro-doc.js';
@@ -150,5 +151,31 @@ describe('useDragDropRow', () => {
 
     expect(useUIStore.getState().dropTargetId).toBeNull();
     expect(useUIStore.getState().dropPosition).toBeNull();
+  });
+
+  it('uses the live parent when the target moved after the hook rendered', () => {
+    const latest = { current: null as HookState | null };
+    const rowRef = createRowRef();
+
+    flushSync(() => {
+      root.render(React.createElement(HookHarness, {
+        latest,
+        nodeId: 'task_1',
+        parentId: 'proj_1',
+        rowRef,
+      }));
+    });
+
+    useNodeStore.getState().moveNodeTo('task_1', 'note_1', 0);
+    useUIStore.getState().setDrag('task_2');
+    useUIStore.getState().setDropTarget('task_1', 'before');
+
+    const dropEvent = createDragEvent();
+    latest.current!.dragHandlers.onDrop(dropEvent);
+
+    expect(dropEvent.preventDefault).toHaveBeenCalledTimes(1);
+    expect(dropEvent.stopPropagation).toHaveBeenCalledTimes(1);
+    expect(loroDoc.getParentId('task_2')).toBe('note_1');
+    expect(loroDoc.getChildren('note_1').slice(0, 2)).toEqual(['task_2', 'task_1']);
   });
 });

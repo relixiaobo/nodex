@@ -213,6 +213,29 @@ describe('getHighlightsForNote', () => {
     expect(highlights[0].id).toBe(highlightNode.id);
     expect(highlights[0].name).toBe('bare text');
   });
+
+  it('ignores non-reference children inside the Highlights field', () => {
+    const store = getStore();
+    const { highlightNode } = createHighlightOnly({
+      store, selectedText: 'bare text', clipNodeId: 'webclip_1',
+    });
+    const { noteNode } = addNoteForHighlight({
+      store, highlightNodeId: highlightNode.id, clipNodeId: 'webclip_1', noteText: 'my thought',
+    });
+
+    const highlightsFieldEntryId = loroDoc.getChildren(noteNode.id).find((childId) => {
+      const child = loroDoc.toNodexNode(childId);
+      return child?.type === 'fieldEntry' && child.fieldDefId === NDX_F.NOTE_HIGHLIGHTS;
+    });
+    expect(highlightsFieldEntryId).toBeDefined();
+
+    const directHighlight = store.createChild(highlightsFieldEntryId!, undefined, { name: 'direct child highlight' });
+    store.applyTag(directHighlight.id, SYS_T.HIGHLIGHT);
+
+    const highlights = getHighlightsForNote(noteNode.id);
+    expect(highlights).toHaveLength(1);
+    expect(highlights[0].id).toBe(highlightNode.id);
+  });
 });
 
 describe('createHighlightOnly', () => {

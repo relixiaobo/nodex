@@ -200,7 +200,7 @@ src/
     palette-commands.ts    # ⌘K 命令注册表 (系统命令 + 日记导航)
     tree-utils.ts          # 树遍历工具 (flatten/navigate/parent/sibling)
   types/                   # 核心类型
-    node.ts                # NodexNode, DocType, NodeProps, CONTAINER_IDS
+    node.ts                # NodexNode, NodeType, SYSTEM_NODE_IDS
     system-nodes.ts        # SYS_A*(60+), SYS_D*(12), SYS_V*(22+), SYS_T*(25+)
     index.ts               # 统一导出
   services/                # 数据服务层
@@ -248,9 +248,9 @@ ContentNode
   └── FieldEntry { fieldDefId, children: [valueNodeId1, valueNodeId2, ...] }
 ```
 
-### 系统节点与 CONTAINER_IDS
+### 系统节点与 SYSTEM_NODE_IDS
 
-系统节点 ID = `{workspaceId}_{SUFFIX}`，后缀见 `CONTAINER_IDS` 常量（JOURNAL、TRASH、SCHEMA、SETTINGS 等）。
+系统节点 ID = 固定字符串常量，见 `SYSTEM_NODE_IDS`（LIBRARY、INBOX、JOURNAL、TRASH、SCHEMA、SETTINGS 等）。
 
 **系统节点不再是特殊类型**——它们是普通节点 + `locked` 属性。保护机制通过 `isLockedNode()` 能力检查实现，而非 ID 检测。新工作区只自动创建 Journal、Trash、Schema、Settings（不再创建 Library/Inbox）。
 

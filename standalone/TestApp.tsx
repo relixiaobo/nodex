@@ -13,7 +13,7 @@ import { TopToolbar } from '../src/components/toolbar/TopToolbar';
 import { PanelStack } from '../src/components/panel/PanelStack';
 import { CommandPalette } from '../src/components/search/CommandPalette';
 import { BatchTagSelector } from '../src/components/tags/BatchTagSelector';
-import { CONTAINER_IDS } from '../src/types/index.js';
+import { SYSTEM_NODE_IDS } from '../src/types/index.js';
 import { seedTestData } from '../src/entrypoints/test/seed-data';
 import * as loroDoc from '../src/lib/loro-doc.js';
 
@@ -44,7 +44,7 @@ function useTestBootstrap(): boolean {
       // Use replacePanel (not navigateTo) to avoid creating a Loro undo entry
       // whose UI snapshot is the empty initial state (Bug 1 fix).
       if (panelHistory.length === 0) {
-        replacePanel(CONTAINER_IDS.LIBRARY);
+        replacePanel(SYSTEM_NODE_IDS.LIBRARY);
       }
 
       // Expose stores + loro-doc on window for MCP/DevTools console testing

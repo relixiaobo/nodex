@@ -8,7 +8,7 @@
 
 soma 让用户在浏览网页时，通过 Chrome Side Panel 记录和组织信息，与历史笔记协同阅读，并提供 AI 辅助功能（聊天、网页操作等）。
 
-**核心设计原则**：基于 Tana 的 "Everything is a Node" 数据模型，保留 Tuple 核心抽象，简化掉 Firebase 时代的 Metanode 和 AssociatedData 间接层。
+**核心设计原则**：基于 Tana 的 "Everything is a Node" 数据模型，保留 Field Entry 核心抽象，简化掉 Firebase 时代的 Metanode 和 AssociatedData 间接层。
 
 ## 沟通约定
 
@@ -195,10 +195,12 @@ src/
   lib/
     chrome-storage.ts      # Zustand persist 适配器 (chrome.storage.local + Set 序列化)
     fuzzy-search.ts        # 轻量 fuzzy search 评分器
-    palette-commands.ts    # ⌘K 命令注册表 (容器导航 + 系统命令)
+    node-capabilities.ts   # 节点能力查询 (isLockedNode, canCreateChildrenUnder, canEditFieldEntryValue)
+    system-node-presets.ts # 系统节点预设 (SYSTEM_NODE_PRESETS, getSystemNodePreset)
+    palette-commands.ts    # ⌘K 命令注册表 (系统命令 + 日记导航)
     tree-utils.ts          # 树遍历工具 (flatten/navigate/parent/sibling)
-  types/                   # 核心类型 (不变)
-    node.ts                # NodexNode, DocType, NodeProps, WORKSPACE_CONTAINERS
+  types/                   # 核心类型
+    node.ts                # NodexNode, DocType, NodeProps, CONTAINER_IDS
     system-nodes.ts        # SYS_A*(60+), SYS_D*(12), SYS_V*(22+), SYS_T*(25+)
     index.ts               # 统一导出
   services/                # 数据服务层
@@ -222,57 +224,59 @@ Tana 的配置页面（字段配置、标签配置等）不是定制 UI，而是
 - **attrDef** 被 `SYS_T02` (FIELD_DEFINITION) 标记 → 配置页 = SYS_T02 的模板字段
 - **tagDef** 被 `SYS_T01` (SUPERTAG) 标记 → 配置页 = SYS_T01 的模板字段
 
-配置页上的每个配置项（Field type 下拉、Options 列表、Toggle 开关等）都是系统标签模板字段的实例，通过不同渲染组件呈现：`TupleAsPicker`（下拉）、`ToggleButton`（开关）、标准 `OutlinerItem`（节点列表）。
+配置页上的每个配置项（Field type 下拉、Options 列表、Toggle 开关等）都是系统标签模板字段的实例，通过不同渲染组件呈现：`ConfigSelectPicker`（下拉）、`ToggleButton`（开关）、标准 `OutlinerItem`（节点列表）。
 
 详见 `docs/research/tana-config-page-architecture.md`。
 
-### 间接层（简化后只保留 Tuple）
+### 间接层（简化后只保留 Field Entry）
 
-1. **Tuple** (`doc_type='tuple'`, 占 29.3%): 万能键值对。`children[0]` = 键 (SYS_A* 或 attrDefId)，`children[1:]` = 值（字段值直接存这里）。
-2. **node.meta** (`TEXT[]` 列): 元信息 Tuple ID 列表。`meta = [tagTupleId, checkboxTupleId, ...]`
+1. **Field Entry** (`type='fieldEntry'`): 字段实例。`fieldDefId` 指向定义，`children` = 值节点列表。
+2. **node.tags** (`string[]`): 节点绑定的标签 ID 列表。
 
-### 标签应用链路 (四步)
+### 标签应用链路
 
 ```
-ContentNode.meta → [TagTuple.id, CbTuple.id]
-  TagTuple.children: [SYS_A13, tagDefId]   ← 标签绑定
-  CbTuple.children: [SYS_A55, SYS_V03]     ← checkbox 配置
-ContentNode.children → Tuple [attrDefId, valueNodeId1, valueNodeId2, ...]  ← 字段实例（值直接存 children）
+ContentNode.tags → [tagDefId1, tagDefId2, ...]    ← 直接绑定
+ContentNode.children → FieldEntry [fieldDefId → attrDefId, children → valueNodeId1, valueNodeId2, ...]
 ```
 
-### 字段值存储 (两层)
+### 字段值存储
 
 ```
 ContentNode
-  ├── children: [..., fieldTupleId, ...]
-  └── FieldTuple.children: [attrDefId, valueNodeId1, valueNodeId2, ...]
+  ├── children: [..., fieldEntryId, ...]
+  └── FieldEntry { fieldDefId, children: [valueNodeId1, valueNodeId2, ...] }
 ```
 
-### 工作区容器命名
+### 系统节点与 CONTAINER_IDS
 
-容器节点 ID = `{workspaceId}_{SUFFIX}`，后缀见 `WORKSPACE_CONTAINERS` 常量。
+系统节点 ID = `{workspaceId}_{SUFFIX}`，后缀见 `CONTAINER_IDS` 常量（JOURNAL、TRASH、SCHEMA、SETTINGS 等）。
+
+**系统节点不再是特殊类型**——它们是普通节点 + `locked` 属性。保护机制通过 `isLockedNode()` 能力检查实现，而非 ID 检测。新工作区只自动创建 Journal、Trash、Schema、Settings（不再创建 Library/Inbox）。
+
+节点能力查询：`src/lib/node-capabilities.ts`（`isLockedNode()`、`canCreateChildrenUnder()`、`canEditFieldEntryValue()`）。系统节点预设：`src/lib/system-node-presets.ts`（`SYSTEM_NODE_PRESETS`、`getSystemNodePreset()`）。
 
 ### 应用页面 vs 用户数据（铁律分离）
 
 > **判断标准**：用户清空所有数据后，这个页面还应不应该存在？如果"应该"→ 应用页面；如果"不应该"→ 用户数据。
 
-- **用户数据**（Library、Inbox、Journal、Trash、Schema、Settings 等）= 节点，存在 LoroDoc 中，可搜索、可同步
+- **用户数据**（Journal、Trash、Schema、Settings 等系统节点 + 用户自建节点）= 节点，存在 LoroDoc 中，可搜索、可同步
 - **应用页面**（About、Changelog、Feedback 等）= 纯 UI 路由（`app:` 前缀），不创建节点，不进入 LoroDoc，不可搜索
 - 应用页面可以复用 NodePanel 的布局样式，但数据层绝对不能共通
 
-面板栈 `panelHistory` 支持两种 ID：节点 ID（如 `ws123_LIBRARY`）和应用页面 ID（如 `app:about`）。
+面板栈 `panelHistory` 支持两种 ID：节点 ID（如 `ws123_JOURNAL`）和应用页面 ID（如 `app:about`）。
 
 **演进方向**：`app:about` 是临时方案。多工作区架构上线后，About/Changelog/Help 等内容迁移为"官方工作区"（soma 维护的只读工作区）的节点。官方工作区、个人工作区、协作工作区本质是同一个模型，区别在于 role（`owner`/`editor`/`viewer`）。每个工作区 = 独立 LoroDoc。
 
 ### "一切皆节点"设计守则（实现时必须遵守）
 
-> **核心判断标准**：这个信息该存为节点/Tuple，还是 JSON/字符串/UI 状态？**答案永远是前者。**
+> **核心判断标准**：这个信息该存为节点/字段，还是 JSON/字符串/UI 状态？**答案永远是前者。**
 
 实现 P2/P3 功能时，以下 6 条守则不可违背：
 
-1. **视图配置 = ViewDef 节点 + Tuple**，不是 JSON blob。视图可通过 supertag 模板继承
-2. **Filter/Sort/Group = ViewDef 的持久化 Tuple**，不是 React state 或 Zustand 临时状态。视图切换时自动保存/恢复
-3. **搜索条件 = Tuple 树**，不是 DSL 字符串 `"#task AND status:TODO"`。Query Builder 直接渲染 Tuple 节点树
+1. **视图配置 = ViewDef 节点 + 字段**，不是 JSON blob。视图可通过 supertag 模板继承
+2. **Filter/Sort/Group = ViewDef 的持久化字段**，不是 React state 或 Zustand 临时状态。视图切换时自动保存/恢复
+3. **搜索条件 = 节点树**，不是 DSL 字符串 `"#task AND status:TODO"`。Query Builder 直接渲染条件节点树
 4. **日期字段值 = 日节点引用**，不是字符串 `"2026-02-16"`。日期是一等公民（可挂 children/tag/field）
 5. **剪藏元数据 = Supertag 字段**，不是节点属性。所有新增元数据走 attrDef，不加 NodexNode 顶层属性
 6. **AI 命令 = Command Node**，prompt/参数/输出全部是节点/字段/children，不建独立配置系统
@@ -331,7 +335,7 @@ ContentNode
 ### Tana 导入
 
 - Tana 导出的 `touchCounts`/`modifiedTs` 有两种格式：标准数组 `[1769, 0]` 和 JSON 字符串 `'{"0":1769}'`（紧凑稀疏格式）。`parseCompactArray()` 统一处理。
-- 工作区 ID 通过 `_ownerId` 链 + 容器后缀（`_SCHEMA`, `_TRASH` 等）反向推导。
+- 工作区 ID 通过 `_ownerId` 链 + 系统节点后缀（`_SCHEMA`, `_TRASH` 等）反向推导。
 - `docs/research/b8AyeCJNsefK@2026-01-30.json` 是 16MB 文件，不要直接用 Read 工具打开，用 Python/Bash 脚本处理。
 
 ### 引用完整性

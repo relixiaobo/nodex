@@ -22,18 +22,13 @@ _(空)_
 
 | Agent | 分支 | 任务 | 锁定文件 | 状态 |
 |---|---|---|---|---|
-| codex | `codex/remove-container-concept` | 消除 Container Node 概念 | `src/types/node.ts`, `src/stores/node-store.ts`, `src/lib/bootstrap-containers.ts`, `src/components/outliner/NodeContextMenu.tsx` | 进行中 |
+| _(空)_ | | | | |
 
 ---
 
 ## 进行中
 
-- [ ] **消除 Container Node 概念** — Container 变为普通 node + locked；删除 Library/Inbox 自动创建；Schema/Trash/Settings/Journal 保留为 locked node + 预置 icon。详见 `docs/research/111-positioning-synthesis.md` § 七。
-  - [x] 修复通过命令面板打开 `Settings` 时的 React update loop 崩溃（`FieldRow` store selector 改为稳定 primitive，并补面板渲染回归测试）
-  - [x] 统一通用 field row 的设置项样式：description 放回字段名下方、窄屏上下布局/宽屏左右布局、boolean 仅保留开关，并修复 boolean 默认值显示错误
-  - [x] 统一 field icon 与普通 node bullet 的前导区布局：复用 `BulletChevron`、gap 与点击区一致，并补 regular field 回归测试
-  - [x] 修复 `Settings` 字段配置页的 `Field type` 选中态：将 `boolean` 纳入通用 field type registry，并补系统 fieldDef 回归测试
-  - [x] 统一 field/tag configure 页的默认值显示逻辑：`Hide field` / `Field type` / 默认 toggle 与 `visibleWhen` 全部走同一套 config default fallback
+_(空)_
 
 ---
 
@@ -155,6 +150,7 @@ _(空)_
 
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
+| 2026-03-10 | 消除 Container Node 概念 — Container 变为普通 node + locked；Settings 改为标准节点页面 | codex | #119 |
 | 2026-03-07 | 高亮点击呼出笔记 — 点击高亮文本打开笔记浮窗，链接/按钮放行原生行为 | nodex | main |
 | 2026-03-07 | 高亮交互清理 — 移除 HIGHLIGHT_CLICK 死代码 + updateSaveButtonState no-op | nodex | main |
 | 2026-03-06 | About 分离为 app panel + Settings 数据迁移 — About 从节点→纯 UI 路由(`app:about`)；Settings highlightEnabled 从 ui-store→LoroDoc 字段 + chrome.storage 投影 | nodex | main |

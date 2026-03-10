@@ -24,6 +24,7 @@ import { runSearch } from '../lib/search-engine.js';
 import { resolveAutoInit } from '../lib/field-auto-init.js';
 import { resolvePreferredTopLevelParentId } from '../lib/system-node-presets.js';
 import type { ParsedPasteNode } from '../lib/paste-parser.js';
+import { resolveEffectiveId } from '../lib/node-type-utils.js';
 
 // ============================================================
 // Store 接口
@@ -1253,8 +1254,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
 
     applyTag: (nodeId, tagDefId) => {
       // Resolve reference → target so tags land on the content node
-      const raw = loroDoc.toNodexNode(nodeId);
-      const effectiveId = raw?.type === 'reference' && raw.targetId ? raw.targetId : nodeId;
+      const effectiveId = resolveEffectiveId(nodeId);
       if (!getNodeCapabilities(effectiveId).canEditStructure) return;
       applyTagMutationsNoCommit(effectiveId, tagDefId);
       loroDoc.commitDoc();
@@ -1268,8 +1268,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
 
     removeTag: (nodeId, tagDefId) => {
       // Resolve reference → target
-      const rawRef = loroDoc.toNodexNode(nodeId);
-      const effectiveId = rawRef?.type === 'reference' && rawRef.targetId ? rawRef.targetId : nodeId;
+      const effectiveId = resolveEffectiveId(nodeId);
       if (!getNodeCapabilities(effectiveId).canEditStructure) return;
       const node = loroDoc.toNodexNode(effectiveId);
       const hadTag = node?.tags.includes(tagDefId) ?? false;
@@ -1305,8 +1304,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
     batchApplyTag: (nodeIds, tagDefId) => {
       for (const nodeId of nodeIds) {
         // Resolve reference → target
-        const raw = loroDoc.toNodexNode(nodeId);
-        const effectiveId = raw?.type === 'reference' && raw.targetId ? raw.targetId : nodeId;
+        const effectiveId = resolveEffectiveId(nodeId);
         if (!getNodeCapabilities(effectiveId).canEditStructure) continue;
         applyTagMutationsNoCommit(effectiveId, tagDefId);
       }
@@ -1316,8 +1314,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
     batchRemoveTag: (nodeIds, tagDefId) => {
       for (const nodeId of nodeIds) {
         // Resolve reference → target
-        const rawRef = loroDoc.toNodexNode(nodeId);
-        const effectiveId = rawRef?.type === 'reference' && rawRef.targetId ? rawRef.targetId : nodeId;
+        const effectiveId = resolveEffectiveId(nodeId);
         if (!getNodeCapabilities(effectiveId).canEditStructure) continue;
         const node = loroDoc.toNodexNode(effectiveId);
         const hadTag = node?.tags.includes(tagDefId) ?? false;
@@ -1712,11 +1709,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
     addReference: (parentId, targetNodeId, position) => {
       if (!canMutate('addReference')) return '';
       if (!canEditStructure(parentId)) return '';
-      const rawTargetNode = loroDoc.toNodexNode(targetNodeId);
-      const effectiveTargetId =
-        rawTargetNode?.type === 'reference' && rawTargetNode.targetId
-          ? rawTargetNode.targetId
-          : targetNodeId;
+      const effectiveTargetId = resolveEffectiveId(targetNodeId);
       const blockReason = getTreeReferenceBlockReason(parentId, targetNodeId, {
         hasNode: loroDoc.hasNode,
         getNode: loroDoc.toNodexNode,

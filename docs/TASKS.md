@@ -38,6 +38,10 @@ _(空)_
 
 > **方法论**：本次上线聚焦 **Think → Connect** 闭环。Think 已基本完成（高亮、笔记、剪藏、Today 首屏），重点打磨 Connect 体验（搜索、视图、标签、字段）。Compound（上下文感知、AI）上线后根据用户反馈再定优先级。详见 `docs/product-philosophy.md`。
 
+#### 数据模型简化
+
+- [ ] **消除 Container Node 概念** — Container 变为普通 node + locked；删除 Library/Inbox 自动创建；Schema/Trash/Settings/Journal 保留为 locked node + 预置 icon。详见 `docs/research/111-positioning-synthesis.md` § 七。
+
 #### 上架准备
 
 - [ ] **产品展示页** — 静态落地页（产品介绍 + 截图 + 安装链接 + 隐私政策），可托管在 Cloudflare Pages 或 GitHub Pages

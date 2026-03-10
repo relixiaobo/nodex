@@ -1,5 +1,5 @@
 import * as loroDoc from '../../src/lib/loro-doc.js';
-import { CONTAINER_IDS } from '../../src/types/index.js';
+import { SYSTEM_NODE_IDS } from '../../src/types/index.js';
 import type { QueryOp } from '../../src/types/node.js';
 import { resetAndSeed } from './helpers/test-state.js';
 
@@ -9,7 +9,7 @@ describe('Search Node data model (Step 0)', () => {
   });
 
   it('persists queryCondition node with queryLogic (group)', () => {
-    const id = loroDoc.createNode(undefined, CONTAINER_IDS.SEARCHES);
+    const id = loroDoc.createNode(undefined, SYSTEM_NODE_IDS.SEARCHES);
     loroDoc.setNodeDataBatch(id, {
       type: 'queryCondition',
       queryLogic: 'AND',
@@ -24,7 +24,7 @@ describe('Search Node data model (Step 0)', () => {
   });
 
   it('persists queryCondition node with queryOp (leaf)', () => {
-    const id = loroDoc.createNode(undefined, CONTAINER_IDS.SEARCHES);
+    const id = loroDoc.createNode(undefined, SYSTEM_NODE_IDS.SEARCHES);
     loroDoc.setNodeDataBatch(id, {
       type: 'queryCondition',
       queryOp: 'HAS_TAG' satisfies QueryOp,
@@ -40,7 +40,7 @@ describe('Search Node data model (Step 0)', () => {
   });
 
   it('persists queryFieldDefId for field conditions', () => {
-    const id = loroDoc.createNode(undefined, CONTAINER_IDS.SEARCHES);
+    const id = loroDoc.createNode(undefined, SYSTEM_NODE_IDS.SEARCHES);
     loroDoc.setNodeDataBatch(id, {
       type: 'queryCondition',
       queryOp: 'FIELD_IS' satisfies QueryOp,
@@ -54,7 +54,7 @@ describe('Search Node data model (Step 0)', () => {
   });
 
   it('persists lastRefreshedAt on search node', () => {
-    const id = loroDoc.createNode(undefined, CONTAINER_IDS.SEARCHES);
+    const id = loroDoc.createNode(undefined, SYSTEM_NODE_IDS.SEARCHES);
     const ts = Date.now();
     loroDoc.setNodeDataBatch(id, {
       type: 'search',
@@ -70,7 +70,7 @@ describe('Search Node data model (Step 0)', () => {
 
   it('supports condition tree structure (AND group with leaf children)', () => {
     // Create search node
-    const searchId = loroDoc.createNode(undefined, CONTAINER_IDS.SEARCHES);
+    const searchId = loroDoc.createNode(undefined, SYSTEM_NODE_IDS.SEARCHES);
     loroDoc.setNodeDataBatch(searchId, { type: 'search', name: 'Tasks' });
 
     // Create AND group as child
@@ -113,7 +113,7 @@ describe('Search Node data model (Step 0)', () => {
   });
 
   it('round-trips query fields through Loro snapshot export/import', () => {
-    const searchId = loroDoc.createNode(undefined, CONTAINER_IDS.SEARCHES);
+    const searchId = loroDoc.createNode(undefined, SYSTEM_NODE_IDS.SEARCHES);
     loroDoc.setNodeDataBatch(searchId, {
       type: 'search',
       name: 'Round-trip test',

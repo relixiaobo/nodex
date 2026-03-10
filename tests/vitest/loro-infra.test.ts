@@ -83,7 +83,7 @@ describe('moveNode across roots', () => {
   beforeEach(initDoc);
 
   it('moves children from one root to another', () => {
-    // Simulates ensureContainers migrating containers from ws_xxx → user.id
+    // Simulates ensureSystemNodes migrating containers from ws_xxx → user.id
     const rootA = createNode('ws_anon', null);
     const child1 = createNode('LIBRARY', rootA);
     const child2 = createNode('JOURNAL', rootA);

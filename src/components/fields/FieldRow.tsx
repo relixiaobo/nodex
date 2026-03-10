@@ -48,10 +48,9 @@ import { FieldValueRow } from './FieldValueRow.js';
 import { FIELD_VALUE_INSET } from './field-layout.js';
 import { dragState } from '../../hooks/use-drag-select.js';
 import { resolveRowPointerSelectAction } from '../../lib/row-pointer-selection.js';
-import { resolveDropHoverPosition } from '../../lib/drag-drop-position.js';
-import { resolveDropMove } from '../../lib/drag-drop.js';
 import { OutlinerRow, useRowSelectionState, useRowPointerHandlers } from '../outliner/OutlinerRow.js';
 import { canCreateChildrenUnder, getNodeCapabilities } from '../../lib/node-capabilities.js';
+import { useDragDropRow } from '../../hooks/use-drag-drop-row.js';
 
 function focusTrailingInputForParent(parentId: string): boolean {
   const roots = document.querySelectorAll<HTMLElement>('[data-trailing-parent-id]');
@@ -452,18 +451,15 @@ export function FieldRow({
   const clickOffsetXRef = useRef<number | undefined>(undefined);
   const rowRef = useRef<HTMLDivElement>(null);
 
-  // Drag state for field row reordering
-  const dragNodeId = useUIStore((s) => s.dragNodeId);
-  const dropTargetId = useUIStore((s) => s.dropTargetId);
-  const dropPosition = useUIStore((s) => s.dropPosition);
-  const setDrag = useUIStore((s) => s.setDrag);
-  const setDropTarget = useUIStore((s) => s.setDropTarget);
-  const moveNodeTo = useNodeStore((s) => s.moveNodeTo);
-
   const isSystemField = dataType === '__system_date__' || dataType === '__system_text__' || dataType === '__system_node__';
   const isOutliner = dataType === '__outliner__';
   const isVirtual = fieldEntryId.startsWith('__virtual_');
   const isEditing = editingFieldNameId === fieldEntryId;
+  const { isDragging, isDropTarget, dropPosition, dragHandlers } = useDragDropRow({
+    nodeId: fieldEntryId,
+    parentId: nodeId,
+    rowRef,
+  });
 
   // Config metadata for system config fields (icon, description)
   const configDef = configKey
@@ -654,81 +650,6 @@ export function FieldRow({
     }
     return false;
   }, [clearSelection, moveToSibling]);
-
-  // ─── Drag handlers for field row reordering ───
-
-  const isDropTarget = dropTargetId === fieldEntryId;
-  const isDragging = dragNodeId === fieldEntryId;
-
-  const handleDragStart = useCallback(
-    (e: DragEvent) => {
-      e.dataTransfer.effectAllowed = 'move';
-      e.dataTransfer.setData('text/plain', fieldEntryId);
-      setDrag(fieldEntryId);
-    },
-    [fieldEntryId, setDrag],
-  );
-
-  const handleDragOver = useCallback(
-    (e: DragEvent) => {
-      if (!dragNodeId || dragNodeId === fieldEntryId) return;
-      e.preventDefault();
-      e.dataTransfer.dropEffect = 'move';
-
-      const rect = rowRef.current?.getBoundingClientRect();
-      if (!rect) return;
-
-      const position = resolveDropHoverPosition({
-        offsetY: e.clientY - rect.top,
-        rowHeight: rect.height,
-      });
-      setDropTarget(fieldEntryId, position);
-    },
-    [fieldEntryId, dragNodeId, setDropTarget],
-  );
-
-  const handleDragLeave = useCallback(() => {
-    if (dropTargetId === fieldEntryId) {
-      setDropTarget(null, null);
-    }
-  }, [fieldEntryId, dropTargetId, setDropTarget]);
-
-  const handleDrop = useCallback(
-    (e: DragEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      if (!dragNodeId || dragNodeId === fieldEntryId) {
-        setDrag(null);
-        return;
-      }
-
-      const dropParentId = nodeId;
-      const dropParent = useNodeStore.getState().getNode(dropParentId);
-      const siblingIndex = dropParent?.children?.indexOf(fieldEntryId) ?? 0;
-
-      const decision = resolveDropMove({
-        dragNodeId,
-        targetNodeId: fieldEntryId,
-        targetParentId: dropParentId,
-        targetParentKey: `${nodeId}:${fieldEntryId}`,
-        siblingIndex,
-        dropPosition,
-        targetHasChildren: false,
-        targetIsExpanded: false,
-      });
-
-      if (decision) {
-        moveNodeTo(dragNodeId, decision.newParentId, decision.position);
-      }
-
-      setDrag(null);
-    },
-    [dragNodeId, fieldEntryId, nodeId, dropPosition, moveNodeTo, setDrag],
-  );
-
-  const handleDragEnd = useCallback(() => {
-    setDrag(null);
-  }, [setDrag]);
 
   const handleFieldRowClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     const target = e.target instanceof HTMLElement ? e.target : null;
@@ -926,10 +847,10 @@ export function FieldRow({
         data-node-id={fieldEntryId}
         data-parent-id={nodeId}
         data-row-kind="field"
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
-        onDragEnd={handleDragEnd}
+        onDragOver={dragHandlers.onDragOver}
+        onDragLeave={dragHandlers.onDragLeave}
+        onDrop={dragHandlers.onDrop}
+        onDragEnd={dragHandlers.onDragEnd}
         onClick={handleFieldRowClick}
       >
         {isFieldSelected && (
@@ -944,7 +865,7 @@ export function FieldRow({
           interactive={!trashed && !isVirtual}
           tooltipLabel={!trashed && !isVirtual ? t('field.configureField') : undefined}
           draggable={canEditFieldDefinition && canManageFieldStructure && !trashed && !isVirtual && !isSystemField && !isSystemConfig}
-          onDragStart={handleDragStart}
+          onDragStart={dragHandlers.onDragStart}
           onClick={!trashed && !isVirtual ? () => navigateTo(attrDefId) : undefined}
         />
         <div

@@ -1,6 +1,6 @@
 import * as loroDoc from '../../src/lib/loro-doc.js';
 import { useNodeStore } from '../../src/stores/node-store.js';
-import { CONTAINER_IDS } from '../../src/types/index.js';
+import { SYSTEM_NODE_IDS } from '../../src/types/index.js';
 import { findNodesByTag, runSearch, evaluateCondition } from '../../src/lib/search-engine.js';
 import { getNodeCapabilities } from '../../src/lib/node-capabilities.js';
 import { isOutlinerContentNodeType } from '../../src/lib/node-type-utils.js';
@@ -58,7 +58,7 @@ describe('search-engine', () => {
 
     it('excludes workspace containers', () => {
       const results = findNodesByTag('tagDef_task');
-      const containerIds = Object.values(CONTAINER_IDS);
+      const containerIds = Object.values(SYSTEM_NODE_IDS);
       for (const id of results) {
         expect(containerIds).not.toContain(id);
       }
@@ -72,7 +72,7 @@ describe('search-engine', () => {
     });
 
     it('returns empty set for search node with no conditions', () => {
-      const searchId = loroDoc.createNode(undefined, CONTAINER_IDS.SEARCHES);
+      const searchId = loroDoc.createNode(undefined, SYSTEM_NODE_IDS.SEARCHES);
       loroDoc.setNodeDataBatch(searchId, { type: 'search', name: 'Empty' });
       loroDoc.commitDoc('__seed__');
 
@@ -82,7 +82,7 @@ describe('search-engine', () => {
 
     it('matches nodes with HAS_TAG condition', () => {
       // Create a search node with HAS_TAG condition
-      const searchId = loroDoc.createNode(undefined, CONTAINER_IDS.SEARCHES);
+      const searchId = loroDoc.createNode(undefined, SYSTEM_NODE_IDS.SEARCHES);
       loroDoc.setNodeDataBatch(searchId, { type: 'search', name: 'Tasks' });
 
       const andGroupId = loroDoc.createNode(undefined, searchId);
@@ -106,7 +106,7 @@ describe('search-engine', () => {
 
     it('excludes search node itself from results', () => {
       // Create a search node and apply a tag to it
-      const searchId = loroDoc.createNode(undefined, CONTAINER_IDS.SEARCHES);
+      const searchId = loroDoc.createNode(undefined, SYSTEM_NODE_IDS.SEARCHES);
       loroDoc.setNodeDataBatch(searchId, { type: 'search', name: 'Self-ref test' });
       loroDoc.addTag(searchId, 'tagDef_task');
 
@@ -131,7 +131,7 @@ describe('search-engine', () => {
       const store = useNodeStore.getState();
       store.toggleNodeDone('task_1');
 
-      const searchId = loroDoc.createNode(undefined, CONTAINER_IDS.SEARCHES);
+      const searchId = loroDoc.createNode(undefined, SYSTEM_NODE_IDS.SEARCHES);
       loroDoc.setNodeDataBatch(searchId, { type: 'search', name: 'Done tasks' });
 
       const andGroupId = loroDoc.createNode(undefined, searchId);
@@ -146,7 +146,7 @@ describe('search-engine', () => {
     });
 
     it('matches NOT_DONE condition (has checkbox but not completed)', () => {
-      const searchId = loroDoc.createNode(undefined, CONTAINER_IDS.SEARCHES);
+      const searchId = loroDoc.createNode(undefined, SYSTEM_NODE_IDS.SEARCHES);
       loroDoc.setNodeDataBatch(searchId, { type: 'search', name: 'Not done' });
 
       const andGroupId = loroDoc.createNode(undefined, searchId);
@@ -175,7 +175,7 @@ describe('search-engine', () => {
       const store = useNodeStore.getState();
       store.toggleNodeDone('task_1'); // Mark one as done
 
-      const searchId = loroDoc.createNode(undefined, CONTAINER_IDS.SEARCHES);
+      const searchId = loroDoc.createNode(undefined, SYSTEM_NODE_IDS.SEARCHES);
       loroDoc.setNodeDataBatch(searchId, { type: 'search', name: 'All todos' });
 
       const andGroupId = loroDoc.createNode(undefined, searchId);
@@ -196,7 +196,7 @@ describe('search-engine', () => {
       store.applyTag('task_2', 'tagDef_task');
       store.toggleNodeDone('task_1'); // Mark task_1 as done
 
-      const searchId = loroDoc.createNode(undefined, CONTAINER_IDS.SEARCHES);
+      const searchId = loroDoc.createNode(undefined, SYSTEM_NODE_IDS.SEARCHES);
       loroDoc.setNodeDataBatch(searchId, { type: 'search', name: 'Undone tasks' });
 
       const andGroupId = loroDoc.createNode(undefined, searchId);
@@ -222,7 +222,7 @@ describe('search-engine', () => {
     });
 
     it('throws for unsupported QueryOp', () => {
-      const searchId = loroDoc.createNode(undefined, CONTAINER_IDS.SEARCHES);
+      const searchId = loroDoc.createNode(undefined, SYSTEM_NODE_IDS.SEARCHES);
       loroDoc.setNodeDataBatch(searchId, { type: 'search', name: 'Unsupported' });
 
       const andGroupId = loroDoc.createNode(undefined, searchId);
@@ -243,7 +243,7 @@ describe('search-engine', () => {
   describe('evaluateCondition', () => {
     it('evaluates OR logic correctly', () => {
       // Create OR condition with two tags
-      const orGroupId = loroDoc.createNode(undefined, CONTAINER_IDS.SEARCHES);
+      const orGroupId = loroDoc.createNode(undefined, SYSTEM_NODE_IDS.SEARCHES);
       loroDoc.setNodeDataBatch(orGroupId, { type: 'queryCondition', queryLogic: 'OR' });
 
       const cond1Id = loroDoc.createNode(undefined, orGroupId);
@@ -269,7 +269,7 @@ describe('search-engine', () => {
     });
 
     it('evaluates NOT logic correctly', () => {
-      const notGroupId = loroDoc.createNode(undefined, CONTAINER_IDS.SEARCHES);
+      const notGroupId = loroDoc.createNode(undefined, SYSTEM_NODE_IDS.SEARCHES);
       loroDoc.setNodeDataBatch(notGroupId, { type: 'queryCondition', queryLogic: 'NOT' });
 
       const condId = loroDoc.createNode(undefined, notGroupId);
@@ -297,7 +297,7 @@ describe('search-engine', () => {
 
       // Should be under SEARCHES container
       const parentId = loroDoc.getParentId(searchId);
-      expect(parentId).toBe(CONTAINER_IDS.SEARCHES);
+      expect(parentId).toBe(SYSTEM_NODE_IDS.SEARCHES);
 
       // Should have an AND group with HAS_TAG leaf
       const children = searchNode!.children;
@@ -425,7 +425,7 @@ describe('search-engine', () => {
     });
 
     it('maps NOT_DONE to Not done', () => {
-      const condId = loroDoc.createNode(undefined, CONTAINER_IDS.SEARCHES);
+      const condId = loroDoc.createNode(undefined, SYSTEM_NODE_IDS.SEARCHES);
       loroDoc.setNodeDataBatch(condId, { type: 'queryCondition', queryOp: 'NOT_DONE' });
       loroDoc.commitDoc('__seed__');
       const cond = loroDoc.toNodexNode(condId)!;
@@ -433,7 +433,7 @@ describe('search-engine', () => {
     });
 
     it('maps DONE to Done', () => {
-      const condId = loroDoc.createNode(undefined, CONTAINER_IDS.SEARCHES);
+      const condId = loroDoc.createNode(undefined, SYSTEM_NODE_IDS.SEARCHES);
       loroDoc.setNodeDataBatch(condId, { type: 'queryCondition', queryOp: 'DONE' });
       loroDoc.commitDoc('__seed__');
       const cond = loroDoc.toNodexNode(condId)!;
@@ -441,7 +441,7 @@ describe('search-engine', () => {
     });
 
     it('maps TODO to Has checkbox', () => {
-      const condId = loroDoc.createNode(undefined, CONTAINER_IDS.SEARCHES);
+      const condId = loroDoc.createNode(undefined, SYSTEM_NODE_IDS.SEARCHES);
       loroDoc.setNodeDataBatch(condId, { type: 'queryCondition', queryOp: 'TODO' });
       loroDoc.commitDoc('__seed__');
       const cond = loroDoc.toNodexNode(condId)!;
@@ -449,7 +449,7 @@ describe('search-engine', () => {
     });
 
     it('maps NOT group to Exclude: prefix', () => {
-      const notGroupId = loroDoc.createNode(undefined, CONTAINER_IDS.SEARCHES);
+      const notGroupId = loroDoc.createNode(undefined, SYSTEM_NODE_IDS.SEARCHES);
       loroDoc.setNodeDataBatch(notGroupId, { type: 'queryCondition', queryLogic: 'NOT' });
       const leafId = loroDoc.createNode(undefined, notGroupId);
       loroDoc.setNodeDataBatch(leafId, { type: 'queryCondition', queryOp: 'DONE' });
@@ -468,7 +468,7 @@ describe('search-engine', () => {
       expect(newNode.name).toBe('Test item');
       expect(newNode.tags).toContain('tagDef_task');
       const parentId = loroDoc.getParentId(newNode.id);
-      expect(parentId).toBe(CONTAINER_IDS.LIBRARY);
+      expect(parentId).toBe(SYSTEM_NODE_IDS.LIBRARY);
     });
 
     it('creates reference child in search node', () => {
@@ -484,7 +484,7 @@ describe('search-engine', () => {
     });
 
     it('skips NOT group tags when auto-applying', () => {
-      const searchId = loroDoc.createNode(undefined, CONTAINER_IDS.SEARCHES);
+      const searchId = loroDoc.createNode(undefined, SYSTEM_NODE_IDS.SEARCHES);
       loroDoc.setNodeDataBatch(searchId, { type: 'search', name: 'Complex' });
       const andGroupId = loroDoc.createNode(undefined, searchId);
       loroDoc.setNodeDataBatch(andGroupId, { type: 'queryCondition', queryLogic: 'AND' });

@@ -3,7 +3,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { flushSync } from 'react-dom';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { resetAndSeed } from './helpers/test-state.js';
-import { CONTAINER_IDS } from '../../src/types/index.js';
+import { SYSTEM_NODE_IDS } from '../../src/types/index.js';
 import {
   BOOTSTRAP_SYSTEM_NODES,
   QUICK_NAV_SYSTEM_NODES,
@@ -67,12 +67,12 @@ describe('settings system', () => {
 
   // ── SETTINGS preset ──
 
-  it('SETTINGS exists in CONTAINER_IDS', () => {
-    expect(CONTAINER_IDS.SETTINGS).toBe('SETTINGS');
+  it('SETTINGS exists in SYSTEM_NODE_IDS', () => {
+    expect(SYSTEM_NODE_IDS.SETTINGS).toBe('SETTINGS');
   });
 
   it('SETTINGS is in the system node presets', () => {
-    const meta = getSystemNodePreset(CONTAINER_IDS.SETTINGS);
+    const meta = getSystemNodePreset(SYSTEM_NODE_IDS.SETTINGS);
     expect(meta).toBeDefined();
     expect(meta!.defaultName).toBe('Settings');
     expect(meta!.iconKey).toBe('settings');
@@ -82,27 +82,27 @@ describe('settings system', () => {
   });
 
   it('SETTINGS is included in bootstrap system nodes', () => {
-    const settingsDef = BOOTSTRAP_SYSTEM_NODES.find((c) => c.id === CONTAINER_IDS.SETTINGS);
+    const settingsDef = BOOTSTRAP_SYSTEM_NODES.find((c) => c.id === SYSTEM_NODE_IDS.SETTINGS);
     expect(settingsDef).toBeDefined();
     expect(settingsDef!.defaultName).toBe('Settings');
   });
 
   it('SETTINGS is NOT in quick nav items', () => {
-    const found = QUICK_NAV_SYSTEM_NODES.find((c) => c.id === CONTAINER_IDS.SETTINGS);
+    const found = QUICK_NAV_SYSTEM_NODES.find((c) => c.id === SYSTEM_NODE_IDS.SETTINGS);
     expect(found).toBeUndefined();
   });
 
   it('SETTINGS remains searchable in the command palette', () => {
-    expect(isPaletteSearchableSystemNode(CONTAINER_IDS.SETTINGS)).toBe(true);
+    expect(isPaletteSearchableSystemNode(SYSTEM_NODE_IDS.SETTINGS)).toBe(true);
   });
 
   // ── highlightEnabled (LoroDoc field on SETTINGS node) ──
 
   it('bootstraps Settings through fixed schema nodes instead of a bespoke page shape', () => {
-    expect(loroDoc.getParentId(NDX_T.WORKSPACE_SETTINGS)).toBe(CONTAINER_IDS.SCHEMA);
+    expect(loroDoc.getParentId(NDX_T.WORKSPACE_SETTINGS)).toBe(SYSTEM_NODE_IDS.SCHEMA);
     expect(loroDoc.toNodexNode(NDX_T.WORKSPACE_SETTINGS)?.locked).toBe(true);
     expect(loroDoc.getParentId(NDX_F.SETTING_HIGHLIGHT_ENABLED)).toBe(NDX_T.WORKSPACE_SETTINGS);
-    expect(loroDoc.getParentId(SYSTEM_SCHEMA_NODE_IDS.SETTINGS_HIGHLIGHT_FIELD_ENTRY)).toBe(CONTAINER_IDS.SETTINGS);
+    expect(loroDoc.getParentId(SYSTEM_SCHEMA_NODE_IDS.SETTINGS_HIGHLIGHT_FIELD_ENTRY)).toBe(SYSTEM_NODE_IDS.SETTINGS);
   });
 
   it('highlightEnabled defaults to true', () => {
@@ -120,7 +120,7 @@ describe('settings system', () => {
   it('renders the Settings node panel without triggering a React update loop', () => {
     expect(() => {
       flushSync(() => {
-        root.render(React.createElement(NodePanel, { nodeId: CONTAINER_IDS.SETTINGS }));
+        root.render(React.createElement(NodePanel, { nodeId: SYSTEM_NODE_IDS.SETTINGS }));
       });
     }).not.toThrow();
 

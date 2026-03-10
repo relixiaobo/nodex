@@ -1121,6 +1121,7 @@ export function toNodexNode(nodexId: string): NodexNode | null {
     editMode: data.get('editMode') as boolean | undefined,
     flags: data.get('flags') as number | undefined,
     locked: data.get('locked') as boolean | undefined,
+    systemBootstrapVersion: data.get('systemBootstrapVersion') as number | undefined,
     imageWidth: data.get('imageWidth') as number | undefined,
     imageHeight: data.get('imageHeight') as number | undefined,
     mediaUrl: data.get('mediaUrl') as string | undefined,

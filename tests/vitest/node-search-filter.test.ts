@@ -18,7 +18,7 @@ import {
   toNodexNode,
 } from '../../src/lib/loro-doc.js';
 import { isLockedNode, isWorkspaceHomeNode } from '../../src/lib/node-capabilities.js';
-import { CONTAINER_IDS } from '../../src/types/index.js';
+import { SYSTEM_NODE_IDS } from '../../src/types/index.js';
 
 /** Structural NodeTypes excluded from search (mirrors use-node-search.ts). */
 const SKIP_DOC_TYPES = new Set<string>([
@@ -68,8 +68,8 @@ beforeEach(() => {
   createNode('fe1', null); setNodeDataBatch('fe1', { name: 'field entry',  type: 'fieldEntry' });
   createNode('ref1', null); setNodeDataBatch('ref1', { name: 'ref data',   type: 'reference' });
 
-  createNode(CONTAINER_IDS.SETTINGS, null);
-  setNodeDataBatch(CONTAINER_IDS.SETTINGS, { name: 'Settings', locked: true });
+  createNode(SYSTEM_NODE_IDS.SETTINGS, null);
+  setNodeDataBatch(SYSTEM_NODE_IDS.SETTINGS, { name: 'Settings', locked: true });
 
   commitDoc('__seed__');
 });
@@ -106,7 +106,7 @@ describe('node search SKIP_DOC_TYPES filter', () => {
   });
 
   it('filters out locked system nodes', () => {
-    expect(searchNodes('Settings').map(r => r.id)).not.toContain(CONTAINER_IDS.SETTINGS);
+    expect(searchNodes('Settings').map(r => r.id)).not.toContain(SYSTEM_NODE_IDS.SETTINGS);
   });
 
   it('returns empty for blank query', () => {

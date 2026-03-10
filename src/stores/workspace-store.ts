@@ -93,9 +93,9 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
         const prevWsId = useWorkspaceStore.getState().currentWorkspaceId;
 
         // Update persistence key so saves go under the correct IndexedDB key.
-        // Do NOT call ensureContainers() here — tree move operations before sync
+        // Do NOT call ensureSystemNodes() here — tree move operations before sync
         // cause a Loro WASM panic when server data is imported (conflicting tree
-        // operations trigger option.rs:2175 unwrap). ensureContainers is deferred
+        // operations trigger option.rs:2175 unwrap). Fixed-system-node bootstrap is deferred
         // until after sync completes.
         if (prevWsId !== user.id) {
           const loroDocMod = await import('../lib/loro-doc.js');
@@ -118,10 +118,10 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
         });
 
         if (prevWsId !== user.id) {
-          // Defer container migration + Today navigation until AFTER first sync.
-          // ensureContainers() MUST run after importUpdatesBatch so that local
+          // Defer fixed-system-node bootstrap + Today navigation until AFTER first sync.
+          // ensureSystemNodes() MUST run after importUpdatesBatch so that local
           // tree move operations don't conflict with server CRDT data during merge.
-          const { ensureContainers } = await import('../lib/bootstrap-containers.js');
+          const { ensureSystemNodes } = await import('../lib/bootstrap-system-nodes.js');
           const { ensureTodayNode } = await import('../lib/journal.js');
           const { useUIStore } = await import('./ui-store.js');
           const targetWsId = user.id;
@@ -134,7 +134,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
             if (state.status === 'synced') {
               unsub();
               try {
-                ensureContainers(targetWsId);
+                ensureSystemNodes(targetWsId);
                 const todayId = ensureTodayNode();
                 useUIStore.getState().replacePanel(todayId);
               } catch (e) {
@@ -145,9 +145,9 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
               // If WASM is poisoned, don't attempt any LoroDoc operations —
               // they will panic. Recovery requires a page reload.
               if (isWasmPoisoned()) return;
-              // Sync failed for non-fatal reason — try ensureContainers for offline functionality
+              // Sync failed for non-fatal reason — try ensureSystemNodes for offline functionality
               try {
-                ensureContainers(targetWsId);
+                ensureSystemNodes(targetWsId);
                 const todayId = ensureTodayNode();
                 useUIStore.getState().replacePanel(todayId);
               } catch (e) {

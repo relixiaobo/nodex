@@ -1,13 +1,13 @@
 /**
  * node-store trash semantics — Loro model.
- * trashNode(nodeId): sync, moves to CONTAINER_IDS.TRASH.
+ * trashNode(nodeId): sync, moves to SYSTEM_NODE_IDS.TRASH.
  * restoreNode(nodeId): sync, moves back to original parent.
  * Tags on other nodes are NOT affected by trashing the tagDef.
  */
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useNodeStore } from '../../src/stores/node-store.js';
 import * as loroDoc from '../../src/lib/loro-doc.js';
-import { CONTAINER_IDS } from '../../src/types/index.js';
+import { SYSTEM_NODE_IDS } from '../../src/types/index.js';
 import { SYSTEM_TAGS } from '../../src/types/system-nodes.js';
 import { ensureJournalTagDefs } from '../../src/lib/journal.js';
 import { collectNodeGraphErrors } from './helpers/invariants.js';
@@ -18,10 +18,10 @@ describe('trashNode', () => {
     resetAndSeed();
   });
 
-  it('moves node to CONTAINER_IDS.TRASH', () => {
+  it('moves node to SYSTEM_NODE_IDS.TRASH', () => {
     useNodeStore.getState().trashNode('idea_1');
-    expect(loroDoc.getParentId('idea_1')).toBe(CONTAINER_IDS.TRASH);
-    expect(loroDoc.getChildren(CONTAINER_IDS.TRASH)).toContain('idea_1');
+    expect(loroDoc.getParentId('idea_1')).toBe(SYSTEM_NODE_IDS.TRASH);
+    expect(loroDoc.getChildren(SYSTEM_NODE_IDS.TRASH)).toContain('idea_1');
   });
 
   it('removes node from original parent children', () => {
@@ -31,8 +31,8 @@ describe('trashNode', () => {
 
   it('trashing tagDef moves it to TRASH', () => {
     useNodeStore.getState().trashNode('tagDef_task');
-    expect(loroDoc.getParentId('tagDef_task')).toBe(CONTAINER_IDS.TRASH);
-    expect(loroDoc.getChildren(CONTAINER_IDS.TRASH)).toContain('tagDef_task');
+    expect(loroDoc.getParentId('tagDef_task')).toBe(SYSTEM_NODE_IDS.TRASH);
+    expect(loroDoc.getChildren(SYSTEM_NODE_IDS.TRASH)).toContain('tagDef_task');
   });
 
   it('does not trash locked journal system tagDefs (sys:day/week/year)', () => {
@@ -53,9 +53,9 @@ describe('trashNode', () => {
     expect(loroDoc.getParentId(SYSTEM_TAGS.DAY)).toBe(beforeDayParent);
     expect(loroDoc.getParentId(SYSTEM_TAGS.WEEK)).toBe(beforeWeekParent);
     expect(loroDoc.getParentId(SYSTEM_TAGS.YEAR)).toBe(beforeYearParent);
-    expect(loroDoc.getChildren(CONTAINER_IDS.TRASH)).not.toContain(SYSTEM_TAGS.DAY);
-    expect(loroDoc.getChildren(CONTAINER_IDS.TRASH)).not.toContain(SYSTEM_TAGS.WEEK);
-    expect(loroDoc.getChildren(CONTAINER_IDS.TRASH)).not.toContain(SYSTEM_TAGS.YEAR);
+    expect(loroDoc.getChildren(SYSTEM_NODE_IDS.TRASH)).not.toContain(SYSTEM_TAGS.DAY);
+    expect(loroDoc.getChildren(SYSTEM_NODE_IDS.TRASH)).not.toContain(SYSTEM_TAGS.WEEK);
+    expect(loroDoc.getChildren(SYSTEM_NODE_IDS.TRASH)).not.toContain(SYSTEM_TAGS.YEAR);
   });
 
   it('trashing tagDef does not remove tag from nodes that had it applied', () => {
@@ -78,8 +78,8 @@ describe('trashNode', () => {
   it('multiple nodes can be trashed', () => {
     useNodeStore.getState().trashNode('idea_1');
     useNodeStore.getState().trashNode('idea_2');
-    expect(loroDoc.getChildren(CONTAINER_IDS.TRASH)).toContain('idea_1');
-    expect(loroDoc.getChildren(CONTAINER_IDS.TRASH)).toContain('idea_2');
+    expect(loroDoc.getChildren(SYSTEM_NODE_IDS.TRASH)).toContain('idea_1');
+    expect(loroDoc.getChildren(SYSTEM_NODE_IDS.TRASH)).toContain('idea_2');
     expect(collectNodeGraphErrors()).toEqual([]);
   });
 });
@@ -96,7 +96,7 @@ describe('restoreNode', () => {
 
     expect(loroDoc.getParentId('idea_1')).toBe(originalParent);
     expect(loroDoc.getChildren(originalParent!)).toContain('idea_1');
-    expect(loroDoc.getChildren(CONTAINER_IDS.TRASH)).not.toContain('idea_1');
+    expect(loroDoc.getChildren(SYSTEM_NODE_IDS.TRASH)).not.toContain('idea_1');
   });
 
   it('restores to original position', () => {
@@ -124,10 +124,10 @@ describe('restoreNode', () => {
     const newId = newNode.id;
     loroDoc.setNodeData(newId, '_trashedFrom', 'nonexistent_parent');
     loroDoc.setNodeData(newId, '_trashedIndex', 0);
-    loroDoc.moveNode(newId, CONTAINER_IDS.TRASH);
+    loroDoc.moveNode(newId, SYSTEM_NODE_IDS.TRASH);
 
     useNodeStore.getState().restoreNode(newId);
-    expect(loroDoc.getParentId(newId)).toBe(CONTAINER_IDS.LIBRARY);
+    expect(loroDoc.getParentId(newId)).toBe(SYSTEM_NODE_IDS.LIBRARY);
   });
 });
 

@@ -15,8 +15,8 @@ import {
   SYSTEM_FIELD_MAP, resolveSystemFieldValue, type ConfigFieldDef,
 } from '../lib/field-utils.js';
 import type { NodexNode } from '../types/index.js';
-import { CONTAINER_IDS, SYS_D, FIELD_TYPES } from '../types/index.js';
-import * as loroDoc from '../lib/loro-doc.js';
+import { SYS_D, FIELD_TYPES } from '../types/index.js';
+import { isNodeInTrash } from '../lib/node-capabilities.js';
 
 export interface FieldEntry {
   fieldDefId: string;
@@ -117,7 +117,7 @@ export function computeNodeFields(
       return valueNode.name;
     })();
 
-    const trashed = !isSysConfig && (loroDoc.getParentId(keyId) === CONTAINER_IDS.TRASH);
+    const trashed = !isSysConfig && isNodeInTrash(keyId);
     const hasContent = valueChildren.length > 0;
 
     fields.push({

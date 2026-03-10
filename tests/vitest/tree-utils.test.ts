@@ -12,7 +12,7 @@ import {
   isOnlyInlineRef,
 } from '../../src/lib/tree-utils.js';
 import { resetLoroDoc, initLoroDocForTest, createNode, setNodeDataBatch } from '../../src/lib/loro-doc.js';
-import { CONTAINER_IDS } from '../../src/types/index.js';
+import { SYSTEM_NODE_IDS } from '../../src/types/index.js';
 
 beforeEach(() => {
   resetLoroDoc();
@@ -25,10 +25,10 @@ describe('tree-utils', () => {
     createNode('ws_default', null);
     setNodeDataBatch('ws_default', { name: 'Workspace' });
 
-    createNode(CONTAINER_IDS.LIBRARY, 'ws_default');
-    setNodeDataBatch(CONTAINER_IDS.LIBRARY, { name: 'Library' });
+    createNode(SYSTEM_NODE_IDS.LIBRARY, 'ws_default');
+    setNodeDataBatch(SYSTEM_NODE_IDS.LIBRARY, { name: 'Library' });
 
-    createNode('parent', CONTAINER_IDS.LIBRARY);
+    createNode('parent', SYSTEM_NODE_IDS.LIBRARY);
     setNodeDataBatch('parent', { name: 'Parent' });
 
     createNode('fieldEntry1', 'parent');
@@ -41,7 +41,7 @@ describe('tree-utils', () => {
     expect(workspaceRootId).toBe('ws_default');
     expect(ancestors).toEqual([
       { id: 'ws_default', name: 'Workspace' },
-      { id: CONTAINER_IDS.LIBRARY, name: 'Library' },
+      { id: SYSTEM_NODE_IDS.LIBRARY, name: 'Library' },
       { id: 'parent', name: 'Parent' },
     ]);
 

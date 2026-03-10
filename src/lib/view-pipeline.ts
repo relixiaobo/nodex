@@ -10,6 +10,7 @@ import { compareNodesByRules, type SortConfig } from './sort-utils.js';
 import { matchesAllFilters, type FilterCondition } from './filter-utils.js';
 import { groupNodes } from './group-utils.js';
 import { buildBacklinkCountMap } from './backlinks.js';
+import { resolveEffectiveId } from './node-type-utils.js';
 
 export interface ViewConfig {
   sortRules: SortConfig[];
@@ -77,10 +78,7 @@ function resolveNode(
   node: NodexNode,
   getNode: (id: string) => NodexNode | null,
 ): NodexNode {
-  if (node.type === 'reference' && node.targetId) {
-    return getNode(node.targetId) ?? node;
-  }
-  return node;
+  return getNode(resolveEffectiveId(node.id, getNode)) ?? node;
 }
 
 /**

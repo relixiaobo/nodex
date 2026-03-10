@@ -1,6 +1,6 @@
 import { useNodeStore } from '../../src/stores/node-store.js';
 import * as loroDoc from '../../src/lib/loro-doc.js';
-import { CONTAINER_IDS } from '../../src/types/index.js';
+import { SYSTEM_NODE_IDS } from '../../src/types/index.js';
 import { collectNodeGraphErrors } from './helpers/invariants.js';
 import { resetAndSeed } from './helpers/test-state.js';
 
@@ -29,7 +29,7 @@ describe('node-store CRUD + tree operations', () => {
     expect(loroDoc.getChildren('task_1')).toEqual(beforeRoundTrip);
 
     store.trashNode(newSibling.id);
-    const trashChildren = loroDoc.getChildren(CONTAINER_IDS.TRASH);
+    const trashChildren = loroDoc.getChildren(SYSTEM_NODE_IDS.TRASH);
     const taskChildren = loroDoc.getChildren('task_1');
     expect(trashChildren).toContain(newSibling.id);
     expect(taskChildren).not.toContain(newSibling.id);

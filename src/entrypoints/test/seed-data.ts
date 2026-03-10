@@ -10,7 +10,7 @@
  * - Tags: direct node.tags array (no meta indirection)
  * - TagDef config: direct properties (showCheckbox, color, etc.)
  * - FieldDef config: direct properties (fieldType, minValue, etc.)
- * - Container IDs: fixed (CONTAINER_IDS.*)
+ * - System node IDs: fixed (SYSTEM_NODE_IDS.*)
  */
 import { initLoroDoc, initLoroDocForTest, commitDoc, clearUndoHistoryForTest } from '../../lib/loro-doc.js';
 import * as loroDoc from '../../lib/loro-doc.js';
@@ -18,7 +18,7 @@ import { deleteSnapshot } from '../../lib/loro-persistence.js';
 import { useNodeStore } from '../../stores/node-store';
 import { useUIStore } from '../../stores/ui-store';
 import { useWorkspaceStore } from '../../stores/workspace-store';
-import { CONTAINER_IDS, FIELD_TYPES, SYS_T, NDX_F, NDX_T, SYS_V } from '../../types/index.js';
+import { SYSTEM_NODE_IDS, FIELD_TYPES, SYS_T, NDX_F, NDX_T, SYS_V } from '../../types/index.js';
 import type { InlineRefEntry, TextMark } from '../../types/index.js';
 import { ensureDateNode } from '../../lib/journal.js';
 import { SYSTEM_SCHEMA_NODE_IDS } from '../../lib/system-schema-presets.js';
@@ -53,16 +53,16 @@ function seedBody(): void {
   cn(WS_ID, null, { name: 'Workspace' });
 
   // ─── Well-known top-level nodes (legacy Library/Inbox preserved for migration coverage) ───
-  cn(CONTAINER_IDS.LIBRARY,  WS_ID, { name: 'Library' });
-  cn(CONTAINER_IDS.INBOX,    WS_ID, { name: 'Inbox' });
-  cn(CONTAINER_IDS.JOURNAL,  WS_ID, { name: 'Daily notes', locked: true });
-  cn(CONTAINER_IDS.SEARCHES, WS_ID, { name: 'Searches' });
-  cn(CONTAINER_IDS.TRASH,    WS_ID, { name: 'Trash', locked: true });
-  cn(CONTAINER_IDS.SCHEMA,   WS_ID, { name: 'Schema', locked: true });
-  cn(CONTAINER_IDS.SETTINGS, WS_ID, { name: 'Settings', locked: true });
+  cn(SYSTEM_NODE_IDS.LIBRARY,  WS_ID, { name: 'Library' });
+  cn(SYSTEM_NODE_IDS.INBOX,    WS_ID, { name: 'Inbox' });
+  cn(SYSTEM_NODE_IDS.JOURNAL,  WS_ID, { name: 'Daily notes', locked: true });
+  cn(SYSTEM_NODE_IDS.SEARCHES, WS_ID, { name: 'Searches' });
+  cn(SYSTEM_NODE_IDS.TRASH,    WS_ID, { name: 'Trash', locked: true });
+  cn(SYSTEM_NODE_IDS.SCHEMA,   WS_ID, { name: 'Schema', locked: true });
+  cn(SYSTEM_NODE_IDS.SETTINGS, WS_ID, { name: 'Settings', locked: true });
 
   // ─── Fixed system schema for workspace settings ───
-  cn(NDX_T.WORKSPACE_SETTINGS, CONTAINER_IDS.SCHEMA, {
+  cn(NDX_T.WORKSPACE_SETTINGS, SYSTEM_NODE_IDS.SCHEMA, {
     type: 'tagDef',
     name: 'Workspace settings',
     description: 'System schema for workspace-level settings',
@@ -77,7 +77,7 @@ function seedBody(): void {
     nullable: true,
     cardinality: 'single',
   });
-  cn(SYSTEM_SCHEMA_NODE_IDS.SETTINGS_HIGHLIGHT_FIELD_ENTRY, CONTAINER_IDS.SETTINGS, {
+  cn(SYSTEM_SCHEMA_NODE_IDS.SETTINGS_HIGHLIGHT_FIELD_ENTRY, SYSTEM_NODE_IDS.SETTINGS, {
     type: 'fieldEntry',
     fieldDefId: NDX_F.SETTING_HIGHLIGHT_ENABLED,
   });
@@ -88,7 +88,7 @@ function seedBody(): void {
   // ═══════════════════════════════════════════════════════════════
   // TagDef: Task (showCheckbox, color, done-state mapping via direct props)
   // ═══════════════════════════════════════════════════════════════
-  cn('tagDef_task', CONTAINER_IDS.SCHEMA, {
+  cn('tagDef_task', SYSTEM_NODE_IDS.SCHEMA, {
     type: 'tagDef', name: 'Task', showCheckbox: true, color: 'green',
   });
 
@@ -113,7 +113,7 @@ function seedBody(): void {
   // ═══════════════════════════════════════════════════════════════
   // TagDef: Person
   // ═══════════════════════════════════════════════════════════════
-  cn('tagDef_person', CONTAINER_IDS.SCHEMA, {
+  cn('tagDef_person', SYSTEM_NODE_IDS.SCHEMA, {
     type: 'tagDef', name: 'Person',
     description: 'Tag for tracking people and their contact info',
   });
@@ -125,7 +125,7 @@ function seedBody(): void {
   // ═══════════════════════════════════════════════════════════════
   // TagDef: DevTask (extends Task)
   // ═══════════════════════════════════════════════════════════════
-  cn('tagDef_dev_task', CONTAINER_IDS.SCHEMA, {
+  cn('tagDef_dev_task', SYSTEM_NODE_IDS.SCHEMA, {
     type: 'tagDef', name: 'Dev Task', showCheckbox: true,
     extends: 'tagDef_task',
     description: 'Dev task extending Task with a Branch field',
@@ -135,7 +135,7 @@ function seedBody(): void {
   // ═══════════════════════════════════════════════════════════════
   // TagDef: Meeting (with Default content / template)
   // ═══════════════════════════════════════════════════════════════
-  cn('tagDef_meeting', CONTAINER_IDS.SCHEMA, {
+  cn('tagDef_meeting', SYSTEM_NODE_IDS.SCHEMA, {
     type: 'tagDef', name: 'Meeting',
     description: 'Tag for meetings — has template default content',
   });
@@ -148,7 +148,7 @@ function seedBody(): void {
   // ═══════════════════════════════════════════════════════════════
   // TagDef: Source (web clips, articles, etc.) — fixed ID SYS_T202
   // ═══════════════════════════════════════════════════════════════
-  cn(SYS_T.SOURCE, CONTAINER_IDS.SCHEMA, { type: 'tagDef', name: 'source', color: 'sage' });
+  cn(SYS_T.SOURCE, SYSTEM_NODE_IDS.SCHEMA, { type: 'tagDef', name: 'source', color: 'sage' });
   cn(NDX_F.SOURCE_URL, SYS_T.SOURCE, { type: 'fieldDef', name: 'Source URL', fieldType: FIELD_TYPES.URL });
 
   // ═══════════════════════════════════════════════════════════════
@@ -160,47 +160,47 @@ function seedBody(): void {
   // ═══════════════════════════════════════════════════════════════
   // TagDef: Book (extends Source)
   // ═══════════════════════════════════════════════════════════════
-  cn('tagDef_book', CONTAINER_IDS.SCHEMA, {
+  cn('tagDef_book', SYSTEM_NODE_IDS.SCHEMA, {
     type: 'tagDef', name: 'book', color: 'brown', extends: SYS_T.SOURCE,
   });
 
   // ── Store image tags (simple, no field inheritance — for clean screenshots) ──
-  cn('tagDef_si_article', CONTAINER_IDS.SCHEMA, { type: 'tagDef', name: 'article', color: 'blue' });
-  cn('tagDef_si_book', CONTAINER_IDS.SCHEMA, { type: 'tagDef', name: 'book', color: 'brown' });
-  cn('tagDef_si_method', CONTAINER_IDS.SCHEMA, { type: 'tagDef', name: 'method', color: 'blue' });
+  cn('tagDef_si_article', SYSTEM_NODE_IDS.SCHEMA, { type: 'tagDef', name: 'article', color: 'blue' });
+  cn('tagDef_si_book', SYSTEM_NODE_IDS.SCHEMA, { type: 'tagDef', name: 'book', color: 'brown' });
+  cn('tagDef_si_method', SYSTEM_NODE_IDS.SCHEMA, { type: 'tagDef', name: 'method', color: 'blue' });
 
   // ═══════════════════════════════════════════════════════════════
   // TagDef: Insight (standalone tag for key insights)
   // ═══════════════════════════════════════════════════════════════
-  cn('tagDef_insight', CONTAINER_IDS.SCHEMA, {
+  cn('tagDef_insight', SYSTEM_NODE_IDS.SCHEMA, {
     type: 'tagDef', name: 'insight', color: 'green',
   });
 
   // ═══════════════════════════════════════════════════════════════
   // TagDef: Mental Model (concept tag)
   // ═══════════════════════════════════════════════════════════════
-  cn('tagDef_mental_model', CONTAINER_IDS.SCHEMA, {
+  cn('tagDef_mental_model', SYSTEM_NODE_IDS.SCHEMA, {
     type: 'tagDef', name: 'mental-model', color: 'indigo',
   });
 
   // ═══════════════════════════════════════════════════════════════
   // TagDef: Project
   // ═══════════════════════════════════════════════════════════════
-  cn('tagDef_project', CONTAINER_IDS.SCHEMA, {
+  cn('tagDef_project', SYSTEM_NODE_IDS.SCHEMA, {
     type: 'tagDef', name: 'project', color: 'orange',
   });
 
   // ═══════════════════════════════════════════════════════════════
   // TagDef: Article (extends Source) — NDX_T01
   // ═══════════════════════════════════════════════════════════════
-  cn(NDX_T.ARTICLE, CONTAINER_IDS.SCHEMA, {
+  cn(NDX_T.ARTICLE, SYSTEM_NODE_IDS.SCHEMA, {
     type: 'tagDef', name: 'article', color: 'slate', extends: SYS_T.SOURCE,
   });
 
   // ═══════════════════════════════════════════════════════════════
   // TagDef: Video (extends Source) — NDX_T02 + Duration field
   // ═══════════════════════════════════════════════════════════════
-  cn(NDX_T.VIDEO, CONTAINER_IDS.SCHEMA, {
+  cn(NDX_T.VIDEO, SYSTEM_NODE_IDS.SCHEMA, {
     type: 'tagDef', name: 'video', color: 'red', extends: SYS_T.SOURCE,
   });
   cn(NDX_F.DURATION, NDX_T.VIDEO, { type: 'fieldDef', name: 'Duration', fieldType: FIELD_TYPES.PLAIN });
@@ -208,7 +208,7 @@ function seedBody(): void {
   // ═══════════════════════════════════════════════════════════════
   // TagDef: Social (extends Source) — NDX_T03
   // ═══════════════════════════════════════════════════════════════
-  cn(NDX_T.SOCIAL, CONTAINER_IDS.SCHEMA, {
+  cn(NDX_T.SOCIAL, SYSTEM_NODE_IDS.SCHEMA, {
     type: 'tagDef', name: 'social', color: 'blue', extends: SYS_T.SOURCE,
   });
 
@@ -217,7 +217,7 @@ function seedBody(): void {
   // ═══════════════════════════════════════════════════════════════
 
   // ── Project ──
-  cn('proj_1', CONTAINER_IDS.LIBRARY, {
+  cn('proj_1', SYSTEM_NODE_IDS.LIBRARY, {
     name: 'My Project',
     description: 'A sample project to demonstrate outliner features',
   });
@@ -240,23 +240,23 @@ function seedBody(): void {
   useNodeStore.getState().applyTag('meeting_1', 'tagDef_meeting');
 
   // ── Person node ──
-  cn('person_1', CONTAINER_IDS.LIBRARY, { name: 'Alice Johnson' });
+  cn('person_1', SYSTEM_NODE_IDS.LIBRARY, { name: 'Alice Johnson' });
   useNodeStore.getState().applyTag('person_1', 'tagDef_person');
 
   // ── Simple notes ──
-  cn('note_1', CONTAINER_IDS.LIBRARY, { name: 'Meeting notes - Team standup' });
+  cn('note_1', SYSTEM_NODE_IDS.LIBRARY, { name: 'Meeting notes - Team standup' });
   cn('note_1a', 'note_1', { name: 'Discussed project timeline' });
   cn('note_1b', 'note_1', { name: 'Need to review PR #42' });
   cn('note_1c', 'note_1', { name: 'Next meeting on Friday' });
 
-  cn('note_2', CONTAINER_IDS.LIBRARY, { name: 'Quick ideas' });
+  cn('note_2', SYSTEM_NODE_IDS.LIBRARY, { name: 'Quick ideas' });
   cn('idea_1', 'note_2', { name: 'Try using virtual scrolling for large lists' });
   cn('idea_2', 'note_2', { name: 'Add dark mode support' });
 
   // ═══════════════════════════════════════════════════════════════
   // Store image content: Library > Reading Notes (Scene 4 — Clean Paper)
   // ═══════════════════════════════════════════════════════════════
-  cn('si_reading_notes', CONTAINER_IDS.LIBRARY, { name: 'Reading Notes' });
+  cn('si_reading_notes', SYSTEM_NODE_IDS.LIBRARY, { name: 'Reading Notes' });
 
   // 1. The Art of Deep Reading #article (expanded, with children)
   cn('si_deep_reading', 'si_reading_notes', { name: 'The Art of Deep Reading' });
@@ -296,7 +296,7 @@ function seedBody(): void {
   // ═══════════════════════════════════════════════════════════════
   // Store image content: Library > Mental Models (Scene 2 — Connect)
   // ═══════════════════════════════════════════════════════════════
-  cn('si_mental_models', CONTAINER_IDS.LIBRARY, { name: 'Mental Models' });
+  cn('si_mental_models', SYSTEM_NODE_IDS.LIBRARY, { name: 'Mental Models' });
 
   // Second-Order Thinking #mental-model (with children)
   cn('si_mm_sot', 'si_mental_models', { name: 'Second-Order Thinking' });
@@ -321,7 +321,7 @@ function seedBody(): void {
   });
 
   // ── Rich text test nodes ──
-  cn('note_rich', CONTAINER_IDS.LIBRARY, { name: 'Rich text formatting tests' });
+  cn('note_rich', SYSTEM_NODE_IDS.LIBRARY, { name: 'Rich text formatting tests' });
   cn('rich_1', 'note_rich', {
     name: 'Bold text mixed with normal',
     marks: [{ start: 0, end: 9, type: 'bold' }],
@@ -354,14 +354,14 @@ function seedBody(): void {
   // ═══════════════════════════════════════════════════════════════
   // Inbox content
   // ═══════════════════════════════════════════════════════════════
-  cn('inbox_1', CONTAINER_IDS.INBOX, { name: 'Read the article about Chrome extensions' });
-  cn('inbox_2', CONTAINER_IDS.INBOX, { name: 'Respond to email from client' });
-  cn('inbox_3', CONTAINER_IDS.INBOX, { name: 'Review pull request' });
+  cn('inbox_1', SYSTEM_NODE_IDS.INBOX, { name: 'Read the article about Chrome extensions' });
+  cn('inbox_2', SYSTEM_NODE_IDS.INBOX, { name: 'Respond to email from client' });
+  cn('inbox_3', SYSTEM_NODE_IDS.INBOX, { name: 'Review pull request' });
   cn('inbox_3a', 'inbox_3', { name: 'Check test coverage' });
   cn('inbox_3b', 'inbox_3', { name: 'Verify performance impact' });
 
   // Web clip (pre-tagged)
-  cn('webclip_1', CONTAINER_IDS.INBOX, {
+  cn('webclip_1', SYSTEM_NODE_IDS.INBOX, {
     name: 'Example Article — Medium',
     description: 'A sample web clip to demonstrate the clipping feature',
   });
@@ -481,7 +481,7 @@ function seedBody(): void {
   // ═══════════════════════════════════════════════════════════════
   // Search node: "Task" tag search (queryCondition tree + auto-materialized results)
   // ═══════════════════════════════════════════════════════════════
-  cn('search_task', CONTAINER_IDS.SEARCHES, { type: 'search', name: 'Everything tagged #Task' });
+  cn('search_task', SYSTEM_NODE_IDS.SEARCHES, { type: 'search', name: 'Everything tagged #Task' });
   cn('search_task_and', 'search_task', { type: 'queryCondition', queryLogic: 'AND' });
   cn('search_task_cond', 'search_task_and', { type: 'queryCondition', queryOp: 'HAS_TAG', queryTagDefId: 'tagDef_task' });
   // Results are auto-materialized on panel open via refreshSearchResults
@@ -493,10 +493,10 @@ function seedBody(): void {
 
   // Expand some nodes by default for testing (skipUndo=true to avoid
   // creating undo entries during seed — Bug 1 fix)
-  uiStore.setExpanded(`${CONTAINER_IDS.LIBRARY}:proj_1`, true, true);
+  uiStore.setExpanded(`${SYSTEM_NODE_IDS.LIBRARY}:proj_1`, true, true);
   uiStore.setExpanded('proj_1:task_1', true, true);
   uiStore.setExpanded('proj_1:task_2', true, true);
-  uiStore.setExpanded(`${CONTAINER_IDS.LIBRARY}:note_rich`, true, true);
+  uiStore.setExpanded(`${SYSTEM_NODE_IDS.LIBRARY}:note_rich`, true, true);
 
   // Store image nodes: expand article nodes with children
   uiStore.setExpanded('si_reading_notes:si_deep_reading', true, true);
@@ -512,7 +512,7 @@ function seedBody(): void {
   // Navigate to Library — use replacePanel (not navigateTo) to avoid
   // creating a Loro undo entry whose UI snapshot is the empty initial state.
   if (uiStore.panelHistory.length === 0) {
-    uiStore.replacePanel(CONTAINER_IDS.LIBRARY);
+    uiStore.replacePanel(SYSTEM_NODE_IDS.LIBRARY);
   }
 }
 

@@ -14,7 +14,7 @@ import type { SlashCommandId } from '../lib/slash-commands.js';
 import { useNodeStore } from '../stores/node-store.js';
 import { useUIStore } from '../stores/ui-store.js';
 import * as loroDoc from '../lib/loro-doc.js';
-import { CONTAINER_IDS } from '../types/index.js';
+import { SYSTEM_NODE_IDS } from '../types/index.js';
 import { toast } from 'sonner';
 import { docToMarks } from '../lib/pm-doc-utils.js';
 import {
@@ -454,7 +454,7 @@ export function useEditorTriggers(config: EditorTriggerConfig): EditorTriggerSta
 
   const handleReferenceCreateNew = useCallback(
     (name: string) => {
-      const parentId = resolvePreferredTopLevelParentId(CONTAINER_IDS.LIBRARY);
+      const parentId = resolvePreferredTopLevelParentId(SYSTEM_NODE_IDS.LIBRARY);
       if (!parentId) return;
       const newNode = useNodeStore.getState().createChild(parentId, undefined, { name });
       handleReferenceSelect(newNode.id);

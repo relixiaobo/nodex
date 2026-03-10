@@ -5,7 +5,7 @@
  * clip type tag (#article / #video / #social / #source), and writes fields.
  */
 import type { NodexNode } from '../types/index.js';
-import { CONTAINER_IDS, SYS_T, NDX_F, NDX_T, FIELD_TYPES } from '../types/index.js';
+import { SYSTEM_NODE_IDS, SYS_T, NDX_F, NDX_T, FIELD_TYPES } from '../types/index.js';
 import type { WebClipCapturePayload } from './webclip-messaging.js';
 import * as loroDoc from './loro-doc.js';
 import { ensureTodayNode } from './journal.js';
@@ -37,7 +37,7 @@ export function findTagDefByName(
   _schemaId: string,
   name: string,
 ): NodexNode | undefined {
-  const schemaChildren = loroDoc.getChildren(CONTAINER_IDS.SCHEMA);
+  const schemaChildren = loroDoc.getChildren(SYSTEM_NODE_IDS.SCHEMA);
   const lowerName = name.toLowerCase();
   for (const childId of schemaChildren) {
     const child = loroDoc.toNodexNode(childId);
@@ -129,7 +129,7 @@ export function detectClipType(url: string, payload?: Partial<WebClipCapturePayl
 export function ensureSourceTagDef(): NodexNode {
   let td = loroDoc.toNodexNode(SYS_T.SOURCE);
   if (!td) {
-    loroDoc.createNode(SYS_T.SOURCE, CONTAINER_IDS.SCHEMA);
+    loroDoc.createNode(SYS_T.SOURCE, SYSTEM_NODE_IDS.SCHEMA);
     loroDoc.setNodeDataBatch(SYS_T.SOURCE, { type: 'tagDef', name: 'source', color: 'sage' });
     loroDoc.commitDoc();
     td = loroDoc.toNodexNode(SYS_T.SOURCE)!;
@@ -210,7 +210,7 @@ export function ensureArticleTagDef(): NodexNode {
   ensurePublishedFieldDef();
   let td = loroDoc.toNodexNode(NDX_T.ARTICLE);
   if (!td) {
-    loroDoc.createNode(NDX_T.ARTICLE, CONTAINER_IDS.SCHEMA);
+    loroDoc.createNode(NDX_T.ARTICLE, SYSTEM_NODE_IDS.SCHEMA);
     loroDoc.setNodeDataBatch(NDX_T.ARTICLE, {
       type: 'tagDef',
       name: 'article',
@@ -252,7 +252,7 @@ export function ensureVideoTagDef(): NodexNode {
   ensurePublishedFieldDef();
   let td = loroDoc.toNodexNode(NDX_T.VIDEO);
   if (!td) {
-    loroDoc.createNode(NDX_T.VIDEO, CONTAINER_IDS.SCHEMA);
+    loroDoc.createNode(NDX_T.VIDEO, SYSTEM_NODE_IDS.SCHEMA);
     loroDoc.setNodeDataBatch(NDX_T.VIDEO, {
       type: 'tagDef',
       name: 'video',
@@ -275,7 +275,7 @@ export function ensureSocialTagDef(): NodexNode {
   ensurePublishedFieldDef();
   let td = loroDoc.toNodexNode(NDX_T.SOCIAL);
   if (!td) {
-    loroDoc.createNode(NDX_T.SOCIAL, CONTAINER_IDS.SCHEMA);
+    loroDoc.createNode(NDX_T.SOCIAL, SYSTEM_NODE_IDS.SCHEMA);
     loroDoc.setNodeDataBatch(NDX_T.SOCIAL, {
       type: 'tagDef',
       name: 'social',
@@ -549,7 +549,7 @@ export function findClipNodeByUrl(url: string): string | null {
   if (!sourceUrlFieldDef) return null;
 
   // Search through flat containers: CLIPS, INBOX, LIBRARY
-  const containers = [CONTAINER_IDS.CLIPS, CONTAINER_IDS.INBOX, CONTAINER_IDS.LIBRARY];
+  const containers = [SYSTEM_NODE_IDS.CLIPS, SYSTEM_NODE_IDS.INBOX, SYSTEM_NODE_IDS.LIBRARY];
 
   for (const containerId of containers) {
     const children = loroDoc.getChildren(containerId);
@@ -561,7 +561,7 @@ export function findClipNodeByUrl(url: string): string | null {
   }
 
   // Search JOURNAL day nodes (Year → Week → Day → clip)
-  const yearIds = loroDoc.getChildren(CONTAINER_IDS.JOURNAL);
+  const yearIds = loroDoc.getChildren(SYSTEM_NODE_IDS.JOURNAL);
   for (const yearId of yearIds) {
     const weekIds = loroDoc.getChildren(yearId);
     for (const weekId of weekIds) {

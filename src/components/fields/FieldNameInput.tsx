@@ -14,7 +14,7 @@ import { useUIStore } from '../../stores/ui-store';
 import { t } from '../../i18n/strings.js';
 
 interface FieldNameInputProps {
-  tupleId: string;
+  fieldEntryId: string;
   nodeId: string;
   attrDefId: string;
   currentName: string;
@@ -26,7 +26,7 @@ interface FieldNameInputProps {
 }
 
 export function FieldNameInput({
-  tupleId,
+  fieldEntryId,
   nodeId,
   attrDefId,
   currentName,
@@ -106,7 +106,7 @@ export function FieldNameInput({
 
       if (match) {
         // Reuse existing fieldDef → swap + delete placeholder
-        replaceFieldDef(nodeId, tupleId, attrDefId, match.id);
+        replaceFieldDef(nodeId, fieldEntryId, attrDefId, match.id);
       } else if (trimmed && trimmed !== currentName) {
         // Rename placeholder fieldDef
         renameFieldDef(attrDefId, trimmed);
@@ -125,17 +125,17 @@ export function FieldNameInput({
         });
       }
     },
-    [value, allFields, attrDefId, nodeId, tupleId, currentName, renameFieldDef, replaceFieldDef, setEditingFieldName],
+    [value, allFields, attrDefId, nodeId, fieldEntryId, currentName, renameFieldDef, replaceFieldDef, setEditingFieldName],
   );
 
   const selectSuggestion = useCallback(
     (fieldId: string) => {
       if (confirmedRef.current) return;
       confirmedRef.current = true;
-      replaceFieldDef(nodeId, tupleId, attrDefId, fieldId);
+      replaceFieldDef(nodeId, fieldEntryId, attrDefId, fieldId);
       setEditingFieldName(null);
     },
-    [nodeId, tupleId, attrDefId, replaceFieldDef, setEditingFieldName],
+    [nodeId, fieldEntryId, attrDefId, replaceFieldDef, setEditingFieldName],
   );
 
   const handleKeyDown = useCallback(
@@ -163,15 +163,15 @@ export function FieldNameInput({
         e.preventDefault();
         confirmedRef.current = true;
         setEditingFieldName(null);
-        // Select the field tuple (same pattern as content node Escape→selected)
-        setSelectedNode(tupleId, nodeId);
+        // Select the field row (same pattern as content node Escape→selected)
+        setSelectedNode(fieldEntryId, nodeId);
       } else if (e.key === 'Backspace') {
         // Empty field name + Backspace → delete the entire field
         if (value === '') {
           e.preventDefault();
           confirmedRef.current = true;
           setEditingFieldName(null);
-          removeField(nodeId, tupleId);
+          removeField(nodeId, fieldEntryId);
         }
       } else if (e.key === 'ArrowDown') {
         e.preventDefault();
@@ -203,7 +203,7 @@ export function FieldNameInput({
       setEditingFieldName,
       value,
       nodeId,
-      tupleId,
+      fieldEntryId,
       removeField,
     ],
   );

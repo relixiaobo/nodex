@@ -3,12 +3,12 @@
  *
  * Renders non-config children of a definition node:
  * - For attrDef: plain content nodes (pre-determined options) → OutlinerItem
- * - For tagDef: field tuples (template fields) → FieldRow + plain content → OutlinerItem
+ * - For tagDef: field entries (template fields) → FieldRow + plain content → OutlinerItem
  *
  * For tagDef with Extend (inheritance): merges inherited template items from
  * ancestor tagDefs. Each item's bullet/icon is tinted with its owning tagDef's color.
  *
- * Skips config tuples (SYS_A* keys) which are handled by FieldList.
+ * Skips config field entries (SYS_A* keys) which are handled by FieldList.
  * Same mixed field/content pattern as FieldValueOutliner.
  */
 import { useCallback, useMemo, useRef } from 'react';
@@ -27,6 +27,7 @@ import { toFieldRowEntryProps } from './field-row-props.js';
 import * as loroDoc from '../../lib/loro-doc.js';
 import { shouldShowTrailingInput } from '../outliner/row-model.js';
 import { navigateToSiblingRow } from '../../lib/outliner-navigation.js';
+import { canCreateChildrenUnder } from '../../lib/node-capabilities.js';
 
 interface ConfigOutlinerProps {
   nodeId: string;
@@ -62,6 +63,10 @@ export function ConfigOutliner({ nodeId, onNavigateOut }: ConfigOutlinerProps) {
   const _version = useNodeStore((s) => s._version);
   const ownerId = loroDoc.getParentId(nodeId) ?? '';
   const isTagDef = useNodeStore((s) => { void s._version; return s.getNode(nodeId)?.type === 'tagDef'; });
+  const canCreateConfigChildren = useNodeStore((s) => {
+    void s._version;
+    return canCreateChildrenUnder(nodeId);
+  });
 
   // For tagDef: get Extend chain (ancestor tagDef IDs)
   const extendsChain = useMemo(
@@ -73,7 +78,7 @@ export function ConfigOutliner({ nodeId, onNavigateOut }: ConfigOutlinerProps) {
   // Detect fields on THIS node (includes config + template fields)
   const fields = useNodeFields(nodeId);
 
-  // Build fieldMap for non-config fields only (template field tuples on current node)
+  // Build fieldMap for non-config fields only (template field entries on current node)
   const fieldMap = useMemo(() => {
     const m = new Map<string, FieldEntry>();
     for (const f of fields) {
@@ -177,7 +182,7 @@ export function ConfigOutliner({ nodeId, onNavigateOut }: ConfigOutlinerProps) {
   // Prevent border stacking: when nested FieldRows are first/last, add padding
   const firstIsField = mergedItems.length > 0 && mergedItems[0].type === 'field';
   const lastIsField = mergedItems.length > 0 && mergedItems[mergedItems.length - 1].type === 'field';
-  const showTrailingInput = shouldShowConfigTrailingInput(mergedItems);
+  const showTrailingInput = canCreateConfigChildren && shouldShowConfigTrailingInput(mergedItems);
 
   const navToField = useCallback((fieldId: string) => {
     clearFocus();

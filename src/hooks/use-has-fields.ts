@@ -1,5 +1,5 @@
 /**
- * Lightweight hook to check if a node has any field tuples.
+ * Lightweight hook to check if a node has any field entries.
  * Used by OutlinerItem to conditionally render FieldList.
  */
 import { useNodeStore } from '../stores/node-store';

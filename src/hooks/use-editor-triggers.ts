@@ -38,6 +38,7 @@ import {
   type WebClipCaptureResponse,
 } from '../lib/webclip-messaging.js';
 import { applyWebClipToNode } from '../lib/webclip-service.js';
+import { resolvePreferredTopLevelParentId } from '../lib/system-node-presets.js';
 import { t } from '../i18n/strings.js';
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -453,7 +454,9 @@ export function useEditorTriggers(config: EditorTriggerConfig): EditorTriggerSta
 
   const handleReferenceCreateNew = useCallback(
     (name: string) => {
-      const newNode = useNodeStore.getState().createChild(CONTAINER_IDS.LIBRARY, undefined, { name });
+      const parentId = resolvePreferredTopLevelParentId(CONTAINER_IDS.LIBRARY);
+      if (!parentId) return;
+      const newNode = useNodeStore.getState().createChild(parentId, undefined, { name });
       handleReferenceSelect(newNode.id);
     },
     [handleReferenceSelect],

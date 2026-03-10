@@ -21,8 +21,7 @@ import { useNodeCheckbox } from '../../hooks/use-node-checkbox';
 import { useEditorTriggers, buildTriggerEditorProps } from '../../hooks/use-editor-triggers.js';
 import { resolveDataType, getFieldTypeIcon } from '../../lib/field-utils.js';
 import { resolveTagColor } from '../../lib/tag-colors.js';
-import { isContainerNode } from '../../types/index.js';
-import { getSystemContainerMeta, type ContainerIconKey } from '../../lib/system-node-registry.js';
+import { getSystemNodePreset, type SystemNodeIconKey } from '../../lib/system-node-presets.js';
 import { TagBar } from '../tags/TagBar';
 import { RichTextEditor } from '../editor/RichTextEditor';
 import { TriggerDropdowns } from '../editor/TriggerDropdowns';
@@ -38,7 +37,7 @@ import * as loroDoc from '../../lib/loro-doc.js';
 import { t } from '../../i18n/strings.js';
 import { NodeContextMenuPortal } from '../outliner/NodeContextMenu.js';
 
-const CONTAINER_HEADER_ICONS: Record<ContainerIconKey, AppIcon> = {
+const SYSTEM_NODE_ICONS: Record<SystemNodeIconKey, AppIcon> = {
   library: Library,
   inbox: Inbox,
   journal: CalendarDays,
@@ -195,13 +194,11 @@ export function NodeHeader({ nodeId, onTitleRef }: NodeHeaderProps) {
     return clean.charAt(0).toUpperCase() || 'W';
   });
 
-  // Container icon lookup
-  const isContainer = isContainerNode(nodeId);
-  const containerMeta = isContainer ? getSystemContainerMeta(nodeId as any) : undefined;
-  const ContainerIcon = containerMeta ? CONTAINER_HEADER_ICONS[containerMeta.iconKey] : undefined;
+  const systemNodePreset = getSystemNodePreset(nodeId);
+  const SystemNodeIcon = systemNodePreset ? SYSTEM_NODE_ICONS[systemNodePreset.iconKey] : undefined;
 
   // Determine whether to show icon block (block ①)
-  const showIconBlock = isTagDef || isFieldDef || isWorkspaceRoot || isContainer || isSearchNode || isCodeBlock;
+  const showIconBlock = isTagDef || isFieldDef || isWorkspaceRoot || !!systemNodePreset || isSearchNode || isCodeBlock;
 
   // Static display HTML for non-editing state
   const displayHtml = marksToHtml(displayName, rawMarks, rawInlineRefs);
@@ -233,9 +230,9 @@ export function NodeHeader({ nodeId, onTitleRef }: NodeHeaderProps) {
               {wsInitial}
             </span>
           )}
-          {isContainer && ContainerIcon && (
+          {systemNodePreset && SystemNodeIcon && (
             <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-foreground/[0.04] mix-blend-multiply text-foreground-tertiary">
-              <ContainerIcon size={20} />
+              <SystemNodeIcon size={20} />
             </span>
           )}
           {isSearchNode && (

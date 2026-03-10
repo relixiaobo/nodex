@@ -45,7 +45,7 @@ export function resolveWorkspaceRootTargetId(params: {
   const { workspaceId, workspaceRootId } = params;
   if (workspaceId) return workspaceId;
   if (workspaceRootId) return workspaceRootId;
-  return CONTAINER_IDS.LIBRARY;
+  return CONTAINER_IDS.JOURNAL;
 }
 
 export function Breadcrumb({ nodeId, showCurrentName, compact }: BreadcrumbProps) {

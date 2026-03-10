@@ -106,6 +106,7 @@ export const enMessages = {
     selectValue: 'Select value',
     selectOption: 'Select option',
     fieldNamePlaceholder: 'Field name',
+    configureField: 'Configure field',
   },
   sidebar: {
     nav: {

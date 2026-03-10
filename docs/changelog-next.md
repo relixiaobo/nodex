@@ -6,3 +6,11 @@
 - 大纲节点间距统一为 6px（父→子 与 兄弟间距一致）
 - 修复 `>` 创建 field 跳到最前面的问题（view pipeline 不再强制字段前置）
 - 修复引用节点无法添加/移除标签的问题（tag 操作现在正确解析到目标节点）
+- 系统根节点改为 locked 普通节点：新工作区不再自动创建 Library/Inbox，旧 Library/Inbox 变为可编辑的普通顶层节点
+- `Settings` 改为真正的通用节点页面：设置项由固定 schema/field 渲染，去掉专用面板分支，并支持在命令面板直接搜索打开
+- 修复 `#highlight` description 被错误隐藏的问题，并将 `sys:day/week/year` 纳入统一系统节点能力策略
+- 修复通过命令面板打开 `Settings` 时的崩溃问题（消除 `FieldRow` 中不稳定的 Zustand selector，避免 React 无限更新）
+- 通用 field row 样式统一：设置项 description 回到字段名下方，窄屏自动改为上下布局，boolean 字段只保留开关，并修复开关默认状态显示错误
+- 通用 field icon 前导区与普通 node bullet 对齐：复用同一套 `BulletChevron` 布局、间距和点击区
+- 修复 `Settings` 中 `Highlight & Comment` 字段配置页的 `Field type` 显示为空的问题（boolean 类型现在会正确显示为已选中）
+- 修复 field/tag configure 页默认配置值显示为空的问题：`Hide field`、默认 `Field type` 与依赖默认值的配置显隐现在都会正确回填

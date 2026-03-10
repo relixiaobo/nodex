@@ -11,11 +11,10 @@ import { OutlinerView } from '../outliner/OutlinerView';
 import { FieldList } from '../fields/FieldList';
 import { resolveTagColor } from '../../lib/tag-colors.js';
 import { isDayNode } from '../../lib/journal.js';
-import { isJournalSystemTagId } from '../../types/index.js';
 import { DateNavigationBar } from '../journal/DateNavigationBar';
 import { BacklinksSection } from './BacklinksSection';
 import { SearchChipBar } from '../search/SearchChipBar';
-import { SettingsSection } from './SettingsSection';
+import { getNodeCapabilities } from '../../lib/node-capabilities.js';
 
 interface NodePanelProps {
   nodeId: string;
@@ -44,11 +43,10 @@ export function NodePanel({ nodeId }: NodePanelProps) {
 
   const isFieldDef = node?.type === 'fieldDef';
   const isTagDef = node?.type === 'tagDef';
-  const isProtectedDateTagDef = isTagDef && isJournalSystemTagId(nodeId);
   const isDefinitionNode = isFieldDef || isTagDef;
 
   const isTrashContainer = nodeId === CONTAINER_IDS.TRASH;
-  const isSettingsContainer = nodeId === CONTAINER_IDS.SETTINGS;
+  const canDeleteNode = getNodeCapabilities(nodeId).canDelete;
 
   const isInTrash = useNodeStore((s) => {
     void s._version;
@@ -103,10 +101,9 @@ export function NodePanel({ nodeId }: NodePanelProps) {
   }, [nodeId]);
 
   const handleDelete = useCallback(() => {
-    if (isProtectedDateTagDef) return;
     useNodeStore.getState().trashNode(nodeId);
     goBack();
-  }, [isProtectedDateTagDef, nodeId, goBack]);
+  }, [nodeId, goBack]);
 
   const handleRestore = useCallback(() => {
     useNodeStore.getState().restoreNode(nodeId);
@@ -149,7 +146,6 @@ export function NodePanel({ nodeId }: NodePanelProps) {
             <FieldList nodeId={nodeId} />
           </div>
         )}
-        {isSettingsContainer && <SettingsSection />}
         {!isDefinitionNode && node?.type === 'search' && <SearchChipBar searchNodeId={nodeId} />}
         {!isDefinitionNode && <OutlinerView rootNodeId={nodeId} />}
         {!isDefinitionNode && <BacklinksSection nodeId={nodeId} />}
@@ -197,7 +193,7 @@ export function NodePanel({ nodeId }: NodePanelProps) {
           </div>
         )}
 
-        {isDefinitionNode && !isProtectedDateTagDef && !isInTrash && (
+        {isDefinitionNode && canDeleteNode && !isInTrash && (
           <div className="ml-4 px-2 pb-4 border-t border-border-subtle">
             <button
               onClick={handleDelete}
@@ -214,4 +210,3 @@ export function NodePanel({ nodeId }: NodePanelProps) {
     </div>
   );
 }
-

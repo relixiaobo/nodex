@@ -10,7 +10,6 @@ import {
   getPreviousSiblingId,
   getPreviousVisibleNode,
   isOnlyInlineRef,
-  isWorkspaceContainer,
 } from '../../src/lib/tree-utils.js';
 import { resetLoroDoc, initLoroDocForTest, createNode, setNodeDataBatch } from '../../src/lib/loro-doc.js';
 import { CONTAINER_IDS } from '../../src/types/index.js';
@@ -21,15 +20,12 @@ beforeEach(() => {
 });
 
 describe('tree-utils', () => {
-  it('detects workspace containers', () => {
-    expect(isWorkspaceContainer(CONTAINER_IDS.LIBRARY)).toBe(true);
-    expect(isWorkspaceContainer('note_1')).toBe(false);
-    expect(isWorkspaceContainer(CONTAINER_IDS.INBOX)).toBe(true);
-  });
-
   it('builds ancestor chain while skipping structural nodes', () => {
-    // Build tree: LIBRARY → parent → fieldEntry → target
-    createNode(CONTAINER_IDS.LIBRARY, null);
+    // Build tree: workspace → Library → parent → fieldEntry → target
+    createNode('ws_default', null);
+    setNodeDataBatch('ws_default', { name: 'Workspace' });
+
+    createNode(CONTAINER_IDS.LIBRARY, 'ws_default');
     setNodeDataBatch(CONTAINER_IDS.LIBRARY, { name: 'Library' });
 
     createNode('parent', CONTAINER_IDS.LIBRARY);
@@ -42,10 +38,9 @@ describe('tree-utils', () => {
     setNodeDataBatch('target', { name: 'Target' });
 
     const { ancestors, workspaceRootId } = getAncestorChain('target');
-    expect(workspaceRootId).toBe(CONTAINER_IDS.LIBRARY);
-    // fieldEntry1 is skipped (structural); container (LIBRARY) is included in chain
-    // ancestors order: root-most first → [LIBRARY, parent]
+    expect(workspaceRootId).toBe('ws_default');
     expect(ancestors).toEqual([
+      { id: 'ws_default', name: 'Workspace' },
       { id: CONTAINER_IDS.LIBRARY, name: 'Library' },
       { id: 'parent', name: 'Parent' },
     ]);

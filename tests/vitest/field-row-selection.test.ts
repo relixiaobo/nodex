@@ -17,14 +17,14 @@ import { resetAndSeed } from './helpers/test-state.js';
 function resolveTaskFieldEntry(fieldDefId: string) {
   const store = useNodeStore.getState();
   const task = store.getNode('task_1');
-  const tupleId = task?.children.find((cid) => {
+  const fieldEntryId = task?.children.find((cid) => {
     const child = store.getNode(cid);
     return child?.type === 'fieldEntry' && child.fieldDefId === fieldDefId;
   });
-  if (!tupleId) throw new Error(`Missing fieldEntry for ${fieldDefId}`);
+  if (!fieldEntryId) throw new Error(`Missing fieldEntry for ${fieldDefId}`);
   const fieldDef = store.getNode(fieldDefId);
   return {
-    tupleId,
+    fieldEntryId,
     attrDefName: fieldDef?.name ?? 'Status',
     dataType: fieldDef?.fieldType ?? FIELD_TYPES.PLAIN,
   };
@@ -43,22 +43,22 @@ describe('FieldRow selected highlight', () => {
   });
 
   it('keeps name/value layers above the selection mask', () => {
-    const { tupleId, attrDefName, dataType } = resolveTaskFieldEntry('attrDef_status');
+    const { fieldEntryId, attrDefName, dataType } = resolveTaskFieldEntry('attrDef_status');
     useUIStore.setState({ selectedNodeIds: new Set(), focusedNodeId: null, editingFieldNameId: null });
 
     const html = renderToStaticMarkup(createElement(FieldRow, {
       nodeId: 'task_1',
       attrDefId: 'attrDef_status',
       attrDefName,
-      tupleId,
+      fieldEntryId,
       dataType,
     }));
 
-    expect(html).toContain('relative z-[1] flex items-center gap-1');
-    expect(html).toContain('relative z-[1] flex flex-1 min-w-0 items-start');
+    expect(html).toContain('relative z-[1] flex items-start gap-2');
+    expect(html).toContain('relative z-[1] flex min-w-0 items-start');
   });
 
-  it('treats only non-interactive name-side clicks as tuple selection triggers', () => {
+  it('treats only non-interactive name-side clicks as field-row selection triggers', () => {
     const nameSide = document.createElement('div');
     const valueSide = document.createElement('div');
     valueSide.setAttribute('data-field-value', '');

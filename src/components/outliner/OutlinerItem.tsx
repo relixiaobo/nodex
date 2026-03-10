@@ -8,7 +8,7 @@ import { useNodeFields, type FieldEntry } from '../../hooks/use-node-fields';
 import { useNodeStore } from '../../stores/node-store';
 import { useUIStore } from '../../stores/ui-store';
 import * as loroDoc from '../../lib/loro-doc.js';
-import { SYS_T } from '../../types/index.js';
+import { shouldRenderNodeDescription } from '../../lib/node-description-visibility.js';
 import { BulletChevron, ChevronButton } from './BulletChevron';
 import { RichTextEditor, type EditorContentPayload } from '../editor/RichTextEditor';
 import { CodeBlockEditor } from '../editor/CodeBlockEditor';
@@ -342,7 +342,7 @@ export function OutlinerItem({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [_version, parentId, parentFieldVisibility]);
 
-  // Build field lookup by tuple ID
+  // Build field lookup by fieldEntry ID
   const fieldMap = useMemo(() => {
     const m = new Map<string, FieldEntry>();
     for (const f of fields) m.set(f.fieldEntryId, f);
@@ -1914,8 +1914,8 @@ export function OutlinerItem({
               )}
             </div>
             )}
-            {/* Description: gray text below name (hidden for #highlight — stores anchor JSON internally) */}
-            {(description || editingDescription) && !tagIds.includes(SYS_T.HIGHLIGHT) && (
+            {/* Description: gray text below name */}
+            {shouldRenderNodeDescription({ description, editing: editingDescription, tags: tagIds }) && (
               <div
                 ref={editingDescription ? descriptionRef : undefined}
                 contentEditable={editingDescription}
@@ -2197,4 +2197,3 @@ export function OutlinerItem({
     </>
   );
 }
-

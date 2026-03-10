@@ -1,7 +1,7 @@
 /**
  * node-store schema flows — Loro model.
  * createTagDef: creates type='tagDef' in SCHEMA with direct properties.
- * No SYS_T01 meta bindings. No config tuples. Just flat properties.
+ * No SYS_T01 meta bindings. No config entry indirection. Just flat properties.
  * createFieldDef: creates type='fieldDef' under tagDef.
  */
 import { describe, it, expect, beforeEach } from 'vitest';
@@ -38,10 +38,10 @@ describe('createTagDef', () => {
     expect(tagDef.color).toBe('green');
   });
 
-  it('no SYS_T01 meta bindings (no meta/tuples)', () => {
+  it('no SYS_T01 meta bindings (no meta indirection)', () => {
     const created = useNodeStore.getState().createTagDef('Clean Tag');
     const tagDef = loroDoc.toNodexNode(created.id)!;
-    // New model has no meta array or config tuples
+    // New model has no meta array or config entry indirection
     expect(tagDef.tags ?? []).toHaveLength(0);
   });
 

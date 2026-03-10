@@ -12,6 +12,7 @@ import { CONTAINER_IDS, SYS_T } from '../types/index.js';
 import { pmSchema } from '../components/editor/pm-schema.js';
 import { docToMarks } from './pm-doc-utils.js';
 import * as loroDoc from './loro-doc.js';
+import { resolvePreferredTopLevelParentId } from './system-node-presets.js';
 import {
   createHighlightOnly,
   type HighlightNodeStore,
@@ -85,7 +86,9 @@ export function extractToTaggedNode(
     newNode = highlightNode;
   } else {
     // Generic tag or no clip ancestor: create in LIBRARY and apply tag
-    newNode = store.createChild(CONTAINER_IDS.LIBRARY, undefined, { name: selectedText });
+    const parentId = resolvePreferredTopLevelParentId(CONTAINER_IDS.LIBRARY);
+    if (!parentId) return null;
+    newNode = store.createChild(parentId, undefined, { name: selectedText });
     store.applyTag(newNode.id, tagDefId);
   }
 

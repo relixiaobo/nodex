@@ -9,15 +9,20 @@
 import { create } from 'zustand';
 import { nanoid } from 'nanoid';
 import type { NodexNode, TextMark, InlineRefEntry, FieldType } from '../types/index.js';
-import { CONTAINER_IDS, SYS_A, SYS_V, isJournalSystemTagId } from '../types/index.js';
-import { isWorkspaceContainer } from '../lib/tree-utils.js';
-import { getNodeCapabilities } from '../lib/node-capabilities.js';
+import { CONTAINER_IDS, SYS_A, SYS_V } from '../types/index.js';
+import {
+  canCreateChildrenUnder,
+  canEditFieldEntryValue,
+  getNodeCapabilities,
+  isLockedNode,
+} from '../lib/node-capabilities.js';
 import * as loroDoc from '../lib/loro-doc.js';
 import { getTreeReferenceBlockReason } from '../lib/reference-rules.js';
 import { resolveCheckboxClick, resolveCmdEnterCycle, resolveForwardDoneMapping, resolveReverseDoneMapping } from '../lib/checkbox-utils.js';
 import { nextAutoColorKey } from '../lib/tag-colors.js';
 import { runSearch } from '../lib/search-engine.js';
 import { resolveAutoInit } from '../lib/field-auto-init.js';
+import { resolvePreferredTopLevelParentId } from '../lib/system-node-presets.js';
 import type { ParsedPasteNode } from '../lib/paste-parser.js';
 
 // ============================================================
@@ -109,7 +114,7 @@ interface NodeStore {
   toggleNodeDone(nodeId: string): void;
   cycleNodeCheckbox(nodeId: string): void;
 
-  // ─── 配置操作（直接属性，不再操作 Tuple） ───
+  // ─── 配置操作（直接属性，不再经过旧配置节点） ───
 
   /** 设置节点的直接配置属性（tagDef/fieldDef 的配置字段） */
   setConfigValue(nodeId: string, configKey: string, value: unknown): void;
@@ -784,6 +789,18 @@ export const useNodeStore = create<NodeStore>((set, get) => {
     };
   }
 
+  function canEditStructure(parentId: string): boolean {
+    return canCreateChildrenUnder(parentId);
+  }
+
+  function canEditFieldValues(nodeId: string): boolean {
+    return getNodeCapabilities(nodeId).canEditFieldValues;
+  }
+
+  function canEditFieldEntryValues(fieldEntryId: string): boolean {
+    return canEditFieldEntryValue(fieldEntryId);
+  }
+
   function setFieldOptionValue(fieldEntryId: string, optionNodeId: string, applyReverseDoneMapping: boolean) {
     const oldChildren = loroDoc.getChildren(fieldEntryId);
     for (const oldId of oldChildren) loroDoc.deleteNode(oldId);
@@ -881,6 +898,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
 
     createChild: (parentId, index, data) => {
       if (!canMutate('createChild')) return detachedNodeFallback(parentId);
+      if (!canEditStructure(parentId)) return detachedNodeFallback(parentId);
       const id = nanoid();
       loroDoc.createNode(id, parentId, index);
       if (data) {
@@ -925,6 +943,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
     createSibling: (siblingId, data) => {
       const parentId = loroDoc.getParentId(siblingId);
       if (!parentId) throw new Error('[createSibling] no parent');
+      if (!canEditStructure(parentId)) return detachedNodeFallback(parentId);
 
       const siblings = loroDoc.getChildren(parentId);
       const idx = siblings.indexOf(siblingId);
@@ -937,6 +956,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
       if (!canMutate('createSiblingNodesFromPaste')) return null;
       const parentId = loroDoc.getParentId(afterNodeId);
       if (!parentId) return null;
+      if (!canEditStructure(parentId)) return null;
 
       const siblings = loroDoc.getChildren(parentId);
       const baseIdx = siblings.indexOf(afterNodeId);
@@ -953,6 +973,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
     createChildNodesFromPaste: (parentNodeId, nodes, options) => {
       if (!canMutate('createChildNodesFromPaste')) return null;
       if (!loroDoc.hasNode(parentNodeId)) return null;
+      if (!canEditStructure(parentNodeId)) return null;
 
       const children = loroDoc.getChildren(parentNodeId);
       const startAt = children.length;
@@ -967,6 +988,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
 
     moveNodeTo: (nodeId, newParentId, index) => {
       if (!getNodeCapabilities(nodeId).canMove) return;
+      if (!canEditStructure(newParentId)) return;
       // Guard: no self-move
       if (nodeId === newParentId) return;
       // Guard: no descendant move (prevent cycle)
@@ -997,6 +1019,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
       const idx = siblings.indexOf(nodeId);
       if (idx <= 0) return; // no previous sibling
       const newParentId = siblings[idx - 1];
+      if (!canEditStructure(newParentId)) return;
       // Move to end of previous sibling's children
       const newParentChildren = loroDoc.getChildren(newParentId);
       loroDoc.moveNode(nodeId, newParentId, newParentChildren.length);
@@ -1007,10 +1030,10 @@ export const useNodeStore = create<NodeStore>((set, get) => {
       if (!getNodeCapabilities(nodeId).canMove) return;
       const parentId = loroDoc.getParentId(nodeId);
       if (!parentId) return;
-      // Cannot outdent out of a workspace container (LIBRARY, INBOX, etc.)
-      if (isWorkspaceContainer(parentId)) return;
+      if (isLockedNode(parentId)) return;
       const grandParentId = loroDoc.getParentId(parentId);
       if (!grandParentId) return;
+      if (!canEditStructure(grandParentId)) return;
 
       // Insert after parent in grandparent's children
       const gpChildren = loroDoc.getChildren(grandParentId);
@@ -1044,7 +1067,6 @@ export const useNodeStore = create<NodeStore>((set, get) => {
     trashNode: (nodeId) => {
       if (!getNodeCapabilities(nodeId).canDelete) return;
       const node = loroDoc.toNodexNode(nodeId);
-      if (node?.type === 'tagDef' && isJournalSystemTagId(nodeId)) return;
       const parentId = loroDoc.getParentId(nodeId);
       const siblings = parentId ? loroDoc.getChildren(parentId) : [];
       const index = siblings.indexOf(nodeId);
@@ -1086,8 +1108,9 @@ export const useNodeStore = create<NodeStore>((set, get) => {
       if (from && loroDoc.hasNode(from)) {
         loroDoc.moveNode(nodeId, from, fromIndex);
       } else {
-        // Fallback: restore to LIBRARY
-        loroDoc.moveNode(nodeId, CONTAINER_IDS.LIBRARY);
+        const fallbackParentId = resolvePreferredTopLevelParentId(CONTAINER_IDS.LIBRARY);
+        if (!fallbackParentId) return;
+        loroDoc.moveNode(nodeId, fallbackParentId);
       }
 
       loroDoc.deleteNodeData(nodeId, '_trashedFrom');
@@ -1098,7 +1121,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
     hardDeleteNode: (nodeId: string) => {
       const parentId = loroDoc.getParentId(nodeId);
       if (parentId !== CONTAINER_IDS.TRASH) return;
-      if (isWorkspaceContainer(nodeId)) return;
+      if (!getNodeCapabilities(nodeId).canDelete) return;
 
       // ─── Scenario B: Cascade fieldDef hard deletion ───
       // When permanently deleting a fieldDef, clean up empty fieldEntries across all nodes.
@@ -1121,8 +1144,10 @@ export const useNodeStore = create<NodeStore>((set, get) => {
     },
 
     duplicateNode: (nodeId) => {
+      if (!getNodeCapabilities(nodeId).canMove) return null;
       const parentId = loroDoc.getParentId(nodeId);
       if (!parentId) return null;
+      if (!canEditStructure(parentId)) return null;
 
       const siblings = loroDoc.getChildren(parentId);
       const idx = siblings.indexOf(nodeId);
@@ -1211,11 +1236,13 @@ export const useNodeStore = create<NodeStore>((set, get) => {
     },
 
     setNodeCodeLanguage: (nodeId, language) => {
+      if (!getNodeCapabilities(nodeId).canEditNode) return;
       loroDoc.setNodeDataBatch(nodeId, { codeLanguage: language || undefined });
       loroDoc.commitDoc();
     },
 
     applyParsedPasteMetadata: (nodeId, node, options) => {
+      if (!getNodeCapabilities(nodeId).canEditNode) return;
       applyParsedPasteMetadataMutationsNoCommit(nodeId, node);
       if (options?.commit !== false) {
         loroDoc.commitDoc();
@@ -1228,6 +1255,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
       // Resolve reference → target so tags land on the content node
       const raw = loroDoc.toNodexNode(nodeId);
       const effectiveId = raw?.type === 'reference' && raw.targetId ? raw.targetId : nodeId;
+      if (!getNodeCapabilities(effectiveId).canEditStructure) return;
       applyTagMutationsNoCommit(effectiveId, tagDefId);
       loroDoc.commitDoc();
     },
@@ -1242,6 +1270,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
       // Resolve reference → target
       const rawRef = loroDoc.toNodexNode(nodeId);
       const effectiveId = rawRef?.type === 'reference' && rawRef.targetId ? rawRef.targetId : nodeId;
+      if (!getNodeCapabilities(effectiveId).canEditStructure) return;
       const node = loroDoc.toNodexNode(effectiveId);
       const hadTag = node?.tags.includes(tagDefId) ?? false;
       loroDoc.removeTag(effectiveId, tagDefId);
@@ -1278,6 +1307,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
         // Resolve reference → target
         const raw = loroDoc.toNodexNode(nodeId);
         const effectiveId = raw?.type === 'reference' && raw.targetId ? raw.targetId : nodeId;
+        if (!getNodeCapabilities(effectiveId).canEditStructure) continue;
         applyTagMutationsNoCommit(effectiveId, tagDefId);
       }
       loroDoc.commitDoc();
@@ -1288,6 +1318,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
         // Resolve reference → target
         const rawRef = loroDoc.toNodexNode(nodeId);
         const effectiveId = rawRef?.type === 'reference' && rawRef.targetId ? rawRef.targetId : nodeId;
+        if (!getNodeCapabilities(effectiveId).canEditStructure) continue;
         const node = loroDoc.toNodexNode(effectiveId);
         const hadTag = node?.tags.includes(tagDefId) ?? false;
         loroDoc.removeTag(effectiveId, tagDefId);
@@ -1318,6 +1349,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
 
     createTagDef: (name, options = {}) => {
       if (!canMutate('createTagDef')) return detachedNodeFallback(CONTAINER_IDS.SCHEMA);
+      if (!canEditStructure(CONTAINER_IDS.SCHEMA)) return detachedNodeFallback(CONTAINER_IDS.SCHEMA);
       // Auto-assign color by round-robin if not explicitly provided.
       const color = options.color ?? nextAutoColorKey(
         loroDoc.getChildren(CONTAINER_IDS.SCHEMA)
@@ -1339,6 +1371,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
 
     createFieldDef: (name, fieldType, tagDefId) => {
       if (!canMutate('createFieldDef')) return detachedNodeFallback(tagDefId);
+      if (!canEditStructure(tagDefId)) return detachedNodeFallback(tagDefId);
       const id = nanoid();
       loroDoc.createNode(id, tagDefId);
       loroDoc.setNodeDataBatch(id, {
@@ -1353,6 +1386,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
     },
 
     setFieldValue: (nodeId, fieldDefId, values) => {
+      if (!canEditFieldValues(nodeId)) return;
       // 找到或创建 fieldEntry
       let feId = findFieldEntry(nodeId, fieldDefId);
       if (!feId) {
@@ -1377,6 +1411,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
     },
 
     setOptionsFieldValue: (nodeId, fieldDefId, optionNodeId) => {
+      if (!canEditFieldValues(nodeId)) return;
       let feId = findFieldEntry(nodeId, fieldDefId);
       if (!feId) {
         feId = nanoid();
@@ -1395,12 +1430,14 @@ export const useNodeStore = create<NodeStore>((set, get) => {
     },
 
     selectFieldOption: (fieldEntryId, optionNodeId, oldOptionNodeId) => {
+      if (!canEditFieldEntryValues(fieldEntryId)) return;
       setFieldOptionValue(fieldEntryId, optionNodeId, true);
       loroDoc.commitDoc();
       void oldOptionNodeId; // suppress lint
     },
 
     clearFieldValue: (nodeId, fieldDefId) => {
+      if (!canEditFieldValues(nodeId)) return;
       const feId = findFieldEntry(nodeId, fieldDefId);
       if (!feId) return;
       const children = loroDoc.getChildren(feId);
@@ -1409,6 +1446,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
     },
 
     addFieldToNode: (nodeId, fieldDefId) => {
+      if (!canEditStructure(nodeId)) return;
       if (findFieldEntry(nodeId, fieldDefId)) return; // already exists
       const feId = nanoid();
       loroDoc.createNode(feId, nodeId);
@@ -1418,6 +1456,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
 
     addUnnamedFieldToNode: (nodeId, afterChildId) => {
       if (!canMutate('addUnnamedFieldToNode')) return { fieldEntryId: '', fieldDefId: '' };
+      if (!canEditStructure(nodeId)) return { fieldEntryId: '', fieldDefId: '' };
       // 创建临时 fieldDef（placeholder）
       const fdId = nanoid();
       loroDoc.createNode(fdId, CONTAINER_IDS.SCHEMA);
@@ -1448,29 +1487,34 @@ export const useNodeStore = create<NodeStore>((set, get) => {
     },
 
     moveFieldEntry: (currentParentId, fieldEntryId, newParentId, position) => {
+      if (!canEditStructure(currentParentId) || !canEditStructure(newParentId)) return;
       loroDoc.moveNode(fieldEntryId, newParentId, position);
       loroDoc.commitDoc();
       void currentParentId; // suppress lint
     },
 
     removeField: (nodeId, fieldEntryId) => {
+      if (!canEditStructure(nodeId)) return;
       loroDoc.deleteNode(fieldEntryId);
       loroDoc.commitDoc();
       void nodeId; // suppress lint
     },
 
     renameFieldDef: (fieldDefId, newName) => {
+      if (!getNodeCapabilities(fieldDefId).canEditNode) return;
       loroDoc.setNodeData(fieldDefId, 'name', newName);
       loroDoc.commitDoc();
     },
 
     changeFieldType: (fieldDefId, newType) => {
+      if (!getNodeCapabilities(fieldDefId).canEditNode) return;
       loroDoc.setNodeData(fieldDefId, 'fieldType', newType);
       loroDoc.commitDoc();
     },
 
     addFieldOption: (fieldDefId, name) => {
       if (!canMutate('addFieldOption')) return '';
+      if (!canEditStructure(fieldDefId)) return '';
       const optId = nanoid();
       loroDoc.createNode(optId, fieldDefId);
       loroDoc.setNodeData(optId, 'name', name);
@@ -1479,6 +1523,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
     },
 
     removeFieldOption: (fieldDefId, optionId) => {
+      if (!canEditStructure(fieldDefId)) return;
       loroDoc.deleteNode(optionId);
       loroDoc.commitDoc();
       void fieldDefId; // suppress lint
@@ -1486,6 +1531,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
 
     autoCollectOption: (nodeId, fieldDefId, name) => {
       if (!canMutate('autoCollectOption')) return '';
+      if (!canEditFieldValues(nodeId) || !canEditStructure(fieldDefId)) return '';
       // 在 fieldDef 下创建新选项
       // NOTE: addFieldOption already calls commitDoc; we batch all mutations
       // here and commit once at the end for atomicity.
@@ -1512,6 +1558,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
 
     registerCollectedOption: (fieldDefId, name) => {
       if (!canMutate('registerCollectedOption')) return;
+      if (!canEditStructure(fieldDefId)) return;
       const trimmed = name.trim();
       if (!trimmed) return;
       // Check if option with same name already exists (pre-determined or collected)
@@ -1527,6 +1574,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
     },
 
     toggleCheckboxField: (fieldEntryId) => {
+      if (!canEditFieldEntryValues(fieldEntryId)) return;
       const fe = loroDoc.toNodexNode(fieldEntryId);
       if (!fe) return;
       const children = loroDoc.getChildren(fieldEntryId);
@@ -1543,6 +1591,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
     },
 
     replaceFieldDef: (nodeId, fieldEntryId, oldFieldDefId, newFieldDefId) => {
+      if (!canEditStructure(nodeId)) return;
       // Dedup: if the target fieldDef already has a fieldEntry on this node,
       // remove the current (placeholder) entry instead of creating a duplicate.
       const existing = findFieldEntry(nodeId, newFieldDefId);
@@ -1559,6 +1608,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
     // ─── Checkbox 操作 ───
 
     toggleNodeDone: (nodeId) => {
+      if (!canEditFieldValues(nodeId)) return;
       const node = loroDoc.toNodexNode(nodeId);
       if (!node) return;
       const result = resolveCheckboxClick(node);
@@ -1579,6 +1629,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
     },
 
     cycleNodeCheckbox: (nodeId) => {
+      if (!canEditFieldValues(nodeId)) return;
       const node = loroDoc.toNodexNode(nodeId);
       if (!node) return;
       const result = resolveCmdEnterCycle(node);
@@ -1593,22 +1644,24 @@ export const useNodeStore = create<NodeStore>((set, get) => {
     // ─── 配置操作 ───
 
     setConfigValue: (nodeId, configKey, value) => {
+      if (!canEditFieldValues(nodeId)) return;
       loroDoc.setNodeData(nodeId, configKey, value);
       loroDoc.commitDoc();
     },
 
     addDoneMappingEntry: (tagDefId, checked, fieldDefId, optionId) => {
+      if (!canEditFieldValues(tagDefId)) return;
       const mappingKey = checked ? SYS_A.DONE_MAP_CHECKED : SYS_A.DONE_MAP_UNCHECKED;
 
-      let mappingTupleId = findFieldEntry(tagDefId, mappingKey);
-      if (!mappingTupleId) {
-        mappingTupleId = nanoid();
-        loroDoc.createNode(mappingTupleId, tagDefId);
-        loroDoc.setNodeDataBatch(mappingTupleId, { type: 'fieldEntry', fieldDefId: mappingKey });
+      let mappingFieldEntryId = findFieldEntry(tagDefId, mappingKey);
+      if (!mappingFieldEntryId) {
+        mappingFieldEntryId = nanoid();
+        loroDoc.createNode(mappingFieldEntryId, tagDefId);
+        loroDoc.setNodeDataBatch(mappingFieldEntryId, { type: 'fieldEntry', fieldDefId: mappingKey });
       }
 
       // Keep entries unique by (fieldDefId, optionId)
-      const entryIds = loroDoc.getChildren(mappingTupleId);
+      const entryIds = loroDoc.getChildren(mappingFieldEntryId);
       for (const entryId of entryIds) {
         const entryNode = loroDoc.toNodexNode(entryId);
         if (!entryNode || entryNode.type !== 'fieldEntry' || entryNode.fieldDefId !== fieldDefId) continue;
@@ -1621,7 +1674,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
       }
 
       const mappingEntryId = nanoid();
-      loroDoc.createNode(mappingEntryId, mappingTupleId);
+      loroDoc.createNode(mappingEntryId, mappingFieldEntryId);
       loroDoc.setNodeDataBatch(mappingEntryId, { type: 'fieldEntry', fieldDefId });
 
       const valueId = nanoid();
@@ -1631,13 +1684,14 @@ export const useNodeStore = create<NodeStore>((set, get) => {
     },
 
     removeDoneMappingEntry: (tagDefId, checked, index) => {
+      if (!canEditFieldValues(tagDefId)) return;
       const mappingKey = checked ? SYS_A.DONE_MAP_CHECKED : SYS_A.DONE_MAP_UNCHECKED;
-      const mappingTupleId = findFieldEntry(tagDefId, mappingKey);
-      if (!mappingTupleId) return;
+      const mappingFieldEntryId = findFieldEntry(tagDefId, mappingKey);
+      if (!mappingFieldEntryId) return;
 
       // Keep index behavior aligned with UI list: only count valid mapping entries
       // (fieldEntry with at least one targetId value child).
-      const entries = loroDoc.getChildren(mappingTupleId).filter((cid) => {
+      const entries = loroDoc.getChildren(mappingFieldEntryId).filter((cid) => {
         const node = loroDoc.toNodexNode(cid);
         if (node?.type !== 'fieldEntry') return false;
         const hasValueTarget = (node.children ?? []).some((valueId) => {
@@ -1657,6 +1711,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
 
     addReference: (parentId, targetNodeId, position) => {
       if (!canMutate('addReference')) return '';
+      if (!canEditStructure(parentId)) return '';
       const rawTargetNode = loroDoc.toNodexNode(targetNodeId);
       const effectiveTargetId =
         rawTargetNode?.type === 'reference' && rawTargetNode.targetId
@@ -1682,12 +1737,15 @@ export const useNodeStore = create<NodeStore>((set, get) => {
     },
 
     removeReference: (refNodeId) => {
+      const parentId = loroDoc.getParentId(refNodeId);
+      if (parentId && !canEditStructure(parentId)) return;
       loroDoc.deleteNode(refNodeId);
       loroDoc.commitDoc();
     },
 
     startRefConversion: (refNodeId, parentId, position) => {
       if (!canMutate('startRefConversion')) return '';
+      if (!canEditStructure(parentId)) return '';
       const refNode = loroDoc.toNodexNode(refNodeId);
       const isReferenceNode = refNode?.type === 'reference';
       const targetId = isReferenceNode ? refNode?.targetId : refNodeId;
@@ -1734,9 +1792,11 @@ export const useNodeStore = create<NodeStore>((set, get) => {
 
     createSearchNode: (tagDefId) => {
       if (!canMutate('createSearchNode')) return '';
+      const searchRootId = resolvePreferredTopLevelParentId(CONTAINER_IDS.SEARCHES);
+      if (!searchRootId) return '';
 
-      // De-duplication: check if a search node for this tag already exists in SEARCHES
-      const searchesChildren = loroDoc.getChildren(CONTAINER_IDS.SEARCHES);
+      // De-duplication: check if a search node for this tag already exists in the preferred top-level parent
+      const searchesChildren = loroDoc.getChildren(searchRootId);
       for (const childId of searchesChildren) {
         const child = loroDoc.toNodexNode(childId);
         if (child?.type !== 'search') continue;
@@ -1766,7 +1826,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
       const searchName = `Everything tagged #${tagLabel}`;
 
       const searchId = nanoid();
-      loroDoc.createNode(searchId, CONTAINER_IDS.SEARCHES);
+      loroDoc.createNode(searchId, searchRootId);
       loroDoc.setNodeDataBatch(searchId, {
         type: 'search',
         name: searchName,
@@ -2073,7 +2133,9 @@ export const useNodeStore = create<NodeStore>((set, get) => {
       const searchNode = loroDoc.toNodexNode(searchNodeId);
       if (!searchNode || searchNode.type !== 'search') return get().createChild(searchNodeId, undefined, data);
       const nodeId = nanoid();
-      loroDoc.createNode(nodeId, CONTAINER_IDS.LIBRARY);
+      const preferredParentId = resolvePreferredTopLevelParentId(CONTAINER_IDS.LIBRARY);
+      if (!preferredParentId) return { id: '', name: '', children: [], tags: [] } as unknown as NodexNode;
+      loroDoc.createNode(nodeId, preferredParentId);
       const now = Date.now();
       loroDoc.setNodeDataBatch(nodeId, { ...data, createdAt: now, updatedAt: now });
       const tagDefIds = extractHasTagIds(searchNode);

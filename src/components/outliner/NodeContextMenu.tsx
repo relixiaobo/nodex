@@ -31,14 +31,14 @@ import { copyNodesToClipboard, cutNodesToClipboard, writeNodeLinkToClipboard } f
 import { formatSmartTimestamp } from '../../lib/format-timestamp.js';
 import { useWorkspaceTags } from '../../hooks/use-workspace-tags.js';
 import { resolveTagColor } from '../../lib/tag-colors.js';
-import { isWorkspaceContainer } from '../../lib/tree-utils.js';
 import { shouldNodeShowCheckbox, hasTagShowCheckbox } from '../../lib/checkbox-utils.js';
-import { CONTAINER_IDS } from '../../types/index.js';
+import { canCreateChildrenUnder, getNodeCapabilities } from '../../lib/node-capabilities.js';
+import { getSystemNodePreset, getWorkspaceHomeNodeId, getWorkspaceTopLevelNodeIds, type SystemNodeIconKey } from '../../lib/system-node-presets.js';
 import { Kbd } from '../ui/Kbd.js';
 import {
   Link, Copy, Scissors, CopyPlus, MoveRight,
   Hash, CheckSquare, Type, Trash2, ChevronLeft, ChevronRight,
-  Plus, Inbox, Library, CalendarDays, ArrowUpDown, ListFilter, Group,
+  Plus, Library, CalendarDays, Search, Settings, ArrowUpDown, ListFilter, Group,
 } from '../../lib/icons.js';
 import type { LucideIcon } from 'lucide-react';
 
@@ -55,6 +55,18 @@ export interface ContextMenuState {
 // ── Sub-view modes ──
 
 type MenuMode = 'main' | 'add-tag';
+
+const SYSTEM_NODE_ICONS: Record<SystemNodeIconKey, LucideIcon> = {
+  library: Library,
+  inbox: Library,
+  journal: CalendarDays,
+  trash: Trash2,
+  search: Search,
+  schema: Library,
+  clips: Library,
+  stash: Library,
+  settings: Settings,
+};
 
 // ── Menu portal ──
 
@@ -105,6 +117,7 @@ function MenuItem({
   onClick,
   destructive,
   trailing,
+  disabled,
 }: {
   icon?: LucideIcon;
   label: string;
@@ -112,15 +125,19 @@ function MenuItem({
   onClick: () => void;
   destructive?: boolean;
   trailing?: React.ReactNode;
+  disabled?: boolean;
 }) {
   return (
     <button
-      className={`flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-sm transition-colors text-left hover:bg-foreground/4 ${
-        destructive
-          ? 'text-destructive'
+      className={`flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-sm transition-colors text-left ${
+        disabled
+          ? 'cursor-default text-foreground-tertiary/60'
+          : destructive
+          ? 'text-destructive hover:bg-foreground/4'
           : 'text-foreground-secondary hover:text-foreground'
       }`}
-      onClick={onClick}
+      onClick={disabled ? undefined : onClick}
+      disabled={disabled}
     >
       {Icon && (
         <div className="flex w-4 shrink-0 items-center justify-center text-foreground-tertiary">
@@ -152,6 +169,14 @@ interface NodeContextMenuContentProps {
 const NodeContextMenuContent = forwardRef<HTMLDivElement, NodeContextMenuContentProps>(
   function NodeContextMenuContent({ x, y, nodeId, viewNodeId, onClose }, ref) {
     const node = useNodeStore((s) => { void s._version; return loroDoc.toNodexNode(nodeId); });
+    const capabilities = useNodeStore((s) => {
+      void s._version;
+      return getNodeCapabilities(nodeId);
+    });
+    const parentId = useNodeStore((s) => {
+      void s._version;
+      return loroDoc.getParentId(nodeId);
+    });
     const [mode, setMode] = useState<MenuMode>('main');
 
     // Measure actual menu size and clamp to viewport (before paint)
@@ -175,6 +200,10 @@ const NodeContextMenuContent = forwardRef<HTMLDivElement, NodeContextMenuContent
     const created = node?.createdAt ? formatSmartTimestamp(node.createdAt) : '';
     const changed = node?.updatedAt ? formatSmartTimestamp(node.updatedAt) : '';
     const hasDescription = (node?.description ?? '').length > 0;
+    const canDuplicate = !!parentId && capabilities.canMove && canCreateChildrenUnder(parentId);
+    const canAddTag = capabilities.canEditStructure;
+    const canToggleCheckbox = capabilities.canEditFieldValues;
+    const canEditDescription = capabilities.canEditNode;
 
     // Checkbox state → dynamic label
     const checkboxLabel = useMemo(() => {
@@ -190,12 +219,14 @@ const NodeContextMenuContent = forwardRef<HTMLDivElement, NodeContextMenuContent
       return 'Mark as done';
     }, [node]);
 
-    // Detect which container the node is in (walk up to find root container)
-    const currentContainerId = useMemo(() => {
+    const currentTopLevelId = useMemo(() => {
+      const workspaceHomeId = getWorkspaceHomeNodeId();
       let cursor: string | null = nodeId;
       while (cursor) {
-        if (isWorkspaceContainer(cursor)) return cursor;
-        cursor = loroDoc.getParentId(cursor);
+        const parentId = loroDoc.getParentId(cursor);
+        if (!parentId) return cursor;
+        if (workspaceHomeId && parentId === workspaceHomeId) return cursor;
+        cursor = parentId;
       }
       return null;
     }, [nodeId]);
@@ -218,43 +249,50 @@ const NodeContextMenuContent = forwardRef<HTMLDivElement, NodeContextMenuContent
     }, [nodeId, onClose]);
 
     const handleDuplicate = useCallback(() => {
+      if (!canDuplicate) return;
       useNodeStore.getState().duplicateNode(nodeId);
       onClose();
-    }, [nodeId, onClose]);
+    }, [canDuplicate, nodeId, onClose]);
 
     const handleCheckbox = useCallback(() => {
+      if (!canToggleCheckbox) return;
       useNodeStore.getState().cycleNodeCheckbox(nodeId);
       onClose();
-    }, [nodeId, onClose]);
+    }, [canToggleCheckbox, nodeId, onClose]);
 
     const handleAddDescription = useCallback(() => {
+      if (!canEditDescription) return;
       if (!hasDescription) {
         useNodeStore.getState().updateNodeDescription(nodeId, '');
       }
       useUIStore.getState().setEditingDescription(nodeId);
       onClose();
-    }, [nodeId, hasDescription, onClose]);
+    }, [canEditDescription, nodeId, hasDescription, onClose]);
 
     const handleDelete = useCallback(() => {
+      if (!capabilities.canDelete) return;
       useNodeStore.getState().trashNode(nodeId);
       onClose();
-    }, [nodeId, onClose]);
+    }, [capabilities.canDelete, nodeId, onClose]);
 
-    const handleMoveTo = useCallback((containerId: string) => {
-      useNodeStore.getState().moveNodeTo(nodeId, containerId);
+    const handleMoveTo = useCallback((targetId: string) => {
+      if (!capabilities.canMove) return;
+      useNodeStore.getState().moveNodeTo(nodeId, targetId);
       onClose();
-    }, [nodeId, onClose]);
+    }, [capabilities.canMove, nodeId, onClose]);
 
     const handleApplyTag = useCallback((tagDefId: string) => {
+      if (!canAddTag) return;
       useNodeStore.getState().applyTag(nodeId, tagDefId);
       onClose();
-    }, [nodeId, onClose]);
+    }, [canAddTag, nodeId, onClose]);
 
     const handleCreateAndApplyTag = useCallback((name: string) => {
+      if (!canAddTag) return;
       const newTag = useNodeStore.getState().createTagDef(name);
       useNodeStore.getState().applyTag(nodeId, newTag.id);
       onClose();
-    }, [nodeId, onClose]);
+    }, [canAddTag, nodeId, onClose]);
 
     // View toolbar toggle — applies to viewNodeId (controls its children's view)
     const toolbarVisible = useMemo(() => {
@@ -307,13 +345,20 @@ const NodeContextMenuContent = forwardRef<HTMLDivElement, NodeContextMenuContent
             onCopy={handleCopy}
             onCut={handleCut}
             onDuplicate={handleDuplicate}
-            currentContainerId={currentContainerId}
+            canCut={capabilities.canDelete}
+            canDuplicate={canDuplicate}
+            canMove={capabilities.canMove}
+            currentTopLevelId={currentTopLevelId}
             onMoveTo={handleMoveTo}
             onAddTag={() => setMode('add-tag')}
+            canAddTag={canAddTag}
             onCheckbox={handleCheckbox}
+            canToggleCheckbox={canToggleCheckbox}
             checkboxLabel={checkboxLabel}
             onAddDescription={handleAddDescription}
+            canEditDescription={canEditDescription}
             onDelete={handleDelete}
+            canDelete={capabilities.canDelete}
             hasDescription={hasDescription}
             changed={changed}
             created={created}
@@ -329,6 +374,7 @@ const NodeContextMenuContent = forwardRef<HTMLDivElement, NodeContextMenuContent
             nodeId={nodeId}
             onSelect={handleApplyTag}
             onCreateNew={handleCreateAndApplyTag}
+            canAddTag={canAddTag}
             onBack={() => setMode('main')}
           />
         )}
@@ -343,14 +389,21 @@ function MainMenu({
   onCopyLink,
   onCopy,
   onCut,
+  canCut,
   onDuplicate,
-  currentContainerId,
+  canDuplicate,
+  canMove,
+  currentTopLevelId,
   onMoveTo,
   onAddTag,
+  canAddTag,
   onCheckbox,
+  canToggleCheckbox,
   checkboxLabel,
   onAddDescription,
+  canEditDescription,
   onDelete,
+  canDelete,
   hasDescription,
   changed,
   created,
@@ -363,14 +416,21 @@ function MainMenu({
   onCopyLink: () => void;
   onCopy: () => void;
   onCut: () => void;
+  canCut: boolean;
   onDuplicate: () => void;
-  currentContainerId: string | null;
-  onMoveTo: (containerId: string) => void;
+  canDuplicate: boolean;
+  canMove: boolean;
+  currentTopLevelId: string | null;
+  onMoveTo: (targetId: string) => void;
   onAddTag: () => void;
+  canAddTag: boolean;
   onCheckbox: () => void;
+  canToggleCheckbox: boolean;
   checkboxLabel: string;
   onAddDescription: () => void;
+  canEditDescription: boolean;
   onDelete: () => void;
+  canDelete: boolean;
   hasDescription: boolean;
   changed: string;
   created: string;
@@ -401,25 +461,26 @@ function MainMenu({
 
       {/* Clipboard + structure group */}
       <MenuItem icon={Copy} label="Copy" kbd="⌘C" onClick={onCopy} />
-      <MenuItem icon={Scissors} label="Cut" kbd="⌘X" onClick={onCut} />
-      <MenuItem icon={CopyPlus} label="Duplicate" kbd="⇧⌘D" onClick={onDuplicate} />
-      <MoveToSubmenu currentContainerId={currentContainerId} onSelect={onMoveTo} />
+      <MenuItem icon={Scissors} label="Cut" kbd="⌘X" onClick={onCut} disabled={!canCut} />
+      <MenuItem icon={CopyPlus} label="Duplicate" kbd="⇧⌘D" onClick={onDuplicate} disabled={!canDuplicate} />
+      <MoveToSubmenu currentTopLevelId={currentTopLevelId} onSelect={onMoveTo} disabled={!canMove} />
 
       <MenuSeparator />
 
       {/* Node attributes group */}
-      <MenuItem icon={Hash} label="Add tag" onClick={onAddTag} />
-      <MenuItem icon={CheckSquare} label={checkboxLabel} kbd="⌘↵" onClick={onCheckbox} />
+      <MenuItem icon={Hash} label="Add tag" onClick={onAddTag} disabled={!canAddTag} />
+      <MenuItem icon={CheckSquare} label={checkboxLabel} kbd="⌘↵" onClick={onCheckbox} disabled={!canToggleCheckbox} />
       <MenuItem
         icon={Type}
         label={hasDescription ? 'Edit description' : 'Add description'}
         onClick={onAddDescription}
+        disabled={!canEditDescription}
       />
 
       <MenuSeparator />
 
       {/* Danger zone */}
-      <MenuItem icon={Trash2} label="Delete" onClick={onDelete} destructive />
+      <MenuItem icon={Trash2} label="Delete" onClick={onDelete} destructive disabled={!canDelete} />
 
       {/* Timestamps */}
       {(changed || created) && (
@@ -437,24 +498,25 @@ function MainMenu({
 
 // ── Move to hover submenu ──
 
-const MOVE_TARGETS: Array<{ id: string; label: string; icon: LucideIcon }> = [
-  { id: CONTAINER_IDS.INBOX, label: 'Inbox', icon: Inbox },
-  { id: CONTAINER_IDS.LIBRARY, label: 'Library', icon: Library },
-  { id: CONTAINER_IDS.JOURNAL, label: 'Daily notes', icon: CalendarDays },
-];
-
 function MoveToSubmenu({
-  currentContainerId,
+  currentTopLevelId,
   onSelect,
+  disabled = false,
 }: {
-  currentContainerId: string | null;
-  onSelect: (containerId: string) => void;
+  currentTopLevelId: string | null;
+  onSelect: (targetId: string) => void;
+  disabled?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const rowRef = useRef<HTMLDivElement>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const topLevelIds = useNodeStore((s) => {
+    void s._version;
+    return getWorkspaceTopLevelNodeIds();
+  });
 
   const showSub = () => {
+    if (disabled) return;
     clearTimeout(timerRef.current);
     setOpen(true);
   };
@@ -483,7 +545,20 @@ function MoveToSubmenu({
     return { top: rect.top, left: margin, position: 'fixed' };
   }, [open]); // recalc when open changes
 
-  const targets = MOVE_TARGETS.filter((t) => t.id !== currentContainerId);
+  const targets = useMemo(() => topLevelIds
+    .filter((id) => id !== currentTopLevelId)
+    .filter((id) => getNodeCapabilities(id).canMove)
+    .map((id) => {
+      const preset = getSystemNodePreset(id);
+      const node = loroDoc.toNodexNode(id);
+      return {
+        id,
+        label: node?.name?.trim() || id,
+        icon: preset ? SYSTEM_NODE_ICONS[preset.iconKey] : Library,
+      };
+    }), [topLevelIds, currentTopLevelId]);
+
+  if (targets.length === 0 && !disabled) return null;
 
   return (
     <div
@@ -493,8 +568,9 @@ function MoveToSubmenu({
       onMouseLeave={hideSub}
     >
       <button
-        className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-sm text-foreground-secondary transition-colors text-left hover:bg-foreground/4 hover:text-foreground"
-        onClick={() => setOpen((v) => !v)}
+        className={`flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-sm text-left ${disabled ? 'cursor-default text-foreground-tertiary/60' : 'text-foreground-secondary transition-colors hover:bg-foreground/4 hover:text-foreground'}`}
+        onClick={disabled ? undefined : () => setOpen((v) => !v)}
+        disabled={disabled}
       >
         <div className="flex w-4 shrink-0 items-center justify-center text-foreground-tertiary">
           <MoveRight size={14} strokeWidth={1.5} />
@@ -503,7 +579,7 @@ function MoveToSubmenu({
         <ChevronRight size={14} strokeWidth={1.5} className="text-foreground-tertiary" />
       </button>
 
-      {open && (
+      {!disabled && open && (
         <div
           className="absolute z-50 min-w-[160px] rounded-lg bg-background shadow-paper p-1"
           style={flyoutStyle}
@@ -530,11 +606,13 @@ function AddTagView({
   nodeId,
   onSelect,
   onCreateNew,
+  canAddTag,
   onBack,
 }: {
   nodeId: string;
   onSelect: (tagDefId: string) => void;
   onCreateNew: (name: string) => void;
+  canAddTag: boolean;
   onBack: () => void;
 }) {
   const [query, setQuery] = useState('');
@@ -661,11 +739,11 @@ function AddTagView({
                 boundedIndex === filteredTags.length ? 'bg-primary-muted' : 'hover:bg-foreground/4 hover:text-foreground'
               }`}
               onMouseDown={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                onCreateNew(query.trim());
-              }}
-            >
+              e.preventDefault();
+              e.stopPropagation();
+              if (canAddTag) onCreateNew(query.trim());
+            }}
+          >
               <Plus size={14} className="text-foreground-tertiary shrink-0" />
               Create &ldquo;{query}&rdquo;
               <span className="ml-auto text-[10px] text-foreground-tertiary shrink-0">⌘↵</span>

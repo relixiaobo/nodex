@@ -66,8 +66,8 @@ export function isJournalSystemTagId(tagId: string): boolean {
 
 /**
  * 系统属性 ID 常量。
- * 迁移期间保留。Meta Tuple 消除后，SYS_A13/A55/A12/A11/A14 等
- * 不再作为 Tuple key，但 fieldEntry/view/search 配置仍用。
+ * 在当前模型里，SYS_A13/A55/A12/A11/A14 等不再作为旧配置节点的 key，
+ * 但 fieldEntry / view / search 配置仍然会引用这些常量。
  */
 export const SYS_A = {
   NULLABLE: 'SYS_A01',
@@ -316,6 +316,8 @@ export type NdxFieldDef = typeof NDX_F[keyof typeof NDX_F];
 // ============================================================
 
 export const NDX_T = {
+  /** Workspace settings schema tagDef */
+  WORKSPACE_SETTINGS: 'NDX_T10',
   /** #article tagDef — extends #source */
   ARTICLE: 'NDX_T01',
   /** #video tagDef — extends #source */

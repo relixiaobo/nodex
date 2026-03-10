@@ -8,6 +8,7 @@
  */
 import * as loroDoc from './loro-doc.js';
 import { CONTAINER_IDS } from '../types/index.js';
+import { isLockedNode, isWorkspaceHomeNode } from './node-capabilities.js';
 import type { NodexNode, NodeType, QueryOp } from '../types/node.js';
 
 // ============================================================
@@ -40,8 +41,7 @@ function isCandidate(node: NodexNode, excludeNodeId: string): boolean {
   if (node.id === excludeNodeId) return false;
   // Exclude structural types
   if (node.type && EXCLUDED_TYPES.has(node.type)) return false;
-  // Exclude workspace containers (LIBRARY, INBOX, etc.)
-  if (Object.values(CONTAINER_IDS).includes(node.id as never)) return false;
+  if (isWorkspaceHomeNode(node.id) || isLockedNode(node.id)) return false;
   // Exclude trashed nodes
   if (isInTrash(node.id)) return false;
   return true;

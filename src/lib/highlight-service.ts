@@ -13,6 +13,7 @@ import type { NodexNode } from '../types/index.js';
 import * as loroDoc from './loro-doc.js';
 import type { WebClipNodeStore } from './webclip-service.js';
 import { ensureSourceTagDef } from './webclip-service.js';
+import { resolveEffectiveId } from './node-type-utils.js';
 
 /** Extended store interface for highlight operations. */
 export interface HighlightNodeStore extends WebClipNodeStore {}
@@ -315,13 +316,9 @@ export function getHighlightsForNote(noteNodeId: string): NodexNode[] {
   if (!feId) return [];
   const results: NodexNode[] = [];
   for (const cid of loroDoc.getChildren(feId)) {
-    const node = loroDoc.toNodexNode(cid);
-    if (!node) continue;
-    if (node.type === 'reference' && node.targetId) {
-      const target = loroDoc.toNodexNode(node.targetId);
-      if (target?.tags.includes(SYS_T.HIGHLIGHT)) {
-        results.push(target);
-      }
+    const target = loroDoc.toNodexNode(resolveEffectiveId(cid));
+    if (target?.tags.includes(SYS_T.HIGHLIGHT)) {
+      results.push(target);
     }
   }
   return results;

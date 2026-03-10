@@ -6,7 +6,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useNodeStore } from '../../src/stores/node-store.js';
 import * as loroDoc from '../../src/lib/loro-doc.js';
-import { CONTAINER_IDS } from '../../src/types/index.js';
+import { SYSTEM_NODE_IDS } from '../../src/types/index.js';
 import { collectNodeGraphErrors } from './helpers/invariants.js';
 import { resetAndSeed } from './helpers/test-state.js';
 
@@ -21,7 +21,7 @@ describe('hardDeleteNode', () => {
 
     useNodeStore.getState().hardDeleteNode('idea_1');
     expect(loroDoc.hasNode('idea_1')).toBe(false);
-    expect(loroDoc.getChildren(CONTAINER_IDS.TRASH)).not.toContain('idea_1');
+    expect(loroDoc.getChildren(SYSTEM_NODE_IDS.TRASH)).not.toContain('idea_1');
   });
 
   it('recursively removes descendants', () => {
@@ -48,8 +48,8 @@ describe('hardDeleteNode', () => {
   it('does not delete container nodes even if somehow in TRASH', () => {
     // Container nodes (LIBRARY, INBOX, etc.) cannot be hard-deleted
     // This is a safety guard — TRASH itself is a container
-    useNodeStore.getState().hardDeleteNode(CONTAINER_IDS.TRASH);
-    expect(loroDoc.hasNode(CONTAINER_IDS.TRASH)).toBe(true);
+    useNodeStore.getState().hardDeleteNode(SYSTEM_NODE_IDS.TRASH);
+    expect(loroDoc.hasNode(SYSTEM_NODE_IDS.TRASH)).toBe(true);
   });
 
   it('graph is valid after hardDeleteNode', () => {
@@ -75,10 +75,10 @@ describe('emptyTrash', () => {
   it('removes all nodes from TRASH', () => {
     useNodeStore.getState().trashNode('idea_1');
     useNodeStore.getState().trashNode('idea_2');
-    expect(loroDoc.getChildren(CONTAINER_IDS.TRASH).length).toBe(2);
+    expect(loroDoc.getChildren(SYSTEM_NODE_IDS.TRASH).length).toBe(2);
 
     useNodeStore.getState().emptyTrash();
-    expect(loroDoc.getChildren(CONTAINER_IDS.TRASH).length).toBe(0);
+    expect(loroDoc.getChildren(SYSTEM_NODE_IDS.TRASH).length).toBe(0);
     expect(loroDoc.hasNode('idea_1')).toBe(false);
     expect(loroDoc.hasNode('idea_2')).toBe(false);
   });

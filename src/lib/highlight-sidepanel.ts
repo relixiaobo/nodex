@@ -13,7 +13,7 @@ import {
 } from './highlight-service.js';
 import { createLightweightClip, findClipNodeByUrl, normalizeUrl } from './webclip-service.js';
 import { resolveTagColor } from './tag-colors.js';
-import { CONTAINER_IDS, SYS_T } from '../types/index.js';
+import { SYSTEM_NODE_IDS, SYS_T } from '../types/index.js';
 import * as loroDoc from './loro-doc.js';
 
 export interface CreateHighlightFromPayloadResult {
@@ -53,12 +53,12 @@ export function collectAllHighlightNodeIds(): Set<string> {
   const ids = new Set<string>();
 
   // Flat containers
-  for (const containerId of [CONTAINER_IDS.LIBRARY, CONTAINER_IDS.INBOX, CONTAINER_IDS.CLIPS]) {
+  for (const containerId of [SYSTEM_NODE_IDS.LIBRARY, SYSTEM_NODE_IDS.INBOX, SYSTEM_NODE_IDS.CLIPS]) {
     collectHighlightsFromFlatContainer(containerId, ids);
   }
 
   // Journal: Year → Week → Day → clip
-  const yearIds = loroDoc.getChildren(CONTAINER_IDS.JOURNAL);
+  const yearIds = loroDoc.getChildren(SYSTEM_NODE_IDS.JOURNAL);
   for (const yearId of yearIds) {
     const weekIds = loroDoc.getChildren(yearId);
     for (const weekId of weekIds) {
@@ -239,7 +239,7 @@ export function saveNotesForHighlight(
 
   // Delete excess existing notes that no longer have a corresponding group
   for (let i = groups.length; i < existingNotes.length; i++) {
-    loroDoc.moveNode(existingNotes[i].id, CONTAINER_IDS.TRASH);
+    loroDoc.moveNode(existingNotes[i].id, SYSTEM_NODE_IDS.TRASH);
   }
   if (groups.length < existingNotes.length) {
     loroDoc.commitDoc();

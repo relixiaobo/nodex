@@ -7,7 +7,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { parseHtmlToNodes, createContentNodes } from '../../src/lib/html-to-nodes.js';
 import { resetAndSeed } from './helpers/test-state.js';
 import * as loroDoc from '../../src/lib/loro-doc.js';
-import { CONTAINER_IDS } from '../../src/types/index.js';
+import { SYSTEM_NODE_IDS } from '../../src/types/index.js';
 
 // ============================================================
 // parseHtmlToNodes — pure function tests (no Loro dependency)

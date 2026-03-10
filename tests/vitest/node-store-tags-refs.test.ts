@@ -9,7 +9,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useNodeStore } from '../../src/stores/node-store.js';
 import * as loroDoc from '../../src/lib/loro-doc.js';
-import { CONTAINER_IDS } from '../../src/types/index.js';
+import { SYSTEM_NODE_IDS } from '../../src/types/index.js';
 import { collectNodeGraphErrors } from './helpers/invariants.js';
 import { resetAndSeed } from './helpers/test-state.js';
 
@@ -212,8 +212,8 @@ describe('addReference / removeReference', () => {
   });
 
   it('blocks cross-branch mutual references when second edge closes a display cycle', () => {
-    const a = useNodeStore.getState().createChild(CONTAINER_IDS.LIBRARY, undefined, { name: 'A' }).id;
-    const b = useNodeStore.getState().createChild(CONTAINER_IDS.LIBRARY, undefined, { name: 'B' }).id;
+    const a = useNodeStore.getState().createChild(SYSTEM_NODE_IDS.LIBRARY, undefined, { name: 'A' }).id;
+    const b = useNodeStore.getState().createChild(SYSTEM_NODE_IDS.LIBRARY, undefined, { name: 'B' }).id;
 
     const refAB = useNodeStore.getState().addReference(a, b);
     const refBA = useNodeStore.getState().addReference(b, a);

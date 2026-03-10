@@ -8,7 +8,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { useNodeStore } from '../../src/stores/node-store.js';
 import { collectNodeGraphErrors } from './helpers/invariants.js';
 import * as loroDoc from '../../src/lib/loro-doc.js';
-import { CONTAINER_IDS } from '../../src/types/index.js';
+import { SYSTEM_NODE_IDS } from '../../src/types/index.js';
 import { FIELD_TYPES } from '../../src/types/system-nodes.js';
 import { resetAndSeed } from './helpers/test-state.js';
 
@@ -22,8 +22,8 @@ describe('createTagDef', () => {
     const tagDef = loroDoc.toNodexNode(created.id)!;
     expect(tagDef.type).toBe('tagDef');
     expect(tagDef.name).toBe('My New Tag');
-    expect(loroDoc.getParentId(created.id)).toBe(CONTAINER_IDS.SCHEMA);
-    expect(loroDoc.getChildren(CONTAINER_IDS.SCHEMA)).toContain(created.id);
+    expect(loroDoc.getParentId(created.id)).toBe(SYSTEM_NODE_IDS.SCHEMA);
+    expect(loroDoc.getChildren(SYSTEM_NODE_IDS.SCHEMA)).toContain(created.id);
   });
 
   it('sets showCheckbox when option provided', () => {

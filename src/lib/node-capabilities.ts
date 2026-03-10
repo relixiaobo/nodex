@@ -1,6 +1,6 @@
 import * as loroDoc from './loro-doc.js';
 import { getSystemNodePreset } from './system-node-presets.js';
-import { CONTAINER_IDS } from '../types/index.js';
+import { SYSTEM_NODE_IDS } from '../types/index.js';
 
 export type SystemNodeRole = 'workspaceHome' | 'system';
 export type NodeRole = SystemNodeRole | 'general';
@@ -30,7 +30,7 @@ export function isNodeInTrash(nodeId: string): boolean {
   const visited = new Set<string>();
 
   while (cursor) {
-    if (cursor === CONTAINER_IDS.TRASH) return true;
+    if (cursor === SYSTEM_NODE_IDS.TRASH) return true;
     if (visited.has(cursor)) return false;
     visited.add(cursor);
     cursor = loroDoc.getParentId(cursor);

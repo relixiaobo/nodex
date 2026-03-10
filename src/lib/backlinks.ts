@@ -12,7 +12,7 @@
 
 import * as loroDoc from './loro-doc.js';
 import { getAncestorChain, getNavigableParentId, type AncestorInfo } from './tree-utils.js';
-import { CONTAINER_IDS } from '../types/index.js';
+import { SYSTEM_NODE_IDS } from '../types/index.js';
 import type { NodexNode } from '../types/index.js';
 import { isNodeInTrash } from './node-capabilities.js';
 
@@ -65,7 +65,7 @@ function isSupertagSearchNode(node: NodexNode): boolean {
 /** Pre-compute the set of all node IDs inside TRASH (single walk from TRASH root). */
 function buildTrashSet(): Set<string> {
   const trashSet = new Set<string>();
-  const trashNode = loroDoc.toNodexNode(CONTAINER_IDS.TRASH);
+  const trashNode = loroDoc.toNodexNode(SYSTEM_NODE_IDS.TRASH);
   if (!trashNode) return trashSet;
   const queue = [...trashNode.children];
   while (queue.length > 0) {

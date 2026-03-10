@@ -7,7 +7,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import * as loroDoc from '../../src/lib/loro-doc.js';
 import { useNodeStore } from '../../src/stores/node-store.js';
-import { CONTAINER_IDS } from '../../src/types/index.js';
+import { SYSTEM_NODE_IDS } from '../../src/types/index.js';
 import { resetAndSeed } from './helpers/test-state.js';
 import { computeBacklinks, buildBacklinkCountMap } from '../../src/lib/backlinks.js';
 
@@ -65,7 +65,7 @@ describe('computeBacklinks', () => {
   it('excludes references inside TRASH', () => {
     // Create a node in LIBRARY with a reference to task_3, then trash it
     const store = useNodeStore.getState();
-    const containerNode = store.createChild(CONTAINER_IDS.LIBRARY, undefined, { name: 'Temp node' });
+    const containerNode = store.createChild(SYSTEM_NODE_IDS.LIBRARY, undefined, { name: 'Temp node' });
     store.addReference(containerNode.id, 'task_3');
     loroDoc.commitDoc();
 
@@ -147,7 +147,7 @@ describe('computeBacklinks', () => {
     // Create a search node with multiple conditions (not a supertag search)
     const store = useNodeStore.getState();
     const searchId = 'search_complex';
-    loroDoc.createNode(searchId, CONTAINER_IDS.SEARCHES);
+    loroDoc.createNode(searchId, SYSTEM_NODE_IDS.SEARCHES);
     loroDoc.setNodeDataBatch(searchId, { type: 'search', name: 'Complex search' });
     const andId = 'search_complex_and';
     loroDoc.createNode(andId, searchId);
@@ -174,7 +174,7 @@ describe('computeBacklinks', () => {
     // Set status for two different nodes
     useNodeStore.getState().setOptionsFieldValue('task_1', 'attrDef_status', 'opt_todo');
     // Create another tagged node
-    const newTask = useNodeStore.getState().createChild(CONTAINER_IDS.LIBRARY, undefined, { name: 'Another task' });
+    const newTask = useNodeStore.getState().createChild(SYSTEM_NODE_IDS.LIBRARY, undefined, { name: 'Another task' });
     useNodeStore.getState().applyTag(newTask.id, 'tagDef_task');
     useNodeStore.getState().setOptionsFieldValue(newTask.id, 'attrDef_status', 'opt_todo');
     loroDoc.commitDoc();
@@ -215,7 +215,7 @@ describe('buildBacklinkCountMap', () => {
 
   it('trashed references are excluded from counts', () => {
     const store = useNodeStore.getState();
-    const node = store.createChild(CONTAINER_IDS.LIBRARY, undefined, { name: 'Temp' });
+    const node = store.createChild(SYSTEM_NODE_IDS.LIBRARY, undefined, { name: 'Temp' });
     store.addReference(node.id, 'task_3');
     loroDoc.commitDoc();
 

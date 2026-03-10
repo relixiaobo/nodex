@@ -1,6 +1,6 @@
 /**
  * webclip-service — Loro model.
- * findTagDefByName: searches CONTAINER_IDS.SCHEMA children (ignores _entities/_schemaId args).
+ * findTagDefByName: searches SYSTEM_NODE_IDS.SCHEMA children (ignores _entities/_schemaId args).
  * findTemplateAttrDef: searches tagDef's fieldDef children by name.
  * saveWebClip: creates clip node, applies type-specific tag, writes fields.
  * applyWebClipToNode: applies web clip data to an existing node in-place.
@@ -23,7 +23,7 @@ import {
   type WebClipCapturePayload,
 } from '../../src/lib/webclip-service.js';
 import * as loroDoc from '../../src/lib/loro-doc.js';
-import { CONTAINER_IDS, SYS_T, NDX_F, NDX_T, FIELD_TYPES } from '../../src/types/index.js';
+import { SYSTEM_NODE_IDS, SYS_T, NDX_F, NDX_T, FIELD_TYPES } from '../../src/types/index.js';
 import { ensureTodayNode } from '../../src/lib/journal.js';
 
 /** Helper: find fieldEntry child with given fieldDefId. */
@@ -63,24 +63,24 @@ describe('findTagDefByName', () => {
   });
 
   it('finds existing tagDef by name (case-insensitive)', () => {
-    const result = findTagDefByName({}, CONTAINER_IDS.SCHEMA, 'source');
+    const result = findTagDefByName({}, SYSTEM_NODE_IDS.SCHEMA, 'source');
     expect(result).toBeDefined();
     expect(result!.id).toBe(SYS_T.SOURCE);
     expect(result!.type).toBe('tagDef');
   });
 
   it('finds tagDef with different casing', () => {
-    const result = findTagDefByName({}, CONTAINER_IDS.SCHEMA, 'Source');
+    const result = findTagDefByName({}, SYSTEM_NODE_IDS.SCHEMA, 'Source');
     expect(result).toBeDefined();
     expect(result!.id).toBe(SYS_T.SOURCE);
   });
 
   it('returns undefined for non-existent tagDef name', () => {
-    const result = findTagDefByName({}, CONTAINER_IDS.SCHEMA, 'nonexistent');
+    const result = findTagDefByName({}, SYSTEM_NODE_IDS.SCHEMA, 'nonexistent');
     expect(result).toBeUndefined();
   });
 
-  it('ignores _schemaId arg — always reads from CONTAINER_IDS.SCHEMA', () => {
+  it('ignores _schemaId arg — always reads from SYSTEM_NODE_IDS.SCHEMA', () => {
     // New Loro model ignores _schemaId and reads from loroDoc directly.
     // So even a "wrong" schemaId still finds the tagDef in the real SCHEMA.
     const result = findTagDefByName({}, 'ws_missing_SCHEMA', 'source');
@@ -378,7 +378,7 @@ describe('saveWebClip', () => {
     expect(node2!.tags).toContain(SYS_T.SOURCE);
 
     // Only one #source tagDef should exist in SCHEMA
-    const schemaChildren = loroDoc.getChildren(CONTAINER_IDS.SCHEMA);
+    const schemaChildren = loroDoc.getChildren(SYSTEM_NODE_IDS.SCHEMA);
     const webClipDefs = schemaChildren.filter(cid => {
       const n = loroDoc.toNodexNode(cid);
       return n?.type === 'tagDef' && n.name?.toLowerCase() === 'source';

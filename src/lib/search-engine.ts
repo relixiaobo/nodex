@@ -7,7 +7,7 @@
  * @see docs/plans/search-node-design.md
  */
 import * as loroDoc from './loro-doc.js';
-import { CONTAINER_IDS } from '../types/index.js';
+import { SYSTEM_NODE_IDS } from '../types/index.js';
 import { isLockedNode, isWorkspaceHomeNode } from './node-capabilities.js';
 import type { NodexNode, NodeType, QueryOp } from '../types/node.js';
 
@@ -29,7 +29,7 @@ const EXCLUDED_TYPES: Set<NonNullable<NodeType>> = new Set([
 function isInTrash(nodeId: string): boolean {
   let cursor: string | null = nodeId;
   while (cursor) {
-    if (cursor === CONTAINER_IDS.TRASH) return true;
+    if (cursor === SYSTEM_NODE_IDS.TRASH) return true;
     cursor = loroDoc.getParentId(cursor);
   }
   return false;

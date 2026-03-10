@@ -23,7 +23,7 @@ import { useNodeStore } from '../../stores/node-store';
 import { useWorkspaceStore } from '../../stores/workspace-store';
 import { useAncestors } from '../../hooks/use-ancestors';
 import { getNavigableParentId } from '../../lib/tree-utils';
-import { CONTAINER_IDS } from '../../types/index.js';
+import { SYSTEM_NODE_IDS } from '../../types/index.js';
 import { ensureWorkspaceHomeNode } from '../../lib/workspace-root.js';
 import * as loroDoc from '../../lib/loro-doc.js';
 import { isDayNode } from '../../lib/journal.js';
@@ -45,7 +45,7 @@ export function resolveWorkspaceRootTargetId(params: {
   const { workspaceId, workspaceRootId } = params;
   if (workspaceId) return workspaceId;
   if (workspaceRootId) return workspaceRootId;
-  return CONTAINER_IDS.JOURNAL;
+  return SYSTEM_NODE_IDS.JOURNAL;
 }
 
 export function Breadcrumb({ nodeId, showCurrentName, compact }: BreadcrumbProps) {

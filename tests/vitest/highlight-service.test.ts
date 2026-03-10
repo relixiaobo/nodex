@@ -13,7 +13,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { useNodeStore } from '../../src/stores/node-store.js';
 import { resetAndSeed } from './helpers/test-state.js';
 import * as loroDoc from '../../src/lib/loro-doc.js';
-import { CONTAINER_IDS, SYS_T, SYS_V, NDX_F, FIELD_TYPES, AUTO_INIT_STRATEGY } from '../../src/types/index.js';
+import { SYSTEM_NODE_IDS, SYS_T, SYS_V, NDX_F, FIELD_TYPES, AUTO_INIT_STRATEGY } from '../../src/types/index.js';
 import {
   ensureHighlightTagDef,
   ensureNoteTagDef,
@@ -155,7 +155,7 @@ describe('ensureNoteTagDef', () => {
     const tagDef = loroDoc.toNodexNode(SYS_T.NOTE);
     expect(tagDef).toBeDefined();
 
-    const schemaChildren = loroDoc.getChildren(CONTAINER_IDS.SCHEMA);
+    const schemaChildren = loroDoc.getChildren(SYSTEM_NODE_IDS.SCHEMA);
     const noteDefs = schemaChildren.filter(cid => cid === SYS_T.NOTE);
     expect(noteDefs).toHaveLength(1);
   });

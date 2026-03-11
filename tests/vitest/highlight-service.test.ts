@@ -2,7 +2,7 @@
  * highlight-service — #highlight and #note system tag tests.
  *
  * Unified model (Path B):
- * - #highlight is always a direct child of clip page
+ * - #highlight lives in the clip page's hidden Highlights field
  * - #note (optional) is a sibling with reference to #highlight in Highlights field
  * - Anchor data stored in #highlight's hidden "Anchor" field
  * - Source field stays on #highlight (auto-init from #source ancestor)
@@ -34,6 +34,13 @@ import {
 /** Get the store as HighlightNodeStore. */
 function getStore(): HighlightNodeStore {
   return useNodeStore.getState() as HighlightNodeStore;
+}
+
+function findFieldEntry(parentId: string, fieldDefId: string): string | undefined {
+  return loroDoc.getChildren(parentId).find((childId) => {
+    const child = loroDoc.toNodexNode(childId);
+    return child?.type === 'fieldEntry' && child.fieldDefId === fieldDefId;
+  });
 }
 
 describe('ensureHighlightTagDef', () => {
@@ -117,6 +124,19 @@ describe('ensureHighlightTagDef', () => {
       return n?.type === 'fieldDef';
     });
     expect(fieldDefs).toHaveLength(2); // Source + Anchor
+  });
+
+  it('ensures #source has a hidden Highlights field for storing #highlight nodes', () => {
+    const store = getStore();
+    ensureHighlightTagDef(store);
+
+    const highlightsFd = loroDoc.toNodexNode(NDX_F.SOURCE_HIGHLIGHTS);
+    expect(highlightsFd).toBeDefined();
+    expect(highlightsFd!.name).toBe('Highlights');
+    expect(highlightsFd!.fieldType).toBe(FIELD_TYPES.OPTIONS_FROM_SUPERTAG);
+    expect(highlightsFd!.sourceSupertag).toBe(SYS_T.HIGHLIGHT);
+    expect(highlightsFd!.hideField).toBe(SYS_V.ALWAYS);
+    expect(highlightsFd!.locked).toBeUndefined();
   });
 });
 
@@ -247,13 +267,15 @@ describe('createHighlightOnly', () => {
     ensureNoteTagDef(store);
   });
 
-  it('creates #highlight as direct child of clip page', () => {
+  it('creates #highlight inside the clip Highlights field', () => {
     const store = getStore();
     const { highlightNode } = createHighlightOnly({
       store, selectedText: 'selected text', clipNodeId: 'webclip_1',
     });
 
-    expect(loroDoc.getParentId(highlightNode.id)).toBe('webclip_1');
+    const highlightsFieldEntryId = findFieldEntry('webclip_1', NDX_F.SOURCE_HIGHLIGHTS);
+    expect(highlightsFieldEntryId).toBeDefined();
+    expect(loroDoc.getParentId(highlightNode.id)).toBe(highlightsFieldEntryId);
     expect(highlightNode.tags).toContain(SYS_T.HIGHLIGHT);
     expect(highlightNode.name).toBe('selected text');
   });
@@ -322,8 +344,9 @@ describe('addNoteForHighlight', () => {
       store, highlightNodeId: highlightNode.id, clipNodeId: 'webclip_1', noteText: 'thought',
     });
 
-    // Highlight stays as direct child of clip
-    expect(loroDoc.getParentId(highlightNode.id)).toBe('webclip_1');
+    const highlightsFieldEntryId = findFieldEntry('webclip_1', NDX_F.SOURCE_HIGHLIGHTS);
+    expect(highlightsFieldEntryId).toBeDefined();
+    expect(loroDoc.getParentId(highlightNode.id)).toBe(highlightsFieldEntryId);
   });
 
   it('Highlights fieldEntry contains reference node with targetId', () => {
@@ -384,7 +407,7 @@ describe('getBareHighlightsForClip', () => {
     expect(getBareHighlightsForClip('webclip_1')).toEqual([]);
   });
 
-  it('returns bare #highlights that are direct children of clip', () => {
+  it('returns bare #highlights from the clip Highlights field', () => {
     const store = getStore();
     createHighlightOnly({ store, selectedText: 'bare 1', clipNodeId: 'webclip_1' });
     createHighlightOnly({ store, selectedText: 'bare 2', clipNodeId: 'webclip_1' });

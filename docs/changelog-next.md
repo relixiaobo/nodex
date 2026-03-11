@@ -15,3 +15,4 @@
 - 修复 `Settings` 中 `Highlight & Comment` 字段配置页的 `Field type` 显示为空的问题（boolean 类型现在会正确显示为已选中）
 - 修复 field/tag configure 页默认配置值显示为空的问题：`Hide field`、默认 `Field type` 与依赖默认值的配置显隐现在都会正确回填
 - 新建/恢复节点默认落到 Today，clip/highlight 查找不再依赖 Library/Inbox 容器，并兼容旧工作区中的 legacy 顶层节点
+- Clip 数据结构调整：`#highlight` 改为存入 `#source` 的隐藏 `Highlights` 字段，`Source URL` 字段重命名为 `URL`，旧数据启动时自动迁移

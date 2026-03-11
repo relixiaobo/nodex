@@ -1,7 +1,7 @@
 /**
  * Highlight service — data model.
  *
- * - #highlight is always a direct child of clip page
+ * - #highlight lives in the clip page's hidden Highlights field
  * - When user adds note, #note is created as sibling with a
  *   reference node in its Highlights fieldEntry pointing to the #highlight
  * - Anchor data stored in #highlight's hidden "Anchor" field
@@ -13,6 +13,7 @@ import type { NodexNode } from '../types/index.js';
 import * as loroDoc from './loro-doc.js';
 import type { WebClipNodeStore } from './webclip-service.js';
 import { ensureSourceTagDef } from './webclip-service.js';
+import { getNavigableParentId } from './tree-utils.js';
 
 /** Extended store interface for highlight operations. */
 export interface HighlightNodeStore extends WebClipNodeStore {}
@@ -101,8 +102,73 @@ export function ensureNoteHighlightsFieldDef(): NodexNode {
 }
 
 /**
+ * Ensure "Highlights" fieldDef exists with fixed ID NDX_F08 under #source tagDef.
+ * Type: options_from_supertag → #highlight, hidden by default.
+ */
+export function ensureSourceHighlightsFieldDef(): NodexNode {
+  ensureSourceTagDef();
+  let fd = loroDoc.toNodexNode(NDX_F.SOURCE_HIGHLIGHTS);
+  if (!fd) {
+    loroDoc.createNode(NDX_F.SOURCE_HIGHLIGHTS, SYS_T.SOURCE);
+    loroDoc.setNodeDataBatch(NDX_F.SOURCE_HIGHLIGHTS, {
+      type: 'fieldDef',
+      name: 'Highlights',
+      fieldType: FIELD_TYPES.OPTIONS_FROM_SUPERTAG,
+      sourceSupertag: SYS_T.HIGHLIGHT,
+      hideField: SYS_V.ALWAYS,
+    });
+    loroDoc.commitDoc();
+    fd = loroDoc.toNodexNode(NDX_F.SOURCE_HIGHLIGHTS)!;
+  }
+
+  const patch: Record<string, unknown> = {};
+  if (fd.name !== 'Highlights') patch.name = 'Highlights';
+  if (fd.fieldType !== FIELD_TYPES.OPTIONS_FROM_SUPERTAG) {
+    patch.fieldType = FIELD_TYPES.OPTIONS_FROM_SUPERTAG;
+  }
+  if (fd.sourceSupertag !== SYS_T.HIGHLIGHT) patch.sourceSupertag = SYS_T.HIGHLIGHT;
+  if (fd.hideField !== SYS_V.ALWAYS) patch.hideField = SYS_V.ALWAYS;
+
+  if (Object.keys(patch).length > 0) {
+    loroDoc.setNodeDataBatch(NDX_F.SOURCE_HIGHLIGHTS, patch);
+    loroDoc.commitDoc();
+    fd = loroDoc.toNodexNode(NDX_F.SOURCE_HIGHLIGHTS)!;
+  }
+
+  if (fd.locked !== undefined) {
+    loroDoc.deleteNodeData(NDX_F.SOURCE_HIGHLIGHTS, 'locked');
+    loroDoc.commitDoc();
+    fd = loroDoc.toNodexNode(NDX_F.SOURCE_HIGHLIGHTS)!;
+  }
+
+  return fd;
+}
+
+/**
+ * Ensure a clip page has the hidden Highlights fieldEntry used to hold #highlight nodes.
+ */
+export function ensureSourceHighlightsFieldEntry(clipNodeId: string): string {
+  ensureSourceHighlightsFieldDef();
+
+  let fieldEntryId = findFieldEntry(clipNodeId, NDX_F.SOURCE_HIGHLIGHTS);
+  if (!fieldEntryId) {
+    fieldEntryId = nanoid();
+    loroDoc.createNode(fieldEntryId, clipNodeId);
+    loroDoc.setNodeDataBatch(fieldEntryId, {
+      type: 'fieldEntry',
+      fieldDefId: NDX_F.SOURCE_HIGHLIGHTS,
+      templateId: NDX_F.SOURCE_HIGHLIGHTS,
+    });
+    loroDoc.commitDoc();
+  }
+
+  return fieldEntryId;
+}
+
+/**
  * Create/find #highlight tagDef with fixed ID SYS_T200.
  * Template fields: Source (options_from_supertag → #source), Anchor (hidden plain).
+ * Also ensures #source has a hidden Highlights field for storing #highlight nodes.
  */
 export function ensureHighlightTagDef(_store: HighlightNodeStore): void {
   // Create tagDef if needed
@@ -128,6 +194,9 @@ export function ensureHighlightTagDef(_store: HighlightNodeStore): void {
 
   // Ensure Anchor hidden field (with fixed ID)
   ensureHighlightAnchorFieldDef();
+
+  // Ensure #source has a hidden Highlights field for storing #highlight nodes
+  ensureSourceHighlightsFieldDef();
 }
 
 /**
@@ -176,14 +245,15 @@ export interface CreateHighlightOnlyParams {
 }
 
 /**
- * Create a bare #highlight node as direct child of clip page (no #note).
+ * Create a bare #highlight node in the clip page's Highlights field (no #note).
  *
  * Data structure created:
  * ```
  * clipPage #source
- *   └── selectedText #highlight        ← direct child of clip
- *       ├── Source (fieldEntry) → clipPage  ← auto-init
- *       └── Anchor (fieldEntry) = anchorJSON ← hidden
+ *   └── Highlights (fieldEntry, hidden)
+ *       └── selectedText #highlight
+ *           ├── Source (fieldEntry) → clipPage  ← auto-init
+ *           └── Anchor (fieldEntry) = anchorJSON ← hidden
  * ```
  */
 export function createHighlightOnly(params: CreateHighlightOnlyParams): {
@@ -191,8 +261,9 @@ export function createHighlightOnly(params: CreateHighlightOnlyParams): {
 } {
   const { store, selectedText, clipNodeId, anchor } = params;
 
-  // 1. Create #highlight node as direct child of clip page
-  const hlNode = store.createChild(clipNodeId, undefined, { name: selectedText });
+  // 1. Create #highlight node inside the clip's hidden Highlights field
+  const highlightsFieldEntryId = ensureSourceHighlightsFieldEntry(clipNodeId);
+  const hlNode = store.createChild(highlightsFieldEntryId, undefined, { name: selectedText });
 
   // 2. Apply #highlight tag — triggers Source auto-init + Anchor fieldEntry
   store.applyTag(hlNode.id, SYS_T.HIGHLIGHT);
@@ -326,12 +397,14 @@ export function getHighlightsForNote(noteNodeId: string): NodexNode[] {
 }
 
 /**
- * Get bare #highlight nodes that are direct children of a clip page (no #note wrapper).
+ * Get bare #highlight nodes stored in a clip page's Highlights field (no #note wrapper).
  */
 export function getBareHighlightsForClip(clipNodeId: string): NodexNode[] {
+  const highlightsFieldEntryId = findFieldEntry(clipNodeId, NDX_F.SOURCE_HIGHLIGHTS);
+  if (!highlightsFieldEntryId) return [];
+
   const results: NodexNode[] = [];
-  const clipChildren = loroDoc.getChildren(clipNodeId);
-  for (const childId of clipChildren) {
+  for (const childId of loroDoc.getChildren(highlightsFieldEntryId)) {
     const child = loroDoc.toNodexNode(childId);
     if (child?.tags.includes(SYS_T.HIGHLIGHT)) {
       results.push(child);
@@ -353,14 +426,22 @@ export function getHighlightAnchor(highlightNodeId: string): string | null {
 }
 
 /**
+ * Resolve the owning clip page for a #highlight node.
+ * Works for both legacy direct-child highlights and the new fieldEntry-backed layout.
+ */
+export function getClipNodeIdForHighlight(highlightNodeId: string): string | null {
+  return getNavigableParentId(highlightNodeId);
+}
+
+/**
  * Find all #note nodes associated with a #highlight (via Highlights field reference).
  * A highlight can have multiple notes (multiple perspectives/thoughts).
  */
 export function findNotesForHighlight(highlightNodeId: string): NodexNode[] {
-  const parentId = loroDoc.getParentId(highlightNodeId);
-  if (!parentId) return [];
+  const clipNodeId = getClipNodeIdForHighlight(highlightNodeId);
+  if (!clipNodeId) return [];
   const results: NodexNode[] = [];
-  for (const note of getNotesForClip(parentId)) {
+  for (const note of getNotesForClip(clipNodeId)) {
     const highlights = getHighlightsForNote(note.id);
     if (highlights.some(hl => hl.id === highlightNodeId)) {
       results.push(note);

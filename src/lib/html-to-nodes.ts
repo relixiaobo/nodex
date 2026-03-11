@@ -693,9 +693,9 @@ export function parseHtmlToNodes(
   }
 
   /** Process an <iframe> element — currently skipped (YouTube embeds are
-   *  redundant with Source URL; no other iframe types supported). */
+   *  redundant with URL; no other iframe types supported). */
   function processIframeElement(_el: Element): void {
-    // Intentionally skip — users access YouTube via Source URL link.
+    // Intentionally skip — users access YouTube via URL field link.
   }
 
   /** Process a <video> element — always create twitter-video embed when possible. */

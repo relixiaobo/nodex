@@ -5,6 +5,7 @@ import {
   addNoteForHighlight,
   ensureNoteTagDef,
   findNotesForHighlight,
+  getClipNodeIdForHighlight,
   getNotesForClip,
   getHighlightsForNote,
   getBareHighlightsForClip,
@@ -42,14 +43,11 @@ function collectHighlightsFromFlatContainer(containerId: string, ids: Set<string
 }
 
 /**
- * Collect all #highlight node IDs under a clip page (direct children).
+ * Collect all #highlight node IDs stored in a clip page's hidden Highlights field.
  */
 function collectHighlightsUnderClip(clipNodeId: string, ids: Set<string>): void {
-  for (const childId of loroDoc.getChildren(clipNodeId)) {
-    const child = loroDoc.toNodexNode(childId);
-    if (child?.tags.includes(SYS_T.HIGHLIGHT)) {
-      ids.add(childId);
-    }
+  for (const highlight of getBareHighlightsForClip(clipNodeId)) {
+    ids.add(highlight.id);
   }
 }
 
@@ -116,7 +114,8 @@ export async function findOrCreateClipNodeForUrl(
 
 /**
  * Create a highlight (with optional note) from a content script payload.
- * Always creates bare #highlight first, then optionally adds #note with reference.
+ * Always creates bare #highlight in the clip's Highlights field first,
+ * then optionally adds #note with reference.
  */
 export async function createHighlightFromPayload(
   payload: HighlightCreatePayload,
@@ -124,7 +123,7 @@ export async function createHighlightFromPayload(
 ): Promise<CreateHighlightFromPayloadResult> {
   const clipNodeId = await findOrCreateClipNodeForUrl(payload.pageUrl, payload.pageTitle, store);
 
-  // Always create bare #highlight as direct child of clip
+  // Always create bare #highlight in the clip's hidden Highlights field
   const { highlightNode } = createHighlightOnly({
     store,
     selectedText: payload.selectedText,
@@ -310,7 +309,7 @@ export function buildHighlightRestorePayload(clipNodeId: string): HighlightResto
     }
   }
 
-  // All highlights are direct children of clip
+  // All highlights live in the clip's hidden Highlights field
   for (const hl of getBareHighlightsForClip(clipNodeId)) {
     const anchorRaw = getHighlightAnchor(hl.id);
     if (!anchorRaw) continue;
@@ -363,11 +362,11 @@ export function getHighlightNoteEntries(noteNodeId: string): NoteEntry[] {
  * Multiple depth-0 entries = multiple notes on the same highlight.
  */
 export function findNoteEntriesForHighlight(highlightNodeId: string): NoteEntry[] {
-  const parentId = loroDoc.getParentId(highlightNodeId);
-  if (!parentId) return [];
+  const clipNodeId = getClipNodeIdForHighlight(highlightNodeId);
+  if (!clipNodeId) return [];
 
   const entries: NoteEntry[] = [];
-  for (const note of getNotesForClip(parentId)) {
+  for (const note of getNotesForClip(clipNodeId)) {
     const highlights = getHighlightsForNote(note.id);
     if (highlights.some((hl) => hl.id === highlightNodeId)) {
       if (note.name?.trim()) {

@@ -93,6 +93,7 @@ export async function findOrCreateClipNodeForUrl(
   url: string,
   title: string,
   store: HighlightNodeStore,
+  pageMeta?: { ogType?: string; schemaOrgType?: string; hasArticleElement?: boolean },
 ): Promise<string> {
   const normalized = normalizeUrl(url);
   const pending = pendingClipCreationByUrl.get(normalized);
@@ -101,7 +102,7 @@ export async function findOrCreateClipNodeForUrl(
   const task = (async () => {
     const existing = findClipNodeByUrl(url);
     if (existing) return existing;
-    return createLightweightClip(url, title, store);
+    return createLightweightClip(url, title, store, pageMeta);
   })();
 
   pendingClipCreationByUrl.set(normalized, task);
@@ -121,7 +122,7 @@ export async function createHighlightFromPayload(
   payload: HighlightCreatePayload,
   store: HighlightNodeStore,
 ): Promise<CreateHighlightFromPayloadResult> {
-  const clipNodeId = await findOrCreateClipNodeForUrl(payload.pageUrl, payload.pageTitle, store);
+  const clipNodeId = await findOrCreateClipNodeForUrl(payload.pageUrl, payload.pageTitle, store, payload.pageMeta);
 
   // Always create bare #highlight in the clip's hidden Highlights field
   const { highlightNode } = createHighlightOnly({

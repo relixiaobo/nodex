@@ -26,6 +26,7 @@ export interface PendingHighlight {
   normalizedUrl: string;
   pageTitle: string;
   noteEntries?: NoteEntry[];
+  pageMeta?: { ogType?: string; schemaOrgType?: string; hasArticleElement?: boolean };
   createdAt: number;
   retryCount: number;
   lastError?: string;

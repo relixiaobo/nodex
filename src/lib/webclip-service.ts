@@ -637,9 +637,18 @@ export async function createLightweightClip(
   pageUrl: string,
   pageTitle: string,
   store: WebClipNodeStore,
+  pageMeta?: { ogType?: string; schemaOrgType?: string; hasArticleElement?: boolean },
 ): Promise<string> {
-  // Detect type from URL only (no metadata available for lightweight)
-  const clipType = detectClipType(pageUrl);
+  const clipType = detectClipType(pageUrl, pageMeta ? {
+    url: pageUrl,
+    title: pageTitle,
+    selectionText: '',
+    pageText: '',
+    capturedAt: 0,
+    ogType: pageMeta.ogType,
+    schemaOrgType: pageMeta.schemaOrgType,
+    hasArticleElement: pageMeta.hasArticleElement,
+  } : undefined);
   const tagDefId = ensureClipTypeDefs(clipType);
   ensureSourceUrlFieldDef();
 

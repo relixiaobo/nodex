@@ -13,9 +13,9 @@ import { TopToolbar } from '../src/components/toolbar/TopToolbar';
 import { PanelStack } from '../src/components/panel/PanelStack';
 import { CommandPalette } from '../src/components/search/CommandPalette';
 import { BatchTagSelector } from '../src/components/tags/BatchTagSelector';
-import { SYSTEM_NODE_IDS } from '../src/types/index.js';
 import { seedTestData } from '../src/entrypoints/test/seed-data';
 import * as loroDoc from '../src/lib/loro-doc.js';
+import { ensureTodayNode } from '../src/lib/journal.js';
 
 /** Map port -> agent identity for visual differentiation */
 const AGENT_BY_PORT: Record<string, { name: string; color: string }> = {
@@ -40,11 +40,11 @@ function useTestBootstrap(): boolean {
       // Initialize LoroDoc + seed test data (async: loads IndexedDB snapshot if any)
       await seedTestData({ forceFresh: true });
 
-      // Navigate to Library if no panel open.
+      // Navigate to Today if no panel open.
       // Use replacePanel (not navigateTo) to avoid creating a Loro undo entry
       // whose UI snapshot is the empty initial state (Bug 1 fix).
       if (panelHistory.length === 0) {
-        replacePanel(SYSTEM_NODE_IDS.LIBRARY);
+        replacePanel(ensureTodayNode());
       }
 
       // Expose stores + loro-doc on window for MCP/DevTools console testing

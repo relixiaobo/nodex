@@ -14,7 +14,6 @@ import type { SlashCommandId } from '../lib/slash-commands.js';
 import { useNodeStore } from '../stores/node-store.js';
 import { useUIStore } from '../stores/ui-store.js';
 import * as loroDoc from '../lib/loro-doc.js';
-import { SYSTEM_NODE_IDS } from '../types/index.js';
 import { toast } from 'sonner';
 import { docToMarks } from '../lib/pm-doc-utils.js';
 import {
@@ -38,7 +37,7 @@ import {
   type WebClipCaptureResponse,
 } from '../lib/webclip-messaging.js';
 import { applyWebClipToNode } from '../lib/webclip-service.js';
-import { resolvePreferredTopLevelParentId } from '../lib/system-node-presets.js';
+import { ensureTodayNode } from '../lib/journal.js';
 import { t } from '../i18n/strings.js';
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -454,8 +453,7 @@ export function useEditorTriggers(config: EditorTriggerConfig): EditorTriggerSta
 
   const handleReferenceCreateNew = useCallback(
     (name: string) => {
-      const parentId = resolvePreferredTopLevelParentId(SYSTEM_NODE_IDS.LIBRARY);
-      if (!parentId) return;
+      const parentId = ensureTodayNode();
       const newNode = useNodeStore.getState().createChild(parentId, undefined, { name });
       handleReferenceSelect(newNode.id);
     },

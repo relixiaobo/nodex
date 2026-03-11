@@ -1,5 +1,6 @@
 import { useNodeStore } from '../../src/stores/node-store.js';
 import * as loroDoc from '../../src/lib/loro-doc.js';
+import { ensureTodayNode } from '../../src/lib/journal.js';
 import { collectNodeGraphErrors } from './helpers/invariants.js';
 import { resetAndSeed } from './helpers/test-state.js';
 
@@ -23,13 +24,15 @@ describe('node-store edge cases', () => {
     expect(collectNodeGraphErrors()).toEqual([]);
   });
 
-  it('outdent top-level legacy Library child moves it to workspace root', () => {
+  it('outdent top-level Today child moves it one level up from the day node', () => {
+    const todayId = ensureTodayNode();
     const beforeParent = loroDoc.getParentId('proj_1');
+    const expectedParent = loroDoc.getParentId(todayId);
     useNodeStore.getState().outdentNode('proj_1');
     const afterParent = loroDoc.getParentId('proj_1');
 
-    expect(beforeParent).toBe('LIBRARY');
-    expect(afterParent).toBe('ws_default');
+    expect(beforeParent).toBe(todayId);
+    expect(afterParent).toBe(expectedParent);
     expect(collectNodeGraphErrors()).toEqual([]);
   });
 });

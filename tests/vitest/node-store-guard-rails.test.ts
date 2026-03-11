@@ -141,6 +141,11 @@ describe('replaceFieldDef', () => {
 describe('legacy top-level nodes remain mutable', () => {
   beforeEach(() => {
     resetAndSeed();
+    loroDoc.createNode(SYSTEM_NODE_IDS.LIBRARY, 'ws_default');
+    loroDoc.setNodeDataBatch(SYSTEM_NODE_IDS.LIBRARY, { name: 'Library' });
+    loroDoc.createNode(SYSTEM_NODE_IDS.INBOX, 'ws_default');
+    loroDoc.setNodeDataBatch(SYSTEM_NODE_IDS.INBOX, { name: 'Inbox' });
+    loroDoc.commitDoc('__seed__');
   });
 
   it('moveNodeTo can move legacy Inbox', () => {

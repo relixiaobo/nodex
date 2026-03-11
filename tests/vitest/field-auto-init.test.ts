@@ -33,8 +33,9 @@ describe('resolveAutoInitValue — pure strategy functions', () => {
   });
 
   it('ancestor_day_node returns null when no day node in ancestry', () => {
-    const result = resolveAutoInitValue('task_1', 'attrDef_due', AUTO_INIT_STRATEGY.ANCESTOR_DAY_NODE);
-    // task_1 is under proj_1 which is a regular node, no day node ancestor
+    const store = useNodeStore.getState();
+    const plainNode = store.createChild('ws_default', undefined, { name: 'Plain root node' });
+    const result = resolveAutoInitValue(plainNode.id, 'attrDef_due', AUTO_INIT_STRATEGY.ANCESTOR_DAY_NODE);
     expect(result).toBeNull();
   });
 

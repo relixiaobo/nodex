@@ -8,6 +8,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import * as loroDoc from '../../src/lib/loro-doc.js';
 import { useNodeStore } from '../../src/stores/node-store.js';
 import { SYSTEM_NODE_IDS } from '../../src/types/index.js';
+import { ensureTodayNode } from '../../src/lib/journal.js';
 import { resetAndSeed } from './helpers/test-state.js';
 import { computeBacklinks, buildBacklinkCountMap } from '../../src/lib/backlinks.js';
 
@@ -65,7 +66,7 @@ describe('computeBacklinks', () => {
   it('excludes references inside TRASH', () => {
     // Create a node in LIBRARY with a reference to task_3, then trash it
     const store = useNodeStore.getState();
-    const containerNode = store.createChild(SYSTEM_NODE_IDS.LIBRARY, undefined, { name: 'Temp node' });
+    const containerNode = store.createChild(ensureTodayNode(), undefined, { name: 'Temp node' });
     store.addReference(containerNode.id, 'task_3');
     loroDoc.commitDoc();
 
@@ -112,10 +113,10 @@ describe('computeBacklinks', () => {
     const treeRef = result.mentionedIn.find(r => r.refType === 'tree' && r.referencingNodeId === 'subtask_1a');
     expect(treeRef).toBeTruthy();
 
-    // subtask_1a is under task_1 → proj_1 → LIBRARY
-    // Breadcrumb should include LIBRARY, proj_1 (My Project), task_1 (Design the data model)
+    // subtask_1a is under task_1 → proj_1 → Today day node → Journal
+    // Breadcrumb should include Journal, proj_1 (My Project), task_1 (Design the data model)
     const names = treeRef!.breadcrumb.map(a => a.name);
-    expect(names).toContain('Library');
+    expect(names).toContain('Daily notes');
     expect(names).toContain('My Project');
     expect(names).toContain('Design the data model');
   });
@@ -174,7 +175,7 @@ describe('computeBacklinks', () => {
     // Set status for two different nodes
     useNodeStore.getState().setOptionsFieldValue('task_1', 'attrDef_status', 'opt_todo');
     // Create another tagged node
-    const newTask = useNodeStore.getState().createChild(SYSTEM_NODE_IDS.LIBRARY, undefined, { name: 'Another task' });
+    const newTask = useNodeStore.getState().createChild(ensureTodayNode(), undefined, { name: 'Another task' });
     useNodeStore.getState().applyTag(newTask.id, 'tagDef_task');
     useNodeStore.getState().setOptionsFieldValue(newTask.id, 'attrDef_status', 'opt_todo');
     loroDoc.commitDoc();
@@ -215,7 +216,7 @@ describe('buildBacklinkCountMap', () => {
 
   it('trashed references are excluded from counts', () => {
     const store = useNodeStore.getState();
-    const node = store.createChild(SYSTEM_NODE_IDS.LIBRARY, undefined, { name: 'Temp' });
+    const node = store.createChild(ensureTodayNode(), undefined, { name: 'Temp' });
     store.addReference(node.id, 'task_3');
     loroDoc.commitDoc();
 

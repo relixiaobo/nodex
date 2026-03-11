@@ -4,10 +4,11 @@
  * Verifies that goBack / goForward correctly navigate panel history,
  * matching the logic consumed by NavButtons.tsx.
  *
- * Seed data initializes panelHistory to ['LIBRARY'] via replacePanel,
- * so all tests start with index 0 pointing to LIBRARY.
+ * Seed data initializes panelHistory to [Today] via replacePanel,
+ * so all tests start with index 0 pointing to the current day node.
  */
 import { describe, it, expect, beforeEach } from 'vitest';
+import { ensureTodayNode } from '../../src/lib/journal.js';
 import { useUIStore } from '../../src/stores/ui-store.js';
 import { resetAndSeed } from './helpers/test-state.js';
 
@@ -16,16 +17,17 @@ beforeEach(() => {
 });
 
 describe('NavButtons — panel history navigation', () => {
-  it('seed initializes at LIBRARY with index 0', () => {
+  it('seed initializes at Today with index 0', () => {
     const s = useUIStore.getState();
     expect(s.panelIndex).toBe(0);
-    expect(s.panelHistory).toEqual(['LIBRARY']);
+    expect(s.panelHistory).toEqual([ensureTodayNode()]);
   });
 
   it('navigateTo pushes to history', () => {
+    const todayId = ensureTodayNode();
     useUIStore.getState().navigateTo('proj_1');
     const s = useUIStore.getState();
-    expect(s.panelHistory).toEqual(['LIBRARY', 'proj_1']);
+    expect(s.panelHistory).toEqual([todayId, 'proj_1']);
     expect(s.panelIndex).toBe(1);
   });
 
@@ -51,12 +53,13 @@ describe('NavButtons — panel history navigation', () => {
   });
 
   it('goBack is no-op at start of history', () => {
-    // Already at index 0 (LIBRARY), goBack should be no-op
+    const todayId = ensureTodayNode();
+    // Already at index 0 (Today), goBack should be no-op
     useUIStore.getState().goBack();
 
     const s = useUIStore.getState();
     expect(s.panelIndex).toBe(0);
-    expect(s.panelHistory[0]).toBe('LIBRARY');
+    expect(s.panelHistory[0]).toBe(todayId);
   });
 
   it('goForward is no-op at end of history', () => {
@@ -69,6 +72,7 @@ describe('NavButtons — panel history navigation', () => {
   });
 
   it('navigateTo after goBack truncates forward history', () => {
+    const todayId = ensureTodayNode();
     useUIStore.getState().navigateTo('proj_1');
     useUIStore.getState().navigateTo('note_1');
     useUIStore.getState().navigateTo('note_2');
@@ -76,7 +80,7 @@ describe('NavButtons — panel history navigation', () => {
     useUIStore.getState().navigateTo('person_1'); // truncates note_2
 
     const s = useUIStore.getState();
-    expect(s.panelHistory).toEqual(['LIBRARY', 'proj_1', 'note_1', 'person_1']);
+    expect(s.panelHistory).toEqual([todayId, 'proj_1', 'note_1', 'person_1']);
     expect(s.panelIndex).toBe(3);
   });
 });

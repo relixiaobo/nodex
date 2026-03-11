@@ -16,6 +16,34 @@
 
 _(空)_
 
+### Clip 节点结构调整
+
+> **背景**：Clip & Spark 产品重新定位（详见 `docs/research/ai-strategy.md` §10 通道 3）。当前 #highlight 是 #source 的直接子节点，与 #note 平铺在一起，影响可读性。需要将 #highlight 改为 #source 的 Highlights 字段。同时 "Source URL" 字段名简化为 "URL"。
+>
+> **参考文件**：
+> - `docs/research/ai-strategy.md` §10「Clip & Spark 节点结构」— 完整设计
+> - `src/lib/highlight-service.ts` — 当前 #highlight / #note 数据模型
+> - `src/lib/webclip-service.ts` — 当前 clip 创建流程
+> - `src/types/system-nodes.ts` — SYS_T / NDX_F 常量
+
+**1. #highlight 改为 #source 的 Highlights 字段**
+
+- [ ] 在 #source tagDef（SYS_T202）下新增 `Highlights` fieldDef（固定 ID，如 `NDX_F08`），类型 `options_from_supertag → #highlight`
+- [ ] `createHighlightOnly()` 改为：创建 #highlight 节点后，自动挂到 #source 的 Highlights fieldEntry 下（而非 #source 的直接子节点）
+- [ ] `getBareHighlightsForClip()` 改为从 Highlights fieldEntry 中读取
+- [ ] 迁移逻辑：已有 #highlight 直接子节点 → 移入 Highlights fieldEntry
+- [ ] Highlights fieldDef 设置 `hideField: SYS_V.ALWAYS`（默认隐藏），但 fieldDef **不设 locked**（区别于 Anchor），用户可自行在配置页改为 NEVER / WHEN_EMPTY
+
+**2. "Source URL" → "URL"**
+
+- [ ] `ensureSourceUrlFieldDef()` 中字段名从 `'Source URL'` 改为 `'URL'`
+- [ ] 已有字段的迁移：检测到旧名 `'Source URL'` 时 rename 为 `'URL'`
+
+**不要做的事**：
+- 不要新增 #spark 相关标签或 UI——后续单独做
+- 不要改变 #note 的现有行为——#note 继续作为 #source 的直接子节点
+- 不要动 clip 创建流程（saveWebClip / createLightweightClip）——只改 highlight 的存放位置和字段名
+
 ---
 
 ## Agent 状态

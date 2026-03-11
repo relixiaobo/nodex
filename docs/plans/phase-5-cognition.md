@@ -49,9 +49,13 @@ CRDT OpLog（原始信号，零额外采集）
         → 弱正向信号（默认接受）
 ```
 
-**Schema evolution skill** 作为后台 subagent（通过 Phase 4 AgentOrchestrator 调度）定期执行：
+**Schema evolution skill** 作为 subagent（通过 Phase 4 AgentOrchestrator 调度），在**面板打开时触发检查**（不是定时后台任务——参见 README.md 跨 Phase 决策 #8 "Sidepanel-Only 模型"）：
 
 ```
+触发时机：Side Panel 打开 → 检查上次分析时间戳
+  → 距上次 > 24h 且有新的 Correction 信号 → 触发 Schema evolution
+
+执行流程：
 1. 读取最近 N 天的 Loro OpLog
 2. 筛选 Correction 信号（agent 操作后被用户修正的 op）
 3. LLM 分析修正模式：
@@ -178,7 +182,7 @@ CRDT OpLog（原始信号，零额外采集）
 
 ### Taste 学习实现
 
-**作为后台 subagent 执行**（通过 Phase 4 AgentOrchestrator）：
+**作为 subagent 执行**（通过 Phase 4 AgentOrchestrator），在面板启动时按需触发：
 
 ```typescript
 // Schema evolution skill 注册
@@ -189,8 +193,10 @@ const schemaEvolutionTask: TaskDescriptor = {
   tools: [nodeTool],  // 需要 node.read + node.search + node.update
 }
 
-// 定期触发（低频，如每天一次或积累 N 条修正后）
-orchestrator.delegate(schemaEvolutionTask)
+// 面板启动时检查：距上次分析 > 24h 且有新的 Correction → 触发
+if (shouldRunSchemaEvolution()) {
+  orchestrator.delegate(schemaEvolutionTask)
+}
 ```
 
 **OpLog 读取**：通过 Loro CRDT 的 `doc.subscribe()` 或直接读取 OpLog。需要区分操作发起者（agent vs user）——Loro OpLog 中每个 op 可标记 peer ID。
@@ -204,10 +210,14 @@ orchestrator.delegate(schemaEvolutionTask)
 // 用户输入 /review → agent 执行以下 tool call 序列：
 
 1. node.search({ dateRange: 'this-week', limit: 50 })
-2. node.read(resultIds)  // 渐进式
+2. node.read({ nodeId: id1 })  // 逐个读取（Phase 1 定义的单节点 read API）
+   node.read({ nodeId: id2 })  // agent 根据需要多次调用
+   ...                          // 渐进式披露：先读摘要，再按需深入子节点
 3. [LLM 分析 — 不需要 tool call]
 4. 输出 Review 结果（带 reference）
 ```
+
+**注意**：node.read 是单节点 API（`{ nodeId: string }` → 返回节点摘要 + children 摘要），不是批量 API。Agent 通过多次 tool call 渐进式探索节点树——这与 Phase 1 的 read 定义一致。
 
 **价值分层逻辑**：在 node.search 结果上运行分层算法（基于标签类型 + 连接密度 + 互动信号），为 LLM 的 Review 分析提供加权上下文。
 

@@ -8,13 +8,25 @@
 
 ## 目标
 
-复杂任务不阻塞 Chat。主 agent 委派 subagent 后台执行，立即回到对话。
+复杂任务不阻塞 Chat。主 agent 委派 subagent 并发执行，立即回到对话。
 
 来源：ai-strategy.md §7
 
-> Chat 永不阻塞。主 agent 接到复杂任务 → 创建 subagent 后台执行 → **立即回到 Chat 继续对话**。
+> Chat 永不阻塞。主 agent 接到复杂任务 → 创建 subagent 并发执行 → **立即回到 Chat 继续对话**。
 
-**交付物**：用户说"从这 5 个页面提取定价信息" → 主 agent 委派 subagent → Chat 不阻塞 → 后台任务指示器显示进度 → 完成后 Chat 中报告。
+**交付物**：用户说"从这 5 个页面提取定价信息" → 主 agent 委派 subagent → Chat 不阻塞 → 任务指示器显示进度 → 完成后 Chat 中报告。
+
+### MV3 约束：Sidepanel-Only 模型
+
+来源：README.md 跨 Phase 决策 #8 "运行时宿主模型"
+
+**Subagent 不是"后台进程"——它们是 Side Panel 进程内的并发 async 任务。** 关闭 Side Panel = 所有 subagent 终止。
+
+这意味着：
+- Subagent 和主 agent 共享同一个 JS 事件循环（已在"并发模型"章节描述）
+- 不存在"面板关闭后继续执行"的场景
+- "后台任务"在这里指"不阻塞 Chat 的并发任务"，不是"操作系统级后台进程"
+- EventTarget message bus 是进程内通信，不是跨进程 IPC
 
 ---
 
@@ -212,11 +224,11 @@ Agent A 写 URL 节点到特定父节点
 
 ---
 
-## 并发模型
+## 并发模型（进程内异步）
 
-来源：multi-agent-orchestration.md §7
+来源：multi-agent-orchestration.md §7 + README.md 跨 Phase 决策 #8
 
-所有 agent 共享 JS 事件循环。每个 agent 的 LLM 调用是 async（fetch/SSE）：
+所有 agent 运行在 Side Panel 同一 JS 进程中，共享事件循环。每个 agent 的 LLM 调用是 async（fetch/SSE），天然并发：
 
 ```
 时间 ───────────────────────────────→
@@ -234,23 +246,23 @@ Subagent B:              [等LLM]    [执行工具]
 
 ---
 
-## 后台任务 UI
+## 并发任务 UI
 
-来源：ai-strategy.md §7 "Subagent 异步后台执行"
+来源：ai-strategy.md §7
 
-> Chat 面板右上角显示后台任务指示器（badge + 任务列表），用户可查看进度、取消任务。
+> Chat 面板右上角显示并发任务指示器（badge + 任务列表），用户可查看进度、取消任务。
 
 ### 任务指示器设计
 
 ```
 ChatDrawer header:
 ┌──────────────────────────────┐
-│ Chat            [●2] [⚙]    │  ← ●2 = 2 个后台任务
+│ Chat            [●2] [⚙]    │  ← ●2 = 2 个并发任务
 └──────────────────────────────┘
 
 点击 badge 展开任务列表：
 ┌──────────────────────────────┐
-│ Background Tasks             │
+│ Running Tasks                │
 │                              │
 │ ● Extracting pricing...  [✕] │  ← running, 可取消
 │ ◐ Waiting: which table?  [→] │  ← waiting-clarification, 可回答
@@ -301,7 +313,7 @@ ChatDrawer header:
 | **Create** | `src/lib/ai-message-bus.ts` | EventTarget message bus (~50 行) |
 | **Create** | `src/lib/ai-orchestrator-types.ts` | AgentMessage / TaskDescriptor / SubagentHandle 类型 |
 | **Modify** | `src/lib/ai-service.ts` | 主 agent 处理 clarification routing |
-| **Create** | `src/components/chat/TaskIndicator.tsx` | 后台任务 badge (~40 行) |
+| **Create** | `src/components/chat/TaskIndicator.tsx` | 并发任务 badge (~40 行) |
 | **Create** | `src/components/chat/TaskList.tsx` | 任务列表（running/waiting/completed）(~80 行) |
 | **Modify** | `src/components/chat/ChatPanel.tsx` | header 加 TaskIndicator |
 | **Create** | `tests/vitest/ai-orchestrator.test.ts` | Orchestrator 测试 |
@@ -375,7 +387,7 @@ THEN agent.abort() 终止 subagent
 
 1. `feat: AgentMessageBus — EventTarget-based coordination bus`
 2. `feat: AgentOrchestrator — single subagent delegation + cancellation`
-3. `feat: background task UI — badge + task list in ChatDrawer`
+3. `feat: concurrent task UI — badge + task list in ChatDrawer`
 4. `feat: concurrent subagents + progress updates`
 5. `feat: clarification flow — subagent mid-task question routing`
 6. `test: orchestrator + message bus unit tests`
@@ -387,4 +399,4 @@ THEN agent.abort() 终止 subagent
 - Inter-agent 协作 pipeline → Phase 4 Step 4（内部分步）
 - Subagent 专用 system prompt 从 #skill 节点加载 → Phase 5
 - 任务依赖图可视化 → 未排期
-- 跨会话任务恢复（subagent 中断后续执行）→ 未排期
+- 跨会话任务恢复（面板关闭后恢复中断的 subagent）→ 未排期（Sidepanel-Only 模型下关闭 = 终止）

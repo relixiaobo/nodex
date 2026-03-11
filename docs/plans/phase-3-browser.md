@@ -85,9 +85,11 @@ Agent 能读取和操作网页——这是 soma 作为浏览器扩展的**独特
 
 来源：ai-strategy.md §8 "权限申请策略"
 
-> `debugger` 权限必须从 v0.1 就声明在 manifest 中。Chrome 扩展后补权限会自动禁用扩展。
+**`debugger` 权限在 Phase 3 启动时声明**，不需要提前在 v0.1 就声明。Chrome 扩展添加新权限会触发一次权限升级提示（用户确认后继续），这是可接受的用户体验。
 
-**Phase 3 需要在 `wxt.config.ts` 中声明 `debugger` 权限**，即使 Phase 0/1 还不使用。
+**权限升级的影响**：Chrome 会在扩展更新时弹出"需要额外权限"提示，用户同意后扩展正常运行。这比在 v0.1 就声明用不到的 `debugger` 权限更合理——用户不需要在安装时就授予调试权限。
+
+Phase 3 实现时在 `wxt.config.ts` 中声明 `debugger` 权限。
 
 ### CDP 生命周期管理
 

@@ -23,7 +23,7 @@ Layer 0: 基座层        pi-ai (server proxy) / pi-agent-core (client agent loo
 ### 运行时架构
 
 ```
-Chrome 扩展 (单 JS 进程)                    Cloudflare Worker
+Chrome 扩展 (Side Panel 进程)                Cloudflare Worker
 ┌──────────────────────────────┐          ┌───────────────────┐
 │  AgentOrchestrator           │          │                   │
 │  ├── Main Agent              │ fetch/SSE│  pi-ai            │
@@ -133,11 +133,13 @@ UI Store 新增：
 
 ### 2. Agent 实例生命周期
 
+所有 Agent 运行在 Side Panel 进程中（跨 Phase 决策 #8）。关闭面板 = 所有 Agent 终止。
+
 | Phase | Agent 生命周期 |
 |-------|--------------|
-| Phase 0 | ChatDrawer 内创建，关闭时可销毁 |
-| Phase 1 | 全局单例（⌘K、Clip 等非 Chat 入口也需要） |
-| Phase 4 | 主 agent 全局 + subagent 按需创建/销毁 |
+| Phase 0 | ChatDrawer 内创建，关闭面板时销毁 |
+| Phase 1 | 全局单例（⌘K、Clip 等非 Chat 入口也需要），面板关闭时销毁 + 持久化 |
+| Phase 4 | 主 agent 全局 + subagent 按需创建/销毁（同一 JS 进程内并发 async） |
 
 ### 3. API Key 演进
 
@@ -186,7 +188,28 @@ UI Store 新增：
 | **browser** | 16 actions (4 观察 + 6 交互 + 3 控制 + 1 执行 + 2 调试) | Phase 3 |
 | **undo** | undo (Loro CRDT undoDoc) | Phase 1 |
 
-### 8. 与多面板架构的关系
+### 8. 运行时宿主模型：Sidepanel-Only（方案A）
+
+**所有 AI 进程（主 agent + subagent）运行在 Side Panel JS 进程中。关闭 Side Panel = 所有 AI 任务终止。**
+
+来源：MV3 架构约束分析 + Claude Code CLI 模型验证
+
+MV3 Chrome 扩展有三个执行上下文：Side Panel、Service Worker、Content Script。Service Worker 有 30s 空闲超时限制，不适合承载长时间的 LLM 流式对话。分析了三种方案后选择 Sidepanel-Only：
+
+| 约束 | 结论 |
+|------|------|
+| Agent 宿主 | Side Panel 进程（Agent 实例 + Loro CRDT + 所有 tools） |
+| 关闭 Side Panel | 所有 AI 任务终止（符合用户心智模型：关抽屉 = 停止） |
+| Service Worker | 只做消息路由 + CDP 转发，不承载 Agent |
+| Subagent | 同一 JS 进程内的并发 async 任务，不是 Web Worker 或后台进程 |
+| 离线 Clip | 已有 task queue 模式（`highlight-pending-queue.ts`）：clip → chrome.storage 暂存 → 下次开面板消费 |
+| Schema evolution | 面板打开时检查（不是后台定时任务） |
+
+**验证**：Claude Code CLI 采用相同模式——前台进程运行，关闭终端 = 会话结束，subagent 是逻辑概念而非独立进程。
+
+**此决策影响 Phase 2（离线 Spark 用 task queue）、Phase 4（subagent 是进程内并发）、Phase 5（Schema evolution 触发方式）。**
+
+### 9. 与多面板架构的关系
 
 来源：multi-panel-design.md §3 分阶段实施
 

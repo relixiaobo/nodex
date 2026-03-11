@@ -7,6 +7,7 @@
     "deploy": "echo '⚠️  Use deploy:staging or deploy:production instead' && exit 1",
     "deploy:staging": "node scripts/deploy.mjs staging",
     "deploy:production": "node scripts/deploy.mjs production",
+    "typecheck": "tsc --noEmit",
     "cf-typegen": "wrangler types",
     "db:migrate:local": "wrangler d1 migrations apply nodex-sync --local",
     "db:migrate:staging": "wrangler d1 migrations apply nodex-sync-staging --env staging --remote",
@@ -14,6 +15,7 @@
     "db:seed:e2e": "wrangler d1 execute nodex-sync --local --file=scripts/seed-e2e.sql"
   },
   "dependencies": {
+    "@mariozechner/pi-ai": "^0.57.1",
     "better-auth": "^1.2.0",
     "hono": "^4.7.0",
     "kysely": "^0.28.11",

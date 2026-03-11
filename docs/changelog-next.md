@@ -3,6 +3,7 @@
 <!-- 每完成一个用户可感知的功能/修复，追加一行。发版时整理到 src/lib/changelog.ts 后清空。 -->
 
 - 用户菜单 UI 优化：Google 登录图标、分隔线精简、菜单项重新分组
+- 新增 AI Chat 基座：用户可在 Chat 抽屉中保存 Anthropic API key，发送消息并接收可中途停止的 Claude 流式回复
 - 网页抓取基础设施重构：clip/x.com/Google Docs/GitHub/YouTube 的增强抓取迁移到独立 page capture 栈，为未来 AI 复用同一套抓取逻辑
 - 大纲节点间距统一为 6px（父→子 与 兄弟间距一致）
 - 修复 `>` 创建 field 跳到最前面的问题（view pipeline 不再强制字段前置）

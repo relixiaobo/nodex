@@ -315,7 +315,7 @@ ChatDrawer header:
 | **Modify** | `src/lib/ai-service.ts` | 主 agent 处理 clarification routing |
 | **Create** | `src/components/chat/TaskIndicator.tsx` | 并发任务 badge (~40 行) |
 | **Create** | `src/components/chat/TaskList.tsx` | 任务列表（running/waiting/completed）(~80 行) |
-| **Modify** | `src/components/chat/ChatPanel.tsx` | header 加 TaskIndicator |
+| **Modify** | `src/components/chat/ChatDrawer.tsx` | header 加 TaskIndicator（Phase 0 创建的根容器） |
 | **Create** | `tests/vitest/ai-orchestrator.test.ts` | Orchestrator 测试 |
 | **Create** | `tests/vitest/ai-message-bus.test.ts` | Message bus 测试 |
 

@@ -23,7 +23,7 @@
 ```
 Chrome 扩展 (Side Panel)                  Cloudflare Worker              LLM Provider
 ┌──────────────────────┐               ┌───────────────────────┐      ┌──────────────┐
-│ pi-agent-core Agent  │   POST        │  POST /api/ai/stream  │      │              │
+│ pi-agent-core Agent  │   POST        │  POST /api/stream     │      │              │
 │   streamProxy()      │──────────────→│                       │      │  Anthropic   │
 │                      │   SSE stream  │  pi-ai stream()       │─────→│  /v1/messages│
 │   authToken:         │←──────────────│  → ProxyEvent SSE     │←─────│              │
@@ -130,7 +130,7 @@ cd server && npm install @mariozechner/pi-ai
 ### 创建 `server/src/routes/ai.ts`
 
 ```typescript
-// Hono sub-app, mounted at /api/ai
+// Hono sub-app, mounted at /api (匹配 streamProxy 的 ${proxyUrl}/api/stream)
 import { Hono } from 'hono';
 import { stream as piStream } from '@mariozechner/pi-ai';
 import type { Env } from '../types.js';
@@ -144,8 +144,9 @@ ai.post('/stream', async (c) => {
   const body = await c.req.json();
   const { model, context, options } = body;
 
-  // Phase 0: API key from request body (Phase 1: from D1)
-  const apiKey = body.apiKey;
+  // Phase 0: API key from context._apiKey (Phase 1: from D1)
+  const apiKey = context?._apiKey;
+  delete context?._apiKey;  // 清除后再传给 pi-ai
   if (!apiKey) {
     return c.json({ error: 'API key required' }, 400);
   }
@@ -249,18 +250,19 @@ app.route('/api', aiRoutes);
 cd server && npx wrangler dev
 
 # 另一个终端：
-curl -N -X POST http://localhost:8787/api/ai/stream \
+curl -N -X POST http://localhost:8787/api/stream \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
   -d '{
     "model": {"provider":"anthropic","id":"claude-sonnet-4-20250514","api":"anthropic"},
-    "context": {"messages":[{"role":"user","content":"Say hi"}]},
-    "options": {},
-    "apiKey": "sk-ant-..."
+    "context": {"messages":[{"role":"user","content":"Say hi"}],"_apiKey":"sk-ant-..."},
+    "options": {}
   }'
 ```
 
 预期：收到 SSE 事件流，包含 `text_delta` 和最终的 `done`。
+
+**注意**：API key 通过 `context._apiKey` 传递（不是顶层 `body.apiKey`），与客户端 `streamProxy` 的注入方式一致。
 
 ---
 
@@ -702,7 +704,7 @@ pi-agent-core 的 `AgentMessage` 和 pi-ai 的 `Message` 类型可能不完全�
 
 ## 验证标准
 
-1. **Server**: `cd server && npx wrangler dev` → curl 测试 `/api/ai/stream` → 收到 SSE 事件流
+1. **Server**: `cd server && npx wrangler dev` → curl 测试 `/api/stream` → 收到 SSE 事件流
 2. **TypeScript**: `npm run typecheck` → 无错误
 3. **Test sync**: `npm run check:test-sync` → 通过
 4. **Vitest**: `npm run test:run` → 所有测试通过

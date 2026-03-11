@@ -196,21 +196,25 @@ Spark 提取时同时填充 supertag 字段（作为 field entries，不是 JSON
 
 Agent 运行在 Side Panel 进程中。用户可能在面板关闭时通过 Content Script 工具栏 clip 网页——此时无法触发 Spark。
 
-**解决方案：Task Queue 模式**（复用已有的 `highlight-pending-queue.ts` 架构）：
+**解决方案：排队原始 payload**（与 `highlight-pending-queue.ts` 同一模式——只排队数据，不离线创建节点）：
 
 ```
 面板关闭时 clip：
   Content Script → Background: "clip this page"
-  Background: 创建 #source 节点（通过 Loro CRDT）
-  Background: 将 { sourceNodeId, pageContent } 写入 chrome.storage.local 队列
-  → Spark 不触发（无 Agent 可用）
+  Background: 将原始 clip payload { url, title, pageContent, highlights? }
+              写入 chrome.storage.local 队列
+  → 不创建 #source 节点（LoroDoc 只在 Side Panel 中初始化）
+  → 不触发 Spark（无 Agent 可用）
 
 下次面板打开时：
   Side Panel 启动 → 检查 chrome.storage.local 队列
-  → 逐个消费：读取 pageContent → 触发 Spark 流程 → 删除队列项
+  → 逐个消费：
+    1. 从 payload 创建 #source 节点（通过 webclip-service + LoroDoc）
+    2. 触发 Spark 流程
+    3. 删除队列项
 ```
 
-**关键**：#source 节点创建不依赖 Agent（现有 webclip-service 直接操作 Loro CRDT），只有 Spark 提取依赖 Agent。所以 clip 本身不受面板关闭影响，只是 Spark 延迟执行。
+**为什么不在 Background 中创建节点**：当前架构下 `initLoroDoc()` 只在 Side Panel bootstrap 时执行，Background Service Worker 没有 LoroDoc 实例。`highlight-pending-queue.ts` 也是同一模式——离线时只暂存原始数据，下次开面板时消费。把 Loro 搬进 Background 是更大的架构改动，不在 Phase 2 范围内。
 
 ---
 

@@ -384,7 +384,7 @@ Agent 报告: "我做了以下整理：
 | **Create** | `src/components/chat/ToolCallBlock.tsx` | Tool call 渲染块 (~60 行) |
 | **Create** | `src/components/chat/NodeReference.tsx` | 节点引用渲染 (~40 行) |
 | **Modify** | `src/components/chat/ChatMessage.tsx` | 支持 tool call + reference 解析 |
-| **Modify** | `src/components/chat/ChatPanel.tsx` | "新对话" 按钮 + 持久化恢复 |
+| **Modify** | `src/components/chat/ChatDrawer.tsx` | "新对话" 按钮 + 持久化恢复（Phase 0 创建的根容器） |
 | **Modify** | `src/lib/palette-commands.ts` | "Ask AI" 选项 |
 | **Modify** | `src/components/search/CommandPalette.tsx` | AI Chat 模式入口 |
 | **Modify** | `server/src/routes/ai.ts` | API key 加密存储/检索端点 |

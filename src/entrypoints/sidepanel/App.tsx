@@ -1,8 +1,9 @@
-import { Component, useEffect, useRef, useState, type ReactNode } from 'react';
+import { Component, Suspense, lazy, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useWorkspaceStore } from '../../stores/workspace-store';
 import { useNodeStore } from '../../stores/node-store';
 import { useUIStore } from '../../stores/ui-store';
 import { useNavUndoKeyboard } from '../../hooks/use-nav-undo-keyboard';
+import { useChatShortcut } from '../../hooks/use-chat-shortcut.js';
 import { useTodayShortcut } from '../../hooks/use-today-shortcut';
 import { useGlobalSelectionDismiss } from '../../hooks/use-global-selection-dismiss.js';
 import { TopToolbar } from '../../components/toolbar/TopToolbar';
@@ -48,6 +49,10 @@ import {
 import { ensureSystemNodes } from '../../lib/bootstrap-system-nodes.js';
 import { Toaster, toast } from 'sonner';
 import { TooltipProvider } from '../../components/ui/Tooltip';
+
+const ChatDrawer = lazy(async () => ({
+  default: (await import('../../components/chat/ChatDrawer.js')).ChatDrawer,
+}));
 
 // ─── Error Boundary ───
 // Prevents white screen — catches render errors and shows a recovery UI.
@@ -252,6 +257,7 @@ interface AppProps {
 export function App({ skipBootstrap = false }: AppProps) {
  const { ready } = useBootstrap(skipBootstrap);
  const selectionDismissHandlers = useGlobalSelectionDismiss();
+ const chatOpen = useUIStore((s) => s.chatOpen);
 
  useEffect(() => {
   if (!ready) return;
@@ -435,6 +441,8 @@ export function App({ skipBootstrap = false }: AppProps) {
 
  // Global Cmd+Z / Cmd+Shift+Z for navigation undo/redo
  useNavUndoKeyboard();
+ // Global Cmd+L / Cmd+Shift+L for chat drawer
+ useChatShortcut();
  // Global Cmd+Shift+D for go to today
  useTodayShortcut();
 
@@ -455,7 +463,20 @@ export function App({ skipBootstrap = false }: AppProps) {
      onFocusCapture={selectionDismissHandlers.onFocusCapture}
     >
      <TopToolbar />
-     <PanelStack />
+     <div className="relative flex flex-1 overflow-hidden">
+      <PanelStack />
+      {chatOpen && (
+       <Suspense
+        fallback={(
+         <div className="absolute inset-x-0 bottom-0 z-[60] flex h-24 items-center justify-center rounded-t-[20px] border-t border-border bg-background text-sm text-foreground-tertiary shadow-paper">
+          Loading chat…
+         </div>
+        )}
+       >
+        <ChatDrawer />
+       </Suspense>
+      )}
+     </div>
      <CommandPalette />
      <BatchTagSelector />
      <Toaster

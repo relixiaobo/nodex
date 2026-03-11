@@ -14,6 +14,7 @@ import { createAuth } from './lib/auth.js';
 import { requireAuth, type AuthVariables } from './middleware/auth.js';
 import { handlePush } from './routes/push.js';
 import { handlePull } from './routes/pull.js';
+import aiRoutes from './routes/ai.js';
 import type { Env } from './types.js';
 
 const app = new Hono<{ Bindings: Env }>();
@@ -162,6 +163,12 @@ app.get('/api/session', async (c) => {
     return c.json(null, 200);
   }
 });
+
+// ---------------------------------------------------------------------------
+// AI proxy endpoints (auth-protected)
+// ---------------------------------------------------------------------------
+
+app.route('/api', aiRoutes);
 
 // ---------------------------------------------------------------------------
 // Health check

@@ -251,6 +251,14 @@ export const SHORTCUT_REGISTRY: ShortcutDefinition[] = [
     source: 'src/hooks/use-today-shortcut.ts',
   },
   {
+    id: 'global.toggle_chat',
+    scope: 'global',
+    keys: ['Mod-l', 'Mod-Shift-l'],
+    when: 'Focus not in contentEditable/input/textarea',
+    action: 'Toggle chat drawer',
+    source: 'src/hooks/use-chat-shortcut.ts',
+  },
+  {
     id: 'global.nav_undo',
     scope: 'global',
     keys: ['Mod-z', 'Ctrl-z'],

@@ -60,5 +60,12 @@ describe('ui-store navigation and UI state', () => {
     ui.closeSearch();
     expect(useUIStore.getState().searchOpen).toBe(false);
     expect(useUIStore.getState().searchQuery).toBe('');
+
+    ui.openChat();
+    expect(useUIStore.getState().chatOpen).toBe(true);
+    ui.toggleChat();
+    expect(useUIStore.getState().chatOpen).toBe(false);
+    ui.closeChat();
+    expect(useUIStore.getState().chatOpen).toBe(false);
   });
 });

@@ -57,6 +57,12 @@ interface UIStore {
   closeSearch(): void;
   setSearchQuery(query: string): void;
 
+  // Chat drawer (session-only)
+  chatOpen: boolean;
+  openChat(): void;
+  closeChat(): void;
+  toggleChat(): void;
+
   // Batch tag selector
   batchTagSelectorOpen: boolean;
   openBatchTagSelector(): void;
@@ -379,6 +385,12 @@ export const useUIStore = create<UIStore>()(
       openSearch: () => set({ searchOpen: true }),
       closeSearch: () => set({ searchOpen: false }),
       setSearchQuery: (query) => set({ searchQuery: query }),
+
+      // Chat drawer
+      chatOpen: false,
+      openChat: () => set({ chatOpen: true }),
+      closeChat: () => set({ chatOpen: false }),
+      toggleChat: () => set((s) => ({ chatOpen: !s.chatOpen })),
 
       // Drag and drop
       dragNodeId: null,

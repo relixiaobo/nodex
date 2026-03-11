@@ -14,7 +14,7 @@ import * as loroDoc from '../../lib/loro-doc.js';
 import { getOrCreateDefaultWorkspaceId } from '../../lib/workspace-id.js';
 import { findUnexpectedShortcutConflicts } from '../../lib/shortcut-registry.js';
 import { ensureTodayNode } from '../../lib/journal.js';
-import { ensureHighlightTagDef, ensureNoteTagDef, type HighlightNodeStore } from '../../lib/highlight-service.js';
+import { ensureHighlightTagDef, ensureNoteTagDef, getClipNodeIdForHighlight, type HighlightNodeStore } from '../../lib/highlight-service.js';
 import {
   createHighlightFromPayload,
   saveNotesForHighlight,
@@ -360,7 +360,7 @@ export function App({ skipBootstrap = false }: AppProps) {
       return true;
     }
 
-    const clipNodeId = loroDoc.getParentId(payload.id);
+    const clipNodeId = getClipNodeIdForHighlight(payload.id);
     if (!clipNodeId) {
       sendResponse({ ok: false, error: 'Highlight has no parent clip' });
       return true;

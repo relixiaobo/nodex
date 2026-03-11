@@ -22,17 +22,17 @@ _(空)_
 
 | Agent | 分支 | 任务 | 锁定文件 | 状态 |
 |---|---|---|---|---|
-| codex | cc/ai-plan-review | AI 计划 Review | `docs/plans/*` | 进行中 |
+| codex | cc/ai-phase-0 | Phase 0: AI 基座 | `server/src/routes/ai.ts`, `src/lib/ai-service.ts`, `src/stores/ui-store.ts` | 进行中 |
 
 ---
 
 ## 进行中
 
-### AI 实施计划 Review — 发现问题和差距
+### Phase 0: AI 基座 — pi-mono 集成 + 最小 Chat
 
-> Agent: codex | 分支: `cc/ai-plan-review` | PR: TBD
+> Agent: codex | 分支: `cc/ai-phase-0` | PR: #125
 
-阅读 `docs/plans/` 全部 7 份计划文档 + 3 份研究文档，交叉验证一致性，发现潜在问题。
+详细计划见 `docs/plans/phase-0-foundation.md`。
 
 ---
 
@@ -180,6 +180,7 @@ _(空)_
 
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
+| 2026-03-11 | AI 实施计划 Review — 6 Phase 计划文档交叉验证 + 3 轮修正（MV3 宿主模型、contract 收敛、并行策略） | codex | #124 |
 | 2026-03-11 | 网页抓取基础设施重构 — clip/x.com/Google Docs/GitHub/YouTube 的增强抓取迁移到独立 page capture 栈，orchestrator + site extractors + background transport | codex | #123 |
 | 2026-03-11 | Clip 节点结构调整 — #highlight → Highlights 字段 + Source URL → URL + 旧数据自动迁移 | codex | #122 |
 | 2026-03-11 | 移除 LIBRARY/INBOX 作为默认目标 — 创建路径改用 ensureTodayNode()，搜索路径遍历 workspace children | codex | #121 |

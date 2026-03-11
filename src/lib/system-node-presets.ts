@@ -58,11 +58,6 @@ export function getWorkspaceHomeNodeId(): string | null {
   return wsId;
 }
 
-export function resolvePreferredTopLevelParentId(preferredId: string): string | null {
-  if (loroDoc.hasNode(preferredId)) return preferredId;
-  return getWorkspaceHomeNodeId();
-}
-
 export function getWorkspaceTopLevelNodeIds(): string[] {
   const workspaceHomeId = getWorkspaceHomeNodeId();
   if (!workspaceHomeId) return [];

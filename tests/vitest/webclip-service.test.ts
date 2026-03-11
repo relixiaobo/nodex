@@ -803,6 +803,16 @@ describe('findClipNodeByUrl', () => {
     const found = findClipNodeByUrl('https://youtube.com/watch?v=test');
     expect(found).toBe(ytClipId);
   });
+
+  it('finds clips under a legacy Library container when it exists', () => {
+    loroDoc.createNode(SYSTEM_NODE_IDS.LIBRARY, 'ws_default');
+    loroDoc.setNodeDataBatch(SYSTEM_NODE_IDS.LIBRARY, { name: 'Library' });
+    loroDoc.moveNode('webclip_1', SYSTEM_NODE_IDS.LIBRARY);
+    loroDoc.commitDoc('__seed__');
+
+    const found = findClipNodeByUrl('https://medium.com/example-article');
+    expect(found).toBe('webclip_1');
+  });
 });
 
 // ── createLightweightClip ──

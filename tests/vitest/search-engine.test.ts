@@ -6,6 +6,7 @@ import { getNodeCapabilities } from '../../src/lib/node-capabilities.js';
 import { isOutlinerContentNodeType } from '../../src/lib/node-type-utils.js';
 import { collectChipEntries, getChipTextForCondition } from '../../src/components/search/SearchChipBar.js';
 import type { NodexNode } from '../../src/types/node.js';
+import { ensureTodayNode } from '../../src/lib/journal.js';
 import { resetAndSeed } from './helpers/test-state.js';
 
 describe('search-engine', () => {
@@ -460,7 +461,7 @@ describe('search-engine', () => {
   });
 
   describe('createNodeInSearchContext', () => {
-    it('creates node in LIBRARY with auto-applied tag', () => {
+    it('creates node in Today with auto-applied tag', () => {
       const store = useNodeStore.getState();
       const searchId = store.createSearchNode('tagDef_task');
       const newNode = store.createNodeInSearchContext(searchId, { name: 'Test item' });
@@ -468,7 +469,7 @@ describe('search-engine', () => {
       expect(newNode.name).toBe('Test item');
       expect(newNode.tags).toContain('tagDef_task');
       const parentId = loroDoc.getParentId(newNode.id);
-      expect(parentId).toBe(SYSTEM_NODE_IDS.LIBRARY);
+      expect(parentId).toBe(ensureTodayNode());
     });
 
     it('creates reference child in search node', () => {

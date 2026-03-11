@@ -250,9 +250,9 @@ ContentNode
 
 ### 系统节点与 SYSTEM_NODE_IDS
 
-系统节点 ID = 固定字符串常量，见 `SYSTEM_NODE_IDS`（LIBRARY、INBOX、JOURNAL、TRASH、SCHEMA、SETTINGS 等）。
+系统节点 ID = 固定字符串常量，见 `SYSTEM_NODE_IDS`。新工作区实际 bootstrap 的系统节点只有 `JOURNAL`、`TRASH`、`SCHEMA`、`SETTINGS`。
 
-**系统节点不再是特殊类型**——它们是普通节点 + `locked` 属性。保护机制通过 `isLockedNode()` 能力检查实现，而非 ID 检测。新工作区只自动创建 Journal、Trash、Schema、Settings（不再创建 Library/Inbox）。
+**系统节点不再是特殊类型**——它们是普通节点 + `locked` 属性。保护机制通过 `isLockedNode()` 能力检查实现，而非 ID 检测。`LIBRARY`、`INBOX`、`CLIPS`、`STASH` 等常量仅用于兼容旧数据或旧迁移路径，新工作区不再自动创建它们。
 
 节点能力查询：`src/lib/node-capabilities.ts`（`isLockedNode()`、`canCreateChildrenUnder()`、`canEditFieldEntryValue()`）。系统节点预设：`src/lib/system-node-presets.ts`（`SYSTEM_NODE_PRESETS`、`getSystemNodePreset()`）。
 

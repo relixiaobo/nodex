@@ -19,9 +19,9 @@ import {
   createNode,
   setNodeData,
 } from '../../src/lib/loro-doc.js';
+import { ensureTodayNode } from '../../src/lib/journal.js';
 import { useNodeStore } from '../../src/stores/node-store.js';
 import { useUIStore } from '../../src/stores/ui-store.js';
-import { SYSTEM_NODE_IDS } from '../../src/types/index.js';
 import { resetAndSeed } from './helpers/test-state.js';
 
 beforeEach(() => {
@@ -182,7 +182,7 @@ describe('UI marker → undoDoc/redoDoc', () => {
 
   it('展开/折叠通过 Loro undo/redo 恢复 expandedNodes', () => {
     const ui = useUIStore.getState();
-    const expandKey = `${SYSTEM_NODE_IDS.LIBRARY}:note_2`;
+    const expandKey = `${ensureTodayNode()}:note_2`;
 
     ui.setExpanded(expandKey, true);
     expect(useUIStore.getState().expandedNodes.has(expandKey)).toBe(true);
@@ -196,7 +196,7 @@ describe('UI marker → undoDoc/redoDoc', () => {
 
   it('程序性 setExpanded(skipUndo) 不创建 undo step', () => {
     const ui = useUIStore.getState();
-    const expandKey = `${SYSTEM_NODE_IDS.LIBRARY}:note_2`;
+    const expandKey = `${ensureTodayNode()}:note_2`;
 
     expect(canUndoDoc()).toBe(false);
     ui.setExpanded(expandKey, true, true);
@@ -206,10 +206,11 @@ describe('UI marker → undoDoc/redoDoc', () => {
 
   it('连续 undo 不应产生空 panelHistory（Bug 1 回归）', () => {
     const ui = useUIStore.getState();
+    const todayId = ensureTodayNode();
 
     // Simulate bootstrap: replacePanel sets initial panel without creating undo entry
-    ui.replacePanel(SYSTEM_NODE_IDS.LIBRARY);
-    expect(useUIStore.getState().panelHistory).toEqual([SYSTEM_NODE_IDS.LIBRARY]);
+    ui.replacePanel(todayId);
+    expect(useUIStore.getState().panelHistory).toEqual([todayId]);
     expect(canUndoDoc()).toBe(false);
 
     // User navigates to two pages
@@ -223,7 +224,7 @@ describe('UI marker → undoDoc/redoDoc', () => {
 
     const { panelHistory, panelIndex } = useUIStore.getState();
     expect(panelHistory.length).toBeGreaterThan(0);
-    expect(panelHistory[panelIndex]).toBe(SYSTEM_NODE_IDS.LIBRARY);
+    expect(panelHistory[panelIndex]).toBe(todayId);
 
     // One more undo should be a no-op (no bootstrap undo entry)
     const before = { ...useUIStore.getState() };
@@ -234,8 +235,9 @@ describe('UI marker → undoDoc/redoDoc', () => {
 
   it('restore 回调忽略空 panelHistory 的 UI 快照', () => {
     const ui = useUIStore.getState();
+    const todayId = ensureTodayNode();
     // Set some panel state
-    ui.replacePanel(SYSTEM_NODE_IDS.LIBRARY);
+    ui.replacePanel(todayId);
 
     // Directly call the restore logic with an empty-history snapshot
     // This simulates what would happen if such a snapshot leaked into the undo stack
@@ -246,7 +248,7 @@ describe('UI marker → undoDoc/redoDoc', () => {
 
     // Simulate restoreUndoUIMeta being called with empty snapshot
     // The guard should prevent setState
-    useUIStore.setState({ panelHistory: [SYSTEM_NODE_IDS.LIBRARY], panelIndex: 0 });
+    useUIStore.setState({ panelHistory: [todayId], panelIndex: 0 });
     // Now try to undoDoc when there's nothing to undo — should be no-op
     const result = undoDoc();
     // canUndoDoc was false so result should be false

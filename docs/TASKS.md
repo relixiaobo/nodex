@@ -22,13 +22,13 @@ _(空)_
 
 | Agent | 分支 | 任务 | 锁定文件 | 状态 |
 |---|---|---|---|---|
-| codex | `codex/remove-library-inbox-defaults` | 移除 LIBRARY/INBOX 作为默认目标 | `src/stores/node-store.ts`, `src/lib/webclip-service.ts`, `src/lib/highlight-sidepanel.ts`, `src/entrypoints/test/seed-data.ts` | 进行中 |
+| _(空)_ | | | | |
 
 ---
 
 ## 进行中
 
-- [ ] **移除 LIBRARY/INBOX 作为默认目标** — 创建路径改用 `ensureTodayNode()`，搜索路径改为遍历 workspace children，seed-data/TestApp 跟随调整
+_(空)_
 
 ---
 
@@ -150,6 +150,7 @@ _(空)_
 
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
+| 2026-03-11 | 移除 LIBRARY/INBOX 作为默认目标 — 创建路径改用 ensureTodayNode()，搜索路径遍历 workspace children | codex | #121 |
 | 2026-03-11 | 统一散落的复用模式 — resolveEffectiveId() + useDragDropRow() hook + isNodeInTrash() + SYSTEM_NODE_IDS 重命名 | codex | #120 |
 | 2026-03-10 | 消除 Container Node 概念 — Container 变为普通 node + locked；Settings 改为标准节点页面 | codex | #119 |
 | 2026-03-07 | 高亮点击呼出笔记 — 点击高亮文本打开笔记浮窗，链接/按钮放行原生行为 | nodex | main |

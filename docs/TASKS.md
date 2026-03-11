@@ -22,13 +22,13 @@ _(空)_
 
 | Agent | 分支 | 任务 | 锁定文件 | 状态 |
 |---|---|---|---|---|
-| _(空)_ | | | | |
+| codex | `codex/remove-library-inbox-defaults` | 移除 LIBRARY/INBOX 作为默认目标 | `src/stores/node-store.ts`, `src/lib/webclip-service.ts`, `src/lib/highlight-sidepanel.ts`, `src/entrypoints/test/seed-data.ts` | 进行中 |
 
 ---
 
 ## 进行中
 
-_(空)_
+- [ ] **移除 LIBRARY/INBOX 作为默认目标** — 创建路径改用 `ensureTodayNode()`，搜索路径改为遍历 workspace children，seed-data/TestApp 跟随调整
 
 ---
 

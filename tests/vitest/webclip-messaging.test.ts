@@ -4,10 +4,13 @@ import {
   WEBCLIP_CAPTURE_PAGE,
   CONTENT_SCRIPT_READY,
   X_VIDEO_FETCH_URL,
+  toWebClipCapturePayload,
+  toWebClipCaptureResponse,
   type WebClipCaptureResponse,
   type XVideoFetchPayload,
   type XVideoFetchResponse,
 } from '../../src/lib/webclip-messaging.js';
+import type { CapturedPage } from '../../src/lib/page-capture/models.js';
 
 describe('webclip-messaging', () => {
   it('defines stable message constants', () => {
@@ -47,5 +50,94 @@ describe('webclip-messaging', () => {
     const emptyResponse: XVideoFetchResponse = {};
     expect(emptyResponse.mp4Url).toBeUndefined();
     expect(emptyResponse.posterUrl).toBeUndefined();
+  });
+
+  it('maps neutral CapturedPage data into the legacy flat webclip payload', () => {
+    const page: CapturedPage = {
+      url: 'https://x.com/user/status/123',
+      title: 'Thread by @user',
+      selectionText: 'selection',
+      contentHtml: '<p>Hello</p>',
+      capturedAt: 123,
+      metadata: {
+        author: '@user',
+        published: '2026-03-11',
+        description: 'hello',
+        siteName: 'X',
+        duration: 'PT45S',
+        extractorType: 'twitter',
+        ogType: 'article',
+        schemaOrgType: 'SocialMediaPosting',
+        hasArticleElement: false,
+      },
+      siteHints: {
+        site: 'x',
+        contentKind: 'article',
+      },
+    };
+
+    expect(toWebClipCapturePayload(page)).toEqual({
+      url: 'https://x.com/user/status/123',
+      title: 'Thread by @user',
+      selectionText: 'selection',
+      pageText: '<p>Hello</p>',
+      capturedAt: 123,
+      author: '@user',
+      published: '2026-03-11',
+      description: 'hello',
+      siteName: 'X',
+      duration: 'PT45S',
+      extractorType: 'twitter',
+      ogType: 'article',
+      schemaOrgType: 'SocialMediaPosting',
+      hasArticleElement: false,
+      isXArticle: true,
+    });
+  });
+
+  it('adapts neutral capture results back into WebClipCaptureResponse', () => {
+    const response = toWebClipCaptureResponse({
+      ok: true,
+      page: {
+        url: 'https://example.com',
+        title: 'Example',
+        selectionText: '',
+        contentHtml: '<p>Example</p>',
+        capturedAt: 999,
+        metadata: {},
+        siteHints: { site: 'generic' },
+      },
+    });
+
+    expect(response).toEqual({
+      ok: true,
+      payload: {
+        url: 'https://example.com',
+        title: 'Example',
+        selectionText: '',
+        pageText: '<p>Example</p>',
+        capturedAt: 999,
+        author: undefined,
+        published: undefined,
+        description: undefined,
+        siteName: undefined,
+        duration: undefined,
+        extractorType: undefined,
+        ogType: undefined,
+        schemaOrgType: undefined,
+        hasArticleElement: undefined,
+        isXArticle: false,
+      },
+    });
+  });
+
+  it('passes through capture errors when adapting into WebClipCaptureResponse', () => {
+    expect(toWebClipCaptureResponse({
+      ok: false,
+      error: 'capture exploded',
+    })).toEqual({
+      ok: false,
+      error: 'capture exploded',
+    });
   });
 });

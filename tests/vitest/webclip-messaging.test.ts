@@ -130,4 +130,14 @@ describe('webclip-messaging', () => {
       },
     });
   });
+
+  it('passes through capture errors when adapting into WebClipCaptureResponse', () => {
+    expect(toWebClipCaptureResponse({
+      ok: false,
+      error: 'capture exploded',
+    })).toEqual({
+      ok: false,
+      error: 'capture exploded',
+    });
+  });
 });

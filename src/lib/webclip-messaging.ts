@@ -6,7 +6,9 @@ import {
   type PageCaptureXVideoResponse,
 } from './page-capture/messaging.js';
 
+/** Deprecated compatibility message for legacy clip callers. */
 export const WEBCLIP_CAPTURE_ACTIVE_TAB = 'webclip:capture-active-tab' as const;
+/** Deprecated compatibility message for legacy content-script capture callers. */
 export const WEBCLIP_CAPTURE_PAGE = 'webclip:capture-page' as const;
 export const X_VIDEO_FETCH_URL = PAGE_CAPTURE_FETCH_X_VIDEO;
 

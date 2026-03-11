@@ -645,7 +645,7 @@ describe('parseHtmlToNodes — images', () => {
 });
 
 describe('parseHtmlToNodes — iframes', () => {
-  it('skips YouTube iframe (users access via Source URL)', () => {
+  it('skips YouTube iframe (users access via URL field)', () => {
     const html = '<iframe src="https://www.youtube.com/embed/dQw4w9WgXcQ"></iframe>';
     const { nodes } = parseHtmlToNodes(html);
     expect(nodes).toHaveLength(0);

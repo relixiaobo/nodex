@@ -146,7 +146,7 @@ export function ensureSourceTagDef(): NodexNode {
 }
 
 /**
- * Ensure "Source URL" fieldDef exists with fixed ID NDX_F01 under #source tagDef.
+ * Ensure "URL" fieldDef exists with fixed ID NDX_F01 under #source tagDef.
  */
 export function ensureSourceUrlFieldDef(): NodexNode {
   ensureSourceTagDef();
@@ -155,9 +155,17 @@ export function ensureSourceUrlFieldDef(): NodexNode {
     loroDoc.createNode(NDX_F.SOURCE_URL, SYS_T.SOURCE);
     loroDoc.setNodeDataBatch(NDX_F.SOURCE_URL, {
       type: 'fieldDef',
-      name: 'Source URL',
+      name: 'URL',
       fieldType: FIELD_TYPES.URL,
     });
+    loroDoc.commitDoc();
+    fd = loroDoc.toNodexNode(NDX_F.SOURCE_URL)!;
+  }
+  const patch: Record<string, unknown> = {};
+  if (fd.name !== 'URL') patch.name = 'URL';
+  if (fd.fieldType !== FIELD_TYPES.URL) patch.fieldType = FIELD_TYPES.URL;
+  if (Object.keys(patch).length > 0) {
+    loroDoc.setNodeDataBatch(NDX_F.SOURCE_URL, patch);
     loroDoc.commitDoc();
     fd = loroDoc.toNodexNode(NDX_F.SOURCE_URL)!;
   }
@@ -494,7 +502,7 @@ export async function saveWebClip(
   // 4. Apply the detected type tag (extends mechanism creates inherited field entries)
   store.applyTag(clipNode.id, tagDefId);
 
-  // 5. Write Source URL field value
+  // 5. Write URL field value
   store.setFieldValue(clipNode.id, NDX_F.SOURCE_URL, [payload.url]);
 
   // 6. Fill Author, Published, Duration fields
@@ -544,7 +552,7 @@ function isMatchingClipNode(
 }
 
 /**
- * Find a #source-family node by its Source URL field value.
+ * Find a #source-family node by its URL field value.
  * Searches workspace top-level content containers and JOURNAL day nodes.
  *
  * @returns The node ID of the matching clip node, or null if not found.
@@ -552,7 +560,7 @@ function isMatchingClipNode(
 export function findClipNodeByUrl(url: string): string | null {
   const normalizedUrl = normalizeUrl(url);
 
-  // Source URL fieldDef must exist
+  // URL fieldDef must exist
   const sourceUrlFieldDef = loroDoc.toNodexNode(NDX_F.SOURCE_URL);
   if (!sourceUrlFieldDef) return null;
 
@@ -624,7 +632,7 @@ export async function createLightweightClip(
   // Apply the detected type tag
   store.applyTag(clipNode.id, tagDefId);
 
-  // Write Source URL field value
+  // Write URL field value
   store.setFieldValue(clipNode.id, NDX_F.SOURCE_URL, [pageUrl]);
 
   return clipNode.id;
@@ -651,7 +659,7 @@ export async function applyWebClipToNode(
   // 3. Apply the detected type tag
   store.applyTag(nodeId, tagDefId);
 
-  // 4. Write Source URL field value
+  // 4. Write URL field value
   store.setFieldValue(nodeId, NDX_F.SOURCE_URL, [payload.url]);
 
   // 5. Fill Author, Published, Duration fields

@@ -263,11 +263,11 @@ describe('importUpdatesBatch deduplicates schema tagDefs by name', () => {
     sourceTag1.data.set('id', 'nanoid_source_abc');
     sourceTag1.data.set('type', 'tagDef');
     sourceTag1.data.set('name', 'source');
-    // Remote Source URL fieldDef with nanoid
+    // Remote URL fieldDef with nanoid
     const urlField1 = tree1.createNode(sourceTag1.id);
     urlField1.data.set('id', 'nanoid_url_def');
     urlField1.data.set('type', 'fieldDef');
-    urlField1.data.set('name', 'Source URL');
+    urlField1.data.set('name', 'URL');
     urlField1.data.set('fieldType', 'url');
     doc1.commit();
 
@@ -280,7 +280,7 @@ describe('importUpdatesBatch deduplicates schema tagDefs by name', () => {
     setNodeData(localSourceTag, 'name', 'source');
     const localUrlField = createNode('NDX_F01', localSourceTag);
     setNodeData(localUrlField, 'type', 'fieldDef');
-    setNodeData(localUrlField, 'name', 'Source URL');
+    setNodeData(localUrlField, 'name', 'URL');
     setNodeData(localUrlField, 'fieldType', 'url');
     commitDoc();
 
@@ -309,13 +309,13 @@ describe('importUpdatesBatch deduplicates schema tagDefs by name', () => {
     // The winner should be the fixed ID
     expect(sourceDefs[0]).toBe('SYS_T202');
 
-    // The winner should have the Source URL fieldDef from both sessions
+    // The winner should have the URL fieldDef from both sessions
     const winnerChildren = getChildren('SYS_T202');
     const urlFields = winnerChildren.filter(id => {
       const n = toNodexNode(id);
-      return n?.type === 'fieldDef' && n.name?.toLowerCase() === 'source url';
+      return n?.type === 'fieldDef' && n.name?.toLowerCase() === 'url';
     });
-    // After fieldDef dedup, only one Source URL should remain
+    // After fieldDef dedup, only one URL field should remain
     expect(urlFields).toHaveLength(1);
     // The winner fieldDef should be the fixed ID
     expect(urlFields[0]).toBe('NDX_F01');

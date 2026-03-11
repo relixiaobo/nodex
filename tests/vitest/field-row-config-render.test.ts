@@ -75,7 +75,7 @@ describe('FieldRow config control resolution', () => {
     const html = renderToStaticMarkup(createElement(FieldRow, {
       nodeId: 'webclip_1',
       attrDefId: NDX_F.SOURCE_URL,
-      attrDefName: 'Source URL',
+      attrDefName: 'URL',
       fieldEntryId: sourceUrlFieldEntryId!,
       dataType: 'url',
     }));
@@ -83,6 +83,6 @@ describe('FieldRow config control resolution', () => {
     expect(html).toContain('h-6');
     expect(html).toContain('gap-2');
     expect(html).toContain('group/bullet');
-    expect(html).toContain('Source URL');
+    expect(html).toContain('URL');
   });
 });

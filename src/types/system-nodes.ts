@@ -291,7 +291,7 @@ export type SystemTag = typeof SYS_T[keyof typeof SYS_T];
 // ============================================================
 
 export const NDX_F = {
-  /** Source URL fieldDef (child of #source tagDef) */
+  /** URL fieldDef (child of #source tagDef) */
   SOURCE_URL: 'NDX_F01',
   /** Source fieldDef (child of #highlight tagDef, options_from_supertag → #source) */
   HIGHLIGHT_SOURCE: 'NDX_F02',
@@ -305,6 +305,8 @@ export const NDX_F = {
   NOTE_HIGHLIGHTS: 'NDX_F06',
   /** Anchor fieldDef (child of #highlight tagDef, hidden plain field for anchor JSON) */
   HIGHLIGHT_ANCHOR: 'NDX_F07',
+  /** Highlights fieldDef (child of #source tagDef, options_from_supertag → #highlight) */
+  SOURCE_HIGHLIGHTS: 'NDX_F08',
   /** Settings: Highlight & Comment toggle (boolean, on Settings container) */
   SETTING_HIGHLIGHT_ENABLED: 'NDX_F10',
 } as const;

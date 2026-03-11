@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { ensureSystemNodes, SYSTEM_BOOTSTRAP_VERSION } from '../../src/lib/bootstrap-system-nodes.js';
 import {
   createNode,
+  getChildren,
   getParentId,
   hasNode,
   initLoroDocForTest,
@@ -10,8 +11,9 @@ import {
   setNodeRichTextContent,
   toNodexNode,
 } from '../../src/lib/loro-doc.js';
-import { SYSTEM_NODE_IDS, NDX_F, NDX_T, SYS_V } from '../../src/types/index.js';
+import { SYSTEM_NODE_IDS, NDX_F, NDX_T, SYS_T, SYS_V } from '../../src/types/index.js';
 import { SYSTEM_SCHEMA_NODE_IDS } from '../../src/lib/system-schema-presets.js';
+import { useNodeStore } from '../../src/stores/node-store.js';
 
 describe('ensureSystemNodes', () => {
   beforeEach(() => {
@@ -81,5 +83,28 @@ describe('ensureSystemNodes', () => {
     ensureSystemNodes('ws_bootstrap');
 
     expect(toNodexNode(SYSTEM_NODE_IDS.LIBRARY)?.locked).toBe(true);
+  });
+
+  it('migrates legacy direct-child highlights into the clip Highlights field', () => {
+    ensureSystemNodes('ws_bootstrap');
+
+    const store = useNodeStore.getState();
+    const clipNode = store.createChild('ws_bootstrap', undefined, { name: 'Legacy clip' });
+    store.applyTag(clipNode.id, SYS_T.SOURCE);
+
+    const legacyHighlight = store.createChild(clipNode.id, undefined, { name: 'Legacy highlight' });
+    store.applyTag(legacyHighlight.id, SYS_T.HIGHLIGHT);
+    expect(getParentId(legacyHighlight.id)).toBe(clipNode.id);
+
+    setNodeData('ws_bootstrap', 'systemBootstrapVersion', SYSTEM_BOOTSTRAP_VERSION - 1);
+    ensureSystemNodes('ws_bootstrap');
+
+    const highlightsFieldEntryId = getChildren(clipNode.id).find((childId) => {
+      const child = toNodexNode(childId);
+      return child?.type === 'fieldEntry' && child.fieldDefId === NDX_F.SOURCE_HIGHLIGHTS;
+    });
+
+    expect(highlightsFieldEntryId).toBeDefined();
+    expect(getParentId(legacyHighlight.id)).toBe(highlightsFieldEntryId);
   });
 });

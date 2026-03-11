@@ -52,14 +52,17 @@ function seedBody(): void {
   // ─── Workspace home node (tree root) ───
   cn(WS_ID, null, { name: 'Workspace' });
 
-  // ─── Well-known top-level nodes (legacy Library/Inbox preserved for migration coverage) ───
-  cn(SYSTEM_NODE_IDS.LIBRARY,  WS_ID, { name: 'Library' });
-  cn(SYSTEM_NODE_IDS.INBOX,    WS_ID, { name: 'Inbox' });
+  // ─── Well-known top-level nodes ───
   cn(SYSTEM_NODE_IDS.JOURNAL,  WS_ID, { name: 'Daily notes', locked: true });
   cn(SYSTEM_NODE_IDS.SEARCHES, WS_ID, { name: 'Searches' });
   cn(SYSTEM_NODE_IDS.TRASH,    WS_ID, { name: 'Trash', locked: true });
   cn(SYSTEM_NODE_IDS.SCHEMA,   WS_ID, { name: 'Schema', locked: true });
   cn(SYSTEM_NODE_IDS.SETTINGS, WS_ID, { name: 'Settings', locked: true });
+
+  const today = new Date();
+  const yesterday = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1);
+  const todayDayId = ensureDateNode(today);
+  const yesterdayDayId = ensureDateNode(yesterday);
 
   // ─── Fixed system schema for workspace settings ───
   cn(NDX_T.WORKSPACE_SETTINGS, SYSTEM_NODE_IDS.SCHEMA, {
@@ -213,11 +216,11 @@ function seedBody(): void {
   });
 
   // ═══════════════════════════════════════════════════════════════
-  // Library content
+  // Today content
   // ═══════════════════════════════════════════════════════════════
 
   // ── Project ──
-  cn('proj_1', SYSTEM_NODE_IDS.LIBRARY, {
+  cn('proj_1', todayDayId, {
     name: 'My Project',
     description: 'A sample project to demonstrate outliner features',
   });
@@ -240,23 +243,23 @@ function seedBody(): void {
   useNodeStore.getState().applyTag('meeting_1', 'tagDef_meeting');
 
   // ── Person node ──
-  cn('person_1', SYSTEM_NODE_IDS.LIBRARY, { name: 'Alice Johnson' });
+  cn('person_1', todayDayId, { name: 'Alice Johnson' });
   useNodeStore.getState().applyTag('person_1', 'tagDef_person');
 
   // ── Simple notes ──
-  cn('note_1', SYSTEM_NODE_IDS.LIBRARY, { name: 'Meeting notes - Team standup' });
+  cn('note_1', todayDayId, { name: 'Meeting notes - Team standup' });
   cn('note_1a', 'note_1', { name: 'Discussed project timeline' });
   cn('note_1b', 'note_1', { name: 'Need to review PR #42' });
   cn('note_1c', 'note_1', { name: 'Next meeting on Friday' });
 
-  cn('note_2', SYSTEM_NODE_IDS.LIBRARY, { name: 'Quick ideas' });
+  cn('note_2', todayDayId, { name: 'Quick ideas' });
   cn('idea_1', 'note_2', { name: 'Try using virtual scrolling for large lists' });
   cn('idea_2', 'note_2', { name: 'Add dark mode support' });
 
   // ═══════════════════════════════════════════════════════════════
   // Store image content: Library > Reading Notes (Scene 4 — Clean Paper)
   // ═══════════════════════════════════════════════════════════════
-  cn('si_reading_notes', SYSTEM_NODE_IDS.LIBRARY, { name: 'Reading Notes' });
+  cn('si_reading_notes', todayDayId, { name: 'Reading Notes' });
 
   // 1. The Art of Deep Reading #article (expanded, with children)
   cn('si_deep_reading', 'si_reading_notes', { name: 'The Art of Deep Reading' });
@@ -296,7 +299,7 @@ function seedBody(): void {
   // ═══════════════════════════════════════════════════════════════
   // Store image content: Library > Mental Models (Scene 2 — Connect)
   // ═══════════════════════════════════════════════════════════════
-  cn('si_mental_models', SYSTEM_NODE_IDS.LIBRARY, { name: 'Mental Models' });
+  cn('si_mental_models', todayDayId, { name: 'Mental Models' });
 
   // Second-Order Thinking #mental-model (with children)
   cn('si_mm_sot', 'si_mental_models', { name: 'Second-Order Thinking' });
@@ -321,7 +324,7 @@ function seedBody(): void {
   });
 
   // ── Rich text test nodes ──
-  cn('note_rich', SYSTEM_NODE_IDS.LIBRARY, { name: 'Rich text formatting tests' });
+  cn('note_rich', todayDayId, { name: 'Rich text formatting tests' });
   cn('rich_1', 'note_rich', {
     name: 'Bold text mixed with normal',
     marks: [{ start: 0, end: 9, type: 'bold' }],
@@ -352,16 +355,16 @@ function seedBody(): void {
   });
 
   // ═══════════════════════════════════════════════════════════════
-  // Inbox content
+  // Additional Today content
   // ═══════════════════════════════════════════════════════════════
-  cn('inbox_1', SYSTEM_NODE_IDS.INBOX, { name: 'Read the article about Chrome extensions' });
-  cn('inbox_2', SYSTEM_NODE_IDS.INBOX, { name: 'Respond to email from client' });
-  cn('inbox_3', SYSTEM_NODE_IDS.INBOX, { name: 'Review pull request' });
+  cn('inbox_1', todayDayId, { name: 'Read the article about Chrome extensions' });
+  cn('inbox_2', todayDayId, { name: 'Respond to email from client' });
+  cn('inbox_3', todayDayId, { name: 'Review pull request' });
   cn('inbox_3a', 'inbox_3', { name: 'Check test coverage' });
   cn('inbox_3b', 'inbox_3', { name: 'Verify performance impact' });
 
   // Web clip (pre-tagged)
-  cn('webclip_1', SYSTEM_NODE_IDS.INBOX, {
+  cn('webclip_1', todayDayId, {
     name: 'Example Article — Medium',
     description: 'A sample web clip to demonstrate the clipping feature',
   });
@@ -392,14 +395,7 @@ function seedBody(): void {
   // ═══════════════════════════════════════════════════════════════
   // Journal content (real date hierarchy: Year → Week → Day)
   // ═══════════════════════════════════════════════════════════════
-  const today = new Date();
-  const yesterday = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1);
-
-  // ensureDateNode creates Year → Week → Day with system tags + descending sort
-  const todayDayId = ensureDateNode(today);
-  const yesterdayDayId = ensureDateNode(yesterday);
-
-  // Today's notes — store image content (Scenes 1, 3, 5)
+  // Additional notes on Today plus older days for heatmap coverage.
 
   // Scene 5: How to Do Great Work (Paul Graham) #article
   cn('j_pg', todayDayId, { name: 'How to Do Great Work' });
@@ -493,10 +489,10 @@ function seedBody(): void {
 
   // Expand some nodes by default for testing (skipUndo=true to avoid
   // creating undo entries during seed — Bug 1 fix)
-  uiStore.setExpanded(`${SYSTEM_NODE_IDS.LIBRARY}:proj_1`, true, true);
+  uiStore.setExpanded(`${todayDayId}:proj_1`, true, true);
   uiStore.setExpanded('proj_1:task_1', true, true);
   uiStore.setExpanded('proj_1:task_2', true, true);
-  uiStore.setExpanded(`${SYSTEM_NODE_IDS.LIBRARY}:note_rich`, true, true);
+  uiStore.setExpanded(`${todayDayId}:note_rich`, true, true);
 
   // Store image nodes: expand article nodes with children
   uiStore.setExpanded('si_reading_notes:si_deep_reading', true, true);
@@ -509,10 +505,10 @@ function seedBody(): void {
   uiStore.setExpanded(`${todayDayId}:j_leaders`, true, true);
   uiStore.setExpanded(`${todayDayId}:j_range`, true, true);
 
-  // Navigate to Library — use replacePanel (not navigateTo) to avoid
+  // Navigate to Today — use replacePanel (not navigateTo) to avoid
   // creating a Loro undo entry whose UI snapshot is the empty initial state.
   if (uiStore.panelHistory.length === 0) {
-    uiStore.replacePanel(SYSTEM_NODE_IDS.LIBRARY);
+    uiStore.replacePanel(todayDayId);
   }
 }
 

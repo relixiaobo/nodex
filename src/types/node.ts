@@ -103,6 +103,7 @@ export type QueryOp =
 
   // Phase 3: Scope
   | 'PARENTS_DESCENDANTS'     // 搜索节点父节点的所有后代
+  /** @deprecated Legacy scope for the old Library container. */
   | 'IN_LIBRARY'              // Library 容器的直接子节点
   | 'ON_DAY_NODE'             // 日历日节点的直接子节点
 
@@ -369,13 +370,16 @@ export interface NodexNode {
 
 /** 工作区内的固定系统节点 ID。 */
 export const SYSTEM_NODE_IDS = {
+  /** @deprecated Legacy — no longer bootstrapped for new workspaces. */
   LIBRARY: 'LIBRARY',
+  /** @deprecated Legacy — no longer bootstrapped for new workspaces. */
   INBOX: 'INBOX',
   JOURNAL: 'JOURNAL',
   SEARCHES: 'SEARCHES',
   TRASH: 'TRASH',
   SCHEMA: 'SCHEMA',
   CLIPS: 'CLIPS',
+  /** @deprecated Legacy — no longer bootstrapped for new workspaces. */
   STASH: 'STASH',
   SETTINGS: 'SETTINGS',
 } as const;

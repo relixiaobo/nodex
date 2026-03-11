@@ -59,6 +59,10 @@ describe('node capabilities', () => {
   });
 
   it('treats legacy Library/Inbox nodes as regular editable nodes', () => {
+    loroDoc.createNode(SYSTEM_NODE_IDS.INBOX, 'ws_default');
+    loroDoc.setNodeDataBatch(SYSTEM_NODE_IDS.INBOX, { name: 'Inbox' });
+    loroDoc.commitDoc('__seed__');
+
     expect(isLockedNode(SYSTEM_NODE_IDS.INBOX)).toBe(false);
     expect(getNodeCapabilities(SYSTEM_NODE_IDS.INBOX)).toEqual({
       role: 'general',

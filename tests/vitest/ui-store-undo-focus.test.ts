@@ -1,3 +1,4 @@
+import { ensureTodayNode } from '../../src/lib/journal.js';
 import { useUIStore } from '../../src/stores/ui-store.js';
 import { resetAndSeed } from './helpers/test-state.js';
 
@@ -8,9 +9,10 @@ describe('ui-store undo/redo + focus/selection semantics', () => {
 
   it('supports navUndo/navRedo and clears redo after new navigation', () => {
     const ui = useUIStore.getState();
+    const todayId = ensureTodayNode();
 
-    // Seed starts at Library panel.
-    expect(useUIStore.getState().panelHistory[useUIStore.getState().panelIndex]).toBe('LIBRARY');
+    // Seed starts at Today panel.
+    expect(useUIStore.getState().panelHistory[useUIStore.getState().panelIndex]).toBe(todayId);
 
     ui.navigateTo('note_2');
     ui.navigateTo('task_1');
@@ -20,7 +22,7 @@ describe('ui-store undo/redo + focus/selection semantics', () => {
     expect(useUIStore.getState().panelHistory[useUIStore.getState().panelIndex]).toBe('note_2');
 
     ui.navUndo();
-    expect(useUIStore.getState().panelHistory[useUIStore.getState().panelIndex]).toBe('LIBRARY');
+    expect(useUIStore.getState().panelHistory[useUIStore.getState().panelIndex]).toBe(todayId);
 
     ui.navRedo();
     expect(useUIStore.getState().panelHistory[useUIStore.getState().panelIndex]).toBe('note_2');

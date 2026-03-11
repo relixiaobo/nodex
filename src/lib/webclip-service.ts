@@ -10,6 +10,14 @@ import type { WebClipCapturePayload } from './webclip-messaging.js';
 import * as loroDoc from './loro-doc.js';
 import { ensureTodayNode } from './journal.js';
 import { resolveFieldOptions } from './field-utils.js';
+import { getWorkspaceTopLevelNodeIds } from './system-node-presets.js';
+
+const CLIP_SCAN_SKIP_IDS: ReadonlySet<string> = new Set([
+  SYSTEM_NODE_IDS.JOURNAL,
+  SYSTEM_NODE_IDS.TRASH,
+  SYSTEM_NODE_IDS.SCHEMA,
+  SYSTEM_NODE_IDS.SETTINGS,
+]);
 
 // Re-export for convenience
 export type { WebClipCapturePayload };
@@ -537,7 +545,7 @@ function isMatchingClipNode(
 
 /**
  * Find a #source-family node by its Source URL field value.
- * Searches CLIPS, INBOX, LIBRARY containers and JOURNAL day nodes.
+ * Searches workspace top-level content containers and JOURNAL day nodes.
  *
  * @returns The node ID of the matching clip node, or null if not found.
  */
@@ -548,10 +556,9 @@ export function findClipNodeByUrl(url: string): string | null {
   const sourceUrlFieldDef = loroDoc.toNodexNode(NDX_F.SOURCE_URL);
   if (!sourceUrlFieldDef) return null;
 
-  // Search through flat containers: CLIPS, INBOX, LIBRARY
-  const containers = [SYSTEM_NODE_IDS.CLIPS, SYSTEM_NODE_IDS.INBOX, SYSTEM_NODE_IDS.LIBRARY];
-
-  for (const containerId of containers) {
+  // Search through workspace top-level content containers.
+  for (const containerId of getWorkspaceTopLevelNodeIds()) {
+    if (CLIP_SCAN_SKIP_IDS.has(containerId)) continue;
     const children = loroDoc.getChildren(containerId);
     for (const childId of children) {
       if (isMatchingClipNode(childId, NDX_F.SOURCE_URL, normalizedUrl)) {

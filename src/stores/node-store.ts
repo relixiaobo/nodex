@@ -22,7 +22,8 @@ import { resolveCheckboxClick, resolveCmdEnterCycle, resolveForwardDoneMapping, 
 import { nextAutoColorKey } from '../lib/tag-colors.js';
 import { runSearch } from '../lib/search-engine.js';
 import { resolveAutoInit } from '../lib/field-auto-init.js';
-import { resolvePreferredTopLevelParentId } from '../lib/system-node-presets.js';
+import { ensureTodayNode } from '../lib/journal.js';
+import { getWorkspaceHomeNodeId } from '../lib/system-node-presets.js';
 import type { ParsedPasteNode } from '../lib/paste-parser.js';
 import { resolveEffectiveId } from '../lib/node-type-utils.js';
 
@@ -1109,8 +1110,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
       if (from && loroDoc.hasNode(from)) {
         loroDoc.moveNode(nodeId, from, fromIndex);
       } else {
-        const fallbackParentId = resolvePreferredTopLevelParentId(SYSTEM_NODE_IDS.LIBRARY);
-        if (!fallbackParentId) return;
+        const fallbackParentId = ensureTodayNode();
         loroDoc.moveNode(nodeId, fallbackParentId);
       }
 
@@ -1785,7 +1785,9 @@ export const useNodeStore = create<NodeStore>((set, get) => {
 
     createSearchNode: (tagDefId) => {
       if (!canMutate('createSearchNode')) return '';
-      const searchRootId = resolvePreferredTopLevelParentId(SYSTEM_NODE_IDS.SEARCHES);
+      const searchRootId = loroDoc.hasNode(SYSTEM_NODE_IDS.SEARCHES)
+        ? SYSTEM_NODE_IDS.SEARCHES
+        : getWorkspaceHomeNodeId();
       if (!searchRootId) return '';
 
       // De-duplication: check if a search node for this tag already exists in the preferred top-level parent
@@ -2126,8 +2128,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
       const searchNode = loroDoc.toNodexNode(searchNodeId);
       if (!searchNode || searchNode.type !== 'search') return get().createChild(searchNodeId, undefined, data);
       const nodeId = nanoid();
-      const preferredParentId = resolvePreferredTopLevelParentId(SYSTEM_NODE_IDS.LIBRARY);
-      if (!preferredParentId) return { id: '', name: '', children: [], tags: [] } as unknown as NodexNode;
+      const preferredParentId = ensureTodayNode();
       loroDoc.createNode(nodeId, preferredParentId);
       const now = Date.now();
       loroDoc.setNodeDataBatch(nodeId, { ...data, createdAt: now, updatedAt: now });

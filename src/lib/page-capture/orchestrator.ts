@@ -71,13 +71,20 @@ export async function captureCurrentPage(
 
   const extractor = matchPageCaptureExtractor(context);
   if (extractor) {
-    const patch = await extractor.enrich({
-      baseline,
-      context,
-      page,
-      request: resolvedRequest,
-    });
-    page = applyPageCapturePatch(page, patch);
+    try {
+      const patch = await extractor.enrich({
+        baseline,
+        context,
+        page,
+        request: resolvedRequest,
+      });
+      page = applyPageCapturePatch(page, patch);
+    } catch (error) {
+      console.warn(
+        `[page-capture] extractor "${extractor.id}" failed, falling back to baseline capture`,
+        error,
+      );
+    }
   }
 
   if (!page.contentHtml) {

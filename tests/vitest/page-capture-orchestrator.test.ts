@@ -259,4 +259,40 @@ describe('page-capture orchestrator', () => {
     }));
     expect(result).toEqual({ ok: false, error: 'Defuddle returned empty content' });
   });
+
+  it('falls back to the baseline capture when a site extractor throws', async () => {
+    setPage({
+      title: 'Broken x page',
+    });
+
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const context: PageCaptureContext = {
+      window,
+      document,
+      location: {
+        href: 'https://x.com/broken',
+        hostname: 'x.com',
+        get pathname() {
+          throw new Error('pathname exploded');
+        },
+      } as unknown as Location,
+      services: {
+        now: () => 123456789,
+        defuddleParse: () => ({
+          title: 'Baseline title',
+          content: '<p>Baseline content</p>',
+          description: 'Baseline description',
+          extractorType: 'twitter',
+        }),
+      },
+    };
+
+    const page = await captureCurrentPage(context);
+
+    expect(page.title).toBe('Baseline title');
+    expect(page.contentHtml).toBe('<p>Baseline content</p>');
+    expect(page.metadata.description).toBe('Baseline description');
+    expect(page.siteHints).toEqual({ site: 'generic' });
+    expect(warn).toHaveBeenCalledOnce();
+  });
 });

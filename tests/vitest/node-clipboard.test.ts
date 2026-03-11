@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { resetAndSeed } from './helpers/test-state.js';
 import { serializeNodesToMarkdown } from '../../src/lib/node-clipboard.js';
 import { useNodeStore } from '../../src/stores/node-store.js';
-import { SYSTEM_NODE_IDS } from '../../src/types/index.js';
+import { ensureTodayNode } from '../../src/lib/journal.js';
 
 describe('serializeNodesToMarkdown', () => {
   beforeEach(() => {
@@ -11,14 +11,14 @@ describe('serializeNodesToMarkdown', () => {
 
   it('serializes a single node with no children', () => {
     const store = useNodeStore.getState();
-    const child = store.createChild(SYSTEM_NODE_IDS.LIBRARY, undefined, { name: 'Hello world' });
+    const child = store.createChild(ensureTodayNode(), undefined, { name: 'Hello world' });
     const result = serializeNodesToMarkdown([child.id]);
     expect(result).toBe('- Hello world');
   });
 
   it('serializes a node with nested children', () => {
     const store = useNodeStore.getState();
-    const parent = store.createChild(SYSTEM_NODE_IDS.LIBRARY, undefined, { name: 'Parent' });
+    const parent = store.createChild(ensureTodayNode(), undefined, { name: 'Parent' });
     const child1 = store.createChild(parent.id, undefined, { name: 'Child 1' });
     store.createChild(child1.id, undefined, { name: 'Grandchild' });
     store.createChild(parent.id, undefined, { name: 'Child 2' });
@@ -34,9 +34,10 @@ describe('serializeNodesToMarkdown', () => {
 
   it('serializes multiple top-level nodes', () => {
     const store = useNodeStore.getState();
-    const a = store.createChild(SYSTEM_NODE_IDS.LIBRARY, undefined, { name: 'Node A' });
-    const b = store.createChild(SYSTEM_NODE_IDS.LIBRARY, undefined, { name: 'Node B' });
-    const c = store.createChild(SYSTEM_NODE_IDS.LIBRARY, undefined, { name: 'Node C' });
+    const parentId = ensureTodayNode();
+    const a = store.createChild(parentId, undefined, { name: 'Node A' });
+    const b = store.createChild(parentId, undefined, { name: 'Node B' });
+    const c = store.createChild(parentId, undefined, { name: 'Node C' });
 
     const result = serializeNodesToMarkdown([a.id, b.id, c.id]);
     expect(result).toBe(
@@ -52,7 +53,7 @@ describe('serializeNodesToMarkdown', () => {
 
   it('handles nodes with empty names', () => {
     const store = useNodeStore.getState();
-    const node = store.createChild(SYSTEM_NODE_IDS.LIBRARY, undefined, { name: '' });
+    const node = store.createChild(ensureTodayNode(), undefined, { name: '' });
     const result = serializeNodesToMarkdown([node.id]);
     // trimEnd() removes trailing space from "- "
     expect(result).toBe('-');
@@ -62,7 +63,7 @@ describe('serializeNodesToMarkdown', () => {
 
   it('serializes a field entry as "field name:: " with value children', () => {
     const store = useNodeStore.getState();
-    const parent = store.createChild(SYSTEM_NODE_IDS.LIBRARY, undefined, { name: 'My task' });
+    const parent = store.createChild(ensureTodayNode(), undefined, { name: 'My task' });
     // Add the Status field (fieldDef name = 'Status', seed has attrDef_status)
     store.addFieldToNode(parent.id, 'attrDef_status');
     // Find the fieldEntry
@@ -83,7 +84,7 @@ describe('serializeNodesToMarkdown', () => {
 
   it('serializes a content node including its field entries', () => {
     const store = useNodeStore.getState();
-    const parent = store.createChild(SYSTEM_NODE_IDS.LIBRARY, undefined, { name: 'My task' });
+    const parent = store.createChild(ensureTodayNode(), undefined, { name: 'My task' });
     store.createChild(parent.id, undefined, { name: 'Some note' });
     store.addFieldToNode(parent.id, 'attrDef_status');
     // Find the fieldEntry and add a value
@@ -103,7 +104,7 @@ describe('serializeNodesToMarkdown', () => {
 
   it('serializes field entry with nested value children', () => {
     const store = useNodeStore.getState();
-    const parent = store.createChild(SYSTEM_NODE_IDS.LIBRARY, undefined, { name: 'Project' });
+    const parent = store.createChild(ensureTodayNode(), undefined, { name: 'Project' });
     store.addFieldToNode(parent.id, 'attrDef_status');
     const parentNode = store.getNode(parent.id);
     const fieldEntryId = parentNode!.children!.find((cid) => {

@@ -15,6 +15,7 @@ import { createLightweightClip, findClipNodeByUrl, normalizeUrl } from './webcli
 import { resolveTagColor } from './tag-colors.js';
 import { SYSTEM_NODE_IDS, SYS_T } from '../types/index.js';
 import * as loroDoc from './loro-doc.js';
+import { getWorkspaceTopLevelNodeIds } from './system-node-presets.js';
 
 export interface CreateHighlightFromPayloadResult {
   highlightNodeId: string;
@@ -23,6 +24,12 @@ export interface CreateHighlightFromPayloadResult {
 }
 
 const pendingClipCreationByUrl = new Map<string, Promise<string>>();
+const HIGHLIGHT_SCAN_SKIP_IDS: ReadonlySet<string> = new Set([
+  SYSTEM_NODE_IDS.JOURNAL,
+  SYSTEM_NODE_IDS.TRASH,
+  SYSTEM_NODE_IDS.SCHEMA,
+  SYSTEM_NODE_IDS.SETTINGS,
+]);
 
 /**
  * Collect highlight IDs from clip pages in a flat container.
@@ -52,8 +59,9 @@ function collectHighlightsUnderClip(clipNodeId: string, ids: Set<string>): void 
 export function collectAllHighlightNodeIds(): Set<string> {
   const ids = new Set<string>();
 
-  // Flat containers
-  for (const containerId of [SYSTEM_NODE_IDS.LIBRARY, SYSTEM_NODE_IDS.INBOX, SYSTEM_NODE_IDS.CLIPS]) {
+  // Workspace top-level content containers
+  for (const containerId of getWorkspaceTopLevelNodeIds()) {
+    if (HIGHLIGHT_SCAN_SKIP_IDS.has(containerId)) continue;
     collectHighlightsFromFlatContainer(containerId, ids);
   }
 
@@ -371,4 +379,3 @@ export function findNoteEntriesForHighlight(highlightNodeId: string): NoteEntry[
   }
   return entries;
 }
-

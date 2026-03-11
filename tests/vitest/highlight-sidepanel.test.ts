@@ -207,6 +207,19 @@ describe('highlight-sidepanel (unified Path B model)', () => {
     expect(ids.has(second.highlightNodeId)).toBe(true);
   });
 
+  it('collectAllHighlightNodeIds still scans a legacy Library container when present', async () => {
+    const store = getStore();
+    const result = await createHighlightFromPayload(makePayload({ selectedText: 'legacy-library' }), store);
+
+    loroDoc.createNode(SYSTEM_NODE_IDS.LIBRARY, 'ws_default');
+    loroDoc.setNodeDataBatch(SYSTEM_NODE_IDS.LIBRARY, { name: 'Library' });
+    loroDoc.moveNode(result.clipNodeId, SYSTEM_NODE_IDS.LIBRARY);
+    loroDoc.commitDoc('__seed__');
+
+    const ids = collectAllHighlightNodeIds();
+    expect(ids.has(result.highlightNodeId)).toBe(true);
+  });
+
   it('detects removed highlight IDs', async () => {
     const store = getStore();
     // Use bare highlights (no notes) so trashing highlight is sufficient

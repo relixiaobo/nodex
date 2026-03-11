@@ -1,7 +1,7 @@
 import { getAllNodeIds } from '../../src/lib/loro-doc.js';
+import { ensureTodayNode } from '../../src/lib/journal.js';
 import { useUIStore } from '../../src/stores/ui-store.js';
 import { useWorkspaceStore } from '../../src/stores/workspace-store.js';
-import { SYSTEM_NODE_IDS } from '../../src/types/index.js';
 import { resetAndSeed } from './helpers/test-state.js';
 
 describe('preflight', () => {
@@ -18,6 +18,6 @@ describe('preflight', () => {
     expect(ws.currentWorkspaceId).toBe('ws_default');
     expect(ws.userId).toBe('user_default');
     expect(ui.panelHistory.length).toBeGreaterThan(0);
-    expect(ui.panelHistory[ui.panelIndex]).toBe(SYSTEM_NODE_IDS.LIBRARY);
+    expect(ui.panelHistory[ui.panelIndex]).toBe(ensureTodayNode());
   });
 });

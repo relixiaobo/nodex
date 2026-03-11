@@ -1,25 +1,25 @@
 /**
  * extractToTaggedNode — ProseMirror operation for # Tag toolbar action.
  *
- * Takes the current selection, creates a Library node with the selected tag,
+ * Takes the current selection, creates a Today node with the selected tag,
  * and replaces the selection with an inline reference.
  *
  * For #highlight tags, sets the Source field to the nearest #source ancestor.
  */
 import type { EditorView } from 'prosemirror-view';
 import type { NodexNode, InlineRefEntry } from '../types/index.js';
-import { SYSTEM_NODE_IDS, SYS_T } from '../types/index.js';
+import { SYS_T } from '../types/index.js';
 import { pmSchema } from '../components/editor/pm-schema.js';
 import { docToMarks } from './pm-doc-utils.js';
 import * as loroDoc from './loro-doc.js';
-import { resolvePreferredTopLevelParentId } from './system-node-presets.js';
+import { ensureTodayNode } from './journal.js';
 import {
   createHighlightOnly,
   type HighlightNodeStore,
 } from './highlight-service.js';
 
 export interface ExtractResult {
-  /** The newly created Library node. */
+  /** The newly created tagged node. */
   node: NodexNode;
   /** Updated text after replacement (contains \uFFFC). */
   newText: string;
@@ -85,9 +85,8 @@ export function extractToTaggedNode(
     });
     newNode = highlightNode;
   } else {
-    // Generic tag or no clip ancestor: create in LIBRARY and apply tag
-    const parentId = resolvePreferredTopLevelParentId(SYSTEM_NODE_IDS.LIBRARY);
-    if (!parentId) return null;
+    // Generic tag or no clip ancestor: create under Today and apply tag
+    const parentId = ensureTodayNode();
     newNode = store.createChild(parentId, undefined, { name: selectedText });
     store.applyTag(newNode.id, tagDefId);
   }

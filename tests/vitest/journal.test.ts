@@ -420,13 +420,13 @@ describe('getDayNoteCountsForMonth', () => {
 
   it('returns correct note counts for days with content', () => {
     // Seed data creates today + yesterday with notes.
-    // today: 4 notes (j_pg, j_deep, j_leaders, j_range)
+    // today: 15 notes (top-level demo content + journal entries on Today)
     // yesterday: 2 notes (j_yest_1, j_yest_2)
     const today = new Date();
     const counts = getDayNoteCountsForMonth(today.getFullYear(), today.getMonth());
 
     const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-    expect(counts.get(todayStr)).toBe(4);
+    expect(counts.get(todayStr)).toBe(15);
 
     const yesterday = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1);
     // Yesterday might be in a different month — only check if same month

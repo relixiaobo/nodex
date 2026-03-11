@@ -190,6 +190,7 @@ function useBootstrap(skip: boolean): BootstrapResult {
         pageUrl: entry.pageUrl,
         pageTitle: entry.pageTitle,
         noteEntries: entry.noteEntries ?? [],
+        pageMeta: entry.pageMeta,
        }, store);
        consumed.push(entry.tempId);
       } catch (err) {

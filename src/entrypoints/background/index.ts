@@ -371,6 +371,7 @@ export default defineBackground(() => {
           pageUrl: payload.pageUrl,
           pageTitle: payload.pageTitle,
           noteEntries: payload.noteEntries,
+          pageMeta: payload.pageMeta,
         });
 
         sendResponse({ ok: true, queued: true });

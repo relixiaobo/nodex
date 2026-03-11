@@ -848,7 +848,7 @@ describe('createLightweightClip', () => {
     expect(node!.name).toBe('My Page Title');
   });
 
-  it('applies #source tag for generic URL', async () => {
+  it('applies #source tag for generic URL without pageMeta', async () => {
     const store = useNodeStore.getState();
     const clipId = await createLightweightClip(
       'https://example.com/page',
@@ -858,6 +858,32 @@ describe('createLightweightClip', () => {
 
     const node = loroDoc.toNodexNode(clipId);
     expect(node!.tags).toContain(SYS_T.SOURCE);
+  });
+
+  it('applies #article tag when pageMeta has hasArticleElement', async () => {
+    const store = useNodeStore.getState();
+    const clipId = await createLightweightClip(
+      'https://example.com/blog-post',
+      'Blog Post',
+      store,
+      { hasArticleElement: true },
+    );
+
+    const node = loroDoc.toNodexNode(clipId);
+    expect(node!.tags).toContain(NDX_T.ARTICLE);
+  });
+
+  it('applies #article tag when pageMeta has ogType article', async () => {
+    const store = useNodeStore.getState();
+    const clipId = await createLightweightClip(
+      'https://example.com/news',
+      'News Article',
+      store,
+      { ogType: 'article' },
+    );
+
+    const node = loroDoc.toNodexNode(clipId);
+    expect(node!.tags).toContain(NDX_T.ARTICLE);
   });
 
   it('applies #video tag for YouTube URL', async () => {

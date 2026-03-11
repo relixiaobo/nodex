@@ -705,8 +705,24 @@ function createHighlightDraft(range: Range): HighlightDraft {
       selectedText,
       pageUrl: source.url,
       pageTitle: source.title,
+      pageMeta: gatherPageMeta(),
     },
   };
+}
+
+/** Gather lightweight page metadata for clip type detection. */
+function gatherPageMeta(): HighlightCreatePayload['pageMeta'] {
+  const ogType = document.querySelector<HTMLMetaElement>('meta[property="og:type"]')?.content;
+  const schemaEl = document.querySelector('script[type="application/ld+json"]');
+  let schemaOrgType: string | undefined;
+  if (schemaEl?.textContent) {
+    try {
+      const json = JSON.parse(schemaEl.textContent);
+      schemaOrgType = json?.['@type'] as string | undefined;
+    } catch { /* ignore */ }
+  }
+  const hasArticleElement = document.querySelector('article') !== null;
+  return { ogType, schemaOrgType, hasArticleElement };
 }
 
 /**

@@ -158,10 +158,14 @@ src/
       index.html           # HTML 容器
       main.tsx             # React createRoot 入口
       App.tsx              # 根组件 (初始化 + 布局)
-    background/            # Service Worker (打开 Side Panel + 消息中转)
+    background/            # Service Worker (打开 Side Panel + 消息路由)
       index.ts
-    content/               # Content Script (网页剪藏, 占位)
-      index.ts
+    content/               # Content Script (网页高亮 + 选中工具栏 + 页面抓取)
+      index.ts             # WXT 入口
+      highlight.ts         # 高亮创建/删除交互
+      highlight-toolbar.ts # 选中文本工具栏
+      highlight-restore.ts # 页面加载时恢复已有高亮
+      anchor-utils.ts      # 文本锚点序列化/反序列化
   components/
     outliner/              # 大纲核心
       OutlinerView.tsx     # 大纲容器 (渲染根节点的子节点列表)
@@ -199,6 +203,27 @@ src/
     system-node-presets.ts # 系统节点预设 (SYSTEM_NODE_PRESETS, getSystemNodePreset)
     palette-commands.ts    # ⌘K 命令注册表 (系统命令 + 日记导航)
     tree-utils.ts          # 树遍历工具 (flatten/navigate/parent/sibling)
+    highlight-service.ts   # 高亮节点 CRUD (Side Panel 端)
+    highlight-sidepanel.ts # SP 端高亮消息处理 + clip 关联
+    highlight-messaging.ts # 高亮相关消息类型定义
+    highlight-pending-queue.ts # 离线高亮队列 (chrome.storage)
+    webclip-service.ts     # Web Clip 节点创建/填充/去重
+    webclip-messaging.ts   # Web Clip 消息类型定义
+    page-capture/          # 网页抓取基础设施 (模块化)
+      orchestrator.ts      # 抓取编排 — 注入 CS → 收集元数据 → 匹配 extractor → 合并结果
+      registry.ts          # Site extractor 注册表
+      models.ts            # PageCaptureResult / SiteExtractor 类型
+      messaging.ts         # 抓取消息常量 + payload 类型
+      background-transport.ts  # BG→CS 通信层 (注入 + 重试 + 消息转发)
+      content-adapter.ts   # CS 端适配器 (DOM 采集 + extractor 执行)
+      metadata.ts          # 通用页面元数据提取 (OG/Schema.org/meta)
+      site-utils.ts        # URL 域名匹配工具
+      x-video-service.ts   # x.com 视频元数据获取 (BG 端 fetch)
+      extractors/          # 站点增强抓取器
+        x.ts               # x.com (推文/视频)
+        youtube.ts         # YouTube (视频元数据)
+        google-docs.ts     # Google Docs (export HTML)
+        github.ts          # GitHub (README/Issue/PR)
   types/                   # 核心类型
     node.ts                # NodexNode, NodeType, SYSTEM_NODE_IDS
     system-nodes.ts        # SYS_A*(60+), SYS_D*(12), SYS_V*(22+), SYS_T*(25+)

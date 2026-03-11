@@ -4,7 +4,7 @@
  * Covers:
  * - isUrlFieldType recognises both FIELD_TYPES.URL and SYS_D.URL
  * - isEmailFieldType recognises both FIELD_TYPES.EMAIL and SYS_D.EMAIL
- * - Seed data: Source URL fieldDef has fieldType = 'url'
+ * - Seed data: URL fieldDef has fieldType = 'url'
  * - Seed data: Email fieldDef has fieldType = 'email'
  */
 import { describe, it, expect, beforeEach } from 'vitest';
@@ -50,7 +50,7 @@ describe('Seed data URL/Email fieldDef types', () => {
     resetAndSeed();
   });
 
-  it('Source URL fieldDef has fieldType = url', () => {
+  it('URL fieldDef has fieldType = url', () => {
     const node = loroDoc.toNodexNode(NDX_F.SOURCE_URL);
     expect(node).toBeDefined();
     expect(node!.fieldType).toBe(FIELD_TYPES.URL);

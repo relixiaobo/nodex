@@ -152,7 +152,14 @@ function seedBody(): void {
   // TagDef: Source (web clips, articles, etc.) — fixed ID SYS_T202
   // ═══════════════════════════════════════════════════════════════
   cn(SYS_T.SOURCE, SYSTEM_NODE_IDS.SCHEMA, { type: 'tagDef', name: 'source', color: 'sage' });
-  cn(NDX_F.SOURCE_URL, SYS_T.SOURCE, { type: 'fieldDef', name: 'Source URL', fieldType: FIELD_TYPES.URL });
+  cn(NDX_F.SOURCE_URL, SYS_T.SOURCE, { type: 'fieldDef', name: 'URL', fieldType: FIELD_TYPES.URL });
+  cn(NDX_F.SOURCE_HIGHLIGHTS, SYS_T.SOURCE, {
+    type: 'fieldDef',
+    name: 'Highlights',
+    fieldType: FIELD_TYPES.OPTIONS_FROM_SUPERTAG,
+    sourceSupertag: SYS_T.HIGHLIGHT,
+    hideField: SYS_V.ALWAYS,
+  });
 
   // ═══════════════════════════════════════════════════════════════
   // FieldDefs under #source: Author (NDX_F03), Published (NDX_F04)
@@ -369,7 +376,7 @@ function seedBody(): void {
     description: 'A sample web clip to demonstrate the clipping feature',
   });
   useNodeStore.getState().applyTag('webclip_1', SYS_T.SOURCE);
-  // Set Source URL value: create a value node under the fieldEntry
+  // Set URL field value: create a value node under the fieldEntry
   const wcFeId = loroDoc.getChildren('webclip_1')
     .find((c) => {
       const n = loroDoc.toNodexNode(c);

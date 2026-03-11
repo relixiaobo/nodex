@@ -95,14 +95,14 @@ describe('findTemplateAttrDef', () => {
   });
 
   it('finds template fieldDef by name within tagDef', () => {
-    const result = findTemplateAttrDef({}, SYS_T.SOURCE, 'Source URL');
+    const result = findTemplateAttrDef({}, SYS_T.SOURCE, 'URL');
     expect(result).toBeDefined();
     expect(result!.id).toBe(NDX_F.SOURCE_URL);
     expect(result!.type).toBe('fieldDef');
   });
 
   it('finds fieldDef case-insensitively', () => {
-    const result = findTemplateAttrDef({}, SYS_T.SOURCE, 'source url');
+    const result = findTemplateAttrDef({}, SYS_T.SOURCE, 'url');
     expect(result).toBeDefined();
     expect(result!.id).toBe(NDX_F.SOURCE_URL);
   });
@@ -113,12 +113,12 @@ describe('findTemplateAttrDef', () => {
   });
 
   it('returns undefined for non-existent tagDef', () => {
-    const result = findTemplateAttrDef({}, 'nonexistent_tag', 'Source URL');
+    const result = findTemplateAttrDef({}, 'nonexistent_tag', 'URL');
     expect(result).toBeUndefined();
   });
 
-  it('Source URL attrDef has fieldType = URL', () => {
-    const result = findTemplateAttrDef({}, SYS_T.SOURCE, 'Source URL');
+  it('URL attrDef has fieldType = URL', () => {
+    const result = findTemplateAttrDef({}, SYS_T.SOURCE, 'URL');
     expect(result).toBeDefined();
     expect(result!.fieldType).toBe('url');
   });
@@ -314,7 +314,7 @@ describe('saveWebClip', () => {
     expect(node!.tags).toContain(SYS_T.SOURCE);
   });
 
-  it('writes Source URL field value', async () => {
+  it('writes URL field value', async () => {
     const store = useNodeStore.getState();
     const payload = makePayload({ url: 'https://example.com/test' });
 
@@ -358,7 +358,7 @@ describe('saveWebClip', () => {
     const node = loroDoc.toNodexNode(clipId);
     expect(node!.tags).toContain(SYS_T.SOURCE);
 
-    // Source URL fieldDef should always be NDX_F01
+    // URL fieldDef should always be NDX_F01
     const feId = findFieldEntry(clipId, NDX_F.SOURCE_URL);
     expect(feId).toBeDefined();
   });
@@ -436,7 +436,7 @@ describe('saveWebClip with templates', () => {
     expect(node!.tags).toContain(NDX_T.VIDEO);
     expect(node!.tags).not.toContain(SYS_T.SOURCE);
 
-    // Source URL field should be populated (inherited from #source via extends)
+    // URL field should be populated (inherited from #source via extends)
     const urlFe = findFieldEntry(clipId, NDX_F.SOURCE_URL);
     expect(urlFe).toBeDefined();
     expect(getFirstFieldValue(urlFe!)).toBe('https://www.youtube.com/watch?v=dQw4w9WgXcQ');
@@ -628,7 +628,7 @@ describe('applyWebClipToNode', () => {
     expect(getFirstFieldValue(durFe!)).toBe('10:05');
   });
 
-  it('writes Source URL field value to existing node', async () => {
+  it('writes URL field value to existing node', async () => {
     const store = useNodeStore.getState();
     const payload = makePayload({ url: 'https://example.com/clipped' });
 
@@ -882,7 +882,7 @@ describe('createLightweightClip', () => {
     expect(node!.tags).toContain(NDX_T.SOCIAL);
   });
 
-  it('writes Source URL field', async () => {
+  it('writes URL field', async () => {
     const store = useNodeStore.getState();
     const clipId = await createLightweightClip(
       'https://example.com/test-page',

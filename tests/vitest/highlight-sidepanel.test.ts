@@ -30,6 +30,13 @@ function getStore(): HighlightNodeStore {
   return useNodeStore.getState() as HighlightNodeStore;
 }
 
+function findFieldEntry(parentId: string, fieldDefId: string): string | undefined {
+  return loroDoc.getChildren(parentId).find((childId) => {
+    const child = loroDoc.toNodexNode(childId);
+    return child?.type === 'fieldEntry' && child.fieldDefId === fieldDefId;
+  });
+}
+
 function makePayload(overrides?: Partial<HighlightCreatePayload>): HighlightCreatePayload {
   return {
     selectedText: 'highlighted text',
@@ -69,7 +76,7 @@ describe('highlight-sidepanel (unified Path B model)', () => {
     expect(noteNode!.name).toBe('my insight');
   });
 
-  it('creates #highlight as direct child of clip (Path B)', async () => {
+  it('creates #highlight inside the clip Highlights field (Path B)', async () => {
     const store = getStore();
     const result = await createHighlightFromPayload(makePayload(), store);
 
@@ -78,8 +85,9 @@ describe('highlight-sidepanel (unified Path B model)', () => {
     expect(hlNode!.tags).toContain(SYS_T.HIGHLIGHT);
     expect(hlNode!.name).toBe('highlighted text');
 
-    // Highlight should be direct child of clip page
-    expect(loroDoc.getParentId(result.highlightNodeId)).toBe('webclip_1');
+    const highlightsFieldEntryId = findFieldEntry('webclip_1', NDX_F.SOURCE_HIGHLIGHTS);
+    expect(highlightsFieldEntryId).toBeDefined();
+    expect(loroDoc.getParentId(result.highlightNodeId)).toBe(highlightsFieldEntryId);
 
     // Note's Highlights field should contain a reference to the highlight
     const noteNode = store.getNode(result.noteNodeId!);
@@ -230,7 +238,7 @@ describe('highlight-sidepanel (unified Path B model)', () => {
     expect(before.has(first.highlightNodeId)).toBe(true);
     expect(before.has(second.highlightNodeId)).toBe(true);
 
-    // Trash the highlight (direct child of clip, no note reference to keep it alive)
+    // Trash the highlight itself; no note reference keeps this bare highlight alive
     loroDoc.moveNode(first.highlightNodeId, SYSTEM_NODE_IDS.TRASH);
     const after = collectAllHighlightNodeIds();
     const removed = getRemovedHighlightIds(before, after);

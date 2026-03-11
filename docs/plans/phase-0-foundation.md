@@ -98,7 +98,7 @@ pi-mono 只提供了客户端 `streamProxy()`，**服务端 handler 需要我们
 
 ```
 1. 接收 POST { model, context, options }
-2. 提取 API key（Phase 0: 从 body.apiKey；Phase 1: 从 D1 解密）
+2. 提取 API key（Phase 0: 从 context._apiKey；Phase 1: 从 D1 解密）
 3. 调用 pi-ai 的 stream(model, context, { apiKey, ...options })
 4. 遍历 AssistantMessageEvent 事件流
 5. 每个事件转换为 ProxyAssistantMessageEvent（去掉 partial 字段）
@@ -331,11 +331,15 @@ export async function createAgent(): Promise<Agent> {
     streamFn: async (model, context, options) => {
       const token = await getStoredToken();
       if (!token) throw new Error('Please sign in first');
+      const apiKey = await getApiKey();
 
-      return streamProxy(model, context, {
+      return streamProxy(model, {
+        ...context,
+        _apiKey: apiKey,  // server 端提取后删除，再传给 pi-ai
+      }, {
         ...options,
         authToken: token,
-        proxyUrl: SYNC_API_URL,
+        proxyUrl: SYNC_API_URL,  // 复用现有 Cloudflare Worker
       });
     },
   });
@@ -345,38 +349,8 @@ export async function createAgent(): Promise<Agent> {
 **关键**：
 - `proxyUrl` = 现有的 `VITE_SYNC_API_URL`（复用同一个 Cloudflare Worker）
 - `authToken` = `getStoredToken()`（复用现有认证）
-- API key 通过 body 传递（Phase 0），不通过 streamProxy options（它没有 apiKey 参数）
-
-**Phase 0 的 API key 传递问题**：`streamProxy` 的 body 只包含 `{ model, context, options }`，没有 `apiKey` 字段。
-
-**决策：通过 context 注入 `_apiKey`**（方案 1）：
-
-```typescript
-streamFn: async (model, context, options) => {
-  const token = await getStoredToken();
-  const apiKey = await getApiKey();
-  return streamProxy(model, {
-    ...context,
-    _apiKey: apiKey,  // server 端提取后删除，再传给 pi-ai
-  }, { ...options, authToken: token, proxyUrl: SYNC_API_URL });
-}
-```
-
-Server 端对应处理：
-```typescript
-ai.post('/stream', async (c) => {
-  const body = await c.req.json();
-  const { model, context, options } = body;
-  const apiKey = context._apiKey;
-  delete context._apiKey;  // 清除后再传给 pi-ai
-  // ...
-});
-```
-
-**为什么选方案 1**：最小侵入——复用 streamProxy 的 SSE 解析逻辑（`processProxyEvent`），不需要自己写 fetch + SSE 解析。Phase 1 迁移到 D1 加密存储后，`_apiKey` 字段消失，改为 server 端从 D1 读取。
-
-**弃选方案 2**（自己写 fetch）：需要导入并复用 `processProxyEvent`，增加维护负担。
-**弃选方案 3**（custom header）：需要修改 CORS 配置。
+- API key 通过 `context._apiKey` 注入 → server 端提取后删除再传给 pi-ai
+- Phase 1 迁移到 D1 加密存储后，`_apiKey` 注入消除，改为 server 端从 D1 读取
 
 ### 创建 `src/hooks/use-agent.ts`
 
@@ -649,7 +623,7 @@ Get your key at console.anthropic.com
 | **npm install** | `server/package.json` | +`@mariozechner/pi-ai` |
 | **npm install** | `package.json` (root) | +`@mariozechner/pi-agent-core` +`@mariozechner/pi-ai` |
 | **Create** | `server/src/routes/ai.ts` | pi-ai proxy endpoint + event conversion (~120 行) |
-| **Modify** | `server/src/index.ts` | 挂载 `/api/ai` routes (+3 行) |
+| **Modify** | `server/src/index.ts` | 挂载 `/api` routes (+3 行) |
 | **Create** | `src/lib/ai-service.ts` | Agent 工厂 + API key 管理 (~100 行) |
 | **Create** | `src/hooks/use-agent.ts` | React hook 订阅 Agent 事件 (~70 行) |
 | **Create** | `src/components/chat/ChatDrawer.tsx` | 主容器 (响应式布局 + API key 状态) (~150 行) |

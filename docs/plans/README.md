@@ -74,29 +74,31 @@ Phase 0 (基座) ━━━ 所有 AI 功能的前提
          └──→ Phase 2 的 CDP 增强 clip ━━━ 可选依赖
 ```
 
-### 并行策略
+### 执行顺序
 
 ```
 时间轴 ──────────────────────────────────────────────→
 
 Phase 0: ██████████  (nodex 自己做，验证基座)
                     │
-                    ├─ Phase 1: ████████████  (Dev Agent A)
-                    │                      │
-                    │                      ├─ Phase 2: ████████████  (Dev Agent A 或 C)
-                    │                      │
-                    │                      └─ Phase 4: ████████████  (Dev Agent B)
-                    │                                             │
-                    │                                             └─ Phase 5: ██████
-                    │
-                    └─ Phase 3: ████████████  (Dev Agent B)
+                    └─ Phase 1: ████████████  (Dev Agent A)
+                                           │
+                                           ├─ Phase 2: ████████████  (Dev Agent A)
+                                           │
+                                           ├─ Phase 3: ████████████  (Dev Agent B)
+                                           │
+                                           └─ Phase 4: ████████████  (Dev Agent B)
+                                                                  │
+                                                                  └─ Phase 5: ██████
 ```
 
 **Phase 0 由 nodex 执行**——核心风险是 pi-mono 协议对齐，需要读源码 + spike 验证。
 
-**Phase 1 和 Phase 3 可并行**——两者只依赖 Phase 0，互不依赖。分配给不同 Dev Agent。
+**Phase 1 完成后再启动后续 Phase**——虽然 Phase 3 在功能上不依赖 Phase 1 的 node tool，但 `ai-service.ts` 是跨 Phase 共享热点文件（详见"高风险文件"章节），Phase 1 合入 main 后 Phase 3 才能基于最新代码开始。
 
-**Phase 2 和 Phase 4 可并行**——Phase 2 依赖 Phase 1 (node tool)，Phase 4 依赖 Phase 1 (稳定 agent loop)。Phase 1 完成后两者同时启动。
+**Phase 2 和 Phase 3 可并行**——Phase 2 (Dev A) 和 Phase 3 (Dev B) 修改的 `ai-service.ts` 部分不同（Phase 2 注册 #skill，Phase 3 注册 browser tool），可以在 Phase 1 合入后同时启动。
+
+**Phase 4 在 Phase 1 后启动**——需要稳定的 agent + tool 体系。
 
 **Phase 5 最后执行**——依赖 Phase 1 (node tool) + Phase 4 (orchestrator)。
 

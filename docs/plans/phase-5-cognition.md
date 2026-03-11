@@ -246,7 +246,7 @@ if (shouldRunSchemaEvolution()) {
 ```
 GIVEN agent 之前给 3 条笔记加了 #meeting 标签
   AND 用户将其中 2 条改为 #1on1
-WHEN Schema evolution skill 下次运行（后台）
+WHEN 用户下次打开 Side Panel，Schema evolution 检查触发（距上次 >24h 且有新 Correction）
 THEN 分析 OpLog 发现修正模式
   AND 在对应的 #skill 节点下创建规则子节点："1对1对话用 #1on1，不是 #meeting"
 WHEN 用户下次请 agent 整理笔记

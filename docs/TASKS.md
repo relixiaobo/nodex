@@ -22,18 +22,17 @@ _(空)_
 
 | Agent | 分支 | 任务 | 锁定文件 | 状态 |
 |---|---|---|---|---|
-| codex | `codex/refactor-page-capture-infra` | 网页抓取基础设施重构 | `src/entrypoints/content/index.ts`, `src/entrypoints/background/index.ts`, `src/lib/webclip-messaging.ts`, `src/lib/webclip-service.ts`, `src/lib/html-to-nodes.ts` | 待 review |
+| codex | cc/ai-plan-review | AI 计划 Review | `docs/plans/*` | 进行中 |
 
 ---
 
 ## 进行中
 
-- [x] **网页抓取基础设施重构** — 将“抓取网页内容供 clip / AI 复用”的能力从 content entrypoint 中抽离为独立基础设施，按最佳实践重建边界
-  - [x] 提取通用 `CapturedPage` / `PageCaptureRequest` / `PageCaptureResult` 领域模型，去掉 `webclip:*` 对核心抓取层的命名绑定
-  - [x] 拆分 capture orchestrator、site extractor registry、transport adapter、clip adapter，避免抓取逻辑继续堆在单个 content script 文件中
-  - [x] 保留现有站点增强能力（x.com、Google Docs、GitHub、YouTube/x video 元数据），但迁移到独立 extractor / helper 模块
-  - [x] 为 orchestrator、site extractors、message adapter 补充结构化测试，确保未来 AI 调用不依赖 clip UI 路径
-  - [x] 保持现有 clip/highlight 用户行为不变，重构只改变基础设施边界和调用方式
+### AI 实施计划 Review — 发现问题和差距
+
+> Agent: codex | 分支: `cc/ai-plan-review` | PR: TBD
+
+阅读 `docs/plans/` 全部 7 份计划文档 + 3 份研究文档，交叉验证一致性，发现潜在问题。
 
 ---
 
@@ -107,11 +106,37 @@ _(空)_
 
 #### AI — 照亮你的思考
 
-> AI 不替你思考，而是把你自己的思考照亮。详见 `docs/product-philosophy.md` § AI 照亮的时机。
+> AI 不替你思考，而是把你自己的思考照亮。基于 pi-mono (pi-ai + pi-agent-core) 架构，分 6 Phase 实施。详细计划见 `docs/plans/`。
 
-- [ ] **笔记问答** — 基于用户笔记回答问题（On-Demand Fetch + RAG）
-- [ ] **Spark Review** — AI 精选有隐藏关联的旧笔记并置呈现，用户主动进入
-- [ ] **AI 反思对话** — 苏格拉底式提问，引导用户发现跨主题脉络（远期）
+##### Phase 0: 基座 — pi-mono 集成 + 最小 Chat
+- [ ] Server: Hono `/api/ai/stream` proxy endpoint（pi-ai streamSimple → ProxyAssistantMessageEvent SSE）
+- [ ] Client: Agent 工厂 + streamProxy 集成 + API key (chrome.storage.local)
+- [ ] UI: ChatDrawer（独立于 PanelStack，⌘L 切换）+ 流式消息 + 空状态 + API key 设置
+
+##### Phase 1: 画布 — node tool + Chat 成熟化
+- [ ] node tool（5 actions: create/read/update/delete/search）+ undo tool
+- [ ] System prompt 从 #agent 节点加载 + #skill 规则注入
+- [ ] Reference 渲染（节点引用可点击跳转）+ Tool call 渲染
+- [ ] Chat 持久化（IndexedDB）+ ⌘K 集成
+
+##### Phase 2: 阅读环 — Clip & Spark
+- [ ] Clip Spark 三轮认知压缩（skeleton → flesh → soul）
+- [ ] 碰撞策略（graph-search，非 embedding）
+- [ ] #skill 节点提取模式学习
+
+##### Phase 3: 浏览器 — browser tool + CDP
+- [ ] Batch 1: read_page + get_text + find（Content Script）
+- [ ] Batch 2: screenshot + click + type（CDP）
+- [ ] Batch 3-4: 深度交互 + 调试工具
+
+##### Phase 4: 编排 — AgentOrchestrator
+- [ ] AgentMessageBus (EventTarget) + AgentOrchestrator (delegate/cancel)
+- [ ] 后台任务 UI（badge + 任务列表）
+- [ ] 求助流（clarification）+ 并发 subagent
+
+##### Phase 5: 认知 — Taste 学习 + Review 引擎
+- [ ] Schema evolution skill（OpLog Correction 分析 → #skill 规则派生）
+- [ ] /review 命令（认知镜像：新结构、升级、矛盾、同构）
 
 ---
 
@@ -155,6 +180,7 @@ _(空)_
 
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
+| 2026-03-11 | 网页抓取基础设施重构 — clip/x.com/Google Docs/GitHub/YouTube 的增强抓取迁移到独立 page capture 栈，orchestrator + site extractors + background transport | codex | #123 |
 | 2026-03-11 | Clip 节点结构调整 — #highlight → Highlights 字段 + Source URL → URL + 旧数据自动迁移 | codex | #122 |
 | 2026-03-11 | 移除 LIBRARY/INBOX 作为默认目标 — 创建路径改用 ensureTodayNode()，搜索路径遍历 workspace children | codex | #121 |
 | 2026-03-11 | 统一散落的复用模式 — resolveEffectiveId() + useDragDropRow() hook + isNodeInTrash() + SYSTEM_NODE_IDS 重命名 | codex | #120 |

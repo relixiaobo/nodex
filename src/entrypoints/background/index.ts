@@ -1,12 +1,21 @@
 import {
   WEBCLIP_CAPTURE_ACTIVE_TAB,
-  WEBCLIP_CAPTURE_PAGE,
   CONTENT_SCRIPT_READY,
-  X_VIDEO_FETCH_URL,
   type WebClipCaptureResponse,
-  type XVideoFetchPayload,
-  type XVideoFetchResponse,
 } from '../../lib/webclip-messaging.js';
+import {
+  PAGE_CAPTURE_ACTIVE_TAB,
+  PAGE_CAPTURE_FETCH_X_VIDEO,
+  capturePageFromTab,
+  capturePageFromTabForWebClip,
+  createContentScriptReadyTracker,
+  ensureTabContentScript,
+  fetchXVideoMetadata,
+  forwardToTab,
+  type PageCaptureResponse,
+  type PageCaptureXVideoPayload,
+  type PageCaptureXVideoResponse,
+} from '../../lib/page-capture/index.js';
 import {
   HIGHLIGHT_CREATE,
   HIGHLIGHT_DELETE,
@@ -34,45 +43,7 @@ import {
   getPendingHighlightsForUrl,
 } from '../../lib/highlight-pending-queue.js';
 
-const CONTENT_SCRIPT_READY_TIMEOUT_MS = 1200;
-const MESSAGE_RETRY_DELAY_MS = 150;
-const MESSAGE_RETRY_TIMES = 2;
-
-const contentScriptReadyWaiters = new Map<number, Set<(ready: boolean) => void>>();
-
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-function resolveReadyWaiters(tabId: number, ready: boolean): void {
-  const waiters = contentScriptReadyWaiters.get(tabId);
-  if (!waiters) return;
-  contentScriptReadyWaiters.delete(tabId);
-  for (const waiter of waiters) waiter(ready);
-}
-
-function waitForContentScriptReady(tabId: number): Promise<boolean> {
-  return new Promise((resolve) => {
-    const waiters = contentScriptReadyWaiters.get(tabId) ?? new Set<(ready: boolean) => void>();
-    const onReady = (ready: boolean) => {
-      clearTimeout(timeoutId);
-      resolve(ready);
-    };
-
-    waiters.add(onReady);
-    contentScriptReadyWaiters.set(tabId, waiters);
-
-    const timeoutId = setTimeout(() => {
-      const activeWaiters = contentScriptReadyWaiters.get(tabId);
-      if (!activeWaiters) return;
-      activeWaiters.delete(onReady);
-      if (activeWaiters.size === 0) {
-        contentScriptReadyWaiters.delete(tabId);
-      }
-      resolve(false);
-    }, CONTENT_SCRIPT_READY_TIMEOUT_MS);
-  });
-}
+const readyTracker = createContentScriptReadyTracker();
 
 function getActiveTabId(): Promise<number> {
   return new Promise((resolve, reject) => {
@@ -98,66 +69,29 @@ async function resolveTargetTabId(requestedTabId?: number): Promise<number> {
   return getActiveTabId();
 }
 
-/**
- * Inject content script and wait for its explicit ready signal.
- */
-async function ensureContentScript(tabId: number): Promise<boolean> {
-  const readyPromise = waitForContentScriptReady(tabId);
-  try {
+function sendMessageToTab<T>(tabId: number, message: unknown): Promise<T | null> {
+  return new Promise((resolve) => {
+    chrome.tabs.sendMessage(tabId, message, (result?: T) => {
+      if (chrome.runtime.lastError) {
+        resolve(null);
+        return;
+      }
+
+      resolve(result ?? null);
+    });
+  });
+}
+
+const pageCaptureTransport = {
+  readyTracker,
+  executeScript: async (tabId: number): Promise<void> => {
     await chrome.scripting.executeScript({
       target: { tabId },
       files: ['/content-scripts/content.js'],
     });
-  } catch {
-    resolveReadyWaiters(tabId, false);
-    return false;
-  }
-  return readyPromise;
-}
-
-async function sendMessageToTab<T>(tabId: number, message: unknown): Promise<T | null> {
-  for (let attempt = 0; attempt < MESSAGE_RETRY_TIMES; attempt++) {
-    if (attempt > 0) await delay(MESSAGE_RETRY_DELAY_MS);
-    const response = await new Promise<T | null>((resolve) => {
-      chrome.tabs.sendMessage(tabId, message, (result?: T) => {
-        if (chrome.runtime.lastError) {
-          resolve(null);
-          return;
-        }
-        resolve(result ?? null);
-      });
-    });
-    if (response !== null) return response;
-  }
-  return null;
-}
-
-async function captureTabFromContentScript(tabId: number): Promise<WebClipCaptureResponse> {
-  const ready = await ensureContentScript(tabId);
-  if (!ready) {
-    return { ok: false, error: 'Content script initialization timed out' };
-  }
-
-  const result = await sendMessageToTab<WebClipCaptureResponse>(tabId, {
-    type: WEBCLIP_CAPTURE_PAGE,
-  });
-  if (result) return result;
-  return { ok: false, error: 'Content script did not respond after initialization' };
-}
-
-/**
- * Forward a message from Side Panel to a specific tab's Content Script.
- */
-async function forwardToTab(tabId: number, message: unknown): Promise<unknown> {
-  const ready = await ensureContentScript(tabId);
-  if (!ready) {
-    return { ok: false, error: 'Content script initialization timed out' };
-  }
-
-  const result = await sendMessageToTab<unknown>(tabId, message);
-  if (result !== null) return result;
-  return { ok: false, error: 'Content script did not respond' };
-}
+  },
+  sendMessageToTab,
+};
 
 /**
  * Check if a URL is valid for content script injection.
@@ -232,56 +166,7 @@ async function forwardHighlightCheck(payload: HighlightCheckUrlPayload): Promise
   await forwardToTab(payload.tabId, {
     type: HIGHLIGHT_RESTORE,
     payload: restorePayload,
-  });
-}
-
-/**
- * Generate syndication token for x.com tweet.
- * Formula from Vercel's react-tweet library.
- */
-function generateSyndicationToken(tweetId: string): string {
-  return ((Number(tweetId) / 1e15) * Math.PI).toString(36).replace(/(0+|\.)/g, '');
-}
-
-/**
- * Fetch direct mp4 URL for an x.com video tweet via the Syndication API.
- */
-async function fetchXVideoUrl(tweetId: string): Promise<XVideoFetchResponse> {
-  const token = generateSyndicationToken(tweetId);
-  const url = `https://cdn.syndication.twimg.com/tweet-result?id=${tweetId}&lang=en&token=${token}`;
-
-  const res = await fetch(url);
-  if (!res.ok) return {};
-
-  const data = await res.json();
-
-  // Find the highest-bitrate mp4 variant
-  const mediaDetails = data?.mediaDetails;
-  if (!Array.isArray(mediaDetails)) return {};
-
-  for (const media of mediaDetails) {
-    if (media.type !== 'video' && media.type !== 'animated_gif') continue;
-    const variants = media.video_info?.variants;
-    if (!Array.isArray(variants)) continue;
-
-    let bestMp4: { url: string; bitrate: number } | undefined;
-    for (const v of variants) {
-      if (v.content_type !== 'video/mp4') continue;
-      const bitrate = v.bitrate ?? 0;
-      if (!bestMp4 || bitrate > bestMp4.bitrate) {
-        bestMp4 = { url: v.url, bitrate };
-      }
-    }
-
-    if (bestMp4) {
-      return {
-        mp4Url: bestMp4.url,
-        posterUrl: media.media_url_https,
-      };
-    }
-  }
-
-  return {};
+  }, pageCaptureTransport);
 }
 
 export default defineBackground(() => {
@@ -303,33 +188,48 @@ export default defineBackground(() => {
     if (type === CONTENT_SCRIPT_READY) {
       const tabId = sender.tab?.id;
       if (tabId) {
-        resolveReadyWaiters(tabId, true);
+        readyTracker.resolveReady(tabId, true);
       }
       sendResponse({ ok: true });
       return true;
     }
 
     // ── X Video URL Fetch: Content Script -> BG ──
-    if (type === X_VIDEO_FETCH_URL) {
-      const payload = message.payload as XVideoFetchPayload | undefined;
+    if (type === PAGE_CAPTURE_FETCH_X_VIDEO) {
+      const payload = message.payload as PageCaptureXVideoPayload | undefined;
       if (!payload?.tweetId) {
-        sendResponse({} as XVideoFetchResponse);
+        sendResponse({} as PageCaptureXVideoResponse);
         return true;
       }
-      fetchXVideoUrl(payload.tweetId).then((result) => {
+      fetchXVideoMetadata(payload.tweetId).then((result) => {
         sendResponse(result);
       }).catch(() => {
-        sendResponse({} as XVideoFetchResponse);
+        sendResponse({} as PageCaptureXVideoResponse);
       });
       return true;
     }
 
-    // ── WebClip: Side Panel -> BG -> Content Script ──
+    // ── Page Capture: Side Panel/AI -> BG -> Content Script ──
+    if (type === PAGE_CAPTURE_ACTIVE_TAB) {
+      (async () => {
+        try {
+          const tabId = await getActiveTabId();
+          const result = await capturePageFromTab(tabId, pageCaptureTransport);
+          sendResponse(result);
+        } catch (err) {
+          const error = err instanceof Error ? err.message : String(err);
+          sendResponse({ ok: false, error } satisfies PageCaptureResponse);
+        }
+      })();
+      return true;
+    }
+
+    // ── WebClip compatibility adapter: Side Panel -> BG -> Content Script ──
     if (type === WEBCLIP_CAPTURE_ACTIVE_TAB) {
       (async () => {
         try {
           const tabId = await getActiveTabId();
-          const result = await captureTabFromContentScript(tabId);
+          const result = await capturePageFromTabForWebClip(tabId, pageCaptureTransport);
           sendResponse(result);
         } catch (err) {
           const error = err instanceof Error ? err.message : String(err);
@@ -481,7 +381,7 @@ export default defineBackground(() => {
           const result = await forwardToTab(tabId, {
             type: HIGHLIGHT_RESTORE,
             payload: message.payload,
-          });
+          }, pageCaptureTransport);
           sendResponse(result);
         } catch (err) {
           const error = err instanceof Error ? err.message : String(err);
@@ -499,7 +399,7 @@ export default defineBackground(() => {
           const result = await forwardToTab(tabId, {
             type: HIGHLIGHT_REMOVE,
             payload: message.payload,
-          });
+          }, pageCaptureTransport);
           sendResponse(result);
         } catch (err) {
           const error = err instanceof Error ? err.message : String(err);
@@ -517,7 +417,7 @@ export default defineBackground(() => {
           const result = await forwardToTab(tabId, {
             type: HIGHLIGHT_SCROLL_TO,
             payload: message.payload,
-          });
+          }, pageCaptureTransport);
           sendResponse(result);
         } catch (err) {
           const error = err instanceof Error ? err.message : String(err);
@@ -531,7 +431,7 @@ export default defineBackground(() => {
   // ── URL Change Listener — inject content script + trigger highlight echo check ──
   chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
     if (changeInfo.status === 'loading') {
-      resolveReadyWaiters(tabId, false);
+      readyTracker.resolveReady(tabId, false);
       return;
     }
 
@@ -540,7 +440,7 @@ export default defineBackground(() => {
     if (!isInjectableUrl(tab.url)) return;
 
     // Inject content script so selection toolbar is available immediately
-    void ensureContentScript(tabId);
+    void ensureTabContentScript(tabId, pageCaptureTransport);
 
     // Send CHECK_URL to Side Panel (or restore from pending queue if offline)
     void forwardHighlightCheck({
@@ -550,6 +450,6 @@ export default defineBackground(() => {
   });
 
   chrome.tabs.onRemoved.addListener((tabId) => {
-    resolveReadyWaiters(tabId, false);
+    readyTracker.resolveReady(tabId, false);
   });
 });

@@ -1,6 +1,14 @@
+import type { CapturedPage, PageCaptureResult } from './page-capture/models.js';
+import {
+  CONTENT_SCRIPT_READY,
+  PAGE_CAPTURE_FETCH_X_VIDEO,
+  type PageCaptureXVideoPayload,
+  type PageCaptureXVideoResponse,
+} from './page-capture/messaging.js';
+
 export const WEBCLIP_CAPTURE_ACTIVE_TAB = 'webclip:capture-active-tab' as const;
 export const WEBCLIP_CAPTURE_PAGE = 'webclip:capture-page' as const;
-export const CONTENT_SCRIPT_READY = 'content-script:ready' as const;
+export const X_VIDEO_FETCH_URL = PAGE_CAPTURE_FETCH_X_VIDEO;
 
 export interface WebClipCapturePayload {
   url: string;
@@ -12,17 +20,11 @@ export interface WebClipCapturePayload {
   published?: string;
   description?: string;
   siteName?: string;
-  /** ISO 8601 or formatted duration (video only) */
   duration?: string;
-  /** Defuddle extractor type (e.g. 'youtube', 'twitter') */
   extractorType?: string;
-  /** og:type meta value */
   ogType?: string;
-  /** Schema.org @type */
   schemaOrgType?: string;
-  /** DOM contains an <article> element */
   hasArticleElement?: boolean;
-  /** x.com long-form article detected (status URL but article DOM structure) */
   isXArticle?: boolean;
 }
 
@@ -30,13 +32,42 @@ export type WebClipCaptureResponse =
   | { ok: true; payload: WebClipCapturePayload }
   | { ok: false; error: string };
 
-export const X_VIDEO_FETCH_URL = 'x-video:fetch-url' as const;
+export type XVideoFetchPayload = PageCaptureXVideoPayload;
+export type XVideoFetchResponse = PageCaptureXVideoResponse;
 
-export interface XVideoFetchPayload {
-  tweetId: string;
+export function toWebClipCapturePayload(page: CapturedPage): WebClipCapturePayload {
+  return {
+    url: page.url,
+    title: page.title,
+    selectionText: page.selectionText,
+    pageText: page.contentHtml,
+    capturedAt: page.capturedAt,
+    author: page.metadata.author,
+    published: page.metadata.published,
+    description: page.metadata.description,
+    siteName: page.metadata.siteName,
+    duration: page.metadata.duration,
+    extractorType: page.metadata.extractorType,
+    ogType: page.metadata.ogType,
+    schemaOrgType: page.metadata.schemaOrgType,
+    hasArticleElement: page.metadata.hasArticleElement,
+    isXArticle: page.siteHints.site === 'x' && page.siteHints.contentKind === 'article',
+  };
 }
 
-export interface XVideoFetchResponse {
-  mp4Url?: string;
-  posterUrl?: string;
+export function toWebClipCaptureResponse(result: PageCaptureResult): WebClipCaptureResponse {
+  if (!result.ok) {
+    return { ok: false, error: result.error };
+  }
+
+  return {
+    ok: true,
+    payload: toWebClipCapturePayload(result.page),
+  };
 }
+
+export {
+  CONTENT_SCRIPT_READY,
+  type PageCaptureXVideoPayload,
+  type PageCaptureXVideoResponse,
+};

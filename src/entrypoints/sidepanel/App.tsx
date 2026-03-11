@@ -51,7 +51,7 @@ import { Toaster, toast } from 'sonner';
 import { TooltipProvider } from '../../components/ui/Tooltip';
 
 const ChatDrawer = lazy(async () => ({
-  default: (await import('../../components/chat/ChatDrawer.js')).ChatDrawer,
+  default: (await import('../../components/chat/ChatDrawer')).ChatDrawer,
 }));
 
 // ─── Error Boundary ───

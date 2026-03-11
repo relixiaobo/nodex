@@ -2,6 +2,35 @@
 
 > 从 `docs/TASKS.md` 迁出的历史已完成条目。TASKS.md 只保留最近一周。
 
+## 2026-03-04
+
+| 任务 | Agent | PR |
+|------|-------|-----|
+| 高亮交互重设计 — chat bubble 标记 + 点击呼出笔记浮窗 + IME 修复 + 设计规范对齐 | nodex | main |
+| x.com clip 修复 + 高亮色系统统一 — Soft Banana 高亮色 + Harvest Yellow 色板 + #highlight 迁移 amber→yellow | nodex | main |
+| Field 配置页打磨 — Auto-init toggle 组 + 字段类型图标 + FieldValueRow 共享布局 + 配置页对齐统一 | nodex | main |
+| Review: Sync 架构全面审查 — 6 commit + compaction CAS 修复 + update 区间校验 | nodex | #117 |
+| 离线高亮排队 — SP 关闭暂存 chrome.storage.local + BG 检测路由 + 页面刷新恢复 + SP bootstrap 消费 | nodex | main |
+
+## 2026-03-03
+
+| 任务 | Agent | PR |
+|------|-------|-----|
+| NodeHeader 富文本编辑 + Reference 编辑修复 — useEditorTriggers 提取 + #/@/Cmd+Enter 支持 | nodex | main |
+| 系统节点只读编辑器 — 容器/workspace home/queryCondition 聚焦变灰、输入无效 | nodex | main |
+| 节点右键菜单扩展 — Copy link / Duplicate / Move to / Add tag / Add checkbox / Add description | nodex | main |
+| Web Clip 默认保存到 Today — #source 节点存入当天日记 | nodex | main |
+| 匿名→登录数据丢失修复 — reparent + deferred 迁移 + 孤儿 snapshot 清理 + WASM recovery | nodex | main |
+
+## 2026-03-01
+
+| 任务 | Agent | PR |
+|------|-------|-----|
+| Sync 数据恢复修复 — subscribeLocalUpdates 时序竞态 + sync 启动前全量 export | nodex | main |
+| Highlight 交互重设计（Readwise 风格）— 图标化网页工具栏 + Note 内联输入 + 评论图标 | codex | #115 |
+| Highlight 数据模型重构 — highlight 改为 clip page 子节点 + auto-init + 去重复创建 | nodex | main |
+| Field & Supertag 功能补全 — Merge Fields + Auto-initialize + 批量标签操作 + 22 test | nodex | main |
+
 ## 2026-02-28
 
 | 任务 | Agent | PR |

@@ -22,17 +22,13 @@ _(空)_
 
 | Agent | 分支 | 任务 | 锁定文件 | 状态 |
 |---|---|---|---|---|
-| codex | cc/ai-phase-0 | Phase 0: AI 基座 | `server/src/routes/ai.ts`, `src/lib/ai-service.ts`, `src/stores/ui-store.ts` | 进行中 |
+| _(空)_ | | | | |
 
 ---
 
 ## 进行中
 
-### Phase 0: AI 基座 — pi-mono 集成 + 最小 Chat
-
-> Agent: codex | 分支: `cc/ai-phase-0` | PR: #125
-
-详细计划见 `docs/plans/phase-0-foundation.md`。
+_(空)_
 
 ---
 
@@ -53,16 +49,9 @@ _(空)_
 >
 > 优先级按"降低发现和聚集摩擦"排序：
 
-##### 1. View Toolbar — Filter / Sort / Group (#25)
+##### ~~1. View Toolbar — Filter / Sort / Group (#25)~~ ✓
 
-> **L0 标签聚集的最后一公里**。用户能打标签、能搜索，但结果是一个平铺列表，无法 filter/sort/group。没有视图工具栏，标签和字段只是装饰。
-
-- [x] Per-node view toolbar UI（Sort / Filter / Group 图标栏）
-- [x] Sort by：单级排序（Name / Created / 标签字段 + asc/desc）
-- [x] ViewDef 节点持久化（type='viewDef' + sortField/sortDirection 直接属性）
-- [x] 右键菜单 "Sort by" 子菜单
-- [x] Filter by：按字段值/标签/checkbox 状态过滤
-- [x] Group by：按字段值分组
+> 已完成。Per-node view toolbar + Sort/Filter/Group + ViewDef 持久化 + 右键菜单。
 
 ##### 2. Search Node 字段过滤 (#23)
 
@@ -94,7 +83,7 @@ _(空)_
 
 ### 上线后 — Compound & AI
 
-> 笔记积累到一定量后才有价值。上线后根据用户使用数据和反馈决定优先级。详见 `docs/product-philosophy.md` § Compound。
+> 基于 pi-mono (pi-ai + pi-agent-core) 架构，分 6 Phase 实施。Phase 0 已完成。详细计划见 `docs/plans/`。
 
 #### 上下文感知 Sidebar
 
@@ -106,12 +95,12 @@ _(空)_
 
 #### AI — 照亮你的思考
 
-> AI 不替你思考，而是把你自己的思考照亮。基于 pi-mono (pi-ai + pi-agent-core) 架构，分 6 Phase 实施。详细计划见 `docs/plans/`。
+> AI 不替你思考，而是把你自己的思考照亮。
 
-##### Phase 0: 基座 — pi-mono 集成 + 最小 Chat
-- [ ] Server: Hono `/api/ai/stream` proxy endpoint（pi-ai streamSimple → ProxyAssistantMessageEvent SSE）
-- [ ] Client: Agent 工厂 + streamProxy 集成 + API key (chrome.storage.local)
-- [ ] UI: ChatDrawer（独立于 PanelStack，⌘L 切换）+ 流式消息 + 空状态 + API key 设置
+##### ~~Phase 0: 基座 — pi-mono 集成 + 最小 Chat~~ ✓ (#125, 2026-03-12)
+- [x] Server: Hono `/api/stream` proxy endpoint（pi-ai streaming → ProxyAssistantMessageEvent SSE）
+- [x] Client: Agent 工厂 + streamProxy 集成 + API key (chrome.storage.local)
+- [x] UI: ChatDrawer（独立于 PanelStack，⌘L 切换）+ 流式消息 + 空状态 + API key 设置
 
 ##### Phase 1: 画布 — node tool + Chat 成熟化
 - [ ] node tool（5 actions: create/read/update/delete/search）+ undo tool
@@ -180,6 +169,7 @@ _(空)_
 
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
+| 2026-03-12 | Phase 0: AI 基座 — pi-mono proxy + ChatDrawer (流式聊天 + API key 管理 + Mod+L 快捷键) | codex | #125 |
 | 2026-03-11 | AI 实施计划 Review — 6 Phase 计划文档交叉验证 + 3 轮修正（MV3 宿主模型、contract 收敛、并行策略） | codex | #124 |
 | 2026-03-11 | 网页抓取基础设施重构 — clip/x.com/Google Docs/GitHub/YouTube 的增强抓取迁移到独立 page capture 栈，orchestrator + site extractors + background transport | codex | #123 |
 | 2026-03-11 | Clip 节点结构调整 — #highlight → Highlights 字段 + Source URL → URL + 旧数据自动迁移 | codex | #122 |
@@ -193,20 +183,6 @@ _(空)_
 | 2026-03-05 | 新用户引导数据 — Welcome/Article Clip/Tasks/Shortcuts 4 段教程树 + #task schema + 9 tests | nodex | main |
 | 2026-03-05 | Google Docs 剪藏 + 两阶段 Loading UX — export HTML 抓取 + kix 列表嵌套 + 空 shell 占位 + pulse 动画 + 加载中禁止交互 | nodex | main |
 | 2026-03-05 | Options 字段 auto-collect 修复 — OutlinerItem blur/Enter 路径补 registerCollectedOption + autoCollected 标志位 + visibleWhen 条件 + 4 test | nodex | main |
-| 2026-03-04 | 高亮交互重设计 — chat bubble 标记 + 点击呼出笔记浮窗 + IME 修复 + 设计规范对齐 | nodex | main |
-| 2026-03-04 | x.com clip 修复 + 高亮色系统统一 — Soft Banana 高亮色 + Harvest Yellow 色板 + #highlight 迁移 amber→yellow | nodex | main |
-| 2026-03-04 | Field 配置页打磨 — Auto-init toggle 组 + 字段类型图标 + FieldValueRow 共享布局 + 配置页对齐统一 | nodex | main |
-| 2026-03-04 | Review: Sync 架构全面审查 — 6 commit + compaction CAS 修复 + update 区间校验 | nodex | #117 |
-| 2026-03-04 | 离线高亮排队 — SP 关闭暂存 chrome.storage.local + BG 检测路由 + 页面刷新恢复 + SP bootstrap 消费 | nodex | main |
-| 2026-03-03 | NodeHeader 富文本编辑 + Reference 编辑修复 — useEditorTriggers 提取 + #/@/Cmd+Enter 支持 | nodex | main |
-| 2026-03-03 | 系统节点只读编辑器 — 容器/workspace home/queryCondition 聚焦变灰、输入无效 | nodex | main |
-| 2026-03-03 | 节点右键菜单扩展 — Copy link / Duplicate / Move to / Add tag / Add checkbox / Add description | nodex | main |
-| 2026-03-03 | Web Clip 默认保存到 Today — #source 节点存入当天日记 | nodex | main |
-| 2026-03-03 | 匿名→登录数据丢失修复 — reparent + deferred 迁移 + 孤儿 snapshot 清理 + WASM recovery | nodex | main |
-| 2026-03-01 | Sync 数据恢复修复 — subscribeLocalUpdates 时序竞态 + sync 启动前全量 export | nodex | main |
-| 2026-03-01 | Highlight 交互重设计（Readwise 风格）— 图标化网页工具栏 + Note 内联输入 + 评论图标 | codex | #115 |
-| 2026-03-01 | Highlight 数据模型重构 — highlight 改为 clip page 子节点 + auto-init + 去重复创建 | nodex | main |
-| 2026-03-01 | Field & Supertag 功能补全 — Merge Fields + Auto-initialize + 批量标签操作 + 22 test | nodex | main |
 
 > 更早的已完成记录见 `docs/_archive/COMPLETED-HISTORY.md`
 

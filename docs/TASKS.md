@@ -22,13 +22,18 @@ _(空)_
 
 | Agent | 分支 | 任务 | 锁定文件 | 状态 |
 |---|---|---|---|---|
-| _(空)_ | | | | |
+| codex | `codex/refactor-page-capture-infra` | 网页抓取基础设施重构 | `src/entrypoints/content/index.ts`, `src/entrypoints/background/index.ts`, `src/lib/webclip-messaging.ts`, `src/lib/webclip-service.ts`, `src/lib/html-to-nodes.ts` | 待 review |
 
 ---
 
 ## 进行中
 
-_(空)_
+- [x] **网页抓取基础设施重构** — 将“抓取网页内容供 clip / AI 复用”的能力从 content entrypoint 中抽离为独立基础设施，按最佳实践重建边界
+  - [x] 提取通用 `CapturedPage` / `PageCaptureRequest` / `PageCaptureResult` 领域模型，去掉 `webclip:*` 对核心抓取层的命名绑定
+  - [x] 拆分 capture orchestrator、site extractor registry、transport adapter、clip adapter，避免抓取逻辑继续堆在单个 content script 文件中
+  - [x] 保留现有站点增强能力（x.com、Google Docs、GitHub、YouTube/x video 元数据），但迁移到独立 extractor / helper 模块
+  - [x] 为 orchestrator、site extractors、message adapter 补充结构化测试，确保未来 AI 调用不依赖 clip UI 路径
+  - [x] 保持现有 clip/highlight 用户行为不变，重构只改变基础设施边界和调用方式
 
 ---
 

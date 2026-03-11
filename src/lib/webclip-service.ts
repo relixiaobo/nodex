@@ -452,26 +452,43 @@ export function createClipShell(store: WebClipNodeStore): string {
 
 /**
  * Fill an existing shell node with web clip data (Phase 2 of two-phase clip).
- * Delegates to the same logic as saveWebClip but targets an existing node.
+ *
+ * If a clip for the same URL already exists, upgrades that node in-place
+ * (enriches title, tag, metadata) and returns its ID so the caller can
+ * discard the empty shell. Otherwise fills the shell itself.
+ *
+ * @returns The ID of the clip node that was filled (may differ from `shellId`
+ *          if an existing clip was found and upgraded).
  */
 export async function fillClipShell(
-  nodeId: string,
+  shellId: string,
   payload: WebClipCapturePayload,
   store: WebClipNodeStore,
-): Promise<void> {
+): Promise<string> {
+  const existing = findClipNodeByUrl(payload.url);
+  const targetId = existing ?? shellId;
+
   const clipType = detectClipType(payload.url, payload);
   const tagDefId = ensureClipTypeDefs(clipType);
   ensureSourceUrlFieldDef();
 
   const title = refineClipTitle(payload.title, payload, clipType);
-  store.setNodeName(nodeId, title);
-  store.applyTag(nodeId, tagDefId);
-  store.setFieldValue(nodeId, NDX_F.SOURCE_URL, [payload.url]);
-  fillClipFields(nodeId, payload, clipType, store);
+  store.setNodeName(targetId, title);
+  store.applyTag(targetId, tagDefId);
+  store.setFieldValue(targetId, NDX_F.SOURCE_URL, [payload.url]);
+  fillClipFields(targetId, payload, clipType, store);
 
   if (payload.description && clipType !== 'social') {
-    store.updateNodeDescription(nodeId, payload.description);
+    store.updateNodeDescription(targetId, payload.description);
   }
+
+  // Discard unused shell if we upgraded an existing clip
+  if (existing) {
+    loroDoc.moveNode(shellId, SYSTEM_NODE_IDS.TRASH);
+    loroDoc.commitDoc();
+  }
+
+  return targetId;
 }
 
 /**

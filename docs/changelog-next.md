@@ -16,3 +16,5 @@
 - 修复 field/tag configure 页默认配置值显示为空的问题：`Hide field`、默认 `Field type` 与依赖默认值的配置显隐现在都会正确回填
 - 新建/恢复节点默认落到 Today，clip/highlight 查找不再依赖 Library/Inbox 容器，并兼容旧工作区中的 legacy 顶层节点
 - Clip 数据结构调整：`#highlight` 改为存入 `#source` 的隐藏 `Highlights` 字段，`Source URL` 字段重命名为 `URL`，旧数据启动时自动迁移
+- 修复高亮添加笔记后 `#note` 被错误放入 Highlights 字段的问题
+- 修复同一页面通过高亮和 Clip Page 两个入口分别创建两个 clip 节点的问题（现在自动合并到已有节点）

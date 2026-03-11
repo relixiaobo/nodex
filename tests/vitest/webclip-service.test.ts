@@ -17,6 +17,8 @@ import {
   normalizeUrl,
   findClipNodeByUrl,
   createLightweightClip,
+  createClipShell,
+  fillClipShell,
   detectClipType,
   formatIsoDuration,
   refineClipTitle,
@@ -922,5 +924,65 @@ describe('createLightweightClip', () => {
 
     const found = findClipNodeByUrl('https://example.com/findme');
     expect(found).toBe(clipId);
+  });
+});
+
+describe('fillClipShell deduplication', () => {
+  const makePayload = (overrides?: Partial<WebClipCapturePayload>): WebClipCapturePayload => ({
+    url: 'https://example.com/article',
+    title: 'Test Article',
+    selectionText: '',
+    pageText: '<p>Article content</p>',
+    capturedAt: Date.now(),
+    ...overrides,
+  });
+
+  beforeEach(() => {
+    resetAndSeed();
+  });
+
+  it('upgrades existing lightweight clip instead of creating a duplicate', async () => {
+    const store = useNodeStore.getState();
+
+    // Create lightweight clip (from highlight path — #source)
+    const lightweightId = await createLightweightClip(
+      'https://example.com/article',
+      'Lightweight Title',
+      store,
+    );
+    expect(loroDoc.toNodexNode(lightweightId)!.tags).toContain(SYS_T.SOURCE);
+
+    // Simulate "Clip Page to Today": create shell, then fill
+    const shellId = createClipShell(store);
+    const payload = makePayload({
+      url: 'https://example.com/article',
+      title: 'Full Article Title',
+      hasArticleElement: true,
+    });
+    const filledId = await fillClipShell(shellId, payload, store);
+
+    // Should upgrade the existing clip, not the shell
+    expect(filledId).toBe(lightweightId);
+    const upgraded = loroDoc.toNodexNode(lightweightId)!;
+    expect(upgraded.tags).toContain(NDX_T.ARTICLE);
+    expect(upgraded.name).toBe('Full Article Title');
+
+    // Shell should be trashed
+    expect(loroDoc.getParentId(shellId)).toBe(SYSTEM_NODE_IDS.TRASH);
+  });
+
+  it('fills the shell when no existing clip found', async () => {
+    const store = useNodeStore.getState();
+
+    const shellId = createClipShell(store);
+    const payload = makePayload({
+      url: 'https://example.com/new-page',
+      title: 'New Page',
+    });
+    const filledId = await fillClipShell(shellId, payload, store);
+
+    expect(filledId).toBe(shellId);
+    expect(loroDoc.toNodexNode(shellId)!.name).toBe('New Page');
+    expect(loroDoc.getParentId(shellId)).not.toBe(SYSTEM_NODE_IDS.TRASH);
   });
 });

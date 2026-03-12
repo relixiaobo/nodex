@@ -11,6 +11,8 @@ import * as loroDoc from './loro-doc.js';
 import { ensureTodayNode } from './journal.js';
 import { resolveFieldOptions } from './field-utils.js';
 import { getWorkspaceTopLevelNodeIds } from './system-node-presets.js';
+import { cachePageContent } from './ai-shadow-cache.js';
+import { shouldAutoTrigger, triggerSpark } from './ai-spark.js';
 
 const CLIP_SCAN_SKIP_IDS: ReadonlySet<string> = new Set([
   SYSTEM_NODE_IDS.JOURNAL,
@@ -488,6 +490,22 @@ export async function fillClipShell(
     loroDoc.commitDoc();
   }
 
+  // Cache page content for Spark extraction (fire-and-forget)
+  if (payload.pageText) {
+    void cachePageContent(payload.url, payload.pageText).catch(() => {});
+  }
+
+  // Auto-trigger Spark extraction if conditions are met (fire-and-forget)
+  void (async () => {
+    try {
+      if (await shouldAutoTrigger()) {
+        void triggerSpark(targetId);
+      }
+    } catch {
+      // Spark trigger errors never affect clip
+    }
+  })();
+
   return targetId;
 }
 
@@ -529,6 +547,22 @@ export async function saveWebClip(
   if (payload.description && clipType !== 'social') {
     store.updateNodeDescription(clipNode.id, payload.description);
   }
+
+  // 8. Cache page content for Spark extraction (fire-and-forget)
+  if (payload.pageText) {
+    void cachePageContent(payload.url, payload.pageText).catch(() => {});
+  }
+
+  // 9. Auto-trigger Spark extraction if conditions are met (fire-and-forget)
+  void (async () => {
+    try {
+      if (await shouldAutoTrigger()) {
+        void triggerSpark(clipNode.id);
+      }
+    } catch {
+      // Spark trigger errors never affect clip
+    }
+  })();
 
   return clipNode.id;
 }

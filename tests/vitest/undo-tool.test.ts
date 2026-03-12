@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { nodeTool } from '../../src/lib/ai-tools/node-tool.js';
+import { createTool } from '../../src/lib/ai-tools/create-tool.js';
+import { editTool } from '../../src/lib/ai-tools/edit-tool.js';
 import { undoTool } from '../../src/lib/ai-tools/undo-tool.js';
 import * as loroDoc from '../../src/lib/loro-doc.js';
 import { useNodeStore } from '../../src/stores/node-store.js';
@@ -14,8 +15,7 @@ describe('undo tool', () => {
     const store = useNodeStore.getState();
     const userNode = store.createChild('proj_1', undefined, { name: 'User note' });
 
-    const aiNode = await nodeTool.execute('tool_node', {
-      action: 'create',
+    const aiNode = await createTool.execute('tool_create', {
       parentId: 'proj_1',
       name: 'AI note',
       tags: ['meeting'],
@@ -40,8 +40,7 @@ describe('undo tool', () => {
     expect(before?.tags).toContain('tagDef_task');
     expect(beforeParentId).toBe('proj_1');
 
-    await nodeTool.execute('tool_node_update', {
-      action: 'update',
+    await editTool.execute('tool_edit', {
       nodeId: 'task_1',
       name: 'Design the graph model',
       addTags: ['meeting'],
@@ -65,13 +64,11 @@ describe('undo tool', () => {
   });
 
   it('can undo multiple AI steps in sequence', async () => {
-    const first = await nodeTool.execute('tool_node_1', {
-      action: 'create',
+    const first = await createTool.execute('tool_create_1', {
       parentId: 'proj_1',
       name: 'AI task 1',
     } as never);
-    const second = await nodeTool.execute('tool_node_2', {
-      action: 'create',
+    const second = await createTool.execute('tool_create_2', {
       parentId: 'proj_1',
       name: 'AI task 2',
     } as never);

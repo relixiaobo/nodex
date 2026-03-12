@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ExternalLink, Settings, Sparkles, X } from '../../lib/icons.js';
+import { ExternalLink, Plus, Settings, Sparkles, X } from '../../lib/icons.js';
 import { useAgent } from '../../hooks/use-agent.js';
 import { clearApiKey, getAISettings, setApiKey } from '../../lib/ai-service.js';
 import { useUIStore } from '../../stores/ui-store.js';
@@ -15,7 +15,9 @@ function maskApiKey(apiKey: string): string {
 
 export function ChatDrawer() {
   const closeChat = useUIStore((s) => s.closeChat);
-  const { messages, isStreaming, error, sendMessage, stopStreaming } = useAgent();
+  const pendingChatPrompt = useUIStore((s) => s.pendingChatPrompt);
+  const setPendingChatPrompt = useUIStore((s) => s.setPendingChatPrompt);
+  const { messages, isStreaming, error, ready, sendMessage, stopStreaming, newChat } = useAgent();
   const scrollRef = useRef<HTMLDivElement>(null);
   const [isWideLayout, setIsWideLayout] = useState(() => window.innerWidth > WIDE_LAYOUT_MIN_WIDTH);
   const [loadingSettings, setLoadingSettings] = useState(true);
@@ -69,6 +71,21 @@ export function ChatDrawer() {
     });
   }, [messages, isStreaming, showSettings]);
 
+  useEffect(() => {
+    if (!pendingChatPrompt || loadingSettings || showSettings || isStreaming || !ready) return;
+
+    setPendingChatPrompt(null);
+    void sendMessage(pendingChatPrompt);
+  }, [
+    pendingChatPrompt,
+    loadingSettings,
+    showSettings,
+    isStreaming,
+    ready,
+    sendMessage,
+    setPendingChatPrompt,
+  ]);
+
   async function handleSaveKey() {
     const normalized = draftKey.trim();
     if (!normalized.startsWith('sk-ant-')) {
@@ -116,6 +133,16 @@ export function ChatDrawer() {
           Chat
         </div>
         <div className="flex items-center gap-1">
+          {!loadingSettings && (
+            <button
+              type="button"
+              onClick={() => void newChat()}
+              className="inline-flex h-7 w-7 items-center justify-center rounded-full text-foreground-tertiary transition-colors hover:bg-foreground/4 hover:text-foreground"
+              aria-label="New chat"
+            >
+              <Plus size={15} strokeWidth={1.6} />
+            </button>
+          )}
           {!loadingSettings && savedKeyMask && (
             <button
               type="button"
@@ -140,7 +167,7 @@ export function ChatDrawer() {
         </div>
       </div>
 
-      {loadingSettings ? (
+      {loadingSettings || !ready ? (
         <div className="flex flex-1 items-center justify-center text-sm text-foreground-tertiary">
           Loading chat…
         </div>
@@ -216,7 +243,7 @@ export function ChatDrawer() {
             {messages.length === 0 ? (
               <div className="flex h-full min-h-40 items-center justify-center">
                 <div className="max-w-[240px] text-center text-sm text-foreground-tertiary">
-                  Ask about your notes, clips, or the page you are reading. Phase 0 is text-only and ephemeral.
+                  Ask about your notes, clips, or the page you are reading. Chat can act on the outliner and pick up where you left off.
                 </div>
               </div>
             ) : (

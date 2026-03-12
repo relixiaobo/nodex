@@ -11,7 +11,7 @@
  */
 import { useCallback, useRef, useState } from 'react';
 import type { EditorView } from 'prosemirror-view';
-import { Library, Inbox, CalendarDays, Trash2, Search, Settings, Code2, MoreHorizontal, type AppIcon } from '../../lib/icons.js';
+import { Library, Inbox, CalendarDays, Trash2, Search, Settings, Sparkles, Code2, MoreHorizontal, type AppIcon } from '../../lib/icons.js';
 import { useNode } from '../../hooks/use-node';
 import { useNodeTags } from '../../hooks/use-node-tags';
 import { useNodeStore } from '../../stores/node-store';
@@ -41,6 +41,7 @@ const SYSTEM_NODE_ICONS: Record<SystemNodeIconKey, AppIcon> = {
   library: Library,
   inbox: Inbox,
   journal: CalendarDays,
+  ai: Sparkles,
   trash: Trash2,
   search: Search,
   schema: Library,

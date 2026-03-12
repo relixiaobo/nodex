@@ -375,6 +375,7 @@ export const SYSTEM_NODE_IDS = {
   /** @deprecated Legacy — no longer bootstrapped for new workspaces. */
   INBOX: 'INBOX',
   JOURNAL: 'JOURNAL',
+  AGENT: 'AGENT',
   SEARCHES: 'SEARCHES',
   TRASH: 'TRASH',
   SCHEMA: 'SCHEMA',

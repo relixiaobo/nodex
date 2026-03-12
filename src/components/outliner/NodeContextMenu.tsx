@@ -38,7 +38,7 @@ import { Kbd } from '../ui/Kbd.js';
 import {
   Link, Copy, Scissors, CopyPlus, MoveRight,
   Hash, CheckSquare, Type, Trash2, ChevronLeft, ChevronRight,
-  Plus, Library, CalendarDays, Search, Settings, ArrowUpDown, ListFilter, Group,
+  Plus, Library, CalendarDays, Search, Settings, Sparkles, ArrowUpDown, ListFilter, Group,
 } from '../../lib/icons.js';
 import type { LucideIcon } from 'lucide-react';
 
@@ -60,6 +60,7 @@ const SYSTEM_NODE_ICONS: Record<SystemNodeIconKey, LucideIcon> = {
   library: Library,
   inbox: Library,
   journal: CalendarDays,
+  ai: Sparkles,
   trash: Trash2,
   search: Search,
   schema: Library,

@@ -14,36 +14,34 @@ import { syncTemplateMutationsNoCommit } from '../../stores/node-store.js';
 import {
   ensureTagDefIdByName,
   getTagDisplayNames,
-  stripReferenceMarkup,
   sanitizeDirectNodeDataPatch,
   resolveAndSetFields,
   formatResultText,
+  pushAiOp,
 } from './shared.js';
 
 const MAX_CHILDREN_DEPTH = 3;
 
 const createChildInputSchema: ReturnType<typeof Type.Object> = Type.Object({
-  name: Type.Optional(Type.String()),
-  tags: Type.Optional(Type.Array(Type.String())),
-  content: Type.Optional(Type.String()),
-  data: Type.Optional(Type.Record(Type.String(), Type.Unknown())),
-  fields: Type.Optional(Type.Record(Type.String(), Type.String())),
-  targetId: Type.Optional(Type.String()),
-  children: Type.Optional(Type.Array(Type.Any())),
+  name: Type.Optional(Type.String({ description: 'Child node name/title.' })),
+  tags: Type.Optional(Type.Array(Type.String(), { description: 'Tag names to apply to this child.' })),
+  data: Type.Optional(Type.Record(Type.String(), Type.Unknown(), { description: 'Raw node properties (type, description, color, etc.).' })),
+  fields: Type.Optional(Type.Record(Type.String(), Type.String(), { description: 'Field values by display name, e.g. {"Status": "Todo"}.' })),
+  targetId: Type.Optional(Type.String({ description: 'Create a reference to this node instead of a content node.' })),
+  children: Type.Optional(Type.Array(Type.Any(), { description: 'Nested children (max 3 levels deep).' })),
 });
 
 const createToolParameters = Type.Object({
-  name: Type.Optional(Type.String()),
-  parentId: Type.Optional(Type.String()),
-  afterId: Type.Optional(Type.String()),
-  position: Type.Optional(Type.Integer({ minimum: 0 })),
-  tags: Type.Optional(Type.Array(Type.String())),
-  content: Type.Optional(Type.String()),
-  data: Type.Optional(Type.Record(Type.String(), Type.Unknown())),
-  fields: Type.Optional(Type.Record(Type.String(), Type.String())),
-  targetId: Type.Optional(Type.String()),
-  duplicateId: Type.Optional(Type.String()),
-  children: Type.Optional(Type.Array(createChildInputSchema)),
+  name: Type.Optional(Type.String({ description: 'Node name/title. Required for content nodes.' })),
+  parentId: Type.Optional(Type.String({ description: 'Parent node ID. Defaults to today\'s journal node. Mutually exclusive with afterId.' })),
+  afterId: Type.Optional(Type.String({ description: 'Create as sibling after this node (same parent). Mutually exclusive with parentId.' })),
+  position: Type.Optional(Type.Integer({ minimum: 0, description: 'Zero-based insertion index in parent\'s children. Defaults to end.' })),
+  tags: Type.Optional(Type.Array(Type.String(), { description: 'Tag display names to apply, e.g. ["task", "source"]. Auto-creates unknown tags.' })),
+  data: Type.Optional(Type.Record(Type.String(), Type.Unknown(), { description: 'Raw node properties: type, description, color, fieldType, cardinality, showCheckbox, etc. Cannot set name/children/tags/timestamps.' })),
+  fields: Type.Optional(Type.Record(Type.String(), Type.String(), { description: 'Set field values by display name, e.g. {"Status": "Todo"}. Requires tags — fields resolve from tag templates.' })),
+  targetId: Type.Optional(Type.String({ description: 'Create a reference node pointing to this target ID.' })),
+  duplicateId: Type.Optional(Type.String({ description: 'Duplicate an existing node (deep copy).' })),
+  children: Type.Optional(Type.Array(createChildInputSchema, { description: 'Child nodes to create recursively (max 3 levels deep).' })),
 });
 
 type CreateToolParams = typeof createToolParameters.static;
@@ -51,7 +49,6 @@ type CreateToolParams = typeof createToolParameters.static;
 interface CreateChildInput {
   name?: string;
   tags?: string[];
-  content?: string;
   data?: Record<string, unknown>;
   fields?: Record<string, string>;
   targetId?: string;
@@ -64,16 +61,12 @@ interface SetupResult {
   unresolvedFields: string[];
 }
 
-function buildCreateNodeData(input: Pick<CreateChildInput, 'name' | 'content' | 'data'>): Record<string, unknown> {
+function buildCreateNodeData(input: Pick<CreateChildInput, 'name' | 'data'>): Record<string, unknown> {
   const { safeData } = sanitizeDirectNodeDataPatch(input.data, { allowType: true });
   const result: Record<string, unknown> = { ...safeData };
 
   if (input.name !== undefined) {
     result.name = input.name.trim();
-  }
-
-  if (!Object.prototype.hasOwnProperty.call(safeData, 'description') && input.content !== undefined) {
-    result.description = stripReferenceMarkup(input.content) || undefined;
   }
 
   return result;
@@ -141,14 +134,18 @@ async function executeCreateTool(params: CreateToolParams): Promise<AgentToolRes
     const result = withCommitOrigin(AI_COMMIT_ORIGIN, () => {
       return useNodeStore.getState().duplicateNode(params.duplicateId!);
     });
-    if (!result) throw new Error(`Failed to duplicate node: ${params.duplicateId}`);
+    if (!result) throw new Error(`Node not found: ${params.duplicateId}. Cannot duplicate a node that does not exist.`);
+    pushAiOp('node_create', result.id, result.name ?? '');
+    const dupParentId = loroDoc.getParentId(result.id) ?? '';
+    const output = {
+      id: result.id,
+      name: result.name ?? '',
+      parentId: dupParentId,
+      duplicatedFrom: params.duplicateId,
+    };
     return {
-      content: [{ type: 'text', text: formatResultText({
-        id: result.id,
-        name: result.name ?? '',
-        duplicatedFrom: params.duplicateId,
-      }) }],
-      details: { id: result.id, name: result.name ?? '', duplicatedFrom: params.duplicateId },
+      content: [{ type: 'text', text: formatResultText(output) }],
+      details: output,
     };
   }
 
@@ -158,17 +155,19 @@ async function executeCreateTool(params: CreateToolParams): Promise<AgentToolRes
     const refId = withCommitOrigin(AI_COMMIT_ORIGIN, () => {
       return useNodeStore.getState().addReference(parentId, params.targetId!, params.position);
     });
-    if (!refId) throw new Error(`Failed to create reference to: ${params.targetId}`);
+    if (!refId) throw new Error(`Node not found: ${params.targetId}. Cannot create a reference to a node that does not exist.`);
+    pushAiOp('node_create', refId, `ref → ${params.targetId}`);
     const targetNode = loroDoc.toNodexNode(params.targetId);
+    const output = {
+      id: refId,
+      name: targetNode?.name ?? '',
+      parentId,
+      isReference: true,
+      targetId: params.targetId,
+    };
     return {
-      content: [{ type: 'text', text: formatResultText({
-        id: refId,
-        name: targetNode?.name ?? '',
-        parentId,
-        isReference: true,
-        targetId: params.targetId,
-      }) }],
-      details: { id: refId, parentId, targetId: params.targetId },
+      content: [{ type: 'text', text: formatResultText(output) }],
+      details: output,
     };
   }
 
@@ -180,13 +179,14 @@ async function executeCreateTool(params: CreateToolParams): Promise<AgentToolRes
       commitDoc();
       return { node: created, ...setup };
     });
+    pushAiOp('node_create', result.node.id, params.name ?? '');
     return buildCreateResult(result.node.id, params, result.childrenCreated, result.createdFields, result.unresolvedFields);
   }
 
   // ── Standard create ──
   const parentId = params.parentId ?? ensureTodayNode();
   if (!params.name && !params.children?.length && !params.targetId) {
-    throw new Error('name or children is required for node_create');
+    throw new Error('Provide at least one of: name, children, or targetId. Cannot create an empty node.');
   }
 
   const result = withCommitOrigin(AI_COMMIT_ORIGIN, () => {
@@ -195,27 +195,28 @@ async function executeCreateTool(params: CreateToolParams): Promise<AgentToolRes
     commitDoc();
     return { node: created, ...setup };
   });
+  pushAiOp('node_create', result.node.id, params.name ?? '');
   return buildCreateResult(result.node.id, params, result.childrenCreated, result.createdFields, result.unresolvedFields);
 }
 
 function buildCreateResult(nodeId: string, params: CreateToolParams, childrenCreated: number, createdFields: string[] = [], unresolvedFields: string[] = []): AgentToolResult<unknown> {
   const parentId = loroDoc.getParentId(nodeId) ?? '';
-  const parentNode = parentId ? loroDoc.toNodexNode(parentId) : null;
   const freshNode = loroDoc.toNodexNode(nodeId);
-  const output: Record<string, unknown> = {
-    id: nodeId,
-    name: freshNode?.name ?? params.name ?? '',
-    parentId,
-    parentName: parentNode?.name ?? parentId,
-    tags: getTagDisplayNames(freshNode?.tags ?? []),
-    childrenCreated,
-  };
+  const output: Record<string, unknown> = { id: nodeId };
+  // parentId is useful when defaulted to today (model didn't pass it)
+  if (!params.afterId) {
+    output.parentId = parentId;
+  }
+  // Only include childrenCreated if > 0 (otherwise noise)
+  if (childrenCreated > 0) {
+    output.childrenCreated = childrenCreated;
+  }
   if (createdFields.length > 0) {
     output.createdFields = createdFields;
   }
   if (unresolvedFields.length > 0) {
     output.unresolvedFields = unresolvedFields;
-    output.hint = 'Some fields could not be resolved. The node has no tags — add a tag first, then set the field values.';
+    output.hint = 'Fields not resolved — the node has no tags. Add a tag first (tags param), then set field values.';
   }
   return {
     content: [{ type: 'text', text: formatResultText(output) }],
@@ -230,12 +231,15 @@ export const createTool: AgentTool<typeof createToolParameters, unknown> = {
     'Create new nodes. Supports single nodes, trees (via children), field values,',
     'references, siblings, and duplicates — everything is a node.',
     '',
-    'Use data to set raw node properties while creating, such as type, description,',
-    'color, fieldType, cardinality, or showCheckbox. data cannot set rich text',
-    'internals, tree structure, tags, or timestamps.',
+    'Structured content belongs in children, not description. Each child is a node with its own name.',
+    'Keep children flat — avoid unnecessary grouping nodes (e.g. "Key Points", "Summary").',
+    'Use data.description only for short metadata summaries, not for main content.',
+    '',
+    'Use data to set raw node properties: type, description, color, fieldType, cardinality,',
+    'showCheckbox, etc. data cannot set rich text internals, tree structure, tags, or timestamps.',
     '',
     'Fields are tied to tags. Include tags when using fields — if the field doesn\'t exist yet,',
-    'it will be auto-created as an options field under the first tag.',
+    'it will be auto-created under the first tag (type inferred from name: date/url/number/options).',
     '',
     'Quick patterns:',
     '- Content node: node_create(name: "...", parentId: "...")',

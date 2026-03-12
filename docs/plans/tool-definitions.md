@@ -27,9 +27,11 @@ description: |
   Create new nodes. Supports single nodes, trees (via children), field values,
   references, siblings, and duplicates — everything is a node.
 
-  Use data to set raw node properties while creating, such as type, description,
-  color, fieldType, cardinality, or showCheckbox. data cannot set rich text
-  internals, tree structure, tags, or timestamps.
+  Structured content belongs in children, not description. Each child is a node with its own name.
+  Use data.description only for short metadata summaries, not for main content.
+
+  Use data to set raw node properties: type, description, color, fieldType, cardinality,
+  showCheckbox, etc. data cannot set rich text internals, tree structure, tags, or timestamps.
 
   Quick patterns:
   - Content node: node_create(name: "...", parentId: "...")
@@ -75,15 +77,11 @@ description: |
       + "new tags are created if they don't exist. Template fields are synced after tagging.",
   },
 
-  content: {
-    type: "string",
-    description: "Legacy description/body text. Prefer data.description for new callers.",
-  },
-
   data: {
     type: "Record<string, unknown>",
     description: "Raw node properties to set while creating. "
       + "Allows type, description, color, fieldType, cardinality, nullable, showCheckbox, etc. "
+      + "Use data.description only for short metadata summaries — structured content belongs in children. "
       + "children/tags/name/richText/marks/inlineRefs/createdAt/updatedAt are blocked.",
   },
 
@@ -421,8 +419,12 @@ description: |
   in this conversation — user's own edits are never affected.
 
   Uses a dedicated AI UndoManager (isolated from the user's ⌘Z timeline via origin prefix).
-  Each undo step reverses one atomic AI operation (e.g., one create, one move, one tag change).
+  Each undo step reverses one entire tool call (e.g., a full node_create or node_edit).
+  Undo is not granular — it cannot revert a single property within an operation.
   Maximum 20 steps per call.
+
+  To restructure a node (e.g. move description into children), do NOT undo then recreate.
+  Instead: create the new children first, then edit the node to remove the old value.
 
   Note: the user can still undo AI operations via ⌘Z (the main UndoManager includes AI ops).
   This tool only goes in the reverse direction — there is no AI redo.
@@ -436,6 +438,7 @@ AI isolation via Loro origin prefix:
 - Main UndoManager (⌘Z): does NOT exclude 'ai:' → user can undo AI ops too
 - AI UndoManager (this tool): excludes all non-'ai:' origins → only tracks AI ops
 - Two UndoManagers on the same LoroDoc, each with different excludeOriginPrefixes
+- Operation log tracks which tool call each undo step reverts
 ```
 
 #### Parameters
@@ -445,7 +448,7 @@ AI isolation via Loro origin prefix:
   steps: {
     type: "number",
     description: "Number of AI operations to undo (default: 1, max: 20). Each step reverses "
-      + "one atomic AI operation. User operations are never affected.",
+      + "one entire tool call. User operations are never affected.",
     default: 1,
   },
 }
@@ -455,8 +458,12 @@ AI isolation via Loro origin prefix:
 
 ```json
 {
-  "undone": 3,
-  "remaining": 12
+  "undone": 2,
+  "hasMore": true,
+  "reverted": [
+    "node_create(abc123, \"Meeting notes\")",
+    "node_edit(def456, \"Updated task\")"
+  ]
 }
 ```
 

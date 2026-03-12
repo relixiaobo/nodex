@@ -48,13 +48,13 @@ describe('node tools (Phase 1.5)', () => {
     }) as {
       id: string;
       parentId: string;
-      tags: string[];
     };
 
     expect(details.parentId).toBe(todayId);
     expect(loroDoc.getChildren(todayId)).toContain(details.id);
-    expect(loroDoc.toNodexNode(details.id)?.name).toBe('AI generated note');
-    expect(details.tags).toContain('Meeting');
+    const created = loroDoc.toNodexNode(details.id);
+    expect(created?.name).toBe('AI generated note');
+    expect(created?.tags).toContain('tagDef_meeting');
   });
 
   it('reads a node with paginated child summaries and breadcrumb metadata', async () => {
@@ -133,14 +133,12 @@ describe('node tools (Phase 1.5)', () => {
       addTags: ['meeting'],
       removeTags: ['task'],
     }) as {
-      id: string;
       updated: string[];
     };
 
     const updatedNode = loroDoc.toNodexNode('task_1');
     const updatedTagNames = (updatedNode?.tags ?? []).map((tagId) => loroDoc.toNodexNode(tagId)?.name);
 
-    expect(details.id).toBe('task_1');
     expect(details.updated).toContain('name');
     expect(details.updated).toContain('tags');
     expect(updatedNode?.name).toBe('Design the graph model');
@@ -166,14 +164,12 @@ describe('node tools (Phase 1.5)', () => {
     const details = await executeDelete({
       nodeId: 'note_1c',
     }) as {
-      id: string;
       name: string;
-      movedToTrash: boolean;
+      action: string;
     };
 
-    expect(details.id).toBe('note_1c');
     expect(details.name).toBe('Next meeting on Friday');
-    expect(details.movedToTrash).toBe(true);
+    expect(details.action).toBe('trashed');
     expect(loroDoc.getParentId('note_1c')).toBe(SYSTEM_NODE_IDS.TRASH);
   });
 });

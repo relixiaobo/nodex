@@ -336,6 +336,31 @@ export function resolveAndSetFields(
   return { resolved, created, unresolved };
 }
 
+// ─── AI operation log (for undo reporting) ───
+
+interface AiOpEntry {
+  tool: string;
+  nodeId: string;
+  name: string;
+}
+
+const aiOpStack: AiOpEntry[] = [];
+
+/** Push an operation record after a successful write tool call. */
+export function pushAiOp(tool: string, nodeId: string, name: string): void {
+  aiOpStack.push({ tool, nodeId, name });
+}
+
+/** Pop the most recent operation record (called by undo). */
+export function popAiOp(): AiOpEntry | undefined {
+  return aiOpStack.pop();
+}
+
+/** Reset the operation log (for tests). */
+export function resetAiOpLog(): void {
+  aiOpStack.length = 0;
+}
+
 // ─── Result formatting ───
 
 export function formatResultText(result: unknown): string {

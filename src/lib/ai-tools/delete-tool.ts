@@ -10,32 +10,34 @@ import { Type } from '@mariozechner/pi-ai';
 import * as loroDoc from '../loro-doc.js';
 import { AI_COMMIT_ORIGIN, commitDoc, withCommitOrigin } from '../loro-doc.js';
 import { useNodeStore } from '../../stores/node-store.js';
-import { formatResultText } from './shared.js';
+import { formatResultText, pushAiOp } from './shared.js';
 
 const deleteToolParameters = Type.Object({
-  nodeId: Type.String(),
-  restore: Type.Optional(Type.Boolean()),
+  nodeId: Type.String({ description: 'ID of the node to delete or restore.' }),
+  restore: Type.Optional(Type.Boolean({ description: 'true = restore from Trash back to original parent. Omit or false = move to Trash.' })),
 });
 
 type DeleteToolParams = typeof deleteToolParameters.static;
 
 async function executeDeleteTool(params: DeleteToolParams): Promise<AgentToolResult<unknown>> {
   const node = loroDoc.toNodexNode(params.nodeId);
-  if (!node) throw new Error(`Node not found: ${params.nodeId}`);
+  if (!node) throw new Error(`Node not found: ${params.nodeId}. Use node_search to find the correct ID.`);
 
   if (params.restore) {
     // Restore from trash
     withCommitOrigin(AI_COMMIT_ORIGIN, () => {
       useNodeStore.getState().restoreNode(params.nodeId);
     });
+    pushAiOp('node_delete', params.nodeId, `restore "${node.name ?? ''}"`);
+    const restoredParentId = loroDoc.getParentId(params.nodeId) ?? '';
 
+    const output = {
+      action: 'restored' as const,
+      parentId: restoredParentId,
+    };
     return {
-      content: [{ type: 'text', text: formatResultText({
-        id: params.nodeId,
-        name: node.name ?? '',
-        restored: true,
-      }) }],
-      details: { id: params.nodeId, name: node.name ?? '', restored: true },
+      content: [{ type: 'text', text: formatResultText(output) }],
+      details: output,
     };
   }
 
@@ -44,14 +46,15 @@ async function executeDeleteTool(params: DeleteToolParams): Promise<AgentToolRes
     useNodeStore.getState().trashNode(params.nodeId, { commit: false });
     commitDoc();
   });
+  pushAiOp('node_delete', params.nodeId, `trash "${node.name ?? ''}"`);
 
+  const output = {
+    action: 'trashed' as const,
+    name: node.name ?? '',
+  };
   return {
-    content: [{ type: 'text', text: formatResultText({
-      id: params.nodeId,
-      name: node.name ?? '',
-      movedToTrash: true,
-    }) }],
-    details: { id: params.nodeId, name: node.name ?? '', movedToTrash: true },
+    content: [{ type: 'text', text: formatResultText(output) }],
+    details: output,
   };
 }
 

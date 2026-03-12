@@ -1,18 +1,22 @@
+import { nanoid } from 'nanoid';
 import { FIELD_TYPES, NDX_F, SYSTEM_NODE_IDS, SYS_T } from '../types/index.js';
+import { isOutlinerContentNodeType } from './node-type-utils.js';
 import * as loroDoc from './loro-doc.js';
 
 export const DEFAULT_AGENT_MODEL_ID = 'claude-sonnet-4-5';
 export const DEFAULT_AGENT_TEMPERATURE = 0.2;
 export const DEFAULT_AGENT_MAX_TOKENS = 4000;
 
-export const DEFAULT_AGENT_SYSTEM_PROMPT = [
+export const DEFAULT_PROMPT_LINES = [
   'You are soma, an AI collaborator inside the user\'s knowledge graph.',
   'Operate carefully on the outliner and prefer precise, reversible changes.',
   'Use tools when the user asks you to inspect, create, edit, delete, search, or undo nodes.',
   'When you mention an existing node in your answer, use <ref id="nodeId">display text</ref>.',
   'When you cite evidence from a node, use <cite id="nodeId">N</cite>.',
   'Reply in the user\'s language unless they explicitly ask otherwise.',
-].join('\n');
+];
+
+export const DEFAULT_AGENT_SYSTEM_PROMPT = DEFAULT_PROMPT_LINES.join('\n');
 
 export const AI_AGENT_NODE_IDS = {
   MODEL_OPTION_SONNET: 'NDX_N20',
@@ -21,12 +25,17 @@ export const AI_AGENT_NODE_IDS = {
   MODEL_FIELD_ENTRY: 'NDX_FE13',
   TEMPERATURE_FIELD_ENTRY: 'NDX_FE14',
   MAX_TOKENS_FIELD_ENTRY: 'NDX_FE15',
+  SKILLS_FIELD_ENTRY: 'NDX_FE16',
   MODEL_VALUE: 'NDX_N23',
   TEMPERATURE_VALUE: 'NDX_N24',
   MAX_TOKENS_VALUE: 'NDX_N25',
+} as const;
+
+// Legacy IDs — used only for migration cleanup
+const LEGACY_IDS = {
   ALWAYS_ACTIVE_SKILLS_GROUP: 'NDX_N26',
   RULES_GROUP: 'NDX_N27',
-} as const;
+};
 
 interface FixedNodePreset {
   id: string;
@@ -41,11 +50,11 @@ export interface AgentNodeConfig {
   modelId: string;
   temperature: number;
   maxTokens: number;
-  alwaysActiveSkillIds: string[];
-  ruleTexts: string[];
+  skillIds: string[];
 }
 
 const AGENT_SCHEMA_PRESETS: ReadonlyArray<FixedNodePreset> = [
+  // #agent tagDef
   {
     id: SYS_T.AGENT,
     parentId: SYSTEM_NODE_IDS.SCHEMA,
@@ -56,6 +65,18 @@ const AGENT_SCHEMA_PRESETS: ReadonlyArray<FixedNodePreset> = [
       description: 'Agent identity and default configuration',
     },
   },
+  // #skill tagDef
+  {
+    id: SYS_T.SKILL,
+    parentId: SYSTEM_NODE_IDS.SCHEMA,
+    name: 'skill',
+    data: {
+      type: 'tagDef',
+      color: 'amber',
+      description: 'AI skill — reusable prompt/instruction set',
+    },
+  },
+  // Model field (options)
   {
     id: NDX_F.AGENT_MODEL,
     parentId: SYS_T.AGENT,
@@ -83,6 +104,7 @@ const AGENT_SCHEMA_PRESETS: ReadonlyArray<FixedNodePreset> = [
     parentId: NDX_F.AGENT_MODEL,
     name: 'claude-haiku-4-5',
   },
+  // Temperature field (number)
   {
     id: NDX_F.AGENT_TEMPERATURE,
     parentId: SYS_T.AGENT,
@@ -95,6 +117,7 @@ const AGENT_SCHEMA_PRESETS: ReadonlyArray<FixedNodePreset> = [
       description: 'Sampling temperature for Chat responses',
     },
   },
+  // Max Tokens field (number)
   {
     id: NDX_F.AGENT_MAX_TOKENS,
     parentId: SYS_T.AGENT,
@@ -107,7 +130,23 @@ const AGENT_SCHEMA_PRESETS: ReadonlyArray<FixedNodePreset> = [
       description: 'Maximum output tokens for Chat responses',
     },
   },
-] as const;
+  // Skills field (options_from_supertag → #skill)
+  {
+    id: NDX_F.AGENT_SKILLS,
+    parentId: SYS_T.AGENT,
+    name: 'Skills',
+    data: {
+      type: 'fieldDef',
+      fieldType: FIELD_TYPES.OPTIONS_FROM_SUPERTAG,
+      sourceSupertag: SYS_T.SKILL,
+      nullable: true,
+      cardinality: 'list',
+      description: 'Active skills available to the agent',
+    },
+  },
+];
+
+// ─── Node helpers ───
 
 function ensureNode({ id, parentId, name, data }: FixedNodePreset): void {
   if (!loroDoc.hasNode(id)) {
@@ -165,34 +204,52 @@ function ensureTargetValue(fieldEntryId: string, valueNodeId: string, targetId: 
   });
 }
 
+// ─── Bootstrap ───
+
 export function ensureAgentNode(workspaceId = loroDoc.getCurrentWorkspaceId() ?? 'ws_default'): string {
+  // Schema presets (tagDefs + fieldDefs)
   for (const preset of AGENT_SCHEMA_PRESETS) {
     ensureNode(preset);
   }
 
+  // Agent node itself
   ensureNode({
     id: SYSTEM_NODE_IDS.AGENT,
     parentId: workspaceId,
     name: 'soma',
-    data: {
-      description: DEFAULT_AGENT_SYSTEM_PROMPT,
-    },
   });
   if (!loroDoc.toNodexNode(SYSTEM_NODE_IDS.AGENT)?.tags.includes(SYS_T.AGENT)) {
     loroDoc.addTag(SYSTEM_NODE_IDS.AGENT, SYS_T.AGENT);
   }
 
-  ensureNode({
-    id: AI_AGENT_NODE_IDS.ALWAYS_ACTIVE_SKILLS_GROUP,
-    parentId: SYSTEM_NODE_IDS.AGENT,
-    name: 'Always Active Skills',
-  });
-  ensureNode({
-    id: AI_AGENT_NODE_IDS.RULES_GROUP,
-    parentId: SYSTEM_NODE_IDS.AGENT,
-    name: 'Rules',
-  });
+  // Migration: clear legacy description (system prompt was stored there)
+  const agentNode = loroDoc.toNodexNode(SYSTEM_NODE_IDS.AGENT);
+  if (agentNode?.description) {
+    loroDoc.deleteNodeData(SYSTEM_NODE_IDS.AGENT, 'description');
+  }
 
+  // Migration: remove legacy group nodes
+  for (const legacyId of Object.values(LEGACY_IDS)) {
+    if (loroDoc.hasNode(legacyId) && loroDoc.getParentId(legacyId) === SYSTEM_NODE_IDS.AGENT) {
+      loroDoc.deleteNode(legacyId);
+    }
+  }
+
+  // Create default prompt as content children (only if no content children exist yet)
+  const contentChildren = loroDoc.getChildren(SYSTEM_NODE_IDS.AGENT)
+    .filter((id) => {
+      const n = loroDoc.toNodexNode(id);
+      return n != null && isOutlinerContentNodeType(n.type);
+    });
+  if (contentChildren.length === 0) {
+    for (const line of DEFAULT_PROMPT_LINES) {
+      const childId = nanoid();
+      loroDoc.createNode(childId, SYSTEM_NODE_IDS.AGENT);
+      loroDoc.setNodeRichTextContent(childId, line, [], []);
+    }
+  }
+
+  // Field entries
   ensureFieldEntry(SYSTEM_NODE_IDS.AGENT, AI_AGENT_NODE_IDS.MODEL_FIELD_ENTRY, NDX_F.AGENT_MODEL);
   ensureTargetValue(
     AI_AGENT_NODE_IDS.MODEL_FIELD_ENTRY,
@@ -214,8 +271,12 @@ export function ensureAgentNode(workspaceId = loroDoc.getCurrentWorkspaceId() ??
     String(DEFAULT_AGENT_MAX_TOKENS),
   );
 
+  ensureFieldEntry(SYSTEM_NODE_IDS.AGENT, AI_AGENT_NODE_IDS.SKILLS_FIELD_ENTRY, NDX_F.AGENT_SKILLS);
+
   return SYSTEM_NODE_IDS.AGENT;
 }
+
+// ─── Reading config ───
 
 function readOptionFieldName(fieldEntryId: string): string | null {
   const fieldEntry = loroDoc.toNodexNode(fieldEntryId);
@@ -234,21 +295,50 @@ function readNumberField(fieldEntryId: string, fallback: number): number {
   return Number.isFinite(value) ? value : fallback;
 }
 
-function readRuleTexts(groupId: string): string[] {
-  return loroDoc.getChildren(groupId)
-    .map((childId) => loroDoc.toNodexNode(childId))
-    .filter((node): node is NonNullable<ReturnType<typeof loroDoc.toNodexNode>> => node !== null)
-    .map((node) => (node.name ?? '').trim())
-    .filter(Boolean);
+/**
+ * Read system prompt from the agent node's content children.
+ * Regular content nodes contribute their name text.
+ * Reference nodes resolve to the target's name (+ its children for multi-line content).
+ */
+function readSystemPromptFromChildren(agentNodeId: string): string {
+  const children = loroDoc.getChildren(agentNodeId);
+  const lines: string[] = [];
+
+  for (const childId of children) {
+    const child = loroDoc.toNodexNode(childId);
+    if (!child || !isOutlinerContentNodeType(child.type)) continue;
+
+    if (child.type === 'reference' && child.targetId) {
+      // Resolve reference → use target's content (name + children)
+      const target = loroDoc.toNodexNode(child.targetId);
+      if (target?.name) lines.push(target.name.trim());
+      // Also include the target's children as lines
+      for (const grandchildId of loroDoc.getChildren(child.targetId)) {
+        const grandchild = loroDoc.toNodexNode(grandchildId);
+        if (grandchild && isOutlinerContentNodeType(grandchild.type) && grandchild.name) {
+          lines.push(grandchild.name.trim());
+        }
+      }
+    } else if (child.name) {
+      lines.push(child.name.trim());
+    }
+  }
+
+  return lines.filter(Boolean).join('\n');
 }
 
-function readAlwaysActiveSkillIds(groupId: string): string[] {
-  return loroDoc.getChildren(groupId)
-    .map((childId) => loroDoc.toNodexNode(childId))
-    .filter((node): node is NonNullable<ReturnType<typeof loroDoc.toNodexNode>> => node !== null)
-    .map((node) => {
-      if (node.type === 'reference') return node.targetId ?? null;
-      return node.targetId ?? null;
+/**
+ * Read active skill IDs from the Skills field entry (options_from_supertag).
+ * Each value node has a targetId pointing to the selected #skill node.
+ */
+function readSkillIds(fieldEntryId: string): string[] {
+  const fieldEntry = loroDoc.toNodexNode(fieldEntryId);
+  if (!fieldEntry?.children?.length) return [];
+
+  return fieldEntry.children
+    .map((valueNodeId) => {
+      const valueNode = loroDoc.toNodexNode(valueNodeId);
+      return valueNode?.targetId ?? null;
     })
     .filter((id): id is string => typeof id === 'string' && id.length > 0);
 }
@@ -256,10 +346,8 @@ function readAlwaysActiveSkillIds(groupId: string): string[] {
 export function readAgentNodeConfig(): AgentNodeConfig {
   ensureAgentNode();
 
-  const agentNode = loroDoc.toNodexNode(SYSTEM_NODE_IDS.AGENT);
-  const systemPrompt = (agentNode?.description ?? '').trim() || DEFAULT_AGENT_SYSTEM_PROMPT;
-  const ruleTexts = readRuleTexts(AI_AGENT_NODE_IDS.RULES_GROUP);
-  const alwaysActiveSkillIds = readAlwaysActiveSkillIds(AI_AGENT_NODE_IDS.ALWAYS_ACTIVE_SKILLS_GROUP);
+  const systemPrompt = readSystemPromptFromChildren(SYSTEM_NODE_IDS.AGENT) || DEFAULT_AGENT_SYSTEM_PROMPT;
+  const skillIds = readSkillIds(AI_AGENT_NODE_IDS.SKILLS_FIELD_ENTRY);
 
   return {
     nodeId: SYSTEM_NODE_IDS.AGENT,
@@ -267,24 +355,17 @@ export function readAgentNodeConfig(): AgentNodeConfig {
     modelId: readOptionFieldName(AI_AGENT_NODE_IDS.MODEL_FIELD_ENTRY) ?? DEFAULT_AGENT_MODEL_ID,
     temperature: readNumberField(AI_AGENT_NODE_IDS.TEMPERATURE_FIELD_ENTRY, DEFAULT_AGENT_TEMPERATURE),
     maxTokens: Math.max(1, Math.round(readNumberField(AI_AGENT_NODE_IDS.MAX_TOKENS_FIELD_ENTRY, DEFAULT_AGENT_MAX_TOKENS))),
-    alwaysActiveSkillIds,
-    ruleTexts,
+    skillIds,
   };
 }
+
+// ─── Build system prompt ───
 
 export function buildAgentSystemPrompt(config: AgentNodeConfig = readAgentNodeConfig()): string {
   const sections = [config.systemPrompt.trim()];
 
-  if (config.ruleTexts.length > 0) {
-    sections.push(
-      '<rules>\n'
-      + config.ruleTexts.map((rule) => `- ${rule}`).join('\n')
-      + '\n</rules>',
-    );
-  }
-
-  if (config.alwaysActiveSkillIds.length > 0) {
-    const skillLines = config.alwaysActiveSkillIds
+  if (config.skillIds.length > 0) {
+    const skillLines = config.skillIds
       .map((skillId) => loroDoc.toNodexNode(skillId))
       .filter((node): node is NonNullable<ReturnType<typeof loroDoc.toNodexNode>> => node !== null)
       .map((skillNode) => {

@@ -284,6 +284,7 @@ export const SYS_T = {
   NOTE: 'SYS_T201',
   SOURCE: 'SYS_T202',
   AGENT: 'SYS_T203',
+  SKILL: 'SYS_T204',
 } as const;
 
 export type SystemTag = typeof SYS_T[keyof typeof SYS_T];
@@ -321,6 +322,8 @@ export const NDX_F = {
   AGENT_TEMPERATURE: 'NDX_F14',
   /** #agent: max tokens */
   AGENT_MAX_TOKENS: 'NDX_F15',
+  /** #agent: active skills (options_from_supertag → #skill) */
+  AGENT_SKILLS: 'NDX_F16',
 } as const;
 
 export type NdxFieldDef = typeof NDX_F[keyof typeof NDX_F];

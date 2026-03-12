@@ -9,227 +9,358 @@
 > 17 actions——架构不同，但参数描述质量（defaults、examples、edge cases）对齐 CiC 水准。
 > Phase 3 实施时逐个 action 对照 CiC 对应工具细化参数。
 >
-> 2026-03-12 — Draft for review
+> 2026-03-12 — Phase 1.5 update: 6 focused tools replacing monolithic node tool
 
 ---
 
-## Phase 1: Knowledge Tools
+## Phase 1.5: Knowledge Tools (6 focused tools)
 
-### Tool: `node`
+> Phase 1 had a single `node` tool with 5 actions and 20+ shared params.
+> Phase 1.5 splits into 6 independent tools with 3-10 focused params each.
+
+### Tool 1: `node_create`
 
 ```
-name: "node"
-label: "Node"
+name: "node_create"
+label: "Create Node"
 description: |
-  Create, read, update, delete, or search nodes in the user's knowledge graph.
-  The knowledge graph is a tree of nodes. Each node has a name, optional description,
-  optional tags (supertags), and children. Nodes can be organized hierarchically.
+  Create new nodes. Supports single nodes, trees (via children), field values,
+  references, siblings, and duplicates — everything is a node.
 
-  Actions:
-  - "create": Create a new node. Defaults to creating under today's journal node.
-  - "read": Read a node and its children summaries. Children are paginated (default 20).
-    Call read multiple times with childOffset to explore large subtrees.
-  - "update": Update a node's name, description, tags, or position. Supports partial updates.
-  - "delete": Move a node to Trash (recoverable). Cannot delete system/locked nodes.
-  - "search": Search nodes by text, tags, or date. Returns paginated results (default 20).
+  Quick patterns:
+  - Content node: node_create(name: "...", parentId: "...")
+  - With tags + fields: node_create(name: "...", tags: ["task"], fields: {"Status": "Todo"})
+  - Tree: node_create(parentId: "...", children: [{name: "...", children: [...]}])
+  - Reference: node_create(parentId: "...", targetId: "nodeId")
+  - Sibling: node_create(afterId: "...", name: "...")
+  - Duplicate: node_create(duplicateId: "nodeId")
+  - Field value (direct): node_create(parentId: "fieldEntryId", name: "value")
 
-  Reference format: When mentioning nodes in your response, use <ref id="nodeId">display name</ref>.
-  For citations, use <cite id="nodeId">N</cite>.
-
-  All write operations (create/update/delete) are committed with origin 'ai:chat'
-  and can be undone with the undo tool (isolated from user's ⌘Z history).
+  All write operations use isolated undo — undoable with the undo tool.
 ```
 
 #### Parameters
 
 ```typescript
 {
-  action: {
-    type: "string",
-    enum: ["create", "read", "update", "delete", "search"],
-    description: "The operation to perform on the knowledge graph.",
-    required: true,
-  },
-
-  // ── create ──
-
   name: {
     type: "string",
-    description: "Node name/title. Required for 'create'. For 'update', the new name to set. "
-      + "Supports plain text only — rich formatting (bold, links) is not supported here.",
+    description: "Node name/title. Required for content nodes. "
+      + "Not needed for reference (targetId) or duplicate (duplicateId) modes.",
   },
 
   parentId: {
     type: "string",
-    description: "Parent node ID. For 'create': where to place the new node (defaults to today's "
-      + "journal node if omitted). For 'update': set this to move the node to a new parent.",
+    description: "Parent node ID. Defaults to today's journal node if omitted. "
+      + "Mutually exclusive with afterId.",
+  },
+
+  afterId: {
+    type: "string",
+    description: "Create a sibling after this node (same parent). Mutually exclusive with parentId.",
   },
 
   position: {
     type: "number",
-    description: "Zero-based index in the parent's children list. For 'create': insertion position "
-      + "(defaults to end). For 'update': new position after move. Omit to append at end.",
+    description: "Zero-based insertion position in parent's children list. Defaults to end.",
   },
 
   tags: {
     type: "array of strings",
-    description: "For 'create': tag names to apply (e.g. ['task', 'source']). Use tag display names, "
-      + "not IDs — the system resolves names to IDs automatically, creating new tags if needed. "
-      + "For 'update': use addTags/removeTags instead.",
+    description: "Tag display names to apply (e.g. ['task', 'source']). Names auto-resolve to IDs; "
+      + "new tags are created if they don't exist. Template fields are synced after tagging.",
   },
 
   content: {
     type: "string",
-    description: "Node description/body text. For 'create': initial description. For 'update': "
-      + "replaces the entire description. Supports plain text and <ref id=\"nodeId\">text</ref> "
-      + "references which will be converted to inline references. Omit to leave unchanged.",
+    description: "Node description/body text. Supports plain text.",
   },
 
-  // ── read ──
+  fields: {
+    type: "Record<string, string>",
+    description: "Convenience field setting by display name. Example: {\"Status\": \"Todo\", \"Priority\": \"High\"}. "
+      + "For options fields: selects existing option or auto-collects a new one. "
+      + "For plain/url/etc: sets as text value. Requires tags to be applied first (fields resolve from tag templates).",
+  },
 
-  nodeId: {
+  targetId: {
     type: "string",
-    description: "Target node ID. Required for 'read', 'update', and 'delete'.",
+    description: "Create a reference node pointing to this target. "
+      + "The reference appears as a child of parentId.",
   },
 
-  depth: {
-    type: "number",
-    description: "For 'read': how many levels of children to include (default: 1, max: 3). "
-      + "depth=1 returns direct children summaries. depth=2 includes grandchildren summaries. "
-      + "Use depth=0 to read only the node itself without children.",
-    default: 1,
-  },
-
-  childOffset: {
-    type: "number",
-    description: "For 'read': skip this many children before returning results (default: 0). "
-      + "Use with childLimit for pagination when a node has many children.",
-    default: 0,
-  },
-
-  childLimit: {
-    type: "number",
-    description: "For 'read': maximum number of children to return (default: 20, max: 50). "
-      + "The response includes a 'total' count so you know if there are more.",
-    default: 20,
-  },
-
-  // ── update ──
-
-  addTags: {
-    type: "array of strings",
-    description: "For 'update': tag names to add (e.g. ['task']). Use display names, not IDs. "
-      + "New tags are created automatically if they don't exist.",
-  },
-
-  removeTags: {
-    type: "array of strings",
-    description: "For 'update': tag names to remove (e.g. ['task']). Use display names.",
-  },
-
-  checked: {
-    type: "boolean",
-    description: "For 'update': set the node's checkbox state. true = done, false = not done, "
-      + "null = remove checkbox. Only works on nodes with checkbox enabled.",
-  },
-
-  // ── search ──
-
-  query: {
+  duplicateId: {
     type: "string",
-    description: "For 'search': text to search for (fuzzy matching, supports CJK). "
-      + "Searches node names and descriptions. Omit to search by tags/date only.",
+    description: "Deep-copy this node. Creates a sibling of the original with all children and fields.",
   },
 
-  searchTags: {
-    type: "array of strings",
-    description: "For 'search': filter by tag names (AND logic — all tags must match). "
-      + "Use display names (e.g. ['task', 'source']), not IDs.",
-  },
-
-  dateRange: {
-    type: "object",
-    description: "For 'search': filter by creation date. "
-      + "Example: {\"from\": \"2026-03-01\", \"to\": \"2026-03-12\"} for nodes created in this range. "
-      + "Both from and to are optional (omit for open-ended range).",
-    properties: {
-      from: { type: "string", description: "Start date (ISO format, inclusive)" },
-      to: { type: "string", description: "End date (ISO format, inclusive)" },
-    },
-  },
-
-  limit: {
-    type: "number",
-    description: "For 'search': maximum results to return (default: 20, max: 50).",
-    default: 20,
-  },
-
-  offset: {
-    type: "number",
-    description: "For 'search': skip this many results for pagination (default: 0).",
-    default: 0,
+  children: {
+    type: "array of CreateChildInput",
+    description: "Recursively create a subtree (max depth 3). Each child can have: "
+      + "name, tags, content, fields, targetId, children. "
+      + "All nodes created in one commit = one undo step.",
   },
 }
 ```
 
-#### Return Values
+#### Smart Dispatch
 
-**create** returns:
+| Condition | Behavior |
+|-----------|----------|
+| `duplicateId` | `store.duplicateNode()` |
+| `targetId` (no children) | `store.addReference(parentId, targetId)` |
+| `afterId` | `store.createSibling(afterId, data)` |
+| otherwise | `store.createChild(parentId, position, data)` |
+
+#### Return Value
+
 ```json
 {
   "id": "abc123",
-  "name": "Meeting notes",
+  "name": "Buy groceries",
   "parentId": "day_20260312",
   "parentName": "2026-03-12",
-  "tags": ["task"]
+  "tags": ["task"],
+  "fields": { "Status": "Todo", "Priority": "High" },
+  "childrenCreated": 0
 }
 ```
 
-**read** returns:
+---
+
+### Tool 2: `node_read`
+
+```
+name: "node_read"
+label: "Read Node"
+description: |
+  Read a node's content, fields, and children. Fields show type and available
+  options. Field entries are in the fields array, not in children — children
+  only lists content nodes and references.
+
+  Use node_read to understand a node before editing or to discover field entry IDs
+  for direct manipulation.
+```
+
+#### Parameters
+
+```typescript
+{
+  nodeId: { type: "string", required: true },
+  depth: { type: "number", default: 1, max: 3 },
+  childOffset: { type: "number", default: 0 },
+  childLimit: { type: "number", default: 20, max: 50 },
+}
+```
+
+#### Return Value
+
 ```json
 {
   "id": "abc123",
-  "name": "AI Research",
-  "description": "Notes on transformer architectures",
-  "tags": ["source", "AI"],
+  "name": "Buy groceries",
+  "description": "",
+  "tags": ["task"],
   "fields": [
-    { "name": "URL", "value": "https://arxiv.org/..." },
-    { "name": "Status", "value": "reading" }
+    {
+      "name": "Status",
+      "type": "options",
+      "value": "In Progress",
+      "fieldEntryId": "fe_001",
+      "valueNodeId": "vn_001",
+      "options": ["Todo", "In Progress", "Done"]
+    },
+    {
+      "name": "Priority",
+      "type": "options",
+      "value": "",
+      "fieldEntryId": "fe_002",
+      "valueNodeId": null,
+      "options": ["Low", "Medium", "High"]
+    }
   ],
-  "checked": null,
+  "checked": false,
   "parent": { "id": "day_20260312", "name": "2026-03-12" },
   "breadcrumb": ["Journal", "2026-03-12"],
   "children": {
-    "total": 45,
+    "total": 3,
     "offset": 0,
     "limit": 20,
     "items": [
-      { "id": "child1", "name": "Attention mechanism", "hasChildren": true, "childCount": 3, "tags": [] },
-      { "id": "child2", "name": "Key findings", "hasChildren": false, "childCount": 0, "tags": ["insight"] }
+      { "id": "c1", "name": "Buy milk", "hasChildren": false, "childCount": 0, "tags": [], "checked": null },
+      { "id": "ref_1", "name": "Shopping list", "isReference": true, "targetId": "list_node", "hasChildren": false, "childCount": 0, "tags": [] }
     ]
   }
 }
 ```
 
-**update** returns:
-```json
+**Key design:**
+- `fields` contains `fieldEntryId` + `valueNodeId` for direct CRUD
+- `fields` contains `type` + `options` so AI knows how to set values
+- `children` excludes fieldEntry nodes (reduced noise)
+- `children` marks `isReference` + `targetId` for AI to distinguish references
+
+---
+
+### Tool 3: `node_edit`
+
+```
+name: "node_edit"
+label: "Edit Node"
+description: |
+  Modify an existing node. Only provided fields are changed. Works on any node
+  including field value nodes and reference nodes.
+
+  Use fields parameter to set field values by name — no need to know field entry IDs.
+  Or edit field value nodes directly: node_edit(nodeId: valueNodeId, name: "new value").
+
+  All write operations use isolated undo — undoable with the undo tool.
+```
+
+#### Parameters
+
+```typescript
 {
-  "id": "abc123",
-  "name": "AI Research (updated)",
-  "updated": ["name", "tags"]
+  nodeId: { type: "string", required: true },
+  name: { type: "string", description: "New name" },
+  content: { type: "string", description: "New description (replaces entire description)" },
+  checked: { type: "boolean | null", description: "true = done, false = not done, null = remove checkbox" },
+  addTags: { type: "array of strings", description: "Tags to add (display names)" },
+  removeTags: { type: "array of strings", description: "Tags to remove (display names)" },
+  fields: {
+    type: "Record<string, string>",
+    description: "Set field values by display name (same as node_create). "
+      + "For options: selects or auto-collects. For plain: sets text value.",
+  },
+  parentId: { type: "string", description: "Move to new parent" },
+  position: { type: "number", description: "New position in parent" },
 }
 ```
 
-**delete** returns:
+#### Return Value
+
 ```json
 {
   "id": "abc123",
-  "name": "Old note",
-  "movedToTrash": true
+  "name": "Updated name",
+  "updated": ["name", "tags", "fields"]
 }
 ```
 
-**search** returns:
+---
+
+### Tool 4: `node_delete`
+
+```
+name: "node_delete"
+label: "Delete Node"
+description: |
+  Move a node to Trash, or restore from Trash.
+  Works on any node: content, field values, references.
+  Deleting a field value node clears that field.
+  Deleting a reference removes the link.
+  Use restore: true to recover a trashed node.
+
+  All write operations use isolated undo — undoable with the undo tool.
+```
+
+#### Parameters
+
+```typescript
+{
+  nodeId: { type: "string", required: true },
+  restore: { type: "boolean", default: false, description: "true = restore from Trash" },
+}
+```
+
+#### Return Value
+
+```json
+{ "id": "abc123", "name": "Old note", "movedToTrash": true }
+```
+
+Or with `restore: true`:
+```json
+{ "id": "abc123", "name": "Old note", "restored": true }
+```
+
+---
+
+### Tool 5: `node_search`
+
+```
+name: "node_search"
+label: "Search Nodes"
+description: |
+  Search the knowledge graph. Supports text search (fuzzy, CJK), tag filtering,
+  field value filtering, backlink lookup, date range, subtree scoping, and
+  structured sort. Think of it as Grep for your knowledge graph.
+
+  Quick patterns:
+  - Text search: node_search(query: "API design")
+  - Tag + field: node_search(searchTags: ["task"], fields: {"Status": "Todo"})
+  - Backlinks: node_search(linkedTo: "nodeId")  → all nodes referencing this node
+  - Subtree: node_search(parentId: "projectId", query: "auth")
+  - Count only: node_search(searchTags: ["task"], count: true)
+  - Sorted: node_search(query: "auth", sort: { field: "modified", order: "desc" })
+```
+
+#### Parameters
+
+```typescript
+{
+  query: { type: "string", description: "Fuzzy text search (name + description)" },
+  searchTags: { type: "array of strings", description: "Tag display names (AND logic)" },
+  fields: {
+    type: "Record<string, string>",
+    description: "Field value filter. Example: {\"Status\": \"Todo\"}. "
+      + "Uses getFieldValue() for value matching.",
+  },
+  linkedTo: {
+    type: "string",
+    description: "Find all nodes referencing this node (backlinks). "
+      + "Uses computeBacklinks() from backlinks.ts.",
+  },
+  parentId: { type: "string", description: "Limit search to subtree under this node" },
+  dateRange: {
+    type: "object",
+    properties: {
+      from: { type: "string", description: "Start date ISO (inclusive)" },
+      to: { type: "string", description: "End date ISO (inclusive)" },
+    },
+  },
+  sort: {
+    type: "object",
+    properties: {
+      field: { type: "string", enum: ["relevance", "created", "modified", "name", "refCount"] },
+      order: { type: "string", enum: ["asc", "desc"], default: "desc" },
+    },
+    description: "Sort results. Uses sort-utils.ts comparators. "
+      + "Default: relevance (fuzzy score) for text search, modified desc otherwise.",
+  },
+  limit: { type: "number", default: 20, max: 50 },
+  offset: { type: "number", default: 0 },
+  count: {
+    type: "boolean",
+    description: "true → only return { total }, no items. Useful for statistics.",
+  },
+}
+```
+
+#### Infrastructure Mapping
+
+| Parameter | Backend |
+|-----------|---------|
+| `query` | fuzzy-search.ts (existing) |
+| `searchTags` | Tag ID resolution + node.tags filter |
+| `fields` | filter-utils.ts `getFieldValue()` logic |
+| `linkedTo` | backlinks.ts `computeBacklinks()` |
+| `parentId` | Subtree walk |
+| `sort` | sort-utils.ts `compareNodes()` |
+| `count` | `return { total: results.length }` |
+
+#### Return Value
+
 ```json
 {
   "total": 42,
@@ -238,19 +369,22 @@ description: |
   "items": [
     {
       "id": "abc123",
-      "name": "Transformer Architecture Notes",
-      "tags": ["source", "AI"],
-      "snippet": "...self-attention mechanism allows the model to...",
-      "createdAt": "2026-03-10T14:30:00Z",
-      "parentName": "2026-03-10"
+      "name": "API Auth Design",
+      "tags": ["source"],
+      "snippet": "API Auth Design — JWT token rotation strategy for...",
+      "createdAt": "2026-03-12T...",
+      "parentName": "Architecture Notes",
+      "fields": { "Status": "In Progress" }
     }
   ]
 }
 ```
 
+`count: true` returns only `{ "total": 42 }`.
+
 ---
 
-### Tool: `undo`
+### Tool 6: `undo`
 
 ```
 name: "undo"

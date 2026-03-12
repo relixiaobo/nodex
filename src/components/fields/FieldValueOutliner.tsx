@@ -63,6 +63,78 @@ export function shouldShowFieldValueTrailingInput(
   return shouldShowTrailingInput(items as Array<{ type: OutlinerRowType }>);
 }
 
+function PasswordFieldEditor({ fieldEntryId, selectableChildIds }: { fieldEntryId: string; selectableChildIds: string[] }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+  const valueNodeId = selectableChildIds[0];
+  const valueNode = valueNodeId ? useNodeStore.getState().getNode(valueNodeId) : undefined;
+  const password = valueNode?.name ?? '';
+  const masked = password
+    ? (password.length <= 12
+      ? `${password.slice(0, 7)}••••`
+      : `${password.slice(0, 7)}••••${password.slice(-4)}`)
+    : '';
+
+  useLayoutEffect(() => {
+    if (editing) inputRef.current?.focus();
+  }, [editing]);
+
+  function handleSave() {
+    const value = draft.trim();
+    if (!value) {
+      setEditing(false);
+      return;
+    }
+    const store = useNodeStore.getState();
+    if (valueNodeId) {
+      loroDoc.setNodeRichTextContent(valueNodeId, value, [], []);
+      loroDoc.commitDoc();
+    } else {
+      store.createChild(fieldEntryId, 0, { name: value });
+    }
+    setDraft('');
+    setEditing(false);
+  }
+
+  if (editing) {
+    return (
+      <FieldValueRow dimmed={false}>
+        <div className="flex flex-1 items-center gap-1.5 min-w-0">
+          <input
+            ref={inputRef}
+            type="password"
+            autoComplete="off"
+            spellCheck={false}
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') { e.preventDefault(); handleSave(); }
+              if (e.key === 'Escape') { e.preventDefault(); setEditing(false); }
+            }}
+            onBlur={handleSave}
+            placeholder="sk-ant-..."
+            className="flex-1 min-w-0 bg-transparent text-[15px] leading-6 text-foreground outline-none placeholder:text-foreground/20"
+          />
+        </div>
+      </FieldValueRow>
+    );
+  }
+
+  return (
+    <FieldValueRow dimmed={!password}>
+      <div
+        className="flex-1 min-w-0 flex items-center cursor-text"
+        onClick={() => { setDraft(''); setEditing(true); }}
+      >
+        <span className={`truncate text-[15px] leading-6 ${password ? 'font-mono tracking-[0.08em] text-foreground' : 'text-foreground/20 select-none'}`}>
+          {password ? masked : 'Add password'}
+        </span>
+      </div>
+    </FieldValueRow>
+  );
+}
+
 export function FieldValueOutliner({ fieldEntryId, fieldDataType, attrDefId, configNodeId, onNavigateOut }: FieldValueOutlinerProps) {
   useChildren(fieldEntryId);
 
@@ -350,23 +422,8 @@ export function FieldValueOutliner({ fieldEntryId, fieldDataType, attrDefId, con
   }
 
   if (isPasswordFieldType(fieldDataType)) {
-    const valueNodeId = selectableChildIds[0];
-    const valueNode = valueNodeId ? useNodeStore.getState().getNode(valueNodeId) : undefined;
-    const password = valueNode?.name ?? '';
-    const masked = password
-      ? (password.length <= 12
-        ? `${password.slice(0, 7)}••••`
-        : `${password.slice(0, 7)}••••${password.slice(-4)}`)
-      : '';
-
     return (
-      <FieldValueRow dimmed={!password}>
-        <div className="flex-1 min-w-0 flex items-center">
-          <span className={`truncate text-[15px] leading-6 ${password ? 'font-mono tracking-[0.08em] text-foreground' : 'text-foreground/20 select-none'}`}>
-            {password ? masked : 'Add password'}
-          </span>
-        </div>
-      </FieldValueRow>
+      <PasswordFieldEditor fieldEntryId={fieldEntryId} selectableChildIds={selectableChildIds} />
     );
   }
 

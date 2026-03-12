@@ -57,7 +57,7 @@ outliner 树状结构天然支持渐进式披露——不需要特殊 UI。
   │     │     ├── 论证：模块边界由变化率决定       ← Round 2 血肉
   │     │     └── 隐形假设：假定变化率可预测
   │     └── 碰撞（置信度过阈值时）                 ← Round 3 灵魂
-  │           └── 跟 [[API 设计笔记]] 是同构 → ref
+  │           └── 跟 <ref id="...">API 设计笔记</ref> 是同构
   ├── #note（用户笔记）
   │     └── 约束有两种：边界约束和时序约束…
   └── (URL / Author — field entries)
@@ -179,12 +179,14 @@ Spark 提取时同时填充 supertag 字段（作为 field entries，不是 JSON
 
 ## Reference 在 Spark 中的应用
 
-来源：ai-strategy.md §13 "Reference 原则"
+Agent 输出统一用 `<ref id="nodeId">text</ref>`（inline）和 `<cite id="nodeId">N</cite>`（角标）。
 
-- Spark 中引用已有节点时用 **inline reference**（真实图谱边）
-  - 例：`"跟 [[API 设计笔记]] 是同构"`
-- Highlight 通过 **reference** 嵌入 spark/note 中作为论据
-  - 例：骨架节点的 children 中有 reference 指向具体 highlight
+消费端各自物化：
+- **node.create content** → `<ref>` 转为 ProseMirror `inlineReference`（真实图谱边）
+- **node.create children** → `<ref>` 转为 Reference 节点 (`type: 'reference', targetId`)
+- **Chat 展示** → `<ref>` 渲染为可点击导航链接（不创建图谱边）
+
+示例：Spark 碰撞结果中 `"跟 <ref id="abc">API 设计笔记</ref> 是同构"` → 创建为节点时自动生成 inline reference。
 
 **画板上的 reference = 真实图谱边（持久化）**——这强化图结构检索，加速碰撞冷启动。
 

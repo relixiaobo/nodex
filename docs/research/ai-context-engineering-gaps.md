@@ -313,14 +313,13 @@ interface TurnContext {
 - `SYS_D.AGENT = 'SYS_D_AGENT'` 新系统节点常量
 - `SYSTEM_NODE_PRESETS` 新增 agent 预设
 
-### Gap 6: Chat 中的节点引用渲染
+### Gap 6: Chat 中的节点引用渲染 ✅ 已设计
 
-Phase 1 计划说用 `[[nodeId|text]]` 格式，但缺少：
-
-1. **解析**：ChatMessage 渲染时正则匹配 `\[\[([^\]|]+)\|([^\]]+)\]\]`
-2. **渲染**：inline `<button>` 样式，点击调用 `pushPanel(nodeId)`
-3. **样式**：与大纲中的 inline reference 一致（下划线 + 主色）
-4. **失效处理**：nodeId 指向已删除节点 → 灰色 + 删除线
+统一引用格式（决策 #4）：
+- `<ref id="nodeId">text</ref>`（inline reference）→ Chat 中渲染为可点击导航链接
+- `<cite id="nodeId">N</cite>`（citation）→ Chat 中渲染为角标数字，hover 显示摘要
+- Consumer-side materialization：Chat / node.create content / children 各自物化
+- 失效处理：nodeId 不存在 → 灰色 + 删除线
 
 ### Gap 7: Tool Call 渲染（ChatMessage 中显示工具调用）
 
@@ -331,9 +330,9 @@ CiC 不直接展示 tool call 细节。Claude Code 显示工具调用摘要。
 - 点击展开显示完整参数和结果
 - 错误的 tool call 以红色高亮
 
-### Gap 8: API Key 迁移到节点存储
+### Gap 8: API Key 迁移到节点存储 ✅ 已设计
 
-Phase 0 用 chrome.storage.local 存储 API key。Phase 1 迁移到节点模型：
+Phase 0 用 chrome.storage.local 存储 API key。Phase 1 迁移到节点模型（决策 #6）：
 
 - **API key** → Settings 节点的字段（password 类型渲染，显示为 `sk-ant-••••`）
 - **模型/参数** → `#agent` 节点的字段（model 下拉、temperature、max tokens）
@@ -417,3 +416,4 @@ Phase 5 假设 Loro OpLog 存储 peer ID 以区分 agent vs 用户操作。**需
 | 8 | 动态上下文注入 | 统一用 `<system-reminder>` 标签注入（面板节点、页面 URL/标题、选中节点、时间等），按需扩展 | Phase 1 |
 | 9 | #agent 节点是否 locked | 否，用户可编辑系统 prompt、Rules、配置 | Phase 1 |
 | 10 | page-capture 复用 | 作为统一页面抓取层，Clip / Spark (P2) / Browser tool (P3) 三方共用 | Phase 2-3 |
+| 11 | Undo 隔离 | AI 写操作用 origin `'ai:chat'` commit；专用 `aiUndoManager`（排除非 ai: origin）只撤销 AI 操作；主 UndoManager（⌘Z）不排除 ai: → 用户仍可撤销 AI 操作 | Phase 1 |

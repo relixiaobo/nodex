@@ -143,14 +143,14 @@ UI Store 新增：
 | Phase 1 | 全局单例（⌘K、Clip 等非 Chat 入口也需要），面板关闭时销毁 + 持久化 |
 | Phase 4 | 主 agent 全局 + subagent 按需创建/销毁（同一 JS 进程内并发 async） |
 
-### 3. API Key 演进
+### 3. API Key & Agent 配置演进
 
-| Phase | 存储方式 | 安全性 |
-|-------|---------|--------|
-| Phase 0 | `chrome.storage.local`（临时） | 客户端明文（spike 阶段可接受） |
-| Phase 1 | D1 加密存储（正式方案） | Worker 解密后使用，客户端不持有明文 |
+| Phase | API Key 存储 | Agent 配置 |
+|-------|-------------|-----------|
+| Phase 0 | `chrome.storage.local`（临时） | 硬编码 |
+| Phase 1 | Settings 节点字段（Loro，随工作区同步） | #agent 节点字段（model/temperature/max tokens） |
 
-来源：ai-strategy.md §15 "BYOK 用户的 key 也通过 Worker 代理（加密传输，不在客户端明文存储）"
+**"一切皆节点"原则**：API key 存为 Settings 节点的 password 类型字段（显示为 `sk-ant-••••`），agent 配置存为 #agent 节点字段。两者分开：Settings = 全局（provider + key），#agent = agent 自身（model + params）。
 
 ### 4. Chat 持久化演进
 
@@ -182,13 +182,19 @@ UI Store 新增：
 
 ### 7. 三工具架构
 
-来源：ai-strategy.md §9 "工具设计"
+> 完整参数 schema + 返回值见 `tool-definitions.md`
 
 | Tool | Actions | Phase |
 |------|---------|-------|
 | **node** | create / read / update / delete / search | Phase 1 |
-| **browser** | 16 actions (4 观察 + 6 交互 + 3 控制 + 1 执行 + 2 调试) | Phase 3 |
-| **undo** | undo (Loro CRDT undoDoc) | Phase 1 |
+| **undo** | undo（AI 专用 UndoManager，与用户 ⌘Z 隔离） | Phase 1 |
+| **browser** | 17 actions: 观察 7 + 交互 6 + 控制 4 | Phase 3 |
+
+**关键设计决策**：
+- Tags 用显示名（不用 ID），execute 层自动解析/创建
+- Reference 格式：`<ref id="nodeId">text</ref>`（inline）+ `<cite id="nodeId">N</cite>`（角标）
+- AI 写操作用 origin `'ai:chat'` 隔离 undo scope
+- 动态上下文用 `<system-reminder>` 标签注入
 
 ### 8. 运行时宿主模型：Sidepanel-Only（方案A）
 
@@ -211,7 +217,14 @@ MV3 Chrome 扩展有三个执行上下文：Side Panel、Service Worker、Conten
 
 **此决策影响 Phase 2（离线 Spark 用 task queue）、Phase 4（subagent 是进程内并发）、Phase 5（Schema evolution 触发方式）。**
 
-### 9. 与多面板架构的关系
+### 9. page-capture 作为统一页面抓取层
+
+`src/lib/page-capture/` 由三方共用：
+- **Web Clip**（已实现）→ 剪藏页面内容
+- **Spark**（Phase 2）→ 三轮认知压缩的输入
+- **page tool + browser tool**（Phase 3）→ `get_text` / `get_metadata` 复用 orchestrator
+
+### 10. 与多面板架构的关系
 
 来源：multi-panel-design.md §3 分阶段实施
 

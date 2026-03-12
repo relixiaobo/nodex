@@ -342,7 +342,7 @@ GIVEN 一个 subagent 在后台执行
 WHEN subagent 完成任务
 THEN 结果节点写入 Loro CRDT（outliner 中出现新节点）
   AND task-completed 消息发送
-  AND 主 agent 在 Chat 中报告 "定价信息提取完成，已创建 [[LLM 价格对比]] 节点"
+  AND 主 agent 在 Chat 中报告 "定价信息提取完成，已创建 <ref id="...">LLM 价格对比</ref> 节点"
   AND badge 数字减少
 ```
 

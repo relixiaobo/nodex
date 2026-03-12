@@ -5,6 +5,7 @@ export type SystemNodeIconKey =
   | 'library'
   | 'inbox'
   | 'journal'
+  | 'ai'
   | 'search'
   | 'trash'
   | 'schema'
@@ -28,6 +29,7 @@ export const SYSTEM_NODE_PRESETS: ReadonlyArray<SystemNodePreset> = [
   { id: SYSTEM_NODE_IDS.LIBRARY, defaultName: 'Library', iconKey: 'library', bootstrap: false, locked: false, canEditStructure: true, canEditFieldValues: true, quickNav: false, paletteSearchable: true },
   { id: SYSTEM_NODE_IDS.INBOX, defaultName: 'Inbox', iconKey: 'inbox', bootstrap: false, locked: false, canEditStructure: true, canEditFieldValues: true, quickNav: false, paletteSearchable: true },
   { id: SYSTEM_NODE_IDS.JOURNAL, defaultName: 'Daily notes', iconKey: 'journal', bootstrap: true, locked: true, canEditStructure: false, canEditFieldValues: false, quickNav: true, paletteSearchable: true },
+  { id: SYSTEM_NODE_IDS.AGENT, defaultName: 'soma', iconKey: 'ai', bootstrap: false, locked: false, canEditStructure: true, canEditFieldValues: true, quickNav: false, paletteSearchable: true },
   { id: SYSTEM_NODE_IDS.SEARCHES, defaultName: 'Searches', iconKey: 'search', bootstrap: false, locked: false, canEditStructure: true, canEditFieldValues: true, quickNav: false, paletteSearchable: true },
   { id: SYSTEM_NODE_IDS.TRASH, defaultName: 'Trash', iconKey: 'trash', bootstrap: true, locked: true, canEditStructure: false, canEditFieldValues: false, quickNav: true, paletteSearchable: true },
   { id: SYSTEM_NODE_IDS.SCHEMA, defaultName: 'Schema', iconKey: 'schema', bootstrap: true, locked: true, canEditStructure: true, canEditFieldValues: false, quickNav: false, paletteSearchable: true },

@@ -14,6 +14,7 @@ import {
   isNumberLikeFieldType,
   isOptionsFieldType,
   isOptionsFromSupertagFieldType,
+  isPasswordFieldType,
   isPlainFieldType,
   isSingleValueFieldType,
   isUrlFieldType,
@@ -257,9 +258,11 @@ describe('getFieldTypeLabel / getFieldTypeIcon / isPlainFieldType', () => {
     expect(isUrlFieldType(SYS_D.URL)).toBe(true);
     expect(isEmailFieldType(FIELD_TYPES.EMAIL)).toBe(true);
     expect(isEmailFieldType(SYS_D.EMAIL)).toBe(true);
+    expect(isPasswordFieldType(FIELD_TYPES.PASSWORD)).toBe(true);
     expect(isSingleValueFieldType(FIELD_TYPES.NUMBER)).toBe(true);
     expect(isSingleValueFieldType(FIELD_TYPES.URL)).toBe(true);
     expect(isSingleValueFieldType(FIELD_TYPES.EMAIL)).toBe(true);
+    expect(isSingleValueFieldType(FIELD_TYPES.PASSWORD)).toBe(true);
     expect(isSingleValueFieldType(FIELD_TYPES.PLAIN)).toBe(false);
   });
 });

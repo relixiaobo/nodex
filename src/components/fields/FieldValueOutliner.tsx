@@ -29,6 +29,7 @@ import {
   isColorFieldType,
   isDateFieldType,
   isEmailFieldType,
+  isPasswordFieldType,
   isUrlFieldType,
   resolveConfigValueWithDefault,
 } from '../../lib/field-utils.js';
@@ -343,6 +344,27 @@ export function FieldValueOutliner({ fieldEntryId, fieldDataType, attrDefId, con
           ) : (
             <span className="text-[15px] leading-6 text-foreground/20 select-none">{t('field.emptyEmail')}</span>
           )}
+        </div>
+      </FieldValueRow>
+    );
+  }
+
+  if (isPasswordFieldType(fieldDataType)) {
+    const valueNodeId = selectableChildIds[0];
+    const valueNode = valueNodeId ? useNodeStore.getState().getNode(valueNodeId) : undefined;
+    const password = valueNode?.name ?? '';
+    const masked = password
+      ? (password.length <= 12
+        ? `${password.slice(0, 7)}••••`
+        : `${password.slice(0, 7)}••••${password.slice(-4)}`)
+      : '';
+
+    return (
+      <FieldValueRow dimmed={!password}>
+        <div className="flex-1 min-w-0 flex items-center">
+          <span className={`truncate text-[15px] leading-6 ${password ? 'font-mono tracking-[0.08em] text-foreground' : 'text-foreground/20 select-none'}`}>
+            {password ? masked : 'Add password'}
+          </span>
         </div>
       </FieldValueRow>
     );

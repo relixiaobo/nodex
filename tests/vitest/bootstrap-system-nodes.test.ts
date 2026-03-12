@@ -32,6 +32,7 @@ describe('ensureSystemNodes', () => {
     expect(hasNode(SYSTEM_NODE_IDS.LIBRARY)).toBe(false);
     expect(hasNode(SYSTEM_NODE_IDS.INBOX)).toBe(false);
     expect(hasNode(SYSTEM_NODE_IDS.SEARCHES)).toBe(false);
+    expect(hasNode(SYSTEM_NODE_IDS.AGENT)).toBe(true);
 
     for (const nodeId of [
       SYSTEM_NODE_IDS.JOURNAL,
@@ -42,6 +43,9 @@ describe('ensureSystemNodes', () => {
       expect(getParentId(nodeId)).toBe('ws_bootstrap');
       expect(toNodexNode(nodeId)?.locked).toBe(true);
     }
+
+    expect(getParentId(SYSTEM_NODE_IDS.AGENT)).toBe('ws_bootstrap');
+    expect(toNodexNode(SYSTEM_NODE_IDS.AGENT)?.locked).toBeUndefined();
   });
 
   it('bootstraps fixed Settings schema and default field value', () => {

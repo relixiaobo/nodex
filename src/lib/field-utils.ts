@@ -180,6 +180,8 @@ export function getFieldTypeIcon(dataType: string): AppIcon {
     case SYS_D.EMAIL:
     case FIELD_TYPES.EMAIL:
       return Mail;
+    case FIELD_TYPES.PASSWORD:
+      return EyeOff;
     case SYS_D.BOOLEAN:
     case FIELD_TYPES.BOOLEAN:
       return ToggleLeft;
@@ -249,6 +251,7 @@ export const FIELD_TYPE_LIST: Array<{ value: string; label: string }> = [
   { value: FIELD_TYPES.NUMBER, label: 'Number' },
   { value: FIELD_TYPES.URL, label: 'URL' },
   { value: FIELD_TYPES.EMAIL, label: 'Email' },
+  { value: FIELD_TYPES.PASSWORD, label: 'Password' },
   { value: FIELD_TYPES.CHECKBOX, label: 'Checkbox' },
   { value: FIELD_TYPES.BOOLEAN, label: 'Boolean' },
 ];
@@ -320,9 +323,17 @@ export function isEmailFieldType(dataType: string | undefined): boolean {
   return dataType === FIELD_TYPES.EMAIL || dataType === SYS_D.EMAIL;
 }
 
+export function isPasswordFieldType(dataType: string | undefined): boolean {
+  if (!dataType) return false;
+  return dataType === FIELD_TYPES.PASSWORD;
+}
+
 /** Enter on these field values should navigate out instead of creating sibling content. */
 export function isSingleValueFieldType(dataType: string | undefined): boolean {
-  return isNumberLikeFieldType(dataType) || isUrlFieldType(dataType) || isEmailFieldType(dataType);
+  return isNumberLikeFieldType(dataType)
+    || isUrlFieldType(dataType)
+    || isEmailFieldType(dataType)
+    || isPasswordFieldType(dataType);
 }
 
 // ─── AttrDef / FieldDef config field registry ───

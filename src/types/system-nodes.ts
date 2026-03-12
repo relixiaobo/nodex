@@ -27,6 +27,7 @@ export const FIELD_TYPES = {
   DATE: 'date',
   OPTIONS_FROM_SUPERTAG: 'options_from_supertag',
   PLAIN: 'plain',
+  PASSWORD: 'password',
   FORMULA: 'formula',
   NUMBER: 'number',
   TANA_USER: 'tana_user',
@@ -282,6 +283,7 @@ export const SYS_T = {
   HIGHLIGHT: 'SYS_T200',
   NOTE: 'SYS_T201',
   SOURCE: 'SYS_T202',
+  AGENT: 'SYS_T203',
 } as const;
 
 export type SystemTag = typeof SYS_T[keyof typeof SYS_T];
@@ -309,6 +311,16 @@ export const NDX_F = {
   SOURCE_HIGHLIGHTS: 'NDX_F08',
   /** Settings: Highlight & Comment toggle (boolean, on Settings container) */
   SETTING_HIGHLIGHT_ENABLED: 'NDX_F10',
+  /** Settings: AI provider selector */
+  SETTING_AI_PROVIDER: 'NDX_F11',
+  /** Settings: API key storage */
+  SETTING_AI_API_KEY: 'NDX_F12',
+  /** #agent: model selector */
+  AGENT_MODEL: 'NDX_F13',
+  /** #agent: temperature */
+  AGENT_TEMPERATURE: 'NDX_F14',
+  /** #agent: max tokens */
+  AGENT_MAX_TOKENS: 'NDX_F15',
 } as const;
 
 export type NdxFieldDef = typeof NDX_F[keyof typeof NDX_F];

@@ -22,23 +22,13 @@ _(空)_
 
 | Agent | 分支 | 任务 | 锁定文件 | 状态 |
 |---|---|---|---|---|
-| codex | cc/phase-1-canvas | Phase 1: node tool + Chat 成熟化 | node-store.ts, ai-service.ts, system-nodes.ts | 待 Review |
+| _(空)_ | | | | |
 
 ---
 
 ## 进行中
 
-### Phase 1: 画布 — node tool + Chat 成熟化 (codex, cc/phase-1-canvas)
-
-> 详细计划：`docs/plans/phase-1-canvas.md` | 工具定义：`docs/plans/tool-definitions.md`
-
-- [x] **Step 1: node tool** — 5 actions (create/read/update/delete/search) + ai:chat origin commit
-- [x] **Step 2: undo tool** — AI UndoManager 隔离（excludeOriginPrefixes 过滤非 ai: origin）
-- [x] **Step 3: #agent 系统节点** — system prompt 从 #agent 节点加载 + `<system-reminder>` 动态上下文注入
-- [x] **Step 4: API key 迁移** — chrome.storage → Settings 节点字段 + #agent 节点 model/temp 配置
-- [x] **Step 5: Reference 渲染** — `<ref>` inline link + `<cite>` 角标 + Tool call 折叠渲染
-- [x] **Step 6: Chat 持久化** — IndexedDB session 存储 + 恢复 + 新对话
-- [x] **Step 7: ⌘K 集成** — 自然语言输入 → "Ask AI" 选项 → 打开 ChatDrawer
+_(空)_
 
 ---
 
@@ -112,13 +102,23 @@ _(空)_
 - [x] Client: Agent 工厂 + streamProxy 集成 + API key (chrome.storage.local)
 - [x] UI: ChatDrawer（独立于 PanelStack，⌘L 切换）+ 流式消息 + 空状态 + API key 设置
 
-##### Phase 1: 画布 — node tool + Chat 成熟化
-> 工具定义：`docs/plans/tool-definitions.md` | 实施计划：`docs/plans/phase-1-canvas.md` | 研究：`docs/research/ai-context-engineering-gaps.md`
-- [ ] node tool（5 actions）+ undo tool（AI 操作隔离，origin `ai:chat` + 专用 aiUndoManager）
-- [ ] System prompt 从 #agent 节点加载（英文）+ `<system-reminder>` 动态上下文注入 + Always Active #skill
-- [ ] API key 迁移到 Settings 节点字段 + Agent 配置（model/temp）迁移到 #agent 节点字段
-- [ ] Reference 渲染（`<ref>` inline + `<cite>` 角标）+ Tool call 折叠渲染
-- [ ] Chat 持久化（IndexedDB）+ ⌘K 集成
+##### ~~Phase 1: 画布 — node tool + Chat 成熟化~~ ✓ (#126, 2026-03-12)
+> 工具定义：`docs/plans/tool-definitions.md` | 实施计划：`docs/plans/phase-1-canvas.md`
+- [x] node tool（5 actions）+ undo tool（AI 操作隔离，origin `ai:chat` + 专用 aiUndoManager）
+- [x] System prompt 从 #agent 节点加载 + `<system-reminder>` 动态上下文注入
+- [x] API key 迁移到 Settings 节点字段 + Agent 配置（model/temp）迁移到 #agent 节点字段
+- [x] Reference 渲染（`<ref>` inline + `<cite>` 角标）+ Tool call 折叠渲染
+- [x] Chat 持久化（IndexedDB）+ ⌘K 集成
+
+##### Phase 1.5: AI 工具体系重构
+> 实施计划：`docs/plans/phase-1.5-node-tool-gaps.md`
+- [ ] Step 1: 拆分 node tool → 6 个独立工具（node_create/node_read/node_edit/node_delete/node_search/undo）
+- [ ] Step 2: node_create — children 批量子树 + fields 便利参数 + reference + sibling + duplicate
+- [ ] Step 3: node_read — fields 增强（type/entryId/options）+ children isReference
+- [ ] Step 4: node_edit — fields 便利参数
+- [ ] Step 5: node_search — 接入 search-engine + filter-utils + backlinks + sort-utils
+- [ ] Step 6: node_delete — restore 恢复
+- [ ] Step 7: 测试 + tool-definitions.md 更新
 
 ##### Phase 2: 阅读环 — Clip & Spark
 - [ ] Clip Spark 三轮认知压缩（skeleton → flesh → soul）
@@ -183,6 +183,7 @@ _(空)_
 
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
+| 2026-03-12 | Phase 1: 画布 — node tool + undo tool + #agent 系统节点 + API key 迁移 + Reference 渲染 + Chat 持久化 + ⌘K 集成 | codex | #126 |
 | 2026-03-12 | Phase 0: AI 基座 — pi-mono proxy + ChatDrawer (流式聊天 + API key 管理 + Mod+L 快捷键) | codex | #125 |
 | 2026-03-11 | AI 实施计划 Review — 6 Phase 计划文档交叉验证 + 3 轮修正（MV3 宿主模型、contract 收敛、并行策略） | codex | #124 |
 | 2026-03-11 | 网页抓取基础设施重构 — clip/x.com/Google Docs/GitHub/YouTube 的增强抓取迁移到独立 page capture 栈，orchestrator + site extractors + background transport | codex | #123 |

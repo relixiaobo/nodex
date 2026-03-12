@@ -22,13 +22,23 @@ _(空)_
 
 | Agent | 分支 | 任务 | 锁定文件 | 状态 |
 |---|---|---|---|---|
-| _(空)_ | | | | |
+| codex | cc/phase-1-canvas | Phase 1: node tool + Chat 成熟化 | node-store.ts, ai-service.ts, system-nodes.ts | 进行中 |
 
 ---
 
 ## 进行中
 
-_(空)_
+### Phase 1: 画布 — node tool + Chat 成熟化 (codex, cc/phase-1-canvas)
+
+> 详细计划：`docs/plans/phase-1-canvas.md` | 工具定义：`docs/plans/tool-definitions.md`
+
+- [ ] **Step 1: node tool** — 5 actions (create/read/update/delete/search) + ai:chat origin commit
+- [ ] **Step 2: undo tool** — AI UndoManager 隔离（excludeOriginPrefixes 过滤非 ai: origin）
+- [ ] **Step 3: #agent 系统节点** — system prompt 从 #agent 节点加载 + `<system-reminder>` 动态上下文注入
+- [ ] **Step 4: API key 迁移** — chrome.storage → Settings 节点字段 + #agent 节点 model/temp 配置
+- [ ] **Step 5: Reference 渲染** — `<ref>` inline link + `<cite>` 角标 + Tool call 折叠渲染
+- [ ] **Step 6: Chat 持久化** — IndexedDB session 存储 + 恢复 + 新对话
+- [ ] **Step 7: ⌘K 集成** — 自然语言输入 → "Ask AI" 选项 → 打开 ChatDrawer
 
 ---
 

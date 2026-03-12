@@ -110,15 +110,15 @@ _(空)_
 - [x] Reference 渲染（`<ref>` inline + `<cite>` 角标）+ Tool call 折叠渲染
 - [x] Chat 持久化（IndexedDB）+ ⌘K 集成
 
-##### Phase 1.5: AI 工具体系重构
+##### ~~Phase 1.5: AI 工具体系重构~~ ✓ (#127, 2026-03-12)
 > 实施计划：`docs/plans/phase-1.5-node-tool-gaps.md`
-- [ ] Step 1: 拆分 node tool → 6 个独立工具（node_create/node_read/node_edit/node_delete/node_search/undo）
-- [ ] Step 2: node_create — children 批量子树 + fields 便利参数 + reference + sibling + duplicate
-- [ ] Step 3: node_read — fields 增强（type/entryId/options）+ children isReference
-- [ ] Step 4: node_edit — fields 便利参数
-- [ ] Step 5: node_search — 接入 search-engine + filter-utils + backlinks + sort-utils
-- [ ] Step 6: node_delete — restore 恢复
-- [ ] Step 7: 测试 + tool-definitions.md 更新
+- [x] 拆分 node tool → 6 个独立工具（node_create/node_read/node_edit/node_delete/node_search/undo）
+- [x] node_create — children 批量子树 + fields 便利参数 + reference + sibling + duplicate
+- [x] node_read — fields 增强（type/entryId/options）+ children isReference
+- [x] node_edit — fields 便利参数
+- [x] node_search — fuzzy-search + filter-utils + backlinks + sort-utils
+- [x] node_delete — restore 恢复
+- [x] 测试 + tool-definitions.md 更新 + 代码优化（DRY + 基础设施复用）
 
 ##### Phase 2: 阅读环 — Clip & Spark
 - [ ] Clip Spark 三轮认知压缩（skeleton → flesh → soul）
@@ -183,6 +183,7 @@ _(空)_
 
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
+| 2026-03-12 | Phase 1.5: AI 工具体系重构 — node tool 拆分为 6 独立工具 + create/read/edit/search 增强 + shared.ts 公共层 + 代码优化 | codex + nodex | #127 |
 | 2026-03-12 | Phase 1: 画布 — node tool + undo tool + #agent 系统节点 + API key 迁移 + Reference 渲染 + Chat 持久化 + ⌘K 集成 | codex | #126 |
 | 2026-03-12 | Phase 0: AI 基座 — pi-mono proxy + ChatDrawer (流式聊天 + API key 管理 + Mod+L 快捷键) | codex | #125 |
 | 2026-03-11 | AI 实施计划 Review — 6 Phase 计划文档交叉验证 + 3 轮修正（MV3 宿主模型、contract 收敛、并行策略） | codex | #124 |

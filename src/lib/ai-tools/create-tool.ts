@@ -55,8 +55,31 @@ interface CreateChildInput {
 }
 
 /**
+ * Apply tags, sync template fields, set field values, and create children on a node.
+ * Must be called inside withCommitOrigin(AI_COMMIT_ORIGIN, ...) — does NOT commit.
+ * Returns the count of children created.
+ */
+function applyNodeSetup(
+  nodeId: string,
+  opts: { tags?: string[]; fields?: Record<string, string>; children?: CreateChildInput[] },
+  childDepth: number,
+): number {
+  for (const tagName of opts.tags ?? []) {
+    applyTagMutationsNoCommit(nodeId, ensureTagDefIdByName(tagName));
+  }
+  if (opts.tags?.length) {
+    syncTemplateMutationsNoCommit(nodeId);
+  }
+  if (opts.fields && Object.keys(opts.fields).length > 0) {
+    resolveAndSetFields(nodeId, opts.fields);
+  }
+  return opts.children?.length
+    ? createChildrenRecursive(nodeId, opts.children, childDepth)
+    : 0;
+}
+
+/**
  * Recursively create children under a parent node.
- * Returns the count of nodes created.
  * Must be called inside withCommitOrigin(AI_COMMIT_ORIGIN, ...) — does NOT commit.
  */
 function createChildrenRecursive(
@@ -71,38 +94,15 @@ function createChildrenRecursive(
 
   for (const child of children) {
     if (child.targetId) {
-      // Reference child
       store.addReference(parentId, child.targetId);
       count++;
     } else {
-      // Content child
       const created = store.createChild(parentId, undefined, {
         name: child.name?.trim(),
         description: child.content ? stripReferenceMarkup(child.content) : undefined,
       }, { commit: false });
 
-      // Apply tags
-      for (const tagName of child.tags ?? []) {
-        const tagDefId = ensureTagDefIdByName(tagName);
-        applyTagMutationsNoCommit(created.id, tagDefId);
-      }
-
-      // Sync template fields after tags are applied
-      if (child.tags?.length) {
-        syncTemplateMutationsNoCommit(created.id);
-      }
-
-      // Set fields
-      if (child.fields && Object.keys(child.fields).length > 0) {
-        resolveAndSetFields(created.id, child.fields);
-      }
-
-      count++;
-
-      // Recurse into grandchildren
-      if (child.children?.length) {
-        count += createChildrenRecursive(created.id, child.children, depth + 1);
-      }
+      count += 1 + applyNodeSetup(created.id, child, depth + 1);
     }
   }
 
@@ -149,49 +149,15 @@ async function executeCreateTool(params: CreateToolParams): Promise<AgentToolRes
   // ── Sibling mode ──
   if (params.afterId) {
     const result = withCommitOrigin(AI_COMMIT_ORIGIN, () => {
-      const store = useNodeStore.getState();
-      const created = store.createSibling(params.afterId!, {
+      const created = useNodeStore.getState().createSibling(params.afterId!, {
         name: params.name?.trim(),
         description: params.content ? stripReferenceMarkup(params.content) : undefined,
       });
-
-      // Apply tags
-      for (const tagName of params.tags ?? []) {
-        const tagDefId = ensureTagDefIdByName(tagName);
-        applyTagMutationsNoCommit(created.id, tagDefId);
-      }
-
-      if (params.tags?.length) {
-        syncTemplateMutationsNoCommit(created.id);
-      }
-
-      if (params.fields && Object.keys(params.fields).length > 0) {
-        resolveAndSetFields(created.id, params.fields);
-      }
-
-      let childrenCreated = 0;
-      if (params.children?.length) {
-        childrenCreated = createChildrenRecursive(created.id, params.children as CreateChildInput[], 1);
-      }
-
+      const childrenCreated = applyNodeSetup(created.id, params as CreateChildInput, 1);
       commitDoc();
       return { node: created, childrenCreated };
     });
-
-    const parentId = loroDoc.getParentId(result.node.id);
-    const parentNode = parentId ? loroDoc.toNodexNode(parentId) : null;
-    const freshNode = loroDoc.toNodexNode(result.node.id);
-    return {
-      content: [{ type: 'text', text: formatResultText({
-        id: result.node.id,
-        name: freshNode?.name ?? params.name ?? '',
-        parentId: parentId ?? '',
-        parentName: parentNode?.name ?? parentId ?? '',
-        tags: getTagDisplayNames(freshNode?.tags ?? []),
-        childrenCreated: result.childrenCreated,
-      }) }],
-      details: { id: result.node.id },
-    };
+    return buildCreateResult(result.node.id, params, result.childrenCreated);
   }
 
   // ── Standard create ──
@@ -201,51 +167,29 @@ async function executeCreateTool(params: CreateToolParams): Promise<AgentToolRes
   }
 
   const result = withCommitOrigin(AI_COMMIT_ORIGIN, () => {
-    const store = useNodeStore.getState();
-
-    const created = store.createChild(parentId, params.position, {
+    const created = useNodeStore.getState().createChild(parentId, params.position, {
       name: params.name?.trim(),
       description: params.content ? stripReferenceMarkup(params.content) : undefined,
     }, { commit: false });
-
-    // Apply tags
-    for (const tagName of params.tags ?? []) {
-      const tagDefId = ensureTagDefIdByName(tagName);
-      applyTagMutationsNoCommit(created.id, tagDefId);
-    }
-
-    // Sync template fields after tags
-    if (params.tags?.length) {
-      syncTemplateMutationsNoCommit(created.id);
-    }
-
-    // Set fields
-    if (params.fields && Object.keys(params.fields).length > 0) {
-      resolveAndSetFields(created.id, params.fields);
-    }
-
-    // Create children
-    let childrenCreated = 0;
-    if (params.children?.length) {
-      childrenCreated = createChildrenRecursive(created.id, params.children as CreateChildInput[], 1);
-    }
-
+    const childrenCreated = applyNodeSetup(created.id, params as CreateChildInput, 1);
     commitDoc();
     return { node: created, childrenCreated };
   });
+  return buildCreateResult(result.node.id, params, result.childrenCreated);
+}
 
-  const parentNode = loroDoc.toNodexNode(parentId);
-  const freshNode = loroDoc.toNodexNode(result.node.id);
+function buildCreateResult(nodeId: string, params: CreateToolParams, childrenCreated: number): AgentToolResult<unknown> {
+  const parentId = loroDoc.getParentId(nodeId) ?? '';
+  const parentNode = parentId ? loroDoc.toNodexNode(parentId) : null;
+  const freshNode = loroDoc.toNodexNode(nodeId);
   const output = {
-    id: result.node.id,
+    id: nodeId,
     name: freshNode?.name ?? params.name ?? '',
     parentId,
     parentName: parentNode?.name ?? parentId,
     tags: getTagDisplayNames(freshNode?.tags ?? []),
-    fields: params.fields ?? {},
-    childrenCreated: result.childrenCreated,
+    childrenCreated,
   };
-
   return {
     content: [{ type: 'text', text: formatResultText(output) }],
     details: output,

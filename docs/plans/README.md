@@ -51,6 +51,7 @@ Chrome 扩展 (Side Panel 进程)                Cloudflare Worker
 |-------|------|------|------|
 | **0** | 基座 | pi-ai proxy + pi-agent-core + 最小 Chat | `phase-0-foundation.md` |
 | **1** | 画板 | node tool → agent 能在 outliner 上行动 | `phase-1-canvas.md` |
+| **1.5** | 工具重构 | 单 node tool → 6 个独立工具 + 搜索增强 | `phase-1.5-node-tool-gaps.md` |
 | **2** | 阅读环 | Clip & Spark → AI 结构提取 + 碰撞 | `phase-2-reading-ring.md` |
 | **3** | 浏览器 | browser tool + CDP → 深度页面操作 | `phase-3-browser.md` |
 | **4** | 编排 | AgentOrchestrator → subagent 后台执行 | `phase-4-orchestration.md` |
@@ -63,11 +64,13 @@ Phase 0 (基座) ━━━ 所有 AI 功能的前提
   │
   ├──→ Phase 1 (node tool) ━━━ agent 在画板上行动
   │      │
-  │      ├──→ Phase 2 (Clip & Spark) ━━━ 需要 node tool 创建 #source/#spark
-  │      │
-  │      └──→ Phase 4 (编排) ━━━ 需要稳定的 agent + tool 体系
+  │      └──→ Phase 1.5 (工具重构) ━━━ 拆分为 6 个独立工具 + 搜索增强
   │             │
-  │             └──→ Phase 5 (认知) ━━━ 需要 orchestrator 管理后台 skill
+  │             ├──→ Phase 2 (Clip & Spark) ━━━ 需要 node_create/node_search 等
+  │             │
+  │             └──→ Phase 4 (编排) ━━━ 需要稳定的 agent + tool 体系
+  │                    │
+  │                    └──→ Phase 5 (认知) ━━━ 需要 orchestrator 管理后台 skill
   │
   └──→ Phase 3 (browser tool) ━━━ 独立于 node tool，只需基座
          │
@@ -83,24 +86,26 @@ Phase 0: ██████████  (nodex 自己做，验证基座)
                     │
                     └─ Phase 1: ████████████  (Dev Agent A)
                                            │
-                                           ├─ Phase 2: ████████████  (Dev Agent A)
-                                           │
-                                           ├─ Phase 3: ████████████  (Dev Agent B)
-                                           │
-                                           └─ Phase 4: ████████████  (Dev Agent B)
-                                                                  │
-                                                                  └─ Phase 5: ██████
+                                           └─ Phase 1.5: ████████  (Dev Agent A，工具重构)
+                                                        │
+                                                        ├─ Phase 2: ████████████  (Dev Agent A)
+                                                        │
+                                                        ├─ Phase 3: ████████████  (Dev Agent B)
+                                                        │
+                                                        └─ Phase 4: ████████████  (Dev Agent B)
+                                                                               │
+                                                                               └─ Phase 5: ██████
 ```
 
 **Phase 0 由 nodex 执行**——核心风险是 pi-mono 协议对齐，需要读源码 + spike 验证。
 
-**Phase 1 完成后再启动后续 Phase**——虽然 Phase 3 在功能上不依赖 Phase 1 的 node tool，但 `ai-service.ts` 是跨 Phase 共享热点文件（详见"高风险文件"章节），Phase 1 合入 main 后 Phase 3 才能基于最新代码开始。
+**Phase 1.5 完成后再启动后续 Phase**——Phase 1.5 将 Phase 1 的单 node tool 拆分为 6 个独立工具并增强搜索能力。虽然 Phase 3 在功能上不依赖 node tools，但 `ai-service.ts` 是跨 Phase 共享热点文件（详见"高风险文件"章节），Phase 1.5 合入 main 后 Phase 3 才能基于最新代码开始。
 
-**Phase 2 和 Phase 3 可并行**——Phase 2 (Dev A) 和 Phase 3 (Dev B) 修改的 `ai-service.ts` 部分不同（Phase 2 注册 #skill，Phase 3 注册 browser tool），可以在 Phase 1 合入后同时启动。
+**Phase 2 和 Phase 3 可并行**——Phase 2 (Dev A) 和 Phase 3 (Dev B) 修改的 `ai-service.ts` 部分不同（Phase 2 注册 #skill，Phase 3 注册 browser tool），可以在 Phase 1.5 合入后同时启动。
 
-**Phase 4 在 Phase 1 后启动**——需要稳定的 agent + tool 体系。
+**Phase 4 在 Phase 1.5 后启动**——需要稳定的 agent + tool 体系。
 
-**Phase 5 最后执行**——依赖 Phase 1 (node tool) + Phase 4 (orchestrator)。
+**Phase 5 最后执行**——依赖 Phase 1.5 (node tools) + Phase 4 (orchestrator)。
 
 ---
 
@@ -180,15 +185,23 @@ UI Store 新增：
 - Agent 的 `steer()` / `followUp()` / `abort()` 直接操作 Agent state
 - 持久化时序列化 `agent.state.messages` 到 IndexedDB
 
-### 7. 三工具架构
+### 7. 工具架构
 
 > 完整参数 schema + 返回值见 `tool-definitions.md`
 
-| Tool | Actions | Phase |
-|------|---------|-------|
-| **node** | create / read / update / delete / search | Phase 1 |
-| **undo** | undo（AI 专用 UndoManager，与用户 ⌘Z 隔离） | Phase 1 |
+**Phase 1.5 重构**：原 Phase 1 的单 `node` 工具（5 actions）拆分为 6 个独立工具，详见 `phase-1.5-node-tool-gaps.md`。
+
+| Tool | 说明 | Phase |
+|------|------|-------|
+| **node_create** | 创建节点（支持 children 批量子树 + fields 便利参数） | Phase 1.5 |
+| **node_read** | 渐进式读取（含 fields 增强 + isReference） | Phase 1.5 |
+| **node_edit** | 修改已有节点（含 fields 便利参数） | Phase 1.5 |
+| **node_delete** | 移至 Trash（支持 restore 恢复） | Phase 1.5 |
+| **node_search** | 搜索（tags + fields 过滤 + linkedTo + sort） | Phase 1.5 |
+| **undo** | AI 专用 UndoManager，与用户 ⌘Z 隔离 | Phase 1 |
 | **browser** | 17 actions: 观察 7 + 交互 6 + 控制 4 | Phase 3 |
+
+**设计模式差异**：node 工具拆分为 6 个独立工具（高频、主力工具，减少 action 路由开销）；browser 保持单工具多 action（低频、辅助工具，减少 LLM 工具选择复杂度，与 CiC 同一模式）。
 
 **关键设计决策**：
 - Tags 用显示名（不用 ID），execute 层自动解析/创建
@@ -268,10 +281,10 @@ Phase 0 创建的根容器是 `src/components/chat/ChatDrawer.tsx`，后续 Phas
 | Agent | Phase | 高风险文件锁 |
 |-------|-------|-------------|
 | nodex | Phase 0 | ui-store.ts (chatOpen), ai-service.ts (创建) |
-| Dev A | Phase 1 → Phase 2 | node-store.ts, system-nodes.ts, ai-service.ts |
-| Dev B | Phase 3 → Phase 4 | ai-service.ts（需等 Dev A 的 Phase 1 合入后再开始 Phase 3） |
+| Dev A | Phase 1 → 1.5 → Phase 2 | node-store.ts, system-nodes.ts, ai-service.ts |
+| Dev B | Phase 3 → Phase 4 | ai-service.ts（需等 Dev A 的 Phase 1.5 合入后再开始 Phase 3） |
 
-**注意**：Dev B 的 Phase 3 虽然不依赖 Phase 1 的功能，但因为 `ai-service.ts` 共享，实际需要在 Phase 1 合入 main 后再基于最新 main 开始。Phase 4 同理需等 Phase 1 完成。
+**注意**：Dev B 的 Phase 3 虽然不依赖 node tools 的功能，但因为 `ai-service.ts` 共享，实际需要在 Phase 1.5 合入 main 后再基于最新 main 开始。Phase 4 同理需等 Phase 1.5 完成。
 
 ---
 
@@ -292,6 +305,25 @@ cd server && npm run typecheck
 ```
 
 视觉验证由 nodex 完成（`npm run dev` + Chrome 扩展加载）。
+
+---
+
+## 设计流程改进
+
+> 来源：Phase 1.5 迭代暴露的系统性问题——计划 top-down 编写未审计已有代码，导致搜索基础设施（search-engine / filter-utils / backlinks / sort-utils）未接入、便利参数缺失、工具命名冲突。
+
+### 设计前审计（每个 Phase 启动前）
+
+1. **基础设施审计**：grep 相关模块，列出可复用的函数/类型/工具
+2. **接口审计**：确认 Phase 依赖的上游工具 API 是否与 `tool-definitions.md` 一致
+3. **命名审计**：新增工具/action 名称是否与其他 Phase 冲突
+
+### 设计检查清单（写完计划后逐项过）
+
+- [ ] 是否审计了相关已有代码？（不能只看计划文档）
+- [ ] 每个新参数/能力是否映射到了具体的已有模块？
+- [ ] 是否遵循"一切皆节点"铁律？（检查有无 JSON blob / DSL 字符串 / flat metadata）
+- [ ] 工具命名是否加了领域前缀（`node_` / `browser_`）避免跨 Phase 冲突？
 
 ---
 

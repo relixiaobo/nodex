@@ -1,7 +1,7 @@
 # Phase 3: 浏览器 — browser tool + CDP
 
 > 依赖：Phase 0 (基座)
-> 可并行：Phase 1 (node tool)
+> 可并行：Phase 1/1.5 (node tools)
 > 工具定义：`tool-definitions.md`（参数 schema + 返回值 + 设计模式）
 > 来源：ai-strategy.md §9 "Tool 2: browser" + §8 "浏览器能力分层" + CiC 逆向分析
 

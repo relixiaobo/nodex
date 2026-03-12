@@ -14,7 +14,7 @@
  * Typing: single "Results" group with fuzzy-matched nodes + commands
  */
 import { useEffect, useCallback, useMemo, useState, useRef } from 'react';
-import { Library, Inbox, CalendarDays, Trash2, Search, Settings, Plus, type AppIcon } from '../../lib/icons.js';
+import { Library, Inbox, CalendarDays, Trash2, Search, Settings, Sparkles, Plus, type AppIcon } from '../../lib/icons.js';
 import { resolveTagColor } from '../../lib/tag-colors.js';
 import { resolveDataType, getFieldTypeIcon } from '../../lib/field-utils.js';
 import { isLockedNode, isWorkspaceHomeNode } from '../../lib/node-capabilities.js';
@@ -62,6 +62,7 @@ const SYSTEM_NODE_ICONS: Record<SystemNodeIconKey, AppIcon> = {
   library: Library,
   inbox: Inbox,
   journal: CalendarDays,
+  ai: Sparkles,
   trash: Trash2,
   search: Search,
   schema: Library,
@@ -101,6 +102,8 @@ export function CommandPalette() {
   const searchQuery = useUIStore((s) => s.searchQuery);
   const setSearchQuery = useUIStore((s) => s.setSearchQuery);
   const navigateTo = useUIStore((s) => s.navigateTo);
+  const openChat = useUIStore((s) => s.openChat);
+  const setPendingChatPrompt = useUIStore((s) => s.setPendingChatPrompt);
   const _version = useNodeStore((s) => s._version);
   const createChild = useNodeStore((s) => s.createChild);
   const authUser = useWorkspaceStore((s) => s.authUser);
@@ -271,6 +274,24 @@ export function CommandPalette() {
     };
   }, [searchQuery, createChild, navigateTo, closeAndClear]);
 
+  const askAiItem: PaletteItem | null = useMemo(() => {
+    const q = searchQuery.trim();
+    if (!q || searchResults.length > 0) return null;
+
+    return {
+      id: '__ask_ai__',
+      label: `Ask AI: ${q}`,
+      icon: Sparkles,
+      type: 'command' as PaletteItemType,
+      typeLabel: 'Ask AI',
+      action: () => {
+        setPendingChatPrompt(q);
+        openChat();
+        closeAndClear();
+      },
+    };
+  }, [searchQuery, searchResults.length, setPendingChatPrompt, openChat, closeAndClear]);
+
   // Default mode: Suggestions (behavior-driven) + Commands (fixed list)
   const sortedDefaultItems = useMemo(() => {
     // Suggestions: purely behavior-driven — items from paletteUsage sorted by boost, max 5
@@ -325,19 +346,20 @@ export function CommandPalette() {
   const allItems: PaletteItem[] = useMemo(() => {
     if (searchQuery.trim()) {
       const items: PaletteItem[] = [];
+      if (askAiItem) items.push(askAiItem);
       if (createItem) items.push(createItem);
       items.push(...searchResults);
       return items;
     }
     return [...sortedDefaultItems.suggestions, ...sortedDefaultItems.commands];
-  }, [searchQuery, searchResults, createItem, sortedDefaultItems]);
+  }, [searchQuery, askAiItem, searchResults, createItem, sortedDefaultItems]);
 
   // Reset selection when items change
   // When searching with results, skip createItem (index 0) and select first result
   useEffect(() => {
-    const hasResults = searchQuery.trim() && searchResults.length > 0 && createItem;
+    const hasResults = searchQuery.trim() && searchResults.length > 0 && createItem && !askAiItem;
     setSelectedIndex(hasResults ? 1 : 0);
-  }, [allItems.length, searchQuery, searchResults.length, createItem]);
+  }, [allItems.length, searchQuery, searchResults.length, createItem, askAiItem]);
 
   // Focus input when opened
   useEffect(() => {
@@ -446,6 +468,18 @@ export function CommandPalette() {
           {hasQuery ? (
             // Search mode: Create + Results
             <div>
+              {askAiItem && (() => {
+                const idx = globalIdx++;
+                return (
+                  <PaletteRow
+                    key={askAiItem.id}
+                    item={askAiItem}
+                    selected={selectedIndex === idx}
+                    onSelect={() => askAiItem.action()}
+                    onHover={() => setSelectedIndex(idx)}
+                  />
+                );
+              })()}
               {createItem && (() => {
                 const idx = globalIdx++;
                 return (

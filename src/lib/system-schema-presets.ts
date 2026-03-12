@@ -4,6 +4,10 @@ import * as loroDoc from './loro-doc.js';
 export const SYSTEM_SCHEMA_NODE_IDS = {
   SETTINGS_HIGHLIGHT_FIELD_ENTRY: 'NDX_FE10',
   SETTINGS_HIGHLIGHT_VALUE: 'NDX_N10',
+  SETTINGS_AI_PROVIDER_FIELD_ENTRY: 'NDX_FE11',
+  SETTINGS_AI_PROVIDER_ANTHROPIC: 'NDX_N11',
+  SETTINGS_AI_PROVIDER_VALUE: 'NDX_N12',
+  SETTINGS_AI_API_KEY_FIELD_ENTRY: 'NDX_FE12',
 } as const;
 
 interface FixedSchemaNodePreset {
@@ -38,11 +42,59 @@ const SYSTEM_SCHEMA_NODE_PRESETS: ReadonlyArray<FixedSchemaNodePreset> = [
     },
   },
   {
+    id: NDX_F.SETTING_AI_PROVIDER,
+    parentId: NDX_T.WORKSPACE_SETTINGS,
+    name: 'AI Provider',
+    data: {
+      type: 'fieldDef',
+      fieldType: FIELD_TYPES.OPTIONS,
+      description: 'Default LLM provider used by soma Chat',
+      locked: true,
+      nullable: false,
+      cardinality: 'single',
+    },
+  },
+  {
+    id: SYSTEM_SCHEMA_NODE_IDS.SETTINGS_AI_PROVIDER_ANTHROPIC,
+    parentId: NDX_F.SETTING_AI_PROVIDER,
+    name: 'Anthropic',
+    data: {},
+  },
+  {
+    id: NDX_F.SETTING_AI_API_KEY,
+    parentId: NDX_T.WORKSPACE_SETTINGS,
+    name: 'API Key',
+    data: {
+      type: 'fieldDef',
+      fieldType: FIELD_TYPES.PASSWORD,
+      description: 'Provider API key used by the Worker proxy',
+      locked: true,
+      nullable: true,
+      cardinality: 'single',
+    },
+  },
+  {
     id: SYSTEM_SCHEMA_NODE_IDS.SETTINGS_HIGHLIGHT_FIELD_ENTRY,
     parentId: SYSTEM_NODE_IDS.SETTINGS,
     data: {
       type: 'fieldEntry',
       fieldDefId: NDX_F.SETTING_HIGHLIGHT_ENABLED,
+    },
+  },
+  {
+    id: SYSTEM_SCHEMA_NODE_IDS.SETTINGS_AI_PROVIDER_FIELD_ENTRY,
+    parentId: SYSTEM_NODE_IDS.SETTINGS,
+    data: {
+      type: 'fieldEntry',
+      fieldDefId: NDX_F.SETTING_AI_PROVIDER,
+    },
+  },
+  {
+    id: SYSTEM_SCHEMA_NODE_IDS.SETTINGS_AI_API_KEY_FIELD_ENTRY,
+    parentId: SYSTEM_NODE_IDS.SETTINGS,
+    data: {
+      type: 'fieldEntry',
+      fieldDefId: NDX_F.SETTING_AI_API_KEY,
     },
   },
 ] as const;
@@ -100,6 +152,29 @@ export function ensureSystemSchema(): void {
     }
     if (loroDoc.toNodexNode(SYSTEM_SCHEMA_NODE_IDS.SETTINGS_HIGHLIGHT_VALUE)?.name !== SYS_V.YES) {
       loroDoc.setNodeRichTextContent(SYSTEM_SCHEMA_NODE_IDS.SETTINGS_HIGHLIGHT_VALUE, SYS_V.YES, [], []);
+    }
+  }
+
+  const providerFieldEntry = loroDoc.toNodexNode(SYSTEM_SCHEMA_NODE_IDS.SETTINGS_AI_PROVIDER_FIELD_ENTRY);
+  if ((providerFieldEntry?.children?.length ?? 0) === 0) {
+    if (!loroDoc.hasNode(SYSTEM_SCHEMA_NODE_IDS.SETTINGS_AI_PROVIDER_VALUE)) {
+      loroDoc.createNode(
+        SYSTEM_SCHEMA_NODE_IDS.SETTINGS_AI_PROVIDER_VALUE,
+        SYSTEM_SCHEMA_NODE_IDS.SETTINGS_AI_PROVIDER_FIELD_ENTRY,
+      );
+    } else if (loroDoc.getParentId(SYSTEM_SCHEMA_NODE_IDS.SETTINGS_AI_PROVIDER_VALUE) !== SYSTEM_SCHEMA_NODE_IDS.SETTINGS_AI_PROVIDER_FIELD_ENTRY) {
+      loroDoc.moveNode(
+        SYSTEM_SCHEMA_NODE_IDS.SETTINGS_AI_PROVIDER_VALUE,
+        SYSTEM_SCHEMA_NODE_IDS.SETTINGS_AI_PROVIDER_FIELD_ENTRY,
+      );
+    }
+
+    if (loroDoc.toNodexNode(SYSTEM_SCHEMA_NODE_IDS.SETTINGS_AI_PROVIDER_VALUE)?.targetId !== SYSTEM_SCHEMA_NODE_IDS.SETTINGS_AI_PROVIDER_ANTHROPIC) {
+      loroDoc.setNodeData(
+        SYSTEM_SCHEMA_NODE_IDS.SETTINGS_AI_PROVIDER_VALUE,
+        'targetId',
+        SYSTEM_SCHEMA_NODE_IDS.SETTINGS_AI_PROVIDER_ANTHROPIC,
+      );
     }
   }
 }

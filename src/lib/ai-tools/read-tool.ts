@@ -56,6 +56,17 @@ interface EnhancedField {
   options?: string[];
 }
 
+const TOP_LEVEL_DATA_KEYS = new Set([
+  'id',
+  'type',
+  'name',
+  'description',
+  'tags',
+  'createdAt',
+  'updatedAt',
+  'richText',
+]);
+
 /**
  * Get available options for an options-type field.
  */
@@ -162,6 +173,14 @@ function buildEnhancedFields(nodeId: string): EnhancedField[] {
     });
 }
 
+function buildNodeData(nodeId: string): Record<string, unknown> {
+  const rawData = loroDoc.getNodeData(nodeId) ?? {};
+
+  return Object.fromEntries(
+    Object.entries(rawData).filter(([key, value]) => !TOP_LEVEL_DATA_KEYS.has(key) && value !== undefined),
+  );
+}
+
 async function executeReadTool(params: ReadToolParams): Promise<AgentToolResult<unknown>> {
   const node = loroDoc.toNodexNode(params.nodeId);
   if (!node) throw new Error(`Node not found: ${params.nodeId}`);
@@ -175,9 +194,13 @@ async function executeReadTool(params: ReadToolParams): Promise<AgentToolResult<
 
   const result = {
     id: node.id,
+    type: node.type ?? null,
     name: node.name ?? '',
     description: node.description ?? '',
+    createdAt: node.createdAt,
+    updatedAt: node.updatedAt,
     tags: getTagDisplayNames(node.tags),
+    nodeData: buildNodeData(params.nodeId),
     fields: buildEnhancedFields(params.nodeId),
     checked: toCheckedValue(node.id),
     parent: parentNode ? { id: parentNode.id, name: parentNode.name ?? parentNode.id } : null,
@@ -197,12 +220,12 @@ export const readTool: AgentTool<typeof readToolParameters, unknown> = {
   name: 'node_read',
   label: 'Read Node',
   description: [
-    'Read a node\'s content, fields, and children. Fields show type and available',
-    'options. Field entries are in the fields array, not in children — children',
-    'only lists content nodes and references.',
+    'Read a node\'s raw type/data, content, fields, and children. Fields show type',
+    'and available options. Field entries are in the fields array, not in children',
+    '— children only lists content nodes and references.',
     '',
-    'Use node_read to understand a node before editing or to discover field entry IDs',
-    'for direct manipulation.',
+    'Use node_read to inspect raw nodeData like fieldType/color/cardinality before',
+    'editing, or to discover field entry IDs for direct manipulation.',
   ].join('\n'),
   parameters: readToolParameters,
   execute: async (_toolCallId, params) => executeReadTool(params),

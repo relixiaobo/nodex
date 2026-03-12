@@ -114,4 +114,49 @@ describe('node_edit tool — fields convenience', () => {
     expect(result.updated).toContain('fields');
     expect(result.createdFields).toEqual(['Location']);
   });
+
+  it('updates raw schema properties through data', async () => {
+    const result = await executeEdit({
+      nodeId: 'attrDef_status',
+      data: { fieldType: 'date' },
+    });
+
+    expect(result.updated).toContain('data');
+    expect(loroDoc.toNodexNode('attrDef_status')?.fieldType).toBe('date');
+  });
+
+  it('updates description through data and strips reference markup', async () => {
+    const result = await executeEdit({
+      nodeId: 'note_1',
+      data: { description: 'See <ref id="task_1">Task</ref> details' },
+    });
+
+    expect(result.updated).toContain('data');
+    expect(loroDoc.toNodexNode('note_1')?.description).toBe('See Task details');
+  });
+
+  it('filters blocked data keys while applying allowed updates', async () => {
+    const before = loroDoc.toNodexNode('tagDef_task');
+
+    const result = await executeEdit({
+      nodeId: 'tagDef_task',
+      data: {
+        color: 'amber',
+        type: 'fieldDef',
+        name: 'Hacked',
+        tags: ['tagDef_person'],
+        createdAt: 1,
+        updatedAt: 2,
+      },
+    });
+
+    const after = loroDoc.toNodexNode('tagDef_task');
+    expect(result.updated).toContain('data');
+    expect(after?.color).toBe('amber');
+    expect(after?.type).toBe('tagDef');
+    expect(after?.name).toBe(before?.name);
+    expect(after?.tags).toEqual(before?.tags ?? []);
+    expect(after?.createdAt).toBe(before?.createdAt);
+    expect(after?.updatedAt).not.toBe(2);
+  });
 });

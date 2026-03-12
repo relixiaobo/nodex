@@ -473,3 +473,11 @@ THEN ChatDrawer 打开
 - Taste 学习 → Phase 5
 - Markdown 渲染（Chat 消息）→ 独立排期
 - 多 session 管理 UI（对话历史列表）→ 独立排期
+
+---
+
+## 历史备注
+
+> **Phase 1.5 重构**：Phase 1 完成后，实际使用中发现单 `node` 工具（5 actions）存在多项问题——便利参数缺失导致 AI 需要多次 round-trip、搜索能力未接入已有基础设施（search-engine / filter-utils / backlinks / sort-utils）等。Phase 1.5 将其拆分为 6 个独立工具（`node_create` / `node_read` / `node_edit` / `node_delete` / `node_search` / `undo`），详见 `phase-1.5-node-tool-gaps.md`。
+>
+> 本文档保留原始 Phase 1 设计作为历史参考。后续 Phase 应基于 Phase 1.5 的工具定义（`tool-definitions.md`）。

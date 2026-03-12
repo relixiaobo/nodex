@@ -23,10 +23,21 @@ _(空)_
 | Agent | 分支 | 任务 | 锁定文件 | 状态 |
 |---|---|---|---|---|
 | codex | cc/phase-1-canvas | Phase 1: node tool + Chat 成熟化 | node-store.ts, ai-service.ts, system-nodes.ts | 待 Review |
+| codex | codex/dedupe-plan | 去重计划评审 — 浮层列表 / mini outliner / highlight helpers | docs/TASKS.md, docs/plans/deduplication-plan.md | 规划中 |
 
 ---
 
 ## 进行中
+
+### 去重计划评审 — 浮层列表 / mini outliner / highlight helpers (codex, codex/dedupe-plan)
+
+> 计划文档：`docs/plans/deduplication-plan.md`
+
+- [ ] Phase 0: 计划评审 — nodex review 范围、阶段顺序、风险边界
+- [ ] Phase 1: 浮层列表 primitive 收敛（Tag/Reference/Slash/BatchTag/Toolbar Tag）
+- [ ] Phase 2: mini outliner 容器层收敛（OutlinerView / FieldValueOutliner / ConfigOutliner）
+- [ ] Phase 3: highlight note tree / message routing helper 收敛
+- [ ] Phase 4: 小型工具重复清理（shortcut/day label/sync api url/focus helper）
 
 ### Phase 1: 画布 — node tool + Chat 成熟化 (codex, cc/phase-1-canvas)
 

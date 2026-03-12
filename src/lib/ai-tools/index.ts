@@ -5,9 +5,10 @@ import { editTool } from './edit-tool.js';
 import { deleteTool } from './delete-tool.js';
 import { searchTool } from './search-tool.js';
 import { undoTool } from './undo-tool.js';
+import { browserTool } from './browser-tool.js';
 
 export function getAITools(): AgentTool<any>[] {
-  return [createTool, readTool, editTool, deleteTool, searchTool, undoTool];
+  return [createTool, readTool, editTool, deleteTool, searchTool, undoTool, browserTool];
 }
 
-export { createTool, readTool, editTool, deleteTool, searchTool, undoTool };
+export { createTool, readTool, editTool, deleteTool, searchTool, undoTool, browserTool };

@@ -42,6 +42,11 @@ import {
   updatePendingHighlightNotes,
   getPendingHighlightsForUrl,
 } from '../../lib/highlight-pending-queue.js';
+import {
+  BROWSER_FIND,
+  BROWSER_GET_PAGE,
+  BROWSER_GET_SELECTION,
+} from '../../lib/ai-tools/browser-messaging.js';
 
 const readyTracker = createContentScriptReadyTracker();
 
@@ -234,6 +239,35 @@ export default defineBackground(() => {
         } catch (err) {
           const error = err instanceof Error ? err.message : String(err);
           sendResponse({ ok: false, error } satisfies WebClipCaptureResponse);
+        }
+      })();
+      return true;
+    }
+
+    // ── Browser Tool: Side Panel -> BG -> Content Script ──
+    if (type === BROWSER_GET_PAGE) {
+      (async () => {
+        try {
+          const tabId = await getActiveTabId();
+          const result = await capturePageFromTab(tabId, pageCaptureTransport);
+          sendResponse(result);
+        } catch (err) {
+          const error = err instanceof Error ? err.message : String(err);
+          sendResponse({ ok: false, error });
+        }
+      })();
+      return true;
+    }
+
+    if (type === BROWSER_FIND || type === BROWSER_GET_SELECTION) {
+      (async () => {
+        try {
+          const tabId = await getActiveTabId();
+          const result = await forwardToTab(tabId, message, pageCaptureTransport);
+          sendResponse(result);
+        } catch (err) {
+          const error = err instanceof Error ? err.message : String(err);
+          sendResponse({ ok: false, error });
         }
       })();
       return true;

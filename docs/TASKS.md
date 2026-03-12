@@ -120,6 +120,14 @@ _(空)_
 - [x] node_delete — restore 恢复
 - [x] 测试 + tool-definitions.md 更新 + 代码优化（DRY + 基础设施复用）
 
+##### Phase 1.5.1: Data Access Layer
+> 实施计划：`docs/plans/phase-1.5.1-data-access-layer.md`
+- [ ] node_read — 返回 type + nodeData（节点底层属性）
+- [ ] node_edit — 新增 `data` 参数（Record<string, unknown>）+ 移除 `content` 参数
+- [ ] node_create — 新增 `data` 参数
+- [ ] BLOCKED_KEYS 安全限制（children/tags/createdAt/id）
+- [ ] 测试覆盖 + tool description 更新
+
 ##### Phase 2: 阅读环 — Clip & Spark
 - [ ] Clip Spark 三轮认知压缩（skeleton → flesh → soul）
 - [ ] 碰撞策略（graph-search，非 embedding）

@@ -1,3 +1,7 @@
+import { ensureSystemNodes } from '../../src/lib/bootstrap-system-nodes.js';
+import * as loroDoc from '../../src/lib/loro-doc.js';
+import { SYSTEM_SCHEMA_NODE_IDS } from '../../src/lib/system-schema-presets.js';
+
 const streamProxyMock = vi.hoisted(() => vi.fn(() => ({ mocked: true })));
 const getStoredTokenMock = vi.hoisted(() => vi.fn(async () => 'auth-token'));
 
@@ -18,6 +22,7 @@ describe('ai-service', () => {
 
   beforeEach(async () => {
     storage = {};
+    loroDoc.resetLoroDoc();
 
     globalThis.chrome = {
       ...globalThis.chrome,
@@ -109,5 +114,41 @@ describe('ai-service', () => {
     expect(agent.prompt).toHaveBeenCalledTimes(1);
     expect(agent.prompt).toHaveBeenCalledWith('hello world');
     expect(agent.abort).toHaveBeenCalledTimes(1);
+  });
+
+  it('writes API keys into Settings field entries when system nodes exist', async () => {
+    loroDoc.initLoroDocForTest('ws_ai_settings');
+    ensureSystemNodes('ws_ai_settings');
+
+    const { setApiKey, getAISettings } = await import('../../src/lib/ai-service.js');
+
+    await setApiKey('sk-ant-node-123');
+
+    expect(await getAISettings()).toEqual({
+      provider: 'anthropic',
+      apiKey: 'sk-ant-node-123',
+    });
+
+    const valueNodeId = loroDoc.toNodexNode(SYSTEM_SCHEMA_NODE_IDS.SETTINGS_AI_API_KEY_FIELD_ENTRY)?.children?.[0];
+    expect(valueNodeId).toBeTruthy();
+    expect(valueNodeId ? loroDoc.toNodexNode(valueNodeId)?.name : null).toBe('sk-ant-node-123');
+  });
+
+  it('migrates legacy chrome storage AI settings into Settings node fields', async () => {
+    storage['soma-ai-settings'] = {
+      provider: 'anthropic',
+      apiKey: 'sk-ant-migrate-123',
+    };
+
+    loroDoc.initLoroDocForTest('ws_ai_migrate');
+    ensureSystemNodes('ws_ai_migrate');
+
+    const { getApiKey } = await import('../../src/lib/ai-service.js');
+
+    expect(await getApiKey()).toBe('sk-ant-migrate-123');
+    expect(storage['soma-ai-settings']).toBeUndefined();
+
+    const valueNodeId = loroDoc.toNodexNode(SYSTEM_SCHEMA_NODE_IDS.SETTINGS_AI_API_KEY_FIELD_ENTRY)?.children?.[0];
+    expect(valueNodeId ? loroDoc.toNodexNode(valueNodeId)?.name : null).toBe('sk-ant-migrate-123');
   });
 });

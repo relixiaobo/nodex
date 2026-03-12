@@ -19,6 +19,7 @@ import {
 import { useNodeStore } from '../stores/node-store.js';
 import { migrateFromUIStore, startSettingsProjection } from './settings-service.js';
 import { ensureSystemSchema } from './system-schema-presets.js';
+import { ensureAgentNode } from './ai-agent-node.js';
 
 const LEGACY_UNLOCKED_SYSTEM_NODE_IDS = [
   SYSTEM_NODE_IDS.LIBRARY,
@@ -98,6 +99,7 @@ export function ensureSystemNodes(wsId: string): void {
 
   applyOneTimeBootstrapMigrations(workspaceHomeId);
   ensureSystemSchema();
+  ensureAgentNode(wsId);
   ensureJournalTagDefs();
   const store = useNodeStore.getState() as HighlightNodeStore;
   ensureHighlightTagDef(store);

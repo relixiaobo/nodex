@@ -62,6 +62,8 @@ interface UIStore {
   openChat(): void;
   closeChat(): void;
   toggleChat(): void;
+  pendingChatPrompt: string | null;
+  setPendingChatPrompt(prompt: string | null): void;
 
   // Batch tag selector
   batchTagSelectorOpen: boolean;
@@ -391,6 +393,8 @@ export const useUIStore = create<UIStore>()(
       openChat: () => set({ chatOpen: true }),
       closeChat: () => set({ chatOpen: false }),
       toggleChat: () => set((s) => ({ chatOpen: !s.chatOpen })),
+      pendingChatPrompt: null,
+      setPendingChatPrompt: (prompt) => set({ pendingChatPrompt: prompt }),
 
       // Drag and drop
       dragNodeId: null,

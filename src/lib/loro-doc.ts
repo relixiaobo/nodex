@@ -15,7 +15,9 @@ import { enqueuePendingUpdate } from './sync/pending-queue.js';
 import { syncManager } from './sync/sync-manager.js';
 
 export const DEFAULT_USER_COMMIT_ORIGIN = 'user:implicit';
+export const AI_COMMIT_ORIGIN = 'ai:chat';
 const UNDO_EXCLUDED_ORIGIN_PREFIXES = ['__seed__', 'system:'] as const;
+const AI_UNDO_EXCLUDED_ORIGIN_PREFIXES = ['__seed__', 'system:', 'user:'] as const;
 const detachedMutationWarnings = new Set<string>();
 const RICH_TEXT_STYLE_CONFIG = {
   bold: { expand: 'after' },
@@ -33,6 +35,8 @@ const RICH_TEXT_STYLE_CONFIG = {
 
 let doc: LoroDoc | null = null;
 let undoManager: UndoManager | null = null;
+let aiUndoManager: UndoManager | null = null;
+const commitOriginOverrideStack: string[] = [];
 
 /** soma ID → Loro TreeID（字符串） */
 const nodexToTree = new Map<string, TreeID>();
@@ -747,6 +751,7 @@ export async function initLoroDoc(workspaceId: string): Promise<{ hadSnapshot: b
   }
 
   undoManager = new UndoManager(doc, { mergeInterval: 500, excludeOriginPrefixes: [...UNDO_EXCLUDED_ORIGIN_PREFIXES] });
+  aiUndoManager = new UndoManager(doc, { mergeInterval: 500, excludeOriginPrefixes: [...AI_UNDO_EXCLUDED_ORIGIN_PREFIXES] });
   bindUndoCallbacks();
 
   // NOTE: We intentionally do NOT register doc.subscribe() here.
@@ -805,7 +810,9 @@ export function resetLoroDoc(): void {
 
   doc = null;
   undoManager = null;
+  aiUndoManager = null;
   redoRestoreUIMetaStack.length = 0;
+  commitOriginOverrideStack.length = 0;
   nodexToTree.clear();
   treeToNodex.clear();
   currentWorkspaceId = null;
@@ -828,6 +835,7 @@ export function initLoroDocForTest(workspaceId: string): void {
   // mergeInterval=0 for deterministic tests; exclude '__seed__' and system origins
   // so seed/system commits are not tracked in the undo stack.
   undoManager = new UndoManager(doc, { mergeInterval: 0, excludeOriginPrefixes: [...UNDO_EXCLUDED_ORIGIN_PREFIXES] });
+  aiUndoManager = new UndoManager(doc, { mergeInterval: 0, excludeOriginPrefixes: [...AI_UNDO_EXCLUDED_ORIGIN_PREFIXES] });
   bindUndoCallbacks();
   // No doc.subscribe() — explicit notifications from commitDoc/import/undo/redo
 }
@@ -840,6 +848,7 @@ export function clearUndoHistoryForTest(): void {
   if (!doc) return;
   redoRestoreUIMetaStack.length = 0;
   undoManager = new UndoManager(doc, { mergeInterval: 0, excludeOriginPrefixes: [...UNDO_EXCLUDED_ORIGIN_PREFIXES] });
+  aiUndoManager = new UndoManager(doc, { mergeInterval: 0, excludeOriginPrefixes: [...AI_UNDO_EXCLUDED_ORIGIN_PREFIXES] });
   bindUndoCallbacks();
 }
 
@@ -1296,14 +1305,17 @@ export function getLoroDoc(): LoroDoc {
 // ============================================================
 
 /** 显式提交当前 pending 事务（origin 用于 UndoManager 过滤）*/
-export function commitDoc(origin: string = DEFAULT_USER_COMMIT_ORIGIN): void {
+export function commitDoc(origin?: string): void {
   if (!doc) return;
   if (!canApplyMutation('commitDoc')) return;
-  if (!origin.startsWith('system:') && origin !== '__seed__') {
+  const resolvedOrigin = origin
+    ?? commitOriginOverrideStack[commitOriginOverrideStack.length - 1]
+    ?? DEFAULT_USER_COMMIT_ORIGIN;
+  if (!resolvedOrigin.startsWith('system:') && resolvedOrigin !== '__seed__') {
     redoRestoreUIMetaStack.length = 0;
   }
   try {
-    doc.commit({ origin });
+    doc.commit({ origin: resolvedOrigin });
   } catch (e) {
     if (e instanceof WebAssembly.RuntimeError) {
       markWasmPoisoned('commitDoc', e);
@@ -1315,6 +1327,15 @@ export function commitDoc(origin: string = DEFAULT_USER_COMMIT_ORIGIN): void {
   // Safe to call synchronously here: doc.commit() has returned, no Loro lock is held.
   scheduleSave();
   notifySubscribers();
+}
+
+export function withCommitOrigin<T>(origin: string, fn: () => T): T {
+  commitOriginOverrideStack.push(origin);
+  try {
+    return fn();
+  } finally {
+    commitOriginOverrideStack.pop();
+  }
 }
 
 /**
@@ -1374,12 +1395,27 @@ export function redoDoc(): boolean {
   return result;
 }
 
+export function undoAiDoc(): boolean {
+  commitDoc('system:flush-before-ai-undo');
+  const result = aiUndoManager?.undo() ?? false;
+  if (result) {
+    rebuildMappings();
+    scheduleSave();
+    notifySubscribers();
+  }
+  return result;
+}
+
 export function canUndoDoc(): boolean {
   return undoManager?.canUndo() ?? false;
 }
 
 export function canRedoDoc(): boolean {
   return undoManager?.canRedo() ?? false;
+}
+
+export function canUndoAiDoc(): boolean {
+  return aiUndoManager?.canUndo() ?? false;
 }
 
 // ============================================================

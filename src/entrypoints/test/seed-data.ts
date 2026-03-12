@@ -21,7 +21,8 @@ import { useWorkspaceStore } from '../../stores/workspace-store';
 import { SYSTEM_NODE_IDS, FIELD_TYPES, SYS_T, NDX_F, NDX_T, SYS_V } from '../../types/index.js';
 import type { InlineRefEntry, TextMark } from '../../types/index.js';
 import { ensureDateNode } from '../../lib/journal.js';
-import { SYSTEM_SCHEMA_NODE_IDS } from '../../lib/system-schema-presets.js';
+import { SYSTEM_SCHEMA_NODE_IDS, ensureSystemSchema } from '../../lib/system-schema-presets.js';
+import { ensureAgentNode } from '../../lib/ai-agent-node.js';
 
 const WS_ID = 'ws_default';
 
@@ -58,6 +59,8 @@ function seedBody(): void {
   cn(SYSTEM_NODE_IDS.TRASH,    WS_ID, { name: 'Trash', locked: true });
   cn(SYSTEM_NODE_IDS.SCHEMA,   WS_ID, { name: 'Schema', locked: true });
   cn(SYSTEM_NODE_IDS.SETTINGS, WS_ID, { name: 'Settings', locked: true });
+  ensureSystemSchema();
+  ensureAgentNode(WS_ID);
 
   const today = new Date();
   const yesterday = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1);

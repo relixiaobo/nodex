@@ -42,7 +42,7 @@ interface NodeStore {
 
   // ─── 树操作（同步） ───
 
-  createChild(parentId: string, index?: number, data?: Partial<NodexNode>): NodexNode;
+  createChild(parentId: string, index?: number, data?: Partial<NodexNode>, options?: { commit?: boolean }): NodexNode;
   createSibling(siblingId: string, data?: Partial<NodexNode>): NodexNode;
   /** Batch-create sibling nodes from parsed paste nodes. Returns last created top-level node ID (or null). Single commitDoc for undo. */
   createSiblingNodesFromPaste(
@@ -56,12 +56,12 @@ interface NodeStore {
     nodes: ParsedPasteNode[],
     options?: { commit?: boolean },
   ): string | null;
-  moveNodeTo(nodeId: string, newParentId: string, index?: number): void;
+  moveNodeTo(nodeId: string, newParentId: string, index?: number, options?: { commit?: boolean }): void;
   indentNode(nodeId: string): void;
   outdentNode(nodeId: string): void;
   moveNodeUp(nodeId: string): void;
   moveNodeDown(nodeId: string): void;
-  trashNode(nodeId: string): void;
+  trashNode(nodeId: string, options?: { commit?: boolean }): void;
   restoreNode(nodeId: string): void;
   hardDeleteNode(nodeId: string): void;
   emptyTrash(): void;
@@ -79,7 +79,7 @@ interface NodeStore {
   // ─── 标签操作 ───
 
   applyTag(nodeId: string, tagDefId: string): void;
-  removeTag(nodeId: string, tagDefId: string): void;
+  removeTag(nodeId: string, tagDefId: string, options?: { commit?: boolean }): void;
   /** Batch-apply a tag to multiple nodes. Single commitDoc for undo. */
   batchApplyTag(nodeIds: string[], tagDefId: string): void;
   /** Batch-remove a tag from multiple nodes. Single commitDoc for undo. */
@@ -898,7 +898,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
 
     // ─── 树操作 ───
 
-    createChild: (parentId, index, data) => {
+    createChild: (parentId, index, data, options) => {
       if (!canMutate('createChild')) return detachedNodeFallback(parentId);
       if (!canEditStructure(parentId)) return detachedNodeFallback(parentId);
       const id = nanoid();
@@ -933,12 +933,14 @@ export const useNodeStore = create<NodeStore>((set, get) => {
         for (const tagId of parentNode.tags) {
           const tagDef = loroDoc.toNodexNode(tagId);
           if (tagDef?.childSupertag) {
-            get().applyTag(id, tagDef.childSupertag);
+            applyTagMutationsNoCommit(id, tagDef.childSupertag);
           }
         }
       }
 
-      loroDoc.commitDoc();
+      if (options?.commit !== false) {
+        loroDoc.commitDoc();
+      }
       return loroDoc.toNodexNode(id)!;
     },
 
@@ -988,7 +990,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
       return lastId;
     },
 
-    moveNodeTo: (nodeId, newParentId, index) => {
+    moveNodeTo: (nodeId, newParentId, index, options) => {
       if (!getNodeCapabilities(nodeId).canMove) return;
       if (!canEditStructure(newParentId)) return;
       // Guard: no self-move
@@ -1010,7 +1012,9 @@ export const useNodeStore = create<NodeStore>((set, get) => {
         }
       }
       loroDoc.moveNode(nodeId, newParentId, adjustedIndex);
-      loroDoc.commitDoc();
+      if (options?.commit !== false) {
+        loroDoc.commitDoc();
+      }
     },
 
     indentNode: (nodeId) => {
@@ -1066,7 +1070,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
       loroDoc.commitDoc();
     },
 
-    trashNode: (nodeId) => {
+    trashNode: (nodeId, options) => {
       if (!getNodeCapabilities(nodeId).canDelete) return;
       const node = loroDoc.toNodexNode(nodeId);
       const parentId = loroDoc.getParentId(nodeId);
@@ -1098,7 +1102,9 @@ export const useNodeStore = create<NodeStore>((set, get) => {
       });
 
       loroDoc.moveNode(nodeId, SYSTEM_NODE_IDS.TRASH);
-      loroDoc.commitDoc();
+      if (options?.commit !== false) {
+        loroDoc.commitDoc();
+      }
     },
 
     restoreNode: (nodeId) => {
@@ -1266,7 +1272,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
       }
     },
 
-    removeTag: (nodeId, tagDefId) => {
+    removeTag: (nodeId, tagDefId, options) => {
       // Resolve reference → target
       const effectiveId = resolveEffectiveId(nodeId);
       if (!getNodeCapabilities(effectiveId).canEditStructure) return;
@@ -1274,7 +1280,9 @@ export const useNodeStore = create<NodeStore>((set, get) => {
       const hadTag = node?.tags.includes(tagDefId) ?? false;
       loroDoc.removeTag(effectiveId, tagDefId);
       if (!hadTag) {
-        loroDoc.commitDoc();
+        if (options?.commit !== false) {
+          loroDoc.commitDoc();
+        }
         return;
       }
 
@@ -1298,7 +1306,9 @@ export const useNodeStore = create<NodeStore>((set, get) => {
         const feId = findFieldEntry(effectiveId, fdId);
         if (feId) loroDoc.deleteNode(feId);
       }
-      loroDoc.commitDoc();
+      if (options?.commit !== false) {
+        loroDoc.commitDoc();
+      }
     },
 
     batchApplyTag: (nodeIds, tagDefId) => {

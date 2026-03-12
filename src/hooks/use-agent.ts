@@ -1,7 +1,14 @@
 import { startTransition, useEffect, useMemo, useState } from 'react';
 import type { Agent } from '@mariozechner/pi-agent-core';
 import type { AssistantMessage, UserMessage } from '@mariozechner/pi-ai';
-import { getAIAgent, stopStreaming, streamChat } from '../lib/ai-service.js';
+import {
+  createNewChatSession,
+  getAIAgent,
+  persistChatSession,
+  restoreLatestChatSession,
+  stopStreaming,
+  streamChat,
+} from '../lib/ai-service.js';
 
 export type ChatConversationMessage = UserMessage | AssistantMessage;
 
@@ -21,8 +28,33 @@ function getConversationMessages(agent: Agent): ChatConversationMessage[] {
   return visibleMessages.filter(isConversationMessage);
 }
 
+function getPersistedMessageSignature(agent: Agent): string {
+  return JSON.stringify(agent.state.messages);
+}
+
 export function useAgent(agent: Agent = getAIAgent()) {
   const [revision, setRevision] = useState(0);
+  const [ready, setReady] = useState(false);
+  const persistedMessageSignature = useMemo(() => {
+    void revision;
+    return getPersistedMessageSignature(agent);
+  }, [agent, revision]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void restoreLatestChatSession(agent).finally(() => {
+      if (cancelled) return;
+      setReady(true);
+      startTransition(() => {
+        setRevision((value) => value + 1);
+      });
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [agent]);
 
   useEffect(() => {
     return agent.subscribe(() => {
@@ -31,6 +63,16 @@ export function useAgent(agent: Agent = getAIAgent()) {
       });
     });
   }, [agent]);
+
+  useEffect(() => {
+    if (!ready) return;
+
+    const timer = window.setTimeout(() => {
+      void persistChatSession(agent);
+    }, 250);
+
+    return () => window.clearTimeout(timer);
+  }, [agent, ready, persistedMessageSignature]);
 
   return useMemo(() => {
     void revision;
@@ -43,11 +85,19 @@ export function useAgent(agent: Agent = getAIAgent()) {
 
     return {
       agent,
+      ready,
+      sessionId: agent.sessionId ?? null,
       messages,
       isStreaming: agent.state.isStreaming,
       error,
       sendMessage: (prompt: string) => streamChat(prompt, agent),
       stopStreaming: () => stopStreaming(agent),
+      newChat: async () => {
+        await createNewChatSession(agent);
+        startTransition(() => {
+          setRevision((value) => value + 1);
+        });
+      },
     };
-  }, [agent, revision]);
+  }, [agent, ready, revision]);
 }

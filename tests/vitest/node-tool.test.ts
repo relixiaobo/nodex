@@ -1,16 +1,40 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { nodeTool } from '../../src/lib/ai-tools/node-tool.js';
+import { createTool } from '../../src/lib/ai-tools/create-tool.js';
+import { readTool } from '../../src/lib/ai-tools/read-tool.js';
+import { editTool } from '../../src/lib/ai-tools/edit-tool.js';
+import { deleteTool } from '../../src/lib/ai-tools/delete-tool.js';
+import { searchTool } from '../../src/lib/ai-tools/search-tool.js';
 import { ensureTodayNode } from '../../src/lib/journal.js';
 import * as loroDoc from '../../src/lib/loro-doc.js';
 import { SYSTEM_NODE_IDS } from '../../src/types/index.js';
 import { resetAndSeed } from './helpers/test-state.js';
 
-async function executeNodeTool(params: Record<string, unknown>) {
-  const result = await nodeTool.execute('tool_node', params as never);
+async function executeCreate(params: Record<string, unknown>) {
+  const result = await createTool.execute('tool_create', params as never);
   return result.details;
 }
 
-describe('node tool', () => {
+async function executeRead(params: Record<string, unknown>) {
+  const result = await readTool.execute('tool_read', params as never);
+  return result.details;
+}
+
+async function executeEdit(params: Record<string, unknown>) {
+  const result = await editTool.execute('tool_edit', params as never);
+  return result.details;
+}
+
+async function executeDelete(params: Record<string, unknown>) {
+  const result = await deleteTool.execute('tool_delete', params as never);
+  return result.details;
+}
+
+async function executeSearch(params: Record<string, unknown>) {
+  const result = await searchTool.execute('tool_search', params as never);
+  return result.details;
+}
+
+describe('node tools (Phase 1.5)', () => {
   beforeEach(() => {
     resetAndSeed();
   });
@@ -18,8 +42,7 @@ describe('node tool', () => {
   it('creates a node under today by default and resolves tag display names', async () => {
     const todayId = ensureTodayNode();
 
-    const details = await executeNodeTool({
-      action: 'create',
+    const details = await executeCreate({
       name: 'AI generated note',
       tags: ['meeting'],
     }) as {
@@ -35,8 +58,7 @@ describe('node tool', () => {
   });
 
   it('reads a node with paginated child summaries and breadcrumb metadata', async () => {
-    const details = await executeNodeTool({
-      action: 'read',
+    const details = await executeRead({
       nodeId: 'note_1',
       depth: 2,
       childLimit: 2,
@@ -59,8 +81,7 @@ describe('node tool', () => {
   });
 
   it('updates node name and tags using display names', async () => {
-    const details = await executeNodeTool({
-      action: 'update',
+    const details = await executeEdit({
       nodeId: 'task_1',
       name: 'Design the graph model',
       addTags: ['meeting'],
@@ -82,8 +103,7 @@ describe('node tool', () => {
   });
 
   it('searches by query and tag display name', async () => {
-    const details = await executeNodeTool({
-      action: 'search',
+    const details = await executeSearch({
       query: 'weekly sync',
       searchTags: ['meeting'],
     }) as {
@@ -97,8 +117,7 @@ describe('node tool', () => {
   });
 
   it('moves deleted nodes to Trash instead of hard-deleting them', async () => {
-    const details = await executeNodeTool({
-      action: 'delete',
+    const details = await executeDelete({
       nodeId: 'note_1c',
     }) as {
       id: string;

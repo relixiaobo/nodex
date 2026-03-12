@@ -431,7 +431,8 @@ npm run dev:test   # 启动 http://localhost:5199/standalone/index.html
 
 ### 自测流程
 
-- 改完代码运行 `/self-test`（Skill：`.claude/skills/self-test/SKILL.md`）
+- 改完代码运行 `npm run verify`（typecheck → test-sync → test → build）
+- Review Dev Agent PR 运行 `/review-pr <PR号>`（自动化检查 + 浏览器验证）
 - Vitest 套件：`tests/vitest/`
 - 每次修复 bug，补一个 Vitest 回归用例
 - **测试通过 ≠ 完成**：键盘快捷键、焦点管理、选择逻辑等 UI 交互改动，Vitest 通过后仍须浏览器验证（`npm run dev` + 实际操作）。这三类是"测试绿灯但浏览器失败"的重灾区

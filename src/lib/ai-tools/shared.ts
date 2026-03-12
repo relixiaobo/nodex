@@ -72,6 +72,53 @@ export function stripReferenceMarkup(text: string): string {
   return text.replace(/<(ref|cite)\s+id="[^"]+">([\s\S]*?)<\/\1>/g, '$2');
 }
 
+const DIRECT_NODE_DATA_BLOCKED_KEYS = new Set([
+  'id',
+  'children',
+  'tags',
+  'createdAt',
+  'updatedAt',
+  'name',
+  'richText',
+  'marks',
+  'inlineRefs',
+]);
+
+interface SanitizeDirectNodeDataOptions {
+  allowType?: boolean;
+}
+
+export function sanitizeDirectNodeDataPatch(
+  data: Record<string, unknown> | undefined,
+  options: SanitizeDirectNodeDataOptions = {},
+): {
+  safeData: Record<string, unknown>;
+  blockedKeys: string[];
+} {
+  if (!data) {
+    return { safeData: {}, blockedKeys: [] };
+  }
+
+  const blockedKeys: string[] = [];
+  const safeData: Record<string, unknown> = {};
+
+  for (const [key, value] of Object.entries(data)) {
+    if (DIRECT_NODE_DATA_BLOCKED_KEYS.has(key) || (key === 'type' && !options.allowType)) {
+      blockedKeys.push(key);
+      continue;
+    }
+
+    if (key === 'description' && typeof value === 'string') {
+      safeData.description = stripReferenceMarkup(value) || undefined;
+      continue;
+    }
+
+    safeData[key] = value;
+  }
+
+  return { safeData, blockedKeys };
+}
+
 // ─── Node inspection helpers ───
 
 export function toCheckedValue(nodeId: string): boolean | null {

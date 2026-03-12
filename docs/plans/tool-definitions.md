@@ -27,6 +27,10 @@ description: |
   Create new nodes. Supports single nodes, trees (via children), field values,
   references, siblings, and duplicates — everything is a node.
 
+  Use data to set raw node properties while creating, such as type, description,
+  color, fieldType, cardinality, or showCheckbox. data cannot set rich text
+  internals, tree structure, tags, or timestamps.
+
   Quick patterns:
   - Content node: node_create(name: "...", parentId: "...")
   - With tags + fields: node_create(name: "...", tags: ["task"], fields: {"Status": "Todo"})
@@ -73,7 +77,14 @@ description: |
 
   content: {
     type: "string",
-    description: "Node description/body text. Supports plain text.",
+    description: "Legacy description/body text. Prefer data.description for new callers.",
+  },
+
+  data: {
+    type: "Record<string, unknown>",
+    description: "Raw node properties to set while creating. "
+      + "Allows type, description, color, fieldType, cardinality, nullable, showCheckbox, etc. "
+      + "children/tags/name/richText/marks/inlineRefs/createdAt/updatedAt are blocked.",
   },
 
   fields: {
@@ -97,7 +108,7 @@ description: |
   children: {
     type: "array of CreateChildInput",
     description: "Recursively create a subtree (max depth 3). Each child can have: "
-      + "name, tags, content, fields, targetId, children. "
+      + "name, tags, content, data, fields, targetId, children. "
       + "All nodes created in one commit = one undo step.",
   },
 }
@@ -121,7 +132,6 @@ description: |
   "parentId": "day_20260312",
   "parentName": "2026-03-12",
   "tags": ["task"],
-  "fields": { "Status": "Todo", "Priority": "High" },
   "childrenCreated": 0
 }
 ```
@@ -134,12 +144,12 @@ description: |
 name: "node_read"
 label: "Read Node"
 description: |
-  Read a node's content, fields, and children. Fields show type and available
-  options. Field entries are in the fields array, not in children — children
-  only lists content nodes and references.
+  Read a node's raw type/data, content, fields, and children. Fields show type
+  and available options. Field entries are in the fields array, not in children
+  — children only lists content nodes and references.
 
-  Use node_read to understand a node before editing or to discover field entry IDs
-  for direct manipulation.
+  Use node_read to inspect raw nodeData like fieldType/color/cardinality before
+  editing, or to discover field entry IDs for direct manipulation.
 ```
 
 #### Parameters
@@ -158,9 +168,17 @@ description: |
 ```json
 {
   "id": "abc123",
+  "type": "fieldDef",
   "name": "Buy groceries",
   "description": "",
+  "createdAt": 1773273600000,
+  "updatedAt": 1773273601000,
   "tags": ["task"],
+  "nodeData": {
+    "fieldType": "options",
+    "cardinality": "single",
+    "nullable": true
+  },
   "fields": [
     {
       "name": "Status",
@@ -211,6 +229,10 @@ description: |
   Modify an existing node. Only provided fields are changed. Works on any node
   including field value nodes and reference nodes.
 
+  Use data to set raw node properties like description, color, fieldType,
+  cardinality, showCheckbox, or viewMode. data cannot change type, name,
+  rich text internals, tree structure, tags, or timestamps.
+
   Use fields parameter to set field values by name — no need to know field entry IDs.
   Or edit field value nodes directly: node_edit(nodeId: valueNodeId, name: "new value").
 
@@ -223,10 +245,15 @@ description: |
 {
   nodeId: { type: "string", required: true },
   name: { type: "string", description: "New name" },
-  content: { type: "string", description: "New description (replaces entire description)" },
   checked: { type: "boolean | null", description: "true = done, false = not done, null = remove checkbox" },
   addTags: { type: "array of strings", description: "Tags to add (display names)" },
   removeTags: { type: "array of strings", description: "Tags to remove (display names)" },
+  data: {
+    type: "Record<string, unknown>",
+    description: "Raw node properties to set. "
+      + "Allows description, color, fieldType, cardinality, nullable, showCheckbox, etc. "
+      + "type/name/richText/marks/inlineRefs/children/tags/createdAt/updatedAt are blocked.",
+  },
   fields: {
     type: "Record<string, string>",
     description: "Set field values by display name (same as node_create). "

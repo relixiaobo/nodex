@@ -22,3 +22,4 @@
 - 修复同一页面通过高亮和 Clip Page 两个入口分别创建两个 clip 节点的问题（现在自动合并到已有节点）
 - AI Chat 升级为可操作画布：新增 node/undo tool、`#agent` 配置与动态上下文、聊天持久化、`<ref>/<cite>` 渲染，以及 `⌘K → Ask AI`
 - 优化 AI Chat 交互细节：一次 AI node 操作现在对应一次 undo，动态上下文使用正确本地时间，聊天持久化减少重复写入
+- AI node 工具新增 data access layer：`node_read` 返回 raw `nodeData`，`node_edit`/`node_create` 可直接读写 `fieldType`、`color`、`cardinality` 等底层属性，并增加安全拦截避免覆盖结构/富文本/时间戳字段

@@ -12,7 +12,7 @@ import { applyTagMutationsNoCommit, syncTemplateMutationsNoCommit, useNodeStore 
 import {
   ensureTagDefIdByName,
   findTagDefIdByName,
-  stripReferenceMarkup,
+  sanitizeDirectNodeDataPatch,
   updateCheckedState,
   resolveAndSetFields,
   formatResultText,
@@ -21,13 +21,13 @@ import {
 const editToolParameters = Type.Object({
   nodeId: Type.String(),
   name: Type.Optional(Type.String()),
-  content: Type.Optional(Type.String()),
   checked: Type.Optional(Type.Union([Type.Boolean(), Type.Null()])),
   addTags: Type.Optional(Type.Array(Type.String())),
   removeTags: Type.Optional(Type.Array(Type.String())),
   fields: Type.Optional(Type.Record(Type.String(), Type.String())),
   parentId: Type.Optional(Type.String()),
   position: Type.Optional(Type.Integer({ minimum: 0 })),
+  data: Type.Optional(Type.Record(Type.String(), Type.Unknown())),
 });
 
 type EditToolParams = typeof editToolParameters.static;
@@ -48,9 +48,10 @@ async function executeEditTool(params: EditToolParams): Promise<AgentToolResult<
       updated.add('name');
     }
 
-    if (params.content !== undefined) {
-      loroDoc.setNodeData(params.nodeId, 'description', stripReferenceMarkup(params.content) || undefined);
-      updated.add('content');
+    const { safeData } = sanitizeDirectNodeDataPatch(params.data, { allowType: false });
+    if (Object.keys(safeData).length > 0) {
+      loroDoc.setNodeDataBatch(params.nodeId, safeData);
+      updated.add('data');
     }
 
     if (params.checked !== undefined && updateCheckedState(params.nodeId, params.checked)) {
@@ -119,6 +120,10 @@ export const editTool: AgentTool<typeof editToolParameters, unknown> = {
   description: [
     'Modify an existing node. Only provided fields are changed. Works on any node',
     'including field value nodes and reference nodes.',
+    '',
+    'Use data to set raw node properties like description, color, fieldType,',
+    'cardinality, showCheckbox, or viewMode. data cannot change type, name,',
+    'rich text internals, tree structure, tags, or timestamps.',
     '',
     'Use fields parameter to set field values by name — no need to know field entry IDs.',
     'Fields are tied to tags. The node must have at least one tag. If the field doesn\'t exist,',

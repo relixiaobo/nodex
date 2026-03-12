@@ -17,7 +17,7 @@ export function ChatDrawer() {
   const closeChat = useUIStore((s) => s.closeChat);
   const pendingChatPrompt = useUIStore((s) => s.pendingChatPrompt);
   const setPendingChatPrompt = useUIStore((s) => s.setPendingChatPrompt);
-  const { messages, isStreaming, error, ready, sendMessage, stopStreaming, newChat } = useAgent();
+  const { messages, toolResults, isStreaming, error, ready, sendMessage, stopStreaming, newChat } = useAgent();
   const scrollRef = useRef<HTMLDivElement>(null);
   const [isWideLayout, setIsWideLayout] = useState(() => window.innerWidth > WIDE_LAYOUT_MIN_WIDTH);
   const [loadingSettings, setLoadingSettings] = useState(true);
@@ -251,6 +251,7 @@ export function ChatDrawer() {
                 <ChatMessage
                   key={`${message.role}-${message.timestamp}-${index}`}
                   message={message}
+                  toolResults={toolResults}
                   streaming={isStreaming && index === messages.length - 1 && message.role === 'assistant'}
                 />
               ))

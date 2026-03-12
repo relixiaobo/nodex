@@ -77,4 +77,27 @@ describe('node_edit tool — fields convenience', () => {
     expect(result.updated).toContain('fields');
     expect(loroDoc.toNodexNode('task_1')?.name).toBe('Redesign the model');
   });
+
+  it('reports unresolved fields when node has no matching tag', async () => {
+    // note_1 is a plain content node without #task tag — no Status field definition
+    const result = await executeEdit({
+      nodeId: 'note_1',
+      fields: { 'Status': 'Todo' },
+    });
+
+    expect(result.updated).not.toContain('fields');
+    expect(result.unresolvedFields).toEqual(['Status']);
+    expect(result.hint).toBeTruthy();
+  });
+
+  it('reports partial resolution when some fields match and some do not', async () => {
+    // task_1 has #task tag with Status field, but no "FakeField" definition
+    const result = await executeEdit({
+      nodeId: 'task_1',
+      fields: { 'Status': 'Done', 'FakeField': 'value' },
+    });
+
+    expect(result.updated).toContain('fields');
+    expect(result.unresolvedFields).toEqual(['FakeField']);
+  });
 });

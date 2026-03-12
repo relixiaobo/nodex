@@ -2,176 +2,149 @@
 
 > 依赖：Phase 0 (基座)
 > 可并行：Phase 3 (browser tool)
-> 来源：ai-strategy.md §9 "Tool 1: node" + §10 "通道 2: Chat" + §13 "Reference 原则"
+> 工具定义：`tool-definitions.md`（参数 schema + 返回值 + 设计模式）
+> 研究文档：`docs/research/ai-context-engineering-gaps.md`（CiC 分析 + 决策清单）
 
 ---
 
 ## 目标
 
-Agent 从"只能聊天"升级为**"能在 outliner 上行动"**——这是 ai-strategy.md 中**执行模式**的核心。
+Agent 从"只能聊天"升级为**"能在 outliner 上行动"**。
 
-来源：ai-strategy.md §10 "通道 2: Chat"
-
-> 主 agent 接收指令 → 理解意图 → 匹配 #skill → 直接在画板上执行 → 在 Chat 中报告 → 接受反馈。
+> 主 agent 接收指令 → 理解意图 → 直接在画板上执行 → 在 Chat 中报告 → 接受反馈。
 
 **交付物**：
 1. 用户说"帮我整理今天的笔记" → agent 操作节点 → outliner 实时更新
-2. Agent 执行结果可 undo（Loro CRDT）
+2. Agent 执行结果可 undo（AI 操作与用户操作隔离）
 3. Chat 对话持久化（关闭重开恢复）
-4. System prompt 从 #agent 节点加载
-5. Agent 文本中的节点引用可点击跳转
+4. System prompt 从 #agent 节点加载（英文编写，回复跟随用户语言）
+5. Agent 文本中的节点引用可点击跳转（`<ref>` / `<cite>` 格式）
 
 ---
 
 ## node tool（5 actions）
 
-来源：ai-strategy.md §9 "Tool 1: node（知识图谱操作）"
+> 完整参数 schema + 返回值 + 设计模式见 `tool-definitions.md`。本节只列实现要点。
+
+### 关键设计决策
+
+- **Tags 用显示名**：`tags: ['task', 'source']`，不用 ID。execute 层自动 fuzzy 匹配 → 解析为 tagDefId，未匹配则自动创建 tagDef
+- **AI origin 隔离**：所有写操作 commit 用 origin `'ai:chat'`（与用户操作隔离，见 undo tool）
+- **Content 支持 `<ref>`**：`content` 参数中的 `<ref id="nodeId">text</ref>` 会被转换为 ProseMirror inlineReference
 
 ### Action 定义
 
 ```typescript
 const nodeTool: AgentTool = {
   name: 'node',
-  description: 'Create, read, update, delete, or search knowledge graph nodes',
+  description: '...', // 见 tool-definitions.md — CiC 质量标准
   parameters: Type.Object({
     action: StringEnum(['create', 'read', 'update', 'delete', 'search']),
-    // 各 action 的参数（见下方详细定义）
+    // 各 action 的参数见 tool-definitions.md
   }),
   execute: async (toolCallId, params, signal, onUpdate) => {
     // 路由到具体 action handler
-    // 所有写操作通过 node-store → loroDoc.commitDoc()
+    // 所有写操作通过 node-store → loroDoc.commitDoc('ai:chat')
   }
 }
 ```
 
 ### create
 
-```typescript
-// 创建节点
-{
-  action: 'create',
-  name: string,           // 节点名称
-  parentId?: string,      // 父节点 ID（默认当天日记节点）
-  position?: number,      // 在 children 中的位置
-  tags?: string[],        // 标签 ID 列表
-  content?: string,       // 描述文本
-}
-// → 返回 { id, name, parentId }
-```
+- `parentId` 默认当天日记节点
+- `tags` 用显示名，自动解析/创建
+- `position` 默认末尾追加
 
 ### read（渐进式披露）
 
-来源：ai-strategy.md §9 "read 的渐进式披露"
+- `depth`：子树深度（default 1, max 3）
+- `childOffset` + `childLimit`：分页（default 20, max 50）
+- 返回 `children.total` 供翻页判断
+- 包含 `fields`、`breadcrumb`、`parent` 信息
 
-```typescript
-// 读取节点（不一次获得整棵子树）
-{
-  action: 'read',
-  nodeId: string,
-}
-// → 返回 {
-//   id, name, tags, fields,
-//   children: [
-//     { id, name, hasChildren, childCount }  // 摘要，不展开
-//   ]
-// }
-```
-
-**关键**：children 只返回摘要（id / name / hasChildren / childCount），agent 需要多次 read 来探索子树。这避免了一次返回几千个节点撑爆 context。
+**关键**：children 只返回摘要（id / name / hasChildren / childCount / tags），agent 需要多次 read 来探索子树。避免一次返回几千节点撑爆 context。
 
 ### update
 
-```typescript
-// 更新节点属性
-{
-  action: 'update',
-  nodeId: string,
-  name?: string,
-  tags?: { add?: string[], remove?: string[] },
-  parentId?: string,       // 移动到新父节点
-  position?: number,       // 新位置
-  content?: string,        // 更新描述
-}
-// → 返回 { id, name, updated: true }
-```
+- `addTags` / `removeTags`（不是 `tags: { add, remove }`）
+- `checked`：设置 checkbox 状态（true/false/null）
+- `parentId` + `position`：移动节点
+- Partial update — 只传需要改的字段
 
 ### delete
 
-```typescript
-// 删除节点（移到 Trash）
-{
-  action: 'delete',
-  nodeId: string,
-}
-// → 返回 { id, deleted: true }
-```
-
-**安全**：delete 实际是移到 Trash 节点（可恢复），不是永久删除。locked 节点不可删除（`node-capabilities.ts` 检查）。
+- 移到 Trash（可恢复），不是永久删除
+- locked 节点拒绝删除（`node-capabilities.ts` 检查）
 
 ### search
 
-```typescript
-// 搜索节点
-{
-  action: 'search',
-  query?: string,          // 文本搜索
-  tags?: string[],         // 按标签过滤
-  dateRange?: {            // 按日期过滤
-    start?: string,        // ISO date
-    end?: string,
-  },
-  limit?: number,          // 结果数量限制（默认 20）
-}
-// → 返回 [{ id, name, tags, snippet, createdAt }]
-```
-
-**复用**：search 复用现有的搜索基础设施（CommandPalette 使用的 fuzzy search + 节点遍历）。
+- `query`：fuzzy 文本搜索（支持 CJK）
+- `searchTags`：AND 过滤，用显示名
+- `dateRange`：`{ from?, to? }` ISO 格式
+- `limit` / `offset`：分页（default 20, max 50）
 
 ### 与 node-store 的集成
 
-所有写操作（create / update / delete）通过 `node-store.ts` 的 actions 执行：
-
 ```
 node tool execute()
-  → node-store action (createNode / updateNode / deleteNode)
+  → node-store action (createChild / setNodeName / applyTag / trashNode / ...)
     → Loro CRDT 修改
-      → loroDoc.commitDoc()
-        → UI 自动更新（subscribe 触发）
+      → loroDoc.commitDoc('ai:chat')  ← AI origin 前缀
+        → UI 自动更新（notifySubscribers 触发）
 ```
 
-**关键陷阱**（CLAUDE.md）：每个 store action 结束必须调用 `loroDoc.commitDoc()`，否则 `doc.subscribe` 不触发 → UI 不更新。
+**关键陷阱**（CLAUDE.md）：每个 store action 结束必须调用 `loroDoc.commitDoc()`，否则 UI 不更新。
 
 ---
 
-## undo tool
+## undo tool（AI 操作隔离）
 
-来源：ai-strategy.md §9 "Tool 3: undo"
+> 完整定义见 `tool-definitions.md`。
+
+### AI Undo 隔离机制
+
+AI 的 undo 与用户的 ⌘Z 使用**独立的 UndoManager**，互不干扰：
+
+```
+AI 写操作 → commitDoc('ai:chat')
+                ↓
+主 UndoManager（⌘Z）        AI UndoManager（undo tool）
+├── 不排除 'ai:' origin     ├── 排除所有非 'ai:' origin
+├── 用户 ⌘Z 可撤销 AI 操作   ├── 只追踪 AI 操作
+└── 也可撤销用户自己的操作    └── 不影响用户操作
+```
+
+**两个 UndoManager 共存于同一 LoroDoc**，各自通过 `excludeOriginPrefixes` 过滤不同 origin。
+
+### 实现
 
 ```typescript
 const undoTool: AgentTool = {
   name: 'undo',
-  description: 'Undo recent node operations',
+  description: 'Undo recent AI operations. Only undoes AI operations — user edits are never affected.',
   parameters: Type.Object({
-    steps: Type.Optional(Type.Number({ default: 1 }))
+    steps: Type.Optional(Type.Number({ default: 1, maximum: 20 }))
   }),
   execute: async (toolCallId, params) => {
+    let undone = 0;
     for (let i = 0; i < (params.steps ?? 1); i++) {
-      loroDoc.undoDoc()
+      if (aiUndoManager.undo()) undone++;
+      else break;
     }
-    return { undone: params.steps ?? 1 }
+    return { undone, remaining: aiUndoManager.canUndo() ? '...' : 0 }
   }
 }
 ```
 
-基于 Loro CRDT 的 `undoDoc()`。Agent 的安全网——做错了直接撤回。
-
 ---
 
-## System Prompt 从 #agent 节点加载
+## System Prompt 架构
 
-来源：ai-strategy.md §7 "#agent vs #skill"
+### 语言与格式
 
-Phase 0 硬编码的 system prompt 迁移为从 `#agent` 节点读取。
+- **系统 prompt 用英文编写**（LLM 理解英文指令最准确）
+- **回复跟随用户语言**（系统 prompt 中明确说明）
+- **XML 分层结构**（借鉴 CiC 模式）：role / capabilities / context / output_rules / safety
 
 ### #agent 系统节点
 
@@ -186,47 +159,80 @@ Phase 0 硬编码的 system prompt 迁移为从 `#agent` 节点读取。
         └── 不要在 Node 输入时插话
 ```
 
-**#agent 节点是普通节点 + #agent 标签**——用户可在 outliner 中查看和编辑。不 locked。
+**#agent 节点是普通节点 + #agent 标签**——用户可在 outliner 中查看和编辑。**不 locked**（用户需要编辑 prompt、rules、模型配置等）。
 
-### System prompt 构建
+### 动态上下文注入（`<system-reminder>`）
+
+每轮对话注入动态上下文，统一用 `<system-reminder>` 标签（与 CiC 同一模式）：
+
+```xml
+<system-reminder>
+<panel-context>
+Current panel: Journal > 2026-03-12 (ID: ws_xxx_day_20260312)
+Children (3):
+  - "AI Research Notes" (id: abc123, 5 children)
+  - "Meeting Record" (id: def456, 0 children)
+  - "#task Buy coffee beans" (id: ghi789, checkbox: done)
+</panel-context>
+
+<page-context>
+User is browsing: https://arxiv.org/abs/2403.xxxxx — "Attention Is All You Need"
+</page-context>
+
+<time-context>
+Current time: 2026-03-12T14:30:00+08:00
+</time-context>
+</system-reminder>
+```
+
+按需注入——没有活动页面就不注入 `<page-context>`，没有选中节点就不注入 `<selection-context>`。
+
+### System prompt 构建流程
 
 ```
 Agent 初始化时：
-  1. 读取 #agent 节点的身份定义
-  2. 加载 Always Active #skill 节点的 Rules
-  3. 拼接为 system prompt
-  4. agent.setSystemPrompt(combined)
+  1. 读取 #agent 节点身份定义 → 基础 system prompt
+  2. 加载 Always Active #skill 节点 Rules → 追加为 <skill-context>
+  3. agent.setSystemPrompt(combined)
+
+每轮对话前：
+  4. 收集面板/页面/选中/时间上下文 → 注入 <system-reminder>
 ```
 
-Phase 1 只实现 #agent 节点加载。#skill 匹配和加载在 Phase 2+ 完善。
+Phase 1 只实现 #agent + Always Active #skill 加载。按需 #skill 匹配在 Phase 2+ 完善。
 
 ---
 
 ## Reference 渲染
 
-来源：ai-strategy.md §13 "Reference 原则"
+### 统一引用格式
 
-### 在 Chat 中的 Reference
+Agent 输出两种引用，统一用 XML 标签：
 
-> Chat 中的 reference = 可点击**导航链接**（不创建图谱边）。
-
-Agent 返回的文本中引用节点时使用格式：`[[nodeId|显示文本]]`
+| 类型 | 格式 | 用途 |
+|------|------|------|
+| Inline reference | `<ref id="nodeId">display text</ref>` | 正文中引用节点（作为回答的一部分） |
+| Citation | `<cite id="nodeId">N</cite>` | 角标引用（作为证据，不直接作为回答） |
 
 ```
-Agent: "我已经给 [[ws1_abc123|今天的会议笔记]] 加了 #meeting 标签，
-        并把 [[ws1_def456|待办事项]] 移到了日记下面。"
+Agent: "I've added #meeting to <ref id="abc123">today's meeting notes</ref>
+        and moved <ref id="def456">todos</ref> under today's journal.
+        <cite id="ghi789">1</cite>"
 ```
 
-Chat 消息渲染时：
-- 解析 `[[nodeId|text]]` 格式
-- 渲染为带颜色的可点击文本
-- 点击 → `navigateTo(nodeId)`
+### Consumer-side Materialization
 
-### 在画板上的 Reference
+**同一格式，不同消费场景各自物化**：
 
-> 画板上的 reference = 真实图谱边（持久化）。
+| 消费场景 | `<ref>` 物化为 | `<cite>` 物化为 |
+|----------|---------------|----------------|
+| Chat 消息渲染 | 可点击导航链接（不创建图谱边） | 角标数字，hover 显示节点摘要 |
+| node.create `content` | ProseMirror `inlineReference` atom 节点 | ProseMirror `inlineReference` |
+| node.create `children` | Reference 节点 (`type: 'reference', targetId`) | Reference 节点 |
 
-Agent 通过 node tool 创建的 reference 是真实的 inline reference 节点，出现在 outliner 中。
+### 失效处理
+
+nodeId 指向已删除/不存在的节点 → 灰色 + 删除线，不可点击。
 
 ---
 
@@ -261,28 +267,25 @@ interface ChatSession {
 
 ---
 
-## API Key 服务端迁移
+## API Key & Agent 配置（节点存储）
 
-来源：ai-strategy.md §15
+> "一切皆节点"原则——API key 和 agent 配置都存为节点字段，不走独立存储系统。
 
-> BYOK 用户的 key 也通过 Worker 代理（加密传输，不在客户端明文存储）
+### API Key → Settings 节点字段
 
-Phase 0 的 chrome.storage.local 临时方案迁移到 D1 加密存储：
+Phase 0 的 chrome.storage.local 临时方案迁移到 Settings 节点：
 
-```
-设置 key 流程：
-  用户在 ChatDrawer 中输入 API key
-  → POST /api/ai/keys { provider: 'anthropic', key: 'sk-ant-...' }
-  → Worker 加密后存入 D1
-  → 客户端只保存 { hasKey: true, provider: 'anthropic' }
+- **Settings 节点** 新增字段：`AI Provider`（下拉）、`API Key`（password 类型，显示为 `sk-ant-••••`）
+- 数据在 Loro 中，随工作区同步
+- 仍通过 Worker proxy 调用 LLM（key 在请求中传递，Worker 不存储）
 
-使用 key 流程：
-  Agent streamProxy 请求不再携带 API key
-  → Worker 从 D1 读取并解密
-  → Worker 用解密后的 key 调用 LLM
-```
+### Agent 配置 → #agent 节点字段
 
-**加密方案**：AES-GCM，密钥从 Worker 环境变量 `AI_KEY_ENCRYPTION_SECRET` 派生。
+- **Model**（下拉：claude-sonnet-4-5 / claude-opus-4 / ...）
+- **Temperature**（数值）
+- **Max Tokens**（数值）
+
+**两者分开**：Settings = 全局配置（provider + key），#agent = agent 自身配置（model + params）。
 
 ---
 
@@ -317,31 +320,13 @@ Phase 1 的判断逻辑可以简单——如果输入不匹配任何搜索结果
 
 ## Tool Call 渲染
 
-Agent 执行 tool call 时，Chat 中需要展示 agent 做了什么：
+Agent 执行 tool call 时，Chat 中展示操作摘要：
 
-```
-┌──────────────────────────────┐
-│ 🤖 Assistant                  │
-│                              │
-│ 我来帮你整理今天的笔记。     │
-│                              │
-│ ┌─ node.update ──────────┐   │
-│ │ 给 "会议笔记" 加了      │   │
-│ │ #meeting 标签           │   │
-│ └────────────────────────┘   │
-│                              │
-│ ┌─ node.update ──────────┐   │
-│ │ 把 "待办" 移到日记下面  │   │
-│ └────────────────────────┘   │
-│                              │
-│ 整理完成，你看看？           │
-└──────────────────────────────┘
-```
+- **默认折叠**，显示工具图标 + 一行摘要（如 "Created node: 会议记录"）
+- 点击展开显示完整参数和结果
+- 错误的 tool call 以红色高亮
 
-Tool call 块样式：
-- 浅灰背景 `bg-foreground/[0.03]`
-- 小字体显示 action + 参数摘要
-- 可折叠（默认展开，用户可折叠）
+> Tool call 渲染**不阻塞主流程**，UI 优化后续迭代。Phase 1 实现最小可用版本。
 
 ---
 
@@ -387,7 +372,7 @@ Agent 报告: "我做了以下整理：
 | **Modify** | `src/components/chat/ChatDrawer.tsx` | "新对话" 按钮 + 持久化恢复（Phase 0 创建的根容器） |
 | **Modify** | `src/lib/palette-commands.ts` | "Ask AI" 选项 |
 | **Modify** | `src/components/search/CommandPalette.tsx` | AI Chat 模式入口 |
-| **Modify** | `server/src/routes/ai.ts` | API key 加密存储/检索端点 |
+| **Create** | `src/lib/ai-context.ts` | 动态上下文收集 + `<system-reminder>` 构建 (~80 行) |
 | **Modify** | `src/types/system-nodes.ts` | #agent 系统标签定义 |
 | **Create** | `tests/vitest/node-tool.test.ts` | node tool 测试 |
 | **Create** | `tests/vitest/undo-tool.test.ts` | undo tool 测试 |
@@ -404,9 +389,9 @@ Agent 报告: "我做了以下整理：
 ```
 GIVEN Chat 已打开，agent 有 node tool
 WHEN 用户输入 "帮我创建一个笔记，标题是'测试'"
-THEN agent 调用 node.create({ name: '测试', parentId: todayJournalId })
+THEN agent 调用 node.create({ name: '测试' })  ← parentId 默认 today journal
   AND outliner 中当天日记下出现新节点 "测试"
-  AND Chat 中显示 tool call 块 + agent 报告
+  AND Chat 中显示折叠的 tool call 摘要 + agent 报告
 ```
 
 ### node.update（标签操作）
@@ -415,19 +400,21 @@ THEN agent 调用 node.create({ name: '测试', parentId: todayJournalId })
 GIVEN outliner 中有节点 "会议笔记"
 WHEN 用户输入 "给会议笔记加上 #meeting 标签"
 THEN agent 调用 node.search({ query: '会议笔记' }) 定位节点
-  AND agent 调用 node.update({ nodeId, tags: { add: ['meetingTagId'] } })
+  AND agent 调用 node.update({ nodeId, addTags: ['meeting'] })  ← 显示名，自动解析
   AND 节点标签实时更新
-  AND Chat 中报告
+  AND Chat 报告用 <ref id="nodeId">会议笔记</ref> 引用
 ```
 
-### undo
+### undo（AI 操作隔离）
 
 ```
 GIVEN agent 刚执行了一系列操作
+  AND 用户在 AI 操作前有自己的编辑
 WHEN 用户输入 "撤回"
 THEN agent 调用 undo({ steps: N })
-  AND Loro CRDT 回退 N 步
-  AND outliner 恢复到操作前状态
+  AND aiUndoManager 回退 N 步 AI 操作
+  AND 用户自己的编辑不受影响
+  AND outliner 恢复到 AI 操作前状态
 ```
 
 ### Chat 持久化
@@ -455,12 +442,12 @@ THEN ChatDrawer 打开
 
 ## 验证标准
 
-1. Chat 中输入"创建一个笔记" → outliner 中出现新节点
-2. "给 X 加 #Y 标签" → 节点标签变更 → Chat 中显示 tool call 块
-3. "撤回" → Loro undo → outliner 恢复
+1. Chat 中输入"创建一个笔记" → outliner 中出现新节点（commit origin = `ai:chat`）
+2. "给 X 加 #Y 标签" → 节点标签变更（tags 用显示名自动解析）→ Chat 显示 tool call 摘要
+3. "撤回" → aiUndoManager 回退 → 只撤销 AI 操作，用户编辑不受影响
 4. 关闭/重开 ChatDrawer → 对话历史恢复
 5. ⌘K 中输入自然语言 → "Ask AI" 选项出现 → 点击跳转到 Chat
-6. Agent 文本中的 `[[nodeId|text]]` 渲染为可点击链接
+6. Agent 文本中的 `<ref id="...">text</ref>` 渲染为可点击导航链接
 7. `npm run typecheck && npm run test:run && npm run build` 全过
 
 ---
@@ -479,9 +466,9 @@ THEN ChatDrawer 打开
 
 ## Out of Scope
 
-- API key D1 加密存储 → 可在 Phase 1 后期或独立 PR
-- #skill 匹配和加载 → Phase 2
-- browser tool → Phase 3
+- #skill 按需匹配和动态加载 → Phase 2
+- browser tool → Phase 3（工具定义已在 `tool-definitions.md`）
+- Planning mode（操作前确认） → Phase 3（browser 操作风险高时引入）
 - Subagent 后台任务 → Phase 4
 - Taste 学习 → Phase 5
 - Markdown 渲染（Chat 消息）→ 独立排期

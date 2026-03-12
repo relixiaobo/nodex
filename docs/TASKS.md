@@ -103,9 +103,11 @@ _(空)_
 - [x] UI: ChatDrawer（独立于 PanelStack，⌘L 切换）+ 流式消息 + 空状态 + API key 设置
 
 ##### Phase 1: 画布 — node tool + Chat 成熟化
-- [ ] node tool（5 actions: create/read/update/delete/search）+ undo tool
-- [ ] System prompt 从 #agent 节点加载 + #skill 规则注入
-- [ ] Reference 渲染（节点引用可点击跳转）+ Tool call 渲染
+> 工具定义：`docs/plans/tool-definitions.md` | 实施计划：`docs/plans/phase-1-canvas.md` | 研究：`docs/research/ai-context-engineering-gaps.md`
+- [ ] node tool（5 actions）+ undo tool（AI 操作隔离，origin `ai:chat` + 专用 aiUndoManager）
+- [ ] System prompt 从 #agent 节点加载（英文）+ `<system-reminder>` 动态上下文注入 + Always Active #skill
+- [ ] API key 迁移到 Settings 节点字段 + Agent 配置（model/temp）迁移到 #agent 节点字段
+- [ ] Reference 渲染（`<ref>` inline + `<cite>` 角标）+ Tool call 折叠渲染
 - [ ] Chat 持久化（IndexedDB）+ ⌘K 集成
 
 ##### Phase 2: 阅读环 — Clip & Spark
@@ -113,10 +115,12 @@ _(空)_
 - [ ] 碰撞策略（graph-search，非 embedding）
 - [ ] #skill 节点提取模式学习
 
-##### Phase 3: 浏览器 — browser tool + CDP
-- [ ] Batch 1: read_page + get_text + find（Content Script）
-- [ ] Batch 2: screenshot + click + type（CDP）
-- [ ] Batch 3-4: 深度交互 + 调试工具
+##### Phase 3: 浏览器 — browser tool（17 actions）+ CDP
+> 工具定义：`docs/plans/tool-definitions.md` | 实施计划：`docs/plans/phase-3-browser.md`
+- [ ] Batch 1: 观察 — get_text + get_metadata + find + get_selection（Content Script + page-capture）
+- [ ] Batch 2: 截图 + 基础交互 — screenshot + click + type + scroll + navigate + tab（CDP）
+- [ ] Batch 3: 深度交互 — key + fill_form + drag + wait + execute_js
+- [ ] Batch 4: 调试 — read_network + read_console（CDP）
 
 ##### Phase 4: 编排 — AgentOrchestrator
 - [ ] AgentMessageBus (EventTarget) + AgentOrchestrator (delegate/cancel)

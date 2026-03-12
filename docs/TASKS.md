@@ -135,7 +135,7 @@ _(空)_
 
 ##### Phase 3: 浏览器 — browser tool（17 actions）+ CDP
 > 工具定义：`docs/plans/tool-definitions.md` | 实施计划：`docs/plans/phase-3-browser.md`
-- [ ] Batch 1: 观察 — get_text + get_metadata + find + get_selection（Content Script + page-capture）
+- [x] Batch 1: 观察 — get_text + get_metadata + find + get_selection（Content Script + page-capture）
 - [ ] Batch 2: 截图 + 基础交互 — screenshot + click + type + scroll + navigate + tab（CDP）
 - [ ] Batch 3: 深度交互 — key + fill_form + drag + wait + execute_js
 - [ ] Batch 4: 调试 — read_network + read_console（CDP）

@@ -16,6 +16,10 @@ import {
   type HighlightRemovePayload,
   type HighlightScrollToPayload,
 } from '../../lib/highlight-messaging.js';
+import {
+  BROWSER_FIND,
+  BROWSER_GET_SELECTION,
+} from '../../lib/ai-tools/browser-messaging.js';
 import { initHighlight, removeHighlightRendering, scrollToHighlight } from './highlight.js';
 import { restoreHighlights } from './highlight-restore.js';
 
@@ -99,6 +103,39 @@ export default defineContentScript({
       if (message?.type === HIGHLIGHT_SCROLL_TO) {
         scrollToHighlight((message.payload as HighlightScrollToPayload).id);
         sendResponse({ ok: true });
+        return true;
+      }
+
+      if (message?.type === BROWSER_FIND) {
+        const query: string = message?.payload?.query ?? '';
+        if (!query.trim()) {
+          sendResponse({ matches: [], total: 0 });
+          return true;
+        }
+
+        const bodyText = document.body?.innerText ?? '';
+        const lowerText = bodyText.toLowerCase();
+        const lowerQuery = query.toLowerCase();
+        const matches: Array<{ excerpt: string; index: number }> = [];
+        let searchFrom = 0;
+
+        while (matches.length < 20) {
+          const idx = lowerText.indexOf(lowerQuery, searchFrom);
+          if (idx === -1) break;
+
+          const start = Math.max(0, idx - 50);
+          const end = Math.min(bodyText.length, idx + query.length + 50);
+          matches.push({ excerpt: bodyText.slice(start, end), index: idx });
+          searchFrom = idx + 1;
+        }
+
+        sendResponse({ matches, total: matches.length });
+        return true;
+      }
+
+      if (message?.type === BROWSER_GET_SELECTION) {
+        const selText = window.getSelection()?.toString() ?? '';
+        sendResponse({ text: selText, hasSelection: selText.length > 0 });
         return true;
       }
 

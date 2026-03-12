@@ -1,6 +1,6 @@
 # Phase 5: 认知 — Taste 学习 + Review 引擎
 
-> 依赖：Phase 1 (node tool) + Phase 4 (AgentOrchestrator)
+> 依赖：Phase 1.5 (node tools) + Phase 4 (AgentOrchestrator)
 > 来源：ai-strategy.md §5 "Taste 学习" + §6 "Review" + §3 "回顾环" + §7 "#skill 节点"
 
 ---
@@ -132,8 +132,8 @@ CRDT OpLog（原始信号，零额外采集）
 
 ```
 1. 确定 review 范围（时间/标签/自定义）
-2. node.search 查找范围内的节点
-3. node.read 渐进式读取节点内容
+2. node_search 查找范围内的节点
+3. node_read 渐进式读取节点内容
 4. 价值分层（AI 自动做，不是用户选择）：
    - #note 标签 → 高权重（用户亲手写）
    - #spark + 用户追加子笔记 → 高权重（用户响应了）
@@ -187,7 +187,7 @@ const schemaEvolutionTask: TaskDescriptor = {
   id: nanoid(),
   description: 'Analyze recent OpLog corrections and update #skill rules',
   skills: [],  // 不需要额外 skill
-  tools: [nodeTool],  // 需要 node.read + node.search + node.update
+  tools: [nodeReadTool, nodeSearchTool, nodeEditTool],  // 6 个独立工具按需注册
 }
 
 // 面板启动时检查：距上次分析 > 24h 且有新的 Correction → 触发
@@ -206,17 +206,17 @@ if (shouldRunSchemaEvolution()) {
 // /review 命令在 palette-commands.ts 中注册
 // 用户输入 /review → agent 执行以下 tool call 序列：
 
-1. node.search({ dateRange: 'this-week', limit: 50 })
-2. node.read({ nodeId: id1 })  // 逐个读取（Phase 1 定义的单节点 read API）
-   node.read({ nodeId: id2 })  // agent 根据需要多次调用
+1. node_search({ dateRange: { from: 'this-week' }, limit: 50 })
+2. node_read({ nodeId: id1 })  // 逐个读取（Phase 1.5 定义的单节点 read API）
+   node_read({ nodeId: id2 })  // agent 根据需要多次调用
    ...                          // 渐进式披露：先读摘要，再按需深入子节点
 3. [LLM 分析 — 不需要 tool call]
 4. 输出 Review 结果（带 reference）
 ```
 
-**注意**：node.read 是单节点 API（`{ nodeId: string }` → 返回节点摘要 + children 摘要），不是批量 API。Agent 通过多次 tool call 渐进式探索节点树——这与 Phase 1 的 read 定义一致。
+**注意**：node_read 是单节点 API（`{ nodeId: string }` → 返回节点摘要 + children 摘要），不是批量 API。Agent 通过多次 tool call 渐进式探索节点树——这与 Phase 1.5 的 read 定义一致。
 
-**价值分层逻辑**：在 node.search 结果上运行分层算法（基于标签类型 + 连接密度 + 互动信号），为 LLM 的 Review 分析提供加权上下文。
+**价值分层逻辑**：在 node_search 结果上运行分层算法（基于标签类型 + 连接密度 + 互动信号），为 LLM 的 Review 分析提供加权上下文。
 
 ---
 

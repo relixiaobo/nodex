@@ -15,6 +15,7 @@ import {
   ensureTagDefIdByName,
   getTagDisplayNames,
   stripReferenceMarkup,
+  sanitizeDirectNodeDataPatch,
   resolveAndSetFields,
   formatResultText,
 } from './shared.js';
@@ -25,6 +26,7 @@ const createChildInputSchema: ReturnType<typeof Type.Object> = Type.Object({
   name: Type.Optional(Type.String()),
   tags: Type.Optional(Type.Array(Type.String())),
   content: Type.Optional(Type.String()),
+  data: Type.Optional(Type.Record(Type.String(), Type.Unknown())),
   fields: Type.Optional(Type.Record(Type.String(), Type.String())),
   targetId: Type.Optional(Type.String()),
   children: Type.Optional(Type.Array(Type.Any())),
@@ -37,6 +39,7 @@ const createToolParameters = Type.Object({
   position: Type.Optional(Type.Integer({ minimum: 0 })),
   tags: Type.Optional(Type.Array(Type.String())),
   content: Type.Optional(Type.String()),
+  data: Type.Optional(Type.Record(Type.String(), Type.Unknown())),
   fields: Type.Optional(Type.Record(Type.String(), Type.String())),
   targetId: Type.Optional(Type.String()),
   duplicateId: Type.Optional(Type.String()),
@@ -49,6 +52,7 @@ interface CreateChildInput {
   name?: string;
   tags?: string[];
   content?: string;
+  data?: Record<string, unknown>;
   fields?: Record<string, string>;
   targetId?: string;
   children?: CreateChildInput[];
@@ -58,6 +62,21 @@ interface SetupResult {
   childrenCreated: number;
   createdFields: string[];
   unresolvedFields: string[];
+}
+
+function buildCreateNodeData(input: Pick<CreateChildInput, 'name' | 'content' | 'data'>): Record<string, unknown> {
+  const { safeData } = sanitizeDirectNodeDataPatch(input.data, { allowType: true });
+  const result: Record<string, unknown> = { ...safeData };
+
+  if (input.name !== undefined) {
+    result.name = input.name.trim();
+  }
+
+  if (!Object.prototype.hasOwnProperty.call(safeData, 'description') && input.content !== undefined) {
+    result.description = stripReferenceMarkup(input.content) || undefined;
+  }
+
+  return result;
 }
 
 /**
@@ -107,10 +126,7 @@ function createChildrenRecursive(
       store.addReference(parentId, child.targetId);
       count++;
     } else {
-      const created = store.createChild(parentId, undefined, {
-        name: child.name?.trim(),
-        description: child.content ? stripReferenceMarkup(child.content) : undefined,
-      }, { commit: false });
+      const created = store.createChild(parentId, undefined, buildCreateNodeData(child), { commit: false });
 
       count += 1 + applyNodeSetup(created.id, child, depth + 1).childrenCreated;
     }
@@ -159,10 +175,7 @@ async function executeCreateTool(params: CreateToolParams): Promise<AgentToolRes
   // ── Sibling mode ──
   if (params.afterId) {
     const result = withCommitOrigin(AI_COMMIT_ORIGIN, () => {
-      const created = useNodeStore.getState().createSibling(params.afterId!, {
-        name: params.name?.trim(),
-        description: params.content ? stripReferenceMarkup(params.content) : undefined,
-      });
+      const created = useNodeStore.getState().createSibling(params.afterId!, buildCreateNodeData(params));
       const setup = applyNodeSetup(created.id, params as CreateChildInput, 1);
       commitDoc();
       return { node: created, ...setup };
@@ -177,10 +190,7 @@ async function executeCreateTool(params: CreateToolParams): Promise<AgentToolRes
   }
 
   const result = withCommitOrigin(AI_COMMIT_ORIGIN, () => {
-    const created = useNodeStore.getState().createChild(parentId, params.position, {
-      name: params.name?.trim(),
-      description: params.content ? stripReferenceMarkup(params.content) : undefined,
-    }, { commit: false });
+    const created = useNodeStore.getState().createChild(parentId, params.position, buildCreateNodeData(params), { commit: false });
     const setup = applyNodeSetup(created.id, params as CreateChildInput, 1);
     commitDoc();
     return { node: created, ...setup };
@@ -219,6 +229,10 @@ export const createTool: AgentTool<typeof createToolParameters, unknown> = {
   description: [
     'Create new nodes. Supports single nodes, trees (via children), field values,',
     'references, siblings, and duplicates — everything is a node.',
+    '',
+    'Use data to set raw node properties while creating, such as type, description,',
+    'color, fieldType, cardinality, or showCheckbox. data cannot set rich text',
+    'internals, tree structure, tags, or timestamps.',
     '',
     'Fields are tied to tags. Include tags when using fields — if the field doesn\'t exist yet,',
     'it will be auto-created as an options field under the first tag.',

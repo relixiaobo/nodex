@@ -80,6 +80,52 @@ describe('node tools (Phase 1.5)', () => {
     expect(details.children.items[0].id).toBe('note_1a');
   });
 
+  it('returns raw type, epoch timestamps, and nodeData for schema nodes', async () => {
+    const details = await executeRead({
+      nodeId: 'attrDef_status',
+    }) as {
+      type: string | null;
+      createdAt: number;
+      updatedAt: number;
+      nodeData: Record<string, unknown>;
+    };
+
+    expect(details.type).toBe('fieldDef');
+    expect(typeof details.createdAt).toBe('number');
+    expect(typeof details.updatedAt).toBe('number');
+    expect(details.nodeData).toMatchObject({
+      fieldType: 'options',
+    });
+    expect(details.nodeData).not.toHaveProperty('type');
+    expect(details.nodeData).not.toHaveProperty('name');
+    expect(details.nodeData).not.toHaveProperty('createdAt');
+    expect(details.nodeData).not.toHaveProperty('updatedAt');
+  });
+
+  it('returns null type for regular content nodes and exposes tag config in nodeData', async () => {
+    const contentDetails = await executeRead({
+      nodeId: 'note_1',
+    }) as {
+      type: string | null;
+      nodeData: Record<string, unknown>;
+    };
+    const tagDetails = await executeRead({
+      nodeId: 'tagDef_task',
+    }) as {
+      type: string | null;
+      nodeData: Record<string, unknown>;
+    };
+
+    expect(contentDetails.type).toBeNull();
+    expect(contentDetails.nodeData).not.toHaveProperty('type');
+    expect(tagDetails.type).toBe('tagDef');
+    expect(tagDetails.nodeData).toMatchObject({
+      color: 'green',
+      showCheckbox: true,
+    });
+    expect(tagDetails.nodeData).not.toHaveProperty('tags');
+  });
+
   it('updates node name and tags using display names', async () => {
     const details = await executeEdit({
       nodeId: 'task_1',

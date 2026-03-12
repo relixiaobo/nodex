@@ -229,4 +229,48 @@ describe('node_create tool', () => {
     expect(result.unresolvedFields).toBeUndefined();
     expect(result.tags).toContain('Task');
   });
+
+  it('creates schema nodes through data.type and raw properties', async () => {
+    const result = await executeCreate({
+      parentId: 'tagDef_task',
+      name: 'Deadline',
+      data: {
+        type: 'fieldDef',
+        fieldType: 'date',
+        cardinality: 'single',
+        nullable: true,
+      },
+    });
+
+    const created = loroDoc.toNodexNode(result.id);
+    expect(created?.type).toBe('fieldDef');
+    expect(created?.name).toBe('Deadline');
+    expect(created?.fieldType).toBe('date');
+    expect(created?.cardinality).toBe('single');
+    expect(created?.nullable).toBe(true);
+  });
+
+  it('filters blocked data keys when creating nodes', async () => {
+    const result = await executeCreate({
+      parentId: 'tagDef_task',
+      name: 'Estimate',
+      content: 'legacy description',
+      data: {
+        type: 'fieldDef',
+        fieldType: 'number',
+        description: 'From <ref id="note_1">note</ref>',
+        name: 'Hacked',
+        createdAt: 1,
+        updatedAt: 2,
+      },
+    });
+
+    const created = loroDoc.toNodexNode(result.id);
+    expect(created?.type).toBe('fieldDef');
+    expect(created?.fieldType).toBe('number');
+    expect(created?.name).toBe('Estimate');
+    expect(created?.description).toBe('From note');
+    expect(created?.createdAt).not.toBe(1);
+    expect(created?.updatedAt).not.toBe(2);
+  });
 });

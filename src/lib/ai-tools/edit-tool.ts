@@ -37,6 +37,7 @@ async function executeEditTool(params: EditToolParams): Promise<AgentToolResult<
   if (!node) throw new Error(`Node not found: ${params.nodeId}`);
 
   const updated = new Set<string>();
+  let unresolvedFields: string[] = [];
 
   withCommitOrigin(AI_COMMIT_ORIGIN, () => {
     const store = useNodeStore.getState();
@@ -75,8 +76,9 @@ async function executeEditTool(params: EditToolParams): Promise<AgentToolResult<
     }
 
     if (params.fields && Object.keys(params.fields).length > 0) {
-      resolveAndSetFields(params.nodeId, params.fields);
-      updated.add('fields');
+      const fieldResult = resolveAndSetFields(params.nodeId, params.fields);
+      if (fieldResult.resolved.length > 0) updated.add('fields');
+      if (fieldResult.unresolved.length > 0) unresolvedFields = fieldResult.unresolved;
     }
 
     if (params.parentId) {
@@ -89,11 +91,16 @@ async function executeEditTool(params: EditToolParams): Promise<AgentToolResult<
     }
   });
 
-  const result = {
+  const result: Record<string, unknown> = {
     id: params.nodeId,
     name: loroDoc.toNodexNode(params.nodeId)?.name ?? '',
     updated: Array.from(updated),
   };
+
+  if (unresolvedFields.length > 0) {
+    result.unresolvedFields = unresolvedFields;
+    result.hint = 'Some fields could not be resolved. The node may not have tags that define these fields. Add the appropriate tag first (addTags), then set the field values.';
+  }
 
   return {
     content: [{ type: 'text', text: formatResultText(result) }],
@@ -109,6 +116,8 @@ export const editTool: AgentTool<typeof editToolParameters, unknown> = {
     'including field value nodes and reference nodes.',
     '',
     'Use fields parameter to set field values by name — no need to know field entry IDs.',
+    'IMPORTANT: fields are defined by tags. The node must have the relevant tag applied',
+    'first (use addTags), then set fields. Example: addTags: ["task"], fields: {"Status": "Todo"}.',
     'Or edit field value nodes directly: node_edit(nodeId: valueNodeId, name: "new value").',
     '',
     'All write operations use isolated undo — undoable with the undo tool.',

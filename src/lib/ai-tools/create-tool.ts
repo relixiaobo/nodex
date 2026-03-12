@@ -54,28 +54,35 @@ interface CreateChildInput {
   children?: CreateChildInput[];
 }
 
+interface SetupResult {
+  childrenCreated: number;
+  unresolvedFields: string[];
+}
+
 /**
  * Apply tags, sync template fields, set field values, and create children on a node.
  * Must be called inside withCommitOrigin(AI_COMMIT_ORIGIN, ...) — does NOT commit.
- * Returns the count of children created.
  */
 function applyNodeSetup(
   nodeId: string,
   opts: { tags?: string[]; fields?: Record<string, string>; children?: CreateChildInput[] },
   childDepth: number,
-): number {
+): SetupResult {
   for (const tagName of opts.tags ?? []) {
     applyTagMutationsNoCommit(nodeId, ensureTagDefIdByName(tagName));
   }
   if (opts.tags?.length) {
     syncTemplateMutationsNoCommit(nodeId);
   }
+  let unresolvedFields: string[] = [];
   if (opts.fields && Object.keys(opts.fields).length > 0) {
-    resolveAndSetFields(nodeId, opts.fields);
+    const fieldResult = resolveAndSetFields(nodeId, opts.fields);
+    unresolvedFields = fieldResult.unresolved;
   }
-  return opts.children?.length
+  const childrenCreated = opts.children?.length
     ? createChildrenRecursive(nodeId, opts.children, childDepth)
     : 0;
+  return { childrenCreated, unresolvedFields };
 }
 
 /**
@@ -102,7 +109,7 @@ function createChildrenRecursive(
         description: child.content ? stripReferenceMarkup(child.content) : undefined,
       }, { commit: false });
 
-      count += 1 + applyNodeSetup(created.id, child, depth + 1);
+      count += 1 + applyNodeSetup(created.id, child, depth + 1).childrenCreated;
     }
   }
 
@@ -153,11 +160,11 @@ async function executeCreateTool(params: CreateToolParams): Promise<AgentToolRes
         name: params.name?.trim(),
         description: params.content ? stripReferenceMarkup(params.content) : undefined,
       });
-      const childrenCreated = applyNodeSetup(created.id, params as CreateChildInput, 1);
+      const setup = applyNodeSetup(created.id, params as CreateChildInput, 1);
       commitDoc();
-      return { node: created, childrenCreated };
+      return { node: created, ...setup };
     });
-    return buildCreateResult(result.node.id, params, result.childrenCreated);
+    return buildCreateResult(result.node.id, params, result.childrenCreated, result.unresolvedFields);
   }
 
   // ── Standard create ──
@@ -171,18 +178,18 @@ async function executeCreateTool(params: CreateToolParams): Promise<AgentToolRes
       name: params.name?.trim(),
       description: params.content ? stripReferenceMarkup(params.content) : undefined,
     }, { commit: false });
-    const childrenCreated = applyNodeSetup(created.id, params as CreateChildInput, 1);
+    const setup = applyNodeSetup(created.id, params as CreateChildInput, 1);
     commitDoc();
-    return { node: created, childrenCreated };
+    return { node: created, ...setup };
   });
-  return buildCreateResult(result.node.id, params, result.childrenCreated);
+  return buildCreateResult(result.node.id, params, result.childrenCreated, result.unresolvedFields);
 }
 
-function buildCreateResult(nodeId: string, params: CreateToolParams, childrenCreated: number): AgentToolResult<unknown> {
+function buildCreateResult(nodeId: string, params: CreateToolParams, childrenCreated: number, unresolvedFields: string[] = []): AgentToolResult<unknown> {
   const parentId = loroDoc.getParentId(nodeId) ?? '';
   const parentNode = parentId ? loroDoc.toNodexNode(parentId) : null;
   const freshNode = loroDoc.toNodexNode(nodeId);
-  const output = {
+  const output: Record<string, unknown> = {
     id: nodeId,
     name: freshNode?.name ?? params.name ?? '',
     parentId,
@@ -190,6 +197,10 @@ function buildCreateResult(nodeId: string, params: CreateToolParams, childrenCre
     tags: getTagDisplayNames(freshNode?.tags ?? []),
     childrenCreated,
   };
+  if (unresolvedFields.length > 0) {
+    output.unresolvedFields = unresolvedFields;
+    output.hint = 'Some fields could not be resolved. Fields must be defined by the node\'s tags. Ensure the correct tags are applied first.';
+  }
   return {
     content: [{ type: 'text', text: formatResultText(output) }],
     details: output,
@@ -202,6 +213,9 @@ export const createTool: AgentTool<typeof createToolParameters, unknown> = {
   description: [
     'Create new nodes. Supports single nodes, trees (via children), field values,',
     'references, siblings, and duplicates — everything is a node.',
+    '',
+    'IMPORTANT: fields are defined by tags. Always include tags when using fields.',
+    'Example: tags: ["task"], fields: {"Status": "Todo"} — the #task tag defines the Status field.',
     '',
     'Quick patterns:',
     '- Content node: node_create(name: "...", parentId: "...")',

@@ -163,21 +163,34 @@ function findOptionByName(fieldDefId: string, optionName: string): string | null
   return null;
 }
 
+export interface FieldSetResult {
+  resolved: string[];
+  unresolved: string[];
+}
+
 /**
  * Resolve and set fields on a node by display name → value.
  * Handles type dispatch: options → selectFieldOption + autoCollect; plain → setFieldValue.
  * Must be called inside withCommitOrigin(AI_COMMIT_ORIGIN, ...).
  * Does NOT call commitDoc — caller is responsible.
+ *
+ * Returns which fields were resolved and which weren't — callers should
+ * surface unresolved fields so the AI model can course-correct.
  */
 export function resolveAndSetFields(
   nodeId: string,
   fields: Record<string, string>,
-): void {
+): FieldSetResult {
   const store = useNodeStore.getState();
+  const resolved: string[] = [];
+  const unresolved: string[] = [];
 
   for (const [fieldName, value] of Object.entries(fields)) {
     const fieldDefId = findFieldDefByName(nodeId, fieldName);
-    if (!fieldDefId) continue;
+    if (!fieldDefId) {
+      unresolved.push(fieldName);
+      continue;
+    }
 
     const dataType = resolveDataType(fieldDefId);
 
@@ -202,7 +215,10 @@ export function resolveAndSetFields(
       // Plain/URL/password/etc — set as text value
       store.setFieldValue(nodeId, fieldDefId, [value]);
     }
+    resolved.push(fieldName);
   }
+
+  return { resolved, unresolved };
 }
 
 // ─── Result formatting ───

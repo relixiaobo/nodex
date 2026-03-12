@@ -180,4 +180,30 @@ describe('node_create tool', () => {
     expect(taskB?.name).toBe('Task B');
     expect(taskB?.tags).toContain('tagDef_task');
   });
+
+  // ── unresolved fields ──
+
+  it('reports unresolved fields when node has no matching tag', async () => {
+    const result = await executeCreate({
+      parentId: 'proj_1',
+      name: 'Plain node',
+      fields: { 'Status': 'Todo' },
+    });
+
+    expect(result.name).toBe('Plain node');
+    expect(result.unresolvedFields).toEqual(['Status']);
+    expect(result.hint).toBeTruthy();
+  });
+
+  it('resolves fields when tags are provided in the same call', async () => {
+    const result = await executeCreate({
+      parentId: 'proj_1',
+      name: 'Tagged node',
+      tags: ['task'],
+      fields: { 'Status': 'To Do' },
+    });
+
+    expect(result.unresolvedFields).toBeUndefined();
+    expect(result.tags).toContain('Task');
+  });
 });

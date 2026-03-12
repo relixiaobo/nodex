@@ -37,6 +37,7 @@ async function executeEditTool(params: EditToolParams): Promise<AgentToolResult<
   if (!node) throw new Error(`Node not found: ${params.nodeId}`);
 
   const updated = new Set<string>();
+  let createdFields: string[] = [];
   let unresolvedFields: string[] = [];
 
   withCommitOrigin(AI_COMMIT_ORIGIN, () => {
@@ -78,6 +79,7 @@ async function executeEditTool(params: EditToolParams): Promise<AgentToolResult<
     if (params.fields && Object.keys(params.fields).length > 0) {
       const fieldResult = resolveAndSetFields(params.nodeId, params.fields);
       if (fieldResult.resolved.length > 0) updated.add('fields');
+      if (fieldResult.created.length > 0) createdFields = fieldResult.created;
       if (fieldResult.unresolved.length > 0) unresolvedFields = fieldResult.unresolved;
     }
 
@@ -97,9 +99,12 @@ async function executeEditTool(params: EditToolParams): Promise<AgentToolResult<
     updated: Array.from(updated),
   };
 
+  if (createdFields.length > 0) {
+    result.createdFields = createdFields;
+  }
   if (unresolvedFields.length > 0) {
     result.unresolvedFields = unresolvedFields;
-    result.hint = 'Some fields could not be resolved. The node may not have tags that define these fields. Add the appropriate tag first (addTags), then set the field values.';
+    result.hint = 'Some fields could not be resolved. The node has no tags — add a tag first (addTags), then set the field values.';
   }
 
   return {
@@ -116,8 +121,9 @@ export const editTool: AgentTool<typeof editToolParameters, unknown> = {
     'including field value nodes and reference nodes.',
     '',
     'Use fields parameter to set field values by name — no need to know field entry IDs.',
-    'IMPORTANT: fields are defined by tags. The node must have the relevant tag applied',
-    'first (use addTags), then set fields. Example: addTags: ["task"], fields: {"Status": "Todo"}.',
+    'Fields are tied to tags. The node must have at least one tag. If the field doesn\'t exist,',
+    'it will be auto-created as an options field under the first tag.',
+    'Example: addTags: ["task"], fields: {"Status": "Todo"}.',
     'Or edit field value nodes directly: node_edit(nodeId: valueNodeId, name: "new value").',
     '',
     'All write operations use isolated undo — undoable with the undo tool.',

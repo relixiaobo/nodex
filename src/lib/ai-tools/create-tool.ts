@@ -56,6 +56,7 @@ interface CreateChildInput {
 
 interface SetupResult {
   childrenCreated: number;
+  createdFields: string[];
   unresolvedFields: string[];
 }
 
@@ -74,15 +75,17 @@ function applyNodeSetup(
   if (opts.tags?.length) {
     syncTemplateMutationsNoCommit(nodeId);
   }
+  let createdFields: string[] = [];
   let unresolvedFields: string[] = [];
   if (opts.fields && Object.keys(opts.fields).length > 0) {
     const fieldResult = resolveAndSetFields(nodeId, opts.fields);
+    createdFields = fieldResult.created;
     unresolvedFields = fieldResult.unresolved;
   }
   const childrenCreated = opts.children?.length
     ? createChildrenRecursive(nodeId, opts.children, childDepth)
     : 0;
-  return { childrenCreated, unresolvedFields };
+  return { childrenCreated, createdFields, unresolvedFields };
 }
 
 /**
@@ -164,7 +167,7 @@ async function executeCreateTool(params: CreateToolParams): Promise<AgentToolRes
       commitDoc();
       return { node: created, ...setup };
     });
-    return buildCreateResult(result.node.id, params, result.childrenCreated, result.unresolvedFields);
+    return buildCreateResult(result.node.id, params, result.childrenCreated, result.createdFields, result.unresolvedFields);
   }
 
   // ── Standard create ──
@@ -182,10 +185,10 @@ async function executeCreateTool(params: CreateToolParams): Promise<AgentToolRes
     commitDoc();
     return { node: created, ...setup };
   });
-  return buildCreateResult(result.node.id, params, result.childrenCreated, result.unresolvedFields);
+  return buildCreateResult(result.node.id, params, result.childrenCreated, result.createdFields, result.unresolvedFields);
 }
 
-function buildCreateResult(nodeId: string, params: CreateToolParams, childrenCreated: number, unresolvedFields: string[] = []): AgentToolResult<unknown> {
+function buildCreateResult(nodeId: string, params: CreateToolParams, childrenCreated: number, createdFields: string[] = [], unresolvedFields: string[] = []): AgentToolResult<unknown> {
   const parentId = loroDoc.getParentId(nodeId) ?? '';
   const parentNode = parentId ? loroDoc.toNodexNode(parentId) : null;
   const freshNode = loroDoc.toNodexNode(nodeId);
@@ -197,9 +200,12 @@ function buildCreateResult(nodeId: string, params: CreateToolParams, childrenCre
     tags: getTagDisplayNames(freshNode?.tags ?? []),
     childrenCreated,
   };
+  if (createdFields.length > 0) {
+    output.createdFields = createdFields;
+  }
   if (unresolvedFields.length > 0) {
     output.unresolvedFields = unresolvedFields;
-    output.hint = 'Some fields could not be resolved. Fields must be defined by the node\'s tags. Ensure the correct tags are applied first.';
+    output.hint = 'Some fields could not be resolved. The node has no tags — add a tag first, then set the field values.';
   }
   return {
     content: [{ type: 'text', text: formatResultText(output) }],
@@ -214,8 +220,8 @@ export const createTool: AgentTool<typeof createToolParameters, unknown> = {
     'Create new nodes. Supports single nodes, trees (via children), field values,',
     'references, siblings, and duplicates — everything is a node.',
     '',
-    'IMPORTANT: fields are defined by tags. Always include tags when using fields.',
-    'Example: tags: ["task"], fields: {"Status": "Todo"} — the #task tag defines the Status field.',
+    'Fields are tied to tags. Include tags when using fields — if the field doesn\'t exist yet,',
+    'it will be auto-created as an options field under the first tag.',
     '',
     'Quick patterns:',
     '- Content node: node_create(name: "...", parentId: "...")',

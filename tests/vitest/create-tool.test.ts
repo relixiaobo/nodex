@@ -183,7 +183,8 @@ describe('node_create tool', () => {
 
   // ── unresolved fields ──
 
-  it('reports unresolved fields when node has no matching tag', async () => {
+  it('reports unresolved fields when node has no tags at all', async () => {
+    // No tags → can't create field definitions → unresolved
     const result = await executeCreate({
       parentId: 'proj_1',
       name: 'Plain node',
@@ -195,7 +196,28 @@ describe('node_create tool', () => {
     expect(result.hint).toBeTruthy();
   });
 
-  it('resolves fields when tags are provided in the same call', async () => {
+  it('auto-creates new field definitions under the tag', async () => {
+    // #task exists but "CustomField" is new → auto-create under #task
+    const result = await executeCreate({
+      parentId: 'proj_1',
+      name: 'Custom node',
+      tags: ['task'],
+      fields: { 'CustomField': 'my value' },
+    });
+
+    expect(result.tags).toContain('Task');
+    expect(result.createdFields).toEqual(['CustomField']);
+    expect(result.unresolvedFields).toBeUndefined();
+
+    // Verify the fieldDef was created under the task tagDef
+    const tagDefChildren = loroDoc.getChildren('tagDef_task');
+    const newFieldDef = tagDefChildren
+      .map((cid) => loroDoc.toNodexNode(cid))
+      .find((c) => c?.type === 'fieldDef' && c.name === 'CustomField');
+    expect(newFieldDef).toBeTruthy();
+  });
+
+  it('resolves existing fields without creating new ones', async () => {
     const result = await executeCreate({
       parentId: 'proj_1',
       name: 'Tagged node',
@@ -203,6 +225,7 @@ describe('node_create tool', () => {
       fields: { 'Status': 'To Do' },
     });
 
+    expect(result.createdFields).toBeUndefined();
     expect(result.unresolvedFields).toBeUndefined();
     expect(result.tags).toContain('Task');
   });

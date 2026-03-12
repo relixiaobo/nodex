@@ -171,16 +171,52 @@ export interface FieldSetResult {
 }
 
 /**
- * Create a fieldDef under a tagDef without committing.
- * Defaults to `options` type — the most versatile for AI-created fields.
+ * Infer field type from the field name and value.
+ * - date/deadline/due → date
+ * - url/link/website → url
+ * - email → email
+ * - count/number/amount/price/cost/qty/quantity → number
+ * - otherwise → options (most versatile for categorical values like status/priority)
  */
-function createFieldDefNoCommit(fieldName: string, tagDefId: string): string {
+function inferFieldType(fieldName: string, value: string): string {
+  const n = fieldName.trim().toLowerCase();
+  const v = value.trim().toLowerCase();
+
+  // Date patterns
+  if (/\b(date|deadline|due|start|end|expire|created|updated|birthday)\b/.test(n)) {
+    return FIELD_TYPES.DATE;
+  }
+
+  // URL patterns
+  if (/\b(url|link|website|homepage)\b/.test(n) || /^https?:\/\//.test(v)) {
+    return FIELD_TYPES.URL;
+  }
+
+  // Email patterns
+  if (/\b(email|e-mail)\b/.test(n) || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) {
+    return FIELD_TYPES.EMAIL;
+  }
+
+  // Number patterns
+  if (/\b(count|number|amount|price|cost|qty|quantity|score|rating|age|weight|height)\b/.test(n)) {
+    return FIELD_TYPES.NUMBER;
+  }
+
+  // Default: options (status, priority, category, type, etc.)
+  return FIELD_TYPES.OPTIONS;
+}
+
+/**
+ * Create a fieldDef under a tagDef without committing.
+ * Field type is inferred from name and value.
+ */
+function createFieldDefNoCommit(fieldName: string, tagDefId: string, value: string): string {
   const id = nanoid();
   loroDoc.createNode(id, tagDefId);
   loroDoc.setNodeDataBatch(id, {
     type: 'fieldDef',
     name: fieldName.trim(),
-    fieldType: FIELD_TYPES.OPTIONS,
+    fieldType: inferFieldType(fieldName, value),
     cardinality: 'single',
     nullable: true,
   });
@@ -192,8 +228,8 @@ function createFieldDefNoCommit(fieldName: string, tagDefId: string): string {
  * Handles type dispatch: options → selectFieldOption + autoCollect; plain → setFieldValue.
  *
  * When a field name can't be found on existing tag definitions, and the node
- * has at least one tag, auto-creates the fieldDef as an options field under
- * the first tag. This lets the AI bootstrap new schemas from scratch.
+ * has at least one tag, auto-creates the fieldDef under the first tag with
+ * type inferred from name/value. This lets the AI bootstrap new schemas.
  *
  * Must be called inside withCommitOrigin(AI_COMMIT_ORIGIN, ...).
  */
@@ -214,7 +250,7 @@ export function resolveAndSetFields(
       const node = loroDoc.toNodexNode(nodeId);
       const firstTagId = node?.tags?.[0];
       if (firstTagId) {
-        fieldDefId = createFieldDefNoCommit(fieldName, firstTagId);
+        fieldDefId = createFieldDefNoCommit(fieldName, firstTagId, value);
         // Sync template so the node picks up the new field definition
         syncTemplateMutationsNoCommit(nodeId);
         created.push(fieldName);

@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import type { ToolCall } from '@mariozechner/pi-ai';
+import type { ToolCall, ToolResultMessage } from '@mariozechner/pi-ai';
 import { ChevronDown, RotateCcw, Sparkles } from '../../lib/icons.js';
 
 interface ToolCallBlockProps {
   toolCall: ToolCall;
+  result?: ToolResultMessage;
 }
 
 function summarizeToolCall(toolCall: ToolCall): string {
@@ -28,7 +29,14 @@ function summarizeToolCall(toolCall: ToolCall): string {
   return toolCall.name;
 }
 
-export function ToolCallBlock({ toolCall }: ToolCallBlockProps) {
+function getResultText(result: ToolResultMessage): string {
+  return result.content
+    .filter((block) => block.type === 'text')
+    .map((block) => block.text)
+    .join('\n');
+}
+
+export function ToolCallBlock({ toolCall, result }: ToolCallBlockProps) {
   const [expanded, setExpanded] = useState(false);
   const Icon = toolCall.name === 'undo' ? RotateCcw : Sparkles;
 
@@ -52,9 +60,25 @@ export function ToolCallBlock({ toolCall }: ToolCallBlockProps) {
         />
       </button>
       {expanded && (
-        <pre className="overflow-x-auto border-t border-border px-3 py-2 text-[11px] leading-5 text-foreground-secondary">
-          {JSON.stringify(toolCall.arguments, null, 2)}
-        </pre>
+        <div className="border-t border-border">
+          <div className="px-3 py-2">
+            <div className="mb-1 text-[10px] font-medium uppercase tracking-[0.06em] text-foreground-tertiary">Input</div>
+            <pre className="overflow-x-auto text-[11px] leading-5 text-foreground-secondary">
+              {JSON.stringify(toolCall.arguments, null, 2)}
+            </pre>
+          </div>
+          {result && (
+            <div className="border-t border-border/50 px-3 py-2">
+              <div className="mb-1 text-[10px] font-medium uppercase tracking-[0.06em] text-foreground-tertiary">
+                Output
+                {result.isError && <span className="ml-1.5 text-destructive">error</span>}
+              </div>
+              <pre className={`overflow-x-auto text-[11px] leading-5 ${result.isError ? 'text-destructive' : 'text-foreground-secondary'}`}>
+                {getResultText(result)}
+              </pre>
+            </div>
+          )}
+        </div>
       )}
     </div>
   );

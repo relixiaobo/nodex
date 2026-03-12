@@ -1,6 +1,6 @@
 import { startTransition, useEffect, useMemo, useState } from 'react';
 import type { Agent } from '@mariozechner/pi-agent-core';
-import type { AssistantMessage, UserMessage } from '@mariozechner/pi-ai';
+import type { AssistantMessage, Message, ToolResultMessage, UserMessage } from '@mariozechner/pi-ai';
 import {
   createNewChatSession,
   getAIAgent,
@@ -11,6 +11,17 @@ import {
 } from '../lib/ai-service.js';
 
 export type ChatConversationMessage = UserMessage | AssistantMessage;
+
+/** Extract a map of toolCallId → result text from all messages. */
+function buildToolResultMap(messages: Message[]): Map<string, ToolResultMessage> {
+  const map = new Map<string, ToolResultMessage>();
+  for (const m of messages) {
+    if (m.role === 'toolResult') {
+      map.set(m.toolCallId, m);
+    }
+  }
+  return map;
+}
 
 function isConversationMessage(message: unknown): message is ChatConversationMessage {
   return !!message
@@ -78,6 +89,7 @@ export function useAgent(agent: Agent = getAIAgent()) {
     void revision;
 
     const messages = getConversationMessages(agent);
+    const toolResults = buildToolResultMap(agent.state.messages);
     const lastMessage = messages[messages.length - 1];
     const error = lastMessage?.role === 'assistant' && lastMessage.stopReason === 'aborted'
       ? undefined
@@ -88,6 +100,7 @@ export function useAgent(agent: Agent = getAIAgent()) {
       ready,
       sessionId: agent.sessionId ?? null,
       messages,
+      toolResults,
       isStreaming: agent.state.isStreaming,
       error,
       sendMessage: (prompt: string) => streamChat(prompt, agent),

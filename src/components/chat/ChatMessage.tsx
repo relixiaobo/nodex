@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import type { AssistantMessage } from '@mariozechner/pi-ai';
+import type { AssistantMessage, ToolResultMessage } from '@mariozechner/pi-ai';
 import type { ChatConversationMessage } from '../../hooks/use-agent.js';
 import { CitationBadge } from './CitationBadge.js';
 import { NodeReference } from './NodeReference.js';
@@ -7,6 +7,7 @@ import { ToolCallBlock } from './ToolCallBlock.js';
 
 interface ChatMessageProps {
   message: ChatConversationMessage;
+  toolResults?: Map<string, ToolResultMessage>;
   streaming?: boolean;
 }
 
@@ -74,7 +75,7 @@ function renderTextWithMarkup(text: string, keyPrefix: string): ReactNode[] {
   return parts;
 }
 
-function renderAssistantBlocks(message: AssistantMessage, streaming: boolean): ReactNode[] {
+function renderAssistantBlocks(message: AssistantMessage, streaming: boolean, toolResults?: Map<string, ToolResultMessage>): ReactNode[] {
   return message.content.flatMap((block, index) => {
     if (block.type === 'thinking') return [];
 
@@ -83,6 +84,7 @@ function renderAssistantBlocks(message: AssistantMessage, streaming: boolean): R
         <ToolCallBlock
           key={`${block.id}-${index}`}
           toolCall={block}
+          result={toolResults?.get(block.id)}
         />
       );
     }
@@ -103,11 +105,11 @@ function renderAssistantBlocks(message: AssistantMessage, streaming: boolean): R
   });
 }
 
-export function ChatMessage({ message, streaming = false }: ChatMessageProps) {
+export function ChatMessage({ message, toolResults, streaming = false }: ChatMessageProps) {
   const text = getMessageText(message);
   const isUser = message.role === 'user';
   const assistantBlocks = message.role === 'assistant'
-    ? renderAssistantBlocks(message, streaming)
+    ? renderAssistantBlocks(message, streaming, toolResults)
     : null;
 
   if (!isUser && (!assistantBlocks || assistantBlocks.length === 0) && !streaming) {

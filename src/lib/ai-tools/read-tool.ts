@@ -22,10 +22,10 @@ import {
 } from './shared.js';
 
 const readToolParameters = Type.Object({
-  nodeId: Type.String(),
-  depth: Type.Optional(Type.Integer({ minimum: 0, maximum: MAX_READ_DEPTH, default: 1 })),
-  childOffset: Type.Optional(Type.Integer({ minimum: 0, default: 0 })),
-  childLimit: Type.Optional(Type.Integer({ minimum: 1, maximum: MAX_PAGE_SIZE, default: DEFAULT_PAGE_SIZE })),
+  nodeId: Type.String({ description: 'ID of the node to read.' }),
+  depth: Type.Optional(Type.Integer({ minimum: 0, maximum: MAX_READ_DEPTH, default: 1, description: 'Recursion depth for children (0 = no children, 1 = direct children, max 3).' })),
+  childOffset: Type.Optional(Type.Integer({ minimum: 0, default: 0, description: 'Pagination offset for children list.' })),
+  childLimit: Type.Optional(Type.Integer({ minimum: 1, maximum: MAX_PAGE_SIZE, default: DEFAULT_PAGE_SIZE, description: 'Max children per page (default 20, max 50).' })),
 });
 
 type ReadToolParams = typeof readToolParameters.static;
@@ -183,7 +183,7 @@ function buildNodeData(nodeId: string): Record<string, unknown> {
 
 async function executeReadTool(params: ReadToolParams): Promise<AgentToolResult<unknown>> {
   const node = loroDoc.toNodexNode(params.nodeId);
-  if (!node) throw new Error(`Node not found: ${params.nodeId}`);
+  if (!node) throw new Error(`Node not found: ${params.nodeId}. Use node_search to find the correct ID.`);
 
   const depth = Math.min(params.depth ?? 1, MAX_READ_DEPTH);
   const childOffset = params.childOffset ?? 0;

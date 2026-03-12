@@ -29,9 +29,11 @@ describe('node_create tool', () => {
     });
 
     expect(result.childrenCreated).toBe(4);
-    expect(result.name).toBe('Spark');
 
-    // Verify tree structure
+    // Verify tree structure via LoroDoc
+    const spark = loroDoc.toNodexNode(result.id);
+    expect(spark?.name).toBe('Spark');
+
     const sparkChildren = loroDoc.getChildren(result.id);
     expect(sparkChildren).toHaveLength(2);
     const framework = loroDoc.toNodexNode(sparkChildren[0]);
@@ -78,11 +80,10 @@ describe('node_create tool', () => {
       fields: { 'Status': 'To Do', 'Priority': 'High' },
     });
 
-    expect(result.tags).toContain('Task');
-
-    // Verify Status field was set
+    // Verify via LoroDoc
     const node = loroDoc.toNodexNode(result.id);
     expect(node).toBeTruthy();
+    expect(node?.tags).toContain('tagDef_task');
 
     // Find the Status field entry
     const children = loroDoc.getChildren(result.id);
@@ -93,7 +94,7 @@ describe('node_create tool', () => {
   });
 
   it('auto-collects a new option value when it does not exist', async () => {
-    const result = await executeCreate({
+    await executeCreate({
       parentId: 'proj_1',
       name: 'Review PR',
       tags: ['task'],
@@ -184,20 +185,21 @@ describe('node_create tool', () => {
   // ── unresolved fields ──
 
   it('reports unresolved fields when node has no tags at all', async () => {
-    // No tags → can't create field definitions → unresolved
     const result = await executeCreate({
       parentId: 'proj_1',
       name: 'Plain node',
       fields: { 'Status': 'Todo' },
     });
 
-    expect(result.name).toBe('Plain node');
     expect(result.unresolvedFields).toEqual(['Status']);
     expect(result.hint).toBeTruthy();
+
+    // Verify node was created despite unresolved fields
+    const node = loroDoc.toNodexNode(result.id);
+    expect(node?.name).toBe('Plain node');
   });
 
   it('auto-creates new field definitions under the tag', async () => {
-    // #task exists but "CustomField" is new → auto-create under #task
     const result = await executeCreate({
       parentId: 'proj_1',
       name: 'Custom node',
@@ -205,7 +207,6 @@ describe('node_create tool', () => {
       fields: { 'CustomField': 'my value' },
     });
 
-    expect(result.tags).toContain('Task');
     expect(result.createdFields).toEqual(['CustomField']);
     expect(result.unresolvedFields).toBeUndefined();
 
@@ -227,7 +228,10 @@ describe('node_create tool', () => {
 
     expect(result.createdFields).toBeUndefined();
     expect(result.unresolvedFields).toBeUndefined();
-    expect(result.tags).toContain('Task');
+
+    // Verify tag was applied via LoroDoc
+    const node = loroDoc.toNodexNode(result.id);
+    expect(node?.tags).toContain('tagDef_task');
   });
 
   it('creates schema nodes through data.type and raw properties', async () => {
@@ -254,7 +258,6 @@ describe('node_create tool', () => {
     const result = await executeCreate({
       parentId: 'tagDef_task',
       name: 'Estimate',
-      content: 'legacy description',
       data: {
         type: 'fieldDef',
         fieldType: 'number',

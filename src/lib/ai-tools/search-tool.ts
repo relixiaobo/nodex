@@ -29,15 +29,15 @@ import {
 } from './shared.js';
 
 const searchToolParameters = Type.Object({
-  query: Type.Optional(Type.String()),
-  searchTags: Type.Optional(Type.Array(Type.String())),
-  fields: Type.Optional(Type.Record(Type.String(), Type.String())),
-  linkedTo: Type.Optional(Type.String()),
-  parentId: Type.Optional(Type.String()),
+  query: Type.Optional(Type.String({ description: 'Fuzzy text search across node names and descriptions. CJK-aware.' })),
+  searchTags: Type.Optional(Type.Array(Type.String(), { description: 'Filter to nodes with ALL these tags (AND logic). Use display names, e.g. ["task", "source"].' })),
+  fields: Type.Optional(Type.Record(Type.String(), Type.String(), { description: 'Filter by field values, e.g. {"Status": "Todo"}. Field names must match existing tag field definitions.' })),
+  linkedTo: Type.Optional(Type.String({ description: 'Find all nodes that reference this node ID (backlinks).' })),
+  parentId: Type.Optional(Type.String({ description: 'Restrict search to descendants of this node.' })),
   dateRange: Type.Optional(Type.Object({
-    from: Type.Optional(Type.String()),
-    to: Type.Optional(Type.String()),
-  })),
+    from: Type.Optional(Type.String({ description: 'Start date (inclusive), ISO format e.g. "2026-01-15".' })),
+    to: Type.Optional(Type.String({ description: 'End date (inclusive), ISO format e.g. "2026-03-12".' })),
+  }, { description: 'Filter by creation date range.' })),
   sort: Type.Optional(Type.Object({
     field: Type.Union([
       Type.Literal('relevance'),
@@ -45,12 +45,12 @@ const searchToolParameters = Type.Object({
       Type.Literal('modified'),
       Type.Literal('name'),
       Type.Literal('refCount'),
-    ]),
-    order: Type.Optional(Type.Union([Type.Literal('asc'), Type.Literal('desc')])),
-  })),
-  limit: Type.Optional(Type.Integer({ minimum: 1, maximum: MAX_PAGE_SIZE, default: DEFAULT_PAGE_SIZE })),
-  offset: Type.Optional(Type.Integer({ minimum: 0, default: 0 })),
-  count: Type.Optional(Type.Boolean()),
+    ], { description: 'Sort field. "refCount" = number of backlinks. Default: "relevance" if query is set, "modified" otherwise.' }),
+    order: Type.Optional(Type.Union([Type.Literal('asc'), Type.Literal('desc')], { description: 'Sort direction. Default: "desc".' })),
+  }, { description: 'Sort configuration.' })),
+  limit: Type.Optional(Type.Integer({ minimum: 1, maximum: MAX_PAGE_SIZE, default: DEFAULT_PAGE_SIZE, description: 'Max results per page (default 20, max 50).' })),
+  offset: Type.Optional(Type.Integer({ minimum: 0, default: 0, description: 'Pagination offset.' })),
+  count: Type.Optional(Type.Boolean({ description: 'If true, return only the total count — no items.' })),
 });
 
 type SearchToolParams = typeof searchToolParameters.static;
@@ -286,15 +286,31 @@ function countResult(total: number, unresolvedFilters: string[] = []): AgentTool
 
 async function executeSearchTool(params: SearchToolParams): Promise<AgentToolResult<unknown>> {
   // Resolve tag display names → IDs
-  const requiredTagIds = (params.searchTags ?? [])
-    .map((name) => findTagDefIdByName(name))
-    .filter((id): id is string => !!id);
+  const resolvedTags: string[] = [];
+  const unresolvedTags: string[] = [];
+  for (const name of params.searchTags ?? []) {
+    const id = findTagDefIdByName(name);
+    if (id) {
+      resolvedTags.push(id);
+    } else {
+      unresolvedTags.push(name);
+    }
+  }
 
-  // If any tag name didn't resolve, result is empty
-  if ((params.searchTags?.length ?? 0) > requiredTagIds.length) {
-    const result = { total: 0, offset: params.offset ?? 0, limit: params.limit ?? DEFAULT_PAGE_SIZE, items: [] };
+  // If any tag name didn't resolve, return empty with hint
+  if (unresolvedTags.length > 0) {
+    const result: Record<string, unknown> = {
+      total: 0,
+      offset: params.offset ?? 0,
+      limit: params.limit ?? DEFAULT_PAGE_SIZE,
+      items: [],
+      unresolvedTags,
+      hint: `Tags not found: ${unresolvedTags.join(', ')}. No results because all searchTags must match (AND logic).`,
+    };
     return { content: [{ type: 'text', text: formatResultText(result) }], details: result };
   }
+
+  const requiredTagIds = resolvedTags;
 
   return params.linkedTo
     ? searchByBacklinks(params.linkedTo, requiredTagIds, params)

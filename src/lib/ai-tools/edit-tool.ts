@@ -12,29 +12,31 @@ import { applyTagMutationsNoCommit, syncTemplateMutationsNoCommit, useNodeStore 
 import {
   ensureTagDefIdByName,
   findTagDefIdByName,
+  getTagDisplayNames,
   sanitizeDirectNodeDataPatch,
   updateCheckedState,
   resolveAndSetFields,
   formatResultText,
+  pushAiOp,
 } from './shared.js';
 
 const editToolParameters = Type.Object({
-  nodeId: Type.String(),
-  name: Type.Optional(Type.String()),
-  checked: Type.Optional(Type.Union([Type.Boolean(), Type.Null()])),
-  addTags: Type.Optional(Type.Array(Type.String())),
-  removeTags: Type.Optional(Type.Array(Type.String())),
-  fields: Type.Optional(Type.Record(Type.String(), Type.String())),
-  parentId: Type.Optional(Type.String()),
-  position: Type.Optional(Type.Integer({ minimum: 0 })),
-  data: Type.Optional(Type.Record(Type.String(), Type.Unknown())),
+  nodeId: Type.String({ description: 'ID of the node to edit.' }),
+  name: Type.Optional(Type.String({ description: 'New name/title for the node.' })),
+  checked: Type.Optional(Type.Union([Type.Boolean(), Type.Null()], { description: 'true = done, false = not done, null = remove checkbox entirely.' })),
+  addTags: Type.Optional(Type.Array(Type.String(), { description: 'Tag display names to add, e.g. ["task"]. Template fields are synced after tagging.' })),
+  removeTags: Type.Optional(Type.Array(Type.String(), { description: 'Tag display names to remove.' })),
+  fields: Type.Optional(Type.Record(Type.String(), Type.String(), { description: 'Set field values by display name, e.g. {"Status": "Done"}. Node must have tags.' })),
+  parentId: Type.Optional(Type.String({ description: 'Move node to this new parent.' })),
+  position: Type.Optional(Type.Integer({ minimum: 0, description: 'Zero-based position in new parent\'s children after move.' })),
+  data: Type.Optional(Type.Record(Type.String(), Type.Unknown(), { description: 'Raw node properties: description, color, fieldType, cardinality, showCheckbox, etc. Cannot change type/name/children/tags/timestamps.' })),
 });
 
 type EditToolParams = typeof editToolParameters.static;
 
 async function executeEditTool(params: EditToolParams): Promise<AgentToolResult<unknown>> {
   const node = loroDoc.toNodexNode(params.nodeId);
-  if (!node) throw new Error(`Node not found: ${params.nodeId}`);
+  if (!node) throw new Error(`Node not found: ${params.nodeId}. Use node_search to find the correct ID.`);
 
   const updated = new Set<string>();
   let createdFields: string[] = [];
@@ -94,11 +96,27 @@ async function executeEditTool(params: EditToolParams): Promise<AgentToolResult<
     }
   });
 
+  const freshNode = loroDoc.toNodexNode(params.nodeId);
+  const freshName = freshNode?.name ?? '';
+  if (updated.size > 0) {
+    pushAiOp('node_edit', params.nodeId, freshName);
+  }
+
   const result: Record<string, unknown> = {
-    id: params.nodeId,
-    name: loroDoc.toNodexNode(params.nodeId)?.name ?? '',
     updated: Array.from(updated),
   };
+
+  if (updated.size === 0) {
+    result.hint = 'No changes applied — all provided values match the current state.';
+  }
+
+  // Include new state only for fields where the model needs confirmation
+  if (updated.has('tags')) {
+    result.tags = getTagDisplayNames(freshNode?.tags ?? []);
+  }
+  if (updated.has('position')) {
+    result.parentId = loroDoc.getParentId(params.nodeId) ?? '';
+  }
 
   if (createdFields.length > 0) {
     result.createdFields = createdFields;
@@ -127,7 +145,7 @@ export const editTool: AgentTool<typeof editToolParameters, unknown> = {
     '',
     'Use fields parameter to set field values by name — no need to know field entry IDs.',
     'Fields are tied to tags. The node must have at least one tag. If the field doesn\'t exist,',
-    'it will be auto-created as an options field under the first tag.',
+    'it will be auto-created under the first tag (type inferred from name: date/url/number/options).',
     'Example: addTags: ["task"], fields: {"Status": "Todo"}.',
     'Or edit field value nodes directly: node_edit(nodeId: valueNodeId, name: "new value").',
     '',

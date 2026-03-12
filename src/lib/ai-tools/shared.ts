@@ -4,6 +4,7 @@
  * Contains tag resolution, field resolution, and common helpers
  * used across create, read, edit, delete, and search tools.
  */
+import { nanoid } from 'nanoid';
 import { FIELD_TYPES, SYSTEM_NODE_IDS } from '../../types/index.js';
 import { fuzzySort } from '../fuzzy-search.js';
 import * as loroDoc from '../loro-doc.js';
@@ -12,7 +13,7 @@ import { isNodeInTrash, isWorkspaceHomeNode } from '../node-capabilities.js';
 import { isOutlinerContentNodeType } from '../node-type-utils.js';
 import { resolveDataType } from '../field-utils.js';
 import { computeNodeFields } from '../../hooks/use-node-fields.js';
-import { applyTagMutationsNoCommit, useNodeStore } from '../../stores/node-store.js';
+import { applyTagMutationsNoCommit, syncTemplateMutationsNoCommit, useNodeStore } from '../../stores/node-store.js';
 
 // ─── Constants ───
 
@@ -165,17 +166,36 @@ function findOptionByName(fieldDefId: string, optionName: string): string | null
 
 export interface FieldSetResult {
   resolved: string[];
+  created: string[];
   unresolved: string[];
+}
+
+/**
+ * Create a fieldDef under a tagDef without committing.
+ * Defaults to `options` type — the most versatile for AI-created fields.
+ */
+function createFieldDefNoCommit(fieldName: string, tagDefId: string): string {
+  const id = nanoid();
+  loroDoc.createNode(id, tagDefId);
+  loroDoc.setNodeDataBatch(id, {
+    type: 'fieldDef',
+    name: fieldName.trim(),
+    fieldType: FIELD_TYPES.OPTIONS,
+    cardinality: 'single',
+    nullable: true,
+  });
+  return id;
 }
 
 /**
  * Resolve and set fields on a node by display name → value.
  * Handles type dispatch: options → selectFieldOption + autoCollect; plain → setFieldValue.
- * Must be called inside withCommitOrigin(AI_COMMIT_ORIGIN, ...).
- * Does NOT call commitDoc — caller is responsible.
  *
- * Returns which fields were resolved and which weren't — callers should
- * surface unresolved fields so the AI model can course-correct.
+ * When a field name can't be found on existing tag definitions, and the node
+ * has at least one tag, auto-creates the fieldDef as an options field under
+ * the first tag. This lets the AI bootstrap new schemas from scratch.
+ *
+ * Must be called inside withCommitOrigin(AI_COMMIT_ORIGIN, ...).
  */
 export function resolveAndSetFields(
   nodeId: string,
@@ -183,13 +203,25 @@ export function resolveAndSetFields(
 ): FieldSetResult {
   const store = useNodeStore.getState();
   const resolved: string[] = [];
+  const created: string[] = [];
   const unresolved: string[] = [];
 
   for (const [fieldName, value] of Object.entries(fields)) {
-    const fieldDefId = findFieldDefByName(nodeId, fieldName);
+    let fieldDefId = findFieldDefByName(nodeId, fieldName);
+
+    // Auto-create: if field doesn't exist but node has a tag, create the fieldDef
     if (!fieldDefId) {
-      unresolved.push(fieldName);
-      continue;
+      const node = loroDoc.toNodexNode(nodeId);
+      const firstTagId = node?.tags?.[0];
+      if (firstTagId) {
+        fieldDefId = createFieldDefNoCommit(fieldName, firstTagId);
+        // Sync template so the node picks up the new field definition
+        syncTemplateMutationsNoCommit(nodeId);
+        created.push(fieldName);
+      } else {
+        unresolved.push(fieldName);
+        continue;
+      }
     }
 
     const dataType = resolveDataType(fieldDefId);
@@ -218,7 +250,7 @@ export function resolveAndSetFields(
     resolved.push(fieldName);
   }
 
-  return { resolved, unresolved };
+  return { resolved, created, unresolved };
 }
 
 // ─── Result formatting ───

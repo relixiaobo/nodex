@@ -78,8 +78,8 @@ describe('node_edit tool — fields convenience', () => {
     expect(loroDoc.toNodexNode('task_1')?.name).toBe('Redesign the model');
   });
 
-  it('reports unresolved fields when node has no matching tag', async () => {
-    // note_1 is a plain content node without #task tag — no Status field definition
+  it('reports unresolved fields when node has no tags at all', async () => {
+    // note_1 is a plain content node without any tags — can't create fields
     const result = await executeEdit({
       nodeId: 'note_1',
       fields: { 'Status': 'Todo' },
@@ -90,14 +90,28 @@ describe('node_edit tool — fields convenience', () => {
     expect(result.hint).toBeTruthy();
   });
 
-  it('reports partial resolution when some fields match and some do not', async () => {
-    // task_1 has #task tag with Status field, but no "FakeField" definition
+  it('auto-creates field definition when tagged node has no such field', async () => {
+    // task_1 has #task tag — "NewField" doesn't exist but will be auto-created
     const result = await executeEdit({
       nodeId: 'task_1',
-      fields: { 'Status': 'Done', 'FakeField': 'value' },
+      fields: { 'NewField': 'some value' },
     });
 
     expect(result.updated).toContain('fields');
-    expect(result.unresolvedFields).toEqual(['FakeField']);
+    expect(result.createdFields).toEqual(['NewField']);
+    expect(result.unresolvedFields).toBeUndefined();
+  });
+
+  it('auto-creates field with addTags in the same call', async () => {
+    // note_1 has no tags, but we add one and set a field in the same call
+    const result = await executeEdit({
+      nodeId: 'note_1',
+      addTags: ['meeting'],
+      fields: { 'Location': 'Room A' },
+    });
+
+    expect(result.updated).toContain('tags');
+    expect(result.updated).toContain('fields');
+    expect(result.createdFields).toEqual(['Location']);
   });
 });

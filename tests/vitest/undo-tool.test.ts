@@ -25,7 +25,7 @@ describe('undo tool', () => {
     expect(loroDoc.getChildren('proj_1')).toContain((aiNode.details as { id: string }).id);
 
     const result = await undoTool.execute('tool_undo', { steps: 1 } as never);
-    const details = result.details as { undone: number; remaining: number };
+    const details = result.details as { undone: number; hasMore: boolean };
 
     expect(details.undone).toBe(1);
     expect(loroDoc.getChildren('proj_1')).toContain(userNode.id);
@@ -55,7 +55,7 @@ describe('undo tool', () => {
     expect(loroDoc.getParentId('task_1')).toBe('note_2');
 
     const result = await undoTool.execute('tool_undo', { steps: 1 } as never);
-    const details = result.details as { undone: number; remaining: number };
+    const details = result.details as { undone: number; hasMore: boolean };
 
     expect(details.undone).toBe(1);
     expect(loroDoc.getParentId('task_1')).toBe(beforeParentId);
@@ -74,11 +74,11 @@ describe('undo tool', () => {
     } as never);
 
     const result = await undoTool.execute('tool_undo', { steps: 2 } as never);
-    const details = result.details as { undone: number; remaining: number };
+    const details = result.details as { undone: number; hasMore: boolean };
 
     expect(details).toEqual({
       undone: 2,
-      remaining: 0,
+      hasMore: false,
     });
     expect(loroDoc.hasNode((first.details as { id: string }).id)).toBe(false);
     expect(loroDoc.hasNode((second.details as { id: string }).id)).toBe(false);

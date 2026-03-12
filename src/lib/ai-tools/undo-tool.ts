@@ -8,7 +8,7 @@ const undoToolParameters = Type.Object({
 
 type UndoToolResult = {
   undone: number;
-  remaining: number;
+  hasMore: boolean;
 };
 
 export const undoTool: AgentTool<typeof undoToolParameters, UndoToolResult> = {
@@ -27,7 +27,7 @@ export const undoTool: AgentTool<typeof undoToolParameters, UndoToolResult> = {
 
     const result: UndoToolResult = {
       undone,
-      remaining: canUndoAiDoc() ? 1 : 0,
+      hasMore: canUndoAiDoc(),
     };
 
     return {

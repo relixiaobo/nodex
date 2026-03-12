@@ -189,10 +189,15 @@ function searchByFilters(params: SearchToolParams, requiredTagIds: string[]): Ag
 
   // Field filters: resolve names → fieldDefIds
   const fieldFilters: Array<{ fieldDefId: string; value: string }> = [];
+  const unresolvedFilters: string[] = [];
   if (params.fields) {
     for (const [name, value] of Object.entries(params.fields)) {
       const fieldDefId = resolveFieldDefId(name);
-      if (fieldDefId) fieldFilters.push({ fieldDefId, value });
+      if (fieldDefId) {
+        fieldFilters.push({ fieldDefId, value });
+      } else {
+        unresolvedFilters.push(name);
+      }
     }
   }
 
@@ -226,9 +231,9 @@ function searchByFilters(params: SearchToolParams, requiredTagIds: string[]): Ag
         candidates.map((n) => ({ ...n, _h: `${n.name ?? ''}\n${n.description ?? ''}` })),
         query, (item) => item._h, candidates.length,
       );
-      return countResult(ranked.length);
+      return countResult(ranked.length, unresolvedFilters);
     }
-    return countResult(candidates.length);
+    return countResult(candidates.length, unresolvedFilters);
   }
 
   // Ranking
@@ -260,12 +265,20 @@ function searchByFilters(params: SearchToolParams, requiredTagIds: string[]): Ag
 
   // Pagination + output
   const items = ranked.slice(offset, offset + limit).map(formatSearchItem);
-  const result = { total: ranked.length, offset, limit, items };
+  const result: Record<string, unknown> = { total: ranked.length, offset, limit, items };
+  if (unresolvedFilters.length > 0) {
+    result.unresolvedFilters = unresolvedFilters;
+    result.hint = 'Some field filters could not be resolved — those filters were ignored. Check field names match existing tag field definitions.';
+  }
   return { content: [{ type: 'text', text: formatResultText(result) }], details: result };
 }
 
-function countResult(total: number): AgentToolResult<unknown> {
-  const result = { total };
+function countResult(total: number, unresolvedFilters: string[] = []): AgentToolResult<unknown> {
+  const result: Record<string, unknown> = { total };
+  if (unresolvedFilters.length > 0) {
+    result.unresolvedFilters = unresolvedFilters;
+    result.hint = 'Some field filters could not be resolved — those filters were ignored. Check field names match existing tag field definitions.';
+  }
   return { content: [{ type: 'text', text: formatResultText(result) }], details: result };
 }
 

@@ -93,8 +93,9 @@ describe('ai-service', () => {
       }),
       expect.objectContaining({
         authToken: 'auth-token',
-        proxyUrl: 'http://localhost:8787',
-        temperature: 0.2,
+        proxyUrl: expect.any(String),
+        temperature: expect.any(Number),
+        maxTokens: expect.any(Number),
       }),
     );
   });

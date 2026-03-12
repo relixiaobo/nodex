@@ -1,118 +1,126 @@
 ---
 name: review-pr
-description: Review a Dev Agent PR — automated checks + browser verification against a test plan file.
+description: Verify code changes and review Dev Agent PRs. Use this whenever someone says "review", "verify", "check the PR", "test this", "validate changes", or any variant of wanting to confirm code works correctly. Also use when a Dev Agent marks a PR as ready, or when you need to run the standard verification suite (typecheck, tests, build) before committing. Works in two modes — quick verify (no args) runs automated checks only; PR review (with PR number) adds browser verification against a test plan.
 ---
 
 # Review PR
 
-Dev Agent 提交 PR 后，nodex 用此 skill 执行完整验证。
+Verify code changes or review a Dev Agent's PR. Two modes depending on arguments.
 
-**用法**：`/review-pr <PR号>` 或 `/review-pr <PR号> <测试清单路径>`
+## How to read `$ARGUMENTS`
 
-- `$ARGUMENTS` 第一个参数：PR 号（必需）
-- `$ARGUMENTS` 第二个参数：测试清单文件路径（可选，默认搜索 `docs/plans/*-test-plan.md`）
+- Empty or `verify` → **Quick Verify** (automated checks only)
+- PR number (e.g. `126`) → **Full PR Review** (automated + browser + report)
+- PR number + path (e.g. `126 docs/plans/phase-1-test-plan.md`) → Full review with explicit test plan
 
 ---
 
-## Phase 0: 准备
+## Quick Verify (no PR number)
 
-1. 解析 `$ARGUMENTS` 获取 PR 号和测试清单路径
-2. 读取 PR 信息：
+Run the standard verification suite. Dev agents use this after code changes, before marking PR ready.
+
+```bash
+npm run verify
+```
+
+This runs: `typecheck → check:test-sync → test:run → build` in sequence. Any failure stops the chain.
+
+If a step fails:
+1. Report the specific error
+2. Suggest a fix direction
+3. After fixing, rerun `npm run verify` from the start — don't skip steps
+
+That's it. Quick verify is intentionally simple. The value is having one command that runs everything in the right order.
+
+---
+
+## Full PR Review (with PR number)
+
+nodex uses this to review a Dev Agent's submitted PR. The goal is to catch issues that automated tests miss — visual bugs, interaction regressions, incorrect behavior that technically passes typecheck.
+
+### Step 1: Prepare
+
+1. Read PR info:
 
 ```bash
 gh pr view <PR号> --json title,body,headRefName,state,isDraft
 ```
 
-3. 如果 PR 仍是 Draft，提示用户确认是否继续
-4. Checkout PR 分支：
+2. If PR is still Draft, ask the user whether to proceed or wait
+3. Checkout the branch:
 
 ```bash
 gh pr checkout <PR号>
 ```
 
-5. 定位测试清单：
-   - 如果指定了路径 → 使用该文件
-   - 否则 → 从 PR body 中查找关联的 phase，搜索 `docs/plans/phase-*-test-plan.md`
-   - 找不到 → 提示用户提供，仅执行自动化检查
+4. Find the test plan:
+   - If a path was given in `$ARGUMENTS` → use it
+   - Otherwise → look at the PR body for which phase/feature this covers, search `docs/plans/*-test-plan.md`
+   - If no test plan exists → tell the user, run automated checks only
 
-6. 读取测试清单文件
+5. Read the test plan file to understand what needs browser verification
 
----
-
-## Phase 1: 自动化门槛
-
-依次执行，任一失败立即停止：
+### Step 2: Automated checks
 
 ```bash
-npm run typecheck
-npm run check:test-sync
-npm run test:run
-npm run build
+npm run verify
 ```
 
-**全过才进入 Phase 2。** 失败时报告错误并建议修复方向。
+All four checks must pass before proceeding to browser verification. If any fail, stop here — report the failure, don't waste time on browser tests when the code doesn't compile or tests are broken.
 
----
+### Step 3: Browser verification
 
-## Phase 2: 浏览器验证
+This step needs MCP tools (chrome-devtools / claude-in-chrome). If MCP is unavailable, output the test plan as a checklist for the user to verify manually.
 
-> 需要 MCP 工具（chrome-devtools / claude-in-chrome）。如果 MCP 不可用，输出清单供用户手动验证。
-
-1. 启动 dev server：
+1. Start dev server:
 
 ```bash
 npm run dev
 ```
 
-2. 等待构建完成（`.output/chrome-mv3-dev/` 产出）
-3. 提示用户确认扩展已加载到 Chrome
-4. **逐项执行测试清单**：
-   - 读取清单中每个测试场景
-   - 用 `claude-in-chrome` MCP 工具执行操作（点击、输入、截图验证）
-   - 对每个场景记录：PASS / FAIL / SKIP（无法自动验证的标记 SKIP）
-   - FAIL 时截图保留证据
+2. Wait for build output in `.output/chrome-mv3-dev/`
+3. Ask the user to confirm the extension is loaded in Chrome
+4. Walk through each scenario in the test plan:
+   - Use `claude-in-chrome` MCP tools to interact with the extension (navigate, click, type, screenshot)
+   - For each scenario: record PASS / FAIL / SKIP
+   - SKIP means the scenario can't be verified via MCP (e.g. requires real keyboard events that ProseMirror ignores from synthetic input)
+   - On FAIL: take a screenshot as evidence, describe what went wrong
 
-5. 执行回归检查（清单中的回归部分）
+5. Run the regression checks section of the test plan (if present)
 
----
+### Step 4: Report
 
-## Phase 3: 汇报
-
-输出验证报告：
+Output a structured review report:
 
 ```
 ## PR #<号> Review Report
 
-### 自动化检查
-| 检查项 | 结果 |
-|--------|------|
+### Automated checks
+| Check | Result |
+|-------|--------|
 | typecheck | PASS/FAIL |
 | test-sync | PASS/FAIL |
 | vitest | PASS/FAIL |
 | build | PASS/FAIL |
 
-### 浏览器验证
-| # | 场景 | 结果 | 备注 |
-|---|------|------|------|
+### Browser verification
+| # | Scenario | Result | Notes |
+|---|----------|--------|-------|
 | T1 | ... | PASS/FAIL/SKIP | ... |
-| ... | | | |
 
-### 回归检查
-| # | 功能 | 结果 |
-|---|------|------|
+### Regression checks
+| # | Feature | Result |
+|---|---------|--------|
 | R1 | ... | PASS/FAIL |
-| ... | | |
 
-### 总结
-- 通过：X / 总数：Y
-- 阻塞问题：[列出 FAIL 项]
-- 建议：approve / request changes / 需要讨论
+### Summary
+- Passed: X / Total: Y
+- Blocking issues: [list FAIL items]
+- Recommendation: approve / request changes / needs discussion
 ```
 
----
+### How to decide
 
-## 判断标准
-
-- **自动化全过 + 浏览器验证无 FAIL** → 建议 approve
-- **有 FAIL 但不影响核心功能** → 列出问题，建议 request changes 并说明修复优先级
-- **核心功能 FAIL** → 阻塞合并，详细描述复现步骤
+- **All automated + browser checks pass** → recommend approve
+- **FAIL on non-core items** → list issues, recommend request changes with priority guidance
+- **Core functionality FAIL** → block merge, describe reproduction steps in detail

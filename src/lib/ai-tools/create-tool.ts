@@ -132,7 +132,7 @@ async function executeCreateTool(params: CreateToolParams): Promise<AgentToolRes
         name: result.name ?? '',
         duplicatedFrom: params.duplicateId,
       }) }],
-      details: { id: result.id, name: result.name ?? '' },
+      details: { id: result.id, name: result.name ?? '', duplicatedFrom: params.duplicateId },
     };
   }
 

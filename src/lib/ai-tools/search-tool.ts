@@ -1,17 +1,22 @@
 /**
  * node_search — Search the knowledge graph.
  *
- * Supports text search (fuzzy, CJK), tag filtering, field value filtering,
- * backlink lookup, date range, subtree scoping, structured sort, and count mode.
+ * Reuses existing infrastructure:
+ * - fuzzy-search.ts for text search (CJK-aware)
+ * - filter-utils.ts for field value extraction
+ * - backlinks.ts for reverse reference lookup
+ * - sort-utils.ts for multi-field sorting
  */
 import type { AgentTool, AgentToolResult } from '@mariozechner/pi-agent-core';
 import { Type } from '@mariozechner/pi-ai';
 import * as loroDoc from '../loro-doc.js';
+import { SYSTEM_NODE_IDS } from '../../types/index.js';
 import { fuzzySort } from '../fuzzy-search.js';
+import { getFieldValue } from '../filter-utils.js';
 import { computeBacklinks, buildBacklinkCountMap } from '../backlinks.js';
 import { compareNodes, type SortConfig } from '../sort-utils.js';
-import { computeNodeFields } from '../../hooks/use-node-fields.js';
 import { getNavigableParentId } from '../tree-utils.js';
+import { computeNodeFields } from '../../hooks/use-node-fields.js';
 import { useNodeStore } from '../../stores/node-store.js';
 import type { NodexNode } from '../../types/node.js';
 import {
@@ -52,43 +57,44 @@ type SearchToolParams = typeof searchToolParameters.static;
 
 // ─── Helpers ───
 
-function toRangeStart(dateText?: string): number | null {
+function toTimestamp(dateText: string | undefined, endOfDay: boolean): number | null {
   if (!dateText) return null;
-  const value = new Date(`${dateText}T00:00:00`).getTime();
-  return Number.isFinite(value) ? value : null;
-}
-
-function toRangeEnd(dateText?: string): number | null {
-  if (!dateText) return null;
-  const value = new Date(`${dateText}T23:59:59.999`).getTime();
+  const suffix = endOfDay ? 'T23:59:59.999' : 'T00:00:00';
+  const value = new Date(`${dateText}${suffix}`).getTime();
   return Number.isFinite(value) ? value : null;
 }
 
 /**
- * Get field value(s) for a node given a fieldDefId.
- * Returns display names for options fields, raw names for plain fields.
+ * Resolve field display name → fieldDefId by scanning tagDef children under SCHEMA.
+ * FieldDefs are grandchildren of SCHEMA (SCHEMA → tagDef → fieldDef).
  */
-function getFieldValue(node: NodexNode, fieldDefId: string): string[] {
-  const getNode = loroDoc.toNodexNode;
-  const values: string[] = [];
-  for (const childId of node.children) {
-    const child = getNode(childId);
-    if (child?.type === 'fieldEntry' && child.fieldDefId === fieldDefId) {
-      for (const valId of child.children) {
-        const valNode = getNode(valId);
-        if (!valNode) continue;
-        if (valNode.targetId) {
-          // Options field: resolve target name
-          const target = getNode(valNode.targetId);
-          if (target?.name) values.push(target.name);
-        } else if (valNode.name) {
-          values.push(valNode.name);
-        }
+function resolveFieldDefId(fieldName: string): string | null {
+  const normalized = fieldName.trim().toLowerCase();
+  for (const tagDefId of loroDoc.getChildren(SYSTEM_NODE_IDS.SCHEMA)) {
+    const tagDef = loroDoc.toNodexNode(tagDefId);
+    if (tagDef?.type !== 'tagDef') continue;
+    for (const childId of loroDoc.getChildren(tagDefId)) {
+      const child = loroDoc.toNodexNode(childId);
+      if (child?.type === 'fieldDef' && (child.name ?? '').trim().toLowerCase() === normalized) {
+        return child.id;
       }
-      break;
     }
   }
-  return values;
+  return null;
+}
+
+/**
+ * Get display-name values of a field on a node.
+ * Wraps filter-utils.getFieldValue — resolves options targetIds to display names.
+ */
+function getFieldDisplayValues(node: NodexNode, fieldDefId: string): string[] {
+  const getNode = loroDoc.toNodexNode;
+  const rawValues = getFieldValue(node, fieldDefId, getNode);
+  return rawValues.map((v) => {
+    // Options fields return targetId — resolve to name
+    const target = getNode(v);
+    return target?.name ?? v;
+  });
 }
 
 /**
@@ -101,216 +107,185 @@ function getSubtreeIds(parentId: string): Set<string> {
     const id = queue.pop()!;
     if (result.has(id)) continue;
     result.add(id);
-    const children = loroDoc.getChildren(id);
-    for (const cid of children) queue.push(cid);
+    for (const cid of loroDoc.getChildren(id)) queue.push(cid);
   }
   return result;
 }
 
 /**
- * Get field display values for a node (for search results).
+ * Format a node into a search result item.
  */
-function getNodeFieldsMap(nodeId: string): Record<string, string> {
+function formatSearchItem(node: NodexNode): {
+  id: string; name: string; tags: string[]; snippet: string;
+  createdAt: string; parentName: string; fields: Record<string, string>;
+} {
+  const parentId = getNavigableParentId(node.id);
+  const parentName = parentId ? (loroDoc.toNodexNode(parentId)?.name ?? parentId) : '';
+  const snippetSource = [node.name ?? '', node.description ?? ''].filter(Boolean).join(' — ');
+
+  // Build fields map
   const store = useNodeStore.getState();
-  const fields = computeNodeFields(store.getNode, store.getChildren, nodeId);
-  const result: Record<string, string> = {};
-  for (const f of fields) {
-    if (f.isSystemConfig) continue;
-    if (f.valueName) {
-      result[f.attrDefName] = f.valueName;
+  const nodeFields = computeNodeFields(store.getNode, store.getChildren, node.id);
+  const fieldsMap: Record<string, string> = {};
+  for (const f of nodeFields) {
+    if (!f.isSystemConfig && f.valueName) {
+      fieldsMap[f.attrDefName] = f.valueName;
     }
   }
-  return result;
+
+  return {
+    id: node.id,
+    name: node.name ?? '',
+    tags: getTagDisplayNames(node.tags),
+    snippet: snippetSource.length > 180 ? `${snippetSource.slice(0, 177)}...` : snippetSource,
+    createdAt: new Date(node.createdAt).toISOString(),
+    parentName,
+    fields: fieldsMap,
+  };
 }
 
-async function executeSearchTool(params: SearchToolParams): Promise<AgentToolResult<unknown>> {
+// ─── Backlinks search path ───
+
+function searchByBacklinks(
+  targetId: string,
+  requiredTagIds: string[],
+  params: SearchToolParams,
+): AgentToolResult<unknown> {
+  const limit = Math.min(params.limit ?? DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
+  const offset = params.offset ?? 0;
+  const backlinks = computeBacklinks(targetId);
+
+  // Collect all referencing node IDs (mentions + field value refs)
+  const refIds = new Set(backlinks.mentionedIn.map((m) => m.referencingNodeId));
+  for (const refs of Object.values(backlinks.fieldValueRefs)) {
+    for (const ref of refs) refIds.add(ref.ownerNodeId);
+  }
+
+  let filtered = [...refIds]
+    .map((id) => loroDoc.toNodexNode(id))
+    .filter((n): n is NodexNode => n !== null)
+    .filter((n) => requiredTagIds.every((tid) => n.tags.includes(tid)));
+
+  if (params.count) {
+    const result = { total: filtered.length };
+    return { content: [{ type: 'text', text: formatResultText(result) }], details: result };
+  }
+
+  const items = filtered.slice(offset, offset + limit).map(formatSearchItem);
+  const result = { total: filtered.length, offset, limit, items };
+  return { content: [{ type: 'text', text: formatResultText(result) }], details: result };
+}
+
+// ─── Main search path ───
+
+function searchByFilters(params: SearchToolParams, requiredTagIds: string[]): AgentToolResult<unknown> {
   const limit = Math.min(params.limit ?? DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
   const offset = params.offset ?? 0;
   const query = params.query?.trim() ?? '';
 
-  // ── Tag resolution ──
-  const requiredTagIds = (params.searchTags ?? [])
-    .map((tagName) => findTagDefIdByName(tagName))
-    .filter((tagId): tagId is string => !!tagId);
-  const hasMissingTag = (params.searchTags?.length ?? 0) > requiredTagIds.length;
-  if (hasMissingTag) {
-    const result = { total: 0, offset, limit, items: [] };
-    return { content: [{ type: 'text', text: formatResultText(result) }], details: result };
-  }
+  // Date range
+  const fromTs = toTimestamp(params.dateRange?.from, false);
+  const toTs = toTimestamp(params.dateRange?.to, true);
 
-  // ── Date range ──
-  const fromTs = toRangeStart(params.dateRange?.from);
-  const toTs = toRangeEnd(params.dateRange?.to);
-
-  // ── Field filter resolution ──
+  // Field filters: resolve names → fieldDefIds
   const fieldFilters: Array<{ fieldDefId: string; value: string }> = [];
   if (params.fields) {
-    // Resolve field names to fieldDefIds by scanning SCHEMA for all fieldDefs
-    const allFieldDefs = loroDoc.getAllNodeIds()
-      .map((id) => loroDoc.toNodexNode(id))
-      .filter((n): n is NonNullable<ReturnType<typeof loroDoc.toNodexNode>> =>
-        n !== null && n.type === 'fieldDef');
-
-    for (const [fieldName, value] of Object.entries(params.fields)) {
-      const normalized = fieldName.trim().toLowerCase();
-      const match = allFieldDefs.find((fd) => (fd.name ?? '').trim().toLowerCase() === normalized);
-      if (match) {
-        fieldFilters.push({ fieldDefId: match.id, value });
-      }
+    for (const [name, value] of Object.entries(params.fields)) {
+      const fieldDefId = resolveFieldDefId(name);
+      if (fieldDefId) fieldFilters.push({ fieldDefId, value });
     }
   }
 
-  // ── Backlinks mode ──
-  if (params.linkedTo) {
-    const backlinks = computeBacklinks(params.linkedTo);
-    const mentionedIds = backlinks.mentionedIn.map((m) => m.referencingNodeId);
-    // Also include field value references
-    for (const refs of Object.values(backlinks.fieldValueRefs)) {
-      for (const ref of refs) {
-        if (!mentionedIds.includes(ref.ownerNodeId)) {
-          mentionedIds.push(ref.ownerNodeId);
-        }
-      }
-    }
+  // Subtree scoping
+  const subtreeIds = params.parentId ? getSubtreeIds(params.parentId) : null;
 
-    // Apply additional filters on the backlink results
-    let filtered = mentionedIds
-      .map((id) => loroDoc.toNodexNode(id))
-      .filter((n): n is NodexNode => n !== null);
-
-    if (requiredTagIds.length > 0) {
-      filtered = filtered.filter((n) => requiredTagIds.every((tid) => n.tags.includes(tid)));
-    }
-
-    if (params.count) {
-      const result = { total: filtered.length };
-      return { content: [{ type: 'text', text: formatResultText(result) }], details: result };
-    }
-
-    const items = filtered.slice(offset, offset + limit).map((node) => {
-      const parentId = getNavigableParentId(node.id);
-      const parentName = parentId ? (loroDoc.toNodexNode(parentId)?.name ?? parentId) : '';
-      return {
-        id: node.id,
-        name: node.name ?? '',
-        tags: getTagDisplayNames(node.tags),
-        snippet: [node.name ?? '', node.description ?? ''].filter(Boolean).join(' — ').slice(0, 180),
-        createdAt: new Date(node.createdAt).toISOString(),
-        parentName,
-        fields: getNodeFieldsMap(node.id),
-      };
-    });
-
-    const result = { total: filtered.length, offset, limit, items };
-    return { content: [{ type: 'text', text: formatResultText(result) }], details: result };
-  }
-
-  // ── Subtree scoping ──
-  let subtreeIds: Set<string> | null = null;
-  if (params.parentId) {
-    subtreeIds = getSubtreeIds(params.parentId);
-  }
-
-  // ── Build candidate list ──
+  // Build candidate list
   let candidates = loroDoc.getAllNodeIds()
     .filter(isSearchCandidate)
     .filter((id) => subtreeIds === null || subtreeIds.has(id))
-    .map((nodeId) => loroDoc.toNodexNode(nodeId)!)
-    .filter((node) => requiredTagIds.every((tagId) => node.tags.includes(tagId)))
-    .filter((node) => fromTs === null || node.createdAt >= fromTs)
-    .filter((node) => toTs === null || node.createdAt <= toTs);
+    .map((id) => loroDoc.toNodexNode(id)!)
+    .filter((n) => requiredTagIds.every((tid) => n.tags.includes(tid)))
+    .filter((n) => fromTs === null || n.createdAt >= fromTs)
+    .filter((n) => toTs === null || n.createdAt <= toTs);
 
-  // ── Field value filtering ──
+  // Field value filtering (reuses filter-utils.getFieldValue)
   if (fieldFilters.length > 0) {
-    candidates = candidates.filter((node) => {
-      return fieldFilters.every(({ fieldDefId, value }) => {
-        const fieldValues = getFieldValue(node, fieldDefId);
-        const normalizedTarget = value.trim().toLowerCase();
-        return fieldValues.some((v) => v.trim().toLowerCase() === normalizedTarget);
-      });
-    });
+    candidates = candidates.filter((node) =>
+      fieldFilters.every(({ fieldDefId, value }) => {
+        const values = getFieldDisplayValues(node, fieldDefId);
+        const target = value.trim().toLowerCase();
+        return values.some((v) => v.trim().toLowerCase() === target);
+      }),
+    );
   }
 
-  // ── Count mode ──
+  // Count mode
   if (params.count) {
-    // For count mode with query, we still need to filter by query
     if (query) {
       const ranked = fuzzySort(
-        candidates.map((node) => ({
-          ...node,
-          _haystack: `${node.name ?? ''}\n${node.description ?? ''}`,
-        })),
-        query,
-        (item) => item._haystack,
-        candidates.length,
+        candidates.map((n) => ({ ...n, _h: `${n.name ?? ''}\n${n.description ?? ''}` })),
+        query, (item) => item._h, candidates.length,
       );
-      const result = { total: ranked.length };
-      return { content: [{ type: 'text', text: formatResultText(result) }], details: result };
+      return countResult(ranked.length);
     }
-    const result = { total: candidates.length };
-    return { content: [{ type: 'text', text: formatResultText(result) }], details: result };
+    return countResult(candidates.length);
   }
 
-  // ── Ranking / sorting ──
+  // Ranking
+  let ranked: Array<NodexNode & { _fuzzyScore: number; _fuzzyRanges: unknown[] }>;
+  if (query) {
+    ranked = fuzzySort(
+      candidates.map((n) => ({ ...n, _h: `${n.name ?? ''}\n${n.description ?? ''}` })),
+      query, (item) => item._h, candidates.length,
+    );
+  } else {
+    ranked = candidates.map((n) => ({ ...n, _fuzzyScore: 0, _fuzzyRanges: [] }));
+  }
+
+  // Sorting (relevance = fuzzySort order, skip additional sort)
   const sortField = params.sort?.field ?? (query ? 'relevance' : 'modified');
   const sortOrder = params.sort?.order ?? 'desc';
 
-  let ranked: Array<NodexNode & { _fuzzyScore: number; _fuzzyRanges: unknown[] }>;
-
-  if (query) {
-    ranked = fuzzySort(
-      candidates.map((node) => ({
-        ...node,
-        _haystack: `${node.name ?? ''}\n${node.description ?? ''}`,
-      })),
-      query,
-      (item) => item._haystack,
-      candidates.length,
-    );
-  } else {
-    ranked = candidates
-      .map((node) => ({ ...node, _fuzzyScore: 0, _fuzzyRanges: [] }));
-  }
-
-  // Apply sorting (unless sorting by relevance, which is already the fuzzySort order)
   if (sortField !== 'relevance') {
     const store = useNodeStore.getState();
-    const getNode = store.getNode;
     const backlinkCounts = sortField === 'refCount'
       ? buildBacklinkCountMap(store._version)
       : undefined;
-
     const sortConfig: SortConfig = {
-      field: sortField === 'created' ? 'createdAt'
-        : sortField === 'modified' ? 'updatedAt'
-        : sortField,
+      field: sortField === 'created' ? 'createdAt' : sortField === 'modified' ? 'updatedAt' : sortField,
       direction: sortOrder,
     };
-
-    ranked.sort((a, b) => compareNodes(a, b, sortConfig, getNode, backlinkCounts));
+    ranked.sort((a, b) => compareNodes(a, b, sortConfig, store.getNode, backlinkCounts));
   }
 
-  // ── Pagination + output ──
-  const items = ranked.slice(offset, offset + limit).map((node) => {
-    const snippetSource = [node.name ?? '', node.description ?? ''].filter(Boolean).join(' — ');
-    const parentId = getNavigableParentId(node.id);
-    const parentName = parentId ? (loroDoc.toNodexNode(parentId)?.name ?? parentId) : '';
-    return {
-      id: node.id,
-      name: node.name ?? '',
-      tags: getTagDisplayNames(node.tags),
-      snippet: snippetSource.length > 180 ? `${snippetSource.slice(0, 177)}...` : snippetSource,
-      createdAt: new Date(node.createdAt).toISOString(),
-      parentName,
-      fields: getNodeFieldsMap(node.id),
-    };
-  });
-
+  // Pagination + output
+  const items = ranked.slice(offset, offset + limit).map(formatSearchItem);
   const result = { total: ranked.length, offset, limit, items };
-  return {
-    content: [{ type: 'text', text: formatResultText(result) }],
-    details: result,
-  };
+  return { content: [{ type: 'text', text: formatResultText(result) }], details: result };
+}
+
+function countResult(total: number): AgentToolResult<unknown> {
+  const result = { total };
+  return { content: [{ type: 'text', text: formatResultText(result) }], details: result };
+}
+
+// ─── Entry point ───
+
+async function executeSearchTool(params: SearchToolParams): Promise<AgentToolResult<unknown>> {
+  // Resolve tag display names → IDs
+  const requiredTagIds = (params.searchTags ?? [])
+    .map((name) => findTagDefIdByName(name))
+    .filter((id): id is string => !!id);
+
+  // If any tag name didn't resolve, result is empty
+  if ((params.searchTags?.length ?? 0) > requiredTagIds.length) {
+    const result = { total: 0, offset: params.offset ?? 0, limit: params.limit ?? DEFAULT_PAGE_SIZE, items: [] };
+    return { content: [{ type: 'text', text: formatResultText(result) }], details: result };
+  }
+
+  return params.linkedTo
+    ? searchByBacklinks(params.linkedTo, requiredTagIds, params)
+    : searchByFilters(params, requiredTagIds);
 }
 
 export const searchTool: AgentTool<typeof searchToolParameters, unknown> = {

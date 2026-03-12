@@ -70,10 +70,11 @@ export function matchesAllFilters(
 }
 
 /**
- * Get the value(s) of a field on a node.
- * Returns array of value names or targetIds.
+ * Get the raw value(s) of a field on a node.
+ * Returns array of value names (plain fields) or targetIds (options fields).
+ * For display-name resolution of options, call toNodexNode on each targetId.
  */
-function getFieldValue(
+export function getFieldValue(
   node: NodexNode,
   fieldDefId: string,
   getNode: (id: string) => NodexNode | null,

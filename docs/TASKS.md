@@ -80,18 +80,18 @@ _(空)_
 #### 已完成
 
 - ~~Layer 0: Agent Runtime~~ ✓ — pi-mono proxy + ChatDrawer + 6 node tools + undo + data access layer + #agent 配置 + Chat 持久化
-- ~~Track C: Browser~~ ✓ — 页面观察 + CDP 截图/交互/调试
-- ~~Layer 1 Step 1~~ ✓ — transformContext + convertToLlm + getApiKey (#132)
+- ~~Layer 1: 多 Agent 运行时~~ ✓ — Spark 直接 LLM 调用 + #agent 节点配置（绕过 createAgent）
+- ~~Layer 2 Step 1~~ ✓ — transformContext + convertToLlm + getApiKey (#132)
 - ~~Context 图片生命周期~~ ✓ — 滑动窗口 + 持久化剥离 (#133)
+- ~~Track C: Browser~~ ✓ — 页面观察 + CDP 截图/交互/调试
+- ~~Spark #agent 重构~~ ✓ — 系统提示词存为子节点，删除 extraction-presets.ts
 
-#### Wave 1: 修复 Spark + 清理（当前优先）
+#### Wave 1: 清理 + 验证（当前优先）
 
-- [x] Spark 重构为 #agent 节点模式 — 系统提示词存为 Spark #agent 节点子节点，删除 extraction-presets.ts
-- [ ] 修复 Spark proxy 400 — 独立 agent 的 API key 初始化路径
-- [ ] 清理 is/has/about — 删除 `ensureSourceMetadataFieldDefs()` + NDX_F17-19 + system prompt Metadata 指令
+- [ ] 清理 is/has/about — 删除 `ensureSourceMetadataFieldDefs()` + NDX_F17-19
 - [ ] 验证 Spark 端到端 — clip 页面 → #spark 子节点生成
 
-#### #skill 节点支持 + 渐进式披露（可交给 Codex）
+#### Wave 2: #skill 节点 + 渐进式披露（可交给 Codex）
 
 > **现状**: 基础设施已完备（tagDef + fieldDef + readSkillIds + buildAgentSystemPrompt），但没有默认 skill 节点、全量 dump 规则到 system prompt、没有测试覆盖。
 >
@@ -116,41 +116,37 @@ _(空)_
 - [ ] **soma agent 默认激活 1 个 skill** — Skills field entry 预填一个默认 skill 引用
 - [ ] **测试覆盖** — ai-agent-node.test.ts 新增：readSkillIds 读取、buildAgentSystemPrompt 输出 `<available-skills>` 索引（非全量规则）、空 skill 渲染为自闭合标签
 
-#### Layer 1: 上下文管线
+#### Wave 3+: 后续
 
-> 设计：`docs/plans/ai-context-management.md`
+> 以下按 Wave 分组，与 `docs/plans/README.md` 对齐。
+
+**Layer 2 上下文管线** — 设计：`ai-context-management.md`
 
 - [ ] Step 3: Context 自动压缩 — Bridge Message + Handoff Memo + token 追踪
 
-#### Track A: Chat
+**Track A: Chat**
 
 - [ ] Chat 会话同步 — 跨设备同步 Chat 历史（方案待定，见 ai-context-management.md）
 - [ ] Chat UI 打磨 — `docs/plans/ui-chat-panel-redesign.md`
 
-#### Track B: 阅读环
-
-> 设计：`docs/plans/phase-2-reading-ring.md`
+**Track B: 阅读环** — 设计：`phase-2-reading-ring.md`
 
 - [ ] Spark 质量提升 — 三轮认知压缩优化 + 进度 UI
 - [ ] 碰撞策略 v0→v1 — agent 驱动 node_search 渐进式碰撞
-- [ ] #skill 提取模式 — 依赖 Layer 1 Step 2
+- [ ] #skill 提取模式 — 依赖 Layer 2 Step 2
 
-#### Layer 3: 编排
-
-> 设计：`docs/plans/phase-4-orchestration.md`
+**Layer 3: 编排** — 设计：`phase-4-orchestration.md`
 
 - [ ] AgentOrchestrator + subagent delegation
 - [ ] 后台任务 UI（badge + 任务列表）
 - [ ] 求助流（clarification）
 
-#### Track D: 认知
-
-> 设计：`docs/plans/phase-5-cognition.md`
+**Track D: 认知** — 设计：`phase-5-cognition.md`
 
 - [ ] Taste 学习 — Schema evolution skill（OpLog Correction → #skill 规则）
 - [ ] /review 命令 — 认知镜像（新结构、升级、矛盾、同构）
 
-#### 其他 AI
+**其他 AI**
 
 - [ ] YouTube 抓取增强 — 获取视频 transcript
 - [ ] 上下文感知 Sidebar — URL 匹配 → 关键词匹配 → 共读模式

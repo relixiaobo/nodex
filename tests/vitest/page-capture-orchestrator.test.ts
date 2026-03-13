@@ -133,6 +133,13 @@ describe('page-capture orchestrator', () => {
         <article data-testid="tweet">
           <div data-testid="User-Name"><a href="/ch402">ch402</a></div>
           <div data-testid="tweetText">Latest post about transformers</div>
+          <a href="/ch402/status/1"><time datetime="2026-03-13T10:00:00.000Z">10h</time></a>
+        </article>
+        <article data-testid="tweet">
+          <span data-testid="socialContext">ch402 reposted</span>
+          <div data-testid="User-Name"><a href="/someone">someone</a></div>
+          <div data-testid="tweetText">Reposted content</div>
+          <a href="/someone/status/2"><time datetime="2026-03-13T08:00:00.000Z">12h</time></a>
         </article>
         <article data-testid="tweet">
           <div data-testid="User-Name"><a href="/ch402">ch402</a></div>
@@ -155,7 +162,14 @@ describe('page-capture orchestrator', () => {
     expect(page.contentHtml).toContain('<li>San Francisco</li>');
     expect(page.contentHtml).toContain('<li>90K Followers</li>');
     expect(page.contentHtml).toContain('<h2>Posts</h2>');
+    // Each tweet includes author and timestamp
+    expect(page.contentHtml).toContain('<b>@ch402</b>');
+    expect(page.contentHtml).toContain('datetime="2026-03-13T10:00:00.000Z"');
     expect(page.contentHtml).toContain('Latest post about transformers');
+    // Reposted tweet shows social context
+    expect(page.contentHtml).toContain('<em>ch402 reposted</em>');
+    expect(page.contentHtml).toContain('<b>@someone</b>');
+    expect(page.contentHtml).toContain('Reposted content');
     expect(page.contentHtml).toContain('Earlier post about circuits');
     expect(page.siteHints).toEqual({ site: 'x', contentKind: 'profile' });
   });
@@ -184,6 +198,61 @@ describe('page-capture orchestrator', () => {
     expect(page.contentHtml).toContain('<h1>Thinking in public</h1>');
     expect(page.metadata.author).toBe('@ch402');
     expect(page.siteHints).toEqual({ site: 'x', contentKind: 'article' });
+  });
+
+  it('extracts quote tweet content within a tweet', async () => {
+    setPage({
+      title: 'Thread by @alice on X',
+      body: `
+        <article data-testid="tweet">
+          <div data-testid="User-Name"><a href="/alice">alice</a></div>
+          <div data-testid="tweetText">Check this out</div>
+          <div class="quoted-tweet-card">
+            <div data-testid="User-Name"><a href="/bob">bob</a></div>
+            <div data-testid="tweetText">Original insight about AI safety</div>
+          </div>
+        </article>
+      `,
+    });
+
+    const page = await captureWithBaseline('https://x.com/alice/status/789', {
+      title: 'Thread by @alice on X',
+      content: '<p>broken</p>',
+      extractorType: 'twitter',
+    });
+
+    expect(page.contentHtml).toContain('Check this out');
+    expect(page.contentHtml).toContain('<blockquote>');
+    expect(page.contentHtml).toContain('<b>@bob</b>');
+    expect(page.contentHtml).toContain('Original insight about AI safety');
+  });
+
+  it('shows pinned and repost indicators on x.com profile timeline', async () => {
+    setPage({
+      title: 'Test on X',
+      body: `
+        <div data-testid="UserName">
+          <div dir="ltr">Test User</div>
+          <div dir="ltr">@test</div>
+        </div>
+        <div data-testid="UserDescription">Bio</div>
+        <article data-testid="tweet">
+          <span data-testid="socialContext">Pinned</span>
+          <div data-testid="User-Name"><a href="/test">test</a></div>
+          <div data-testid="tweetText">My pinned tweet</div>
+        </article>
+      `,
+    });
+
+    const page = await captureWithBaseline('https://x.com/test', {
+      title: 'Test on X',
+      content: '<p>timeline</p>',
+      extractorType: 'twitter',
+    });
+
+    expect(page.contentHtml).toContain('<em>Pinned</em>');
+    expect(page.contentHtml).toContain('My pinned tweet');
+    expect(page.siteHints).toEqual({ site: 'x', contentKind: 'profile' });
   });
 
   it('uses Google Docs export HTML and nests flat list levels', async () => {

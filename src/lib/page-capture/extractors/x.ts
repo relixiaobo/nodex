@@ -189,6 +189,56 @@ function extractTweetAuthor(article: Element): string | undefined {
   return undefined;
 }
 
+function extractTweetSocialContext(article: Element): string | undefined {
+  const contextElement = article.querySelector('[data-testid="socialContext"]');
+  if (!contextElement) return undefined;
+  return contextElement.textContent?.trim() || undefined;
+}
+
+function extractTweetTimestamp(article: Element): string | undefined {
+  const timeElement = article.querySelector('time[datetime]');
+  if (!timeElement) return undefined;
+  return timeElement.getAttribute('datetime') || undefined;
+}
+
+function extractQuotedTweetContent(article: Element): string | undefined {
+  // Quote tweets are inline within the article (not separate article[data-testid="tweet"]).
+  // The first tweetText is the main tweet; any subsequent ones are quoted content.
+  const allTweetTexts = article.querySelectorAll('[data-testid="tweetText"]');
+  if (allTweetTexts.length <= 1) return undefined;
+
+  const parts: string[] = [];
+  for (let i = 1; i < allTweetTexts.length; i++) {
+    const textEl = allTweetTexts[i];
+    // Walk up to find the closest User-Name that isn't the main tweet's
+    let quotedAuthor: string | undefined;
+    let parent = textEl.parentElement;
+    while (parent && parent !== article) {
+      const userName = parent.querySelector('[data-testid="User-Name"]');
+      if (userName) {
+        const links = userName.querySelectorAll('a[href*="/"]');
+        for (const link of links) {
+          const href = link.getAttribute('href');
+          if (href?.startsWith('/') && !href.includes('/status/')) {
+            quotedAuthor = '@' + href.replace(/^\//, '');
+            break;
+          }
+        }
+        break;
+      }
+      parent = parent.parentElement;
+    }
+
+    const textHtml = tweetTextToHtmlParagraphs(textEl);
+    if (!textHtml) continue;
+
+    const authorPrefix = quotedAuthor ? `<b>${quotedAuthor}</b>: ` : '';
+    parts.push(`<blockquote>${authorPrefix}${textHtml}</blockquote>`);
+  }
+
+  return parts.length > 0 ? parts.join('\n') : undefined;
+}
+
 function extractTweetArticleParts(article: Element, videoMp4Url?: string): string[] {
   const parts: string[] = [];
 
@@ -217,6 +267,9 @@ function extractTweetArticleParts(article: Element, videoMp4Url?: string): strin
     }
   }
 
+  const quotedContent = extractQuotedTweetContent(article);
+  if (quotedContent) parts.push(quotedContent);
+
   return parts;
 }
 
@@ -228,7 +281,18 @@ function extractXTimelineContent(document: Document): string {
   for (const article of articles) {
     const parts = extractTweetArticleParts(article);
     if (parts.length === 0) continue;
-    items.push(`<li>${parts.join('\n')}</li>`);
+
+    const headerParts: string[] = [];
+    const author = extractTweetAuthor(article);
+    if (author) headerParts.push(`<b>${author}</b>`);
+    const timestamp = extractTweetTimestamp(article);
+    if (timestamp) headerParts.push(`<time datetime="${timestamp}">${timestamp}</time>`);
+
+    const socialContext = extractTweetSocialContext(article);
+    const contextTag = socialContext ? `<em>${socialContext}</em>\n` : '';
+
+    const header = headerParts.length > 0 ? `<p>${headerParts.join(' · ')}</p>\n` : '';
+    items.push(`<li>${contextTag}${header}${parts.join('\n')}</li>`);
   }
 
   return items.length > 0 ? `<h2>Posts</h2>\n<ul>${items.join('\n')}</ul>` : '';
@@ -257,12 +321,16 @@ function extractXPageContent(document: Document, videoMp4Url?: string): string {
       continue;
     }
 
-    const authorPrefix = author ? `<b>${author}</b>: ` : '';
+    const timestamp = extractTweetTimestamp(article);
+    const authorPrefix = author ? `<b>${author}</b>` : '';
+    const timeStr = timestamp ? ` · <time datetime="${timestamp}">${timestamp}</time>` : '';
+    const header = authorPrefix || timeStr ? `${authorPrefix}${timeStr}: ` : '';
+
     const firstPart = parts[0];
-    if (firstPart.startsWith('<p>')) {
-      parts[0] = `<p>${authorPrefix}${firstPart.slice(3)}`;
-    } else {
-      parts.unshift(`<p>${authorPrefix}</p>`);
+    if (header && firstPart.startsWith('<p>')) {
+      parts[0] = `<p>${header}${firstPart.slice(3)}`;
+    } else if (header) {
+      parts.unshift(`<p>${header}</p>`);
     }
     replyItems.push(`<li>${parts.join('\n')}</li>`);
   }

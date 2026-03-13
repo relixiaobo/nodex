@@ -129,6 +129,7 @@ _(空)_
 - [x] 测试覆盖 + tool description 更新
 
 ##### Phase 2: 阅读环 — Clip & Spark
+- [x] Step 1: Spark extraction — ai-spark.ts + shadow cache + extraction presets + webclip integration
 - [ ] Clip Spark 三轮认知压缩（skeleton → flesh → soul）
 - [ ] 碰撞策略（graph-search，非 embedding）
 - [ ] #skill 节点提取模式学习
@@ -203,11 +204,6 @@ _(空)_
 | 2026-03-07 | 高亮点击呼出笔记 — 点击高亮文本打开笔记浮窗，链接/按钮放行原生行为 | nodex | main |
 | 2026-03-07 | 高亮交互清理 — 移除 HIGHLIGHT_CLICK 死代码 + updateSaveButtonState no-op | nodex | main |
 | 2026-03-06 | About 分离为 app panel + Settings 数据迁移 — About 从节点→纯 UI 路由(`app:about`)；Settings highlightEnabled 从 ui-store→LoroDoc 字段 + chrome.storage 投影 | nodex | main |
-| 2026-03-05 | About 面板 — 版本号 + Changelog + Tally 反馈 + GitHub 链接，ToolbarUserMenu 入口 | nodex | main |
-| 2026-03-05 | 新用户引导数据 — Welcome/Article Clip/Tasks/Shortcuts 4 段教程树 + #task schema + 9 tests | nodex | main |
-| 2026-03-05 | Google Docs 剪藏 + 两阶段 Loading UX — export HTML 抓取 + kix 列表嵌套 + 空 shell 占位 + pulse 动画 + 加载中禁止交互 | nodex | main |
-| 2026-03-05 | Options 字段 auto-collect 修复 — OutlinerItem blur/Enter 路径补 registerCollectedOption + autoCollected 标志位 + visibleWhen 条件 + 4 test | nodex | main |
-
 > 更早的已完成记录见 `docs/_archive/COMPLETED-HISTORY.md`
 
 ### 已关闭的远期/非开发任务

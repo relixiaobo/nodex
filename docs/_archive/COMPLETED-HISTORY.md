@@ -2,6 +2,15 @@
 
 > 从 `docs/TASKS.md` 迁出的历史已完成条目。TASKS.md 只保留最近一周。
 
+## 2026-03-05
+
+| 任务 | Agent | PR |
+|------|-------|-----|
+| About 面板 — 版本号 + Changelog + Tally 反馈 + GitHub 链接，ToolbarUserMenu 入口 | nodex | main |
+| 新用户引导数据 — Welcome/Article Clip/Tasks/Shortcuts 4 段教程树 + #task schema + 9 tests | nodex | main |
+| Google Docs 剪藏 + 两阶段 Loading UX — export HTML 抓取 + kix 列表嵌套 + 空 shell 占位 + pulse 动画 + 加载中禁止交互 | nodex | main |
+| Options 字段 auto-collect 修复 — OutlinerItem blur/Enter 路径补 registerCollectedOption + autoCollected 标志位 + visibleWhen 条件 + 4 test | nodex | main |
+
 ## 2026-03-04
 
 | 任务 | Agent | PR |

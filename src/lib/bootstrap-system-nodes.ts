@@ -36,7 +36,7 @@ const SOURCE_FAMILY_TAG_IDS: ReadonlySet<string> = new Set([
   NDX_T.SOCIAL,
 ]);
 
-export const SYSTEM_BOOTSTRAP_VERSION = 3;
+export const SYSTEM_BOOTSTRAP_VERSION = 2;
 
 function migrateLegacyClipHighlights(): void {
   for (const nodeId of loroDoc.getAllNodeIds()) {
@@ -71,15 +71,6 @@ function applyOneTimeBootstrapMigrations(workspaceHomeId: string): void {
   }
 
   migrateLegacyClipHighlights();
-
-  // v3: Remove stale is/has/about fieldDefs from #source tagDef.
-  // These were created by an earlier Spark implementation but are no longer used —
-  // #spark child nodes ARE the extraction result, no separate metadata fields needed.
-  for (const fieldId of [NDX_F.SOURCE_IS, NDX_F.SOURCE_HAS, NDX_F.SOURCE_ABOUT]) {
-    if (loroDoc.hasNode(fieldId)) {
-      loroDoc.deleteNode(fieldId);
-    }
-  }
 
   loroDoc.setNodeData(workspaceHomeId, 'systemBootstrapVersion', SYSTEM_BOOTSTRAP_VERSION);
 }

@@ -1,8 +1,11 @@
 import type { AgentMessage } from '@mariozechner/pi-agent-core';
+import { messageHasImage, replaceMessageImages } from './ai-message-images.js';
 import * as loroDoc from './loro-doc.js';
 import { getAncestorChain } from './tree-utils.js';
 import { isOutlinerContentNodeType } from './node-type-utils.js';
 import { useUIStore } from '../stores/ui-store.js';
+
+const RECENT_IMAGE_MESSAGES = 3;
 
 function escapeXml(text: string): string {
   return text
@@ -103,6 +106,36 @@ export async function buildSystemReminder(): Promise<string> {
 
   if (sections.length === 0) return '';
   return `<system-reminder>\n${sections.join('\n\n')}\n</system-reminder>`;
+}
+
+export function stripOldImages(messages: AgentMessage[]): AgentMessage[] {
+  let remainingMessages = RECENT_IMAGE_MESSAGES;
+  let nextMessages: AgentMessage[] | null = null;
+
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+    if (!messageHasImage(message)) continue;
+
+    if (remainingMessages > 0) {
+      remainingMessages -= 1;
+      continue;
+    }
+
+    const strippedMessage = replaceMessageImages(
+      message,
+      (image) => `[Image removed from context: ${image.mimeType}]`,
+    );
+
+    if (strippedMessage === message) continue;
+
+    if (!nextMessages) {
+      nextMessages = messages.slice();
+    }
+
+    nextMessages[index] = strippedMessage;
+  }
+
+  return nextMessages ?? messages;
 }
 
 export function injectReminder(messages: AgentMessage[], reminder: string): AgentMessage[] {

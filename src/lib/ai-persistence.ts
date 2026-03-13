@@ -1,4 +1,5 @@
 import type { AgentMessage } from '@mariozechner/pi-agent-core';
+import { messageHasImage, replaceMessageImages } from './ai-message-images.js';
 
 const DB_NAME = 'soma-ai-chat';
 const DB_VERSION = 1;
@@ -50,6 +51,13 @@ function pruneMessages(messages: AgentMessage[]): AgentMessage[] {
   return messages.slice(messages.length - MAX_MESSAGES_PER_SESSION);
 }
 
+function stripImagesForPersistence(messages: AgentMessage[]): AgentMessage[] {
+  if (!messages.some(messageHasImage)) return messages;
+
+  return messages.map((message) =>
+    replaceMessageImages(message, () => '[Image removed from storage]'));
+}
+
 async function trimOldSessions(db: IDBDatabase): Promise<void> {
   const sessions = await listChatSessions(db);
   const extraSessions = sessions.slice(MAX_SESSIONS);
@@ -94,7 +102,7 @@ export async function saveChatSession(session: ChatSession): Promise<ChatSession
   const db = await openDB();
   const nextSession: ChatSession = {
     ...session,
-    messages: pruneMessages(session.messages),
+    messages: stripImagesForPersistence(pruneMessages(session.messages)),
     updatedAt: Date.now(),
   };
 

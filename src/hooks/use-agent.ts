@@ -40,7 +40,12 @@ function getConversationMessages(agent: Agent): ChatConversationMessage[] {
 }
 
 function getPersistedMessageSignature(agent: Agent): string {
-  return JSON.stringify(agent.state.messages);
+  const messages = agent.state.messages;
+  const length = messages.length;
+  if (length === 0) return '0';
+
+  const lastMessage = messages[length - 1];
+  return `${length}:${'timestamp' in lastMessage ? lastMessage.timestamp : 0}`;
 }
 
 export function useAgent(agent: Agent = getAIAgent()) {

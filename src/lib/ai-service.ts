@@ -1,10 +1,10 @@
-import { Agent, streamProxy } from '@mariozechner/pi-agent-core';
+import { Agent, streamProxy, type AgentMessage } from '@mariozechner/pi-agent-core';
 import { getModel, type Context } from '@mariozechner/pi-ai';
-import type { Model } from '@mariozechner/pi-ai';
+import type { Message, Model } from '@mariozechner/pi-ai';
 import { nanoid } from 'nanoid';
 import { getStoredToken } from './auth.js';
 import { buildAgentSystemPrompt, DEFAULT_AGENT_MODEL_ID, DEFAULT_AGENT_MAX_TOKENS, DEFAULT_AGENT_SYSTEM_PROMPT, DEFAULT_AGENT_TEMPERATURE, readAgentNodeConfig } from './ai-agent-node.js';
-import { buildSystemReminder } from './ai-context.js';
+import { buildSystemReminder, injectReminder } from './ai-context.js';
 import { type ChatSession, getLatestChatSession, saveChatSession } from './ai-persistence.js';
 import { getAITools } from './ai-tools/index.js';
 import * as loroDoc from './loro-doc.js';
@@ -185,7 +185,6 @@ function supportsDynamicAgentConfiguration(agent: Agent): boolean {
 
 async function configureAgent(agent: Agent): Promise<{
   provider: StoredAISettings['provider'];
-  apiKey: string | null;
 }> {
   await ensureAISettingsMigrated();
 
@@ -194,9 +193,6 @@ async function configureAgent(agent: Agent): Promise<{
   const provider = hasNodeBackedAISettings()
     ? readProviderFromSettingsNode()
     : (fallbackSettings?.provider ?? 'anthropic');
-  const apiKey = hasNodeBackedAISettings()
-    ? readApiKeyFromSettingsNode()
-    : (fallbackSettings?.apiKey ?? null);
   const agentConfig = readAgentConfigSafely();
 
   runtime.temperature = agentConfig?.temperature ?? DEFAULT_AGENT_TEMPERATURE;
@@ -206,7 +202,13 @@ async function configureAgent(agent: Agent): Promise<{
   agent.setSystemPrompt(agentConfig ? buildAgentSystemPrompt(agentConfig) : DEFAULT_AGENT_SYSTEM_PROMPT);
   agent.setModel(resolveModel(provider, agentConfig?.modelId ?? DEFAULT_AGENT_MODEL_ID));
 
-  return { provider, apiKey };
+  return { provider };
+}
+
+function isLlmCompatibleMessage(message: AgentMessage): message is Message {
+  return message.role === 'user'
+    || message.role === 'assistant'
+    || message.role === 'toolResult';
 }
 
 function buildSessionPayload(agent: Agent): ChatSession {
@@ -295,6 +297,15 @@ export function createAgent(model: Model<any> = DEFAULT_CHAT_MODEL): Agent {
     initialState: {
       model,
     },
+    getApiKey: async () => {
+      const apiKey = await getApiKey();
+      return apiKey ?? undefined;
+    },
+    transformContext: async (messages) => {
+      const systemReminder = await buildSystemReminder();
+      return injectReminder(messages, systemReminder);
+    },
+    convertToLlm: (messages) => messages.filter(isLlmCompatibleMessage),
     streamFn: async (activeModel, context, options = {}) => {
       const authToken = await getStoredToken();
       if (!authToken) {
@@ -302,15 +313,13 @@ export function createAgent(model: Model<any> = DEFAULT_CHAT_MODEL): Agent {
       }
 
       const runtime = getAgentRuntimeState(agent);
-      const apiKey = options.apiKey ?? await getApiKey();
+      const apiKey = options.apiKey?.trim();
       if (!apiKey) {
         throw new Error('API key required');
       }
 
-      const systemReminder = await buildSystemReminder();
       const proxyContext = {
         ...context,
-        systemPrompt: [context.systemPrompt, systemReminder].filter(Boolean).join('\n\n'),
         _apiKey: apiKey,
       } as Context & { _apiKey: string };
 

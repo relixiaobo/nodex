@@ -36,7 +36,7 @@ _(空)_
 
 ### v0.1 — Chrome Web Store 上架
 
-> **方法论**：本次上线聚焦 **Think → Connect** 闭环。Think 已基本完成（高亮、笔记、剪藏、Today 首屏），重点打磨 Connect 体验（搜索、视图、标签、字段）。Compound（上下文感知、AI）上线后根据用户反馈再定优先级。详见 `docs/product-philosophy.md`。
+> **方法论**：本次上线聚焦 **Think → Connect** 闭环。Think 已基本完成（高亮、笔记、剪藏、Today 首屏），重点打磨 Connect 体验（搜索、视图、标签、字段）。Emerge（上下文感知、AI 认知工作流）上线后根据用户反馈再定优先级。详见 `docs/product-philosophy.md`。
 
 #### 上架准备
 
@@ -75,7 +75,7 @@ _(空)_
 
 ### AI — 照亮你的思考
 
-> AI 不替你思考，而是把你自己的思考照亮。基于 pi-mono 架构，按 Infrastructure Layer × Feature Track 实施。详细计划见 `docs/plans/README.md`。
+> AI 不替你思考，而是把你自己的思考照亮。基于 pi-mono 架构，按 Infrastructure Layer × Feature Track 实施。架构概览见 CLAUDE.md「AI 架构概览」。
 
 #### 已完成
 
@@ -118,7 +118,7 @@ _(空)_
 
 #### Wave 3+: 后续
 
-> 以下按 Wave 分组，与 `docs/plans/README.md` 对齐。
+> 以下按 Wave 分组。
 
 **Layer 2 上下文管线** — 设计：`ai-context-management.md`
 

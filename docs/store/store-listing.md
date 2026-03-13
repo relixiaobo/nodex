@@ -20,8 +20,8 @@ The moment you read something that matters, capture it. Highlight a sentence. Jo
 **Connect — find the threads**
 Tag your notes, drag them into structure, link ideas together. Every time you organize, you discover relationships you didn't see before. Organizing isn't filing — it's thinking.
 
-**Compound — AI reveals the threads in your thinking**
-AI doesn't think for you — it reveals the threads in your own thinking. Three cognitive workflows make your notes compound over time:
+**Emerge — AI reveals the threads in your thinking**
+AI doesn't think for you — it reveals the threads in your own thinking. Three cognitive workflows help new understanding emerge from your accumulated notes:
 • **Reading Ring** — When you clip a page, AI extracts the thinking framework and connects it to your existing notes. You focus on "what does this make me think?" instead of summarizing.
 • **Collision Ring** — Open Chat with a half-formed idea. AI adds density and angles. You leave with sharper questions, not just answers.
 • **Review Ring** — `/review` analyzes how your thinking has evolved: new structures emerging, old ones upgrading, hidden contradictions. A cognitive mirror, not a summary.
@@ -48,13 +48,13 @@ Productivity
 English
 
 ## Promo images
-- `images/promo-marquee.png` — 1400×560 marquee: "Think where you read" + Think→Connect→Compound pills + browser mockup
+- `images/promo-marquee.png` — 1400×560 marquee: "Think where you read" + Think→Connect→Emerge pills + browser mockup
 
 ## Screenshots to upload (in order)
 1. `images/screenshot-1-overview.png` — Think where you read: browser + side panel overview (1280×800)
 2. `images/screenshot-2-think.png` — Write it in your own words: reading → understanding (1280×800)
 3. `images/screenshot-3-connect.png` — Organize your notes, discover what you think (1280×800)
-4. `images/screenshot-4-compound.png` — AI finds the threads in your thinking (1280×800)
+4. `images/screenshot-4-emerge.png` — AI finds the threads in your thinking (1280×800)
 5. `images/screenshot-5-belief.png` — 100 notes thought through beat 10,000 unread bookmarks (1280×800)
 
 HTML source files for regenerating screenshots: `image-sources/`

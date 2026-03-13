@@ -18,7 +18,6 @@ export async function handleGetText(
     tabId: params.tabId,
   });
   assertBrowserResponseOk(result);
-  if (!result.ok) throw new Error(`Failed to capture page: ${result.error}`);
 
   const text = stripHtml(result.page.contentHtml);
   const offset = params.textOffset ?? 0;
@@ -37,7 +36,6 @@ export async function handleGetMetadata(
     tabId: params.tabId,
   });
   assertBrowserResponseOk(result);
-  if (!result.ok) throw new Error(`Failed to capture page: ${result.error}`);
 
   const page = result.page;
   const data: Record<string, string> = { title: page.title, url: page.url };

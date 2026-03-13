@@ -86,10 +86,28 @@ _(空)_
 - ~~Track C: Browser~~ ✓ — 页面观察 + CDP 截图/交互/调试
 - ~~Spark #agent 重构~~ ✓ — 系统提示词存为子节点，删除 extraction-presets.ts
 
-#### Wave 1: 清理 + 验证（当前优先）
+#### Wave 1: 清理 + 验证
 
-- [ ] 清理 is/has/about — 删除 `ensureSourceMetadataFieldDefs()` + NDX_F17-19
-- [ ] 验证 Spark 端到端 — clip 页面 → #spark 子节点生成
+- [x] 清理 is/has/about — 删除 `ensureSourceMetadataFieldDefs()` + NDX_F17-19
+- [x] Spark 提示词重构 — napkin 极限压缩 + 骨架/血肉自然嵌套 + 零术语/自检/承重区分规则
+- [ ] 验证 Spark 端到端 — clip 页面 → #spark 子节点生成（餐巾纸 name + 递归 children）
+
+#### Wave 1.5: Spark 交互优化（Clip → Spark 闭环）
+
+> **核心设计**：Clip 后立刻在 #source fields 之后第一个位置创建 #spark 节点，三态切换：
+> - `pending` — ✨ Generate Spark（可点击按钮）
+> - `loading` — bullet 转圈 + "Generating..."
+> - `complete` — 餐巾纸 name + insight children
+>
+> **触发策略**：主动 clip（⌘K / /clip）→ 自动触发 loading；被动 clip（高亮/笔记创建 source）→ pending 等用户手动点击；无 API key → 灰显 + 引导设置。
+
+- [ ] #spark 节点 pending 态 — clip 时立即创建（不触发 LLM），显示为可点击按钮
+- [ ] #spark 节点 loading 态 — bullet 转圈动画 + "Generating..." 文案
+- [ ] #spark 节点 complete 态 — 餐巾纸 name + children（当前已实现）
+- [ ] 主动 clip 自动触发 — ⌘K / /clip 路径自动进入 loading
+- [ ] 被动 clip 不触发 — 高亮/笔记路径只创建 pending 节点
+- [ ] 无 API key 态 — 灰显按钮 + "Set up API key" 引导
+- [ ] 统一 /clip 和 ⌘K clip 行为
 
 #### Wave 2: #skill 节点 + 渐进式披露（可交给 Codex）
 

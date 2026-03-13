@@ -6,12 +6,13 @@ const streamProxyMock = vi.hoisted(() => vi.fn(() => ({ mocked: true })));
 const getStoredTokenMock = vi.hoisted(() => vi.fn(async () => 'auth-token'));
 const buildSystemReminderMock = vi.hoisted(() => vi.fn(async () => '<system-reminder>ctx</system-reminder>'));
 
+vi.mock('../../src/lib/ai-proxy.js', () => ({
+  streamProxyWithApiKey: streamProxyMock,
+}));
+
 vi.mock('@mariozechner/pi-agent-core', async () => {
   const actual = await vi.importActual<typeof import('@mariozechner/pi-agent-core')>('@mariozechner/pi-agent-core');
-  return {
-    ...actual,
-    streamProxy: streamProxyMock,
-  };
+  return actual;
 });
 
 vi.mock('../../src/lib/auth.js', () => ({
@@ -92,7 +93,7 @@ describe('ai-service', () => {
     await expect(internalAgent.getApiKey('anthropic')).resolves.toBe('sk-ant-test-456');
   });
 
-  it('creates an agent whose streamFn injects auth and API key into the proxy call', async () => {
+  it('creates an agent whose streamFn forwards auth and API key through proxy options', async () => {
     const { createAgent, setApiKey } = await import('../../src/lib/ai-service.js');
     await setApiKey('sk-ant-test-456');
 
@@ -117,9 +118,9 @@ describe('ai-service', () => {
       agent.state.model,
       expect.objectContaining({
         messages: [],
-        _apiKey: 'sk-ant-test-456',
       }),
       expect.objectContaining({
+        apiKey: 'sk-ant-test-456',
         authToken: 'auth-token',
         proxyUrl: expect.any(String),
         temperature: expect.any(Number),

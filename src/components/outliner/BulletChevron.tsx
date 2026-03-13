@@ -28,6 +28,8 @@ interface BulletChevronProps {
   icon?: AppIcon | null;
   /** Loading state: pulse animation while content is being fetched */
   isLoading?: boolean;
+  /** Spark node: uses spinning arc instead of pulsing dot for loading */
+  isSparkNode?: boolean;
   /** Disable button semantics/cursor for purely decorative bullets */
   interactive?: boolean;
   /** Override tooltip label; defaults to "Zoom in" for interactive bullets */
@@ -68,14 +70,25 @@ export function BulletChevron({
   bulletColors,
   icon: Icon,
   isLoading,
+  isSparkNode,
   interactive = true,
   tooltipLabel,
 }: BulletChevronProps) {
   const showOuterRing = hasChildren && !isExpanded;
   const wrapperClass = `flex shrink-0 h-6 w-[15px] items-center justify-center group/bullet ${interactive ? 'cursor-pointer' : 'cursor-default'}`;
 
-  // Loading state: pulsing dot
+  // Loading state: spinning arc or pulsing dot
   if (isLoading) {
+    const spinner = isSparkNode ? (
+      // Spark loading: spinning arc
+      <svg className="animate-spin h-3 w-3" viewBox="0 0 12 12" fill="none">
+        <circle cx="6" cy="6" r="4.5" stroke="currentColor" strokeWidth="1.5" opacity="0.15" />
+        <path d="M10.5 6a4.5 4.5 0 0 0-4.5-4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      </svg>
+    ) : (
+      // Generic loading: pulsing dot
+      <div className="h-[5px] w-[5px] rounded-full bg-foreground/40 animate-pulse" />
+    );
     return (
       maybeWrapWithTooltip({
         interactive,
@@ -83,10 +96,10 @@ export function BulletChevron({
         content: (
           <span
             role={interactive ? 'button' : undefined}
-            className={wrapperClass}
+            className={`${wrapperClass} text-foreground/40`}
             onClick={interactive ? onBulletClick : undefined}
           >
-            <div className="h-[5px] w-[5px] rounded-full bg-foreground/40 animate-pulse" />
+            {spinner}
           </span>
         ),
       })

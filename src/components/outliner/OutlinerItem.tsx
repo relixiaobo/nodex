@@ -19,7 +19,7 @@ import { useEditorTriggers, buildTriggerEditorProps } from '../../hooks/use-edit
 import { FieldRow } from '../fields/FieldRow';
 import { FIELD_OVERLAY_Z_INDEX } from '../fields/field-layout.js';
 import { toFieldRowEntryProps } from '../fields/field-row-props.js';
-import { SYS_V } from '../../types/index.js';
+import { NDX_T, SYS_V } from '../../types/index.js';
 import { useFieldOptions } from '../../hooks/use-field-options.js';
 import { resolveInlineReferenceTextColor, resolveTagColor } from '../../lib/tag-colors.js';
 import {
@@ -55,6 +55,8 @@ import { getTextOffsetFromPoint, getRenderedTextRightEdge } from '../../lib/dom-
 import type { ParsedPasteNode } from '../../lib/paste-parser.js';
 import { t } from '../../i18n/strings.js';
 import { getNodeCapabilities } from '../../lib/node-capabilities.js';
+import { triggerSparkExtraction } from '../../lib/ai-spark.js';
+import { hasApiKey } from '../../lib/ai-service.js';
 import { RowHost } from './RowHost.js';
 import { ViewToolbar } from './ViewToolbar.js';
 import { readViewConfig, applyViewPipeline } from '../../lib/view-pipeline.js';
@@ -284,6 +286,7 @@ export function OutlinerItem({
 
   const tagIds = useNodeTags(effectiveNodeId);
   const syncTemplateFields = useNodeStore((s) => s.syncTemplateFields);
+  const isSparkNode = tagIds.includes(NDX_T.SPARK);
 
   // Sync template fieldEntries/content for tagged nodes — handles the case
   // where fieldDefs were added to tagDef Default content AFTER the tag was applied.
@@ -400,6 +403,11 @@ export function OutlinerItem({
   );
   // For hasChildren: count non-hidden items (hidden-always fields don't count toward expand chevron)
   const hasChildren = !isCyclicReferenceExpansion && visibleChildren.some((c) => !c.hidden);
+
+  // Spark pending/loading (requires hasChildren)
+  const isSparkPending = isSparkNode && !hasChildren && !isLoadingNode;
+  const isSparkLoading = isSparkNode && isLoadingNode;
+
   // All hidden fields (including ALWAYS): shown as compact pills, click to temporarily reveal
   const hiddenRevealableFields = useMemo(
     () => visibleChildren
@@ -948,7 +956,7 @@ export function OutlinerItem({
   // mode. Edit mode is deferred to click so drag-select can take over if the
   // user drags (mounting RichTextEditor on mousedown captures subsequent mouse events).
   const handleContentMouseDown = useCallback((e: React.MouseEvent) => {
-    if (isLoadingNode) { e.preventDefault(); return; }
+    if (isLoadingNode || isSparkPending) { e.preventDefault(); return; }
     if (isCheckboxFieldType(fieldDataType)) return;
     const target = e.target as HTMLElement;
     // Skip for hyperlinks — handleContentClick will open in new tab
@@ -1670,9 +1678,9 @@ export function OutlinerItem({
         <div ref={contentWrapperRef} className={`flex items-start gap-2 min-w-0 relative ${isSelectedRefClick ? 'node-selected-ref w-fit flex-none' : 'flex-1'}`}>
           {/* Bullet is the drag handle for reorder */}
           <div
-            className={`${isLoadingNode ? 'cursor-default' : 'cursor-grab active:cursor-grabbing'} ${deleteBlockedPulse ? 'node-delete-blocked-pulse' : ''}`}
-            draggable={!isLoadingNode}
-            onDragStart={isLoadingNode ? undefined : dragHandlers.onDragStart}
+            className={`${isLoadingNode || isSparkPending ? 'cursor-default' : 'cursor-grab active:cursor-grabbing'} ${deleteBlockedPulse ? 'node-delete-blocked-pulse' : ''}`}
+            draggable={!isLoadingNode && !isSparkPending}
+            onDragStart={isLoadingNode || isSparkPending ? undefined : dragHandlers.onDragStart}
           >
             <BulletChevron
               hasChildren={hasChildren}
@@ -1683,6 +1691,7 @@ export function OutlinerItem({
               bulletColors={effectiveBulletColors}
               icon={structuralIcon}
               isLoading={isLoadingNode}
+              isSparkNode={isSparkNode}
             />
           </div>
           {showCheckbox && (
@@ -1815,6 +1824,26 @@ export function OutlinerItem({
                   className="node-content"
                   dangerouslySetInnerHTML={{ __html: nodeContentHtml }}
                 />
+              ) : isSparkPending ? (
+                <span
+                  className="node-content text-primary/70 hover:text-primary cursor-pointer transition-colors"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    void (async () => {
+                      const hasKey = await hasApiKey();
+                      if (!hasKey) {
+                        // TODO: toast / navigate to Settings
+                        console.warn('[spark] No API key configured');
+                        return;
+                      }
+                      void triggerSparkExtraction(nodeId, parentId);
+                    })();
+                  }}
+                >
+                  ✦ Generate Spark
+                </span>
+              ) : isSparkLoading ? (
+                <span className="node-content text-foreground-tertiary">Generating…</span>
               ) : isLoadingNode ? (
                 <span className="node-content text-foreground-tertiary animate-pulse">Clipping…</span>
               ) : hasTags ? (

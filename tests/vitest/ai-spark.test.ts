@@ -4,8 +4,8 @@
  * Tests cover:
  * - Spark trigger conditions (shouldAutoTrigger)
  * - Shadow Cache read/write + TTL expiry
- * - Extraction rule loading by content type
- * - #spark tagDef and is/has/about fieldDef bootstrapping
+ * - #spark tagDef bootstrapping
+ * - Spark #agent node bootstrapping and config reading
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
@@ -15,20 +15,20 @@ import {
   resetShadowCacheForTests,
 } from '../../src/lib/ai-shadow-cache.js';
 import {
-  getExtractionRules,
-  ARTICLE_EXTRACTION_RULES,
-  VIDEO_EXTRACTION_RULES,
-  SOCIAL_EXTRACTION_RULES,
-  GENERAL_EXTRACTION_RULES,
-} from '../../src/lib/ai-skills/extraction-presets.js';
-import {
   ensureSparkTagDef,
-  ensureSourceMetadataFieldDefs,
   shouldAutoTrigger,
   SPARK_COMMIT_ORIGIN,
 } from '../../src/lib/ai-spark.js';
+import {
+  ensureSparkAgentNode,
+  readSparkAgentConfig,
+  SPARK_AGENT_NODE_IDS,
+  SPARK_DEFAULT_TEMPERATURE,
+  SPARK_DEFAULT_MAX_TOKENS,
+  SPARK_DEFAULT_PROMPT_LINES,
+} from '../../src/lib/ai-agent-node.js';
 import * as loroDoc from '../../src/lib/loro-doc.js';
-import { NDX_T, NDX_F, SYS_T, SYSTEM_NODE_IDS } from '../../src/types/index.js';
+import { NDX_T, SYSTEM_NODE_IDS, SYS_T } from '../../src/types/index.js';
 import { resetAndSeed } from './helpers/test-state.js';
 
 // ============================================================
@@ -212,40 +212,6 @@ const originalIndexedDB = globalThis.indexedDB;
 // Tests
 // ============================================================
 
-describe('extraction presets', () => {
-  it('returns article rules for "article" content type', () => {
-    expect(getExtractionRules('article')).toBe(ARTICLE_EXTRACTION_RULES);
-  });
-
-  it('returns video rules for "video" content type', () => {
-    expect(getExtractionRules('video')).toBe(VIDEO_EXTRACTION_RULES);
-  });
-
-  it('returns social rules for "social" content type', () => {
-    expect(getExtractionRules('social')).toBe(SOCIAL_EXTRACTION_RULES);
-  });
-
-  it('returns general rules for unknown content type', () => {
-    expect(getExtractionRules('source')).toBe(GENERAL_EXTRACTION_RULES);
-    expect(getExtractionRules(undefined)).toBe(GENERAL_EXTRACTION_RULES);
-  });
-
-  it('all rule sets are non-empty arrays of strings', () => {
-    for (const rules of [
-      ARTICLE_EXTRACTION_RULES,
-      VIDEO_EXTRACTION_RULES,
-      SOCIAL_EXTRACTION_RULES,
-      GENERAL_EXTRACTION_RULES,
-    ]) {
-      expect(rules.length).toBeGreaterThan(0);
-      for (const rule of rules) {
-        expect(typeof rule).toBe('string');
-        expect(rule.length).toBeGreaterThan(0);
-      }
-    }
-  });
-});
-
 describe('shadow cache', () => {
   beforeAll(() => {
     (globalThis as { indexedDB?: IDBFactory }).indexedDB = createFakeIndexedDB();
@@ -286,7 +252,7 @@ describe('shadow cache', () => {
   });
 });
 
-describe('spark tagDef and fieldDef bootstrapping', () => {
+describe('spark tagDef bootstrapping', () => {
   beforeEach(() => {
     resetAndSeed();
   });
@@ -306,43 +272,85 @@ describe('spark tagDef and fieldDef bootstrapping', () => {
     const sparkTag = loroDoc.toNodexNode(NDX_T.SPARK);
     expect(sparkTag).toBeDefined();
   });
+});
 
-  it('creates is/has/about fieldDefs under #source', () => {
-    ensureSourceMetadataFieldDefs();
-
-    const isField = loroDoc.toNodexNode(NDX_F.SOURCE_IS);
-    expect(isField).toBeDefined();
-    expect(isField!.type).toBe('fieldDef');
-    expect(isField!.name).toBe('is');
-    expect(isField!.fieldType).toBe('options');
-
-    const hasField = loroDoc.toNodexNode(NDX_F.SOURCE_HAS);
-    expect(hasField).toBeDefined();
-    expect(hasField!.type).toBe('fieldDef');
-    expect(hasField!.name).toBe('has');
-    expect(hasField!.fieldType).toBe('options');
-    expect(hasField!.cardinality).toBe('list');
-
-    const aboutField = loroDoc.toNodexNode(NDX_F.SOURCE_ABOUT);
-    expect(aboutField).toBeDefined();
-    expect(aboutField!.type).toBe('fieldDef');
-    expect(aboutField!.name).toBe('about');
-    expect(aboutField!.fieldType).toBe('options');
-    expect(aboutField!.cardinality).toBe('list');
+describe('spark agent node bootstrapping', () => {
+  beforeEach(() => {
+    resetAndSeed();
   });
 
-  it('is/has/about fieldDefs are children of #source tagDef', () => {
-    ensureSourceMetadataFieldDefs();
-    expect(loroDoc.getParentId(NDX_F.SOURCE_IS)).toBe(SYS_T.SOURCE);
-    expect(loroDoc.getParentId(NDX_F.SOURCE_HAS)).toBe(SYS_T.SOURCE);
-    expect(loroDoc.getParentId(NDX_F.SOURCE_ABOUT)).toBe(SYS_T.SOURCE);
+  it('creates Spark agent node tagged with #agent', () => {
+    ensureSparkAgentNode();
+    loroDoc.commitDoc();
+
+    const sparkAgent = loroDoc.toNodexNode(SYSTEM_NODE_IDS.SPARK_AGENT);
+    expect(sparkAgent).toBeDefined();
+    expect(sparkAgent!.name).toBe('Spark');
+    expect(sparkAgent!.tags).toContain(SYS_T.AGENT);
   });
 
-  it('ensureSourceMetadataFieldDefs is idempotent', () => {
-    ensureSourceMetadataFieldDefs();
-    ensureSourceMetadataFieldDefs();
-    // Should not error and fieldDefs should still be valid
-    expect(loroDoc.toNodexNode(NDX_F.SOURCE_IS)).toBeDefined();
+  it('creates prompt children from default lines', () => {
+    ensureSparkAgentNode();
+    loroDoc.commitDoc();
+
+    const children = loroDoc.getChildren(SYSTEM_NODE_IDS.SPARK_AGENT);
+    // Filter content children (not field entries)
+    const contentChildren = children.filter((id) => {
+      const n = loroDoc.toNodexNode(id);
+      return n != null && n.type !== 'fieldEntry';
+    });
+    expect(contentChildren.length).toBe(SPARK_DEFAULT_PROMPT_LINES.length);
+  });
+
+  it('creates field entries for Model, Temperature, MaxTokens', () => {
+    ensureSparkAgentNode();
+    loroDoc.commitDoc();
+
+    const modelFE = loroDoc.toNodexNode(SPARK_AGENT_NODE_IDS.MODEL_FIELD_ENTRY);
+    expect(modelFE).toBeDefined();
+    expect(modelFE!.type).toBe('fieldEntry');
+
+    const tempFE = loroDoc.toNodexNode(SPARK_AGENT_NODE_IDS.TEMPERATURE_FIELD_ENTRY);
+    expect(tempFE).toBeDefined();
+    expect(tempFE!.type).toBe('fieldEntry');
+
+    const maxTokensFE = loroDoc.toNodexNode(SPARK_AGENT_NODE_IDS.MAX_TOKENS_FIELD_ENTRY);
+    expect(maxTokensFE).toBeDefined();
+    expect(maxTokensFE!.type).toBe('fieldEntry');
+  });
+
+  it('is idempotent — calling twice does not duplicate children', () => {
+    ensureSparkAgentNode();
+    loroDoc.commitDoc();
+    const firstChildren = loroDoc.getChildren(SYSTEM_NODE_IDS.SPARK_AGENT);
+
+    ensureSparkAgentNode();
+    loroDoc.commitDoc();
+    const secondChildren = loroDoc.getChildren(SYSTEM_NODE_IDS.SPARK_AGENT);
+
+    expect(secondChildren.length).toBe(firstChildren.length);
+  });
+});
+
+describe('spark agent config reading', () => {
+  beforeEach(() => {
+    resetAndSeed();
+  });
+
+  it('reads default config values', () => {
+    const config = readSparkAgentConfig();
+    expect(config.nodeId).toBe(SYSTEM_NODE_IDS.SPARK_AGENT);
+    expect(config.temperature).toBe(SPARK_DEFAULT_TEMPERATURE);
+    expect(config.maxTokens).toBe(SPARK_DEFAULT_MAX_TOKENS);
+    expect(config.systemPrompt.length).toBeGreaterThan(0);
+    expect(config.skillIds).toEqual([]);
+  });
+
+  it('system prompt contains all default lines', () => {
+    const config = readSparkAgentConfig();
+    for (const line of SPARK_DEFAULT_PROMPT_LINES) {
+      expect(config.systemPrompt).toContain(line);
+    }
   });
 });
 

@@ -383,6 +383,7 @@ export const SYSTEM_NODE_IDS = {
   /** @deprecated Legacy — no longer bootstrapped for new workspaces. */
   STASH: 'STASH',
   SETTINGS: 'SETTINGS',
+  SPARK_AGENT: 'SPARK_AGENT',
 } as const;
 
 // ── App Panel IDs (pure UI routes, not nodes) ──

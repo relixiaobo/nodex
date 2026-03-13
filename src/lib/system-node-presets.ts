@@ -36,6 +36,7 @@ export const SYSTEM_NODE_PRESETS: ReadonlyArray<SystemNodePreset> = [
   { id: SYSTEM_NODE_IDS.CLIPS, defaultName: 'Clips', iconKey: 'clips', bootstrap: false, locked: false, canEditStructure: true, canEditFieldValues: true, quickNav: false, paletteSearchable: true },
   { id: SYSTEM_NODE_IDS.STASH, defaultName: 'Stash', iconKey: 'stash', bootstrap: false, locked: false, canEditStructure: true, canEditFieldValues: true, quickNav: false, paletteSearchable: true },
   { id: SYSTEM_NODE_IDS.SETTINGS, defaultName: 'Settings', iconKey: 'settings', bootstrap: true, locked: true, canEditStructure: false, canEditFieldValues: true, quickNav: false, paletteSearchable: true },
+  { id: SYSTEM_NODE_IDS.SPARK_AGENT, defaultName: 'Spark', iconKey: 'ai', bootstrap: false, locked: false, canEditStructure: true, canEditFieldValues: true, quickNav: false, paletteSearchable: true },
   { id: SYSTEM_TAGS.DAY, defaultName: 'day', iconKey: 'journal', bootstrap: false, locked: true, canEditStructure: true, canEditFieldValues: true, quickNav: false, paletteSearchable: false },
   { id: SYSTEM_TAGS.WEEK, defaultName: 'week', iconKey: 'journal', bootstrap: false, locked: true, canEditStructure: true, canEditFieldValues: true, quickNav: false, paletteSearchable: false },
   { id: SYSTEM_TAGS.YEAR, defaultName: 'year', iconKey: 'journal', bootstrap: false, locked: true, canEditStructure: true, canEditFieldValues: true, quickNav: false, paletteSearchable: false },

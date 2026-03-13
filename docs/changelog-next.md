@@ -31,3 +31,5 @@
 - 网页抓取增强：x.com 个人主页现在包含 timeline 推文列表；GitHub issue/PR 页面现在包含全部评论（含作者）
 - x.com 抓取深度增强：每条推文现在包含作者、ISO 时间戳、转帖/置顶标记，引用推文以 blockquote 形式嵌入
 - 修复 AI browser tool `get_text` 输出结构丢失的问题（HTML 块级标签现在正确转为换行符）
+- 修复 AI Chat 历史记录在重新打开面板后不显示的问题（需先发一条消息才出现）
+- Spark 重构为 #agent 节点模式：系统提示词从硬编码迁移到 Spark #agent 节点的子节点，用户可直接在大纲中编辑提取规则；模型/温度/Token 上限通过 #agent 字段配置；删除 extraction-presets.ts

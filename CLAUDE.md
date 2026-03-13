@@ -388,8 +388,27 @@ ContentNode
 ## 任务跟踪
 
 - **唯一事实来源**: `docs/TASKS.md`
+- **设计文档**: `docs/plans/*.md`（阶段性，完成后归档到 `docs/_archive/plans/`）
 - **迭代记录**: GitHub PR（计划在 PR description，讨论在 PR comment）
 - **深度研究**: 复杂问题先研究再动手，研究成果沉淀到 `docs/research/`
+
+### AI 架构概览
+
+基础能力（Infrastructure Layers）× 功能轨道（Feature Tracks）双维度：
+
+```
+Layer 3: 编排层          AgentOrchestrator / Subagent / 后台任务
+Layer 2: 上下文管线       Skill 渐进式披露 / 上下文压缩
+Layer 1: 多 Agent 运行时  直接 LLM 调用（Spark #agent 节点）
+Layer 0: Agent 运行时     pi-ai proxy + Chat UI + 6 node tools + browser tools
+─────────────────────────────────────────────────────────
+Track A: Chat         对话体验 — 持久化 / 同步 / UI 打磨
+Track B: Reading Ring  阅读环 — Spark 提取 / 碰撞 / #skill 学习
+Track C: Browser       浏览器 — 页面观察 + CDP 交互 + 调试
+Track D: Cognition     认知 — Taste 学习 + Review 引擎
+```
+
+跨轨道决策：Chat = ChatDrawer 不进 panelHistory | Agent 运行在 Side Panel 进程 | Chat 历史不存为节点（IndexedDB）| page-capture 三方共用 | Tool 设计 node 拆分 browser 合并 | Reference 格式 `<ref>` + `<cite>` | Spark 直接 LLM 调用不走 Agent | Spark 配置存为 #agent 节点
 
 ## Chrome Side Panel 约束
 

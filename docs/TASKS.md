@@ -90,9 +90,9 @@ _(空)_
 
 #### Phase 2: 阅读环 — Clip & Spark
 
-- [ ] Spark 三轮认知压缩（skeleton → flesh → soul）
-- [ ] 碰撞策略（graph-search，非 embedding）
-- [ ] #skill 节点提取模式学习
+- [x] Spark 三轮认知压缩（skeleton → flesh → soul）
+- [x] 碰撞策略（graph-search，非 embedding）
+- [x] #skill 节点提取模式学习
 
 #### Phase 3: 浏览器 — browser tool + CDP
 

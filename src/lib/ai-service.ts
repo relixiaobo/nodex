@@ -1,10 +1,11 @@
-import { Agent, streamProxy, type AgentMessage } from '@mariozechner/pi-agent-core';
-import { getModel, type Context } from '@mariozechner/pi-ai';
+import { Agent, type AgentMessage } from '@mariozechner/pi-agent-core';
+import { getModel } from '@mariozechner/pi-ai';
 import type { Message, Model } from '@mariozechner/pi-ai';
 import { nanoid } from 'nanoid';
 import { getStoredToken } from './auth.js';
 import { buildAgentSystemPrompt, DEFAULT_AGENT_MODEL_ID, DEFAULT_AGENT_MAX_TOKENS, DEFAULT_AGENT_SYSTEM_PROMPT, DEFAULT_AGENT_TEMPERATURE, readAgentNodeConfig } from './ai-agent-node.js';
 import { buildSystemReminder, injectReminder } from './ai-context.js';
+import { streamProxyWithApiKey } from './ai-proxy.js';
 import { type ChatSession, getLatestChatSession, saveChatSession } from './ai-persistence.js';
 import { getAITools } from './ai-tools/index.js';
 import * as loroDoc from './loro-doc.js';
@@ -313,17 +314,7 @@ export function createAgent(model: Model<any> = DEFAULT_CHAT_MODEL): Agent {
       }
 
       const runtime = getAgentRuntimeState(agent);
-      const apiKey = options.apiKey?.trim();
-      if (!apiKey) {
-        throw new Error('API key required');
-      }
-
-      const proxyContext = {
-        ...context,
-        _apiKey: apiKey,
-      } as Context & { _apiKey: string };
-
-      return streamProxy(activeModel, proxyContext, {
+      return streamProxyWithApiKey(activeModel, context, {
         ...options,
         temperature: runtime.temperature,
         maxTokens: runtime.maxTokens,

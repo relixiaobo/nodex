@@ -26,3 +26,4 @@
 - 新增 browser tool 第一批观察能力：AI 现在可以读取当前页面正文与元数据、查找页面文本，并获取用户当前选中内容
 - browser tool 升级为完整浏览器操作集：新增 CDP 截图、点击/输入/滚动/导航/标签页、快捷键/表单/拖拽/等待/JS 执行，以及 network/console 调试读取
 - 新增 Spark 结构提取：剪藏网页后 AI 自动提取认知结构（框架、论点、机制），创建 #spark 子节点树，并填充 is/has/about 元数据字段
+- AI 上下文管理重构：动态上下文注入迁移到 `transformContext` hook，API key 通过标准 `getApiKey` 解析，`streamFn` 简化为纯转发

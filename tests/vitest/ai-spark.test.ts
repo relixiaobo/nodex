@@ -5,11 +5,11 @@
  * - Spark trigger conditions (shouldAutoTrigger)
  * - Shadow Cache read/write + TTL expiry
  * - Extraction rule loading by content type
- * - #spark tagDef and is/has/about fieldDef bootstrapping
+ * - #spark tagDef bootstrapping
  * - #skill node bootstrap + rule reading + fallback
- * - Collision system prompt building
- * - Source metadata reading
- * - System prompt content (metadata instructions)
+ * - Collision system prompt building (spark text based)
+ * - System prompt content (skeleton + flesh extraction)
+ * - Content type detection
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
@@ -33,12 +33,11 @@ import {
 } from '../../src/lib/ai-skills/extraction-presets.js';
 import {
   ensureSparkTagDef,
-  ensureSourceMetadataFieldDefs,
   shouldAutoTrigger,
   detectContentType,
   buildSparkSystemPrompt,
   buildCollisionSystemPrompt,
-  readSourceMetadata,
+  gatherSparkSummary,
   SPARK_COMMIT_ORIGIN,
 } from '../../src/lib/ai-spark.js';
 import * as loroDoc from '../../src/lib/loro-doc.js';
@@ -300,7 +299,7 @@ describe('shadow cache', () => {
   });
 });
 
-describe('spark tagDef and fieldDef bootstrapping', () => {
+describe('spark tagDef bootstrapping', () => {
   beforeEach(() => {
     resetAndSeed();
   });
@@ -319,44 +318,6 @@ describe('spark tagDef and fieldDef bootstrapping', () => {
     ensureSparkTagDef();
     const sparkTag = loroDoc.toNodexNode(NDX_T.SPARK);
     expect(sparkTag).toBeDefined();
-  });
-
-  it('creates is/has/about fieldDefs under #source', () => {
-    ensureSourceMetadataFieldDefs();
-
-    const isField = loroDoc.toNodexNode(NDX_F.SOURCE_IS);
-    expect(isField).toBeDefined();
-    expect(isField!.type).toBe('fieldDef');
-    expect(isField!.name).toBe('is');
-    expect(isField!.fieldType).toBe('options');
-
-    const hasField = loroDoc.toNodexNode(NDX_F.SOURCE_HAS);
-    expect(hasField).toBeDefined();
-    expect(hasField!.type).toBe('fieldDef');
-    expect(hasField!.name).toBe('has');
-    expect(hasField!.fieldType).toBe('options');
-    expect(hasField!.cardinality).toBe('list');
-
-    const aboutField = loroDoc.toNodexNode(NDX_F.SOURCE_ABOUT);
-    expect(aboutField).toBeDefined();
-    expect(aboutField!.type).toBe('fieldDef');
-    expect(aboutField!.name).toBe('about');
-    expect(aboutField!.fieldType).toBe('options');
-    expect(aboutField!.cardinality).toBe('list');
-  });
-
-  it('is/has/about fieldDefs are children of #source tagDef', () => {
-    ensureSourceMetadataFieldDefs();
-    expect(loroDoc.getParentId(NDX_F.SOURCE_IS)).toBe(SYS_T.SOURCE);
-    expect(loroDoc.getParentId(NDX_F.SOURCE_HAS)).toBe(SYS_T.SOURCE);
-    expect(loroDoc.getParentId(NDX_F.SOURCE_ABOUT)).toBe(SYS_T.SOURCE);
-  });
-
-  it('ensureSourceMetadataFieldDefs is idempotent', () => {
-    ensureSourceMetadataFieldDefs();
-    ensureSourceMetadataFieldDefs();
-    // Should not error and fieldDefs should still be valid
-    expect(loroDoc.toNodexNode(NDX_F.SOURCE_IS)).toBeDefined();
   });
 });
 
@@ -512,15 +473,6 @@ describe('buildSparkSystemPrompt', () => {
     resetAndSeed();
   });
 
-  it('includes per-value metadata instructions for list fields', () => {
-    const prompt = buildSparkSystemPrompt('test-source-id', 'article');
-
-    // Should instruct separate calls for has/about
-    expect(prompt).toContain('one call PER concept');
-    expect(prompt).toContain('one call PER topic');
-    expect(prompt).toContain('Do NOT combine into comma-separated string');
-  });
-
   it('includes extraction rules in the prompt', () => {
     const prompt = buildSparkSystemPrompt('test-source-id', 'article');
     expect(prompt).toContain('<extraction-rules>');
@@ -531,69 +483,78 @@ describe('buildSparkSystemPrompt', () => {
     const prompt = buildSparkSystemPrompt('my-source-123', 'article');
     expect(prompt).toContain('my-source-123');
   });
+
+  it('includes skeleton and flesh instructions', () => {
+    const prompt = buildSparkSystemPrompt('test-source-id', 'article');
+    expect(prompt).toContain('Skeleton');
+    expect(prompt).toContain('Flesh');
+    expect(prompt).toContain('spark');
+  });
+
+  it('does not include metadata field instructions', () => {
+    const prompt = buildSparkSystemPrompt('test-source-id', 'article');
+    // No is/has/about metadata instructions
+    expect(prompt).not.toContain('one call PER concept');
+    expect(prompt).not.toContain('one call PER topic');
+    expect(prompt).not.toContain('node_edit');
+  });
 });
 
 // ============================================================
 // Collision
 // ============================================================
 
-describe('readSourceMetadata', () => {
+describe('gatherSparkSummary', () => {
   beforeEach(() => {
     resetAndSeed();
-    ensureSourceMetadataFieldDefs();
+    ensureSparkTagDef();
   });
 
-  it('returns empty metadata for node without field entries', () => {
-    // Create a bare source node
+  it('returns empty array for node with no spark children', () => {
     loroDoc.createNode('test-source', SYSTEM_NODE_IDS.JOURNAL);
     loroDoc.addTag('test-source', SYS_T.SOURCE);
     loroDoc.commitDoc();
 
-    const meta = readSourceMetadata('test-source');
-    expect(meta.is).toBeNull();
-    expect(meta.has).toEqual([]);
-    expect(meta.about).toEqual([]);
+    const summary = gatherSparkSummary('test-source');
+    expect(summary).toEqual([]);
   });
 
-  it('reads is field value from field entry', () => {
-    // Create source node with is field entry
+  it('collects spark child names and grandchildren', () => {
     loroDoc.createNode('test-source-2', SYSTEM_NODE_IDS.JOURNAL);
     loroDoc.addTag('test-source-2', SYS_T.SOURCE);
 
-    // Create is field entry
-    loroDoc.createNode('test-fe-is', 'test-source-2');
-    loroDoc.setNodeDataBatch('test-fe-is', { type: 'fieldEntry', fieldDefId: NDX_F.SOURCE_IS });
+    // Create a #spark child node
+    loroDoc.createNode('spark-child-1', 'test-source-2');
+    loroDoc.setNodeRichTextContent('spark-child-1', 'Core framework', [], []);
+    loroDoc.addTag('spark-child-1', NDX_T.SPARK);
 
-    // Create value node (plain text, no targetId)
-    loroDoc.createNode('test-val-is', 'test-fe-is');
-    loroDoc.setNodeRichTextContent('test-val-is', 'technical tutorial', [], []);
+    // Create a grandchild under the spark node
+    loroDoc.createNode('spark-gc-1', 'spark-child-1');
+    loroDoc.setNodeRichTextContent('spark-gc-1', 'Supporting detail', [], []);
     loroDoc.commitDoc();
 
-    const meta = readSourceMetadata('test-source-2');
-    expect(meta.is).toBe('technical tutorial');
+    const summary = gatherSparkSummary('test-source-2');
+    expect(summary).toContain('Core framework');
+    expect(summary).toContain('  - Supporting detail');
   });
 });
 
 describe('buildCollisionSystemPrompt', () => {
-  it('includes metadata context', () => {
+  it('includes spark summary and source node ID', () => {
     const prompt = buildCollisionSystemPrompt(
       'src-123',
-      { is: 'methodological argument', has: ['modularity', 'constraints'], about: ['architecture'] },
-      ['Core framework: constraint-freedom trade-off'],
+      ['Core framework: constraint-freedom trade-off', '  - Detail about modularity'],
     );
 
     expect(prompt).toContain('src-123');
-    expect(prompt).toContain('methodological argument');
-    expect(prompt).toContain('modularity, constraints');
-    expect(prompt).toContain('architecture');
     expect(prompt).toContain('constraint-freedom trade-off');
+    expect(prompt).toContain('Detail about modularity');
   });
 
   it('includes confidence threshold instructions', () => {
     const prompt = buildCollisionSystemPrompt(
       'src-456',
-      { is: null, has: [], about: ['testing'] },
-      [],
+      ['Some spark content'],
     );
 
     expect(prompt).toContain('Confidence threshold');
@@ -601,15 +562,13 @@ describe('buildCollisionSystemPrompt', () => {
     expect(prompt).toContain('0-2 collisions');
   });
 
-  it('handles empty metadata gracefully', () => {
+  it('handles empty spark summary gracefully', () => {
     const prompt = buildCollisionSystemPrompt(
       'src-789',
-      { is: null, has: [], about: [] },
       [],
     );
 
-    expect(prompt).toContain('no metadata available');
-    expect(prompt).toContain('no spark nodes yet');
+    expect(prompt).toContain('no spark nodes');
   });
 });
 

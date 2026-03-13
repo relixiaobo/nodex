@@ -10,8 +10,7 @@
  *   1. Read page content from Shadow Cache (or node children)
  *   2. Create a dedicated agent instance with extraction system prompt
  *   3. Agent uses node_create tool calls to build the #spark subtree
- *   4. Fill is/has/about metadata fields on the #source node (Round 3 Soul)
- *   5. Collision: search for related nodes and create cross-references
+ *   4. Collision: search for related nodes and create cross-references
  *
  * Spark runs as a fire-and-forget background task — it does not block clip
  * and does not interfere with Chat.
@@ -22,12 +21,12 @@ import { getAITools } from './ai-tools/index.js';
 import { getPageContent } from './ai-shadow-cache.js';
 import { getSkillBasedRules, ensureDefaultSkillNodes } from './ai-skills/extraction-presets.js';
 import * as loroDoc from './loro-doc.js';
-import { NDX_T, SYS_T, NDX_F, FIELD_TYPES, SYSTEM_NODE_IDS } from '../types/index.js';
+import { NDX_T, SYS_T, NDX_F, SYSTEM_NODE_IDS } from '../types/index.js';
 
 export const SPARK_COMMIT_ORIGIN = 'ai:spark';
 
 // ============================================================
-// Ensure #spark tagDef and is/has/about fieldDefs
+// Ensure #spark tagDef
 // ============================================================
 
 /**
@@ -41,58 +40,6 @@ export function ensureSparkTagDef(): void {
       name: 'spark',
       color: 'amber',
       description: 'AI structure extraction — cognitive framework, not summary',
-    });
-    loroDoc.commitDoc();
-  }
-}
-
-/**
- * Ensure "is", "has", "about" fieldDefs exist under #source tagDef.
- * These are metadata fields filled by Spark extraction.
- *
- * Assumes #source tagDef (SYS_T.SOURCE) already exists — it is created
- * during the clip flow before Spark triggers.
- */
-export function ensureSourceMetadataFieldDefs(): void {
-
-  // "is" field — content type classification
-  if (!loroDoc.hasNode(NDX_F.SOURCE_IS)) {
-    loroDoc.createNode(NDX_F.SOURCE_IS, SYS_T.SOURCE);
-    loroDoc.setNodeDataBatch(NDX_F.SOURCE_IS, {
-      type: 'fieldDef',
-      name: 'is',
-      fieldType: FIELD_TYPES.OPTIONS,
-      cardinality: 'single',
-      nullable: true,
-      autocollectOptions: true,
-    });
-    loroDoc.commitDoc();
-  }
-
-  // "has" field — core concepts
-  if (!loroDoc.hasNode(NDX_F.SOURCE_HAS)) {
-    loroDoc.createNode(NDX_F.SOURCE_HAS, SYS_T.SOURCE);
-    loroDoc.setNodeDataBatch(NDX_F.SOURCE_HAS, {
-      type: 'fieldDef',
-      name: 'has',
-      fieldType: FIELD_TYPES.OPTIONS,
-      cardinality: 'list',
-      nullable: true,
-      autocollectOptions: true,
-    });
-    loroDoc.commitDoc();
-  }
-
-  // "about" field — topics
-  if (!loroDoc.hasNode(NDX_F.SOURCE_ABOUT)) {
-    loroDoc.createNode(NDX_F.SOURCE_ABOUT, SYS_T.SOURCE);
-    loroDoc.setNodeDataBatch(NDX_F.SOURCE_ABOUT, {
-      type: 'fieldDef',
-      name: 'about',
-      fieldType: FIELD_TYPES.OPTIONS,
-      cardinality: 'list',
-      nullable: true,
-      autocollectOptions: true,
     });
     loroDoc.commitDoc();
   }
@@ -179,8 +126,8 @@ function getSourceUrl(sourceNodeId: string): string | null {
  * Build the Spark extraction system prompt.
  *
  * Uses #skill node rules when available, falls back to hardcoded presets.
- * Metadata instructions guide the agent to fill is/has/about fields correctly
- * (separate node_edit call per value for list-cardinality fields).
+ * The agent creates #spark child nodes as the extraction result —
+ * no separate metadata fields.
  */
 export function buildSparkSystemPrompt(
   sourceNodeId: string,
@@ -196,30 +143,14 @@ export function buildSparkSystemPrompt(
     'You will receive the full text of a web page that the user has clipped.',
     'Your task:',
     '',
-    '1. **Round 1 — Skeleton**: Create 2-5 top-level #spark child nodes under the',
-    `   source node (parentId: "${sourceNodeId}"). Each node captures a core structural`,
-    '   element (framework, thesis, key mechanism) — not a topic heading.',
+    '1. **Skeleton**: Create 2-5 top-level child nodes under the source node',
+    `   (parentId: "${sourceNodeId}"). Each node captures a core structural element`,
+    '   (framework, thesis, key mechanism) — not a topic heading.',
     '   Tag each with "spark".',
     '',
-    '2. **Round 2 — Flesh**: For each skeleton node, create child nodes that capture',
+    '2. **Flesh**: For each skeleton node, create child nodes that capture',
     '   the supporting reasoning: argument chains, implicit assumptions, boundary',
     '   conditions, tensions. Keep these as real child nodes, not descriptions.',
-    '',
-    '3. **Round 3 — Soul (Metadata)**: After extraction, use node_edit to set these',
-    `   fields on the source node (id: "${sourceNodeId}"):`,
-    '',
-    '   a) "is" field (single value): classify the content type.',
-    `      → One call: node_edit(nodeId: "${sourceNodeId}", fields: {"is": "methodological argument"})`,
-    '',
-    '   b) "has" field (multiple values — one call PER concept):',
-    `      → node_edit(nodeId: "${sourceNodeId}", fields: {"has": "modularity"})`,
-    `      → node_edit(nodeId: "${sourceNodeId}", fields: {"has": "constraint theory"})`,
-    '      Each call adds one value. Do NOT combine into comma-separated string.',
-    '',
-    '   c) "about" field (multiple values — one call PER topic):',
-    `      → node_edit(nodeId: "${sourceNodeId}", fields: {"about": "software architecture"})`,
-    `      → node_edit(nodeId: "${sourceNodeId}", fields: {"about": "design philosophy"})`,
-    '      Each call adds one value. Do NOT combine into comma-separated string.',
     '',
     '<extraction-rules>',
     rulesBlock,
@@ -240,85 +171,35 @@ export function buildSparkSystemPrompt(
 // ============================================================
 
 /**
- * Read is/has/about metadata values from a #source node.
+ * Gather #spark children names (with their sub-children) for collision context.
  */
-export function readSourceMetadata(sourceNodeId: string): {
-  is: string | null;
-  has: string[];
-  about: string[];
-} {
-  const result = { is: null as string | null, has: [] as string[], about: [] as string[] };
-  const children = loroDoc.getChildren(sourceNodeId);
-
-  for (const childId of children) {
-    const child = loroDoc.toNodexNode(childId);
-    if (child?.type !== 'fieldEntry') continue;
-
-    const values = readFieldEntryValues(childId);
-
-    if (child.fieldDefId === NDX_F.SOURCE_IS) {
-      result.is = values[0] ?? null;
-    } else if (child.fieldDefId === NDX_F.SOURCE_HAS) {
-      result.has = values;
-    } else if (child.fieldDefId === NDX_F.SOURCE_ABOUT) {
-      result.about = values;
-    }
-  }
-
-  return result;
-}
-
-/**
- * Read display values from a field entry (resolves option targetIds).
- */
-function readFieldEntryValues(fieldEntryId: string): string[] {
-  const valueChildren = loroDoc.getChildren(fieldEntryId);
-  const values: string[] = [];
-  for (const vcId of valueChildren) {
-    const vc = loroDoc.toNodexNode(vcId);
-    if (!vc) continue;
-    // Options field: value node has targetId → resolve to option name
-    if (vc.targetId) {
-      const target = loroDoc.toNodexNode(vc.targetId);
-      if (target?.name) values.push(target.name);
-    } else if (vc.name) {
-      values.push(vc.name);
-    }
-  }
-  return values;
-}
-
-/**
- * Gather #spark children names for collision context.
- */
-function gatherSparkSummary(sourceNodeId: string): string[] {
-  const sparkNames: string[] = [];
+export function gatherSparkSummary(sourceNodeId: string): string[] {
+  const lines: string[] = [];
   const children = loroDoc.getChildren(sourceNodeId);
   for (const childId of children) {
     const child = loroDoc.toNodexNode(childId);
-    if (child?.tags?.includes(NDX_T.SPARK) && child.name) {
-      sparkNames.push(child.name);
+    if (!child?.tags?.includes(NDX_T.SPARK) || !child.name) continue;
+    lines.push(child.name);
+    // Include first-level sub-children for richer context
+    for (const grandchildId of loroDoc.getChildren(childId)) {
+      const gc = loroDoc.toNodexNode(grandchildId);
+      if (gc?.name) lines.push(`  - ${gc.name}`);
     }
   }
-  return sparkNames;
+  return lines;
 }
 
 /**
  * Build the collision detection system prompt.
+ * Collision is driven by the spark extraction content — no structured fields needed.
  */
 export function buildCollisionSystemPrompt(
   sourceNodeId: string,
-  metadata: { is: string | null; has: string[]; about: string[] },
   sparkSummary: string[],
 ): string {
-  const metaLines: string[] = [];
-  if (metadata.is) metaLines.push(`- Content type (is): ${metadata.is}`);
-  if (metadata.has.length > 0) metaLines.push(`- Core concepts (has): ${metadata.has.join(', ')}`);
-  if (metadata.about.length > 0) metaLines.push(`- Topics (about): ${metadata.about.join(', ')}`);
-
   const sparkBlock = sparkSummary.length > 0
-    ? sparkSummary.map((s) => `- ${s}`).join('\n')
-    : '(no spark nodes yet)';
+    ? sparkSummary.join('\n')
+    : '(no spark nodes)';
 
   return [
     'You are soma\'s collision detector. Your job is to find meaningful connections',
@@ -326,10 +207,7 @@ export function buildCollisionSystemPrompt(
     '',
     `Source node ID: "${sourceNodeId}"`,
     '',
-    '<source-metadata>',
-    ...(metaLines.length > 0 ? metaLines : ['(no metadata available)']),
-    '</source-metadata>',
-    '',
+    'Here is the cognitive structure just extracted from this source:',
     '<spark-structure>',
     sparkBlock,
     '</spark-structure>',
@@ -338,18 +216,18 @@ export function buildCollisionSystemPrompt(
     '',
     '1. **Search for candidates**: Use node_search to find potentially related nodes.',
     '   Search strategies (try in order, stop when you have enough candidates):',
-    '   a) Search by "about" topics: node_search(searchTags: ["source"], fields: {"about": "<topic>"})',
-    '   b) Search by "has" concepts: node_search(searchTags: ["source"], fields: {"has": "<concept>"})',
-    '   c) Broad text search: node_search(query: "<key term from spark>")',
+    '   a) Search by tags: node_search(searchTags: ["source"])',
+    '   b) Text search by key concepts from the spark structure:',
+    '      node_search(query: "<key concept>")',
     '   Limit to 10 candidates total. Skip the source node itself.',
     '',
     '2. **Evaluate candidates**: For promising candidates, use node_read to examine',
-    '   their content. Look for:',
+    '   their content and #spark children. Look for:',
     '   - **Cross-domain isomorphism** (highest value): same underlying structure/pattern',
     '     in a different domain (e.g. "software modularity" ↔ "organizational design")',
     '   - **Complementary arguments**: different perspectives on the same mechanism',
     '   - **Tensions or contradictions**: conflicting claims worth surfacing',
-    '   Do NOT report mere topic overlap (e.g. two articles both "about" machine learning).',
+    '   Do NOT report mere topic overlap (e.g. two articles both about machine learning).',
     '',
     '3. **Create collision results**: For each genuinely related node (high confidence only),',
     `   create a child node under the source node (parentId: "${sourceNodeId}") with:`,
@@ -416,9 +294,8 @@ export async function triggerSpark(sourceNodeId: string): Promise<void> {
     // Detect content type for rule selection
     const contentType = detectContentType(sourceNodeId);
 
-    // Ensure #spark tag, is/has/about fields, and default #skill nodes
+    // Ensure #spark tag and default #skill nodes
     ensureSparkTagDef();
-    ensureSourceMetadataFieldDefs();
     ensureDefaultSkillNodes();
 
     // Create a dedicated agent for this extraction
@@ -442,7 +319,6 @@ export async function triggerSpark(sourceNodeId: string): Promise<void> {
     ].join('\n');
 
     // Run the extraction — agent will use node_create via tool calls.
-    // Tool calls commit with AI_COMMIT_ORIGIN internally.
     await agent.prompt(prompt);
 
     console.log('[spark] extraction completed for:', sourceNodeId);
@@ -460,32 +336,28 @@ export async function triggerSpark(sourceNodeId: string): Promise<void> {
 /**
  * Trigger collision detection on a #source node.
  *
- * Reads the source's metadata (is/has/about) and spark structure,
- * then uses a separate agent to search for related nodes in the
- * knowledge graph and create cross-reference collision results.
+ * Reads the spark extraction results and uses a separate agent to search
+ * for related nodes in the knowledge graph.
  *
  * This is a fire-and-forget operation that runs after extraction.
  *
  * @param sourceNodeId - The ID of the #source node to search collisions for
  */
 export async function triggerCollision(sourceNodeId: string): Promise<void> {
-  // Read metadata from the source node (filled by extraction agent)
-  const metadata = readSourceMetadata(sourceNodeId);
-
-  // Skip collision if no metadata to search with
-  if (!metadata.is && metadata.has.length === 0 && metadata.about.length === 0) {
-    console.log('[spark] skipping collision — no metadata available:', sourceNodeId);
-    return;
-  }
-
   // Gather spark structure for context
   const sparkSummary = gatherSparkSummary(sourceNodeId);
+
+  // Skip collision if no spark nodes to search with
+  if (sparkSummary.length === 0) {
+    console.log('[spark] skipping collision — no spark nodes:', sourceNodeId);
+    return;
+  }
 
   // Create a dedicated collision agent
   const collisionAgent = createAgent();
   collisionAgent.setTools(getAITools());
   collisionAgent.setSystemPrompt(
-    buildCollisionSystemPrompt(sourceNodeId, metadata, sparkSummary),
+    buildCollisionSystemPrompt(sourceNodeId, sparkSummary),
   );
 
   const prompt = [

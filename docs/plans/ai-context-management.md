@@ -1,139 +1,94 @@
-# AI 上下文管理重构方案
+# AI 上下文管理方案 (Layer 2: 上下文管线)
 
-> **目标**：充分利用 pi-agent-core 的标准钩子，让上下文组装清晰、分层、可扩展。不重复造轮子——pi-mono 提供的能力直接用。
+> **目标**：充分利用 pi-agent-core 的标准钩子，让上下文组装清晰、分层、可扩展。
+> **更新**：2026-03-13 — Step 1 已完成 (#132)；Step 2 任务已创建，见 TASKS.md「#skill 节点支持」
 
-## 现状问题
+## 三步走状态
 
-### 1. 职责混乱：streamFn 承担了上下文编排
+| Step | 内容 | 状态 | PR |
+|------|------|------|-----|
+| Step 1 | `transformContext` + `convertToLlm` + `getApiKey` + streamFn 简化 | ✅ | #132 |
+| Step 2 | Skill 渐进式披露 | ⬜ | — |
+| Step 3 | Context 自动压缩 (Bridge Message + Handoff Memo) | ⬜ | — |
 
-```
-当前流程：
-streamChat()
-  → configureAgent()          // 读 #agent 配置，一次性设置 systemPrompt + tools + model
-      → setSystemPrompt(base prompt + ALL skill rules)   ← 全量注入
-  → agent.prompt()
-      → streamFn()            // 本应只负责"转发到 proxy"
-          → buildSystemReminder()  ← 在这里注入 panel/page/time 上下文
-          → 拼接到 systemPrompt 末尾
-          → streamProxy()
-```
+## 补充议题：Chat 会话同步
 
-**问题**：
-- `streamFn` 同时做了"上下文注入"和"网络转发"两件事
-- pi-agent-core 提供了 `transformContext` 钩子专门做上下文变换，但没有使用
-- system prompt 在两个地方被修改（`configureAgent` 和 `streamFn`），难以追踪最终发给 LLM 的内容
+当前 Chat 历史只存在本地 IndexedDB，不随工作区同步。用户在设备 A 的对话在设备 B 看不到。
 
-### 2. 没有利用 pi-mono 提供的能力
+**方案选项**：
 
-| pi-mono 能力 | 用途 | 当前状态 |
-|---|---|---|
-| `transformContext` | 上下文变换（注入/压缩） | 未使用，逻辑散落在 streamFn |
-| `convertToLlm` | 自定义消息类型 → LLM 格式 | 未使用 |
-| Custom message types | 声明合并扩展 AgentMessage | 未使用 |
-| `getApiKey` | Agent 构造参数，自动传给 provider | 未使用，在 streamFn 手动解析 |
-| `model.contextWindow` | 模型上下文窗口大小 | 未使用 |
-| `AssistantMessage.usage` | 实际 token 用量 | 未使用 |
-| `isContextOverflow()` | 检测 LLM 溢出错误 | 未使用 |
-
-### 3. Skill 全量注入，没有渐进式披露
-
-```
-当前：
-systemPrompt = base prompt + <skill-context>ALL active skill rules</skill-context>
-
-问题：
-- 5 个 skill × 10 条规则 = 50+ 行始终占用 token
-- AI 大部分时候不需要这些规则
-- 无法根据对话上下文动态选择相关 skill
-```
-
-### 4. 没有上下文窗口管理
-
-- 全量历史发送，无裁剪
-- 长对话会超出 token 限制
-- 没有利用 `transformContext` 做消息裁剪
-
-## 目标架构
-
-```
-streamChat()
-  → configureAgent()                     // 只设置 model + temperature + maxTokens
-  → agent.prompt()
-      → transformContext(messages)        // pi-agent-core 标准钩子
-          → 1. compactIfNeeded()          // token 超阈值时 Handoff 压缩
-          → 2. injectSystemReminder()     // panel/page/time 注入到最后一条 user 消息
-          → return transformedMessages
-      → convertToLlm(messages)           // 自定义消息类型 → LLM 格式（bridge → user）
-      → streamFn()                        // 纯粹的网络转发，不做上下文操作
-          → streamProxy()
-```
-
-### 关键变化
-
-| 维度 | 现在 | 目标 |
+| 方案 | 优点 | 缺点 |
 |------|------|------|
-| **system prompt** | base + all skills + system reminder（拼接） | base prompt only（稳定） |
-| **skill 上下文** | 全量规则塞进 system prompt | name+description 索引 → 按需注入 |
-| **dynamic context** | 在 streamFn 里手动拼接 | 通过 transformContext 标准注入 |
-| **streamFn** | 上下文编排 + 网络转发 + API key 解析 | 纯网络转发 |
-| **API key** | streamFn 内手动获取 | `getApiKey` 构造参数，pi-mono 自动处理 |
-| **context 压缩** | 无 | transformContext 中 token 超阈值自动 Handoff 压缩 |
-| **Bridge Message** | 不存在 | 自定义消息类型 `role: "bridge"`，`convertToLlm` 转换 |
-| **token 追踪** | 无 | `AssistantMessage.usage` 实际用量 + `model.contextWindow` 阈值 |
-| **溢出保护** | 无 | `isContextOverflow()` 兜底检测 |
+| A: Loro CRDT 专用容器 | 天然随工作区同步，离线可用 | messages 数据量大，CRDT 膨胀 |
+| B: Sync API 独立通道 | 轻量，不污染 CRDT | 需要新的 sync 端点，离线体验差 |
+| C: 只同步 session 索引 | 最小改动 | 用户期望看到完整历史 |
+
+**推荐**：方案 A（Loro CRDT），但需要控制数据量——压缩后的 Bridge Message 比全量历史更适合同步。可与 Step 3 (Context 压缩) 协同设计：同步的是"压缩后的会话状态"，而非"全部消息历史"。
+
+**待定决策**：
+- 是否只同步最近 N 个 session？
+- 压缩后的 Bridge Message 是否作为同步单元？
+- 新设备打开时如何呈现同步来的历史？
+
+---
+
+## Step 1 已完成的变化 ✅
+
+以下问题已在 #132 中解决：
+
+~~1. 职责混乱：streamFn 承担了上下文编排~~ → `transformContext` + `getApiKey` 各司其职
+~~2. 没有利用 pi-mono 能力~~ → `transformContext`、`convertToLlm`、`getApiKey` 已接入
+~~3. Skill 全量注入~~ → 待 Step 2 解决
+~~4. 没有上下文窗口管理~~ → 待 Step 3 解决
+
+## 当前架构（Step 1 完成后）
+
+```
+streamChat()
+  → configureAgent()                     // 设置 model + temperature + maxTokens + tools + systemPrompt
+  → agent.prompt()
+      → transformContext(messages)        // ✅ pi-agent-core 标准钩子
+          → stripOldImages()              // ✅ 滑动窗口剥离旧图片
+          → injectReminder()             // ✅ panel/page/time 注入到最后一条 user 消息
+          → return transformedMessages
+      → convertToLlm(messages)           // ✅ 过滤非 LLM 消息类型
+      → streamFn()                        // ✅ 纯网络转发
+          → streamProxyWithApiKey()
+```
+
+### Step 1 完成的变化 ✅
+
+| 维度 | 之前 | 现在 |
+|------|------|------|
+| **dynamic context** | 在 streamFn 里手动拼接 | ✅ `transformContext` 标准注入 |
+| **streamFn** | 上下文编排 + 网络转发 + API key 解析 | ✅ 纯网络转发 |
+| **API key** | streamFn 内手动获取 | ✅ `getApiKey` 构造参数 |
+| **图片管理** | 无 | ✅ `stripOldImages` 滑动窗口 |
+
+### 待完成
+
+| 维度 | 当前 | 目标 |
+|------|------|------|
+| **skill 上下文** | 全量规则塞进 system prompt | Step 2: name+description 索引 → 按需注入 |
+| **context 压缩** | 无 | Step 3: transformContext 中 Handoff 压缩 |
+| **Bridge Message** | 不存在 | Step 3: `role: "bridge"` + `convertToLlm` 转换 |
+| **token 追踪** | 无 | Step 3: `AssistantMessage.usage` + `model.contextWindow` |
+| **溢出保护** | 无 | Step 3: `isContextOverflow()` 兜底 |
 
 ## 详细设计
 
-### 第一步：将 dynamic context 迁移到 transformContext + 清理 streamFn
+### Step 1 ✅ (已完成 — #132)
 
-**文件变更**：
-- `ai-service.ts`：Agent 创建时注册 `transformContext`、`convertToLlm`、`getApiKey`，简化 `streamFn`
+实际实现见 `src/lib/ai-service.ts` 的 `createAgent()` + `src/lib/ai-context.ts`。
 
-```typescript
-// ai-service.ts — createAgent()
-new Agent({
-  // API key 解析交给 pi-mono
-  getApiKey: async () => {
-    const key = await getApiKey();
-    return key ?? undefined;
-  },
+关键实现细节：
+- `transformContext`：先 `stripOldImages()`（滑动窗口保留最近 N 轮图片），再 `injectReminder()`
+- `convertToLlm`：过滤只保留 user / assistant / toolResult
+- `getApiKey`：从 Settings 节点或 legacy chrome.storage 读取
+- `streamFn`：提取为 `streamProxyWithApiKey()`，只做认证 + 网络转发
+- `ai-proxy.ts`：从 `ai-service.ts` 独立出来的代理层
 
-  // 上下文变换：注入 system reminder 到最后一条 user 消息
-  transformContext: async (messages, signal) => {
-    const reminder = await buildSystemReminder();
-    return injectReminder(messages, reminder);
-  },
-
-  // 自定义消息类型转换（Step 4 加入 bridge 处理，此步先透传）
-  convertToLlm: (messages) => {
-    return messages.filter(m =>
-      m.role === 'user' || m.role === 'assistant' || m.role === 'toolResult'
-    );
-  },
-
-  // streamFn 只负责网络转发
-  streamFn: async (activeModel, context, options = {}) => {
-    const authToken = await getStoredToken();
-    if (!authToken) throw new Error('Please sign in to use Chat');
-
-    const runtime = getAgentRuntimeState(agent);
-    return streamProxy(activeModel, context, {
-      ...options,
-      temperature: runtime.temperature,
-      maxTokens: runtime.maxTokens,
-      authToken,
-      proxyUrl: getSyncApiUrl(),
-    });
-  },
-});
-```
-
-**注入方式**：system reminder 作为最后一条 user message 的附加内容（而非拼接到 systemPrompt），这样：
-- system prompt 保持稳定（不是每次调用都不同）
-- 动态上下文与消息历史在同一层级
-- 符合 pi-agent-core 的 `transformContext` 设计意图
-
-### 第二步：Skill 渐进式披露
+### Step 2：Skill 渐进式披露
 
 **核心思路**：
 
@@ -156,7 +111,7 @@ When you need a skill's detailed rules, use node_read to read the skill node's c
 - 索引中给出 skill node id，AI 用 `node_read(id, depth=1)` 读取规则
 - 符合"一切皆节点"原则
 
-### 第三步：System Prompt 分层
+### Step 2 补充：System Prompt 分层
 
 最终的 system prompt 结构（稳定，不随每次消息变化）：
 
@@ -179,7 +134,7 @@ When you need a skill's detailed rules, use node_read to read the skill node's c
 
 动态上下文（panel/page/time）不再进 system prompt，而是通过 `transformContext` 注入到消息流中。
 
-### 第四步：Context 自动压缩（Handoff Memo 模式）
+### Step 3：Context 自动压缩（Handoff Memo 模式）
 
 核心思想：压缩不是"总结对话"，而是**给接替你的同事写一份交接备忘录**。用同一模型生成（命中 prompt cache），用 Bridge Message 无缝衔接（用户无感知）。
 
@@ -494,29 +449,35 @@ When you need a skill's detailed rules, use node_read to read the skill node's c
 
 ## 文件清单
 
+### Step 1 已完成 ✅
+
 | 文件 | 操作 | 说明 |
 |------|------|------|
-| `src/lib/ai-service.ts` | 修改 | 添加 `transformContext`/`convertToLlm`/`getApiKey`，简化 `streamFn` |
-| `src/lib/ai-types.ts` | 新建 | Bridge 自定义消息类型声明合并 |
-| `src/lib/ai-agent-node.ts` | 修改 | `buildAgentSystemPrompt()` 不再全量注入 skill rules，改为 skill 索引 |
-| `src/lib/ai-context.ts` | 修改 | 新增 `injectReminder()` 函数（注入到消息流而非 systemPrompt） |
-| `src/lib/ai-tools/index.ts` | 不变 | 工具集保持不变（skill 读取复用 node_read） |
+| `src/lib/ai-service.ts` | ✅ 修改 | 添加 `transformContext`/`convertToLlm`/`getApiKey`，简化 `streamFn` |
+| `src/lib/ai-context.ts` | ✅ 修改 | `buildSystemReminder()` + `injectReminder()` + `stripOldImages()` |
+| `src/lib/ai-proxy.ts` | ✅ 新建 | 从 ai-service 提取的代理层 |
+| `tests/vitest/ai-context.test.ts` | ✅ 新建 | transformContext 注入逻辑测试 |
+
+### Step 2 待做
+
+| 文件 | 操作 | 说明 |
+|------|------|------|
+| `src/lib/ai-agent-node.ts` | 修改 | `buildAgentSystemPrompt()` 改为 skill 索引 |
 | `tests/vitest/ai-agent-node.test.ts` | 修改 | 更新 skill 相关测试 |
-| `tests/vitest/ai-context.test.ts` | 新建 | transformContext 注入逻辑测试 |
-| `src/lib/ai-compress.ts` | 新建 | Handoff 压缩逻辑（token 追踪 + Compact Prompt + Bridge 构建） |
+
+### Step 3 待做
+
+| 文件 | 操作 | 说明 |
+|------|------|------|
+| `src/lib/ai-types.ts` | 新建 | Bridge 自定义消息类型声明合并 |
+| `src/lib/ai-compress.ts` | 新建 | Handoff 压缩逻辑 |
+| `src/lib/ai-context.ts` | 修改 | `transformContext` 中加入 `compactIfNeeded()` |
 | `tests/vitest/ai-compress.test.ts` | 新建 | 压缩触发条件 + 边界保护测试 |
-
-## 实施顺序
-
-1. **Step 1**：迁移到 `transformContext` + `convertToLlm` + `getApiKey`，简化 `streamFn`（纯重构，行为不变）
-2. **Step 2**：Skill 渐进式披露（system prompt 只放索引，skill rules 按需读取）
-3. **Step 3**：Context 自动压缩（Bridge 自定义消息类型 + token 追踪 + Handoff Memo + 溢出兜底）
 
 ## 不做的事
 
 - 不新增 `get_skill` 专用工具 — 复用 node_read
 - 不做 embedding 相关的 skill 匹配 — 索引足够小，AI 自己判断
 - 不改 tool 定义和注册方式 — 当前工具的静态注册没有问题
-- 不改 chat 持久化 — IndexedDB 方案足够
 - 不引入精确 tokenizer — 用 `AssistantMessage.usage` 实际数据，不需要预估
 - 不自建溢出检测 — 用 pi-ai 的 `isContextOverflow()`

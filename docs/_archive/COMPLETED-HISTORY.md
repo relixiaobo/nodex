@@ -2,6 +2,19 @@
 
 > 从 `docs/TASKS.md` 迁出的历史已完成条目。TASKS.md 只保留最近一周。
 
+## 2026-03-07
+
+| 任务 | Agent | PR |
+|------|-------|-----|
+| 高亮点击呼出笔记 — 点击高亮文本打开笔记浮窗，链接/按钮放行原生行为 | nodex | main |
+| 高亮交互清理 — 移除 HIGHLIGHT_CLICK 死代码 + updateSaveButtonState no-op | nodex | main |
+
+## 2026-03-06
+
+| 任务 | Agent | PR |
+|------|-------|-----|
+| About 分离为 app panel + Settings 数据迁移 — About 从节点→纯 UI 路由(`app:about`)；Settings highlightEnabled 从 ui-store→LoroDoc 字段 + chrome.storage 投影 | nodex | main |
+
 ## 2026-03-05
 
 | 任务 | Agent | PR |

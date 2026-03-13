@@ -22,13 +22,15 @@ _(空)_
 
 | 工作区 | 分支 | 任务 | 状态 |
 |--------|------|------|------|
-| _(空)_ | | | |
+| nodex-claude | feat/phase-2-reading-loop | Phase 2: 阅读环 (#130) | 待开始 |
+| nodex-codex | feat/phase-3-browser-tool | Phase 3: 浏览器工具 (#131) | 待开始 |
 
 ---
 
 ## 进行中
 
-_(空)_
+- [ ] **Phase 2: 阅读环** (#130) — Review 现有 Spark 实现 → Round 3 Soul → 碰撞策略 → #skill 节点 `→ nodex-claude`
+- [ ] **Phase 3: 浏览器工具** (#131) — Review 现有 Batch 1 → CDP 基础设施 → Batch 2/3/4 `→ nodex-codex`
 
 ---
 

@@ -23,14 +23,12 @@ _(空)_
 | 工作区 | 分支 | 任务 | 状态 |
 |--------|------|------|------|
 | nodex-claude | feat/phase-2-reading-loop | Phase 2: 阅读环 (#130) | 待开始 |
-| nodex-codex | feat/phase-3-browser-tool | Phase 3: 浏览器工具 (#131) | 待 Review |
 
 ---
 
 ## 进行中
 
 - [ ] **Phase 2: 阅读环** (#130) — Review 现有 Spark 实现 → Round 3 Soul → 碰撞策略 → #skill 节点 `→ nodex-claude`
-- [x] **Phase 3: 浏览器工具** (#131) — Review 现有 Batch 1 → CDP 基础设施 → Batch 2/3/4 `→ nodex-codex`
 
 ---
 
@@ -163,6 +161,8 @@ _(空)_
 
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
+| 2026-03-13 | Browser tool 审计优化 — 修正参数描述、移除冗余返回值、添加分页提示 | nodex | main |
+| 2026-03-13 | Phase 3: 浏览器工具 (#131) — CDP screenshot + interaction + debugging | codex | #131 |
 | 2026-03-13 | 多 Agent 工作流重构 — 固定 worktree + PR 协作流程，移除 dispatcher/subagent 模式 | nodex | main |
 | 2026-03-13 | Phase 3 Batch 1: browser tool 观察能力 — get_text + get_metadata + find + get_selection | codex | main |
 | 2026-03-13 | Phase 2 Step 1: Spark 结构提取 — ai-spark.ts + shadow cache + extraction presets + webclip 集成 | claude | main |

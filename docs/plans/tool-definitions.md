@@ -561,11 +561,11 @@ description: |
       + "Returns up to 20 matching excerpts with surrounding context (50 chars before/after).",
   },
 
-  // ── click / fill_form / drag ──
+  // ── click / type / fill_form / drag ──
 
   selector: {
     type: "string",
-    description: "CSS selector of the target element. For 'click', 'fill_form', and 'drag'. "
+    description: "CSS selector of the target element. For 'click', 'type', 'fill_form', and 'drag'. "
       + "Examples: 'button.submit', '#login-form input[type=email]', '[data-testid=save-btn]'. "
       + "If the selector matches multiple elements, the first visible one is used.",
   },
@@ -573,7 +573,7 @@ description: |
   elementDescription: {
     type: "string",
     description: "Natural language description of the element to interact with. "
-      + "Alternative to selector — the system uses page structure to find the best match. "
+      + "For 'click', 'type'. Alternative to selector — the system uses page structure to find the best match. "
       + "Examples: 'the login button', 'search input field', 'the third item in the list'. "
       + "Provide either selector or elementDescription, not both.",
   },
@@ -706,9 +706,12 @@ description: |
   "text": "Article content here...",
   "totalLength": 45000,
   "offset": 0,
-  "truncated": true
+  "truncated": true,
+  "nextOffset": 30000,
+  "hint": "Use textOffset to read the next page."
 }
 ```
+`nextOffset` and `hint` only present when `truncated` is true.
 
 **get_metadata** returns:
 ```json
@@ -757,7 +760,22 @@ Plus the image content in the tool result.
 
 **type** returns:
 ```json
-{ "typed": true, "length": 15 }
+{ "typed": true }
+```
+
+**key** returns:
+```json
+{ "pressed": true }
+```
+
+**scroll** returns:
+```json
+{ "scrolled": true }
+```
+
+**fill_form** returns:
+```json
+{ "filled": true }
 ```
 
 **drag** returns:
@@ -769,8 +787,7 @@ Plus the image content in the tool result.
 ```json
 {
   "url": "https://example.com/page",
-  "title": "Page Title",
-  "loaded": true
+  "title": "Page Title"
 }
 ```
 
@@ -782,6 +799,26 @@ Plus the image content in the tool result.
     { "tabId": 456, "title": "Other Page", "url": "https://...", "active": false }
   ]
 }
+```
+
+**tab** (switch) returns:
+```json
+{ "switched": true, "title": "Page Title", "url": "https://..." }
+```
+
+**tab** (create) returns:
+```json
+{ "created": true, "tabId": 789, "title": "", "url": "https://..." }
+```
+
+**tab** (close) returns:
+```json
+{ "closed": true }
+```
+
+**wait** returns:
+```json
+{ "waited": true, "duration": 3 }
 ```
 
 **read_network** returns:

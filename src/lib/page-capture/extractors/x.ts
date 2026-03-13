@@ -220,6 +220,20 @@ function extractTweetArticleParts(article: Element, videoMp4Url?: string): strin
   return parts;
 }
 
+function extractXTimelineContent(document: Document): string {
+  const articles = Array.from(document.querySelectorAll('article[data-testid="tweet"]'));
+  if (articles.length === 0) return '';
+
+  const items: string[] = [];
+  for (const article of articles) {
+    const parts = extractTweetArticleParts(article);
+    if (parts.length === 0) continue;
+    items.push(`<li>${parts.join('\n')}</li>`);
+  }
+
+  return items.length > 0 ? `<h2>Posts</h2>\n<ul>${items.join('\n')}</ul>` : '';
+}
+
 function extractXPageContent(document: Document, videoMp4Url?: string): string {
   const richTextView = document.querySelector('[data-testid="twitterArticleRichTextView"]');
   if (richTextView) return richTextView.innerHTML;
@@ -306,7 +320,7 @@ export const xPageCaptureExtractor: PageCaptureSiteExtractor = {
       contentKind = 'profile';
       const profileTitle = extractXProfileTitle(document);
       const profileContent = extractXProfileContent(document);
-      const timelineContent = extractXPageContent(document);
+      const timelineContent = extractXTimelineContent(document);
       const bioElement = document.querySelector('[data-testid="UserDescription"]');
       const handle = location.pathname.split('/')[1];
 

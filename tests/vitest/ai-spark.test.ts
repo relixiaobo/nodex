@@ -2,7 +2,7 @@
  * ai-spark — Spark structure extraction tests.
  *
  * Tests cover:
- * - Spark trigger conditions (shouldAutoTrigger)
+ * - Spark response parsing
  * - Shadow Cache read/write + TTL expiry
  * - #spark tagDef bootstrapping
  * - Spark #agent node bootstrapping and config reading
@@ -16,7 +16,6 @@ import {
 } from '../../src/lib/ai-shadow-cache.js';
 import {
   ensureSparkTagDef,
-  shouldAutoTrigger,
   parseSparkResponse,
   SPARK_COMMIT_ORIGIN,
 } from '../../src/lib/ai-spark.js';
@@ -355,14 +354,6 @@ describe('spark agent config reading', () => {
   });
 });
 
-describe('shouldAutoTrigger', () => {
-  it('delegates to hasApiKey and returns a boolean', async () => {
-    // In test environment there's no chrome.storage and no Settings node
-    // with an API key, so shouldAutoTrigger should return false.
-    const result = await shouldAutoTrigger();
-    expect(typeof result).toBe('boolean');
-  });
-});
 
 describe('parseSparkResponse', () => {
   it('parses new format: { napkin, insights }', () => {

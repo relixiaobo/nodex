@@ -12,7 +12,7 @@ import { ensureTodayNode } from './journal.js';
 import { resolveFieldOptions } from './field-utils.js';
 import { getWorkspaceTopLevelNodeIds } from './system-node-presets.js';
 import { cachePageContent } from './ai-shadow-cache.js';
-import { shouldAutoTrigger, createSparkPlaceholder, triggerSparkExtraction, findSparkChild } from './ai-spark.js';
+import { ensureSparkPlaceholder, autoTriggerSpark } from './ai-spark.js';
 
 const CLIP_SCAN_SKIP_IDS: ReadonlySet<string> = new Set([
   SYSTEM_NODE_IDS.JOURNAL,
@@ -495,19 +495,8 @@ export async function fillClipShell(
     void cachePageContent(payload.url, payload.pageText).catch(() => {});
   }
 
-  // Create Spark placeholder (always) + auto-trigger extraction (if API key available)
-  const sparkId = createSparkPlaceholder(targetId);
-  if (sparkId) {
-    void (async () => {
-      try {
-        if (await shouldAutoTrigger()) {
-          void triggerSparkExtraction(sparkId, targetId, payload.pageText ?? undefined);
-        }
-      } catch {
-        // Spark trigger errors never affect clip
-      }
-    })();
-  }
+  // Spark: create placeholder + auto-trigger extraction (active clip)
+  autoTriggerSpark(targetId, payload.pageText ?? undefined);
 
   return targetId;
 }
@@ -556,19 +545,8 @@ export async function saveWebClip(
     void cachePageContent(payload.url, payload.pageText).catch(() => {});
   }
 
-  // 9. Create Spark placeholder + auto-trigger extraction (if API key available)
-  const sparkId = createSparkPlaceholder(clipNode.id);
-  if (sparkId) {
-    void (async () => {
-      try {
-        if (await shouldAutoTrigger()) {
-          void triggerSparkExtraction(sparkId, clipNode.id, payload.pageText ?? undefined);
-        }
-      } catch {
-        // Spark trigger errors never affect clip
-      }
-    })();
-  }
+  // 9. Spark: create placeholder + auto-trigger extraction (active clip)
+  autoTriggerSpark(clipNode.id, payload.pageText ?? undefined);
 
   return clipNode.id;
 }
@@ -702,7 +680,7 @@ export async function createLightweightClip(
   store.setFieldValue(clipNode.id, NDX_F.SOURCE_URL, [pageUrl]);
 
   // Spark placeholder only — passive clip, user can trigger manually
-  createSparkPlaceholder(clipNode.id);
+  ensureSparkPlaceholder(clipNode.id);
 
   return clipNode.id;
 }
@@ -739,18 +717,6 @@ export async function applyWebClipToNode(
     store.updateNodeDescription(nodeId, payload.description);
   }
 
-  // 7. Trigger Spark on existing placeholder (or create one) — this is an active clip
-  let sparkId = findSparkChild(nodeId);
-  if (!sparkId) sparkId = createSparkPlaceholder(nodeId);
-  if (sparkId) {
-    void (async () => {
-      try {
-        if (await shouldAutoTrigger()) {
-          void triggerSparkExtraction(sparkId!, nodeId, payload.pageText ?? undefined);
-        }
-      } catch {
-        // Spark trigger errors never affect clip
-      }
-    })();
-  }
+  // 7. Spark: ensure placeholder + auto-trigger extraction (active clip)
+  autoTriggerSpark(nodeId, payload.pageText ?? undefined);
 }

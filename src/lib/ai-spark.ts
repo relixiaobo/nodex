@@ -2,7 +2,7 @@
  * AI Spark — structure extraction from clipped content.
  *
  * Two-phase flow:
- *   1. createSparkPlaceholder() — immediate: creates empty #spark node (pending state)
+ *   1. ensureSparkPlaceholder() — immediate: creates empty #spark node (pending state)
  *   2. triggerSparkExtraction() — async: LLM call → napkin name + insight children
  *
  * The #spark node has three states, driven by children + UI loading set:
@@ -57,7 +57,7 @@ export function ensureSparkTagDef(): void {
 }
 
 // ============================================================
-// Content reading (fallback when content not passed directly)
+// Content reading
 // ============================================================
 
 async function readPageContent(sourceNodeId: string): Promise<string | null> {
@@ -224,10 +224,6 @@ function buildInsightNodes(sparkNodeId: string, insights: SparkInsight[]): numbe
 // Public API
 // ============================================================
 
-export async function shouldAutoTrigger(): Promise<boolean> {
-  return hasApiKey();
-}
-
 /**
  * Find an existing #spark child node under a source node.
  */
@@ -241,21 +237,19 @@ export function findSparkChild(sourceNodeId: string): string | null {
 }
 
 /**
- * Create an empty #spark placeholder node under a source node.
- * The node starts in "pending" state (no name, no children).
- * Returns the spark node ID, or null if one already exists.
+ * Find or create a #spark placeholder under a source node.
+ * Idempotent — returns existing spark node ID if one exists.
  */
-export function createSparkPlaceholder(sourceNodeId: string): string | null {
-  // Don't create duplicate — if #spark child already exists, skip
-  if (findSparkChild(sourceNodeId)) return null;
+export function ensureSparkPlaceholder(sourceNodeId: string): string {
+  const existing = findSparkChild(sourceNodeId);
+  if (existing) return existing;
 
   ensureSparkTagDef();
   ensureSparkAgentNode();
 
   return withCommitOrigin(AI_COMMIT_ORIGIN, () => {
     const store = useNodeStore.getState();
-    // Empty name — OutlinerItem detects pending state and renders button
-    const created = store.createChild(sourceNodeId, undefined, {}, { commit: false });
+    const created = store.createChild(sourceNodeId, undefined, { name: 'Spark' }, { commit: false });
     applyTagMutationsNoCommit(created.id, NDX_T.SPARK);
     syncTemplateMutationsNoCommit(created.id);
     commitDoc();
@@ -266,18 +260,13 @@ export function createSparkPlaceholder(sourceNodeId: string): string | null {
 /**
  * Run Spark extraction on an existing #spark placeholder node.
  * Transitions: pending → loading → complete (or back to pending on failure).
- *
- * @param sparkNodeId - The #spark placeholder node
- * @param sourceNodeId - The parent #source node (for content reading)
- * @param providedContent - Optional pre-fetched page content
  */
 export async function triggerSparkExtraction(
   sparkNodeId: string,
   sourceNodeId: string,
   providedContent?: string,
 ): Promise<void> {
-  const ui = useUIStore.getState();
-  ui.addLoadingNode(sparkNodeId);
+  useUIStore.getState().addLoadingNode(sparkNodeId);
 
   try {
     const pageContent = providedContent || await readPageContent(sourceNodeId);
@@ -323,26 +312,32 @@ export async function triggerSparkExtraction(
 }
 
 /**
- * Legacy convenience: create placeholder + immediately trigger extraction.
- * Used by triggerSpark callers that haven't migrated to the two-phase API.
+ * Create placeholder + auto-trigger extraction if API key available.
+ * Used by clip flows for active clips.
  */
-export async function triggerSpark(sourceNodeId: string, providedContent?: string): Promise<void> {
-  try {
-    const sourceNode = loroDoc.toNodexNode(sourceNodeId);
-    if (!sourceNode) {
-      console.warn('[spark] source node not found:', sourceNodeId);
-      return;
+export function autoTriggerSpark(sourceNodeId: string, providedContent?: string): void {
+  const sparkId = ensureSparkPlaceholder(sourceNodeId);
+  void (async () => {
+    try {
+      if (await hasApiKey()) {
+        await triggerSparkExtraction(sparkId, sourceNodeId, providedContent);
+      }
+    } catch {
+      // Spark errors never affect clip
     }
+  })();
+}
 
-    // Create or find existing placeholder
-    let sparkNodeId = findSparkChild(sourceNodeId);
-    if (!sparkNodeId) {
-      sparkNodeId = createSparkPlaceholder(sourceNodeId);
-    }
-    if (!sparkNodeId) return;
-
-    await triggerSparkExtraction(sparkNodeId, sourceNodeId, providedContent);
-  } catch (error) {
-    console.error('[spark] extraction failed:', error);
+/**
+ * Handle user clicking "Generate Spark" on a pending #spark node.
+ * Checks API key, then triggers extraction.
+ */
+export async function handleSparkClick(sparkNodeId: string, sourceNodeId: string): Promise<void> {
+  const hasKey = await hasApiKey();
+  if (!hasKey) {
+    // TODO: navigate to Settings or show toast
+    console.warn('[spark] No API key configured');
+    return;
   }
+  await triggerSparkExtraction(sparkNodeId, sourceNodeId);
 }

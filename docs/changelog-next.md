@@ -29,3 +29,5 @@
 - AI 上下文管理重构：动态上下文注入迁移到 `transformContext` hook，API key 通过标准 `getApiKey` 解析，`streamFn` 简化为纯转发
 - 修复 AI Chat 在多轮截图/图片工具调用时的上下文膨胀与持久化卡顿问题：旧图片会从 prompt 上下文和本地聊天缓存中剥离，避免扩展因大体积 base64 消息崩溃
 - 网页抓取增强：x.com 个人主页现在包含 timeline 推文列表；GitHub issue/PR 页面现在包含全部评论（含作者）
+- x.com 抓取深度增强：每条推文现在包含作者、ISO 时间戳、转帖/置顶标记，引用推文以 blockquote 形式嵌入
+- 修复 AI browser tool `get_text` 输出结构丢失的问题（HTML 块级标签现在正确转为换行符）

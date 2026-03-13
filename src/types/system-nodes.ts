@@ -324,12 +324,6 @@ export const NDX_F = {
   AGENT_MAX_TOKENS: 'NDX_F15',
   /** #agent: active skills (options_from_supertag → #skill) */
   AGENT_SKILLS: 'NDX_F16',
-  /** #source: "is" metadata — content type classification (e.g. "methodological argument") */
-  SOURCE_IS: 'NDX_F17',
-  /** #source: "has" metadata — core concepts (e.g. "modularity, constraint theory") */
-  SOURCE_HAS: 'NDX_F18',
-  /** #source: "about" metadata — topics (e.g. "software architecture") */
-  SOURCE_ABOUT: 'NDX_F19',
   /** #skill: trigger condition — content type match (e.g. "article", "video") */
   SKILL_TRIGGER: 'NDX_F20',
 } as const;

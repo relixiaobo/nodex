@@ -35,7 +35,7 @@ export default defineConfig({
       '48':  `${iconDir}/48.png`,
       '128': `${iconDir}/128.png`,
     },
-    permissions: ['storage', 'unlimitedStorage', 'sidePanel', 'activeTab', 'identity', 'scripting'],
+    permissions: ['storage', 'unlimitedStorage', 'sidePanel', 'activeTab', 'identity', 'scripting', 'debugger'],
     host_permissions: [
       '<all_urls>',                                               // executeScript on any tab
       ...(!isStore && !isPreview ? [

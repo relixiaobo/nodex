@@ -1,3 +1,4 @@
+import type { AgentMessage } from '@mariozechner/pi-agent-core';
 import * as loroDoc from './loro-doc.js';
 import { getAncestorChain } from './tree-utils.js';
 import { isOutlinerContentNodeType } from './node-type-utils.js';
@@ -102,4 +103,50 @@ export async function buildSystemReminder(): Promise<string> {
 
   if (sections.length === 0) return '';
   return `<system-reminder>\n${sections.join('\n\n')}\n</system-reminder>`;
+}
+
+export function injectReminder(messages: AgentMessage[], reminder: string): AgentMessage[] {
+  const normalizedReminder = reminder.trim();
+  if (!normalizedReminder) return messages;
+
+  const userMessageIndex = [...messages]
+    .map((message, index) => ({ message, index }))
+    .reverse()
+    .find(({ message }) => message.role === 'user')
+    ?.index;
+
+  if (userMessageIndex == null) return messages;
+
+  const userMessage = messages[userMessageIndex];
+  if (userMessage.role !== 'user') return messages;
+
+  const nextMessages = messages.slice();
+
+  if (typeof userMessage.content === 'string') {
+    nextMessages[userMessageIndex] = {
+      ...userMessage,
+      content: `${userMessage.content}\n\n${normalizedReminder}`,
+    };
+    return nextMessages;
+  }
+
+  const nextContent = userMessage.content.slice();
+  const lastContent = nextContent[nextContent.length - 1];
+  if (lastContent?.type === 'text') {
+    nextContent[nextContent.length - 1] = {
+      ...lastContent,
+      text: `${lastContent.text}\n\n${normalizedReminder}`,
+    };
+  } else {
+    nextContent.push({
+      type: 'text',
+      text: normalizedReminder,
+    });
+  }
+
+  nextMessages[userMessageIndex] = {
+    ...userMessage,
+    content: nextContent,
+  };
+  return nextMessages;
 }

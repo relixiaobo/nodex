@@ -1,13 +1,14 @@
 /**
  * AI Spark — structure extraction from clipped content.
  *
- * Flow:
- *   1. Read config from Spark #agent node (system prompt + model settings)
- *   2. Pre-create #spark container node (user sees it immediately)
- *   3. Single LLM call: system prompt (from agent node) + user prompt (content) → JSON
- *   4. Parse JSON → create child nodes under the container
+ * Two-phase flow:
+ *   1. createSparkPlaceholder() — immediate: creates empty #spark node (pending state)
+ *   2. triggerSparkExtraction() — async: LLM call → napkin name + insight children
  *
- * No Agent class, no tools. Simple prompt → response → build nodes.
+ * The #spark node has three states, driven by children + UI loading set:
+ *   - pending:  no children, not loading → clickable "Generate Spark" button
+ *   - loading:  in loadingNodeIds → spinning bullet + "Generating..."
+ *   - complete: has children → napkin name + insight tree
  */
 
 import { getModel } from '@mariozechner/pi-ai';
@@ -19,6 +20,7 @@ import { ensureSparkAgentNode, readSparkAgentConfig } from './ai-agent-node.js';
 import * as loroDoc from './loro-doc.js';
 import { AI_COMMIT_ORIGIN, withCommitOrigin, commitDoc } from './loro-doc.js';
 import { useNodeStore, applyTagMutationsNoCommit, syncTemplateMutationsNoCommit } from '../stores/node-store.js';
+import { useUIStore } from '../stores/ui-store.js';
 import { NDX_T, NDX_F, SYSTEM_NODE_IDS } from '../types/index.js';
 
 export const SPARK_COMMIT_ORIGIN = 'ai:spark';
@@ -192,17 +194,6 @@ export function parseSparkResponse(text: string): SparkResponse {
 // Node creation
 // ============================================================
 
-function createSparkContainer(sourceNodeId: string): string {
-  return withCommitOrigin(AI_COMMIT_ORIGIN, () => {
-    const store = useNodeStore.getState();
-    const created = store.createChild(sourceNodeId, undefined, { name: 'Spark' }, { commit: false });
-    applyTagMutationsNoCommit(created.id, NDX_T.SPARK);
-    syncTemplateMutationsNoCommit(created.id);
-    commitDoc();
-    return created.id;
-  });
-}
-
 function buildInsightTree(
   store: ReturnType<typeof useNodeStore.getState>,
   parentId: string,
@@ -217,13 +208,6 @@ function buildInsightTree(
     }
   }
   return count;
-}
-
-function updateSparkContainerName(sparkNodeId: string, napkin: string): void {
-  withCommitOrigin(AI_COMMIT_ORIGIN, () => {
-    loroDoc.setNodeRichTextContent(sparkNodeId, napkin, [], []);
-    commitDoc();
-  });
 }
 
 function buildInsightNodes(sparkNodeId: string, insights: SparkInsight[]): number {
@@ -245,41 +229,67 @@ export async function shouldAutoTrigger(): Promise<boolean> {
 }
 
 /**
- * Trigger Spark extraction on a #source node.
- *
- * 1. Reads config from the Spark #agent node (system prompt + model settings)
- * 2. Pre-creates a single #spark container (appears immediately)
- * 3. Single LLM call → JSON response
- * 4. Parse JSON → create child nodes
- *
- * Fire-and-forget — errors are logged but never propagate.
+ * Find an existing #spark child node under a source node.
  */
-export async function triggerSpark(sourceNodeId: string, providedContent?: string): Promise<void> {
-  try {
-    const sourceNode = loroDoc.toNodexNode(sourceNodeId);
-    if (!sourceNode) {
-      console.warn('[spark] source node not found:', sourceNodeId);
-      return;
-    }
+export function findSparkChild(sourceNodeId: string): string | null {
+  const children = loroDoc.getChildren(sourceNodeId);
+  for (const childId of children) {
+    const child = loroDoc.toNodexNode(childId);
+    if (child?.tags.includes(NDX_T.SPARK)) return childId;
+  }
+  return null;
+}
 
+/**
+ * Create an empty #spark placeholder node under a source node.
+ * The node starts in "pending" state (no name, no children).
+ * Returns the spark node ID, or null if one already exists.
+ */
+export function createSparkPlaceholder(sourceNodeId: string): string | null {
+  // Don't create duplicate — if #spark child already exists, skip
+  if (findSparkChild(sourceNodeId)) return null;
+
+  ensureSparkTagDef();
+  ensureSparkAgentNode();
+
+  return withCommitOrigin(AI_COMMIT_ORIGIN, () => {
+    const store = useNodeStore.getState();
+    // Empty name — OutlinerItem detects pending state and renders button
+    const created = store.createChild(sourceNodeId, undefined, {}, { commit: false });
+    applyTagMutationsNoCommit(created.id, NDX_T.SPARK);
+    syncTemplateMutationsNoCommit(created.id);
+    commitDoc();
+    return created.id;
+  });
+}
+
+/**
+ * Run Spark extraction on an existing #spark placeholder node.
+ * Transitions: pending → loading → complete (or back to pending on failure).
+ *
+ * @param sparkNodeId - The #spark placeholder node
+ * @param sourceNodeId - The parent #source node (for content reading)
+ * @param providedContent - Optional pre-fetched page content
+ */
+export async function triggerSparkExtraction(
+  sparkNodeId: string,
+  sourceNodeId: string,
+  providedContent?: string,
+): Promise<void> {
+  const ui = useUIStore.getState();
+  ui.addLoadingNode(sparkNodeId);
+
+  try {
     const pageContent = providedContent || await readPageContent(sourceNodeId);
     if (!pageContent) {
       console.warn('[spark] no content available for extraction:', sourceNodeId);
       return;
     }
 
-    // Bootstrap
     ensureSparkTagDef();
     ensureSparkAgentNode();
-
-    // Read config from Spark #agent node
     const config = readSparkAgentConfig();
 
-    // 1. Container appears immediately
-    const sparkNodeId = createSparkContainer(sourceNodeId);
-    console.log('[spark] container created:', sparkNodeId);
-
-    // 2. Single LLM call
     const truncated = pageContent.length > 100_000
       ? pageContent.slice(0, 100_000) + '\n\n[Content truncated]'
       : pageContent;
@@ -292,17 +302,46 @@ export async function triggerSpark(sourceNodeId: string, providedContent?: strin
       config.maxTokens,
     );
 
-    // 3. Parse and build nodes
     const response = parseSparkResponse(responseText);
 
     // Update container name with napkin (extreme one-sentence compression)
     if (response.napkin) {
-      updateSparkContainerName(sparkNodeId, response.napkin);
+      withCommitOrigin(AI_COMMIT_ORIGIN, () => {
+        loroDoc.setNodeRichTextContent(sparkNodeId, response.napkin, [], []);
+        commitDoc();
+      });
     }
 
-    const nodeCount = buildInsightNodes(sparkNodeId, response.insights);
+    buildInsightNodes(sparkNodeId, response.insights);
 
-    console.log('[spark] completed for:', sourceNodeId, '| napkin:', !!response.napkin, '| insights:', response.insights.length, '| nodes:', nodeCount);
+    console.log('[spark] completed for:', sourceNodeId, '| napkin:', !!response.napkin, '| insights:', response.insights.length);
+  } catch (error) {
+    console.error('[spark] extraction failed:', error);
+  } finally {
+    useUIStore.getState().removeLoadingNode(sparkNodeId);
+  }
+}
+
+/**
+ * Legacy convenience: create placeholder + immediately trigger extraction.
+ * Used by triggerSpark callers that haven't migrated to the two-phase API.
+ */
+export async function triggerSpark(sourceNodeId: string, providedContent?: string): Promise<void> {
+  try {
+    const sourceNode = loroDoc.toNodexNode(sourceNodeId);
+    if (!sourceNode) {
+      console.warn('[spark] source node not found:', sourceNodeId);
+      return;
+    }
+
+    // Create or find existing placeholder
+    let sparkNodeId = findSparkChild(sourceNodeId);
+    if (!sparkNodeId) {
+      sparkNodeId = createSparkPlaceholder(sourceNodeId);
+    }
+    if (!sparkNodeId) return;
+
+    await triggerSparkExtraction(sparkNodeId, sourceNodeId, providedContent);
   } catch (error) {
     console.error('[spark] extraction failed:', error);
   }

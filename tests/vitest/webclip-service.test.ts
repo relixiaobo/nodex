@@ -388,7 +388,7 @@ describe('saveWebClip', () => {
     expect(webClipDefs).toHaveLength(1);
   });
 
-  it('does not create content child nodes from pageText (metadata-only clip)', async () => {
+  it('does not create content child nodes from pageText (only spark placeholder)', async () => {
     const store = useNodeStore.getState();
     const payload = makePayload({
       pageText: '<h2>Intro</h2><p>First paragraph</p><p>Second paragraph</p>',
@@ -396,13 +396,15 @@ describe('saveWebClip', () => {
 
     const clipId = await saveWebClip(payload, store);
 
-    // Only fieldEntry children from tag template, no content nodes
+    // Only fieldEntry children + #spark placeholder, no pageText content nodes
     const children = loroDoc.getChildren(clipId);
     const contentChildren = children.filter(cid => {
       const n = loroDoc.toNodexNode(cid);
       return n?.type === undefined;
     });
-    expect(contentChildren).toHaveLength(0);
+    // 1 = spark placeholder (no pageText content nodes created)
+    expect(contentChildren).toHaveLength(1);
+    expect(loroDoc.toNodexNode(contentChildren[0])!.tags).toContain(NDX_T.SPARK);
   });
 });
 
@@ -923,7 +925,7 @@ describe('createLightweightClip', () => {
     expect(getFirstFieldValue(feId!)).toBe('https://example.com/test-page');
   });
 
-  it('does not create content children (lightweight)', async () => {
+  it('creates only spark placeholder as content child (lightweight)', async () => {
     const store = useNodeStore.getState();
     const clipId = await createLightweightClip(
       'https://example.com/page',
@@ -932,12 +934,13 @@ describe('createLightweightClip', () => {
     );
 
     const children = loroDoc.getChildren(clipId);
-    // Only fieldEntry children from tag template, no content nodes
+    // Only fieldEntry children + #spark placeholder
     const contentChildren = children.filter(cid => {
       const n = loroDoc.toNodexNode(cid);
       return n?.type === undefined;
     });
-    expect(contentChildren).toHaveLength(0);
+    expect(contentChildren).toHaveLength(1);
+    expect(loroDoc.toNodexNode(contentChildren[0])!.tags).toContain(NDX_T.SPARK);
   });
 
   it('is findable by findClipNodeByUrl after creation', async () => {

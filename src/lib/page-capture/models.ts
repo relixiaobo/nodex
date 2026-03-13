@@ -6,7 +6,8 @@ export type PageCaptureContentKind =
   | 'video'
   | 'profile'
   | 'document'
-  | 'repository';
+  | 'repository'
+  | 'discussion';
 
 export interface PageCaptureRequest {
   url?: string;

@@ -130,6 +130,14 @@ describe('page-capture orchestrator', () => {
         <div data-testid="UserJoinDate">Joined 2017</div>
         <a href="/ch402/following">120 Following</a>
         <a href="/ch402/followers">90K Followers</a>
+        <article data-testid="tweet">
+          <div data-testid="User-Name"><a href="/ch402">ch402</a></div>
+          <div data-testid="tweetText">Latest post about transformers</div>
+        </article>
+        <article data-testid="tweet">
+          <div data-testid="User-Name"><a href="/ch402">ch402</a></div>
+          <div data-testid="tweetText">Earlier post about circuits</div>
+        </article>
       `,
     });
 
@@ -146,6 +154,8 @@ describe('page-capture orchestrator', () => {
     expect(page.contentHtml).toContain('<p>Interpretability researcher</p>');
     expect(page.contentHtml).toContain('<li>San Francisco</li>');
     expect(page.contentHtml).toContain('<li>90K Followers</li>');
+    expect(page.contentHtml).toContain('Latest post about transformers');
+    expect(page.contentHtml).toContain('Earlier post about circuits');
     expect(page.siteHints).toEqual({ site: 'x', contentKind: 'profile' });
   });
 
@@ -222,6 +232,33 @@ describe('page-capture orchestrator', () => {
 
     expect(page.contentHtml).toBe('<h1>README</h1><p>Focused content</p>');
     expect(page.siteHints).toEqual({ site: 'github', contentKind: 'repository' });
+  });
+
+  it('extracts GitHub issue body and comments on discussion pages', async () => {
+    setPage({
+      title: 'Bug: crash on startup · Issue #42',
+      body: `
+        <div class="js-timeline-item">
+          <a class="author" data-hovercard-type="user">alice</a>
+          <div class="js-comment-body"><p>App crashes on startup after update.</p></div>
+        </div>
+        <div class="js-timeline-item">
+          <a class="author" data-hovercard-type="user">bob</a>
+          <div class="js-comment-body"><p>Can reproduce on macOS.</p></div>
+        </div>
+      `,
+    });
+
+    const page = await captureWithBaseline('https://github.com/relixiaobo/nodex/issues/42', {
+      title: 'Bug: crash on startup · Issue #42',
+      content: '<p>broken defuddle</p>',
+    });
+
+    expect(page.contentHtml).toContain('<p><b>@alice</b></p>');
+    expect(page.contentHtml).toContain('App crashes on startup after update.');
+    expect(page.contentHtml).toContain('<p><b>@bob</b></p>');
+    expect(page.contentHtml).toContain('Can reproduce on macOS.');
+    expect(page.siteHints).toEqual({ site: 'github', contentKind: 'discussion' });
   });
 
   it('corrects YouTube author from page DOM instead of stale defuddle metadata', async () => {

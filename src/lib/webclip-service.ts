@@ -440,6 +440,62 @@ function fillClipFields(
   }
 }
 
+// ============================================================
+// Shared clip pipeline (single source of truth)
+// ============================================================
+
+/**
+ * Apply clip data to a node: tag, URL, metadata fields, description, cache, spark.
+ * Every clip path funnels through here — add new clip behavior once, not four times.
+ *
+ * @param spark - 'auto': create placeholder + trigger if API key (active clip);
+ *                'placeholder': create placeholder only (passive clip, user triggers later)
+ */
+function applyClipData(
+  nodeId: string,
+  url: string,
+  title: string,
+  payload: WebClipCapturePayload | undefined,
+  store: WebClipNodeStore,
+  spark: 'auto' | 'placeholder',
+): void {
+  const clipType = detectClipType(url, payload);
+  const tagDefId = ensureClipTypeDefs(clipType);
+  ensureSourceUrlFieldDef();
+
+  // Title (refined for social posts when full payload available)
+  const finalTitle = payload ? refineClipTitle(title, payload, clipType) : title;
+  store.setNodeName(nodeId, finalTitle);
+
+  // Tag + URL
+  store.applyTag(nodeId, tagDefId);
+  store.setFieldValue(nodeId, NDX_F.SOURCE_URL, [url]);
+
+  // Metadata fields (Author, Published, Duration)
+  if (payload) {
+    fillClipFields(nodeId, payload, clipType, store);
+    if (payload.description && clipType !== 'social') {
+      store.updateNodeDescription(nodeId, payload.description);
+    }
+  }
+
+  // Cache page content for future re-extraction
+  if (payload?.pageText) {
+    void cachePageContent(url, payload.pageText).catch(() => {});
+  }
+
+  // Spark
+  if (spark === 'auto') {
+    autoTriggerSpark(nodeId, payload?.pageText ?? undefined);
+  } else {
+    ensureSparkPlaceholder(nodeId);
+  }
+}
+
+// ============================================================
+// Public API — thin wrappers over shared pipeline
+// ============================================================
+
 /**
  * Create an empty placeholder node under today's journal (Phase 1 of two-phase clip).
  * The node has no title and no tags — those will be filled asynchronously in Phase 2.
@@ -456,11 +512,7 @@ export function createClipShell(store: WebClipNodeStore): string {
  * Fill an existing shell node with web clip data (Phase 2 of two-phase clip).
  *
  * If a clip for the same URL already exists, upgrades that node in-place
- * (enriches title, tag, metadata) and returns its ID so the caller can
- * discard the empty shell. Otherwise fills the shell itself.
- *
- * @returns The ID of the clip node that was filled (may differ from `shellId`
- *          if an existing clip was found and upgraded).
+ * and discards the empty shell. Otherwise fills the shell itself.
  */
 export async function fillClipShell(
   shellId: string,
@@ -470,19 +522,7 @@ export async function fillClipShell(
   const existing = findClipNodeByUrl(payload.url);
   const targetId = existing ?? shellId;
 
-  const clipType = detectClipType(payload.url, payload);
-  const tagDefId = ensureClipTypeDefs(clipType);
-  ensureSourceUrlFieldDef();
-
-  const title = refineClipTitle(payload.title, payload, clipType);
-  store.setNodeName(targetId, title);
-  store.applyTag(targetId, tagDefId);
-  store.setFieldValue(targetId, NDX_F.SOURCE_URL, [payload.url]);
-  fillClipFields(targetId, payload, clipType, store);
-
-  if (payload.description && clipType !== 'social') {
-    store.updateNodeDescription(targetId, payload.description);
-  }
+  applyClipData(targetId, payload.url, payload.title, payload, store, 'auto');
 
   // Discard unused shell if we upgraded an existing clip
   if (existing) {
@@ -490,21 +530,11 @@ export async function fillClipShell(
     loroDoc.commitDoc();
   }
 
-  // Cache page content for future re-extraction (fire-and-forget)
-  if (payload.pageText) {
-    void cachePageContent(payload.url, payload.pageText).catch(() => {});
-  }
-
-  // Spark: create placeholder + auto-trigger extraction (active clip)
-  autoTriggerSpark(targetId, payload.pageText ?? undefined);
-
   return targetId;
 }
 
 /**
  * Save a web clip as a node under today's journal day with appropriate type tag and fields.
- *
- * @returns The ID of the newly created clip node.
  */
 export async function saveWebClip(
   payload: WebClipCapturePayload,
@@ -514,39 +544,9 @@ export async function saveWebClip(
   parentId?: string,
 ): Promise<string> {
   const targetParentId = parentId ?? ensureTodayNode();
+  const clipNode = store.createChild(targetParentId, undefined, { name: '' });
 
-  // 1. Detect clip type and ensure tag/field defs
-  const clipType = detectClipType(payload.url, payload);
-  const tagDefId = ensureClipTypeDefs(clipType);
-  ensureSourceUrlFieldDef();
-
-  // 2. Refine title for social posts (use tweet text instead of "Thread by @user")
-  const title = refineClipTitle(payload.title, payload, clipType);
-
-  // 3. Create the clip node under parent (defaults to today's journal day)
-  const clipNode = store.createChild(targetParentId, undefined, { name: title });
-
-  // 4. Apply the detected type tag (extends mechanism creates inherited field entries)
-  store.applyTag(clipNode.id, tagDefId);
-
-  // 5. Write URL field value
-  store.setFieldValue(clipNode.id, NDX_F.SOURCE_URL, [payload.url]);
-
-  // 6. Fill Author, Published, Duration fields
-  fillClipFields(clipNode.id, payload, clipType, store);
-
-  // 7. Set description if available (skip for social — body already has the tweet content)
-  if (payload.description && clipType !== 'social') {
-    store.updateNodeDescription(clipNode.id, payload.description);
-  }
-
-  // 8. Cache page content for future re-extraction (fire-and-forget)
-  if (payload.pageText) {
-    void cachePageContent(payload.url, payload.pageText).catch(() => {});
-  }
-
-  // 9. Spark: create placeholder + auto-trigger extraction (active clip)
-  autoTriggerSpark(clipNode.id, payload.pageText ?? undefined);
+  applyClipData(clipNode.id, payload.url, payload.title, payload, store, 'auto');
 
   return clipNode.id;
 }
@@ -647,9 +647,7 @@ function findFieldEntryForNode(nodeId: string, fieldDefId: string): string | und
 /**
  * Create a lightweight clip node (URL + Title only, no content parsing).
  * Used when a highlight is created on a page that hasn't been clipped yet.
- * Detects type from URL domain when possible.
- *
- * @returns The ID of the newly created clip node.
+ * Passive clip — spark placeholder only, user triggers manually.
  */
 export async function createLightweightClip(
   pageUrl: string,
@@ -657,7 +655,10 @@ export async function createLightweightClip(
   store: WebClipNodeStore,
   pageMeta?: { ogType?: string; schemaOrgType?: string; hasArticleElement?: boolean },
 ): Promise<string> {
-  const clipType = detectClipType(pageUrl, pageMeta ? {
+  const clipNode = store.createChild(ensureTodayNode(), undefined, { name: '' });
+
+  // Build minimal payload for type detection (no content / metadata)
+  const minPayload: WebClipCapturePayload | undefined = pageMeta ? {
     url: pageUrl,
     title: pageTitle,
     selectionText: '',
@@ -666,21 +667,9 @@ export async function createLightweightClip(
     ogType: pageMeta.ogType,
     schemaOrgType: pageMeta.schemaOrgType,
     hasArticleElement: pageMeta.hasArticleElement,
-  } : undefined);
-  const tagDefId = ensureClipTypeDefs(clipType);
-  ensureSourceUrlFieldDef();
+  } : undefined;
 
-  // Create clip node under today's journal day
-  const clipNode = store.createChild(ensureTodayNode(), undefined, { name: pageTitle });
-
-  // Apply the detected type tag
-  store.applyTag(clipNode.id, tagDefId);
-
-  // Write URL field value
-  store.setFieldValue(clipNode.id, NDX_F.SOURCE_URL, [pageUrl]);
-
-  // Spark placeholder only — passive clip, user can trigger manually
-  ensureSparkPlaceholder(clipNode.id);
+  applyClipData(clipNode.id, pageUrl, pageTitle, minPayload, store, 'placeholder');
 
   return clipNode.id;
 }
@@ -695,28 +684,5 @@ export async function applyWebClipToNode(
   _workspaceId?: string,
   _userId?: string,
 ): Promise<void> {
-  // 1. Detect clip type and ensure tag/field defs
-  const clipType = detectClipType(payload.url, payload);
-  const tagDefId = ensureClipTypeDefs(clipType);
-  ensureSourceUrlFieldDef();
-
-  // 2. Rename node to refined title
-  store.setNodeName(nodeId, refineClipTitle(payload.title, payload, clipType));
-
-  // 3. Apply the detected type tag
-  store.applyTag(nodeId, tagDefId);
-
-  // 4. Write URL field value
-  store.setFieldValue(nodeId, NDX_F.SOURCE_URL, [payload.url]);
-
-  // 5. Fill Author, Published, Duration fields
-  fillClipFields(nodeId, payload, clipType, store);
-
-  // 6. Set description if available (skip for social — body already has the tweet content)
-  if (payload.description && clipType !== 'social') {
-    store.updateNodeDescription(nodeId, payload.description);
-  }
-
-  // 7. Spark: ensure placeholder + auto-trigger extraction (active clip)
-  autoTriggerSpark(nodeId, payload.pageText ?? undefined);
+  applyClipData(nodeId, payload.url, payload.title, payload, store, 'auto');
 }

@@ -24,7 +24,11 @@ export async function handleGetText(
   const limit = params.maxChars ?? 30000;
   const slice = text.slice(offset, offset + limit);
   const truncated = (offset + limit) < text.length;
-  const data = { text: slice, totalLength: text.length, offset, truncated };
+  const data: Record<string, unknown> = { text: slice, totalLength: text.length, offset, truncated };
+  if (truncated) {
+    data.nextOffset = offset + limit;
+    data.hint = 'Use textOffset to read the next page.';
+  }
 
   return textResult(data);
 }

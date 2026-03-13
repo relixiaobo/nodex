@@ -85,10 +85,10 @@ const browserToolParameters = Type.Object({
     description: 'Optional target tab ID for any browser action. Defaults to the active tab.',
   })),
   selector: Type.Optional(Type.String({
-    description: "For 'click', 'fill_form', 'drag': CSS selector of target element.",
+    description: "For 'click', 'type', 'fill_form', 'drag': CSS selector of target element.",
   })),
   elementDescription: Type.Optional(Type.String({
-    description: "For 'click': natural language description. Alternative to selector.",
+    description: "For 'click', 'type': natural language description of element. Alternative to selector.",
   })),
   text: Type.Optional(Type.String({
     description: "For 'type': text to type. For 'key': keys to press (e.g. 'Enter', 'cmd+a').",
@@ -98,9 +98,9 @@ const browserToolParameters = Type.Object({
     Type.Literal('down'),
     Type.Literal('left'),
     Type.Literal('right'),
-  ], { description: "For 'scroll': direction." })),
+  ], { description: "For 'scroll': direction to scroll. Required." })),
   amount: Type.Optional(Type.Number({
-    description: "For 'scroll': ticks (default: 3).",
+    description: "For 'scroll': number of scroll wheel ticks (default: 3, range: 1-10).",
     default: 3,
   })),
   targetPosition: Type.Optional(Type.Object({
@@ -121,7 +121,7 @@ const browserToolParameters = Type.Object({
     default: 2,
   })),
   waitFor: Type.Optional(Type.String({ description: "For 'wait': CSS selector to wait for." })),
-  urlPattern: Type.Optional(Type.String({ description: "For 'read_network': URL pattern filter." })),
+  urlPattern: Type.Optional(Type.String({ description: "For 'read_network': substring filter applied to request URLs." })),
   logLevel: Type.Optional(Type.Union([
     Type.Literal('all'),
     Type.Literal('error'),
@@ -130,13 +130,13 @@ const browserToolParameters = Type.Object({
     Type.Literal('info'),
   ], { description: "For 'read_console': log level (default: 'all')." })),
   code: Type.Optional(Type.String({
-    description: "For 'execute_js': JS expression to evaluate in page context.",
+    description: "For 'execute_js': JS expression to evaluate in page context. Max 5000 characters.",
   })),
   value: Type.Optional(Type.Union([
     Type.String(),
     Type.Number(),
     Type.Boolean(),
-  ], { description: "For 'fill_form': value to set." })),
+  ], { description: "For 'fill_form': value to set. Use boolean for checkboxes/radios, string for text inputs, number for number inputs." })),
   targetSelector: Type.Optional(Type.String({
     description: "For 'drag': CSS selector of drop target.",
   })),

@@ -75,7 +75,7 @@ describe('browser tool', () => {
       expect(typeof parsed.truncated).toBe('boolean');
     });
 
-    it('truncates at maxChars', async () => {
+    it('truncates at maxChars and includes pagination hint', async () => {
       mockSendMessageFn.mockResolvedValue({
         ok: true,
         page: {
@@ -91,6 +91,8 @@ describe('browser tool', () => {
 
       expect(parsed.text.length).toBeLessThanOrEqual(10);
       expect(parsed.truncated).toBe(true);
+      expect(parsed.nextOffset).toBe(10);
+      expect(parsed.hint).toContain('textOffset');
     });
 
     it('applies textOffset', async () => {
@@ -221,11 +223,11 @@ describe('browser tool', () => {
     });
 
     it('routes type without explicit selector to focused element', async () => {
-      mockSendMessageFn.mockResolvedValue({ typed: true, length: 5 });
+      mockSendMessageFn.mockResolvedValue({ typed: true });
 
       const result = await execute({ action: 'type', text: 'hello' });
 
-      expect(result.details).toEqual({ typed: true, length: 5 });
+      expect(result.details).toEqual({ typed: true });
       expect(mockSendMessageFn).toHaveBeenCalledWith({
         type: 'browser:type',
         payload: { text: 'hello', tabId: undefined },
@@ -233,11 +235,11 @@ describe('browser tool', () => {
     });
 
     it('routes scroll with default direction and clamped amount', async () => {
-      mockSendMessageFn.mockResolvedValue({ scrolled: true, direction: 'down', amount: 10 });
+      mockSendMessageFn.mockResolvedValue({ scrolled: true });
 
       const result = await execute({ action: 'scroll', amount: 99 });
 
-      expect(result.details).toEqual({ scrolled: true, direction: 'down', amount: 10 });
+      expect(result.details).toEqual({ scrolled: true });
       expect(mockSendMessageFn).toHaveBeenCalledWith({
         type: 'browser:scroll',
         payload: { direction: 'down', amount: 10, tabId: undefined },
@@ -245,11 +247,11 @@ describe('browser tool', () => {
     });
 
     it('routes navigate to background', async () => {
-      mockSendMessageFn.mockResolvedValue({ url: 'https://example.com', title: 'Example', loaded: true });
+      mockSendMessageFn.mockResolvedValue({ url: 'https://example.com', title: 'Example' });
 
       const result = await execute({ action: 'navigate', url: 'example.com' });
 
-      expect(result.details).toEqual({ url: 'https://example.com', title: 'Example', loaded: true });
+      expect(result.details).toEqual({ url: 'https://example.com', title: 'Example' });
       expect(mockSendMessageFn).toHaveBeenCalledWith({
         type: 'browser:navigate',
         payload: { url: 'example.com', tabId: undefined },
@@ -275,11 +277,11 @@ describe('browser tool', () => {
 
   describe('deep interaction routing', () => {
     it('routes key sequences', async () => {
-      mockSendMessageFn.mockResolvedValue({ pressed: true, key: 'cmd+a' });
+      mockSendMessageFn.mockResolvedValue({ pressed: true });
 
       const result = await execute({ action: 'key', text: 'cmd+a' });
 
-      expect(result.details).toEqual({ pressed: true, key: 'cmd+a' });
+      expect(result.details).toEqual({ pressed: true });
       expect(mockSendMessageFn).toHaveBeenCalledWith({
         type: 'browser:key',
         payload: { text: 'cmd+a', tabId: undefined },
@@ -291,11 +293,11 @@ describe('browser tool', () => {
     });
 
     it('routes fill_form with boolean values', async () => {
-      mockSendMessageFn.mockResolvedValue({ filled: true, fields: 1 });
+      mockSendMessageFn.mockResolvedValue({ filled: true });
 
       const result = await execute({ action: 'fill_form', selector: '#remember', value: true });
 
-      expect(result.details).toEqual({ filled: true, fields: 1 });
+      expect(result.details).toEqual({ filled: true });
       expect(mockSendMessageFn).toHaveBeenCalledWith({
         type: 'browser:fill_form',
         payload: { selector: '#remember', value: true, tabId: undefined },

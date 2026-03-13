@@ -631,22 +631,22 @@ async function handleBrowserClick(tabId: number, payload: BrowserClickPayload): 
   return { clicked: true, element: target.label || target.element };
 }
 
-async function handleBrowserType(tabId: number, payload: BrowserTypePayload): Promise<{ typed: true; length: number }> {
+async function handleBrowserType(tabId: number, payload: BrowserTypePayload): Promise<{ typed: true }> {
   if (payload.selector || payload.elementDescription) {
     const target = await resolveElementTarget(tabId, payload);
     await dispatchMouseClick(tabId, target.x, target.y);
   }
 
   await sendCommand(tabId, 'Input.insertText', { text: payload.text });
-  return { typed: true, length: payload.text.length };
+  return { typed: true };
 }
 
-async function handleBrowserKey(tabId: number, text: string): Promise<{ pressed: true; key: string }> {
+async function handleBrowserKey(tabId: number, text: string): Promise<{ pressed: true }> {
   await dispatchKeySequence(tabId, text);
-  return { pressed: true, key: text };
+  return { pressed: true };
 }
 
-async function handleBrowserScroll(tabId: number, payload: BrowserScrollPayload): Promise<{ scrolled: true; direction: string; amount: number }> {
+async function handleBrowserScroll(tabId: number, payload: BrowserScrollPayload): Promise<{ scrolled: true }> {
   const direction = payload.direction ?? 'down';
   const amount = Math.min(10, Math.max(1, Math.trunc(payload.amount ?? 3)));
   const pixels = amount * 100;
@@ -662,7 +662,7 @@ async function handleBrowserScroll(tabId: number, payload: BrowserScrollPayload)
     return { scrollX: window.scrollX, scrollY: window.scrollY };
   })()`);
 
-  return { scrolled: true, direction, amount };
+  return { scrolled: true };
 }
 
 async function handleBrowserDrag(tabId: number, payload: BrowserDragPayload): Promise<{ dragged: true; from: string; to: string }> {
@@ -719,7 +719,7 @@ async function handleBrowserDrag(tabId: number, payload: BrowserDragPayload): Pr
   };
 }
 
-async function handleBrowserFillForm(tabId: number, payload: BrowserFillFormPayload): Promise<{ filled: true; fields: number }> {
+async function handleBrowserFillForm(tabId: number, payload: BrowserFillFormPayload): Promise<{ filled: true }> {
   const result = await evaluateInTab<{
     filled?: boolean;
     error?: string;
@@ -781,10 +781,10 @@ async function handleBrowserFillForm(tabId: number, payload: BrowserFillFormPayl
     throw new Error(result?.error ?? 'Failed to fill form field');
   }
 
-  return { filled: true, fields: 1 };
+  return { filled: true };
 }
 
-async function handleBrowserNavigate(tabId: number, payload: BrowserNavigatePayload): Promise<{ url: string; title: string; loaded: true }> {
+async function handleBrowserNavigate(tabId: number, payload: BrowserNavigatePayload): Promise<{ url: string; title: string }> {
   if (payload.url === 'back') {
     await goBack(tabId);
   } else if (payload.url === 'forward') {
@@ -797,7 +797,6 @@ async function handleBrowserNavigate(tabId: number, payload: BrowserNavigatePayl
   return {
     url: tab.url ?? payload.url,
     title: tab.title ?? '',
-    loaded: true,
   };
 }
 
@@ -820,7 +819,6 @@ async function handleBrowserTab(payload: BrowserTabPayload): Promise<Record<stri
       await focusWindow(tab.windowId);
       return {
         switched: true,
-        tabId: tab.id,
         title: tab.title ?? '',
         url: tab.url ?? '',
       };
@@ -838,7 +836,7 @@ async function handleBrowserTab(payload: BrowserTabPayload): Promise<Record<stri
       if (!payload.tabId) throw new Error("'tab' action with tabAction='close' requires 'tabId'.");
       await removeTab(payload.tabId);
       await detachFromTab(payload.tabId).catch(() => {});
-      return { closed: true, tabId: payload.tabId };
+      return { closed: true };
     }
     default:
       throw new Error(`Unsupported tab action: ${payload.tabAction}`);
@@ -865,7 +863,7 @@ async function handleBrowserWait(tabId: number, payload: BrowserWaitPayload): Pr
     await wait(100);
   }
 
-  throw new Error(`Timed out waiting for selector: ${selector}`);
+  throw new Error(`Timed out after ${timeoutSeconds}s waiting for selector: ${selector}. Try a different selector or increase duration (max 10s).`);
 }
 
 async function handleBrowserExecuteJs(tabId: number, payload: BrowserExecuteJsPayload): Promise<{ result: unknown; type: string }> {

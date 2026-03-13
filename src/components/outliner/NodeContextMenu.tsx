@@ -170,14 +170,9 @@ interface NodeContextMenuContentProps {
 const NodeContextMenuContent = forwardRef<HTMLDivElement, NodeContextMenuContentProps>(
   function NodeContextMenuContent({ x, y, nodeId, viewNodeId, onClose }, ref) {
     const node = useNodeStore((s) => { void s._version; return loroDoc.toNodexNode(nodeId); });
-    const capabilities = useNodeStore((s) => {
-      void s._version;
-      return getNodeCapabilities(nodeId);
-    });
-    const parentId = useNodeStore((s) => {
-      void s._version;
-      return loroDoc.getParentId(nodeId);
-    });
+    const parentId = useNodeStore((s) => { void s._version; return loroDoc.getParentId(nodeId); });
+    // getNodeCapabilities returns a new object each call — extract primitives to avoid infinite re-render
+    const capabilities = useMemo(() => getNodeCapabilities(nodeId), [nodeId, node]);
     const [mode, setMode] = useState<MenuMode>('main');
 
     // Measure actual menu size and clamp to viewport (before paint)

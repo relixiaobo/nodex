@@ -490,16 +490,16 @@ export async function fillClipShell(
     loroDoc.commitDoc();
   }
 
-  // Cache page content for Spark extraction (fire-and-forget)
+  // Cache page content for future re-extraction (fire-and-forget)
   if (payload.pageText) {
     void cachePageContent(payload.url, payload.pageText).catch(() => {});
   }
 
-  // Auto-trigger Spark extraction if conditions are met (fire-and-forget)
+  // Auto-trigger Spark extraction — pass content directly to avoid cache race
   void (async () => {
     try {
       if (await shouldAutoTrigger()) {
-        void triggerSpark(targetId);
+        void triggerSpark(targetId, payload.pageText ?? undefined);
       }
     } catch {
       // Spark trigger errors never affect clip
@@ -548,16 +548,16 @@ export async function saveWebClip(
     store.updateNodeDescription(clipNode.id, payload.description);
   }
 
-  // 8. Cache page content for Spark extraction (fire-and-forget)
+  // 8. Cache page content for future re-extraction (fire-and-forget)
   if (payload.pageText) {
     void cachePageContent(payload.url, payload.pageText).catch(() => {});
   }
 
-  // 9. Auto-trigger Spark extraction if conditions are met (fire-and-forget)
+  // 9. Auto-trigger Spark extraction — pass content directly to avoid cache race
   void (async () => {
     try {
       if (await shouldAutoTrigger()) {
-        void triggerSpark(clipNode.id);
+        void triggerSpark(clipNode.id, payload.pageText ?? undefined);
       }
     } catch {
       // Spark trigger errors never affect clip

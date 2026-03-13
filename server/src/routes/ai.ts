@@ -4,6 +4,7 @@ import type {
   AssistantMessageEvent,
   Context,
   Model,
+  SimpleStreamOptions,
   TextContent,
   ThinkingContent,
   ToolCall,
@@ -12,8 +13,6 @@ import type {
 import type { Env } from '../types.js';
 import type { AuthVariables } from '../middleware/auth.js';
 import { requireAuth } from '../middleware/auth.js';
-
-type ProxyContext = Context & { _apiKey?: string };
 
 type ProxyAssistantMessageEvent =
   | { type: 'start' }
@@ -40,12 +39,8 @@ type ProxyAssistantMessageEvent =
 
 interface ProxyStreamRequest {
   model?: Model<any>;
-  context?: ProxyContext;
-  options?: {
-    temperature?: number;
-    maxTokens?: number;
-    reasoning?: 'minimal' | 'low' | 'medium' | 'high' | 'xhigh';
-  };
+  context?: Context;
+  options?: Pick<SimpleStreamOptions, 'temperature' | 'maxTokens' | 'reasoning' | 'apiKey'>;
 }
 
 const EMPTY_USAGE: Usage = {
@@ -80,9 +75,8 @@ ai.post('/stream', async (c) => {
     return c.json({ error: 'model and context required' }, 400);
   }
 
-  const proxyContext: ProxyContext = { ...context };
-  const apiKey = proxyContext._apiKey?.trim();
-  delete proxyContext._apiKey;
+  const { apiKey: rawApiKey, ...streamOptions } = options ?? {};
+  const apiKey = rawApiKey?.trim();
 
   if (!apiKey) {
     return c.json({ error: 'API key required' }, 400);
@@ -92,8 +86,8 @@ ai.post('/stream', async (c) => {
   const responseStream = new ReadableStream<Uint8Array>({
     async start(controller) {
       try {
-        const eventStream = piStream(model, proxyContext, {
-          ...options,
+        const eventStream = piStream(model, context, {
+          ...streamOptions,
           apiKey,
           signal: c.req.raw.signal,
         });

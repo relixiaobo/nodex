@@ -5,6 +5,9 @@ import { SYSTEM_SCHEMA_NODE_IDS } from '../../src/lib/system-schema-presets.js';
 const streamProxyMock = vi.hoisted(() => vi.fn(() => ({ mocked: true })));
 const getStoredTokenMock = vi.hoisted(() => vi.fn(async () => 'auth-token'));
 const buildSystemReminderMock = vi.hoisted(() => vi.fn(async () => '<system-reminder>ctx</system-reminder>'));
+const stripOldImagesMock = vi.hoisted(() => vi.fn(
+  (messages: import('@mariozechner/pi-agent-core').AgentMessage[]) => messages,
+));
 
 vi.mock('../../src/lib/ai-proxy.js', () => ({
   streamProxyWithApiKey: streamProxyMock,
@@ -24,6 +27,7 @@ vi.mock('../../src/lib/ai-context.js', async () => {
   return {
     ...actual,
     buildSystemReminder: buildSystemReminderMock,
+    stripOldImages: stripOldImagesMock,
   };
 });
 
@@ -56,6 +60,10 @@ describe('ai-service', () => {
     getStoredTokenMock.mockResolvedValue('auth-token');
     buildSystemReminderMock.mockReset();
     buildSystemReminderMock.mockResolvedValue('<system-reminder>ctx</system-reminder>');
+    stripOldImagesMock.mockReset();
+    stripOldImagesMock.mockImplementation(
+      (messages: import('@mariozechner/pi-agent-core').AgentMessage[]) => messages,
+    );
 
     const { resetAIAgentForTests } = await import('../../src/lib/ai-service.js');
     resetAIAgentForTests();
@@ -129,12 +137,19 @@ describe('ai-service', () => {
     );
   });
 
-  it('registers transformContext that injects the system reminder into the last user message', async () => {
+  it('registers transformContext that strips old images before injecting the system reminder', async () => {
     const { createAgent } = await import('../../src/lib/ai-service.js');
     const agent = createAgent();
     const internalAgent = agent as unknown as {
       transformContext: (messages: import('@mariozechner/pi-agent-core').AgentMessage[]) => Promise<import('@mariozechner/pi-agent-core').AgentMessage[]>;
     };
+    stripOldImagesMock.mockReturnValueOnce([
+      {
+        role: 'user',
+        content: 'stripped',
+        timestamp: 1,
+      },
+    ]);
 
     const transformed = await internalAgent.transformContext([
       {
@@ -144,11 +159,22 @@ describe('ai-service', () => {
       },
     ]);
 
+    expect(stripOldImagesMock).toHaveBeenCalledTimes(1);
+    expect(stripOldImagesMock).toHaveBeenCalledWith([
+      {
+        role: 'user',
+        content: 'hello',
+        timestamp: 1,
+      },
+    ]);
     expect(buildSystemReminderMock).toHaveBeenCalledTimes(1);
+    expect(stripOldImagesMock.mock.invocationCallOrder[0]).toBeLessThan(
+      buildSystemReminderMock.mock.invocationCallOrder[0],
+    );
     expect(transformed).toEqual([
       {
         role: 'user',
-        content: 'hello\n\n<system-reminder>ctx</system-reminder>',
+        content: 'stripped\n\n<system-reminder>ctx</system-reminder>',
         timestamp: 1,
       },
     ]);

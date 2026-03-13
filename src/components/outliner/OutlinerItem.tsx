@@ -55,8 +55,7 @@ import { getTextOffsetFromPoint, getRenderedTextRightEdge } from '../../lib/dom-
 import type { ParsedPasteNode } from '../../lib/paste-parser.js';
 import { t } from '../../i18n/strings.js';
 import { getNodeCapabilities } from '../../lib/node-capabilities.js';
-import { triggerSparkExtraction } from '../../lib/ai-spark.js';
-import { hasApiKey } from '../../lib/ai-service.js';
+import { handleSparkClick } from '../../lib/ai-spark.js';
 import { RowHost } from './RowHost.js';
 import { ViewToolbar } from './ViewToolbar.js';
 import { readViewConfig, applyViewPipeline } from '../../lib/view-pipeline.js';
@@ -1691,7 +1690,7 @@ export function OutlinerItem({
               bulletColors={effectiveBulletColors}
               icon={structuralIcon}
               isLoading={isLoadingNode}
-              isSparkNode={isSparkNode}
+              spinnerStyle={isSparkNode ? 'spin' : undefined}
             />
           </div>
           {showCheckbox && (
@@ -1829,15 +1828,7 @@ export function OutlinerItem({
                   className="node-content text-primary/70 hover:text-primary cursor-pointer transition-colors"
                   onClick={(e) => {
                     e.stopPropagation();
-                    void (async () => {
-                      const hasKey = await hasApiKey();
-                      if (!hasKey) {
-                        // TODO: toast / navigate to Settings
-                        console.warn('[spark] No API key configured');
-                        return;
-                      }
-                      void triggerSparkExtraction(nodeId, parentId);
-                    })();
+                    void handleSparkClick(nodeId, parentId);
                   }}
                 >
                   ✦ Generate Spark

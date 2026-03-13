@@ -28,8 +28,8 @@ interface BulletChevronProps {
   icon?: AppIcon | null;
   /** Loading state: pulse animation while content is being fetched */
   isLoading?: boolean;
-  /** Spark node: uses spinning arc instead of pulsing dot for loading */
-  isSparkNode?: boolean;
+  /** Loading spinner variant: 'pulse' (default pulsing dot) or 'spin' (spinning arc) */
+  spinnerStyle?: 'pulse' | 'spin';
   /** Disable button semantics/cursor for purely decorative bullets */
   interactive?: boolean;
   /** Override tooltip label; defaults to "Zoom in" for interactive bullets */
@@ -70,7 +70,7 @@ export function BulletChevron({
   bulletColors,
   icon: Icon,
   isLoading,
-  isSparkNode,
+  spinnerStyle,
   interactive = true,
   tooltipLabel,
 }: BulletChevronProps) {
@@ -79,8 +79,8 @@ export function BulletChevron({
 
   // Loading state: spinning arc or pulsing dot
   if (isLoading) {
-    const spinner = isSparkNode ? (
-      // Spark loading: spinning arc
+    const spinner = spinnerStyle === 'spin' ? (
+      // Spinning arc variant
       <svg className="animate-spin h-3 w-3" viewBox="0 0 12 12" fill="none">
         <circle cx="6" cy="6" r="4.5" stroke="currentColor" strokeWidth="1.5" opacity="0.15" />
         <path d="M10.5 6a4.5 4.5 0 0 0-4.5-4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />

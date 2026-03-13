@@ -31,6 +31,34 @@ export const AI_AGENT_NODE_IDS = {
   MAX_TOKENS_VALUE: 'NDX_N25',
 } as const;
 
+// ─── Spark agent defaults ───
+
+export const SPARK_DEFAULT_TEMPERATURE = 0.5;
+export const SPARK_DEFAULT_MAX_TOKENS = 4096;
+
+export const SPARK_DEFAULT_PROMPT_LINES = [
+  'You extract the cognitive structure of content — NOT a summary.',
+  'Return a JSON array of 3-5 insights.',
+  'Each insight has "name" (clear statement, under 100 chars) and optional "children" (supporting sub-insights with "name").',
+  'Sub-insights capture: argument chains, implicit assumptions, boundary conditions, tensions.',
+  'Extract the core argumentation framework, not bullet-point summaries.',
+  'Identify implicit assumptions and boundary conditions.',
+  'Distinguish the author\'s own claims from cited viewpoints.',
+  'Surface the logical structure: premise → reasoning → conclusion.',
+  'Note any tensions or contradictions within the argument.',
+  'Reply in the same language as the source content.',
+  'Return ONLY the JSON array, no markdown fences, no explanation.',
+];
+
+export const SPARK_AGENT_NODE_IDS = {
+  MODEL_FIELD_ENTRY: 'NDX_FE20',
+  TEMPERATURE_FIELD_ENTRY: 'NDX_FE21',
+  MAX_TOKENS_FIELD_ENTRY: 'NDX_FE22',
+  MODEL_VALUE: 'NDX_N30',
+  TEMPERATURE_VALUE: 'NDX_N31',
+  MAX_TOKENS_VALUE: 'NDX_N32',
+} as const;
+
 // Legacy IDs — used only for migration cleanup
 const LEGACY_IDS = {
   ALWAYS_ACTIVE_SKILLS_GROUP: 'NDX_N26',
@@ -356,6 +384,81 @@ export function readAgentNodeConfig(): AgentNodeConfig {
     temperature: readNumberField(AI_AGENT_NODE_IDS.TEMPERATURE_FIELD_ENTRY, DEFAULT_AGENT_TEMPERATURE),
     maxTokens: Math.max(1, Math.round(readNumberField(AI_AGENT_NODE_IDS.MAX_TOKENS_FIELD_ENTRY, DEFAULT_AGENT_MAX_TOKENS))),
     skillIds,
+  };
+}
+
+// ─── Build system prompt ───
+
+// ─── Spark agent bootstrap ───
+
+export function ensureSparkAgentNode(workspaceId = loroDoc.getCurrentWorkspaceId() ?? 'ws_default'): string {
+  // Schema presets (shared with main agent — tagDefs + fieldDefs)
+  for (const preset of AGENT_SCHEMA_PRESETS) {
+    ensureNode(preset);
+  }
+
+  // Spark agent node
+  ensureNode({
+    id: SYSTEM_NODE_IDS.SPARK_AGENT,
+    parentId: workspaceId,
+    name: 'Spark',
+  });
+  if (!loroDoc.toNodexNode(SYSTEM_NODE_IDS.SPARK_AGENT)?.tags.includes(SYS_T.AGENT)) {
+    loroDoc.addTag(SYSTEM_NODE_IDS.SPARK_AGENT, SYS_T.AGENT);
+  }
+
+  // Create default prompt as content children (only if no content children exist yet)
+  const contentChildren = loroDoc.getChildren(SYSTEM_NODE_IDS.SPARK_AGENT)
+    .filter((id) => {
+      const n = loroDoc.toNodexNode(id);
+      return n != null && isOutlinerContentNodeType(n.type);
+    });
+  if (contentChildren.length === 0) {
+    for (const line of SPARK_DEFAULT_PROMPT_LINES) {
+      const childId = nanoid();
+      loroDoc.createNode(childId, SYSTEM_NODE_IDS.SPARK_AGENT);
+      loroDoc.setNodeRichTextContent(childId, line, [], []);
+    }
+  }
+
+  // Field entries
+  ensureFieldEntry(SYSTEM_NODE_IDS.SPARK_AGENT, SPARK_AGENT_NODE_IDS.MODEL_FIELD_ENTRY, NDX_F.AGENT_MODEL);
+  ensureTargetValue(
+    SPARK_AGENT_NODE_IDS.MODEL_FIELD_ENTRY,
+    SPARK_AGENT_NODE_IDS.MODEL_VALUE,
+    AI_AGENT_NODE_IDS.MODEL_OPTION_SONNET,
+  );
+
+  ensureFieldEntry(SYSTEM_NODE_IDS.SPARK_AGENT, SPARK_AGENT_NODE_IDS.TEMPERATURE_FIELD_ENTRY, NDX_F.AGENT_TEMPERATURE);
+  ensureTextValue(
+    SPARK_AGENT_NODE_IDS.TEMPERATURE_FIELD_ENTRY,
+    SPARK_AGENT_NODE_IDS.TEMPERATURE_VALUE,
+    String(SPARK_DEFAULT_TEMPERATURE),
+  );
+
+  ensureFieldEntry(SYSTEM_NODE_IDS.SPARK_AGENT, SPARK_AGENT_NODE_IDS.MAX_TOKENS_FIELD_ENTRY, NDX_F.AGENT_MAX_TOKENS);
+  ensureTextValue(
+    SPARK_AGENT_NODE_IDS.MAX_TOKENS_FIELD_ENTRY,
+    SPARK_AGENT_NODE_IDS.MAX_TOKENS_VALUE,
+    String(SPARK_DEFAULT_MAX_TOKENS),
+  );
+
+  return SYSTEM_NODE_IDS.SPARK_AGENT;
+}
+
+export function readSparkAgentConfig(): AgentNodeConfig {
+  ensureSparkAgentNode();
+
+  const systemPrompt = readSystemPromptFromChildren(SYSTEM_NODE_IDS.SPARK_AGENT)
+    || SPARK_DEFAULT_PROMPT_LINES.join('\n');
+
+  return {
+    nodeId: SYSTEM_NODE_IDS.SPARK_AGENT,
+    systemPrompt,
+    modelId: readOptionFieldName(SPARK_AGENT_NODE_IDS.MODEL_FIELD_ENTRY) ?? DEFAULT_AGENT_MODEL_ID,
+    temperature: readNumberField(SPARK_AGENT_NODE_IDS.TEMPERATURE_FIELD_ENTRY, SPARK_DEFAULT_TEMPERATURE),
+    maxTokens: Math.max(1, Math.round(readNumberField(SPARK_AGENT_NODE_IDS.MAX_TOKENS_FIELD_ENTRY, SPARK_DEFAULT_MAX_TOKENS))),
+    skillIds: [],
   };
 }
 

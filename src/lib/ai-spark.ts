@@ -27,9 +27,14 @@ export const SPARK_COMMIT_ORIGIN = 'ai:spark';
 // Types
 // ============================================================
 
-interface SparkInsight {
+export interface SparkInsight {
   name: string;
-  children?: { name: string }[];
+  children?: SparkInsight[];
+}
+
+export interface SparkResponse {
+  napkin: string;
+  insights: SparkInsight[];
 }
 
 // ============================================================
@@ -144,7 +149,18 @@ async function callSparkLLM(
 // Response parsing
 // ============================================================
 
-function parseSparkResponse(text: string): SparkInsight[] {
+function parseInsights(raw: unknown[]): SparkInsight[] {
+  return raw
+    .filter((item: any) => typeof item?.name === 'string' && item.name.trim().length > 0)
+    .map((item: any) => ({
+      name: item.name.trim(),
+      children: Array.isArray(item.children) && item.children.length > 0
+        ? parseInsights(item.children)
+        : undefined,
+    }));
+}
+
+export function parseSparkResponse(text: string): SparkResponse {
   // Strip markdown code fences if present
   let json = text.trim();
   if (json.startsWith('```')) {
@@ -152,20 +168,24 @@ function parseSparkResponse(text: string): SparkInsight[] {
   }
 
   const parsed = JSON.parse(json);
-  if (!Array.isArray(parsed)) {
-    throw new Error('Expected JSON array');
+
+  // New format: { napkin, insights }
+  if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+    return {
+      napkin: typeof parsed.napkin === 'string' ? parsed.napkin.trim() : '',
+      insights: Array.isArray(parsed.insights) ? parseInsights(parsed.insights) : [],
+    };
   }
 
-  return parsed.filter(
-    (item: any) => typeof item?.name === 'string' && item.name.trim().length > 0,
-  ).map((item: any) => ({
-    name: item.name.trim(),
-    children: Array.isArray(item.children)
-      ? item.children
-          .filter((c: any) => typeof c?.name === 'string' && c.name.trim().length > 0)
-          .map((c: any) => ({ name: c.name.trim() }))
-      : undefined,
-  }));
+  // Legacy fallback: plain array (from old prompt format)
+  if (Array.isArray(parsed)) {
+    return {
+      napkin: '',
+      insights: parseInsights(parsed),
+    };
+  }
+
+  throw new Error('Expected JSON object with napkin + insights, or JSON array');
 }
 
 // ============================================================
@@ -183,20 +203,34 @@ function createSparkContainer(sourceNodeId: string): string {
   });
 }
 
+function buildInsightTree(
+  store: ReturnType<typeof useNodeStore.getState>,
+  parentId: string,
+  items: SparkInsight[],
+): number {
+  let count = 0;
+  for (const item of items) {
+    const node = store.createChild(parentId, undefined, { name: item.name }, { commit: false });
+    count++;
+    if (item.children && item.children.length > 0) {
+      count += buildInsightTree(store, node.id, item.children);
+    }
+  }
+  return count;
+}
+
+function updateSparkContainerName(sparkNodeId: string, napkin: string): void {
+  withCommitOrigin(AI_COMMIT_ORIGIN, () => {
+    loroDoc.setNodeRichTextContent(sparkNodeId, napkin, [], []);
+    commitDoc();
+  });
+}
+
 function buildInsightNodes(sparkNodeId: string, insights: SparkInsight[]): number {
   let count = 0;
   withCommitOrigin(AI_COMMIT_ORIGIN, () => {
     const store = useNodeStore.getState();
-    for (const insight of insights) {
-      const node = store.createChild(sparkNodeId, undefined, { name: insight.name }, { commit: false });
-      count++;
-      if (insight.children) {
-        for (const child of insight.children) {
-          store.createChild(node.id, undefined, { name: child.name }, { commit: false });
-          count++;
-        }
-      }
-    }
+    count = buildInsightTree(store, sparkNodeId, insights);
     commitDoc();
   });
   return count;
@@ -259,10 +293,16 @@ export async function triggerSpark(sourceNodeId: string, providedContent?: strin
     );
 
     // 3. Parse and build nodes
-    const insights = parseSparkResponse(responseText);
-    const nodeCount = buildInsightNodes(sparkNodeId, insights);
+    const response = parseSparkResponse(responseText);
 
-    console.log('[spark] completed for:', sourceNodeId, '| insights:', insights.length, '| nodes:', nodeCount);
+    // Update container name with napkin (extreme one-sentence compression)
+    if (response.napkin) {
+      updateSparkContainerName(sparkNodeId, response.napkin);
+    }
+
+    const nodeCount = buildInsightNodes(sparkNodeId, response.insights);
+
+    console.log('[spark] completed for:', sourceNodeId, '| napkin:', !!response.napkin, '| insights:', response.insights.length, '| nodes:', nodeCount);
   } catch (error) {
     console.error('[spark] extraction failed:', error);
   }

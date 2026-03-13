@@ -154,6 +154,7 @@ describe('page-capture orchestrator', () => {
     expect(page.contentHtml).toContain('<p>Interpretability researcher</p>');
     expect(page.contentHtml).toContain('<li>San Francisco</li>');
     expect(page.contentHtml).toContain('<li>90K Followers</li>');
+    expect(page.contentHtml).toContain('<h2>Posts</h2>');
     expect(page.contentHtml).toContain('Latest post about transformers');
     expect(page.contentHtml).toContain('Earlier post about circuits');
     expect(page.siteHints).toEqual({ site: 'x', contentKind: 'profile' });

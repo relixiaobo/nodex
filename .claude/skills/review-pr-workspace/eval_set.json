@@ -1,0 +1,82 @@
+[
+  {
+    "query": "codex 的 PR #126 ready 了，帮我 review",
+    "should_trigger": true
+  },
+  {
+    "query": "/review-pr 126",
+    "should_trigger": true
+  },
+  {
+    "query": "跑一下测试确认代码没问题",
+    "should_trigger": true
+  },
+  {
+    "query": "帮我检查一下 cc/phase-1-canvas 分支的改动",
+    "should_trigger": true
+  },
+  {
+    "query": "npm run verify 跑完了吗？build 有没有过？",
+    "should_trigger": true
+  },
+  {
+    "query": "这个 PR 能不能合并，先做个验证",
+    "should_trigger": true
+  },
+  {
+    "query": "dev agent 提交了新代码，我需要在浏览器里测一下",
+    "should_trigger": true
+  },
+  {
+    "query": "/review-pr",
+    "should_trigger": true
+  },
+  {
+    "query": "typecheck 和 vitest 都过了没有？帮我确认一下",
+    "should_trigger": true
+  },
+  {
+    "query": "validate the changes on PR 127 before I merge",
+    "should_trigger": true
+  },
+  {
+    "query": "帮我写一个 PR 的 description",
+    "should_trigger": false
+  },
+  {
+    "query": "创建一个新的 feature 分支",
+    "should_trigger": false
+  },
+  {
+    "query": "这个 bug 怎么修？看看 node-store.ts 的代码",
+    "should_trigger": false
+  },
+  {
+    "query": "帮我把 Phase 1 的计划整理到 PR body 里",
+    "should_trigger": false
+  },
+  {
+    "query": "gh pr merge 126",
+    "should_trigger": false
+  },
+  {
+    "query": "给 codex 派发一个新任务",
+    "should_trigger": false
+  },
+  {
+    "query": "Review 一下这段代码的设计思路对不对",
+    "should_trigger": false
+  },
+  {
+    "query": "帮我看看 vitest 的配置怎么改",
+    "should_trigger": false
+  },
+  {
+    "query": "把 self-test 改成 review-pr",
+    "should_trigger": false
+  },
+  {
+    "query": "部署到 production 之前需要做什么",
+    "should_trigger": false
+  }
+]

@@ -23,12 +23,14 @@ _(空)_
 | 工作区 | 分支 | 任务 | 状态 |
 |--------|------|------|------|
 | nodex-claude | feat/phase-2-reading-loop | Phase 2: 阅读环 (#130) | 待开始 |
+| codex | codex/context-image-lifecycle | AI context image lifecycle (#133) | 待 review |
 
 ---
 
 ## 进行中
 
 - [ ] **Phase 2: 阅读环** (#130) — Review 现有 Spark 实现 → Round 3 Soul → 碰撞策略 → #skill 节点 `→ nodex-claude`
+- [x] **AI context image lifecycle** (#133) — strip old image context + persistence image stripping + lightweight persistence signature `→ codex`
 
 ---
 

@@ -1,5 +1,30 @@
 import type { AgentMessage } from '@mariozechner/pi-agent-core';
-import { formatLocalTimestamp, injectReminder } from '../../src/lib/ai-context.js';
+import { formatLocalTimestamp, injectReminder, stripOldImages } from '../../src/lib/ai-context.js';
+
+function createImageToolResult(timestamp: number, label: string): AgentMessage {
+  return {
+    role: 'toolResult',
+    toolCallId: `call_${timestamp}`,
+    toolName: 'browser',
+    content: [
+      { type: 'image', data: `base64-${label}`, mimeType: 'image/png' },
+      { type: 'text', text: `details-${label}` },
+    ],
+    isError: false,
+    timestamp,
+  };
+}
+
+function createTextToolResult(timestamp: number, label: string): AgentMessage {
+  return {
+    role: 'toolResult',
+    toolCallId: `text_${timestamp}`,
+    toolName: 'browser',
+    content: [{ type: 'text', text: label }],
+    isError: false,
+    timestamp,
+  };
+}
 
 describe('ai context', () => {
   it('formats time context timestamps with a local offset instead of UTC Zulu time', () => {
@@ -7,6 +32,90 @@ describe('ai context', () => {
 
     expect(timestamp).toMatch(/^2026-03-12T15:04:05[+-]\d{2}:\d{2}$/);
     expect(timestamp.endsWith('Z')).toBe(false);
+  });
+});
+
+describe('stripOldImages', () => {
+  it('returns the original array when no message contains images', () => {
+    const messages: AgentMessage[] = [
+      {
+        role: 'user',
+        content: 'hello',
+        timestamp: 1,
+      },
+      createTextToolResult(2, 'details'),
+    ];
+
+    expect(stripOldImages(messages)).toBe(messages);
+  });
+
+  it('keeps the last three image messages and strips older ones while preserving text blocks', () => {
+    const messages: AgentMessage[] = [
+      createImageToolResult(1, 'oldest'),
+      createTextToolResult(2, 'not-counted'),
+      createImageToolResult(3, 'older'),
+      createImageToolResult(4, 'keep-1'),
+      createImageToolResult(5, 'keep-2'),
+      createImageToolResult(6, 'keep-3'),
+    ];
+
+    const result = stripOldImages(messages);
+
+    expect(result).not.toBe(messages);
+    expect((result[0] as Extract<AgentMessage, { role: 'toolResult' }>).content).toEqual([
+      { type: 'text', text: '[Image removed from context: image/png]' },
+      { type: 'text', text: 'details-oldest' },
+    ]);
+    expect((result[2] as Extract<AgentMessage, { role: 'toolResult' }>).content).toEqual([
+      { type: 'text', text: '[Image removed from context: image/png]' },
+      { type: 'text', text: 'details-older' },
+    ]);
+    expect((result[3] as Extract<AgentMessage, { role: 'toolResult' }>).content[0]).toEqual({
+      type: 'image',
+      data: 'base64-keep-1',
+      mimeType: 'image/png',
+    });
+    expect((result[1] as Extract<AgentMessage, { role: 'toolResult' }>).content).toEqual([
+      { type: 'text', text: 'not-counted' },
+    ]);
+  });
+
+  it('counts user image messages in the same sliding window', () => {
+    const messages: AgentMessage[] = [
+      {
+        role: 'user',
+        content: [
+          { type: 'text', text: 'look at this' },
+          { type: 'image', data: 'base64-user-old', mimeType: 'image/jpeg' },
+        ],
+        timestamp: 1,
+      },
+      createImageToolResult(2, 'keep-1'),
+      createImageToolResult(3, 'keep-2'),
+      createImageToolResult(4, 'keep-3'),
+    ];
+
+    const result = stripOldImages(messages);
+
+    expect(result).not.toBe(messages);
+    expect(result[0]).toEqual({
+      role: 'user',
+      content: [
+        { type: 'text', text: 'look at this' },
+        { type: 'text', text: '[Image removed from context: image/jpeg]' },
+      ],
+      timestamp: 1,
+    });
+  });
+
+  it('returns the original array when image count stays within the retention window', () => {
+    const messages: AgentMessage[] = [
+      createImageToolResult(1, 'keep-1'),
+      createImageToolResult(2, 'keep-2'),
+      createImageToolResult(3, 'keep-3'),
+    ];
+
+    expect(stripOldImages(messages)).toBe(messages);
   });
 });
 

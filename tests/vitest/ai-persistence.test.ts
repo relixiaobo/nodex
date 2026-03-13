@@ -262,4 +262,73 @@ describe('ai persistence', () => {
     await deleteChatSession('session_delete');
     expect(await getChatSession('session_delete')).toBeNull();
   });
+
+  it('strips image blocks before persisting while keeping text details', async () => {
+    const saved = await saveChatSession({
+      id: 'session_images',
+      messages: [
+        {
+          role: 'toolResult',
+          toolCallId: 'call_1',
+          toolName: 'browser',
+          content: [
+            { type: 'image', data: 'base64-image', mimeType: 'image/png' },
+            { type: 'text', text: 'details' },
+          ],
+          isError: false,
+          timestamp: 1,
+        },
+      ],
+      createdAt: 1,
+      updatedAt: 1,
+    });
+
+    expect(saved.messages).toEqual([
+      {
+        role: 'toolResult',
+        toolCallId: 'call_1',
+        toolName: 'browser',
+        content: [
+          { type: 'text', text: '[Image removed from storage]' },
+          { type: 'text', text: 'details' },
+        ],
+        isError: false,
+        timestamp: 1,
+      },
+    ]);
+  });
+
+  it('restores sessions without image payloads after persistence stripping', async () => {
+    await saveChatSession({
+      id: 'session_restore_images',
+      messages: [
+        {
+          role: 'user',
+          content: [
+            { type: 'text', text: 'prompt' },
+            { type: 'image', data: 'base64-user-image', mimeType: 'image/jpeg' },
+          ],
+          timestamp: 1,
+        },
+      ],
+      createdAt: 1,
+      updatedAt: 1,
+    });
+
+    expect(await getChatSession('session_restore_images')).toEqual({
+      id: 'session_restore_images',
+      messages: [
+        {
+          role: 'user',
+          content: [
+            { type: 'text', text: 'prompt' },
+            { type: 'text', text: '[Image removed from storage]' },
+          ],
+          timestamp: 1,
+        },
+      ],
+      createdAt: 1,
+      updatedAt: expect.any(Number),
+    });
+  });
 });

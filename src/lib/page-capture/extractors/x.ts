@@ -306,11 +306,13 @@ export const xPageCaptureExtractor: PageCaptureSiteExtractor = {
       contentKind = 'profile';
       const profileTitle = extractXProfileTitle(document);
       const profileContent = extractXProfileContent(document);
+      const timelineContent = extractXPageContent(document);
       const bioElement = document.querySelector('[data-testid="UserDescription"]');
       const handle = location.pathname.split('/')[1];
 
       if (profileTitle) title = profileTitle;
-      if (profileContent) contentHtml = profileContent;
+      const parts = [profileContent, timelineContent].filter(Boolean);
+      if (parts.length > 0) contentHtml = parts.join('\n');
       if (bioElement?.textContent?.trim()) description = bioElement.textContent.trim();
       if (handle) author = '@' + handle;
     } else if (isXArticlePage(document)) {

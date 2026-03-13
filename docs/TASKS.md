@@ -23,14 +23,12 @@ _(空)_
 | 工作区 | 分支 | 任务 | 状态 |
 |--------|------|------|------|
 | nodex-claude | feat/phase-2-reading-loop | Phase 2: 阅读环 (#130) | 待开始 |
-| codex | codex/context-image-lifecycle | AI context image lifecycle (#133) | 待 review |
 
 ---
 
 ## 进行中
 
 - [ ] **Phase 2: 阅读环** (#130) — Review 现有 Spark 实现 → Round 3 Soul → 碰撞策略 → #skill 节点 `→ nodex-claude`
-- [x] **AI context image lifecycle** (#133) — strip old image context + persistence image stripping + lightweight persistence signature `→ codex`
 
 ---
 
@@ -103,6 +101,7 @@ _(空)_
 - [x] Batch 2: 截图 + 基础交互 — screenshot + click + type + scroll + navigate + tab（CDP）
 - [x] Batch 3: 深度交互 — key + fill_form + drag + wait + execute_js
 - [x] Batch 4: 调试 — read_network + read_console（CDP）
+- [ ] YouTube 抓取增强 — 获取视频 transcript（`/transcript` 或 API），替代当前仅 author 元数据的提取
 
 #### Phase 4: 编排 — AgentOrchestrator
 
@@ -164,6 +163,7 @@ _(空)_
 
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
+| 2026-03-13 | AI 上下文图片生命周期 — 滑动窗口 + 持久化剥离 + 轻量签名，修复多轮截图崩溃 | codex | #133 |
 | 2026-03-13 | AI Context Refactor Step 1 — transformContext + convertToLlm + getApiKey + ai-proxy 提取 | codex | #132 |
 | 2026-03-13 | Browser tool 审计优化 — 修正参数描述、移除冗余返回值、添加分页提示 | nodex | main |
 | 2026-03-13 | Phase 3: 浏览器工具 (#131) — CDP screenshot + interaction + debugging | codex | #131 |

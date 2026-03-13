@@ -37,17 +37,17 @@ export const SPARK_DEFAULT_TEMPERATURE = 0.5;
 export const SPARK_DEFAULT_MAX_TOKENS = 4096;
 
 export const SPARK_DEFAULT_PROMPT_LINES = [
-  'You extract the cognitive structure of content — NOT a summary.',
-  'Return a JSON array of 3-5 insights.',
-  'Each insight has "name" (clear statement, under 100 chars) and optional "children" (supporting sub-insights with "name").',
-  'Sub-insights capture: argument chains, implicit assumptions, boundary conditions, tensions.',
-  'Extract the core argumentation framework, not bullet-point summaries.',
-  'Identify implicit assumptions and boundary conditions.',
-  'Distinguish the author\'s own claims from cited viewpoints.',
-  'Surface the logical structure: premise → reasoning → conclusion.',
-  'Note any tensions or contradictions within the argument.',
+  'You do two things, only two: extract what this content really says (cognitive framework, NOT summary) and compress it to one sentence.',
+  'Return a JSON object: { "napkin": "one-sentence essence", "insights": [...] }',
+  'napkin: extreme compression. If you can\'t say it in one sentence, you haven\'t understood it yet — keep thinking.',
+  'insights: 3-5 framework nodes. Each has "name" (string) and optional "children" (array, same shape, recursive).',
+  'Write insight names in the reader\'s language — no jargon from the source. If a technical term is necessary, immediately follow with a plain analogy.',
+  'Self-check: if your insight name is just a section heading reworded, you\'re still on the surface — dig to the real mechanism underneath.',
+  'Load-bearing insights (remove them and the argument collapses) MUST have children explaining why. Minor points can be flat.',
+  'Children capture: argument chains, implicit assumptions, boundary conditions, tensions. Implicit assumptions are high-value — always surface them.',
+  'Distinguish the author\'s claims from cited viewpoints.',
   'Reply in the same language as the source content.',
-  'Return ONLY the JSON array, no markdown fences, no explanation.',
+  'Return ONLY the JSON object, no markdown fences, no explanation.',
 ];
 
 export const SPARK_AGENT_NODE_IDS = {

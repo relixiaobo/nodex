@@ -17,6 +17,7 @@ import {
 import {
   ensureSparkTagDef,
   shouldAutoTrigger,
+  parseSparkResponse,
   SPARK_COMMIT_ORIGIN,
 } from '../../src/lib/ai-spark.js';
 import {
@@ -360,5 +361,91 @@ describe('shouldAutoTrigger', () => {
     // with an API key, so shouldAutoTrigger should return false.
     const result = await shouldAutoTrigger();
     expect(typeof result).toBe('boolean');
+  });
+});
+
+describe('parseSparkResponse', () => {
+  it('parses new format: { napkin, insights }', () => {
+    const input = JSON.stringify({
+      napkin: 'Modules should be bounded by rate of change, not function',
+      insights: [
+        {
+          name: 'Core framework: constraint shapes freedom',
+          children: [
+            { name: 'Load-bearing: change rate determines module boundary' },
+            { name: 'Implicit assumption: change rate is predictable' },
+          ],
+        },
+        { name: 'Minor: microservices often split wrong' },
+      ],
+    });
+
+    const result = parseSparkResponse(input);
+    expect(result.napkin).toBe('Modules should be bounded by rate of change, not function');
+    expect(result.insights).toHaveLength(2);
+    expect(result.insights[0].children).toHaveLength(2);
+    expect(result.insights[1].children).toBeUndefined();
+  });
+
+  it('handles recursive children (3+ levels)', () => {
+    const input = JSON.stringify({
+      napkin: 'Test',
+      insights: [
+        {
+          name: 'Level 1',
+          children: [
+            {
+              name: 'Level 2',
+              children: [{ name: 'Level 3' }],
+            },
+          ],
+        },
+      ],
+    });
+
+    const result = parseSparkResponse(input);
+    expect(result.insights[0].children![0].children![0].name).toBe('Level 3');
+  });
+
+  it('falls back to legacy array format with empty napkin', () => {
+    const input = JSON.stringify([
+      { name: 'Insight 1', children: [{ name: 'Sub 1' }] },
+      { name: 'Insight 2' },
+    ]);
+
+    const result = parseSparkResponse(input);
+    expect(result.napkin).toBe('');
+    expect(result.insights).toHaveLength(2);
+    expect(result.insights[0].children).toHaveLength(1);
+  });
+
+  it('strips markdown code fences', () => {
+    const input = '```json\n' + JSON.stringify({
+      napkin: 'Test napkin',
+      insights: [{ name: 'Insight' }],
+    }) + '\n```';
+
+    const result = parseSparkResponse(input);
+    expect(result.napkin).toBe('Test napkin');
+    expect(result.insights).toHaveLength(1);
+  });
+
+  it('filters out empty-name insights', () => {
+    const input = JSON.stringify({
+      napkin: 'Valid',
+      insights: [
+        { name: 'Good insight' },
+        { name: '' },
+        { name: '   ' },
+      ],
+    });
+
+    const result = parseSparkResponse(input);
+    expect(result.insights).toHaveLength(1);
+  });
+
+  it('throws on invalid input', () => {
+    expect(() => parseSparkResponse('"just a string"')).toThrow();
+    expect(() => parseSparkResponse('not json')).toThrow();
   });
 });

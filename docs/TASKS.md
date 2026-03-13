@@ -86,6 +86,7 @@ _(空)_
 - ~~Phase 2 Step 1: Spark 提取~~ ✓ — ai-spark.ts + shadow cache + extraction presets + webclip 集成
 - ~~Phase 3 Batch 1: 浏览器观察~~ ✓ — get_text + get_metadata + find + get_selection
 - ~~Phase 3: 浏览器工具~~ ✓ — CDP screenshot + interaction + debugging
+- ~~Context Refactor Step 1~~ ✓ — transformContext + convertToLlm + getApiKey (#132)
 
 #### Phase 2: 阅读环 — Clip & Spark
 
@@ -161,6 +162,7 @@ _(空)_
 
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
+| 2026-03-13 | AI Context Refactor Step 1 — transformContext + convertToLlm + getApiKey + ai-proxy 提取 | codex | #132 |
 | 2026-03-13 | Browser tool 审计优化 — 修正参数描述、移除冗余返回值、添加分页提示 | nodex | main |
 | 2026-03-13 | Phase 3: 浏览器工具 (#131) — CDP screenshot + interaction + debugging | codex | #131 |
 | 2026-03-13 | 多 Agent 工作流重构 — 固定 worktree + PR 协作流程，移除 dispatcher/subagent 模式 | nodex | main |

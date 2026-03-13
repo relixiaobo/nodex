@@ -24,4 +24,5 @@
 - 优化 AI Chat 交互细节：一次 AI node 操作现在对应一次 undo，动态上下文使用正确本地时间，聊天持久化减少重复写入
 - AI node 工具新增 data access layer：`node_read` 返回 raw `nodeData`，`node_edit`/`node_create` 可直接读写 `fieldType`、`color`、`cardinality` 等底层属性，并增加安全拦截避免覆盖结构/富文本/时间戳字段
 - 新增 browser tool 第一批观察能力：AI 现在可以读取当前页面正文与元数据、查找页面文本，并获取用户当前选中内容
+- browser tool 升级为完整浏览器操作集：新增 CDP 截图、点击/输入/滚动/导航/标签页、快捷键/表单/拖拽/等待/JS 执行，以及 network/console 调试读取
 - 新增 Spark 结构提取：剪藏网页后 AI 自动提取认知结构（框架、论点、机制），创建 #spark 子节点树，并填充 is/has/about 元数据字段

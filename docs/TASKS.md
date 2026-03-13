@@ -23,14 +23,14 @@ _(空)_
 | 工作区 | 分支 | 任务 | 状态 |
 |--------|------|------|------|
 | nodex-claude | feat/phase-2-reading-loop | Phase 2: 阅读环 (#130) | 待开始 |
-| nodex-codex | feat/phase-3-browser-tool | Phase 3: 浏览器工具 (#131) | 待开始 |
+| nodex-codex | feat/phase-3-browser-tool | Phase 3: 浏览器工具 (#131) | 待 Review |
 
 ---
 
 ## 进行中
 
 - [ ] **Phase 2: 阅读环** (#130) — Review 现有 Spark 实现 → Round 3 Soul → 碰撞策略 → #skill 节点 `→ nodex-claude`
-- [ ] **Phase 3: 浏览器工具** (#131) — Review 现有 Batch 1 → CDP 基础设施 → Batch 2/3/4 `→ nodex-codex`
+- [x] **Phase 3: 浏览器工具** (#131) — Review 现有 Batch 1 → CDP 基础设施 → Batch 2/3/4 `→ nodex-codex`
 
 ---
 
@@ -87,6 +87,7 @@ _(空)_
 - ~~Phase 1.5.1: Data Access Layer~~ ✓ — node_read/edit/create 的 `data` 参数 + BLOCKED_KEYS (#129)
 - ~~Phase 2 Step 1: Spark 提取~~ ✓ — ai-spark.ts + shadow cache + extraction presets + webclip 集成
 - ~~Phase 3 Batch 1: 浏览器观察~~ ✓ — get_text + get_metadata + find + get_selection
+- ~~Phase 3: 浏览器工具~~ ✓ — CDP screenshot + interaction + debugging
 
 #### Phase 2: 阅读环 — Clip & Spark
 
@@ -98,9 +99,9 @@ _(空)_
 
 > 工具定义：`docs/plans/tool-definitions.md` | 实施计划：`docs/plans/phase-3-browser.md`
 
-- [ ] Batch 2: 截图 + 基础交互 — screenshot + click + type + scroll + navigate + tab（CDP）
-- [ ] Batch 3: 深度交互 — key + fill_form + drag + wait + execute_js
-- [ ] Batch 4: 调试 — read_network + read_console（CDP）
+- [x] Batch 2: 截图 + 基础交互 — screenshot + click + type + scroll + navigate + tab（CDP）
+- [x] Batch 3: 深度交互 — key + fill_form + drag + wait + execute_js
+- [x] Batch 4: 调试 — read_network + read_console（CDP）
 
 #### Phase 4: 编排 — AgentOrchestrator
 

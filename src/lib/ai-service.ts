@@ -26,6 +26,7 @@ export interface StoredAISettings {
 interface AgentRuntimeState {
   createdAt: number;
   hydrated: boolean;
+  restorePromise: Promise<void> | null;
   temperature: number;
   maxTokens: number;
 }
@@ -81,6 +82,7 @@ function getAgentRuntimeState(agent: Agent): AgentRuntimeState {
     state = {
       createdAt: Date.now(),
       hydrated: false,
+      restorePromise: null,
       temperature: DEFAULT_AGENT_TEMPERATURE,
       maxTokens: DEFAULT_AGENT_MAX_TOKENS,
     };
@@ -336,27 +338,36 @@ export function getAIAgent(): Agent {
   return agentSingleton;
 }
 
-export async function restoreLatestChatSession(agent: Agent = getAIAgent()): Promise<void> {
+export function restoreLatestChatSession(agent: Agent = getAIAgent()): Promise<void> {
   const runtime = getAgentRuntimeState(agent);
-  if (runtime.hydrated) return;
+  if (runtime.hydrated) return Promise.resolve();
 
-  runtime.hydrated = true;
+  // Share a single restore promise so React StrictMode's double-invoked
+  // effects await the same IndexedDB read instead of the second call
+  // resolving immediately with an empty agent.
+  if (!runtime.restorePromise) {
+    runtime.restorePromise = (async () => {
+      try {
+        const latestSession = await getLatestChatSession();
+        if (latestSession) {
+          agent.sessionId = latestSession.id;
+          runtime.createdAt = latestSession.createdAt;
+          agent.replaceMessages(latestSession.messages);
+          runtime.hydrated = true;
+          return;
+        }
+      } catch {
+        // IndexedDB is unavailable in some test/browser contexts.
+      }
 
-  try {
-    const latestSession = await getLatestChatSession();
-    if (latestSession) {
-      agent.sessionId = latestSession.id;
-      runtime.createdAt = latestSession.createdAt;
-      agent.replaceMessages(latestSession.messages);
-      return;
-    }
-  } catch {
-    // IndexedDB is unavailable in some test/browser contexts.
+      agent.sessionId = nanoid();
+      runtime.createdAt = Date.now();
+      agent.replaceMessages([]);
+      runtime.hydrated = true;
+    })();
   }
 
-  agent.sessionId = nanoid();
-  runtime.createdAt = Date.now();
-  agent.replaceMessages([]);
+  return runtime.restorePromise;
 }
 
 export async function persistChatSession(agent: Agent = getAIAgent()): Promise<void> {
@@ -377,6 +388,7 @@ export async function createNewChatSession(agent: Agent = getAIAgent()): Promise
   agent.sessionId = nanoid();
   runtime.createdAt = Date.now();
   runtime.hydrated = true;
+  runtime.restorePromise = null;
   await configureAgent(agent);
   await persistChatSession(agent);
 }

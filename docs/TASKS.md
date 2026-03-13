@@ -22,13 +22,13 @@ _(空)_
 
 | 工作区 | 分支 | 任务 | 状态 |
 |--------|------|------|------|
-| nodex-claude | feat/phase-2-reading-loop | Phase 2: 阅读环 (#130) | 待开始 |
+| _(空)_ | — | — | — |
 
 ---
 
 ## 进行中
 
-- [ ] **Phase 2: 阅读环** (#130) — Review 现有 Spark 实现 → Round 3 Soul → 碰撞策略 → #skill 节点 `→ nodex-claude`
+_(空)_
 
 ---
 
@@ -75,52 +75,85 @@ _(空)_
 
 ### AI — 照亮你的思考
 
-> AI 不替你思考，而是把你自己的思考照亮。基于 pi-mono 架构，分 Phase 实施。详细计划见 `docs/plans/`。
+> AI 不替你思考，而是把你自己的思考照亮。基于 pi-mono 架构，按 Infrastructure Layer × Feature Track 实施。详细计划见 `docs/plans/README.md`。
 
 #### 已完成
 
-- ~~Phase 0: 基座~~ ✓ — pi-mono proxy + ChatDrawer + API key (#125)
-- ~~Phase 1: 画布~~ ✓ — node/undo tool + #agent 配置 + Reference/ToolCall 渲染 + Chat 持久化 (#126)
-- ~~Phase 1.5: 工具重构~~ ✓ — 拆分为 6 独立工具 + create/read/edit/search 增强 (#127)
-- ~~Phase 1.5.1: Data Access Layer~~ ✓ — node_read/edit/create 的 `data` 参数 + BLOCKED_KEYS (#129)
-- ~~Phase 2 Step 1: Spark 提取~~ ✓ — ai-spark.ts + shadow cache + extraction presets + webclip 集成
-- ~~Phase 3 Batch 1: 浏览器观察~~ ✓ — get_text + get_metadata + find + get_selection
-- ~~Phase 3: 浏览器工具~~ ✓ — CDP screenshot + interaction + debugging
-- ~~Context Refactor Step 1~~ ✓ — transformContext + convertToLlm + getApiKey (#132)
+- ~~Layer 0: Agent Runtime~~ ✓ — pi-mono proxy + ChatDrawer + 6 node tools + undo + data access layer + #agent 配置 + Chat 持久化
+- ~~Track C: Browser~~ ✓ — 页面观察 + CDP 截图/交互/调试
+- ~~Layer 1 Step 1~~ ✓ — transformContext + convertToLlm + getApiKey (#132)
+- ~~Context 图片生命周期~~ ✓ — 滑动窗口 + 持久化剥离 (#133)
 
-#### Phase 2: 阅读环 — Clip & Spark
+#### Wave 1: 修复 Spark + 清理（当前优先）
 
-- [ ] Spark 三轮认知压缩（skeleton → flesh → soul）
-- [ ] 碰撞策略（graph-search，非 embedding）
-- [ ] #skill 节点提取模式学习
+- [x] Spark 重构为 #agent 节点模式 — 系统提示词存为 Spark #agent 节点子节点，删除 extraction-presets.ts
+- [ ] 修复 Spark proxy 400 — 独立 agent 的 API key 初始化路径
+- [ ] 清理 is/has/about — 删除 `ensureSourceMetadataFieldDefs()` + NDX_F17-19 + system prompt Metadata 指令
+- [ ] 验证 Spark 端到端 — clip 页面 → #spark 子节点生成
 
-#### Phase 3: 浏览器 — browser tool + CDP
+#### #skill 节点支持 + 渐进式披露（可交给 Codex）
 
-> 工具定义：`docs/plans/tool-definitions.md` | 实施计划：`docs/plans/phase-3-browser.md`
+> **现状**: 基础设施已完备（tagDef + fieldDef + readSkillIds + buildAgentSystemPrompt），但没有默认 skill 节点、全量 dump 规则到 system prompt、没有测试覆盖。
+>
+> **目标**: 创建默认技能 + 改为渐进式加载 + 补测试。设计详见 `docs/plans/ai-context-management.md` §Step 2。
+>
+> **渐进式披露核心设计**:
+> - L0: system prompt 只放 `<available-skills>` 索引（id + name + description）
+> - L1: AI 需要时通过 `node_read(skillId, depth=1)` 按需读取完整规则（不新增工具）
+> - 改动集中在 `buildAgentSystemPrompt()` — 从全量 dump 改为只输出索引 XML
 
-- [x] Batch 2: 截图 + 基础交互 — screenshot + click + type + scroll + navigate + tab（CDP）
-- [x] Batch 3: 深度交互 — key + fill_form + drag + wait + execute_js
-- [x] Batch 4: 调试 — read_network + read_console（CDP）
-- [ ] YouTube 抓取增强 — 获取视频 transcript（`/transcript` 或 API），替代当前仅 author 元数据的提取
+- [ ] **默认 #skill 节点 bootstrap** — 在 `ensureAgentNode()` 中创建 2-3 个默认 skill 节点（固定 ID），每个 skill 的子节点是规则行。候选：
+  - `Refine structure` — 拆解复杂节点为子任务/子结构的规则
+  - `Writing assistant` — 改写/润色/翻译的规则
+  - `Research` — 信息收集和整理的规则
+- [ ] **渐进式披露** — `buildAgentSystemPrompt()` 改为只输出 skill 索引：
+  ```xml
+  <available-skills>
+    <skill id="..." name="..." description="..." />
+  </available-skills>
+  When you need a skill's detailed rules, use node_read to read the skill node's children.
+  ```
+- [ ] **soma agent 默认激活 1 个 skill** — Skills field entry 预填一个默认 skill 引用
+- [ ] **测试覆盖** — ai-agent-node.test.ts 新增：readSkillIds 读取、buildAgentSystemPrompt 输出 `<available-skills>` 索引（非全量规则）、空 skill 渲染为自闭合标签
 
-#### Phase 4: 编排 — AgentOrchestrator
+#### Layer 1: 上下文管线
 
-- [ ] AgentMessageBus (EventTarget) + AgentOrchestrator (delegate/cancel)
+> 设计：`docs/plans/ai-context-management.md`
+
+- [ ] Step 3: Context 自动压缩 — Bridge Message + Handoff Memo + token 追踪
+
+#### Track A: Chat
+
+- [ ] Chat 会话同步 — 跨设备同步 Chat 历史（方案待定，见 ai-context-management.md）
+- [ ] Chat UI 打磨 — `docs/plans/ui-chat-panel-redesign.md`
+
+#### Track B: 阅读环
+
+> 设计：`docs/plans/phase-2-reading-ring.md`
+
+- [ ] Spark 质量提升 — 三轮认知压缩优化 + 进度 UI
+- [ ] 碰撞策略 v0→v1 — agent 驱动 node_search 渐进式碰撞
+- [ ] #skill 提取模式 — 依赖 Layer 1 Step 2
+
+#### Layer 3: 编排
+
+> 设计：`docs/plans/phase-4-orchestration.md`
+
+- [ ] AgentOrchestrator + subagent delegation
 - [ ] 后台任务 UI（badge + 任务列表）
-- [ ] 求助流（clarification）+ 并发 subagent
+- [ ] 求助流（clarification）
 
-#### Phase 5: 认知 — Taste 学习 + Review 引擎
+#### Track D: 认知
 
-- [ ] Schema evolution skill（OpLog Correction 分析 → #skill 规则派生）
-- [ ] /review 命令（认知镜像：新结构、升级、矛盾、同构）
+> 设计：`docs/plans/phase-5-cognition.md`
 
-#### 上下文感知 Sidebar
+- [ ] Taste 学习 — Schema evolution skill（OpLog Correction → #skill 规则）
+- [ ] /review 命令 — 认知镜像（新结构、升级、矛盾、同构）
 
-> 三层渐进披露：L1 低调 badge → L2 标题列表 → L3 导航到节点。
+#### 其他 AI
 
-- [ ] v1: URL 精确匹配 — 当前页 URL 匹配已有 #source → 工具栏 badge 显示关联数
-- [ ] v2: 关键词/语义匹配 — 扩展到同域名、主题相关的笔记匹配
-- [ ] v3: 共读模式（远期）— 侧边栏持续展示与当前页相关的笔记
+- [ ] YouTube 抓取增强 — 获取视频 transcript
+- [ ] 上下文感知 Sidebar — URL 匹配 → 关键词匹配 → 共读模式
 
 ---
 
@@ -163,13 +196,16 @@ _(空)_
 
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
+| 2026-03-13 | x.com 抓取深度增强 — per-tweet author/timestamp/repost/pinned + quote tweet 提取 | nodex | main |
+| 2026-03-13 | 修复 Chat 历史不显示 — StrictMode 双重 effect race condition (restorePromise 共享) | nodex | main |
+| 2026-03-13 | 修复 AI browser tool get_text — stripHtml 保留块级标签换行 | nodex | main |
 | 2026-03-13 | AI 上下文图片生命周期 — 滑动窗口 + 持久化剥离 + 轻量签名，修复多轮截图崩溃 | codex | #133 |
 | 2026-03-13 | AI Context Refactor Step 1 — transformContext + convertToLlm + getApiKey + ai-proxy 提取 | codex | #132 |
 | 2026-03-13 | Browser tool 审计优化 — 修正参数描述、移除冗余返回值、添加分页提示 | nodex | main |
-| 2026-03-13 | Phase 3: 浏览器工具 (#131) — CDP screenshot + interaction + debugging | codex | #131 |
+| 2026-03-13 | Track C: 浏览器工具 (#131) — CDP screenshot + interaction + debugging | codex | #131 |
 | 2026-03-13 | 多 Agent 工作流重构 — 固定 worktree + PR 协作流程，移除 dispatcher/subagent 模式 | nodex | main |
-| 2026-03-13 | Phase 3 Batch 1: browser tool 观察能力 — get_text + get_metadata + find + get_selection | codex | main |
-| 2026-03-13 | Phase 2 Step 1: Spark 结构提取 — ai-spark.ts + shadow cache + extraction presets + webclip 集成 | claude | main |
+| 2026-03-13 | Track C Batch 1: browser tool 观察能力 — get_text + get_metadata + find + get_selection | codex | main |
+| 2026-03-13 | Spark 结构提取 — ai-spark.ts + shadow cache + extraction presets + webclip 集成 | claude | main |
 | 2026-03-13 | Chat/Panel UI 优化调研计划 — 详细实施方案 `docs/plans/ui-chat-panel-redesign.md` | gemini + nodex | — |
 | 2026-03-12 | Phase 1.5.1: Data Access Layer — node_read/edit/create data 参数 + BLOCKED_KEYS 安全限制 | codex | #129 |
 | 2026-03-12 | Phase 1.5: AI 工具体系重构 — node tool 拆分为 6 独立工具 + 增强 + 代码优化 | codex + nodex | #127 |

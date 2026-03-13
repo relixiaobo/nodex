@@ -6,6 +6,10 @@
  * - Shadow Cache read/write + TTL expiry
  * - Extraction rule loading by content type
  * - #spark tagDef and is/has/about fieldDef bootstrapping
+ * - #skill node bootstrap + rule reading + fallback
+ * - Collision system prompt building
+ * - Source metadata reading
+ * - System prompt content (metadata instructions)
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
@@ -16,6 +20,12 @@ import {
 } from '../../src/lib/ai-shadow-cache.js';
 import {
   getExtractionRules,
+  getSkillBasedRules,
+  ensureDefaultSkillNodes,
+  ensureSkillTriggerFieldDef,
+  findSkillByTrigger,
+  readSkillRules,
+  DEFAULT_SKILL_IDS,
   ARTICLE_EXTRACTION_RULES,
   VIDEO_EXTRACTION_RULES,
   SOCIAL_EXTRACTION_RULES,
@@ -25,6 +35,10 @@ import {
   ensureSparkTagDef,
   ensureSourceMetadataFieldDefs,
   shouldAutoTrigger,
+  detectContentType,
+  buildSparkSystemPrompt,
+  buildCollisionSystemPrompt,
+  readSourceMetadata,
   SPARK_COMMIT_ORIGIN,
 } from '../../src/lib/ai-spark.js';
 import * as loroDoc from '../../src/lib/loro-doc.js';
@@ -352,5 +366,298 @@ describe('shouldAutoTrigger', () => {
     // with an API key, so shouldAutoTrigger should return false.
     const result = await shouldAutoTrigger();
     expect(typeof result).toBe('boolean');
+  });
+});
+
+// ============================================================
+// #skill node bootstrap + rule reading
+// ============================================================
+
+describe('skill trigger fieldDef', () => {
+  beforeEach(() => {
+    resetAndSeed();
+  });
+
+  it('creates Trigger fieldDef under #skill tagDef', () => {
+    // Ensure #skill tagDef exists first (normally done by ai-agent-node bootstrap)
+    if (!loroDoc.hasNode(SYS_T.SKILL)) {
+      loroDoc.createNode(SYS_T.SKILL, SYSTEM_NODE_IDS.SCHEMA);
+      loroDoc.setNodeDataBatch(SYS_T.SKILL, { type: 'tagDef', name: 'skill' });
+      loroDoc.commitDoc();
+    }
+
+    ensureSkillTriggerFieldDef();
+
+    const triggerField = loroDoc.toNodexNode(NDX_F.SKILL_TRIGGER);
+    expect(triggerField).toBeDefined();
+    expect(triggerField!.type).toBe('fieldDef');
+    expect(triggerField!.name).toBe('Trigger');
+    expect(triggerField!.fieldType).toBe('options');
+    expect(loroDoc.getParentId(NDX_F.SKILL_TRIGGER)).toBe(SYS_T.SKILL);
+  });
+
+  it('ensureSkillTriggerFieldDef is idempotent', () => {
+    if (!loroDoc.hasNode(SYS_T.SKILL)) {
+      loroDoc.createNode(SYS_T.SKILL, SYSTEM_NODE_IDS.SCHEMA);
+      loroDoc.setNodeDataBatch(SYS_T.SKILL, { type: 'tagDef', name: 'skill' });
+      loroDoc.commitDoc();
+    }
+
+    ensureSkillTriggerFieldDef();
+    ensureSkillTriggerFieldDef();
+    expect(loroDoc.toNodexNode(NDX_F.SKILL_TRIGGER)).toBeDefined();
+  });
+});
+
+describe('default skill nodes', () => {
+  beforeEach(() => {
+    resetAndSeed();
+    // Ensure #skill tagDef exists
+    if (!loroDoc.hasNode(SYS_T.SKILL)) {
+      loroDoc.createNode(SYS_T.SKILL, SYSTEM_NODE_IDS.SCHEMA);
+      loroDoc.setNodeDataBatch(SYS_T.SKILL, { type: 'tagDef', name: 'skill' });
+      loroDoc.commitDoc();
+    }
+  });
+
+  it('creates 4 default skill nodes', () => {
+    ensureDefaultSkillNodes();
+
+    for (const id of Object.values(DEFAULT_SKILL_IDS)) {
+      const node = loroDoc.toNodexNode(id);
+      expect(node).toBeDefined();
+      expect(node!.tags).toContain(SYS_T.SKILL);
+    }
+  });
+
+  it('each skill node has rules as children', () => {
+    ensureDefaultSkillNodes();
+
+    const articleRules = readSkillRules(DEFAULT_SKILL_IDS.ARTICLE);
+    expect(articleRules.length).toBe(ARTICLE_EXTRACTION_RULES.length);
+    expect(articleRules[0]).toBe(ARTICLE_EXTRACTION_RULES[0]);
+
+    const videoRules = readSkillRules(DEFAULT_SKILL_IDS.VIDEO);
+    expect(videoRules.length).toBe(VIDEO_EXTRACTION_RULES.length);
+
+    const socialRules = readSkillRules(DEFAULT_SKILL_IDS.SOCIAL);
+    expect(socialRules.length).toBe(SOCIAL_EXTRACTION_RULES.length);
+
+    const generalRules = readSkillRules(DEFAULT_SKILL_IDS.GENERAL);
+    expect(generalRules.length).toBe(GENERAL_EXTRACTION_RULES.length);
+  });
+
+  it('findSkillByTrigger finds matching skill nodes', () => {
+    ensureDefaultSkillNodes();
+
+    expect(findSkillByTrigger('article')).toBe(DEFAULT_SKILL_IDS.ARTICLE);
+    expect(findSkillByTrigger('video')).toBe(DEFAULT_SKILL_IDS.VIDEO);
+    expect(findSkillByTrigger('social')).toBe(DEFAULT_SKILL_IDS.SOCIAL);
+    expect(findSkillByTrigger('general')).toBe(DEFAULT_SKILL_IDS.GENERAL);
+  });
+
+  it('findSkillByTrigger returns null for unknown trigger', () => {
+    ensureDefaultSkillNodes();
+    expect(findSkillByTrigger('unknown_type')).toBeNull();
+  });
+
+  it('ensureDefaultSkillNodes is idempotent', () => {
+    ensureDefaultSkillNodes();
+    ensureDefaultSkillNodes();
+
+    // Should not duplicate nodes
+    const articleNode = loroDoc.toNodexNode(DEFAULT_SKILL_IDS.ARTICLE);
+    expect(articleNode).toBeDefined();
+    expect(readSkillRules(DEFAULT_SKILL_IDS.ARTICLE).length).toBe(ARTICLE_EXTRACTION_RULES.length);
+  });
+});
+
+describe('getSkillBasedRules', () => {
+  beforeEach(() => {
+    resetAndSeed();
+    // Ensure #skill tagDef exists
+    if (!loroDoc.hasNode(SYS_T.SKILL)) {
+      loroDoc.createNode(SYS_T.SKILL, SYSTEM_NODE_IDS.SCHEMA);
+      loroDoc.setNodeDataBatch(SYS_T.SKILL, { type: 'tagDef', name: 'skill' });
+      loroDoc.commitDoc();
+    }
+  });
+
+  it('returns skill node rules when matching skill exists', () => {
+    ensureDefaultSkillNodes();
+
+    const rules = getSkillBasedRules('article');
+    expect(rules.length).toBe(ARTICLE_EXTRACTION_RULES.length);
+    expect(rules[0]).toBe(ARTICLE_EXTRACTION_RULES[0]);
+  });
+
+  it('falls back to hardcoded presets when no skill nodes exist', () => {
+    // No skill nodes bootstrapped
+    const rules = getSkillBasedRules('article');
+    expect(rules).toBe(ARTICLE_EXTRACTION_RULES);
+  });
+
+  it('returns general rules for undefined content type', () => {
+    const rules = getSkillBasedRules(undefined);
+    expect(rules).toBe(GENERAL_EXTRACTION_RULES);
+  });
+});
+
+// ============================================================
+// System prompt content
+// ============================================================
+
+describe('buildSparkSystemPrompt', () => {
+  beforeEach(() => {
+    resetAndSeed();
+  });
+
+  it('includes per-value metadata instructions for list fields', () => {
+    const prompt = buildSparkSystemPrompt('test-source-id', 'article');
+
+    // Should instruct separate calls for has/about
+    expect(prompt).toContain('one call PER concept');
+    expect(prompt).toContain('one call PER topic');
+    expect(prompt).toContain('Do NOT combine into comma-separated string');
+  });
+
+  it('includes extraction rules in the prompt', () => {
+    const prompt = buildSparkSystemPrompt('test-source-id', 'article');
+    expect(prompt).toContain('<extraction-rules>');
+    expect(prompt).toContain('argumentation framework');
+  });
+
+  it('includes source node ID in the prompt', () => {
+    const prompt = buildSparkSystemPrompt('my-source-123', 'article');
+    expect(prompt).toContain('my-source-123');
+  });
+});
+
+// ============================================================
+// Collision
+// ============================================================
+
+describe('readSourceMetadata', () => {
+  beforeEach(() => {
+    resetAndSeed();
+    ensureSourceMetadataFieldDefs();
+  });
+
+  it('returns empty metadata for node without field entries', () => {
+    // Create a bare source node
+    loroDoc.createNode('test-source', SYSTEM_NODE_IDS.JOURNAL);
+    loroDoc.addTag('test-source', SYS_T.SOURCE);
+    loroDoc.commitDoc();
+
+    const meta = readSourceMetadata('test-source');
+    expect(meta.is).toBeNull();
+    expect(meta.has).toEqual([]);
+    expect(meta.about).toEqual([]);
+  });
+
+  it('reads is field value from field entry', () => {
+    // Create source node with is field entry
+    loroDoc.createNode('test-source-2', SYSTEM_NODE_IDS.JOURNAL);
+    loroDoc.addTag('test-source-2', SYS_T.SOURCE);
+
+    // Create is field entry
+    loroDoc.createNode('test-fe-is', 'test-source-2');
+    loroDoc.setNodeDataBatch('test-fe-is', { type: 'fieldEntry', fieldDefId: NDX_F.SOURCE_IS });
+
+    // Create value node (plain text, no targetId)
+    loroDoc.createNode('test-val-is', 'test-fe-is');
+    loroDoc.setNodeRichTextContent('test-val-is', 'technical tutorial', [], []);
+    loroDoc.commitDoc();
+
+    const meta = readSourceMetadata('test-source-2');
+    expect(meta.is).toBe('technical tutorial');
+  });
+});
+
+describe('buildCollisionSystemPrompt', () => {
+  it('includes metadata context', () => {
+    const prompt = buildCollisionSystemPrompt(
+      'src-123',
+      { is: 'methodological argument', has: ['modularity', 'constraints'], about: ['architecture'] },
+      ['Core framework: constraint-freedom trade-off'],
+    );
+
+    expect(prompt).toContain('src-123');
+    expect(prompt).toContain('methodological argument');
+    expect(prompt).toContain('modularity, constraints');
+    expect(prompt).toContain('architecture');
+    expect(prompt).toContain('constraint-freedom trade-off');
+  });
+
+  it('includes confidence threshold instructions', () => {
+    const prompt = buildCollisionSystemPrompt(
+      'src-456',
+      { is: null, has: [], about: ['testing'] },
+      [],
+    );
+
+    expect(prompt).toContain('Confidence threshold');
+    expect(prompt).toContain('Cross-domain');
+    expect(prompt).toContain('0-2 collisions');
+  });
+
+  it('handles empty metadata gracefully', () => {
+    const prompt = buildCollisionSystemPrompt(
+      'src-789',
+      { is: null, has: [], about: [] },
+      [],
+    );
+
+    expect(prompt).toContain('no metadata available');
+    expect(prompt).toContain('no spark nodes yet');
+  });
+});
+
+// ============================================================
+// Content type detection
+// ============================================================
+
+describe('detectContentType', () => {
+  beforeEach(() => {
+    resetAndSeed();
+  });
+
+  it('detects article from NDX_T.ARTICLE tag', () => {
+    loroDoc.createNode('ct-article', SYSTEM_NODE_IDS.JOURNAL);
+    loroDoc.addTag('ct-article', SYS_T.SOURCE);
+    loroDoc.addTag('ct-article', NDX_T.ARTICLE);
+    loroDoc.commitDoc();
+
+    expect(detectContentType('ct-article')).toBe('article');
+  });
+
+  it('detects video from NDX_T.VIDEO tag', () => {
+    loroDoc.createNode('ct-video', SYSTEM_NODE_IDS.JOURNAL);
+    loroDoc.addTag('ct-video', SYS_T.SOURCE);
+    loroDoc.addTag('ct-video', NDX_T.VIDEO);
+    loroDoc.commitDoc();
+
+    expect(detectContentType('ct-video')).toBe('video');
+  });
+
+  it('detects social from NDX_T.SOCIAL tag', () => {
+    loroDoc.createNode('ct-social', SYSTEM_NODE_IDS.JOURNAL);
+    loroDoc.addTag('ct-social', SYS_T.SOURCE);
+    loroDoc.addTag('ct-social', NDX_T.SOCIAL);
+    loroDoc.commitDoc();
+
+    expect(detectContentType('ct-social')).toBe('social');
+  });
+
+  it('returns source for generic #source tag', () => {
+    loroDoc.createNode('ct-source', SYSTEM_NODE_IDS.JOURNAL);
+    loroDoc.addTag('ct-source', SYS_T.SOURCE);
+    loroDoc.commitDoc();
+
+    expect(detectContentType('ct-source')).toBe('source');
+  });
+
+  it('returns undefined for non-existent node', () => {
+    expect(detectContentType('non-existent')).toBeUndefined();
   });
 });

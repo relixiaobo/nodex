@@ -330,6 +330,8 @@ export const NDX_F = {
   SOURCE_HAS: 'NDX_F18',
   /** #source: "about" metadata — topics (e.g. "software architecture") */
   SOURCE_ABOUT: 'NDX_F19',
+  /** #skill: trigger condition — content type match (e.g. "article", "video") */
+  SKILL_TRIGGER: 'NDX_F20',
 } as const;
 
 export type NdxFieldDef = typeof NDX_F[keyof typeof NDX_F];

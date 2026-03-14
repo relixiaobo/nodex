@@ -1,5 +1,6 @@
 import { startTransition, useEffect, useMemo, useState } from 'react';
 import type { Agent } from '@mariozechner/pi-agent-core';
+import type { AgentMessage, AgentTool } from '@mariozechner/pi-agent-core';
 import type { AssistantMessage, Message, ToolResultMessage, UserMessage } from '@mariozechner/pi-ai';
 import {
   createNewChatSession,
@@ -11,6 +12,15 @@ import {
 } from '../lib/ai-service.js';
 
 export type ChatConversationMessage = UserMessage | AssistantMessage;
+
+export interface AgentDebugState {
+  revision: number;
+  systemPrompt: string;
+  messages: AgentMessage[];
+  tools: AgentTool<any>[];
+  modelId: string;
+  provider: string;
+}
 
 /** Extract a map of toolCallId → result text from all messages. */
 function buildToolResultMap(messages: Message[]): Map<string, ToolResultMessage> {
@@ -108,6 +118,14 @@ export function useAgent(agent: Agent = getAIAgent()) {
       toolResults,
       isStreaming: agent.state.isStreaming,
       error,
+      debug: {
+        revision,
+        systemPrompt: agent.state.systemPrompt,
+        messages: agent.state.messages,
+        tools: agent.state.tools,
+        modelId: agent.state.model.id,
+        provider: agent.state.model.provider,
+      } satisfies AgentDebugState,
       sendMessage: (prompt: string) => streamChat(prompt, agent),
       stopStreaming: () => stopStreaming(agent),
       newChat: async () => {

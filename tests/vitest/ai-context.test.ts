@@ -1,5 +1,5 @@
 import type { AgentMessage } from '@mariozechner/pi-agent-core';
-import { formatLocalTimestamp, injectReminder, stripOldImages } from '../../src/lib/ai-context.js';
+import { formatLocalTimestamp, injectReminder, stripOldImages, transformAgentContext } from '../../src/lib/ai-context.js';
 
 function createImageToolResult(timestamp: number, label: string): AgentMessage {
   return {
@@ -195,5 +195,39 @@ describe('injectReminder', () => {
     ];
 
     expect(injectReminder(messages, '<system-reminder>ctx</system-reminder>')).toBe(messages);
+  });
+});
+
+describe('transformAgentContext', () => {
+  it('reuses the same strip-plus-reminder pipeline used by chat runtime and debug mode', () => {
+    const messages: AgentMessage[] = [
+      {
+        role: 'user',
+        content: [
+          { type: 'text', text: 'look at this' },
+          { type: 'image', data: 'base64-user-old', mimeType: 'image/jpeg' },
+        ],
+        timestamp: 1,
+      },
+      createImageToolResult(2, 'keep-1'),
+      createImageToolResult(3, 'keep-2'),
+      createImageToolResult(4, 'keep-3'),
+    ];
+
+    const result = transformAgentContext(messages, '<system-reminder>ctx</system-reminder>');
+
+    expect(result).toEqual([
+      {
+        role: 'user',
+        content: [
+          { type: 'text', text: 'look at this' },
+          { type: 'text', text: '[Image removed from context: image/jpeg]\n\n<system-reminder>ctx</system-reminder>' },
+        ],
+        timestamp: 1,
+      },
+      createImageToolResult(2, 'keep-1'),
+      createImageToolResult(3, 'keep-2'),
+      createImageToolResult(4, 'keep-3'),
+    ]);
   });
 });

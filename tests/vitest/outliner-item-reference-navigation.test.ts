@@ -1,12 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import { resolvePanelNavigationNodeId } from '../../src/components/outliner/OutlinerItem.js';
 
-describe('OutlinerItem reference panel navigation target', () => {
-  it('navigates to reference target node for reference rows', () => {
-    expect(resolvePanelNavigationNodeId('ref_123', 'target_456')).toBe('target_456');
+describe('OutlinerItem panel navigation target', () => {
+  it('navigates to targetId for reference nodes', () => {
+    expect(resolvePanelNavigationNodeId('ref_123', { targetId: 'target_456' })).toBe('target_456');
   });
 
-  it('falls back to row node id for normal rows', () => {
+  it('navigates to targetId for options value nodes', () => {
+    expect(resolvePanelNavigationNodeId('value_node', { targetId: 'skill_node' })).toBe('skill_node');
+  });
+
+  it('falls back to nodeId when node has no targetId', () => {
+    expect(resolvePanelNavigationNodeId('node_123', {})).toBe('node_123');
+  });
+
+  it('falls back to nodeId when node is null', () => {
     expect(resolvePanelNavigationNodeId('node_123', null)).toBe('node_123');
   });
 });

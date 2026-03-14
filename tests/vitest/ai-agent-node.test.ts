@@ -55,7 +55,7 @@ describe('ai agent skill bootstrap and prompt rendering', () => {
   });
 
   it('readSkillIds returns the default active skill reference', () => {
-    expect(readSkillIds(AI_AGENT_NODE_IDS.SKILLS_FIELD_ENTRY)).toEqual([SKILL_NODE_IDS.REFINE_STRUCTURE]);
+    expect(readSkillIds(AI_AGENT_NODE_IDS.SKILLS_FIELD_ENTRY)).toEqual([SKILL_NODE_IDS.SKILL_CREATOR]);
   });
 
   it('buildAgentSystemPrompt renders available-skills index without dumping full rules', () => {

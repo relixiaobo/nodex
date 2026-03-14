@@ -3,6 +3,7 @@ import { useWorkspaceStore } from '../../stores/workspace-store';
 import { useNodeStore } from '../../stores/node-store';
 import { useUIStore } from '../../stores/ui-store';
 import { useNavUndoKeyboard } from '../../hooks/use-nav-undo-keyboard';
+import { usePanelKeyboard } from '../../hooks/use-panel-keyboard.js';
 import { useChatShortcut } from '../../hooks/use-chat-shortcut.js';
 import { useTodayShortcut } from '../../hooks/use-today-shortcut';
 import { useGlobalSelectionDismiss } from '../../hooks/use-global-selection-dismiss.js';
@@ -435,6 +436,8 @@ export function App({ skipBootstrap = false }: AppProps) {
 
  // Global Cmd+Z / Cmd+Shift+Z for navigation undo/redo
  useNavUndoKeyboard();
+ // Global multi-panel keyboard shortcuts (Cmd+\, Cmd+Shift+W, Cmd+Option+←/→)
+ usePanelKeyboard();
  // Global Cmd+L / Cmd+Shift+L for chat drawer
  useChatShortcut();
  // Global Cmd+Shift+D for go to today

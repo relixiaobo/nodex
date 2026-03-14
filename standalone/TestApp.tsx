@@ -8,6 +8,7 @@ import { useWorkspaceStore } from '../src/stores/workspace-store';
 import { useUIStore } from '../src/stores/ui-store';
 import { useNodeStore } from '../src/stores/node-store';
 import { useNavUndoKeyboard } from '../src/hooks/use-nav-undo-keyboard';
+import { usePanelKeyboard } from '../src/hooks/use-panel-keyboard.js';
 import { useGlobalSelectionDismiss } from '../src/hooks/use-global-selection-dismiss.js';
 import { TopToolbar } from '../src/components/toolbar/TopToolbar';
 import { PanelLayout } from '../src/components/panel/PanelLayout';
@@ -73,6 +74,8 @@ export function TestApp() {
 
   // Global Cmd+Z / Cmd+Shift+Z for unified Loro undo/redo (parity with App.tsx)
   useNavUndoKeyboard();
+  // Global multi-panel keyboard shortcuts (Cmd+\, Cmd+Shift+W, Cmd+Option+←/→)
+  usePanelKeyboard();
 
   if (!ready) {
     return (

@@ -274,6 +274,38 @@ export const SHORTCUT_REGISTRY: ShortcutDefinition[] = [
     action: 'Navigation redo',
     source: 'src/hooks/use-nav-undo-keyboard.ts',
   },
+  {
+    id: 'global.open_panel',
+    scope: 'global',
+    keys: ['Mod-\\'],
+    when: 'Node selected or focused',
+    action: 'Open focused/selected node in a new panel',
+    source: 'src/hooks/use-panel-keyboard.ts',
+  },
+  {
+    id: 'global.close_panel',
+    scope: 'global',
+    keys: ['Mod-Shift-w'],
+    when: 'More than one panel open',
+    action: 'Close the active panel',
+    source: 'src/hooks/use-panel-keyboard.ts',
+  },
+  {
+    id: 'global.prev_panel',
+    scope: 'global',
+    keys: ['Mod-Alt-ArrowLeft'],
+    when: 'More than one panel open',
+    action: 'Switch to the previous panel',
+    source: 'src/hooks/use-panel-keyboard.ts',
+  },
+  {
+    id: 'global.next_panel',
+    scope: 'global',
+    keys: ['Mod-Alt-ArrowRight'],
+    when: 'More than one panel open',
+    action: 'Switch to the next panel',
+    source: 'src/hooks/use-panel-keyboard.ts',
+  },
 ];
 
 function normalizeKey(key: string): string {

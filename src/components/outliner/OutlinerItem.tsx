@@ -245,6 +245,7 @@ export function OutlinerItem({
   const toggleExpanded = useUIStore((s) => s.toggleExpanded);
   const setExpanded = useUIStore((s) => s.setExpanded);
   const navigateTo = useUIStore((s) => s.navigateTo);
+  const openPanel = useUIStore((s) => s.openPanel);
   const openSearch = useUIStore((s) => s.openSearch);
   const expandedNodes = useUIStore((s) => s.expandedNodes);
   // Unified pointer handlers from OutlinerRow
@@ -1184,10 +1185,14 @@ export function OutlinerItem({
     navigateTo(panelNavigationNodeId);
   }, [panelNavigationNodeId, navigateTo]);
 
-  const handleBulletClick = useCallback(() => {
-    navigateTo(panelNavigationNodeId);
-    ensureUndoFocusAfterNavigation();
-  }, [panelNavigationNodeId, navigateTo]);
+  const handleBulletClick = useCallback((e: React.MouseEvent) => {
+    if (e.altKey) {
+      openPanel(panelNavigationNodeId);
+    } else {
+      navigateTo(panelNavigationNodeId);
+      ensureUndoFocusAfterNavigation();
+    }
+  }, [panelNavigationNodeId, navigateTo, openPanel]);
 
   const handleIndentLineClick = useCallback(() => {
     // Toggle expand/collapse all direct children (Tana indent guide line behavior)

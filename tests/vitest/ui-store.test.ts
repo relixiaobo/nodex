@@ -71,4 +71,97 @@ describe('ui-store navigation and UI state', () => {
     ui.closeChat();
     expect(useUIStore.getState().chatOpen).toBe(false);
   });
+
+  it('openPanel creates a new panel and switches active', () => {
+    const ui = useUIStore.getState();
+    const todayId = ensureTodayNode();
+    expect(useUIStore.getState().panels).toHaveLength(1);
+    expect(useUIStore.getState().activePanelId).toBe('main');
+
+    ui.openPanel('note_2');
+    const s1 = useUIStore.getState();
+    expect(s1.panels).toHaveLength(2);
+    expect(s1.panels[1].nodeId).toBe('note_2');
+    expect(s1.activePanelId).toBe(s1.panels[1].id);
+    // Focus should be cleared
+    expect(s1.focusedNodeId).toBeNull();
+
+    // navHistory should record the open-panel event
+    const lastEvent = s1.navHistory[s1.navIndex];
+    expect(lastEvent.action).toBe('open-panel');
+  });
+
+  it('closePanel removes the panel and adjusts active', () => {
+    const ui = useUIStore.getState();
+    ui.openPanel('note_2');
+    const s1 = useUIStore.getState();
+    const secondPanelId = s1.panels[1].id;
+
+    // Close the second panel
+    ui.closePanel(secondPanelId);
+    const s2 = useUIStore.getState();
+    expect(s2.panels).toHaveLength(1);
+    expect(s2.activePanelId).toBe('main');
+
+    // navHistory should record the close-panel event
+    const lastEvent = s2.navHistory[s2.navIndex];
+    expect(lastEvent.action).toBe('close-panel');
+  });
+
+  it('closePanel refuses to close the last panel', () => {
+    const ui = useUIStore.getState();
+    expect(useUIStore.getState().panels).toHaveLength(1);
+    ui.closePanel('main');
+    expect(useUIStore.getState().panels).toHaveLength(1);
+  });
+
+  it('setActivePanel switches active and clears focus', () => {
+    const ui = useUIStore.getState();
+    ui.openPanel('note_2');
+    const s1 = useUIStore.getState();
+    const secondPanelId = s1.panels[1].id;
+
+    // Set active back to main
+    ui.setActivePanel('main');
+    expect(useUIStore.getState().activePanelId).toBe('main');
+    expect(useUIStore.getState().focusedNodeId).toBeNull();
+
+    // setActivePanel to nonexistent panel is a no-op
+    ui.setActivePanel('nonexistent');
+    expect(useUIStore.getState().activePanelId).toBe('main');
+  });
+
+  it('goBack undoes open-panel and goForward redoes it', () => {
+    const ui = useUIStore.getState();
+    ui.openPanel('note_2');
+    const s1 = useUIStore.getState();
+    expect(s1.panels).toHaveLength(2);
+
+    // goBack should undo the open-panel → back to 1 panel
+    ui.goBack();
+    const s2 = useUIStore.getState();
+    expect(s2.panels).toHaveLength(1);
+
+    // goForward should redo the open-panel → back to 2 panels
+    ui.goForward();
+    const s3 = useUIStore.getState();
+    expect(s3.panels).toHaveLength(2);
+    expect(s3.panels[1].nodeId).toBe('note_2');
+  });
+
+  it('goBack undoes close-panel by restoring the snapshot', () => {
+    const ui = useUIStore.getState();
+    ui.openPanel('note_2');
+    const s1 = useUIStore.getState();
+    const secondPanelId = s1.panels[1].id;
+
+    ui.closePanel(secondPanelId);
+    expect(useUIStore.getState().panels).toHaveLength(1);
+
+    // goBack should restore the closed panel
+    ui.goBack();
+    const s3 = useUIStore.getState();
+    expect(s3.panels).toHaveLength(2);
+    expect(s3.panels.some((p) => p.id === secondPanelId)).toBe(true);
+  });
 });

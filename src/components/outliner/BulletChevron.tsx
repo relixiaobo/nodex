@@ -15,7 +15,7 @@ function buildBulletStyle(colors: string[]): React.CSSProperties {
 interface BulletChevronProps {
   hasChildren: boolean;
   isExpanded: boolean;
-  onBulletClick: () => void;
+  onBulletClick: (e: React.MouseEvent) => void;
   /** Dimmed style for trailing input placeholder bullets */
   dimmed?: boolean;
   /** Reference node: show concentric circles (bullseye) bullet */

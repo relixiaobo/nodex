@@ -30,6 +30,9 @@ interface UIStore {
   goBack(): void;
   goForward(): void;
   replacePanel(nodeId: string): void;
+  openPanel(nodeId: string, insertIndex?: number): void;
+  closePanel(panelId: string): void;
+  setActivePanel(panelId: string): void;
 
   // Expand/collapse (keys are compound: "panelId:parentId:nodeId" for per-panel per-instance state)
   expandedNodes: Set<string>;
@@ -344,6 +347,86 @@ export const useUIStore = create<UIStore>()(
           newPanels[panelIdx] = { ...newPanels[panelIdx], nodeId };
           return {
             panels: newPanels,
+            ...clearedFocus(),
+          };
+        }),
+
+      openPanel: (nodeId, insertIndex) =>
+        set((s) => {
+          if (!hasBackingNode(nodeId)) return {};
+          commitUIMarker();
+
+          const newPanelId = `panel_${Date.now().toString(36)}`;
+          const newPanel: Panel = { id: newPanelId, nodeId };
+          const idx = insertIndex ?? s.panels.length;
+          const newPanels = [...s.panels];
+          newPanels.splice(idx, 0, newPanel);
+
+          // Truncate forward history
+          const newNavHistory = s.navHistory.slice(0, s.navIndex + 1);
+          newNavHistory.push({
+            action: 'open-panel',
+            panelId: newPanelId,
+            nodeId,
+            insertIndex: idx,
+            prevActivePanelId: s.activePanelId,
+          });
+
+          return {
+            panels: newPanels,
+            activePanelId: newPanelId,
+            navHistory: newNavHistory,
+            navIndex: newNavHistory.length - 1,
+            ...clearedFocus(),
+          };
+        }),
+
+      closePanel: (panelId) =>
+        set((s) => {
+          // Cannot close the last panel
+          if (s.panels.length <= 1) return {};
+          const idx = s.panels.findIndex((p) => p.id === panelId);
+          if (idx < 0) return {};
+
+          commitUIMarker();
+
+          const snapshot = { ...s.panels[idx] };
+          const newPanels = [...s.panels];
+          newPanels.splice(idx, 1);
+
+          // Determine new active panel
+          let nextActivePanelId = s.activePanelId;
+          if (s.activePanelId === panelId) {
+            // Prefer the panel to the right (same index), otherwise the one before
+            const nextIdx = Math.min(idx, newPanels.length - 1);
+            nextActivePanelId = newPanels[nextIdx].id;
+          }
+
+          // Truncate forward history
+          const newNavHistory = s.navHistory.slice(0, s.navIndex + 1);
+          newNavHistory.push({
+            action: 'close-panel',
+            panelId,
+            snapshot,
+            insertIndex: idx,
+            nextActivePanelId,
+          });
+
+          return {
+            panels: newPanels,
+            activePanelId: nextActivePanelId,
+            navHistory: newNavHistory,
+            navIndex: newNavHistory.length - 1,
+            ...clearedFocus(),
+          };
+        }),
+
+      setActivePanel: (panelId) =>
+        set((s) => {
+          if (s.activePanelId === panelId) return {};
+          if (!s.panels.some((p) => p.id === panelId)) return {};
+          return {
+            activePanelId: panelId,
             ...clearedFocus(),
           };
         }),

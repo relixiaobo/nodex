@@ -9,7 +9,7 @@
  * with horizontal resize handle.
  */
 import { Suspense, lazy, useEffect, useState } from 'react';
-import { PanelTab, GlobalTools } from '../toolbar/TopToolbar.js';
+import { GlobalTools } from '../toolbar/TopToolbar.js';
 import { PanelLayout } from '../panel/PanelLayout.js';
 import { useUIStore } from '../../stores/ui-store.js';
 import { useChatResize } from '../../hooks/use-chat-resize.js';
@@ -43,21 +43,12 @@ export function DeskLayout() {
         ? ' flex-1 min-w-0 min-h-0 relative z-10 rounded-xl overflow-clip shadow-panel-right'
         : ' flex-1 min-h-0'}`}
       >
-        {wideChat ? (
-          <div className="flex items-center h-10 shrink-0 bg-background">
-            <PanelTab />
-          </div>
-        ) : (
-          <div className="flex items-center shrink-0">
-            <div className="tab-connector-right flex h-10 items-center bg-background rounded-t-xl max-w-[240px]">
-              <PanelTab />
-            </div>
-            <div className="flex flex-1 justify-end">
-              <GlobalTools />
-            </div>
+        {!wideChat && (
+          <div className="flex items-center justify-end shrink-0">
+            <GlobalTools />
           </div>
         )}
-        <div className={`flex flex-1 flex-col overflow-hidden bg-background${wideChat ? '' : ' rounded-b-xl rounded-tr-xl'}`}>
+        <div className={`flex flex-1 flex-col overflow-hidden bg-background${wideChat ? '' : ' rounded-xl'}`}>
           <PanelLayout />
         </div>
       </div>

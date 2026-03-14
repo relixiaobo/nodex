@@ -13,6 +13,7 @@ import { AtSign, Calendar, Plus } from '../../lib/icons.js';
 import { useNodeSearch, type NodeSearchResult } from '../../hooks/use-node-search';
 import { useUIStore } from '../../stores/ui-store';
 import { useNodeStore } from '../../stores/node-store';
+import type { Panel, NavigationEvent } from '../../types/index.js';
 import { isLockedNode, isWorkspaceHomeNode } from '../../lib/node-capabilities.js';
 import { getSystemNodePreset } from '../../lib/system-node-presets.js';
 import * as loroDoc from '../../lib/loro-doc.js';
@@ -94,11 +95,12 @@ function normalizeRecentNode(
 
 export function collectRecentReferenceNodes(params: {
  currentNodeId: string;
- panelHistory: string[];
- panelIndex: number;
+ navHistory: NavigationEvent[];
+ navIndex: number;
+ panels: Panel[];
  limit?: number;
 }): NodeSearchResult[] {
- const { currentNodeId, panelHistory, panelIndex, limit = 5 } = params;
+ const { currentNodeId, navHistory, navIndex, panels, limit = 5 } = params;
  const seen = new Set<string>();
  const results: NodeSearchResult[] = [];
 
@@ -110,11 +112,16 @@ export function collectRecentReferenceNodes(params: {
   results.push(normalized);
  };
 
- // Primary source: navigation history (most recently opened first).
- for (let i = panelIndex; i >= 0 && results.length < limit; i--) {
-  const id = panelHistory[i];
-  if (!id) continue;
-  pushIfValid(id);
+ // Primary source: current panels + navigation history (most recent first).
+ for (const panel of panels) {
+  if (results.length >= limit) break;
+  pushIfValid(panel.nodeId);
+ }
+ for (let i = navIndex; i >= 0 && results.length < limit; i--) {
+  const event = navHistory[i];
+  if (event.action === 'navigate') {
+   pushIfValid(event.fromNodeId);
+  }
  }
 
  // Fallback source: most recently edited nodes globally.
@@ -185,15 +192,16 @@ export const ReferenceSelector = forwardRef<ReferenceDropdownHandle, ReferenceSe
 
   // When query is empty, show recently used nodes:
   // navigation history first, then recently edited fallback.
-  const panelHistory = useUIStore((s) => s.panelHistory);
-  const panelIndex = useUIStore((s) => s.panelIndex);
+  const navHistory = useUIStore((s) => s.navHistory);
+  const navIndex = useUIStore((s) => s.navIndex);
+  const panels = useUIStore((s) => s.panels);
   const _version = useNodeStore((s) => s._version);
 
   const recentNodes = useMemo(() => {
    if (query.trim()) return [];
-   return collectRecentReferenceNodes({ currentNodeId, panelHistory, panelIndex, limit: 5 });
+   return collectRecentReferenceNodes({ currentNodeId, navHistory, navIndex, panels, limit: 5 });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query, panelHistory, panelIndex, _version, currentNodeId]);
+  }, [query, navHistory, navIndex, panels, _version, currentNodeId]);
 
   const dateMatches = useMemo(() => matchDateShortcuts(query), [query]);
   const items = query.trim() ? searchResults : recentNodes;

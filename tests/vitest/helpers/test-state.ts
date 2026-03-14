@@ -20,8 +20,10 @@ export function resetStores(): void {
   });
 
   useUIStore.setState({
-    panelHistory: [],
-    panelIndex: -1,
+    panels: [],
+    activePanelId: '',
+    navHistory: [],
+    navIndex: -1,
     expandedNodes: new Set<string>(),
     focusedNodeId: null,
     focusedParentId: null,
@@ -40,8 +42,6 @@ export function resetStores(): void {
     focusClickCoords: null,
     pendingRefConversion: null,
     expandedHiddenFields: new Set<string>(),
-    navUndoStack: [],
-    navRedoStack: [],
   });
 }
 

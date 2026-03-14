@@ -32,7 +32,7 @@ function getAgentInfo() {
 
 function useTestBootstrap(): boolean {
   const [ready, setReady] = useState(false);
-  const panelHistory = useUIStore((s) => s.panelHistory);
+  const panels = useUIStore((s) => s.panels);
   const replacePanel = useUIStore((s) => s.replacePanel);
 
   useEffect(() => {
@@ -43,7 +43,7 @@ function useTestBootstrap(): boolean {
       // Navigate to Today if no panel open.
       // Use replacePanel (not navigateTo) to avoid creating a Loro undo entry
       // whose UI snapshot is the empty initial state (Bug 1 fix).
-      if (panelHistory.length === 0) {
+      if (panels.length === 0) {
         replacePanel(ensureTodayNode());
       }
 

@@ -17,7 +17,8 @@ describe('preflight', () => {
     expect(nodeIds.length).toBeGreaterThanOrEqual(20);
     expect(ws.currentWorkspaceId).toBe('ws_default');
     expect(ws.userId).toBe('user_default');
-    expect(ui.panelHistory.length).toBeGreaterThan(0);
-    expect(ui.panelHistory[ui.panelIndex]).toBe(ensureTodayNode());
+    expect(ui.panels.length).toBeGreaterThan(0);
+    const currentNodeId = ui.panels.find((p) => p.id === ui.activePanelId)?.nodeId;
+    expect(currentNodeId).toBe(ensureTodayNode());
   });
 });

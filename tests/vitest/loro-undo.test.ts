@@ -24,6 +24,12 @@ import { useNodeStore } from '../../src/stores/node-store.js';
 import { useUIStore } from '../../src/stores/ui-store.js';
 import { resetAndSeed } from './helpers/test-state.js';
 
+/** Helper: get current active panel node ID */
+function currentNodeId(): string | null {
+  const s = useUIStore.getState();
+  return s.panels.find((p) => p.id === s.activePanelId)?.nodeId ?? null;
+}
+
 beforeEach(() => {
   resetAndSeed();
 });
@@ -162,22 +168,20 @@ describe('多次操作的撤销栈深度', () => {
 });
 
 describe('UI marker → undoDoc/redoDoc', () => {
-  it('导航操作通过 Loro undo/redo 恢复 panel history', () => {
+  it('导航操作通过 Loro undo/redo 恢复 panel state', () => {
     const ui = useUIStore.getState();
-    const before = {
-      panelHistory: [...useUIStore.getState().panelHistory],
-      panelIndex: useUIStore.getState().panelIndex,
-    };
+    const beforePanels = useUIStore.getState().panels.map((p) => ({ ...p }));
+    const beforeActivePanelId = useUIStore.getState().activePanelId;
 
     ui.navigateTo('inbox_3');
-    expect(useUIStore.getState().panelHistory[useUIStore.getState().panelIndex]).toBe('inbox_3');
+    expect(currentNodeId()).toBe('inbox_3');
 
     expect(undoDoc()).toBe(true);
-    expect(useUIStore.getState().panelHistory).toEqual(before.panelHistory);
-    expect(useUIStore.getState().panelIndex).toBe(before.panelIndex);
+    expect(useUIStore.getState().panels).toEqual(beforePanels);
+    expect(useUIStore.getState().activePanelId).toBe(beforeActivePanelId);
 
     expect(redoDoc()).toBe(true);
-    expect(useUIStore.getState().panelHistory[useUIStore.getState().panelIndex]).toBe('inbox_3');
+    expect(currentNodeId()).toBe('inbox_3');
   });
 
   it('展开/折叠通过 Loro undo/redo 恢复 expandedNodes', () => {
@@ -204,55 +208,47 @@ describe('UI marker → undoDoc/redoDoc', () => {
     expect(canUndoDoc()).toBe(false);
   });
 
-  it('连续 undo 不应产生空 panelHistory（Bug 1 回归）', () => {
+  it('连续 undo 不应产生空 panels（Bug 1 回归）', () => {
     const ui = useUIStore.getState();
     const todayId = ensureTodayNode();
 
     // Simulate bootstrap: replacePanel sets initial panel without creating undo entry
     ui.replacePanel(todayId);
-    expect(useUIStore.getState().panelHistory).toEqual([todayId]);
+    expect(useUIStore.getState().panels[0].nodeId).toBe(todayId);
     expect(canUndoDoc()).toBe(false);
 
     // User navigates to two pages
     ui.navigateTo('proj_1');
     ui.navigateTo('note_1');
-    expect(useUIStore.getState().panelHistory[useUIStore.getState().panelIndex]).toBe('note_1');
+    expect(currentNodeId()).toBe('note_1');
 
-    // Undo both navigations — should return to Library, not empty
+    // Undo both navigations — should return to Today, not empty
     undoDoc();
     undoDoc();
 
-    const { panelHistory, panelIndex } = useUIStore.getState();
-    expect(panelHistory.length).toBeGreaterThan(0);
-    expect(panelHistory[panelIndex]).toBe(todayId);
+    const { panels } = useUIStore.getState();
+    expect(panels.length).toBeGreaterThan(0);
+    expect(currentNodeId()).toBe(todayId);
 
     // One more undo should be a no-op (no bootstrap undo entry)
-    const before = { ...useUIStore.getState() };
+    const before = { panels: [...useUIStore.getState().panels], activePanelId: useUIStore.getState().activePanelId };
     undoDoc();
-    expect(useUIStore.getState().panelHistory).toEqual(before.panelHistory);
-    expect(useUIStore.getState().panelIndex).toBe(before.panelIndex);
+    expect(useUIStore.getState().panels).toEqual(before.panels);
+    expect(useUIStore.getState().activePanelId).toBe(before.activePanelId);
   });
 
-  it('restore 回调忽略空 panelHistory 的 UI 快照', () => {
+  it('restore 回调忽略空 panels 的 UI 快照', () => {
     const ui = useUIStore.getState();
     const todayId = ensureTodayNode();
     // Set some panel state
     ui.replacePanel(todayId);
 
-    // Directly call the restore logic with an empty-history snapshot
-    // This simulates what would happen if such a snapshot leaked into the undo stack
-    const emptySnapshot = { v: 1, panelHistory: [], panelIndex: -1, expandedNodes: [] };
-    // Invoke restore via registerUndoUICallbacks pathway — it's the same function
-    // The restore callback is registered at module load; we test indirectly via setState
-    const stateBefore = { ...useUIStore.getState() };
-
-    // Simulate restoreUndoUIMeta being called with empty snapshot
-    // The guard should prevent setState
-    useUIStore.setState({ panelHistory: [todayId], panelIndex: 0 });
+    // Directly test by setting panel state then trying undo
+    useUIStore.setState({ panels: [{ id: 'main', nodeId: todayId }], activePanelId: 'main' });
     // Now try to undoDoc when there's nothing to undo — should be no-op
     const result = undoDoc();
     // canUndoDoc was false so result should be false
     expect(result).toBe(false);
-    expect(useUIStore.getState().panelHistory.length).toBeGreaterThan(0);
+    expect(useUIStore.getState().panels.length).toBeGreaterThan(0);
   });
 });

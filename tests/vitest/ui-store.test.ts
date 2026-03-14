@@ -2,6 +2,12 @@ import { useUIStore } from '../../src/stores/ui-store.js';
 import { ensureTodayNode } from '../../src/lib/journal.js';
 import { resetAndSeed } from './helpers/test-state.js';
 
+/** Helper: get current active panel node ID */
+function currentNodeId(): string | null {
+  const s = useUIStore.getState();
+  return s.panels.find((p) => p.id === s.activePanelId)?.nodeId ?? null;
+}
+
 describe('ui-store navigation and UI state', () => {
   beforeEach(() => {
     resetAndSeed();
@@ -13,31 +19,28 @@ describe('ui-store navigation and UI state', () => {
     const noteExpandKey = `${todayId}:note_2`;
 
     ui.navigateTo('inbox_3');
-    let state = useUIStore.getState();
-    expect(state.panelHistory[state.panelIndex]).toBe('inbox_3');
+    expect(currentNodeId()).toBe('inbox_3');
 
     ui.goBack();
-    state = useUIStore.getState();
-    expect(state.panelHistory[state.panelIndex]).toBe(todayId);
+    expect(currentNodeId()).toBe(todayId);
 
     ui.goForward();
-    state = useUIStore.getState();
-    expect(state.panelHistory[state.panelIndex]).toBe('inbox_3');
+    expect(currentNodeId()).toBe('inbox_3');
 
     ui.replacePanel('note_2');
-    state = useUIStore.getState();
-    expect(state.panelHistory[state.panelIndex]).toBe('note_2');
+    expect(currentNodeId()).toBe('note_2');
 
     const beforeInvalidNavigate = useUIStore.getState();
     ui.navigateTo('missing_node_for_panel_navigation');
-    state = useUIStore.getState();
-    expect(state.panelHistory).toEqual(beforeInvalidNavigate.panelHistory);
-    expect(state.panelIndex).toBe(beforeInvalidNavigate.panelIndex);
+    let state = useUIStore.getState();
+    // navigateTo with missing node should be a no-op — panels unchanged
+    expect(state.panels).toEqual(beforeInvalidNavigate.panels);
+    expect(state.activePanelId).toBe(beforeInvalidNavigate.activePanelId);
 
     ui.replacePanel('missing_node_for_panel_navigation');
     state = useUIStore.getState();
-    expect(state.panelHistory).toEqual(beforeInvalidNavigate.panelHistory);
-    expect(state.panelIndex).toBe(beforeInvalidNavigate.panelIndex);
+    expect(state.panels).toEqual(beforeInvalidNavigate.panels);
+    expect(state.activePanelId).toBe(beforeInvalidNavigate.activePanelId);
 
     ui.setExpanded(noteExpandKey, true);
     expect(useUIStore.getState().expandedNodes.has(noteExpandKey)).toBe(true);

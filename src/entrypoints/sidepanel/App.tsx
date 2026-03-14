@@ -157,16 +157,16 @@ function useBootstrap(skip: boolean): BootstrapResult {
    // Use replacePanel (not navigateTo) to avoid creating a Loro undo entry
    // whose captured UI snapshot is the empty initial state — that would cause
    // repeated Cmd+Z to restore a blank panel stack.
-   const latestHistory = useUIStore.getState().panelHistory;
-   const latestIndex = useUIStore.getState().panelIndex;
-   const currentPanelId = latestHistory[latestIndex] ?? latestHistory[latestHistory.length - 1];
+   const uiState = useUIStore.getState();
+   const activePanel = uiState.panels.find((p) => p.id === uiState.activePanelId);
+   const currentPanelNodeId = activePanel?.nodeId ?? null;
    const todayStr = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
-   const lastVisitDate = useUIStore.getState().lastVisitDate;
+   const lastVisitDate = uiState.lastVisitDate;
    const isFirstVisitOfDay = lastVisitDate !== todayStr;
    useUIStore.getState().setLastVisitDate(todayStr);
 
-   if (latestHistory.length === 0
-    || (currentPanelId && !loroDoc.hasNode(currentPanelId))
+   if (uiState.panels.length === 0
+    || (currentPanelNodeId && !currentPanelNodeId.startsWith('app:') && !loroDoc.hasNode(currentPanelNodeId))
     || isFirstVisitOfDay) {
     replacePanel(ensureTodayNode());
    }

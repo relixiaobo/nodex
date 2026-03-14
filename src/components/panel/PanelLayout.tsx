@@ -75,7 +75,7 @@ export function PanelLayout({ toolbar }: PanelLayoutProps) {
                     </button>
                   )}
                 </div>
-                <div className="flex shrink-0 justify-end">
+                <div className="flex flex-1 justify-end">
                   {toolbar}
                 </div>
               </div>

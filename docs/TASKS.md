@@ -94,45 +94,23 @@ _(空)_
 
 #### Wave 1.5: Spark 交互优化（Clip → Spark 闭环）
 
-> **核心设计**：Clip 后立刻在 #source fields 之后第一个位置创建 #spark 节点，三态切换：
-> - `pending` — ✨ Generate Spark（可点击按钮）
-> - `loading` — bullet 转圈 + "Generating..."
-> - `complete` — 餐巾纸 name + insight children
->
-> **触发策略**：主动 clip（⌘K / /clip）→ 自动触发 loading；被动 clip（高亮/笔记创建 source）→ pending 等用户手动点击；无 API key → 灰显 + 引导设置。
+> ✅ 已完成。三态 #spark 节点 + 统一 clip 管线。
 
-- [ ] #spark 节点 pending 态 — clip 时立即创建（不触发 LLM），显示为可点击按钮
-- [ ] #spark 节点 loading 态 — bullet 转圈动画 + "Generating..." 文案
-- [ ] #spark 节点 complete 态 — 餐巾纸 name + children（当前已实现）
-- [ ] 主动 clip 自动触发 — ⌘K / /clip 路径自动进入 loading
-- [ ] 被动 clip 不触发 — 高亮/笔记路径只创建 pending 节点
+- [x] #spark 节点三态交互 — pending（✦ Generate Spark 按钮）/ loading（bullet 转圈）/ complete（餐巾纸 + children）
+- [x] 主动 clip 自动触发 — ⌘K / /clip 路径自动进入 loading
+- [x] 被动 clip 不触发 — 高亮/笔记路径只创建 pending 节点
+- [x] 统一 clip 管线 — 4 条 clip 路径共享 `applyClipData()` 管线，修复 `/clip` 路径缺失 content cache 的问题
+- [x] Spark API 简化 — 4 个清晰公开函数（ensureSparkPlaceholder / triggerSparkExtraction / autoTriggerSpark / handleSparkClick）
+- [x] BulletChevron 泛化 — `isSparkNode` 改为通用 `spinnerStyle?: 'pulse' | 'spin'`
+- [x] Spark commit origin 修正 — 使用 `SPARK_COMMIT_ORIGIN ('ai:spark')` 替代错误的 `AI_COMMIT_ORIGIN ('ai:chat')`
 - [ ] 无 API key 态 — 灰显按钮 + "Set up API key" 引导
-- [ ] 统一 /clip 和 ⌘K clip 行为
 
-#### Wave 2: #skill 节点 + 渐进式披露（可交给 Codex）
+#### Wave 2: #skill 节点 + 渐进式披露 ✅
 
-> **现状**: 基础设施已完备（tagDef + fieldDef + readSkillIds + buildAgentSystemPrompt），但没有默认 skill 节点、全量 dump 规则到 system prompt、没有测试覆盖。
->
-> **目标**: 创建默认技能 + 改为渐进式加载 + 补测试。设计详见 `docs/plans/ai-context-management.md` §Step 2。
->
-> **渐进式披露核心设计**:
-> - L0: system prompt 只放 `<available-skills>` 索引（id + name + description）
-> - L1: AI 需要时通过 `node_read(skillId, depth=1)` 按需读取完整规则（不新增工具）
-> - 改动集中在 `buildAgentSystemPrompt()` — 从全量 dump 改为只输出索引 XML
-
-- [ ] **默认 #skill 节点 bootstrap** — 在 `ensureAgentNode()` 中创建 2-3 个默认 skill 节点（固定 ID），每个 skill 的子节点是规则行。候选：
-  - `Refine structure` — 拆解复杂节点为子任务/子结构的规则
-  - `Writing assistant` — 改写/润色/翻译的规则
-  - `Research` — 信息收集和整理的规则
-- [ ] **渐进式披露** — `buildAgentSystemPrompt()` 改为只输出 skill 索引：
-  ```xml
-  <available-skills>
-    <skill id="..." name="..." description="..." />
-  </available-skills>
-  When you need a skill's detailed rules, use node_read to read the skill node's children.
-  ```
-- [ ] **soma agent 默认激活 1 个 skill** — Skills field entry 预填一个默认 skill 引用
-- [ ] **测试覆盖** — ai-agent-node.test.ts 新增：readSkillIds 读取、buildAgentSystemPrompt 输出 `<available-skills>` 索引（非全量规则）、空 skill 渲染为自闭合标签
+- [x] 默认 #skill 节点 bootstrap — Refine structure / Writing assistant / Research（固定 ID，子节点 = 规则行）
+- [x] 渐进式披露 — `buildAgentSystemPrompt()` 改为 `<available-skills>` 索引 + `node_read` 提示
+- [x] soma agent 默认激活 1 个 skill — Skills field entry 预填 Refine structure
+- [x] 测试覆盖 — readSkillIds、索引渲染、空 skill、description fallback
 
 #### Wave 3+: 后续
 
@@ -210,6 +188,8 @@ _(空)_
 
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
+| 2026-03-14 | #skill 节点 bootstrap + 渐进式披露 — 3 个默认 skill + `<available-skills>` 索引 + 测试 | codex | #134 |
+| 2026-03-14 | Spark 交互优化 + clip 管线统一 — 三态 #spark 节点 + `applyClipData()` 共享管线 + API 简化 + commit origin 修正 | nodex | main |
 | 2026-03-13 | x.com 抓取深度增强 — per-tweet author/timestamp/repost/pinned + quote tweet 提取 | nodex | main |
 | 2026-03-13 | 修复 Chat 历史不显示 — StrictMode 双重 effect race condition (restorePromise 共享) | nodex | main |
 | 2026-03-13 | 修复 AI browser tool get_text — stripHtml 保留块级标签换行 | nodex | main |

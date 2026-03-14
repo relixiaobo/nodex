@@ -34,3 +34,6 @@
 - 修复 AI Chat 历史记录在重新打开面板后不显示的问题（需先发一条消息才出现）
 - Spark 重构为 #agent 节点模式：系统提示词从硬编码迁移到 Spark #agent 节点的子节点，用户可直接在大纲中编辑提取规则；模型/温度/Token 上限通过 #agent 字段配置；删除 extraction-presets.ts
 - Spark 提示词升级：餐巾纸极限压缩（#spark 节点名 = 一句话本质）+ 骨架/血肉自然嵌套 + 零术语规则 + 承重概念区分
+- Spark 交互优化：剪藏后立即出现 #spark 节点，三态切换——待生成（✦ Generate Spark 按钮）/ 生成中（bullet 转圈）/ 完成（餐巾纸 + 结构树）；主动剪藏自动触发，高亮/笔记只创建占位等用户手动触发
+- 统一剪藏管线：所有剪藏路径（⌘K、/clip、编程式、高亮/笔记）共享同一套处理逻辑，修复 /clip 路径缺失页面内容缓存的问题
+- AI Skill 渐进式披露：新增 3 个默认技能节点（Refine structure / Writing assistant / Research），system prompt 从全量 dump 改为只展示技能索引，AI 按需通过 node_read 读取详细规则

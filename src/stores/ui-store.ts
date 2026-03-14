@@ -124,8 +124,9 @@ interface UIStore {
   clearExpandedHiddenFields(): void;
 
   // Panel title visibility (session-only, not persisted)
-  panelTitleVisible: boolean;
-  setPanelTitleVisible(visible: boolean): void;
+  // Keyed by panelId — missing key means title is visible (default true)
+  panelTitleVisibleMap: Record<string, boolean>;
+  setPanelTitleVisible(panelId: string, visible: boolean): void;
 
   // ⌘K palette usage tracking (persisted)
   paletteUsage: Record<string, { count: number; lastUsedAt: number }>;
@@ -195,7 +196,6 @@ function clearedFocus() {
     selectionSource: null as 'global' | 'ref-click' | null,
     selectedNodeIds: new Set<string>(),
     selectionAnchorId: null as string | null,
-    panelTitleVisible: true,
   };
 }
 
@@ -591,9 +591,12 @@ export const useUIStore = create<UIStore>()(
         }),
       clearExpandedHiddenFields: () => set({ expandedHiddenFields: new Set<string>() }),
 
-      // Panel title visibility
-      panelTitleVisible: true,
-      setPanelTitleVisible: (visible) => set({ panelTitleVisible: visible }),
+      // Panel title visibility (per-panel)
+      panelTitleVisibleMap: {},
+      setPanelTitleVisible: (panelId, visible) =>
+        set((s) => ({
+          panelTitleVisibleMap: { ...s.panelTitleVisibleMap, [panelId]: visible },
+        })),
 
       // ⌘K palette usage tracking
       paletteUsage: {},

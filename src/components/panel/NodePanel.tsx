@@ -83,15 +83,15 @@ export function NodePanel({ nodeId, panelId }: NodePanelProps) {
     const root = scrollRef.current;
     if (!el || !root) return;
     const observer = new IntersectionObserver(
-      ([entry]) => setPanelTitleVisible(entry.isIntersecting),
+      ([entry]) => setPanelTitleVisible(panelId, entry.isIntersecting),
       { root, threshold: 0 },
     );
     observer.observe(el);
     return () => {
       observer.disconnect();
-      setPanelTitleVisible(true);
+      setPanelTitleVisible(panelId, true);
     };
-  }, [nodeId, setPanelTitleVisible]);
+  }, [nodeId, panelId, setPanelTitleVisible]);
 
   const [confirmHardDelete, setConfirmHardDelete] = useState(false);
   const [confirmEmptyTrash, setConfirmEmptyTrash] = useState(false);

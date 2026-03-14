@@ -10,6 +10,7 @@ import { ChatInput } from './ChatInput.js';
 import { ChatMessage } from './ChatMessage.js';
 
 const WIDE_LAYOUT_MIN_WIDTH = 500;
+const HEADER_ICON_BUTTON = 'inline-flex h-7 w-7 items-center justify-center rounded-full text-foreground-tertiary transition-colors hover:bg-foreground/4 hover:text-foreground';
 
 function maskApiKey(apiKey: string): string {
   if (apiKey.length <= 12) return `${apiKey.slice(0, 7)}••••`;
@@ -164,10 +165,10 @@ export function ChatDrawer() {
 
   const containerClassName = useMemo(() => {
     if (isWideLayout) {
-      return 'relative z-[60] flex h-full w-[min(40vw,420px)] min-w-[320px] shrink-0 flex-col border-l border-border bg-[var(--color-background-recessed)]';
+      return 'relative z-[60] flex h-full w-[min(40vw,420px)] min-w-[320px] shrink-0 flex-col border-l border-border bg-background-recessed';
     }
 
-    return 'absolute inset-x-0 bottom-0 z-[60] flex h-[min(68vh,560px)] flex-col rounded-t-[20px] border-t border-border bg-[var(--color-background-recessed)] shadow-paper';
+    return 'absolute inset-x-0 bottom-0 z-[60] flex h-[min(68vh,560px)] flex-col rounded-t-[20px] border-t border-border bg-background-recessed shadow-paper';
   }, [isWideLayout]);
 
   return (
@@ -201,7 +202,7 @@ export function ChatDrawer() {
             <button
               type="button"
               onClick={() => void newChat()}
-              className="inline-flex h-7 w-7 items-center justify-center rounded-full text-foreground-tertiary transition-colors hover:bg-foreground/4 hover:text-foreground"
+              className={HEADER_ICON_BUTTON}
               aria-label="New chat"
             >
               <Plus size={15} strokeWidth={1.6} />
@@ -214,7 +215,7 @@ export function ChatDrawer() {
                 setFormError(null);
                 setShowSettings((value) => !value);
               }}
-              className="inline-flex h-7 w-7 items-center justify-center rounded-full text-foreground-tertiary transition-colors hover:bg-foreground/4 hover:text-foreground"
+              className={HEADER_ICON_BUTTON}
               aria-label="Chat settings"
             >
               <Settings size={15} strokeWidth={1.6} />
@@ -303,9 +304,11 @@ export function ChatDrawer() {
         </div>
       ) : (
         <>
-          <div ref={scrollRef} className="flex-1 space-y-4 overflow-y-auto px-4 py-4">
+          <div ref={scrollRef} className="flex flex-1 flex-col overflow-y-auto px-4 py-4">
             {debugEnabled && debugOpen && (
-              <ChatDebugPanel debug={debug} />
+              <div className="mb-4">
+                <ChatDebugPanel debug={debug} />
+              </div>
             )}
             {messages.length === 0 ? (
               <div className="flex h-full min-h-40 flex-col items-center justify-center gap-4 px-6">

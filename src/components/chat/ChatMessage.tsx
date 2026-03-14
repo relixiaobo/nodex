@@ -95,7 +95,7 @@ function renderAssistantBlocks(message: AssistantMessage, streaming: boolean, to
     return (
       <div
         key={`text-${index}`}
-        className={`whitespace-pre-wrap text-[13px] leading-6 text-foreground ${message.errorMessage && message.stopReason !== 'aborted' ? 'text-destructive' : ''}`}
+        className={`whitespace-pre-wrap text-sm leading-6 text-foreground ${message.errorMessage && message.stopReason !== 'aborted' ? 'text-destructive' : ''}`}
       >
         {renderTextWithMarkup(block.text, `assistant-${index}`)}
         {streaming && !hasLaterText && (
@@ -118,7 +118,7 @@ export function ChatMessage({ message, toolResults, streaming = false, grouped =
   }
 
   return (
-    <div className={`flex w-full ${isUser ? 'justify-end' : 'justify-start'} ${grouped ? 'mt-1' : ''}`}>
+    <div className={`flex w-full ${isUser ? 'justify-end' : 'justify-start'} ${grouped ? 'mt-1' : 'mt-4 first:mt-0'}`}>
       <div className={`max-w-[88%] ${isUser ? 'items-end' : 'items-start'} flex flex-col gap-1`}>
         {!grouped && (
           <span className="text-xs text-foreground-tertiary">
@@ -126,7 +126,7 @@ export function ChatMessage({ message, toolResults, streaming = false, grouped =
           </span>
         )}
         {isUser ? (
-          <div className="whitespace-pre-wrap rounded-lg bg-foreground/[0.04] px-3 py-2 text-[13px] leading-6 text-foreground">
+          <div className="whitespace-pre-wrap rounded-lg bg-foreground/4 px-3 py-2 text-sm leading-6 text-foreground">
             {text}
           </div>
         ) : (

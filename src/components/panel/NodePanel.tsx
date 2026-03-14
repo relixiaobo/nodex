@@ -28,7 +28,7 @@ export function NodePanel({ nodeId }: NodePanelProps) {
     return (
       <div className="flex flex-1 items-center justify-center p-6">
         <div className="text-center">
-          <div className="text-sm text-muted-foreground">This page is unavailable.</div>
+          <div className="text-sm text-foreground-tertiary">This page is unavailable.</div>
           <button
             type="button"
             onClick={goBack}

@@ -9,7 +9,7 @@ export function PanelStack() {
 
   if (!topNodeId) {
     return (
-      <div className="flex flex-1 items-center justify-center text-muted-foreground text-sm">
+      <div className="flex flex-1 items-center justify-center text-foreground-tertiary text-sm">
         Press ⌘K to search
       </div>
     );

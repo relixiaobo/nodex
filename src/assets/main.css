@@ -4,6 +4,7 @@
 @theme {
   /* Light mode — Paper & Ink */
   --color-background: #F5F4EE;
+  --color-background-recessed: #EEEEE8;
   --color-surface: #FFFFFF;
   --color-foreground: #1A1A1A;
   --color-foreground-secondary: #666666;

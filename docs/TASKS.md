@@ -90,7 +90,7 @@ _(空)_
 
 - [x] 清理 is/has/about — 删除 `ensureSourceMetadataFieldDefs()` + NDX_F17-19
 - [x] Spark 提示词重构 — napkin 极限压缩 + 骨架/血肉自然嵌套 + 零术语/自检/承重区分规则
-- [ ] 验证 Spark 端到端 — clip 页面 → #spark 子节点生成（餐巾纸 name + 递归 children）
+- [x] 验证 Spark 端到端 — clip 页面 → #spark 子节点生成（餐巾纸 name + 递归 children）
 
 #### Wave 1.5: Spark 交互优化（Clip → Spark 闭环）
 
@@ -103,7 +103,7 @@ _(空)_
 - [x] Spark API 简化 — 4 个清晰公开函数（ensureSparkPlaceholder / triggerSparkExtraction / autoTriggerSpark / handleSparkClick）
 - [x] BulletChevron 泛化 — `isSparkNode` 改为通用 `spinnerStyle?: 'pulse' | 'spin'`
 - [x] Spark commit origin 修正 — 使用 `SPARK_COMMIT_ORIGIN ('ai:spark')` 替代错误的 `AI_COMMIT_ORIGIN ('ai:chat')`
-- [ ] 无 API key 态 — 灰显按钮 + "Set up API key" 引导
+- [x] 无 API key 态 — 点击 Generate Spark 自动跳转 Settings 配置页
 
 #### Wave 2: #skill 基础设施 + 渐进式披露 ✅
 

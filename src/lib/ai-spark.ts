@@ -335,8 +335,7 @@ export function autoTriggerSpark(sourceNodeId: string, providedContent?: string)
 export async function handleSparkClick(sparkNodeId: string, sourceNodeId: string): Promise<void> {
   const hasKey = await hasApiKey();
   if (!hasKey) {
-    // TODO: navigate to Settings or show toast
-    console.warn('[spark] No API key configured');
+    useUIStore.getState().navigateTo(SYSTEM_NODE_IDS.SETTINGS);
     return;
   }
   await triggerSparkExtraction(sparkNodeId, sourceNodeId);

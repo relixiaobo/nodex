@@ -36,7 +36,7 @@ import { canCreateChildrenUnder, getNodeCapabilities } from '../../lib/node-capa
 import { getSystemNodePreset, getWorkspaceHomeNodeId, getWorkspaceTopLevelNodeIds, type SystemNodeIconKey } from '../../lib/system-node-presets.js';
 import { Kbd } from '../ui/Kbd.js';
 import {
-  Link, Copy, Scissors, CopyPlus, MoveRight,
+  Link, Copy, Scissors, CopyPlus, MoveRight, PanelRight,
   Hash, CheckSquare, Type, Trash2, ChevronLeft, ChevronRight,
   Plus, Library, CalendarDays, Search, Settings, Sparkles, ArrowUpDown, ListFilter, Group,
 } from '../../lib/icons.js';
@@ -229,6 +229,11 @@ const NodeContextMenuContent = forwardRef<HTMLDivElement, NodeContextMenuContent
 
     // ── Handlers ──
 
+    const handleOpenInNewPanel = useCallback(() => {
+      useUIStore.getState().openPanel(nodeId);
+      onClose();
+    }, [nodeId, onClose]);
+
     const handleCopyLink = useCallback(() => {
       writeNodeLinkToClipboard(nodeId);
       onClose();
@@ -337,6 +342,7 @@ const NodeContextMenuContent = forwardRef<HTMLDivElement, NodeContextMenuContent
       >
         {mode === 'main' && (
           <MainMenu
+            onOpenInNewPanel={handleOpenInNewPanel}
             onCopyLink={handleCopyLink}
             onCopy={handleCopy}
             onCut={handleCut}
@@ -382,6 +388,7 @@ const NodeContextMenuContent = forwardRef<HTMLDivElement, NodeContextMenuContent
 // ── Main menu view ──
 
 function MainMenu({
+  onOpenInNewPanel,
   onCopyLink,
   onCopy,
   onCut,
@@ -409,6 +416,7 @@ function MainMenu({
   onOpenFilter,
   onOpenGroup,
 }: {
+  onOpenInNewPanel: () => void;
   onCopyLink: () => void;
   onCopy: () => void;
   onCut: () => void;
@@ -438,6 +446,11 @@ function MainMenu({
 }) {
   return (
     <>
+      {/* Open in new panel */}
+      <MenuItem icon={PanelRight} label="Open in new panel" kbd="⌥Click" onClick={onOpenInNewPanel} />
+
+      <MenuSeparator />
+
       {/* View section */}
       <MenuItem
         icon={ArrowUpDown}

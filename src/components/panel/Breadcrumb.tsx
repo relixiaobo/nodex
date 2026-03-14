@@ -36,6 +36,8 @@ interface BreadcrumbProps {
   nodeId: string;
   showCurrentName?: boolean;
   compact?: boolean;
+  /** When true, [W] avatar uses primary color; when false, gray. */
+  active?: boolean;
 }
 
 export function resolveWorkspaceRootTargetId(params: {
@@ -48,7 +50,7 @@ export function resolveWorkspaceRootTargetId(params: {
   return SYSTEM_NODE_IDS.JOURNAL;
 }
 
-export function Breadcrumb({ nodeId, showCurrentName, compact }: BreadcrumbProps) {
+export function Breadcrumb({ nodeId, showCurrentName, compact, active = true }: BreadcrumbProps) {
   const navigateTo = useUIStore((s) => s.navigateTo);
 
   const { ancestors, workspaceRootId } = useAncestors(nodeId);
@@ -144,7 +146,11 @@ export function Breadcrumb({ nodeId, showCurrentName, compact }: BreadcrumbProps
             <Tooltip label={t('breadcrumb.goToWorkspaceRoot')}>
               <button
                 onClick={handleNavigateToWorkspaceRoot}
-                className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/15 text-[11px] font-semibold text-primary hover:bg-primary/20"
+                className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold ${
+                  active
+                    ? 'bg-primary/15 text-primary hover:bg-primary/20'
+                    : 'bg-foreground/8 text-foreground-tertiary hover:bg-foreground/12'
+                }`}
               >
                 {wsInitial}
               </button>

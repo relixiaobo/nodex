@@ -105,12 +105,12 @@ _(空)_
 - [x] Spark commit origin 修正 — 使用 `SPARK_COMMIT_ORIGIN ('ai:spark')` 替代错误的 `AI_COMMIT_ORIGIN ('ai:chat')`
 - [ ] 无 API key 态 — 灰显按钮 + "Set up API key" 引导
 
-#### Wave 2: #skill 节点 + 渐进式披露 ✅
+#### Wave 2: #skill 基础设施 + 渐进式披露 ✅
 
-- [x] 默认 #skill 节点 bootstrap — Refine structure / Writing assistant / Research（固定 ID，子节点 = 规则行）
-- [x] 渐进式披露 — `buildAgentSystemPrompt()` 改为 `<available-skills>` 索引 + `node_read` 提示
-- [x] soma agent 默认激活 1 个 skill — Skills field entry 预填 Refine structure
+- [x] `#skill` tagDef + Skills field（options_from_supertag）+ `buildAgentSystemPrompt()` 渐进式 `<available-skills>` 索引
+- [x] 默认 Skill creator 技能 — 教 AI 帮用户创建/编辑 #skill 节点（替换早期 3 个 generic 占位 skill）
 - [x] 测试覆盖 — readSkillIds、索引渲染、空 skill、description fallback
+- [x] 修复 options value 导航 — `resolvePanelNavigationNodeId` 统一解析任何指针节点的 `targetId`
 
 #### Wave 3+: 后续
 
@@ -188,7 +188,8 @@ _(空)_
 
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
-| 2026-03-14 | #skill 节点 bootstrap + 渐进式披露 — 3 个默认 skill + `<available-skills>` 索引 + 测试 | codex | #134 |
+| 2026-03-14 | Skill 重设计 — 删除 3 个 generic skill，新增 Skill creator + 修复 options value 导航 | nodex | main |
+| 2026-03-14 | #skill 基础设施 + 渐进式披露 — `<available-skills>` 索引 + 测试 | codex | #134 |
 | 2026-03-14 | Spark 交互优化 + clip 管线统一 — 三态 #spark 节点 + `applyClipData()` 共享管线 + API 简化 + commit origin 修正 | nodex | main |
 | 2026-03-13 | x.com 抓取深度增强 — per-tweet author/timestamp/repost/pinned + quote tweet 提取 | nodex | main |
 | 2026-03-13 | 修复 Chat 历史不显示 — StrictMode 双重 effect race condition (restorePromise 共享) | nodex | main |

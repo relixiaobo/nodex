@@ -36,4 +36,5 @@
 - Spark 提示词升级：餐巾纸极限压缩（#spark 节点名 = 一句话本质）+ 骨架/血肉自然嵌套 + 零术语规则 + 承重概念区分
 - Spark 交互优化：剪藏后立即出现 #spark 节点，三态切换——待生成（✦ Generate Spark 按钮）/ 生成中（bullet 转圈）/ 完成（餐巾纸 + 结构树）；主动剪藏自动触发，高亮/笔记只创建占位等用户手动触发
 - 统一剪藏管线：所有剪藏路径（⌘K、/clip、编程式、高亮/笔记）共享同一套处理逻辑，修复 /clip 路径缺失页面内容缓存的问题
-- AI Skill 渐进式披露：新增 3 个默认技能节点（Refine structure / Writing assistant / Research），system prompt 从全量 dump 改为只展示技能索引，AI 按需通过 node_read 读取详细规则
+- AI Skill 基础设施：`#skill` 节点 + `<available-skills>` 渐进式披露索引 + 默认 Skill creator 技能（教 AI 帮用户创建新 skill）
+- 修复点击 options 字段引用值（如 Skills 中的技能项）跳转到空白 Untitled 节点的问题（指针节点导航现在统一解析 targetId）

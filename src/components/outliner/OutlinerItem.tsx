@@ -186,8 +186,12 @@ function focusEditorForNodeId(nodeId: string): boolean {
 export type OutlinerVisibleChild = OutlinerRowItem;
 export { buildFieldOwnerColors, buildVisibleChildrenRows, isHiddenFieldRow };
 
-export function resolvePanelNavigationNodeId(nodeId: string, referenceTargetId: string | null): string {
-  return referenceTargetId ?? nodeId;
+/**
+ * Resolve where clicking a node should navigate.
+ * Any node with targetId is a pointer (reference, options value, etc.) → navigate to the target.
+ */
+export function resolvePanelNavigationNodeId(nodeId: string, node: { targetId?: string } | null): string {
+  return node?.targetId ?? nodeId;
 }
 
 export function shouldRenderReferenceBulletStyle(params: {
@@ -214,7 +218,7 @@ export function OutlinerItem({
   const referenceTargetId = node?.type === 'reference' ? (node.targetId ?? null) : null;
   const referenceTargetNode = useNode(referenceTargetId);
   const effectiveNodeId = referenceTargetId ?? nodeId;
-  const panelNavigationNodeId = resolvePanelNavigationNodeId(nodeId, referenceTargetId);
+  const panelNavigationNodeId = resolvePanelNavigationNodeId(nodeId, node);
   const effectiveNode = referenceTargetNode ?? node;
   const isCyclicReferenceExpansion = !!referenceTargetId && isReferenceDisplayCycle(effectiveNodeId, referencePath);
   const nextReferencePath = useMemo(

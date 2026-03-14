@@ -33,18 +33,12 @@ export const AI_AGENT_NODE_IDS = {
 } as const;
 
 export const SKILL_NODE_IDS = {
-  REFINE_STRUCTURE: 'NDX_N40',
-  REFINE_STRUCTURE_RULE_1: 'NDX_N41',
-  REFINE_STRUCTURE_RULE_2: 'NDX_N42',
-  REFINE_STRUCTURE_RULE_3: 'NDX_N43',
-  WRITING_ASSISTANT: 'NDX_N44',
-  WRITING_ASSISTANT_RULE_1: 'NDX_N45',
-  WRITING_ASSISTANT_RULE_2: 'NDX_N46',
-  WRITING_ASSISTANT_RULE_3: 'NDX_N47',
-  RESEARCH: 'NDX_N48',
-  RESEARCH_RULE_1: 'NDX_N49',
-  RESEARCH_RULE_2: 'NDX_N50',
-  RESEARCH_RULE_3: 'NDX_N51',
+  SKILL_CREATOR: 'NDX_N40',
+  SKILL_CREATOR_RULE_1: 'NDX_N41',
+  SKILL_CREATOR_RULE_2: 'NDX_N42',
+  SKILL_CREATOR_RULE_3: 'NDX_N43',
+  SKILL_CREATOR_RULE_4: 'NDX_N44',
+  SKILL_CREATOR_RULE_5: 'NDX_N45',
 } as const;
 
 // ─── Spark agent defaults ───
@@ -80,6 +74,9 @@ const LEGACY_IDS = {
   ALWAYS_ACTIVE_SKILLS_GROUP: 'NDX_N26',
   RULES_GROUP: 'NDX_N27',
 };
+
+// IDs from deleted default skills (Writing assistant rules, Research + rules)
+const LEGACY_SKILL_IDS = ['NDX_N46', 'NDX_N47', 'NDX_N48', 'NDX_N49', 'NDX_N50', 'NDX_N51'];
 
 interface FixedNodePreset {
   id: string;
@@ -202,59 +199,29 @@ const AGENT_SCHEMA_PRESETS: ReadonlyArray<FixedNodePreset> = [
 
 const DEFAULT_SKILL_PRESETS: ReadonlyArray<DefaultSkillPreset> = [
   {
-    id: SKILL_NODE_IDS.REFINE_STRUCTURE,
-    name: 'Refine structure',
-    description: 'Break a complex node into smaller tasks or clearer substructure.',
+    id: SKILL_NODE_IDS.SKILL_CREATOR,
+    name: 'Skill creator',
+    description: 'Help the user design, create, and refine #skill nodes. Use when the user wants to add a new skill, edit an existing skill, or asks how skills work.',
     rulePresets: [
       {
-        id: SKILL_NODE_IDS.REFINE_STRUCTURE_RULE_1,
-        text: 'Clarify the goal before editing: what should stay, what should split, and what should become children.',
+        id: SKILL_NODE_IDS.SKILL_CREATOR_RULE_1,
+        text: 'A skill is a #skill node whose children define the rules the AI follows when that skill is active. Create the skill node under Schema, tag it #skill, and add rule nodes as children.',
       },
       {
-        id: SKILL_NODE_IDS.REFINE_STRUCTURE_RULE_2,
-        text: 'Prefer a short parent node plus concrete child nodes over one overloaded paragraph node.',
+        id: SKILL_NODE_IDS.SKILL_CREATOR_RULE_2,
+        text: 'The description field is the trigger — it determines when the skill activates. Write it to describe both what the skill does AND the situations where it should be used.',
       },
       {
-        id: SKILL_NODE_IDS.REFINE_STRUCTURE_RULE_3,
-        text: 'Preserve the user\'s meaning and wording unless a structural rewrite is explicitly requested.',
-      },
-    ],
-  },
-  {
-    id: SKILL_NODE_IDS.WRITING_ASSISTANT,
-    name: 'Writing assistant',
-    description: 'Rewrite, polish, translate, or change tone while preserving intent.',
-    rulePresets: [
-      {
-        id: SKILL_NODE_IDS.WRITING_ASSISTANT_RULE_1,
-        text: 'Preserve facts, meaning, and uncertainty level unless the user asks for substantive changes.',
+        id: SKILL_NODE_IDS.SKILL_CREATOR_RULE_3,
+        text: 'Each rule should be one node with one clear instruction. Explain the "why" behind the rule — context helps the AI apply it intelligently in edge cases rather than following it blindly.',
       },
       {
-        id: SKILL_NODE_IDS.WRITING_ASSISTANT_RULE_2,
-        text: 'Match the requested language, tone, and length; if unspecified, stay close to the original voice.',
+        id: SKILL_NODE_IDS.SKILL_CREATOR_RULE_4,
+        text: 'Keep rules specific and actionable. Avoid vague guidance like "be helpful" — instead say exactly what to do and when.',
       },
       {
-        id: SKILL_NODE_IDS.WRITING_ASSISTANT_RULE_3,
-        text: 'Keep proper nouns, references, and formatting stable unless the user asks to adapt them.',
-      },
-    ],
-  },
-  {
-    id: SKILL_NODE_IDS.RESEARCH,
-    name: 'Research',
-    description: 'Collect relevant information, compare evidence, and organize findings.',
-    rulePresets: [
-      {
-        id: SKILL_NODE_IDS.RESEARCH_RULE_1,
-        text: 'Start from the user\'s question and gather only information that helps answer it.',
-      },
-      {
-        id: SKILL_NODE_IDS.RESEARCH_RULE_2,
-        text: 'Separate observed facts from inference, assumptions, and open questions.',
-      },
-      {
-        id: SKILL_NODE_IDS.RESEARCH_RULE_3,
-        text: 'Return findings in a scannable structure with sources or explicit gaps when available.',
+        id: SKILL_NODE_IDS.SKILL_CREATOR_RULE_5,
+        text: 'To activate a skill, add it to the Skills field on the soma #agent node. Test by chatting with scenarios that should trigger the skill.',
       },
     ],
   },
@@ -384,6 +351,13 @@ export function ensureAgentNode(workspaceId = loroDoc.getCurrentWorkspaceId() ??
     }
   }
 
+  // Migration: remove deleted default skill nodes (Writing assistant rules, Research + rules)
+  for (const legacyId of LEGACY_SKILL_IDS) {
+    if (loroDoc.hasNode(legacyId)) {
+      loroDoc.deleteNode(legacyId);
+    }
+  }
+
   // Create default prompt as content children (only if no content children exist yet)
   const contentChildren = loroDoc.getChildren(SYSTEM_NODE_IDS.AGENT)
     .filter((id) => {
@@ -428,7 +402,7 @@ export function ensureAgentNode(workspaceId = loroDoc.getCurrentWorkspaceId() ??
   ensureTargetValue(
     AI_AGENT_NODE_IDS.SKILLS_FIELD_ENTRY,
     AI_AGENT_NODE_IDS.DEFAULT_SKILL_VALUE,
-    SKILL_NODE_IDS.REFINE_STRUCTURE,
+    SKILL_NODE_IDS.SKILL_CREATOR,
   );
 
   return SYSTEM_NODE_IDS.AGENT;

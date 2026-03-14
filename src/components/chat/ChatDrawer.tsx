@@ -164,10 +164,10 @@ export function ChatDrawer() {
 
   const containerClassName = useMemo(() => {
     if (isWideLayout) {
-      return 'relative z-[60] flex h-full w-[min(40vw,420px)] min-w-[320px] shrink-0 flex-col border-l border-border bg-background';
+      return 'relative z-[60] flex h-full w-[min(40vw,420px)] min-w-[320px] shrink-0 flex-col border-l border-border bg-[var(--color-background-recessed)]';
     }
 
-    return 'absolute inset-x-0 bottom-0 z-[60] flex h-[min(68vh,560px)] flex-col rounded-t-[20px] border-t border-border bg-background shadow-paper';
+    return 'absolute inset-x-0 bottom-0 z-[60] flex h-[min(68vh,560px)] flex-col rounded-t-[20px] border-t border-border bg-[var(--color-background-recessed)] shadow-paper';
   }, [isWideLayout]);
 
   return (
@@ -178,9 +178,7 @@ export function ChatDrawer() {
           onClick={handleHeaderTitleClick}
           className="flex items-center gap-2 text-sm font-medium text-foreground"
         >
-          <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-primary">
-            <Sparkles size={14} strokeWidth={1.75} />
-          </span>
+          <Sparkles size={14} strokeWidth={1.75} className="text-foreground-tertiary" />
           Chat
         </button>
         <div className="flex items-center gap-1">
@@ -239,22 +237,22 @@ export function ChatDrawer() {
         </div>
       ) : showSettings ? (
         <div className="flex flex-1 flex-col justify-center px-5 py-6">
-          <div className="rounded-2xl border border-border bg-foreground/[0.02] p-4">
+          <div className="rounded-lg border border-border bg-foreground/4 p-4">
             <div className="mb-4">
-              <div className="text-[12px] font-medium uppercase tracking-[0.08em] text-foreground-tertiary">
+              <div className="text-xs font-medium uppercase tracking-[0.08em] text-foreground-tertiary">
                 Provider
               </div>
               <div className="mt-1 text-sm text-foreground">Anthropic</div>
             </div>
 
             {savedKeyMask && (
-              <div className="mb-4 rounded-xl border border-border bg-background px-3 py-2 text-[12px] text-foreground-secondary">
+              <div className="mb-4 rounded-lg border border-border bg-background px-3 py-2 text-xs text-foreground-secondary">
                 Saved key: <span className="font-medium text-foreground">{savedKeyMask}</span>
               </div>
             )}
 
             <label className="block">
-              <span className="mb-1.5 block text-[12px] font-medium uppercase tracking-[0.08em] text-foreground-tertiary">
+              <span className="mb-1.5 block text-xs font-medium uppercase tracking-[0.08em] text-foreground-tertiary">
                 API key
               </span>
               <input
@@ -264,12 +262,12 @@ export function ChatDrawer() {
                 value={draftKey}
                 onChange={(event) => setDraftKey(event.target.value)}
                 placeholder="sk-ant-..."
-                className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground outline-none transition-colors placeholder:text-foreground-tertiary focus:border-primary"
+                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none transition-colors placeholder:text-foreground-tertiary focus:border-primary"
               />
             </label>
 
             {formError && (
-              <div className="mt-3 text-[12px] text-destructive">{formError}</div>
+              <div className="mt-3 text-xs text-destructive">{formError}</div>
             )}
 
             <div className="mt-4 flex items-center gap-2">
@@ -277,7 +275,7 @@ export function ChatDrawer() {
                 type="button"
                 onClick={() => void handleSaveKey()}
                 disabled={savingKey || draftKey.trim().length === 0}
-                className="inline-flex h-9 items-center rounded-xl bg-foreground px-3 text-sm font-medium text-background transition-colors hover:bg-foreground/90 disabled:cursor-not-allowed disabled:bg-foreground/20"
+                className="inline-flex h-9 items-center rounded-full bg-foreground px-3 text-sm font-medium text-background transition-colors hover:bg-foreground/90 disabled:cursor-not-allowed disabled:bg-foreground/20"
               >
                 {savingKey ? 'Saving…' : 'Save'}
               </button>
@@ -285,7 +283,7 @@ export function ChatDrawer() {
                 <button
                   type="button"
                   onClick={() => void handleClearKey()}
-                  className="inline-flex h-9 items-center rounded-xl border border-border px-3 text-sm text-foreground-secondary transition-colors hover:bg-foreground/4 hover:text-foreground"
+                  className="inline-flex h-9 items-center rounded-full border border-border px-3 text-sm text-foreground-secondary transition-colors hover:bg-foreground/4 hover:text-foreground"
                 >
                   Clear
                 </button>
@@ -296,7 +294,7 @@ export function ChatDrawer() {
               href="https://console.anthropic.com/"
               target="_blank"
               rel="noreferrer"
-              className="mt-4 inline-flex items-center gap-1 text-[12px] text-foreground-tertiary transition-colors hover:text-foreground"
+              className="mt-4 inline-flex items-center gap-1 text-xs text-foreground-tertiary transition-colors hover:text-foreground"
             >
               Get your key at console.anthropic.com
               <ExternalLink size={11} strokeWidth={1.7} />
@@ -310,9 +308,25 @@ export function ChatDrawer() {
               <ChatDebugPanel debug={debug} />
             )}
             {messages.length === 0 ? (
-              <div className="flex h-full min-h-40 items-center justify-center">
-                <div className="max-w-[240px] text-center text-sm text-foreground-tertiary">
-                  Ask about your notes, clips, or the page you are reading. Chat can act on the outliner and pick up where you left off.
+              <div className="flex h-full min-h-40 flex-col items-center justify-center gap-4 px-6">
+                <div className="text-center text-sm text-foreground-tertiary">
+                  Ask about your notes, clips, or the page you're reading.
+                </div>
+                <div className="flex w-full max-w-[260px] flex-col gap-2">
+                  {[
+                    'Summarize this page',
+                    'Organize my notes from today',
+                    'What did I clip this week?',
+                  ].map((suggestion) => (
+                    <button
+                      key={suggestion}
+                      type="button"
+                      onClick={() => void sendMessage(suggestion)}
+                      className="rounded-lg border border-border px-3 py-2 text-left text-sm text-foreground-secondary transition-colors hover:bg-foreground/4 hover:text-foreground"
+                    >
+                      {suggestion}
+                    </button>
+                  ))}
                 </div>
               </div>
             ) : (
@@ -322,6 +336,7 @@ export function ChatDrawer() {
                   message={message}
                   toolResults={toolResults}
                   streaming={isStreaming && index === messages.length - 1 && message.role === 'assistant'}
+                  grouped={index > 0 && messages[index - 1].role === message.role}
                 />
               ))
             )}

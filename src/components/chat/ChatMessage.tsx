@@ -9,6 +9,7 @@ interface ChatMessageProps {
   message: ChatConversationMessage;
   toolResults?: Map<string, ToolResultMessage>;
   streaming?: boolean;
+  grouped?: boolean;
 }
 
 const INLINE_MARKUP_PATTERN = /<(ref|cite)\s+id="([^"]+)">([\s\S]*?)<\/\1>/g;
@@ -105,7 +106,7 @@ function renderAssistantBlocks(message: AssistantMessage, streaming: boolean, to
   });
 }
 
-export function ChatMessage({ message, toolResults, streaming = false }: ChatMessageProps) {
+export function ChatMessage({ message, toolResults, streaming = false, grouped = false }: ChatMessageProps) {
   const text = getMessageText(message);
   const isUser = message.role === 'user';
   const assistantBlocks = message.role === 'assistant'
@@ -117,13 +118,15 @@ export function ChatMessage({ message, toolResults, streaming = false }: ChatMes
   }
 
   return (
-    <div className={`flex w-full ${isUser ? 'justify-end' : 'justify-start'}`}>
+    <div className={`flex w-full ${isUser ? 'justify-end' : 'justify-start'} ${grouped ? 'mt-1' : ''}`}>
       <div className={`max-w-[88%] ${isUser ? 'items-end' : 'items-start'} flex flex-col gap-1`}>
-        <span className="text-[11px] font-medium uppercase tracking-[0.08em] text-foreground-tertiary">
-          {isUser ? 'You' : 'soma'}
-        </span>
+        {!grouped && (
+          <span className="text-xs text-foreground-tertiary">
+            {isUser ? 'You' : 'soma'}
+          </span>
+        )}
         {isUser ? (
-          <div className="whitespace-pre-wrap rounded-2xl bg-foreground/[0.04] px-3 py-2 text-[13px] leading-6 text-foreground">
+          <div className="whitespace-pre-wrap rounded-lg bg-foreground/[0.04] px-3 py-2 text-[13px] leading-6 text-foreground">
             {text}
           </div>
         ) : (

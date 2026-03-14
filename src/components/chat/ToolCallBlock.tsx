@@ -41,7 +41,7 @@ export function ToolCallBlock({ toolCall, result }: ToolCallBlockProps) {
   const Icon = toolCall.name === 'undo' ? RotateCcw : Sparkles;
 
   return (
-    <div className="rounded-xl border border-border bg-foreground/[0.02]">
+    <div className="rounded-lg border border-border bg-foreground/4">
       <button
         type="button"
         onClick={() => setExpanded((value) => !value)}
@@ -50,7 +50,7 @@ export function ToolCallBlock({ toolCall, result }: ToolCallBlockProps) {
         <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-primary">
           <Icon size={13} strokeWidth={1.8} />
         </span>
-        <span className="min-w-0 flex-1 truncate text-[12px] font-medium text-foreground-secondary">
+        <span className="min-w-0 flex-1 truncate text-xs font-medium text-foreground-secondary">
           {summarizeToolCall(toolCall)}
         </span>
         <ChevronDown

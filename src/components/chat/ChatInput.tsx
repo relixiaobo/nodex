@@ -31,7 +31,7 @@ export function ChatInput({ disabled, error, onSend, onStop }: ChatInputProps) {
   return (
     <div className="border-t border-border bg-background px-3 py-3">
       {error && (
-        <div className="mb-2 rounded-lg border border-destructive/15 bg-destructive/5 px-2.5 py-2 text-[12px] text-destructive">
+        <div className="mb-2 rounded-lg border border-destructive/15 bg-destructive/5 px-2.5 py-2 text-xs text-destructive">
           {error}
         </div>
       )}
@@ -41,8 +41,8 @@ export function ChatInput({ disabled, error, onSend, onStop }: ChatInputProps) {
           value={draft}
           disabled={disabled}
           rows={1}
-          placeholder={disabled ? 'Claude is responding…' : 'Type a message…'}
-          className="min-h-10 flex-1 resize-none rounded-xl border border-border bg-background px-3 py-2 text-[13px] leading-5 text-foreground outline-none transition-colors placeholder:text-foreground-tertiary focus:border-primary disabled:cursor-not-allowed disabled:opacity-60"
+          placeholder={disabled ? 'Responding…' : 'Ask about your notes…'}
+          className="min-h-10 flex-1 resize-none rounded-lg border border-border bg-background px-3 py-2 text-[13px] leading-5 text-foreground outline-none transition-colors placeholder:text-foreground-tertiary focus:border-primary disabled:cursor-not-allowed disabled:opacity-60"
           onChange={(event) => setDraft(event.target.value)}
           onKeyDown={(event) => {
             if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
@@ -55,7 +55,7 @@ export function ChatInput({ disabled, error, onSend, onStop }: ChatInputProps) {
           <button
             type="button"
             onClick={onStop}
-            className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-border px-3 text-[12px] font-medium text-foreground transition-colors hover:bg-foreground/4"
+            className="inline-flex h-10 items-center gap-1.5 rounded-full bg-foreground/8 px-3 text-xs font-medium text-foreground transition-colors hover:bg-foreground/15"
           >
             <SquareCheck size={14} strokeWidth={1.75} />
             Stop
@@ -65,7 +65,7 @@ export function ChatInput({ disabled, error, onSend, onStop }: ChatInputProps) {
             type="button"
             onClick={() => void handleSend()}
             disabled={draft.trim().length === 0}
-            className="inline-flex h-10 items-center justify-center rounded-xl bg-foreground px-3 text-background transition-colors hover:bg-foreground/90 disabled:cursor-not-allowed disabled:bg-foreground/20"
+            className="inline-flex h-10 items-center justify-center rounded-full bg-foreground px-3 text-background transition-colors hover:bg-foreground/90 disabled:cursor-not-allowed disabled:bg-foreground/20"
             aria-label="Send message"
           >
             <ArrowRight size={15} strokeWidth={1.75} />
@@ -73,7 +73,7 @@ export function ChatInput({ disabled, error, onSend, onStop }: ChatInputProps) {
         )}
       </div>
       <div className="mt-2 text-[11px] text-foreground-tertiary">
-        {disabled ? 'Streaming response…' : 'Send with Cmd/Ctrl+Enter'}
+        {disabled ? '' : '⌘↵ to send'}
       </div>
     </div>
   );

@@ -16,12 +16,16 @@
 | 决策 | 结论 | 原因 |
 |------|------|------|
 | 导航模型 | 全局 `navHistory` 事件栈 | 单一时间线撤销符合直觉：Back 依次回退所有操作 |
+| Back 跨面板 | 自动切换 activePanelId 到受影响面板 | 用户按 Back 必须看到变化，不能静默改非活跃面板 |
 | Chat 事件 | 不进 `navHistory` | Chat 是桌面层工具，混入面板导航会导致 Back 时意外开关 Chat |
 | Per-panel 展开 | v1 就做 | 同节点在不同面板独立展开更符合直觉 |
 | persist 迁移 | 一次 v3→v4 | 避免中间版本，expandedNodes key 变化一起做 |
 | 切换面板时 focus | 旧面板 blur（保存内容、清光标、清选区） | 同一时间只有一个编辑焦点 |
 | ⌘Z | 全局数据撤销（Loro） | 不受面板影响 |
 | 方向键/编辑键 | 作用于 activePanelId 面板 | 键盘事件跟随焦点面板 |
+| 面板数量 | 不设上限 | 用户觉得太窄会自行关闭，无需强制限制 |
+| 全局工具位置 | Back/Forward/Search 保持桌面层 | 全局工具不属于任何面板，桌面层是正确的 Z 层级 |
+| 关闭面板快捷键 | 不用 ⌘W（会被 Chrome 拦截关闭标签页） | 需要选择不与 Chrome 冲突的快捷键 |
 
 ## 当前状态
 
@@ -185,7 +189,7 @@ PanelLayout → NodePanel(panelId) → OutlinerView(panelId) → OutlinerItem(pa
 - `src/components/outliner/OutlinerItem.tsx` — Alt+Click
 - `src/components/outliner/NodeContextMenu.tsx` — 右键菜单
 - `src/lib/shortcut-registry.ts` — 注册新快捷键
-- `src/hooks/use-panel-keyboard.ts` — 新建，Cmd+\ / Cmd+W / Cmd+Option+←/→
+- `src/hooks/use-panel-keyboard.ts` — 新建，Cmd+\ / Cmd+Shift+W / Cmd+Option+←/→
 
 **新增 actions**：
 ```typescript
@@ -215,6 +219,9 @@ setActivePanel(panelId: string): void
   'open-panel'  → 关闭该面板（从 panels 移除，恢复 activePanelId）
   'close-panel' → 从 snapshot 恢复面板（重新插入 panels）
 navIndex-- / navIndex++
+
+关键：如果事件涉及的面板不是当前 activePanelId，
+自动切换 activePanelId 到该面板（让用户看到变化）
 ```
 
 **触发方式**：
@@ -224,7 +231,7 @@ navIndex-- / navIndex++
 | Alt+Click bullet | 在新面板打开 | OutlinerItem `handleBulletClick` 检测 `e.altKey` |
 | 右键 → "Open in new panel" | 在新面板打开 | NodeContextMenu 顶部新增菜单项 |
 | `⌘\` | 将选中/聚焦节点在新面板打开 | use-panel-keyboard hook |
-| `⌘W` | 关闭当前活跃面板（不关最后一个） | use-panel-keyboard hook |
+| `⌘⇧W` | 关闭当前活跃面板（不关最后一个） | use-panel-keyboard hook（⌘W 被 Chrome 拦截） |
 | `⌘⌥←` / `⌘⌥→` | 切换活跃面板 | use-panel-keyboard hook |
 | 点击面板区域 | 该面板变为活跃 | PanelLayout onClick |
 
@@ -255,10 +262,11 @@ navIndex-- / navIndex++
 - Tab 宽度自适应（`max-w-[180px]`，多 tab 时收缩）
 
 **响应式降级**：
-- 宽屏 (>900px)：最多 3 面板并排
-- 中屏 (500-900px)：最多 2 面板并排
-- 窄屏 (≤500px)：Tab 模式，只显示 1 个
+- 宽屏 (>900px)：面板并排显示
+- 中屏 (500-900px)：面板并排显示（用户自行决定数量）
+- 窄屏 (≤500px)：Tab 模式，只显示活跃面板
 - 降级时不关闭面板，只变形态
+- 不设面板数量上限，用户觉得太窄会自行关闭
 
 **验证**：typecheck → test → build → 浏览器验证窄屏/宽屏切换
 

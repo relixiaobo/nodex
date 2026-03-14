@@ -106,6 +106,23 @@
   box-shadow: calc(-0.5 * var(--radius-xl)) 0 0 0 var(--color-background);
 }
 
+/* Mirror: concave corner at the tab's bottom-left edge.
+   Used when GlobalTools tab connects to the last panel's top-right. */
+.tab-connector-left {
+  position: relative;
+}
+.tab-connector-left::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: calc(-1 * var(--radius-xl));
+  width: var(--radius-xl);
+  height: var(--radius-xl);
+  background: transparent;
+  border-bottom-right-radius: var(--radius-xl);
+  box-shadow: calc(0.5 * var(--radius-xl)) 0 0 0 var(--color-background);
+}
+
 /* Reference single-click selection: compact frame rendered as overlay.
    Important: use pseudo-element instead of border/padding on layout box,
    so selected/unselected states keep identical row height (no visual jump). */

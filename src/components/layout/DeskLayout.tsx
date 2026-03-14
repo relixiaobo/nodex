@@ -2,11 +2,10 @@
  * DeskLayout — Two-layer Z-axis layout.
  *
  * - Desk layer (recessed background): Chat, GlobalTools
- * - Card layer (elevated paper): NodePanel with breadcrumb tab
+ * - Card layer (elevated paper): NodePanel cards floating on desk
  *
- * Wide mode: NodePanel card left, Chat column right, vertical resize handle between.
- * Narrow mode: Chrome-tab breadcrumb at top, NodePanel card below, Chat area at bottom
- * with horizontal resize handle.
+ * Wide chat: panel cards left + Chat column right (GlobalTools above chat)
+ * No chat / narrow chat: GlobalTools as shaped tab on last panel's top-right
  */
 import { Suspense, lazy, useEffect, useState } from 'react';
 import { GlobalTools } from '../toolbar/TopToolbar.js';
@@ -43,13 +42,8 @@ export function DeskLayout() {
         ? ' flex-1 min-w-0 min-h-0 relative z-10'
         : ' flex-1 min-h-0'}`}
       >
-        {!wideChat && (
-          <div className="flex items-center justify-end shrink-0">
-            <GlobalTools />
-          </div>
-        )}
         <div className="flex flex-1 overflow-hidden">
-          <PanelLayout />
+          <PanelLayout toolbar={wideChat ? undefined : <GlobalTools />} />
         </div>
       </div>
 

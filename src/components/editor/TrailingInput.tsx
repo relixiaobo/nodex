@@ -56,6 +56,8 @@ interface TrailingInputProps {
     autoFocus?: boolean;
     /** Compound expand key for the parent node (grandparentId:parentId) */
     parentExpandKey: string;
+    /** Panel ID for scoped expand state (defaults to 'main') */
+    panelId?: string;
     /** Field data type (e.g., SYS_D.OPTIONS) — enables option autocomplete */
     fieldDataType?: string;
     /** AttrDef ID — used to look up available options */
@@ -77,7 +79,7 @@ function getEditorText(view: EditorView): string {
     return view.state.doc.textContent;
 }
 
-export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fieldDataType, attrDefId, onNavigateOut, isSearchContext }: TrailingInputProps) {
+export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, panelId = 'main', fieldDataType, attrDefId, onNavigateOut, isSearchContext }: TrailingInputProps) {
     const createChild = useNodeStore((s) => s.createChild);
     const createNodeInSearchContext = useNodeStore((s) => s.createNodeInSearchContext);
     const cycleNodeCheckbox = useNodeStore((s) => s.cycleNodeCheckbox);
@@ -134,7 +136,7 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
 
     const callbacksRef = useRef({
         createChild, createNodeInSearchContext, cycleNodeCheckbox, addUnnamedFieldToNode, addReference, selectFieldOption, registerCollectedOption, applyParsedPasteMetadata, createSiblingNodesFromPaste, createChildNodesFromPaste,
-        parentId, effectiveParentId, effectiveDepth, effectiveParentEK,
+        parentId, effectiveParentId, effectiveDepth, effectiveParentEK, panelId,
         setEffectiveParentId, setEffectiveDepth, setEffectiveParentEK,
         setExpanded, setFocusedNode, setFocusClickCoords, setEditingFieldName, setTriggerHint,
         isOptions, attrDefId, optionsOpen, filteredOptions, optionsIndex,
@@ -143,7 +145,7 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
     });
     callbacksRef.current = {
         createChild, createNodeInSearchContext, cycleNodeCheckbox, addUnnamedFieldToNode, addReference, selectFieldOption, registerCollectedOption, applyParsedPasteMetadata, createSiblingNodesFromPaste, createChildNodesFromPaste,
-        parentId, effectiveParentId, effectiveDepth, effectiveParentEK,
+        parentId, effectiveParentId, effectiveDepth, effectiveParentEK, panelId,
         setEffectiveParentId, setEffectiveDepth, setEffectiveParentEK,
         setExpanded, setFocusedNode, setFocusClickCoords, setEditingFieldName, setTriggerHint,
         isOptions, attrDefId, optionsOpen, filteredOptions, optionsIndex,
@@ -265,7 +267,7 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
 
                     const lastSiblingId = siblings[siblings.length - 1];
                     // Expand the last sibling (compound key: effectiveParentId is its parent context)
-                    const siblingEK = `${ref.effectiveParentId}:${lastSiblingId}`;
+                    const siblingEK = `${ref.panelId}:${ref.effectiveParentId}:${lastSiblingId}`;
                     ref.setExpanded(siblingEK, true, true);
                     // Track: new effectiveParentId is lastSiblingId, its expand key is siblingEK
                     ref.setEffectiveParentEK(siblingEK);
@@ -287,7 +289,7 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
 
                     // Compute expand key for grandparent (best-effort via parent chain)
                     const ggpId = loroDoc.getParentId(grandparentId) ?? '';
-                    ref.setEffectiveParentEK(`${ggpId}:${grandparentId}`);
+                    ref.setEffectiveParentEK(`${ref.panelId}:${ggpId}:${grandparentId}`);
                     ref.setEffectiveParentId(grandparentId);
                     ref.setEffectiveDepth(ref.effectiveDepth - 1);
                     return true;
@@ -298,7 +300,7 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
                     const isEditorEmpty = getEditorText(view).length === 0;
                     const expanded = useUIStore.getState().expandedNodes;
                     const parent = useNodeStore.getState().getNode(ref.effectiveParentId);
-                    const target = getLastVisibleNode(ref.effectiveParentId, expanded);
+                    const target = getLastVisibleNode(ref.effectiveParentId, expanded, ref.panelId);
                     const intent = resolveTrailingBackspaceIntent({
                         isEditorEmpty,
                         depthShifted: ref.effectiveParentId !== ref.parentId,
@@ -359,7 +361,7 @@ export function TrailingInput({ parentId, depth, autoFocus, parentExpandKey, fie
                     if (isComposing(view)) return false;
                     const ref = callbacksRef.current;
                     const expanded = useUIStore.getState().expandedNodes;
-                    const target = getLastVisibleNode(ref.effectiveParentId, expanded);
+                    const target = getLastVisibleNode(ref.effectiveParentId, expanded, ref.panelId);
                     const intent = resolveTrailingArrowUpIntent({
                         optionsOpen: ref.isOptions && ref.optionsOpen,
                         optionCount: ref.filteredOptions.length,

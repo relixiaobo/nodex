@@ -40,6 +40,8 @@ export interface RowInteractionConfig {
   rootChildIds: string[];
   /** Root node ID for selection flat-list computation */
   rootNodeId: string;
+  /** Panel ID for multi-panel expanded-node scoping */
+  panelId: string;
   /** Whether this row is currently in edit mode */
   isEditing: boolean;
   /** Enter edit mode for this row */
@@ -104,6 +106,7 @@ export function OutlinerRow({ config, children }: OutlinerRowProps) {
     parentId,
     rootChildIds,
     rootNodeId,
+    panelId,
     isEditing,
     enterEdit,
     rowKind,
@@ -192,7 +195,7 @@ export function OutlinerRow({ config, children }: OutlinerRowProps) {
       if (selAction === 'batch_delete') {
         e.preventDefault();
         const latestUi = useUIStore.getState();
-        const flatList = getFlattenedVisibleNodes(rootChildIds, latestUi.expandedNodes, rootNodeId);
+        const flatList = getFlattenedVisibleNodes(rootChildIds, latestUi.expandedNodes, rootNodeId, panelId);
         const bounds = getSelectionBounds(latestUi.selectedNodeIds, flatList);
         const prev = bounds ? getPreviousVisibleNode(bounds.first.nodeId, bounds.first.parentId, flatList) : null;
         const orderedIds = getSelectedIdsInOrder(latestUi.selectedNodeIds, flatList);
@@ -216,7 +219,7 @@ export function OutlinerRow({ config, children }: OutlinerRowProps) {
       if (selAction === 'batch_indent') {
         e.preventDefault();
         const latestUi = useUIStore.getState();
-        const flatList = getFlattenedVisibleNodes(rootChildIds, latestUi.expandedNodes, rootNodeId);
+        const flatList = getFlattenedVisibleNodes(rootChildIds, latestUi.expandedNodes, rootNodeId, panelId);
         const orderedIds = getSelectedIdsInOrder(latestUi.selectedNodeIds, flatList);
 
         for (const id of orderedIds) {
@@ -231,7 +234,7 @@ export function OutlinerRow({ config, children }: OutlinerRowProps) {
             const index = parent.children.indexOf(id);
             if (index <= 0) continue;
             const newParentId = parent.children[index - 1];
-            setExpanded(`${ownerId}:${newParentId}`, true, true);
+            setExpanded(`${panelId}:${ownerId}:${newParentId}`, true, true);
             indentNode(id);
           }
         }
@@ -242,7 +245,7 @@ export function OutlinerRow({ config, children }: OutlinerRowProps) {
       if (selAction === 'batch_outdent') {
         e.preventDefault();
         const latestUi = useUIStore.getState();
-        const flatList = getFlattenedVisibleNodes(rootChildIds, latestUi.expandedNodes, rootNodeId);
+        const flatList = getFlattenedVisibleNodes(rootChildIds, latestUi.expandedNodes, rootNodeId, panelId);
         const orderedIds = getSelectedIdsInOrder(latestUi.selectedNodeIds, flatList);
 
         for (let i = orderedIds.length - 1; i >= 0; i--) {
@@ -259,7 +262,7 @@ export function OutlinerRow({ config, children }: OutlinerRowProps) {
       if (selAction === 'batch_duplicate') {
         e.preventDefault();
         const latestUi = useUIStore.getState();
-        const flatList = getFlattenedVisibleNodes(rootChildIds, latestUi.expandedNodes, rootNodeId);
+        const flatList = getFlattenedVisibleNodes(rootChildIds, latestUi.expandedNodes, rootNodeId, panelId);
         const orderedIds = getSelectedIdsInOrder(latestUi.selectedNodeIds, flatList);
         for (let i = orderedIds.length - 1; i >= 0; i--) {
           const name = useNodeStore.getState().getNode(orderedIds[i])?.name ?? '';
@@ -278,7 +281,7 @@ export function OutlinerRow({ config, children }: OutlinerRowProps) {
       if (selAction === 'batch_copy') {
         e.preventDefault();
         const latestUi = useUIStore.getState();
-        const flatList = getFlattenedVisibleNodes(rootChildIds, latestUi.expandedNodes, rootNodeId);
+        const flatList = getFlattenedVisibleNodes(rootChildIds, latestUi.expandedNodes, rootNodeId, panelId);
         const orderedIds = getSelectedIdsInOrder(latestUi.selectedNodeIds, flatList);
         copyNodesToClipboard(orderedIds);
         return;
@@ -287,7 +290,7 @@ export function OutlinerRow({ config, children }: OutlinerRowProps) {
       if (selAction === 'batch_cut') {
         e.preventDefault();
         const latestUi = useUIStore.getState();
-        const flatList = getFlattenedVisibleNodes(rootChildIds, latestUi.expandedNodes, rootNodeId);
+        const flatList = getFlattenedVisibleNodes(rootChildIds, latestUi.expandedNodes, rootNodeId, panelId);
         const bounds = getSelectionBounds(latestUi.selectedNodeIds, flatList);
         const prev = bounds ? getPreviousVisibleNode(bounds.first.nodeId, bounds.first.parentId, flatList) : null;
         const orderedIds = getSelectedIdsInOrder(latestUi.selectedNodeIds, flatList);
@@ -312,7 +315,7 @@ export function OutlinerRow({ config, children }: OutlinerRowProps) {
       if (selAction === 'extend_up' || selAction === 'extend_down') {
         e.preventDefault();
         const latestUi = useUIStore.getState();
-        const flatList = getFlattenedVisibleNodes(rootChildIds, latestUi.expandedNodes, rootNodeId);
+        const flatList = getFlattenedVisibleNodes(rootChildIds, latestUi.expandedNodes, rootNodeId, panelId);
 
         const anchor = latestUi.selectionAnchorId;
         if (!anchor) return;
@@ -351,7 +354,7 @@ export function OutlinerRow({ config, children }: OutlinerRowProps) {
 
       // Navigate / enter edit / type-char: use fresh state for multi-select bounds
       const latestUi = useUIStore.getState();
-      const flatList = getFlattenedVisibleNodes(rootChildIds, latestUi.expandedNodes, rootNodeId);
+      const flatList = getFlattenedVisibleNodes(rootChildIds, latestUi.expandedNodes, rootNodeId, panelId);
 
       if (selAction === 'navigate_up') {
         e.preventDefault();
@@ -415,7 +418,7 @@ export function OutlinerRow({ config, children }: OutlinerRowProps) {
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [
     isSelected, isFocused, isEditing, isSelectionAnchor, rowKind,
-    parentId, rowId, rootNodeId, rootChildIds, expandedNodes,
+    parentId, rowId, rootNodeId, panelId, rootChildIds, expandedNodes,
     onSelectionKeydown, onBatchDelete, onBatchIndent, onBatchOutdent,
     setSelectedNodes, clearSelection, setFocusedNode, clearFocus,
     setPendingInputChar, enterEdit,
@@ -437,6 +440,7 @@ export function useRowPointerHandlers(
   parentId: string,
   rootChildIds: string[],
   rootNodeId: string,
+  panelId: string,
 ) {
   const setSelectedNode = useUIStore((s) => s.setSelectedNode);
   const setSelectedNodes = useUIStore((s) => s.setSelectedNodes);
@@ -461,10 +465,10 @@ export function useRowPointerHandlers(
       setSelectedNode(rowId, parentId);
       return;
     }
-    const flatList = getFlattenedVisibleNodes(rootChildIds, state.expandedNodes, rootNodeId);
+    const flatList = getFlattenedVisibleNodes(rootChildIds, state.expandedNodes, rootNodeId, panelId);
     const range = computeRangeSelection(anchor, rowId, flatList);
     setSelectedNodes(range, anchor);
-  }, [rowId, parentId, rootChildIds, rootNodeId, setSelectedNode, setSelectedNodes]);
+  }, [rowId, parentId, rootChildIds, rootNodeId, panelId, setSelectedNode, setSelectedNodes]);
 
   return { handleCmdClick, handleShiftClick };
 }

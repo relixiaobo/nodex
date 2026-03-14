@@ -32,6 +32,7 @@ interface UseDragSelectOptions {
   containerRef: React.RefObject<HTMLElement | null>;
   rootChildIds: string[];
   rootNodeId: string;
+  panelId?: string;
 }
 
 /** Find the closest ancestor with data-node-id and return nodeId + parentId. */
@@ -59,9 +60,9 @@ function isTextArea(el: EventTarget | null): boolean {
 
 const DRAG_SELECT_SCOPE_ATTR = 'data-drag-select-scope';
 
-export function useDragSelect({ containerRef, rootChildIds, rootNodeId }: UseDragSelectOptions) {
-  const contextRef = useRef({ rootChildIds, rootNodeId });
-  contextRef.current = { rootChildIds, rootNodeId };
+export function useDragSelect({ containerRef, rootChildIds, rootNodeId, panelId = 'main' }: UseDragSelectOptions) {
+  const contextRef = useRef({ rootChildIds, rootNodeId, panelId });
+  contextRef.current = { rootChildIds, rootNodeId, panelId };
 
   const stateRef = useRef({
     isDragging: false,
@@ -185,8 +186,8 @@ export function useDragSelect({ containerRef, rootChildIds, rootNodeId }: UseDra
       if (!hoverNode) return;
 
       const uiState = useUIStore.getState();
-      const { rootChildIds: rcIds, rootNodeId: rnId } = contextRef.current;
-      const flatList = getFlattenedVisibleNodes(rcIds, uiState.expandedNodes, rnId);
+      const { rootChildIds: rcIds, rootNodeId: rnId, panelId: pId } = contextRef.current;
+      const flatList = getFlattenedVisibleNodes(rcIds, uiState.expandedNodes, rnId, pId);
 
       // Validate hover node belongs to this outliner context
       if (!flatList.some((item) => item.nodeId === hoverNode.nodeId)) return;

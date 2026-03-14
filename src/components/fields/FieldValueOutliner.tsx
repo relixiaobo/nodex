@@ -55,6 +55,8 @@ interface FieldValueOutlinerProps {
   configNodeId?: string;
   /** Called when arrow navigation escapes field value boundaries */
   onNavigateOut?: (direction: 'up' | 'down') => void;
+  /** Panel ID for expand-state isolation across panels */
+  panelId?: string;
 }
 
 export function shouldShowFieldValueTrailingInput(
@@ -135,7 +137,7 @@ function PasswordFieldEditor({ fieldEntryId, selectableChildIds }: { fieldEntryI
   );
 }
 
-export function FieldValueOutliner({ fieldEntryId, fieldDataType, attrDefId, configNodeId, onNavigateOut }: FieldValueOutlinerProps) {
+export function FieldValueOutliner({ fieldEntryId, fieldDataType, attrDefId, configNodeId, onNavigateOut, panelId = 'main' }: FieldValueOutlinerProps) {
   useChildren(fieldEntryId);
 
   // Values are fieldEntry.children (no key prefix in new model)
@@ -469,6 +471,7 @@ export function FieldValueOutliner({ fieldEntryId, fieldDataType, attrDefId, con
             rootNodeId={fieldEntryId}
             fieldDataType={fieldDataType}
             attrDefId={attrDefId}
+            panelId={panelId}
             onNavigateOut={onNavigateOut}
           />
         )}
@@ -477,9 +480,10 @@ export function FieldValueOutliner({ fieldEntryId, fieldDataType, attrDefId, con
         <TrailingInput
           parentId={fieldEntryId}
           depth={0}
-          parentExpandKey={`${loroDoc.getParentId(fieldEntryId) ?? ''}:${fieldEntryId}`}
+          parentExpandKey={`${panelId}:${loroDoc.getParentId(fieldEntryId) ?? ''}:${fieldEntryId}`}
           fieldDataType={fieldDataType}
           attrDefId={attrDefId}
+          panelId={panelId}
           onNavigateOut={handleTrailingNavigateOut}
         />
       )}

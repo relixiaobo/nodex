@@ -10,7 +10,7 @@
  */
 import { Suspense, lazy, useEffect, useState } from 'react';
 import { PanelTab, GlobalTools } from '../toolbar/TopToolbar.js';
-import { PanelStack } from '../panel/PanelStack.js';
+import { PanelLayout } from '../panel/PanelLayout.js';
 import { useUIStore } from '../../stores/ui-store.js';
 import { useChatResize } from '../../hooks/use-chat-resize.js';
 
@@ -58,7 +58,7 @@ export function DeskLayout() {
           </div>
         )}
         <div className={`flex flex-1 flex-col overflow-hidden bg-background${wideChat ? '' : ' rounded-b-xl rounded-tr-xl'}`}>
-          <PanelStack />
+          <PanelLayout />
         </div>
       </div>
 

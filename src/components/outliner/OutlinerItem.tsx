@@ -107,6 +107,7 @@ interface OutlinerItemProps {
   rootChildIds: string[];
   parentId: string;
   rootNodeId: string;
+  panelId: string;
   /** When set, controls how the value node is rendered (e.g. checkbox toggle). Only applies to direct field value nodes. */
   fieldDataType?: string;
   /** AttrDef ID — for Options field dropdown when clicking selected value */
@@ -208,6 +209,7 @@ export function OutlinerItem({
   rootChildIds,
   parentId,
   rootNodeId,
+  panelId,
   fieldDataType,
   attrDefId,
   onNavigateOut,
@@ -227,8 +229,8 @@ export function OutlinerItem({
   );
   // Expansion is instance-scoped by design: the same target referenced from two places
   // can keep independent expanded/collapsed state, so the key stays on ref nodeId.
-  const expandKey = `${parentId}:${nodeId}`;
-  const isExpanded = useUIStore((s) => s.expandedNodes.has(`${parentId}:${nodeId}`));
+  const expandKey = `${panelId}:${parentId}:${nodeId}`;
+  const isExpanded = useUIStore((s) => s.expandedNodes.has(`${panelId}:${parentId}:${nodeId}`));
   const focusedNodeId = useUIStore((s) => s.focusedNodeId);
   const focusedParentId = useUIStore((s) => s.focusedParentId);
   const setFocusedNode = useUIStore((s) => s.setFocusedNode);
@@ -246,7 +248,7 @@ export function OutlinerItem({
   const openSearch = useUIStore((s) => s.openSearch);
   const expandedNodes = useUIStore((s) => s.expandedNodes);
   // Unified pointer handlers from OutlinerRow
-  const { handleCmdClick, handleShiftClick } = useRowPointerHandlers(nodeId, parentId, rootChildIds, rootNodeId);
+  const { handleCmdClick, handleShiftClick } = useRowPointerHandlers(nodeId, parentId, rootChildIds, rootNodeId, panelId);
 
   const isLoadingNode = useUIStore((s) => s.loadingNodeIds.has(nodeId));
 
@@ -528,6 +530,7 @@ export function OutlinerItem({
   const triggers = useEditorTriggers({
     nodeId,
     parentId,
+    panelId,
     editorRef,
     tagIds,
     isActive: isFocused,
@@ -1150,7 +1153,7 @@ export function OutlinerItem({
   }, [nodeId, parentId, isReference, isPendingConversion, isOptionsValueNode, setFocusedNode]);
 
   const handleToggle = useCallback(() => {
-    const ek = `${parentId}:${nodeId}`;
+    const ek = `${panelId}:${parentId}:${nodeId}`;
     const currentHasChildren = (useNodeStore.getState().getNode(nodeId)?.children ?? []).length > 0;
     const currentlyExpanded = useUIStore.getState().expandedNodes.has(ek);
 
@@ -1192,10 +1195,10 @@ export function OutlinerItem({
     if (currentChildIds.length === 0) return;
     const expanded = useUIStore.getState().expandedNodes;
     // Check if any child is expanded (compound key: nodeId is parent of children)
-    const anyChildExpanded = currentChildIds.some((cid) => expanded.has(`${nodeId}:${cid}`));
+    const anyChildExpanded = currentChildIds.some((cid) => expanded.has(`${panelId}:${nodeId}:${cid}`));
     const next = new Set(expanded);
     for (const cid of currentChildIds) {
-      const ck = `${nodeId}:${cid}`;
+      const ck = `${panelId}:${nodeId}:${cid}`;
       if (anyChildExpanded) {
         next.delete(ck);
       } else {
@@ -1230,7 +1233,7 @@ export function OutlinerItem({
         return;
       }
 
-      const currentlyExpanded = useUIStore.getState().expandedNodes.has(`${parentId}:${nodeId}`);
+      const currentlyExpanded = useUIStore.getState().expandedNodes.has(`${panelId}:${parentId}:${nodeId}`);
       const currentHasChildren = (useNodeStore.getState().getNode(nodeId)?.children ?? []).length > 0;
 
       // Options field: register current node's name as auto-collected option
@@ -1287,7 +1290,7 @@ export function OutlinerItem({
     if (index <= 0) return; // Can't indent first child
 
     const newParentId = parent.children[index - 1];
-    setExpanded(`${ownerId}:${newParentId}`, true, true);
+    setExpanded(`${panelId}:${ownerId}:${newParentId}`, true, true);
     indentNode(nodeId);
     // Update focusedParentId so the node keeps focus under its new parent
     setFocusedNode(nodeId, newParentId);
@@ -1317,7 +1320,7 @@ export function OutlinerItem({
     }
 
     const latestUi = useUIStore.getState();
-    const flatList = getFlattenedVisibleNodes(rootChildIds, latestUi.expandedNodes, rootNodeId);
+    const flatList = getFlattenedVisibleNodes(rootChildIds, latestUi.expandedNodes, rootNodeId, panelId);
     const prev = getPreviousVisibleNode(nodeId, parentId, flatList);
 
     // Reference: just remove from parent's children, don't trash the node.
@@ -1356,7 +1359,7 @@ export function OutlinerItem({
 
   const handleBackspaceAtStart = useCallback((): boolean => {
     const latestUi = useUIStore.getState();
-    const flatList = getFlattenedVisibleNodes(rootChildIds, latestUi.expandedNodes, rootNodeId);
+    const flatList = getFlattenedVisibleNodes(rootChildIds, latestUi.expandedNodes, rootNodeId, panelId);
     const prev = getPreviousVisibleNode(nodeId, parentId, flatList);
     if (!prev) return false;
 
@@ -1481,7 +1484,7 @@ export function OutlinerItem({
       }
     }
 
-    const flatList = getFlattenedVisibleNodes(rootChildIds, expandedNodes, rootNodeId);
+    const flatList = getFlattenedVisibleNodes(rootChildIds, expandedNodes, rootNodeId, panelId);
     const prev = getPreviousVisibleNode(nodeId, parentId, flatList);
     if (prev) {
       useUIStore.getState().setFocusClickCoords({
@@ -1493,7 +1496,7 @@ export function OutlinerItem({
     } else if (onNavigateOut) {
       onNavigateOut('up');
     }
-  }, [nodeId, parentId, rootNodeId, rootChildIds, expandedNodes, setFocusedNode, onNavigateOut, renderableSiblings, clearFocus, setEditingFieldName]);
+  }, [nodeId, parentId, rootNodeId, rootChildIds, expandedNodes, panelId, setFocusedNode, onNavigateOut, renderableSiblings, clearFocus, setEditingFieldName]);
 
   const handleArrowDown = useCallback(() => {
     // When expanded, ArrowDown first enters this node's child scope
@@ -1529,7 +1532,7 @@ export function OutlinerItem({
       return;
     }
 
-    const flatList = getFlattenedVisibleNodes(rootChildIds, expandedNodes, rootNodeId);
+    const flatList = getFlattenedVisibleNodes(rootChildIds, expandedNodes, rootNodeId, panelId);
     const next = getNextVisibleNode(nodeId, parentId, flatList);
     if (next) {
       setFocusedNode(next.nodeId, next.parentId);
@@ -1543,7 +1546,7 @@ export function OutlinerItem({
     } else if (onNavigateOut) {
       onNavigateOut('down');
     }
-  }, [nodeId, parentId, rootNodeId, rootChildIds, expandedNodes, isExpanded, showTrailingInputRow, firstRenderableChild, setFocusedNode, onNavigateOut, renderableSiblings, clearFocus, setEditingFieldName]);
+  }, [nodeId, parentId, rootNodeId, rootChildIds, expandedNodes, panelId, isExpanded, showTrailingInputRow, firstRenderableChild, setFocusedNode, onNavigateOut, renderableSiblings, clearFocus, setEditingFieldName]);
 
   const handleMoveUp = useCallback(() => {
     const ed = editorRef.current;
@@ -1588,6 +1591,7 @@ export function OutlinerItem({
   const { isDragging, isDropTarget, dropPosition, dragHandlers } = useDragDropRow({
     nodeId,
     parentId,
+    panelId,
     rowRef,
     targetHasChildren: hasChildren,
     targetIsExpanded: isExpanded,
@@ -1632,6 +1636,7 @@ export function OutlinerItem({
         parentId,
         rootChildIds,
         rootNodeId,
+        panelId,
         isEditing: isFocused,
         enterEdit: () => { if (!isLoadingNode) setFocusedNode(nodeId, parentId); },
         exitEdit: () => clearFocus(),
@@ -1986,6 +1991,7 @@ export function OutlinerItem({
                   {...toFieldRowEntryProps(fieldMap.get(row.id)!)}
                   rootChildIds={rootChildIds}
                   rootNodeId={rootNodeId}
+                  panelId={panelId}
                   isLastInGroup={i === rows.length - 1 || rows[i + 1].type !== 'field'}
                   ownerTagColor={fieldOwnerColors.get(row.id)}
                   onNavigateOut={(direction) => {
@@ -2024,7 +2030,7 @@ export function OutlinerItem({
                         if (focusTrailingInputForParent(effectiveNodeId)) {
                           return;
                         }
-                        const fl = getFlattenedVisibleNodes(rootChildIds, useUIStore.getState().expandedNodes, rootNodeId);
+                        const fl = getFlattenedVisibleNodes(rootChildIds, useUIStore.getState().expandedNodes, rootNodeId, panelId);
                         const nx = getNextVisibleNode(nodeId, parentId, fl);
                         if (nx) {
                           useUIStore.getState().setFocusClickCoords({
@@ -2051,6 +2057,7 @@ export function OutlinerItem({
                 rootChildIds={rootChildIds}
                 parentId={effectiveNodeId}
                 rootNodeId={rootNodeId}
+                panelId={panelId}
                 referencePath={nextReferencePath}
                 bulletColors={templateContentColors.get(row.id)}
               />
@@ -2070,12 +2077,14 @@ export function OutlinerItem({
               depth={depth + 1}
               autoFocus={!lastRenderableChild}
               parentExpandKey={expandKey}
+              panelId={panelId}
               onNavigateOut={(direction) => {
                 if (direction === 'up') {
                   const fl = getFlattenedVisibleNodes(
                     rootChildIds,
                     useUIStore.getState().expandedNodes,
                     rootNodeId,
+                    panelId,
                   );
                   // Find the true previous visible node prior to our parent
                   // By finding our parent's index and taking the node *right after* its descendants ends?
@@ -2088,6 +2097,7 @@ export function OutlinerItem({
                     parentChildren,
                     useUIStore.getState().expandedNodes,
                     effectiveNodeId,
+                    panelId,
                   );
                   if (parentFl.length > 0) {
                     const lastNode = parentFl[parentFl.length - 1];
@@ -2113,6 +2123,7 @@ export function OutlinerItem({
                   rootChildIds,
                   useUIStore.getState().expandedNodes,
                   rootNodeId,
+                  panelId,
                 );
                 const nx = getNextVisibleNode(nodeId, parentId, fl);
                 if (!nx) return;

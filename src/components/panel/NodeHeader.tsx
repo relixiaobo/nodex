@@ -56,10 +56,11 @@ const noopDelete = (): boolean => false;
 
 interface NodeHeaderProps {
   nodeId: string;
+  panelId?: string;
   onTitleRef?: (el: HTMLElement | null) => void;
 }
 
-export function NodeHeader({ nodeId, onTitleRef }: NodeHeaderProps) {
+export function NodeHeader({ nodeId, panelId = 'main', onTitleRef }: NodeHeaderProps) {
   const node = useNode(nodeId);
   const updateNodeContent = useNodeStore((s) => s.updateNodeContent);
 
@@ -121,6 +122,7 @@ export function NodeHeader({ nodeId, onTitleRef }: NodeHeaderProps) {
   const triggers = useEditorTriggers({
     nodeId,
     parentId: null,
+    panelId,
     editorRef,
     tagIds,
     isActive: editing,

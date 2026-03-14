@@ -7,7 +7,7 @@ describe('chrome-storage adapter', () => {
 
     await chromeLocalStorage.setItem('k1', {
       state: {
-        expandedNodes: new Set(['a:b', 'c:d']),
+        expandedNodes: new Set(['main:a:b', 'main:c:d']),
       },
       version: 1,
     });
@@ -19,7 +19,7 @@ describe('chrome-storage adapter', () => {
     const restored = await chromeLocalStorage.getItem('k1');
     expect(restored).toEqual({
       state: {
-        expandedNodes: new Set(['a:b', 'c:d']),
+        expandedNodes: new Set(['main:a:b', 'main:c:d']),
       },
       version: 1,
     });

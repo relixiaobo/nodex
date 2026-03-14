@@ -54,6 +54,8 @@ export interface EditorTriggerConfig {
   isActive: boolean;
   /** Disable all triggers (e.g. code block). */
   disabled?: boolean;
+  /** Panel ID for scoping expanded state keys. Defaults to 'main'. */
+  panelId?: string;
 
   enableSlash?: boolean;         // default true
   enableFieldTrigger?: boolean;  // default true, NodeHeader sets false
@@ -139,6 +141,7 @@ export function useEditorTriggers(config: EditorTriggerConfig): EditorTriggerSta
     tagIds,
     isActive,
     disabled = false,
+    panelId = 'main',
     enableSlash = true,
     enableFieldTrigger = true,
     enableTreeReference = true,
@@ -425,7 +428,7 @@ export function useEditorTriggers(config: EditorTriggerConfig): EditorTriggerSta
           const tempNodeId = startRefConversion(newRefId, parentId, insertPos);
           setPendingRefConversion({ tempNodeId, refNodeId, parentId });
           const gpId = loroDoc.getParentId(parentId);
-          if (gpId) setExpanded(`${gpId}:${parentId}`, true, true);
+          if (gpId) setExpanded(`${panelId}:${gpId}:${parentId}`, true, true);
           useUIStore.getState().setPendingInputChar(null);
           useUIStore.getState().setFocusClickCoords({
             nodeId: tempNodeId,

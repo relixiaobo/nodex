@@ -93,6 +93,7 @@ interface FieldRowProps {
   /** Root outliner context for unified range selection across field/content rows */
   rootChildIds?: string[];
   rootNodeId?: string;
+  panelId?: string;
 }
 
 export const FIELD_ROW_SELECTION_OVERLAY_CLASS =
@@ -431,6 +432,7 @@ export function FieldRow({
   configControl,
   rootChildIds,
   rootNodeId,
+  panelId,
 }: FieldRowProps) {
   const navigateTo = useUIStore((s) => s.navigateTo);
   const editingFieldNameId = useUIStore((s) => s.editingFieldNameId);
@@ -441,7 +443,7 @@ export function FieldRow({
   // Unified selection state + pointer handlers from OutlinerRow
   const { isSelected: isFieldSelected } = useRowSelectionState(fieldEntryId, nodeId);
   const { handleCmdClick, handleShiftClick } = useRowPointerHandlers(
-    fieldEntryId, nodeId, rootChildIds ?? [], rootNodeId ?? nodeId,
+    fieldEntryId, nodeId, rootChildIds ?? [], rootNodeId ?? nodeId, panelId ?? 'main',
   );
   const createChild = useNodeStore((s) => s.createChild);
   const moveFieldEntry = useNodeStore((s) => s.moveFieldEntry);
@@ -458,6 +460,7 @@ export function FieldRow({
   const { isDragging, isDropTarget, dropPosition, dragHandlers } = useDragDropRow({
     nodeId: fieldEntryId,
     parentId: nodeId,
+    panelId: panelId ?? 'main',
     rowRef,
   });
 
@@ -826,6 +829,7 @@ export function FieldRow({
         parentId: nodeId,
         rootChildIds: rootChildIds ?? renderableSiblings.map((item) => item.id),
         rootNodeId: rootNodeId ?? nodeId,
+        panelId: panelId ?? 'main',
         isEditing,
         enterEdit: () => setEditingFieldName(fieldEntryId),
         exitEdit: () => setEditingFieldName(null),
@@ -911,9 +915,9 @@ export function FieldRow({
       <div className={FIELD_ROW_VALUE_COLUMN_CLASS} data-field-value>
         <div className="flex-1 min-w-0">
           {isOutliner ? (
-            <ConfigOutliner nodeId={nodeId} onNavigateOut={onNavigateOut} />
+            <ConfigOutliner nodeId={nodeId} onNavigateOut={onNavigateOut} panelId={panelId ?? 'main'} />
           ) : (
-            <FieldValueOutliner fieldEntryId={fieldEntryId} fieldDataType={dataType} attrDefId={attrDefId} onNavigateOut={onNavigateOut} />
+            <FieldValueOutliner fieldEntryId={fieldEntryId} fieldDataType={dataType} attrDefId={attrDefId} onNavigateOut={onNavigateOut} panelId={panelId ?? 'main'} />
           )}
         </div>
         {validationWarning && (

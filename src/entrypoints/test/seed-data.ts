@@ -499,21 +499,21 @@ function seedBody(): void {
 
   // Expand some nodes by default for testing (skipUndo=true to avoid
   // creating undo entries during seed — Bug 1 fix)
-  uiStore.setExpanded(`${todayDayId}:proj_1`, true, true);
-  uiStore.setExpanded('proj_1:task_1', true, true);
-  uiStore.setExpanded('proj_1:task_2', true, true);
-  uiStore.setExpanded(`${todayDayId}:note_rich`, true, true);
+  uiStore.setExpanded(`main:${todayDayId}:proj_1`, true, true);
+  uiStore.setExpanded('main:proj_1:task_1', true, true);
+  uiStore.setExpanded('main:proj_1:task_2', true, true);
+  uiStore.setExpanded(`main:${todayDayId}:note_rich`, true, true);
 
   // Store image nodes: expand article nodes with children
-  uiStore.setExpanded('si_reading_notes:si_deep_reading', true, true);
-  uiStore.setExpanded('si_mental_models:si_mm_sot', true, true);
-  uiStore.setExpanded('si_mental_models:si_mm_inv', true, true);
-  uiStore.setExpanded('si_mental_models:si_mm_dte', true, true);
-  uiStore.setExpanded(`${todayDayId}:j_pg`, true, true);
-  uiStore.setExpanded(`${todayDayId}:j_deep`, true, true);
-  uiStore.setExpanded('j_deep_2:j_deep_2a', true, true);
-  uiStore.setExpanded(`${todayDayId}:j_leaders`, true, true);
-  uiStore.setExpanded(`${todayDayId}:j_range`, true, true);
+  uiStore.setExpanded('main:si_reading_notes:si_deep_reading', true, true);
+  uiStore.setExpanded('main:si_mental_models:si_mm_sot', true, true);
+  uiStore.setExpanded('main:si_mental_models:si_mm_inv', true, true);
+  uiStore.setExpanded('main:si_mental_models:si_mm_dte', true, true);
+  uiStore.setExpanded(`main:${todayDayId}:j_pg`, true, true);
+  uiStore.setExpanded(`main:${todayDayId}:j_deep`, true, true);
+  uiStore.setExpanded('main:j_deep_2:j_deep_2a', true, true);
+  uiStore.setExpanded(`main:${todayDayId}:j_leaders`, true, true);
+  uiStore.setExpanded(`main:${todayDayId}:j_range`, true, true);
 
   // Navigate to Today — use replacePanel (not navigateTo) to avoid
   // creating a Loro undo entry whose UI snapshot is the empty initial state.

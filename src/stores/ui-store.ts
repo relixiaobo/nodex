@@ -15,6 +15,7 @@
  */
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { nanoid } from 'nanoid';
 import { chromeLocalStorage } from '../lib/chrome-storage';
 import { commitUIMarker, registerUndoUICallbacks } from '../lib/loro-doc.js';
 import { useNodeStore } from './node-store';
@@ -356,7 +357,7 @@ export const useUIStore = create<UIStore>()(
           if (!hasBackingNode(nodeId)) return {};
           commitUIMarker();
 
-          const newPanelId = `panel_${Date.now().toString(36)}`;
+          const newPanelId = nanoid();
           const newPanel: Panel = { id: newPanelId, nodeId };
           const idx = insertIndex ?? s.panels.length;
           const newPanels = [...s.panels];

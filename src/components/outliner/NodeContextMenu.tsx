@@ -6,6 +6,8 @@
  * "Add tag" uses mode-based sub-view (needs search input).
  *
  * Menu layout:
+ *   Open in new panel   ⌘\
+ *   ───
  *   Copy node link
  *   ───
  *   Copy               ⌘C
@@ -447,7 +449,7 @@ function MainMenu({
   return (
     <>
       {/* Open in new panel */}
-      <MenuItem icon={PanelRight} label="Open in new panel" kbd="⌥Click" onClick={onOpenInNewPanel} />
+      <MenuItem icon={PanelRight} label="Open in new panel" kbd="⌘\" onClick={onOpenInNewPanel} />
 
       <MenuSeparator />
 

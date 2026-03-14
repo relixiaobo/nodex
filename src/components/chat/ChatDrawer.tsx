@@ -23,6 +23,7 @@ export function ChatDrawer() {
   const { messages, toolResults, isStreaming, error, ready, debug, sendMessage, stopStreaming, newChat } = useAgent();
   const scrollRef = useRef<HTMLDivElement>(null);
   const debugTapResetRef = useRef<number | null>(null);
+  const debugTapCountRef = useRef(0);
   const [isWideLayout, setIsWideLayout] = useState(() => window.innerWidth > WIDE_LAYOUT_MIN_WIDTH);
   const [loadingSettings, setLoadingSettings] = useState(true);
   const [showSettings, setShowSettings] = useState(false);
@@ -32,7 +33,6 @@ export function ChatDrawer() {
   const [savingKey, setSavingKey] = useState(false);
   const [debugEnabled, setDebugEnabled] = useState(false);
   const [debugOpen, setDebugOpen] = useState(false);
-  const [debugTapCount, setDebugTapCount] = useState(0);
 
   useEffect(() => {
     function handleResize() {
@@ -142,27 +142,24 @@ export function ChatDrawer() {
   function handleHeaderTitleClick() {
     if (!showSettings || debugEnabled) return;
 
-    setDebugTapCount((current) => {
-      const nextCount = current + 1;
+    debugTapCountRef.current += 1;
 
-      if (debugTapResetRef.current != null) {
-        window.clearTimeout(debugTapResetRef.current);
-        debugTapResetRef.current = null;
-      }
+    if (debugTapResetRef.current != null) {
+      window.clearTimeout(debugTapResetRef.current);
+      debugTapResetRef.current = null;
+    }
 
-      if (nextCount >= 5) {
-        setDebugEnabled(true);
-        toast.success('Debug mode enabled');
-        void writeChatDebugEnabled(true);
-        return 0;
-      }
+    if (debugTapCountRef.current >= 5) {
+      debugTapCountRef.current = 0;
+      setDebugEnabled(true);
+      toast.success('Debug mode enabled');
+      void writeChatDebugEnabled(true);
+      return;
+    }
 
-      debugTapResetRef.current = window.setTimeout(() => {
-        setDebugTapCount(0);
-      }, 1200);
-
-      return nextCount;
-    });
+    debugTapResetRef.current = window.setTimeout(() => {
+      debugTapCountRef.current = 0;
+    }, 1200);
   }
 
   const containerClassName = useMemo(() => {

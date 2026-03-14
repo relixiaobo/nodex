@@ -4,10 +4,12 @@ import { SYSTEM_SCHEMA_NODE_IDS } from '../../src/lib/system-schema-presets.js';
 
 const streamProxyMock = vi.hoisted(() => vi.fn(() => ({ mocked: true })));
 const getStoredTokenMock = vi.hoisted(() => vi.fn(async () => 'auth-token'));
-const buildSystemReminderMock = vi.hoisted(() => vi.fn(async () => '<system-reminder>ctx</system-reminder>'));
-const stripOldImagesMock = vi.hoisted(() => vi.fn(
-  (messages: import('@mariozechner/pi-agent-core').AgentMessage[]) => messages,
-));
+const prepareAgentContextMock = vi.hoisted(() => vi.fn(async (
+  messages: import('@mariozechner/pi-agent-core').AgentMessage[],
+) => ({
+  reminder: '<system-reminder>ctx</system-reminder>',
+  messages,
+})));
 
 vi.mock('../../src/lib/ai-proxy.js', () => ({
   streamProxyWithApiKey: streamProxyMock,
@@ -26,8 +28,7 @@ vi.mock('../../src/lib/ai-context.js', async () => {
   const actual = await vi.importActual<typeof import('../../src/lib/ai-context.js')>('../../src/lib/ai-context.js');
   return {
     ...actual,
-    buildSystemReminder: buildSystemReminderMock,
-    stripOldImages: stripOldImagesMock,
+    prepareAgentContext: prepareAgentContextMock,
   };
 });
 
@@ -58,12 +59,13 @@ describe('ai-service', () => {
     streamProxyMock.mockReturnValue({ mocked: true });
     getStoredTokenMock.mockReset();
     getStoredTokenMock.mockResolvedValue('auth-token');
-    buildSystemReminderMock.mockReset();
-    buildSystemReminderMock.mockResolvedValue('<system-reminder>ctx</system-reminder>');
-    stripOldImagesMock.mockReset();
-    stripOldImagesMock.mockImplementation(
-      (messages: import('@mariozechner/pi-agent-core').AgentMessage[]) => messages,
-    );
+    prepareAgentContextMock.mockReset();
+    prepareAgentContextMock.mockImplementation(async (
+      messages: import('@mariozechner/pi-agent-core').AgentMessage[],
+    ) => ({
+      reminder: '<system-reminder>ctx</system-reminder>',
+      messages,
+    }));
 
     const { resetAIAgentForTests } = await import('../../src/lib/ai-service.js');
     resetAIAgentForTests();
@@ -137,44 +139,39 @@ describe('ai-service', () => {
     );
   });
 
-  it('registers transformContext that strips old images before injecting the system reminder', async () => {
+  it('registers transformContext that delegates to the shared context preparation helper', async () => {
     const { createAgent } = await import('../../src/lib/ai-service.js');
     const agent = createAgent();
     const internalAgent = agent as unknown as {
       transformContext: (messages: import('@mariozechner/pi-agent-core').AgentMessage[]) => Promise<import('@mariozechner/pi-agent-core').AgentMessage[]>;
     };
-    stripOldImagesMock.mockReturnValueOnce([
-      {
-        role: 'user',
-        content: 'stripped',
-        timestamp: 1,
-      },
-    ]);
+    prepareAgentContextMock.mockResolvedValueOnce({
+      reminder: '<system-reminder>ctx</system-reminder>',
+      messages: [
+        {
+          role: 'user',
+          content: 'prepared',
+          timestamp: 1,
+        },
+      ],
+    });
 
-    const transformed = await internalAgent.transformContext([
+    const sourceMessages = [
       {
         role: 'user',
         content: 'hello',
         timestamp: 1,
       },
-    ]);
+    ];
 
-    expect(stripOldImagesMock).toHaveBeenCalledTimes(1);
-    expect(stripOldImagesMock).toHaveBeenCalledWith([
-      {
-        role: 'user',
-        content: 'hello',
-        timestamp: 1,
-      },
-    ]);
-    expect(buildSystemReminderMock).toHaveBeenCalledTimes(1);
-    expect(stripOldImagesMock.mock.invocationCallOrder[0]).toBeLessThan(
-      buildSystemReminderMock.mock.invocationCallOrder[0],
-    );
+    const transformed = await internalAgent.transformContext(sourceMessages);
+
+    expect(prepareAgentContextMock).toHaveBeenCalledTimes(1);
+    expect(prepareAgentContextMock).toHaveBeenCalledWith(sourceMessages);
     expect(transformed).toEqual([
       {
         role: 'user',
-        content: 'stripped\n\n<system-reminder>ctx</system-reminder>',
+        content: 'prepared',
         timestamp: 1,
       },
     ]);

@@ -1,6 +1,6 @@
 import type { AgentMessage, AgentTool } from '@mariozechner/pi-agent-core';
 import type { Message } from '@mariozechner/pi-ai';
-import { buildSystemReminder, injectReminder, stripOldImages } from './ai-context.js';
+import { prepareAgentContext, type PreparedAgentContext } from './ai-context.js';
 
 const CHAT_DEBUG_STORAGE_KEY = 'soma-chat-debug-enabled';
 
@@ -201,11 +201,10 @@ function getContextWindowLimit(modelId: string): number {
 
 export function buildAgentDebugSnapshot(
   source: Omit<AgentDebugSource, 'revision'>,
-  reminder: string,
+  preparedContext: PreparedAgentContext,
 ): AgentDebugSnapshot {
-  const normalizedReminder = reminder.trim();
-  const messages = injectReminder(stripOldImages(source.messages), normalizedReminder)
-    .filter(isLlmMessage);
+  const normalizedReminder = preparedContext.reminder.trim();
+  const messages = preparedContext.messages.filter(isLlmMessage);
 
   const plainTools = source.tools.map((tool) => ({
     name: tool.name,
@@ -262,6 +261,6 @@ export function buildAgentDebugSnapshot(
 }
 
 export async function collectAgentDebugSnapshot(source: AgentDebugSource): Promise<AgentDebugSnapshot> {
-  const reminder = await buildSystemReminder();
-  return buildAgentDebugSnapshot(source, reminder);
+  const preparedContext = await prepareAgentContext(source.messages);
+  return buildAgentDebugSnapshot(source, preparedContext);
 }

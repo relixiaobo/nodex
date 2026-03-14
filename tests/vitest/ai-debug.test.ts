@@ -1,6 +1,7 @@
 import type { AgentMessage } from '@mariozechner/pi-agent-core';
 import { Type } from '@mariozechner/pi-ai';
 import { buildAgentDebugSnapshot } from '../../src/lib/ai-debug.js';
+import type { PreparedAgentContext } from '../../src/lib/ai-context.js';
 
 const TOOL_SCHEMA = Type.Object({
   query: Type.String(),
@@ -60,6 +61,11 @@ describe('ai-debug', () => {
       },
     ];
 
+    const preparedContext: PreparedAgentContext = {
+      reminder: '<system-reminder>\n<panel-context>\nPanel\n</panel-context>\n\n<page-context>\nPage\n</page-context>\n\n<time-context>\nTime\n</time-context>\n</system-reminder>',
+      messages,
+    };
+
     const snapshot = buildAgentDebugSnapshot(
       {
         systemPrompt: 'Base prompt\n\n<available-skills>\n<skill id="skill_1" name="Skill" description="Test" />\n</available-skills>',
@@ -79,7 +85,7 @@ describe('ai-debug', () => {
         modelId: 'claude-sonnet-4-5',
         provider: 'anthropic',
       },
-      '<system-reminder>\n<panel-context>\nPanel\n</panel-context>\n\n<page-context>\nPage\n</page-context>\n\n<time-context>\nTime\n</time-context>\n</system-reminder>',
+      preparedContext,
     );
 
     expect(snapshot.reminder.panelContext).toContain('<panel-context>');

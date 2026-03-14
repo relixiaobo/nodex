@@ -7,6 +7,11 @@ import { useUIStore } from '../stores/ui-store.js';
 
 const RECENT_IMAGE_MESSAGES = 3;
 
+export interface PreparedAgentContext {
+  reminder: string;
+  messages: AgentMessage[];
+}
+
 function escapeXml(text: string): string {
   return text
     .replace(/&/g, '&amp;')
@@ -182,4 +187,16 @@ export function injectReminder(messages: AgentMessage[], reminder: string): Agen
     content: nextContent,
   };
   return nextMessages;
+}
+
+export function transformAgentContext(messages: AgentMessage[], reminder: string): AgentMessage[] {
+  return injectReminder(stripOldImages(messages), reminder);
+}
+
+export async function prepareAgentContext(messages: AgentMessage[]): Promise<PreparedAgentContext> {
+  const reminder = await buildSystemReminder();
+  return {
+    reminder,
+    messages: transformAgentContext(messages, reminder),
+  };
 }

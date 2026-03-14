@@ -4,7 +4,7 @@ import type { Message, Model } from '@mariozechner/pi-ai';
 import { nanoid } from 'nanoid';
 import { getStoredToken } from './auth.js';
 import { buildAgentSystemPrompt, DEFAULT_AGENT_MODEL_ID, DEFAULT_AGENT_MAX_TOKENS, DEFAULT_AGENT_SYSTEM_PROMPT, DEFAULT_AGENT_TEMPERATURE, readAgentNodeConfig } from './ai-agent-node.js';
-import { buildSystemReminder, injectReminder, stripOldImages } from './ai-context.js';
+import { prepareAgentContext } from './ai-context.js';
 import { streamProxyWithApiKey } from './ai-proxy.js';
 import { type ChatSession, getLatestChatSession, saveChatSession } from './ai-persistence.js';
 import { getAITools } from './ai-tools/index.js';
@@ -304,11 +304,7 @@ export function createAgent(model: Model<any> = DEFAULT_CHAT_MODEL): Agent {
       const apiKey = await getApiKey();
       return apiKey ?? undefined;
     },
-    transformContext: async (messages) => {
-      const strippedMessages = stripOldImages(messages);
-      const systemReminder = await buildSystemReminder();
-      return injectReminder(strippedMessages, systemReminder);
-    },
+    transformContext: async (messages) => (await prepareAgentContext(messages)).messages,
     convertToLlm: (messages) => messages.filter(isLlmCompatibleMessage),
     streamFn: async (activeModel, context, options = {}) => {
       const authToken = await getStoredToken();
@@ -327,6 +323,8 @@ export function createAgent(model: Model<any> = DEFAULT_CHAT_MODEL): Agent {
     },
   });
 
+  agent.setTools(getAITools());
+  agent.setSystemPrompt(DEFAULT_AGENT_SYSTEM_PROMPT);
   getAgentRuntimeState(agent);
   return agent;
 }
@@ -353,6 +351,11 @@ export function restoreLatestChatSession(agent: Agent = getAIAgent()): Promise<v
           agent.sessionId = latestSession.id;
           runtime.createdAt = latestSession.createdAt;
           agent.replaceMessages(latestSession.messages);
+          try {
+            await configureAgent(agent);
+          } catch {
+            // Keep default prompt/tools when config hydration fails.
+          }
           runtime.hydrated = true;
           return;
         }
@@ -363,6 +366,11 @@ export function restoreLatestChatSession(agent: Agent = getAIAgent()): Promise<v
       agent.sessionId = nanoid();
       runtime.createdAt = Date.now();
       agent.replaceMessages([]);
+      try {
+        await configureAgent(agent);
+      } catch {
+        // Keep default prompt/tools when config hydration fails.
+      }
       runtime.hydrated = true;
     })();
   }

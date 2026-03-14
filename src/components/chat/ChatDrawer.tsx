@@ -1,8 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { toast } from 'sonner';
 import { ExternalLink, Plus, Settings, Sparkles, X } from '../../lib/icons.js';
 import { useAgent } from '../../hooks/use-agent.js';
+import { readChatDebugEnabled, writeChatDebugEnabled } from '../../lib/ai-debug.js';
 import { clearApiKey, getAISettings, setApiKey } from '../../lib/ai-service.js';
 import { useUIStore } from '../../stores/ui-store.js';
+import { ChatDebugPanel } from './ChatDebugPanel.js';
 import { ChatInput } from './ChatInput.js';
 import { ChatMessage } from './ChatMessage.js';
 
@@ -17,8 +20,9 @@ export function ChatDrawer() {
   const closeChat = useUIStore((s) => s.closeChat);
   const pendingChatPrompt = useUIStore((s) => s.pendingChatPrompt);
   const setPendingChatPrompt = useUIStore((s) => s.setPendingChatPrompt);
-  const { messages, toolResults, isStreaming, error, ready, sendMessage, stopStreaming, newChat } = useAgent();
+  const { messages, toolResults, isStreaming, error, ready, debug, sendMessage, stopStreaming, newChat } = useAgent();
   const scrollRef = useRef<HTMLDivElement>(null);
+  const debugTapResetRef = useRef<number | null>(null);
   const [isWideLayout, setIsWideLayout] = useState(() => window.innerWidth > WIDE_LAYOUT_MIN_WIDTH);
   const [loadingSettings, setLoadingSettings] = useState(true);
   const [showSettings, setShowSettings] = useState(false);
@@ -26,6 +30,9 @@ export function ChatDrawer() {
   const [draftKey, setDraftKey] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
   const [savingKey, setSavingKey] = useState(false);
+  const [debugEnabled, setDebugEnabled] = useState(false);
+  const [debugOpen, setDebugOpen] = useState(false);
+  const [debugTapCount, setDebugTapCount] = useState(0);
 
   useEffect(() => {
     function handleResize() {
@@ -41,7 +48,10 @@ export function ChatDrawer() {
 
     async function loadSettings() {
       setLoadingSettings(true);
-      const settings = await getAISettings();
+      const [settings, storedDebugEnabled] = await Promise.all([
+        getAISettings(),
+        readChatDebugEnabled(),
+      ]);
       if (cancelled) return;
 
       if (settings?.apiKey) {
@@ -51,6 +61,7 @@ export function ChatDrawer() {
         setSavedKeyMask(null);
         setShowSettings(true);
       }
+      setDebugEnabled(storedDebugEnabled);
       setLoadingSettings(false);
     }
 
@@ -60,6 +71,19 @@ export function ChatDrawer() {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    return () => {
+      if (debugTapResetRef.current != null) {
+        window.clearTimeout(debugTapResetRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (debugEnabled) return;
+    setDebugOpen(false);
+  }, [debugEnabled]);
 
   useEffect(() => {
     if (showSettings) return;
@@ -115,6 +139,32 @@ export function ChatDrawer() {
     setShowSettings(true);
   }
 
+  function handleHeaderTitleClick() {
+    if (!showSettings || debugEnabled) return;
+
+    setDebugTapCount((current) => {
+      const nextCount = current + 1;
+
+      if (debugTapResetRef.current != null) {
+        window.clearTimeout(debugTapResetRef.current);
+        debugTapResetRef.current = null;
+      }
+
+      if (nextCount >= 5) {
+        setDebugEnabled(true);
+        toast.success('Debug mode enabled');
+        void writeChatDebugEnabled(true);
+        return 0;
+      }
+
+      debugTapResetRef.current = window.setTimeout(() => {
+        setDebugTapCount(0);
+      }, 1200);
+
+      return nextCount;
+    });
+  }
+
   const containerClassName = useMemo(() => {
     if (isWideLayout) {
       return 'relative z-[60] flex h-full w-[min(40vw,420px)] min-w-[320px] shrink-0 flex-col border-l border-border bg-background';
@@ -126,13 +176,32 @@ export function ChatDrawer() {
   return (
     <aside className={containerClassName}>
       <div className="flex h-12 items-center justify-between border-b border-border px-3">
-        <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+        <button
+          type="button"
+          onClick={handleHeaderTitleClick}
+          className="flex items-center gap-2 text-sm font-medium text-foreground"
+        >
           <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-primary">
             <Sparkles size={14} strokeWidth={1.75} />
           </span>
           Chat
-        </div>
+        </button>
         <div className="flex items-center gap-1">
+          {debugEnabled && !showSettings && (
+            <button
+              type="button"
+              onClick={() => setDebugOpen((value) => !value)}
+              className={`inline-flex h-7 min-w-8 items-center justify-center rounded-full px-2 font-mono text-[11px] transition-colors ${
+                debugOpen
+                  ? 'bg-foreground/8 text-foreground'
+                  : 'text-foreground-tertiary hover:bg-foreground/4 hover:text-foreground'
+              }`}
+              aria-label={debugOpen ? 'Hide chat debug panel' : 'Show chat debug panel'}
+              aria-pressed={debugOpen}
+            >
+              {'</>'}
+            </button>
+          )}
           {!loadingSettings && (
             <button
               type="button"
@@ -240,6 +309,9 @@ export function ChatDrawer() {
       ) : (
         <>
           <div ref={scrollRef} className="flex-1 space-y-4 overflow-y-auto px-4 py-4">
+            {debugEnabled && debugOpen && (
+              <ChatDebugPanel debug={debug} />
+            )}
             {messages.length === 0 ? (
               <div className="flex h-full min-h-40 items-center justify-center">
                 <div className="max-w-[240px] text-center text-sm text-foreground-tertiary">

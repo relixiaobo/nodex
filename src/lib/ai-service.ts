@@ -327,6 +327,8 @@ export function createAgent(model: Model<any> = DEFAULT_CHAT_MODEL): Agent {
     },
   });
 
+  agent.setTools(getAITools());
+  agent.setSystemPrompt(DEFAULT_AGENT_SYSTEM_PROMPT);
   getAgentRuntimeState(agent);
   return agent;
 }
@@ -353,6 +355,11 @@ export function restoreLatestChatSession(agent: Agent = getAIAgent()): Promise<v
           agent.sessionId = latestSession.id;
           runtime.createdAt = latestSession.createdAt;
           agent.replaceMessages(latestSession.messages);
+          try {
+            await configureAgent(agent);
+          } catch {
+            // Keep default prompt/tools when config hydration fails.
+          }
           runtime.hydrated = true;
           return;
         }
@@ -363,6 +370,11 @@ export function restoreLatestChatSession(agent: Agent = getAIAgent()): Promise<v
       agent.sessionId = nanoid();
       runtime.createdAt = Date.now();
       agent.replaceMessages([]);
+      try {
+        await configureAgent(agent);
+      } catch {
+        // Keep default prompt/tools when config hydration fails.
+      }
       runtime.hydrated = true;
     })();
   }

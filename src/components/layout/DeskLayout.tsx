@@ -38,9 +38,9 @@ export function DeskLayout() {
 
   return (
     <div className={`flex flex-1 overflow-hidden p-1.5${wideChat ? '' : ' flex-col'}`}>
-      {/* ── NodePanel card (elevated paper layer) ── */}
+      {/* ── Panel cards (elevated paper layer) ── */}
       <div className={`flex flex-col${wideChat
-        ? ' flex-1 min-w-0 min-h-0 relative z-10 rounded-xl overflow-clip shadow-panel-right'
+        ? ' flex-1 min-w-0 min-h-0 relative z-10'
         : ' flex-1 min-h-0'}`}
       >
         {!wideChat && (
@@ -48,7 +48,7 @@ export function DeskLayout() {
             <GlobalTools />
           </div>
         )}
-        <div className={`flex flex-1 flex-col overflow-hidden bg-background${wideChat ? '' : ' rounded-xl'}`}>
+        <div className="flex flex-1 overflow-hidden">
           <PanelLayout />
         </div>
       </div>

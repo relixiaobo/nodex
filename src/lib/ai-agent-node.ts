@@ -517,8 +517,6 @@ export function readAgentNodeConfig(): AgentNodeConfig {
   };
 }
 
-// ─── Build system prompt ───
-
 // ─── Spark agent bootstrap ───
 
 export function ensureSparkAgentNode(workspaceId = loroDoc.getCurrentWorkspaceId() ?? 'ws_default'): string {

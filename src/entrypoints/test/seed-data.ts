@@ -517,7 +517,7 @@ function seedBody(): void {
 
   // Navigate to Today — use replacePanel (not navigateTo) to avoid
   // creating a Loro undo entry whose UI snapshot is the empty initial state.
-  if (uiStore.panelHistory.length === 0) {
+  if (uiStore.panels.length === 0) {
     uiStore.replacePanel(todayDayId);
   }
 }
@@ -535,7 +535,7 @@ export async function seedTestData(options?: { forceFresh?: boolean }): Promise<
     // Reset persisted UI/workspace state for deterministic test page boot.
     await useUIStore.persist.clearStorage();
     await useWorkspaceStore.persist.clearStorage();
-    useUIStore.setState({ panelHistory: [], panelIndex: -1, expandedNodes: new Set() });
+    useUIStore.setState({ panels: [], activePanelId: '', expandedNodes: new Set() });
     useWorkspaceStore.setState({ currentWorkspaceId: null, userId: null, isAuthenticated: false, authUser: null });
     if (typeof localStorage !== 'undefined') {
       localStorage.removeItem('nodex-ui');

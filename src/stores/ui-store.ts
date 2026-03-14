@@ -1,24 +1,31 @@
 /**
- * UI state store: navigation history, expanded nodes, focus.
+ * UI state store: multi-panel navigation, expanded nodes, focus.
  *
- * Persisted to chrome.storage.local (history, expandedNodes, viewMode).
+ * Persisted to chrome.storage.local (panels, expandedNodes, viewMode).
  *
- * Navigation uses a browser-like history model:
- * - panelHistory: linear list of visited node IDs
- * - panelIndex: current position pointer
- * - navigateTo: truncate forward history + push
- * - goBack/goForward: move pointer
+ * Navigation uses a global event timeline:
+ * - panels: list of open panels, each displaying a node
+ * - activePanelId: which panel receives keyboard events
+ * - navHistory: ordered list of NavigationEvents (navigate / open-panel / close-panel)
+ * - navIndex: pointer into navHistory (-1 = no events)
+ * - goBack/goForward: undo/redo events from navHistory
+ *
+ * Chat events are NOT included in navHistory (Chat is desk-layer, not navigation).
+ * Back/Forward auto-switch activePanelId to the affected panel.
  */
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { chromeLocalStorage } from '../lib/chrome-storage';
 import { commitUIMarker, registerUndoUICallbacks } from '../lib/loro-doc.js';
 import { useNodeStore } from './node-store';
+import type { Panel, NavigationEvent } from '../types/index.js';
 
 interface UIStore {
-  // Browser-like navigation history
-  panelHistory: string[];
-  panelIndex: number;
+  // Multi-panel navigation (global event timeline)
+  panels: Panel[];
+  activePanelId: string;
+  navHistory: NavigationEvent[];
+  navIndex: number;
   navigateTo(nodeId: string): void;
   goBack(): void;
   goForward(): void;
@@ -112,12 +119,6 @@ interface UIStore {
   toggleHiddenField(panelNodeId: string, fieldEntryId: string): void;
   clearExpandedHiddenFields(): void;
 
-  // Navigation undo/redo (session-only, not persisted)
-  navUndoStack: Array<{ panelHistory: string[]; panelIndex: number }>;
-  navRedoStack: Array<{ panelHistory: string[]; panelIndex: number }>;
-  navUndo(): void;
-  navRedo(): void;
-
   // Panel title visibility (session-only, not persisted)
   panelTitleVisible: boolean;
   setPanelTitleVisible(visible: boolean): void;
@@ -145,22 +146,22 @@ interface UIStore {
 }
 
 export interface PersistedUIStoreState {
-  panelHistory: string[];
-  panelIndex: number;
+  panels: Panel[];
+  activePanelId: string;
   expandedNodes: Set<string>;
   viewMode: 'list' | 'table' | 'tiles' | 'cards';
   paletteUsage: Record<string, { count: number; lastUsedAt: number }>;
   lastVisitDate: string | null;
 }
 
-/** Stable selector for the current (top) node ID. */
+/** Stable selector for the active panel's current node ID. */
 export const selectCurrentNodeId = (s: UIStore): string | null =>
-  s.panelHistory[s.panelIndex] ?? null;
+  s.panels.find((p) => p.id === s.activePanelId)?.nodeId ?? null;
 
 export function partializeUIStore(state: UIStore): PersistedUIStoreState {
   return {
-    panelHistory: state.panelHistory,
-    panelIndex: state.panelIndex,
+    panels: state.panels,
+    activePanelId: state.activePanelId,
     expandedNodes: state.expandedNodes,
     viewMode: state.viewMode,
     paletteUsage: state.paletteUsage,
@@ -180,103 +181,167 @@ function hasBackingNode(nodeId: string): boolean {
   }
 }
 
+/** Fields to clear on any panel navigation (navigate / back / forward / replace). */
+const CLEARED_FOCUS = {
+  focusedNodeId: null as string | null,
+  focusedParentId: null as string | null,
+  selectedNodeId: null as string | null,
+  selectedParentId: null as string | null,
+  selectionSource: null as 'global' | 'ref-click' | null,
+  selectedNodeIds: new Set<string>(),
+  selectionAnchorId: null as string | null,
+  panelTitleVisible: true,
+};
+
 export const useUIStore = create<UIStore>()(
   persist(
     (set) => ({
-      // Navigation history
-      panelHistory: [],
-      panelIndex: -1,
+      // Multi-panel navigation
+      panels: [],
+      activePanelId: '',
+      navHistory: [],
+      navIndex: -1,
+
       navigateTo: (nodeId) =>
         set((s) => {
           if (!hasBackingNode(nodeId)) return {};
-          // Truncate forward history, skip duplicate of current page
-          const newHistory = s.panelHistory.slice(0, s.panelIndex + 1);
-          if (newHistory[newHistory.length - 1] === nodeId) return {};
-          // Push undo snapshot before modifying
+          const panelIdx = s.panels.findIndex((p) => p.id === s.activePanelId);
+          if (panelIdx < 0) return {};
+          const panel = s.panels[panelIdx];
+          if (panel.nodeId === nodeId) return {};
+
           commitUIMarker();
-          const snapshot = { panelHistory: [...s.panelHistory], panelIndex: s.panelIndex };
-          newHistory.push(nodeId);
+
+          // Truncate forward history
+          const newNavHistory = s.navHistory.slice(0, s.navIndex + 1);
+          newNavHistory.push({
+            action: 'navigate',
+            panelId: panel.id,
+            fromNodeId: panel.nodeId,
+            toNodeId: nodeId,
+          });
+
+          const newPanels = [...s.panels];
+          newPanels[panelIdx] = { ...panel, nodeId };
+
           return {
-            panelHistory: newHistory,
-            panelIndex: newHistory.length - 1,
-            navUndoStack: [...s.navUndoStack, snapshot],
-            navRedoStack: [],
-            focusedNodeId: null,
-            focusedParentId: null,
-            selectedNodeId: null,
-            selectedParentId: null,
-            selectionSource: null,
-            selectedNodeIds: new Set(),
-            selectionAnchorId: null,
-            panelTitleVisible: true,
+            panels: newPanels,
+            navHistory: newNavHistory,
+            navIndex: newNavHistory.length - 1,
+            ...CLEARED_FOCUS,
           };
         }),
+
       goBack: () =>
         set((s) => {
-          if (s.panelIndex <= 0) return {};
+          if (s.navIndex < 0) return {};
+          const event = s.navHistory[s.navIndex];
+          if (!event) return {};
+
           commitUIMarker();
-          const snapshot = { panelHistory: [...s.panelHistory], panelIndex: s.panelIndex };
+
+          const newPanels = [...s.panels];
+          let newActivePanelId = s.activePanelId;
+
+          switch (event.action) {
+            case 'navigate': {
+              const idx = newPanels.findIndex((p) => p.id === event.panelId);
+              if (idx < 0) return {}; // Panel no longer exists — skip
+              newPanels[idx] = { ...newPanels[idx], nodeId: event.fromNodeId };
+              newActivePanelId = event.panelId;
+              break;
+            }
+            case 'open-panel': {
+              // Undo opening = close the panel
+              const idx = newPanels.findIndex((p) => p.id === event.panelId);
+              if (idx >= 0) newPanels.splice(idx, 1);
+              newActivePanelId = event.prevActivePanelId;
+              if (!newPanels.some((p) => p.id === newActivePanelId) && newPanels.length > 0) {
+                newActivePanelId = newPanels[0].id;
+              }
+              break;
+            }
+            case 'close-panel': {
+              // Undo closing = reopen from snapshot
+              const insertAt = Math.min(event.insertIndex, newPanels.length);
+              newPanels.splice(insertAt, 0, { ...event.snapshot });
+              newActivePanelId = event.snapshot.id;
+              break;
+            }
+          }
+
           return {
-            panelIndex: s.panelIndex - 1,
-            navUndoStack: [...s.navUndoStack, snapshot],
-            navRedoStack: [],
-            focusedNodeId: null,
-            focusedParentId: null,
-            selectedNodeId: null,
-            selectedParentId: null,
-            selectionSource: null,
-            selectedNodeIds: new Set(),
-            selectionAnchorId: null,
-            panelTitleVisible: true,
+            panels: newPanels,
+            activePanelId: newActivePanelId,
+            navIndex: s.navIndex - 1,
+            ...CLEARED_FOCUS,
           };
         }),
+
       goForward: () =>
         set((s) => {
-          if (s.panelIndex >= s.panelHistory.length - 1) return {};
+          if (s.navIndex >= s.navHistory.length - 1) return {};
+          const newNavIndex = s.navIndex + 1;
+          const event = s.navHistory[newNavIndex];
+          if (!event) return {};
+
           commitUIMarker();
-          const snapshot = { panelHistory: [...s.panelHistory], panelIndex: s.panelIndex };
+
+          const newPanels = [...s.panels];
+          let newActivePanelId = s.activePanelId;
+
+          switch (event.action) {
+            case 'navigate': {
+              const idx = newPanels.findIndex((p) => p.id === event.panelId);
+              if (idx < 0) return {}; // Panel no longer exists — skip
+              newPanels[idx] = { ...newPanels[idx], nodeId: event.toNodeId };
+              newActivePanelId = event.panelId;
+              break;
+            }
+            case 'open-panel': {
+              // Redo opening = re-insert the panel
+              const insertAt = Math.min(event.insertIndex, newPanels.length);
+              newPanels.splice(insertAt, 0, { id: event.panelId, nodeId: event.nodeId });
+              newActivePanelId = event.panelId;
+              break;
+            }
+            case 'close-panel': {
+              // Redo closing = close the panel again
+              const idx = newPanels.findIndex((p) => p.id === event.panelId);
+              if (idx >= 0) newPanels.splice(idx, 1);
+              newActivePanelId = event.nextActivePanelId;
+              if (!newPanels.some((p) => p.id === newActivePanelId) && newPanels.length > 0) {
+                newActivePanelId = newPanels[0].id;
+              }
+              break;
+            }
+          }
+
           return {
-            panelIndex: s.panelIndex + 1,
-            navUndoStack: [...s.navUndoStack, snapshot],
-            navRedoStack: [],
-            focusedNodeId: null,
-            focusedParentId: null,
-            selectedNodeId: null,
-            selectedParentId: null,
-            selectionSource: null,
-            selectedNodeIds: new Set(),
-            selectionAnchorId: null,
-            panelTitleVisible: true,
+            panels: newPanels,
+            activePanelId: newActivePanelId,
+            navIndex: newNavIndex,
+            ...CLEARED_FOCUS,
           };
         }),
+
       replacePanel: (nodeId) =>
         set((s) => {
           if (!hasBackingNode(nodeId)) return {};
-          if (s.panelHistory.length === 0) {
+          if (s.panels.length === 0) {
             return {
-              panelHistory: [nodeId],
-              panelIndex: 0,
-              focusedNodeId: null,
-              focusedParentId: null,
-              selectedNodeId: null,
-              selectedParentId: null,
-              selectionSource: null,
-              selectedNodeIds: new Set(),
-              selectionAnchorId: null,
+              panels: [{ id: 'main', nodeId }],
+              activePanelId: 'main',
+              ...CLEARED_FOCUS,
             };
           }
-          const next = [...s.panelHistory];
-          next[s.panelIndex] = nodeId;
+          const panelIdx = s.panels.findIndex((p) => p.id === s.activePanelId);
+          if (panelIdx < 0) return {};
+          const newPanels = [...s.panels];
+          newPanels[panelIdx] = { ...newPanels[panelIdx], nodeId };
           return {
-            panelHistory: next,
-            focusedNodeId: null,
-            focusedParentId: null,
-            selectedNodeId: null,
-            selectedParentId: null,
-            selectionSource: null,
-            selectedNodeIds: new Set(),
-            selectionAnchorId: null,
-            panelTitleVisible: true,
+            panels: newPanels,
+            ...CLEARED_FOCUS,
           };
         }),
 
@@ -439,35 +504,6 @@ export const useUIStore = create<UIStore>()(
         }),
       clearExpandedHiddenFields: () => set({ expandedHiddenFields: new Set<string>() }),
 
-      // Navigation undo/redo (session-only)
-      navUndoStack: [],
-      navRedoStack: [],
-      navUndo: () =>
-        set((s) => {
-          if (s.navUndoStack.length === 0) return {};
-          const prev = s.navUndoStack[s.navUndoStack.length - 1];
-          const currentSnapshot = { panelHistory: [...s.panelHistory], panelIndex: s.panelIndex };
-          return {
-            panelHistory: prev.panelHistory,
-            panelIndex: prev.panelIndex,
-            navUndoStack: s.navUndoStack.slice(0, -1),
-            navRedoStack: [...s.navRedoStack, currentSnapshot],
-          };
-        }),
-      navRedo: () =>
-        set((s) => {
-          if (s.navRedoStack.length === 0) return {};
-          const next = s.navRedoStack[s.navRedoStack.length - 1];
-          const currentSnapshot = { panelHistory: [...s.panelHistory], panelIndex: s.panelIndex };
-          return {
-            panelHistory: next.panelHistory,
-            panelIndex: next.panelIndex,
-            navUndoStack: [...s.navUndoStack, currentSnapshot],
-            navRedoStack: s.navRedoStack.slice(0, -1),
-            panelTitleVisible: true,
-          };
-        }),
-
       // Panel title visibility
       panelTitleVisible: true,
       setPanelTitleVisible: (visible) => set({ panelTitleVisible: visible }),
@@ -515,13 +551,47 @@ export const useUIStore = create<UIStore>()(
     }),
     {
       name: 'nodex-ui',
-      version: 3,
+      version: 4,
       storage: chromeLocalStorage,
       partialize: partializeUIStore,
+      migrate: (persisted: unknown, version: number) => {
+        const state = persisted as Record<string, unknown>;
+        if (version < 4) {
+          // v3→v4: panelHistory/panelIndex → panels/activePanelId
+          const panelHistory = (state.panelHistory as string[] | undefined) ?? [];
+          const panelIndex = (state.panelIndex as number | undefined) ?? -1;
+          const currentNodeId = panelHistory[panelIndex] ?? '';
+
+          state.panels = currentNodeId ? [{ id: 'main', nodeId: currentNodeId }] : [];
+          state.activePanelId = 'main';
+          delete state.panelHistory;
+          delete state.panelIndex;
+        }
+        return state;
+      },
     },
   ),
 );
 
+// ── Loro undo/redo UI state capture ──
+
+interface UndoUISnapshotV2 {
+  v: 2;
+  panels: Panel[];
+  activePanelId: string;
+  expandedNodes: string[];
+}
+
+function isUndoUISnapshotV2(value: unknown): value is UndoUISnapshotV2 {
+  if (!value || typeof value !== 'object') return false;
+  const v = value as Partial<UndoUISnapshotV2>;
+  return v.v === 2
+    && Array.isArray(v.panels)
+    && typeof v.activePanelId === 'string'
+    && Array.isArray(v.expandedNodes);
+}
+
+// Also accept v1 snapshots from before the migration (graceful upgrade)
 interface UndoUISnapshotV1 {
   v: 1;
   panelHistory: string[];
@@ -542,25 +612,32 @@ registerUndoUICallbacks({
   capture: () => {
     const s = useUIStore.getState();
     return {
-      v: 1,
-      panelHistory: [...s.panelHistory],
-      panelIndex: s.panelIndex,
+      v: 2,
+      panels: s.panels.map((p) => ({ ...p })),
+      activePanelId: s.activePanelId,
       expandedNodes: [...s.expandedNodes],
-    } satisfies UndoUISnapshotV1;
+    } satisfies UndoUISnapshotV2;
   },
   restore: (meta) => {
-    if (!isUndoUISnapshotV1(meta)) {
-      if (import.meta.env.DEV) {
-        console.warn('[undo-ui] type guard failed, received:', meta);
-      }
-      return;
+    if (isUndoUISnapshotV2(meta)) {
+      if (meta.panels.length === 0) return;
+      useUIStore.setState({
+        panels: meta.panels.map((p) => ({ ...p })),
+        activePanelId: meta.activePanelId,
+        expandedNodes: new Set(meta.expandedNodes),
+      });
+    } else if (isUndoUISnapshotV1(meta)) {
+      // Graceful upgrade: convert v1 snapshot to new panel model
+      if (meta.panelHistory.length === 0) return;
+      const nodeId = meta.panelHistory[meta.panelIndex] ?? meta.panelHistory[0];
+      if (!nodeId) return;
+      useUIStore.setState({
+        panels: [{ id: 'main', nodeId }],
+        activePanelId: 'main',
+        expandedNodes: new Set(meta.expandedNodes),
+      });
+    } else if (import.meta.env.DEV) {
+      console.warn('[undo-ui] type guard failed, received:', meta);
     }
-    // Defensive: never restore an empty panel stack (bootstrap artifact).
-    if (meta.panelHistory.length === 0) return;
-    useUIStore.setState({
-      panelHistory: [...meta.panelHistory],
-      panelIndex: meta.panelIndex,
-      expandedNodes: new Set(meta.expandedNodes),
-    });
   },
 });

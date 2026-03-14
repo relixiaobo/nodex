@@ -401,6 +401,25 @@ export function isAppPanel(panelId: string): panelId is AppPanelId {
 }
 
 // ============================================================
+// Multi-Panel 导航类型
+// ============================================================
+
+/** A single panel displaying a node (or app page). */
+export interface Panel {
+  id: string;
+  nodeId: string;
+}
+
+/**
+ * Global navigation event — forms a single undo/redo timeline.
+ * Chat events are excluded (Chat is desk-layer, not navigation).
+ */
+export type NavigationEvent =
+  | { action: 'navigate'; panelId: string; fromNodeId: string; toNodeId: string }
+  | { action: 'open-panel'; panelId: string; nodeId: string; insertIndex: number; prevActivePanelId: string }
+  | { action: 'close-panel'; panelId: string; snapshot: Panel; insertIndex: number; nextActivePanelId: string };
+
+// ============================================================
 // 编辑者信息（保留类型，实际数据 Phase 2 用 Loro PeerID 替代）
 // ============================================================
 

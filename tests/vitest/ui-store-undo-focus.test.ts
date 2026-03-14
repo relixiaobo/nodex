@@ -2,37 +2,43 @@ import { ensureTodayNode } from '../../src/lib/journal.js';
 import { useUIStore } from '../../src/stores/ui-store.js';
 import { resetAndSeed } from './helpers/test-state.js';
 
-describe('ui-store undo/redo + focus/selection semantics', () => {
+/** Helper: get current active panel node ID */
+function currentNodeId(): string | null {
+  const s = useUIStore.getState();
+  return s.panels.find((p) => p.id === s.activePanelId)?.nodeId ?? null;
+}
+
+describe('ui-store navigation + focus/selection semantics', () => {
   beforeEach(() => {
     resetAndSeed();
   });
 
-  it('supports navUndo/navRedo and clears redo after new navigation', () => {
+  it('supports goBack/goForward via navHistory and truncates forward on new navigation', () => {
     const ui = useUIStore.getState();
     const todayId = ensureTodayNode();
 
     // Seed starts at Today panel.
-    expect(useUIStore.getState().panelHistory[useUIStore.getState().panelIndex]).toBe(todayId);
+    expect(currentNodeId()).toBe(todayId);
 
     ui.navigateTo('note_2');
     ui.navigateTo('task_1');
-    expect(useUIStore.getState().panelHistory[useUIStore.getState().panelIndex]).toBe('task_1');
+    expect(currentNodeId()).toBe('task_1');
 
-    ui.navUndo();
-    expect(useUIStore.getState().panelHistory[useUIStore.getState().panelIndex]).toBe('note_2');
+    ui.goBack();
+    expect(currentNodeId()).toBe('note_2');
 
-    ui.navUndo();
-    expect(useUIStore.getState().panelHistory[useUIStore.getState().panelIndex]).toBe(todayId);
+    ui.goBack();
+    expect(currentNodeId()).toBe(todayId);
 
-    ui.navRedo();
-    expect(useUIStore.getState().panelHistory[useUIStore.getState().panelIndex]).toBe('note_2');
+    ui.goForward();
+    expect(currentNodeId()).toBe('note_2');
 
-    // A fresh navigation should clear redo stack.
+    // A fresh navigation should truncate forward history.
     ui.navigateTo('inbox_3');
-    const beforeRedoIndex = useUIStore.getState().panelIndex;
-    ui.navRedo();
-    expect(useUIStore.getState().panelIndex).toBe(beforeRedoIndex);
-    expect(useUIStore.getState().panelHistory[useUIStore.getState().panelIndex]).toBe('inbox_3');
+    const beforeForwardIndex = useUIStore.getState().navIndex;
+    ui.goForward();
+    expect(useUIStore.getState().navIndex).toBe(beforeForwardIndex);
+    expect(currentNodeId()).toBe('inbox_3');
   });
 
   it('keeps focus/selection mutually exclusive and preserves parent disambiguation', () => {

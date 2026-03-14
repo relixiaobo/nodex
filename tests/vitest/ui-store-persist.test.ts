@@ -6,8 +6,8 @@ describe('ui-store persistence helpers', () => {
   it('partialize keeps only persisted keys', () => {
     const expanded = new Set<string>(['a:b']);
     const result = partializeUIStore({
-      panelHistory: ['library', 'note_1'],
-      panelIndex: 1,
+      panels: [{ id: 'main', nodeId: 'note_1' }],
+      activePanelId: 'main',
       expandedNodes: expanded,
       viewMode: 'cards',
       searchOpen: true,
@@ -17,8 +17,8 @@ describe('ui-store persistence helpers', () => {
     } as never);
 
     expect(result).toEqual({
-      panelHistory: ['library', 'note_1'],
-      panelIndex: 1,
+      panels: [{ id: 'main', nodeId: 'note_1' }],
+      activePanelId: 'main',
       expandedNodes: expanded,
       viewMode: 'cards',
       paletteUsage: undefined,
@@ -26,15 +26,15 @@ describe('ui-store persistence helpers', () => {
     });
   });
 
-  it('keeps current persisted shape for panel history fields', () => {
+  it('keeps current persisted shape for panel fields', () => {
     const persisted = partializeUIStore({
-      panelHistory: ['LIBRARY'],
-      panelIndex: 0,
+      panels: [{ id: 'main', nodeId: 'LIBRARY' }],
+      activePanelId: 'main',
       expandedNodes: new Set<string>(),
       viewMode: 'list',
     } as never);
 
-    expect(persisted.panelHistory).toEqual(['LIBRARY']);
-    expect(persisted.panelIndex).toBe(0);
+    expect(persisted.panels).toEqual([{ id: 'main', nodeId: 'LIBRARY' }]);
+    expect(persisted.activePanelId).toBe('main');
   });
 });

@@ -6,6 +6,8 @@ export type {
   DoneMappingEntry,
   NodexNode,
   AppPanelId,
+  Panel,
+  NavigationEvent,
   Editor,
   CreateNodeInput,
   UpdateNodeInput,

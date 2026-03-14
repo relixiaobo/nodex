@@ -15,8 +15,8 @@ const btnClass =
   'flex h-7 w-7 items-center justify-center rounded-full text-foreground-tertiary transition-colors hover:bg-foreground/4 hover:text-foreground-secondary disabled:pointer-events-none disabled:opacity-40';
 
 export function NavButtons() {
-  const canGoBack = useUIStore((s) => s.panelIndex > 0);
-  const canGoForward = useUIStore((s) => s.panelIndex < s.panelHistory.length - 1);
+  const canGoBack = useUIStore((s) => s.navIndex >= 0);
+  const canGoForward = useUIStore((s) => s.navIndex < s.navHistory.length - 1);
 
   const goBack = useUIStore((s) => s.goBack);
   const goForward = useUIStore((s) => s.goForward);

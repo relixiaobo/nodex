@@ -66,8 +66,8 @@ describe('palette usage tracking (ui-store)', () => {
   it('paletteUsage is included in partializeUIStore', () => {
     const usage = { node_1: { count: 3, lastUsedAt: 1000 } };
     const result = partializeUIStore({
-      panelHistory: [],
-      panelIndex: -1,
+      panels: [],
+      activePanelId: '',
       expandedNodes: new Set<string>(),
       viewMode: 'list',
       paletteUsage: usage,

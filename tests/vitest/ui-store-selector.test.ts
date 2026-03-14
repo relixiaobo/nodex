@@ -1,27 +1,31 @@
 import { selectCurrentNodeId } from '../../src/stores/ui-store.js';
 
 describe('ui-store selectors', () => {
-  it('returns null when panel index is out of range', () => {
+  it('returns null when no panel matches activePanelId', () => {
     expect(
       selectCurrentNodeId({
-        panelHistory: [],
-        panelIndex: -1,
+        panels: [],
+        activePanelId: '',
       } as never),
     ).toBeNull();
 
     expect(
       selectCurrentNodeId({
-        panelHistory: ['a'],
-        panelIndex: 5,
+        panels: [{ id: 'main', nodeId: 'a' }],
+        activePanelId: 'missing',
       } as never),
     ).toBeNull();
   });
 
-  it('returns current node id by panel index', () => {
+  it('returns current node id by active panel', () => {
     expect(
       selectCurrentNodeId({
-        panelHistory: ['library', 'note_1', 'task_2'],
-        panelIndex: 1,
+        panels: [
+          { id: 'p1', nodeId: 'library' },
+          { id: 'p2', nodeId: 'note_1' },
+          { id: 'p3', nodeId: 'task_2' },
+        ],
+        activePanelId: 'p2',
       } as never),
     ).toBe('note_1');
   });

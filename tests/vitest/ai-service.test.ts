@@ -209,6 +209,24 @@ describe('ai-service', () => {
     ]);
   });
 
+  it('restoreLatestChatSession hydrates prompt and tools for debug inspection', async () => {
+    const { createAgent, restoreLatestChatSession } = await import('../../src/lib/ai-service.js');
+    const agent = createAgent();
+
+    await restoreLatestChatSession(agent);
+
+    expect(agent.state.systemPrompt).toContain('You are soma');
+    expect(agent.state.tools.map((tool) => tool.name)).toEqual([
+      'node_create',
+      'node_read',
+      'node_edit',
+      'node_delete',
+      'node_search',
+      'undo',
+      'browser',
+    ]);
+  });
+
   it('streamChat trims input and stopStreaming aborts the agent', async () => {
     const { streamChat, stopStreaming } = await import('../../src/lib/ai-service.js');
 

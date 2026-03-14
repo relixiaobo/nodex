@@ -181,17 +181,78 @@ function hasBackingNode(nodeId: string): boolean {
   }
 }
 
-/** Fields to clear on any panel navigation (navigate / back / forward / replace). */
-const CLEARED_FOCUS = {
-  focusedNodeId: null as string | null,
-  focusedParentId: null as string | null,
-  selectedNodeId: null as string | null,
-  selectedParentId: null as string | null,
-  selectionSource: null as 'global' | 'ref-click' | null,
-  selectedNodeIds: new Set<string>(),
-  selectionAnchorId: null as string | null,
-  panelTitleVisible: true,
-};
+/** Fresh focus/selection reset fields — must be a function so each call gets its own Set instance. */
+function clearedFocus() {
+  return {
+    focusedNodeId: null as string | null,
+    focusedParentId: null as string | null,
+    selectedNodeId: null as string | null,
+    selectedParentId: null as string | null,
+    selectionSource: null as 'global' | 'ref-click' | null,
+    selectedNodeIds: new Set<string>(),
+    selectionAnchorId: null as string | null,
+    panelTitleVisible: true,
+  };
+}
+
+/**
+ * Apply a NavigationEvent in the given direction (back = undo, forward = redo).
+ * Returns the new panels + activePanelId, or null if the event can't be applied
+ * (e.g. target panel no longer exists).
+ */
+function applyNavEvent(
+  panels: Panel[],
+  event: NavigationEvent,
+  direction: 'back' | 'forward',
+): { panels: Panel[]; activePanelId: string } | null {
+  const result = [...panels];
+  let activePanelId: string;
+
+  switch (event.action) {
+    case 'navigate': {
+      const idx = result.findIndex((p) => p.id === event.panelId);
+      if (idx < 0) return null;
+      result[idx] = { ...result[idx], nodeId: direction === 'back' ? event.fromNodeId : event.toNodeId };
+      activePanelId = event.panelId;
+      break;
+    }
+    case 'open-panel': {
+      if (direction === 'back') {
+        // Undo opening = close the panel
+        const idx = result.findIndex((p) => p.id === event.panelId);
+        if (idx >= 0) result.splice(idx, 1);
+        activePanelId = event.prevActivePanelId;
+      } else {
+        // Redo opening = re-insert the panel
+        const insertAt = Math.min(event.insertIndex, result.length);
+        result.splice(insertAt, 0, { id: event.panelId, nodeId: event.nodeId });
+        activePanelId = event.panelId;
+      }
+      break;
+    }
+    case 'close-panel': {
+      if (direction === 'back') {
+        // Undo closing = reopen from snapshot
+        const insertAt = Math.min(event.insertIndex, result.length);
+        result.splice(insertAt, 0, { ...event.snapshot });
+        activePanelId = event.snapshot.id;
+      } else {
+        // Redo closing = close the panel again
+        const idx = result.findIndex((p) => p.id === event.panelId);
+        if (idx >= 0) result.splice(idx, 1);
+        activePanelId = event.nextActivePanelId;
+      }
+      break;
+    }
+  }
+
+  // Ensure activePanelId points to an existing panel
+  if (!result.some((p) => p.id === activePanelId) && result.length > 0) {
+    activePanelId = result[0].id;
+  }
+
+  return { panels: result, activePanelId };
+}
 
 export const useUIStore = create<UIStore>()(
   persist(
@@ -228,7 +289,7 @@ export const useUIStore = create<UIStore>()(
             panels: newPanels,
             navHistory: newNavHistory,
             navIndex: newNavHistory.length - 1,
-            ...CLEARED_FOCUS,
+            ...clearedFocus(),
           };
         }),
 
@@ -239,42 +300,13 @@ export const useUIStore = create<UIStore>()(
           if (!event) return {};
 
           commitUIMarker();
-
-          const newPanels = [...s.panels];
-          let newActivePanelId = s.activePanelId;
-
-          switch (event.action) {
-            case 'navigate': {
-              const idx = newPanels.findIndex((p) => p.id === event.panelId);
-              if (idx < 0) return {}; // Panel no longer exists — skip
-              newPanels[idx] = { ...newPanels[idx], nodeId: event.fromNodeId };
-              newActivePanelId = event.panelId;
-              break;
-            }
-            case 'open-panel': {
-              // Undo opening = close the panel
-              const idx = newPanels.findIndex((p) => p.id === event.panelId);
-              if (idx >= 0) newPanels.splice(idx, 1);
-              newActivePanelId = event.prevActivePanelId;
-              if (!newPanels.some((p) => p.id === newActivePanelId) && newPanels.length > 0) {
-                newActivePanelId = newPanels[0].id;
-              }
-              break;
-            }
-            case 'close-panel': {
-              // Undo closing = reopen from snapshot
-              const insertAt = Math.min(event.insertIndex, newPanels.length);
-              newPanels.splice(insertAt, 0, { ...event.snapshot });
-              newActivePanelId = event.snapshot.id;
-              break;
-            }
-          }
+          const applied = applyNavEvent(s.panels, event, 'back');
+          if (!applied) return {};
 
           return {
-            panels: newPanels,
-            activePanelId: newActivePanelId,
+            ...applied,
             navIndex: s.navIndex - 1,
-            ...CLEARED_FOCUS,
+            ...clearedFocus(),
           };
         }),
 
@@ -286,42 +318,13 @@ export const useUIStore = create<UIStore>()(
           if (!event) return {};
 
           commitUIMarker();
-
-          const newPanels = [...s.panels];
-          let newActivePanelId = s.activePanelId;
-
-          switch (event.action) {
-            case 'navigate': {
-              const idx = newPanels.findIndex((p) => p.id === event.panelId);
-              if (idx < 0) return {}; // Panel no longer exists — skip
-              newPanels[idx] = { ...newPanels[idx], nodeId: event.toNodeId };
-              newActivePanelId = event.panelId;
-              break;
-            }
-            case 'open-panel': {
-              // Redo opening = re-insert the panel
-              const insertAt = Math.min(event.insertIndex, newPanels.length);
-              newPanels.splice(insertAt, 0, { id: event.panelId, nodeId: event.nodeId });
-              newActivePanelId = event.panelId;
-              break;
-            }
-            case 'close-panel': {
-              // Redo closing = close the panel again
-              const idx = newPanels.findIndex((p) => p.id === event.panelId);
-              if (idx >= 0) newPanels.splice(idx, 1);
-              newActivePanelId = event.nextActivePanelId;
-              if (!newPanels.some((p) => p.id === newActivePanelId) && newPanels.length > 0) {
-                newActivePanelId = newPanels[0].id;
-              }
-              break;
-            }
-          }
+          const applied = applyNavEvent(s.panels, event, 'forward');
+          if (!applied) return {};
 
           return {
-            panels: newPanels,
-            activePanelId: newActivePanelId,
+            ...applied,
             navIndex: newNavIndex,
-            ...CLEARED_FOCUS,
+            ...clearedFocus(),
           };
         }),
 
@@ -332,7 +335,7 @@ export const useUIStore = create<UIStore>()(
             return {
               panels: [{ id: 'main', nodeId }],
               activePanelId: 'main',
-              ...CLEARED_FOCUS,
+              ...clearedFocus(),
             };
           }
           const panelIdx = s.panels.findIndex((p) => p.id === s.activePanelId);
@@ -341,7 +344,7 @@ export const useUIStore = create<UIStore>()(
           newPanels[panelIdx] = { ...newPanels[panelIdx], nodeId };
           return {
             panels: newPanels,
-            ...CLEARED_FOCUS,
+            ...clearedFocus(),
           };
         }),
 

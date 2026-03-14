@@ -29,6 +29,22 @@ export const AI_AGENT_NODE_IDS = {
   MODEL_VALUE: 'NDX_N23',
   TEMPERATURE_VALUE: 'NDX_N24',
   MAX_TOKENS_VALUE: 'NDX_N25',
+  DEFAULT_SKILL_VALUE: 'NDX_N52',
+} as const;
+
+export const SKILL_NODE_IDS = {
+  REFINE_STRUCTURE: 'NDX_N40',
+  REFINE_STRUCTURE_RULE_1: 'NDX_N41',
+  REFINE_STRUCTURE_RULE_2: 'NDX_N42',
+  REFINE_STRUCTURE_RULE_3: 'NDX_N43',
+  WRITING_ASSISTANT: 'NDX_N44',
+  WRITING_ASSISTANT_RULE_1: 'NDX_N45',
+  WRITING_ASSISTANT_RULE_2: 'NDX_N46',
+  WRITING_ASSISTANT_RULE_3: 'NDX_N47',
+  RESEARCH: 'NDX_N48',
+  RESEARCH_RULE_1: 'NDX_N49',
+  RESEARCH_RULE_2: 'NDX_N50',
+  RESEARCH_RULE_3: 'NDX_N51',
 } as const;
 
 // ─── Spark agent defaults ───
@@ -70,6 +86,16 @@ interface FixedNodePreset {
   parentId: string;
   name?: string;
   data?: Record<string, unknown>;
+}
+
+interface DefaultSkillPreset {
+  id: string;
+  name: string;
+  description: string;
+  rulePresets: ReadonlyArray<{
+    id: string;
+    text: string;
+  }>;
 }
 
 export interface AgentNodeConfig {
@@ -174,6 +200,69 @@ const AGENT_SCHEMA_PRESETS: ReadonlyArray<FixedNodePreset> = [
   },
 ];
 
+const DEFAULT_SKILL_PRESETS: ReadonlyArray<DefaultSkillPreset> = [
+  {
+    id: SKILL_NODE_IDS.REFINE_STRUCTURE,
+    name: 'Refine structure',
+    description: 'Break a complex node into smaller tasks or clearer substructure.',
+    rulePresets: [
+      {
+        id: SKILL_NODE_IDS.REFINE_STRUCTURE_RULE_1,
+        text: 'Clarify the goal before editing: what should stay, what should split, and what should become children.',
+      },
+      {
+        id: SKILL_NODE_IDS.REFINE_STRUCTURE_RULE_2,
+        text: 'Prefer a short parent node plus concrete child nodes over one overloaded paragraph node.',
+      },
+      {
+        id: SKILL_NODE_IDS.REFINE_STRUCTURE_RULE_3,
+        text: 'Preserve the user\'s meaning and wording unless a structural rewrite is explicitly requested.',
+      },
+    ],
+  },
+  {
+    id: SKILL_NODE_IDS.WRITING_ASSISTANT,
+    name: 'Writing assistant',
+    description: 'Rewrite, polish, translate, or change tone while preserving intent.',
+    rulePresets: [
+      {
+        id: SKILL_NODE_IDS.WRITING_ASSISTANT_RULE_1,
+        text: 'Preserve facts, meaning, and uncertainty level unless the user asks for substantive changes.',
+      },
+      {
+        id: SKILL_NODE_IDS.WRITING_ASSISTANT_RULE_2,
+        text: 'Match the requested language, tone, and length; if unspecified, stay close to the original voice.',
+      },
+      {
+        id: SKILL_NODE_IDS.WRITING_ASSISTANT_RULE_3,
+        text: 'Keep proper nouns, references, and formatting stable unless the user asks to adapt them.',
+      },
+    ],
+  },
+  {
+    id: SKILL_NODE_IDS.RESEARCH,
+    name: 'Research',
+    description: 'Collect relevant information, compare evidence, and organize findings.',
+    rulePresets: [
+      {
+        id: SKILL_NODE_IDS.RESEARCH_RULE_1,
+        text: 'Start from the user\'s question and gather only information that helps answer it.',
+      },
+      {
+        id: SKILL_NODE_IDS.RESEARCH_RULE_2,
+        text: 'Separate observed facts from inference, assumptions, and open questions.',
+      },
+      {
+        id: SKILL_NODE_IDS.RESEARCH_RULE_3,
+        text: 'Return findings in a scannable structure with sources or explicit gaps when available.',
+      },
+    ],
+  },
+] as const;
+
+const SKILL_INDEX_READ_INSTRUCTION =
+  "When you need a skill's detailed rules, use node_read to read the skill node's children.";
+
 // ─── Node helpers ───
 
 function ensureNode({ id, parentId, name, data }: FixedNodePreset): void {
@@ -230,6 +319,38 @@ function ensureTargetValue(fieldEntryId: string, valueNodeId: string, targetId: 
     parentId: fieldEntryId,
     data: { targetId },
   });
+}
+
+function ensureSkillNode(skillPreset: DefaultSkillPreset): void {
+  ensureNode({
+    id: skillPreset.id,
+    parentId: SYSTEM_NODE_IDS.SCHEMA,
+    name: skillPreset.name,
+    data: {
+      description: skillPreset.description,
+    },
+  });
+
+  const skillNode = loroDoc.toNodexNode(skillPreset.id);
+  if (!skillNode?.tags.includes(SYS_T.SKILL)) {
+    loroDoc.addTag(skillPreset.id, SYS_T.SKILL);
+  }
+
+  const contentChildren = loroDoc.getChildren(skillPreset.id)
+    .filter((childId) => {
+      const child = loroDoc.toNodexNode(childId);
+      return child != null && isOutlinerContentNodeType(child.type);
+    });
+
+  if (contentChildren.length > 0) return;
+
+  for (const rulePreset of skillPreset.rulePresets) {
+    ensureNode({
+      id: rulePreset.id,
+      parentId: skillPreset.id,
+      name: rulePreset.text,
+    });
+  }
 }
 
 // ─── Bootstrap ───
@@ -299,7 +420,16 @@ export function ensureAgentNode(workspaceId = loroDoc.getCurrentWorkspaceId() ??
     String(DEFAULT_AGENT_MAX_TOKENS),
   );
 
+  for (const skillPreset of DEFAULT_SKILL_PRESETS) {
+    ensureSkillNode(skillPreset);
+  }
+
   ensureFieldEntry(SYSTEM_NODE_IDS.AGENT, AI_AGENT_NODE_IDS.SKILLS_FIELD_ENTRY, NDX_F.AGENT_SKILLS);
+  ensureTargetValue(
+    AI_AGENT_NODE_IDS.SKILLS_FIELD_ENTRY,
+    AI_AGENT_NODE_IDS.DEFAULT_SKILL_VALUE,
+    SKILL_NODE_IDS.REFINE_STRUCTURE,
+  );
 
   return SYSTEM_NODE_IDS.AGENT;
 }
@@ -359,7 +489,7 @@ function readSystemPromptFromChildren(agentNodeId: string): string {
  * Read active skill IDs from the Skills field entry (options_from_supertag).
  * Each value node has a targetId pointing to the selected #skill node.
  */
-function readSkillIds(fieldEntryId: string): string[] {
+export function readSkillIds(fieldEntryId: string): string[] {
   const fieldEntry = loroDoc.toNodexNode(fieldEntryId);
   if (!fieldEntry?.children?.length) return [];
 
@@ -464,26 +594,33 @@ export function readSparkAgentConfig(): AgentNodeConfig {
 
 // ─── Build system prompt ───
 
+function escapeXmlAttribute(value: string): string {
+  return value
+    .replaceAll('&', '&amp;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&apos;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;');
+}
+
 export function buildAgentSystemPrompt(config: AgentNodeConfig = readAgentNodeConfig()): string {
   const sections = [config.systemPrompt.trim()];
 
   if (config.skillIds.length > 0) {
     const skillLines = config.skillIds
-      .map((skillId) => loroDoc.toNodexNode(skillId))
-      .filter((node): node is NonNullable<ReturnType<typeof loroDoc.toNodexNode>> => node !== null)
-      .map((skillNode) => {
-        const ruleLines = loroDoc.getChildren(skillNode.id)
-          .map((childId) => loroDoc.toNodexNode(childId))
-          .filter((node): node is NonNullable<ReturnType<typeof loroDoc.toNodexNode>> => node !== null)
-          .map((node) => (node.name ?? '').trim())
-          .filter(Boolean);
+      .map((skillId) => {
+        const skillNode = loroDoc.toNodexNode(skillId);
+        if (!skillNode) return null;
 
-        if (ruleLines.length === 0) return `<skill name="${skillNode.name ?? skillNode.id}" />`;
-        return `<skill name="${skillNode.name ?? skillNode.id}">\n${ruleLines.map((line) => `- ${line}`).join('\n')}\n</skill>`;
-      });
+        const name = (skillNode.name ?? '').trim() || skillNode.id;
+        const description = (skillNode.description ?? '').trim() || name;
+        return `<skill id="${escapeXmlAttribute(skillNode.id)}" name="${escapeXmlAttribute(name)}" description="${escapeXmlAttribute(description)}" />`;
+      })
+      .filter((line): line is string => line !== null);
 
     if (skillLines.length > 0) {
-      sections.push(`<skill-context>\n${skillLines.join('\n')}\n</skill-context>`);
+      sections.push(`<available-skills>\n${skillLines.join('\n')}\n</available-skills>`);
+      sections.push(SKILL_INDEX_READ_INSTRUCTION);
     }
   }
 

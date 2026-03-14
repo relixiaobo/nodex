@@ -38,3 +38,5 @@
 - 统一剪藏管线：所有剪藏路径（⌘K、/clip、编程式、高亮/笔记）共享同一套处理逻辑，修复 /clip 路径缺失页面内容缓存的问题
 - AI Skill 基础设施：`#skill` 节点 + `<available-skills>` 渐进式披露索引 + 默认 Skill creator 技能（教 AI 帮用户创建新 skill）
 - 修复点击 options 字段引用值（如 Skills 中的技能项）跳转到空白 Untitled 节点的问题（指针节点导航现在统一解析 targetId）
+- 新增 Chat Debug 模式：在 Chat 设置页连点 5 次标题激活，可查看完整 system prompt、动态上下文（panel/page/time）、消息检查器、已注册工具及 token 用量估算
+- Chat UI 视觉打磨：圆角/字号/颜色对齐设计系统，连续同角色消息自动分组（首条显示 sender，组内收紧间距），空态改为引导操作按钮，Chat 背景色略暗于 NodePanel 营造 Z 轴层次

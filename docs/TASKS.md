@@ -22,15 +22,15 @@ _(空)_
 
 | 工作区 | 分支 | 任务 | 状态 |
 |--------|------|------|------|
-| nodex-gemini | gemini/chat-ui-polish | Chat UI 视觉打磨 #135 | 待开始 |
-| nodex-codex | codex/chat-debug-mode | Chat Debug 模式 #136 | 待开始 |
+| nodex-gemini | — | 空闲 | — |
+| nodex-codex | — | 空闲 | — |
 
 ---
 
 ## 进行中
 
-- [ ] **Chat UI 视觉打磨** — 设计系统对齐 + 消息分组 + 空态引导 + Z 轴层次 | Gemini | [#135](https://github.com/relixiaobo/nodex/pull/135)
-- [ ] **Chat Debug 模式** — 隐藏上下文检查器（system prompt / dynamic context / messages / tools / token 估算）| Codex | [#136](https://github.com/relixiaobo/nodex/pull/136)
+- [x] **Chat UI 视觉打磨** — 设计系统对齐 + 消息分组 + 空态引导 + Z 轴层次 | nodex | main
+- [x] **Chat Debug 模式** — 隐藏上下文检查器（system prompt / dynamic context / messages / tools / token 估算）| Codex | [#136](https://github.com/relixiaobo/nodex/pull/136)
 
 ---
 
@@ -191,6 +191,8 @@ _(空)_
 
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
+| 2026-03-14 | Chat UI 视觉打磨 — 设计系统对齐 + 消息分组 + 空态引导按钮 + Z 轴层次 | nodex | main |
+| 2026-03-14 | Chat Debug 模式 — 隐藏上下文检查器（system prompt / dynamic context / messages / tools / token 估算）| codex | #136 |
 | 2026-03-14 | Skill 重设计 — 删除 3 个 generic skill，新增 Skill creator + 修复 options value 导航 | nodex | main |
 | 2026-03-14 | #skill 基础设施 + 渐进式披露 — `<available-skills>` 索引 + 测试 | codex | #134 |
 | 2026-03-14 | Spark 交互优化 + clip 管线统一 — 三态 #spark 节点 + `applyClipData()` 共享管线 + API 简化 + commit origin 修正 | nodex | main |

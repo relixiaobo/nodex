@@ -1,11 +1,8 @@
 /**
- * Top toolbar — replaces the Sidebar as the primary navigation chrome.
+ * Top toolbar components — split into two layers:
  *
- * Layout: [←][→]  [🔍 Search...  ⌘K]  [👤]
- *
- * - Left: Back/Forward navigation (panel history)
- * - Center: SearchTrigger (fake input, opens CommandPalette)
- * - Right: UserMenu avatar (with sync badge)
+ * - PanelTab: Breadcrumb (inside the NodePanel card)
+ * - GlobalTools: Navigation + search + user menu (can be inside card or on desk layer)
  */
 import { NavButtons } from './NavButtons';
 import { SearchTrigger } from './SearchTrigger';
@@ -13,25 +10,25 @@ import { ToolbarUserMenu } from './ToolbarUserMenu';
 import { Breadcrumb } from '../panel/Breadcrumb';
 import { useUIStore, selectCurrentNodeId } from '../../stores/ui-store';
 
-export function TopToolbar() {
+/** Breadcrumb content for the NodePanel card header. */
+export function PanelTab() {
   const currentNodeId = useUIStore(selectCurrentNodeId);
   const panelTitleVisible = useUIStore((s) => s.panelTitleVisible);
 
   return (
-    <div className="absolute top-0 left-0 right-0 h-[48px] z-50 bg-background/85 backdrop-blur-md flex items-center justify-between px-4 pb-1">
-      {/* Region A: Current Context (Breadcrumbs)
-          - Left aligned */}
-      <div className="flex flex-1 min-w-0 items-center -ml-4">
-        {currentNodeId && <Breadcrumb nodeId={currentNodeId} showCurrentName={!panelTitleVisible} compact />}
-      </div>
+    <div className="flex flex-1 min-w-0 items-center">
+      {currentNodeId && <Breadcrumb nodeId={currentNodeId} showCurrentName={!panelTitleVisible} compact />}
+    </div>
+  );
+}
 
-      {/* Region B: Global Tools (Back/Forward, Search, User)
-          - Right aligned */}
-      <div className="flex shrink-0 items-center gap-1 text-foreground-tertiary">
-        <NavButtons />
-        <SearchTrigger />
-        <ToolbarUserMenu />
-      </div>
+/** Global tools — back/forward, search, user menu. */
+export function GlobalTools() {
+  return (
+    <div className="flex shrink-0 items-center gap-1 px-2 h-10 text-foreground-tertiary">
+      <NavButtons />
+      <SearchTrigger />
+      <ToolbarUserMenu />
     </div>
   );
 }

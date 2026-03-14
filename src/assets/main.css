@@ -80,6 +80,32 @@
     0 12px 20px -4px rgba(0, 0, 0, 0.04);
 }
 
+/* Panel right-edge shadow — NodePanel (paper) casts shadow onto the
+   Chat surface (desk) to create Z-axis layering. */
+.shadow-panel-right {
+  box-shadow:
+    2px 0 4px -1px rgba(0, 0, 0, 0.06),
+    6px 0 16px -4px rgba(0, 0, 0, 0.06);
+}
+
+/* Concave corner at the breadcrumb tab's bottom-right edge.
+   Creates a smooth inner curve connecting the tab to the desk area,
+   mimicking the Chrome tab bar connector. */
+.tab-connector-right {
+  position: relative;
+}
+.tab-connector-right::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  right: calc(-1 * var(--radius-xl));
+  width: var(--radius-xl);
+  height: var(--radius-xl);
+  background: transparent;
+  border-bottom-left-radius: var(--radius-xl);
+  box-shadow: calc(-0.5 * var(--radius-xl)) 0 0 0 var(--color-background);
+}
+
 /* Reference single-click selection: compact frame rendered as overlay.
    Important: use pseudo-element instead of border/padding on layout box,
    so selected/unselected states keep identical row height (no visual jump). */

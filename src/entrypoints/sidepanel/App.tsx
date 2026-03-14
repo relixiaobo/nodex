@@ -1,4 +1,4 @@
-import { Component, Suspense, lazy, useEffect, useRef, useState, type ReactNode } from 'react';
+import { Component, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useWorkspaceStore } from '../../stores/workspace-store';
 import { useNodeStore } from '../../stores/node-store';
 import { useUIStore } from '../../stores/ui-store';
@@ -6,8 +6,7 @@ import { useNavUndoKeyboard } from '../../hooks/use-nav-undo-keyboard';
 import { useChatShortcut } from '../../hooks/use-chat-shortcut.js';
 import { useTodayShortcut } from '../../hooks/use-today-shortcut';
 import { useGlobalSelectionDismiss } from '../../hooks/use-global-selection-dismiss.js';
-import { TopToolbar } from '../../components/toolbar/TopToolbar';
-import { PanelStack } from '../../components/panel/PanelStack';
+import { DeskLayout } from '../../components/layout/DeskLayout.js';
 import { CommandPalette } from '../../components/search/CommandPalette';
 import { BatchTagSelector } from '../../components/tags/BatchTagSelector';
 import { initLoroDoc } from '../../lib/loro-doc.js';
@@ -49,10 +48,6 @@ import {
 import { ensureSystemNodes } from '../../lib/bootstrap-system-nodes.js';
 import { Toaster, toast } from 'sonner';
 import { TooltipProvider } from '../../components/ui/Tooltip';
-
-const ChatDrawer = lazy(async () => ({
-  default: (await import('../../components/chat/ChatDrawer')).ChatDrawer,
-}));
 
 // ─── Error Boundary ───
 // Prevents white screen — catches render errors and shows a recovery UI.
@@ -257,7 +252,6 @@ interface AppProps {
 export function App({ skipBootstrap = false }: AppProps) {
  const { ready } = useBootstrap(skipBootstrap);
  const selectionDismissHandlers = useGlobalSelectionDismiss();
- const chatOpen = useUIStore((s) => s.chatOpen);
 
  useEffect(() => {
   if (!ready) return;
@@ -458,25 +452,11 @@ export function App({ skipBootstrap = false }: AppProps) {
   <ErrorBoundary>
    <TooltipProvider>
     <div
-     className="flex h-screen w-full flex-col overflow-hidden bg-background text-foreground"
+     className="flex h-screen w-full flex-col overflow-hidden bg-background-recessed text-foreground"
      onPointerDownCapture={selectionDismissHandlers.onPointerDownCapture}
      onFocusCapture={selectionDismissHandlers.onFocusCapture}
     >
-     <TopToolbar />
-     <div className="relative flex flex-1 overflow-hidden">
-      <PanelStack />
-      {chatOpen && (
-       <Suspense
-        fallback={(
-         <div className="absolute inset-x-0 bottom-0 z-[60] flex h-24 items-center justify-center rounded-t-[20px] border-t border-border bg-background text-sm text-foreground-tertiary shadow-paper">
-          Loading chat…
-         </div>
-        )}
-       >
-        <ChatDrawer />
-       </Suspense>
-      )}
-     </div>
+     <DeskLayout />
      <CommandPalette />
      <BatchTagSelector />
      <Toaster

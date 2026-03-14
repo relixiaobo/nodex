@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { ExternalLink, Plus, Settings, Sparkles, X } from '../../lib/icons.js';
 import { useAgent } from '../../hooks/use-agent.js';
@@ -9,7 +9,6 @@ import { ChatDebugPanel } from './ChatDebugPanel.js';
 import { ChatInput } from './ChatInput.js';
 import { ChatMessage } from './ChatMessage.js';
 
-const WIDE_LAYOUT_MIN_WIDTH = 500;
 const HEADER_ICON_BUTTON = 'inline-flex h-7 w-7 items-center justify-center rounded-full text-foreground-tertiary transition-colors hover:bg-foreground/4 hover:text-foreground';
 
 function maskApiKey(apiKey: string): string {
@@ -25,7 +24,6 @@ export function ChatDrawer() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const debugTapResetRef = useRef<number | null>(null);
   const debugTapCountRef = useRef(0);
-  const [isWideLayout, setIsWideLayout] = useState(() => window.innerWidth > WIDE_LAYOUT_MIN_WIDTH);
   const [loadingSettings, setLoadingSettings] = useState(true);
   const [showSettings, setShowSettings] = useState(false);
   const [savedKeyMask, setSavedKeyMask] = useState<string | null>(null);
@@ -34,15 +32,6 @@ export function ChatDrawer() {
   const [savingKey, setSavingKey] = useState(false);
   const [debugEnabled, setDebugEnabled] = useState(false);
   const [debugOpen, setDebugOpen] = useState(false);
-
-  useEffect(() => {
-    function handleResize() {
-      setIsWideLayout(window.innerWidth > WIDE_LAYOUT_MIN_WIDTH);
-    }
-
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -163,16 +152,8 @@ export function ChatDrawer() {
     }, 1200);
   }
 
-  const containerClassName = useMemo(() => {
-    if (isWideLayout) {
-      return 'relative z-[60] flex h-full w-[min(40vw,420px)] min-w-[320px] shrink-0 flex-col border-l border-border bg-background-recessed';
-    }
-
-    return 'absolute inset-x-0 bottom-0 z-[60] flex h-[min(68vh,560px)] flex-col rounded-t-[20px] border-t border-border bg-background-recessed shadow-paper';
-  }, [isWideLayout]);
-
   return (
-    <aside className={containerClassName}>
+    <aside className="flex flex-1 flex-col overflow-hidden">
       <div className="flex h-12 items-center justify-between border-b border-border px-3">
         <button
           type="button"

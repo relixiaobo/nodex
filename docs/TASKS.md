@@ -124,8 +124,9 @@ _(空)_
 
 **Track A: Chat**
 
-- [ ] Chat UI 打磨 — 视觉对齐 + 消息分组 + Z 轴层次 (#135, Gemini)
-- [ ] Chat Debug 模式 — 隐藏上下文检查器 (#136, Codex)
+- [x] Chat UI 打磨 — 视觉对齐 + 消息分组 + Z 轴层次 (#135, Gemini → nodex)
+- [x] Chat Debug 模式 — 隐藏上下文检查器 (#136, Codex)
+- [x] Desk/Card 布局 — Z 轴分层 + Chrome-tab + resize handle | nodex | main
 - [ ] Chat 会话同步 — 跨设备同步 Chat 历史（方案待定，见 ai-context-management.md）
 
 **Track B: 阅读环** — 设计：`phase-2-reading-ring.md`
@@ -191,6 +192,7 @@ _(空)_
 
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
+| 2026-03-14 | Desk/Card Z 轴布局 — 桌面/纸张双层 + Chrome-tab 面包屑 + 可拖拽 resize + 设计系统更新 | nodex | main |
 | 2026-03-14 | Chat UI 视觉打磨 — 设计系统对齐 + 消息分组 + 空态引导按钮 + Z 轴层次 | nodex | main |
 | 2026-03-14 | Chat Debug 模式 — 隐藏上下文检查器（system prompt / dynamic context / messages / tools / token 估算）| codex | #136 |
 | 2026-03-14 | Skill 重设计 — 删除 3 个 generic skill，新增 Skill creator + 修复 options value 导航 | nodex | main |

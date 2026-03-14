@@ -40,3 +40,4 @@
 - 修复点击 options 字段引用值（如 Skills 中的技能项）跳转到空白 Untitled 节点的问题（指针节点导航现在统一解析 targetId）
 - 新增 Chat Debug 模式：在 Chat 设置页连点 5 次标题激活，可查看完整 system prompt、动态上下文（panel/page/time）、消息检查器、已注册工具及 token 用量估算
 - Chat UI 视觉打磨：圆角/字号/颜色对齐设计系统，连续同角色消息自动分组（首条显示 sender，组内收紧间距），空态改为引导操作按钮，Chat 背景色略暗于 NodePanel 营造 Z 轴层次
+- 桌面/纸张双层布局：NodePanel 作为浮动卡片（圆角、阴影），Chat 和全局工具在桌面层；窄屏 Chrome-tab 异形面包屑，宽屏完整方形卡片；Chat 面板支持拖拽调整宽度/高度

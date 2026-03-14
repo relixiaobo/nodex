@@ -19,10 +19,6 @@ export function PanelLayout() {
   const setActivePanel = useUIStore((s) => s.setActivePanel);
   const closePanel = useUIStore((s) => s.closePanel);
 
-  const handlePanelClick = useCallback((panelId: string) => {
-    setActivePanel(panelId);
-  }, [setActivePanel]);
-
   const handleClosePanel = useCallback((e: React.MouseEvent, panelId: string) => {
     e.stopPropagation();
     closePanel(panelId);
@@ -49,14 +45,14 @@ export function PanelLayout() {
           <Fragment key={panel.id}>
             {i > 0 && <div className="w-px shrink-0 bg-border-subtle" />}
             <div
-              className={`relative flex flex-1 min-w-0 flex-col overflow-hidden ${
+              className={`group/panel relative flex flex-1 min-w-0 flex-col overflow-hidden ${
                 isActive ? 'border-t-2 border-primary' : 'border-t-2 border-transparent'
               }`}
-              onClick={() => handlePanelClick(panel.id)}
+              onClick={() => setActivePanel(panel.id)}
             >
               {showClose && (
                 <button
-                  className="absolute top-1 right-1 z-10 flex h-5 w-5 items-center justify-center rounded-md text-foreground-tertiary opacity-0 transition-opacity hover:bg-foreground/8 hover:text-foreground group-hover/panel:opacity-100 [div:hover>&]:opacity-100"
+                  className="absolute top-1 right-1 z-10 flex h-5 w-5 items-center justify-center rounded-md text-foreground-tertiary opacity-0 transition-opacity hover:bg-foreground/8 hover:text-foreground group-hover/panel:opacity-100"
                   onClick={(e) => handleClosePanel(e, panel.id)}
                   title="Close panel"
                 >

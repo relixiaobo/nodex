@@ -18,7 +18,7 @@ import { getStoredToken } from './auth.js';
 import { getPageContent } from './ai-shadow-cache.js';
 import { ensureSparkAgentNode, readSparkAgentConfig } from './ai-agent-node.js';
 import * as loroDoc from './loro-doc.js';
-import { AI_COMMIT_ORIGIN, withCommitOrigin, commitDoc } from './loro-doc.js';
+import { withCommitOrigin, commitDoc } from './loro-doc.js';
 import { useNodeStore, applyTagMutationsNoCommit, syncTemplateMutationsNoCommit } from '../stores/node-store.js';
 import { useUIStore } from '../stores/ui-store.js';
 import { NDX_T, NDX_F, SYSTEM_NODE_IDS } from '../types/index.js';
@@ -212,7 +212,7 @@ function buildInsightTree(
 
 function buildInsightNodes(sparkNodeId: string, insights: SparkInsight[]): number {
   let count = 0;
-  withCommitOrigin(AI_COMMIT_ORIGIN, () => {
+  withCommitOrigin(SPARK_COMMIT_ORIGIN, () => {
     const store = useNodeStore.getState();
     count = buildInsightTree(store, sparkNodeId, insights);
     commitDoc();
@@ -247,7 +247,7 @@ export function ensureSparkPlaceholder(sourceNodeId: string): string {
   ensureSparkTagDef();
   ensureSparkAgentNode();
 
-  return withCommitOrigin(AI_COMMIT_ORIGIN, () => {
+  return withCommitOrigin(SPARK_COMMIT_ORIGIN, () => {
     const store = useNodeStore.getState();
     const created = store.createChild(sourceNodeId, undefined, { name: 'Spark' }, { commit: false });
     applyTagMutationsNoCommit(created.id, NDX_T.SPARK);
@@ -295,7 +295,7 @@ export async function triggerSparkExtraction(
 
     // Update container name with napkin (extreme one-sentence compression)
     if (response.napkin) {
-      withCommitOrigin(AI_COMMIT_ORIGIN, () => {
+      withCommitOrigin(SPARK_COMMIT_ORIGIN, () => {
         loroDoc.setNodeRichTextContent(sparkNodeId, response.napkin, [], []);
         commitDoc();
       });

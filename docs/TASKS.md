@@ -22,13 +22,15 @@ _(空)_
 
 | 工作区 | 分支 | 任务 | 状态 |
 |--------|------|------|------|
-| _(空)_ | — | — | — |
+| nodex-gemini | gemini/chat-ui-polish | Chat UI 视觉打磨 #135 | 待开始 |
+| nodex-codex | codex/chat-debug-mode | Chat Debug 模式 #136 | 待开始 |
 
 ---
 
 ## 进行中
 
-_(空)_
+- [ ] **Chat UI 视觉打磨** — 设计系统对齐 + 消息分组 + 空态引导 + Z 轴层次 | Gemini | [#135](https://github.com/relixiaobo/nodex/pull/135)
+- [ ] **Chat Debug 模式** — 隐藏上下文检查器（system prompt / dynamic context / messages / tools / token 估算）| Codex | [#136](https://github.com/relixiaobo/nodex/pull/136)
 
 ---
 
@@ -122,8 +124,9 @@ _(空)_
 
 **Track A: Chat**
 
+- [ ] Chat UI 打磨 — 视觉对齐 + 消息分组 + Z 轴层次 (#135, Gemini)
+- [ ] Chat Debug 模式 — 隐藏上下文检查器 (#136, Codex)
 - [ ] Chat 会话同步 — 跨设备同步 Chat 历史（方案待定，见 ai-context-management.md）
-- [ ] Chat UI 打磨 — `docs/plans/ui-chat-panel-redesign.md`
 
 **Track B: 阅读环** — 设计：`phase-2-reading-ring.md`
 

@@ -4,7 +4,7 @@ import type { Message, Model } from '@mariozechner/pi-ai';
 import { nanoid } from 'nanoid';
 import { getStoredToken } from './auth.js';
 import { buildAgentSystemPrompt, DEFAULT_AGENT_MODEL_ID, DEFAULT_AGENT_MAX_TOKENS, DEFAULT_AGENT_SYSTEM_PROMPT, DEFAULT_AGENT_TEMPERATURE, readAgentNodeConfig } from './ai-agent-node.js';
-import { buildSystemReminder, injectReminder, stripOldImages } from './ai-context.js';
+import { prepareAgentContext } from './ai-context.js';
 import { streamProxyWithApiKey } from './ai-proxy.js';
 import { type ChatSession, getLatestChatSession, saveChatSession } from './ai-persistence.js';
 import { getAITools } from './ai-tools/index.js';
@@ -304,11 +304,7 @@ export function createAgent(model: Model<any> = DEFAULT_CHAT_MODEL): Agent {
       const apiKey = await getApiKey();
       return apiKey ?? undefined;
     },
-    transformContext: async (messages) => {
-      const strippedMessages = stripOldImages(messages);
-      const systemReminder = await buildSystemReminder();
-      return injectReminder(strippedMessages, systemReminder);
-    },
+    transformContext: async (messages) => (await prepareAgentContext(messages)).messages,
     convertToLlm: (messages) => messages.filter(isLlmCompatibleMessage),
     streamFn: async (activeModel, context, options = {}) => {
       const authToken = await getStoredToken();

@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import type { AgentDebugState } from '../../hooks/use-agent.js';
-import { collectAgentDebugSnapshot, type AgentDebugSnapshot } from '../../lib/ai-debug.js';
+import type { AgentDebugSnapshot } from '../../lib/ai-debug.js';
+import { useChatDebugSnapshot } from '../../hooks/use-chat-debug-snapshot.js';
 import { ChevronDown } from '../../lib/icons.js';
-import { useUIStore } from '../../stores/ui-store.js';
 
 type SectionKey = 'system' | 'context' | 'messages' | 'tools' | 'tokens';
 
@@ -81,54 +81,10 @@ function DebugSection({
 }
 
 export function ChatDebugPanel({ debug }: ChatDebugPanelProps) {
-  const panelHistory = useUIStore((state) => state.panelHistory);
-  const panelIndex = useUIStore((state) => state.panelIndex);
   const [expandedSections, setExpandedSections] = useState(DEFAULT_SECTION_STATE);
   const [expandedMessages, setExpandedMessages] = useState<Record<string, boolean>>({});
   const [expandedTools, setExpandedTools] = useState<Record<string, boolean>>({});
-  const [tabRefreshVersion, setTabRefreshVersion] = useState(0);
-  const [snapshot, setSnapshot] = useState<AgentDebugSnapshot | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    function handleTabRefresh() {
-      setTabRefreshVersion((value) => value + 1);
-    }
-
-    window.addEventListener('focus', handleTabRefresh);
-
-    if (typeof chrome !== 'undefined' && chrome.tabs) {
-      chrome.tabs.onActivated?.addListener(handleTabRefresh);
-      chrome.tabs.onUpdated?.addListener(handleTabRefresh);
-    }
-
-    return () => {
-      window.removeEventListener('focus', handleTabRefresh);
-      if (typeof chrome !== 'undefined' && chrome.tabs) {
-        chrome.tabs.onActivated?.removeListener(handleTabRefresh);
-        chrome.tabs.onUpdated?.removeListener(handleTabRefresh);
-      }
-    };
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    void collectAgentDebugSnapshot(debug)
-      .then((nextSnapshot) => {
-        if (cancelled) return;
-        setSnapshot(nextSnapshot);
-        setError(null);
-      })
-      .catch((loadError) => {
-        if (cancelled) return;
-        setError(loadError instanceof Error ? loadError.message : String(loadError));
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [debug, panelHistory, panelIndex, tabRefreshVersion]);
+  const { snapshot, error, loading } = useChatDebugSnapshot(debug);
 
   function toggleSection(section: SectionKey) {
     setExpandedSections((current) => ({
@@ -151,7 +107,7 @@ export function ChatDebugPanel({ debug }: ChatDebugPanelProps) {
     }));
   }
 
-  if (!snapshot && !error) {
+  if (loading) {
     return (
       <div className="rounded-2xl border border-border bg-foreground/[0.02] px-3 py-3 font-mono text-[10px] text-foreground-tertiary">
         Loading debug context…

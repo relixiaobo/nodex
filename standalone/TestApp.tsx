@@ -10,7 +10,7 @@ import { useNodeStore } from '../src/stores/node-store';
 import { useNavUndoKeyboard } from '../src/hooks/use-nav-undo-keyboard';
 import { useGlobalSelectionDismiss } from '../src/hooks/use-global-selection-dismiss.js';
 import { TopToolbar } from '../src/components/toolbar/TopToolbar';
-import { PanelStack } from '../src/components/panel/PanelStack';
+import { PanelLayout } from '../src/components/panel/PanelLayout';
 import { CommandPalette } from '../src/components/search/CommandPalette';
 import { BatchTagSelector } from '../src/components/tags/BatchTagSelector';
 import { seedTestData } from '../src/entrypoints/test/seed-data';
@@ -91,7 +91,7 @@ export function TestApp() {
       onFocusCapture={selectionDismissHandlers.onFocusCapture}
     >
       <TopToolbar />
-      <PanelStack />
+      <PanelLayout />
       <CommandPalette />
       <BatchTagSelector />
       {/* Agent badge — only shown with ?badge query param (for multi-agent debugging) */}

@@ -18,9 +18,10 @@ import { getNodeCapabilities, isNodeInTrash } from '../../lib/node-capabilities.
 
 interface NodePanelProps {
   nodeId: string;
+  panelId: string;
 }
 
-export function NodePanel({ nodeId }: NodePanelProps) {
+export function NodePanel({ nodeId, panelId }: NodePanelProps) {
   const node = useNode(nodeId);
   const goBack = useUIStore((s) => s.goBack);
 
@@ -139,15 +140,15 @@ export function NodePanel({ nodeId }: NodePanelProps) {
             }}
           />
         )}
-        <NodeHeader nodeId={nodeId} onTitleRef={handleTitleRef} />
+        <NodeHeader nodeId={nodeId} panelId={panelId} onTitleRef={handleTitleRef} />
         {showDateNav && <DateNavigationBar dayNodeId={nodeId} />}
         {isDefinitionNode && (
           <div className="mb-2 ml-4 px-2">
-            <FieldList nodeId={nodeId} />
+            <FieldList nodeId={nodeId} panelId={panelId} />
           </div>
         )}
         {!isDefinitionNode && node?.type === 'search' && <SearchChipBar searchNodeId={nodeId} />}
-        {!isDefinitionNode && <OutlinerView rootNodeId={nodeId} />}
+        {!isDefinitionNode && <OutlinerView rootNodeId={nodeId} panelId={panelId} />}
         {!isDefinitionNode && <BacklinksSection nodeId={nodeId} />}
 
         {isTrashContainer && trashChildCount > 0 && (

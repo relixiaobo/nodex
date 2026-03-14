@@ -31,7 +31,7 @@ interface UIStore {
   goForward(): void;
   replacePanel(nodeId: string): void;
 
-  // Expand/collapse (keys are compound: "parentId:nodeId" for per-instance state)
+  // Expand/collapse (keys are compound: "panelId:parentId:nodeId" for per-panel per-instance state)
   expandedNodes: Set<string>;
   toggleExpanded(expandKey: string): void;
   setExpanded(expandKey: string, expanded: boolean, skipUndo?: boolean): void;
@@ -554,7 +554,7 @@ export const useUIStore = create<UIStore>()(
     }),
     {
       name: 'nodex-ui',
-      version: 4,
+      version: 5,
       storage: chromeLocalStorage,
       partialize: partializeUIStore,
       migrate: (persisted: unknown, version: number) => {
@@ -569,6 +569,23 @@ export const useUIStore = create<UIStore>()(
           state.activePanelId = 'main';
           delete state.panelHistory;
           delete state.panelIndex;
+        }
+        if (version < 5) {
+          // v4→v5: expandedNodes key format "parentId:nodeId" → "main:parentId:nodeId"
+          const oldNodes = state.expandedNodes as Set<string> | undefined;
+          if (oldNodes && oldNodes instanceof Set) {
+            const migrated = new Set<string>();
+            for (const key of oldNodes) {
+              // Only prefix if the key doesn't already have 3+ colon-separated parts
+              const parts = key.split(':');
+              if (parts.length === 2) {
+                migrated.add(`main:${key}`);
+              } else {
+                migrated.add(key);
+              }
+            }
+            state.expandedNodes = migrated;
+          }
         }
         return state;
       },

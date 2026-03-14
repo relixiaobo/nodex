@@ -16,7 +16,7 @@ describe('ui-store navigation and UI state', () => {
   it('handles navigation history and UI toggles correctly', () => {
     const ui = useUIStore.getState();
     const todayId = ensureTodayNode();
-    const noteExpandKey = `${todayId}:note_2`;
+    const noteExpandKey = `main:${todayId}:note_2`;
 
     ui.navigateTo('inbox_3');
     expect(currentNodeId()).toBe('inbox_3');

@@ -31,6 +31,7 @@ import { canCreateChildrenUnder } from '../../lib/node-capabilities.js';
 
 interface ConfigOutlinerProps {
   nodeId: string;
+  panelId?: string;
   onNavigateOut?: (direction: 'up' | 'down') => void;
 }
 
@@ -57,7 +58,7 @@ export function shouldShowConfigTrailingInput(
   return shouldShowTrailingInput(items);
 }
 
-export function ConfigOutliner({ nodeId, onNavigateOut }: ConfigOutlinerProps) {
+export function ConfigOutliner({ nodeId, panelId = 'main', onNavigateOut }: ConfigOutlinerProps) {
   useChildren(nodeId);
 
   const _version = useNodeStore((s) => s._version);
@@ -244,6 +245,7 @@ export function ConfigOutliner({ nodeId, onNavigateOut }: ConfigOutlinerProps) {
             <OutlinerItem
               nodeId={row.id}
               depth={0}
+              panelId={panelId}
               rootChildIds={selectableRootIds}
               parentId={nodeId}
               rootNodeId={nodeId}
@@ -257,7 +259,8 @@ export function ConfigOutliner({ nodeId, onNavigateOut }: ConfigOutlinerProps) {
         <TrailingInput
           parentId={nodeId}
           depth={0}
-          parentExpandKey={`${ownerId}:${nodeId}`}
+          panelId={panelId}
+          parentExpandKey={`${panelId}:${ownerId}:${nodeId}`}
           onNavigateOut={handleTrailingNavigateOut}
         />
       )}

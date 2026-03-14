@@ -30,6 +30,8 @@ interface OutlinerViewProps {
   rootNodeId: string;
   /** When true, show template fieldEntry children for tagDef nodes. */
   showTemplateFields?: boolean;
+  /** Panel ID for per-panel expand state. */
+  panelId: string;
 }
 
 export type OutlinerVisibleChildRow = OutlinerRowItem;
@@ -41,7 +43,7 @@ export function getDragSelectableRootIds(
   return getDragSelectableRowIds(rows, isFieldRevealed);
 }
 
-export function OutlinerView({ rootNodeId, showTemplateFields }: OutlinerViewProps) {
+export function OutlinerView({ rootNodeId, showTemplateFields, panelId }: OutlinerViewProps) {
   const node = useNode(rootNodeId);
   useChildren(rootNodeId);
 
@@ -159,7 +161,7 @@ export function OutlinerView({ rootNodeId, showTemplateFields }: OutlinerViewPro
 
   // Drag select: document-level mouse tracking for multi-node selection
   const containerRef = useRef<HTMLDivElement>(null);
-  useDragSelect({ containerRef, rootChildIds: dragSelectableRootIds, rootNodeId });
+  useDragSelect({ containerRef, rootChildIds: dragSelectableRootIds, rootNodeId, panelId });
 
   const navToField = useCallback((fieldId: string) => {
     clearFocus();
@@ -208,6 +210,7 @@ export function OutlinerView({ rootNodeId, showTemplateFields }: OutlinerViewPro
               {...toFieldRowEntryProps(fieldMap.get(row.id)!)}
               rootChildIds={dragSelectableRootIds}
               rootNodeId={rootNodeId}
+              panelId={panelId}
               isLastInGroup={i === rows.length - 1 || rows[i + 1].type !== 'field'}
               ownerTagColor={fieldOwnerColors.get(row.id)}
               onNavigateOut={(direction) => navigateToSiblingRow({
@@ -228,6 +231,7 @@ export function OutlinerView({ rootNodeId, showTemplateFields }: OutlinerViewPro
             rootChildIds={dragSelectableRootIds}
             parentId={rootNodeId}
             rootNodeId={rootNodeId}
+            panelId={panelId}
             bulletColors={templateContentColors.get(row.id)}
           />
         )}
@@ -251,7 +255,8 @@ export function OutlinerView({ rootNodeId, showTemplateFields }: OutlinerViewPro
           parentId={rootNodeId}
           depth={0}
           autoFocus={!isSearchNode && visibleChildren.length === 0}
-          parentExpandKey={`${loroDoc.getParentId(rootNodeId) ?? ''}:${rootNodeId}`}
+          parentExpandKey={`${panelId}:${loroDoc.getParentId(rootNodeId) ?? ''}:${rootNodeId}`}
+          panelId={panelId}
           isSearchContext={isSearchNode}
           onNavigateOut={(direction) => {
             if (direction !== 'up') return;
@@ -259,6 +264,7 @@ export function OutlinerView({ rootNodeId, showTemplateFields }: OutlinerViewPro
               dragSelectableRootIds,
               useUIStore.getState().expandedNodes,
               rootNodeId,
+              panelId,
             );
             if (fl.length > 0) {
               const lastNode = fl[fl.length - 1];

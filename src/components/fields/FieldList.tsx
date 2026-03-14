@@ -12,9 +12,10 @@ import { toFieldRowEntryProps } from './field-row-props.js';
 
 interface FieldListProps {
   nodeId: string;
+  panelId?: string;
 }
 
-export function FieldList({ nodeId }: FieldListProps) {
+export function FieldList({ nodeId, panelId = 'main' }: FieldListProps) {
   const allFields = useNodeFields(nodeId);
   const isDefinitionNode = useNodeStore(
     (s) => {
@@ -39,6 +40,7 @@ export function FieldList({ nodeId }: FieldListProps) {
           <FieldRow
             nodeId={nodeId}
             {...toFieldRowEntryProps(f)}
+            panelId={panelId}
             hideMode={f.hideMode}
           />
         </div>

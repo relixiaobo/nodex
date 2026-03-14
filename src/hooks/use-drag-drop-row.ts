@@ -8,6 +8,7 @@ import { resolveDropMove, type DropPosition } from '../lib/drag-drop.js';
 interface UseDragDropRowOptions {
   nodeId: string;
   parentId: string;
+  panelId?: string;
   rowRef: RefObject<HTMLElement | null>;
   targetHasChildren?: boolean;
   targetIsExpanded?: boolean;
@@ -33,6 +34,7 @@ interface UseDragDropRowResult {
 export function useDragDropRow({
   nodeId,
   parentId,
+  panelId = 'main',
   rowRef,
   targetHasChildren = false,
   targetIsExpanded = false,
@@ -96,7 +98,7 @@ export function useDragDropRow({
       dragNodeId: activeDragId,
       targetNodeId: nodeId,
       targetParentId: liveParentId,
-      targetParentKey: `${liveParentId}:${nodeId}`,
+      targetParentKey: `${panelId}:${liveParentId}:${nodeId}`,
       siblingIndex,
       dropPosition: currentDropPosition,
       targetHasChildren,

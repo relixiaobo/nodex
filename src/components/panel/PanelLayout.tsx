@@ -5,6 +5,9 @@
  * When `toolbar` is provided, the last panel's breadcrumb becomes a
  * shaped tab extending above the card (Chrome tab style), and the
  * toolbar (GlobalTools) sits on the desk background to its right.
+ *
+ * Active panel is indicated by the breadcrumb [W] avatar color:
+ * active = primary (colored), inactive = foreground-tertiary (gray).
  */
 import { useCallback } from 'react';
 import { useUIStore } from '../../stores/ui-store.js';
@@ -52,7 +55,6 @@ export function PanelLayout({ toolbar }: PanelLayoutProps) {
         const hasTab = isLast && !!toolbar && !isApp;
 
         // ── Last panel with tab layout ──
-        // Tab shape itself is the visual indicator — no ring needed.
         if (hasTab) {
           return (
             <div key={panel.id} className="flex flex-1 min-w-0 flex-col">
@@ -62,7 +64,7 @@ export function PanelLayout({ toolbar }: PanelLayoutProps) {
                   className="tab-connector-right flex h-10 min-w-0 shrink items-center bg-background rounded-t-xl"
                   onClick={() => setActivePanel(panel.id)}
                 >
-                  <Breadcrumb nodeId={nodeId} showCurrentName={!titleVisible} compact />
+                  <Breadcrumb nodeId={nodeId} showCurrentName={!titleVisible} active={isActive} compact />
                   {showClose && (
                     <button
                       className="flex h-5 w-5 mr-1 shrink-0 items-center justify-center rounded-md text-foreground-tertiary hover:bg-foreground/8 hover:text-foreground"
@@ -96,14 +98,12 @@ export function PanelLayout({ toolbar }: PanelLayoutProps) {
         return (
           <div key={panel.id} className="flex flex-1 min-w-0 flex-col">
             <div
-              className={`group/panel flex flex-1 min-w-0 flex-col overflow-hidden rounded-xl bg-background ${
-                isActive && showClose ? 'ring-2 ring-primary/30' : ''
-              }`}
+              className="group/panel flex flex-1 min-w-0 flex-col overflow-hidden rounded-xl bg-background"
               onClick={() => setActivePanel(panel.id)}
             >
               {!isApp && (
                 <div className="flex items-center shrink-0">
-                  <Breadcrumb nodeId={nodeId} showCurrentName={!titleVisible} compact />
+                  <Breadcrumb nodeId={nodeId} showCurrentName={!titleVisible} active={isActive} />
                   {showClose && (
                     <button
                       className="flex h-5 w-5 mr-1 shrink-0 items-center justify-center rounded-md text-foreground-tertiary opacity-0 transition-opacity hover:bg-foreground/8 hover:text-foreground group-hover/panel:opacity-100"

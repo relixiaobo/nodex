@@ -52,15 +52,14 @@ export function PanelLayout({ toolbar }: PanelLayoutProps) {
         const hasTab = isLast && !!toolbar && !isApp;
 
         // ── Last panel with tab layout ──
+        // Tab shape itself is the visual indicator — no ring needed.
         if (hasTab) {
           return (
             <div key={panel.id} className="flex flex-1 min-w-0 flex-col">
               {/* Tab row: breadcrumb tab (paper) + toolbar (desk) */}
               <div className="flex items-end shrink-0">
                 <div
-                  className={`tab-connector-right flex h-10 items-center bg-background rounded-t-xl max-w-[240px] ${
-                    isActive ? 'ring-2 ring-primary/30 ring-b-0' : ''
-                  }`}
+                  className="tab-connector-right flex h-10 min-w-0 shrink items-center bg-background rounded-t-xl"
                   onClick={() => setActivePanel(panel.id)}
                 >
                   <Breadcrumb nodeId={nodeId} showCurrentName={!titleVisible} compact />
@@ -74,15 +73,13 @@ export function PanelLayout({ toolbar }: PanelLayoutProps) {
                     </button>
                   )}
                 </div>
-                <div className="flex flex-1 justify-end">
+                <div className="flex shrink-0 justify-end">
                   {toolbar}
                 </div>
               </div>
               {/* Panel body — no top-left rounding (connects to tab) */}
               <div
-                className={`group/panel flex flex-1 min-w-0 flex-col overflow-hidden bg-background rounded-b-xl rounded-tr-xl ${
-                  isActive ? 'ring-2 ring-primary/30 ring-t-0' : ''
-                }`}
+                className="group/panel flex flex-1 min-w-0 flex-col overflow-hidden bg-background rounded-b-xl rounded-tr-xl"
                 onClick={() => setActivePanel(panel.id)}
               >
                 {isApp ? (
@@ -100,7 +97,7 @@ export function PanelLayout({ toolbar }: PanelLayoutProps) {
           <div key={panel.id} className="flex flex-1 min-w-0 flex-col">
             <div
               className={`group/panel flex flex-1 min-w-0 flex-col overflow-hidden rounded-xl bg-background ${
-                isActive ? 'ring-2 ring-primary/30' : ''
+                isActive && showClose ? 'ring-2 ring-primary/30' : ''
               }`}
               onClick={() => setActivePanel(panel.id)}
             >

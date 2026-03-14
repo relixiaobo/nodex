@@ -5,7 +5,7 @@
  * - Card layer (elevated paper): NodePanel cards floating on desk
  *
  * Wide chat: panel cards left + Chat column right (GlobalTools above chat)
- * No chat / narrow chat: GlobalTools as shaped tab on last panel's top-right
+ * No chat / narrow chat: last panel's breadcrumb as shaped tab + GlobalTools on desk
  */
 import { Suspense, lazy, useEffect, useState } from 'react';
 import { GlobalTools } from '../toolbar/TopToolbar.js';
@@ -38,13 +38,11 @@ export function DeskLayout() {
   return (
     <div className={`flex flex-1 overflow-hidden p-1.5${wideChat ? '' : ' flex-col'}`}>
       {/* ── Panel cards (elevated paper layer) ── */}
-      <div className={`flex flex-col${wideChat
+      <div className={`flex overflow-hidden${wideChat
         ? ' flex-1 min-w-0 min-h-0 relative z-10'
         : ' flex-1 min-h-0'}`}
       >
-        <div className="flex flex-1 overflow-hidden">
-          <PanelLayout toolbar={wideChat ? undefined : <GlobalTools />} />
-        </div>
+        <PanelLayout toolbar={wideChat ? undefined : <GlobalTools />} />
       </div>
 
       {/* ── Chat area (desk-level, same Z as background) ── */}

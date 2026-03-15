@@ -144,12 +144,16 @@ function syncAgentToTree(session: ChatSession, agentMessages: AgentMessage[]): v
 | 时机 | 方向 | 操作 |
 |------|------|------|
 | **加载 session** | 树 → agent | `getLinearPath(session)` → `agent.replaceMessages()` |
-| **`agent_end` 事件** | agent → 树 | `syncAgentToTree(session, event.messages)` — 追加新消息到树 |
+| **`turn_end` 事件** | agent → 树 | 每轮 tool-call 结束 → `syncAgentToTree` 增量追加 + 持久化（断点恢复） |
+| **`agent_end` 事件** | agent → 树 | prompt 完整结束 → 最终同步（兜底确认一致性） |
 | **编辑/重新生成** | 树 → agent | 在树中创建新分支 → `getLinearPath()` → `agent.replaceMessages()` |
 | **切换分支** | 树 → agent | 更新 `currentNode` → `getLinearPath()` → `agent.replaceMessages()` |
 | **压缩后** | 双向 | 树中记录 bridge → `agent.replaceMessages(compressedPath)` |
 
-**同步由 `agent_end` 事件驱动**：pi-agent-core 的 `AgentEvent` 类型联合包含 `agent_end`（agent.prompt() 完整结束，含 tool loop 全部轮次）和 `message_end`（每条消息结束）。`agent_end` 事件携带 `event.messages`（完整消息数组），是同步到树的精确时机——替代轮询 `isStreaming` 状态。
+**同步由 typed event 驱动**：pi-agent-core 的 `AgentEvent` 类型联合包含三个关键事件：
+- `turn_end`：每轮 tool-call 结束时触发 — 用于增量同步到树 + 持久化，实现断点恢复（browser tool chain 可达 10+ 轮）
+- `agent_end`：`agent.prompt()` 完整结束时触发，携带 `event.messages` — 最终同步确认 + cleanup
+- `message_end`：每条消息结束时触发 — 用于 overflow 检测（Phase 3）
 
 **不变式**：任意时刻，`agent.state.messages` 的前 N 条消息必须与 `getLinearPath(session)` 前 N 条一一对应。agent 可以比树多（streaming 追加的新消息），但不能比树少或乱序。
 
@@ -161,12 +165,13 @@ function syncAgentToTree(session: ChatSession, agentMessages: AgentMessage[]): v
 
 | 事件 | 触发持久化 | 说明 |
 |------|-----------|------|
-| `agent_end` 事件 | ✅ | agent.prompt() 完整结束（含所有 tool-call 轮次），通过 `agent.subscribe()` 监听 |
+| `turn_end` 事件 | ✅ | 每轮 tool-call 结束 → 增量持久化，browser 操作链可达 10+ 轮，中途断开不丢进度 |
+| `agent_end` 事件 | ✅ | prompt 完整结束 → 最终持久化（兜底确认） |
 | 用户操作（newChat / switchSession / edit / regenerate） | ✅ | UI 层直接调用 |
 | visibilitychange（切标签页 / 关浏览器） | ✅ | 兜底保障 |
-| streaming 进行中 | ❌ | 不保存半成品 |
+| streaming 进行中（token by token） | ❌ | 不保存半成品 |
 
-**替代了 `isStreaming` 轮询**：现有 `use-agent.ts` 的 250ms debounce 依赖状态轮询（检测 `messages.length` + `lastTimestamp` 变化）。`agent_end` 事件是精确的完成信号，无需轮询和 debounce。
+**替代了 `isStreaming` 轮询**：现有 `use-agent.ts` 的 250ms debounce 依赖状态轮询（检测 `messages.length` + `lastTimestamp` 变化）。`turn_end` / `agent_end` 事件是精确的完成信号，无需轮询和 debounce。
 
 ### IndexedDB schema 迁移
 
@@ -314,9 +319,14 @@ async function streamChat(text: string, session: ChatSession, agent: Agent) {
   // 1. 首轮前置压缩（显式状态修改）
   await compactIfNeeded(session, agent);
 
-  // 2. 订阅事件：同步 + 持久化 + overflow 检测
+  // 2. 订阅事件：增量同步 + 持久化 + overflow 检测
   const unsubscribe = agent.subscribe((event: AgentEvent) => {
-    // agent.prompt() 完整结束（含所有 tool-call 轮次）→ 同步到树 + 持久化
+    // 每轮 tool-call 结束 → 增量同步到树 + 持久化（断点恢复）
+    if (event.type === 'turn_end') {
+      syncAgentToTree(session, agent.state.messages);
+      persistSession(session);
+    }
+    // prompt 完整结束 → 最终同步确认 + cleanup
     if (event.type === 'agent_end') {
       syncAgentToTree(session, event.messages);
       persistSession(session);
@@ -355,7 +365,8 @@ transformContext: async (messages, signal) => {
 | **首轮 LLM 调用前** | `compactIfNeeded()` 主动压缩 | `streamChat()` 调用层显式执行 |
 | **tool loop 内后续轮** | 不主动压缩 | runtime 限制：`agent.prompt()` 包住整个 tool loop，调用层无法插入 |
 | **LLM 返回 overflow** | 强制压缩 + 重试 | `message_end` 事件 + `isContextOverflow()` → `replaceMessages` → `continue()` |
-| **prompt 完成** | 同步 + 持久化 | `agent_end` 事件，携带完整 `event.messages` |
+| **每轮 tool-call 结束** | 增量同步 + 持久化 | `turn_end` 事件 → 断点恢复（browser chain 可达 10+ 轮） |
+| **prompt 完成** | 最终同步 + 持久化 | `agent_end` 事件，携带完整 `event.messages` |
 
 ### 压缩流程
 
@@ -520,7 +531,8 @@ R2: chat/{workspace_id}/{session_id}.json（完整 ChatSession JSON）
 | 能力 | 用途 | Phase |
 |------|------|-------|
 | `agent.subscribe(AgentEvent)` | 事件驱动的同步和持久化（替代 isStreaming 轮询） | 1, 3 |
-| `AgentEvent.agent_end` | prompt 完整结束信号，携带 `event.messages` → 同步到树 + 持久化 | 1 |
+| `AgentEvent.turn_end` | 每轮 tool-call 结束 → 增量同步 + 持久化（断点恢复，browser chain 可达 10+ 轮） | 1 |
+| `AgentEvent.agent_end` | prompt 完整结束信号，携带 `event.messages` → 最终同步确认 | 1 |
 | `AgentEvent.message_end` | 每条消息结束信号 → overflow 检测 | 3 |
 | `isContextOverflow()` | 检测 LLM 返回的 context overflow 错误 | 3 |
 | `agent.continue()` | overflow 后压缩上下文并重试（不重新发送用户消息） | 3 |
@@ -530,12 +542,11 @@ R2: chat/{workspace_id}/{session_id}.json（完整 ChatSession JSON）
 | `transformContext` hook | 纯变换（stripOldImages + injectReminder），不做压缩 | 已有 |
 | `convertToLlm` hook | 过滤消息类型（新增 bridge → user 转换） | 3 |
 
-**不用于同步/持久化的能力**：
+**仅用于 UI 渲染的能力**：
 
 | 能力 | 用途 | 不用于同步/持久化的原因 |
 |------|------|----------------------|
-| `AgentEvent.turn_end` | MVP 不使用；未来可用于断点恢复（长 tool-call 链中途断开时保留已完成的轮次） | 当前 tool-call 链短（1-3 轮），"丢了重来"可接受，断点恢复逻辑增加复杂度 |
-| `agent.state.isStreaming` | UI 渲染：禁用发送按钮、显示 loading/stop 按钮、typing indicator | 状态适合驱动声明式 UI（"现在怎样"），但不适合触发副作用（"刚发生了什么"）——后者用 `agent_end` 事件 |
+| `agent.state.isStreaming` | UI 渲染：禁用发送按钮、显示 loading/stop 按钮、typing indicator | 状态适合驱动声明式 UI（"现在怎样"），但不适合触发副作用（"刚发生了什么"）——后者用事件 |
 
 ---
 

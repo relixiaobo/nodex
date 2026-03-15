@@ -4,8 +4,8 @@ import type { AgentMessage, AgentTool } from '@mariozechner/pi-agent-core';
 import type { AssistantMessage, Message, ToolResultMessage, UserMessage } from '@mariozechner/pi-ai';
 import {
   createNewChatSession,
+  getCurrentSession,
   getAIAgent,
-  persistChatSession,
   restoreLatestChatSession,
   stopStreaming,
   streamChat,
@@ -49,22 +49,9 @@ function getConversationMessages(agent: Agent): ChatConversationMessage[] {
   return visibleMessages.filter(isConversationMessage);
 }
 
-function getPersistedMessageSignature(agent: Agent): string {
-  const messages = agent.state.messages;
-  const length = messages.length;
-  if (length === 0) return '0';
-
-  const lastMessage = messages[length - 1];
-  return `${length}:${'timestamp' in lastMessage ? lastMessage.timestamp : 0}`;
-}
-
 export function useAgent(agent: Agent = getAIAgent()) {
   const [revision, setRevision] = useState(0);
   const [ready, setReady] = useState(false);
-  const persistedMessageSignature = useMemo(() => {
-    void revision;
-    return getPersistedMessageSignature(agent);
-  }, [agent, revision]);
 
   useEffect(() => {
     let cancelled = false;
@@ -90,16 +77,6 @@ export function useAgent(agent: Agent = getAIAgent()) {
     });
   }, [agent]);
 
-  useEffect(() => {
-    if (!ready) return;
-
-    const timer = window.setTimeout(() => {
-      void persistChatSession(agent);
-    }, 250);
-
-    return () => window.clearTimeout(timer);
-  }, [agent, ready, persistedMessageSignature]);
-
   return useMemo(() => {
     void revision;
 
@@ -114,6 +91,7 @@ export function useAgent(agent: Agent = getAIAgent()) {
       agent,
       ready,
       sessionId: agent.sessionId ?? null,
+      sessionTitle: getCurrentSession(agent)?.title ?? null,
       messages,
       toolResults,
       isStreaming: agent.state.isStreaming,

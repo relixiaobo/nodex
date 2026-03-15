@@ -1,6 +1,6 @@
 import 'fake-indexeddb/auto';
 import { deleteDB } from 'idb';
-import { getLinearPath, linearToTree } from '../../src/lib/ai-chat-tree.js';
+import { appendMessage, editMessage, getLinearPath, linearToTree, type ChatSession } from '../../src/lib/ai-chat-tree.js';
 import { ensureSystemNodes } from '../../src/lib/bootstrap-system-nodes.js';
 import * as loroDoc from '../../src/lib/loro-doc.js';
 import { SYSTEM_SCHEMA_NODE_IDS } from '../../src/lib/system-schema-presets.js';
@@ -14,6 +14,131 @@ const prepareAgentContextMock = vi.hoisted(() => vi.fn(async (
   messages,
 })));
 const DB_NAME = 'soma-ai-chat';
+
+function createUserMessage(content: string, timestamp: number): import('@mariozechner/pi-agent-core').AgentMessage {
+  return {
+    role: 'user',
+    content,
+    timestamp,
+  };
+}
+
+function createAssistantMessage(text: string, timestamp: number): import('@mariozechner/pi-agent-core').AgentMessage {
+  return {
+    role: 'assistant',
+    content: [{ type: 'text', text }],
+    api: 'anthropic-messages',
+    provider: 'anthropic',
+    model: 'claude-sonnet-4-5',
+    usage: {
+      input: 0,
+      output: 0,
+      cacheRead: 0,
+      cacheWrite: 0,
+      totalTokens: 0,
+      cost: {
+        input: 0,
+        output: 0,
+        cacheRead: 0,
+        cacheWrite: 0,
+        total: 0,
+      },
+    },
+    stopReason: 'stop',
+    timestamp,
+  };
+}
+
+type DynamicTestAgent = import('@mariozechner/pi-agent-core').Agent & {
+  subscribe: ReturnType<typeof vi.fn>;
+  setTools: ReturnType<typeof vi.fn>;
+  setSystemPrompt: ReturnType<typeof vi.fn>;
+  setModel: ReturnType<typeof vi.fn>;
+  replaceMessages: ReturnType<typeof vi.fn>;
+  prompt: ReturnType<typeof vi.fn>;
+  abort: ReturnType<typeof vi.fn>;
+  reset: ReturnType<typeof vi.fn>;
+  waitForIdle: ReturnType<typeof vi.fn>;
+  continue: ReturnType<typeof vi.fn>;
+};
+
+function createDynamicTestAgent() {
+  const listeners = new Set<(event: import('@mariozechner/pi-agent-core').AgentEvent) => void>();
+  const state = {
+    messages: [] as import('@mariozechner/pi-agent-core').AgentMessage[],
+    streamMessage: undefined as import('@mariozechner/pi-agent-core').AgentMessage | undefined,
+    isStreaming: false,
+    error: undefined,
+    systemPrompt: '',
+    tools: [] as import('@mariozechner/pi-agent-core').AgentTool<any>[],
+    model: {
+      id: 'claude-sonnet-4-5',
+      provider: 'anthropic',
+      contextWindow: 200000,
+    },
+  };
+
+  const agent = {
+    state,
+    sessionId: undefined as string | undefined,
+    subscribe: vi.fn((fn: (event: import('@mariozechner/pi-agent-core').AgentEvent) => void) => {
+      listeners.add(fn);
+      return () => {
+        listeners.delete(fn);
+      };
+    }),
+    setTools: vi.fn((tools: import('@mariozechner/pi-agent-core').AgentTool<any>[]) => {
+      state.tools = tools;
+    }),
+    setSystemPrompt: vi.fn((prompt: string) => {
+      state.systemPrompt = prompt;
+    }),
+    setModel: vi.fn((model: { id: string; provider: string; contextWindow?: number }) => {
+      state.model = {
+        ...state.model,
+        ...model,
+      };
+    }),
+    replaceMessages: vi.fn((messages: import('@mariozechner/pi-agent-core').AgentMessage[]) => {
+      state.messages = messages;
+    }),
+    prompt: vi.fn(async () => undefined),
+    abort: vi.fn(),
+    reset: vi.fn(() => {
+      state.messages = [];
+      state.streamMessage = undefined;
+      state.isStreaming = false;
+      state.error = undefined;
+    }),
+    waitForIdle: vi.fn().mockResolvedValue(undefined),
+    continue: vi.fn().mockResolvedValue(undefined),
+  } as unknown as DynamicTestAgent;
+
+  return {
+    agent,
+    state,
+    emit(event: import('@mariozechner/pi-agent-core').AgentEvent) {
+      for (const listener of listeners) {
+        listener(event);
+      }
+    },
+  };
+}
+
+async function seedCurrentSession(
+  agent: import('@mariozechner/pi-agent-core').Agent,
+  session: ChatSession,
+): Promise<ChatSession> {
+  const { getCurrentSession } = await import('../../src/lib/ai-service.js');
+  const currentSession = getCurrentSession(agent);
+  if (!currentSession) {
+    throw new Error('expected current session');
+  }
+
+  Object.assign(currentSession, session);
+  agent.sessionId = currentSession.id;
+  return currentSession;
+}
 
 vi.mock('../../src/lib/ai-proxy.js', () => ({
   streamProxyWithApiKey: streamProxyMock,
@@ -393,6 +518,133 @@ describe('ai-service', () => {
     expect(agent.prompt).toHaveBeenCalledTimes(1);
     expect(agent.prompt).toHaveBeenCalledWith('hello world');
     expect(agent.abort).toHaveBeenCalledTimes(1);
+  });
+
+  it('editAndResend creates a new user branch and streams the replacement reply', async () => {
+    const { createNewChatSession, editAndResend } = await import('../../src/lib/ai-service.js');
+    const { agent, state, emit } = createDynamicTestAgent();
+
+    await createNewChatSession(agent);
+
+    const session = await seedCurrentSession(agent, linearToTree([
+      createUserMessage('user-1', 1),
+      createAssistantMessage('assistant-1', 2),
+      createUserMessage('user-2', 3),
+      createAssistantMessage('assistant-2', 4),
+    ]));
+    const originalUser = getLinearPath(session)[2];
+    const replacementReply = createAssistantMessage('assistant-edited', 6);
+
+    agent.replaceMessages.mockClear();
+    agent.prompt.mockImplementation(async () => {
+      state.messages = [...state.messages, replacementReply];
+      emit({
+        type: 'turn_end',
+        message: replacementReply,
+        toolResults: [],
+      } as import('@mariozechner/pi-agent-core').AgentEvent);
+    });
+
+    await editAndResend(originalUser!.id, 'edited user', agent);
+
+    expect(agent.replaceMessages).toHaveBeenCalledTimes(1);
+    expect(agent.replaceMessages.mock.calls[0][0]).toEqual([
+      createUserMessage('user-1', 1),
+      createAssistantMessage('assistant-1', 2),
+      expect.objectContaining({
+        role: 'user',
+        content: 'edited user',
+      }),
+    ]);
+    expect(agent.prompt).toHaveBeenCalledWith('edited user');
+    expect(getLinearPath(session).map((node) => node.message)).toEqual([
+      createUserMessage('user-1', 1),
+      createAssistantMessage('assistant-1', 2),
+      expect.objectContaining({
+        role: 'user',
+        content: 'edited user',
+      }),
+      replacementReply,
+    ]);
+  });
+
+  it('regenerateResponse replaces the assistant branch using the preceding user prompt', async () => {
+    const { createNewChatSession, regenerateResponse } = await import('../../src/lib/ai-service.js');
+    const { agent, state, emit } = createDynamicTestAgent();
+
+    await createNewChatSession(agent);
+
+    const session = await seedCurrentSession(agent, linearToTree([
+      createUserMessage('user-1', 1),
+      createAssistantMessage('assistant-1', 2),
+      createUserMessage('user-2', 3),
+      createAssistantMessage('assistant-2', 4),
+    ]));
+    const targetAssistant = getLinearPath(session)[3];
+    const regeneratedReply = createAssistantMessage('assistant-regenerated', 5);
+
+    agent.replaceMessages.mockClear();
+    agent.prompt.mockImplementation(async () => {
+      state.messages = [...state.messages, regeneratedReply];
+      emit({
+        type: 'turn_end',
+        message: regeneratedReply,
+        toolResults: [],
+      } as import('@mariozechner/pi-agent-core').AgentEvent);
+    });
+
+    await regenerateResponse(targetAssistant!.id, agent);
+
+    expect(agent.replaceMessages).toHaveBeenCalledTimes(1);
+    expect(agent.replaceMessages.mock.calls[0][0]).toEqual([
+      createUserMessage('user-1', 1),
+      createAssistantMessage('assistant-1', 2),
+      createUserMessage('user-2', 3),
+    ]);
+    expect(agent.prompt).toHaveBeenCalledWith('user-2');
+    expect(getLinearPath(session).map((node) => node.message)).toEqual([
+      createUserMessage('user-1', 1),
+      createAssistantMessage('assistant-1', 2),
+      createUserMessage('user-2', 3),
+      regeneratedReply,
+    ]);
+  });
+
+  it('switchMessageBranch swaps the active branch without prompting the agent', async () => {
+    const { createNewChatSession, switchMessageBranch } = await import('../../src/lib/ai-service.js');
+    const { agent } = createDynamicTestAgent();
+
+    await createNewChatSession(agent);
+
+    const seededSession = linearToTree([
+      createUserMessage('user-1', 1),
+      createAssistantMessage('assistant-1', 2),
+      createUserMessage('user-2', 3),
+      createAssistantMessage('assistant-2', 4),
+    ]);
+    const originalPath = getLinearPath(seededSession);
+    editMessage(seededSession, originalPath[2]!.id, createUserMessage('alt-user', 5));
+    appendMessage(seededSession, createAssistantMessage('alt-assistant', 6));
+
+    const session = await seedCurrentSession(agent, seededSession);
+
+    agent.replaceMessages.mockClear();
+
+    switchMessageBranch(originalPath[2]!.id, agent);
+
+    expect(agent.replaceMessages).toHaveBeenCalledTimes(1);
+    expect(agent.replaceMessages.mock.calls[0][0]).toEqual([
+      createUserMessage('user-1', 1),
+      createAssistantMessage('assistant-1', 2),
+      createUserMessage('user-2', 3),
+      createAssistantMessage('assistant-2', 4),
+    ]);
+    expect(getLinearPath(session).map((node) => node.message)).toEqual([
+      createUserMessage('user-1', 1),
+      createAssistantMessage('assistant-1', 2),
+      createUserMessage('user-2', 3),
+      createAssistantMessage('assistant-2', 4),
+    ]);
   });
 
   it('streamChat persists sessions from turn_end and agent_end events', async () => {

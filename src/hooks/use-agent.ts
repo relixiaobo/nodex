@@ -2,16 +2,26 @@ import { startTransition, useEffect, useMemo, useState } from 'react';
 import type { Agent } from '@mariozechner/pi-agent-core';
 import type { AgentMessage, AgentTool } from '@mariozechner/pi-agent-core';
 import type { AssistantMessage, Message, ToolResultMessage, UserMessage } from '@mariozechner/pi-ai';
+import { getBranches, getLinearPath } from '../lib/ai-chat-tree.js';
 import {
   createNewChatSession,
+  editAndResend,
   getCurrentSession,
   getAIAgent,
+  regenerateResponse,
   restoreLatestChatSession,
   stopStreaming,
   streamChat,
+  switchMessageBranch,
 } from '../lib/ai-service.js';
 
 export type ChatConversationMessage = UserMessage | AssistantMessage;
+
+export interface ChatMessageEntry {
+  nodeId: string | null;
+  message: ChatConversationMessage;
+  branches: { ids: string[]; currentIndex: number } | null;
+}
 
 export interface AgentDebugState {
   revision: number;
@@ -41,12 +51,41 @@ function isConversationMessage(message: unknown): message is ChatConversationMes
       || (message as { role: string }).role === 'assistant');
 }
 
-function getConversationMessages(agent: Agent): ChatConversationMessage[] {
-  const visibleMessages = agent.state.streamMessage
-    ? [...agent.state.messages, agent.state.streamMessage]
-    : agent.state.messages;
+function getConversationMessages(agent: Agent): ChatMessageEntry[] {
+  const session = getCurrentSession(agent);
+  const pathEntries = session
+    ? getLinearPath(session)
+      .flatMap((node) => {
+        if (!isConversationMessage(node.message)) {
+          return [];
+        }
 
-  return visibleMessages.filter(isConversationMessage);
+        const branchIds = getBranches(session, node.id);
+        const currentIndex = branchIds.indexOf(node.id);
+
+        return [{
+          nodeId: node.id,
+          message: node.message,
+          branches: branchIds.length > 1 && currentIndex >= 0
+            ? { ids: branchIds, currentIndex }
+            : null,
+        } satisfies ChatMessageEntry];
+      })
+    : [];
+
+  const streamingMessage = agent.state.streamMessage;
+  if (!isConversationMessage(streamingMessage)) {
+    return pathEntries;
+  }
+
+  return [
+    ...pathEntries,
+    {
+      nodeId: null,
+      message: streamingMessage,
+      branches: null,
+    },
+  ];
 }
 
 export function useAgent(agent: Agent = getAIAgent()) {
@@ -82,7 +121,7 @@ export function useAgent(agent: Agent = getAIAgent()) {
 
     const messages = getConversationMessages(agent);
     const toolResults = buildToolResultMap(agent.state.messages);
-    const lastMessage = messages[messages.length - 1];
+    const lastMessage = messages[messages.length - 1]?.message;
     const error = lastMessage?.role === 'assistant' && lastMessage.stopReason === 'aborted'
       ? undefined
       : agent.state.error;
@@ -105,6 +144,9 @@ export function useAgent(agent: Agent = getAIAgent()) {
         provider: agent.state.model.provider,
       } satisfies AgentDebugState,
       sendMessage: (prompt: string) => streamChat(prompt, agent),
+      editMessage: (nodeId: string, newContent: string) => editAndResend(nodeId, newContent, agent),
+      regenerateMessage: (nodeId: string) => regenerateResponse(nodeId, agent),
+      switchBranch: (nodeId: string) => switchMessageBranch(nodeId, agent),
       stopStreaming: () => stopStreaming(agent),
       newChat: async () => {
         await createNewChatSession(agent);

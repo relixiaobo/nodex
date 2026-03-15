@@ -111,11 +111,15 @@ export function PanelLayout({ toolbar }: PanelLayoutProps) {
 
     return (
       <div ref={containerRef} className="flex flex-1 flex-col overflow-hidden">
-        <div className="flex h-10 shrink-0 items-center gap-2">
-          <div ref={notesMenuRef} className="relative min-w-0">
+        {/* Tab row: dropdown tab (paper) + toolbar (desk) */}
+        <div className="flex items-end shrink-0">
+          <div
+            ref={notesMenuRef}
+            className="tab-connector-right relative z-10 flex h-10 min-w-0 shrink items-center bg-background rounded-t-xl"
+          >
             <button
               type="button"
-              className="flex min-w-0 items-center gap-1 rounded-lg px-2 py-1 text-[13px] text-foreground transition-colors hover:bg-foreground/4"
+              className="flex min-w-0 items-center gap-1 px-3 py-1 text-[13px] text-foreground transition-colors hover:bg-foreground/4 rounded-lg"
               onClick={() => setNotesMenuOpen((open) => !open)}
               aria-haspopup="menu"
               aria-expanded={notesMenuOpen}
@@ -171,14 +175,12 @@ export function PanelLayout({ toolbar }: PanelLayoutProps) {
               </div>
             )}
           </div>
-          <div className="flex-1" />
-          {toolbar && (
-            <div className="flex shrink-0">
-              {toolbar}
-            </div>
-          )}
+          <div className="flex flex-1 justify-end">
+            {toolbar}
+          </div>
         </div>
-        <div className="group/panel flex flex-1 min-h-0 flex-col overflow-hidden rounded-xl bg-background shadow-card">
+        {/* Panel body — no top-left rounding (connects to tab) */}
+        <div className="group/panel flex flex-1 min-h-0 flex-col overflow-hidden bg-background shadow-card rounded-b-xl rounded-tr-xl">
           {renderPanelContent(nodeId, activePanel.id)}
         </div>
       </div>
@@ -195,7 +197,7 @@ export function PanelLayout({ toolbar }: PanelLayoutProps) {
         const isChat = isChatPanel(nodeId);
         const titleVisible = panelTitleVisibleMap[panel.id] ?? true;
         const isLast = i === panels.length - 1;
-        const hasTab = isLast && !!toolbar && !isApp && !isChat;
+        const hasTab = isLast && !!toolbar && !isApp;
 
         // ── Last panel with tab layout ──
         if (hasTab) {
@@ -207,7 +209,14 @@ export function PanelLayout({ toolbar }: PanelLayoutProps) {
                   className="tab-connector-right relative z-10 flex h-10 min-w-0 shrink items-center bg-background rounded-t-xl"
                   onClick={() => setActivePanel(panel.id)}
                 >
-                  <Breadcrumb nodeId={nodeId} showCurrentName={!titleVisible} active={isActive} compact />
+                  {isChat ? (
+                    <span className="flex items-center gap-1.5 px-3 text-[13px] text-foreground">
+                      <Sparkles size={12} strokeWidth={1.6} className="text-foreground-tertiary" />
+                      Chat
+                    </span>
+                  ) : (
+                    <Breadcrumb nodeId={nodeId} showCurrentName={!titleVisible} active={isActive} compact />
+                  )}
                   {showClose && (
                     <button
                       type="button"

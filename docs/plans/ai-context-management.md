@@ -2,7 +2,7 @@
 
 > Chat 持久化、上下文压缩、跨设备同步的统一设计。
 >
-> **更新**：2026-03-15 — 结合代码现状完成 review；Bridge 决策落定（Option B）；补充 5 项实现细节
+> **更新**：2026-03-15 — 结合代码现状完成 review；Bridge 决策落定（Option B）；补充 5 项实现细节；全面采用 pi-agent-core 事件系统
 
 ## 总览
 
@@ -144,10 +144,12 @@ function syncAgentToTree(session: ChatSession, agentMessages: AgentMessage[]): v
 | 时机 | 方向 | 操作 |
 |------|------|------|
 | **加载 session** | 树 → agent | `getLinearPath(session)` → `agent.replaceMessages()` |
-| **streaming 结束** | agent → 树 | `syncAgentToTree(session, agent.state.messages)` — 追加新消息到树 |
+| **`agent_end` 事件** | agent → 树 | `syncAgentToTree(session, event.messages)` — 追加新消息到树 |
 | **编辑/重新生成** | 树 → agent | 在树中创建新分支 → `getLinearPath()` → `agent.replaceMessages()` |
 | **切换分支** | 树 → agent | 更新 `currentNode` → `getLinearPath()` → `agent.replaceMessages()` |
 | **压缩后** | 双向 | 树中记录 bridge → `agent.replaceMessages(compressedPath)` |
+
+**同步由 `agent_end` 事件驱动**：pi-agent-core 的 `AgentEvent` 类型联合包含 `agent_end`（agent.prompt() 完整结束，含 tool loop 全部轮次）和 `message_end`（每条消息结束）。`agent_end` 事件携带 `event.messages`（完整消息数组），是同步到树的精确时机——替代轮询 `isStreaming` 状态。
 
 **不变式**：任意时刻，`agent.state.messages` 的前 N 条消息必须与 `getLinearPath(session)` 前 N 条一一对应。agent 可以比树多（streaming 追加的新消息），但不能比树少或乱序。
 
@@ -155,14 +157,16 @@ function syncAgentToTree(session: ChatSession, agentMessages: AgentMessage[]): v
 
 **现状**：250ms debounce on `${messages.length}:${lastTimestamp}` 变化 — streaming 中频繁触发。
 
-**改为事件驱动**：
+**改为事件驱动**（利用 pi-agent-core `AgentEvent` 类型系统）：
 
-| 事件 | 触发持久化 |
-|------|-----------|
-| streaming 结束（`agent.state.isStreaming` false → effect） | ✅ |
-| 用户操作（newChat / switchSession / edit / regenerate） | ✅ |
-| visibilitychange（切标签页 / 关浏览器） | ✅ |
-| streaming 进行中 | ❌ 不保存半成品 |
+| 事件 | 触发持久化 | 说明 |
+|------|-----------|------|
+| `agent_end` 事件 | ✅ | agent.prompt() 完整结束（含所有 tool-call 轮次），通过 `agent.subscribe()` 监听 |
+| 用户操作（newChat / switchSession / edit / regenerate） | ✅ | UI 层直接调用 |
+| visibilitychange（切标签页 / 关浏览器） | ✅ | 兜底保障 |
+| streaming 进行中 | ❌ | 不保存半成品 |
+
+**替代了 `isStreaming` 轮询**：现有 `use-agent.ts` 的 250ms debounce 依赖状态轮询（检测 `messages.length` + `lastTimestamp` 变化）。`agent_end` 事件是精确的完成信号，无需轮询和 debounce。
 
 ### IndexedDB schema 迁移
 
@@ -300,23 +304,39 @@ LLM 收到: [bridge.content as user message] → U₅₁ → A₅₁
 
 ### 压缩时机
 
-**在调用层执行，不在 `transformContext` hook 中**：
+**在调用层执行，不在 `transformContext` hook 中**。利用 pi-agent-core 的 typed event system 实现精确的事件驱动：
 
 ```typescript
 // ai-service.ts — streamChat()
-async function streamChat(userMessage, session, agent) {
+async function streamChat(text: string, session: ChatSession, agent: Agent) {
   configureAgent(agent);
 
   // 1. 首轮前置压缩（显式状态修改）
   await compactIfNeeded(session, agent);
 
-  // 2. agent.prompt() — 内部可能多轮 tool-call
-  await agent.prompt(userMessage);
-  //   → transformContext: stripOldImages + injectReminder（纯变换，无副作用）
+  // 2. 订阅事件：同步 + 持久化 + overflow 检测
+  const unsubscribe = agent.subscribe((event: AgentEvent) => {
+    // agent.prompt() 完整结束（含所有 tool-call 轮次）→ 同步到树 + 持久化
+    if (event.type === 'agent_end') {
+      syncAgentToTree(session, event.messages);
+      persistSession(session);
+      unsubscribe();
+    }
+    // 每条 assistant 消息结束 → 检测 context overflow
+    if (event.type === 'message_end' && event.message.role === 'assistant') {
+      if (isContextOverflow(event.message)) {
+        // 移除尾部 overflow error → 压缩 → 重试
+        const msgs = agent.state.messages.slice(0, -1);
+        const compressed = compact(msgs, session);
+        agent.replaceMessages(compressed);
+        agent.continue();  // 在压缩后的上下文中重试
+      }
+    }
+  });
 
-  // 3. 持久化
-  syncAgentToTree(session, agent.state.messages);
-  await persistSession(session);
+  // 3. agent.prompt() — 内部可能多轮 tool-call
+  await agent.prompt(text);
+  //   → transformContext: stripOldImages + injectReminder（纯变换，无副作用）
 }
 ```
 
@@ -330,11 +350,12 @@ transformContext: async (messages, signal) => {
 },
 ```
 
-| 时机 | 策略 | 说明 |
+| 时机 | 策略 | 机制 |
 |------|------|------|
 | **首轮 LLM 调用前** | `compactIfNeeded()` 主动压缩 | `streamChat()` 调用层显式执行 |
 | **tool loop 内后续轮** | 不主动压缩 | runtime 限制：`agent.prompt()` 包住整个 tool loop，调用层无法插入 |
-| **LLM 返回 overflow** | 强制压缩 + 重试 | `isContextOverflow` → 移除尾部 assistant error → `replaceMessages` → `continue()` |
+| **LLM 返回 overflow** | 强制压缩 + 重试 | `message_end` 事件 + `isContextOverflow()` → `replaceMessages` → `continue()` |
+| **prompt 完成** | 同步 + 持久化 | `agent_end` 事件，携带完整 `event.messages` |
 
 ### 压缩流程
 
@@ -489,6 +510,32 @@ R2: chat/{workspace_id}/{session_id}.json（完整 ChatSession JSON）
 | `src/lib/sync/sync-manager.ts` | 修改 | 加入 `syncChatSessions()` 步骤 |
 | `src/components/chat/` | 修改 | 冲突处理 UI |
 | Backend: `worker/` | 新建 | D1 表 + R2 存储 + CAS 写入端点 |
+
+---
+
+## pi-agent-core 能力利用
+
+本方案涉及的 pi-agent-core 能力及使用方式：
+
+| 能力 | 用途 | Phase |
+|------|------|-------|
+| `agent.subscribe(AgentEvent)` | 事件驱动的同步和持久化（替代 isStreaming 轮询） | 1, 3 |
+| `AgentEvent.agent_end` | prompt 完整结束信号，携带 `event.messages` → 同步到树 + 持久化 | 1 |
+| `AgentEvent.message_end` | 每条消息结束信号 → overflow 检测 | 3 |
+| `isContextOverflow()` | 检测 LLM 返回的 context overflow 错误 | 3 |
+| `agent.continue()` | overflow 后压缩上下文并重试（不重新发送用户消息） | 3 |
+| `agent.replaceMessages()` | 树 → agent 同步、压缩后替换上下文 | 1, 2, 3 |
+| `agent.state.messages` | 运行时消息数组，与树保持位置映射 | 1 |
+| `CustomAgentMessages` 声明合并 | 定义 `bridge` 消息类型 | 3 |
+| `transformContext` hook | 纯变换（stripOldImages + injectReminder），不做压缩 | 已有 |
+| `convertToLlm` hook | 过滤消息类型（新增 bridge → user 转换） | 3 |
+
+**不使用的能力**：
+
+| 能力 | 不使用的原因 |
+|------|-------------|
+| `AgentEvent.turn_end` | 粒度过细（每轮 tool-call 触发），同步只需要在整个 prompt 结束时执行一次 |
+| `agent.state.isStreaming` | 被 `agent_end` 事件替代，事件比状态轮询更精确 |
 
 ---
 

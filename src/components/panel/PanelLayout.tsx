@@ -115,11 +115,11 @@ export function PanelLayout({ toolbar }: PanelLayoutProps) {
         <div className="flex items-end shrink-0">
           <div
             ref={notesMenuRef}
-            className="tab-connector-right relative z-10 flex h-10 min-w-0 shrink items-center bg-background rounded-t-xl"
+            className="tab-connector-right relative z-10 flex h-10 w-fit items-center bg-background rounded-t-xl"
           >
             <button
               type="button"
-              className="flex min-w-0 items-center gap-1 px-3 py-1 text-[13px] text-foreground transition-colors hover:bg-foreground/4 rounded-lg"
+              className="flex items-center gap-1 px-3 py-1 text-[13px] text-foreground transition-colors hover:bg-foreground/4 rounded-lg"
               onClick={() => setNotesMenuOpen((open) => !open)}
               aria-haspopup="menu"
               aria-expanded={notesMenuOpen}
@@ -206,7 +206,7 @@ export function PanelLayout({ toolbar }: PanelLayoutProps) {
               {/* Tab row: breadcrumb tab (paper) + toolbar (desk) */}
               <div className="flex items-end shrink-0">
                 <div
-                  className="tab-connector-right relative z-10 flex h-10 min-w-0 shrink items-center bg-background rounded-t-xl"
+                  className={`tab-connector-right relative z-10 flex h-10 items-center bg-background rounded-t-xl ${isChat ? 'w-fit' : 'min-w-0 shrink'}`}
                   onClick={() => setActivePanel(panel.id)}
                 >
                   {isChat ? (

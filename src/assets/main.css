@@ -4,7 +4,7 @@
 @theme {
   /* Light mode — Paper & Ink */
   --color-background: #F5F4EE;
-  --color-background-recessed: #E8E7E1;
+  --color-background-recessed: #EBEBE6;
   --color-surface: #FFFFFF;
   --color-foreground: #1A1A1A;
   --color-foreground-secondary: #666666;
@@ -84,8 +84,8 @@
    Chat surface (desk) to create Z-axis layering. */
 .shadow-panel-right {
   box-shadow:
-    2px 0 4px -1px rgba(0, 0, 0, 0.06),
-    6px 0 16px -4px rgba(0, 0, 0, 0.06);
+    2px 0 4px -1px rgba(0, 0, 0, 0.05),
+    6px 0 16px -4px rgba(0, 0, 0, 0.04);
 }
 
 /* Concave corners at the active tab's bottom edges.

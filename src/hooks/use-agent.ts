@@ -9,6 +9,7 @@ import {
   getCurrentSession,
   getAIAgent,
   regenerateResponse,
+  restoreChatSessionById,
   restoreLatestChatSession,
   stopStreaming,
   streamChat,
@@ -88,14 +89,19 @@ function getConversationMessages(agent: Agent): ChatMessageEntry[] {
   ];
 }
 
-export function useAgent(agent: Agent = getAIAgent()) {
+export function useAgent(agent: Agent = getAIAgent(), sessionId?: string) {
   const [revision, setRevision] = useState(0);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
+    setReady(false);
 
-    void restoreLatestChatSession(agent).finally(() => {
+    const restore = sessionId
+      ? restoreChatSessionById(sessionId, agent)
+      : restoreLatestChatSession(agent);
+
+    void restore.finally(() => {
       if (cancelled) return;
       setReady(true);
       startTransition(() => {
@@ -106,7 +112,7 @@ export function useAgent(agent: Agent = getAIAgent()) {
     return () => {
       cancelled = true;
     };
-  }, [agent]);
+  }, [agent, sessionId]);
 
   useEffect(() => {
     return agent.subscribe(() => {

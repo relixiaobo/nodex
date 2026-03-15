@@ -13,21 +13,44 @@
  *
  * Active panel is indicated by the dropdown row highlight + bullet color.
  */
-import { useCallback, useRef, useState, useEffect } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react';
 import { useUIStore } from '../../stores/ui-store.js';
 import { useNodeStore } from '../../stores/node-store.js';
-import { isAppPanel } from '../../types/index.js';
+import { chatPanelSessionId, isAppPanel, isChatPanel } from '../../types/index.js';
 import type { AppPanelId } from '../../types/index.js';
 import { NodePanel } from './NodePanel';
 import { AppPanel } from './AppPanel';
 import { Breadcrumb } from './Breadcrumb';
-import { ChevronDown, X } from '../../lib/icons.js';
+import { ChevronDown, Sparkles, X } from '../../lib/icons.js';
+
+const ChatPanel = lazy(async () => ({
+  default: (await import('../chat/ChatPanel')).ChatPanel,
+}));
+const CHAT_PANEL_FALLBACK = (
+  <div className="flex flex-1 items-center justify-center text-sm text-foreground-tertiary">
+    Loading chat…
+  </div>
+);
 
 /** Minimum width per panel before switching to tab mode. */
 const MIN_PANEL_WIDTH = 250;
 
 interface PanelLayoutProps {
   toolbar?: React.ReactNode;
+}
+
+function renderPanelContent(nodeId: string, panelId: string) {
+  if (isChatPanel(nodeId)) {
+    return (
+      <Suspense fallback={CHAT_PANEL_FALLBACK}>
+        <ChatPanel panelId={panelId} sessionId={chatPanelSessionId(nodeId)} />
+      </Suspense>
+    );
+  }
+  if (isAppPanel(nodeId)) {
+    return <AppPanel panelId={nodeId as AppPanelId} />;
+  }
+  return <NodePanel nodeId={nodeId} panelId={panelId} />;
 }
 
 export function PanelLayout({ toolbar }: PanelLayoutProps) {
@@ -85,7 +108,6 @@ export function PanelLayout({ toolbar }: PanelLayoutProps) {
   if (dropdownMode) {
     const activePanel = panels.find((p) => p.id === activePanelId) ?? panels[0];
     const nodeId = activePanel.nodeId;
-    const isApp = isAppPanel(nodeId);
 
     return (
       <div ref={containerRef} className="flex flex-1 flex-col overflow-hidden">
@@ -122,8 +144,10 @@ export function PanelLayout({ toolbar }: PanelLayoutProps) {
                         setNotesMenuOpen(false);
                       }}
                     >
-                      <span className={`shrink-0 text-[10px] ${active ? 'text-primary' : 'text-foreground-tertiary'}`}>
-                        ●
+                      <span className={`flex shrink-0 text-[10px] ${active ? 'text-primary' : 'text-foreground-tertiary'}`}>
+                        {isChatPanel(panel.nodeId)
+                          ? <Sparkles size={10} strokeWidth={1.6} />
+                          : '●'}
                       </span>
                       <span className="min-w-0 flex-1 truncate">
                         <PanelLabel nodeId={panel.nodeId} />
@@ -155,11 +179,7 @@ export function PanelLayout({ toolbar }: PanelLayoutProps) {
           )}
         </div>
         <div className="group/panel flex flex-1 min-h-0 flex-col overflow-hidden rounded-xl bg-background shadow-card">
-          {isApp ? (
-            <AppPanel panelId={nodeId as AppPanelId} />
-          ) : (
-            <NodePanel nodeId={nodeId} panelId={activePanel.id} />
-          )}
+          {renderPanelContent(nodeId, activePanel.id)}
         </div>
       </div>
     );
@@ -172,9 +192,10 @@ export function PanelLayout({ toolbar }: PanelLayoutProps) {
         const isActive = panel.id === activePanelId;
         const nodeId = panel.nodeId;
         const isApp = isAppPanel(nodeId);
+        const isChat = isChatPanel(nodeId);
         const titleVisible = panelTitleVisibleMap[panel.id] ?? true;
         const isLast = i === panels.length - 1;
-        const hasTab = isLast && !!toolbar && !isApp;
+        const hasTab = isLast && !!toolbar && !isApp && !isChat;
 
         // ── Last panel with tab layout ──
         if (hasTab) {
@@ -207,11 +228,7 @@ export function PanelLayout({ toolbar }: PanelLayoutProps) {
                 className="group/panel flex flex-1 min-w-0 flex-col overflow-hidden bg-background shadow-card rounded-b-xl rounded-tr-xl"
                 onClick={() => setActivePanel(panel.id)}
               >
-                {isApp ? (
-                  <AppPanel panelId={nodeId as AppPanelId} />
-                ) : (
-                  <NodePanel nodeId={nodeId} panelId={panel.id} />
-                )}
+                {renderPanelContent(nodeId, panel.id)}
               </div>
             </div>
           );
@@ -224,7 +241,7 @@ export function PanelLayout({ toolbar }: PanelLayoutProps) {
               className="group/panel flex flex-1 min-w-0 flex-col overflow-hidden rounded-xl bg-background shadow-card"
               onClick={() => setActivePanel(panel.id)}
             >
-              {!isApp && (
+              {!isApp && !isChat && (
                 <div className="flex items-center shrink-0">
                   <Breadcrumb nodeId={nodeId} showCurrentName={!titleVisible} active={isActive} />
                   {showClose && (
@@ -251,11 +268,7 @@ export function PanelLayout({ toolbar }: PanelLayoutProps) {
                   </button>
                 </div>
               )}
-              {isApp ? (
-                <AppPanel panelId={nodeId as AppPanelId} />
-              ) : (
-                <NodePanel nodeId={nodeId} panelId={panel.id} />
-              )}
+              {renderPanelContent(nodeId, panel.id)}
             </div>
           </div>
         );
@@ -268,6 +281,7 @@ export function PanelLayout({ toolbar }: PanelLayoutProps) {
 function PanelLabel({ nodeId }: { nodeId: string }) {
   const name = useNodeStore((s) => {
     void s._version;
+    if (isChatPanel(nodeId)) return 'Chat';
     if (isAppPanel(nodeId)) return nodeId.replace(/^app:/, '').replace(/^./, (c) => c.toUpperCase());
     const node = s.getNode(nodeId);
     const raw = node?.name ?? '';

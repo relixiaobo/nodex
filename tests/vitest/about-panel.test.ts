@@ -1,4 +1,4 @@
-import { APP_PANELS, isAppPanel } from '../../src/types/index.js';
+import { APP_PANELS, CHAT_PANEL_PREFIX, chatPanelSessionId, isAppPanel, isChatPanel } from '../../src/types/index.js';
 import { CHANGELOG } from '../../src/lib/changelog.js';
 import { SYSTEM_NODE_PRESETS } from '../../src/lib/system-node-presets.js';
 
@@ -6,6 +6,12 @@ describe('About panel', () => {
   it('APP_PANELS.ABOUT is an app panel, not a node', () => {
     expect(APP_PANELS.ABOUT).toBe('app:about');
     expect(isAppPanel(APP_PANELS.ABOUT)).toBe(true);
+  });
+
+  it('chat panel ids use the chat: prefix and expose their session id', () => {
+    const panelId = `${CHAT_PANEL_PREFIX}sess_123`;
+    expect(isChatPanel(panelId)).toBe(true);
+    expect(chatPanelSessionId(panelId)).toBe('sess_123');
   });
 
   it('ABOUT is not registered in system node presets', () => {

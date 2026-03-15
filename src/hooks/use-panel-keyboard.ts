@@ -9,6 +9,7 @@
 import { useEffect } from 'react';
 import { useUIStore, selectCurrentNodeId } from '../stores/ui-store.js';
 import { getShortcutKeys, matchesShortcutEvent } from '../lib/shortcut-registry.js';
+import { isAppPanel, isChatPanel } from '../types/index.js';
 
 export function usePanelKeyboard() {
   useEffect(() => {
@@ -23,7 +24,7 @@ export function usePanelKeyboard() {
       // Open panel: Cmd+\ — open focused/selected node in new panel
       if (openBindings.some((b) => matchesShortcutEvent(e, b))) {
         const nodeId = state.focusedNodeId ?? state.selectedNodeId ?? selectCurrentNodeId(state);
-        if (!nodeId) return;
+        if (!nodeId || isChatPanel(nodeId) || isAppPanel(nodeId)) return;
         e.preventDefault();
         state.openPanel(nodeId);
         return;

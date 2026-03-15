@@ -40,6 +40,7 @@ import { ensureTodayNode, isDayNode } from '../../lib/journal.js';
 import { parseDayNodeName, parseYearNodeName, isToday } from '../../lib/date-utils.js';
 
 import { ensureUndoFocusAfterNavigation } from '../../lib/focus-utils.js';
+import { openChatWithPrompt } from '../../lib/chat-panel-actions.js';
 import { t } from '../../i18n/strings.js';
 import { Kbd } from '../ui/Kbd';
 
@@ -102,8 +103,6 @@ export function CommandPalette() {
   const searchQuery = useUIStore((s) => s.searchQuery);
   const setSearchQuery = useUIStore((s) => s.setSearchQuery);
   const navigateTo = useUIStore((s) => s.navigateTo);
-  const openChat = useUIStore((s) => s.openChat);
-  const setPendingChatPrompt = useUIStore((s) => s.setPendingChatPrompt);
   const _version = useNodeStore((s) => s._version);
   const createChild = useNodeStore((s) => s.createChild);
   const authUser = useWorkspaceStore((s) => s.authUser);
@@ -285,12 +284,11 @@ export function CommandPalette() {
       type: 'command' as PaletteItemType,
       typeLabel: 'Ask AI',
       action: () => {
-        setPendingChatPrompt(q);
-        openChat();
+        void openChatWithPrompt(q);
         closeAndClear();
       },
     };
-  }, [searchQuery, searchResults.length, setPendingChatPrompt, openChat, closeAndClear]);
+  }, [searchQuery, searchResults.length, closeAndClear]);
 
   // Default mode: Suggestions (behavior-driven) + Commands (fixed list)
   const sortedDefaultItems = useMemo(() => {

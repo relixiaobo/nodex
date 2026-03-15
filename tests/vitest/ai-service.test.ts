@@ -467,6 +467,51 @@ describe('ai-service', () => {
     ]);
   });
 
+  it('getAgentForSession reuses the same agent per session id', async () => {
+    const { getAgentForSession } = await import('../../src/lib/ai-service.js');
+
+    const first = getAgentForSession('session_a');
+    const second = getAgentForSession('session_a');
+    const third = getAgentForSession('session_b');
+
+    expect(second).toBe(first);
+    expect(third).not.toBe(first);
+  });
+
+  it('restoreChatSessionById hydrates the requested session instead of the latest one', async () => {
+    const { saveChatSession } = await import('../../src/lib/ai-persistence.js');
+    const { getAgentForSession, getCurrentSession, restoreChatSessionById } = await import('../../src/lib/ai-service.js');
+
+    const olderSession = linearToTree([
+      createUserMessage('older-session', 1),
+      createAssistantMessage('older-reply', 2),
+    ]);
+    olderSession.id = 'session_older';
+    olderSession.createdAt = 1;
+    olderSession.updatedAt = 2;
+
+    const targetSession = linearToTree([
+      createUserMessage('target-session', 3),
+      createAssistantMessage('target-reply', 4),
+    ]);
+    targetSession.id = 'session_target';
+    targetSession.createdAt = 3;
+    targetSession.updatedAt = 4;
+
+    await saveChatSession(olderSession);
+    await saveChatSession(targetSession);
+
+    const agent = getAgentForSession('session_target');
+    await restoreChatSessionById('session_target', agent);
+
+    expect(agent.sessionId).toBe('session_target');
+    expect(getCurrentSession(agent)?.id).toBe('session_target');
+    expect(agent.state.messages).toEqual([
+      createUserMessage('target-session', 3),
+      createAssistantMessage('target-reply', 4),
+    ]);
+  });
+
   it('keeps chat sessions isolated per agent instance', async () => {
     const { createAgent, createNewChatSession, getCurrentSession } = await import('../../src/lib/ai-service.js');
 

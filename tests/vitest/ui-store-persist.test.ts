@@ -12,7 +12,6 @@ describe('ui-store persistence helpers', () => {
       viewMode: 'cards',
       searchOpen: true,
       searchQuery: 'x',
-      chatOpen: true,
       focusedNodeId: 'note_1',
     } as never);
 

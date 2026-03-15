@@ -14,7 +14,7 @@ import {
 import { compactForOverflow, compactIfNeeded, getCompressedPath } from './ai-compress.js';
 import { prepareAgentContext } from './ai-context.js';
 import { streamProxyWithApiKey } from './ai-proxy.js';
-import { type ChatSession, getLatestChatSession, saveChatSession } from './ai-persistence.js';
+import { type ChatSession, getChatSession, getLatestChatSession, saveChatSession } from './ai-persistence.js';
 import { getAITools } from './ai-tools/index.js';
 import * as loroDoc from './loro-doc.js';
 import { withCommitOrigin } from './loro-doc.js';
@@ -42,6 +42,7 @@ interface AgentRuntimeState {
 
 let agentSingleton: Agent | null = null;
 const agentRuntimeState = new WeakMap<Agent, AgentRuntimeState>();
+export const agentRegistry = new Map<string, Agent>();
 let migrationPromise: Promise<void> | null = null;
 
 function hasChromeStorage(): boolean {
@@ -196,7 +197,7 @@ function supportsDynamicAgentConfiguration(agent: Agent): boolean {
     && typeof candidate.replaceMessages === 'function';
 }
 
-async function configureAgent(agent: Agent): Promise<{
+export async function configureAgent(agent: Agent): Promise<{
   provider: StoredAISettings['provider'];
 }> {
   await ensureAISettingsMigrated();
@@ -497,6 +498,59 @@ export function getAIAgent(): Agent {
   return agentSingleton;
 }
 
+export function getAgentForSession(sessionId: string): Agent {
+  const existing = agentRegistry.get(sessionId);
+  if (existing) {
+    return existing;
+  }
+
+  const agent = createAgent();
+  agentRegistry.set(sessionId, agent);
+  return agent;
+}
+
+export function restoreChatSessionById(sessionId: string, agent: Agent): Promise<void> {
+  const runtime = getAgentRuntimeState(agent);
+  if (runtime.hydrated) return Promise.resolve();
+
+  if (!runtime.restorePromise) {
+    runtime.restorePromise = (async () => {
+      try {
+        await configureAgent(agent);
+      } catch {
+        // Keep default prompt/tools when config hydration fails.
+      }
+
+      try {
+        const session = await getChatSession(sessionId);
+        if (session) {
+          trimIncompleteTrail(session);
+          setCurrentSession(agent, session);
+          agent.replaceMessages(getCompressedPath(session));
+          runtime.hydrated = true;
+          return;
+        }
+      } catch {
+        // IndexedDB is unavailable in some test/browser contexts.
+      }
+
+      const createdSession = createSession(sessionId);
+      let persistedSession = createdSession;
+      try {
+        persistedSession = await saveChatSession(createdSession);
+      } catch {
+        // Ignore persistence failures; chat should still function.
+      }
+
+      setCurrentSession(agent, persistedSession);
+      agent.replaceMessages([]);
+      runtime.hydrated = true;
+    })();
+  }
+
+  return runtime.restorePromise;
+}
+
 export function restoreLatestChatSession(agent: Agent = getAIAgent()): Promise<void> {
   const runtime = getAgentRuntimeState(agent);
   if (runtime.hydrated) return Promise.resolve();
@@ -625,6 +679,7 @@ export function stopStreaming(agent: Agent = getAIAgent()): void {
 
 export function resetAIAgentForTests(): void {
   agentSingleton = null;
+  agentRegistry.clear();
   migrationPromise = null;
 }
 

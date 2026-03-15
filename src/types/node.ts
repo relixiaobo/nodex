@@ -395,25 +395,34 @@ export const APP_PANELS = {
 export type AppPanelId = typeof APP_PANELS[keyof typeof APP_PANELS];
 
 const APP_PANEL_VALUES = new Set<string>(Object.values(APP_PANELS));
+export const CHAT_PANEL_PREFIX = 'chat:';
 
 export function isAppPanel(panelId: string): panelId is AppPanelId {
   return APP_PANEL_VALUES.has(panelId);
+}
+
+export function isChatPanel(panelId: string): boolean {
+  return panelId.startsWith(CHAT_PANEL_PREFIX);
+}
+
+export function chatPanelSessionId(panelId: string): string {
+  if (!isChatPanel(panelId)) {
+    throw new Error(`[node] Expected chat panel id, got "${panelId}"`);
+  }
+  return panelId.slice(CHAT_PANEL_PREFIX.length);
 }
 
 // ============================================================
 // Multi-Panel 导航类型
 // ============================================================
 
-/** A single panel displaying a node (or app page). */
+/** A single panel displaying a node, chat session, or app page. */
 export interface Panel {
   id: string;
   nodeId: string;
 }
 
-/**
- * Global navigation event — forms a single undo/redo timeline.
- * Chat events are excluded (Chat is desk-layer, not navigation).
- */
+/** Global navigation event — forms a single undo/redo timeline. */
 export type NavigationEvent =
   | { action: 'navigate'; panelId: string; fromNodeId: string; toNodeId: string }
   | { action: 'open-panel'; panelId: string; nodeId: string; insertIndex: number; prevActivePanelId: string }

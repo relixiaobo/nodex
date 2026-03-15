@@ -110,9 +110,20 @@ interface MessageNode {
 |------|------|
 | **正常对话** | 新消息作为 `currentNode` 的子节点，更新 `currentNode` 指向新叶 |
 | **编辑消息** | 在被编辑消息的**父节点**下创建新 user 兄弟 → 触发新 assistant 子节点 → `currentNode` 指向新叶 |
-| **重新生成** | 在 user 消息下创建新 assistant 兄弟 → `currentNode` 指向新叶 |
+| **重新生成** | 在被 regenerate 消息的**同一 parent** 下创建新 assistant 兄弟 → `currentNode` 指向新叶 |
 | **切换分支** | 改变选中的子节点 → 沿后代走到叶 → 更新 `currentNode` |
 | **展示对话** | 从 `currentNode` 沿 `parentId` 向上到根 → 反转 → 线性路径 → 渲染 |
+
+**tool-call 链处理**：`toolResult` 是树中的独立 `MessageNode`，不是 assistant 的附属 metadata。典型链路：
+
+```
+U₁ → A₁(tool_use) → TR₁ → A₂(final response)
+```
+
+- Regenerate A₂ 时，A₂ 的 parent 是 TR₁ → 在 TR₁ 下创建 A₂' 作为兄弟
+- Regenerate A₁ 时，整条 A₁ → TR₁ → A₂ 子树变为旧分支，新 A₁' 在 U₁ 下创建
+- `getLinearPath()` 导出的路径必须包含中间的 toolResult 节点
+- UI 分支导航 `← 2/3 →` 只显示在可见的 user/assistant 消息上，不在 toolResult 上显示
 
 **分支导航 UI**：`children.length > 1` 时，在子消息上显示 `← 2/3 →` 箭头。
 
@@ -179,18 +190,46 @@ async function compactIfNeeded(messages, agent, signal) {
 }
 ```
 
-在 `transformContext` 管线中的位置：
+**压缩在调用层执行，不在 `transformContext` hook 中**：
+
+```typescript
+// streamChat() 调用层
+async function streamChat(userMessage, session, agent) {
+  // 1. 首轮前置压缩（显式状态修改）
+  await compactIfNeeded(session, agent);        // 修改: 树 + agent.replaceMessages + IndexedDB
+
+  // 2. 执行 agent.prompt()
+  await agent.prompt(userMessage);
+  //   → transformContext: stripOldImages + injectReminder（纯变换，无副作用）
+  //   → agent-loop 内部可能多轮 tool-call
+
+  // 3. 持久化（agent.state.messages → 树 → IndexedDB）
+  await persistSession(session, agent);
+}
+```
+
+`transformContext` 保持纯函数语义，只做 `stripOldImages` + `injectReminder`：
 
 ```typescript
 transformContext: async (messages, signal) => {
   let ctx = messages;
-  ctx = await compactIfNeeded(ctx, agent, signal);    // 1. 压缩（按需）
-  ctx = injectReminder(ctx, await buildSystemReminder()); // 2. 动态上下文注入
+  ctx = stripOldImages(ctx);
+  ctx = injectReminder(ctx, await buildSystemReminder());
   return ctx;
 },
 ```
 
-溢出兜底：LLM 返回 `isContextOverflow` 时，强制压缩 + `agent.continue()` 重试。
+**已知限制**：`agent.prompt()` 包住整个 tool loop（见 pi-agent-core `agent.js:242`、`agent-loop.js:134`），pre-prompt 压缩只能覆盖首轮 LLM 调用。tool loop 内后续轮次如果 token 持续增长，只能靠 overflow fallback。
+
+### 压缩时机总结
+
+| 时机 | 策略 | 触发方式 |
+|------|------|----------|
+| **首轮 LLM 调用前** | `compactIfNeeded()` 主动压缩 | `streamChat()` 调用层显式执行 |
+| **tool loop 内后续轮** | 不主动压缩 | 当前 runtime 限制，无法在 loop 中插入 |
+| **LLM 返回 overflow** | 强制压缩 + 重试 | `isContextOverflow` 事件触发 |
+
+**overflow retry 要点**：retry 前必须移除尾部的 assistant error message，再 `agent.replaceMessages(compressedMessages)` + `agent.continue()`。不能直接对着 assistant error 结尾 continue。
 
 ### 压缩流程
 
@@ -203,12 +242,21 @@ transformContext: async (messages, signal) => {
 2. 构建 Bridge Message → 填入 Bridge Template
    → { role: 'bridge', content: bridgeContent, timestamp }
 
-3. 重建上下文
-   → [Bridge Message] + [Current User Message]
+3. 重建上下文 + 持久化
+   → [Bridge Message] + [Recent Messages]
    → agent.replaceMessages(newMessages)
+   → 同步回写消息树 + IndexedDB
 ```
 
-压缩是透明的中间步骤——用户发消息后，如果 token 超阈值，压缩在下一次 LLM 调用前自动执行，然后模型继续处理用户的任务。
+压缩是透明的中间步骤——用户发消息后，如果 token 超阈值，压缩在 LLM 调用前自动执行，然后模型继续处理用户的任务。
+
+### write-back 路径
+
+压缩修改三层状态，顺序如下：
+
+1. **消息树**：根据 Bridge 存放策略（选项 A 或 B），更新 `session.mapping` 和/或 `session.bridges`
+2. **agent 状态**：`agent.replaceMessages(getLinearPath(session))` — 让 pi-agent-core 看到压缩后的线性路径
+3. **IndexedDB**：持久化更新后的 `ChatSession`
 
 ### 与消息树的关系
 
@@ -314,9 +362,9 @@ but respond as if you've been here all along.
 | 文件 | 操作 | 说明 |
 |------|------|------|
 | `src/lib/ai-types.ts` | 新建 | Bridge 自定义消息类型声明合并 |
-| `src/lib/ai-compress.ts` | 新建 | Handoff 压缩逻辑 |
-| `src/lib/ai-context.ts` | 修改 | `transformContext` 中加入 `compactIfNeeded()` |
-| `tests/vitest/ai-compress.test.ts` | 新建 | 压缩触发条件 + 边界保护测试 |
+| `src/lib/ai-compress.ts` | 新建 | Handoff 压缩逻辑（`compactIfNeeded` + `compact` + overflow retry） |
+| `src/lib/ai-service.ts` | 修改 | `streamChat` 调用层加入 pre-prompt 压缩 + overflow 事件处理 |
+| `tests/vitest/ai-compress.test.ts` | 新建 | 压缩触发条件 + overflow retry + 边界保护测试 |
 
 ---
 
@@ -329,34 +377,62 @@ but respond as if you've been here all along.
 ### 方案：Sync API 独立通道
 
 不走 Loro CRDT，原因：
-- Chat 是追加写入，不需要 CRDT 冲突合并
 - 节点 LoroDoc 已经很大，不应再塞 chat 数据
-- Last-write-wins 对 chat 场景完全够用
+- Chat 同步的冲突场景有限（同一 session 极少在两台设备同时活跃），不需要通用 CRDT
 
 ```
-D1: chat_sessions 表（id, user_id, workspace_id, title, message_count, timestamps）
+D1: chat_sessions 表（id, user_id, workspace_id, title, message_count, revision, timestamps）
 R2: chat/{workspace_id}/{session_id}.json（完整 ChatSession JSON）
 ```
 
-### 同步流程
+### 冲突检测：server-side compare-and-swap
 
-- **Push**：`updatedAt > syncedAt` → PUT D1 行 + PUT R2 对象 → 更新本地 `syncedAt`
-- **Pull**：查 D1 `updated_at > lastPullAt` → GET R2 → last-write-wins 合并 → 写入本地 IndexedDB
-- **时机**：复用 SyncManager 的 30s 定时 + visibilitychange 触发
+**不使用静默 LWW**——消息树模型下，静默覆盖会丢失整个分支，违反"原始消息永远不删"原则。
+
+**Push（带版本检查）**：
+
+```
+客户端 → PUT /chat/sessions/{id}
+  body: { session, baseRevision }        // baseRevision = 上次同步时服务端的 revision
+
+服务端:
+  if remote.revision == baseRevision → 接受写入，revision++，更新 R2
+  if remote.revision != baseRevision → 返回 409 Conflict + 远端 session
+```
+
+**Pull**：
+
+- 查 D1 `updated_at > lastPullAt` → GET R2 → 写入本地 IndexedDB
+- 如果本地 session 也有未同步的修改（`updatedAt > syncedAt`）→ 标记冲突
+
+**冲突处理 UI（Phase 4 简化方案）**：
+
+冲突时不自动合并，提供三个选项：
+1. **保留本地** — 用本地版本强制覆盖远端
+2. **保留远端** — 用远端版本覆盖本地
+3. **两者都保留** — 复制为两个独立 session
+
+**已知限制**：Phase 4 不做 mapping-level merge（即不会自动合并两边各自创建的分支）。同一 session 在多设备并发编辑是已知的不支持场景。未来可升级为 mapping dict union merge。
+
+**时机**：复用 SyncManager 的 30s 定时 + visibilitychange 触发。
 
 ### 文件清单
 
 | 文件 | 操作 | 说明 |
 |------|------|------|
-| `src/lib/ai-persistence.ts` | 修改 | push/pull 逻辑 |
+| `src/lib/ai-persistence.ts` | 修改 | push/pull + 冲突检测逻辑 |
 | `src/lib/sync/sync-manager.ts` | 修改 | 加入 `syncChatSessions()` 步骤 |
-| Backend: `worker/` | 新建 | D1 表 + R2 存储的 API 端点 |
+| `src/components/chat/` | 修改 | 冲突处理 UI |
+| Backend: `worker/` | 新建 | D1 表 + R2 存储 + CAS 写入端点 |
 
 ---
 
 ## 不做的事
 
-- 不用 Loro CRDT 同步 chat — 追加写入，last-write-wins 足够
+- 不用 Loro CRDT 同步 chat — 冲突场景有限，CAS + 手动解决足够
+- 不做 mapping-level 自动 merge — Phase 4 不支持多设备并发编辑同一 session
+- 不在 `transformContext` 中做压缩 — 压缩有持久化副作用，提到调用层显式执行
+- 不在 tool loop 内主动压缩 — 当前 runtime 限制，靠 overflow fallback 兜底
 - 不引入精确 tokenizer — 用 `AssistantMessage.usage` 实际数据
 - 不自建溢出检测 — 用 pi-ai 的 `isContextOverflow()`
 - 不拆 IndexedDB 为 session + message 两个 store — 当前会话量级不需要

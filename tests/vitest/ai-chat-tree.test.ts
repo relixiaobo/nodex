@@ -245,6 +245,29 @@ describe('ai chat tree', () => {
     expect(() => performOp(session, parent, 'link', child.id)).toThrow(/cycle/i);
   });
 
+  it('performOp relink validates before mutating the existing tree', () => {
+    const session = createSession();
+    const root = getRootNode(session);
+    const parent = linkSibling(session, root.id, createUserMessage('parent', 1));
+    const child = createMessageNode(createAssistantMessage('child', 2), parent.id, parent.level + 1);
+    performOp(session, child, 'link', parent.id);
+
+    expect(() => performOp(session, parent, 'relink', child.id)).toThrow(/cycle/i);
+    expect(root.children).toEqual([parent.id]);
+    expect(root.currentChild).toBe(parent.id);
+    expect(parent.parentId).toBe(root.id);
+    expect(parent.children).toEqual([child.id]);
+    expect(child.parentId).toBe(parent.id);
+  });
+
+  it('performOp link does not register a new node when validation fails', () => {
+    const session = createSession();
+    const orphan = createMessageNode(createUserMessage('orphan', 1), 'missing-parent', 1);
+
+    expect(() => performOp(session, orphan, 'link', 'missing-parent')).toThrow(/Missing node/);
+    expect(session.mapping[orphan.id]).toBeUndefined();
+  });
+
   it('performOp link updates subtree levels recursively', () => {
     const session = createSession();
     const root = getRootNode(session);
@@ -295,6 +318,45 @@ describe('ai chat tree', () => {
     expect(session.currentNode).toBe(placeholder.id);
     expect(placeholder.parentId).toBe(user.id);
     expect(placeholder.message).toBeNull();
+  });
+
+  it('syncAgentToTree fills a regenerate placeholder before appending deeper messages', () => {
+    const session = createSession();
+    const root = getRootNode(session);
+    const user = linkSibling(session, root.id, createUserMessage('user', 1));
+    const original = createMessageNode(createAssistantMessage('original', 2), user.id, user.level + 1);
+    performOp(session, original, 'link', user.id);
+    const placeholder = regenerate(session, original.id);
+
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    expect(getLinearPath(session).map((node) => node.id)).toEqual([user.id]);
+    expect(warn).not.toHaveBeenCalled();
+
+    syncAgentToTree(session, [
+      createUserMessage('user', 1),
+      createAssistantMessage('regenerated', 3),
+      {
+        role: 'toolResult',
+        toolCallId: 'call_4',
+        toolName: 'browser',
+        content: [{ type: 'text', text: 'tool output' }],
+        isError: false,
+        timestamp: 4,
+      },
+      createAssistantMessage('final', 5),
+    ]);
+
+    expect(placeholder.message).toEqual(createAssistantMessage('regenerated', 3));
+    expect(user.children).toEqual([original.id, placeholder.id]);
+    expect(placeholder.children).toHaveLength(1);
+    const toolResultId = placeholder.children[0];
+    expect(session.mapping[toolResultId]?.message).toMatchObject({ role: 'toolResult' });
+    expect(getLinearPath(session).map((node) => node.message?.role)).toEqual([
+      'user',
+      'assistant',
+      'toolResult',
+      'assistant',
+    ]);
   });
 
   it('switchBranch updates currentChild and follows currentChild pointers to the latest leaf', () => {

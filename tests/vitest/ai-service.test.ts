@@ -274,6 +274,74 @@ describe('ai-service', () => {
     ]);
   });
 
+  it('restoreLatestChatSession hydrates compressed paths when a bridge exists', async () => {
+    const { saveChatSession } = await import('../../src/lib/ai-persistence.js');
+    const { createAgent, restoreLatestChatSession } = await import('../../src/lib/ai-service.js');
+
+    const session = linearToTree([
+      { role: 'user', content: 'user-1', timestamp: 1 },
+      {
+        role: 'assistant',
+        content: [{ type: 'text', text: 'assistant-1' }],
+        api: 'anthropic-messages',
+        provider: 'anthropic',
+        model: 'claude-sonnet-4-5',
+        usage: {
+          input: 100,
+          output: 0,
+          cacheRead: 0,
+          cacheWrite: 0,
+          totalTokens: 100,
+          cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+        },
+        stopReason: 'stop',
+        timestamp: 2,
+      },
+      { role: 'user', content: 'user-2', timestamp: 3 },
+      {
+        role: 'assistant',
+        content: [{ type: 'text', text: 'assistant-2' }],
+        api: 'anthropic-messages',
+        provider: 'anthropic',
+        model: 'claude-sonnet-4-5',
+        usage: {
+          input: 200,
+          output: 0,
+          cacheRead: 0,
+          cacheWrite: 0,
+          totalTokens: 200,
+          cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+        },
+        stopReason: 'stop',
+        timestamp: 4,
+      },
+    ]);
+    const path = getLinearPath(session);
+    session.bridges = [{
+      afterNodeId: path[1].id,
+      content: 'memo for the next assistant',
+      timestamp: 50,
+    }];
+
+    await saveChatSession(session);
+
+    const agent = createAgent();
+    await restoreLatestChatSession(agent);
+
+    expect(agent.state.messages).toEqual([
+      expect.objectContaining({
+        role: 'user',
+        content: expect.stringContaining('memo for the next assistant'),
+        timestamp: 50,
+      }),
+      { role: 'user', content: 'user-2', timestamp: 3 },
+      expect.objectContaining({
+        role: 'assistant',
+        timestamp: 4,
+      }),
+    ]);
+  });
+
   it('keeps chat sessions isolated per agent instance', async () => {
     const { createAgent, createNewChatSession, getCurrentSession } = await import('../../src/lib/ai-service.js');
 
@@ -296,9 +364,25 @@ describe('ai-service', () => {
   it('streamChat trims input and stopStreaming aborts the agent', async () => {
     const { streamChat, stopStreaming } = await import('../../src/lib/ai-service.js');
 
+    const state = {
+      messages: [] as import('@mariozechner/pi-agent-core').AgentMessage[],
+      systemPrompt: '',
+      tools: [] as import('@mariozechner/pi-agent-core').AgentTool<any>[],
+      model: {
+        id: 'claude-sonnet-4-5',
+        provider: 'anthropic',
+        contextWindow: 200000,
+      },
+    };
     const agent = {
+      state,
       prompt: vi.fn().mockResolvedValue(undefined),
       subscribe: vi.fn(() => () => {}),
+      waitForIdle: vi.fn().mockResolvedValue(undefined),
+      continue: vi.fn().mockResolvedValue(undefined),
+      replaceMessages: vi.fn((messages: import('@mariozechner/pi-agent-core').AgentMessage[]) => {
+        state.messages = messages;
+      }),
       abort: vi.fn(),
     } as unknown as import('@mariozechner/pi-agent-core').Agent;
 
@@ -342,6 +426,7 @@ describe('ai-service', () => {
       model: {
         id: 'claude-sonnet-4-5',
         provider: 'anthropic',
+        contextWindow: 200000,
       },
     };
 
@@ -368,6 +453,8 @@ describe('ai-service', () => {
       replaceMessages: vi.fn((messages: import('@mariozechner/pi-agent-core').AgentMessage[]) => {
         state.messages = messages;
       }),
+      waitForIdle: vi.fn().mockResolvedValue(undefined),
+      continue: vi.fn().mockResolvedValue(undefined),
       prompt: vi.fn(async (input: string) => {
         state.messages = [
           { role: 'user', content: input, timestamp: 1 },

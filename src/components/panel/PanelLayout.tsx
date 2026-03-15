@@ -122,7 +122,7 @@ export function PanelLayout({ toolbar }: PanelLayoutProps) {
           )}
         </div>
         {/* Panel body — round exposed top corners where desk background shows through */}
-        <div className={`group/panel flex flex-1 min-h-0 flex-col overflow-hidden bg-background ${
+        <div className={`group/panel flex flex-1 min-h-0 flex-col overflow-hidden bg-background shadow-card ${
           activeIdx > 0 ? 'rounded-xl' : 'rounded-b-xl rounded-tr-xl'
         }`}>
           {isApp ? (
@@ -173,7 +173,7 @@ export function PanelLayout({ toolbar }: PanelLayoutProps) {
               </div>
               {/* Panel body — no top-left rounding (connects to tab) */}
               <div
-                className="group/panel flex flex-1 min-w-0 flex-col overflow-hidden bg-background rounded-b-xl rounded-tr-xl"
+                className="group/panel flex flex-1 min-w-0 flex-col overflow-hidden bg-background shadow-card rounded-b-xl rounded-tr-xl"
                 onClick={() => setActivePanel(panel.id)}
               >
                 {isApp ? (
@@ -190,7 +190,7 @@ export function PanelLayout({ toolbar }: PanelLayoutProps) {
         return (
           <div key={panel.id} className="flex flex-1 min-w-0 flex-col">
             <div
-              className="group/panel flex flex-1 min-w-0 flex-col overflow-hidden rounded-xl bg-background"
+              className="group/panel flex flex-1 min-w-0 flex-col overflow-hidden rounded-xl bg-background shadow-card"
               onClick={() => setActivePanel(panel.id)}
             >
               {!isApp && (

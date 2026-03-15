@@ -1,9 +1,10 @@
 import { Agent, type AgentEvent, type AgentMessage } from '@mariozechner/pi-agent-core';
-import { getModel } from '@mariozechner/pi-ai';
+import { getModel, isContextOverflow } from '@mariozechner/pi-ai';
 import type { Message, Model } from '@mariozechner/pi-ai';
 import { getStoredToken } from './auth.js';
 import { buildAgentSystemPrompt, DEFAULT_AGENT_MODEL_ID, DEFAULT_AGENT_MAX_TOKENS, DEFAULT_AGENT_SYSTEM_PROMPT, DEFAULT_AGENT_TEMPERATURE, readAgentNodeConfig } from './ai-agent-node.js';
 import { createSession, getLinearPath, syncAgentToTree } from './ai-chat-tree.js';
+import { compactForOverflow, compactIfNeeded, getCompressedPath } from './ai-compress.js';
 import { prepareAgentContext } from './ai-context.js';
 import { streamProxyWithApiKey } from './ai-proxy.js';
 import { type ChatSession, getLatestChatSession, saveChatSession } from './ai-persistence.js';
@@ -270,6 +271,38 @@ function trimIncompleteTrail(session: ChatSession): void {
   }
 }
 
+function syncSessionFromAgent(session: ChatSession, agentMessages: AgentMessage[]): void {
+  const fullPathMessages = getLinearPath(session).map((node) => node.message!);
+  const compressedPath = getCompressedPath(session);
+
+  if (compressedPath.length > agentMessages.length) {
+    console.error(
+      '[ai-service] syncSessionFromAgent: compressed path is longer than agent state (%d > %d)',
+      compressedPath.length,
+      agentMessages.length,
+    );
+    return;
+  }
+
+  if (compressedPath.length > 0) {
+    const pathTail = compressedPath[compressedPath.length - 1];
+    const agentTail = agentMessages[compressedPath.length - 1];
+    if (!agentTail || pathTail.role !== agentTail.role) {
+      console.error(
+        '[ai-service] syncSessionFromAgent: prefix mismatch - path tail role=%s, agent role=%s',
+        pathTail.role,
+        agentTail?.role ?? 'null',
+      );
+      return;
+    }
+  }
+
+  syncAgentToTree(session, [
+    ...fullPathMessages,
+    ...agentMessages.slice(compressedPath.length),
+  ]);
+}
+
 export async function getAISettings(): Promise<StoredAISettings | null> {
   if (!hasNodeBackedAISettings()) {
     return readSettings();
@@ -357,8 +390,8 @@ export function createAgent(model: Model<any> = DEFAULT_CHAT_MODEL): Agent {
       const runtime = getAgentRuntimeState(agent);
       return streamProxyWithApiKey(activeModel, context, {
         ...options,
-        temperature: runtime.temperature,
-        maxTokens: runtime.maxTokens,
+        temperature: options.temperature ?? runtime.temperature,
+        maxTokens: options.maxTokens ?? runtime.maxTokens,
         authToken,
         proxyUrl: getSyncApiUrl(),
       });
@@ -392,7 +425,7 @@ export function restoreLatestChatSession(agent: Agent = getAIAgent()): Promise<v
         if (latestSession) {
           trimIncompleteTrail(latestSession);
           setCurrentSession(agent, latestSession);
-          agent.replaceMessages(getLinearPath(latestSession).map((node) => node.message!));
+          agent.replaceMessages(getCompressedPath(latestSession));
           try {
             await configureAgent(agent);
           } catch {
@@ -455,34 +488,62 @@ export async function streamChat(prompt: string, agent: Agent = getAIAgent()): P
   }
 
   const session = ensureCurrentSession(agent);
+  await compactIfNeeded(session, agent);
 
-  let unsubscribed = false;
+  let skipCurrentTurnSync = false;
+  const overflowRecoveries: Promise<void>[] = [];
+  let overflowQueue = Promise.resolve();
+
+  function queueOverflowRecovery(): void {
+    skipCurrentTurnSync = true;
+
+    const recovery = overflowQueue.then(async () => {
+      await agent.waitForIdle();
+      skipCurrentTurnSync = false;
+      await compactForOverflow(session, agent);
+    });
+    overflowQueue = recovery.catch(() => {});
+    overflowRecoveries.push(recovery);
+  }
+
   const unsubscribe = agent.subscribe((event: AgentEvent) => {
     if (getCurrentSession(agent) !== session) return;
 
-    if (event.type === 'turn_end') {
-      syncAgentToTree(session, agent.state.messages);
-      void persistChatSession(agent);
+    if (event.type === 'message_end') {
+      if (event.message.role === 'assistant') {
+        if (isContextOverflow(event.message, agent.state.model.contextWindow)) {
+          queueOverflowRecovery();
+        }
+        return;
+      }
+
+      syncSessionFromAgent(session, agent.state.messages);
       return;
     }
 
-    if (event.type === 'agent_end') {
-      syncAgentToTree(session, event.messages);
-      if (session.title === null) {
-        session.title = deriveSessionTitle(event.messages);
-      }
+    if (event.type === 'turn_end') {
+      if (skipCurrentTurnSync) return;
+      syncSessionFromAgent(session, agent.state.messages);
       void persistChatSession(agent);
-      unsubscribe();
-      unsubscribed = true;
+      return;
     }
   });
 
   try {
     await agent.prompt(normalized);
-  } finally {
-    if (!unsubscribed) {
-      unsubscribe();
+    let recoveryIndex = 0;
+    while (recoveryIndex < overflowRecoveries.length) {
+      await overflowRecoveries[recoveryIndex];
+      recoveryIndex += 1;
     }
+
+    syncSessionFromAgent(session, agent.state.messages);
+    if (session.title === null) {
+      session.title = deriveSessionTitle(agent.state.messages);
+    }
+    await persistChatSession(agent);
+  } finally {
+    unsubscribe();
   }
 }
 

@@ -530,12 +530,12 @@ R2: chat/{workspace_id}/{session_id}.json（完整 ChatSession JSON）
 | `transformContext` hook | 纯变换（stripOldImages + injectReminder），不做压缩 | 已有 |
 | `convertToLlm` hook | 过滤消息类型（新增 bridge → user 转换） | 3 |
 
-**不使用的能力**：
+**不用于同步/持久化的能力**：
 
-| 能力 | 不使用的原因 |
-|------|-------------|
-| `AgentEvent.turn_end` | 粒度过细（每轮 tool-call 触发），同步只需要在整个 prompt 结束时执行一次 |
-| `agent.state.isStreaming` | 被 `agent_end` 事件替代，事件比状态轮询更精确 |
+| 能力 | 用途 | 不用于同步/持久化的原因 |
+|------|------|----------------------|
+| `AgentEvent.turn_end` | MVP 不使用；未来可用于断点恢复（长 tool-call 链中途断开时保留已完成的轮次） | 当前 tool-call 链短（1-3 轮），"丢了重来"可接受，断点恢复逻辑增加复杂度 |
+| `agent.state.isStreaming` | UI 渲染：禁用发送按钮、显示 loading/stop 按钮、typing indicator | 状态适合驱动声明式 UI（"现在怎样"），但不适合触发副作用（"刚发生了什么"）——后者用 `agent_end` 事件 |
 
 ---
 

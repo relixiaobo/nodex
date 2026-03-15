@@ -23,13 +23,13 @@ _(空)_
 | 工作区 | 分支 | 任务 | 状态 |
 |--------|------|------|------|
 | nodex-gemini | — | 空闲 | — |
-| nodex-codex | — | 空闲 | — |
+| nodex-codex | codex/chat-phase-3 | Chat Phase 3 — 上下文自动压缩 | 待执行 |
 
 ---
 
 ## 进行中
 
-_(空)_
+- [ ] **Chat Phase 3** — 上下文自动压缩（Bridge Message + Handoff Memo） | Codex | [#140](https://github.com/relixiaobo/nodex/pull/140)
 
 ---
 

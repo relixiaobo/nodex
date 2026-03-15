@@ -1,146 +1,393 @@
-# AI 上下文管理方案 (Layer 2: 上下文管线)
+# AI Chat 架构方案
 
-> **目标**：充分利用 pi-agent-core 的标准钩子，让上下文组装清晰、分层、可扩展。
-> **更新**：2026-03-13 — Step 1 已完成 (#132)；Step 2 任务已创建，见 TASKS.md「#skill 节点支持」
+> Chat 持久化、上下文压缩、跨设备同步的统一设计。
+>
+> **更新**：2026-03-15 — 代码现状 review + 开源调研 + 参考实现分析（assistant-ui / Vercel AI SDK）+ pi-agent-core 事件系统全面采用
 
-## 三步走状态
+## 总览
 
-| Step | 内容 | 状态 | PR |
-|------|------|------|-----|
-| Step 1 | `transformContext` + `convertToLlm` + `getApiKey` + streamFn 简化 | ✅ | #132 |
-| Step 2 | Skill 渐进式披露 | ⬜ | — |
-| Step 3 | Context 自动压缩 (Bridge Message + Handoff Memo) | ⬜ | — |
+```
+已完成                              待做
+──────────────────────              ──────────────────────────────────────
+✅ transformContext 管线 (#132)      Phase 1: 消息树数据模型 + 去限制
+✅ Skill 渐进式披露 (#134)           Phase 2: 编辑 + 重新生成 + 分支导航
+                                    Phase 3: Context 自动压缩
+                                    Phase 4: 跨设备同步
+```
 
-## 补充议题：Chat 会话同步
+Phase 2、3、4 互相不依赖，Phase 1 完成后可并行。
 
-当前 Chat 历史只存在本地 IndexedDB，不随工作区同步。用户在设备 A 的对话在设备 B 看不到。
+## 当前架构
 
-**方案选项**：
+### 代码结构
 
-| 方案 | 优点 | 缺点 |
-|------|------|------|
-| A: Loro CRDT 专用容器 | 天然随工作区同步，离线可用 | messages 数据量大，CRDT 膨胀 |
-| B: Sync API 独立通道 | 轻量，不污染 CRDT | 需要新的 sync 端点，离线体验差 |
-| C: 只同步 session 索引 | 最小改动 | 用户期望看到完整历史 |
+```
+ai-persistence.ts    ChatSession { id, messages[], createdAt, updatedAt }
+                     IndexedDB 'soma-ai-chat', DB_VERSION=1
+                     MAX_SESSIONS=10, MAX_MESSAGES_PER_SESSION=100
 
-**推荐**：方案 A（Loro CRDT），但需要控制数据量——压缩后的 Bridge Message 比全量历史更适合同步。可与 Step 3 (Context 压缩) 协同设计：同步的是"压缩后的会话状态"，而非"全部消息历史"。
+ai-service.ts        agentSingleton (单例 Agent)
+                     streamChat() → configureAgent() → agent.prompt()
+                     restoreLatestChatSession() / persistChatSession()
 
-**待定决策**：
-- 是否只同步最近 N 个 session？
-- 压缩后的 Bridge Message 是否作为同步单元？
-- 新设备打开时如何呈现同步来的历史？
+ai-context.ts        transformContext: stripOldImages + injectReminder
+                     buildSystemReminder(): panel + page + time context
+
+use-agent.ts         React hook: { messages, sendMessage, newChat, ... }
+                     250ms debounce persist on message signature change
+
+ChatDrawer.tsx       Drawer overlay (不在 panelHistory)
+ChatMessage.tsx      纯渲染 user/assistant, 支持 <ref>/<cite> markup
+ChatInput.tsx        textarea + send/stop, Cmd+Enter 发送
+```
+
+### 调用流程
+
+```
+sendMessage(prompt)
+  → streamChat(prompt, agent)
+    → configureAgent(agent)                // set tools, systemPrompt, model, temp, maxTokens
+    → agent.prompt(normalized)
+        → transformContext(messages)        // ✅ stripOldImages + injectReminder（纯变换）
+        → convertToLlm(messages)           // ✅ 过滤到 user/assistant/toolResult
+        → streamFn → streamProxyWithApiKey  // ✅ 纯网络转发
+    → agent 内部 tool loop（可能多轮 LLM 调用）
+  → useAgent effect 检测 messages 变化 → debounced persistChatSession()
+```
+
+### 当前局限
+
+1. **线性 messages[]** — 不支持编辑消息、重新生成、分支导航
+2. **硬限制** — 最多 10 个 session × 100 条消息，静默丢弃
+3. **无标题** — session 列表无法区分
+4. **无压缩** — 长对话会撞 context window
+5. **无同步** — 聊天记录只在本地
 
 ---
 
-## Step 1 已完成的变化 ✅
+## 参考实现分析
 
-以下问题已在 #132 中解决：
+调研了 assistant-ui（8.8k stars）的 `MessageRepository` 和 Vercel AI SDK PR #5085 的分支工具函数。两者验证了我们的设计方向，同时提供了几个值得采纳的模式：
 
-~~1. 职责混乱：streamFn 承担了上下文编排~~ → `transformContext` + `getApiKey` 各司其职
-~~2. 没有利用 pi-mono 能力~~ → `transformContext`、`convertToLlm`、`getApiKey` 已接入
-~~3. Skill 全量注入~~ → 待 Step 2 解决
-~~4. 没有上下文窗口管理~~ → 待 Step 3 解决
+### 采纳的模式
 
-## 当前架构（Step 1 完成后）
-
-```
-streamChat()
-  → configureAgent()                     // 设置 model + temperature + maxTokens + tools + systemPrompt
-  → agent.prompt()
-      → transformContext(messages)        // ✅ pi-agent-core 标准钩子
-          → stripOldImages()              // ✅ 滑动窗口剥离旧图片
-          → injectReminder()             // ✅ panel/page/time 注入到最后一条 user 消息
-          → return transformedMessages
-      → convertToLlm(messages)           // ✅ 过滤非 LLM 消息类型
-      → streamFn()                        // ✅ 纯网络转发
-          → streamProxyWithApiKey()
-```
-
-### Step 1 完成的变化 ✅
-
-| 维度 | 之前 | 现在 |
+| 模式 | 来源 | 说明 |
 |------|------|------|
-| **dynamic context** | 在 streamFn 里手动拼接 | ✅ `transformContext` 标准注入 |
-| **streamFn** | 上下文编排 + 网络转发 + API key 解析 | ✅ 纯网络转发 |
-| **API key** | streamFn 内手动获取 | ✅ `getApiKey` 构造参数 |
-| **图片管理** | 无 | ✅ `stripOldImages` 滑动窗口 |
+| **虚拟根节点** | assistant-ui | `mapping` 中有一个 `message: null` 的合成根节点，所有顶层消息挂在它下面。消除 `parentId === null` 的特殊处理 |
+| **`level` 字段加速路径构建** | assistant-ui | 每个节点缓存深度值，`getLinearPath()` 预分配 `new Array(head.level + 1)` 然后反向填充，无需 `unshift` 或 reverse |
+| **`currentChild` 指针** | assistant-ui | 每个有 children 的节点记住"上次选中的子节点"，切换分支后再切回来不丢失位置 |
+| **切换分支时自动选最新叶** | Vercel AI SDK | 点击一个中间兄弟节点时，自动沿后代走到 `createdAt` 最大的叶节点，而非停在点击处 |
+| **统一变异函数** | assistant-ui | 所有树结构修改通过一个 `performOp(parent, child, "cut" \| "link" \| "relink")` 执行，含环检测 + `currentChild` 回退 |
+| **引入 idb** | 调研结论 | 用 Jake Archibald 的 `idb`（1.2KB）替换手写 IndexedDB 样板代码 |
 
-### 待完成
+### 不采纳的模式
 
-| 维度 | 当前 | 目标 |
+| 模式 | 来源 | 不采纳原因 |
+|------|------|-----------|
+| 运行时 linked-list 图 (`prev`/`next` 指针) | assistant-ui | 我们的持久层是 `mapping: Record<string, MessageNode>`（可直接序列化到 IndexedDB），运行时操作通过查字典实现。linked-list 图适合纯内存场景，但增加序列化/反序列化复杂度 |
+| `parentId` 存在消息 annotations 中 | Vercel AI SDK | 关系应在树结构中管理，不应侵入消息 payload |
+| 每次渲染重建 adjacency map | Vercel AI SDK | O(n) 重建在消息量大时有性能问题，不如直接维护 `children[]` |
+
+---
+
+## Phase 1: 消息树数据模型
+
+### 设计原则
+
+1. **去掉所有限制** — 不限会话数、不限消息数，全量保留
+2. **消息树结构** — 为 Phase 2（编辑/重新生成/分支）打基础
+3. **会话标题** — MVP 用第一条用户消息前 30 字截断
+4. **原始消息永远不删** — 压缩只影响发给 LLM 的上下文，不影响存储和 UI
+5. **图片剥离** — 保持当前 `stripImagesForPersistence()`（替换为占位符）
+
+### 数据模型
+
+```typescript
+interface ChatSession {
+  id: string;
+  title: string | null;
+  mapping: Record<string, MessageNode>;  // 所有消息节点的平铺字典
+  currentNode: string;                   // 当前活跃分支的叶节点 ID
+  createdAt: number;
+  updatedAt: number;
+  syncedAt: number | null;               // Phase 4 使用
+  revision: number;                      // Phase 4 CAS 使用，本地从 0 开始
+  bridges: BridgeEntry[];                // Phase 3 使用，初始为空数组
+}
+
+interface MessageNode {
+  id: string;                            // nanoid 生成
+  parentId: string | null;               // null = 合成根节点
+  children: string[];                    // 子节点 ID 列表（多个 = 有分支）
+  currentChild: string | null;           // 当前选中的子节点（记住分支选择，切回时不丢失）
+  level: number;                         // 深度（根=0），用于 O(depth) 路径构建
+  message: AgentMessage | null;          // null 为合成根节点
+}
+
+interface BridgeEntry {                  // Phase 3 填充
+  afterNodeId: string;                   // 此节点之后的路径被压缩
+  content: string;                       // Handoff Memo
+  timestamp: number;
+}
+```
+
+**与现状的对比**：
+
+| 维度 | 现在 | Phase 1 后 |
+|------|------|-----------|
+| 会话结构 | `messages: AgentMessage[]` | `mapping: Record<string, MessageNode>` + `currentNode` |
+| 限制 | 10 session × 100 message | 无限制 |
+| 标题 | 无 | `title: string \| null` |
+| 同步字段 | 无 | `syncedAt`, `revision`（Phase 4 前置占位） |
+| 压缩字段 | 无 | `bridges: BridgeEntry[]`（Phase 3 前置占位） |
+
+### 消息身份：树节点 ↔ agent 消息的关联
+
+pi-agent-core 的 `AgentMessage` 没有稳定 ID 字段。树模型需要为每条消息分配 `MessageNode.id`（nanoid）。
+
+**关联策略**：不在 AgentMessage 上附加 ID，而是维护一个**位置映射**：
+
+```typescript
+// ai-chat-tree.ts
+
+/** 从 currentNode 向上走到根，用 level 作为数组索引，O(depth) 无需 reverse */
+function getLinearPath(session: ChatSession): MessageNode[] {
+  const head = session.mapping[session.currentNode];
+  if (!head) return [];
+  const path = new Array<MessageNode>(head.level + 1);
+  const visited = new Set<string>();               // 防御环：corrupt 数据不能卡死 UI
+  for (let cur: MessageNode | null = head; cur; cur = cur.parentId ? session.mapping[cur.parentId] : null) {
+    if (visited.has(cur.id)) break;                // 检测到环 → 中断
+    visited.add(cur.id);
+    if (cur.message) path[cur.level] = cur;        // 跳过合成根节点（level=0, message=null）
+  }
+  if (DEV && path.some((_, i) => !path[i])) {
+    console.warn('[ai-chat-tree] getLinearPath: path has gaps, tree may be malformed');
+  }
+  return path.filter(Boolean);
+}
+
+/** 差量追加：agent 的消息数组是树路径的超集，只追加多出的部分 */
+function syncAgentToTree(session: ChatSession, agentMessages: AgentMessage[]): void {
+  const linearPath = getLinearPath(session);
+  const existingCount = linearPath.length;
+
+  // 安全断言：验证已有路径与 agent 消息的一致性（防止 agent 内部重试导致错位）
+  if (existingCount > 0 && existingCount <= agentMessages.length) {
+    const treeMsg = linearPath[existingCount - 1].message!;
+    const agentMsg = agentMessages[existingCount - 1];
+    if (treeMsg.role !== agentMsg.role) {
+      console.error('[ai-chat-tree] syncAgentToTree: position mismatch — tree last role=%s, agent role=%s', treeMsg.role, agentMsg.role);
+      return;  // 不追加，避免 corrupt 树
+    }
+  }
+
+  for (let i = existingCount; i < agentMessages.length; i++) {
+    appendMessage(session, agentMessages[i]);       // 分配 nanoid + 设置 level + 更新 currentChild
+  }
+}
+```
+
+核心思路：agent 的消息数组是树的线性路径的**超集**——前 N 条与树一致，后面多出的是新消息。`syncAgentToTree` 只追加差量。`level` 字段让路径构建无需 `unshift` 或 reverse（来自 assistant-ui 的模式）。
+
+**防御性措施**：
+- `getLinearPath` 有环检测（`visited` set），防止 corrupt IndexedDB 数据卡死 UI
+- `getLinearPath` 在 DEV 模式检测路径空洞（level 不连续），及早发现 migration bug
+- `syncAgentToTree` 在追加前验证末尾消息 role 一致性，防止 pi-agent-core 内部重试（rate limit → 移除/重新添加消息）导致位置错位
+
+**安全前提**：streaming 期间不执行 edit/regenerate/switchBranch（这些操作会改变树的线性路径，导致位置对不上）。这在当前 UI 中天然成立——streaming 时输入和按钮都 disabled。
+
+### 双源同步：agent ↔ 树的时序
+
+运行时有两个事实源：`session.mapping`（持久层）和 `agent.state.messages`（运行时）。同步规则：
+
+| 时机 | 方向 | 操作 |
 |------|------|------|
-| **skill 上下文** | 全量规则塞进 system prompt | Step 2: name+description 索引 → 按需注入 |
-| **context 压缩** | 无 | Step 3: transformContext 中 Handoff 压缩 |
-| **Bridge Message** | 不存在 | Step 3: `role: "bridge"` + `convertToLlm` 转换 |
-| **token 追踪** | 无 | Step 3: `AssistantMessage.usage` + `model.contextWindow` |
-| **溢出保护** | 无 | Step 3: `isContextOverflow()` 兜底 |
+| **加载 session** | 树 → agent | `getLinearPath(session)` → `agent.replaceMessages()` |
+| **`turn_end` 事件** | agent → 树 | 每轮 tool-call 结束 → `syncAgentToTree` 增量追加 + 持久化（断点恢复） |
+| **`agent_end` 事件** | agent → 树 | prompt 完整结束 → 最终同步（兜底确认一致性） |
+| **编辑/重新生成** | 树 → agent | 在树中创建新分支 → `getLinearPath()` → `agent.replaceMessages()` |
+| **切换分支** | 树 → agent | 更新 `currentNode` → `getLinearPath()` → `agent.replaceMessages()` |
+| **压缩后** | 双向 | 树中记录 bridge → `agent.replaceMessages(compressedPath)` |
 
-## 详细设计
+**同步由 typed event 驱动**：pi-agent-core 的 `AgentEvent` 类型联合包含三个关键事件：
+- `turn_end`：每轮 tool-call 结束时触发 — 用于增量同步到树 + 持久化，实现断点恢复（browser tool chain 可达 10+ 轮）
+- `agent_end`：`agent.prompt()` 完整结束时触发，携带 `event.messages` — 最终同步确认 + cleanup
+- `message_end`：每条消息结束时触发 — 用于 overflow 检测（Phase 3）
 
-### Step 1 ✅ (已完成 — #132)
+**不变式**：任意时刻，`agent.state.messages` 的前 N 条消息必须与 `getLinearPath(session)` 前 N 条一一对应。agent 可以比树多（streaming 追加的新消息），但不能比树少或乱序。
 
-实际实现见 `src/lib/ai-service.ts` 的 `createAgent()` + `src/lib/ai-context.ts`。
+### 持久化时机
 
-关键实现细节：
-- `transformContext`：先 `stripOldImages()`（滑动窗口保留最近 N 轮图片），再 `injectReminder()`
-- `convertToLlm`：过滤只保留 user / assistant / toolResult
-- `getApiKey`：从 Settings 节点或 legacy chrome.storage 读取
-- `streamFn`：提取为 `streamProxyWithApiKey()`，只做认证 + 网络转发
-- `ai-proxy.ts`：从 `ai-service.ts` 独立出来的代理层
+**现状**：250ms debounce on `${messages.length}:${lastTimestamp}` 变化 — streaming 中频繁触发。
 
-### Step 2：Skill 渐进式披露
+**改为事件驱动**（利用 pi-agent-core `AgentEvent` 类型系统）：
 
-**核心思路**：
+| 事件 | 触发持久化 | 说明 |
+|------|-----------|------|
+| `turn_end` 事件 | ✅ | 每轮 tool-call 结束 → 增量持久化，browser 操作链可达 10+ 轮，中途断开不丢进度 |
+| `agent_end` 事件 | ✅ | prompt 完整结束 → 最终持久化（兜底确认） |
+| 用户操作（newChat / switchSession / edit / regenerate） | ✅ | UI 层直接调用 |
+| visibilitychange（切标签页 / 关浏览器） | ✅ | 兜底保障 |
+| streaming 进行中（token by token） | ❌ | 不保存半成品 |
 
-| 层级 | 内容 | 何时注入 |
-|------|------|----------|
-| L0 | skill name + description 索引 | 始终在 system prompt 中 |
-| L1 | 完整 skill rules | AI 判断需要时，通过 tool call 拉取 |
+**替代了 `isStreaming` 轮询**：现有 `use-agent.ts` 的 250ms debounce 依赖状态轮询（检测 `messages.length` + `lastTimestamp` 变化）。`turn_end` / `agent_end` 事件是精确的完成信号，无需轮询和 debounce。
 
-**System prompt 中的 skill 索引（轻量）**：
+### Session 加载与崩溃恢复
 
-```xml
-<available-skills>
-  <skill id="NDX_T05" name="从文章提取认知框架" description="提取核心论证结构、隐形假设和边界条件" />
-  <skill id="NDX_T06" name="对比分析" description="识别两个概念的共性和差异" />
-</available-skills>
-When you need a skill's detailed rules, use node_read to read the skill node's children.
+**加载优化**：去掉 10 session 限制后，`getLatestChatSession()` 必须用 IDBKeyRange 游标限制（按 `updatedAt` 降序取 1 条），不能全量扫描。session 列表 UI 也应分页加载。
+
+**崩溃恢复**：`turn_end` 增量持久化可能在 `agent_end` 前崩溃，恢复时 session 末尾可能是 `toolResult`（对 LLM 无效状态）。`restoreSession` 必须检测并修剪：
+
+```typescript
+function restoreSession(session: ChatSession, agent: Agent): void {
+  const path = getLinearPath(session);
+  // 修剪尾部不完整消息（toolResult 或无 content 的 assistant）
+  while (path.length > 0) {
+    const last = path[path.length - 1].message!;
+    if (last.role === 'toolResult' || (last.role === 'assistant' && !last.content)) {
+      path.pop();
+    } else break;
+  }
+  // 更新 currentNode 指向修剪后的末尾
+  if (path.length > 0) session.currentNode = path[path.length - 1].id;
+  agent.replaceMessages(path.map(n => n.message!));
+}
 ```
 
-**复用 node_read**（不新增工具）：
-- 索引中给出 skill node id，AI 用 `node_read(id, depth=1)` 读取规则
-- 符合"一切皆节点"原则
+**Session 切换守卫**：切换 session 或 `newChat` 前，必须先 `agent.abort()`（当前 `createNewChatSession` 已有此逻辑，新代码必须保留）。streaming 中（`isStreaming === true`）禁止切换。
 
-### Step 2 补充：System Prompt 分层
+**标题生成时机**：首次 `agent_end` 事件中，如果 `session.title === null`，取第一条 user 消息前 30 字设为标题。
 
-最终的 system prompt 结构（稳定，不随每次消息变化）：
+**图片剥离**：`persistSession()` 在写 IndexedDB 前，必须对 `mapping` 中所有 `MessageNode.message` 执行 `stripImagesForPersistence()`（替换为占位符）。这是从现有 `saveChatSession` 继承的行为，重写时不能丢失。
 
-```
-[1. Identity & behavior — 从 #agent 节点 children 读取]
-You are soma, an AI collaborator inside the user's knowledge graph.
-...
+### IndexedDB schema 迁移
 
-[2. Tool usage guidance — 固定]
-Use tools when the user asks you to inspect, create, edit, delete, search, or undo nodes.
-When you mention an existing node, use <ref id="nodeId">display text</ref>.
-...
+DB_VERSION 从 1 升到 2，`onupgradeneeded` 中转换现有 session：
 
-[3. Skill index — 从 #agent.Skills 字段读取，只有 name+description]
-<available-skills>
-  <skill id="..." name="..." description="..." />
-</available-skills>
-When you need a skill's detailed rules, use node_read to read the skill node's children.
+```typescript
+// ai-persistence.ts — upgrade handler
+if (oldVersion < 2) {
+  // 读出所有 v1 session（{ id, messages[], createdAt, updatedAt }）
+  // 逐个转换为 v2 树结构：
+  //   synthetic root → messages[0] → messages[1] → ... → messages[N]
+  //   每条消息分配 nanoid 作为 MessageNode.id
+  //   currentNode = 最后一条消息的 id
+  //   title = 第一条 user 消息前 30 字
+  //   bridges = [], syncedAt = null, revision = 0
+}
 ```
 
-动态上下文（panel/page/time）不再进 system prompt，而是通过 `transformContext` 注入到消息流中。
+### 文件清单
 
-### Step 3：Context 自动压缩（Handoff Memo 模式）
+| 文件 | 操作 | 说明 |
+|------|------|------|
+| `src/lib/ai-chat-tree.ts` | 新建 | 树操作：`performOp` / `appendMessage` / `getLinearPath` / `syncAgentToTree` / `findLatestLeaf` + nanoid 分配 |
+| `src/lib/ai-persistence.ts` | 重写 | `ChatSession` 树模型 + DB_VERSION=2 migration + 去掉限制；用 `idb`（1.2KB）替换手写 IndexedDB 样板 |
+| `src/lib/ai-service.ts` | 修改 | `streamChat` 加 syncAgentToTree；`restoreSession` 加 getLinearPath + 崩溃恢复修剪；`newChat` 创建树模型 session |
+| `src/hooks/use-agent.ts` | 修改 | 删除 `getPersistedMessageSignature` + 250ms debounce；persist 改为事件驱动；暴露 session title；session 切换前 `agent.abort()` 守卫 |
+| `tests/vitest/ai-persistence.test.ts` | 新建 | 树操作 + migration + 持久化测试 |
 
-核心思想：压缩不是"总结对话"，而是**给接替你的同事写一份交接备忘录**。用同一模型生成（命中 prompt cache），用 Bridge Message 无缝衔接（用户无感知）。
+---
 
-#### 自定义消息类型：Bridge Message
+## Phase 2: 编辑 + 重新生成 + 分支导航
 
-利用 pi-agent-core 的声明合并，定义 `bridge` 消息类型：
+### 树变异：统一 `performOp` 模式
+
+借鉴 assistant-ui，所有树结构修改通过一个统一函数执行（避免散落的手动指针维护）：
+
+```typescript
+/** 原子树操作 — 所有 append/edit/regenerate/delete 最终都调用这个 */
+function performOp(
+  session: ChatSession,
+  child: MessageNode,
+  op: 'cut' | 'link' | 'relink',
+  newParentId?: string,
+): void {
+  if (op === 'cut' || op === 'relink') {
+    // 从旧 parent 的 children[] 中移除
+    // 如果 child 是旧 parent 的 currentChild：
+    //   - children 还有剩余 → 回退到 children.at(-1)
+    //   - children 为空 → currentChild = null（关键：防止悬空指针）
+  }
+  if (op === 'link' || op === 'relink') {
+    // 环检测：沿 newParent 的 parentId 向上走，确保不遇到 child.id
+    // 加入新 parent 的 children[]
+    // 设为新 parent 的 currentChild
+    // 递归更新 child 及后代的 level（DFS，包括 child 自身）
+    //   ⚠️ 硬不变式：child.level = parent.level + 1，包括合成根的直接子节点
+  }
+}
+```
+
+### 操作语义
+
+| 操作 | 机制 |
+|------|------|
+| **正常对话** | `performOp(link)` 新消息到 `currentNode` 下 → 更新 `currentNode` 指向新叶 |
+| **编辑消息** | `performOp(link)` 新 user 消息到被编辑消息的**父节点**下 → 触发新 assistant → `currentNode` 指向新叶 |
+| **重新生成** | `performOp(link)` 新 assistant 消息到被 regenerate 消息的**同一 parent** 下 → `currentNode` 指向新叶 |
+| **切换分支** | 设置 parent 的 `currentChild` → `findLatestLeaf()` 沿 `currentChild` 走到最深叶 → 更新 `currentNode` |
+| **展示对话** | `getLinearPath()` 从 `currentNode` 向上走，用 `level` 索引填充数组 |
+
+### tool-call 链处理
+
+`toolResult` 是树中的独立 `MessageNode`，不是 assistant 的附属 metadata。典型链路：
+
+```
+U₁ → A₁(tool_use) → TR₁ → A₂(final response)
+```
+
+- Regenerate A₂：A₂ 的 parent 是 TR₁ → 在 TR₁ 下创建 A₂' 作为兄弟
+- Regenerate A₁：整条 A₁ → TR₁ → A₂ 子树变为旧分支，新 A₁' 在 U₁ 下创建
+- `getLinearPath()` 必须包含中间的 toolResult 节点
+- UI 分支导航 `← 2/3 →` 只显示在 user/assistant 消息上，不在 toolResult 上显示
+- 分支计数 `N/M` 必须排除 `toolResult` 兄弟（只计 user/assistant siblings），避免用户看到不可导航的幽灵分支
+
+### 分支导航 UI
+
+`children.length > 1` 时，在子消息上显示 `← 2/3 →` 箭头。切换时调用 `findLatestLeaf()`（来自 Vercel AI SDK 的模式）：自动沿 `currentChild` 指针走到最深叶节点，而非停在点击的兄弟节点上。这保证切换分支后看到的是该分支的最新对话。
+
+**现状对比**：当前 `ChatMessage` 组件无任何编辑/重新生成/分支 UI。Phase 2 需要：
+
+| 组件 | 改动 |
+|------|------|
+| `ChatMessage` | hover 时显示 edit（user）/ regenerate（assistant）按钮 + 分支箭头 |
+| `ChatDrawer` | 处理 edit/regenerate action → 调用 tree 操作 → replaceMessages |
+| `ChatInput` | 编辑模式：pre-fill 被编辑消息的文本 |
+
+### 文件清单
+
+| 文件 | 操作 | 说明 |
+|------|------|------|
+| `src/lib/ai-chat-tree.ts` | 修改 | 新增 `editMessage` / `regenerate` / `switchBranch`（均基于 `performOp`） |
+| `src/components/chat/ChatMessage.tsx` | 修改 | 分支导航箭头 + edit/regenerate 按钮 |
+| `src/components/chat/ChatDrawer.tsx` | 修改 | 编辑消息、重新生成 action handler |
+| `src/components/chat/ChatInput.tsx` | 修改 | 编辑模式支持 |
+| `tests/vitest/ai-chat-tree.test.ts` | 修改 | 分支操作 + 路径切换测试 |
+
+---
+
+## Phase 3: Context 自动压缩
+
+### 核心思路
+
+压缩不是"总结对话"，而是**给接替你的同事写一份交接备忘录**。用同一模型生成（命中 prompt cache），用 Bridge Message 无缝衔接（用户无感知）。原始消息始终保留在树中。
+
+### 行业调研
+
+| 维度 | Claude Code | OpenCode |
+|------|-------------|----------|
+| **触发阈值** | 接近 context window 上限 | `总 token >= context - maxOutputTokens` |
+| **检测数据** | 未公开 | LLM 返回的实际 `usage` token 数 |
+| **两阶段** | 先清旧工具输出 → 再摘要 | 先 prune 工具输出（保护最近 40K）→ 再摘要 |
+| **摘要模型** | 同模型（命中 prompt cache） | 可配置不同模型 |
+
+**soma 的简化优势**：system prompt 通过 `agent.state.systemPrompt` 独立注入，不在 messages 中。压缩只替换 messages，system prompt + tools 永远完整且命中缓存。
+
+### Bridge Message
+
+利用 pi-agent-core 声明合并，定义 `bridge` 消息类型：
 
 ```typescript
 // ai-types.ts
@@ -148,139 +395,144 @@ declare module '@mariozechner/pi-agent-core' {
   interface CustomAgentMessages {
     bridge: {
       role: 'bridge';
-      content: string;   // Handoff Memo + 节点快照，填入 Bridge Template
+      content: string;   // Handoff Memo，填入 Bridge Template
       timestamp: number;
     };
   }
 }
 ```
 
-Bridge Message 存在于 `agent.state.messages` 中：
-- **UI 层**：可识别 `role: "bridge"` 做特殊处理（如不显示、或显示为折叠的"上下文已压缩"提示）
-- **LLM 层**：`convertToLlm` 将其转为标准 user message 发给模型
+- **UI 层**：识别 `role: "bridge"` 做特殊处理（折叠的"上下文已压缩"提示）
+- **LLM 层**：`convertToLlm` 将其转为标准 user message（现有 `convertToLlm` 只通过 user/assistant/toolResult，需新增 bridge → user 转换）
+
+### Bridge 存储：Option B（session 级元数据）
+
+**决策**：Bridge 存在 `ChatSession.bridges` 数组中，不作为树节点。
+
+理由：
+- 树的职责是存储**用户可见的对话消息**和分支结构
+- Bridge 是系统压缩产物，不是用户内容
+- 树拓扑永远不变，压缩不会 re-parent 节点，逻辑简单
+- `getLinearPath` 纯粹遍历树，不需要判断节点类型
+- 给 LLM 的路径由独立函数 `getCompressedPath` 组装（检查 bridges，截断早期消息）
+
+```
+树结构:  Root → U₁ → A₁ → ... → A₅₀ → U₅₁ → A₅₁  (不变)
+bridges: [{ afterNodeId: A₅₀.id, content: "...", timestamp: ... }]
+
+UI 展示:  全部消息可见，bridges[i] 位置渲染一条折叠分隔线（可展开查看 bridge.content）
+LLM 收到: [bridge.content as user message] → U₅₁ → A₅₁
+```
+
+### 多次压缩与 `getCompressedPath` 语义
+
+对话可能压缩多次，产生多个 bridge。**规则：只使用最新的适用 bridge**：
 
 ```typescript
-// convertToLlm 处理 bridge 消息
-convertToLlm: (messages) => {
-  return messages.flatMap(m => {
-    if (m.role === 'bridge') {
-      // 转为 user message 发给 LLM
-      return [{ role: 'user', content: m.content, timestamp: m.timestamp }];
+function getCompressedPath(session: ChatSession): AgentMessage[] {
+  const fullPath = getLinearPath(session);
+  // 找到当前路径上最新的 bridge（afterNodeId 在路径中的最后一个）
+  const applicableBridge = findLatestApplicableBridge(session.bridges, fullPath);
+  if (!applicableBridge) return fullPath.map(n => n.message!);  // 无压缩
+
+  // 截断 bridge 之前的消息，用 bridge.content 替代
+  const cutIndex = fullPath.findIndex(n => n.id === applicableBridge.afterNodeId);
+  const recentMessages = fullPath.slice(cutIndex + 1).map(n => n.message!);
+  return [bridgeToUserMessage(applicableBridge), ...recentMessages];
+}
+```
+
+**切换到旧分支的处理**：如果用户切换到 bridge `afterNodeId` 之前分叉的旧分支，`afterNodeId` 不在当前路径上 → 该 bridge 不适用 → `getCompressedPath` 跳过它，返回完整路径。这意味着旧分支可能因上下文过长而触发 overflow → 由 `message_end` + `isContextOverflow()` 兜底压缩。
+
+### `compactIfNeeded` 的 maxTokens
+
+压缩调用使用独立的 `maxTokens`（2048-4096），不继承 chat agent 的 `maxTokens` 设置。Handoff Memo 应该简洁，不需要长输出。
+
+### 压缩时机
+
+**在调用层执行，不在 `transformContext` hook 中**。利用 pi-agent-core 的 typed event system 实现精确的事件驱动：
+
+```typescript
+// ai-service.ts — streamChat()
+async function streamChat(text: string, session: ChatSession, agent: Agent) {
+  configureAgent(agent);
+
+  // 1. 首轮前置压缩（显式状态修改）
+  await compactIfNeeded(session, agent);
+
+  // 2. 订阅事件：增量同步 + 持久化 + overflow 检测
+  const unsubscribe = agent.subscribe((event: AgentEvent) => {
+    // 每轮 tool-call 结束 → 增量同步到树 + 持久化（断点恢复）
+    if (event.type === 'turn_end') {
+      syncAgentToTree(session, agent.state.messages);
+      persistSession(session);
     }
-    if (['user', 'assistant', 'toolResult'].includes(m.role)) {
-      return [m];
+    // prompt 完整结束 → 最终同步确认 + cleanup
+    if (event.type === 'agent_end') {
+      syncAgentToTree(session, event.messages);
+      persistSession(session);
+      unsubscribe();
     }
-    return []; // 过滤其他自定义类型
+    // 每条 assistant 消息结束 → 检测 context overflow
+    if (event.type === 'message_end' && event.message.role === 'assistant') {
+      if (isContextOverflow(event.message)) {
+        // 移除尾部 overflow error → 压缩 → 重试
+        const msgs = agent.state.messages.slice(0, -1);
+        const compressed = compact(msgs, session);
+        agent.replaceMessages(compressed);
+        agent.continue();  // 在压缩后的上下文中重试
+      }
+    }
   });
+
+  // 3. agent.prompt() — 内部可能多轮 tool-call
+  await agent.prompt(text);
+  //   → transformContext: stripOldImages + injectReminder（纯变换，无副作用）
+}
+```
+
+`transformContext` 保持纯函数：
+
+```typescript
+transformContext: async (messages, signal) => {
+  let ctx = stripOldImages(messages);
+  ctx = injectReminder(ctx, await buildSystemReminder());
+  return ctx;
 },
 ```
 
-#### 信息分层模型
+| 时机 | 策略 | 机制 |
+|------|------|------|
+| **首轮 LLM 调用前** | `compactIfNeeded()` 主动压缩 | `streamChat()` 调用层显式执行 |
+| **tool loop 内后续轮** | 不主动压缩 | runtime 限制：`agent.prompt()` 包住整个 tool loop，调用层无法插入 |
+| **LLM 返回 overflow** | 强制压缩 + 重试 | `message_end` 事件 + `isContextOverflow()` → `replaceMessages` → `continue()` |
+| **每轮 tool-call 结束** | 增量同步 + 持久化 | `turn_end` 事件 → 断点恢复（browser chain 可达 10+ 轮） |
+| **prompt 完成** | 最终同步 + 持久化 | `agent_end` 事件，携带完整 `event.messages` |
 
-| 层级 | 内容 | 处理方式 |
-|------|------|----------|
-| **Must Keep** | 用户偏好/约束/身份、当前任务完整上下文、已创建的节点及最新状态、最近几轮完整交互 | 原文保留或精确描述 |
-| **Summarize** | 中期话题的关键结论、已完成任务的结果摘要、用户反馈过的偏好 | 只保留结论，丢弃过程 |
-| **Can Discard** | 已解决且不再相关的话题、闲聊寒暄、被后续覆盖的旧信息、搜索过程/中间推理步骤、被用户否定的方案 | 完全丢弃 |
-
-#### Token 追踪与触发条件
-
-**利用 pi-mono 提供的实际数据，而非估算**：
-
-```typescript
-// 从 model 对象获取精确的上下文窗口大小
-const contextWindow = agent.state.model.contextWindow;
-const threshold = contextWindow * 0.7;
-
-// 从最近一条 AssistantMessage.usage 获取实际 token 用量
-function getLastKnownInputTokens(messages: AgentMessage[]): number {
-  for (let i = messages.length - 1; i >= 0; i--) {
-    const msg = messages[i];
-    if (msg.role === 'assistant' && msg.usage?.input) {
-      return msg.usage.input;
-    }
-  }
-  return 0; // 无历史数据时回退
-}
-```
-
-**触发逻辑**（在 `transformContext` 中）：
-
-```typescript
-async function compactIfNeeded(
-  messages: AgentMessage[],
-  agent: Agent,
-  signal?: AbortSignal,
-): Promise<AgentMessage[]> {
-  const contextWindow = agent.state.model.contextWindow;
-  const threshold = contextWindow * 0.7;
-
-  // 用上一次 LLM 调用的实际 input tokens 作为基线
-  const lastInputTokens = getLastKnownInputTokens(messages);
-  if (lastInputTokens < threshold) return messages;
-
-  // 触发 Handoff 压缩
-  return await compact(messages, agent, signal);
-}
-```
-
-#### 溢出兜底：isContextOverflow
-
-万一 token 追踪不准、压缩没触发，LLM 返回溢出错误时自动压缩重试：
-
-```typescript
-// 在 agent 事件监听中
-agent.subscribe((event) => {
-  if (event.type === 'message_end') {
-    const msg = event.message;
-    if (msg.role === 'assistant' && isContextOverflow(msg)) {
-      // 强制压缩 + 重试
-      // 利用 agent.continue() 从压缩后的上下文继续
-    }
-  }
-});
-```
-
-#### 压缩流程
-
-压缩发生在 `transformContext` 内部，即**每次 LLM 调用前**。当 token 量超过阈值时，压缩自动执行，完成后无缝继续用户当前任务——用户完全无感知。
+### 压缩流程
 
 ```
-每次 LLM 调用前（transformContext 内）:
-
-  1. 读取上一次 AssistantMessage.usage.input（实际 token 量）
-  2. 对比 model.contextWindow * 0.7（阈值）
-  3. 未超阈值 → 跳过，正常继续
-  4. 超阈值 → 触发压缩：
-
-  Step 1: 发送压缩请求（同一模型，命中 prompt cache）
-    → [Tools] + [System] + [...History...] + [Compact Prompt]
-    → 模型生成 Handoff Memo
-
-  Step 2: 构建 Bridge Message
-    → 将 Handoff Memo + 节点资源快照填入 Bridge Template
-    → 创建 { role: 'bridge', content: bridgeContent, timestamp }
-
-  Step 3: 重建上下文
-    → [Bridge Message] + [Current User Message]
-    → agent.replaceMessages(newMessages)
-    → 缓存状态：
-      - [Tools] + [System] → 缓存命中（从未改变）
-      - [Bridge_v1] → 新缓存创建点
-
-  5. 返回压缩后的 messages，继续执行用户的原始请求
+compactIfNeeded(session, agent):
+  1. 读 getLastKnownInputTokens(agent.state.messages)
+  2. 对比 agent.state.model.contextWindow * 0.7
+  3. 未超阈值 → 返回，不压缩
+  4. 超阈值 →
+     a. 发送 Compact Prompt（同一模型，命中 prompt cache）→ 模型生成 Handoff Memo
+     b. 写入 session.bridges（追加 BridgeEntry）
+     c. 计算压缩后的线性路径（bridge + 最近消息）
+     d. agent.replaceMessages(compressedPath)
+     e. 持久化 session 到 IndexedDB
 ```
 
-**关键**：压缩是透明的中间步骤。用户发了一条消息，可能触发了工具调用导致 token 增长超阈值，压缩在下一次 LLM 调用前自动执行，然后模型继续处理用户的任务。不是等一轮结束才压缩。
+### write-back 路径
 
-#### 压缩模型选择
+压缩修改三层状态，顺序如下：
 
-**使用与对话相同的模型**（不是便宜模型），原因：
-- Compact Prompt 追加到当前上下文末尾，`[Tools] + [System] + [...History...]` 的 prompt cache 完全命中
-- 只需要为 Compact Prompt 本身 + Handoff Memo 输出付费
-- 如果用不同模型，整个上下文 cache 失效，反而更贵
+1. **session.bridges**：追加 `{ afterNodeId, content, timestamp }`
+2. **agent 状态**：`agent.replaceMessages(getCompressedPath(session))` — bridge content 作为首条 user message
+3. **IndexedDB**：持久化更新后的 `ChatSession`
 
-#### Compact Prompt（追加到当前上下文末尾）
+### Compact Prompt
 
 ```markdown
 This conversation has reached its context limit and will be handed off to a fresh
@@ -310,11 +562,10 @@ IMPORTANT: Write the handoff memo in the primary language the user has been usin
 - Old information that's been superseded
 ```
 
-#### Bridge Template（填入 Bridge Message 的 content）
+### Bridge Template
 
 ```xml
 <system-reminder>
-
 ## Context Handoff
 
 You are continuing a conversation previously handled by another assistant instance.
@@ -323,7 +574,6 @@ This handoff is invisible to the user—they experience this as one continuous c
 **Critical**:
 - Do NOT mention this handoff, context limits, or "previous conversation"
 - Respond naturally as if you have always been in this conversation
-- The user should feel no discontinuity
 
 ## Previous Assistant's Handoff Memo
 
@@ -342,142 +592,191 @@ Use node_search to discover other nodes if needed.
 
 Continue helping the user naturally. Use the memo above to understand the context,
 but respond as if you've been here all along.
-
 </system-reminder>
 ```
 
-#### 关键设计决策
-
-**1. System prompt 天然安全**
-
-soma 的 system prompt 通过 `agent.state.systemPrompt` 独立注入，不在 messages 中。压缩只替换 messages，system prompt + tools 永远完整且命中缓存。
-
-**2. 可多次叠加压缩**
-
-- 压缩后继续对话又超阈值 → 再次压缩（Bridge + 最近消息 → 新 Handoff Memo → 新 Bridge）
-- 每次压缩都操作在已压缩的内容上，信息逐步损失是预期行为
-- `[Tools] + [System]` 前缀始终不变，缓存始终命中
-
-#### 在 transformContext 中的位置
-
-```typescript
-transformContext: async (messages, signal) => {
-  let ctx = messages;
-
-  // 1. Handoff 压缩（token 超阈值时自动触发）
-  //    用 AssistantMessage.usage 追踪实际 token，对比 model.contextWindow * 0.7
-  ctx = await compactIfNeeded(ctx, agent, signal);
-
-  // 2. 动态上下文注入（panel/page/time）
-  ctx = injectReminder(ctx, await buildSystemReminder());
-
-  return ctx;
-},
-```
-
-**执行时序示例**：
-
-```
-用户发送消息 "帮我整理这些笔记"
-  → LLM 调用 1: transformContext(messages)
-    → 上次 usage.input: 45k, 阈值: 140k (200k × 0.7) → 不压缩
-    → 注入 system reminder
-    → LLM 返回: 调用 node_search 工具（usage.input: 46k）
-  → 工具执行，结果 append 到 messages
-  → LLM 调用 2: transformContext(messages)
-    → 上次 usage.input: 150k, 阈值: 140k → 超阈值，触发压缩
-    → 发送 Compact Prompt → 生成 Handoff Memo → 创建 Bridge Message → 重建上下文
-    → token 降至 ~30k
-    → 注入 system reminder
-    → LLM 继续处理用户的"整理笔记"任务（用户无感知）
-
-如果压缩没触发但 LLM 返回溢出错误：
-  → isContextOverflow(assistantMessage) === true
-  → 强制压缩 + agent.continue() 重试
-```
-
-## 新设计后的上下文全貌
-
-```
-═══ System Prompt（稳定，configureAgent 一次性设置）═══
-
-You are soma, an AI collaborator inside the user's knowledge graph.
-Operate carefully on the outliner and prefer precise, reversible changes.
-Use tools when the user asks you to inspect, create, edit, delete, search, or undo nodes.
-When you mention an existing node, use <ref id="nodeId">display text</ref>.
-Reply in the user's language unless they explicitly ask otherwise.
-
-<available-skills>
-  <skill id="NDX_T05" name="从文章提取认知框架" description="..." />
-  <skill id="NDX_T06" name="对比分析" description="..." />
-</available-skills>
-When you need a skill's detailed rules, use node_read to read the skill node's children.
-
-═══ Messages（agent.state.messages）═══
-
-[bridge]    ← 压缩后才有，convertToLlm 转为 user message
-  <system-reminder>
-  ## Context Handoff
-  ...
-  ## Previous Assistant's Handoff Memo
-  {{ handoff_memo }}
-  ## Recently Referenced Nodes
-  {{ recent_nodes_list }}
-  </system-reminder>
-
-[user]      用户消息 1
-[assistant] 助手回复 1（含 usage.input/output 实际 token 数据）
-[toolResult] 工具结果
-[assistant] 助手回复 2
-...
-[user]      用户最新消息 + ← transformContext 注入 system reminder
-  <system-reminder>
-  <panel-context>
-  Current panel: Journal > 2026-03-13 (ID: ws1_JOURNAL_2026-03-13)
-  Children (3):
-    - "今天的计划" (id: abc123, 2 children)
-    ...
-  </panel-context>
-  <page-context>
-  User is browsing: https://example.com — "Some Article"
-  </page-context>
-  <time-context>
-  Current time: 2026-03-13T15:30:00+08:00 (Asia/Shanghai)
-  </time-context>
-  </system-reminder>
-```
-
-## 文件清单
-
-### Step 1 已完成 ✅
-
-| 文件 | 操作 | 说明 |
-|------|------|------|
-| `src/lib/ai-service.ts` | ✅ 修改 | 添加 `transformContext`/`convertToLlm`/`getApiKey`，简化 `streamFn` |
-| `src/lib/ai-context.ts` | ✅ 修改 | `buildSystemReminder()` + `injectReminder()` + `stripOldImages()` |
-| `src/lib/ai-proxy.ts` | ✅ 新建 | 从 ai-service 提取的代理层 |
-| `tests/vitest/ai-context.test.ts` | ✅ 新建 | transformContext 注入逻辑测试 |
-
-### Step 2 待做
-
-| 文件 | 操作 | 说明 |
-|------|------|------|
-| `src/lib/ai-agent-node.ts` | 修改 | `buildAgentSystemPrompt()` 改为 skill 索引 |
-| `tests/vitest/ai-agent-node.test.ts` | 修改 | 更新 skill 相关测试 |
-
-### Step 3 待做
+### 文件清单
 
 | 文件 | 操作 | 说明 |
 |------|------|------|
 | `src/lib/ai-types.ts` | 新建 | Bridge 自定义消息类型声明合并 |
-| `src/lib/ai-compress.ts` | 新建 | Handoff 压缩逻辑 |
-| `src/lib/ai-context.ts` | 修改 | `transformContext` 中加入 `compactIfNeeded()` |
-| `tests/vitest/ai-compress.test.ts` | 新建 | 压缩触发条件 + 边界保护测试 |
+| `src/lib/ai-compress.ts` | 新建 | `compactIfNeeded` + `compact` + `getCompressedPath` + overflow retry |
+| `src/lib/ai-service.ts` | 修改 | `streamChat` 加入 pre-prompt 压缩 + overflow 事件处理；`convertToLlm` 加 bridge→user |
+| `tests/vitest/ai-compress.test.ts` | 新建 | 压缩触发条件 + overflow retry + bridge 路径组装测试 |
+
+---
+
+## Phase 4: 跨设备同步
+
+### 核心原则
+
+**同步完整原始对话，不是压缩后的摘要。** 用户在乎原始聊天记录，压缩是系统内部优化，两者独立。
+
+### 方案：Sync API 独立通道
+
+不走 Loro CRDT，原因：
+- 节点 LoroDoc 已经很大，不应再塞 chat 数据
+- Chat 同步的冲突场景有限（同一 session 极少在两台设备同时活跃），不需要通用 CRDT
+
+```
+D1: chat_sessions 表（id, user_id, workspace_id, title, message_count, revision, timestamps）
+R2: chat/{workspace_id}/{session_id}.json（完整 ChatSession JSON）
+```
+
+### 冲突检测：server-side compare-and-swap
+
+**不使用静默 LWW**——消息树模型下，静默覆盖会丢失整个分支，违反"原始消息永远不删"原则。
+
+**Push（带版本检查）**：
+
+```
+客户端 → PUT /chat/sessions/{id}
+  body: { session, baseRevision }        // baseRevision = 上次同步时服务端的 revision
+
+服务端:
+  if remote.revision == baseRevision → 接受写入，revision++，更新 R2
+  if remote.revision != baseRevision → 返回 409 Conflict + 远端 session
+```
+
+**Pull**：
+
+- 查 D1 `updated_at > lastPullAt` → GET R2 → 写入本地 IndexedDB
+- 如果本地 session 也有未同步的修改（`updatedAt > syncedAt`）→ 标记冲突
+
+**冲突处理 UI**：
+
+冲突时不自动合并，提供三个选项：
+1. **保留本地** — 用本地版本强制覆盖远端
+2. **保留远端** — 用远端版本覆盖本地
+3. **两者都保留** — 复制为两个独立 session
+
+**已知限制**：Phase 4 不做 mapping-level merge（即不会自动合并两边各自创建的分支）。同一 session 在多设备并发编辑是已知的不支持场景。未来可升级为 mapping dict union merge。
+
+**时机**：复用 SyncManager 的 30s 定时 + visibilitychange 触发。
+
+**Pull 守卫**：streaming 进行中（`isStreaming === true`）时，跳过当前活跃 session 的 pull。否则 pull 写入 IndexedDB 的同时 `turn_end` 也在写，内存中的 session 对象可能处于 stale 状态。
+
+**visibilitychange 注意**：在 Chrome 扩展 Side Panel 上下文中，`visibilitychange` 是 best-effort 的——tab hidden 后 IndexedDB 异步写入可能来不及完成。`turn_end` 增量持久化是主要保障，`visibilitychange` 只是额外兜底。
+
+### 文件清单
+
+| 文件 | 操作 | 说明 |
+|------|------|------|
+| `src/lib/ai-persistence.ts` | 修改 | push/pull + 冲突检测逻辑 |
+| `src/lib/sync/sync-manager.ts` | 修改 | 加入 `syncChatSessions()` 步骤 |
+| `src/components/chat/` | 修改 | 冲突处理 UI |
+| Backend: `worker/` | 新建 | D1 表 + R2 存储 + CAS 写入端点 |
+
+---
+
+## pi-agent-core 能力利用
+
+本方案涉及的 pi-agent-core 能力及使用方式：
+
+| 能力 | 用途 | Phase |
+|------|------|-------|
+| `agent.subscribe(AgentEvent)` | 事件驱动的同步和持久化（替代 isStreaming 轮询） | 1, 3 |
+| `AgentEvent.turn_end` | 每轮 tool-call 结束 → 增量同步 + 持久化（断点恢复，browser chain 可达 10+ 轮） | 1 |
+| `AgentEvent.agent_end` | prompt 完整结束信号，携带 `event.messages` → 最终同步确认 | 1 |
+| `AgentEvent.message_end` | 每条消息结束信号 → overflow 检测 | 3 |
+| `isContextOverflow()` | 检测 LLM 返回的 context overflow 错误 | 3 |
+| `agent.continue()` | overflow 后压缩上下文并重试（不重新发送用户消息） | 3 |
+| `agent.replaceMessages()` | 树 → agent 同步、压缩后替换上下文 | 1, 2, 3 |
+| `agent.state.messages` | 运行时消息数组，与树保持位置映射 | 1 |
+| `CustomAgentMessages` 声明合并 | 定义 `bridge` 消息类型 | 3 |
+| `transformContext` hook | 纯变换（stripOldImages + injectReminder），不做压缩 | 已有 |
+| `convertToLlm` hook | 过滤消息类型（新增 bridge → user 转换） | 3 |
+
+**仅用于 UI 渲染的能力**：
+
+| 能力 | 用途 | 不用于同步/持久化的原因 |
+|------|------|----------------------|
+| `agent.state.isStreaming` | UI 渲染：禁用发送按钮、显示 loading/stop 按钮、typing indicator | 状态适合驱动声明式 UI（"现在怎样"），但不适合触发副作用（"刚发生了什么"）——后者用事件 |
+
+---
+
+## 开源调研结论
+
+2026-03-15 调研了 LibreChat（36k stars）、assistant-ui（8.8k stars）、LobeChat（77k stars）、Vercel AI SDK PR #5085、Forky、Dexie.js、idb、LangChain ConversationSummaryBufferMemory、gpt-tokenizer 等方案。
+
+| 问题 | 结论 | 理由 |
+|------|------|------|
+| **消息树** | 自建（~300 行），参考 assistant-ui | 无独立库可用。所有成熟项目（LibreChat / LobeChat / assistant-ui）都用 flat messages + parentId 模式，与我们设计一致 |
+| **IndexedDB** | 引入 `idb`（1.2KB） | 替换手写 IDBRequest 样板代码。Dexie.js（15KB）功能过重 |
+| **上下文压缩** | 自建（~100-150 行） | 无可用库。LangChain 依赖链太重。行业标准是 DIY rolling summary（Claude Code / OpenCode / Cline 均如此） |
+| **跨设备同步** | 复用现有 Cloudflare R2 + D1 | 已有基础设施。Chat session 是简单 JSON blob，不需要新的同步库 |
+| **Token 计数** | 用 LLM 返回的 `usage` 数据 | 不引入客户端 tokenizer（gpt-tokenizer 等），避免编码不匹配风险 |
+
+---
+
+## 决策记录
+
+### D1: 消息树数据结构 — flat mapping vs linked-list 图
+
+**决策**：`mapping: Record<string, MessageNode>`（flat 字典）
+
+- **考虑过的替代方案**：assistant-ui 的 `prev`/`next` 链表指针图
+- **选择理由**：flat 字典可直接序列化到 IndexedDB（JSON.stringify），无需额外的序列化/反序列化逻辑。链表图适合纯内存场景（O(1) 导航），但持久化时需要拆解指针重建引用
+- **取舍**：查 parent/children 需要一次字典查找（O(1) 但有哈希开销），比指针解引用慢；但在 chat 消息量级（数百条）下无实际影响
+
+### D2: 消息身份 — 位置映射 vs 给 AgentMessage 附加 ID
+
+**决策**：位置映射（`syncAgentToTree` 差量追加）
+
+- **考虑过的替代方案**：monkey-patch `AgentMessage` 加 `_nodeId` 字段
+- **选择理由**：不侵入 pi-agent-core 的类型系统。位置映射在 streaming 期间 UI 锁定（按钮 disabled）的前提下是安全的
+- **风险**：如果未来允许 streaming 中编辑，位置映射会失效。届时需要切换到 ID 映射
+
+### D3: Bridge 存储 — session 级元数据 vs 树节点
+
+**决策**：Option B — `ChatSession.bridges[]` 数组
+
+- **考虑过的替代方案**：Option A — Bridge 作为 `MessageNode`（`message.role === 'bridge'`）插入树中
+- **选择理由**：树的职责是存储用户可见的对话消息。Bridge 是系统压缩产物，作为树节点会污染 `getLinearPath()`、`children.length`（分支计数）、UI 渲染逻辑
+- **取舍**：需要独立的 `getCompressedPath()` 函数组装 LLM 上下文（检查 bridges 位置 → 截断早期消息）
+
+### D4: 压缩层 — 调用层 vs transformContext hook
+
+**决策**：在 `streamChat()` 调用层执行
+
+- **考虑过的替代方案**：在 `transformContext` hook 中压缩
+- **选择理由**：压缩有持久化副作用（写 `session.bridges`、写 IndexedDB）。`transformContext` 应是纯变换（每轮 LLM 调用都执行，无副作用）。压缩是一次性决策，应在 prompt 前显式执行
+- **pi-agent-core 约束**：`agent.prompt()` 包住整个 tool loop，调用层无法在 tool loop 中途插入压缩。靠 `message_end` + `isContextOverflow()` + `agent.continue()` 兜底
+
+### D5: 事件系统 — 三事件分工
+
+**决策**：`turn_end`（增量持久化）+ `agent_end`（最终确认）+ `message_end`（overflow 检测）
+
+- **考虑过的替代方案**：只用 `agent_end`（更简单）；只用 `isStreaming` 轮询（现有模式）
+- **选择理由**：browser tool chain 可达 10+ 轮，只用 `agent_end` 在中途断开时丢失全部进度。`turn_end` 增量持久化实现断点恢复。`isStreaming` 是状态（适合 UI），不是事件（适合副作用）
+- **`syncAgentToTree` 幂等性**：`turn_end` 和 `agent_end` 都调用 `syncAgentToTree`，后者只追加差量，多次调用安全
+
+### D6: 同步冲突 — server-side CAS vs LWW
+
+**决策**：Server-side compare-and-swap（push 带 `baseRevision`）
+
+- **考虑过的替代方案**：静默 last-write-wins
+- **选择理由**：消息树模型下，静默覆盖会丢失整个分支，违反"原始消息永远不删"原则。CAS 在版本不匹配时返回 409 + 远端数据，让用户选择处理方式
+- **已知限制**：不做 mapping-level merge（不自动合并两边各自创建的分支）
+
+### D7: IndexedDB 封装 — idb vs Dexie vs 手写
+
+**决策**：引入 `idb`（1.2KB）
+
+- **考虑过的替代方案**：继续手写 IDBRequest（现状）；Dexie.js（15KB，含 reactive hooks）
+- **选择理由**：`idb` 是 Promise 薄封装，API 与原生 IndexedDB 一致，学习成本为零。Dexie 功能丰富但 15KB 对我们的 IndexedDB 使用量级过重。手写样板代码冗长且容易出错（忘记关 transaction 等）
+
+---
 
 ## 不做的事
 
-- 不新增 `get_skill` 专用工具 — 复用 node_read
-- 不做 embedding 相关的 skill 匹配 — 索引足够小，AI 自己判断
-- 不改 tool 定义和注册方式 — 当前工具的静态注册没有问题
-- 不引入精确 tokenizer — 用 `AssistantMessage.usage` 实际数据，不需要预估
+- 不用 Loro CRDT 同步 chat — 冲突场景有限，CAS + 手动解决足够
+- 不做 mapping-level 自动 merge — Phase 4 不支持多设备并发编辑同一 session
+- 不在 `transformContext` 中做压缩 — 压缩有持久化副作用，提到调用层显式执行
+- 不在 tool loop 内主动压缩 — 当前 runtime 限制，靠 overflow fallback 兜底
+- 不给 AgentMessage 附加 ID — 用位置映射（`syncAgentToTree` 差量追加）
+- 不引入精确 tokenizer — 用 `AssistantMessage.usage` 实际数据
 - 不自建溢出检测 — 用 pi-ai 的 `isContextOverflow()`
+- 不拆 IndexedDB 为 session + message 两个 store — 当前会话量级不需要
+- 不采用 assistant-ui 组件库 — Chat UI 已定制化，只参考其 `MessageRepository` 数据结构
+- 不采用 LangChain memory — 依赖链过重（~100 行 DIY 即可）

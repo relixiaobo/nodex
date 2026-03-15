@@ -29,7 +29,7 @@ _(空)_
 
 ## 进行中
 
-- [ ] **AI Chat 架构方案 Review** — 消息树 + 压缩 + 同步方案 review | Codex | [#137](https://github.com/relixiaobo/nodex/pull/137)
+_(空)_
 
 ---
 
@@ -83,6 +83,7 @@ _(空)_
 - ~~Layer 0: Agent Runtime~~ ✓ — pi-mono proxy + ChatDrawer + 6 node tools + undo + data access layer + #agent 配置 + Chat 持久化
 - ~~Layer 1: 多 Agent 运行时~~ ✓ — Spark 直接 LLM 调用 + #agent 节点配置（绕过 createAgent）
 - ~~Layer 2 Step 1~~ ✓ — transformContext + convertToLlm + getApiKey (#132)
+- ~~Layer 2 Step 2~~ ✓ — Skill 渐进式披露 (#134)
 - ~~Context 图片生命周期~~ ✓ — 滑动窗口 + 持久化剥离 (#133)
 - ~~Track C: Browser~~ ✓ — 页面观察 + CDP 截图/交互/调试
 - ~~Spark #agent 重构~~ ✓ — 系统提示词存为子节点，删除 extraction-presets.ts
@@ -122,9 +123,10 @@ _(空)_
 - [x] Chat UI 打磨 — 视觉对齐 + 消息分组 + Z 轴层次 (#135, Gemini → nodex)
 - [x] Chat Debug 模式 — 隐藏上下文检查器 (#136, Codex)
 - [x] Desk/Card 布局 — Z 轴分层 + Chrome-tab + resize handle | nodex | main
-- [ ] Chat 持久化 Phase 1 — 消息树数据模型 + 去限制 + 会话标题
-- [ ] Chat 持久化 Phase 2 — 编辑消息 + 重新生成 + 分支导航 UI
-- [ ] Chat 持久化 Phase 3 — Context 自动压缩（Bridge Message + Handoff Memo）
+- [ ] Chat Phase 1A — 消息树数据模型 + 算法 + 测试（`ai-chat-tree.ts` 新建）
+- [ ] Chat Phase 1B — 集成 + IndexedDB 迁移 + 事件驱动持久化（`ai-persistence.ts` 重写 + `ai-service.ts` + `use-agent.ts`）
+- [ ] Chat Phase 2 — 编辑消息 + 重新生成 + 分支导航 UI（`← 2/3 →` 箭头）
+- [ ] Chat Phase 3 — Context 自动压缩（Bridge Message + Handoff Memo）
 - [ ] Chat 持久化 Phase 4 — 跨设备同步完整原始对话历史（Sync API + D1/R2）
 
 **Track B: 阅读环** — 设计：`phase-2-reading-ring.md`

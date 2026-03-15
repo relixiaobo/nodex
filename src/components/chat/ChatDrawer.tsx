@@ -10,6 +10,14 @@ import { ChatInput } from './ChatInput.js';
 import { ChatMessage } from './ChatMessage.js';
 
 const HEADER_ICON_BUTTON = 'inline-flex h-7 w-7 items-center justify-center rounded-full text-foreground-tertiary transition-colors hover:bg-foreground/4 hover:text-foreground';
+const AUTO_SCROLL_THRESHOLD = 48;
+
+export function shouldStickChatScroll(
+  scroller: Pick<HTMLDivElement, 'scrollHeight' | 'scrollTop' | 'clientHeight'>,
+  threshold: number = AUTO_SCROLL_THRESHOLD,
+): boolean {
+  return scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight <= threshold;
+}
 
 function maskApiKey(apiKey: string): string {
   if (apiKey.length <= 12) return `${apiKey.slice(0, 7)}••••`;
@@ -35,6 +43,7 @@ export function ChatDrawer() {
     newChat,
   } = useAgent();
   const scrollRef = useRef<HTMLDivElement>(null);
+  const shouldStickToBottomRef = useRef(true);
   const debugTapResetRef = useRef<number | null>(null);
   const debugTapCountRef = useRef(0);
   const [loadingSettings, setLoadingSettings] = useState(true);
@@ -92,9 +101,11 @@ export function ChatDrawer() {
     if (showSettings) return;
     const scroller = scrollRef.current;
     if (!scroller) return;
+    if (!shouldStickToBottomRef.current) return;
 
     requestAnimationFrame(() => {
       scroller.scrollTop = scroller.scrollHeight;
+      shouldStickToBottomRef.current = true;
     });
   }, [messages, isStreaming, showSettings]);
 
@@ -298,7 +309,15 @@ export function ChatDrawer() {
         </div>
       ) : (
         <>
-          <div ref={scrollRef} className="flex flex-1 flex-col overflow-y-auto px-4 py-4">
+          <div
+            ref={scrollRef}
+            className="flex flex-1 flex-col overflow-y-auto px-4 py-4"
+            onScroll={() => {
+              const scroller = scrollRef.current;
+              if (!scroller) return;
+              shouldStickToBottomRef.current = shouldStickChatScroll(scroller);
+            }}
+          >
             {debugEnabled && debugOpen && (
               <div className="mb-4">
                 <ChatDebugPanel debug={debug} />
@@ -334,6 +353,7 @@ export function ChatDrawer() {
                   toolResults={toolResults}
                   streaming={isStreaming && index === messages.length - 1 && entry.message.role === 'assistant'}
                   grouped={index > 0 && messages[index - 1].message.role === entry.message.role}
+                  busy={isStreaming}
                   onEdit={editMessage}
                   onRegenerate={regenerateMessage}
                   onSwitchBranch={switchBranch}

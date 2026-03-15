@@ -240,11 +240,20 @@ describe('ai-service', () => {
     const session = linearToTree([
       { role: 'user', content: 'recover me', timestamp: 1 },
       {
-        role: 'toolResult',
-        toolCallId: 'call_1',
-        toolName: 'browser',
-        content: [{ type: 'text', text: 'partial tool result' }],
-        isError: false,
+        role: 'assistant',
+        content: [],
+        api: 'anthropic-messages',
+        provider: 'anthropic',
+        model: 'claude-sonnet-4-5',
+        usage: {
+          input: 0,
+          output: 0,
+          cacheRead: 0,
+          cacheWrite: 0,
+          totalTokens: 0,
+          cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+        },
+        stopReason: 'stop',
         timestamp: 2,
       },
     ]);
@@ -260,9 +269,28 @@ describe('ai-service', () => {
     expect(agent.state.messages).toEqual([
       { role: 'user', content: 'recover me', timestamp: 1 },
     ]);
-    expect(getLinearPath(getCurrentSession()!).map((node) => node.message)).toEqual([
+    expect(getLinearPath(getCurrentSession(agent)!).map((node) => node.message)).toEqual([
       { role: 'user', content: 'recover me', timestamp: 1 },
     ]);
+  });
+
+  it('keeps chat sessions isolated per agent instance', async () => {
+    const { createAgent, createNewChatSession, getCurrentSession } = await import('../../src/lib/ai-service.js');
+
+    const agentA = createAgent();
+    const agentB = createAgent();
+
+    await createNewChatSession(agentA);
+    await createNewChatSession(agentB);
+
+    const sessionA = getCurrentSession(agentA);
+    const sessionB = getCurrentSession(agentB);
+
+    expect(sessionA).not.toBeNull();
+    expect(sessionB).not.toBeNull();
+    expect(sessionA?.id).not.toBe(sessionB?.id);
+    expect(agentA.sessionId).toBe(sessionA?.id);
+    expect(agentB.sessionId).toBe(sessionB?.id);
   });
 
   it('streamChat trims input and stopStreaming aborts the agent', async () => {
@@ -362,7 +390,7 @@ describe('ai-service', () => {
       ]);
     });
 
-    expect(getCurrentSession()?.title).toBe('first question');
+    expect(getCurrentSession(agent)?.title).toBe('first question');
   });
 
   it('writes API keys into Settings field entries when system nodes exist', async () => {

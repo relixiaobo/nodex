@@ -1,23 +1,60 @@
+import 'fake-indexeddb/auto';
+import { deleteDB } from 'idb';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { createRoot, type Root } from 'react-dom/client';
 import { flushSync } from 'react-dom';
 import { ChatInput } from '../../src/components/chat/ChatInput.js';
 import { ChatMessage } from '../../src/components/chat/ChatMessage.js';
-import { shouldStickChatScroll } from '../../src/components/chat/ChatDrawer.js';
+import { shouldStickChatScroll } from '../../src/components/chat/ChatPanel.js';
 import { DeskLayout } from '../../src/components/layout/DeskLayout.js';
 import { GlobalTools } from '../../src/components/toolbar/TopToolbar.js';
+import { resetChatPersistenceForTests } from '../../src/lib/ai-persistence.js';
 import { useUIStore } from '../../src/stores/ui-store.js';
 import { resetStores } from './helpers/test-state.js';
 
+const DB_NAME = 'soma-ai-chat';
+
+class MockResizeObserver {
+  constructor(private readonly callback: ResizeObserverCallback) {}
+
+  observe(target: Element) {
+    this.callback(
+      [
+        {
+          target,
+          contentRect: {
+            width: 480,
+            height: 640,
+          } as DOMRectReadOnly,
+        } as ResizeObserverEntry,
+      ],
+      this as unknown as ResizeObserver,
+    );
+  }
+
+  disconnect() {}
+
+  unobserve() {}
+
+  takeRecords(): ResizeObserverEntry[] {
+    return [];
+  }
+}
+
 describe('chat ui', () => {
   const originalInnerWidth = window.innerWidth;
+  const originalResizeObserver = globalThis.ResizeObserver;
   let container: HTMLDivElement;
   let root: Root;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     resetStores();
+    resetChatPersistenceForTests();
+    await deleteDB(DB_NAME);
+    resetChatPersistenceForTests();
     window.innerWidth = originalInnerWidth;
+    globalThis.ResizeObserver = MockResizeObserver as typeof ResizeObserver;
     container = document.createElement('div');
     document.body.appendChild(container);
     root = createRoot(container);
@@ -29,6 +66,7 @@ describe('chat ui', () => {
     });
     container.remove();
     window.innerWidth = originalInnerWidth;
+    globalThis.ResizeObserver = originalResizeObserver;
   });
 
   it('keeps auto-scroll sticky only when the reader is already near the bottom', () => {
@@ -108,28 +146,53 @@ describe('chat ui', () => {
     expect(html).not.toContain('Stop');
   });
 
-  it('renders the global chat toggle with the current open state', () => {
-    useUIStore.getState().openChat();
-
+  it('renders the global chat trigger as a non-toggle button', () => {
     flushSync(() => {
       root.render(React.createElement(GlobalTools));
     });
 
-    const toggle = container.querySelector('button[aria-label="Close chat"]');
-    expect(toggle).not.toBeNull();
-    expect(toggle?.getAttribute('aria-pressed')).toBe('true');
+    const trigger = container.querySelector('button[aria-label="Open chat"]');
+    expect(trigger).not.toBeNull();
+    expect(trigger?.getAttribute('aria-pressed')).toBeNull();
   });
 
-  it('shows only the chat fallback on narrow screens when chat is open', () => {
+  it('alt-click on the global chat trigger always opens a new chat panel', async () => {
+    flushSync(() => {
+      root.render(React.createElement(GlobalTools));
+    });
+
+    const trigger = container.querySelector('button[aria-label="Open chat"]');
+    expect(trigger).not.toBeNull();
+
+    flushSync(() => {
+      trigger?.dispatchEvent(new MouseEvent('click', { bubbles: true, altKey: true }));
+    });
+    await vi.waitFor(() => {
+      expect(useUIStore.getState().panels).toHaveLength(1);
+    });
+
+    const firstPanelId = useUIStore.getState().activePanelId;
+
+    flushSync(() => {
+      trigger?.dispatchEvent(new MouseEvent('click', { bubbles: true, altKey: true }));
+    });
+    await vi.waitFor(() => {
+      expect(useUIStore.getState().panels).toHaveLength(2);
+    });
+
+    const state = useUIStore.getState();
+    expect(state.activePanelId).not.toBe(firstPanelId);
+    expect(state.panels.every((panel) => panel.nodeId.startsWith('chat:'))).toBe(true);
+  });
+
+  it('keeps the panel layout visible on narrow screens instead of swapping to a chat-only view', () => {
     window.innerWidth = 480;
-    useUIStore.getState().openChat();
 
     flushSync(() => {
       root.render(React.createElement(DeskLayout));
     });
 
-    expect(container.textContent).toContain('Loading chat…');
-    expect(container.textContent).not.toContain('Press ⌘K to search');
-    expect(container.querySelector('button[aria-label="Open chat"]')).toBeNull();
+    expect(container.textContent).toContain('Press ⌘K to search');
+    expect(container.textContent).not.toContain('Loading chat…');
   });
 });

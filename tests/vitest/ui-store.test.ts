@@ -64,12 +64,8 @@ describe('ui-store navigation and UI state', () => {
     expect(useUIStore.getState().searchOpen).toBe(false);
     expect(useUIStore.getState().searchQuery).toBe('');
 
-    ui.openChat();
-    expect(useUIStore.getState().chatOpen).toBe(true);
-    ui.toggleChat();
-    expect(useUIStore.getState().chatOpen).toBe(false);
-    ui.closeChat();
-    expect(useUIStore.getState().chatOpen).toBe(false);
+    ui.openPanel('chat:session_test');
+    expect(useUIStore.getState().panels.at(-1)?.nodeId).toBe('chat:session_test');
   });
 
   it('openPanel creates a new panel and switches active', () => {

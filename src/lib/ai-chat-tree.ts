@@ -89,12 +89,12 @@ export function createMessageNode(
   };
 }
 
-export function createSession(): ChatSession {
+export function createSession(id?: string): ChatSession {
   const now = Date.now();
   const rootNode = createMessageNode(null, null, 0);
 
   return {
-    id: nanoid(),
+    id: id ?? nanoid(),
     title: null,
     mapping: {
       [rootNode.id]: rootNode,

@@ -4,6 +4,7 @@ import * as loroDoc from './loro-doc.js';
 import { getAncestorChain } from './tree-utils.js';
 import { isOutlinerContentNodeType } from './node-type-utils.js';
 import { useUIStore } from '../stores/ui-store.js';
+import { isAppPanel, isChatPanel } from '../types/index.js';
 
 const RECENT_IMAGE_MESSAGES = 3;
 
@@ -43,7 +44,7 @@ export function formatLocalTimestamp(date: Date): string {
 function buildPanelContext(): string | null {
   const ui = useUIStore.getState();
   const currentPanelId = ui.panels.find((p) => p.id === ui.activePanelId)?.nodeId ?? null;
-  if (!currentPanelId || currentPanelId.startsWith('app:')) return null;
+  if (!currentPanelId || isAppPanel(currentPanelId) || isChatPanel(currentPanelId)) return null;
 
   const panelNode = loroDoc.toNodexNode(currentPanelId);
   if (!panelNode) return null;

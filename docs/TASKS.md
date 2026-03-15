@@ -22,15 +22,14 @@ _(空)_
 
 | 工作区 | 分支 | 任务 | 状态 |
 |--------|------|------|------|
-| nodex-gemini | — | 空闲 | — |
-| nodex-codex | — | 空闲 | — |
+| nodex-gemini | review/ai-chat-architecture | AI Chat 架构方案 Review | 待分配 |
+| nodex-codex | review/ai-chat-architecture | AI Chat 架构方案 Review | 待分配 |
 
 ---
 
 ## 进行中
 
-- [x] **Chat UI 视觉打磨** — 设计系统对齐 + 消息分组 + 空态引导 + Z 轴层次 | nodex | main
-- [x] **Chat Debug 模式** — 隐藏上下文检查器（system prompt / dynamic context / messages / tools / token 估算）| Codex | [#136](https://github.com/relixiaobo/nodex/pull/136)
+- [ ] **AI Chat 架构方案 Review** — 消息树 + 压缩 + 同步方案 review | Codex + Gemini | [#137](https://github.com/relixiaobo/nodex/pull/137)
 
 ---
 
@@ -118,16 +117,15 @@ _(空)_
 
 > 以下按 Wave 分组。
 
-**Layer 2 上下文管线** — 设计：`ai-context-management.md`
-
-- [ ] Step 3: Context 自动压缩 — Bridge Message + Handoff Memo + token 追踪
-
-**Track A: Chat**
+**Track A: Chat** — 设计：`ai-context-management.md`（统一方案，含持久化 + 压缩 + 同步）
 
 - [x] Chat UI 打磨 — 视觉对齐 + 消息分组 + Z 轴层次 (#135, Gemini → nodex)
 - [x] Chat Debug 模式 — 隐藏上下文检查器 (#136, Codex)
 - [x] Desk/Card 布局 — Z 轴分层 + Chrome-tab + resize handle | nodex | main
-- [ ] Chat 会话同步 — 跨设备同步 Chat 历史（方案待定，见 ai-context-management.md）
+- [ ] Chat 持久化 Phase 1 — 消息树数据模型 + 去限制 + 会话标题
+- [ ] Chat 持久化 Phase 2 — 编辑消息 + 重新生成 + 分支导航 UI
+- [ ] Chat 持久化 Phase 3 — Context 自动压缩（Bridge Message + Handoff Memo）
+- [ ] Chat 持久化 Phase 4 — 跨设备同步完整原始对话历史（Sync API + D1/R2）
 
 **Track B: 阅读环** — 设计：`phase-2-reading-ring.md`
 

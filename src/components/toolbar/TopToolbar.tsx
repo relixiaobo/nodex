@@ -4,7 +4,7 @@
  * Breadcrumb is rendered per-panel inside PanelLayout, not here.
  */
 import { Sparkles } from '../../lib/icons.js';
-import { focusOrOpenChat } from '../../lib/chat-panel-actions.js';
+import { focusOrOpenChat, openChatPanel } from '../../lib/chat-panel-actions.js';
 import { NavButtons } from './NavButtons.js';
 import { SearchTrigger } from './SearchTrigger.js';
 import { ToolbarUserMenu } from './ToolbarUserMenu.js';
@@ -17,7 +17,13 @@ export function GlobalTools() {
       <SearchTrigger />
       <button
         type="button"
-        onClick={() => void focusOrOpenChat()}
+        onClick={(event) => {
+          if (event.altKey) {
+            void openChatPanel();
+            return;
+          }
+          void focusOrOpenChat();
+        }}
         className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-foreground/4"
         aria-label="Open chat"
       >

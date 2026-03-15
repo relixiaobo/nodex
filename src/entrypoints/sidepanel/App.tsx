@@ -49,7 +49,7 @@ import {
 import { ensureSystemNodes } from '../../lib/bootstrap-system-nodes.js';
 import { Toaster, toast } from 'sonner';
 import { TooltipProvider } from '../../components/ui/Tooltip';
-import { CHAT_PANEL_PREFIX } from '../../types/index.js';
+import { isAppPanel, isChatPanel } from '../../types/index.js';
 
 // ─── Error Boundary ───
 // Prevents white screen — catches render errors and shows a recovery UI.
@@ -155,10 +155,12 @@ function useBootstrap(skip: boolean): BootstrapResult {
     });
    }
 
-   // Navigate to Today on first visit of the day, otherwise restore last panel.
-   // Use replacePanel (not navigateTo) to avoid creating a Loro undo entry
-   // whose captured UI snapshot is the empty initial state — that would cause
-   // repeated Cmd+Z to restore a blank panel stack.
+   // Navigate to Today on first visit of the day when the restored active panel
+   // is a regular node panel. Preserve restored app/chat panels as-is so special
+   // panels survive restart and continue restoring their own state.
+   // Use replacePanel (not navigateTo) to avoid creating a Loro undo entry whose
+   // captured UI snapshot is the empty initial state — that would cause repeated
+   // Cmd+Z to restore a blank panel stack.
    const uiState = useUIStore.getState();
    const activePanel = uiState.panels.find((p) => p.id === uiState.activePanelId);
    const currentPanelNodeId = activePanel?.nodeId ?? null;
@@ -166,15 +168,20 @@ function useBootstrap(skip: boolean): BootstrapResult {
    const lastVisitDate = uiState.lastVisitDate;
    const isFirstVisitOfDay = lastVisitDate !== todayStr;
    useUIStore.getState().setLastVisitDate(todayStr);
-
-   if (uiState.panels.length === 0
+   const hasInvalidActiveNode = !!currentPanelNodeId
+    && !isAppPanel(currentPanelNodeId)
+    && !isChatPanel(currentPanelNodeId)
+    && !loroDoc.hasNode(currentPanelNodeId);
+   const shouldResetToToday = uiState.panels.length === 0
+    || hasInvalidActiveNode
     || (
-      currentPanelNodeId
-      && !currentPanelNodeId.startsWith('app:')
-      && !currentPanelNodeId.startsWith(CHAT_PANEL_PREFIX)
-      && !loroDoc.hasNode(currentPanelNodeId)
-    )
-    || isFirstVisitOfDay) {
+      isFirstVisitOfDay
+      && !!currentPanelNodeId
+      && !isAppPanel(currentPanelNodeId)
+      && !isChatPanel(currentPanelNodeId)
+    );
+
+   if (shouldResetToToday) {
     replacePanel(ensureTodayNode());
    }
 

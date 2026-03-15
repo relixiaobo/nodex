@@ -54,6 +54,24 @@ describe('chat-panel-actions', () => {
     const state = useUIStore.getState();
     expect(state.panels).toHaveLength(2);
     expect(state.activePanelId).toBe(existingChatPanel.id);
-    expect(state.pendingChatPrompt).toBe('Explain this page');
+    expect(state.pendingChatPrompt).toEqual({
+      panelId: existingChatPanel.id,
+      prompt: 'Explain this page',
+    });
+  });
+
+  it('openChatWithPrompt opens a new chat panel and targets that panel when none exists', async () => {
+    await openChatWithPrompt('Start fresh');
+
+    const state = useUIStore.getState();
+    const createdChatPanel = state.panels[1];
+
+    expect(createdChatPanel).toBeDefined();
+    expect(isChatPanel(createdChatPanel!.nodeId)).toBe(true);
+    expect(state.activePanelId).toBe(createdChatPanel!.id);
+    expect(state.pendingChatPrompt).toEqual({
+      panelId: createdChatPanel!.id,
+      prompt: 'Start fresh',
+    });
   });
 });

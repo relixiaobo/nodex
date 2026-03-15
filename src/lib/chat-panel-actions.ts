@@ -3,10 +3,16 @@ import { saveChatSession } from './ai-persistence.js';
 import { useUIStore } from '../stores/ui-store.js';
 import { CHAT_PANEL_PREFIX, isChatPanel } from '../types/index.js';
 
-export async function openChatPanel(insertIndex?: number): Promise<void> {
+export async function openChatPanel(insertIndex?: number): Promise<string> {
   const session = createSession();
-  const persisted = await saveChatSession(session);
-  useUIStore.getState().openPanel(`${CHAT_PANEL_PREFIX}${persisted.id}`, insertIndex);
+  try {
+    await saveChatSession(session);
+  } catch {
+    // Fail open: panel restoration can recreate the session if persistence is unavailable.
+  }
+
+  useUIStore.getState().openPanel(`${CHAT_PANEL_PREFIX}${session.id}`, insertIndex);
+  return useUIStore.getState().activePanelId;
 }
 
 export async function focusOrOpenChat(): Promise<void> {
@@ -32,11 +38,13 @@ export async function openChatWithPrompt(prompt: string): Promise<void> {
   );
   const targetPanel = activeChatPanel ?? panels.find((panel) => isChatPanel(panel.nodeId));
 
+  let targetPanelId: string;
   if (targetPanel) {
     setActivePanel(targetPanel.id);
+    targetPanelId = targetPanel.id;
   } else {
-    await openChatPanel();
+    targetPanelId = await openChatPanel();
   }
 
-  setPendingChatPrompt(prompt);
+  setPendingChatPrompt({ panelId: targetPanelId, prompt });
 }

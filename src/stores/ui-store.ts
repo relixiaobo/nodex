@@ -18,7 +18,12 @@ import { nanoid } from 'nanoid';
 import { chromeLocalStorage } from '../lib/chrome-storage';
 import { commitUIMarker, registerUndoUICallbacks } from '../lib/loro-doc.js';
 import { useNodeStore } from './node-store';
-import { CHAT_PANEL_PREFIX, type NavigationEvent, type Panel } from '../types/index.js';
+import { isAppPanel, isChatPanel, type NavigationEvent, type Panel } from '../types/index.js';
+
+interface PendingChatPrompt {
+  panelId: string;
+  prompt: string;
+}
 
 interface UIStore {
   // Multi-panel navigation (global event timeline)
@@ -67,9 +72,9 @@ interface UIStore {
   closeSearch(): void;
   setSearchQuery(query: string): void;
 
-  // Pending chat prompt (session-only)
-  pendingChatPrompt: string | null;
-  setPendingChatPrompt(prompt: string | null): void;
+  // Pending chat prompt (session-only, targeted to a specific chat panel)
+  pendingChatPrompt: PendingChatPrompt | null;
+  setPendingChatPrompt(prompt: PendingChatPrompt | null): void;
 
   // Batch tag selector
   batchTagSelectorOpen: boolean;
@@ -170,9 +175,7 @@ export function partializeUIStore(state: UIStore): PersistedUIStoreState {
 }
 
 function hasBackingNode(nodeId: string): boolean {
-  // App panels (app:about, etc.) are pure UI routes, not nodes
-  if (nodeId.startsWith('app:')) return true;
-  if (nodeId.startsWith(CHAT_PANEL_PREFIX)) return true;
+  if (isAppPanel(nodeId) || isChatPanel(nodeId)) return true;
   try {
     return useNodeStore.getState().getNode(nodeId) !== null;
   } catch {

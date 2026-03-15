@@ -125,12 +125,14 @@ export function ChatPanel({ panelId, sessionId }: ChatPanelProps) {
   }, [messages, isStreaming, showSettings]);
 
   useEffect(() => {
-    if (!isActive || !pendingChatPrompt || loadingSettings || showSettings || chatBusy || !ready) return;
+    if (!isActive || !pendingChatPrompt || pendingChatPrompt.panelId !== panelId) return;
+    if (loadingSettings || showSettings || chatBusy || !ready) return;
 
     setPendingChatPrompt(null);
-    void handleSendMessage(pendingChatPrompt);
+    void handleSendMessage(pendingChatPrompt.prompt);
   }, [
     isActive,
+    panelId,
     pendingChatPrompt,
     loadingSettings,
     showSettings,

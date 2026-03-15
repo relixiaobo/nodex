@@ -1,3 +1,5 @@
+import 'fake-indexeddb/auto';
+import { deleteDB } from 'idb';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { createRoot, type Root } from 'react-dom/client';
@@ -7,7 +9,11 @@ import { ChatMessage } from '../../src/components/chat/ChatMessage.js';
 import { shouldStickChatScroll } from '../../src/components/chat/ChatPanel.js';
 import { DeskLayout } from '../../src/components/layout/DeskLayout.js';
 import { GlobalTools } from '../../src/components/toolbar/TopToolbar.js';
+import { resetChatPersistenceForTests } from '../../src/lib/ai-persistence.js';
+import { useUIStore } from '../../src/stores/ui-store.js';
 import { resetStores } from './helpers/test-state.js';
+
+const DB_NAME = 'soma-ai-chat';
 
 class MockResizeObserver {
   constructor(private readonly callback: ResizeObserverCallback) {}
@@ -42,8 +48,11 @@ describe('chat ui', () => {
   let container: HTMLDivElement;
   let root: Root;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     resetStores();
+    resetChatPersistenceForTests();
+    await deleteDB(DB_NAME);
+    resetChatPersistenceForTests();
     window.innerWidth = originalInnerWidth;
     globalThis.ResizeObserver = MockResizeObserver as typeof ResizeObserver;
     container = document.createElement('div');
@@ -145,6 +154,35 @@ describe('chat ui', () => {
     const trigger = container.querySelector('button[aria-label="Open chat"]');
     expect(trigger).not.toBeNull();
     expect(trigger?.getAttribute('aria-pressed')).toBeNull();
+  });
+
+  it('alt-click on the global chat trigger always opens a new chat panel', async () => {
+    flushSync(() => {
+      root.render(React.createElement(GlobalTools));
+    });
+
+    const trigger = container.querySelector('button[aria-label="Open chat"]');
+    expect(trigger).not.toBeNull();
+
+    flushSync(() => {
+      trigger?.dispatchEvent(new MouseEvent('click', { bubbles: true, altKey: true }));
+    });
+    await vi.waitFor(() => {
+      expect(useUIStore.getState().panels).toHaveLength(1);
+    });
+
+    const firstPanelId = useUIStore.getState().activePanelId;
+
+    flushSync(() => {
+      trigger?.dispatchEvent(new MouseEvent('click', { bubbles: true, altKey: true }));
+    });
+    await vi.waitFor(() => {
+      expect(useUIStore.getState().panels).toHaveLength(2);
+    });
+
+    const state = useUIStore.getState();
+    expect(state.activePanelId).not.toBe(firstPanelId);
+    expect(state.panels.every((panel) => panel.nodeId.startsWith('chat:'))).toBe(true);
   });
 
   it('keeps the panel layout visible on narrow screens instead of swapping to a chat-only view', () => {

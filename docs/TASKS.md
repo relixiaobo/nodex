@@ -23,13 +23,13 @@ _(空)_
 | 工作区 | 分支 | 任务 | 状态 |
 |--------|------|------|------|
 | nodex-gemini | — | 空闲 | — |
-| nodex-codex | — | 空闲 | — |
+| nodex-codex | codex/chat-phase-2 | Chat Phase 2 — 编辑/重新生成/分支导航 | 待执行 |
 
 ---
 
 ## 进行中
 
-_(空)_
+- [ ] **Chat Phase 2** — 编辑消息 + 重新生成 + 分支导航 UI | Codex | [#141](https://github.com/relixiaobo/nodex/pull/141)
 
 ---
 

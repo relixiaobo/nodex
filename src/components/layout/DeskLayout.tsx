@@ -25,7 +25,7 @@ const RESIZE_DOT_CLASSES = 'rounded-full bg-foreground/0 transition-colors group
 export function DeskLayout() {
   const chatOpen = useUIStore((s) => s.chatOpen);
   const [isWideLayout, setIsWideLayout] = useState(() => window.innerWidth > WIDE_LAYOUT_MIN_WIDTH);
-  const { chatWidth, chatHeight, handlePointerDown } = useChatResize();
+  const { chatWidth, handlePointerDown } = useChatResize();
 
   useEffect(() => {
     const onResize = () => setIsWideLayout(window.innerWidth > WIDE_LAYOUT_MIN_WIDTH);
@@ -34,58 +34,50 @@ export function DeskLayout() {
   }, []);
 
   const wideChat = chatOpen && isWideLayout;
+  const narrowChat = chatOpen && !isWideLayout;
 
   return (
     <div className={`flex flex-1 overflow-hidden p-1.5${wideChat ? '' : ' flex-col'}`}>
-      {/* ── Panel cards (elevated paper layer) ── */}
-      <div className={`flex overflow-hidden${wideChat
-        ? ' flex-1 min-w-0 min-h-0 relative z-10'
-        : ' flex-1 min-h-0'}`}
-      >
-        <PanelLayout toolbar={wideChat ? undefined : <GlobalTools />} />
-      </div>
-
-      {/* ── Chat area (desk-level, same Z as background) ── */}
-      {wideChat ? (
-        <>
-          <div
-            className={`${RESIZE_HANDLE_CLASSES} cursor-col-resize`}
-            style={{ width: 8 }}
-            onPointerDown={handlePointerDown}
-          >
-            <div className={`${RESIZE_DOT_CLASSES} h-8 w-1`} />
-          </div>
-          <div
-            className="flex flex-col shrink-0 min-w-[240px]"
-            style={{ width: chatWidth }}
-          >
-            <div className="self-end">
-              <GlobalTools />
-            </div>
-            <Suspense fallback={<ChatFallback />}>
-              <ChatDrawer />
-            </Suspense>
-          </div>
-        </>
-      ) : chatOpen ? (
-        <>
-          <div
-            className={`${RESIZE_HANDLE_CLASSES} cursor-row-resize`}
-            style={{ height: 8 }}
-            onPointerDown={handlePointerDown}
-          >
-            <div className={`${RESIZE_DOT_CLASSES} w-8 h-1`} />
-          </div>
-          <div
-            className="flex shrink-0 min-h-[120px]"
-            style={{ height: chatHeight }}
-          >
-            <Suspense fallback={<ChatFallback />}>
-              <ChatDrawer />
-            </Suspense>
-          </div>
-        </>
+      {narrowChat ? (
+        <Suspense fallback={<ChatFallback />}>
+          <ChatDrawer />
+        </Suspense>
       ) : null}
+      {!narrowChat && (
+        <>
+          {/* ── Panel cards (elevated paper layer) ── */}
+          <div className={`flex overflow-hidden${wideChat
+            ? ' flex-1 min-w-0 min-h-0 relative z-10'
+            : ' flex-1 min-h-0'}`}
+          >
+            <PanelLayout toolbar={wideChat ? undefined : <GlobalTools />} />
+          </div>
+
+          {/* ── Chat area (desk-level, same Z as background) ── */}
+          {wideChat ? (
+            <>
+              <div
+                className={`${RESIZE_HANDLE_CLASSES} cursor-col-resize`}
+                style={{ width: 8 }}
+                onPointerDown={handlePointerDown}
+              >
+                <div className={`${RESIZE_DOT_CLASSES} h-8 w-1`} />
+              </div>
+              <div
+                className="flex flex-col shrink-0 min-w-[240px]"
+                style={{ width: chatWidth }}
+              >
+                <div className="self-end">
+                  <GlobalTools />
+                </div>
+                <Suspense fallback={<ChatFallback />}>
+                  <ChatDrawer />
+                </Suspense>
+              </div>
+            </>
+          ) : null}
+        </>
+      )}
     </div>
   );
 }

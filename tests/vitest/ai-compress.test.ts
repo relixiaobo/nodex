@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   BRIDGE_TEMPLATE,
   bridgeToUserMessage,
+  compactForOverflow,
   compactIfNeeded,
   findLatestApplicableBridge,
   getCompressedPath,
@@ -304,6 +305,76 @@ describe('ai-compress', () => {
         timestamp: 88,
       },
     ]);
+    expect(agent.state.messages).toEqual([
+      bridgeToUserMessage(session.bridges[0]),
+    ]);
+  });
+
+  it('trims the overflow error before generating the handoff memo and continues afterwards', async () => {
+    const session = createSession();
+    appendMessage(session, createUserMessage('user-1', 1));
+
+    const overflowMessage = {
+      ...createAssistantMessage('', 2, 1200),
+      content: [{ type: 'text' as const, text: '' }],
+      stopReason: 'error' as const,
+      errorMessage: 'prompt is too long: 1200 tokens > 1000 maximum',
+    };
+
+    const state = {
+      messages: [
+        createUserMessage('user-1', 1),
+        overflowMessage,
+      ] as AgentMessage[],
+      model: {
+        id: 'claude-sonnet-4-5',
+        provider: 'anthropic',
+        contextWindow: 1000,
+      },
+      systemPrompt: 'chat system prompt',
+      tools: [],
+    };
+    const agent = {
+      state,
+      streamFn: vi.fn(),
+      sessionId: 'session_1',
+      waitForIdle: vi.fn().mockResolvedValue(undefined),
+      replaceMessages: vi.fn((nextMessages: AgentMessage[]) => {
+        state.messages = nextMessages;
+      }),
+      continue: vi.fn().mockResolvedValue(undefined),
+    } as unknown as Agent;
+
+    const compactAgent = {
+      state: {
+        messages: [
+          createAssistantMessage('memo after trimming overflow', 99, 10),
+        ] as AgentMessage[],
+      },
+      prompt: vi.fn(async (input: string) => {
+        expect(input).toContain('Conversation transcript:');
+        expect(input).toContain('User: user-1');
+        expect(input).not.toContain('prompt is too long');
+      }),
+    };
+
+    await compactForOverflow(session, agent, {
+      createCompactAgent: () => compactAgent,
+      saveSession: vi.fn(async (nextSession: ChatSession) => ({
+        ...nextSession,
+        updatedAt: 1235,
+      })),
+      now: () => 89,
+    });
+
+    expect(session.bridges).toEqual([
+      {
+        afterNodeId: getLinearPath(session).at(-1)!.id,
+        content: 'memo after trimming overflow',
+        timestamp: 89,
+      },
+    ]);
+    expect(agent.continue).toHaveBeenCalledOnce();
     expect(agent.state.messages).toEqual([
       bridgeToUserMessage(session.bridges[0]),
     ]);

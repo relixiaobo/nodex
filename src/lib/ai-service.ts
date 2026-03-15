@@ -272,7 +272,7 @@ function trimIncompleteTrail(session: ChatSession): void {
 }
 
 function syncSessionFromAgent(session: ChatSession, agentMessages: AgentMessage[]): void {
-  const fullPathMessages = getLinearPath(session).map((node) => node.message!);
+  const fullPath = getLinearPath(session);
   const compressedPath = getCompressedPath(session);
 
   if (compressedPath.length > agentMessages.length) {
@@ -284,23 +284,55 @@ function syncSessionFromAgent(session: ChatSession, agentMessages: AgentMessage[
     return;
   }
 
-  if (compressedPath.length > 0) {
-    const pathTail = compressedPath[compressedPath.length - 1];
-    const agentTail = agentMessages[compressedPath.length - 1];
-    if (!agentTail || pathTail.role !== agentTail.role) {
+  for (let index = 0; index < compressedPath.length; index += 1) {
+    if (compressedPath[index]?.role !== agentMessages[index]?.role) {
       console.error(
-        '[ai-service] syncSessionFromAgent: prefix mismatch - path tail role=%s, agent role=%s',
-        pathTail.role,
-        agentTail?.role ?? 'null',
+        '[ai-service] syncSessionFromAgent: prefix mismatch at %d - path role=%s, agent role=%s',
+        index,
+        compressedPath[index]?.role ?? 'null',
+        agentMessages[index]?.role ?? 'null',
       );
       return;
     }
   }
 
   syncAgentToTree(session, [
-    ...fullPathMessages,
+    ...fullPath.map((node) => node.message!),
     ...agentMessages.slice(compressedPath.length),
   ]);
+}
+
+function createOverflowRecoveryCoordinator(session: ChatSession, agent: Agent) {
+  const recoveries: Promise<void>[] = [];
+  let queue = Promise.resolve();
+  let suppressTurnSync = false;
+
+  return {
+    shouldSkipTurnSync(): boolean {
+      return suppressTurnSync;
+    },
+    handleAssistantMessage(message: AgentMessage): void {
+      if (message.role !== 'assistant') return;
+      if (!isContextOverflow(message, agent.state.model.contextWindow)) return;
+
+      suppressTurnSync = true;
+      const recovery = queue.then(async () => {
+        await agent.waitForIdle();
+        try {
+          await compactForOverflow(session, agent);
+        } finally {
+          suppressTurnSync = false;
+        }
+      });
+      queue = recovery.catch(() => {});
+      recoveries.push(recovery);
+    },
+    async waitForAll(): Promise<void> {
+      for (const recovery of recoveries) {
+        await recovery;
+      }
+    },
+  };
 }
 
 export async function getAISettings(): Promise<StoredAISettings | null> {
@@ -489,31 +521,14 @@ export async function streamChat(prompt: string, agent: Agent = getAIAgent()): P
 
   const session = ensureCurrentSession(agent);
   await compactIfNeeded(session, agent);
-
-  let skipCurrentTurnSync = false;
-  const overflowRecoveries: Promise<void>[] = [];
-  let overflowQueue = Promise.resolve();
-
-  function queueOverflowRecovery(): void {
-    skipCurrentTurnSync = true;
-
-    const recovery = overflowQueue.then(async () => {
-      await agent.waitForIdle();
-      skipCurrentTurnSync = false;
-      await compactForOverflow(session, agent);
-    });
-    overflowQueue = recovery.catch(() => {});
-    overflowRecoveries.push(recovery);
-  }
+  const overflowRecovery = createOverflowRecoveryCoordinator(session, agent);
 
   const unsubscribe = agent.subscribe((event: AgentEvent) => {
     if (getCurrentSession(agent) !== session) return;
 
     if (event.type === 'message_end') {
       if (event.message.role === 'assistant') {
-        if (isContextOverflow(event.message, agent.state.model.contextWindow)) {
-          queueOverflowRecovery();
-        }
+        overflowRecovery.handleAssistantMessage(event.message);
         return;
       }
 
@@ -522,7 +537,7 @@ export async function streamChat(prompt: string, agent: Agent = getAIAgent()): P
     }
 
     if (event.type === 'turn_end') {
-      if (skipCurrentTurnSync) return;
+      if (overflowRecovery.shouldSkipTurnSync()) return;
       syncSessionFromAgent(session, agent.state.messages);
       void persistChatSession(agent);
       return;
@@ -531,12 +546,7 @@ export async function streamChat(prompt: string, agent: Agent = getAIAgent()): P
 
   try {
     await agent.prompt(normalized);
-    let recoveryIndex = 0;
-    while (recoveryIndex < overflowRecoveries.length) {
-      await overflowRecoveries[recoveryIndex];
-      recoveryIndex += 1;
-    }
-
+    await overflowRecovery.waitForAll();
     syncSessionFromAgent(session, agent.state.messages);
     if (session.title === null) {
       session.title = deriveSessionTitle(agent.state.messages);

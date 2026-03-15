@@ -2,7 +2,6 @@ import type { Agent, AgentMessage } from '@mariozechner/pi-agent-core';
 import { describe, expect, it, vi } from 'vitest';
 import {
   BRIDGE_TEMPLATE,
-  COMPACT_PROMPT,
   bridgeToUserMessage,
   compactIfNeeded,
   findLatestApplicableBridge,
@@ -233,18 +232,19 @@ describe('ai-compress', () => {
       createAssistantMessage('assistant-2', 4, 800),
     ]);
 
-    const compactState = { messages: [] as AgentMessage[] };
+    const compactState = {
+      messages: [
+        createAssistantMessage('memo for next assistant', 99, 10),
+      ] as AgentMessage[],
+    };
     const compactAgent = {
       state: compactState,
-      replaceMessages: vi.fn((messages: AgentMessage[]) => {
-        compactState.messages = messages.slice();
-      }),
       prompt: vi.fn(async (input: string) => {
-        expect(input).toBe(COMPACT_PROMPT);
-        compactState.messages = [
-          ...compactState.messages,
-          createAssistantMessage('memo for next assistant', 99, 10),
-        ];
+        expect(input).toContain('Conversation transcript:');
+        expect(input).toContain('User: user-1');
+        expect(input).toContain('Assistant: assistant-1');
+        expect(input).toContain('User: user-2');
+        expect(input).toContain('Assistant: assistant-2');
       }),
     };
     const saveSession = vi.fn(async (nextSession: ChatSession) => ({
@@ -266,6 +266,44 @@ describe('ai-compress', () => {
       },
     ]);
     expect(saveSession).toHaveBeenCalledOnce();
+    expect(agent.state.messages).toEqual([
+      bridgeToUserMessage(session.bridges[0]),
+    ]);
+  });
+
+  it('keeps the compressed session in memory when persistence fails', async () => {
+    const session = createLinearSession();
+    const agent = createStubAgent([
+      createUserMessage('user-1', 1),
+      createAssistantMessage('assistant-1', 2, 100),
+      createUserMessage('user-2', 3),
+      createAssistantMessage('assistant-2', 4, 800),
+    ]);
+
+    const compactAgent = {
+      state: {
+        messages: [
+          createAssistantMessage('memo despite persistence failure', 99, 10),
+        ] as AgentMessage[],
+      },
+      prompt: vi.fn(async () => {}),
+    };
+
+    await expect(compactIfNeeded(session, agent, {
+      createCompactAgent: () => compactAgent,
+      saveSession: vi.fn(async () => {
+        throw new Error('indexeddb unavailable');
+      }),
+      now: () => 88,
+    })).resolves.toBe(true);
+
+    expect(session.bridges).toEqual([
+      {
+        afterNodeId: getLinearPath(session).at(-1)!.id,
+        content: 'memo despite persistence failure',
+        timestamp: 88,
+      },
+    ]);
     expect(agent.state.messages).toEqual([
       bridgeToUserMessage(session.bridges[0]),
     ]);

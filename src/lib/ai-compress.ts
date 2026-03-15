@@ -57,7 +57,6 @@ interface CompactAgentLike {
   state: {
     messages: AgentMessage[];
   };
-  replaceMessages(messages: AgentMessage[]): void;
   prompt(input: string): Promise<void>;
 }
 
@@ -69,13 +68,14 @@ interface CompactDeps {
 
 function getMessageText(message: AgentMessage): string {
   if (typeof message.content === 'string') {
-    return message.content;
+    return message.content.replace(/\s+/g, ' ').trim();
   }
 
   return message.content
     .filter((part): part is Extract<typeof message.content[number], { type: 'text' }> => part.type === 'text')
     .map((part) => part.text)
     .join(' ')
+    .replace(/\s+/g, ' ')
     .trim();
 }
 
@@ -83,7 +83,7 @@ function createCompactAgent(agent: Agent): CompactAgentLike {
   return new Agent({
     initialState: {
       model: agent.state.model,
-      systemPrompt: agent.state.systemPrompt,
+      systemPrompt: COMPACT_PROMPT,
       tools: [],
     },
     getApiKey: agent.getApiKey,
@@ -109,8 +109,35 @@ function extractHandoffMemo(messages: AgentMessage[]): string {
   throw new Error('[ai-compress] Failed to extract handoff memo from compact response');
 }
 
+function formatTranscriptEntry(message: AgentMessage): string | null {
+  if (message.role === 'user') {
+    const text = getMessageText(message);
+    return text ? `User: ${text}` : null;
+  }
+
+  if (message.role === 'assistant') {
+    const text = getMessageText(message);
+    return text ? `Assistant: ${text}` : null;
+  }
+
+  return null;
+}
+
 function getActivePath(session: ChatSession): MessageNode[] {
   return getLinearPath(session);
+}
+
+function buildCompactUserPrompt(messages: AgentMessage[]): string {
+  const transcript = messages
+    .map(formatTranscriptEntry)
+    .filter((entry): entry is string => entry !== null)
+    .join('\n\n');
+
+  return [
+    'Conversation transcript:',
+    '',
+    transcript || '(No prior conversation transcript available.)',
+  ].join('\n');
 }
 
 function fillBridgeTemplate(memo: string): string {
@@ -121,6 +148,7 @@ async function compactSession(
   session: ChatSession,
   agent: Agent,
   deps: CompactDeps,
+  sourceMessages: AgentMessage[],
 ): Promise<void> {
   const path = getActivePath(session);
   const lastNode = path[path.length - 1];
@@ -129,8 +157,7 @@ async function compactSession(
   }
 
   const compactAgent = (deps.createCompactAgent ?? createCompactAgent)(agent);
-  compactAgent.replaceMessages(agent.state.messages);
-  await compactAgent.prompt(COMPACT_PROMPT);
+  await compactAgent.prompt(buildCompactUserPrompt(sourceMessages));
 
   session.bridges = [
     ...session.bridges,
@@ -142,8 +169,12 @@ async function compactSession(
   ];
 
   agent.replaceMessages(getCompressedPath(session));
-  const persisted = await (deps.saveSession ?? saveChatSession)(session);
-  session.updatedAt = persisted.updatedAt;
+  try {
+    const persisted = await (deps.saveSession ?? saveChatSession)(session);
+    session.updatedAt = persisted.updatedAt;
+  } catch {
+    // Compression should degrade gracefully when IndexedDB is temporarily unavailable.
+  }
 }
 
 function trimOverflowTail(agent: Agent): AgentMessage[] {
@@ -241,7 +272,7 @@ export async function compactIfNeeded(
     return false;
   }
 
-  await compactSession(session, agent, deps);
+  await compactSession(session, agent, deps, agent.state.messages);
   return true;
 }
 
@@ -252,8 +283,9 @@ export async function compactForOverflow(
 ): Promise<void> {
   await agent.waitForIdle();
 
-  agent.replaceMessages(trimOverflowTail(agent));
-  await compactSession(session, agent, deps);
+  const sourceMessages = trimOverflowTail(agent);
+  agent.replaceMessages(sourceMessages);
+  await compactSession(session, agent, deps, sourceMessages);
 
   if (agent.state.messages.at(-1)?.role === 'assistant') {
     throw new Error('[ai-compress] Cannot continue from assistant message after overflow compaction');

@@ -16,7 +16,10 @@ export type {
 export {
   SYSTEM_NODE_IDS,
   APP_PANELS,
+  CHAT_PANEL_PREFIX,
   isAppPanel,
+  isChatPanel,
+  chatPanelSessionId,
 } from './node.js';
 
 export {

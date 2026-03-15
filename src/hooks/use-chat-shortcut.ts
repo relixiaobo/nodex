@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { useUIStore } from '../stores/ui-store';
+import { focusOrOpenChat } from '../lib/chat-panel-actions.js';
 import { getShortcutKeys, matchesShortcutEvent } from '../lib/shortcut-registry.js';
 
 function shouldHandleChatShortcut(): boolean {
@@ -24,7 +24,7 @@ export function useChatShortcut(): void {
 
       event.preventDefault();
       event.stopPropagation();
-      useUIStore.getState().toggleChat();
+      void focusOrOpenChat();
     }
 
     document.addEventListener('keydown', handleKeyDown, true);

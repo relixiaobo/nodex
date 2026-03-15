@@ -10,7 +10,6 @@
  * - navIndex: pointer into navHistory (-1 = no events)
  * - goBack/goForward: undo/redo events from navHistory
  *
- * Chat events are NOT included in navHistory (Chat is desk-layer, not navigation).
  * Back/Forward auto-switch activePanelId to the affected panel.
  */
 import { create } from 'zustand';
@@ -19,7 +18,7 @@ import { nanoid } from 'nanoid';
 import { chromeLocalStorage } from '../lib/chrome-storage';
 import { commitUIMarker, registerUndoUICallbacks } from '../lib/loro-doc.js';
 import { useNodeStore } from './node-store';
-import type { Panel, NavigationEvent } from '../types/index.js';
+import { CHAT_PANEL_PREFIX, type NavigationEvent, type Panel } from '../types/index.js';
 
 interface UIStore {
   // Multi-panel navigation (global event timeline)
@@ -68,11 +67,7 @@ interface UIStore {
   closeSearch(): void;
   setSearchQuery(query: string): void;
 
-  // Chat drawer (session-only)
-  chatOpen: boolean;
-  openChat(): void;
-  closeChat(): void;
-  toggleChat(): void;
+  // Pending chat prompt (session-only)
   pendingChatPrompt: string | null;
   setPendingChatPrompt(prompt: string | null): void;
 
@@ -177,6 +172,7 @@ export function partializeUIStore(state: UIStore): PersistedUIStoreState {
 function hasBackingNode(nodeId: string): boolean {
   // App panels (app:about, etc.) are pure UI routes, not nodes
   if (nodeId.startsWith('app:')) return true;
+  if (nodeId.startsWith(CHAT_PANEL_PREFIX)) return true;
   try {
     return useNodeStore.getState().getNode(nodeId) !== null;
   } catch {
@@ -540,11 +536,6 @@ export const useUIStore = create<UIStore>()(
       closeSearch: () => set({ searchOpen: false }),
       setSearchQuery: (query) => set({ searchQuery: query }),
 
-      // Chat drawer
-      chatOpen: false,
-      openChat: () => set({ chatOpen: true }),
-      closeChat: () => set({ chatOpen: false }),
-      toggleChat: () => set((s) => ({ chatOpen: !s.chatOpen })),
       pendingChatPrompt: null,
       setPendingChatPrompt: (prompt) => set({ pendingChatPrompt: prompt }),
 

@@ -49,6 +49,7 @@ import {
 import { ensureSystemNodes } from '../../lib/bootstrap-system-nodes.js';
 import { Toaster, toast } from 'sonner';
 import { TooltipProvider } from '../../components/ui/Tooltip';
+import { CHAT_PANEL_PREFIX } from '../../types/index.js';
 
 // ─── Error Boundary ───
 // Prevents white screen — catches render errors and shows a recovery UI.
@@ -167,7 +168,12 @@ function useBootstrap(skip: boolean): BootstrapResult {
    useUIStore.getState().setLastVisitDate(todayStr);
 
    if (uiState.panels.length === 0
-    || (currentPanelNodeId && !currentPanelNodeId.startsWith('app:') && !loroDoc.hasNode(currentPanelNodeId))
+    || (
+      currentPanelNodeId
+      && !currentPanelNodeId.startsWith('app:')
+      && !currentPanelNodeId.startsWith(CHAT_PANEL_PREFIX)
+      && !loroDoc.hasNode(currentPanelNodeId)
+    )
     || isFirstVisitOfDay) {
     replacePanel(ensureTodayNode());
    }

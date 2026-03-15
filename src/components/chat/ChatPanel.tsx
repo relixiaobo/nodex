@@ -3,7 +3,8 @@ import { toast } from 'sonner';
 import { ExternalLink, Plus, Settings, Sparkles, X } from '../../lib/icons.js';
 import { useAgent } from '../../hooks/use-agent.js';
 import { readChatDebugEnabled, writeChatDebugEnabled } from '../../lib/ai-debug.js';
-import { clearApiKey, getAISettings, setApiKey } from '../../lib/ai-service.js';
+import { clearApiKey, getAISettings, getAgentForSession, setApiKey } from '../../lib/ai-service.js';
+import { openChatPanel } from '../../lib/chat-panel-actions.js';
 import { useUIStore } from '../../stores/ui-store.js';
 import { ChatDebugPanel } from './ChatDebugPanel.js';
 import { ChatInput } from './ChatInput.js';
@@ -11,6 +12,11 @@ import { ChatMessage } from './ChatMessage.js';
 
 const HEADER_ICON_BUTTON = 'inline-flex h-7 w-7 items-center justify-center rounded-full text-foreground-tertiary transition-colors hover:bg-foreground/4 hover:text-foreground';
 const AUTO_SCROLL_THRESHOLD = 48;
+
+export interface ChatPanelProps {
+  panelId: string;
+  sessionId: string;
+}
 
 export function shouldStickChatScroll(
   scroller: Pick<HTMLDivElement, 'scrollHeight' | 'scrollTop' | 'clientHeight'>,
@@ -31,10 +37,11 @@ function getActionErrorMessage(error: unknown, fallback: string): string {
   return fallback;
 }
 
-export function ChatDrawer() {
-  const closeChat = useUIStore((s) => s.closeChat);
+export function ChatPanel({ panelId, sessionId }: ChatPanelProps) {
   const pendingChatPrompt = useUIStore((s) => s.pendingChatPrompt);
   const setPendingChatPrompt = useUIStore((s) => s.setPendingChatPrompt);
+  const activePanelId = useUIStore((s) => s.activePanelId);
+  const isActive = activePanelId === panelId;
   const {
     messages,
     toolResults,
@@ -47,8 +54,7 @@ export function ChatDrawer() {
     regenerateMessage,
     switchBranch,
     stopStreaming,
-    newChat,
-  } = useAgent();
+  } = useAgent(getAgentForSession(sessionId), sessionId);
   const scrollRef = useRef<HTMLDivElement>(null);
   const shouldStickToBottomRef = useRef(true);
   const debugTapResetRef = useRef<number | null>(null);
@@ -119,11 +125,12 @@ export function ChatDrawer() {
   }, [messages, isStreaming, showSettings]);
 
   useEffect(() => {
-    if (!pendingChatPrompt || loadingSettings || showSettings || chatBusy || !ready) return;
+    if (!isActive || !pendingChatPrompt || loadingSettings || showSettings || chatBusy || !ready) return;
 
     setPendingChatPrompt(null);
     void handleSendMessage(pendingChatPrompt);
   }, [
+    isActive,
     pendingChatPrompt,
     loadingSettings,
     showSettings,
@@ -167,8 +174,8 @@ export function ChatDrawer() {
     shouldStickToBottomRef.current = true;
     try {
       await sendMessage(prompt);
-    } catch (error) {
-      toast.error(getActionErrorMessage(error, 'Failed to send message'));
+    } catch (sendError) {
+      toast.error(getActionErrorMessage(sendError, 'Failed to send message'));
     }
   }
 
@@ -195,9 +202,9 @@ export function ChatDrawer() {
   async function handleNewChat() {
     shouldStickToBottomRef.current = true;
     try {
-      await newChat();
-    } catch (error) {
-      toast.error(getActionErrorMessage(error, 'Failed to create a new chat'));
+      await openChatPanel();
+    } catch (createError) {
+      toast.error(getActionErrorMessage(createError, 'Failed to create a new chat'));
     }
   }
 
@@ -225,7 +232,7 @@ export function ChatDrawer() {
   }
 
   return (
-    <aside className="flex flex-1 flex-col overflow-hidden">
+    <div className="flex flex-1 flex-col overflow-hidden bg-background">
       <div className="flex h-12 items-center justify-between border-b border-border px-3">
         <button
           type="button"
@@ -276,7 +283,7 @@ export function ChatDrawer() {
           )}
           <button
             type="button"
-            onClick={closeChat}
+            onClick={() => useUIStore.getState().closePanel(panelId)}
             className="inline-flex h-7 w-7 items-center justify-center rounded-full text-foreground-tertiary transition-colors hover:bg-foreground/4 hover:text-foreground"
             aria-label="Close chat"
           >
@@ -418,6 +425,6 @@ export function ChatDrawer() {
           />
         </>
       )}
-    </aside>
+    </div>
   );
 }

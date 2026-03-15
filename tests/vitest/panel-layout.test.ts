@@ -196,4 +196,19 @@ describe('PanelLayout notes dropdown', () => {
     expect(getNotesTrigger()).toBeNull();
     expect(container.querySelector('button[title="Close panel"]')).toBeNull();
   });
+
+  it('shows chat panels with a sparkles icon in the dropdown', async () => {
+    setPanels([
+      { id: 'main', nodeId: 'proj_1' },
+      { id: 'chat', nodeId: 'chat:sess_test' },
+      { id: 'notes', nodeId: 'note_1' },
+    ], 'main');
+
+    await renderLayout();
+    await openNotesMenu();
+
+    const chatRow = getMenuRow('Chat');
+    expect(chatRow).toBeDefined();
+    expect(chatRow?.querySelector('svg')).not.toBeNull();
+  });
 });

@@ -2,7 +2,7 @@
 
 > Chat 持久化、上下文压缩、跨设备同步的统一设计。
 >
-> **更新**：2026-03-15 — 结合代码现状完成 review；Bridge 决策落定（Option B）；补充 5 项实现细节；全面采用 pi-agent-core 事件系统
+> **更新**：2026-03-15 — 代码现状 review + 开源调研 + 参考实现分析（assistant-ui / Vercel AI SDK）+ pi-agent-core 事件系统全面采用
 
 ## 总览
 
@@ -613,6 +613,79 @@ R2: chat/{workspace_id}/{session_id}.json（完整 ChatSession JSON）
 
 ---
 
+## 开源调研结论
+
+2026-03-15 调研了 LibreChat（36k stars）、assistant-ui（8.8k stars）、LobeChat（77k stars）、Vercel AI SDK PR #5085、Forky、Dexie.js、idb、LangChain ConversationSummaryBufferMemory、gpt-tokenizer 等方案。
+
+| 问题 | 结论 | 理由 |
+|------|------|------|
+| **消息树** | 自建（~300 行），参考 assistant-ui | 无独立库可用。所有成熟项目（LibreChat / LobeChat / assistant-ui）都用 flat messages + parentId 模式，与我们设计一致 |
+| **IndexedDB** | 引入 `idb`（1.2KB） | 替换手写 IDBRequest 样板代码。Dexie.js（15KB）功能过重 |
+| **上下文压缩** | 自建（~100-150 行） | 无可用库。LangChain 依赖链太重。行业标准是 DIY rolling summary（Claude Code / OpenCode / Cline 均如此） |
+| **跨设备同步** | 复用现有 Cloudflare R2 + D1 | 已有基础设施。Chat session 是简单 JSON blob，不需要新的同步库 |
+| **Token 计数** | 用 LLM 返回的 `usage` 数据 | 不引入客户端 tokenizer（gpt-tokenizer 等），避免编码不匹配风险 |
+
+---
+
+## 决策记录
+
+### D1: 消息树数据结构 — flat mapping vs linked-list 图
+
+**决策**：`mapping: Record<string, MessageNode>`（flat 字典）
+
+- **考虑过的替代方案**：assistant-ui 的 `prev`/`next` 链表指针图
+- **选择理由**：flat 字典可直接序列化到 IndexedDB（JSON.stringify），无需额外的序列化/反序列化逻辑。链表图适合纯内存场景（O(1) 导航），但持久化时需要拆解指针重建引用
+- **取舍**：查 parent/children 需要一次字典查找（O(1) 但有哈希开销），比指针解引用慢；但在 chat 消息量级（数百条）下无实际影响
+
+### D2: 消息身份 — 位置映射 vs 给 AgentMessage 附加 ID
+
+**决策**：位置映射（`syncAgentToTree` 差量追加）
+
+- **考虑过的替代方案**：monkey-patch `AgentMessage` 加 `_nodeId` 字段
+- **选择理由**：不侵入 pi-agent-core 的类型系统。位置映射在 streaming 期间 UI 锁定（按钮 disabled）的前提下是安全的
+- **风险**：如果未来允许 streaming 中编辑，位置映射会失效。届时需要切换到 ID 映射
+
+### D3: Bridge 存储 — session 级元数据 vs 树节点
+
+**决策**：Option B — `ChatSession.bridges[]` 数组
+
+- **考虑过的替代方案**：Option A — Bridge 作为 `MessageNode`（`message.role === 'bridge'`）插入树中
+- **选择理由**：树的职责是存储用户可见的对话消息。Bridge 是系统压缩产物，作为树节点会污染 `getLinearPath()`、`children.length`（分支计数）、UI 渲染逻辑
+- **取舍**：需要独立的 `getCompressedPath()` 函数组装 LLM 上下文（检查 bridges 位置 → 截断早期消息）
+
+### D4: 压缩层 — 调用层 vs transformContext hook
+
+**决策**：在 `streamChat()` 调用层执行
+
+- **考虑过的替代方案**：在 `transformContext` hook 中压缩
+- **选择理由**：压缩有持久化副作用（写 `session.bridges`、写 IndexedDB）。`transformContext` 应是纯变换（每轮 LLM 调用都执行，无副作用）。压缩是一次性决策，应在 prompt 前显式执行
+- **pi-agent-core 约束**：`agent.prompt()` 包住整个 tool loop，调用层无法在 tool loop 中途插入压缩。靠 `message_end` + `isContextOverflow()` + `agent.continue()` 兜底
+
+### D5: 事件系统 — 三事件分工
+
+**决策**：`turn_end`（增量持久化）+ `agent_end`（最终确认）+ `message_end`（overflow 检测）
+
+- **考虑过的替代方案**：只用 `agent_end`（更简单）；只用 `isStreaming` 轮询（现有模式）
+- **选择理由**：browser tool chain 可达 10+ 轮，只用 `agent_end` 在中途断开时丢失全部进度。`turn_end` 增量持久化实现断点恢复。`isStreaming` 是状态（适合 UI），不是事件（适合副作用）
+- **`syncAgentToTree` 幂等性**：`turn_end` 和 `agent_end` 都调用 `syncAgentToTree`，后者只追加差量，多次调用安全
+
+### D6: 同步冲突 — server-side CAS vs LWW
+
+**决策**：Server-side compare-and-swap（push 带 `baseRevision`）
+
+- **考虑过的替代方案**：静默 last-write-wins
+- **选择理由**：消息树模型下，静默覆盖会丢失整个分支，违反"原始消息永远不删"原则。CAS 在版本不匹配时返回 409 + 远端数据，让用户选择处理方式
+- **已知限制**：不做 mapping-level merge（不自动合并两边各自创建的分支）
+
+### D7: IndexedDB 封装 — idb vs Dexie vs 手写
+
+**决策**：引入 `idb`（1.2KB）
+
+- **考虑过的替代方案**：继续手写 IDBRequest（现状）；Dexie.js（15KB，含 reactive hooks）
+- **选择理由**：`idb` 是 Promise 薄封装，API 与原生 IndexedDB 一致，学习成本为零。Dexie 功能丰富但 15KB 对我们的 IndexedDB 使用量级过重。手写样板代码冗长且容易出错（忘记关 transaction 等）
+
+---
+
 ## 不做的事
 
 - 不用 Loro CRDT 同步 chat — 冲突场景有限，CAS + 手动解决足够
@@ -623,3 +696,5 @@ R2: chat/{workspace_id}/{session_id}.json（完整 ChatSession JSON）
 - 不引入精确 tokenizer — 用 `AssistantMessage.usage` 实际数据
 - 不自建溢出检测 — 用 pi-ai 的 `isContextOverflow()`
 - 不拆 IndexedDB 为 session + message 两个 store — 当前会话量级不需要
+- 不采用 assistant-ui 组件库 — Chat UI 已定制化，只参考其 `MessageRepository` 数据结构
+- 不采用 LangChain memory — 依赖链过重（~100 行 DIY 即可）

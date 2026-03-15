@@ -23,13 +23,13 @@ _(空)_
 | 工作区 | 分支 | 任务 | 状态 |
 |--------|------|------|------|
 | nodex-gemini | — | 空闲 | — |
-| nodex-codex | review/ai-chat-architecture | AI Chat 架构方案 Review | 待分配 |
+| nodex-codex | codex/chat-phase-1a | Chat Phase 1A — 消息树模型 + 测试 | 待执行 |
 
 ---
 
 ## 进行中
 
-_(空)_
+- [ ] **Chat Phase 1A** — 消息树数据模型 + 算法 + 测试 | Codex | [#138](https://github.com/relixiaobo/nodex/pull/138)
 
 ---
 

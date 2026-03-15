@@ -61,6 +61,8 @@ export {
   ToggleLeft,
   EyeOff,
   Play,
+  Pencil,
+  RefreshCw,
   Sparkles,
 } from 'lucide-react';
 

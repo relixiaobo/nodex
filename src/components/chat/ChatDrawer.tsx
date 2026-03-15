@@ -20,7 +20,20 @@ export function ChatDrawer() {
   const closeChat = useUIStore((s) => s.closeChat);
   const pendingChatPrompt = useUIStore((s) => s.pendingChatPrompt);
   const setPendingChatPrompt = useUIStore((s) => s.setPendingChatPrompt);
-  const { messages, toolResults, isStreaming, error, ready, debug, sendMessage, stopStreaming, newChat } = useAgent();
+  const {
+    messages,
+    toolResults,
+    isStreaming,
+    error,
+    ready,
+    debug,
+    sendMessage,
+    editMessage,
+    regenerateMessage,
+    switchBranch,
+    stopStreaming,
+    newChat,
+  } = useAgent();
   const scrollRef = useRef<HTMLDivElement>(null);
   const debugTapResetRef = useRef<number | null>(null);
   const debugTapCountRef = useRef(0);
@@ -314,13 +327,16 @@ export function ChatDrawer() {
                 </div>
               </div>
             ) : (
-              messages.map((message, index) => (
+              messages.map((entry, index) => (
                 <ChatMessage
-                  key={`${message.role}-${message.timestamp}-${index}`}
-                  message={message}
+                  key={entry.nodeId ?? `stream-${entry.message.timestamp}-${index}`}
+                  entry={entry}
                   toolResults={toolResults}
-                  streaming={isStreaming && index === messages.length - 1 && message.role === 'assistant'}
-                  grouped={index > 0 && messages[index - 1].role === message.role}
+                  streaming={isStreaming && index === messages.length - 1 && entry.message.role === 'assistant'}
+                  grouped={index > 0 && messages[index - 1].message.role === entry.message.role}
+                  onEdit={editMessage}
+                  onRegenerate={regenerateMessage}
+                  onSwitchBranch={switchBranch}
                 />
               ))
             )}

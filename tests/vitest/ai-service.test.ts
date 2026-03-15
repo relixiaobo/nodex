@@ -1,3 +1,6 @@
+import 'fake-indexeddb/auto';
+import { deleteDB } from 'idb';
+import { getLinearPath, linearToTree } from '../../src/lib/ai-chat-tree.js';
 import { ensureSystemNodes } from '../../src/lib/bootstrap-system-nodes.js';
 import * as loroDoc from '../../src/lib/loro-doc.js';
 import { SYSTEM_SCHEMA_NODE_IDS } from '../../src/lib/system-schema-presets.js';
@@ -10,6 +13,7 @@ const prepareAgentContextMock = vi.hoisted(() => vi.fn(async (
   reminder: '<system-reminder>ctx</system-reminder>',
   messages,
 })));
+const DB_NAME = 'soma-ai-chat';
 
 vi.mock('../../src/lib/ai-proxy.js', () => ({
   streamProxyWithApiKey: streamProxyMock,
@@ -66,6 +70,11 @@ describe('ai-service', () => {
       reminder: '<system-reminder>ctx</system-reminder>',
       messages,
     }));
+
+    const { resetChatPersistenceForTests } = await import('../../src/lib/ai-persistence.js');
+    resetChatPersistenceForTests();
+    await deleteDB(DB_NAME);
+    resetChatPersistenceForTests();
 
     const { resetAIAgentForTests } = await import('../../src/lib/ai-service.js');
     resetAIAgentForTests();
@@ -224,11 +233,44 @@ describe('ai-service', () => {
     ]);
   });
 
+  it('restoreLatestChatSession trims incomplete persisted tails before hydrating the agent', async () => {
+    const { saveChatSession } = await import('../../src/lib/ai-persistence.js');
+    const { createAgent, getCurrentSession, restoreLatestChatSession } = await import('../../src/lib/ai-service.js');
+
+    const session = linearToTree([
+      { role: 'user', content: 'recover me', timestamp: 1 },
+      {
+        role: 'toolResult',
+        toolCallId: 'call_1',
+        toolName: 'browser',
+        content: [{ type: 'text', text: 'partial tool result' }],
+        isError: false,
+        timestamp: 2,
+      },
+    ]);
+    session.id = 'session_trim';
+    session.createdAt = 1;
+    session.updatedAt = 2;
+
+    await saveChatSession(session);
+
+    const agent = createAgent();
+    await restoreLatestChatSession(agent);
+
+    expect(agent.state.messages).toEqual([
+      { role: 'user', content: 'recover me', timestamp: 1 },
+    ]);
+    expect(getLinearPath(getCurrentSession()!).map((node) => node.message)).toEqual([
+      { role: 'user', content: 'recover me', timestamp: 1 },
+    ]);
+  });
+
   it('streamChat trims input and stopStreaming aborts the agent', async () => {
     const { streamChat, stopStreaming } = await import('../../src/lib/ai-service.js');
 
     const agent = {
       prompt: vi.fn().mockResolvedValue(undefined),
+      subscribe: vi.fn(() => () => {}),
       abort: vi.fn(),
     } as unknown as import('@mariozechner/pi-agent-core').Agent;
 
@@ -239,6 +281,88 @@ describe('ai-service', () => {
     expect(agent.prompt).toHaveBeenCalledTimes(1);
     expect(agent.prompt).toHaveBeenCalledWith('hello world');
     expect(agent.abort).toHaveBeenCalledTimes(1);
+  });
+
+  it('streamChat persists sessions from turn_end and agent_end events', async () => {
+    const { getChatSession } = await import('../../src/lib/ai-persistence.js');
+    const { getCurrentSession, streamChat } = await import('../../src/lib/ai-service.js');
+
+    const assistantMessage = {
+      role: 'assistant' as const,
+      content: [{ type: 'text' as const, text: 'hi there' }],
+      api: 'anthropic-messages' as const,
+      provider: 'anthropic' as const,
+      model: 'claude-sonnet-4-5',
+      usage: {
+        input: 0,
+        output: 0,
+        cacheRead: 0,
+        cacheWrite: 0,
+        totalTokens: 0,
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+      },
+      stopReason: 'stop' as const,
+      timestamp: 2,
+    };
+
+    const state = {
+      messages: [] as import('@mariozechner/pi-agent-core').AgentMessage[],
+      isStreaming: false,
+      error: undefined,
+      systemPrompt: '',
+      tools: [] as import('@mariozechner/pi-agent-core').AgentTool<any>[],
+      model: {
+        id: 'claude-sonnet-4-5',
+        provider: 'anthropic',
+      },
+    };
+
+    let listener: ((event: import('@mariozechner/pi-agent-core').AgentEvent) => void) | null = null;
+
+    const agent = {
+      state,
+      sessionId: undefined as string | undefined,
+      subscribe: vi.fn((fn: (event: import('@mariozechner/pi-agent-core').AgentEvent) => void) => {
+        listener = fn;
+        return () => {
+          listener = null;
+        };
+      }),
+      setTools: vi.fn((tools: import('@mariozechner/pi-agent-core').AgentTool<any>[]) => {
+        state.tools = tools;
+      }),
+      setSystemPrompt: vi.fn((prompt: string) => {
+        state.systemPrompt = prompt;
+      }),
+      setModel: vi.fn((model: { id: string; provider: string }) => {
+        state.model = model;
+      }),
+      replaceMessages: vi.fn((messages: import('@mariozechner/pi-agent-core').AgentMessage[]) => {
+        state.messages = messages;
+      }),
+      prompt: vi.fn(async (input: string) => {
+        state.messages = [
+          { role: 'user', content: input, timestamp: 1 },
+          assistantMessage,
+        ];
+        listener?.({ type: 'turn_end', message: assistantMessage, toolResults: [] });
+        listener?.({ type: 'agent_end', messages: state.messages });
+      }),
+      abort: vi.fn(),
+    } as unknown as import('@mariozechner/pi-agent-core').Agent;
+
+    await streamChat('  first question  ', agent);
+
+    await vi.waitFor(async () => {
+      const persisted = agent.sessionId ? await getChatSession(agent.sessionId) : null;
+      expect(persisted).not.toBeNull();
+      expect(getLinearPath(persisted!).map((node) => node.message)).toEqual([
+        { role: 'user', content: 'first question', timestamp: 1 },
+        assistantMessage,
+      ]);
+    });
+
+    expect(getCurrentSession()?.title).toBe('first question');
   });
 
   it('writes API keys into Settings field entries when system nodes exist', async () => {

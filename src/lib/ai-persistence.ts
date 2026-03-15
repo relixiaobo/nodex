@@ -1,151 +1,243 @@
 import type { AgentMessage } from '@mariozechner/pi-agent-core';
+import { openDB, type DBSchema, type IDBPDatabase, type IDBPTransaction, unwrap } from 'idb';
+import { linearToTree } from './ai-chat-tree.js';
+import type { BridgeEntry, ChatSession, MessageNode } from './ai-chat-tree.js';
 import { messageHasImage, replaceMessageImages } from './ai-message-images.js';
 
 const DB_NAME = 'soma-ai-chat';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE_NAME = 'sessions';
+const META_STORE_NAME = 'session-metas';
 const UPDATED_AT_INDEX = 'updatedAt';
-const MAX_MESSAGES_PER_SESSION = 100;
-const MAX_SESSIONS = 10;
 
-let dbPromise: Promise<IDBDatabase> | null = null;
+interface ChatSessionMeta {
+  id: string;
+  title: string | null;
+  updatedAt: number;
+}
 
-export interface ChatSession {
+interface LegacyChatSession {
   id: string;
   messages: AgentMessage[];
   createdAt: number;
   updatedAt: number;
 }
 
+interface ChatPersistenceDB extends DBSchema {
+  [STORE_NAME]: {
+    key: string;
+    value: ChatSession;
+    indexes: {
+      [UPDATED_AT_INDEX]: number;
+    };
+  };
+  [META_STORE_NAME]: {
+    key: string;
+    value: ChatSessionMeta;
+    indexes: {
+      [UPDATED_AT_INDEX]: number;
+    };
+  };
+}
+
+let dbPromise: Promise<IDBPDatabase<ChatPersistenceDB>> | null = null;
+let dbInstance: IDBPDatabase<ChatPersistenceDB> | null = null;
+
+export type { BridgeEntry, ChatSession, MessageNode };
+
 function getIndexedDB(): IDBFactory {
   if (!globalThis.indexedDB) {
     throw new Error('indexedDB is not available');
   }
+
   return globalThis.indexedDB;
 }
 
-async function openDB(): Promise<IDBDatabase> {
+function isLegacyChatSession(session: unknown): session is LegacyChatSession {
+  return !!session
+    && typeof session === 'object'
+    && 'messages' in session
+    && Array.isArray((session as LegacyChatSession).messages)
+    && !('mapping' in (session as Record<string, unknown>));
+}
+
+function migrateLegacySession(session: LegacyChatSession): ChatSession {
+  const migrated = linearToTree(session.messages);
+  migrated.id = session.id;
+  migrated.createdAt = session.createdAt;
+  migrated.updatedAt = session.updatedAt;
+  return migrated;
+}
+
+function toSessionMeta(session: ChatSession): ChatSessionMeta {
+  return {
+    id: session.id,
+    title: session.title,
+    updatedAt: session.updatedAt,
+  };
+}
+
+function ensureSessionStore(
+  db: IDBPDatabase<ChatPersistenceDB>,
+  transaction: IDBPTransaction<ChatPersistenceDB, ['sessions', 'session-metas'], 'versionchange'>,
+): IDBObjectStore {
+  const store = db.objectStoreNames.contains(STORE_NAME)
+    ? unwrap(transaction.objectStore(STORE_NAME))
+    : unwrap(db.createObjectStore(STORE_NAME, { keyPath: 'id' }));
+
+  if (!store.indexNames.contains(UPDATED_AT_INDEX)) {
+    store.createIndex(UPDATED_AT_INDEX, UPDATED_AT_INDEX);
+  }
+
+  return store;
+}
+
+function ensureMetaStore(
+  db: IDBPDatabase<ChatPersistenceDB>,
+  transaction: IDBPTransaction<ChatPersistenceDB, ['sessions', 'session-metas'], 'versionchange'>,
+): IDBObjectStore {
+  const store = db.objectStoreNames.contains(META_STORE_NAME)
+    ? unwrap(transaction.objectStore(META_STORE_NAME))
+    : unwrap(db.createObjectStore(META_STORE_NAME, { keyPath: 'id' }));
+
+  if (!store.indexNames.contains(UPDATED_AT_INDEX)) {
+    store.createIndex(UPDATED_AT_INDEX, UPDATED_AT_INDEX);
+  }
+
+  return store;
+}
+
+function backfillSessionMetas(sessionStore: IDBObjectStore, metaStore: IDBObjectStore): void {
+  const cursorRequest = sessionStore.openCursor();
+
+  cursorRequest.onsuccess = () => {
+    const cursor = cursorRequest.result;
+    if (!cursor) return;
+
+    const rawValue = cursor.value as ChatSession | LegacyChatSession;
+    const nextValue = isLegacyChatSession(rawValue)
+      ? migrateLegacySession(rawValue)
+      : rawValue;
+
+    cursor.update(nextValue);
+    metaStore.put(toSessionMeta(nextValue));
+    cursor.continue();
+  };
+}
+
+async function getDB(): Promise<IDBPDatabase<ChatPersistenceDB>> {
+  getIndexedDB();
   if (dbPromise) return dbPromise;
 
-  dbPromise = new Promise((resolve, reject) => {
-    const req = getIndexedDB().open(DB_NAME, DB_VERSION);
-    req.onupgradeneeded = () => {
-      const db = req.result;
-      const store = db.objectStoreNames.contains(STORE_NAME)
-        ? req.transaction!.objectStore(STORE_NAME)
-        : db.createObjectStore(STORE_NAME, { keyPath: 'id' });
+  dbPromise = openDB<ChatPersistenceDB>(DB_NAME, DB_VERSION, {
+    upgrade(db, oldVersion, _newVersion, transaction) {
+      const sessionStore = ensureSessionStore(db, transaction);
+      const metaStore = ensureMetaStore(db, transaction);
 
-      if (!store.indexNames.contains(UPDATED_AT_INDEX)) {
-        store.createIndex(UPDATED_AT_INDEX, UPDATED_AT_INDEX);
+      if (oldVersion < 2) {
+        backfillSessionMetas(sessionStore, metaStore);
       }
-    };
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
+    },
+    terminated() {
+      dbInstance = null;
+      dbPromise = null;
+    },
+  }).then((db) => {
+    dbInstance = db;
+    return db;
   });
 
   return dbPromise;
 }
 
-function pruneMessages(messages: AgentMessage[]): AgentMessage[] {
-  if (messages.length <= MAX_MESSAGES_PER_SESSION) return messages;
-  return messages.slice(messages.length - MAX_MESSAGES_PER_SESSION);
+function stripMessageImagesForPersistence(message: AgentMessage): AgentMessage {
+  if (!messageHasImage(message)) return message;
+  return replaceMessageImages(message, () => '[Image removed from storage]');
 }
 
-function stripImagesForPersistence(messages: AgentMessage[]): AgentMessage[] {
-  if (!messages.some(messageHasImage)) return messages;
-
-  return messages.map((message) =>
-    replaceMessageImages(message, () => '[Image removed from storage]'));
-}
-
-async function trimOldSessions(db: IDBDatabase): Promise<void> {
-  const sessions = await listChatSessions(db);
-  const extraSessions = sessions.slice(MAX_SESSIONS);
-  if (extraSessions.length === 0) return;
-
-  await new Promise<void>((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, 'readwrite');
-    const store = tx.objectStore(STORE_NAME);
-    for (const session of extraSessions) {
-      store.delete(session.id);
-    }
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-    tx.onabort = () => reject(tx.error);
-  });
-}
-
-async function listChatSessions(db?: IDBDatabase): Promise<ChatSession[]> {
-  const database = db ?? await openDB();
-  return new Promise((resolve, reject) => {
-    const tx = database.transaction(STORE_NAME, 'readonly');
-    const index = tx.objectStore(STORE_NAME).index(UPDATED_AT_INDEX);
-    const req = index.openCursor(null, 'prev');
-    const sessions: ChatSession[] = [];
-
-    req.onsuccess = () => {
-      const cursor = req.result;
-      if (!cursor) {
-        resolve(sessions);
-        return;
-      }
-      sessions.push(cursor.value as ChatSession);
-      cursor.continue();
-    };
-    req.onerror = () => reject(req.error);
-    tx.onerror = () => reject(tx.error);
-    tx.onabort = () => reject(tx.error);
-  });
+function stripMappingImagesForPersistence(mapping: Record<string, MessageNode>): Record<string, MessageNode> {
+  return Object.fromEntries(
+    Object.entries(mapping).map(([nodeId, node]) => [
+      nodeId,
+      {
+        ...node,
+        children: node.children.slice(),
+        message: node.message ? stripMessageImagesForPersistence(node.message) : null,
+      },
+    ]),
+  );
 }
 
 export async function saveChatSession(session: ChatSession): Promise<ChatSession> {
-  const db = await openDB();
+  const db = await getDB();
+  const updatedAt = Date.now();
   const nextSession: ChatSession = {
     ...session,
-    messages: stripImagesForPersistence(pruneMessages(session.messages)),
-    updatedAt: Date.now(),
+    updatedAt,
+    mapping: stripMappingImagesForPersistence(session.mapping),
   };
 
-  await new Promise<void>((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, 'readwrite');
-    tx.objectStore(STORE_NAME).put(nextSession);
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-    tx.onabort = () => reject(tx.error);
-  });
+  const tx = db.transaction([STORE_NAME, META_STORE_NAME], 'readwrite');
+  await Promise.all([
+    tx.objectStore(STORE_NAME).put(nextSession),
+    tx.objectStore(META_STORE_NAME).put(toSessionMeta(nextSession)),
+  ]);
+  await tx.done;
 
-  await trimOldSessions(db);
   return nextSession;
 }
 
 export async function getChatSession(sessionId: string): Promise<ChatSession | null> {
-  const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, 'readonly');
-    const req = tx.objectStore(STORE_NAME).get(sessionId);
-    req.onsuccess = () => resolve((req.result as ChatSession | undefined) ?? null);
-    req.onerror = () => reject(req.error);
-    tx.onerror = () => reject(tx.error);
-    tx.onabort = () => reject(tx.error);
-  });
+  const db = await getDB();
+  return (await db.get(STORE_NAME, sessionId)) ?? null;
 }
 
 export async function getLatestChatSession(): Promise<ChatSession | null> {
-  const sessions = await listChatSessions();
-  return sessions[0] ?? null;
+  const db = await getDB();
+  const tx = db.transaction([STORE_NAME, META_STORE_NAME], 'readonly');
+  const metaCursor = await tx.objectStore(META_STORE_NAME)
+    .index(UPDATED_AT_INDEX)
+    .openCursor(IDBKeyRange.lowerBound(0), 'prev');
+
+  if (!metaCursor) {
+    await tx.done;
+    return null;
+  }
+
+  const session = await tx.objectStore(STORE_NAME).get(metaCursor.value.id);
+  await tx.done;
+  return session ?? null;
+}
+
+export async function listChatSessionMetas(): Promise<ChatSessionMeta[]> {
+  const db = await getDB();
+  const tx = db.transaction(META_STORE_NAME, 'readonly');
+  const metas: ChatSessionMeta[] = [];
+  let cursor = await tx.objectStore(META_STORE_NAME)
+    .index(UPDATED_AT_INDEX)
+    .openCursor(IDBKeyRange.lowerBound(0), 'prev');
+
+  while (cursor) {
+    metas.push(cursor.value);
+    cursor = await cursor.continue();
+  }
+
+  await tx.done;
+  return metas;
 }
 
 export async function deleteChatSession(sessionId: string): Promise<void> {
-  const db = await openDB();
-  await new Promise<void>((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, 'readwrite');
-    tx.objectStore(STORE_NAME).delete(sessionId);
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-    tx.onabort = () => reject(tx.error);
-  });
+  const db = await getDB();
+  const tx = db.transaction([STORE_NAME, META_STORE_NAME], 'readwrite');
+  await Promise.all([
+    tx.objectStore(STORE_NAME).delete(sessionId),
+    tx.objectStore(META_STORE_NAME).delete(sessionId),
+  ]);
+  await tx.done;
 }
 
 export function resetChatPersistenceForTests(): void {
+  dbInstance?.close();
+  dbInstance = null;
   dbPromise = null;
 }

@@ -4,7 +4,7 @@
 @theme {
   /* Light mode — Paper & Ink */
   --color-background: #F5F4EE;
-  --color-background-recessed: #EEEEE8;
+  --color-background-recessed: #E8E7E1;
   --color-surface: #FFFFFF;
   --color-foreground: #1A1A1A;
   --color-foreground-secondary: #666666;
@@ -88,9 +88,11 @@
     6px 0 16px -4px rgba(0, 0, 0, 0.06);
 }
 
-/* Concave corner at the breadcrumb tab's bottom-right edge.
-   Creates a smooth inner curve connecting the tab to the desk area,
-   mimicking the Chrome tab bar connector. */
+/* Concave corners at the active tab's bottom edges.
+   Creates smooth inner curves connecting the tab to the desk area,
+   mimicking the Chrome tab bar connector.
+   Uses radial-gradient: transparent quarter-circle (desk shows through)
+   + paper fill (extends tab/panel body). */
 .tab-connector-right {
   position: relative;
 }
@@ -101,9 +103,27 @@
   right: calc(-1 * var(--radius-xl));
   width: var(--radius-xl);
   height: var(--radius-xl);
-  background: transparent;
-  border-bottom-left-radius: var(--radius-xl);
-  box-shadow: calc(-0.5 * var(--radius-xl)) 0 0 0 var(--color-background);
+  background: radial-gradient(
+    circle at 100% 0,
+    transparent var(--radius-xl),
+    var(--color-background) var(--radius-xl)
+  );
+}
+.tab-connector-left {
+  position: relative;
+}
+.tab-connector-left::before {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: calc(-1 * var(--radius-xl));
+  width: var(--radius-xl);
+  height: var(--radius-xl);
+  background: radial-gradient(
+    circle at 0 0,
+    transparent var(--radius-xl),
+    var(--color-background) var(--radius-xl)
+  );
 }
 
 

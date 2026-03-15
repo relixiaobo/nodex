@@ -1,28 +1,27 @@
 /**
  * Breadcrumb navigation bar for zoomed-in node pages.
  *
- * Layout: [← Parent] [W avatar] / ancestor1 / ancestor2 / ... / [currentName?]
+ * Layout: [W avatar] / ancestor1 / ancestor2 / ... / [currentName?]
  *
  * - Workspace root is represented by a circular avatar (first char of workspace name)
- * - ← button navigates to parent node (not history back)
  * - Containers appear as normal ancestors in the chain
  * - At workspace root view, breadcrumb content is hidden (toolbar only)
  *
  * Folding rules (applied to ancestor chain):
- * - 0 ancestors: [←] [W]
- * - 1 ancestor: [←] [W] › parent
- * - 2 ancestors: [←] [W] › grandparent › parent
- * - 3+ ancestors: [←] [W] › [...] › parent
+ * - 0 ancestors: [W]
+ * - 1 ancestor: [W] / parent
+ * - 2 ancestors: [W] / grandparent / parent
+ * - 3+ ancestors: [W] / [...] / parent
+ * - foldAll: [W] / [...] / currentName (tab mode)
  *
  * [...] expands in-place (no navigation). Resets when nodeId changes.
  */
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { ChevronLeft, MoreHorizontal } from '../../lib/icons.js';
+import { MoreHorizontal } from '../../lib/icons.js';
 import { useUIStore } from '../../stores/ui-store';
 import { useNodeStore } from '../../stores/node-store';
 import { useWorkspaceStore } from '../../stores/workspace-store';
 import { useAncestors } from '../../hooks/use-ancestors';
-import { getNavigableParentId } from '../../lib/tree-utils';
 import { SYSTEM_NODE_IDS } from '../../types/index.js';
 import { ensureWorkspaceHomeNode } from '../../lib/workspace-root.js';
 import * as loroDoc from '../../lib/loro-doc.js';
@@ -38,6 +37,9 @@ interface BreadcrumbProps {
   compact?: boolean;
   /** When true, [W] avatar uses primary color; when false, gray. */
   active?: boolean;
+  /** When true, all ancestors collapse into [...] dropdown, none shown inline.
+   *  Used by tab mode for compact `[W] / ... / nodeName` display. */
+  foldAll?: boolean;
 }
 
 export function resolveWorkspaceRootTargetId(params: {
@@ -50,7 +52,7 @@ export function resolveWorkspaceRootTargetId(params: {
   return SYSTEM_NODE_IDS.JOURNAL;
 }
 
-export function Breadcrumb({ nodeId, showCurrentName, compact, active = true }: BreadcrumbProps) {
+export function Breadcrumb({ nodeId, showCurrentName, compact, active = true, foldAll }: BreadcrumbProps) {
   const navigateTo = useUIStore((s) => s.navigateTo);
 
   const { ancestors, workspaceRootId } = useAncestors(nodeId);
@@ -85,8 +87,6 @@ export function Breadcrumb({ nodeId, showCurrentName, compact, active = true }: 
   // Container nodes (Library, Inbox, etc.) are NOT root view — they show [W] + their own content.
   const isRootView = !!wsId && nodeId === wsId;
 
-  // Get parent ID for ← button (navigate to first non-structural parent)
-  const parentId = useNodeStore((s) => { void s._version; return getNavigableParentId(nodeId); });
   const workspaceRootTargetId = resolveWorkspaceRootTargetId({
     workspaceId: wsId,
     workspaceRootId,
@@ -99,16 +99,6 @@ export function Breadcrumb({ nodeId, showCurrentName, compact, active = true }: 
     const clean = raw.replace(/<[^>]+>/g, '').trim();
     return clean.charAt(0).toUpperCase() || 'W';
   });
-
-  // Show ← when current node has a parent (not at workspace root)
-  const canGoUp = !!parentId;
-
-  const handleGoUp = useCallback(() => {
-    if (parentId) {
-      navigateTo(parentId);
-      ensureUndoFocusAfterNavigation();
-    }
-  }, [parentId, navigateTo]);
 
   const handleNavigateToWorkspaceRoot = useCallback(() => {
     if (wsId && workspaceRootTargetId === wsId) {
@@ -125,13 +115,20 @@ export function Breadcrumb({ nodeId, showCurrentName, compact, active = true }: 
   );
 
   // Determine which ancestors to show
-  const needsFolding = filteredAncestors.length >= 3;
-  const visibleAncestors = needsFolding
-    ? [filteredAncestors[filteredAncestors.length - 1]] // only the immediate parent
-    : filteredAncestors;
-  const hiddenAncestors = needsFolding
-    ? filteredAncestors.slice(0, -1)
-    : [];
+  // foldAll: everything goes into [...] dropdown (used by tab mode)
+  const needsFolding = foldAll
+    ? filteredAncestors.length > 0
+    : filteredAncestors.length >= 3;
+  const visibleAncestors = foldAll
+    ? []
+    : needsFolding
+      ? [filteredAncestors[filteredAncestors.length - 1]]
+      : filteredAncestors;
+  const hiddenAncestors = foldAll
+    ? filteredAncestors
+    : needsFolding
+      ? filteredAncestors.slice(0, -1)
+      : [];
 
   return (
     <div className={`flex flex-1 min-w-0 items-center gap-1 pl-4 pr-3 text-[13px] text-foreground-tertiary ${compact ? '' : 'h-8 mt-1'}`}>
@@ -171,7 +168,7 @@ export function Breadcrumb({ nodeId, showCurrentName, compact, active = true }: 
                   </button>
                 </Tooltip>
                 {expanded && (
-                  <div className="absolute top-full left-0 mt-1 w-56 rounded-lg bg-background p-1 shadow-[0_0_0_1px_rgba(0,0,0,0.015),0_-1px_2px_rgba(255,255,255,0.6),0_2px_5px_-1px_rgba(0,0,0,0.05),0_6px_10px_-3px_rgba(0,0,0,0.03),0_12px_20px_-4px_rgba(0,0,0,0.04)] z-50">
+                  <div className="absolute top-full left-0 mt-1 w-56 rounded-lg bg-background p-1 shadow-paper z-50">
                     <div className="flex flex-col max-h-64 overflow-y-auto">
                       {hiddenAncestors.map((ancestor) => (
                         <button

@@ -192,6 +192,7 @@ _(空)_
 
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
+| 2026-03-15 | 多面板 Phase 2.5 — 窄屏 Chrome-tab 标签模式 + 凹角连接器 + 桌面底色加深 + Breadcrumb dead code 清理 | nodex | main |
 | 2026-03-14 | 多面板 Phase 2 — N 面板并排 + 独立浮动卡片 + 全局 navHistory + 异形标签 + 活跃指示器 | nodex | main |
 | 2026-03-14 | Desk/Card Z 轴布局 — 桌面/纸张双层 + Chrome-tab 面包屑 + 可拖拽 resize + 设计系统更新 | nodex | main |
 | 2026-03-14 | Chat UI 视觉打磨 — 设计系统对齐 + 消息分组 + 空态引导按钮 + Z 轴层次 | nodex | main |

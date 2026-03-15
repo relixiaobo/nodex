@@ -1,289 +1,160 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import 'fake-indexeddb/auto';
+import type { AgentMessage } from '@mariozechner/pi-agent-core';
+import { deleteDB } from 'idb';
+import { afterAll, beforeEach, describe, expect, it } from 'vitest';
+import { getLinearPath, linearToTree, type ChatSession } from '../../src/lib/ai-chat-tree.js';
 import {
   deleteChatSession,
   getChatSession,
   getLatestChatSession,
+  listChatSessionMetas,
   resetChatPersistenceForTests,
   saveChatSession,
 } from '../../src/lib/ai-persistence.js';
 
-function createAsyncRequest<T>(producer: () => T): IDBRequest<T> {
-  const request = {
-    onsuccess: null,
-    onerror: null,
-    result: undefined,
-    error: null,
-  } as unknown as IDBRequest<T>;
+const DB_NAME = 'soma-ai-chat';
+const STORE_NAME = 'sessions';
+const UPDATED_AT_INDEX = 'updatedAt';
 
-  queueMicrotask(() => {
-    try {
-      (request as { result: T }).result = producer();
-      request.onsuccess?.({ target: request } as Event);
-    } catch (error) {
-      (request as { error: DOMException }).error = error as DOMException;
-      request.onerror?.({ target: request } as Event);
-    }
-  });
-
-  return request;
+interface LegacyChatSession {
+  id: string;
+  messages: AgentMessage[];
+  createdAt: number;
+  updatedAt: number;
 }
 
-function createFakeIndexedDB(): IDBFactory {
-  const stores = new Map<string, Map<string, Record<string, unknown>>>();
-  let initialized = false;
-
-  function ensureStore(name: string): Map<string, Record<string, unknown>> {
-    let store = stores.get(name);
-    if (!store) {
-      store = new Map<string, Record<string, unknown>>();
-      stores.set(name, store);
-    }
-    return store;
+function buildSession(
+  id: string,
+  messages: AgentMessage[],
+  {
+    createdAt = 1,
+    updatedAt = createdAt,
+    title,
+  }: {
+    createdAt?: number;
+    updatedAt?: number;
+    title?: string | null;
+  } = {},
+): ChatSession {
+  const session = linearToTree(messages);
+  session.id = id;
+  session.createdAt = createdAt;
+  session.updatedAt = updatedAt;
+  if (title !== undefined) {
+    session.title = title;
   }
-
-  const db = {
-    objectStoreNames: {
-      contains: (name: string) => stores.has(name),
-    },
-    createObjectStore: (name: string) => {
-      const target = ensureStore(name);
-      return {
-        indexNames: {
-          contains: () => false,
-        },
-        createIndex: () => ({}),
-        put: (value: Record<string, unknown>) => createAsyncRequest(() => {
-          target.set(String(value.id), value);
-          return value.id;
-        }),
-        get: (key: string) => createAsyncRequest(() => target.get(key)),
-        delete: (key: string) => createAsyncRequest(() => {
-          target.delete(key);
-          return undefined;
-        }),
-        index: () => ({
-          openCursor: (_query: unknown, direction?: IDBCursorDirection) => {
-            const values = [...target.values()]
-              .sort((a, b) => Number(a.updatedAt ?? 0) - Number(b.updatedAt ?? 0));
-            if (direction === 'prev') values.reverse();
-
-            let cursorIndex = 0;
-            const request = {
-              onsuccess: null,
-              onerror: null,
-              result: null,
-              error: null,
-            } as unknown as IDBRequest<IDBCursorWithValue | null>;
-
-            const emit = () => {
-              queueMicrotask(() => {
-                if (cursorIndex >= values.length) {
-                  (request as { result: IDBCursorWithValue | null }).result = null;
-                  request.onsuccess?.({ target: request } as Event);
-                  return;
-                }
-
-                const value = values[cursorIndex];
-                (request as { result: IDBCursorWithValue | null }).result = {
-                  value,
-                  continue: () => {
-                    cursorIndex += 1;
-                    emit();
-                  },
-                } as IDBCursorWithValue;
-                request.onsuccess?.({ target: request } as Event);
-              });
-            };
-
-            emit();
-            return request;
-          },
-        }),
-      } as unknown as IDBObjectStore;
-    },
-    transaction: (storeName: string) => {
-      const tx = {
-        oncomplete: null as ((e: Event) => void) | null,
-        onerror: null as ((e: Event) => void) | null,
-        onabort: null as ((e: Event) => void) | null,
-        objectStore: (name: string) => {
-          const storeNameToUse = name || storeName;
-          const target = ensureStore(storeNameToUse);
-          return {
-            put: (value: Record<string, unknown>) => createAsyncRequest(() => {
-              target.set(String(value.id), value);
-              return value.id;
-            }),
-            get: (key: string) => createAsyncRequest(() => target.get(key)),
-            delete: (key: string) => createAsyncRequest(() => {
-              target.delete(key);
-              return undefined;
-            }),
-            index: () => ({
-              openCursor: (_query: unknown, direction?: IDBCursorDirection) => {
-                const values = [...target.values()]
-                  .sort((a, b) => Number(a.updatedAt ?? 0) - Number(b.updatedAt ?? 0));
-                if (direction === 'prev') values.reverse();
-
-                let cursorIndex = 0;
-                const request = {
-                  onsuccess: null,
-                  onerror: null,
-                  result: null,
-                  error: null,
-                } as unknown as IDBRequest<IDBCursorWithValue | null>;
-
-                const emit = () => {
-                  queueMicrotask(() => {
-                    if (cursorIndex >= values.length) {
-                      (request as { result: IDBCursorWithValue | null }).result = null;
-                      request.onsuccess?.({ target: request } as Event);
-                      return;
-                    }
-
-                    const value = values[cursorIndex];
-                    (request as { result: IDBCursorWithValue | null }).result = {
-                      value,
-                      continue: () => {
-                        cursorIndex += 1;
-                        emit();
-                      },
-                    } as IDBCursorWithValue;
-                    request.onsuccess?.({ target: request } as Event);
-                  });
-                };
-
-                emit();
-                return request;
-              },
-            }),
-          } as unknown as IDBObjectStore;
-        },
-      };
-
-      queueMicrotask(() => queueMicrotask(() => {
-        tx.oncomplete?.({ target: tx } as unknown as Event);
-      }));
-
-      return tx as unknown as IDBTransaction;
-    },
-  } as unknown as IDBDatabase;
-
-  return {
-    open: () => {
-      const request = {
-        onsuccess: null,
-        onerror: null,
-        onupgradeneeded: null,
-        result: undefined,
-        error: null,
-        transaction: {
-          objectStore: (name: string) => db.createObjectStore(name),
-        },
-      } as unknown as IDBOpenDBRequest;
-
-      queueMicrotask(() => {
-        (request as { result: IDBDatabase }).result = db;
-        if (!initialized) {
-          initialized = true;
-          request.onupgradeneeded?.({ target: request } as IDBVersionChangeEvent);
-        }
-        request.onsuccess?.({ target: request } as Event);
-      });
-
-      return request;
-    },
-  } as unknown as IDBFactory;
+  return session;
 }
 
-const originalIndexedDB = globalThis.indexedDB;
+async function resetPersistence(): Promise<void> {
+  resetChatPersistenceForTests();
+  await deleteDB(DB_NAME);
+  resetChatPersistenceForTests();
+}
+
+async function seedLegacySessions(sessions: LegacyChatSession[]): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, 1);
+
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      const store = db.createObjectStore(STORE_NAME, { keyPath: 'id' });
+      store.createIndex(UPDATED_AT_INDEX, UPDATED_AT_INDEX);
+    };
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      const db = request.result;
+      const tx = db.transaction(STORE_NAME, 'readwrite');
+      const store = tx.objectStore(STORE_NAME);
+      for (const session of sessions) {
+        store.put(session);
+      }
+      tx.oncomplete = () => {
+        db.close();
+        resolve();
+      };
+      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error);
+    };
+  });
+}
 
 describe('ai persistence', () => {
-  beforeAll(() => {
-    (globalThis as { indexedDB?: IDBFactory }).indexedDB = createFakeIndexedDB();
+  beforeEach(async () => {
+    await resetPersistence();
   });
 
-  afterAll(() => {
-    if (originalIndexedDB) {
-      (globalThis as { indexedDB?: IDBFactory }).indexedDB = originalIndexedDB;
-    } else {
-      delete (globalThis as { indexedDB?: IDBFactory }).indexedDB;
-    }
+  afterAll(async () => {
+    await resetPersistence();
   });
 
-  beforeEach(() => {
-    resetChatPersistenceForTests();
-  });
+  it('saves and restores the latest session while listing metadata separately', async () => {
+    await saveChatSession(buildSession('session_1', [
+      { role: 'user', content: 'hello', timestamp: 1 },
+    ], { createdAt: 1, updatedAt: 1, title: 'hello' }));
 
-  it('saves and restores the latest session', async () => {
-    await saveChatSession({
-      id: 'session_1',
-      messages: [{ role: 'user', content: 'hello', timestamp: 1 }],
-      createdAt: 1,
-      updatedAt: 1,
-    });
-    await saveChatSession({
-      id: 'session_2',
-      messages: [{ role: 'assistant', content: [{ type: 'text', text: 'hi' }], api: 'anthropic-messages', provider: 'anthropic', model: 'claude-sonnet-4-5', usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } }, stopReason: 'stop', timestamp: 2 }],
-      createdAt: 2,
-      updatedAt: 2,
-    });
+    await saveChatSession(buildSession('session_2', [
+      { role: 'user', content: 'follow up', timestamp: 2 },
+      { role: 'assistant', content: [{ type: 'text', text: 'hi' }], api: 'anthropic-messages', provider: 'anthropic', model: 'claude-sonnet-4-5', usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } }, stopReason: 'stop', timestamp: 3 },
+    ], { createdAt: 2, updatedAt: 2, title: 'follow up' }));
 
     expect((await getChatSession('session_1'))?.id).toBe('session_1');
     expect((await getLatestChatSession())?.id).toBe('session_2');
+    const metas = await listChatSessionMetas();
+    expect(metas.map(({ id, title }) => ({ id, title }))).toEqual([
+      { id: 'session_2', title: 'follow up' },
+      { id: 'session_1', title: 'hello' },
+    ]);
+    expect(metas[0].updatedAt).toBeGreaterThanOrEqual(metas[1].updatedAt);
   });
 
-  it('trims stored messages to the latest 100 entries', async () => {
+  it('keeps long sessions intact instead of trimming to the latest 100 entries', async () => {
     const messages = Array.from({ length: 105 }, (_, index) => ({
       role: 'user' as const,
       content: `message-${index}`,
       timestamp: index,
     }));
 
-    const saved = await saveChatSession({
-      id: 'session_many',
-      messages,
-      createdAt: 1,
-      updatedAt: 1,
-    });
+    const saved = await saveChatSession(buildSession('session_many', messages));
 
-    expect(saved.messages).toHaveLength(100);
-    expect((saved.messages[0] as { content: string }).content).toBe('message-5');
+    expect(getLinearPath(saved)).toHaveLength(105);
+    expect(getLinearPath(saved)[0].message).toMatchObject({
+      role: 'user',
+      content: 'message-0',
+    });
+    expect(getLinearPath(saved)[104].message).toMatchObject({
+      role: 'user',
+      content: 'message-104',
+    });
   });
 
-  it('deletes a saved session', async () => {
-    await saveChatSession({
-      id: 'session_delete',
-      messages: [],
-      createdAt: 1,
-      updatedAt: 1,
-    });
+  it('deletes a saved session and its metadata record', async () => {
+    await saveChatSession(buildSession('session_delete', [
+      { role: 'user', content: 'delete me', timestamp: 1 },
+    ]));
 
     await deleteChatSession('session_delete');
+
     expect(await getChatSession('session_delete')).toBeNull();
+    expect(await listChatSessionMetas()).toEqual([]);
   });
 
-  it('strips image blocks before persisting while keeping text details', async () => {
-    const saved = await saveChatSession({
-      id: 'session_images',
-      messages: [
-        {
-          role: 'toolResult',
-          toolCallId: 'call_1',
-          toolName: 'browser',
-          content: [
-            { type: 'image', data: 'base64-image', mimeType: 'image/png' },
-            { type: 'text', text: 'details' },
-          ],
-          isError: false,
-          timestamp: 1,
-        },
-      ],
-      createdAt: 1,
-      updatedAt: 1,
-    });
+  it('strips image blocks from message nodes before persisting', async () => {
+    const saved = await saveChatSession(buildSession('session_images', [
+      {
+        role: 'toolResult',
+        toolCallId: 'call_1',
+        toolName: 'browser',
+        content: [
+          { type: 'image', data: 'base64-image', mimeType: 'image/png' },
+          { type: 'text', text: 'details' },
+        ],
+        isError: false,
+        timestamp: 1,
+      },
+    ]));
 
-    expect(saved.messages).toEqual([
+    expect(getLinearPath(saved).map((node) => node.message)).toEqual([
       {
         role: 'toolResult',
         toolCallId: 'call_1',
@@ -298,37 +169,92 @@ describe('ai persistence', () => {
     ]);
   });
 
-  it('restores sessions without image payloads after persistence stripping', async () => {
-    await saveChatSession({
-      id: 'session_restore_images',
-      messages: [
-        {
-          role: 'user',
-          content: [
-            { type: 'text', text: 'prompt' },
-            { type: 'image', data: 'base64-user-image', mimeType: 'image/jpeg' },
-          ],
-          timestamp: 1,
-        },
-      ],
-      createdAt: 1,
-      updatedAt: 1,
-    });
+  it('restores persisted sessions without image payloads after stripping', async () => {
+    await saveChatSession(buildSession('session_restore_images', [
+      {
+        role: 'user',
+        content: [
+          { type: 'text', text: 'prompt' },
+          { type: 'image', data: 'base64-user-image', mimeType: 'image/jpeg' },
+        ],
+        timestamp: 1,
+      },
+    ]));
 
-    expect(await getChatSession('session_restore_images')).toEqual({
-      id: 'session_restore_images',
-      messages: [
-        {
-          role: 'user',
-          content: [
-            { type: 'text', text: 'prompt' },
-            { type: 'text', text: '[Image removed from storage]' },
-          ],
-          timestamp: 1,
+    const restored = await getChatSession('session_restore_images');
+
+    expect(getLinearPath(restored!).map((node) => node.message)).toEqual([
+      {
+        role: 'user',
+        content: [
+          { type: 'text', text: 'prompt' },
+          { type: 'text', text: '[Image removed from storage]' },
+        ],
+        timestamp: 1,
+      },
+    ]);
+  });
+
+  it('migrates v1 linear sessions into v2 tree sessions on open', async () => {
+    await seedLegacySessions([
+      {
+        id: 'legacy_session',
+        createdAt: 100,
+        updatedAt: 200,
+        messages: [
+          { role: 'user', content: 'legacy hello', timestamp: 1 },
+          {
+            role: 'assistant',
+            content: [{ type: 'text', text: 'legacy hi' }],
+            api: 'anthropic-messages',
+            provider: 'anthropic',
+            model: 'claude-sonnet-4-5',
+            usage: {
+              input: 0,
+              output: 0,
+              cacheRead: 0,
+              cacheWrite: 0,
+              totalTokens: 0,
+              cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+            },
+            stopReason: 'stop',
+            timestamp: 2,
+          },
+        ],
+      },
+    ]);
+
+    resetChatPersistenceForTests();
+
+    const migrated = await getChatSession('legacy_session');
+
+    expect(migrated).not.toBeNull();
+    expect(migrated?.id).toBe('legacy_session');
+    expect(migrated?.createdAt).toBe(100);
+    expect(migrated?.updatedAt).toBe(200);
+    expect(migrated?.title).toBe('legacy hello');
+    expect(getLinearPath(migrated!).map((node) => node.message)).toEqual([
+      { role: 'user', content: 'legacy hello', timestamp: 1 },
+      {
+        role: 'assistant',
+        content: [{ type: 'text', text: 'legacy hi' }],
+        api: 'anthropic-messages',
+        provider: 'anthropic',
+        model: 'claude-sonnet-4-5',
+        usage: {
+          input: 0,
+          output: 0,
+          cacheRead: 0,
+          cacheWrite: 0,
+          totalTokens: 0,
+          cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
         },
-      ],
-      createdAt: 1,
-      updatedAt: expect.any(Number),
-    });
+        stopReason: 'stop',
+        timestamp: 2,
+      },
+    ]);
+    expect(await listChatSessionMetas()).toEqual([
+      { id: 'legacy_session', title: 'legacy hello', updatedAt: 200 },
+    ]);
   });
 });

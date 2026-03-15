@@ -1,9 +1,9 @@
-import { Agent, type AgentMessage } from '@mariozechner/pi-agent-core';
+import { Agent, type AgentEvent, type AgentMessage } from '@mariozechner/pi-agent-core';
 import { getModel } from '@mariozechner/pi-ai';
 import type { Message, Model } from '@mariozechner/pi-ai';
-import { nanoid } from 'nanoid';
 import { getStoredToken } from './auth.js';
 import { buildAgentSystemPrompt, DEFAULT_AGENT_MODEL_ID, DEFAULT_AGENT_MAX_TOKENS, DEFAULT_AGENT_SYSTEM_PROMPT, DEFAULT_AGENT_TEMPERATURE, readAgentNodeConfig } from './ai-agent-node.js';
+import { createSession, getLinearPath, syncAgentToTree } from './ai-chat-tree.js';
 import { prepareAgentContext } from './ai-context.js';
 import { streamProxyWithApiKey } from './ai-proxy.js';
 import { type ChatSession, getLatestChatSession, saveChatSession } from './ai-persistence.js';
@@ -34,6 +34,7 @@ interface AgentRuntimeState {
 let agentSingleton: Agent | null = null;
 const agentRuntimeState = new WeakMap<Agent, AgentRuntimeState>();
 let migrationPromise: Promise<void> | null = null;
+let currentSession: ChatSession | null = null;
 
 function hasChromeStorage(): boolean {
   return typeof chrome !== 'undefined' && !!chrome.storage?.local;
@@ -214,18 +215,41 @@ function isLlmCompatibleMessage(message: AgentMessage): message is Message {
     || message.role === 'toolResult';
 }
 
-function buildSessionPayload(agent: Agent): ChatSession {
-  const runtime = getAgentRuntimeState(agent);
-  if (!agent.sessionId) {
-    agent.sessionId = nanoid();
+function getMessageText(message: AgentMessage): string {
+  if (typeof message.content === 'string') {
+    return message.content;
   }
 
-  return {
-    id: agent.sessionId,
-    messages: agent.state.messages.slice(),
-    createdAt: runtime.createdAt,
-    updatedAt: Date.now(),
-  };
+  return message.content
+    .filter((part): part is Extract<typeof message.content[number], { type: 'text' }> => part.type === 'text')
+    .map((part) => part.text)
+    .join(' ');
+}
+
+function deriveSessionTitle(messages: AgentMessage[]): string | null {
+  const firstUserMessage = messages.find((message) => message.role === 'user');
+  if (!firstUserMessage) return null;
+
+  const normalized = getMessageText(firstUserMessage).replace(/\s+/g, ' ').trim();
+  return normalized ? normalized.slice(0, 30) : null;
+}
+
+function trimIncompleteTrail(session: ChatSession): void {
+  const path = getLinearPath(session);
+  let trimCount = 0;
+
+  for (let index = path.length - 1; index >= 0; index -= 1) {
+    const message = path[index].message!;
+    if (message.role === 'toolResult' || (message.role === 'assistant' && !message.content)) {
+      trimCount += 1;
+      continue;
+    }
+    break;
+  }
+
+  if (trimCount > 0 && path.length - trimCount > 0) {
+    session.currentNode = path[path.length - 1 - trimCount].id;
+  }
 }
 
 export async function getAISettings(): Promise<StoredAISettings | null> {
@@ -348,9 +372,11 @@ export function restoreLatestChatSession(agent: Agent = getAIAgent()): Promise<v
       try {
         const latestSession = await getLatestChatSession();
         if (latestSession) {
+          trimIncompleteTrail(latestSession);
+          currentSession = latestSession;
           agent.sessionId = latestSession.id;
           runtime.createdAt = latestSession.createdAt;
-          agent.replaceMessages(latestSession.messages);
+          agent.replaceMessages(getLinearPath(latestSession).map((node) => node.message!));
           try {
             await configureAgent(agent);
           } catch {
@@ -363,8 +389,9 @@ export function restoreLatestChatSession(agent: Agent = getAIAgent()): Promise<v
         // IndexedDB is unavailable in some test/browser contexts.
       }
 
-      agent.sessionId = nanoid();
-      runtime.createdAt = Date.now();
+      currentSession = createSession();
+      agent.sessionId = currentSession.id;
+      runtime.createdAt = currentSession.createdAt;
       agent.replaceMessages([]);
       try {
         await configureAgent(agent);
@@ -381,9 +408,11 @@ export function restoreLatestChatSession(agent: Agent = getAIAgent()): Promise<v
 export async function persistChatSession(agent: Agent = getAIAgent()): Promise<void> {
   const runtime = getAgentRuntimeState(agent);
   if (!runtime.hydrated) return;
+  if (!currentSession) return;
 
   try {
-    await saveChatSession(buildSessionPayload(agent));
+    const persisted = await saveChatSession(currentSession);
+    currentSession.updatedAt = persisted.updatedAt;
   } catch {
     // Ignore persistence failures; chat should still function.
   }
@@ -393,8 +422,9 @@ export async function createNewChatSession(agent: Agent = getAIAgent()): Promise
   const runtime = getAgentRuntimeState(agent);
   agent.abort();
   agent.reset();
-  agent.sessionId = nanoid();
-  runtime.createdAt = Date.now();
+  currentSession = createSession();
+  agent.sessionId = currentSession.id;
+  runtime.createdAt = currentSession.createdAt;
   runtime.hydrated = true;
   runtime.restorePromise = null;
   await configureAgent(agent);
@@ -413,7 +443,40 @@ export async function streamChat(prompt: string, agent: Agent = getAIAgent()): P
     }
   }
 
-  await agent.prompt(normalized);
+  if (!currentSession) {
+    currentSession = createSession();
+    agent.sessionId = currentSession.id;
+    getAgentRuntimeState(agent).createdAt = currentSession.createdAt;
+  }
+
+  let unsubscribed = false;
+  const unsubscribe = agent.subscribe((event: AgentEvent) => {
+    if (!currentSession) return;
+
+    if (event.type === 'turn_end') {
+      syncAgentToTree(currentSession, agent.state.messages);
+      void persistChatSession(agent);
+      return;
+    }
+
+    if (event.type === 'agent_end') {
+      syncAgentToTree(currentSession, event.messages);
+      if (currentSession.title === null) {
+        currentSession.title = deriveSessionTitle(event.messages);
+      }
+      void persistChatSession(agent);
+      unsubscribe();
+      unsubscribed = true;
+    }
+  });
+
+  try {
+    await agent.prompt(normalized);
+  } finally {
+    if (!unsubscribed) {
+      unsubscribe();
+    }
+  }
 }
 
 export function stopStreaming(agent: Agent = getAIAgent()): void {
@@ -422,5 +485,10 @@ export function stopStreaming(agent: Agent = getAIAgent()): void {
 
 export function resetAIAgentForTests(): void {
   agentSingleton = null;
+  currentSession = null;
   migrationPromise = null;
+}
+
+export function getCurrentSession(): ChatSession | null {
+  return currentSession;
 }

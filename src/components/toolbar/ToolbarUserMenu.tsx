@@ -217,19 +217,6 @@ export function ToolbarUserMenu() {
                     <button
                         onClick={() => {
                             setOpen(false);
-                            useUIStore.getState().openChat();
-                        }}
-                        className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-sm text-foreground-secondary transition-colors hover:bg-foreground/4 hover:text-foreground"
-                    >
-                        <div className="flex w-4 shrink-0 items-center justify-center text-foreground-tertiary">
-                            <Sparkles size={14} strokeWidth={1.5} />
-                        </div>
-                        Chat
-                    </button>
-
-                    <button
-                        onClick={() => {
-                            setOpen(false);
                             useUIStore.getState().navigateTo(APP_PANELS.ABOUT);
                         }}
                         className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-sm text-foreground-secondary transition-colors hover:bg-foreground/4 hover:text-foreground"

@@ -22,7 +22,7 @@ import type { AppPanelId } from '../../types/index.js';
 import { NodePanel } from './NodePanel';
 import { AppPanel } from './AppPanel';
 import { Breadcrumb } from './Breadcrumb';
-import { X } from '../../lib/icons.js';
+import { ChevronDown, X } from '../../lib/icons.js';
 
 /** Minimum width per panel before switching to tab mode. */
 const MIN_PANEL_WIDTH = 250;
@@ -39,7 +39,9 @@ export function PanelLayout({ toolbar }: PanelLayoutProps) {
   const panelTitleVisibleMap = useUIStore((s) => s.panelTitleVisibleMap);
 
   const containerRef = useRef<HTMLDivElement>(null);
+  const notesMenuRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(Infinity);
+  const [notesMenuOpen, setNotesMenuOpen] = useState(false);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -50,6 +52,19 @@ export function PanelLayout({ toolbar }: PanelLayoutProps) {
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
+
+  useEffect(() => {
+    if (!notesMenuOpen) return;
+
+    function onPointerDown(e: PointerEvent) {
+      if (notesMenuRef.current && !notesMenuRef.current.contains(e.target as Node)) {
+        setNotesMenuOpen(false);
+      }
+    }
+
+    document.addEventListener('pointerdown', onPointerDown);
+    return () => document.removeEventListener('pointerdown', onPointerDown);
+  }, [notesMenuOpen]);
 
   const handleClosePanel = useCallback((e: React.MouseEvent, panelId: string) => {
     e.stopPropagation();
@@ -70,61 +85,77 @@ export function PanelLayout({ toolbar }: PanelLayoutProps) {
   // ── Tab mode: Chrome-style tab bar — all tabs same height, equal width ──
   if (tabMode) {
     const activePanel = panels.find((p) => p.id === activePanelId) ?? panels[0];
-    const activeIdx = panels.findIndex((p) => p.id === activePanelId);
     const nodeId = activePanel.nodeId;
     const isApp = isAppPanel(nodeId);
 
     return (
       <div ref={containerRef} className="flex flex-1 flex-col overflow-hidden">
-        {/* Tab bar */}
-        <div className="flex items-end shrink-0">
-          <div className="flex min-w-0 flex-1 items-end">
-            {panels.map((panel) => {
-              const active = panel.id === activePanelId;
-              return (
-                <div
-                  key={panel.id}
-                  className={`group/tab flex h-10 min-w-0 flex-1 items-center rounded-t-xl transition-colors ${
-                    active
-                      ? `bg-background relative z-10 tab-connector-right${activeIdx > 0 ? ' tab-connector-left' : ''}`
-                      : 'cursor-pointer text-foreground-tertiary hover:text-foreground overflow-hidden'
-                  }`}
-                  onClick={() => !active && setActivePanel(panel.id)}
-                >
-                  {active ? (
-                    /* Active tab: [W] / ... / NodeName — full breadcrumb navigation */
-                    <div className="min-w-0 flex-1 overflow-hidden">
-                      <Breadcrumb nodeId={panel.nodeId} showCurrentName active compact foldAll />
+        <div className="flex h-10 shrink-0 items-center gap-2">
+          <div ref={notesMenuRef} className="relative min-w-0">
+            <button
+              type="button"
+              className="flex min-w-0 items-center gap-1 rounded-lg px-2 py-1 text-[13px] text-foreground transition-colors hover:bg-foreground/4"
+              onClick={() => setNotesMenuOpen((open) => !open)}
+              aria-haspopup="menu"
+              aria-expanded={notesMenuOpen}
+            >
+              <ChevronDown
+                size={13}
+                strokeWidth={1.7}
+                className={`shrink-0 transition-transform ${notesMenuOpen ? 'rotate-180' : ''}`}
+              />
+              <span className="min-w-0 truncate">
+                <InactiveTabLabel nodeId={activePanel.nodeId} />
+              </span>
+            </button>
+            {notesMenuOpen && (
+              <div className="absolute left-0 top-full z-50 mt-1 min-w-[220px] rounded-lg bg-background p-1 shadow-paper">
+                {panels.map((panel) => {
+                  const active = panel.id === activePanelId;
+                  return (
+                    <div
+                      key={panel.id}
+                      className={`group/menu flex items-center gap-2 rounded-md px-2 py-1.5 text-[13px] text-foreground transition-colors ${
+                        active ? 'bg-foreground/4' : 'cursor-pointer hover:bg-foreground/4'
+                      }`}
+                      onClick={() => {
+                        setActivePanel(panel.id);
+                        setNotesMenuOpen(false);
+                      }}
+                    >
+                      <span className={`shrink-0 text-[10px] ${active ? 'text-primary' : 'text-foreground-tertiary'}`}>
+                        ●
+                      </span>
+                      <span className="min-w-0 flex-1 truncate">
+                        <InactiveTabLabel nodeId={panel.nodeId} />
+                      </span>
+                      {showClose && (
+                        <button
+                          type="button"
+                          className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-foreground-tertiary transition-colors hover:bg-foreground/8 hover:text-foreground"
+                          onClick={(e) => {
+                            setNotesMenuOpen(false);
+                            handleClosePanel(e, panel.id);
+                          }}
+                          title="Close panel"
+                        >
+                          <X size={12} />
+                        </button>
+                      )}
                     </div>
-                  ) : (
-                    /* Inactive tab: just the node name */
-                    <span className="min-w-0 flex-1 truncate pl-3 text-[13px]">
-                      <InactiveTabLabel nodeId={panel.nodeId} />
-                    </span>
-                  )}
-                  <button
-                    className={`flex h-5 w-5 mr-2 shrink-0 items-center justify-center rounded-md text-foreground-tertiary hover:bg-foreground/8 hover:text-foreground ${
-                      active ? '' : 'opacity-0 transition-opacity group-hover/tab:opacity-100'
-                    }`}
-                    onClick={(e) => handleClosePanel(e, panel.id)}
-                    title="Close panel"
-                  >
-                    <X size={12} />
-                  </button>
-                </div>
-              );
-            })}
+                  );
+                })}
+              </div>
+            )}
           </div>
+          <div className="flex-1" />
           {toolbar && (
             <div className="flex shrink-0">
               {toolbar}
             </div>
           )}
         </div>
-        {/* Panel body — round exposed top corners where desk background shows through */}
-        <div className={`group/panel flex flex-1 min-h-0 flex-col overflow-hidden bg-background shadow-card ${
-          activeIdx > 0 ? 'rounded-xl' : 'rounded-b-xl rounded-tr-xl'
-        }`}>
+        <div className="group/panel flex flex-1 min-h-0 flex-col overflow-hidden rounded-xl bg-background shadow-card">
           {isApp ? (
             <AppPanel panelId={nodeId as AppPanelId} />
           ) : (

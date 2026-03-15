@@ -80,12 +80,12 @@
     0 12px 20px -4px rgba(0, 0, 0, 0.04);
 }
 
-/* Panel right-edge shadow — NodePanel (paper) casts shadow onto the
-   Chat surface (desk) to create Z-axis layering. */
-.shadow-panel-right {
+/* Card shadow — minimal 2-layer shadow defining card edges on desk.
+   Lighter than shadow-paper (floats), just enough to separate layers. */
+.shadow-card {
   box-shadow:
-    2px 0 4px -1px rgba(0, 0, 0, 0.05),
-    6px 0 16px -4px rgba(0, 0, 0, 0.04);
+    0 0.5px 1px rgba(0, 0, 0, 0.04),
+    0 2px 6px -2px rgba(0, 0, 0, 0.05);
 }
 
 /* Concave corners at the active tab's bottom edges.

@@ -22,14 +22,14 @@ _(空)_
 
 | 工作区 | 分支 | 任务 | 状态 |
 |--------|------|------|------|
-| nodex-gemini | review/ai-chat-architecture | AI Chat 架构方案 Review | 待分配 |
+| nodex-gemini | — | 空闲 | — |
 | nodex-codex | review/ai-chat-architecture | AI Chat 架构方案 Review | 待分配 |
 
 ---
 
 ## 进行中
 
-- [ ] **AI Chat 架构方案 Review** — 消息树 + 压缩 + 同步方案 review | Codex + Gemini | [#137](https://github.com/relixiaobo/nodex/pull/137)
+- [ ] **AI Chat 架构方案 Review** — 消息树 + 压缩 + 同步方案 review | Codex | [#137](https://github.com/relixiaobo/nodex/pull/137)
 
 ---
 

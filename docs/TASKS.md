@@ -23,7 +23,7 @@ _(空)_
 | 工作区 | 分支 | 任务 | 状态 |
 |--------|------|------|------|
 | nodex-gemini | — | 空闲 | — |
-| nodex-codex | — | 空闲 | — |
+| nodex-codex | review/ai-chat-architecture | AI Chat 架构方案 Review | 待分配 |
 
 ---
 
@@ -118,17 +118,15 @@ _(空)_
 
 > 以下按 Wave 分组。
 
-**Layer 2 上下文管线** — 设计：`ai-context-management.md`（Step 1-2 已完成）
-
-- [ ] Step 3: Context 自动压缩 — Bridge Message + Handoff Memo + token 追踪（行业调研已完成，见设计文档）
-
-**Track A: Chat** — 设计：`ai-context-management.md`「Chat 会话」
+**Track A: Chat** — 设计：`ai-context-management.md`（统一方案，含持久化 + 压缩 + 同步）
 
 - [x] Chat UI 打磨 — 视觉对齐 + 消息分组 + Z 轴层次 (#135, Gemini → nodex)
 - [x] Chat Debug 模式 — 隐藏上下文检查器 (#136, Codex)
 - [x] Desk/Card 布局 — Z 轴分层 + Chrome-tab + resize handle | nodex | main
-- [ ] Chat 持久化 Phase 1 — 消息树数据模型 + 去掉限制 + 会话标题 + syncedAt
-- [ ] Chat 持久化 Phase 2 — 编辑消息 + 重新生成 + 分支导航 UI（`← 2/3 →` 箭头）
+- [ ] Chat Phase 1A — 消息树数据模型 + 算法 + 测试（`ai-chat-tree.ts` 新建）
+- [ ] Chat Phase 1B — 集成 + IndexedDB 迁移 + 事件驱动持久化（`ai-persistence.ts` 重写 + `ai-service.ts` + `use-agent.ts`）
+- [ ] Chat Phase 2 — 编辑消息 + 重新生成 + 分支导航 UI（`← 2/3 →` 箭头）
+- [ ] Chat Phase 3 — Context 自动压缩（Bridge Message + Handoff Memo）
 - [ ] Chat 持久化 Phase 4 — 跨设备同步完整原始对话历史（Sync API + D1/R2）
 
 **Track B: 阅读环** — 设计：`phase-2-reading-ring.md`

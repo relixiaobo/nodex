@@ -1,153 +1,442 @@
-# Chat Toggle + Notes Dropdown — 设计方案
+# Chat as Panel — 设计方案 v3
 
-> Chat 在桌面层，面板浮在上面。宽屏面板没盖满，Chat 自然露出；窄屏面板盖满了，收起面板才能看到 Chat。
-
-## 层级模型
-
-```
-┌─ 卡片层 ─────────────────────────┐
-│  NodePanel（浮动卡片，可多个）     │  ← 盖在 Chat 上面
-├─ 桌面层 ─────────────────────────┤
-│  Chat（始终在底层）               │  ← 面板收起后露出
-└──────────────────────────────────┘
-```
-
-- **宽屏**：面板卡片没盖满桌面，Chat 在右侧自然可见（现状）
-- **窄屏**：面板卡片盖满桌面，Chat 被完全遮住。`chatOpen` = 收起面板，露出 Chat
+> Chat 晋升为面板级，与 NodePanel 同层、同权、同操作。宽屏并排，窄屏 dropdown 切换。
 
 ## 动机
 
-窄屏当前问题：Chat 开启时上下挤压面板空间，两边都不好用。正确做法是面板收起让出全屏给 Chat，而非两者同时挤在一起。
+Chat 和 Notes 是**对等工作区**——用户在 Chat 里做多轮对话、操作节点、分析网页，不是"背景环境"。宽屏时它们已经并排（对等），窄屏时也应该是对等的 tab 切换，而非"层级揭开"。
 
-窄屏 tab bar 问题：多个面板挤成 N 个小 tab，区分度低，不实用。
+统一为 Panel 后：
+- 一个心智模型——一切都是卡片
+- 窄屏 Notes dropdown 自然包含 Chat（无需特殊处理）
+- DeskLayout 大幅简化（删除 chat 层、resize handle、宽窄判断）
+- 支持多个 Chat 面板（不同对话同时可见）
 
 ## 核心变化
 
 | 现状 | 目标 |
 |------|------|
-| 窄屏 Chat：上下挤压面板 | 窄屏 Chat：面板收起，Chat 露出全屏 |
-| 窄屏 tab bar：N 个小标签 | `[Notes ▾]` 下拉选择器 |
-| Chat 开关只在菜单/快捷键里 | GlobalTools 加显式 Chat toggle 按钮 |
-| 宽屏 Chat：面板左 + Chat 右 | 不变 |
+| ChatDrawer 在桌面层，独立 Z 轴 | ChatPanel 与 NodePanel 同级，浮动卡片 |
+| `chatOpen` / `toggleChat()` toggle 机制 | 用通用 `openPanel()` / `closePanel()` |
+| 单例 Agent | Agent 注册表，每个 ChatPanel 独立实例 |
+| DeskLayout 管理两层布局 + resize | DeskLayout 简化为纯面板容器 |
 
-**不变的**：`chatOpen` toggle 机制、Agent 单例、Chat session 管理、ChatDrawer 组件、`useChatResize`（宽屏水平拖拽）、⌘L 快捷键。
-
----
-
-## 1. DeskLayout 窄屏行为
-
-当前四种状态和目标：
-
-| 宽窄 | chatOpen | 现状 | 目标 |
-|------|---------|------|------|
-| 宽 | false | 面板铺满 | **不变** |
-| 宽 | true | 面板左 + Chat 右（水平拖拽） | **不变** |
-| 窄 | false | 面板铺满 | **不变** |
-| 窄 | true | 面板上 + Chat 下（垂直挤压） | **面板收起，露出 Chat** |
-
-改动只有一格。窄屏面板本来就盖在 Chat 上面，`chatOpen` 就是把面板收起来：
-
-```tsx
-// DeskLayout.tsx — narrow 分支
-
-const narrowChat = chatOpen && !isWideLayout;
-
-// 窄屏：面板盖住 Chat。chatOpen = 收起面板，露出底层 Chat
-{narrowChat ? (
-  <Suspense fallback={<ChatFallback />}>
-    <ChatDrawer />
-  </Suspense>
-) : (
-  <PanelLayout toolbar={<GlobalTools />} />
-)}
-```
-
-- **收起面板（露出 Chat）**：✦ toggle 按钮或 ⌘L
-- **恢复面板（盖住 Chat）**：ChatDrawer 的 X 按钮或 ⌘L
-
-PanelLayout 完全不需要知道 Chat 的存在。无需任何新 prop。
-
-**删除**：窄屏的垂直 resize handle 分支（resize handle + 固定高度 Chat 容器）。`useChatResize` 的 height 逻辑保留（无害），不阻塞。
+**不变的**：Chat session 管理（ai-chat-tree / ai-persistence）、Agent 核心（pi-agent-core）、ChatInput / ChatMessage 组件、Debug 模式、消息树/分支/压缩。
 
 ---
 
-## 2. Chat Toggle 按钮
+## 1. Panel ID 体系扩展
 
-在 GlobalTools 中添加显式 Chat toggle 按钮——点击收起面板露出 Chat，再次点击恢复面板。宽屏时控制 Chat 列的展开/收起，窄屏时控制面板的收起/恢复。
+| 前缀 | 示例 | 类型 |
+|------|------|------|
+| _(无)_ | `ws123_abc` | NodePanel（节点 ID） |
+| `app:` | `app:about` | AppPanel（纯 UI 路由） |
+| `chat:` | `chat:sess_abc123` | **ChatPanel（聊天会话）** |
 
 ```typescript
-// src/components/toolbar/TopToolbar.tsx — GlobalTools 内部
+// src/types/node.ts — 新增
 
-<button
-  type="button"
-  onClick={toggleChat}
-  className={TOOL_BUTTON_CLASSES}
-  aria-label={chatOpen ? 'Close chat' : 'Open chat'}
-  aria-pressed={chatOpen}
->
-  <Sparkles size={15} strokeWidth={1.6} />
-</button>
+export const CHAT_PANEL_PREFIX = 'chat:';
+
+export function isChatPanel(panelNodeId: string): boolean {
+  return panelNodeId.startsWith(CHAT_PANEL_PREFIX);
+}
+
+export function chatPanelSessionId(panelNodeId: string): string {
+  return panelNodeId.slice(CHAT_PANEL_PREFIX.length);
+}
 ```
-
-图标复用 ChatDrawer header 的 `Sparkles`（✦），保持一致。按下态用颜色区分（active = `text-foreground`，inactive = `text-foreground-tertiary`）。
-
-位置：`NavButtons` → `SearchTrigger` → **ChatToggle** → `ToolbarUserMenu`。
-
-同时从 `ToolbarUserMenu` 下拉菜单中移除 `openChat()` 项——✦ 按钮是更直接的入口。
 
 ---
 
-## 3. Notes Dropdown（窄屏 tab 模式）
+## 2. UIStore 改动
 
-### 触发条件
+### 删除
 
-只替换现有 tab 模式。当前条件：`panels.length > 1 && containerWidth / panels.length < MIN_PANEL_WIDTH`。单面板窄屏不进 tab 模式，用现有 shaped tab 布局，不受影响。
-
-### 布局
-
-header 行：
-
-```
-[▾ Active Panel Name] ────── flex-1 spacer ────── [GlobalTools]
+```diff
+- chatOpen: boolean;              // session-only, L71
+- openChat(): void;               // L543
+- closeChat(): void;              // L545
+- toggleChat(): void;             // L547
 ```
 
-点击 `[▾ Active Panel Name]` 展开下拉：
+由通用面板操作替代。
 
+### 保留
+
+```typescript
+pendingChatPrompt: string | null;
+setPendingChatPrompt(prompt: string | null): void;
 ```
-┌────────────────────────────┐
-│ ● Panel 1 Name         ✕  │  ← 当前激活（高亮）
-│   Panel 2 Name         ✕  │
-│   Panel 3 Name         ✕  │
-└────────────────────────────┘
+
+投递逻辑（找到活跃 ChatPanel 或新建）由 `chat-panel-actions.ts` 编排函数处理。
+
+### hasBackingNode 适配
+
+```diff
+  function hasBackingNode(nodeId: string): boolean {
+    if (nodeId.startsWith('app:')) return true;
++   if (nodeId.startsWith(CHAT_PANEL_PREFIX)) return true;
+    // ... node store check
+  }
 ```
 
-- 选择面板 → `setActivePanel(panelId)`，下拉关闭
-- ✕ → `closePanel(panelId)`（最后一个面板不可关闭）
+### NavigationEvent
 
-实现：Radix `DropdownMenu` 或 state-controlled Popover。
+删除 `NavigationEvent` 类型注释中的 _"Chat events are NOT included in navHistory"_。Chat 面板的 `open-panel` / `close-panel` 事件正常进入 `navHistory`，支持 undo/redo。
 
 ---
 
-## 4. 文件清单
+## 3. Agent 多实例管理
+
+### 现状
+
+```typescript
+// ai-service.ts
+let agentSingleton: Agent | null = null;
+export function getAIAgent(): Agent { /* 返回/创建单例 */ }
+export async function restoreLatestChatSession(agent: Agent): Promise<void> { /* 从 IndexedDB 取最新 session */ }
+```
+
+全局唯一。多面板场景下所有面板竞争同一个 latest session。
+
+### 目标
+
+```typescript
+// ai-service.ts — 新增
+
+const agentRegistry = new Map<string, Agent>();
+
+/** 获取或创建指定 session 的 Agent 实例。 */
+export function getAgentForSession(sessionId: string): Agent {
+  let agent = agentRegistry.get(sessionId);
+  if (!agent) {
+    agent = createAgent();
+    agentRegistry.set(sessionId, agent);
+  }
+  return agent;
+}
+
+/** 按 sessionId 恢复指定 session。ChatPanel mount 时调用。 */
+export async function restoreChatSessionById(
+  sessionId: string,
+  agent: Agent,
+): Promise<void> {
+  const runtime = getAgentRuntimeState(agent);
+  if (runtime.hydrated) return;
+
+  if (!runtime.restorePromise) {
+    runtime.restorePromise = (async () => {
+      await configureAgent(agent);
+      const session = await getChatSession(sessionId);
+      if (session) {
+        setCurrentSession(agent, session);
+        agent.replaceMessages(getCompressedPath(session));
+      } else {
+        // session 被删除或首次打开 — 创建新 session 并立即保存
+        const newSession = createSession();
+        // 覆盖 id 以匹配面板 nodeId
+        Object.assign(newSession, { id: sessionId });
+        await saveChatSession(newSession);
+        setCurrentSession(agent, newSession);
+      }
+      runtime.hydrated = true;
+    })();
+  }
+  await runtime.restorePromise;
+}
+```
+
+**不主动 destroy**：Agent 是轻量 JS 对象，关闭面板只是从 `panels[]` 移除。undo 重新打开时无缝恢复。
+
+`getAIAgent()` 保留用于非面板场景（Spark）。Chat 面板用 `getAgentForSession(sessionId)`。
+
+### useAgent hook 适配
+
+新增可选 `sessionId` 参数，决定走哪个 restore 路径：
+
+```typescript
+// use-agent.ts
+export function useAgent(agent: Agent = getAIAgent(), sessionId?: string) {
+  useEffect(() => {
+    const restoreFn = sessionId
+      ? restoreChatSessionById(sessionId, agent)
+      : restoreLatestChatSession(agent);
+    void restoreFn.finally(() => { if (!cancelled) setReady(true); ... });
+  }, [agent, sessionId]);
+  // ... rest unchanged
+}
+```
+
+---
+
+## 4. 编排函数
+
+```typescript
+// src/lib/chat-panel-actions.ts — 新建
+
+import { createSession } from './ai-chat-tree.js';
+import { saveChatSession } from './ai-persistence.js';
+import { CHAT_PANEL_PREFIX, isChatPanel } from '../types/index.js';
+import { useUIStore } from '../stores/ui-store.js';
+
+/** 创建新 session 并打开 ChatPanel。 */
+export async function openChatPanel(insertIndex?: number): Promise<void> {
+  const session = createSession();
+  await saveChatSession(session);
+  useUIStore.getState().openPanel(
+    CHAT_PANEL_PREFIX + session.id,
+    insertIndex,
+  );
+}
+
+/** 聚焦已有 ChatPanel，没有则新建。⌘L 用。 */
+export async function focusOrOpenChat(): Promise<void> {
+  const { panels, activePanelId, setActivePanel } = useUIStore.getState();
+  // 当前面板已是 Chat → 不做任何事
+  if (panels.some((p) => p.id === activePanelId && isChatPanel(p.nodeId))) return;
+  // 有其他 Chat 面板 → 聚焦
+  const anyChatPanel = panels.find((p) => isChatPanel(p.nodeId));
+  if (anyChatPanel) {
+    setActivePanel(anyChatPanel.id);
+    return;
+  }
+  // 没有 Chat 面板 → 新建
+  await openChatPanel();
+}
+
+/** 找到活跃 ChatPanel 并投递 prompt，没有则新建。⌘K Ask AI 用。 */
+export async function openChatWithPrompt(prompt: string): Promise<void> {
+  const { panels, activePanelId, setActivePanel, setPendingChatPrompt } =
+    useUIStore.getState();
+  const activeChatPanel = panels.find(
+    (p) => p.id === activePanelId && isChatPanel(p.nodeId),
+  );
+  const targetPanel = activeChatPanel ?? panels.find((p) => isChatPanel(p.nodeId));
+
+  if (targetPanel) {
+    setActivePanel(targetPanel.id);
+  } else {
+    await openChatPanel();
+  }
+  setPendingChatPrompt(prompt);
+}
+```
+
+---
+
+## 5. DeskLayout 简化
+
+从两层 Z 轴布局简化为纯面板容器：
+
+```typescript
+// DeskLayout.tsx — 目标
+
+export function DeskLayout() {
+  return (
+    <div className="flex flex-1 overflow-hidden p-1.5">
+      <PanelLayout toolbar={<GlobalTools />} />
+    </div>
+  );
+}
+```
+
+**删除**：`chatOpen` 订阅、`isWideLayout` 状态、`useChatResize` hook、ChatDrawer lazy import、所有 resize handle、`ChatFallback` 组件、宽窄条件判断。
+
+**`use-chat-resize.ts`**：整个文件删除。面板间距由 PanelLayout 的 `gap-1.5` 控制。
+
+---
+
+## 6. PanelLayout 适配
+
+### 面板内容分发
+
+```typescript
+// PanelLayout.tsx
+
+function renderPanelContent(nodeId: string, panelId: string) {
+  if (isChatPanel(nodeId)) {
+    return <ChatPanel panelId={panelId} sessionId={chatPanelSessionId(nodeId)} />;
+  }
+  if (isAppPanel(nodeId)) {
+    return <AppPanel panelId={nodeId as AppPanelId} />;
+  }
+  return <NodePanel nodeId={nodeId} panelId={panelId} />;
+}
+```
+
+### Shaped tab 排除
+
+ChatPanel 没有 Breadcrumb（不是节点树），走 `hasTab` 会用 `<Breadcrumb nodeId="chat:xxx">` 崩溃。排除：
+
+```diff
+- const hasTab = isLast && !!toolbar && !isApp;
++ const isChat = isChatPanel(nodeId);
++ const hasTab = isLast && !!toolbar && !isApp && !isChat;
+```
+
+ChatPanel 作为最后面板时走普通卡片布局（与 AppPanel 同）。
+
+### Dropdown 模式
+
+PR #143 已实现 Notes dropdown。ChatPanel 自然出现在 dropdown 列表里。`PanelLabel` 组件需要增加 `chat:` 分支：
+
+```typescript
+function PanelLabel({ nodeId }: { nodeId: string }) {
+  const name = useNodeStore((s) => {
+    void s._version;
+    if (isChatPanel(nodeId)) return 'Chat';
+    if (isAppPanel(nodeId)) return nodeId.replace(/^app:/, '').replace(/^./, (c) => c.toUpperCase());
+    const node = s.getNode(nodeId);
+    const raw = node?.name ?? '';
+    return raw.replace(/<[^>]+>/g, '').trim() || 'Untitled';
+  });
+  return <>{name}</>;
+}
+```
+
+### Dropdown 中 Chat 的视觉区分
+
+Chat 面板在 dropdown 列表中用 ✦ 图标（Sparkles）替代 ● bullet，区分于 NodePanel：
+
+```tsx
+<span className={`shrink-0 text-[10px] ${active ? 'text-primary' : 'text-foreground-tertiary'}`}>
+  {isChatPanel(panel.nodeId) ? <Sparkles size={10} /> : '●'}
+</span>
+```
+
+---
+
+## 7. ChatPanel 组件
+
+从 `ChatDrawer` 演化。
+
+| ChatDrawer（现状） | ChatPanel（目标） |
+|-------------------|-----------------|
+| `<aside>` 根元素 | `<div>` 填满面板卡片 |
+| Close → `closeChat()` | Close → `closePanel(panelId)` |
+| `useAgent()` 无参 | `useAgent(getAgentForSession(sessionId), sessionId)` |
+| `pendingChatPrompt` 始终消费 | 只在活跃面板时消费 |
+| 背景色略暗（`bg-background-recessed`） | 与 NodePanel 相同 `bg-background` |
+| `+` → 同 agent 换 session | `+` → `openChatPanel()` 新开面板 |
+
+Props：`{ panelId: string; sessionId: string }`
+
+**`shouldStickChatScroll`**：从 ChatDrawer 迁移到 ChatPanel（或提取到独立 util）。`chat-ui.test.ts` import 路径同步更新。
+
+### `pendingChatPrompt` 消费守卫
+
+只在当前面板是活跃面板时消费：
+
+```typescript
+const activePanelId = useUIStore((s) => s.activePanelId);
+const isActive = activePanelId === panelId;
+
+useEffect(() => {
+  if (!isActive || !pendingChatPrompt || ...) return;
+  setPendingChatPrompt(null);
+  void handleSendMessage(pendingChatPrompt);
+}, [isActive, pendingChatPrompt, ...]);
+```
+
+---
+
+## 8. TopToolbar ✦ 按钮
+
+位置不变（PR #143 已实现）。行为从 `toggleChat()` 改为 `focusOrOpenChat()`：
+
+```diff
+- const chatOpen = useUIStore((s) => s.chatOpen);
+- const toggleChat = useUIStore((s) => s.toggleChat);
++ import { focusOrOpenChat } from '../../lib/chat-panel-actions.js';
+
+  <button
+    type="button"
+-   onClick={toggleChat}
++   onClick={() => void focusOrOpenChat()}
+    className="..."
+-   aria-label={chatOpen ? 'Close chat' : 'Open chat'}
+-   aria-pressed={chatOpen}
++   aria-label="Open chat"
+  >
+    <Sparkles size={15} strokeWidth={1.6} className="text-foreground-tertiary" />
+  </button>
+```
+
+按钮不再有 toggle 语义（Chat 面板通过通用的 X/⌘⇧W 关闭）。
+
+---
+
+## 9. 调用方迁移
+
+| 调用方 | 现状 | 目标 |
+|--------|------|------|
+| `TopToolbar.tsx` | `toggleChat()` | `focusOrOpenChat()` |
+| `use-chat-shortcut.ts` | `toggleChat()` | `focusOrOpenChat()` |
+| `CommandPalette.tsx` | `openChat()` + `setPendingChatPrompt()` | `openChatWithPrompt(query)` |
+| `use-panel-keyboard.ts` | ⌘\ fallback 无排除 | 排除 `chat:` / `app:` 面板 |
+| `App.tsx` bootstrap | 只排除 `app:` | 额外排除 `chat:` 前缀 |
+
+### ⌘\ 排除
+
+```typescript
+// use-panel-keyboard.ts
+if (!nodeId || isChatPanel(nodeId) || isAppPanel(nodeId)) return;
+```
+
+### App.tsx bootstrap
+
+```diff
+  if (!currentPanelNodeId.startsWith('app:')
++   && !currentPanelNodeId.startsWith(CHAT_PANEL_PREFIX)
+    && !loroDoc.hasNode(currentPanelNodeId))
+```
+
+---
+
+## 10. 文件清单
 
 | 文件 | 改动 | 大小 |
 |------|------|------|
-| `src/components/layout/DeskLayout.tsx` | 窄屏 chatOpen：面板收起，露出 ChatDrawer；删除垂直 resize 分支 | 小 |
-| `src/components/toolbar/TopToolbar.tsx` | GlobalTools 加 Chat toggle 按钮 | 小 |
-| `src/components/toolbar/ToolbarUserMenu.tsx` | 移除 `openChat()` 菜单项 | 小 |
-| `src/components/panel/PanelLayout.tsx` | tab 模式：N tabs → Notes dropdown | 中 |
+| `src/types/node.ts` | 新增 `CHAT_PANEL_PREFIX`、`isChatPanel()`、`chatPanelSessionId()` | 小 |
+| `src/lib/chat-panel-actions.ts` | **新建** — 编排函数 | 小 |
+| `src/lib/ai-service.ts` | `agentRegistry` + `getAgentForSession()` + `restoreChatSessionById()` | 中 |
+| `src/hooks/use-agent.ts` | 新增可选 `sessionId` 参数 | 小 |
+| `src/stores/ui-store.ts` | 删除 `chatOpen` 系列，`hasBackingNode` 加 `chat:` | 小 |
+| `src/components/chat/ChatPanel.tsx` | **新建**，从 ChatDrawer 演化 | 中 |
+| `src/components/chat/ChatDrawer.tsx` | **删除** | — |
+| `src/hooks/use-chat-resize.ts` | **删除** | — |
+| `src/components/layout/DeskLayout.tsx` | 大幅简化（~90 行 → ~10 行） | 小 |
+| `src/components/panel/PanelLayout.tsx` | `isChatPanel` 分发 + `hasTab` 排除 + `PanelLabel` 适配 | 小 |
+| `src/components/toolbar/TopToolbar.tsx` | `toggleChat()` → `focusOrOpenChat()` | 小 |
+| `src/hooks/use-chat-shortcut.ts` | `toggleChat()` → `focusOrOpenChat()` | 小 |
+| `src/hooks/use-panel-keyboard.ts` | ⌘\ fallback 排除 `chat:` / `app:` | 小 |
+| `src/components/search/CommandPalette.tsx` | `openChat()` → `openChatWithPrompt()` | 小 |
+| `src/entrypoints/sidepanel/App.tsx` | bootstrap 排除 `chat:` 前缀 | 小 |
+| `tests/vitest/chat-ui.test.ts` | `ChatDrawer` → `ChatPanel` + import 更新 | 小 |
+| `tests/vitest/panel-layout.test.ts` | 增加 ChatPanel dropdown 测试 | 小 |
+| `tests/vitest/ui-store.test.ts` | 删除 `chatOpen` 测试 | 小 |
+| `tests/vitest/ui-store-persist.test.ts` | 删除 `chatOpen` 字段断言 | 小 |
+| `tests/vitest/helpers/test-state.ts` | 删除 `chatOpen` 初始值 | 小 |
 
-**不改的**：`ui-store.ts`、`ChatDrawer.tsx`、`ai-service.ts`、`use-agent.ts`、`use-chat-shortcut.ts`、`use-chat-resize.ts`。
-
-**测试**：当前无 DeskLayout / PanelLayout / TopToolbar 的测试文件。`check:test-sync` 要求 `src/` 有变动时 `tests/vitest/` 必须也有变动。需要至少更新一个测试文件。
+**不改的**：`ai-chat-tree.ts`、`ai-persistence.ts`、`ChatInput.tsx`、`ChatMessage.tsx`、`ToolCallBlock.tsx`、`ToolbarUserMenu.tsx`（PR #143 已清理）。
 
 ---
 
-## 5. Checklist
+## 11. Checklist
 
-- [ ] `TopToolbar.tsx` — GlobalTools 加 Chat toggle 按钮（✦ Sparkles + `toggleChat`）
-- [ ] `ToolbarUserMenu.tsx` — 移除 `openChat()` 菜单项
-- [ ] `DeskLayout.tsx` — 窄屏 chatOpen 分支改为全屏 ChatDrawer，删除垂直 resize
-- [ ] `PanelLayout.tsx` — tab 模式：N tabs → `[▾ ActivePanelName]` dropdown
-- [ ] 更新测试文件（满足 `check:test-sync`）
+按依赖顺序 commit：
+
+- [ ] `node.ts` — 新增 `chat:` 前缀类型和工具函数
+- [ ] `ai-service.ts` — `agentRegistry` + `getAgentForSession()` + `restoreChatSessionById()`
+- [ ] `use-agent.ts` — 新增可选 `sessionId` 参数
+- [ ] `ui-store.ts` — 删除 `chatOpen` 系列，`hasBackingNode` 加 `chat:`
+- [ ] `chat-panel-actions.ts` — 新建编排函数
+- [ ] `ChatPanel.tsx` — 从 ChatDrawer 演化（props / agent / close / new chat / pendingChatPrompt 守卫 / `shouldStickChatScroll` 迁移）
+- [ ] `PanelLayout.tsx` — `isChatPanel` 分发 + `hasTab` 排除 + `PanelLabel` 适配 + dropdown ✦ 图标
+- [ ] `DeskLayout.tsx` — 删除 chat 层，简化为纯面板容器
+- [ ] `App.tsx` — bootstrap 排除 `chat:` 前缀
+- [ ] 迁移调用方：`TopToolbar`、`CommandPalette`、`use-chat-shortcut`、`use-panel-keyboard`
+- [ ] 删除：`ChatDrawer.tsx`、`use-chat-resize.ts`
+- [ ] 测试同步：更新 `chat-ui.test.ts`、`panel-layout.test.ts`、`ui-store.test.ts`、`ui-store-persist.test.ts`、`helpers/test-state.ts`
 - [ ] `npm run verify`

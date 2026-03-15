@@ -23,13 +23,13 @@ _(空)_
 | 工作区 | 分支 | 任务 | 状态 |
 |--------|------|------|------|
 | nodex-gemini | — | 空闲 | — |
-| nodex-codex | codex/chat-phase-1a | Chat Phase 1A — 消息树模型 + 测试 | 待执行 |
+| nodex-codex | codex/chat-phase-1b | Chat Phase 1B — 集成 + 迁移 + 事件持久化 | 待执行 |
 
 ---
 
 ## 进行中
 
-- [ ] **Chat Phase 1A** — 消息树数据模型 + 算法 + 测试 | Codex | [#138](https://github.com/relixiaobo/nodex/pull/138)
+- [ ] **Chat Phase 1B** — 集成 + IndexedDB 迁移 + 事件驱动持久化 | Codex | [#139](https://github.com/relixiaobo/nodex/pull/139)
 
 ---
 
@@ -123,7 +123,7 @@ _(空)_
 - [x] Chat UI 打磨 — 视觉对齐 + 消息分组 + Z 轴层次 (#135, Gemini → nodex)
 - [x] Chat Debug 模式 — 隐藏上下文检查器 (#136, Codex)
 - [x] Desk/Card 布局 — Z 轴分层 + Chrome-tab + resize handle | nodex | main
-- [ ] Chat Phase 1A — 消息树数据模型 + 算法 + 测试（`ai-chat-tree.ts` 新建）
+- [x] Chat Phase 1A — 消息树数据模型 + 算法 + 测试（`ai-chat-tree.ts` 新建）(#138, Codex)
 - [ ] Chat Phase 1B — 集成 + IndexedDB 迁移 + 事件驱动持久化（`ai-persistence.ts` 重写 + `ai-service.ts` + `use-agent.ts`）
 - [ ] Chat Phase 2 — 编辑消息 + 重新生成 + 分支导航 UI（`← 2/3 →` 箭头）
 - [ ] Chat Phase 3 — Context 自动压缩（Bridge Message + Handoff Memo）
@@ -192,6 +192,7 @@ _(空)_
 
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
+| 2026-03-15 | Chat Phase 1A — 消息树数据模型 + 算法 + 测试 (`ai-chat-tree.ts`) | codex | #138 |
 | 2026-03-15 | 多面板 Phase 2.5 — 窄屏 Chrome-tab 标签模式 + 凹角连接器 + 桌面底色加深 + Breadcrumb dead code 清理 | nodex | main |
 | 2026-03-14 | 多面板 Phase 2 — N 面板并排 + 独立浮动卡片 + 全局 navHistory + 异形标签 + 活跃指示器 | nodex | main |
 | 2026-03-14 | Desk/Card Z 轴布局 — 桌面/纸张双层 + Chrome-tab 面包屑 + 可拖拽 resize + 设计系统更新 | nodex | main |

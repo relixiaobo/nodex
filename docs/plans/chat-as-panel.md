@@ -1,18 +1,31 @@
 # Chat Toggle + Notes Dropdown — 设计方案
 
-> 窄屏不再挤压，Chat 和 Notes 全屏互切；宽屏保持并排，加一个显式 toggle 按钮。
+> Chat 在桌面层，面板浮在上面。宽屏面板没盖满，Chat 自然露出；窄屏面板盖满了，收起面板才能看到 Chat。
+
+## 层级模型
+
+```
+┌─ 卡片层 ─────────────────────────┐
+│  NodePanel（浮动卡片，可多个）     │  ← 盖在 Chat 上面
+├─ 桌面层 ─────────────────────────┤
+│  Chat（始终在底层）               │  ← 面板收起后露出
+└──────────────────────────────────┘
+```
+
+- **宽屏**：面板卡片没盖满桌面，Chat 在右侧自然可见（现状）
+- **窄屏**：面板卡片盖满桌面，Chat 被完全遮住。`chatOpen` = 收起面板，露出 Chat
 
 ## 动机
 
-当前窄屏问题：Chat 开启时上下挤压面板空间，两边都不好用。而窄屏本来就只能看一个东西（面板已是 tab 模式），"并排"不是目标，**全屏互切**才是。
+窄屏当前问题：Chat 开启时上下挤压面板空间，两边都不好用。正确做法是面板收起让出全屏给 Chat，而非两者同时挤在一起。
 
-当前窄屏 tab bar 问题：多个面板挤成 N 个小 tab，区分度低，不实用。
+窄屏 tab bar 问题：多个面板挤成 N 个小 tab，区分度低，不实用。
 
 ## 核心变化
 
 | 现状 | 目标 |
 |------|------|
-| 窄屏 Chat：上下挤压面板 | 窄屏 Chat：全屏显示，面板隐藏 |
+| 窄屏 Chat：上下挤压面板 | 窄屏 Chat：面板收起，Chat 露出全屏 |
 | 窄屏 tab bar：N 个小标签 | `[Notes ▾]` 下拉选择器 |
 | Chat 开关只在菜单/快捷键里 | GlobalTools 加显式 Chat toggle 按钮 |
 | 宽屏 Chat：面板左 + Chat 右 | 不变 |
@@ -30,16 +43,16 @@
 | 宽 | false | 面板铺满 | **不变** |
 | 宽 | true | 面板左 + Chat 右（水平拖拽） | **不变** |
 | 窄 | false | 面板铺满 | **不变** |
-| 窄 | true | 面板上 + Chat 下（垂直挤压） | **Chat 全屏，面板隐藏** |
+| 窄 | true | 面板上 + Chat 下（垂直挤压） | **面板收起，露出 Chat** |
 
-改动只有一格。窄屏二选一——Chat 或面板，像程序最大化/最小化：
+改动只有一格。窄屏面板本来就盖在 Chat 上面，`chatOpen` 就是把面板收起来：
 
 ```tsx
 // DeskLayout.tsx — narrow 分支
 
 const narrowChat = chatOpen && !isWideLayout;
 
-// 窄屏：Chat 和面板互斥，全屏切换
+// 窄屏：面板盖住 Chat。chatOpen = 收起面板，露出底层 Chat
 {narrowChat ? (
   <Suspense fallback={<ChatFallback />}>
     <ChatDrawer />
@@ -49,8 +62,8 @@ const narrowChat = chatOpen && !isWideLayout;
 )}
 ```
 
-- **打开 Chat**：✦ toggle 按钮（GlobalTools 内）或 ⌘L → Chat 最大化，面板消失
-- **关闭 Chat**：ChatDrawer 自带的 X 按钮或 ⌘L → Chat 消失，面板恢复
+- **收起面板（露出 Chat）**：✦ toggle 按钮或 ⌘L
+- **恢复面板（盖住 Chat）**：ChatDrawer 的 X 按钮或 ⌘L
 
 PanelLayout 完全不需要知道 Chat 的存在。无需任何新 prop。
 
@@ -60,7 +73,7 @@ PanelLayout 完全不需要知道 Chat 的存在。无需任何新 prop。
 
 ## 2. Chat Toggle 按钮
 
-在 GlobalTools 中添加显式 Chat toggle 按钮——点击展开 Chat，再次点击收起。
+在 GlobalTools 中添加显式 Chat toggle 按钮——点击收起面板露出 Chat，再次点击恢复面板。宽屏时控制 Chat 列的展开/收起，窄屏时控制面板的收起/恢复。
 
 ```typescript
 // src/components/toolbar/TopToolbar.tsx — GlobalTools 内部
@@ -119,7 +132,7 @@ header 行：
 
 | 文件 | 改动 | 大小 |
 |------|------|------|
-| `src/components/layout/DeskLayout.tsx` | 窄屏二选一：chatOpen → ChatDrawer，否则 PanelLayout；删除垂直 resize 分支 | 小 |
+| `src/components/layout/DeskLayout.tsx` | 窄屏 chatOpen：面板收起，露出 ChatDrawer；删除垂直 resize 分支 | 小 |
 | `src/components/toolbar/TopToolbar.tsx` | GlobalTools 加 Chat toggle 按钮 | 小 |
 | `src/components/toolbar/ToolbarUserMenu.tsx` | 移除 `openChat()` 菜单项 | 小 |
 | `src/components/panel/PanelLayout.tsx` | tab 模式：N tabs → Notes dropdown | 中 |

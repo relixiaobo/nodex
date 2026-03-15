@@ -23,13 +23,13 @@ _(空)_
 | 工作区 | 分支 | 任务 | 状态 |
 |--------|------|------|------|
 | nodex-gemini | — | 空闲 | — |
-| nodex-codex | codex/chat-phase-2 | Chat Phase 2 — 编辑/重新生成/分支导航 | 待执行 |
+| nodex-codex | — | 空闲 | — |
 
 ---
 
 ## 进行中
 
-- [ ] **Chat Phase 2** — 编辑消息 + 重新生成 + 分支导航 UI | Codex | [#141](https://github.com/relixiaobo/nodex/pull/141)
+_(空)_
 
 ---
 
@@ -125,7 +125,7 @@ _(空)_
 - [x] Desk/Card 布局 — Z 轴分层 + Chrome-tab + resize handle | nodex | main
 - [x] Chat Phase 1A — 消息树数据模型 + 算法 + 测试（`ai-chat-tree.ts` 新建）(#138, Codex)
 - [x] Chat Phase 1B — 集成 + IndexedDB 迁移 + 事件驱动持久化（`ai-persistence.ts` 重写 + `ai-service.ts` + `use-agent.ts`）(#139, Codex)
-- [ ] Chat Phase 2 — 编辑消息 + 重新生成 + 分支导航 UI（`← 2/3 →` 箭头）
+- [x] Chat Phase 2 — 编辑消息 + 重新生成 + 分支导航 UI（`← 2/3 →` 箭头）(#141, Codex)
 - [x] Chat Phase 3 — Context 自动压缩（Bridge Message + Handoff Memo）(#140, Codex)
 - [ ] Chat 持久化 Phase 4 — 跨设备同步完整原始对话历史（Sync API + D1/R2）
 

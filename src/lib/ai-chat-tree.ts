@@ -42,6 +42,15 @@ function touchSession(session: ChatSession): void {
   session.updatedAt = Date.now();
 }
 
+function getPendingLeafPlaceholder(session: ChatSession): MessageNode | null {
+  const node = session.mapping[session.currentNode];
+  if (!node) return null;
+  if (node.message !== null) return null;
+  if (node.parentId === null) return null;
+  if (node.children.length > 0) return null;
+  return node;
+}
+
 function updateSubtreeLevels(session: ChatSession, nodeId: string, level: number): void {
   const node = getNodeOrThrow(session, nodeId);
   node.level = level;
@@ -105,17 +114,40 @@ export function performOp(
   op: TreeOp,
   newParentId?: string,
 ): void {
-  const childNode = session.mapping[child.id] ?? child;
-  session.mapping[childNode.id] = childNode;
+  const existingChild = session.mapping[child.id];
+  const childNode = existingChild ?? child;
+  const oldParent = childNode.parentId !== null ? getNodeOrThrow(session, childNode.parentId) : null;
+  let newParent: MessageNode | null = null;
 
   if (op === 'relink' && childNode.parentId === newParentId) {
     return;
   }
 
+  if (op === 'link' || op === 'relink') {
+    if (!newParentId) {
+      throw new Error('[ai-chat-tree] link requires newParentId');
+    }
+
+    newParent = getNodeOrThrow(session, newParentId);
+    const visited = new Set<string>();
+    let cursor: MessageNode | undefined = newParent;
+
+    while (cursor) {
+      if (cursor.id === childNode.id) {
+        throw new Error('[ai-chat-tree] Cannot create cycle while linking node');
+      }
+      if (visited.has(cursor.id)) break;
+      visited.add(cursor.id);
+      cursor = cursor.parentId ? session.mapping[cursor.parentId] : undefined;
+    }
+  }
+
+  if (!existingChild && (op === 'link' || op === 'relink')) {
+    session.mapping[childNode.id] = childNode;
+  }
+
   if (op === 'cut' || op === 'relink') {
-    const oldParentId = childNode.parentId;
-    if (oldParentId !== null) {
-      const oldParent = getNodeOrThrow(session, oldParentId);
+    if (oldParent) {
       oldParent.children = oldParent.children.filter((childId) => childId !== childNode.id);
 
       if (oldParent.currentChild === childNode.id) {
@@ -131,24 +163,7 @@ export function performOp(
     }
   }
 
-  if (op === 'link' || op === 'relink') {
-    if (!newParentId) {
-      throw new Error('[ai-chat-tree] link requires newParentId');
-    }
-
-    const newParent = getNodeOrThrow(session, newParentId);
-    const visited = new Set<string>();
-    let cursor: MessageNode | undefined = newParent;
-
-    while (cursor) {
-      if (cursor.id === childNode.id) {
-        throw new Error('[ai-chat-tree] Cannot create cycle while linking node');
-      }
-      if (visited.has(cursor.id)) break;
-      visited.add(cursor.id);
-      cursor = cursor.parentId ? session.mapping[cursor.parentId] : undefined;
-    }
-
+  if (newParent) {
     if (!newParent.children.includes(childNode.id)) {
       newParent.children = [...newParent.children, childNode.id];
     }
@@ -166,7 +181,6 @@ export function appendMessage(session: ChatSession, message: AgentMessage): Mess
 
   performOp(session, node, 'link', parent.id);
   session.currentNode = node.id;
-  touchSession(session);
 
   return node;
 }
@@ -175,7 +189,7 @@ export function getLinearPath(session: ChatSession): MessageNode[] {
   const head = session.mapping[session.currentNode];
   if (!head) return [];
 
-  const path: Array<MessageNode | undefined> = new Array(head.level + 1);
+  const path: Array<MessageNode | undefined> = [];
   const visited = new Set<string>();
 
   for (
@@ -246,7 +260,15 @@ export function syncAgentToTree(session: ChatSession, agentMessages: AgentMessag
     }
   }
 
-  for (let index = existingCount; index < agentMessages.length; index += 1) {
+  let nextIndex = existingCount;
+  const placeholder = getPendingLeafPlaceholder(session);
+  if (placeholder && nextIndex < agentMessages.length) {
+    placeholder.message = agentMessages[nextIndex];
+    touchSession(session);
+    nextIndex += 1;
+  }
+
+  for (let index = nextIndex; index < agentMessages.length; index += 1) {
     appendMessage(session, agentMessages[index]);
   }
 }
@@ -264,7 +286,6 @@ export function editMessage(
   const sibling = createMessageNode(newMessage, target.parentId, target.level);
   performOp(session, sibling, 'link', target.parentId);
   session.currentNode = sibling.id;
-  touchSession(session);
 
   return sibling;
 }
@@ -278,7 +299,6 @@ export function regenerate(session: ChatSession, nodeId: string): MessageNode {
   const sibling = createMessageNode(null, target.parentId, target.level);
   performOp(session, sibling, 'link', target.parentId);
   session.currentNode = sibling.id;
-  touchSession(session);
 
   return sibling;
 }
@@ -313,7 +333,6 @@ export function linearToTree(messages: AgentMessage[]): ChatSession {
   }
 
   session.title = messages.map(getMessageTitle).find((title) => title !== null) ?? null;
-  touchSession(session);
 
   return session;
 }

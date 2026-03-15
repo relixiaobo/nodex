@@ -242,17 +242,24 @@ export function getCompressedPath(session: ChatSession): AgentMessage[] {
   const path = getActivePath(session);
   const bridge = findLatestApplicableBridge(session.bridges, path);
   if (!bridge) {
-    return path.map((node) => node.message!);
+    return path
+      .filter((node) => node.message !== null)
+      .map((node) => node.message!);
   }
 
   const cutIndex = path.findIndex((node) => node.id === bridge.afterNodeId);
   if (cutIndex < 0) {
-    return path.map((node) => node.message!);
+    return path
+      .filter((node) => node.message !== null)
+      .map((node) => node.message!);
   }
 
   return [
     bridgeToUserMessage(bridge),
-    ...path.slice(cutIndex + 1).map((node) => node.message!),
+    ...path
+      .slice(cutIndex + 1)
+      .filter((node) => node.message !== null)
+      .map((node) => node.message!),
   ];
 }
 

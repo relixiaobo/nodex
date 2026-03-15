@@ -3,14 +3,16 @@ import { ArrowRight, SquareCheck } from '../../lib/icons.js';
 
 interface ChatInputProps {
   disabled: boolean;
+  busy?: boolean;
   error?: string;
   onSend(prompt: string): Promise<void>;
   onStop(): void;
 }
 
-export function ChatInput({ disabled, error, onSend, onStop }: ChatInputProps) {
+export function ChatInput({ disabled, busy = false, error, onSend, onStop }: ChatInputProps) {
   const [draft, setDraft] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const inputDisabled = disabled || busy;
 
   useEffect(() => {
     const el = textareaRef.current;
@@ -23,7 +25,7 @@ export function ChatInput({ disabled, error, onSend, onStop }: ChatInputProps) {
 
   async function handleSend() {
     const normalized = draft.trim();
-    if (!normalized || disabled) return;
+    if (!normalized || inputDisabled) return;
     await onSend(normalized);
     setDraft('');
   }
@@ -39,10 +41,10 @@ export function ChatInput({ disabled, error, onSend, onStop }: ChatInputProps) {
         <textarea
           ref={textareaRef}
           value={draft}
-          disabled={disabled}
+          disabled={inputDisabled}
           rows={1}
-          placeholder={disabled ? 'Responding…' : 'Ask about your notes…'}
-          className="min-h-10 flex-1 resize-none rounded-lg border border-border bg-background px-3 py-2 text-sm leading-5 text-foreground outline-none transition-colors placeholder:text-foreground-tertiary focus:border-primary disabled:cursor-not-allowed disabled:opacity-60"
+          placeholder={disabled ? 'Responding…' : busy ? 'Working…' : 'Ask about your notes…'}
+          className="min-h-10 flex-1 resize-none rounded-lg border border-border bg-background px-3 py-2 text-base leading-6 text-foreground outline-none transition-colors placeholder:text-foreground-tertiary focus:border-primary disabled:cursor-not-allowed disabled:opacity-60"
           onChange={(event) => setDraft(event.target.value)}
           onKeyDown={(event) => {
             if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
@@ -64,7 +66,7 @@ export function ChatInput({ disabled, error, onSend, onStop }: ChatInputProps) {
           <button
             type="button"
             onClick={() => void handleSend()}
-            disabled={draft.trim().length === 0}
+            disabled={busy || draft.trim().length === 0}
             className="inline-flex h-10 items-center justify-center rounded-full bg-foreground px-3 text-background transition-colors hover:bg-foreground/90 disabled:cursor-not-allowed disabled:bg-foreground/20"
             aria-label="Send message"
           >
@@ -73,7 +75,7 @@ export function ChatInput({ disabled, error, onSend, onStop }: ChatInputProps) {
         )}
       </div>
       <div className="mt-2 text-xs text-foreground-tertiary">
-        {disabled ? '' : '⌘↵ to send'}
+        {inputDisabled ? '' : '⌘↵ to send'}
       </div>
     </div>
   );

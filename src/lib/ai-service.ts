@@ -3,7 +3,14 @@ import { getModel, isContextOverflow } from '@mariozechner/pi-ai';
 import type { Message, Model } from '@mariozechner/pi-ai';
 import { getStoredToken } from './auth.js';
 import { buildAgentSystemPrompt, DEFAULT_AGENT_MODEL_ID, DEFAULT_AGENT_MAX_TOKENS, DEFAULT_AGENT_SYSTEM_PROMPT, DEFAULT_AGENT_TEMPERATURE, readAgentNodeConfig } from './ai-agent-node.js';
-import { createSession, getLinearPath, syncAgentToTree } from './ai-chat-tree.js';
+import {
+  createSession,
+  editMessage as editTreeMessage,
+  getLinearPath,
+  regenerate as regenerateTree,
+  switchBranch as switchTreeBranch,
+  syncAgentToTree,
+} from './ai-chat-tree.js';
 import { compactForOverflow, compactIfNeeded, getCompressedPath } from './ai-compress.js';
 import { prepareAgentContext } from './ai-context.js';
 import { streamProxyWithApiKey } from './ai-proxy.js';
@@ -335,6 +342,53 @@ function createOverflowRecoveryCoordinator(session: ChatSession, agent: Agent) {
   };
 }
 
+async function ensureAgentHydrated(agent: Agent): Promise<void> {
+  if (!supportsDynamicAgentConfiguration(agent)) return;
+  if (getAgentRuntimeState(agent).hydrated) return;
+  await restoreLatestChatSession(agent);
+}
+
+async function runAgentTurn(session: ChatSession, agent: Agent, prompt: string): Promise<void> {
+  if (supportsDynamicAgentConfiguration(agent)) {
+    await configureAgent(agent);
+  }
+
+  await compactIfNeeded(session, agent);
+  const overflowRecovery = createOverflowRecoveryCoordinator(session, agent);
+
+  const unsubscribe = agent.subscribe((event: AgentEvent) => {
+    if (getCurrentSession(agent) !== session) return;
+
+    if (event.type === 'message_end') {
+      if (event.message.role === 'assistant') {
+        overflowRecovery.handleAssistantMessage(event.message);
+        return;
+      }
+
+      syncSessionFromAgent(session, agent.state.messages);
+      return;
+    }
+
+    if (event.type === 'turn_end') {
+      if (overflowRecovery.shouldSkipTurnSync()) return;
+      syncSessionFromAgent(session, agent.state.messages);
+      void persistChatSession(agent);
+    }
+  });
+
+  try {
+    await agent.prompt(prompt);
+    await overflowRecovery.waitForAll();
+    syncSessionFromAgent(session, agent.state.messages);
+    if (session.title === null) {
+      session.title = deriveSessionTitle(agent.state.messages);
+    }
+    await persistChatSession(agent);
+  } finally {
+    unsubscribe();
+  }
+}
+
 export async function getAISettings(): Promise<StoredAISettings | null> {
   if (!hasNodeBackedAISettings()) {
     return readSettings();
@@ -512,49 +566,57 @@ export async function streamChat(prompt: string, agent: Agent = getAIAgent()): P
   const normalized = prompt.trim();
   if (!normalized) return;
 
-  if (supportsDynamicAgentConfiguration(agent)) {
-    await configureAgent(agent);
-    if (!getAgentRuntimeState(agent).hydrated) {
-      await restoreLatestChatSession(agent);
-    }
-  }
+  await ensureAgentHydrated(agent);
 
   const session = ensureCurrentSession(agent);
-  await compactIfNeeded(session, agent);
-  const overflowRecovery = createOverflowRecoveryCoordinator(session, agent);
+  await runAgentTurn(session, agent, normalized);
+}
 
-  const unsubscribe = agent.subscribe((event: AgentEvent) => {
-    if (getCurrentSession(agent) !== session) return;
+export async function editAndResend(
+  nodeId: string,
+  newContent: string,
+  agent: Agent = getAIAgent(),
+): Promise<void> {
+  const normalized = newContent.trim();
+  if (!normalized) return;
 
-    if (event.type === 'message_end') {
-      if (event.message.role === 'assistant') {
-        overflowRecovery.handleAssistantMessage(event.message);
-        return;
-      }
+  await ensureAgentHydrated(agent);
 
-      syncSessionFromAgent(session, agent.state.messages);
-      return;
-    }
-
-    if (event.type === 'turn_end') {
-      if (overflowRecovery.shouldSkipTurnSync()) return;
-      syncSessionFromAgent(session, agent.state.messages);
-      void persistChatSession(agent);
-      return;
-    }
+  const session = ensureCurrentSession(agent);
+  editTreeMessage(session, nodeId, {
+    role: 'user',
+    content: normalized,
+    timestamp: Date.now(),
   });
 
-  try {
-    await agent.prompt(normalized);
-    await overflowRecovery.waitForAll();
-    syncSessionFromAgent(session, agent.state.messages);
-    if (session.title === null) {
-      session.title = deriveSessionTitle(agent.state.messages);
-    }
-    await persistChatSession(agent);
-  } finally {
-    unsubscribe();
+  agent.replaceMessages(getCompressedPath(session));
+  await runAgentTurn(session, agent, normalized);
+}
+
+export async function regenerateResponse(
+  nodeId: string,
+  agent: Agent = getAIAgent(),
+): Promise<void> {
+  await ensureAgentHydrated(agent);
+
+  const session = ensureCurrentSession(agent);
+  regenerateTree(session, nodeId);
+
+  const messagesForAgent = getCompressedPath(session);
+  agent.replaceMessages(messagesForAgent);
+
+  const lastUserMessage = [...messagesForAgent].reverse().find((message) => message.role === 'user');
+  if (!lastUserMessage) {
+    throw new Error('[ai-service] Cannot regenerate without a preceding user message');
   }
+
+  await runAgentTurn(session, agent, getMessageText(lastUserMessage));
+}
+
+export function switchMessageBranch(nodeId: string, agent: Agent = getAIAgent()): void {
+  const session = ensureCurrentSession(agent);
+  switchTreeBranch(session, nodeId);
+  agent.replaceMessages(getCompressedPath(session));
 }
 
 export function stopStreaming(agent: Agent = getAIAgent()): void {

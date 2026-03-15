@@ -7,12 +7,11 @@
  * Last panel's breadcrumb becomes a shaped tab (Chrome tab style) when
  * `toolbar` is provided; toolbar sits on the desk background to its right.
  *
- * Tab mode (narrow, < 250px per panel): Chrome-style tab bar with equal-width
- * tabs. Active tab shows [W] / ... / nodeName breadcrumb; inactive tabs show
- * only the node name. Only the active panel is rendered below.
+ * Narrow mode (< 250px per panel): replace the tab strip with a Notes dropdown.
+ * The trigger shows the active panel name, the menu lists every panel, and
+ * only the active panel body is rendered below.
  *
- * Active panel is indicated by the breadcrumb [W] avatar color:
- * active = primary (colored), inactive = foreground-tertiary (gray).
+ * Active panel is indicated by the dropdown row highlight + bullet color.
  */
 import { useCallback, useRef, useState, useEffect } from 'react';
 import { useUIStore } from '../../stores/ui-store.js';
@@ -80,10 +79,10 @@ export function PanelLayout({ toolbar }: PanelLayoutProps) {
   }
 
   const showClose = panels.length > 1;
-  const tabMode = panels.length > 1 && containerWidth / panels.length < MIN_PANEL_WIDTH;
+  const dropdownMode = panels.length > 1 && containerWidth / panels.length < MIN_PANEL_WIDTH;
 
-  // ── Tab mode: Chrome-style tab bar — all tabs same height, equal width ──
-  if (tabMode) {
+  // ── Narrow mode: Notes dropdown + single active panel body ──
+  if (dropdownMode) {
     const activePanel = panels.find((p) => p.id === activePanelId) ?? panels[0];
     const nodeId = activePanel.nodeId;
     const isApp = isAppPanel(nodeId);
@@ -105,7 +104,7 @@ export function PanelLayout({ toolbar }: PanelLayoutProps) {
                 className={`shrink-0 transition-transform ${notesMenuOpen ? 'rotate-180' : ''}`}
               />
               <span className="min-w-0 truncate">
-                <InactiveTabLabel nodeId={activePanel.nodeId} />
+                <PanelLabel nodeId={activePanel.nodeId} />
               </span>
             </button>
             {notesMenuOpen && (
@@ -127,7 +126,7 @@ export function PanelLayout({ toolbar }: PanelLayoutProps) {
                         ●
                       </span>
                       <span className="min-w-0 flex-1 truncate">
-                        <InactiveTabLabel nodeId={panel.nodeId} />
+                        <PanelLabel nodeId={panel.nodeId} />
                       </span>
                       {showClose && (
                         <button
@@ -190,6 +189,7 @@ export function PanelLayout({ toolbar }: PanelLayoutProps) {
                   <Breadcrumb nodeId={nodeId} showCurrentName={!titleVisible} active={isActive} compact />
                   {showClose && (
                     <button
+                      type="button"
                       className="flex h-5 w-5 mr-1 shrink-0 items-center justify-center rounded-md text-foreground-tertiary hover:bg-foreground/8 hover:text-foreground"
                       onClick={(e) => handleClosePanel(e, panel.id)}
                       title="Close panel"
@@ -229,6 +229,7 @@ export function PanelLayout({ toolbar }: PanelLayoutProps) {
                   <Breadcrumb nodeId={nodeId} showCurrentName={!titleVisible} active={isActive} />
                   {showClose && (
                     <button
+                      type="button"
                       className="flex h-5 w-5 mr-1 shrink-0 items-center justify-center rounded-md text-foreground-tertiary opacity-0 transition-opacity hover:bg-foreground/8 hover:text-foreground group-hover/panel:opacity-100"
                       onClick={(e) => handleClosePanel(e, panel.id)}
                       title="Close panel"
@@ -241,6 +242,7 @@ export function PanelLayout({ toolbar }: PanelLayoutProps) {
               {isApp && showClose && (
                 <div className="flex items-center justify-end shrink-0 h-8">
                   <button
+                    type="button"
                     className="flex h-5 w-5 mr-1 shrink-0 items-center justify-center rounded-md text-foreground-tertiary opacity-0 transition-opacity hover:bg-foreground/8 hover:text-foreground group-hover/panel:opacity-100"
                     onClick={(e) => handleClosePanel(e, panel.id)}
                     title="Close panel"
@@ -262,8 +264,8 @@ export function PanelLayout({ toolbar }: PanelLayoutProps) {
   );
 }
 
-/** Node name label for inactive tabs in tab mode. */
-function InactiveTabLabel({ nodeId }: { nodeId: string }) {
+/** Shared panel title text for the dropdown trigger and menu rows. */
+function PanelLabel({ nodeId }: { nodeId: string }) {
   const name = useNodeStore((s) => {
     void s._version;
     if (isAppPanel(nodeId)) return nodeId.replace(/^app:/, '').replace(/^./, (c) => c.toUpperCase());

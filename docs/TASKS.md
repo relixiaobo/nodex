@@ -29,8 +29,7 @@ _(空)_
 
 ## 进行中
 
-- [x] **Chat UI 视觉打磨** — 设计系统对齐 + 消息分组 + 空态引导 + Z 轴层次 | nodex | main
-- [x] **Chat Debug 模式** — 隐藏上下文检查器（system prompt / dynamic context / messages / tools / token 估算）| Codex | [#136](https://github.com/relixiaobo/nodex/pull/136)
+_(空)_
 
 ---
 
@@ -84,6 +83,7 @@ _(空)_
 - ~~Layer 0: Agent Runtime~~ ✓ — pi-mono proxy + ChatDrawer + 6 node tools + undo + data access layer + #agent 配置 + Chat 持久化
 - ~~Layer 1: 多 Agent 运行时~~ ✓ — Spark 直接 LLM 调用 + #agent 节点配置（绕过 createAgent）
 - ~~Layer 2 Step 1~~ ✓ — transformContext + convertToLlm + getApiKey (#132)
+- ~~Layer 2 Step 2~~ ✓ — Skill 渐进式披露 (#134)
 - ~~Context 图片生命周期~~ ✓ — 滑动窗口 + 持久化剥离 (#133)
 - ~~Track C: Browser~~ ✓ — 页面观察 + CDP 截图/交互/调试
 - ~~Spark #agent 重构~~ ✓ — 系统提示词存为子节点，删除 extraction-presets.ts
@@ -118,16 +118,18 @@ _(空)_
 
 > 以下按 Wave 分组。
 
-**Layer 2 上下文管线** — 设计：`ai-context-management.md`
+**Layer 2 上下文管线** — 设计：`ai-context-management.md`（Step 1-2 已完成）
 
-- [ ] Step 3: Context 自动压缩 — Bridge Message + Handoff Memo + token 追踪
+- [ ] Step 3: Context 自动压缩 — Bridge Message + Handoff Memo + token 追踪（行业调研已完成，见设计文档）
 
-**Track A: Chat**
+**Track A: Chat** — 设计：`ai-context-management.md`「Chat 会话」
 
 - [x] Chat UI 打磨 — 视觉对齐 + 消息分组 + Z 轴层次 (#135, Gemini → nodex)
 - [x] Chat Debug 模式 — 隐藏上下文检查器 (#136, Codex)
 - [x] Desk/Card 布局 — Z 轴分层 + Chrome-tab + resize handle | nodex | main
-- [ ] Chat 会话同步 — 跨设备同步 Chat 历史（方案待定，见 ai-context-management.md）
+- [ ] Chat 持久化 Phase 1 — 消息树数据模型 + 去掉限制 + 会话标题 + syncedAt
+- [ ] Chat 持久化 Phase 2 — 编辑消息 + 重新生成 + 分支导航 UI（`← 2/3 →` 箭头）
+- [ ] Chat 持久化 Phase 4 — 跨设备同步完整原始对话历史（Sync API + D1/R2）
 
 **Track B: 阅读环** — 设计：`phase-2-reading-ring.md`
 

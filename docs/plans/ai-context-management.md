@@ -155,16 +155,33 @@ function getLinearPath(session: ChatSession): MessageNode[] {
   const head = session.mapping[session.currentNode];
   if (!head) return [];
   const path = new Array<MessageNode>(head.level + 1);
+  const visited = new Set<string>();               // 防御环：corrupt 数据不能卡死 UI
   for (let cur: MessageNode | null = head; cur; cur = cur.parentId ? session.mapping[cur.parentId] : null) {
-    if (cur.message) path[cur.level] = cur;       // 跳过合成根节点
+    if (visited.has(cur.id)) break;                // 检测到环 → 中断
+    visited.add(cur.id);
+    if (cur.message) path[cur.level] = cur;        // 跳过合成根节点（level=0, message=null）
   }
-  return path.filter(Boolean);                     // 合成根在 level=0 且 message=null，被跳过
+  if (DEV && path.some((_, i) => !path[i])) {
+    console.warn('[ai-chat-tree] getLinearPath: path has gaps, tree may be malformed');
+  }
+  return path.filter(Boolean);
 }
 
 /** 差量追加：agent 的消息数组是树路径的超集，只追加多出的部分 */
 function syncAgentToTree(session: ChatSession, agentMessages: AgentMessage[]): void {
   const linearPath = getLinearPath(session);
   const existingCount = linearPath.length;
+
+  // 安全断言：验证已有路径与 agent 消息的一致性（防止 agent 内部重试导致错位）
+  if (existingCount > 0 && existingCount <= agentMessages.length) {
+    const treeMsg = linearPath[existingCount - 1].message!;
+    const agentMsg = agentMessages[existingCount - 1];
+    if (treeMsg.role !== agentMsg.role) {
+      console.error('[ai-chat-tree] syncAgentToTree: position mismatch — tree last role=%s, agent role=%s', treeMsg.role, agentMsg.role);
+      return;  // 不追加，避免 corrupt 树
+    }
+  }
+
   for (let i = existingCount; i < agentMessages.length; i++) {
     appendMessage(session, agentMessages[i]);       // 分配 nanoid + 设置 level + 更新 currentChild
   }
@@ -172,6 +189,11 @@ function syncAgentToTree(session: ChatSession, agentMessages: AgentMessage[]): v
 ```
 
 核心思路：agent 的消息数组是树的线性路径的**超集**——前 N 条与树一致，后面多出的是新消息。`syncAgentToTree` 只追加差量。`level` 字段让路径构建无需 `unshift` 或 reverse（来自 assistant-ui 的模式）。
+
+**防御性措施**：
+- `getLinearPath` 有环检测（`visited` set），防止 corrupt IndexedDB 数据卡死 UI
+- `getLinearPath` 在 DEV 模式检测路径空洞（level 不连续），及早发现 migration bug
+- `syncAgentToTree` 在追加前验证末尾消息 role 一致性，防止 pi-agent-core 内部重试（rate limit → 移除/重新添加消息）导致位置错位
 
 **安全前提**：streaming 期间不执行 edit/regenerate/switchBranch（这些操作会改变树的线性路径，导致位置对不上）。这在当前 UI 中天然成立——streaming 时输入和按钮都 disabled。
 
@@ -211,6 +233,34 @@ function syncAgentToTree(session: ChatSession, agentMessages: AgentMessage[]): v
 
 **替代了 `isStreaming` 轮询**：现有 `use-agent.ts` 的 250ms debounce 依赖状态轮询（检测 `messages.length` + `lastTimestamp` 变化）。`turn_end` / `agent_end` 事件是精确的完成信号，无需轮询和 debounce。
 
+### Session 加载与崩溃恢复
+
+**加载优化**：去掉 10 session 限制后，`getLatestChatSession()` 必须用 IDBKeyRange 游标限制（按 `updatedAt` 降序取 1 条），不能全量扫描。session 列表 UI 也应分页加载。
+
+**崩溃恢复**：`turn_end` 增量持久化可能在 `agent_end` 前崩溃，恢复时 session 末尾可能是 `toolResult`（对 LLM 无效状态）。`restoreSession` 必须检测并修剪：
+
+```typescript
+function restoreSession(session: ChatSession, agent: Agent): void {
+  const path = getLinearPath(session);
+  // 修剪尾部不完整消息（toolResult 或无 content 的 assistant）
+  while (path.length > 0) {
+    const last = path[path.length - 1].message!;
+    if (last.role === 'toolResult' || (last.role === 'assistant' && !last.content)) {
+      path.pop();
+    } else break;
+  }
+  // 更新 currentNode 指向修剪后的末尾
+  if (path.length > 0) session.currentNode = path[path.length - 1].id;
+  agent.replaceMessages(path.map(n => n.message!));
+}
+```
+
+**Session 切换守卫**：切换 session 或 `newChat` 前，必须先 `agent.abort()`（当前 `createNewChatSession` 已有此逻辑，新代码必须保留）。streaming 中（`isStreaming === true`）禁止切换。
+
+**标题生成时机**：首次 `agent_end` 事件中，如果 `session.title === null`，取第一条 user 消息前 30 字设为标题。
+
+**图片剥离**：`persistSession()` 在写 IndexedDB 前，必须对 `mapping` 中所有 `MessageNode.message` 执行 `stripImagesForPersistence()`（替换为占位符）。这是从现有 `saveChatSession` 继承的行为，重写时不能丢失。
+
 ### IndexedDB schema 迁移
 
 DB_VERSION 从 1 升到 2，`onupgradeneeded` 中转换现有 session：
@@ -234,8 +284,8 @@ if (oldVersion < 2) {
 |------|------|------|
 | `src/lib/ai-chat-tree.ts` | 新建 | 树操作：`performOp` / `appendMessage` / `getLinearPath` / `syncAgentToTree` / `findLatestLeaf` + nanoid 分配 |
 | `src/lib/ai-persistence.ts` | 重写 | `ChatSession` 树模型 + DB_VERSION=2 migration + 去掉限制；用 `idb`（1.2KB）替换手写 IndexedDB 样板 |
-| `src/lib/ai-service.ts` | 修改 | `streamChat` 加 syncAgentToTree；`restoreSession` 加 getLinearPath |
-| `src/hooks/use-agent.ts` | 修改 | persist 改为事件驱动；暴露 session title |
+| `src/lib/ai-service.ts` | 修改 | `streamChat` 加 syncAgentToTree；`restoreSession` 加 getLinearPath + 崩溃恢复修剪；`newChat` 创建树模型 session |
+| `src/hooks/use-agent.ts` | 修改 | 删除 `getPersistedMessageSignature` + 250ms debounce；persist 改为事件驱动；暴露 session title；session 切换前 `agent.abort()` 守卫 |
 | `tests/vitest/ai-persistence.test.ts` | 新建 | 树操作 + migration + 持久化测试 |
 
 ---
@@ -256,13 +306,16 @@ function performOp(
 ): void {
   if (op === 'cut' || op === 'relink') {
     // 从旧 parent 的 children[] 中移除
-    // 如果 child 是旧 parent 的 currentChild，回退到 children.at(-1)
+    // 如果 child 是旧 parent 的 currentChild：
+    //   - children 还有剩余 → 回退到 children.at(-1)
+    //   - children 为空 → currentChild = null（关键：防止悬空指针）
   }
   if (op === 'link' || op === 'relink') {
     // 环检测：沿 newParent 的 parentId 向上走，确保不遇到 child.id
     // 加入新 parent 的 children[]
     // 设为新 parent 的 currentChild
-    // 递归更新 child 及后代的 level
+    // 递归更新 child 及后代的 level（DFS，包括 child 自身）
+    //   ⚠️ 硬不变式：child.level = parent.level + 1，包括合成根的直接子节点
   }
 }
 ```
@@ -289,6 +342,7 @@ U₁ → A₁(tool_use) → TR₁ → A₂(final response)
 - Regenerate A₁：整条 A₁ → TR₁ → A₂ 子树变为旧分支，新 A₁' 在 U₁ 下创建
 - `getLinearPath()` 必须包含中间的 toolResult 节点
 - UI 分支导航 `← 2/3 →` 只显示在 user/assistant 消息上，不在 toolResult 上显示
+- 分支计数 `N/M` 必须排除 `toolResult` 兄弟（只计 user/assistant siblings），避免用户看到不可导航的幽灵分支
 
 ### 分支导航 UI
 
@@ -366,9 +420,33 @@ declare module '@mariozechner/pi-agent-core' {
 树结构:  Root → U₁ → A₁ → ... → A₅₀ → U₅₁ → A₅₁  (不变)
 bridges: [{ afterNodeId: A₅₀.id, content: "...", timestamp: ... }]
 
-UI 展示:  全部消息可见，bridges[i] 位置渲染一条折叠分隔线
+UI 展示:  全部消息可见，bridges[i] 位置渲染一条折叠分隔线（可展开查看 bridge.content）
 LLM 收到: [bridge.content as user message] → U₅₁ → A₅₁
 ```
+
+### 多次压缩与 `getCompressedPath` 语义
+
+对话可能压缩多次，产生多个 bridge。**规则：只使用最新的适用 bridge**：
+
+```typescript
+function getCompressedPath(session: ChatSession): AgentMessage[] {
+  const fullPath = getLinearPath(session);
+  // 找到当前路径上最新的 bridge（afterNodeId 在路径中的最后一个）
+  const applicableBridge = findLatestApplicableBridge(session.bridges, fullPath);
+  if (!applicableBridge) return fullPath.map(n => n.message!);  // 无压缩
+
+  // 截断 bridge 之前的消息，用 bridge.content 替代
+  const cutIndex = fullPath.findIndex(n => n.id === applicableBridge.afterNodeId);
+  const recentMessages = fullPath.slice(cutIndex + 1).map(n => n.message!);
+  return [bridgeToUserMessage(applicableBridge), ...recentMessages];
+}
+```
+
+**切换到旧分支的处理**：如果用户切换到 bridge `afterNodeId` 之前分叉的旧分支，`afterNodeId` 不在当前路径上 → 该 bridge 不适用 → `getCompressedPath` 跳过它，返回完整路径。这意味着旧分支可能因上下文过长而触发 overflow → 由 `message_end` + `isContextOverflow()` 兜底压缩。
+
+### `compactIfNeeded` 的 maxTokens
+
+压缩调用使用独立的 `maxTokens`（2048-4096），不继承 chat agent 的 `maxTokens` 设置。Handoff Memo 应该简洁，不需要长输出。
 
 ### 压缩时机
 
@@ -575,6 +653,10 @@ R2: chat/{workspace_id}/{session_id}.json（完整 ChatSession JSON）
 **已知限制**：Phase 4 不做 mapping-level merge（即不会自动合并两边各自创建的分支）。同一 session 在多设备并发编辑是已知的不支持场景。未来可升级为 mapping dict union merge。
 
 **时机**：复用 SyncManager 的 30s 定时 + visibilitychange 触发。
+
+**Pull 守卫**：streaming 进行中（`isStreaming === true`）时，跳过当前活跃 session 的 pull。否则 pull 写入 IndexedDB 的同时 `turn_end` 也在写，内存中的 session 对象可能处于 stale 状态。
+
+**visibilitychange 注意**：在 Chrome 扩展 Side Panel 上下文中，`visibilitychange` 是 best-effort 的——tab hidden 后 IndexedDB 异步写入可能来不及完成。`turn_end` 增量持久化是主要保障，`visibilitychange` 只是额外兜底。
 
 ### 文件清单
 

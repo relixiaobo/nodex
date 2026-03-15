@@ -32,25 +32,47 @@
 | 窄 | false | 面板铺满 | **不变** |
 | 窄 | true | 面板上 + Chat 下（垂直挤压） | **Chat 全屏，面板隐藏** |
 
-改动只有一格：窄屏 + chatOpen 时隐藏面板，Chat 占满空间。
+改动只有一格：窄屏 + chatOpen 时 Chat 占满 body 区域。
 
-```diff
-  // DeskLayout.tsx — narrow + chatOpen 分支
+### 实现方式
 
-- {/* 窄屏：面板上 + resize handle + Chat 下 */}
-- <div className="flex-1 min-h-0"><PanelLayout ... /></div>
-- <ResizeHandle />
-- <div style={{ height: chatHeight }}><ChatDrawer /></div>
+**不是隐藏 PanelLayout**，而是让 PanelLayout 的 body 区域显示 ChatDrawer。PanelLayout 的 header 行（Notes 下拉 + GlobalTools）始终可见，用户可以随时通过 Notes 下拉切回面板或通过 ✦ toggle 关闭 Chat。
 
-+ {/* 窄屏 + chatOpen：Chat 全屏 */}
-+ <Suspense fallback={<ChatFallback />}>
-+   <ChatDrawer />
-+ </Suspense>
+DeskLayout 通过新 prop `bodyOverride` 传递 Chat 内容：
+
+```tsx
+// DeskLayout.tsx — 窄屏分支
+
+const narrowChat = chatOpen && !isWideLayout;
+
+<PanelLayout
+  toolbar={<GlobalTools />}
+  bodyOverride={narrowChat ? (
+    <Suspense fallback={<ChatFallback />}>
+      <ChatDrawer />
+    </Suspense>
+  ) : undefined}
+/>
 ```
 
-窄屏 + !chatOpen 时渲染面板（现状不变）。
+PanelLayout 内部：有 `bodyOverride` 时渲染它替代面板 body，header 行不受影响。
 
-**副作用**：窄屏不再需要垂直 resize handle。`useChatResize` 的 height 逻辑可以保留（无害）或后续清理，不阻塞本次改动。
+```diff
+  // PanelLayout.tsx — tab 模式末尾
+  {/* Panel body */}
+- <div className="...">
+-   {isApp ? <AppPanel .../> : <NodePanel .../>}
+- </div>
++ {bodyOverride ?? (
++   <div className="...">
++     {isApp ? <AppPanel .../> : <NodePanel .../>}
++   </div>
++ )}
+```
+
+窄屏单面板时也一样——`bodyOverride` 在 side-by-side 模式下同样生效（替换面板卡片的 body 区域）。
+
+**副作用**：窄屏不再需要垂直 resize handle。DeskLayout 的窄屏 + chatOpen 分支（resize handle + 固定高度 Chat）整段删除。`useChatResize` 的 height 逻辑保留（无害），不阻塞本次改动。
 
 ---
 
@@ -76,49 +98,48 @@
 
 位置：在 `ToolbarUserMenu` 前面（`NavButtons` → `SearchTrigger` → **ChatToggle** → `ToolbarUserMenu`）。
 
+同时从 `ToolbarUserMenu` 的下拉菜单中移除 `openChat()` 菜单项——GlobalTools 的 ✦ 按钮是更直接的入口，菜单里不再需要。
+
 ---
 
 ## 3. Notes Dropdown（窄屏 tab 模式）
 
-当前窄屏 tab 模式：N 个等宽 Chrome 风格标签，每个面板一个。
+### 触发条件
 
-替换为 `[Notes ▾]` 下拉选择器：
+Notes 下拉**只替换现有 tab 模式**。当前 tab 模式条件：`panels.length > 1 && containerWidth / panels.length < MIN_PANEL_WIDTH`。单面板窄屏不进 tab 模式，继续用现有 shaped tab 布局，不受影响。
+
+### 布局
+
+窄屏 tab 模式的 header 行变为：
 
 ```
-┌──────────────────────────────────────────────────┐
-│ [▾ Active Panel Name          ]  [✦] [🔍] [👤]  │
-├──────────────────────────────────────────────────┤
-│                                                  │
-│            Active Panel (full height)             │
-│                                                  │
-└──────────────────────────────────────────────────┘
+[▾ Active Panel Name] ────── flex-1 spacer ────── [GlobalTools]
 ```
+
+`GlobalTools`（含 ✦ Chat toggle）始终在右侧。与宽屏的 shaped tab + toolbar 布局一致——左侧面板标识，右侧全局工具。
 
 点击 `[▾ Active Panel Name]` 展开下拉：
 
 ```
 ┌────────────────────────────┐
-│  Panel 1 Name          ✕  │  ← 当前激活（高亮）
-│  Panel 2 Name          ✕  │
-│  Panel 3 Name          ✕  │
+│ ● Panel 1 Name         ✕  │  ← 当前激活（● 高亮）
+│   Panel 2 Name         ✕  │
+│   Panel 3 Name         ✕  │
 └────────────────────────────┘
 ```
 
 - 选择面板 → `setActivePanel(panelId)`，下拉关闭
 - ✕ 按钮 → `closePanel(panelId)`（最后一个面板不可关闭）
-- 当前激活面板有视觉高亮（如 `bg-foreground/8`）
+- 当前激活面板有 `●` 标记或背景高亮
 
-实现：`PanelLayout` 的 `tabMode` 分支替换为 Dropdown 组件（Radix `DropdownMenu` 或简单的 Popover + 列表）。
+实现：Radix `DropdownMenu` 或简单的 state-controlled Popover + 面板列表。
 
-### Tab bar 行整体布局
+### Body 区域
 
-窄屏时 tab bar 行变为：
+- 正常情况（`bodyOverride` 无）：渲染活跃面板
+- 窄屏 + chatOpen（`bodyOverride` 有）：渲染 ChatDrawer
 
-```
-[▾ Notes dropdown] ────── flex-1 spacer ────── [GlobalTools]
-```
-
-`GlobalTools`（含 Chat toggle）始终在右侧。这与宽屏的 shaped tab + toolbar 布局一致——左侧是面板标识，右侧是全局工具。
+Header 行不受 `bodyOverride` 影响，始终显示 Notes 下拉和 GlobalTools。
 
 ---
 
@@ -126,18 +147,22 @@
 
 | 文件 | 改动 | 大小 |
 |------|------|------|
-| `src/components/layout/DeskLayout.tsx` | 窄屏 + chatOpen：渲染 Chat 全屏，隐藏面板 | 小 |
+| `src/components/layout/DeskLayout.tsx` | 窄屏 + chatOpen：通过 `bodyOverride` 传 ChatDrawer，删除垂直 resize 分支 | 小 |
 | `src/components/toolbar/TopToolbar.tsx` | GlobalTools 加 Chat toggle 按钮 | 小 |
-| `src/components/panel/PanelLayout.tsx` | tab 模式：N tabs → Notes dropdown | 中 |
+| `src/components/toolbar/ToolbarUserMenu.tsx` | 移除下拉菜单中的 `openChat()` 项 | 小 |
+| `src/components/panel/PanelLayout.tsx` | 新增 `bodyOverride` prop；tab 模式：N tabs → Notes dropdown | 中 |
 
-**不改的**：`ui-store.ts`（`chatOpen` toggle 保留）、`ChatDrawer.tsx`、`ai-service.ts`、`use-agent.ts`、`use-chat-shortcut.ts`、`use-chat-resize.ts`。
+**不改的**：`ui-store.ts`、`ChatDrawer.tsx`、`ai-service.ts`、`use-agent.ts`、`use-chat-shortcut.ts`、`use-chat-resize.ts`。
+
+**测试**：当前无 DeskLayout / PanelLayout / TopToolbar 的测试文件。`check:test-sync` 要求 `src/` 有变动时 `tests/vitest/` 也必须有变动。需要至少新增或更新一个测试文件（如 PanelLayout Notes dropdown 的基本渲染测试）。
 
 ---
 
 ## 5. Checklist
 
-- [ ] `TopToolbar.tsx` — GlobalTools 加 Chat toggle 按钮（Sparkles icon + `toggleChat`）
-- [ ] `DeskLayout.tsx` — 窄屏 + chatOpen 分支：只渲染 ChatDrawer，不渲染 PanelLayout
-- [ ] `PanelLayout.tsx` — tab 模式重写：`[▾ ActivePanelName]` dropdown + 面板列表
-- [ ] 测试同步
-- [ ] `npm run verify`
+- [ ] `TopToolbar.tsx` — GlobalTools 加 Chat toggle 按钮（✦ Sparkles + `toggleChat`）
+- [ ] `ToolbarUserMenu.tsx` — 移除 `openChat()` 菜单项
+- [ ] `PanelLayout.tsx` — 新增 `bodyOverride` prop；tab 模式重写为 `[▾ ActivePanelName]` dropdown
+- [ ] `DeskLayout.tsx` — 窄屏 + chatOpen：`bodyOverride={<ChatDrawer />}`，删除垂直 resize 分支
+- [ ] 新增测试文件（满足 `check:test-sync`）
+- [ ] `npm run verify`（typecheck → test-sync → test → build）

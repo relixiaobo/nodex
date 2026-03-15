@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { AssistantMessage, ToolResultMessage } from '@mariozechner/pi-ai';
+import { toast } from 'sonner';
 import type { ChatConversationMessage, ChatMessageEntry } from '../../hooks/use-agent.js';
 import { Check, ChevronLeft, ChevronRight, Copy, Pencil, RefreshCw } from '../../lib/icons.js';
 import { CitationBadge } from './CitationBadge.js';
@@ -21,6 +22,13 @@ interface ChatMessageProps {
 const INLINE_MARKUP_PATTERN = /<(ref|cite)\s+id="([^"]+)">([\s\S]*?)<\/\1>/g;
 const ACTION_BUTTON = 'inline-flex h-7 w-7 items-center justify-center rounded-full text-foreground-tertiary transition-colors hover:bg-foreground/4 hover:text-foreground focus-visible:bg-foreground/4 focus-visible:text-foreground disabled:cursor-not-allowed disabled:text-foreground-tertiary/40 disabled:hover:bg-transparent disabled:focus-visible:bg-transparent';
 const SECONDARY_BUTTON = 'inline-flex h-8 items-center rounded-full border border-border px-3 text-sm text-foreground-secondary transition-colors hover:bg-foreground/4 hover:text-foreground';
+
+function getActionErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof Error && error.message.trim().length > 0) {
+    return error.message;
+  }
+  return fallback;
+}
 
 function getMessageText(message: ChatConversationMessage): string {
   if (message.role === 'user') {
@@ -188,8 +196,22 @@ export function ChatMessage({
     if (!nodeId || !onEdit) return;
     const normalized = editText.trim();
     if (!normalized) return;
-    await onEdit(nodeId, normalized);
-    setIsEditing(false);
+    try {
+      await onEdit(nodeId, normalized);
+      setIsEditing(false);
+    } catch (error) {
+      toast.error(getActionErrorMessage(error, 'Failed to edit message'));
+    }
+  }
+
+  async function handleRegenerate() {
+    if (!nodeId || !onRegenerate) return;
+
+    try {
+      await onRegenerate(nodeId);
+    } catch (error) {
+      toast.error(getActionErrorMessage(error, 'Failed to regenerate response'));
+    }
   }
 
   function renderBranchNavigator(): ReactNode {
@@ -312,7 +334,7 @@ export function ChatMessage({
             ) : (
               <button
                 type="button"
-                onClick={() => nodeId && void onRegenerate?.(nodeId)}
+                onClick={() => void handleRegenerate()}
                 className={ACTION_BUTTON}
                 disabled={busy}
                 aria-label="Regenerate response"

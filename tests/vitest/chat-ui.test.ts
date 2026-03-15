@@ -65,4 +65,20 @@ describe('chat ui', () => {
     expect(messageHtml).toContain('text-base leading-6 text-foreground');
     expect(inputHtml).toContain('text-base leading-6 text-foreground');
   });
+
+  it('keeps composer in working state without turning it into a stop action', () => {
+    const html = renderToStaticMarkup(
+      React.createElement(ChatInput, {
+        disabled: false,
+        busy: true,
+        onSend: async () => {},
+        onStop: () => {},
+      }),
+    );
+
+    expect(html).toContain('placeholder="Working…"' );
+    expect(html).toContain('aria-label="Send message"');
+    expect(html).toContain('disabled=""');
+    expect(html).not.toContain('Stop');
+  });
 });

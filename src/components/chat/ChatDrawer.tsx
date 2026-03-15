@@ -24,6 +24,13 @@ function maskApiKey(apiKey: string): string {
   return `${apiKey.slice(0, 7)}••••${apiKey.slice(-4)}`;
 }
 
+function getActionErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof Error && error.message.trim().length > 0) {
+    return error.message;
+  }
+  return fallback;
+}
+
 export function ChatDrawer() {
   const closeChat = useUIStore((s) => s.closeChat);
   const pendingChatPrompt = useUIStore((s) => s.pendingChatPrompt);
@@ -54,6 +61,8 @@ export function ChatDrawer() {
   const [savingKey, setSavingKey] = useState(false);
   const [debugEnabled, setDebugEnabled] = useState(false);
   const [debugOpen, setDebugOpen] = useState(false);
+  const [pendingMessageActionId, setPendingMessageActionId] = useState<string | null>(null);
+  const chatBusy = isStreaming || pendingMessageActionId !== null;
 
   useEffect(() => {
     let cancelled = false;
@@ -110,17 +119,16 @@ export function ChatDrawer() {
   }, [messages, isStreaming, showSettings]);
 
   useEffect(() => {
-    if (!pendingChatPrompt || loadingSettings || showSettings || isStreaming || !ready) return;
+    if (!pendingChatPrompt || loadingSettings || showSettings || chatBusy || !ready) return;
 
     setPendingChatPrompt(null);
-    void sendMessage(pendingChatPrompt);
+    void handleSendMessage(pendingChatPrompt);
   }, [
     pendingChatPrompt,
     loadingSettings,
     showSettings,
-    isStreaming,
+    chatBusy,
     ready,
-    sendMessage,
     setPendingChatPrompt,
   ]);
 
@@ -151,6 +159,46 @@ export function ChatDrawer() {
     setDraftKey('');
     setFormError(null);
     setShowSettings(true);
+  }
+
+  async function handleSendMessage(prompt: string) {
+    if (pendingMessageActionId) return;
+
+    shouldStickToBottomRef.current = true;
+    try {
+      await sendMessage(prompt);
+    } catch (error) {
+      toast.error(getActionErrorMessage(error, 'Failed to send message'));
+    }
+  }
+
+  async function runMessageAction(nodeId: string, action: () => Promise<void>) {
+    if (pendingMessageActionId) return;
+
+    shouldStickToBottomRef.current = true;
+    setPendingMessageActionId(nodeId);
+    try {
+      await action();
+    } finally {
+      setPendingMessageActionId((current) => (current === nodeId ? null : current));
+    }
+  }
+
+  async function handleEditMessage(nodeId: string, newContent: string) {
+    await runMessageAction(nodeId, () => editMessage(nodeId, newContent));
+  }
+
+  async function handleRegenerateMessage(nodeId: string) {
+    await runMessageAction(nodeId, () => regenerateMessage(nodeId));
+  }
+
+  async function handleNewChat() {
+    shouldStickToBottomRef.current = true;
+    try {
+      await newChat();
+    } catch (error) {
+      toast.error(getActionErrorMessage(error, 'Failed to create a new chat'));
+    }
   }
 
   function handleHeaderTitleClick() {
@@ -206,7 +254,7 @@ export function ChatDrawer() {
           {!loadingSettings && (
             <button
               type="button"
-              onClick={() => void newChat()}
+              onClick={() => void handleNewChat()}
               className={HEADER_ICON_BUTTON}
               aria-label="New chat"
             >
@@ -337,7 +385,7 @@ export function ChatDrawer() {
                     <button
                       key={suggestion}
                       type="button"
-                      onClick={() => void sendMessage(suggestion)}
+                      onClick={() => void handleSendMessage(suggestion)}
                       className="rounded-lg border border-border px-3 py-2 text-left text-sm text-foreground-secondary transition-colors hover:bg-foreground/4 hover:text-foreground"
                     >
                       {suggestion}
@@ -353,9 +401,9 @@ export function ChatDrawer() {
                   toolResults={toolResults}
                   streaming={isStreaming && index === messages.length - 1 && entry.message.role === 'assistant'}
                   grouped={index > 0 && messages[index - 1].message.role === entry.message.role}
-                  busy={isStreaming}
-                  onEdit={editMessage}
-                  onRegenerate={regenerateMessage}
+                  busy={chatBusy}
+                  onEdit={handleEditMessage}
+                  onRegenerate={handleRegenerateMessage}
                   onSwitchBranch={switchBranch}
                 />
               ))
@@ -363,8 +411,9 @@ export function ChatDrawer() {
           </div>
           <ChatInput
             disabled={isStreaming}
+            busy={pendingMessageActionId !== null}
             error={error}
-            onSend={sendMessage}
+            onSend={handleSendMessage}
             onStop={stopStreaming}
           />
         </>

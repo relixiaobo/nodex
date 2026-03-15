@@ -25,6 +25,7 @@ export interface StoredAISettings {
 
 interface AgentRuntimeState {
   createdAt: number;
+  currentSession: ChatSession | null;
   hydrated: boolean;
   restorePromise: Promise<void> | null;
   temperature: number;
@@ -34,7 +35,6 @@ interface AgentRuntimeState {
 let agentSingleton: Agent | null = null;
 const agentRuntimeState = new WeakMap<Agent, AgentRuntimeState>();
 let migrationPromise: Promise<void> | null = null;
-let currentSession: ChatSession | null = null;
 
 function hasChromeStorage(): boolean {
   return typeof chrome !== 'undefined' && !!chrome.storage?.local;
@@ -82,6 +82,7 @@ function getAgentRuntimeState(agent: Agent): AgentRuntimeState {
   if (!state) {
     state = {
       createdAt: Date.now(),
+      currentSession: null,
       hydrated: false,
       restorePromise: null,
       temperature: DEFAULT_AGENT_TEMPERATURE,
@@ -234,13 +235,30 @@ function deriveSessionTitle(messages: AgentMessage[]): string | null {
   return normalized ? normalized.slice(0, 30) : null;
 }
 
+function setCurrentSession(agent: Agent, session: ChatSession): ChatSession {
+  const runtime = getAgentRuntimeState(agent);
+  runtime.currentSession = session;
+  runtime.createdAt = session.createdAt;
+  agent.sessionId = session.id;
+  return session;
+}
+
+function ensureCurrentSession(agent: Agent): ChatSession {
+  const runtime = getAgentRuntimeState(agent);
+  return runtime.currentSession ?? setCurrentSession(agent, createSession());
+}
+
+function getAssistantContentLength(message: AgentMessage): number | null {
+  return message.role === 'assistant' ? message.content.length : null;
+}
+
 function trimIncompleteTrail(session: ChatSession): void {
   const path = getLinearPath(session);
   let trimCount = 0;
 
   for (let index = path.length - 1; index >= 0; index -= 1) {
     const message = path[index].message!;
-    if (message.role === 'toolResult' || (message.role === 'assistant' && !message.content)) {
+    if (message.role === 'toolResult' || getAssistantContentLength(message) === 0) {
       trimCount += 1;
       continue;
     }
@@ -373,9 +391,7 @@ export function restoreLatestChatSession(agent: Agent = getAIAgent()): Promise<v
         const latestSession = await getLatestChatSession();
         if (latestSession) {
           trimIncompleteTrail(latestSession);
-          currentSession = latestSession;
-          agent.sessionId = latestSession.id;
-          runtime.createdAt = latestSession.createdAt;
+          setCurrentSession(agent, latestSession);
           agent.replaceMessages(getLinearPath(latestSession).map((node) => node.message!));
           try {
             await configureAgent(agent);
@@ -389,9 +405,7 @@ export function restoreLatestChatSession(agent: Agent = getAIAgent()): Promise<v
         // IndexedDB is unavailable in some test/browser contexts.
       }
 
-      currentSession = createSession();
-      agent.sessionId = currentSession.id;
-      runtime.createdAt = currentSession.createdAt;
+      setCurrentSession(agent, createSession());
       agent.replaceMessages([]);
       try {
         await configureAgent(agent);
@@ -408,11 +422,11 @@ export function restoreLatestChatSession(agent: Agent = getAIAgent()): Promise<v
 export async function persistChatSession(agent: Agent = getAIAgent()): Promise<void> {
   const runtime = getAgentRuntimeState(agent);
   if (!runtime.hydrated) return;
-  if (!currentSession) return;
+  if (!runtime.currentSession) return;
 
   try {
-    const persisted = await saveChatSession(currentSession);
-    currentSession.updatedAt = persisted.updatedAt;
+    const persisted = await saveChatSession(runtime.currentSession);
+    runtime.currentSession.updatedAt = persisted.updatedAt;
   } catch {
     // Ignore persistence failures; chat should still function.
   }
@@ -422,9 +436,7 @@ export async function createNewChatSession(agent: Agent = getAIAgent()): Promise
   const runtime = getAgentRuntimeState(agent);
   agent.abort();
   agent.reset();
-  currentSession = createSession();
-  agent.sessionId = currentSession.id;
-  runtime.createdAt = currentSession.createdAt;
+  setCurrentSession(agent, createSession());
   runtime.hydrated = true;
   runtime.restorePromise = null;
   await configureAgent(agent);
@@ -437,32 +449,27 @@ export async function streamChat(prompt: string, agent: Agent = getAIAgent()): P
 
   if (supportsDynamicAgentConfiguration(agent)) {
     await configureAgent(agent);
-    const runtime = getAgentRuntimeState(agent);
-    if (!runtime.hydrated) {
+    if (!getAgentRuntimeState(agent).hydrated) {
       await restoreLatestChatSession(agent);
     }
   }
 
-  if (!currentSession) {
-    currentSession = createSession();
-    agent.sessionId = currentSession.id;
-    getAgentRuntimeState(agent).createdAt = currentSession.createdAt;
-  }
+  const session = ensureCurrentSession(agent);
 
   let unsubscribed = false;
   const unsubscribe = agent.subscribe((event: AgentEvent) => {
-    if (!currentSession) return;
+    if (getCurrentSession(agent) !== session) return;
 
     if (event.type === 'turn_end') {
-      syncAgentToTree(currentSession, agent.state.messages);
+      syncAgentToTree(session, agent.state.messages);
       void persistChatSession(agent);
       return;
     }
 
     if (event.type === 'agent_end') {
-      syncAgentToTree(currentSession, event.messages);
-      if (currentSession.title === null) {
-        currentSession.title = deriveSessionTitle(event.messages);
+      syncAgentToTree(session, event.messages);
+      if (session.title === null) {
+        session.title = deriveSessionTitle(event.messages);
       }
       void persistChatSession(agent);
       unsubscribe();
@@ -485,10 +492,9 @@ export function stopStreaming(agent: Agent = getAIAgent()): void {
 
 export function resetAIAgentForTests(): void {
   agentSingleton = null;
-  currentSession = null;
   migrationPromise = null;
 }
 
-export function getCurrentSession(): ChatSession | null {
-  return currentSession;
+export function getCurrentSession(agent: Agent = getAIAgent()): ChatSession | null {
+  return getAgentRuntimeState(agent).currentSession;
 }

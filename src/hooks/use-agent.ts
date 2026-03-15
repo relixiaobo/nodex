@@ -91,7 +91,7 @@ export function useAgent(agent: Agent = getAIAgent()) {
       agent,
       ready,
       sessionId: agent.sessionId ?? null,
-      sessionTitle: getCurrentSession()?.title ?? null,
+      sessionTitle: getCurrentSession(agent)?.title ?? null,
       messages,
       toolResults,
       isStreaming: agent.state.isStreaming,

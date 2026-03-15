@@ -9,6 +9,7 @@ const DB_VERSION = 2;
 const STORE_NAME = 'sessions';
 const META_STORE_NAME = 'session-metas';
 const UPDATED_AT_INDEX = 'updatedAt';
+const STORE_NAMES = [STORE_NAME, META_STORE_NAME] as const;
 
 interface ChatSessionMeta {
   id: string;
@@ -77,28 +78,14 @@ function toSessionMeta(session: ChatSession): ChatSessionMeta {
   };
 }
 
-function ensureSessionStore(
+function ensureStore(
   db: IDBPDatabase<ChatPersistenceDB>,
-  transaction: IDBPTransaction<ChatPersistenceDB, ['sessions', 'session-metas'], 'versionchange'>,
+  transaction: IDBPTransaction<ChatPersistenceDB, typeof STORE_NAMES, 'versionchange'>,
+  storeName: typeof STORE_NAMES[number],
 ): IDBObjectStore {
-  const store = db.objectStoreNames.contains(STORE_NAME)
-    ? unwrap(transaction.objectStore(STORE_NAME))
-    : unwrap(db.createObjectStore(STORE_NAME, { keyPath: 'id' }));
-
-  if (!store.indexNames.contains(UPDATED_AT_INDEX)) {
-    store.createIndex(UPDATED_AT_INDEX, UPDATED_AT_INDEX);
-  }
-
-  return store;
-}
-
-function ensureMetaStore(
-  db: IDBPDatabase<ChatPersistenceDB>,
-  transaction: IDBPTransaction<ChatPersistenceDB, ['sessions', 'session-metas'], 'versionchange'>,
-): IDBObjectStore {
-  const store = db.objectStoreNames.contains(META_STORE_NAME)
-    ? unwrap(transaction.objectStore(META_STORE_NAME))
-    : unwrap(db.createObjectStore(META_STORE_NAME, { keyPath: 'id' }));
+  const store = db.objectStoreNames.contains(storeName)
+    ? unwrap(transaction.objectStore(storeName))
+    : unwrap(db.createObjectStore(storeName, { keyPath: 'id' }));
 
   if (!store.indexNames.contains(UPDATED_AT_INDEX)) {
     store.createIndex(UPDATED_AT_INDEX, UPDATED_AT_INDEX);
@@ -131,8 +118,8 @@ async function getDB(): Promise<IDBPDatabase<ChatPersistenceDB>> {
 
   dbPromise = openDB<ChatPersistenceDB>(DB_NAME, DB_VERSION, {
     upgrade(db, oldVersion, _newVersion, transaction) {
-      const sessionStore = ensureSessionStore(db, transaction);
-      const metaStore = ensureMetaStore(db, transaction);
+      const sessionStore = ensureStore(db, transaction, STORE_NAME);
+      const metaStore = ensureStore(db, transaction, META_STORE_NAME);
 
       if (oldVersion < 2) {
         backfillSessionMetas(sessionStore, metaStore);
@@ -177,7 +164,7 @@ export async function saveChatSession(session: ChatSession): Promise<ChatSession
     mapping: stripMappingImagesForPersistence(session.mapping),
   };
 
-  const tx = db.transaction([STORE_NAME, META_STORE_NAME], 'readwrite');
+  const tx = db.transaction(STORE_NAMES, 'readwrite');
   await Promise.all([
     tx.objectStore(STORE_NAME).put(nextSession),
     tx.objectStore(META_STORE_NAME).put(toSessionMeta(nextSession)),
@@ -194,10 +181,10 @@ export async function getChatSession(sessionId: string): Promise<ChatSession | n
 
 export async function getLatestChatSession(): Promise<ChatSession | null> {
   const db = await getDB();
-  const tx = db.transaction([STORE_NAME, META_STORE_NAME], 'readonly');
+  const tx = db.transaction(STORE_NAMES, 'readonly');
   const metaCursor = await tx.objectStore(META_STORE_NAME)
     .index(UPDATED_AT_INDEX)
-    .openCursor(IDBKeyRange.lowerBound(0), 'prev');
+    .openCursor(null, 'prev');
 
   if (!metaCursor) {
     await tx.done;
@@ -215,7 +202,7 @@ export async function listChatSessionMetas(): Promise<ChatSessionMeta[]> {
   const metas: ChatSessionMeta[] = [];
   let cursor = await tx.objectStore(META_STORE_NAME)
     .index(UPDATED_AT_INDEX)
-    .openCursor(IDBKeyRange.lowerBound(0), 'prev');
+    .openCursor(null, 'prev');
 
   while (cursor) {
     metas.push(cursor.value);
@@ -228,7 +215,7 @@ export async function listChatSessionMetas(): Promise<ChatSessionMeta[]> {
 
 export async function deleteChatSession(sessionId: string): Promise<void> {
   const db = await getDB();
-  const tx = db.transaction([STORE_NAME, META_STORE_NAME], 'readwrite');
+  const tx = db.transaction(STORE_NAMES, 'readwrite');
   await Promise.all([
     tx.objectStore(STORE_NAME).delete(sessionId),
     tx.objectStore(META_STORE_NAME).delete(sessionId),

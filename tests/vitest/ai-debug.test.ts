@@ -1,6 +1,6 @@
 import type { AgentMessage } from '@mariozechner/pi-agent-core';
-import { Type } from '@mariozechner/pi-ai';
-import { buildAgentDebugSnapshot } from '../../src/lib/ai-debug.js';
+import { Type, getModel } from '@mariozechner/pi-ai';
+import { buildAgentDebugSnapshot, createChatTurnDebugRecord, finalizeChatTurnDebugRecord } from '../../src/lib/ai-debug.js';
 import type { PreparedAgentContext } from '../../src/lib/ai-context.js';
 
 const TOOL_SCHEMA = Type.Object({
@@ -107,5 +107,89 @@ describe('ai-debug', () => {
     );
     expect(snapshot.tokenEstimate.contextWindow).toBe(200000);
     expect(snapshot.provider).toBe('anthropic');
+  });
+
+  it('creates and finalizes turn-level debug records with redacted request secrets and response usage', () => {
+    const model = getModel('anthropic', 'claude-sonnet-4-5');
+
+    const turn = createChatTurnDebugRecord({
+      id: 'turn_1',
+      model,
+      context: {
+        systemPrompt: 'You are soma',
+        messages: [
+          {
+            role: 'user',
+            content: 'Inspect the current page',
+            timestamp: 1,
+          },
+        ],
+        tools: [
+          {
+            name: 'browser',
+            description: 'Inspect the active tab',
+            parameters: TOOL_SCHEMA,
+          },
+        ],
+      },
+      options: {
+        temperature: 0.2,
+        apiKey: 'sk-secret',
+        authToken: 'auth-secret',
+        metadata: { panel: 'chat' },
+      },
+      startedAt: 1000,
+    });
+
+    expect(turn.status).toBe('running');
+    expect(turn.request.json).toContain('"systemPrompt": "You are soma"');
+    expect(turn.request.json).toContain('"metadata"');
+    expect(turn.request.json).toContain('[redacted]');
+    expect(turn.request.json).not.toContain('sk-secret');
+    expect(turn.request.json).not.toContain('auth-secret');
+
+    const finalized = finalizeChatTurnDebugRecord(turn, {
+      assistantMessage: {
+        role: 'assistant',
+        content: [{ type: 'text', text: 'Observed page state' }],
+        api: 'anthropic-messages',
+        provider: 'anthropic',
+        model: 'claude-sonnet-4-5',
+        usage: {
+          input: 1234,
+          output: 321,
+          cacheRead: 10,
+          cacheWrite: 0,
+          totalTokens: 1565,
+          cost: {
+            input: 0.001,
+            output: 0.002,
+            cacheRead: 0,
+            cacheWrite: 0,
+            total: 0.003,
+          },
+        },
+        stopReason: 'stop',
+        timestamp: 2000,
+      },
+      toolResults: [
+        {
+          role: 'toolResult',
+          toolCallId: 'call_1',
+          toolName: 'browser',
+          content: [{ type: 'text', text: 'Page title: soma' }],
+          isError: false,
+          timestamp: 1500,
+        },
+      ],
+      finishedAt: 2500,
+    });
+
+    expect(finalized.status).toBe('completed');
+    expect(finalized.durationMs).toBe(1500);
+    expect(finalized.response.stopReason).toBe('stop');
+    expect(finalized.response.usage?.totalTokens).toBe(1565);
+    expect(finalized.response.json).toContain('"assistantMessage"');
+    expect(finalized.response.json).toContain('"toolResults"');
   });
 });

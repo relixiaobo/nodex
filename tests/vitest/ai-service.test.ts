@@ -340,6 +340,45 @@ describe('ai-service', () => {
     );
   });
 
+  it('captures redacted turn logs from actual stream payloads when AI Debug is enabled', async () => {
+    storage['soma-chat-debug-enabled'] = true;
+    storage['soma-ai-settings'] = {
+      provider: 'anthropic',
+      apiKey: 'sk-ant-debug',
+    };
+
+    const { createAgent, createNewChatSession, getCurrentSession } = await import('../../src/lib/ai-service.js');
+    const agent = createAgent();
+
+    await createNewChatSession(agent);
+    await agent.streamFn(
+      agent.state.model,
+      {
+        systemPrompt: 'Turn prompt',
+        messages: [
+          {
+            role: 'user',
+            content: 'Inspect the page',
+            timestamp: 1,
+          },
+        ],
+      },
+      {
+        temperature: 0.3,
+        metadata: { panel: 'chat' },
+      },
+    );
+
+    const turns = getCurrentSession(agent)?.debugTurns ?? [];
+
+    expect(turns).toHaveLength(1);
+    expect(turns[0]?.request.json).toContain('"systemPrompt": "Turn prompt"');
+    expect(turns[0]?.request.json).toContain('"metadata"');
+    expect(turns[0]?.request.json).toContain('"hasApiKey": true');
+    expect(turns[0]?.request.json).not.toContain('sk-ant-debug');
+    expect(turns[0]?.request.json).not.toContain('auth-token');
+  });
+
   it('registers transformContext that delegates to the shared context preparation helper', async () => {
     const { createAgent } = await import('../../src/lib/ai-service.js');
     const agent = createAgent();

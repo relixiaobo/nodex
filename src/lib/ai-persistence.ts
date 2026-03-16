@@ -70,6 +70,13 @@ function migrateLegacySession(session: LegacyChatSession): ChatSession {
   return migrated;
 }
 
+function normalizeChatSession(session: ChatSession): ChatSession {
+  return {
+    ...session,
+    debugTurns: Array.isArray(session.debugTurns) ? session.debugTurns : [],
+  };
+}
+
 function toSessionMeta(session: ChatSession): ChatSessionMeta {
   return {
     id: session.id,
@@ -158,10 +165,11 @@ function stripMappingImagesForPersistence(mapping: Record<string, MessageNode>):
 export async function saveChatSession(session: ChatSession): Promise<ChatSession> {
   const db = await getDB();
   const updatedAt = Date.now();
+  const normalizedSession = normalizeChatSession(session);
   const nextSession: ChatSession = {
-    ...session,
+    ...normalizedSession,
     updatedAt,
-    mapping: stripMappingImagesForPersistence(session.mapping),
+    mapping: stripMappingImagesForPersistence(normalizedSession.mapping),
   };
 
   const tx = db.transaction(STORE_NAMES, 'readwrite');
@@ -176,7 +184,8 @@ export async function saveChatSession(session: ChatSession): Promise<ChatSession
 
 export async function getChatSession(sessionId: string): Promise<ChatSession | null> {
   const db = await getDB();
-  return (await db.get(STORE_NAME, sessionId)) ?? null;
+  const session = await db.get(STORE_NAME, sessionId);
+  return session ? normalizeChatSession(session) : null;
 }
 
 export async function getLatestChatSession(): Promise<ChatSession | null> {
@@ -193,7 +202,7 @@ export async function getLatestChatSession(): Promise<ChatSession | null> {
 
   const session = await tx.objectStore(STORE_NAME).get(metaCursor.value.id);
   await tx.done;
-  return session ?? null;
+  return session ? normalizeChatSession(session) : null;
 }
 
 export async function listChatSessionMetas(): Promise<ChatSessionMeta[]> {

@@ -1,8 +1,10 @@
 import { Agent, type AgentEvent, type AgentMessage } from '@mariozechner/pi-agent-core';
 import { getModel, isContextOverflow } from '@mariozechner/pi-ai';
-import type { Message, Model } from '@mariozechner/pi-ai';
+import type { AssistantMessage, Context, Message, Model, StopReason, ToolResultMessage } from '@mariozechner/pi-ai';
+import { nanoid } from 'nanoid';
 import { getStoredToken } from './auth.js';
 import { buildAgentSystemPrompt, DEFAULT_AGENT_MODEL_ID, DEFAULT_AGENT_MAX_TOKENS, DEFAULT_AGENT_SYSTEM_PROMPT, DEFAULT_AGENT_TEMPERATURE, readAgentNodeConfig, type AgentNodeConfig } from './ai-agent-node.js';
+import { createChatTurnDebugRecord, finalizeChatTurnDebugRecord, readChatDebugEnabled } from './ai-debug.js';
 import { findProviderOptionNodeId, getApiKeyForProvider, getAvailableModels, getProviderConfigs } from './ai-provider-config.js';
 import {
   createSession,
@@ -24,6 +26,7 @@ import { useNodeStore } from '../stores/node-store.js';
 import { NDX_F, SYSTEM_NODE_IDS, SYS_V } from '../types/index.js';
 
 const AI_SETTINGS_KEY = 'soma-ai-settings';
+const MAX_SESSION_DEBUG_TURNS = 12;
 
 const DEFAULT_CHAT_MODEL = getModel('anthropic', 'claude-sonnet-4-5');
 
@@ -39,6 +42,7 @@ interface AgentRuntimeState {
   restorePromise: Promise<void> | null;
   temperature: number;
   maxTokens: number;
+  activeDebugTurnId: string | null;
 }
 
 let agentSingleton: Agent | null = null;
@@ -97,6 +101,7 @@ function getAgentRuntimeState(agent: Agent): AgentRuntimeState {
       restorePromise: null,
       temperature: DEFAULT_AGENT_TEMPERATURE,
       maxTokens: DEFAULT_AGENT_MAX_TOKENS,
+      activeDebugTurnId: null,
     };
     agentRuntimeState.set(agent, state);
   }
@@ -296,6 +301,7 @@ function setCurrentSession(agent: Agent, session: ChatSession): ChatSession {
   const runtime = getAgentRuntimeState(agent);
   runtime.currentSession = session;
   runtime.createdAt = session.createdAt;
+  runtime.activeDebugTurnId = null;
   agent.sessionId = session.id;
   return session;
 }
@@ -303,6 +309,101 @@ function setCurrentSession(agent: Agent, session: ChatSession): ChatSession {
 function ensureCurrentSession(agent: Agent): ChatSession {
   const runtime = getAgentRuntimeState(agent);
   return runtime.currentSession ?? setCurrentSession(agent, createSession());
+}
+
+function isAssistantDebugMessage(message: AgentMessage | null | undefined): message is AssistantMessage {
+  return message?.role === 'assistant';
+}
+
+function buildDebugStreamOptions(
+  options: {
+    temperature?: unknown;
+    maxTokens?: unknown;
+    reasoning?: unknown;
+    transport?: unknown;
+    cacheRetention?: unknown;
+    sessionId?: unknown;
+    metadata?: unknown;
+    headers?: unknown;
+  },
+  runtime: AgentRuntimeState,
+): Record<string, unknown> {
+  return {
+    temperature: options.temperature ?? runtime.temperature,
+    maxTokens: options.maxTokens ?? runtime.maxTokens,
+    reasoning: options.reasoning ?? null,
+    transport: options.transport ?? null,
+    cacheRetention: options.cacheRetention ?? null,
+    sessionId: options.sessionId ?? null,
+    metadata: options.metadata ?? null,
+    headers: options.headers ?? null,
+    hasApiKey: true,
+  };
+}
+
+function appendDebugTurn(session: ChatSession, turn: ReturnType<typeof createChatTurnDebugRecord>): void {
+  session.debugTurns = [...session.debugTurns, turn].slice(-MAX_SESSION_DEBUG_TURNS);
+}
+
+async function startDebugTurn(
+  agent: Agent,
+  model: Model<any>,
+  context: Context,
+  options: {
+    temperature?: unknown;
+    maxTokens?: unknown;
+    reasoning?: unknown;
+    transport?: unknown;
+    cacheRetention?: unknown;
+    sessionId?: unknown;
+    metadata?: unknown;
+    headers?: unknown;
+  },
+): Promise<void> {
+  if (!await readChatDebugEnabled()) return;
+
+  const runtime = getAgentRuntimeState(agent);
+  const session = runtime.currentSession;
+  if (!session) return;
+
+  const turn = createChatTurnDebugRecord({
+    id: nanoid(),
+    model,
+    context,
+    options: buildDebugStreamOptions(options, runtime),
+  });
+  appendDebugTurn(session, turn);
+  runtime.activeDebugTurnId = turn.id;
+}
+
+function finalizeDebugTurn(
+  agent: Agent,
+  args: {
+    assistantMessage?: AssistantMessage | null;
+    toolResults?: ToolResultMessage[];
+    stopReason?: StopReason | null;
+    errorMessage?: string | null;
+  } = {},
+): void {
+  const runtime = getAgentRuntimeState(agent);
+  const session = runtime.currentSession;
+  const activeDebugTurnId = runtime.activeDebugTurnId;
+  if (!session || !activeDebugTurnId) return;
+
+  const turnIndex = session.debugTurns.findIndex((turn) => turn.id === activeDebugTurnId);
+  runtime.activeDebugTurnId = null;
+  if (turnIndex < 0) return;
+
+  session.debugTurns[turnIndex] = finalizeChatTurnDebugRecord(session.debugTurns[turnIndex], args);
+}
+
+function getLatestAssistantMessage(agent: Agent): AssistantMessage | null {
+  if (isAssistantDebugMessage(agent.state.streamMessage)) {
+    return agent.state.streamMessage;
+  }
+
+  const lastAssistantMessage = [...agent.state.messages].reverse().find(isAssistantDebugMessage);
+  return lastAssistantMessage ?? null;
 }
 
 function getAssistantContentLength(message: AgentMessage): number | null {
@@ -419,6 +520,10 @@ async function runAgentTurn(session: ChatSession, agent: Agent, prompt: string):
     }
 
     if (event.type === 'turn_end') {
+      finalizeDebugTurn(agent, {
+        assistantMessage: isAssistantDebugMessage(event.message) ? event.message : null,
+        toolResults: event.toolResults,
+      });
       if (overflowRecovery.shouldSkipTurnSync()) return;
       syncSessionFromAgent(session, agent.state.messages);
       void persistChatSession(agent);
@@ -428,11 +533,23 @@ async function runAgentTurn(session: ChatSession, agent: Agent, prompt: string):
   try {
     await agent.prompt(prompt);
     await overflowRecovery.waitForAll();
+    finalizeDebugTurn(agent, {
+      assistantMessage: getLatestAssistantMessage(agent),
+    });
     syncSessionFromAgent(session, agent.state.messages);
     if (session.title === null) {
       session.title = deriveSessionTitle(agent.state.messages);
     }
     await persistChatSession(agent);
+  } catch (error) {
+    const latestAssistantMessage = getLatestAssistantMessage(agent);
+    finalizeDebugTurn(agent, {
+      assistantMessage: latestAssistantMessage,
+      stopReason: latestAssistantMessage?.stopReason ?? 'error',
+      errorMessage: error instanceof Error ? error.message : String(error),
+    });
+    await persistChatSession(agent);
+    throw error;
   } finally {
     unsubscribe();
   }
@@ -488,6 +605,8 @@ export function createAgent(model: Model<any> = DEFAULT_CHAT_MODEL): Agent {
       }
 
       const runtime = getAgentRuntimeState(agent);
+      await startDebugTurn(agent, activeModel, context, options);
+
       return streamProxyWithApiKey(activeModel, context, {
         ...options,
         apiKey: resolvedApiKey,

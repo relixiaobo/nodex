@@ -367,9 +367,12 @@ export function CommandPalette() {
   }, [searchOpen]);
 
   // Global Cmd+K toggle + Esc close (works even when input loses focus)
+  const panelCount = useUIStore((s) => s.panels.length);
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        // When no panels are open, DeskLanding handles ⌘K inline
+        if (panelCount === 0) return;
         e.preventDefault();
         if (searchOpen) {
           closePalette();
@@ -383,7 +386,7 @@ export function CommandPalette() {
     }
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [searchOpen, closePalette]);
+  }, [searchOpen, closePalette, panelCount]);
 
   // Keyboard navigation within the palette
   const handleKeyDown = useCallback(

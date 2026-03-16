@@ -21,7 +21,8 @@ import type { AppPanelId } from '../../types/index.js';
 import { NodePanel } from './NodePanel';
 import { AppPanel } from './AppPanel';
 import { Breadcrumb } from './Breadcrumb';
-import { ChevronDown, Search, Sparkles, X } from '../../lib/icons.js';
+import { ChevronDown, Sparkles, X } from '../../lib/icons.js';
+import { DeskLanding } from './DeskLanding';
 
 const ChatPanel = lazy(async () => ({
   default: (await import('../chat/ChatPanel')).ChatPanel,
@@ -93,20 +94,13 @@ export function PanelLayout({ toolbar }: PanelLayoutProps) {
     closePanel(panelId);
   }, [closePanel]);
 
-  const openSearch = useUIStore((s) => s.openSearch);
-
   if (panels.length === 0) {
     return (
-      <div ref={containerRef} className="flex flex-1 items-center justify-center">
-        <button
-          type="button"
-          onClick={openSearch}
-          className="flex w-full max-w-xs items-center gap-2.5 rounded-xl bg-background px-4 py-3 text-sm text-foreground-tertiary shadow-card transition-colors hover:text-foreground"
-        >
-          <Search size={15} strokeWidth={1.6} className="shrink-0" />
-          <span className="flex-1 text-left">Search or jump to…</span>
-          <kbd className="shrink-0 rounded-md bg-foreground/6 px-1.5 py-0.5 font-mono text-xs text-foreground-tertiary">⌘K</kbd>
-        </button>
+      <div ref={containerRef} className="flex flex-1 flex-col overflow-hidden">
+        <div className="flex shrink-0 justify-end">
+          {toolbar}
+        </div>
+        <DeskLanding />
       </div>
     );
   }

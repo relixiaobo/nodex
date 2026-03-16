@@ -618,20 +618,27 @@
   padding: 0.125rem 0.25rem;
 }
 
-/* Code block container */
+/* Code block container — max-height with internal scroll.
+   overflow-x on <pre> (horizontal code scroll), overflow-y here (vertical). */
 .chat-code-block {
   border: 1px solid var(--color-border);
   border-radius: 0.5rem;
-  overflow: hidden;
+  overflow: hidden auto;
+  max-height: 400px;
   background: var(--color-muted);
 }
 
+/* Sticky header: stays visible when scrolling long code blocks */
 .chat-code-header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 4px 8px 4px 12px;
   border-bottom: 1px solid var(--color-border-subtle);
+  background: var(--color-muted);
 }
 
 .chat-code-lang {

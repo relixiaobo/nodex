@@ -3,6 +3,7 @@ import type { AgentMessage } from '@mariozechner/pi-agent-core';
 import { deleteDB } from 'idb';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { getLinearPath, linearToTree, type ChatSession } from '../../src/lib/ai-chat-tree.js';
+import { IMAGE_PLACEHOLDER } from '../../src/lib/ai-message-images.js';
 import {
   deleteChatSession,
   getChatDebugTurns,
@@ -303,7 +304,7 @@ describe('ai persistence', () => {
         toolCallId: 'call_1',
         toolName: 'browser',
         content: [
-          { type: 'text', text: '[Image removed from storage]' },
+          { type: 'text', text: IMAGE_PLACEHOLDER },
           { type: 'text', text: 'details' },
         ],
         isError: false,
@@ -331,7 +332,7 @@ describe('ai persistence', () => {
         role: 'user',
         content: [
           { type: 'text', text: 'prompt' },
-          { type: 'text', text: '[Image removed from storage]' },
+          { type: 'text', text: IMAGE_PLACEHOLDER },
         ],
         timestamp: 1,
       },

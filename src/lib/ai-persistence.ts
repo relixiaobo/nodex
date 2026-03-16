@@ -3,7 +3,7 @@ import { openDB, type DBSchema, type IDBPDatabase, type IDBPTransaction, unwrap 
 import { linearToTree } from './ai-chat-tree.js';
 import type { BridgeEntry, ChatSession, MessageNode } from './ai-chat-tree.js';
 import type { ChatTurnDebugRecord } from './ai-debug.js';
-import { messageHasImage, replaceMessageImages } from './ai-message-images.js';
+import { IMAGE_PLACEHOLDER, messageHasImage, replaceMessageImages } from './ai-message-images.js';
 
 const DB_NAME = 'soma-ai-chat';
 const DB_VERSION = 3;
@@ -205,7 +205,7 @@ async function getDB(): Promise<IDBPDatabase<ChatPersistenceDB>> {
 
 function stripMessageImagesForPersistence(message: AgentMessage): AgentMessage {
   if (!messageHasImage(message)) return message;
-  return replaceMessageImages(message, () => '[Image removed from storage]');
+  return replaceMessageImages(message, () => IMAGE_PLACEHOLDER);
 }
 
 function stripMappingImagesForPersistence(mapping: Record<string, MessageNode>): Record<string, MessageNode> {

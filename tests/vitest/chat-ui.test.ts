@@ -86,7 +86,7 @@ describe('chat ui', () => {
     })).toBe(false);
   });
 
-  it('renders user toolbar on hover and assistant toolbar only on the last message in a turn', () => {
+  it('renders user toolbar on hover and assistant toolbar always visible', () => {
     const userHtml = renderToStaticMarkup(
       React.createElement(ChatMessage, {
         entry: {
@@ -101,6 +101,7 @@ describe('chat ui', () => {
       }),
     );
 
+    // User toolbar: hover-to-show, right-aligned
     expect(userHtml).toContain('data-testid="chat-message-toolbar"');
     expect(userHtml).toContain('group/message');
     expect(userHtml).toContain('opacity-0');
@@ -125,10 +126,12 @@ describe('chat ui', () => {
       }),
     );
 
+    // Assistant toolbar: always visible, left-aligned (isLastInTurn defaults to true)
     expect(assistantHtml).toContain('data-testid="chat-message-toolbar"');
     expect(assistantHtml).toContain('justify-start');
     expect(assistantHtml).not.toContain('opacity-0');
 
+    // Mid-turn assistant messages (isLastInTurn=false) hide toolbar
     const midTurnHtml = renderToStaticMarkup(
       React.createElement(ChatMessage, {
         entry: {
@@ -148,7 +151,6 @@ describe('chat ui', () => {
         isLastInTurn: false,
       }),
     );
-
     expect(midTurnHtml).not.toContain('data-testid="chat-message-toolbar"');
   });
 

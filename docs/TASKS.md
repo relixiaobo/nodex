@@ -23,13 +23,13 @@ _(空)_
 | 工作区 | 分支 | 任务 | 状态 |
 |--------|------|------|------|
 | nodex-gemini | — | 空闲 | — |
-| nodex-codex | codex/chat-as-panel | ✅ Chat as Panel — 统一面板系统 | merged #144 |
+| nodex-codex | codex/multi-provider-settings | 多 Provider AI 设置 + Composer Model 选择器 | Draft #145 |
 
 ---
 
 ## 进行中
 
-_(空)_
+- [ ] **多 Provider AI 设置** (#145, Codex) — Settings 节点多 provider 配置 + Composer model 选择器 + 迁移旧设置
 
 ---
 
@@ -127,6 +127,7 @@ _(空)_
 - [x] Chat Phase 1B — 集成 + IndexedDB 迁移 + 事件驱动持久化（`ai-persistence.ts` 重写 + `ai-service.ts` + `use-agent.ts`）(#139, Codex)
 - [x] Chat Phase 2 — 编辑消息 + 重新生成 + 分支导航 UI（`← 2/3 →` 箭头）(#141, Codex)
 - [x] Chat Phase 3 — Context 自动压缩（Bridge Message + Handoff Memo）(#140, Codex)
+- [x] **截图工具结果修复** — 占位符统一为 `IMAGE_PLACEHOLDER` 常量（模型可理解的文案），ToolCallBlock UI 检测占位符显示图片图标而非原始文本
 - [ ] Chat 持久化 Phase 4 — 跨设备同步完整原始对话历史（Sync API + D1/R2）
 
 **Track B: 阅读环** — 设计：`phase-2-reading-ring.md`

@@ -1,5 +1,5 @@
 import type { AgentMessage } from '@mariozechner/pi-agent-core';
-import { messageHasImage, replaceMessageImages } from './ai-message-images.js';
+import { IMAGE_PLACEHOLDER, messageHasImage, replaceMessageImages } from './ai-message-images.js';
 import * as loroDoc from './loro-doc.js';
 import { getAncestorChain } from './tree-utils.js';
 import { isOutlinerContentNodeType } from './node-type-utils.js';
@@ -129,7 +129,7 @@ export function stripOldImages(messages: AgentMessage[]): AgentMessage[] {
 
     const strippedMessage = replaceMessageImages(
       message,
-      (image) => `[Image removed from context: ${image.mimeType}]`,
+      () => IMAGE_PLACEHOLDER,
     );
 
     if (strippedMessage === message) continue;

@@ -56,18 +56,35 @@ function readBooleanFieldValue(nodeId: string, fieldDefId: string): boolean {
   return readTextFieldValue(nodeId, fieldDefId) === SYS_V.YES;
 }
 
-function getPreferredProviderConfigs(configs: ProviderConfig[]): ProviderConfig[] {
-  const seenProviders = new Set<string>();
-  const result: ProviderConfig[] = [];
+function getProviderConfigPriority(config: ProviderConfig): number {
+  if (config.enabled && config.apiKey.length > 0) return 2;
+  if (config.enabled) return 1;
+  return 0;
+}
+
+function getCanonicalProviderConfigs(configs: ProviderConfig[]): ProviderConfig[] {
+  const result = new Map<string, ProviderConfig>();
 
   for (const config of configs) {
     const provider = normalizeProviderId(config.provider);
-    if (!provider || seenProviders.has(provider)) continue;
-    seenProviders.add(provider);
-    result.push(config);
+    if (!provider) continue;
+
+    const existing = result.get(provider);
+    if (!existing || getProviderConfigPriority(config) > getProviderConfigPriority(existing)) {
+      result.set(provider, config);
+    }
   }
 
-  return result;
+  return [...result.values()];
+}
+
+function getCanonicalProviderConfig(provider: string): ProviderConfig | null {
+  const normalizedProvider = normalizeProviderId(provider);
+  if (!normalizedProvider) return null;
+
+  return getCanonicalProviderConfigs(getProviderConfigs()).find(
+    (candidate) => normalizeProviderId(candidate.provider) === normalizedProvider,
+  ) ?? null;
 }
 
 export function findProviderOptionNodeId(provider: string): string | null {
@@ -123,26 +140,20 @@ export function getProviderConfigs(): ProviderConfig[] {
 }
 
 export function getEnabledProviderConfigs(): ProviderConfig[] {
-  return getPreferredProviderConfigs(
-    getProviderConfigs().filter((config) => config.enabled && config.apiKey.length > 0),
-  );
+  return getCanonicalProviderConfigs(getProviderConfigs())
+    .filter((config) => config.enabled && config.apiKey.length > 0);
 }
 
 export function getApiKeyForProvider(provider: string): string | null {
-  const normalizedProvider = normalizeProviderId(provider);
-  if (!normalizedProvider) return null;
-
-  const config = getEnabledProviderConfigs().find(
-    (candidate) => normalizeProviderId(candidate.provider) === normalizedProvider,
-  );
-  return config?.apiKey ?? null;
+  const config = getCanonicalProviderConfig(provider);
+  if (!config?.enabled || config.apiKey.length === 0) return null;
+  return config.apiKey;
 }
 
 export function getAvailableModels(): Model<Api>[] {
   const knownProviders = new Set(getProviders().map((provider) => normalizeProviderId(provider)));
-  const enabledConfigs = getPreferredProviderConfigs(
-    getProviderConfigs().filter((config) => config.enabled),
-  );
+  const enabledConfigs = getCanonicalProviderConfigs(getProviderConfigs())
+    .filter((config) => config.enabled);
 
   return enabledConfigs.flatMap((config) => {
     const provider = normalizeProviderId(config.provider);
@@ -157,5 +168,6 @@ export function getAvailableModels(): Model<Api>[] {
 }
 
 export function hasAnyEnabledProvider(): boolean {
-  return getEnabledProviderConfigs().length > 0;
+  return getCanonicalProviderConfigs(getProviderConfigs())
+    .some((config) => config.enabled && config.apiKey.length > 0);
 }

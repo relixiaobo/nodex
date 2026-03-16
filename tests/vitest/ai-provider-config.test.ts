@@ -142,6 +142,39 @@ describe('ai-provider-config', () => {
     expect(getApiKeyForProvider('groq')).toBeNull();
   });
 
+  it('uses one canonical config per provider for models, baseUrl, and api key', () => {
+    seedProviderConfig({
+      provider: 'openai',
+      enabled: true,
+      apiKey: '',
+      baseUrl: 'https://stale-openai.example/v1',
+      name: 'OpenAI Stale',
+    });
+    seedProviderConfig({
+      provider: 'openai',
+      enabled: true,
+      apiKey: 'sk-openai-primary',
+      baseUrl: 'https://primary-openai.example/v1',
+      name: 'OpenAI Primary',
+    });
+
+    const enabledConfigs = getEnabledProviderConfigs();
+    const availableModels = getAvailableModels();
+
+    expect(enabledConfigs).toEqual([
+      expect.objectContaining({
+        provider: 'openai',
+        apiKey: 'sk-openai-primary',
+        baseUrl: 'https://primary-openai.example/v1',
+      }),
+    ]);
+    expect(getApiKeyForProvider('openai')).toBe('sk-openai-primary');
+    expect(
+      availableModels.find((model) => model.provider === 'openai' && model.id === 'gpt-4o')?.baseUrl,
+    ).toBe('https://primary-openai.example/v1');
+    expect(hasAnyEnabledProvider()).toBe(true);
+  });
+
   it('getAvailableModels aggregates enabled provider models and applies baseUrl overrides', () => {
     seedProviderConfig({
       provider: 'anthropic',

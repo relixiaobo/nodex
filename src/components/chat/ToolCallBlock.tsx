@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { ToolCall, ToolResultMessage } from '@mariozechner/pi-ai';
 import type { AppIcon } from '../../lib/icons.js';
 import { IMAGE_PLACEHOLDER } from '../../lib/ai-message-images.js';
+import { highlightCode } from '../../lib/code-highlight.js';
 import { ChevronDown, FileText, Globe, Image, Pencil, Plus, RotateCcw, Search, Sparkles, Trash2 } from '../../lib/icons.js';
 
 interface ToolCallBlockProps {
@@ -103,9 +104,18 @@ function getResultParts(result: ToolResultMessage): ResultPart[] {
     );
 }
 
+const CODE_BLOCK = 'max-h-48 overflow-auto whitespace-pre text-[11px] leading-5';
+
 export function ToolCallBlock({ toolCall, result }: ToolCallBlockProps) {
   const [expanded, setExpanded] = useState(false);
   const Icon = getToolIcon(toolCall.name, toolCall.arguments);
+
+  const inputHtml = useMemo(
+    () => expanded ? highlightCode(JSON.stringify(toolCall.arguments, null, 2), 'json') : '',
+    [expanded, toolCall.arguments],
+  );
+
+  const parts = useMemo(() => result && expanded ? getResultParts(result) : [], [result, expanded]);
 
   return (
     <div className="max-w-full">
@@ -133,9 +143,10 @@ export function ToolCallBlock({ toolCall, result }: ToolCallBlockProps) {
         <div className="ml-5 mt-1 overflow-hidden rounded-lg border border-border/60 bg-foreground/[0.02]">
           <div className="px-3 py-2">
             <div className="mb-1 text-[10px] font-medium uppercase tracking-[0.06em] text-foreground-tertiary">Input</div>
-            <pre className="overflow-x-auto whitespace-pre-wrap break-all text-[11px] leading-5 text-foreground-secondary">
-              {JSON.stringify(toolCall.arguments, null, 2)}
-            </pre>
+            <pre
+              className={`${CODE_BLOCK} text-foreground-secondary`}
+              dangerouslySetInnerHTML={{ __html: inputHtml }}
+            />
           </div>
           {result && (
             <div className="border-t border-border/50 px-3 py-2">
@@ -143,16 +154,14 @@ export function ToolCallBlock({ toolCall, result }: ToolCallBlockProps) {
                 Output
                 {result.isError && <span className="ml-1.5 text-destructive">error</span>}
               </div>
-              {getResultParts(result).map((part, i) =>
+              {parts.map((part, i) =>
                 part.type === 'image_placeholder' ? (
                   <div key={i} className="flex items-center gap-1.5 py-1 text-[11px] text-foreground-tertiary">
                     <Image size={14} strokeWidth={1.6} className="shrink-0" />
                     <span>Screenshot captured</span>
                   </div>
                 ) : (
-                  <pre key={i} className={`overflow-x-auto whitespace-pre-wrap break-all text-[11px] leading-5 ${result.isError ? 'text-destructive' : 'text-foreground-secondary'}`}>
-                    {part.text}
-                  </pre>
+                  <HighlightedPre key={i} text={part.text} isError={result.isError} />
                 ),
               )}
             </div>
@@ -160,5 +169,15 @@ export function ToolCallBlock({ toolCall, result }: ToolCallBlockProps) {
         </div>
       )}
     </div>
+  );
+}
+
+function HighlightedPre({ text, isError }: { text: string; isError: boolean }) {
+  const html = useMemo(() => highlightCode(text), [text]);
+  return (
+    <pre
+      className={`${CODE_BLOCK} ${isError ? 'text-destructive' : 'text-foreground-secondary'}`}
+      dangerouslySetInnerHTML={{ __html: html }}
+    />
   );
 }

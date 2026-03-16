@@ -127,6 +127,7 @@ _(空)_
 - [x] Chat Phase 1B — 集成 + IndexedDB 迁移 + 事件驱动持久化（`ai-persistence.ts` 重写 + `ai-service.ts` + `use-agent.ts`）(#139, Codex)
 - [x] Chat Phase 2 — 编辑消息 + 重新生成 + 分支导航 UI（`← 2/3 →` 箭头）(#141, Codex)
 - [x] Chat Phase 3 — Context 自动压缩（Bridge Message + Handoff Memo）(#140, Codex)
+- [ ] **截图工具结果修复** — 截图 base64 持久化后被替换为 `[Image removed from storage]` 并原样发送给模型。修复方向：(1) 统一占位符为模型可理解的文案 `[Screenshot captured; image no longer available]`；(2) ToolCallBlock UI 检测图片占位符显示友好图标而非原始文本；(3) 未来考虑将截图 blob 存入独立 IndexedDB store 并按 imageId 引用，允许 UI 回显缩略图
 - [ ] Chat 持久化 Phase 4 — 跨设备同步完整原始对话历史（Sync API + D1/R2）
 
 **Track B: 阅读环** — 设计：`phase-2-reading-ring.md`

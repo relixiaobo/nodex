@@ -1,6 +1,6 @@
 import { Agent, type AgentEvent, type AgentMessage } from '@mariozechner/pi-agent-core';
 import { getModel, isContextOverflow } from '@mariozechner/pi-ai';
-import type { AssistantMessage, Message, Model, StopReason, ToolResultMessage } from '@mariozechner/pi-ai';
+import type { AssistantMessage, Message, Model, StopReason, ThinkingLevel, ToolResultMessage } from '@mariozechner/pi-ai';
 import { nanoid } from 'nanoid';
 import { getStoredToken } from './auth.js';
 import { buildAgentSystemPrompt, DEFAULT_AGENT_MODEL_ID, DEFAULT_AGENT_MAX_TOKENS, DEFAULT_AGENT_SYSTEM_PROMPT, DEFAULT_AGENT_TEMPERATURE, readAgentNodeConfig, type AgentNodeConfig } from './ai-agent-node.js';
@@ -44,6 +44,7 @@ interface AgentRuntimeState {
   restorePromise: Promise<void> | null;
   temperature: number;
   maxTokens: number;
+  thinkingLevel: ThinkingLevel | null;
   activeDebugTurnId: string | null;
 }
 
@@ -104,6 +105,7 @@ function getAgentRuntimeState(agent: Agent): AgentRuntimeState {
       restorePromise: null,
       temperature: DEFAULT_AGENT_TEMPERATURE,
       maxTokens: DEFAULT_AGENT_MAX_TOKENS,
+      thinkingLevel: null,
       activeDebugTurnId: null,
     };
     agentRuntimeState.set(agent, state);
@@ -265,10 +267,35 @@ export async function selectChatModel(
     throw new Error(`Model ${provider}/${modelId} is not available.`);
   }
 
+  if (!resolvedModel.reasoning) {
+    runtime.thinkingLevel = null;
+    if (session) {
+      session.selectedThinkingLevel = null;
+    }
+  }
+
   const agentConfig = readAgentConfigSafely();
   applyAgentConfiguration(agent, session, agentConfig, resolvedModel);
   await persistChatSession(agent);
   return resolvedModel;
+}
+
+export async function selectThinkingLevel(
+  level: ThinkingLevel | null,
+  agent: Agent = getAIAgent(),
+): Promise<void> {
+  const runtime = getAgentRuntimeState(agent);
+  runtime.thinkingLevel = level;
+
+  const session = runtime.currentSession;
+  if (session) {
+    session.selectedThinkingLevel = level;
+    await persistChatSession(agent);
+  }
+}
+
+export function getThinkingLevel(agent: Agent = getAIAgent()): ThinkingLevel | null {
+  return getAgentRuntimeState(agent).thinkingLevel;
 }
 
 function isLlmCompatibleMessage(message: AgentMessage): message is Message {
@@ -301,6 +328,7 @@ function setCurrentSession(agent: Agent, session: ChatSession): ChatSession {
   runtime.currentSession = session;
   runtime.debugTurns = [];
   runtime.createdAt = session.createdAt;
+  runtime.thinkingLevel = session.selectedThinkingLevel ?? null;
   runtime.activeDebugTurnId = null;
   agent.sessionId = session.id;
   return session;
@@ -595,6 +623,7 @@ export function createAgent(model: Model<any> = DEFAULT_CHAT_MODEL): Agent {
         apiKey: resolvedApiKey,
         temperature: options.temperature ?? runtime.temperature,
         maxTokens: options.maxTokens ?? runtime.maxTokens,
+        reasoning: options.reasoning ?? runtime.thinkingLevel ?? undefined,
         authToken,
         proxyUrl: getSyncApiUrl(),
         onRequestBody: debugEnabled

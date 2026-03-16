@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import type { AgentDebugState } from '../../hooks/use-agent.js';
 import { useChatDebugSnapshot } from '../../hooks/use-chat-debug-snapshot.js';
 import type { AgentDebugSnapshot, ChatTurnDebugRecord } from '../../lib/ai-debug.js';
+import { highlightCode } from '../../lib/code-highlight.js';
 import { ChevronDown } from '../../lib/icons.js';
 
 type SectionKey = 'turns' | 'system' | 'context' | 'messages' | 'tools' | 'tokens';
@@ -115,11 +116,26 @@ function DebugSection({
   );
 }
 
-function DebugCodeBlock({ children }: { children: React.ReactNode }) {
+const DEBUG_CODE = 'max-h-96 overflow-auto whitespace-pre font-mono text-[10px] leading-4 text-foreground-secondary';
+const DEBUG_CODE_CARD = `${DEBUG_CODE} rounded-xl border border-border/80 bg-background px-2.5 py-2`;
+
+function DebugCodeBlock({ text, language }: { text: string; language?: string }) {
+  const html = useMemo(() => highlightCode(text, language), [text, language]);
   return (
-    <pre className="overflow-x-auto whitespace-pre-wrap break-words rounded-xl border border-border/80 bg-background px-2.5 py-2 font-mono text-[10px] leading-4 text-foreground-secondary">
-      {children}
-    </pre>
+    <pre
+      className={DEBUG_CODE_CARD}
+      dangerouslySetInnerHTML={{ __html: html }}
+    />
+  );
+}
+
+function HighlightedDebugPre({ text, language }: { text: string; language?: string }) {
+  const html = useMemo(() => highlightCode(text, language), [text, language]);
+  return (
+    <pre
+      className={DEBUG_CODE}
+      dangerouslySetInnerHTML={{ __html: html }}
+    />
   );
 }
 
@@ -214,7 +230,7 @@ function TurnLogCard({
                   <span>{formatTokenCount(turn.request.tokenEstimate.total)}</span>
                 </div>
               </div>
-              <DebugCodeBlock>{turn.request.json}</DebugCodeBlock>
+              <DebugCodeBlock text={turn.request.json} language="json" />
             </div>
           </DebugSection>
 
@@ -253,7 +269,7 @@ function TurnLogCard({
                   </div>
                 </div>
               )}
-              <DebugCodeBlock>{turn.response.json}</DebugCodeBlock>
+              <DebugCodeBlock text={turn.response.json} language="json" />
             </div>
           </DebugSection>
         </div>
@@ -369,9 +385,7 @@ export function ChatDebugPanel({ debug }: ChatDebugPanelProps) {
             open={expandedSections.system}
             onToggle={() => toggleSection('system')}
           >
-            <pre className="overflow-x-auto whitespace-pre-wrap break-words font-mono text-[10px] leading-4 text-foreground-secondary">
-              {snapshot.systemPrompt || '(empty)'}
-            </pre>
+            <HighlightedDebugPre text={snapshot.systemPrompt || '(empty)'} />
           </DebugSection>
 
           <DebugSection
@@ -385,7 +399,7 @@ export function ChatDebugPanel({ debug }: ChatDebugPanelProps) {
                 snapshot.reminder.pageContext ?? sectionPlaceholder('page-context'),
                 snapshot.reminder.timeContext ?? sectionPlaceholder('time-context'),
               ].map((block, index) => (
-                <DebugCodeBlock key={`${index}-${block.slice(0, 24)}`}>{block}</DebugCodeBlock>
+                <DebugCodeBlock key={`${index}-${block.slice(0, 24)}`} text={block} language="xml" />
               ))}
             </div>
           </DebugSection>
@@ -426,9 +440,7 @@ export function ChatDebugPanel({ debug }: ChatDebugPanelProps) {
                     </button>
                     {expandedMessages[message.id] && (
                       <div className="border-t border-border/80 px-2.5 py-2">
-                        <pre className="overflow-x-auto whitespace-pre-wrap break-words font-mono text-[10px] leading-4 text-foreground-secondary">
-                          {message.json}
-                        </pre>
+                        <HighlightedDebugPre text={message.json} language="json" />
                       </div>
                     )}
                   </div>
@@ -468,9 +480,7 @@ export function ChatDebugPanel({ debug }: ChatDebugPanelProps) {
                     </button>
                     {expandedTools[tool.id] && (
                       <div className="border-t border-border/80 px-2.5 py-2">
-                        <pre className="overflow-x-auto whitespace-pre-wrap break-words font-mono text-[10px] leading-4 text-foreground-secondary">
-                          {tool.schema}
-                        </pre>
+                        <HighlightedDebugPre text={tool.schema} language="json" />
                       </div>
                     )}
                   </div>

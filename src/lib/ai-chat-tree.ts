@@ -1,4 +1,5 @@
 import type { AgentMessage } from '@mariozechner/pi-agent-core';
+import type { ThinkingLevel } from '@mariozechner/pi-ai';
 import { nanoid } from 'nanoid';
 
 export interface BridgeEntry {
@@ -23,6 +24,7 @@ export interface ChatSession {
   currentNode: string;
   selectedModelId?: string;
   selectedProvider?: string;
+  selectedThinkingLevel?: ThinkingLevel | null;
   createdAt: number;
   updatedAt: number;
   syncedAt: number | null;

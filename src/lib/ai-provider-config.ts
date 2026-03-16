@@ -4,6 +4,39 @@ import { NDX_F, NDX_T, SYS_V } from '../types/index.js';
 import * as loroDoc from './loro-doc.js';
 import { SYSTEM_SCHEMA_NODE_IDS } from './system-schema-presets.js';
 
+// ---------------------------------------------------------------------------
+// Featured models — shown prominently in the model selector
+// ---------------------------------------------------------------------------
+
+const FEATURED_MODELS: Record<string, { id: string; description: string }[]> = {
+  anthropic: [
+    { id: 'claude-sonnet-4-6', description: 'Fast and efficient' },
+    { id: 'claude-opus-4-6', description: 'Most capable' },
+  ],
+  openai: [
+    { id: 'gpt-5.4', description: 'Latest GPT' },
+    { id: 'gpt-5.4-codex', description: 'Code-optimized' },
+  ],
+  google: [
+    { id: 'gemini-2.5-flash', description: 'Fast and free' },
+    { id: 'gemini-2.5-pro', description: 'Most capable' },
+  ],
+  xai: [
+    { id: 'grok-4', description: 'Latest Grok' },
+  ],
+  mistral: [
+    { id: 'mistral-large-latest', description: 'Most capable' },
+  ],
+};
+
+export interface AvailableModel {
+  id: string;
+  name: string;
+  provider: string;
+  reasoning: boolean;
+  featured: boolean;
+}
+
 export interface ProviderConfig {
   provider: string;
   enabled: boolean;
@@ -170,4 +203,18 @@ export function getAvailableModels(): Model<Api>[] {
 export function hasAnyEnabledProvider(): boolean {
   return getCanonicalProviderConfigs(getProviderConfigs())
     .some((config) => config.enabled && config.apiKey.length > 0);
+}
+
+export function getAvailableModelsWithMeta(): AvailableModel[] {
+  return getAvailableModels().map((model) => {
+    const featured = FEATURED_MODELS[normalizeProviderId(model.provider)];
+    const entry = featured?.find((f) => f.id === model.id);
+    return {
+      id: model.id,
+      name: model.name,
+      provider: model.provider,
+      reasoning: model.reasoning,
+      featured: !!entry,
+    };
+  });
 }

@@ -3,8 +3,7 @@ import type { AssistantMessage, ToolResultMessage } from '@mariozechner/pi-ai';
 import { toast } from 'sonner';
 import type { ChatConversationMessage, ChatMessageEntry } from '../../hooks/use-agent.js';
 import { Brain, Check, ChevronDown, ChevronLeft, ChevronRight, Copy, Pencil, RefreshCw } from '../../lib/icons.js';
-import { CitationBadge } from './CitationBadge.js';
-import { NodeReference } from './NodeReference.js';
+import { MarkdownContent } from './MarkdownRenderer.js';
 import { ToolCallBlock } from './ToolCallBlock.js';
 
 interface ChatMessageProps {
@@ -22,7 +21,6 @@ interface ChatMessageProps {
   onCopy?: (text: string) => void | Promise<void>;
 }
 
-const INLINE_MARKUP_PATTERN = /<(ref|cite)\s+id="([^"]+)">([\s\S]*?)<\/\1>/g;
 const ACTION_BUTTON = 'inline-flex h-7 w-7 items-center justify-center rounded-lg text-foreground-tertiary transition-colors hover:bg-foreground/4 hover:text-foreground focus-visible:bg-foreground/4 focus-visible:text-foreground disabled:cursor-not-allowed disabled:text-foreground-tertiary/40 disabled:hover:bg-transparent disabled:focus-visible:bg-transparent';
 const SECONDARY_BUTTON = 'inline-flex h-8 items-center rounded-full border border-border px-3 text-sm text-foreground-secondary transition-colors hover:bg-foreground/4 hover:text-foreground';
 
@@ -50,49 +48,6 @@ function getMessageText(message: ChatConversationMessage): string {
   if (textContent) return textContent;
   if (message.stopReason === 'aborted') return '';
   return message.errorMessage ?? '';
-}
-
-function renderTextWithMarkup(text: string, keyPrefix: string): ReactNode[] {
-  const parts: ReactNode[] = [];
-  let cursor = 0;
-  let matchIndex = 0;
-  INLINE_MARKUP_PATTERN.lastIndex = 0;
-
-  let match = INLINE_MARKUP_PATTERN.exec(text);
-  while (match) {
-    const [fullMatch, kind, nodeId, content] = match;
-    const start = match.index;
-
-    if (start > cursor) {
-      parts.push(text.slice(cursor, start));
-    }
-
-    if (kind === 'ref') {
-      parts.push(
-        <NodeReference key={`${keyPrefix}-ref-${matchIndex}`} nodeId={nodeId}>
-          {content}
-        </NodeReference>,
-      );
-    } else {
-      parts.push(
-        <CitationBadge
-          key={`${keyPrefix}-cite-${matchIndex}`}
-          nodeId={nodeId}
-          label={content}
-        />,
-      );
-    }
-
-    cursor = start + fullMatch.length;
-    matchIndex += 1;
-    match = INLINE_MARKUP_PATTERN.exec(text);
-  }
-
-  if (cursor < text.length) {
-    parts.push(text.slice(cursor));
-  }
-
-  return parts;
 }
 
 function ThinkingBlock({ text, streaming }: { text: string; streaming: boolean }) {
@@ -153,17 +108,23 @@ function renderAssistantBlocks(message: AssistantMessage, streaming: boolean, to
     }
 
     const hasLaterText = message.content.slice(index + 1).some((candidate) => candidate.type === 'text');
+    const isError = message.errorMessage && message.stopReason !== 'aborted';
+
+    if (isError) {
+      return (
+        <div key={`text-${index}`} className="whitespace-pre-wrap text-base leading-6 text-destructive">
+          {block.text}
+        </div>
+      );
+    }
 
     return (
-      <div
+      <MarkdownContent
         key={`text-${index}`}
-        className={`whitespace-pre-wrap text-base leading-6 text-foreground ${message.errorMessage && message.stopReason !== 'aborted' ? 'text-destructive' : ''}`}
-      >
-        {renderTextWithMarkup(block.text, `assistant-${index}`)}
-        {streaming && !hasLaterText && (
-          <span className="ml-1 inline-block h-3 w-1.5 animate-pulse rounded-sm bg-primary align-[-2px]" />
-        )}
-      </div>
+        text={block.text}
+        streaming={streaming && !hasLaterText}
+        keyPrefix={`assistant-${index}`}
+      />
     );
   });
 }

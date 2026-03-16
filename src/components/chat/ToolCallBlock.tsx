@@ -85,7 +85,7 @@ function summarizeToolCall(toolCall: ToolCall): string {
   return name;
 }
 
-const IMAGE_PLACEHOLDER_RE = /^\[(?:Screenshot captured|Image removed)[^\]]*\]$/;
+const IMAGE_PLACEHOLDER_RE = /^\[(?:Screenshot was captured|Image removed)[^\]]*\]$/;
 
 function isImagePlaceholder(text: string): boolean {
   return IMAGE_PLACEHOLDER_RE.test(text.trim());

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowUp, Check, ChevronDown, Plus, Settings, Square } from '../../lib/icons.js';
+import { ArrowUp, Check, ChevronDown, Code2, Plus, Settings, Square } from '../../lib/icons.js';
 
 interface ChatInputModel {
   id: string;
@@ -13,9 +13,12 @@ interface ChatInputProps {
   error?: string;
   currentModel?: ChatInputModel;
   availableModels?: ChatInputModel[];
+  debugEnabled?: boolean;
+  debugOpen?: boolean;
   onSend(prompt: string): Promise<void>;
   onStop(): void;
   onOpenSettings?(): void;
+  onToggleDebug?(): void;
   onModelChange?(modelId: string, provider: string): void;
 }
 
@@ -25,9 +28,12 @@ export function ChatInput({
   error,
   currentModel,
   availableModels,
+  debugEnabled = false,
+  debugOpen = false,
   onSend,
   onStop,
   onOpenSettings,
+  onToggleDebug,
   onModelChange,
 }: ChatInputProps) {
   const [draft, setDraft] = useState('');
@@ -39,6 +45,11 @@ export function ChatInput({
   const inputDisabled = disabled || busy;
   const canSend = !inputDisabled && draft.trim().length > 0;
   const canSelectModel = !!onModelChange && (availableModels?.length ?? 0) > 0;
+  const debugMenuLabel = !debugEnabled
+    ? 'Enable AI Debug'
+    : debugOpen
+      ? 'Hide AI Debug'
+      : 'Show AI Debug';
 
   const modelGroups = useMemo(() => {
     const groups = new Map<string, ChatInputModel[]>();
@@ -126,6 +137,19 @@ export function ChatInput({
             </button>
             {menuOpen && (
               <div className="absolute bottom-full left-0 mb-1 min-w-[180px] rounded-lg border border-border bg-background p-1 shadow-paper">
+                {onToggleDebug && (
+                  <button
+                    type="button"
+                    className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[13px] text-foreground transition-colors hover:bg-foreground/4"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      onToggleDebug();
+                    }}
+                  >
+                    <Code2 size={14} strokeWidth={1.6} className="shrink-0 text-foreground-tertiary" />
+                    {debugMenuLabel}
+                  </button>
+                )}
                 {onOpenSettings && (
                   <button
                     type="button"

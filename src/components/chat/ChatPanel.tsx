@@ -63,6 +63,11 @@ export function ChatPanel({ panelId, sessionId, hideHeader }: ChatPanelProps) {
   const [debugOpen, setDebugOpen] = useState(false);
   const [pendingMessageActionId, setPendingMessageActionId] = useState<string | null>(null);
   const chatBusy = isStreaming || pendingMessageActionId !== null;
+  const debugActionLabel = !debugEnabled
+    ? 'Enable AI Debug'
+    : debugOpen
+      ? 'Hide AI Debug'
+      : 'Show AI Debug';
 
   const availableModels = useMemo(() => {
     void settingsVersion;
@@ -98,7 +103,7 @@ export function ChatPanel({ panelId, sessionId, hideHeader }: ChatPanelProps) {
 
     void readChatDebugEnabled().then((storedDebugEnabled) => {
       if (!cancelled) {
-        setDebugEnabled(storedDebugEnabled);
+        setDebugEnabled((current) => current || storedDebugEnabled);
       }
     });
 
@@ -192,6 +197,7 @@ export function ChatPanel({ panelId, sessionId, hideHeader }: ChatPanelProps) {
     if (debugTapCountRef.current >= 5) {
       debugTapCountRef.current = 0;
       setDebugEnabled(true);
+      setDebugOpen(true);
       toast.success('Debug mode enabled');
       void writeChatDebugEnabled(true);
       return;
@@ -204,6 +210,18 @@ export function ChatPanel({ panelId, sessionId, hideHeader }: ChatPanelProps) {
 
   function handleOpenSettings() {
     useUIStore.getState().openPanel(SYSTEM_NODE_IDS.SETTINGS);
+  }
+
+  function handleToggleDebug() {
+    if (!debugEnabled) {
+      setDebugEnabled(true);
+      setDebugOpen(true);
+      toast.success('AI Debug enabled');
+      void writeChatDebugEnabled(true);
+      return;
+    }
+
+    setDebugOpen((value) => !value);
   }
 
   async function handleModelChange(modelId: string, provider: string) {
@@ -228,10 +246,10 @@ export function ChatPanel({ panelId, sessionId, hideHeader }: ChatPanelProps) {
           </button>
         )}
         <div className="flex items-center gap-1">
-          {debugEnabled && hasEnabledProvider && (
+          {debugEnabled && (
             <button
               type="button"
-              onClick={() => setDebugOpen((value) => !value)}
+              onClick={handleToggleDebug}
               className={`inline-flex h-7 min-w-8 items-center justify-center rounded-full px-2 font-mono text-[11px] transition-colors ${
                 debugOpen
                   ? 'bg-foreground/8 text-foreground'
@@ -261,17 +279,33 @@ export function ChatPanel({ panelId, sessionId, hideHeader }: ChatPanelProps) {
           Loading chat…
         </div>
       ) : !hasEnabledProvider ? (
-        <div className="flex flex-1 flex-col items-center justify-center gap-4 px-6 text-center">
-          <div className="max-w-[260px] text-sm text-foreground-tertiary">
-            Configure an AI provider to start chatting
+        <div className="flex flex-1 flex-col justify-center gap-4 px-6">
+          {debugEnabled && debugOpen && (
+            <div className="mx-auto w-full max-w-[560px]">
+              <ChatDebugPanel debug={debug} />
+            </div>
+          )}
+          <div className="flex flex-col items-center gap-4 text-center">
+            <div className="max-w-[260px] text-sm text-foreground-tertiary">
+              Configure an AI provider to start chatting
+            </div>
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              <button
+                type="button"
+                onClick={handleOpenSettings}
+                className="inline-flex h-9 items-center rounded-full border border-border px-4 text-sm font-medium text-foreground transition-colors hover:bg-foreground/4"
+              >
+                Open Settings
+              </button>
+              <button
+                type="button"
+                onClick={handleToggleDebug}
+                className="inline-flex h-9 items-center rounded-full border border-border px-4 text-sm font-medium text-foreground-secondary transition-colors hover:bg-foreground/4 hover:text-foreground"
+              >
+                {debugActionLabel}
+              </button>
+            </div>
           </div>
-          <button
-            type="button"
-            onClick={handleOpenSettings}
-            className="inline-flex h-9 items-center rounded-full border border-border px-4 text-sm font-medium text-foreground transition-colors hover:bg-foreground/4"
-          >
-            Open Settings
-          </button>
         </div>
       ) : (
         <>
@@ -333,9 +367,12 @@ export function ChatPanel({ panelId, sessionId, hideHeader }: ChatPanelProps) {
             error={error}
             currentModel={currentModel}
             availableModels={availableModels}
+            debugEnabled={debugEnabled}
+            debugOpen={debugOpen}
             onSend={handleSendMessage}
             onStop={stopStreaming}
             onOpenSettings={handleOpenSettings}
+            onToggleDebug={handleToggleDebug}
             onModelChange={handleModelChange}
           />
         </>

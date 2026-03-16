@@ -7,6 +7,7 @@ import { flushSync } from 'react-dom';
 import { ChatInput } from '../../src/components/chat/ChatInput.js';
 import { ChatMessage } from '../../src/components/chat/ChatMessage.js';
 import { ChatPanel, shouldStickChatScroll } from '../../src/components/chat/ChatPanel.js';
+import { extractInlineMarkup, splitMarkdownBlocks } from '../../src/components/chat/MarkdownRenderer.js';
 import { DeskLayout } from '../../src/components/layout/DeskLayout.js';
 import { GlobalTools } from '../../src/components/toolbar/TopToolbar.js';
 import { resetChatPersistenceForTests } from '../../src/lib/ai-persistence.js';
@@ -154,8 +155,9 @@ describe('chat ui', () => {
     expect(midTurnHtml).not.toContain('data-testid="chat-message-toolbar"');
   });
 
-  it('uses text-base typography for chat body and composer', () => {
-    const messageHtml = renderToStaticMarkup(
+  it('renders assistant messages with chat-prose markdown and user messages with text-base', () => {
+    // User messages still use plain text
+    const userHtml = renderToStaticMarkup(
       React.createElement(ChatMessage, {
         entry: {
           nodeId: 'msg_1',
@@ -168,6 +170,32 @@ describe('chat ui', () => {
         },
       }),
     );
+    expect(userHtml).toContain('text-base leading-6 text-foreground');
+
+    // Assistant messages use chat-prose (markdown renderer)
+    const assistantHtml = renderToStaticMarkup(
+      React.createElement(ChatMessage, {
+        entry: {
+          nodeId: 'msg_2',
+          message: {
+            role: 'assistant',
+            content: [{ type: 'text', text: 'Hello **bold** and `code`' }],
+            api: 'anthropic-messages',
+            provider: 'anthropic',
+            model: 'test',
+            usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },
+            stopReason: 'stop',
+            timestamp: 2,
+          },
+          branches: null,
+        },
+      }),
+    );
+    expect(assistantHtml).toContain('chat-prose');
+    expect(assistantHtml).toContain('<strong>bold</strong>');
+    expect(assistantHtml).toContain('chat-inline-code');
+
+    // Composer still uses text-base
     const inputHtml = renderToStaticMarkup(
       React.createElement(ChatInput, {
         disabled: false,
@@ -175,9 +203,80 @@ describe('chat ui', () => {
         onStop: () => {},
       }),
     );
-
-    expect(messageHtml).toContain('text-base leading-6 text-foreground');
     expect(inputHtml).toContain('text-base leading-6 text-foreground');
+  });
+
+  it('renders code blocks with syntax highlighting', () => {
+    const html = renderToStaticMarkup(
+      React.createElement(ChatMessage, {
+        entry: {
+          nodeId: 'msg_code',
+          message: {
+            role: 'assistant',
+            content: [{ type: 'text', text: '```typescript\nconst x: number = 42;\n```' }],
+            api: 'anthropic-messages',
+            provider: 'anthropic',
+            model: 'test',
+            usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },
+            stopReason: 'stop',
+            timestamp: 2,
+          },
+          branches: null,
+        },
+      }),
+    );
+    expect(html).toContain('chat-code-block');
+    expect(html).toContain('code-block-pre');
+    expect(html).toContain('hljs-');
+  });
+
+  it('renders error messages as plain text without markdown', () => {
+    const html = renderToStaticMarkup(
+      React.createElement(ChatMessage, {
+        entry: {
+          nodeId: 'msg_err',
+          message: {
+            role: 'assistant',
+            content: [{ type: 'text', text: 'Something **went** wrong' }],
+            api: 'anthropic-messages',
+            provider: 'anthropic',
+            model: 'test',
+            usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },
+            stopReason: 'error',
+            errorMessage: 'API error',
+            timestamp: 2,
+          },
+          branches: null,
+        },
+      }),
+    );
+    expect(html).toContain('text-destructive');
+    expect(html).not.toContain('chat-prose');
+    expect(html).not.toContain('<strong>');
+  });
+
+  it('shows streaming cursor on the last text block', () => {
+    const html = renderToStaticMarkup(
+      React.createElement(ChatMessage, {
+        entry: {
+          nodeId: 'msg_stream',
+          message: {
+            role: 'assistant',
+            content: [{ type: 'text', text: 'Streaming response...' }],
+            api: 'anthropic-messages',
+            provider: 'anthropic',
+            model: 'test',
+            usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },
+            stopReason: 'stop',
+            timestamp: 2,
+          },
+          branches: null,
+        },
+        streaming: true,
+      }),
+    );
+    expect(html).toContain('animate-pulse');
+    expect(html).toContain('bg-primary');
   });
 
   it('keeps composer in working state without turning it into a stop action', () => {
@@ -382,5 +481,36 @@ describe('chat ui', () => {
     // Empty desk state renders DeskLanding with a search input (placeholder is an attribute, not text)
     expect(container.querySelector('input[placeholder]')).not.toBeNull();
     expect(container.textContent).not.toContain('Loading chat…');
+  });
+});
+
+describe('extractInlineMarkup', () => {
+  it('extracts ref and cite tags into placeholders', () => {
+    const input = 'See <ref id="n1">Node 1</ref> and <cite id="n2">2</cite> here.';
+    const { cleaned, placeholders } = extractInlineMarkup(input);
+    expect(cleaned).toBe('See %%SOMA_0%% and %%SOMA_1%% here.');
+    expect(placeholders).toHaveLength(2);
+    expect(placeholders[0]).toEqual({ kind: 'ref', nodeId: 'n1', content: 'Node 1' });
+    expect(placeholders[1]).toEqual({ kind: 'cite', nodeId: 'n2', content: '2' });
+  });
+
+  it('returns unchanged text when no inline markup is present', () => {
+    const input = 'Plain text with **bold** and `code`.';
+    const { cleaned, placeholders } = extractInlineMarkup(input);
+    expect(cleaned).toBe(input);
+    expect(placeholders).toHaveLength(0);
+  });
+});
+
+describe('splitMarkdownBlocks', () => {
+  it('splits a multi-block markdown string', () => {
+    const input = '# Title\n\nA paragraph.\n\n```js\ncode\n```\n';
+    const blocks = splitMarkdownBlocks(input);
+    expect(blocks.length).toBeGreaterThanOrEqual(3);
+    expect(blocks[0]).toContain('# Title');
+  });
+
+  it('returns a single block for empty input', () => {
+    expect(splitMarkdownBlocks('')).toEqual(['']);
   });
 });

@@ -63,3 +63,4 @@
 - 新增 Extended Thinking 支持：模型菜单内 toggle + Low/Med/High 等级选择，状态按会话持久化；思考过程以可折叠"Thinking…/Thought"块展示（streaming 时显示进行中，完成后切换为已完成）
 - Chat Debug 面板改为左右分栏：Chat 在左，Debug 在右，各自独立滚动
 - Debug 面板代码块支持语法高亮：System Prompt、Dynamic Context (XML)、Messages/Tools/Turn Log (JSON) 均使用 highlight.js 着色，限高可滚动
+- AI Chat Markdown 渲染：AI 回复现在支持完整 Markdown 格式——标题、粗体/斜体、代码块（语法高亮）、列表、GFM 表格、引用块、链接，并兼容 `<ref>`/`<cite>` 内联标记；流式输出时已完成的块不重渲染

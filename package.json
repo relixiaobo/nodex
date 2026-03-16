@@ -34,6 +34,7 @@
     "immer": "^10.1.1",
     "loro-crdt": "^1.10.6",
     "lucide-react": "^0.575.0",
+    "marked": "^17.0.4",
     "nanoid": "^5.1.6",
     "prosemirror-commands": "^1.7.1",
     "prosemirror-history": "^1.5.0",
@@ -43,6 +44,9 @@
     "prosemirror-view": "^1.41.6",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
+    "remend": "^1.2.2",
     "sonner": "^2.0.7",
     "vite-plugin-wasm": "^3.5.0",
     "zustand": "^5.0.3"

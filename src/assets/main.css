@@ -575,3 +575,173 @@
   background-color: var(--color-border);
   margin: 0.25rem 0;
 }
+
+/* ── Chat Markdown Prose ── */
+.chat-prose {
+  font-size: 15px;
+  line-height: 24px;
+  color: var(--color-foreground);
+}
+
+.chat-prose > * + * {
+  margin-top: 12px;
+}
+
+/* Headings */
+.chat-prose .chat-h1 {
+  font-size: 20px;
+  font-weight: 500;
+  line-height: 28px;
+}
+
+.chat-prose .chat-h2 {
+  font-size: 17px;
+  font-weight: 500;
+  line-height: 24px;
+}
+
+.chat-prose .chat-h3 {
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 24px;
+}
+
+/* Inline code */
+.chat-inline-code {
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  line-height: inherit;
+  background-color: var(--color-muted);
+  border-radius: 0.125rem;
+  padding: 0.125rem 0.25rem;
+}
+
+/* Code block container */
+.chat-code-block {
+  border-radius: 0.5rem;
+  overflow: hidden;
+  background: var(--color-muted);
+}
+
+.chat-code-header {
+  display: flex;
+  align-items: center;
+  padding: 4px 12px;
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.chat-code-lang {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 20px;
+  color: var(--color-foreground-tertiary);
+  text-transform: lowercase;
+}
+
+/* Lists */
+.chat-prose ul,
+.chat-prose ol {
+  padding-left: 24px;
+}
+
+.chat-prose li + li {
+  margin-top: 4px;
+}
+
+.chat-prose ul > li {
+  list-style-type: disc;
+}
+
+.chat-prose ol > li {
+  list-style-type: decimal;
+}
+
+/* Nested lists: tighter spacing, no extra top margin */
+.chat-prose li > ul,
+.chat-prose li > ol {
+  margin-top: 4px;
+}
+
+/* GFM task list: remove bullet, show checkbox */
+.chat-prose ul:has(> li > input[type="checkbox"]) {
+  list-style: none;
+  padding-left: 4px;
+}
+
+.chat-prose li > input[type="checkbox"] {
+  margin-right: 6px;
+  vertical-align: middle;
+}
+
+/* Tables */
+.chat-prose table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.chat-prose th,
+.chat-prose td {
+  border: 1px solid var(--color-border);
+  padding: 4px 8px;
+  text-align: left;
+}
+
+.chat-prose th {
+  font-weight: 500;
+  background: var(--color-muted);
+}
+
+.chat-prose tr:nth-child(even) {
+  background: rgba(0, 0, 0, 0.02);
+}
+
+/* Blockquote */
+.chat-prose blockquote {
+  border-left: 3px solid var(--color-border-emphasis);
+  padding-left: 12px;
+  color: var(--color-foreground-secondary);
+}
+
+/* Links */
+.chat-prose .chat-link {
+  color: var(--color-primary);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* Strong / em / del */
+.chat-prose strong {
+  font-weight: 600;
+}
+
+.chat-prose em {
+  font-style: italic;
+}
+
+.chat-prose del {
+  text-decoration: line-through;
+  opacity: 0.5;
+}
+
+/* Horizontal rule */
+.chat-prose hr {
+  border: none;
+  border-top: 1px solid var(--color-border);
+  margin: 12px 0;
+}
+
+/* Streaming cursor sits inline at the end of the last block */
+.chat-streaming-block {
+  display: inline;
+}
+
+.chat-streaming-block > *:first-child {
+  display: inline;
+}
+
+/* Paragraphs within streaming block should be inline */
+.chat-streaming-block p {
+  display: inline;
+}

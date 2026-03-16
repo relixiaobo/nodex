@@ -96,6 +96,7 @@ export {
   ListChecks,
   Mic,
   Scissors,
+  Square,
   SquareCheck,
 } from 'lucide-react';
 

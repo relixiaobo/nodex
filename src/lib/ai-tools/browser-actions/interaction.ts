@@ -14,6 +14,7 @@ import {
   assertBrowserResponseOk,
   clampAmount,
   imageResult,
+  mutationResult,
   requireNonEmptyString,
   requireSelectorOrDescription,
   sendBrowserMessage,
@@ -44,7 +45,7 @@ export async function handleClick(
     tabId: params.tabId,
   });
   assertBrowserResponseOk(result);
-  return textResult(result);
+  return mutationResult(result, params.tabId);
 }
 
 export async function handleType(
@@ -61,7 +62,7 @@ export async function handleType(
     tabId: params.tabId,
   });
   assertBrowserResponseOk(result);
-  return textResult(result);
+  return mutationResult(result, params.tabId);
 }
 
 export async function handleScroll(
@@ -76,7 +77,7 @@ export async function handleScroll(
     tabId: params.tabId,
   });
   assertBrowserResponseOk(result);
-  return textResult(result);
+  return mutationResult(result, params.tabId);
 }
 
 export async function handleNavigate(
@@ -89,7 +90,7 @@ export async function handleNavigate(
     tabId: params.tabId,
   });
   assertBrowserResponseOk(result);
-  return textResult(result);
+  return mutationResult(result, params.tabId);
 }
 
 export async function handleTab(
@@ -111,5 +112,5 @@ export async function handleTab(
     url: params.url?.trim(),
   });
   assertBrowserResponseOk(result);
-  return textResult(result);
+  return mutationResult(result, params.tabId);
 }

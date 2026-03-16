@@ -10,10 +10,10 @@ import {
 } from '../browser-messaging.js';
 import {
   assertBrowserResponseOk,
+  mutationResult,
   requireNonEmptyString,
   requireSelectorOrDescription,
   sendBrowserMessage,
-  textResult,
 } from './shared.js';
 
 export async function handleKey(
@@ -25,7 +25,7 @@ export async function handleKey(
     tabId: params.tabId,
   });
   assertBrowserResponseOk(result);
-  return textResult(result);
+  return mutationResult(result, params.tabId);
 }
 
 export async function handleFillForm(
@@ -42,7 +42,7 @@ export async function handleFillForm(
     tabId: params.tabId,
   });
   assertBrowserResponseOk(result);
-  return textResult(result);
+  return mutationResult(result, params.tabId);
 }
 
 export async function handleDrag(
@@ -74,7 +74,7 @@ export async function handleDrag(
     tabId: params.tabId,
   });
   assertBrowserResponseOk(result);
-  return textResult(result);
+  return mutationResult(result, params.tabId);
 }
 
 export async function handleWait(
@@ -95,7 +95,7 @@ export async function handleWait(
     tabId: params.tabId,
   });
   assertBrowserResponseOk(result);
-  return textResult(result);
+  return mutationResult(result, params.tabId);
 }
 
 export async function handleExecuteJs(
@@ -111,5 +111,5 @@ export async function handleExecuteJs(
     tabId: params.tabId,
   });
   assertBrowserResponseOk(result);
-  return textResult(result);
+  return mutationResult(result, params.tabId);
 }

@@ -23,13 +23,13 @@ _(空)_
 | 工作区 | 分支 | 任务 | 状态 |
 |--------|------|------|------|
 | nodex-gemini | — | 空闲 | — |
-| nodex-codex | codex/multi-provider-settings | 多 Provider AI 设置 + Composer Model 选择器 | Draft #145 |
+| nodex-codex | — | 空闲 | — |
 
 ---
 
 ## 进行中
 
-- [ ] **多 Provider AI 设置** (#145, Codex) — Settings 节点多 provider 配置 + Composer model 选择器 + 迁移旧设置
+_(空)_
 
 ---
 
@@ -193,6 +193,7 @@ _(空)_
 
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
+| 2026-03-16 | 多 Provider AI 设置 — Settings 多 provider 配置 + Composer model 选择器 + 旧设置迁移 + Chat Debug 增强 | codex | #145 |
 | 2026-03-15 | Chat as Panel — Chat 晋升为面板级，与 NodePanel 同层同权，Agent 注册表支持多 Chat 并排 | codex | #144 |
 | 2026-03-15 | Chat toggle + Notes dropdown — 窄屏全屏切换 + 下拉面板选择器 + ✦ 按钮 | codex | #143 |
 | 2026-03-15 | Chat Phase 1B — 集成 + IndexedDB 迁移 + 事件驱动持久化 | codex | #139 |

@@ -255,5 +255,5 @@ function BreadcrumbCurrentName({ nodeId }: { nodeId: string }) {
     return resolveBreadcrumbLabel(nodeId, clean);
   });
 
-  return <span className="truncate max-w-[100px] px-0.5 text-xs text-foreground">{name}</span>;
+  return <span className="truncate max-w-[100px] px-0.5 text-foreground">{name}</span>;
 }

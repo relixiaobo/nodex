@@ -139,7 +139,7 @@ export function PanelLayout({ toolbar }: PanelLayoutProps) {
               )}
               <button
                 type="button"
-                className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-foreground-tertiary hover:bg-foreground/8 hover:text-foreground"
+                className="flex h-5 w-5 mr-1 shrink-0 items-center justify-center rounded-md text-foreground-tertiary hover:bg-foreground/8 hover:text-foreground"
                 onClick={(e) => handleClosePanel(e, activePanel.id)}
                 title="Close panel"
               >
@@ -149,7 +149,7 @@ export function PanelLayout({ toolbar }: PanelLayoutProps) {
             {/* Hover zone 2: dropdown trigger */}
             <button
               type="button"
-              className="flex h-7 w-7 mr-0.5 shrink-0 items-center justify-center rounded-md text-foreground-tertiary hover:bg-foreground/8 hover:text-foreground"
+              className="flex h-7 w-7 mr-1 shrink-0 items-center justify-center rounded-md text-foreground-tertiary transition-colors hover:bg-foreground/8 hover:text-foreground"
               onClick={() => setNotesMenuOpen((open) => !open)}
               aria-haspopup="menu"
               aria-expanded={notesMenuOpen}

@@ -351,11 +351,7 @@ export function createChatTurnDebugRecord(args: {
     responseSummary: 'Waiting for response…',
     request: {
       json: stringifyDebugPayload({
-        model: {
-          id: args.model.id,
-          provider: args.model.provider,
-          api: args.model.api,
-        },
+        model: args.model,
         context: args.context,
         options: args.options,
       }),

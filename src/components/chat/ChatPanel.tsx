@@ -3,7 +3,7 @@ import { toast } from 'sonner';
 import { Sparkles, X } from '../../lib/icons.js';
 import { useAgent } from '../../hooks/use-agent.js';
 import { readChatDebugEnabled, writeChatDebugEnabled } from '../../lib/ai-debug.js';
-import { getAvailableModels, hasAnyEnabledProvider } from '../../lib/ai-provider-config.js';
+import { getAvailableModels } from '../../lib/ai-provider-config.js';
 import { getAgentForSession, selectChatModel } from '../../lib/ai-service.js';
 import { useNodeStore } from '../../stores/node-store.js';
 import { useUIStore } from '../../stores/ui-store.js';
@@ -73,11 +73,7 @@ export function ChatPanel({ panelId, sessionId, hideHeader }: ChatPanelProps) {
     void settingsVersion;
     return getAvailableModels();
   }, [settingsVersion]);
-
-  const hasEnabledProvider = useMemo(() => {
-    void settingsVersion;
-    return hasAnyEnabledProvider();
-  }, [settingsVersion]);
+  const hasAvailableModels = availableModels.length > 0;
 
   const currentModel = useMemo(() => {
     const selectedModel = availableModels.find(
@@ -126,7 +122,7 @@ export function ChatPanel({ panelId, sessionId, hideHeader }: ChatPanelProps) {
   }, [debugEnabled]);
 
   useEffect(() => {
-    if (!hasEnabledProvider) return;
+    if (!hasAvailableModels) return;
     const scroller = scrollRef.current;
     if (!scroller) return;
     if (!shouldStickToBottomRef.current) return;
@@ -135,17 +131,17 @@ export function ChatPanel({ panelId, sessionId, hideHeader }: ChatPanelProps) {
       scroller.scrollTop = scroller.scrollHeight;
       shouldStickToBottomRef.current = true;
     });
-  }, [messages, isStreaming, hasEnabledProvider]);
+  }, [messages, isStreaming, hasAvailableModels]);
 
   useEffect(() => {
     if (!isActive || !pendingChatPrompt || pendingChatPrompt.panelId !== panelId) return;
-    if (!hasEnabledProvider || chatBusy || !ready) return;
+    if (!hasAvailableModels || chatBusy || !ready) return;
 
     setPendingChatPrompt(null);
     void handleSendMessage(pendingChatPrompt.prompt);
   }, [
     chatBusy,
-    hasEnabledProvider,
+    hasAvailableModels,
     isActive,
     panelId,
     pendingChatPrompt,
@@ -185,7 +181,7 @@ export function ChatPanel({ panelId, sessionId, hideHeader }: ChatPanelProps) {
   }
 
   function handleHeaderTitleClick() {
-    if (hasEnabledProvider || debugEnabled) return;
+    if (hasAvailableModels || debugEnabled) return;
 
     debugTapCountRef.current += 1;
 
@@ -278,7 +274,7 @@ export function ChatPanel({ panelId, sessionId, hideHeader }: ChatPanelProps) {
         <div className="flex flex-1 items-center justify-center text-sm text-foreground-tertiary">
           Loading chat…
         </div>
-      ) : !hasEnabledProvider ? (
+      ) : !hasAvailableModels ? (
         <div className="flex flex-1 flex-col justify-center gap-4 px-6">
           {debugEnabled && debugOpen && (
             <div className="mx-auto w-full max-w-[560px]">

@@ -382,10 +382,21 @@ describe('ai-service', () => {
     );
 
     const turns = getCurrentDebugTurns(agent);
+    const requestPayload = JSON.parse(turns[0]?.request.json ?? '{}') as {
+      model?: Record<string, unknown>;
+      options?: Record<string, unknown>;
+    };
 
     expect(turns).toHaveLength(1);
     expect(turns[0]?.request.json).toContain('"systemPrompt": "Turn prompt"');
     expect(turns[0]?.request.json).toContain('"temperature": 0.3');
+    expect(requestPayload.model).toMatchObject({
+      id: 'claude-sonnet-4-5',
+      provider: 'anthropic',
+      api: 'anthropic-messages',
+      baseUrl: 'https://api.anthropic.com',
+    });
+    expect(requestPayload.options?.apiKey).toBe('[redacted]');
     expect(turns[0]?.request.json).not.toContain('"headers"');
     expect(turns[0]?.request.json).not.toContain('sk-ant-debug');
     expect(turns[0]?.request.json).not.toContain('auth-token');

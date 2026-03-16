@@ -10,7 +10,10 @@ import { ChatPanel, shouldStickChatScroll } from '../../src/components/chat/Chat
 import { DeskLayout } from '../../src/components/layout/DeskLayout.js';
 import { GlobalTools } from '../../src/components/toolbar/TopToolbar.js';
 import { resetChatPersistenceForTests } from '../../src/lib/ai-persistence.js';
+import { SYSTEM_SCHEMA_NODE_IDS } from '../../src/lib/system-schema-presets.js';
+import { useNodeStore } from '../../src/stores/node-store.js';
 import { useUIStore } from '../../src/stores/ui-store.js';
+import { NDX_F, SYS_V } from '../../src/types/index.js';
 import { resetAndSeed, resetStores } from './helpers/test-state.js';
 
 const DB_NAME = 'soma-ai-chat';
@@ -250,6 +253,30 @@ describe('chat ui', () => {
     await vi.waitFor(() => {
       expect(container.textContent).toContain('Chat Debug');
     });
+  });
+
+  it('keeps the chat composer visible when a provider is enabled without an API key', async () => {
+    resetAndSeed();
+    useNodeStore.getState().setFieldValue(
+      SYSTEM_SCHEMA_NODE_IDS.DEFAULT_AI_PROVIDER_NODE,
+      NDX_F.PROVIDER_ENABLED,
+      [SYS_V.YES],
+    );
+    useNodeStore.getState().setFieldValue(
+      SYSTEM_SCHEMA_NODE_IDS.DEFAULT_AI_PROVIDER_NODE,
+      NDX_F.PROVIDER_API_KEY,
+      [],
+    );
+
+    flushSync(() => {
+      root.render(React.createElement(ChatPanel, { panelId: 'chat-panel', sessionId: 'session-keyless-enabled' }));
+    });
+
+    await vi.waitFor(() => {
+      expect(container.textContent).toContain('Ask about your notes, clips, or the page you\'re reading.');
+    });
+
+    expect(container.textContent).not.toContain('Configure an AI provider to start chatting');
   });
 
   it('renders the global chat trigger as a non-toggle button', () => {

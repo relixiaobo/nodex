@@ -56,3 +56,6 @@
 - Chat 工具调用显示优化：去掉边框卡片改为轻量内联行（图标+摘要+展开），图标按工具类型区分（Plus/FileText/Pencil/Trash/Search/Globe/RotateCcw），摘要显示具体操作和对象
 - AI 工具错误传播修复：maxTokens 默认值从 4000 提升到 32k 避免模型输出截断；browser tool 空响应不再静默通过，改为抛出可操作的错误信息让模型自我修正
 - 截图工具结果修复：持久化/上下文剥离后的图片占位符统一为模型可理解的文案，ToolCallBlock 中显示图片图标而非原始占位文本
+- 工具调用展开区域支持语法高亮：Input（JSON）和 Output（自动检测语言）使用 highlight.js 着色，代码块限高 192px 可滚动
+- 语言检测改用结构启发式优先策略：JSON/HTML/SQL/bash 通过首字符/关键词可靠识别，hljs auto-detect 仅作兜底
+- 多 Provider AI 设置：Settings 中可配置多个 AI provider（Anthropic/OpenAI/Google 等），每个 provider 独立 API key 和启用开关；Chat 输入框新增 model 选择器，可在不同 provider 的模型间切换；旧单 API key 设置自动迁移为 Anthropic provider

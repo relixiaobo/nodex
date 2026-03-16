@@ -3,6 +3,7 @@ import type { AgentMessage } from '@mariozechner/pi-agent-core';
 import { deleteDB } from 'idb';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { getLinearPath, linearToTree, type ChatSession } from '../../src/lib/ai-chat-tree.js';
+import { IMAGE_PLACEHOLDER } from '../../src/lib/ai-message-images.js';
 import {
   deleteChatSession,
   getChatSession,
@@ -160,7 +161,7 @@ describe('ai persistence', () => {
         toolCallId: 'call_1',
         toolName: 'browser',
         content: [
-          { type: 'text', text: '[Screenshot was captured successfully. The image data has been removed from storage to save space — you can no longer see it, but the screenshot did exist at the time of the tool call.]' },
+          { type: 'text', text: IMAGE_PLACEHOLDER },
           { type: 'text', text: 'details' },
         ],
         isError: false,
@@ -188,7 +189,7 @@ describe('ai persistence', () => {
         role: 'user',
         content: [
           { type: 'text', text: 'prompt' },
-          { type: 'text', text: '[Screenshot was captured successfully. The image data has been removed from storage to save space — you can no longer see it, but the screenshot did exist at the time of the tool call.]' },
+          { type: 'text', text: IMAGE_PLACEHOLDER },
         ],
         timestamp: 1,
       },

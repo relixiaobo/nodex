@@ -131,7 +131,7 @@ function ThinkingBlock({ text, streaming }: { text: string; streaming: boolean }
 function renderAssistantBlocks(message: AssistantMessage, streaming: boolean, toolResults?: Map<string, ToolResultMessage>): ReactNode[] {
   return message.content.flatMap((block, index) => {
     if (block.type === 'thinking') {
-      if (block.redacted) return [];
+      if (block.redacted || (!block.thinking && !streaming)) return [];
       return (
         <ThinkingBlock
           key={`thinking-${index}`}

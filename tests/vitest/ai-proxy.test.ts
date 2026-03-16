@@ -51,6 +51,7 @@ describe('streamProxyWithApiKey', () => {
     expect(body.options).toEqual({
       apiKey: 'sk-ant-test-123',
       maxTokens: 4000,
+      reasoning: undefined,
       temperature: 0.2,
     });
   });

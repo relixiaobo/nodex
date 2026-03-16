@@ -82,14 +82,14 @@ function TabHead({ nodeId, showCurrentName, active = true, onClose, onClick, tab
       className="tab-connector-right relative z-10 flex h-10 min-w-0 shrink items-center bg-background rounded-t-xl"
       onClick={onClick}
     >
-      <div className="flex flex-1 max-w-[240px] min-w-0 items-center rounded-lg hover:bg-foreground/4 transition-colors">
+      <div className="group/tab flex flex-1 max-w-[240px] min-w-0 ml-1 h-7 items-center rounded-md hover:bg-foreground/4 transition-colors">
         {isChat ? (
-          <span className="flex items-center gap-1.5 px-3 text-[13px] text-foreground">
+          <span className="flex items-center gap-1.5 px-2 text-[13px] text-foreground">
             <Sparkles size={12} strokeWidth={1.6} className="text-foreground-tertiary" />
             Chat
           </span>
         ) : isApp ? (
-          <span className="flex min-w-0 flex-1 items-center px-3 text-[13px] text-foreground truncate">
+          <span className="flex min-w-0 flex-1 items-center px-2 text-[13px] text-foreground truncate">
             <PanelLabel nodeId={nodeId} />
           </span>
         ) : (
@@ -97,7 +97,7 @@ function TabHead({ nodeId, showCurrentName, active = true, onClose, onClick, tab
         )}
         <button
           type="button"
-          className="flex h-5 w-5 mr-1 shrink-0 items-center justify-center rounded-md text-foreground-tertiary hover:bg-foreground/8 hover:text-foreground"
+          className="flex h-5 w-5 mr-1 shrink-0 items-center justify-center rounded-md text-foreground-tertiary opacity-0 transition-opacity hover:bg-foreground/8 hover:text-foreground group-hover/tab:opacity-100"
           onClick={onClose}
           title="Close panel"
         >
@@ -185,7 +185,7 @@ export function PanelLayout({ toolbar }: PanelLayoutProps) {
             {/* Hover zone 2: dropdown trigger */}
             <button
               type="button"
-              className="flex h-7 w-7 mr-1 shrink-0 items-center justify-center rounded-md text-foreground-tertiary transition-colors hover:bg-foreground/8 hover:text-foreground"
+              className="flex h-7 w-7 mr-1 shrink-0 items-center justify-center rounded-md text-foreground-tertiary transition-colors hover:bg-foreground/4 hover:text-foreground"
               onClick={() => setNotesMenuOpen((open) => !open)}
               aria-haspopup="menu"
               aria-expanded={notesMenuOpen}
@@ -304,7 +304,7 @@ export function PanelLayout({ toolbar }: PanelLayoutProps) {
                   {showClose && (
                     <button
                       type="button"
-                      className="flex h-5 w-5 mr-1 shrink-0 items-center justify-center rounded-md text-foreground-tertiary opacity-0 transition-opacity hover:bg-foreground/8 hover:text-foreground group-hover/panel:opacity-100"
+                      className="flex h-5 w-5 mr-2 shrink-0 items-center justify-center rounded-md text-foreground-tertiary opacity-0 transition-opacity hover:bg-foreground/8 hover:text-foreground group-hover/panel:opacity-100"
                       onClick={(e) => handleClosePanel(e, panel.id)}
                       title="Close panel"
                     >
@@ -317,7 +317,7 @@ export function PanelLayout({ toolbar }: PanelLayoutProps) {
                 <div className="flex items-center justify-end shrink-0 h-8">
                   <button
                     type="button"
-                    className="flex h-5 w-5 mr-1 shrink-0 items-center justify-center rounded-md text-foreground-tertiary opacity-0 transition-opacity hover:bg-foreground/8 hover:text-foreground group-hover/panel:opacity-100"
+                    className="flex h-5 w-5 mr-2 shrink-0 items-center justify-center rounded-md text-foreground-tertiary opacity-0 transition-opacity hover:bg-foreground/8 hover:text-foreground group-hover/panel:opacity-100"
                     onClick={(e) => handleClosePanel(e, panel.id)}
                     title="Close panel"
                   >

@@ -618,12 +618,14 @@ export function createAgent(model: Model<any> = DEFAULT_CHAT_MODEL): Agent {
       const runtime = getAgentRuntimeState(agent);
       const debugEnabled = await readChatDebugEnabled();
 
+      const reasoning = options.reasoning ?? runtime.thinkingLevel ?? undefined;
+
       return streamProxyWithApiKey(activeModel, context, {
         ...options,
         apiKey: resolvedApiKey,
-        temperature: options.temperature ?? runtime.temperature,
+        temperature: reasoning ? 1 : (options.temperature ?? runtime.temperature),
         maxTokens: options.maxTokens ?? runtime.maxTokens,
-        reasoning: options.reasoning ?? runtime.thinkingLevel ?? undefined,
+        reasoning,
         authToken,
         proxyUrl: getSyncApiUrl(),
         onRequestBody: debugEnabled

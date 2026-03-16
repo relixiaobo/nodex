@@ -620,6 +620,7 @@
 
 /* Code block container */
 .chat-code-block {
+  border: 1px solid var(--color-border);
   border-radius: 0.5rem;
   overflow: hidden;
   background: var(--color-muted);
@@ -628,7 +629,8 @@
 .chat-code-header {
   display: flex;
   align-items: center;
-  padding: 4px 12px;
+  justify-content: space-between;
+  padding: 4px 8px 4px 12px;
   border-bottom: 1px solid var(--color-border-subtle);
 }
 
@@ -638,6 +640,22 @@
   line-height: 20px;
   color: var(--color-foreground-tertiary);
   text-transform: lowercase;
+}
+
+.chat-code-copy {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 0.25rem;
+  color: var(--color-foreground-tertiary);
+  transition: color 0.15s, background-color 0.15s;
+}
+
+.chat-code-copy:hover {
+  color: var(--color-foreground-secondary);
+  background-color: rgba(0, 0, 0, 0.04);
 }
 
 /* Lists */

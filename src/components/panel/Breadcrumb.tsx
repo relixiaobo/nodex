@@ -7,11 +7,12 @@
  * - Containers appear as normal ancestors in the chain
  * - At workspace root view, breadcrumb content is hidden (toolbar only)
  *
- * Folding rules:
- * - 0 ancestors: [W]
- * - 1 ancestor: [W] / parent
- * - 2 ancestors: [W] / grandparent / parent
- * - 3+ ancestors: [W] / [...] / parent
+ * Progressive folding (priority: ... > currentName > parent > [W]):
+ * - 0-1 ancestors: [W] / parent
+ * - 2+ ancestors: [W] / [...] / parent
+ * - title scrolled + 1+ ancestors: [W] / [...] / currentName
+ * - extremely narrow + folding: [...] / currentName (or parent)
+ *   — [W] hidden, workspace root added to [...] dropdown top
  *
  * [...] expands in-place (no navigation). Resets when nodeId changes.
  */
@@ -47,6 +48,9 @@ export function resolveWorkspaceRootTargetId(params: {
   return SYSTEM_NODE_IDS.JOURNAL;
 }
 
+/** Width threshold below which [W] avatar hides to save space. */
+const HIDE_AVATAR_WIDTH = 160;
+
 export function Breadcrumb({ nodeId, showCurrentName, active = true }: BreadcrumbProps) {
   const navigateTo = useUIStore((s) => s.navigateTo);
 
@@ -56,8 +60,21 @@ export function Breadcrumb({ nodeId, showCurrentName, active = true }: Breadcrum
   // Ellipsis expansion state — reset when nodeId changes
   const [expanded, setExpanded] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [containerNarrow, setContainerNarrow] = useState(false);
 
   useEffect(() => setExpanded(false), [nodeId]);
+
+  // Measure container width for progressive avatar hiding
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([entry]) => {
+      setContainerNarrow(entry.contentRect.width < HIDE_AVATAR_WIDTH);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   // Close dropdown on outside click or Escape
   useEffect(() => {
@@ -94,6 +111,13 @@ export function Breadcrumb({ nodeId, showCurrentName, active = true }: Breadcrum
     const clean = raw.replace(/<[^>]+>/g, '').trim();
     return clean.charAt(0).toUpperCase() || 'W';
   });
+  const wsName = useNodeStore((s) => {
+    void s._version;
+    if (!wsId) return 'Workspace';
+    const wsNode = loroDoc.toNodexNode(wsId);
+    const raw = wsNode?.name ?? '';
+    return raw.replace(/<[^>]+>/g, '').trim() || 'Workspace';
+  });
 
   const handleNavigateToWorkspaceRoot = useCallback(() => {
     if (wsId && workspaceRootTargetId === wsId) {
@@ -109,26 +133,33 @@ export function Breadcrumb({ nodeId, showCurrentName, active = true }: Breadcrum
     (a) => a.id !== wsId,
   );
 
-  // Determine which ancestors to show
-  // Fold at 3+ ancestors, show 1-2 inline
-  const needsFolding = filteredAncestors.length >= 3;
+  // Determine which ancestors to show.
+  // When showCurrentName is active (title scrolled out of view), fold ALL ancestors
+  // into the ellipsis so the current node name gets maximum display space.
+  // Normal mode: fold at 3+ ancestors, show 1-2 inline.
+  const needsFolding = showCurrentName
+    ? filteredAncestors.length >= 1
+    : filteredAncestors.length >= 2;
   const visibleAncestors = needsFolding
-    ? [filteredAncestors[filteredAncestors.length - 1]]
+    ? (showCurrentName ? [] : [filteredAncestors[filteredAncestors.length - 1]])
     : filteredAncestors;
   const hiddenAncestors = needsFolding
-    ? filteredAncestors.slice(0, -1)
+    ? (showCurrentName ? filteredAncestors : filteredAncestors.slice(0, -1))
     : [];
 
+  // Hide [W] avatar when container is too narrow AND folding is active,
+  // since [...] dropdown will include workspace root as the first item.
+  const showAvatar = !!wsId && !(containerNarrow && needsFolding);
+
   return (
-    <div className="flex flex-1 min-w-0 items-center gap-1 pl-4 pr-3 h-8 text-[13px] text-foreground-tertiary">
+    <div ref={containerRef} className="flex flex-1 min-w-0 items-center gap-1 pl-4 pr-3 h-8 text-[13px] text-foreground-tertiary">
 
       {/* Root view: only show toolbar (sidebar toggle + search), no breadcrumb content */}
       {!isRootView && (
         <>
-          {/* Workspace avatar — shown whenever workspace is initialized.
-              For container nodes (Library, Inbox…) workspaceRootId is null because they
-              have no parent; we still show [W] to indicate workspace context. */}
-          {!!wsId && (
+          {/* Workspace avatar — hidden when extremely narrow to save space.
+              When hidden, workspace root is accessible via [...] dropdown. */}
+          {showAvatar && (
             <Tooltip label={t('breadcrumb.goToWorkspaceRoot')}>
               <button
                 onClick={handleNavigateToWorkspaceRoot}
@@ -146,7 +177,7 @@ export function Breadcrumb({ nodeId, showCurrentName, active = true }: Breadcrum
           {/* Ellipsis for folded ancestors */}
           {needsFolding && (
             <>
-              <span className="shrink-0 text-foreground-tertiary/50 mx-0.5">/</span>
+              {showAvatar && <span className="shrink-0 text-foreground-tertiary/50 mx-0.5">/</span>}
               <div className="relative" ref={dropdownRef}>
                 <Tooltip label={t('breadcrumb.showHiddenAncestors')}>
                   <button
@@ -159,6 +190,26 @@ export function Breadcrumb({ nodeId, showCurrentName, active = true }: Breadcrum
                 {expanded && (
                   <div className="absolute top-full left-0 mt-1 w-56 rounded-lg bg-background p-1 shadow-paper z-50">
                     <div className="flex flex-col max-h-64 overflow-y-auto">
+                      {/* Workspace root — shown when [W] avatar is hidden */}
+                      {!showAvatar && (
+                        <button
+                          className="flex items-center gap-2 w-full rounded-md px-2 py-1 text-sm hover:bg-foreground/4 text-left"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setExpanded(false);
+                            handleNavigateToWorkspaceRoot();
+                          }}
+                        >
+                          <span className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[9px] font-semibold ${
+                            active
+                              ? 'bg-primary/15 text-primary'
+                              : 'bg-foreground/8 text-foreground-tertiary'
+                          }`}>
+                            {wsInitial}
+                          </span>
+                          <span className="truncate">{wsName}</span>
+                        </button>
+                      )}
                       {hiddenAncestors.map((ancestor) => (
                         <button
                           key={ancestor.id}

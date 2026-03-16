@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ArrowRight, SquareCheck } from '../../lib/icons.js';
+import { ArrowUp, Plus, Square } from '../../lib/icons.js';
 
 interface ChatInputProps {
   disabled: boolean;
@@ -13,14 +13,15 @@ export function ChatInput({ disabled, busy = false, error, onSend, onStop }: Cha
   const [draft, setDraft] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const inputDisabled = disabled || busy;
+  const canSend = !inputDisabled && draft.trim().length > 0;
 
   useEffect(() => {
     const el = textareaRef.current;
     if (!el) return;
 
     el.style.height = '0px';
-    const nextHeight = Math.min(el.scrollHeight, 112);
-    el.style.height = `${Math.max(nextHeight, 40)}px`;
+    const nextHeight = Math.min(el.scrollHeight, 160);
+    el.style.height = `${Math.max(nextHeight, 24)}px`;
   }, [draft]);
 
   async function handleSend() {
@@ -31,51 +32,70 @@ export function ChatInput({ disabled, busy = false, error, onSend, onStop }: Cha
   }
 
   return (
-    <div className="border-t border-border px-3 py-3">
+    <div className="px-3 pb-3 pt-1">
       {error && (
         <div className="mb-2 rounded-lg border border-destructive/15 bg-destructive/5 px-2.5 py-2 text-xs text-destructive">
           {error}
         </div>
       )}
-      <div className="flex items-end gap-2">
-        <textarea
-          ref={textareaRef}
-          value={draft}
-          disabled={inputDisabled}
-          rows={1}
-          placeholder={disabled ? 'Responding…' : busy ? 'Working…' : 'Ask about your notes…'}
-          className="min-h-10 flex-1 resize-none rounded-lg border border-border bg-background px-3 py-2 text-base leading-6 text-foreground outline-none transition-colors placeholder:text-foreground-tertiary focus:border-primary disabled:cursor-not-allowed disabled:opacity-60"
-          onChange={(event) => setDraft(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
-              event.preventDefault();
-              void handleSend();
-            }
-          }}
-        />
-        {disabled ? (
-          <button
-            type="button"
-            onClick={onStop}
-            className="inline-flex h-10 items-center gap-1.5 rounded-full bg-foreground/8 px-3 text-xs font-medium text-foreground transition-colors hover:bg-foreground/15"
-          >
-            <SquareCheck size={14} strokeWidth={1.75} />
-            Stop
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={() => void handleSend()}
-            disabled={busy || draft.trim().length === 0}
-            className="inline-flex h-10 items-center justify-center rounded-full bg-foreground px-3 text-background transition-colors hover:bg-foreground/90 disabled:cursor-not-allowed disabled:bg-foreground/20"
-            aria-label="Send message"
-          >
-            <ArrowRight size={15} strokeWidth={1.75} />
-          </button>
-        )}
-      </div>
-      <div className="mt-2 text-xs text-foreground-tertiary">
-        {inputDisabled ? '' : '⌘↵ to send'}
+      {/* Claude-style unified composer card */}
+      <div className="rounded-2xl border border-border bg-background transition-colors focus-within:border-foreground/20">
+        {/* Textarea area */}
+        <div className="px-3 pt-2.5 pb-1">
+          <textarea
+            ref={textareaRef}
+            value={draft}
+            disabled={inputDisabled}
+            rows={1}
+            placeholder={disabled ? 'Responding…' : busy ? 'Working…' : 'Ask about your notes…'}
+            className="w-full resize-none bg-transparent text-base leading-6 text-foreground outline-none placeholder:text-foreground-tertiary disabled:cursor-not-allowed disabled:opacity-60"
+            onChange={(event) => setDraft(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
+                event.preventDefault();
+                void handleSend();
+              }
+            }}
+          />
+        </div>
+        {/* Bottom action bar */}
+        <div className="flex items-center justify-between px-2.5 pb-2">
+          <div className="flex items-center">
+            <button
+              type="button"
+              className="flex h-7 w-7 items-center justify-center rounded-lg text-foreground-tertiary transition-colors hover:bg-foreground/4 hover:text-foreground"
+              title="Add context"
+            >
+              <Plus size={16} strokeWidth={1.75} />
+            </button>
+          </div>
+          <div className="flex items-center gap-1.5">
+            {disabled ? (
+              <button
+                type="button"
+                onClick={onStop}
+                className="flex h-7 w-7 items-center justify-center rounded-lg bg-foreground/8 text-foreground transition-colors hover:bg-foreground/15"
+                aria-label="Stop generating"
+              >
+                <Square size={12} fill="currentColor" />
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => void handleSend()}
+                disabled={!canSend}
+                className={`flex h-7 w-7 items-center justify-center rounded-lg transition-colors ${
+                  canSend
+                    ? 'bg-foreground text-background hover:bg-foreground/90'
+                    : 'bg-foreground/10 text-foreground-tertiary'
+                }`}
+                aria-label="Send message"
+              >
+                <ArrowUp size={15} strokeWidth={2} />
+              </button>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );

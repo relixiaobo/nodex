@@ -140,10 +140,11 @@ describe('chat ui', () => {
       }),
     );
 
-    expect(html).toContain('placeholder="Working…"' );
+    expect(html).toContain('placeholder="Working…"');
     expect(html).toContain('aria-label="Send message"');
     expect(html).toContain('disabled=""');
-    expect(html).not.toContain('Stop');
+    // Stop button only appears when disabled=true (streaming), not when busy
+    expect(html).not.toContain('aria-label="Stop generating"');
   });
 
   it('renders the global chat trigger as a non-toggle button', () => {

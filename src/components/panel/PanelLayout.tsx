@@ -73,7 +73,7 @@ function renderPanelHeader(
   if (isChatPanel(nodeId)) return null;
   if (isAppPanel(nodeId)) {
     return (
-      <div className="flex items-center justify-end shrink-0 h-8">
+      <div className="flex items-center justify-end shrink-0 h-8 mt-2">
         <button type="button" className={PANEL_CLOSE_BTN} onClick={opts.onClose} title="Close panel">
           <X size={12} />
         </button>
@@ -81,7 +81,7 @@ function renderPanelHeader(
     );
   }
   return (
-    <div className="flex items-center shrink-0">
+    <div className="flex items-center shrink-0 mt-2">
       <Breadcrumb nodeId={nodeId} showCurrentName={!opts.titleVisible} active={opts.isActive} />
       <button type="button" className={PANEL_CLOSE_BTN} onClick={opts.onClose} title="Close panel">
         <X size={12} />
@@ -259,7 +259,7 @@ export function PanelLayout({ toolbar }: PanelLayoutProps) {
         </div>
         <div className={TAB_PANEL_BODY}>
           {!isApp && !isChat && (
-            <div className="flex items-center shrink-0">
+            <div className="flex items-center shrink-0 mt-2">
               <Breadcrumb nodeId={nodeId} active />
             </div>
           )}

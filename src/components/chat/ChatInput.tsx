@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ArrowUp, Plus, Square } from '../../lib/icons.js';
+import { ArrowUp, Plus, Settings, Square } from '../../lib/icons.js';
 
 interface ChatInputProps {
   disabled: boolean;
@@ -7,11 +7,14 @@ interface ChatInputProps {
   error?: string;
   onSend(prompt: string): Promise<void>;
   onStop(): void;
+  onOpenSettings?(): void;
 }
 
-export function ChatInput({ disabled, busy = false, error, onSend, onStop }: ChatInputProps) {
+export function ChatInput({ disabled, busy = false, error, onSend, onStop, onOpenSettings }: ChatInputProps) {
   const [draft, setDraft] = useState('');
+  const [menuOpen, setMenuOpen] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const inputDisabled = disabled || busy;
   const canSend = !inputDisabled && draft.trim().length > 0;
 
@@ -23,6 +26,19 @@ export function ChatInput({ disabled, busy = false, error, onSend, onStop }: Cha
     const nextHeight = Math.min(el.scrollHeight, 160);
     el.style.height = `${Math.max(nextHeight, 24)}px`;
   }, [draft]);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+
+    function onPointerDown(e: PointerEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    }
+
+    document.addEventListener('pointerdown', onPointerDown);
+    return () => document.removeEventListener('pointerdown', onPointerDown);
+  }, [menuOpen]);
 
   async function handleSend() {
     const normalized = draft.trim();
@@ -60,14 +76,34 @@ export function ChatInput({ disabled, busy = false, error, onSend, onStop }: Cha
         </div>
         {/* Bottom action bar */}
         <div className="flex items-center justify-between px-2.5 pb-2">
-          <div className="flex items-center">
+          <div ref={menuRef} className="relative flex items-center">
             <button
               type="button"
+              onClick={() => setMenuOpen((v) => !v)}
               className="flex h-7 w-7 items-center justify-center rounded-lg text-foreground-tertiary transition-colors hover:bg-foreground/4 hover:text-foreground"
-              title="Add context"
+              aria-label="More options"
+              aria-haspopup="menu"
+              aria-expanded={menuOpen}
             >
               <Plus size={16} strokeWidth={1.75} />
             </button>
+            {menuOpen && (
+              <div className="absolute bottom-full left-0 mb-1 min-w-[180px] rounded-lg border border-border bg-background p-1 shadow-paper">
+                {onOpenSettings && (
+                  <button
+                    type="button"
+                    className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[13px] text-foreground transition-colors hover:bg-foreground/4"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      onOpenSettings();
+                    }}
+                  >
+                    <Settings size={14} strokeWidth={1.6} className="shrink-0 text-foreground-tertiary" />
+                    API Settings
+                  </button>
+                )}
+              </div>
+            )}
           </div>
           <div className="flex items-center gap-1.5">
             {disabled ? (

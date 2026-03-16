@@ -83,7 +83,7 @@ describe('chat ui', () => {
     })).toBe(false);
   });
 
-  it('renders message actions as an absolute overlay instead of reserving row height', () => {
+  it('renders message actions inline below the message', () => {
     const html = renderToStaticMarkup(
       React.createElement(ChatMessage, {
         entry: {
@@ -99,9 +99,9 @@ describe('chat ui', () => {
     );
 
     expect(html).toContain('data-testid="chat-message-toolbar"');
-    expect(html).toContain('pointer-events-none absolute right-0 top-full');
-    expect(html).toContain('group-hover/message:pointer-events-auto');
-    expect(html).toContain('group-focus-within/message:opacity-100');
+    // Toolbar is inline (not absolute overlay) and right-aligned for user messages
+    expect(html).toContain('justify-end');
+    expect(html).not.toContain('pointer-events-none absolute');
   });
 
   it('uses text-base typography for chat body and composer', () => {

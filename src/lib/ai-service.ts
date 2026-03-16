@@ -2,7 +2,7 @@ import { Agent, type AgentEvent, type AgentMessage } from '@mariozechner/pi-agen
 import { getModel, isContextOverflow } from '@mariozechner/pi-ai';
 import type { Message, Model } from '@mariozechner/pi-ai';
 import { getStoredToken } from './auth.js';
-import { buildAgentSystemPrompt, DEFAULT_AGENT_MODEL_ID, DEFAULT_AGENT_MAX_TOKENS, DEFAULT_AGENT_SYSTEM_PROMPT, DEFAULT_AGENT_TEMPERATURE, readAgentNodeConfig } from './ai-agent-node.js';
+import { buildAgentSystemPrompt, DEFAULT_AGENT_MODEL_ID, DEFAULT_AGENT_MAX_TOKENS, DEFAULT_AGENT_SYSTEM_PROMPT, DEFAULT_AGENT_TEMPERATURE, readAgentNodeConfig, type AgentNodeConfig } from './ai-agent-node.js';
 import { findProviderOptionNodeId, getApiKeyForProvider, getAvailableModels, getProviderConfigs } from './ai-provider-config.js';
 import {
   createSession,
@@ -115,27 +115,31 @@ function hasAnthropicProviderConfig(configs: ReturnType<typeof getProviderConfig
   return configs.some((config) => config.provider === 'anthropic' && config.apiKey.length > 0);
 }
 
-function resolveModel(modelId: string, providerHint?: string): Model<any> {
-  const normalizedProviderHint = providerHint?.trim().toLowerCase();
+function normalizeProviderId(provider: string | null | undefined): string {
+  return provider?.trim().toLowerCase() ?? '';
+}
+
+function findAvailableModel(
+  availableModels: Model<any>[],
+  modelId: string,
+  provider?: string,
+): Model<any> | null {
+  const normalizedProvider = normalizeProviderId(provider);
+  return availableModels.find((model) => (
+    model.id === modelId
+      && (normalizedProvider.length === 0 || normalizeProviderId(model.provider) === normalizedProvider)
+  )) ?? null;
+}
+
+function resolveModel(session: ChatSession | null, modelId: string): Model<any> {
   const availableModels = getAvailableModels();
+  const sessionModel = session?.selectedModelId
+    ? findAvailableModel(availableModels, session.selectedModelId, session.selectedProvider)
+    : null;
+  if (sessionModel) return sessionModel;
 
-  if (normalizedProviderHint) {
-    const exactAvailableModel = availableModels.find(
-      (model) => model.provider === normalizedProviderHint && model.id === modelId,
-    );
-    if (exactAvailableModel) return exactAvailableModel;
-  }
-
-  const availableModel = availableModels.find((model) => model.id === modelId);
-  if (availableModel) return availableModel;
-
-  if (normalizedProviderHint) {
-    try {
-      return getModel(normalizedProviderHint as Parameters<typeof getModel>[0], modelId as never);
-    } catch {
-      // Fall through to a known-good default.
-    }
-  }
+  const configuredModel = findAvailableModel(availableModels, modelId);
+  if (configuredModel) return configuredModel;
 
   if (availableModels.length > 0) {
     return availableModels[0];
@@ -145,6 +149,26 @@ function resolveModel(modelId: string, providerHint?: string): Model<any> {
     return getModel('anthropic', modelId as never);
   } catch {
     return DEFAULT_CHAT_MODEL;
+  }
+}
+
+function applyAgentConfiguration(
+  agent: Agent,
+  session: ChatSession | null,
+  agentConfig: AgentNodeConfig | null,
+  resolvedModel: Model<any>,
+): void {
+  const runtime = getAgentRuntimeState(agent);
+  runtime.temperature = agentConfig?.temperature ?? DEFAULT_AGENT_TEMPERATURE;
+  runtime.maxTokens = agentConfig?.maxTokens ?? DEFAULT_AGENT_MAX_TOKENS;
+
+  agent.setTools(getAITools());
+  agent.setSystemPrompt(agentConfig ? buildAgentSystemPrompt(agentConfig) : DEFAULT_AGENT_SYSTEM_PROMPT);
+  agent.setModel(resolvedModel);
+
+  if (session) {
+    session.selectedModelId = resolvedModel.id;
+    session.selectedProvider = normalizeProviderId(resolvedModel.provider);
   }
 }
 
@@ -211,18 +235,36 @@ export async function configureAgent(agent: Agent): Promise<{
   const runtime = getAgentRuntimeState(agent);
   const agentConfig = readAgentConfigSafely();
   const resolvedModel = resolveModel(
+    runtime.currentSession,
     agentConfig?.modelId ?? DEFAULT_AGENT_MODEL_ID,
-    agent.state.model.provider,
   );
-
-  runtime.temperature = agentConfig?.temperature ?? DEFAULT_AGENT_TEMPERATURE;
-  runtime.maxTokens = agentConfig?.maxTokens ?? DEFAULT_AGENT_MAX_TOKENS;
-
-  agent.setTools(getAITools());
-  agent.setSystemPrompt(agentConfig ? buildAgentSystemPrompt(agentConfig) : DEFAULT_AGENT_SYSTEM_PROMPT);
-  agent.setModel(resolvedModel);
+  applyAgentConfiguration(agent, runtime.currentSession, agentConfig, resolvedModel);
 
   return { provider: resolvedModel.provider };
+}
+
+export async function selectChatModel(
+  modelId: string,
+  provider: string,
+  agent: Agent = getAIAgent(),
+): Promise<Model<any>> {
+  await ensureAISettingsMigrated();
+
+  const runtime = getAgentRuntimeState(agent);
+  const session = runtime.currentSession;
+  if (!session) {
+    throw new Error('Chat session is not ready yet.');
+  }
+
+  const resolvedModel = findAvailableModel(getAvailableModels(), modelId, provider);
+  if (!resolvedModel) {
+    throw new Error(`Model ${provider}/${modelId} is not available.`);
+  }
+
+  const agentConfig = readAgentConfigSafely();
+  applyAgentConfiguration(agent, session, agentConfig, resolvedModel);
+  await persistChatSession(agent);
+  return resolvedModel;
 }
 
 function isLlmCompatibleMessage(message: AgentMessage): message is Message {
@@ -488,17 +530,16 @@ export function restoreChatSessionById(sessionId: string, agent: Agent): Promise
   if (!runtime.restorePromise) {
     runtime.restorePromise = (async () => {
       try {
-        await configureAgent(agent);
-      } catch {
-        // Keep default prompt/tools when config hydration fails.
-      }
-
-      try {
         const session = await getChatSession(sessionId);
         if (session) {
           trimIncompleteTrail(session);
           setCurrentSession(agent, session);
           agent.replaceMessages(getCompressedPath(session));
+          try {
+            await configureAgent(agent);
+          } catch {
+            // Keep default prompt/tools when config hydration fails.
+          }
           runtime.hydrated = true;
           return;
         }
@@ -516,6 +557,11 @@ export function restoreChatSessionById(sessionId: string, agent: Agent): Promise
 
       setCurrentSession(agent, persistedSession);
       agent.replaceMessages([]);
+      try {
+        await configureAgent(agent);
+      } catch {
+        // Keep default prompt/tools when config hydration fails.
+      }
       runtime.hydrated = true;
     })();
   }

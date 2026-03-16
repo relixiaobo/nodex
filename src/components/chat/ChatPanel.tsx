@@ -4,7 +4,7 @@ import { Sparkles, X } from '../../lib/icons.js';
 import { useAgent } from '../../hooks/use-agent.js';
 import { readChatDebugEnabled, writeChatDebugEnabled } from '../../lib/ai-debug.js';
 import { getAvailableModels, hasAnyEnabledProvider } from '../../lib/ai-provider-config.js';
-import { getAgentForSession } from '../../lib/ai-service.js';
+import { getAgentForSession, selectChatModel } from '../../lib/ai-service.js';
 import { useNodeStore } from '../../stores/node-store.js';
 import { useUIStore } from '../../stores/ui-store.js';
 import { SYSTEM_NODE_IDS } from '../../types/index.js';
@@ -206,16 +206,12 @@ export function ChatPanel({ panelId, sessionId, hideHeader }: ChatPanelProps) {
     useUIStore.getState().openPanel(SYSTEM_NODE_IDS.SETTINGS);
   }
 
-  function handleModelChange(modelId: string, provider: string) {
-    const nextModel = availableModels.find(
-      (model) => model.id === modelId && model.provider === provider,
-    );
-    if (!nextModel) {
-      toast.error('Failed to switch models');
-      return;
+  async function handleModelChange(modelId: string, provider: string) {
+    try {
+      await selectChatModel(modelId, provider, agent);
+    } catch (changeError) {
+      toast.error(getActionErrorMessage(changeError, 'Failed to switch models'));
     }
-
-    agent.setModel(nextModel);
   }
 
   return (

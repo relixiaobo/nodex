@@ -425,6 +425,48 @@ describe('ai-service', () => {
     ]);
   });
 
+  it('keeps the session-selected model when configureAgent reapplies runtime config', async () => {
+    loroDoc.initLoroDocForTest('ws_ai_selected_model');
+    ensureSystemNodes('ws_ai_selected_model');
+    seedProviderConfig({
+      provider: 'anthropic',
+      enabled: true,
+      apiKey: 'sk-ant-selected',
+      name: 'Anthropic',
+    });
+    seedProviderConfig({
+      provider: 'openai',
+      enabled: true,
+      apiKey: 'sk-openai-selected',
+      name: 'OpenAI',
+    });
+
+    const { agent } = createDynamicTestAgent();
+    const {
+      configureAgent,
+      createNewChatSession,
+      getCurrentSession,
+      selectChatModel,
+    } = await import('../../src/lib/ai-service.js');
+
+    await createNewChatSession(agent);
+    await selectChatModel('gpt-4o', 'openai', agent);
+
+    agent.setModel.mockClear();
+    await configureAgent(agent);
+
+    expect(agent.state.model.provider).toBe('openai');
+    expect(agent.state.model.id).toBe('gpt-4o');
+    expect(getCurrentSession(agent)?.selectedProvider).toBe('openai');
+    expect(getCurrentSession(agent)?.selectedModelId).toBe('gpt-4o');
+    expect(agent.setModel).toHaveBeenCalledWith(
+      expect.objectContaining({
+        provider: 'openai',
+        id: 'gpt-4o',
+      }),
+    );
+  });
+
   it('restoreLatestChatSession trims incomplete persisted tails before hydrating the agent', async () => {
     const { saveChatSession } = await import('../../src/lib/ai-persistence.js');
     const { createAgent, getCurrentSession, restoreLatestChatSession } = await import('../../src/lib/ai-service.js');
@@ -549,6 +591,21 @@ describe('ai-service', () => {
     const { saveChatSession } = await import('../../src/lib/ai-persistence.js');
     const { getAgentForSession, getCurrentSession, restoreChatSessionById } = await import('../../src/lib/ai-service.js');
 
+    loroDoc.initLoroDocForTest('ws_ai_restore_by_id');
+    ensureSystemNodes('ws_ai_restore_by_id');
+    seedProviderConfig({
+      provider: 'anthropic',
+      enabled: true,
+      apiKey: 'sk-ant-restore',
+      name: 'Anthropic',
+    });
+    seedProviderConfig({
+      provider: 'openai',
+      enabled: true,
+      apiKey: 'sk-openai-restore',
+      name: 'OpenAI',
+    });
+
     const olderSession = linearToTree([
       createUserMessage('older-session', 1),
       createAssistantMessage('older-reply', 2),
@@ -564,6 +621,8 @@ describe('ai-service', () => {
     targetSession.id = 'session_target';
     targetSession.createdAt = 3;
     targetSession.updatedAt = 4;
+    targetSession.selectedProvider = 'openai';
+    targetSession.selectedModelId = 'gpt-4o';
 
     await saveChatSession(olderSession);
     await saveChatSession(targetSession);
@@ -577,6 +636,8 @@ describe('ai-service', () => {
       createUserMessage('target-session', 3),
       createAssistantMessage('target-reply', 4),
     ]);
+    expect(agent.state.model.provider).toBe('openai');
+    expect(agent.state.model.id).toBe('gpt-4o');
   });
 
   it('keeps chat sessions isolated per agent instance', async () => {

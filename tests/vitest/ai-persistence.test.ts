@@ -28,10 +28,14 @@ function buildSession(
   messages: AgentMessage[],
   {
     createdAt = 1,
+    selectedModelId,
+    selectedProvider,
     updatedAt = createdAt,
     title,
   }: {
     createdAt?: number;
+    selectedModelId?: string;
+    selectedProvider?: string;
     updatedAt?: number;
     title?: string | null;
   } = {},
@@ -42,6 +46,12 @@ function buildSession(
   session.updatedAt = updatedAt;
   if (title !== undefined) {
     session.title = title;
+  }
+  if (selectedModelId !== undefined) {
+    session.selectedModelId = selectedModelId;
+  }
+  if (selectedProvider !== undefined) {
+    session.selectedProvider = selectedProvider;
   }
   return session;
 }
@@ -106,6 +116,20 @@ describe('ai persistence', () => {
       { id: 'session_1', title: 'hello' },
     ]);
     expect(metas[0].updatedAt).toBeGreaterThanOrEqual(metas[1].updatedAt);
+  });
+
+  it('persists per-session selected model state alongside the chat tree', async () => {
+    await saveChatSession(buildSession('session_model', [
+      { role: 'user', content: 'hello', timestamp: 1 },
+    ], {
+      selectedProvider: 'openai',
+      selectedModelId: 'gpt-4o',
+    }));
+
+    const restored = await getChatSession('session_model');
+
+    expect(restored?.selectedProvider).toBe('openai');
+    expect(restored?.selectedModelId).toBe('gpt-4o');
   });
 
   it('keeps long sessions intact instead of trimming to the latest 100 entries', async () => {

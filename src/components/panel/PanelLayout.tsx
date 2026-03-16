@@ -20,7 +20,7 @@ import type { AppPanelId } from '../../types/index.js';
 import { NodePanel } from './NodePanel';
 import { AppPanel } from './AppPanel';
 import { Breadcrumb } from './Breadcrumb';
-import { Sparkles, X } from '../../lib/icons.js';
+import { ChevronDown, Sparkles, X } from '../../lib/icons.js';
 import { DeskLanding } from './DeskLanding';
 
 const ChatPanel = lazy(async () => ({
@@ -119,7 +119,7 @@ function TabHead({ nodeId, onClickBody, onClose, menuOpen, tabRef, children }: T
     >
       {/* Name area — independent hover + click (opens dropdown / activates panel) */}
       <div
-        className="flex min-w-0 flex-1 ml-1 h-7 items-center rounded-md hover:bg-foreground/4 transition-colors cursor-pointer"
+        className="group/name flex min-w-0 flex-1 ml-1 h-7 items-center rounded-md hover:bg-foreground/4 transition-colors cursor-pointer"
         onClick={onClickBody}
         role={menuOpen !== undefined ? 'button' : undefined}
         aria-haspopup={menuOpen !== undefined ? 'menu' : undefined}
@@ -129,6 +129,13 @@ function TabHead({ nodeId, onClickBody, onClose, menuOpen, tabRef, children }: T
           {isChat && <Sparkles size={12} strokeWidth={1.6} className="shrink-0 text-foreground-tertiary" />}
           <PanelLabel nodeId={nodeId} />
         </span>
+        {menuOpen !== undefined && (
+          <ChevronDown
+            size={14}
+            strokeWidth={1.7}
+            className={`shrink-0 mr-1.5 text-foreground-tertiary transition-all ${menuOpen ? 'opacity-100 rotate-180' : 'opacity-0 group-hover/name:opacity-100'}`}
+          />
+        )}
       </div>
       {/* Close button — independent hover + click */}
       {onClose && (

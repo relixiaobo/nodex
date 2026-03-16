@@ -54,6 +54,64 @@ function renderPanelContent(nodeId: string, panelId: string, options?: { hideHea
   return <NodePanel nodeId={nodeId} panelId={panelId} />;
 }
 
+// ── Shared shaped tab ──────────────────────────────────────────────
+//
+// Used by both narrow-mode dropdown tab and wide-mode last-panel tab.
+// Renders: [tab-connector container] → [hover zone (max-w-[240px]): content + close] + children
+//
+// `children` slot is for narrow-mode extras (chevron trigger + dropdown menu).
+
+interface TabHeadProps {
+  nodeId: string;
+  showCurrentName?: boolean;
+  active?: boolean;
+  onClose: (e: React.MouseEvent) => void;
+  onClick?: () => void;
+  tabRef?: React.Ref<HTMLDivElement>;
+  /** Extra content inside tab container, after the main hover zone (e.g., dropdown trigger). */
+  children?: React.ReactNode;
+}
+
+function TabHead({ nodeId, showCurrentName, active = true, onClose, onClick, tabRef, children }: TabHeadProps) {
+  const isChat = isChatPanel(nodeId);
+  const isApp = isAppPanel(nodeId);
+
+  return (
+    <div
+      ref={tabRef}
+      className="tab-connector-right relative z-10 flex h-10 min-w-0 shrink items-center bg-background rounded-t-xl"
+      onClick={onClick}
+    >
+      <div className="flex flex-1 max-w-[240px] min-w-0 items-center rounded-lg hover:bg-foreground/4 transition-colors">
+        {isChat ? (
+          <span className="flex items-center gap-1.5 px-3 text-[13px] text-foreground">
+            <Sparkles size={12} strokeWidth={1.6} className="text-foreground-tertiary" />
+            Chat
+          </span>
+        ) : isApp ? (
+          <span className="flex min-w-0 flex-1 items-center px-3 text-[13px] text-foreground truncate">
+            <PanelLabel nodeId={nodeId} />
+          </span>
+        ) : (
+          <Breadcrumb nodeId={nodeId} showCurrentName={showCurrentName} active={active} compact />
+        )}
+        <button
+          type="button"
+          className="flex h-5 w-5 mr-1 shrink-0 items-center justify-center rounded-md text-foreground-tertiary hover:bg-foreground/8 hover:text-foreground"
+          onClick={onClose}
+          title="Close panel"
+        >
+          <X size={12} />
+        </button>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+/** Panel body class shared by tab layouts (narrow + wide hasTab). */
+const TAB_PANEL_BODY = 'group/panel flex flex-1 min-h-0 min-w-0 flex-col overflow-hidden bg-background shadow-card rounded-b-xl rounded-tr-xl';
+
 export function PanelLayout({ toolbar }: PanelLayoutProps) {
   const panels = useUIStore((s) => s.panels);
   const activePanelId = useUIStore((s) => s.activePanelId);
@@ -112,40 +170,18 @@ export function PanelLayout({ toolbar }: PanelLayoutProps) {
   if (dropdownMode) {
     const activePanel = panels.find((p) => p.id === activePanelId) ?? panels[0];
     const nodeId = activePanel.nodeId;
-    const isChat = isChatPanel(nodeId);
-    const isApp = isAppPanel(nodeId);
 
     return (
       <div ref={containerRef} className="flex flex-1 flex-col overflow-hidden">
         {/* Tab row: dropdown tab (paper) + toolbar (desk) */}
         <div className="flex items-end shrink-0">
-          <div
-            ref={notesMenuRef}
-            className="tab-connector-right relative z-10 flex h-10 max-w-[240px] min-w-0 shrink items-center bg-background rounded-t-xl"
+          <TabHead
+            nodeId={nodeId}
+            showCurrentName
+            active
+            onClose={(e) => handleClosePanel(e, activePanel.id)}
+            tabRef={notesMenuRef}
           >
-            {/* Hover zone 1: breadcrumb + close */}
-            <div className="flex flex-1 min-w-0 items-center rounded-lg hover:bg-foreground/4 transition-colors">
-              {isChat ? (
-                <span className="flex items-center gap-1.5 px-3 text-[13px] text-foreground">
-                  <Sparkles size={12} strokeWidth={1.6} className="text-foreground-tertiary" />
-                  Chat
-                </span>
-              ) : isApp ? (
-                <span className="flex min-w-0 flex-1 items-center px-3 text-[13px] text-foreground truncate">
-                  <PanelLabel nodeId={nodeId} />
-                </span>
-              ) : (
-                <Breadcrumb nodeId={nodeId} showCurrentName active compact />
-              )}
-              <button
-                type="button"
-                className="flex h-5 w-5 mr-1 shrink-0 items-center justify-center rounded-md text-foreground-tertiary hover:bg-foreground/8 hover:text-foreground"
-                onClick={(e) => handleClosePanel(e, activePanel.id)}
-                title="Close panel"
-              >
-                <X size={12} />
-              </button>
-            </div>
             {/* Hover zone 2: dropdown trigger */}
             <button
               type="button"
@@ -202,13 +238,13 @@ export function PanelLayout({ toolbar }: PanelLayoutProps) {
                 })}
               </div>
             )}
-          </div>
+          </TabHead>
           <div className="flex flex-1 justify-end">
             {toolbar}
           </div>
         </div>
         {/* Panel body — no top-left rounding (connects to tab) */}
-        <div className="group/panel flex flex-1 min-h-0 flex-col overflow-hidden bg-background shadow-card rounded-b-xl rounded-tr-xl">
+        <div className={TAB_PANEL_BODY}>
           {renderPanelContent(nodeId, activePanel.id, { hideHeader: isChatPanel(nodeId) })}
         </div>
       </div>
@@ -233,38 +269,20 @@ export function PanelLayout({ toolbar }: PanelLayoutProps) {
             <div key={panel.id} className="flex flex-1 min-w-0 flex-col">
               {/* Tab row: breadcrumb tab (paper) + toolbar (desk) */}
               <div className="flex items-end shrink-0">
-                <div
-                  className="tab-connector-right relative z-10 flex h-10 max-w-[240px] min-w-0 shrink items-center bg-background rounded-t-xl"
+                <TabHead
+                  nodeId={nodeId}
+                  showCurrentName={!titleVisible}
+                  active={isActive}
+                  onClose={(e) => handleClosePanel(e, panel.id)}
                   onClick={() => setActivePanel(panel.id)}
-                >
-                  <div className="flex flex-1 min-w-0 items-center rounded-lg hover:bg-foreground/4 transition-colors">
-                    {isChat ? (
-                      <span className="flex items-center gap-1.5 px-3 text-[13px] text-foreground">
-                        <Sparkles size={12} strokeWidth={1.6} className="text-foreground-tertiary" />
-                        Chat
-                      </span>
-                    ) : (
-                      <Breadcrumb nodeId={nodeId} showCurrentName={!titleVisible} active={isActive} compact />
-                    )}
-                    {showClose && (
-                      <button
-                        type="button"
-                        className="flex h-5 w-5 mr-1 shrink-0 items-center justify-center rounded-md text-foreground-tertiary hover:bg-foreground/8 hover:text-foreground"
-                        onClick={(e) => handleClosePanel(e, panel.id)}
-                        title="Close panel"
-                      >
-                        <X size={12} />
-                      </button>
-                    )}
-                  </div>
-                </div>
+                />
                 <div className="flex flex-1 justify-end">
                   {toolbar}
                 </div>
               </div>
               {/* Panel body — no top-left rounding (connects to tab) */}
               <div
-                className="group/panel flex flex-1 min-w-0 flex-col overflow-hidden bg-background shadow-card rounded-b-xl rounded-tr-xl"
+                className={TAB_PANEL_BODY}
                 onClick={() => setActivePanel(panel.id)}
               >
                 {renderPanelContent(nodeId, panel.id, { hideHeader: isChat })}

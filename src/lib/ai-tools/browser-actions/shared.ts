@@ -1,5 +1,5 @@
 import type { AgentToolResult } from '@mariozechner/pi-agent-core';
-import type { BrowserErrorResponse } from '../browser-messaging.js';
+import { BROWSER_SCREENSHOT, type BrowserErrorResponse } from '../browser-messaging.js';
 import { formatResultText } from '../shared.js';
 
 export function sendBrowserMessage<T>(type: string, payload?: unknown): Promise<T> {
@@ -49,6 +49,22 @@ export function imageResult<T>(details: T, imageData: string, mimeType = 'image/
     ],
     details,
   };
+}
+
+/**
+ * Return a mutation tool result with an auto-captured screenshot.
+ * If the screenshot fails (e.g. tab closed), falls back to text-only.
+ */
+export async function mutationResult<T>(details: T, tabId?: number): Promise<AgentToolResult<T>> {
+  try {
+    const screenshot = await sendBrowserMessage<
+      { imageData: string; width: number; height: number; imageId: string } | BrowserErrorResponse
+    >(BROWSER_SCREENSHOT, { tabId });
+    assertBrowserResponseOk(screenshot);
+    return imageResult(details, screenshot.imageData);
+  } catch {
+    return textResult(details);
+  }
 }
 
 export function requireNonEmptyString(

@@ -383,8 +383,6 @@ export const useUIStore = create<UIStore>()(
 
       closePanel: (panelId) =>
         set((s) => {
-          // Cannot close the last panel
-          if (s.panels.length <= 1) return {};
           const idx = s.panels.findIndex((p) => p.id === panelId);
           if (idx < 0) return {};
 
@@ -397,9 +395,13 @@ export const useUIStore = create<UIStore>()(
           // Determine new active panel
           let nextActivePanelId = s.activePanelId;
           if (s.activePanelId === panelId) {
-            // Prefer the panel to the right (same index), otherwise the one before
-            const nextIdx = Math.min(idx, newPanels.length - 1);
-            nextActivePanelId = newPanels[nextIdx].id;
+            if (newPanels.length === 0) {
+              nextActivePanelId = '';
+            } else {
+              // Prefer the panel to the right (same index), otherwise the one before
+              const nextIdx = Math.min(idx, newPanels.length - 1);
+              nextActivePanelId = newPanels[nextIdx].id;
+            }
           }
 
           // Truncate forward history

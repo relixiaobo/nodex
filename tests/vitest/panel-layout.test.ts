@@ -172,7 +172,7 @@ describe('PanelLayout notes dropdown', () => {
     expect(getMenuRow('Meeting notes - Team standup')).toBeUndefined();
   });
 
-  it('closes panels from the dropdown and leaves no close action for a single panel', async () => {
+  it('closes panels from the dropdown; single remaining panel still has close button', async () => {
     setPanels([
       { id: 'main', nodeId: 'proj_1' },
       { id: 'notes', nodeId: 'note_1' },
@@ -193,8 +193,10 @@ describe('PanelLayout notes dropdown', () => {
 
     expect(useUIStore.getState().panels).toHaveLength(1);
     expect(useUIStore.getState().activePanelId).toBe('main');
+    // No longer in dropdown mode (single panel)
     expect(getNotesTrigger()).toBeNull();
-    expect(container.querySelector('button[title="Close panel"]')).toBeNull();
+    // Single panel still shows close button (all panels are closable)
+    expect(container.querySelector('button[title="Close panel"]')).not.toBeNull();
   });
 
   it('shows chat panels with a sparkles icon in the dropdown', async () => {

@@ -16,6 +16,8 @@ const AUTO_SCROLL_THRESHOLD = 48;
 export interface ChatPanelProps {
   panelId: string;
   sessionId: string;
+  /** When true, hide the full header (title + close). Action buttons remain visible. */
+  hideHeader?: boolean;
 }
 
 export function shouldStickChatScroll(
@@ -37,7 +39,7 @@ function getActionErrorMessage(error: unknown, fallback: string): string {
   return fallback;
 }
 
-export function ChatPanel({ panelId, sessionId }: ChatPanelProps) {
+export function ChatPanel({ panelId, sessionId, hideHeader }: ChatPanelProps) {
   const pendingChatPrompt = useUIStore((s) => s.pendingChatPrompt);
   const setPendingChatPrompt = useUIStore((s) => s.setPendingChatPrompt);
   const activePanelId = useUIStore((s) => s.activePanelId);
@@ -235,15 +237,17 @@ export function ChatPanel({ panelId, sessionId }: ChatPanelProps) {
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden bg-background">
-      <div className="flex h-12 items-center justify-between border-b border-border px-3">
-        <button
-          type="button"
-          onClick={handleHeaderTitleClick}
-          className="flex items-center gap-2 text-sm font-medium text-foreground"
-        >
-          <Sparkles size={14} strokeWidth={1.75} className="text-foreground-tertiary" />
-          Chat
-        </button>
+      <div className={`flex items-center px-3 ${hideHeader ? 'h-8 justify-end' : 'h-12 justify-between border-b border-border'}`}>
+        {!hideHeader && (
+          <button
+            type="button"
+            onClick={handleHeaderTitleClick}
+            className="flex items-center gap-2 text-sm font-medium text-foreground"
+          >
+            <Sparkles size={14} strokeWidth={1.75} className="text-foreground-tertiary" />
+            Chat
+          </button>
+        )}
         <div className="flex items-center gap-1">
           {debugEnabled && !showSettings && (
             <button
@@ -283,14 +287,16 @@ export function ChatPanel({ panelId, sessionId }: ChatPanelProps) {
               <Settings size={15} strokeWidth={1.6} />
             </button>
           )}
-          <button
-            type="button"
-            onClick={() => useUIStore.getState().closePanel(panelId)}
-            className="inline-flex h-7 w-7 items-center justify-center rounded-full text-foreground-tertiary transition-colors hover:bg-foreground/4 hover:text-foreground"
-            aria-label="Close chat"
-          >
-            <X size={15} strokeWidth={1.6} />
-          </button>
+          {!hideHeader && (
+            <button
+              type="button"
+              onClick={() => useUIStore.getState().closePanel(panelId)}
+              className="inline-flex h-7 w-7 items-center justify-center rounded-full text-foreground-tertiary transition-colors hover:bg-foreground/4 hover:text-foreground"
+              aria-label="Close chat"
+            >
+              <X size={15} strokeWidth={1.6} />
+            </button>
+          )}
         </div>
       </div>
 

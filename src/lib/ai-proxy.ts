@@ -11,6 +11,21 @@ import type { ProxyAssistantMessageEvent, ProxyStreamOptions } from '@mariozechn
 
 type StreamingToolCall = ToolCall & { partialJson?: string };
 
+export interface ProxyStreamRequestPayload {
+  model: Model<any>;
+  context: Context;
+  options: {
+    temperature: ProxyStreamOptions['temperature'];
+    maxTokens: ProxyStreamOptions['maxTokens'];
+    reasoning: ProxyStreamOptions['reasoning'];
+    apiKey: ProxyStreamOptions['apiKey'];
+  };
+}
+
+export interface SomaProxyStreamOptions extends ProxyStreamOptions {
+  onRequestBody?: (payload: ProxyStreamRequestPayload) => void;
+}
+
 class ProxyMessageEventStream extends EventStream<AssistantMessageEvent, AssistantMessage> {
   constructor() {
     super(
@@ -27,7 +42,7 @@ class ProxyMessageEventStream extends EventStream<AssistantMessageEvent, Assista
 export function streamProxyWithApiKey(
   model: Model<any>,
   context: Context,
-  options: ProxyStreamOptions,
+  options: SomaProxyStreamOptions,
 ): ProxyMessageEventStream {
   const stream = new ProxyMessageEventStream();
 
@@ -60,22 +75,16 @@ export function streamProxyWithApiKey(
     }
 
     try {
+      const requestBody = buildProxyStreamRequestPayload(model, context, options);
+      options.onRequestBody?.(requestBody);
+
       const response = await fetch(`${options.proxyUrl}/api/stream`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${options.authToken}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          model,
-          context,
-          options: {
-            temperature: options.temperature,
-            maxTokens: options.maxTokens,
-            reasoning: options.reasoning,
-            apiKey: options.apiKey,
-          },
-        }),
+        body: JSON.stringify(requestBody),
         signal: options.signal,
       });
 
@@ -150,6 +159,23 @@ export function streamProxyWithApiKey(
   })();
 
   return stream;
+}
+
+export function buildProxyStreamRequestPayload(
+  model: Model<any>,
+  context: Context,
+  options: Pick<ProxyStreamOptions, 'temperature' | 'maxTokens' | 'reasoning' | 'apiKey'>,
+): ProxyStreamRequestPayload {
+  return {
+    model,
+    context,
+    options: {
+      temperature: options.temperature,
+      maxTokens: options.maxTokens,
+      reasoning: options.reasoning,
+      apiKey: options.apiKey,
+    },
+  };
 }
 
 function processProxyEvent(

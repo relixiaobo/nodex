@@ -1,10 +1,11 @@
 import { Agent, type AgentEvent, type AgentMessage } from '@mariozechner/pi-agent-core';
 import { getModel, isContextOverflow } from '@mariozechner/pi-ai';
-import type { AssistantMessage, Context, Message, Model, StopReason, ToolResultMessage } from '@mariozechner/pi-ai';
+import type { AssistantMessage, Message, Model, StopReason, ToolResultMessage } from '@mariozechner/pi-ai';
 import { nanoid } from 'nanoid';
 import { getStoredToken } from './auth.js';
 import { buildAgentSystemPrompt, DEFAULT_AGENT_MODEL_ID, DEFAULT_AGENT_MAX_TOKENS, DEFAULT_AGENT_SYSTEM_PROMPT, DEFAULT_AGENT_TEMPERATURE, readAgentNodeConfig, type AgentNodeConfig } from './ai-agent-node.js';
-import { createChatTurnDebugRecord, finalizeChatTurnDebugRecord, readChatDebugEnabled } from './ai-debug.js';
+import type { ChatTurnDebugRecord, DebugTurnStatus } from './ai-debug.js';
+import { createChatTurnDebugRecord, finalizeChatTurnDebugRecord, normalizeRestoredDebugTurns, readChatDebugEnabled } from './ai-debug.js';
 import { findProviderOptionNodeId, getApiKeyForProvider, getAvailableModels, getProviderConfigs } from './ai-provider-config.js';
 import {
   createSession,
@@ -16,8 +17,8 @@ import {
 } from './ai-chat-tree.js';
 import { compactForOverflow, compactIfNeeded, getCompressedPath } from './ai-compress.js';
 import { prepareAgentContext } from './ai-context.js';
-import { streamProxyWithApiKey } from './ai-proxy.js';
-import { type ChatSession, getChatSession, getLatestChatSession, saveChatSession } from './ai-persistence.js';
+import { type ProxyStreamRequestPayload, streamProxyWithApiKey } from './ai-proxy.js';
+import { getChatDebugTurns, type ChatSession, getChatSession, getLatestChatSession, saveChatDebugTurns, saveChatSession } from './ai-persistence.js';
 import { getAITools } from './ai-tools/index.js';
 import * as loroDoc from './loro-doc.js';
 import { withCommitOrigin } from './loro-doc.js';
@@ -38,6 +39,7 @@ interface LegacyStoredAISettings {
 interface AgentRuntimeState {
   createdAt: number;
   currentSession: ChatSession | null;
+  debugTurns: ChatTurnDebugRecord[];
   hydrated: boolean;
   restorePromise: Promise<void> | null;
   temperature: number;
@@ -97,6 +99,7 @@ function getAgentRuntimeState(agent: Agent): AgentRuntimeState {
     state = {
       createdAt: Date.now(),
       currentSession: null,
+      debugTurns: [],
       hydrated: false,
       restorePromise: null,
       temperature: DEFAULT_AGENT_TEMPERATURE,
@@ -300,6 +303,7 @@ function deriveSessionTitle(messages: AgentMessage[]): string | null {
 function setCurrentSession(agent: Agent, session: ChatSession): ChatSession {
   const runtime = getAgentRuntimeState(agent);
   runtime.currentSession = session;
+  runtime.debugTurns = [];
   runtime.createdAt = session.createdAt;
   runtime.activeDebugTurnId = null;
   agent.sessionId = session.id;
@@ -315,65 +319,45 @@ function isAssistantDebugMessage(message: AgentMessage | null | undefined): mess
   return message?.role === 'assistant';
 }
 
-function buildDebugStreamOptions(
-  options: {
-    temperature?: unknown;
-    maxTokens?: unknown;
-    reasoning?: unknown;
-    transport?: unknown;
-    cacheRetention?: unknown;
-    sessionId?: unknown;
-    metadata?: unknown;
-    headers?: unknown;
-  },
-  runtime: AgentRuntimeState,
-): Record<string, unknown> {
-  return {
-    temperature: options.temperature ?? runtime.temperature,
-    maxTokens: options.maxTokens ?? runtime.maxTokens,
-    reasoning: options.reasoning ?? null,
-    transport: options.transport ?? null,
-    cacheRetention: options.cacheRetention ?? null,
-    sessionId: options.sessionId ?? null,
-    metadata: options.metadata ?? null,
-    headers: options.headers ?? null,
-    hasApiKey: true,
-  };
+function readCurrentDebugTurns(agent: Agent): ChatTurnDebugRecord[] {
+  return getAgentRuntimeState(agent).debugTurns;
 }
 
-function appendDebugTurn(session: ChatSession, turn: ReturnType<typeof createChatTurnDebugRecord>): void {
-  session.debugTurns = [...session.debugTurns, turn].slice(-MAX_SESSION_DEBUG_TURNS);
+function setCurrentDebugTurns(agent: Agent, turns: ChatTurnDebugRecord[]): void {
+  const runtime = getAgentRuntimeState(agent);
+  runtime.debugTurns = turns.slice(-MAX_SESSION_DEBUG_TURNS);
 }
 
-async function startDebugTurn(
+function appendDebugTurn(agent: Agent, turn: ChatTurnDebugRecord): void {
+  setCurrentDebugTurns(agent, [...readCurrentDebugTurns(agent), turn]);
+}
+
+function startDebugTurn(
   agent: Agent,
-  model: Model<any>,
-  context: Context,
-  options: {
-    temperature?: unknown;
-    maxTokens?: unknown;
-    reasoning?: unknown;
-    transport?: unknown;
-    cacheRetention?: unknown;
-    sessionId?: unknown;
-    metadata?: unknown;
-    headers?: unknown;
-  },
-): Promise<void> {
-  if (!await readChatDebugEnabled()) return;
-
+  requestBody: ProxyStreamRequestPayload,
+): void {
   const runtime = getAgentRuntimeState(agent);
   const session = runtime.currentSession;
   if (!session) return;
 
   const turn = createChatTurnDebugRecord({
     id: nanoid(),
-    model,
-    context,
-    options: buildDebugStreamOptions(options, runtime),
+    model: requestBody.model,
+    context: requestBody.context,
+    options: requestBody.options,
   });
-  appendDebugTurn(session, turn);
+  appendDebugTurn(agent, turn);
   runtime.activeDebugTurnId = turn.id;
+}
+
+async function restoreDebugTurns(sessionId: string, agent: Agent): Promise<void> {
+  const restoredTurns = await getChatDebugTurns(sessionId);
+  const normalized = normalizeRestoredDebugTurns(restoredTurns);
+  setCurrentDebugTurns(agent, normalized.turns);
+
+  if (normalized.changed) {
+    await saveChatDebugTurns(sessionId, normalized.turns);
+  }
 }
 
 function finalizeDebugTurn(
@@ -383,18 +367,21 @@ function finalizeDebugTurn(
     toolResults?: ToolResultMessage[];
     stopReason?: StopReason | null;
     errorMessage?: string | null;
+    status?: Exclude<DebugTurnStatus, 'running'>;
   } = {},
 ): void {
   const runtime = getAgentRuntimeState(agent);
-  const session = runtime.currentSession;
   const activeDebugTurnId = runtime.activeDebugTurnId;
-  if (!session || !activeDebugTurnId) return;
+  if (!activeDebugTurnId) return;
 
-  const turnIndex = session.debugTurns.findIndex((turn) => turn.id === activeDebugTurnId);
+  const turns = readCurrentDebugTurns(agent);
+  const turnIndex = turns.findIndex((turn) => turn.id === activeDebugTurnId);
   runtime.activeDebugTurnId = null;
   if (turnIndex < 0) return;
 
-  session.debugTurns[turnIndex] = finalizeChatTurnDebugRecord(session.debugTurns[turnIndex], args);
+  const nextTurns = turns.slice();
+  nextTurns[turnIndex] = finalizeChatTurnDebugRecord(nextTurns[turnIndex], args);
+  setCurrentDebugTurns(agent, nextTurns);
 }
 
 function getLatestAssistantMessage(agent: Agent): AssistantMessage | null {
@@ -605,7 +592,7 @@ export function createAgent(model: Model<any> = DEFAULT_CHAT_MODEL): Agent {
       }
 
       const runtime = getAgentRuntimeState(agent);
-      await startDebugTurn(agent, activeModel, context, options);
+      const debugEnabled = await readChatDebugEnabled();
 
       return streamProxyWithApiKey(activeModel, context, {
         ...options,
@@ -614,6 +601,11 @@ export function createAgent(model: Model<any> = DEFAULT_CHAT_MODEL): Agent {
         maxTokens: options.maxTokens ?? runtime.maxTokens,
         authToken,
         proxyUrl: getSyncApiUrl(),
+        onRequestBody: debugEnabled
+          ? (requestBody) => {
+            startDebugTurn(agent, requestBody);
+          }
+          : undefined,
       });
     },
   });
@@ -653,6 +645,7 @@ export function restoreChatSessionById(sessionId: string, agent: Agent): Promise
         if (session) {
           trimIncompleteTrail(session);
           setCurrentSession(agent, session);
+          await restoreDebugTurns(session.id, agent);
           agent.replaceMessages(getCompressedPath(session));
           try {
             await configureAgent(agent);
@@ -675,6 +668,7 @@ export function restoreChatSessionById(sessionId: string, agent: Agent): Promise
       }
 
       setCurrentSession(agent, persistedSession);
+      setCurrentDebugTurns(agent, []);
       agent.replaceMessages([]);
       try {
         await configureAgent(agent);
@@ -702,6 +696,7 @@ export function restoreLatestChatSession(agent: Agent = getAIAgent()): Promise<v
         if (latestSession) {
           trimIncompleteTrail(latestSession);
           setCurrentSession(agent, latestSession);
+          await restoreDebugTurns(latestSession.id, agent);
           agent.replaceMessages(getCompressedPath(latestSession));
           try {
             await configureAgent(agent);
@@ -716,6 +711,7 @@ export function restoreLatestChatSession(agent: Agent = getAIAgent()): Promise<v
       }
 
       setCurrentSession(agent, createSession());
+      setCurrentDebugTurns(agent, []);
       agent.replaceMessages([]);
       try {
         await configureAgent(agent);
@@ -735,8 +731,12 @@ export async function persistChatSession(agent: Agent = getAIAgent()): Promise<v
   if (!runtime.currentSession) return;
 
   try {
-    const persisted = await saveChatSession(runtime.currentSession);
-    runtime.currentSession.updatedAt = persisted.updatedAt;
+    const [persistedSession, persistedTurns] = await Promise.all([
+      saveChatSession(runtime.currentSession),
+      saveChatDebugTurns(runtime.currentSession.id, runtime.debugTurns),
+    ]);
+    runtime.currentSession.updatedAt = persistedSession.updatedAt;
+    runtime.debugTurns = persistedTurns;
   } catch {
     // Ignore persistence failures; chat should still function.
   }
@@ -822,4 +822,8 @@ export function resetAIAgentForTests(): void {
 
 export function getCurrentSession(agent: Agent = getAIAgent()): ChatSession | null {
   return getAgentRuntimeState(agent).currentSession;
+}
+
+export function getCurrentDebugTurns(agent: Agent = getAIAgent()): ChatTurnDebugRecord[] {
+  return readCurrentDebugTurns(agent);
 }

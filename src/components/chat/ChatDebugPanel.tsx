@@ -69,6 +69,8 @@ function turnStatusClass(status: ChatTurnDebugRecord['status']): string {
       return 'border-destructive/30 bg-destructive/10 text-destructive';
     case 'aborted':
       return 'border-amber-500/30 bg-amber-500/10 text-amber-700';
+    case 'interrupted':
+      return 'border-border bg-background text-foreground-tertiary';
     default:
       return 'border-border bg-background text-foreground-tertiary';
   }
@@ -155,6 +157,9 @@ function TurnLogCard({
               {turn.requestSummary}
             </div>
             <div className="mt-1 font-mono text-[10px] leading-4 text-foreground-secondary">
+              {turn.responseSummary}
+            </div>
+            <div className="mt-1 font-mono text-[10px] leading-4 text-foreground-secondary">
               {turn.provider} / {turn.modelId} · {formatTimestamp(turn.startedAt)} · {formatDuration(turn.durationMs)}
             </div>
           </div>
@@ -162,7 +167,7 @@ function TurnLogCard({
 
         <div className="space-y-1 font-mono text-[10px] text-foreground-secondary">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <span>stop: {turn.response.stopReason ?? 'pending'}</span>
+            <span>stop: {turn.response.stopReason ?? (turn.status === 'interrupted' ? 'interrupted' : 'pending')}</span>
             <span>tool results: {turn.response.toolResultCount}</span>
             <span>request: {formatTokenCount(turn.request.tokenEstimate.total)}</span>
           </div>
@@ -215,7 +220,7 @@ function TurnLogCard({
 
           <DebugSection
             title="Response"
-            meta={turn.response.stopReason ?? 'pending'}
+            meta={turn.response.stopReason ?? (turn.status === 'interrupted' ? 'interrupted' : 'pending')}
             open={responseOpen}
             onToggle={onToggleResponse}
           >

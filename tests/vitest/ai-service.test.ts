@@ -225,7 +225,19 @@ describe('ai-service', () => {
     } as unknown as typeof chrome;
 
     streamProxyMock.mockReset();
-    streamProxyMock.mockReturnValue({ mocked: true });
+    streamProxyMock.mockImplementation((model, context, options = {}) => {
+      options.onRequestBody?.({
+        model,
+        context,
+        options: {
+          temperature: options.temperature,
+          maxTokens: options.maxTokens,
+          reasoning: options.reasoning,
+          apiKey: options.apiKey,
+        },
+      });
+      return { mocked: true };
+    });
     getStoredTokenMock.mockReset();
     getStoredTokenMock.mockResolvedValue('auth-token');
     prepareAgentContextMock.mockReset();
@@ -340,14 +352,14 @@ describe('ai-service', () => {
     );
   });
 
-  it('captures redacted turn logs from actual stream payloads when AI Debug is enabled', async () => {
+  it('captures the actual proxy request body in turn logs when AI Debug is enabled', async () => {
     storage['soma-chat-debug-enabled'] = true;
     storage['soma-ai-settings'] = {
       provider: 'anthropic',
       apiKey: 'sk-ant-debug',
     };
 
-    const { createAgent, createNewChatSession, getCurrentSession } = await import('../../src/lib/ai-service.js');
+    const { createAgent, createNewChatSession, getCurrentDebugTurns } = await import('../../src/lib/ai-service.js');
     const agent = createAgent();
 
     await createNewChatSession(agent);
@@ -365,18 +377,71 @@ describe('ai-service', () => {
       },
       {
         temperature: 0.3,
-        metadata: { panel: 'chat' },
+        headers: { 'x-debug': '1' },
       },
     );
 
-    const turns = getCurrentSession(agent)?.debugTurns ?? [];
+    const turns = getCurrentDebugTurns(agent);
 
     expect(turns).toHaveLength(1);
     expect(turns[0]?.request.json).toContain('"systemPrompt": "Turn prompt"');
-    expect(turns[0]?.request.json).toContain('"metadata"');
-    expect(turns[0]?.request.json).toContain('"hasApiKey": true');
+    expect(turns[0]?.request.json).toContain('"temperature": 0.3');
+    expect(turns[0]?.request.json).not.toContain('"headers"');
     expect(turns[0]?.request.json).not.toContain('sk-ant-debug');
     expect(turns[0]?.request.json).not.toContain('auth-token');
+  });
+
+  it('marks stale running debug turns as interrupted when restoring a session', async () => {
+    const { saveChatDebugTurns } = await import('../../src/lib/ai-persistence.js');
+    const { createAgent, createNewChatSession, getCurrentDebugTurns, restoreChatSessionById } = await import('../../src/lib/ai-service.js');
+
+    const agent = createAgent();
+    await createNewChatSession(agent);
+    const sessionId = agent.sessionId!;
+
+    await saveChatDebugTurns(sessionId, [
+      {
+        id: 'turn_running',
+        startedAt: 100,
+        finishedAt: null,
+        durationMs: null,
+        modelId: 'claude-sonnet-4-5',
+        provider: 'anthropic',
+        status: 'running',
+        requestSummary: 'Inspect the page',
+        responseSummary: 'Waiting for response…',
+        request: {
+          json: '{"context":{"messages":[]}}',
+          messageCount: 1,
+          toolCount: 0,
+          tokenEstimate: {
+            systemPrompt: 1,
+            messages: 2,
+            tools: 0,
+            total: 3,
+            contextWindow: 200000,
+            usagePercent: 0.0015,
+          },
+        },
+        response: {
+          json: '{"assistantMessage":null}',
+          stopReason: null,
+          usage: null,
+          toolResultCount: 0,
+          errorMessage: null,
+        },
+      },
+    ]);
+
+    const restoredAgent = createAgent();
+    await restoreChatSessionById(sessionId, restoredAgent);
+
+    const restoredTurns = getCurrentDebugTurns(restoredAgent);
+
+    expect(restoredTurns).toHaveLength(1);
+    expect(restoredTurns[0]?.status).toBe('interrupted');
+    expect(restoredTurns[0]?.finishedAt).not.toBeNull();
+    expect(restoredTurns[0]?.response.errorMessage).toBe('Session reloaded before this turn completed.');
   });
 
   it('registers transformContext that delegates to the shared context preparation helper', async () => {

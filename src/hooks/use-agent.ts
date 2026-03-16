@@ -6,6 +6,7 @@ import { getBranches, getLinearPath } from '../lib/ai-chat-tree.js';
 import type { ChatTurnDebugRecord } from '../lib/ai-debug.js';
 import {
   createNewChatSession,
+  getCurrentDebugTurns,
   editAndResend,
   getCurrentSession,
   getAIAgent,
@@ -150,7 +151,7 @@ export function useAgent(agent: Agent = getAIAgent(), sessionId?: string) {
         tools: agent.state.tools,
         modelId: agent.state.model.id,
         provider: agent.state.model.provider,
-        turns: getCurrentSession(agent)?.debugTurns ?? [],
+        turns: getCurrentDebugTurns(agent),
       } satisfies AgentDebugState,
       sendMessage: (prompt: string) => streamChat(prompt, agent),
       editMessage: (nodeId: string, newContent: string) => editAndResend(nodeId, newContent, agent),

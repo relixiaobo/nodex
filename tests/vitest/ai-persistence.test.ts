@@ -5,10 +5,12 @@ import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { getLinearPath, linearToTree, type ChatSession } from '../../src/lib/ai-chat-tree.js';
 import {
   deleteChatSession,
+  getChatDebugTurns,
   getChatSession,
   getLatestChatSession,
   listChatSessionMetas,
   resetChatPersistenceForTests,
+  saveChatDebugTurns,
   saveChatSession,
 } from '../../src/lib/ai-persistence.js';
 
@@ -89,6 +91,41 @@ async function seedLegacySessions(sessions: LegacyChatSession[]): Promise<void> 
   });
 }
 
+async function seedV2SessionsWithEmbeddedDebugTurns(sessions: Array<ChatSession & { debugTurns: unknown[] }>): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, 2);
+
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      const sessionStore = db.createObjectStore(STORE_NAME, { keyPath: 'id' });
+      sessionStore.createIndex(UPDATED_AT_INDEX, UPDATED_AT_INDEX);
+      const metaStore = db.createObjectStore('session-metas', { keyPath: 'id' });
+      metaStore.createIndex(UPDATED_AT_INDEX, UPDATED_AT_INDEX);
+    };
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      const db = request.result;
+      const tx = db.transaction([STORE_NAME, 'session-metas'], 'readwrite');
+      const sessionStore = tx.objectStore(STORE_NAME);
+      const metaStore = tx.objectStore('session-metas');
+      for (const session of sessions) {
+        sessionStore.put(session);
+        metaStore.put({
+          id: session.id,
+          title: session.title,
+          updatedAt: session.updatedAt,
+        });
+      }
+      tx.oncomplete = () => {
+        db.close();
+        resolve();
+      };
+      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error);
+    };
+  });
+}
+
 describe('ai persistence', () => {
   beforeEach(async () => {
     await resetPersistence();
@@ -132,6 +169,54 @@ describe('ai persistence', () => {
     expect(restored?.selectedModelId).toBe('gpt-4o');
   });
 
+  it('persists debug turn logs separately from the chat session payload', async () => {
+    await saveChatSession(buildSession('session_debug', [
+      { role: 'user', content: 'hello', timestamp: 1 },
+    ]));
+
+    await saveChatDebugTurns('session_debug', [
+      {
+        id: 'turn_1',
+        startedAt: 1,
+        finishedAt: 2,
+        durationMs: 1,
+        modelId: 'claude-sonnet-4-5',
+        provider: 'anthropic',
+        status: 'completed',
+        requestSummary: 'hello',
+        responseSummary: 'hi',
+        request: {
+          json: '{"context":{"messages":[{"role":"user"}]}}',
+          messageCount: 1,
+          toolCount: 0,
+          tokenEstimate: {
+            systemPrompt: 1,
+            messages: 1,
+            tools: 0,
+            total: 2,
+            contextWindow: 200000,
+            usagePercent: 0.001,
+          },
+        },
+        response: {
+          json: '{"assistantMessage":{"role":"assistant"}}',
+          stopReason: 'stop',
+          usage: null,
+          toolResultCount: 0,
+          errorMessage: null,
+        },
+      },
+    ]);
+
+    const restoredSession = await getChatSession('session_debug');
+    const restoredTurns = await getChatDebugTurns('session_debug');
+
+    expect(restoredSession).not.toBeNull();
+    expect(Object.hasOwn(restoredSession!, 'debugTurns')).toBe(false);
+    expect(restoredTurns).toHaveLength(1);
+    expect(restoredTurns[0]?.id).toBe('turn_1');
+  });
+
   it('keeps long sessions intact instead of trimming to the latest 100 entries', async () => {
     const messages = Array.from({ length: 105 }, (_, index) => ({
       role: 'user' as const,
@@ -156,10 +241,44 @@ describe('ai persistence', () => {
     await saveChatSession(buildSession('session_delete', [
       { role: 'user', content: 'delete me', timestamp: 1 },
     ]));
+    await saveChatDebugTurns('session_delete', [
+      {
+        id: 'turn_delete',
+        startedAt: 1,
+        finishedAt: 2,
+        durationMs: 1,
+        modelId: 'claude-sonnet-4-5',
+        provider: 'anthropic',
+        status: 'completed',
+        requestSummary: 'delete me',
+        responseSummary: 'ok',
+        request: {
+          json: '{}',
+          messageCount: 1,
+          toolCount: 0,
+          tokenEstimate: {
+            systemPrompt: 0,
+            messages: 1,
+            tools: 0,
+            total: 1,
+            contextWindow: 200000,
+            usagePercent: 0.0005,
+          },
+        },
+        response: {
+          json: '{}',
+          stopReason: 'stop',
+          usage: null,
+          toolResultCount: 0,
+          errorMessage: null,
+        },
+      },
+    ]);
 
     await deleteChatSession('session_delete');
 
     expect(await getChatSession('session_delete')).toBeNull();
+    expect(await getChatDebugTurns('session_delete')).toEqual([]);
     expect(await listChatSessionMetas()).toEqual([]);
   });
 
@@ -280,5 +399,60 @@ describe('ai persistence', () => {
     expect(await listChatSessionMetas()).toEqual([
       { id: 'legacy_session', title: 'legacy hello', updatedAt: 200 },
     ]);
+  });
+
+  it('migrates embedded debug turns from the session store into the dedicated debug store', async () => {
+    const session = buildSession('session_embedded_debug', [
+      { role: 'user', content: 'hello', timestamp: 1 },
+    ]);
+
+    await seedV2SessionsWithEmbeddedDebugTurns([
+      {
+        ...session,
+        debugTurns: [
+          {
+            id: 'turn_embedded',
+            startedAt: 1,
+            finishedAt: 2,
+            durationMs: 1,
+            modelId: 'claude-sonnet-4-5',
+            provider: 'anthropic',
+            status: 'completed',
+            requestSummary: 'hello',
+            responseSummary: 'hi',
+            request: {
+              json: '{"context":{"messages":[]}}',
+              messageCount: 1,
+              toolCount: 0,
+              tokenEstimate: {
+                systemPrompt: 0,
+                messages: 1,
+                tools: 0,
+                total: 1,
+                contextWindow: 200000,
+                usagePercent: 0.0005,
+              },
+            },
+            response: {
+              json: '{"assistantMessage":{"role":"assistant"}}',
+              stopReason: 'stop',
+              usage: null,
+              toolResultCount: 0,
+              errorMessage: null,
+            },
+          },
+        ],
+      },
+    ]);
+
+    resetChatPersistenceForTests();
+
+    const restoredSession = await getChatSession('session_embedded_debug');
+    const restoredTurns = await getChatDebugTurns('session_embedded_debug');
+
+    expect(restoredSession).not.toBeNull();
+    expect(Object.hasOwn(restoredSession!, 'debugTurns')).toBe(false);
+    expect(restoredTurns).toHaveLength(1);
+    expect(restoredTurns[0]?.id).toBe('turn_embedded');
   });
 });

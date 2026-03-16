@@ -1,6 +1,5 @@
 import type { AgentMessage } from '@mariozechner/pi-agent-core';
 import { nanoid } from 'nanoid';
-import type { ChatTurnDebugRecord } from './ai-debug.js';
 
 export interface BridgeEntry {
   afterNodeId: string;
@@ -24,7 +23,6 @@ export interface ChatSession {
   currentNode: string;
   selectedModelId?: string;
   selectedProvider?: string;
-  debugTurns: ChatTurnDebugRecord[];
   createdAt: number;
   updatedAt: number;
   syncedAt: number | null;
@@ -108,7 +106,6 @@ export function createSession(id?: string): ChatSession {
     updatedAt: now,
     syncedAt: null,
     revision: 0,
-    debugTurns: [],
     bridges: [],
   };
 }

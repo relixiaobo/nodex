@@ -2,14 +2,17 @@ import type { AgentMessage } from '@mariozechner/pi-agent-core';
 import { openDB, type DBSchema, type IDBPDatabase, type IDBPTransaction, unwrap } from 'idb';
 import { linearToTree } from './ai-chat-tree.js';
 import type { BridgeEntry, ChatSession, MessageNode } from './ai-chat-tree.js';
+import type { ChatTurnDebugRecord } from './ai-debug.js';
 import { messageHasImage, replaceMessageImages } from './ai-message-images.js';
 
 const DB_NAME = 'soma-ai-chat';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 const STORE_NAME = 'sessions';
 const META_STORE_NAME = 'session-metas';
+const DEBUG_STORE_NAME = 'session-debug-turns';
 const UPDATED_AT_INDEX = 'updatedAt';
-const STORE_NAMES = [STORE_NAME, META_STORE_NAME] as const;
+const SESSION_STORE_NAMES = [STORE_NAME, META_STORE_NAME] as const;
+const ALL_STORE_NAMES = [STORE_NAME, META_STORE_NAME, DEBUG_STORE_NAME] as const;
 
 interface ChatSessionMeta {
   id: string;
@@ -24,10 +27,19 @@ interface LegacyChatSession {
   updatedAt: number;
 }
 
+interface ChatDebugTurnsRecord {
+  id: string;
+  turns: ChatTurnDebugRecord[];
+}
+
+type PersistedChatSession = ChatSession & {
+  debugTurns?: ChatTurnDebugRecord[];
+};
+
 interface ChatPersistenceDB extends DBSchema {
   [STORE_NAME]: {
     key: string;
-    value: ChatSession;
+    value: PersistedChatSession;
     indexes: {
       [UPDATED_AT_INDEX]: number;
     };
@@ -38,6 +50,10 @@ interface ChatPersistenceDB extends DBSchema {
     indexes: {
       [UPDATED_AT_INDEX]: number;
     };
+  };
+  [DEBUG_STORE_NAME]: {
+    key: string;
+    value: ChatDebugTurnsRecord;
   };
 }
 
@@ -71,10 +87,14 @@ function migrateLegacySession(session: LegacyChatSession): ChatSession {
 }
 
 function normalizeChatSession(session: ChatSession): ChatSession {
+  const { debugTurns: _debugTurns, ...rest } = session as PersistedChatSession;
   return {
-    ...session,
-    debugTurns: Array.isArray(session.debugTurns) ? session.debugTurns : [],
+    ...rest,
   };
+}
+
+function normalizeChatDebugTurns(turns: ChatTurnDebugRecord[] | null | undefined): ChatTurnDebugRecord[] {
+  return Array.isArray(turns) ? turns : [];
 }
 
 function toSessionMeta(session: ChatSession): ChatSessionMeta {
@@ -87,8 +107,8 @@ function toSessionMeta(session: ChatSession): ChatSessionMeta {
 
 function ensureStore(
   db: IDBPDatabase<ChatPersistenceDB>,
-  transaction: IDBPTransaction<ChatPersistenceDB, typeof STORE_NAMES, 'versionchange'>,
-  storeName: typeof STORE_NAMES[number],
+  transaction: IDBPTransaction<ChatPersistenceDB, typeof ALL_STORE_NAMES, 'versionchange'>,
+  storeName: typeof SESSION_STORE_NAMES[number],
 ): IDBObjectStore {
   const store = db.objectStoreNames.contains(storeName)
     ? unwrap(transaction.objectStore(storeName))
@@ -101,6 +121,17 @@ function ensureStore(
   return store;
 }
 
+function ensureDebugStore(
+  db: IDBPDatabase<ChatPersistenceDB>,
+  transaction: IDBPTransaction<ChatPersistenceDB, typeof ALL_STORE_NAMES, 'versionchange'>,
+): IDBObjectStore {
+  if (db.objectStoreNames.contains(DEBUG_STORE_NAME)) {
+    return unwrap(transaction.objectStore(DEBUG_STORE_NAME));
+  }
+
+  return unwrap(db.createObjectStore(DEBUG_STORE_NAME, { keyPath: 'id' }));
+}
+
 function backfillSessionMetas(sessionStore: IDBObjectStore, metaStore: IDBObjectStore): void {
   const cursorRequest = sessionStore.openCursor();
 
@@ -108,13 +139,34 @@ function backfillSessionMetas(sessionStore: IDBObjectStore, metaStore: IDBObject
     const cursor = cursorRequest.result;
     if (!cursor) return;
 
-    const rawValue = cursor.value as ChatSession | LegacyChatSession;
+    const rawValue = cursor.value as PersistedChatSession | LegacyChatSession;
     const nextValue = isLegacyChatSession(rawValue)
       ? migrateLegacySession(rawValue)
-      : rawValue;
+      : normalizeChatSession(rawValue);
 
     cursor.update(nextValue);
     metaStore.put(toSessionMeta(nextValue));
+    cursor.continue();
+  };
+}
+
+function migrateEmbeddedDebugTurns(sessionStore: IDBObjectStore, debugStore: IDBObjectStore): void {
+  const cursorRequest = sessionStore.openCursor();
+
+  cursorRequest.onsuccess = () => {
+    const cursor = cursorRequest.result;
+    if (!cursor) return;
+
+    const rawValue = cursor.value as PersistedChatSession;
+    const turns = normalizeChatDebugTurns(rawValue.debugTurns);
+    if (turns.length > 0) {
+      debugStore.put({
+        id: rawValue.id,
+        turns,
+      } satisfies ChatDebugTurnsRecord);
+      cursor.update(normalizeChatSession(rawValue));
+    }
+
     cursor.continue();
   };
 }
@@ -130,6 +182,13 @@ async function getDB(): Promise<IDBPDatabase<ChatPersistenceDB>> {
 
       if (oldVersion < 2) {
         backfillSessionMetas(sessionStore, metaStore);
+      }
+
+      if (oldVersion < 3) {
+        const debugStore = ensureDebugStore(db, transaction);
+        migrateEmbeddedDebugTurns(sessionStore, debugStore);
+      } else {
+        ensureDebugStore(db, transaction);
       }
     },
     terminated() {
@@ -172,7 +231,7 @@ export async function saveChatSession(session: ChatSession): Promise<ChatSession
     mapping: stripMappingImagesForPersistence(normalizedSession.mapping),
   };
 
-  const tx = db.transaction(STORE_NAMES, 'readwrite');
+  const tx = db.transaction(SESSION_STORE_NAMES, 'readwrite');
   await Promise.all([
     tx.objectStore(STORE_NAME).put(nextSession),
     tx.objectStore(META_STORE_NAME).put(toSessionMeta(nextSession)),
@@ -190,7 +249,7 @@ export async function getChatSession(sessionId: string): Promise<ChatSession | n
 
 export async function getLatestChatSession(): Promise<ChatSession | null> {
   const db = await getDB();
-  const tx = db.transaction(STORE_NAMES, 'readonly');
+  const tx = db.transaction(SESSION_STORE_NAMES, 'readonly');
   const metaCursor = await tx.objectStore(META_STORE_NAME)
     .index(UPDATED_AT_INDEX)
     .openCursor(null, 'prev');
@@ -224,12 +283,31 @@ export async function listChatSessionMetas(): Promise<ChatSessionMeta[]> {
 
 export async function deleteChatSession(sessionId: string): Promise<void> {
   const db = await getDB();
-  const tx = db.transaction(STORE_NAMES, 'readwrite');
+  const tx = db.transaction(ALL_STORE_NAMES, 'readwrite');
   await Promise.all([
     tx.objectStore(STORE_NAME).delete(sessionId),
     tx.objectStore(META_STORE_NAME).delete(sessionId),
+    tx.objectStore(DEBUG_STORE_NAME).delete(sessionId),
   ]);
   await tx.done;
+}
+
+export async function saveChatDebugTurns(sessionId: string, turns: ChatTurnDebugRecord[]): Promise<ChatTurnDebugRecord[]> {
+  const db = await getDB();
+  const normalizedTurns = normalizeChatDebugTurns(turns);
+  const tx = db.transaction(DEBUG_STORE_NAME, 'readwrite');
+  await tx.objectStore(DEBUG_STORE_NAME).put({
+    id: sessionId,
+    turns: normalizedTurns,
+  } satisfies ChatDebugTurnsRecord);
+  await tx.done;
+  return normalizedTurns;
+}
+
+export async function getChatDebugTurns(sessionId: string): Promise<ChatTurnDebugRecord[]> {
+  const db = await getDB();
+  const record = await db.get(DEBUG_STORE_NAME, sessionId);
+  return normalizeChatDebugTurns(record?.turns);
 }
 
 export function resetChatPersistenceForTests(): void {

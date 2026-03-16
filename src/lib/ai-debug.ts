@@ -53,7 +53,7 @@ export interface DebugTokenEstimate {
   usagePercent: number;
 }
 
-export type DebugTurnStatus = 'running' | 'completed' | 'error' | 'aborted';
+export type DebugTurnStatus = 'running' | 'completed' | 'error' | 'aborted' | 'interrupted';
 
 export interface ChatTurnDebugRecord {
   id: string;
@@ -384,6 +384,7 @@ export function finalizeChatTurnDebugRecord(
     finishedAt?: number;
     errorMessage?: string | null;
     stopReason?: StopReason | null;
+    status?: Exclude<DebugTurnStatus, 'running'>;
   } = {},
 ): ChatTurnDebugRecord {
   const assistantMessage = args.assistantMessage ?? null;
@@ -395,11 +396,13 @@ export function finalizeChatTurnDebugRecord(
     ? getMessageSummary(assistantMessage).summary
     : truncateSummary(errorMessage ?? 'No assistant response captured');
 
-  let status: DebugTurnStatus = 'completed';
-  if (stopReason === 'aborted') {
-    status = 'aborted';
-  } else if (stopReason === 'error' || errorMessage) {
-    status = 'error';
+  let status: DebugTurnStatus = args.status ?? 'completed';
+  if (!args.status) {
+    if (stopReason === 'aborted') {
+      status = 'aborted';
+    } else if (stopReason === 'error' || errorMessage) {
+      status = 'error';
+    }
   }
 
   return {
@@ -418,6 +421,34 @@ export function finalizeChatTurnDebugRecord(
       toolResultCount: toolResults.length,
       errorMessage,
     },
+  };
+}
+
+export function normalizeRestoredDebugTurns(
+  turns: ChatTurnDebugRecord[],
+  restoredAt: number = Date.now(),
+): {
+  turns: ChatTurnDebugRecord[];
+  changed: boolean;
+} {
+  let changed = false;
+
+  const normalizedTurns = turns.map((turn) => {
+    if (turn.status !== 'running') {
+      return turn;
+    }
+
+    changed = true;
+    return finalizeChatTurnDebugRecord(turn, {
+      finishedAt: restoredAt,
+      status: 'interrupted',
+      errorMessage: 'Session reloaded before this turn completed.',
+    });
+  });
+
+  return {
+    turns: normalizedTurns,
+    changed,
   };
 }
 

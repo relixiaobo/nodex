@@ -2,9 +2,10 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { Sparkles, X } from '../../lib/icons.js';
 import { useAgent } from '../../hooks/use-agent.js';
+import type { ThinkingLevel } from '@mariozechner/pi-ai';
 import { readChatDebugEnabled, writeChatDebugEnabled } from '../../lib/ai-debug.js';
-import { getAvailableModels } from '../../lib/ai-provider-config.js';
-import { getAgentForSession, selectChatModel } from '../../lib/ai-service.js';
+import { getAvailableModelsWithMeta } from '../../lib/ai-provider-config.js';
+import { getAgentForSession, selectChatModel, selectThinkingLevel } from '../../lib/ai-service.js';
 import { useNodeStore } from '../../stores/node-store.js';
 import { useUIStore } from '../../stores/ui-store.js';
 import { SYSTEM_NODE_IDS } from '../../types/index.js';
@@ -61,6 +62,8 @@ export function ChatPanel({ panelId, sessionId, hideHeader }: ChatPanelProps) {
   const debugTapCountRef = useRef(0);
   const [debugEnabled, setDebugEnabled] = useState(false);
   const [debugOpen, setDebugOpen] = useState(false);
+  const [thinkingLevel, setThinkingLevel] = useState<ThinkingLevel | null>(debug.thinkingLevel);
+  const [selectedModelKey, setSelectedModelKey] = useState<{ id: string; provider: string } | null>(null);
   const [pendingMessageActionId, setPendingMessageActionId] = useState<string | null>(null);
   const chatBusy = isStreaming || pendingMessageActionId !== null;
   const debugActionLabel = !debugEnabled
@@ -71,28 +74,25 @@ export function ChatPanel({ panelId, sessionId, hideHeader }: ChatPanelProps) {
 
   const availableModels = useMemo(() => {
     void settingsVersion;
-    return getAvailableModels();
+    return getAvailableModelsWithMeta();
   }, [settingsVersion]);
   const hasAvailableModels = availableModels.length > 0;
 
   const currentModel = useMemo(() => {
+    const key = selectedModelKey ?? { id: debug.modelId, provider: debug.provider };
     const selectedModel = availableModels.find(
-      (model) => model.id === debug.modelId && model.provider === debug.provider,
+      (model) => model.id === key.id && model.provider === key.provider,
     );
-    if (selectedModel) {
-      return {
-        id: selectedModel.id,
-        name: selectedModel.name,
-        provider: selectedModel.provider,
-      };
-    }
+    if (selectedModel) return selectedModel;
 
     return {
       id: debug.modelId,
       name: agent.state.model.name,
       provider: debug.provider,
+      reasoning: debug.reasoning,
+      featured: false,
     };
-  }, [agent.state.model.name, availableModels, debug.modelId, debug.provider]);
+  }, [agent.state.model.name, availableModels, debug.modelId, debug.provider, debug.reasoning, selectedModelKey]);
 
   useEffect(() => {
     let cancelled = false;
@@ -115,6 +115,11 @@ export function ChatPanel({ panelId, sessionId, hideHeader }: ChatPanelProps) {
       }
     };
   }, []);
+
+  useEffect(() => {
+    setThinkingLevel(debug.thinkingLevel);
+    setSelectedModelKey(null);
+  }, [debug.thinkingLevel, debug.modelId, debug.provider]);
 
   useEffect(() => {
     if (debugEnabled) return;
@@ -221,10 +226,27 @@ export function ChatPanel({ panelId, sessionId, hideHeader }: ChatPanelProps) {
   }
 
   async function handleModelChange(modelId: string, provider: string) {
+    const prevThinking = thinkingLevel;
+    setSelectedModelKey({ id: modelId, provider });
     try {
-      await selectChatModel(modelId, provider, agent);
+      const model = await selectChatModel(modelId, provider, agent);
+      if (!model.reasoning) {
+        setThinkingLevel(null);
+      }
     } catch (changeError) {
+      setSelectedModelKey(null);
+      setThinkingLevel(prevThinking);
       toast.error(getActionErrorMessage(changeError, 'Failed to switch models'));
+    }
+  }
+
+  async function handleThinkingChange(level: ThinkingLevel | null) {
+    setThinkingLevel(level);
+    try {
+      await selectThinkingLevel(level, agent);
+    } catch (thinkingError) {
+      setThinkingLevel(debug.thinkingLevel);
+      toast.error(getActionErrorMessage(thinkingError, 'Failed to change thinking level'));
     }
   }
 
@@ -275,104 +297,110 @@ export function ChatPanel({ panelId, sessionId, hideHeader }: ChatPanelProps) {
           Loading chat…
         </div>
       ) : !hasAvailableModels ? (
-        <div className="flex flex-1 flex-col justify-center gap-4 px-6">
+        <div className="flex flex-1 overflow-hidden">
+          <div className="flex flex-1 flex-col justify-center gap-4 px-6">
+            <div className="flex flex-col items-center gap-4 text-center">
+              <div className="max-w-[260px] text-sm text-foreground-tertiary">
+                Configure an AI provider to start chatting
+              </div>
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleOpenSettings}
+                  className="inline-flex h-9 items-center rounded-full border border-border px-4 text-sm font-medium text-foreground transition-colors hover:bg-foreground/4"
+                >
+                  Open Settings
+                </button>
+                <button
+                  type="button"
+                  onClick={handleToggleDebug}
+                  className="inline-flex h-9 items-center rounded-full border border-border px-4 text-sm font-medium text-foreground-secondary transition-colors hover:bg-foreground/4 hover:text-foreground"
+                >
+                  {debugActionLabel}
+                </button>
+              </div>
+            </div>
+          </div>
           {debugEnabled && debugOpen && (
-            <div className="mx-auto w-full max-w-[560px]">
+            <div className="w-1/2 shrink-0 overflow-y-auto border-l border-border px-3 py-3">
               <ChatDebugPanel debug={debug} />
             </div>
           )}
-          <div className="flex flex-col items-center gap-4 text-center">
-            <div className="max-w-[260px] text-sm text-foreground-tertiary">
-              Configure an AI provider to start chatting
-            </div>
-            <div className="flex flex-wrap items-center justify-center gap-2">
-              <button
-                type="button"
-                onClick={handleOpenSettings}
-                className="inline-flex h-9 items-center rounded-full border border-border px-4 text-sm font-medium text-foreground transition-colors hover:bg-foreground/4"
-              >
-                Open Settings
-              </button>
-              <button
-                type="button"
-                onClick={handleToggleDebug}
-                className="inline-flex h-9 items-center rounded-full border border-border px-4 text-sm font-medium text-foreground-secondary transition-colors hover:bg-foreground/4 hover:text-foreground"
-              >
-                {debugActionLabel}
-              </button>
-            </div>
-          </div>
         </div>
       ) : (
-        <>
-          <div
-            ref={scrollRef}
-            className="flex flex-1 flex-col overflow-y-auto px-4 py-4"
-            onScroll={() => {
-              const scroller = scrollRef.current;
-              if (!scroller) return;
-              shouldStickToBottomRef.current = shouldStickChatScroll(scroller);
-            }}
-          >
-            {debugEnabled && debugOpen && (
-              <div className="mb-4">
-                <ChatDebugPanel debug={debug} />
-              </div>
-            )}
-            {messages.length === 0 ? (
-              <div className="flex h-full min-h-40 flex-col items-center justify-center gap-4 px-6">
-                <div className="text-center text-sm text-foreground-tertiary">
-                  Ask about your notes, clips, or the page you&apos;re reading.
+        <div className="flex flex-1 overflow-hidden">
+          <div className="flex flex-1 flex-col overflow-hidden">
+            <div
+              ref={scrollRef}
+              className="flex flex-1 flex-col overflow-y-auto px-4 py-4"
+              onScroll={() => {
+                const scroller = scrollRef.current;
+                if (!scroller) return;
+                shouldStickToBottomRef.current = shouldStickChatScroll(scroller);
+              }}
+            >
+              {messages.length === 0 ? (
+                <div className="flex h-full min-h-40 flex-col items-center justify-center gap-4 px-6">
+                  <div className="text-center text-sm text-foreground-tertiary">
+                    Ask about your notes, clips, or the page you&apos;re reading.
+                  </div>
+                  <div className="flex w-full max-w-[260px] flex-col gap-2">
+                    {[
+                      'Summarize this page',
+                      'Organize my notes from today',
+                      'What did I clip this week?',
+                    ].map((suggestion) => (
+                      <button
+                        key={suggestion}
+                        type="button"
+                        onClick={() => void handleSendMessage(suggestion)}
+                        className="rounded-lg border border-border px-3 py-2 text-left text-sm text-foreground-secondary transition-colors hover:bg-foreground/4 hover:text-foreground"
+                      >
+                        {suggestion}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-                <div className="flex w-full max-w-[260px] flex-col gap-2">
-                  {[
-                    'Summarize this page',
-                    'Organize my notes from today',
-                    'What did I clip this week?',
-                  ].map((suggestion) => (
-                    <button
-                      key={suggestion}
-                      type="button"
-                      onClick={() => void handleSendMessage(suggestion)}
-                      className="rounded-lg border border-border px-3 py-2 text-left text-sm text-foreground-secondary transition-colors hover:bg-foreground/4 hover:text-foreground"
-                    >
-                      {suggestion}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              messages.map((entry, index) => (
-                <ChatMessage
-                  key={entry.nodeId ?? `stream-${entry.message.timestamp}-${index}`}
-                  entry={entry}
-                  toolResults={toolResults}
-                  streaming={isStreaming && index === messages.length - 1 && entry.message.role === 'assistant'}
-                  grouped={index > 0 && messages[index - 1].message.role === entry.message.role}
-                  busy={chatBusy}
-                  isLastInTurn={index === messages.length - 1 || messages[index + 1].message.role !== entry.message.role}
-                  onEdit={handleEditMessage}
-                  onRegenerate={handleRegenerateMessage}
-                  onSwitchBranch={switchBranch}
-                />
-              ))
-            )}
+              ) : (
+                messages.map((entry, index) => (
+                  <ChatMessage
+                    key={entry.nodeId ?? `stream-${entry.message.timestamp}-${index}`}
+                    entry={entry}
+                    toolResults={toolResults}
+                    streaming={isStreaming && index === messages.length - 1 && entry.message.role === 'assistant'}
+                    grouped={index > 0 && messages[index - 1].message.role === entry.message.role}
+                    busy={chatBusy}
+                    isLastInTurn={index === messages.length - 1 || messages[index + 1].message.role !== entry.message.role}
+                    onEdit={handleEditMessage}
+                    onRegenerate={handleRegenerateMessage}
+                    onSwitchBranch={switchBranch}
+                  />
+                ))
+              )}
+            </div>
+            <ChatInput
+              disabled={isStreaming}
+              busy={pendingMessageActionId !== null}
+              error={error}
+              currentModel={currentModel}
+              availableModels={availableModels}
+              thinkingLevel={thinkingLevel}
+              debugEnabled={debugEnabled}
+              debugOpen={debugOpen}
+              onSend={handleSendMessage}
+              onStop={stopStreaming}
+              onOpenSettings={handleOpenSettings}
+              onToggleDebug={handleToggleDebug}
+              onModelChange={handleModelChange}
+              onThinkingChange={handleThinkingChange}
+            />
           </div>
-          <ChatInput
-            disabled={isStreaming}
-            busy={pendingMessageActionId !== null}
-            error={error}
-            currentModel={currentModel}
-            availableModels={availableModels}
-            debugEnabled={debugEnabled}
-            debugOpen={debugOpen}
-            onSend={handleSendMessage}
-            onStop={stopStreaming}
-            onOpenSettings={handleOpenSettings}
-            onToggleDebug={handleToggleDebug}
-            onModelChange={handleModelChange}
-          />
-        </>
+          {debugEnabled && debugOpen && (
+            <div className="w-1/2 shrink-0 overflow-y-auto border-l border-border px-3 py-3">
+              <ChatDebugPanel debug={debug} />
+            </div>
+          )}
+        </div>
       )}
     </div>
   );

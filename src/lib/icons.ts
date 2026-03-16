@@ -64,6 +64,7 @@ export {
   Pencil,
   RefreshCw,
   Sparkles,
+  Brain,
 } from 'lucide-react';
 
 // ─── Text Formatting ────────────────────────────────────────────────────────

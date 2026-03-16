@@ -1,7 +1,7 @@
 import { startTransition, useEffect, useMemo, useState } from 'react';
 import type { Agent } from '@mariozechner/pi-agent-core';
 import type { AgentMessage, AgentTool } from '@mariozechner/pi-agent-core';
-import type { AssistantMessage, Message, ToolResultMessage, UserMessage } from '@mariozechner/pi-ai';
+import type { AssistantMessage, Message, ThinkingLevel, ToolResultMessage, UserMessage } from '@mariozechner/pi-ai';
 import { getBranches, getLinearPath } from '../lib/ai-chat-tree.js';
 import type { ChatTurnDebugRecord } from '../lib/ai-debug.js';
 import {
@@ -10,6 +10,7 @@ import {
   editAndResend,
   getCurrentSession,
   getAIAgent,
+  getThinkingLevel,
   regenerateResponse,
   restoreChatSessionById,
   restoreLatestChatSession,
@@ -33,6 +34,8 @@ export interface AgentDebugState {
   tools: AgentTool<any>[];
   modelId: string;
   provider: string;
+  reasoning: boolean;
+  thinkingLevel: ThinkingLevel | null;
   turns: ChatTurnDebugRecord[];
 }
 
@@ -151,6 +154,8 @@ export function useAgent(agent: Agent = getAIAgent(), sessionId?: string) {
         tools: agent.state.tools,
         modelId: agent.state.model.id,
         provider: agent.state.model.provider,
+        reasoning: agent.state.model.reasoning,
+        thinkingLevel: getThinkingLevel(agent),
         turns: getCurrentDebugTurns(agent),
       } satisfies AgentDebugState,
       sendMessage: (prompt: string) => streamChat(prompt, agent),

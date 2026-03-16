@@ -97,27 +97,32 @@ export function ToolCallBlock({ toolCall, result }: ToolCallBlockProps) {
   const Icon = getToolIcon(toolCall.name, toolCall.arguments);
 
   return (
-    <div>
+    <div className="max-w-full">
       <button
         type="button"
         onClick={() => setExpanded((value) => !value)}
-        className="flex items-center gap-1.5 py-0.5 text-foreground-tertiary transition-colors hover:text-foreground-secondary"
+        className="group/tool flex max-w-full items-center gap-1.5 py-0.5 text-foreground-tertiary transition-colors hover:text-foreground-secondary"
       >
-        <Icon size={14} strokeWidth={1.6} className="shrink-0" />
+        {/* Icon area: tool icon by default, chevron on hover / when expanded */}
+        <span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center">
+          {expanded ? (
+            <ChevronDown size={14} strokeWidth={1.8} className="rotate-180" />
+          ) : (
+            <>
+              <Icon size={14} strokeWidth={1.6} className="group-hover/tool:hidden" />
+              <ChevronDown size={14} strokeWidth={1.8} className="hidden group-hover/tool:block" />
+            </>
+          )}
+        </span>
         <span className="min-w-0 truncate text-xs">
           {summarizeToolCall(toolCall)}
         </span>
-        <ChevronDown
-          size={12}
-          strokeWidth={1.8}
-          className={`shrink-0 transition-transform ${expanded ? 'rotate-180' : ''}`}
-        />
       </button>
       {expanded && (
         <div className="ml-5 mt-1 overflow-hidden rounded-lg border border-border/60 bg-foreground/[0.02]">
           <div className="px-3 py-2">
             <div className="mb-1 text-[10px] font-medium uppercase tracking-[0.06em] text-foreground-tertiary">Input</div>
-            <pre className="overflow-x-auto text-[11px] leading-5 text-foreground-secondary">
+            <pre className="overflow-x-auto whitespace-pre-wrap break-all text-[11px] leading-5 text-foreground-secondary">
               {JSON.stringify(toolCall.arguments, null, 2)}
             </pre>
           </div>
@@ -127,7 +132,7 @@ export function ToolCallBlock({ toolCall, result }: ToolCallBlockProps) {
                 Output
                 {result.isError && <span className="ml-1.5 text-destructive">error</span>}
               </div>
-              <pre className={`overflow-x-auto text-[11px] leading-5 ${result.isError ? 'text-destructive' : 'text-foreground-secondary'}`}>
+              <pre className={`overflow-x-auto whitespace-pre-wrap break-all text-[11px] leading-5 ${result.isError ? 'text-destructive' : 'text-foreground-secondary'}`}>
                 {getResultText(result)}
               </pre>
             </div>

@@ -110,9 +110,9 @@ describe('PanelLayout notes dropdown', () => {
     return container.querySelector('button[aria-haspopup="menu"]');
   }
 
-  /** The wrapper holding the tab (breadcrumb + close) + dropdown trigger. */
+  /** The tab container holding breadcrumb + close + dropdown trigger. */
   function getNotesTabText(): string {
-    return getNotesTrigger()?.closest('[class*="relative"]')?.textContent ?? '';
+    return getNotesTrigger()?.parentElement?.textContent ?? '';
   }
 
   function getMenuRow(label: string): HTMLDivElement | undefined {

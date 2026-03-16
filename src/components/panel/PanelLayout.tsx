@@ -66,9 +66,9 @@ function renderPanelContent(nodeId: string, panelId: string, options?: { hideHea
 const PANEL_CLOSE_BTN = 'flex h-5 w-5 mr-2.5 shrink-0 items-center justify-center rounded-md text-foreground-tertiary opacity-0 transition-opacity hover:bg-foreground/8 hover:text-foreground group-hover/panel:opacity-100';
 
 /**
- * Panel header: breadcrumb + close (node), close-only (app), null (chat).
- * Renders the same content regardless of container — caller provides the
- * container shape (normal card interior vs tab-connector).
+ * Panel header: breadcrumb + close (node), close-only (app/chat-non-hasTab).
+ * Returns null for chat panels (ChatPanel renders its own header internally).
+ * In hasTab mode, chat gets an inline header directly in PanelLayout.
  */
 function renderPanelHeader(
   nodeId: string,
@@ -94,11 +94,10 @@ function renderPanelHeader(
   );
 }
 
-// ── Name-only tab (narrow mode + hasTab chat) ────────────────────
+// ── Name-only tab (narrow / dropdown mode) ──────────────────────
 //
 // Shows panel name (+ sparkles for Chat) in a shaped tab.
-// Narrow mode: click body → toggle dropdown; `children` = dropdown menu.
-// hasTab chat: click body → activate panel.
+// Click body → toggle dropdown; `children` = dropdown menu.
 
 interface TabHeadProps {
   nodeId: string;
@@ -117,9 +116,9 @@ function TabHead({ nodeId, onClickBody, onClose, menuOpen, tabRef, children }: T
       ref={tabRef}
       className="tab-connector-right relative z-10 flex h-10 min-w-0 flex-1 items-center bg-background rounded-t-xl"
     >
-      {/* Name area — independent hover + click (opens dropdown / activates panel) */}
+      {/* Name area — interactive only when onClickBody is provided (dropdown trigger or panel activation) */}
       <div
-        className="group/name flex min-w-0 flex-1 ml-1 h-7 items-center rounded-md hover:bg-foreground/4 transition-colors cursor-pointer"
+        className={`group/name flex min-w-0 flex-1 ml-1 h-7 items-center rounded-md transition-colors ${onClickBody ? 'cursor-pointer hover:bg-foreground/4' : ''}`}
         onClick={onClickBody}
         role={menuOpen !== undefined ? 'button' : undefined}
         aria-haspopup={menuOpen !== undefined ? 'menu' : undefined}
@@ -233,8 +232,8 @@ export function PanelLayout({ toolbar }: PanelLayoutProps) {
                   return (
                     <div
                       key={panel.id}
-                      className={`group/menu flex items-center gap-2 rounded-md px-2 py-1.5 text-[13px] text-foreground transition-colors ${
-                        active ? 'bg-foreground/4' : 'cursor-pointer hover:bg-foreground/4'
+                      className={`group/menu flex items-center gap-2 rounded-md px-2 py-1.5 text-[13px] text-foreground transition-colors hover:bg-foreground/4 ${
+                        active ? '' : 'cursor-pointer'
                       }`}
                       onClick={() => {
                         setActivePanel(panel.id);
@@ -291,7 +290,7 @@ export function PanelLayout({ toolbar }: PanelLayoutProps) {
         const isChat = isChatPanel(nodeId);
         const titleVisible = panelTitleVisibleMap[panel.id] ?? true;
         const isLast = i === panels.length - 1;
-        const hasTab = isLast && !!toolbar && !isAppPanel(nodeId);
+        const hasTab = isLast && !!toolbar;
         const headerOpts = { isActive, titleVisible, onClose: (e: React.MouseEvent) => handleClosePanel(e, panel.id) };
 
         // ── Last panel: tab shape, same header content ──
@@ -299,20 +298,24 @@ export function PanelLayout({ toolbar }: PanelLayoutProps) {
           return (
             <div key={panel.id} className="group/panel flex flex-1 min-w-0 flex-col">
               <div className="flex items-end shrink-0">
-                {isChat ? (
-                  <TabHead
-                    nodeId={nodeId}
-                    onClose={(e) => handleClosePanel(e, panel.id)}
-                    onClickBody={() => setActivePanel(panel.id)}
-                  />
-                ) : (
-                  <div
-                    className="tab-connector-right relative z-10 flex-1 min-w-0 bg-background rounded-t-xl"
-                    onClick={() => setActivePanel(panel.id)}
-                  >
-                    {renderPanelHeader(nodeId, headerOpts)}
-                  </div>
-                )}
+                <div
+                  className="tab-connector-right relative z-10 flex-1 min-w-0 self-stretch bg-background rounded-t-xl"
+                  onClick={() => setActivePanel(panel.id)}
+                >
+                  {isChat ? (
+                    <div className="flex items-center shrink-0 mt-1">
+                      <div className="flex flex-1 min-w-0 items-center gap-1.5 pl-4 pr-3 h-8 text-[13px] text-foreground-tertiary">
+                        <Sparkles size={12} strokeWidth={1.6} className="shrink-0" />
+                        <PanelLabel nodeId={nodeId} />
+                      </div>
+                      <button type="button" className={PANEL_CLOSE_BTN} onClick={headerOpts.onClose} title="Close panel">
+                        <X size={12} />
+                      </button>
+                    </div>
+                  ) : (
+                    renderPanelHeader(nodeId, headerOpts)
+                  )}
+                </div>
                 <div className="flex shrink-0 justify-end">
                   {toolbar}
                 </div>

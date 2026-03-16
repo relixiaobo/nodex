@@ -160,7 +160,7 @@ describe('ai persistence', () => {
         toolCallId: 'call_1',
         toolName: 'browser',
         content: [
-          { type: 'text', text: '[Image removed from storage]' },
+          { type: 'text', text: '[Screenshot captured; image no longer available]' },
           { type: 'text', text: 'details' },
         ],
         isError: false,
@@ -188,7 +188,7 @@ describe('ai persistence', () => {
         role: 'user',
         content: [
           { type: 'text', text: 'prompt' },
-          { type: 'text', text: '[Image removed from storage]' },
+          { type: 'text', text: '[Screenshot captured; image no longer available]' },
         ],
         timestamp: 1,
       },

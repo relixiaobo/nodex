@@ -139,7 +139,7 @@ async function getDB(): Promise<IDBPDatabase<ChatPersistenceDB>> {
 
 function stripMessageImagesForPersistence(message: AgentMessage): AgentMessage {
   if (!messageHasImage(message)) return message;
-  return replaceMessageImages(message, () => '[Image removed from storage]');
+  return replaceMessageImages(message, () => '[Screenshot captured; image no longer available]');
 }
 
 function stripMappingImagesForPersistence(mapping: Record<string, MessageNode>): Record<string, MessageNode> {

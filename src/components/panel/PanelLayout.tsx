@@ -234,7 +234,9 @@ export function PanelLayout({ toolbar }: PanelLayoutProps) {
         {/* Panel body — breadcrumb inside, no top-left rounding (connects to tab) */}
         <div className={TAB_PANEL_BODY}>
           {!isApp && !isChat && (
-            <Breadcrumb nodeId={nodeId} active />
+            <div className="flex items-center shrink-0">
+              <Breadcrumb nodeId={nodeId} active />
+            </div>
           )}
           {renderPanelContent(nodeId, activePanel.id, { hideHeader: isChat })}
         </div>
@@ -275,7 +277,9 @@ export function PanelLayout({ toolbar }: PanelLayoutProps) {
                 onClick={() => setActivePanel(panel.id)}
               >
                 {!isApp && !isChat && (
-                  <Breadcrumb nodeId={nodeId} showCurrentName={!titleVisible} active={isActive} />
+                  <div className="flex items-center shrink-0">
+                    <Breadcrumb nodeId={nodeId} showCurrentName={!titleVisible} active={isActive} />
+                  </div>
                 )}
                 {renderPanelContent(nodeId, panel.id, { hideHeader: isChat })}
               </div>

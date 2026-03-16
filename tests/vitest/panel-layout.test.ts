@@ -106,13 +106,13 @@ describe('PanelLayout notes dropdown', () => {
     useUIStore.setState({ panels, activePanelId });
   }
 
-  function getNotesTrigger(): HTMLButtonElement | null {
-    return container.querySelector('button[aria-haspopup="menu"]');
+  function getNotesTrigger(): HTMLDivElement | null {
+    return container.querySelector('[aria-haspopup="menu"]');
   }
 
-  /** The tab container holding breadcrumb + close + dropdown trigger. */
+  /** The tab name area text (trigger div contains name + close button). */
   function getNotesTabText(): string {
-    return getNotesTrigger()?.parentElement?.textContent ?? '';
+    return getNotesTrigger()?.textContent ?? '';
   }
 
   function getMenuRow(label: string): HTMLDivElement | undefined {

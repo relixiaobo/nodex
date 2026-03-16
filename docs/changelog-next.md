@@ -48,3 +48,4 @@
 - 窄屏 Chat 全屏切换：Chat 开启时面板收起露出全屏 Chat，关闭后面板恢复；窄屏多面板标签栏改为 Notes 下拉选择器；GlobalTools 新增 ✦ Chat toggle 按钮
 - Chat 晋升为面板级：Chat 与 NodePanel 同层同权，支持多个 Chat 面板并排（Alt+Click ✦ 按钮新建），每个面板独立 Agent 实例和聊天历史；DeskLayout 简化为纯面板容器
 - 窄屏标签模式打磨：标签内显示完整面包屑（与宽屏一致），面包屑折叠规则统一为两种模式（compact/default），标签内 hover 分区（面包屑+关闭 vs 下拉按钮），设计规范合规修复（字号/4px 网格/过渡动画）
+- 标签简化为纯名称标签：标签只显示面板名（Chat/节点名），面包屑移入面板体内；窄屏点击标签名切换面板、点击 × 关闭，去掉独立下拉按钮；移除 Breadcrumb compact 模式（死代码清理）

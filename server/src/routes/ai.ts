@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { stream as piStream } from '@mariozechner/pi-ai';
+import { streamSimple as piStream } from '@mariozechner/pi-ai';
 import type {
   AssistantMessageEvent,
   Context,

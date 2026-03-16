@@ -6,7 +6,7 @@ import { getStoredToken } from './auth.js';
 import { buildAgentSystemPrompt, DEFAULT_AGENT_MODEL_ID, DEFAULT_AGENT_MAX_TOKENS, DEFAULT_AGENT_SYSTEM_PROMPT, DEFAULT_AGENT_TEMPERATURE, readAgentNodeConfig, type AgentNodeConfig } from './ai-agent-node.js';
 import type { ChatTurnDebugRecord, DebugTurnStatus } from './ai-debug.js';
 import { createChatTurnDebugRecord, finalizeChatTurnDebugRecord, normalizeRestoredDebugTurns, readChatDebugEnabled } from './ai-debug.js';
-import { findProviderOptionNodeId, getApiKeyForProvider, getAvailableModels, getProviderConfigs } from './ai-provider-config.js';
+import { findProviderOptionNodeId, getApiKeyForProvider, getAvailableModels, getProviderConfigs, normalizeProviderId } from './ai-provider-config.js';
 import {
   createSession,
   editMessage as editTreeMessage,
@@ -121,10 +121,6 @@ function hasNodeBackedAISettings(): boolean {
 
 function hasAnthropicProviderConfig(configs: ReturnType<typeof getProviderConfigs>): boolean {
   return configs.some((config) => config.provider === 'anthropic' && config.apiKey.length > 0);
-}
-
-function normalizeProviderId(provider: string | null | undefined): string {
-  return provider?.trim().toLowerCase() ?? '';
 }
 
 function findAvailableModel(

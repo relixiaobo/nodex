@@ -350,6 +350,7 @@ export function ChatPanel({ panelId, sessionId, hideHeader }: ChatPanelProps) {
                   streaming={isStreaming && index === messages.length - 1 && entry.message.role === 'assistant'}
                   grouped={index > 0 && messages[index - 1].message.role === entry.message.role}
                   busy={chatBusy}
+                  isLastInTurn={index === messages.length - 1 || messages[index + 1].message.role !== entry.message.role}
                   onEdit={handleEditMessage}
                   onRegenerate={handleRegenerateMessage}
                   onSwitchBranch={switchBranch}

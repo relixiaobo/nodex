@@ -86,14 +86,14 @@ describe('chat ui', () => {
     })).toBe(false);
   });
 
-  it('renders message actions as an absolute overlay instead of reserving row height', () => {
-    const html = renderToStaticMarkup(
+  it('renders user toolbar on hover and assistant toolbar only on the last message in a turn', () => {
+    const userHtml = renderToStaticMarkup(
       React.createElement(ChatMessage, {
         entry: {
           nodeId: 'msg_1',
           message: {
             role: 'user',
-            content: 'Tight, readable chat copy',
+            content: 'User message',
             timestamp: 1,
           },
           branches: { ids: ['msg_1', 'msg_2'], currentIndex: 0 },
@@ -101,10 +101,55 @@ describe('chat ui', () => {
       }),
     );
 
-    expect(html).toContain('data-testid="chat-message-toolbar"');
-    expect(html).toContain('pointer-events-none absolute right-0 top-full');
-    expect(html).toContain('group-hover/message:pointer-events-auto');
-    expect(html).toContain('group-focus-within/message:opacity-100');
+    expect(userHtml).toContain('data-testid="chat-message-toolbar"');
+    expect(userHtml).toContain('group/message');
+    expect(userHtml).toContain('opacity-0');
+    expect(userHtml).toContain('group-hover/message:opacity-100');
+
+    const assistantHtml = renderToStaticMarkup(
+      React.createElement(ChatMessage, {
+        entry: {
+          nodeId: 'msg_2',
+          message: {
+            role: 'assistant',
+            content: [{ type: 'text', text: 'AI reply' }],
+            api: 'anthropic-messages',
+            provider: 'anthropic',
+            model: 'test',
+            usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },
+            stopReason: 'stop',
+            timestamp: 2,
+          },
+          branches: null,
+        },
+      }),
+    );
+
+    expect(assistantHtml).toContain('data-testid="chat-message-toolbar"');
+    expect(assistantHtml).toContain('justify-start');
+    expect(assistantHtml).not.toContain('opacity-0');
+
+    const midTurnHtml = renderToStaticMarkup(
+      React.createElement(ChatMessage, {
+        entry: {
+          nodeId: 'msg_3',
+          message: {
+            role: 'assistant',
+            content: [{ type: 'text', text: 'Intermediate step' }],
+            api: 'anthropic-messages',
+            provider: 'anthropic',
+            model: 'test',
+            usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },
+            stopReason: 'stop',
+            timestamp: 3,
+          },
+          branches: null,
+        },
+        isLastInTurn: false,
+      }),
+    );
+
+    expect(midTurnHtml).not.toContain('data-testid="chat-message-toolbar"');
   });
 
   it('uses text-base typography for chat body and composer', () => {

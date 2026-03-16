@@ -12,7 +12,7 @@ export interface ProviderConfig {
   nodeId: string;
 }
 
-function normalizeProviderId(provider: string | null | undefined): string {
+export function normalizeProviderId(provider: string | null | undefined): string {
   return provider?.trim().toLowerCase() ?? '';
 }
 

@@ -123,28 +123,30 @@ export function PanelLayout({ toolbar }: PanelLayoutProps) {
             ref={notesMenuRef}
             className="tab-connector-right relative z-10 flex h-10 max-w-[240px] min-w-0 shrink items-center bg-background rounded-t-xl"
           >
-            {/* Breadcrumb area (hover zone 1) */}
-            {isChat ? (
-              <span className="flex items-center gap-1.5 px-3 text-[13px] text-foreground">
-                <Sparkles size={12} strokeWidth={1.6} className="text-foreground-tertiary" />
-                Chat
-              </span>
-            ) : isApp ? (
-              <span className="flex min-w-0 flex-1 items-center px-3 text-[13px] text-foreground truncate">
-                <PanelLabel nodeId={nodeId} />
-              </span>
-            ) : (
-              <Breadcrumb nodeId={nodeId} showCurrentName active compact />
-            )}
-            <button
-              type="button"
-              className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-foreground-tertiary hover:bg-foreground/8 hover:text-foreground"
-              onClick={(e) => handleClosePanel(e, activePanel.id)}
-              title="Close panel"
-            >
-              <X size={12} />
-            </button>
-            {/* Dropdown trigger (hover zone 2) */}
+            {/* Hover zone 1: breadcrumb + close */}
+            <div className="flex flex-1 min-w-0 items-center rounded-lg hover:bg-foreground/4 transition-colors">
+              {isChat ? (
+                <span className="flex items-center gap-1.5 px-3 text-[13px] text-foreground">
+                  <Sparkles size={12} strokeWidth={1.6} className="text-foreground-tertiary" />
+                  Chat
+                </span>
+              ) : isApp ? (
+                <span className="flex min-w-0 flex-1 items-center px-3 text-[13px] text-foreground truncate">
+                  <PanelLabel nodeId={nodeId} />
+                </span>
+              ) : (
+                <Breadcrumb nodeId={nodeId} showCurrentName active compact />
+              )}
+              <button
+                type="button"
+                className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-foreground-tertiary hover:bg-foreground/8 hover:text-foreground"
+                onClick={(e) => handleClosePanel(e, activePanel.id)}
+                title="Close panel"
+              >
+                <X size={12} />
+              </button>
+            </div>
+            {/* Hover zone 2: dropdown trigger */}
             <button
               type="button"
               className="flex h-7 w-7 mr-0.5 shrink-0 items-center justify-center rounded-md text-foreground-tertiary hover:bg-foreground/8 hover:text-foreground"
@@ -235,24 +237,26 @@ export function PanelLayout({ toolbar }: PanelLayoutProps) {
                   className="tab-connector-right relative z-10 flex h-10 max-w-[240px] min-w-0 shrink items-center bg-background rounded-t-xl"
                   onClick={() => setActivePanel(panel.id)}
                 >
-                  {isChat ? (
-                    <span className="flex items-center gap-1.5 px-3 text-[13px] text-foreground">
-                      <Sparkles size={12} strokeWidth={1.6} className="text-foreground-tertiary" />
-                      Chat
-                    </span>
-                  ) : (
-                    <Breadcrumb nodeId={nodeId} showCurrentName={!titleVisible} active={isActive} compact />
-                  )}
-                  {showClose && (
-                    <button
-                      type="button"
-                      className="flex h-5 w-5 mr-1 shrink-0 items-center justify-center rounded-md text-foreground-tertiary hover:bg-foreground/8 hover:text-foreground"
-                      onClick={(e) => handleClosePanel(e, panel.id)}
-                      title="Close panel"
-                    >
-                      <X size={12} />
-                    </button>
-                  )}
+                  <div className="flex flex-1 min-w-0 items-center rounded-lg hover:bg-foreground/4 transition-colors">
+                    {isChat ? (
+                      <span className="flex items-center gap-1.5 px-3 text-[13px] text-foreground">
+                        <Sparkles size={12} strokeWidth={1.6} className="text-foreground-tertiary" />
+                        Chat
+                      </span>
+                    ) : (
+                      <Breadcrumb nodeId={nodeId} showCurrentName={!titleVisible} active={isActive} compact />
+                    )}
+                    {showClose && (
+                      <button
+                        type="button"
+                        className="flex h-5 w-5 mr-1 shrink-0 items-center justify-center rounded-md text-foreground-tertiary hover:bg-foreground/8 hover:text-foreground"
+                        onClick={(e) => handleClosePanel(e, panel.id)}
+                        title="Close panel"
+                      >
+                        <X size={12} />
+                      </button>
+                    )}
+                  </div>
                 </div>
                 <div className="flex flex-1 justify-end">
                   {toolbar}

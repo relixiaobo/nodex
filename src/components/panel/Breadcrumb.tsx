@@ -136,7 +136,7 @@ export function Breadcrumb({ nodeId, showCurrentName, compact, active = true }: 
       : [];
 
   return (
-    <div className={`flex flex-1 min-w-0 items-center gap-1 text-[13px] text-foreground-tertiary ${compact ? 'pl-3 pr-2 rounded-lg hover:bg-foreground/4 transition-colors' : 'pl-4 pr-3 h-8 mt-1'}`}>
+    <div className={`flex flex-1 min-w-0 items-center gap-1 text-[13px] text-foreground-tertiary ${compact ? 'pl-3 pr-1' : 'pl-4 pr-3 h-8 mt-1'}`}>
 
       {/* Root view: only show toolbar (sidebar toggle + search), no breadcrumb content */}
       {!isRootView && (

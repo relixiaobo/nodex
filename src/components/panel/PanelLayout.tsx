@@ -56,18 +56,20 @@ function renderPanelContent(nodeId: string, panelId: string, options?: { hideHea
 
 // ── Shared shaped tab ──────────────────────────────────────────────
 //
-// Name-only label tab used by both narrow-mode dropdown and wide-mode
-// last-panel. Shows: [panel name] [×close]. Breadcrumb lives inside
-// the panel body, not the tab.
+// Name-only label tab for spatial accommodation. The tab visually
+// extends the card into the top row where it shares space with the
+// toolbar. All real interactions (breadcrumb, close) live in the
+// panel body, identical to normal cards.
 //
-// Narrow mode: click tab body → toggle dropdown; dropdown as `children`.
+// Narrow mode: click tab body → toggle dropdown; `children` = dropdown menu.
 // Wide mode: click tab body → activate panel; no children.
 
 interface TabHeadProps {
   nodeId: string;
-  onClose: (e: React.MouseEvent) => void;
-  /** Click on the name area (not close). */
+  /** Click on the name area. */
   onClickBody?: () => void;
+  /** Narrow mode: close button handler (shown inside the tab). */
+  onClose?: (e: React.MouseEvent) => void;
   /** Narrow mode: whether the dropdown is open (for aria-expanded). */
   menuOpen?: boolean;
   tabRef?: React.Ref<HTMLDivElement>;
@@ -75,7 +77,7 @@ interface TabHeadProps {
   children?: React.ReactNode;
 }
 
-function TabHead({ nodeId, onClose, onClickBody, menuOpen, tabRef, children }: TabHeadProps) {
+function TabHead({ nodeId, onClickBody, onClose, menuOpen, tabRef, children }: TabHeadProps) {
   const isChat = isChatPanel(nodeId);
 
   return (
@@ -95,14 +97,17 @@ function TabHead({ nodeId, onClose, onClickBody, menuOpen, tabRef, children }: T
           {isChat && <Sparkles size={12} strokeWidth={1.6} className="shrink-0 text-foreground-tertiary" />}
           <PanelLabel nodeId={nodeId} />
         </span>
-        <button
-          type="button"
-          className="flex h-5 w-5 mr-1 shrink-0 items-center justify-center rounded-md text-foreground-tertiary opacity-0 transition-opacity hover:bg-foreground/8 hover:text-foreground group-hover/tab:opacity-100"
-          onClick={onClose}
-          title="Close panel"
-        >
-          <X size={12} />
-        </button>
+        {/* Close button only in narrow mode (wide mode has close inside panel body) */}
+        {onClose && (
+          <button
+            type="button"
+            className="flex h-5 w-5 mr-1 shrink-0 items-center justify-center rounded-md text-foreground-tertiary opacity-0 transition-opacity hover:bg-foreground/8 hover:text-foreground group-hover/tab:opacity-100"
+            onClick={onClose}
+            title="Close panel"
+          >
+            <X size={12} />
+          </button>
+        )}
       </div>
       {children}
     </div>
@@ -257,6 +262,9 @@ export function PanelLayout({ toolbar }: PanelLayoutProps) {
         const hasTab = isLast && !!toolbar && !isApp;
 
         // ── Last panel with tab layout ──
+        // Tab is purely spatial accommodation (name label). Panel body
+        // is identical to a normal card: breadcrumb + close for nodes,
+        // close-only for apps.
         if (hasTab) {
           return (
             <div key={panel.id} className="flex flex-1 min-w-0 flex-col">
@@ -264,14 +272,13 @@ export function PanelLayout({ toolbar }: PanelLayoutProps) {
               <div className="flex items-end shrink-0">
                 <TabHead
                   nodeId={nodeId}
-                  onClose={(e) => handleClosePanel(e, panel.id)}
                   onClickBody={() => setActivePanel(panel.id)}
                 />
                 <div className="flex flex-1 justify-end">
                   {toolbar}
                 </div>
               </div>
-              {/* Panel body — breadcrumb inside, no top-left rounding (connects to tab) */}
+              {/* Panel body — identical to normal card, just no top-left rounding (connects to tab) */}
               <div
                 className={TAB_PANEL_BODY}
                 onClick={() => setActivePanel(panel.id)}
@@ -279,6 +286,28 @@ export function PanelLayout({ toolbar }: PanelLayoutProps) {
                 {!isApp && !isChat && (
                   <div className="flex items-center shrink-0">
                     <Breadcrumb nodeId={nodeId} showCurrentName={!titleVisible} active={isActive} />
+                    {showClose && (
+                      <button
+                        type="button"
+                        className="flex h-5 w-5 mr-2 shrink-0 items-center justify-center rounded-md text-foreground-tertiary opacity-0 transition-opacity hover:bg-foreground/8 hover:text-foreground group-hover/panel:opacity-100"
+                        onClick={(e) => handleClosePanel(e, panel.id)}
+                        title="Close panel"
+                      >
+                        <X size={12} />
+                      </button>
+                    )}
+                  </div>
+                )}
+                {isChat && showClose && (
+                  <div className="flex items-center justify-end shrink-0 h-8">
+                    <button
+                      type="button"
+                      className="flex h-5 w-5 mr-2 shrink-0 items-center justify-center rounded-md text-foreground-tertiary opacity-0 transition-opacity hover:bg-foreground/8 hover:text-foreground group-hover/panel:opacity-100"
+                      onClick={(e) => handleClosePanel(e, panel.id)}
+                      title="Close panel"
+                    >
+                      <X size={12} />
+                    </button>
                   </div>
                 )}
                 {renderPanelContent(nodeId, panel.id, { hideHeader: isChat })}

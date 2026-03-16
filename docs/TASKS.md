@@ -23,7 +23,7 @@ _(空)_
 | 工作区 | 分支 | 任务 | 状态 |
 |--------|------|------|------|
 | nodex-gemini | — | 空闲 | — |
-| nodex-codex | — | 空闲 | — |
+| nodex-codex | fix/chat-branch-audit | Chat 分支消息审计 (#147) | Draft PR 待执行 |
 
 ---
 
@@ -129,6 +129,7 @@ _(空)_
 - [x] Chat Phase 3 — Context 自动压缩（Bridge Message + Handoff Memo）(#140, Codex)
 - [x] **截图工具结果修复** — 占位符统一为 `IMAGE_PLACEHOLDER` 常量（模型可理解的文案），ToolCallBlock UI 检测占位符显示图片图标而非原始文本
 - [x] **Extended Thinking** — 模型选择器 toggle + Low/Med/High 等级 + 会话持久化 + 可折叠 Thought block + server 端 `streamSimple` 修复 (#146)
+- [ ] **Chat 分支消息审计** — 系统检查 regenerate/edit 的分支逻辑与交互：regenerate 应在 assistant 层创建分支（`← 2/2 →`），而非重复发送 user 消息；对照 ChatGPT 行为验证 edit/regenerate/switch 全链路
 - [ ] Chat 持久化 Phase 4 — 跨设备同步完整原始对话历史（Sync API + D1/R2）
 
 **Track B: 阅读环** — 设计：`phase-2-reading-ring.md`

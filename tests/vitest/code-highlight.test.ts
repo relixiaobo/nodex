@@ -41,13 +41,12 @@ describe('code-highlight', () => {
       expect(html).toContain('<span');
     });
 
-    it('escapes HTML entities in plain text', () => {
-      const html = highlightCode('<div>"hello" & world</div>');
-      // Should not contain raw < or >
-      expect(html).not.toContain('<div>');
-      expect(html).toContain('&lt;div&gt;');
+    it('escapes HTML entities when no language matches', () => {
+      const html = highlightCode('just some "text" & symbols < > here');
       expect(html).toContain('&amp;');
       expect(html).toContain('&quot;');
+      expect(html).toContain('&lt;');
+      expect(html).toContain('&gt;');
     });
 
     it('falls back gracefully for unknown language', () => {
@@ -72,12 +71,44 @@ describe('code-highlight', () => {
       expect(detectLanguage('just some text')).toBe('');
     });
 
-    it('detects JavaScript-like code', () => {
+    // Structural heuristics
+    it('detects JSON object', () => {
+      expect(detectLanguage('{ "name": "test" }')).toBe('json');
+    });
+
+    it('detects JSON array', () => {
+      expect(detectLanguage('[\n  1, 2, 3\n]')).toBe('json');
+    });
+
+    it('detects JSON with leading whitespace', () => {
+      expect(detectLanguage('  \n  { "key": "value" }')).toBe('json');
+    });
+
+    it('detects JSON with long embedded text values', () => {
+      const json = JSON.stringify({ text: 'A very long natural language paragraph that would confuse auto-detect...'.repeat(20), offset: 0 }, null, 2);
+      expect(detectLanguage(json)).toBe('json');
+    });
+
+    it('detects HTML', () => {
+      expect(detectLanguage('<div class="app">\n  <p>Hello</p>\n</div>')).toBe('html');
+    });
+
+    it('detects SQL (case-insensitive)', () => {
+      expect(detectLanguage('SELECT id, name FROM users WHERE active = true')).toBe('sql');
+      expect(detectLanguage('select * from orders')).toBe('sql');
+      expect(detectLanguage('INSERT INTO users (name) VALUES ("test")')).toBe('sql');
+    });
+
+    it('detects bash shebang', () => {
+      expect(detectLanguage('#!/bin/bash\necho "hello"')).toBe('bash');
+    });
+
+    // hljs auto-detect fallback
+    it('detects JavaScript-like code via hljs fallback', () => {
       const lang = detectLanguage(
         `function add(a, b) {\n  return a + b;\n}\nconsole.log(add(1, 2));`,
       );
-      // Should detect as some language (js or ts)
-      expect(typeof lang).toBe('string');
+      expect(lang.length).toBeGreaterThan(0);
     });
   });
 });

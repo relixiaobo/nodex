@@ -59,29 +59,37 @@ export function highlightCode(code: string, language?: string): string {
   if (!code) return '';
 
   // Explicit language
-  if (language) {
+  const lang = language || detectLanguage(code);
+  if (lang) {
     try {
-      const result = hljs.highlight(code, { language });
-      return result.value;
+      return hljs.highlight(code, { language: lang }).value;
     } catch {
-      // Unknown language — fall through to auto-detect
+      // Unknown language — fall through to escaped plain text
     }
-  }
-
-  // Auto-detect
-  const auto = hljs.highlightAuto(code);
-  // Only use auto-detect if confidence is reasonable
-  if (auto.relevance > 3) {
-    return auto.value;
   }
 
   // No highlight — return escaped HTML
   return escapeHtml(code);
 }
 
-/** Returns the detected language name (or empty string). */
+/**
+ * Returns the detected language name (or empty string).
+ * Uses structural heuristics for common formats first, then falls back
+ * to hljs auto-detect for keyword-rich languages (JS/TS/Python/etc.).
+ */
 export function detectLanguage(code: string): string {
   if (!code) return '';
+
+  // Structural heuristics — reliable for formats with distinctive openers
+  const trimmed = code.trimStart();
+  const first = trimmed[0];
+
+  if (first === '{' || first === '[') return 'json';
+  if (first === '<' && trimmed.includes('</')) return 'html';
+  if (/^(SELECT|INSERT|UPDATE|DELETE|CREATE|ALTER|DROP|WITH)\b/i.test(trimmed)) return 'sql';
+  if (trimmed.startsWith('#!') && trimmed.startsWith('#!/')) return 'bash';
+
+  // hljs auto-detect — works well for keyword-rich languages
   const auto = hljs.highlightAuto(code);
   return auto.relevance > 3 ? (auto.language ?? '') : '';
 }

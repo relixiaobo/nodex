@@ -132,11 +132,12 @@ function renderAssistantBlocks(message: AssistantMessage, streaming: boolean, to
   return message.content.flatMap((block, index) => {
     if (block.type === 'thinking') {
       if (block.redacted || (!block.thinking && !streaming)) return [];
+      const hasLaterContent = message.content.slice(index + 1).some((b) => b.type === 'text' || b.type === 'toolCall');
       return (
         <ThinkingBlock
           key={`thinking-${index}`}
           text={block.thinking}
-          streaming={streaming}
+          streaming={streaming && !hasLaterContent}
         />
       );
     }

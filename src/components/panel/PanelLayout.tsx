@@ -115,10 +115,11 @@ function TabHead({ nodeId, onClickBody, onClose, menuOpen, tabRef, children }: T
   return (
     <div
       ref={tabRef}
-      className="tab-connector-right relative z-10 flex h-10 min-w-0 shrink items-center bg-background rounded-t-xl"
+      className="tab-connector-right relative z-10 flex h-10 min-w-0 flex-1 items-center bg-background rounded-t-xl"
     >
+      {/* Name area — independent hover + click (opens dropdown / activates panel) */}
       <div
-        className="group/tab flex flex-1 max-w-[240px] min-w-0 ml-1 h-7 items-center rounded-md hover:bg-foreground/4 transition-colors cursor-pointer"
+        className="flex min-w-0 flex-1 ml-1 h-7 items-center rounded-md hover:bg-foreground/4 transition-colors cursor-pointer"
         onClick={onClickBody}
         role={menuOpen !== undefined ? 'button' : undefined}
         aria-haspopup={menuOpen !== undefined ? 'menu' : undefined}
@@ -128,17 +129,18 @@ function TabHead({ nodeId, onClickBody, onClose, menuOpen, tabRef, children }: T
           {isChat && <Sparkles size={12} strokeWidth={1.6} className="shrink-0 text-foreground-tertiary" />}
           <PanelLabel nodeId={nodeId} />
         </span>
-        {onClose && (
-          <button
-            type="button"
-            className="flex h-5 w-5 mr-1 shrink-0 items-center justify-center rounded-md text-foreground-tertiary opacity-0 transition-opacity hover:bg-foreground/8 hover:text-foreground group-hover/tab:opacity-100"
-            onClick={onClose}
-            title="Close panel"
-          >
-            <X size={12} />
-          </button>
-        )}
       </div>
+      {/* Close button — independent hover + click */}
+      {onClose && (
+        <button
+          type="button"
+          className="flex h-7 w-7 mr-1 shrink-0 items-center justify-center rounded-md text-foreground-tertiary transition-colors hover:bg-foreground/4 hover:text-foreground"
+          onClick={onClose}
+          title="Close panel"
+        >
+          <X size={12} />
+        </button>
+      )}
       {children}
     </div>
   );
@@ -257,7 +259,7 @@ export function PanelLayout({ toolbar }: PanelLayoutProps) {
               </div>
             )}
           </TabHead>
-          <div className="flex flex-1 justify-end">
+          <div className="flex shrink-0 justify-end">
             {toolbar}
           </div>
         </div>

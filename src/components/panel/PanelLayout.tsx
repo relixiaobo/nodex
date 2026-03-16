@@ -227,7 +227,7 @@ export function PanelLayout({ toolbar }: PanelLayoutProps) {
             tabRef={notesMenuRef}
           >
             {notesMenuOpen && (
-              <div className="absolute left-0 top-full z-50 mt-1 min-w-[220px] rounded-lg bg-background p-1 shadow-paper">
+              <div className="absolute left-0 right-0 top-full z-50 mt-1 min-w-[220px] rounded-lg bg-background p-1 shadow-paper">
                 {panels.map((panel) => {
                   const active = panel.id === activePanelId;
                   return (

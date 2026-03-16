@@ -23,13 +23,13 @@ _(空)_
 | 工作区 | 分支 | 任务 | 状态 |
 |--------|------|------|------|
 | nodex-gemini | — | 空闲 | — |
-| nodex-codex | codex/fix-extended-thinking | Extended thinking 不返回思考内容 | Draft #146 |
+| nodex-codex | — | 空闲 | — |
 
 ---
 
 ## 进行中
 
-- [ ] **Extended thinking 不返回思考内容** (#146, Codex) — 客户端正确传 `reasoning: "medium"`，服务端已部署，但 API 不返回 thinking blocks。需排查 pi-ai 对 Anthropic thinking 参数的转换
+_(空)_
 
 ---
 
@@ -193,6 +193,7 @@ _(空)_
 
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
+| 2026-03-16 | Extended thinking 修复 — server 端 `stream` → `streamSimple` 使 reasoning 参数正确传递 | codex | #146 |
 | 2026-03-16 | 多 Provider AI 设置 — Settings 多 provider 配置 + Composer model 选择器 + 旧设置迁移 + Chat Debug 增强 | codex | #145 |
 | 2026-03-15 | Chat as Panel — Chat 晋升为面板级，与 NodePanel 同层同权，Agent 注册表支持多 Chat 并排 | codex | #144 |
 | 2026-03-15 | Chat toggle + Notes dropdown — 窄屏全屏切换 + 下拉面板选择器 + ✦ 按钮 | codex | #143 |

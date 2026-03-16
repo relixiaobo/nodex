@@ -5,7 +5,7 @@ import * as loroDoc from './loro-doc.js';
 
 export const DEFAULT_AGENT_MODEL_ID = 'claude-sonnet-4-5';
 export const DEFAULT_AGENT_TEMPERATURE = 0.2;
-export const DEFAULT_AGENT_MAX_TOKENS = 4000;
+export const DEFAULT_AGENT_MAX_TOKENS = 16000;
 
 export const DEFAULT_PROMPT_LINES = [
   'You are soma, an AI collaborator inside the user\'s knowledge graph.',

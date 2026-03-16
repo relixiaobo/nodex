@@ -118,10 +118,15 @@ export function streamProxyWithApiKey(
           const data = line.slice(6).trim();
           if (!data) continue;
 
-          const proxyEvent = JSON.parse(data) as ProxyAssistantMessageEvent;
-          const event = processProxyEvent(proxyEvent, partial);
-          if (event) {
-            stream.push(event);
+          try {
+            const proxyEvent = JSON.parse(data) as ProxyAssistantMessageEvent;
+            const event = processProxyEvent(proxyEvent, partial);
+            if (event) {
+              stream.push(event);
+            }
+          } catch {
+            // Skip malformed SSE lines (e.g. truncated tool call JSON from max_tokens)
+            // rather than killing the entire stream.
           }
         }
       }

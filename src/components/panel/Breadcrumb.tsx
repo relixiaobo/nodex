@@ -120,7 +120,7 @@ export function Breadcrumb({ nodeId, showCurrentName, active = true }: Breadcrum
     : [];
 
   return (
-    <div className="flex flex-1 min-w-0 items-center gap-1 pl-4 pr-3 h-8 mt-2 text-[13px] text-foreground-tertiary">
+    <div className="flex flex-1 min-w-0 items-center gap-1 pl-4 pr-3 h-8 text-[13px] text-foreground-tertiary">
 
       {/* Root view: only show toolbar (sidebar toggle + search), no breadcrumb content */}
       {!isRootView && (

@@ -46,3 +46,4 @@
 - 长对话自动压缩：上下文接近模型窗口 70% 时自动生成交接备忘录（Handoff Memo），用 Bridge Message 无缝衔接，原始消息完整保留可回溯
 - Chat 消息操作：hover 消息显示操作栏，支持编辑已发送消息（inline textarea + Save & Submit）、重新生成 AI 回复、复制消息内容，以及 `← 2/3 →` 分支导航切换不同版本的对话
 - 窄屏 Chat 全屏切换：Chat 开启时面板收起露出全屏 Chat，关闭后面板恢复；窄屏多面板标签栏改为 Notes 下拉选择器；GlobalTools 新增 ✦ Chat toggle 按钮
+- Chat 晋升为面板级：Chat 与 NodePanel 同层同权，支持多个 Chat 面板并排（Alt+Click ✦ 按钮新建），每个面板独立 Agent 实例和聊天历史；DeskLayout 简化为纯面板容器

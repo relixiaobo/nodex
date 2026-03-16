@@ -114,51 +114,50 @@ export function PanelLayout({ toolbar }: PanelLayoutProps) {
     const nodeId = activePanel.nodeId;
     const isChat = isChatPanel(nodeId);
     const isApp = isAppPanel(nodeId);
-    const titleVisible = panelTitleVisibleMap[activePanel.id] ?? true;
 
     return (
       <div ref={containerRef} className="flex flex-1 flex-col overflow-hidden">
         {/* Tab row: dropdown tab (paper) + toolbar (desk) */}
         <div className="flex items-end shrink-0">
-          <div
-            ref={notesMenuRef}
-            className="tab-connector-right relative z-10 flex h-10 max-w-[240px] min-w-0 shrink items-center bg-background rounded-t-xl"
-          >
-            {/* Dropdown trigger for panel switching */}
+          <div ref={notesMenuRef} className="relative flex items-end shrink min-w-0">
+            {/* Tab (paper layer): breadcrumb + close */}
+            <div className="tab-connector-right relative z-10 flex h-10 max-w-[240px] min-w-0 shrink items-center bg-background rounded-t-xl">
+              {isChat ? (
+                <span className="flex items-center gap-1.5 px-3 text-[13px] text-foreground">
+                  <Sparkles size={12} strokeWidth={1.6} className="text-foreground-tertiary" />
+                  Chat
+                </span>
+              ) : isApp ? (
+                <span className="flex min-w-0 flex-1 items-center px-3 text-[13px] text-foreground truncate">
+                  <PanelLabel nodeId={nodeId} />
+                </span>
+              ) : (
+                <Breadcrumb nodeId={nodeId} showCurrentName active compact />
+              )}
+              <button
+                type="button"
+                className="flex h-5 w-5 mr-1 shrink-0 items-center justify-center rounded-md text-foreground-tertiary hover:bg-foreground/8 hover:text-foreground"
+                onClick={(e) => handleClosePanel(e, activePanel.id)}
+                title="Close panel"
+              >
+                <X size={12} />
+              </button>
+            </div>
+            {/* Dropdown trigger (desk layer) */}
             <button
               type="button"
-              className="flex h-7 w-6 ml-1 shrink-0 items-center justify-center rounded text-foreground-tertiary hover:text-foreground"
+              className="flex h-10 w-7 shrink-0 items-center justify-center text-foreground-tertiary hover:text-foreground"
               onClick={() => setNotesMenuOpen((open) => !open)}
               aria-haspopup="menu"
               aria-expanded={notesMenuOpen}
             >
               <ChevronDown
-                size={13}
+                size={14}
                 strokeWidth={1.7}
                 className={`transition-transform ${notesMenuOpen ? 'rotate-180' : ''}`}
               />
             </button>
-            {/* Tab content — matching wide mode breadcrumb style */}
-            {isChat ? (
-              <span className="flex items-center gap-1.5 px-2 text-[13px] text-foreground">
-                <Sparkles size={12} strokeWidth={1.6} className="text-foreground-tertiary" />
-                Chat
-              </span>
-            ) : isApp ? (
-              <span className="flex min-w-0 flex-1 items-center px-2 text-[13px] text-foreground truncate">
-                <PanelLabel nodeId={nodeId} />
-              </span>
-            ) : (
-              <Breadcrumb nodeId={nodeId} showCurrentName active compact />
-            )}
-            <button
-              type="button"
-              className="flex h-5 w-5 mr-1 shrink-0 items-center justify-center rounded-md text-foreground-tertiary hover:bg-foreground/8 hover:text-foreground"
-              onClick={(e) => handleClosePanel(e, activePanel.id)}
-              title="Close panel"
-            >
-              <X size={12} />
-            </button>
+            {/* Dropdown menu */}
             {notesMenuOpen && (
               <div className="absolute left-0 top-full z-50 mt-1 min-w-[220px] rounded-lg bg-background p-1 shadow-paper">
                 {panels.map((panel) => {

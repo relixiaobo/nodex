@@ -1,9 +1,12 @@
 import 'fake-indexeddb/auto';
 import { deleteDB } from 'idb';
 import { appendMessage, editMessage, getLinearPath, linearToTree, type ChatSession } from '../../src/lib/ai-chat-tree.js';
+import { findProviderOptionNodeId, getProviderConfigs } from '../../src/lib/ai-provider-config.js';
 import { ensureSystemNodes } from '../../src/lib/bootstrap-system-nodes.js';
 import * as loroDoc from '../../src/lib/loro-doc.js';
 import { SYSTEM_SCHEMA_NODE_IDS } from '../../src/lib/system-schema-presets.js';
+import { useNodeStore } from '../../src/stores/node-store.js';
+import { NDX_F, SYS_V } from '../../src/types/index.js';
 
 const streamProxyMock = vi.hoisted(() => vi.fn(() => ({ mocked: true })));
 const getStoredTokenMock = vi.hoisted(() => vi.fn(async () => 'auth-token'));
@@ -140,6 +143,43 @@ async function seedCurrentSession(
   return currentSession;
 }
 
+function seedProviderConfig({
+  provider,
+  enabled,
+  apiKey,
+  baseUrl,
+  name,
+}: {
+  provider: string;
+  enabled: boolean;
+  apiKey?: string;
+  baseUrl?: string;
+  name: string;
+}): string {
+  const store = useNodeStore.getState();
+  const node = store.createChild(
+    SYSTEM_SCHEMA_NODE_IDS.SETTINGS_AI_PROVIDERS_FIELD_ENTRY,
+    undefined,
+    { name },
+    { commit: false },
+  );
+
+  const providerOptionNodeId = findProviderOptionNodeId(provider);
+  if (providerOptionNodeId) {
+    store.setOptionsFieldValue(node.id, NDX_F.PROVIDER_ID, providerOptionNodeId);
+  }
+
+  store.setFieldValue(node.id, NDX_F.PROVIDER_ENABLED, [enabled ? SYS_V.YES : SYS_V.NO]);
+  if (apiKey !== undefined) {
+    store.setFieldValue(node.id, NDX_F.PROVIDER_API_KEY, apiKey ? [apiKey] : []);
+  }
+  if (baseUrl !== undefined) {
+    store.setFieldValue(node.id, NDX_F.PROVIDER_BASE_URL, baseUrl ? [baseUrl] : []);
+  }
+
+  return node.id;
+}
+
 vi.mock('../../src/lib/ai-proxy.js', () => ({
   streamProxyWithApiKey: streamProxyMock,
 }));
@@ -205,29 +245,55 @@ describe('ai-service', () => {
     resetAIAgentForTests();
   });
 
-  it('stores and clears Anthropic API keys', async () => {
-    const { setApiKey, getApiKey, hasApiKey, clearApiKey } = await import('../../src/lib/ai-service.js');
+  it('reads Anthropic API keys from enabled provider configs', async () => {
+    loroDoc.initLoroDocForTest('ws_ai_settings');
+    ensureSystemNodes('ws_ai_settings');
+    seedProviderConfig({
+      provider: 'anthropic',
+      enabled: true,
+      apiKey: 'sk-ant-test-123',
+      name: 'Primary Anthropic',
+    });
 
-    expect(await hasApiKey()).toBe(false);
-    expect(await getApiKey()).toBeNull();
+    const { getApiKey, hasApiKey } = await import('../../src/lib/ai-service.js');
 
-    await setApiKey('sk-ant-test-123');
     expect(await hasApiKey()).toBe(true);
     expect(await getApiKey()).toBe('sk-ant-test-123');
+  });
 
-    await clearApiKey();
+  it('returns null when Anthropic is disabled or missing a key', async () => {
+    loroDoc.initLoroDocForTest('ws_ai_settings_missing');
+    ensureSystemNodes('ws_ai_settings_missing');
+    seedProviderConfig({
+      provider: 'anthropic',
+      enabled: false,
+      apiKey: 'sk-ant-disabled',
+      name: 'Disabled Anthropic',
+    });
+
+    const { getApiKey, hasApiKey } = await import('../../src/lib/ai-service.js');
+
     expect(await hasApiKey()).toBe(false);
     expect(await getApiKey()).toBeNull();
   });
 
-  it('rejects malformed API keys', async () => {
-    const { setApiKey } = await import('../../src/lib/ai-service.js');
-    await expect(setApiKey('bad-key')).rejects.toThrow('sk-ant-');
-  });
+  it('creates an agent whose getApiKey hook resolves provider-specific keys', async () => {
+    loroDoc.initLoroDocForTest('ws_ai_agent');
+    ensureSystemNodes('ws_ai_agent');
+    seedProviderConfig({
+      provider: 'anthropic',
+      enabled: true,
+      apiKey: 'sk-ant-test-456',
+      name: 'Anthropic',
+    });
+    seedProviderConfig({
+      provider: 'openai',
+      enabled: true,
+      apiKey: 'sk-openai-test-456',
+      name: 'OpenAI',
+    });
 
-  it('creates an agent whose getApiKey hook resolves the stored API key', async () => {
-    const { createAgent, setApiKey } = await import('../../src/lib/ai-service.js');
-    await setApiKey('sk-ant-test-456');
+    const { createAgent } = await import('../../src/lib/ai-service.js');
 
     const agent = createAgent();
     const internalAgent = agent as unknown as {
@@ -235,26 +301,27 @@ describe('ai-service', () => {
     };
 
     await expect(internalAgent.getApiKey('anthropic')).resolves.toBe('sk-ant-test-456');
+    await expect(internalAgent.getApiKey('openai')).resolves.toBe('sk-openai-test-456');
   });
 
-  it('creates an agent whose streamFn forwards auth and API key through proxy options', async () => {
-    const { createAgent, setApiKey } = await import('../../src/lib/ai-service.js');
-    await setApiKey('sk-ant-test-456');
+  it('creates an agent whose streamFn routes auth and API key by active model provider', async () => {
+    loroDoc.initLoroDocForTest('ws_ai_stream');
+    ensureSystemNodes('ws_ai_stream');
+    seedProviderConfig({
+      provider: 'openai',
+      enabled: true,
+      apiKey: 'sk-openai-test-456',
+      name: 'OpenAI',
+    });
 
-    const agent = createAgent();
-    expect(agent.state.model.provider).toBe('anthropic');
-    expect(agent.state.model.id).toContain('claude-sonnet');
+    const { getModel } = await import('@mariozechner/pi-ai');
+    const { createAgent } = await import('../../src/lib/ai-service.js');
+    const openAiModel = getModel('openai', 'gpt-4o');
+    const agent = createAgent(openAiModel);
+    expect(agent.state.model.provider).toBe('openai');
+    expect(agent.state.model.id).toBe('gpt-4o');
 
-    const internalAgent = agent as unknown as {
-      getApiKey: (provider: string) => Promise<string | undefined>;
-    };
-    const apiKey = await internalAgent.getApiKey('anthropic');
-
-    const result = await agent.streamFn(
-      agent.state.model,
-      { messages: [] },
-      { temperature: 0.2, apiKey },
-    );
+    const result = await agent.streamFn(agent.state.model, { messages: [] }, { temperature: 0.2 });
 
     expect(result).toEqual({ mocked: true });
     expect(streamProxyMock).toHaveBeenCalledTimes(1);
@@ -264,7 +331,7 @@ describe('ai-service', () => {
         messages: [],
       }),
       expect.objectContaining({
-        apiKey: 'sk-ant-test-456',
+        apiKey: 'sk-openai-test-456',
         authToken: 'auth-token',
         proxyUrl: expect.any(String),
         temperature: expect.any(Number),
@@ -777,25 +844,7 @@ describe('ai-service', () => {
     expect(getCurrentSession(agent)?.title).toBe('first question');
   });
 
-  it('writes API keys into Settings field entries when system nodes exist', async () => {
-    loroDoc.initLoroDocForTest('ws_ai_settings');
-    ensureSystemNodes('ws_ai_settings');
-
-    const { setApiKey, getAISettings } = await import('../../src/lib/ai-service.js');
-
-    await setApiKey('sk-ant-node-123');
-
-    expect(await getAISettings()).toEqual({
-      provider: 'anthropic',
-      apiKey: 'sk-ant-node-123',
-    });
-
-    const valueNodeId = loroDoc.toNodexNode(SYSTEM_SCHEMA_NODE_IDS.SETTINGS_AI_API_KEY_FIELD_ENTRY)?.children?.[0];
-    expect(valueNodeId).toBeTruthy();
-    expect(valueNodeId ? loroDoc.toNodexNode(valueNodeId)?.name : null).toBe('sk-ant-node-123');
-  });
-
-  it('migrates legacy chrome storage AI settings into Settings node fields', async () => {
+  it('migrates legacy chrome storage AI settings into provider config nodes', async () => {
     storage['soma-ai-settings'] = {
       provider: 'anthropic',
       apiKey: 'sk-ant-migrate-123',
@@ -809,7 +858,8 @@ describe('ai-service', () => {
     expect(await getApiKey()).toBe('sk-ant-migrate-123');
     expect(storage['soma-ai-settings']).toBeUndefined();
 
-    const valueNodeId = loroDoc.toNodexNode(SYSTEM_SCHEMA_NODE_IDS.SETTINGS_AI_API_KEY_FIELD_ENTRY)?.children?.[0];
-    expect(valueNodeId ? loroDoc.toNodexNode(valueNodeId)?.name : null).toBe('sk-ant-migrate-123');
+    const migratedConfig = getProviderConfigs().find((config) => config.provider === 'anthropic');
+    expect(migratedConfig?.enabled).toBe(true);
+    expect(migratedConfig?.apiKey).toBe('sk-ant-migrate-123');
   });
 });

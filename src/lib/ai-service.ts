@@ -3,6 +3,7 @@ import { getModel, isContextOverflow } from '@mariozechner/pi-ai';
 import type { Message, Model } from '@mariozechner/pi-ai';
 import { getStoredToken } from './auth.js';
 import { buildAgentSystemPrompt, DEFAULT_AGENT_MODEL_ID, DEFAULT_AGENT_MAX_TOKENS, DEFAULT_AGENT_SYSTEM_PROMPT, DEFAULT_AGENT_TEMPERATURE, readAgentNodeConfig } from './ai-agent-node.js';
+import { findProviderOptionNodeId, getApiKeyForProvider, getAvailableModels, getProviderConfigs } from './ai-provider-config.js';
 import {
   createSession,
   editMessage as editTreeMessage,
@@ -20,13 +21,13 @@ import * as loroDoc from './loro-doc.js';
 import { withCommitOrigin } from './loro-doc.js';
 import { SYSTEM_SCHEMA_NODE_IDS } from './system-schema-presets.js';
 import { useNodeStore } from '../stores/node-store.js';
-import { NDX_F, SYSTEM_NODE_IDS } from '../types/index.js';
+import { NDX_F, SYSTEM_NODE_IDS, SYS_V } from '../types/index.js';
 
 const AI_SETTINGS_KEY = 'soma-ai-settings';
 
 const DEFAULT_CHAT_MODEL = getModel('anthropic', 'claude-sonnet-4-5');
 
-export interface StoredAISettings {
+interface LegacyStoredAISettings {
   provider: 'anthropic';
   apiKey: string;
 }
@@ -53,23 +54,23 @@ function getSyncApiUrl(): string {
   return import.meta.env.VITE_SYNC_API_URL ?? 'http://localhost:8787';
 }
 
-async function readSettings(): Promise<StoredAISettings | null> {
+async function readSettings(): Promise<LegacyStoredAISettings | null> {
   if (hasChromeStorage()) {
     const result = await chrome.storage.local.get(AI_SETTINGS_KEY);
-    return (result[AI_SETTINGS_KEY] as StoredAISettings | undefined) ?? null;
+    return (result[AI_SETTINGS_KEY] as LegacyStoredAISettings | undefined) ?? null;
   }
 
   const raw = localStorage.getItem(AI_SETTINGS_KEY);
   if (!raw) return null;
 
   try {
-    return JSON.parse(raw) as StoredAISettings;
+    return JSON.parse(raw) as LegacyStoredAISettings;
   } catch {
     return null;
   }
 }
 
-async function writeSettings(settings: StoredAISettings | null): Promise<void> {
+async function writeSettings(settings: LegacyStoredAISettings | null): Promise<void> {
   if (hasChromeStorage()) {
     if (settings) {
       await chrome.storage.local.set({ [AI_SETTINGS_KEY]: settings });
@@ -110,40 +111,40 @@ function hasNodeBackedAISettings(): boolean {
   }
 }
 
-function getSettingValueNode(fieldEntryId: string) {
-  if (!hasNodeBackedAISettings()) return null;
-  const fieldEntry = loroDoc.toNodexNode(fieldEntryId);
-  const valueNodeId = fieldEntry?.children?.[0];
-  return valueNodeId ? loroDoc.toNodexNode(valueNodeId) : null;
+function hasAnthropicProviderConfig(configs: ReturnType<typeof getProviderConfigs>): boolean {
+  return configs.some((config) => config.provider === 'anthropic' && config.apiKey.length > 0);
 }
 
-function readProviderFromSettingsNode(): 'anthropic' {
-  const valueNode = getSettingValueNode(SYSTEM_SCHEMA_NODE_IDS.SETTINGS_AI_PROVIDER_FIELD_ENTRY);
-  const providerName = valueNode?.targetId
-    ? loroDoc.toNodexNode(valueNode.targetId)?.name
-    : valueNode?.name;
-  return providerName?.trim().toLowerCase() === 'anthropic' ? 'anthropic' : 'anthropic';
-}
+function resolveModel(modelId: string, providerHint?: string): Model<any> {
+  const normalizedProviderHint = providerHint?.trim().toLowerCase();
+  const availableModels = getAvailableModels();
 
-function readApiKeyFromSettingsNode(): string | null {
-  const valueNode = getSettingValueNode(SYSTEM_SCHEMA_NODE_IDS.SETTINGS_AI_API_KEY_FIELD_ENTRY);
-  const apiKey = valueNode?.name?.trim() ?? '';
-  return apiKey.length > 0 ? apiKey : null;
-}
-
-function resolveProviderOptionId(provider: StoredAISettings['provider']): string {
-  switch (provider) {
-    case 'anthropic':
-    default:
-      return SYSTEM_SCHEMA_NODE_IDS.SETTINGS_AI_PROVIDER_ANTHROPIC;
+  if (normalizedProviderHint) {
+    const exactAvailableModel = availableModels.find(
+      (model) => model.provider === normalizedProviderHint && model.id === modelId,
+    );
+    if (exactAvailableModel) return exactAvailableModel;
   }
-}
 
-function resolveModel(provider: StoredAISettings['provider'], modelId: string): Model<any> {
+  const availableModel = availableModels.find((model) => model.id === modelId);
+  if (availableModel) return availableModel;
+
+  if (normalizedProviderHint) {
+    try {
+      return getModel(normalizedProviderHint as Parameters<typeof getModel>[0], modelId as never);
+    } catch {
+      // Fall through to a known-good default.
+    }
+  }
+
+  if (availableModels.length > 0) {
+    return availableModels[0];
+  }
+
   try {
-    return getModel(provider, modelId as never);
+    return getModel('anthropic', modelId as never);
   } catch {
-    return getModel('anthropic', DEFAULT_AGENT_MODEL_ID);
+    return DEFAULT_CHAT_MODEL;
   }
 }
 
@@ -154,23 +155,28 @@ async function ensureAISettingsMigrated(): Promise<void> {
   migrationPromise = (async () => {
     const legacySettings = await readSettings();
     if (!legacySettings?.apiKey) return;
-    if (readApiKeyFromSettingsNode()) {
+    const existingConfigs = getProviderConfigs();
+    if (hasAnthropicProviderConfig(existingConfigs)) {
       await writeSettings(null);
       return;
     }
 
     withCommitOrigin('system:ai-settings-migration', () => {
       const store = useNodeStore.getState();
-      store.setOptionsFieldValue(
-        SYSTEM_NODE_IDS.SETTINGS,
-        NDX_F.SETTING_AI_PROVIDER,
-        resolveProviderOptionId(legacySettings.provider),
-      );
-      store.setFieldValue(
-        SYSTEM_NODE_IDS.SETTINGS,
-        NDX_F.SETTING_AI_API_KEY,
-        [legacySettings.apiKey],
-      );
+      const anthropicConfig = existingConfigs.find((config) => config.provider === 'anthropic');
+      const targetNodeId = anthropicConfig?.nodeId
+        ?? store.createChild(
+          SYSTEM_SCHEMA_NODE_IDS.SETTINGS_AI_PROVIDERS_FIELD_ENTRY,
+          undefined,
+          { name: 'Anthropic' },
+          { commit: false },
+        ).id;
+      const providerOptionNodeId = findProviderOptionNodeId(legacySettings.provider);
+      if (providerOptionNodeId) {
+        store.setOptionsFieldValue(targetNodeId, NDX_F.PROVIDER_ID, providerOptionNodeId);
+      }
+      store.setFieldValue(targetNodeId, NDX_F.PROVIDER_ENABLED, [SYS_V.YES]);
+      store.setFieldValue(targetNodeId, NDX_F.PROVIDER_API_KEY, [legacySettings.apiKey]);
     });
 
     await writeSettings(null);
@@ -198,25 +204,25 @@ function supportsDynamicAgentConfiguration(agent: Agent): boolean {
 }
 
 export async function configureAgent(agent: Agent): Promise<{
-  provider: StoredAISettings['provider'];
+  provider: string;
 }> {
   await ensureAISettingsMigrated();
 
   const runtime = getAgentRuntimeState(agent);
-  const fallbackSettings = !hasNodeBackedAISettings() ? await readSettings() : null;
-  const provider = hasNodeBackedAISettings()
-    ? readProviderFromSettingsNode()
-    : (fallbackSettings?.provider ?? 'anthropic');
   const agentConfig = readAgentConfigSafely();
+  const resolvedModel = resolveModel(
+    agentConfig?.modelId ?? DEFAULT_AGENT_MODEL_ID,
+    agent.state.model.provider,
+  );
 
   runtime.temperature = agentConfig?.temperature ?? DEFAULT_AGENT_TEMPERATURE;
   runtime.maxTokens = agentConfig?.maxTokens ?? DEFAULT_AGENT_MAX_TOKENS;
 
   agent.setTools(getAITools());
   agent.setSystemPrompt(agentConfig ? buildAgentSystemPrompt(agentConfig) : DEFAULT_AGENT_SYSTEM_PROMPT);
-  agent.setModel(resolveModel(provider, agentConfig?.modelId ?? DEFAULT_AGENT_MODEL_ID));
+  agent.setModel(resolvedModel);
 
-  return { provider };
+  return { provider: resolvedModel.provider };
 }
 
 function isLlmCompatibleMessage(message: AgentMessage): message is Message {
@@ -390,69 +396,17 @@ async function runAgentTurn(session: ChatSession, agent: Agent, prompt: string):
   }
 }
 
-export async function getAISettings(): Promise<StoredAISettings | null> {
+export async function getApiKey(): Promise<string | null> {
   if (!hasNodeBackedAISettings()) {
-    return readSettings();
+    return (await readSettings())?.apiKey ?? null;
   }
 
   await ensureAISettingsMigrated();
-  const apiKey = readApiKeyFromSettingsNode();
-  if (!apiKey) return null;
-
-  return {
-    provider: readProviderFromSettingsNode(),
-    apiKey,
-  };
-}
-
-export async function getApiKey(): Promise<string | null> {
-  const settings = await getAISettings();
-  return settings?.apiKey ?? null;
+  return getApiKeyForProvider('anthropic');
 }
 
 export async function hasApiKey(): Promise<boolean> {
   return (await getApiKey()) !== null;
-}
-
-export async function setApiKey(apiKey: string): Promise<void> {
-  const normalized = apiKey.trim();
-  if (!normalized || !normalized.startsWith('sk-ant-')) {
-    throw new Error('Anthropic API key must start with sk-ant-');
-  }
-
-  if (!hasNodeBackedAISettings()) {
-    await writeSettings({
-      provider: 'anthropic',
-      apiKey: normalized,
-    });
-    return;
-  }
-
-  const store = useNodeStore.getState();
-  store.setOptionsFieldValue(
-    SYSTEM_NODE_IDS.SETTINGS,
-    NDX_F.SETTING_AI_PROVIDER,
-    SYSTEM_SCHEMA_NODE_IDS.SETTINGS_AI_PROVIDER_ANTHROPIC,
-  );
-  store.setFieldValue(
-    SYSTEM_NODE_IDS.SETTINGS,
-    NDX_F.SETTING_AI_API_KEY,
-    [normalized],
-  );
-  await writeSettings(null);
-}
-
-export async function clearApiKey(): Promise<void> {
-  if (!hasNodeBackedAISettings()) {
-    await writeSettings(null);
-    return;
-  }
-
-  useNodeStore.getState().clearFieldValue(
-    SYSTEM_NODE_IDS.SETTINGS,
-    NDX_F.SETTING_AI_API_KEY,
-  );
-  await writeSettings(null);
 }
 
 export function createAgent(model: Model<any> = DEFAULT_CHAT_MODEL): Agent {
@@ -462,8 +416,14 @@ export function createAgent(model: Model<any> = DEFAULT_CHAT_MODEL): Agent {
     initialState: {
       model,
     },
-    getApiKey: async () => {
-      const apiKey = await getApiKey();
+    getApiKey: async (provider) => {
+      if (!hasNodeBackedAISettings()) {
+        const apiKey = (await readSettings())?.apiKey;
+        return apiKey ?? undefined;
+      }
+
+      await ensureAISettingsMigrated();
+      const apiKey = getApiKeyForProvider(provider);
       return apiKey ?? undefined;
     },
     transformContext: async (messages) => (await prepareAgentContext(messages)).messages,
@@ -474,9 +434,21 @@ export function createAgent(model: Model<any> = DEFAULT_CHAT_MODEL): Agent {
         throw new Error('Please sign in to use Chat');
       }
 
+      const legacyApiKey = !hasNodeBackedAISettings()
+        ? (await readSettings())?.apiKey ?? null
+        : null;
+      await ensureAISettingsMigrated();
+      const resolvedApiKey = options.apiKey
+        ?? legacyApiKey
+        ?? getApiKeyForProvider(activeModel.provider);
+      if (!resolvedApiKey) {
+        throw new Error(`No API key configured for ${activeModel.provider}. Open Settings to add one.`);
+      }
+
       const runtime = getAgentRuntimeState(agent);
       return streamProxyWithApiKey(activeModel, context, {
         ...options,
+        apiKey: resolvedApiKey,
         temperature: options.temperature ?? runtime.temperature,
         maxTokens: options.maxTokens ?? runtime.maxTokens,
         authToken,

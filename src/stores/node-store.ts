@@ -26,6 +26,7 @@ import { ensureTodayNode } from '../lib/journal.js';
 import { getWorkspaceHomeNodeId } from '../lib/system-node-presets.js';
 import type { ParsedPasteNode } from '../lib/paste-parser.js';
 import { resolveEffectiveId } from '../lib/node-type-utils.js';
+import { resolveChildSupertags } from '../lib/field-utils.js';
 
 // ============================================================
 // Store 接口
@@ -927,15 +928,9 @@ export const useNodeStore = create<NodeStore>((set, get) => {
         }
       }
 
-      // Auto-apply child supertags from parent's tags
-      const parentNode = loroDoc.toNodexNode(parentId);
-      if (parentNode) {
-        for (const tagId of parentNode.tags) {
-          const tagDef = loroDoc.toNodexNode(tagId);
-          if (tagDef?.childSupertag) {
-            applyTagMutationsNoCommit(id, tagDef.childSupertag);
-          }
-        }
+      // Auto-apply default child supertags from the parent node or field definition.
+      for (const tagId of resolveChildSupertags(parentId)) {
+        applyTagMutationsNoCommit(id, tagId);
       }
 
       if (options?.commit !== false) {

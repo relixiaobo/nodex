@@ -6,12 +6,12 @@ import { createRoot, type Root } from 'react-dom/client';
 import { flushSync } from 'react-dom';
 import { ChatInput } from '../../src/components/chat/ChatInput.js';
 import { ChatMessage } from '../../src/components/chat/ChatMessage.js';
-import { shouldStickChatScroll } from '../../src/components/chat/ChatPanel.js';
+import { ChatPanel, shouldStickChatScroll } from '../../src/components/chat/ChatPanel.js';
 import { DeskLayout } from '../../src/components/layout/DeskLayout.js';
 import { GlobalTools } from '../../src/components/toolbar/TopToolbar.js';
 import { resetChatPersistenceForTests } from '../../src/lib/ai-persistence.js';
 import { useUIStore } from '../../src/stores/ui-store.js';
-import { resetStores } from './helpers/test-state.js';
+import { resetAndSeed, resetStores } from './helpers/test-state.js';
 
 const DB_NAME = 'soma-ai-chat';
 
@@ -145,6 +145,50 @@ describe('chat ui', () => {
     expect(html).toContain('disabled=""');
     // Stop button only appears when disabled=true (streaming), not when busy
     expect(html).not.toContain('aria-label="Stop generating"');
+  });
+
+  it('renders a model selector in the composer footer when models are available', () => {
+    const html = renderToStaticMarkup(
+      React.createElement(ChatInput, {
+        disabled: false,
+        currentModel: {
+          id: 'claude-sonnet-4-5',
+          name: 'Sonnet 4.5',
+          provider: 'anthropic',
+        },
+        availableModels: [
+          {
+            id: 'claude-sonnet-4-5',
+            name: 'Sonnet 4.5',
+            provider: 'anthropic',
+          },
+          {
+            id: 'gpt-4o',
+            name: 'GPT-4o',
+            provider: 'openai',
+          },
+        ],
+        onModelChange: () => {},
+        onSend: async () => {},
+        onStop: () => {},
+      }),
+    );
+
+    expect(html).toContain('aria-label="Select model"');
+    expect(html).toContain('Sonnet 4.5');
+  });
+
+  it('renders an empty state when no enabled provider is configured', async () => {
+    resetAndSeed();
+
+    flushSync(() => {
+      root.render(React.createElement(ChatPanel, { panelId: 'chat-panel', sessionId: 'session-empty' }));
+    });
+
+    await vi.waitFor(() => {
+      expect(container.textContent).toContain('Configure an AI provider to start chatting');
+      expect(container.textContent).toContain('Open Settings');
+    });
   });
 
   it('renders the global chat trigger as a non-toggle button', () => {

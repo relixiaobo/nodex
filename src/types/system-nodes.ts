@@ -312,10 +312,10 @@ export const NDX_F = {
   SOURCE_HIGHLIGHTS: 'NDX_F08',
   /** Settings: Highlight & Comment toggle (boolean, on Settings container) */
   SETTING_HIGHLIGHT_ENABLED: 'NDX_F10',
-  /** Settings: AI provider selector */
-  SETTING_AI_PROVIDER: 'NDX_F11',
-  /** Settings: API key storage */
-  SETTING_AI_API_KEY: 'NDX_F12',
+  /** @deprecated Legacy Settings: single AI provider selector */
+  LEGACY_SETTING_AI_PROVIDER: 'NDX_F11',
+  /** @deprecated Legacy Settings: single API key storage */
+  LEGACY_SETTING_AI_API_KEY: 'NDX_F12',
   /** #agent: model selector */
   AGENT_MODEL: 'NDX_F13',
   /** #agent: temperature */
@@ -324,6 +324,16 @@ export const NDX_F = {
   AGENT_MAX_TOKENS: 'NDX_F15',
   /** #agent: active skills (options_from_supertag → #skill) */
   AGENT_SKILLS: 'NDX_F16',
+  /** #ai-provider: provider identifier */
+  PROVIDER_ID: 'NDX_F17',
+  /** #ai-provider: enabled toggle */
+  PROVIDER_ENABLED: 'NDX_F18',
+  /** #ai-provider: API key */
+  PROVIDER_API_KEY: 'NDX_F19',
+  /** #ai-provider: custom base URL */
+  PROVIDER_BASE_URL: 'NDX_F20',
+  /** Settings: multi-provider configs (options_from_supertag → #ai-provider) */
+  SETTING_AI_PROVIDERS: 'NDX_F21',
 } as const;
 
 export type NdxFieldDef = typeof NDX_F[keyof typeof NDX_F];
@@ -335,6 +345,8 @@ export type NdxFieldDef = typeof NDX_F[keyof typeof NDX_F];
 export const NDX_T = {
   /** Workspace settings schema tagDef */
   WORKSPACE_SETTINGS: 'NDX_T10',
+  /** #ai-provider tagDef */
+  AI_PROVIDER: 'NDX_T11',
   /** #article tagDef — extends #source */
   ARTICLE: 'NDX_T01',
   /** #video tagDef — extends #source */

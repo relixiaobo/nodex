@@ -262,29 +262,25 @@ export function PanelLayout({ toolbar }: PanelLayoutProps) {
         const hasTab = isLast && !!toolbar && !isApp;
 
         // ── Last panel with tab layout ──
-        // Tab is purely spatial accommodation (name label). Panel body
-        // is identical to a normal card: breadcrumb + close for nodes,
-        // close-only for apps.
+        // The tab IS the breadcrumb row (same as normal card header),
+        // just shaped as a tab because it shares the top row with the
+        // toolbar. Panel body has content only, no separate header.
         if (hasTab) {
           return (
-            <div key={panel.id} className="flex flex-1 min-w-0 flex-col">
-              {/* Tab row: name tab (paper) + toolbar (desk) */}
+            <div key={panel.id} className="group/panel flex flex-1 min-w-0 flex-col">
+              {/* Tab row = breadcrumb + close (identical to normal card header) + toolbar */}
               <div className="flex items-end shrink-0">
-                <TabHead
-                  nodeId={nodeId}
-                  onClickBody={() => setActivePanel(panel.id)}
-                />
-                <div className="flex flex-1 justify-end">
-                  {toolbar}
-                </div>
-              </div>
-              {/* Panel body — identical to normal card, just no top-left rounding (connects to tab) */}
-              <div
-                className={TAB_PANEL_BODY}
-                onClick={() => setActivePanel(panel.id)}
-              >
-                {!isApp && !isChat && (
-                  <div className="flex items-center shrink-0">
+                {isChat ? (
+                  <TabHead
+                    nodeId={nodeId}
+                    onClose={(e) => handleClosePanel(e, panel.id)}
+                    onClickBody={() => setActivePanel(panel.id)}
+                  />
+                ) : (
+                  <div
+                    className="tab-connector-right relative z-10 flex min-w-0 shrink items-center bg-background rounded-t-xl"
+                    onClick={() => setActivePanel(panel.id)}
+                  >
                     <Breadcrumb nodeId={nodeId} showCurrentName={!titleVisible} active={isActive} />
                     {showClose && (
                       <button
@@ -298,18 +294,15 @@ export function PanelLayout({ toolbar }: PanelLayoutProps) {
                     )}
                   </div>
                 )}
-                {isChat && showClose && (
-                  <div className="flex items-center justify-end shrink-0 h-8">
-                    <button
-                      type="button"
-                      className="flex h-5 w-5 mr-2 shrink-0 items-center justify-center rounded-md text-foreground-tertiary opacity-0 transition-opacity hover:bg-foreground/8 hover:text-foreground group-hover/panel:opacity-100"
-                      onClick={(e) => handleClosePanel(e, panel.id)}
-                      title="Close panel"
-                    >
-                      <X size={12} />
-                    </button>
-                  </div>
-                )}
+                <div className="flex flex-1 justify-end">
+                  {toolbar}
+                </div>
+              </div>
+              {/* Panel body — content only, no top-left rounding (connects to tab) */}
+              <div
+                className={TAB_PANEL_BODY}
+                onClick={() => setActivePanel(panel.id)}
+              >
                 {renderPanelContent(nodeId, panel.id, { hideHeader: isChat })}
               </div>
             </div>

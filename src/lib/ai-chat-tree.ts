@@ -21,6 +21,8 @@ export interface ChatSession {
   title: string | null;
   mapping: Record<string, MessageNode>;
   currentNode: string;
+  selectedModelId?: string;
+  selectedProvider?: string;
   createdAt: number;
   updatedAt: number;
   syncedAt: number | null;

@@ -1,10 +1,13 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { ExternalLink, Sparkles, X } from '../../lib/icons.js';
+import { Sparkles, X } from '../../lib/icons.js';
 import { useAgent } from '../../hooks/use-agent.js';
 import { readChatDebugEnabled, writeChatDebugEnabled } from '../../lib/ai-debug.js';
-import { clearApiKey, getAISettings, getAgentForSession, setApiKey } from '../../lib/ai-service.js';
+import { getAvailableModels } from '../../lib/ai-provider-config.js';
+import { getAgentForSession, selectChatModel } from '../../lib/ai-service.js';
+import { useNodeStore } from '../../stores/node-store.js';
 import { useUIStore } from '../../stores/ui-store.js';
+import { SYSTEM_NODE_IDS } from '../../types/index.js';
 import { ChatDebugPanel } from './ChatDebugPanel.js';
 import { ChatInput } from './ChatInput.js';
 import { ChatMessage } from './ChatMessage.js';
@@ -25,11 +28,6 @@ export function shouldStickChatScroll(
   return scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight <= threshold;
 }
 
-function maskApiKey(apiKey: string): string {
-  if (apiKey.length <= 12) return `${apiKey.slice(0, 7)}••••`;
-  return `${apiKey.slice(0, 7)}••••${apiKey.slice(-4)}`;
-}
-
 function getActionErrorMessage(error: unknown, fallback: string): string {
   if (error instanceof Error && error.message.trim().length > 0) {
     return error.message;
@@ -43,6 +41,7 @@ export function ChatPanel({ panelId, sessionId, hideHeader }: ChatPanelProps) {
   const activePanelId = useUIStore((s) => s.activePanelId);
   const isActive = activePanelId === panelId;
   const {
+    agent,
     messages,
     toolResults,
     isStreaming,
@@ -55,44 +54,54 @@ export function ChatPanel({ panelId, sessionId, hideHeader }: ChatPanelProps) {
     switchBranch,
     stopStreaming,
   } = useAgent(getAgentForSession(sessionId), sessionId);
+  const settingsVersion = useNodeStore((s) => s._version);
   const scrollRef = useRef<HTMLDivElement>(null);
   const shouldStickToBottomRef = useRef(true);
   const debugTapResetRef = useRef<number | null>(null);
   const debugTapCountRef = useRef(0);
-  const [loadingSettings, setLoadingSettings] = useState(true);
-  const [showSettings, setShowSettings] = useState(false);
-  const [savedKeyMask, setSavedKeyMask] = useState<string | null>(null);
-  const [draftKey, setDraftKey] = useState('');
-  const [formError, setFormError] = useState<string | null>(null);
-  const [savingKey, setSavingKey] = useState(false);
   const [debugEnabled, setDebugEnabled] = useState(false);
   const [debugOpen, setDebugOpen] = useState(false);
   const [pendingMessageActionId, setPendingMessageActionId] = useState<string | null>(null);
   const chatBusy = isStreaming || pendingMessageActionId !== null;
+  const debugActionLabel = !debugEnabled
+    ? 'Enable AI Debug'
+    : debugOpen
+      ? 'Hide AI Debug'
+      : 'Show AI Debug';
+
+  const availableModels = useMemo(() => {
+    void settingsVersion;
+    return getAvailableModels();
+  }, [settingsVersion]);
+  const hasAvailableModels = availableModels.length > 0;
+
+  const currentModel = useMemo(() => {
+    const selectedModel = availableModels.find(
+      (model) => model.id === debug.modelId && model.provider === debug.provider,
+    );
+    if (selectedModel) {
+      return {
+        id: selectedModel.id,
+        name: selectedModel.name,
+        provider: selectedModel.provider,
+      };
+    }
+
+    return {
+      id: debug.modelId,
+      name: agent.state.model.name,
+      provider: debug.provider,
+    };
+  }, [agent.state.model.name, availableModels, debug.modelId, debug.provider]);
 
   useEffect(() => {
     let cancelled = false;
 
-    async function loadSettings() {
-      setLoadingSettings(true);
-      const [settings, storedDebugEnabled] = await Promise.all([
-        getAISettings(),
-        readChatDebugEnabled(),
-      ]);
-      if (cancelled) return;
-
-      if (settings?.apiKey) {
-        setSavedKeyMask(maskApiKey(settings.apiKey));
-        setShowSettings(false);
-      } else {
-        setSavedKeyMask(null);
-        setShowSettings(true);
+    void readChatDebugEnabled().then((storedDebugEnabled) => {
+      if (!cancelled) {
+        setDebugEnabled((current) => current || storedDebugEnabled);
       }
-      setDebugEnabled(storedDebugEnabled);
-      setLoadingSettings(false);
-    }
-
-    void loadSettings();
+    });
 
     return () => {
       cancelled = true;
@@ -113,7 +122,7 @@ export function ChatPanel({ panelId, sessionId, hideHeader }: ChatPanelProps) {
   }, [debugEnabled]);
 
   useEffect(() => {
-    if (showSettings) return;
+    if (!hasAvailableModels) return;
     const scroller = scrollRef.current;
     if (!scroller) return;
     if (!shouldStickToBottomRef.current) return;
@@ -122,53 +131,23 @@ export function ChatPanel({ panelId, sessionId, hideHeader }: ChatPanelProps) {
       scroller.scrollTop = scroller.scrollHeight;
       shouldStickToBottomRef.current = true;
     });
-  }, [messages, isStreaming, showSettings]);
+  }, [messages, isStreaming, hasAvailableModels]);
 
   useEffect(() => {
     if (!isActive || !pendingChatPrompt || pendingChatPrompt.panelId !== panelId) return;
-    if (loadingSettings || showSettings || chatBusy || !ready) return;
+    if (!hasAvailableModels || chatBusy || !ready) return;
 
     setPendingChatPrompt(null);
     void handleSendMessage(pendingChatPrompt.prompt);
   }, [
+    chatBusy,
+    hasAvailableModels,
     isActive,
     panelId,
     pendingChatPrompt,
-    loadingSettings,
-    showSettings,
-    chatBusy,
     ready,
     setPendingChatPrompt,
   ]);
-
-  async function handleSaveKey() {
-    const normalized = draftKey.trim();
-    if (!normalized.startsWith('sk-ant-')) {
-      setFormError('Anthropic API key must start with sk-ant-.');
-      return;
-    }
-
-    setSavingKey(true);
-    setFormError(null);
-    try {
-      await setApiKey(normalized);
-      setSavedKeyMask(maskApiKey(normalized));
-      setDraftKey('');
-      setShowSettings(false);
-    } catch (saveError) {
-      setFormError(saveError instanceof Error ? saveError.message : String(saveError));
-    } finally {
-      setSavingKey(false);
-    }
-  }
-
-  async function handleClearKey() {
-    await clearApiKey();
-    setSavedKeyMask(null);
-    setDraftKey('');
-    setFormError(null);
-    setShowSettings(true);
-  }
 
   async function handleSendMessage(prompt: string) {
     if (pendingMessageActionId) return;
@@ -202,7 +181,7 @@ export function ChatPanel({ panelId, sessionId, hideHeader }: ChatPanelProps) {
   }
 
   function handleHeaderTitleClick() {
-    if (!showSettings || debugEnabled) return;
+    if (hasAvailableModels || debugEnabled) return;
 
     debugTapCountRef.current += 1;
 
@@ -214,6 +193,7 @@ export function ChatPanel({ panelId, sessionId, hideHeader }: ChatPanelProps) {
     if (debugTapCountRef.current >= 5) {
       debugTapCountRef.current = 0;
       setDebugEnabled(true);
+      setDebugOpen(true);
       toast.success('Debug mode enabled');
       void writeChatDebugEnabled(true);
       return;
@@ -222,6 +202,30 @@ export function ChatPanel({ panelId, sessionId, hideHeader }: ChatPanelProps) {
     debugTapResetRef.current = window.setTimeout(() => {
       debugTapCountRef.current = 0;
     }, 1200);
+  }
+
+  function handleOpenSettings() {
+    useUIStore.getState().openPanel(SYSTEM_NODE_IDS.SETTINGS);
+  }
+
+  function handleToggleDebug() {
+    if (!debugEnabled) {
+      setDebugEnabled(true);
+      setDebugOpen(true);
+      toast.success('AI Debug enabled');
+      void writeChatDebugEnabled(true);
+      return;
+    }
+
+    setDebugOpen((value) => !value);
+  }
+
+  async function handleModelChange(modelId: string, provider: string) {
+    try {
+      await selectChatModel(modelId, provider, agent);
+    } catch (changeError) {
+      toast.error(getActionErrorMessage(changeError, 'Failed to switch models'));
+    }
   }
 
   return (
@@ -238,10 +242,10 @@ export function ChatPanel({ panelId, sessionId, hideHeader }: ChatPanelProps) {
           </button>
         )}
         <div className="flex items-center gap-1">
-          {debugEnabled && !showSettings && (
+          {debugEnabled && (
             <button
               type="button"
-              onClick={() => setDebugOpen((value) => !value)}
+              onClick={handleToggleDebug}
               className={`inline-flex h-7 min-w-8 items-center justify-center rounded-full px-2 font-mono text-[11px] transition-colors ${
                 debugOpen
                   ? 'bg-foreground/8 text-foreground'
@@ -266,74 +270,37 @@ export function ChatPanel({ panelId, sessionId, hideHeader }: ChatPanelProps) {
         </div>
       </div>
 
-      {loadingSettings || !ready ? (
+      {!ready ? (
         <div className="flex flex-1 items-center justify-center text-sm text-foreground-tertiary">
           Loading chat…
         </div>
-      ) : showSettings ? (
-        <div className="flex flex-1 flex-col justify-center px-5 py-6">
-          <div className="rounded-lg border border-border bg-foreground/4 p-4">
-            <div className="mb-4">
-              <div className="text-xs font-medium uppercase tracking-[0.08em] text-foreground-tertiary">
-                Provider
-              </div>
-              <div className="mt-1 text-sm text-foreground">Anthropic</div>
+      ) : !hasAvailableModels ? (
+        <div className="flex flex-1 flex-col justify-center gap-4 px-6">
+          {debugEnabled && debugOpen && (
+            <div className="mx-auto w-full max-w-[560px]">
+              <ChatDebugPanel debug={debug} />
             </div>
-
-            {savedKeyMask && (
-              <div className="mb-4 rounded-lg border border-border bg-background px-3 py-2 text-xs text-foreground-secondary">
-                Saved key: <span className="font-medium text-foreground">{savedKeyMask}</span>
-              </div>
-            )}
-
-            <label className="block">
-              <span className="mb-1.5 block text-xs font-medium uppercase tracking-[0.08em] text-foreground-tertiary">
-                API key
-              </span>
-              <input
-                type="password"
-                autoComplete="off"
-                spellCheck={false}
-                value={draftKey}
-                onChange={(event) => setDraftKey(event.target.value)}
-                placeholder="sk-ant-..."
-                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none transition-colors placeholder:text-foreground-tertiary focus:border-primary"
-              />
-            </label>
-
-            {formError && (
-              <div className="mt-3 text-xs text-destructive">{formError}</div>
-            )}
-
-            <div className="mt-4 flex items-center gap-2">
+          )}
+          <div className="flex flex-col items-center gap-4 text-center">
+            <div className="max-w-[260px] text-sm text-foreground-tertiary">
+              Configure an AI provider to start chatting
+            </div>
+            <div className="flex flex-wrap items-center justify-center gap-2">
               <button
                 type="button"
-                onClick={() => void handleSaveKey()}
-                disabled={savingKey || draftKey.trim().length === 0}
-                className="inline-flex h-9 items-center rounded-full bg-foreground px-3 text-sm font-medium text-background transition-colors hover:bg-foreground/90 disabled:cursor-not-allowed disabled:bg-foreground/20"
+                onClick={handleOpenSettings}
+                className="inline-flex h-9 items-center rounded-full border border-border px-4 text-sm font-medium text-foreground transition-colors hover:bg-foreground/4"
               >
-                {savingKey ? 'Saving…' : 'Save'}
+                Open Settings
               </button>
-              {savedKeyMask && (
-                <button
-                  type="button"
-                  onClick={() => void handleClearKey()}
-                  className="inline-flex h-9 items-center rounded-full border border-border px-3 text-sm text-foreground-secondary transition-colors hover:bg-foreground/4 hover:text-foreground"
-                >
-                  Clear
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={handleToggleDebug}
+                className="inline-flex h-9 items-center rounded-full border border-border px-4 text-sm font-medium text-foreground-secondary transition-colors hover:bg-foreground/4 hover:text-foreground"
+              >
+                {debugActionLabel}
+              </button>
             </div>
-
-            <a
-              href="https://console.anthropic.com/"
-              target="_blank"
-              rel="noreferrer"
-              className="mt-4 inline-flex items-center gap-1 text-xs text-foreground-tertiary transition-colors hover:text-foreground"
-            >
-              Get your key at console.anthropic.com
-              <ExternalLink size={11} strokeWidth={1.7} />
-            </a>
           </div>
         </div>
       ) : (
@@ -355,7 +322,7 @@ export function ChatPanel({ panelId, sessionId, hideHeader }: ChatPanelProps) {
             {messages.length === 0 ? (
               <div className="flex h-full min-h-40 flex-col items-center justify-center gap-4 px-6">
                 <div className="text-center text-sm text-foreground-tertiary">
-                  Ask about your notes, clips, or the page you're reading.
+                  Ask about your notes, clips, or the page you&apos;re reading.
                 </div>
                 <div className="flex w-full max-w-[260px] flex-col gap-2">
                   {[
@@ -395,12 +362,15 @@ export function ChatPanel({ panelId, sessionId, hideHeader }: ChatPanelProps) {
             disabled={isStreaming}
             busy={pendingMessageActionId !== null}
             error={error}
+            currentModel={currentModel}
+            availableModels={availableModels}
+            debugEnabled={debugEnabled}
+            debugOpen={debugOpen}
             onSend={handleSendMessage}
             onStop={stopStreaming}
-            onOpenSettings={() => {
-              setFormError(null);
-              setShowSettings(true);
-            }}
+            onOpenSettings={handleOpenSettings}
+            onToggleDebug={handleToggleDebug}
+            onModelChange={handleModelChange}
           />
         </>
       )}

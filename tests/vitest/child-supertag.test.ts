@@ -10,7 +10,8 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { useNodeStore } from '../../src/stores/node-store.js';
 import { resolveChildSupertags } from '../../src/lib/field-utils.js';
 import * as loroDoc from '../../src/lib/loro-doc.js';
-import { SYS_T } from '../../src/types/index.js';
+import { NDX_F, NDX_T, SYS_T } from '../../src/types/index.js';
+import { SYSTEM_SCHEMA_NODE_IDS } from '../../src/lib/system-schema-presets.js';
 import { resetAndSeed } from './helpers/test-state.js';
 
 describe('Default Child Supertag', () => {
@@ -40,6 +41,11 @@ describe('Default Child Supertag', () => {
       const result = resolveChildSupertags('nonexistent_node');
       expect(result).toEqual([]);
     });
+
+    it('returns fieldDef childSupertag for a fieldEntry parent', () => {
+      const result = resolveChildSupertags(SYSTEM_SCHEMA_NODE_IDS.SETTINGS_AI_PROVIDERS_FIELD_ENTRY);
+      expect(result).toEqual([NDX_T.AI_PROVIDER]);
+    });
   });
 
   describe('createChild auto-tag', () => {
@@ -68,6 +74,21 @@ describe('Default Child Supertag', () => {
 
       const childNode = loroDoc.toNodexNode(child.id)!;
       expect(childNode.tags).toHaveLength(0);
+    });
+
+    it('auto-applies fieldDef childSupertag when parent is a fieldEntry', () => {
+      const child = useNodeStore.getState().createChild(
+        SYSTEM_SCHEMA_NODE_IDS.SETTINGS_AI_PROVIDERS_FIELD_ENTRY,
+        undefined,
+        { name: 'Secondary OpenAI' },
+      );
+
+      const childNode = loroDoc.toNodexNode(child.id)!;
+      expect(childNode.tags).toContain(NDX_T.AI_PROVIDER);
+      expect(loroDoc.getChildren(child.id).some((childId) => {
+        const node = loroDoc.toNodexNode(childId);
+        return node?.type === 'fieldEntry' && node.fieldDefId === NDX_F.PROVIDER_ID;
+      })).toBe(true);
     });
 
     it('applies multiple childSupertags when parent has multiple tags with different childSupertag values', () => {

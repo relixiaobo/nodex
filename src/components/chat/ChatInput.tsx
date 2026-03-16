@@ -1,22 +1,68 @@
-import { useEffect, useRef, useState } from 'react';
-import { ArrowUp, Plus, Settings, Square } from '../../lib/icons.js';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { ArrowUp, Check, ChevronDown, Code2, Plus, Settings, Square } from '../../lib/icons.js';
+
+interface ChatInputModel {
+  id: string;
+  name: string;
+  provider: string;
+}
 
 interface ChatInputProps {
   disabled: boolean;
   busy?: boolean;
   error?: string;
+  currentModel?: ChatInputModel;
+  availableModels?: ChatInputModel[];
+  debugEnabled?: boolean;
+  debugOpen?: boolean;
   onSend(prompt: string): Promise<void>;
   onStop(): void;
   onOpenSettings?(): void;
+  onToggleDebug?(): void;
+  onModelChange?(modelId: string, provider: string): void;
 }
 
-export function ChatInput({ disabled, busy = false, error, onSend, onStop, onOpenSettings }: ChatInputProps) {
+export function ChatInput({
+  disabled,
+  busy = false,
+  error,
+  currentModel,
+  availableModels,
+  debugEnabled = false,
+  debugOpen = false,
+  onSend,
+  onStop,
+  onOpenSettings,
+  onToggleDebug,
+  onModelChange,
+}: ChatInputProps) {
   const [draft, setDraft] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
+  const [modelMenuOpen, setModelMenuOpen] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const modelMenuRef = useRef<HTMLDivElement>(null);
   const inputDisabled = disabled || busy;
   const canSend = !inputDisabled && draft.trim().length > 0;
+  const canSelectModel = !!onModelChange && (availableModels?.length ?? 0) > 0;
+  const debugMenuLabel = !debugEnabled
+    ? 'Enable AI Debug'
+    : debugOpen
+      ? 'Hide AI Debug'
+      : 'Show AI Debug';
+
+  const modelGroups = useMemo(() => {
+    const groups = new Map<string, ChatInputModel[]>();
+    for (const model of availableModels ?? []) {
+      const existing = groups.get(model.provider);
+      if (existing) {
+        existing.push(model);
+      } else {
+        groups.set(model.provider, [model]);
+      }
+    }
+    return [...groups.entries()];
+  }, [availableModels]);
 
   useEffect(() => {
     const el = textareaRef.current;
@@ -28,17 +74,19 @@ export function ChatInput({ disabled, busy = false, error, onSend, onStop, onOpe
   }, [draft]);
 
   useEffect(() => {
-    if (!menuOpen) return;
+    if (!menuOpen && !modelMenuOpen) return;
 
-    function onPointerDown(e: PointerEvent) {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setMenuOpen(false);
-      }
+    function onPointerDown(event: PointerEvent) {
+      const target = event.target as Node;
+      if (menuRef.current?.contains(target)) return;
+      if (modelMenuRef.current?.contains(target)) return;
+      setMenuOpen(false);
+      setModelMenuOpen(false);
     }
 
-    document.addEventListener('pointerdown', onPointerDown);
-    return () => document.removeEventListener('pointerdown', onPointerDown);
-  }, [menuOpen]);
+    document.addEventListener('pointerdown', onPointerDown, true);
+    return () => document.removeEventListener('pointerdown', onPointerDown, true);
+  }, [menuOpen, modelMenuOpen]);
 
   async function handleSend() {
     const normalized = draft.trim();
@@ -54,10 +102,8 @@ export function ChatInput({ disabled, busy = false, error, onSend, onStop, onOpe
           {error}
         </div>
       )}
-      {/* Claude-style unified composer card */}
       <div className="rounded-2xl border border-border bg-background transition-colors focus-within:border-foreground/20">
-        {/* Textarea area */}
-        <div className="px-3 pt-2.5 pb-1">
+        <div className="px-3 pb-1 pt-2.5">
           <textarea
             ref={textareaRef}
             value={draft}
@@ -74,12 +120,14 @@ export function ChatInput({ disabled, busy = false, error, onSend, onStop, onOpe
             }}
           />
         </div>
-        {/* Bottom action bar */}
         <div className="flex items-center justify-between px-2.5 pb-2">
           <div ref={menuRef} className="relative flex items-center">
             <button
               type="button"
-              onClick={() => setMenuOpen((v) => !v)}
+              onClick={() => {
+                setMenuOpen((open) => !open);
+                setModelMenuOpen(false);
+              }}
               className="flex h-7 w-7 items-center justify-center rounded-lg text-foreground-tertiary transition-colors hover:bg-foreground/4 hover:text-foreground"
               aria-label="More options"
               aria-haspopup="menu"
@@ -89,6 +137,19 @@ export function ChatInput({ disabled, busy = false, error, onSend, onStop, onOpe
             </button>
             {menuOpen && (
               <div className="absolute bottom-full left-0 mb-1 min-w-[180px] rounded-lg border border-border bg-background p-1 shadow-paper">
+                {onToggleDebug && (
+                  <button
+                    type="button"
+                    className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[13px] text-foreground transition-colors hover:bg-foreground/4"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      onToggleDebug();
+                    }}
+                  >
+                    <Code2 size={14} strokeWidth={1.6} className="shrink-0 text-foreground-tertiary" />
+                    {debugMenuLabel}
+                  </button>
+                )}
                 {onOpenSettings && (
                   <button
                     type="button"
@@ -105,7 +166,55 @@ export function ChatInput({ disabled, busy = false, error, onSend, onStop, onOpe
               </div>
             )}
           </div>
-          <div className="flex items-center gap-1.5">
+          <div className="flex min-w-0 items-center gap-1.5">
+            {canSelectModel && (
+              <div ref={modelMenuRef} className="relative">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setModelMenuOpen((open) => !open);
+                    setMenuOpen(false);
+                  }}
+                  className="inline-flex h-7 max-w-[180px] items-center gap-1 rounded-lg px-2 text-[13px] text-foreground-secondary transition-colors hover:bg-foreground/4 hover:text-foreground"
+                  aria-label="Select model"
+                  aria-haspopup="menu"
+                  aria-expanded={modelMenuOpen}
+                >
+                  <span className="truncate">{currentModel?.name ?? 'Select model'}</span>
+                  <ChevronDown size={12} strokeWidth={1.8} className="shrink-0 text-foreground-tertiary" />
+                </button>
+                {modelMenuOpen && (
+                  <div className="absolute bottom-full right-0 mb-1 min-w-[240px] max-w-[280px] rounded-lg border border-border bg-background p-1 shadow-paper">
+                    {modelGroups.map(([provider, models]) => (
+                      <div key={provider} className="py-1">
+                        <div className="px-2.5 pb-1 text-[10px] font-medium uppercase tracking-[0.08em] text-foreground-quaternary">
+                          {provider}
+                        </div>
+                        {models.map((model) => {
+                          const selected = currentModel?.id === model.id && currentModel.provider === model.provider;
+                          return (
+                            <button
+                              key={`${model.provider}:${model.id}`}
+                              type="button"
+                              className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-[13px] text-foreground transition-colors hover:bg-foreground/4"
+                              onClick={() => {
+                                setModelMenuOpen(false);
+                                onModelChange?.(model.id, model.provider);
+                              }}
+                            >
+                              <span className="flex h-3.5 w-3.5 items-center justify-center text-foreground-tertiary">
+                                {selected ? <Check size={12} strokeWidth={2.4} /> : null}
+                              </span>
+                              <span className="truncate">{model.name}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
             {disabled ? (
               <button
                 type="button"

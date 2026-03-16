@@ -1,16 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { ExternalLink, Plus, Settings, Sparkles, X } from '../../lib/icons.js';
+import { ExternalLink, Sparkles, X } from '../../lib/icons.js';
 import { useAgent } from '../../hooks/use-agent.js';
 import { readChatDebugEnabled, writeChatDebugEnabled } from '../../lib/ai-debug.js';
 import { clearApiKey, getAISettings, getAgentForSession, setApiKey } from '../../lib/ai-service.js';
-import { openChatPanel } from '../../lib/chat-panel-actions.js';
 import { useUIStore } from '../../stores/ui-store.js';
 import { ChatDebugPanel } from './ChatDebugPanel.js';
 import { ChatInput } from './ChatInput.js';
 import { ChatMessage } from './ChatMessage.js';
 
-const HEADER_ICON_BUTTON = 'inline-flex h-7 w-7 items-center justify-center rounded-full text-foreground-tertiary transition-colors hover:bg-foreground/4 hover:text-foreground';
 const AUTO_SCROLL_THRESHOLD = 48;
 
 export interface ChatPanelProps {
@@ -203,15 +201,6 @@ export function ChatPanel({ panelId, sessionId, hideHeader }: ChatPanelProps) {
     await runMessageAction(nodeId, () => regenerateMessage(nodeId));
   }
 
-  async function handleNewChat() {
-    shouldStickToBottomRef.current = true;
-    try {
-      await openChatPanel();
-    } catch (createError) {
-      toast.error(getActionErrorMessage(createError, 'Failed to create a new chat'));
-    }
-  }
-
   function handleHeaderTitleClick() {
     if (!showSettings || debugEnabled) return;
 
@@ -262,29 +251,6 @@ export function ChatPanel({ panelId, sessionId, hideHeader }: ChatPanelProps) {
               aria-pressed={debugOpen}
             >
               {'</>'}
-            </button>
-          )}
-          {!loadingSettings && (
-            <button
-              type="button"
-              onClick={() => void handleNewChat()}
-              className={HEADER_ICON_BUTTON}
-              aria-label="New chat"
-            >
-              <Plus size={15} strokeWidth={1.6} />
-            </button>
-          )}
-          {!loadingSettings && savedKeyMask && (
-            <button
-              type="button"
-              onClick={() => {
-                setFormError(null);
-                setShowSettings((value) => !value);
-              }}
-              className={HEADER_ICON_BUTTON}
-              aria-label="Chat settings"
-            >
-              <Settings size={15} strokeWidth={1.6} />
             </button>
           )}
           {!hideHeader && (
@@ -430,6 +396,10 @@ export function ChatPanel({ panelId, sessionId, hideHeader }: ChatPanelProps) {
             error={error}
             onSend={handleSendMessage}
             onStop={stopStreaming}
+            onOpenSettings={() => {
+              setFormError(null);
+              setShowSettings(true);
+            }}
           />
         </>
       )}

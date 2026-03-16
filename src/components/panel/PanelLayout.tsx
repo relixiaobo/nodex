@@ -119,34 +119,35 @@ export function PanelLayout({ toolbar }: PanelLayoutProps) {
       <div ref={containerRef} className="flex flex-1 flex-col overflow-hidden">
         {/* Tab row: dropdown tab (paper) + toolbar (desk) */}
         <div className="flex items-end shrink-0">
-          <div ref={notesMenuRef} className="relative flex items-end shrink min-w-0">
-            {/* Tab (paper layer): breadcrumb + close */}
-            <div className="tab-connector-right relative z-10 flex h-10 max-w-[240px] min-w-0 shrink items-center bg-background rounded-t-xl">
-              {isChat ? (
-                <span className="flex items-center gap-1.5 px-3 text-[13px] text-foreground">
-                  <Sparkles size={12} strokeWidth={1.6} className="text-foreground-tertiary" />
-                  Chat
-                </span>
-              ) : isApp ? (
-                <span className="flex min-w-0 flex-1 items-center px-3 text-[13px] text-foreground truncate">
-                  <PanelLabel nodeId={nodeId} />
-                </span>
-              ) : (
-                <Breadcrumb nodeId={nodeId} showCurrentName active compact />
-              )}
-              <button
-                type="button"
-                className="flex h-5 w-5 mr-1 shrink-0 items-center justify-center rounded-md text-foreground-tertiary hover:bg-foreground/8 hover:text-foreground"
-                onClick={(e) => handleClosePanel(e, activePanel.id)}
-                title="Close panel"
-              >
-                <X size={12} />
-              </button>
-            </div>
-            {/* Dropdown trigger (desk layer) */}
+          <div
+            ref={notesMenuRef}
+            className="tab-connector-right relative z-10 flex h-10 max-w-[240px] min-w-0 shrink items-center bg-background rounded-t-xl"
+          >
+            {/* Breadcrumb area (hover zone 1) */}
+            {isChat ? (
+              <span className="flex items-center gap-1.5 px-3 text-[13px] text-foreground">
+                <Sparkles size={12} strokeWidth={1.6} className="text-foreground-tertiary" />
+                Chat
+              </span>
+            ) : isApp ? (
+              <span className="flex min-w-0 flex-1 items-center px-3 text-[13px] text-foreground truncate">
+                <PanelLabel nodeId={nodeId} />
+              </span>
+            ) : (
+              <Breadcrumb nodeId={nodeId} showCurrentName active compact />
+            )}
             <button
               type="button"
-              className="flex h-10 w-7 shrink-0 items-center justify-center text-foreground-tertiary hover:text-foreground"
+              className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-foreground-tertiary hover:bg-foreground/8 hover:text-foreground"
+              onClick={(e) => handleClosePanel(e, activePanel.id)}
+              title="Close panel"
+            >
+              <X size={12} />
+            </button>
+            {/* Dropdown trigger (hover zone 2) */}
+            <button
+              type="button"
+              className="flex h-7 w-7 mr-0.5 shrink-0 items-center justify-center rounded-md text-foreground-tertiary hover:bg-foreground/8 hover:text-foreground"
               onClick={() => setNotesMenuOpen((open) => !open)}
               aria-haspopup="menu"
               aria-expanded={notesMenuOpen}

@@ -252,7 +252,7 @@ export function ChatMessage({
   const showToolbar = nodeId !== null && !streaming && !isEditing;
 
   return (
-    <div className={`flex w-full ${isUser ? 'justify-end' : 'justify-start'} ${grouped ? 'mt-1' : 'mt-4 first:mt-0'}`}>
+    <div className={`${isUser ? 'group/message' : ''} flex w-full ${isUser ? 'justify-end' : 'justify-start'} ${grouped ? 'mt-1' : 'mt-4 first:mt-0'}`}>
       <div className={`flex max-w-[88%] flex-col gap-1 ${isUser ? 'items-end' : 'items-start'}`}>
         {!grouped && (
           <span className="text-xs text-foreground-tertiary">
@@ -316,7 +316,7 @@ export function ChatMessage({
         {showToolbar && (
           <div
             data-testid="chat-message-toolbar"
-            className={`flex items-center gap-0.5 ${isUser ? 'justify-end' : 'justify-start'}`}
+            className={`flex items-center gap-0.5 ${isUser ? 'justify-end opacity-0 transition-opacity group-hover/message:opacity-100' : 'justify-start'}`}
           >
             {isUser ? (
               <button

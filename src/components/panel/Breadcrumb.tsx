@@ -7,12 +7,18 @@
  * - Containers appear as normal ancestors in the chain
  * - At workspace root view, breadcrumb content is hidden (toolbar only)
  *
- * Folding rules (applied to ancestor chain):
+ * Two modes controlled by `compact`:
+ *
+ * Default (panel header):
  * - 0 ancestors: [W]
  * - 1 ancestor: [W] / parent
  * - 2 ancestors: [W] / grandparent / parent
  * - 3+ ancestors: [W] / [...] / parent
- * - foldAll: [W] / [...] / currentName (tab mode)
+ *
+ * Compact (tab mode) — all ancestors fold into [...]:
+ * - 0 ancestors: [W]
+ * - 1+ ancestors: [W] / [...] / currentName
+ * - Hover background on entire breadcrumb zone
  *
  * [...] expands in-place (no navigation). Resets when nodeId changes.
  */
@@ -34,12 +40,10 @@ import { Tooltip } from '../ui/Tooltip';
 interface BreadcrumbProps {
   nodeId: string;
   showCurrentName?: boolean;
+  /** Tab mode: all ancestors fold into [...], hover background on entire zone. */
   compact?: boolean;
   /** When true, [W] avatar uses primary color; when false, gray. */
   active?: boolean;
-  /** When true, all ancestors collapse into [...] dropdown, none shown inline.
-   *  Used by tab mode for compact `[W] / ... / nodeName` display. */
-  foldAll?: boolean;
 }
 
 export function resolveWorkspaceRootTargetId(params: {
@@ -52,7 +56,7 @@ export function resolveWorkspaceRootTargetId(params: {
   return SYSTEM_NODE_IDS.JOURNAL;
 }
 
-export function Breadcrumb({ nodeId, showCurrentName, compact, active = true, foldAll }: BreadcrumbProps) {
+export function Breadcrumb({ nodeId, showCurrentName, compact, active = true }: BreadcrumbProps) {
   const navigateTo = useUIStore((s) => s.navigateTo);
 
   const { ancestors, workspaceRootId } = useAncestors(nodeId);
@@ -115,23 +119,24 @@ export function Breadcrumb({ nodeId, showCurrentName, compact, active = true, fo
   );
 
   // Determine which ancestors to show
-  // foldAll: everything goes into [...] dropdown (used by tab mode)
-  const needsFolding = foldAll
+  // compact (tab mode): all ancestors fold into [...] dropdown
+  // default (panel header): fold at 3+ ancestors, show 1-2 inline
+  const needsFolding = compact
     ? filteredAncestors.length > 0
     : filteredAncestors.length >= 3;
-  const visibleAncestors = foldAll
+  const visibleAncestors = compact
     ? []
     : needsFolding
       ? [filteredAncestors[filteredAncestors.length - 1]]
       : filteredAncestors;
-  const hiddenAncestors = foldAll
+  const hiddenAncestors = compact
     ? filteredAncestors
     : needsFolding
       ? filteredAncestors.slice(0, -1)
       : [];
 
   return (
-    <div className={`flex flex-1 min-w-0 items-center gap-1 pl-4 pr-3 text-[13px] text-foreground-tertiary ${compact ? '' : 'h-8 mt-1'}`}>
+    <div className={`flex flex-1 min-w-0 items-center gap-1 text-[13px] text-foreground-tertiary ${compact ? 'pl-3 pr-2 rounded-lg hover:bg-foreground/4 transition-colors' : 'pl-4 pr-3 h-8 mt-1'}`}>
 
       {/* Root view: only show toolbar (sidebar toggle + search), no breadcrumb content */}
       {!isRootView && (

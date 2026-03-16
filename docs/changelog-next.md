@@ -59,3 +59,7 @@
 - 工具调用展开区域支持语法高亮：Input（JSON）和 Output（自动检测语言）使用 highlight.js 着色，代码块限高 192px 可滚动
 - 语言检测改用结构启发式优先策略：JSON/HTML/SQL/bash 通过首字符/关键词可靠识别，hljs auto-detect 仅作兜底
 - 多 Provider AI 设置：Settings 中可配置多个 AI provider（Anthropic/OpenAI/Google 等），每个 provider 独立 API key 和启用开关；Chat 输入框新增 model 选择器，可在不同 provider 的模型间切换；旧单 API key 设置自动迁移为 Anthropic provider
+- 模型选择器重设计：每个 provider 展示 1-2 个推荐模型，其余收入"More models"折叠区；触发按钮缩短厂商前缀（"Claude Sonnet 4.6" → "Sonnet 4.6"）
+- 新增 Extended Thinking 支持：模型菜单内 toggle + Low/Med/High 等级选择，状态按会话持久化；支持所有标记 `reasoning: true` 的模型
+- Chat Debug 面板改为左右分栏：Chat 在左，Debug 在右，各自独立滚动
+- Debug 面板代码块支持语法高亮：System Prompt、Dynamic Context (XML)、Messages/Tools/Turn Log (JSON) 均使用 highlight.js 着色，限高可滚动

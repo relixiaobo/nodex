@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { AssistantMessage, ToolResultMessage } from '@mariozechner/pi-ai';
 import { toast } from 'sonner';
 import type { ChatConversationMessage, ChatMessageEntry } from '../../hooks/use-agent.js';
-import { Check, ChevronLeft, ChevronRight, Copy, Pencil, RefreshCw } from '../../lib/icons.js';
+import { Brain, Check, ChevronDown, ChevronLeft, ChevronRight, Copy, Pencil, RefreshCw } from '../../lib/icons.js';
 import { CitationBadge } from './CitationBadge.js';
 import { NodeReference } from './NodeReference.js';
 import { ToolCallBlock } from './ToolCallBlock.js';
@@ -95,9 +95,51 @@ function renderTextWithMarkup(text: string, keyPrefix: string): ReactNode[] {
   return parts;
 }
 
+function ThinkingBlock({ text, streaming }: { text: string; streaming: boolean }) {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <div className="max-w-full">
+      <button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        className="group/thinking flex max-w-full items-center gap-1.5 py-0.5 text-foreground-tertiary transition-colors hover:text-foreground-secondary"
+      >
+        <span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center">
+          {expanded ? (
+            <ChevronDown size={14} strokeWidth={1.8} className="rotate-180" />
+          ) : (
+            <>
+              <Brain size={14} strokeWidth={1.5} className="group-hover/thinking:hidden" />
+              <ChevronDown size={14} strokeWidth={1.8} className="hidden group-hover/thinking:block" />
+            </>
+          )}
+        </span>
+        <span className="text-xs">
+          {streaming && !text ? 'Thinking…' : 'Thought'}
+        </span>
+      </button>
+      {expanded && text && (
+        <pre className="ml-5 mt-1 max-h-96 overflow-auto whitespace-pre-wrap text-xs leading-5 text-foreground-tertiary">
+          {text}
+        </pre>
+      )}
+    </div>
+  );
+}
+
 function renderAssistantBlocks(message: AssistantMessage, streaming: boolean, toolResults?: Map<string, ToolResultMessage>): ReactNode[] {
   return message.content.flatMap((block, index) => {
-    if (block.type === 'thinking') return [];
+    if (block.type === 'thinking') {
+      if (block.redacted) return [];
+      return (
+        <ThinkingBlock
+          key={`thinking-${index}`}
+          text={block.thinking}
+          streaming={streaming}
+        />
+      );
+    }
 
     if (block.type === 'toolCall') {
       return (

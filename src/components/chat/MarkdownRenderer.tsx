@@ -3,7 +3,10 @@ import {
   type ComponentPropsWithoutRef,
   type ReactNode,
   memo,
+  useCallback,
   useMemo,
+  useRef,
+  useState,
 } from 'react';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -12,6 +15,7 @@ import rehypeKatex from 'rehype-katex';
 import { Lexer } from 'marked';
 import remend from 'remend';
 import { highlightCode } from '../../lib/code-highlight.js';
+import { Check, Copy } from '../../lib/icons.js';
 import { CitationBadge } from './CitationBadge.js';
 import { NodeReference } from './NodeReference.js';
 
@@ -98,26 +102,51 @@ function injectPlaceholders(
 const remarkPlugins = [remarkGfm, remarkMath];
 const rehypePlugins = [rehypeKatex];
 
+// ── Code block with copy button ──
+
+function ChatCodeBlock({ code, lang, className }: { code: string; lang: string; className?: string }) {
+  const [copied, setCopied] = useState(false);
+  const resetRef = useRef<number | null>(null);
+  const highlighted = highlightCode(code, lang);
+
+  const handleCopy = useCallback(() => {
+    void navigator.clipboard.writeText(code).then(() => {
+      setCopied(true);
+      if (resetRef.current !== null) window.clearTimeout(resetRef.current);
+      resetRef.current = window.setTimeout(() => {
+        setCopied(false);
+        resetRef.current = null;
+      }, 1500);
+    });
+  }, [code]);
+
+  return (
+    <div className="chat-code-block">
+      <div className="chat-code-header">
+        <span className="chat-code-lang">{lang}</span>
+        <button type="button" onClick={handleCopy} className="chat-code-copy" aria-label="Copy code">
+          {copied
+            ? <Check size={13} strokeWidth={2} />
+            : <Copy size={13} strokeWidth={1.8} />}
+        </button>
+      </div>
+      <pre className="code-block-pre">
+        <code className={className} dangerouslySetInnerHTML={{ __html: highlighted }} />
+      </pre>
+    </div>
+  );
+}
+
 function buildComponents(keyPrefix: string, placeholders: Placeholder[]) {
   const wp = (children: ReactNode) => injectPlaceholders(children, placeholders, keyPrefix);
 
   return {
-    code({ children, className, ...rest }: ComponentPropsWithoutRef<'code'>) {
+    code({ children, className }: ComponentPropsWithoutRef<'code'>) {
       const lang = className?.match(/language-(\S+)/)?.[1];
       if (lang) {
-        const highlighted = highlightCode(String(children).replace(/\n$/, ''), lang);
-        return (
-          <div className="chat-code-block">
-            <div className="chat-code-header">
-              <span className="chat-code-lang">{lang}</span>
-            </div>
-            <pre className="code-block-pre">
-              <code className={className} dangerouslySetInnerHTML={{ __html: highlighted }} {...rest} />
-            </pre>
-          </div>
-        );
+        return <ChatCodeBlock code={String(children).replace(/\n$/, '')} lang={lang} className={className} />;
       }
-      return <code className="chat-inline-code" {...rest}>{children}</code>;
+      return <code className="chat-inline-code">{children}</code>;
     },
     pre({ children }: ComponentPropsWithoutRef<'pre'>) {
       return <>{children}</>;

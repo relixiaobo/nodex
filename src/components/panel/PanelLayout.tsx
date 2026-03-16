@@ -21,7 +21,7 @@ import type { AppPanelId } from '../../types/index.js';
 import { NodePanel } from './NodePanel';
 import { AppPanel } from './AppPanel';
 import { Breadcrumb } from './Breadcrumb';
-import { ChevronDown, Sparkles, X } from '../../lib/icons.js';
+import { ChevronDown, Search, Sparkles, X } from '../../lib/icons.js';
 
 const ChatPanel = lazy(async () => ({
   default: (await import('../chat/ChatPanel')).ChatPanel,
@@ -39,11 +39,11 @@ interface PanelLayoutProps {
   toolbar?: React.ReactNode;
 }
 
-function renderPanelContent(nodeId: string, panelId: string) {
+function renderPanelContent(nodeId: string, panelId: string, options?: { hideHeader?: boolean }) {
   if (isChatPanel(nodeId)) {
     return (
       <Suspense fallback={CHAT_PANEL_FALLBACK}>
-        <ChatPanel panelId={panelId} sessionId={chatPanelSessionId(nodeId)} />
+        <ChatPanel panelId={panelId} sessionId={chatPanelSessionId(nodeId)} hideHeader={options?.hideHeader} />
       </Suspense>
     );
   }
@@ -93,15 +93,25 @@ export function PanelLayout({ toolbar }: PanelLayoutProps) {
     closePanel(panelId);
   }, [closePanel]);
 
+  const openSearch = useUIStore((s) => s.openSearch);
+
   if (panels.length === 0) {
     return (
-      <div ref={containerRef} className="flex flex-1 items-center justify-center text-foreground-tertiary text-sm">
-        Press ⌘K to search
+      <div ref={containerRef} className="flex flex-1 items-center justify-center">
+        <button
+          type="button"
+          onClick={openSearch}
+          className="flex w-full max-w-xs items-center gap-2.5 rounded-xl bg-background px-4 py-3 text-sm text-foreground-tertiary shadow-card transition-colors hover:text-foreground"
+        >
+          <Search size={15} strokeWidth={1.6} className="shrink-0" />
+          <span className="flex-1 text-left">Search or jump to…</span>
+          <kbd className="shrink-0 rounded-md bg-foreground/6 px-1.5 py-0.5 font-mono text-xs text-foreground-tertiary">⌘K</kbd>
+        </button>
       </div>
     );
   }
 
-  const showClose = panels.length > 1;
+  const showClose = true;
   const dropdownMode = panels.length > 1 && containerWidth / panels.length < MIN_PANEL_WIDTH;
 
   // ── Narrow mode: Notes dropdown + single active panel body ──
@@ -181,7 +191,7 @@ export function PanelLayout({ toolbar }: PanelLayoutProps) {
         </div>
         {/* Panel body — no top-left rounding (connects to tab) */}
         <div className="group/panel flex flex-1 min-h-0 flex-col overflow-hidden bg-background shadow-card rounded-b-xl rounded-tr-xl">
-          {renderPanelContent(nodeId, activePanel.id)}
+          {renderPanelContent(nodeId, activePanel.id, { hideHeader: isChatPanel(nodeId) })}
         </div>
       </div>
     );
@@ -206,7 +216,7 @@ export function PanelLayout({ toolbar }: PanelLayoutProps) {
               {/* Tab row: breadcrumb tab (paper) + toolbar (desk) */}
               <div className="flex items-end shrink-0">
                 <div
-                  className={`tab-connector-right relative z-10 flex h-10 items-center bg-background rounded-t-xl ${isChat ? 'w-fit' : 'min-w-0 shrink'}`}
+                  className="tab-connector-right relative z-10 flex h-10 min-w-0 shrink items-center bg-background rounded-t-xl"
                   onClick={() => setActivePanel(panel.id)}
                 >
                   {isChat ? (
@@ -237,7 +247,7 @@ export function PanelLayout({ toolbar }: PanelLayoutProps) {
                 className="group/panel flex flex-1 min-w-0 flex-col overflow-hidden bg-background shadow-card rounded-b-xl rounded-tr-xl"
                 onClick={() => setActivePanel(panel.id)}
               >
-                {renderPanelContent(nodeId, panel.id)}
+                {renderPanelContent(nodeId, panel.id, { hideHeader: isChat })}
               </div>
             </div>
           );

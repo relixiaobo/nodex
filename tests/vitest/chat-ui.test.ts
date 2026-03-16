@@ -192,7 +192,7 @@ describe('chat ui', () => {
       root.render(React.createElement(DeskLayout));
     });
 
-    expect(container.textContent).toContain('Press ⌘K to search');
+    expect(container.textContent).toContain('Search or jump to');
     expect(container.textContent).not.toContain('Loading chat…');
   });
 });

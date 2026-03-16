@@ -104,11 +104,12 @@ describe('ui-store navigation and UI state', () => {
     expect(lastEvent.action).toBe('close-panel');
   });
 
-  it('closePanel refuses to close the last panel', () => {
+  it('closePanel allows closing the last panel (empty state)', () => {
     const ui = useUIStore.getState();
     expect(useUIStore.getState().panels).toHaveLength(1);
     ui.closePanel('main');
-    expect(useUIStore.getState().panels).toHaveLength(1);
+    expect(useUIStore.getState().panels).toHaveLength(0);
+    expect(useUIStore.getState().activePanelId).toBe('');
   });
 
   it('setActivePanel switches active and clears focus', () => {

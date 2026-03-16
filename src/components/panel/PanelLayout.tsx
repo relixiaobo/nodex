@@ -4,12 +4,12 @@
  * Two layout modes based on container width:
  *
  * Side-by-side (wide): panels as independent cards with breadcrumb headers.
- * Last panel's breadcrumb becomes a shaped tab (Chrome tab style) when
- * `toolbar` is provided; toolbar sits on the desk background to its right.
+ * Last panel uses a shaped tab (Chrome tab style) when `toolbar` is provided;
+ * tab shows panel name only, breadcrumb moves into the panel body.
  *
- * Narrow mode (< 250px per panel): replace the tab strip with a Notes dropdown.
- * The trigger shows the active panel name, the menu lists every panel, and
- * only the active panel body is rendered below.
+ * Narrow mode (< 250px per panel): shaped tab with Notes dropdown.
+ * Click tab body → toggle panel switcher dropdown.
+ * Click × → close panel. Breadcrumb renders inside panel body.
  *
  * Active panel is indicated by the dropdown row highlight + bullet color.
  */
@@ -21,7 +21,7 @@ import type { AppPanelId } from '../../types/index.js';
 import { NodePanel } from './NodePanel';
 import { AppPanel } from './AppPanel';
 import { Breadcrumb } from './Breadcrumb';
-import { ChevronDown, Sparkles, X } from '../../lib/icons.js';
+import { Sparkles, X } from '../../lib/icons.js';
 import { DeskLanding } from './DeskLanding';
 
 const ChatPanel = lazy(async () => ({
@@ -56,45 +56,45 @@ function renderPanelContent(nodeId: string, panelId: string, options?: { hideHea
 
 // ── Shared shaped tab ──────────────────────────────────────────────
 //
-// Used by both narrow-mode dropdown tab and wide-mode last-panel tab.
-// Renders: [tab-connector container] → [hover zone (max-w-[240px]): content + close] + children
+// Name-only label tab used by both narrow-mode dropdown and wide-mode
+// last-panel. Shows: [panel name] [×close]. Breadcrumb lives inside
+// the panel body, not the tab.
 //
-// `children` slot is for narrow-mode extras (chevron trigger + dropdown menu).
+// Narrow mode: click tab body → toggle dropdown; dropdown as `children`.
+// Wide mode: click tab body → activate panel; no children.
 
 interface TabHeadProps {
   nodeId: string;
-  showCurrentName?: boolean;
-  active?: boolean;
   onClose: (e: React.MouseEvent) => void;
-  onClick?: () => void;
+  /** Click on the name area (not close). */
+  onClickBody?: () => void;
+  /** Narrow mode: whether the dropdown is open (for aria-expanded). */
+  menuOpen?: boolean;
   tabRef?: React.Ref<HTMLDivElement>;
-  /** Extra content inside tab container, after the main hover zone (e.g., dropdown trigger). */
+  /** Dropdown menu (narrow mode only). */
   children?: React.ReactNode;
 }
 
-function TabHead({ nodeId, showCurrentName, active = true, onClose, onClick, tabRef, children }: TabHeadProps) {
+function TabHead({ nodeId, onClose, onClickBody, menuOpen, tabRef, children }: TabHeadProps) {
   const isChat = isChatPanel(nodeId);
-  const isApp = isAppPanel(nodeId);
 
   return (
     <div
       ref={tabRef}
       className="tab-connector-right relative z-10 flex h-10 min-w-0 shrink items-center bg-background rounded-t-xl"
-      onClick={onClick}
     >
-      <div className="group/tab flex flex-1 max-w-[240px] min-w-0 ml-1 h-7 items-center rounded-md hover:bg-foreground/4 transition-colors">
-        {isChat ? (
-          <span className="flex items-center gap-1.5 px-2 text-[13px] text-foreground">
-            <Sparkles size={12} strokeWidth={1.6} className="text-foreground-tertiary" />
-            Chat
-          </span>
-        ) : isApp ? (
-          <span className="flex min-w-0 flex-1 items-center px-2 text-[13px] text-foreground truncate">
-            <PanelLabel nodeId={nodeId} />
-          </span>
-        ) : (
-          <Breadcrumb nodeId={nodeId} showCurrentName={showCurrentName} active={active} compact />
-        )}
+      {/* Name area — clickable body */}
+      <div
+        className="group/tab flex flex-1 max-w-[240px] min-w-0 ml-1 h-7 items-center rounded-md hover:bg-foreground/4 transition-colors cursor-pointer"
+        onClick={onClickBody}
+        role={menuOpen !== undefined ? 'button' : undefined}
+        aria-haspopup={menuOpen !== undefined ? 'menu' : undefined}
+        aria-expanded={menuOpen !== undefined ? menuOpen : undefined}
+      >
+        <span className="flex min-w-0 flex-1 items-center gap-1.5 px-2 text-[13px] text-foreground truncate">
+          {isChat && <Sparkles size={12} strokeWidth={1.6} className="shrink-0 text-foreground-tertiary" />}
+          <PanelLabel nodeId={nodeId} />
+        </span>
         <button
           type="button"
           className="flex h-5 w-5 mr-1 shrink-0 items-center justify-center rounded-md text-foreground-tertiary opacity-0 transition-opacity hover:bg-foreground/8 hover:text-foreground group-hover/tab:opacity-100"
@@ -170,32 +170,20 @@ export function PanelLayout({ toolbar }: PanelLayoutProps) {
   if (dropdownMode) {
     const activePanel = panels.find((p) => p.id === activePanelId) ?? panels[0];
     const nodeId = activePanel.nodeId;
+    const isApp = isAppPanel(nodeId);
+    const isChat = isChatPanel(nodeId);
 
     return (
       <div ref={containerRef} className="flex flex-1 flex-col overflow-hidden">
-        {/* Tab row: dropdown tab (paper) + toolbar (desk) */}
+        {/* Tab row: name tab (paper) + toolbar (desk) */}
         <div className="flex items-end shrink-0">
           <TabHead
             nodeId={nodeId}
-            showCurrentName
-            active
             onClose={(e) => handleClosePanel(e, activePanel.id)}
+            onClickBody={() => setNotesMenuOpen((open) => !open)}
+            menuOpen={notesMenuOpen}
             tabRef={notesMenuRef}
           >
-            {/* Hover zone 2: dropdown trigger */}
-            <button
-              type="button"
-              className="flex h-7 w-7 mr-1 shrink-0 items-center justify-center rounded-md text-foreground-tertiary transition-colors hover:bg-foreground/4 hover:text-foreground"
-              onClick={() => setNotesMenuOpen((open) => !open)}
-              aria-haspopup="menu"
-              aria-expanded={notesMenuOpen}
-            >
-              <ChevronDown
-                size={14}
-                strokeWidth={1.7}
-                className={`transition-transform ${notesMenuOpen ? 'rotate-180' : ''}`}
-              />
-            </button>
             {/* Dropdown menu */}
             {notesMenuOpen && (
               <div className="absolute left-0 top-full z-50 mt-1 min-w-[220px] rounded-lg bg-background p-1 shadow-paper">
@@ -243,9 +231,12 @@ export function PanelLayout({ toolbar }: PanelLayoutProps) {
             {toolbar}
           </div>
         </div>
-        {/* Panel body — no top-left rounding (connects to tab) */}
+        {/* Panel body — breadcrumb inside, no top-left rounding (connects to tab) */}
         <div className={TAB_PANEL_BODY}>
-          {renderPanelContent(nodeId, activePanel.id, { hideHeader: isChatPanel(nodeId) })}
+          {!isApp && !isChat && (
+            <Breadcrumb nodeId={nodeId} active />
+          )}
+          {renderPanelContent(nodeId, activePanel.id, { hideHeader: isChat })}
         </div>
       </div>
     );
@@ -267,24 +258,25 @@ export function PanelLayout({ toolbar }: PanelLayoutProps) {
         if (hasTab) {
           return (
             <div key={panel.id} className="flex flex-1 min-w-0 flex-col">
-              {/* Tab row: breadcrumb tab (paper) + toolbar (desk) */}
+              {/* Tab row: name tab (paper) + toolbar (desk) */}
               <div className="flex items-end shrink-0">
                 <TabHead
                   nodeId={nodeId}
-                  showCurrentName={!titleVisible}
-                  active={isActive}
                   onClose={(e) => handleClosePanel(e, panel.id)}
-                  onClick={() => setActivePanel(panel.id)}
+                  onClickBody={() => setActivePanel(panel.id)}
                 />
                 <div className="flex flex-1 justify-end">
                   {toolbar}
                 </div>
               </div>
-              {/* Panel body — no top-left rounding (connects to tab) */}
+              {/* Panel body — breadcrumb inside, no top-left rounding (connects to tab) */}
               <div
                 className={TAB_PANEL_BODY}
                 onClick={() => setActivePanel(panel.id)}
               >
+                {!isApp && !isChat && (
+                  <Breadcrumb nodeId={nodeId} showCurrentName={!titleVisible} active={isActive} />
+                )}
                 {renderPanelContent(nodeId, panel.id, { hideHeader: isChat })}
               </div>
             </div>

@@ -7,18 +7,11 @@
  * - Containers appear as normal ancestors in the chain
  * - At workspace root view, breadcrumb content is hidden (toolbar only)
  *
- * Two modes controlled by `compact`:
- *
- * Default (panel header):
+ * Folding rules:
  * - 0 ancestors: [W]
  * - 1 ancestor: [W] / parent
  * - 2 ancestors: [W] / grandparent / parent
  * - 3+ ancestors: [W] / [...] / parent
- *
- * Compact (tab mode) — all ancestors fold into [...]:
- * - 0 ancestors: [W]
- * - 1+ ancestors: [W] / [...] / currentName
- * - Hover background on entire breadcrumb zone
  *
  * [...] expands in-place (no navigation). Resets when nodeId changes.
  */
@@ -40,8 +33,6 @@ import { Tooltip } from '../ui/Tooltip';
 interface BreadcrumbProps {
   nodeId: string;
   showCurrentName?: boolean;
-  /** Tab mode: all ancestors fold into [...], hover background on entire zone. */
-  compact?: boolean;
   /** When true, [W] avatar uses primary color; when false, gray. */
   active?: boolean;
 }
@@ -56,7 +47,7 @@ export function resolveWorkspaceRootTargetId(params: {
   return SYSTEM_NODE_IDS.JOURNAL;
 }
 
-export function Breadcrumb({ nodeId, showCurrentName, compact, active = true }: BreadcrumbProps) {
+export function Breadcrumb({ nodeId, showCurrentName, active = true }: BreadcrumbProps) {
   const navigateTo = useUIStore((s) => s.navigateTo);
 
   const { ancestors, workspaceRootId } = useAncestors(nodeId);
@@ -119,24 +110,17 @@ export function Breadcrumb({ nodeId, showCurrentName, compact, active = true }: 
   );
 
   // Determine which ancestors to show
-  // compact (tab mode): all ancestors fold into [...] dropdown
-  // default (panel header): fold at 3+ ancestors, show 1-2 inline
-  const needsFolding = compact
-    ? filteredAncestors.length > 0
-    : filteredAncestors.length >= 3;
-  const visibleAncestors = compact
-    ? []
-    : needsFolding
-      ? [filteredAncestors[filteredAncestors.length - 1]]
-      : filteredAncestors;
-  const hiddenAncestors = compact
-    ? filteredAncestors
-    : needsFolding
-      ? filteredAncestors.slice(0, -1)
-      : [];
+  // Fold at 3+ ancestors, show 1-2 inline
+  const needsFolding = filteredAncestors.length >= 3;
+  const visibleAncestors = needsFolding
+    ? [filteredAncestors[filteredAncestors.length - 1]]
+    : filteredAncestors;
+  const hiddenAncestors = needsFolding
+    ? filteredAncestors.slice(0, -1)
+    : [];
 
   return (
-    <div className={`flex flex-1 min-w-0 items-center gap-1 text-[13px] text-foreground-tertiary ${compact ? 'pl-2 pr-1' : 'pl-4 pr-3 h-8 mt-2'}`}>
+    <div className="flex flex-1 min-w-0 items-center gap-1 pl-4 pr-3 h-8 mt-2 text-[13px] text-foreground-tertiary">
 
       {/* Root view: only show toolbar (sidebar toggle + search), no breadcrumb content */}
       {!isRootView && (

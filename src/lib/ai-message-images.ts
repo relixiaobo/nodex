@@ -1,6 +1,9 @@
 import type { AgentMessage } from '@mariozechner/pi-agent-core';
 import type { ImageContent, ToolResultMessage, UserMessage } from '@mariozechner/pi-ai';
 
+/** Placeholder text that replaces stripped image data (persistence & context). */
+export const IMAGE_PLACEHOLDER = '[Screenshot was captured successfully. The image data is no longer available — you cannot see it, but the screenshot did exist when the tool was called.]';
+
 type ImageBearingMessage = UserMessage | ToolResultMessage<unknown>;
 
 function isImageBearingMessage(message: AgentMessage): message is ImageBearingMessage {

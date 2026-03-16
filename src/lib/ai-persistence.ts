@@ -2,7 +2,7 @@ import type { AgentMessage } from '@mariozechner/pi-agent-core';
 import { openDB, type DBSchema, type IDBPDatabase, type IDBPTransaction, unwrap } from 'idb';
 import { linearToTree } from './ai-chat-tree.js';
 import type { BridgeEntry, ChatSession, MessageNode } from './ai-chat-tree.js';
-import { messageHasImage, replaceMessageImages } from './ai-message-images.js';
+import { IMAGE_PLACEHOLDER, messageHasImage, replaceMessageImages } from './ai-message-images.js';
 
 const DB_NAME = 'soma-ai-chat';
 const DB_VERSION = 2;
@@ -139,7 +139,7 @@ async function getDB(): Promise<IDBPDatabase<ChatPersistenceDB>> {
 
 function stripMessageImagesForPersistence(message: AgentMessage): AgentMessage {
   if (!messageHasImage(message)) return message;
-  return replaceMessageImages(message, () => '[Screenshot was captured successfully. The image data has been removed from storage to save space — you can no longer see it, but the screenshot did exist at the time of the tool call.]');
+  return replaceMessageImages(message, () => IMAGE_PLACEHOLDER);
 }
 
 function stripMappingImagesForPersistence(mapping: Record<string, MessageNode>): Record<string, MessageNode> {

@@ -1,5 +1,6 @@
 import type { AgentMessage } from '@mariozechner/pi-agent-core';
 import { formatLocalTimestamp, injectReminder, stripOldImages, transformAgentContext } from '../../src/lib/ai-context.js';
+import { IMAGE_PLACEHOLDER } from '../../src/lib/ai-message-images.js';
 
 function createImageToolResult(timestamp: number, label: string): AgentMessage {
   return {
@@ -63,11 +64,11 @@ describe('stripOldImages', () => {
 
     expect(result).not.toBe(messages);
     expect((result[0] as Extract<AgentMessage, { role: 'toolResult' }>).content).toEqual([
-      { type: 'text', text: '[Screenshot was captured successfully. The image data has been removed from context to reduce token usage — you can no longer see it, but the screenshot did exist at the time of the tool call.]' },
+      { type: 'text', text: IMAGE_PLACEHOLDER },
       { type: 'text', text: 'details-oldest' },
     ]);
     expect((result[2] as Extract<AgentMessage, { role: 'toolResult' }>).content).toEqual([
-      { type: 'text', text: '[Screenshot was captured successfully. The image data has been removed from context to reduce token usage — you can no longer see it, but the screenshot did exist at the time of the tool call.]' },
+      { type: 'text', text: IMAGE_PLACEHOLDER },
       { type: 'text', text: 'details-older' },
     ]);
     expect((result[3] as Extract<AgentMessage, { role: 'toolResult' }>).content[0]).toEqual({
@@ -102,7 +103,7 @@ describe('stripOldImages', () => {
       role: 'user',
       content: [
         { type: 'text', text: 'look at this' },
-        { type: 'text', text: '[Screenshot was captured successfully. The image data has been removed from context to reduce token usage — you can no longer see it, but the screenshot did exist at the time of the tool call.]' },
+        { type: 'text', text: IMAGE_PLACEHOLDER },
       ],
       timestamp: 1,
     });
@@ -221,7 +222,7 @@ describe('transformAgentContext', () => {
         role: 'user',
         content: [
           { type: 'text', text: 'look at this' },
-          { type: 'text', text: '[Screenshot was captured successfully. The image data has been removed from context to reduce token usage — you can no longer see it, but the screenshot did exist at the time of the tool call.]\n\n<system-reminder>ctx</system-reminder>' },
+          { type: 'text', text: `${IMAGE_PLACEHOLDER}\n\n<system-reminder>ctx</system-reminder>` },
         ],
         timestamp: 1,
       },

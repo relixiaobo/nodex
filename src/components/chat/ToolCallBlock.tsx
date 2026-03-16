@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { ToolCall, ToolResultMessage } from '@mariozechner/pi-ai';
 import type { AppIcon } from '../../lib/icons.js';
+import { IMAGE_PLACEHOLDER } from '../../lib/ai-message-images.js';
 import { ChevronDown, FileText, Globe, Image, Pencil, Plus, RotateCcw, Search, Sparkles, Trash2 } from '../../lib/icons.js';
 
 interface ToolCallBlockProps {
@@ -85,30 +86,22 @@ function summarizeToolCall(toolCall: ToolCall): string {
   return name;
 }
 
-const IMAGE_PLACEHOLDER_RE = /^\[(?:Screenshot was captured|Image removed)[^\]]*\]$/;
+/** Match current constant and legacy placeholder variants. */
+const IMAGE_PLACEHOLDER_RE = new RegExp(
+  `^${IMAGE_PLACEHOLDER.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`
+    + '|^\\[(?:Image removed)[^\\]]*\\]$',
+);
 
-function isImagePlaceholder(text: string): boolean {
-  return IMAGE_PLACEHOLDER_RE.test(text.trim());
-}
+type ResultPart = { type: 'text'; text: string } | { type: 'image_placeholder' };
 
-function getResultText(result: ToolResultMessage): string {
+function getResultParts(result: ToolResultMessage): ResultPart[] {
   return result.content
-    .filter((block) => block.type === 'text')
-    .map((block) => block.text)
-    .join('\n');
-}
-
-function getResultParts(result: ToolResultMessage): Array<{ type: 'text'; text: string } | { type: 'image_placeholder' }> {
-  const parts: Array<{ type: 'text'; text: string } | { type: 'image_placeholder' }> = [];
-  for (const block of result.content) {
-    if (block.type !== 'text') continue;
-    if (isImagePlaceholder(block.text)) {
-      parts.push({ type: 'image_placeholder' });
-    } else {
-      parts.push({ type: 'text', text: block.text });
-    }
-  }
-  return parts;
+    .filter((block): block is Extract<typeof block, { type: 'text' }> => block.type === 'text')
+    .map((block) =>
+      IMAGE_PLACEHOLDER_RE.test(block.text.trim())
+        ? { type: 'image_placeholder' as const }
+        : { type: 'text' as const, text: block.text },
+    );
 }
 
 export function ToolCallBlock({ toolCall, result }: ToolCallBlockProps) {

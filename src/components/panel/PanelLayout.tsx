@@ -58,8 +58,12 @@ function renderPanelContent(nodeId: string, panelId: string, options?: { hideHea
 // Used by both normal cards and hasTab layout. The content is identical;
 // only the container shape differs (rounded-xl card vs tab-connector).
 
-/** Close button class shared across all panel headers. */
-const PANEL_CLOSE_BTN = 'flex h-5 w-5 mr-2 shrink-0 items-center justify-center rounded-md text-foreground-tertiary opacity-0 transition-opacity hover:bg-foreground/8 hover:text-foreground group-hover/panel:opacity-100';
+/**
+ * Close button class shared across all panel headers.
+ * mr-2.5 (10px) matches the effective top distance: mt-1 (4px) + centering
+ * offset (6px from h-5 centered in h-8) = 10px. Equal edge distance.
+ */
+const PANEL_CLOSE_BTN = 'flex h-5 w-5 mr-2.5 shrink-0 items-center justify-center rounded-md text-foreground-tertiary opacity-0 transition-opacity hover:bg-foreground/8 hover:text-foreground group-hover/panel:opacity-100';
 
 /**
  * Panel header: breadcrumb + close (node), close-only (app), null (chat).
@@ -73,7 +77,7 @@ function renderPanelHeader(
   if (isChatPanel(nodeId)) return null;
   if (isAppPanel(nodeId)) {
     return (
-      <div className="flex items-center justify-end shrink-0 h-8 mt-2">
+      <div className="flex items-center justify-end shrink-0 h-8 mt-1">
         <button type="button" className={PANEL_CLOSE_BTN} onClick={opts.onClose} title="Close panel">
           <X size={12} />
         </button>
@@ -81,7 +85,7 @@ function renderPanelHeader(
     );
   }
   return (
-    <div className="flex items-center shrink-0 mt-2">
+    <div className="flex items-center shrink-0 mt-1">
       <Breadcrumb nodeId={nodeId} showCurrentName={!opts.titleVisible} active={opts.isActive} />
       <button type="button" className={PANEL_CLOSE_BTN} onClick={opts.onClose} title="Close panel">
         <X size={12} />
@@ -259,7 +263,7 @@ export function PanelLayout({ toolbar }: PanelLayoutProps) {
         </div>
         <div className={TAB_PANEL_BODY}>
           {!isApp && !isChat && (
-            <div className="flex items-center shrink-0 mt-2">
+            <div className="flex items-center shrink-0 mt-1">
               <Breadcrumb nodeId={nodeId} active />
             </div>
           )}

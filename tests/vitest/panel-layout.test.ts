@@ -110,6 +110,11 @@ describe('PanelLayout notes dropdown', () => {
     return container.querySelector('button[aria-haspopup="menu"]');
   }
 
+  /** The tab container holding the trigger + breadcrumb + close button. */
+  function getNotesTabText(): string {
+    return getNotesTrigger()?.parentElement?.textContent ?? '';
+  }
+
   function getMenuRow(label: string): HTMLDivElement | undefined {
     return Array.from(container.querySelectorAll('div')).find(
       (element) =>
@@ -137,7 +142,7 @@ describe('PanelLayout notes dropdown', () => {
 
     await renderLayout();
 
-    expect(getNotesTrigger()?.textContent).toContain('My Project');
+    expect(getNotesTabText()).toContain('My Project');
 
     await openNotesMenu();
 
@@ -150,7 +155,7 @@ describe('PanelLayout notes dropdown', () => {
     await tick();
 
     expect(useUIStore.getState().activePanelId).toBe('notes');
-    expect(getNotesTrigger()?.textContent).toContain('Meeting notes - Team standup');
+    expect(getNotesTabText()).toContain('Meeting notes - Team standup');
     expect(getNotesTrigger()?.getAttribute('aria-expanded')).toBe('false');
   });
 

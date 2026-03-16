@@ -112,6 +112,9 @@ export function PanelLayout({ toolbar }: PanelLayoutProps) {
   if (dropdownMode) {
     const activePanel = panels.find((p) => p.id === activePanelId) ?? panels[0];
     const nodeId = activePanel.nodeId;
+    const isChat = isChatPanel(nodeId);
+    const isApp = isAppPanel(nodeId);
+    const titleVisible = panelTitleVisibleMap[activePanel.id] ?? true;
 
     return (
       <div ref={containerRef} className="flex flex-1 flex-col overflow-hidden">
@@ -119,11 +122,12 @@ export function PanelLayout({ toolbar }: PanelLayoutProps) {
         <div className="flex items-end shrink-0">
           <div
             ref={notesMenuRef}
-            className="tab-connector-right relative z-10 flex h-10 w-[160px] shrink min-w-0 items-center bg-background rounded-t-xl"
+            className="tab-connector-right relative z-10 flex h-10 max-w-[240px] min-w-0 shrink items-center bg-background rounded-t-xl"
           >
+            {/* Dropdown trigger for panel switching */}
             <button
               type="button"
-              className="flex flex-1 min-w-0 items-center gap-1 px-3 py-1 text-[13px] text-foreground transition-colors hover:bg-foreground/4 rounded-lg"
+              className="flex h-7 w-6 ml-1 shrink-0 items-center justify-center rounded text-foreground-tertiary hover:text-foreground"
               onClick={() => setNotesMenuOpen((open) => !open)}
               aria-haspopup="menu"
               aria-expanded={notesMenuOpen}
@@ -131,12 +135,22 @@ export function PanelLayout({ toolbar }: PanelLayoutProps) {
               <ChevronDown
                 size={13}
                 strokeWidth={1.7}
-                className={`shrink-0 transition-transform ${notesMenuOpen ? 'rotate-180' : ''}`}
+                className={`transition-transform ${notesMenuOpen ? 'rotate-180' : ''}`}
               />
-              <span className="min-w-0 truncate">
-                <PanelLabel nodeId={activePanel.nodeId} />
-              </span>
             </button>
+            {/* Tab content — matching wide mode breadcrumb style */}
+            {isChat ? (
+              <span className="flex items-center gap-1.5 px-2 text-[13px] text-foreground">
+                <Sparkles size={12} strokeWidth={1.6} className="text-foreground-tertiary" />
+                Chat
+              </span>
+            ) : isApp ? (
+              <span className="flex min-w-0 flex-1 items-center px-2 text-[13px] text-foreground truncate">
+                <PanelLabel nodeId={nodeId} />
+              </span>
+            ) : (
+              <Breadcrumb nodeId={nodeId} showCurrentName active compact />
+            )}
             <button
               type="button"
               className="flex h-5 w-5 mr-1 shrink-0 items-center justify-center rounded-md text-foreground-tertiary hover:bg-foreground/8 hover:text-foreground"

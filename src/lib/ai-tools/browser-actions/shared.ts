@@ -18,7 +18,13 @@ export function sendBrowserMessage<T>(type: string, payload?: unknown): Promise<
 export function assertBrowserResponseOk<T>(
   result: T | BrowserErrorResponse,
 ): asserts result is T {
-  if (!result || typeof result !== 'object') return;
+  if (result == null) {
+    throw new Error('No response from browser extension. The content script may not be injected on this page — try reloading the page or navigating to a regular http(s) URL.');
+  }
+
+  if (typeof result !== 'object') {
+    throw new Error(`Unexpected browser response type: ${typeof result}. Expected an object.`);
+  }
 
   if ('ok' in result && result.ok === false) {
     const message = 'error' in result && typeof result.error === 'string'

@@ -294,13 +294,13 @@ export function PanelLayout({ toolbar }: PanelLayoutProps) {
                   />
                 ) : (
                   <div
-                    className="tab-connector-right relative z-10 min-w-0 shrink bg-background rounded-t-xl"
+                    className="tab-connector-right relative z-10 flex-1 min-w-0 bg-background rounded-t-xl"
                     onClick={() => setActivePanel(panel.id)}
                   >
                     {renderPanelHeader(nodeId, headerOpts)}
                   </div>
                 )}
-                <div className="flex flex-1 justify-end">
+                <div className="flex shrink-0 justify-end">
                   {toolbar}
                 </div>
               </div>

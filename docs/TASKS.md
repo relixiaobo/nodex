@@ -128,6 +128,7 @@ _(空)_
 - [x] Chat Phase 2 — 编辑消息 + 重新生成 + 分支导航 UI（`← 2/3 →` 箭头）(#141, Codex)
 - [x] Chat Phase 3 — Context 自动压缩（Bridge Message + Handoff Memo）(#140, Codex)
 - [x] **截图工具结果修复** — 占位符统一为 `IMAGE_PLACEHOLDER` 常量（模型可理解的文案），ToolCallBlock UI 检测占位符显示图片图标而非原始文本
+- [x] **Extended Thinking** — 模型选择器 toggle + Low/Med/High 等级 + 会话持久化 + 可折叠 Thought block + server 端 `streamSimple` 修复 (#146)
 - [ ] Chat 持久化 Phase 4 — 跨设备同步完整原始对话历史（Sync API + D1/R2）
 
 **Track B: 阅读环** — 设计：`phase-2-reading-ring.md`

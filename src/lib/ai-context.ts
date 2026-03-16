@@ -129,7 +129,7 @@ export function stripOldImages(messages: AgentMessage[]): AgentMessage[] {
 
     const strippedMessage = replaceMessageImages(
       message,
-      () => '[Screenshot captured; image no longer available]',
+      () => '[Screenshot was captured successfully. The image data has been removed from context to reduce token usage — you can no longer see it, but the screenshot did exist at the time of the tool call.]',
     );
 
     if (strippedMessage === message) continue;

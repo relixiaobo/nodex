@@ -23,13 +23,13 @@ _(空)_
 | 工作区 | 分支 | 任务 | 状态 |
 |--------|------|------|------|
 | nodex-gemini | — | 空闲 | — |
-| nodex-codex | codex/chat-as-panel | ✅ Chat as Panel — 统一面板系统 | merged #144 |
+| nodex-codex | codex/multi-provider-settings | 多 Provider AI 设置 + Composer Model 选择器 | Draft #145 |
 
 ---
 
 ## 进行中
 
-_(空)_
+- [ ] **多 Provider AI 设置** (#145, Codex) — Settings 节点多 provider 配置 + Composer model 选择器 + 迁移旧设置
 
 ---
 

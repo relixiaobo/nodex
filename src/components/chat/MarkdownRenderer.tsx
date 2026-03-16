@@ -7,6 +7,8 @@ import {
 } from 'react';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
 import { Lexer } from 'marked';
 import remend from 'remend';
 import { highlightCode } from '../../lib/code-highlight.js';
@@ -93,7 +95,8 @@ function injectPlaceholders(
 // 2. Code blocks — syntax highlighting via highlightCode()
 // All visual styling lives in CSS (.chat-prose h1, .chat-prose a, etc.)
 
-const remarkPlugins = [remarkGfm];
+const remarkPlugins = [remarkGfm, remarkMath];
+const rehypePlugins = [rehypeKatex];
 
 function buildComponents(keyPrefix: string, placeholders: Placeholder[]) {
   const wp = (children: ReactNode) => injectPlaceholders(children, placeholders, keyPrefix);
@@ -175,7 +178,7 @@ const MemoizedMarkdownBlock = memo(
     );
 
     return (
-      <Markdown remarkPlugins={remarkPlugins} components={components}>
+      <Markdown remarkPlugins={remarkPlugins} rehypePlugins={rehypePlugins} components={components}>
         {markdown}
       </Markdown>
     );
@@ -208,7 +211,7 @@ export function MarkdownContent({ text, streaming = false, keyPrefix }: Markdown
           const components = buildComponents(blockKey, placeholders);
           return (
             <div key={blockKey} data-streaming="">
-              <Markdown remarkPlugins={remarkPlugins} components={components}>
+              <Markdown remarkPlugins={remarkPlugins} rehypePlugins={rehypePlugins} components={components}>
                 {block}
               </Markdown>
               <span className="ml-1 inline-block h-3 w-1.5 animate-pulse rounded-sm bg-primary align-[-2px]" />

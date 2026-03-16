@@ -52,6 +52,21 @@ function createAssistantMessage(text: string, timestamp: number): import('@mario
   };
 }
 
+function createToolResultMessage(
+  text: string,
+  timestamp: number,
+  toolCallId: string = 'tool_call_1',
+): import('@mariozechner/pi-agent-core').AgentMessage {
+  return {
+    role: 'toolResult',
+    toolCallId,
+    toolName: 'browser',
+    content: [{ type: 'text', text }],
+    isError: false,
+    timestamp,
+  };
+}
+
 type DynamicTestAgent = import('@mariozechner/pi-agent-core').Agent & {
   subscribe: ReturnType<typeof vi.fn>;
   setTools: ReturnType<typeof vi.fn>;
@@ -808,7 +823,7 @@ describe('ai-service', () => {
     expect(agent.abort).toHaveBeenCalledTimes(1);
   });
 
-  it('editAndResend creates a new user branch and streams the replacement reply', async () => {
+  it('editAndResend creates a new user branch and continues without duplicating the user message', async () => {
     const { createNewChatSession, editAndResend } = await import('../../src/lib/ai-service.js');
     const { agent, state, emit } = createDynamicTestAgent();
 
@@ -824,7 +839,7 @@ describe('ai-service', () => {
     const replacementReply = createAssistantMessage('assistant-edited', 6);
 
     agent.replaceMessages.mockClear();
-    agent.prompt.mockImplementation(async () => {
+    agent.continue.mockImplementation(async () => {
       state.messages = [...state.messages, replacementReply];
       emit({
         type: 'turn_end',
@@ -844,7 +859,8 @@ describe('ai-service', () => {
         content: 'edited user',
       }),
     ]);
-    expect(agent.prompt).toHaveBeenCalledWith('edited user');
+    expect(agent.continue).toHaveBeenCalledTimes(1);
+    expect(agent.prompt).not.toHaveBeenCalled();
     expect(getLinearPath(session).map((node) => node.message)).toEqual([
       createUserMessage('user-1', 1),
       createAssistantMessage('assistant-1', 2),
@@ -856,7 +872,7 @@ describe('ai-service', () => {
     ]);
   });
 
-  it('regenerateResponse replaces the assistant branch using the preceding user prompt', async () => {
+  it('regenerateResponse continues from the existing branch context without duplicating the user message', async () => {
     const { createNewChatSession, regenerateResponse } = await import('../../src/lib/ai-service.js');
     const { agent, state, emit } = createDynamicTestAgent();
 
@@ -872,7 +888,7 @@ describe('ai-service', () => {
     const regeneratedReply = createAssistantMessage('assistant-regenerated', 5);
 
     agent.replaceMessages.mockClear();
-    agent.prompt.mockImplementation(async () => {
+    agent.continue.mockImplementation(async () => {
       state.messages = [...state.messages, regeneratedReply];
       emit({
         type: 'turn_end',
@@ -889,7 +905,8 @@ describe('ai-service', () => {
       createAssistantMessage('assistant-1', 2),
       createUserMessage('user-2', 3),
     ]);
-    expect(agent.prompt).toHaveBeenCalledWith('user-2');
+    expect(agent.continue).toHaveBeenCalledTimes(1);
+    expect(agent.prompt).not.toHaveBeenCalled();
     expect(getLinearPath(session).map((node) => node.message)).toEqual([
       createUserMessage('user-1', 1),
       createAssistantMessage('assistant-1', 2),
@@ -898,7 +915,51 @@ describe('ai-service', () => {
     ]);
   });
 
-  it('switchMessageBranch swaps the active branch without prompting the agent', async () => {
+  it('regenerateResponse can continue from a trailing tool result', async () => {
+    const { createNewChatSession, regenerateResponse } = await import('../../src/lib/ai-service.js');
+    const { agent, state, emit } = createDynamicTestAgent();
+
+    await createNewChatSession(agent);
+
+    const session = await seedCurrentSession(agent, linearToTree([
+      createUserMessage('user-1', 1),
+      createAssistantMessage('assistant-with-tool', 2),
+      createToolResultMessage('tool output', 3),
+      createAssistantMessage('assistant-final', 4),
+    ]));
+    const targetAssistant = getLinearPath(session)[3];
+    const regeneratedReply = createAssistantMessage('assistant-regenerated', 5);
+
+    agent.replaceMessages.mockClear();
+    agent.continue.mockImplementation(async () => {
+      state.messages = [...state.messages, regeneratedReply];
+      emit({
+        type: 'turn_end',
+        message: regeneratedReply,
+        toolResults: [],
+      } as import('@mariozechner/pi-agent-core').AgentEvent);
+    });
+
+    await regenerateResponse(targetAssistant!.id, agent);
+
+    expect(agent.replaceMessages).toHaveBeenCalledTimes(1);
+    expect(agent.replaceMessages.mock.calls[0][0]).toEqual([
+      createUserMessage('user-1', 1),
+      createAssistantMessage('assistant-with-tool', 2),
+      createToolResultMessage('tool output', 3),
+    ]);
+    expect(agent.continue).toHaveBeenCalledTimes(1);
+    expect(agent.prompt).not.toHaveBeenCalled();
+    expect(getLinearPath(session).map((node) => node.message)).toEqual([
+      createUserMessage('user-1', 1),
+      createAssistantMessage('assistant-with-tool', 2),
+      createToolResultMessage('tool output', 3),
+      regeneratedReply,
+    ]);
+  });
+
+  it('switchMessageBranch swaps the active branch, persists it, and does not prompt the agent', async () => {
+    const { getChatSession } = await import('../../src/lib/ai-persistence.js');
     const { createNewChatSession, switchMessageBranch } = await import('../../src/lib/ai-service.js');
     const { agent } = createDynamicTestAgent();
 
@@ -927,6 +988,15 @@ describe('ai-service', () => {
       createUserMessage('user-2', 3),
       createAssistantMessage('assistant-2', 4),
     ]);
+    await vi.waitFor(async () => {
+      const persisted = agent.sessionId ? await getChatSession(agent.sessionId) : null;
+      expect(getLinearPath(persisted!).map((node) => node.message)).toEqual([
+        createUserMessage('user-1', 1),
+        createAssistantMessage('assistant-1', 2),
+        createUserMessage('user-2', 3),
+        createAssistantMessage('assistant-2', 4),
+      ]);
+    });
     expect(getLinearPath(session).map((node) => node.message)).toEqual([
       createUserMessage('user-1', 1),
       createAssistantMessage('assistant-1', 2),

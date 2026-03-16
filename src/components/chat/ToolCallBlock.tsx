@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { ToolCall, ToolResultMessage } from '@mariozechner/pi-ai';
 import type { AppIcon } from '../../lib/icons.js';
-import { ChevronDown, FileText, Globe, Pencil, Plus, RotateCcw, Search, Sparkles, Trash2 } from '../../lib/icons.js';
+import { ChevronDown, FileText, Globe, Image, Pencil, Plus, RotateCcw, Search, Sparkles, Trash2 } from '../../lib/icons.js';
 
 interface ToolCallBlockProps {
   toolCall: ToolCall;
@@ -85,11 +85,30 @@ function summarizeToolCall(toolCall: ToolCall): string {
   return name;
 }
 
+const IMAGE_PLACEHOLDER_RE = /^\[(?:Screenshot captured|Image removed)[^\]]*\]$/;
+
+function isImagePlaceholder(text: string): boolean {
+  return IMAGE_PLACEHOLDER_RE.test(text.trim());
+}
+
 function getResultText(result: ToolResultMessage): string {
   return result.content
     .filter((block) => block.type === 'text')
     .map((block) => block.text)
     .join('\n');
+}
+
+function getResultParts(result: ToolResultMessage): Array<{ type: 'text'; text: string } | { type: 'image_placeholder' }> {
+  const parts: Array<{ type: 'text'; text: string } | { type: 'image_placeholder' }> = [];
+  for (const block of result.content) {
+    if (block.type !== 'text') continue;
+    if (isImagePlaceholder(block.text)) {
+      parts.push({ type: 'image_placeholder' });
+    } else {
+      parts.push({ type: 'text', text: block.text });
+    }
+  }
+  return parts;
 }
 
 export function ToolCallBlock({ toolCall, result }: ToolCallBlockProps) {
@@ -132,9 +151,18 @@ export function ToolCallBlock({ toolCall, result }: ToolCallBlockProps) {
                 Output
                 {result.isError && <span className="ml-1.5 text-destructive">error</span>}
               </div>
-              <pre className={`overflow-x-auto whitespace-pre-wrap break-all text-[11px] leading-5 ${result.isError ? 'text-destructive' : 'text-foreground-secondary'}`}>
-                {getResultText(result)}
-              </pre>
+              {getResultParts(result).map((part, i) =>
+                part.type === 'image_placeholder' ? (
+                  <div key={i} className="flex items-center gap-1.5 py-1 text-[11px] text-foreground-tertiary">
+                    <Image size={14} strokeWidth={1.6} className="shrink-0" />
+                    <span>Screenshot captured</span>
+                  </div>
+                ) : (
+                  <pre key={i} className={`overflow-x-auto whitespace-pre-wrap break-all text-[11px] leading-5 ${result.isError ? 'text-destructive' : 'text-foreground-secondary'}`}>
+                    {part.text}
+                  </pre>
+                ),
+              )}
             </div>
           )}
         </div>

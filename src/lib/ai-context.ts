@@ -129,7 +129,7 @@ export function stripOldImages(messages: AgentMessage[]): AgentMessage[] {
 
     const strippedMessage = replaceMessageImages(
       message,
-      (image) => `[Image removed from context: ${image.mimeType}]`,
+      () => '[Screenshot captured; image no longer available]',
     );
 
     if (strippedMessage === message) continue;

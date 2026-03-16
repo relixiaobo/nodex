@@ -123,10 +123,32 @@ describe('chat ui', () => {
       }),
     );
 
-    // Assistant toolbar: always visible, left-aligned
+    // Assistant toolbar: always visible, left-aligned (isLastInTurn defaults to true)
     expect(assistantHtml).toContain('data-testid="chat-message-toolbar"');
     expect(assistantHtml).toContain('justify-start');
     expect(assistantHtml).not.toContain('opacity-0');
+
+    // Mid-turn assistant messages (isLastInTurn=false) hide toolbar
+    const midTurnHtml = renderToStaticMarkup(
+      React.createElement(ChatMessage, {
+        entry: {
+          nodeId: 'msg_3',
+          message: {
+            role: 'assistant',
+            content: [{ type: 'text', text: 'Intermediate step' }],
+            api: 'anthropic-messages',
+            provider: 'anthropic',
+            model: 'test',
+            usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },
+            stopReason: 'stop',
+            timestamp: 3,
+          },
+          branches: null,
+        },
+        isLastInTurn: false,
+      }),
+    );
+    expect(midTurnHtml).not.toContain('data-testid="chat-message-toolbar"');
   });
 
   it('uses text-base typography for chat body and composer', () => {

@@ -13,6 +13,9 @@ interface ChatMessageProps {
   streaming?: boolean;
   grouped?: boolean;
   busy?: boolean;
+  /** True when this is the last message in a consecutive same-role group.
+   *  Assistant toolbar only renders on the last message of a turn. */
+  isLastInTurn?: boolean;
   onEdit?: (nodeId: string, newContent: string) => void | Promise<void>;
   onRegenerate?: (nodeId: string) => void | Promise<void>;
   onSwitchBranch?: (nodeId: string) => void;
@@ -20,7 +23,7 @@ interface ChatMessageProps {
 }
 
 const INLINE_MARKUP_PATTERN = /<(ref|cite)\s+id="([^"]+)">([\s\S]*?)<\/\1>/g;
-const ACTION_BUTTON = 'inline-flex h-7 w-7 items-center justify-center rounded-full text-foreground-tertiary transition-colors hover:bg-foreground/4 hover:text-foreground focus-visible:bg-foreground/4 focus-visible:text-foreground disabled:cursor-not-allowed disabled:text-foreground-tertiary/40 disabled:hover:bg-transparent disabled:focus-visible:bg-transparent';
+const ACTION_BUTTON = 'inline-flex h-7 w-7 items-center justify-center rounded-lg text-foreground-tertiary transition-colors hover:bg-foreground/4 hover:text-foreground focus-visible:bg-foreground/4 focus-visible:text-foreground disabled:cursor-not-allowed disabled:text-foreground-tertiary/40 disabled:hover:bg-transparent disabled:focus-visible:bg-transparent';
 const SECONDARY_BUTTON = 'inline-flex h-8 items-center rounded-full border border-border px-3 text-sm text-foreground-secondary transition-colors hover:bg-foreground/4 hover:text-foreground';
 
 function getActionErrorMessage(error: unknown, fallback: string): string {
@@ -128,6 +131,7 @@ export function ChatMessage({
   streaming = false,
   grouped = false,
   busy = false,
+  isLastInTurn = true,
   onEdit,
   onRegenerate,
   onSwitchBranch,
@@ -249,7 +253,7 @@ export function ChatMessage({
     );
   }
 
-  const showToolbar = nodeId !== null && !streaming && !isEditing;
+  const showToolbar = nodeId !== null && !streaming && !isEditing && (isUser || isLastInTurn);
 
   return (
     <div className={`${isUser ? 'group/message' : ''} flex w-full ${isUser ? 'justify-end' : 'justify-start'} ${grouped ? 'mt-1' : 'mt-4 first:mt-0'}`}>

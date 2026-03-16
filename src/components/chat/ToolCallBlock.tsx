@@ -86,11 +86,10 @@ function summarizeToolCall(toolCall: ToolCall): string {
   return name;
 }
 
-/** Match current constant and legacy placeholder variants. */
-const IMAGE_PLACEHOLDER_RE = new RegExp(
-  `^${IMAGE_PLACEHOLDER.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`
-    + '|^\\[(?:Image removed)[^\\]]*\\]$',
-);
+function isImagePlaceholder(text: string): boolean {
+  const t = text.trim();
+  return t === IMAGE_PLACEHOLDER || t.startsWith('[Image removed');
+}
 
 type ResultPart = { type: 'text'; text: string } | { type: 'image_placeholder' };
 
@@ -98,7 +97,7 @@ function getResultParts(result: ToolResultMessage): ResultPart[] {
   return result.content
     .filter((block): block is Extract<typeof block, { type: 'text' }> => block.type === 'text')
     .map((block) =>
-      IMAGE_PLACEHOLDER_RE.test(block.text.trim())
+      isImagePlaceholder(block.text)
         ? { type: 'image_placeholder' as const }
         : { type: 'text' as const, text: block.text },
     );

@@ -161,7 +161,12 @@ export function useAgent(agent: Agent = getAIAgent(), sessionId?: string) {
       sendMessage: (prompt: string) => streamChat(prompt, agent),
       editMessage: (nodeId: string, newContent: string) => editAndResend(nodeId, newContent, agent),
       regenerateMessage: (nodeId: string) => regenerateResponse(nodeId, agent),
-      switchBranch: (nodeId: string) => switchMessageBranch(nodeId, agent),
+      switchBranch: (nodeId: string) => {
+        switchMessageBranch(nodeId, agent);
+        startTransition(() => {
+          setRevision((value) => value + 1);
+        });
+      },
       stopStreaming: () => stopStreaming(agent),
       newChat: async () => {
         await createNewChatSession(agent);

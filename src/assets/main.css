@@ -587,20 +587,21 @@
   margin-top: 12px;
 }
 
-/* Headings */
-.chat-prose .chat-h1 {
+/* Headings — styled via element selectors, no custom classes needed */
+.chat-prose h1 {
   font-size: 20px;
   font-weight: 500;
   line-height: 28px;
 }
 
-.chat-prose .chat-h2 {
+.chat-prose h2 {
   font-size: 17px;
   font-weight: 500;
   line-height: 24px;
 }
 
-.chat-prose .chat-h3 {
+.chat-prose h3,
+.chat-prose h4 {
   font-size: 15px;
   font-weight: 500;
   line-height: 24px;
@@ -705,7 +706,7 @@
 }
 
 /* Links */
-.chat-prose .chat-link {
+.chat-prose a {
   color: var(--color-primary);
   text-decoration: underline;
   text-underline-offset: 3px;
@@ -732,16 +733,9 @@
   margin: 12px 0;
 }
 
-/* Streaming cursor sits inline at the end of the last block */
-.chat-streaming-block {
-  display: inline;
-}
-
-.chat-streaming-block > *:first-child {
-  display: inline;
-}
-
-/* Paragraphs within streaming block should be inline */
-.chat-streaming-block p {
+/* Streaming cursor: when the last block is a single paragraph, make it inline
+   so the cursor sits at the end of text. For block-level elements (code, table,
+   list), the paragraph rule doesn't match — cursor appears below, which is fine. */
+.chat-prose [data-streaming] > p:only-child {
   display: inline;
 }

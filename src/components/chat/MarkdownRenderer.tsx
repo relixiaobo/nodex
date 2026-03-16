@@ -56,158 +56,132 @@ function injectPlaceholders(
   if (placeholders.length === 0) return children;
 
   return Children.map(children, (child) => {
-    if (typeof child === 'string') {
-      // Split on %%SOMA_N%% and interleave components
-      const parts: ReactNode[] = [];
-      let cursor = 0;
-      let partIndex = 0;
-      PLACEHOLDER_RE.lastIndex = 0;
-      let match = PLACEHOLDER_RE.exec(child);
-      while (match) {
-        const idx = Number(match[1]);
-        const ph = placeholders[idx];
-        if (match.index > cursor) {
-          parts.push(child.slice(cursor, match.index));
-        }
-        if (ph) {
-          if (ph.kind === 'ref') {
-            parts.push(
-              <NodeReference key={`${keyPrefix}-ref-${partIndex}`} nodeId={ph.nodeId}>
-                {ph.content}
-              </NodeReference>,
-            );
-          } else {
-            parts.push(
-              <CitationBadge
-                key={`${keyPrefix}-cite-${partIndex}`}
-                nodeId={ph.nodeId}
-                label={ph.content}
-              />,
-            );
-          }
-        }
-        cursor = match.index + match[0].length;
-        partIndex += 1;
-        match = PLACEHOLDER_RE.exec(child);
+    if (typeof child !== 'string') return child;
+
+    const parts: ReactNode[] = [];
+    let cursor = 0;
+    let partIndex = 0;
+    PLACEHOLDER_RE.lastIndex = 0;
+    let match = PLACEHOLDER_RE.exec(child);
+    while (match) {
+      const idx = Number(match[1]);
+      const ph = placeholders[idx];
+      if (match.index > cursor) {
+        parts.push(child.slice(cursor, match.index));
       }
-      if (cursor < child.length) {
-        parts.push(child.slice(cursor));
+      if (ph) {
+        parts.push(
+          ph.kind === 'ref'
+            ? <NodeReference key={`${keyPrefix}-ref-${partIndex}`} nodeId={ph.nodeId}>{ph.content}</NodeReference>
+            : <CitationBadge key={`${keyPrefix}-cite-${partIndex}`} nodeId={ph.nodeId} label={ph.content} />,
+        );
       }
-      return parts.length === 1 ? parts[0] : <>{parts}</>;
+      cursor = match.index + match[0].length;
+      partIndex += 1;
+      match = PLACEHOLDER_RE.exec(child);
     }
-    return child;
+    if (cursor < child.length) {
+      parts.push(child.slice(cursor));
+    }
+    return parts.length === 1 ? parts[0] : <>{parts}</>;
   });
 }
 
 // ── Markdown component overrides ──
+// Component overrides handle two concerns:
+// 1. Placeholder injection — replace %%SOMA_N%% with NodeReference/CitationBadge
+// 2. Code blocks — syntax highlighting via highlightCode()
+// All visual styling lives in CSS (.chat-prose h1, .chat-prose a, etc.)
 
 const remarkPlugins = [remarkGfm];
 
 function buildComponents(keyPrefix: string, placeholders: Placeholder[]) {
-  function withPlaceholders(children: ReactNode) {
-    return injectPlaceholders(children, placeholders, keyPrefix);
-  }
+  const wp = (children: ReactNode) => injectPlaceholders(children, placeholders, keyPrefix);
 
   return {
-    // Code: inline vs block
     code({ children, className, ...rest }: ComponentPropsWithoutRef<'code'>) {
-      const langMatch = className?.match(/language-(\S+)/);
-      if (langMatch) {
-        const lang = langMatch[1];
-        const codeStr = String(children).replace(/\n$/, '');
-        const highlighted = highlightCode(codeStr, lang);
+      const lang = className?.match(/language-(\S+)/)?.[1];
+      if (lang) {
+        const highlighted = highlightCode(String(children).replace(/\n$/, ''), lang);
         return (
           <div className="chat-code-block">
             <div className="chat-code-header">
               <span className="chat-code-lang">{lang}</span>
             </div>
             <pre className="code-block-pre">
-              <code
-                className={className}
-                dangerouslySetInnerHTML={{ __html: highlighted }}
-                {...rest}
-              />
+              <code className={className} dangerouslySetInnerHTML={{ __html: highlighted }} {...rest} />
             </pre>
           </div>
         );
       }
-      // Inline code
-      return (
-        <code className="chat-inline-code" {...rest}>
-          {children}
-        </code>
-      );
+      return <code className="chat-inline-code" {...rest}>{children}</code>;
     },
-
-    // Fenced code block wrapper (```...```)
     pre({ children }: ComponentPropsWithoutRef<'pre'>) {
       return <>{children}</>;
     },
-
-    // Inject placeholders into text-bearing elements
     p({ children, ...rest }: ComponentPropsWithoutRef<'p'>) {
-      return <p {...rest}>{withPlaceholders(children)}</p>;
+      return <p {...rest}>{wp(children)}</p>;
     },
     li({ children, ...rest }: ComponentPropsWithoutRef<'li'>) {
-      return <li {...rest}>{withPlaceholders(children)}</li>;
+      return <li {...rest}>{wp(children)}</li>;
     },
     td({ children, ...rest }: ComponentPropsWithoutRef<'td'>) {
-      return <td {...rest}>{withPlaceholders(children)}</td>;
+      return <td {...rest}>{wp(children)}</td>;
     },
     th({ children, ...rest }: ComponentPropsWithoutRef<'th'>) {
-      return <th {...rest}>{withPlaceholders(children)}</th>;
+      return <th {...rest}>{wp(children)}</th>;
     },
     blockquote({ children, ...rest }: ComponentPropsWithoutRef<'blockquote'>) {
-      return <blockquote {...rest}>{withPlaceholders(children)}</blockquote>;
+      return <blockquote {...rest}>{wp(children)}</blockquote>;
     },
-
-    // Headings
     h1({ children, ...rest }: ComponentPropsWithoutRef<'h1'>) {
-      return <h1 className="chat-h1" {...rest}>{withPlaceholders(children)}</h1>;
+      return <h1 {...rest}>{wp(children)}</h1>;
     },
     h2({ children, ...rest }: ComponentPropsWithoutRef<'h2'>) {
-      return <h2 className="chat-h2" {...rest}>{withPlaceholders(children)}</h2>;
+      return <h2 {...rest}>{wp(children)}</h2>;
     },
     h3({ children, ...rest }: ComponentPropsWithoutRef<'h3'>) {
-      return <h3 className="chat-h3" {...rest}>{withPlaceholders(children)}</h3>;
+      return <h3 {...rest}>{wp(children)}</h3>;
     },
     h4({ children, ...rest }: ComponentPropsWithoutRef<'h4'>) {
-      return <h4 className="chat-h3" {...rest}>{withPlaceholders(children)}</h4>;
+      return <h4 {...rest}>{wp(children)}</h4>;
     },
-
-    // Links
     a({ children, href, ...rest }: ComponentPropsWithoutRef<'a'>) {
-      return (
-        <a href={href} target="_blank" rel="noopener noreferrer" className="chat-link" {...rest}>
-          {withPlaceholders(children)}
-        </a>
-      );
+      return <a href={href} target="_blank" rel="noopener noreferrer" {...rest}>{wp(children)}</a>;
     },
   };
 }
 
 // ── Memoized single block ──
+// Custom comparator: only compare the markdown string. Completed blocks have
+// stable markdown — if it hasn't changed, the render output is identical.
+// `placeholders` array ref changes every streaming tick, but a completed block
+// only references placeholder indices embedded in its own markdown substring,
+// so content equality is guaranteed when markdown matches.
 
-const MemoizedMarkdownBlock = memo(function MemoizedMarkdownBlock({
-  markdown,
-  keyPrefix,
-  placeholders,
-}: {
-  markdown: string;
-  keyPrefix: string;
-  placeholders: Placeholder[];
-}) {
-  const components = useMemo(
-    () => buildComponents(keyPrefix, placeholders),
-    [keyPrefix, placeholders],
-  );
+const MemoizedMarkdownBlock = memo(
+  function MemoizedMarkdownBlock({
+    markdown,
+    keyPrefix,
+    placeholders,
+  }: {
+    markdown: string;
+    keyPrefix: string;
+    placeholders: Placeholder[];
+  }) {
+    const components = useMemo(
+      () => buildComponents(keyPrefix, placeholders),
+      [keyPrefix, placeholders],
+    );
 
-  return (
-    <Markdown remarkPlugins={remarkPlugins} components={components}>
-      {markdown}
-    </Markdown>
-  );
-});
+    return (
+      <Markdown remarkPlugins={remarkPlugins} components={components}>
+        {markdown}
+      </Markdown>
+    );
+  },
+  (prev, next) => prev.markdown === next.markdown,
+);
 
 // ── Main export ──
 
@@ -222,11 +196,6 @@ export function MarkdownContent({ text, streaming = false, keyPrefix }: Markdown
   const mended = streaming ? remend(cleaned) : cleaned;
   const blocks = useMemo(() => splitMarkdownBlocks(mended), [mended]);
 
-  const components = useMemo(
-    () => buildComponents(keyPrefix, placeholders),
-    [keyPrefix, placeholders],
-  );
-
   return (
     <div className="chat-prose">
       {blocks.map((block, i) => {
@@ -234,9 +203,11 @@ export function MarkdownContent({ text, streaming = false, keyPrefix }: Markdown
         const blockKey = `${keyPrefix}-b${i}`;
 
         if (streaming && isLast) {
-          // Last block during streaming: render directly (no memo) + cursor
+          // Last block during streaming: no memo (content changes every tick).
+          // [data-streaming] CSS makes a single <p> inline so cursor follows text.
+          const components = buildComponents(blockKey, placeholders);
           return (
-            <div key={blockKey} className="chat-streaming-block">
+            <div key={blockKey} data-streaming="">
               <Markdown remarkPlugins={remarkPlugins} components={components}>
                 {block}
               </Markdown>

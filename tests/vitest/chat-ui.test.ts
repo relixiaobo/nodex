@@ -6,12 +6,15 @@ import { createRoot, type Root } from 'react-dom/client';
 import { flushSync } from 'react-dom';
 import { ChatInput } from '../../src/components/chat/ChatInput.js';
 import { ChatMessage } from '../../src/components/chat/ChatMessage.js';
-import { shouldStickChatScroll } from '../../src/components/chat/ChatPanel.js';
+import { ChatPanel, shouldStickChatScroll } from '../../src/components/chat/ChatPanel.js';
 import { DeskLayout } from '../../src/components/layout/DeskLayout.js';
 import { GlobalTools } from '../../src/components/toolbar/TopToolbar.js';
 import { resetChatPersistenceForTests } from '../../src/lib/ai-persistence.js';
+import { SYSTEM_SCHEMA_NODE_IDS } from '../../src/lib/system-schema-presets.js';
+import { useNodeStore } from '../../src/stores/node-store.js';
 import { useUIStore } from '../../src/stores/ui-store.js';
-import { resetStores } from './helpers/test-state.js';
+import { NDX_F, SYS_V } from '../../src/types/index.js';
+import { resetAndSeed, resetStores } from './helpers/test-state.js';
 
 const DB_NAME = 'soma-ai-chat';
 
@@ -192,6 +195,135 @@ describe('chat ui', () => {
     expect(html).toContain('disabled=""');
     // Stop button only appears when disabled=true (streaming), not when busy
     expect(html).not.toContain('aria-label="Stop generating"');
+  });
+
+  it('renders a model selector in the composer footer when models are available', () => {
+    const html = renderToStaticMarkup(
+      React.createElement(ChatInput, {
+        disabled: false,
+        currentModel: {
+          id: 'claude-sonnet-4-5',
+          name: 'Sonnet 4.5',
+          provider: 'anthropic',
+        },
+        availableModels: [
+          {
+            id: 'claude-sonnet-4-5',
+            name: 'Sonnet 4.5',
+            provider: 'anthropic',
+          },
+          {
+            id: 'gpt-4o',
+            name: 'GPT-4o',
+            provider: 'openai',
+          },
+        ],
+        onModelChange: () => {},
+        onSend: async () => {},
+        onStop: () => {},
+      }),
+    );
+
+    expect(html).toContain('aria-label="Select model"');
+    expect(html).toContain('Sonnet 4.5');
+  });
+
+  it('shows an explicit AI Debug action in the composer menu', async () => {
+    const onToggleDebug = vi.fn();
+
+    flushSync(() => {
+      root.render(React.createElement(ChatInput, {
+        disabled: false,
+        onSend: async () => {},
+        onStop: () => {},
+        onToggleDebug,
+      }));
+    });
+
+    const menuButton = container.querySelector('button[aria-label="More options"]');
+    expect(menuButton).not.toBeNull();
+
+    flushSync(() => {
+      menuButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    await vi.waitFor(() => {
+      expect(container.textContent).toContain('Enable AI Debug');
+    });
+
+    const debugButton = Array.from(container.querySelectorAll('button')).find(
+      (button) => button.textContent?.includes('Enable AI Debug'),
+    );
+    expect(debugButton).not.toBeUndefined();
+
+    flushSync(() => {
+      debugButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(onToggleDebug).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders an empty state when no enabled provider is configured', async () => {
+    resetAndSeed();
+
+    flushSync(() => {
+      root.render(React.createElement(ChatPanel, { panelId: 'chat-panel', sessionId: 'session-empty' }));
+    });
+
+    await vi.waitFor(() => {
+      expect(container.textContent).toContain('Configure an AI provider to start chatting');
+      expect(container.textContent).toContain('Open Settings');
+      expect(container.textContent).toContain('Enable AI Debug');
+    });
+  });
+
+  it('can open AI Debug directly from the empty state', async () => {
+    resetAndSeed();
+
+    flushSync(() => {
+      root.render(React.createElement(ChatPanel, { panelId: 'chat-panel', sessionId: 'session-debug-empty' }));
+    });
+
+    await vi.waitFor(() => {
+      expect(container.textContent).toContain('Enable AI Debug');
+    });
+
+    const debugButton = Array.from(container.querySelectorAll('button')).find(
+      (button) => button.textContent?.includes('Enable AI Debug'),
+    );
+    expect(debugButton).not.toBeUndefined();
+
+    flushSync(() => {
+      debugButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    await vi.waitFor(() => {
+      expect(container.textContent).toContain('Chat Debug');
+    });
+  });
+
+  it('keeps the chat composer visible when a provider is enabled without an API key', async () => {
+    resetAndSeed();
+    useNodeStore.getState().setFieldValue(
+      SYSTEM_SCHEMA_NODE_IDS.DEFAULT_AI_PROVIDER_NODE,
+      NDX_F.PROVIDER_ENABLED,
+      [SYS_V.YES],
+    );
+    useNodeStore.getState().setFieldValue(
+      SYSTEM_SCHEMA_NODE_IDS.DEFAULT_AI_PROVIDER_NODE,
+      NDX_F.PROVIDER_API_KEY,
+      [],
+    );
+
+    flushSync(() => {
+      root.render(React.createElement(ChatPanel, { panelId: 'chat-panel', sessionId: 'session-keyless-enabled' }));
+    });
+
+    await vi.waitFor(() => {
+      expect(container.textContent).toContain('Ask about your notes, clips, or the page you\'re reading.');
+    });
+
+    expect(container.textContent).not.toContain('Configure an AI provider to start chatting');
   });
 
   it('renders the global chat trigger as a non-toggle button', () => {

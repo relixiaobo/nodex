@@ -559,17 +559,27 @@ export const TAGDEF_OUTLINER_FIELDS = TAGDEF_CONFIG_FIELDS.filter(f => f.control
  */
 export function resolveChildSupertags(parentId: string): string[] {
   const parent = loroDoc.toNodexNode(parentId);
-  if (!parent?.tags.length) return [];
+  if (!parent) return [];
 
   const result: string[] = [];
+  const pushChildSupertag = (childSupertag: string | undefined) => {
+    if (!childSupertag) return;
+    if (!loroDoc.hasNode(childSupertag)) return;
+    if (!result.includes(childSupertag)) {
+      result.push(childSupertag);
+    }
+  };
+
   for (const tagDefId of parent.tags) {
     const tagDef = loroDoc.toNodexNode(tagDefId);
-    if (!tagDef?.childSupertag) continue;
-    if (!loroDoc.hasNode(tagDef.childSupertag)) continue;
-    if (!result.includes(tagDef.childSupertag)) {
-      result.push(tagDef.childSupertag);
-    }
+    pushChildSupertag(tagDef?.childSupertag);
   }
+
+  if (parent.type === 'fieldEntry' && parent.fieldDefId) {
+    const fieldDef = loroDoc.toNodexNode(parent.fieldDefId);
+    pushChildSupertag(fieldDef?.childSupertag);
+  }
+
   return result;
 }
 

@@ -101,12 +101,15 @@ describe('settings system', () => {
   it('bootstraps Settings through fixed schema nodes instead of a bespoke page shape', () => {
     expect(loroDoc.getParentId(NDX_T.WORKSPACE_SETTINGS)).toBe(SYSTEM_NODE_IDS.SCHEMA);
     expect(loroDoc.toNodexNode(NDX_T.WORKSPACE_SETTINGS)?.locked).toBe(true);
+    expect(loroDoc.getParentId(NDX_T.AI_PROVIDER)).toBe(SYSTEM_NODE_IDS.SCHEMA);
     expect(loroDoc.getParentId(NDX_F.SETTING_HIGHLIGHT_ENABLED)).toBe(NDX_T.WORKSPACE_SETTINGS);
-    expect(loroDoc.getParentId(NDX_F.SETTING_AI_PROVIDER)).toBe(NDX_T.WORKSPACE_SETTINGS);
-    expect(loroDoc.getParentId(NDX_F.SETTING_AI_API_KEY)).toBe(NDX_T.WORKSPACE_SETTINGS);
+    expect(loroDoc.getParentId(NDX_F.SETTING_AI_PROVIDERS)).toBe(NDX_T.WORKSPACE_SETTINGS);
+    expect(loroDoc.getParentId(NDX_F.PROVIDER_ID)).toBe(NDX_T.AI_PROVIDER);
+    expect(loroDoc.getParentId(NDX_F.PROVIDER_ENABLED)).toBe(NDX_T.AI_PROVIDER);
+    expect(loroDoc.getParentId(NDX_F.PROVIDER_API_KEY)).toBe(NDX_T.AI_PROVIDER);
+    expect(loroDoc.getParentId(NDX_F.PROVIDER_BASE_URL)).toBe(NDX_T.AI_PROVIDER);
     expect(loroDoc.getParentId(SYSTEM_SCHEMA_NODE_IDS.SETTINGS_HIGHLIGHT_FIELD_ENTRY)).toBe(SYSTEM_NODE_IDS.SETTINGS);
-    expect(loroDoc.getParentId(SYSTEM_SCHEMA_NODE_IDS.SETTINGS_AI_PROVIDER_FIELD_ENTRY)).toBe(SYSTEM_NODE_IDS.SETTINGS);
-    expect(loroDoc.getParentId(SYSTEM_SCHEMA_NODE_IDS.SETTINGS_AI_API_KEY_FIELD_ENTRY)).toBe(SYSTEM_NODE_IDS.SETTINGS);
+    expect(loroDoc.getParentId(SYSTEM_SCHEMA_NODE_IDS.SETTINGS_AI_PROVIDERS_FIELD_ENTRY)).toBe(SYSTEM_NODE_IDS.SETTINGS);
   });
 
   it('highlightEnabled defaults to true', () => {
@@ -130,8 +133,9 @@ describe('settings system', () => {
 
     expect(container.textContent).toContain('Settings');
     expect(container.textContent).toContain('Highlight & Comment');
-    expect(container.textContent).toContain('AI Provider');
-    expect(container.textContent).toContain('API Key');
+    expect(container.textContent).toContain('AI Providers');
+    expect(container.textContent).toContain('Anthropic');
+    expect(container.textContent).toContain('#ai-provider');
     expect(container.textContent).not.toContain('No');
     expect(container.querySelector('[role="switch"]')?.getAttribute('aria-checked')).toBe('true');
     expect(container.querySelector('[data-field-row]')?.className).toContain('@md:grid-cols-[clamp(10rem,32%,15rem)_minmax(0,1fr)]');

@@ -8,6 +8,7 @@ import {
   initLoroDocForTest,
   resetLoroDoc,
   setNodeData,
+  setNodeDataBatch,
   setNodeRichTextContent,
   toNodexNode,
 } from '../../src/lib/loro-doc.js';
@@ -48,16 +49,25 @@ describe('ensureSystemNodes', () => {
     expect(toNodexNode(SYSTEM_NODE_IDS.AGENT)?.locked).toBeUndefined();
   });
 
-  it('bootstraps fixed Settings schema and default field value', () => {
+  it('bootstraps fixed Settings schema and default provider config', () => {
     ensureSystemNodes('ws_bootstrap');
 
     expect(getParentId(NDX_T.WORKSPACE_SETTINGS)).toBe(SYSTEM_NODE_IDS.SCHEMA);
     expect(toNodexNode(NDX_T.WORKSPACE_SETTINGS)?.locked).toBe(true);
+    expect(getParentId(NDX_T.AI_PROVIDER)).toBe(SYSTEM_NODE_IDS.SCHEMA);
     expect(getParentId(NDX_F.SETTING_HIGHLIGHT_ENABLED)).toBe(NDX_T.WORKSPACE_SETTINGS);
+    expect(getParentId(NDX_F.SETTING_AI_PROVIDERS)).toBe(NDX_T.WORKSPACE_SETTINGS);
     expect(toNodexNode(NDX_F.SETTING_HIGHLIGHT_ENABLED)?.locked).toBe(true);
+    expect(getParentId(NDX_F.PROVIDER_ID)).toBe(NDX_T.AI_PROVIDER);
+    expect(getParentId(NDX_F.PROVIDER_ENABLED)).toBe(NDX_T.AI_PROVIDER);
+    expect(getParentId(NDX_F.PROVIDER_API_KEY)).toBe(NDX_T.AI_PROVIDER);
+    expect(getParentId(NDX_F.PROVIDER_BASE_URL)).toBe(NDX_T.AI_PROVIDER);
     expect(getParentId(SYSTEM_SCHEMA_NODE_IDS.SETTINGS_HIGHLIGHT_FIELD_ENTRY)).toBe(SYSTEM_NODE_IDS.SETTINGS);
     expect(getParentId(SYSTEM_SCHEMA_NODE_IDS.SETTINGS_HIGHLIGHT_VALUE)).toBe(SYSTEM_SCHEMA_NODE_IDS.SETTINGS_HIGHLIGHT_FIELD_ENTRY);
     expect(toNodexNode(SYSTEM_SCHEMA_NODE_IDS.SETTINGS_HIGHLIGHT_VALUE)?.name).toBe(SYS_V.YES);
+    expect(getParentId(SYSTEM_SCHEMA_NODE_IDS.SETTINGS_AI_PROVIDERS_FIELD_ENTRY)).toBe(SYSTEM_NODE_IDS.SETTINGS);
+    expect(getParentId(SYSTEM_SCHEMA_NODE_IDS.DEFAULT_AI_PROVIDER_NODE)).toBe(SYSTEM_SCHEMA_NODE_IDS.SETTINGS_AI_PROVIDERS_FIELD_ENTRY);
+    expect(toNodexNode(SYSTEM_SCHEMA_NODE_IDS.DEFAULT_AI_PROVIDER_NODE)?.tags).toContain(NDX_T.AI_PROVIDER);
   });
 
   it('records bootstrap version and runs legacy locked cleanup only once per workspace', () => {
@@ -87,6 +97,30 @@ describe('ensureSystemNodes', () => {
     ensureSystemNodes('ws_bootstrap');
 
     expect(toNodexNode(SYSTEM_NODE_IDS.LIBRARY)?.locked).toBe(true);
+  });
+
+  it('migrates legacy single-provider Settings fields into the default provider config', () => {
+    createNode('ws_bootstrap', null);
+    setNodeRichTextContent('ws_bootstrap', 'Workspace', [], []);
+    createNode(SYSTEM_NODE_IDS.SETTINGS, 'ws_bootstrap');
+    setNodeRichTextContent(SYSTEM_NODE_IDS.SETTINGS, 'Settings', [], []);
+    createNode(SYSTEM_NODE_IDS.SCHEMA, 'ws_bootstrap');
+    setNodeRichTextContent(SYSTEM_NODE_IDS.SCHEMA, 'Schema', [], []);
+
+    createNode(SYSTEM_SCHEMA_NODE_IDS.LEGACY_SETTINGS_AI_API_KEY_FIELD_ENTRY, SYSTEM_NODE_IDS.SETTINGS);
+    setNodeDataBatch(SYSTEM_SCHEMA_NODE_IDS.LEGACY_SETTINGS_AI_API_KEY_FIELD_ENTRY, {
+      type: 'fieldEntry',
+      fieldDefId: NDX_F.LEGACY_SETTING_AI_API_KEY,
+    });
+    createNode('legacy_ai_key_value', SYSTEM_SCHEMA_NODE_IDS.LEGACY_SETTINGS_AI_API_KEY_FIELD_ENTRY);
+    setNodeRichTextContent('legacy_ai_key_value', 'sk-ant-legacy-123', [], []);
+
+    ensureSystemNodes('ws_bootstrap');
+
+    expect(hasNode(SYSTEM_SCHEMA_NODE_IDS.LEGACY_SETTINGS_AI_API_KEY_FIELD_ENTRY)).toBe(false);
+    expect(getParentId(SYSTEM_SCHEMA_NODE_IDS.DEFAULT_AI_PROVIDER_NODE)).toBe(SYSTEM_SCHEMA_NODE_IDS.SETTINGS_AI_PROVIDERS_FIELD_ENTRY);
+    expect(toNodexNode(SYSTEM_SCHEMA_NODE_IDS.DEFAULT_AI_PROVIDER_ENABLED_VALUE)?.name).toBe(SYS_V.YES);
+    expect(toNodexNode(SYSTEM_SCHEMA_NODE_IDS.DEFAULT_AI_PROVIDER_API_KEY_VALUE)?.name).toBe('sk-ant-legacy-123');
   });
 
   it('migrates legacy direct-child highlights into the clip Highlights field', () => {

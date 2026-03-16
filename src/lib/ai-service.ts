@@ -1,8 +1,12 @@
 import { Agent, type AgentEvent, type AgentMessage } from '@mariozechner/pi-agent-core';
 import { getModel, isContextOverflow } from '@mariozechner/pi-ai';
-import type { Message, Model } from '@mariozechner/pi-ai';
+import type { AssistantMessage, Message, Model, StopReason, ToolResultMessage } from '@mariozechner/pi-ai';
+import { nanoid } from 'nanoid';
 import { getStoredToken } from './auth.js';
-import { buildAgentSystemPrompt, DEFAULT_AGENT_MODEL_ID, DEFAULT_AGENT_MAX_TOKENS, DEFAULT_AGENT_SYSTEM_PROMPT, DEFAULT_AGENT_TEMPERATURE, readAgentNodeConfig } from './ai-agent-node.js';
+import { buildAgentSystemPrompt, DEFAULT_AGENT_MODEL_ID, DEFAULT_AGENT_MAX_TOKENS, DEFAULT_AGENT_SYSTEM_PROMPT, DEFAULT_AGENT_TEMPERATURE, readAgentNodeConfig, type AgentNodeConfig } from './ai-agent-node.js';
+import type { ChatTurnDebugRecord, DebugTurnStatus } from './ai-debug.js';
+import { createChatTurnDebugRecord, finalizeChatTurnDebugRecord, normalizeRestoredDebugTurns, readChatDebugEnabled } from './ai-debug.js';
+import { findProviderOptionNodeId, getApiKeyForProvider, getAvailableModels, getProviderConfigs, normalizeProviderId } from './ai-provider-config.js';
 import {
   createSession,
   editMessage as editTreeMessage,
@@ -13,20 +17,21 @@ import {
 } from './ai-chat-tree.js';
 import { compactForOverflow, compactIfNeeded, getCompressedPath } from './ai-compress.js';
 import { prepareAgentContext } from './ai-context.js';
-import { streamProxyWithApiKey } from './ai-proxy.js';
-import { type ChatSession, getChatSession, getLatestChatSession, saveChatSession } from './ai-persistence.js';
+import { type ProxyStreamRequestPayload, streamProxyWithApiKey } from './ai-proxy.js';
+import { getChatDebugTurns, type ChatSession, getChatSession, getLatestChatSession, saveChatDebugTurns, saveChatSession } from './ai-persistence.js';
 import { getAITools } from './ai-tools/index.js';
 import * as loroDoc from './loro-doc.js';
 import { withCommitOrigin } from './loro-doc.js';
 import { SYSTEM_SCHEMA_NODE_IDS } from './system-schema-presets.js';
 import { useNodeStore } from '../stores/node-store.js';
-import { NDX_F, SYSTEM_NODE_IDS } from '../types/index.js';
+import { NDX_F, SYSTEM_NODE_IDS, SYS_V } from '../types/index.js';
 
 const AI_SETTINGS_KEY = 'soma-ai-settings';
+const MAX_SESSION_DEBUG_TURNS = 12;
 
 const DEFAULT_CHAT_MODEL = getModel('anthropic', 'claude-sonnet-4-5');
 
-export interface StoredAISettings {
+interface LegacyStoredAISettings {
   provider: 'anthropic';
   apiKey: string;
 }
@@ -34,10 +39,12 @@ export interface StoredAISettings {
 interface AgentRuntimeState {
   createdAt: number;
   currentSession: ChatSession | null;
+  debugTurns: ChatTurnDebugRecord[];
   hydrated: boolean;
   restorePromise: Promise<void> | null;
   temperature: number;
   maxTokens: number;
+  activeDebugTurnId: string | null;
 }
 
 let agentSingleton: Agent | null = null;
@@ -53,23 +60,23 @@ function getSyncApiUrl(): string {
   return import.meta.env.VITE_SYNC_API_URL ?? 'http://localhost:8787';
 }
 
-async function readSettings(): Promise<StoredAISettings | null> {
+async function readSettings(): Promise<LegacyStoredAISettings | null> {
   if (hasChromeStorage()) {
     const result = await chrome.storage.local.get(AI_SETTINGS_KEY);
-    return (result[AI_SETTINGS_KEY] as StoredAISettings | undefined) ?? null;
+    return (result[AI_SETTINGS_KEY] as LegacyStoredAISettings | undefined) ?? null;
   }
 
   const raw = localStorage.getItem(AI_SETTINGS_KEY);
   if (!raw) return null;
 
   try {
-    return JSON.parse(raw) as StoredAISettings;
+    return JSON.parse(raw) as LegacyStoredAISettings;
   } catch {
     return null;
   }
 }
 
-async function writeSettings(settings: StoredAISettings | null): Promise<void> {
+async function writeSettings(settings: LegacyStoredAISettings | null): Promise<void> {
   if (hasChromeStorage()) {
     if (settings) {
       await chrome.storage.local.set({ [AI_SETTINGS_KEY]: settings });
@@ -92,10 +99,12 @@ function getAgentRuntimeState(agent: Agent): AgentRuntimeState {
     state = {
       createdAt: Date.now(),
       currentSession: null,
+      debugTurns: [],
       hydrated: false,
       restorePromise: null,
       temperature: DEFAULT_AGENT_TEMPERATURE,
       maxTokens: DEFAULT_AGENT_MAX_TOKENS,
+      activeDebugTurnId: null,
     };
     agentRuntimeState.set(agent, state);
   }
@@ -110,40 +119,60 @@ function hasNodeBackedAISettings(): boolean {
   }
 }
 
-function getSettingValueNode(fieldEntryId: string) {
-  if (!hasNodeBackedAISettings()) return null;
-  const fieldEntry = loroDoc.toNodexNode(fieldEntryId);
-  const valueNodeId = fieldEntry?.children?.[0];
-  return valueNodeId ? loroDoc.toNodexNode(valueNodeId) : null;
+function hasAnthropicProviderConfig(configs: ReturnType<typeof getProviderConfigs>): boolean {
+  return configs.some((config) => config.provider === 'anthropic' && config.apiKey.length > 0);
 }
 
-function readProviderFromSettingsNode(): 'anthropic' {
-  const valueNode = getSettingValueNode(SYSTEM_SCHEMA_NODE_IDS.SETTINGS_AI_PROVIDER_FIELD_ENTRY);
-  const providerName = valueNode?.targetId
-    ? loroDoc.toNodexNode(valueNode.targetId)?.name
-    : valueNode?.name;
-  return providerName?.trim().toLowerCase() === 'anthropic' ? 'anthropic' : 'anthropic';
+function findAvailableModel(
+  availableModels: Model<any>[],
+  modelId: string,
+  provider?: string,
+): Model<any> | null {
+  const normalizedProvider = normalizeProviderId(provider);
+  return availableModels.find((model) => (
+    model.id === modelId
+      && (normalizedProvider.length === 0 || normalizeProviderId(model.provider) === normalizedProvider)
+  )) ?? null;
 }
 
-function readApiKeyFromSettingsNode(): string | null {
-  const valueNode = getSettingValueNode(SYSTEM_SCHEMA_NODE_IDS.SETTINGS_AI_API_KEY_FIELD_ENTRY);
-  const apiKey = valueNode?.name?.trim() ?? '';
-  return apiKey.length > 0 ? apiKey : null;
-}
+function resolveModel(session: ChatSession | null, modelId: string): Model<any> {
+  const availableModels = getAvailableModels();
+  const sessionModel = session?.selectedModelId
+    ? findAvailableModel(availableModels, session.selectedModelId, session.selectedProvider)
+    : null;
+  if (sessionModel) return sessionModel;
 
-function resolveProviderOptionId(provider: StoredAISettings['provider']): string {
-  switch (provider) {
-    case 'anthropic':
-    default:
-      return SYSTEM_SCHEMA_NODE_IDS.SETTINGS_AI_PROVIDER_ANTHROPIC;
+  const configuredModel = findAvailableModel(availableModels, modelId);
+  if (configuredModel) return configuredModel;
+
+  if (availableModels.length > 0) {
+    return availableModels[0];
+  }
+
+  try {
+    return getModel('anthropic', modelId as never);
+  } catch {
+    return DEFAULT_CHAT_MODEL;
   }
 }
 
-function resolveModel(provider: StoredAISettings['provider'], modelId: string): Model<any> {
-  try {
-    return getModel(provider, modelId as never);
-  } catch {
-    return getModel('anthropic', DEFAULT_AGENT_MODEL_ID);
+function applyAgentConfiguration(
+  agent: Agent,
+  session: ChatSession | null,
+  agentConfig: AgentNodeConfig | null,
+  resolvedModel: Model<any>,
+): void {
+  const runtime = getAgentRuntimeState(agent);
+  runtime.temperature = agentConfig?.temperature ?? DEFAULT_AGENT_TEMPERATURE;
+  runtime.maxTokens = agentConfig?.maxTokens ?? DEFAULT_AGENT_MAX_TOKENS;
+
+  agent.setTools(getAITools());
+  agent.setSystemPrompt(agentConfig ? buildAgentSystemPrompt(agentConfig) : DEFAULT_AGENT_SYSTEM_PROMPT);
+  agent.setModel(resolvedModel);
+
+  if (session) {
+    session.selectedModelId = resolvedModel.id;
+    session.selectedProvider = normalizeProviderId(resolvedModel.provider);
   }
 }
 
@@ -154,23 +183,28 @@ async function ensureAISettingsMigrated(): Promise<void> {
   migrationPromise = (async () => {
     const legacySettings = await readSettings();
     if (!legacySettings?.apiKey) return;
-    if (readApiKeyFromSettingsNode()) {
+    const existingConfigs = getProviderConfigs();
+    if (hasAnthropicProviderConfig(existingConfigs)) {
       await writeSettings(null);
       return;
     }
 
     withCommitOrigin('system:ai-settings-migration', () => {
       const store = useNodeStore.getState();
-      store.setOptionsFieldValue(
-        SYSTEM_NODE_IDS.SETTINGS,
-        NDX_F.SETTING_AI_PROVIDER,
-        resolveProviderOptionId(legacySettings.provider),
-      );
-      store.setFieldValue(
-        SYSTEM_NODE_IDS.SETTINGS,
-        NDX_F.SETTING_AI_API_KEY,
-        [legacySettings.apiKey],
-      );
+      const anthropicConfig = existingConfigs.find((config) => config.provider === 'anthropic');
+      const targetNodeId = anthropicConfig?.nodeId
+        ?? store.createChild(
+          SYSTEM_SCHEMA_NODE_IDS.SETTINGS_AI_PROVIDERS_FIELD_ENTRY,
+          undefined,
+          { name: 'Anthropic' },
+          { commit: false },
+        ).id;
+      const providerOptionNodeId = findProviderOptionNodeId(legacySettings.provider);
+      if (providerOptionNodeId) {
+        store.setOptionsFieldValue(targetNodeId, NDX_F.PROVIDER_ID, providerOptionNodeId);
+      }
+      store.setFieldValue(targetNodeId, NDX_F.PROVIDER_ENABLED, [SYS_V.YES]);
+      store.setFieldValue(targetNodeId, NDX_F.PROVIDER_API_KEY, [legacySettings.apiKey]);
     });
 
     await writeSettings(null);
@@ -198,25 +232,43 @@ function supportsDynamicAgentConfiguration(agent: Agent): boolean {
 }
 
 export async function configureAgent(agent: Agent): Promise<{
-  provider: StoredAISettings['provider'];
+  provider: string;
 }> {
   await ensureAISettingsMigrated();
 
   const runtime = getAgentRuntimeState(agent);
-  const fallbackSettings = !hasNodeBackedAISettings() ? await readSettings() : null;
-  const provider = hasNodeBackedAISettings()
-    ? readProviderFromSettingsNode()
-    : (fallbackSettings?.provider ?? 'anthropic');
   const agentConfig = readAgentConfigSafely();
+  const resolvedModel = resolveModel(
+    runtime.currentSession,
+    agentConfig?.modelId ?? DEFAULT_AGENT_MODEL_ID,
+  );
+  applyAgentConfiguration(agent, runtime.currentSession, agentConfig, resolvedModel);
 
-  runtime.temperature = agentConfig?.temperature ?? DEFAULT_AGENT_TEMPERATURE;
-  runtime.maxTokens = agentConfig?.maxTokens ?? DEFAULT_AGENT_MAX_TOKENS;
+  return { provider: resolvedModel.provider };
+}
 
-  agent.setTools(getAITools());
-  agent.setSystemPrompt(agentConfig ? buildAgentSystemPrompt(agentConfig) : DEFAULT_AGENT_SYSTEM_PROMPT);
-  agent.setModel(resolveModel(provider, agentConfig?.modelId ?? DEFAULT_AGENT_MODEL_ID));
+export async function selectChatModel(
+  modelId: string,
+  provider: string,
+  agent: Agent = getAIAgent(),
+): Promise<Model<any>> {
+  await ensureAISettingsMigrated();
 
-  return { provider };
+  const runtime = getAgentRuntimeState(agent);
+  const session = runtime.currentSession;
+  if (!session) {
+    throw new Error('Chat session is not ready yet.');
+  }
+
+  const resolvedModel = findAvailableModel(getAvailableModels(), modelId, provider);
+  if (!resolvedModel) {
+    throw new Error(`Model ${provider}/${modelId} is not available.`);
+  }
+
+  const agentConfig = readAgentConfigSafely();
+  applyAgentConfiguration(agent, session, agentConfig, resolvedModel);
+  await persistChatSession(agent);
+  return resolvedModel;
 }
 
 function isLlmCompatibleMessage(message: AgentMessage): message is Message {
@@ -247,7 +299,9 @@ function deriveSessionTitle(messages: AgentMessage[]): string | null {
 function setCurrentSession(agent: Agent, session: ChatSession): ChatSession {
   const runtime = getAgentRuntimeState(agent);
   runtime.currentSession = session;
+  runtime.debugTurns = [];
   runtime.createdAt = session.createdAt;
+  runtime.activeDebugTurnId = null;
   agent.sessionId = session.id;
   return session;
 }
@@ -255,6 +309,84 @@ function setCurrentSession(agent: Agent, session: ChatSession): ChatSession {
 function ensureCurrentSession(agent: Agent): ChatSession {
   const runtime = getAgentRuntimeState(agent);
   return runtime.currentSession ?? setCurrentSession(agent, createSession());
+}
+
+function isAssistantDebugMessage(message: AgentMessage | null | undefined): message is AssistantMessage {
+  return message?.role === 'assistant';
+}
+
+function readCurrentDebugTurns(agent: Agent): ChatTurnDebugRecord[] {
+  return getAgentRuntimeState(agent).debugTurns;
+}
+
+function setCurrentDebugTurns(agent: Agent, turns: ChatTurnDebugRecord[]): void {
+  const runtime = getAgentRuntimeState(agent);
+  runtime.debugTurns = turns.slice(-MAX_SESSION_DEBUG_TURNS);
+}
+
+function appendDebugTurn(agent: Agent, turn: ChatTurnDebugRecord): void {
+  setCurrentDebugTurns(agent, [...readCurrentDebugTurns(agent), turn]);
+}
+
+function startDebugTurn(
+  agent: Agent,
+  requestBody: ProxyStreamRequestPayload,
+): void {
+  const runtime = getAgentRuntimeState(agent);
+  const session = runtime.currentSession;
+  if (!session) return;
+
+  const turn = createChatTurnDebugRecord({
+    id: nanoid(),
+    model: requestBody.model,
+    context: requestBody.context,
+    options: requestBody.options,
+  });
+  appendDebugTurn(agent, turn);
+  runtime.activeDebugTurnId = turn.id;
+}
+
+async function restoreDebugTurns(sessionId: string, agent: Agent): Promise<void> {
+  const restoredTurns = await getChatDebugTurns(sessionId);
+  const normalized = normalizeRestoredDebugTurns(restoredTurns);
+  setCurrentDebugTurns(agent, normalized.turns);
+
+  if (normalized.changed) {
+    await saveChatDebugTurns(sessionId, normalized.turns);
+  }
+}
+
+function finalizeDebugTurn(
+  agent: Agent,
+  args: {
+    assistantMessage?: AssistantMessage | null;
+    toolResults?: ToolResultMessage[];
+    stopReason?: StopReason | null;
+    errorMessage?: string | null;
+    status?: Exclude<DebugTurnStatus, 'running'>;
+  } = {},
+): void {
+  const runtime = getAgentRuntimeState(agent);
+  const activeDebugTurnId = runtime.activeDebugTurnId;
+  if (!activeDebugTurnId) return;
+
+  const turns = readCurrentDebugTurns(agent);
+  const turnIndex = turns.findIndex((turn) => turn.id === activeDebugTurnId);
+  runtime.activeDebugTurnId = null;
+  if (turnIndex < 0) return;
+
+  const nextTurns = turns.slice();
+  nextTurns[turnIndex] = finalizeChatTurnDebugRecord(nextTurns[turnIndex], args);
+  setCurrentDebugTurns(agent, nextTurns);
+}
+
+function getLatestAssistantMessage(agent: Agent): AssistantMessage | null {
+  if (isAssistantDebugMessage(agent.state.streamMessage)) {
+    return agent.state.streamMessage;
+  }
+
+  const lastAssistantMessage = [...agent.state.messages].reverse().find(isAssistantDebugMessage);
+  return lastAssistantMessage ?? null;
 }
 
 function getAssistantContentLength(message: AgentMessage): number | null {
@@ -371,6 +503,10 @@ async function runAgentTurn(session: ChatSession, agent: Agent, prompt: string):
     }
 
     if (event.type === 'turn_end') {
+      finalizeDebugTurn(agent, {
+        assistantMessage: isAssistantDebugMessage(event.message) ? event.message : null,
+        toolResults: event.toolResults,
+      });
       if (overflowRecovery.shouldSkipTurnSync()) return;
       syncSessionFromAgent(session, agent.state.messages);
       void persistChatSession(agent);
@@ -380,79 +516,39 @@ async function runAgentTurn(session: ChatSession, agent: Agent, prompt: string):
   try {
     await agent.prompt(prompt);
     await overflowRecovery.waitForAll();
+    finalizeDebugTurn(agent, {
+      assistantMessage: getLatestAssistantMessage(agent),
+    });
     syncSessionFromAgent(session, agent.state.messages);
     if (session.title === null) {
       session.title = deriveSessionTitle(agent.state.messages);
     }
     await persistChatSession(agent);
+  } catch (error) {
+    const latestAssistantMessage = getLatestAssistantMessage(agent);
+    finalizeDebugTurn(agent, {
+      assistantMessage: latestAssistantMessage,
+      stopReason: latestAssistantMessage?.stopReason ?? 'error',
+      errorMessage: error instanceof Error ? error.message : String(error),
+    });
+    await persistChatSession(agent);
+    throw error;
   } finally {
     unsubscribe();
   }
 }
 
-export async function getAISettings(): Promise<StoredAISettings | null> {
+export async function getApiKey(): Promise<string | null> {
   if (!hasNodeBackedAISettings()) {
-    return readSettings();
+    return (await readSettings())?.apiKey ?? null;
   }
 
   await ensureAISettingsMigrated();
-  const apiKey = readApiKeyFromSettingsNode();
-  if (!apiKey) return null;
-
-  return {
-    provider: readProviderFromSettingsNode(),
-    apiKey,
-  };
-}
-
-export async function getApiKey(): Promise<string | null> {
-  const settings = await getAISettings();
-  return settings?.apiKey ?? null;
+  return getApiKeyForProvider('anthropic');
 }
 
 export async function hasApiKey(): Promise<boolean> {
   return (await getApiKey()) !== null;
-}
-
-export async function setApiKey(apiKey: string): Promise<void> {
-  const normalized = apiKey.trim();
-  if (!normalized || !normalized.startsWith('sk-ant-')) {
-    throw new Error('Anthropic API key must start with sk-ant-');
-  }
-
-  if (!hasNodeBackedAISettings()) {
-    await writeSettings({
-      provider: 'anthropic',
-      apiKey: normalized,
-    });
-    return;
-  }
-
-  const store = useNodeStore.getState();
-  store.setOptionsFieldValue(
-    SYSTEM_NODE_IDS.SETTINGS,
-    NDX_F.SETTING_AI_PROVIDER,
-    SYSTEM_SCHEMA_NODE_IDS.SETTINGS_AI_PROVIDER_ANTHROPIC,
-  );
-  store.setFieldValue(
-    SYSTEM_NODE_IDS.SETTINGS,
-    NDX_F.SETTING_AI_API_KEY,
-    [normalized],
-  );
-  await writeSettings(null);
-}
-
-export async function clearApiKey(): Promise<void> {
-  if (!hasNodeBackedAISettings()) {
-    await writeSettings(null);
-    return;
-  }
-
-  useNodeStore.getState().clearFieldValue(
-    SYSTEM_NODE_IDS.SETTINGS,
-    NDX_F.SETTING_AI_API_KEY,
-  );
-  await writeSettings(null);
 }
 
 export function createAgent(model: Model<any> = DEFAULT_CHAT_MODEL): Agent {
@@ -462,8 +558,14 @@ export function createAgent(model: Model<any> = DEFAULT_CHAT_MODEL): Agent {
     initialState: {
       model,
     },
-    getApiKey: async () => {
-      const apiKey = await getApiKey();
+    getApiKey: async (provider) => {
+      if (!hasNodeBackedAISettings()) {
+        const apiKey = (await readSettings())?.apiKey;
+        return apiKey ?? undefined;
+      }
+
+      await ensureAISettingsMigrated();
+      const apiKey = getApiKeyForProvider(provider);
       return apiKey ?? undefined;
     },
     transformContext: async (messages) => (await prepareAgentContext(messages)).messages,
@@ -474,13 +576,32 @@ export function createAgent(model: Model<any> = DEFAULT_CHAT_MODEL): Agent {
         throw new Error('Please sign in to use Chat');
       }
 
+      const legacyApiKey = !hasNodeBackedAISettings()
+        ? (await readSettings())?.apiKey ?? null
+        : null;
+      await ensureAISettingsMigrated();
+      const resolvedApiKey = options.apiKey
+        ?? legacyApiKey
+        ?? getApiKeyForProvider(activeModel.provider);
+      if (!resolvedApiKey) {
+        throw new Error(`No API key configured for ${activeModel.provider}. Open Settings to add one.`);
+      }
+
       const runtime = getAgentRuntimeState(agent);
+      const debugEnabled = await readChatDebugEnabled();
+
       return streamProxyWithApiKey(activeModel, context, {
         ...options,
+        apiKey: resolvedApiKey,
         temperature: options.temperature ?? runtime.temperature,
         maxTokens: options.maxTokens ?? runtime.maxTokens,
         authToken,
         proxyUrl: getSyncApiUrl(),
+        onRequestBody: debugEnabled
+          ? (requestBody) => {
+            startDebugTurn(agent, requestBody);
+          }
+          : undefined,
       });
     },
   });
@@ -516,17 +637,17 @@ export function restoreChatSessionById(sessionId: string, agent: Agent): Promise
   if (!runtime.restorePromise) {
     runtime.restorePromise = (async () => {
       try {
-        await configureAgent(agent);
-      } catch {
-        // Keep default prompt/tools when config hydration fails.
-      }
-
-      try {
         const session = await getChatSession(sessionId);
         if (session) {
           trimIncompleteTrail(session);
           setCurrentSession(agent, session);
+          await restoreDebugTurns(session.id, agent);
           agent.replaceMessages(getCompressedPath(session));
+          try {
+            await configureAgent(agent);
+          } catch {
+            // Keep default prompt/tools when config hydration fails.
+          }
           runtime.hydrated = true;
           return;
         }
@@ -543,7 +664,13 @@ export function restoreChatSessionById(sessionId: string, agent: Agent): Promise
       }
 
       setCurrentSession(agent, persistedSession);
+      setCurrentDebugTurns(agent, []);
       agent.replaceMessages([]);
+      try {
+        await configureAgent(agent);
+      } catch {
+        // Keep default prompt/tools when config hydration fails.
+      }
       runtime.hydrated = true;
     })();
   }
@@ -565,6 +692,7 @@ export function restoreLatestChatSession(agent: Agent = getAIAgent()): Promise<v
         if (latestSession) {
           trimIncompleteTrail(latestSession);
           setCurrentSession(agent, latestSession);
+          await restoreDebugTurns(latestSession.id, agent);
           agent.replaceMessages(getCompressedPath(latestSession));
           try {
             await configureAgent(agent);
@@ -579,6 +707,7 @@ export function restoreLatestChatSession(agent: Agent = getAIAgent()): Promise<v
       }
 
       setCurrentSession(agent, createSession());
+      setCurrentDebugTurns(agent, []);
       agent.replaceMessages([]);
       try {
         await configureAgent(agent);
@@ -598,8 +727,12 @@ export async function persistChatSession(agent: Agent = getAIAgent()): Promise<v
   if (!runtime.currentSession) return;
 
   try {
-    const persisted = await saveChatSession(runtime.currentSession);
-    runtime.currentSession.updatedAt = persisted.updatedAt;
+    const [persistedSession, persistedTurns] = await Promise.all([
+      saveChatSession(runtime.currentSession),
+      saveChatDebugTurns(runtime.currentSession.id, runtime.debugTurns),
+    ]);
+    runtime.currentSession.updatedAt = persistedSession.updatedAt;
+    runtime.debugTurns = persistedTurns;
   } catch {
     // Ignore persistence failures; chat should still function.
   }
@@ -685,4 +818,8 @@ export function resetAIAgentForTests(): void {
 
 export function getCurrentSession(agent: Agent = getAIAgent()): ChatSession | null {
   return getAgentRuntimeState(agent).currentSession;
+}
+
+export function getCurrentDebugTurns(agent: Agent = getAIAgent()): ChatTurnDebugRecord[] {
+  return readCurrentDebugTurns(agent);
 }

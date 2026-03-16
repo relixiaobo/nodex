@@ -23,13 +23,13 @@ _(空)_
 | 工作区 | 分支 | 任务 | 状态 |
 |--------|------|------|------|
 | nodex-gemini | — | 空闲 | — |
-| nodex-codex | — | 空闲 | — |
+| nodex-codex | codex/fix-extended-thinking | Extended thinking 不返回思考内容 | Draft #146 |
 
 ---
 
 ## 进行中
 
-_(空)_
+- [ ] **Extended thinking 不返回思考内容** (#146, Codex) — 客户端正确传 `reasoning: "medium"`，服务端已部署，但 API 不返回 thinking blocks。需排查 pi-ai 对 Anthropic thinking 参数的转换
 
 ---
 

@@ -1,4 +1,3 @@
-import { nanoid } from 'nanoid';
 import { FIELD_TYPES, NDX_F, SYSTEM_NODE_IDS, SYS_T } from '../types/index.js';
 import { isOutlinerContentNodeType } from './node-type-utils.js';
 import * as loroDoc from './loro-doc.js';
@@ -30,6 +29,12 @@ export const AI_AGENT_NODE_IDS = {
   TEMPERATURE_VALUE: 'NDX_N24',
   MAX_TOKENS_VALUE: 'NDX_N25',
   DEFAULT_SKILL_VALUE: 'NDX_N52',
+  PROMPT_LINE_0: 'NDX_N53',
+  PROMPT_LINE_1: 'NDX_N54',
+  PROMPT_LINE_2: 'NDX_N55',
+  PROMPT_LINE_3: 'NDX_N56',
+  PROMPT_LINE_4: 'NDX_N57',
+  PROMPT_LINE_5: 'NDX_N58',
 } as const;
 
 export const SKILL_NODE_IDS = {
@@ -67,6 +72,17 @@ export const SPARK_AGENT_NODE_IDS = {
   MODEL_VALUE: 'NDX_N30',
   TEMPERATURE_VALUE: 'NDX_N31',
   MAX_TOKENS_VALUE: 'NDX_N32',
+  PROMPT_LINE_0: 'NDX_N59',
+  PROMPT_LINE_1: 'NDX_N60',
+  PROMPT_LINE_2: 'NDX_N61',
+  PROMPT_LINE_3: 'NDX_N62',
+  PROMPT_LINE_4: 'NDX_N63',
+  PROMPT_LINE_5: 'NDX_N64',
+  PROMPT_LINE_6: 'NDX_N65',
+  PROMPT_LINE_7: 'NDX_N66',
+  PROMPT_LINE_8: 'NDX_N67',
+  PROMPT_LINE_9: 'NDX_N68',
+  PROMPT_LINE_10: 'NDX_N69',
 } as const;
 
 // Legacy IDs — used only for migration cleanup
@@ -77,6 +93,16 @@ const LEGACY_IDS = {
 
 // IDs from deleted default skills (Writing assistant rules, Research + rules)
 const LEGACY_SKILL_IDS = ['NDX_N46', 'NDX_N47', 'NDX_N48', 'NDX_N49', 'NDX_N50', 'NDX_N51'];
+
+const DEFAULT_PROMPT_PRESETS = DEFAULT_PROMPT_LINES.map((text, i) => ({
+  id: AI_AGENT_NODE_IDS[`PROMPT_LINE_${i}` as keyof typeof AI_AGENT_NODE_IDS],
+  text,
+}));
+
+const SPARK_DEFAULT_PROMPT_PRESETS = SPARK_DEFAULT_PROMPT_LINES.map((text, i) => ({
+  id: SPARK_AGENT_NODE_IDS[`PROMPT_LINE_${i}` as keyof typeof SPARK_AGENT_NODE_IDS],
+  text,
+}));
 
 interface FixedNodePreset {
   id: string;
@@ -365,10 +391,12 @@ export function ensureAgentNode(workspaceId = loroDoc.getCurrentWorkspaceId() ??
       return n != null && isOutlinerContentNodeType(n.type);
     });
   if (contentChildren.length === 0) {
-    for (const line of DEFAULT_PROMPT_LINES) {
-      const childId = nanoid();
-      loroDoc.createNode(childId, SYSTEM_NODE_IDS.AGENT);
-      loroDoc.setNodeRichTextContent(childId, line, [], []);
+    for (const preset of DEFAULT_PROMPT_PRESETS) {
+      ensureNode({
+        id: preset.id,
+        parentId: SYSTEM_NODE_IDS.AGENT,
+        name: preset.text,
+      });
     }
   }
 
@@ -516,10 +544,12 @@ export function ensureSparkAgentNode(workspaceId = loroDoc.getCurrentWorkspaceId
       return n != null && isOutlinerContentNodeType(n.type);
     });
   if (contentChildren.length === 0) {
-    for (const line of SPARK_DEFAULT_PROMPT_LINES) {
-      const childId = nanoid();
-      loroDoc.createNode(childId, SYSTEM_NODE_IDS.SPARK_AGENT);
-      loroDoc.setNodeRichTextContent(childId, line, [], []);
+    for (const preset of SPARK_DEFAULT_PROMPT_PRESETS) {
+      ensureNode({
+        id: preset.id,
+        parentId: SYSTEM_NODE_IDS.SPARK_AGENT,
+        name: preset.text,
+      });
     }
   }
 

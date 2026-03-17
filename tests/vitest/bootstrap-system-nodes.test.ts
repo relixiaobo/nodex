@@ -15,6 +15,8 @@ import {
 import { SYSTEM_NODE_IDS, NDX_F, NDX_T, SYS_T, SYS_V } from '../../src/types/index.js';
 import { SYSTEM_SCHEMA_NODE_IDS } from '../../src/lib/system-schema-presets.js';
 import { useNodeStore } from '../../src/stores/node-store.js';
+import { isOutlinerContentNodeType } from '../../src/lib/node-type-utils.js';
+import { ensureSparkAgentNode } from '../../src/lib/ai-agent-node.js';
 
 describe('ensureSystemNodes', () => {
   beforeEach(() => {
@@ -121,6 +123,49 @@ describe('ensureSystemNodes', () => {
     expect(getParentId(SYSTEM_SCHEMA_NODE_IDS.DEFAULT_AI_PROVIDER_NODE)).toBe(SYSTEM_SCHEMA_NODE_IDS.SETTINGS_AI_PROVIDERS_FIELD_ENTRY);
     expect(toNodexNode(SYSTEM_SCHEMA_NODE_IDS.DEFAULT_AI_PROVIDER_ENABLED_VALUE)?.name).toBe(SYS_V.YES);
     expect(toNodexNode(SYSTEM_SCHEMA_NODE_IDS.DEFAULT_AI_PROVIDER_API_KEY_VALUE)?.name).toBe('sk-ant-legacy-123');
+  });
+
+  it('ensureAgentNode does not duplicate prompt lines on repeated calls', () => {
+    ensureSystemNodes('ws_bootstrap');
+
+    const contentChildrenBefore = getChildren(SYSTEM_NODE_IDS.AGENT)
+      .filter((id) => {
+        const n = toNodexNode(id);
+        return n != null && isOutlinerContentNodeType(n.type);
+      });
+    expect(contentChildrenBefore.length).toBe(6);
+
+    ensureSystemNodes('ws_bootstrap');
+
+    const contentChildrenAfter = getChildren(SYSTEM_NODE_IDS.AGENT)
+      .filter((id) => {
+        const n = toNodexNode(id);
+        return n != null && isOutlinerContentNodeType(n.type);
+      });
+    expect(contentChildrenAfter.length).toBe(contentChildrenBefore.length);
+    expect(contentChildrenAfter).toEqual(contentChildrenBefore);
+  });
+
+  it('ensureSparkAgentNode does not duplicate prompt lines on repeated calls', () => {
+    ensureSystemNodes('ws_bootstrap');
+    ensureSparkAgentNode('ws_bootstrap');
+
+    const contentChildrenBefore = getChildren(SYSTEM_NODE_IDS.SPARK_AGENT)
+      .filter((id) => {
+        const n = toNodexNode(id);
+        return n != null && isOutlinerContentNodeType(n.type);
+      });
+    expect(contentChildrenBefore.length).toBe(11);
+
+    ensureSparkAgentNode('ws_bootstrap');
+
+    const contentChildrenAfter = getChildren(SYSTEM_NODE_IDS.SPARK_AGENT)
+      .filter((id) => {
+        const n = toNodexNode(id);
+        return n != null && isOutlinerContentNodeType(n.type);
+      });
+    expect(contentChildrenAfter.length).toBe(contentChildrenBefore.length);
+    expect(contentChildrenAfter).toEqual(contentChildrenBefore);
   });
 
   it('migrates legacy direct-child highlights into the clip Highlights field', () => {

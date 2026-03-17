@@ -217,8 +217,8 @@ function TabHead({ nodeId, onClickBody, onClose, menuOpen, tabRef, children }: T
         aria-haspopup={menuOpen !== undefined ? 'menu' : undefined}
         aria-expanded={menuOpen !== undefined ? menuOpen : undefined}
       >
-        <span className="flex min-w-0 flex-1 items-center gap-1.5 px-2 text-[13px] text-foreground">
-          {isChat && <MessageCircle size={12} strokeWidth={1.6} className="shrink-0 text-foreground-tertiary" />}
+        <span className="flex min-w-0 flex-1 items-center gap-1.5 px-2 text-[13px] text-foreground-tertiary">
+          {isChat && <MessageCircle size={12} strokeWidth={1.6} className="shrink-0" />}
           <span className="min-w-0 truncate"><PanelLabel nodeId={nodeId} /></span>
         </span>
         {menuOpen !== undefined && (
@@ -276,24 +276,26 @@ function ChatDropdownRow({
       <span className="min-w-0 flex-1 truncate">
         {edit.editing ? <ChatTitleInput edit={edit} /> : <PanelLabel nodeId={nodeId} />}
       </span>
-      {!edit.editing && (
+      <div className="flex shrink-0 items-center">
+        {!edit.editing && (
+          <button
+            type="button"
+            onClick={edit.startEdit}
+            className="flex h-5 w-5 items-center justify-center rounded-md text-foreground-tertiary opacity-0 transition-opacity hover:bg-foreground/4 hover:text-foreground group-hover/menu:opacity-100"
+            title="Edit title"
+          >
+            <Pencil size={10} strokeWidth={1.8} />
+          </button>
+        )}
         <button
           type="button"
-          onClick={edit.startEdit}
-          className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-foreground-tertiary opacity-0 transition-opacity hover:bg-foreground/4 hover:text-foreground group-hover/menu:opacity-100"
-          title="Edit title"
+          className="flex h-5 w-5 items-center justify-center rounded-md text-foreground-tertiary transition-colors hover:bg-foreground/4 hover:text-foreground"
+          onClick={onClose}
+          title="Close panel"
         >
-          <Pencil size={10} strokeWidth={1.8} />
+          <X size={12} />
         </button>
-      )}
-      <button
-        type="button"
-        className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-foreground-tertiary transition-colors hover:bg-foreground/4 hover:text-foreground"
-        onClick={onClose}
-        title="Close panel"
-      >
-        <X size={12} />
-      </button>
+      </div>
     </div>
   );
 }

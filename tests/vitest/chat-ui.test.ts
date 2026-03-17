@@ -547,6 +547,35 @@ describe('chat ui', () => {
     expect(state.panels.every((panel) => panel.nodeId.startsWith('chat:'))).toBe(true);
   });
 
+  it('enables textarea during streaming when onSteer is provided and shows steering placeholder', () => {
+    const html = renderToStaticMarkup(
+      React.createElement(ChatInput, {
+        disabled: true,
+        onSend: async () => {},
+        onStop: () => {},
+        onSteer: () => {},
+      }),
+    );
+
+    expect(html).toContain('placeholder="Steer the conversation…"');
+    // textarea should NOT have disabled attribute when steering is available
+    expect(html).not.toContain('disabled=""');
+  });
+
+  it('shows send button instead of stop button when user types during streaming', () => {
+    // Without text — stop button
+    const emptyHtml = renderToStaticMarkup(
+      React.createElement(ChatInput, {
+        disabled: true,
+        onSend: async () => {},
+        onStop: () => {},
+        onSteer: () => {},
+      }),
+    );
+    expect(emptyHtml).toContain('aria-label="Stop generating"');
+    expect(emptyHtml).not.toContain('aria-label="Send message"');
+  });
+
   it('keeps the panel layout visible on narrow screens instead of swapping to a chat-only view', () => {
     window.innerWidth = 480;
 

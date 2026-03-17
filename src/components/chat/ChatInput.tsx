@@ -181,8 +181,8 @@ export function ChatInput({
   async function handleSend() {
     const normalized = draft.trim();
     if (!normalized || inputDisabled) return;
-    await onSend(normalized);
     setDraft('');
+    await onSend(normalized);
   }
 
   function handleSelectModel(model: ChatInputModel) {

@@ -186,6 +186,7 @@ function extractAssistantText(message: AssistantMessage): string {
   return message.content
     .map((block) => {
       if (block.type === 'text') return block.text;
+      if (block.type === 'thinking') return `[thinking]\n${block.thinking}\n[/thinking]`;
       return '';
     })
     .filter(Boolean)

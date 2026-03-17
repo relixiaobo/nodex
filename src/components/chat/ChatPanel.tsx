@@ -287,7 +287,7 @@ export function ChatPanel({ panelId, sessionId, hideHeader }: ChatPanelProps) {
             </div>
           </div>
           {debugEnabled && debugOpen && (
-            <div className="w-1/2 shrink-0 overflow-y-auto border-l border-border px-3 py-3">
+            <div className="w-1/2 min-w-0 shrink-0 overflow-y-auto overflow-x-hidden border-l border-border px-3 py-3">
               <ChatDebugPanel debug={debug} />
             </div>
           )}
@@ -391,7 +391,7 @@ export function ChatPanel({ panelId, sessionId, hideHeader }: ChatPanelProps) {
             </div>
           </div>
           {debugEnabled && debugOpen && (
-            <div className="w-1/2 shrink-0 overflow-y-auto border-l border-border px-3 py-3">
+            <div className="w-1/2 min-w-0 shrink-0 overflow-y-auto overflow-x-hidden border-l border-border px-3 py-3">
               <ChatDebugPanel debug={debug} />
             </div>
           )}

@@ -20,8 +20,8 @@ import type { AppPanelId } from '../../types/index.js';
 import { NodePanel } from './NodePanel';
 import { AppPanel } from './AppPanel';
 import { Breadcrumb } from './Breadcrumb';
-import { ChevronDown, Sparkles, X } from '../../lib/icons.js';
-import { getChatTitle, subscribeChatTitles } from '../../lib/ai-service.js';
+import { ChevronDown, MessageCircle, Pencil, X } from '../../lib/icons.js';
+import { getChatTitle, subscribeChatTitles, getAgentForSession, updateSessionTitle } from '../../lib/ai-service.js';
 import { DeskLanding } from './DeskLanding';
 
 const ChatPanel = lazy(async () => ({
@@ -95,10 +95,103 @@ function renderPanelHeader(
   );
 }
 
+// ── Chat title editing hook ──────────────────────────────────────
+
+function useChatTitleEdit(nodeId: string) {
+  const sessionId = chatPanelSessionId(nodeId);
+  const title = useSyncExternalStore(
+    subscribeChatTitles,
+    () => getChatTitle(sessionId),
+  );
+  const displayTitle = title || 'Chat';
+
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const startEdit = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    setDraft(displayTitle);
+    setEditing(true);
+    requestAnimationFrame(() => inputRef.current?.select());
+  }, [displayTitle]);
+
+  const saveEdit = useCallback(() => {
+    const trimmed = draft.trim();
+    if (trimmed && trimmed !== displayTitle) {
+      const agent = getAgentForSession(sessionId);
+      updateSessionTitle(agent, trimmed);
+    }
+    setEditing(false);
+  }, [draft, displayTitle, sessionId]);
+
+  const cancelEdit = useCallback(() => {
+    setEditing(false);
+  }, []);
+
+  return { editing, draft, setDraft, displayTitle, inputRef, startEdit, saveEdit, cancelEdit };
+}
+
+/** Inline input used when editing a chat title. */
+function ChatTitleInput({ edit }: { edit: ReturnType<typeof useChatTitleEdit> }) {
+  return (
+    <input
+      ref={edit.inputRef}
+      value={edit.draft}
+      onChange={(e) => edit.setDraft(e.target.value)}
+      onBlur={edit.saveEdit}
+      onClick={(e) => e.stopPropagation()}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') edit.saveEdit();
+        if (e.key === 'Escape') edit.cancelEdit();
+        e.stopPropagation();
+      }}
+      className="min-w-0 flex-1 bg-transparent text-[13px] text-foreground outline-none"
+      placeholder="Chat"
+    />
+  );
+}
+
+// ── Chat tab header (wide hasTab mode) ───────────────────────────
+//
+// Layout: [✦ title] [✏️] [×]
+// Title truncates when container is narrow. Pencil + close are shrink-0.
+
+function ChatTabHeader({ nodeId, onClose }: { nodeId: string; onClose: (e: React.MouseEvent) => void }) {
+  const edit = useChatTitleEdit(nodeId);
+
+  return (
+    <div className="group/panel flex items-center shrink-0 mt-1 h-8">
+      <div className="flex flex-1 min-w-0 items-center gap-1.5 pl-4 text-[13px] text-foreground-tertiary">
+        <MessageCircle size={12} strokeWidth={1.6} className="shrink-0" />
+        {edit.editing ? (
+          <ChatTitleInput edit={edit} />
+        ) : (
+          <span className="min-w-0 truncate">{edit.displayTitle}</span>
+        )}
+      </div>
+      {!edit.editing && (
+        <button
+          type="button"
+          onClick={edit.startEdit}
+          className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-foreground-tertiary opacity-0 transition-opacity hover:bg-foreground/8 hover:text-foreground group-hover/panel:opacity-100"
+          title="Edit title"
+        >
+          <Pencil size={10} strokeWidth={1.8} />
+        </button>
+      )}
+      <button type="button" className={PANEL_CLOSE_BTN} onClick={onClose} title="Close panel">
+        <X size={12} />
+      </button>
+    </div>
+  );
+}
+
 // ── Name-only tab (narrow / dropdown mode) ──────────────────────
 //
 // Shows panel name (+ sparkles for Chat) in a shaped tab.
 // Click body → toggle dropdown; `children` = dropdown menu.
+// For chat panels, a pencil edit icon appears adjacent to close on hover.
 
 interface TabHeadProps {
   nodeId: string;
@@ -115,28 +208,31 @@ function TabHead({ nodeId, onClickBody, onClose, menuOpen, tabRef, children }: T
   return (
     <div
       ref={tabRef}
-      className="tab-connector-right relative z-10 flex h-10 min-w-0 flex-1 items-center bg-background rounded-t-xl"
+      className="group/tab tab-connector-right relative z-10 flex h-10 min-w-0 flex-1 items-center bg-background rounded-t-xl"
     >
-      {/* Name area — interactive only when onClickBody is provided (dropdown trigger or panel activation) */}
-      <div
-        className={`group/name flex min-w-0 flex-1 ml-1 h-7 items-center rounded-md transition-colors ${onClickBody ? 'cursor-pointer hover:bg-foreground/4' : ''}`}
-        onClick={onClickBody}
-        role={menuOpen !== undefined ? 'button' : undefined}
-        aria-haspopup={menuOpen !== undefined ? 'menu' : undefined}
-        aria-expanded={menuOpen !== undefined ? menuOpen : undefined}
-      >
-        <span className="flex min-w-0 flex-1 items-center gap-1.5 px-2 text-[13px] text-foreground truncate">
-          {isChat && <Sparkles size={12} strokeWidth={1.6} className="shrink-0 text-foreground-tertiary" />}
-          <PanelLabel nodeId={nodeId} />
-        </span>
-        {menuOpen !== undefined && (
-          <ChevronDown
-            size={14}
-            strokeWidth={1.7}
-            className={`shrink-0 mr-1.5 text-foreground-tertiary transition-all ${menuOpen ? 'opacity-100 rotate-180' : 'opacity-0 group-hover/name:opacity-100'}`}
-          />
-        )}
-      </div>
+      {isChat ? (
+        <ChatTabHeadContent nodeId={nodeId} onClickBody={onClickBody} menuOpen={menuOpen} />
+      ) : (
+        /* Name area — interactive only when onClickBody is provided (dropdown trigger or panel activation) */
+        <div
+          className={`group/name flex min-w-0 flex-1 ml-1 h-7 items-center rounded-md transition-colors ${onClickBody ? 'cursor-pointer hover:bg-foreground/4' : ''}`}
+          onClick={onClickBody}
+          role={menuOpen !== undefined ? 'button' : undefined}
+          aria-haspopup={menuOpen !== undefined ? 'menu' : undefined}
+          aria-expanded={menuOpen !== undefined ? menuOpen : undefined}
+        >
+          <span className="flex min-w-0 flex-1 items-center gap-1.5 px-2 text-[13px] text-foreground truncate">
+            <PanelLabel nodeId={nodeId} />
+          </span>
+          {menuOpen !== undefined && (
+            <ChevronDown
+              size={14}
+              strokeWidth={1.7}
+              className={`shrink-0 mr-1.5 text-foreground-tertiary transition-all ${menuOpen ? 'opacity-100 rotate-180' : 'opacity-0 group-hover/name:opacity-100'}`}
+            />
+          )}
+        </div>
+      )}
       {/* Close button — independent hover + click */}
       {onClose && (
         <button
@@ -149,6 +245,84 @@ function TabHead({ nodeId, onClickBody, onClose, menuOpen, tabRef, children }: T
         </button>
       )}
       {children}
+    </div>
+  );
+}
+
+/** Chat-specific name area for narrow TabHead. No edit button here — editing is in the dropdown menu. */
+function ChatTabHeadContent({ nodeId, onClickBody, menuOpen }: { nodeId: string; onClickBody?: () => void; menuOpen?: boolean }) {
+  return (
+    <div
+      className={`group/name flex min-w-0 flex-1 ml-1 h-7 items-center rounded-md transition-colors ${onClickBody ? 'cursor-pointer hover:bg-foreground/4' : ''}`}
+      onClick={onClickBody}
+      role={menuOpen !== undefined ? 'button' : undefined}
+      aria-haspopup={menuOpen !== undefined ? 'menu' : undefined}
+      aria-expanded={menuOpen !== undefined ? menuOpen : undefined}
+    >
+      <span className="flex min-w-0 flex-1 items-center gap-1.5 px-2 text-[13px] text-foreground truncate">
+        <MessageCircle size={12} strokeWidth={1.6} className="shrink-0 text-foreground-tertiary" />
+        <PanelLabel nodeId={nodeId} />
+      </span>
+      {menuOpen !== undefined && (
+        <ChevronDown
+          size={14}
+          strokeWidth={1.7}
+          className={`shrink-0 mr-1.5 text-foreground-tertiary transition-all ${menuOpen ? 'opacity-100 rotate-180' : 'opacity-0 group-hover/name:opacity-100'}`}
+        />
+      )}
+    </div>
+  );
+}
+
+/** Dropdown menu row for a chat panel — includes inline title editing. */
+function ChatDropdownRow({
+  nodeId,
+  active,
+  onSelect,
+  onClose,
+}: {
+  nodeId: string;
+  active: boolean;
+  onSelect: () => void;
+  onClose: (e: React.MouseEvent) => void;
+}) {
+  const edit = useChatTitleEdit(nodeId);
+
+  return (
+    <div
+      className={`group/menu flex items-center gap-2 rounded-md px-2 py-1.5 text-[13px] text-foreground transition-colors hover:bg-foreground/4 ${
+        active ? '' : 'cursor-pointer'
+      }`}
+      onClick={onSelect}
+    >
+      <span className={`flex shrink-0 text-[10px] ${active ? 'text-primary' : 'text-foreground-tertiary'}`}>
+        <MessageCircle size={10} strokeWidth={1.6} />
+      </span>
+      <span className="min-w-0 flex-1 truncate">
+        {edit.editing ? (
+          <ChatTitleInput edit={edit} />
+        ) : (
+          <PanelLabel nodeId={nodeId} />
+        )}
+      </span>
+      {!edit.editing && (
+        <button
+          type="button"
+          onClick={edit.startEdit}
+          className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-foreground-tertiary opacity-0 transition-opacity hover:bg-foreground/8 hover:text-foreground group-hover/menu:opacity-100"
+          title="Edit title"
+        >
+          <Pencil size={10} strokeWidth={1.8} />
+        </button>
+      )}
+      <button
+        type="button"
+        className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-foreground-tertiary transition-colors hover:bg-foreground/8 hover:text-foreground"
+        onClick={onClose}
+        title="Close panel"
+      >
+        <X size={12} />
+      </button>
     </div>
   );
 }
@@ -230,6 +404,25 @@ export function PanelLayout({ toolbar }: PanelLayoutProps) {
               <div className="absolute left-0 right-0 top-full z-50 mt-1 min-w-[220px] rounded-lg bg-background p-1 shadow-paper">
                 {panels.map((panel) => {
                   const active = panel.id === activePanelId;
+
+                  if (isChatPanel(panel.nodeId)) {
+                    return (
+                      <ChatDropdownRow
+                        key={panel.id}
+                        nodeId={panel.nodeId}
+                        active={active}
+                        onSelect={() => {
+                          setActivePanel(panel.id);
+                          setNotesMenuOpen(false);
+                        }}
+                        onClose={(e) => {
+                          setNotesMenuOpen(false);
+                          handleClosePanel(e, panel.id);
+                        }}
+                      />
+                    );
+                  }
+
                   return (
                     <div
                       key={panel.id}
@@ -242,9 +435,7 @@ export function PanelLayout({ toolbar }: PanelLayoutProps) {
                       }}
                     >
                       <span className={`flex shrink-0 text-[10px] ${active ? 'text-primary' : 'text-foreground-tertiary'}`}>
-                        {isChatPanel(panel.nodeId)
-                          ? <Sparkles size={10} strokeWidth={1.6} />
-                          : '●'}
+                        ●
                       </span>
                       <span className="min-w-0 flex-1 truncate">
                         <PanelLabel nodeId={panel.nodeId} />
@@ -304,15 +495,7 @@ export function PanelLayout({ toolbar }: PanelLayoutProps) {
                   onClick={() => setActivePanel(panel.id)}
                 >
                   {isChat ? (
-                    <div className="flex items-center shrink-0 mt-1">
-                      <div className="flex flex-1 min-w-0 items-center gap-1.5 pl-4 pr-3 h-8 text-[13px] text-foreground-tertiary">
-                        <Sparkles size={12} strokeWidth={1.6} className="shrink-0" />
-                        <PanelLabel nodeId={nodeId} />
-                      </div>
-                      <button type="button" className={PANEL_CLOSE_BTN} onClick={headerOpts.onClose} title="Close panel">
-                        <X size={12} />
-                      </button>
-                    </div>
+                    <ChatTabHeader nodeId={nodeId} onClose={headerOpts.onClose} />
                   ) : (
                     renderPanelHeader(nodeId, headerOpts)
                   )}

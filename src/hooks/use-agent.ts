@@ -19,6 +19,7 @@ import {
   stopStreaming,
   streamChat,
   switchMessageBranch,
+  updateSessionTitle,
 } from '../lib/ai-service.js';
 
 export type ChatConversationMessage = UserMessage | AssistantMessage;
@@ -175,6 +176,10 @@ export function useAgent(agent: Agent = getAIAgent(), sessionId?: string) {
         startTransition(() => setRevision((v) => v + 1));
       },
       hasSteering: hasSteering(agent),
+      updateTitle: (title: string) => {
+        updateSessionTitle(agent, title);
+        startTransition(() => setRevision((v) => v + 1));
+      },
       newChat: async () => {
         await createNewChatSession(agent);
         startTransition(() => {

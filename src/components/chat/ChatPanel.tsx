@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { Pencil, Sparkles, Trash2, X } from '../../lib/icons.js';
 import { useAgent } from '../../hooks/use-agent.js';
@@ -49,6 +49,7 @@ export function ChatPanel({ panelId, sessionId, hideHeader }: ChatPanelProps) {
     error,
     ready,
     debug,
+    sessionTitle,
     sendMessage,
     editMessage,
     regenerateMessage,
@@ -56,6 +57,7 @@ export function ChatPanel({ panelId, sessionId, hideHeader }: ChatPanelProps) {
     stopStreaming,
     setSteeringNote,
     hasSteering,
+    updateTitle,
   } = useAgent(getAgentForSession(sessionId), sessionId);
   const settingsVersion = useNodeStore((s) => s._version);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -69,6 +71,9 @@ export function ChatPanel({ panelId, sessionId, hideHeader }: ChatPanelProps) {
   const [selectedModelKey, setSelectedModelKey] = useState<{ id: string; provider: string } | null>(null);
   const [pendingMessageActionId, setPendingMessageActionId] = useState<string | null>(null);
   const [steeringNote, setLocalSteeringNote] = useState<string | null>(null);
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [titleDraft, setTitleDraft] = useState('');
+  const titleInputRef = useRef<HTMLInputElement>(null);
   const chatBusy = isStreaming || pendingMessageActionId !== null;
   const debugActionLabel = !debugEnabled
     ? 'Enable AI Debug'
@@ -241,6 +246,24 @@ export function ChatPanel({ panelId, sessionId, hideHeader }: ChatPanelProps) {
     }, 1200);
   }
 
+  const handleStartEditTitle = useCallback(() => {
+    setTitleDraft(sessionTitle || '');
+    setEditingTitle(true);
+    requestAnimationFrame(() => titleInputRef.current?.select());
+  }, [sessionTitle]);
+
+  const handleSaveTitle = useCallback(() => {
+    const trimmed = titleDraft.trim();
+    if (trimmed && trimmed !== sessionTitle) {
+      updateTitle(trimmed);
+    }
+    setEditingTitle(false);
+  }, [titleDraft, sessionTitle, updateTitle]);
+
+  const handleCancelEditTitle = useCallback(() => {
+    setEditingTitle(false);
+  }, []);
+
   function handleOpenSettings() {
     useUIStore.getState().openPanel(SYSTEM_NODE_IDS.SETTINGS);
   }
@@ -286,14 +309,37 @@ export function ChatPanel({ panelId, sessionId, hideHeader }: ChatPanelProps) {
     <div className="flex flex-1 flex-col overflow-hidden bg-background">
       <div className={`flex items-center px-3 ${hideHeader ? 'h-8 justify-end' : 'h-12 justify-between border-b border-border'}`}>
         {!hideHeader && (
-          <button
-            type="button"
-            onClick={handleHeaderTitleClick}
-            className="flex items-center gap-2 text-sm font-medium text-foreground"
-          >
-            <Sparkles size={14} strokeWidth={1.75} className="text-foreground-tertiary" />
-            Chat
-          </button>
+          <div className="flex min-w-0 flex-1 items-center gap-2">
+            <button
+              type="button"
+              onClick={handleHeaderTitleClick}
+              className="flex shrink-0 items-center text-foreground-tertiary"
+            >
+              <Sparkles size={14} strokeWidth={1.75} />
+            </button>
+            {editingTitle ? (
+              <input
+                ref={titleInputRef}
+                value={titleDraft}
+                onChange={(e) => setTitleDraft(e.target.value)}
+                onBlur={handleSaveTitle}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleSaveTitle();
+                  if (e.key === 'Escape') handleCancelEditTitle();
+                }}
+                className="min-w-0 flex-1 bg-transparent text-sm font-medium text-foreground outline-none"
+                placeholder="Chat"
+              />
+            ) : (
+              <button
+                type="button"
+                onClick={handleStartEditTitle}
+                className="min-w-0 truncate text-sm font-medium text-foreground hover:text-foreground/80"
+              >
+                {sessionTitle || 'Chat'}
+              </button>
+            )}
+          </div>
         )}
         <div className="flex items-center gap-1">
           {debugEnabled && (

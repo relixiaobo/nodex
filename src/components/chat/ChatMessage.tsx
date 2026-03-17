@@ -269,28 +269,30 @@ export function ChatMessage({
         )}
         {isUser ? (
           isEditing ? (
-            <div className="w-full min-w-[220px] rounded-lg border border-border bg-background px-3 py-2">
-              <textarea
-                ref={textareaRef}
-                rows={1}
-                value={editText}
-                onChange={(event) => setEditText(event.target.value)}
-                className="min-h-10 w-full resize-none bg-transparent text-base leading-6 text-foreground outline-none placeholder:text-foreground-tertiary"
-                onKeyDown={(event) => {
-                  if (event.key === 'Escape') {
-                    event.preventDefault();
-                    setEditText(text);
-                    setIsEditing(false);
-                    return;
-                  }
+            <div className="w-full min-w-[220px]">
+              <div className="rounded-xl border border-border-emphasis bg-background px-3 py-2">
+                <textarea
+                  ref={textareaRef}
+                  rows={1}
+                  value={editText}
+                  onChange={(event) => setEditText(event.target.value)}
+                  className="min-h-10 w-full resize-none bg-transparent text-base leading-6 text-foreground outline-none placeholder:text-foreground-tertiary"
+                  onKeyDown={(event) => {
+                    if (event.key === 'Escape') {
+                      event.preventDefault();
+                      setEditText(text);
+                      setIsEditing(false);
+                      return;
+                    }
 
-                  if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
-                    event.preventDefault();
-                    void handleSubmitEdit();
-                  }
-                }}
-              />
-              <div className="mt-3 flex items-center justify-end gap-2">
+                    if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
+                      event.preventDefault();
+                      void handleSubmitEdit();
+                    }
+                  }}
+                />
+              </div>
+              <div className="mt-2 flex items-center justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => {
@@ -307,7 +309,7 @@ export function ChatMessage({
                   disabled={busy || editText.trim().length === 0}
                   className="inline-flex h-8 items-center rounded-full bg-foreground px-3 text-sm font-medium text-background transition-colors hover:bg-foreground/90 disabled:cursor-not-allowed disabled:bg-foreground/20"
                 >
-                  Save &amp; Submit
+                  Save
                 </button>
               </div>
             </div>

@@ -354,10 +354,10 @@ export function PanelLayout({ toolbar }: PanelLayoutProps) {
     );
   }
 
-  const dropdownMode = panels.length > 1 && containerWidth / panels.length < MIN_PANEL_WIDTH;
+  const narrowMode = containerWidth / panels.length < MIN_PANEL_WIDTH;
 
-  // ── Narrow mode: name tab + dropdown panel switcher ──
-  if (dropdownMode) {
+  // ── Narrow mode: name-only tab (+ dropdown panel switcher when multi-panel) ──
+  if (narrowMode) {
     const activePanel = panels.find((p) => p.id === activePanelId) ?? panels[0];
     const nodeId = activePanel.nodeId;
     const isApp = isAppPanel(nodeId);
@@ -369,11 +369,11 @@ export function PanelLayout({ toolbar }: PanelLayoutProps) {
           <TabHead
             nodeId={nodeId}
             onClose={(e) => handleClosePanel(e, activePanel.id)}
-            onClickBody={() => setNotesMenuOpen((open) => !open)}
-            menuOpen={notesMenuOpen}
-            tabRef={notesMenuRef}
+            onClickBody={panels.length > 1 ? () => setNotesMenuOpen((open) => !open) : undefined}
+            menuOpen={panels.length > 1 ? notesMenuOpen : undefined}
+            tabRef={panels.length > 1 ? notesMenuRef : undefined}
           >
-            {notesMenuOpen && (
+            {panels.length > 1 && notesMenuOpen && (
               <div className="absolute left-0 right-0 top-full z-50 mt-1 min-w-[220px] rounded-lg bg-background p-1 shadow-paper">
                 {panels.map((panel) => {
                   const active = panel.id === activePanelId;

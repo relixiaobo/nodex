@@ -158,6 +158,7 @@ export {
 export {
   Info,
   ExternalLink,
+  MessageCircle,
   MessageSquare,
   Globe,
 } from 'lucide-react';

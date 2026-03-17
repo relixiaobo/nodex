@@ -82,6 +82,17 @@ function isWebUrl(url: string): boolean {
   return url.startsWith('http://') || url.startsWith('https://');
 }
 
+function toOriginPath(url: string): string {
+  try {
+    const u = new URL(url);
+    const host = u.hostname.replace(/^www\./, '');
+    const path = u.pathname === '/' ? '' : u.pathname;
+    return host + path;
+  } catch {
+    return url;
+  }
+}
+
 async function getPageContext(): Promise<string | null> {
   if (typeof chrome === 'undefined' || !chrome.tabs?.query) return null;
 
@@ -95,7 +106,7 @@ async function getPageContext(): Promise<string | null> {
 
     const lines = webTabs.map((tab) => {
       const prefix = tab.active ? '[active, ' : '[';
-      return `* ${prefix}id:${tab.id}] "${escapeXml(tab.title!)}" — ${escapeXml(tab.url!)}`;
+      return `* ${prefix}id:${tab.id}] "${escapeXml(tab.title!)}" — ${escapeXml(toOriginPath(tab.url!))}`;
     });
 
     return [

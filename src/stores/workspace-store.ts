@@ -164,10 +164,15 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
       signOut: async () => {
         const wsId = useWorkspaceStore.getState().currentWorkspaceId;
         syncManager.stop();
-        // Clear pending updates to avoid leaking stale data on re-sign-in
+        // Clear all local user data to avoid leaking stale data
         if (wsId) {
           const { clearPendingUpdates } = await import('../lib/sync/pending-queue.js');
-          await clearPendingUpdates(wsId).catch(() => {});
+          const { deleteSnapshot, deleteSyncCursor } = await import('../lib/loro-persistence.js');
+          await Promise.all([
+            clearPendingUpdates(wsId),
+            deleteSnapshot(wsId),
+            deleteSyncCursor(wsId),
+          ]).catch(() => {});
         }
         const { signOut: authSignOut } = await import('../lib/auth.js');
         await authSignOut();

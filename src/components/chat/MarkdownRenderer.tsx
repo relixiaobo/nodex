@@ -1,6 +1,8 @@
 import {
   Children,
+  cloneElement,
   type ComponentPropsWithoutRef,
+  isValidElement,
   type ReactNode,
   memo,
   useCallback,
@@ -62,34 +64,42 @@ function injectPlaceholders(
   if (placeholders.length === 0) return children;
 
   return Children.map(children, (child) => {
-    if (typeof child !== 'string') return child;
+    // String child — scan for %%SOMA_N%% and replace with components
+    if (typeof child === 'string') {
+      const parts: ReactNode[] = [];
+      let cursor = 0;
+      let partIndex = 0;
+      PLACEHOLDER_RE.lastIndex = 0;
+      let match = PLACEHOLDER_RE.exec(child);
+      while (match) {
+        const idx = Number(match[1]);
+        const ph = placeholders[idx];
+        if (match.index > cursor) {
+          parts.push(child.slice(cursor, match.index));
+        }
+        if (ph) {
+          parts.push(
+            ph.kind === 'ref'
+              ? <NodeReference key={`${keyPrefix}-ref-${partIndex}`} nodeId={ph.nodeId}>{ph.content}</NodeReference>
+              : <CitationBadge key={`${keyPrefix}-cite-${partIndex}`} nodeId={ph.nodeId} label={ph.content} />,
+          );
+        }
+        cursor = match.index + match[0].length;
+        partIndex += 1;
+        match = PLACEHOLDER_RE.exec(child);
+      }
+      if (cursor < child.length) {
+        parts.push(child.slice(cursor));
+      }
+      return parts.length === 1 ? parts[0] : <>{parts}</>;
+    }
 
-    const parts: ReactNode[] = [];
-    let cursor = 0;
-    let partIndex = 0;
-    PLACEHOLDER_RE.lastIndex = 0;
-    let match = PLACEHOLDER_RE.exec(child);
-    while (match) {
-      const idx = Number(match[1]);
-      const ph = placeholders[idx];
-      if (match.index > cursor) {
-        parts.push(child.slice(cursor, match.index));
-      }
-      if (ph) {
-        parts.push(
-          ph.kind === 'ref'
-            ? <NodeReference key={`${keyPrefix}-ref-${partIndex}`} nodeId={ph.nodeId}>{ph.content}</NodeReference>
-            : <CitationBadge key={`${keyPrefix}-cite-${partIndex}`} nodeId={ph.nodeId} label={ph.content} />,
-        );
-      }
-      cursor = match.index + match[0].length;
-      partIndex += 1;
-      match = PLACEHOLDER_RE.exec(child);
+    // React element (e.g. <strong>, <em>) — recurse into its children
+    if (isValidElement<{ children?: ReactNode }>(child) && child.props.children != null) {
+      return cloneElement(child, {}, injectPlaceholders(child.props.children, placeholders, keyPrefix));
     }
-    if (cursor < child.length) {
-      parts.push(child.slice(cursor));
-    }
-    return parts.length === 1 ? parts[0] : <>{parts}</>;
+
+    return child;
   });
 }
 

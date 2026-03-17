@@ -11,9 +11,11 @@ import {
   getCurrentSession,
   getAIAgent,
   getThinkingLevel,
+  hasSteering,
   regenerateResponse,
   restoreChatSessionById,
   restoreLatestChatSession,
+  setSteeringNote,
   stopStreaming,
   streamChat,
   switchMessageBranch,
@@ -168,6 +170,11 @@ export function useAgent(agent: Agent = getAIAgent(), sessionId?: string) {
         });
       },
       stopStreaming: () => stopStreaming(agent),
+      setSteeringNote: (text: string | null) => {
+        setSteeringNote(text, agent);
+        startTransition(() => setRevision((v) => v + 1));
+      },
+      hasSteering: hasSteering(agent),
       newChat: async () => {
         await createNewChatSession(agent);
         startTransition(() => {

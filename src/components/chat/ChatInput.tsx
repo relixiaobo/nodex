@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import type { ThinkingLevel } from '@mariozechner/pi-ai';
 import { ArrowUp, Brain, Check, ChevronDown, Code2, Plus, Settings, Square } from '../../lib/icons.js';
 
@@ -8,6 +8,10 @@ export interface ChatInputModel {
   provider: string;
   reasoning: boolean;
   featured: boolean;
+}
+
+export interface ChatInputHandle {
+  setDraft(text: string): void;
 }
 
 interface ChatInputProps {
@@ -21,6 +25,7 @@ interface ChatInputProps {
   debugOpen?: boolean;
   onSend(prompt: string): Promise<void>;
   onStop(): void;
+  onSteer?(text: string): void;
   onOpenSettings?(): void;
   onToggleDebug?(): void;
   onModelChange?(modelId: string, provider: string): void;
@@ -91,7 +96,7 @@ function ThinkingLevelPicker({ level, onChange }: { level: ThinkingLevel; onChan
   );
 }
 
-export function ChatInput({
+export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function ChatInput({
   disabled,
   busy = false,
   error,
@@ -102,20 +107,25 @@ export function ChatInput({
   debugOpen = false,
   onSend,
   onStop,
+  onSteer,
   onOpenSettings,
   onToggleDebug,
   onModelChange,
   onThinkingChange,
-}: ChatInputProps) {
+}, ref) {
   const [draft, setDraft] = useState('');
+
+  useImperativeHandle(ref, () => ({ setDraft }), []);
   const [menuOpen, setMenuOpen] = useState(false);
   const [modelMenuOpen, setModelMenuOpen] = useState(false);
   const [moreModelsOpen, setMoreModelsOpen] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const modelMenuRef = useRef<HTMLDivElement>(null);
-  const inputDisabled = disabled || busy;
+  const canSteer = disabled && !!onSteer;
+  const inputDisabled = (disabled || busy) && !canSteer;
   const canSend = !inputDisabled && draft.trim().length > 0;
+  const hasSteeringDraft = canSteer && draft.trim().length > 0;
   const canSelectModel = !!onModelChange && (availableModels?.length ?? 0) > 0;
   const debugMenuLabel = !debugEnabled
     ? 'Enable AI Debug'
@@ -180,7 +190,15 @@ export function ChatInput({
 
   async function handleSend() {
     const normalized = draft.trim();
-    if (!normalized || inputDisabled) return;
+    if (!normalized) return;
+
+    if (canSteer) {
+      setDraft('');
+      onSteer!(normalized);
+      return;
+    }
+
+    if (inputDisabled) return;
     setDraft('');
     await onSend(normalized);
   }
@@ -221,7 +239,7 @@ export function ChatInput({
             value={draft}
             disabled={inputDisabled}
             rows={1}
-            placeholder={disabled ? 'Responding…' : busy ? 'Working…' : 'Ask about your notes…'}
+            placeholder={canSteer ? 'Steer the conversation…' : disabled ? 'Responding…' : busy ? 'Working…' : 'Ask about your notes…'}
             className="w-full resize-none bg-transparent text-base leading-6 text-foreground outline-none placeholder:text-foreground-tertiary disabled:cursor-not-allowed disabled:opacity-60"
             onChange={(event) => setDraft(event.target.value)}
             onKeyDown={(event) => {
@@ -362,7 +380,7 @@ export function ChatInput({
                 )}
               </div>
             )}
-            {disabled ? (
+            {disabled && !hasSteeringDraft ? (
               <button
                 type="button"
                 onClick={onStop}
@@ -391,4 +409,4 @@ export function ChatInput({
       </div>
     </div>
   );
-}
+});

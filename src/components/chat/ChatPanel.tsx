@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { Sparkles, X } from '../../lib/icons.js';
+import { Pencil, Sparkles, Trash2, X } from '../../lib/icons.js';
 import { useAgent } from '../../hooks/use-agent.js';
 import type { ThinkingLevel } from '@mariozechner/pi-ai';
 import { readChatDebugEnabled, writeChatDebugEnabled } from '../../lib/ai-debug.js';
@@ -10,7 +10,7 @@ import { useNodeStore } from '../../stores/node-store.js';
 import { useUIStore } from '../../stores/ui-store.js';
 import { SYSTEM_NODE_IDS } from '../../types/index.js';
 import { ChatDebugPanel } from './ChatDebugPanel.js';
-import { ChatInput } from './ChatInput.js';
+import { ChatInput, type ChatInputHandle } from './ChatInput.js';
 import { ChatMessage } from './ChatMessage.js';
 
 const AUTO_SCROLL_THRESHOLD = 48;
@@ -54,9 +54,12 @@ export function ChatPanel({ panelId, sessionId, hideHeader }: ChatPanelProps) {
     regenerateMessage,
     switchBranch,
     stopStreaming,
+    setSteeringNote,
+    hasSteering,
   } = useAgent(getAgentForSession(sessionId), sessionId);
   const settingsVersion = useNodeStore((s) => s._version);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const chatInputRef = useRef<ChatInputHandle>(null);
   const shouldStickToBottomRef = useRef(true);
   const debugTapResetRef = useRef<number | null>(null);
   const debugTapCountRef = useRef(0);
@@ -65,6 +68,7 @@ export function ChatPanel({ panelId, sessionId, hideHeader }: ChatPanelProps) {
   const [thinkingLevel, setThinkingLevel] = useState<ThinkingLevel | null>(debug.thinkingLevel);
   const [selectedModelKey, setSelectedModelKey] = useState<{ id: string; provider: string } | null>(null);
   const [pendingMessageActionId, setPendingMessageActionId] = useState<string | null>(null);
+  const [steeringNote, setLocalSteeringNote] = useState<string | null>(null);
   const chatBusy = isStreaming || pendingMessageActionId !== null;
   const debugActionLabel = !debugEnabled
     ? 'Enable AI Debug'
@@ -126,6 +130,14 @@ export function ChatPanel({ panelId, sessionId, hideHeader }: ChatPanelProps) {
     setDebugOpen(false);
   }, [debugEnabled]);
 
+  const hadSteeringRef = useRef(false);
+  useEffect(() => {
+    if (hadSteeringRef.current && !hasSteering) {
+      setLocalSteeringNote(null);
+    }
+    hadSteeringRef.current = hasSteering;
+  }, [hasSteering]);
+
   useEffect(() => {
     if (!hasAvailableModels) return;
     const scroller = scrollRef.current;
@@ -136,7 +148,7 @@ export function ChatPanel({ panelId, sessionId, hideHeader }: ChatPanelProps) {
       scroller.scrollTop = scroller.scrollHeight;
       shouldStickToBottomRef.current = true;
     });
-  }, [messages, isStreaming, hasAvailableModels]);
+  }, [messages, isStreaming, hasAvailableModels, steeringNote]);
 
   useEffect(() => {
     if (!isActive || !pendingChatPrompt || pendingChatPrompt.panelId !== panelId) return;
@@ -153,6 +165,24 @@ export function ChatPanel({ panelId, sessionId, hideHeader }: ChatPanelProps) {
     ready,
     setPendingChatPrompt,
   ]);
+
+  function handleSteerMessage(text: string) {
+    const combined = steeringNote ? `${steeringNote}\n${text}` : text;
+    setLocalSteeringNote(combined);
+    setSteeringNote(combined);
+  }
+
+  function handleClearSteering() {
+    setLocalSteeringNote(null);
+    setSteeringNote(null);
+  }
+
+  function handleEditSteerNote() {
+    if (steeringNote) {
+      chatInputRef.current?.setDraft(steeringNote);
+    }
+    handleClearSteering();
+  }
 
   async function handleSendMessage(prompt: string) {
     if (pendingMessageActionId) return;
@@ -378,7 +408,38 @@ export function ChatPanel({ panelId, sessionId, hideHeader }: ChatPanelProps) {
                 ))
               )}
             </div>
-            <ChatInput
+            <div className="relative">
+              {steeringNote && (
+                <div className="pointer-events-none absolute inset-x-0 bottom-full px-4 pb-2">
+                  <div className="group/steer flex justify-end">
+                    <div className="pointer-events-auto flex max-w-[88%] flex-col gap-1 items-end">
+                      <div className="flex items-center gap-0.5 justify-end opacity-0 transition-opacity group-hover/steer:opacity-100">
+                        <button
+                          type="button"
+                          onClick={handleEditSteerNote}
+                          className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-foreground-tertiary transition-colors hover:bg-foreground/4 hover:text-foreground"
+                          aria-label="Edit queued message"
+                        >
+                          <Pencil size={14} strokeWidth={1.8} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleClearSteering}
+                          className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-foreground-tertiary transition-colors hover:bg-foreground/4 hover:text-foreground"
+                          aria-label="Cancel queued message"
+                        >
+                          <Trash2 size={14} strokeWidth={1.8} />
+                        </button>
+                      </div>
+                      <div className="steer-note-pending whitespace-pre-wrap rounded-lg bg-background px-3 py-2 text-base leading-6 text-foreground">
+                        {steeringNote}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+              <ChatInput
+                ref={chatInputRef}
               disabled={isStreaming}
               busy={pendingMessageActionId !== null}
               error={error}
@@ -389,11 +450,13 @@ export function ChatPanel({ panelId, sessionId, hideHeader }: ChatPanelProps) {
               debugOpen={debugOpen}
               onSend={handleSendMessage}
               onStop={stopStreaming}
+              onSteer={handleSteerMessage}
               onOpenSettings={handleOpenSettings}
               onToggleDebug={handleToggleDebug}
               onModelChange={handleModelChange}
               onThinkingChange={handleThinkingChange}
             />
+            </div>
           </div>
           {debugEnabled && debugOpen && (
             <div className="w-1/2 shrink-0 overflow-y-auto border-l border-border px-3 py-3">

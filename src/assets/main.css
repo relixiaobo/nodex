@@ -89,6 +89,18 @@
     0 2px 6px -2px rgba(0, 0, 0, 0.05);
 }
 
+/* Steering note — dashed border + breathing background conveying "queued, waiting".
+   The fill color gently pulses between secondary-muted and near-transparent,
+   like the node-selected-ref pattern but with slow temporal variation. */
+.steer-note-pending {
+  border: 1px dashed rgba(0, 0, 0, 0.15);
+  animation: steer-breathe 2.5s ease-in-out infinite;
+}
+@keyframes steer-breathe {
+  0%, 100% { background-color: rgba(225, 161, 94, 0.12); }
+  50% { background-color: rgba(225, 161, 94, 0.04); }
+}
+
 /* Concave corners at the active tab's bottom edges.
    Creates smooth inner curves connecting the tab to the desk area,
    mimicking the Chrome tab bar connector.
@@ -618,27 +630,20 @@
   padding: 0.125rem 0.25rem;
 }
 
-/* Code block container — max-height with internal scroll.
-   overflow-x on <pre> (horizontal code scroll), overflow-y here (vertical). */
+/* Code block container */
 .chat-code-block {
   border: 1px solid var(--color-border);
   border-radius: 0.5rem;
-  overflow: hidden auto;
-  max-height: 400px;
+  overflow: hidden;
   background: var(--color-muted);
 }
 
-/* Sticky header: stays visible when scrolling long code blocks */
 .chat-code-header {
-  position: sticky;
-  top: 0;
-  z-index: 1;
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 4px 8px 4px 12px;
   border-bottom: 1px solid var(--color-border-subtle);
-  background: var(--color-muted);
 }
 
 .chat-code-lang {

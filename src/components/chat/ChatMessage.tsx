@@ -262,11 +262,6 @@ export function ChatMessage({
   return (
     <div className={`${isUser ? 'group/message' : ''} flex w-full ${isUser ? 'justify-end' : 'justify-start'} ${grouped ? 'mt-1' : 'mt-4 first:mt-0'}`}>
       <div className={`flex max-w-[88%] flex-col gap-1 ${isUser ? 'items-end' : 'items-start'}`}>
-        {!grouped && (
-          <span className="text-xs text-foreground-tertiary">
-            {isUser ? 'You' : 'soma'}
-          </span>
-        )}
         {isUser ? (
           isEditing ? (
             <div className="w-full min-w-[220px]">
@@ -314,7 +309,7 @@ export function ChatMessage({
               </div>
             </div>
           ) : (
-            <div className="whitespace-pre-wrap rounded-lg bg-foreground/4 px-3 py-2 text-base leading-6 text-foreground">
+            <div className="whitespace-pre-wrap rounded-lg bg-secondary-muted px-3 py-2 text-base leading-6 text-foreground">
               {text}
             </div>
           )

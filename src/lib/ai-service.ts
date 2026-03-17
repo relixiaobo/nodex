@@ -601,6 +601,7 @@ export function createAgent(model: Model<any> = DEFAULT_CHAT_MODEL): Agent {
     initialState: {
       model,
     },
+    steeringMode: 'all',
     getApiKey: async (provider) => {
       if (!hasNodeBackedAISettings()) {
         const apiKey = (await readSettings())?.apiKey;
@@ -857,6 +858,24 @@ export function switchMessageBranch(nodeId: string, agent: Agent = getAIAgent())
 
 export function stopStreaming(agent: Agent = getAIAgent()): void {
   agent.abort();
+}
+
+export function setSteeringNote(text: string | null, agent: Agent = getAIAgent()): void {
+  agent.clearSteeringQueue();
+  if (text) {
+    const normalized = text.trim();
+    if (normalized) {
+      agent.steer({
+        role: 'user',
+        content: normalized,
+        timestamp: Date.now(),
+      });
+    }
+  }
+}
+
+export function hasSteering(agent: Agent = getAIAgent()): boolean {
+  return agent.hasQueuedMessages();
 }
 
 export function resetAIAgentForTests(): void {

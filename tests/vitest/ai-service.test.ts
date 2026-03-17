@@ -1090,6 +1090,45 @@ describe('ai-service', () => {
     expect(getCurrentSession(agent)?.title).toBe('first question');
   });
 
+  it('setSteeringNote replaces the steering queue with a single combined message', async () => {
+    const { setSteeringNote, hasSteering } = await import('../../src/lib/ai-service.js');
+
+    const steerMock = vi.fn();
+    const clearSteeringQueueMock = vi.fn();
+    const hasQueuedMessagesMock = vi.fn(() => true);
+
+    const agent = {
+      steer: steerMock,
+      clearSteeringQueue: clearSteeringQueueMock,
+      hasQueuedMessages: hasQueuedMessagesMock,
+    } as unknown as import('@mariozechner/pi-agent-core').Agent;
+
+    setSteeringNote('  course correct  ', agent);
+    expect(clearSteeringQueueMock).toHaveBeenCalledTimes(1);
+    expect(steerMock).toHaveBeenCalledTimes(1);
+    expect(steerMock).toHaveBeenCalledWith({
+      role: 'user',
+      content: 'course correct',
+      timestamp: expect.any(Number),
+    });
+
+    // Null clears without re-queuing
+    steerMock.mockClear();
+    clearSteeringQueueMock.mockClear();
+    setSteeringNote(null, agent);
+    expect(clearSteeringQueueMock).toHaveBeenCalledTimes(1);
+    expect(steerMock).not.toHaveBeenCalled();
+
+    // Empty string also clears
+    steerMock.mockClear();
+    clearSteeringQueueMock.mockClear();
+    setSteeringNote('   ', agent);
+    expect(clearSteeringQueueMock).toHaveBeenCalledTimes(1);
+    expect(steerMock).not.toHaveBeenCalled();
+
+    expect(hasSteering(agent)).toBe(true);
+  });
+
   it('migrates legacy chrome storage AI settings into provider config nodes', async () => {
     storage['soma-ai-settings'] = {
       provider: 'anthropic',

@@ -170,19 +170,21 @@ function ChatTabHeader({ nodeId, onClose }: { nodeId: string; onClose: (e: React
           <span className="min-w-0 truncate">{edit.displayTitle}</span>
         )}
       </div>
-      {!edit.editing && (
-        <button
-          type="button"
-          onClick={edit.startEdit}
-          className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-foreground-tertiary opacity-0 transition-opacity hover:bg-foreground/8 hover:text-foreground group-hover/panel:opacity-100"
-          title="Edit title"
-        >
-          <Pencil size={10} strokeWidth={1.8} />
+      <div className="flex shrink-0 items-center mr-2.5">
+        {!edit.editing && (
+          <button
+            type="button"
+            onClick={edit.startEdit}
+            className="flex h-5 w-5 items-center justify-center rounded-md text-foreground-tertiary opacity-0 transition-opacity hover:bg-foreground/8 hover:text-foreground group-hover/panel:opacity-100"
+            title="Edit title"
+          >
+            <Pencil size={10} strokeWidth={1.8} />
+          </button>
+        )}
+        <button type="button" onClick={onClose} title="Close panel" className="flex h-5 w-5 items-center justify-center rounded-md text-foreground-tertiary opacity-0 transition-opacity hover:bg-foreground/8 hover:text-foreground group-hover/panel:opacity-100">
+          <X size={12} />
         </button>
-      )}
-      <button type="button" className={PANEL_CLOSE_BTN} onClick={onClose} title="Close panel">
-        <X size={12} />
-      </button>
+      </div>
     </div>
   );
 }
@@ -259,9 +261,9 @@ function ChatTabHeadContent({ nodeId, onClickBody, menuOpen }: { nodeId: string;
       aria-haspopup={menuOpen !== undefined ? 'menu' : undefined}
       aria-expanded={menuOpen !== undefined ? menuOpen : undefined}
     >
-      <span className="flex min-w-0 flex-1 items-center gap-1.5 px-2 text-[13px] text-foreground truncate">
+      <span className="flex min-w-0 flex-1 items-center gap-1.5 px-2 text-[13px] text-foreground">
         <MessageCircle size={12} strokeWidth={1.6} className="shrink-0 text-foreground-tertiary" />
-        <PanelLabel nodeId={nodeId} />
+        <span className="min-w-0 truncate"><PanelLabel nodeId={nodeId} /></span>
       </span>
       {menuOpen !== undefined && (
         <ChevronDown

@@ -47,15 +47,15 @@ function createSnapshot(): AgentDebugSnapshot {
         usage: {
           input: 120,
           output: 24,
-          cacheRead: 0,
+          cacheRead: 89,
           cacheWrite: 0,
           totalTokens: 144,
           cost: {
             input: 0.001,
             output: 0.002,
-            cacheRead: 0,
+            cacheRead: 0.0012,
             cacheWrite: 0,
-            total: 0.003,
+            total: 0.0042,
           },
         },
         stopReason: 'toolUse',
@@ -124,52 +124,7 @@ function createDebugState(): AgentDebugState {
     provider: 'anthropic',
     reasoning: false,
     thinkingLevel: null,
-    turns: [
-      {
-        id: 'turn_1',
-        startedAt: 1000,
-        finishedAt: 2200,
-        durationMs: 1200,
-        modelId: 'claude-sonnet-4-5',
-        provider: 'anthropic',
-        status: 'completed',
-        requestSummary: 'Find Tana notes',
-        responseSummary: 'Searching workspace',
-        request: {
-          json: '{\n  "temperature": 0.2\n}',
-          messageCount: 3,
-          toolCount: 1,
-          tokenEstimate: {
-            systemPrompt: 80,
-            messages: 40,
-            tools: 20,
-            total: 140,
-            contextWindow: 200000,
-            usagePercent: 0.07,
-          },
-        },
-        response: {
-          json: '{\n  "stopReason": "toolUse"\n}',
-          stopReason: 'toolUse',
-          usage: {
-            input: 120,
-            output: 24,
-            cacheRead: 0,
-            cacheWrite: 0,
-            totalTokens: 144,
-            cost: {
-              input: 0.001,
-              output: 0.002,
-              cacheRead: 0,
-              cacheWrite: 0,
-              total: 0.003,
-            },
-          },
-          toolResultCount: 1,
-          errorMessage: null,
-        },
-      },
-    ],
+    turns: [],
   };
 }
 
@@ -201,7 +156,7 @@ describe('ChatDebugPanel', () => {
     vi.clearAllMocks();
   });
 
-  it('renders a conversation-log-first layout and removes the old debug sections', () => {
+  it('renders a conversation-log-first layout with tools entry and no turn/tools sections', () => {
     const html = renderToStaticMarkup(
       React.createElement(ChatDebugPanel, { debug: createDebugState() }),
     );
@@ -209,14 +164,15 @@ describe('ChatDebugPanel', () => {
     expect(html).toContain('Chat Debug');
     expect(html).toContain('Context');
     expect(html).toContain('SYSTEM');
+    expect(html).toContain('TOOLS');
     expect(html).toContain('USER');
     expect(html).toContain('ASST');
     expect(html).toContain('TOOL');
     expect(html).toContain('node_search({query: &quot;Tana&quot;})');
     expect(html).toContain('0 results');
-    expect(html).toContain('Turn 1');
-    expect(html).toContain('Tools');
 
+    // Turn Log and standalone Tools section should not appear
+    expect(html).not.toContain('Turn 1');
     expect(html).not.toContain('Live Snapshot');
     expect(html).not.toContain('System Prompt');
     expect(html).not.toContain('Dynamic Context');
@@ -224,28 +180,45 @@ describe('ChatDebugPanel', () => {
     expect(html).not.toContain('Token Estimate');
   });
 
-  it('renders a flat top-level message flow including tool results', () => {
+  it('renders a flat top-level message flow including tools and tool results', () => {
     flushSync(() => {
       root.render(React.createElement(ChatDebugPanel, { debug: createDebugState() }));
     });
 
     const rows = Array.from(container.querySelectorAll('[data-testid="chat-debug-message-row"]'));
-    expect(rows).toHaveLength(4);
+    // SYSTEM + TOOLS + USER + ASST + TOOL = 5 rows
+    expect(rows).toHaveLength(5);
     expect(rows[0]?.textContent).toContain('SYSTEM');
-    expect(rows[1]?.textContent).toContain('USER');
-    expect(rows[2]?.textContent).toContain('ASST');
-    expect(rows[3]?.textContent).toContain('TOOL');
-    expect(rows[3]?.textContent).toContain('0 results');
+    expect(rows[1]?.textContent).toContain('TOOLS');
+    expect(rows[1]?.textContent).toContain('node_search');
+    expect(rows[2]?.textContent).toContain('USER');
+    expect(rows[3]?.textContent).toContain('ASST');
+    expect(rows[4]?.textContent).toContain('TOOL');
+    expect(rows[4]?.textContent).toContain('0 results');
   });
 
-  it('reveals message details and raw turn JSON progressively', () => {
+  it('shows usage metadata on ASST entries', () => {
+    flushSync(() => {
+      root.render(React.createElement(ChatDebugPanel, { debug: createDebugState() }));
+    });
+
+    const usageMetas = Array.from(container.querySelectorAll('[data-testid="chat-debug-usage-meta"]'));
+    expect(usageMetas).toHaveLength(1);
+    const usageText = usageMetas[0]?.textContent ?? '';
+    expect(usageText).toContain('in:120');
+    expect(usageText).toContain('out:24');
+    expect(usageText).toContain('cache:89');
+    expect(usageText).toContain('$0.0042');
+    expect(usageText).toContain('toolUse');
+  });
+
+  it('reveals message details progressively', () => {
     flushSync(() => {
       root.render(React.createElement(ChatDebugPanel, { debug: createDebugState() }));
     });
 
     // System prompt truncated — tail marker not visible
     expect(container.textContent).not.toContain('hidden-tail-marker');
-    expect(container.textContent).not.toContain('"temperature": 0.2');
 
     // Click system text part to expand
     const systemRow = findButton(container, 'SYSTEM');
@@ -256,31 +229,5 @@ describe('ChatDebugPanel', () => {
     });
 
     expect(container.textContent).toContain('hidden-tail-marker');
-
-    // Click turn row to expand request/response
-    const turnRow = findButton(container, 'Turn 1');
-    expect(turnRow).toBeDefined();
-
-    flushSync(() => {
-      turnRow?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    });
-
-    expect(container.textContent).toContain('Request');
-    expect(container.textContent).toContain('Response');
-    expect(container.textContent).not.toContain('"temperature": 0.2');
-
-    // Click the turn's Request Raw JSON (not a message row's Raw JSON)
-    const rawJsonButtons = Array.from(container.querySelectorAll('button')).filter(
-      (button) => button.textContent?.includes('Raw JSON'),
-    );
-    // The last Raw JSON buttons belong to the expanded turn's Request/Response sections
-    const turnRawJsonButton = rawJsonButtons[rawJsonButtons.length - 2]; // Request Raw JSON
-    expect(turnRawJsonButton).toBeDefined();
-
-    flushSync(() => {
-      turnRawJsonButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    });
-
-    expect(container.textContent).toContain('"temperature": 0.2');
   });
 });

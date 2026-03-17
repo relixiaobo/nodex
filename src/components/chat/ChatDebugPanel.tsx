@@ -1,8 +1,8 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { useMemo, useState } from 'react';
 import type { AssistantMessage, Message, ToolCall, ToolResultMessage } from '@mariozechner/pi-ai';
 import type { AgentDebugState } from '../../hooks/use-agent.js';
 import { useChatDebugSnapshot } from '../../hooks/use-chat-debug-snapshot.js';
-import type { AgentDebugSnapshot, ChatTurnDebugRecord, DebugTokenEstimate } from '../../lib/ai-debug.js';
+import type { AgentDebugSnapshot, DebugTokenEstimate } from '../../lib/ai-debug.js';
 import { sanitizeDebugValue } from '../../lib/ai-debug.js';
 import { highlightCode } from '../../lib/code-highlight.js';
 import { ChevronDown } from '../../lib/icons.js';
@@ -11,7 +11,7 @@ interface ChatDebugPanelProps {
   debug: AgentDebugState;
 }
 
-type DisplayRole = 'SYSTEM' | 'USER' | 'ASST' | 'TOOL';
+type DisplayRole = 'SYSTEM' | 'USER' | 'ASST' | 'TOOL' | 'TOOLS';
 
 interface ContentPart {
   type: string;
@@ -19,16 +19,21 @@ interface ContentPart {
   fullText: string;
 }
 
+interface UsageMeta {
+  input: number;
+  output: number;
+  cacheRead: number;
+  cacheWrite: number;
+  cost: number;
+  stopReason: string;
+}
+
 interface ConversationEntry {
   id: string;
   role: DisplayRole;
   contentParts: ContentPart[];
   rawJson: string | null;
-}
-
-interface TurnJsonState {
-  request: boolean;
-  response: boolean;
+  usageMeta?: UsageMeta;
 }
 
 const DEBUG_TEXT = 'max-h-80 overflow-auto whitespace-pre-wrap break-words font-mono text-[10px] leading-4 text-foreground-secondary';
@@ -42,12 +47,6 @@ function formatTokenCount(value: number): string {
 
 function formatUsagePercent(value: number): string {
   return `${value.toFixed(1)}%`;
-}
-
-function formatDuration(durationMs: number | null): string {
-  if (durationMs === null) return 'running';
-  if (durationMs < 1000) return `${durationMs}ms`;
-  return `${(durationMs / 1000).toFixed(1)}s`;
 }
 
 function formatCost(value: number | null | undefined): string {
@@ -88,23 +87,10 @@ function roleBadgeClass(role: DisplayRole): string {
       return 'text-primary';
     case 'TOOL':
       return 'text-amber-700';
+    case 'TOOLS':
+      return 'text-foreground-tertiary';
     default:
       return 'text-foreground-tertiary';
-  }
-}
-
-function turnStatusClass(status: ChatTurnDebugRecord['status']): string {
-  switch (status) {
-    case 'completed':
-      return 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700';
-    case 'error':
-      return 'border-destructive/30 bg-destructive/10 text-destructive';
-    case 'aborted':
-      return 'border-amber-500/30 bg-amber-500/10 text-amber-700';
-    case 'interrupted':
-      return 'border-border bg-background text-foreground-tertiary';
-    default:
-      return 'border-border bg-background text-foreground-tertiary';
   }
 }
 
@@ -204,45 +190,6 @@ function RawJsonToggle({
       </button>
       {open && (
         <DebugCodeBlock text={json} language="json" />
-      )}
-    </div>
-  );
-}
-
-function DebugSection({
-  title,
-  meta,
-  open,
-  onToggle,
-  children,
-}: {
-  title: string;
-  meta?: string;
-  open: boolean;
-  onToggle: () => void;
-  children: ReactNode;
-}) {
-  return (
-    <div className={PANEL_CARD}>
-      <button
-        type="button"
-        onClick={onToggle}
-        className="flex w-full items-center gap-2 px-3 py-2 text-left"
-      >
-        <span className="min-w-0 flex-1 text-[11px] font-medium text-foreground">{title}</span>
-        {meta && (
-          <span className="font-mono text-[10px] text-foreground-tertiary">{meta}</span>
-        )}
-        <ChevronDown
-          size={14}
-          strokeWidth={1.8}
-          className={`shrink-0 text-foreground-tertiary transition-transform ${open ? 'rotate-180' : ''}`}
-        />
-      </button>
-      {open && (
-        <div className="border-t border-border/80 px-3 py-3">
-          {children}
-        </div>
       )}
     </div>
   );
@@ -383,6 +330,13 @@ function ConversationRow({
           </button>
         );
       })}
+      {entry.usageMeta && (
+        <div className="ml-11 pl-2 py-0.5 font-mono text-[9px] text-foreground-tertiary" data-testid="chat-debug-usage-meta">
+          {'↳ '}in:{entry.usageMeta.input} out:{entry.usageMeta.output} cache:{entry.usageMeta.cacheRead}
+          {' · '}{formatCost(entry.usageMeta.cost)}
+          {' · '}{entry.usageMeta.stopReason}
+        </div>
+      )}
       {entry.rawJson && (
         <div className="ml-11 pl-2 pt-1">
           <RawJsonToggle
@@ -391,180 +345,6 @@ function ConversationRow({
             onToggle={onToggleRawJson}
             json={entry.rawJson}
           />
-        </div>
-      )}
-    </div>
-  );
-}
-
-function TurnPayloadSection({
-  title,
-  meta,
-  rawJson,
-  rawJsonOpen,
-  onToggleRawJson,
-  children,
-}: {
-  title: string;
-  meta: string;
-  rawJson: string;
-  rawJsonOpen: boolean;
-  onToggleRawJson: () => void;
-  children: ReactNode;
-}) {
-  return (
-    <div className="rounded-lg border border-border/70 bg-background px-2.5 py-2.5">
-      <div className="mb-2 flex items-center justify-between gap-3">
-        <div className="font-mono text-[10px] uppercase tracking-[0.04em] text-foreground">{title}</div>
-        <div className="font-mono text-[10px] text-foreground-tertiary">{meta}</div>
-      </div>
-      <div className="space-y-2">
-        {children}
-        <RawJsonToggle
-          label="Raw JSON"
-          open={rawJsonOpen}
-          onToggle={onToggleRawJson}
-          json={rawJson}
-        />
-      </div>
-    </div>
-  );
-}
-
-function TurnRow({
-  turn,
-  turnNumber,
-  open,
-  rawJsonOpen,
-  onToggle,
-  onToggleRequestJson,
-  onToggleResponseJson,
-}: {
-  turn: ChatTurnDebugRecord;
-  turnNumber: number;
-  open: boolean;
-  rawJsonOpen: TurnJsonState;
-  onToggle: () => void;
-  onToggleRequestJson: () => void;
-  onToggleResponseJson: () => void;
-}) {
-  const usage = turn.response.usage;
-  const summary = [
-    `Turn ${turnNumber}`,
-    formatDuration(turn.durationMs),
-    formatCost(usage?.cost.total),
-  ].join(' · ');
-
-  return (
-    <div className={PANEL_CARD}>
-      <button
-        type="button"
-        onClick={onToggle}
-        className="flex w-full items-center gap-3 px-3 py-2.5 text-left"
-      >
-        <span className="min-w-0 flex-1 font-mono text-[10px] text-foreground">{summary}</span>
-        <span className={`rounded-full border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.04em] ${turnStatusClass(turn.status)}`}>
-          {turn.status}
-        </span>
-        <ChevronDown
-          size={14}
-          strokeWidth={1.8}
-          className={`shrink-0 text-foreground-tertiary transition-transform ${open ? 'rotate-180' : ''}`}
-        />
-      </button>
-
-      {open && (
-        <div className="space-y-3 border-t border-border/80 px-3 py-3">
-          <TurnPayloadSection
-            title="Request"
-            meta={`${formatCount(turn.request.messageCount, 'msg')} · ${formatCount(turn.request.toolCount, 'tool')}`}
-            rawJson={turn.request.json}
-            rawJsonOpen={rawJsonOpen.request}
-            onToggleRawJson={onToggleRequestJson}
-          >
-            <TokenBreakdown tokenEstimate={turn.request.tokenEstimate} />
-          </TurnPayloadSection>
-
-          <TurnPayloadSection
-            title="Response"
-            meta={turn.response.stopReason ?? (turn.status === 'interrupted' ? 'interrupted' : 'pending')}
-            rawJson={turn.response.json}
-            rawJsonOpen={rawJsonOpen.response}
-            onToggleRawJson={onToggleResponseJson}
-          >
-            <div className="space-y-1 font-mono text-[10px] text-foreground-secondary">
-              <div className="flex items-center justify-between">
-                <span>tool results</span>
-                <span>{turn.response.toolResultCount}</span>
-              </div>
-              {usage && (
-                <>
-                  <div className="flex items-center justify-between">
-                    <span>input tokens</span>
-                    <span>{usage.input.toLocaleString()}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span>output tokens</span>
-                    <span>{usage.output.toLocaleString()}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span>cache read</span>
-                    <span>{usage.cacheRead.toLocaleString()}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span>cache write</span>
-                    <span>{usage.cacheWrite.toLocaleString()}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-foreground">
-                    <span>total cost</span>
-                    <span>{formatCost(usage.cost.total)}</span>
-                  </div>
-                </>
-              )}
-              {turn.response.errorMessage && (
-                <div className="text-destructive">
-                  error: {turn.response.errorMessage}
-                </div>
-              )}
-            </div>
-          </TurnPayloadSection>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function ToolSchemaRow({
-  tool,
-  open,
-  onToggle,
-}: {
-  tool: AgentDebugSnapshot['tools'][number];
-  open: boolean;
-  onToggle: () => void;
-}) {
-  return (
-    <div className="overflow-hidden rounded-xl border border-border/80 bg-background">
-      <button
-        type="button"
-        onClick={onToggle}
-        className="flex w-full items-start gap-2 px-2.5 py-2 text-left"
-      >
-        <div className="min-w-0 flex-1">
-          <div className="font-mono text-[10px] text-foreground">{tool.name}</div>
-          <div className="mt-1 font-mono text-[10px] leading-4 text-foreground-secondary">
-            {tool.description}
-          </div>
-        </div>
-        <ChevronDown
-          size={14}
-          strokeWidth={1.8}
-          className={`shrink-0 text-foreground-tertiary transition-transform ${open ? 'rotate-180' : ''}`}
-        />
-      </button>
-      {open && (
-        <div className="border-t border-border/80 px-2.5 py-2">
-          <DebugCodeBlock text={tool.schema} language="json" />
         </div>
       )}
     </div>
@@ -616,6 +396,29 @@ function buildToolResultParts(message: ToolResultMessage): ContentPart[] {
   });
 }
 
+function buildToolsParts(snapshot: AgentDebugSnapshot): ContentPart[] {
+  return snapshot.tools.map((tool) => ({
+    type: tool.name,
+    preview: truncatePreview(tool.description),
+    fullText: tool.schema,
+  }));
+}
+
+function buildUsageMeta(originalMessage: Message): UsageMeta | undefined {
+  if (originalMessage.role !== 'assistant') return undefined;
+  const assistantMsg = originalMessage as AssistantMessage;
+  const usage = assistantMsg.usage;
+  if (!usage) return undefined;
+  return {
+    input: usage.input,
+    output: usage.output,
+    cacheRead: usage.cacheRead,
+    cacheWrite: usage.cacheWrite,
+    cost: usage.cost.total,
+    stopReason: assistantMsg.stopReason ?? 'unknown',
+  };
+}
+
 function buildConversationEntries(snapshot: AgentDebugSnapshot): ConversationEntry[] {
   const sanitizedMessages = snapshot.messages.map((message) => sanitizeDebugValue(message) as Message);
 
@@ -626,8 +429,19 @@ function buildConversationEntries(snapshot: AgentDebugSnapshot): ConversationEnt
     rawJson: null,
   }];
 
+  // Tools entry (after system, before user messages)
+  if (snapshot.tools.length > 0) {
+    entries.push({
+      id: 'tools',
+      role: 'TOOLS',
+      contentParts: buildToolsParts(snapshot),
+      rawJson: null,
+    });
+  }
+
   sanitizedMessages.forEach((message, index) => {
     const inspector = snapshot.messageInspectors[index];
+    const originalMessage = snapshot.messages[index];
 
     if (message.role === 'toolResult') {
       entries.push({
@@ -645,6 +459,7 @@ function buildConversationEntries(snapshot: AgentDebugSnapshot): ConversationEnt
         role: 'ASST',
         contentParts: buildAssistantParts(message),
         rawJson: inspector.json,
+        usageMeta: buildUsageMeta(originalMessage),
       });
       return;
     }
@@ -662,13 +477,8 @@ function buildConversationEntries(snapshot: AgentDebugSnapshot): ConversationEnt
 
 export function ChatDebugPanel({ debug }: ChatDebugPanelProps) {
   const [contextOpen, setContextOpen] = useState(false);
-  const [toolsOpen, setToolsOpen] = useState(false);
   const [expandedParts, togglePart] = useToggleMap();
   const [expandedMessageJson, toggleMessageJson] = useToggleMap();
-  const [expandedTurns, toggleTurn] = useToggleMap();
-  const [expandedTurnRequestJson, toggleTurnRequestJson] = useToggleMap();
-  const [expandedTurnResponseJson, toggleTurnResponseJson] = useToggleMap();
-  const [expandedToolSchemas, toggleToolSchema] = useToggleMap();
   const { snapshot, error, loading } = useChatDebugSnapshot(debug);
 
   const conversationEntries = useMemo(
@@ -721,48 +531,6 @@ export function ChatDebugPanel({ debug }: ChatDebugPanelProps) {
               ))
             )}
           </div>
-
-          {debug.turns.length > 0 && (
-            <div className="space-y-2 pt-1">
-              {debug.turns.map((turn, index) => (
-                <TurnRow
-                  key={turn.id}
-                  turn={turn}
-                  turnNumber={index + 1}
-                  open={expandedTurns[turn.id] ?? false}
-                  rawJsonOpen={{
-                    request: expandedTurnRequestJson[turn.id] ?? false,
-                    response: expandedTurnResponseJson[turn.id] ?? false,
-                  }}
-                  onToggle={() => toggleTurn(turn.id)}
-                  onToggleRequestJson={() => toggleTurnRequestJson(turn.id)}
-                  onToggleResponseJson={() => toggleTurnResponseJson(turn.id)}
-                />
-              ))}
-            </div>
-          )}
-
-          <DebugSection
-            title="Tools"
-            meta={`${snapshot.tools.length}`}
-            open={toolsOpen}
-            onToggle={() => setToolsOpen((value) => !value)}
-          >
-            <div className="space-y-2">
-              {snapshot.tools.length === 0 ? (
-                <div className="font-mono text-[10px] text-foreground-tertiary">No registered tools.</div>
-              ) : (
-                snapshot.tools.map((tool) => (
-                  <ToolSchemaRow
-                    key={tool.id}
-                    tool={tool}
-                    open={expandedToolSchemas[tool.id] ?? false}
-                    onToggle={() => toggleToolSchema(tool.id)}
-                  />
-                ))
-              )}
-            </div>
-          </DebugSection>
         </>
       )}
     </div>

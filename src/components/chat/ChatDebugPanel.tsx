@@ -291,30 +291,29 @@ function ConversationRow({
         const isExpanded = expandedParts[partId] ?? false;
 
         return (
-          <button
-            key={partId}
-            type="button"
-            onClick={() => onTogglePart(partId)}
-            className={`flex w-full flex-col rounded-lg px-2 py-1 text-left transition-colors hover:bg-foreground/4 ${isExpanded ? 'bg-foreground/4' : ''}`}
-          >
-            <div className="flex w-full items-center gap-2">
-              {partIndex === 0 ? (
-                <span className={`w-11 shrink-0 font-mono text-[10px] uppercase tracking-[0.04em] ${roleBadgeClass(entry.role)}`}>
-                  {entry.role}
-                </span>
-              ) : (
-                <span className="w-11 shrink-0" />
-              )}
-              <span className="min-w-0 flex-1 font-mono text-[10px] text-foreground-tertiary">
-                {part.type}
+          <div key={partId} className="flex items-start gap-2 px-2">
+            {partIndex === 0 ? (
+              <span className={`w-11 shrink-0 pt-1 font-mono text-[10px] uppercase tracking-[0.04em] ${roleBadgeClass(entry.role)}`}>
+                {entry.role}
               </span>
-              <ChevronDown
-                size={12}
-                strokeWidth={1.5}
-                className={`shrink-0 text-foreground-tertiary transition-transform ${isExpanded ? 'rotate-180' : ''}`}
-              />
-            </div>
-            <div className="ml-11 pl-2">
+            ) : (
+              <span className="w-11 shrink-0" />
+            )}
+            <button
+              type="button"
+              onClick={() => onTogglePart(partId)}
+              className={`flex min-w-0 flex-1 flex-col rounded-lg px-2 py-1 text-left transition-colors hover:bg-foreground/4 ${isExpanded ? 'bg-foreground/4' : ''}`}
+            >
+              <div className="flex w-full items-center gap-2">
+                <span className="min-w-0 flex-1 font-mono text-[10px] text-foreground-tertiary">
+                  {part.type}
+                </span>
+                <ChevronDown
+                  size={12}
+                  strokeWidth={1.5}
+                  className={`shrink-0 text-foreground-tertiary transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                />
+              </div>
               {isExpanded ? (
                 <HighlightedPre
                   text={part.fullText}
@@ -326,19 +325,19 @@ function ConversationRow({
                   {part.preview}
                 </span>
               )}
-            </div>
-          </button>
+            </button>
+          </div>
         );
       })}
       {entry.usageMeta && (
-        <div className="ml-11 pl-2 py-0.5 font-mono text-[10px] text-foreground-tertiary" data-testid="chat-debug-usage-meta">
+        <div className="pl-[60px] pr-2 py-0.5 font-mono text-[10px] text-foreground-tertiary" data-testid="chat-debug-usage-meta">
           {'↳ '}in:{entry.usageMeta.input} out:{entry.usageMeta.output} cache:{entry.usageMeta.cacheRead}
           {' · '}{formatCost(entry.usageMeta.cost)}
           {' · '}{entry.usageMeta.stopReason}
         </div>
       )}
       {entry.rawJson && (
-        <div className="ml-11 pl-2 pt-1">
+        <div className="pl-[60px] pr-2 pt-1">
           <RawJsonToggle
             label="Raw JSON"
             open={rawJsonOpen}

@@ -243,9 +243,11 @@ describe('ChatDebugPanel', () => {
       root.render(React.createElement(ChatDebugPanel, { debug: createDebugState() }));
     });
 
+    // System prompt truncated — tail marker not visible
     expect(container.textContent).not.toContain('hidden-tail-marker');
     expect(container.textContent).not.toContain('"temperature": 0.2');
 
+    // Click system text part to expand
     const systemRow = findButton(container, 'SYSTEM');
     expect(systemRow).toBeDefined();
 
@@ -254,8 +256,8 @@ describe('ChatDebugPanel', () => {
     });
 
     expect(container.textContent).toContain('hidden-tail-marker');
-    expect(container.textContent).not.toContain('"temperature": 0.2');
 
+    // Click turn row to expand request/response
     const turnRow = findButton(container, 'Turn 1');
     expect(turnRow).toBeDefined();
 
@@ -267,11 +269,16 @@ describe('ChatDebugPanel', () => {
     expect(container.textContent).toContain('Response');
     expect(container.textContent).not.toContain('"temperature": 0.2');
 
-    const rawJsonButton = findButton(container, 'Raw JSON');
-    expect(rawJsonButton).toBeDefined();
+    // Click the turn's Request Raw JSON (not a message row's Raw JSON)
+    const rawJsonButtons = Array.from(container.querySelectorAll('button')).filter(
+      (button) => button.textContent?.includes('Raw JSON'),
+    );
+    // The last Raw JSON buttons belong to the expanded turn's Request/Response sections
+    const turnRawJsonButton = rawJsonButtons[rawJsonButtons.length - 2]; // Request Raw JSON
+    expect(turnRawJsonButton).toBeDefined();
 
     flushSync(() => {
-      rawJsonButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      turnRawJsonButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
 
     expect(container.textContent).toContain('"temperature": 0.2');

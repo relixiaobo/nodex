@@ -89,6 +89,11 @@
     0 2px 6px -2px rgba(0, 0, 0, 0.05);
 }
 
+/* Prevent macOS overscroll bounce (rubber-band effect) on the side panel root. */
+html, body {
+  overscroll-behavior: none;
+}
+
 /* Steering note — dashed border + breathing background conveying "queued, waiting".
    The fill color gently pulses between secondary-muted and near-transparent,
    like the node-selected-ref pattern but with slow temporal variation. */

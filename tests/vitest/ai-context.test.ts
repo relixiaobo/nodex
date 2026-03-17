@@ -163,7 +163,10 @@ describe('injectReminder', () => {
     expect(result).not.toBe(messages);
     expect(result[2]).toMatchObject({
       role: 'user',
-      content: 'latest\n\n<system-reminder>ctx</system-reminder>',
+      content: [
+        { type: 'text', text: 'latest' },
+        { type: 'text', text: '<system-reminder>ctx</system-reminder>' },
+      ],
     });
     expect(messages[2]).toMatchObject({
       role: 'user',
@@ -222,7 +225,8 @@ describe('transformAgentContext', () => {
         role: 'user',
         content: [
           { type: 'text', text: 'look at this' },
-          { type: 'text', text: `${IMAGE_PLACEHOLDER}\n\n<system-reminder>ctx</system-reminder>` },
+          { type: 'text', text: IMAGE_PLACEHOLDER },
+          { type: 'text', text: '<system-reminder>ctx</system-reminder>' },
         ],
         timestamp: 1,
       },

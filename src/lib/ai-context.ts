@@ -161,31 +161,16 @@ export function injectReminder(messages: AgentMessage[], reminder: string): Agen
 
   const nextMessages = messages.slice();
 
-  if (typeof userMessage.content === 'string') {
-    nextMessages[userMessageIndex] = {
-      ...userMessage,
-      content: `${userMessage.content}\n\n${normalizedReminder}`,
-    };
-    return nextMessages;
-  }
+  const existingParts: Array<{ type: 'text'; text: string } | { type: 'image'; data: string; mimeType: string }> =
+    typeof userMessage.content === 'string'
+      ? [{ type: 'text', text: userMessage.content }]
+      : userMessage.content.slice();
 
-  const nextContent = userMessage.content.slice();
-  const lastContent = nextContent[nextContent.length - 1];
-  if (lastContent?.type === 'text') {
-    nextContent[nextContent.length - 1] = {
-      ...lastContent,
-      text: `${lastContent.text}\n\n${normalizedReminder}`,
-    };
-  } else {
-    nextContent.push({
-      type: 'text',
-      text: normalizedReminder,
-    });
-  }
+  existingParts.push({ type: 'text', text: normalizedReminder });
 
   nextMessages[userMessageIndex] = {
     ...userMessage,
-    content: nextContent,
+    content: existingParts,
   };
   return nextMessages;
 }

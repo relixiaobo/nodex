@@ -111,16 +111,19 @@ export async function loadSnapshotRecord(workspaceId: string): Promise<SnapshotR
   });
 }
 
-export async function deleteSnapshot(workspaceId: string): Promise<void> {
+async function deleteRecord(storeName: string, key: string): Promise<void> {
   const db = await openDB();
   return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, 'readwrite');
-    const store = tx.objectStore(STORE_NAME);
-    const req = store.delete(workspaceId);
+    const tx = db.transaction(storeName, 'readwrite');
+    const store = tx.objectStore(storeName);
+    const req = store.delete(key);
     req.onsuccess = () => resolve();
     req.onerror = (e) => reject((e.target as IDBRequest).error);
   });
 }
+
+export const deleteSnapshot = (wsId: string) => deleteRecord(STORE_NAME, wsId);
+export const deleteSyncCursor = (wsId: string) => deleteRecord(CURSOR_STORE, wsId);
 
 /** Reset DB promise (for tests). */
 export function _resetDBForTest(): void {

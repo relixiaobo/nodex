@@ -22,7 +22,6 @@ interface ContentPart {
 interface ConversationEntry {
   id: string;
   role: DisplayRole;
-  roleMeta?: string;
   contentParts: ContentPart[];
   rawJson: string | null;
 }
@@ -338,8 +337,6 @@ function ConversationRow({
   onTogglePart: (id: string) => void;
   onToggleRawJson: () => void;
 }) {
-  const roleLabel = entry.roleMeta ? `${entry.role} · ${entry.roleMeta}` : entry.role;
-
   return (
     <div data-testid="chat-debug-message-row">
       {entry.contentParts.map((part, partIndex) => {
@@ -351,41 +348,43 @@ function ConversationRow({
             key={partId}
             type="button"
             onClick={() => onTogglePart(partId)}
-            className={`flex w-full items-start gap-2 rounded-lg px-2 py-1 text-left transition-colors hover:bg-foreground/[0.03] ${isExpanded ? 'bg-foreground/[0.03]' : ''}`}
+            className={`flex w-full flex-col rounded-lg px-2 py-1 text-left transition-colors hover:bg-foreground/[0.03] ${isExpanded ? 'bg-foreground/[0.03]' : ''}`}
           >
-            {partIndex === 0 ? (
-              <span className={`w-11 shrink-0 pt-0.5 font-mono text-[10px] uppercase tracking-[0.04em] ${roleBadgeClass(entry.role)}`}>
-                {roleLabel}
+            <div className="flex w-full items-center gap-2">
+              {partIndex === 0 ? (
+                <span className={`w-11 shrink-0 font-mono text-[10px] uppercase tracking-[0.04em] ${roleBadgeClass(entry.role)}`}>
+                  {entry.role}
+                </span>
+              ) : (
+                <span className="w-11 shrink-0" />
+              )}
+              <span className="min-w-0 flex-1 font-mono text-[9px] text-foreground-tertiary">
+                {part.type}
               </span>
-            ) : (
-              <span className="w-11 shrink-0" />
-            )}
-            <span className="w-14 shrink-0 pt-0.5 font-mono text-[9px] text-foreground-tertiary">
-              {part.type}
-            </span>
-            {isExpanded ? (
-              <div className="min-w-0 flex-1">
+              <ChevronDown
+                size={12}
+                strokeWidth={1.8}
+                className={`shrink-0 text-foreground-tertiary transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+              />
+            </div>
+            <div className="ml-11 pl-2">
+              {isExpanded ? (
                 <HighlightedPre
                   text={part.fullText}
                   language={inferLanguage(part.fullText)}
                   className={DEBUG_TEXT}
                 />
-              </div>
-            ) : (
-              <span className="min-w-0 flex-1 truncate font-mono text-[10px] leading-4 text-foreground-secondary">
-                {part.preview}
-              </span>
-            )}
-            <ChevronDown
-              size={12}
-              strokeWidth={1.8}
-              className={`mt-0.5 shrink-0 text-foreground-tertiary transition-transform ${isExpanded ? 'rotate-180' : ''}`}
-            />
+              ) : (
+                <span className="block truncate font-mono text-[10px] leading-4 text-foreground-secondary">
+                  {part.preview}
+                </span>
+              )}
+            </div>
           </button>
         );
       })}
       {entry.rawJson && (
-        <div className="ml-[108px] pt-1">
+        <div className="ml-11 pl-2 pt-1">
           <RawJsonToggle
             label="Raw JSON"
             open={rawJsonOpen}
@@ -607,13 +606,13 @@ function buildAssistantParts(message: AssistantMessage): ContentPart[] {
 function buildToolResultParts(message: ToolResultMessage): ContentPart[] {
   return (message.content as Array<{ type: string; text?: string; data?: string; mimeType?: string }>).map((block) => {
     if (block.type === 'text' && block.text) {
-      return { type: 'text', preview: truncatePreview(block.text), fullText: block.text };
+      return { type: message.toolName, preview: truncatePreview(block.text), fullText: block.text };
     }
     if (block.type === 'image') {
       const label = `[image: ${block.mimeType ?? 'unknown'}]`;
-      return { type: 'image', preview: label, fullText: label };
+      return { type: message.toolName, preview: label, fullText: label };
     }
-    return { type: block.type, preview: '(unknown block)', fullText: JSON.stringify(block, null, 2) };
+    return { type: message.toolName, preview: '(unknown block)', fullText: JSON.stringify(block, null, 2) };
   });
 }
 
@@ -634,7 +633,6 @@ function buildConversationEntries(snapshot: AgentDebugSnapshot): ConversationEnt
       entries.push({
         id: inspector.id,
         role: 'TOOL',
-        roleMeta: message.toolName,
         contentParts: buildToolResultParts(message),
         rawJson: inspector.json,
       });

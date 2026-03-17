@@ -12,7 +12,7 @@
  * dropdown. Click tab body → toggle dropdown. Click × → close.
  * Breadcrumb renders inside the panel body for navigation context.
  */
-import { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { useUIStore } from '../../stores/ui-store.js';
 import { useNodeStore } from '../../stores/node-store.js';
 import { chatPanelSessionId, isAppPanel, isChatPanel } from '../../types/index.js';
@@ -21,6 +21,7 @@ import { NodePanel } from './NodePanel';
 import { AppPanel } from './AppPanel';
 import { Breadcrumb } from './Breadcrumb';
 import { ChevronDown, Sparkles, X } from '../../lib/icons.js';
+import { getChatTitle, subscribeChatTitles } from '../../lib/ai-service.js';
 import { DeskLanding } from './DeskLanding';
 
 const ChatPanel = lazy(async () => ({
@@ -349,13 +350,20 @@ export function PanelLayout({ toolbar }: PanelLayoutProps) {
 
 /** Panel name text for tab labels and dropdown menu rows. */
 function PanelLabel({ nodeId }: { nodeId: string }) {
-  const name = useNodeStore((s) => {
+  const isChat = isChatPanel(nodeId);
+  const chatTitle = useSyncExternalStore(
+    subscribeChatTitles,
+    () => isChat ? getChatTitle(chatPanelSessionId(nodeId)) : null,
+  );
+
+  const nodeName = useNodeStore((s) => {
     void s._version;
-    if (isChatPanel(nodeId)) return 'Chat';
+    if (isChat) return null;
     if (isAppPanel(nodeId)) return nodeId.replace(/^app:/, '').replace(/^./, (c) => c.toUpperCase());
     const node = s.getNode(nodeId);
     const raw = node?.name ?? '';
     return raw.replace(/<[^>]+>/g, '').trim() || 'Untitled';
   });
-  return <>{name}</>;
+
+  return <>{isChat ? (chatTitle || 'Chat') : nodeName}</>;
 }

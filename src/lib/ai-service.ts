@@ -29,6 +29,27 @@ import { NDX_F, SYSTEM_NODE_IDS, SYS_V } from '../types/index.js';
 const AI_SETTINGS_KEY = 'soma-ai-settings';
 const MAX_SESSION_DEBUG_TURNS = 12;
 
+// ── Reactive chat title store ────────────────────────────────────
+// PanelLabel lives outside ChatPanel and cannot use useAgent, so it
+// subscribes to this module-level store via useSyncExternalStore.
+
+const chatTitleListeners = new Set<() => void>();
+const chatTitleMap = new Map<string, string>();
+
+export function getChatTitle(sessionId: string): string | null {
+  return chatTitleMap.get(sessionId) ?? null;
+}
+
+export function subscribeChatTitles(listener: () => void): () => void {
+  chatTitleListeners.add(listener);
+  return () => { chatTitleListeners.delete(listener); };
+}
+
+function notifyChatTitleChange(sessionId: string, title: string): void {
+  chatTitleMap.set(sessionId, title);
+  chatTitleListeners.forEach((l) => l());
+}
+
 const DEFAULT_CHAT_MODEL = getModel('anthropic', 'claude-sonnet-4-5');
 
 interface LegacyStoredAISettings {
@@ -327,6 +348,69 @@ function deriveSessionTitle(messages: AgentMessage[]): string | null {
   return normalized ? normalized.slice(0, 30) : null;
 }
 
+async function generateSessionTitle(session: ChatSession, agent: Agent): Promise<string | null> {
+  try {
+    // Collect conversation summary (first user + first assistant, limited to 500 chars)
+    const messages = agent.state.messages;
+    const firstUser = messages.find((m) => m.role === 'user');
+    const firstAssistant = messages.find((m) => m.role === 'assistant');
+    if (!firstUser) return null;
+
+    let summary = getMessageText(firstUser).slice(0, 300);
+    if (firstAssistant) {
+      summary += '\n\nAssistant: ' + getMessageText(firstAssistant).slice(0, 200);
+    }
+
+    const resolvedModel = resolveModel(session, agent.state.model.id);
+    const normalizedProvider = normalizeProviderId(resolvedModel.provider);
+    const apiKey = getApiKeyForProvider(normalizedProvider);
+    const authToken = await getStoredToken();
+    if (!authToken || !apiKey) return null;
+
+    const proxyUrl = getSyncApiUrl();
+    const stream = streamProxyWithApiKey(resolvedModel, {
+      systemPrompt: 'Generate a short title (3-8 words) for the following conversation. Return only the title text, nothing else.',
+      messages: [{
+        role: 'user' as const,
+        content: [{ type: 'text' as const, text: summary }],
+        timestamp: Date.now(),
+      }],
+      tools: [],
+    }, {
+      apiKey,
+      authToken,
+      proxyUrl,
+      temperature: 0.3,
+      maxTokens: 60,
+    });
+
+    let fullText = '';
+    for await (const event of stream) {
+      if (event.type === 'text_delta') {
+        fullText += event.delta;
+      }
+      if (event.type === 'error') {
+        return null;
+      }
+    }
+
+    // Clean up: remove surrounding quotes, trim, truncate
+    let title = fullText.trim().replace(/^["']+|["']+$/g, '').trim();
+    if (title.length > 60) title = title.slice(0, 57) + '...';
+    return title || null;
+  } catch {
+    return null;
+  }
+}
+
+export function updateSessionTitle(agent: Agent, title: string): void {
+  const session = getCurrentSession(agent);
+  if (!session) return;
+  session.title = title;
+  notifyChatTitleChange(session.id, title);
+  void persistChatSession(agent);
+}
+
 function setCurrentSession(agent: Agent, session: ChatSession): ChatSession {
   const runtime = getAgentRuntimeState(agent);
   runtime.currentSession = session;
@@ -335,6 +419,12 @@ function setCurrentSession(agent: Agent, session: ChatSession): ChatSession {
   runtime.thinkingLevel = session.selectedThinkingLevel ?? null;
   runtime.activeDebugTurnId = null;
   agent.sessionId = session.id;
+
+  // Hydrate reactive title store so PanelLabel picks up persisted titles
+  if (session.title) {
+    notifyChatTitleChange(session.id, session.title);
+  }
+
   return session;
 }
 
@@ -564,7 +654,18 @@ async function runAgentTurn(session: ChatSession, agent: Agent, input: AgentTurn
     });
     syncSessionFromAgent(session, agent.state.messages);
     if (session.title === null) {
+      // Immediate fallback — truncated first message as temporary title
       session.title = deriveSessionTitle(agent.state.messages);
+      if (session.title) notifyChatTitleChange(session.id, session.title);
+
+      // Fire-and-forget — LLM generates a better title to replace the fallback
+      void generateSessionTitle(session, agent).then((title) => {
+        if (title && getCurrentSession(agent) === session) {
+          session.title = title;
+          notifyChatTitleChange(session.id, title);
+          void persistChatSession(agent);
+        }
+      });
     }
     await persistChatSession(agent);
   } catch (error) {

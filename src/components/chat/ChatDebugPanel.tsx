@@ -705,6 +705,17 @@ function buildConversationEntries(snapshot: AgentDebugSnapshot): ConversationEnt
     toolEntries: [],
   }];
 
+  if (snapshot.reminder.full) {
+    entries.push({
+      id: 'system-reminder',
+      role: 'SYSTEM',
+      preview: truncatePreview(snapshot.reminder.full),
+      fullText: snapshot.reminder.full,
+      rawJson: null,
+      toolEntries: [],
+    });
+  }
+
   sanitizedMessages.forEach((message, index) => {
     const inspector = snapshot.messageInspectors[index];
 

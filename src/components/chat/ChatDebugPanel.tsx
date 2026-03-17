@@ -65,6 +65,19 @@ function formatCount(value: number, singular: string, plural = `${singular}s`): 
   return `${value} ${value === 1 ? singular : plural}`;
 }
 
+function useToggleMap() {
+  const [value, setValue] = useState<Record<string, boolean>>({});
+
+  function toggle(id: string) {
+    setValue((current) => ({
+      ...current,
+      [id]: !current[id],
+    }));
+  }
+
+  return [value, toggle] as const;
+}
+
 function truncatePreview(text: string, maxLength = 100): string {
   const normalized = text.replace(/\s+/g, ' ').trim();
   if (!normalized) return '(empty)';
@@ -680,7 +693,6 @@ function buildConversationEntries(snapshot: AgentDebugSnapshot): ConversationEnt
     });
   });
 
-  const consumedToolResults = new Set<string>();
   const entries: ConversationEntry[] = [{
     id: 'system-prompt',
     role: 'SYSTEM',
@@ -694,7 +706,6 @@ function buildConversationEntries(snapshot: AgentDebugSnapshot): ConversationEnt
     const inspector = snapshot.messageInspectors[index];
 
     if (message.role === 'toolResult') {
-      if (consumedToolResults.has(message.toolCallId)) return;
       const resultText = extractToolResultText(message);
       entries.push({
         id: inspector.id,
@@ -712,10 +723,6 @@ function buildConversationEntries(snapshot: AgentDebugSnapshot): ConversationEnt
         .filter((block): block is ToolCall => block.type === 'toolCall')
         .map((toolCall) => {
           const result = toolResultMap.get(toolCall.id);
-          if (result) {
-            consumedToolResults.add(toolCall.id);
-          }
-
           const resultText = result ? extractToolResultText(result.message) : null;
           return {
             id: toolCall.id,
@@ -755,68 +762,19 @@ function buildConversationEntries(snapshot: AgentDebugSnapshot): ConversationEnt
 export function ChatDebugPanel({ debug }: ChatDebugPanelProps) {
   const [contextOpen, setContextOpen] = useState(false);
   const [toolsOpen, setToolsOpen] = useState(false);
-  const [expandedMessages, setExpandedMessages] = useState<Record<string, boolean>>({});
-  const [expandedMessageJson, setExpandedMessageJson] = useState<Record<string, boolean>>({});
-  const [expandedConversationTools, setExpandedConversationTools] = useState<Record<string, boolean>>({});
-  const [expandedTurns, setExpandedTurns] = useState<Record<string, boolean>>({});
-  const [expandedTurnRequestJson, setExpandedTurnRequestJson] = useState<Record<string, boolean>>({});
-  const [expandedTurnResponseJson, setExpandedTurnResponseJson] = useState<Record<string, boolean>>({});
-  const [expandedToolSchemas, setExpandedToolSchemas] = useState<Record<string, boolean>>({});
+  const [expandedMessages, toggleMessage] = useToggleMap();
+  const [expandedMessageJson, toggleMessageJson] = useToggleMap();
+  const [expandedConversationTools, toggleConversationTool] = useToggleMap();
+  const [expandedTurns, toggleTurn] = useToggleMap();
+  const [expandedTurnRequestJson, toggleTurnRequestJson] = useToggleMap();
+  const [expandedTurnResponseJson, toggleTurnResponseJson] = useToggleMap();
+  const [expandedToolSchemas, toggleToolSchema] = useToggleMap();
   const { snapshot, error, loading } = useChatDebugSnapshot(debug);
 
   const conversationEntries = useMemo(
     () => snapshot ? buildConversationEntries(snapshot) : [],
     [snapshot],
   );
-
-  function toggleMessage(id: string) {
-    setExpandedMessages((current) => ({
-      ...current,
-      [id]: !current[id],
-    }));
-  }
-
-  function toggleMessageJson(id: string) {
-    setExpandedMessageJson((current) => ({
-      ...current,
-      [id]: !current[id],
-    }));
-  }
-
-  function toggleConversationTool(id: string) {
-    setExpandedConversationTools((current) => ({
-      ...current,
-      [id]: !current[id],
-    }));
-  }
-
-  function toggleTurn(id: string) {
-    setExpandedTurns((current) => ({
-      ...current,
-      [id]: !current[id],
-    }));
-  }
-
-  function toggleTurnRequestJson(id: string) {
-    setExpandedTurnRequestJson((current) => ({
-      ...current,
-      [id]: !current[id],
-    }));
-  }
-
-  function toggleTurnResponseJson(id: string) {
-    setExpandedTurnResponseJson((current) => ({
-      ...current,
-      [id]: !current[id],
-    }));
-  }
-
-  function toggleToolSchema(id: string) {
-    setExpandedToolSchemas((current) => ({
-      ...current,
-      [id]: !current[id],
-    }));
-  }
 
   return (
     <div className="space-y-2 rounded-2xl border border-border bg-foreground/[0.02] p-2.5">

@@ -195,6 +195,7 @@ _(空)_
 
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
+| 2026-03-17 | Chat 自动摘要标题 + AI Debug 迁移 Settings + ref 渲染修复 + 设计系统合规 + overscroll 修复 | nodex | main |
 | 2026-03-17 | Chat 分支消息审计 — regenerate/edit 改用 `agent.continue()`，修复重复 user 消息 + switchBranch 持久化 + toolResult 续接 | codex | #148 |
 | 2026-03-16 | Extended thinking 修复 — server 端 `stream` → `streamSimple` 使 reasoning 参数正确传递 | codex | #146 |
 | 2026-03-16 | 多 Provider AI 设置 — Settings 多 provider 配置 + Composer model 选择器 + 旧设置迁移 + Chat Debug 增强 | codex | #145 |

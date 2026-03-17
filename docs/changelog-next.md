@@ -72,4 +72,7 @@
 - 登出时清除本地数据：sign-out 现在删除 IndexedDB 中的 Loro snapshot 和 sync cursor，防止用户数据残留；重新登录后从服务端恢复
 - Chat 自动摘要标题：首轮 AI 回复后 LLM 自动生成简短对话标题，显示在面板标签和 header 中；支持点击 header 标题手动编辑
 - 修复 AI 回复中加粗/斜体内的节点引用（`<ref>`）显示为 `%%SOMA_N%%` 原始占位符的问题
-- AI Debug 设置迁移到 Settings 页面（LoroDoc boolean 字段），移除 5-tap 手势和 ChatInput 菜单项，debug toggle 按钮改为浮动定位
+- AI Debug 设置迁移到 Settings 页面（LoroDoc boolean 字段），移除 5-tap 手势和 ChatInput 菜单项，debug toggle 按钮改为浮动定位不占布局空间
+- 修复 macOS 侧边栏橡皮筋弹性效果（overscroll bounce）导致面板可拖动产生白边的问题
+- Chat Debug 面板 UI 规范化：去掉内部圆角容器、hover 背景对齐内容列、颜色/圆角/间距/图标全部对齐设计系统
+- Chat 输入框圆角从 16px 调整为 12px，与面板容器圆角对齐

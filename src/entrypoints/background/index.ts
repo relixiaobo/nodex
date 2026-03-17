@@ -851,7 +851,7 @@ async function handleBrowserTab(payload: BrowserTabPayload): Promise<Record<stri
       };
     }
     case 'create': {
-      const tab = await createTab(payload.url ? { url: normalizeBrowserUrl(payload.url), active: true } : { active: true });
+      const tab = await createTab(payload.url ? { url: normalizeBrowserUrl(payload.url), active: false } : { active: false });
       return {
         created: true,
         tabId: tab.id,

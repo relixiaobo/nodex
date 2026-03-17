@@ -115,7 +115,12 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
 }, ref) {
   const [draft, setDraft] = useState('');
 
-  useImperativeHandle(ref, () => ({ setDraft }), []);
+  useImperativeHandle(ref, () => ({
+    setDraft(text: string) {
+      setDraft(text);
+      requestAnimationFrame(() => textareaRef.current?.focus());
+    },
+  }), []);
   const [menuOpen, setMenuOpen] = useState(false);
   const [modelMenuOpen, setModelMenuOpen] = useState(false);
   const [moreModelsOpen, setMoreModelsOpen] = useState(false);

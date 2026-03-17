@@ -224,6 +224,20 @@ describe('ChatDebugPanel', () => {
     expect(html).not.toContain('Token Estimate');
   });
 
+  it('renders a flat top-level message flow including tool results', () => {
+    flushSync(() => {
+      root.render(React.createElement(ChatDebugPanel, { debug: createDebugState() }));
+    });
+
+    const rows = Array.from(container.querySelectorAll('[data-testid="chat-debug-message-row"]'));
+    expect(rows).toHaveLength(4);
+    expect(rows[0]?.textContent).toContain('SYSTEM');
+    expect(rows[1]?.textContent).toContain('USER');
+    expect(rows[2]?.textContent).toContain('ASST');
+    expect(rows[3]?.textContent).toContain('TOOL');
+    expect(rows[3]?.textContent).toContain('0 results');
+  });
+
   it('reveals message details and raw turn JSON progressively', () => {
     flushSync(() => {
       root.render(React.createElement(ChatDebugPanel, { debug: createDebugState() }));

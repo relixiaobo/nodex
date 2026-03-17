@@ -68,3 +68,4 @@
 - 新增 Chat 转向便条（Steering）：AI 工作期间可在输入框中发送消息，多次 Enter 追加到同一张便条，点击便条可撤回编辑，AI 在当前工具执行完成后一次性读取全部内容
 - 修复登录/登出导致 `#agent` 和 `#spark` 系统提示词子节点重复的问题（prompt line 改用固定 ID，bootstrap 幂等）
 - AI Chat 上下文增强：`<page-context>` 现在包含当前窗口所有标签页（title + URL + tabId），AI 可以感知用户打开的多个页面并通过 browser tool 跨标签获取信息
+- 截图工具静默化：活跃标签页截图改用 `captureVisibleTab` API，不再触发 debugger 附加和焦点切换；非活跃标签仍使用 CDP

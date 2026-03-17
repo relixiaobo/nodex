@@ -607,7 +607,34 @@ async function focusWindow(windowId: number | undefined): Promise<void> {
   });
 }
 
+async function captureActiveTabSilently(): Promise<{ imageData: string; width: number; height: number } | null> {
+  try {
+    const dataUrl: string = await chrome.tabs.captureVisibleTab({ format: 'png' });
+    if (!dataUrl) return null;
+
+    const base64 = dataUrl.replace(/^data:image\/png;base64,/, '');
+    // Decode PNG header to read dimensions (bytes 16-23 contain width/height as 4-byte big-endian)
+    const raw = atob(base64.slice(0, 48));
+    const width = (raw.charCodeAt(16) << 24) | (raw.charCodeAt(17) << 16) | (raw.charCodeAt(18) << 8) | raw.charCodeAt(19);
+    const height = (raw.charCodeAt(20) << 24) | (raw.charCodeAt(21) << 16) | (raw.charCodeAt(22) << 8) | raw.charCodeAt(23);
+
+    return { imageData: base64, width, height };
+  } catch {
+    return null;
+  }
+}
+
 async function handleBrowserScreenshot(tabId: number): Promise<{ imageData: string; width: number; height: number; imageId: string }> {
+  // Use silent captureVisibleTab for the active tab (no debugger bar, no focus switch)
+  const activeTabId = await getActiveTabId().catch(() => -1);
+  if (tabId === activeTabId) {
+    const silent = await captureActiveTabSilently();
+    if (silent) {
+      return { ...silent, imageId: `screenshot_${Date.now()}` };
+    }
+  }
+
+  // Fall back to CDP for non-active tabs or if captureVisibleTab failed
   await attachToTab(tabId);
   const metrics = await sendCommand<{
     visualViewport?: { clientWidth?: number; clientHeight?: number };

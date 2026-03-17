@@ -354,7 +354,7 @@ export function PanelLayout({ toolbar }: PanelLayoutProps) {
     );
   }
 
-  const narrowMode = panels.length === 1 || containerWidth / panels.length < MIN_PANEL_WIDTH;
+  const narrowMode = containerWidth / panels.length < MIN_PANEL_WIDTH;
 
   // ── Narrow mode: name-only tab (+ dropdown panel switcher when multi-panel) ──
   if (narrowMode) {

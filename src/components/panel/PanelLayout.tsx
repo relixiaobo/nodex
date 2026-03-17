@@ -64,7 +64,10 @@ function renderPanelContent(nodeId: string, panelId: string, options?: { hideHea
  * mr-2.5 (10px) matches the effective top distance: mt-1 (4px) + centering
  * offset (6px from h-5 centered in h-8) = 10px. Equal edge distance.
  */
-const PANEL_CLOSE_BTN = 'flex h-5 w-5 mr-2.5 shrink-0 items-center justify-center rounded-md text-foreground-tertiary opacity-0 transition-opacity hover:bg-foreground/8 hover:text-foreground group-hover/panel:opacity-100';
+const PANEL_CLOSE_BTN = 'flex h-5 w-5 mr-2.5 shrink-0 items-center justify-center rounded-md text-foreground-tertiary opacity-0 transition-opacity hover:bg-foreground/4 hover:text-foreground group-hover/panel:opacity-100';
+
+/** Icon button that appears on hover via group-hover. Same visual as PANEL_CLOSE_BTN but no margin. */
+const PANEL_ICON_BTN = 'flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-foreground-tertiary opacity-0 transition-opacity hover:bg-foreground/4 hover:text-foreground group-hover/panel:opacity-100';
 
 /**
  * Panel header: breadcrumb + close (node), close-only (app/chat-non-hasTab).
@@ -95,7 +98,7 @@ function renderPanelHeader(
   );
 }
 
-// ── Chat title editing hook ──────────────────────────────────────
+// ── Chat title editing ───────────────────────────────────────────
 
 function useChatTitleEdit(nodeId: string) {
   const sessionId = chatPanelSessionId(nodeId);
@@ -154,7 +157,7 @@ function ChatTitleInput({ edit }: { edit: ReturnType<typeof useChatTitleEdit> })
 
 // ── Chat tab header (wide hasTab mode) ───────────────────────────
 //
-// Layout: [✦ title] [✏️] [×]
+// Layout: [💬 title] [✏️ ×]
 // Title truncates when container is narrow. Pencil + close are shrink-0.
 
 function ChatTabHeader({ nodeId, onClose }: { nodeId: string; onClose: (e: React.MouseEvent) => void }) {
@@ -172,16 +175,11 @@ function ChatTabHeader({ nodeId, onClose }: { nodeId: string; onClose: (e: React
       </div>
       <div className="flex shrink-0 items-center mr-2.5">
         {!edit.editing && (
-          <button
-            type="button"
-            onClick={edit.startEdit}
-            className="flex h-5 w-5 items-center justify-center rounded-md text-foreground-tertiary opacity-0 transition-opacity hover:bg-foreground/8 hover:text-foreground group-hover/panel:opacity-100"
-            title="Edit title"
-          >
+          <button type="button" onClick={edit.startEdit} title="Edit title" className={PANEL_ICON_BTN}>
             <Pencil size={10} strokeWidth={1.8} />
           </button>
         )}
-        <button type="button" onClick={onClose} title="Close panel" className="flex h-5 w-5 items-center justify-center rounded-md text-foreground-tertiary opacity-0 transition-opacity hover:bg-foreground/8 hover:text-foreground group-hover/panel:opacity-100">
+        <button type="button" onClick={onClose} title="Close panel" className={PANEL_ICON_BTN}>
           <X size={12} />
         </button>
       </div>
@@ -191,9 +189,8 @@ function ChatTabHeader({ nodeId, onClose }: { nodeId: string; onClose: (e: React
 
 // ── Name-only tab (narrow / dropdown mode) ──────────────────────
 //
-// Shows panel name (+ sparkles for Chat) in a shaped tab.
+// Shows panel name (+ MessageCircle for Chat) in a shaped tab.
 // Click body → toggle dropdown; `children` = dropdown menu.
-// For chat panels, a pencil edit icon appears adjacent to close on hover.
 
 interface TabHeadProps {
   nodeId: string;
@@ -210,32 +207,29 @@ function TabHead({ nodeId, onClickBody, onClose, menuOpen, tabRef, children }: T
   return (
     <div
       ref={tabRef}
-      className="group/tab tab-connector-right relative z-10 flex h-10 min-w-0 flex-1 items-center bg-background rounded-t-xl"
+      className="tab-connector-right relative z-10 flex h-10 min-w-0 flex-1 items-center bg-background rounded-t-xl"
     >
-      {isChat ? (
-        <ChatTabHeadContent nodeId={nodeId} onClickBody={onClickBody} menuOpen={menuOpen} />
-      ) : (
-        /* Name area — interactive only when onClickBody is provided (dropdown trigger or panel activation) */
-        <div
-          className={`group/name flex min-w-0 flex-1 ml-1 h-7 items-center rounded-md transition-colors ${onClickBody ? 'cursor-pointer hover:bg-foreground/4' : ''}`}
-          onClick={onClickBody}
-          role={menuOpen !== undefined ? 'button' : undefined}
-          aria-haspopup={menuOpen !== undefined ? 'menu' : undefined}
-          aria-expanded={menuOpen !== undefined ? menuOpen : undefined}
-        >
-          <span className="flex min-w-0 flex-1 items-center gap-1.5 px-2 text-[13px] text-foreground truncate">
-            <PanelLabel nodeId={nodeId} />
-          </span>
-          {menuOpen !== undefined && (
-            <ChevronDown
-              size={14}
-              strokeWidth={1.7}
-              className={`shrink-0 mr-1.5 text-foreground-tertiary transition-all ${menuOpen ? 'opacity-100 rotate-180' : 'opacity-0 group-hover/name:opacity-100'}`}
-            />
-          )}
-        </div>
-      )}
-      {/* Close button — independent hover + click */}
+      {/* Name area — interactive only when onClickBody is provided */}
+      <div
+        className={`group/name flex min-w-0 flex-1 ml-1 h-7 items-center rounded-md transition-colors ${onClickBody ? 'cursor-pointer hover:bg-foreground/4' : ''}`}
+        onClick={onClickBody}
+        role={menuOpen !== undefined ? 'button' : undefined}
+        aria-haspopup={menuOpen !== undefined ? 'menu' : undefined}
+        aria-expanded={menuOpen !== undefined ? menuOpen : undefined}
+      >
+        <span className="flex min-w-0 flex-1 items-center gap-1.5 px-2 text-[13px] text-foreground">
+          {isChat && <MessageCircle size={12} strokeWidth={1.6} className="shrink-0 text-foreground-tertiary" />}
+          <span className="min-w-0 truncate"><PanelLabel nodeId={nodeId} /></span>
+        </span>
+        {menuOpen !== undefined && (
+          <ChevronDown
+            size={14}
+            strokeWidth={1.7}
+            className={`shrink-0 mr-1.5 text-foreground-tertiary transition-all ${menuOpen ? 'opacity-100 rotate-180' : 'opacity-0 group-hover/name:opacity-100'}`}
+          />
+        )}
+      </div>
+      {/* Close button */}
       {onClose && (
         <button
           type="button"
@@ -251,32 +245,11 @@ function TabHead({ nodeId, onClickBody, onClose, menuOpen, tabRef, children }: T
   );
 }
 
-/** Chat-specific name area for narrow TabHead. No edit button here — editing is in the dropdown menu. */
-function ChatTabHeadContent({ nodeId, onClickBody, menuOpen }: { nodeId: string; onClickBody?: () => void; menuOpen?: boolean }) {
-  return (
-    <div
-      className={`group/name flex min-w-0 flex-1 ml-1 h-7 items-center rounded-md transition-colors ${onClickBody ? 'cursor-pointer hover:bg-foreground/4' : ''}`}
-      onClick={onClickBody}
-      role={menuOpen !== undefined ? 'button' : undefined}
-      aria-haspopup={menuOpen !== undefined ? 'menu' : undefined}
-      aria-expanded={menuOpen !== undefined ? menuOpen : undefined}
-    >
-      <span className="flex min-w-0 flex-1 items-center gap-1.5 px-2 text-[13px] text-foreground">
-        <MessageCircle size={12} strokeWidth={1.6} className="shrink-0 text-foreground-tertiary" />
-        <span className="min-w-0 truncate"><PanelLabel nodeId={nodeId} /></span>
-      </span>
-      {menuOpen !== undefined && (
-        <ChevronDown
-          size={14}
-          strokeWidth={1.7}
-          className={`shrink-0 mr-1.5 text-foreground-tertiary transition-all ${menuOpen ? 'opacity-100 rotate-180' : 'opacity-0 group-hover/name:opacity-100'}`}
-        />
-      )}
-    </div>
-  );
-}
+// ── Dropdown menu row for chat panels ────────────────────────────
+//
+// Separate component because useChatTitleEdit is a hook and cannot
+// be called conditionally inside the dropdown loop.
 
-/** Dropdown menu row for a chat panel — includes inline title editing. */
 function ChatDropdownRow({
   nodeId,
   active,
@@ -301,17 +274,13 @@ function ChatDropdownRow({
         <MessageCircle size={10} strokeWidth={1.6} />
       </span>
       <span className="min-w-0 flex-1 truncate">
-        {edit.editing ? (
-          <ChatTitleInput edit={edit} />
-        ) : (
-          <PanelLabel nodeId={nodeId} />
-        )}
+        {edit.editing ? <ChatTitleInput edit={edit} /> : <PanelLabel nodeId={nodeId} />}
       </span>
       {!edit.editing && (
         <button
           type="button"
           onClick={edit.startEdit}
-          className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-foreground-tertiary opacity-0 transition-opacity hover:bg-foreground/8 hover:text-foreground group-hover/menu:opacity-100"
+          className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-foreground-tertiary opacity-0 transition-opacity hover:bg-foreground/4 hover:text-foreground group-hover/menu:opacity-100"
           title="Edit title"
         >
           <Pencil size={10} strokeWidth={1.8} />
@@ -319,7 +288,7 @@ function ChatDropdownRow({
       )}
       <button
         type="button"
-        className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-foreground-tertiary transition-colors hover:bg-foreground/8 hover:text-foreground"
+        className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-foreground-tertiary transition-colors hover:bg-foreground/4 hover:text-foreground"
         onClick={onClose}
         title="Close panel"
       >
@@ -444,7 +413,7 @@ export function PanelLayout({ toolbar }: PanelLayoutProps) {
                       </span>
                       <button
                         type="button"
-                        className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-foreground-tertiary transition-colors hover:bg-foreground/8 hover:text-foreground"
+                        className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-foreground-tertiary transition-colors hover:bg-foreground/4 hover:text-foreground"
                         onClick={(e) => {
                           setNotesMenuOpen(false);
                           handleClosePanel(e, panel.id);

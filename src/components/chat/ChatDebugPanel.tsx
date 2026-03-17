@@ -467,15 +467,36 @@ function ConversationRow({
         <span className={`w-11 shrink-0 pt-0.5 font-mono text-[10px] uppercase tracking-[0.04em] ${roleBadgeClass(entry.role)}`}>
           {entry.role}
         </span>
-        <span className="min-w-0 flex-1 font-mono text-[10px] leading-4 text-foreground-secondary">
-          {entry.preview}
-        </span>
+        {open ? (
+          <div className="min-w-0 flex-1 space-y-2">
+            <HighlightedPre
+              text={entry.fullText}
+              language={inferLanguage(entry.fullText)}
+              className={DEBUG_TEXT}
+            />
+          </div>
+        ) : (
+          <span className="min-w-0 flex-1 font-mono text-[10px] leading-4 text-foreground-secondary">
+            {entry.preview}
+          </span>
+        )}
         <ChevronDown
           size={14}
           strokeWidth={1.8}
           className={`mt-0.5 shrink-0 text-foreground-tertiary transition-transform ${open ? 'rotate-180' : ''}`}
         />
       </button>
+
+      {open && entry.rawJson && (
+        <div className="ml-[52px]">
+          <RawJsonToggle
+            label="Raw JSON"
+            open={rawJsonOpen}
+            onToggle={onToggleRawJson}
+            json={entry.rawJson}
+          />
+        </div>
+      )}
 
       {entry.toolEntries.map((tool) => (
         <ToolDetail
@@ -485,24 +506,6 @@ function ConversationRow({
           onToggle={() => onToggleTool(tool.id)}
         />
       ))}
-
-      {open && (
-        <div className="ml-[52px] space-y-2 rounded-lg border border-border/70 bg-foreground/[0.02] px-2.5 py-2.5">
-          <HighlightedPre
-            text={entry.fullText}
-            language={inferLanguage(entry.fullText)}
-            className={DEBUG_TEXT}
-          />
-          {entry.rawJson && (
-            <RawJsonToggle
-              label="Raw JSON"
-              open={rawJsonOpen}
-              onToggle={onToggleRawJson}
-              json={entry.rawJson}
-            />
-          )}
-        </div>
-      )}
     </div>
   );
 }

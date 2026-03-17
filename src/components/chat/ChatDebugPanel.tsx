@@ -492,7 +492,7 @@ export function ChatDebugPanel({ debug }: ChatDebugPanelProps) {
 
   return (
     <div className="space-y-2">
-      <div className="flex items-center justify-between px-1">
+      <div className="flex items-center justify-between px-2">
         <div className="text-[11px] font-medium text-foreground">Chat Debug</div>
         <div className="font-mono text-[10px] text-foreground-tertiary">
           {debug.provider} / {debug.modelId}
@@ -519,7 +519,7 @@ export function ChatDebugPanel({ debug }: ChatDebugPanelProps) {
             onToggle={() => setContextOpen((value) => !value)}
           />
 
-          <div className="space-y-1.5 px-1">
+          <div className="space-y-1.5">
             {conversationEntries.length === 0 ? (
               <div className="font-mono text-[10px] text-foreground-tertiary">No messages in context.</div>
             ) : (

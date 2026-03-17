@@ -130,12 +130,12 @@ export function ChatPanel({ panelId, sessionId, hideHeader }: ChatPanelProps) {
     setDebugOpen(false);
   }, [debugEnabled]);
 
-  const hadSteeringRef = useRef(false);
+  const steeringArmedRef = useRef(false);
   useEffect(() => {
-    if (hadSteeringRef.current && !hasSteering) {
+    if (steeringArmedRef.current && !hasSteering) {
       setLocalSteeringNote(null);
+      steeringArmedRef.current = false;
     }
-    hadSteeringRef.current = hasSteering;
   }, [hasSteering]);
 
   useEffect(() => {
@@ -170,11 +170,13 @@ export function ChatPanel({ panelId, sessionId, hideHeader }: ChatPanelProps) {
     const combined = steeringNote ? `${steeringNote}\n${text}` : text;
     setLocalSteeringNote(combined);
     setSteeringNote(combined);
+    steeringArmedRef.current = true;
   }
 
   function handleClearSteering() {
     setLocalSteeringNote(null);
     setSteeringNote(null);
+    steeringArmedRef.current = false;
   }
 
   function handleEditSteerNote() {
@@ -431,7 +433,7 @@ export function ChatPanel({ panelId, sessionId, hideHeader }: ChatPanelProps) {
                           <Trash2 size={14} strokeWidth={1.8} />
                         </button>
                       </div>
-                      <div className="steer-note-pending whitespace-pre-wrap rounded-lg bg-background px-3 py-2 text-base leading-6 text-foreground">
+                      <div className="steer-note-pending max-h-32 overflow-y-auto whitespace-pre-wrap rounded-lg bg-background px-3 py-2 text-base leading-6 text-foreground">
                         {steeringNote}
                       </div>
                     </div>

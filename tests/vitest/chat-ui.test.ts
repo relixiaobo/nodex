@@ -562,18 +562,63 @@ describe('chat ui', () => {
     expect(html).not.toContain('disabled=""');
   });
 
-  it('shows send button instead of stop button when user types during streaming', () => {
-    // Without text — stop button
-    const emptyHtml = renderToStaticMarkup(
-      React.createElement(ChatInput, {
+  it('shows stop button when streaming with empty input, send button when text is typed', async () => {
+    const onSteer = vi.fn();
+
+    flushSync(() => {
+      root.render(React.createElement(ChatInput, {
         disabled: true,
         onSend: async () => {},
         onStop: () => {},
-        onSteer: () => {},
-      }),
-    );
-    expect(emptyHtml).toContain('aria-label="Stop generating"');
-    expect(emptyHtml).not.toContain('aria-label="Send message"');
+        onSteer,
+      }));
+    });
+
+    // Empty textarea — stop button
+    expect(container.querySelector('button[aria-label="Stop generating"]')).not.toBeNull();
+    expect(container.querySelector('button[aria-label="Send message"]')).toBeNull();
+
+    // Type text — switches to send button
+    const textarea = container.querySelector('textarea') as HTMLTextAreaElement;
+    flushSync(() => {
+      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!.call(textarea, 'steer text');
+      textarea.dispatchEvent(new Event('input', { bubbles: true }));
+      textarea.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+
+    await vi.waitFor(() => {
+      expect(container.querySelector('button[aria-label="Send message"]')).not.toBeNull();
+      expect(container.querySelector('button[aria-label="Stop generating"]')).toBeNull();
+    });
+  });
+
+  it('calls onSteer with the draft text when Enter is pressed during streaming', async () => {
+    const onSteer = vi.fn();
+
+    flushSync(() => {
+      root.render(React.createElement(ChatInput, {
+        disabled: true,
+        onSend: async () => {},
+        onStop: () => {},
+        onSteer,
+      }));
+    });
+
+    const textarea = container.querySelector('textarea') as HTMLTextAreaElement;
+
+    flushSync(() => {
+      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!.call(textarea, 'course correct');
+      textarea.dispatchEvent(new Event('input', { bubbles: true }));
+      textarea.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+
+    flushSync(() => {
+      textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    });
+
+    expect(onSteer).toHaveBeenCalledTimes(1);
+    expect(onSteer).toHaveBeenCalledWith('course correct');
+    expect(textarea.value).toBe('');
   });
 
   it('keeps the panel layout visible on narrow screens instead of swapping to a chat-only view', () => {

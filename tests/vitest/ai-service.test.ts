@@ -1126,7 +1126,10 @@ describe('ai-service', () => {
     expect(clearSteeringQueueMock).toHaveBeenCalledTimes(1);
     expect(steerMock).not.toHaveBeenCalled();
 
+    // hasSteering delegates to hasQueuedMessages
     expect(hasSteering(agent)).toBe(true);
+    hasQueuedMessagesMock.mockReturnValue(false);
+    expect(hasSteering(agent)).toBe(false);
   });
 
   it('migrates legacy chrome storage AI settings into provider config nodes', async () => {

@@ -373,6 +373,9 @@ function buildAssistantParts(message: AssistantMessage): ContentPart[] {
       return { type: 'text', preview: truncatePreview(block.text), fullText: block.text };
     }
     if (block.type === 'thinking') {
+      if (block.redacted) {
+        return { type: 'thinking (redacted)', preview: '(content redacted by provider)', fullText: '(content redacted by provider)' };
+      }
       return { type: 'thinking', preview: truncatePreview(block.thinking), fullText: block.thinking };
     }
     if (block.type === 'toolCall') {
@@ -384,15 +387,16 @@ function buildAssistantParts(message: AssistantMessage): ContentPart[] {
 }
 
 function buildToolResultParts(message: ToolResultMessage): ContentPart[] {
+  const typeLabel = message.isError ? `${message.toolName} (error)` : message.toolName;
   return (message.content as Array<{ type: string; text?: string; data?: string; mimeType?: string }>).map((block) => {
     if (block.type === 'text' && block.text) {
-      return { type: message.toolName, preview: truncatePreview(block.text), fullText: block.text };
+      return { type: typeLabel, preview: truncatePreview(block.text), fullText: block.text };
     }
     if (block.type === 'image') {
       const label = `[image: ${block.mimeType ?? 'unknown'}]`;
-      return { type: message.toolName, preview: label, fullText: label };
+      return { type: typeLabel, preview: label, fullText: label };
     }
-    return { type: message.toolName, preview: '(unknown block)', fullText: JSON.stringify(block, null, 2) };
+    return { type: typeLabel, preview: '(unknown block)', fullText: JSON.stringify(block, null, 2) };
   });
 }
 

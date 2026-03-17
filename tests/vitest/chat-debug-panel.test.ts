@@ -230,4 +230,95 @@ describe('ChatDebugPanel', () => {
 
     expect(container.textContent).toContain('hidden-tail-marker');
   });
+
+  it('renders multi-part user messages as separate collapsible rows', () => {
+    const snapshot = createSnapshot();
+    snapshot.messages[0] = {
+      role: 'user',
+      content: [
+        { type: 'text', text: 'Hello' },
+        { type: 'text', text: '<system-reminder>context here</system-reminder>' },
+      ],
+      timestamp: 1,
+    };
+    snapshot.messageInspectors[0] = {
+      ...snapshot.messageInspectors[0],
+      summary: 'Hello',
+    };
+    useChatDebugSnapshotMock.mockReturnValue({ snapshot, error: null, loading: false });
+
+    flushSync(() => {
+      root.render(React.createElement(ChatDebugPanel, { debug: createDebugState() }));
+    });
+
+    const userRow = container.querySelectorAll('[data-testid="chat-debug-message-row"]')[2];
+    const buttons = userRow?.querySelectorAll('button') ?? [];
+    // Two text parts = two collapsible buttons
+    expect(buttons.length).toBeGreaterThanOrEqual(2);
+    expect(userRow?.textContent).toContain('Hello');
+    expect(userRow?.textContent).toContain('system-reminder');
+  });
+
+  it('renders thinking blocks in assistant messages', () => {
+    const snapshot = createSnapshot();
+    snapshot.messages[1] = {
+      ...snapshot.messages[1],
+      role: 'assistant',
+      content: [
+        { type: 'thinking', thinking: 'Let me search...', redacted: false },
+        { type: 'text', text: 'Searching workspace' },
+        { type: 'toolCall', id: 'call_1', name: 'node_search', arguments: { query: 'Tana' } },
+      ],
+    } as any;
+    useChatDebugSnapshotMock.mockReturnValue({ snapshot, error: null, loading: false });
+
+    flushSync(() => {
+      root.render(React.createElement(ChatDebugPanel, { debug: createDebugState() }));
+    });
+
+    const asstRow = container.querySelectorAll('[data-testid="chat-debug-message-row"]')[3];
+    expect(asstRow?.textContent).toContain('thinking');
+    expect(asstRow?.textContent).toContain('Let me search');
+  });
+
+  it('labels redacted thinking blocks', () => {
+    const snapshot = createSnapshot();
+    snapshot.messages[1] = {
+      ...snapshot.messages[1],
+      role: 'assistant',
+      content: [
+        { type: 'thinking', thinking: '', redacted: true },
+        { type: 'text', text: 'Searching workspace' },
+        { type: 'toolCall', id: 'call_1', name: 'node_search', arguments: { query: 'Tana' } },
+      ],
+    } as any;
+    useChatDebugSnapshotMock.mockReturnValue({ snapshot, error: null, loading: false });
+
+    flushSync(() => {
+      root.render(React.createElement(ChatDebugPanel, { debug: createDebugState() }));
+    });
+
+    const asstRow = container.querySelectorAll('[data-testid="chat-debug-message-row"]')[3];
+    expect(asstRow?.textContent).toContain('thinking (redacted)');
+    expect(asstRow?.textContent).toContain('content redacted by provider');
+  });
+
+  it('marks failed tool results with error indicator', () => {
+    const snapshot = createSnapshot();
+    (snapshot.messages[2] as any).isError = true;
+    (snapshot.messages[2] as any).content = [{ type: 'text', text: 'Permission denied' }];
+    snapshot.messageInspectors[2] = {
+      ...snapshot.messageInspectors[2],
+      summary: 'node_search (error) Permission denied',
+    };
+    useChatDebugSnapshotMock.mockReturnValue({ snapshot, error: null, loading: false });
+
+    flushSync(() => {
+      root.render(React.createElement(ChatDebugPanel, { debug: createDebugState() }));
+    });
+
+    const toolRow = container.querySelectorAll('[data-testid="chat-debug-message-row"]')[4];
+    expect(toolRow?.textContent).toContain('node_search (error)');
+    expect(toolRow?.textContent).toContain('Permission denied');
+  });
 });

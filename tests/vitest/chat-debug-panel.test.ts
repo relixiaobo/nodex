@@ -230,12 +230,13 @@ describe('ChatDebugPanel', () => {
     });
 
     const rows = Array.from(container.querySelectorAll('[data-testid="chat-debug-message-row"]'));
-    expect(rows).toHaveLength(4);
+    expect(rows).toHaveLength(5);
     expect(rows[0]?.textContent).toContain('SYSTEM');
-    expect(rows[1]?.textContent).toContain('USER');
-    expect(rows[2]?.textContent).toContain('ASST');
-    expect(rows[3]?.textContent).toContain('TOOL');
-    expect(rows[3]?.textContent).toContain('0 results');
+    expect(rows[1]?.textContent).toContain('SYSTEM');
+    expect(rows[2]?.textContent).toContain('USER');
+    expect(rows[3]?.textContent).toContain('ASST');
+    expect(rows[4]?.textContent).toContain('TOOL');
+    expect(rows[4]?.textContent).toContain('0 results');
   });
 
   it('reveals message details and raw turn JSON progressively', () => {

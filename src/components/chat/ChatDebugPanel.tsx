@@ -2,7 +2,7 @@ import { useMemo, useState, type ReactNode } from 'react';
 import type { AssistantMessage, Message, ToolCall, ToolResultMessage } from '@mariozechner/pi-ai';
 import type { AgentDebugState } from '../../hooks/use-agent.js';
 import { useChatDebugSnapshot } from '../../hooks/use-chat-debug-snapshot.js';
-import type { AgentDebugSnapshot, ChatTurnDebugRecord, DebugMessageInspector, DebugTokenEstimate } from '../../lib/ai-debug.js';
+import type { AgentDebugSnapshot, ChatTurnDebugRecord, DebugTokenEstimate } from '../../lib/ai-debug.js';
 import { sanitizeDebugValue } from '../../lib/ai-debug.js';
 import { highlightCode } from '../../lib/code-highlight.js';
 import { ChevronDown } from '../../lib/icons.js';
@@ -13,23 +13,18 @@ interface ChatDebugPanelProps {
 
 type DisplayRole = 'SYSTEM' | 'USER' | 'ASST' | 'TOOL';
 
-interface ConversationToolEntry {
-  id: string;
-  summary: string;
-  argumentsJson: string;
-  resultPreview: string;
-  resultText: string | null;
-  resultJson: string | null;
-  resultIsError: boolean;
+interface ContentPart {
+  type: string;
+  preview: string;
+  fullText: string;
 }
 
 interface ConversationEntry {
   id: string;
   role: DisplayRole;
-  preview: string;
-  fullText: string;
+  roleMeta?: string;
+  contentParts: ContentPart[];
   rawJson: string | null;
-  toolEntries: ConversationToolEntry[];
 }
 
 interface TurnJsonState {
@@ -99,10 +94,6 @@ function roleBadgeClass(role: DisplayRole): string {
   }
 }
 
-function toolBadgeClass(): string {
-  return 'border-amber-500/30 bg-amber-500/10 text-amber-700';
-}
-
 function turnStatusClass(status: ChatTurnDebugRecord['status']): string {
   switch (status) {
     case 'completed':
@@ -149,52 +140,6 @@ function summarizeArguments(value: unknown): string {
 function summarizeToolCall(toolCall: ToolCall): string {
   const argsSummary = summarizeArguments(toolCall.arguments);
   return argsSummary ? `${toolCall.name}(${argsSummary})` : `${toolCall.name}()`;
-}
-
-function blockToText(block: Record<string, unknown>): string {
-  if (block.type === 'text' && typeof block.text === 'string') {
-    return block.text;
-  }
-
-  if (block.type === 'image' && typeof block.mimeType === 'string') {
-    return `[image: ${block.mimeType}]`;
-  }
-
-  return '';
-}
-
-function extractArrayContentText(content: unknown[]): string {
-  return content
-    .map((block) => block && typeof block === 'object' ? blockToText(block as Record<string, unknown>) : '')
-    .filter(Boolean)
-    .join('\n');
-}
-
-function extractMessageText(message: Message): string {
-  if (message.role === 'assistant') {
-    return extractAssistantText(message);
-  }
-
-  if (typeof message.content === 'string') {
-    return message.content;
-  }
-
-  return extractArrayContentText(message.content as unknown[]);
-}
-
-function extractAssistantText(message: AssistantMessage): string {
-  return message.content
-    .map((block) => {
-      if (block.type === 'text') return block.text;
-      if (block.type === 'thinking') return `[thinking]\n${block.thinking}\n[/thinking]`;
-      return '';
-    })
-    .filter(Boolean)
-    .join('\n');
-}
-
-function extractToolResultText(result: ToolResultMessage): string {
-  return extractArrayContentText(result.content as unknown[]);
 }
 
 function HighlightedPre({
@@ -380,116 +325,67 @@ function ContextSummaryBar({
   );
 }
 
-function ToolDetail({
-  tool,
-  open,
-  onToggle,
-}: {
-  tool: ConversationToolEntry;
-  open: boolean;
-  onToggle: () => void;
-}) {
-  return (
-    <div className="ml-[52px] rounded-lg border border-border/70 bg-foreground/[0.02]">
-      <button
-        type="button"
-        onClick={onToggle}
-        className="flex w-full items-start gap-2 px-2.5 py-2 text-left"
-      >
-        <span className={`mt-0.5 rounded-full border px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.04em] ${toolBadgeClass()}`}>
-          TOOL
-        </span>
-        <div className="min-w-0 flex-1 font-mono text-[10px] leading-4">
-          <div className="truncate text-foreground">{tool.summary}</div>
-          <div className="mt-0.5 truncate text-foreground-tertiary">
-            {tool.resultPreview}
-          </div>
-        </div>
-        <ChevronDown
-          size={14}
-          strokeWidth={1.8}
-          className={`mt-0.5 shrink-0 text-foreground-tertiary transition-transform ${open ? 'rotate-180' : ''}`}
-        />
-      </button>
-
-      {open && (
-        <div className="space-y-2 border-t border-border/70 px-2.5 py-2.5">
-          <div>
-            <div className="mb-1 font-mono text-[10px] uppercase tracking-[0.04em] text-foreground-tertiary">Input</div>
-            <DebugCodeBlock text={tool.argumentsJson} language="json" />
-          </div>
-          {tool.resultText && (
-            <div>
-              <div className={`mb-1 font-mono text-[10px] uppercase tracking-[0.04em] ${tool.resultIsError ? 'text-destructive' : 'text-foreground-tertiary'}`}>
-                Output
-              </div>
-              <DebugCodeBlock
-                text={tool.resultText}
-                language={inferLanguage(tool.resultText)}
-                wrap
-              />
-            </div>
-          )}
-          {tool.resultJson && (
-            <div className="font-mono text-[10px] text-foreground-tertiary">
-              Sanitized tool result available.
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
 function ConversationRow({
   entry,
-  open,
+  expandedParts,
   rawJsonOpen,
-  onToggle,
+  onTogglePart,
   onToggleRawJson,
-  expandedTools,
-  onToggleTool,
 }: {
   entry: ConversationEntry;
-  open: boolean;
+  expandedParts: Record<string, boolean>;
   rawJsonOpen: boolean;
-  onToggle: () => void;
+  onTogglePart: (id: string) => void;
   onToggleRawJson: () => void;
-  expandedTools: Record<string, boolean>;
-  onToggleTool: (id: string) => void;
 }) {
-  return (
-    <div className="space-y-1.5" data-testid="chat-debug-message-row">
-      <button
-        type="button"
-        onClick={onToggle}
-        className={`flex w-full items-start gap-3 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-foreground/[0.03] ${open ? 'bg-foreground/[0.03]' : ''}`}
-      >
-        <span className={`w-11 shrink-0 pt-0.5 font-mono text-[10px] uppercase tracking-[0.04em] ${roleBadgeClass(entry.role)}`}>
-          {entry.role}
-        </span>
-        {open ? (
-          <div className="min-w-0 flex-1 space-y-2">
-            <HighlightedPre
-              text={entry.fullText}
-              language={inferLanguage(entry.fullText)}
-              className={DEBUG_TEXT}
-            />
-          </div>
-        ) : (
-          <span className="min-w-0 flex-1 font-mono text-[10px] leading-4 text-foreground-secondary">
-            {entry.preview}
-          </span>
-        )}
-        <ChevronDown
-          size={14}
-          strokeWidth={1.8}
-          className={`mt-0.5 shrink-0 text-foreground-tertiary transition-transform ${open ? 'rotate-180' : ''}`}
-        />
-      </button>
+  const roleLabel = entry.roleMeta ? `${entry.role} · ${entry.roleMeta}` : entry.role;
 
-      {open && entry.rawJson && (
-        <div className="ml-[52px]">
+  return (
+    <div data-testid="chat-debug-message-row">
+      {entry.contentParts.map((part, partIndex) => {
+        const partId = `${entry.id}-${partIndex}`;
+        const isExpanded = expandedParts[partId] ?? false;
+
+        return (
+          <button
+            key={partId}
+            type="button"
+            onClick={() => onTogglePart(partId)}
+            className={`flex w-full items-start gap-2 rounded-lg px-2 py-1 text-left transition-colors hover:bg-foreground/[0.03] ${isExpanded ? 'bg-foreground/[0.03]' : ''}`}
+          >
+            {partIndex === 0 ? (
+              <span className={`w-11 shrink-0 pt-0.5 font-mono text-[10px] uppercase tracking-[0.04em] ${roleBadgeClass(entry.role)}`}>
+                {roleLabel}
+              </span>
+            ) : (
+              <span className="w-11 shrink-0" />
+            )}
+            <span className="w-14 shrink-0 pt-0.5 font-mono text-[9px] text-foreground-tertiary">
+              {part.type}
+            </span>
+            {isExpanded ? (
+              <div className="min-w-0 flex-1">
+                <HighlightedPre
+                  text={part.fullText}
+                  language={inferLanguage(part.fullText)}
+                  className={DEBUG_TEXT}
+                />
+              </div>
+            ) : (
+              <span className="min-w-0 flex-1 truncate font-mono text-[10px] leading-4 text-foreground-secondary">
+                {part.preview}
+              </span>
+            )}
+            <ChevronDown
+              size={12}
+              strokeWidth={1.8}
+              className={`mt-0.5 shrink-0 text-foreground-tertiary transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+            />
+          </button>
+        );
+      })}
+      {entry.rawJson && (
+        <div className="ml-[108px] pt-1">
           <RawJsonToggle
             label="Raw JSON"
             open={rawJsonOpen}
@@ -498,15 +394,6 @@ function ConversationRow({
           />
         </div>
       )}
-
-      {entry.toolEntries.map((tool) => (
-        <ToolDetail
-          key={tool.id}
-          tool={tool}
-          open={expandedTools[tool.id] ?? false}
-          onToggle={() => onToggleTool(tool.id)}
-        />
-      ))}
     </div>
   );
 }
@@ -685,68 +572,81 @@ function ToolSchemaRow({
   );
 }
 
+function buildUserParts(message: Message): ContentPart[] {
+  if (typeof message.content === 'string') {
+    return [{ type: 'text', preview: truncatePreview(message.content), fullText: message.content }];
+  }
+  return (message.content as Array<{ type: string; text?: string; data?: string; mimeType?: string }>).map((block) => {
+    if (block.type === 'text' && block.text) {
+      return { type: 'text', preview: truncatePreview(block.text), fullText: block.text };
+    }
+    if (block.type === 'image') {
+      const label = `[image: ${block.mimeType ?? 'unknown'}]`;
+      return { type: 'image', preview: label, fullText: label };
+    }
+    return { type: block.type, preview: '(unknown block)', fullText: JSON.stringify(block, null, 2) };
+  });
+}
+
+function buildAssistantParts(message: AssistantMessage): ContentPart[] {
+  return message.content.map((block) => {
+    if (block.type === 'text') {
+      return { type: 'text', preview: truncatePreview(block.text), fullText: block.text };
+    }
+    if (block.type === 'thinking') {
+      return { type: 'thinking', preview: truncatePreview(block.thinking), fullText: block.thinking };
+    }
+    if (block.type === 'toolCall') {
+      const summary = summarizeToolCall(block);
+      return { type: 'toolCall', preview: summary, fullText: JSON.stringify(block.arguments, null, 2) };
+    }
+    return { type: 'unknown', preview: '(unknown block)', fullText: JSON.stringify(block, null, 2) };
+  });
+}
+
+function buildToolResultParts(message: ToolResultMessage): ContentPart[] {
+  return (message.content as Array<{ type: string; text?: string; data?: string; mimeType?: string }>).map((block) => {
+    if (block.type === 'text' && block.text) {
+      return { type: 'text', preview: truncatePreview(block.text), fullText: block.text };
+    }
+    if (block.type === 'image') {
+      const label = `[image: ${block.mimeType ?? 'unknown'}]`;
+      return { type: 'image', preview: label, fullText: label };
+    }
+    return { type: block.type, preview: '(unknown block)', fullText: JSON.stringify(block, null, 2) };
+  });
+}
+
 function buildConversationEntries(snapshot: AgentDebugSnapshot): ConversationEntry[] {
   const sanitizedMessages = snapshot.messages.map((message) => sanitizeDebugValue(message) as Message);
-  const toolResultMap = new Map<string, { message: ToolResultMessage; inspector: DebugMessageInspector }>();
-
-  sanitizedMessages.forEach((message, index) => {
-    if (message.role !== 'toolResult') return;
-    toolResultMap.set(message.toolCallId, {
-      message,
-      inspector: snapshot.messageInspectors[index],
-    });
-  });
 
   const entries: ConversationEntry[] = [{
     id: 'system-prompt',
     role: 'SYSTEM',
-    preview: truncatePreview(snapshot.systemPrompt),
-    fullText: snapshot.systemPrompt || '(empty)',
+    contentParts: [{ type: 'text', preview: truncatePreview(snapshot.systemPrompt), fullText: snapshot.systemPrompt || '(empty)' }],
     rawJson: null,
-    toolEntries: [],
   }];
-
 
   sanitizedMessages.forEach((message, index) => {
     const inspector = snapshot.messageInspectors[index];
 
     if (message.role === 'toolResult') {
-      const resultText = extractToolResultText(message);
       entries.push({
         id: inspector.id,
         role: 'TOOL',
-        preview: inspector.summary,
-        fullText: resultText || '(empty)',
+        roleMeta: message.toolName,
+        contentParts: buildToolResultParts(message),
         rawJson: inspector.json,
-        toolEntries: [],
       });
       return;
     }
 
     if (message.role === 'assistant') {
-      const toolEntries = message.content
-        .filter((block): block is ToolCall => block.type === 'toolCall')
-        .map((toolCall) => {
-          const result = toolResultMap.get(toolCall.id);
-          const resultText = result ? extractToolResultText(result.message) : null;
-          return {
-            id: toolCall.id,
-            summary: summarizeToolCall(toolCall),
-            argumentsJson: JSON.stringify(toolCall.arguments, null, 2),
-            resultPreview: result ? truncatePreview(result.inspector.summary) : 'Waiting for result…',
-            resultText: resultText && resultText.trim().length > 0 ? resultText : result ? '(empty)' : null,
-            resultJson: result?.inspector.json ?? null,
-            resultIsError: result?.message.isError === true,
-          } satisfies ConversationToolEntry;
-        });
-
       entries.push({
         id: inspector.id,
         role: 'ASST',
-        preview: inspector.summary,
-        fullText: extractAssistantText(message) || '(tool calls only)',
+        contentParts: buildAssistantParts(message),
         rawJson: inspector.json,
-        toolEntries,
       });
       return;
     }
@@ -754,10 +654,8 @@ function buildConversationEntries(snapshot: AgentDebugSnapshot): ConversationEnt
     entries.push({
       id: inspector.id,
       role: 'USER',
-      preview: inspector.summary,
-      fullText: extractMessageText(message) || '(empty)',
+      contentParts: buildUserParts(message),
       rawJson: inspector.json,
-      toolEntries: [],
     });
   });
 
@@ -767,9 +665,8 @@ function buildConversationEntries(snapshot: AgentDebugSnapshot): ConversationEnt
 export function ChatDebugPanel({ debug }: ChatDebugPanelProps) {
   const [contextOpen, setContextOpen] = useState(false);
   const [toolsOpen, setToolsOpen] = useState(false);
-  const [expandedMessages, toggleMessage] = useToggleMap();
+  const [expandedParts, togglePart] = useToggleMap();
   const [expandedMessageJson, toggleMessageJson] = useToggleMap();
-  const [expandedConversationTools, toggleConversationTool] = useToggleMap();
   const [expandedTurns, toggleTurn] = useToggleMap();
   const [expandedTurnRequestJson, toggleTurnRequestJson] = useToggleMap();
   const [expandedTurnResponseJson, toggleTurnResponseJson] = useToggleMap();
@@ -818,12 +715,10 @@ export function ChatDebugPanel({ debug }: ChatDebugPanelProps) {
                 <ConversationRow
                   key={entry.id}
                   entry={entry}
-                  open={expandedMessages[entry.id] ?? false}
+                  expandedParts={expandedParts}
                   rawJsonOpen={expandedMessageJson[entry.id] ?? false}
-                  onToggle={() => toggleMessage(entry.id)}
+                  onTogglePart={togglePart}
                   onToggleRawJson={() => toggleMessageJson(entry.id)}
-                  expandedTools={expandedConversationTools}
-                  onToggleTool={toggleConversationTool}
                 />
               ))
             )}

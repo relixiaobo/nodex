@@ -76,16 +76,32 @@ function buildPanelContext(): string | null {
   ].join('\n');
 }
 
-async function getActiveTabContext(): Promise<string | null> {
+const MAX_BROWSER_TABS = 20;
+
+function isWebUrl(url: string): boolean {
+  return url.startsWith('http://') || url.startsWith('https://');
+}
+
+async function getPageContext(): Promise<string | null> {
   if (typeof chrome === 'undefined' || !chrome.tabs?.query) return null;
 
   try {
-    const tabs = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
-    const tab = tabs[0];
-    if (!tab?.url || !tab.title) return null;
+    const allTabs = await chrome.tabs.query({ currentWindow: true });
+    const webTabs = allTabs
+      .filter((tab) => tab.url && tab.title && isWebUrl(tab.url))
+      .slice(0, MAX_BROWSER_TABS);
+
+    if (webTabs.length === 0) return null;
+
+    const lines = webTabs.map((tab) => {
+      const prefix = tab.active ? '[active, ' : '[';
+      return `* ${prefix}id:${tab.id}] "${escapeXml(tab.title!)}" — ${escapeXml(tab.url!)}`;
+    });
+
     return [
       '<page-context>',
-      `User is browsing: ${escapeXml(tab.url)} — "${escapeXml(tab.title)}"`,
+      'Tabs:',
+      ...lines,
       '</page-context>',
     ].join('\n');
   } catch {
@@ -106,7 +122,7 @@ function buildTimeContext(): string {
 export async function buildSystemReminder(): Promise<string> {
   const sections = [
     buildPanelContext(),
-    await getActiveTabContext(),
+    await getPageContext(),
     buildTimeContext(),
   ].filter((section): section is string => !!section);
 

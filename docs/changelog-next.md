@@ -67,3 +67,4 @@
 - 修复 Chat 分支逻辑：regenerate 不再重复创建 user 消息，正确在 assistant 层创建分支（`← 1/2 →`）；切换分支后持久化正确保存；支持从 tool result 续接 regenerate
 - 新增 Chat 转向便条（Steering）：AI 工作期间可在输入框中发送消息，多次 Enter 追加到同一张便条，点击便条可撤回编辑，AI 在当前工具执行完成后一次性读取全部内容
 - 修复登录/登出导致 `#agent` 和 `#spark` 系统提示词子节点重复的问题（prompt line 改用固定 ID，bootstrap 幂等）
+- AI Chat 上下文增强：`<page-context>` 现在包含当前窗口所有标签页（title + URL + tabId），AI 可以感知用户打开的多个页面并通过 browser tool 跨标签获取信息

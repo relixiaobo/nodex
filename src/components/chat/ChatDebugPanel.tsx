@@ -38,7 +38,7 @@ interface ConversationEntry {
 
 const DEBUG_TEXT = 'max-h-80 overflow-auto whitespace-pre-wrap break-words font-mono text-[10px] leading-4 text-foreground-secondary';
 const DEBUG_CODE = 'max-h-80 overflow-auto whitespace-pre font-mono text-[10px] leading-4 text-foreground-secondary';
-const DEBUG_CODE_CARD = `${DEBUG_CODE} rounded-xl border border-border/80 bg-background px-2.5 py-2`;
+const DEBUG_CODE_CARD = `${DEBUG_CODE} rounded-xl border border-border bg-background px-2 py-2`;
 const PANEL_CARD = 'overflow-hidden rounded-xl border border-border bg-background';
 
 function formatTokenCount(value: number): string {
@@ -86,7 +86,7 @@ function roleBadgeClass(role: DisplayRole): string {
     case 'ASST':
       return 'text-primary';
     case 'TOOL':
-      return 'text-amber-700';
+      return 'text-warning';
     case 'TOOLS':
       return 'text-foreground-tertiary';
     default:
@@ -179,12 +179,12 @@ function RawJsonToggle({
       <button
         type="button"
         onClick={onToggle}
-        className="inline-flex items-center gap-1.5 rounded-full border border-border px-2 py-1 font-mono text-[10px] text-foreground-tertiary transition-colors hover:border-foreground/20 hover:text-foreground"
+        className="inline-flex items-center gap-1.5 rounded-full border border-border px-2 py-1 font-mono text-[10px] text-foreground-tertiary transition-colors hover:border-border-emphasis hover:text-foreground"
       >
         <span>{label}</span>
         <ChevronDown
           size={12}
-          strokeWidth={1.8}
+          strokeWidth={1.5}
           className={`transition-transform ${open ? 'rotate-180' : ''}`}
         />
       </button>
@@ -241,7 +241,7 @@ function ContextSummaryBar({
           <span className="font-mono text-[10px] text-foreground-tertiary">{summary}</span>
           <ChevronDown
             size={14}
-            strokeWidth={1.8}
+            strokeWidth={1.5}
             className={`shrink-0 text-foreground-tertiary transition-transform ${open ? 'rotate-180' : ''}`}
           />
         </div>
@@ -263,7 +263,7 @@ function ContextSummaryBar({
       </button>
 
       {open && (
-        <div className="border-t border-border/80 px-3 py-3">
+        <div className="border-t border-border px-3 py-3">
           <TokenBreakdown tokenEstimate={snapshot.tokenEstimate} />
         </div>
       )}
@@ -295,7 +295,7 @@ function ConversationRow({
             key={partId}
             type="button"
             onClick={() => onTogglePart(partId)}
-            className={`flex w-full flex-col rounded-lg px-2 py-1 text-left transition-colors hover:bg-foreground/[0.03] ${isExpanded ? 'bg-foreground/[0.03]' : ''}`}
+            className={`flex w-full flex-col rounded-lg px-2 py-1 text-left transition-colors hover:bg-foreground/4 ${isExpanded ? 'bg-foreground/4' : ''}`}
           >
             <div className="flex w-full items-center gap-2">
               {partIndex === 0 ? (
@@ -305,12 +305,12 @@ function ConversationRow({
               ) : (
                 <span className="w-11 shrink-0" />
               )}
-              <span className="min-w-0 flex-1 font-mono text-[9px] text-foreground-tertiary">
+              <span className="min-w-0 flex-1 font-mono text-[10px] text-foreground-tertiary">
                 {part.type}
               </span>
               <ChevronDown
                 size={12}
-                strokeWidth={1.8}
+                strokeWidth={1.5}
                 className={`shrink-0 text-foreground-tertiary transition-transform ${isExpanded ? 'rotate-180' : ''}`}
               />
             </div>
@@ -331,7 +331,7 @@ function ConversationRow({
         );
       })}
       {entry.usageMeta && (
-        <div className="ml-11 pl-2 py-0.5 font-mono text-[9px] text-foreground-tertiary" data-testid="chat-debug-usage-meta">
+        <div className="ml-11 pl-2 py-0.5 font-mono text-[10px] text-foreground-tertiary" data-testid="chat-debug-usage-meta">
           {'↳ '}in:{entry.usageMeta.input} out:{entry.usageMeta.output} cache:{entry.usageMeta.cacheRead}
           {' · '}{formatCost(entry.usageMeta.cost)}
           {' · '}{entry.usageMeta.stopReason}
@@ -500,13 +500,13 @@ export function ChatDebugPanel({ debug }: ChatDebugPanelProps) {
       </div>
 
       {loading && (
-        <div className="rounded-2xl border border-border bg-background px-3 py-3 font-mono text-[10px] text-foreground-tertiary">
+        <div className="rounded-xl border border-border bg-background px-3 py-3 font-mono text-[10px] text-foreground-tertiary">
           Loading live context snapshot…
         </div>
       )}
 
       {error && (
-        <div className="rounded-2xl border border-destructive/30 bg-destructive/5 px-3 py-3 font-mono text-[10px] text-destructive">
+        <div className="rounded-xl border border-destructive/30 bg-destructive/5 px-3 py-3 font-mono text-[10px] text-destructive">
           Live snapshot failed to load: {error}
         </div>
       )}

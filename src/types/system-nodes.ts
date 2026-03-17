@@ -334,6 +334,8 @@ export const NDX_F = {
   PROVIDER_BASE_URL: 'NDX_F20',
   /** Settings: multi-provider configs (options_from_supertag → #ai-provider) */
   SETTING_AI_PROVIDERS: 'NDX_F21',
+  /** Settings: AI Debug toggle (boolean, on Settings container) */
+  SETTING_AI_DEBUG: 'NDX_F22',
 } as const;
 
 export type NdxFieldDef = typeof NDX_F[keyof typeof NDX_F];

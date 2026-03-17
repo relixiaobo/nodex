@@ -10,7 +10,9 @@ import { ChatPanel, shouldStickChatScroll } from '../../src/components/chat/Chat
 import { extractInlineMarkup, splitMarkdownBlocks } from '../../src/components/chat/MarkdownRenderer.js';
 import { DeskLayout } from '../../src/components/layout/DeskLayout.js';
 import { GlobalTools } from '../../src/components/toolbar/TopToolbar.js';
-import { resetChatPersistenceForTests } from '../../src/lib/ai-persistence.js';
+import { appendMessage, editMessage, getLinearPath, linearToTree, switchBranch as switchChatBranch } from '../../src/lib/ai-chat-tree.js';
+import { resetChatPersistenceForTests, saveChatSession } from '../../src/lib/ai-persistence.js';
+import { resetAIAgentForTests } from '../../src/lib/ai-service.js';
 import { SYSTEM_SCHEMA_NODE_IDS } from '../../src/lib/system-schema-presets.js';
 import { useNodeStore } from '../../src/stores/node-store.js';
 import { useUIStore } from '../../src/stores/ui-store.js';
@@ -46,6 +48,34 @@ class MockResizeObserver {
   }
 }
 
+function createUserMessage(content: string, timestamp: number) {
+  return {
+    role: 'user' as const,
+    content,
+    timestamp,
+  };
+}
+
+function createAssistantMessage(text: string, timestamp: number) {
+  return {
+    role: 'assistant' as const,
+    content: [{ type: 'text' as const, text }],
+    api: 'anthropic-messages' as const,
+    provider: 'anthropic' as const,
+    model: 'test',
+    usage: {
+      input: 0,
+      output: 0,
+      cacheRead: 0,
+      cacheWrite: 0,
+      totalTokens: 0,
+      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+    },
+    stopReason: 'stop' as const,
+    timestamp,
+  };
+}
+
 describe('chat ui', () => {
   const originalInnerWidth = window.innerWidth;
   const originalResizeObserver = globalThis.ResizeObserver;
@@ -54,6 +84,7 @@ describe('chat ui', () => {
 
   beforeEach(async () => {
     resetStores();
+    resetAIAgentForTests();
     resetChatPersistenceForTests();
     await deleteDB(DB_NAME);
     resetChatPersistenceForTests();
@@ -430,6 +461,51 @@ describe('chat ui', () => {
     });
 
     expect(container.textContent).not.toContain('Configure an AI provider to start chatting');
+  });
+
+  it('updates the rendered conversation when switching chat branches', async () => {
+    resetAndSeed();
+    useNodeStore.getState().setFieldValue(
+      SYSTEM_SCHEMA_NODE_IDS.DEFAULT_AI_PROVIDER_NODE,
+      NDX_F.PROVIDER_ENABLED,
+      [SYS_V.YES],
+    );
+
+    const session = linearToTree([
+      createUserMessage('user-1', 1),
+      createAssistantMessage('assistant-1', 2),
+      createUserMessage('user-2', 3),
+      createAssistantMessage('assistant-2', 4),
+    ]);
+    const originalUser = getLinearPath(session)[2];
+    editMessage(session, originalUser!.id, createUserMessage('alt-user', 5));
+    appendMessage(session, createAssistantMessage('alt-assistant', 6));
+    switchChatBranch(session, originalUser!.id);
+    await saveChatSession(session);
+
+    flushSync(() => {
+      root.render(React.createElement(ChatPanel, { panelId: 'chat-panel', sessionId: session.id }));
+    });
+
+    await vi.waitFor(() => {
+      expect(container.textContent).toContain('user-2');
+      expect(container.textContent).toContain('assistant-2');
+      expect(container.textContent).toContain('1/2');
+    });
+
+    const nextBranchButton = container.querySelector('button[aria-label="Show next branch"]');
+    expect(nextBranchButton).not.toBeNull();
+
+    flushSync(() => {
+      nextBranchButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    await vi.waitFor(() => {
+      expect(container.textContent).toContain('alt-user');
+      expect(container.textContent).toContain('alt-assistant');
+      expect(container.textContent).toContain('2/2');
+      expect(container.textContent).not.toContain('assistant-2');
+    });
   });
 
   it('renders the global chat trigger as a non-toggle button', () => {

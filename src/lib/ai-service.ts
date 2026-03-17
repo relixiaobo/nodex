@@ -304,6 +304,10 @@ function isLlmCompatibleMessage(message: AgentMessage): message is Message {
     || message.role === 'toolResult';
 }
 
+function canContinueFromMessage(message: AgentMessage | undefined): boolean {
+  return message?.role === 'user' || message?.role === 'toolResult';
+}
+
 function getMessageText(message: AgentMessage): string {
   if (typeof message.content === 'string') {
     return message.content;
@@ -509,7 +513,11 @@ async function ensureAgentHydrated(agent: Agent): Promise<void> {
   await restoreLatestChatSession(agent);
 }
 
-async function runAgentTurn(session: ChatSession, agent: Agent, prompt: string): Promise<void> {
+type AgentTurnInput =
+  | { mode: 'prompt'; prompt: string }
+  | { mode: 'continue' };
+
+async function runAgentTurn(session: ChatSession, agent: Agent, input: AgentTurnInput): Promise<void> {
   if (supportsDynamicAgentConfiguration(agent)) {
     await configureAgent(agent);
   }
@@ -542,7 +550,14 @@ async function runAgentTurn(session: ChatSession, agent: Agent, prompt: string):
   });
 
   try {
-    await agent.prompt(prompt);
+    if (input.mode === 'prompt') {
+      await agent.prompt(input.prompt);
+    } else {
+      if (!canContinueFromMessage(agent.state.messages.at(-1))) {
+        throw new Error('[ai-service] Cannot continue without a trailing user or toolResult message');
+      }
+      await agent.continue();
+    }
     await overflowRecovery.waitForAll();
     finalizeDebugTurn(agent, {
       assistantMessage: getLatestAssistantMessage(agent),
@@ -787,7 +802,10 @@ export async function streamChat(prompt: string, agent: Agent = getAIAgent()): P
   await ensureAgentHydrated(agent);
 
   const session = ensureCurrentSession(agent);
-  await runAgentTurn(session, agent, normalized);
+  await runAgentTurn(session, agent, {
+    mode: 'prompt',
+    prompt: normalized,
+  });
 }
 
 export async function editAndResend(
@@ -808,7 +826,7 @@ export async function editAndResend(
   });
 
   agent.replaceMessages(getCompressedPath(session));
-  await runAgentTurn(session, agent, normalized);
+  await runAgentTurn(session, agent, { mode: 'continue' });
 }
 
 export async function regenerateResponse(
@@ -823,18 +841,18 @@ export async function regenerateResponse(
   const messagesForAgent = getCompressedPath(session);
   agent.replaceMessages(messagesForAgent);
 
-  const lastUserMessage = [...messagesForAgent].reverse().find((message) => message.role === 'user');
-  if (!lastUserMessage) {
-    throw new Error('[ai-service] Cannot regenerate without a preceding user message');
+  if (!canContinueFromMessage(messagesForAgent.at(-1))) {
+    throw new Error('[ai-service] Cannot regenerate without a trailing user or toolResult message');
   }
 
-  await runAgentTurn(session, agent, getMessageText(lastUserMessage));
+  await runAgentTurn(session, agent, { mode: 'continue' });
 }
 
 export function switchMessageBranch(nodeId: string, agent: Agent = getAIAgent()): void {
   const session = ensureCurrentSession(agent);
   switchTreeBranch(session, nodeId);
   agent.replaceMessages(getCompressedPath(session));
+  void persistChatSession(agent);
 }
 
 export function stopStreaming(agent: Agent = getAIAgent()): void {

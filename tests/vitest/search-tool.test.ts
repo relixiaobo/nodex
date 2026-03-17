@@ -158,13 +158,20 @@ describe('node_search tool', () => {
 
   it('filters by date range', async () => {
     const today = new Date();
-    const todayStr = today.toISOString().split('T')[0];
+    const todayStr = [
+      today.getFullYear(),
+      String(today.getMonth() + 1).padStart(2, '0'),
+      String(today.getDate()).padStart(2, '0'),
+    ].join('-');
+    const createdToday = useNodeStore.getState().createChild('proj_1', undefined, {
+      name: 'Created today for date range filter',
+    });
 
     const result = await executeSearch({
       dateRange: { from: todayStr, to: todayStr },
     });
 
-    // Should return nodes created today (from seed data)
+    expect(result.items.map((i: { id: string }) => i.id)).toContain(createdToday.id);
     expect(result.total).toBeGreaterThan(0);
   });
 });

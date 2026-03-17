@@ -365,41 +365,6 @@ describe('chat ui', () => {
     expect(html).toContain('Sonnet 4.5');
   });
 
-  it('shows an explicit AI Debug action in the composer menu', async () => {
-    const onToggleDebug = vi.fn();
-
-    flushSync(() => {
-      root.render(React.createElement(ChatInput, {
-        disabled: false,
-        onSend: async () => {},
-        onStop: () => {},
-        onToggleDebug,
-      }));
-    });
-
-    const menuButton = container.querySelector('button[aria-label="More options"]');
-    expect(menuButton).not.toBeNull();
-
-    flushSync(() => {
-      menuButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    });
-
-    await vi.waitFor(() => {
-      expect(container.textContent).toContain('Enable AI Debug');
-    });
-
-    const debugButton = Array.from(container.querySelectorAll('button')).find(
-      (button) => button.textContent?.includes('Enable AI Debug'),
-    );
-    expect(debugButton).not.toBeUndefined();
-
-    flushSync(() => {
-      debugButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    });
-
-    expect(onToggleDebug).toHaveBeenCalledTimes(1);
-  });
-
   it('renders an empty state when no enabled provider is configured', async () => {
     resetAndSeed();
 
@@ -410,32 +375,6 @@ describe('chat ui', () => {
     await vi.waitFor(() => {
       expect(container.textContent).toContain('Configure an AI provider to start chatting');
       expect(container.textContent).toContain('Open Settings');
-      expect(container.textContent).toContain('Enable AI Debug');
-    });
-  });
-
-  it('can open AI Debug directly from the empty state', async () => {
-    resetAndSeed();
-
-    flushSync(() => {
-      root.render(React.createElement(ChatPanel, { panelId: 'chat-panel', sessionId: 'session-debug-empty' }));
-    });
-
-    await vi.waitFor(() => {
-      expect(container.textContent).toContain('Enable AI Debug');
-    });
-
-    const debugButton = Array.from(container.querySelectorAll('button')).find(
-      (button) => button.textContent?.includes('Enable AI Debug'),
-    );
-    expect(debugButton).not.toBeUndefined();
-
-    flushSync(() => {
-      debugButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    });
-
-    await vi.waitFor(() => {
-      expect(container.textContent).toContain('Chat Debug');
     });
   });
 

@@ -10,6 +10,9 @@ import type {
   Usage,
 } from '@mariozechner/pi-ai';
 import { prepareAgentContext, type PreparedAgentContext } from './ai-context.js';
+import * as loroDoc from './loro-doc.js';
+import { SYSTEM_SCHEMA_NODE_IDS } from './system-schema-presets.js';
+import { SYS_V } from '../types/index.js';
 
 const CHAT_DEBUG_STORAGE_KEY = 'soma-chat-debug-enabled';
 
@@ -100,6 +103,19 @@ function hasLocalStorage(): boolean {
 }
 
 export async function readChatDebugEnabled(): Promise<boolean> {
+  // Read from LoroDoc Settings field
+  try {
+    const fieldEntry = loroDoc.toNodexNode(SYSTEM_SCHEMA_NODE_IDS.SETTINGS_AI_DEBUG_FIELD_ENTRY);
+    const valueNodeId = fieldEntry?.children?.[0];
+    if (valueNodeId) {
+      const valueNode = loroDoc.toNodexNode(valueNodeId);
+      return valueNode?.name === SYS_V.YES;
+    }
+  } catch {
+    // LoroDoc not ready, fall through to legacy storage
+  }
+
+  // Fallback to legacy chrome.storage / localStorage
   if (hasChromeStorage()) {
     const result = await chrome.storage.local.get(CHAT_DEBUG_STORAGE_KEY);
     return result[CHAT_DEBUG_STORAGE_KEY] === true;

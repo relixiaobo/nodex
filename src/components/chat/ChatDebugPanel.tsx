@@ -491,7 +491,7 @@ export function ChatDebugPanel({ debug }: ChatDebugPanelProps) {
   );
 
   return (
-    <div className="space-y-2 rounded-2xl border border-border bg-foreground/[0.02] p-2.5">
+    <div className="space-y-2">
       <div className="flex items-center justify-between px-1">
         <div className="text-[11px] font-medium text-foreground">Chat Debug</div>
         <div className="font-mono text-[10px] text-foreground-tertiary">

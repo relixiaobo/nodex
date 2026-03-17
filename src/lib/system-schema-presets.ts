@@ -7,6 +7,8 @@ const PROVIDER_OPTION_ID_PREFIX = 'NDX_PROVIDER_OPT_';
 export const SYSTEM_SCHEMA_NODE_IDS = {
   SETTINGS_HIGHLIGHT_FIELD_ENTRY: 'NDX_FE10',
   SETTINGS_HIGHLIGHT_VALUE: 'NDX_N10',
+  SETTINGS_AI_DEBUG_FIELD_ENTRY: 'NDX_FE22',
+  SETTINGS_AI_DEBUG_VALUE: 'NDX_N18',
   LEGACY_SETTINGS_AI_PROVIDER_FIELD_ENTRY: 'NDX_FE11',
   LEGACY_SETTINGS_AI_PROVIDER_ANTHROPIC_OPTION: 'NDX_N11',
   LEGACY_SETTINGS_AI_PROVIDER_VALUE: 'NDX_N12',
@@ -49,6 +51,19 @@ const SYSTEM_SCHEMA_NODE_PRESETS: ReadonlyArray<FixedSchemaNodePreset> = [
       type: 'fieldDef',
       fieldType: FIELD_TYPES.BOOLEAN,
       description: 'Show floating toolbar when selecting text on web pages',
+      locked: true,
+      nullable: true,
+      cardinality: 'single',
+    },
+  },
+  {
+    id: NDX_F.SETTING_AI_DEBUG,
+    parentId: NDX_T.WORKSPACE_SETTINGS,
+    name: 'AI Debug',
+    data: {
+      type: 'fieldDef',
+      fieldType: FIELD_TYPES.BOOLEAN,
+      description: 'Show debug panel for inspecting AI context and messages',
       locked: true,
       nullable: true,
       cardinality: 'single',
@@ -138,6 +153,14 @@ const SYSTEM_SCHEMA_NODE_PRESETS: ReadonlyArray<FixedSchemaNodePreset> = [
     data: {
       type: 'fieldEntry',
       fieldDefId: NDX_F.SETTING_HIGHLIGHT_ENABLED,
+    },
+  },
+  {
+    id: SYSTEM_SCHEMA_NODE_IDS.SETTINGS_AI_DEBUG_FIELD_ENTRY,
+    parentId: SYSTEM_NODE_IDS.SETTINGS,
+    data: {
+      type: 'fieldEntry',
+      fieldDefId: NDX_F.SETTING_AI_DEBUG,
     },
   },
   {
@@ -304,6 +327,15 @@ export function ensureSystemSchema(): void {
       SYSTEM_SCHEMA_NODE_IDS.SETTINGS_HIGHLIGHT_FIELD_ENTRY,
       SYSTEM_SCHEMA_NODE_IDS.SETTINGS_HIGHLIGHT_VALUE,
       SYS_V.YES,
+    );
+  }
+
+  const debugFieldEntry = loroDoc.toNodexNode(SYSTEM_SCHEMA_NODE_IDS.SETTINGS_AI_DEBUG_FIELD_ENTRY);
+  if ((debugFieldEntry?.children?.length ?? 0) === 0) {
+    ensureTextValue(
+      SYSTEM_SCHEMA_NODE_IDS.SETTINGS_AI_DEBUG_FIELD_ENTRY,
+      SYSTEM_SCHEMA_NODE_IDS.SETTINGS_AI_DEBUG_VALUE,
+      SYS_V.NO,
     );
   }
 

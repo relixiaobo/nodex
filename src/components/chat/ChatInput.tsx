@@ -1,6 +1,6 @@
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import type { ThinkingLevel } from '@mariozechner/pi-ai';
-import { ArrowUp, Brain, Check, ChevronDown, Code2, Plus, Settings, Square } from '../../lib/icons.js';
+import { ArrowUp, Brain, Check, ChevronDown, Plus, Settings, Square } from '../../lib/icons.js';
 
 export interface ChatInputModel {
   id: string;
@@ -21,13 +21,10 @@ interface ChatInputProps {
   currentModel?: ChatInputModel;
   availableModels?: ChatInputModel[];
   thinkingLevel?: ThinkingLevel | null;
-  debugEnabled?: boolean;
-  debugOpen?: boolean;
   onSend(prompt: string): Promise<void>;
   onStop(): void;
   onSteer?(text: string): void;
   onOpenSettings?(): void;
-  onToggleDebug?(): void;
   onModelChange?(modelId: string, provider: string): void;
   onThinkingChange?(level: ThinkingLevel | null): void;
 }
@@ -103,13 +100,10 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
   currentModel,
   availableModels,
   thinkingLevel,
-  debugEnabled = false,
-  debugOpen = false,
   onSend,
   onStop,
   onSteer,
   onOpenSettings,
-  onToggleDebug,
   onModelChange,
   onThinkingChange,
 }, ref) {
@@ -132,11 +126,6 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
   const canSend = !inputDisabled && draft.trim().length > 0;
   const hasSteeringDraft = canSteer && draft.trim().length > 0;
   const canSelectModel = !!onModelChange && (availableModels?.length ?? 0) > 0;
-  const debugMenuLabel = !debugEnabled
-    ? 'Enable AI Debug'
-    : debugOpen
-      ? 'Hide AI Debug'
-      : 'Show AI Debug';
 
   const { featuredModels, moreModelGroups } = useMemo(() => {
     const featured: ChatInputModel[] = [];
@@ -272,19 +261,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
             </button>
             {menuOpen && (
               <div className="absolute bottom-full left-0 mb-1 min-w-[180px] rounded-lg bg-background p-1 shadow-paper">
-                {onToggleDebug && (
-                  <button
-                    type="button"
-                    className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-sm text-foreground-secondary transition-colors hover:bg-foreground/4 hover:text-foreground"
-                    onClick={() => {
-                      setMenuOpen(false);
-                      onToggleDebug();
-                    }}
-                  >
-                    <Code2 size={14} strokeWidth={1.5} className="shrink-0 text-foreground-tertiary" />
-                    {debugMenuLabel}
-                  </button>
-                )}
+                {/* Reserved for future menu items */}
               </div>
             )}
           </div>

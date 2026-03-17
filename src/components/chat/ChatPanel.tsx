@@ -3,7 +3,7 @@ import { toast } from 'sonner';
 import { Pencil, Sparkles, Trash2, X } from '../../lib/icons.js';
 import { useAgent } from '../../hooks/use-agent.js';
 import type { ThinkingLevel } from '@mariozechner/pi-ai';
-import { readChatDebugEnabled, writeChatDebugEnabled } from '../../lib/ai-debug.js';
+import { readChatDebugEnabled } from '../../lib/ai-debug.js';
 import { getAvailableModelsWithMeta } from '../../lib/ai-provider-config.js';
 import { getAgentForSession, selectChatModel, selectThinkingLevel } from '../../lib/ai-service.js';
 import { useNodeStore } from '../../stores/node-store.js';
@@ -61,8 +61,6 @@ export function ChatPanel({ panelId, sessionId, hideHeader }: ChatPanelProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const chatInputRef = useRef<ChatInputHandle>(null);
   const shouldStickToBottomRef = useRef(true);
-  const debugTapResetRef = useRef<number | null>(null);
-  const debugTapCountRef = useRef(0);
   const [debugEnabled, setDebugEnabled] = useState(false);
   const [debugOpen, setDebugOpen] = useState(false);
   const [thinkingLevel, setThinkingLevel] = useState<ThinkingLevel | null>(debug.thinkingLevel);
@@ -70,11 +68,6 @@ export function ChatPanel({ panelId, sessionId, hideHeader }: ChatPanelProps) {
   const [pendingMessageActionId, setPendingMessageActionId] = useState<string | null>(null);
   const [steeringNote, setLocalSteeringNote] = useState<string | null>(null);
   const chatBusy = isStreaming || pendingMessageActionId !== null;
-  const debugActionLabel = !debugEnabled
-    ? 'Enable AI Debug'
-    : debugOpen
-      ? 'Hide AI Debug'
-      : 'Show AI Debug';
 
   const availableModels = useMemo(() => {
     void settingsVersion;
@@ -109,14 +102,6 @@ export function ChatPanel({ panelId, sessionId, hideHeader }: ChatPanelProps) {
 
     return () => {
       cancelled = true;
-    };
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      if (debugTapResetRef.current != null) {
-        window.clearTimeout(debugTapResetRef.current);
-      }
     };
   }, []);
 
@@ -217,44 +202,8 @@ export function ChatPanel({ panelId, sessionId, hideHeader }: ChatPanelProps) {
     await runMessageAction(nodeId, () => regenerateMessage(nodeId));
   }
 
-  function handleHeaderTitleClick() {
-    if (hasAvailableModels || debugEnabled) return;
-
-    debugTapCountRef.current += 1;
-
-    if (debugTapResetRef.current != null) {
-      window.clearTimeout(debugTapResetRef.current);
-      debugTapResetRef.current = null;
-    }
-
-    if (debugTapCountRef.current >= 5) {
-      debugTapCountRef.current = 0;
-      setDebugEnabled(true);
-      setDebugOpen(true);
-      toast.success('Debug mode enabled');
-      void writeChatDebugEnabled(true);
-      return;
-    }
-
-    debugTapResetRef.current = window.setTimeout(() => {
-      debugTapCountRef.current = 0;
-    }, 1200);
-  }
-
   function handleOpenSettings() {
     useUIStore.getState().openPanel(SYSTEM_NODE_IDS.SETTINGS);
-  }
-
-  function handleToggleDebug() {
-    if (!debugEnabled) {
-      setDebugEnabled(true);
-      setDebugOpen(true);
-      toast.success('AI Debug enabled');
-      void writeChatDebugEnabled(true);
-      return;
-    }
-
-    setDebugOpen((value) => !value);
   }
 
   async function handleModelChange(modelId: string, provider: string) {
@@ -283,46 +232,39 @@ export function ChatPanel({ panelId, sessionId, hideHeader }: ChatPanelProps) {
   }
 
   return (
-    <div className="flex flex-1 flex-col overflow-hidden bg-background">
-      <div className={`flex items-center px-3 ${hideHeader ? 'h-8 justify-end' : 'h-12 justify-between border-b border-border'}`}>
-        {!hideHeader && (
-          <button
-            type="button"
-            onClick={handleHeaderTitleClick}
-            className="flex items-center gap-2 text-sm font-medium text-foreground"
-          >
+    <div className="relative flex flex-1 flex-col overflow-hidden bg-background">
+      {!hideHeader && (
+        <div className="flex items-center justify-between px-3 h-12 border-b border-border">
+          <div className="flex items-center gap-2 text-sm font-medium text-foreground">
             <Sparkles size={14} strokeWidth={1.75} className="text-foreground-tertiary" />
             Chat
+          </div>
+          <button
+            type="button"
+            onClick={() => useUIStore.getState().closePanel(panelId)}
+            className="inline-flex h-7 w-7 items-center justify-center rounded-full text-foreground-tertiary transition-colors hover:bg-foreground/4 hover:text-foreground"
+            aria-label="Close chat"
+          >
+            <X size={15} strokeWidth={1.6} />
           </button>
-        )}
-        <div className="flex items-center gap-1">
-          {debugEnabled && (
-            <button
-              type="button"
-              onClick={handleToggleDebug}
-              className={`inline-flex h-7 min-w-8 items-center justify-center rounded-full px-2 font-mono text-[11px] transition-colors ${
-                debugOpen
-                  ? 'bg-foreground/8 text-foreground'
-                  : 'text-foreground-tertiary hover:bg-foreground/4 hover:text-foreground'
-              }`}
-              aria-label={debugOpen ? 'Hide chat debug panel' : 'Show chat debug panel'}
-              aria-pressed={debugOpen}
-            >
-              {'</>'}
-            </button>
-          )}
-          {!hideHeader && (
-            <button
-              type="button"
-              onClick={() => useUIStore.getState().closePanel(panelId)}
-              className="inline-flex h-7 w-7 items-center justify-center rounded-full text-foreground-tertiary transition-colors hover:bg-foreground/4 hover:text-foreground"
-              aria-label="Close chat"
-            >
-              <X size={15} strokeWidth={1.6} />
-            </button>
-          )}
         </div>
-      </div>
+      )}
+
+      {debugEnabled && (
+        <button
+          type="button"
+          onClick={() => setDebugOpen((v) => !v)}
+          className={`absolute right-3 top-2 z-10 inline-flex h-7 min-w-8 items-center justify-center rounded-full px-2 font-mono text-[11px] transition-colors ${
+            debugOpen
+              ? 'bg-foreground/8 text-foreground'
+              : 'text-foreground-tertiary hover:bg-foreground/4 hover:text-foreground'
+          }`}
+          aria-label={debugOpen ? 'Hide debug panel' : 'Show debug panel'}
+          aria-pressed={debugOpen}
+        >
+          {'</>'}
+        </button>
+      )}
 
       {!ready ? (
         <div className="flex flex-1 items-center justify-center text-sm text-foreground-tertiary">
@@ -335,22 +277,13 @@ export function ChatPanel({ panelId, sessionId, hideHeader }: ChatPanelProps) {
               <div className="max-w-[260px] text-sm text-foreground-tertiary">
                 Configure an AI provider to start chatting
               </div>
-              <div className="flex flex-wrap items-center justify-center gap-2">
-                <button
-                  type="button"
-                  onClick={handleOpenSettings}
-                  className="inline-flex h-9 items-center rounded-full border border-border px-4 text-sm font-medium text-foreground transition-colors hover:bg-foreground/4"
-                >
-                  Open Settings
-                </button>
-                <button
-                  type="button"
-                  onClick={handleToggleDebug}
-                  className="inline-flex h-9 items-center rounded-full border border-border px-4 text-sm font-medium text-foreground-secondary transition-colors hover:bg-foreground/4 hover:text-foreground"
-                >
-                  {debugActionLabel}
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={handleOpenSettings}
+                className="inline-flex h-9 items-center rounded-full border border-border px-4 text-sm font-medium text-foreground transition-colors hover:bg-foreground/4"
+              >
+                Open Settings
+              </button>
             </div>
           </div>
           {debugEnabled && debugOpen && (
@@ -442,22 +375,19 @@ export function ChatPanel({ panelId, sessionId, hideHeader }: ChatPanelProps) {
               )}
               <ChatInput
                 ref={chatInputRef}
-              disabled={isStreaming}
-              busy={pendingMessageActionId !== null}
-              error={error}
-              currentModel={currentModel}
-              availableModels={availableModels}
-              thinkingLevel={thinkingLevel}
-              debugEnabled={debugEnabled}
-              debugOpen={debugOpen}
-              onSend={handleSendMessage}
-              onStop={stopStreaming}
-              onSteer={handleSteerMessage}
-              onOpenSettings={handleOpenSettings}
-              onToggleDebug={handleToggleDebug}
-              onModelChange={handleModelChange}
-              onThinkingChange={handleThinkingChange}
-            />
+                disabled={isStreaming}
+                busy={pendingMessageActionId !== null}
+                error={error}
+                currentModel={currentModel}
+                availableModels={availableModels}
+                thinkingLevel={thinkingLevel}
+                onSend={handleSendMessage}
+                onStop={stopStreaming}
+                onSteer={handleSteerMessage}
+                onOpenSettings={handleOpenSettings}
+                onModelChange={handleModelChange}
+                onThinkingChange={handleThinkingChange}
+              />
             </div>
           </div>
           {debugEnabled && debugOpen && (

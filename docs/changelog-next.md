@@ -64,3 +64,4 @@
 - Chat Debug 面板改为左右分栏：Chat 在左，Debug 在右，各自独立滚动
 - Debug 面板代码块支持语法高亮：System Prompt、Dynamic Context (XML)、Messages/Tools/Turn Log (JSON) 均使用 highlight.js 着色，限高可滚动
 - AI Chat Markdown 渲染：AI 回复现在支持完整 Markdown 格式——标题、粗体/斜体、代码块（语法高亮）、列表、GFM 表格、引用块、链接、数学公式（KaTeX），并兼容 `<ref>`/`<cite>` 内联标记；流式输出时已完成的块不重渲染
+- 修复 Chat 分支逻辑：regenerate 不再重复创建 user 消息，正确在 assistant 层创建分支（`← 1/2 →`）；切换分支后持久化正确保存；支持从 tool result 续接 regenerate

@@ -574,11 +574,11 @@ export function CommandPalette() {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex justify-center bg-foreground/[0.08] p-2 sm:p-4 pt-[8vh] sm:pt-[12vh]"
+      className="fixed inset-0 z-50 flex justify-center bg-black/30 p-2 sm:p-4 pt-[8vh] sm:pt-[12vh]"
       onPointerDown={closePalette}
     >
       <div
-        className="animate-palette-expand flex flex-col w-full max-w-[600px] h-[min(480px,80vh)] rounded-xl bg-background shadow-paper border border-border-subtle overflow-hidden"
+        className="animate-palette-expand flex flex-col w-full max-w-[600px] h-[min(480px,80vh)] rounded-lg bg-background shadow-paper overflow-hidden"
         onPointerDown={(e) => e.stopPropagation()}
       >
         {/* Search header */}
@@ -586,7 +586,7 @@ export function CommandPalette() {
           {aiMode && (
             <button
               onClick={() => setAiMode(false)}
-              className="shrink-0 flex items-center justify-center h-6 w-6 rounded hover:bg-foreground/5 text-foreground-secondary"
+              className="shrink-0 flex items-center justify-center h-7 w-7 rounded-md hover:bg-foreground/4 text-foreground-secondary"
             >
               <ChevronLeft size={16} strokeWidth={1.5} />
             </button>
@@ -602,7 +602,7 @@ export function CommandPalette() {
           {!aiMode && (
             <button
               onClick={() => setAiMode(true)}
-              className="shrink-0 flex items-center gap-1.5 rounded-md px-1.5 py-0.5 text-foreground-tertiary hover:text-foreground-secondary hover:bg-foreground/5 transition-colors"
+              className="shrink-0 flex items-center gap-1.5 rounded-md px-1.5 py-0.5 text-foreground-tertiary hover:text-foreground-secondary hover:bg-foreground/4 transition-colors"
             >
               <span className="text-xs">Ask AI</span>
               <Kbd>Tab</Kbd>
@@ -706,7 +706,7 @@ export function CommandPalette() {
                     </>
                   )}
                   {bottomItems.length > 0 && hasResults && (
-                    <div className="mx-4 my-1 border-t border-border-subtle" />
+                    <div className="mx-3 my-1 h-px bg-border-subtle" />
                   )}
                   {bottomItems.map((item) => {
                     const idx = globalIdx++;
@@ -775,7 +775,7 @@ export function CommandPalette() {
               {!aiMode && hasQuery && createItem && selected.id !== '__create__' && (
                 <button
                   onClick={() => createItem.action()}
-                  className="flex items-center gap-1.5 rounded px-1 py-0.5 hover:bg-foreground/5 transition-colors cursor-pointer"
+                  className="flex items-center gap-1.5 rounded-md px-1.5 py-0.5 hover:bg-foreground/4 transition-colors cursor-pointer"
                 >
                   <span className="text-xs text-foreground-tertiary">{t('search.commandPalette.actionCreate')}</span>
                   <Kbd>⌘↵</Kbd>
@@ -783,7 +783,7 @@ export function CommandPalette() {
               )}
               <button
                 onClick={() => selected.action()}
-                className="flex items-center gap-1.5 rounded px-1 py-0.5 hover:bg-foreground/5 transition-colors cursor-pointer"
+                className="flex items-center gap-1.5 rounded-md px-1.5 py-0.5 hover:bg-foreground/4 transition-colors cursor-pointer"
               >
                 <span className="text-xs text-foreground-secondary">
                   {selected.id === '__ask_ai__' ? t('search.commandPalette.actionAskAI') : getActionLabel(selected.type)}
@@ -825,7 +825,7 @@ function PaletteRow({ item, selected, onSelect, onHover }: PaletteRowProps) {
       data-selected={selected}
       onClick={onSelect}
       onMouseMove={onHover}
-      className={`mx-2 flex h-8 cursor-pointer items-center gap-2.5 rounded-md px-2 transition-colors ${selected ? 'bg-primary-muted' : ''
+      className={`mx-2 flex h-8 cursor-pointer items-center gap-2.5 rounded-md px-2 transition-colors ${selected ? 'bg-primary-muted' : 'hover:bg-foreground/4'
         }`}
     >
       {/* Icon: command/container use explicit icon; tagDef uses colored #; nodes use colored bullet */}

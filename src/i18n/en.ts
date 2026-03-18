@@ -67,6 +67,7 @@ export const enMessages = {
       typeLabelChat: 'Chat',
       typeLabelAskAI: 'Ask AI',
       actionAskAI: 'Ask AI',
+      actionOpenChat: 'Open Chat',
       aiModePlaceholder: 'Ask AI anything...',
     },
   },

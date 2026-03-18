@@ -167,11 +167,10 @@ export function getAllCommands(ctx: CommandContext): PaletteCommand[] {
 /**
  * Action bar label for a given item type (Raycast-style: "Open Node", "Run Command").
  */
-export function getActionLabel(type: PaletteItemType, aiMode = false): string {
-  if (aiMode) return t('search.commandPalette.actionAskAI');
+export function getActionLabel(type: PaletteItemType): string {
   switch (type) {
     case 'node': return t('search.commandPalette.actionOpenNode');
-    case 'chat': return t('search.commandPalette.actionOpenNode');
+    case 'chat': return t('search.commandPalette.actionOpenChat');
     case 'command': return t('search.commandPalette.actionRunCommand');
     case 'create': return t('search.commandPalette.actionRunCommand');
     default: return t('search.commandPalette.actionOpenNode');

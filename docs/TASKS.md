@@ -22,6 +22,7 @@ _(空)_
 
 | 工作区 | 分支 | 任务 | 状态 |
 |--------|------|------|------|
+| nodex-claude | claude/command-palette-chat-integration | ⌘K Chat 融合 (#150) | 待执行 |
 | nodex-gemini | — | 空闲 | — |
 | nodex-codex | — | 空闲 | — |
 
@@ -29,7 +30,8 @@ _(空)_
 
 ## 进行中
 
-_(空)_
+- [ ] **⌘K Chat 融合** — nodex-claude (#150)
+- [ ] **Chat 持久化 Phase 4 方案设计** — nodex（出设计方案中）
 
 ---
 

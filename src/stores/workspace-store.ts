@@ -174,6 +174,10 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
             deleteSyncCursor(wsId),
           ]).catch(() => {});
         }
+        // Clear chat agent registry to prevent cross-workspace data leaks
+        const { resetAIAgentForTests: resetAgentRegistry } = await import('../lib/ai-service.js');
+        resetAgentRegistry();
+
         const { signOut: authSignOut } = await import('../lib/auth.js');
         await authSignOut();
         set({

@@ -41,6 +41,10 @@ export interface SyncState {
 
 type StateListener = (state: SyncState) => void;
 
+class ChatSyncAuthError extends Error {
+  constructor() { super('Chat sync auth expired'); }
+}
+
 export class SyncManager {
   private intervalId: ReturnType<typeof setInterval> | null = null;
   private isSyncing = false;
@@ -360,13 +364,20 @@ export class SyncManager {
   // ── Chat session sync ────────────────────────────────────────────
 
   private chatLastPullAt = 0;
+  // Reset chat pull cursor when sync restarts (sign-in, workspace switch)
+  resetChatSync(): void { this.chatLastPullAt = 0; }
 
   private async syncChatSessions(workspaceId: string, accessToken: string): Promise<void> {
     try {
       await this.pushChatSessions(workspaceId, accessToken);
       await this.pullChatSessions(workspaceId, accessToken);
     } catch (err) {
-      // Chat sync errors are non-fatal — don't stop Loro sync
+      // Detect auth errors — 401 means token expired, stop retrying
+      if (err instanceof ChatSyncAuthError) {
+        console.error('[sync] chat auth expired, skipping until next session');
+        return;
+      }
+      // Other chat sync errors are non-fatal — don't stop Loro sync
       console.warn('[sync] chat sync error:', err);
     }
   }
@@ -393,26 +404,26 @@ export class SyncManager {
           }),
         });
 
+        if (res.status === 401) throw new ChatSyncAuthError();
+
         if (res.ok) {
           const { revision } = await res.json() as { revision: number };
           await markSessionSynced(session.id, revision);
-          // Also update in-memory Agent session so next persistChatSession
-          // doesn't overwrite the synced revision back to 0
           await this.updateInMemorySessionSync(session.id, revision);
         } else if (res.status === 409) {
-          // Conflict — LWW: pull the remote version
           const { remoteSession, remoteRevision } = await res.json() as {
             remoteSession: unknown;
             remoteRevision: number;
           };
           if (remoteSession) {
             const { importRemoteSession } = await import('../ai-persistence.js');
-            await importRemoteSession(remoteSession as any, remoteRevision);
+            const result = await importRemoteSession(remoteSession as any, remoteRevision);
+            console.warn(`[sync] chat push conflict for ${session.id}: ${result}`);
             await this.updateInMemorySessionSync(session.id, remoteRevision);
           }
         }
-        // 4xx / 5xx other than 409 — skip, will retry next cycle
-      } catch {
+      } catch (err) {
+        if (err instanceof ChatSyncAuthError) throw err;
         // Network error — skip, will retry next cycle
       }
     }
@@ -428,6 +439,7 @@ export class SyncManager {
       },
     );
 
+    if (res.status === 401) throw new ChatSyncAuthError();
     if (!res.ok) return;
 
     const { sessions, metas } = await res.json() as {
@@ -443,7 +455,13 @@ export class SyncManager {
       const session = sessions[i];
       const meta = metas[i];
       if (session && meta) {
-        await importRemoteSession(session as any, meta.revision);
+        const result = await importRemoteSession(session as any, meta.revision);
+        if (result !== 'skipped') {
+          await this.updateInMemorySessionSync(meta.id, meta.revision);
+        }
+        if (result === 'conflict') {
+          console.warn(`[sync] chat pull conflict for ${meta.id}: remote wins (LWW)`);
+        }
       }
     }
 

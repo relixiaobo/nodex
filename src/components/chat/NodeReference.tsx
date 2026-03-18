@@ -20,13 +20,15 @@ export function NodeReference({ nodeId, children }: NodeReferenceProps) {
   }
 
   return (
-    <button
-      type="button"
+    <span
+      role="button"
+      tabIndex={0}
       onClick={() => navigateTo(nodeId)}
-      className="inline cursor-pointer text-primary underline decoration-primary/30 underline-offset-[3px] transition-colors hover:text-primary/80"
+      onKeyDown={(e) => { if (e.key === 'Enter') navigateTo(nodeId); }}
+      className="cursor-pointer text-primary underline decoration-primary/30 underline-offset-[3px] transition-colors hover:text-primary/80"
       title={node.name ?? nodeId}
     >
       {children}
-    </button>
+    </span>
   );
 }

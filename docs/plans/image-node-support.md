@@ -1,6 +1,6 @@
 # Image Node Support — 完整方案
 
-> 状态: Draft — 待 nodex review
+> 状态: v2 — 已整合 nodex review 反馈
 > 作者: Claude (nodex-claude)
 > 日期: 2026-03-18
 
@@ -61,7 +61,7 @@ Obsidian     Logseq     Notion     Tana      Heptabase    Capacities
 - **Tana**：图片 = 节点，可以有 name、tags、children。**哲学最接近** soma。但图片体验被自己用户评为"需要改进"，且导出不含图片（只有下载链接）。
 
 **关键教训：**
-- **Notion 的 1 小时签名 URL 过期**是开发者和用户抱怨最多的图片问题。soma 必须避免——应使用内容寻址 key + 公开桶，URL 永不过期。
+- **Notion 的 1 小时签名 URL 过期**是开发者和用户抱怨最多的图片问题。soma 必须避免。
 - **Tana 导出不含图片**是数据可移植性的警示。soma 的图片存 R2，导出时应可下载。
 - **AI 图片理解在知识工具中仍是蓝海**。大多数工具（Obsidian/Logseq/Heptabase/Reflect/Tana）无 AI 图片理解。Notion 最近才加。这是 soma 的差异化机会。
 
@@ -137,6 +137,7 @@ R2 的免费出口流量是关键优势。
 | **渲染** | ✅ 可用 | `ImageNodeRenderer.tsx` — 懒加载、aspect ratio、错误兜底 |
 | **剪藏提取** | ✅ 可用 | `html-to-nodes.ts` 处理 `<img>`, `<picture>`, `<figure>`, `<video>` |
 | **Outliner 集成** | ✅ 可用 | `OutlinerItem.tsx` 对 media node 禁用文本 trigger |
+| **字段可见性系统** | ✅ 已有 | `hideField` 属性支持 NEVER/ALWAYS/WHEN_EMPTY/WHEN_NOT_EMPTY 四种模式 |
 | **Slash command** | ⚠️ 占位 | `image_file` 存在但 `enabled: false` |
 | **R2 存储** | ⚠️ 仅 CRDT | 只存 Loro update/snapshot，无媒体文件桶 |
 | **上传端点** | ❌ 无 | 无 multipart 或 presigned URL 端点 |
@@ -144,6 +145,15 @@ R2 的免费出口流量是关键优势。
 | **编辑器图片粘贴** | ❌ 无 | ProseMirror handlePaste 不处理图片 |
 | **AI 读取图片** | ❌ 无 | `node_read` 返回 `mediaUrl` 文本，不含图片数据；children summary 无 type 字段 |
 | **AI 保存截图** | ❌ 无 | browser screenshot 是 ephemeral，3 条后变 placeholder |
+
+### 2.6 已有的隐藏字段先例
+
+代码库中已有 `hideField: SYS_V.ALWAYS` 的实践：
+
+- **`NDX_F.HIGHLIGHT_ANCHOR`**：高亮锚点数据，存储 JSON 序列化的文本选区信息，对用户完全隐藏
+- **`NDX_F.SOURCE_HIGHLIGHTS`**：来源高亮列表，同样 `hideField: ALWAYS`
+
+这证明"系统内部字段走 fieldDef + hideField: ALWAYS"是 soma 的既定模式，image description 应该复用。
 
 ---
 
@@ -174,17 +184,21 @@ R2 的免费出口流量是关键优势。
 - 可在 Worker 内做额外处理（如未来的 thumbnail 生成）
 - 如果规模增长需要直传，届时再升级
 
-### 决策 3：公开桶 + 自定义域名，不用签名 URL
+### 决策 3：Worker 代理读取，不用公开桶
 
-**选项 A：公开桶 + 自定义域名**（`img.soma.app`）
-**选项 B：签名 URL**（每次访问生成临时 URL）
+**选项 A：公开桶 + 自定义域名**
+**选项 B：Worker 代理读取**（GET /api/images/{wsId}/{hash}）
 
-**选择 A。** 理由：
-- 内容寻址 key（SHA-256 hash）→ URL 永不变 → 可永久缓存
-- 避免 Notion 的 1 小时 URL 过期问题
-- Cloudflare CDN 自动缓存
-- 图片内容不算高敏感数据（用户自己上传的截图/文章配图）
-- 如果未来需要 workspace 级访问控制，可在 R2 前加 Worker 代理层
+**选择 B。**
+
+> **Review 反馈**：用户截图可能包含敏感信息（密码管理器、私信、合同、内部 dashboard）。SHA-256 key 虽不可枚举，但 URL 一旦泄露就永久可访问且无法吊销。
+
+方案：
+- 不开 R2 公开桶
+- 通过 Worker 代理读取：`GET /api/images/{wsId}/{hash}` → 验证 auth + workspace 成员 → 返回图片
+- 设置 `Cache-Control: public, max-age=31536000, immutable`（内容寻址 key 永不变）
+- Cloudflare CDN 自动缓存，后续请求不经 Worker
+- 天然带 auth 保护，无需签名 URL，无过期问题
 
 ### 决策 4：Canvas API 压缩，不引入额外依赖
 
@@ -197,18 +211,28 @@ R2 的免费出口流量是关键优势。
 - ~20 行代码，不值得引入一个库
 - Chrome 扩展对 bundle size 敏感
 
-### 决策 5：Per-workspace 去重，不做全局
+### 决策 5：智能压缩，不强制所有格式转 WebP
+
+> **Review 反馈**：GIF 动画丢失（Canvas 只取第一帧），SVG 矢量质量降级，已压缩的小文件被二次压缩。
+
+**压缩策略：**
+- **GIF**：保留原格式直传（保留动画）
+- **SVG**：保留原格式直传（保留矢量）
+- **已压缩的 WebP/JPEG < 500KB**：直传，不重编码
+- **大尺寸 PNG/BMP 等**：Canvas → WebP 0.85，resize ≤ 2048px
+
+### 决策 6：Per-workspace 去重，不做全局
 
 **选项 A：Per-workspace**（同一张图在不同 workspace 存两份）
 **选项 B：全局去重**（一份图跨 workspace 共享）
 
 **选择 A。** 理由：
-- 简单：R2 key = `{wsId}/images/{hash}.webp`，天然隔离
+- 简单：R2 key = `{wsId}/images/{hash}.{ext}`，天然隔离
 - 无跨 workspace 隐私/安全风险
 - 存储成本极低（$0.56/月 @ 1000 用户），省的不值得复杂化
 - 删除 workspace 时可直接清理该前缀下所有对象
 
-### 决策 6：node_read 直接带图，不要额外参数或工具
+### 决策 7：node_read 直接带图，不要额外参数或工具
 
 **选项 A：node_read 自动包含 ImageContent**（如果节点是 image 类型）
 **选项 B：新增 `includeImages` 参数**
@@ -219,32 +243,56 @@ R2 的免费出口流量是关键优势。
 - 图片是 image 节点的"内容"，就像文本是文本节点的内容——不需要额外开关
 - Agent 控制 token 成本的方式是**选择读不读**，而非参数开关
 - 前提：children summary 加 `type` 字段，让 Agent 能判断哪些子节点是图片
+- soma 是大纲产品，绝大多数节点是文本，image 节点是少数
 - 不增加新工具 = 不增加 Agent 认知负担
 
-### 决策 7：node_create 内部处理上传，不加新工具
+### 决策 8：node_create 内部处理上传，不加新工具
 
 **选项 A：扩展 node_create 支持 `data.imageData`**
 **选项 B：新增 `save_image` 独立工具**
 
 **选择 A。** 理由：
 - 创建图片节点本质上还是"创建节点"，只是内容是图片而非文本
-- 工具内部检测 `imageData` 字段 → 压缩 → 上传 R2 → 创建节点
+- 工具内部用 `uploadAndCreateImageNode()` 封装，保证原子性（上传失败不创建节点）
 - 不增加工具数量，保持 Agent 工具集简洁
-- 上传失败的错误处理可以在工具内部完成，返回清晰错误信息
+- 工具描述明确说明"创建图片节点需要网络上传，可能较慢"
 
-### 决策 8：Layer 2 描述惰性生成，不在上传时
+> **Review 反馈**：原子性——上传成功但 LoroDoc 写入失败会产生 R2 孤儿对象。解决：内部封装为原子操作，上传失败 → 不创建节点，LoroDoc 失败 → 孤儿图片后续可由 cleanup 任务回收（成本可忽略）。
 
-**选项 A：上传时自动生成**（每张图 1 次 vision API 调用）
+### 决策 9：Layer 2 描述上传时异步生成
+
+**选项 A：上传时异步生成**（fire-and-forget vision API 调用）
 **选项 B：Agent 首次读取时惰性生成**
 **选项 C：手动触发**
 
-**选择 B。** 理由：
-- 不是所有图片都会被 Agent 读取，上传时全量生成浪费 API 调用
-- 首次读取的延迟可接受（Agent 本身有思考时间）
-- 生成后缓存到节点的 `imageDescription` 字段，后续读取直接返回
-- 比手动触发更自然（用户不会主动为每张图生成描述）
+**选择 A。**
 
-### 决策 9：不做 URL 粘贴变图片
+> **Review 反馈**：惰性生成策略模糊——"Agent 自然地会描述"不是可靠路径，"谁来存回"未定义。
+
+改为上传时异步生成：
+- 上传完成 → 创建节点（mediaUrl 已有）→ fire-and-forget 调用 vision API
+- 参考 Spark 的三态模式（pending → generating → done）
+- 生成完成 → 写入 `NDX_F.IMAGE_DESCRIPTION` fieldEntry
+- 成本可控（只在上传时调一次）
+- 保证 Agent 后续读取时有描述可用
+
+### 决策 10：imageDescription 走 fieldDef + hideField: ALWAYS
+
+**选项 A：NodexNode 顶层属性**
+**选项 B：fieldDef + hideField: SYS_V.ALWAYS**
+
+**选择 B。**
+
+> **Review 反馈**：顶层属性违反 CLAUDE.md "所有新增元数据走 attrDef" 守则。
+
+复用已有的 `hideField` 机制，与 `NDX_F.HIGHLIGHT_ANCHOR` 同一模式：
+- 定义 `NDX_F.IMAGE_DESCRIPTION` fieldDef
+- `fieldType: 'plain'`
+- `hideField: SYS_V.ALWAYS` → 永远不在 Outliner 中展示
+- AI 和搜索可以正常读取（标准字段）
+- 遵守"一切皆节点"铁律
+
+### 决策 11：不做 URL 粘贴变图片
 
 **不做。** 理由：
 - 很难区分用户粘贴的是"想变成图片的 URL"还是"想记录这个链接"
@@ -252,7 +300,7 @@ R2 的免费出口流量是关键优势。
 - 用户可以截图粘贴，比输入 URL 更快
 - "下载远程图片"的能力已在剪藏重存中覆盖
 
-### 决策 10：网页拖图优先级最低
+### 决策 12：网页拖图优先级最低
 
 **降低优先级。** 理由：
 - Chrome Side Panel 跨上下文拖拽不可靠（DataTransfer 可能只含 URL，不含二进制）
@@ -273,48 +321,58 @@ R2 的免费出口流量是关键优势。
               ▼               ▼                 │             ▼
          ┌──────────────────────────┐           │    bg fetch + download
          │  Client Upload Pipeline  │           │             │
-         │  Canvas resize ≤2048px   │           │             │
-         │  → WebP 0.85            │ ◄─────────┘─────────────┘
-         │  → SHA-256 hash         │
-         │  → IndexedDB 本地缓存    │
+         │  智能压缩(见决策5)        │           │             │
+         │  → SHA-256 hash         │ ◄─────────┘─────────────┘
+         │  → IndexedDB 暂存(防丢失)│
          └───────────┬─────────────┘
                      │ POST /api/images
                      ▼
          ┌──────────────────────────┐
          │  Worker (CF)             │
-         │  Auth + 校验 magic bytes │
+         │  Auth + workspace 校验   │
+         │  Magic bytes + 大小校验  │
          │  D1 hash 查重            │
+         │  Quota 检查(500MB/ws)    │
          │  → R2 存储               │
+         │  → 异步 vision API       │
+         │    生成描述(fire&forget)  │
          └───────────┬─────────────┘
                      │
                      ▼
-         R2: {wsId}/images/{hash}.webp
-         CDN: https://img.soma.app/...
+         R2: {wsId}/images/{hash}.{ext}
                      │
-                     ▼
-              ┌──────────────┐
-              │  Image Node  │ ← mediaUrl = R2 公开 URL
+              ┌──────┴───────┐
+              │  Image Node  │ ← mediaUrl = 内部 R2 key
               │  (Loro CRDT) │
               └──────┬───────┘
                 ↗         ↘
     Outliner 渲染          Agent 读取
-    ImageNodeRenderer      node_read → ImageContent
+    GET /api/images/       node_read → fetch →
+    {wsId}/{hash}          ImageContent
+    (CDN 缓存)
 ```
 
 ### 4.2 数据模型
 
-**NodexNode 改动（最小）：**
+**NodexNode：不新增顶层属性。** 已有字段完全够用：
 
 ```typescript
 // 已有，不改
 type?: 'image'
-mediaUrl?: string        // → R2 公开 URL
+mediaUrl?: string        // → R2 内部 key 或 Worker 代理 URL
 mediaAlt?: string        // 用户可编辑的 alt text
 imageWidth?: number
 imageHeight?: number
+```
 
-// 新增
-imageDescription?: string  // Layer 2: AI 生成的文本描述缓存
+**新增 fieldDef（系统内部，用户不可见）：**
+
+```typescript
+// NDX_F.IMAGE_DESCRIPTION — AI 生成的图片文本描述
+// fieldType: 'plain'
+// hideField: SYS_V.ALWAYS
+// 挂在 image 类型节点上
+// 与 NDX_F.HIGHLIGHT_ANCHOR 同一模式
 ```
 
 **后端 D1 新增 images 表：**
@@ -323,7 +381,8 @@ imageDescription?: string  // Layer 2: AI 生成的文本描述缓存
 CREATE TABLE images (
   hash         TEXT NOT NULL,
   workspace_id TEXT NOT NULL,
-  r2_key       TEXT NOT NULL,           -- {wsId}/images/{hash}.webp
+  r2_key       TEXT NOT NULL,           -- {wsId}/images/{hash}.{ext}
+  mime_type    TEXT NOT NULL,            -- image/webp, image/gif, image/svg+xml 等
   size_bytes   INTEGER NOT NULL,
   width        INTEGER,
   height       INTEGER,
@@ -334,13 +393,13 @@ CREATE TABLE images (
 
 ### 4.3 后端 API
 
-**新增路由：`POST /api/images`**
+**新增路由 1：`POST /api/images`（上传）**
 
 ```
 Request:
   Headers: Authorization (Better Auth session)
   Body: multipart/form-data
-    - file: WebP image blob
+    - file: 图片 blob (WebP/JPEG/PNG/GIF/SVG)
     - hash: SHA-256 hex string (客户端预算)
     - workspaceId: string
     - width: number (可选)
@@ -354,18 +413,40 @@ Response (200 - 已存在，hash 去重):
 
 Response (400): file > 10MB / 非图片 / hash 不匹配
 Response (401): unauthorized
+Response (413): workspace quota exceeded
+Response (429): rate limit exceeded
 ```
 
 **校验流程：**
 1. 验证 Better Auth session + workspace 成员资格
-2. 检查 Content-Length ≤ 10MB
-3. 读取文件前 12 字节，校验 WebP magic bytes（`RIFF....WEBP`）
-4. 验证客户端提交的 hash 与实际文件内容 hash 一致
-5. 查 D1：`SELECT * FROM images WHERE workspace_id = ? AND hash = ?`
+2. Rate limit 检查（10 次/分钟/用户）
+3. Workspace quota 检查（500MB 上限）
+4. 检查 Content-Length ≤ 10MB
+5. 读取文件头，校验 magic bytes（WebP/JPEG/PNG/GIF/SVG）
+6. 验证客户端提交的 hash 与实际文件内容 hash 一致
+7. 查 D1：`SELECT * FROM images WHERE workspace_id = ? AND hash = ?`
    - 已存在 → 返回 existing URL（跳过上传）
-6. `env.SYNC_BUCKET.put(r2Key, file)` 存入 R2
-7. D1 INSERT 记录
-8. 返回 `{ url: "https://img.soma.app/{wsId}/images/{hash}.webp", ... }`
+8. `env.SYNC_BUCKET.put(r2Key, file)` 存入 R2
+9. D1 INSERT 记录
+10. 返回 URL
+
+**新增路由 2：`GET /api/images/{wsId}/{hash}`（读取，带 auth）**
+
+```
+Request:
+  Headers: Authorization (Better Auth session)
+
+Response (200):
+  Headers:
+    Content-Type: image/webp (或原始类型)
+    Cache-Control: public, max-age=31536000, immutable
+  Body: 图片二进制数据
+
+Response (401): unauthorized
+Response (404): image not found
+```
+
+Cloudflare CDN 自动缓存响应，后续请求命中缓存不经 Worker。
 
 ### 4.4 客户端上传管线
 
@@ -376,17 +457,17 @@ Response (401): unauthorized
 
 Pipeline:
   1. 格式校验 (仅接受 image/*)
-  2. Canvas 压缩
-     createImageBitmap(blob, { resizeWidth: 2048, resizeHeight: 2048 })
-     OffscreenCanvas → convertToBlob({ type: 'image/webp', quality: 0.85 })
-  3. SHA-256 hash
+  2. 智能压缩（决策 5）
+     - GIF/SVG → 保留原格式
+     - WebP/JPEG < 500KB → 直传
+     - 其他 → createImageBitmap + OffscreenCanvas → WebP 0.85, ≤2048px
+  3. IndexedDB 暂存（防止上传中断丢失）
+  4. SHA-256 hash
      crypto.subtle.digest('SHA-256', arrayBuffer) → hex string
-  4. 构造 multipart/form-data，POST /api/images
-  5. 返回 { url, hash, width, height }
-
-错误处理:
-  - 网络失败 → 抛出可重试错误
-  - 服务端拒绝 → 抛出不可重试错误（文件太大、格式无效等）
+  5. 构造 multipart/form-data，POST /api/images
+  6. 上传成功 → 清除 IndexedDB 缓存
+  7. 上传失败 → 保留 IndexedDB，节点显示重试按钮
+  8. 返回 { url, hash, width, height }
 ```
 
 ### 4.5 创建路径集成
@@ -409,7 +490,7 @@ handlePaste(view, event) {
 
 检测逻辑：遍历 `clipboardData.items`，找 `kind === 'file'` 且 `type.startsWith('image/')` 的项。
 
-**上传态 UI：** image node 创建时 `mediaUrl` 为空 → `ImageNodeRenderer` 显示 loading 骨架屏。上传完成 → 更新 `mediaUrl` → 渲染图片。上传失败 → 显示错误态 + 重试。
+**上传态 UI：** image node 创建时 `mediaUrl` 为空 → `ImageNodeRenderer` 显示 loading 骨架屏。上传完成 → 更新 `mediaUrl` → 渲染图片。上传失败 → 显示错误态 + 重试。图片 blob 暂存 IndexedDB，防止 Side Panel 关闭后丢失。
 
 **路径 2：Agent 截图保存（P0）**
 
@@ -417,19 +498,13 @@ handlePaste(view, event) {
 
 ```
 if (data.type === 'image' && data.imageData) {
-  // base64 → Blob → 走 image-upload 管线
-  const blob = base64ToBlob(data.imageData)
-  const { url, width, height } = await uploadImage(blob, workspaceId)
-  // 创建节点
-  createChild(parentId, {
-    type: 'image',
-    mediaUrl: url,
-    imageWidth: width,
-    imageHeight: height,
-    mediaAlt: data.mediaAlt
-  })
+  // base64 → Blob → 走 image-upload 管线（原子操作）
+  // 上传失败 → 返回错误，不创建节点
+  // 上传成功 → 创建节点（mediaUrl = Worker 代理 URL）
 }
 ```
+
+工具描述明确说明：创建图片节点需要网络上传，可能较慢。
 
 **路径 3：Chat 输入粘贴（P1）**
 
@@ -483,7 +558,7 @@ if (node.type === 'image' && node.mediaUrl) {
         width: node.imageWidth,
         height: node.imageHeight,
         alt: node.mediaAlt,
-        description: node.imageDescription ?? null  // Layer 2 缓存
+        description: resolveImageDescription(node) ?? null  // 从 fieldEntry 读取
       },
       // ...其他标准字段（tags, fields, parent, breadcrumb）
     })
@@ -501,30 +576,20 @@ if (node.type === 'image' && node.mediaUrl) {
 
 Agent 每次读 image 节点都能"看到"图片，无需额外参数。Agent 通过 children summary 的 `type` 字段决定是否读取——这就是成本控制机制。
 
-**改动 3：Layer 2 描述惰性生成**
-
-当 Agent 首次读取一个没有 `imageDescription` 的 image 节点时：
-- 本次返回 `description: null` + 图片数据
-- Agent 自然地在回复中会描述这张图片
-- 可以在 Agent 处理完成后，将其对图片的描述存回 `imageDescription` 字段
-
-或者更简单的方案：描述生成作为独立后台任务，不阻塞 node_read 流程。
-
 ### 5.2 node_create
 
 **增加 imageData 处理分支：**
 
 ```typescript
-// node_create handler
+// node_create handler — 封装为原子操作
 if (data.type === 'image' && data.imageData) {
-  // 1. base64 → Blob
-  // 2. 调用 image-upload 管线（compress → hash → upload）
-  // 3. 创建节点（mediaUrl = R2 URL）
-  // 4. 返回 { id, mediaUrl, ... }
+  const result = await uploadAndCreateImageNode(parentId, data.imageData, data.mediaAlt)
+  // 上传失败 → 返回明确错误信息，不创建节点
+  // 成功 → 返回 { id, mediaUrl, ... }
 }
 ```
 
-**工具描述更新：** 在 node_create 的 tool description 中说明支持 `data.imageData`（base64 字符串）创建图片节点。Agent 手上的截图可以直接通过 `node_create` 持久化。
+**工具描述更新：** 说明支持 `data.imageData`（base64 字符串）创建图片节点。明确标注"需要网络上传，可能较慢"。
 
 ### 5.3 Agent 典型工作流
 
@@ -551,30 +616,42 @@ if (data.type === 'image' && data.imageData) {
 
 ## 6. 实施计划
 
-### Phase 1: Foundation（R2 + Upload + Paste）
+### Phase 1a: 后端基础设施
 
-**目标：** 用户可以在编辑器中粘贴图片，图片上传到 R2 并持久化为 image node。
-
-**后端改动：**
+**目标：** R2 图片存储 + 上传/读取 API 可独立验证。
 
 | 文件 | 动作 | 内容 |
 |------|------|------|
-| `server/src/routes/images.ts` | 新建 | POST /api/images 路由（auth + 校验 + 去重 + R2 存储） |
+| `server/src/routes/images.ts` | 新建 | POST /api/images (上传) + GET /api/images/{wsId}/{hash} (读取+auth) |
 | `server/src/lib/db.ts` | 修改 | 新增 images 表 schema |
-| `server/src/types.ts` | 修改 | 确认 R2 binding（或新增 IMAGE_BUCKET） |
-| `server/wrangler.toml` | 修改 | R2 公开桶 + 自定义域名配置 |
+| `server/src/types.ts` | 修改 | 确认/新增 R2 binding |
+| `server/wrangler.toml` | 修改 | R2 桶配置（不公开） |
 | `server/src/index.ts` | 修改 | 注册 images 路由 |
 
-**客户端改动：**
+**验收：** curl 上传图片 → R2 存储 → curl 读取 → 返回图片 → 重复上传 → hash 去重生效
+
+### Phase 1b: 客户端管线 + Editor 粘贴
+
+**目标：** 用户在编辑器中粘贴图片 → 上传 R2 → 显示在大纲中。
 
 | 文件 | 动作 | 内容 |
 |------|------|------|
-| `src/lib/image-upload.ts` | 新建 | 客户端上传管线（compress + hash + upload） |
+| `src/lib/image-upload.ts` | 新建 | 客户端上传管线（智能压缩 + hash + IndexedDB 暂存 + upload + 重试） |
 | `src/components/editor/RichTextEditor.tsx` | 修改 | handlePaste 增加图片检测分支 |
 | `src/components/editor/TrailingInput.tsx` | 修改 | handlePaste 增加图片检测分支 |
 | `src/components/outliner/ImageNodeRenderer.tsx` | 修改 | 增加 loading / error / retry 状态 |
-| `src/lib/slash-commands.ts` | 修改 | 启用 image_file 命令 |
 | `src/stores/node-store.ts` | 修改 | 新增 createImageNode action（或扩展 createChild） |
+
+**验收：** Cmd+V 粘贴截图 → loading → 显示图片 → 上传失败可重试
+
+### Phase 1c: Slash command + 容量控制
+
+**目标：** /image 命令 + workspace 配额 + rate limit。
+
+| 文件 | 动作 | 内容 |
+|------|------|------|
+| `src/lib/slash-commands.ts` | 修改 | 启用 image_file 命令，绑定文件选择器 |
+| `server/src/routes/images.ts` | 修改 | 添加 per-workspace quota (500MB) + rate limit (10/min) |
 
 ### Phase 2: AI Integration
 
@@ -584,41 +661,152 @@ if (data.type === 'image' && data.imageData) {
 |------|------|------|
 | `src/lib/ai-tools/read-tool.ts` | 修改 | children summary 加 type；image 节点返回 ImageContent |
 | `src/lib/ai-tools/node-tool.ts` | 修改 | node_create 支持 imageData → upload → create |
-| `src/types/node.ts` | 修改 | 新增 `imageDescription?: string` 可选字段 |
+| `src/types/system-nodes.ts` | 修改 | 新增 NDX_F.IMAGE_DESCRIPTION fieldDef 定义 |
+| `src/lib/field-utils.ts` | 修改 | IMAGE_DESCRIPTION 字段解析支持 |
+| 描述生成服务 | 新建 | 上传完成后 fire-and-forget vision API → 写入 fieldEntry |
 
 ### Phase 3: Ecosystem
 
-**目标：** 完善图片生态——Chat 输入、剪藏重存、离线支持。
+**目标：** 完善图片生态——Chat 输入、剪藏重存、存量迁移、离线支持。
 
 | 任务 | 文件 | 说明 |
 |------|------|------|
-| Chat 输入图片粘贴 | `src/components/chat/ChatInput.tsx` 等 | paste 检测 + 缩略图预览 + 发送为 ImageContent |
+| Chat 输入图片粘贴 | `src/components/chat/` | paste 检测 + 缩略图预览 + 发送为 ImageContent |
 | 剪藏图片重存 | `src/lib/html-to-nodes.ts`, background script | 外部 URL → bg fetch → upload R2 → 替换 mediaUrl |
-| 离线队列 | `src/lib/image-upload.ts` | IndexedDB 缓存 + 联网后自动上传 |
+| Tana 存量图片迁移 | 迁移脚本 | 扫描 type:'image' 且 mediaUrl 非 R2 域名 → 批量 re-upload |
+| 离线队列完善 | `src/lib/image-upload.ts` | IndexedDB 完整队列 + 联网后自动上传 |
 | 图片 lightbox | `src/components/outliner/ImageNodeRenderer.tsx` | 点击放大查看 |
 
 ---
 
 ## 7. 验证要点
 
-### Phase 1 验收标准
+### Phase 1a 验收标准
+
+- [ ] POST /api/images 上传图片 → 存入 R2 → D1 记录
+- [ ] GET /api/images/{wsId}/{hash} → 验证 auth → 返回图片
+- [ ] 未认证请求 → 401
+- [ ] 非 workspace 成员 → 403
+- [ ] 重复 hash → 返回已有 URL，不重复存储
+- [ ] 文件 > 10MB → 400
+- [ ] 非图片文件 → 400
+
+### Phase 1b 验收标准
 
 - [ ] 在编辑器中 Cmd+V 粘贴截图 → 出现 loading 态 → 上传完成后显示图片
-- [ ] 同一张图粘贴两次 → R2 只存一份（SHA-256 hash 去重生效）
-- [ ] 图片节点在大纲中正常渲染，可拖拽排序，可有 children
-- [ ] 上传失败（网络断开）→ 显示错误态 + 可重试
-- [ ] slash command `/image` 可触发文件选择器上传图片
-- [ ] `npm run verify` 全通过
+- [ ] 粘贴 GIF → 保留动画（不转 WebP）
+- [ ] 粘贴小 JPEG (< 500KB) → 不重编码，直传
+- [ ] 同一张图粘贴两次 → R2 只存一份
+- [ ] 图片节点可拖拽排序，可有 children
+- [ ] 上传失败 → 显示错误态 + 重试按钮
+- [ ] 上传中关闭 Side Panel → 重新打开后图片不丢失（IndexedDB 暂存）
+
+### Phase 1c 验收标准
+
+- [ ] slash command `/image` → 打开文件选择器 → 上传 → 创建图片节点
+- [ ] workspace 图片总量 > 500MB → 上传拒绝 + 提示
+- [ ] 短时间大量上传 → rate limit 生效
 
 ### Phase 2 验收标准
 
-- [ ] Agent `node_read` 一个 image 节点 → 返回中包含 ImageContent → Agent 能描述图片内容
+- [ ] Agent `node_read` image 节点 → 返回 ImageContent → Agent 能描述图片内容
 - [ ] Agent 读父节点 → children summary 中 image 子节点有 `type: "image"` 标识
-- [ ] Agent `node_create({ data: { type: 'image', imageData: '...' } })` → 图片上传 R2 + 创建持久节点
+- [ ] Agent `node_create({ data: { type: 'image', imageData: '...' } })` → 上传 R2 + 创建持久节点
 - [ ] Agent 截图 → 保存为节点 → 后续读取能看到同一张图
+- [ ] 图片上传后异步生成描述 → 写入 NDX_F.IMAGE_DESCRIPTION fieldEntry
+- [ ] Agent 读 image 节点 → imageInfo.description 有值
 
 ### Phase 3 验收标准
 
 - [ ] Chat 输入框粘贴图片 → 显示缩略图预览 → 发送后 Agent 能看到
 - [ ] 新剪藏文章中的图片 → mediaUrl 指向 R2（不是外部 URL）
-- [ ] 离线粘贴图片 → 本地缓存 → 联网后自动上传 → mediaUrl 更新为 R2 URL
+- [ ] Tana 导入的旧图片 → 批量迁移到 R2
+- [ ] 离线粘贴图片 → 本地缓存 → 联网后自动上传 → mediaUrl 更新
+
+---
+
+## 附录：决策讨论记录
+
+### Round 1: 初始方案 (v1)
+
+**用户需求**：支持 image node，图片存 R2，支持粘贴上传和剪藏。
+
+**初始调研**：启动 5 个并行研究 agent——竞品分析、R2 上传模式、AI 多模态、Chrome 扩展限制、代码库审计。
+
+**用户反馈**："还需要考虑 image node 也是要给 AI/agent 使用的"。补充 AI 维度后，识别出 Agent 与图片之间的三个断点（读不到、截图不能沉淀、用户无法给 Agent 看图）。
+
+**用户反馈**："系统地思考和调研，不要着急下结论"。扩大调研范围，增加外部研究。
+
+**用户反馈**："TipTap 已经从项目中移除了"。修正集成点：从 TipTap handlePaste 改为 ProseMirror EditorView handlePaste。
+
+### Round 2: 工具设计讨论
+
+**用户反馈**："node_read 都是读 node 的详细内容了，如果需要读的 node 是图片，就应该直接带图片，而不是还需要一个参数"
+
+→ 取消 `includeImages` 参数方案。node_read 对 image 节点直接返回 ImageContent。
+
+**用户反馈**："Agent 将截图保存为 image node，应该就是 node_create 的基础能力"
+
+→ 取消独立 `save_image` 工具方案。扩展 node_create 支持 `data.imageData`。
+
+**用户反馈**："工具设计需要谨慎，尽量不要添加新的工具，会增加工具调用的复杂性"
+
+→ 确认不新增任何 AI 工具，仅扩展 node_read 和 node_create。
+
+### Round 3: nodex Review (10 条反馈)
+
+nodex 从数据模型、安全、实施、AI 集成、边界情况五个角度审视了 v1 方案：
+
+**第 1 点：imageDescription 顶层属性违反"一切皆节点"**
+
+- nodex 建议：走 fieldDef + supertag 模板
+- 用户最初不同意："这些信息不是给用户看的，是给模型或搜索使用的"
+- 后续讨论：用户提出"是不是可以有一些属性永远不展示，有些用户可以自己设置"
+- 发现代码库已有 `hideField: SYS_V.ALWAYS` 机制，且 `NDX_F.HIGHLIGHT_ANCHOR` 已在使用
+- **最终决策**：走 fieldDef + `hideField: SYS_V.ALWAYS`，复用现有机制。这既遵守铁律，又不给用户添噪音
+
+**第 2 点：node_create 塞入上传逻辑，职责混乱**
+
+- nodex 指出原子性、超时、API 形状误导问题
+- **接受**：内部用 `uploadAndCreateImageNode()` 封装，工具描述明确标注"可能较慢"
+
+**第 3 点：公开桶安全假设过于乐观**
+
+- nodex 指出用户截图可能含敏感信息，URL 泄露后永久可访问
+- **接受**：改为 Worker 代理读取（GET /api/images/{wsId}/{hash}），不开公开桶。CDN 缓存确保性能
+
+**第 4 点：node_read 内联 fetch 图片字节，成本失控**
+
+- nodex 建议增加 includeImage 参数或独立 view_image 工具
+- 用户不同意："并不是每个 node 都有图片，我们是大纲产品，图片信息应该没那么多"
+- **维持原设计**：node_read 对 image 节点直接带图。Agent 通过 children summary 的 type 字段决定是否读取，这就是成本控制机制
+
+**第 5 点：Layer 2 描述生成策略模糊**
+
+- nodex 指出"Agent 自然会描述"不是可靠路径，"谁来存回"未定义
+- **接受**：改为上传时异步生成（fire-and-forget vision API），参考 Spark 三态模式
+
+**第 6 点：WebP 强制转换丢失信息**
+
+- nodex 指出 GIF 动画丢失、SVG 降级、小文件二次压缩
+- **接受**：改为智能压缩——GIF/SVG 保留原格式，小文件跳过重编码
+
+**第 7 点：缺少容量控制**
+
+- nodex 建议 per-workspace 配额 + rate limit + trash 清理
+- **接受**：Phase 1c 加入 500MB/workspace 配额 + 10次/分钟 rate limit
+
+**第 8 点：离线与上传态 UX 空白**
+
+- nodex 指出 Phase 1 就会遇到网络不稳定，不能把离线推到 Phase 3
+- **接受**：Phase 1b 加入最小重试机制（IndexedDB 暂存 blob，防止粘贴后图片丢失）
+
+**第 9 点：Tana 导入存量图片未提及**
+
+- nodex 指出 Tana CDN URL 未来会失效
+- **接受**：Phase 3 加迁移任务
+
+**第 10 点：Phase 1 应该拆更细**
+
+- nodex 建议拆为 1a(后端)/1b(editor paste)/1c(slash command)
+- **接受**：每步可独立 typecheck + test + build + 浏览器验证

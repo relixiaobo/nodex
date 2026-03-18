@@ -869,6 +869,18 @@ export function restoreLatestChatSession(agent: Agent = getAIAgent()): Promise<v
   return runtime.restorePromise;
 }
 
+let chatSyncNudgeTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** Debounced nudge — waits 2s after last persist before triggering sync.
+ *  During streaming, turn_end fires rapidly; this batches into one sync. */
+function debouncedSyncNudge(): void {
+  if (chatSyncNudgeTimer !== null) clearTimeout(chatSyncNudgeTimer);
+  chatSyncNudgeTimer = setTimeout(() => {
+    chatSyncNudgeTimer = null;
+    import('./sync/sync-manager.js').then(({ syncManager }) => syncManager.nudge()).catch(() => {});
+  }, 2000);
+}
+
 export async function persistChatSession(agent: Agent = getAIAgent()): Promise<void> {
   const runtime = getAgentRuntimeState(agent);
   if (!runtime.hydrated) return;
@@ -882,9 +894,7 @@ export async function persistChatSession(agent: Agent = getAIAgent()): Promise<v
     runtime.currentSession.updatedAt = persistedSession.updatedAt;
     runtime.debugTurns = persistedTurns;
 
-    // Nudge sync manager so chat sessions push promptly
-    // (lazy import to avoid circular dependency)
-    import('./sync/sync-manager.js').then(({ syncManager }) => syncManager.nudge()).catch(() => {});
+    debouncedSyncNudge();
   } catch {
     // Ignore persistence failures; chat should still function.
   }

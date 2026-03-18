@@ -48,12 +48,11 @@ _(空)_
 
 > Connect 的核心动作是**将相关节点聚到一起，观察和发现结构**（归纳法）。标签和链接在 Think 阶段已经完成了"标记关系"的工作，Connect 阶段需要好的"观察工具"来揭示结构。详见 `docs/research/102-connect-mechanisms-research.md`。
 
-##### 1. Search Node 字段过滤 (#23)
+##### 1. Search Node AI 自然语言过滤 (#23)
 
-> Search Node 目前只支持标签搜索，无法表达"所有 #insight 且 source 包含 'AI'"这样的条件。
+> Search Node 目前只支持标签搜索。跳过传统芯片条 UI（L1），直接用 AI 自然语言创建/修改 queryCondition 树。条件节点作为普通大纲节点渲染（数据即 UI），AI 输入框是唯一编辑入口。
 
-- [ ] Step 4: L1 字段过滤 UI — 芯片条增删改 + FIELD_IS/时间条件 + 计数提示
-- [ ] Step 5: L2 AI 自然语言 — tool call 创建 queryCondition 树
+- [ ] Search Node 内嵌 AI 输入框 — 自然语言 → AI 创建/修改 queryCondition 子节点 → 刷新搜索结果
 
 ##### 2. Supertags 完善
 

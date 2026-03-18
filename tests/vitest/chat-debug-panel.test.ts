@@ -129,6 +129,16 @@ function createDebugState(): AgentDebugState {
 }
 
 function findButton(container: HTMLElement, text: string): HTMLButtonElement | undefined {
+  // After refactor, role labels (SYSTEM/USER/ASST) are outside the button.
+  // Find the row div containing the text, then return its nested button.
+  const rows = container.querySelectorAll('[data-testid="chat-debug-message-row"]');
+  for (const row of rows) {
+    if (row.textContent?.includes(text)) {
+      const btn = row.querySelector('button');
+      if (btn) return btn;
+    }
+  }
+  // Fallback: direct button text match
   return Array.from(container.querySelectorAll('button')).find((button) => button.textContent?.includes(text));
 }
 

@@ -15,6 +15,7 @@ import { requireAuth, type AuthVariables } from './middleware/auth.js';
 import { handlePush } from './routes/push.js';
 import { handlePull } from './routes/pull.js';
 import aiRoutes from './routes/ai.js';
+import chatRoutes from './routes/chat.js';
 import type { Env } from './types.js';
 
 const app = new Hono<{ Bindings: Env }>();
@@ -39,7 +40,7 @@ app.use('*', async (c, next) => {
   const corsMiddleware = cors({
     origin: origins,
     allowHeaders: ['Content-Type', 'Authorization'],
-    allowMethods: ['POST', 'GET', 'OPTIONS'],
+    allowMethods: ['POST', 'GET', 'PUT', 'OPTIONS'],
     credentials: true,
     maxAge: 86400,
   });
@@ -244,5 +245,14 @@ sync.post('/push', handlePush);
 sync.post('/pull', handlePull);
 
 app.route('/sync', sync);
+
+// ---------------------------------------------------------------------------
+// Chat sync endpoints (auth-protected)
+// ---------------------------------------------------------------------------
+
+const chatSync = new Hono<{ Bindings: Env; Variables: AuthVariables }>();
+chatSync.use('*', requireAuth);
+chatSync.route('/', chatRoutes);
+app.route('/api/chat', chatSync);
 
 export default app;

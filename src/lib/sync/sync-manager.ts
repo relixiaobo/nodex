@@ -177,6 +177,10 @@ export class SyncManager {
         return;
       }
 
+      // Chat session sync (independent of Loro CRDT sync)
+      await this.syncChatSessions(workspaceId, accessToken);
+      if (!this.isSessionCurrent(sessionToken)) return;
+
       const pending = await getPendingCount(workspaceId);
       if (!this.isSessionCurrent(sessionToken)) return;
 
@@ -351,6 +355,103 @@ export class SyncManager {
     }
 
     return !hasMore;
+  }
+
+  // ── Chat session sync ────────────────────────────────────────────
+
+  private chatLastPullAt = 0;
+
+  private async syncChatSessions(workspaceId: string, accessToken: string): Promise<void> {
+    try {
+      await this.pushChatSessions(workspaceId, accessToken);
+      await this.pullChatSessions(workspaceId, accessToken);
+    } catch (err) {
+      // Chat sync errors are non-fatal — don't stop Loro sync
+      console.warn('[sync] chat sync error:', err);
+    }
+  }
+
+  private async pushChatSessions(workspaceId: string, accessToken: string): Promise<void> {
+    const { getDirtyChatSessions, markSessionSynced } = await import('../ai-persistence.js');
+    const dirty = await getDirtyChatSessions();
+    if (dirty.length === 0) return;
+
+    const baseUrl = this.getApiUrl();
+
+    for (const session of dirty) {
+      try {
+        const res = await fetch(`${baseUrl}/api/chat/sessions/${session.id}`, {
+          method: 'PUT',
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            session,
+            baseRevision: session.revision,
+            workspaceId,
+          }),
+        });
+
+        if (res.ok) {
+          const { revision } = await res.json() as { revision: number };
+          await markSessionSynced(session.id, revision);
+        } else if (res.status === 409) {
+          // Conflict — LWW: pull the remote version
+          const { remoteSession, remoteRevision } = await res.json() as {
+            remoteSession: unknown;
+            remoteRevision: number;
+          };
+          if (remoteSession) {
+            const { importRemoteSession } = await import('../ai-persistence.js');
+            await importRemoteSession(remoteSession as any, remoteRevision);
+          }
+        }
+        // 4xx / 5xx other than 409 — skip, will retry next cycle
+      } catch {
+        // Network error — skip, will retry next cycle
+      }
+    }
+  }
+
+  private async pullChatSessions(workspaceId: string, accessToken: string): Promise<void> {
+    const baseUrl = this.getApiUrl();
+
+    const res = await fetch(
+      `${baseUrl}/api/chat/sessions?workspaceId=${encodeURIComponent(workspaceId)}&since=${this.chatLastPullAt}`,
+      {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      },
+    );
+
+    if (!res.ok) return;
+
+    const { sessions, metas } = await res.json() as {
+      sessions: unknown[];
+      metas: Array<{ id: string; revision: number; updatedAt: number }>;
+    };
+
+    if (sessions.length === 0) return;
+
+    const { importRemoteSession } = await import('../ai-persistence.js');
+
+    for (let i = 0; i < sessions.length; i++) {
+      const session = sessions[i];
+      const meta = metas[i];
+      if (session && meta) {
+        await importRemoteSession(session as any, meta.revision);
+      }
+    }
+
+    // Update pull cursor to the latest updatedAt we received
+    const maxUpdatedAt = Math.max(...metas.map((m) => m.updatedAt));
+    if (maxUpdatedAt > this.chatLastPullAt) {
+      this.chatLastPullAt = maxUpdatedAt;
+    }
+  }
+
+  private getApiUrl(): string {
+    return import.meta.env.VITE_SYNC_API_URL ?? 'http://localhost:8787';
   }
 }
 

@@ -386,6 +386,7 @@ export class SyncManager {
     const { getDirtyChatSessions, markSessionSynced } = await import('../ai-persistence.js');
     const dirty = await getDirtyChatSessions();
     if (dirty.length === 0) return;
+    console.log(`[sync] chat: pushing ${dirty.length} dirty session(s)`);
 
     const baseUrl = this.getApiUrl();
 
@@ -408,6 +409,7 @@ export class SyncManager {
 
         if (res.ok) {
           const { revision } = await res.json() as { revision: number };
+          console.log(`[sync] chat: pushed ${session.id} → revision ${revision}`);
           await markSessionSynced(session.id, revision);
           await this.updateInMemorySessionSync(session.id, revision);
         } else if (res.status === 409) {

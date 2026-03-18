@@ -773,17 +773,23 @@ export function CommandPalette() {
           return (
             <div className="mx-2 flex h-10 shrink-0 items-center justify-end gap-3 border-t border-border-subtle bg-background px-2">
               {!aiMode && hasQuery && createItem && selected.id !== '__create__' && (
-                <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => createItem.action()}
+                  className="flex items-center gap-1.5 rounded px-1 py-0.5 hover:bg-foreground/5 transition-colors cursor-pointer"
+                >
                   <span className="text-xs text-foreground-tertiary">{t('search.commandPalette.actionCreate')}</span>
                   <Kbd>⌘↵</Kbd>
-                </div>
+                </button>
               )}
-              <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => selected.action()}
+                className="flex items-center gap-1.5 rounded px-1 py-0.5 hover:bg-foreground/5 transition-colors cursor-pointer"
+              >
                 <span className="text-xs text-foreground-secondary">
                   {selected.id === '__ask_ai__' ? t('search.commandPalette.actionAskAI') : getActionLabel(selected.type)}
                 </span>
                 <Kbd>↵</Kbd>
-              </div>
+              </button>
             </div>
           );
         })()}

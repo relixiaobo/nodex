@@ -77,3 +77,4 @@
 - Chat Debug 面板 UI 规范化：去掉内部圆角容器、hover 背景对齐内容列、颜色/圆角/间距/图标全部对齐设计系统
 - Chat 输入框圆角从 16px 调整为 12px，与面板容器圆角对齐
 - Chat 跨设备同步：聊天历史通过 Cloudflare D1/R2 在设备间自动同步，30 秒周期 + 可见性触发，CAS 版本控制 + LWW 冲突处理
+- ⌘K 命令面板融合 Chat：搜索历史聊天（fuzzy match 标题）、Tab 键切换 AI 模式（Raycast 风格）、Ask AI 始终可见、New Chat 命令；AI 模式空态浏览最近对话，有输入时直接提问

@@ -150,30 +150,27 @@ chat.get('/sessions', async (c) => {
     return c.json({ sessions: [], metas: [] });
   }
 
-  // Fetch full sessions from R2 in parallel
-  const sessions = await Promise.all(
+  // Fetch full sessions from R2 in parallel, zip with metas
+  const pairs = await Promise.all(
     rows.results.map(async (row) => {
       const r2Key = `chat/${workspaceId}/${row.id}.json`;
       const obj = await r2.get(r2Key);
       if (!obj) return null;
       try {
-        return JSON.parse(await obj.text());
+        const session = JSON.parse(await obj.text());
+        const meta = { id: row.id, title: row.title, revision: row.revision, updatedAt: row.updated_at };
+        return { session, meta };
       } catch {
         return null;
       }
     }),
   );
 
-  const metas = rows.results.map((row) => ({
-    id: row.id,
-    title: row.title,
-    revision: row.revision,
-    updatedAt: row.updated_at,
-  }));
+  const valid = pairs.filter((p): p is NonNullable<typeof p> => p !== null);
 
   return c.json({
-    sessions: sessions.filter(Boolean),
-    metas,
+    sessions: valid.map((p) => p.session),
+    metas: valid.map((p) => p.meta),
   });
 });
 

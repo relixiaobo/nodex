@@ -509,6 +509,12 @@ export function CommandPalette() {
         return;
       }
 
+      // Backspace on empty input in AI mode: back to search (Raycast-style)
+      if (e.key === 'Backspace' && aiMode && !searchQuery) {
+        setAiMode(false);
+        return;
+      }
+
       // ⌘1-⌘9 — execute item at that position (Alfred-style)
       if ((e.metaKey || e.ctrlKey) && e.key >= '1' && e.key <= '9') {
         e.preventDefault();

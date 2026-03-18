@@ -226,11 +226,12 @@ export async function saveChatSession(session: ChatSession): Promise<ChatSession
   const updatedAt = Date.now();
   const normalizedSession = normalizeChatSession(session);
 
-  // Preserve syncedAt/revision from IndexedDB if they're newer than the
-  // in-memory session. This prevents persistChatSession (which writes the
-  // in-memory Agent session) from overwriting sync state set by
-  // markSessionSynced or importRemoteSession.
-  const existing = await db.get(STORE_NAME, session.id);
+  // P1-6: Read existing inside the same transaction to avoid race with
+  // markSessionSynced or importRemoteSession writing between read and write.
+  const tx = db.transaction(SESSION_STORE_NAMES, 'readwrite');
+  const store = tx.objectStore(STORE_NAME);
+
+  const existing = await store.get(session.id);
   const syncedAt = existing
     ? Math.max(normalizedSession.syncedAt ?? 0, existing.syncedAt ?? 0) || null
     : normalizedSession.syncedAt;
@@ -246,11 +247,8 @@ export async function saveChatSession(session: ChatSession): Promise<ChatSession
     mapping: stripMappingImagesForPersistence(normalizedSession.mapping),
   };
 
-  const tx = db.transaction(SESSION_STORE_NAMES, 'readwrite');
-  await Promise.all([
-    tx.objectStore(STORE_NAME).put(nextSession),
-    tx.objectStore(META_STORE_NAME).put(toSessionMeta(nextSession)),
-  ]);
+  await store.put(nextSession);
+  await tx.objectStore(META_STORE_NAME).put(toSessionMeta(nextSession));
   await tx.done;
 
   return nextSession;
@@ -331,6 +329,21 @@ export function resetChatPersistenceForTests(): void {
   dbPromise = null;
 }
 
+/**
+ * Clear all chat sessions from IndexedDB (used on sign-out to prevent
+ * cross-user data leaks).
+ */
+export async function clearAllChatSessions(): Promise<void> {
+  const db = await getDB();
+  const tx = db.transaction(ALL_STORE_NAMES, 'readwrite');
+  await Promise.all([
+    tx.objectStore(STORE_NAME).clear(),
+    tx.objectStore(META_STORE_NAME).clear(),
+    tx.objectStore(DEBUG_STORE_NAME).clear(),
+  ]);
+  await tx.done;
+}
+
 // ---------------------------------------------------------------------------
 // Chat sync — push / pull
 // ---------------------------------------------------------------------------
@@ -365,30 +378,35 @@ export async function getDirtyChatSessions(): Promise<ChatSession[]> {
 
 /**
  * Mark a session as synced (update syncedAt + revision in IndexedDB).
+ * P1-6: Read and write in the same transaction to avoid overwriting newer
+ * content written by persistChatSession between a separate read and write.
  */
 export async function markSessionSynced(sessionId: string, revision: number): Promise<void> {
   const db = await getDB();
-  const session = await db.get(STORE_NAME, sessionId);
-  if (!session) return;
+  const tx = db.transaction(SESSION_STORE_NAMES, 'readwrite');
+  const store = tx.objectStore(STORE_NAME);
+  const session = await store.get(sessionId);
+  if (!session) {
+    await tx.done;
+    return;
+  }
 
   const now = Date.now();
-  const updated: ChatSession = {
-    ...normalizeChatSession(session),
-    syncedAt: now,
-    revision,
-  };
-
-  const tx = db.transaction(SESSION_STORE_NAMES, 'readwrite');
-  await Promise.all([
-    tx.objectStore(STORE_NAME).put(updated),
-    tx.objectStore(META_STORE_NAME).put(toSessionMeta(updated)),
-  ]);
+  // Only update sync fields, preserve everything else (including newer content)
+  const updated = { ...session, syncedAt: now, revision };
+  await store.put(updated);
+  await tx.objectStore(META_STORE_NAME).put({
+    id: sessionId,
+    title: updated.title ?? null,
+    updatedAt: updated.updatedAt,
+  });
   await tx.done;
 }
 
 /**
  * Import a remote session into IndexedDB (from pull).
  * Only overwrites if local session has no unsynchronized changes.
+ * P1-6: Read and write in the same transaction to avoid races.
  * Returns 'imported' | 'skipped' (local has pending changes) | 'conflict'.
  */
 export async function importRemoteSession(
@@ -396,7 +414,10 @@ export async function importRemoteSession(
   remoteRevision: number,
 ): Promise<'imported' | 'skipped' | 'conflict'> {
   const db = await getDB();
-  const local = await db.get(STORE_NAME, remoteSession.id);
+  const tx = db.transaction(SESSION_STORE_NAMES, 'readwrite');
+  const store = tx.objectStore(STORE_NAME);
+  const metaStore = tx.objectStore(META_STORE_NAME);
+  const local = await store.get(remoteSession.id);
 
   if (!local) {
     // New session — import directly
@@ -405,11 +426,8 @@ export async function importRemoteSession(
       syncedAt: Date.now(),
       revision: remoteRevision,
     };
-    const tx = db.transaction(SESSION_STORE_NAMES, 'readwrite');
-    await Promise.all([
-      tx.objectStore(STORE_NAME).put(synced),
-      tx.objectStore(META_STORE_NAME).put(toSessionMeta(synced)),
-    ]);
+    await store.put(synced);
+    await metaStore.put(toSessionMeta(synced));
     await tx.done;
     return 'imported';
   }
@@ -425,14 +443,12 @@ export async function importRemoteSession(
         syncedAt: Date.now(),
         revision: remoteRevision,
       };
-      const tx = db.transaction(SESSION_STORE_NAMES, 'readwrite');
-      await Promise.all([
-        tx.objectStore(STORE_NAME).put(synced),
-        tx.objectStore(META_STORE_NAME).put(toSessionMeta(synced)),
-      ]);
+      await store.put(synced);
+      await metaStore.put(toSessionMeta(synced));
       await tx.done;
       return 'conflict'; // Imported but was a conflict
     }
+    await tx.done;
     return 'skipped'; // Local is newer, will push on next cycle
   }
 
@@ -442,11 +458,8 @@ export async function importRemoteSession(
     syncedAt: Date.now(),
     revision: remoteRevision,
   };
-  const tx = db.transaction(SESSION_STORE_NAMES, 'readwrite');
-  await Promise.all([
-    tx.objectStore(STORE_NAME).put(synced),
-    tx.objectStore(META_STORE_NAME).put(toSessionMeta(synced)),
-  ]);
+  await store.put(synced);
+  await metaStore.put(toSessionMeta(synced));
   await tx.done;
   return 'imported';
 }

@@ -459,9 +459,10 @@ export class SyncManager {
     if (res.status === 401) throw new ChatSyncAuthError();
     if (!res.ok) return;
 
-    const { sessions, metas } = await res.json() as {
+    const { sessions, metas, hasMore } = await res.json() as {
       sessions: unknown[];
       metas: Array<{ id: string; revision: number; updatedAt: number }>;
+      hasMore?: boolean;
     };
 
     if (sessions.length === 0) return;
@@ -480,6 +481,10 @@ export class SyncManager {
       streamingSessionIds = new Set();
     }
 
+    // P1-5: Track cursor advancement carefully — don't skip past streaming sessions
+    let maxImportedAt = this.chatLastPullAt;
+    let skippedAny = false;
+
     for (let i = 0; i < sessions.length; i++) {
       if (!this.isSessionCurrent(sessionToken)) return;
 
@@ -490,7 +495,8 @@ export class SyncManager {
       // Skip sessions with active streaming to avoid overwriting in-flight data
       if (streamingSessionIds.has(meta.id)) {
         console.log(`[sync] chat: skipping pull for ${meta.id} (streaming)`);
-        continue;
+        skippedAny = true;
+        continue; // Don't advance cursor past this
       }
 
       const result = await importRemoteSession(session as any, meta.revision);
@@ -500,13 +506,22 @@ export class SyncManager {
       if (result === 'conflict') {
         console.warn(`[sync] chat pull conflict for ${meta.id}: remote wins (LWW)`);
       }
+
+      if (meta.updatedAt > maxImportedAt) {
+        maxImportedAt = meta.updatedAt;
+      }
     }
 
-    // Persist pull cursor (like Loro's saveCursor pattern)
-    const maxUpdatedAt = Math.max(...metas.map((m) => m.updatedAt));
-    if (maxUpdatedAt > this.chatLastPullAt) {
-      this.chatLastPullAt = maxUpdatedAt;
-      await saveChatPullCursor(workspaceId, maxUpdatedAt);
+    // P1-5: Only advance cursor if no sessions were skipped.
+    // Skipped sessions need to be re-pulled next cycle.
+    if (!skippedAny && maxImportedAt > this.chatLastPullAt) {
+      this.chatLastPullAt = maxImportedAt;
+      await saveChatPullCursor(workspaceId, maxImportedAt);
+    }
+
+    // If server indicated more pages, schedule another sync cycle
+    if (hasMore) {
+      this.nudgePending = true;
     }
   }
 

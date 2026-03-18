@@ -225,9 +225,24 @@ export async function saveChatSession(session: ChatSession): Promise<ChatSession
   const db = await getDB();
   const updatedAt = Date.now();
   const normalizedSession = normalizeChatSession(session);
+
+  // Preserve syncedAt/revision from IndexedDB if they're newer than the
+  // in-memory session. This prevents persistChatSession (which writes the
+  // in-memory Agent session) from overwriting sync state set by
+  // markSessionSynced or importRemoteSession.
+  const existing = await db.get(STORE_NAME, session.id);
+  const syncedAt = existing
+    ? Math.max(normalizedSession.syncedAt ?? 0, existing.syncedAt ?? 0) || null
+    : normalizedSession.syncedAt;
+  const revision = existing
+    ? Math.max(normalizedSession.revision, existing.revision)
+    : normalizedSession.revision;
+
   const nextSession: ChatSession = {
     ...normalizedSession,
     updatedAt,
+    syncedAt,
+    revision,
     mapping: stripMappingImagesForPersistence(normalizedSession.mapping),
   };
 

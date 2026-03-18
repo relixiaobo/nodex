@@ -62,6 +62,13 @@ export const enMessages = {
       actionCreate: 'Create in Today',
       cmdYesterday: 'Go to Yesterday',
       cmdClipPage: 'Clip Page to Today',
+      groupChats: 'Chats',
+      groupRecentChats: 'Recent Chats',
+      typeLabelChat: 'Chat',
+      typeLabelAskAI: 'Ask AI',
+      actionAskAI: 'Ask AI',
+      actionOpenChat: 'Open Chat',
+      aiModePlaceholder: 'Ask AI anything...',
     },
   },
   nodePicker: {

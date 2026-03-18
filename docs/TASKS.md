@@ -54,22 +54,6 @@ _(空)_
 
 - [ ] Search Node 自然语言条件编辑 — 可编辑描述行 + AI 生成/更新 queryCondition（隐藏） + 结果刷新
 
-##### 2. Supertags 完善
-
-> 降低打标签的摩擦 + 提升标签节点的可读性。
-
-- [ ] Convert to supertag — 普通节点快捷转 tagDef
-- [ ] Title expression — `${field name}` 动态标题
-- [ ] Pinned fields — 置顶显示 + filter 优先
-- [ ] Optional fields — 建议按钮 + 自动降级
-
-##### 3. 其他 Connect 基础设施
-
-- [ ] 自然语言日期解析（@next Monday / @November / @last week）(#22)
-- [ ] 日记模板（#day supertag 配置）(#22)
-- [ ] 日期字段链接到日节点 (#22)
-- [ ] Trash 交互优化 — 批量选中删除、右键菜单、自动清理策略（30 天）
-
 ---
 
 ### AI — 照亮你的思考
@@ -191,9 +175,15 @@ _(空)_
 
 ---
 
-### 暂缓 — 需要独立窗口 / Web 版后再考虑
+### 暂缓
 
-> 以下视图类型在 Chrome Side Panel（300-700px）中体验受限。
+#### Connect 增强（上线后根据反馈定优先级）
+
+- [ ] Supertags 完善 — Convert to supertag / Title expression / Pinned fields / Optional fields
+- [ ] 日期增强 — 自然语言日期解析 / 日记模板 / 日期字段链接到日节点 (#22)
+- [ ] Trash 交互优化 — 批量选中删除、右键菜单、自动清理策略（30 天）
+
+#### 视图类型（需要独立窗口 / Web 版）
 
 - [ ] Table View (#24) — 表格视图 + 列宽调整 + 列计算
 - [ ] Cards View (#26) — 卡片视图 + 拖拽更新字段值

@@ -41,7 +41,7 @@ import { ensureTodayNode, isDayNode } from '../../lib/journal.js';
 import { parseDayNodeName, parseYearNodeName, isToday } from '../../lib/date-utils.js';
 
 import { ensureUndoFocusAfterNavigation } from '../../lib/focus-utils.js';
-import { openChatWithPrompt } from '../../lib/chat-panel-actions.js';
+import { openChatWithPrompt, openChatPanel } from '../../lib/chat-panel-actions.js';
 import { listChatSessionMetas, type ChatSessionMeta } from '../../lib/ai-persistence.js';
 import { CHAT_PANEL_PREFIX } from '../../types/index.js';
 import { t } from '../../i18n/strings.js';
@@ -335,6 +335,19 @@ export function CommandPalette() {
     };
   }, [searchQuery, createChild, navigateTo, closeAndClear]);
 
+  // "New Chat" item for AI mode empty state
+  const newChatItem: PaletteItem = useMemo(() => ({
+    id: '__new_chat__',
+    label: 'New Chat',
+    icon: MessageCircleDashed,
+    type: 'command' as PaletteItemType,
+    typeLabel: t('search.commandPalette.typeLabelCommand'),
+    action: () => {
+      void openChatPanel();
+      closeAndClear();
+    },
+  }), [closeAndClear]);
+
   // "Ask AI" item — always shown when there's a query (in both modes)
   const askAiItem: PaletteItem | null = useMemo(() => {
     const q = searchQuery.trim();
@@ -440,6 +453,7 @@ export function CommandPalette() {
   const allItems: PaletteItem[] = useMemo(() => {
     if (aiMode) {
       const items = [...aiModeItems];
+      if (!searchQuery.trim()) items.push(newChatItem);
       if (askAiItem) items.push(askAiItem);
       return items;
     }
@@ -455,7 +469,7 @@ export function CommandPalette() {
       return items;
     }
     return [...sortedDefaultItems.suggestions, ...sortedDefaultItems.commands];
-  }, [aiMode, searchQuery, askAiItem, searchResults, chatSearchResults, createItem, sortedDefaultItems, aiModeItems]);
+  }, [aiMode, searchQuery, askAiItem, searchResults, chatSearchResults, createItem, sortedDefaultItems, aiModeItems, newChatItem]);
 
   // Reset selection when items change
   useEffect(() => {
@@ -564,8 +578,8 @@ export function CommandPalette() {
   // Track global index across groups for keyboard selection
   let globalIdx = 0;
 
-  // Separate node results and chat results for grouped rendering in search mode
-  const nodeResults = searchResults.filter((item) => item.type !== 'chat');
+  // Grouped rendering: searchResults = nodes + commands, chatSearchResults = chat sessions
+  const nodeResults = searchResults;
   const chatResults = chatSearchResults;
 
   return (
@@ -631,6 +645,18 @@ export function CommandPalette() {
                   })}
                 </>
               )}
+              {!hasQuery && (() => {
+                const idx = globalIdx++;
+                return (
+                  <PaletteRow
+                    key={newChatItem.id}
+                    item={newChatItem}
+                    selected={selectedIndex === idx}
+                    onSelect={() => newChatItem.action()}
+                    onHover={() => setSelectedIndex(idx)}
+                  />
+                );
+              })()}
               {askAiItem && (() => {
                 const idx = globalIdx++;
                 return (

@@ -31,7 +31,6 @@ _(空)_
 ## 进行中
 
 - [ ] **⌘K Chat 融合** — nodex-claude (#150)
-- [ ] **Chat 持久化 Phase 4 方案设计** — nodex（出设计方案中）
 
 ---
 
@@ -122,7 +121,7 @@ _(空)_
 - [x] **Extended Thinking** — 模型选择器 toggle + Low/Med/High 等级 + 会话持久化 + 可折叠 Thought block + server 端 `streamSimple` 修复 (#146)
 - [x] **Chat 分支消息审计** — regenerate 改用 `agent.continue()` 替代 `agent.prompt()`，修复重复 user 消息 + switchBranch 持久化 + toolResult 续接 (#148)
 - [ ] **⌘K Chat 融合** — Chat 历史搜索 + AI 模式 Tab 切换 + Ask AI 始终可见 + New Chat 命令（设计：`command-palette-chat-integration.md`）
-- [ ] Chat 持久化 Phase 4 — 跨设备同步完整原始对话历史（Sync API + D1/R2）
+- [x] **Chat 持久化 Phase 4** — 跨设备同步（D1 + R2 + SyncManager 集成 + LWW 冲突处理）
 
 **Track B: 阅读环** — 设计：`phase-2-reading-ring.md`
 
@@ -204,6 +203,7 @@ _(空)_
 
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
+| 2026-03-18 | Chat Phase 4 跨设备同步 — D1/R2 后端 + SyncManager 集成 + LWW 冲突 | nodex | main |
 | 2026-03-18 | ⌘K Chat 融合计划 + 图片节点计划 v3 合并 + 窄屏单面板布局修复 + NodeReference inline 修复 + ChatInput 圆角对齐 | nodex | main |
 | 2026-03-17 | Chat 自动摘要标题 + AI Debug 迁移 Settings + ref 渲染修复 + 设计系统合规 + overscroll 修复 | nodex | main |
 | 2026-03-17 | Chat 分支消息审计 — regenerate/edit 改用 `agent.continue()`，修复重复 user 消息 + switchBranch 持久化 + toolResult 续接 | codex | #148 |

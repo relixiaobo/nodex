@@ -5,6 +5,8 @@
 >
 > **定位**：本文档是 Search Node 功能的唯一设计来源。执行 agent 应完全基于此文档实施，不依赖其他上下文。
 > **前置文档**：`docs/_archive/features/search.md`（旧 spec）、`docs/_archive/plans/search-nodes-impl.md`（旧实施计划）。本文档取代两者中的设计决策，但旧文档中的代码位置参考仍有效。
+>
+> **⚠️ 2026-03-18 更新**：Step 4（L1 字段过滤芯片条 UI）已作废。改为 AI-first 方案——queryCondition 节点默认隐藏，用户只看到一行可编辑的自然语言搜索描述，AI Agent 负责生成/修改 queryCondition 树。数据模型（§二）和搜索引擎（§五）不变，交互方式（§四）中的 L1 部分由 AI Agent 取代。详见 `ai-features-architecture.md` 中 Search Agent 章节。
 
 ---
 

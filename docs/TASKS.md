@@ -50,9 +50,9 @@ _(空)_
 
 ##### 1. Search Node AI 自然语言过滤 (#23)
 
-> Search Node 目前只支持标签搜索。跳过传统芯片条 UI（L1），直接用 AI 自然语言创建/修改 queryCondition 树。条件节点作为普通大纲节点渲染（数据即 UI），AI 输入框是唯一编辑入口。
+> Search Node 目前只支持标签搜索。queryCondition 节点默认隐藏，用户只看到一行可编辑的自然语言搜索描述。编辑后提交 → AI 重新生成 queryCondition 树 → 刷新搜索结果。
 
-- [ ] Search Node 内嵌 AI 输入框 — 自然语言 → AI 创建/修改 queryCondition 子节点 → 刷新搜索结果
+- [ ] Search Node 自然语言条件编辑 — 可编辑描述行 + AI 生成/更新 queryCondition（隐藏） + 结果刷新
 
 ##### 2. Supertags 完善
 

@@ -396,6 +396,9 @@ export class SyncManager {
         if (res.ok) {
           const { revision } = await res.json() as { revision: number };
           await markSessionSynced(session.id, revision);
+          // Also update in-memory Agent session so next persistChatSession
+          // doesn't overwrite the synced revision back to 0
+          await this.updateInMemorySessionSync(session.id, revision);
         } else if (res.status === 409) {
           // Conflict — LWW: pull the remote version
           const { remoteSession, remoteRevision } = await res.json() as {
@@ -405,6 +408,7 @@ export class SyncManager {
           if (remoteSession) {
             const { importRemoteSession } = await import('../ai-persistence.js');
             await importRemoteSession(remoteSession as any, remoteRevision);
+            await this.updateInMemorySessionSync(session.id, remoteRevision);
           }
         }
         // 4xx / 5xx other than 409 — skip, will retry next cycle
@@ -447,6 +451,21 @@ export class SyncManager {
     const maxUpdatedAt = Math.max(...metas.map((m) => m.updatedAt));
     if (maxUpdatedAt > this.chatLastPullAt) {
       this.chatLastPullAt = maxUpdatedAt;
+    }
+  }
+
+  private async updateInMemorySessionSync(sessionId: string, revision: number): Promise<void> {
+    try {
+      const { agentRegistry, getCurrentSession } = await import('../ai-service.js');
+      const agent = agentRegistry.get(sessionId);
+      if (!agent) return;
+      const session = getCurrentSession(agent);
+      if (session && session.id === sessionId) {
+        session.syncedAt = Date.now();
+        session.revision = revision;
+      }
+    } catch {
+      // ai-service not loaded yet — safe to skip
     }
   }
 

@@ -54,6 +54,13 @@ _(空)_
 
 - [ ] Search Node 自然语言条件编辑 — 可编辑描述行 + AI 生成/更新 queryCondition（隐藏） + 结果刷新
 
+##### 2. Table View (#24)
+
+> Search Node + Table View + AI 是核心组合：AI 创建结构化节点（带 tag + fields） → Table View 按字段列展示 → 用户可排序/编辑。Side Panel 宽度足够显示 3-5 列的简洁表格。
+
+- [ ] Table View 基础 — viewDef 节点 + 字段列渲染 + 列宽调整
+- [ ] Search Node 结果以 Table 展示 — viewDef 关联到 search node
+
 ---
 
 ### AI — 照亮你的思考
@@ -185,7 +192,6 @@ _(空)_
 
 #### 视图类型（需要独立窗口 / Web 版）
 
-- [ ] Table View (#24) — 表格视图 + 列宽调整 + 列计算
 - [ ] Cards View (#26) — 卡片视图 + 拖拽更新字段值
 - [ ] Calendar View (#27) — 日历视图 + 日/周/月切换
 - [ ] List & Tabs View (#28) — List 双面板 + Tabs 视图

@@ -157,6 +157,18 @@ _(空)_
 
 ---
 
+### 图片节点支持
+
+> 设计：`docs/plans/image-node-support.md`（v3，已 review）
+
+- [ ] **Phase 1a: 后端基础设施** — R2 桶 + POST 上传 + GET 读取(media token 鉴权) + D1 images 表 + quota/rate limit
+- [ ] **Phase 1b: 客户端管线 + Editor 粘贴** — image-upload.ts（智能压缩 + hash + IndexedDB 暂存）+ media token 管理 + ProseMirror handlePaste + ImageNodeRenderer loading/error/retry
+- [ ] **Phase 1c: Slash command** — 启用 /image 命令 + 文件选择器
+- [ ] **Phase 2: AI 集成** — node_read 返回 ImageContent + node_create 支持 imageData + NDX_F.IMAGE_DESCRIPTION fieldDef + 客户端异步描述生成 + ToolCallBlock 图片渲染
+- [ ] **Phase 3: 生态** — Chat 输入图片粘贴 + 剪藏图片重存(webclip-service) + Tana 存量迁移 + 离线队列 + lightbox
+
+---
+
 ### 编辑器增强 & 交互完善
 
 - [ ] 节点选中增强 (#47) — Cmd+Shift+D 批量复制、拖动选择优化

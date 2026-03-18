@@ -109,7 +109,7 @@ function chatSessionToItem(
     id: `chat:${meta.id}`,
     label: meta.title || 'Untitled Chat',
     icon: MessageCircle,
-    type: 'chat' as PaletteItemType,
+    type: 'chat',
     typeLabel: t('search.commandPalette.typeLabelChat'),
     action: () => {
       const panelId = `${CHAT_PANEL_PREFIX}${meta.id}`;
@@ -194,7 +194,7 @@ export function CommandPalette() {
       id: node.id,
       label: node.defaultName,
       icon: SYSTEM_NODE_ICONS[node.iconKey] ?? Library,
-      type: 'node' as PaletteItemType,
+      type: 'node',
       typeLabel: t('search.commandPalette.typeLabelNavigate'),
       action: () => { trackPaletteUsage(node.id); navigateTo(node.id); closeAndClear(); },
     })),
@@ -324,7 +324,7 @@ export function CommandPalette() {
       id: '__create__',
       label: q,
       icon: Plus,
-      type: 'create' as PaletteItemType,
+      type: 'create',
       typeLabel: 'New in Today',
       action: () => {
         const todayId = ensureTodayNode();
@@ -340,7 +340,7 @@ export function CommandPalette() {
     id: '__new_chat__',
     label: 'New Chat',
     icon: MessageCircleDashed,
-    type: 'command' as PaletteItemType,
+    type: 'command',
     typeLabel: t('search.commandPalette.typeLabelCommand'),
     action: () => {
       void openChatPanel();
@@ -357,7 +357,7 @@ export function CommandPalette() {
       id: '__ask_ai__',
       label: `Ask AI: ${q}`,
       icon: MessageCircleDashed,
-      type: 'command' as PaletteItemType,
+      type: 'command',
       typeLabel: t('search.commandPalette.typeLabelAskAI'),
       action: () => {
         void openChatWithPrompt(q);
@@ -574,11 +574,11 @@ export function CommandPalette() {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex justify-center bg-black/30 p-2 sm:p-4 pt-[8vh] sm:pt-[12vh]"
+      className="fixed inset-0 z-50 flex justify-center bg-foreground/30 p-2 sm:p-4 pt-[8vh] sm:pt-[12vh]"
       onPointerDown={closePalette}
     >
       <div
-        className="animate-palette-expand flex flex-col w-full max-w-[600px] h-[min(480px,80vh)] rounded-lg bg-background shadow-paper overflow-hidden"
+        className="animate-palette-expand flex flex-col w-full max-w-[600px] h-[min(480px,80vh)] rounded-xl bg-background shadow-paper overflow-hidden"
         onPointerDown={(e) => e.stopPropagation()}
       >
         {/* Search header */}

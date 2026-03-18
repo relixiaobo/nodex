@@ -46,6 +46,15 @@ describe('getSystemCommands', () => {
     expect(cmd!.keywords).toContain('page');
   });
 
+  it('includes New Chat', () => {
+    const cmds = getSystemCommands();
+    const cmd = cmds.find((c) => c.id === 'cmd:new-chat');
+    expect(cmd).toBeDefined();
+    expect(cmd!.type).toBe('command');
+    expect(cmd!.keywords).toContain('chat');
+    expect(cmd!.keywords).toContain('ai');
+  });
+
   it('does not include Sign in/out (handled by ToolbarUserMenu)', () => {
     const cmds = getSystemCommands();
     const ids = cmds.map((c) => c.id);
@@ -78,5 +87,9 @@ describe('getActionLabel', () => {
     expect(getActionLabel('node')).toBe('Open Node');
     expect(getActionLabel('command')).toBe('Run Command');
     expect(getActionLabel('create')).toBe('Run Command');
+  });
+
+  it('returns Open Chat for chat type', () => {
+    expect(getActionLabel('chat')).toBe('Open Chat');
   });
 });

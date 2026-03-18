@@ -10,11 +10,12 @@
  * - The selected (highlighted) item shows ↵ instead
  * - Pressing ⌘N executes that item directly
  *
- * Empty input: Suggestions (recent nodes + containers) + Commands
- * Typing: single "Results" group with fuzzy-matched nodes + commands
+ * Two modes:
+ * - Search mode (default): Suggestions + Commands + Chat history
+ * - AI mode (Tab switch): Chat history + Ask AI
  */
 import { useEffect, useCallback, useMemo, useState, useRef } from 'react';
-import { Library, Inbox, CalendarDays, Trash2, Search, Settings, Sparkles, Plus, type AppIcon } from '../../lib/icons.js';
+import { Library, Inbox, CalendarDays, Trash2, Search, Settings, Sparkles, Plus, MessageCircle, MessageCircleDashed, ChevronLeft, type AppIcon } from '../../lib/icons.js';
 import { resolveTagColor } from '../../lib/tag-colors.js';
 import { resolveDataType, getFieldTypeIcon } from '../../lib/field-utils.js';
 import { isLockedNode, isWorkspaceHomeNode } from '../../lib/node-capabilities.js';
@@ -41,6 +42,8 @@ import { parseDayNodeName, parseYearNodeName, isToday } from '../../lib/date-uti
 
 import { ensureUndoFocusAfterNavigation } from '../../lib/focus-utils.js';
 import { openChatWithPrompt } from '../../lib/chat-panel-actions.js';
+import { listChatSessionMetas, type ChatSessionMeta } from '../../lib/ai-persistence.js';
+import { CHAT_PANEL_PREFIX } from '../../types/index.js';
 import { t } from '../../i18n/strings.js';
 import { Kbd } from '../ui/Kbd';
 
@@ -97,6 +100,32 @@ function resolveNodeVisuals(id: string, node: { type?: string; tags?: string[] }
   return { bulletColors, typeLabel: 'Node', type: 'node' };
 }
 
+/** Build a PaletteItem for a chat session. */
+function chatSessionToItem(
+  meta: ChatSessionMeta,
+  closeAndClear: () => void,
+): PaletteItem {
+  return {
+    id: `chat:${meta.id}`,
+    label: meta.title || 'Untitled Chat',
+    icon: MessageCircle,
+    type: 'chat' as PaletteItemType,
+    typeLabel: t('search.commandPalette.typeLabelChat'),
+    action: () => {
+      const panelId = `${CHAT_PANEL_PREFIX}${meta.id}`;
+      const { panels, setActivePanel, openPanel } = useUIStore.getState();
+      // Reuse existing chat panel if already open, otherwise open new one
+      const existing = panels.find((p) => p.nodeId === panelId);
+      if (existing) {
+        setActivePanel(existing.id);
+      } else {
+        openPanel(panelId);
+      }
+      closeAndClear();
+    },
+  };
+}
+
 export function CommandPalette() {
   const searchOpen = useUIStore((s) => s.searchOpen);
   const closeSearch = useUIStore((s) => s.closeSearch);
@@ -113,8 +142,22 @@ export function CommandPalette() {
   const trackPaletteUsage = useUIStore((s) => s.trackPaletteUsage);
 
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [aiMode, setAiMode] = useState(false);
+  const [chatSessions, setChatSessions] = useState<ChatSessionMeta[]>([]);
   const listRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Load chat sessions once on mount
+  useEffect(() => {
+    if (searchOpen) {
+      void listChatSessionMetas().then(setChatSessions).catch(() => {});
+    }
+  }, [searchOpen]);
+
+  // Reset AI mode when palette closes
+  useEffect(() => {
+    if (!searchOpen) setAiMode(false);
+  }, [searchOpen]);
 
   // Close without clearing query (dismiss via Esc / backdrop / ⌘K)
   const closePalette = useCallback(() => {
@@ -201,6 +244,25 @@ export function CommandPalette() {
     return freqBoost + recencyBoost;
   }, [paletteUsage]);
 
+  // Chat session items for search results (fuzzy match on title)
+  const chatSearchResults = useMemo(() => {
+    const q = searchQuery.trim();
+    if (!q || chatSessions.length === 0) return [];
+    const items: PaletteItem[] = [];
+    for (const meta of chatSessions) {
+      if (!meta.title) continue;
+      const match = fuzzyMatch(q, meta.title);
+      if (match) {
+        items.push({
+          ...chatSessionToItem(meta, closeAndClear),
+          score: match.score,
+        });
+      }
+    }
+    items.sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
+    return items.slice(0, 5);
+  }, [searchQuery, chatSessions, closeAndClear]);
+
   // Fuzzy search results (nodes + commands mixed, sorted by score + usage boost)
   const searchResults = useMemo(() => {
     const q = searchQuery.trim();
@@ -273,22 +335,23 @@ export function CommandPalette() {
     };
   }, [searchQuery, createChild, navigateTo, closeAndClear]);
 
+  // "Ask AI" item — always shown when there's a query (in both modes)
   const askAiItem: PaletteItem | null = useMemo(() => {
     const q = searchQuery.trim();
-    if (!q || searchResults.length > 0) return null;
+    if (!q) return null;
 
     return {
       id: '__ask_ai__',
       label: `Ask AI: ${q}`,
-      icon: Sparkles,
+      icon: MessageCircleDashed,
       type: 'command' as PaletteItemType,
-      typeLabel: 'Ask AI',
+      typeLabel: t('search.commandPalette.typeLabelAskAI'),
       action: () => {
         void openChatWithPrompt(q);
         closeAndClear();
       },
     };
-  }, [searchQuery, searchResults.length, closeAndClear]);
+  }, [searchQuery, closeAndClear]);
 
   // Default mode: Suggestions (behavior-driven) + Commands (fixed list)
   const sortedDefaultItems = useMemo(() => {
@@ -336,28 +399,68 @@ export function CommandPalette() {
       }
     }
 
+    // Add recent chat sessions to suggestions (max 2)
+    const recentChats = chatSessions.slice(0, 2).map((meta) => chatSessionToItem(meta, closeAndClear));
+
     const cmdItems = [...quickNavItems, ...commandItems];
-    return { suggestions: suggestionItems, commands: cmdItems };
-  }, [paletteUsage, getUsageBoost, commands, quickNavItems, commandItems, ctx, trackPaletteUsage, navigateTo, closeAndClear]);
+    return { suggestions: [...suggestionItems, ...recentChats], commands: cmdItems };
+  }, [paletteUsage, getUsageBoost, commands, quickNavItems, commandItems, ctx, trackPaletteUsage, navigateTo, closeAndClear, chatSessions]);
+
+  // AI mode items
+  const aiModeItems = useMemo(() => {
+    const q = searchQuery.trim();
+    const items: PaletteItem[] = [];
+
+    if (q) {
+      // Fuzzy match chat sessions
+      for (const meta of chatSessions) {
+        if (!meta.title) continue;
+        const match = fuzzyMatch(q, meta.title);
+        if (match) {
+          items.push({
+            ...chatSessionToItem(meta, closeAndClear),
+            score: match.score,
+          });
+        }
+      }
+      items.sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
+      // Trim to max 10
+      if (items.length > 10) items.length = 10;
+    } else {
+      // Empty state: recent chat sessions (max 10)
+      for (const meta of chatSessions.slice(0, 10)) {
+        items.push(chatSessionToItem(meta, closeAndClear));
+      }
+    }
+
+    return items;
+  }, [searchQuery, chatSessions, closeAndClear]);
 
   // Flat list of all visible items (for keyboard navigation)
   const allItems: PaletteItem[] = useMemo(() => {
+    if (aiMode) {
+      const items = [...aiModeItems];
+      if (askAiItem) items.push(askAiItem);
+      return items;
+    }
     if (searchQuery.trim()) {
       const items: PaletteItem[] = [];
-      if (askAiItem) items.push(askAiItem);
+      // Node results first
+      if (searchResults.length > 0) items.push(...searchResults);
+      // Chat results
+      if (chatSearchResults.length > 0) items.push(...chatSearchResults);
+      // Separator items at the end
       if (createItem) items.push(createItem);
-      items.push(...searchResults);
+      if (askAiItem) items.push(askAiItem);
       return items;
     }
     return [...sortedDefaultItems.suggestions, ...sortedDefaultItems.commands];
-  }, [searchQuery, askAiItem, searchResults, createItem, sortedDefaultItems]);
+  }, [aiMode, searchQuery, askAiItem, searchResults, chatSearchResults, createItem, sortedDefaultItems, aiModeItems]);
 
   // Reset selection when items change
-  // When searching with results, skip createItem (index 0) and select first result
   useEffect(() => {
-    const hasResults = searchQuery.trim() && searchResults.length > 0 && createItem && !askAiItem;
-    setSelectedIndex(hasResults ? 1 : 0);
-  }, [allItems.length, searchQuery, searchResults.length, createItem, askAiItem]);
+    setSelectedIndex(0);
+  }, [allItems.length, searchQuery, aiMode]);
 
   // Focus input when opened
   useEffect(() => {
@@ -381,16 +484,33 @@ export function CommandPalette() {
         }
       } else if (e.key === 'Escape' && searchOpen) {
         e.preventDefault();
-        closePalette();
+        if (aiMode) {
+          setAiMode(false);
+        } else {
+          closePalette();
+        }
       }
     }
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [searchOpen, closePalette, panelCount]);
+  }, [searchOpen, closePalette, panelCount, aiMode]);
 
   // Keyboard navigation within the palette
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
+      // Tab / Shift+Tab — toggle AI mode
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        if (e.shiftKey) {
+          // Shift+Tab: back to search mode
+          if (aiMode) setAiMode(false);
+        } else {
+          // Tab: toggle AI mode
+          setAiMode((prev) => !prev);
+        }
+        return;
+      }
+
       // ⌘1-⌘9 — execute item at that position (Alfred-style)
       if ((e.metaKey || e.ctrlKey) && e.key >= '1' && e.key <= '9') {
         e.preventDefault();
@@ -407,7 +527,7 @@ export function CommandPalette() {
       } else if (e.key === 'ArrowUp') {
         e.preventDefault();
         setSelectedIndex((i) => Math.max(i - 1, 0));
-      } else if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && createItem) {
+      } else if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && createItem && !aiMode) {
         // ⌘↵ — Create new node in Today
         e.preventDefault();
         createItem.action();
@@ -417,10 +537,14 @@ export function CommandPalette() {
         if (item) item.action();
       } else if (e.key === 'Escape') {
         e.preventDefault();
-        closePalette();
+        if (aiMode) {
+          setAiMode(false);
+        } else {
+          closePalette();
+        }
       }
     },
-    [allItems, selectedIndex, closePalette, createItem],
+    [allItems, selectedIndex, closePalette, createItem, aiMode],
   );
 
   // Scroll selected item into view
@@ -440,6 +564,10 @@ export function CommandPalette() {
   // Track global index across groups for keyboard selection
   let globalIdx = 0;
 
+  // Separate node results and chat results for grouped rendering in search mode
+  const nodeResults = searchResults.filter((item) => item.type !== 'chat');
+  const chatResults = chatSearchResults;
+
   return (
     <div
       className="fixed inset-0 z-50 flex justify-center bg-foreground/[0.08] p-2 sm:p-4 pt-[8vh] sm:pt-[12vh]"
@@ -451,14 +579,31 @@ export function CommandPalette() {
       >
         {/* Search header */}
         <div className="mx-2 flex h-10 shrink-0 items-center gap-2.5 border-b border-border-subtle bg-background px-2">
+          {aiMode && (
+            <button
+              onClick={() => setAiMode(false)}
+              className="shrink-0 flex items-center justify-center h-6 w-6 rounded hover:bg-foreground/5 text-foreground-secondary"
+            >
+              <ChevronLeft size={16} strokeWidth={1.5} />
+            </button>
+          )}
           <input
             ref={inputRef}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={t('search.commandPalette.placeholder')}
+            placeholder={aiMode ? t('search.commandPalette.aiModePlaceholder') : t('search.commandPalette.placeholder')}
             className="flex-1 bg-transparent text-sm outline-none placeholder:text-foreground-tertiary"
           />
+          {!aiMode && (
+            <button
+              onClick={() => setAiMode(true)}
+              className="shrink-0 flex items-center gap-1.5 rounded-md px-1.5 py-0.5 text-foreground-tertiary hover:text-foreground-secondary hover:bg-foreground/5 transition-colors"
+            >
+              <span className="text-xs">Ask AI</span>
+              <Kbd>Tab</Kbd>
+            </button>
+          )}
           <span className="shrink-0 cursor-pointer" onClick={closePalette}>
             <Kbd>Esc</Kbd>
           </span>
@@ -466,9 +611,26 @@ export function CommandPalette() {
 
         {/* Results area — fills remaining space */}
         <div ref={listRef} className="flex-1 overflow-y-auto py-1.5">
-          {hasQuery ? (
-            // Search mode: Create + Results
+          {aiMode ? (
+            // AI mode
             <div>
+              {aiModeItems.length > 0 && (
+                <>
+                  <GroupHeader label={hasQuery ? t('search.commandPalette.groupChats') : t('search.commandPalette.groupRecentChats')} />
+                  {aiModeItems.map((item) => {
+                    const idx = globalIdx++;
+                    return (
+                      <PaletteRow
+                        key={item.id}
+                        item={item}
+                        selected={selectedIndex === idx}
+                        onSelect={() => item.action()}
+                        onHover={() => setSelectedIndex(idx)}
+                      />
+                    );
+                  })}
+                </>
+              )}
               {askAiItem && (() => {
                 const idx = globalIdx++;
                 return (
@@ -481,30 +643,20 @@ export function CommandPalette() {
                   />
                 );
               })()}
-              {createItem && (() => {
-                const idx = globalIdx++;
-                return (
-                  <PaletteRow
-                    key={createItem.id}
-                    item={createItem}
-                    selected={selectedIndex === idx}
-
-                    onSelect={() => createItem.action()}
-                    onHover={() => setSelectedIndex(idx)}
-                  />
-                );
-              })()}
-              {searchResults.length > 0 && (
+            </div>
+          ) : hasQuery ? (
+            // Search mode with query
+            <div>
+              {nodeResults.length > 0 && (
                 <>
-                  <GroupHeader label={t('search.commandPalette.groupResults')} />
-                  {searchResults.map((item) => {
+                  <GroupHeader label={t('search.commandPalette.groupNodes')} />
+                  {nodeResults.map((item) => {
                     const idx = globalIdx++;
                     return (
                       <PaletteRow
                         key={item.id}
                         item={item}
                         selected={selectedIndex === idx}
-    
                         onSelect={() => item.action()}
                         onHover={() => setSelectedIndex(idx)}
                       />
@@ -512,6 +664,51 @@ export function CommandPalette() {
                   })}
                 </>
               )}
+              {chatResults.length > 0 && (
+                <>
+                  <GroupHeader label={t('search.commandPalette.groupChats')} />
+                  {chatResults.map((item) => {
+                    const idx = globalIdx++;
+                    return (
+                      <PaletteRow
+                        key={item.id}
+                        item={item}
+                        selected={selectedIndex === idx}
+                        onSelect={() => item.action()}
+                        onHover={() => setSelectedIndex(idx)}
+                      />
+                    );
+                  })}
+                </>
+              )}
+              {/* Separator + bottom actions */}
+              {(createItem || askAiItem) && (nodeResults.length > 0 || chatResults.length > 0) && (
+                <div className="mx-4 my-1 border-t border-border-subtle" />
+              )}
+              {createItem && (() => {
+                const idx = globalIdx++;
+                return (
+                  <PaletteRow
+                    key={createItem.id}
+                    item={createItem}
+                    selected={selectedIndex === idx}
+                    onSelect={() => createItem.action()}
+                    onHover={() => setSelectedIndex(idx)}
+                  />
+                );
+              })()}
+              {askAiItem && (() => {
+                const idx = globalIdx++;
+                return (
+                  <PaletteRow
+                    key={askAiItem.id}
+                    item={askAiItem}
+                    selected={selectedIndex === idx}
+                    onSelect={() => askAiItem.action()}
+                    onHover={() => setSelectedIndex(idx)}
+                  />
+                );
+              })()}
             </div>
           ) : (
             // Default mode: Suggestions + Commands (sorted by usage)
@@ -526,7 +723,7 @@ export function CommandPalette() {
                         key={item.id}
                         item={item}
                         selected={selectedIndex === idx}
-    
+
                         onSelect={() => item.action()}
                         onHover={() => setSelectedIndex(idx)}
                       />
@@ -544,7 +741,7 @@ export function CommandPalette() {
                         key={item.id}
                         item={item}
                         selected={selectedIndex === idx}
-    
+
                         onSelect={() => item.action()}
                         onHover={() => setSelectedIndex(idx)}
                       />
@@ -562,14 +759,14 @@ export function CommandPalette() {
           if (!selected) return null;
           return (
             <div className="mx-2 flex h-10 shrink-0 items-center justify-end gap-3 border-t border-border-subtle bg-background px-2">
-              {hasQuery && createItem && selected.id !== '__create__' && (
+              {!aiMode && hasQuery && createItem && selected.id !== '__create__' && (
                 <div className="flex items-center gap-1.5">
                   <span className="text-xs text-foreground-tertiary">{t('search.commandPalette.actionCreate')}</span>
                   <Kbd>⌘↵</Kbd>
                 </div>
               )}
               <div className="flex items-center gap-1.5">
-                <span className="text-xs text-foreground-secondary">{getActionLabel(selected.type)}</span>
+                <span className="text-xs text-foreground-secondary">{getActionLabel(selected.type, aiMode)}</span>
                 <Kbd>↵</Kbd>
               </div>
             </div>

@@ -498,10 +498,12 @@ export function CommandPalette() {
       if (e.key === 'Tab') {
         e.preventDefault();
         if (e.shiftKey) {
-          // Shift+Tab: back to search mode
           if (aiMode) setAiMode(false);
+        } else if (searchQuery.trim()) {
+          // Tab with input: directly Ask AI (Raycast-style)
+          void openChatWithPrompt(searchQuery.trim());
+          closeAndClear();
         } else {
-          // Tab: toggle AI mode
           setAiMode((prev) => !prev);
         }
         return;
@@ -540,7 +542,7 @@ export function CommandPalette() {
         }
       }
     },
-    [allItems, selectedIndex, closePalette, createItem, aiMode],
+    [allItems, selectedIndex, closePalette, closeAndClear, createItem, aiMode, searchQuery],
   );
 
   // Scroll selected item into view

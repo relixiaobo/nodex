@@ -315,3 +315,123 @@ export function resetChatPersistenceForTests(): void {
   dbInstance = null;
   dbPromise = null;
 }
+
+// ---------------------------------------------------------------------------
+// Chat sync — push / pull
+// ---------------------------------------------------------------------------
+
+export interface ChatSyncResult {
+  pushed: number;
+  pulled: number;
+  conflicts: number;
+}
+
+/**
+ * Get all sessions that have local changes not yet synced.
+ * A session is dirty when updatedAt > syncedAt (or syncedAt is null).
+ */
+export async function getDirtyChatSessions(): Promise<ChatSession[]> {
+  const db = await getDB();
+  const tx = db.transaction(STORE_NAME, 'readonly');
+  const dirty: ChatSession[] = [];
+  let cursor = await tx.objectStore(STORE_NAME).openCursor();
+
+  while (cursor) {
+    const session = normalizeChatSession(cursor.value);
+    if (session.syncedAt === null || session.updatedAt > session.syncedAt) {
+      dirty.push(session);
+    }
+    cursor = await cursor.continue();
+  }
+
+  await tx.done;
+  return dirty;
+}
+
+/**
+ * Mark a session as synced (update syncedAt + revision in IndexedDB).
+ */
+export async function markSessionSynced(sessionId: string, revision: number): Promise<void> {
+  const db = await getDB();
+  const session = await db.get(STORE_NAME, sessionId);
+  if (!session) return;
+
+  const now = Date.now();
+  const updated: ChatSession = {
+    ...normalizeChatSession(session),
+    syncedAt: now,
+    revision,
+  };
+
+  const tx = db.transaction(SESSION_STORE_NAMES, 'readwrite');
+  await Promise.all([
+    tx.objectStore(STORE_NAME).put(updated),
+    tx.objectStore(META_STORE_NAME).put(toSessionMeta(updated)),
+  ]);
+  await tx.done;
+}
+
+/**
+ * Import a remote session into IndexedDB (from pull).
+ * Only overwrites if local session has no unsynchronized changes.
+ * Returns 'imported' | 'skipped' (local has pending changes) | 'conflict'.
+ */
+export async function importRemoteSession(
+  remoteSession: ChatSession,
+  remoteRevision: number,
+): Promise<'imported' | 'skipped' | 'conflict'> {
+  const db = await getDB();
+  const local = await db.get(STORE_NAME, remoteSession.id);
+
+  if (!local) {
+    // New session — import directly
+    const synced: ChatSession = {
+      ...remoteSession,
+      syncedAt: Date.now(),
+      revision: remoteRevision,
+    };
+    const tx = db.transaction(SESSION_STORE_NAMES, 'readwrite');
+    await Promise.all([
+      tx.objectStore(STORE_NAME).put(synced),
+      tx.objectStore(META_STORE_NAME).put(toSessionMeta(synced)),
+    ]);
+    await tx.done;
+    return 'imported';
+  }
+
+  const localSession = normalizeChatSession(local);
+
+  // Local has unsynchronized changes — conflict
+  if (localSession.syncedAt !== null && localSession.updatedAt > localSession.syncedAt) {
+    // LWW: remote wins if it's newer
+    if (remoteSession.updatedAt >= localSession.updatedAt) {
+      const synced: ChatSession = {
+        ...remoteSession,
+        syncedAt: Date.now(),
+        revision: remoteRevision,
+      };
+      const tx = db.transaction(SESSION_STORE_NAMES, 'readwrite');
+      await Promise.all([
+        tx.objectStore(STORE_NAME).put(synced),
+        tx.objectStore(META_STORE_NAME).put(toSessionMeta(synced)),
+      ]);
+      await tx.done;
+      return 'conflict'; // Imported but was a conflict
+    }
+    return 'skipped'; // Local is newer, will push on next cycle
+  }
+
+  // Local is clean — overwrite with remote
+  const synced: ChatSession = {
+    ...remoteSession,
+    syncedAt: Date.now(),
+    revision: remoteRevision,
+  };
+  const tx = db.transaction(SESSION_STORE_NAMES, 'readwrite');
+  await Promise.all([
+    tx.objectStore(STORE_NAME).put(synced),
+    tx.objectStore(META_STORE_NAME).put(toSessionMeta(synced)),
+  ]);
+  await tx.done;
+  return 'imported';
+}

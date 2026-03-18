@@ -70,7 +70,6 @@ _(空)_
 - [ ] 日记模板（#day supertag 配置）(#22)
 - [ ] 日期字段链接到日节点 (#22)
 - [ ] Trash 交互优化 — 批量选中删除、右键菜单、自动清理策略（30 天）
-- [ ] 图片节点支持 — 节点嵌入/展示图片（上传、粘贴、拖拽），存储走 R2
 
 ---
 
@@ -175,7 +174,7 @@ _(空)_
 - [ ] 合并节点 — 选中多个重复节点 → 合并为一个（保留第一个，合并 children/tags）
 - [ ] **数学公式渲染** — 支持 LaTeX/KaTeX 公式在节点中展示（行内 `$...$` + 块级 `$$...$$`）
 - [ ] Floating Toolbar: @ Reference 按钮 (#46)
-- [ ] Slash Command 后续 (#48) — Paste / Search node / Image / Checklist
+- [ ] Slash Command 后续 (#48) — Paste / Search node / Checklist
 - [ ] 性能基线测量
 
 ---
@@ -208,6 +207,7 @@ _(空)_
 
 | 日期 | 任务 | Agent | PR |
 |------|------|-------|-----|
+| 2026-03-18 | ⌘K Chat 融合计划 + 图片节点计划 v3 合并 + 窄屏单面板布局修复 + NodeReference inline 修复 + ChatInput 圆角对齐 | nodex | main |
 | 2026-03-17 | Chat 自动摘要标题 + AI Debug 迁移 Settings + ref 渲染修复 + 设计系统合规 + overscroll 修复 | nodex | main |
 | 2026-03-17 | Chat 分支消息审计 — regenerate/edit 改用 `agent.continue()`，修复重复 user 消息 + switchBranch 持久化 + toolResult 续接 | codex | #148 |
 | 2026-03-16 | Extended thinking 修复 — server 端 `stream` → `streamSimple` 使 reasoning 参数正确传递 | codex | #146 |
@@ -244,7 +244,6 @@ _(空)_
 | 2026-03-11 | Clip 节点结构调整 — #highlight → Highlights 字段 + Source URL → URL | codex | #122 |
 | 2026-03-11 | 移除 LIBRARY/INBOX — 创建路径改用 ensureTodayNode() | codex | #121 |
 | 2026-03-11 | 统一复用模式 — resolveEffectiveId() + useDragDropRow() + isNodeInTrash() | codex | #120 |
-| 2026-03-10 | 消除 Container Node — Container 变为 node + locked；Settings 标准页面 | codex | #119 |
 > 更早的已完成记录见 `docs/_archive/COMPLETED-HISTORY.md`
 
 ### 已关闭的远期/非开发任务

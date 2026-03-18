@@ -1,6 +1,6 @@
 {
   "name": "soma",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Think where you read — knowledge management in your browser side panel",
   "type": "module",
   "scripts": {

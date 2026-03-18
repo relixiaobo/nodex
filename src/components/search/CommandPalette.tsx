@@ -15,7 +15,7 @@
  * - AI mode (Tab switch): Chat history + Ask AI
  */
 import { useEffect, useCallback, useMemo, useState, useRef } from 'react';
-import { Library, Inbox, CalendarDays, Trash2, Search, Settings, Sparkles, Plus, MessageCircle, MessageCircleDashed, ChevronLeft, type AppIcon } from '../../lib/icons.js';
+import { Library, Inbox, CalendarDays, Trash2, Search, Settings, Sparkles, Plus, MessageCircle, MessageCircleDashed, ArrowLeft, type AppIcon } from '../../lib/icons.js';
 import { resolveTagColor } from '../../lib/tag-colors.js';
 import { resolveDataType, getFieldTypeIcon } from '../../lib/field-utils.js';
 import { isLockedNode, isWorkspaceHomeNode } from '../../lib/node-capabilities.js';
@@ -541,6 +541,7 @@ export function CommandPalette() {
         if (item) item.action();
       } else if (e.key === 'Escape') {
         e.preventDefault();
+        e.nativeEvent.stopImmediatePropagation(); // prevent document handler from double-firing
         if (aiMode) {
           setAiMode(false);
         } else {
@@ -582,13 +583,13 @@ export function CommandPalette() {
         onPointerDown={(e) => e.stopPropagation()}
       >
         {/* Search header */}
-        <div className="mx-2 flex h-10 shrink-0 items-center gap-2.5 border-b border-border-subtle bg-background px-2">
+        <div className="flex h-10 shrink-0 items-center gap-2.5 border-b border-border-subtle bg-background px-4">
           {aiMode && (
             <button
               onClick={() => setAiMode(false)}
-              className="shrink-0 flex items-center justify-center h-7 w-7 rounded-md hover:bg-foreground/4 text-foreground-secondary"
+              className="-ml-1 shrink-0 flex items-center justify-center h-6 w-6 rounded-md bg-foreground/8 text-foreground-secondary hover:bg-foreground/12 transition-colors"
             >
-              <ChevronLeft size={16} strokeWidth={1.5} />
+              <ArrowLeft size={14} strokeWidth={1.5} />
             </button>
           )}
           <input
@@ -608,9 +609,6 @@ export function CommandPalette() {
               <Kbd>Tab</Kbd>
             </button>
           )}
-          <span className="shrink-0 cursor-pointer" onClick={closePalette}>
-            <Kbd>Esc</Kbd>
-          </span>
         </div>
 
         {/* Results area — fills remaining space */}
@@ -771,7 +769,7 @@ export function CommandPalette() {
           const selected = allItems[selectedIndex];
           if (!selected) return null;
           return (
-            <div className="mx-2 flex h-10 shrink-0 items-center justify-end gap-3 border-t border-border-subtle bg-background px-2">
+            <div className="flex h-10 shrink-0 items-center justify-end gap-3 border-t border-border-subtle bg-background px-4">
               {!aiMode && hasQuery && createItem && selected.id !== '__create__' && (
                 <button
                   onClick={() => createItem.action()}

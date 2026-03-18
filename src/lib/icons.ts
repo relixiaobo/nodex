@@ -163,3 +163,15 @@ export {
   MessageSquare,
   Globe,
 } from 'lucide-react';
+
+// ─── AI Tool Call ───────────────────────────────────────────────────────────
+
+export {
+  Camera,
+  Clock,
+  Keyboard,
+  MousePointer,
+  Move,
+  PanelTop,
+  Terminal,
+} from 'lucide-react';

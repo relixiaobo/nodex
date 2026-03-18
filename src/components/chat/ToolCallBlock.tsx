@@ -3,21 +3,64 @@ import type { ToolCall, ToolResultMessage } from '@mariozechner/pi-ai';
 import type { AppIcon } from '../../lib/icons.js';
 import { IMAGE_PLACEHOLDER } from '../../lib/ai-message-images.js';
 import { highlightCode } from '../../lib/code-highlight.js';
-import { ChevronDown, FileText, Globe, Image, Pencil, Plus, RotateCcw, Search, Sparkles, Trash2 } from '../../lib/icons.js';
+import {
+  ArrowUpDown, Camera, ChevronDown, Clock, Code2, FileText, Globe, Image,
+  Info, Keyboard, MousePointer, Move, PanelTop, Pencil, Plus, RotateCcw,
+  Search, Sparkles, Terminal, Trash2,
+} from '../../lib/icons.js';
 
 interface ToolCallBlockProps {
   toolCall: ToolCall;
   result?: ToolResultMessage;
 }
 
+// ---------------------------------------------------------------------------
+// Status
+// ---------------------------------------------------------------------------
+
+type ToolStatus = 'pending' | 'done' | 'error';
+
+function getStatus(result?: ToolResultMessage): ToolStatus {
+  if (!result) return 'pending';
+  return result.isError ? 'error' : 'done';
+}
+
+// ---------------------------------------------------------------------------
+// Icons
+// ---------------------------------------------------------------------------
+
+const BROWSER_ICON: Record<string, AppIcon> = {
+  get_text: FileText,
+  get_metadata: Info,
+  find: Search,
+  get_selection: FileText,
+  screenshot: Camera,
+  read_console: Terminal,
+  read_network: Terminal,
+  click: MousePointer,
+  type: Keyboard,
+  key: Keyboard,
+  fill_form: Keyboard,
+  scroll: ArrowUpDown,
+  drag: Move,
+  navigate: Globe,
+  tab: PanelTop,
+  wait: Clock,
+  execute_js: Code2,
+};
+
 function getToolIcon(name: string, args: Record<string, unknown>): AppIcon {
   if (name === 'node_create') return Plus;
   if (name === 'node_read') return FileText;
   if (name === 'node_edit') return Pencil;
-  if (name === 'node_delete') return Trash2;
+  if (name === 'node_delete') return args.restore === true ? RotateCcw : Trash2;
   if (name === 'node_search') return Search;
   if (name === 'undo') return RotateCcw;
-  if (name === 'browser') return Globe;
+
+  if (name === 'browser') {
+    const action = typeof args.action === 'string' ? args.action : '';
+    return BROWSER_ICON[action] ?? Globe;
+  }
 
   // Legacy combined node tool
   if (name === 'node') {
@@ -32,60 +75,142 @@ function getToolIcon(name: string, args: Record<string, unknown>): AppIcon {
   return Sparkles;
 }
 
-function summarizeToolCall(toolCall: ToolCall): string {
+// ---------------------------------------------------------------------------
+// Title helpers
+// ---------------------------------------------------------------------------
+
+/** Wrap subject in quotes (skip URLs). */
+function q(subject: string): string {
+  if (subject.startsWith('http://') || subject.startsWith('https://')) return subject;
+  return `"${subject}"`;
+}
+
+/** Pick first available string arg. */
+function pickSubject(args: Record<string, unknown>, ...keys: string[]): string | null {
+  for (const key of keys) {
+    if (typeof args[key] === 'string' && args[key]) return args[key] as string;
+  }
+  return null;
+}
+
+// Verb forms: [base, -ing, -ed]
+type VerbForms = [string, string, string];
+
+function verbByStatus(forms: VerbForms, status: ToolStatus): string {
+  if (status === 'pending') return forms[1]; // -ing
+  if (status === 'done') return forms[2];    // -ed
+  return `Failed to ${forms[0]}`;            // error: Failed to + base
+}
+
+// ---------------------------------------------------------------------------
+// Summarize
+// ---------------------------------------------------------------------------
+
+function summarizeToolCall(toolCall: ToolCall, status: ToolStatus): string {
   const { name, arguments: args } = toolCall;
+  const subject = pickSubject(args, 'name', 'query');
+
+  // ── Node tools ──────────────────────────────────────────────────────────
 
   if (name === 'node_create') {
-    const nodeName = typeof args.name === 'string' ? args.name : null;
-    return nodeName ? `Create — ${nodeName}` : 'Create node';
+    const verb = verbByStatus(['create', 'Creating', 'Created'], status);
+    return subject ? `${verb} ${q(subject)}` : `${verb} node`;
   }
   if (name === 'node_read') {
-    return `Read — ${typeof args.nodeId === 'string' ? args.nodeId : 'node'}`;
+    return verbByStatus(['read', 'Reading', 'Read'], status) + ' node';
   }
   if (name === 'node_edit') {
-    const label = typeof args.name === 'string' ? args.name : typeof args.nodeId === 'string' ? args.nodeId : 'node';
-    return `Edit — ${label}`;
+    const verb = verbByStatus(['edit', 'Editing', 'Edited'], status);
+    const label = pickSubject(args, 'name');
+    return label ? `${verb} ${q(label)}` : `${verb} node`;
   }
   if (name === 'node_delete') {
-    const restore = args.restore === true;
-    return `${restore ? 'Restore' : 'Delete'} — ${typeof args.nodeId === 'string' ? args.nodeId : 'node'}`;
+    if (args.restore === true) {
+      const verb = verbByStatus(['restore', 'Restoring', 'Restored'], status);
+      return `${verb} node`;
+    }
+    const verb = verbByStatus(['delete', 'Deleting', 'Deleted'], status);
+    return `${verb} node`;
   }
   if (name === 'node_search') {
-    return `Search — ${typeof args.query === 'string' ? args.query : '…'}`;
+    const verb = verbByStatus(['search', 'Searching', 'Searched'], status);
+    const query = pickSubject(args, 'query');
+    return query ? `${verb} ${q(query)}` : `${verb} nodes`;
   }
 
   // Legacy combined node tool
   if (name === 'node') {
     const action = typeof args.action === 'string' ? args.action : 'run';
-    const subject = typeof args.name === 'string'
-      ? args.name
-      : typeof args.query === 'string'
-        ? args.query
-        : typeof args.nodeId === 'string'
-          ? args.nodeId
-          : null;
-    return subject ? `node.${action} — ${subject}` : `node.${action}`;
+    const legacySubject = pickSubject(args, 'name', 'query');
+    const LEGACY_VERBS: Record<string, VerbForms> = {
+      create: ['create', 'Creating', 'Created'],
+      read: ['read', 'Reading', 'Read'],
+      edit: ['edit', 'Editing', 'Edited'],
+      delete: ['delete', 'Deleting', 'Deleted'],
+      search: ['search', 'Searching', 'Searched'],
+    };
+    const forms = LEGACY_VERBS[action];
+    if (forms) {
+      const verb = verbByStatus(forms, status);
+      return legacySubject ? `${verb} ${q(legacySubject)}` : `${verb} node`;
+    }
+    return legacySubject ? `node.${action} ${q(legacySubject)}` : `node.${action}`;
   }
+
+  // ── Undo ────────────────────────────────────────────────────────────────
 
   if (name === 'undo') {
     const steps = typeof args.steps === 'number' ? args.steps : 1;
-    return steps === 1 ? 'Undo — 1 step' : `Undo — ${steps} steps`;
+    const verb = verbByStatus(['undo', 'Undoing', 'Undone'], status);
+    return `${verb} ${steps} step${steps > 1 ? 's' : ''}`;
   }
+
+  // ── Browser ─────────────────────────────────────────────────────────────
 
   if (name === 'browser') {
     const action = typeof args.action === 'string' ? args.action : null;
     if (!action) return 'browser';
+
+    const browserSubject = pickSubject(args, 'elementDescription', 'query', 'selector', 'url', 'text');
+
+    const BROWSER_VERBS: Record<string, VerbForms> = {
+      get_text: ['read page text', 'Reading page text', 'Read page text'],
+      get_metadata: ['read metadata', 'Reading metadata', 'Read metadata'],
+      find: ['find', 'Finding', 'Found'],
+      get_selection: ['read selection', 'Reading selection', 'Read selection'],
+      screenshot: ['take screenshot', 'Taking screenshot', 'Took screenshot'],
+      read_console: ['read console', 'Reading console', 'Read console'],
+      read_network: ['read network', 'Reading network', 'Read network'],
+      click: ['click', 'Clicking', 'Clicked'],
+      type: ['type text', 'Typing', 'Typed'],
+      key: ['press', 'Pressing', 'Pressed'],
+      fill_form: ['fill form', 'Filling form', 'Filled form'],
+      scroll: ['scroll', 'Scrolling', 'Scrolled'],
+      drag: ['drag', 'Dragging', 'Dragged'],
+      navigate: ['navigate to', 'Navigating to', 'Navigated to'],
+      tab: ['manage tab', 'Managing tab', 'Managed tab'],
+      wait: ['wait', 'Waiting…', 'Waited'],
+      execute_js: ['execute script', 'Executing script', 'Executed script'],
+    };
+
+    const forms = BROWSER_VERBS[action];
+    if (forms) {
+      const verb = verbByStatus(forms, status);
+      return browserSubject ? `${verb} ${q(browserSubject)}` : verb;
+    }
+    // Unknown action fallback
     const readable = action.replace(/_/g, ' ');
-    const subject = typeof args.query === 'string' ? args.query
-      : typeof args.url === 'string' ? args.url
-      : typeof args.selector === 'string' ? args.selector
-      : typeof args.elementDescription === 'string' ? args.elementDescription
-      : null;
-    return subject ? `${readable} — ${subject}` : readable;
+    return browserSubject ? `${readable} ${q(browserSubject)}` : readable;
   }
+
+  // ── Fallback ────────────────────────────────────────────────────────────
 
   return name;
 }
+
+// ---------------------------------------------------------------------------
+// Result rendering helpers
+// ---------------------------------------------------------------------------
 
 function isImagePlaceholder(text: string): boolean {
   const t = text.trim();
@@ -104,11 +229,16 @@ function getResultParts(result: ToolResultMessage): ResultPart[] {
     );
 }
 
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
+
 const CODE_BLOCK = 'max-h-48 overflow-auto whitespace-pre text-[11px] leading-5';
 
 export function ToolCallBlock({ toolCall, result }: ToolCallBlockProps) {
   const [expanded, setExpanded] = useState(false);
   const Icon = getToolIcon(toolCall.name, toolCall.arguments);
+  const status = getStatus(result);
 
   const inputHtml = useMemo(
     () => expanded ? highlightCode(JSON.stringify(toolCall.arguments, null, 2), 'json') : '',
@@ -122,7 +252,7 @@ export function ToolCallBlock({ toolCall, result }: ToolCallBlockProps) {
       <button
         type="button"
         onClick={() => setExpanded((value) => !value)}
-        className="group/tool flex max-w-full items-center gap-1.5 py-0.5 text-foreground-tertiary transition-colors hover:text-foreground-secondary"
+        className="group/tool flex max-w-[62%] items-center gap-1.5 py-0.5 text-foreground-tertiary transition-colors hover:text-foreground-secondary"
       >
         {/* Icon area: tool icon by default, chevron on hover / when expanded */}
         <span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center">
@@ -136,7 +266,7 @@ export function ToolCallBlock({ toolCall, result }: ToolCallBlockProps) {
           )}
         </span>
         <span className="min-w-0 truncate text-xs">
-          {summarizeToolCall(toolCall)}
+          {summarizeToolCall(toolCall, status)}
         </span>
       </button>
       {expanded && (

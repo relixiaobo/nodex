@@ -24,6 +24,35 @@ interface ChatSessionRow {
 }
 
 // ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function countMessages(session: unknown): number {
+  const mapping = (session as Record<string, unknown>).mapping;
+  if (!mapping || typeof mapping !== 'object') return 0;
+  return Object.keys(mapping).length;
+}
+
+/** Verify that the authenticated user owns the workspace. */
+async function verifyWorkspaceOwnership(
+  db: D1Database,
+  workspaceId: string,
+  userId: string,
+): Promise<{ error: string; status: 403 | 404 } | null> {
+  const workspace = await db.prepare(
+    'SELECT owner_id FROM sync_workspaces WHERE workspace_id = ?',
+  ).bind(workspaceId).first<{ owner_id: string }>();
+
+  if (!workspace) {
+    return { error: 'Workspace not found', status: 404 };
+  }
+  if (workspace.owner_id !== userId) {
+    return { error: 'Forbidden — not workspace owner', status: 403 };
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
 // Routes
 // ---------------------------------------------------------------------------
 
@@ -66,62 +95,61 @@ chat.put('/sessions/:id', async (c) => {
   const r2 = c.env.SYNC_BUCKET;
   const r2Key = `chat/${workspaceId}/${sessionId}.json`;
 
-  // Check existing server state
-  const existing = await db.prepare(
-    'SELECT revision FROM chat_sessions WHERE id = ? AND workspace_id = ?',
-  ).bind(sessionId, workspaceId).first<{ revision: number }>();
+  // P0-1: Verify workspace ownership
+  const ownershipError = await verifyWorkspaceOwnership(db, workspaceId, userId);
+  if (ownershipError) {
+    return c.json({ error: ownershipError.error }, ownershipError.status);
+  }
 
-  if (!existing) {
-    // New session — create
-    const now = Date.now();
-    await Promise.all([
-      r2.put(r2Key, sessionJson),
-      db.prepare(
-        `INSERT INTO chat_sessions (id, user_id, workspace_id, title, message_count, revision, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, 1, ?, ?)`,
-      ).bind(
-        sessionId, userId, workspaceId,
-        (session as Record<string, unknown>).title ?? null,
-        countMessages(session),
-        now, now,
-      ).run(),
-    ]);
+  const title = (session as Record<string, unknown>).title ?? null;
+  const messageCount = countMessages(session);
+  const now = Date.now();
 
+  // P1-3: Atomic create — INSERT OR IGNORE so concurrent creates don't race
+  const insertResult = await db.prepare(
+    `INSERT OR IGNORE INTO chat_sessions (id, user_id, workspace_id, title, message_count, revision, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, 1, ?, ?)`,
+  ).bind(sessionId, userId, workspaceId, title, messageCount, now, now).run();
+
+  if ((insertResult.meta?.changes ?? 0) > 0) {
+    // New session created — write blob to R2
+    await r2.put(r2Key, sessionJson);
     return c.json({ revision: 1 });
   }
 
-  // Existing session — CAS check
-  if (existing.revision !== baseRevision) {
-    // Conflict: return remote session for client to resolve
+  // Existing session — P1-3: Atomic CAS via conditional UPDATE
+  const updateResult = await db.prepare(
+    `UPDATE chat_sessions
+     SET title = ?, message_count = ?, revision = revision + 1, updated_at = ?
+     WHERE id = ? AND workspace_id = ? AND revision = ?`,
+  ).bind(title, messageCount, now, sessionId, workspaceId, baseRevision).run();
+
+  if ((updateResult.meta?.changes ?? 0) === 0) {
+    // CAS failed — revision mismatch (conflict)
+    const current = await db.prepare(
+      'SELECT revision FROM chat_sessions WHERE id = ? AND workspace_id = ?',
+    ).bind(sessionId, workspaceId).first<{ revision: number }>();
+
+    if (!current) {
+      return c.json({ error: 'Session not found' }, 404);
+    }
+
     const remoteJson = await r2.get(r2Key);
     const remoteSession = remoteJson ? JSON.parse(await remoteJson.text()) : null;
-
-    return c.json({
-      conflict: true,
-      remoteSession,
-      remoteRevision: existing.revision,
-    }, 409);
+    return c.json({ conflict: true, remoteSession, remoteRevision: current.revision }, 409);
   }
 
-  // CAS passed — accept
-  const newRevision = existing.revision + 1;
-  const now = Date.now();
+  // P1-4: CAS passed in D1 — now write blob to R2
+  // If R2 fails, revision is advanced but blob is stale. Next push will
+  // hit 409, pull the stale blob, and re-push — self-healing.
+  await r2.put(r2Key, sessionJson);
 
-  await Promise.all([
-    r2.put(r2Key, sessionJson),
-    db.prepare(
-      `UPDATE chat_sessions
-       SET title = ?, message_count = ?, revision = ?, updated_at = ?
-       WHERE id = ? AND workspace_id = ?`,
-    ).bind(
-      (session as Record<string, unknown>).title ?? null,
-      countMessages(session),
-      newRevision, now,
-      sessionId, workspaceId,
-    ).run(),
-  ]);
+  // Read back the new revision
+  const updated = await db.prepare(
+    'SELECT revision FROM chat_sessions WHERE id = ? AND workspace_id = ?',
+  ).bind(sessionId, workspaceId).first<{ revision: number }>();
 
-  return c.json({ revision: newRevision });
+  return c.json({ revision: updated?.revision ?? baseRevision + 1 });
 });
 
 /**
@@ -131,6 +159,7 @@ chat.put('/sessions/:id', async (c) => {
  * Returns metadata list + full session JSON from R2.
  */
 chat.get('/sessions', async (c) => {
+  const userId = c.get('userId');
   const workspaceId = c.req.query('workspaceId');
   const since = Number(c.req.query('since') ?? '0');
 
@@ -141,13 +170,22 @@ chat.get('/sessions', async (c) => {
   const db = c.env.SYNC_DB;
   const r2 = c.env.SYNC_BUCKET;
 
-  // Get metas from D1
+  // P0-1: Verify workspace ownership
+  const ownershipError = await verifyWorkspaceOwnership(db, workspaceId, userId);
+  if (ownershipError) {
+    return c.json({ error: ownershipError.error }, ownershipError.status);
+  }
+
+  // P1-5: ORDER BY ASC so oldest changes come first (cursor-safe)
   const rows = await db.prepare(
-    'SELECT * FROM chat_sessions WHERE workspace_id = ? AND updated_at > ? ORDER BY updated_at DESC LIMIT 100',
+    'SELECT * FROM chat_sessions WHERE workspace_id = ? AND updated_at > ? ORDER BY updated_at ASC LIMIT 100',
   ).bind(workspaceId, since).all<ChatSessionRow>();
 
+  // P1-5: hasMore flag for pagination
+  const hasMore = rows.results.length >= 100;
+
   if (rows.results.length === 0) {
-    return c.json({ sessions: [], metas: [] });
+    return c.json({ sessions: [], metas: [], hasMore: false });
   }
 
   // Fetch full sessions from R2 in parallel, zip with metas
@@ -171,17 +209,8 @@ chat.get('/sessions', async (c) => {
   return c.json({
     sessions: valid.map((p) => p.session),
     metas: valid.map((p) => p.meta),
+    hasMore,
   });
 });
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function countMessages(session: unknown): number {
-  const mapping = (session as Record<string, unknown>).mapping;
-  if (!mapping || typeof mapping !== 'object') return 0;
-  return Object.keys(mapping).length;
-}
 
 export default chat;

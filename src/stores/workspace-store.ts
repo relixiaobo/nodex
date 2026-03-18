@@ -174,6 +174,16 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
             deleteSyncCursor(wsId),
           ]).catch(() => {});
         }
+        // P0-2: Clear chat IndexedDB to prevent cross-user data leaks
+        const { clearAllChatSessions } = await import('../lib/ai-persistence.js');
+        await clearAllChatSessions().catch(() => {});
+
+        // Clear chat pull cursor in IndexedDB
+        if (wsId) {
+          const { deleteSyncCursor: deleteCursor } = await import('../lib/loro-persistence.js');
+          await deleteCursor(`chat:${wsId}`).catch(() => {});
+        }
+
         // Clear chat agent registry to prevent cross-workspace data leaks
         const { resetAIAgentForTests: resetAgentRegistry } = await import('../lib/ai-service.js');
         resetAgentRegistry();

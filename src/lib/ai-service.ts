@@ -881,6 +881,10 @@ export async function persistChatSession(agent: Agent = getAIAgent()): Promise<v
     ]);
     runtime.currentSession.updatedAt = persistedSession.updatedAt;
     runtime.debugTurns = persistedTurns;
+
+    // Nudge sync manager so chat sessions push promptly
+    // (lazy import to avoid circular dependency)
+    import('./sync/sync-manager.js').then(({ syncManager }) => syncManager.nudge()).catch(() => {});
   } catch {
     // Ignore persistence failures; chat should still function.
   }

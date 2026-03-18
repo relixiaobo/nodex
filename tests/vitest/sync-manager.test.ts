@@ -570,6 +570,7 @@ describe('SyncManager', () => {
 
       mockOpenDB
         .mockResolvedValueOnce(makeFakeDB()) // loadCursor
+        .mockResolvedValueOnce(makeFakeDB()) // loadChatPullCursor
         .mockResolvedValueOnce(makeFailingWriteDB(idbError)); // saveCursor
 
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});

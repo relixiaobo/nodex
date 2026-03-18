@@ -100,8 +100,9 @@ export class SyncManager {
     this.accessToken = accessToken;
     this.deviceId = deviceId;
 
-    // Restore cursor from IndexedDB
+    // Restore cursors from IndexedDB
     this.lastSeq = await loadCursor(workspaceId);
+    this.chatLastPullAt = await loadChatPullCursor(workspaceId);
     if (!this.isSessionCurrent(sessionToken) || this.workspaceId !== workspaceId) return;
 
     const pending = await getPendingCount(workspaceId);
@@ -144,6 +145,7 @@ export class SyncManager {
     this.accessToken = null;
     this.deviceId = null;
     this.lastSeq = 0;
+    this.chatLastPullAt = 0;
     this.isSyncing = false;
     this.nudgePending = false;
     this.updateState({ status: 'local-only', error: null, pendingCount: 0, lastSyncedAt: null });
@@ -182,7 +184,7 @@ export class SyncManager {
       }
 
       // Chat session sync (independent of Loro CRDT sync)
-      await this.syncChatSessions(workspaceId, accessToken);
+      await this.syncChatSessions(workspaceId, accessToken, sessionToken);
       if (!this.isSessionCurrent(sessionToken)) return;
 
       const pending = await getPendingCount(workspaceId);
@@ -363,26 +365,32 @@ export class SyncManager {
 
   // ── Chat session sync ────────────────────────────────────────────
 
-  private chatLastPullAt = 0;
-  // Reset chat pull cursor when sync restarts (sign-in, workspace switch)
-  resetChatSync(): void { this.chatLastPullAt = 0; }
+  private chatLastPullAt = 0; // Restored from IndexedDB in start(), persisted in pullChatSessions()
 
-  private async syncChatSessions(workspaceId: string, accessToken: string): Promise<void> {
+  private async syncChatSessions(
+    workspaceId: string,
+    accessToken: string,
+    sessionToken: number,
+  ): Promise<void> {
     try {
-      await this.pushChatSessions(workspaceId, accessToken);
-      await this.pullChatSessions(workspaceId, accessToken);
+      if (!this.isSessionCurrent(sessionToken)) return;
+      await this.pushChatSessions(workspaceId, accessToken, sessionToken);
+      if (!this.isSessionCurrent(sessionToken)) return;
+      await this.pullChatSessions(workspaceId, accessToken, sessionToken);
     } catch (err) {
-      // Detect auth errors — 401 means token expired, stop retrying
       if (err instanceof ChatSyncAuthError) {
         console.error('[sync] chat auth expired, skipping until next session');
         return;
       }
-      // Other chat sync errors are non-fatal — don't stop Loro sync
       console.warn('[sync] chat sync error:', err);
     }
   }
 
-  private async pushChatSessions(workspaceId: string, accessToken: string): Promise<void> {
+  private async pushChatSessions(
+    workspaceId: string,
+    accessToken: string,
+    sessionToken: number,
+  ): Promise<void> {
     const { getDirtyChatSessions, markSessionSynced } = await import('../ai-persistence.js');
     const dirty = await getDirtyChatSessions();
     if (dirty.length === 0) return;
@@ -391,6 +399,8 @@ export class SyncManager {
     const baseUrl = this.getApiUrl();
 
     for (const session of dirty) {
+      if (!this.isSessionCurrent(sessionToken)) return;
+
       try {
         const res = await fetch(`${baseUrl}/api/chat/sessions/${session.id}`, {
           method: 'PUT',
@@ -405,6 +415,7 @@ export class SyncManager {
           }),
         });
 
+        if (!this.isSessionCurrent(sessionToken)) return;
         if (res.status === 401) throw new ChatSyncAuthError();
 
         if (res.ok) {
@@ -426,12 +437,15 @@ export class SyncManager {
         }
       } catch (err) {
         if (err instanceof ChatSyncAuthError) throw err;
-        // Network error — skip, will retry next cycle
       }
     }
   }
 
-  private async pullChatSessions(workspaceId: string, accessToken: string): Promise<void> {
+  private async pullChatSessions(
+    workspaceId: string,
+    accessToken: string,
+    sessionToken: number,
+  ): Promise<void> {
     const baseUrl = this.getApiUrl();
 
     const res = await fetch(
@@ -441,6 +455,7 @@ export class SyncManager {
       },
     );
 
+    if (!this.isSessionCurrent(sessionToken)) return;
     if (res.status === 401) throw new ChatSyncAuthError();
     if (!res.ok) return;
 
@@ -453,24 +468,45 @@ export class SyncManager {
 
     const { importRemoteSession } = await import('../ai-persistence.js');
 
+    // Check which sessions have an active streaming agent — skip those
+    let streamingSessionIds: Set<string>;
+    try {
+      const { agentRegistry } = await import('../ai-service.js');
+      streamingSessionIds = new Set<string>();
+      for (const [sid, agent] of agentRegistry) {
+        if (agent.state.isStreaming) streamingSessionIds.add(sid);
+      }
+    } catch {
+      streamingSessionIds = new Set();
+    }
+
     for (let i = 0; i < sessions.length; i++) {
+      if (!this.isSessionCurrent(sessionToken)) return;
+
       const session = sessions[i];
       const meta = metas[i];
-      if (session && meta) {
-        const result = await importRemoteSession(session as any, meta.revision);
-        if (result !== 'skipped') {
-          await this.updateInMemorySessionSync(meta.id, meta.revision);
-        }
-        if (result === 'conflict') {
-          console.warn(`[sync] chat pull conflict for ${meta.id}: remote wins (LWW)`);
-        }
+      if (!session || !meta) continue;
+
+      // Skip sessions with active streaming to avoid overwriting in-flight data
+      if (streamingSessionIds.has(meta.id)) {
+        console.log(`[sync] chat: skipping pull for ${meta.id} (streaming)`);
+        continue;
+      }
+
+      const result = await importRemoteSession(session as any, meta.revision);
+      if (result !== 'skipped') {
+        await this.updateInMemorySessionSync(meta.id, meta.revision);
+      }
+      if (result === 'conflict') {
+        console.warn(`[sync] chat pull conflict for ${meta.id}: remote wins (LWW)`);
       }
     }
 
-    // Update pull cursor to the latest updatedAt we received
+    // Persist pull cursor (like Loro's saveCursor pattern)
     const maxUpdatedAt = Math.max(...metas.map((m) => m.updatedAt));
     if (maxUpdatedAt > this.chatLastPullAt) {
       this.chatLastPullAt = maxUpdatedAt;
+      await saveChatPullCursor(workspaceId, maxUpdatedAt);
     }
   }
 
@@ -530,6 +566,47 @@ async function saveCursor(workspaceId: string, lastSeq: number): Promise<void> {
     });
   } catch (e) {
     console.warn('[sync] Failed to save cursor:', e);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Chat pull cursor persistence (reuses same IndexedDB as Loro cursors)
+// ---------------------------------------------------------------------------
+
+const CHAT_CURSOR_PREFIX = 'chat:';
+
+async function loadChatPullCursor(workspaceId: string): Promise<number> {
+  try {
+    const db = await openDB();
+    return new Promise((resolve) => {
+      const tx = db.transaction(CURSOR_STORE, 'readonly');
+      const store = tx.objectStore(CURSOR_STORE);
+      const req = store.get(`${CHAT_CURSOR_PREFIX}${workspaceId}`);
+      req.onsuccess = () => {
+        const val = req.result as { lastSeq: number } | undefined;
+        resolve(val?.lastSeq ?? 0);
+      };
+      req.onerror = () => resolve(0);
+    });
+  } catch {
+    return 0;
+  }
+}
+
+async function saveChatPullCursor(workspaceId: string, lastPullAt: number): Promise<void> {
+  try {
+    const db = await openDB();
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(CURSOR_STORE, 'readwrite');
+      const store = tx.objectStore(CURSOR_STORE);
+      const req = store.put({ lastSeq: lastPullAt, savedAt: Date.now() }, `${CHAT_CURSOR_PREFIX}${workspaceId}`);
+      tx.oncomplete = () => resolve();
+      tx.onerror = (e) => reject((e.target as IDBTransaction).error);
+      tx.onabort = (e) => reject((e.target as IDBTransaction).error);
+      req.onerror = (e) => reject((e.target as IDBRequest).error);
+    });
+  } catch (e) {
+    console.warn('[sync] Failed to save chat pull cursor:', e);
   }
 }
 

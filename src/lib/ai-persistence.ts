@@ -14,7 +14,7 @@ const UPDATED_AT_INDEX = 'updatedAt';
 const SESSION_STORE_NAMES = [STORE_NAME, META_STORE_NAME] as const;
 const ALL_STORE_NAMES = [STORE_NAME, META_STORE_NAME, DEBUG_STORE_NAME] as const;
 
-interface ChatSessionMeta {
+export interface ChatSessionMeta {
   id: string;
   title: string | null;
   updatedAt: number;

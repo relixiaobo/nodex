@@ -13,6 +13,7 @@ import type { AppIcon } from './icons.js';
 import {
   CalendarDays,
   CalendarCheck,
+  MessageCircleDashed,
   Scissors,
 } from './icons.js';
 import { ensureTodayNode, getAdjacentDayNodeId } from './journal.js';
@@ -21,11 +22,12 @@ import {
   type WebClipCaptureResponse,
 } from './webclip-messaging.js';
 import { createClipShell, fillClipShell } from './webclip-service.js';
+import { openChatPanel } from './chat-panel-actions.js';
 import { useNodeStore } from '../stores/node-store.js';
 import { useUIStore } from '../stores/ui-store.js';
 import { t } from '../i18n/strings.js';
 
-export type PaletteItemType = 'node' | 'command' | 'create';
+export type PaletteItemType = 'node' | 'command' | 'create' | 'chat';
 
 export interface PaletteItem {
   id: string;
@@ -140,6 +142,17 @@ export function getSystemCommands(): PaletteCommand[] {
         }
       },
     },
+    {
+      id: 'cmd:new-chat',
+      label: 'New Chat',
+      icon: MessageCircleDashed,
+      type: 'command',
+      keywords: ['chat', 'ai', 'ask', 'conversation'],
+      action: (ctx) => {
+        ctx.closeSearch();
+        void openChatPanel();
+      },
+    },
     // Sign in / Sign out: handled by ToolbarUserMenu avatar, not in command palette.
   ];
 }
@@ -154,9 +167,11 @@ export function getAllCommands(ctx: CommandContext): PaletteCommand[] {
 /**
  * Action bar label for a given item type (Raycast-style: "Open Node", "Run Command").
  */
-export function getActionLabel(type: PaletteItemType): string {
+export function getActionLabel(type: PaletteItemType, aiMode = false): string {
+  if (aiMode) return t('search.commandPalette.actionAskAI');
   switch (type) {
     case 'node': return t('search.commandPalette.actionOpenNode');
+    case 'chat': return t('search.commandPalette.actionOpenNode');
     case 'command': return t('search.commandPalette.actionRunCommand');
     case 'create': return t('search.commandPalette.actionRunCommand');
     default: return t('search.commandPalette.actionOpenNode');

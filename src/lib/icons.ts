@@ -159,6 +159,7 @@ export {
   Info,
   ExternalLink,
   MessageCircle,
+  MessageCircleDashed,
   MessageSquare,
   Globe,
 } from 'lucide-react';

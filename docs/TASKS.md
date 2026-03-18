@@ -130,6 +130,7 @@ _(空)_
 - [x] **截图工具结果修复** — 占位符统一为 `IMAGE_PLACEHOLDER` 常量（模型可理解的文案），ToolCallBlock UI 检测占位符显示图片图标而非原始文本
 - [x] **Extended Thinking** — 模型选择器 toggle + Low/Med/High 等级 + 会话持久化 + 可折叠 Thought block + server 端 `streamSimple` 修复 (#146)
 - [x] **Chat 分支消息审计** — regenerate 改用 `agent.continue()` 替代 `agent.prompt()`，修复重复 user 消息 + switchBranch 持久化 + toolResult 续接 (#148)
+- [ ] **⌘K Chat 融合** — Chat 历史搜索 + AI 模式 Tab 切换 + Ask AI 始终可见 + New Chat 命令（设计：`command-palette-chat-integration.md`）
 - [ ] Chat 持久化 Phase 4 — 跨设备同步完整原始对话历史（Sync API + D1/R2）
 
 **Track B: 阅读环** — 设计：`phase-2-reading-ring.md`

@@ -178,3 +178,4 @@
 | 长文本 node 失焦时文本布局宽度变窄 | — | — |
 | #tag 与所在行文本垂直居中对齐 | — | — |
 | @ 创建 reference 后光标继续输入应转为 inline reference | — | — |
+| 2026-03-10 | 消除 Container Node — Container 变为 node + locked；Settings 标准页面 | codex | #119 |

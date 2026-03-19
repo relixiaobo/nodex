@@ -3,6 +3,7 @@ import {
   findProviderOptionNodeId,
   getApiKeyForProvider,
   getAvailableModels,
+  getAvailableModelsWithMeta,
   getEnabledProviderConfigs,
   getProviderConfigs,
   hasAnyEnabledProvider,
@@ -19,12 +20,14 @@ function seedProviderConfig({
   apiKey,
   baseUrl,
   name,
+  models,
 }: {
   provider: string;
   enabled: boolean;
   apiKey?: string;
   baseUrl?: string;
   name: string;
+  models?: string[];
 }): string {
   const store = useNodeStore.getState();
   const node = store.createChild(
@@ -45,6 +48,9 @@ function seedProviderConfig({
   }
   if (baseUrl !== undefined) {
     store.setFieldValue(node.id, NDX_F.PROVIDER_BASE_URL, baseUrl ? [baseUrl] : []);
+  }
+  if (models !== undefined && models.length > 0) {
+    store.setFieldValue(node.id, NDX_F.PROVIDER_MODELS, models);
   }
 
   return node.id;
@@ -214,5 +220,177 @@ describe('ai-provider-config', () => {
     useNodeStore.getState().setFieldValue(openAiNodeId, NDX_F.PROVIDER_API_KEY, ['sk-openai-primary']);
 
     expect(hasAnyEnabledProvider()).toBe(true);
+  });
+
+  describe('custom provider models', () => {
+    it('includes custom models from the Models field for a known provider', () => {
+      seedProviderConfig({
+        provider: 'openai',
+        enabled: true,
+        apiKey: 'sk-openai',
+        name: 'OpenAI',
+        models: ['ft:gpt-4o-custom', 'o3-preview'],
+      });
+
+      const models = getAvailableModels();
+
+      // SDK models should still be present
+      expect(models.some((m) => m.provider === 'openai' && m.id === 'gpt-4o')).toBe(true);
+      // Custom models should appear
+      expect(models.some((m) => m.provider === 'openai' && m.id === 'ft:gpt-4o-custom')).toBe(true);
+      expect(models.some((m) => m.provider === 'openai' && m.id === 'o3-preview')).toBe(true);
+
+      // Custom model should use the same API as SDK models
+      const customModel = models.find((m) => m.id === 'ft:gpt-4o-custom');
+      const sdkModel = models.find((m) => m.id === 'gpt-4o');
+      expect(customModel?.api).toBe(sdkModel?.api);
+    });
+
+    it('deduplicates custom model IDs that overlap with SDK models', () => {
+      seedProviderConfig({
+        provider: 'openai',
+        enabled: true,
+        apiKey: 'sk-openai',
+        name: 'OpenAI',
+        models: ['gpt-4o', 'custom-model'],
+      });
+
+      const models = getAvailableModels();
+      const gpt4oModels = models.filter((m) => m.id === 'gpt-4o');
+
+      // gpt-4o should appear only once (from SDK, not duplicated by custom)
+      expect(gpt4oModels).toHaveLength(1);
+      // custom-model should appear once
+      expect(models.filter((m) => m.id === 'custom-model')).toHaveLength(1);
+    });
+
+    it('custom models inherit baseUrl from provider config', () => {
+      seedProviderConfig({
+        provider: 'openai',
+        enabled: true,
+        apiKey: 'sk-openai',
+        baseUrl: 'https://custom-api.example/v1',
+        name: 'OpenAI Custom',
+        models: ['my-custom-model'],
+      });
+
+      const models = getAvailableModels();
+      const customModel = models.find((m) => m.id === 'my-custom-model');
+
+      expect(customModel?.baseUrl).toBe('https://custom-api.example/v1');
+      expect(customModel?.provider).toBe('openai');
+    });
+
+    it('custom models for unknown providers default to openai-completions API', () => {
+      // Seed an unknown provider option node directly via loroDoc (bypasses locked guard)
+      const optId = 'NDX_PROVIDER_OPT_QWEN';
+      loroDoc.createNode(optId, NDX_F.PROVIDER_ID);
+      loroDoc.setNodeRichTextContent(optId, 'qwen', [], []);
+      loroDoc.commitDoc();
+
+      seedProviderConfig({
+        provider: 'qwen',
+        enabled: true,
+        apiKey: 'sk-qwen',
+        baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+        name: 'Qwen',
+        models: ['qwen-plus', 'qwen-turbo'],
+      });
+
+      const models = getAvailableModels();
+
+      // No SDK models for unknown providers
+      const qwenModels = models.filter((m) => m.provider === 'qwen');
+      expect(qwenModels).toHaveLength(2);
+      expect(qwenModels.map((m) => m.id).sort()).toEqual(['qwen-plus', 'qwen-turbo']);
+
+      // Unknown providers default to openai-completions
+      expect(qwenModels[0].api).toBe('openai-completions');
+      expect(qwenModels[0].baseUrl).toBe('https://dashscope.aliyuncs.com/compatible-mode/v1');
+    });
+
+    it('provider with no custom models returns only SDK models', () => {
+      seedProviderConfig({
+        provider: 'openai',
+        enabled: true,
+        apiKey: 'sk-openai',
+        name: 'OpenAI',
+      });
+
+      const models = getAvailableModels();
+
+      // Should have SDK models
+      expect(models.some((m) => m.provider === 'openai' && m.id === 'gpt-4o')).toBe(true);
+      // No extra custom models
+      expect(models.every((m) => m.provider === 'openai')).toBe(true);
+    });
+
+    it('getAvailableModelsWithMeta marks custom models as not featured', () => {
+      seedProviderConfig({
+        provider: 'openai',
+        enabled: true,
+        apiKey: 'sk-openai',
+        name: 'OpenAI',
+        models: ['my-custom-model'],
+      });
+
+      const modelsWithMeta = getAvailableModelsWithMeta();
+      const customModel = modelsWithMeta.find((m) => m.id === 'my-custom-model');
+
+      expect(customModel).toBeDefined();
+      expect(customModel?.featured).toBe(false);
+      expect(customModel?.provider).toBe('openai');
+    });
+
+    it('custom model with a featured model ID is still not featured', () => {
+      // Use an unknown provider so there are no SDK models to dedup against.
+      // Give the custom model an ID that matches a featured model from another
+      // provider — the __isCustom marker must force featured: false by design,
+      // not merely because the provider lookup misses.
+      const optId = 'NDX_PROVIDER_OPT_ACME';
+      loroDoc.createNode(optId, NDX_F.PROVIDER_ID);
+      loroDoc.setNodeRichTextContent(optId, 'acme', [], []);
+      loroDoc.commitDoc();
+
+      // Use a featured OpenAI model name as the custom model ID
+      const featuredModelId = 'gpt-5.4';
+
+      seedProviderConfig({
+        provider: 'acme',
+        enabled: true,
+        apiKey: 'sk-acme',
+        baseUrl: 'https://acme.example/v1',
+        name: 'Acme Corp',
+        models: [featuredModelId, 'acme-custom'],
+      });
+
+      const modelsWithMeta = getAvailableModelsWithMeta();
+      const acmeModels = modelsWithMeta.filter((m) => m.provider === 'acme');
+
+      expect(acmeModels).toHaveLength(2);
+
+      // Both custom models must be not-featured, even though one has an ID
+      // that matches a featured model name
+      const matchingModel = acmeModels.find((m) => m.id === featuredModelId);
+      expect(matchingModel).toBeDefined();
+      expect(matchingModel?.featured).toBe(false);
+
+      const otherModel = acmeModels.find((m) => m.id === 'acme-custom');
+      expect(otherModel).toBeDefined();
+      expect(otherModel?.featured).toBe(false);
+    });
+
+    it('disabled provider custom models are excluded', () => {
+      seedProviderConfig({
+        provider: 'openai',
+        enabled: false,
+        apiKey: 'sk-openai',
+        name: 'OpenAI',
+        models: ['custom-disabled-model'],
+      });
+
+      const models = getAvailableModels();
+      expect(models.some((m) => m.id === 'custom-disabled-model')).toBe(false);
+    });
   });
 });

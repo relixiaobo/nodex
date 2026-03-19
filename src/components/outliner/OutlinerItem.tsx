@@ -63,6 +63,7 @@ import { OutlinerRow, useRowSelectionState, useRowPointerHandlers } from './Outl
 import { NodeContextMenuPortal } from './NodeContextMenu.js';
 import { useDragDropRow } from '../../hooks/use-drag-drop-row.js';
 import {
+  OUTLINER_ROW_CONTAINER_CLASS,
   buildFieldOwnerColors,
   buildVisibleChildrenRows,
   isHiddenFieldRow,
@@ -1649,11 +1650,11 @@ export function OutlinerItem({
         onSelectionKeydown: handleReferenceSelectionKeydown,
       }}
     >
-    <div role="treeitem" aria-expanded={isExpanded} className={`relative flex flex-col gap-1.5 ${hasOverlayOpen ? 'field-overlay-open z-[80]' : 'has-[.field-overlay-open]:z-[80]'}`}>
+    <div role="treeitem" aria-expanded={isExpanded} className={`relative ${OUTLINER_ROW_CONTAINER_CLASS} ${hasOverlayOpen ? 'field-overlay-open z-[80]' : 'has-[.field-overlay-open]:z-[80]'}`}>
       <div
         ref={rowRef}
         tabIndex={-1}
-        className={`group/row flex gap-1 min-h-6 items-start relative ${isDropTarget && dropPosition === 'inside'
+        className={`group/row flex gap-1 min-h-6 py-px items-start relative ${isDropTarget && dropPosition === 'inside'
           ? 'bg-primary/10 ring-1 ring-primary/30 rounded-sm'
           : ''
           } ${isDragging ? 'opacity-40' : ''} ${hasOverlayOpen ? 'z-[80]' : 'has-[.field-overlay-open]:z-[80]'}`}
@@ -1960,7 +1961,7 @@ export function OutlinerItem({
         </button>
       )}
       {isExpanded && !isCyclicReferenceExpansion && (
-        <div className="relative flex flex-col gap-1.5" data-row-scope-parent-id={nodeId} ref={childrenScopeRef}>
+        <div className={`relative ${OUTLINER_ROW_CONTAINER_CLASS}`} data-row-scope-parent-id={nodeId} ref={childrenScopeRef}>
           {/* Selection subtree mask: children area, connects to parent row above (global selection only). */}
           {isSelectedGlobal && (
             <div

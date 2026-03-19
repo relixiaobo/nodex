@@ -274,6 +274,13 @@ export const useUIStore = create<UIStore>()(
           const panel = s.panels[panelIdx];
           if (panel.nodeId === nodeId) return {};
 
+          // Don't replace a chat panel with a node — open a new panel instead.
+          if (isChatPanel(panel.nodeId) && !isChatPanel(nodeId)) {
+            // Defer to openPanel (can't call within set); schedule microtask.
+            queueMicrotask(() => useUIStore.getState().openPanel(nodeId));
+            return {};
+          }
+
           commitUIMarker();
 
           // Truncate forward history

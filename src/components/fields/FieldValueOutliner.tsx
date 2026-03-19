@@ -40,7 +40,7 @@ import { useUIStore } from '../../stores/ui-store.js';
 import * as loroDoc from '../../lib/loro-doc.js';
 import { t } from '../../i18n/strings.js';
 import { FIELD_OVERLAY_Z_INDEX } from './field-layout.js';
-import { shouldShowTrailingInput, type OutlinerRowItem, type OutlinerRowType } from '../outliner/row-model.js';
+import { OUTLINER_ROW_CONTAINER_CLASS, shouldShowTrailingInput, type OutlinerRowItem, type OutlinerRowType } from '../outliner/row-model.js';
 import { useDragSelect } from '../../hooks/use-drag-select.js';
 import { navigateToSiblingRow } from '../../lib/outliner-navigation.js';
 import { canCreateChildrenUnder, canEditFieldEntryValue, getNodeCapabilities } from '../../lib/node-capabilities.js';
@@ -434,7 +434,7 @@ export function FieldValueOutliner({ fieldEntryId, fieldDataType, attrDefId, con
   return (
     <div
       ref={containerRef}
-      className={`min-h-[22px]${firstIsField ? ' pt-1' : ''}${lastIsField ? ' pb-1' : ''}${dragActive ? ' ring-1 ring-primary/30 bg-primary/5 rounded-sm' : ''}`}
+      className={`min-h-[22px] ${OUTLINER_ROW_CONTAINER_CLASS}${firstIsField ? ' pt-1' : ''}${lastIsField ? ' pb-1' : ''}${dragActive ? ' ring-1 ring-primary/30 bg-primary/5 rounded-sm' : ''}`}
       data-row-scope-parent-id={fieldEntryId}
       onDragOver={handleContainerDragOver}
       onDragLeave={handleContainerDragLeave}

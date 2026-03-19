@@ -129,7 +129,7 @@ export function OutlinerRow({ config, children }: OutlinerRowProps) {
   const batchHardDelete = useNodeStore((s) => s.batchHardDelete);
   const indentNode = useNodeStore((s) => s.indentNode);
   const outdentNode = useNodeStore((s) => s.outdentNode);
-  const createSibling = useNodeStore((s) => s.createSibling);
+  const duplicateNodes = useNodeStore((s) => s.duplicateNodes);
   const cycleNodeCheckbox = useNodeStore((s) => s.cycleNodeCheckbox);
 
   const { isSelected, isMultiSelected, isSelectionAnchor, isFocused } =
@@ -273,10 +273,7 @@ export function OutlinerRow({ config, children }: OutlinerRowProps) {
         const latestUi = useUIStore.getState();
         const flatList = getFlattenedVisibleNodes(rootChildIds, latestUi.expandedNodes, rootNodeId, panelId);
         const orderedIds = getSelectedIdsInOrder(latestUi.selectedNodeIds, flatList);
-        for (let i = orderedIds.length - 1; i >= 0; i--) {
-          const name = useNodeStore.getState().getNode(orderedIds[i])?.name ?? '';
-          createSibling(orderedIds[i], { name });
-        }
+        duplicateNodes(orderedIds);
         clearSelection();
         return;
       }
@@ -431,7 +428,7 @@ export function OutlinerRow({ config, children }: OutlinerRowProps) {
     onSelectionKeydown, onBatchDelete, onBatchIndent, onBatchOutdent,
     setSelectedNodes, clearSelection, setFocusedNode, clearFocus,
     setPendingInputChar, enterEdit,
-    trashNode, batchHardDelete, indentNode, outdentNode, createSibling, cycleNodeCheckbox,
+    trashNode, batchHardDelete, indentNode, outdentNode, createSibling, duplicateNodes, cycleNodeCheckbox,
     setExpanded,
   ]);
 

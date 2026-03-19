@@ -70,6 +70,8 @@ interface NodeStore {
   emptyTrash(): void;
   /** Deep-duplicate a node and all its descendants, inserting as next sibling. */
   duplicateNode(nodeId: string): NodexNode | null;
+  /** Batch deep-duplicate multiple nodes, inserting all copies after the last selected node. Single commitDoc for undo. */
+  duplicateNodes(nodeIds: string[]): string[];
 
   // ─── 内容编辑（同步） ───
 
@@ -1234,6 +1236,92 @@ export const useNodeStore = create<NodeStore>((set, get) => {
       const newId = deepClone(nodeId, parentId, insertAt);
       loroDoc.commitDoc();
       return loroDoc.toNodexNode(newId);
+    },
+
+    duplicateNodes: (nodeIds) => {
+      if (nodeIds.length === 0) return [];
+
+      // Deep-clone helper (same logic as duplicateNode).
+      function deepClone(srcId: string, destParentId: string, destIndex?: number): string {
+        const src = loroDoc.toNodexNode(srcId);
+        const newId = nanoid();
+        loroDoc.createNode(newId, destParentId, destIndex);
+
+        if (src) {
+          const batch: Record<string, unknown> = {};
+          if (src.name !== undefined) batch.name = src.name;
+          if (src.description !== undefined) batch.description = src.description;
+          if (src.type !== undefined) batch.type = src.type;
+          if (src.fieldDefId !== undefined) batch.fieldDefId = src.fieldDefId;
+          if (src.targetId !== undefined) batch.targetId = src.targetId;
+          if (src.color !== undefined) batch.color = src.color;
+          if (src.showCheckbox !== undefined) batch.showCheckbox = src.showCheckbox;
+          if (src.completedAt !== undefined) batch.completedAt = src.completedAt;
+          if (src.templateId !== undefined) batch.templateId = src.templateId;
+
+          if (Object.keys(batch).length > 0) {
+            loroDoc.setNodeDataBatch(newId, batch);
+          }
+
+          if (src.name && (src.marks?.length || src.inlineRefs?.length)) {
+            loroDoc.setNodeRichTextContent(
+              newId,
+              src.name,
+              src.marks ?? [],
+              src.inlineRefs ?? [],
+            );
+          }
+
+          for (const tagId of src.tags) {
+            loroDoc.addTag(newId, tagId);
+          }
+        }
+
+        const childIds = loroDoc.getChildren(srcId);
+        for (const childId of childIds) {
+          deepClone(childId, newId);
+        }
+
+        return newId;
+      }
+
+      const newIds: string[] = [];
+
+      // Group nodes by parent to maintain sibling order.
+      // Insert all copies after the last selected node in each parent.
+      const byParent = new Map<string, { ids: string[]; maxIndex: number }>();
+      for (const nodeId of nodeIds) {
+        if (!getNodeCapabilities(nodeId).canMove) continue;
+        const parentId = loroDoc.getParentId(nodeId);
+        if (!parentId) continue;
+        if (!canEditStructure(parentId)) continue;
+
+        const siblings = loroDoc.getChildren(parentId);
+        const idx = siblings.indexOf(nodeId);
+        const entry = byParent.get(parentId);
+        if (entry) {
+          entry.ids.push(nodeId);
+          if (idx > entry.maxIndex) entry.maxIndex = idx;
+        } else {
+          byParent.set(parentId, { ids: [nodeId], maxIndex: idx >= 0 ? idx : siblings.length });
+        }
+      }
+
+      for (const [parentId, { ids, maxIndex }] of byParent) {
+        // Insert copies after the last selected node in this parent.
+        // Clone in forward order so they appear in the same relative order.
+        let insertAt = maxIndex + 1;
+        for (const srcId of ids) {
+          const newId = deepClone(srcId, parentId, insertAt);
+          newIds.push(newId);
+          insertAt++;
+        }
+      }
+
+      if (newIds.length > 0) {
+        loroDoc.commitDoc();
+      }
+      return newIds;
     },
 
     // ─── 内容编辑 ───

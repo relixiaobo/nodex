@@ -7,6 +7,7 @@
 import { useNode } from '../../hooks/use-node.js';
 import { OutlinerView } from '../outliner/OutlinerView.js';
 import { CHAT_OUTLINER_PANEL_ID } from './NodePopover.js';
+import { ChatNodeIdentity } from './ChatNodeIdentity.js';
 
 interface NodeEmbedProps {
   nodeId: string;
@@ -25,6 +26,7 @@ export function NodeEmbed({ nodeId }: NodeEmbedProps) {
 
   return (
     <div className="chat-node-embed my-1 rounded-md border border-border bg-background">
+      <ChatNodeIdentity nodeId={nodeId} />
       <OutlinerView rootNodeId={nodeId} panelId={CHAT_OUTLINER_PANEL_ID} />
     </div>
   );

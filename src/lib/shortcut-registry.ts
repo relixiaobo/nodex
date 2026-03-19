@@ -461,3 +461,9 @@ export function matchesShortcutEvent(
 
   return true;
 }
+
+// ---------------------------------------------------------------------------
+// Pre-resolved shortcut key constants (shared across components)
+// ---------------------------------------------------------------------------
+
+export const DESCRIPTION_SHORTCUT_KEYS = getShortcutKeys('editor.edit_description', ['Ctrl-i']);

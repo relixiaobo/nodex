@@ -13,9 +13,7 @@ import { useWorkspaceFields } from '../../hooks/use-workspace-fields';
 import { useNodeStore } from '../../stores/node-store';
 import { useUIStore } from '../../stores/ui-store';
 import { t } from '../../i18n/strings.js';
-import { getShortcutKeys, matchesShortcutEvent } from '../../lib/shortcut-registry.js';
-
-const DESCRIPTION_SHORTCUT_KEYS = getShortcutKeys('editor.edit_description', ['Ctrl-i']);
+import { DESCRIPTION_SHORTCUT_KEYS, matchesShortcutEvent } from '../../lib/shortcut-registry.js';
 
 interface FieldNameInputProps {
   fieldEntryId: string;

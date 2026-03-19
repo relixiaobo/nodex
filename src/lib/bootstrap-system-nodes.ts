@@ -75,19 +75,22 @@ function applyOneTimeBootstrapMigrations(workspaceHomeId: string): void {
   loroDoc.setNodeData(workspaceHomeId, 'systemBootstrapVersion', SYSTEM_BOOTSTRAP_VERSION);
 }
 
-/** Auto-cleanup: permanently delete trash items older than 30 days (by updatedAt). */
+/** How long trashed items are kept before automatic permanent deletion. */
+const TRASH_AUTO_DELETE_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+
+/** Auto-cleanup: permanently delete trash items older than TRASH_AUTO_DELETE_MS (by updatedAt). */
 function autoCleanupTrash(): void {
   const trashChildren = loroDoc.getChildren(SYSTEM_NODE_IDS.TRASH);
   if (trashChildren.length === 0) return;
 
-  const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
+  const oldestKeepDate = Date.now() - TRASH_AUTO_DELETE_MS;
   let deleted = false;
 
   for (let i = trashChildren.length - 1; i >= 0; i--) {
     const node = loroDoc.toNodexNode(trashChildren[i]);
     if (!node) continue;
     const ts = node.updatedAt ?? node.createdAt ?? 0;
-    if (ts > 0 && ts < thirtyDaysAgo) {
+    if (ts > 0 && ts < oldestKeepDate) {
       loroDoc.deleteNode(trashChildren[i]);
       deleted = true;
     }

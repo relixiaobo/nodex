@@ -15,6 +15,7 @@ import {
   canEditFieldEntryValue,
   getNodeCapabilities,
   isLockedNode,
+  isNodeInTrash,
 } from '../lib/node-capabilities.js';
 import * as loroDoc from '../lib/loro-doc.js';
 import { getTreeReferenceBlockReason } from '../lib/reference-rules.js';
@@ -759,6 +760,58 @@ export function remapInlineRefsByPlaceholderOrder(
 }
 
 // ============================================================
+// Deep-clone helper: recursively copy a node and its descendants.
+// Shared by duplicateNode() and duplicateNodes().
+// ============================================================
+
+function deepCloneNode(srcId: string, destParentId: string, destIndex?: number): string {
+  const src = loroDoc.toNodexNode(srcId);
+  const newId = nanoid();
+  loroDoc.createNode(newId, destParentId, destIndex);
+
+  if (src) {
+    // Copy core data fields
+    const batch: Record<string, unknown> = {};
+    if (src.name !== undefined) batch.name = src.name;
+    if (src.description !== undefined) batch.description = src.description;
+    if (src.type !== undefined) batch.type = src.type;
+    if (src.fieldDefId !== undefined) batch.fieldDefId = src.fieldDefId;
+    if (src.targetId !== undefined) batch.targetId = src.targetId;
+    if (src.color !== undefined) batch.color = src.color;
+    if (src.showCheckbox !== undefined) batch.showCheckbox = src.showCheckbox;
+    if (src.completedAt !== undefined) batch.completedAt = src.completedAt;
+    if (src.templateId !== undefined) batch.templateId = src.templateId;
+
+    if (Object.keys(batch).length > 0) {
+      loroDoc.setNodeDataBatch(newId, batch);
+    }
+
+    // Copy rich text (marks + inlineRefs)
+    if (src.name && (src.marks?.length || src.inlineRefs?.length)) {
+      loroDoc.setNodeRichTextContent(
+        newId,
+        src.name,
+        src.marks ?? [],
+        src.inlineRefs ?? [],
+      );
+    }
+
+    // Copy tags (stored as LoroList, not children)
+    for (const tagId of src.tags) {
+      loroDoc.addTag(newId, tagId);
+    }
+  }
+
+  // Clone children (order preserved)
+  const childIds = loroDoc.getChildren(srcId);
+  for (const childId of childIds) {
+    deepCloneNode(childId, newId);
+  }
+
+  return newId;
+}
+
+// ============================================================
 // Store 实现
 // ============================================================
 
@@ -1118,7 +1171,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
       const from = loroDoc.getNodeData(nodeId)?._trashedFrom as string | undefined;
       const fromIndex = loroDoc.getNodeData(nodeId)?._trashedIndex as number | undefined;
 
-      if (from && loroDoc.hasNode(from)) {
+      if (from && loroDoc.hasNode(from) && !isNodeInTrash(from)) {
         loroDoc.moveNode(nodeId, from, fromIndex);
       } else {
         const fallbackParentId = ensureTodayNode();
@@ -1184,106 +1237,13 @@ export const useNodeStore = create<NodeStore>((set, get) => {
       const idx = siblings.indexOf(nodeId);
       const insertAt = idx >= 0 ? idx + 1 : siblings.length;
 
-      // Deep-clone helper: recursively copy a node and its descendants.
-      // Returns the new node's ID.
-      function deepClone(srcId: string, destParentId: string, destIndex?: number): string {
-        const src = loroDoc.toNodexNode(srcId);
-        const newId = nanoid();
-        loroDoc.createNode(newId, destParentId, destIndex);
-
-        if (src) {
-          // Copy core data fields
-          const batch: Record<string, unknown> = {};
-          if (src.name !== undefined) batch.name = src.name;
-          if (src.description !== undefined) batch.description = src.description;
-          if (src.type !== undefined) batch.type = src.type;
-          if (src.fieldDefId !== undefined) batch.fieldDefId = src.fieldDefId;
-          if (src.targetId !== undefined) batch.targetId = src.targetId;
-          if (src.color !== undefined) batch.color = src.color;
-          if (src.showCheckbox !== undefined) batch.showCheckbox = src.showCheckbox;
-          if (src.completedAt !== undefined) batch.completedAt = src.completedAt;
-          if (src.templateId !== undefined) batch.templateId = src.templateId;
-
-          if (Object.keys(batch).length > 0) {
-            loroDoc.setNodeDataBatch(newId, batch);
-          }
-
-          // Copy rich text (marks + inlineRefs)
-          if (src.name && (src.marks?.length || src.inlineRefs?.length)) {
-            loroDoc.setNodeRichTextContent(
-              newId,
-              src.name,
-              src.marks ?? [],
-              src.inlineRefs ?? [],
-            );
-          }
-
-          // Copy tags (stored as LoroList, not children)
-          for (const tagId of src.tags) {
-            loroDoc.addTag(newId, tagId);
-          }
-        }
-
-        // Clone children (order preserved)
-        const childIds = loroDoc.getChildren(srcId);
-        for (const childId of childIds) {
-          deepClone(childId, newId);
-        }
-
-        return newId;
-      }
-
-      const newId = deepClone(nodeId, parentId, insertAt);
+      const newId = deepCloneNode(nodeId, parentId, insertAt);
       loroDoc.commitDoc();
       return loroDoc.toNodexNode(newId);
     },
 
     duplicateNodes: (nodeIds) => {
       if (nodeIds.length === 0) return [];
-
-      // Deep-clone helper (same logic as duplicateNode).
-      function deepClone(srcId: string, destParentId: string, destIndex?: number): string {
-        const src = loroDoc.toNodexNode(srcId);
-        const newId = nanoid();
-        loroDoc.createNode(newId, destParentId, destIndex);
-
-        if (src) {
-          const batch: Record<string, unknown> = {};
-          if (src.name !== undefined) batch.name = src.name;
-          if (src.description !== undefined) batch.description = src.description;
-          if (src.type !== undefined) batch.type = src.type;
-          if (src.fieldDefId !== undefined) batch.fieldDefId = src.fieldDefId;
-          if (src.targetId !== undefined) batch.targetId = src.targetId;
-          if (src.color !== undefined) batch.color = src.color;
-          if (src.showCheckbox !== undefined) batch.showCheckbox = src.showCheckbox;
-          if (src.completedAt !== undefined) batch.completedAt = src.completedAt;
-          if (src.templateId !== undefined) batch.templateId = src.templateId;
-
-          if (Object.keys(batch).length > 0) {
-            loroDoc.setNodeDataBatch(newId, batch);
-          }
-
-          if (src.name && (src.marks?.length || src.inlineRefs?.length)) {
-            loroDoc.setNodeRichTextContent(
-              newId,
-              src.name,
-              src.marks ?? [],
-              src.inlineRefs ?? [],
-            );
-          }
-
-          for (const tagId of src.tags) {
-            loroDoc.addTag(newId, tagId);
-          }
-        }
-
-        const childIds = loroDoc.getChildren(srcId);
-        for (const childId of childIds) {
-          deepClone(childId, newId);
-        }
-
-        return newId;
-      }
 
       const newIds: string[] = [];
 
@@ -1312,7 +1272,7 @@ export const useNodeStore = create<NodeStore>((set, get) => {
         // Clone in forward order so they appear in the same relative order.
         let insertAt = maxIndex + 1;
         for (const srcId of ids) {
-          const newId = deepClone(srcId, parentId, insertAt);
+          const newId = deepCloneNode(srcId, parentId, insertAt);
           newIds.push(newId);
           insertAt++;
         }

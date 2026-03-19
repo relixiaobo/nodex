@@ -133,6 +133,19 @@ const SYSTEM_SCHEMA_NODE_PRESETS: ReadonlyArray<FixedSchemaNodePreset> = [
     },
   },
   {
+    id: NDX_F.PROVIDER_MODELS,
+    parentId: NDX_T.AI_PROVIDER,
+    name: 'Models',
+    data: {
+      type: 'fieldDef',
+      fieldType: FIELD_TYPES.PLAIN,
+      description: 'Custom model IDs for this provider',
+      locked: true,
+      nullable: true,
+      cardinality: 'list',
+    },
+  },
+  {
     id: NDX_F.SETTING_AI_PROVIDERS,
     parentId: NDX_T.WORKSPACE_SETTINGS,
     name: 'AI Providers',

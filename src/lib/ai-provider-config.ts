@@ -95,6 +95,18 @@ function readBooleanFieldValue(nodeId: string, fieldDefId: string): boolean {
   return readTextFieldValue(nodeId, fieldDefId) === SYS_V.YES;
 }
 
+function readListFieldValues(nodeId: string, fieldDefId: string): string[] {
+  const fieldEntryId = findFieldEntry(nodeId, fieldDefId);
+  if (!fieldEntryId) return [];
+
+  const fieldEntry = loroDoc.toNodexNode(fieldEntryId);
+  if (!fieldEntry?.children?.length) return [];
+
+  return fieldEntry.children
+    .map((childId) => loroDoc.toNodexNode(childId)?.name?.trim())
+    .filter((name): name is string => !!name);
+}
+
 function getProviderConfigPriority(config: ProviderConfig): number {
   if (config.enabled && config.apiKey.length > 0) return 2;
   if (config.enabled) return 1;
@@ -189,6 +201,57 @@ export function getApiKeyForProvider(provider: string): string | null {
   return config.apiKey;
 }
 
+// ---------------------------------------------------------------------------
+// Provider → API type mapping for custom models
+// ---------------------------------------------------------------------------
+
+/** Default API type for known providers (first model's api from pi-ai registry). */
+const PROVIDER_API_DEFAULTS: Record<string, Api> = {};
+
+function getProviderApiType(provider: string): Api {
+  const normalizedProvider = normalizeProviderId(provider);
+
+  // Return cached value if available
+  if (PROVIDER_API_DEFAULTS[normalizedProvider]) {
+    return PROVIDER_API_DEFAULTS[normalizedProvider];
+  }
+
+  // Try to derive from pi-ai's built-in model registry
+  const knownProviders = getProviders();
+  for (const known of knownProviders) {
+    if (normalizeProviderId(known) === normalizedProvider) {
+      const models = getModels(known);
+      if (models.length > 0) {
+        PROVIDER_API_DEFAULTS[normalizedProvider] = models[0].api;
+        return models[0].api;
+      }
+    }
+  }
+
+  // Fallback: most custom/compatible providers use openai-completions
+  return 'openai-completions';
+}
+
+function buildCustomModel(
+  modelId: string,
+  provider: string,
+  api: Api,
+  baseUrl: string,
+): Model<Api> {
+  return {
+    id: modelId,
+    name: modelId,
+    api,
+    provider,
+    baseUrl,
+    reasoning: false,
+    input: ['text'] as ('text' | 'image')[],
+    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+    contextWindow: 128_000,
+    maxTokens: 8_192,
+  };
+}
+
 export function getAvailableModels(): Model<Api>[] {
   const knownProviders = new Set(getProviders().map((provider) => normalizeProviderId(provider)));
   const enabledConfigs = getCanonicalProviderConfigs(getProviderConfigs())
@@ -196,13 +259,27 @@ export function getAvailableModels(): Model<Api>[] {
 
   return enabledConfigs.flatMap((config) => {
     const provider = normalizeProviderId(config.provider);
-    if (!knownProviders.has(provider)) return [];
 
-    return getModels(provider as Parameters<typeof getModels>[0]).map((model) => (
-      config.baseUrl
-        ? { ...model, baseUrl: config.baseUrl }
-        : model
-    ));
+    // SDK built-in models (only for known providers)
+    const sdkModels: Model<Api>[] = knownProviders.has(provider)
+      ? getModels(provider as Parameters<typeof getModels>[0]).map((model) => (
+          config.baseUrl
+            ? { ...model, baseUrl: config.baseUrl }
+            : model
+        ))
+      : [];
+
+    // Custom models from the provider's Models field
+    const customModelIds = readListFieldValues(config.nodeId, NDX_F.PROVIDER_MODELS);
+    const sdkModelIdSet = new Set(sdkModels.map((m) => m.id));
+    const api = customModelIds.length > 0 ? getProviderApiType(provider) : ('' as Api);
+    const baseUrl = config.baseUrl ?? sdkModels[0]?.baseUrl ?? '';
+
+    const customModels = customModelIds
+      .filter((modelId) => !sdkModelIdSet.has(modelId))
+      .map((modelId) => buildCustomModel(modelId, provider, api, baseUrl));
+
+    return [...sdkModels, ...customModels];
   });
 }
 

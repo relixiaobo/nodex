@@ -5,7 +5,7 @@ import { IMAGE_PLACEHOLDER } from '../../lib/ai-message-images.js';
 import { highlightCode } from '../../lib/code-highlight.js';
 import {
   ArrowUpDown, Camera, ChevronDown, Clock, Code2, FileText, Globe, Image,
-  Info, Keyboard, MousePointer, Move, PanelTop, Pencil, Plus, RotateCcw,
+  Info, Keyboard, MessageSquare, MousePointer, Move, PanelTop, Pencil, Plus, RotateCcw,
   Search, Terminal, Trash2, Wand2,
 } from '../../lib/icons.js';
 
@@ -56,6 +56,7 @@ function getToolIcon(name: string, args: Record<string, unknown>): AppIcon {
   if (name === 'node_delete') return args.restore === true ? RotateCcw : Trash2;
   if (name === 'node_search') return Search;
   if (name === 'undo') return RotateCcw;
+  if (name === 'past_chats') return MessageSquare;
 
   if (name === 'browser') {
     const action = typeof args.action === 'string' ? args.action : '';

@@ -80,3 +80,6 @@
 - ⌘K 命令面板融合 Chat：搜索历史聊天（fuzzy match 标题）、Tab 键切换 AI 模式（Raycast 风格）、Ask AI 始终可见、New Chat 命令；AI 模式空态浏览最近对话，有输入时直接提问
 - 新增 past_chats 跨会话记忆工具：AI 现在可以搜索和浏览历史对话，三层渐进探索（会话列表 → 用户消息 → 详情分页），支持关键词过滤和时间范围筛选
 - AI 系统提示词架构重构：内置提示词改为代码管理，#agent 节点的子节点内容现在是纯用户自定义指令，两者以 `<user-instructions>` 标签分隔组合
+- Chat 节点展示改造：`<ref>` 和 `<cite>` 点击改为弹出 Popover 浮窗（OutlinerView，可展开编辑，不离开对话）；新增 `<node id="xxx" />` block-level markup，渲染为内嵌 OutlinerView（可展开、可编辑、可拖拽）
+- 首屏改为 Chat：新安装或空面板时默认打开 Chat 面板，而非 Outliner
+- AI 提及节点编辑感知：AI 回复中引用的节点如果被用户编辑，下轮 system reminder 自动提示 AI 重新读取

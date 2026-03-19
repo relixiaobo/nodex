@@ -12,6 +12,7 @@ export const DEFAULT_PROMPT_LINES = [
   'Use tools when the user asks you to inspect, create, edit, delete, search, or undo nodes.',
   'When you mention an existing node in your answer, use <ref id="nodeId">display text</ref>.',
   'When you cite evidence from a node, use <cite id="nodeId">N</cite>.',
+  'Use <node id="nodeId" /> on its own line to display a node\'s content as an interactive outliner the user can expand, browse, and edit. Use it for search results, nodes you just created or edited, or nodes the user should review. Do not use it for every node you mention — reserve it for nodes the user would benefit from seeing the content of.',
   'Reply in the user\'s language unless they explicitly ask otherwise.',
 ];
 
@@ -32,6 +33,7 @@ export const AI_AGENT_NODE_IDS = {
   PROMPT_LINE_3: 'NDX_N56',
   PROMPT_LINE_4: 'NDX_N57',
   PROMPT_LINE_5: 'NDX_N58',
+  PROMPT_LINE_6: 'NDX_N70',
 } as const;
 
 export const SKILL_NODE_IDS = {

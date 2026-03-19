@@ -134,7 +134,7 @@ describe('ensureSystemNodes', () => {
         const n = toNodexNode(id);
         return n != null && isOutlinerContentNodeType(n.type);
       });
-    expect(contentChildrenBefore.length).toBe(6);
+    expect(contentChildrenBefore.length).toBe(7);
 
     ensureSystemNodes('ws_bootstrap');
 

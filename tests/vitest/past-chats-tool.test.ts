@@ -188,6 +188,42 @@ describe('past_chats tool', () => {
     ]);
   });
 
+  it('uses fuzzy matching for multi-term, mixed-language, typo, and CJK session queries', async () => {
+    await seedSessions([
+      buildSession('session_cn', '会议纪要', [
+        createUserMessage('今天会议决定涨价', 1),
+        createAssistantMessage([{ type: 'text', text: '需要同步给销售团队。' }], 2),
+      ], Date.parse('2026-03-02T10:00:00Z')),
+      buildSession('session_en', 'Pricing review', [
+        createUserMessage('Kick off pricing review', 3),
+        createAssistantMessage([{ type: 'text', text: 'We should revisit packaging.' }], 4),
+      ], Date.parse('2026-03-03T10:00:00Z')),
+      buildSession('session_mixed', 'Quarterly planning', [
+        createUserMessage('Q3 涨价决策讨论', 5),
+        createAssistantMessage([{ type: 'text', text: '先准备公告草稿。' }], 6),
+      ], Date.parse('2026-03-04T10:00:00Z')),
+      buildSession('session_char', '周报', [
+        createUserMessage('今天的会议记录', 7),
+      ], Date.parse('2026-03-05T10:00:00Z')),
+    ]);
+
+    const tool = createPastChatsTool();
+    const cases = [
+      { query: '会议 决定', expectedId: 'session_cn' },
+      { query: 'pricing review', expectedId: 'session_en' },
+      { query: 'Q3 涨价', expectedId: 'session_mixed' },
+      { query: 'pricng', expectedId: 'session_en' },
+      { query: '会', expectedId: 'session_char' },
+    ];
+
+    for (const { query, expectedId } of cases) {
+      const result = await tool.execute('tool_past_chats', { query } as never);
+      const sessionIds = (result.details as { sessions: Array<{ id: string }> }).sessions.map((session) => session.id);
+
+      expect(sessionIds).toContain(expectedId);
+    }
+  });
+
   it('lists only user messages in a session and strips injected system reminders', async () => {
     await seedSessions([
       buildSession('session_alpha', 'Pricing review', [
@@ -216,6 +252,39 @@ describe('past_chats tool', () => {
       }],
       next: 'Choose a message id from userMessages and call past_chats(sessionId: "...", messageId: "...") to read the full exchange.',
     });
+  });
+
+  it('uses the same fuzzy matching rules when filtering user messages within a session', async () => {
+    await seedSessions([
+      buildSession('session_fuzzy', 'Search playground', [
+        createUserMessage('今天会议决定涨价', 1),
+        createAssistantMessage([{ type: 'text', text: '需要同步给销售团队。' }], 2),
+        createUserMessage('Kick off pricing review', 3),
+        createAssistantMessage([{ type: 'text', text: 'We should revisit packaging.' }], 4),
+        createUserMessage('Q3 涨价决策讨论', 5),
+        createAssistantMessage([{ type: 'text', text: '先准备公告草稿。' }], 6),
+        createUserMessage('今天的会议记录', 7),
+      ], Date.parse('2026-03-06T10:00:00Z')),
+    ]);
+
+    const tool = createPastChatsTool();
+    const cases = [
+      { query: '会议 决定', expectedText: '今天会议决定涨价' },
+      { query: 'pricing review', expectedText: 'Kick off pricing review' },
+      { query: 'Q3 涨价', expectedText: 'Q3 涨价决策讨论' },
+      { query: 'pricng', expectedText: 'Kick off pricing review' },
+      { query: '会', expectedText: '今天的会议记录' },
+    ];
+
+    for (const { query, expectedText } of cases) {
+      const result = await tool.execute('tool_past_chats', {
+        sessionId: 'session_fuzzy',
+        query,
+      } as never);
+      const messageTexts = (result.details as { userMessages: Array<{ text: string }> }).userMessages.map((message) => message.text);
+
+      expect(messageTexts).toContain(expectedText);
+    }
   });
 
   it('reads a user message with assistant replies, skipping tool results and paginating long text', async () => {

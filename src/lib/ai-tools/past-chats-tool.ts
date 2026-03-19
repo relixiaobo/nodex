@@ -2,6 +2,7 @@ import type { AgentMessage, AgentTool, AgentToolResult } from '@mariozechner/pi-
 import { Type } from '@mariozechner/pi-ai';
 import { getLinearPath, type ChatSession, type MessageNode } from '../ai-chat-tree.js';
 import { getChatSession, listChatSessionMetas } from '../ai-persistence.js';
+import { fuzzyMatch } from '../fuzzy-search.js';
 import { formatResultText } from './shared.js';
 
 const DEFAULT_LIMIT = 10;
@@ -19,7 +20,7 @@ const pastChatsToolParameters = Type.Object({
     description: 'Level 2 only. User message ID to read in detail. Requires sessionId. Returns that user message plus assistant replies until the next user message.',
   })),
   query: Type.Optional(Type.String({
-    description: 'Keyword filter (case-insensitive substring match). Valid for Level 0/1 only. Level 0: search session title plus active-branch user and assistant text. Level 1: search user messages inside the session. Use concrete keywords like names, features, or decisions.',
+    description: 'Keyword filter (case-insensitive fuzzy match across whitespace-separated terms). Valid for Level 0/1 only. Level 0: search session title plus active-branch user and assistant text. Level 1: search user messages inside the session. Use concrete keywords like names, features, or decisions.',
   })),
   before: Type.Optional(Type.String({
     description: 'Level 0 only. Only valid when sessionId is omitted. ISO date (user\'s local timezone), inclusive upper bound. Use plain date like "2026-03-15" — do NOT append Z or timezone offset. The date is interpreted in the user\'s local timezone.',
@@ -139,11 +140,11 @@ function truncatePreview(text: string, maxChars: number): string {
 
 function matchesQuery(text: string, query: string | null): boolean {
   if (!query) return true;
-  return text.toLowerCase().includes(query);
+  return fuzzyMatch(query, text) !== null;
 }
 
 function normalizeQuery(query: string | undefined): string | null {
-  return query?.trim().toLowerCase() || null;
+  return query?.trim() || null;
 }
 
 function getListPagingParams(params: PastChatsToolParams): { limit: number; offset: number } {
@@ -241,7 +242,7 @@ function getSessionSearchText(meta: SessionMeta, session: ChatSession): string {
     }
   }
 
-  return parts.join('\n\n').toLowerCase();
+  return parts.join('\n\n');
 }
 
 async function listSessionSummaries(
@@ -319,7 +320,7 @@ async function listUserMessagesInSession(
   const query = normalizeQuery(params.query);
 
   const messages: UserMessageSummary[] = getVisibleUserMessages(session)
-    .filter(({ text }) => matchesQuery(text.toLowerCase(), query))
+    .filter(({ text }) => matchesQuery(text, query))
     .map(({ node, text }) => ({
       id: node.id,
       text: truncatePreview(text, USER_MESSAGE_PREVIEW_CHARS),

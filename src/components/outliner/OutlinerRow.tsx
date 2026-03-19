@@ -28,6 +28,7 @@ import {
 } from '../../lib/selection-utils.js';
 import { resolveSelectionKeyboardAction } from '../../lib/selection-keyboard.js';
 import { copyNodesToClipboard, cutNodesToClipboard } from '../../lib/node-clipboard.js';
+import { isNodeInTrash } from '../../lib/node-capabilities.js';
 
 // ── Public types ──
 
@@ -125,6 +126,7 @@ export function OutlinerRow({ config, children }: OutlinerRowProps) {
   const setPendingInputChar = useUIStore((s) => s.setPendingInputChar);
 
   const trashNode = useNodeStore((s) => s.trashNode);
+  const batchHardDelete = useNodeStore((s) => s.batchHardDelete);
   const indentNode = useNodeStore((s) => s.indentNode);
   const outdentNode = useNodeStore((s) => s.outdentNode);
   const createSibling = useNodeStore((s) => s.createSibling);
@@ -201,13 +203,20 @@ export function OutlinerRow({ config, children }: OutlinerRowProps) {
         const orderedIds = getSelectedIdsInOrder(latestUi.selectedNodeIds, flatList);
 
         // Bottom-up: avoid index shift when deleting upper nodes first
+        // Collect trash node IDs for batch permanent delete
+        const trashIds: string[] = [];
         for (let i = orderedIds.length - 1; i >= 0; i--) {
           const id = orderedIds[i];
           if (onBatchDelete) {
             onBatchDelete(id);
+          } else if (isNodeInTrash(id)) {
+            trashIds.push(id);
           } else {
             trashNode(id);
           }
+        }
+        if (trashIds.length > 0) {
+          batchHardDelete(trashIds);
         }
         clearSelection();
         if (prev) {
@@ -422,7 +431,7 @@ export function OutlinerRow({ config, children }: OutlinerRowProps) {
     onSelectionKeydown, onBatchDelete, onBatchIndent, onBatchOutdent,
     setSelectedNodes, clearSelection, setFocusedNode, clearFocus,
     setPendingInputChar, enterEdit,
-    trashNode, indentNode, outdentNode, createSibling, cycleNodeCheckbox,
+    trashNode, batchHardDelete, indentNode, outdentNode, createSibling, cycleNodeCheckbox,
     setExpanded,
   ]);
 

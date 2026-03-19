@@ -65,6 +65,8 @@ interface NodeStore {
   trashNode(nodeId: string, options?: { commit?: boolean }): void;
   restoreNode(nodeId: string): void;
   hardDeleteNode(nodeId: string): void;
+  /** Batch permanently delete multiple nodes in Trash. Single commitDoc for undo. */
+  batchHardDelete(nodeIds: string[]): void;
   emptyTrash(): void;
   /** Deep-duplicate a node and all its descendants, inserting as next sibling. */
   duplicateNode(nodeId: string): NodexNode | null;
@@ -1140,6 +1142,25 @@ export const useNodeStore = create<NodeStore>((set, get) => {
 
       loroDoc.deleteNode(nodeId);
       loroDoc.commitDoc();
+    },
+
+    batchHardDelete: (nodeIds: string[]) => {
+      if (nodeIds.length === 0) return;
+      let deleted = false;
+      for (const nodeId of nodeIds) {
+        const parentId = loroDoc.getParentId(nodeId);
+        if (parentId !== SYSTEM_NODE_IDS.TRASH) continue;
+        if (!getNodeCapabilities(nodeId).canDelete) continue;
+
+        const node = loroDoc.toNodexNode(nodeId);
+        if (node?.type === 'fieldDef') {
+          cascadeFieldDefDeletion(nodeId);
+        }
+
+        loroDoc.deleteNode(nodeId);
+        deleted = true;
+      }
+      if (deleted) loroDoc.commitDoc();
     },
 
     emptyTrash: () => {

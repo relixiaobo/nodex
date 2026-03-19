@@ -205,15 +205,15 @@ export function getApiKeyForProvider(provider: string): string | null {
 // Custom model marker — distinguishes user-added models from SDK built-in
 // models so getAvailableModelsWithMeta() can force featured: false regardless
 // of whether a custom model ID coincidentally matches a featured model name.
+// Uses a WeakSet so we never mutate external Model objects.
 // ---------------------------------------------------------------------------
 
-/** @internal Runtime marker key attached to custom model objects. */
-const CUSTOM_MODEL_MARKER = '__isCustom' as const;
+/** @internal Tracks Model instances created by buildCustomModel(). */
+const customModelSet = new WeakSet<Model<Api>>();
 
 /** Check whether a Model was created by buildCustomModel(). */
 function isCustomModel(model: Model<Api>): boolean {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- runtime property check on external type
-  return (model as any)[CUSTOM_MODEL_MARKER] === true;
+  return customModelSet.has(model);
 }
 
 // ---------------------------------------------------------------------------
@@ -253,7 +253,7 @@ function buildCustomModel(
   api: Api,
   baseUrl: string,
 ): Model<Api> {
-  return {
+  const model: Model<Api> = {
     id: modelId,
     name: modelId,
     api,
@@ -264,8 +264,9 @@ function buildCustomModel(
     cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
     contextWindow: 128_000,
     maxTokens: 8_192,
-    [CUSTOM_MODEL_MARKER]: true,
   } as Model<Api>;
+  customModelSet.add(model);
+  return model;
 }
 
 export function getAvailableModels(): Model<Api>[] {

@@ -51,9 +51,7 @@ import { resolveRowPointerSelectAction } from '../../lib/row-pointer-selection.j
 import { OutlinerRow, useRowSelectionState, useRowPointerHandlers } from '../outliner/OutlinerRow.js';
 import { canCreateChildrenUnder, getNodeCapabilities } from '../../lib/node-capabilities.js';
 import { useDragDropRow } from '../../hooks/use-drag-drop-row.js';
-import { getShortcutKeys, matchesShortcutEvent } from '../../lib/shortcut-registry.js';
-
-const DESCRIPTION_SHORTCUT_KEYS = getShortcutKeys('editor.edit_description', ['Ctrl-i']);
+import { DESCRIPTION_SHORTCUT_KEYS, matchesShortcutEvent } from '../../lib/shortcut-registry.js';
 
 function focusTrailingInputForParent(parentId: string): boolean {
   const roots = document.querySelectorAll<HTMLElement>('[data-trailing-parent-id]');

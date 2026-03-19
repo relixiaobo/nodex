@@ -42,7 +42,7 @@ import {
 } from '../../lib/tree-utils';
 import { resolveSelectedReferenceShortcut } from '../../lib/selected-reference-shortcuts';
 import { resolveRowPointerSelectAction } from '../../lib/row-pointer-selection';
-import { getShortcutKeys, matchesShortcutEvent } from '../../lib/shortcut-registry.js';
+import { DESCRIPTION_SHORTCUT_KEYS, matchesShortcutEvent } from '../../lib/shortcut-registry.js';
 import {
   isEditorViewAlive,
   setEditorSelection,
@@ -71,7 +71,6 @@ import {
   type OutlinerRowItem,
 } from './row-model.js';
 
-const DESCRIPTION_SHORTCUT_KEYS = getShortcutKeys('editor.edit_description', ['Ctrl-i']);
 const EMPTY_REFERENCE_PATH: readonly string[] = [];
 
 /**

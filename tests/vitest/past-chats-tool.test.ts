@@ -315,6 +315,12 @@ describe('past_chats tool', () => {
       messageId: 'msg_1',
       query: 'current',
     } as never)).rejects.toThrow('query is not valid with messageId.');
+
+    await expect(tool.execute('tool_past_chats', {
+      sessionId: 'session_current',
+      messageId: 'msg_1',
+      limit: 1,
+    } as never)).rejects.toThrow('limit is not valid with messageId.');
   });
 
   it('returns a boundary when the selected user message has no assistant reply', async () => {
@@ -341,5 +347,24 @@ describe('past_chats tool', () => {
       assistant: null,
       boundary: 'No assistant reply exists after this user message on the active branch.',
     });
+  });
+
+  it('rejects textOffset values beyond the assistant response length', async () => {
+    const session = buildSession('session_alpha', 'Pricing review', [
+      createUserMessage('What did we decide for enterprise?', 1),
+      createAssistantMessage([{ type: 'text', text: 'Short answer.' }], 2),
+    ], Date.parse('2026-03-01T10:00:00Z'));
+    await seedSessions([session]);
+
+    const userMessageId = Object.values(session.mapping)
+      .find((node) => node.message?.role === 'user')?.id;
+
+    const tool = createPastChatsTool();
+
+    await expect(tool.execute('tool_past_chats', {
+      sessionId: 'session_alpha',
+      messageId: userMessageId!,
+      textOffset: 99,
+    } as never)).rejects.toThrow('textOffset is past the end of the assistant response.');
   });
 });

@@ -51,6 +51,7 @@ const pastChatsToolParameters = Type.Object({
 });
 
 type PastChatsToolParams = typeof pastChatsToolParameters.static;
+type PastChatsMode = 'sessions' | 'sessionMessages' | 'messageDetail';
 
 export interface PastChatsToolRuntime {
   getCurrentSessionId?: () => string | null;
@@ -69,6 +70,13 @@ interface UserMessageSummary {
   id: string;
   text: string;
   createdAt: string;
+}
+
+function toToolResult<T>(details: T): AgentToolResult<T> {
+  return {
+    content: [{ type: 'text', text: formatResultText(details) }],
+    details,
+  };
 }
 
 function parseTimeFilter(value: string | undefined, kind: 'before' | 'after'): number | null {
@@ -128,6 +136,66 @@ function matchesQuery(text: string, query: string | null): boolean {
   return text.toLowerCase().includes(query);
 }
 
+function normalizeQuery(query: string | undefined): string | null {
+  return query?.trim().toLowerCase() || null;
+}
+
+function getListPagingParams(params: PastChatsToolParams): { limit: number; offset: number } {
+  return {
+    limit: Math.min(params.limit ?? DEFAULT_LIMIT, MAX_LIMIT),
+    offset: params.offset ?? 0,
+  };
+}
+
+function getDetailPagingParams(params: PastChatsToolParams): { maxChars: number; textOffset: number } {
+  return {
+    maxChars: params.maxChars ?? DEFAULT_MAX_CHARS,
+    textOffset: params.textOffset ?? DEFAULT_TEXT_OFFSET,
+  };
+}
+
+function getPastChatsMode(params: PastChatsToolParams): PastChatsMode {
+  if (!params.sessionId) return 'sessions';
+  if (!params.messageId) return 'sessionMessages';
+  return 'messageDetail';
+}
+
+function validatePastChatsParams(params: PastChatsToolParams): void {
+  const mode = getPastChatsMode(params);
+
+  if (params.before !== undefined && mode !== 'sessions') {
+    throw new Error('before is only valid when sessionId is omitted. Use past_chats() to browse sessions by time range.');
+  }
+
+  if (params.after !== undefined && mode !== 'sessions') {
+    throw new Error('after is only valid when sessionId is omitted. Use past_chats() to browse sessions by time range.');
+  }
+
+  if (params.messageId && !params.sessionId) {
+    throw new Error('messageId requires sessionId. Use past_chats() to browse sessions first.');
+  }
+
+  if (mode === 'messageDetail' && params.query !== undefined) {
+    throw new Error('query is not valid with messageId. First browse user messages, then read one message in detail.');
+  }
+
+  if (mode === 'messageDetail' && params.limit !== undefined) {
+    throw new Error('limit is not valid with messageId. Level 2 returns a single user message plus assistant reply detail.');
+  }
+
+  if (mode === 'messageDetail' && params.offset !== undefined) {
+    throw new Error('offset is not valid with messageId. Level 2 reads a single user message plus assistant reply detail.');
+  }
+
+  if (params.maxChars !== undefined && mode !== 'messageDetail') {
+    throw new Error('maxChars requires messageId. Use past_chats(sessionId: "...", messageId: "...") to read a specific reply.');
+  }
+
+  if (params.textOffset !== undefined && mode !== 'messageDetail') {
+    throw new Error('textOffset requires messageId. Use past_chats(sessionId: "...", messageId: "...") to read a specific reply.');
+  }
+}
+
 function toIsoString(timestamp: number | undefined): string {
   return new Date(timestamp ?? 0).toISOString();
 }
@@ -176,9 +244,8 @@ async function listSessionSummaries(
 ): Promise<AgentToolResult<unknown>> {
   const after = parseTimeFilter(params.after, 'after');
   const before = parseTimeFilter(params.before, 'before');
-  const query = params.query?.trim().toLowerCase() || null;
-  const limit = Math.min(params.limit ?? DEFAULT_LIMIT, MAX_LIMIT);
-  const offset = params.offset ?? 0;
+  const query = normalizeQuery(params.query);
+  const { limit, offset } = getListPagingParams(params);
 
   const metas = (await listChatSessionMetas())
     .filter((meta) => meta.id !== currentSessionId)
@@ -218,10 +285,7 @@ async function listSessionSummaries(
       : {}),
   };
 
-  return {
-    content: [{ type: 'text', text: formatResultText(result) }],
-    details: result,
-  };
+  return toToolResult(result);
 }
 
 function ensureSessionAllowed(sessionId: string, currentSessionId: string | null): void {
@@ -245,9 +309,8 @@ async function listUserMessagesInSession(
   currentSessionId: string | null,
 ): Promise<AgentToolResult<unknown>> {
   const session = await loadSessionOrThrow(sessionId, currentSessionId);
-  const limit = Math.min(params.limit ?? DEFAULT_LIMIT, MAX_LIMIT);
-  const offset = params.offset ?? 0;
-  const query = params.query?.trim().toLowerCase() || null;
+  const { limit, offset } = getListPagingParams(params);
+  const query = normalizeQuery(params.query);
 
   const messages: UserMessageSummary[] = getVisibleUserMessages(session)
     .filter(({ text }) => matchesQuery(text.toLowerCase(), query))
@@ -275,10 +338,7 @@ async function listUserMessagesInSession(
       : {}),
   };
 
-  return {
-    content: [{ type: 'text', text: formatResultText(result) }],
-    details: result,
-  };
+  return toToolResult(result);
 }
 
 function collectAssistantResponse(path: MessageNode[], startIndex: number): string {
@@ -314,8 +374,7 @@ async function readMessageDetail(
   const userMessage = path[messageIndex].message!;
   const userText = extractUserText(userMessage);
   const assistantText = collectAssistantResponse(path, messageIndex);
-  const maxChars = params.maxChars ?? DEFAULT_MAX_CHARS;
-  const textOffset = params.textOffset ?? DEFAULT_TEXT_OFFSET;
+  const { maxChars, textOffset } = getDetailPagingParams(params);
 
   const assistant = assistantText.length === 0
     ? null
@@ -356,59 +415,26 @@ async function readMessageDetail(
       : {}),
   };
 
-  return {
-    content: [{ type: 'text', text: formatResultText(result) }],
-    details: result,
-  };
+  return toToolResult(result);
 }
 
 async function executePastChatsTool(
   params: PastChatsToolParams,
   runtime: PastChatsToolRuntime,
 ): Promise<AgentToolResult<unknown>> {
-  if (params.before !== undefined && params.sessionId) {
-    throw new Error('before is only valid when sessionId is omitted. Use past_chats() to browse sessions by time range.');
-  }
-
-  if (params.after !== undefined && params.sessionId) {
-    throw new Error('after is only valid when sessionId is omitted. Use past_chats() to browse sessions by time range.');
-  }
-
-  if (params.messageId && !params.sessionId) {
-    throw new Error('messageId requires sessionId. Use past_chats() to browse sessions first.');
-  }
-
-  if (params.query !== undefined && params.messageId) {
-    throw new Error('query is not valid with messageId. First browse user messages, then read one message in detail.');
-  }
-
-  if (params.limit !== undefined && params.messageId) {
-    throw new Error('limit is not valid with messageId. Level 2 returns a single user message plus assistant reply detail.');
-  }
-
-  if (params.offset !== undefined && params.messageId) {
-    throw new Error('offset is not valid with messageId. Level 2 reads a single user message plus assistant reply detail.');
-  }
-
-  if (params.maxChars !== undefined && !params.messageId) {
-    throw new Error('maxChars requires messageId. Use past_chats(sessionId: "...", messageId: "...") to read a specific reply.');
-  }
-
-  if (params.textOffset !== undefined && !params.messageId) {
-    throw new Error('textOffset requires messageId. Use past_chats(sessionId: "...", messageId: "...") to read a specific reply.');
-  }
+  validatePastChatsParams(params);
 
   const currentSessionId = runtime.getCurrentSessionId?.() ?? null;
+  const mode = getPastChatsMode(params);
 
-  if (!params.sessionId) {
-    return listSessionSummaries(params, currentSessionId);
+  switch (mode) {
+    case 'sessions':
+      return listSessionSummaries(params, currentSessionId);
+    case 'sessionMessages':
+      return listUserMessagesInSession(params.sessionId!, params, currentSessionId);
+    case 'messageDetail':
+      return readMessageDetail(params.sessionId!, params.messageId!, params, currentSessionId);
   }
-
-  if (!params.messageId) {
-    return listUserMessagesInSession(params.sessionId, params, currentSessionId);
-  }
-
-  return readMessageDetail(params.sessionId, params.messageId, params, currentSessionId);
 }
 
 export function createPastChatsTool(runtime: PastChatsToolRuntime = {}): AgentTool<typeof pastChatsToolParameters, unknown> {

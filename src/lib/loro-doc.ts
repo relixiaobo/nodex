@@ -1054,6 +1054,22 @@ export function getChildren(parentNodexId: string): string[] {
   return result;
 }
 
+/**
+ * Get the raw Loro tree index of a child node within its parent.
+ * Unlike getChildren() which filters unmapped nodes, this returns the
+ * actual position in the Loro tree — required for accurate index-based insertion.
+ */
+export function getRawChildIndex(parentNodexId: string, childNodexId: string): number {
+  const tree = getTree();
+  const parentTreeId = nodexToTree.get(parentNodexId);
+  const childTreeId = nodexToTree.get(childNodexId);
+  if (!parentTreeId || !childTreeId) return -1;
+  const parent = tree.getNodeByID(parentTreeId);
+  if (!parent) return -1;
+  const children = parent.children() ?? [];
+  return children.findIndex(c => c.id === childTreeId);
+}
+
 export function getParentId(nodexId: string): string | null {
   if (_wasmPoisoned) return null;
   const tree = getTree();

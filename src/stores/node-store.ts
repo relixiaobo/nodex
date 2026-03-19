@@ -948,7 +948,13 @@ export const useNodeStore = create<NodeStore>((set, get) => {
       const idx = siblings.indexOf(siblingId);
       const insertAt = idx >= 0 ? idx + 1 : siblings.length;
 
-      return get().createChild(parentId, insertAt, data);
+      // Use the sibling's raw Loro tree index for accurate insertion.
+      // getChildren() filters out unmapped nodes, but createNode() operates
+      // on the raw tree — using filtered index causes misplacement.
+      const rawIdx = loroDoc.getRawChildIndex(parentId, siblingId);
+      const rawInsertAt = rawIdx >= 0 ? rawIdx + 1 : insertAt;
+
+      return get().createChild(parentId, rawInsertAt, data);
     },
 
     createSiblingNodesFromPaste: (afterNodeId, nodes, options) => {

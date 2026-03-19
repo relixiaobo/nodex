@@ -339,9 +339,14 @@ export function ensureSystemSchema(): void {
     );
   }
 
+  // Only create default Anthropic provider when migrating a legacy API key.
+  // New users start with an empty provider list — no provider is special-cased.
   const providerConfigsFieldEntry = loroDoc.toNodexNode(SYSTEM_SCHEMA_NODE_IDS.SETTINGS_AI_PROVIDERS_FIELD_ENTRY);
   if ((providerConfigsFieldEntry?.children?.length ?? 0) === 0) {
-    ensureDefaultAnthropicProvider(readLegacyApiKey());
+    const legacyApiKey = readLegacyApiKey();
+    if (legacyApiKey) {
+      ensureDefaultAnthropicProvider(legacyApiKey);
+    }
   }
 
   cleanupLegacySettingsNodes();

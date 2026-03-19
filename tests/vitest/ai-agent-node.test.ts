@@ -1,10 +1,13 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
+  AGENT_PAST_CHATS_GUIDANCE,
   AI_AGENT_NODE_IDS,
   buildAgentSystemPrompt,
+  DEFAULT_AGENT_SYSTEM_PROMPT,
   DEFAULT_AGENT_MAX_TOKENS,
   DEFAULT_AGENT_MODEL_ID,
   DEFAULT_AGENT_TEMPERATURE,
+  readAgentNodeConfig,
   readSkillIds,
   SKILL_NODE_IDS,
 } from '../../src/lib/ai-agent-node.js';
@@ -42,7 +45,7 @@ function createSkillNode({
 
 const BASE_CONFIG = {
   nodeId: SYSTEM_NODE_IDS.AGENT,
-  systemPrompt: 'Base prompt',
+  userInstructions: 'Base prompt',
   modelId: DEFAULT_AGENT_MODEL_ID,
   temperature: DEFAULT_AGENT_TEMPERATURE,
   maxTokens: DEFAULT_AGENT_MAX_TOKENS,
@@ -58,6 +61,13 @@ describe('ai agent skill bootstrap and prompt rendering', () => {
     expect(readSkillIds(AI_AGENT_NODE_IDS.SKILLS_FIELD_ENTRY)).toEqual([SKILL_NODE_IDS.SKILL_CREATOR]);
   });
 
+  it('reads agent node content as user instructions, not built-in system prompt', () => {
+    const config = readAgentNodeConfig();
+
+    expect(config.userInstructions).toBe('');
+    expect(config.skillIds).toEqual([SKILL_NODE_IDS.SKILL_CREATOR]);
+  });
+
   it('buildAgentSystemPrompt renders available-skills index without dumping full rules', () => {
     createSkillNode({
       id: 'skill_test_index',
@@ -71,6 +81,10 @@ describe('ai agent skill bootstrap and prompt rendering', () => {
       skillIds: ['skill_test_index'],
     });
 
+    expect(prompt).toContain(DEFAULT_AGENT_SYSTEM_PROMPT);
+    expect(prompt).toContain(AGENT_PAST_CHATS_GUIDANCE);
+    expect(prompt).toContain('<user-instructions>');
+    expect(prompt).toContain('Base prompt');
     expect(prompt).toContain('<available-skills>');
     expect(prompt).toContain('<skill id="skill_test_index" name="Test skill" description="Custom description" />');
     expect(prompt).toContain("When you need a skill's detailed rules, use node_read to read the skill node's children.");
@@ -81,7 +95,9 @@ describe('ai agent skill bootstrap and prompt rendering', () => {
   it('buildAgentSystemPrompt omits available-skills block when no skills are active', () => {
     const prompt = buildAgentSystemPrompt(BASE_CONFIG);
 
-    expect(prompt).toBe('Base prompt');
+    expect(prompt).toContain(DEFAULT_AGENT_SYSTEM_PROMPT);
+    expect(prompt).toContain(AGENT_PAST_CHATS_GUIDANCE);
+    expect(prompt).toContain('<user-instructions>\nBase prompt\n</user-instructions>');
     expect(prompt).not.toContain('<available-skills>');
   });
 

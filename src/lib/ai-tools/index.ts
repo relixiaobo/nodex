@@ -6,9 +6,21 @@ import { deleteTool } from './delete-tool.js';
 import { searchTool } from './search-tool.js';
 import { undoTool } from './undo-tool.js';
 import { browserTool } from './browser-tool.js';
+import { createPastChatsTool, type PastChatsToolRuntime } from './past-chats-tool.js';
 
-export function getAITools(): AgentTool<any>[] {
-  return [createTool, readTool, editTool, deleteTool, searchTool, undoTool, browserTool];
+export interface AIToolRuntime extends PastChatsToolRuntime {}
+
+export function getAITools(runtime: AIToolRuntime = {}): AgentTool<any>[] {
+  return [
+    createTool,
+    readTool,
+    editTool,
+    deleteTool,
+    searchTool,
+    undoTool,
+    browserTool,
+    createPastChatsTool(runtime),
+  ];
 }
 
-export { createTool, readTool, editTool, deleteTool, searchTool, undoTool, browserTool };
+export { createTool, readTool, editTool, deleteTool, searchTool, undoTool, browserTool, createPastChatsTool };

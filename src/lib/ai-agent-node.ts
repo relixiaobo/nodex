@@ -17,6 +17,16 @@ export const DEFAULT_PROMPT_LINES = [
 
 export const DEFAULT_AGENT_SYSTEM_PROMPT = DEFAULT_PROMPT_LINES.join('\n');
 
+const PAST_CHATS_GUIDANCE_LINES = [
+  'When the user references past conversations or assumes shared knowledge, use the past_chats tool to search history.',
+  'Browse with past_chats() first, then drill into a session with sessionId and a user message with messageId.',
+  'Use concrete keywords in query. Do not use past_chats to search the current conversation; the current session is already in context.',
+  'Never say you cannot access previous conversations without checking past_chats first.',
+  'If past conversations conflict with the current context, prioritize the current context.',
+];
+
+export const AGENT_PAST_CHATS_GUIDANCE = PAST_CHATS_GUIDANCE_LINES.join('\n');
+
 export const AI_AGENT_NODE_IDS = {
   MODEL_FIELD_ENTRY: 'NDX_FE13',
   TEMPERATURE_FIELD_ENTRY: 'NDX_FE14',
@@ -61,6 +71,8 @@ export const SPARK_DEFAULT_PROMPT_LINES = [
   'Reply in the same language as the source content.',
   'Return ONLY the JSON object, no markdown fences, no explanation.',
 ];
+
+export const SPARK_DEFAULT_SYSTEM_PROMPT = SPARK_DEFAULT_PROMPT_LINES.join('\n');
 
 export const SPARK_AGENT_NODE_IDS = {
   MODEL_FIELD_ENTRY: 'NDX_FE20',
@@ -120,7 +132,7 @@ interface DefaultSkillPreset {
 
 export interface AgentNodeConfig {
   nodeId: string;
-  systemPrompt: string;
+  userInstructions: string;
   modelId: string;
   temperature: number;
   maxTokens: number;
@@ -248,9 +260,10 @@ function ensureNode({ id, parentId, name, data }: FixedNodePreset): void {
   }
 
   const current = loroDoc.toNodexNode(id);
+  const currentRecord = current as (Record<string, unknown> | null | undefined);
   const patch: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(data ?? {})) {
-    if ((current as Record<string, unknown> | null)?.[key] !== value) {
+    if (currentRecord?.[key] !== value) {
       patch[key] = value;
     }
   }
@@ -328,6 +341,31 @@ function ensureSkillNode(skillPreset: DefaultSkillPreset): void {
   }
 }
 
+function isDefaultPromptPresetNode(nodeId: string, parentId: string, text: string): boolean {
+  if (loroDoc.getParentId(nodeId) !== parentId) return false;
+
+  const node = loroDoc.toNodexNode(nodeId);
+  if (!node || !isOutlinerContentNodeType(node.type) || node.type === 'reference') return false;
+  if ((node.name ?? '').trim() !== text) return false;
+  if ((node.description ?? '').trim().length > 0) return false;
+  if ((node.tags?.length ?? 0) > 0) return false;
+  if (node.targetId) return false;
+  if (loroDoc.getChildren(nodeId).length > 0) return false;
+
+  return true;
+}
+
+function cleanupSeededPromptPresetNodes(
+  parentId: string,
+  presets: ReadonlyArray<{ id: string; text: string }>,
+): void {
+  for (const preset of presets) {
+    if (isDefaultPromptPresetNode(preset.id, parentId, preset.text)) {
+      loroDoc.deleteNode(preset.id);
+    }
+  }
+}
+
 // ─── Bootstrap ───
 
 export function ensureAgentNode(workspaceId = loroDoc.getCurrentWorkspaceId() ?? 'ws_default'): string {
@@ -366,21 +404,10 @@ export function ensureAgentNode(workspaceId = loroDoc.getCurrentWorkspaceId() ??
     }
   }
 
-  // Create default prompt as content children (only if no content children exist yet)
-  const contentChildren = loroDoc.getChildren(SYSTEM_NODE_IDS.AGENT)
-    .filter((id) => {
-      const n = loroDoc.toNodexNode(id);
-      return n != null && isOutlinerContentNodeType(n.type);
-    });
-  if (contentChildren.length === 0) {
-    for (const preset of DEFAULT_PROMPT_PRESETS) {
-      ensureNode({
-        id: preset.id,
-        parentId: SYSTEM_NODE_IDS.AGENT,
-        name: preset.text,
-      });
-    }
-  }
+  // Default prompt now lives in code. Legacy seeded prompt lines are removed
+  // when they still match the old built-in defaults, while custom content
+  // remains as user-authored instructions.
+  cleanupSeededPromptPresetNodes(SYSTEM_NODE_IDS.AGENT, DEFAULT_PROMPT_PRESETS);
 
   // Field entries
   ensureFieldEntry(SYSTEM_NODE_IDS.AGENT, AI_AGENT_NODE_IDS.MODEL_FIELD_ENTRY, NDX_F.AGENT_MODEL);
@@ -459,11 +486,11 @@ function readNumberField(fieldEntryId: string, fallback: number): number {
 }
 
 /**
- * Read system prompt from the agent node's content children.
+ * Read user-authored instructions from the agent node's content children.
  * Regular content nodes contribute their name text.
  * Reference nodes resolve to the target's name (+ its children for multi-line content).
  */
-function readSystemPromptFromChildren(agentNodeId: string): string {
+function readUserInstructionsFromChildren(agentNodeId: string): string {
   const children = loroDoc.getChildren(agentNodeId);
   const lines: string[] = [];
 
@@ -509,12 +536,11 @@ export function readSkillIds(fieldEntryId: string): string[] {
 export function readAgentNodeConfig(): AgentNodeConfig {
   ensureAgentNode();
 
-  const systemPrompt = readSystemPromptFromChildren(SYSTEM_NODE_IDS.AGENT) || DEFAULT_AGENT_SYSTEM_PROMPT;
   const skillIds = readSkillIds(AI_AGENT_NODE_IDS.SKILLS_FIELD_ENTRY);
 
   return {
     nodeId: SYSTEM_NODE_IDS.AGENT,
-    systemPrompt,
+    userInstructions: readUserInstructionsFromChildren(SYSTEM_NODE_IDS.AGENT),
     modelId: readOptionFieldName(AI_AGENT_NODE_IDS.MODEL_FIELD_ENTRY) ?? DEFAULT_AGENT_MODEL_ID,
     temperature: readNumberField(AI_AGENT_NODE_IDS.TEMPERATURE_FIELD_ENTRY, DEFAULT_AGENT_TEMPERATURE),
     maxTokens: Math.max(1, Math.round(readNumberField(AI_AGENT_NODE_IDS.MAX_TOKENS_FIELD_ENTRY, DEFAULT_AGENT_MAX_TOKENS))),
@@ -540,21 +566,7 @@ export function ensureSparkAgentNode(workspaceId = loroDoc.getCurrentWorkspaceId
     loroDoc.addTag(SYSTEM_NODE_IDS.SPARK_AGENT, SYS_T.AGENT);
   }
 
-  // Create default prompt as content children (only if no content children exist yet)
-  const contentChildren = loroDoc.getChildren(SYSTEM_NODE_IDS.SPARK_AGENT)
-    .filter((id) => {
-      const n = loroDoc.toNodexNode(id);
-      return n != null && isOutlinerContentNodeType(n.type);
-    });
-  if (contentChildren.length === 0) {
-    for (const preset of SPARK_DEFAULT_PROMPT_PRESETS) {
-      ensureNode({
-        id: preset.id,
-        parentId: SYSTEM_NODE_IDS.SPARK_AGENT,
-        name: preset.text,
-      });
-    }
-  }
+  cleanupSeededPromptPresetNodes(SYSTEM_NODE_IDS.SPARK_AGENT, SPARK_DEFAULT_PROMPT_PRESETS);
 
   // Field entries
   ensureFieldEntry(SYSTEM_NODE_IDS.SPARK_AGENT, SPARK_AGENT_NODE_IDS.MODEL_FIELD_ENTRY, NDX_F.AGENT_MODEL);
@@ -587,12 +599,9 @@ export function ensureSparkAgentNode(workspaceId = loroDoc.getCurrentWorkspaceId
 export function readSparkAgentConfig(): AgentNodeConfig {
   ensureSparkAgentNode();
 
-  const systemPrompt = readSystemPromptFromChildren(SYSTEM_NODE_IDS.SPARK_AGENT)
-    || SPARK_DEFAULT_PROMPT_LINES.join('\n');
-
   return {
     nodeId: SYSTEM_NODE_IDS.SPARK_AGENT,
-    systemPrompt,
+    userInstructions: readUserInstructionsFromChildren(SYSTEM_NODE_IDS.SPARK_AGENT),
     modelId: readOptionFieldName(SPARK_AGENT_NODE_IDS.MODEL_FIELD_ENTRY) ?? DEFAULT_AGENT_MODEL_ID,
     temperature: readNumberField(SPARK_AGENT_NODE_IDS.TEMPERATURE_FIELD_ENTRY, SPARK_DEFAULT_TEMPERATURE),
     maxTokens: Math.max(1, Math.round(readNumberField(SPARK_AGENT_NODE_IDS.MAX_TOKENS_FIELD_ENTRY, SPARK_DEFAULT_MAX_TOKENS))),
@@ -612,7 +621,15 @@ function escapeXmlAttribute(value: string): string {
 }
 
 export function buildAgentSystemPrompt(config: AgentNodeConfig = readAgentNodeConfig()): string {
-  const sections = [config.systemPrompt.trim()];
+  const sections = [
+    DEFAULT_AGENT_SYSTEM_PROMPT,
+    AGENT_PAST_CHATS_GUIDANCE,
+  ];
+
+  const userInstructions = config.userInstructions.trim();
+  if (userInstructions) {
+    sections.push(`<user-instructions>\n${userInstructions}\n</user-instructions>`);
+  }
 
   if (config.skillIds.length > 0) {
     const skillLines = config.skillIds
@@ -633,4 +650,15 @@ export function buildAgentSystemPrompt(config: AgentNodeConfig = readAgentNodeCo
   }
 
   return sections.filter(Boolean).join('\n\n');
+}
+
+export function buildSparkSystemPrompt(config: AgentNodeConfig = readSparkAgentConfig()): string {
+  const sections = [SPARK_DEFAULT_SYSTEM_PROMPT];
+  const userInstructions = config.userInstructions.trim();
+
+  if (userInstructions) {
+    sections.push(`<user-instructions>\n${userInstructions}\n</user-instructions>`);
+  }
+
+  return sections.join('\n\n');
 }

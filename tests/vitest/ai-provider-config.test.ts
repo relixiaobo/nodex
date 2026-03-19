@@ -237,10 +237,10 @@ describe('ai-provider-config', () => {
       expect(models.some((m) => m.provider === 'openai' && m.id === 'ft:gpt-4o-custom')).toBe(true);
       expect(models.some((m) => m.provider === 'openai' && m.id === 'o3-preview')).toBe(true);
 
-      // Custom model should use the same API as SDK models
+      // Custom models intentionally use openai-completions even for known
+      // providers, because it is the shared compatible wire format.
       const customModel = models.find((m) => m.id === 'ft:gpt-4o-custom');
-      const sdkModel = models.find((m) => m.id === 'gpt-4o');
-      expect(customModel?.api).toBe(sdkModel?.api);
+      expect(customModel?.api).toBe('openai-completions');
     });
 
     it('deduplicates custom model IDs that overlap with SDK models', () => {

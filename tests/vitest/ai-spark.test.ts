@@ -20,6 +20,7 @@ import {
   SPARK_COMMIT_ORIGIN,
 } from '../../src/lib/ai-spark.js';
 import {
+  buildSparkSystemPrompt,
   ensureSparkAgentNode,
   readSparkAgentConfig,
   SPARK_AGENT_NODE_IDS,
@@ -289,17 +290,16 @@ describe('spark agent node bootstrapping', () => {
     expect(sparkAgent!.tags).toContain(SYS_T.AGENT);
   });
 
-  it('creates prompt children from default lines', () => {
+  it('does not seed built-in prompt lines into Spark node content', () => {
     ensureSparkAgentNode();
     loroDoc.commitDoc();
 
     const children = loroDoc.getChildren(SYSTEM_NODE_IDS.SPARK_AGENT);
-    // Filter content children (not field entries)
     const contentChildren = children.filter((id) => {
       const n = loroDoc.toNodexNode(id);
       return n != null && n.type !== 'fieldEntry';
     });
-    expect(contentChildren.length).toBe(SPARK_DEFAULT_PROMPT_LINES.length);
+    expect(contentChildren.length).toBe(0);
   });
 
   it('creates field entries for Model, Temperature, MaxTokens', () => {
@@ -342,14 +342,15 @@ describe('spark agent config reading', () => {
     expect(config.nodeId).toBe(SYSTEM_NODE_IDS.SPARK_AGENT);
     expect(config.temperature).toBe(SPARK_DEFAULT_TEMPERATURE);
     expect(config.maxTokens).toBe(SPARK_DEFAULT_MAX_TOKENS);
-    expect(config.systemPrompt.length).toBeGreaterThan(0);
+    expect(config.userInstructions).toBe('');
     expect(config.skillIds).toEqual([]);
   });
 
-  it('system prompt contains all default lines', () => {
+  it('buildSparkSystemPrompt contains all default lines', () => {
     const config = readSparkAgentConfig();
+    const prompt = buildSparkSystemPrompt(config);
     for (const line of SPARK_DEFAULT_PROMPT_LINES) {
-      expect(config.systemPrompt).toContain(line);
+      expect(prompt).toContain(line);
     }
   });
 });

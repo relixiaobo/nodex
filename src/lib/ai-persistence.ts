@@ -2,11 +2,12 @@ import type { AgentMessage } from '@mariozechner/pi-agent-core';
 import { openDB, type DBSchema, type IDBPDatabase, type IDBPTransaction, unwrap } from 'idb';
 import { linearToTree } from './ai-chat-tree.js';
 import type { BridgeEntry, ChatSession, MessageNode } from './ai-chat-tree.js';
+import { buildChatSessionSearchSummary } from './ai-chat-summary.js';
 import type { ChatTurnDebugRecord } from './ai-debug.js';
 import { IMAGE_PLACEHOLDER, messageHasImage, replaceMessageImages } from './ai-message-images.js';
 
 const DB_NAME = 'soma-ai-chat';
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 const STORE_NAME = 'sessions';
 const META_STORE_NAME = 'session-metas';
 const DEBUG_STORE_NAME = 'session-debug-turns';
@@ -18,6 +19,8 @@ export interface ChatSessionMeta {
   id: string;
   title: string | null;
   updatedAt: number;
+  searchText: string;
+  userMessageCount: number;
 }
 
 interface LegacyChatSession {
@@ -98,10 +101,14 @@ function normalizeChatDebugTurns(turns: ChatTurnDebugRecord[] | null | undefined
 }
 
 function toSessionMeta(session: ChatSession): ChatSessionMeta {
+  const { searchText, userMessageCount } = buildChatSessionSearchSummary(session);
+
   return {
     id: session.id,
-    title: session.title,
+    title: session.title ?? null,
     updatedAt: session.updatedAt,
+    searchText,
+    userMessageCount,
   };
 }
 
@@ -132,7 +139,7 @@ function ensureDebugStore(
   return unwrap(db.createObjectStore(DEBUG_STORE_NAME, { keyPath: 'id' }));
 }
 
-function backfillSessionMetas(sessionStore: IDBObjectStore, metaStore: IDBObjectStore): void {
+function syncSessionMetas(sessionStore: IDBObjectStore, metaStore: IDBObjectStore): void {
   const cursorRequest = sessionStore.openCursor();
 
   cursorRequest.onsuccess = () => {
@@ -144,7 +151,10 @@ function backfillSessionMetas(sessionStore: IDBObjectStore, metaStore: IDBObject
       ? migrateLegacySession(rawValue)
       : normalizeChatSession(rawValue);
 
-    cursor.update(nextValue);
+    if (isLegacyChatSession(rawValue)) {
+      cursor.update(nextValue);
+    }
+
     metaStore.put(toSessionMeta(nextValue));
     cursor.continue();
   };
@@ -180,8 +190,8 @@ async function getDB(): Promise<IDBPDatabase<ChatPersistenceDB>> {
       const sessionStore = ensureStore(db, transaction, STORE_NAME);
       const metaStore = ensureStore(db, transaction, META_STORE_NAME);
 
-      if (oldVersion < 2) {
-        backfillSessionMetas(sessionStore, metaStore);
+      if (oldVersion < 4) {
+        syncSessionMetas(sessionStore, metaStore);
       }
 
       if (oldVersion < 3) {
@@ -395,11 +405,7 @@ export async function markSessionSynced(sessionId: string, revision: number): Pr
   // Only update sync fields, preserve everything else (including newer content)
   const updated = { ...session, syncedAt: now, revision };
   await store.put(updated);
-  await tx.objectStore(META_STORE_NAME).put({
-    id: sessionId,
-    title: updated.title ?? null,
-    updatedAt: updated.updatedAt,
-  });
+  await tx.objectStore(META_STORE_NAME).put(toSessionMeta(updated));
   await tx.done;
 }
 

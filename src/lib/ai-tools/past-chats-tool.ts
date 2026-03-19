@@ -1,6 +1,7 @@
 import type { AgentMessage, AgentTool, AgentToolResult } from '@mariozechner/pi-agent-core';
 import { Type } from '@mariozechner/pi-ai';
-import { getLinearPath, type ChatSession, type MessageNode } from '../ai-chat-tree.js';
+import type { ChatSession, MessageNode } from '../ai-chat-tree.js';
+import { extractAssistantText, extractUserText, getActivePath, getVisibleUserMessages } from '../ai-chat-summary.js';
 import { getChatSession, listChatSessionMetas } from '../ai-persistence.js';
 import { fuzzyMatch } from '../fuzzy-search.js';
 import { formatResultText } from './shared.js';
@@ -10,7 +11,6 @@ const MAX_LIMIT = 20;
 const DEFAULT_MAX_CHARS = 2_000;
 const DEFAULT_TEXT_OFFSET = 0;
 const USER_MESSAGE_PREVIEW_CHARS = 200;
-const SYSTEM_REMINDER_PATTERN = /<system-reminder>[\s\S]*?<\/system-reminder>/g;
 
 const pastChatsToolParameters = Type.Object({
   sessionId: Type.Optional(Type.String({
@@ -103,36 +103,6 @@ function parseTimeFilter(value: string | undefined, kind: 'before' | 'after'): n
   return timestamp;
 }
 
-function extractTextParts(content: AgentMessage['content']): string {
-  if (typeof content === 'string') return content;
-
-  return content
-    .filter((part): part is Extract<typeof content[number], { type: 'text' }> => part.type === 'text')
-    .map((part) => part.text)
-    .join('\n\n');
-}
-
-function normalizeExtractedText(text: string): string {
-  return text
-    .replace(/\r\n/g, '\n')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim();
-}
-
-function stripSystemReminder(text: string): string {
-  return normalizeExtractedText(text.replace(SYSTEM_REMINDER_PATTERN, ''));
-}
-
-function extractUserText(message: AgentMessage): string {
-  if (message.role !== 'user') return '';
-  return stripSystemReminder(extractTextParts(message.content));
-}
-
-function extractAssistantText(message: AgentMessage): string {
-  if (message.role !== 'assistant') return '';
-  return normalizeExtractedText(extractTextParts(message.content));
-}
-
 function truncatePreview(text: string, maxChars: number): string {
   if (text.length <= maxChars) return text;
   return `${text.slice(0, Math.max(0, maxChars - 3)).trimEnd()}...`;
@@ -211,40 +181,6 @@ function getSessionTitle(meta: SessionMeta): string {
   return meta.title?.trim() || '';
 }
 
-function getActivePath(session: ChatSession): MessageNode[] {
-  return getLinearPath(session).filter((node) => node.message !== null);
-}
-
-function getVisibleUserMessages(session: ChatSession): Array<{ node: MessageNode; text: string }> {
-  return getActivePath(session)
-    .filter((node): node is MessageNode & { message: Extract<AgentMessage, { role: 'user' }> } => node.message?.role === 'user')
-    .map((node) => ({
-      node,
-      text: extractUserText(node.message),
-    }))
-    .filter((entry) => entry.text.length > 0);
-}
-
-function getSessionSearchText(meta: SessionMeta, session: ChatSession): string {
-  const parts = [getSessionTitle(meta)];
-
-  for (const node of getActivePath(session)) {
-    const message = node.message;
-    if (!message) continue;
-    if (message.role === 'user') {
-      const text = extractUserText(message);
-      if (text) parts.push(text);
-      continue;
-    }
-    if (message.role === 'assistant') {
-      const text = extractAssistantText(message);
-      if (text) parts.push(text);
-    }
-  }
-
-  return parts.join('\n\n');
-}
-
 async function listSessionSummaries(
   params: PastChatsToolParams,
   currentSessionId: string | null,
@@ -262,16 +198,13 @@ async function listSessionSummaries(
   const summaries: SessionSummary[] = [];
 
   for (const meta of metas) {
-    const session = await getChatSession(meta.id);
-    if (!session) continue;
-
-    if (!matchesQuery(getSessionSearchText(meta, session), query)) continue;
+    if (!matchesQuery(meta.searchText, query)) continue;
 
     summaries.push({
       id: meta.id,
       title: getSessionTitle(meta),
       updatedAt: new Date(meta.updatedAt).toISOString(),
-      userMessageCount: getVisibleUserMessages(session).length,
+      userMessageCount: meta.userMessageCount,
     });
   }
 

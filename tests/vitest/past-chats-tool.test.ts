@@ -224,6 +224,34 @@ describe('past_chats tool', () => {
     }
   });
 
+  it('lists Level 0 session summaries from persisted metadata fields', async () => {
+    await seedSessions([
+      buildSession('session_meta_only', 'Strategy sync', [
+        createUserMessage('Kick off pricing review', 1),
+        createAssistantMessage([{ type: 'text', text: 'Need to finalize the rollout.' }], 2),
+        createUserMessage('Q3 涨价决策讨论', 3),
+      ], Date.parse('2026-03-07T10:00:00Z')),
+    ]);
+
+    const tool = createPastChatsTool();
+    const result = await tool.execute('tool_past_chats', {
+      query: 'Q3 涨价',
+    } as never);
+
+    expect(result.details).toEqual({
+      total: 1,
+      offset: 0,
+      limit: 10,
+      sessions: [{
+        id: 'session_meta_only',
+        title: 'Strategy sync',
+        updatedAt: '2026-03-07T10:00:00.000Z',
+        userMessageCount: 2,
+      }],
+      next: 'Choose a session id from sessions and call past_chats(sessionId: "...") to browse its user messages.',
+    });
+  });
+
   it('lists only user messages in a session and strips injected system reminders', async () => {
     await seedSessions([
       buildSession('session_alpha', 'Pricing review', [

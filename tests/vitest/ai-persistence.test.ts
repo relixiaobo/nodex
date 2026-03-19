@@ -153,6 +153,14 @@ describe('ai persistence', () => {
       { id: 'session_2', title: 'follow up' },
       { id: 'session_1', title: 'hello' },
     ]);
+    expect(metas[0]).toMatchObject({
+      searchText: 'follow up\n\nfollow up\n\nhi',
+      userMessageCount: 1,
+    });
+    expect(metas[1]).toMatchObject({
+      searchText: 'hello\n\nhello',
+      userMessageCount: 1,
+    });
     expect(metas[0].updatedAt).toBeGreaterThanOrEqual(metas[1].updatedAt);
   });
 
@@ -398,7 +406,13 @@ describe('ai persistence', () => {
       },
     ]);
     expect(await listChatSessionMetas()).toEqual([
-      { id: 'legacy_session', title: 'legacy hello', updatedAt: 200 },
+      {
+        id: 'legacy_session',
+        title: 'legacy hello',
+        updatedAt: 200,
+        searchText: 'legacy hello\n\nlegacy hello\n\nlegacy hi',
+        userMessageCount: 1,
+      },
     ]);
   });
 
@@ -455,5 +469,14 @@ describe('ai persistence', () => {
     expect(Object.hasOwn(restoredSession!, 'debugTurns')).toBe(false);
     expect(restoredTurns).toHaveLength(1);
     expect(restoredTurns[0]?.id).toBe('turn_embedded');
+    expect(await listChatSessionMetas()).toEqual([
+      {
+        id: 'session_embedded_debug',
+        title: 'hello',
+        updatedAt: 1,
+        searchText: 'hello\n\nhello',
+        userMessageCount: 1,
+      },
+    ]);
   });
 });

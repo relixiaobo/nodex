@@ -1,19 +1,23 @@
 /**
- * NodePopover — popover showing an OutlinerView for a node.
+ * NodePopover — popover showing a node as an OutlinerItem.
  *
  * Used by NodeReference and CitationBadge (type="node") to show node details
- * in-place without navigating away from the chat.
+ * in-place without navigating away from the chat. The node is rendered as a
+ * single OutlinerItem (with bullet, name, tags) and auto-expanded.
  */
-import { useCallback, useState, type RefObject } from 'react';
+import { useCallback, useEffect, useState, type RefObject } from 'react';
 import { ExternalLink } from '../../lib/icons.js';
 import { useUIStore } from '../../stores/ui-store.js';
-import { OutlinerView } from '../outliner/OutlinerView.js';
+import { OutlinerItem } from '../outliner/OutlinerItem.js';
+import { useNode } from '../../hooks/use-node.js';
 import type { NodexNode } from '../../types/index.js';
 import { PopoverShell } from './PopoverShell.js';
-import { ChatNodeIdentity } from './ChatNodeIdentity.js';
 
 /** Shared panelId for all OutlinerViews rendered inside Chat (popover + embed). */
 export const CHAT_OUTLINER_PANEL_ID = 'chat';
+
+/** Synthetic parent ID for root-level items in chat context. */
+export const CHAT_ROOT_PARENT_ID = '__chat_root__';
 
 const POPOVER_MAX_HEIGHT = 320;
 
@@ -48,6 +52,16 @@ interface NodePopoverProps {
 
 export function NodePopover({ nodeId, anchorRect, onClose }: NodePopoverProps) {
   const navigateTo = useUIStore((s) => s.navigateTo);
+  const setExpanded = useUIStore((s) => s.setExpanded);
+  const node = useNode(nodeId);
+  const hasChildren = (node?.children?.length ?? 0) > 0;
+
+  // Auto-expand on mount so children are visible
+  useEffect(() => {
+    if (hasChildren) {
+      setExpanded(`${CHAT_OUTLINER_PANEL_ID}:${CHAT_ROOT_PARENT_ID}:${nodeId}`, true, true);
+    }
+  }, [nodeId, hasChildren, setExpanded]);
 
   const handleOpenInPanel = useCallback(() => {
     navigateTo(nodeId);
@@ -56,12 +70,18 @@ export function NodePopover({ nodeId, anchorRect, onClose }: NodePopoverProps) {
 
   return (
     <PopoverShell anchorRect={anchorRect} onClose={onClose}>
-      <ChatNodeIdentity nodeId={nodeId} />
       <div
-        className="overflow-y-auto"
+        className="overflow-y-auto py-1"
         style={{ maxHeight: POPOVER_MAX_HEIGHT }}
       >
-        <OutlinerView rootNodeId={nodeId} panelId={CHAT_OUTLINER_PANEL_ID} />
+        <OutlinerItem
+          nodeId={nodeId}
+          depth={0}
+          rootChildIds={[nodeId]}
+          parentId={CHAT_ROOT_PARENT_ID}
+          rootNodeId={CHAT_ROOT_PARENT_ID}
+          panelId={CHAT_OUTLINER_PANEL_ID}
+        />
       </div>
       <div className="flex items-center justify-end border-t border-border px-2 py-1">
         <button

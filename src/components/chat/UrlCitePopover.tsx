@@ -37,7 +37,7 @@ export function UrlCitePopover({ url, anchorRect, onClose }: UrlCitePopoverProps
         <button
           type="button"
           onClick={handleOpen}
-          className="flex items-center gap-1 rounded px-2 py-1 text-xs text-foreground-secondary transition-colors hover:bg-surface hover:text-foreground"
+          className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-foreground-secondary transition-colors hover:bg-foreground/4 hover:text-foreground"
         >
           <ExternalLink size={12} />
           Open in new tab

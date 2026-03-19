@@ -18,14 +18,14 @@ export function NodeEmbed({ nodeId }: NodeEmbedProps) {
 
   if (!node) {
     return (
-      <div className="my-1 rounded-md border border-border bg-surface px-3 py-2 text-sm text-foreground-tertiary">
+      <div className="chat-node-embed my-1 rounded-md border border-border bg-surface px-3 py-2 text-sm text-foreground-tertiary">
         Node not found
       </div>
     );
   }
 
   return (
-    <div className="my-1 rounded-md border border-border bg-background">
+    <div className="chat-node-embed my-1 rounded-md border border-border bg-background">
       <OutlinerView rootNodeId={nodeId} panelId={CHAT_EMBED_PANEL_ID} />
     </div>
   );

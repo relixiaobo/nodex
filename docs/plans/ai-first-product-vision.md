@@ -326,13 +326,14 @@ soma 不应出现一个用户不可见的独立 memory 层。记忆分三层：
 
 ### 工具层现状
 
-现有 7 个 AI 工具（node_create / node_read / node_edit / node_delete / node_search / undo / browser）对当前方向已经够用。对话沉淀通过现有 node_create / node_edit 实现，不需要额外节点工具。
+8 个 AI 工具：node_create / node_read / node_edit / node_delete / node_search / undo / browser / **past_chats**。节点 CRUD 和跨会话记忆均已具备。
 
-核心缺口不在工具层，在记忆层：
+past_chats 工具（#157 已完成）采用三层渐进探索设计：session 列表 → user 消息列表 → 消息详情（assistant 回复分页）。AI 自己做相关性判断，关键词过滤是可选加速。详见 `docs/plans/past-chats-tool.md`。
+
+剩余缺口：
 
 | 缺口 | 说明 | 解法 |
 |------|------|------|
-| 跨会话记忆 | AI 无法回忆上次聊了什么 | Chat 持久化 + `past_chats` 检索工具（纯 chat 层，与 node 无关） |
 | 上下文感知不足 | AI 不知道最近访问/编辑了哪些节点 | 丰富 system reminder 注入 |
 | 主动沉淀行为 | AI 不知道什么时候该主动记 | system prompt 行为指导（简短即可） |
 
@@ -348,15 +349,23 @@ soma 不应出现一个用户不可见的独立 memory 层。记忆分三层：
 
 输入 `@` → 弹出节点搜索下拉 → 选中后插入引用 → 节点内容作为精确上下文注入。
 
-### 内嵌节点
+### Chat 中的节点展示
 
-AI 的回答不只是文本，而是可以嵌入活的节点。渐进式交互：
+Chat 中有三种节点呈现方式，各有不同用途：
 
-1. **默认态** — 标题 + bullet，和文本自然混排
-2. **点击** — 展开 children（mini OutlinerView）
-3. **按钮** — 跳到独立 Outliner 面板
+| markup | 用途 | 渲染 |
+|--------|------|------|
+| `<ref id="xxx">文本</ref>` | 行内提及（"你之前有一条笔记..."） | 蓝色链接 → 点击弹 Popover 浮窗 |
+| `<cite id="xxx">N</cite>` | 引用证据 | 上标数字 → 点击弹 Popover 浮窗 |
+| `<node id="xxx" />` | 展示节点内容 | 内嵌 OutlinerView（可展开、可编辑） |
 
-嵌入的是真实节点引用，不是快照。Chat 和 Outliner 看到的永远是同一份数据。
+**浮窗（ref / cite）**：点击弹出 Popover，内容是该节点的 OutlinerView。用户可以在浮窗内展开子节点、编辑内容。底部有"在面板中打开"按钮。不打断对话心流。
+
+**内嵌 outliner（`<node />`）**：AI 回答的一部分，独占一行。复用现有 `OutlinerView` / `OutlinerItem` 组件，样式与面板中的 outliner 完全一致——可编辑、可无限展开、可拖拽。嵌入的是真实节点引用，不是快照。
+
+用户在 Chat 内嵌 outliner 中编辑了节点后，system reminder 会注入编辑状态（"本会话中提及的节点 X 在 3 分钟前被编辑"），AI 下一轮自然知道该重新读取。
+
+详细设计见 `docs/plans/chat-node-display.md`。
 
 ### 浏览器上下文
 
@@ -395,20 +404,26 @@ soma 活在浏览器侧边栏，天然知道用户正在看什么。这个上下
 - 状态变更 = `node_edit` 修改字段值，subagent 用现有工具即可操作
 - 任务完成的结果 = 子节点，天然在知识图谱中可搜索、可关联
 
-### Chat 中的任务感知
+### 异步任务的运行模式
 
-节点树是数据层，但 Chat 界面需要任务感知视图：
+当前架构约束：AI 请求从 Side Panel 进程发出，Side Panel 关闭则进程终止。因此异步任务**不是**服务端后台运行，而是：
+
+- 侧边栏保持开着，AI 自主跑多轮 tool call
+- 用户可以去其他标签页做自己的事
+- AI 的浏览器操作（如果需要打开页面、抓取内容）放入 **tab group** 隔离，不打扰用户的标签页
+
+Chat UI 需要任务感知视图：
 - 当前有哪些 agent 在执行什么任务
 - 每个任务的实时进度（checklist 自动更新，因为底层是节点字段变化）
 - 已完成任务的结果（内嵌节点展示）
-- 侧边栏关闭时，通过浏览器通知推送完成结果
 
-### 多 Agent 协作网络
+### 多 Agent 协作
 
-不是简单的"主 agent 派 subagent"单向指挥，而是多个 agent 的协作：
-- Agent 之间可以相互询问信息
-- Agent 之间可以通知状态变化
+异步任务的扩展——多个 Agent 并行执行子任务：
+- 主 Agent 拆任务，分给多个 subagent 并行
+- Agent 之间可以相互询问信息和通知状态
 - 编排层（Orchestrator）协调任务分配和依赖关系
+- 异步能力是多 Agent 的前置条件
 
 ## 八、设计红线
 
@@ -472,9 +487,23 @@ v5  人机协作    "Think with your AI"      对话即思考
 
 ### 下一步优先级
 
-1. **Chat 持久化 + past_chats 检索**（ai-context-management Phase 1 + 新搜索工具）
-2. **system reminder 注入最近活动**（丰富 AI 的上下文感知）
-3. **system prompt 加入沉淀行为指导**（低成本）
+**近期（让 Chat 作为主界面真正可用）**：
+
+1. ~~past_chats 跨会话记忆工具~~ ✅ #157 已完成
+2. **Chat 节点展示改造** — ref/cite 浮窗 + `<node />` 内嵌 outliner + 首屏 Chat（#158 进行中）
+3. **AI 行为调优** — system prompt 沉淀行为指导 + 三种 markup 使用规范
+4. **上下文注入丰富** — system reminder 注入常用标签 + 已提及节点编辑状态
+5. **@ 引用节点** — Chat 输入框 `@` 触发节点选择器，精确注入上下文
+
+**中期（让飞轮转起来）**：
+
+6. 沉淀生命周期 — 定期整理，防止 outliner 膨胀
+7. 预设召唤 — 用户设定持续运行的指令
+
+**远期（扩展能力边界）**：
+
+8. 异步任务 + 多 Agent（依赖侧边栏保持开着 + tab group 隔离）
+9. 冷启动 + 对外叙事
 
 ---
 

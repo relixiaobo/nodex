@@ -309,11 +309,15 @@ VideoClipNode (#video)
 
 ### 4.1 Architecture
 
-The user is already on the YouTube page. The caption data is already loaded by YouTube's own code. Local extraction via the player API is the most stable approach because:
-1. It uses the exact same data YouTube uses to render captions
-2. It inherits the user's authentication state (age-restricted, private videos)
-3. Only one fetch is needed (the transcript content), and it's same-origin
-4. Proven at scale by Immersive Translate (millions of users) and Brave browser AI Chat
+**2026-03-19 实测更新**：YouTube 已更改 timedtext API 行为——`baseUrl` fetch（即使同源）返回 200 但 0 bytes，`get_transcript` InnerTube API 返回 400 FAILED_PRECONDITION。但 YouTube 自己的 Transcript 面板仍然正常工作，使用新组件 `transcript-segment-view-model` 渲染。
+
+**实际可行的方案是 DOM 抓取**：
+1. 检查 `captionTracks` 是否存在（确认视频有字幕）
+2. 程序化点击"Show transcript"按钮（触发 YouTube 内部加载机制）
+3. 等待 `transcript-segment-view-model` 元素渲染
+4. 从 DOM 提取 timestamp + text
+
+这个方案更简单（无需 MAIN world 注入），更稳定（使用 YouTube 自己的 UI 加载逻辑），从 ISOLATED world content script 即可完成。
 
 **Flow:**
 
@@ -355,177 +359,126 @@ The user is already on the YouTube page. The caption data is already loaded by Y
 
 ### 4.2 Implementation Plan
 
-#### New files:
-
-| File | Purpose |
-|------|---------|
-| `src/entrypoints/youtube-transcript-main.ts` | Unlisted script — runs in MAIN world, extracts caption tracks + fetches transcript content |
-
 #### Modified files:
 
 | File | Change |
 |------|--------|
-| `src/lib/page-capture/extractors/youtube.ts` | Inject MAIN world script, receive transcript via `postMessage` |
+| `src/lib/page-capture/extractors/youtube.ts` | 添加 `extractTranscript()` — 点击按钮 + DOM 抓取 |
 | `src/lib/page-capture/models.ts` | Add `transcript?: string` to `CapturedPageMetadata` |
-| `src/entrypoints/content/index.ts` | Wire up transcript extraction in `PageCaptureServices` |
 | `src/lib/webclip-service.ts` | Store transcript in a new `Transcript` fieldDef under `#video` |
 | `src/lib/webclip-messaging.ts` | Add `transcript?: string` to `WebClipCapturePayload` |
 | `src/types/node.ts` (or `system-nodes.ts`) | Add `NDX_F.TRANSCRIPT` fixed ID constant |
-| `wxt.config.ts` | Add `web_accessible_resources` for the unlisted script |
+
+**不再需要**：`youtube-transcript-main.ts`（无需 MAIN world）、`wxt.config.ts`（无需 `web_accessible_resources`）
 
 #### Estimated effort:
-- `youtube-transcript-main.ts` (MAIN world script): ~80 lines
-- YouTube extractor integration: ~50 lines
+- YouTube extractor transcript 抓取: ~80 lines
 - WebClip integration: ~30 lines
-- Tests: ~80 lines
-- **Total: ~240 lines of code, 1-2 days of work**
+- Tests: ~60 lines
+- **Total: ~170 lines of code, 1 day**
 
-### 4.3 Pseudocode: MAIN World Script (`youtube-transcript-main.ts`)
+### 4.3 Pseudocode: Content Script DOM 抓取 (ISOLATED world)
 
-```typescript
-// Unlisted script — runs in YouTube page's MAIN world
-export default defineUnlistedScript(() => {
-  const MSG_PREFIX = 'soma:yt-transcript';
-
-  interface CaptionTrack {
-    baseUrl: string;
-    languageCode: string;
-    kind?: string;        // 'asr' for auto-generated
-    name: { simpleText: string };
-  }
-
-  // --- Step 1: Extract caption tracks from page context ---
-
-  function getCaptionTracks(): CaptionTrack[] | null {
-    // Method A: Player API (best — always reflects current video)
-    try {
-      const player = document.querySelector('#movie_player') as any;
-      const response = player?.getPlayerResponse?.();
-      const tracks = response?.captions
-        ?.playerCaptionsTracklistRenderer?.captionTracks;
-      if (tracks?.length) return tracks;
-    } catch { /* fall through */ }
-
-    // Method B: ytd-app data binding (Polymer component)
-    try {
-      const app = document.querySelector('ytd-app') as any;
-      const tracks = app?.data?.playerResponse?.captions
-        ?.playerCaptionsTracklistRenderer?.captionTracks;
-      if (tracks?.length) return tracks;
-    } catch { /* fall through */ }
-
-    // Method C: Global variable (initial load only)
-    try {
-      const w = window as any;
-      const tracks = w.ytInitialPlayerResponse?.captions
-        ?.playerCaptionsTracklistRenderer?.captionTracks;
-      if (tracks?.length) return tracks;
-    } catch { /* fall through */ }
-
-    return null;
-  }
-
-  // --- Step 2: Select best track ---
-
-  function selectBestTrack(tracks: CaptionTrack[]): CaptionTrack | null {
-    // Prefer manual English, then auto-generated English, then first manual, then first auto
-    const manualEn = tracks.find(t => t.languageCode === 'en' && t.kind !== 'asr');
-    if (manualEn) return manualEn;
-    const autoEn = tracks.find(t => t.languageCode === 'en' && t.kind === 'asr');
-    if (autoEn) return autoEn;
-    const firstManual = tracks.find(t => t.kind !== 'asr');
-    if (firstManual) return firstManual;
-    return tracks[0] ?? null;
-  }
-
-  // --- Step 3: Fetch transcript content (same-origin!) ---
-
-  async function fetchTranscript(baseUrl: string) {
-    // Append fmt=json3 for structured JSON response
-    const url = baseUrl + (baseUrl.includes('?') ? '&' : '?') + 'fmt=json3';
-    const response = await fetch(url);
-    if (!response.ok) return null;
-    const data = await response.json();
-
-    // Parse events[] → segments
-    const segments = (data.events ?? [])
-      .filter((e: any) => e.segs)
-      .map((e: any) => ({
-        text: e.segs.map((s: any) => s.utf8 ?? '').join(''),
-        startMs: e.tStartMs ?? 0,
-        durationMs: e.dDurationMs ?? 0,
-      }));
-
-    return segments;
-  }
-
-  // --- Step 4: Orchestrate & send result ---
-
-  async function extractAndSend() {
-    const tracks = getCaptionTracks();
-    if (!tracks) {
-      window.postMessage({ type: `${MSG_PREFIX}:result`, data: null }, '*');
-      return;
-    }
-
-    const track = selectBestTrack(tracks);
-    if (!track) {
-      window.postMessage({ type: `${MSG_PREFIX}:result`, data: null }, '*');
-      return;
-    }
-
-    const segments = await fetchTranscript(track.baseUrl);
-    window.postMessage({
-      type: `${MSG_PREFIX}:result`,
-      data: segments ? {
-        segments,
-        fullText: segments.map((s: any) => s.text).join(' '),
-        languageCode: track.languageCode,
-        isAutoGenerated: track.kind === 'asr',
-      } : null,
-    }, '*');
-  }
-
-  // Listen for extraction requests from isolated world
-  window.addEventListener('message', (event) => {
-    if (event.source !== window) return;
-    if (event.data?.type === `${MSG_PREFIX}:extract`) {
-      extractAndSend();
-    }
-  });
-});
-```
-
-### 4.4 Pseudocode: Content Script Integration (ISOLATED world)
+无需 MAIN world 注入。Content script 在 ISOLATED world 中即可完成全部操作：
 
 ```typescript
-// In youtube.ts extractor enrich() — runs in ISOLATED world
-async function extractTranscript(): Promise<YouTubeTranscriptResult | null> {
-  const MSG_PREFIX = 'soma:yt-transcript';
+interface TranscriptSegment {
+  timestamp: string;   // "0:18"
+  text: string;        // segment text
+}
 
-  // Inject the MAIN world script
-  await injectScript('/youtube-transcript-main.js');
+interface TranscriptResult {
+  segments: TranscriptSegment[];
+  fullText: string;
+  languageCode: string;  // from captionTracks (best available)
+}
 
-  // Request extraction and wait for result
+// --- Step 1: Check if video has captions (via page HTML) ---
+
+function hasCaptions(): boolean {
+  // Parse ytInitialPlayerResponse from <script> tags (works in ISOLATED world)
+  const scripts = document.querySelectorAll('script');
+  for (const script of scripts) {
+    const text = script.textContent || '';
+    const match = text.match(/var ytInitialPlayerResponse\s*=\s*(\{.+?\});/);
+    if (match) {
+      try {
+        const data = JSON.parse(match[1]);
+        const tracks = data?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
+        return !!tracks?.length;
+      } catch { /* ignore */ }
+    }
+  }
+  return false;
+}
+
+// --- Step 2: Click "Show transcript" button ---
+
+function clickShowTranscript(): boolean {
+  const buttons = document.querySelectorAll('button');
+  for (const btn of buttons) {
+    if (btn.textContent?.trim() === 'Show transcript') {
+      btn.click();
+      return true;
+    }
+  }
+  return false;
+}
+
+// --- Step 3: Wait for transcript segments to render ---
+
+async function waitForTranscriptSegments(timeoutMs = 5000): Promise<NodeListOf<Element> | null> {
   return new Promise((resolve) => {
-    const timeout = setTimeout(() => {
-      window.removeEventListener('message', handler);
-      resolve(null); // Timeout → no transcript (graceful)
-    }, 5000);
+    const check = () => {
+      const segments = document.querySelectorAll('transcript-segment-view-model');
+      if (segments.length > 0) return resolve(segments);
+    };
+    check(); // immediate check
 
-    function handler(event: MessageEvent) {
-      if (event.source !== window) return;
-      if (event.data?.type !== `${MSG_PREFIX}:result`) return;
-      clearTimeout(timeout);
-      window.removeEventListener('message', handler);
-      resolve(event.data.data);
-    }
+    const observer = new MutationObserver(check);
+    observer.observe(document.body, { childList: true, subtree: true });
 
-    window.addEventListener('message', handler);
-    window.postMessage({ type: `${MSG_PREFIX}:extract` }, '*');
+    setTimeout(() => {
+      observer.disconnect();
+      resolve(null);
+    }, timeoutMs);
   });
 }
+
+// --- Step 4: Extract text from DOM ---
+
+function scrapeTranscriptDOM(elements: NodeListOf<Element>): TranscriptSegment[] {
+  return [...elements].map(seg => ({
+    timestamp: seg.querySelector('.ytwTranscriptSegmentViewModelTimestamp')?.textContent?.trim() || '',
+    text: seg.querySelector('.yt-core-attributed-string')?.textContent?.trim() || '',
+  })).filter(s => s.text);
+}
+
+// --- Orchestration ---
+
+async function extractTranscript(): Promise<TranscriptResult | null> {
+  if (!hasCaptions()) return null;
+  if (!clickShowTranscript()) return null;
+
+  const segments = await waitForTranscriptSegments();
+  if (!segments) return null;
+
+  const data = scrapeTranscriptDOM(segments);
+  if (data.length === 0) return null;
+
+  return {
+    segments: data,
+    fullText: data.map(s => s.text).join(' '),
+    languageCode: 'en', // TODO: detect from active track
+  };
+}
 ```
+
+**关键优势**：
+- 无需 MAIN world 注入（无需 `injectScript`、`web_accessible_resources`、`window.postMessage`）
+- 使用 YouTube 自己的 UI 加载机制，绕过所有 API 限制
+- Content script ISOLATED world 可直接操作 DOM
+- `MutationObserver` 高效等待异步渲染
 
 ## 5. Risk Assessment
 
@@ -568,15 +521,15 @@ Our page-capture extractor runs at the time of web clip creation (user action). 
 
 | Aspect | Decision |
 |--------|----------|
-| **Approach** | Local extraction via MAIN world script (player API + same-origin fetch) |
+| **Approach** | Content Script DOM 抓取（点击"Show transcript" → 读取 `transcript-segment-view-model`） |
 | **API key** | Not required |
-| **New permissions** | None (already have `<all_urls>`) |
-| **npm dependencies** | None (custom implementation) |
-| **WXT integration** | `injectScript()` + unlisted script for MAIN world access |
+| **New permissions** | None |
+| **npm dependencies** | None |
+| **MAIN world injection** | **不需要** |
 | **Data storage** | `Transcript` field (type: PLAIN) under `#video` tagDef |
 | **Graceful degradation** | Extraction fails → clip created without transcript |
-| **Estimated effort** | ~240 lines, 1-2 days |
-| **Primary risk** | YouTube player API structure changes (mitigated by 3-method local redundancy) |
+| **Estimated effort** | ~170 lines, 1 day |
+| **Primary risk** | YouTube 更改 transcript DOM 结构（`transcript-segment-view-model` 组件名/class 名） |
 
 ### Why local extraction, not InnerTube API
 
@@ -586,17 +539,40 @@ Our page-capture extractor runs at the time of web clip creation (user action). 
 4. **Proven at scale** — Immersive Translate (millions of users), Brave browser AI, and dozens of userscripts use this technique
 5. **Lower breakage surface** — uses the same data YouTube itself uses to render captions
 
-### Appendix: Server-side verification (2026-03-19)
+### Appendix: 实测验证记录 (2026-03-19)
 
-实际验证了 3 种服务器端方案的可行性：
+在用户已登录 YouTube 的 Chrome 浏览器中逐一验证了所有方案：
+
+#### 服务器端方案（全部失败）
 
 | 方案 | 结果 | 说明 |
 |------|------|------|
-| **Page HTML 抓取** | ⚠️ 不稳定 | `ytInitialPlayerResponse` 在部分视频可提取到 captionTracks（Rick Astley: 6 tracks），但多数视频返回 `LOGIN_REQUIRED` 或 0 tracks |
-| **baseUrl fetch** | ❌ 失败 | 即使拿到 baseUrl，从服务器端 fetch 返回 200 但 0 bytes（URL 含签名 + `ip=0.0.0.0`，需同源上下文） |
-| **InnerTube API** | ❌ 失败 | 返回 `UNPLAYABLE` 或 `LOGIN_REQUIRED`，无 captionTracks |
+| **Page HTML 抓取** | ⚠️ 不稳定 | `ytInitialPlayerResponse` 部分视频可提取 captionTracks，多数返回 `LOGIN_REQUIRED` |
+| **baseUrl fetch** | ❌ 失败 | 即使拿到 baseUrl，fetch 返回 200 但 0 bytes（URL 签名绑定会话） |
+| **InnerTube API** | ❌ 失败 | 返回 `UNPLAYABLE` 或 `LOGIN_REQUIRED` |
 
-**结论**：所有服务器端方案都不可靠。YouTube 日益严格的反爬措施使得外部请求无法稳定获取字幕数据。唯一可靠路径是 MAIN world 本地提取——运行在用户浏览器的 youtube.com 上下文中，继承完整的 cookies/session/auth，规避所有限制。
+#### 浏览器端方案
+
+| 方案 | 结果 | 说明 |
+|------|------|------|
+| **captionTracks 元数据** | ✅ 成功 | 3 种方法（player API / ytd-app.data / ytInitialPlayerResponse）全部可用 |
+| **baseUrl fetch（同源）** | ❌ 失败 | 即使从 youtube.com 页面 fetch，也返回 200 但 0 bytes |
+| **`get_transcript` API** | ❌ 失败 | 返回 400 FAILED_PRECONDITION（即使使用完整 INNERTUBE_CONTEXT） |
+| **DOM 抓取 transcript 面板** | ✅✅ 成功 | 点击"Show transcript" → `transcript-segment-view-model` 渲染 → 提取文本 |
+
+#### DOM 抓取验证详情
+
+**Video 1: Rick Astley - Never Gonna Give You Up**
+- 24 segments, 2089 chars
+- 组件: `transcript-segment-view-model`
+- 时间戳: `.ytwTranscriptSegmentViewModelTimestamp`
+- 文本: `.yt-core-attributed-string`
+
+**Video 2: Me at the zoo (第一个 YouTube 视频)**
+- 3 segments, 217 chars
+- 相同 DOM 结构
+
+**结论**：YouTube 2026 年已更改 timedtext API 和 get_transcript API 行为，所有 fetch 方案均失效。唯一可靠路径是 DOM 抓取——利用 YouTube 自己的 UI 加载机制，从渲染后的 `transcript-segment-view-model` 元素提取文本。此方案无需 MAIN world 注入，ISOLATED world content script 即可完成。
 
 ## References
 

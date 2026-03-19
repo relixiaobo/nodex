@@ -28,9 +28,10 @@ export function useTodayShortcut(): void {
       // Only handle when not in an editor
       if (!shouldHandleGlobalShortcut()) return;
 
-      // Don't handle if a node is focused (selection-keyboard handles it as batch_duplicate)
-      const { focusedNodeId } = useUIStore.getState();
+      // Don't handle if a node is focused or selected (selection-keyboard handles it as batch_duplicate)
+      const { focusedNodeId, selectedNodeIds } = useUIStore.getState();
       if (focusedNodeId) return;
+      if (selectedNodeIds.size > 0) return;
 
       e.preventDefault();
       e.stopPropagation();

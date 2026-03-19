@@ -5,6 +5,7 @@ import { getAncestorChain } from './tree-utils.js';
 import { isOutlinerContentNodeType } from './node-type-utils.js';
 import { useUIStore } from '../stores/ui-store.js';
 import { isAppPanel, isChatPanel } from '../types/index.js';
+import { buildMentionedNodeEditReminder } from './ai-mentioned-nodes.js';
 
 const RECENT_IMAGE_MESSAGES = 3;
 
@@ -135,6 +136,7 @@ export async function buildSystemReminder(): Promise<string> {
     buildPanelContext(),
     await getPageContext(),
     buildTimeContext(),
+    buildMentionedNodeEditReminder(),
   ].filter((section): section is string => !!section);
 
   if (sections.length === 0) return '';

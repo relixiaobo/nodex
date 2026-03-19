@@ -25,6 +25,7 @@ import { withCommitOrigin } from './loro-doc.js';
 import { SYSTEM_SCHEMA_NODE_IDS } from './system-schema-presets.js';
 import { useNodeStore } from '../stores/node-store.js';
 import { NDX_F, SYSTEM_NODE_IDS, SYS_V } from '../types/index.js';
+import { scanAndTrackMentionedNodes, clearMentionedNodes } from './ai-mentioned-nodes.js';
 
 const AI_SETTINGS_KEY = 'soma-ai-settings';
 const MAX_SESSION_DEBUG_TURNS = 12;
@@ -671,6 +672,15 @@ async function runAgentTurn(session: ChatSession, agent: Agent, input: AgentTurn
       });
     }
     await persistChatSession(agent);
+
+    // Track nodes mentioned in the AI response for edit-detection in system reminder
+    const lastAssistant = getLatestAssistantMessage(agent);
+    if (lastAssistant) {
+      const text = typeof lastAssistant.content === 'string'
+        ? lastAssistant.content
+        : lastAssistant.content.filter((p): p is { type: 'text'; text: string } => p.type === 'text').map((p) => p.text).join('');
+      if (text) scanAndTrackMentionedNodes(text);
+    }
   } catch (error) {
     const latestAssistantMessage = getLatestAssistantMessage(agent);
     finalizeDebugTurn(agent, {
@@ -910,6 +920,7 @@ export async function createNewChatSession(agent: Agent = getAIAgent()): Promise
   setCurrentSession(agent, createSession());
   runtime.hydrated = true;
   runtime.restorePromise = null;
+  clearMentionedNodes();
   await configureAgent(agent);
   await persistChatSession(agent);
 }

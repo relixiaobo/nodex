@@ -75,6 +75,29 @@ function applyOneTimeBootstrapMigrations(workspaceHomeId: string): void {
   loroDoc.setNodeData(workspaceHomeId, 'systemBootstrapVersion', SYSTEM_BOOTSTRAP_VERSION);
 }
 
+/** Auto-cleanup: permanently delete trash items older than 30 days (by updatedAt). */
+function autoCleanupTrash(): void {
+  const trashChildren = loroDoc.getChildren(SYSTEM_NODE_IDS.TRASH);
+  if (trashChildren.length === 0) return;
+
+  const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
+  let deleted = false;
+
+  for (let i = trashChildren.length - 1; i >= 0; i--) {
+    const node = loroDoc.toNodexNode(trashChildren[i]);
+    if (!node) continue;
+    const ts = node.updatedAt ?? node.createdAt ?? 0;
+    if (ts > 0 && ts < thirtyDaysAgo) {
+      loroDoc.deleteNode(trashChildren[i]);
+      deleted = true;
+    }
+  }
+
+  if (deleted) {
+    commitDoc('system:trash-cleanup');
+  }
+}
+
 export function ensureSystemNodes(wsId: string): void {
   const workspaceHomeId = ensureWorkspaceHomeNode(wsId);
   if (!workspaceHomeId) return;
@@ -106,6 +129,9 @@ export function ensureSystemNodes(wsId: string): void {
   ensureNoteTagDef(store);
   commitDoc('system:bootstrap');
   startSettingsProjection();
+
+  // Auto-cleanup trash items older than 30 days (silent, no UI)
+  autoCleanupTrash();
 
   // Migrate settings from ui-store to LoroDoc (idempotent)
   void migrateFromUIStore();

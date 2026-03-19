@@ -34,13 +34,13 @@ import { formatSmartTimestamp } from '../../lib/format-timestamp.js';
 import { useWorkspaceTags } from '../../hooks/use-workspace-tags.js';
 import { resolveTagColor } from '../../lib/tag-colors.js';
 import { shouldNodeShowCheckbox, hasTagShowCheckbox } from '../../lib/checkbox-utils.js';
-import { canCreateChildrenUnder, getNodeCapabilities } from '../../lib/node-capabilities.js';
+import { canCreateChildrenUnder, getNodeCapabilities, isNodeInTrash } from '../../lib/node-capabilities.js';
 import { getSystemNodePreset, getWorkspaceHomeNodeId, getWorkspaceTopLevelNodeIds, type SystemNodeIconKey } from '../../lib/system-node-presets.js';
 import { Kbd } from '../ui/Kbd.js';
 import {
   Link, Copy, Scissors, CopyPlus, MoveRight, PanelRight,
   Hash, CheckSquare, Type, Trash2, ChevronLeft, ChevronRight,
-  Plus, Library, CalendarDays, Search, Settings, Bot, ArrowUpDown, ListFilter, Group,
+  Plus, Library, CalendarDays, Search, Settings, Bot, ArrowUpDown, ListFilter, Group, RotateCcw,
 } from '../../lib/icons.js';
 import type { LucideIcon } from 'lucide-react';
 
@@ -175,6 +175,7 @@ const NodeContextMenuContent = forwardRef<HTMLDivElement, NodeContextMenuContent
     const parentId = useNodeStore((s) => { void s._version; return loroDoc.getParentId(nodeId); });
     // getNodeCapabilities returns a new object each call — extract primitives to avoid infinite re-render
     const capabilities = useMemo(() => getNodeCapabilities(nodeId), [nodeId, node]);
+    const isInTrash = useMemo(() => isNodeInTrash(nodeId), [nodeId, node]);
     const [mode, setMode] = useState<MenuMode>('main');
 
     // Measure actual menu size and clamp to viewport (before paint)
@@ -278,6 +279,16 @@ const NodeContextMenuContent = forwardRef<HTMLDivElement, NodeContextMenuContent
       onClose();
     }, [capabilities.canDelete, nodeId, onClose]);
 
+    const handleRestore = useCallback(() => {
+      useNodeStore.getState().restoreNode(nodeId);
+      onClose();
+    }, [nodeId, onClose]);
+
+    const handlePermanentlyDelete = useCallback(() => {
+      useNodeStore.getState().hardDeleteNode(nodeId);
+      onClose();
+    }, [nodeId, onClose]);
+
     const handleMoveTo = useCallback((targetId: string) => {
       if (!capabilities.canMove) return;
       useNodeStore.getState().moveNodeTo(nodeId, targetId);
@@ -371,6 +382,9 @@ const NodeContextMenuContent = forwardRef<HTMLDivElement, NodeContextMenuContent
             onOpenSort={handleOpenSort}
             onOpenFilter={handleOpenFilter}
             onOpenGroup={handleOpenGroup}
+            isInTrash={isInTrash}
+            onRestore={handleRestore}
+            onPermanentlyDelete={handlePermanentlyDelete}
           />
         )}
         {mode === 'add-tag' && (
@@ -417,6 +431,9 @@ function MainMenu({
   onOpenSort,
   onOpenFilter,
   onOpenGroup,
+  isInTrash,
+  onRestore,
+  onPermanentlyDelete,
 }: {
   onOpenInNewPanel: () => void;
   onCopyLink: () => void;
@@ -445,6 +462,9 @@ function MainMenu({
   onOpenSort: () => void;
   onOpenFilter: () => void;
   onOpenGroup: () => void;
+  isInTrash: boolean;
+  onRestore: () => void;
+  onPermanentlyDelete: () => void;
 }) {
   return (
     <>
@@ -491,7 +511,14 @@ function MainMenu({
       <MenuSeparator />
 
       {/* Danger zone */}
-      <MenuItem icon={Trash2} label="Delete" onClick={onDelete} destructive disabled={!canDelete} />
+      {isInTrash ? (
+        <>
+          <MenuItem icon={RotateCcw} label="Restore" onClick={onRestore} />
+          <MenuItem icon={Trash2} label="Delete permanently" onClick={onPermanentlyDelete} destructive />
+        </>
+      ) : (
+        <MenuItem icon={Trash2} label="Delete" onClick={onDelete} destructive disabled={!canDelete} />
+      )}
 
       {/* Timestamps */}
       {(changed || created) && (

@@ -1,7 +1,15 @@
-import type { AgentMessage, AgentTool, AgentToolResult } from '@mariozechner/pi-agent-core';
+import type { AgentTool, AgentToolResult } from '@mariozechner/pi-agent-core';
 import { Type } from '@mariozechner/pi-ai';
-import { getLinearPath, type ChatSession, type MessageNode } from '../ai-chat-tree.js';
-import { getChatSession, listChatSessionMetas } from '../ai-persistence.js';
+import type { ChatSession, MessageNode } from '../ai-chat-tree.js';
+import { extractAssistantText, extractUserText, getActivePath } from '../ai-chat-summary.js';
+import {
+  type ChatSessionMeta,
+  getChatSession,
+  getChatSessionMeta,
+  listChatSessionMetasPage,
+  listChatSessionUserMessageMetasPage,
+} from '../ai-persistence.js';
+import { fuzzyMatch } from '../fuzzy-search.js';
 import { formatResultText } from './shared.js';
 
 const DEFAULT_LIMIT = 10;
@@ -9,7 +17,6 @@ const MAX_LIMIT = 20;
 const DEFAULT_MAX_CHARS = 2_000;
 const DEFAULT_TEXT_OFFSET = 0;
 const USER_MESSAGE_PREVIEW_CHARS = 200;
-const SYSTEM_REMINDER_PATTERN = /<system-reminder>[\s\S]*?<\/system-reminder>/g;
 
 const pastChatsToolParameters = Type.Object({
   sessionId: Type.Optional(Type.String({
@@ -19,7 +26,7 @@ const pastChatsToolParameters = Type.Object({
     description: 'Level 2 only. User message ID to read in detail. Requires sessionId. Returns that user message plus assistant replies until the next user message.',
   })),
   query: Type.Optional(Type.String({
-    description: 'Keyword filter (case-insensitive substring match). Valid for Level 0/1 only. Level 0: search session title plus active-branch user and assistant text. Level 1: search user messages inside the session. Use concrete keywords like names, features, or decisions.',
+    description: 'Keyword filter (case-insensitive fuzzy match across whitespace-separated terms). Valid for Level 0/1 only. Level 0: search session title plus active-branch user and assistant text. Level 1: search user messages inside the session. Use concrete keywords like names, features, or decisions.',
   })),
   before: Type.Optional(Type.String({
     description: 'Level 0 only. Only valid when sessionId is omitted. ISO date (user\'s local timezone), inclusive upper bound. Use plain date like "2026-03-15" — do NOT append Z or timezone offset. The date is interpreted in the user\'s local timezone.',
@@ -57,7 +64,7 @@ export interface PastChatsToolRuntime {
   getCurrentSessionId?: () => string | null;
 }
 
-type SessionMeta = Awaited<ReturnType<typeof listChatSessionMetas>>[number];
+type SessionMeta = ChatSessionMeta;
 
 interface SessionSummary {
   id: string;
@@ -102,36 +109,6 @@ function parseTimeFilter(value: string | undefined, kind: 'before' | 'after'): n
   return timestamp;
 }
 
-function extractTextParts(content: AgentMessage['content']): string {
-  if (typeof content === 'string') return content;
-
-  return content
-    .filter((part): part is Extract<typeof content[number], { type: 'text' }> => part.type === 'text')
-    .map((part) => part.text)
-    .join('\n\n');
-}
-
-function normalizeExtractedText(text: string): string {
-  return text
-    .replace(/\r\n/g, '\n')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim();
-}
-
-function stripSystemReminder(text: string): string {
-  return normalizeExtractedText(text.replace(SYSTEM_REMINDER_PATTERN, ''));
-}
-
-function extractUserText(message: AgentMessage): string {
-  if (message.role !== 'user') return '';
-  return stripSystemReminder(extractTextParts(message.content));
-}
-
-function extractAssistantText(message: AgentMessage): string {
-  if (message.role !== 'assistant') return '';
-  return normalizeExtractedText(extractTextParts(message.content));
-}
-
 function truncatePreview(text: string, maxChars: number): string {
   if (text.length <= maxChars) return text;
   return `${text.slice(0, Math.max(0, maxChars - 3)).trimEnd()}...`;
@@ -139,11 +116,11 @@ function truncatePreview(text: string, maxChars: number): string {
 
 function matchesQuery(text: string, query: string | null): boolean {
   if (!query) return true;
-  return text.toLowerCase().includes(query);
+  return fuzzyMatch(query, text) !== null;
 }
 
 function normalizeQuery(query: string | undefined): string | null {
-  return query?.trim().toLowerCase() || null;
+  return query?.trim() || null;
 }
 
 function getListPagingParams(params: PastChatsToolParams): { limit: number; offset: number } {
@@ -210,40 +187,6 @@ function getSessionTitle(meta: SessionMeta): string {
   return meta.title?.trim() || '';
 }
 
-function getActivePath(session: ChatSession): MessageNode[] {
-  return getLinearPath(session).filter((node) => node.message !== null);
-}
-
-function getVisibleUserMessages(session: ChatSession): Array<{ node: MessageNode; text: string }> {
-  return getActivePath(session)
-    .filter((node): node is MessageNode & { message: Extract<AgentMessage, { role: 'user' }> } => node.message?.role === 'user')
-    .map((node) => ({
-      node,
-      text: extractUserText(node.message),
-    }))
-    .filter((entry) => entry.text.length > 0);
-}
-
-function getSessionSearchText(meta: SessionMeta, session: ChatSession): string {
-  const parts = [getSessionTitle(meta)];
-
-  for (const node of getActivePath(session)) {
-    const message = node.message;
-    if (!message) continue;
-    if (message.role === 'user') {
-      const text = extractUserText(message);
-      if (text) parts.push(text);
-      continue;
-    }
-    if (message.role === 'assistant') {
-      const text = extractAssistantText(message);
-      if (text) parts.push(text);
-    }
-  }
-
-  return parts.join('\n\n').toLowerCase();
-}
-
 async function listSessionSummaries(
   params: PastChatsToolParams,
   currentSessionId: string | null,
@@ -252,39 +195,33 @@ async function listSessionSummaries(
   const before = parseTimeFilter(params.before, 'before');
   const query = normalizeQuery(params.query);
   const { limit, offset } = getListPagingParams(params);
-
-  const metas = (await listChatSessionMetas())
-    .filter((meta) => meta.id !== currentSessionId)
-    .filter((meta) => after === null || meta.updatedAt >= after)
-    .filter((meta) => before === null || meta.updatedAt <= before);
-
-  const summaries: SessionSummary[] = [];
-
-  for (const meta of metas) {
-    const session = await getChatSession(meta.id);
-    if (!session) continue;
-
-    if (!matchesQuery(getSessionSearchText(meta, session), query)) continue;
-
-    summaries.push({
-      id: meta.id,
-      title: getSessionTitle(meta),
-      updatedAt: new Date(meta.updatedAt).toISOString(),
-      userMessageCount: getVisibleUserMessages(session).length,
-    });
-  }
-
-  const result = {
-    total: summaries.length,
+  const predicate = query ? (meta: SessionMeta) => matchesQuery(meta.searchText, query) : undefined;
+  const { items, hasMore } = await listChatSessionMetasPage({
+    after,
+    before,
+    excludeId: currentSessionId,
     offset,
     limit,
-    sessions: summaries.slice(offset, offset + limit),
+    predicate,
+  });
+  const summaries: SessionSummary[] = items.map((meta) => ({
+    id: meta.id,
+    title: getSessionTitle(meta),
+    updatedAt: new Date(meta.updatedAt).toISOString(),
+    userMessageCount: meta.userMessageCount,
+  }));
+
+  const result = {
+    offset,
+    limit,
+    hasMore,
+    sessions: summaries,
     ...(summaries.length > 0
       ? {
         next: 'Choose a session id from sessions and call past_chats(sessionId: "...") to browse its user messages.',
       }
       : {}),
-    ...(query && summaries.length === 0
+    ...(query && summaries.length === 0 && !hasMore
       ? {
         hint: 'No matching past chats. Try broader keywords or browse all sessions.',
       }
@@ -309,35 +246,48 @@ async function loadSessionOrThrow(sessionId: string, currentSessionId: string | 
   return session;
 }
 
+async function loadSessionMetaOrThrow(sessionId: string, currentSessionId: string | null): Promise<SessionMeta> {
+  ensureSessionAllowed(sessionId, currentSessionId);
+  const meta = await getChatSessionMeta(sessionId);
+  if (!meta) {
+    throw new Error(`Session not found: ${sessionId}. Use past_chats() to browse available sessions.`);
+  }
+  return meta;
+}
+
 async function listUserMessagesInSession(
   sessionId: string,
   params: PastChatsToolParams,
   currentSessionId: string | null,
 ): Promise<AgentToolResult<unknown>> {
-  const session = await loadSessionOrThrow(sessionId, currentSessionId);
+  const sessionMeta = await loadSessionMetaOrThrow(sessionId, currentSessionId);
   const { limit, offset } = getListPagingParams(params);
   const query = normalizeQuery(params.query);
-
-  const messages: UserMessageSummary[] = getVisibleUserMessages(session)
-    .filter(({ text }) => matchesQuery(text.toLowerCase(), query))
-    .map(({ node, text }) => ({
-      id: node.id,
-      text: truncatePreview(text, USER_MESSAGE_PREVIEW_CHARS),
-      createdAt: toIsoString(node.message?.timestamp),
-    }));
-
-  const result = {
-    title: session.title?.trim() || '',
-    total: messages.length,
+  const predicate = query ? (message: { text: string }) => matchesQuery(message.text, query) : undefined;
+  const { items, hasMore } = await listChatSessionUserMessageMetasPage({
+    sessionId,
     offset,
     limit,
-    userMessages: messages.slice(offset, offset + limit),
+    predicate,
+  });
+  const messages: UserMessageSummary[] = items.map((message) => ({
+    id: message.messageId,
+    text: truncatePreview(message.text, USER_MESSAGE_PREVIEW_CHARS),
+    createdAt: toIsoString(message.createdAt),
+  }));
+
+  const result = {
+    title: getSessionTitle(sessionMeta),
+    offset,
+    limit,
+    hasMore,
+    userMessages: messages,
     ...(messages.length > 0
       ? {
         next: 'Choose a message id from userMessages and call past_chats(sessionId: "...", messageId: "...") to read the full exchange.',
       }
       : {}),
-    ...(query && messages.length === 0
+    ...(query && messages.length === 0 && !hasMore
       ? {
         hint: 'No matching user messages in this session. Try broader keywords or browse the session without query.',
       }
@@ -457,6 +407,7 @@ export function createPastChatsTool(runtime: PastChatsToolRuntime = {}): AgentTo
       '',
       'Defaults and limits:',
       '- limit defaults to 10 and maxes at 20.',
+      '- Session and message browsing return hasMore instead of exact totals so pagination can stop early.',
       '- Assistant response pagination uses maxChars (default 2000) and textOffset.',
       '- Invalid parameter combinations fail fast instead of being silently ignored.',
       '',

@@ -187,7 +187,71 @@ soma 活在浏览器侧边栏——天然知道用户正在看什么。这个上
 4. **笔记不够多时坦诚说"再积累一些"**
 5. **预设召唤需要用户主动设置**
 
-## 七、待深入
+## 七、产品理念演进历程
+
+### v1：记下来，用得上
+
+> Slogan: "记下来，用得上"
+
+- 方法论：**捕获 → 消化 → 重遇**（三步线性流）
+- 核心假设：笔记是对信息的预处理
+- AI 角色：未明确
+- 主界面：Outliner
+
+### v2：Think where you read
+
+> Slogan: "Think where you read"
+
+- 方法论：**Think → Connect → Compound**
+- 关键变化：从"记录"升级为"思考"，"重遇"变成"复利（Compound）"
+- 新增：费曼学习法理念——"用自己的话写才算理解"
+- AI 角色：辅助
+
+### v3：AI 策略对齐
+
+> Slogan: "Think where you read"
+
+- 方法论：**Think → Connect → Compound**（不变）
+- 关键变化："选择是思考的第一步"（高亮即思考）、三条认知工作流（阅读环/碰撞环/回顾环）
+- 新增：开放问题区（剪藏边界、上下文感知、AI 工作流决策）
+
+### v4：AI 照亮你的思考
+
+> Slogan: "Think where you read"
+
+- 方法论：**Think → Connect → Emerge**（Compound → Emerge，强调涌现）
+- 关键变化：AI 独立成章（"照亮你的思考"）、干/湿分工、Outliner = 共享画板、Taste 学习、设计红线
+- 新增：市场定位图、产品路径（4 条）、"知识组织没有客观正确答案"
+- 文档：`product-philosophy.md`（当前版本）
+
+### v5：人机协作（当前方向）
+
+> Slogan: "Think with your AI"
+
+- 方法论：**对话即思考**（Think/Connect/Emerge 在对话中一体化）
+- 关键变化：
+  - 一个输入框替代多入口
+  - AI 从工具变为协作伙伴（也是数据主人）
+  - 认知摩擦主动设计
+  - Outliner 从主界面变为可选深入操作层
+  - 记录和对话的边界消失
+- 文档：`ai-first-product-vision.md`（本文件）
+
+### 演进脉络
+
+```
+v1  记录工具    "记下来，用得上"           捕获 → 消化 → 重遇
+v2  思考工具    "Think where you read"    Think → Connect → Compound
+v3  +AI 策略    "Think where you read"    + 认知工作流
+v4  AI 照亮     "Think where you read"    Think → Connect → Emerge
+v5  人机协作    "Think with your AI"      对话即思考
+```
+
+从"记录"到"思考"到"协作"——每次迭代都在把更多的认知工作从用户独自承担，转移到人机共同完成。核心不变的是：**工具让人变强，不是让人觉得工具强。**
+
+---
+
+## 八、待深入
 
 - 认知摩擦的精细设计（AI 什么时候该问、什么时候该闭嘴）
 - 节点编辑与模型上下文同步（`transformContext` 注入实时状态）

@@ -1,6 +1,6 @@
-import { useCallback, useRef, useState } from 'react';
+import { useRef } from 'react';
 import { useNode } from '../../hooks/use-node.js';
-import { NodePopover } from './NodePopover.js';
+import { NodePopover, useNodePopover } from './NodePopover.js';
 
 interface CitationBadgeProps {
   nodeId: string;
@@ -10,20 +10,11 @@ interface CitationBadgeProps {
 export function CitationBadge({ nodeId, label }: CitationBadgeProps) {
   const node = useNode(nodeId);
   const triggerRef = useRef<HTMLButtonElement>(null);
-  const [popoverRect, setPopoverRect] = useState<DOMRect | null>(null);
+  const { anchorRect, open, close } = useNodePopover(node, triggerRef);
 
   const title = node
     ? [node.name ?? nodeId, node.description ?? ''].filter(Boolean).join('\n')
     : 'Deleted node';
-
-  const handleClick = useCallback(() => {
-    if (!node || !triggerRef.current) return;
-    setPopoverRect(triggerRef.current.getBoundingClientRect());
-  }, [node]);
-
-  const handleClose = useCallback(() => {
-    setPopoverRect(null);
-  }, []);
 
   return (
     <>
@@ -31,7 +22,7 @@ export function CitationBadge({ nodeId, label }: CitationBadgeProps) {
         <button
           ref={triggerRef}
           type="button"
-          onClick={handleClick}
+          onClick={open}
           disabled={!node}
           title={title}
           className={[
@@ -44,8 +35,8 @@ export function CitationBadge({ nodeId, label }: CitationBadgeProps) {
           {label}
         </button>
       </sup>
-      {popoverRect && (
-        <NodePopover nodeId={nodeId} anchorRect={popoverRect} onClose={handleClose} />
+      {anchorRect && (
+        <NodePopover nodeId={nodeId} anchorRect={anchorRect} onClose={close} />
       )}
     </>
   );

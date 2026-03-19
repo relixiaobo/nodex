@@ -31,7 +31,7 @@ const PLACEHOLDER_RE = /%%SOMA_(\d+)%%/g;
 // Block-level <node /> tag: must be on its own line (optional whitespace around)
 const NODE_EMBED_LINE_RE = /^\s*<node\s+id="([^"]+)"\s*\/>\s*$/;
 
-export type CiteType = 'node' | 'chat' | 'url';
+type CiteType = 'node' | 'chat' | 'url';
 
 interface RefPlaceholder {
   kind: 'ref';

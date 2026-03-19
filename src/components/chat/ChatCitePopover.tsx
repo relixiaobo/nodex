@@ -109,12 +109,12 @@ export function ChatCitePopover({ sessionId, anchorRect, onClose }: ChatCitePopo
           <>
             <div className="mb-2">
               <p className="text-sm font-medium text-foreground truncate">{preview.title}</p>
-              <p className="text-[11px] text-foreground-tertiary">{formatDate(preview.updatedAt)}</p>
+              <p className="text-xs text-foreground-tertiary">{formatDate(preview.updatedAt)}</p>
             </div>
             {preview.userMessages.length > 0 && (
-              <ul className="space-y-1.5 mb-2">
+              <ul className="space-y-1 mb-2">
                 {preview.userMessages.map((msg, i) => (
-                  <li key={i} className="text-xs text-foreground-secondary leading-relaxed line-clamp-2">
+                  <li key={i} className="text-xs text-foreground-secondary leading-4 line-clamp-2">
                     {msg}
                   </li>
                 ))}
@@ -128,7 +128,7 @@ export function ChatCitePopover({ sessionId, anchorRect, onClose }: ChatCitePopo
           <button
             type="button"
             onClick={handleOpenChat}
-            className="flex items-center gap-1 rounded px-2 py-1 text-xs text-foreground-secondary transition-colors hover:bg-surface hover:text-foreground"
+            className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-foreground-secondary transition-colors hover:bg-foreground/4 hover:text-foreground"
           >
             <MessageSquare size={12} />
             Open this chat

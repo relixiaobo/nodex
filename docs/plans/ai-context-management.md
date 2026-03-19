@@ -11,13 +11,15 @@
 ```
 已完成                              待做
 ──────────────────────              ──────────────────────────────────────
-✅ transformContext 管线 (#132)      Phase 1: 消息树数据模型 + 去限制
-✅ Skill 渐进式披露 (#134)           Phase 2: 编辑 + 重新生成 + 分支导航
-                                    Phase 3: Context 自动压缩
-                                    Phase 4: 跨设备同步
+✅ transformContext 管线 (#132)      past_chats 搜索工具（设计中）
+✅ Skill 渐进式披露 (#134)
+✅ Phase 1: 消息树数据模型 + 去限制
+✅ Phase 2: 编辑 + 重新生成 + 分支导航
+✅ Phase 3: Context 自动压缩
+✅ Phase 4: 跨设备同步
 ```
 
-Phase 2、3、4 互相不依赖，Phase 1 完成后可并行。
+Phase 1-4 全部完成。下一步是 past_chats 搜索工具，让 AI 能跨会话回忆历史对话。
 
 ## 当前架构
 

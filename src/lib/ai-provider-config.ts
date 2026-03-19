@@ -10,22 +10,28 @@ import { SYSTEM_SCHEMA_NODE_IDS } from './system-schema-presets.js';
 
 const FEATURED_MODELS: Record<string, { id: string; description: string }[]> = {
   anthropic: [
-    { id: 'claude-sonnet-4-6', description: 'Fast and efficient' },
+    { id: 'claude-sonnet-4-6', description: 'Fast and intelligent' },
     { id: 'claude-opus-4-6', description: 'Most capable' },
   ],
   openai: [
     { id: 'gpt-5.4', description: 'Latest GPT' },
-    { id: 'gpt-5.4-codex', description: 'Code-optimized' },
+    { id: 'gpt-5.4-pro', description: 'Most capable' },
   ],
   google: [
     { id: 'gemini-2.5-flash', description: 'Fast and free' },
-    { id: 'gemini-2.5-pro', description: 'Most capable' },
+    { id: 'gemini-3.1-pro-preview', description: 'Most capable' },
   ],
   xai: [
-    { id: 'grok-4', description: 'Latest Grok' },
+    { id: 'grok-4', description: 'Most capable' },
+    { id: 'grok-4-1-fast', description: 'Fast reasoning' },
   ],
   mistral: [
-    { id: 'mistral-large-latest', description: 'Most capable' },
+    { id: 'mistral-medium-latest', description: 'Best balance' },
+    { id: 'magistral-medium-latest', description: 'Reasoning' },
+  ],
+  groq: [
+    { id: 'meta-llama/llama-4-maverick-17b-128e-instruct', description: 'Latest Llama' },
+    { id: 'llama-3.3-70b-versatile', description: 'Fast open-source' },
   ],
 };
 
@@ -203,6 +209,15 @@ export function getAvailableModels(): Model<Api>[] {
 export function hasAnyEnabledProvider(): boolean {
   return getCanonicalProviderConfigs(getProviderConfigs())
     .some((config) => config.enabled && config.apiKey.length > 0);
+}
+
+/** Return the set of featured model IDs across all providers. */
+export function getFeaturedModelIds(): Set<string> {
+  const ids = new Set<string>();
+  for (const models of Object.values(FEATURED_MODELS)) {
+    for (const m of models) ids.add(m.id);
+  }
+  return ids;
 }
 
 export function getAvailableModelsWithMeta(): AvailableModel[] {

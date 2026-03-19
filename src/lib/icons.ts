@@ -63,8 +63,11 @@ export {
   Play,
   Pencil,
   RefreshCw,
-  Sparkles,
+  Bot,
   Brain,
+  Gem,
+  Wand2,
+  Zap,
 } from 'lucide-react';
 
 // ─── Text Formatting ────────────────────────────────────────────────────────

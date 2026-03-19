@@ -2,7 +2,7 @@ import { FIELD_TYPES, NDX_F, SYSTEM_NODE_IDS, SYS_T } from '../types/index.js';
 import { isOutlinerContentNodeType } from './node-type-utils.js';
 import * as loroDoc from './loro-doc.js';
 
-export const DEFAULT_AGENT_MODEL_ID = 'claude-sonnet-4-5';
+export const DEFAULT_AGENT_MODEL_ID = '';
 export const DEFAULT_AGENT_TEMPERATURE = 0.2;
 export const DEFAULT_AGENT_MAX_TOKENS = 32_000;
 
@@ -18,9 +18,6 @@ export const DEFAULT_PROMPT_LINES = [
 export const DEFAULT_AGENT_SYSTEM_PROMPT = DEFAULT_PROMPT_LINES.join('\n');
 
 export const AI_AGENT_NODE_IDS = {
-  MODEL_OPTION_SONNET: 'NDX_N20',
-  MODEL_OPTION_OPUS: 'NDX_N21',
-  MODEL_OPTION_HAIKU: 'NDX_N22',
   MODEL_FIELD_ENTRY: 'NDX_FE13',
   TEMPERATURE_FIELD_ENTRY: 'NDX_FE14',
   MAX_TOKENS_FIELD_ENTRY: 'NDX_FE15',
@@ -153,33 +150,18 @@ const AGENT_SCHEMA_PRESETS: ReadonlyArray<FixedNodePreset> = [
       description: 'AI skill — reusable prompt/instruction set',
     },
   },
-  // Model field (options)
+  // Model field (plain text — user types any model name)
   {
     id: NDX_F.AGENT_MODEL,
     parentId: SYS_T.AGENT,
     name: 'Model',
     data: {
       type: 'fieldDef',
-      fieldType: FIELD_TYPES.OPTIONS,
+      fieldType: FIELD_TYPES.PLAIN,
       nullable: false,
       cardinality: 'single',
       description: 'Default model used by the soma agent',
     },
-  },
-  {
-    id: AI_AGENT_NODE_IDS.MODEL_OPTION_SONNET,
-    parentId: NDX_F.AGENT_MODEL,
-    name: DEFAULT_AGENT_MODEL_ID,
-  },
-  {
-    id: AI_AGENT_NODE_IDS.MODEL_OPTION_OPUS,
-    parentId: NDX_F.AGENT_MODEL,
-    name: 'claude-opus-4',
-  },
-  {
-    id: AI_AGENT_NODE_IDS.MODEL_OPTION_HAIKU,
-    parentId: NDX_F.AGENT_MODEL,
-    name: 'claude-haiku-4-5',
   },
   // Temperature field (number)
   {
@@ -402,11 +384,15 @@ export function ensureAgentNode(workspaceId = loroDoc.getCurrentWorkspaceId() ??
 
   // Field entries
   ensureFieldEntry(SYSTEM_NODE_IDS.AGENT, AI_AGENT_NODE_IDS.MODEL_FIELD_ENTRY, NDX_F.AGENT_MODEL);
-  ensureTargetValue(
+  ensureTextValue(
     AI_AGENT_NODE_IDS.MODEL_FIELD_ENTRY,
     AI_AGENT_NODE_IDS.MODEL_VALUE,
-    AI_AGENT_NODE_IDS.MODEL_OPTION_SONNET,
+    DEFAULT_AGENT_MODEL_ID,
   );
+
+  // Migration: convert Model value from OPTIONS (targetId → option node) to PLAIN (direct name).
+  // Old data has a value node with targetId pointing to a preset option; resolve and inline the name.
+  migrateModelValueToPlainText(AI_AGENT_NODE_IDS.MODEL_FIELD_ENTRY);
 
   ensureFieldEntry(SYSTEM_NODE_IDS.AGENT, AI_AGENT_NODE_IDS.TEMPERATURE_FIELD_ENTRY, NDX_F.AGENT_TEMPERATURE);
   ensureTextValue(
@@ -437,6 +423,23 @@ export function ensureAgentNode(workspaceId = loroDoc.getCurrentWorkspaceId() ??
 }
 
 // ─── Reading config ───
+
+/**
+ * Migration: convert an OPTIONS value node (targetId → option) to plain text (name only).
+ * Resolves the target name and writes it as the value node's own name, then clears targetId.
+ */
+function migrateModelValueToPlainText(fieldEntryId: string): void {
+  const fieldEntry = loroDoc.toNodexNode(fieldEntryId);
+  const valueNodeId = fieldEntry?.children?.[0];
+  if (!valueNodeId) return;
+  const valueNode = loroDoc.toNodexNode(valueNodeId);
+  if (!valueNode?.targetId) return; // already plain text
+
+  // Resolve the display name from the old option node, write as plain text, clear pointer
+  const resolvedName = loroDoc.toNodexNode(valueNode.targetId)?.name ?? DEFAULT_AGENT_MODEL_ID;
+  loroDoc.setNodeData(valueNodeId, 'name', resolvedName);
+  loroDoc.deleteNodeData(valueNodeId, 'targetId');
+}
 
 function readOptionFieldName(fieldEntryId: string): string | null {
   const fieldEntry = loroDoc.toNodexNode(fieldEntryId);
@@ -555,11 +558,14 @@ export function ensureSparkAgentNode(workspaceId = loroDoc.getCurrentWorkspaceId
 
   // Field entries
   ensureFieldEntry(SYSTEM_NODE_IDS.SPARK_AGENT, SPARK_AGENT_NODE_IDS.MODEL_FIELD_ENTRY, NDX_F.AGENT_MODEL);
-  ensureTargetValue(
+  ensureTextValue(
     SPARK_AGENT_NODE_IDS.MODEL_FIELD_ENTRY,
     SPARK_AGENT_NODE_IDS.MODEL_VALUE,
-    AI_AGENT_NODE_IDS.MODEL_OPTION_SONNET,
+    DEFAULT_AGENT_MODEL_ID,
   );
+
+  // Migration: convert Model value from OPTIONS to PLAIN (same as main agent)
+  migrateModelValueToPlainText(SPARK_AGENT_NODE_IDS.MODEL_FIELD_ENTRY);
 
   ensureFieldEntry(SYSTEM_NODE_IDS.SPARK_AGENT, SPARK_AGENT_NODE_IDS.TEMPERATURE_FIELD_ENTRY, NDX_F.AGENT_TEMPERATURE);
   ensureTextValue(

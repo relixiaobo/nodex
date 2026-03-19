@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { Pencil, Sparkles, Trash2, X } from '../../lib/icons.js';
+import { MessageCircle, Pencil, Trash2, X } from '../../lib/icons.js';
 import { useAgent } from '../../hooks/use-agent.js';
 import type { ThinkingLevel } from '@mariozechner/pi-ai';
 import { readChatDebugEnabled } from '../../lib/ai-debug.js';
@@ -236,7 +236,7 @@ export function ChatPanel({ panelId, sessionId, hideHeader }: ChatPanelProps) {
       {!hideHeader && (
         <div className="flex items-center justify-between px-3 h-12 border-b border-border">
           <div className="flex items-center gap-2 text-sm font-medium text-foreground">
-            <Sparkles size={14} strokeWidth={1.75} className="text-foreground-tertiary" />
+            <MessageCircle size={14} strokeWidth={1.75} className="text-foreground-tertiary" />
             Chat
           </div>
           <button

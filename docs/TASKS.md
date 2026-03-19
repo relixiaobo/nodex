@@ -140,6 +140,14 @@ _(空)_
 - [ ] Taste 学习 — Schema evolution skill（OpLog Correction → #skill 规则）
 - [ ] /review 命令 — 认知镜像（新结构、升级、矛盾、同构）
 
+**自定义 Provider + 模型**
+
+> 设计方向：ChatBox 模式。`#ai-provider` 新增 "Models" 字段，用户手填模型名，合并到 Chat 模型选择器。支持 Qwen/DeepSeek/Ollama 等 OpenAI 兼容 API。
+
+- [ ] **Phase 1: 自定义模型字段** — `#ai-provider` 新增 Models 字段（PLAIN, list），`getAvailableModels()` 合并自定义模型，Chat 选择器展示
+- [ ] **Phase 2: 模型自动发现** — "Fetch Models" 调用 `/v1/models` 端点自动填充 Models 字段
+- [ ] **Phase 3: 内置 Provider 预设** — Qwen/DeepSeek/Ollama 等预填 Base URL，用户只需填 API Key
+
 **其他 AI**
 
 - [ ] YouTube 抓取增强 — 获取视频 transcript
@@ -161,6 +169,7 @@ _(空)_
 
 ### 编辑器增强 & 交互完善
 
+- [ ] FieldRow Ctrl+I 编辑 description — 在 FieldRow 中支持 Ctrl+I 快捷键编辑 fieldDef 的 description（当前只在 OutlinerItem 中生效）
 - [ ] 节点选中增强 (#47) — Cmd+Shift+D 批量复制、拖动选择优化
 - [ ] 合并节点 — 选中多个重复节点 → 合并为一个（保留第一个，合并 children/tags）
 - [ ] **数学公式渲染** — 支持 LaTeX/KaTeX 公式在节点中展示（行内 `$...$` + 块级 `$$...$$`）

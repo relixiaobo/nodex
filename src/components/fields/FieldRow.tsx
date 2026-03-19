@@ -881,34 +881,36 @@ export function FieldRow({
               <Trash2 size={12} className="shrink-0 text-foreground-tertiary" />
             </span>
           )}
-          {isEditing ? (
-            <FieldNameInput
-              fieldEntryId={fieldEntryId}
-              nodeId={nodeId}
-              attrDefId={attrDefId}
-              currentName={attrDefName}
-              onEnterConfirm={handleEnterConfirm}
-              onNavigateRow={moveToSibling}
-              onIndentRow={handleIndentField}
-              onOutdentRow={handleOutdentField}
-              clickOffsetX={clickOffsetXRef.current}
-            />
-          ) : (
-            <div className="min-w-0">
-              <span
-                className={`block text-[15px] leading-6 min-h-6 truncate ${trashed ? 'text-foreground-tertiary line-through' : !attrDefName || attrDefName === t('common.untitled') ? 'text-foreground/20' : 'text-foreground'}`}
-                title={trashed ? `Field "${attrDefName}" has been deleted` : attrDefName}
-              >
-                {!attrDefName || attrDefName === t('common.untitled') ? t('field.fieldNamePlaceholder') : attrDefName}
-                {isRequired && isEmpty && !trashed && <span className="text-destructive ml-0.5">*</span>}
-              </span>
-              {fieldDescription && (
-                <span className="block text-xs leading-tight text-foreground-tertiary mt-0.5">
-                  {fieldDescription}
+          <div className="min-w-0">
+            {isEditing ? (
+              <FieldNameInput
+                fieldEntryId={fieldEntryId}
+                nodeId={nodeId}
+                attrDefId={attrDefId}
+                currentName={attrDefName}
+                onEnterConfirm={handleEnterConfirm}
+                onNavigateRow={moveToSibling}
+                onIndentRow={handleIndentField}
+                onOutdentRow={handleOutdentField}
+                clickOffsetX={clickOffsetXRef.current}
+              />
+            ) : (
+              <>
+                <span
+                  className={`block text-[15px] leading-6 min-h-6 truncate ${trashed ? 'text-foreground-tertiary line-through' : !attrDefName || attrDefName === t('common.untitled') ? 'text-foreground/20' : 'text-foreground'}`}
+                  title={trashed ? `Field "${attrDefName}" has been deleted` : attrDefName}
+                >
+                  {!attrDefName || attrDefName === t('common.untitled') ? t('field.fieldNamePlaceholder') : attrDefName}
+                  {isRequired && isEmpty && !trashed && <span className="text-destructive ml-0.5">*</span>}
                 </span>
-              )}
-            </div>
-          )}
+              </>
+            )}
+            {fieldDescription && (
+              <span className="block text-xs leading-tight text-foreground-tertiary mt-0.5">
+                {fieldDescription}
+              </span>
+            )}
+          </div>
         </div>
       </div>
       {/* Value column */}

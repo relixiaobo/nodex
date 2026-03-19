@@ -271,7 +271,7 @@ function ChatDropdownRow({
       onClick={onSelect}
     >
       <span className={`flex shrink-0 text-[10px] ${active ? 'text-primary' : 'text-foreground-tertiary'}`}>
-        <MessageCircle size={10} strokeWidth={1.6} />
+        <MessageCircle size={10} strokeWidth={1.6} fill={active ? 'currentColor' : 'none'} />
       </span>
       <span className="min-w-0 flex-1 truncate">
         {edit.editing ? <ChatTitleInput edit={edit} /> : <PanelLabel nodeId={nodeId} />}

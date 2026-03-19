@@ -125,9 +125,7 @@ export function useAgent(agent: Agent = getAIAgent(), sessionId?: string) {
 
   useEffect(() => {
     return agent.subscribe(() => {
-      startTransition(() => {
-        setRevision((value) => value + 1);
-      });
+      setRevision((value) => value + 1);
     });
   }, [agent]);
 

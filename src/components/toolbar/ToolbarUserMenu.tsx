@@ -5,7 +5,7 @@
  * - Not signed in: generic user icon, click triggers Google sign-in
  */
 import { useState, useRef, useEffect, useMemo } from 'react';
-import { LogOut, Settings, Info, User, MessageSquare, ExternalLink, Sparkles } from '../../lib/icons.js';
+import { LogOut, Settings, Info, User, MessageSquare, ExternalLink, Gem } from '../../lib/icons.js';
 import { GoogleIcon } from '../ui/GoogleIcon.js';
 import { useWorkspaceStore } from '../../stores/workspace-store';
 import { useSyncStore } from '../../stores/sync-store';
@@ -257,7 +257,7 @@ export function ToolbarUserMenu() {
                     ) : (
                         <div className="flex items-center gap-2.5 px-2 py-1.5">
                             <div className="flex w-4 shrink-0 items-center justify-center text-foreground-tertiary">
-                                <Sparkles size={14} strokeWidth={1.5} />
+                                <Gem size={14} strokeWidth={1.5} />
                             </div>
                             <span className="text-xs text-foreground-tertiary">Early Access · Free</span>
                         </div>

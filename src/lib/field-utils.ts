@@ -9,7 +9,7 @@ import {
   type AppIcon,
   AlignLeft, Building2, Calendar, CalendarCheck, CalendarClock, CalendarPlus,
   CheckSquare, ChevronDown, FileText, Hash, Link, List, ListTree, Mail, Palette,
-  Play, Asterisk, EyeOff, Search, Settings2, SquareUser, Sparkles, Tag, ToggleLeft, UserPen, Code2,
+  Play, Asterisk, EyeOff, Search, Settings2, SquareUser, Zap, Tag, ToggleLeft, UserPen, Code2,
 } from './icons.js';
 import { SYS_A, SYS_D, SYS_V, FIELD_TYPES, AUTO_INIT_STRATEGY } from '../types/index.js';
 import type { NodexNode } from '../types/index.js';
@@ -386,7 +386,7 @@ export const ATTRDEF_CONFIG_FIELDS: ConfigFieldDef[] = [
     key: SYS_A.AUTOCOLLECT_OPTIONS,
     name: 'Auto-collect values',
     control: 'toggle',
-    icon: Sparkles,
+    icon: Zap,
     defaultValue: SYS_V.YES,
     appliesTo: [FIELD_TYPES.OPTIONS],
     description: 'Values created from field input',

@@ -4,17 +4,50 @@
  * Used by NodeReference and CitationBadge to show node details in-place
  * without navigating away from the chat. Includes an "Open in panel" button.
  */
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type RefObject,
+} from 'react';
 import { createPortal } from 'react-dom';
 import { ExternalLink } from '../../lib/icons.js';
 import { useUIStore } from '../../stores/ui-store.js';
 import { OutlinerView } from '../outliner/OutlinerView.js';
+import type { NodexNode } from '../../types/index.js';
 
-const CHAT_POPOVER_PANEL_ID = 'chat';
+/** Shared panelId for all OutlinerViews rendered inside Chat (popover + embed). */
+export const CHAT_OUTLINER_PANEL_ID = 'chat';
+
 const POPOVER_Z_INDEX = 1300;
 const POPOVER_MAX_HEIGHT = 320;
 const POPOVER_WIDTH = 320;
 const EDGE_MARGIN = 8;
+
+// ── Hook: popover trigger state ──
+
+/**
+ * Shared hook for NodeReference and CitationBadge.
+ * Returns the click handler, close handler, and current anchor rect (null when closed).
+ */
+export function useNodePopover(node: NodexNode | null, triggerRef: RefObject<HTMLElement | null>) {
+  const [anchorRect, setAnchorRect] = useState<DOMRect | null>(null);
+
+  const open = useCallback(() => {
+    if (!node || !triggerRef.current) return;
+    setAnchorRect(triggerRef.current.getBoundingClientRect());
+  }, [node, triggerRef]);
+
+  const close = useCallback(() => {
+    setAnchorRect(null);
+  }, []);
+
+  return { anchorRect, open, close };
+}
+
+// ── Popover component ──
 
 interface NodePopoverProps {
   nodeId: string;
@@ -105,7 +138,7 @@ export function NodePopover({ nodeId, anchorRect, onClose }: NodePopoverProps) {
         className="overflow-y-auto py-1"
         style={{ maxHeight: POPOVER_MAX_HEIGHT }}
       >
-        <OutlinerView rootNodeId={nodeId} panelId={CHAT_POPOVER_PANEL_ID} />
+        <OutlinerView rootNodeId={nodeId} panelId={CHAT_OUTLINER_PANEL_ID} />
       </div>
       <div className="flex items-center justify-end border-t border-border px-2 py-1">
         <button

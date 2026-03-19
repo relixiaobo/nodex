@@ -4,13 +4,12 @@
  * Used by NodeReference and CitationBadge (type="node") to show node details
  * in-place without navigating away from the chat.
  */
-import { useCallback, type RefObject } from 'react';
+import { useCallback, useState, type RefObject } from 'react';
 import { ExternalLink } from '../../lib/icons.js';
 import { useUIStore } from '../../stores/ui-store.js';
 import { OutlinerView } from '../outliner/OutlinerView.js';
 import type { NodexNode } from '../../types/index.js';
 import { PopoverShell } from './PopoverShell.js';
-import { useState } from 'react';
 
 /** Shared panelId for all OutlinerViews rendered inside Chat (popover + embed). */
 export const CHAT_OUTLINER_PANEL_ID = 'chat';

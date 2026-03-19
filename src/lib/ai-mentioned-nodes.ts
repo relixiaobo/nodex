@@ -13,7 +13,6 @@ const REF_RE = /<ref\s+id="([^"]+)">/g;
 // Matches <cite id="xxx"> (no type = node) and <cite type="node" id="xxx">
 // Skips type="chat" and type="url" since those aren't knowledge graph nodes.
 const CITE_NODE_RE = /<cite\s+(?:type="node"\s+)?id="([^"]+)">/g;
-const CITE_NON_NODE_RE = /<cite\s+type="(?:chat|url)"\s+id="[^"]+">/g;
 const NODE_RE = /<node\s+id="([^"]+)"\s*\/>/g;
 
 /** nodeId → timestamp when AI last mentioned it */

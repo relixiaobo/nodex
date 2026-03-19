@@ -3,12 +3,11 @@ import { useNode } from '../../hooks/use-node.js';
 import { NodePopover } from './NodePopover.js';
 import { ChatCitePopover } from './ChatCitePopover.js';
 import { UrlCitePopover } from './UrlCitePopover.js';
-import type { CiteType } from './MarkdownRenderer.js';
 
 interface CitationBadgeProps {
   id: string;
   label: string;
-  type?: CiteType;
+  type?: 'node' | 'chat' | 'url';
 }
 
 export function CitationBadge({ id, label, type = 'node' }: CitationBadgeProps) {
@@ -55,14 +54,10 @@ export function CitationBadge({ id, label, type = 'node' }: CitationBadgeProps) 
           {label}
         </button>
       </sup>
-      {anchorRect && type === 'node' && (
-        <NodePopover nodeId={id} anchorRect={anchorRect} onClose={close} />
-      )}
-      {anchorRect && type === 'chat' && (
-        <ChatCitePopover sessionId={id} anchorRect={anchorRect} onClose={close} />
-      )}
-      {anchorRect && type === 'url' && (
-        <UrlCitePopover url={id} anchorRect={anchorRect} onClose={close} />
+      {anchorRect && (
+        type === 'node' ? <NodePopover nodeId={id} anchorRect={anchorRect} onClose={close} />
+        : type === 'chat' ? <ChatCitePopover sessionId={id} anchorRect={anchorRect} onClose={close} />
+        : <UrlCitePopover url={id} anchorRect={anchorRect} onClose={close} />
       )}
     </>
   );

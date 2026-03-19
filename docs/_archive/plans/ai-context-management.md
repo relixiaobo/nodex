@@ -3,6 +3,8 @@
 > Chat 持久化、上下文压缩、跨设备同步的统一设计。
 >
 > **更新**：2026-03-15 — 代码现状 review + 开源调研 + 参考实现分析（assistant-ui / Vercel AI SDK）+ pi-agent-core 事件系统全面采用
+>
+> **补充**：2026-03-19 — 边界收敛：Chat 是过程历史层；用户可感知的长期记忆属于 Outliner 节点，不做独立 memory 数据库
 
 ## 总览
 
@@ -62,6 +64,55 @@ sendMessage(prompt)
 3. **无标题** — session 列表无法区分
 4. **无压缩** — 长对话会撞 context window
 5. **无同步** — 聊天记录只在本地
+
+## 2026-03-19 设计结论：Chat 不是第二个知识库
+
+这轮产品讨论后，Chat / Outliner / Memory 的边界收敛如下：
+
+- **ChatSession store**：保存协作过程历史，回答"我们怎么走到这里"
+- **Outliner nodes**：保存用户可感知的长期记忆，回答"哪些东西值得跨会话持续成立"
+- **Runtime retrieval / cache**：保存检索索引、相关性排序、摘要缓存等运行时辅助信息，但它们不是用户意义上的 memory，也不是真相源
+
+这意味着 soma 不应引入一个与 Outliner 平行、面向用户的独立 memory 数据库。凡是用户应该能看到、修正、继承、引用的长期记忆，都应该是节点，例如：
+
+- 长期偏好
+- 持续主题
+- 未完问题
+- 工作方式约束
+- 任务状态
+- AI 学到的协作规则（如 `#skill`）
+
+### 对跨会话能力的直接影响
+
+跨会话能力应该拆成两类，而不是做成"自动带上所有旧聊天"：
+
+1. **按时间检索 past chats**：回答"最近 / 昨天 / 上周我们聊了什么"
+2. **按主题检索 past chats**：回答"之前我们怎么讨论过 X"
+
+可参考 Claude 的两类工具抽象：
+
+- `recent_chats` — 时间范围检索
+- `conversation_search` — 关键词 / 主题检索
+
+但这些 past chats 结果是**过程证据**，不是长期记忆本身。稳定成立的内容应沉淀为节点，而不是只留在 transcript 中。
+
+### Scope 原则
+
+当前产品讨论的结论是：**用户对 past chats 的心智更接近全局个人历史，而不是当前局部空间。**
+
+这意味着 scope 讨论要拆成两层：
+
+1. **用户主动检索**
+   默认可以是全局个人历史，因为这是用户明确发起的回溯动作。
+
+2. **AI 自动引用**
+   这里仍有待定张力：默认也走全局，还是优先当前上下文 / 当前 workspace，再按需升级到全局。
+
+无论最终怎么定，默认优先级都应明确：
+
+1. **先看当前上下文**
+2. **再看 Outliner 中已沉淀的长期记忆节点**
+3. **最后才检索 past chats 作为过程补充**
 
 ---
 
@@ -766,6 +817,78 @@ R2: chat/{workspace_id}/{session_id}.json（完整 ChatSession JSON）
 - **考虑过的替代方案**：继续手写 IDBRequest（现状）；Dexie.js（15KB，含 reactive hooks）
 - **选择理由**：`idb` 是 Promise 薄封装，API 与原生 IndexedDB 一致，学习成本为零。Dexie 功能丰富但 15KB 对我们的 IndexedDB 使用量级过重。手写样板代码冗长且容易出错（忘记关 transaction 等）
 
+### D8: 跨会话记忆边界 — 独立 Memory DB vs Outliner 节点
+
+**决策**：用户可感知的长期记忆进入 Outliner；Chat 只保存过程历史
+
+- **考虑过的替代方案**：为 AI 建一个独立的 memory store / memory DB
+- **选择理由**：soma 已经有天然适合承载长期记忆的共享画板。凡是用户应该能看到、修正、继承、引用的东西，都应该是节点。否则会出现第二真相源，削弱"一切皆节点"
+- **结果**：Chat transcript 独立持久化，但长期偏好、持续主题、未完问题、协作规则等 durable memory 应沉淀为节点
+
+### D9: 跨会话能力形态 — 自动全量带历史 vs 按需 past chats 检索
+
+**决策**：按需检索 past chats（时间 / 主题），而不是默认把所有旧聊天塞进新对话
+
+- **考虑过的替代方案**：每次新对话都自动带上大量历史 transcript
+- **选择理由**：全量历史噪音高、成本高、可控性差。按时间和按主题检索更符合用户心智，也更容易给出引用和 scope 控制
+- **结果**：后续应提供类似 `recent_chats` 和 `conversation_search` 的能力；检索结果作为过程证据补充当前对话，而不是替代 Outliner 中的长期记忆节点
+
+### D10: durable memory 的落地方式 — 候选沉淀 vs AI 直接记节点
+
+**决策**：AI 可以直接把值得长期保留的内容记录到 nodes 中
+
+- **考虑过的替代方案**：只生成候选，等待用户确认后再落节点
+- **选择理由**：在 v5 协作模型里，AI 不是审批流助手，而是共同工作的协作者。默认先动手，再让用户修正，更符合产品方向
+- **结果**：后续设计重点不再是"要不要先确认"，而是来源标记、撤销路径、以及 durable memory taxonomy
+
+### D11: past chats 的用户心智 — 当前 scope vs 全局个人历史
+
+**决策**：用户主动检索 past chats 时，心智更接近全局个人历史
+
+- **考虑过的替代方案**：默认限定在当前 workspace / 当前 topic / 当前 agent scope
+- **选择理由**：用户问"我们之前聊过什么"时，通常期待的是跨当前工作面的个人连续性，而不是被当前面板局部截断
+- **结果**：后续需要单独定义"AI 自动引用 past chats"是否也默认全局；这仍是待定问题
+
+### D12: 引用展示方式 — 默认显式 citation vs 渐进式披露
+
+**决策**：来源默认收起，只在展开时显示
+
+- **考虑过的替代方案**：每次引用都默认显式展示来源块 / citation
+- **选择理由**：默认显式来源会让对话过重，破坏自然性。渐进式披露更符合"先自然使用，必要时再解释"
+- **结果**：后续 UI 只需要定义最小控制面：查看来源、跳转、排除、撤销
+
+## 下一轮需要定的设计件
+
+以下问题已经不是理念分歧，而是需要继续产出可实现设计：
+
+1. **Chat → Node 沉淀接口**
+   需要定义哪些 chat 产物可以沉淀为节点、沉淀成什么节点形态、如何标记来源、以及最小撤销路径。
+
+2. **past chats 检索接口**
+   至少需要两类能力：
+   - 时间检索：`recent_chats`
+   - 主题检索：`conversation_search`
+   需要进一步定义输入 schema、返回格式、是否附带 citation、以及与当前 `transformContext` / tool loop 的集成方式。
+
+3. **Scope 模型**
+   用户主动检索已经偏向全局个人历史。现在真正要定的是：AI 自动引用时的默认 scope 是什么，以及何时从局部升级到全局。
+
+4. **引用与可解释性**
+   现在已明确来源默认收起。还需要定义展开后最少显示哪些控制：来源、摘要、跳转入口、排除入口、撤销入口。
+
+5. **本地与跨设备边界**
+   本地跨会话已经有底座，但跨设备 past chats / memory 会直接影响同步设计和隐私承诺。需要明确哪些只做本地，哪些进入 Phase 4。
+
+### 建议 Claude Code 下一轮直接回答的 5 个问题
+
+如果下一轮要和 Claude Code 深入讨论，建议直接围绕下面 5 个问题收敛：
+
+1. durable memory 的 taxonomy 是什么？
+2. Chat 中哪些信号触发"直接沉淀为节点"？
+3. `recent_chats` 和 `conversation_search` 的最小可用 schema 是什么？
+4. AI 自动引用 past chats 时，默认 scope 应该是什么？
+5. 当 AI 引用了 past chats 或 durable memory，展开态最少要暴露哪些控制？
+
 ---
 
 ## 不做的事
@@ -780,3 +903,4 @@ R2: chat/{workspace_id}/{session_id}.json（完整 ChatSession JSON）
 - 不拆 IndexedDB 为 session + message 两个 store — 当前会话量级不需要
 - 不采用 assistant-ui 组件库 — Chat UI 已定制化，只参考其 `MessageRepository` 数据结构
 - 不采用 LangChain memory — 依赖链过重（~100 行 DIY 即可）
+- 不做面向用户的独立 memory 数据库 — durable memory 属于 Outliner 节点

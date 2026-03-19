@@ -342,6 +342,44 @@ describe('ai-provider-config', () => {
       expect(customModel?.provider).toBe('openai');
     });
 
+    it('custom model with a featured model ID is still not featured', () => {
+      // Use an unknown provider so there are no SDK models to dedup against.
+      // Give the custom model an ID that matches a featured model from another
+      // provider — the __isCustom marker must force featured: false by design,
+      // not merely because the provider lookup misses.
+      const optId = 'NDX_PROVIDER_OPT_ACME';
+      loroDoc.createNode(optId, NDX_F.PROVIDER_ID);
+      loroDoc.setNodeRichTextContent(optId, 'acme', [], []);
+      loroDoc.commitDoc();
+
+      // Use a featured OpenAI model name as the custom model ID
+      const featuredModelId = 'gpt-5.4';
+
+      seedProviderConfig({
+        provider: 'acme',
+        enabled: true,
+        apiKey: 'sk-acme',
+        baseUrl: 'https://acme.example/v1',
+        name: 'Acme Corp',
+        models: [featuredModelId, 'acme-custom'],
+      });
+
+      const modelsWithMeta = getAvailableModelsWithMeta();
+      const acmeModels = modelsWithMeta.filter((m) => m.provider === 'acme');
+
+      expect(acmeModels).toHaveLength(2);
+
+      // Both custom models must be not-featured, even though one has an ID
+      // that matches a featured model name
+      const matchingModel = acmeModels.find((m) => m.id === featuredModelId);
+      expect(matchingModel).toBeDefined();
+      expect(matchingModel?.featured).toBe(false);
+
+      const otherModel = acmeModels.find((m) => m.id === 'acme-custom');
+      expect(otherModel).toBeDefined();
+      expect(otherModel?.featured).toBe(false);
+    });
+
     it('disabled provider custom models are excluded', () => {
       seedProviderConfig({
         provider: 'openai',

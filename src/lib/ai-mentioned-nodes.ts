@@ -10,19 +10,23 @@ import * as loroDoc from './loro-doc.js';
 // ── Regex for scanning AI response content ──
 
 const REF_RE = /<ref\s+id="([^"]+)">/g;
-const CITE_RE = /<cite\s+id="([^"]+)">/g;
+// Matches <cite id="xxx"> (no type = node) and <cite type="node" id="xxx">
+// Skips type="chat" and type="url" since those aren't knowledge graph nodes.
+const CITE_NODE_RE = /<cite\s+(?:type="node"\s+)?id="([^"]+)">/g;
+const CITE_NON_NODE_RE = /<cite\s+type="(?:chat|url)"\s+id="[^"]+">/g;
 const NODE_RE = /<node\s+id="([^"]+)"\s*\/>/g;
 
 /** nodeId → timestamp when AI last mentioned it */
 const mentionedNodes = new Map<string, number>();
 
 /**
- * Scan an AI response for <ref>, <cite>, and <node /> tags.
+ * Scan an AI response for <ref>, <cite type="node">, and <node /> tags.
  * Records each referenced nodeId with the current timestamp.
+ * Skips <cite type="chat"> and <cite type="url"> (not node references).
  */
 export function scanAndTrackMentionedNodes(responseText: string): void {
   const now = Date.now();
-  for (const re of [REF_RE, CITE_RE, NODE_RE]) {
+  for (const re of [REF_RE, CITE_NODE_RE, NODE_RE]) {
     re.lastIndex = 0;
     let m = re.exec(responseText);
     while (m) {

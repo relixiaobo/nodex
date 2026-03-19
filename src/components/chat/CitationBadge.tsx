@@ -1,20 +1,40 @@
-import { useRef } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { useNode } from '../../hooks/use-node.js';
-import { NodePopover, useNodePopover } from './NodePopover.js';
+import { NodePopover } from './NodePopover.js';
+import { ChatCitePopover } from './ChatCitePopover.js';
+import { UrlCitePopover } from './UrlCitePopover.js';
+import type { CiteType } from './MarkdownRenderer.js';
 
 interface CitationBadgeProps {
-  nodeId: string;
+  id: string;
   label: string;
+  type?: CiteType;
 }
 
-export function CitationBadge({ nodeId, label }: CitationBadgeProps) {
-  const node = useNode(nodeId);
+export function CitationBadge({ id, label, type = 'node' }: CitationBadgeProps) {
   const triggerRef = useRef<HTMLButtonElement>(null);
-  const { anchorRect, open, close } = useNodePopover(node, triggerRef);
+  const [anchorRect, setAnchorRect] = useState<DOMRect | null>(null);
 
-  const title = node
-    ? [node.name ?? nodeId, node.description ?? ''].filter(Boolean).join('\n')
-    : 'Deleted node';
+  // Only load node data for node-type citations
+  const node = useNode(type === 'node' ? id : null);
+
+  const open = useCallback(() => {
+    if (type === 'node' && !node) return;
+    if (!triggerRef.current) return;
+    setAnchorRect(triggerRef.current.getBoundingClientRect());
+  }, [type, node]);
+
+  const close = useCallback(() => {
+    setAnchorRect(null);
+  }, []);
+
+  const isDisabled = type === 'node' && !node;
+
+  const title = type === 'node'
+    ? (node ? [node.name ?? id, node.description ?? ''].filter(Boolean).join('\n') : 'Deleted node')
+    : type === 'chat'
+      ? 'Past conversation'
+      : id; // url — show the URL itself
 
   return (
     <>
@@ -23,20 +43,26 @@ export function CitationBadge({ nodeId, label }: CitationBadgeProps) {
           ref={triggerRef}
           type="button"
           onClick={open}
-          disabled={!node}
+          disabled={isDisabled}
           title={title}
           className={[
             'inline-flex min-w-4 items-center justify-center rounded-full border px-1 text-[10px] leading-4',
-            node
-              ? 'border-border bg-background text-foreground-secondary transition-colors hover:border-primary/30 hover:text-foreground'
-              : 'cursor-default border-border bg-background text-foreground-tertiary line-through',
+            isDisabled
+              ? 'cursor-default border-border bg-background text-foreground-tertiary line-through'
+              : 'border-border bg-background text-foreground-secondary transition-colors hover:border-primary/30 hover:text-foreground',
           ].join(' ')}
         >
           {label}
         </button>
       </sup>
-      {anchorRect && (
-        <NodePopover nodeId={nodeId} anchorRect={anchorRect} onClose={close} />
+      {anchorRect && type === 'node' && (
+        <NodePopover nodeId={id} anchorRect={anchorRect} onClose={close} />
+      )}
+      {anchorRect && type === 'chat' && (
+        <ChatCitePopover sessionId={id} anchorRect={anchorRect} onClose={close} />
+      )}
+      {anchorRect && type === 'url' && (
+        <UrlCitePopover url={id} anchorRect={anchorRect} onClose={close} />
       )}
     </>
   );

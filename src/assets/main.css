@@ -605,6 +605,11 @@ html, body {
   margin-top: 12px;
 }
 
+/* Consecutive node embeds: collapse inter-block gap for compact list feel */
+.chat-prose > .chat-node-embed + .chat-node-embed {
+  margin-top: 2px;
+}
+
 /* Headings — styled via element selectors, no custom classes needed */
 .chat-prose h1 {
   font-size: 20px;

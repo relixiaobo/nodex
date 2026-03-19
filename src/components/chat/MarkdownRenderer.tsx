@@ -20,25 +20,62 @@ import { highlightCode } from '../../lib/code-highlight.js';
 import { Check, Copy } from '../../lib/icons.js';
 import { CitationBadge } from './CitationBadge.js';
 import { NodeReference } from './NodeReference.js';
+import { NodeEmbed } from './NodeEmbed.js';
 
 // ── Inline markup extraction ──
 
 const INLINE_MARKUP_RE = /<(ref|cite)\s+id="([^"]+)">([\s\S]*?)<\/\1>/g;
 const PLACEHOLDER_RE = /%%SOMA_(\d+)%%/g;
 
-interface Placeholder {
+// Block-level <node /> tag: must be on its own line (optional whitespace around)
+const NODE_EMBED_LINE_RE = /^\s*<node\s+id="([^"]+)"\s*\/>\s*$/;
+
+interface InlinePlaceholder {
   kind: 'ref' | 'cite';
   nodeId: string;
   content: string;
 }
 
+interface NodeEmbedPlaceholder {
+  kind: 'node';
+  nodeId: string;
+}
+
+type Placeholder = InlinePlaceholder | NodeEmbedPlaceholder;
+
+/**
+ * Extract inline markup (<ref>, <cite>) and block-level <node /> tags.
+ *
+ * - <ref> and <cite> are replaced with %%SOMA_N%% inline placeholders.
+ * - <node /> on its own line becomes a standalone %%SOMA_N%% paragraph.
+ */
 export function extractInlineMarkup(text: string): { cleaned: string; placeholders: Placeholder[] } {
   const placeholders: Placeholder[] = [];
-  const cleaned = text.replace(INLINE_MARKUP_RE, (_match, kind: string, nodeId: string, content: string) => {
+
+  // Pass 1: extract block-level <node /> tags (line-by-line)
+  const lines = text.split('\n');
+  const processedLines: string[] = [];
+  for (const line of lines) {
+    const nodeMatch = NODE_EMBED_LINE_RE.exec(line);
+    if (nodeMatch) {
+      const index = placeholders.length;
+      placeholders.push({ kind: 'node', nodeId: nodeMatch[1] });
+      // Emit as its own paragraph (blank lines around ensure marked treats it as separate block)
+      processedLines.push('', `%%SOMA_${index}%%`, '');
+    } else {
+      processedLines.push(line);
+    }
+  }
+
+  const afterNodeExtraction = processedLines.join('\n');
+
+  // Pass 2: extract inline <ref> and <cite> tags
+  const cleaned = afterNodeExtraction.replace(INLINE_MARKUP_RE, (_match, kind: string, nodeId: string, content: string) => {
     const index = placeholders.length;
     placeholders.push({ kind: kind as 'ref' | 'cite', nodeId, content });
     return `%%SOMA_${index}%%`;
   });
+
   return { cleaned, placeholders };
 }
 
@@ -52,6 +89,19 @@ export function splitMarkdownBlocks(text: string): string[] {
   } catch {
     return [text];
   }
+}
+
+// ── Check if a block is a standalone node embed placeholder ──
+
+const STANDALONE_NODE_EMBED_RE = /^\s*%%SOMA_(\d+)%%\s*$/;
+
+function tryGetNodeEmbed(block: string, placeholders: Placeholder[]): string | null {
+  const match = STANDALONE_NODE_EMBED_RE.exec(block);
+  if (!match) return null;
+  const idx = Number(match[1]);
+  const ph = placeholders[idx];
+  if (ph?.kind === 'node') return ph.nodeId;
+  return null;
 }
 
 // ── Placeholder injection into React children ──
@@ -78,11 +128,16 @@ function injectPlaceholders(
           parts.push(child.slice(cursor, match.index));
         }
         if (ph) {
-          parts.push(
-            ph.kind === 'ref'
-              ? <NodeReference key={`${keyPrefix}-ref-${partIndex}`} nodeId={ph.nodeId}>{ph.content}</NodeReference>
-              : <CitationBadge key={`${keyPrefix}-cite-${partIndex}`} nodeId={ph.nodeId} label={ph.content} />,
-          );
+          if (ph.kind === 'ref') {
+            parts.push(
+              <NodeReference key={`${keyPrefix}-ref-${partIndex}`} nodeId={ph.nodeId}>{ph.content}</NodeReference>,
+            );
+          } else if (ph.kind === 'cite') {
+            parts.push(
+              <CitationBadge key={`${keyPrefix}-cite-${partIndex}`} nodeId={ph.nodeId} label={ph.content} />,
+            );
+          }
+          // 'node' kind is handled at block level, not inline — skip here
         }
         cursor = match.index + match[0].length;
         partIndex += 1;
@@ -243,6 +298,12 @@ export function MarkdownContent({ text, streaming = false, keyPrefix }: Markdown
       {blocks.map((block, i) => {
         const isLast = i === blocks.length - 1;
         const blockKey = `${keyPrefix}-b${i}`;
+
+        // Block-level <node /> embed — render as NodeEmbed instead of markdown
+        const embedNodeId = tryGetNodeEmbed(block, placeholders);
+        if (embedNodeId) {
+          return <NodeEmbed key={blockKey} nodeId={embedNodeId} />;
+        }
 
         if (streaming && isLast) {
           // Last block during streaming: no memo (content changes every tick).

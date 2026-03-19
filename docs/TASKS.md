@@ -22,7 +22,7 @@ _(空)_
 
 | 工作区 | 分支 | 任务 | 状态 |
 |--------|------|------|------|
-| nodex-claude | — | 空闲 | — |
+| nodex-claude | 多个 | 6 个任务（见下方进行中） | 待开始 |
 | nodex-gemini | — | 空闲 | — |
 | nodex-codex | — | 空闲 | — |
 
@@ -30,7 +30,14 @@ _(空)_
 
 ## 进行中
 
-_(空)_
+| PR | 任务 | 类型 | Agent |
+|----|------|------|-------|
+| #151 | 自定义 Provider Models 字段 | 编码 | claude |
+| #152 | FieldRow Ctrl+I description 编辑 | 编码 | claude |
+| #153 | KaTeX 数学公式渲染 | **调研优先** | claude |
+| #154 | YouTube transcript 抓取 | **调研优先** | claude |
+| #155 | Trash 交互优化 | 编码 | claude |
+| #156 | 节点选中增强 (Cmd+Shift+D) | 编码 | claude |
 
 ---
 

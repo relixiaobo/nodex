@@ -127,6 +127,7 @@ const LEGACY_PROMPT_LINES = [
   'When you mention an existing node in your answer, use <ref id="nodeId">display text</ref>.',
   'When you cite evidence from a node, use <cite id="nodeId">N</cite>.',
   'Reply in the user\'s language unless they explicitly ask otherwise.',
+  'Use <node id="nodeId" /> on its own line to display a node\'s content as an interactive outliner.',
 ];
 
 const DEFAULT_PROMPT_PRESETS = LEGACY_PROMPT_LINES.map((text, i) => ({

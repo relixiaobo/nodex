@@ -50,6 +50,7 @@ import { ensureSystemNodes } from '../../lib/bootstrap-system-nodes.js';
 import { Toaster, toast } from 'sonner';
 import { TooltipProvider } from '../../components/ui/Tooltip';
 import { isAppPanel, isChatPanel } from '../../types/index.js';
+import { openChatPanel } from '../../lib/chat-panel-actions.js';
 
 // ─── Error Boundary ───
 // Prevents white screen — catches render errors and shows a recovery UI.
@@ -155,9 +156,11 @@ function useBootstrap(skip: boolean): BootstrapResult {
     });
    }
 
-   // Navigate to Today on first visit of the day when the restored active panel
-   // is a regular node panel. Preserve restored app/chat panels as-is so special
-   // panels survive restart and continue restoring their own state.
+   // Default panel logic:
+   // - Empty panels → open Chat (chat-first experience)
+   // - Invalid/stale node panel → reset to Today
+   // - First visit of the day on a node panel → reset to Today
+   // Preserve restored app/chat panels as-is so special panels survive restart.
    // Use replacePanel (not navigateTo) to avoid creating a Loro undo entry whose
    // captured UI snapshot is the empty initial state — that would cause repeated
    // Cmd+Z to restore a blank panel stack.
@@ -172,16 +175,19 @@ function useBootstrap(skip: boolean): BootstrapResult {
     && !isAppPanel(currentPanelNodeId)
     && !isChatPanel(currentPanelNodeId)
     && !loroDoc.hasNode(currentPanelNodeId);
-   const shouldResetToToday = uiState.panels.length === 0
-    || hasInvalidActiveNode
+
+   if (uiState.panels.length === 0) {
+    // Chat-first: open a new Chat panel on fresh start
+    void openChatPanel();
+   } else if (
+    hasInvalidActiveNode
     || (
       isFirstVisitOfDay
       && !!currentPanelNodeId
       && !isAppPanel(currentPanelNodeId)
       && !isChatPanel(currentPanelNodeId)
-    );
-
-   if (shouldResetToToday) {
+    )
+   ) {
     replacePanel(ensureTodayNode());
    }
 

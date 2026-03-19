@@ -2,6 +2,11 @@ import type { NodeType } from '../../types/index.js';
 import { SYS_V } from '../../types/index.js';
 import type { FieldEntry } from '../../hooks/use-node-fields';
 
+/** Shared container class for all outliner row lists (root, children, field values).
+ *  Single source of truth — prevents layout drift between OutlinerView,
+ *  OutlinerItem (recursive children), and FieldValueOutliner. */
+export const OUTLINER_ROW_CONTAINER_CLASS = 'flex flex-col';
+
 export type OutlinerRowType = 'field' | 'content' | 'groupHeader';
 
 export type OutlinerRowItem =

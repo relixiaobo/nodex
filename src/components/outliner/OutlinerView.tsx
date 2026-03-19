@@ -9,6 +9,7 @@ import * as loroDoc from '../../lib/loro-doc.js';
 import { isOutlinerContentNodeType } from '../../lib/node-type-utils.js';
 import { OutlinerItem } from './OutlinerItem';
 import { RowHost } from './RowHost.js';
+import { OUTLINER_ROW_CONTAINER_CLASS } from './row-model.js';
 import { FieldRow } from '../fields/FieldRow';
 import { toFieldRowEntryProps } from '../fields/field-row-props.js';
 import { TrailingInput } from '../editor/TrailingInput';
@@ -179,7 +180,7 @@ export function OutlinerView({ rootNodeId, showTemplateFields, panelId }: Outlin
   return (
     <div
       ref={containerRef}
-      className="flex flex-col gap-1.5 pr-4"
+      className={`${OUTLINER_ROW_CONTAINER_CLASS} pr-4`}
       role="tree"
       data-row-scope-parent-id={rootNodeId}
     >

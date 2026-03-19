@@ -10,6 +10,7 @@ import { useUIStore } from '../../stores/ui-store.js';
 import { OutlinerView } from '../outliner/OutlinerView.js';
 import type { NodexNode } from '../../types/index.js';
 import { PopoverShell } from './PopoverShell.js';
+import { ChatNodeIdentity } from './ChatNodeIdentity.js';
 
 /** Shared panelId for all OutlinerViews rendered inside Chat (popover + embed). */
 export const CHAT_OUTLINER_PANEL_ID = 'chat';
@@ -55,8 +56,9 @@ export function NodePopover({ nodeId, anchorRect, onClose }: NodePopoverProps) {
 
   return (
     <PopoverShell anchorRect={anchorRect} onClose={onClose}>
+      <ChatNodeIdentity nodeId={nodeId} />
       <div
-        className="overflow-y-auto py-1"
+        className="overflow-y-auto"
         style={{ maxHeight: POPOVER_MAX_HEIGHT }}
       >
         <OutlinerView rootNodeId={nodeId} panelId={CHAT_OUTLINER_PANEL_ID} />

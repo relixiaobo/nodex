@@ -1,6 +1,11 @@
-# soma 产品方法论
+# soma 产品方法论 (v4)
 
 > Think where you read.
+
+> **注意**：本文档是 v4 版本，记录了 "Think → Connect → Emerge" 的产品方法论。
+> 产品方向已演进到 **v5（人机协作）**，核心理念从"工具 + AI 辅助"转变为"对话即思考 + 人机协作"。
+> v5 文档见 [`docs/plans/ai-first-product-vision.md`](plans/ai-first-product-vision.md)。
+> 本文档中的核心价值观（让人变强、正反馈、一切皆节点）在 v5 中保留不变。
 
 ---
 

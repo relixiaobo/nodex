@@ -59,13 +59,32 @@
 
 ```
 Loro CRDT (Blackboard — 数据交换)       EventTarget (Message Bus — 协调信号)
-├── 结果节点                           ├── task-delegated
-├── 进度节点                           ├── task-progress
-└── 协作数据（Agent A → B）            ├── task-completed / task-failed
-                                       ├── clarification-needed / response
+├── 任务节点 (#task + status 字段)     ├── task-delegated
+├── 步骤子节点 (#task-step)            ├── task-progress
+├── 结果子节点                         ├── task-completed / task-failed
+└── 协作数据（Agent A → B）            ├── clarification-needed / response
                                        ├── task-cancelled
                                        └── data-available
 ```
+
+### 任务即节点（数据模型）
+
+> 来源：`ai-first-product-vision.md` §九
+
+任务不需要独立的管理系统——节点树本身就是任务系统：
+
+```
+"调研 AI Agent 竞品"  #task  status: running
+  ├── 搜索主流平台          #task-step  status: done
+  ├── 阅读 CrewAI           #task-step  status: running  ← subagent 1
+  ├── 阅读 AutoGen          #task-step  status: running  ← subagent 2
+  └── 整理对比表            #task-step  status: pending
+```
+
+- `#task` 是 supertag，定义 `status` 字段（pending / running / done / failed）
+- 状态变更 = `node_edit` 修改字段值，subagent 用现有 node tools 即可操作
+- 任务完成的结果 = 子节点，天然在知识图谱中可搜索、可关联
+- 泛化自 Spark 三态节点（pending → loading → complete），统一状态渲染机制
 
 **为什么不用单一方案**：
 - 纯 Blackboard：无法实现结构化的 request/response（clarification 需要）

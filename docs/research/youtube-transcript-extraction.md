@@ -1,7 +1,7 @@
 # YouTube Transcript Extraction Research
 
-> Research date: 2026-03-19
-> Context: soma Chrome extension (MV3), existing `page-capture` framework
+> Research date: 2026-03-19 (updated: 2026-03-19)
+> Context: soma Chrome extension (MV3), existing `page-capture` framework, WXT build system
 
 ## 1. Extraction Methods Survey
 
@@ -101,22 +101,41 @@ Fetch the YouTube watch page HTML and extract caption track metadata from the em
 
 This is the approach used by most npm libraries. It is functionally equivalent to the InnerTube approach (same data, different delivery mechanism) but requires an extra page fetch.
 
-### 1.4 Unofficial: Content Script DOM Extraction
+### 1.4 Unofficial: Content Script Local Extraction (MAIN World)
 
-When the user is on a YouTube video page, the `ytInitialPlayerResponse` object is available as a global variable on the page.
+When the user is on a YouTube video page, caption track metadata is available through multiple local access methods that don't require any external API call.
 
-**Access path:**
+**Access methods (in priority order):**
+
+1. **Player API** — `document.querySelector('#movie_player').getPlayerResponse()` returns the full player response including captions. This is the most reliable method as it reflects the _current_ video's state, even after SPA navigation.
+
+2. **DOM element data** — `document.querySelector('ytd-app').data.playerResponse` accesses the player response via YouTube's Polymer component data binding. This is the approach used by the popular [Youtube Subtitle Downloader v36](https://greasyfork.org/en/scripts/5368-youtube-subtitle-downloader-v36) userscript.
+
+3. **Global variable** — `window.ytInitialPlayerResponse` is set on initial page load but does **not** update on SPA navigation.
+
+4. **Inline script regex** — Parse `<script>` tag contents for `ytInitialPlayerResponse\s*=\s*({.+?});` and extract the JSON. Used by the [YouTube Smart Subtitle Downloader](https://greasyfork.org/en/scripts/523696-youtube-smart-subtitle-downloader) userscript.
+
+**All methods yield the same data path:**
 ```javascript
-window.ytInitialPlayerResponse?.captions
+playerResponse?.captions
   ?.playerCaptionsTracklistRenderer?.captionTracks
 ```
 
-**Critical limitation:** Content scripts run in an isolated world and cannot access page-level JavaScript variables directly. Accessing `window.ytInitialPlayerResponse` requires injecting a `<script>` tag into the page's main world, which:
-- Works but requires `"world": "MAIN"` in the content script manifest, or dynamic script injection
-- Has security implications (runs in the page's JS context)
-- **The global variable does not update on SPA navigation** — when users navigate between videos without full page reloads, the variable retains stale data
+**Critical constraint:** Methods 1-3 require access to the page's JavaScript context. Content scripts run in an isolated world and cannot access page-level variables. This requires **main world injection** (see Section 1.6).
 
-**However**, a content script _can_ read the raw HTML of `<script>` tags in the DOM and extract the data via regex, avoiding the isolated world issue.
+Method 4 (regex) works from the isolated world but only captures the initial page load data — it misses SPA navigation updates.
+
+**SPA navigation handling:**
+
+YouTube uses `history.pushState` for navigation between videos. The page fires several custom events:
+- `yt-navigate-start` — navigation begins
+- `yt-page-data-fetched` — new page data loaded
+- `yt-page-data-updated` — DOM updated with new data
+- `yt-navigate-finish` — navigation complete
+
+A main world script can listen for `yt-navigate-finish` to re-extract caption tracks for the new video. The `event.detail.response.playerResponse` also contains the fresh player response directly.
+
+**Proven at scale:** Extensions like [Immersive Translate](https://immersivetranslate.com/) (millions of users) and [youtube-to-claude-transcriptiser](https://github.com/MorganOnCode/youtube-to-claude-transcriptiser) use this local extraction approach for YouTube subtitle access. The Brave browser's built-in AI Chat also [extracts transcripts locally](https://github.com/brave/brave-browser/issues/34945) from the page.
 
 ### 1.5 Existing npm Libraries
 
@@ -129,13 +148,87 @@ window.ytInitialPlayerResponse?.captions
 
 **Bundle size concern:** These packages are designed for Node.js server environments. They use `fetch` (fine) but include Node.js-specific error handling and may bring unnecessary dependencies. For a Chrome extension, a lean custom implementation is preferable.
 
+### 1.6 MV3 `world: 'MAIN'` Injection
+
+Chrome MV3 introduced the ability to run content scripts in the page's main world via `world: "MAIN"`. This is essential for accessing YouTube's player API and `ytInitialPlayerResponse`.
+
+**Two approaches in MV3:**
+
+**A. Manifest declaration** (`world: "MAIN"` in manifest.json):
+```json
+{
+  "content_scripts": [{
+    "matches": ["*://*.youtube.com/*"],
+    "js": ["main-world.js"],
+    "world": "MAIN"
+  }]
+}
+```
+- Chrome-only (not supported in Firefox)
+- The script has NO access to extension APIs (`chrome.runtime`, `chrome.storage`, etc.)
+- Must communicate with the isolated-world content script via `window.postMessage` or `CustomEvent`
+
+**B. WXT `injectScript` utility** (recommended for our codebase):
+
+WXT provides `injectScript()` which creates a `<script>` element pointing to an unlisted script, loading it into the page's main world. This is the recommended cross-browser approach.
+
+**Setup:**
+
+1. Create an **unlisted script** (runs in MAIN world):
+```typescript
+// src/entrypoints/youtube-main-world.ts
+export default defineUnlistedScript(() => {
+  // Full access to page JS context
+  const player = document.querySelector('#movie_player') as any;
+  const captionTracks = player?.getPlayerResponse()
+    ?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
+
+  // Send data back to content script via CustomEvent
+  document.currentScript?.dispatchEvent(
+    new CustomEvent('yt-caption-tracks', { detail: captionTracks })
+  );
+});
+```
+
+2. **Inject from content script** (ISOLATED world):
+```typescript
+import { injectScript } from 'wxt/client';
+
+const { script } = await injectScript('/youtube-main-world.js', {
+  modifyScript(script) {
+    script.addEventListener('yt-caption-tracks', (event) => {
+      const tracks = (event as CustomEvent).detail;
+      // Now have captionTracks in isolated world
+    });
+  },
+});
+```
+
+**Key WXT details:**
+- `injectScript` is synchronous in MV3 — the injected script evaluates at the same time as `run_at`
+- Returns a Promise that resolves when the script has been evaluated
+- The `<script>` element itself serves as a communication channel via `CustomEvent`
+- Works in MV2 and MV3, Chrome and Firefox
+- The unlisted script must be configured as a `web_accessible_resource`
+
+**Communication patterns (MAIN <-> ISOLATED):**
+
+| Method | Pros | Cons |
+|--------|------|------|
+| `CustomEvent` on `<script>` element | Scoped, no global pollution | One-shot (script element removed after eval) |
+| `window.postMessage` | Bidirectional, persistent | Any page script can listen; needs origin check |
+| `document.dispatchEvent` | Simple, persistent | Any page script can listen |
+
+For our use case, `window.postMessage` with a unique message type prefix is best since we need ongoing communication (SPA navigation triggers re-extraction).
+
 ## 2. Chrome Extension Constraints (MV3)
 
 ### 2.1 Content Script Limitations
 
-- **CORS**: Content scripts follow the page's CORS policy (since Chrome 73). YouTube's timedtext/transcript endpoints do not set CORS headers, so content scripts **cannot** directly `fetch()` transcript URLs.
+- **CORS**: Content scripts follow the page's CORS policy (since Chrome 73). YouTube's timedtext/transcript endpoints do not set CORS headers, so content scripts **cannot** directly `fetch()` transcript URLs from the ISOLATED world.
 - **Isolated world**: Content scripts cannot access `window.ytInitialPlayerResponse` without main-world injection.
 - **What content scripts CAN do**: Read DOM elements, read `<script>` tag text content, extract data via regex from inline scripts.
+- **MAIN world scripts**: Can access all page JS variables and APIs, but **cannot** use extension APIs. Can fetch same-origin URLs (youtube.com timedtext endpoints are same-origin when running on youtube.com). This is a key advantage — the `baseUrl` for transcript content is on `youtube.com`, so a MAIN world script can fetch it directly without needing the background service worker.
 
 ### 2.2 Background Service Worker Capabilities
 
@@ -170,19 +263,25 @@ It does **not** extract transcript data.
 
 ### 3.2 Existing Pattern for Background Fetches
 
-The X.com video metadata fetch provides a direct precedent:
+The X.com video metadata fetch provides a direct precedent for the **fallback** approach:
 
 1. Content script calls `fetchXVideoMetadataViaBackground(tweetId)` — sends a message to background
 2. Background receives `PAGE_CAPTURE_FETCH_X_VIDEO` message
 3. Background calls `fetchXVideoMetadata()` which does the actual HTTP request
 4. Response relayed back to content script
 
-YouTube transcript extraction should follow the same pattern:
-1. YouTube extractor (running in content script) extracts `captionTracks` from DOM (regex on inline `<script>` tags)
-2. Sends tracks to background via `chrome.runtime.sendMessage`
-3. Background fetches the transcript XML/JSON from the track's `baseUrl`
-4. Returns parsed transcript data to content script
+The **primary** approach (local extraction) differs from this pattern:
+1. YouTube extractor injects a MAIN world script via WXT `injectScript()`
+2. MAIN world script accesses YouTube's player API directly to get `captionTracks`
+3. MAIN world script fetches transcript content (same-origin, no CORS issues)
+4. Result sent back to isolated world via `window.postMessage`
 5. Extractor includes transcript in the `PageCapturePatch`
+
+If local extraction fails, the **fallback** follows the X.com pattern:
+1. Content script sends `videoId` to background via `chrome.runtime.sendMessage`
+2. Background POSTs to InnerTube `/player` endpoint to get `captionTracks`
+3. Background fetches transcript XML/JSON from the track's `baseUrl`
+4. Returns parsed transcript data to content script
 
 ### 3.3 Transcript Data Storage
 
@@ -217,53 +316,81 @@ VideoClipNode (#video)
 - The primary use case is AI context (feeding transcript to LLM), which needs the full text
 - If timestamp-level navigation is needed later, the raw segment data can be cached in IndexedDB or `chrome.storage` alongside the page content cache (`ai-shadow-cache`)
 
-## 4. Recommended Approach
+## 4. Recommended Approach: Local Extraction via MAIN World
 
-### 4.1 Architecture: Background Fetch via InnerTube API
+### 4.1 Architecture: Local Extraction (Primary) + InnerTube API (Fallback)
 
-**Why this approach:**
-- No external API key or OAuth required
-- No npm dependency needed (lean custom implementation)
-- Follows existing `x-video-service.ts` pattern exactly
-- Works for any public video with captions enabled
-- Background service worker has no CORS restrictions
+**Why local extraction is preferred over InnerTube API:**
+
+| Aspect | Local Extraction (MAIN world) | InnerTube API (Background SW) |
+|--------|------------------------------|------------------------------|
+| **Network requests** | 1 (fetch `baseUrl` for transcript content) | 2 (POST to `/player` + fetch `baseUrl`) |
+| **Data freshness** | Uses YouTube's own loaded data — always current | Separate request — may get different data |
+| **CORS** | Same-origin fetch (youtube.com → youtube.com) | Needs background SW (no CORS in SW) |
+| **Authentication** | Inherits user's cookies — works for age-restricted/private videos | No cookies — fails for restricted content |
+| **SPA navigation** | Handles via `yt-navigate-finish` event | N/A (videoId-based) |
+| **Stability** | Proven by Immersive Translate (millions of users), Brave browser | Undocumented API, YouTube may change |
+| **Background SW** | Not needed for caption data | Required for all fetches |
+| **Complexity** | Needs MAIN world injection setup | Simpler messaging pattern |
+
+**The key insight from Immersive Translate and similar extensions:** The user is already on the YouTube page. The caption data is already loaded by YouTube's own code. Extracting it locally via the player API is more stable than making a separate API call, because:
+1. It uses the exact same data YouTube uses to render captions
+2. It inherits the user's authentication state (age-restricted, private videos)
+3. It avoids the risk of YouTube blocking or rate-limiting the InnerTube endpoint
+4. Only one fetch is needed (the transcript content), and it's same-origin
 
 **Flow:**
 
 ```
-┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
-│  Content Script  │     │  Background SW   │     │  YouTube API    │
-│  (youtube.com)   │     │                  │     │                 │
-├─────────────────┤     ├──────────────────┤     ├─────────────────┤
-│ 1. Extract       │     │                  │     │                 │
-│    videoId from  │     │                  │     │                 │
-│    URL           │     │                  │     │                 │
-│                  │     │                  │     │                 │
-│ 2. sendMessage   │────>│ 3. POST to       │────>│ 4. Return       │
-│    {videoId}     │     │    InnerTube      │     │    captionTracks│
-│                  │     │    /player        │<────│                 │
-│                  │     │                  │     │                 │
-│                  │     │ 5. Pick best      │     │                 │
-│                  │     │    track (en/     │     │                 │
-│                  │     │    auto-gen)      │     │                 │
-│                  │     │                  │     │                 │
-│                  │     │ 6. GET baseUrl    │────>│ 7. Return XML/  │
-│                  │     │    &fmt=json3     │<────│    JSON3        │
-│                  │     │                  │     │                 │
-│                  │     │ 8. Parse segments │     │                 │
-│ 9. Receive       │<────│    & return       │     │                 │
-│    transcript    │     │                  │     │                 │
-└─────────────────┘     └──────────────────┘     └─────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│  YouTube Page (youtube.com)                                     │
+│                                                                 │
+│  ┌──────────────────┐     ┌──────────────────┐                 │
+│  │  MAIN World       │     │  ISOLATED World   │                 │
+│  │  (unlisted script)│     │  (content script)  │                 │
+│  ├──────────────────┤     ├──────────────────┤                 │
+│  │ 1. Access player  │     │                  │                 │
+│  │    API or ytd-app │     │                  │                 │
+│  │    .data          │     │                  │                 │
+│  │                  │     │                  │                 │
+│  │ 2. Extract        │     │                  │                 │
+│  │    captionTracks  │     │                  │                 │
+│  │                  │     │                  │                 │
+│  │ 3. Select best    │     │                  │                 │
+│  │    track          │     │                  │                 │
+│  │                  │     │                  │                 │
+│  │ 4. fetch(baseUrl) │     │                  │                 │
+│  │    (same-origin!) │     │                  │                 │
+│  │                  │     │                  │                 │
+│  │ 5. Parse XML/JSON │     │                  │                 │
+│  │    → segments     │     │                  │                 │
+│  │                  │     │                  │                 │
+│  │ 6. postMessage    │────>│ 7. Receive       │                 │
+│  │    {transcript}   │     │    transcript     │                 │
+│  │                  │     │    data           │                 │
+│  └──────────────────┘     │                  │                 │
+│                           │ 8. Include in     │                 │
+│                           │    PageCapturePatch│                 │
+│                           └──────────────────┘                 │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-### 4.2 Alternative Considered: Content Script DOM Extraction
+**No background service worker involvement** — the entire extraction happens within the YouTube page context. The MAIN world script can fetch the transcript content directly because the `baseUrl` points to `youtube.com` (same-origin).
 
-An alternative would be to extract `captionTracks` from the page's inline `<script>` tags in the content script, then only send the `baseUrl` to background for fetching.
+### 4.2 Fallback: InnerTube API via Background Service Worker
 
-**Pros:** Avoids one network request (the InnerTube POST) since the data is already in the page.
-**Cons:** More fragile — YouTube's HTML structure changes more frequently than the InnerTube API response format. SPA navigation on YouTube means the initial page data may be stale.
+The InnerTube API approach (from the original research) serves as a fallback when local extraction fails. This can happen if:
+- YouTube changes the player API structure
+- The MAIN world injection is blocked
+- The page hasn't fully loaded the player response
 
-**Verdict:** The InnerTube approach is more robust. A single extra POST request is negligible latency.
+The fallback follows the existing `x-video-service.ts` pattern:
+1. Content script sends `videoId` to background
+2. Background POSTs to InnerTube `/player` endpoint
+3. Background fetches transcript from `baseUrl`
+4. Returns parsed transcript to content script
+
+See Section 4.4 for the InnerTube pseudocode (retained for fallback reference).
 
 ### 4.3 Implementation Plan
 
@@ -271,32 +398,187 @@ An alternative would be to extract `captionTracks` from the page's inline `<scri
 
 | File | Purpose |
 |------|---------|
-| `src/lib/page-capture/youtube-transcript-service.ts` | InnerTube API call + transcript parsing (runs in background) |
+| `src/entrypoints/youtube-transcript-main.ts` | Unlisted script — runs in MAIN world, extracts caption tracks + fetches transcript content |
+| `src/lib/page-capture/youtube-transcript-service.ts` | InnerTube API fallback + shared transcript parsing logic (runs in background) |
 
 #### Modified files:
 
 | File | Change |
 |------|--------|
-| `src/lib/page-capture/extractors/youtube.ts` | Add transcript fetching via background message in `enrich()` |
-| `src/lib/page-capture/messaging.ts` | Add `PAGE_CAPTURE_FETCH_YT_TRANSCRIPT` message type + payload/response types |
-| `src/lib/page-capture/content-adapter.ts` | Add `fetchYouTubeTranscriptViaBackground()` helper (like `fetchXVideoMetadataViaBackground`) |
+| `src/lib/page-capture/extractors/youtube.ts` | Orchestrate local extraction (inject MAIN world script) with InnerTube fallback |
+| `src/lib/page-capture/messaging.ts` | Add `PAGE_CAPTURE_FETCH_YT_TRANSCRIPT` message type for fallback path |
+| `src/lib/page-capture/content-adapter.ts` | Add `fetchYouTubeTranscriptViaBackground()` fallback helper |
 | `src/lib/page-capture/models.ts` | Add `transcript?: string` to `CapturedPageMetadata` |
-| `src/entrypoints/background/index.ts` | Handle `PAGE_CAPTURE_FETCH_YT_TRANSCRIPT` message |
-| `src/entrypoints/content/index.ts` | Wire up new service in `PageCaptureServices` |
+| `src/entrypoints/background/index.ts` | Handle `PAGE_CAPTURE_FETCH_YT_TRANSCRIPT` message (fallback only) |
+| `src/entrypoints/content/index.ts` | Wire up transcript extraction in `PageCaptureServices` |
 | `src/lib/webclip-service.ts` | Store transcript in a new `Transcript` fieldDef under `#video` |
 | `src/lib/webclip-messaging.ts` | Add `transcript?: string` to `WebClipCapturePayload` |
 | `src/types/node.ts` (or `system-nodes.ts`) | Add `NDX_F.TRANSCRIPT` fixed ID constant |
+| `wxt.config.ts` | May need to add `web_accessible_resources` for the unlisted script |
 
 #### Estimated effort:
-- `youtube-transcript-service.ts`: ~120 lines (InnerTube fetch + JSON3 parsing + language selection)
-- Messaging plumbing: ~30 lines across messaging/content-adapter files
-- YouTube extractor enhancement: ~20 lines
-- Background handler: ~15 lines
-- WebClip integration: ~30 lines (new fieldDef + storage)
-- Tests: ~100 lines (mock InnerTube responses, parse verification)
-- **Total: ~300-350 lines of code, 1-2 days of work**
+- `youtube-transcript-main.ts` (MAIN world script): ~80 lines (player API access + fetch + parse + postMessage)
+- `youtube-transcript-service.ts` (BG fallback + shared types): ~120 lines
+- YouTube extractor orchestration: ~50 lines (inject + listen + fallback logic)
+- Messaging plumbing: ~30 lines
+- WebClip integration: ~30 lines
+- Tests: ~120 lines (mock player response, parse verification, fallback logic)
+- **Total: ~430 lines of code, 2-3 days of work**
 
-### 4.4 `youtube-transcript-service.ts` Pseudocode
+### 4.4 Pseudocode: MAIN World Script (`youtube-transcript-main.ts`)
+
+```typescript
+// Unlisted script — runs in YouTube page's MAIN world
+export default defineUnlistedScript(() => {
+  const MSG_PREFIX = 'soma:yt-transcript';
+
+  interface CaptionTrack {
+    baseUrl: string;
+    languageCode: string;
+    kind?: string;        // 'asr' for auto-generated
+    name: { simpleText: string };
+  }
+
+  // --- Step 1: Extract caption tracks from page context ---
+
+  function getCaptionTracks(): CaptionTrack[] | null {
+    // Method A: Player API (best — always reflects current video)
+    try {
+      const player = document.querySelector('#movie_player') as any;
+      const response = player?.getPlayerResponse?.();
+      const tracks = response?.captions
+        ?.playerCaptionsTracklistRenderer?.captionTracks;
+      if (tracks?.length) return tracks;
+    } catch { /* fall through */ }
+
+    // Method B: ytd-app data binding (Polymer component)
+    try {
+      const app = document.querySelector('ytd-app') as any;
+      const tracks = app?.data?.playerResponse?.captions
+        ?.playerCaptionsTracklistRenderer?.captionTracks;
+      if (tracks?.length) return tracks;
+    } catch { /* fall through */ }
+
+    // Method C: Global variable (initial load only)
+    try {
+      const w = window as any;
+      const tracks = w.ytInitialPlayerResponse?.captions
+        ?.playerCaptionsTracklistRenderer?.captionTracks;
+      if (tracks?.length) return tracks;
+    } catch { /* fall through */ }
+
+    return null;
+  }
+
+  // --- Step 2: Select best track ---
+
+  function selectBestTrack(tracks: CaptionTrack[]): CaptionTrack | null {
+    // Prefer manual English, then auto-generated English, then first manual, then first auto
+    const manualEn = tracks.find(t => t.languageCode === 'en' && t.kind !== 'asr');
+    if (manualEn) return manualEn;
+    const autoEn = tracks.find(t => t.languageCode === 'en' && t.kind === 'asr');
+    if (autoEn) return autoEn;
+    const firstManual = tracks.find(t => t.kind !== 'asr');
+    if (firstManual) return firstManual;
+    return tracks[0] ?? null;
+  }
+
+  // --- Step 3: Fetch transcript content (same-origin!) ---
+
+  async function fetchTranscript(baseUrl: string) {
+    // Append fmt=json3 for structured JSON response
+    const url = baseUrl + (baseUrl.includes('?') ? '&' : '?') + 'fmt=json3';
+    const response = await fetch(url);
+    if (!response.ok) return null;
+    const data = await response.json();
+
+    // Parse events[] → segments
+    const segments = (data.events ?? [])
+      .filter((e: any) => e.segs)
+      .map((e: any) => ({
+        text: e.segs.map((s: any) => s.utf8 ?? '').join(''),
+        startMs: e.tStartMs ?? 0,
+        durationMs: e.dDurationMs ?? 0,
+      }));
+
+    return segments;
+  }
+
+  // --- Step 4: Orchestrate & send result ---
+
+  async function extractAndSend() {
+    const tracks = getCaptionTracks();
+    if (!tracks) {
+      window.postMessage({ type: `${MSG_PREFIX}:result`, data: null }, '*');
+      return;
+    }
+
+    const track = selectBestTrack(tracks);
+    if (!track) {
+      window.postMessage({ type: `${MSG_PREFIX}:result`, data: null }, '*');
+      return;
+    }
+
+    const segments = await fetchTranscript(track.baseUrl);
+    window.postMessage({
+      type: `${MSG_PREFIX}:result`,
+      data: segments ? {
+        segments,
+        fullText: segments.map((s: any) => s.text).join(' '),
+        languageCode: track.languageCode,
+        isAutoGenerated: track.kind === 'asr',
+      } : null,
+    }, '*');
+  }
+
+  // Listen for extraction requests from isolated world
+  window.addEventListener('message', (event) => {
+    if (event.source !== window) return;
+    if (event.data?.type === `${MSG_PREFIX}:extract`) {
+      extractAndSend();
+    }
+  });
+});
+```
+
+### 4.5 Pseudocode: Content Script Integration (ISOLATED world)
+
+```typescript
+// In youtube.ts extractor enrich() — runs in ISOLATED world
+async function extractTranscriptLocally(): Promise<YouTubeTranscriptResult | null> {
+  const MSG_PREFIX = 'soma:yt-transcript';
+
+  // Inject the MAIN world script
+  await injectScript('/youtube-transcript-main.js');
+
+  // Request extraction and wait for result
+  return new Promise((resolve) => {
+    const timeout = setTimeout(() => {
+      window.removeEventListener('message', handler);
+      resolve(null); // Timeout → fall back to InnerTube
+    }, 5000);
+
+    function handler(event: MessageEvent) {
+      if (event.source !== window) return;
+      if (event.data?.type !== `${MSG_PREFIX}:result`) return;
+      clearTimeout(timeout);
+      window.removeEventListener('message', handler);
+      resolve(event.data.data);
+    }
+
+    window.addEventListener('message', handler);
+    window.postMessage({ type: `${MSG_PREFIX}:extract` }, '*');
+  });
+}
+
+// In enrich():
+const transcript = await extractTranscriptLocally()
+  ?? await fetchYouTubeTranscriptViaBackground(videoId); // fallback
+```
+
+### 4.6 InnerTube API Fallback Pseudocode (`youtube-transcript-service.ts`)
+
+Retained from original research as the fallback strategy. Runs in background service worker.
 
 ```typescript
 // Types
@@ -332,7 +614,7 @@ async function fetchCaptionTracks(videoId: string): Promise<CaptionTrack[]> {
   return data?.captions?.playerCaptionsTracklistRenderer?.captionTracks ?? [];
 }
 
-// Select best track (prefer manual English, then auto-generated English, then first available)
+// Select best track (same logic as MAIN world script)
 function selectBestTrack(tracks: CaptionTrack[]): CaptionTrack | null { ... }
 
 // Fetch and parse transcript content (JSON3 format)
@@ -340,7 +622,6 @@ async function fetchTranscriptContent(baseUrl: string): Promise<YouTubeTranscrip
   const url = baseUrl + '&fmt=json3';
   const response = await fetch(url);
   const data = await response.json();
-  // Parse events[] → segments, filter events without segs
   return data.events
     .filter(e => e.segs)
     .map(e => ({
@@ -350,7 +631,7 @@ async function fetchTranscriptContent(baseUrl: string): Promise<YouTubeTranscrip
     }));
 }
 
-// Main entry point
+// Main entry point (background service worker)
 export async function fetchYouTubeTranscript(videoId: string): Promise<YouTubeTranscriptResult | null> {
   const tracks = await fetchCaptionTracks(videoId);
   if (tracks.length === 0) return null;
@@ -368,54 +649,97 @@ export async function fetchYouTubeTranscript(videoId: string): Promise<YouTubeTr
 
 ## 5. Risk Assessment
 
-### 5.1 Breakage Risk (Medium)
+### 5.1 Breakage Risk (Medium-Low)
 
-The InnerTube API is undocumented and YouTube can change it at any time. Mitigations:
+Both approaches depend on YouTube's internal data structures. Mitigations:
+
 - **Graceful degradation**: If transcript fetch fails, the video clip is still created with all other metadata (title, author, URL, duration). Transcript is purely additive.
-- **Versioned client context**: If YouTube enforces client version checks, we update the version string.
-- **Dual-strategy fallback**: If InnerTube fails, fall back to parsing the watch page HTML (same approach as `youtube-transcript` npm package).
+- **Dual-strategy fallback**: Local extraction fails → InnerTube API fallback. Both fail → no transcript (graceful).
+- **Proven stability**: The local extraction approach (player API + `ytd-app.data`) has been used by Immersive Translate for years with millions of users. Brave browser's AI Chat also uses local extraction. The `playerCaptionsTracklistRenderer` structure has been stable since at least 2023.
+- **Multi-method local extraction**: Three different access methods (player API, ytd-app data, global variable) provide redundancy within the local approach itself.
 
-### 5.2 Rate Limiting (Low)
+### 5.2 Rate Limiting (Very Low)
 
-YouTube may rate-limit requests from the same IP. For a browser extension, each user's requests come from their own IP, so collective rate limiting is not a concern. Individual users are unlikely to clip more than a few videos per session.
+Local extraction uses data already loaded by the page — no additional API calls to YouTube servers for caption metadata. The transcript content fetch is a single same-origin GET request, indistinguishable from YouTube's own subtitle loading. This is much less likely to trigger rate limiting than the InnerTube API approach.
 
 ### 5.3 Videos Without Captions (Expected)
 
 Some videos have no captions (manual or auto-generated). The transcript field simply remains empty. ~97% of popular YouTube videos have auto-generated captions available.
 
-### 5.4 Age-Restricted / Private Videos (Expected)
+### 5.4 Age-Restricted / Private Videos (Improved)
 
-- **Age-restricted**: InnerTube API returns no caption tracks without authentication cookies. Since the user is browsing YouTube in their own browser (logged in), the content script approach could work (the page already has the data). But the background fetch approach sends a fresh request without cookies. Mitigation: fall back to DOM extraction for age-restricted videos if the InnerTube approach fails.
-- **Private/unlisted**: If the user can see the video, the content script DOM approach works. Background fetch will fail for private videos.
+The local extraction approach **solves** the age-restricted/private video problem identified in the original research:
+- **Age-restricted**: The MAIN world script inherits the user's YouTube session cookies. If the user can see the video (logged in, age-verified), the player response includes caption tracks.
+- **Private/unlisted**: Same — if the user has access, the player response is available locally.
+- **InnerTube fallback**: Will still fail for restricted content (no cookies), but this is acceptable since the primary approach handles it.
 
 ### 5.5 Long Videos (Low Risk)
 
 A 2-hour video might produce ~20KB of transcript text. This is well within node storage limits and reasonable for LLM context.
 
-### 5.6 MV3 Service Worker Lifetime (Low Risk)
+### 5.6 MAIN World Security (Low Risk)
 
-The InnerTube POST + transcript fetch should complete in 1-3 seconds total. Well within the 30-second service worker idle timeout. The existing X.com video fetch follows the same pattern without issues.
+The MAIN world script runs in YouTube's page context. Risks:
+- **Page script interference**: YouTube or other extensions could intercept our `postMessage` calls. Mitigated by using a unique message type prefix (`soma:yt-transcript`).
+- **XSS via page data**: The extracted caption data is text content from YouTube's own API. We parse JSON, extract text strings, and concatenate. No HTML rendering or `eval()`.
+- **Script injection detection**: Some pages detect injected scripts. YouTube does not appear to block this (Immersive Translate, Brave, and numerous userscripts use this approach successfully).
+
+### 5.7 SPA Navigation Timing (Low Risk)
+
+Our page-capture extractor runs at the time of web clip creation (user action). At that point, the YouTube player has fully loaded the current video's data. The SPA staleness issue only affects persistent listeners that need to track _every_ video the user navigates to — not applicable to our clip-on-demand model.
 
 ## 6. Summary
 
 | Aspect | Decision |
 |--------|----------|
-| **Approach** | Background service worker fetches via InnerTube API |
+| **Primary approach** | Local extraction via MAIN world script (player API + same-origin fetch) |
+| **Fallback approach** | InnerTube API via background service worker |
 | **API key** | Not required |
 | **New permissions** | None (already have `<all_urls>`) |
-| **npm dependencies** | None (custom ~120-line implementation) |
+| **npm dependencies** | None (custom implementation) |
+| **WXT integration** | `injectScript()` + unlisted script for MAIN world access |
 | **Data storage** | `Transcript` field (type: PLAIN) under `#video` tagDef |
-| **Fallback** | Graceful — clip created without transcript if fetch fails |
-| **Pattern** | Mirrors existing `x-video-service.ts` architecture |
-| **Estimated effort** | ~300-350 lines, 1-2 days |
-| **Primary risk** | YouTube API changes (mitigated by graceful degradation + dual strategy) |
+| **Fallback** | Local fails → InnerTube fallback → graceful (clip without transcript) |
+| **Estimated effort** | ~430 lines, 2-3 days |
+| **Primary risk** | YouTube player API structure changes (mitigated by 3-method local fallback + InnerTube fallback) |
+
+### Decision rationale (local over InnerTube)
+
+The original research recommended InnerTube API as the primary approach. After studying how Immersive Translate and similar extensions extract YouTube subtitles locally, we now prefer local extraction because:
+
+1. **Zero extra API calls** for caption metadata — the data is already on the page
+2. **Same-origin fetch** for transcript content — no background SW needed for the primary path
+3. **Authenticated access** — inherits user session, solving the age-restricted/private video problem
+4. **Proven at scale** — Immersive Translate (millions of users), Brave browser AI, and dozens of userscripts/extensions use this technique
+5. **Lower breakage surface** — uses the same data YouTube itself uses to render captions
+
+The InnerTube API is retained as a reliable fallback. Having dual strategies maximizes resilience.
 
 ## References
 
+### APIs & Official Docs
 - [YouTube Data API v3 — Captions](https://developers.google.com/youtube/v3/docs/captions)
+- [Chrome MV3 Content Scripts — world: MAIN](https://developer.chrome.com/docs/extensions/develop/concepts/content-scripts)
+- [Chrome MV3 CORS changes](https://www.chromium.org/Home/chromium-security/extension-content-script-fetches/) — content script fetch restrictions
+
+### WXT Framework
+- [WXT Content Scripts — Main World & injectScript](https://wxt.dev/guide/essentials/content-scripts.html)
+- [WXT injectScript API reference](https://wxt.dev/api/reference/wxt/client/functions/injectscript)
+- [WXT Discussion: Best practice for injecting scripts / accessing page window](https://github.com/wxt-dev/wxt/discussions/523)
+
+### Open-source implementations (local extraction)
+- [youtube-to-claude-transcriptiser](https://github.com/MorganOnCode/youtube-to-claude-transcriptiser) — Chrome extension, multi-method fallback (player API + global var + regex)
+- [Brave browser — YouTube transcript fix](https://github.com/brave/brave-browser/issues/34945) — SPA navigation staleness analysis
+- [Youtube Subtitle Downloader v36](https://greasyfork.org/en/scripts/5368-youtube-subtitle-downloader-v36/code) — uses `ytd-app.data.playerResponse` + `yt-navigate-finish`
+- [YouTube Smart Subtitle Downloader](https://greasyfork.org/en/scripts/523696-youtube-smart-subtitle-downloader/code) — uses `ytInitialPlayerResponse` regex extraction
+
+### Libraries & Analysis
 - [youtube-transcript (npm)](https://www.npmjs.com/package/youtube-transcript) — most popular JS extraction library
 - [youtube-captions-scraper (npm)](https://www.npmjs.com/package/youtube-captions-scraper) — Algolia's scraper
-- [youtube-transcript-api (Python)](https://github.com/jdepoix/youtube-transcript-api) — reference implementation
+- [youtube-transcript-api (Python)](https://github.com/jdepoix/youtube-transcript-api) — reference implementation, InnerTube approach
 - [InnerTube API transcript guide (Medium)](https://medium.com/@aqib-2/extract-youtube-transcripts-using-innertube-api-2025-javascript-guide-dc417b762f49)
 - [How ytranscript Works](https://nadimtuhin.com/blog/ytranscript-how-it-works) — reverse-engineering analysis
-- [Chrome MV3 CORS changes](https://www.chromium.org/Home/chromium-security/extension-content-script-fetches/) — content script fetch restrictions
+
+### Extensions using local extraction at scale
+- [Immersive Translate](https://immersivetranslate.com/) — millions of users, YouTube bilingual subtitle translation
+- [Trancy](https://chromewebstore.google.com/detail/trancy-immersive-translat/mjdbhokoopacimoekfgkcoogikbfgngb) — immersive translate + language learning

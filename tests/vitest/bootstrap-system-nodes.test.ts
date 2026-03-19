@@ -68,8 +68,9 @@ describe('ensureSystemNodes', () => {
     expect(getParentId(SYSTEM_SCHEMA_NODE_IDS.SETTINGS_HIGHLIGHT_VALUE)).toBe(SYSTEM_SCHEMA_NODE_IDS.SETTINGS_HIGHLIGHT_FIELD_ENTRY);
     expect(toNodexNode(SYSTEM_SCHEMA_NODE_IDS.SETTINGS_HIGHLIGHT_VALUE)?.name).toBe(SYS_V.YES);
     expect(getParentId(SYSTEM_SCHEMA_NODE_IDS.SETTINGS_AI_PROVIDERS_FIELD_ENTRY)).toBe(SYSTEM_NODE_IDS.SETTINGS);
-    expect(getParentId(SYSTEM_SCHEMA_NODE_IDS.DEFAULT_AI_PROVIDER_NODE)).toBe(SYSTEM_SCHEMA_NODE_IDS.SETTINGS_AI_PROVIDERS_FIELD_ENTRY);
-    expect(toNodexNode(SYSTEM_SCHEMA_NODE_IDS.DEFAULT_AI_PROVIDER_NODE)?.tags).toContain(NDX_T.AI_PROVIDER);
+    // Default Anthropic provider is no longer auto-created on bootstrap;
+    // the providers field entry starts empty for new workspaces.
+    expect(toNodexNode(SYSTEM_SCHEMA_NODE_IDS.SETTINGS_AI_PROVIDERS_FIELD_ENTRY)?.children?.length ?? 0).toBe(0);
   });
 
   it('records bootstrap version and runs legacy locked cleanup only once per workspace', () => {

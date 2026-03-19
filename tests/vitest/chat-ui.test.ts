@@ -12,11 +12,48 @@ import { DeskLayout } from '../../src/components/layout/DeskLayout.js';
 import { appendMessage, editMessage, getLinearPath, linearToTree, switchBranch as switchChatBranch } from '../../src/lib/ai-chat-tree.js';
 import { resetChatPersistenceForTests, saveChatSession } from '../../src/lib/ai-persistence.js';
 import { resetAIAgentForTests } from '../../src/lib/ai-service.js';
+import { findProviderOptionNodeId } from '../../src/lib/ai-provider-config.js';
 import { SYSTEM_SCHEMA_NODE_IDS } from '../../src/lib/system-schema-presets.js';
 import { useNodeStore } from '../../src/stores/node-store.js';
 import { useUIStore } from '../../src/stores/ui-store.js';
 import { NDX_F, SYS_V } from '../../src/types/index.js';
 import { resetAndSeed, resetStores } from './helpers/test-state.js';
+
+/**
+ * Seed a provider config node under the Settings AI Providers field entry.
+ * Returns the created node ID.
+ */
+function seedProviderConfig({
+  provider,
+  enabled,
+  apiKey,
+  name,
+}: {
+  provider: string;
+  enabled: boolean;
+  apiKey?: string;
+  name: string;
+}): string {
+  const store = useNodeStore.getState();
+  const node = store.createChild(
+    SYSTEM_SCHEMA_NODE_IDS.SETTINGS_AI_PROVIDERS_FIELD_ENTRY,
+    undefined,
+    { name },
+    { commit: false },
+  );
+
+  const providerOptionNodeId = findProviderOptionNodeId(provider);
+  if (providerOptionNodeId) {
+    store.setOptionsFieldValue(node.id, NDX_F.PROVIDER_ID, providerOptionNodeId);
+  }
+
+  store.setFieldValue(node.id, NDX_F.PROVIDER_ENABLED, [enabled ? SYS_V.YES : SYS_V.NO]);
+  if (apiKey !== undefined) {
+    store.setFieldValue(node.id, NDX_F.PROVIDER_API_KEY, apiKey ? [apiKey] : []);
+  }
+
+  return node.id;
+}
 
 const DB_NAME = 'soma-ai-chat';
 
@@ -379,16 +416,13 @@ describe('chat ui', () => {
 
   it('keeps the chat composer visible when a provider is enabled without an API key', async () => {
     resetAndSeed();
-    useNodeStore.getState().setFieldValue(
-      SYSTEM_SCHEMA_NODE_IDS.DEFAULT_AI_PROVIDER_NODE,
-      NDX_F.PROVIDER_ENABLED,
-      [SYS_V.YES],
-    );
-    useNodeStore.getState().setFieldValue(
-      SYSTEM_SCHEMA_NODE_IDS.DEFAULT_AI_PROVIDER_NODE,
-      NDX_F.PROVIDER_API_KEY,
-      [],
-    );
+    // Default Anthropic provider is no longer auto-created; seed one explicitly.
+    seedProviderConfig({
+      provider: 'anthropic',
+      enabled: true,
+      apiKey: '',
+      name: 'Anthropic',
+    });
 
     flushSync(() => {
       root.render(React.createElement(ChatPanel, { panelId: 'chat-panel', sessionId: 'session-keyless-enabled' }));
@@ -403,11 +437,12 @@ describe('chat ui', () => {
 
   it('updates the rendered conversation when switching chat branches', async () => {
     resetAndSeed();
-    useNodeStore.getState().setFieldValue(
-      SYSTEM_SCHEMA_NODE_IDS.DEFAULT_AI_PROVIDER_NODE,
-      NDX_F.PROVIDER_ENABLED,
-      [SYS_V.YES],
-    );
+    // Default Anthropic provider is no longer auto-created; seed one explicitly.
+    seedProviderConfig({
+      provider: 'anthropic',
+      enabled: true,
+      name: 'Anthropic',
+    });
 
     const session = linearToTree([
       createUserMessage('user-1', 1),

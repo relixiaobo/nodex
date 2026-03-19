@@ -80,13 +80,9 @@ describe('ai-provider-config', () => {
 
     const configs = getProviderConfigs();
 
+    // Default Anthropic provider is no longer auto-created on bootstrap;
+    // only the explicitly seeded providers should appear.
     expect(configs).toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        provider: 'anthropic',
-        enabled: false,
-        apiKey: '',
-        nodeId: SYSTEM_SCHEMA_NODE_IDS.DEFAULT_AI_PROVIDER_NODE,
-      }),
       expect.objectContaining({
         provider: 'openai',
         enabled: true,
@@ -99,6 +95,7 @@ describe('ai-provider-config', () => {
         baseUrl: 'https://openrouter.example/v1',
       }),
     ]));
+    expect(configs).toHaveLength(2);
   });
 
   it('getEnabledProviderConfigs filters out disabled and keyless providers', () => {

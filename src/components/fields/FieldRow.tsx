@@ -51,6 +51,9 @@ import { resolveRowPointerSelectAction } from '../../lib/row-pointer-selection.j
 import { OutlinerRow, useRowSelectionState, useRowPointerHandlers } from '../outliner/OutlinerRow.js';
 import { canCreateChildrenUnder, getNodeCapabilities } from '../../lib/node-capabilities.js';
 import { useDragDropRow } from '../../hooks/use-drag-drop-row.js';
+import { getShortcutKeys, matchesShortcutEvent } from '../../lib/shortcut-registry.js';
+
+const DESCRIPTION_SHORTCUT_KEYS = getShortcutKeys('editor.edit_description', ['Ctrl-i']);
 
 function focusTrailingInputForParent(parentId: string): boolean {
   const roots = document.querySelectorAll<HTMLElement>('[data-trailing-parent-id]');
@@ -448,6 +451,7 @@ export function FieldRow({
   const createChild = useNodeStore((s) => s.createChild);
   const moveFieldEntry = useNodeStore((s) => s.moveFieldEntry);
   const removeField = useNodeStore((s) => s.removeField);
+  const updateNodeDescription = useNodeStore((s) => s.updateNodeDescription);
   const _version = useNodeStore((s) => s._version);
   const siblingFields = useNodeFields(nodeId);
   const clickOffsetXRef = useRef<number | undefined>(undefined);
@@ -463,6 +467,11 @@ export function FieldRow({
     panelId: panelId ?? 'main',
     rowRef,
   });
+
+  // ─── Description editing state (Ctrl+I toggle) ───
+  const [editingDescription, setEditingDescription] = useState(false);
+  const descriptionRef = useRef<HTMLDivElement>(null);
+  const descClickCoordsRef = useRef<{ x: number; y: number } | null>(null);
 
   // Config metadata for system config fields (icon, description)
   const configDef = configKey
@@ -634,6 +643,97 @@ export function FieldRow({
     setEditingFieldName(fieldEntryId);
   }, [canEditFieldDefinition, canManageFieldStructure, fieldEntryId, setEditingFieldName]);
 
+  // ─── Description editing callbacks (Ctrl+I) ───
+
+  const commitDescriptionDraft = useCallback(() => {
+    if (!descriptionRef.current) return;
+    const newDesc = descriptionRef.current.textContent?.trim() ?? '';
+    if (newDesc !== (fieldDescription ?? '')) {
+      updateNodeDescription(attrDefId, newDesc);
+    }
+  }, [attrDefId, fieldDescription, updateNodeDescription]);
+
+  const handleDescriptionEdit = useCallback(() => {
+    if (!canEditFieldDefinition) return;
+    descClickCoordsRef.current = null; // No click coords → cursor at end
+    setEditingDescription(true);
+  }, [canEditFieldDefinition]);
+
+  const handleDescriptionMouseDown = useCallback((e: React.MouseEvent) => {
+    if (!canEditFieldDefinition) return;
+    e.preventDefault(); // Prevent native focus churn
+    descClickCoordsRef.current = { x: e.clientX, y: e.clientY };
+    setEditingDescription(true);
+  }, [canEditFieldDefinition]);
+
+  const handleDescriptionBlur = useCallback(() => {
+    commitDescriptionDraft();
+    setEditingDescription(false);
+  }, [commitDescriptionDraft]);
+
+  const handleDescriptionKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      descriptionRef.current?.blur();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      if (descriptionRef.current) descriptionRef.current.textContent = fieldDescription ?? '';
+      setEditingDescription(false);
+      // Return focus to field name editing
+      setEditingFieldName(fieldEntryId);
+    } else if (DESCRIPTION_SHORTCUT_KEYS.some((binding) => matchesShortcutEvent(e.nativeEvent, binding))) {
+      // Ctrl+I toggle: save description and return focus to field name editing
+      e.preventDefault();
+      commitDescriptionDraft();
+      setEditingDescription(false);
+      // Return focus to field name editing
+      setEditingFieldName(fieldEntryId);
+    }
+  }, [fieldDescription, commitDescriptionDraft, fieldEntryId, setEditingFieldName]);
+
+  // Focus description contentEditable when entering edit mode
+  useEffect(() => {
+    if (editingDescription && descriptionRef.current) {
+      const el = descriptionRef.current;
+      el.textContent = fieldDescription ?? '';
+      el.focus();
+
+      const coords = descClickCoordsRef.current;
+      descClickCoordsRef.current = null;
+
+      if (coords && fieldDescription) {
+        // Place cursor at click position
+        const doc = el.ownerDocument;
+        const caretDoc = doc as Document & {
+          caretPositionFromPoint?: (x: number, y: number) => CaretPosition | null;
+          caretRangeFromPoint?: (x: number, y: number) => Range | null;
+        };
+        try {
+          const pos = caretDoc.caretPositionFromPoint?.(coords.x, coords.y);
+          if (pos && el.contains(pos.offsetNode)) {
+            const range = doc.createRange();
+            range.setStart(pos.offsetNode, pos.offset);
+            range.collapse(true);
+            const sel = window.getSelection();
+            sel?.removeAllRanges();
+            sel?.addRange(range);
+            return;
+          }
+        } catch {
+          // fallthrough to end placement
+        }
+      }
+
+      // No click coords or empty → cursor at end
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      range.collapse(false);
+      const sel = window.getSelection();
+      sel?.removeAllRanges();
+      sel?.addRange(range);
+    }
+  }, [editingDescription, fieldDescription]);
+
   // Field-specific keyboard pre-processing for selection mode:
   // ArrowUp/Down navigates between sibling rows (field→field or field→content)
   const handleFieldSelectionKeydown = useCallback((e: KeyboardEvent): boolean => {
@@ -696,6 +796,9 @@ export function FieldRow({
     canEditFieldDefinition,
     canManageFieldStructure,
   ]);
+
+  // Whether to show description: visible when description exists, or when editing description
+  const shouldShowDescription = Boolean(fieldDescription) || editingDescription;
 
   // ─── Path 1: System metadata fields (NDX_SYS_*) — read-only ───
   if (isSystemField) {
@@ -892,6 +995,7 @@ export function FieldRow({
                 onNavigateRow={moveToSibling}
                 onIndentRow={handleIndentField}
                 onOutdentRow={handleOutdentField}
+                onDescriptionEdit={handleDescriptionEdit}
                 clickOffsetX={clickOffsetXRef.current}
               />
             ) : (
@@ -905,10 +1009,19 @@ export function FieldRow({
                 </span>
               </>
             )}
-            {fieldDescription && (
-              <span className="block text-xs leading-tight text-foreground-tertiary mt-0.5">
-                {fieldDescription}
-              </span>
+            {/* Description: gray text below field name (matches OutlinerItem description pattern) */}
+            {shouldShowDescription && (
+              <div
+                ref={editingDescription ? descriptionRef : undefined}
+                contentEditable={editingDescription}
+                suppressContentEditableWarning
+                className={`text-xs leading-[15px] min-h-[15px] text-foreground-tertiary cursor-text ${editingDescription ? 'outline-none' : ''}`}
+                onMouseDown={!editingDescription ? handleDescriptionMouseDown : undefined}
+                onBlur={editingDescription ? handleDescriptionBlur : undefined}
+                onKeyDown={editingDescription ? handleDescriptionKeyDown : undefined}
+              >
+                {!editingDescription && fieldDescription}
+              </div>
             )}
           </div>
         </div>

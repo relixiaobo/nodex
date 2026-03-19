@@ -5,6 +5,7 @@
  * - Enter / blur → confirm name (reuse existing attrDef or rename placeholder)
  * - Tab → confirm + focus value area
  * - Escape → close editing, keep "Untitled"
+ * - Ctrl+I → toggle description editing (delegated to parent FieldRow)
  */
 import { useState, useRef, useEffect, useLayoutEffect, useCallback, type KeyboardEvent } from 'react';
 import { createPortal } from 'react-dom';
@@ -12,6 +13,9 @@ import { useWorkspaceFields } from '../../hooks/use-workspace-fields';
 import { useNodeStore } from '../../stores/node-store';
 import { useUIStore } from '../../stores/ui-store';
 import { t } from '../../i18n/strings.js';
+import { getShortcutKeys, matchesShortcutEvent } from '../../lib/shortcut-registry.js';
+
+const DESCRIPTION_SHORTCUT_KEYS = getShortcutKeys('editor.edit_description', ['Ctrl-i']);
 
 interface FieldNameInputProps {
   fieldEntryId: string;
@@ -22,6 +26,7 @@ interface FieldNameInputProps {
   onNavigateRow?: (direction: 'up' | 'down') => void;
   onIndentRow?: () => void;
   onOutdentRow?: () => void;
+  onDescriptionEdit?: () => void;
   clickOffsetX?: number;
 }
 
@@ -34,6 +39,7 @@ export function FieldNameInput({
   onNavigateRow,
   onIndentRow,
   onOutdentRow,
+  onDescriptionEdit,
   clickOffsetX,
 }: FieldNameInputProps) {
   const [value, setValue] = useState(currentName === t('common.untitled') ? '' : currentName);
@@ -140,6 +146,13 @@ export function FieldNameInput({
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
+      // Ctrl+I → toggle description editing (before other key checks)
+      if (DESCRIPTION_SHORTCUT_KEYS.some((binding) => matchesShortcutEvent(e.nativeEvent, binding))) {
+        e.preventDefault();
+        onDescriptionEdit?.();
+        return;
+      }
+
       if (e.key === 'Enter') {
         e.preventDefault();
         // When a suggestion is highlighted in the dropdown, Enter applies that suggestion.
@@ -197,6 +210,7 @@ export function FieldNameInput({
       onNavigateRow,
       onIndentRow,
       onOutdentRow,
+      onDescriptionEdit,
       suggestions,
       selectedIndex,
       selectSuggestion,

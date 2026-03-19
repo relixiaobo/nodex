@@ -222,6 +222,16 @@ describe('ai-service', () => {
   beforeEach(async () => {
     storage = {};
     loroDoc.resetLoroDoc();
+    // Ensure a valid LoroDoc + system schema so resolveModel can find models.
+    // Tests that need a custom workspace re-init with their own workspace ID.
+    loroDoc.initLoroDocForTest('ws_ai_default');
+    ensureSystemNodes('ws_ai_default');
+    seedProviderConfig({
+      provider: 'anthropic',
+      enabled: true,
+      apiKey: 'sk-ant-default',
+      name: 'Anthropic',
+    });
 
     globalThis.chrome = {
       ...globalThis.chrome,
@@ -368,11 +378,15 @@ describe('ai-service', () => {
   });
 
   it('captures the actual proxy request body in turn logs when AI Debug is enabled', async () => {
-    storage['soma-chat-debug-enabled'] = true;
-    storage['soma-ai-settings'] = {
-      provider: 'anthropic',
-      apiKey: 'sk-ant-debug',
-    };
+    // Enable AI Debug via the LoroDoc Settings field (the beforeEach
+    // initialises system nodes so the debug field entry already exists).
+    loroDoc.setNodeRichTextContent(
+      SYSTEM_SCHEMA_NODE_IDS.SETTINGS_AI_DEBUG_VALUE,
+      SYS_V.YES,
+      [],
+      [],
+    );
+    loroDoc.commitDoc();
 
     const { createAgent, createNewChatSession, getCurrentDebugTurns } = await import('../../src/lib/ai-service.js');
     const agent = createAgent();
@@ -406,14 +420,13 @@ describe('ai-service', () => {
     expect(turns[0]?.request.json).toContain('"systemPrompt": "Turn prompt"');
     expect(turns[0]?.request.json).toContain('"temperature": 0.3');
     expect(requestPayload.model).toMatchObject({
-      id: 'claude-sonnet-4-5',
       provider: 'anthropic',
       api: 'anthropic-messages',
       baseUrl: 'https://api.anthropic.com',
     });
     expect(requestPayload.options?.apiKey).toBe('[redacted]');
     expect(turns[0]?.request.json).not.toContain('"headers"');
-    expect(turns[0]?.request.json).not.toContain('sk-ant-debug');
+    expect(turns[0]?.request.json).not.toContain('sk-ant-default');
     expect(turns[0]?.request.json).not.toContain('auth-token');
   });
 

@@ -134,9 +134,8 @@ describe('settings system', () => {
     expect(container.textContent).toContain('Settings');
     expect(container.textContent).toContain('Highlight & Comment');
     expect(container.textContent).toContain('AI Providers');
-    expect(container.textContent).toContain('Anthropic');
-    expect(container.textContent).toContain('#ai-provider');
-    expect(container.textContent).not.toContain('No');
+    // Default Anthropic provider is no longer auto-created on bootstrap;
+    // the AI Providers field entry starts empty for new workspaces.
     expect(container.querySelector('[role="switch"]')?.getAttribute('aria-checked')).toBe('true');
     expect(container.querySelector('[data-field-row]')?.className).toContain('@md:grid-cols-[clamp(10rem,32%,15rem)_minmax(0,1fr)]');
   });

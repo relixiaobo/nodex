@@ -16,7 +16,7 @@ import { getApiKey, hasApiKey } from './ai-service.js';
 import { streamProxyWithApiKey } from './ai-proxy.js';
 import { getStoredToken } from './auth.js';
 import { getPageContent } from './ai-shadow-cache.js';
-import { ensureSparkAgentNode, readSparkAgentConfig } from './ai-agent-node.js';
+import { buildSparkSystemPrompt, ensureSparkAgentNode, readSparkAgentConfig } from './ai-agent-node.js';
 import * as loroDoc from './loro-doc.js';
 import { withCommitOrigin, commitDoc } from './loro-doc.js';
 import { useNodeStore, applyTagMutationsNoCommit, syncTemplateMutationsNoCommit } from '../stores/node-store.js';
@@ -284,7 +284,7 @@ export async function triggerSparkExtraction(
       : pageContent;
 
     const responseText = await callSparkLLM(
-      config.systemPrompt,
+      buildSparkSystemPrompt(config),
       truncated,
       config.modelId,
       config.temperature,

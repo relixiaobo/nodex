@@ -126,7 +126,7 @@ describe('ensureSystemNodes', () => {
     expect(toNodexNode(SYSTEM_SCHEMA_NODE_IDS.DEFAULT_AI_PROVIDER_API_KEY_VALUE)?.name).toBe('sk-ant-legacy-123');
   });
 
-  it('ensureAgentNode does not duplicate prompt lines on repeated calls', () => {
+  it('ensureAgentNode keeps built-in prompt out of node children on repeated calls', () => {
     ensureSystemNodes('ws_bootstrap');
 
     const contentChildrenBefore = getChildren(SYSTEM_NODE_IDS.AGENT)
@@ -134,7 +134,7 @@ describe('ensureSystemNodes', () => {
         const n = toNodexNode(id);
         return n != null && isOutlinerContentNodeType(n.type);
       });
-    expect(contentChildrenBefore.length).toBe(6);
+    expect(contentChildrenBefore.length).toBe(0);
 
     ensureSystemNodes('ws_bootstrap');
 
@@ -147,7 +147,7 @@ describe('ensureSystemNodes', () => {
     expect(contentChildrenAfter).toEqual(contentChildrenBefore);
   });
 
-  it('ensureSparkAgentNode does not duplicate prompt lines on repeated calls', () => {
+  it('ensureSparkAgentNode keeps built-in prompt out of node children on repeated calls', () => {
     ensureSystemNodes('ws_bootstrap');
     ensureSparkAgentNode('ws_bootstrap');
 
@@ -156,7 +156,7 @@ describe('ensureSystemNodes', () => {
         const n = toNodexNode(id);
         return n != null && isOutlinerContentNodeType(n.type);
       });
-    expect(contentChildrenBefore.length).toBe(11);
+    expect(contentChildrenBefore.length).toBe(0);
 
     ensureSparkAgentNode('ws_bootstrap');
 

@@ -22,10 +22,10 @@ const pastChatsToolParameters = Type.Object({
     description: 'Keyword filter (case-insensitive substring match). Valid for Level 0/1 only. Level 0: search session title plus active-branch user and assistant text. Level 1: search user messages inside the session. Use concrete keywords like names, features, or decisions.',
   })),
   before: Type.Optional(Type.String({
-    description: 'Level 0 only. Only valid when sessionId is omitted. ISO date or datetime, inclusive upper bound. Examples: "2026-03-15" or "2026-03-15T18:30:00Z".',
+    description: 'Level 0 only. Only valid when sessionId is omitted. ISO date (user\'s local timezone), inclusive upper bound. Use plain date like "2026-03-15" — do NOT append Z or timezone offset. The date is interpreted in the user\'s local timezone.',
   })),
   after: Type.Optional(Type.String({
-    description: 'Level 0 only. Only valid when sessionId is omitted. ISO date or datetime, inclusive lower bound. Examples: "2026-03-01" or "2026-03-01T09:00:00+08:00".',
+    description: 'Level 0 only. Only valid when sessionId is omitted. ISO date (user\'s local timezone), inclusive lower bound. Use plain date like "2026-03-01" — do NOT append Z or timezone offset. The date is interpreted in the user\'s local timezone.',
   })),
   limit: Type.Optional(Type.Integer({
     minimum: 1,
@@ -84,13 +84,19 @@ function parseTimeFilter(value: string | undefined, kind: 'before' | 'after'): n
 
   const trimmed = value.trim();
   const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(trimmed);
+
+  // Always interpret as local timezone — strip Z or timezone offset if present,
+  // so new Date() parses in user's local time (not UTC).
+  const stripped = dateOnly
+    ? trimmed
+    : trimmed.replace(/[Zz]$/, '').replace(/[+-]\d{2}:\d{2}$/, '');
   const normalized = dateOnly
-    ? `${trimmed}${kind === 'after' ? 'T00:00:00.000' : 'T23:59:59.999'}`
-    : trimmed;
+    ? `${stripped}${kind === 'after' ? 'T00:00:00.000' : 'T23:59:59.999'}`
+    : stripped;
   const timestamp = new Date(normalized).getTime();
 
   if (!Number.isFinite(timestamp)) {
-    throw new Error(`Invalid ${kind} time: ${value}. Use ISO date or datetime, for example "2026-03-15" or "2026-03-15T18:30:00Z".`);
+    throw new Error(`Invalid ${kind} time: ${value}. Use plain date like "2026-03-15" without Z or timezone offset.`);
   }
 
   return timestamp;

@@ -84,12 +84,12 @@ export function ChatPanel({ panelId, sessionId, hideHeader }: ChatPanelProps) {
 
     return {
       id: debug.modelId,
-      name: agent.state.model.name,
+      name: agent.state.model?.name ?? '',
       provider: debug.provider,
       reasoning: debug.reasoning,
       featured: false,
     };
-  }, [agent.state.model.name, availableModels, debug.modelId, debug.provider, debug.reasoning, selectedModelKey]);
+  }, [agent.state.model?.name, availableModels, debug.modelId, debug.provider, debug.reasoning, selectedModelKey]);
 
   useEffect(() => {
     let cancelled = false;

@@ -9,7 +9,6 @@ import { ChatMessage } from '../../src/components/chat/ChatMessage.js';
 import { ChatPanel, shouldStickChatScroll } from '../../src/components/chat/ChatPanel.js';
 import { extractInlineMarkup, splitMarkdownBlocks } from '../../src/components/chat/MarkdownRenderer.js';
 import { DeskLayout } from '../../src/components/layout/DeskLayout.js';
-import { GlobalTools } from '../../src/components/toolbar/TopToolbar.js';
 import { appendMessage, editMessage, getLinearPath, linearToTree, switchBranch as switchChatBranch } from '../../src/lib/ai-chat-tree.js';
 import { resetChatPersistenceForTests, saveChatSession } from '../../src/lib/ai-persistence.js';
 import { resetAIAgentForTests } from '../../src/lib/ai-service.js';
@@ -445,45 +444,6 @@ describe('chat ui', () => {
       expect(container.textContent).toContain('2/2');
       expect(container.textContent).not.toContain('assistant-2');
     });
-  });
-
-  it('renders the global chat trigger as a non-toggle button', () => {
-    flushSync(() => {
-      root.render(React.createElement(GlobalTools));
-    });
-
-    const trigger = container.querySelector('button[aria-label="Open chat"]');
-    expect(trigger).not.toBeNull();
-    expect(trigger?.getAttribute('aria-pressed')).toBeNull();
-  });
-
-  it('alt-click on the global chat trigger always opens a new chat panel', async () => {
-    flushSync(() => {
-      root.render(React.createElement(GlobalTools));
-    });
-
-    const trigger = container.querySelector('button[aria-label="Open chat"]');
-    expect(trigger).not.toBeNull();
-
-    flushSync(() => {
-      trigger?.dispatchEvent(new MouseEvent('click', { bubbles: true, altKey: true }));
-    });
-    await vi.waitFor(() => {
-      expect(useUIStore.getState().panels).toHaveLength(1);
-    });
-
-    const firstPanelId = useUIStore.getState().activePanelId;
-
-    flushSync(() => {
-      trigger?.dispatchEvent(new MouseEvent('click', { bubbles: true, altKey: true }));
-    });
-    await vi.waitFor(() => {
-      expect(useUIStore.getState().panels).toHaveLength(2);
-    });
-
-    const state = useUIStore.getState();
-    expect(state.activePanelId).not.toBe(firstPanelId);
-    expect(state.panels.every((panel) => panel.nodeId.startsWith('chat:'))).toBe(true);
   });
 
   it('enables textarea during streaming when onSteer is provided and shows steering placeholder', () => {

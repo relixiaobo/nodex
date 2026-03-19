@@ -6,7 +6,7 @@ import { highlightCode } from '../../lib/code-highlight.js';
 import {
   ArrowUpDown, Camera, ChevronDown, Clock, Code2, FileText, Globe, Image,
   Info, Keyboard, MousePointer, Move, PanelTop, Pencil, Plus, RotateCcw,
-  Search, Sparkles, Terminal, Trash2,
+  Search, Terminal, Trash2, Wand2,
 } from '../../lib/icons.js';
 
 interface ToolCallBlockProps {
@@ -72,7 +72,7 @@ function getToolIcon(name: string, args: Record<string, unknown>): AppIcon {
     if (action === 'search') return Search;
   }
 
-  return Sparkles;
+  return Wand2;
 }
 
 // ---------------------------------------------------------------------------

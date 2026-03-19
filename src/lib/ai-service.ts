@@ -6,7 +6,7 @@ import { getStoredToken } from './auth.js';
 import { buildAgentSystemPrompt, DEFAULT_AGENT_MODEL_ID, DEFAULT_AGENT_MAX_TOKENS, DEFAULT_AGENT_SYSTEM_PROMPT, DEFAULT_AGENT_TEMPERATURE, readAgentNodeConfig, type AgentNodeConfig } from './ai-agent-node.js';
 import type { ChatTurnDebugRecord, DebugTurnStatus } from './ai-debug.js';
 import { createChatTurnDebugRecord, finalizeChatTurnDebugRecord, normalizeRestoredDebugTurns, readChatDebugEnabled } from './ai-debug.js';
-import { findProviderOptionNodeId, getApiKeyForProvider, getAvailableModels, getProviderConfigs, normalizeProviderId } from './ai-provider-config.js';
+import { findProviderOptionNodeId, getApiKeyForProvider, getAvailableModels, getFeaturedModelIds, getProviderConfigs, normalizeProviderId } from './ai-provider-config.js';
 import {
   createSession,
   editMessage as editTreeMessage,
@@ -169,7 +169,10 @@ function resolveModel(session: ChatSession | null, modelId: string): Model<any> 
   if (configuredModel) return configuredModel;
 
   if (availableModels.length > 0) {
-    return availableModels[0];
+    // Prefer the first featured model as default
+    const featuredIds = getFeaturedModelIds();
+    const featured = availableModels.find((m) => featuredIds.has(m.id));
+    return featured ?? availableModels[0];
   }
 
   try {

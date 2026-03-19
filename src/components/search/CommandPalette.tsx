@@ -15,7 +15,7 @@
  * - AI mode (Tab switch): Chat history + Ask AI
  */
 import { useEffect, useCallback, useMemo, useState, useRef } from 'react';
-import { Library, Inbox, CalendarDays, Trash2, Search, Settings, Sparkles, Plus, MessageCircle, MessageCircleDashed, ArrowLeft, type AppIcon } from '../../lib/icons.js';
+import { Library, Inbox, CalendarDays, Trash2, Search, Settings, Bot, Plus, MessageCircle, MessageCircleDashed, ArrowLeft, type AppIcon } from '../../lib/icons.js';
 import { resolveTagColor } from '../../lib/tag-colors.js';
 import { resolveDataType, getFieldTypeIcon } from '../../lib/field-utils.js';
 import { isLockedNode, isWorkspaceHomeNode } from '../../lib/node-capabilities.js';
@@ -66,7 +66,7 @@ const SYSTEM_NODE_ICONS: Record<SystemNodeIconKey, AppIcon> = {
   library: Library,
   inbox: Inbox,
   journal: CalendarDays,
-  ai: Sparkles,
+  ai: Bot,
   trash: Trash2,
   search: Search,
   schema: Library,

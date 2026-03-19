@@ -38,7 +38,7 @@ import {
   Trash2,
   Search,
   Settings,
-  Sparkles,
+  Bot,
   Plus,
   type AppIcon,
 } from '../../lib/icons.js';
@@ -49,7 +49,7 @@ const SYSTEM_NODE_ICONS: Record<SystemNodeIconKey, AppIcon> = {
   library: Library,
   inbox: Inbox,
   journal: CalendarDays,
-  ai: Sparkles,
+  ai: Bot,
   trash: Trash2,
   search: Search,
   schema: Library,

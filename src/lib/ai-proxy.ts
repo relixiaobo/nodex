@@ -1,8 +1,9 @@
 import {
-  EventStream,
+  createAssistantMessageEventStream,
   parseStreamingJson,
   type AssistantMessage,
   type AssistantMessageEvent,
+  type AssistantMessageEventStream,
   type Context,
   type Model,
   type ToolCall,
@@ -26,25 +27,12 @@ export interface SomaProxyStreamOptions extends ProxyStreamOptions {
   onRequestBody?: (payload: ProxyStreamRequestPayload) => void;
 }
 
-class ProxyMessageEventStream extends EventStream<AssistantMessageEvent, AssistantMessage> {
-  constructor() {
-    super(
-      (event) => event.type === 'done' || event.type === 'error',
-      (event) => {
-        if (event.type === 'done') return event.message;
-        if (event.type === 'error') return event.error;
-        throw new Error('Unexpected event type');
-      },
-    );
-  }
-}
-
 export function streamProxyWithApiKey(
   model: Model<any>,
   context: Context,
   options: SomaProxyStreamOptions,
-): ProxyMessageEventStream {
-  const stream = new ProxyMessageEventStream();
+): AssistantMessageEventStream {
+  const stream = createAssistantMessageEventStream();
 
   void (async () => {
     const partial: AssistantMessage = {

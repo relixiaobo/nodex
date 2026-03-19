@@ -1,9 +1,13 @@
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { extractInlineMarkup } from '../../src/components/chat/MarkdownRenderer.js';
+import { NodeEmbed } from '../../src/components/chat/NodeEmbed.js';
 import {
   scanAndTrackMentionedNodes,
   buildMentionedNodeEditReminder,
   clearMentionedNodes,
 } from '../../src/lib/ai-mentioned-nodes.js';
+import { resetAndSeed } from './helpers/test-state.js';
 
 // ── extractInlineMarkup: <node /> parsing ──
 
@@ -116,5 +120,25 @@ describe('mentioned node tracking', () => {
     scanAndTrackMentionedNodes('<ref id="x">test</ref>');
     clearMentionedNodes();
     expect(buildMentionedNodeEditReminder()).toBeNull();
+  });
+});
+
+// ── NodeEmbed component ──
+
+describe('NodeEmbed component', () => {
+  beforeEach(() => {
+    resetAndSeed();
+  });
+
+  it('renders OutlinerView for an existing node', () => {
+    // 'task_1' exists in seed data
+    const html = renderToStaticMarkup(createElement(NodeEmbed, { nodeId: 'task_1' }));
+    expect(html).toContain('chat-node-embed');
+    expect(html).not.toContain('Node not found');
+  });
+
+  it('renders "Node not found" for a missing node', () => {
+    const html = renderToStaticMarkup(createElement(NodeEmbed, { nodeId: 'nonexistent_id' }));
+    expect(html).toContain('Node not found');
   });
 });

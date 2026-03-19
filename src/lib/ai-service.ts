@@ -3,7 +3,7 @@ import { getModel, isContextOverflow } from '@mariozechner/pi-ai';
 import type { AssistantMessage, Message, Model, StopReason, ThinkingLevel, ToolResultMessage } from '@mariozechner/pi-ai';
 import { nanoid } from 'nanoid';
 import { getStoredToken } from './auth.js';
-import { buildAgentSystemPrompt, DEFAULT_AGENT_MODEL_ID, DEFAULT_AGENT_MAX_TOKENS, DEFAULT_AGENT_SYSTEM_PROMPT, DEFAULT_AGENT_TEMPERATURE, readAgentNodeConfig, type AgentNodeConfig } from './ai-agent-node.js';
+import { buildAgentSystemPrompt, DEFAULT_AGENT_MODEL_ID, DEFAULT_AGENT_MAX_TOKENS, DEFAULT_AGENT_TEMPERATURE, readAgentNodeConfig, type AgentNodeConfig } from './ai-agent-node.js';
 import type { ChatTurnDebugRecord, DebugTurnStatus } from './ai-debug.js';
 import { createChatTurnDebugRecord, finalizeChatTurnDebugRecord, normalizeRestoredDebugTurns, readChatDebugEnabled } from './ai-debug.js';
 import { findProviderOptionNodeId, getApiKeyForProvider, getAvailableModels, getFeaturedModelIds, getProviderConfigs, normalizeProviderId } from './ai-provider-config.js';
@@ -146,6 +146,17 @@ function hasAnthropicProviderConfig(configs: ReturnType<typeof getProviderConfig
   return configs.some((config) => config.provider === 'anthropic' && config.apiKey.length > 0);
 }
 
+function getBuiltInAgentSystemPrompt(): string {
+  return buildAgentSystemPrompt({
+    nodeId: SYSTEM_NODE_IDS.AGENT,
+    userInstructions: '',
+    modelId: DEFAULT_AGENT_MODEL_ID,
+    temperature: DEFAULT_AGENT_TEMPERATURE,
+    maxTokens: DEFAULT_AGENT_MAX_TOKENS,
+    skillIds: [],
+  });
+}
+
 function findAvailableModel(
   availableModels: Model<any>[],
   modelId: string,
@@ -192,8 +203,10 @@ function applyAgentConfiguration(
   runtime.temperature = agentConfig?.temperature ?? DEFAULT_AGENT_TEMPERATURE;
   runtime.maxTokens = agentConfig?.maxTokens ?? DEFAULT_AGENT_MAX_TOKENS;
 
-  agent.setTools(getAITools());
-  agent.setSystemPrompt(agentConfig ? buildAgentSystemPrompt(agentConfig) : DEFAULT_AGENT_SYSTEM_PROMPT);
+  agent.setTools(getAITools({
+    getCurrentSessionId: () => agent.sessionId ?? getAgentRuntimeState(agent).currentSession?.id ?? null,
+  }));
+  agent.setSystemPrompt(agentConfig ? buildAgentSystemPrompt(agentConfig) : getBuiltInAgentSystemPrompt());
   agent.setModel(resolvedModel);
 
   if (session) {
@@ -757,8 +770,10 @@ export function createAgent(model: Model<any> = DEFAULT_CHAT_MODEL): Agent {
     },
   });
 
-  agent.setTools(getAITools());
-  agent.setSystemPrompt(DEFAULT_AGENT_SYSTEM_PROMPT);
+  agent.setTools(getAITools({
+    getCurrentSessionId: () => agent.sessionId ?? getAgentRuntimeState(agent).currentSession?.id ?? null,
+  }));
+  agent.setSystemPrompt(getBuiltInAgentSystemPrompt());
   getAgentRuntimeState(agent);
   return agent;
 }

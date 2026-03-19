@@ -565,6 +565,7 @@ describe('ai-service', () => {
       'node_search',
       'undo',
       'browser',
+      'past_chats',
     ]);
   });
 

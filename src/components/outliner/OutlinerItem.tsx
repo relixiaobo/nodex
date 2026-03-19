@@ -54,7 +54,7 @@ import { focusUndoShortcutSink, ensureUndoFocusAfterNavigation } from '../../lib
 import { getTextOffsetFromPoint, getRenderedTextRightEdge } from '../../lib/dom-caret-utils.js';
 import type { ParsedPasteNode } from '../../lib/paste-parser.js';
 import { t } from '../../i18n/strings.js';
-import { getNodeCapabilities } from '../../lib/node-capabilities.js';
+import { getNodeCapabilities, isNodeInTrash } from '../../lib/node-capabilities.js';
 import { handleSparkClick } from '../../lib/ai-spark.js';
 import { RowHost } from './RowHost.js';
 import { ViewToolbar } from './ViewToolbar.js';
@@ -262,6 +262,7 @@ export function OutlinerItem({
   const moveNodeUp = useNodeStore((s) => s.moveNodeUp);
   const moveNodeDown = useNodeStore((s) => s.moveNodeDown);
   const trashNode = useNodeStore((s) => s.trashNode);
+  const hardDeleteNode = useNodeStore((s) => s.hardDeleteNode);
   const toggleNodeDone = useNodeStore((s) => s.toggleNodeDone);
   const cycleNodeCheckbox = useNodeStore((s) => s.cycleNodeCheckbox);
   const _version = useNodeStore((s) => s._version);
@@ -1337,6 +1338,8 @@ export function OutlinerItem({
     const isActualRef = loroDoc.getParentId(nodeId) !== parentId && parentChildren.includes(nodeId);
     if (isActualRef) {
       removeReference(nodeId);
+    } else if (isNodeInTrash(nodeId)) {
+      hardDeleteNode(nodeId);
     } else {
       trashNode(nodeId);
     }
@@ -1357,6 +1360,7 @@ export function OutlinerItem({
     rootNodeId,
     rootChildIds,
     trashNode,
+    hardDeleteNode,
     removeReference,
     setFocusedNode,
     hasChildren,
@@ -1422,7 +1426,11 @@ export function OutlinerItem({
       marks: merged.marks,
       inlineRefs: merged.inlineRefs,
     });
-    trashNode(nodeId);
+    if (isNodeInTrash(nodeId)) {
+      hardDeleteNode(nodeId);
+    } else {
+      trashNode(nodeId);
+    }
     useUIStore.getState().setFocusClickCoords({
       nodeId: prev.nodeId,
       parentId: prev.parentId,
@@ -1440,6 +1448,7 @@ export function OutlinerItem({
     setEditingFieldName,
     updateNodeContent,
     trashNode,
+    hardDeleteNode,
     setFocusedNode,
   ]);
 

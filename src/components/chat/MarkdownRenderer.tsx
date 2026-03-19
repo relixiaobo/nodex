@@ -24,16 +24,26 @@ import { NodeEmbed } from './NodeEmbed.js';
 
 // ── Inline markup extraction ──
 
-const INLINE_MARKUP_RE = /<(ref|cite)\s+id="([^"]+)">([\s\S]*?)<\/\1>/g;
+const REF_MARKUP_RE = /<ref\s+id="([^"]+)">([\s\S]*?)<\/ref>/g;
+const CITE_MARKUP_RE = /<cite\s+(?:type="([^"]+)"\s+)?id="([^"]+)">([\s\S]*?)<\/cite>/g;
 const PLACEHOLDER_RE = /%%SOMA_(\d+)%%/g;
 
 // Block-level <node /> tag: must be on its own line (optional whitespace around)
 const NODE_EMBED_LINE_RE = /^\s*<node\s+id="([^"]+)"\s*\/>\s*$/;
 
-interface InlinePlaceholder {
-  kind: 'ref' | 'cite';
+export type CiteType = 'node' | 'chat' | 'url';
+
+interface RefPlaceholder {
+  kind: 'ref';
   nodeId: string;
   content: string;
+}
+
+interface CitePlaceholder {
+  kind: 'cite';
+  id: string;
+  content: string;
+  citeType: CiteType;
 }
 
 interface NodeEmbedPlaceholder {
@@ -41,7 +51,7 @@ interface NodeEmbedPlaceholder {
   nodeId: string;
 }
 
-type Placeholder = InlinePlaceholder | NodeEmbedPlaceholder;
+type Placeholder = RefPlaceholder | CitePlaceholder | NodeEmbedPlaceholder;
 
 /**
  * Extract inline markup (<ref>, <cite>) and block-level <node /> tags.
@@ -69,10 +79,18 @@ export function extractInlineMarkup(text: string): { cleaned: string; placeholde
 
   const afterNodeExtraction = processedLines.join('\n');
 
-  // Pass 2: extract inline <ref> and <cite> tags
-  const cleaned = afterNodeExtraction.replace(INLINE_MARKUP_RE, (_match, kind: string, nodeId: string, content: string) => {
+  // Pass 2: extract inline <ref> tags
+  let afterRefs = afterNodeExtraction.replace(REF_MARKUP_RE, (_match, nodeId: string, content: string) => {
     const index = placeholders.length;
-    placeholders.push({ kind: kind as 'ref' | 'cite', nodeId, content });
+    placeholders.push({ kind: 'ref', nodeId, content });
+    return `%%SOMA_${index}%%`;
+  });
+
+  // Pass 3: extract inline <cite> tags (with optional type attribute)
+  const cleaned = afterRefs.replace(CITE_MARKUP_RE, (_match, type: string | undefined, id: string, content: string) => {
+    const index = placeholders.length;
+    const citeType: CiteType = (type === 'chat' || type === 'url') ? type : 'node';
+    placeholders.push({ kind: 'cite', id, content, citeType });
     return `%%SOMA_${index}%%`;
   });
 
@@ -134,7 +152,7 @@ function injectPlaceholders(
             );
           } else if (ph.kind === 'cite') {
             parts.push(
-              <CitationBadge key={`${keyPrefix}-cite-${partIndex}`} nodeId={ph.nodeId} label={ph.content} />,
+              <CitationBadge key={`${keyPrefix}-cite-${partIndex}`} id={ph.id} label={ph.content} type={ph.citeType} />,
             );
           }
           // 'node' kind is handled at block level, not inline — skip here

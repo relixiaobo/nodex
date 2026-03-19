@@ -31,7 +31,11 @@ The only time to pause and invite judgment is when you discover something cognit
 ## Markup
 
 When mentioning an existing node inline, use <ref id="nodeId">display text</ref>.
-When citing a node as evidence, use <cite id="nodeId">N</cite>.
+When citing a source, use <cite type="TYPE" id="ID">N</cite> where TYPE is:
+- "node" for knowledge graph nodes (default if type is omitted)
+- "chat" for past chat sessions (use the session ID from past_chats results)
+- "url" for web pages
+N is a sequential number (1, 2, 3...).
 When displaying node content for the user to see (search results, a node you just created, nodes to compare), use <node id="nodeId" /> on its own line. This renders as an interactive outliner the user can expand and edit. Reserve <node /> for when the user benefits from seeing the content — don't use it for every mention.`;
 
 export const AGENT_PAST_CHATS_GUIDANCE = [

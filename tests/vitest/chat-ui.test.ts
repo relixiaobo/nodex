@@ -575,7 +575,7 @@ describe('extractInlineMarkup', () => {
     expect(cleaned).toBe('See %%SOMA_0%% and %%SOMA_1%% here.');
     expect(placeholders).toHaveLength(2);
     expect(placeholders[0]).toEqual({ kind: 'ref', nodeId: 'n1', content: 'Node 1' });
-    expect(placeholders[1]).toEqual({ kind: 'cite', nodeId: 'n2', content: '2' });
+    expect(placeholders[1]).toEqual({ kind: 'cite', id: 'n2', content: '2', citeType: 'node' });
   });
 
   it('returns unchanged text when no inline markup is present', () => {

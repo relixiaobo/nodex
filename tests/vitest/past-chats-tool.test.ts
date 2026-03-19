@@ -159,6 +159,7 @@ describe('past_chats tool', () => {
         updatedAt: '2026-03-01T10:00:00.000Z',
         userMessageCount: 2,
       }],
+      next: 'Choose a session id from sessions and call past_chats(sessionId: "...") to browse its user messages.',
     });
   });
 
@@ -204,16 +205,16 @@ describe('past_chats tool', () => {
     } as never);
 
     expect(result.details).toEqual({
-      sessionId: 'session_alpha',
       title: 'Pricing review',
       total: 1,
       offset: 0,
       limit: 10,
-      messages: [{
+      userMessages: [{
         id: expect.any(String),
         text: 'What did we decide for enterprise?',
         createdAt: '1970-01-01T00:00:00.003Z',
       }],
+      next: 'Choose a message id from userMessages and call past_chats(sessionId: "...", messageId: "...") to read the full exchange.',
     });
   });
 
@@ -259,6 +260,7 @@ describe('past_chats tool', () => {
         truncated: true,
         nextOffset: 60,
       },
+      next: 'Use textOffset: nextOffset to continue the assistant response.',
     });
 
     const secondPage = await tool.execute('tool_past_chats', {
@@ -296,7 +298,48 @@ describe('past_chats tool', () => {
     } as never)).rejects.toThrow('Session session_current is the current chat. Use the existing conversation context instead of past_chats.');
 
     await expect(tool.execute('tool_past_chats', {
-      textOffset: 50,
+      textOffset: 0,
     } as never)).rejects.toThrow('textOffset requires messageId.');
+
+    await expect(tool.execute('tool_past_chats', {
+      maxChars: 200,
+    } as never)).rejects.toThrow('maxChars requires messageId.');
+
+    await expect(tool.execute('tool_past_chats', {
+      sessionId: 'session_current',
+      before: '2026-03-20',
+    } as never)).rejects.toThrow('before is only valid when sessionId is omitted.');
+
+    await expect(tool.execute('tool_past_chats', {
+      sessionId: 'session_current',
+      messageId: 'msg_1',
+      query: 'current',
+    } as never)).rejects.toThrow('query is not valid with messageId.');
+  });
+
+  it('returns a boundary when the selected user message has no assistant reply', async () => {
+    const session = buildSession('session_alpha', 'Pending reply', [
+      createUserMessage('Question with no answer yet', 1),
+    ], Date.parse('2026-03-01T10:00:00Z'));
+    await seedSessions([session]);
+
+    const userMessageId = Object.values(session.mapping)
+      .find((node) => node.message?.role === 'user')?.id;
+
+    const tool = createPastChatsTool();
+    const result = await tool.execute('tool_past_chats', {
+      sessionId: 'session_alpha',
+      messageId: userMessageId!,
+    } as never);
+
+    expect(result.details).toEqual({
+      user: {
+        id: userMessageId,
+        text: 'Question with no answer yet',
+        createdAt: '1970-01-01T00:00:00.001Z',
+      },
+      assistant: null,
+      boundary: 'No assistant reply exists after this user message on the active branch.',
+    });
   });
 });

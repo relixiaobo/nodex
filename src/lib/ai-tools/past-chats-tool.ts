@@ -19,34 +19,34 @@ const pastChatsToolParameters = Type.Object({
     description: 'Level 2 only. User message ID to read in detail. Requires sessionId. Returns that user message plus assistant replies until the next user message.',
   })),
   query: Type.Optional(Type.String({
-    description: 'Keyword filter (case-insensitive substring match). Level 0: search session title plus active-branch user and assistant text. Level 1: search user messages inside the session. Use concrete keywords like names, features, or decisions.',
+    description: 'Keyword filter (case-insensitive substring match). Valid for Level 0/1 only. Level 0: search session title plus active-branch user and assistant text. Level 1: search user messages inside the session. Use concrete keywords like names, features, or decisions.',
   })),
   before: Type.Optional(Type.String({
-    description: 'Level 0 only. ISO date or datetime, inclusive upper bound. Examples: "2026-03-15" or "2026-03-15T18:30:00Z".',
+    description: 'Level 0 only. Only valid when sessionId is omitted. ISO date or datetime, inclusive upper bound. Examples: "2026-03-15" or "2026-03-15T18:30:00Z".',
   })),
   after: Type.Optional(Type.String({
-    description: 'Level 0 only. ISO date or datetime, inclusive lower bound. Examples: "2026-03-01" or "2026-03-01T09:00:00+08:00".',
+    description: 'Level 0 only. Only valid when sessionId is omitted. ISO date or datetime, inclusive lower bound. Examples: "2026-03-01" or "2026-03-01T09:00:00+08:00".',
   })),
   limit: Type.Optional(Type.Integer({
     minimum: 1,
     maximum: MAX_LIMIT,
     default: DEFAULT_LIMIT,
-    description: 'Level 0/1 only. Max sessions or messages to return. Default 10, max 20.',
+    description: 'Level 0/1 only. Not valid with messageId. Max sessions or user messages to return. Default 10, max 20.',
   })),
   offset: Type.Optional(Type.Integer({
     minimum: 0,
     default: 0,
-    description: 'Level 0/1 only. Pagination offset for sessions or messages. Default 0.',
+    description: 'Level 0/1 only. Not valid with messageId. Pagination offset for sessions or user messages. Default 0.',
   })),
   maxChars: Type.Optional(Type.Integer({
     minimum: 1,
     default: DEFAULT_MAX_CHARS,
-    description: 'Level 2 only. Max assistant-response characters to return. Default 2000. Use with textOffset when the previous result was truncated.',
+    description: 'Level 2 only. Requires messageId. Max assistant-response characters to return. Default 2000. Use with textOffset when the previous result was truncated.',
   })),
   textOffset: Type.Optional(Type.Integer({
     minimum: 0,
     default: DEFAULT_TEXT_OFFSET,
-    description: 'Level 2 only. Character offset into the assistant response. Default 0. Requires messageId.',
+    description: 'Level 2 only. Requires messageId. Character offset into the assistant response. Default 0.',
   })),
 });
 
@@ -206,9 +206,14 @@ async function listSessionSummaries(
     offset,
     limit,
     sessions: summaries.slice(offset, offset + limit),
+    ...(summaries.length > 0
+      ? {
+        next: 'Choose a session id from sessions and call past_chats(sessionId: "...") to browse its user messages.',
+      }
+      : {}),
     ...(query && summaries.length === 0
       ? {
-        hint: `No past chats match query "${params.query}". Try different keywords or use past_chats() to browse all sessions.`,
+        hint: 'No matching past chats. Try broader keywords or browse all sessions.',
       }
       : {}),
   };
@@ -253,15 +258,19 @@ async function listUserMessagesInSession(
     }));
 
   const result = {
-    sessionId,
     title: session.title?.trim() || '',
     total: messages.length,
     offset,
     limit,
-    messages: messages.slice(offset, offset + limit),
+    userMessages: messages.slice(offset, offset + limit),
+    ...(messages.length > 0
+      ? {
+        next: 'Choose a message id from userMessages and call past_chats(sessionId: "...", messageId: "...") to read the full exchange.',
+      }
+      : {}),
     ...(query && messages.length === 0
       ? {
-        hint: `No user messages in session ${sessionId} match query "${params.query}". Use past_chats(sessionId: "${sessionId}") to browse all user messages.`,
+        hint: 'No matching user messages in this session. Try broader keywords or browse the session without query.',
       }
       : {}),
   };
@@ -311,6 +320,10 @@ async function readMessageDetail(
   const assistant = assistantText.length === 0
     ? null
     : (() => {
+      if (textOffset >= assistantText.length) {
+        throw new Error('textOffset is past the end of the assistant response. Use a smaller offset or omit textOffset to start from the beginning.');
+      }
+
       const text = assistantText.slice(textOffset, textOffset + maxChars);
       const totalLength = assistantText.length;
       const nextOffset = textOffset + maxChars;
@@ -331,6 +344,16 @@ async function readMessageDetail(
       createdAt: toIsoString(userMessage.timestamp),
     },
     assistant,
+    ...(assistant?.truncated
+      ? {
+        next: 'Use textOffset: nextOffset to continue the assistant response.',
+      }
+      : {}),
+    ...(assistant === null
+      ? {
+        boundary: 'No assistant reply exists after this user message on the active branch.',
+      }
+      : {}),
   };
 
   return {
@@ -343,11 +366,35 @@ async function executePastChatsTool(
   params: PastChatsToolParams,
   runtime: PastChatsToolRuntime,
 ): Promise<AgentToolResult<unknown>> {
+  if (params.before !== undefined && params.sessionId) {
+    throw new Error('before is only valid when sessionId is omitted. Use past_chats() to browse sessions by time range.');
+  }
+
+  if (params.after !== undefined && params.sessionId) {
+    throw new Error('after is only valid when sessionId is omitted. Use past_chats() to browse sessions by time range.');
+  }
+
   if (params.messageId && !params.sessionId) {
     throw new Error('messageId requires sessionId. Use past_chats() to browse sessions first.');
   }
 
-  if (params.textOffset && !params.messageId) {
+  if (params.query !== undefined && params.messageId) {
+    throw new Error('query is not valid with messageId. First browse user messages, then read one message in detail.');
+  }
+
+  if (params.limit !== undefined && params.messageId) {
+    throw new Error('limit is not valid with messageId. Level 2 returns a single user message plus assistant reply detail.');
+  }
+
+  if (params.offset !== undefined && params.messageId) {
+    throw new Error('offset is not valid with messageId. Level 2 reads a single user message plus assistant reply detail.');
+  }
+
+  if (params.maxChars !== undefined && !params.messageId) {
+    throw new Error('maxChars requires messageId. Use past_chats(sessionId: "...", messageId: "...") to read a specific reply.');
+  }
+
+  if (params.textOffset !== undefined && !params.messageId) {
     throw new Error('textOffset requires messageId. Use past_chats(sessionId: "...", messageId: "...") to read a specific reply.');
   }
 
@@ -373,12 +420,13 @@ export function createPastChatsTool(runtime: PastChatsToolRuntime = {}): AgentTo
       '',
       'Modes:',
       '- No sessionId: list sessions (title, updatedAt, userMessageCount).',
-      '- sessionId only: list user messages from that session for quick scanning.',
+      '- sessionId only: list userMessages from that session for quick scanning.',
       '- sessionId + messageId: read that user message plus assistant replies until the next user message.',
       '',
       'Defaults and limits:',
       '- limit defaults to 10 and maxes at 20.',
       '- Assistant response pagination uses maxChars (default 2000) and textOffset.',
+      '- Invalid parameter combinations fail fast instead of being silently ignored.',
       '',
       'Guidance:',
       '- Browse with past_chats() before drilling in.',

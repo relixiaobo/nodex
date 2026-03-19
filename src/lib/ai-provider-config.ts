@@ -287,14 +287,16 @@ export function getAvailableModels(): Model<Api>[] {
       : [];
 
     // Custom models from the provider's Models field
+    // Always use openai-completions for custom models — it's the universal
+    // OpenAI-compatible format. openai-responses is OpenAI-specific and
+    // third-party providers (DeepSeek, Qwen, Ollama, etc.) don't support it.
     const customModelIds = readListFieldValues(config.nodeId, NDX_F.PROVIDER_MODELS);
     const sdkModelIdSet = new Set(sdkModels.map((m) => m.id));
-    const api = customModelIds.length > 0 ? getProviderApiType(provider) : ('' as Api);
     const baseUrl = config.baseUrl ?? sdkModels[0]?.baseUrl ?? '';
 
     const customModels = customModelIds
       .filter((modelId) => !sdkModelIdSet.has(modelId))
-      .map((modelId) => buildCustomModel(modelId, provider, api, baseUrl));
+      .map((modelId) => buildCustomModel(modelId, provider, 'openai-completions' as Api, baseUrl));
 
     return [...sdkModels, ...customModels];
   });
